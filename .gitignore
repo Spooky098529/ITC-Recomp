@@ -1,0 +1,6 @@
+# Game files (copyrighted, supply your own copy)
+/itc/
+
+# Build output and code regenerated from the XEX on every build
+/itc_recomp/out/
+/itc_recomp/generated/
