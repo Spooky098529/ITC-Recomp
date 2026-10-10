@@ -12,4 +12,5 @@ export LD_LIBRARY_PATH=../rexglue-sdk/out/linux-amd64${LD_LIBRARY_PATH:+:$LD_LIB
 exec ./out/build/linux-amd64-release/itc \
   --gpu_plugin=xenos \
   --game_data_root="../itc/Import Tuner Challenge (USA)" \
+  --mnk_mode=true \
   "$@"
