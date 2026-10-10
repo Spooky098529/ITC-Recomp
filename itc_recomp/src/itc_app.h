@@ -16,14 +16,6 @@ class ItcApp : public rex::ReXApp {
         PPCImageConfig));
   }
 
-  // With no --game_data_root, use the executable's own folder, so the build
-  // can be dropped into the game folder next to default.xex.
-  void OnConfigurePaths(rex::PathConfig& paths) override {
-    if (paths.game_data_root.empty()) {
-      paths.game_data_root = rex::filesystem::GetExecutableFolder();
-    }
-  }
-
   // Override virtual hooks for customization:
   // void OnPostInitLogging() override {}
   // void OnPreSetup(rex::RuntimeConfig& config) override {}
