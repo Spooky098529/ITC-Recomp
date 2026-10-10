@@ -8,6 +8,27 @@ project(itc LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Apply this project's patches to the rexglue-sdk submodule, skipping any
+# already applied. See patches/rexglue-sdk/ for what each one works around.
+if(REXSDK_DIR)
+    file(GLOB ITC_SDK_PATCHES "${CMAKE_CURRENT_SOURCE_DIR}/../patches/rexglue-sdk/*.patch")
+    list(SORT ITC_SDK_PATCHES)
+    foreach(patch IN LISTS ITC_SDK_PATCHES)
+        execute_process(
+            COMMAND git -C "${REXSDK_DIR}" apply --reverse --check "${patch}"
+            RESULT_VARIABLE already_applied OUTPUT_QUIET ERROR_QUIET)
+        if(NOT already_applied EQUAL 0)
+            execute_process(
+                COMMAND git -C "${REXSDK_DIR}" apply "${patch}"
+                RESULT_VARIABLE apply_result)
+            if(NOT apply_result EQUAL 0)
+                message(FATAL_ERROR "Failed to apply SDK patch ${patch}")
+            endif()
+            message(STATUS "Applied SDK patch ${patch}")
+        endif()
+    endforeach()
+endif()
+
 include(generated/rexglue.cmake)
 
 # Sources
