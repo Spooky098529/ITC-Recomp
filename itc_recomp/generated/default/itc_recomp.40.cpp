@@ -6015,7 +6015,9 @@ loc_8218E4D8:
 	// beq cr6,0x8218e514
 	if (ctx.cr6.eq) goto loc_8218E514;
 	// cmplwi cr6,r11,60
-	ctx.cr6.compare<uint32_t>(ctx.r11.u32, 60, ctx.xer);
+	// PATCH: 60 -> 1. Too many loading-check cycles leaves a black screen
+	// after quest races on fast hardware (Gliniak's Xenia patch, xenia-project/game-compatibility#651).
+	ctx.cr6.compare<uint32_t>(ctx.r11.u32, 1, ctx.xer);
 	// blt cr6,0x8218e514
 	if (ctx.cr6.lt) goto loc_8218E514;
 	// li r11,0
