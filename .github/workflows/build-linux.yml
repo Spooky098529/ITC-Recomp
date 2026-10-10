@@ -1,0 +1,113 @@
+name: Build Linux
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    # Build inside 22.04 so the binary needs glibc 2.35 at most, like the SDK's
+    # own Linux builds; 24.04 would raise that to 2.38.
+    container: ubuntu:22.04
+    env:
+      DEBIAN_FRONTEND: noninteractive
+    steps:
+      # The container starts bare, and checkout needs git before it can clone.
+      - name: Bootstrap container
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            ca-certificates curl wget gnupg git git-lfs zip
+          git config --global --add safe.directory '*'
+
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      # Same dependencies as the SDK's linux-amd64 CI.
+      - name: Install clang 20
+        run: |
+          apt-get install -y --no-install-recommends software-properties-common lsb-release
+          wget -qO llvm.sh https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          ./llvm.sh 20
+          apt-get install -y clang-20 lld-20
+          update-alternatives --install /usr/bin/clang clang /usr/bin/clang-20 200
+          update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-20 200
+
+      - name: Install build dependencies
+        run: |
+          wget -qO- https://packages.lunarg.com/lunarg-signing-key-pub.asc | tee /etc/apt/trusted.gpg.d/lunarg.asc
+          wget -qO /etc/apt/sources.list.d/lunarg-vulkan-jammy.list http://packages.lunarg.com/vulkan/lunarg-vulkan-jammy.list
+          # jammy's libstdc++ 11 has no <format>, and its cmake is 3.22 against a 3.25 minimum
+          add-apt-repository -y ppa:ubuntu-toolchain-r/test
+          wget -qO- https://apt.kitware.com/keys/kitware-archive-latest.asc | gpg --dearmor -o /usr/share/keyrings/kitware.gpg
+          echo "deb [signed-by=/usr/share/keyrings/kitware.gpg] https://apt.kitware.com/ubuntu/ jammy main" > /etc/apt/sources.list.d/kitware.list
+          apt-get update
+          apt-get install -y cmake ninja-build build-essential g++-13 git curl unzip zip autoconf python3-venv \
+            libgtk-3-dev libx11-xcb-dev libxss-dev vulkan-sdk \
+            libwayland-dev libwayland-bin wayland-protocols libxkbcommon-dev libdecor-0-dev \
+            libasound2-dev libpulse-dev libpipewire-0.3-dev
+
+      - name: Set up sccache
+        uses: hendrikmuhs/ccache-action@v1.2.22
+        with:
+          variant: sccache
+          key: itc-linux-amd64
+
+      - name: Configure
+        working-directory: itc_recomp
+        run: >
+          cmake --preset linux-amd64-release
+          -DCMAKE_C_COMPILER_LAUNCHER=sccache
+          -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
+
+      - name: Build
+        working-directory: itc_recomp
+        run: cmake --build out/build/linux-amd64-release --parallel
+
+      - name: Package
+        id: package
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            version="${GITHUB_REF_NAME}"
+          else
+            version="$(git rev-parse --short HEAD)"
+          fi
+          name="itc-${version}-linux-amd64"
+          mkdir -p "dist/${name}"
+          cp itc_recomp/out/build/linux-amd64-release/{itc,librexruntime.so,librexgpu-xenos.so} "dist/${name}/"
+
+          # Fail if the executable needs a library the zip doesn't carry.
+          missing=$(cd "dist/${name}" && ldd ./itc | grep 'not found' || true)
+          if [[ -n "$missing" ]]; then
+            echo "Missing libraries:"; echo "$missing"; exit 1
+          fi
+
+          (cd "dist/${name}" && zip -9 "../${name}.zip" itc librexruntime.so librexgpu-xenos.so)
+          echo "name=${name}" >> "$GITHUB_OUTPUT"
+
+      - name: sccache stats
+        if: always()
+        run: sccache --show-stats || true
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.package.outputs.name }}
+          path: dist/${{ steps.package.outputs.name }}.zip
+
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/${{ steps.package.outputs.name }}.zip
+          generate_release_notes: true
