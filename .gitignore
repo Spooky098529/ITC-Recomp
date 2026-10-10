@@ -1,6 +1,11 @@
 # Game files (copyrighted, supply your own copy)
 /itc/
 
-# Build output and code regenerated from the XEX on every build
+# Build output
 /itc_recomp/out/
-/itc_recomp/generated/
+
+# Codegen bookkeeping with machine-specific absolute paths. The generated code
+# itself is committed and hand-edited; the build never reruns codegen.
+/itc_recomp/generated/default/codegen.d
+/itc_recomp/generated/default/codegen.stamp
+/itc_recomp/generated/default/codegen.build.stamp
