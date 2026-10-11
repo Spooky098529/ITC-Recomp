@@ -4,7 +4,9 @@
 // generated definitions are weak, so these take their place at link time.
 // See docs/functions.md for what is known about each address.
 
+#include "debug/state_capture.h"
 #include "guest.h"
+#include "interpolation/interpolator.h"
 
 namespace {
 
@@ -27,5 +29,7 @@ float Vehicle_GetSpeedKmh(uint8_t* base, uint32_t vehicle) {
 extern "C" REX_FUNC(sub_820C0128) {
   REX_FUNC_PROLOGUE();
   ctx.fpscr.disableFlushMode();
+  debug::StateCapture_OnVehicleSeen(ctx.r3.u32);
+  interpolation::Interpolation_OnVehicleSeen(ctx.r3.u32);
   ctx.f1.f64 = double(Vehicle_GetSpeedKmh(base, ctx.r3.u32));
 }

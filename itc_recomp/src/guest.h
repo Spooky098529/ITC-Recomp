@@ -29,6 +29,10 @@ inline float LoadFloat(uint8_t* base, uint32_t address) {
   return std::bit_cast<float>(REX_LOAD_U32(address));
 }
 
+inline void StoreFloat(uint8_t* base, uint32_t address, float value) {
+  REX_STORE_U32(address, std::bit_cast<uint32_t>(value));
+}
+
 // Reserves space on the guest stack for the lifetime of the object, for
 // guest functions that take pointers to locals. Mirrors a guest prologue.
 class StackFrame {

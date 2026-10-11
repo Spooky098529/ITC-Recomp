@@ -37,6 +37,9 @@ set(ITC_SOURCES
     src/hooks/vehicle.cpp
     src/frame_pacing/frame_pacer.cpp
     src/frame_pacing/renderer_hooks.cpp
+    src/debug/state_capture.cpp
+    src/interpolation/interpolator.cpp
+    src/interpolation/transform.cpp
 )
 
 if(WIN32)

@@ -7,8 +7,10 @@
 // releases game logic. Logic stays paused while frames are drawn, as before,
 // so drawing never sees a half-updated scene.
 
+#include "debug/state_capture.h"
 #include "frame_pacer.h"
 #include "guest.h"
+#include "interpolation/interpolator.h"
 
 namespace {
 
@@ -39,9 +41,12 @@ void Event_Signal(PPCContext& ctx, uint8_t* base, uint32_t event) {
 }
 
 void Renderer_DrawFrame(PPCContext& ctx, uint8_t* base, uint32_t renderer) {
-  GetFramePacer().OnFrameStarted();
+  auto& pacer = GetFramePacer();
+  pacer.OnFrameStarted();
+  interpolation::Interpolation_BeginFrame(base, pacer.TickProgress());
   ctx.r3.u64 = renderer;
   sub_82091E58(ctx, base);
+  interpolation::Interpolation_EndFrame(base);
 }
 
 bool Renderer_IsRunning(uint8_t* base, uint32_t renderer) {
@@ -52,6 +57,8 @@ void Renderer_ThreadLoop(PPCContext& ctx, uint8_t* base, uint32_t renderer) {
   auto& pacer = GetFramePacer();
   while (Renderer_IsRunning(base, renderer)) {
     Event_Wait(ctx, base, renderer + kRendererTickDoneEventOffset);
+    debug::StateCapture_OnTickDone(base);
+    interpolation::Interpolation_OnTickDone(base);
 
     Renderer_DrawFrame(ctx, base, renderer);
     while (pacer.WaitForNextFrame()) {

@@ -74,3 +74,27 @@ Also 48 functions load 30.0 and 12 load 60.0. These are likely
 frames-per-second conversions or timers counted in frames, but each one needs
 checking. Integer frame counters (for example `cmpwi r11,60`) aren't
 included in these counts.
+
+## Known data
+
+| Address | What | Notes |
+|---|---|---|
+| vehicle+0x30 | Speed (float, m/s) | Read by `Vehicle::GetSpeedKmh`. |
+| vehicle+0xD0 | Vehicle world matrix | 4x4 row-major: rotation rows, then position row (w = 1). The car's forward axis is -row 0. |
+| vehicle+0xCF0 | Copy of the world matrix | Identical every tick; not yet known which one drawing reads. |
+| `0x826BAC10` | Camera view matrix | Global in the game's data section; 4x4 row-major view matrix. The camera position is -t·Rᵀ. In the car's frame the views sit at (-5.48, 1.34, 0) for chase, (-0.44, 0.67, 0) for bumper and (-0.26, 0.85, -0.38) for cockpit. Drawing does not read it (raising it 3 m between ticks changed nothing). |
+| `0x826BAC00` | Camera pass array | 21 objects of 592 bytes. Pass settings at +564 to +588, active flag at +588. |
+
+## Render command recording
+
+The game records render commands during the logic tick, on the main thread,
+and the render thread only replays them. Matrices are copied into the
+commands at record time, so changing them between ticks doesn't affect what
+is drawn. Recording happens inside `sub_820C5DE8` (5,600 lines, also game
+logic), which calls `sub_8209F8A0` and `sub_8209F900`. Those loop over the
+active camera passes and record them with `sub_820A0CC0` and `sub_820A1C30`,
+which allocate command packets with `sub_8258CAA0`.
+
+Interpolation (`src/interpolation/`) therefore needs to substitute matrices
+while the recorded commands are replayed. The command format is the next
+thing to work out.
