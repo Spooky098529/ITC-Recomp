@@ -54,7 +54,14 @@ struct RigidMotion {
   // away) would swing the in-between camera sideways.
   std::optional<Vec3> pivot;
 };
-std::optional<RigidMotion> FindRigidMotion(const Matrix4& a, const Matrix4& b);
+struct RigidMotionOptions {
+  // Solve the motion from the well-conditioned columns (0, 1, 3) first.
+  bool stable_solver = true;
+  // Blend turns about the eye of a perspective matrix.
+  bool eye_pivot = true;
+};
+std::optional<RigidMotion> FindRigidMotion(const Matrix4& a, const Matrix4& b,
+                                           const RigidMotionOptions& options = {});
 Matrix4 BlendRigidMotion(const RigidMotion& motion, float amount);
 
 // General 4x4 matrix helpers (computed in double precision).

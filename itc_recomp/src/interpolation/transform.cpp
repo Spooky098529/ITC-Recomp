@@ -351,13 +351,17 @@ std::optional<Matrix4d> SolveRigidFromWellConditionedColumns(const Matrix4d& a,
   return d;
 }
 
-std::optional<RigidMotion> FindRigidMotion(const Matrix4& a_in, const Matrix4& b_in) {
+std::optional<RigidMotion> FindRigidMotion(const Matrix4& a_in, const Matrix4& b_in,
+                                           const RigidMotionOptions& options) {
   Matrix4d a = ToDouble(a_in);
   Matrix4d b = ToDouble(b_in);
-  if (std::optional<Matrix4d> d = SolveRigidFromWellConditionedColumns(a, b);
-      d && IsRigidRowLayout(*d)) {
-    if (std::optional<Transform> motion = TransformFromWorldMatrix(ToFloat(*d))) {
-      return RigidMotion{a_in, *motion, true, false, EyePoint(b)};
+  if (options.stable_solver) {
+    if (std::optional<Matrix4d> d = SolveRigidFromWellConditionedColumns(a, b);
+        d && IsRigidRowLayout(*d)) {
+      if (std::optional<Transform> motion = TransformFromWorldMatrix(ToFloat(*d))) {
+        return RigidMotion{a_in, *motion, true, false,
+                           options.eye_pivot ? EyePoint(b) : std::nullopt};
+      }
     }
   }
   std::optional<Matrix4d> a_inverse = Inverse(a);
@@ -377,7 +381,7 @@ std::optional<RigidMotion> FindRigidMotion(const Matrix4& a_in, const Matrix4& b
         continue;
       }
       RigidMotion rigid{a_in, *motion, applied_first, column_layout, std::nullopt};
-      if (applied_first && !column_layout) {
+      if (applied_first && !column_layout && options.eye_pivot) {
         rigid.pivot = EyePoint(b);
       }
       return rigid;

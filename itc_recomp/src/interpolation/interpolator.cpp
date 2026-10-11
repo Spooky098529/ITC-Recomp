@@ -33,6 +33,9 @@ REXCVAR_DEFINE_BOOL(interpolate_debug_hide_cycle, false, "ITC",
 REXCVAR_DEFINE_STRING(interpolate_debug_dump, "", "ITC",
                       "Debug: file to write two consecutive ticks' replayed uploads to, "
                       "20 s into the first race");
+REXCVAR_DEFINE_BOOL(interpolate_debug_ab_cycle, false, "ITC",
+                    "Debug: cycle 5 s each through blending variants A-D (see "
+                    "interpolator.cpp)");
 REXCVAR_DEFINE_STRING(interpolate_recorders, "", "ITC",
                       "Debug: comma-separated recorder addresses (hex) to interpolate; empty "
                       "means all");
@@ -131,6 +134,7 @@ class Interpolator {
 
   void OnTickDone(uint8_t* base) {
     blends_.clear();
+    UpdateAbCycle();
     if (!REXCVAR_GET(interpolate) || scene_ == 0) {
       replayed_.clear();
       return;
@@ -179,7 +183,7 @@ class Interpolator {
       return;
     }
     auto it = blends_.find(payload);
-    if (it == blends_.end()) {
+    if (it == blends_.end() || ab_disabled_) {
       upload();
       return;
     }
@@ -316,7 +320,7 @@ class Interpolator {
       float best_size = std::numeric_limits<float>::infinity();
       for (size_t c = 0; c < tested; c++) {
         Matrix4 before = MatrixFromBits(previous_cameras_[candidates[c].second]);
-        std::optional<RigidMotion> motion = FindRigidMotion(before, now);
+        std::optional<RigidMotion> motion = FindRigidMotion(before, now, rigid_options_);
         if (!motion) {
           continue;
         }
@@ -391,7 +395,7 @@ class Interpolator {
   // register (the camera's view-projection often follows a leading vector),
   // so every register offset is tried; matches don't overlap.
   static Blend FindBlendable(const std::vector<float>& a, const std::vector<float>& b,
-                             std::vector<bool> used) {
+                             std::vector<bool> used, const RigidMotionOptions& options) {
     Blend blend{};
     for (size_t start = 0; start + kFloatsPerMatrix <= a.size(); start += kFloatsPerRegister) {
       if (used[start]) {
@@ -405,7 +409,7 @@ class Interpolator {
       if (ma == mb) {
         continue;
       }
-      if (std::optional<RigidMotion> motion = FindRigidMotion(ma, mb)) {
+      if (std::optional<RigidMotion> motion = FindRigidMotion(ma, mb, options)) {
         blend.matrices.push_back({start, *motion});
         std::fill(used.begin() + start, used.begin() + start + kFloatsPerMatrix, true);
         start += kFloatsPerMatrix - kFloatsPerRegister;
@@ -438,6 +442,7 @@ class Interpolator {
       }
       Snapshot snapshot{recorded.payload, recorded.upload.Signature(), std::nullopt, {}};
       snapshot.tag = DrawTags_Find(recorded.payload);
+      race_seen_ |= snapshot.tag && snapshot.tag->recorder == 0x825953D0;
       if (!snapshot.tag) {
         // Recorded outside the wrapped recorders: the few global uploads
         // (such as the main camera), recorded in the same order each tick.
@@ -501,7 +506,7 @@ class Interpolator {
         continue;
       }
       recorder_stats.plausible++;
-      Blend blend = FindBlendable(it->second->values, current[i].values, used);
+      Blend blend = FindBlendable(it->second->values, current[i].values, used, rigid_options_);
       if (blend.matrices.empty() && blend.positions.empty()) {
         continue;  // nothing more to blend
       }
@@ -568,6 +573,38 @@ class Interpolator {
   }
   int dump_race_ticks_ = 0;
   bool dump_done_ = false;
+
+  // Debug A/B cycle: 5 s each of (A) stable solver + eye pivot, (B) stable
+  // solver only, (C) the earlier solver, (D) no interpolation.
+  void UpdateAbCycle() {
+    rigid_options_ = {};
+    ab_disabled_ = false;
+    if (!REXCVAR_GET(interpolate_debug_ab_cycle)) {
+      return;
+    }
+    if (!ab_started_) {
+      if (!race_seen_) {
+        return;  // start with the race
+      }
+      ab_started_ = true;
+      ab_start_ = std::chrono::steady_clock::now();
+    }
+    auto elapsed = std::chrono::steady_clock::now() - ab_start_;
+    int phase = int(std::chrono::duration_cast<std::chrono::seconds>(elapsed).count() / 5) % 4;
+    rigid_options_.stable_solver = phase <= 1;
+    rigid_options_.eye_pivot = phase == 0;
+    ab_disabled_ = phase == 3;
+    if (phase != ab_logged_phase_) {
+      REXLOG_INFO("interpolation: A/B phase {}", "ABCD"[phase]);
+      ab_logged_phase_ = phase;
+    }
+  }
+  RigidMotionOptions rigid_options_;
+  bool ab_disabled_ = false;
+  bool ab_started_ = false;
+  bool race_seen_ = false;
+  int ab_logged_phase_ = -1;
+  std::chrono::steady_clock::time_point ab_start_;
 
   // Debug hide cycle: which recorder (if any) is hidden right now.
   static constexpr uint32_t kHideCycle[] = {0x825953D0, 0x8209C1A0, 0x82146BD0, 0x820CECA0};
