@@ -30,11 +30,16 @@
 #include <rex/logging.h>
 
 #include <algorithm>
+#include <chrono>
 #include <string>
 #include <vector>
 
 REXCVAR_DEFINE_BOOL(debug_redraw_twice, false, "ITC",
                     "Debug: run the draw step twice per tick (should look identical)");
+REXCVAR_DEFINE_BOOL(debug_rerecord, true, "ITC",
+                    "Debug: re-record the scene for extra frames (off: redraw the last frame)");
+REXCVAR_DEFINE_BOOL(debug_keep_hud, true, "ITC",
+                    "Debug: keep the tick's HUD in re-recorded frames");
 
 namespace frame_pacing {
 namespace {
@@ -225,8 +230,36 @@ void ToggleReplayIndex(uint8_t* base, uint32_t state) {
 }  // namespace
 
 bool DrawStep_CanRerecord() {
-  return Current().valid;
+  return Current().valid && REXCVAR_GET(debug_rerecord);
 }
+
+namespace {
+// Counts logged once a second.
+struct Counts {
+  int rerecords = 0;
+  int hud_kept = 0;
+  int hud_failed = 0;
+  size_t hud_nodes = 0;
+  std::chrono::steady_clock::time_point last_log{};
+};
+Counts& GetCounts() {
+  static Counts counts;
+  return counts;
+}
+void LogCounts() {
+  Counts& c = GetCounts();
+  auto now = std::chrono::steady_clock::now();
+  if (now - c.last_log < std::chrono::seconds(1)) {
+    return;
+  }
+  if (c.rerecords > 0) {
+    REXLOG_INFO("draw step: {} re-records, HUD kept {} failed {} ({} nodes last)", c.rerecords,
+                c.hud_kept, c.hud_failed, c.hud_nodes);
+  }
+  c = {};
+  c.last_log = now;
+}
+}  // namespace
 
 bool DrawStep_Rerecord(PPCContext& ctx, uint8_t* base) {
   State& s = Current();
@@ -236,10 +269,18 @@ bool DrawStep_Rerecord(PPCContext& ctx, uint8_t* base) {
   RestoreBeforeDrawStep(base, s);
   ctx.r3.u64 = s.argument;
   __imp__sub_8215B4F8(ctx, base);
+  Counts& counts = GetCounts();
+  counts.rerecords++;
+  counts.hud_nodes = s.after_draw_nodes.size();
+  LogCounts();
+  if (!REXCVAR_GET(debug_keep_hud)) {
+    return false;
+  }
 
   // Put back what the tick recorded after the draw step. Its bytes must not
   // have been overwritten by a longer re-run.
   if (WritePointer(base, s) > s.write_pointer_after_draw) {
+    counts.hud_failed++;
     return false;  // the HUD's bytes were overwritten; show the scene without it
   }
   uint32_t start = StartOfDrawStep(s);
@@ -250,9 +291,11 @@ bool DrawStep_Rerecord(PPCContext& ctx, uint8_t* base) {
                   s.official_list_header[kCommandListWritePointerOffset / 4]);
   for (const Node& node : s.after_draw_nodes) {
     if (!AppendNode(base, s, node)) {
+      counts.hud_failed++;
       return false;
     }
   }
+  counts.hud_kept++;
   return true;
 }
 
