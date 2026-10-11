@@ -270,6 +270,17 @@ class CameraProductLog {
 
 class DrawState {
  public:
+  // Main thread, after a matrix multiply outside Draw whose second operand
+  // is a camera's view-projection: game logic prepared world *
+  // view-projection for something drawn later (the scenery does this).
+  void OnCameraProduct(uint8_t* base, uint32_t out, uint32_t world, uint32_t view_projection) {
+    if (in_draw_ || !IsCameraViewProjection(view_projection) || products_pending_.size() >= 4096) {
+      return;
+    }
+    int pass = int((view_projection - kCameraPasses) / kCameraPassBytes);
+    products_pending_.push_back({out, pass, LoadMatrix(base, world), LoadMatrix(base, out)});
+  }
+
   bool in_draw() const { return in_draw_; }
   CameraProductLog& camera_products() { return camera_products_; }
 
@@ -290,14 +301,27 @@ class DrawState {
     if (!enabled_) {
       return;
     }
+    std::array<std::optional<Matrix4>, kCameraPassCount> blended{};
     for (const CameraBlend& camera : camera_blends_) {
       uint32_t pass = CameraPass(camera.pass);
       Matrix4 view = ViewMatrixFromTransform(Blend(camera.from, camera.to, amount_));
+      Matrix4 view_projection = Multiply(view, camera.projection);
       Save(base, pass + kViewOffset);
       Save(base, pass + kViewProjectionOffset);
       StoreMatrix(base, pass + kViewOffset, view);
-      StoreMatrix(base, pass + kViewProjectionOffset, Multiply(view, camera.projection));
+      StoreMatrix(base, pass + kViewProjectionOffset, view_projection);
+      blended[camera.pass] = view_projection;
       counts_.cameras++;
+    }
+    // Products game logic made with a camera, still in place: redo them with
+    // the blended camera.
+    for (const CameraProduct& product : products_) {
+      if (!blended[product.pass] || LoadMatrix(base, product.out) != product.value) {
+        continue;
+      }
+      Save(base, product.out);
+      StoreMatrix(base, product.out, Multiply(product.world, *blended[product.pass]));
+      counts_.products++;
     }
   }
 
@@ -357,6 +381,13 @@ class DrawState {
     Matrix4 projection;
   };
 
+  struct CameraProduct {
+    uint32_t out;
+    int pass;
+    Matrix4 world;
+    Matrix4 value;  // world * the pass's view-projection, as game logic left it
+  };
+
   struct ObjectKey {
     uint32_t address;
     int occurrence;  // times this address was recorded earlier in the Draw
@@ -385,6 +416,8 @@ class DrawState {
     }
     objects_last_tick_ = std::move(objects_this_tick_);
     objects_this_tick_.clear();
+    products_ = std::move(products_pending_);
+    products_pending_.clear();
   }
 
   // The camera of a pass whose view-projection is its view * projection (set
@@ -427,9 +460,9 @@ class DrawState {
     }
     int draws = std::max(counts_.draws, 1);
     REXLOG_INFO(
-        "blend state: {} draws; per draw {} cameras, {} objects ({} unmatched, {} not "
-        "transforms); {} camera cuts, {} object cuts",
-        counts_.draws, counts_.cameras / draws, counts_.objects / draws,
+        "blend state: {} draws; per draw {} cameras, {} camera products, {} objects ({} "
+        "unmatched, {} not transforms); {} camera cuts, {} object cuts",
+        counts_.draws, counts_.cameras / draws, counts_.products / draws, counts_.objects / draws,
         counts_.objects_unmatched / draws, counts_.objects_not_transforms / draws,
         counts_.camera_cuts, counts_.object_cuts);
     counts_ = {};
@@ -449,6 +482,9 @@ class DrawState {
   std::unordered_map<ObjectKey, ScaledTransform, ObjectKeyHash> objects_this_tick_;
   std::unordered_map<uint32_t, int> recorded_;
 
+  std::vector<CameraProduct> products_pending_;  // made since the last tick's Draw
+  std::vector<CameraProduct> products_;
+
   std::vector<std::pair<uint32_t, Matrix4>> saved_;
   std::vector<std::pair<uint32_t, Matrix4>> object_saved_;
 
@@ -458,6 +494,7 @@ class DrawState {
     int draws = 0;
     int cameras = 0;
     int objects = 0;
+    int products = 0;
     int objects_unmatched = 0;
     int objects_not_transforms = 0;
     int camera_cuts = 0;
@@ -497,5 +534,7 @@ extern "C" REX_FUNC(sub_8209BD50) {
   auto& state = interpolation::GetDrawState();
   state.camera_products().OnMultiply(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, uint32_t(ctx.lr),
                                      state.in_draw());
+  uint32_t out = ctx.r3.u32, a = ctx.r4.u32, b = ctx.r5.u32;
   __imp__sub_8209BD50(ctx, base);
+  state.OnCameraProduct(base, out, a, b);
 }
