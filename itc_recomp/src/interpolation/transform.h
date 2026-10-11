@@ -37,6 +37,18 @@ Matrix4 ViewMatrixFromTransform(const Transform& t);
 // rotations along the shortest arc.
 Transform Blend(const Transform& a, const Transform& b, float amount);
 
+// A world matrix that may also scale each axis: rows 0-2 are the rotation
+// rows times `scale`.
+struct ScaledTransform {
+  Transform transform;
+  Vec3 scale{1, 1, 1};
+};
+// Returns nothing unless column 3 is (0, 0, 0, 1) and the rows, normalised,
+// form a rotation.
+std::optional<ScaledTransform> ScaledTransformFromWorldMatrix(const Matrix4& m);
+Matrix4 WorldMatrixFromScaledTransform(const ScaledTransform& t);
+ScaledTransform Blend(const ScaledTransform& a, const ScaledTransform& b, float amount);
+
 // Blends between two 4x4 matrices that differ by a rigid motion, such as
 // view-projection or world-view-projection matrices from consecutive ticks:
 // a * D or D * a for a rotation plus translation D, in either layout. Blends

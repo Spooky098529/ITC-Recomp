@@ -1,15 +1,25 @@
-// Game logic prepares the matrices the draw step reads, at stable addresses:
-// each camera pass's view-projection (+0x90 of the 21 pass objects at
-// 0x826BAC00), and a render-state block (0x70180000-0x70190000) holding
-// copies of those and per-object transforms such as the cars' body and
-// wheels. Other object matrices are handed to the per-object recorder
-// (sub_825953D0, r4 and r5).
+// What the draw step reads (measured in a race, --dump_draw_state):
 //
-// After each tick, every such 4x4 matrix that moved rigidly since the
-// previous tick is paired with itself by address (the same object every
-// tick), and before each Draw it's replaced with a blend of the two (with
-// the eye-pivot maths in transform.h), then restored. Copies of a matrix
-// get identical blends, so everything drawn with a camera stays together.
+// - Camera passes: 21 objects of 592 bytes at 0x826BAC00, each with a view
+//   matrix at +0x10, a projection at +0x50 and their product (view *
+//   projection) at +0x90. Pass 0 is the main 1280x720 camera; game logic
+//   sets it during Update. Some passes (the car reflection and shadow maps)
+//   are recomputed inside Draw from other state.
+// - Objects: Draw works out each object's world matrix (often into a
+//   temporary on its stack) and hands it to the per-object recorder
+//   (sub_825953D0) with the camera's view-projection; the recorder copies
+//   world * view-projection and world into the command list.
+//
+// So, the usual engine interpolation: before Draw, each camera whose
+// view-projection is view * projection is moved to a blend of its last two
+// ticks' positions and rotations, and its view and view-projection are
+// rebuilt. In the recorder, each object's world matrix is blended with its
+// previous tick's, matched by address and by how many times that address has
+// been recorded in this Draw (the draw step visits objects in the same order
+// every tick). Everything is put back afterwards.
+//
+// Drawing runs a tick behind: the logic pass draws the previous tick (amount
+// 0) and the passes after it move towards the current one.
 
 #include "blend_state.h"
 
@@ -22,44 +32,40 @@
 #include <rex/logging.h>
 
 #include <algorithm>
-#include <array>
 #include <chrono>
-#include <cstring>
+#include <cmath>
 #include <fstream>
-#include <string>
-#include <mutex>
 #include <optional>
-#include <set>
+#include <string>
 #include <unordered_map>
 #include <vector>
 
 REXCVAR_DEFINE_BOOL(interpolate_draw_state, true, "ITC",
-                    "Smooth motion between 30 Hz ticks in races by blending the matrices "
-                    "the draw step reads");
+                    "Smooth motion between 30 Hz ticks in races by blending cameras and "
+                    "object transforms");
 REXCVAR_DEFINE_BOOL(log_blend_state, false, "ITC",
-                    "Log how many matrices were blended, once a second");
+                    "Log how many cameras and objects were blended, once a second");
 REXCVAR_DEFINE_STRING(dump_draw_state, "", "ITC",
-                      "Folder to dump the draw step's matrix memory to, before and after "
-                      "Draw, for 60 race ticks starting 20 s into the first race");
-REXCVAR_DEFINE_BOOL(log_blend_detail, false, "ITC",
-                    "Log why candidate matrices were or weren't blended, once a second");
+                      "Folder to dump the camera passes and the draw step's stack to, before "
+                      "and after Draw, for 60 race ticks starting 20 s into the first race");
 
 namespace interpolation {
 namespace {
 
-struct Region {
-  uint32_t start;
-  uint32_t end;
-};
+constexpr uint32_t kCameraPasses = 0x826BAC00;
+constexpr int kCameraPassCount = 21;
+constexpr uint32_t kCameraPassBytes = 592;
+constexpr uint32_t kViewOffset = 0x10;
+constexpr uint32_t kProjectionOffset = 0x50;
+constexpr uint32_t kViewProjectionOffset = 0x90;
 
-constexpr Region kCameraPasses = {0x826BAC00, 0x826BAC00 + 21 * 592};
-constexpr Region kRenderStateBlock = {0x70180000, 0x70190000};
-constexpr uint32_t kMatrixBytes = 64;
-constexpr uint32_t kRowBytes = 16;
+// Where the main thread's stack is during Draw (dumped for analysis).
+constexpr uint32_t kDrawStack = 0x70180000;
+constexpr uint32_t kDrawStackBytes = 0x10000;
 
-// A matrix moving further than this in one tick is a cut (a camera switch,
-// a reset), drawn without blending.
-constexpr float kCutDistance = 4.0f;  // metres
+// Moving further than this in one tick is a cut (a camera switch, a reset):
+// drawn without blending.
+constexpr float kCutDistance = 8.0f;  // metres
 constexpr float kCutAngle = 0.5f;     // radians, ~30 degrees
 
 Matrix4 LoadMatrix(uint8_t* base, uint32_t address) {
@@ -80,43 +86,33 @@ bool IsFinite(const Matrix4& m) {
   return std::all_of(m.begin(), m.end(), [](float v) { return std::isfinite(v); });
 }
 
-// How far a rigid motion moves its subject: the eye for a perspective
-// matrix (rotating about a pivot), otherwise the translation.
-float MovedDistance(const RigidMotion& motion) {
-  if (!motion.pivot) {
-    return Distance(motion.motion.position, Vec3{});
-  }
-  Matrix4 full = WorldMatrixFromTransform(motion.motion);
-  const Vec3& p = *motion.pivot;
-  Vec3 q;
-  for (int k = 0; k < 3; k++) {
-    q[k] = p[0] * full[k] + p[1] * full[4 + k] + p[2] * full[8 + k] + full[12 + k];
-  }
-  return Distance(p, q);
+bool IsCut(const Transform& a, const Transform& b) {
+  return Distance(a.position, b.position) > kCutDistance ||
+         AngleBetween(a.rotation, b.rotation) > kCutAngle;
 }
 
-enum class Outcome { kNew, kUnchanged, kNotFinite, kNotRigid, kCut, kBlended, kInside, kCount };
-constexpr const char* kOutcomeNames[] = {"new", "unchanged", "nonfinite", "notrigid",
-                                         "cut",  "blended",   "inside"};
-enum RegionIndex { kPasses, kBlock, kRecorder, kRegionCount };
-constexpr const char* kRegionNames[] = {"passes", "block", "recorder"};
-constexpr char kOutcomeLetters[] = "nu!rcbi";
-
-std::string FormatMatrix(const Matrix4& m) {
-  std::string s;
+// Whether `product` is `a * b`, to float precision.
+bool IsProduct(const Matrix4& product, const Matrix4& a, const Matrix4& b) {
+  Matrix4 expected = Multiply(a, b);
   for (int i = 0; i < 16; i++) {
-    s += fmt::format("{}{:.4g}", i == 0 ? "" : (i % 4 == 0 ? " | " : " "), m[i]);
+    float tolerance = 1e-3f * std::max(1.0f, std::abs(expected[i]));
+    if (!(std::abs(product[i] - expected[i]) <= tolerance)) {
+      return false;
+    }
   }
-  return s;
+  return true;
 }
 
-// Writes the camera passes, the render-state block and every recorder
-// matrix to <folder>/tick<N>_<when>.bin as (u32 address, u32 size, bytes)
-// records, little endian, with the bytes as in guest memory (big endian).
+uint32_t CameraPass(int pass) {
+  return kCameraPasses + pass * kCameraPassBytes;
+}
+
+// Writes the camera passes and the draw step's stack to
+// <folder>/tick<N>_<when>.bin as (u32 address, u32 size, bytes) records,
+// little endian, with the bytes as in guest memory (big endian).
 class DrawStateDump {
  public:
-  void OnDraw(uint8_t* base, bool logic_pass, const std::set<uint32_t>& recorder,
-              const char* when) {
+  void OnDraw(uint8_t* base, bool logic_pass, const char* when) {
     std::string folder = REXCVAR_GET(dump_draw_state);
     if (folder.empty() || !frame_pacing::GameMessages_InRace() || !logic_pass) {
       return;
@@ -135,11 +131,8 @@ class DrawStateDump {
       out.write(reinterpret_cast<const char*>(&size), 4);
       out.write(reinterpret_cast<const char*>(base + address), size);
     };
-    write(kCameraPasses.start, kCameraPasses.end - kCameraPasses.start);
-    write(kRenderStateBlock.start, kRenderStateBlock.end - kRenderStateBlock.start);
-    for (uint32_t a : recorder) {
-      write(a, kMatrixBytes);
-    }
+    write(kCameraPasses, kCameraPassCount * kCameraPassBytes);
+    write(kDrawStack, kDrawStackBytes);
   }
 
  private:
@@ -148,188 +141,143 @@ class DrawStateDump {
 
 class DrawState {
  public:
-  // Main thread, from the per-object recorder: a matrix it was handed.
-  void OnMatrixUsed(uint32_t address) {
-    std::lock_guard lock(mutex_);
-    used_this_tick_.insert(address);
-  }
-
-  void OnRecorderCall(uint32_t r4, uint32_t r5) {
-    std::lock_guard lock(mutex_);
-    if (detail_.recorder_pairs.size() < 40) {
-      detail_.recorder_pairs.insert({r4, r5});
-    }
-  }
-
-  // Main thread, before the Draw of a logic pass: this tick's matrices.
-  void OnTick(uint8_t* base) {
-    std::vector<uint32_t> candidates;
-    for (const Region& region : {kCameraPasses, kRenderStateBlock}) {
-      for (uint32_t a = region.start; a + kMatrixBytes <= region.end; a += kRowBytes) {
-        candidates.push_back(a);
-      }
-    }
-    {
-      std::lock_guard lock(mutex_);
-      for (uint32_t a : used_last_tick_) {
-        if (!InRegion(a)) {
-          candidates.push_back(a);
-        }
-      }
-      used_last_tick_ = std::move(used_this_tick_);
-      used_this_tick_.clear();
-    }
-
-    std::unordered_map<uint32_t, Matrix4> current;
-    current.reserve(candidates.size());
-    blends_.clear();
-    uint32_t taken_start = 0;  // the last matrix taken, whose rows aren't matrices
-    std::string pass_outcomes(21, '-');
-    for (uint32_t address : candidates) {
-      Matrix4 now = LoadMatrix(base, address);
-      current[address] = now;
-      Outcome outcome = Classify(address, now, taken_start);
-      int region = RegionOf(address);
-      detail_.counts[region][int(outcome)]++;
-      if (region == kPasses && (address - kCameraPasses.start) % 592 == 0x90) {
-        pass_outcomes[(address - kCameraPasses.start) / 592] = kOutcomeLetters[int(outcome)];
-      }
-    }
-    detail_.last_pass_outcomes = pass_outcomes;
-    if (REXCVAR_GET(log_blend_detail) && detail_.vp_copies.empty()) {
-      for (int pass = 0; pass < 21; pass++) {
-        uint32_t vp = kCameraPasses.start + pass * 592 + 0x90;
-        const Matrix4& m = current[vp];
-        if (std::all_of(m.begin(), m.end(), [](float v) { return v == 0; })) {
-          continue;
-        }
-        for (uint32_t a = kRenderStateBlock.start; a + kMatrixBytes <= kRenderStateBlock.end;
-             a += kRowBytes) {
-          if (current[a] == m) {
-            detail_.vp_copies += fmt::format(" pass{}@{:X}", pass, a);
-          }
-        }
-      }
-      if (detail_.vp_copies.empty()) {
-        detail_.vp_copies = " none";
-      }
-    }
-    detail_.ticks++;
-    previous_ = std::move(current);
-  }
-
-  Outcome Classify(uint32_t address, const Matrix4& now, uint32_t& taken_start) {
-    if (taken_start != 0 && address > taken_start && address < taken_start + kMatrixBytes) {
-      return Outcome::kInside;  // inside a matrix already taken
-    }
-    auto before = previous_.find(address);
-    if (before == previous_.end()) {
-      return Outcome::kNew;
-    }
-    if (before->second == now) {
-      return Outcome::kUnchanged;
-    }
-    if (!IsFinite(now) || !IsFinite(before->second)) {
-      return Outcome::kNotFinite;
-    }
-    std::optional<RigidMotion> motion = FindRigidMotion(before->second, now);
-    bool is_pass_vp = InRange(kCameraPasses, address) &&
-                      (address - kCameraPasses.start) % 592 == 0x90;
-    if (!motion) {
-      if (is_pass_vp && detail_.not_rigid_sample.empty()) {
-        detail_.not_rigid_sample = fmt::format("{:08X}\n  before {}\n  now    {}", address,
-                                               FormatMatrix(before->second), FormatMatrix(now));
-      }
-      return Outcome::kNotRigid;
-    }
-    float moved = MovedDistance(*motion);
-    float angle = AngleBetween(motion->motion.rotation, Quaternion{});
-    if (moved > kCutDistance || angle > kCutAngle) {
-      counts_.cuts++;
-      if (is_pass_vp && detail_.cut_sample.empty()) {
-        detail_.cut_sample = fmt::format("{:08X} moved {:.3f} angle {:.3f}", address, moved, angle);
-      }
-      return Outcome::kCut;
-    }
-    if (is_pass_vp) {
-      detail_.max_pass_moved = std::max(detail_.max_pass_moved, moved);
-      detail_.max_pass_angle = std::max(detail_.max_pass_angle, angle);
-    }
-    blends_.push_back({address, *motion});
-    taken_start = address;
-    return Outcome::kBlended;
-  }
-
   void BeforeDraw(uint8_t* base, bool logic_pass) {
     logic_pass_ = logic_pass;
-    {
-      std::lock_guard lock(mutex_);
-      dump_.OnDraw(base, logic_pass, used_last_tick_, "pre");
+    dump_.OnDraw(base, logic_pass, "pre");
+    if (logic_pass) {
+      OnTick(base);
     }
+    amount_ = frame_pacing::GetFramePacer().TickProgress();
+    recorded_.clear();
     saved_.clear();
-    if (!REXCVAR_GET(interpolate_draw_state)) {
+    enabled_ = REXCVAR_GET(interpolate_draw_state);
+    if (!enabled_) {
       return;
     }
-    // Drawing runs a tick behind: the logic pass shows the previous tick
-    // (amount 0) and the passes after it move towards the current one.
-    float amount = frame_pacing::GetFramePacer().TickProgress();
-    for (const auto& [address, motion] : blends_) {
-      saved_.push_back({address, LoadMatrix(base, address)});
-      StoreMatrix(base, address, BlendRigidMotion(motion, amount));
+    for (const CameraBlend& camera : camera_blends_) {
+      uint32_t pass = CameraPass(camera.pass);
+      Matrix4 view = ViewMatrixFromTransform(Blend(camera.from, camera.to, amount_));
+      Save(base, pass + kViewOffset);
+      Save(base, pass + kViewProjectionOffset);
+      StoreMatrix(base, pass + kViewOffset, view);
+      StoreMatrix(base, pass + kViewProjectionOffset, Multiply(view, camera.projection));
+      counts_.cameras++;
     }
-    if (REXCVAR_GET(log_blend_detail)) {
-      block_before_draw_.assign(base + kRenderStateBlock.start, base + kRenderStateBlock.end);
-      if (detail_.amounts.size() < 12) {
-        detail_.amounts += fmt::format(" {:.2f}", amount);
-      }
-    }
-    counts_.draws++;
-    counts_.blended += int(blends_.size());
-    LogCounts();
   }
 
   void AfterDraw(uint8_t* base) {
-    {
-      std::lock_guard lock(mutex_);
-      dump_.OnDraw(base, logic_pass_, used_this_tick_, "post");
+    Restore(base, saved_);
+    dump_.OnDraw(base, logic_pass_, "post");
+    counts_.draws++;
+    LogCounts();
+  }
+
+  void BeforeRecordObject(uint8_t* base, uint32_t view_projection, uint32_t world) {
+    object_saved_.clear();
+    if (!IsCameraViewProjection(view_projection)) {
+      return;
     }
-    if (!block_before_draw_.empty()) {
-      // Rows of the block the draw step itself wrote.
-      const uint8_t* now = base + kRenderStateBlock.start;
-      for (uint32_t row = 0; row < block_before_draw_.size(); row += kRowBytes) {
-        if (std::memcmp(now + row, block_before_draw_.data() + row, kRowBytes) != 0) {
-          detail_.rows_written_by_draw++;
-          if (detail_.written_sample.size() < 200) {
-            detail_.written_sample += fmt::format(" {:X}", kRenderStateBlock.start + row);
-          }
-        }
-      }
-      block_before_draw_.clear();
+    ObjectKey key{world, recorded_[world]++};
+    Matrix4 now = LoadMatrix(base, world);
+    std::optional<ScaledTransform> transform;
+    if (IsFinite(now)) {
+      transform = ScaledTransformFromWorldMatrix(now);
     }
-    for (auto it = saved_.rbegin(); it != saved_.rend(); ++it) {
-      StoreMatrix(base, it->first, it->second);
+    if (!transform) {
+      counts_.objects_not_transforms++;
+      return;
     }
-    saved_.clear();
+    if (logic_pass_) {
+      objects_this_tick_[key] = *transform;
+    }
+    if (!enabled_) {
+      return;
+    }
+    auto before = objects_last_tick_.find(key);
+    if (before == objects_last_tick_.end()) {
+      counts_.objects_unmatched++;
+      return;
+    }
+    if (IsCut(before->second.transform, transform->transform)) {
+      counts_.object_cuts++;
+      return;
+    }
+    object_saved_.push_back({world, now});
+    StoreMatrix(base, world,
+                WorldMatrixFromScaledTransform(Blend(before->second, *transform, amount_)));
+    counts_.objects++;
+  }
+
+  void AfterRecordObject(uint8_t* base) {
+    Restore(base, object_saved_);
   }
 
  private:
-  static bool InRange(const Region& region, uint32_t address) {
-    return address >= region.start && address < region.end;
-  }
+  struct CameraBlend {
+    int pass;
+    Transform from;
+    Transform to;
+    Matrix4 projection;
+  };
 
-  static int RegionOf(uint32_t address) {
-    if (InRange(kCameraPasses, address)) return kPasses;
-    if (InRange(kRenderStateBlock, address)) return kBlock;
-    return kRecorder;
-  }
-
-  static bool InRegion(uint32_t address) {
-    for (const Region& region : {kCameraPasses, kRenderStateBlock}) {
-      if (address >= region.start && address < region.end) {
-        return true;
-      }
+  struct ObjectKey {
+    uint32_t address;
+    int occurrence;  // times this address was recorded earlier in the Draw
+    bool operator==(const ObjectKey&) const = default;
+  };
+  struct ObjectKeyHash {
+    size_t operator()(const ObjectKey& key) const {
+      return std::hash<uint64_t>()(uint64_t(key.address) << 20 ^ uint64_t(key.occurrence));
     }
-    return false;
+  };
+
+  // Main thread, before the Draw of a logic pass (after its Update).
+  void OnTick(uint8_t* base) {
+    camera_blends_.clear();
+    for (int pass = 0; pass < kCameraPassCount; pass++) {
+      std::optional<Transform> camera = CameraOf(base, pass);
+      if (camera && cameras_[pass]) {
+        if (IsCut(*cameras_[pass], *camera)) {
+          counts_.camera_cuts++;
+        } else {
+          camera_blends_.push_back({pass, *cameras_[pass], *camera,
+                                    LoadMatrix(base, CameraPass(pass) + kProjectionOffset)});
+        }
+      }
+      cameras_[pass] = camera;
+    }
+    objects_last_tick_ = std::move(objects_this_tick_);
+    objects_this_tick_.clear();
+  }
+
+  // The camera of a pass whose view-projection is its view * projection (set
+  // by game logic, rather than recomputed in Draw).
+  static std::optional<Transform> CameraOf(uint8_t* base, int pass) {
+    uint32_t address = CameraPass(pass);
+    Matrix4 view = LoadMatrix(base, address + kViewOffset);
+    Matrix4 projection = LoadMatrix(base, address + kProjectionOffset);
+    Matrix4 view_projection = LoadMatrix(base, address + kViewProjectionOffset);
+    if (!IsFinite(view) || !IsFinite(projection) || !IsFinite(view_projection) ||
+        !IsProduct(view_projection, view, projection)) {
+      return std::nullopt;
+    }
+    return TransformFromViewMatrix(view);
+  }
+
+  static bool IsCameraViewProjection(uint32_t address) {
+    return address >= kCameraPasses && address < CameraPass(kCameraPassCount) &&
+           (address - kCameraPasses) % kCameraPassBytes == kViewProjectionOffset;
+  }
+
+  void Save(uint8_t* base, uint32_t address) {
+    saved_.push_back({address, LoadMatrix(base, address)});
+  }
+
+  static void Restore(uint8_t* base, std::vector<std::pair<uint32_t, Matrix4>>& saved) {
+    for (auto it = saved.rbegin(); it != saved.rend(); ++it) {
+      StoreMatrix(base, it->first, it->second);
+    }
+    saved.clear();
   }
 
   void LogCounts() {
@@ -340,81 +288,43 @@ class DrawState {
     if (now - counts_.last_log < std::chrono::seconds(1)) {
       return;
     }
-    REXLOG_INFO("blend state: {} draws, {} matrices blended per draw, {} cuts", counts_.draws,
-                counts_.draws ? counts_.blended / counts_.draws : 0, counts_.cuts);
+    int draws = std::max(counts_.draws, 1);
+    REXLOG_INFO(
+        "blend state: {} draws; per draw {} cameras, {} objects ({} unmatched, {} not "
+        "transforms); {} camera cuts, {} object cuts",
+        counts_.draws, counts_.cameras / draws, counts_.objects / draws,
+        counts_.objects_unmatched / draws, counts_.objects_not_transforms / draws,
+        counts_.camera_cuts, counts_.object_cuts);
     counts_ = {};
     counts_.last_log = now;
-    LogDetail();
   }
 
-  void LogDetail() {
-    if (!REXCVAR_GET(log_blend_detail)) {
-      detail_ = {};
-      return;
-    }
-    REXLOG_INFO("blend detail: {} ticks, last tick's pass VPs [{}] (letters: {})", detail_.ticks,
-                detail_.last_pass_outcomes, kOutcomeLetters);
-    for (int r = 0; r < kRegionCount; r++) {
-      std::string line;
-      for (int o = 0; o < int(Outcome::kCount); o++) {
-        line += fmt::format(" {}={}", kOutcomeNames[o], detail_.counts[r][o]);
-      }
-      REXLOG_INFO("blend detail: {:8}{}", kRegionNames[r], line);
-    }
-    REXLOG_INFO("blend detail: pass VP max moved {:.3f} max angle {:.3f}", detail_.max_pass_moved,
-                detail_.max_pass_angle);
-    {
-      std::string pairs;
-      for (auto [r4, r5] : detail_.recorder_pairs) {
-        pairs += fmt::format(" {:08X}/{:08X}", r4, r5);
-      }
-      REXLOG_INFO("blend detail: recorder r4/r5:{}", pairs);
-    }
-    REXLOG_INFO("blend detail: amounts{}", detail_.amounts);
-    REXLOG_INFO("blend detail: pass VP copies in block:{}", detail_.vp_copies);
-    REXLOG_INFO("blend detail: block rows written during draws: {}, e.g.{}",
-                detail_.rows_written_by_draw, detail_.written_sample);
-    if (!detail_.cut_sample.empty()) {
-      REXLOG_INFO("blend detail: cut {}", detail_.cut_sample);
-    }
-    if (!detail_.not_rigid_sample.empty()) {
-      REXLOG_INFO("blend detail: not rigid {}", detail_.not_rigid_sample);
-    }
-    detail_ = {};
-  }
+  bool logic_pass_ = false;
+  bool enabled_ = false;
+  float amount_ = 0;
 
-  std::mutex mutex_;
-  std::set<uint32_t> used_this_tick_;
-  std::set<uint32_t> used_last_tick_;
+  std::array<std::optional<Transform>, kCameraPassCount> cameras_;
+  std::vector<CameraBlend> camera_blends_;
 
-  std::unordered_map<uint32_t, Matrix4> previous_;
-  std::vector<std::pair<uint32_t, RigidMotion>> blends_;
+  std::unordered_map<ObjectKey, ScaledTransform, ObjectKeyHash> objects_last_tick_;
+  std::unordered_map<ObjectKey, ScaledTransform, ObjectKeyHash> objects_this_tick_;
+  std::unordered_map<uint32_t, int> recorded_;
+
   std::vector<std::pair<uint32_t, Matrix4>> saved_;
+  std::vector<std::pair<uint32_t, Matrix4>> object_saved_;
+
+  DrawStateDump dump_;
 
   struct Counts {
     int draws = 0;
-    int blended = 0;
-    int cuts = 0;
+    int cameras = 0;
+    int objects = 0;
+    int objects_unmatched = 0;
+    int objects_not_transforms = 0;
+    int camera_cuts = 0;
+    int object_cuts = 0;
     std::chrono::steady_clock::time_point last_log{};
   } counts_;
-
-  struct Detail {
-    int ticks = 0;
-    std::array<std::array<int, int(Outcome::kCount)>, kRegionCount> counts{};
-    std::string last_pass_outcomes;
-    std::string not_rigid_sample;
-    std::string cut_sample;
-    float max_pass_moved = 0;
-    float max_pass_angle = 0;
-    std::string amounts;
-    std::set<std::pair<uint32_t, uint32_t>> recorder_pairs;
-    std::string vp_copies;
-    int rows_written_by_draw = 0;
-    std::string written_sample;
-  } detail_;
-  std::vector<uint8_t> block_before_draw_;
-  DrawStateDump dump_;
-  bool logic_pass_ = false;
 };
 
 DrawState& GetDrawState() {
@@ -424,25 +334,20 @@ DrawState& GetDrawState() {
 
 }  // namespace
 
-void BlendState_OnVehicleSeen(uint32_t) {}
-
-void BlendState_OnRecorderCall(uint32_t r4, uint32_t r5) {
-  GetDrawState().OnRecorderCall(r4, r5);
-}
-
-void BlendState_OnMatrixUsed(uint32_t address) {
-  GetDrawState().OnMatrixUsed(address);
-}
-
 void BlendState_BeforeDraw(uint8_t* base, bool render_only_pass) {
-  if (!render_only_pass) {
-    GetDrawState().OnTick(base);
-  }
   GetDrawState().BeforeDraw(base, !render_only_pass);
 }
 
 void BlendState_AfterDraw(uint8_t* base) {
   GetDrawState().AfterDraw(base);
+}
+
+void BlendState_BeforeRecordObject(uint8_t* base, uint32_t view_projection, uint32_t world) {
+  GetDrawState().BeforeRecordObject(base, view_projection, world);
+}
+
+void BlendState_AfterRecordObject(uint8_t* base) {
+  GetDrawState().AfterRecordObject(base);
 }
 
 }  // namespace interpolation

@@ -1,10 +1,11 @@
 // Interpolated game state for drawing.
 //
 // Each main-loop pass delivers the game's Draw message (see
-// frame_pacing/game_messages.h). Around it, the matrices the draw step reads
-// (camera passes, the render-state block, recorder arguments) are replaced
-// with a blend of the last two ticks, then put back, so game logic never
-// sees them. See blend_state.cpp.
+// frame_pacing/game_messages.h). Game logic ticks at 30 Hz, so drawing shows
+// a blend of the last two ticks: the cameras are blended around the Draw
+// message, and each object's world matrix as the per-object recorder is
+// handed it. Originals are put back afterwards, so game logic never sees the
+// blends. See blend_state.cpp.
 
 #pragma once
 
@@ -12,15 +13,13 @@
 
 namespace interpolation {
 
-// Main thread, from the speed getter: a vehicle seen this tick.
-void BlendState_OnVehicleSeen(uint32_t vehicle);
-
-// Main thread, from the per-object recorder: a matrix the draw step read.
-void BlendState_OnMatrixUsed(uint32_t address);
-void BlendState_OnRecorderCall(uint32_t r4, uint32_t r5);
-
 // Main thread, around the delivery of a Draw message.
 void BlendState_BeforeDraw(uint8_t* base, bool render_only_pass);
 void BlendState_AfterDraw(uint8_t* base);
+
+// Main thread, around the per-object recorder (sub_825953D0): r4 is the
+// camera's view-projection matrix and r5 the object's world matrix.
+void BlendState_BeforeRecordObject(uint8_t* base, uint32_t view_projection, uint32_t world);
+void BlendState_AfterRecordObject(uint8_t* base);
 
 }  // namespace interpolation

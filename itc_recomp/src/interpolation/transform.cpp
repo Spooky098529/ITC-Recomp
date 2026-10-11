@@ -487,6 +487,52 @@ Transform Blend(const Transform& a, const Transform& b, float amount) {
   return out;
 }
 
+std::optional<ScaledTransform> ScaledTransformFromWorldMatrix(const Matrix4& m) {
+  constexpr float kTolerance = 1e-3f;
+  if (!(std::abs(m[3]) < kTolerance && std::abs(m[7]) < kTolerance &&
+        std::abs(m[11]) < kTolerance && std::abs(m[15] - 1) < kTolerance)) {
+    return std::nullopt;
+  }
+  ScaledTransform out;
+  Matrix4 unscaled = m;
+  for (int i = 0; i < 3; i++) {
+    float length = std::sqrt(m[i * 4] * m[i * 4] + m[i * 4 + 1] * m[i * 4 + 1] +
+                             m[i * 4 + 2] * m[i * 4 + 2]);
+    if (!(length > 1e-6f)) {
+      return std::nullopt;
+    }
+    out.scale[i] = length;
+    for (int j = 0; j < 3; j++) {
+      unscaled[i * 4 + j] /= length;
+    }
+  }
+  std::optional<Transform> transform = TransformFromWorldMatrix(unscaled);
+  if (!transform) {
+    return std::nullopt;
+  }
+  out.transform = *transform;
+  return out;
+}
+
+Matrix4 WorldMatrixFromScaledTransform(const ScaledTransform& t) {
+  Matrix4 m = WorldMatrixFromTransform(t.transform);
+  for (int i = 0; i < 3; i++) {
+    for (int j = 0; j < 3; j++) {
+      m[i * 4 + j] *= t.scale[i];
+    }
+  }
+  return m;
+}
+
+ScaledTransform Blend(const ScaledTransform& a, const ScaledTransform& b, float amount) {
+  ScaledTransform out;
+  out.transform = Blend(a.transform, b.transform, amount);
+  for (int k = 0; k < 3; k++) {
+    out.scale[k] = a.scale[k] + (b.scale[k] - a.scale[k]) * amount;
+  }
+  return out;
+}
+
 float Distance(const Vec3& a, const Vec3& b) {
   float dx = a[0] - b[0], dy = a[1] - b[1], dz = a[2] - b[2];
   return std::sqrt(dx * dx + dy * dy + dz * dz);
