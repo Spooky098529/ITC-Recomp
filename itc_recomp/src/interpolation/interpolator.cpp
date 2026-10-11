@@ -10,7 +10,7 @@
 
 #include <chrono>
 #include <cmath>
-#include <string>
+#include <bit>
 #include <optional>
 #include <unordered_map>
 #include <vector>
@@ -32,6 +32,7 @@ constexpr float kCameraCutDistance = 1.0f;  // metres from the extrapolated posi
 constexpr float kCameraCutAngle = 0.5f;     // radians, ~30 degrees
 
 constexpr uint32_t kFloatsPerRegister = 4;
+constexpr size_t kFloatsPerMatrix = 16;
 
 // How much (as a fraction of their size) an upload's values can change in one
 // tick and still be blended. Bigger jumps are teleports or wrong pairs.
@@ -127,11 +128,23 @@ class Interpolator {
       upload();
       return;
     }
-    const std::vector<float>& from = earlier_values_[it->second.earlier];
-    const std::vector<float>& to = replayed_[it->second.replayed].values;
+    const Blend& blend = it->second;
+    const std::vector<float>& from = earlier_values_[blend.earlier];
+    const std::vector<float>& to = replayed_[blend.replayed].values;
     for (size_t i = 0; i < to.size(); i++) {
-      float value = from[i] + (to[i] - from[i]) * tick_progress_;
-      if (std::isfinite(value)) {
+      size_t block = i / kFloatsPerMatrix;
+      if (block < blend.rigid_blocks.size() && blend.rigid_blocks[block]) {
+        if (i % kFloatsPerMatrix == 0) {
+          Matrix4 m = BlendRigidMotion(*blend.rigid_blocks[block], tick_progress_);
+          for (size_t k = 0; k < kFloatsPerMatrix; k++) {
+            guest::StoreFloat(base, payload + 4 * uint32_t(i + k), m[k]);
+          }
+        }
+        continue;
+      }
+      // Integer data stored in float registers reads as NaN; leave it.
+      if (std::isfinite(from[i]) && std::isfinite(to[i])) {
+        float value = from[i] + (to[i] - from[i]) * tick_progress_;
         guest::StoreFloat(base, payload + 4 * uint32_t(i), value);
       }
     }
@@ -146,7 +159,25 @@ class Interpolator {
   struct Blend {
     size_t earlier;   // index into earlier_values_
     size_t replayed;  // index into replayed_
+    // For each whole 4x4 block of the upload, its rigid motion between the
+    // ticks if it has one (a transform); other values blend linearly.
+    std::vector<std::optional<RigidMotion>> rigid_blocks;
   };
+
+  static std::vector<std::optional<RigidMotion>> FindRigidBlocks(const std::vector<float>& a,
+                                                                 const std::vector<float>& b) {
+    std::vector<std::optional<RigidMotion>> blocks;
+    for (size_t start = 0; start + kFloatsPerMatrix <= a.size(); start += kFloatsPerMatrix) {
+      Matrix4 ma, mb;
+      for (size_t k = 0; k < kFloatsPerMatrix; k++) {
+        ma[k] = a[start + k];
+        mb[k] = b[start + k];
+      }
+      bool same = ma == mb;
+      blocks.push_back(same ? std::nullopt : FindRigidMotion(ma, mb));
+    }
+    return blocks;
+  }
 
   std::vector<Snapshot> TakeSnapshots(uint8_t* base) {
     std::vector<Snapshot> snapshots;
@@ -172,10 +203,9 @@ class Interpolator {
   }
 
   // Pairs each upload in the newly replayed list with the upload that had
-  // the same tag in the list replayed before it. Only uploads from recorders
-  // that carry transforms are blended, and only when both values are finite
-  // and differ by a plausible amount for one tick of motion. Everything else
-  // is drawn as recorded.
+  // the same tag in the list replayed before it, if its values changed by a
+  // plausible amount for one tick of motion. Everything else is drawn as
+  // recorded.
   void Pair(const std::vector<Snapshot>& current) {
     earlier_values_.clear();
     std::unordered_map<DrawTag, const Snapshot*> earlier_by_tag;
@@ -185,7 +215,7 @@ class Interpolator {
       }
     }
     for (size_t i = 0; i < current.size(); i++) {
-      if (!current[i].tag || !CarriesTransforms(current[i].tag->recorder)) {
+      if (!current[i].tag) {
         continue;
       }
       auto it = earlier_by_tag.find(current[i].tag->tag);
@@ -194,45 +224,32 @@ class Interpolator {
         continue;
       }
       earlier_values_.push_back(it->second->values);
-      blends_[current[i].payload] = {earlier_values_.size() - 1, i};
-      DumpSample(current[i].tag->recorder, it->second->values, current[i].values);
+      blends_[current[i].payload] = {earlier_values_.size() - 1, i,
+                                     FindRigidBlocks(it->second->values, current[i].values)};
     }
     stats_.unpaired = current.size() - blends_.size();
   }
 
-  // Recorders whose uploads change smoothly from tick to tick (see the
-  // pairing measurements in docs/functions.md). sub_82146BD0, sub_82128750
-  // and sub_82595550 upload sprite and texture parameters instead.
-  static bool CarriesTransforms(uint32_t recorder) {
-    return recorder == 0x825953D0 || recorder == 0x8209C1A0 || recorder == 0x820CECA0;
-  }
-
+  // Values that can't be blended (integers read as NaN) must match exactly;
+  // the rest must change by under kMaxRelativeChangePerTick.
   static bool IsPlausibleMotion(const std::vector<float>& a, const std::vector<float>& b) {
     if (a.size() != b.size()) {
       return false;
     }
     float difference = 0, magnitude = 0;
     for (size_t k = 0; k < a.size(); k++) {
-      if (!std::isfinite(a[k]) || !std::isfinite(b[k])) {
-        return false;
+      bool finite_a = std::isfinite(a[k]), finite_b = std::isfinite(b[k]);
+      if (!finite_a || !finite_b) {
+        if (std::bit_cast<uint32_t>(a[k]) != std::bit_cast<uint32_t>(b[k])) {
+          return false;
+        }
+        continue;
       }
       difference += std::abs(a[k] - b[k]);
       magnitude += std::abs(a[k]) + std::abs(b[k]);
     }
     return difference <= kMaxRelativeChangePerTick * magnitude;
   }
-
-  void DumpSample(uint32_t recorder, const std::vector<float>& a,
-                  const std::vector<float>& b) { /* TEMP */
-    if (dumps_[recorder] >= 4 || ++dump_skip_ % 997 != 0) return;
-    dumps_[recorder]++;
-    std::string sa, sb;
-    for (float v : a) sa += fmt::format(" {:.3f}", v);
-    for (float v : b) sb += fmt::format(" {:.3f}", v);
-    REXLOG_INFO("pairdbg {:08x} ({} floats)\n  a:{}\n  b:{}", recorder, a.size(), sa, sb);
-  }
-  std::unordered_map<uint32_t, int> dumps_; /* TEMP */
-  int dump_skip_ = 0; /* TEMP */
 
   void LogStats() {
     if (!REXCVAR_GET(log_interpolation)) {

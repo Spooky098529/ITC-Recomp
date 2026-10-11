@@ -37,6 +37,22 @@ Matrix4 ViewMatrixFromTransform(const Transform& t);
 // rotations along the shortest arc.
 Transform Blend(const Transform& a, const Transform& b, float amount);
 
+// Blends between two 4x4 matrices that differ by a rigid motion, such as
+// view-projection or world-view-projection matrices from consecutive ticks:
+// a * D or D * a for a rotation plus translation D, in either layout. Blends
+// D from identity, so the result stays a proper transform instead of
+// shrinking mid-turn as an element-wise blend would. Returns nothing if the
+// matrices don't differ by a rigid motion (not a transform, or the
+// projection changed).
+struct RigidMotion {
+  Matrix4 from;      // the earlier matrix
+  Transform motion;  // the rigid motion D, in row layout
+  bool applied_first;  // b = D * a (true) or b = a * D
+  bool column_layout;  // D's translation is in column 3 rather than row 3
+};
+std::optional<RigidMotion> FindRigidMotion(const Matrix4& a, const Matrix4& b);
+Matrix4 BlendRigidMotion(const RigidMotion& motion, float amount);
+
 float Distance(const Vec3& a, const Vec3& b);
 
 // Angle in radians between two rotations.

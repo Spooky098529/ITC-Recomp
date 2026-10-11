@@ -144,7 +144,141 @@ Matrix4 MatrixFrom(const Matrix3& rotation, const Vec3& translation) {
   return m;
 }
 
+using Matrix4d = std::array<double, 16>;
+
+Matrix4d Multiply(const Matrix4d& a, const Matrix4d& b) {
+  Matrix4d c{};
+  for (int i = 0; i < 4; i++) {
+    for (int j = 0; j < 4; j++) {
+      double sum = 0;
+      for (int k = 0; k < 4; k++) {
+        sum += a[i * 4 + k] * b[k * 4 + j];
+      }
+      c[i * 4 + j] = sum;
+    }
+  }
+  return c;
+}
+
+std::optional<Matrix4d> Inverse(const Matrix4d& m) {
+  // Gauss-Jordan elimination with partial pivoting.
+  Matrix4d a = m;
+  Matrix4d inv{};
+  for (int i = 0; i < 4; i++) {
+    inv[i * 4 + i] = 1;
+  }
+  for (int col = 0; col < 4; col++) {
+    int pivot = col;
+    for (int row = col + 1; row < 4; row++) {
+      if (std::abs(a[row * 4 + col]) > std::abs(a[pivot * 4 + col])) {
+        pivot = row;
+      }
+    }
+    if (std::abs(a[pivot * 4 + col]) < 1e-12) {
+      return std::nullopt;
+    }
+    for (int k = 0; k < 4; k++) {
+      std::swap(a[col * 4 + k], a[pivot * 4 + k]);
+      std::swap(inv[col * 4 + k], inv[pivot * 4 + k]);
+    }
+    double scale = 1 / a[col * 4 + col];
+    for (int k = 0; k < 4; k++) {
+      a[col * 4 + k] *= scale;
+      inv[col * 4 + k] *= scale;
+    }
+    for (int row = 0; row < 4; row++) {
+      if (row == col) {
+        continue;
+      }
+      double factor = a[row * 4 + col];
+      for (int k = 0; k < 4; k++) {
+        a[row * 4 + k] -= factor * a[col * 4 + k];
+        inv[row * 4 + k] -= factor * inv[col * 4 + k];
+      }
+    }
+  }
+  return inv;
+}
+
+Matrix4d Transposed4(const Matrix4d& m) {
+  Matrix4d t;
+  for (int i = 0; i < 4; i++) {
+    for (int j = 0; j < 4; j++) {
+      t[i * 4 + j] = m[j * 4 + i];
+    }
+  }
+  return t;
+}
+
+// Whether `d` is a rigid motion with its translation in row 3 (the game's
+// world matrix layout).
+bool IsRigidRowLayout(const Matrix4d& d) {
+  constexpr double kTolerance = 1e-3;
+  if (std::abs(d[3]) > kTolerance || std::abs(d[7]) > kTolerance ||
+      std::abs(d[11]) > kTolerance || std::abs(d[15] - 1) > kTolerance) {
+    return false;
+  }
+  Matrix3 r;
+  for (int i = 0; i < 3; i++) {
+    for (int j = 0; j < 3; j++) {
+      r[i][j] = float(d[i * 4 + j]);
+    }
+  }
+  return IsRotation(r);
+}
+
+Matrix4 ToFloat(const Matrix4d& m) {
+  Matrix4 f;
+  for (int i = 0; i < 16; i++) {
+    f[i] = float(m[i]);
+  }
+  return f;
+}
+
+Matrix4d ToDouble(const Matrix4& m) {
+  Matrix4d d;
+  for (int i = 0; i < 16; i++) {
+    d[i] = m[i];
+  }
+  return d;
+}
+
 }  // namespace
+
+std::optional<RigidMotion> FindRigidMotion(const Matrix4& a_in, const Matrix4& b_in) {
+  Matrix4d a = ToDouble(a_in);
+  Matrix4d b = ToDouble(b_in);
+  std::optional<Matrix4d> a_inverse = Inverse(a);
+  if (!a_inverse) {
+    return std::nullopt;
+  }
+  // b = D * a or b = a * D, with D in row or column layout.
+  for (bool applied_first : {true, false}) {
+    Matrix4d d = applied_first ? Multiply(b, *a_inverse) : Multiply(*a_inverse, b);
+    for (bool column_layout : {false, true}) {
+      Matrix4d row_d = column_layout ? Transposed4(d) : d;
+      if (!IsRigidRowLayout(row_d)) {
+        continue;
+      }
+      std::optional<Transform> motion = TransformFromWorldMatrix(ToFloat(row_d));
+      if (!motion) {
+        continue;
+      }
+      return RigidMotion{a_in, *motion, applied_first, column_layout};
+    }
+  }
+  return std::nullopt;
+}
+
+Matrix4 BlendRigidMotion(const RigidMotion& rigid, float amount) {
+  Transform partial = Blend(Transform{}, rigid.motion, amount);
+  Matrix4d d = ToDouble(WorldMatrixFromTransform(partial));
+  if (rigid.column_layout) {
+    d = Transposed4(d);
+  }
+  Matrix4d a = ToDouble(rigid.from);
+  return ToFloat(rigid.applied_first ? Multiply(d, a) : Multiply(a, d));
+}
 
 std::optional<Transform> TransformFromWorldMatrix(const Matrix4& m) {
   Matrix3 rotation = RotationOf(m);
