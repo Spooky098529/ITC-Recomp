@@ -161,3 +161,10 @@ Restoring the command list header, the recording pass list (header and
 buckets) and the sequence before a second run makes re-running the draw
 step safe: with both runs every tick, a race looked normal
 (`--debug_redraw_twice`, `src/frame_pacing/draw_step.cpp`).
+
+## Known issues
+
+- **UI flickers with unlocked frame rates** (`unlock-fps`): render-only main
+  loop passes skip the Update message, but menus (and probably the race HUD)
+  are recorded while handling Update, so they only appear on logic passes.
+  Planned fix: skip Update only for the handlers that run game logic.
