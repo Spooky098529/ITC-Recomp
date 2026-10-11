@@ -114,10 +114,27 @@ void GameMessages_SetRenderOnlyPass(bool render_only) {
   g_render_only_pass = render_only;
 }
 
+bool GameMessages_IsRenderOnlyPass() {
+  return g_render_only_pass;
+}
+
 }  // namespace frame_pacing
 
 // Guest entry points. These keep the generated names so the game's calls and
 // the function table reach them; they only unpack registers and forward.
+
+// Input manager update (a main-loop handler; reads the controllers through
+// sub_825BA3F8, XInputGetState): r3 = input manager. Skipped on render-only
+// passes, so input is read and acted on once per 30 Hz tick as the game
+// expects. Otherwise presses read on a render-only pass were lost before
+// game logic saw them, and menu auto-repeat (counted in reads) ran 5x fast.
+extern "C" REX_FUNC(sub_820990F0) {
+  REX_FUNC_PROLOGUE();
+  if (frame_pacing::GameMessages_IsRenderOnlyPass()) {
+    return;
+  }
+  __imp__sub_820990F0(ctx, base);
+}
 
 // Message dispatcher: r3 = dispatcher object.
 extern "C" REX_FUNC(sub_821062E8) {

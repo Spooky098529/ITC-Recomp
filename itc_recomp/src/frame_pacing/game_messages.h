@@ -21,5 +21,6 @@ namespace frame_pacing {
 
 // Main thread: whether the coming main-loop pass is render-only.
 void GameMessages_SetRenderOnlyPass(bool render_only);
+bool GameMessages_IsRenderOnlyPass();
 
 }  // namespace frame_pacing
