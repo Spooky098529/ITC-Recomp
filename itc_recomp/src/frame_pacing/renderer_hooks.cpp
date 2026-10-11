@@ -171,12 +171,17 @@ bool DrawExtraFrame(PPCContext& ctx, uint8_t* base, uint32_t renderer) {
   return drawn;
 }
 
-// Main thread, after the game tick: the game's own wait, then extra frames
-// until the next tick is due.
+// Main thread, after the game tick: extra frames until the next tick is due,
+// then the game's own wait.
+//
+// The game's wait (sub_820920D8) waits for the frame in flight and then runs
+// deferred work, which frees objects that frame used. Extra frames must come
+// before that, while those objects are still alive, so the frame in flight is
+// waited for here first, and the frame-done event is set again afterwards so
+// the game's own wait goes straight through to its deferred work.
 void Renderer_WaitForFrame(PPCContext& ctx, uint8_t* base, uint32_t renderer) {
   GetTickTimer().OnTickFinished();
-  ctx.r3.u64 = renderer;
-  __imp__sub_820920D8(ctx, base);
+  Event_Wait(ctx, base, renderer + kRendererFrameDoneEventOffset);
 
   auto& pacer = GetFramePacer();
   while (Renderer_IsRunning(base, renderer) && pacer.WaitForNextFrame()) {
@@ -194,6 +199,10 @@ void Renderer_WaitForFrame(PPCContext& ctx, uint8_t* base, uint32_t renderer) {
   }
   // Leave this tick's recording exactly as the game made it.
   frame_pacing::DrawStep_FinishExtraFrames(base);
+
+  Event_Signal(ctx, base, renderer + kRendererFrameDoneEventOffset);
+  ctx.r3.u64 = renderer;
+  __imp__sub_820920D8(ctx, base);
   pacer.OnTickReleased();
   pacer.OnFrameStarted();  // the game's own frame for this tick follows
   GetTickTimer().OnTickStarted();
