@@ -1,6 +1,7 @@
 #include "game_messages.h"
 
 #include "guest.h"
+#include "interpolation/blend_state.h"
 
 #include <rex/cvar.h>
 #include <rex/logging.h>
@@ -102,6 +103,10 @@ void DispatchMessages(PPCContext& ctx, uint8_t* base, uint32_t dispatcher) {
       }
     } else if (id == kDraw) {
       counts.draws++;
+      interpolation::BlendState_BeforeDraw(base, g_render_only_pass);
+      Deliver(ctx, base, dispatcher, message);
+      interpolation::BlendState_AfterDraw(base);
+      continue;
     } else {
       counts.others++;
     }
