@@ -11,6 +11,9 @@
 #include <chrono>
 #include <cmath>
 #include <bit>
+#include <cctype>
+#include <cstdio>
+#include <string>
 #include <optional>
 #include <unordered_map>
 #include <vector>
@@ -19,6 +22,9 @@ REXCVAR_DEFINE_BOOL(interpolate, true, "ITC",
                     "Smooth motion between 30 Hz game ticks by blending shader constants");
 REXCVAR_DEFINE_BOOL(log_interpolation, false, "ITC",
                     "Log interpolation counts once a second");
+REXCVAR_DEFINE_STRING(interpolate_recorders, "", "ITC",
+                      "Debug: comma-separated recorder addresses (hex) to interpolate; empty "
+                      "means all");
 
 namespace interpolation {
 namespace {
@@ -212,7 +218,7 @@ class Interpolator {
       }
     }
     for (size_t i = 0; i < current.size(); i++) {
-      if (!current[i].tag) {
+      if (!current[i].tag || !RecorderEnabled(current[i].tag->recorder)) {
         continue;
       }
       auto it = earlier_by_tag.find(current[i].tag->tag);
@@ -233,6 +239,20 @@ class Interpolator {
       blends_[current[i].payload] = {earlier_values_.size() - 1, i, std::move(rigid_blocks)};
     }
     stats_.unpaired = current.size() - blends_.size();
+  }
+
+  static bool RecorderEnabled(uint32_t recorder) {
+    const std::string& list = REXCVAR_GET(interpolate_recorders);
+    if (list.empty()) {
+      return true;
+    }
+    char name[16];
+    std::snprintf(name, sizeof(name), "%08x", recorder);
+    std::string lower = list;
+    for (char& c : lower) {
+      c = char(std::tolower(static_cast<unsigned char>(c)));
+    }
+    return lower.find(name) != std::string::npos;
   }
 
   // Values that can't be blended (integers read as NaN) must match exactly;
