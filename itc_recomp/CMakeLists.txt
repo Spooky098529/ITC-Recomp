@@ -40,6 +40,8 @@ set(ITC_SOURCES
     src/debug/state_capture.cpp
     src/interpolation/interpolator.cpp
     src/interpolation/transform.cpp
+    src/interpolation/command_list.cpp
+    src/interpolation/draw_tags.cpp
 )
 
 if(WIN32)

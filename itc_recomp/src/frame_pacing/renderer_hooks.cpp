@@ -43,10 +43,9 @@ void Event_Signal(PPCContext& ctx, uint8_t* base, uint32_t event) {
 void Renderer_DrawFrame(PPCContext& ctx, uint8_t* base, uint32_t renderer) {
   auto& pacer = GetFramePacer();
   pacer.OnFrameStarted();
-  interpolation::Interpolation_BeginFrame(base, pacer.TickProgress());
+  interpolation::Interpolation_BeginFrame(pacer.TickProgress());
   ctx.r3.u64 = renderer;
   sub_82091E58(ctx, base);
-  interpolation::Interpolation_EndFrame(base);
 }
 
 bool Renderer_IsRunning(uint8_t* base, uint32_t renderer) {

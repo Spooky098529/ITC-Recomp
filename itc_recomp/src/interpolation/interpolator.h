@@ -1,16 +1,14 @@
 // Smooths motion between 30 Hz game ticks.
 //
-// After each tick, records the camera's
-// view matrix and each vehicle's world matrix. Before each frame, writes a
-// blend of the last two ticks into guest memory, weighted by how far the
-// frame is between ticks; after the frame, puts the real values back so
-// game logic never sees them. The picture therefore runs one tick (33 ms)
-// behind the game.
+// The render thread replays the previous tick's render command list on every
+// drawn frame (see command_list.h). After each tick, the vertex shader
+// constant uploads in that list (which carry the camera and object
+// transforms) are paired with the same uploads from the list before it. When
+// an upload is replayed, a blend of the two, weighted by how far the frame is
+// between ticks, is uploaded instead. What is drawn therefore runs two ticks
+// (67 ms) behind the game logic.
 //
-// Big jumps (a camera switch, a car reset) are drawn as cuts, not blended.
-// Enabled by --interpolate (default false). Not effective yet: the game
-// records its render commands, with copies of these matrices, during the
-// tick, and drawing only replays them. See docs/functions.md.
+// Camera switches are drawn as cuts, not blended. Enabled by --interpolate.
 
 #pragma once
 
@@ -18,15 +16,11 @@
 
 namespace interpolation {
 
-// Called from the speed getter with each vehicle pointer it sees.
-void Interpolation_OnVehicleSeen(uint32_t vehicle);
-
 // Render thread, after each tick while game logic is paused.
 void Interpolation_OnTickDone(uint8_t* base);
 
-// Render thread, around each frame. `tick_progress` runs from 0 just after
+// Render thread, before each frame. `tick_progress` runs from 0 just after
 // the last tick to 1 when the next is due.
-void Interpolation_BeginFrame(uint8_t* base, float tick_progress);
-void Interpolation_EndFrame(uint8_t* base);
+void Interpolation_BeginFrame(float tick_progress);
 
 }  // namespace interpolation

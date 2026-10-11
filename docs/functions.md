@@ -95,6 +95,33 @@ logic), which calls `sub_8209F8A0` and `sub_8209F900`. Those loop over the
 active camera passes and record them with `sub_820A0CC0` and `sub_820A1C30`,
 which allocate command packets with `sub_8258CAA0`.
 
-Interpolation (`src/interpolation/`) therefore needs to substitute matrices
-while the recorded commands are replayed. The command format is the next
-thing to work out.
+Interpolation (`src/interpolation/`) therefore substitutes values while the
+recorded commands are replayed.
+
+### Command list format
+
+- Scene object +8 is the command list. It's double-buffered: buffer pointers
+  at +24 and +28, the index being recorded at +4 (flipped by `sub_8258C9C0`
+  each tick), slots used at +12, and the previous recording's slot count at
+  +16 (saved by `sub_8258C998`). The render thread replays the other buffer,
+  so drawing is one tick behind logic.
+- Recorders write through the list pointer at `0x8296B918`. `sub_8258C9D0`
+  opens a chunk, `sub_8258CAA0` allocates n 16-byte slots (write pointer at
+  +44) and `sub_8258CA50` closes the chunk.
+- Commands are 16-byte slots: header [id, arg1, arg2, 0] then payload slots.
+  `sub_8258EE98` walks item chains (types 0-6), and `sub_8258E698` and others
+  dispatch each command through the table at `0x8265EDE0` (38 ids).
+- Command 7 (`sub_8258FD48`) sets shader constants. arg1 is the register
+  count; arg2 is stage << 24 | type << 16 | start << 8 | count. Vertex
+  constants starting at 9 with 5 registers are the per-object transforms
+  (thousands a second in a race); 0 with 9 registers carries per-pass
+  values.
+
+### Recorders
+
+- `sub_82595550`, `sub_82146BD0` and `sub_820CECA0` record draws with a
+  command 7 (vertex constants 9, 5 registers). `sub_82595550` runs once a
+  tick in a race and its uploads aren't in the replayed list, so the bulk
+  per-object recorder is still to be found.
+- `sub_825953D0` (vertex constants 0, 9 registers) and `sub_82595490` (pixel
+  constants 0, 63 registers) record per-pass constants.

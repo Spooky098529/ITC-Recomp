@@ -6,7 +6,6 @@
 
 #include "debug/state_capture.h"
 #include "guest.h"
-#include "interpolation/interpolator.h"
 
 namespace {
 
@@ -30,6 +29,5 @@ extern "C" REX_FUNC(sub_820C0128) {
   REX_FUNC_PROLOGUE();
   ctx.fpscr.disableFlushMode();
   debug::StateCapture_OnVehicleSeen(ctx.r3.u32);
-  interpolation::Interpolation_OnVehicleSeen(ctx.r3.u32);
   ctx.f1.f64 = double(Vehicle_GetSpeedKmh(base, ctx.r3.u32));
 }
