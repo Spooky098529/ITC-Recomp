@@ -52,6 +52,9 @@ REXCVAR_DEFINE_BOOL(interpolate_draw_state, true, "ITC",
 REXCVAR_DEFINE_DOUBLE(debug_camera_constant_lift, 0.0, "ITC",
                       "Testing: draw the camera constants recorded during Update from this many "
                       "metres higher, to show what they affect");
+REXCVAR_DEFINE_DOUBLE(debug_camera_lift, 0.0, "ITC",
+                      "Testing: draw with the blended main camera (pass 0) raised this many "
+                      "metres, to show what it affects");
 REXCVAR_DEFINE_BOOL(log_blend_state, false, "ITC",
                     "Log how many cameras and objects were blended, once a second");
 REXCVAR_DEFINE_BOOL(log_camera_products, false, "ITC",
@@ -334,7 +337,11 @@ class DrawState {
     std::array<std::optional<Matrix4>, kCameraPassCount> blended{};
     for (const CameraBlend& camera : camera_blends_) {
       uint32_t pass = CameraPass(camera.pass);
-      Matrix4 view = ViewMatrixFromTransform(Blend(camera.from, camera.to, amount_));
+      Transform eye = Blend(camera.from, camera.to, amount_);
+      if (camera.pass == 0) {
+        eye.position[1] += float(REXCVAR_GET(debug_camera_lift));
+      }
+      Matrix4 view = ViewMatrixFromTransform(eye);
       Matrix4 view_projection = Multiply(view, camera.projection);
       Replace(base, saved_, pass + kViewOffset, view);
       Replace(base, saved_, pass + kViewProjectionOffset, view_projection);
