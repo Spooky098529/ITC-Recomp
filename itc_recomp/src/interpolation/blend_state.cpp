@@ -23,6 +23,7 @@
 #include <algorithm>
 #include <array>
 #include <chrono>
+#include <cstring>
 #include <string>
 #include <mutex>
 #include <optional>
@@ -147,6 +148,24 @@ class DrawState {
       }
     }
     detail_.last_pass_outcomes = pass_outcomes;
+    if (REXCVAR_GET(log_blend_detail) && detail_.vp_copies.empty()) {
+      for (int pass = 0; pass < 21; pass++) {
+        uint32_t vp = kCameraPasses.start + pass * 592 + 0x90;
+        const Matrix4& m = current[vp];
+        if (std::all_of(m.begin(), m.end(), [](float v) { return v == 0; })) {
+          continue;
+        }
+        for (uint32_t a = kRenderStateBlock.start; a + kMatrixBytes <= kRenderStateBlock.end;
+             a += kRowBytes) {
+          if (current[a] == m) {
+            detail_.vp_copies += fmt::format(" pass{}@{:X}", pass, a);
+          }
+        }
+      }
+      if (detail_.vp_copies.empty()) {
+        detail_.vp_copies = " none";
+      }
+    }
     detail_.ticks++;
     previous_ = std::move(current);
   }
@@ -205,12 +224,31 @@ class DrawState {
       saved_.push_back({address, LoadMatrix(base, address)});
       StoreMatrix(base, address, BlendRigidMotion(motion, amount));
     }
+    if (REXCVAR_GET(log_blend_detail)) {
+      block_before_draw_.assign(base + kRenderStateBlock.start, base + kRenderStateBlock.end);
+      if (detail_.amounts.size() < 12) {
+        detail_.amounts += fmt::format(" {:.2f}", amount);
+      }
+    }
     counts_.draws++;
     counts_.blended += int(blends_.size());
     LogCounts();
   }
 
   void AfterDraw(uint8_t* base) {
+    if (!block_before_draw_.empty()) {
+      // Rows of the block the draw step itself wrote.
+      const uint8_t* now = base + kRenderStateBlock.start;
+      for (uint32_t row = 0; row < block_before_draw_.size(); row += kRowBytes) {
+        if (std::memcmp(now + row, block_before_draw_.data() + row, kRowBytes) != 0) {
+          detail_.rows_written_by_draw++;
+          if (detail_.written_sample.size() < 200) {
+            detail_.written_sample += fmt::format(" {:X}", kRenderStateBlock.start + row);
+          }
+        }
+      }
+      block_before_draw_.clear();
+    }
     for (auto it = saved_.rbegin(); it != saved_.rend(); ++it) {
       StoreMatrix(base, it->first, it->second);
     }
@@ -268,6 +306,10 @@ class DrawState {
     }
     REXLOG_INFO("blend detail: pass VP max moved {:.3f} max angle {:.3f}", detail_.max_pass_moved,
                 detail_.max_pass_angle);
+    REXLOG_INFO("blend detail: amounts{}", detail_.amounts);
+    REXLOG_INFO("blend detail: pass VP copies in block:{}", detail_.vp_copies);
+    REXLOG_INFO("blend detail: block rows written during draws: {}, e.g.{}",
+                detail_.rows_written_by_draw, detail_.written_sample);
     if (!detail_.cut_sample.empty()) {
       REXLOG_INFO("blend detail: cut {}", detail_.cut_sample);
     }
@@ -300,7 +342,12 @@ class DrawState {
     std::string cut_sample;
     float max_pass_moved = 0;
     float max_pass_angle = 0;
+    std::string amounts;
+    std::string vp_copies;
+    int rows_written_by_draw = 0;
+    std::string written_sample;
   } detail_;
+  std::vector<uint8_t> block_before_draw_;
 };
 
 DrawState& GetDrawState() {
