@@ -43,6 +43,9 @@ constexpr float kCameraCutAngle = 0.5f;     // radians, ~30 degrees
 constexpr uint32_t kFloatsPerRegister = 4;
 constexpr size_t kFloatsPerMatrix = 16;
 
+// Recorder id for uploads not recorded by a wrapped recorder.
+constexpr uint32_t kUntaggedRecorder = 0;
+
 // How much (as a fraction of their size) an upload's values can change in one
 // tick and still be blended. Bigger jumps are teleports or wrong pairs.
 constexpr float kMaxRelativeChangePerTick = 0.2f;
@@ -201,6 +204,7 @@ class Interpolator {
   std::vector<Snapshot> TakeSnapshots(uint8_t* base) {
     std::vector<Snapshot> snapshots;
     std::vector<RecordedUpload> replayed = FindReplayedShaderConstantUploads(base, scene_);
+    std::unordered_map<uint64_t, uint32_t> untagged_occurrences;
     UpdateDebugHide(replayed);
     for (const RecordedUpload& recorded : replayed) {
       if (!ShouldBlend(recorded.upload)) {
@@ -208,6 +212,14 @@ class Interpolator {
       }
       Snapshot snapshot{recorded.payload, recorded.upload.Signature(), std::nullopt, {}};
       snapshot.tag = DrawTags_Find(recorded.payload);
+      if (!snapshot.tag) {
+        // Recorded outside the wrapped recorders: the few global uploads
+        // (such as the main camera), recorded in the same order each tick.
+        // Identify them by kind and order.
+        uint32_t occurrence = untagged_occurrences[snapshot.signature]++;
+        snapshot.tag = DrawTagInfo{
+            snapshot.signature * 0x9E3779B97F4A7C15ull + occurrence + 1, kUntaggedRecorder};
+      }
       uint32_t floats = recorded.upload.register_count * kFloatsPerRegister;
       snapshot.values.resize(floats);
       for (uint32_t i = 0; i < floats; i++) {
@@ -218,7 +230,7 @@ class Interpolator {
     stats_.uploads_found = snapshots.size();
     stats_.uploads_tagged = 0;
     for (const Snapshot& snapshot : snapshots) {
-      stats_.uploads_tagged += snapshot.tag.has_value();
+      stats_.uploads_tagged += snapshot.tag && snapshot.tag->recorder != kUntaggedRecorder;
     }
     return snapshots;
   }
