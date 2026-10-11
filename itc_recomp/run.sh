@@ -11,4 +11,6 @@ exec "$dir/itc" \
   --gpu_plugin=xenos \
   --game_data_root="$dir" \
   --mnk_mode=true \
+  --max_fps=144 \
+  --log_fps=true \
   "$@"

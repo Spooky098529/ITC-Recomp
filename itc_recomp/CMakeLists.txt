@@ -35,6 +35,8 @@ include(generated/rexglue.cmake)
 set(ITC_SOURCES
     src/main.cpp
     src/hooks/vehicle.cpp
+    src/frame_pacing/frame_pacer.cpp
+    src/frame_pacing/renderer_hooks.cpp
 )
 
 if(WIN32)
@@ -44,6 +46,8 @@ else()
 endif()
 
 rexglue_setup_target(itc GPU_PLUGINS xenos)
+
+target_include_directories(itc PRIVATE src)
 
 # rex::runtime doesn't propagate imgui's include path, which rex_app.cpp and
 # the app header need. Headers only: the symbols already live in librexruntime.

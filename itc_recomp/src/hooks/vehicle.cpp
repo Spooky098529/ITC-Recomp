@@ -4,16 +4,9 @@
 // generated definitions are weak, so these take their place at link time.
 // See docs/functions.md for what is known about each address.
 
-#include "generated/default/itc_pch.h"
-
-#include <bit>
+#include "guest.h"
 
 namespace {
-
-// Reads a big-endian float from guest memory.
-float LoadGuestFloat(uint8_t* base, uint32_t address) {
-  return std::bit_cast<float>(REX_LOAD_U32(address));
-}
 
 // Offsets into the vehicle object.
 constexpr uint32_t kVehicleSpeedOffset = 48;  // float, metres per second
@@ -21,7 +14,7 @@ constexpr uint32_t kVehicleSpeedOffset = 48;  // float, metres per second
 constexpr float kMetresPerSecondToKmh = 3.6f;
 
 float Vehicle_GetSpeedKmh(uint8_t* base, uint32_t vehicle) {
-  float speed = LoadGuestFloat(base, vehicle + kVehicleSpeedOffset);
+  float speed = guest::LoadFloat(base, vehicle + kVehicleSpeedOffset);
   return speed * kMetresPerSecondToKmh;
 }
 
