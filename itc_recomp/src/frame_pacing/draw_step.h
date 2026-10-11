@@ -15,13 +15,12 @@ bool DrawStep_CanRerecord();
 
 // Main thread: records the scene again from current game memory, keeping
 // what the tick recorded after the draw step (HUD, text) as it was. Returns
-// false if it couldn't, in which case the tick's original recording is in
-// place instead.
+// false if the HUD couldn't be kept; the scene is still re-recorded.
 bool DrawStep_Rerecord(PPCContext& ctx, uint8_t* base);
 
-// Main thread, after the last extra frame of a tick: puts the tick's
-// original recording back exactly, for the game's own frame.
-void DrawStep_FinishExtraFrames(uint8_t* base);
+// Main thread, after the last extra frame of a tick (which must have been
+// re-recorded from the exact state, to become the game's own frame).
+void DrawStep_FinishExtraFrames();
 
 // Main thread: makes the current recording the one the render thread
 // replays (and back again). The game swaps them itself later in the tick

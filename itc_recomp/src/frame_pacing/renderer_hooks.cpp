@@ -184,11 +184,13 @@ void Renderer_WaitForFrame(PPCContext& ctx, uint8_t* base, uint32_t renderer) {
   Event_Wait(ctx, base, renderer + kRendererFrameDoneEventOffset);
 
   auto& pacer = GetFramePacer();
+  bool rerecorded = false;
   while (Renderer_IsRunning(base, renderer) && pacer.WaitForNextFrame()) {
     pacer.OnFrameStarted();
     bool drawn;
     if (frame_pacing::DrawStep_CanRerecord()) {
       drawn = DrawExtraFrame(ctx, base, renderer);
+      rerecorded = true;
     } else {
       // No draw step this tick (a menu): redraw what's displayed.
       drawn = Renderer_DrawFrameAndWait(ctx, base, renderer);
@@ -197,8 +199,12 @@ void Renderer_WaitForFrame(PPCContext& ctx, uint8_t* base, uint32_t renderer) {
       break;
     }
   }
-  // Leave this tick's recording exactly as the game made it.
-  frame_pacing::DrawStep_FinishExtraFrames(base);
+  // The game's own frame for this tick: re-recorded from the exact state, as
+  // an older recording may reference objects the re-runs released.
+  if (rerecorded) {
+    frame_pacing::DrawStep_Rerecord(ctx, base);
+  }
+  frame_pacing::DrawStep_FinishExtraFrames();
 
   Event_Signal(ctx, base, renderer + kRendererFrameDoneEventOffset);
   ctx.r3.u64 = renderer;
