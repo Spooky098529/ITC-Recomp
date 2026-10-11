@@ -66,7 +66,10 @@ constexpr size_t kNoEarlier = ~size_t(0);
 constexpr double kMinInvertibility = 1e-8;
 
 // How many of the closest previous matrices to test for a rigid match.
-constexpr size_t kMaxCameraCandidates = 4;
+constexpr size_t kMaxCameraCandidates = 8;
+
+// Weighs rotation against movement when comparing candidate motions.
+constexpr float kMetresPerRadian = 10.0f;
 
 // How much (as a fraction of their size) an upload's values can change in one
 // tick and still be blended. Bigger jumps are teleports or wrong pairs.
@@ -304,15 +307,28 @@ class Interpolator {
         }
         candidates.push_back({difference, p});
       }
+      // Of the closest few that this matrix moved rigidly from, take the one
+      // with the smallest motion: sibling views (offset by metres) can be
+      // numerically closer than this view's own previous matrix.
       size_t tested = std::min(candidates.size(), kMaxCameraCandidates);
       std::partial_sort(candidates.begin(), candidates.begin() + tested, candidates.end());
+      std::optional<RigidMotion> best;
+      float best_size = std::numeric_limits<float>::infinity();
       for (size_t c = 0; c < tested; c++) {
         Matrix4 before = MatrixFromBits(previous_cameras_[candidates[c].second]);
-        if (std::optional<RigidMotion> motion = FindRigidMotion(before, now)) {
-          camera_index_[camera] = camera_motions_.size();
-          camera_motions_.push_back(*motion);
-          break;
+        std::optional<RigidMotion> motion = FindRigidMotion(before, now);
+        if (!motion) {
+          continue;
         }
+        float size = MotionSize(motion->motion);
+        if (size < best_size) {
+          best = motion;
+          best_size = size;
+        }
+      }
+      if (best) {
+        camera_index_[camera] = camera_motions_.size();
+        camera_motions_.push_back(*best);
       }
     }
     previous_cameras_ = std::move(invertible);
@@ -345,6 +361,13 @@ class Interpolator {
       bound *= std::sqrt(length);
     }
     return bound > 0 && std::abs(det) > kMinInvertibility * bound;
+  }
+
+  // How big a rigid motion is: metres moved plus a metre per ~6 degrees.
+  static float MotionSize(const Transform& motion) {
+    float distance = Distance(motion.position, Vec3{});
+    float angle = AngleBetween(motion.rotation, Quaternion{});
+    return distance + kMetresPerRadian * angle;
   }
 
   // Where an upload holds copies of this tick's camera matrices.
