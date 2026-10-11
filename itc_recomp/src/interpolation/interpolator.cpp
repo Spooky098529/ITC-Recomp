@@ -14,6 +14,7 @@
 #include <array>
 #include <limits>
 #include <map>
+#include <set>
 #include <bit>
 #include <cctype>
 #include <cstdio>
@@ -256,16 +257,31 @@ class Interpolator {
         copies[BitsAt(snapshot.values, start)]++;
       }
     }
-    std::vector<MatrixBits> cameras;
+    // Only matrices that changed since last tick need blending, and only
+    // invertible ones can be transforms (sprite and lighting data are
+    // singular). That leaves a few dozen a tick.
+    std::vector<MatrixBits> invertible;  // every candidate transform this tick
+    std::vector<MatrixBits> cameras;     // those that changed, to be paired
     for (const auto& [bits, count] : copies) {
+      if (count < kMinCameraCopies) {
+        continue;
+      }
       Matrix4 m = MatrixFromBits(bits);
       bool finite = true;
       for (float v : m) {
         finite &= std::isfinite(v);
       }
-      if (count >= kMinCameraCopies && finite && m[15] != 0 && !(m == Matrix4{})) {
+      if (!finite || !IsInvertible(m)) {
+        continue;
+      }
+      invertible.push_back(bits);
+      if (!previous_all_.contains(bits)) {
         cameras.push_back(bits);
       }
+    }
+    previous_all_.clear();
+    for (const auto& [bits, count] : copies) {
+      previous_all_.insert(bits);
     }
 
     camera_index_.clear();
@@ -284,8 +300,9 @@ class Interpolator {
         }
         candidates.push_back({difference, p});
       }
-      std::sort(candidates.begin(), candidates.end());
-      for (size_t c = 0; c < candidates.size() && c < kMaxCameraCandidates; c++) {
+      size_t tested = std::min(candidates.size(), kMaxCameraCandidates);
+      std::partial_sort(candidates.begin(), candidates.begin() + tested, candidates.end());
+      for (size_t c = 0; c < tested; c++) {
         Matrix4 before = MatrixFromBits(previous_cameras_[candidates[c].second]);
         if (std::optional<RigidMotion> motion = FindRigidMotion(before, now)) {
           camera_index_[camera] = camera_motions_.size();
@@ -294,8 +311,29 @@ class Interpolator {
         }
       }
     }
-    previous_cameras_ = std::move(cameras);
+    previous_cameras_ = std::move(invertible);
     stats_.cameras = camera_motions_.size();
+  }
+
+  // Cheap invertibility test: determinant relative to the matrix's scale.
+  static bool IsInvertible(const Matrix4& m) {
+    double a[16];
+    double scale = 0;
+    for (int i = 0; i < 16; i++) {
+      a[i] = m[i];
+      scale = std::max(scale, std::abs(a[i]));
+    }
+    if (scale == 0) {
+      return false;
+    }
+    double s0 = a[0] * a[5] - a[4] * a[1], s1 = a[0] * a[6] - a[4] * a[2];
+    double s2 = a[0] * a[7] - a[4] * a[3], s3 = a[1] * a[6] - a[5] * a[2];
+    double s4 = a[1] * a[7] - a[5] * a[3], s5 = a[2] * a[7] - a[6] * a[3];
+    double c5 = a[10] * a[15] - a[14] * a[11], c4 = a[9] * a[15] - a[13] * a[11];
+    double c3 = a[9] * a[14] - a[13] * a[10], c2 = a[8] * a[15] - a[12] * a[11];
+    double c1 = a[8] * a[14] - a[12] * a[10], c0 = a[8] * a[13] - a[12] * a[9];
+    double det = s0 * c5 - s1 * c4 + s2 * c3 + s3 * c2 - s4 * c1 + s5 * c0;
+    return std::abs(det) > 1e-9 * scale * scale * scale * scale;
   }
 
   // Where an upload holds copies of this tick's camera matrices.
@@ -616,6 +654,7 @@ class Interpolator {
   std::vector<std::vector<float>> earlier_values_;  // counterparts from the list before
   std::unordered_map<uint32_t, Blend> blends_;
   std::vector<MatrixBits> previous_cameras_;
+  std::set<MatrixBits> previous_all_;  // every matrix window last tick
   std::map<MatrixBits, size_t> camera_index_;
   std::vector<RigidMotion> camera_motions_;     // by payload address
   float tick_progress_ = 1;
