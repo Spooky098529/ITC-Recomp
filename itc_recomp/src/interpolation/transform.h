@@ -49,6 +49,10 @@ struct RigidMotion {
   Transform motion;  // the rigid motion D, in row layout
   bool applied_first;  // b = D * a (true) or b = a * D
   bool column_layout;  // D's translation is in column 3 rather than row 3
+  // The point D's rotation is blended about: the camera's eye for a
+  // perspective matrix. Blending a turn about the world origin (kilometres
+  // away) would swing the in-between camera sideways.
+  std::optional<Vec3> pivot;
 };
 std::optional<RigidMotion> FindRigidMotion(const Matrix4& a, const Matrix4& b);
 Matrix4 BlendRigidMotion(const RigidMotion& motion, float amount);

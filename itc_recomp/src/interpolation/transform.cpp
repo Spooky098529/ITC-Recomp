@@ -243,11 +243,123 @@ Matrix4d ToDouble(const Matrix4& m) {
   return d;
 }
 
+// The eye of a perspective matrix in row layout: the point x with
+// [x, 1] * m = (0, 0, z, 0), i.e. columns 0, 1 and 3 vanish. Nothing for an
+// orthographic or degenerate matrix.
+std::optional<Vec3> EyePoint(const Matrix4d& m) {
+  // Solve A x = -r with A[j][i] = m[i][col_j], r[j] = m[3][col_j].
+  const int columns[3] = {0, 1, 3};
+  double a[3][4];
+  for (int j = 0; j < 3; j++) {
+    for (int i = 0; i < 3; i++) {
+      a[j][i] = m[i * 4 + columns[j]];
+    }
+    a[j][3] = -m[12 + columns[j]];
+  }
+  for (int col = 0; col < 3; col++) {
+    int pivot = col;
+    for (int row = col + 1; row < 3; row++) {
+      if (std::abs(a[row][col]) > std::abs(a[pivot][col])) {
+        pivot = row;
+      }
+    }
+    if (std::abs(a[pivot][col]) < 1e-9) {
+      return std::nullopt;
+    }
+    std::swap(a[col], a[pivot]);
+    for (int row = 0; row < 3; row++) {
+      if (row == col) {
+        continue;
+      }
+      double factor = a[row][col] / a[col][col];
+      for (int k = col; k < 4; k++) {
+        a[row][k] -= factor * a[col][k];
+      }
+    }
+  }
+  Vec3 eye;
+  for (int i = 0; i < 3; i++) {
+    eye[i] = float(a[i][3] / a[i][i]);
+    if (!std::isfinite(eye[i])) {
+      return std::nullopt;
+    }
+  }
+  return eye;
+}
+
 }  // namespace
+
+// For b = D * a with D rigid in row layout, solves for D using only
+// columns 0, 1 and 3 of a and b. A perspective matrix's depth column (2) is
+// nearly parallel to its w column (3), so inverting all of a amplifies float
+// rounding into errors of many pixels; the top 3x3 of columns 0, 1, 3 is the
+// camera rotation scaled per column, which is well conditioned.
+std::optional<Matrix4d> SolveRigidFromWellConditionedColumns(const Matrix4d& a,
+                                                             const Matrix4d& b) {
+  const int columns[3] = {0, 1, 3};
+  // A = a[0..2][columns], solve R * A = B_top and t * A = b[3] - a[3].
+  double m[3][3];
+  for (int i = 0; i < 3; i++) {
+    for (int j = 0; j < 3; j++) {
+      m[i][j] = a[i * 4 + columns[j]];
+    }
+  }
+  double det = m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1]) -
+               m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0]) +
+               m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]);
+  double scale = 0;
+  for (auto& row : m) {
+    for (double v : row) {
+      scale = std::max(scale, std::abs(v));
+    }
+  }
+  if (scale == 0 || std::abs(det) < 1e-6 * scale * scale * scale) {
+    return std::nullopt;
+  }
+  double inv[3][3];
+  inv[0][0] = (m[1][1] * m[2][2] - m[1][2] * m[2][1]) / det;
+  inv[0][1] = (m[0][2] * m[2][1] - m[0][1] * m[2][2]) / det;
+  inv[0][2] = (m[0][1] * m[1][2] - m[0][2] * m[1][1]) / det;
+  inv[1][0] = (m[1][2] * m[2][0] - m[1][0] * m[2][2]) / det;
+  inv[1][1] = (m[0][0] * m[2][2] - m[0][2] * m[2][0]) / det;
+  inv[1][2] = (m[0][2] * m[1][0] - m[0][0] * m[1][2]) / det;
+  inv[2][0] = (m[1][0] * m[2][1] - m[1][1] * m[2][0]) / det;
+  inv[2][1] = (m[0][1] * m[2][0] - m[0][0] * m[2][1]) / det;
+  inv[2][2] = (m[0][0] * m[1][1] - m[0][1] * m[1][0]) / det;
+
+  Matrix4d d{};
+  for (int i = 0; i < 4; i++) {
+    double rhs[3];
+    for (int j = 0; j < 3; j++) {
+      rhs[j] = b[i * 4 + columns[j]] - (i == 3 ? a[12 + columns[j]] : 0);
+    }
+    for (int k = 0; k < 3; k++) {
+      d[i * 4 + k] = rhs[0] * inv[0][k] + rhs[1] * inv[1][k] + rhs[2] * inv[2][k];
+    }
+  }
+  d[15] = 1;
+  // The depth column must agree too, or the projection changed.
+  Matrix4d check = Multiply(d, a);
+  double depth_scale = 0, depth_error = 0;
+  for (int i = 0; i < 4; i++) {
+    depth_scale = std::max(depth_scale, std::abs(b[i * 4 + 2]));
+    depth_error = std::max(depth_error, std::abs(check[i * 4 + 2] - b[i * 4 + 2]));
+  }
+  if (depth_error > 1e-3 * std::max(1.0, depth_scale)) {
+    return std::nullopt;
+  }
+  return d;
+}
 
 std::optional<RigidMotion> FindRigidMotion(const Matrix4& a_in, const Matrix4& b_in) {
   Matrix4d a = ToDouble(a_in);
   Matrix4d b = ToDouble(b_in);
+  if (std::optional<Matrix4d> d = SolveRigidFromWellConditionedColumns(a, b);
+      d && IsRigidRowLayout(*d)) {
+    if (std::optional<Transform> motion = TransformFromWorldMatrix(ToFloat(*d))) {
+      return RigidMotion{a_in, *motion, true, false, EyePoint(b)};
+    }
+  }
   std::optional<Matrix4d> a_inverse = Inverse(a);
   if (!a_inverse) {
     return std::nullopt;
@@ -264,7 +376,11 @@ std::optional<RigidMotion> FindRigidMotion(const Matrix4& a_in, const Matrix4& b
       if (!motion) {
         continue;
       }
-      return RigidMotion{a_in, *motion, applied_first, column_layout};
+      RigidMotion rigid{a_in, *motion, applied_first, column_layout, std::nullopt};
+      if (applied_first && !column_layout) {
+        rigid.pivot = EyePoint(b);
+      }
+      return rigid;
     }
   }
   return std::nullopt;
@@ -273,6 +389,25 @@ std::optional<RigidMotion> FindRigidMotion(const Matrix4& a_in, const Matrix4& b
 Matrix4 BlendRigidMotion(const RigidMotion& rigid, float amount) {
   Transform partial = Blend(Transform{}, rigid.motion, amount);
   Matrix4d d = ToDouble(WorldMatrixFromTransform(partial));
+  if (rigid.pivot) {
+    // The pivot p is the later matrix's eye; D takes it to the earlier eye
+    // q = p D. Put the in-between eye on the straight line e(t) = q + t (p - q)
+    // and turn by the partial rotation about it: x -> (x - e(t)) R(t) + q.
+    const Vec3& p = *rigid.pivot;
+    Matrix4d full = ToDouble(WorldMatrixFromTransform(rigid.motion));
+    double q[3], e[3];
+    for (int k = 0; k < 3; k++) {
+      q[k] = p[0] * full[0 * 4 + k] + p[1] * full[1 * 4 + k] + p[2] * full[2 * 4 + k] +
+             full[12 + k];
+    }
+    for (int k = 0; k < 3; k++) {
+      e[k] = q[k] + amount * (p[k] - q[k]);
+    }
+    for (int k = 0; k < 3; k++) {
+      double e_rotated = e[0] * d[0 * 4 + k] + e[1] * d[1 * 4 + k] + e[2] * d[2 * 4 + k];
+      d[12 + k] = -e_rotated + q[k];
+    }
+  }
   if (rigid.column_layout) {
     d = Transposed4(d);
   }
