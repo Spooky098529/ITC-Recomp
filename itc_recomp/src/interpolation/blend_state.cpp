@@ -21,7 +21,9 @@
 #include <rex/logging.h>
 
 #include <algorithm>
+#include <array>
 #include <chrono>
+#include <string>
 #include <mutex>
 #include <optional>
 #include <set>
@@ -33,6 +35,8 @@ REXCVAR_DEFINE_BOOL(interpolate_draw_state, true, "ITC",
                     "the draw step reads");
 REXCVAR_DEFINE_BOOL(log_blend_state, false, "ITC",
                     "Log how many matrices were blended, once a second");
+REXCVAR_DEFINE_BOOL(log_blend_detail, false, "ITC",
+                    "Log why candidate matrices were or weren't blended, once a second");
 
 namespace interpolation {
 namespace {
@@ -85,6 +89,21 @@ float MovedDistance(const RigidMotion& motion) {
   return Distance(p, q);
 }
 
+enum class Outcome { kNew, kUnchanged, kNotFinite, kNotRigid, kCut, kBlended, kInside, kCount };
+constexpr const char* kOutcomeNames[] = {"new", "unchanged", "nonfinite", "notrigid",
+                                         "cut",  "blended",   "inside"};
+enum RegionIndex { kPasses, kBlock, kRecorder, kRegionCount };
+constexpr const char* kRegionNames[] = {"passes", "block", "recorder"};
+constexpr char kOutcomeLetters[] = "nu!rcbi";
+
+std::string FormatMatrix(const Matrix4& m) {
+  std::string s;
+  for (int i = 0; i < 16; i++) {
+    s += fmt::format("{}{:.4g}", i == 0 ? "" : (i % 4 == 0 ? " | " : " "), m[i]);
+  }
+  return s;
+}
+
 class DrawState {
  public:
   // Main thread, from the per-object recorder: a matrix it was handed.
@@ -116,30 +135,62 @@ class DrawState {
     current.reserve(candidates.size());
     blends_.clear();
     uint32_t skip_until = 0;
+    std::string pass_outcomes(21, '-');
     for (uint32_t address : candidates) {
       Matrix4 now = LoadMatrix(base, address);
       current[address] = now;
-      if (address < skip_until) {
-        continue;  // inside a matrix already taken
+      Outcome outcome = Classify(address, now, skip_until);
+      int region = RegionOf(address);
+      detail_.counts[region][int(outcome)]++;
+      if (region == kPasses && (address - kCameraPasses.start) % 592 == 0x90) {
+        pass_outcomes[(address - kCameraPasses.start) / 592] = kOutcomeLetters[int(outcome)];
       }
-      auto before = previous_.find(address);
-      if (before == previous_.end() || before->second == now || !IsFinite(now) ||
-          !IsFinite(before->second)) {
-        continue;
-      }
-      std::optional<RigidMotion> motion = FindRigidMotion(before->second, now);
-      if (!motion) {
-        continue;
-      }
-      if (MovedDistance(*motion) > kCutDistance ||
-          AngleBetween(motion->motion.rotation, Quaternion{}) > kCutAngle) {
-        counts_.cuts++;
-        continue;
-      }
-      blends_.push_back({address, *motion});
-      skip_until = address + kMatrixBytes;
     }
+    detail_.last_pass_outcomes = pass_outcomes;
+    detail_.ticks++;
     previous_ = std::move(current);
+  }
+
+  Outcome Classify(uint32_t address, const Matrix4& now, uint32_t& skip_until) {
+    if (address < skip_until) {
+      return Outcome::kInside;  // inside a matrix already taken
+    }
+    auto before = previous_.find(address);
+    if (before == previous_.end()) {
+      return Outcome::kNew;
+    }
+    if (before->second == now) {
+      return Outcome::kUnchanged;
+    }
+    if (!IsFinite(now) || !IsFinite(before->second)) {
+      return Outcome::kNotFinite;
+    }
+    std::optional<RigidMotion> motion = FindRigidMotion(before->second, now);
+    bool is_pass_vp = InRange(kCameraPasses, address) &&
+                      (address - kCameraPasses.start) % 592 == 0x90;
+    if (!motion) {
+      if (is_pass_vp && detail_.not_rigid_sample.empty()) {
+        detail_.not_rigid_sample = fmt::format("{:08X}\n  before {}\n  now    {}", address,
+                                               FormatMatrix(before->second), FormatMatrix(now));
+      }
+      return Outcome::kNotRigid;
+    }
+    float moved = MovedDistance(*motion);
+    float angle = AngleBetween(motion->motion.rotation, Quaternion{});
+    if (moved > kCutDistance || angle > kCutAngle) {
+      counts_.cuts++;
+      if (is_pass_vp && detail_.cut_sample.empty()) {
+        detail_.cut_sample = fmt::format("{:08X} moved {:.3f} angle {:.3f}", address, moved, angle);
+      }
+      return Outcome::kCut;
+    }
+    if (is_pass_vp) {
+      detail_.max_pass_moved = std::max(detail_.max_pass_moved, moved);
+      detail_.max_pass_angle = std::max(detail_.max_pass_angle, angle);
+    }
+    blends_.push_back({address, *motion});
+    skip_until = address + kMatrixBytes;
+    return Outcome::kBlended;
   }
 
   void BeforeDraw(uint8_t* base) {
@@ -167,6 +218,16 @@ class DrawState {
   }
 
  private:
+  static bool InRange(const Region& region, uint32_t address) {
+    return address >= region.start && address < region.end;
+  }
+
+  static int RegionOf(uint32_t address) {
+    if (InRange(kCameraPasses, address)) return kPasses;
+    if (InRange(kRenderStateBlock, address)) return kBlock;
+    return kRecorder;
+  }
+
   static bool InRegion(uint32_t address) {
     for (const Region& region : {kCameraPasses, kRenderStateBlock}) {
       if (address >= region.start && address < region.end) {
@@ -188,6 +249,32 @@ class DrawState {
                 counts_.draws ? counts_.blended / counts_.draws : 0, counts_.cuts);
     counts_ = {};
     counts_.last_log = now;
+    LogDetail();
+  }
+
+  void LogDetail() {
+    if (!REXCVAR_GET(log_blend_detail)) {
+      detail_ = {};
+      return;
+    }
+    REXLOG_INFO("blend detail: {} ticks, last tick's pass VPs [{}] (letters: {})", detail_.ticks,
+                detail_.last_pass_outcomes, kOutcomeLetters);
+    for (int r = 0; r < kRegionCount; r++) {
+      std::string line;
+      for (int o = 0; o < int(Outcome::kCount); o++) {
+        line += fmt::format(" {}={}", kOutcomeNames[o], detail_.counts[r][o]);
+      }
+      REXLOG_INFO("blend detail: {:8}{}", kRegionNames[r], line);
+    }
+    REXLOG_INFO("blend detail: pass VP max moved {:.3f} max angle {:.3f}", detail_.max_pass_moved,
+                detail_.max_pass_angle);
+    if (!detail_.cut_sample.empty()) {
+      REXLOG_INFO("blend detail: cut {}", detail_.cut_sample);
+    }
+    if (!detail_.not_rigid_sample.empty()) {
+      REXLOG_INFO("blend detail: not rigid {}", detail_.not_rigid_sample);
+    }
+    detail_ = {};
   }
 
   std::mutex mutex_;
@@ -204,6 +291,16 @@ class DrawState {
     int cuts = 0;
     std::chrono::steady_clock::time_point last_log{};
   } counts_;
+
+  struct Detail {
+    int ticks = 0;
+    std::array<std::array<int, int(Outcome::kCount)>, kRegionCount> counts{};
+    std::string last_pass_outcomes;
+    std::string not_rigid_sample;
+    std::string cut_sample;
+    float max_pass_moved = 0;
+    float max_pass_angle = 0;
+  } detail_;
 };
 
 DrawState& GetDrawState() {
