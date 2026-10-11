@@ -72,6 +72,12 @@ constexpr uint32_t kCameraPassBytes = 592;
 constexpr uint32_t kViewOffset = 0x10;
 constexpr uint32_t kProjectionOffset = 0x50;
 constexpr uint32_t kViewProjectionOffset = 0x90;
+// The camera Draw rebuilds the view from (sub_820A3978, once per use):
+// eye position, look-at target and up vector, 3 floats each.
+constexpr uint32_t kEyeOffset = 0x190;
+constexpr uint32_t kTargetOffset = 0x1A0;
+constexpr uint32_t kUpOffset = 0x1B0;
+constexpr uint32_t kLookAtOffsets[] = {kEyeOffset, kTargetOffset, kUpOffset};
 
 // The command list recorders write into (see "Command list format" in
 // docs/functions.md): its two buffers, and the slots used (16 bytes each).
@@ -108,6 +114,17 @@ void StoreMatrix(uint8_t* base, uint32_t address, const Matrix4& m) {
 
 bool IsFinite(const Matrix4& m) {
   return std::all_of(m.begin(), m.end(), [](float v) { return std::isfinite(v); });
+}
+
+Vec3 LoadVec3(uint8_t* base, uint32_t address) {
+  return {guest::LoadFloat(base, address), guest::LoadFloat(base, address + 4),
+          guest::LoadFloat(base, address + 8)};
+}
+
+void StoreVec3(uint8_t* base, uint32_t address, const Vec3& v) {
+  for (int k = 0; k < 3; k++) {
+    guest::StoreFloat(base, address + 4 * k, v[k]);
+  }
 }
 
 bool IsCut(const Transform& a, const Transform& b) {
@@ -366,13 +383,25 @@ class DrawState {
     if (!enabled_) {
       return;
     }
+    // Draw rebuilds each camera's view from these; blend them, as positions.
+    for (const LookAtBlend& blend : look_at_blends_) {
+      for (int i = 0; i < 3; i++) {
+        uint32_t address = CameraPass(blend.pass) + kLookAtOffsets[i];
+        Vec3 v;
+        for (int k = 0; k < 3; k++) {
+          v[k] = blend.from[i][k] + (blend.to[i][k] - blend.from[i][k]) * amount_;
+        }
+        if (i == 0 && blend.pass == 0) {
+          v[1] += float(REXCVAR_GET(debug_camera_lift));
+        }
+        ReplaceVec3(base, address, v);
+      }
+      counts_.look_ats++;
+    }
     std::array<std::optional<Matrix4>, kCameraPassCount> blended{};
     for (const CameraBlend& camera : camera_blends_) {
       uint32_t pass = CameraPass(camera.pass);
       Transform eye = Blend(camera.from, camera.to, amount_);
-      if (camera.pass == 0) {
-        eye.position[1] += float(REXCVAR_GET(debug_camera_lift));
-      }
       Matrix4 view = ViewMatrixFromTransform(eye);
       Matrix4 view_projection = Multiply(view, camera.projection);
       Replace(base, saved_, pass + kViewOffset, view);
@@ -408,6 +437,12 @@ class DrawState {
   void AfterDraw(uint8_t* base) {
     in_draw_ = false;
     Restore(base, saved_);
+    for (auto it = saved_vec3_.rbegin(); it != saved_vec3_.rend(); ++it) {
+      if (LoadVec3(base, it->address) == it->written) {
+        StoreVec3(base, it->address, it->original);
+      }
+    }
+    saved_vec3_.clear();
     dump_.OnDraw(base, logic_pass_, "post");
     counts_.draws++;
     LogCounts();
@@ -453,6 +488,23 @@ class DrawState {
   }
 
  private:
+  struct LookAtBlend {
+    int pass;
+    std::array<Vec3, 3> from;  // eye, target, up
+    std::array<Vec3, 3> to;
+  };
+
+  struct SavedVec3 {
+    uint32_t address;
+    Vec3 original;
+    Vec3 written;
+  };
+
+  void ReplaceVec3(uint8_t* base, uint32_t address, const Vec3& value) {
+    saved_vec3_.push_back({address, LoadVec3(base, address), value});
+    StoreVec3(base, address, value);
+  }
+
   struct CameraBlend {
     int pass;
     Transform from;
@@ -487,6 +539,7 @@ class DrawState {
   // Main thread, before the Draw of a logic pass (after its Update).
   void OnTick(uint8_t* base) {
     camera_blends_.clear();
+    look_at_blends_.clear();
     for (int pass = 0; pass < kCameraPassCount; pass++) {
       std::optional<Transform> camera = CameraOf(base, pass);
       if (camera && cameras_[pass]) {
@@ -498,6 +551,20 @@ class DrawState {
         }
       }
       cameras_[pass] = camera;
+
+      std::array<Vec3, 3> look_at;
+      bool finite = true;
+      for (int i = 0; i < 3; i++) {
+        look_at[i] = LoadVec3(base, CameraPass(pass) + kLookAtOffsets[i]);
+        finite &= std::all_of(look_at[i].begin(), look_at[i].end(),
+                              [](float v) { return std::isfinite(v); });
+      }
+      if (finite && look_ats_[pass] && look_at != *look_ats_[pass] &&
+          Distance((*look_ats_[pass])[0], look_at[0]) <= kCutDistance &&
+          Distance((*look_ats_[pass])[1], look_at[1]) <= kCutDistance) {
+        look_at_blends_.push_back({pass, *look_ats_[pass], look_at});
+      }
+      look_ats_[pass] = finite ? std::optional(look_at) : std::nullopt;
     }
     objects_last_tick_ = std::move(objects_this_tick_);
     objects_this_tick_.clear();
@@ -600,9 +667,9 @@ class DrawState {
     }
     int draws = std::max(counts_.draws, 1);
     REXLOG_INFO(
-        "blend state: {} draws; per draw {} cameras, {} camera constants, {} camera products, "
+        "blend state: {} draws; per draw {} look-ats, {} cameras, {} camera constants, {} camera products, "
         "{} objects ({} unmatched, {} not transforms); {} camera cuts, {} object cuts",
-        counts_.draws, counts_.cameras / draws, counts_.constants / draws,
+        counts_.draws, counts_.look_ats / draws, counts_.cameras / draws, counts_.constants / draws,
         counts_.products / draws, counts_.objects / draws,
         counts_.objects_unmatched / draws, counts_.objects_not_transforms / draws,
         counts_.camera_cuts, counts_.object_cuts);
@@ -619,6 +686,9 @@ class DrawState {
 
   std::array<std::optional<Transform>, kCameraPassCount> cameras_;
   std::vector<CameraBlend> camera_blends_;
+  std::array<std::optional<std::array<Vec3, 3>>, kCameraPassCount> look_ats_;
+  std::vector<LookAtBlend> look_at_blends_;
+  std::vector<SavedVec3> saved_vec3_;
 
   std::unordered_map<ObjectKey, ScaledTransform, ObjectKeyHash> objects_last_tick_;
   std::unordered_map<ObjectKey, ScaledTransform, ObjectKeyHash> objects_this_tick_;
@@ -639,6 +709,7 @@ class DrawState {
     int objects = 0;
     int products = 0;
     int constants = 0;
+    int look_ats = 0;
     int objects_unmatched = 0;
     int objects_not_transforms = 0;
     int camera_cuts = 0;
