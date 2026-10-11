@@ -80,7 +80,15 @@ void Renderer_WaitForFrame(PPCContext& ctx, uint8_t* base, uint32_t renderer) {
   __imp__sub_820920D8(ctx, base);
 
   auto& pacer = GetFramePacer();
-  bool render_only = pacer.WaitForNextFrame();  // false once the next tick is due
+  frame_pacing::GameMessages_OnPassFinished();
+  bool render_only;
+  if (frame_pacing::GameMessages_InRace()) {
+    render_only = pacer.WaitForNextFrame();  // false once the next tick is due
+  } else {
+    // Menus run at the game's 30 fps (see game_messages.h).
+    pacer.WaitForNextTick();
+    render_only = false;
+  }
   if (!render_only) {
     pacer.OnTickReleased();
   }

@@ -27,6 +27,10 @@ bool FramePacer::WaitForNextFrame() {
   return true;
 }
 
+void FramePacer::WaitForNextTick() {
+  std::this_thread::sleep_until(next_tick_);
+}
+
 void FramePacer::OnTickReleased() {
   Clock::time_point now = Clock::now();
   // Stay on the 30 Hz grid, unless we've fallen a whole tick behind (a

@@ -26,6 +26,9 @@ class FramePacer {
   // Returns false instead if the next tick is due first.
   bool WaitForNextFrame();
 
+  // Sleeps until the next tick is due.
+  void WaitForNextTick();
+
   // Call when releasing game logic for its next tick. Schedules the tick
   // after it.
   void OnTickReleased();

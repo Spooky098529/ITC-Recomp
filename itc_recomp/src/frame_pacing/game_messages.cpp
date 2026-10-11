@@ -28,6 +28,8 @@ enum MessageId : uint32_t {
 };
 
 bool g_render_only_pass = false;
+bool g_race_draw_step_seen = false;  // during the current logic pass
+bool g_in_race = false;              // as of the last logic pass
 
 struct Counts {
   int updates = 0;
@@ -110,8 +112,20 @@ void DispatchMessages(PPCContext& ctx, uint8_t* base, uint32_t dispatcher) {
 
 }  // namespace
 
+void GameMessages_OnPassFinished() {
+  if (!g_render_only_pass) {
+    // The pass that just ran was a logic pass: it decides whether we're in a race.
+    g_in_race = g_race_draw_step_seen;
+    g_race_draw_step_seen = false;
+  }
+}
+
 void GameMessages_SetRenderOnlyPass(bool render_only) {
   g_render_only_pass = render_only;
+}
+
+bool GameMessages_InRace() {
+  return g_in_race;
 }
 
 bool GameMessages_IsRenderOnlyPass() {
@@ -134,6 +148,13 @@ extern "C" REX_FUNC(sub_820990F0) {
     return;
   }
   __imp__sub_820990F0(ctx, base);
+}
+
+// The race's draw step: r3 = its argument. Noted to tell races from menus.
+extern "C" REX_FUNC(sub_8215B4F8) {
+  REX_FUNC_PROLOGUE();
+  frame_pacing::g_race_draw_step_seen = true;
+  __imp__sub_8215B4F8(ctx, base);
 }
 
 // Message dispatcher: r3 = dispatcher object.
