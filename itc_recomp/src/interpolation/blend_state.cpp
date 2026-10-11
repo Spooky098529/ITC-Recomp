@@ -67,6 +67,16 @@ constexpr uint32_t kViewOffset = 0x10;
 constexpr uint32_t kProjectionOffset = 0x50;
 constexpr uint32_t kViewProjectionOffset = 0x90;
 
+// The command list recorders write into (see "Command list format" in
+// docs/functions.md): its two buffers, and the slots used (16 bytes each).
+constexpr uint32_t kCommandListPointer = 0x8296B918;
+constexpr uint32_t kCommandListCapacityOffset = 8;
+constexpr uint32_t kCommandListUsedOffset = 12;
+constexpr uint32_t kCommandListPreviousUsedOffset = 16;
+constexpr uint32_t kCommandListBufferOffsets[] = {24, 28};
+constexpr uint32_t kCommandSlotBytes = 16;
+constexpr uint32_t kSetConstantsCommand = 7;
+
 // Where the main thread's stack is during Draw (dumped for analysis).
 constexpr uint32_t kDrawStack = 0x70180000;
 constexpr uint32_t kDrawStackBytes = 0x10000;
@@ -328,6 +338,14 @@ class DrawState {
       blended[camera.pass] = view_projection;
       counts_.cameras++;
     }
+    for (CameraConstant& constant : camera_constants_) {
+      if (!blended[constant.pass] || LoadMatrix(base, constant.payload) != constant.written) {
+        continue;  // recorded over
+      }
+      StoreMatrix(base, constant.payload, *blended[constant.pass]);
+      constant.written = *blended[constant.pass];
+      counts_.constants++;
+    }
     // Products game logic made with a camera, still in place: redo them with
     // the blended camera.
     for (const CameraProduct& product : products_) {
@@ -394,6 +412,12 @@ class DrawState {
     Matrix4 projection;
   };
 
+  struct CameraConstant {
+    uint32_t payload;
+    int pass;
+    Matrix4 written;  // what's there now
+  };
+
   struct CameraProduct {
     uint32_t out;
     int pass;
@@ -431,6 +455,48 @@ class DrawState {
     objects_this_tick_.clear();
     products_ = std::move(products_pending_);
     products_pending_.clear();
+    FindCameraConstants(base);
+  }
+
+  // Commands recorded during Update that set shader constants to a
+  // camera's view-projection (the scenery's per-pass constants): rewritten
+  // with the blended camera on every pass, since the render thread replays
+  // them after Draw.
+  void FindCameraConstants(uint8_t* base) {
+    camera_constants_.clear();
+    uint32_t list = guest::LoadU32(base, kCommandListPointer);
+    if (list == 0 || camera_blends_.empty()) {
+      return;
+    }
+    std::vector<std::pair<int, Matrix4>> cameras;
+    for (const CameraBlend& camera : camera_blends_) {
+      cameras.push_back({camera.pass, LoadMatrix(base, CameraPass(camera.pass) + kViewProjectionOffset)});
+    }
+    uint32_t capacity = guest::LoadU32(base, list + kCommandListCapacityOffset);
+    uint32_t used = std::max(guest::LoadU32(base, list + kCommandListUsedOffset),
+                             guest::LoadU32(base, list + kCommandListPreviousUsedOffset));
+    uint32_t slots = std::min(capacity, used);
+    for (uint32_t offset : kCommandListBufferOffsets) {
+      uint32_t buffer = guest::LoadU32(base, list + offset);
+      if (buffer == 0) {
+        continue;
+      }
+      for (uint32_t slot = 0; slot + 5 <= slots; slot++) {
+        uint32_t header = buffer + slot * kCommandSlotBytes;
+        if (guest::LoadU32(base, header) != kSetConstantsCommand) {
+          continue;
+        }
+        uint32_t payload = header + kCommandSlotBytes;
+        // Cheap check on the first value before loading the matrix.
+        float first = guest::LoadFloat(base, payload);
+        for (const auto& [pass, view_projection] : cameras) {
+          if (first == view_projection[0] && LoadMatrix(base, payload) == view_projection) {
+            camera_constants_.push_back({payload, pass, view_projection});
+            break;
+          }
+        }
+      }
+    }
   }
 
   // The camera of a pass whose view-projection is its view * projection (set
@@ -486,9 +552,10 @@ class DrawState {
     }
     int draws = std::max(counts_.draws, 1);
     REXLOG_INFO(
-        "blend state: {} draws; per draw {} cameras, {} camera products, {} objects ({} "
-        "unmatched, {} not transforms); {} camera cuts, {} object cuts",
-        counts_.draws, counts_.cameras / draws, counts_.products / draws, counts_.objects / draws,
+        "blend state: {} draws; per draw {} cameras, {} camera constants, {} camera products, "
+        "{} objects ({} unmatched, {} not transforms); {} camera cuts, {} object cuts",
+        counts_.draws, counts_.cameras / draws, counts_.constants / draws,
+        counts_.products / draws, counts_.objects / draws,
         counts_.objects_unmatched / draws, counts_.objects_not_transforms / draws,
         counts_.camera_cuts, counts_.object_cuts);
     counts_ = {};
@@ -509,6 +576,7 @@ class DrawState {
   std::unordered_map<ObjectKey, ScaledTransform, ObjectKeyHash> objects_this_tick_;
   std::unordered_map<uint32_t, int> recorded_;
 
+  std::vector<CameraConstant> camera_constants_;
   std::vector<CameraProduct> products_pending_;  // made since the last tick's Draw
   std::vector<CameraProduct> products_;
 
@@ -522,6 +590,7 @@ class DrawState {
     int cameras = 0;
     int objects = 0;
     int products = 0;
+    int constants = 0;
     int objects_unmatched = 0;
     int objects_not_transforms = 0;
     int camera_cuts = 0;
