@@ -26,10 +26,15 @@
 #include <rex/cvar.h>
 #include <rex/logging.h>
 
+#include <algorithm>
+#include <string>
 #include <vector>
 
 REXCVAR_DEFINE_BOOL(debug_redraw_twice, false, "ITC",
                     "Debug: run the draw step twice per tick (should look identical)");
+REXCVAR_DEFINE_BOOL(debug_compare_rerecord, false, "ITC",
+                    "Debug: compare each tick's first re-record with the original, log where "
+                    "they differ, and show the original instead");
 
 namespace frame_pacing {
 namespace {
@@ -220,6 +225,52 @@ void RestoreOfficial(uint8_t* base, const State& s) {
   Restore(base, StartOfDrawStep(s), s.official_bytes);
 }
 
+// Logs where a re-run of the draw step first differs from the original, a
+// few times per session.
+void CompareWithOriginal(uint8_t* base, const State& s) {
+  static int logged = 0;
+  if (logged >= 12) {
+    return;
+  }
+  logged++;
+  uint32_t start = StartOfDrawStep(s);
+  uint32_t original_words = (s.write_pointer_after_draw - start) / 4;
+  uint32_t rerun_words = (WritePointer(base, s) - start) / 4;
+  uint32_t first_difference = std::min(original_words, rerun_words);
+  for (uint32_t i = 0; i < std::min(original_words, rerun_words); i++) {
+    if (guest::LoadU32(base, start + 4 * i) != s.official_bytes[i]) {
+      first_difference = i;
+      break;
+    }
+  }
+  auto slot_text = [&](bool rerun, uint32_t word) {
+    std::string text;
+    uint32_t slot = word / 4 * 4;
+    for (uint32_t k = slot; k < slot + 8 && k < (rerun ? rerun_words : original_words); k++) {
+      uint32_t v = rerun ? guest::LoadU32(base, start + 4 * k) : s.official_bytes[k];
+      text += fmt::format(" {:08x}", v);
+    }
+    return text;
+  };
+  // Pointers into the draw step's region from what was recorded after it.
+  uint32_t end = s.write_pointer_after_draw;
+  int references = 0;
+  for (uint32_t i = original_words; i < s.official_bytes.size(); i++) {
+    uint32_t v = s.official_bytes[i];
+    references += v >= start && v < end;
+  }
+  int node_references = 0;
+  for (const Node& n : s.after_draw_nodes) {
+    node_references += n.item >= start && n.item < end;
+  }
+  REXLOG_INFO(
+      "draw step compare: original {} words, re-run {}, first difference at word {} "
+      "(slot {}); after-draw-step data has {} words and {} nodes pointing into the draw "
+      "step's region\n  original:{}\n  re-run:  {}",
+      original_words, rerun_words, first_difference, first_difference / 4, references,
+      node_references, slot_text(false, first_difference), slot_text(true, first_difference));
+}
+
 void ToggleReplayIndex(uint8_t* base, uint32_t state) {
   uint32_t index = guest::LoadU32(base, state + kStateReplayIndexOffset);
   guest::StoreU32(base, state + kStateReplayIndexOffset, index ? 0 : 1);
@@ -239,6 +290,12 @@ bool DrawStep_Rerecord(PPCContext& ctx, uint8_t* base) {
   RestoreBeforeDrawStep(base, s);
   ctx.r3.u64 = s.argument;
   __imp__sub_8215B4F8(ctx, base);
+
+  if (REXCVAR_GET(debug_compare_rerecord)) {
+    CompareWithOriginal(base, s);
+    RestoreOfficial(base, s);
+    return false;
+  }
 
   // Put back what the tick recorded after the draw step. Its bytes must not
   // have been overwritten by a longer re-run.

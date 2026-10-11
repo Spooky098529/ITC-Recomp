@@ -43,13 +43,17 @@ constexpr uint32_t kVideoOutputDeviceOffset = 140;
 
 constexpr uint32_t kInfiniteTimeout = 0xFFFFFFFF;
 
-void Event_Wait(PPCContext& ctx, uint8_t* base, uint32_t event) {
+// Waits for a game event; the timeout is in milliseconds (sub_82297D38
+// converts it for NtWaitForSingleObjectEx). Returns whether it was set.
+bool Event_Wait(PPCContext& ctx, uint8_t* base, uint32_t event,
+                uint32_t timeout_ms = kInfiniteTimeout) {
   guest::StackFrame frame(ctx, 96);
   uint32_t timeout = frame.Local(80);
-  guest::StoreU32(base, timeout, kInfiniteTimeout);
+  guest::StoreU32(base, timeout, timeout_ms);
   ctx.r3.u64 = event;
   ctx.r4.u64 = timeout;
   sub_8258DD90(ctx, base);
+  return ctx.r3.u32 != 0;
 }
 
 void Event_Signal(PPCContext& ctx, uint8_t* base, uint32_t event) {
@@ -78,10 +82,24 @@ void Renderer_ThreadLoop(PPCContext& ctx, uint8_t* base, uint32_t renderer) {
   }
 }
 
+// How long an extra frame may take before the frame loop gives up on extra
+// frames for the tick (the render thread may be busy elsewhere, as during
+// loading).
+constexpr uint32_t kExtraFrameTimeoutMs = 1000;
+
 // Main thread: has the render thread draw one frame and waits for it.
-void Renderer_DrawFrameAndWait(PPCContext& ctx, uint8_t* base, uint32_t renderer) {
+// Returns false if it didn't finish in time.
+bool Renderer_DrawFrameAndWait(PPCContext& ctx, uint8_t* base, uint32_t renderer) {
   Event_Signal(ctx, base, renderer + kRendererTickDoneEventOffset);
-  Event_Wait(ctx, base, renderer + kRendererFrameDoneEventOffset);
+  if (Event_Wait(ctx, base, renderer + kRendererFrameDoneEventOffset, kExtraFrameTimeoutMs)) {
+    return true;
+  }
+  static int logged = 0;
+  if (logged++ < 10) {
+    REXLOG_WARN("frame loop: render thread didn't finish an extra frame within {} ms",
+                kExtraFrameTimeoutMs);
+  }
+  return false;
 }
 
 // See "Known data" in docs/functions.md.
@@ -133,8 +151,9 @@ TickTimer& GetTickTimer() {
 }
 
 // Records one extra frame from the current game memory, with the debug
-// camera lift applied, and has it drawn.
-void DrawExtraFrame(PPCContext& ctx, uint8_t* base, uint32_t renderer) {
+// camera lift applied, and has it drawn. Returns false if the render thread
+// didn't respond.
+bool DrawExtraFrame(PPCContext& ctx, uint8_t* base, uint32_t renderer) {
   float lift = float(REXCVAR_GET(debug_extra_frame_camera_lift));
   interpolation::Matrix4 camera = LoadMatrix(base, kCameraViewMatrixAddress);
   if (lift != 0) {
@@ -147,8 +166,9 @@ void DrawExtraFrame(PPCContext& ctx, uint8_t* base, uint32_t renderer) {
   StoreMatrix(base, kCameraViewMatrixAddress, camera);
 
   frame_pacing::DrawStep_ShowRecording(base);
-  Renderer_DrawFrameAndWait(ctx, base, renderer);
+  bool drawn = Renderer_DrawFrameAndWait(ctx, base, renderer);
   frame_pacing::DrawStep_HideRecording(base);
+  return drawn;
 }
 
 // Main thread, after the game tick: the game's own wait, then extra frames
@@ -159,13 +179,17 @@ void Renderer_WaitForFrame(PPCContext& ctx, uint8_t* base, uint32_t renderer) {
   __imp__sub_820920D8(ctx, base);
 
   auto& pacer = GetFramePacer();
-  while (pacer.WaitForNextFrame()) {
+  while (Renderer_IsRunning(base, renderer) && pacer.WaitForNextFrame()) {
     pacer.OnFrameStarted();
+    bool drawn;
     if (frame_pacing::DrawStep_CanRerecord()) {
-      DrawExtraFrame(ctx, base, renderer);
+      drawn = DrawExtraFrame(ctx, base, renderer);
     } else {
       // No draw step this tick (a menu): redraw what's displayed.
-      Renderer_DrawFrameAndWait(ctx, base, renderer);
+      drawn = Renderer_DrawFrameAndWait(ctx, base, renderer);
+    }
+    if (!drawn) {
+      break;
     }
   }
   // Leave this tick's recording exactly as the game made it.
