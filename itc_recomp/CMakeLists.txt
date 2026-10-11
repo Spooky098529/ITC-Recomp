@@ -42,6 +42,7 @@ set(ITC_SOURCES
     src/interpolation/transform.cpp
     src/interpolation/command_list.cpp
     src/interpolation/draw_tags.cpp
+    src/frame_pacing/draw_step.cpp
 )
 
 if(WIN32)

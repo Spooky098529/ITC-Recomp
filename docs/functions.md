@@ -148,5 +148,16 @@ Measured in a race (temporary diagnostics, since removed):
   (pass item lists or the replay's sort queue), and those kept pointing at
   overwritten data.
 
-So re-running only the draw step on extra frames with blended state is
-possible in principle, but needs that registration found and reset first.
+Recordings are registered in the game mode object's pass lists. The mode
+object (scene+64, vtable `0x8206CB8C`) holds two pass lists at +8 and +12;
+its state (+4) holds the replay index at +0 and a float submission sequence
+at +84. Method 6 (`sub_8258E5E0`) flips the replay index, method 7
+(`sub_8258E5F8`) returns the list being recorded, method 8 (`sub_8258E618`)
+the list being replayed, and method 4 (`sub_8258EDC8`) submits an item into
+a bucket (1,024 buckets of 16 bytes at list+24, count at +12) and advances
+the sequence. `sub_8258EB38` empties a pass list.
+
+Restoring the command list header, the recording pass list (header and
+buckets) and the sequence before a second run makes re-running the draw
+step safe: with both runs every tick, a race looked normal
+(`--debug_redraw_twice`, `src/frame_pacing/draw_step.cpp`).
