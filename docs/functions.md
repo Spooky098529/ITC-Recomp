@@ -125,3 +125,28 @@ recorded commands are replayed.
   per-object recorder is still to be found.
 - `sub_825953D0` (vertex constants 0, 9 registers) and `sub_82595490` (pixel
   constants 0, 63 registers) record per-pass constants.
+
+## Separating drawing from the game tick
+
+Measured in a race (temporary diagnostics, since removed):
+
+- The main loop's first tick handler, `sub_82093DC0`, polls input and then
+  walks listener lists (at +28 or +40 by game state, then +52, +76 and +96).
+  Both physics and render recording run in the +40 list (+28 in the other
+  state).
+- Within it, `sub_8215B4F8` is the draw step: it updates the 21 camera passes
+  (`sub_820A0958` each), records the passes (`sub_8209F8A0`,
+  `sub_8209F900`), runs the render orchestrator `sub_820C5DE8` (about six
+  near-identical blocks of recording, one per pass), then `sub_820F6068`,
+  `sub_82130978` and `sub_82133960`. No physics runs inside it: the speed
+  getter was called 0 times inside `sub_820C5DE8` and ~90 times a second
+  outside.
+- Running the draw step twice per tick, rewinding the command list header
+  (64 bytes at the list object) before the second run, crashed at race
+  start: the render thread jumped to a garbage address while replaying. The
+  draw step registers what it records somewhere besides the list header
+  (pass item lists or the replay's sort queue), and those kept pointing at
+  overwritten data.
+
+So re-running only the draw step on extra frames with blended state is
+possible in principle, but needs that registration found and reset first.
