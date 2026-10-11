@@ -14,6 +14,7 @@
 #include "blend_state.h"
 
 #include "frame_pacing/frame_pacer.h"
+#include "frame_pacing/game_messages.h"
 #include "guest.h"
 #include "transform.h"
 
@@ -24,6 +25,7 @@
 #include <array>
 #include <chrono>
 #include <cstring>
+#include <fstream>
 #include <string>
 #include <mutex>
 #include <optional>
@@ -36,6 +38,9 @@ REXCVAR_DEFINE_BOOL(interpolate_draw_state, true, "ITC",
                     "the draw step reads");
 REXCVAR_DEFINE_BOOL(log_blend_state, false, "ITC",
                     "Log how many matrices were blended, once a second");
+REXCVAR_DEFINE_STRING(dump_draw_state, "", "ITC",
+                      "Folder to dump the draw step's matrix memory to, before and after "
+                      "Draw, for 60 race ticks starting 20 s into the first race");
 REXCVAR_DEFINE_BOOL(log_blend_detail, false, "ITC",
                     "Log why candidate matrices were or weren't blended, once a second");
 
@@ -104,6 +109,42 @@ std::string FormatMatrix(const Matrix4& m) {
   }
   return s;
 }
+
+// Writes the camera passes, the render-state block and every recorder
+// matrix to <folder>/tick<N>_<when>.bin as (u32 address, u32 size, bytes)
+// records, little endian, with the bytes as in guest memory (big endian).
+class DrawStateDump {
+ public:
+  void OnDraw(uint8_t* base, bool logic_pass, const std::set<uint32_t>& recorder,
+              const char* when) {
+    std::string folder = REXCVAR_GET(dump_draw_state);
+    if (folder.empty() || !frame_pacing::GameMessages_InRace() || !logic_pass) {
+      return;
+    }
+    if (std::string(when) == "pre") {
+      race_ticks_++;
+    }
+    int first = 20 * 30;
+    if (race_ticks_ <= first || race_ticks_ > first + 60) {
+      return;
+    }
+    std::ofstream out(fmt::format("{}/tick{:03}_{}.bin", folder, race_ticks_ - first, when),
+                      std::ios::binary);
+    auto write = [&](uint32_t address, uint32_t size) {
+      out.write(reinterpret_cast<const char*>(&address), 4);
+      out.write(reinterpret_cast<const char*>(&size), 4);
+      out.write(reinterpret_cast<const char*>(base + address), size);
+    };
+    write(kCameraPasses.start, kCameraPasses.end - kCameraPasses.start);
+    write(kRenderStateBlock.start, kRenderStateBlock.end - kRenderStateBlock.start);
+    for (uint32_t a : recorder) {
+      write(a, kMatrixBytes);
+    }
+  }
+
+ private:
+  int race_ticks_ = 0;
+};
 
 class DrawState {
  public:
@@ -212,7 +253,12 @@ class DrawState {
     return Outcome::kBlended;
   }
 
-  void BeforeDraw(uint8_t* base) {
+  void BeforeDraw(uint8_t* base, bool logic_pass) {
+    logic_pass_ = logic_pass;
+    {
+      std::lock_guard lock(mutex_);
+      dump_.OnDraw(base, logic_pass, used_last_tick_, "pre");
+    }
     saved_.clear();
     if (!REXCVAR_GET(interpolate_draw_state)) {
       return;
@@ -236,6 +282,10 @@ class DrawState {
   }
 
   void AfterDraw(uint8_t* base) {
+    {
+      std::lock_guard lock(mutex_);
+      dump_.OnDraw(base, logic_pass_, used_this_tick_, "post");
+    }
     if (!block_before_draw_.empty()) {
       // Rows of the block the draw step itself wrote.
       const uint8_t* now = base + kRenderStateBlock.start;
@@ -348,6 +398,8 @@ class DrawState {
     std::string written_sample;
   } detail_;
   std::vector<uint8_t> block_before_draw_;
+  DrawStateDump dump_;
+  bool logic_pass_ = false;
 };
 
 DrawState& GetDrawState() {
@@ -367,7 +419,7 @@ void BlendState_BeforeDraw(uint8_t* base, bool render_only_pass) {
   if (!render_only_pass) {
     GetDrawState().OnTick(base);
   }
-  GetDrawState().BeforeDraw(base);
+  GetDrawState().BeforeDraw(base, !render_only_pass);
 }
 
 void BlendState_AfterDraw(uint8_t* base) {
