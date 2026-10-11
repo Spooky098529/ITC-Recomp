@@ -159,22 +159,17 @@ void Renderer_WaitForFrame(PPCContext& ctx, uint8_t* base, uint32_t renderer) {
   __imp__sub_820920D8(ctx, base);
 
   auto& pacer = GetFramePacer();
-  bool rerecorded = false;
   while (pacer.WaitForNextFrame()) {
     pacer.OnFrameStarted();
     if (frame_pacing::DrawStep_CanRerecord()) {
       DrawExtraFrame(ctx, base, renderer);
-      rerecorded = true;
     } else {
       // No draw step this tick (a menu): redraw what's displayed.
       Renderer_DrawFrameAndWait(ctx, base, renderer);
     }
   }
-  if (rerecorded) {
-    // Leave this tick's recording exactly as the game made it.
-    frame_pacing::DrawStep_Rerecord(ctx, base);
-  }
-  frame_pacing::DrawStep_Invalidate();
+  // Leave this tick's recording exactly as the game made it.
+  frame_pacing::DrawStep_FinishExtraFrames(base);
   pacer.OnTickReleased();
   pacer.OnFrameStarted();  // the game's own frame for this tick follows
   GetTickTimer().OnTickStarted();

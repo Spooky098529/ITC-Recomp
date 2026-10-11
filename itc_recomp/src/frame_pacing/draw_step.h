@@ -13,18 +13,20 @@ namespace frame_pacing {
 // loading screens don't), so it can be re-recorded.
 bool DrawStep_CanRerecord();
 
-// Main thread: puts the recording structures back as they were before this
-// tick's draw step and runs it again, recording from current game memory.
-void DrawStep_Rerecord(PPCContext& ctx, uint8_t* base);
+// Main thread: records the scene again from current game memory, keeping
+// what the tick recorded after the draw step (HUD, text) as it was. Returns
+// false if it couldn't, in which case the tick's original recording is in
+// place instead.
+bool DrawStep_Rerecord(PPCContext& ctx, uint8_t* base);
 
-// Main thread: makes the recording just made the one the render thread
-// replays (and back again). The game itself swaps them later in the tick
+// Main thread, after the last extra frame of a tick: puts the tick's
+// original recording back exactly, for the game's own frame.
+void DrawStep_FinishExtraFrames(uint8_t* base);
+
+// Main thread: makes the current recording the one the render thread
+// replays (and back again). The game swaps them itself later in the tick
 // (Scene::Update), so every Show must be followed by a Hide.
 void DrawStep_ShowRecording(uint8_t* base);
 void DrawStep_HideRecording(uint8_t* base);
-
-// Main thread, once this tick's extra frames are done: forget the snapshot,
-// so a tick without a draw step (a menu) never re-records stale state.
-void DrawStep_Invalidate();
 
 }  // namespace frame_pacing
