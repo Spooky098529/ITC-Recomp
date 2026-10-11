@@ -147,12 +147,15 @@ extern "C" REX_FUNC(sub_8209C1A0) {
                               [&] { __imp__sub_8209C1A0(ctx, base); });
 }
 
-// Per-pass constants: r4, r5 = pass inputs. Passes are recorded in the
-// same order every tick, so they're identified by order alone: r4 and r5
-// may point to per-tick data that changes address.
+// Per-object transform constants (~135 calls a tick in a race): uploads the
+// object's world-view-projection matrix, world matrix and a vector. r5 is
+// passed to both matrix routines (sub_8209BD50, sub_820A0AC0), so it's the
+// object's own transform and identifies the object; r4 goes only into the
+// combined matrix (the camera), and tagging with it paired only about half
+// the objects between ticks.
 extern "C" REX_FUNC(sub_825953D0) {
   REX_FUNC_PROLOGUE();
-  interpolation::RecordTagged(base, 0x825953D0, {},
+  interpolation::RecordTagged(base, 0x825953D0, {ctx.r5.u32},
                               [&] { __imp__sub_825953D0(ctx, base); });
 }
 
