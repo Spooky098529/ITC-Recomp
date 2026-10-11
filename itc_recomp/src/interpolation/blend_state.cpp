@@ -314,10 +314,8 @@ class DrawState {
       uint32_t pass = CameraPass(camera.pass);
       Matrix4 view = ViewMatrixFromTransform(Blend(camera.from, camera.to, amount_));
       Matrix4 view_projection = Multiply(view, camera.projection);
-      Save(base, pass + kViewOffset);
-      Save(base, pass + kViewProjectionOffset);
-      StoreMatrix(base, pass + kViewOffset, view);
-      StoreMatrix(base, pass + kViewProjectionOffset, view_projection);
+      Replace(base, saved_, pass + kViewOffset, view);
+      Replace(base, saved_, pass + kViewProjectionOffset, view_projection);
       blended[camera.pass] = view_projection;
       counts_.cameras++;
     }
@@ -327,8 +325,7 @@ class DrawState {
       if (!blended[product.pass] || LoadMatrix(base, product.out) != product.value) {
         continue;
       }
-      Save(base, product.out);
-      StoreMatrix(base, product.out, Multiply(product.world, *blended[product.pass]));
+      Replace(base, saved_, product.out, Multiply(product.world, *blended[product.pass]));
       counts_.products++;
     }
   }
@@ -371,9 +368,8 @@ class DrawState {
       counts_.object_cuts++;
       return;
     }
-    object_saved_.push_back({world, now});
-    StoreMatrix(base, world,
-                WorldMatrixFromScaledTransform(Blend(before->second, *transform, amount_)));
+    Replace(base, object_saved_, world,
+            WorldMatrixFromScaledTransform(Blend(before->second, *transform, amount_)));
     counts_.objects++;
   }
 
@@ -447,13 +443,26 @@ class DrawState {
            (address - kCameraPasses) % kCameraPassBytes == kViewProjectionOffset;
   }
 
-  void Save(uint8_t* base, uint32_t address) {
-    saved_.push_back({address, LoadMatrix(base, address)});
+  struct Saved {
+    uint32_t address;
+    Matrix4 original;
+    Matrix4 written;
+  };
+
+  static void Replace(uint8_t* base, std::vector<Saved>& saved, uint32_t address,
+                      const Matrix4& value) {
+    saved.push_back({address, LoadMatrix(base, address), value});
+    StoreMatrix(base, address, value);
   }
 
-  static void Restore(uint8_t* base, std::vector<std::pair<uint32_t, Matrix4>>& saved) {
+  // Puts the originals back, except where the game has since written
+  // something else there (the memory may have been freed and reused, as
+  // when a race loads).
+  static void Restore(uint8_t* base, std::vector<Saved>& saved) {
     for (auto it = saved.rbegin(); it != saved.rend(); ++it) {
-      StoreMatrix(base, it->first, it->second);
+      if (LoadMatrix(base, it->address) == it->written) {
+        StoreMatrix(base, it->address, it->original);
+      }
     }
     saved.clear();
   }
@@ -494,8 +503,8 @@ class DrawState {
   std::vector<CameraProduct> products_pending_;  // made since the last tick's Draw
   std::vector<CameraProduct> products_;
 
-  std::vector<std::pair<uint32_t, Matrix4>> saved_;
-  std::vector<std::pair<uint32_t, Matrix4>> object_saved_;
+  std::vector<Saved> saved_;
+  std::vector<Saved> object_saved_;
 
   DrawStateDump dump_;
 
