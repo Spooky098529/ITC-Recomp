@@ -55,6 +55,8 @@ REXCVAR_DEFINE_DOUBLE(debug_camera_constant_lift, 0.0, "ITC",
 REXCVAR_DEFINE_DOUBLE(debug_camera_lift, 0.0, "ITC",
                       "Testing: draw with the blended main camera (pass 0) raised this many "
                       "metres, to show what it affects");
+REXCVAR_DEFINE_BOOL(log_replayed_constants, false, "ITC",
+                    "Log the vertex constant matrices the render thread replays, once a second");
 REXCVAR_DEFINE_BOOL(log_blend_state, false, "ITC",
                     "Log how many cameras and objects were blended, once a second");
 REXCVAR_DEFINE_BOOL(log_camera_products, false, "ITC",
@@ -718,6 +720,72 @@ class DrawState {
   } counts_;
 };
 
+// Diagnostics on the render thread: the vertex shader constant uploads it
+// replays each frame (4+ registers), compared with the same upload (by
+// order) in the previous frame.
+class ReplayedConstantsLog {
+ public:
+  void OnFrameStart() {
+    if (!REXCVAR_GET(log_replayed_constants)) {
+      return;
+    }
+    auto now = std::chrono::steady_clock::now();
+    if (logging_) {
+      logging_ = false;
+      REXLOG_INFO("replayed constants: frame with {} uploads, {} changed since the last frame",
+                  frame_.size(), changed_);
+      for (const auto& line : lines_) {
+        REXLOG_INFO("replayed constants: {}", line);
+      }
+    }
+    if (now - last_log_ >= std::chrono::seconds(1) && frames_since_tick_ == 2) {
+      logging_ = true;
+      last_log_ = now;
+    }
+    frames_since_tick_++;
+    previous_ = std::move(frame_);
+    frame_.clear();
+    lines_.clear();
+    changed_ = 0;
+  }
+
+  void OnTick() { frames_since_tick_ = 0; }
+
+  void OnUpload(uint8_t* base, uint32_t payload, uint32_t packed) {
+    if (!REXCVAR_GET(log_replayed_constants)) {
+      return;
+    }
+    uint32_t stage = packed >> 24, start = (packed >> 8) & 0xFF, count = packed & 0xFF;
+    if (stage != 0 || count < 4) {
+      return;
+    }
+    Matrix4 m = LoadMatrix(base, payload);
+    size_t index = frame_.size();
+    bool changed = index >= previous_.size() || previous_[index] != m;
+    changed_ += changed;
+    frame_.push_back(m);
+    if (logging_ && lines_.size() < 60) {
+      lines_.push_back(fmt::format("#{} c{} x{} from {:08X} {} [{:.3g} {:.3g} {:.3g} {:.3g} | ... | "
+                                   "{:.4g} {:.4g} {:.4g} {:.4g}]",
+                                   index, start, count, payload, changed ? "changed" : "same",
+                                   m[0], m[1], m[2], m[3], m[12], m[13], m[14], m[15]));
+    }
+  }
+
+ private:
+  std::vector<Matrix4> frame_, previous_;
+  std::vector<std::string> lines_;
+  int changed_ = 0;
+  int frames_since_tick_ = 0;
+  bool logging_ = false;
+  std::chrono::steady_clock::time_point last_log_{};
+};
+
+ReplayedConstantsLog& GetReplayedConstantsLog() {
+  static ReplayedConstantsLog log;
+  return log;
+}
+
 DrawState& GetDrawState() {
   static DrawState state;
   return state;
@@ -727,6 +795,18 @@ DrawState& GetDrawState() {
 
 void BlendState_BeforeDraw(uint8_t* base, bool render_only_pass) {
   GetDrawState().BeforeDraw(base, !render_only_pass);
+}
+
+void BlendState_OnReplayFrameStart() {
+  GetReplayedConstantsLog().OnFrameStart();
+}
+
+void BlendState_OnReplayTick() {
+  GetReplayedConstantsLog().OnTick();
+}
+
+void BlendState_OnReplayConstants(uint8_t* base, uint32_t payload, uint32_t packed) {
+  GetReplayedConstantsLog().OnUpload(base, payload, packed);
 }
 
 void BlendState_AfterDraw(uint8_t* base) {

@@ -22,4 +22,10 @@ void BlendState_AfterDraw(uint8_t* base);
 void BlendState_BeforeRecordObject(uint8_t* base, uint32_t view_projection, uint32_t world);
 void BlendState_AfterRecordObject(uint8_t* base);
 
+// Render thread diagnostics (--log_replayed_constants): a frame starting
+// (after a logic tick, or not), and each shader constant upload replayed.
+void BlendState_OnReplayFrameStart();
+void BlendState_OnReplayTick();
+void BlendState_OnReplayConstants(uint8_t* base, uint32_t payload, uint32_t packed);
+
 }  // namespace interpolation

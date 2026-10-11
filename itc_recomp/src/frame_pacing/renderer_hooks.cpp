@@ -18,6 +18,7 @@
 #include "frame_pacer.h"
 #include "game_messages.h"
 #include "guest.h"
+#include "interpolation/blend_state.h"
 #include "interpolation/interpolator.h"
 
 namespace {
@@ -53,6 +54,7 @@ void Event_Signal(PPCContext& ctx, uint8_t* base, uint32_t event) {
 }
 
 void Renderer_DrawFrame(PPCContext& ctx, uint8_t* base, uint32_t renderer) {
+  interpolation::BlendState_OnReplayFrameStart();
   interpolation::Interpolation_BeginFrame(GetFramePacer().TickProgress());
   ctx.r3.u64 = renderer;
   sub_82091E58(ctx, base);
@@ -90,6 +92,7 @@ void Renderer_WaitForFrame(PPCContext& ctx, uint8_t* base, uint32_t renderer) {
     render_only = false;
   }
   if (!render_only) {
+    interpolation::BlendState_OnReplayTick();
     pacer.OnTickReleased();
   }
   pacer.OnFrameStarted();
