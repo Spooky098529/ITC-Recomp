@@ -37,7 +37,10 @@
 #include <cmath>
 #include <cstring>
 #include <fstream>
+#include <atomic>
 #include <map>
+#include <mutex>
+#include <thread>
 #include <optional>
 #include <string>
 #include <unordered_map>
@@ -222,6 +225,7 @@ class CameraProductLog {
     if (!REXCVAR_GET(log_camera_products)) {
       return;
     }
+    std::lock_guard lock(mutex_);
     int pass = PassOf(a) >= 0 ? PassOf(a) : PassOf(b);
     if (pass < 0) {
       return;
@@ -264,6 +268,7 @@ class CameraProductLog {
     uint32_t last_out = 0;
     uint32_t last_other = 0;
   };
+  std::mutex mutex_;
   std::map<Key, Entry> entries_;
   std::chrono::steady_clock::time_point last_log_{};
 };
@@ -274,7 +279,9 @@ class DrawState {
   // is a camera's view-projection: game logic prepared world *
   // view-projection for something drawn later (the scenery does this).
   void OnCameraProduct(uint8_t* base, uint32_t out, uint32_t world, uint32_t view_projection) {
-    if (in_draw_ || !IsCameraViewProjection(view_projection) || products_pending_.size() >= 4096) {
+    // Draw runs on the main thread; other threads (loading) multiply too.
+    if (std::this_thread::get_id() != main_thread_ || in_draw_ ||
+        !IsCameraViewProjection(view_projection) || products_pending_.size() >= 4096) {
       return;
     }
     int pass = int((view_projection - kCameraPasses) / kCameraPassBytes);
@@ -285,6 +292,7 @@ class DrawState {
   CameraProductLog& camera_products() { return camera_products_; }
 
   void BeforeDraw(uint8_t* base, bool logic_pass) {
+    main_thread_ = std::this_thread::get_id();
     in_draw_ = true;
     logic_pass_ = logic_pass;
     if (logic_pass) {
@@ -470,7 +478,8 @@ class DrawState {
   }
 
   bool logic_pass_ = false;
-  bool in_draw_ = false;
+  std::atomic<bool> in_draw_ = false;
+  std::thread::id main_thread_;
   CameraProductLog camera_products_;
   bool enabled_ = false;
   float amount_ = 0;
