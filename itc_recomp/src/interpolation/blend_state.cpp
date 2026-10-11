@@ -37,6 +37,7 @@
 #include <cmath>
 #include <cstring>
 #include <fstream>
+#include <map>
 #include <optional>
 #include <string>
 #include <unordered_map>
@@ -47,6 +48,8 @@ REXCVAR_DEFINE_BOOL(interpolate_draw_state, true, "ITC",
                     "object transforms");
 REXCVAR_DEFINE_BOOL(log_blend_state, false, "ITC",
                     "Log how many cameras and objects were blended, once a second");
+REXCVAR_DEFINE_BOOL(log_camera_products, false, "ITC",
+                    "Log matrix multiplies that read a camera's view-projection, once a second");
 REXCVAR_DEFINE_STRING(dump_draw_state, "", "ITC",
                       "Folder to dump the camera passes and the draw step's stack to, before "
                       "and after Draw, for 60 race ticks starting 20 s into the first race");
@@ -212,9 +215,66 @@ class DrawStateDump {
   Matrix4 view_{}, view_projection_{}, previous_view_{}, previous_view_projection_{};
 };
 
+// Diagnostics: who multiplies by a camera's view-projection, and when.
+class CameraProductLog {
+ public:
+  void OnMultiply(uint32_t out, uint32_t a, uint32_t b, uint32_t caller, bool in_draw) {
+    if (!REXCVAR_GET(log_camera_products)) {
+      return;
+    }
+    int pass = PassOf(a) >= 0 ? PassOf(a) : PassOf(b);
+    if (pass < 0) {
+      return;
+    }
+    Key key{caller, pass, PassOf(a) >= 0, in_draw};
+    Entry& e = entries_[key];
+    e.count++;
+    e.last_out = out;
+    e.last_other = PassOf(a) >= 0 ? b : a;
+    auto now = std::chrono::steady_clock::now();
+    if (now - last_log_ < std::chrono::seconds(1)) {
+      return;
+    }
+    for (const auto& [k, v] : entries_) {
+      REXLOG_INFO("camera product: caller {:08X} pass {} vp as {} in {}: {} calls, out {:08X} other {:08X}",
+                  k.caller, k.pass, k.vp_first ? "a" : "b", k.in_draw ? "Draw" : "other",
+                  v.count, v.last_out, v.last_other);
+    }
+    entries_.clear();
+    last_log_ = now;
+  }
+
+ private:
+  static int PassOf(uint32_t address) {
+    if (address < kCameraPasses || address >= CameraPass(kCameraPassCount) ||
+        (address - kCameraPasses) % kCameraPassBytes != kViewProjectionOffset) {
+      return -1;
+    }
+    return int((address - kCameraPasses) / kCameraPassBytes);
+  }
+  struct Key {
+    uint32_t caller;
+    int pass;
+    bool vp_first;
+    bool in_draw;
+    auto operator<=>(const Key&) const = default;
+  };
+  struct Entry {
+    int count = 0;
+    uint32_t last_out = 0;
+    uint32_t last_other = 0;
+  };
+  std::map<Key, Entry> entries_;
+  std::chrono::steady_clock::time_point last_log_{};
+};
+
 class DrawState {
  public:
+  bool in_draw() const { return in_draw_; }
+  CameraProductLog& camera_products() { return camera_products_; }
+
   void BeforeDraw(uint8_t* base, bool logic_pass) {
+    in_draw_ = true;
     logic_pass_ = logic_pass;
     if (logic_pass) {
       dump_.OnTick(base);
@@ -242,6 +302,7 @@ class DrawState {
   }
 
   void AfterDraw(uint8_t* base) {
+    in_draw_ = false;
     Restore(base, saved_);
     dump_.OnDraw(base, logic_pass_, "post");
     counts_.draws++;
@@ -376,6 +437,8 @@ class DrawState {
   }
 
   bool logic_pass_ = false;
+  bool in_draw_ = false;
+  CameraProductLog camera_products_;
   bool enabled_ = false;
   float amount_ = 0;
 
@@ -427,3 +490,12 @@ void BlendState_AfterRecordObject(uint8_t* base) {
 }
 
 }  // namespace interpolation
+
+// Matrix_Multiply: r3 = out, r4 = a, r5 = b; out = a * b (4x4).
+extern "C" REX_FUNC(sub_8209BD50) {
+  REX_FUNC_PROLOGUE();
+  auto& state = interpolation::GetDrawState();
+  state.camera_products().OnMultiply(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, uint32_t(ctx.lr),
+                                     state.in_draw());
+  __imp__sub_8209BD50(ctx, base);
+}
