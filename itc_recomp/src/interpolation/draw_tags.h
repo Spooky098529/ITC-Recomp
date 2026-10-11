@@ -1,30 +1,33 @@
 // Tags shader constant uploads with the draw that recorded them, so the same
 // object's uploads can be found again in the next tick's command list.
 //
-// A draw recorder (sub_82595550) is called with what it draws: r3 = model,
-// r4 = part index, r5 = flag, r6-r8 = per-draw values. Each upload recorded
-// during a call is tagged with those, plus which occurrence of that tag it is
-// this tick (a model drawn several times).
+// Each recorder that writes shader constant uploads (see "Recorders" in
+// docs/functions.md) is wrapped. Uploads recorded during a call are tagged
+// with: the recorder, its arguments (what it draws), which call with those
+// arguments this is in the tick (a model drawn several times), the upload's
+// position in the call, and how many uploads the call made (so a batch that
+// changed size doesn't pair with the old one).
 //
-// Not effective yet: in a race this recorder runs once a tick, records 16
-// uploads, and writes them to a list other than the one replayed. The
-// ~2,000 per-object uploads in the replayed list come from a recorder not
-// yet found, which is what should be tagged instead.
+// Tags are stored by the upload's address in the command list and cleared
+// when the game starts recording into that buffer again, so they're always
+// those of the list currently in the buffer, whenever it was recorded.
 
 #pragma once
 
 #include <cstdint>
-#include <unordered_map>
+#include <optional>
 
 namespace interpolation {
 
 using DrawTag = uint64_t;
 
-// Tags of the uploads in one recorded list, by payload address.
-using DrawTags = std::unordered_map<uint32_t, DrawTag>;
+struct DrawTagInfo {
+  DrawTag tag;
+  uint32_t recorder;  // guest address of the recorder function
+};
 
-// Render thread, after each tick: the tags of the list now being replayed
-// (recorded on the previous tick). Valid until the next call.
-const DrawTags& DrawTags_TakeReplayedTags();
+// Render thread: the tag of the upload whose payload is at `payload`, if it
+// was recorded by a tagged recorder.
+std::optional<DrawTagInfo> DrawTags_Find(uint32_t payload);
 
 }  // namespace interpolation

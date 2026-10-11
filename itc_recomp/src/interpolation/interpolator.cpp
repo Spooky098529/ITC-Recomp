@@ -10,7 +10,7 @@
 
 #include <chrono>
 #include <cmath>
-#include <limits>
+#include <string>
 #include <optional>
 #include <unordered_map>
 #include <vector>
@@ -33,12 +33,9 @@ constexpr float kCameraCutAngle = 0.5f;     // radians, ~30 degrees
 
 constexpr uint32_t kFloatsPerRegister = 4;
 
-// Pairing: how far apart (as a fraction of their size) two uploads' values
-// can be and still be the same object a tick later, and how many uploads
-// ahead to search when neighbours don't match.
-constexpr float kCloseFraction = 0.1f;
-constexpr size_t kLookAhead = 8;
-constexpr float kSkipPenalty = 0.5f;
+// How much (as a fraction of their size) an upload's values can change in one
+// tick and still be blended. Bigger jumps are teleports or wrong pairs.
+constexpr float kMaxRelativeChangePerTick = 0.2f;
 
 Matrix4 LoadMatrix(uint8_t* base, uint32_t address) {
   Matrix4 m;
@@ -86,7 +83,7 @@ class CameraCutDetector {
 struct Snapshot {
   uint32_t payload;
   uint64_t signature;
-  std::optional<DrawTag> tag;
+  std::optional<DrawTagInfo> tag;
   std::vector<float> values;
 };
 
@@ -96,7 +93,6 @@ class Interpolator {
 
   void OnTickDone(uint8_t* base) {
     blends_.clear();
-    const DrawTags& tags = DrawTags_TakeReplayedTags();
     if (!REXCVAR_GET(interpolate) || scene_ == 0) {
       replayed_.clear();
       return;
@@ -107,7 +103,7 @@ class Interpolator {
     bool cut_between_replayed_lists = pending_cut_;
     pending_cut_ = camera_cuts_.Update(base);
 
-    std::vector<Snapshot> current = TakeSnapshots(base, tags);
+    std::vector<Snapshot> current = TakeSnapshots(base);
     if (cut_between_replayed_lists) {
       stats_.cuts++;
     } else {
@@ -152,16 +148,14 @@ class Interpolator {
     size_t replayed;  // index into replayed_
   };
 
-  std::vector<Snapshot> TakeSnapshots(uint8_t* base, const DrawTags& tags) {
+  std::vector<Snapshot> TakeSnapshots(uint8_t* base) {
     std::vector<Snapshot> snapshots;
     for (const RecordedUpload& recorded : FindReplayedShaderConstantUploads(base, scene_)) {
       if (!ShouldBlend(recorded.upload)) {
         continue;
       }
       Snapshot snapshot{recorded.payload, recorded.upload.Signature(), std::nullopt, {}};
-      if (auto tag = tags.find(recorded.payload); tag != tags.end()) {
-        snapshot.tag = tag->second;
-      }
+      snapshot.tag = DrawTags_Find(recorded.payload);
       uint32_t floats = recorded.upload.register_count * kFloatsPerRegister;
       snapshot.values.resize(floats);
       for (uint32_t i = 0; i < floats; i++) {
@@ -177,128 +171,68 @@ class Interpolator {
     return snapshots;
   }
 
-  // Pairs each upload in the newly replayed list with its counterpart in the
-  // list replayed before it. Uploads with the same signature are aligned in
-  // recording order, like a diff: objects come and go between ticks as they
-  // enter and leave view, so where neighbours don't match, the closest pair
-  // by value within a short look-ahead is taken and the uploads skipped over
-  // are left unblended.
+  // Pairs each upload in the newly replayed list with the upload that had
+  // the same tag in the list replayed before it. Only uploads from recorders
+  // that carry transforms are blended, and only when both values are finite
+  // and differ by a plausible amount for one tick of motion. Everything else
+  // is drawn as recorded.
   void Pair(const std::vector<Snapshot>& current) {
     earlier_values_.clear();
-    stats_.tag_paired = 0;
-
-    // Uploads tagged by the draw that recorded them pair exactly.
     std::unordered_map<DrawTag, const Snapshot*> earlier_by_tag;
     for (const Snapshot& snapshot : replayed_) {
       if (snapshot.tag) {
-        earlier_by_tag[*snapshot.tag] = &snapshot;
+        earlier_by_tag[snapshot.tag->tag] = &snapshot;
       }
     }
     for (size_t i = 0; i < current.size(); i++) {
-      if (!current[i].tag) {
+      if (!current[i].tag || !CarriesTransforms(current[i].tag->recorder)) {
         continue;
       }
-      auto it = earlier_by_tag.find(*current[i].tag);
-      if (it == earlier_by_tag.end()) {
+      auto it = earlier_by_tag.find(current[i].tag->tag);
+      if (it == earlier_by_tag.end() ||
+          !IsPlausibleMotion(it->second->values, current[i].values)) {
         continue;
       }
       earlier_values_.push_back(it->second->values);
       blends_[current[i].payload] = {earlier_values_.size() - 1, i};
-      stats_.tag_paired++;
-    }
-
-    // The rest pair by value, in recording order.
-    std::unordered_map<uint64_t, std::vector<const Snapshot*>> earlier_by_signature;
-    std::unordered_map<uint64_t, std::vector<size_t>> current_by_signature;
-    for (const Snapshot& snapshot : replayed_) {
-      if (!snapshot.tag) {
-        earlier_by_signature[snapshot.signature].push_back(&snapshot);
-      }
-    }
-    for (size_t i = 0; i < current.size(); i++) {
-      if (!current[i].tag) {
-        current_by_signature[current[i].signature].push_back(i);
-      }
-    }
-
-    for (const auto& [signature, now_indices] : current_by_signature) {
-      auto it = earlier_by_signature.find(signature);
-      if (it == earlier_by_signature.end()) {
-        continue;
-      }
-      std::vector<const Snapshot*> now;
-      for (size_t index : now_indices) {
-        now.push_back(&current[index]);
-      }
-      const std::vector<const Snapshot*>& before = it->second;
-
-      size_t i = 0, j = 0;
-      while (i < now.size() && j < before.size()) {
-        size_t di = 0, dj = 0;
-        if (!FindBestPairAhead(now, i, before, j, di, dj)) {
-          i++;  // nothing nearby matches this upload
-          continue;
-        }
-        i += di;
-        j += dj;
-        earlier_values_.push_back(before[j]->values);
-        blends_[now[i]->payload] = {earlier_values_.size() - 1, now_indices[i]};
-        i++;
-        j++;
-      }
+      DumpSample(current[i].tag->recorder, it->second->values, current[i].values);
     }
     stats_.unpaired = current.size() - blends_.size();
   }
 
-  static float Difference(const std::vector<float>& a, const std::vector<float>& b) {
-    float sum = 0;
+  // Recorders whose uploads change smoothly from tick to tick (see the
+  // pairing measurements in docs/functions.md). sub_82146BD0, sub_82128750
+  // and sub_82595550 upload sprite and texture parameters instead.
+  static bool CarriesTransforms(uint32_t recorder) {
+    return recorder == 0x825953D0 || recorder == 0x8209C1A0 || recorder == 0x820CECA0;
+  }
+
+  static bool IsPlausibleMotion(const std::vector<float>& a, const std::vector<float>& b) {
+    if (a.size() != b.size()) {
+      return false;
+    }
+    float difference = 0, magnitude = 0;
     for (size_t k = 0; k < a.size(); k++) {
-      sum += std::abs(a[k] - b[k]);
-    }
-    return sum;
-  }
-
-  static float Magnitude(const std::vector<float>& a) {
-    float sum = 0;
-    for (float v : a) {
-      sum += std::abs(v);
-    }
-    return sum;
-  }
-
-  // The same object one tick apart: values differ by a small fraction.
-  static bool IsClose(const std::vector<float>& a, const std::vector<float>& b) {
-    float difference = Difference(a, b);
-    return std::isfinite(difference) &&
-           difference <= kCloseFraction * (Magnitude(a) + Magnitude(b)) + 1e-6f;
-  }
-
-  // Searches up to kLookAhead uploads ahead in both lists for the pair most
-  // likely to be the same object: the smallest absolute difference in values,
-  // plus a small penalty per upload skipped. Absolute, so an object that
-  // hasn't moved always beats a similar neighbour (a row of lamp posts).
-  // Returns its offsets in `di`, `dj`.
-  static bool FindBestPairAhead(const std::vector<const Snapshot*>& now, size_t i,
-                               const std::vector<const Snapshot*>& before, size_t j,
-                               size_t& di, size_t& dj) {
-    float best = std::numeric_limits<float>::infinity();
-    for (size_t a = 0; a < kLookAhead && i + a < now.size(); a++) {
-      for (size_t b = 0; b < kLookAhead && j + b < before.size(); b++) {
-        const std::vector<float>& x = now[i + a]->values;
-        const std::vector<float>& y = before[j + b]->values;
-        if (!IsClose(x, y)) {
-          continue;
-        }
-        float score = Difference(x, y) + kSkipPenalty * float(a + b);
-        if (score < best) {
-          best = score;
-          di = a;
-          dj = b;
-        }
+      if (!std::isfinite(a[k]) || !std::isfinite(b[k])) {
+        return false;
       }
+      difference += std::abs(a[k] - b[k]);
+      magnitude += std::abs(a[k]) + std::abs(b[k]);
     }
-    return std::isfinite(best);
+    return difference <= kMaxRelativeChangePerTick * magnitude;
   }
+
+  void DumpSample(uint32_t recorder, const std::vector<float>& a,
+                  const std::vector<float>& b) { /* TEMP */
+    if (dumps_[recorder] >= 4 || ++dump_skip_ % 997 != 0) return;
+    dumps_[recorder]++;
+    std::string sa, sb;
+    for (float v : a) sa += fmt::format(" {:.3f}", v);
+    for (float v : b) sb += fmt::format(" {:.3f}", v);
+    REXLOG_INFO("pairdbg {:08x} ({} floats)\n  a:{}\n  b:{}", recorder, a.size(), sa, sb);
+  }
+  std::unordered_map<uint32_t, int> dumps_; /* TEMP */
+  int dump_skip_ = 0; /* TEMP */
 
   void LogStats() {
     if (!REXCVAR_GET(log_interpolation)) {
@@ -309,10 +243,10 @@ class Interpolator {
       return;
     }
     REXLOG_INFO(
-        "interpolation: {} frames, {} uploads per list ({} tagged), {} paired ({} by tag), "
-        "{} unpaired, {} blended uploads, {} cut ticks",
+        "interpolation: {} frames, {} uploads per list ({} tagged), {} paired, {} unpaired, "
+        "{} blended uploads, {} cut ticks",
         stats_.frames, stats_.uploads_found, stats_.uploads_tagged, blends_.size(),
-        stats_.tag_paired, stats_.unpaired, stats_.blended_uploads, stats_.cuts);
+        stats_.unpaired, stats_.blended_uploads, stats_.cuts);
     stats_ = {};
     last_stats_log_ = now;
   }
@@ -321,7 +255,6 @@ class Interpolator {
     int frames = 0;
     size_t uploads_found = 0;
     size_t uploads_tagged = 0;
-    size_t tag_paired = 0;
     size_t unpaired = 0;
     int blended_uploads = 0;
     int cuts = 0;
