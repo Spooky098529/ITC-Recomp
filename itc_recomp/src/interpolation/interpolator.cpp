@@ -142,11 +142,8 @@ class Interpolator {
         }
         continue;
       }
-      // Integer data stored in float registers reads as NaN; leave it.
-      if (std::isfinite(from[i]) && std::isfinite(to[i])) {
-        float value = from[i] + (to[i] - from[i]) * tick_progress_;
-        guest::StoreFloat(base, payload + 4 * uint32_t(i), value);
-      }
+      // Values that aren't part of a rigidly moving matrix (sprite
+      // rectangles, colours, integers) are drawn as recorded for now.
     }
     upload();
     for (size_t i = 0; i < to.size(); i++) {
@@ -160,7 +157,7 @@ class Interpolator {
     size_t earlier;   // index into earlier_values_
     size_t replayed;  // index into replayed_
     // For each whole 4x4 block of the upload, its rigid motion between the
-    // ticks if it has one (a transform); other values blend linearly.
+    // ticks if it has one (a transform). Only those blocks are blended.
     std::vector<std::optional<RigidMotion>> rigid_blocks;
   };
 
@@ -223,9 +220,17 @@ class Interpolator {
           !IsPlausibleMotion(it->second->values, current[i].values)) {
         continue;
       }
+      std::vector<std::optional<RigidMotion>> rigid_blocks =
+          FindRigidBlocks(it->second->values, current[i].values);
+      bool any_rigid = false;
+      for (const auto& block : rigid_blocks) {
+        any_rigid |= block.has_value();
+      }
+      if (!any_rigid) {
+        continue;  // nothing to blend
+      }
       earlier_values_.push_back(it->second->values);
-      blends_[current[i].payload] = {earlier_values_.size() - 1, i,
-                                     FindRigidBlocks(it->second->values, current[i].values)};
+      blends_[current[i].payload] = {earlier_values_.size() - 1, i, std::move(rigid_blocks)};
     }
     stats_.unpaired = current.size() - blends_.size();
   }
