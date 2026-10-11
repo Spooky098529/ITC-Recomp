@@ -10,6 +10,10 @@
 
 #include <chrono>
 #include <cmath>
+#include <algorithm>
+#include <array>
+#include <limits>
+#include <map>
 #include <bit>
 #include <cctype>
 #include <cstdio>
@@ -48,6 +52,11 @@ constexpr size_t kFloatsPerMatrix = 16;
 
 // Recorder id for uploads not recorded by a wrapped recorder.
 constexpr uint32_t kUntaggedRecorder = 0;
+
+// A 4x4 matrix copied into at least this many uploads in a tick is a camera.
+constexpr int kMinCameraCopies = 8;
+
+constexpr size_t kNoEarlier = ~size_t(0);
 
 // How much (as a fraction of their size) an upload's values can change in one
 // tick and still be blended. Bigger jumps are teleports or wrong pairs.
@@ -123,6 +132,10 @@ class Interpolator {
     DumpForAnalysis(base, current);
     if (cut_between_replayed_lists) {
       stats_.cuts++;
+      // Remember this tick's cameras, but don't blend across the cut.
+      FindCameras(current);
+      camera_index_.clear();
+      camera_motions_.clear();
     } else {
       Pair(current);
     }
@@ -158,22 +171,36 @@ class Interpolator {
       return;
     }
     const Blend& blend = it->second;
-    const std::vector<float>& from = earlier_values_[blend.earlier];
     const std::vector<float>& to = replayed_[blend.replayed].values;
-    for (size_t i = 0; i < to.size(); i++) {
-      size_t block = i / kFloatsPerMatrix;
-      if (block < blend.rigid_blocks.size() && blend.rigid_blocks[block]) {
-        if (i % kFloatsPerMatrix == 0) {
-          Matrix4 m = BlendRigidMotion(*blend.rigid_blocks[block], tick_progress_);
-          for (size_t k = 0; k < kFloatsPerMatrix; k++) {
-            guest::StoreFloat(base, payload + 4 * uint32_t(i + k), m[k]);
-          }
-        }
-        continue;
+    for (const auto& [offset, camera] : blend.cameras) {
+      Matrix4 m = BlendRigidMotion(camera_motions_[camera], tick_progress_);
+      for (size_t k = 0; k < kFloatsPerMatrix; k++) {
+        guest::StoreFloat(base, payload + 4 * uint32_t(offset + k), m[k]);
       }
-      // Values that aren't part of a rigidly moving matrix (sprite
-      // rectangles, colours, integers) are drawn as recorded for now.
     }
+    if (blend.earlier == kNoEarlier) {
+      upload();
+      for (size_t i = 0; i < to.size(); i++) {
+        guest::StoreFloat(base, payload + 4 * uint32_t(i), to[i]);
+      }
+      stats_.blended_uploads++;
+      return;
+    }
+    const std::vector<float>& from = earlier_values_[blend.earlier];
+    for (const auto& [offset, motion] : blend.matrices) {
+      Matrix4 m = BlendRigidMotion(motion, tick_progress_);
+      for (size_t k = 0; k < kFloatsPerMatrix; k++) {
+        guest::StoreFloat(base, payload + 4 * uint32_t(offset + k), m[k]);
+      }
+    }
+    for (size_t offset : blend.positions) {
+      for (size_t k = 0; k < 3; k++) {
+        float value = from[offset + k] + (to[offset + k] - from[offset + k]) * tick_progress_;
+        guest::StoreFloat(base, payload + 4 * uint32_t(offset + k), value);
+      }
+    }
+    // Other values (sprite rectangles, colours, integers) are drawn as
+    // recorded for now.
     upload();
     for (size_t i = 0; i < to.size(); i++) {
       guest::StoreFloat(base, payload + 4 * uint32_t(i), to[i]);
@@ -185,24 +212,141 @@ class Interpolator {
   struct Blend {
     size_t earlier;   // index into earlier_values_
     size_t replayed;  // index into replayed_
-    // For each whole 4x4 block of the upload, its rigid motion between the
-    // ticks if it has one (a transform). Only those blocks are blended.
-    std::vector<std::optional<RigidMotion>> rigid_blocks;
+    // 4x4 matrices in the upload that moved rigidly between the ticks (by
+    // float offset), blended as rigid motions.
+    std::vector<std::pair<size_t, RigidMotion>> matrices;
+    // Other (x, y, z, 1) position vectors that moved, blended linearly.
+    std::vector<size_t> positions;
+    // Exact copies of a camera matrix (by float offset), replaced by that
+    // camera's blend so everything drawn with it moves together.
+    std::vector<std::pair<size_t, size_t>> cameras;  // offset, index into camera_motions_
   };
 
-  static std::vector<std::optional<RigidMotion>> FindRigidBlocks(const std::vector<float>& a,
-                                                                 const std::vector<float>& b) {
-    std::vector<std::optional<RigidMotion>> blocks;
-    for (size_t start = 0; start + kFloatsPerMatrix <= a.size(); start += kFloatsPerMatrix) {
+  using MatrixBits = std::array<uint32_t, kFloatsPerMatrix>;
+
+  static MatrixBits BitsAt(const std::vector<float>& values, size_t start) {
+    MatrixBits bits;
+    for (size_t k = 0; k < kFloatsPerMatrix; k++) {
+      bits[k] = std::bit_cast<uint32_t>(values[start + k]);
+    }
+    return bits;
+  }
+
+  static Matrix4 MatrixFromBits(const MatrixBits& bits) {
+    Matrix4 m;
+    for (size_t k = 0; k < kFloatsPerMatrix; k++) {
+      m[k] = std::bit_cast<float>(bits[k]);
+    }
+    return m;
+  }
+
+  // Camera matrices: 4x4 matrices copied into many uploads this tick (the
+  // view-projection of each pass). Each is paired with the previous tick's
+  // camera it moved rigidly from.
+  void FindCameras(const std::vector<Snapshot>& current) {
+    std::map<MatrixBits, int> copies;
+    for (const Snapshot& snapshot : current) {
+      for (size_t start = 0; start + kFloatsPerMatrix <= snapshot.values.size();
+           start += kFloatsPerRegister) {
+        copies[BitsAt(snapshot.values, start)]++;
+      }
+    }
+    std::vector<MatrixBits> cameras;
+    for (const auto& [bits, count] : copies) {
+      Matrix4 m = MatrixFromBits(bits);
+      bool finite = true;
+      for (float v : m) {
+        finite &= std::isfinite(v);
+      }
+      if (count >= kMinCameraCopies && finite && m[15] != 0 && !(m == Matrix4{})) {
+        cameras.push_back(bits);
+      }
+    }
+
+    camera_index_.clear();
+    camera_motions_.clear();
+    for (const MatrixBits& camera : cameras) {
+      Matrix4 now = MatrixFromBits(camera);
+      std::optional<RigidMotion> best;
+      float best_difference = std::numeric_limits<float>::infinity();
+      for (const MatrixBits& previous : previous_cameras_) {
+        Matrix4 before = MatrixFromBits(previous);
+        float difference = 0;
+        for (size_t k = 0; k < kFloatsPerMatrix; k++) {
+          difference += std::abs(now[k] - before[k]);
+        }
+        if (difference >= best_difference) {
+          continue;
+        }
+        if (std::optional<RigidMotion> motion = FindRigidMotion(before, now)) {
+          best = motion;
+          best_difference = difference;
+        }
+      }
+      if (best) {
+        camera_index_[camera] = camera_motions_.size();
+        camera_motions_.push_back(*best);
+      }
+    }
+    previous_cameras_ = std::move(cameras);
+    stats_.cameras = camera_motions_.size();
+  }
+
+  // Where an upload holds copies of this tick's camera matrices.
+  std::vector<std::pair<size_t, size_t>> FindCameraCopies(const std::vector<float>& values) const {
+    std::vector<std::pair<size_t, size_t>> found;
+    if (camera_index_.empty()) {
+      return found;
+    }
+    for (size_t start = 0; start + kFloatsPerMatrix <= values.size();
+         start += kFloatsPerRegister) {
+      auto it = camera_index_.find(BitsAt(values, start));
+      if (it != camera_index_.end()) {
+        found.push_back({start, it->second});
+        start += kFloatsPerMatrix - kFloatsPerRegister;
+      }
+    }
+    return found;
+  }
+
+  // Finds what in an upload can be blended. Matrices can start at any
+  // register (the camera's view-projection often follows a leading vector),
+  // so every register offset is tried; matches don't overlap.
+  static Blend FindBlendable(const std::vector<float>& a, const std::vector<float>& b,
+                             std::vector<bool> used) {
+    Blend blend{};
+    for (size_t start = 0; start + kFloatsPerMatrix <= a.size(); start += kFloatsPerRegister) {
+      if (used[start]) {
+        continue;
+      }
       Matrix4 ma, mb;
       for (size_t k = 0; k < kFloatsPerMatrix; k++) {
         ma[k] = a[start + k];
         mb[k] = b[start + k];
       }
-      bool same = ma == mb;
-      blocks.push_back(same ? std::nullopt : FindRigidMotion(ma, mb));
+      if (ma == mb) {
+        continue;
+      }
+      if (std::optional<RigidMotion> motion = FindRigidMotion(ma, mb)) {
+        blend.matrices.push_back({start, *motion});
+        std::fill(used.begin() + start, used.begin() + start + kFloatsPerMatrix, true);
+        start += kFloatsPerMatrix - kFloatsPerRegister;
+      }
     }
-    return blocks;
+    for (size_t start = 0; start + kFloatsPerRegister <= a.size(); start += kFloatsPerRegister) {
+      if (used[start] || a[start + 3] != 1.0f || b[start + 3] != 1.0f) {
+        continue;
+      }
+      bool finite = true, moved = false;
+      for (size_t k = 0; k < 3; k++) {
+        finite &= std::isfinite(a[start + k]) && std::isfinite(b[start + k]);
+        moved |= a[start + k] != b[start + k];
+      }
+      if (finite && moved) {
+        blend.positions.push_back(start);
+      }
+    }
+    return blend;
   }
 
   std::vector<Snapshot> TakeSnapshots(uint8_t* base) {
@@ -245,6 +389,7 @@ class Interpolator {
   // recorded.
   void Pair(const std::vector<Snapshot>& current) {
     earlier_values_.clear();
+    FindCameras(current);
     std::unordered_map<DrawTag, const Snapshot*> earlier_by_tag;
     for (const Snapshot& snapshot : replayed_) {
       if (snapshot.tag) {
@@ -254,6 +399,18 @@ class Interpolator {
     for (size_t i = 0; i < current.size(); i++) {
       if (!current[i].tag || !RecorderEnabled(current[i].tag->recorder)) {
         continue;
+      }
+      std::vector<std::pair<size_t, size_t>> cameras = FindCameraCopies(current[i].values);
+      std::vector<bool> used(current[i].values.size(), false);
+      for (const auto& [offset, camera] : cameras) {
+        std::fill(used.begin() + offset, used.begin() + offset + kFloatsPerMatrix, true);
+      }
+      if (!cameras.empty()) {
+        Blend camera_only{};
+        camera_only.earlier = kNoEarlier;
+        camera_only.replayed = i;
+        camera_only.cameras = cameras;
+        blends_[current[i].payload] = std::move(camera_only);
       }
       RecorderStats& recorder_stats = stats_.recorders[current[i].tag->recorder];
       recorder_stats.found++;
@@ -266,18 +423,16 @@ class Interpolator {
         continue;
       }
       recorder_stats.plausible++;
-      std::vector<std::optional<RigidMotion>> rigid_blocks =
-          FindRigidBlocks(it->second->values, current[i].values);
-      bool any_rigid = false;
-      for (const auto& block : rigid_blocks) {
-        any_rigid |= block.has_value();
-      }
-      if (!any_rigid) {
-        continue;  // nothing to blend
+      Blend blend = FindBlendable(it->second->values, current[i].values, used);
+      if (blend.matrices.empty() && blend.positions.empty()) {
+        continue;  // nothing more to blend
       }
       recorder_stats.blended++;
       earlier_values_.push_back(it->second->values);
-      blends_[current[i].payload] = {earlier_values_.size() - 1, i, std::move(rigid_blocks)};
+      blend.earlier = earlier_values_.size() - 1;
+      blend.replayed = i;
+      blend.cameras = std::move(cameras);
+      blends_[current[i].payload] = std::move(blend);
     }
     stats_.unpaired = current.size() - blends_.size();
   }
@@ -414,6 +569,7 @@ class Interpolator {
     if (now - last_stats_log_ < std::chrono::seconds(1)) {
       return;
     }
+    REXLOG_INFO("interpolation: {} cameras paired", stats_.cameras);
     REXLOG_INFO(
         "interpolation: {} frames, {} uploads per list ({} tagged), {} paired, {} unpaired, "
         "{} blended uploads, {} cut ticks",
@@ -440,6 +596,7 @@ class Interpolator {
     int frames = 0;
     size_t uploads_found = 0;
     size_t uploads_tagged = 0;
+    size_t cameras = 0;
     size_t unpaired = 0;
     int blended_uploads = 0;
     int cuts = 0;
@@ -451,7 +608,10 @@ class Interpolator {
 
   std::vector<Snapshot> replayed_;                 // the list being replayed
   std::vector<std::vector<float>> earlier_values_;  // counterparts from the list before
-  std::unordered_map<uint32_t, Blend> blends_;     // by payload address
+  std::unordered_map<uint32_t, Blend> blends_;
+  std::vector<MatrixBits> previous_cameras_;
+  std::map<MatrixBits, size_t> camera_index_;
+  std::vector<RigidMotion> camera_motions_;     // by payload address
   float tick_progress_ = 1;
 
   Stats stats_;
