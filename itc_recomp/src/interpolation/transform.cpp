@@ -280,6 +280,28 @@ Matrix4 BlendRigidMotion(const RigidMotion& rigid, float amount) {
   return ToFloat(rigid.applied_first ? Multiply(d, a) : Multiply(a, d));
 }
 
+Matrix4 Multiply(const Matrix4& a, const Matrix4& b) {
+  return ToFloat(Multiply(ToDouble(a), ToDouble(b)));
+}
+
+std::optional<Matrix4> Inverse(const Matrix4& m) {
+  std::optional<Matrix4d> inverse = Inverse(ToDouble(m));
+  if (!inverse) {
+    return std::nullopt;
+  }
+  return ToFloat(*inverse);
+}
+
+bool IsAffineRowLayout(const Matrix4& m) {
+  float scale = 0;
+  for (int i = 0; i < 12; i++) {
+    scale = std::max(scale, std::abs(m[i]));
+  }
+  float tolerance = 1e-4f * std::max(1.0f, scale);
+  return std::abs(m[3]) <= tolerance && std::abs(m[7]) <= tolerance &&
+         std::abs(m[11]) <= tolerance && std::abs(m[15] - 1) <= 1e-3f;
+}
+
 std::optional<Transform> TransformFromWorldMatrix(const Matrix4& m) {
   Matrix3 rotation = RotationOf(m);
   if (!IsRotation(rotation)) {

@@ -53,6 +53,14 @@ struct RigidMotion {
 std::optional<RigidMotion> FindRigidMotion(const Matrix4& a, const Matrix4& b);
 Matrix4 BlendRigidMotion(const RigidMotion& motion, float amount);
 
+// General 4x4 matrix helpers (computed in double precision).
+Matrix4 Multiply(const Matrix4& a, const Matrix4& b);
+std::optional<Matrix4> Inverse(const Matrix4& m);
+
+// Whether `m` is an affine transform in the game's row layout: column 3 is
+// (0, 0, 0, 1). Rotation, scale and translation are all allowed.
+bool IsAffineRowLayout(const Matrix4& m);
+
 float Distance(const Vec3& a, const Vec3& b);
 
 // Angle in radians between two rotations.

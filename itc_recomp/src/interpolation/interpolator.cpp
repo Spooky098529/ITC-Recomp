@@ -53,10 +53,15 @@ constexpr size_t kFloatsPerMatrix = 16;
 // Recorder id for uploads not recorded by a wrapped recorder.
 constexpr uint32_t kUntaggedRecorder = 0;
 
-// A 4x4 matrix copied into at least this many uploads in a tick is a camera.
-constexpr int kMinCameraCopies = 8;
+// Every invertible 4x4 matrix in the list is treated as a shared transform
+// (in practice almost all are exact copies of one of a dozen or so camera
+// matrices, some used by only a few draws), however many copies it has.
+constexpr int kMinCameraCopies = 1;
 
 constexpr size_t kNoEarlier = ~size_t(0);
+
+// How many of the closest previous matrices to test for a rigid match.
+constexpr size_t kMaxCameraCandidates = 4;
 
 // How much (as a fraction of their size) an upload's values can change in one
 // tick and still be blended. Bigger jumps are teleports or wrong pairs.
@@ -265,27 +270,28 @@ class Interpolator {
 
     camera_index_.clear();
     camera_motions_.clear();
+    std::vector<std::pair<float, size_t>> candidates;
     for (const MatrixBits& camera : cameras) {
       Matrix4 now = MatrixFromBits(camera);
-      std::optional<RigidMotion> best;
-      float best_difference = std::numeric_limits<float>::infinity();
-      for (const MatrixBits& previous : previous_cameras_) {
-        Matrix4 before = MatrixFromBits(previous);
+      // Closest previous matrices first; the first that this one moved
+      // rigidly from is its counterpart.
+      candidates.clear();
+      for (size_t p = 0; p < previous_cameras_.size(); p++) {
+        Matrix4 before = MatrixFromBits(previous_cameras_[p]);
         float difference = 0;
         for (size_t k = 0; k < kFloatsPerMatrix; k++) {
           difference += std::abs(now[k] - before[k]);
         }
-        if (difference >= best_difference) {
-          continue;
-        }
-        if (std::optional<RigidMotion> motion = FindRigidMotion(before, now)) {
-          best = motion;
-          best_difference = difference;
-        }
+        candidates.push_back({difference, p});
       }
-      if (best) {
-        camera_index_[camera] = camera_motions_.size();
-        camera_motions_.push_back(*best);
+      std::sort(candidates.begin(), candidates.end());
+      for (size_t c = 0; c < candidates.size() && c < kMaxCameraCandidates; c++) {
+        Matrix4 before = MatrixFromBits(previous_cameras_[candidates[c].second]);
+        if (std::optional<RigidMotion> motion = FindRigidMotion(before, now)) {
+          camera_index_[camera] = camera_motions_.size();
+          camera_motions_.push_back(*motion);
+          break;
+        }
       }
     }
     previous_cameras_ = std::move(cameras);
