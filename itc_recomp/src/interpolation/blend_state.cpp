@@ -153,6 +153,8 @@ class DrawStateDump {
       }
     }
     int found = 0;
+    std::ofstream copies(fmt::format("{}/copies_{}.bin", std::string(REXCVAR_GET(dump_draw_state)), when),
+                         std::ios::binary);
     std::ifstream maps("/proc/self/maps");
     std::string line;
     uint64_t guest_start = reinterpret_cast<uint64_t>(base);
@@ -170,9 +172,16 @@ class DrawStateDump {
         const uint32_t* words = reinterpret_cast<const uint32_t*>(at);
         for (const Pattern& p : patterns) {
           if (words[0] == p.words[0] && words[1] == p.words[1] && words[2] == p.words[2]) {
-            REXLOG_INFO("camera copy scan ({}): {} at {:08X}", when, p.name,
-                        uint32_t(at - guest_start));
+            uint32_t address = uint32_t(at - guest_start);
+            REXLOG_INFO("camera copy scan ({}): {} at {:08X}", when, p.name, address);
             found++;
+            // Its surroundings, as a dump record (see OnDraw).
+            uint32_t from = address - 0x200, size = 0x400;
+            if (at - 0x200 >= start && at + 0x200 <= end) {
+              copies.write(reinterpret_cast<const char*>(&from), 4);
+              copies.write(reinterpret_cast<const char*>(&size), 4);
+              copies.write(reinterpret_cast<const char*>(base + from), size);
+            }
           }
         }
       }
