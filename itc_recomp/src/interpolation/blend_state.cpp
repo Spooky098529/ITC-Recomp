@@ -33,7 +33,9 @@
 
 #include <algorithm>
 #include <chrono>
+#include <array>
 #include <cmath>
+#include <cstring>
 #include <fstream>
 #include <optional>
 #include <string>
@@ -112,6 +114,73 @@ uint32_t CameraPass(int pass) {
 // little endian, with the bytes as in guest memory (big endian).
 class DrawStateDump {
  public:
+  // Logs every place in guest memory holding a copy of pass 0's camera:
+  // the start of its view, view-projection (and their transposes), or its
+  // eye position, from this tick and the previous one.
+  void ScanForCameraCopies(uint8_t* base, const char* when) {
+    struct Pattern {
+      std::string name;
+      std::array<uint32_t, 3> words;  // as stored in guest memory
+    };
+    std::vector<Pattern> patterns;
+    auto add = [&](const std::string& name, float a, float b, float c) {
+      Pattern p{name, {}};
+      float values[3] = {a, b, c};
+      for (int i = 0; i < 3; i++) {
+        uint32_t bits;
+        std::memcpy(&bits, &values[i], 4);
+        p.words[i] = __builtin_bswap32(bits);
+      }
+      patterns.push_back(p);
+    };
+    for (int tick = 0; tick < 2; tick++) {
+      const Matrix4& view = tick == 0 ? view_ : previous_view_;
+      const Matrix4& vp = tick == 0 ? view_projection_ : previous_view_projection_;
+      std::string t = tick == 0 ? "" : "(prev)";
+      add("V" + t, view[0], view[1], view[2]);
+      add("Vt" + t, view[0], view[4], view[8]);
+      add("VP" + t, vp[0], vp[1], vp[2]);
+      add("VPt" + t, vp[0], vp[4], vp[8]);
+      add("VPt row3" + t, vp[3], vp[7], vp[11]);
+      if (std::optional<Transform> eye = TransformFromViewMatrix(view)) {
+        add("eye" + t, eye->position[0], eye->position[1], eye->position[2]);
+      }
+    }
+    int found = 0;
+    std::ifstream maps("/proc/self/maps");
+    std::string line;
+    uint64_t guest_start = reinterpret_cast<uint64_t>(base);
+    uint64_t guest_end = guest_start + 0x100000000ull;
+    while (std::getline(maps, line) && found < 400) {
+      uint64_t start = std::stoull(line.substr(0, line.find('-')), nullptr, 16);
+      uint64_t end = std::stoull(line.substr(line.find('-') + 1), nullptr, 16);
+      std::string perms = line.substr(line.find(' ') + 1, 4);
+      if (perms[0] != 'r' || end <= guest_start || start >= guest_end) {
+        continue;
+      }
+      start = std::max(start, guest_start);
+      end = std::min(end, guest_end);
+      for (uint64_t at = start; at + 12 <= end && found < 400; at += 4) {
+        const uint32_t* words = reinterpret_cast<const uint32_t*>(at);
+        for (const Pattern& p : patterns) {
+          if (words[0] == p.words[0] && words[1] == p.words[1] && words[2] == p.words[2]) {
+            REXLOG_INFO("camera copy scan ({}): {} at {:08X}", when, p.name,
+                        uint32_t(at - guest_start));
+            found++;
+          }
+        }
+      }
+    }
+    REXLOG_INFO("camera copy scan ({}): {} found", when, found);
+  }
+
+  void OnTick(uint8_t* base) {
+    previous_view_ = view_;
+    previous_view_projection_ = view_projection_;
+    view_ = LoadMatrix(base, kCameraPasses + kViewOffset);
+    view_projection_ = LoadMatrix(base, kCameraPasses + kViewProjectionOffset);
+  }
+
   void OnDraw(uint8_t* base, bool logic_pass, const char* when) {
     std::string folder = REXCVAR_GET(dump_draw_state);
     if (folder.empty() || !frame_pacing::GameMessages_InRace() || !logic_pass) {
@@ -133,16 +202,23 @@ class DrawStateDump {
     };
     write(kCameraPasses, kCameraPassCount * kCameraPassBytes);
     write(kDrawStack, kDrawStackBytes);
+    if (race_ticks_ - first == 10) {
+      ScanForCameraCopies(base, when);
+    }
   }
 
  private:
   int race_ticks_ = 0;
+  Matrix4 view_{}, view_projection_{}, previous_view_{}, previous_view_projection_{};
 };
 
 class DrawState {
  public:
   void BeforeDraw(uint8_t* base, bool logic_pass) {
     logic_pass_ = logic_pass;
+    if (logic_pass) {
+      dump_.OnTick(base);
+    }
     dump_.OnDraw(base, logic_pass, "pre");
     if (logic_pass) {
       OnTick(base);
