@@ -251,8 +251,16 @@ class CameraProductLog {
       return;
     }
     std::lock_guard lock(mutex_);
+    if (PassOfMatrix(out) >= 0) {
+      // Something computing a pass's matrix: log its operands once a second.
+      Entry& e = writes_[{caller, PassOfMatrix(out), out - CameraPass(PassOfMatrix(out)), in_draw}];
+      e.count++;
+      e.last_out = a;
+      e.last_other = b;
+    }
     int pass = PassOf(a) >= 0 ? PassOf(a) : PassOf(b);
     if (pass < 0) {
+      LogMaybe();
       return;
     }
     Key key{caller, pass, PassOf(a) >= 0, in_draw};
@@ -260,10 +268,20 @@ class CameraProductLog {
     e.count++;
     e.last_out = out;
     e.last_other = PassOf(a) >= 0 ? b : a;
+    LogMaybe();
+  }
+
+  void LogMaybe() {
     auto now = std::chrono::steady_clock::now();
     if (now - last_log_ < std::chrono::seconds(1)) {
       return;
     }
+    for (const auto& [k, v] : writes_) {
+      REXLOG_INFO("pass matrix write: caller {:08X} pass {} +{:X} in {}: {} calls, a {:08X} b {:08X}",
+                  k.caller, k.pass, k.offset, k.in_draw ? "Draw" : "other", v.count, v.last_out,
+                  v.last_other);
+    }
+    writes_.clear();
     for (const auto& [k, v] : entries_) {
       REXLOG_INFO("camera product: caller {:08X} pass {} vp as {} in {}: {} calls, out {:08X} other {:08X}",
                   k.caller, k.pass, k.vp_first ? "a" : "b", k.in_draw ? "Draw" : "other",
@@ -288,6 +306,19 @@ class CameraProductLog {
     bool in_draw;
     auto operator<=>(const Key&) const = default;
   };
+  struct WriteKey {
+    uint32_t caller;
+    int pass;
+    uint32_t offset;
+    bool in_draw;
+    auto operator<=>(const WriteKey&) const = default;
+  };
+  static int PassOfMatrix(uint32_t address) {
+    if (address < kCameraPasses || address >= CameraPass(kCameraPassCount)) {
+      return -1;
+    }
+    return int((address - kCameraPasses) / kCameraPassBytes);
+  }
   struct Entry {
     int count = 0;
     uint32_t last_out = 0;
@@ -295,6 +326,7 @@ class CameraProductLog {
   };
   std::mutex mutex_;
   std::map<Key, Entry> entries_;
+  std::map<WriteKey, Entry> writes_;
   std::chrono::steady_clock::time_point last_log_{};
 };
 
