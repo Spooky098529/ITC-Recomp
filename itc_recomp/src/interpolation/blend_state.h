@@ -17,6 +17,7 @@ void BlendState_OnVehicleSeen(uint32_t vehicle);
 
 // Main thread, from the per-object recorder: a matrix the draw step read.
 void BlendState_OnMatrixUsed(uint32_t address);
+void BlendState_OnRecorderCall(uint32_t r4, uint32_t r5);
 
 // Main thread, around the delivery of a Draw message.
 void BlendState_BeforeDraw(uint8_t* base, bool render_only_pass);

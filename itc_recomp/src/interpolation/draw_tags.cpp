@@ -159,6 +159,7 @@ extern "C" REX_FUNC(sub_825953D0) {
   REX_FUNC_PROLOGUE();
   interpolation::BlendState_OnMatrixUsed(ctx.r4.u32);
   interpolation::BlendState_OnMatrixUsed(ctx.r5.u32);
+  interpolation::BlendState_OnRecorderCall(ctx.r4.u32, ctx.r5.u32);
   interpolation::RecordTagged(base, 0x825953D0, {ctx.r5.u32},
                               [&] { __imp__sub_825953D0(ctx, base); });
 }

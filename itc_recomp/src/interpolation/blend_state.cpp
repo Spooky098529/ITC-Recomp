@@ -154,6 +154,13 @@ class DrawState {
     used_this_tick_.insert(address);
   }
 
+  void OnRecorderCall(uint32_t r4, uint32_t r5) {
+    std::lock_guard lock(mutex_);
+    if (detail_.recorder_pairs.size() < 40) {
+      detail_.recorder_pairs.insert({r4, r5});
+    }
+  }
+
   // Main thread, before the Draw of a logic pass: this tick's matrices.
   void OnTick(uint8_t* base) {
     std::vector<uint32_t> candidates;
@@ -356,6 +363,13 @@ class DrawState {
     }
     REXLOG_INFO("blend detail: pass VP max moved {:.3f} max angle {:.3f}", detail_.max_pass_moved,
                 detail_.max_pass_angle);
+    {
+      std::string pairs;
+      for (auto [r4, r5] : detail_.recorder_pairs) {
+        pairs += fmt::format(" {:08X}/{:08X}", r4, r5);
+      }
+      REXLOG_INFO("blend detail: recorder r4/r5:{}", pairs);
+    }
     REXLOG_INFO("blend detail: amounts{}", detail_.amounts);
     REXLOG_INFO("blend detail: pass VP copies in block:{}", detail_.vp_copies);
     REXLOG_INFO("blend detail: block rows written during draws: {}, e.g.{}",
@@ -393,6 +407,7 @@ class DrawState {
     float max_pass_moved = 0;
     float max_pass_angle = 0;
     std::string amounts;
+    std::set<std::pair<uint32_t, uint32_t>> recorder_pairs;
     std::string vp_copies;
     int rows_written_by_draw = 0;
     std::string written_sample;
@@ -410,6 +425,10 @@ DrawState& GetDrawState() {
 }  // namespace
 
 void BlendState_OnVehicleSeen(uint32_t) {}
+
+void BlendState_OnRecorderCall(uint32_t r4, uint32_t r5) {
+  GetDrawState().OnRecorderCall(r4, r5);
+}
 
 void BlendState_OnMatrixUsed(uint32_t address) {
   GetDrawState().OnMatrixUsed(address);
