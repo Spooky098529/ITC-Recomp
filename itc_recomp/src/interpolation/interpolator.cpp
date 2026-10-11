@@ -25,6 +25,9 @@ REXCVAR_DEFINE_BOOL(log_interpolation, false, "ITC",
 REXCVAR_DEFINE_BOOL(interpolate_debug_hide_cycle, false, "ITC",
                     "Debug: from the first race tick, hide each recorder's uploads in "
                     "turn for 5 s, with 5 s gaps (see docs/functions.md)");
+REXCVAR_DEFINE_STRING(interpolate_debug_dump, "", "ITC",
+                      "Debug: file to write two consecutive ticks' replayed uploads to, "
+                      "20 s into the first race");
 REXCVAR_DEFINE_STRING(interpolate_recorders, "", "ITC",
                       "Debug: comma-separated recorder addresses (hex) to interpolate; empty "
                       "means all");
@@ -117,6 +120,7 @@ class Interpolator {
     pending_cut_ = camera_cuts_.Update(base);
 
     std::vector<Snapshot> current = TakeSnapshots(base);
+    DumpForAnalysis(base, current);
     if (cut_between_replayed_lists) {
       stats_.cuts++;
     } else {
@@ -291,6 +295,46 @@ class Interpolator {
     }
     return lower.find(name) != std::string::npos;
   }
+
+  // Debug: writes two consecutive ticks' uploads, 20 s (600 ticks) into the
+  // first race, for working out how each is encoded.
+  void DumpForAnalysis(uint8_t* base, const std::vector<Snapshot>& current) {
+    const std::string& path = REXCVAR_GET(interpolate_debug_dump);
+    if (path.empty() || dump_done_) {
+      return;
+    }
+    bool in_race = false;
+    for (const Snapshot& snapshot : current) {
+      in_race |= snapshot.tag && snapshot.tag->recorder == 0x825953D0;
+    }
+    if (!in_race || ++dump_race_ticks_ < 600) {
+      return;
+    }
+    std::FILE* out = std::fopen(path.c_str(), dump_race_ticks_ == 600 ? "w" : "a");
+    if (!out) {
+      dump_done_ = true;
+      return;
+    }
+    std::fprintf(out, "tick %d\ncamera", dump_race_ticks_);
+    for (int i = 0; i < 16; i++) {
+      std::fprintf(out, " %.6g", guest::LoadFloat(base, kCameraViewMatrixAddress + 4 * i));
+    }
+    std::fprintf(out, "\n");
+    for (const Snapshot& snapshot : current) {
+      std::fprintf(out, "upload %08x %016llx %016llx %u", snapshot.tag ? snapshot.tag->recorder : 0,
+                   (unsigned long long)snapshot.signature,
+                   (unsigned long long)(snapshot.tag ? snapshot.tag->tag : 0), snapshot.payload);
+      for (float v : snapshot.values) {
+        std::fprintf(out, " %.6g", v);
+      }
+      std::fprintf(out, "\n");
+    }
+    std::fclose(out);
+    REXLOG_INFO("interpolation: dumped tick {} to {}", dump_race_ticks_, path);
+    dump_done_ = dump_race_ticks_ >= 601;
+  }
+  int dump_race_ticks_ = 0;
+  bool dump_done_ = false;
 
   // Debug hide cycle: which recorder (if any) is hidden right now.
   static constexpr uint32_t kHideCycle[] = {0x825953D0, 0x8209C1A0, 0x82146BD0, 0x820CECA0};
