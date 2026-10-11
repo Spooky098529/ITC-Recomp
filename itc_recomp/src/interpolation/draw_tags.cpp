@@ -1,5 +1,7 @@
 #include "draw_tags.h"
 
+#include "blend_state.h"
+
 #include "command_list.h"
 #include "guest.h"
 
@@ -155,6 +157,8 @@ extern "C" REX_FUNC(sub_8209C1A0) {
 // the objects between ticks.
 extern "C" REX_FUNC(sub_825953D0) {
   REX_FUNC_PROLOGUE();
+  interpolation::BlendState_OnMatrixUsed(ctx.r4.u32);
+  interpolation::BlendState_OnMatrixUsed(ctx.r5.u32);
   interpolation::RecordTagged(base, 0x825953D0, {ctx.r5.u32},
                               [&] { __imp__sub_825953D0(ctx, base); });
 }
