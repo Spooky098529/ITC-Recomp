@@ -1,0 +1,31 @@
+diff --git a/src/graphics/vulkan/command_processor.cpp b/src/graphics/vulkan/command_processor.cpp
+index 00f96b2..eeff920 100644
+--- a/src/graphics/vulkan/command_processor.cpp
++++ b/src/graphics/vulkan/command_processor.cpp
+@@ -46,6 +46,11 @@
+ #include <rex/ui/vulkan/presenter.h>
+ #include <rex/ui/vulkan/util.h>
+ 
++// ITC (patches/rexglue-sdk/0002-itc-motion-blur-toggle.patch).
++REXCVAR_DEFINE_BOOL(motion_blur, true, "ITC",
++                    "Draw Import Tuner Challenge's motion blur (pixel shader "
++                    "7EB16456AAD56CBA)");
++
+ // Legacy backend compatibility aliases for shared readback controls.
+ REXCVAR_DEFINE_BOOL(vulkan_readback_resolve, false, "GPU/Vulkan",
+                     "Read render-to-texture results on the CPU")
+@@ -3669,6 +3674,14 @@ bool VulkanCommandProcessor::IssueDraw(xenos::PrimitiveType prim_type, uint32_t
+       return true;
+     }
+   }
++  if (!REXCVAR_GET(motion_blur) && pixel_shader &&
++      pixel_shader->ucode_data_hash() == 0x7EB16456AAD56CBAull) {
++    // ITC (patches/rexglue-sdk/0002-itc-motion-blur-toggle.patch): skip
++    // Import Tuner Challenge's velocity-based motion blur pass. Its velocities
++    // come from the 30 Hz game tick, so with interpolated frames it smears the
++    // scene along a whole tick of motion.
++    return true;
++  }
+   if (pixel_shader && pixel_shader->ucode_data_hash() == 0x9750599DF5ED3B39ull) {
+     // ITC WORKAROUND (patches/rexglue-sdk/0001-itc-disable-glow.patch):
+     // zero the glow intensity (c33.y) of Import Tuner Challenge's bloom combine
