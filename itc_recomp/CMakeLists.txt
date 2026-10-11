@@ -34,6 +34,7 @@ include(generated/rexglue.cmake)
 # Sources
 set(ITC_SOURCES
     src/main.cpp
+    src/hooks/vehicle.cpp
 )
 
 if(WIN32)
