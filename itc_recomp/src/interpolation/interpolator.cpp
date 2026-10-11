@@ -61,6 +61,10 @@ constexpr int kMinCameraCopies = 1;
 
 constexpr size_t kNoEarlier = ~size_t(0);
 
+// Smallest |det| / (product of row lengths) for a matrix to count as a
+// transform (see IsInvertible).
+constexpr double kMinInvertibility = 1e-8;
+
 // How many of the closest previous matrices to test for a rigid match.
 constexpr size_t kMaxCameraCandidates = 4;
 
@@ -315,16 +319,15 @@ class Interpolator {
     stats_.cameras = camera_motions_.size();
   }
 
-  // Cheap invertibility test: determinant relative to the matrix's scale.
+  // Cheap invertibility test, independent of scale: the determinant divided
+  // by the product of the row lengths (Hadamard's bound) is 1 for a
+  // perfectly conditioned matrix and 0 for a singular one. Camera matrices
+  // with large translations measure 1e-7 to 0.2; sprite and lighting data
+  // are singular.
   static bool IsInvertible(const Matrix4& m) {
     double a[16];
-    double scale = 0;
     for (int i = 0; i < 16; i++) {
       a[i] = m[i];
-      scale = std::max(scale, std::abs(a[i]));
-    }
-    if (scale == 0) {
-      return false;
     }
     double s0 = a[0] * a[5] - a[4] * a[1], s1 = a[0] * a[6] - a[4] * a[2];
     double s2 = a[0] * a[7] - a[4] * a[3], s3 = a[1] * a[6] - a[5] * a[2];
@@ -333,7 +336,15 @@ class Interpolator {
     double c3 = a[9] * a[14] - a[13] * a[10], c2 = a[8] * a[15] - a[12] * a[11];
     double c1 = a[8] * a[14] - a[12] * a[10], c0 = a[8] * a[13] - a[12] * a[9];
     double det = s0 * c5 - s1 * c4 + s2 * c3 + s3 * c2 - s4 * c1 + s5 * c0;
-    return std::abs(det) > 1e-9 * scale * scale * scale * scale;
+    double bound = 1;
+    for (int row = 0; row < 4; row++) {
+      double length = 0;
+      for (int k = 0; k < 4; k++) {
+        length += a[row * 4 + k] * a[row * 4 + k];
+      }
+      bound *= std::sqrt(length);
+    }
+    return bound > 0 && std::abs(det) > kMinInvertibility * bound;
   }
 
   // Where an upload holds copies of this tick's camera matrices.
