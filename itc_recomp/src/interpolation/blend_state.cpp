@@ -134,12 +134,12 @@ class DrawState {
     std::unordered_map<uint32_t, Matrix4> current;
     current.reserve(candidates.size());
     blends_.clear();
-    uint32_t skip_until = 0;
+    uint32_t taken_start = 0;  // the last matrix taken, whose rows aren't matrices
     std::string pass_outcomes(21, '-');
     for (uint32_t address : candidates) {
       Matrix4 now = LoadMatrix(base, address);
       current[address] = now;
-      Outcome outcome = Classify(address, now, skip_until);
+      Outcome outcome = Classify(address, now, taken_start);
       int region = RegionOf(address);
       detail_.counts[region][int(outcome)]++;
       if (region == kPasses && (address - kCameraPasses.start) % 592 == 0x90) {
@@ -151,8 +151,8 @@ class DrawState {
     previous_ = std::move(current);
   }
 
-  Outcome Classify(uint32_t address, const Matrix4& now, uint32_t& skip_until) {
-    if (address < skip_until) {
+  Outcome Classify(uint32_t address, const Matrix4& now, uint32_t& taken_start) {
+    if (taken_start != 0 && address > taken_start && address < taken_start + kMatrixBytes) {
       return Outcome::kInside;  // inside a matrix already taken
     }
     auto before = previous_.find(address);
@@ -189,7 +189,7 @@ class DrawState {
       detail_.max_pass_angle = std::max(detail_.max_pass_angle, angle);
     }
     blends_.push_back({address, *motion});
-    skip_until = address + kMatrixBytes;
+    taken_start = address;
     return Outcome::kBlended;
   }
 
