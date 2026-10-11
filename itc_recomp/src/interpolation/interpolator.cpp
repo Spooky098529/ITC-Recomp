@@ -221,11 +221,17 @@ class Interpolator {
       if (!current[i].tag || !RecorderEnabled(current[i].tag->recorder)) {
         continue;
       }
+      RecorderStats& recorder_stats = stats_.recorders[current[i].tag->recorder];
+      recorder_stats.found++;
       auto it = earlier_by_tag.find(current[i].tag->tag);
-      if (it == earlier_by_tag.end() ||
-          !IsPlausibleMotion(it->second->values, current[i].values)) {
+      if (it == earlier_by_tag.end()) {
         continue;
       }
+      recorder_stats.matched++;
+      if (!IsPlausibleMotion(it->second->values, current[i].values)) {
+        continue;
+      }
+      recorder_stats.plausible++;
       std::vector<std::optional<RigidMotion>> rigid_blocks =
           FindRigidBlocks(it->second->values, current[i].values);
       bool any_rigid = false;
@@ -235,6 +241,7 @@ class Interpolator {
       if (!any_rigid) {
         continue;  // nothing to blend
       }
+      recorder_stats.blended++;
       earlier_values_.push_back(it->second->values);
       blends_[current[i].payload] = {earlier_values_.size() - 1, i, std::move(rigid_blocks)};
     }
@@ -289,11 +296,24 @@ class Interpolator {
         "{} blended uploads, {} cut ticks",
         stats_.frames, stats_.uploads_found, stats_.uploads_tagged, blends_.size(),
         stats_.unpaired, stats_.blended_uploads, stats_.cuts);
+    for (const auto& [recorder, r] : stats_.recorders) {
+      REXLOG_INFO("interpolation: recorder {:08x}: {} found, {} matched, {} plausible, {} blended",
+                  recorder, r.found, r.matched, r.plausible, r.blended);
+    }
     stats_ = {};
     last_stats_log_ = now;
   }
 
+  // Per recorder, summed over a second of ticks.
+  struct RecorderStats {
+    int found = 0;
+    int matched = 0;
+    int plausible = 0;
+    int blended = 0;
+  };
+
   struct Stats {
+    std::unordered_map<uint32_t, RecorderStats> recorders;
     int frames = 0;
     size_t uploads_found = 0;
     size_t uploads_tagged = 0;

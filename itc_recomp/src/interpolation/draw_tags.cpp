@@ -147,10 +147,12 @@ extern "C" REX_FUNC(sub_8209C1A0) {
                               [&] { __imp__sub_8209C1A0(ctx, base); });
 }
 
-// Per-pass constants: r4, r5 = pass inputs.
+// Per-pass constants: r4, r5 = pass inputs. Passes are recorded in the
+// same order every tick, so they're identified by order alone: r4 and r5
+// may point to per-tick data that changes address.
 extern "C" REX_FUNC(sub_825953D0) {
   REX_FUNC_PROLOGUE();
-  interpolation::RecordTagged(base, 0x825953D0, {ctx.r3.u32, ctx.r4.u32, ctx.r5.u32},
+  interpolation::RecordTagged(base, 0x825953D0, {},
                               [&] { __imp__sub_825953D0(ctx, base); });
 }
 
