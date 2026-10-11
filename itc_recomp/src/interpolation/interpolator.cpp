@@ -23,7 +23,9 @@
 #include <unordered_map>
 #include <vector>
 
-REXCVAR_DEFINE_BOOL(interpolate, true, "ITC",
+// Off by default: superseded by re-recording each frame on the main thread
+// (src/frame_pacing/frame_loop.cpp).
+REXCVAR_DEFINE_BOOL(interpolate, false, "ITC",
                     "Smooth motion between 30 Hz game ticks by blending shader constants");
 REXCVAR_DEFINE_BOOL(log_interpolation, false, "ITC",
                     "Log interpolation counts once a second");
