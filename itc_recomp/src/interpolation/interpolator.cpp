@@ -22,6 +22,9 @@ REXCVAR_DEFINE_BOOL(interpolate, true, "ITC",
                     "Smooth motion between 30 Hz game ticks by blending shader constants");
 REXCVAR_DEFINE_BOOL(log_interpolation, false, "ITC",
                     "Log interpolation counts once a second");
+REXCVAR_DEFINE_BOOL(interpolate_debug_hide_cycle, false, "ITC",
+                    "Debug: from the first race tick, hide each recorder's uploads in "
+                    "turn for 5 s, with 5 s gaps (see docs/functions.md)");
 REXCVAR_DEFINE_STRING(interpolate_recorders, "", "ITC",
                       "Debug: comma-separated recorder addresses (hex) to interpolate; empty "
                       "means all");
@@ -129,6 +132,19 @@ class Interpolator {
   // the recorded values.
   template <typename Upload>
   void OnShaderConstants(uint8_t* base, uint32_t payload, Upload&& upload) {
+    if (HiddenByDebugCycle(payload)) {
+      std::vector<uint32_t> saved;
+      uint32_t floats = debug_hide_sizes_[payload];
+      for (uint32_t i = 0; i < floats; i++) {
+        saved.push_back(guest::LoadU32(base, payload + 4 * i));
+        guest::StoreU32(base, payload + 4 * i, 0);
+      }
+      upload();
+      for (uint32_t i = 0; i < floats; i++) {
+        guest::StoreU32(base, payload + 4 * i, saved[i]);
+      }
+      return;
+    }
     auto it = blends_.find(payload);
     if (it == blends_.end()) {
       upload();
@@ -184,7 +200,9 @@ class Interpolator {
 
   std::vector<Snapshot> TakeSnapshots(uint8_t* base) {
     std::vector<Snapshot> snapshots;
-    for (const RecordedUpload& recorded : FindReplayedShaderConstantUploads(base, scene_)) {
+    std::vector<RecordedUpload> replayed = FindReplayedShaderConstantUploads(base, scene_);
+    UpdateDebugHide(replayed);
+    for (const RecordedUpload& recorded : replayed) {
       if (!ShouldBlend(recorded.upload)) {
         continue;
       }
@@ -261,6 +279,55 @@ class Interpolator {
     }
     return lower.find(name) != std::string::npos;
   }
+
+  // Debug hide cycle: which recorder (if any) is hidden right now.
+  static constexpr uint32_t kHideCycle[] = {0x825953D0, 0x8209C1A0, 0x82146BD0, 0x820CECA0};
+  uint32_t DebugHiddenRecorder() {
+    if (!REXCVAR_GET(interpolate_debug_hide_cycle) || !debug_cycle_started_) {
+      return 0;
+    }
+    auto elapsed = std::chrono::steady_clock::now() - debug_cycle_start_;
+    int phase = int(std::chrono::duration_cast<std::chrono::seconds>(elapsed).count() / 5) % 8;
+    uint32_t hidden = phase % 2 ? kHideCycle[phase / 2] : 0;
+    if (hidden != debug_logged_hidden_) {
+      REXLOG_INFO("interpolation: debug hiding {:08x}", hidden);
+      debug_logged_hidden_ = hidden;
+    }
+    return hidden;
+  }
+  bool HiddenByDebugCycle(uint32_t payload) {
+    auto it = debug_hide_recorders_.find(payload);
+    return it != debug_hide_recorders_.end() && it->second == debug_hidden_now_;
+  }
+  void UpdateDebugHide(const std::vector<RecordedUpload>& uploads) {
+    debug_hide_recorders_.clear();
+    debug_hide_sizes_.clear();
+    if (!REXCVAR_GET(interpolate_debug_hide_cycle)) {
+      return;
+    }
+    for (const RecordedUpload& recorded : uploads) {
+      std::optional<DrawTagInfo> tag = DrawTags_Find(recorded.payload);
+      if (!tag) {
+        continue;
+      }
+      if (!debug_cycle_started_ && tag->recorder == 0x825953D0) {
+        debug_cycle_started_ = true;  // first race tick
+        debug_cycle_start_ = std::chrono::steady_clock::now();
+      }
+      debug_hide_recorders_[recorded.payload] = tag->recorder;
+      debug_hide_sizes_[recorded.payload] = recorded.upload.register_count * kFloatsPerRegister;
+    }
+    debug_hidden_now_ = DebugHiddenRecorder();
+    if (debug_hidden_now_ == 0) {
+      debug_hide_recorders_.clear();
+    }
+  }
+  std::unordered_map<uint32_t, uint32_t> debug_hide_recorders_;
+  std::unordered_map<uint32_t, uint32_t> debug_hide_sizes_;
+  uint32_t debug_hidden_now_ = 0;
+  uint32_t debug_logged_hidden_ = 0;
+  bool debug_cycle_started_ = false;
+  std::chrono::steady_clock::time_point debug_cycle_start_;
 
   // Values that can't be blended (integers read as NaN) must match exactly;
   // the rest must change by under kMaxRelativeChangePerTick.
