@@ -49,6 +49,9 @@
 REXCVAR_DEFINE_BOOL(interpolate_draw_state, true, "ITC",
                     "Smooth motion between 30 Hz ticks in races by blending cameras and "
                     "object transforms");
+REXCVAR_DEFINE_DOUBLE(debug_camera_constant_lift, 0.0, "ITC",
+                      "Testing: draw the camera constants recorded during Update from this many "
+                      "metres higher, to show what they affect");
 REXCVAR_DEFINE_BOOL(log_blend_state, false, "ITC",
                     "Log how many cameras and objects were blended, once a second");
 REXCVAR_DEFINE_BOOL(log_camera_products, false, "ITC",
@@ -342,8 +345,14 @@ class DrawState {
       if (!blended[constant.pass] || LoadMatrix(base, constant.payload) != constant.written) {
         continue;  // recorded over
       }
-      StoreMatrix(base, constant.payload, *blended[constant.pass]);
-      constant.written = *blended[constant.pass];
+      Matrix4 value = *blended[constant.pass];
+      if (float lift = float(REXCVAR_GET(debug_camera_constant_lift)); lift != 0) {
+        // Moving the eye up moves the world down: world * T(0, -lift, 0) * VP.
+        Matrix4 down = WorldMatrixFromTransform(Transform{{}, {0, -lift, 0}});
+        value = Multiply(down, value);
+      }
+      StoreMatrix(base, constant.payload, value);
+      constant.written = value;
       counts_.constants++;
     }
     // Products game logic made with a camera, still in place: redo them with
