@@ -261,15 +261,10 @@ Matrix4 BlendProduct(const ReplayedProduct& product, float amount, BlendStats& s
     } else {
       view_projection = ViewProjectionFromCamera(Blend(*ca, *cb, amount));
     }
-  } else if (a.view_projection != b.view_projection) {
-    if (std::optional<RigidMotion> motion = FindRigidMotion(a.view_projection, b.view_projection);
-        motion && Distance(motion->motion.position, Vec3{}) < 1e6f &&
-        AngleBetween(motion->motion.rotation, Quaternion{}) <= kCutAngle) {
-      view_projection = BlendRigidMotion(*motion, amount);
-    } else {
-      stats.camera_not_blended++;
-    }
   }
+  // Other cameras (orthographic: the shadow map's, refitted around the car
+  // every tick) stay at the tick's, so everything using one agrees within a
+  // frame; only the objects move.
   return Multiply(world, view_projection);
 }
 
