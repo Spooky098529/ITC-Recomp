@@ -271,9 +271,9 @@ Matrix4 BlendProduct(const ReplayedProduct& product, float amount, BlendStats& s
 // Which camera a view-projection belongs to, as far as can be told from
 // its projection: aspect ratio and depth mapping stay the same for a view
 // while its field of view changes. Several views share stack copies of their
-// cameras, so this tells them apart. Each distinct camera seen gets a stable
-// number (matched within a tolerance, so rounding can't split one camera);
-// 0 for a non-perspective one. Main thread.
+// cameras, so this tells them apart. Each distinct camera seen gets a
+// permanent number (matched within a tolerance, so rounding can't split one
+// camera); 0 for a non-perspective one. Main thread.
 class CameraIds {
  public:
   uint64_t Of(const Matrix4& view_projection) {
@@ -283,16 +283,27 @@ class CameraIds {
     }
     Signature signature{camera->x_scale / camera->y_scale, camera->depth_offset,
                         camera->depth_scale / camera->depth_offset};
-    for (size_t i = 0; i < known_.size(); i++) {
-      if (IsClose(known_[i], signature)) {
-        return i + 1;
+    // Look in the signature's bucket and its neighbours, so values either
+    // side of a bucket boundary still match.
+    std::array<int32_t, 3> bucket = BucketOf(signature);
+    for (int d0 = -1; d0 <= 1; d0++) {
+      for (int d1 = -1; d1 <= 1; d1++) {
+        for (int d2 = -1; d2 <= 1; d2++) {
+          auto it = buckets_.find(Key({bucket[0] + d0, bucket[1] + d1, bucket[2] + d2}));
+          if (it == buckets_.end()) {
+            continue;
+          }
+          for (const auto& [known, id] : it->second) {
+            if (IsClose(known, signature)) {
+              return id;
+            }
+          }
+        }
       }
     }
-    if (known_.size() >= 256) {
-      known_.clear();  // shouldn't happen; start again rather than grow
-    }
-    known_.push_back(signature);
-    return known_.size();
+    uint64_t id = ++count_;
+    buckets_[Key(bucket)].push_back({signature, id});
+    return id;
   }
 
  private:
@@ -305,7 +316,22 @@ class CameraIds {
     }
     return true;
   }
-  std::vector<Signature> known_;
+  // Buckets about 1% wide, on a log scale, with the sign kept.
+  static std::array<int32_t, 3> BucketOf(const Signature& s) {
+    std::array<int32_t, 3> b;
+    for (int i = 0; i < 3; i++) {
+      float magnitude = std::max(std::abs(s[i]), 1e-3f);
+      int32_t k = int32_t(std::lround(std::log(magnitude) / 0.01f));
+      b[i] = s[i] < 0 ? -k - 100000 : k;
+    }
+    return b;
+  }
+  static uint64_t Key(const std::array<int32_t, 3>& b) {
+    return (uint64_t(uint32_t(b[0])) * 0x9E3779B97F4A7C15ull) ^ (uint64_t(uint32_t(b[1])) << 21) ^
+           (uint64_t(uint32_t(b[2])) * 0xC2B2AE3D27D4EB4Full);
+  }
+  std::unordered_map<uint64_t, std::vector<std::pair<Signature, uint64_t>>> buckets_;
+  uint64_t count_ = 0;
 };
 
 }  // namespace
