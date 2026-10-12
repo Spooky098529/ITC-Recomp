@@ -67,6 +67,9 @@ REXCVAR_DEFINE_BOOL(log_overlay_uploads, false, "ITC",
                     "Log every shader constant upload the race overlays recorded, as replayed, "
                     "12 frames every 3 s");
 REXCVAR_DECLARE(bool, log_frame_times);
+REXCVAR_DEFINE_BOOL(strict_pixel_pairing, true, "ITC",
+                    "Leave per-object pixel constants unblended after a draw that isn't a known "
+                    "camera product, instead of pairing them by the product before it");
 REXCVAR_DEFINE_BOOL(blend_object_extras, true, "ITC",
                     "Blend the per-object uploads' world matrix (c4-c7) and camera position "
                     "(c8) along with c0-c3 (the paint's reflections)");
@@ -1059,6 +1062,13 @@ class ReplayCameras {
     }
     auto it = frame_->products.find(payload);
     if (it == frame_->products.end() || it->second.written != m) {
+      // A draw that isn't a known product (world geometry's matrix often
+      // isn't): the pixel constants after it belong to it, not to the last
+      // product, so they mustn't be paired by that product's identity (that
+      // blended one piece of world geometry's lighting with another's).
+      if (REXCVAR_GET(strict_pixel_pairing)) {
+        last_identity_ = 0;
+      }
       return std::nullopt;
     }
     last_identity_ = it->second.identity;
