@@ -337,12 +337,14 @@ class DrawState {
     }
     bool render_only = frame_pacing::GameMessages_IsRenderOnlyPass();
     bool recorder = caller == kRecorderMultiplyReturn;
-    // Other multiplies into a camera matter when made by a logic pass (the
-    // scenery's, during Update); render-only passes' are already blended.
-    if (!recorder && (render_only || PassOfViewProjection(b) < 0)) {
+    ProductInputs inputs{LoadMatrix(base, a), LoadMatrix(base, b)};
+    // Any multiply by a camera: the recorder's, one by a camera pass, or one
+    // by a perspective view-projection wherever it's kept (the light
+    // billboards' recorder, sub_8209C1A0, builds one on its stack).
+    if (!recorder && PassOfViewProjection(b) < 0 && camera_ids_.Of(inputs.view_projection) == 0) {
       return;
     }
-    Note(base, out, a, b, {LoadMatrix(base, a), LoadMatrix(base, b)}, render_only);
+    Note(base, out, a, b, inputs, render_only);
   }
 
   // Main thread, after the matrix copy dst = src. A copy of a camera (as
