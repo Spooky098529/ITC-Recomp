@@ -59,6 +59,8 @@ REXCVAR_DEFINE_BOOL(log_stepping_constants, false, "ITC",
                     "Log constant uploads that change at the tick rate rather than every "
                     "frame (left at 30 Hz), with the code that recorded them; needs "
                     "--log_slot_callers");
+REXCVAR_DEFINE_BOOL(log_overlay_products, false, "ITC",
+                    "Log the race overlays' camera products as replayed, 12 frames every 3 s");
 REXCVAR_DEFINE_BOOL(log_blend_state, false, "ITC",
                     "Log how many cameras and objects were blended, once a second");
 REXCVAR_DEFINE_BOOL(log_replayed_constants, false, "ITC",
@@ -166,6 +168,7 @@ struct ProductInputs {
 // A multiply made during a logic pass, as the render thread redoes it.
 struct ReplayedProduct {
   uint64_t identity = 0;  // the same multiply in every tick (its pairing key)
+  uint32_t handler = 0;   // the numbering context it was made in
   Matrix4 written;  // the product, as written to the output address
   ProductInputs now;
   std::optional<ProductInputs> before;  // the previous tick's, if paired
@@ -673,7 +676,7 @@ class DrawState {
           continue;
         }
         auto before = previous_tick_.find(output.key);
-        frame->products[out] = {ProductKeyHash()(output.key), output.written, now->second,
+        frame->products[out] = {ProductKeyHash()(output.key), output.key.handler, output.written, now->second,
                                 before != previous_tick_.end() ? std::optional(before->second)
                                                                : std::nullopt};
       }
@@ -818,12 +821,39 @@ class ReplayCameras {
  public:
   void OnFrameStart() {
     LogStats();
+    if (overlay_frames_left_ > 0) {
+      overlay_frames_left_--;
+      if (REXCVAR_GET(log_overlay_products)) {
+        REXLOG_INFO("overlay: --- frame ---");
+      }
+    }
     last_identity_ = 0;
     std::lock_guard lock(g_replay_mutex);
     frame_ = g_replay_frame;
   }
 
   uint64_t tick() const { return frame_ ? frame_->tick : 0; }
+
+  // Diagnostics (--log_overlay_products): every race overlay product of 12
+  // frames in a row, every 3 s.
+  void LogOverlay(uint32_t payload, const ReplayedProduct& product, const Matrix4& result) {
+    auto now = std::chrono::steady_clock::now();
+    if (overlay_frames_left_ == 0 && now - overlay_last_ >= std::chrono::seconds(3)) {
+      overlay_frames_left_ = 12;
+      overlay_last_ = now;
+    }
+    if (overlay_frames_left_ == 0) {
+      return;
+    }
+    const Matrix4& w = product.written;
+    REXLOG_INFO("overlay: tick {} amount {:.2f} payload {:08X} paired {} written row3 ({:.4g} {:.4g} "
+                "{:.4g} {:.4g}) now ({:.4g} {:.4g} {:.4g} {:.4g}) result ({:.4g} {:.4g} {:.4g} {:.4g})",
+                frame_->tick, frame_->amount, payload, product.before.has_value(), w[12], w[13],
+                w[14], w[15], product.now.world[12], product.now.world[13], product.now.world[14],
+                product.now.world[15], result[12], result[13], result[14], result[15]);
+  }
+  int overlay_frames_left_ = 0;
+  std::chrono::steady_clock::time_point overlay_last_{};
   // The last camera product replayed: identifies the object being drawn.
   uint64_t last_identity() const { return last_identity_; }
   float amount() const { return frame_ ? frame_->amount : 1.0f; }
@@ -873,7 +903,11 @@ class ReplayCameras {
       return std::nullopt;
     }
     last_identity_ = it->second.identity;
-    return BlendProduct(it->second, frame_->amount, stats_.blend);
+    Matrix4 result = BlendProduct(it->second, frame_->amount, stats_.blend);
+    if (REXCVAR_GET(log_overlay_products) && it->second.handler == kRaceOverlaysHandler) {
+      LogOverlay(payload, it->second, result);
+    }
+    return result;
   }
 
  private:
