@@ -15,9 +15,38 @@
 
 REXCVAR_DEFINE_BOOL(log_game_messages, false, "ITC",
                     "Log game messages delivered and skipped, once a second");
+// Testing: main loop tick handlers or message handlers to skip on
+// render-only passes, by target (comma-separated hex), to find which one
+// counts frames.
+REXCVAR_DEFINE_STRING(render_only_skip, "", "ITC",
+                      "Testing: tick handler or message handler targets (hex, "
+                      "comma-separated) to skip on render-only passes");
 
 namespace frame_pacing {
 namespace {
+
+bool SkipOnRenderOnlyPass(uint32_t target) {
+  static std::string parsed_from;
+  static std::vector<uint32_t> targets;
+  std::string list = REXCVAR_GET(render_only_skip);
+  if (list != parsed_from) {
+    parsed_from = list;
+    targets.clear();
+    size_t start = 0;
+    while (start < list.size()) {
+      size_t end = list.find(',', start);
+      std::string item = list.substr(start, end == std::string::npos ? std::string::npos : end - start);
+      if (!item.empty()) {
+        targets.push_back(uint32_t(std::stoul(item, nullptr, 16)));
+      }
+      if (end == std::string::npos) {
+        break;
+      }
+      start = end + 1;
+    }
+  }
+  return std::find(targets.begin(), targets.end(), target) != targets.end();
+}
 
 // Message dispatcher object (r3 of sub_821062E8).
 constexpr uint32_t kHandlersOffset = 0;  // array of handler pointers
@@ -84,6 +113,9 @@ void Deliver(PPCContext& ctx, uint8_t* base, uint32_t dispatcher, uint32_t messa
     uint32_t target = (method == 0x8223A3F0 || method == 0x82233460)
                           ? guest::LoadU32(base, object + 8)
                           : method;
+    if (g_render_only_pass && SkipOnRenderOnlyPass(target)) {
+      continue;
+    }
     debug::FrameStateDiff_Before(base);
     REX_CALL_INDIRECT_FUNC(method);
     debug::FrameStateDiff_After(base, "message handler", target);
@@ -144,6 +176,10 @@ bool GameMessages_InRace() {
   return g_in_race;
 }
 
+bool SkipTickHandlerOnRenderOnlyPass(uint32_t target) {
+  return SkipOnRenderOnlyPass(target);
+}
+
 bool GameMessages_IsRenderOnlyPass() {
   return g_render_only_pass;
 }
@@ -190,42 +226,11 @@ std::map<std::pair<uint32_t, uint32_t>, int> g_tick_handlers;
 std::chrono::steady_clock::time_point g_tick_handlers_logged{};
 }  // namespace
 
-// Testing: main loop tick handlers to skip on render-only passes, by target
-// (comma-separated hex), to find which one counts frames.
-REXCVAR_DEFINE_STRING(render_only_skip, "", "ITC",
-                      "Testing: tick handler targets (hex, comma-separated) to skip on "
-                      "render-only passes");
-
-namespace {
-bool SkipOnRenderOnlyPass(uint32_t target) {
-  static std::string parsed_from;
-  static std::vector<uint32_t> targets;
-  std::string list = REXCVAR_GET(render_only_skip);
-  if (list != parsed_from) {
-    parsed_from = list;
-    targets.clear();
-    size_t start = 0;
-    while (start < list.size()) {
-      size_t end = list.find(',', start);
-      std::string item = list.substr(start, end == std::string::npos ? std::string::npos : end - start);
-      if (!item.empty()) {
-        targets.push_back(uint32_t(std::stoul(item, nullptr, 16)));
-      }
-      if (end == std::string::npos) {
-        break;
-      }
-      start = end + 1;
-    }
-  }
-  return std::find(targets.begin(), targets.end(), target) != targets.end();
-}
-}  // namespace
-
 // TickHandler_Invoke: r3 = app, r4 = (handler object in the low word).
 extern "C" REX_FUNC(sub_82099A98) {
   REX_FUNC_PROLOGUE();
   if (frame_pacing::GameMessages_IsRenderOnlyPass() &&
-      SkipOnRenderOnlyPass(guest::LoadU32(base, ctx.r4.u32 + 8))) {
+      frame_pacing::SkipTickHandlerOnRenderOnlyPass(guest::LoadU32(base, ctx.r4.u32 + 8))) {
     return;
   }
   if (REXCVAR_GET(log_tick_handlers) && frame_pacing::GameMessages_IsRenderOnlyPass()) {
