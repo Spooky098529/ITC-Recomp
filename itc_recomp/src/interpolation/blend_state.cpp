@@ -87,6 +87,10 @@ REXCVAR_DEFINE_BOOL(log_blend_state, false, "ITC",
                     "Log how many cameras and objects were blended, once a second");
 REXCVAR_DEFINE_BOOL(log_replayed_constants, false, "ITC",
                     "Log the vertex constant matrices the render thread replays, once a second");
+REXCVAR_DEFINE_BOOL(pixel_blend_from_latest, true, "ITC",
+                    "Blend per-object lighting from the last value recorded in the previous "
+                    "tick to this frame's (false: only frames recording the tick's first value "
+                    "are blended)");
 REXCVAR_DEFINE_BOOL(log_pixel_outcomes, false, "ITC",
                     "Log what happened to the per-object lighting uploads (blended, unpaired, "
                     "rejected...), for moving and still objects, every 2 s");
@@ -1253,8 +1257,15 @@ class PixelConstantBlender {
     }
     last_key_ = {object, key.occurrence};
     last_values_ = now;
+    last_blended_ = now;
     Entry& entry = entries_[key];
-    if (entry.current_tick != tick_) {
+    // The light slots (cars' headlights among them) are recorded on a tick's
+    // logic pass before the lights move, so they hold the previous tick's
+    // lights there, and the tick's own on the frames after. Blending from
+    // the last value recorded in the previous tick to this frame's gives the
+    // previous tick's lights at the tick (amount about 0) and a blend after.
+    bool from_latest = REXCVAR_GET(pixel_blend_from_latest);
+    if (entry.current_tick != tick_ || from_latest) {
       entry.current = now;  // first time this tick: the tick's own value
       entry.current_tick = tick_;
     }
@@ -1311,10 +1322,12 @@ class PixelConstantBlender {
       return std::nullopt;
     }
     outcome_ = Outcome::kBlended;
+    last_blended_ = now;
     for (uint32_t i = 0; i < now.size(); i++) {
       float a = entry.previous[i], b = now[i];
       if (a != b && !jumps[i]) {
-        guest::StoreFloat(base, payload + 4 * i, a + (b - a) * amount);
+        last_blended_[i] = a + (b - a) * amount;
+        guest::StoreFloat(base, payload + 4 * i, last_blended_[i]);
       }
     }
     return now;
@@ -1337,11 +1350,13 @@ class PixelConstantBlender {
   // The last upload's object and occurrence, and its values as recorded.
   std::pair<uint64_t, int> last_key() const { return last_key_; }
   const std::vector<float>& last_values() const { return last_values_; }
+  // ...and as uploaded (the blend, or as recorded).
+  const std::vector<float>& last_blended() const { return last_blended_; }
 
  private:
   std::vector<Difference> differing_;
   std::pair<uint64_t, int> last_key_{};
-  std::vector<float> last_values_;
+  std::vector<float> last_values_, last_blended_;
   static void LogRejection(uint32_t i, float a, float b);
 
   Outcome outcome_ = Outcome::kNoObject;
@@ -1484,14 +1499,15 @@ class PixelOutcomesLog {
   std::string rejected_examples_;
   // Every 5 s, one moving object's light slots (c8-c11 positions, c24-c27
   // directions) followed upload by upload for 4 ticks, from the first one
-  // that isn't as recorded.
+  // that isn't as recorded or is blended.
   void Trace(uint32_t start, bool moving, uint64_t tick, float amount, const Vec3& world_now,
              const Vec3& world) {
     const PixelConstantBlender& blender = GetPixelConstantBlender();
     auto now = std::chrono::steady_clock::now();
     if (trace_ticks_left_ == 0) {
       if (moving && start == 0 &&
-          blender.outcome() == PixelConstantBlender::Outcome::kNotAsRecorded &&
+          (blender.outcome() == PixelConstantBlender::Outcome::kNotAsRecorded ||
+           blender.outcome() == PixelConstantBlender::Outcome::kBlended) &&
           now - last_trace_ >= std::chrono::seconds(5)) {
         last_trace_ = now;
         trace_key_ = blender.last_key();
@@ -1515,16 +1531,23 @@ class PixelOutcomesLog {
     static const char* kNames[] = {"no object", "unpaired", "not as recorded",
                                    "rejected", "unchanged", "blended"};
     const std::vector<float>& v = blender.last_values();
+    const std::vector<float>& u = blender.last_blended();
+    auto uploaded = [&](uint32_t r) {
+      return r * 4 + 2 < u.size()
+                 ? fmt::format("{:.3f} {:.3f} {:.3f}", u[r * 4], u[r * 4 + 1], u[r * 4 + 2])
+                 : std::string("-");
+    };
     auto reg = [&](uint32_t r) {
       return r * 4 + 2 < v.size()
                  ? fmt::format("{:.3f} {:.3f} {:.3f}", v[r * 4], v[r * 4 + 1], v[r * 4 + 2])
                  : std::string("-");
     };
     REXLOG_INFO("pixel trace: tick {} amount {:.2f} {} | world now {:.3f} {:.3f} {:.3f} blend "
-                "{:.3f} {:.3f} {:.3f} | c8 {} | c9 {} | c11 {} | c24 {} | c25 {} | c27 {}",
+                "{:.3f} {:.3f} {:.3f} | c8 {} | c9 {} | c11 {} | c24 {} | c25 {} | c27 {} | "
+                "uploaded c9 {} | c25 {}",
                 tick, amount, kNames[int(blender.outcome())], world_now[0], world_now[1],
                 world_now[2], world[0], world[1], world[2], reg(8), reg(9), reg(11), reg(24),
-                reg(25), reg(27));
+                reg(25), reg(27), uploaded(9), uploaded(25));
   }
 
   std::chrono::steady_clock::time_point last_trace_{};
