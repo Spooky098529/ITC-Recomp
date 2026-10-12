@@ -68,7 +68,7 @@ opponents and the light trails are all done. `run.sh` turns interpolation on
 
 Not done yet:
 
-- About 45 commits aren't pushed to `origin/unlock-fps`. Ask before pushing.
+- Ask before pushing to `origin` (github.com/Spooky098529/ITC-Recomp).
 - The test zip `itc-interp-linux-amd64.zip` predates the countdown, HUD,
   marker and trail fixes. Rebuild it when the user wants to test.
 - Menus still run at 30 fps (see Known issues).
