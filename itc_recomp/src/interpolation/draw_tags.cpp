@@ -4,6 +4,7 @@
 
 #include "command_list.h"
 #include "guest.h"
+#include "debug/frame_state_diff.h"
 
 #include <functional>
 #include <initializer_list>
@@ -180,6 +181,9 @@ void PerFrameLogic_RecordWorldSprites(uint8_t* base, uint32_t list,
 
 extern "C" REX_FUNC(sub_82128750) {
   REX_FUNC_PROLOGUE();
+  if (debug::IsHidden(0x82128750)) {
+    return;
+  }
   PerFrameLogic_RecordWorldSprites(base, ctx.r3.u32, [&] {
     interpolation::RecordTagged(base, 0x82128750, {ctx.r3.u32, ctx.r4.u32, ctx.r5.u32},
                                 [&] { __imp__sub_82128750(ctx, base); });
