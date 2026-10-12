@@ -23,6 +23,9 @@ REXCVAR_DEFINE_BOOL(find_per_frame_state, false, "ITC",
 REXCVAR_DEFINE_INT32(find_per_frame_state_interval_ms, 2000, "ITC",
                      "How often --find_per_frame_state samples a render-only pass (0 = every "
                      "one; slow)");
+REXCVAR_DEFINE_STRING(debug_hide, "", "ITC",
+                      "Testing: wrapped draw functions (hex, comma-separated) never to run, "
+                      "to see what they draw");
 REXCVAR_DEFINE_STRING(watch_addresses, "", "ITC",
                       "With --find_per_frame_state, guest addresses (hex, comma-separated) to "
                       "watch from the start, logging every change with the code making it");
@@ -280,6 +283,23 @@ void FrameStateDiff_Before(uint8_t* base) {
   Get().Before(base);
 }
 
+bool IsHidden(uint32_t function) {
+  std::string list = REXCVAR_GET(debug_hide);
+  size_t start = 0;
+  while (start < list.size()) {
+    size_t end = list.find(',', start);
+    std::string item = list.substr(start, end == std::string::npos ? std::string::npos : end - start);
+    if (!item.empty() && uint32_t(std::stoul(item, nullptr, 16)) == function) {
+      return true;
+    }
+    if (end == std::string::npos) {
+      break;
+    }
+    start = end + 1;
+  }
+  return false;
+}
+
 void FrameStateDiff_After(uint8_t* base, const char* kind, uint32_t id) {
   Get().After(base, kind, id);
 }
@@ -291,6 +311,9 @@ void FrameStateDiff_After(uint8_t* base, const char* kind, uint32_t id) {
 #define ITC_FRAME_STATE_WRAP(address)                       \
   extern "C" REX_FUNC(sub_##address) {                      \
     REX_FUNC_PROLOGUE();                                    \
+    if (debug::IsHidden(0x##address)) {                     \
+      return;                                               \
+    }                                                       \
     debug::FrameStateDiff_Before(base);                     \
     __imp__sub_##address(ctx, base);                        \
     debug::FrameStateDiff_After(base, "draw step part", 0x##address); \
@@ -317,6 +340,8 @@ ITC_FRAME_STATE_WRAP(82597118)
 ITC_FRAME_STATE_WRAP(82597518)
 ITC_FRAME_STATE_WRAP(82597610)
 ITC_FRAME_STATE_WRAP(82598768)
+// The light billboards' batch (calls sub_8209C1A0 and sub_8209C6E0).
+ITC_FRAME_STATE_WRAP(8209CC38)
 // The per-car update called from Draw (sub_820DAC68), and its callees.
 ITC_FRAME_STATE_WRAP(820DAC68)
 ITC_FRAME_STATE_WRAP(820C5C88)

@@ -127,10 +127,6 @@ class ReplayFromLogicPass {
 // including the race start countdown). Furthest field used: ~+0x96C8.
 ReplayFromLogicPass g_ui_movies("UI movies", 0xA000);
 
-// Markers above opponent cars (sub_821225D8, r3 = marker, r4 = camera pass):
-// a state machine stepped (a counter at +0x150 counts down) and drawn per
-// view, which made the marker flicker.
-ReplayFromLogicPass g_opponent_markers("opponent markers", 0x400);
 }  // namespace
 
 extern "C" REX_FUNC(sub_8211D2F8) {
@@ -140,9 +136,4 @@ extern "C" REX_FUNC(sub_8211D2F8) {
     return;
   }
   g_ui_movies.Run(base, ctx.r3.u32, [&] { __imp__sub_8211D2F8(ctx, base); });
-}
-
-extern "C" REX_FUNC(sub_821225D8) {
-  REX_FUNC_PROLOGUE();
-  g_opponent_markers.Run(base, ctx.r3.u32, [&] { __imp__sub_821225D8(ctx, base); });
 }

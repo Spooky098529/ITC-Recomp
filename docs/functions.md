@@ -218,7 +218,6 @@ render-only passes it ran ~5x fast. Each case found is fixed in
 |---|---|---|
 | Blink timers of the car's sprites (four 64-bit frame counters, called from the car's draw `sub_820DDE58`) | `sub_820DC958` | Skipped on render-only passes (`--per_tick_blink_timers`) |
 | UI movies: the HUD, including the race start countdown (a 240-frame movie, a beep at frames 60, 120, 180, 240) | `sub_8211D2F8`, with r4 = 0 (advance a frame and draw); r4 = 1 only draws | Replayed (below) (`--per_tick_ui_movies`) |
-| Marker above opponent cars: a state machine (a counter at +0x150 counts down) stepped and drawn once per view | `sub_821225D8` (r3 = marker, r4 = camera pass) | Replayed |
 
 **Replaying** (`ReplayFromLogicPass`): when a call both steps an object's
 state and draws it, skipping it would stop the drawing too (the HUD
@@ -246,8 +245,12 @@ so with frames uncapped it's fast; at `--max_fps=30` it's right.
   frames, which led to the movie call inside it.
 - `--log_recording_by_pass` lists the code that records render commands more
   often on logic passes than on render-only ones: something drawn only on
-  logic passes, or gated by per-frame state. That found the opponent
-  markers' recorder (`sub_821281A8`, from `sub_821225D8`).
+  logic passes, or gated by per-frame state. It points at `sub_821281A8`
+  (reached from `sub_821225D8`, which steps a counter at +0x150 and draws
+  once per view during Update), but hiding `sub_821225D8` entirely leaves
+  the marker above opponents on screen, so that's something else.
+- `--debug_hide=<hex,...>` never runs the given wrapped draw functions, to
+  see what each draws.
 - `--log_recording_handlers` lists which message handlers record commands,
   by message. `--render_only_update_handlers=<hex,...>` still delivers Update
   to given handlers on render-only passes (a test).
@@ -399,6 +402,8 @@ constants:
   that run game logic.
 - **The race HUD updates at 30 fps.** Accepted for now; its animations
   advance once per tick (see "Per-frame logic").
+- **The marker above opponent cars flickers** with frames uncapped (steady
+  at 30 fps). Not yet found; see "Per-frame logic".
 - **More per-frame logic may exist.** Anything that runs too fast or
   flickers only with frames uncapped is probably another case; see
   "Per-frame logic" for how they were found.
