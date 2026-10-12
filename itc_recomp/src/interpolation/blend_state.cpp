@@ -66,6 +66,9 @@ REXCVAR_DEFINE_BOOL(log_overlay_products, false, "ITC",
 REXCVAR_DEFINE_BOOL(log_overlay_uploads, false, "ITC",
                     "Log every shader constant upload the race overlays recorded, as replayed, "
                     "12 frames every 3 s");
+REXCVAR_DEFINE_BOOL(test_pixel_switches, false, "ITC",
+                    "Testing: also treat the pixel constant components rejected most often "
+                    "(c2.x, c8.y, c24.x, c47.x, c48.x) as switches");
 REXCVAR_DEFINE_STRING(debug_zero_owners, "", "ITC",
                       "Testing: vertex or pixel constant uploads recorded by these callers (hex, "
                       "comma-separated; needs --log_slot_callers) are replayed as zeros, so "
@@ -1224,7 +1227,15 @@ class PixelConstantBlender {
     auto is_switch = [&](uint32_t i) {
       // Register * 4 + component, from the start of the upload (the same
       // layout is uploaded at c0 and at c63).
-      return i == 1 * 4 + 0 || i == 3 * 4 + 0 || i == 3 * 4 + 1 || i == 3 * 4 + 2 || i == 4 * 4 + 0;
+      if (i == 1 * 4 + 0 || i == 3 * 4 + 0 || i == 3 * 4 + 1 || i == 3 * 4 + 2 || i == 4 * 4 + 0) {
+        return true;
+      }
+      // Testing: the components rejected most often (c2.x of either block,
+      // and c8.y, c24.x, c47.x, c48.x of the c0 block).
+      return REXCVAR_GET(test_pixel_switches) &&
+             (i == 2 * 4 + 0 ||
+              (start == 0 && (i == 8 * 4 + 1 || i == 24 * 4 + 0 || i == 47 * 4 + 0 ||
+                              i == 48 * 4 + 0)));
     };
     std::vector<bool> jumps(now.size(), false);
     bool changed = false;
