@@ -439,6 +439,20 @@ Three more things are blended, outside the products:
   with another's, so buildings' lighting briefly changed.
   `--blend_pixel_constants=false` turns this off.
 
+  Each upload blends from the **last** value recorded in the previous tick
+  to this frame's, not from the tick's first. The light slots (c8-c11
+  positions, c24-c27 directions; cars' headlights among them) are recorded
+  on a tick's logic pass before the lights move, so there they still hold
+  the previous tick's lights, and the tick's own on the render-only frames
+  after (a car at -1745.33 had its headlight at -1744.61, tick 765's, on
+  tick 766's first frame, and -1745.12 from the next). Pairing only uploads
+  equal to the tick's first left those later frames as recorded (45-110
+  uploads a frame on moving objects), so the headlights' light on car
+  bodies stepped once a tick, a frame late, while the road was smooth. Now
+  the stale first frame equals the previous tick's value (no change at
+  amount about 0) and the frames after blend towards the new one.
+  `--pixel_blend_from_latest=false` brings back the old pairing.
+
 Logic and render-only passes both draw the tick's real state; nothing is
 blended while drawing. Blending the camera inside Draw changed what the game
 culled, so the order-based pairing slipped and bits of the scene stepped at
@@ -454,6 +468,8 @@ and target, and recorder world matrices), mostly for comparison.
 | `--motion_blur` | The game's velocity-based motion blur (pixel shader `7EB16456AAD56CBA`), skipped when false (as `run.sh` does, except with `--no-interpolation`). Its velocities come from the tick, so it smears a whole tick of motion at high frame rates. Patch `patches/rexglue-sdk/0002`. |
 | `--blend_pixel_constants` | Blend per-object lighting constants (default on). |
 | `--log_fps` | Frames and ticks per second. |
+| `--pixel_blend_from_latest` | Blend per-object lighting from the previous tick's last value (default on); see "What gets blended". |
+| `--log_pixel_outcomes` | Every 2 s: what the lighting uploads got (blended, unpaired, not as recorded, rejected, unchanged) per frame, for moving and still objects, which components differ or were rejected, and every 5 s one moving object's light slots traced frame by frame for 4 ticks. |
 | `--log_blend_state` | Per second: products published, blended, unpaired, rejected cameras with the reason, and uploads left alone. Unpaired or rejected counts above zero in steady driving mean something is stepping at 30 Hz. |
 | `--log_replayed_constants` | One frame per second: every vertex constant upload replayed, whether it changed since the last frame, and whether it was substituted. |
 | `--log_stepping_constants` | With `--log_slot_callers`: every 2 s, the constant uploads left as recorded that change about 30 times a second (stuck to the tick) rather than every frame, with the code that recorded them. The quickest way to find what still steps. |
@@ -528,9 +544,15 @@ constants:
   "Finding what still steps" if something does.
 - **A piece of geometry flickers while the car moves**, at native 30 fps
   too, so not interpolation: probably the game's own effect (a broken light).
-- **Headlight lighting on other cars**: the beam's edge flickers on an
-  opponent close and diagonal in it, with occasional flashes, and the
-  player's beam can jump in sharp turns. Branch `headlight-fixes` holds an
+- **Headlight lighting on other cars**: the light on their bodies stepped
+  at 30 Hz because the light slots lag a frame on logic passes; blending
+  from the previous tick's last value fixed that (see "What gets blended").
+  Earlier reports: the beam's edge flickers on an opponent close and
+  diagonal in it, with occasional flashes, and the player's beam can jump
+  in sharp turns; not rechecked since the fix. Branch `lighting-fixes`
+  tried rerunning the game's light setup with blended cars, lights and
+  camera (`--recompute_lighting`); it smoothed the road's lighting but not
+  car bodies, and was dropped for this. Branch `headlight-fixes` holds an
   attempt (light slots matched by the light in them, faded in and out,
   switched; jumps judged per register; c4-c8 held with the lighting). None
   of it was a consistent improvement, and opponents got worse, so it isn't

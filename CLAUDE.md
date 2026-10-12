@@ -78,9 +78,10 @@ releases).
 Not done yet:
 
 - Ask before pushing to `origin` (github.com/Spooky098529/ITC-Recomp).
-- Headlight lighting on other cars flickers when they're close and diagonal
-  in the beam. Branch `headlight-fixes` holds an attempt that wasn't a
-  consistent improvement; see Known issues.
+- Branch `car-lighting`: headlight light on other cars' bodies now blends
+  smoothly (`--pixel_blend_from_latest`, confirmed in game). Not merged to
+  `main` yet. Whether the beam-edge flicker on close, diagonal opponents
+  remains hasn't been rechecked; see Known issues.
 - Races don't hold 144 fps in busy areas (about 105-150). `--log_frame_times`
   shows the render thread is the limit (6-8 ms a frame, our blending under
   1 ms of it); next step is profiling with `perf` (not installed yet).
