@@ -990,8 +990,9 @@ ReplayedConstantsLog& GetReplayedConstantsLog() {
 // are recorded with the tick's values. Each upload is paired with the same
 // one as of the previous tick, identified by the object's camera product
 // replayed just before it (which is paired reliably), and given the frame's
-// linear blend of the two. If any value jumps (a flag, a cut, a different
-// object), the upload is left as recorded.
+// linear blend of the two. Per-object light switches that jump keep the
+// tick's value; any other jump (a cut, a different object) leaves the upload
+// as recorded.
 class PixelConstantBlender {
  public:
   void OnFrameStart(uint64_t tick) {
@@ -1029,8 +1030,16 @@ class PixelConstantBlender {
         entry.current != now) {
       return std::nullopt;  // not paired, or not the recorded value
     }
-    // Any value jumping means this isn't the same object (or something cut):
-    // leave the whole upload as recorded rather than mix two objects.
+    // Some components are per-object switches that legitimately jump
+    // between ticks (c1.x, c3.x, c3.y, c4.x: which lights reach the object,
+    // and how strongly); they take the tick's value and the rest blends. A
+    // jump anywhere else means this isn't the same object (or something cut),
+    // so the whole upload is left as recorded rather than mix two objects.
+    auto is_switch = [&](uint32_t i) {
+      uint32_t index = start * 4 + i;  // register * 4 + component
+      return index == 1 * 4 + 0 || index == 3 * 4 + 0 || index == 3 * 4 + 1 || index == 4 * 4 + 0;
+    };
+    std::vector<bool> jumps(now.size(), false);
     bool changed = false;
     for (uint32_t i = 0; i < now.size(); i++) {
       float a = entry.previous[i], b = now[i];
@@ -1039,10 +1048,14 @@ class PixelConstantBlender {
       }
       if (!std::isfinite(a) || !std::isfinite(b) ||
           !(std::abs(b - a) <= 0.3f * std::max(std::abs(a), std::abs(b)) + 0.2f)) {
-        if (REXCVAR_GET(log_blend_state)) {
-          LogRejection(i, a, b);
+        if (!is_switch(i)) {
+          if (REXCVAR_GET(log_blend_state)) {
+            LogRejection(start * 4 + i, a, b);
+          }
+          return std::nullopt;
         }
-        return std::nullopt;
+        jumps[i] = true;
+        continue;
       }
       changed = true;
     }
@@ -1051,7 +1064,7 @@ class PixelConstantBlender {
     }
     for (uint32_t i = 0; i < now.size(); i++) {
       float a = entry.previous[i], b = now[i];
-      if (a != b) {
+      if (a != b && !jumps[i]) {
         guest::StoreFloat(base, payload + 4 * i, a + (b - a) * amount);
       }
     }
