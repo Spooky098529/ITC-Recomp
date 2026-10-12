@@ -8,16 +8,23 @@
 #include "game_messages.h"
 #include "guest.h"
 
+#include <rex/cvar.h>
+
 #include <cstring>
 #include <unordered_map>
 #include <vector>
+
+REXCVAR_DEFINE_BOOL(per_tick_blink_timers, true, "ITC",
+                    "Advance the car blink timers once per tick on render-only passes");
+REXCVAR_DEFINE_BOOL(per_tick_ui_movies, true, "ITC",
+                    "Advance UI movies once per tick on render-only passes");
 
 // Blink timers (r3 = timer set, from the car's draw, sub_820DDE58): adds one
 // to each of four frame counters (+8, +16, +24, +32, 64-bit) and resets each
 // past its duration. Drives the flashing sprites above cars.
 extern "C" REX_FUNC(sub_820DC958) {
   REX_FUNC_PROLOGUE();
-  if (frame_pacing::GameMessages_IsRenderOnlyPass()) {
+  if (frame_pacing::GameMessages_IsRenderOnlyPass() && REXCVAR_GET(per_tick_blink_timers)) {
     return;
   }
   __imp__sub_820DC958(ctx, base);
@@ -41,7 +48,7 @@ std::unordered_map<uint32_t, MovieStates> g_movie_states;
 extern "C" REX_FUNC(sub_8211D2F8) {
   REX_FUNC_PROLOGUE();
   uint32_t movie = ctx.r3.u32;
-  if (ctx.r4.u32 != 0) {
+  if (ctx.r4.u32 != 0 || !REXCVAR_GET(per_tick_ui_movies)) {
     __imp__sub_8211D2F8(ctx, base);
     return;
   }
