@@ -9,24 +9,23 @@
 #include "guest.h"
 #include "frame_pacer.h"
 #include "interpolation/blend_state.h"
-#include "interpolation/transform.h"
 
 #include <rex/cvar.h>
 
 #include <rex/logging.h>
 
 #include <chrono>
+#include <cmath>
 #include <cstring>
 #include <map>
-#include <set>
 #include <string>
 #include <unordered_map>
 #include <vector>
 
 REXCVAR_DECLARE(bool, interpolate_draw_state);
-REXCVAR_DEFINE_DOUBLE(debug_overlay_vehicle_lift, 0.0, "ITC",
-                      "Testing: raise the cars this many metres while the race overlays "
-                      "record");
+REXCVAR_DEFINE_BOOL(blend_race_overlays, true, "ITC",
+                    "Blend the race overlays' state (the marker above opponents) between ticks "
+                    "while they record");
 REXCVAR_DEFINE_BOOL(per_tick_blink_timers, true, "ITC",
                     "Advance the car blink timers once per tick on render-only passes");
 REXCVAR_DEFINE_BOOL(per_tick_ui_movies, true, "ITC",
@@ -165,99 +164,63 @@ constexpr uint32_t kCameraPassesBytes = 21 * 592;
 std::vector<uint8_t> g_overlay_cameras;  // as of the logic pass's overlays
 }  // namespace
 
-// The race overlays build the marker above each opponent on the CPU, at
-// that car's position. So that it sits over the car as drawn (blended
-// between ticks), each car's world matrix is set to the frame's blend while
-// the overlays record, then put back.
+// The overlays keep where to draw in their own state, set when updated
+// (slot 4). So that the marker above an opponent moves smoothly, each
+// overlay's state is blended between its last two ticks while it records:
+// 32-bit words that hold floats and changed by a modest amount are
+// interpolated to the frame's amount; anything else (pointers, flags,
+// counters, unchanged values) keeps the newest tick's. Then it's put back.
 namespace {
-constexpr uint32_t kVehicleWorldOffset = 0xD0;
-constexpr uint32_t kVehicleWorldCopyOffset = 0xCF0;  // identical every tick
-
-struct VehiclePoses {
-  std::optional<interpolation::Matrix4> before, now;  // world, last two ticks
+constexpr uint32_t kOverlayBytes = 0x1000;
+struct OverlayStates {
+  std::vector<uint8_t> before, now;  // after the last two ticks' updates
 };
-std::set<uint32_t> g_vehicles;  // seen by the speed getter
-std::unordered_map<uint32_t, VehiclePoses> g_vehicle_poses;
+std::unordered_map<uint32_t, OverlayStates> g_overlay_states;
 
-interpolation::Matrix4 LoadMatrix(uint8_t* base, uint32_t address) {
-  interpolation::Matrix4 m;
-  for (int i = 0; i < 16; i++) {
-    m[i] = guest::LoadFloat(base, address + 4 * i);
-  }
-  return m;
+float WordAsFloat(const uint8_t* p) {
+  uint32_t bits = (uint32_t(p[0]) << 24) | (uint32_t(p[1]) << 16) | (uint32_t(p[2]) << 8) | p[3];
+  float f;
+  std::memcpy(&f, &bits, 4);
+  return f;
 }
 
-void StoreMatrix(uint8_t* base, uint32_t address, const interpolation::Matrix4& m) {
-  for (int i = 0; i < 16; i++) {
-    guest::StoreFloat(base, address + 4 * i, m[i]);
-  }
+void StoreFloatWord(uint8_t* p, float f) {
+  uint32_t bits;
+  std::memcpy(&bits, &f, 4);
+  p[0] = uint8_t(bits >> 24);
+  p[1] = uint8_t(bits >> 16);
+  p[2] = uint8_t(bits >> 8);
+  p[3] = uint8_t(bits);
 }
 
-// Logic pass: the cars' poses this tick.
-void RecordVehiclePoses(uint8_t* base) {
-  for (uint32_t vehicle : g_vehicles) {
-    VehiclePoses& poses = g_vehicle_poses[vehicle];
-    poses.before = poses.now;
-    poses.now = LoadMatrix(base, vehicle + kVehicleWorldOffset);
-  }
+bool IsPlainFloat(float f) {
+  float a = std::abs(f);
+  return std::isfinite(f) && (a == 0 || (a > 1e-6f && a < 1e7f));
 }
 
-// Sets each car's world matrix to the frame's blend; returns what to put back.
-std::vector<std::pair<uint32_t, interpolation::Matrix4>> BlendVehiclePoses(uint8_t* base) {
-  std::vector<std::pair<uint32_t, interpolation::Matrix4>> saved;
-  if (!REXCVAR_GET(interpolate_draw_state) && REXCVAR_GET(debug_overlay_vehicle_lift) == 0) {
-    return saved;
-  }
-  float amount = frame_pacing::GetFramePacer().TickProgress();
-  float lift = float(REXCVAR_GET(debug_overlay_vehicle_lift));
-  if (lift != 0) {
-    for (uint32_t vehicle : g_vehicles) {
-      for (uint32_t offset : {kVehicleWorldOffset, kVehicleWorldCopyOffset}) {
-        interpolation::Matrix4 m = LoadMatrix(base, vehicle + offset);
-        saved.push_back({vehicle + offset, m});
-        m[13] += lift;
-        StoreMatrix(base, vehicle + offset, m);
-      }
-    }
-    return saved;
-  }
-  for (const auto& [vehicle, poses] : g_vehicle_poses) {
-    if (!poses.before || !poses.now) {
+// Writes the blend of `states` into the overlay at `state`.
+void BlendOverlayState(uint8_t* state, const OverlayStates& states, float amount) {
+  for (uint32_t i = 0; i + 4 <= kOverlayBytes; i += 4) {
+    const uint8_t* a = states.before.data() + i;
+    const uint8_t* b = states.now.data() + i;
+    if (std::memcmp(a, b, 4) == 0 || std::memcmp(state + i, b, 4) != 0) {
       continue;
     }
-    auto a = interpolation::ScaledTransformFromWorldMatrix(*poses.before);
-    auto b = interpolation::ScaledTransformFromWorldMatrix(*poses.now);
-    if (!a || !b ||
-        interpolation::Distance(a->transform.position, b->transform.position) > 8.0f) {
+    float fa = WordAsFloat(a), fb = WordAsFloat(b);
+    if (!IsPlainFloat(fa) || !IsPlainFloat(fb) ||
+        !(std::abs(fb - fa) <= 0.5f * std::max(std::abs(fa), std::abs(fb)) + 2.0f)) {
       continue;
     }
-    interpolation::Matrix4 blended =
-        interpolation::WorldMatrixFromScaledTransform(interpolation::Blend(*a, *b, amount));
-    for (uint32_t offset : {kVehicleWorldOffset, kVehicleWorldCopyOffset}) {
-      if (LoadMatrix(base, vehicle + offset) == *poses.now) {
-        saved.push_back({vehicle + offset, *poses.now});
-        StoreMatrix(base, vehicle + offset, blended);
-      }
-    }
+    StoreFloatWord(state + i, fa + (fb - fa) * amount);
   }
-  return saved;
 }
 }  // namespace
-
-namespace frame_pacing {
-void PerFrameLogic_OnVehicleSeen(uint32_t vehicle) {
-  if (g_vehicles.size() < 64) {
-    g_vehicles.insert(vehicle);
-  }
-}
-}  // namespace frame_pacing
 
 extern "C" REX_FUNC(sub_8215DEA0) {
   REX_FUNC_PROLOGUE();
   constexpr uint32_t kOverlayCount = 25;
   constexpr uint32_t kUpdateSlot = 16;  // vtable offset of slot 4
   constexpr uint32_t kRecordSlot = 20;  // vtable offset of slot 5
-  constexpr uint32_t kOverlayBytes = 0x1000;  // saved around a redone update
   // Numbering contexts for camera products (blend_state.h): the recording
   // loop numbers its products the same on every pass, whether or not the
   // update loop ran before it, so they pair with the logic pass's.
@@ -289,34 +252,37 @@ extern "C" REX_FUNC(sub_8215DEA0) {
       REX_CALL_INDIRECT_FUNC(guest::LoadU32(base, guest::LoadU32(base, overlay) + slot));
     }
   };
+  std::vector<uint32_t> overlays;
+  for (uint32_t i = 0; i < kOverlayCount; i++) {
+    if (uint32_t overlay = guest::LoadU32(base, list + 4 * i)) {
+      overlays.push_back(overlay);
+    }
+  }
   if (!render_only) {
     interpolation::BlendState_SetHandler(kUpdateContext);
     for_each_overlay(kUpdateSlot);
-    RecordVehiclePoses(base);
-  }
-  // For drawing, the overlays are updated again with the cars at the frame's
-  // blended poses (they place themselves when updated), recorded, and then
-  // both are put back: the game's own state advances once per tick.
-  auto vehicles = BlendVehiclePoses(base);
-  std::vector<std::pair<uint32_t, std::vector<uint8_t>>> overlay_states;
-  if (!vehicles.empty()) {
-    for (uint32_t i = 0; i < kOverlayCount; i++) {
-      uint32_t overlay = guest::LoadU32(base, list + 4 * i);
-      if (overlay != 0) {
-        overlay_states.push_back(
-            {overlay, std::vector<uint8_t>(base + overlay, base + overlay + kOverlayBytes)});
-      }
+    for (uint32_t overlay : overlays) {
+      OverlayStates& states = g_overlay_states[overlay];
+      states.before = std::move(states.now);
+      states.now.assign(base + overlay, base + overlay + kOverlayBytes);
     }
-    interpolation::BlendState_SetHandler(kUpdateContext);
-    for_each_overlay(kUpdateSlot);
+  }
+  std::vector<std::pair<uint32_t, std::vector<uint8_t>>> saved;
+  if (REXCVAR_GET(interpolate_draw_state) && REXCVAR_GET(blend_race_overlays)) {
+    float amount = frame_pacing::GetFramePacer().TickProgress();
+    for (uint32_t overlay : overlays) {
+      auto it = g_overlay_states.find(overlay);
+      if (it == g_overlay_states.end() || it->second.before.size() != kOverlayBytes) {
+        continue;
+      }
+      saved.push_back({overlay, std::vector<uint8_t>(base + overlay, base + overlay + kOverlayBytes)});
+      BlendOverlayState(base + overlay, it->second, amount);
+    }
   }
   interpolation::BlendState_SetHandler(kRecordContext);
   for_each_overlay(kRecordSlot);
-  for (const auto& [overlay, state] : overlay_states) {
+  for (const auto& [overlay, state] : saved) {
     std::memcpy(base + overlay, state.data(), state.size());
-  }
-  for (const auto& [address, matrix] : vehicles) {
-    StoreMatrix(base, address, matrix);
   }
   if (render_only) {
     std::memcpy(cameras, current.data(), kCameraPassesBytes);

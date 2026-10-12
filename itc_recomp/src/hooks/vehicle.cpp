@@ -5,7 +5,6 @@
 // See docs/functions.md for what is known about each address.
 
 #include "debug/state_capture.h"
-#include "frame_pacing/game_messages.h"
 #include "guest.h"
 
 namespace {
@@ -30,6 +29,5 @@ extern "C" REX_FUNC(sub_820C0128) {
   REX_FUNC_PROLOGUE();
   ctx.fpscr.disableFlushMode();
   debug::StateCapture_OnVehicleSeen(ctx.r3.u32);
-  frame_pacing::PerFrameLogic_OnVehicleSeen(ctx.r3.u32);
   ctx.f1.f64 = double(Vehicle_GetSpeedKmh(base, ctx.r3.u32));
 }
