@@ -31,6 +31,9 @@ REXCVAR_DEFINE_BOOL(per_tick_blink_timers, true, "ITC",
                     "Advance the car blink timers once per tick on render-only passes");
 REXCVAR_DEFINE_BOOL(per_tick_ui_movies, true, "ITC",
                     "Advance UI movies once per tick on render-only passes");
+REXCVAR_DEFINE_BOOL(per_tick_texture_animations, true, "ITC",
+                    "Advance texture animations (flashing lights) once per tick on "
+                    "render-only passes");
 REXCVAR_DEFINE_BOOL(per_tick_play_time, true, "ITC",
                     "Count play time once per tick on render-only passes");
 REXCVAR_DEFINE_BOOL(log_replays, false, "ITC",
@@ -45,6 +48,19 @@ extern "C" REX_FUNC(sub_820DC958) {
     return;
   }
   __imp__sub_820DC958(ctx, base);
+}
+
+// Texture animations (sub_820F11A8, from the draw step part sub_820F6068):
+// advances every flipbook animation in the set at r3+1060 (sub_82146B20,
+// one sub_82146AC0 each). Drives the flashing building lights; the light
+// groups pick their frame's texture with sub_82146B80.
+extern "C" REX_FUNC(sub_820F11A8) {
+  REX_FUNC_PROLOGUE();
+  if (frame_pacing::GameMessages_IsRenderOnlyPass() &&
+      REXCVAR_GET(per_tick_texture_animations)) {
+    return;
+  }
+  __imp__sub_820F11A8(ctx, base);
 }
 
 // Play time (sub_82107910, from Draw): adds one to the frame counter at
