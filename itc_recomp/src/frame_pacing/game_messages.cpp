@@ -253,3 +253,24 @@ extern "C" REX_FUNC(sub_82099A98) {
   __imp__sub_82099A98(ctx, base);
   debug::FrameStateDiff_After(base, "tick handler", target);
 }
+
+// Testing: the race HUD's (UI movie) functions called from its Draw
+// handlers (sub_8216C330, sub_8216D0C8), skippable on render-only passes with
+// --render_only_skip, to find which one advances its animation.
+#define ITC_SKIPPABLE(address)                                                   \
+  extern "C" REX_FUNC(sub_##address) {                                           \
+    REX_FUNC_PROLOGUE();                                                         \
+    if (frame_pacing::GameMessages_IsRenderOnlyPass() &&                         \
+        frame_pacing::SkipTickHandlerOnRenderOnlyPass(0x##address)) {            \
+      return;                                                                    \
+    }                                                                            \
+    __imp__sub_##address(ctx, base);                                             \
+  }
+ITC_SKIPPABLE(822128A8)
+ITC_SKIPPABLE(822141E8)
+ITC_SKIPPABLE(822129A8)
+ITC_SKIPPABLE(82212A48)
+ITC_SKIPPABLE(82212A38)
+ITC_SKIPPABLE(82212AC8)
+ITC_SKIPPABLE(82211D08)
+#undef ITC_SKIPPABLE
