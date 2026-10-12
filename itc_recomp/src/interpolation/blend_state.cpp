@@ -91,6 +91,9 @@ REXCVAR_DEFINE_BOOL(pixel_blend_from_latest, true, "ITC",
                     "Blend per-object lighting from the last value recorded in the previous "
                     "tick to this frame's (false: only frames recording the tick's first value "
                     "are blended)");
+REXCVAR_DEFINE_BOOL(blend_lighting_camera, true, "ITC",
+                    "Blend the per-object lighting's camera (c0-c3 view, c4 position) as a whole "
+                    "(false: by component, with c1.x, c3.xyz and c4.x as switches)");
 REXCVAR_DEFINE_BOOL(switch_light_slots, true, "ITC",
                     "A per-object light slot whose light changed between ticks takes the tick's "
                     "light and the rest of the lighting blends (false: the whole upload is left "
@@ -1770,11 +1773,37 @@ class PixelConstantBlender {
       }
       return false;
     };
+    // c0-c3 are the view matrix and c4 the position of the camera the
+    // lighting is worked out against (copied from the camera pass by the
+    // render orchestrator): they blend together as a camera, or on a cut
+    // (the camera moved more than kCutDistance) take the tick's together.
+    // Judged by component, a view matrix entry that moved more than the
+    // tolerance kept the tick's value while the rest blended, so the car was
+    // lit against an inconsistent camera for a tick (a flash).
+    bool camera = count == 63 && REXCVAR_GET(blend_lighting_camera);
+    bool camera_cut = false;
+    if (camera) {
+      Vec3 eye_before{entry.previous[16], entry.previous[17], entry.previous[18]};
+      Vec3 eye_now{now[16], now[17], now[18]};
+      camera_cut = !IsFinite(eye_before) || !IsFinite(eye_now) ||
+                   !(Distance(eye_before, eye_now) <= kCutDistance);
+      for (uint32_t i = 0; i < 20; i++) {
+        camera_cut = camera_cut || !std::isfinite(entry.previous[i]) || !std::isfinite(now[i]);
+      }
+    }
     std::vector<bool> jumps(now.size(), false);
     bool changed = false;
     for (uint32_t i = 0; i < now.size(); i++) {
       float a = entry.previous[i], b = now[i];
       if (a == b) {
+        continue;
+      }
+      if (camera && i < 20) {
+        if (camera_cut) {
+          jumps[i] = true;  // the tick's camera
+        } else {
+          changed = true;
+        }
         continue;
       }
       if (in_switched_slot(i)) {
