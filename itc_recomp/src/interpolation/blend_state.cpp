@@ -66,6 +66,9 @@ REXCVAR_DEFINE_BOOL(log_overlay_products, false, "ITC",
 REXCVAR_DEFINE_BOOL(log_overlay_uploads, false, "ITC",
                     "Log every shader constant upload the race overlays recorded, as replayed, "
                     "12 frames every 3 s");
+REXCVAR_DEFINE_BOOL(blend_object_extras, true, "ITC",
+                    "Blend the per-object uploads' world matrix (c4-c7) and camera position "
+                    "(c8) along with c0-c3 (the paint's reflections)");
 REXCVAR_DEFINE_BOOL(log_object_extras, false, "ITC",
                     "Log how often c4-c8 of substituted per-object uploads change, with "
                     "examples, every 2 s");
@@ -268,7 +271,18 @@ struct BlendStats {
   int spinning = 0;
 };
 
-Matrix4 BlendProduct(const ReplayedProduct& product, float amount, BlendStats& stats) {
+// What went into a blended product, for the per-object recorder's other
+// registers (c4-c7, the world matrix; c8, the camera's position).
+struct ProductBlendParts {
+  Matrix4 world_now, world;          // the tick's world matrix, and the blend
+  std::optional<Vec3> eye_now, eye;  // the camera's position, if it was blended
+};
+
+Matrix4 BlendProduct(const ReplayedProduct& product, float amount, BlendStats& stats,
+                     ProductBlendParts* parts = nullptr) {
+  if (parts) {
+    *parts = {product.now.world, product.now.world, std::nullopt, std::nullopt};
+  }
   if (!product.before) {
     stats.unpaired++;
     return product.written;
@@ -301,8 +315,16 @@ Matrix4 BlendProduct(const ReplayedProduct& product, float amount, BlendStats& s
     if (!IsSameCamera(*ca, *cb)) {
       stats.camera_not_blended++;
     } else {
-      view_projection = ViewProjectionFromCamera(Blend(*ca, *cb, amount));
+      PerspectiveCamera blended = Blend(*ca, *cb, amount);
+      view_projection = ViewProjectionFromCamera(blended);
+      if (parts) {
+        parts->eye_now = cb->camera.position;
+        parts->eye = blended.camera.position;
+      }
     }
+  }
+  if (parts) {
+    parts->world = world;
   }
   // Other cameras (orthographic: the shadow map's, refitted around the car
   // every tick) stay at the tick's, so everything using one agrees within a
@@ -992,6 +1014,9 @@ class ReplayCameras {
   int miss_lines_ = 0;
   // The last camera product replayed: identifies the object being drawn.
   uint64_t last_identity() const { return last_identity_; }
+  // What went into the last substituted product.
+  const ProductBlendParts& last_parts() const { return last_parts_; }
+  ProductBlendParts last_parts_;
   float amount() const { return frame_ ? frame_->amount : 1.0f; }
 
   // Render thread diagnostics: why an upload was or wasn't substituted.
@@ -1042,7 +1067,7 @@ class ReplayCameras {
     if (it->second.handler == kRaceOverlaysHandler) {
       overlay_payloads_.insert(payload);
     }
-    Matrix4 result = BlendProduct(it->second, frame_->amount, stats_.blend);
+    Matrix4 result = BlendProduct(it->second, frame_->amount, stats_.blend, &last_parts_);
     if (REXCVAR_GET(log_overlay_products) && it->second.handler == kRaceOverlaysHandler) {
       LogOverlay(payload, it->second, result);
     }
@@ -1551,8 +1576,24 @@ class ObjectExtrasLog {
     for (const std::string& example : examples_) {
       REXLOG_INFO("object extras: {}", example);
     }
+    REXLOG_INFO("object extras: replaced c4-c7 in {}, c8 in {}; camera blended but c8 not its "
+                "position in {} (e.g. {:.3g} m away)",
+                world_replaced_, eye_replaced_, eye_missed_, eye_miss_example_);
     frames_ = uploads_ = world_changes_ = c8_changes_ = 0;
+    world_replaced_ = eye_replaced_ = eye_missed_ = 0;
     examples_.clear();
+  }
+
+  // eye_distance: from c8 to the camera's position, or -1 if the camera
+  // wasn't blended.
+  void OnReplaced(bool world, float eye_distance) {
+    world_replaced_ += world;
+    if (eye_distance >= 0.05f) {
+      eye_missed_++;
+      eye_miss_example_ = eye_distance;
+    } else if (eye_distance >= 0) {
+      eye_replaced_++;
+    }
   }
 
   void OnUpload(uint8_t* base, uint32_t payload) {
@@ -1585,6 +1626,8 @@ class ObjectExtrasLog {
  private:
   std::chrono::steady_clock::time_point last_log_ = std::chrono::steady_clock::now();
   int frames_ = 0, uploads_ = 0, world_changes_ = 0, c8_changes_ = 0;
+  int world_replaced_ = 0, eye_replaced_ = 0, eye_missed_ = 0;
+  float eye_miss_example_ = 0;
   std::vector<std::string> examples_;
   std::unordered_map<uint32_t, std::array<float, 20>> last_;
 };
@@ -1627,6 +1670,34 @@ void BlendState_ReplayConstants(uint8_t* base, uint32_t payload, uint32_t packed
       original = m;
       StoreMatrix(base, payload, *substitute);
       GetDrawState().CountReplayedProduct();
+    }
+  }
+  // The per-object recorder's upload (c0 x9, sub_825953D0) also holds the
+  // world matrix (c4-c7) and the camera's position (c8), which the paint's
+  // reflections use: give them the same blend as c0-c3, when they hold
+  // what the product was made from.
+  std::vector<float> original_extras;
+  if (original && count >= 9 && REXCVAR_GET(blend_object_extras)) {
+    const ProductBlendParts& parts = GetReplayCameras().last_parts();
+    for (uint32_t i = 0; i < 20; i++) {
+      original_extras.push_back(guest::LoadFloat(base, payload + 64 + 4 * i));
+    }
+    bool world = LoadMatrix(base, payload + 64) == parts.world_now;
+    if (world) {
+      StoreMatrix(base, payload + 64, parts.world);
+    }
+    float eye_distance = -1;
+    if (parts.eye_now && parts.eye) {
+      float* c8 = &original_extras[16];
+      eye_distance = Distance({c8[0], c8[1], c8[2]}, *parts.eye_now);
+      if (eye_distance < 0.05f) {
+        for (uint32_t i = 0; i < 3; i++) {
+          guest::StoreFloat(base, payload + 128 + 4 * i, (*parts.eye)[i]);
+        }
+      }
+    }
+    if (REXCVAR_GET(log_object_extras)) {
+      GetObjectExtrasLog().OnReplaced(world, eye_distance);
     }
   }
   std::optional<std::vector<float>> original_pixel;
@@ -1711,6 +1782,9 @@ void BlendState_ReplayConstants(uint8_t* base, uint32_t payload, uint32_t packed
   }
   if (original) {
     StoreMatrix(base, payload, *original);
+  }
+  for (uint32_t i = 0; i < original_extras.size(); i++) {
+    guest::StoreFloat(base, payload + 64 + 4 * i, original_extras[i]);
   }
   if (original_pixel) {
     for (uint32_t i = 0; i < original_pixel->size(); i++) {
