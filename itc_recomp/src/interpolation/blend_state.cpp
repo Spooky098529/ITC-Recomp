@@ -298,12 +298,14 @@ struct BlendStats {
 struct ProductBlendParts {
   Matrix4 world_now, world;          // the tick's world matrix, and the blend
   std::optional<Vec3> eye_now, eye;  // the camera's position, if it was blended
+  // Diagnostics: the product it was paired with.
+  const ReplayedProduct* product = nullptr;
 };
 
 Matrix4 BlendProduct(const ReplayedProduct& product, float amount, BlendStats& stats,
                      ProductBlendParts* parts = nullptr) {
   if (parts) {
-    *parts = {product.now.world, product.now.world, std::nullopt, std::nullopt};
+    *parts = {product.now.world, product.now.world, std::nullopt, std::nullopt, &product};
   }
   if (!product.before) {
     stats.unpaired++;
@@ -1879,6 +1881,22 @@ class PixelOutcomesLog {
         rejected_examples_ += fmt::format(" c{}.{} {:.4g}->{:.4g}", start + blender.rejected() / 4,
                                           "xyzw"[blender.rejected() % 4], a, b);
       }
+      const ReplayedProduct* product = GetReplayCameras().last_parts().product;
+      if (product && rejected_lines_++ < 12) {
+        const Matrix4& w = product->now.world;
+        const auto& c = product->now.context;
+        std::string before = "-";
+        if (product->before) {
+          const Matrix4& v = product->before->world;
+          const auto& d = product->before->context;
+          before = fmt::format("{:.3f} {:.3f} {:.3f} (lr {:08X} r31 {:08X})", v[12], v[13], v[14],
+                               d[0], d[8]);
+        }
+        REXLOG_INFO("pixel outcomes: rejected c{}.{} {:.4g}->{:.4g}, object {:016X}: now {:.3f} "
+                    "{:.3f} {:.3f} (lr {:08X} r31 {:08X}), before {}",
+                    start + blender.rejected() / 4, "xyzw"[blender.rejected() % 4], a, b,
+                    product->identity, w[12], w[13], w[14], c[0], c[8], before);
+      }
     }
   }
 
@@ -1923,6 +1941,7 @@ class PixelOutcomesLog {
     }
     differing_.clear();
     not_as_recorded_examples_.clear();
+    rejected_lines_ = 0;
     counts_.clear();
     switch_jumps_.clear();
     rejected_.clear();
@@ -1994,6 +2013,7 @@ class PixelOutcomesLog {
   int trace_ticks_left_ = 0;
   std::map<uint32_t, int> differing_;
   std::vector<std::string> not_as_recorded_examples_;
+  int rejected_lines_ = 0;
   int frames_ = 0;
   std::chrono::steady_clock::time_point last_ = std::chrono::steady_clock::now();
 };
