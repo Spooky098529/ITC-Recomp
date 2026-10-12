@@ -58,20 +58,30 @@ install -m 755 itc_recomp/run-debug.sh $D/run-debug.sh
 (cd $D && python3 -I -m zipfile -c ../$name.zip itc librexruntime.so librexgpu-xenos.so run.sh run-debug.sh)
 ```
 
-## Status (branch `player-triangle-fix`, from `main`, 2026-10-12)
+## Status (`main`, 2026-10-12)
 
 Frame interpolation for races is working: logic runs at 30 Hz and frames are
 blended between ticks. The world, cameras, wheels, lights, shadows,
 headlights, tunnels, the race start countdown, the HUD, the marker above
 opponents, the light trails, the texture animations (flashing lights, signs,
 the off-ramp chevron), the minimap triangle's flashing, the car's
-reflections and play time are all done. `run.sh` turns interpolation on
-(marked experimental); `./run.sh --no-interpolation` gives the original 30
-fps with motion blur. Known issues are at the end of `docs/functions.md`.
+reflections, buildings' lighting and play time are all done. `run.sh` turns
+interpolation on (marked experimental) with logging off; `run-debug.sh` is
+the same with logs; `./run.sh --no-interpolation` gives the original 30 fps
+with motion blur. Known issues are at the end of `docs/functions.md`.
+
+Releases are made by pushing a `v*` tag: CI builds the zip and publishes a
+GitHub release with generated notes, which are then replaced with notes
+written for players (title "vX.Y.Z: <summary>", same layout as earlier
+releases).
 
 Not done yet:
 
 - Ask before pushing to `origin` (github.com/Spooky098529/ITC-Recomp).
-- The test zip `itc-interp-linux-amd64.zip` predates the countdown, HUD,
-  marker, trail, texture animation, play time and reflection fixes. Rebuild it when the user wants to test.
+- Headlight lighting on other cars flickers when they're close and diagonal
+  in the beam. Branch `headlight-fixes` holds an attempt that wasn't a
+  consistent improvement; see Known issues.
+- Races don't hold 144 fps in busy areas (about 105-150). `--log_frame_times`
+  shows the render thread is the limit (6-8 ms a frame, our blending under
+  1 ms of it); next step is profiling with `perf` (not installed yet).
 - Menus still run at 30 fps (see Known issues).
