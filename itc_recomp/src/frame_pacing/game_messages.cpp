@@ -80,9 +80,13 @@ void Deliver(PPCContext& ctx, uint8_t* base, uint32_t dispatcher, uint32_t messa
     ctx.r3.u64 = object;
     ctx.r4.u64 = dispatcher;
     ctx.lr = 0x82106388;
+    // Delegates (sub_8223A3F0, sub_82233460) keep their real target at +8.
+    uint32_t target = (method == 0x8223A3F0 || method == 0x82233460)
+                          ? guest::LoadU32(base, object + 8)
+                          : method;
     debug::FrameStateDiff_Before(base);
     REX_CALL_INDIRECT_FUNC(method);
-    debug::FrameStateDiff_After(base, "message handler", method);
+    debug::FrameStateDiff_After(base, "message handler", target);
   }
 }
 
