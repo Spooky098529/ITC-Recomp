@@ -557,6 +557,20 @@ std::optional<PerspectiveCamera> SplitViewProjection(const Matrix4& vp) {
       view_columns[i][r] = c[r] / scales[i];
     }
   }
+  // A mirrored camera (a reflection) has a view whose rotation part has
+  // determinant -1; make it a proper rotation by moving the mirror into the
+  // projection's x scale.
+  const auto& x = view_columns[0];
+  const auto& y = view_columns[1];
+  const auto& zc = view_columns[2];
+  double determinant = x[0] * (y[1] * zc[2] - y[2] * zc[1]) - y[0] * (x[1] * zc[2] - x[2] * zc[1]) +
+                       zc[0] * (x[1] * y[2] - x[2] * y[1]);
+  if (determinant < 0) {
+    for (double& v : view_columns[0]) {
+      v = -v;
+    }
+    scales[0] = -scales[0];
+  }
   // Column 2 = depth_scale * view column 2 + depth_offset * e3.
   auto c2 = column(2);
   const auto& z = view_columns[2];
