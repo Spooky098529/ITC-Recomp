@@ -293,12 +293,12 @@ extern "C" REX_FUNC(sub_8215DEA0) {
 }
 
 // World-space sprite lists (sub_82128750: r3 = list, r4 = camera; from the
-// race overlays, including the marker above opponents). The list holds up to
+// race overlays: the light trails behind headlights and tail lights). The list holds up to
 // 500 sprites, count at +0x109F0; sprite i's four corners (x, y, z, pad) at
 // +80 + 64 * i, written by game logic once a tick. The recorder writes them
 // into the command list as vertices, drawn through the camera, which is
-// blended between ticks; left at the tick's corners, a sprite was ahead of
-// its blended car early in each tick and caught up by the end (two markers).
+// blended between ticks; left at the tick's corners, the trails were missing
+// at high frame rates.
 // The corners are blended between their last two ticks, by index, while it
 // records, then put back. The list is shared: each overlay fills it and
 // records it in turn (the marker, then particles), so each recording is
@@ -329,7 +329,7 @@ std::unordered_map<uint32_t, int> g_sprite_occurrences;
 }  // namespace
 
 REXCVAR_DEFINE_BOOL(blend_world_sprites, true, "ITC",
-                    "Blend world-space sprites (the marker above opponents) between ticks");
+                    "Blend world-space sprites (light trails) between ticks");
 
 // Wrapped in draw_tags.cpp (sub_82128750); `record` runs the original.
 REXCVAR_DEFINE_BOOL(log_world_sprites, false, "ITC",

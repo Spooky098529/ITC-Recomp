@@ -173,8 +173,8 @@ extern "C" REX_FUNC(sub_820CECA0) {
                               [&] { __imp__sub_820CECA0(ctx, base); });
 }
 
-// World-space sprite recorder (up to 500 sprites per call): r3 = sprite
-// list, r4 = camera, r5. Items pair only while the batch size is unchanged.
+// World-space sprite recorder (up to 500 sprites per call; the light
+// trails, not the marker above opponents): r3 = sprite list, r4 = camera, r5. Items pair only while the batch size is unchanged.
 // Its corners are blended between ticks (per_frame_logic.cpp).
 void PerFrameLogic_RecordWorldSprites(uint8_t* base, uint32_t list,
                                       const std::function<void()>& record);
