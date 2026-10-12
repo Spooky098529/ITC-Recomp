@@ -1039,6 +1039,9 @@ class PixelConstantBlender {
       }
       if (!std::isfinite(a) || !std::isfinite(b) ||
           !(std::abs(b - a) <= 0.3f * std::max(std::abs(a), std::abs(b)) + 0.2f)) {
+        if (REXCVAR_GET(log_blend_state)) {
+          LogRejection(i, a, b);
+        }
         return std::nullopt;
       }
       changed = true;
@@ -1056,6 +1059,8 @@ class PixelConstantBlender {
   }
 
  private:
+  static void LogRejection(uint32_t i, float a, float b);
+
   struct Key {
     uint64_t object;
     uint32_t start, count;
@@ -1070,6 +1075,24 @@ class PixelConstantBlender {
   std::map<Key, int> occurrences_;
   uint64_t tick_ = 0;
 };
+
+void PixelConstantBlender::LogRejection(uint32_t i, float a, float b) {
+  static std::map<uint32_t, int> rejections;  // by register * 4 + component
+  static auto last = std::chrono::steady_clock::now();
+  rejections[i]++;
+  auto now = std::chrono::steady_clock::now();
+  if (now - last < std::chrono::seconds(2)) {
+    return;
+  }
+  last = now;
+  std::string line;
+  for (const auto& [index, n] : rejections) {
+    line += fmt::format(" c{}.{}:{}", index / 4, "xyzw"[index % 4], n);
+  }
+  REXLOG_INFO("pixel constants rejected (register.component:count):{}; e.g. c{}.{} {} -> {}", line,
+              i / 4, "xyzw"[i % 4], a, b);
+  rejections.clear();
+}
 
 PixelConstantBlender& GetPixelConstantBlender() {
   static PixelConstantBlender blender;
