@@ -87,6 +87,9 @@ REXCVAR_DEFINE_BOOL(log_blend_state, false, "ITC",
                     "Log how many cameras and objects were blended, once a second");
 REXCVAR_DEFINE_BOOL(log_replayed_constants, false, "ITC",
                     "Log the vertex constant matrices the render thread replays, once a second");
+REXCVAR_DEFINE_BOOL(log_pixel_outcomes, false, "ITC",
+                    "Log what happened to the per-object lighting uploads (blended, unpaired, "
+                    "rejected...), for moving and still objects, every 2 s");
 
 namespace interpolation {
 namespace {
@@ -1237,6 +1240,8 @@ class PixelConstantBlender {
   // Blends the upload in place; returns the original to put back after.
   std::optional<std::vector<float>> Apply(uint8_t* base, uint32_t payload, uint32_t packed,
                                           float amount, uint64_t object) {
+    outcome_ = Outcome::kNoObject;
+    switch_jumps_ = 0;
     if (object == 0) {
       return std::nullopt;  // no object to pair by
     }
@@ -1251,9 +1256,13 @@ class PixelConstantBlender {
       entry.current = now;  // first time this tick: the tick's own value
       entry.current_tick = tick_;
     }
-    if (entry.previous_tick + 1 != tick_ || entry.previous.size() != now.size() ||
-        entry.current != now) {
-      return std::nullopt;  // not paired, or not the recorded value
+    if (entry.previous_tick + 1 != tick_ || entry.previous.size() != now.size()) {
+      outcome_ = Outcome::kUnpaired;
+      return std::nullopt;
+    }
+    if (entry.current != now) {
+      outcome_ = Outcome::kNotAsRecorded;  // differs from the tick's first value
+      return std::nullopt;
     }
     // Some components are per-object switches that legitimately jump
     // between ticks (c1.x, c3.xyz, c4.x of an upload: which lights reach the
@@ -1278,16 +1287,22 @@ class PixelConstantBlender {
           if (REXCVAR_GET(log_blend_state)) {
             LogRejection(start * 4 + i, a, b);
           }
+          outcome_ = Outcome::kRejected;
+          rejected_ = i;
+          rejected_values_ = {a, b};
           return std::nullopt;
         }
         jumps[i] = true;
+        switch_jumps_++;
         continue;
       }
       changed = true;
     }
     if (!changed) {
+      outcome_ = Outcome::kUnchanged;
       return std::nullopt;
     }
+    outcome_ = Outcome::kBlended;
     for (uint32_t i = 0; i < now.size(); i++) {
       float a = entry.previous[i], b = now[i];
       if (a != b && !jumps[i]) {
@@ -1297,8 +1312,21 @@ class PixelConstantBlender {
     return now;
   }
 
+  // What the last Apply did, for --log_pixel_outcomes.
+  enum class Outcome { kNoObject, kUnpaired, kNotAsRecorded, kRejected, kUnchanged, kBlended };
+  Outcome outcome() const { return outcome_; }
+  int switch_jumps() const { return switch_jumps_; }
+  // The rejected component (from the upload's start) and its two ticks' values.
+  uint32_t rejected() const { return rejected_; }
+  std::pair<float, float> rejected_values() const { return rejected_values_; }
+
  private:
   static void LogRejection(uint32_t i, float a, float b);
+
+  Outcome outcome_ = Outcome::kNoObject;
+  int switch_jumps_ = 0;
+  uint32_t rejected_ = 0;
+  std::pair<float, float> rejected_values_{};
 
   struct Key {
     uint64_t object;
@@ -1336,6 +1364,81 @@ void PixelConstantBlender::LogRejection(uint32_t i, float a, float b) {
 PixelConstantBlender& GetPixelConstantBlender() {
   static PixelConstantBlender blender;
   return blender;
+}
+
+// Diagnostics (--log_pixel_outcomes): what the pixel constant blender did with
+// each lighting upload, by the object it was paired by: moving (its world
+// matrix blends, so a car, a wheel, a car body) or still (road, buildings),
+// or no product before it. An upload that isn't blended on a moving object
+// shows the tick's lighting on a blended object.
+class PixelOutcomesLog {
+ public:
+  void OnUpload(uint32_t start, bool has_object, bool moving) {
+    using Outcome = PixelConstantBlender::Outcome;
+    const PixelConstantBlender& blender = GetPixelConstantBlender();
+    Outcome outcome = blender.outcome();
+    const char* kind = !has_object ? "no product" : moving ? "moving" : "still";
+    counts_[{kind, start, int(outcome)}]++;
+    if (outcome == Outcome::kBlended && blender.switch_jumps() > 0) {
+      switch_jumps_[{kind, start}]++;
+    }
+    if (outcome == Outcome::kRejected && moving) {
+      auto [a, b] = blender.rejected_values();
+      rejected_[blender.rejected()]++;
+      if (rejected_examples_.size() < 400) {
+        rejected_examples_ += fmt::format(" c{}.{} {:.4g}->{:.4g}", start + blender.rejected() / 4,
+                                          "xyzw"[blender.rejected() % 4], a, b);
+      }
+    }
+  }
+
+  void OnFrameStart() {
+    frames_++;
+    auto now = std::chrono::steady_clock::now();
+    if (now - last_ < std::chrono::seconds(2)) {
+      return;
+    }
+    last_ = now;
+    static const char* kNames[] = {"no object", "unpaired", "not as recorded",
+                                   "rejected", "unchanged", "blended"};
+    std::map<std::pair<std::string, uint32_t>, std::string> lines;
+    for (const auto& [key, n] : counts_) {
+      const auto& [kind, start, outcome] = key;
+      lines[{kind, start}] += fmt::format(" {} {:.1f}", kNames[outcome], double(n) / frames_);
+    }
+    for (const auto& [key, line] : lines) {
+      auto jumps = switch_jumps_.find(key);
+      REXLOG_INFO("pixel outcomes per frame, {} objects, c{}:{}; blended with switches jumping {:.1f}",
+                  key.first, key.second, line,
+                  jumps == switch_jumps_.end() ? 0.0 : double(jumps->second) / frames_);
+    }
+    if (!rejected_.empty()) {
+      std::string line;
+      for (const auto& [i, n] : rejected_) {
+        line += fmt::format(" +{}.{}:{}", i / 4, "xyzw"[i % 4], n);
+      }
+      REXLOG_INFO("pixel outcomes: moving objects rejected by (register from start.component:count):{}; e.g.{}",
+                  line, rejected_examples_);
+    }
+    counts_.clear();
+    switch_jumps_.clear();
+    rejected_.clear();
+    rejected_examples_.clear();
+    frames_ = 0;
+  }
+
+ private:
+  std::map<std::tuple<std::string, uint32_t, int>, int> counts_;
+  std::map<std::pair<std::string, uint32_t>, int> switch_jumps_;
+  std::map<uint32_t, int> rejected_;
+  std::string rejected_examples_;
+  int frames_ = 0;
+  std::chrono::steady_clock::time_point last_ = std::chrono::steady_clock::now();
+};
+
+PixelOutcomesLog& GetPixelOutcomesLog() {
+  static PixelOutcomesLog log;
+  return log;
 }
 
 // Diagnostics on the render thread (--log_stepping_constants): constant
@@ -1654,6 +1757,9 @@ void BlendState_OnReplayFrameStart() {
   GetReplayCameras().OnFrameStart();
   GetOverlayUploadsLog().OnFrameStart();
   GetPixelConstantBlender().OnFrameStart(GetReplayCameras().tick());
+  if (REXCVAR_GET(log_pixel_outcomes)) {
+    GetPixelOutcomesLog().OnFrameStart();
+  }
 }
 
 void BlendState_OnReplayTick() {
@@ -1706,6 +1812,11 @@ void BlendState_ReplayConstants(uint8_t* base, uint32_t payload, uint32_t packed
     original_pixel =
         GetPixelConstantBlender().Apply(base, payload, packed, GetReplayCameras().amount(),
                                         GetReplayCameras().last_identity());
+    if (REXCVAR_GET(log_pixel_outcomes)) {
+      const ProductBlendParts& parts = GetReplayCameras().last_parts();
+      GetPixelOutcomesLog().OnUpload((packed >> 8) & 0xFF, GetReplayCameras().last_identity() != 0,
+                                     parts.world != parts.world_now);
+    }
   }
   GetSteppingConstantsLog().OnUpload(base, payload, packed,
                                      original.has_value() || original_pixel.has_value());
