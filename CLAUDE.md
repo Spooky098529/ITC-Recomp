@@ -57,18 +57,19 @@ install -m 755 itc_recomp/run.sh $D/run.sh
 (cd $D && python3 -I -m zipfile -c ../$name.zip itc librexruntime.so librexgpu-xenos.so run.sh)
 ```
 
-## Status (branch `unlock-fps`, 2026-10-12)
+## Status (branch `fps-sprite-fix`, from `main`, 2026-10-12)
 
 Frame interpolation for races is working: logic runs at 30 Hz and frames
 are blended between ticks. The world, cameras, wheels, lights, shadows,
 headlights, tunnels, the race start countdown, the HUD, the marker above
-opponents and the light trails are all done. `run.sh` turns interpolation on
-(marked experimental); `./run.sh --no-interpolation` gives the original
+opponents, the light trails, the texture animations (flashing lights,
+signs, the off-ramp chevron) and play time are all done. `run.sh` turns
+interpolation on (marked experimental); `./run.sh --no-interpolation` gives the original
 30 fps with motion blur. Known issues are at the end of `docs/functions.md`.
 
 Not done yet:
 
 - Ask before pushing to `origin` (github.com/Spooky098529/ITC-Recomp).
 - The test zip `itc-interp-linux-amd64.zip` predates the countdown, HUD,
-  marker and trail fixes. Rebuild it when the user wants to test.
+  marker, trail, texture animation and play time fixes. Rebuild it when the user wants to test.
 - Menus still run at 30 fps (see Known issues).
