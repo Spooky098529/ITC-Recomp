@@ -223,6 +223,7 @@ struct BlendStats {
   int unpaired = 0;
   int world_not_blended = 0;
   int camera_not_blended = 0;
+  int spinning = 0;
 };
 
 Matrix4 BlendProduct(const ReplayedProduct& product, float amount, BlendStats& stats) {
@@ -238,6 +239,12 @@ Matrix4 BlendProduct(const ReplayedProduct& product, float amount, BlendStats& s
   std::optional<ScaledTransform> wb = ScaledTransformFromWorldMatrix(b.world);
   if (wa && wb && !IsCut(wa->transform, wb->transform)) {
     world = WorldMatrixFromScaledTransform(Blend(*wa, *wb, amount));
+  } else if (std::optional<ScaledTransform> spinning;
+             wa && wb && Distance(wa->transform.position, wb->transform.position) <= kCutDistance &&
+             (spinning = BlendSpinning(*wa, *wb, amount, kCutAngle))) {
+    // A wheel: too much spin to blend, but its position and steering can be.
+    world = WorldMatrixFromScaledTransform(*spinning);
+    stats.spinning++;
   } else if (a.world != b.world) {
     stats.world_not_blended++;
   }
@@ -713,9 +720,10 @@ class ReplayCameras {
       }
     }
     REXLOG_INFO(
-        "replay: {} frames; per frame {} uploads, {} blended ({} world, {} camera not blended), "
+        "replay: {} frames; per frame {} uploads, {} blended ({} spinning, {} world, {} camera not "
+        "blended), "
         "{} unpaired, not replaced: {} unchanged since last frame, {} changed",
-        stats_.frames, stats_.uploads / f, stats_.blend.blended / f,
+        stats_.frames, stats_.uploads / f, stats_.blend.blended / f, stats_.blend.spinning / f,
         stats_.blend.world_not_blended / f, stats_.blend.camera_not_blended / f,
         stats_.blend.unpaired / f, stats_.not_substituted_same / f,
         stats_.not_substituted_changed / f);

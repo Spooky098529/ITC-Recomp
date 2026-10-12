@@ -599,6 +599,62 @@ PerspectiveCamera Blend(const PerspectiveCamera& a, const PerspectiveCamera& b, 
           mix(a.depth_scale, b.depth_scale), mix(a.depth_offset, b.depth_offset)};
 }
 
+std::optional<ScaledTransform> BlendSpinning(const ScaledTransform& a, const ScaledTransform& b,
+                                             float amount, float max_swing) {
+  // Row vectors: world = local * R. b's rotation = D * a's, with D applied
+  // in the object's own frame first, where a wheel's axle is a fixed axis.
+  // D = twist * swing: the spin about the axle first, then the rest.
+  Matrix3 ra = RotationFromQuaternion(a.transform.rotation);
+  Matrix3 rb = RotationFromQuaternion(b.transform.rotation);
+  auto multiply = [](const Matrix3& x, const Matrix3& y) {
+    Matrix3 out{};
+    for (int i = 0; i < 3; i++) {
+      for (int j = 0; j < 3; j++) {
+        for (int k = 0; k < 3; k++) {
+          out[i][j] += x[i][k] * y[k][j];
+        }
+      }
+    }
+    return out;
+  };
+  Matrix3 d = multiply(rb, Transposed(ra));
+  Quaternion q = QuaternionFromRotation(d);
+  float vector_length = std::sqrt(q.x * q.x + q.y * q.y + q.z * q.z);
+  if (!(vector_length > 1e-6f)) {
+    return std::nullopt;
+  }
+  // The local axis the turn is mostly about.
+  float components[3] = {q.x / vector_length, q.y / vector_length, q.z / vector_length};
+  int axis = 0;
+  for (int k = 1; k < 3; k++) {
+    if (std::abs(components[k]) > std::abs(components[axis])) {
+      axis = k;
+    }
+  }
+  if (std::abs(components[axis]) < 0.9f) {
+    return std::nullopt;
+  }
+  // Twist: q's part about that axis; swing = transpose(twist) * D.
+  float along[3] = {0, 0, 0};
+  along[axis] = axis == 0 ? q.x : axis == 1 ? q.y : q.z;
+  Matrix3 t = RotationFromQuaternion(Normalized({along[0], along[1], along[2], q.w}));
+  Quaternion swing = QuaternionFromRotation(multiply(Transposed(t), d));
+  if (AngleBetween(swing, Quaternion{}) > max_swing) {
+    return std::nullopt;
+  }
+  // R(amount) = twist * slerp(identity, swing, amount) * ra.
+  Matrix3 partial = RotationFromQuaternion(Slerp(Quaternion{}, swing, amount));
+  Matrix3 r = multiply(multiply(t, partial), ra);
+  ScaledTransform out;
+  out.transform.rotation = QuaternionFromRotation(r);
+  for (int k = 0; k < 3; k++) {
+    out.transform.position[k] =
+        a.transform.position[k] + (b.transform.position[k] - a.transform.position[k]) * amount;
+    out.scale[k] = a.scale[k] + (b.scale[k] - a.scale[k]) * amount;
+  }
+  return out;
+}
+
 float Distance(const Vec3& a, const Vec3& b) {
   float dx = a[0] - b[0], dy = a[1] - b[1], dz = a[2] - b[2];
   return std::sqrt(dx * dx + dy * dy + dz * dz);

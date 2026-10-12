@@ -49,6 +49,15 @@ std::optional<ScaledTransform> ScaledTransformFromWorldMatrix(const Matrix4& m);
 Matrix4 WorldMatrixFromScaledTransform(const ScaledTransform& t);
 ScaledTransform Blend(const ScaledTransform& a, const ScaledTransform& b, float amount);
 
+// Blends an object that spins fast about one of its own axes (a wheel), whose
+// spin can't be interpolated between ticks: split the turn from `a` to `b`
+// into a twist about that axis and the rest (steering, the car turning), blend
+// the position and the rest, and take the twist from `b`. Returns nothing if
+// the turn isn't mostly about one local axis, or the rest is over `max_swing`
+// radians.
+std::optional<ScaledTransform> BlendSpinning(const ScaledTransform& a, const ScaledTransform& b,
+                                             float amount, float max_swing);
+
 // Blends between two 4x4 matrices that differ by a rigid motion, such as
 // view-projection or world-view-projection matrices from consecutive ticks:
 // a * D or D * a for a rotation plus translation D, in either layout. Blends
