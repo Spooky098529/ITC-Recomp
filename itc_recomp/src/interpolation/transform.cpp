@@ -533,6 +533,72 @@ ScaledTransform Blend(const ScaledTransform& a, const ScaledTransform& b, float 
   return out;
 }
 
+std::optional<PerspectiveCamera> SplitViewProjection(const Matrix4& vp) {
+  // vp = view * projection. Projection columns: 0 = x_scale * e0,
+  // 1 = y_scale * e1, 3 = w_scale * e2, 2 = depth_scale * e2 + depth_offset * e3
+  // (e_i the unit columns). So vp's columns 0, 1 and 3 are view columns 0,
+  // 1 and 2 scaled, and the view's rotation columns are unit length.
+  auto column = [&](int c) {
+    return std::array<double, 4>{vp[c], vp[4 + c], vp[8 + c], vp[12 + c]};
+  };
+  auto length3 = [](const std::array<double, 4>& v) {
+    return std::sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
+  };
+  std::array<std::array<double, 4>, 3> view_columns;
+  double scales[3];
+  int source[3] = {0, 1, 3};
+  for (int i = 0; i < 3; i++) {
+    auto c = column(source[i]);
+    scales[i] = length3(c);
+    if (!(scales[i] > 1e-6)) {
+      return std::nullopt;  // not perspective (an orthographic w column)
+    }
+    for (int r = 0; r < 4; r++) {
+      view_columns[i][r] = c[r] / scales[i];
+    }
+  }
+  // Column 2 = depth_scale * view column 2 + depth_offset * e3.
+  auto c2 = column(2);
+  const auto& z = view_columns[2];
+  double depth_scale = c2[0] * z[0] + c2[1] * z[1] + c2[2] * z[2];
+  double depth_offset = c2[3] - depth_scale * z[3];
+  for (int r = 0; r < 3; r++) {
+    if (std::abs(c2[r] - depth_scale * z[r]) > 1e-3 * std::max(1.0, std::abs(c2[r]))) {
+      return std::nullopt;  // an off-centre or unusual projection
+    }
+  }
+  Matrix4 view{};
+  for (int r = 0; r < 4; r++) {
+    for (int i = 0; i < 3; i++) {
+      view[r * 4 + i] = float(view_columns[i][r]);
+    }
+    view[r * 4 + 3] = r == 3 ? 1.0f : 0.0f;
+  }
+  std::optional<Transform> camera = TransformFromViewMatrix(view);
+  if (!camera) {
+    return std::nullopt;
+  }
+  return PerspectiveCamera{*camera, float(scales[0]), float(scales[1]), float(scales[2]),
+                           float(depth_scale), float(depth_offset)};
+}
+
+Matrix4 ViewProjectionFromCamera(const PerspectiveCamera& c) {
+  Matrix4 projection{};
+  projection[0] = c.x_scale;
+  projection[5] = c.y_scale;
+  projection[10] = c.depth_scale;
+  projection[11] = c.w_scale;
+  projection[14] = c.depth_offset;
+  return Multiply(ViewMatrixFromTransform(c.camera), projection);
+}
+
+PerspectiveCamera Blend(const PerspectiveCamera& a, const PerspectiveCamera& b, float amount) {
+  auto mix = [&](float x, float y) { return x + (y - x) * amount; };
+  return {Blend(a.camera, b.camera, amount), mix(a.x_scale, b.x_scale),
+          mix(a.y_scale, b.y_scale),         mix(a.w_scale, b.w_scale),
+          mix(a.depth_scale, b.depth_scale), mix(a.depth_offset, b.depth_offset)};
+}
+
 float Distance(const Vec3& a, const Vec3& b) {
   float dx = a[0] - b[0], dy = a[1] - b[1], dz = a[2] - b[2];
   return std::sqrt(dx * dx + dy * dy + dz * dz);

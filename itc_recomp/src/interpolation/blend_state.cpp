@@ -217,7 +217,19 @@ Matrix4 BlendProduct(const ReplayedProduct& product, float amount, BlendStats& s
     stats.world_not_blended++;
   }
   Matrix4 view_projection = b.view_projection;
+  std::optional<PerspectiveCamera> ca, cb;
   if (a.view_projection != b.view_projection) {
+    ca = SplitViewProjection(a.view_projection);
+    cb = SplitViewProjection(b.view_projection);
+  }
+  if (ca && cb) {
+    // A perspective camera: blend its placement and projection separately.
+    if (IsCut(ca->camera, cb->camera)) {
+      stats.camera_not_blended++;
+    } else {
+      view_projection = ViewProjectionFromCamera(Blend(*ca, *cb, amount));
+    }
+  } else if (a.view_projection != b.view_projection) {
     if (std::optional<RigidMotion> motion = FindRigidMotion(a.view_projection, b.view_projection);
         motion && Distance(motion->motion.position, Vec3{}) < 1e6f &&
         AngleBetween(motion->motion.rotation, Quaternion{}) <= kCutAngle) {

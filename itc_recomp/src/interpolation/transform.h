@@ -76,6 +76,20 @@ std::optional<RigidMotion> FindRigidMotion(const Matrix4& a, const Matrix4& b,
                                            const RigidMotionOptions& options = {});
 Matrix4 BlendRigidMotion(const RigidMotion& motion, float amount);
 
+// A perspective view-projection (view * projection, row vectors) split into
+// its camera and projection, so the two can be blended separately (for a
+// camera that turns and changes field of view in one tick). The projection
+// is a symmetric perspective: x and y scales, and depth mapped as
+// z * depth_scale + depth_offset.
+struct PerspectiveCamera {
+  Transform camera;  // the camera's world placement (inverse view)
+  float x_scale, y_scale, w_scale;
+  float depth_scale, depth_offset;
+};
+std::optional<PerspectiveCamera> SplitViewProjection(const Matrix4& view_projection);
+Matrix4 ViewProjectionFromCamera(const PerspectiveCamera& camera);
+PerspectiveCamera Blend(const PerspectiveCamera& a, const PerspectiveCamera& b, float amount);
+
 // General 4x4 matrix helpers (computed in double precision).
 Matrix4 Multiply(const Matrix4& a, const Matrix4& b);
 std::optional<Matrix4> Inverse(const Matrix4& m);
