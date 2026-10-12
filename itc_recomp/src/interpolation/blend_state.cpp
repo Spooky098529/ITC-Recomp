@@ -437,7 +437,21 @@ class DrawState {
     }
     auto& outputs = render_only ? pass_outputs_ : tick_outputs_;
     auto it = outputs.find(src);
-    if (it == outputs.end() || it->second.written != LoadMatrix(base, src)) {
+    if (render_only && it == outputs.end()) {
+      // A product made only on the logic pass (the race overlays compute
+      // the marker above opponents in their update, which render-only
+      // passes skip), copied again for drawing: carry on as the logic
+      // pass's product, or the copy went up unblended on render-only
+      // passes and blended on logic passes (two markers).
+      it = tick_outputs_.find(src);
+      if (it == tick_outputs_.end()) {
+        return;
+      }
+    }
+    if (it == outputs.end() && !render_only) {
+      return;
+    }
+    if (it->second.written != LoadMatrix(base, src)) {
       return;
     }
     outputs[dst] = {it->second.key, LoadMatrix(base, dst)};
