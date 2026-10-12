@@ -91,6 +91,10 @@ REXCVAR_DEFINE_BOOL(pixel_blend_from_latest, true, "ITC",
                     "Blend per-object lighting from the last value recorded in the previous "
                     "tick to this frame's (false: only frames recording the tick's first value "
                     "are blended)");
+REXCVAR_DEFINE_BOOL(pair_by_object, true, "ITC",
+                    "Pair the per-object recorder's products between ticks by the part being "
+                    "drawn (its caller's r31), not only by order, so culling or reordering "
+                    "doesn't pair a wheel with another wheel or car");
 REXCVAR_DEFINE_BOOL(log_moving_products, false, "ITC",
                     "Log moving objects drawn out of step: render-only mismatches, products not "
                     "blended or unpaired, pairings that move unlike their neighbours, and jumps "
@@ -206,8 +210,8 @@ int PassOfViewProjection(uint32_t address) {
 struct ProductInputs {
   Matrix4 world;
   Matrix4 view_projection;
-  // Diagnostics (--log_moving_products): for the per-object recorder's
-  // multiply, its caller (lr) and the caller's r24-r31 at the call.
+  // For the per-object recorder's multiply, its caller (lr) and the
+  // caller's r24-r31 at the call: r31 identifies the part (--pair_by_object).
   std::array<uint32_t, 9> context{};
 };
 
@@ -525,8 +529,19 @@ class DrawState {
     // tolerance between ticks, which renumbered them and left them unpaired.
     uint64_t signature =
         handler_ == kRaceOverlaysHandler ? 0 : camera_ids_.Of(inputs.view_projection);
-    ProductKey key{camera, world, signature, handler_,
-                   product_occurrences_[{camera, world, signature, handler_, 0}]++};
+    // The per-object recorder's caller (0x820D0564 for cars' parts) keeps a
+    // pointer to the part it draws in r31. Numbering products by order alone
+    // paired a wheel with another wheel, or another car, whenever a part was
+    // culled or the cars were drawn in another order.
+    uint64_t object = REXCVAR_GET(pair_by_object) && inputs.context[0] != 0
+                          ? (uint64_t(inputs.context[0]) << 32) | inputs.context[8]
+                          : 0;
+    ProductKey key{camera, world, signature, handler_, object,
+                   product_occurrences_[{camera, world, signature, handler_, object, 0}]++};
+    if (object != 0 && !render_only) {
+      object_keys_.keyed++;
+      object_keys_.shared += key.occurrence > 0;
+    }
     if (REXCVAR_GET(log_overlay_products) && handler_ == kRaceOverlaysHandler &&
         overlay_keys_logged_ < 24 &&
         (!render_only || previous_tick_.count(key) == 0)) {
@@ -648,6 +663,17 @@ class DrawState {
     Restore(base, saved_vec3_);
     counts_.draws++;
     LogCounts();
+    if (REXCVAR_GET(log_moving_products) && logic_pass_) {
+      object_keys_.ticks++;
+      auto now = std::chrono::steady_clock::now();
+      if (now - object_keys_.last_log >= std::chrono::seconds(2)) {
+        REXLOG_INFO("moving: per tick, {:.1f} products keyed by object, {:.1f} sharing one",
+                    double(object_keys_.keyed) / std::max(object_keys_.ticks, 1),
+                    double(object_keys_.shared) / std::max(object_keys_.ticks, 1));
+        object_keys_ = {};
+        object_keys_.last_log = now;
+      }
+    }
   }
 
   void BeforeRecordObject(uint8_t* base, uint32_t view_projection, uint32_t world) {
@@ -917,6 +943,7 @@ class DrawState {
     uint32_t world;      // address
     uint64_t signature;  // CameraIds number
     uint32_t handler;    // the message handler running (0 for none)
+    uint64_t object;     // the part being drawn, if known (--pair_by_object)
     int occurrence;
     bool operator==(const ProductKey&) const = default;
   };
@@ -924,7 +951,8 @@ class DrawState {
     size_t operator()(const ProductKey& key) const {
       return std::hash<uint64_t>()(((uint64_t(key.world) << 32) | key.camera) ^
                                    (uint64_t(key.occurrence) << 7) ^ (key.signature * 31) ^
-                                   (uint64_t(key.handler) * 0x9E3779B97F4A7C15ull));
+                                   (uint64_t(key.handler) * 0x9E3779B97F4A7C15ull) ^
+                                   (key.object * 0xC2B2AE3D27D4EB4Full));
     }
   };
   using ProductInputsByKey = std::unordered_map<ProductKey, ProductInputs, ProductKeyHash>;
@@ -932,6 +960,10 @@ class DrawState {
   ProductInputsByKey current_tick_;
   ProductInputsByKey previous_tick_;
   std::unordered_map<ProductKey, int, ProductKeyHash> product_occurrences_;
+  struct {
+    int ticks = 0, keyed = 0, shared = 0;
+    std::chrono::steady_clock::time_point last_log{};
+  } object_keys_;  // --log_moving_products
 
   // Diagnostics (--log_moving_products): a render-only pass's multiply whose
   // inputs differ from the logic pass's under the same key. It isn't
@@ -2443,11 +2475,9 @@ extern "C" REX_FUNC(sub_8258FD48) {
 extern "C" REX_FUNC(sub_825953D0) {
   REX_FUNC_PROLOGUE();
   interpolation::BlendState_BeforeRecordObject(base, ctx.r4.u32, ctx.r5.u32);
-  if (REXCVAR_GET(log_moving_products)) {
-    interpolation::g_record_context = {uint32_t(ctx.lr), ctx.r24.u32, ctx.r25.u32, ctx.r26.u32,
-                                       ctx.r27.u32,      ctx.r28.u32, ctx.r29.u32, ctx.r30.u32,
-                                       ctx.r31.u32};
-  }
+  interpolation::g_record_context = {uint32_t(ctx.lr), ctx.r24.u32, ctx.r25.u32, ctx.r26.u32,
+                                     ctx.r27.u32,      ctx.r28.u32, ctx.r29.u32, ctx.r30.u32,
+                                     ctx.r31.u32};
   __imp__sub_825953D0(ctx, base);
   interpolation::g_record_context = {};
   interpolation::BlendState_AfterRecordObject(base);
