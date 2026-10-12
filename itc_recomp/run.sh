@@ -7,6 +7,9 @@
 #   ./run.sh                     frame interpolation on (the default)
 #   ./run.sh --no-interpolation  the original 30 fps, with motion blur
 #
+# Logging is off; ./run-debug.sh runs the same with logs (in logs/), for
+# reporting problems.
+#
 # Frame interpolation (experimental): game logic stays at 30 Hz and races
 # draw up to --max_fps (144 here; pass --max_fps=N to change it, 0 for
 # unlimited), each frame blended between the last two ticks. Menus stay at
@@ -28,7 +31,7 @@ done
 
 # The flag parser rejects a flag given twice, so a default is left out when
 # the same flag is passed in.
-flags=(--gpu_plugin=xenos --game_data_root="$dir" --mnk_mode=true "${defaults[@]}" --log_fps=true)
+flags=(--gpu_plugin=xenos --game_data_root="$dir" --mnk_mode=true "${defaults[@]}" --log_level=off)
 final=()
 for flag in "${flags[@]}"; do
   name="${flag%%=*}"

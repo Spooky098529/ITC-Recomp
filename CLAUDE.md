@@ -54,7 +54,8 @@ name=itc-<label>-linux-amd64; D=itc_recomp/out/dist/$name
 rm -rf $D $D.zip; mkdir -p $D
 cp itc_recomp/out/build/linux-amd64-release/itc itc_recomp/out/build/linux-amd64-release/librexgpu-xenos.so rexglue-sdk/out/linux-amd64/librexruntime.so $D/
 install -m 755 itc_recomp/run.sh $D/run.sh
-(cd $D && python3 -I -m zipfile -c ../$name.zip itc librexruntime.so librexgpu-xenos.so run.sh)
+install -m 755 itc_recomp/run-debug.sh $D/run-debug.sh
+(cd $D && python3 -I -m zipfile -c ../$name.zip itc librexruntime.so librexgpu-xenos.so run.sh run-debug.sh)
 ```
 
 ## Status (branch `player-triangle-fix`, from `main`, 2026-10-12)

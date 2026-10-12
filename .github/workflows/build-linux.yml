@@ -88,6 +88,7 @@ jobs:
           # The SDK writes librexruntime.so to its own output folder.
           cp rexglue-sdk/out/linux-amd64/librexruntime.so "dist/${name}/"
           install -m 755 itc_recomp/run.sh "dist/${name}/run.sh"
+          install -m 755 itc_recomp/run-debug.sh "dist/${name}/run-debug.sh"
 
           # Fail if the executable needs a library the zip doesn't carry.
           missing=$(cd "dist/${name}" && ldd ./itc | grep 'not found' || true)
@@ -95,7 +96,7 @@ jobs:
             echo "Missing libraries:"; echo "$missing"; exit 1
           fi
 
-          (cd "dist/${name}" && zip -9 "../${name}.zip" itc librexruntime.so librexgpu-xenos.so run.sh)
+          (cd "dist/${name}" && zip -9 "../${name}.zip" itc librexruntime.so librexgpu-xenos.so run.sh run-debug.sh)
           echo "name=${name}" >> "$GITHUB_OUTPUT"
 
       - name: sccache stats
