@@ -66,6 +66,9 @@ REXCVAR_DEFINE_BOOL(log_overlay_products, false, "ITC",
 REXCVAR_DEFINE_BOOL(log_overlay_uploads, false, "ITC",
                     "Log every shader constant upload the race overlays recorded, as replayed, "
                     "12 frames every 3 s");
+REXCVAR_DEFINE_BOOL(log_object_extras, false, "ITC",
+                    "Log how often c4-c8 of substituted per-object uploads change, with "
+                    "examples, every 2 s");
 REXCVAR_DEFINE_BOOL(test_pixel_switches, false, "ITC",
                     "Testing: also treat the pixel constant components rejected most often "
                     "(c2.x, c8.y, c24.x, c47.x, c48.x) as switches");
@@ -1527,6 +1530,70 @@ void BlendState_AfterDraw(uint8_t* base) {
   GetDrawState().AfterDraw(base);
 }
 
+// Diagnostics (--log_object_extras): the per-object uploads (vertex c0 x9,
+// sub_825953D0) whose c0-c3 were substituted: how often their c4-c7 (the
+// world matrix) and c8 change from frame to frame, with examples, every 2 s.
+class ObjectExtrasLog {
+ public:
+  void OnFrameStart() {
+    frames_++;
+    auto now = std::chrono::steady_clock::now();
+    if (now - last_log_ < std::chrono::seconds(2)) {
+      return;
+    }
+    float seconds = std::chrono::duration<float>(now - last_log_).count();
+    last_log_ = now;
+    REXLOG_INFO("object extras: {} frames, {} substituted x9 uploads; c4-c7 changed in {} "
+                "({:.1f}/s per upload address), c8 changed in {}",
+                frames_, uploads_, world_changes_,
+                world_changes_ / std::max<float>(seconds * std::max<size_t>(last_.size(), 1), 1),
+                c8_changes_);
+    for (const std::string& example : examples_) {
+      REXLOG_INFO("object extras: {}", example);
+    }
+    frames_ = uploads_ = world_changes_ = c8_changes_ = 0;
+    examples_.clear();
+  }
+
+  void OnUpload(uint8_t* base, uint32_t payload) {
+    uploads_++;
+    std::array<float, 20> extras;
+    for (uint32_t i = 0; i < 20; i++) {
+      extras[i] = guest::LoadFloat(base, payload + 64 + 4 * i);
+    }
+    auto it = last_.find(payload);
+    if (it != last_.end()) {
+      bool world = !std::equal(extras.begin(), extras.begin() + 16, it->second.begin());
+      bool c8 = !std::equal(extras.begin() + 16, extras.end(), it->second.begin() + 16);
+      world_changes_ += world;
+      c8_changes_ += c8;
+      if ((world || c8) && examples_.size() < 6) {
+        examples_.push_back(fmt::format(
+            "{:08X} c7 {:.4g} {:.4g} {:.4g} {:.4g} -> {:.4g} {:.4g} {:.4g} {:.4g}; "
+            "c8 {:.4g} {:.4g} {:.4g} {:.4g} -> {:.4g} {:.4g} {:.4g} {:.4g}",
+            payload, it->second[12], it->second[13], it->second[14], it->second[15], extras[12],
+            extras[13], extras[14], extras[15], it->second[16], it->second[17], it->second[18],
+            it->second[19], extras[16], extras[17], extras[18], extras[19]));
+      }
+    }
+    last_[payload] = extras;
+    if (last_.size() > 100000) {
+      last_.clear();
+    }
+  }
+
+ private:
+  std::chrono::steady_clock::time_point last_log_ = std::chrono::steady_clock::now();
+  int frames_ = 0, uploads_ = 0, world_changes_ = 0, c8_changes_ = 0;
+  std::vector<std::string> examples_;
+  std::unordered_map<uint32_t, std::array<float, 20>> last_;
+};
+
+ObjectExtrasLog& GetObjectExtrasLog() {
+  static ObjectExtrasLog log;
+  return log;
+}
+
 void BlendState_BeforeRecordObject(uint8_t* base, uint32_t view_projection, uint32_t world) {
   GetDrawState().BeforeRecordObject(base, view_projection, world);
 }
@@ -1536,6 +1603,9 @@ void BlendState_AfterRecordObject(uint8_t* base) {
 }
 
 void BlendState_OnReplayFrameStart() {
+  if (REXCVAR_GET(log_object_extras)) {
+    GetObjectExtrasLog().OnFrameStart();
+  }
   GetReplayedConstantsLog().OnFrameStart();
   GetSteppingConstantsLog().OnFrameStart();
   GetReplayCameras().OnFrameStart();
@@ -1568,6 +1638,9 @@ void BlendState_ReplayConstants(uint8_t* base, uint32_t payload, uint32_t packed
   }
   GetSteppingConstantsLog().OnUpload(base, payload, packed,
                                      original.has_value() || original_pixel.has_value());
+  if (REXCVAR_GET(log_object_extras) && stage == 0 && count == 9 && original) {
+    GetObjectExtrasLog().OnUpload(base, payload);
+  }
   if (stage == 0 && count >= 4) {
     GetReplayCameras().CountUpload(base, payload, original.has_value());
     if (!original && REXCVAR_GET(log_overlay_products)) {
