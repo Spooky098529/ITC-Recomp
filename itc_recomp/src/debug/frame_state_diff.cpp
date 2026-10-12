@@ -142,6 +142,7 @@ class FrameStateDiff {
     size_t offset = 0;
     int found = 0;
     std::string sample;
+    std::vector<uint32_t> stepped_now;
     for (const Range& r : ranges_) {
       const uint8_t* now = base + r.start;
       const uint8_t* then = snapshot_.data() + offset;
@@ -162,15 +163,26 @@ class FrameStateDiff {
                         ? fmt::format(" {:08X}:{}->{}", address, AsFloat(before), AsFloat(after))
                         : fmt::format(" {:08X}:{}->{}", address, before, after);
         }
-        if (watched_.size() < kMaxWatched &&
-            std::find(watched_.begin(), watched_.end(), address) == watched_.end()) {
-          watched_.push_back(address);
-        }
+        stepped_now.push_back(address);
       }
       offset += r.size;
     }
     REXLOG_INFO("per-frame state: {} words stepped like timers over a render-only pass:{}", found,
                 sample);
+    // Watch words that stepped in more than one sampled pass: steady
+    // per-frame counters, not one-off changes (a load finishing).
+    for (uint32_t address : stepped_now) {
+      hits_[address]++;
+    }
+    watched_.clear();
+    for (const auto& [address, hits] : hits_) {
+      if (hits >= 2 && watched_.size() < kMaxWatched) {
+        watched_.push_back(address);
+      }
+    }
+    if (hits_.size() > 200000) {
+      hits_.clear();
+    }
   }
 
   void LogChanges(std::chrono::steady_clock::time_point now) {
@@ -191,6 +203,7 @@ class FrameStateDiff {
   std::vector<uint8_t> snapshot_;
   std::chrono::steady_clock::time_point last_snapshot_{}, last_log_{};
   std::vector<uint32_t> watched_;
+  std::map<uint32_t, int> hits_;  // sampled passes each word stepped in
   std::vector<std::vector<uint32_t>> before_;  // nested: messages within handlers
   std::map<std::tuple<std::string, uint32_t, uint32_t>, int> changes_;
 };
