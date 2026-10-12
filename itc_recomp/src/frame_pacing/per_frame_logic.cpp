@@ -397,8 +397,24 @@ void PerFrameLogic_RecordWorldSprites(uint8_t* base, uint32_t list,
     }
   }
   if (REXCVAR_GET(log_world_sprites) && !saved.empty()) {
-    REXLOG_INFO("world sprites: list {:08X} blended {} words at amount {:.2f}", list, saved.size(),
-                amount);
+    static std::chrono::steady_clock::time_point last{};
+    auto now = std::chrono::steady_clock::now();
+    if (now - last >= std::chrono::milliseconds(500)) {
+      last = now;
+      for (uint32_t i = 0; i < paired; i++) {
+        const float* a = &sprites.before[i * 16];
+        const float* b = &sprites.now[i * 16];
+        REXLOG_INFO("world sprites: list {:08X} sprite {}/{} amount {:.2f} before ({:.5g} {:.5g} "
+                    "{:.5g}) ({:.5g} {:.5g} {:.5g}) now ({:.5g} {:.5g} {:.5g}) ({:.5g} {:.5g} {:.5g})",
+                    list, i, count, amount, a[0], a[1], a[2], a[4], a[5], a[6], b[0], b[1], b[2],
+                    b[4], b[5], b[6]);
+      }
+      auto f = [&](uint32_t o) { return guest::LoadFloat(base, list + o); };
+      REXLOG_INFO("world sprites: list {:08X} matrix {:.4g} {:.4g} {:.4g} | {:.4g} {:.4g} {:.4g} | "
+                  "{:.4g} {:.4g} {:.4g} | {:.5g} {:.5g} {:.5g}",
+                  list, f(0), f(4), f(8), f(16), f(20), f(24), f(32), f(36), f(40), f(48), f(52),
+                  f(56));
+    }
   }
   record();
   for (const auto& [address, value] : saved) {
