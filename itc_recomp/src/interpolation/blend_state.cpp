@@ -313,6 +313,20 @@ class CameraIds {
   std::vector<Signature> known_;
 };
 
+}  // namespace
+
+// Diagnostics (--log_slot_callers): which code allocated each command slot.
+std::mutex g_slot_owners_mutex;
+std::unordered_map<uint32_t, uint32_t> g_slot_owners;
+
+uint32_t SlotOwner(uint32_t address) {
+  std::lock_guard lock(g_slot_owners_mutex);
+  auto it = g_slot_owners.find(address);
+  return it != g_slot_owners.end() ? it->second : 0;
+}
+
+namespace {
+
 class DrawState {
  public:
   // Main thread, after the matrix multiply wrote out = a * b.
@@ -946,9 +960,9 @@ void BlendState_ReplayConstants(uint8_t* base, uint32_t payload, uint32_t packed
     if (start == 0 && status != "substituted" && logged < 400 &&
         REXCVAR_GET(log_replayed_constants)) {
       logged++;
-      REXLOG_INFO("c0 upload t={} from {:08X} x{} {}: {:.4g} {:.4g} {:.4g} {:.4g} ... {:.4g} {:.4g} {:.4g} {:.4g}",
+      REXLOG_INFO("c0 upload t={} from {:08X} (slot by {:08X}, header by {:08X}) x{} {}: {:.4g} {:.4g} {:.4g} {:.4g} ... {:.4g} {:.4g} {:.4g} {:.4g}",
                   std::chrono::duration_cast<std::chrono::microseconds>(now.time_since_epoch()).count() % 100000000,
-                  payload, count, status, m[0], m[1], m[2], m[3],
+                  payload, SlotOwner(payload), SlotOwner(payload - 16), count, status, m[0], m[1], m[2], m[3],
                   m[12], m[13], m[14], m[15]);
     }
   }
@@ -987,6 +1001,15 @@ extern "C" REX_FUNC(sub_8258CAA0) {
   REX_FUNC_PROLOGUE();
   uint32_t count = ctx.r4.u32, caller = uint32_t(ctx.lr);
   __imp__sub_8258CAA0(ctx, base);
+  if (REXCVAR_GET(log_slot_callers) && ctx.r3.u32 != 0) {
+    std::lock_guard lock(interpolation::g_slot_owners_mutex);
+    if (interpolation::g_slot_owners.size() > 200000) {
+      interpolation::g_slot_owners.clear();
+    }
+    for (uint32_t i = 0; i < count; i++) {
+      interpolation::g_slot_owners[ctx.r3.u32 + 16 * i] = caller;
+    }
+  }
   if (!REXCVAR_GET(log_slot_callers) || (count != 4 && count != 9)) {
     return;
   }
