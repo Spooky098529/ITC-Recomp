@@ -15,6 +15,7 @@
 #include <rex/logging.h>
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <cmath>
 #include <cstring>
@@ -471,4 +472,98 @@ extern "C" REX_FUNC(sub_820A3978) {
     }
   }
   __imp__sub_820A3978(ctx, base);
+}
+
+// Single world-space sprites (sub_821281A8: r3 = sprite, r4 = camera; the
+// marker above opponents, from the race overlays). Like the sprite lists
+// above: c0 is the sprite's matrix (+0) times the camera, and its four
+// corners (x, y, z, pad) at +80 become the vertices. The corners are
+// blended between their last two ticks while it records, matched by sprite
+// and order in the pass, then put back.
+REXCVAR_DEFINE_BOOL(log_single_sprites, false, "ITC",
+                    "Log each single world-space sprite recorded, 40 lines every 2 s");
+
+namespace {
+struct SingleSpriteKey {
+  uint32_t sprite;
+  uint32_t caller;
+  int occurrence;
+  bool operator==(const SingleSpriteKey&) const = default;
+};
+struct SingleSpriteKeyHash {
+  size_t operator()(const SingleSpriteKey& k) const {
+    return (size_t(k.sprite) << 20) ^ (size_t(k.caller) << 4) ^ size_t(k.occurrence);
+  }
+};
+struct SingleSprite {
+  std::array<float, 16> before{}, now{};
+  int ticks = 0;
+};
+std::unordered_map<SingleSpriteKey, SingleSprite, SingleSpriteKeyHash> g_single_sprites;
+uint64_t g_single_sprite_pass = ~0ull;
+std::map<std::pair<uint32_t, uint32_t>, int> g_single_sprite_occurrences;
+}  // namespace
+
+extern "C" REX_FUNC(sub_821281A8) {
+  REX_FUNC_PROLOGUE();
+  uint32_t sprite = ctx.r3.u32, caller = uint32_t(ctx.lr);
+  bool render_only = frame_pacing::GameMessages_IsRenderOnlyPass();
+  uint64_t pass = frame_pacing::GameMessages_PassNumber();
+  if (pass != g_single_sprite_pass) {
+    g_single_sprite_pass = pass;
+    g_single_sprite_occurrences.clear();
+  }
+  SingleSpriteKey key{sprite, caller, g_single_sprite_occurrences[{sprite, caller}]++};
+  std::array<float, 16> corners;
+  for (uint32_t k = 0; k < 16; k++) {
+    corners[k] = guest::LoadFloat(base, sprite + kSpriteCornersOffset + 4 * k);
+  }
+  SingleSprite& state = g_single_sprites[key];
+  if (!render_only) {
+    state.before = state.now;
+    state.now = corners;
+    state.ticks++;
+  }
+  float amount = frame_pacing::GetFramePacer().TickProgress();
+  bool blend = REXCVAR_GET(interpolate_draw_state) && REXCVAR_GET(blend_world_sprites) &&
+               frame_pacing::GameMessages_InRace() && state.ticks >= 2 && corners == state.now;
+  for (uint32_t k = 0; blend && k < 16; k++) {
+    blend = std::isfinite(state.before[k]) &&
+            std::abs(state.now[k] - state.before[k]) <= kMaxSpriteStep;
+  }
+  if (REXCVAR_GET(log_single_sprites)) {
+    static std::chrono::steady_clock::time_point last{};
+    static int lines = 0;
+    auto now = std::chrono::steady_clock::now();
+    if (now - last >= std::chrono::seconds(2)) {
+      last = now;
+      lines = 0;
+    }
+    if (lines++ < 40) {
+      uint32_t handler, message;
+      frame_pacing::GameMessages_CurrentHandler(handler, message);
+      auto f = [&](uint32_t o) { return guest::LoadFloat(base, sprite + o); };
+      REXLOG_INFO("single sprite: pass {} {} amount {:.2f} sprite {:08X} from {:08X} #{} handler "
+                  "{:08X} message {} camera {:08X} matrix row3 ({:.5g} {:.5g} {:.5g}) corner0 "
+                  "({:.5g} {:.5g} {:.5g}) before ({:.5g} {:.5g} {:.5g}) blend {}",
+                  pass, render_only ? "render-only" : "logic", amount, sprite, caller,
+                  key.occurrence, handler, int32_t(message), ctx.r4.u32, f(48), f(52), f(56),
+                  corners[0], corners[1], corners[2], state.before[0], state.before[1],
+                  state.before[2], blend);
+    }
+  }
+  if (!blend) {
+    __imp__sub_821281A8(ctx, base);
+    return;
+  }
+  for (uint32_t k = 0; k < 16; k++) {
+    if (k % 4 != 3) {
+      guest::StoreFloat(base, sprite + kSpriteCornersOffset + 4 * k,
+                        state.before[k] + (state.now[k] - state.before[k]) * amount);
+    }
+  }
+  __imp__sub_821281A8(ctx, base);
+  for (uint32_t k = 0; k < 16; k++) {
+    guest::StoreFloat(base, sprite + kSpriteCornersOffset + 4 * k, corners[k]);
+  }
 }
