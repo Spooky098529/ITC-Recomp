@@ -67,7 +67,7 @@ REXCVAR_DEFINE_BOOL(log_overlay_uploads, false, "ITC",
                     "Log every shader constant upload the race overlays recorded, as replayed, "
                     "12 frames every 3 s");
 REXCVAR_DEFINE_STRING(debug_zero_owners, "", "ITC",
-                      "Testing: vertex constant uploads recorded by these callers (hex, "
+                      "Testing: vertex or pixel constant uploads recorded by these callers (hex, "
                       "comma-separated; needs --log_slot_callers) are replayed as zeros, so "
                       "their draws vanish");
 REXCVAR_DEFINE_BOOL(log_upload_owners, false, "ITC",
@@ -1608,9 +1608,11 @@ void BlendState_ReplayConstants(uint8_t* base, uint32_t payload, uint32_t packed
         frames = 0;
       }
     }
-    std::string list = REXCVAR_GET(debug_zero_owners);
-    if (!list.empty() && owner != 0 &&
-        list.find(fmt::format("{:08X}", owner)) != std::string::npos) {
+  }
+  // Vertex or pixel constants, by the code that allocated the header.
+  if (std::string list = REXCVAR_GET(debug_zero_owners); !list.empty()) {
+    uint32_t owner = SlotOwner(payload - 16);
+    if (owner != 0 && list.find(fmt::format("{:08X}", owner)) != std::string::npos) {
       for (uint32_t i = 0; i < count * 4; i++) {
         zeroed.push_back(guest::LoadU32(base, payload + 4 * i));
         guest::StoreU32(base, payload + 4 * i, 0);
