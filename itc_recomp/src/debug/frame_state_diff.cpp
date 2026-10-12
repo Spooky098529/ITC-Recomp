@@ -12,6 +12,7 @@
 #include <fstream>
 #include <algorithm>
 #include <map>
+#include <unordered_map>
 #include <set>
 #include <tuple>
 #include <sstream>
@@ -30,6 +31,10 @@ REXCVAR_DEFINE_STRING(debug_hide, "", "ITC",
 REXCVAR_DEFINE_STRING(watch_addresses, "", "ITC",
                       "With --find_per_frame_state, guest addresses (hex, comma-separated) to "
                       "watch from the start, logging every change with the code making it");
+REXCVAR_DEFINE_BOOL(find_any_steps, false, "ITC",
+                    "With --find_per_frame_state, look for any steady step (a float changing "
+                    "by less than 1, or an integer by up to 4, by the same amount in two "
+                    "samples) instead of timer steps only");
 REXCVAR_DEFINE_BOOL(find_countdowns, false, "ITC",
                     "With --find_per_frame_state, look for values counting down (a float in "
                     "0..10 going down, or a small integer going down by one) instead of any "
@@ -92,6 +97,23 @@ const char* CountdownStep(uint32_t before, uint32_t after) {
     return "float";
   }
   if (int64_t(before) - int64_t(after) == 1 && before <= 300) {
+    return "int";
+  }
+  return nullptr;
+}
+
+// Whether a word changed by a small amount: a normal float by less than 1,
+// or a small integer by up to 4. Sets `step` to the change.
+const char* AnyStep(uint32_t before, uint32_t after, double& step) {
+  float a = AsFloat(before), b = AsFloat(after);
+  auto plain = [](float f) { return f == 0 || (std::isnormal(f) && std::abs(f) < 1e5f); };
+  if (plain(a) && plain(b) && a != b && std::abs(b - a) < 1) {
+    step = double(b) - double(a);
+    return "float";
+  }
+  int64_t di = int64_t(after) - int64_t(before);
+  if (di != 0 && di >= -4 && di <= 4 && before < 100000 && after < 100000) {
+    step = double(di);
     return "int";
   }
   return nullptr;
@@ -196,9 +218,27 @@ class FrameStateDiff {
         uint32_t address = r.start + i;
         uint32_t before = __builtin_bswap32(*reinterpret_cast<const uint32_t*>(then + i));
         uint32_t after = guest::LoadU32(base, address);
-        const char* step = TimerStep(before, after);
-        if (!step) {
-          continue;
+        const char* step;
+        if (REXCVAR_GET(find_any_steps)) {
+          // Only steps equal to the word's step in an earlier sample: a
+          // steady rate, not a buffer being rewritten.
+          double change = 0;
+          step = AnyStep(before, after, change);
+          if (!step) {
+            continue;
+          }
+          auto last = last_step_.find(address);
+          bool steady = last != last_step_.end() &&
+                        std::abs(last->second - change) <= 0.01 * std::abs(change);
+          last_step_[address] = change;
+          if (!steady) {
+            continue;
+          }
+        } else {
+          step = TimerStep(before, after);
+          if (!step) {
+            continue;
+          }
         }
         found++;
         if (sample.size() < 3000) {
@@ -226,6 +266,9 @@ class FrameStateDiff {
     }
     if (hits_.size() > 200000) {
       hits_.clear();
+    }
+    if (last_step_.size() > 2000000) {
+      last_step_.clear();
     }
   }
 
@@ -279,6 +322,7 @@ class FrameStateDiff {
   std::chrono::steady_clock::time_point last_snapshot_{}, last_log_{};
   std::vector<uint32_t> watched_;
   std::map<uint32_t, int> hits_;  // sampled passes each word stepped in
+  std::unordered_map<uint32_t, double> last_step_;  // --find_any_steps
   std::vector<std::vector<uint32_t>> before_;  // nested: messages within handlers
   std::map<std::tuple<std::string, uint32_t, uint32_t>, int> changes_;
 };

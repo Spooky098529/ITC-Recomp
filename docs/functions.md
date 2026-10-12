@@ -271,6 +271,9 @@ so with frames uncapped it's fast; at `--max_fps=30` it's right.
   sample, are watched; each change is attributed to the tick handler,
   message handler (delegates by their target) or wrapped draw step part that
   made it. `--find_countdowns` looks for values counting down instead;
+  `--find_any_steps` for any steady step (a float by under 1, an integer
+  by up to 4, the same amount in two samples), for animations that don't
+  count in frames;
   `--find_per_frame_state_interval_ms=0` samples every pass (very slow);
   `--watch_addresses` watches given addresses from the start.
 - `--render_only_skip=<hex,...>` skips tick handlers or message handlers (by
