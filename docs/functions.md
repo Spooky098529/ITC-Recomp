@@ -219,6 +219,37 @@ render-only passes it ran ~5x fast. Each case found is fixed in
 | Blink timers of the car's sprites (four 64-bit frame counters, called from the car's draw `sub_820DDE58`) | `sub_820DC958` | Skipped on render-only passes (`--per_tick_blink_timers`) |
 | UI movies: the HUD, including the race start countdown (a 240-frame movie, a beep at frames 60, 120, 180, 240) | `sub_8211D2F8`, with r4 = 0 (advance a frame and draw); r4 = 1 only draws | Replayed (below) (`--per_tick_ui_movies`) |
 
+**Race overlays** (the marker above opponents, the light trails). Update
+handler `sub_8215E150` calls `sub_8215DEA0` with a list of 25 overlay
+objects: each is updated (vtable slot 4, +16) then records its drawing
+(slot 5, +20), during Update. Render-only passes skip Update, so the
+overlays showed only on logic passes (flicker). Now:
+
+- Render-only passes still deliver Update to this one handler
+  (`--redraw_race_overlays`, `game_messages.cpp`), and the
+  `sub_8215DEA0` wrapper (`per_frame_logic.cpp`) runs only the recording
+  loop there, so the overlays draw every frame and advance once a tick.
+- The overlays place themselves with the camera passes (`0x826BAC00`, 21 x
+  592 bytes) as game logic left them; by a render-only pass's Update, Draw
+  has reused them for other views. The wrapper saves them on the logic pass
+  and puts them back around the render-only recording.
+- The wrapper sets numbering contexts for camera products
+  (`BlendState_SetHandler`: 0x8215E151 for updates, 0x8215E150 for
+  recordings), so the render-only recording's products pair with the logic
+  pass's. They're also matched by value (`overlay_keys_` in
+  `blend_state.cpp`), since the render-only recording numbers them
+  differently.
+- The sprites' own corners are blended separately; see "World-space
+  sprites".
+
+Dead ends on the marker, all before it was found to be its corners: blending
+vehicle poses for the overlays, lifting vehicle +0xD0/+0xCF0 (the marker
+didn't move), blending the overlay objects' first 0x1000 bytes
+(`--blend_race_overlays`, still in, no effect), carrying logic-pass products
+through render-only copies (`OnCopy`, kept, harmless), restoring the camera
+passes before Draw (`--restore_draw_cameras`, off), and hiding
+`sub_821225D8`, `sub_820DDE58`, `820F6068` and HUD handlers.
+
 **Replaying** (`ReplayFromLogicPass`): when a call both steps an object's
 state and draws it, skipping it would stop the drawing too (the HUD
 flickered). Instead, on the logic pass the object's memory is saved before and
@@ -282,7 +313,10 @@ a corner that moved more than 10 units in a tick is a new sprite):
 The marker was found by elimination: `--log_upload_owners` lists the code
 that allocated each vertex constant upload's header (with
 `--log_slot_callers`), and `--debug_zero_owners=<hex,...>` replays those
-uploads as zeros so their draws vanish. Halving the list found 0x82128468,
+uploads as zeros so their draws vanish. Use the addresses
+`--log_upload_owners` prints (the header's allocation), not the payload
+allocation that `--log_slot_callers` lists: those never match, so nothing
+is zeroed. Halving the list found 0x82128468,
 in `sub_821281A8`. Before that, a long run of guesses (vehicle poses,
 overlay object state, camera products, the camera passes as Draw sees them)
 changed nothing, because none of them was the corners. `--log_single_sprites`
@@ -383,6 +417,10 @@ and target, and recorder world matrices), mostly for comparison.
 | `--per_tick_blink_timers`, `--per_tick_ui_movies` | The per-frame logic fixes (default on); see "Per-frame logic". |
 | `--find_per_frame_state`, `--render_only_skip`, `--log_recording_by_pass` and others | Finding per-frame logic; see "Per-frame logic". |
 | `--log_game_messages`, `--log_slot_callers` | Message delivery per pass; which code allocates constant slots. |
+| `--log_upload_owners`, `--debug_zero_owners` | Which code recorded each vertex constant upload; replay a recorder's uploads as zeros to see what it draws. The fastest way to identify a draw; see "World-space sprites". |
+| `--log_overlay_products`, `--log_overlay_uploads` | The race overlays' camera products and uploads, as replayed. |
+| `--log_world_sprites`, `--log_single_sprites` | The world-space sprites as recorded. |
+| `--log_camera_pass_records` | Which camera passes are recorded on logic and render-only passes, by message handler. |
 
 ### What didn't work, and why
 
