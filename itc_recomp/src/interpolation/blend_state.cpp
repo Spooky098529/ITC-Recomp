@@ -1251,6 +1251,8 @@ class PixelConstantBlender {
     for (uint32_t i = 0; i < now.size(); i++) {
       now[i] = guest::LoadFloat(base, payload + 4 * i);
     }
+    last_key_ = {object, key.occurrence};
+    last_values_ = now;
     Entry& entry = entries_[key];
     if (entry.current_tick != tick_) {
       entry.current = now;  // first time this tick: the tick's own value
@@ -1332,9 +1334,14 @@ class PixelConstantBlender {
     float first, now;
   };
   const std::vector<Difference>& differing() const { return differing_; }
+  // The last upload's object and occurrence, and its values as recorded.
+  std::pair<uint64_t, int> last_key() const { return last_key_; }
+  const std::vector<float>& last_values() const { return last_values_; }
 
  private:
   std::vector<Difference> differing_;
+  std::pair<uint64_t, int> last_key_{};
+  std::vector<float> last_values_;
   static void LogRejection(uint32_t i, float a, float b);
 
   Outcome outcome_ = Outcome::kNoObject;
@@ -1387,10 +1394,12 @@ PixelConstantBlender& GetPixelConstantBlender() {
 // shows the tick's lighting on a blended object.
 class PixelOutcomesLog {
  public:
-  void OnUpload(uint32_t start, bool has_object, bool moving) {
+  void OnUpload(uint32_t start, bool has_object, bool moving, uint64_t tick, float amount,
+                const Vec3& world_now, const Vec3& world) {
     using Outcome = PixelConstantBlender::Outcome;
     const PixelConstantBlender& blender = GetPixelConstantBlender();
     Outcome outcome = blender.outcome();
+    Trace(start, moving, tick, amount, world_now, world);
     const char* kind = !has_object ? "no product" : moving ? "moving" : "still";
     counts_[{kind, start, int(outcome)}]++;
     if (outcome == Outcome::kBlended && blender.switch_jumps() > 0) {
@@ -1473,6 +1482,55 @@ class PixelOutcomesLog {
   std::map<std::pair<std::string, uint32_t>, int> switch_jumps_;
   std::map<uint32_t, int> rejected_;
   std::string rejected_examples_;
+  // Every 5 s, one moving object's light slots (c8-c11 positions, c24-c27
+  // directions) followed upload by upload for 4 ticks, from the first one
+  // that isn't as recorded.
+  void Trace(uint32_t start, bool moving, uint64_t tick, float amount, const Vec3& world_now,
+             const Vec3& world) {
+    const PixelConstantBlender& blender = GetPixelConstantBlender();
+    auto now = std::chrono::steady_clock::now();
+    if (trace_ticks_left_ == 0) {
+      if (moving && start == 0 &&
+          blender.outcome() == PixelConstantBlender::Outcome::kNotAsRecorded &&
+          now - last_trace_ >= std::chrono::seconds(5)) {
+        last_trace_ = now;
+        trace_key_ = blender.last_key();
+        trace_tick_ = tick;
+        trace_ticks_left_ = 4;
+        REXLOG_INFO("pixel trace: following object {:016X} occurrence {}", trace_key_.first,
+                    trace_key_.second);
+      } else {
+        return;
+      }
+    }
+    if (blender.last_key() != trace_key_ || start != 0) {
+      return;
+    }
+    if (tick != trace_tick_) {
+      trace_tick_ = tick;
+      if (--trace_ticks_left_ == 0) {
+        return;
+      }
+    }
+    static const char* kNames[] = {"no object", "unpaired", "not as recorded",
+                                   "rejected", "unchanged", "blended"};
+    const std::vector<float>& v = blender.last_values();
+    auto reg = [&](uint32_t r) {
+      return r * 4 + 2 < v.size()
+                 ? fmt::format("{:.3f} {:.3f} {:.3f}", v[r * 4], v[r * 4 + 1], v[r * 4 + 2])
+                 : std::string("-");
+    };
+    REXLOG_INFO("pixel trace: tick {} amount {:.2f} {} | world now {:.3f} {:.3f} {:.3f} blend "
+                "{:.3f} {:.3f} {:.3f} | c8 {} | c9 {} | c11 {} | c24 {} | c25 {} | c27 {}",
+                tick, amount, kNames[int(blender.outcome())], world_now[0], world_now[1],
+                world_now[2], world[0], world[1], world[2], reg(8), reg(9), reg(11), reg(24),
+                reg(25), reg(27));
+  }
+
+  std::chrono::steady_clock::time_point last_trace_{};
+  std::pair<uint64_t, int> trace_key_{};
+  uint64_t trace_tick_ = 0;
+  int trace_ticks_left_ = 0;
   std::map<uint32_t, int> differing_;
   std::vector<std::string> not_as_recorded_examples_;
   int frames_ = 0;
@@ -1857,8 +1915,11 @@ void BlendState_ReplayConstants(uint8_t* base, uint32_t payload, uint32_t packed
                                         GetReplayCameras().last_identity());
     if (REXCVAR_GET(log_pixel_outcomes)) {
       const ProductBlendParts& parts = GetReplayCameras().last_parts();
-      GetPixelOutcomesLog().OnUpload((packed >> 8) & 0xFF, GetReplayCameras().last_identity() != 0,
-                                     parts.world != parts.world_now);
+      GetPixelOutcomesLog().OnUpload(
+          (packed >> 8) & 0xFF, GetReplayCameras().last_identity() != 0,
+          parts.world != parts.world_now, GetReplayCameras().tick(), GetReplayCameras().amount(),
+          {parts.world_now[12], parts.world_now[13], parts.world_now[14]},
+          {parts.world[12], parts.world[13], parts.world[14]});
     }
   }
   GetSteppingConstantsLog().OnUpload(base, payload, packed,
