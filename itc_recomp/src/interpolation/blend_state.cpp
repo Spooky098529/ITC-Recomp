@@ -653,6 +653,7 @@ class DrawState {
       previous_tick_ = std::move(current_tick_);
       current_tick_ = std::move(collecting_);
       collecting_.clear();
+      MatchTick();
       overlay_keys_ = std::move(overlay_keys_this_tick_);
       overlay_keys_this_tick_.clear();
     }
@@ -858,8 +859,13 @@ class DrawState {
         if (now == current_tick_.end()) {
           continue;
         }
-        auto before = previous_tick_.find(output.key);
-        frame->products[out] = {ProductKeyHash()(output.key), output.key.handler, output.written, now->second,
+        auto paired = paired_.find(output.key);
+        auto before = paired != paired_.end() ? previous_tick_.find(paired->second)
+                                              : previous_tick_.end();
+        auto identity = identities_.find(output.key);
+        frame->products[out] = {identity != identities_.end() ? identity->second
+                                                              : ProductKeyHash()(output.key),
+                                output.key.handler, output.written, now->second,
                                 before != previous_tick_.end() ? std::optional(before->second)
                                                                : std::nullopt};
       }
@@ -960,6 +966,145 @@ class DrawState {
   ProductInputsByKey current_tick_;
   ProductInputsByKey previous_tick_;
   std::unordered_map<ProductKey, int, ProductKeyHash> product_occurrences_;
+  // Each of this tick's products' previous-tick counterpart, and a number
+  // that stays with an object from tick to tick (carried along the pairing),
+  // which the pixel constants are paired by.
+  std::unordered_map<ProductKey, ProductKey, ProductKeyHash> paired_;
+  std::unordered_map<ProductKey, uint64_t, ProductKeyHash> identities_;
+  uint64_t next_identity_ = 1;
+
+  // Once a tick: pairs this tick's products with the previous tick's.
+  // Products are numbered by order among those with the same operands, and
+  // the order changes when something is culled or the cars are drawn in
+  // another order. For the per-object recorder's products (keyed by the
+  // part's mesh, which cars of a model and a car's wheels share), each group
+  // with the same key but for that number is matched by position instead:
+  // first the parts with no sibling within kCutDistance (a car's body),
+  // whose movement then predicts the rest (its wheels, matched to the
+  // previous tick's nearest after moving back by it). Others pair by key.
+  void MatchTick() {
+    paired_.clear();
+    auto previous_identities = std::move(identities_);
+    identities_.clear();
+    using Entry = std::pair<const ProductKey, ProductInputs>;
+    auto group_of = [](ProductKey key) {
+      key.occurrence = 0;
+      return key;
+    };
+    auto position = [](const ProductInputs& inputs) {
+      return Vec3{inputs.world[12], inputs.world[13], inputs.world[14]};
+    };
+    std::unordered_map<ProductKey, std::vector<const Entry*>, ProductKeyHash> now_groups,
+        before_groups;
+    for (const Entry& entry : current_tick_) {
+      if (entry.first.object != 0) {
+        now_groups[group_of(entry.first)].push_back(&entry);
+      } else if (previous_tick_.count(entry.first)) {
+        paired_[entry.first] = entry.first;
+      }
+    }
+    for (const Entry& entry : previous_tick_) {
+      if (entry.first.object != 0) {
+        before_groups[group_of(entry.first)].push_back(&entry);
+      }
+    }
+    auto has_sibling = [&](const std::vector<const Entry*>& group, const Entry* entry) {
+      for (const Entry* other : group) {
+        if (other != entry &&
+            Distance(position(other->second), position(entry->second)) <= kCutDistance) {
+          return true;
+        }
+      }
+      return false;
+    };
+    // Anchors: alone in their group within kCutDistance in both ticks.
+    struct Anchor {
+      Vec3 now, moved;
+    };
+    std::vector<Anchor> anchors;
+    std::unordered_set<const Entry*> used;
+    for (const auto& [group, now] : now_groups) {
+      auto before = before_groups.find(group);
+      if (before == before_groups.end()) {
+        continue;
+      }
+      for (const Entry* n : now) {
+        if (has_sibling(now, n)) {
+          continue;
+        }
+        const Entry* match = nullptr;
+        int candidates = 0;
+        for (const Entry* b : before->second) {
+          if (Distance(position(b->second), position(n->second)) <= kCutDistance) {
+            match = b;
+            candidates++;
+          }
+        }
+        if (candidates == 1 && !has_sibling(before->second, match)) {
+          paired_[n->first] = match->first;
+          used.insert(match);
+          Vec3 p = position(n->second), q = position(match->second);
+          anchors.push_back({p, {p[0] - q[0], p[1] - q[1], p[2] - q[2]}});
+        }
+      }
+    }
+    // The rest: nearest after moving back by the nearest anchor's movement.
+    for (const auto& [group, now] : now_groups) {
+      auto before = before_groups.find(group);
+      if (before == before_groups.end()) {
+        continue;
+      }
+      struct Candidate {
+        float cost;
+        const Entry* n;
+        const Entry* b;
+      };
+      std::vector<Candidate> candidates;
+      for (const Entry* n : now) {
+        if (paired_.count(n->first)) {
+          continue;
+        }
+        Vec3 p = position(n->second);
+        Vec3 moved{};
+        float nearest = kCutDistance;
+        for (const Anchor& anchor : anchors) {
+          float d = Distance(anchor.now, p);
+          if (d <= nearest) {
+            nearest = d;
+            moved = anchor.moved;
+          }
+        }
+        Vec3 predicted{p[0] - moved[0], p[1] - moved[1], p[2] - moved[2]};
+        for (const Entry* b : before->second) {
+          if (used.count(b)) {
+            continue;
+          }
+          float cost = Distance(position(b->second), predicted);
+          if (cost <= kCutDistance) {
+            // Ties (several draws of one object) keep the order.
+            candidates.push_back(
+                {cost + (b->first.occurrence != n->first.occurrence ? 1e-3f : 0.0f), n, b});
+          }
+        }
+      }
+      std::sort(candidates.begin(), candidates.end(),
+                [](const Candidate& x, const Candidate& y) { return x.cost < y.cost; });
+      for (const Candidate& c : candidates) {
+        if (paired_.count(c.n->first) || used.count(c.b)) {
+          continue;
+        }
+        paired_[c.n->first] = c.b->first;
+        used.insert(c.b);
+      }
+    }
+    for (const Entry& entry : current_tick_) {
+      auto paired = paired_.find(entry.first);
+      auto identity = paired != paired_.end() ? previous_identities.find(paired->second)
+                                              : previous_identities.end();
+      identities_[entry.first] =
+          identity != previous_identities.end() ? identity->second : next_identity_++;
+    }
+  }
   struct {
     int ticks = 0, keyed = 0, shared = 0;
     std::chrono::steady_clock::time_point last_log{};
@@ -1517,12 +1662,19 @@ class PixelConstantBlender {
     occurrences_.clear();
     if (tick != tick_) {
       tick_ = tick;
-      // A new tick: what was current becomes the previous tick's.
-      for (auto& [key, entry] : entries_) {
+      // A new tick: what was current becomes the previous tick's. Objects
+      // not seen for two ticks are gone (identities aren't reused).
+      for (auto it = entries_.begin(); it != entries_.end();) {
+        Entry& entry = it->second;
+        if (entry.current_tick + 2 < tick) {
+          it = entries_.erase(it);
+          continue;
+        }
         if (entry.current_tick + 1 == tick) {
           entry.previous = entry.current;
           entry.previous_tick = entry.current_tick;
         }
+        ++it;
       }
     }
   }
