@@ -65,6 +65,9 @@
 REXCVAR_DEFINE_BOOL(interpolate_draw_state, true, "ITC",
                     "Smooth motion between 30 Hz ticks in races by blending cameras and "
                     "object transforms");
+REXCVAR_DEFINE_BOOL(blend_while_drawing, false, "ITC",
+                    "Also blend cameras and objects while render-only passes draw (changes "
+                    "what the game culls, so pairings with the logic pass can slip)");
 REXCVAR_DEFINE_BOOL(log_blend_state, false, "ITC",
                     "Log how many cameras and objects were blended, once a second");
 REXCVAR_DEFINE_BOOL(log_replayed_constants, false, "ITC",
@@ -272,8 +275,19 @@ class DrawState {
       return;
     }
     ProductKey key{b, a, product_occurrences_[{b, a, 0}]++};
+    ProductInputs inputs{LoadMatrix(base, a), LoadMatrix(base, b)};
     if (!render_only) {
-      collecting_[key] = {LoadMatrix(base, a), LoadMatrix(base, b)};
+      collecting_[key] = inputs;
+    } else if (!enabled_) {
+      // A render-only pass draws the same state as the logic pass, so the
+      // same multiply should have the same inputs; if not, the pairing
+      // slipped (something was culled differently) and it's left alone.
+      auto tick = current_tick_.find(key);
+      if (tick == current_tick_.end() || tick->second.world != inputs.world ||
+          tick->second.view_projection != inputs.view_projection) {
+        counts_.mismatched_products++;
+        return;
+      }
     }
     auto& outputs = render_only ? pass_outputs_ : tick_outputs_;
     outputs[out] = {key, LoadMatrix(base, out)};
@@ -288,7 +302,8 @@ class DrawState {
     amount_ = frame_pacing::GetFramePacer().TickProgress();
     recorded_.clear();
     // A logic pass draws the tick as it is (its uploads are blended at replay).
-    enabled_ = REXCVAR_GET(interpolate_draw_state) && !logic_pass;
+    enabled_ = REXCVAR_GET(interpolate_draw_state) && REXCVAR_GET(blend_while_drawing) &&
+               !logic_pass;
     if (!enabled_) {
       return;
     }
@@ -505,11 +520,12 @@ class DrawState {
     REXLOG_INFO(
         "blend state: {} draws; per draw {} look-ats, {} cameras, {} objects ({} unmatched, {} "
         "not transforms), {} replayed camera products; {} camera cuts, {} object cuts; {} "
-        "products published per draw",
+        "products published per draw, {} mismatched",
         counts_.draws, counts_.look_ats / draws, counts_.cameras / draws,
         counts_.objects / draws, counts_.objects_unmatched / draws,
         counts_.objects_not_transforms / draws, counts_.replayed_products.load() / draws,
-        counts_.camera_cuts, counts_.object_cuts, counts_.products_published / draws);
+        counts_.camera_cuts, counts_.object_cuts, counts_.products_published / draws,
+        counts_.mismatched_products / draws);
     counts_.Reset();
     counts_.last_log = now;
   }
@@ -569,12 +585,13 @@ class DrawState {
     int camera_cuts = 0;
     int object_cuts = 0;
     int products_published = 0;
+    int mismatched_products = 0;
     std::atomic<int> replayed_products = 0;  // render thread
     std::chrono::steady_clock::time_point last_log{};
 
     void Reset() {
       draws = look_ats = cameras = objects = objects_unmatched = objects_not_transforms =
-          camera_cuts = object_cuts = products_published = 0;
+          camera_cuts = object_cuts = products_published = mismatched_products = 0;
       replayed_products = 0;
     }
   } counts_;
