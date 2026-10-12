@@ -201,7 +201,29 @@ constexpr uint32_t kRecorderMultiplyReturn = 0x82595438;
 // view changes slowly, aspect and depth range don't). Stack copies of
 // cameras are shared by several views, so a pairing can be two different
 // cameras.
+bool IsSameCameraCheck(const PerspectiveCamera& a, const PerspectiveCamera& b);
+
+std::mutex g_camera_rejects_mutex;
+std::string g_camera_rejects;  // a sample, for --log_blend_state
+
 bool IsSameCamera(const PerspectiveCamera& a, const PerspectiveCamera& b) {
+  bool same = IsSameCameraCheck(a, b);
+  if (!same && REXCVAR_GET(log_blend_state)) {
+    std::lock_guard lock(g_camera_rejects_mutex);
+    if (g_camera_rejects.size() < 600) {
+      g_camera_rejects += fmt::format(
+          "\n  moved {:.2f} m, turned {:.3f} rad, x {:.4g}->{:.4g}, y {:.4g}->{:.4g}, w {:.4g}->{:.4g}, "
+          "depth {:.4g}->{:.4g} {:.4g}->{:.4g}",
+          Distance(a.camera.position, b.camera.position),
+          AngleBetween(a.camera.rotation, b.camera.rotation), a.x_scale, b.x_scale, a.y_scale,
+          b.y_scale, a.w_scale, b.w_scale, a.depth_scale, b.depth_scale, a.depth_offset,
+          b.depth_offset);
+    }
+  }
+  return same;
+}
+
+bool IsSameCameraCheck(const PerspectiveCamera& a, const PerspectiveCamera& b) {
   auto close = [](float x, float y, float tolerance) {
     return std::abs(x - y) <= tolerance * std::max(std::abs(x), std::abs(y));
   };
@@ -654,6 +676,13 @@ class ReplayCameras {
       return;
     }
     int f = std::max(stats_.frames, 1);
+    {
+      std::lock_guard lock(g_camera_rejects_mutex);
+      if (!g_camera_rejects.empty()) {
+        REXLOG_INFO("replay: cameras not blended:{}", g_camera_rejects);
+        g_camera_rejects.clear();
+      }
+    }
     REXLOG_INFO(
         "replay: {} frames; per frame {} uploads, {} blended ({} world, {} camera not blended), "
         "{} unpaired, not replaced: {} unchanged since last frame, {} changed",
