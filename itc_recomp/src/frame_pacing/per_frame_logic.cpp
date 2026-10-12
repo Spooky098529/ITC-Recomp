@@ -14,9 +14,11 @@
 
 #include <rex/logging.h>
 
+#include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <cstring>
+#include <functional>
 #include <map>
 #include <string>
 #include <unordered_map>
@@ -287,5 +289,88 @@ extern "C" REX_FUNC(sub_8215DEA0) {
   }
   if (render_only) {
     std::memcpy(cameras, current.data(), kCameraPassesBytes);
+  }
+}
+
+// World-space sprite lists (sub_82128750: r3 = list, r4 = camera; from the
+// race overlays, including the marker above opponents). The list holds up to
+// 500 sprites, count at +0x109F0; sprite i's four corners (x, y, z, pad) at
+// +80 + 64 * i, written by game logic once a tick. The recorder writes them
+// into the command list as vertices, drawn through the camera, which is
+// blended between ticks; left at the tick's corners, a sprite was ahead of
+// its blended car early in each tick and caught up by the end (two markers).
+// The corners are blended between their last two ticks, by index, while it
+// records, then put back.
+namespace {
+constexpr uint32_t kSpriteCountOffset = 0x109F0;
+constexpr uint32_t kSpriteCornersOffset = 80;
+constexpr uint32_t kSpriteStride = 64;
+constexpr uint32_t kMaxSprites = 500;
+constexpr float kMaxSpriteStep = 10.0f;  // further in a tick is a new sprite
+
+struct SpriteList {
+  uint64_t pass = ~0ull;
+  std::vector<float> before, now;  // corners after the last two ticks
+};
+std::unordered_map<uint32_t, SpriteList> g_sprite_lists;
+}  // namespace
+
+REXCVAR_DEFINE_BOOL(blend_world_sprites, true, "ITC",
+                    "Blend world-space sprites (the marker above opponents) between ticks");
+
+// Wrapped in draw_tags.cpp (sub_82128750); `record` runs the original.
+void PerFrameLogic_RecordWorldSprites(uint8_t* base, uint32_t list,
+                                      const std::function<void()>& record) {
+  if (!REXCVAR_GET(interpolate_draw_state) || !REXCVAR_GET(blend_world_sprites) ||
+      !frame_pacing::GameMessages_InRace()) {
+    record();
+    return;
+  }
+  uint32_t count = std::min(guest::LoadU32(base, list + kSpriteCountOffset), kMaxSprites);
+  auto corner = [&](uint32_t i, uint32_t k) {
+    return list + kSpriteCornersOffset + kSpriteStride * i + 4 * k;  // k: 16 floats
+  };
+  SpriteList& sprites = g_sprite_lists[list];
+  if (!frame_pacing::GameMessages_IsRenderOnlyPass()) {
+    uint64_t pass = frame_pacing::GameMessages_PassNumber();
+    if (pass != sprites.pass) {
+      // The first recording of this tick (it's recorded once per view).
+      sprites.pass = pass;
+      sprites.before = std::move(sprites.now);
+      sprites.now.resize(count * 16);
+      for (uint32_t i = 0; i < count; i++) {
+        for (uint32_t k = 0; k < 16; k++) {
+          sprites.now[i * 16 + k] = guest::LoadFloat(base, corner(i, k));
+        }
+      }
+    }
+  }
+  float amount = frame_pacing::GetFramePacer().TickProgress();
+  std::vector<std::pair<uint32_t, float>> saved;
+  uint32_t paired = std::min<uint32_t>(
+      count, uint32_t(std::min(sprites.before.size(), sprites.now.size()) / 16));
+  for (uint32_t i = 0; i < paired; i++) {
+    const float* a = &sprites.before[i * 16];
+    const float* b = &sprites.now[i * 16];
+    bool same = true, near = true;
+    for (uint32_t k = 0; k < 16; k++) {
+      // Only while the list holds this tick's corners.
+      same = same && guest::LoadFloat(base, corner(i, k)) == b[k];
+      near = near && std::isfinite(a[k]) && std::abs(b[k] - a[k]) <= kMaxSpriteStep;
+    }
+    if (!same || !near) {
+      continue;
+    }
+    for (uint32_t k = 0; k < 16; k++) {
+      if (k % 4 == 3) {
+        continue;
+      }
+      saved.push_back({corner(i, k), b[k]});
+      guest::StoreFloat(base, corner(i, k), a[k] + (b[k] - a[k]) * amount);
+    }
+  }
+  record();
+  for (const auto& [address, value] : saved) {
+    guest::StoreFloat(base, address, value);
   }
 }

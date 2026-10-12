@@ -5,6 +5,7 @@
 #include "command_list.h"
 #include "guest.h"
 
+#include <functional>
 #include <initializer_list>
 #include <map>
 #include <mutex>
@@ -171,12 +172,18 @@ extern "C" REX_FUNC(sub_820CECA0) {
                               [&] { __imp__sub_820CECA0(ctx, base); });
 }
 
-// Batch recorder (up to 500 items per call, likely sprites): r3 = owner,
-// r4, r5. Items pair only while the batch size is unchanged.
+// World-space sprite recorder (up to 500 sprites per call): r3 = sprite
+// list, r4 = camera, r5. Items pair only while the batch size is unchanged.
+// Its corners are blended between ticks (per_frame_logic.cpp).
+void PerFrameLogic_RecordWorldSprites(uint8_t* base, uint32_t list,
+                                      const std::function<void()>& record);
+
 extern "C" REX_FUNC(sub_82128750) {
   REX_FUNC_PROLOGUE();
-  interpolation::RecordTagged(base, 0x82128750, {ctx.r3.u32, ctx.r4.u32, ctx.r5.u32},
-                              [&] { __imp__sub_82128750(ctx, base); });
+  PerFrameLogic_RecordWorldSprites(base, ctx.r3.u32, [&] {
+    interpolation::RecordTagged(base, 0x82128750, {ctx.r3.u32, ctx.r4.u32, ctx.r5.u32},
+                                [&] { __imp__sub_82128750(ctx, base); });
+  });
 }
 
 // Draw recorder: r3 = model, r4 = part index, r5 = flag, r6-r8 = per-draw
