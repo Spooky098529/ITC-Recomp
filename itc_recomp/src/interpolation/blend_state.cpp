@@ -186,6 +186,9 @@ std::shared_ptr<const ReplayFrame> g_replay_frame;
 // (sub_825953D0): out = the command's constants, a = world, b = camera.
 constexpr uint32_t kRecorderMultiplyReturn = 0x82595438;
 
+// The Update handler that records the race overlays (see per_frame_logic.cpp).
+constexpr uint32_t kRaceOverlaysHandler = 0x8215E150;
+
 // Blends a multiply's result between ticks: the world matrix and the camera
 // each as a rigid motion (positions straight, rotations along the shortest
 // arc), falling back to the current tick's where they aren't.
@@ -405,6 +408,12 @@ class DrawState {
   // an identity) and their values.
   void Note(uint8_t* base, uint32_t out, uint32_t world, uint32_t camera,
             const ProductInputs& inputs, bool render_only) {
+    // The race overlays (the marker above opponents, Update handler
+    // sub_8215E150) are left unblended: blended, the logic pass's and the
+    // render-only passes' markers came out a tick apart (two markers).
+    if (handler_ == kRaceOverlaysHandler) {
+      return;
+    }
     uint64_t signature = camera_ids_.Of(inputs.view_projection);
     ProductKey key{camera, world, signature, handler_,
                    product_occurrences_[{camera, world, signature, handler_, 0}]++};
