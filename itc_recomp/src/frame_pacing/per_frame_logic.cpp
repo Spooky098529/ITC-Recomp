@@ -35,6 +35,8 @@ REXCVAR_DEFINE_BOOL(per_tick_ui_movies, true, "ITC",
 REXCVAR_DEFINE_BOOL(per_tick_texture_animations, true, "ITC",
                     "Advance texture animations (flashing lights) once per tick on "
                     "render-only passes");
+REXCVAR_DEFINE_BOOL(per_tick_minimap_blink, true, "ITC",
+                    "Advance the minimap's blink clock once per tick on render-only passes");
 REXCVAR_DEFINE_BOOL(per_tick_play_time, true, "ITC",
                     "Count play time once per tick on render-only passes");
 REXCVAR_DEFINE_BOOL(log_replays, false, "ITC",
@@ -62,6 +64,26 @@ extern "C" REX_FUNC(sub_820F11A8) {
     return;
   }
   __imp__sub_820F11A8(ctx, base);
+}
+
+// Minimap blink clock (sub_820F5740, from the draw step part sub_820F6068):
+// after drawing, adds one to 0x826C5AA4, which wraps after 4 and then adds
+// one to 0x826C5AA8, which wraps after 5. 0x826C5AA8 is the phase of the
+// player's triangle flashing where it overlaps other cars' on the minimap.
+// On a render-only pass, both are put back after the call, so it draws with
+// the logic pass's phase and the clock advances once per tick.
+extern "C" REX_FUNC(sub_820F5740) {
+  REX_FUNC_PROLOGUE();
+  constexpr uint32_t kBlinkFrames = 0x826C5AA4, kBlinkPhase = 0x826C5AA8;
+  if (!frame_pacing::GameMessages_IsRenderOnlyPass() || !REXCVAR_GET(per_tick_minimap_blink)) {
+    __imp__sub_820F5740(ctx, base);
+    return;
+  }
+  uint32_t frames = guest::LoadU32(base, kBlinkFrames);
+  uint32_t phase = guest::LoadU32(base, kBlinkPhase);
+  __imp__sub_820F5740(ctx, base);
+  guest::StoreU32(base, kBlinkFrames, frames);
+  guest::StoreU32(base, kBlinkPhase, phase);
 }
 
 // Play time (sub_82107910, from Draw): adds one to the frame counter at
