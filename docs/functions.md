@@ -200,6 +200,64 @@ Only races get render-only passes: menus record their UI and act on input
 during Update, so they flickered and repeated button presses. A pass is "in a
 race" when the last logic pass ran the race draw step `sub_8215B4F8`.
 
+Every other main loop tick handler still runs on every pass, and they must:
+`Scene::Update` (`sub_820988C8`) flips the command list and starts each
+pass's recording (skipping it froze race loading), `0x82091A58` kicks the
+render thread, and `0x82096340` is needed for drawing (skipping it left a
+black screen with red blocks). See "Per-frame logic" for what counts frames
+anyway.
+
+### Per-frame logic
+
+Some game logic runs from Draw (or the per-pass handlers) and counts frames.
+On hardware every pass was a 30 Hz tick, so it counted ticks; with
+render-only passes it ran ~5x fast. Each case found is fixed in
+`src/frame_pacing/per_frame_logic.cpp`, without changing what's drawn:
+
+| What | Function | Fix |
+|---|---|---|
+| Blink timers of the car's sprites (four 64-bit frame counters, called from the car's draw `sub_820DDE58`) | `sub_820DC958` | Skipped on render-only passes (`--per_tick_blink_timers`) |
+| UI movies: the HUD, including the race start countdown (a 240-frame movie, a beep at frames 60, 120, 180, 240) | `sub_8211D2F8`, with r4 = 0 (advance a frame and draw); r4 = 1 only draws | Replayed (below) (`--per_tick_ui_movies`) |
+| Marker above opponent cars: a state machine (a counter at +0x150 counts down) stepped and drawn once per view | `sub_821225D8` (r3 = marker, r4 = camera pass) | Replayed |
+
+**Replaying** (`ReplayFromLogicPass`): when a call both steps an object's
+state and draws it, skipping it would stop the drawing too (the HUD
+flickered). Instead, on the logic pass the object's memory is saved before and
+after the call; on a render-only pass the call runs from the "before" copy
+(drawing exactly what the logic pass drew) and the "after" copy is put back,
+so the state advances once per tick. Calls are matched by object and order
+within the pass. If the object changed since the logic pass, the call just
+runs.
+
+**Finding them.** The race start countdown runs at the main loop pass rate,
+so with frames uncapped it's fast; at `--max_fps=30` it's right.
+
+- `--find_per_frame_state` (`src/debug/frame_state_diff.cpp`) compares guest
+  memory before and after a render-only pass every 2 s. Words that step like
+  a timer (floats by ±1/30 or ±1/60, small integers by ±1), in more than one
+  sample, are watched; each change is attributed to the tick handler,
+  message handler (delegates by their target) or wrapped draw step part that
+  made it. `--find_countdowns` looks for values counting down instead;
+  `--find_per_frame_state_interval_ms=0` samples every pass (very slow);
+  `--watch_addresses` watches given addresses from the start.
+- `--render_only_skip=<hex,...>` skips tick handlers or message handlers (by
+  target) on render-only passes, to bisect. Skipping the UI handler
+  `0x8216C330` fixed the countdown's speed but hid the HUD on render-only
+  frames, which led to the movie call inside it.
+- `--log_recording_by_pass` lists the code that records render commands more
+  often on logic passes than on render-only ones: something drawn only on
+  logic passes, or gated by per-frame state. That found the opponent
+  markers' recorder (`sub_821281A8`, from `sub_821225D8`).
+- `--log_recording_handlers` lists which message handlers record commands,
+  by message. `--render_only_update_handlers=<hex,...>` still delivers Update
+  to given handlers on render-only passes (a test).
+
+What didn't work: skipping all non-drawing tick handlers on render-only
+passes (froze loading: `Scene::Update`); skipping `0x82096340`, first as a
+function (a generic "call vtable slot 1" thunk) and then as a tick handler
+(both broke rendering); skipping `sub_822128A8` in the HUD (it's part of
+drawing).
+
 ### What gets blended
 
 `src/interpolation/blend_state.cpp`. Drawing runs a tick behind: a logic
@@ -292,6 +350,8 @@ and target, and recorder world matrices), mostly for comparison.
 | `--log_blend_state` | Per second: products published, blended, unpaired, rejected cameras with the reason, and uploads left alone. Unpaired or rejected counts above zero in steady driving mean something is stepping at 30 Hz. |
 | `--log_replayed_constants` | One frame per second: every vertex constant upload replayed, whether it changed since the last frame, and whether it was substituted. |
 | `--log_stepping_constants` | With `--log_slot_callers`: every 2 s, the constant uploads left as recorded that change about 30 times a second (stuck to the tick) rather than every frame, with the code that recorded them. The quickest way to find what still steps. |
+| `--per_tick_blink_timers`, `--per_tick_ui_movies` | The per-frame logic fixes (default on); see "Per-frame logic". |
+| `--find_per_frame_state`, `--render_only_skip`, `--log_recording_by_pass` and others | Finding per-frame logic; see "Per-frame logic". |
 | `--log_game_messages`, `--log_slot_callers` | Message delivery per pass; which code allocates constant slots. |
 
 ### What didn't work, and why
@@ -337,7 +397,11 @@ constants:
   input during Update, so render-only passes made them flicker and repeat
   presses. Unlocking them would mean skipping Update only for the handlers
   that run game logic.
-- **The race HUD updates at 30 fps.** Accepted for now.
+- **The race HUD updates at 30 fps.** Accepted for now; its animations
+  advance once per tick (see "Per-frame logic").
+- **More per-frame logic may exist.** Anything that runs too fast or
+  flickers only with frames uncapped is probably another case; see
+  "Per-frame logic" for how they were found.
 - **Some uploads still step on purpose**: the shadow lookup matrices (c70 and
   c74, orthographic, kept at the tick to match the shadow map), c14 x4 (a
   texture projection) and c100 x4. Nothing visible steps in testing; see
