@@ -37,6 +37,7 @@
 #include <atomic>
 #include <chrono>
 #include <cmath>
+#include <cstring>
 #include <map>
 #include <memory>
 #include <tuple>
@@ -95,6 +96,16 @@ void StoreMatrix(uint8_t* base, uint32_t address, const Matrix4& m) {
   for (int i = 0; i < 16; i++) {
     guest::StoreFloat(base, address + 4 * i, m[i]);
   }
+}
+
+uint64_t HashMatrix(const Matrix4& m) {
+  uint64_t h = 1469598103934665603ull;
+  for (float f : m) {
+    uint32_t bits;
+    std::memcpy(&bits, &f, 4);
+    h = (h ^ bits) * 1099511628211ull;
+  }
+  return h;
 }
 
 bool IsFinite(const Matrix4& m) {
@@ -431,6 +442,25 @@ class DrawState {
                   key.signature, key.occurrence, ticks_, current_tick_.count(key),
                   previous_tick_.count(key));
     }
+    if (handler_ == kRaceOverlaysHandler) {
+      // The race overlays' recording on a render-only pass replays the logic
+      // pass's exactly (same state, the logic pass's cameras put back), but
+      // numbers its products differently, so each is matched to the logic
+      // pass's product with the same value instead.
+      Matrix4 written = LoadMatrix(base, out);
+      uint64_t value = HashMatrix(written);
+      if (!render_only) {
+        overlay_keys_this_tick_[value] = key;
+      } else {
+        auto by_value = overlay_keys_.find(value);
+        if (by_value == overlay_keys_.end()) {
+          counts_.mismatched_products++;
+          return;
+        }
+        pass_outputs_[out] = {by_value->second, written};
+        return;
+      }
+    }
     if (!render_only) {
       collecting_[key] = inputs;
     } else if (!enabled_) {
@@ -507,6 +537,8 @@ class DrawState {
       previous_tick_ = std::move(current_tick_);
       current_tick_ = std::move(collecting_);
       collecting_.clear();
+      overlay_keys_ = std::move(overlay_keys_this_tick_);
+      overlay_keys_this_tick_.clear();
     }
     PublishReplayFrame();
     pass_outputs_.clear();
@@ -807,6 +839,8 @@ class DrawState {
   };
   std::unordered_map<uint32_t, Output> tick_outputs_;  // by address, from the logic pass
   std::unordered_map<uint32_t, Output> pass_outputs_;  // from this render-only pass
+  // The race overlays' products on the logic pass, by value (see Note).
+  std::unordered_map<uint64_t, ProductKey> overlay_keys_this_tick_, overlay_keys_;
 
   std::vector<Saved<Matrix4>> saved_;
   std::vector<Saved<Vec3>> saved_vec3_;
