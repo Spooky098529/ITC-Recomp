@@ -7,7 +7,6 @@
 #include <rex/cvar.h>
 #include <rex/logging.h>
 
-#include <algorithm>
 #include <chrono>
 #include <map>
 
@@ -184,23 +183,9 @@ std::map<std::pair<uint32_t, uint32_t>, int> g_tick_handlers;
 std::chrono::steady_clock::time_point g_tick_handlers_logged{};
 }  // namespace
 
-// Main loop tick handlers that count frames, skipped on render-only passes
-// so they keep the game's 30 Hz (found with --find_per_frame_state). By the
-// handler's target: 0x82096340 (a generic "call vtable slot 1" thunk, so
-// it's skipped only as this tick handler) advances the HUD's animations, such
-// as the race start countdown.
-constexpr uint32_t kPerTickHandlers[] = {0x82096340};
-
 // TickHandler_Invoke: r3 = app, r4 = (handler object in the low word).
 extern "C" REX_FUNC(sub_82099A98) {
   REX_FUNC_PROLOGUE();
-  if (frame_pacing::GameMessages_IsRenderOnlyPass()) {
-    uint32_t target = guest::LoadU32(base, ctx.r4.u32 + 8);
-    if (std::find(std::begin(kPerTickHandlers), std::end(kPerTickHandlers), target) !=
-        std::end(kPerTickHandlers)) {
-      return;
-    }
-  }
   if (REXCVAR_GET(log_tick_handlers) && frame_pacing::GameMessages_IsRenderOnlyPass()) {
     uint32_t handler = ctx.r4.u32;
     uint32_t tick = guest::LoadU32(base, guest::LoadU32(base, handler) + 4);

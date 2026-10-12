@@ -19,3 +19,15 @@ extern "C" REX_FUNC(sub_820DC958) {
   }
   __imp__sub_820DC958(ctx, base);
 }
+
+// A main loop tick handler (via TickHandler_Invoke): r3 = its object, whose
+// vtable slot 1 it calls. Advances the HUD's animations one frame per call
+// (the race start countdown, the markers above opponents), so render-only
+// passes played them ~5x fast. Found with --find_per_frame_state.
+extern "C" REX_FUNC(sub_82096340) {
+  REX_FUNC_PROLOGUE();
+  if (frame_pacing::GameMessages_IsRenderOnlyPass()) {
+    return;
+  }
+  __imp__sub_82096340(ctx, base);
+}
