@@ -37,7 +37,7 @@ REXCVAR_DEFINE_BOOL(find_any_steps, false, "ITC",
                     "samples) instead of timer steps only");
 REXCVAR_DEFINE_BOOL(watch_lights, false, "ITC",
                     "With --find_per_frame_state, watch the light billboards' lights (the "
-                    "first 4 of each list drawn by sub_8209CC38), logging every change");
+                    "first 2 of each list drawn by sub_8209CC38, up to 64 lists), logging every change");
 REXCVAR_DEFINE_BOOL(find_countdowns, false, "ITC",
                     "With --find_per_frame_state, look for values counting down (a float in "
                     "0..10 going down, or a small integer going down by one) instead of any "
@@ -433,11 +433,16 @@ extern "C" REX_FUNC(sub_8209CC38) {
     return;
   }
   if (REXCVAR_GET(watch_lights) && REXCVAR_GET(find_per_frame_state)) {
+    static std::set<uint32_t> seen;
     uint32_t list = ctx.r4.u32;
     uint32_t lights = guest::LoadU32(base, list + 36);
-    uint32_t count = std::min<uint32_t>(guest::LoadU32(base, list + 32), 4);
-    for (uint32_t i = 0; i < count * 48; i += 4) {
-      debug::FrameStateDiff_Watch(lights + i);
+    uint32_t count = guest::LoadU32(base, list + 32);
+    if (seen.insert(lights).second && seen.size() <= 64) {
+      REXLOG_INFO("per-frame state: watching light list {:08X}: {} lights at {:08X}, type {}",
+                  list, count, lights, guest::LoadU32(base, list));
+      for (uint32_t i = 0; i < std::min<uint32_t>(count, 2) * 48; i += 4) {
+        debug::FrameStateDiff_Watch(lights + i);
+      }
     }
   }
   debug::FrameStateDiff_Before(base);
