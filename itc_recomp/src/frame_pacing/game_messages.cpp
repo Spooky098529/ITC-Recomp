@@ -15,6 +15,9 @@
 
 REXCVAR_DEFINE_BOOL(log_game_messages, false, "ITC",
                     "Log game messages delivered and skipped, once a second");
+REXCVAR_DEFINE_BOOL(log_recording_handlers, false, "ITC",
+                    "Log which message handlers record render commands, by message, once a "
+                    "second");
 // Testing: main loop tick handlers or message handlers to skip on
 // render-only passes, by target (comma-separated hex), to find which one
 // counts frames.
@@ -94,6 +97,26 @@ void LogCounts() {
   c.last_log = now;
 }
 
+// Diagnostics (--log_recording_handlers): command slots recorded per message
+// handler, by message id, once a second.
+void LogRecording(uint32_t message, uint32_t handler, int slots) {
+  static std::map<std::pair<uint32_t, uint32_t>, std::pair<int, int>> recorded;
+  static auto last = std::chrono::steady_clock::now();
+  auto& entry = recorded[{message, handler}];
+  entry.first++;
+  entry.second += slots;
+  auto now = std::chrono::steady_clock::now();
+  if (now - last < std::chrono::seconds(1)) {
+    return;
+  }
+  last = now;
+  for (const auto& [key, value] : recorded) {
+    REXLOG_INFO("recording: message {} handler {:08X}: {} calls, {} slots", key.first,
+                key.second, value.first, value.second);
+  }
+  recorded.clear();
+}
+
 // Delivers one message to every handler, as the game does.
 void Deliver(PPCContext& ctx, uint8_t* base, uint32_t dispatcher, uint32_t message) {
   uint32_t handler_count = guest::LoadU32(base, dispatcher + kHandlerCountOffset);
@@ -116,9 +139,21 @@ void Deliver(PPCContext& ctx, uint8_t* base, uint32_t dispatcher, uint32_t messa
     if (g_render_only_pass && SkipOnRenderOnlyPass(target)) {
       continue;
     }
+    // The command list recorders write to, and its slots used.
+    constexpr uint32_t kCommandListPointer = 0x8296B918;
+    constexpr uint32_t kCommandListUsedOffset = 12;
+    uint32_t list = guest::LoadU32(base, kCommandListPointer);
+    uint32_t used_before = list ? guest::LoadU32(base, list + kCommandListUsedOffset) : 0;
     debug::FrameStateDiff_Before(base);
     REX_CALL_INDIRECT_FUNC(method);
     debug::FrameStateDiff_After(base, "message handler", target);
+    if (REXCVAR_GET(log_recording_handlers) && list &&
+        guest::LoadU32(base, kCommandListPointer) == list) {
+      uint32_t used_after = guest::LoadU32(base, list + kCommandListUsedOffset);
+      if (used_after != used_before) {
+        LogRecording(guest::LoadU32(base, message), target, int(used_after - used_before));
+      }
+    }
   }
 }
 
