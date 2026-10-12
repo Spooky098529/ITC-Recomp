@@ -20,6 +20,13 @@
 REXCVAR_DEFINE_BOOL(find_per_frame_state, false, "ITC",
                     "Find game state that advances on render-only passes, and the code that "
                     "advances it");
+REXCVAR_DEFINE_INT32(find_per_frame_state_interval_ms, 2000, "ITC",
+                     "How often --find_per_frame_state samples a render-only pass (0 = every "
+                     "one; slow)");
+REXCVAR_DEFINE_BOOL(find_countdowns, false, "ITC",
+                    "With --find_per_frame_state, look for values counting down (a float in "
+                    "0..10 going down, or a small integer going down by one) instead of any "
+                    "timer step");
 
 namespace debug {
 
@@ -69,9 +76,26 @@ float AsFloat(uint32_t bits) {
   return f;
 }
 
+// Whether a word went down like a countdown: a float in 0..10 going down by
+// a small step, or a small integer going down by one.
+const char* CountdownStep(uint32_t before, uint32_t after) {
+  float a = AsFloat(before), b = AsFloat(after);
+  if (std::isfinite(a) && std::isfinite(b) && a > 0 && a <= 10 && b < a && a - b < 0.5f &&
+      a - b > 1e-4f) {
+    return "float";
+  }
+  if (int64_t(before) - int64_t(after) == 1 && before <= 300) {
+    return "int";
+  }
+  return nullptr;
+}
+
 // Whether a word stepped like a frame timer: a float by +-1/30 or +-1/60 s,
 // or a small integer by +-1.
 const char* TimerStep(uint32_t before, uint32_t after) {
+  if (REXCVAR_GET(find_countdowns)) {
+    return CountdownStep(before, after);
+  }
   float a = AsFloat(before), b = AsFloat(after);
   if (std::isfinite(a) && std::isfinite(b) && a != b) {
     float d = std::abs(b - a);
@@ -99,7 +123,8 @@ class FrameStateDiff {
     render_only_ = render_only;
     before_.clear();
     auto now = std::chrono::steady_clock::now();
-    if (render_only && now - last_snapshot_ >= std::chrono::seconds(2)) {
+    if (render_only && now - last_snapshot_ >= std::chrono::milliseconds(
+                           REXCVAR_GET(find_per_frame_state_interval_ms))) {
       last_snapshot_ = now;
       ranges_ = ReadableGuestRanges(base);
       snapshot_.clear();
