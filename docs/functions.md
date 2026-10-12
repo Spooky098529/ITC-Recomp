@@ -532,8 +532,8 @@ constants:
   opponent close and diagonal in it, with occasional flashes, and the
   player's beam can jump in sharp turns. Branch `headlight-fixes` holds an
   attempt (light slots matched by the light in them, faded in and out,
-  switched; jumps judged per register; c4-c8 held with the lighting): it
-  fixed the turns but made opponents worse than without it, so it isn't
+  switched; jumps judged per register; c4-c8 held with the lighting). None
+  of it was a consistent improvement, and opponents got worse, so it isn't
   on `main`. Its commits and docs describe what was learned.
 - **One tick of latency**: drawing shows between the previous and the
   current tick, as usual for this kind of interpolation.
