@@ -27,7 +27,6 @@ void BlendState_AfterRecordObject(uint8_t* base);
 // (after a logic tick, or not), and each shader constant upload replayed.
 void BlendState_OnReplayFrameStart();
 void BlendState_OnReplayTick();
-void BlendState_OnReplayConstants(uint8_t* base, uint32_t payload, uint32_t packed);
 
 // Render thread, around a shader constant upload (command 7) being replayed:
 // gives constants recorded with a tick's camera the frame's blended camera.

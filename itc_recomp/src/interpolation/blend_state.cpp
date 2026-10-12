@@ -318,16 +318,26 @@ class ReplayCameras {
   // Render thread, before a shader constant upload: the value to upload in
   // place of `m`, if it was made with a tick camera.
   std::optional<Matrix4> Substitute(uint32_t payload, const Matrix4& m) {
+    last_kind_ = RecordedInUpdate(payload) ? "U" : "D";
+    for (const Camera& camera : cameras_) {
+      if (NearlyEqual(m, camera.frame.tick)) {
+        last_kind_ += "=tick";
+      } else if (NearlyEqual(m, camera.frame.blended)) {
+        last_kind_ += "=blended";
+      }
+    }
     if (!RecordedInUpdate(payload)) {
       return std::nullopt;  // recorded in Draw, already with the blended camera
     }
     for (const Camera& camera : cameras_) {
       if (NearlyEqual(m, camera.frame.tick)) {
+        last_kind_ += " subst-exact";
         return camera.frame.blended;
       }
       // m = world * tick: world = m * inverse(tick), an affine transform.
       Matrix4 world = Multiply(m, camera.tick_inverse);
       if (IsPlausibleWorld(world)) {
+        last_kind_ += " subst-world";
         return Multiply(m, camera.tick_to_blended);
       }
     }
@@ -367,6 +377,9 @@ class ReplayCameras {
 
   std::vector<Camera> cameras_;
   std::shared_ptr<const Ranges> update_ranges_;
+
+ public:
+  std::string last_kind_;
 };
 
 ReplayCameras& GetReplayCameras() {
@@ -863,7 +876,7 @@ class ReplayedConstantsLog {
 
   void OnTick() { frames_since_tick_ = 0; }
 
-  void OnUpload(uint8_t* base, uint32_t payload, uint32_t packed) {
+  void OnUpload(uint8_t* base, uint32_t payload, uint32_t packed, const std::string& kind) {
     if (!REXCVAR_GET(log_replayed_constants)) {
       return;
     }
@@ -876,10 +889,10 @@ class ReplayedConstantsLog {
     bool changed = index >= previous_.size() || previous_[index] != m;
     changed_ += changed;
     frame_.push_back(m);
-    if (logging_ && lines_.size() < 60) {
-      lines_.push_back(fmt::format("#{} c{} x{} from {:08X} {} [{:.3g} {:.3g} {:.3g} {:.3g} | ... | "
+    if (logging_ && lines_.size() < 120) {
+      lines_.push_back(fmt::format("#{} c{} x{} from {:08X} {} {} [{:.3g} {:.3g} {:.3g} {:.3g} | ... | "
                                    "{:.4g} {:.4g} {:.4g} {:.4g}]",
-                                   index, start, count, payload, changed ? "changed" : "same",
+                                   index, start, count, payload, changed ? "changed" : "same", kind,
                                    m[0], m[1], m[2], m[3], m[12], m[13], m[14], m[15]));
     }
   }
@@ -916,8 +929,8 @@ void BlendState_OnReplayFrameStart() {
 
 void BlendState_ReplayConstants(uint8_t* base, uint32_t payload, uint32_t packed,
                                 const std::function<void()>& upload) {
-  GetReplayedConstantsLog().OnUpload(base, payload, packed);
   uint32_t stage = packed >> 24, count = packed & 0xFF;
+  GetReplayCameras().last_kind_.clear();
   std::optional<Matrix4> original;
   if (REXCVAR_GET(interpolate_draw_state) && stage == 0 && count >= 4) {
     Matrix4 m = LoadMatrix(base, payload);
@@ -928,6 +941,7 @@ void BlendState_ReplayConstants(uint8_t* base, uint32_t payload, uint32_t packed
       }
     }
   }
+  GetReplayedConstantsLog().OnUpload(base, payload, packed, GetReplayCameras().last_kind_);
   upload();
   if (original) {
     StoreMatrix(base, payload, *original);
@@ -938,9 +952,7 @@ void BlendState_OnReplayTick() {
   GetReplayedConstantsLog().OnTick();
 }
 
-void BlendState_OnReplayConstants(uint8_t* base, uint32_t payload, uint32_t packed) {
-  GetReplayedConstantsLog().OnUpload(base, payload, packed);
-}
+
 
 void BlendState_AfterDraw(uint8_t* base) {
   GetDrawState().AfterDraw(base);
