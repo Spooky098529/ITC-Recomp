@@ -281,6 +281,21 @@ Matrix4 BlendProduct(const ReplayedProduct& product, float amount, BlendStats& s
   return Multiply(world, view_projection);
 }
 
+// Which camera a view-projection belongs to, as far as can be told from
+// its projection: aspect ratio and depth mapping stay the same for a view
+// while its field of view changes. Several views share stack copies of their
+// cameras, so this tells them apart. 0 for a non-perspective camera.
+uint64_t CameraSignature(const Matrix4& view_projection) {
+  std::optional<PerspectiveCamera> camera = SplitViewProjection(view_projection);
+  if (!camera || !(camera->y_scale != 0)) {
+    return 0;
+  }
+  auto quantise = [](float v, float step) { return uint64_t(int64_t(std::lround(v / step)) & 0xFFFFF); };
+  return 1 | quantise(camera->x_scale / camera->y_scale, 1e-3f) << 1 |
+         quantise(camera->depth_offset, 1e-3f) << 21 |
+         quantise(camera->depth_scale / std::max(std::abs(camera->depth_offset), 1e-6f), 1e-3f) << 41;
+}
+
 class DrawState {
  public:
   // Main thread, after the matrix multiply wrote out = a * b.
@@ -296,8 +311,9 @@ class DrawState {
     if (!recorder && (render_only || PassOfViewProjection(b) < 0)) {
       return;
     }
-    ProductKey key{b, a, product_occurrences_[{b, a, 0}]++};
     ProductInputs inputs{LoadMatrix(base, a), LoadMatrix(base, b)};
+    uint64_t signature = CameraSignature(inputs.view_projection);
+    ProductKey key{b, a, signature, product_occurrences_[{b, a, signature, 0}]++};
     if (!render_only) {
       collecting_[key] = inputs;
     } else if (!enabled_) {
@@ -566,18 +582,20 @@ class DrawState {
   std::unordered_map<ObjectKey, ScaledTransform, ObjectKeyHash> objects_this_tick_;
   std::unordered_map<uint32_t, int> recorded_;
 
-  // A multiply, identified across ticks by its operands' addresses and how
-  // many times they were multiplied earlier in the pass.
+  // A multiply, identified across ticks by its operands' addresses, which
+  // camera it was (see CameraSignature), and how many times that combination
+  // was multiplied earlier in the pass.
   struct ProductKey {
-    uint32_t camera;  // address
-    uint32_t world;   // address
+    uint32_t camera;     // address
+    uint32_t world;      // address
+    uint64_t signature;  // CameraSignature
     int occurrence;
     bool operator==(const ProductKey&) const = default;
   };
   struct ProductKeyHash {
     size_t operator()(const ProductKey& key) const {
       return std::hash<uint64_t>()(((uint64_t(key.world) << 32) | key.camera) ^
-                                   (uint64_t(key.occurrence) << 7));
+                                   (uint64_t(key.occurrence) << 7) ^ (key.signature * 31));
     }
   };
   using ProductInputsByKey = std::unordered_map<ProductKey, ProductInputs, ProductKeyHash>;
