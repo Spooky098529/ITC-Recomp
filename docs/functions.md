@@ -245,9 +245,9 @@ overlays showed only on logic passes (flicker). Now:
 Dead ends on the marker, all before it was found to be its corners: blending
 vehicle poses for the overlays, lifting vehicle +0xD0/+0xCF0 (the marker
 didn't move), blending the overlay objects' first 0x1000 bytes
-(`--blend_race_overlays`, still in, no effect), carrying logic-pass products
+(since removed), carrying logic-pass products
 through render-only copies (`OnCopy`, kept, harmless), restoring the camera
-passes before Draw (`--restore_draw_cameras`, off), and hiding
+passes before Draw (since removed), and hiding
 `sub_821225D8`, `sub_820DDE58`, `820F6068` and HUD handlers.
 
 **Replaying** (`ReplayFromLogicPass`): when a call both steps an object's
@@ -408,7 +408,7 @@ and target, and recorder world matrices), mostly for comparison.
 |---|---|
 | `--max_fps` | Frame rate cap in races; 0 = unlimited. |
 | `--interpolate_draw_state` | Blending on (default) or off. |
-| `--motion_blur` | The game's velocity-based motion blur (pixel shader `7EB16456AAD56CBA`), skipped when false (as `run.sh` does). Its velocities come from the tick, so it smears a whole tick of motion at high frame rates. Patch `patches/rexglue-sdk/0002`. |
+| `--motion_blur` | The game's velocity-based motion blur (pixel shader `7EB16456AAD56CBA`), skipped when false (as `run.sh` does, except with `--no-interpolation`). Its velocities come from the tick, so it smears a whole tick of motion at high frame rates. Patch `patches/rexglue-sdk/0002`. |
 | `--blend_pixel_constants` | Blend per-object lighting constants (default on). |
 | `--log_fps` | Frames and ticks per second. |
 | `--log_blend_state` | Per second: products published, blended, unpaired, rejected cameras with the reason, and uploads left alone. Unpaired or rejected counts above zero in steady driving mean something is stepping at 30 Hz. |

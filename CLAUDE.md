@@ -63,16 +63,12 @@ Frame interpolation for races is working: logic runs at 30 Hz and frames
 are blended between ticks. The world, cameras, wheels, lights, shadows,
 headlights, tunnels, the race start countdown, the HUD, the marker above
 opponents and the light trails are all done. `run.sh` turns interpolation on
-(marked experimental). Known issues are at the end of `docs/functions.md`.
+(marked experimental); `./run.sh --no-interpolation` gives the original
+30 fps with motion blur. Known issues are at the end of `docs/functions.md`.
 
 Not done yet:
 
 - About 45 commits aren't pushed to `origin/unlock-fps`. Ask before pushing.
 - The test zip `itc-interp-linux-amd64.zip` predates the countdown, HUD,
   marker and trail fixes. Rebuild it when the user wants to test.
-- Clean up diagnostics from the marker hunt that did nothing:
-  `--blend_race_overlays` with `BlendOverlayState` in `per_frame_logic.cpp`,
-  `--restore_draw_cameras` in `game_messages.cpp`, and the test wrappers for
-  HUD functions (`822128A8` and others) in `game_messages.cpp`. Keep the
-  logging options documented in `docs/functions.md`; they're the tools.
 - Menus still run at 30 fps (see Known issues).

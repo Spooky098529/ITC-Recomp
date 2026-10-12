@@ -38,34 +38,6 @@ uint32_t g_current_handler = 0;
 uint32_t g_current_message = ~0u;
 }  // namespace
 
-REXCVAR_DEFINE_BOOL(restore_draw_cameras, false, "ITC",
-                    "On render-only passes, start Draw with the camera passes as the logic "
-                    "pass's Update left them");
-
-namespace {
-// The race's Draw handler (records the camera passes) and the passes.
-constexpr uint32_t kRaceDrawHandler = 0x8215C770;
-constexpr uint32_t kCameraPasses = 0x826BAC00;
-constexpr uint32_t kCameraPassesBytes = 21 * 592;
-std::vector<uint8_t> g_draw_cameras;
-
-// Draw reads the camera passes as Update left them (the marker above
-// opponents is placed with them) before rebuilding them per view. On a
-// render-only pass Update doesn't run, so they held what the last Draw left
-// (its last view): the marker drew elsewhere on those passes (two markers).
-void RestoreCameraPassesForDraw(uint8_t* base, uint32_t target) {
-  if (target != kRaceDrawHandler || !REXCVAR_GET(restore_draw_cameras)) {
-    return;
-  }
-  uint8_t* cameras = base + kCameraPasses;
-  if (!GameMessages_IsRenderOnlyPass()) {
-    g_draw_cameras.assign(cameras, cameras + kCameraPassesBytes);
-  } else if (g_draw_cameras.size() == kCameraPassesBytes) {
-    std::memcpy(cameras, g_draw_cameras.data(), kCameraPassesBytes);
-  }
-}
-}  // namespace
-
 void GameMessages_CurrentHandler(uint32_t& handler, uint32_t& message) {
   handler = g_current_handler;
   message = g_current_message;
@@ -213,7 +185,6 @@ void Deliver(PPCContext& ctx, uint8_t* base, uint32_t dispatcher, uint32_t messa
     uint32_t list = guest::LoadU32(base, kCommandListPointer);
     uint32_t used_before = list ? guest::LoadU32(base, list + kCommandListUsedOffset) : 0;
     debug::FrameStateDiff_Before(base);
-    RestoreCameraPassesForDraw(base, target);
     interpolation::BlendState_SetHandler(target);
     g_current_handler = target;
     g_current_message = guest::LoadU32(base, message);
@@ -385,24 +356,3 @@ extern "C" REX_FUNC(sub_82099A98) {
   __imp__sub_82099A98(ctx, base);
   debug::FrameStateDiff_After(base, "tick handler", target);
 }
-
-// Testing: the race HUD's (UI movie) functions called from its Draw
-// handlers (sub_8216C330, sub_8216D0C8), skippable on render-only passes with
-// --render_only_skip, to find which one advances its animation.
-#define ITC_SKIPPABLE(address)                                                   \
-  extern "C" REX_FUNC(sub_##address) {                                           \
-    REX_FUNC_PROLOGUE();                                                         \
-    if (frame_pacing::GameMessages_IsRenderOnlyPass() &&                         \
-        frame_pacing::SkipTickHandlerOnRenderOnlyPass(0x##address)) {            \
-      return;                                                                    \
-    }                                                                            \
-    __imp__sub_##address(ctx, base);                                             \
-  }
-ITC_SKIPPABLE(822128A8)
-ITC_SKIPPABLE(822141E8)
-ITC_SKIPPABLE(822129A8)
-ITC_SKIPPABLE(82212A48)
-ITC_SKIPPABLE(82212A38)
-ITC_SKIPPABLE(82212AC8)
-ITC_SKIPPABLE(82211D08)
-#undef ITC_SKIPPABLE

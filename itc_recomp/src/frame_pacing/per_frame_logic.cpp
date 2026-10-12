@@ -27,9 +27,6 @@
 #include <vector>
 
 REXCVAR_DECLARE(bool, interpolate_draw_state);
-REXCVAR_DEFINE_BOOL(blend_race_overlays, true, "ITC",
-                    "Blend the race overlays' state (the marker above opponents) between ticks "
-                    "while they record");
 REXCVAR_DEFINE_BOOL(per_tick_blink_timers, true, "ITC",
                     "Advance the car blink timers once per tick on render-only passes");
 REXCVAR_DEFINE_BOOL(per_tick_ui_movies, true, "ITC",
@@ -168,58 +165,6 @@ constexpr uint32_t kCameraPassesBytes = 21 * 592;
 std::vector<uint8_t> g_overlay_cameras;  // as of the logic pass's overlays
 }  // namespace
 
-// The overlays keep where to draw in their own state, set when updated
-// (slot 4). So that the marker above an opponent moves smoothly, each
-// overlay's state is blended between its last two ticks while it records:
-// 32-bit words that hold floats and changed by a modest amount are
-// interpolated to the frame's amount; anything else (pointers, flags,
-// counters, unchanged values) keeps the newest tick's. Then it's put back.
-namespace {
-constexpr uint32_t kOverlayBytes = 0x1000;
-struct OverlayStates {
-  std::vector<uint8_t> before, now;  // after the last two ticks' updates
-};
-std::unordered_map<uint32_t, OverlayStates> g_overlay_states;
-
-float WordAsFloat(const uint8_t* p) {
-  uint32_t bits = (uint32_t(p[0]) << 24) | (uint32_t(p[1]) << 16) | (uint32_t(p[2]) << 8) | p[3];
-  float f;
-  std::memcpy(&f, &bits, 4);
-  return f;
-}
-
-void StoreFloatWord(uint8_t* p, float f) {
-  uint32_t bits;
-  std::memcpy(&bits, &f, 4);
-  p[0] = uint8_t(bits >> 24);
-  p[1] = uint8_t(bits >> 16);
-  p[2] = uint8_t(bits >> 8);
-  p[3] = uint8_t(bits);
-}
-
-bool IsPlainFloat(float f) {
-  float a = std::abs(f);
-  return std::isfinite(f) && (a == 0 || (a > 1e-6f && a < 1e7f));
-}
-
-// Writes the blend of `states` into the overlay at `state`.
-void BlendOverlayState(uint8_t* state, const OverlayStates& states, float amount) {
-  for (uint32_t i = 0; i + 4 <= kOverlayBytes; i += 4) {
-    const uint8_t* a = states.before.data() + i;
-    const uint8_t* b = states.now.data() + i;
-    if (std::memcmp(a, b, 4) == 0 || std::memcmp(state + i, b, 4) != 0) {
-      continue;
-    }
-    float fa = WordAsFloat(a), fb = WordAsFloat(b);
-    if (!IsPlainFloat(fa) || !IsPlainFloat(fb) ||
-        !(std::abs(fb - fa) <= 0.5f * std::max(std::abs(fa), std::abs(fb)) + 2.0f)) {
-      continue;
-    }
-    StoreFloatWord(state + i, fa + (fb - fa) * amount);
-  }
-}
-}  // namespace
-
 extern "C" REX_FUNC(sub_8215DEA0) {
   REX_FUNC_PROLOGUE();
   constexpr uint32_t kOverlayCount = 25;
@@ -256,39 +201,13 @@ extern "C" REX_FUNC(sub_8215DEA0) {
       REX_CALL_INDIRECT_FUNC(guest::LoadU32(base, guest::LoadU32(base, overlay) + slot));
     }
   };
-  std::vector<uint32_t> overlays;
-  for (uint32_t i = 0; i < kOverlayCount; i++) {
-    if (uint32_t overlay = guest::LoadU32(base, list + 4 * i)) {
-      overlays.push_back(overlay);
-    }
-  }
   if (!render_only) {
     interpolation::BlendState_SetHandler(kUpdateContext);
     for_each_overlay(kUpdateSlot);
-    for (uint32_t overlay : overlays) {
-      OverlayStates& states = g_overlay_states[overlay];
-      states.before = std::move(states.now);
-      states.now.assign(base + overlay, base + overlay + kOverlayBytes);
-    }
-  }
-  std::vector<std::pair<uint32_t, std::vector<uint8_t>>> saved;
-  if (REXCVAR_GET(interpolate_draw_state) && REXCVAR_GET(blend_race_overlays)) {
-    float amount = frame_pacing::GetFramePacer().TickProgress();
-    for (uint32_t overlay : overlays) {
-      auto it = g_overlay_states.find(overlay);
-      if (it == g_overlay_states.end() || it->second.before.size() != kOverlayBytes) {
-        continue;
-      }
-      saved.push_back({overlay, std::vector<uint8_t>(base + overlay, base + overlay + kOverlayBytes)});
-      BlendOverlayState(base + overlay, it->second, amount);
-    }
   }
   interpolation::BlendState_SetHandler(kRecordContext);
   for_each_overlay(kRecordSlot);
   interpolation::BlendState_LogOverlayAllocations(base);
-  for (const auto& [overlay, state] : saved) {
-    std::memcpy(base + overlay, state.data(), state.size());
-  }
   if (render_only) {
     std::memcpy(cameras, current.data(), kCameraPassesBytes);
   }
