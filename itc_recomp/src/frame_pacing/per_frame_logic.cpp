@@ -8,6 +8,7 @@
 #include "game_messages.h"
 #include "guest.h"
 #include "frame_pacer.h"
+#include "debug/frame_state_diff.h"
 #include "interpolation/blend_state.h"
 
 #include <rex/cvar.h>
@@ -283,7 +284,6 @@ std::unordered_map<uint32_t, int> g_sprite_occurrences;
 REXCVAR_DEFINE_BOOL(blend_world_sprites, true, "ITC",
                     "Blend world-space sprites (light trails) between ticks");
 
-// Wrapped in draw_tags.cpp (sub_82128750); `record` runs the original.
 REXCVAR_DEFINE_BOOL(log_world_sprites, false, "ITC",
                     "Log the world-space sprite lists as recorded, every 2 s");
 
@@ -386,6 +386,16 @@ void PerFrameLogic_RecordWorldSprites(uint8_t* base, uint32_t list,
   for (const auto& [address, value] : saved) {
     guest::StoreFloat(base, address, value);
   }
+}
+
+// World-space sprite recorder (sub_82128750: r3 = sprite list, r4 = camera;
+// the light trails): blends the corners around the original.
+extern "C" REX_FUNC(sub_82128750) {
+  REX_FUNC_PROLOGUE();
+  if (debug::IsHidden(0x82128750)) {
+    return;
+  }
+  PerFrameLogic_RecordWorldSprites(base, ctx.r3.u32, [&] { __imp__sub_82128750(ctx, base); });
 }
 
 // Diagnostics (--log_camera_pass_records): which camera passes are recorded

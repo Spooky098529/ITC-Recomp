@@ -474,9 +474,10 @@ and target, and recorder world matrices), mostly for comparison.
 - **Rigid-motion blending of view-projections** (`FindRigidMotion`). It fails
   when the field of view changes during a turn; the placement/projection
   split replaced it for perspective cameras.
-- **The command list shim** (`--interpolate`, `interpolator.cpp`,
-  `command_list.cpp`, `draw_tags.cpp`): blending recorded constants matched
-  between ticks by draw order. Left in but off.
+- **The command list shim**: blending recorded constants matched between
+  ticks by draw order (the `--interpolate` option). It paired the wrong
+  objects whenever draws came and went, and showed up in the settings
+  overlay as a buggy "interpolate" toggle; removed.
 - **Pairing pixel constants by order in the frame.** Objects coming into or
   leaving view shifted the order; pairing by the preceding camera product
   fixed it.

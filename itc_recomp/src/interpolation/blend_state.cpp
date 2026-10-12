@@ -1903,3 +1903,22 @@ extern "C" REX_FUNC(sub_8209C6E0) {
   __imp__sub_8209C6E0(ctx, base);
   interpolation::GetDrawState().AfterBillboards(base);
 }
+
+// Command 7, set shader constants (render thread): r3 = payload, r4 =
+// register count, r5 = packed stage/type/start/count. Uploads the frame's
+// blend in place of the tick's camera products and lighting.
+extern "C" REX_FUNC(sub_8258FD48) {
+  REX_FUNC_PROLOGUE();
+  uint32_t payload = ctx.r3.u32, packed = ctx.r5.u32;
+  interpolation::BlendState_ReplayConstants(base, payload, packed,
+                                            [&] { __imp__sub_8258FD48(ctx, base); });
+}
+
+// The per-object recorder (~150 calls a pass in a race): r4 = camera
+// view-projection, r5 = the object's world matrix.
+extern "C" REX_FUNC(sub_825953D0) {
+  REX_FUNC_PROLOGUE();
+  interpolation::BlendState_BeforeRecordObject(base, ctx.r4.u32, ctx.r5.u32);
+  __imp__sub_825953D0(ctx, base);
+  interpolation::BlendState_AfterRecordObject(base);
+}
