@@ -193,6 +193,21 @@ constexpr uint32_t kRecorderMultiplyReturn = 0x82595438;
 // Blends a multiply's result between ticks: the world matrix and the camera
 // each as a rigid motion (positions straight, rotations along the shortest
 // arc), falling back to the current tick's where they aren't.
+// Whether two perspective cameras from consecutive ticks can be the same
+// camera: placement within a cut, and nearly the same projection (field of
+// view changes slowly, aspect and depth range don't). Stack copies of
+// cameras are shared by several views, so a pairing can be two different
+// cameras.
+bool IsSameCamera(const PerspectiveCamera& a, const PerspectiveCamera& b) {
+  auto close = [](float x, float y, float tolerance) {
+    return std::abs(x - y) <= tolerance * std::max(std::abs(x), std::abs(y));
+  };
+  return !IsCut(a.camera, b.camera) && close(a.x_scale, b.x_scale, 0.05f) &&
+         close(a.y_scale, b.y_scale, 0.05f) && close(a.w_scale, b.w_scale, 0.01f) &&
+         close(a.x_scale / a.y_scale, b.x_scale / b.y_scale, 0.01f) &&
+         close(a.depth_scale, b.depth_scale, 0.01f) && close(a.depth_offset, b.depth_offset, 0.01f);
+}
+
 struct BlendStats {
   int blended = 0;
   int unpaired = 0;
@@ -224,7 +239,7 @@ Matrix4 BlendProduct(const ReplayedProduct& product, float amount, BlendStats& s
   }
   if (ca && cb) {
     // A perspective camera: blend its placement and projection separately.
-    if (IsCut(ca->camera, cb->camera)) {
+    if (!IsSameCamera(*ca, *cb)) {
       stats.camera_not_blended++;
     } else {
       view_projection = ViewProjectionFromCamera(Blend(*ca, *cb, amount));
