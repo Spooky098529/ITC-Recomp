@@ -144,11 +144,28 @@ extern "C" REX_FUNC(sub_8211D2F8) {
 // Update and lasting a frame, so it showed on logic passes only (flicker).
 // Render-only passes deliver Update to this handler alone (see
 // game_messages.cpp), and here only the recording runs.
+//
+// The overlays place themselves with the camera passes as game logic left
+// them. By a render-only pass's Update, Draw has reused the passes for other
+// views, so the logic pass's camera passes are put back around the
+// recording.
+namespace {
+constexpr uint32_t kCameraPasses = 0x826BAC00;
+constexpr uint32_t kCameraPassesBytes = 21 * 592;
+std::vector<uint8_t> g_overlay_cameras;  // as of the logic pass's overlays
+}  // namespace
+
 extern "C" REX_FUNC(sub_8215DEA0) {
   REX_FUNC_PROLOGUE();
+  uint8_t* cameras = base + kCameraPasses;
   if (!frame_pacing::GameMessages_IsRenderOnlyPass()) {
+    g_overlay_cameras.assign(cameras, cameras + kCameraPassesBytes);
     __imp__sub_8215DEA0(ctx, base);
     return;
+  }
+  std::vector<uint8_t> current(cameras, cameras + kCameraPassesBytes);
+  if (g_overlay_cameras.size() == kCameraPassesBytes) {
+    std::memcpy(cameras, g_overlay_cameras.data(), kCameraPassesBytes);
   }
   constexpr uint32_t kOverlayCount = 25;
   constexpr uint32_t kRecordSlot = 20;  // vtable offset of slot 5
@@ -162,4 +179,5 @@ extern "C" REX_FUNC(sub_8215DEA0) {
     ctx.r3.u64 = overlay;
     REX_CALL_INDIRECT_FUNC(record);
   }
+  std::memcpy(cameras, current.data(), kCameraPassesBytes);
 }
