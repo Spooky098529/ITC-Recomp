@@ -1896,6 +1896,9 @@ class PixelOutcomesLog {
     const PixelConstantBlender& blender = GetPixelConstantBlender();
     Outcome outcome = blender.outcome();
     Trace(start, moving, tick, amount, world_now, world);
+    if (moving) {
+      FrameChanges(start, tick, amount);
+    }
     const char* kind = !has_object ? "no product" : moving ? "moving" : "still";
     counts_[{kind, start, int(outcome)}]++;
     if (outcome == Outcome::kBlended && blender.switch_jumps() > 0) {
@@ -1943,6 +1946,7 @@ class PixelOutcomesLog {
 
   void OnFrameStart() {
     frames_++;
+    frame_counter_++;
     auto now = std::chrono::steady_clock::now();
     if (now - last_ < std::chrono::seconds(2)) {
       return;
@@ -1980,6 +1984,22 @@ class PixelOutcomesLog {
         REXLOG_INFO("pixel outcomes: not as recorded, e.g. {}", example);
       }
     }
+    for (const auto* changes : {&frame_jumps_, &frame_flips_}) {
+      if (changes->empty()) {
+        continue;
+      }
+      std::string line;
+      for (const auto& [i, n] : *changes) {
+        line += fmt::format(" c{}.{}:{}", i / 4, "xyzw"[i % 4], n);
+      }
+      REXLOG_INFO("pixel outcomes: moving objects' lighting, frame-to-frame {} (register from "
+                  "start.component:count):{}",
+                  changes == &frame_jumps_ ? "jumps" : "flips", line);
+    }
+    frame_jumps_.clear();
+    frame_flips_.clear();
+    change_lines_ = 0;
+    history_.clear();
     differing_.clear();
     not_as_recorded_examples_.clear();
     rejected_lines_ = 0;
@@ -1995,6 +2015,59 @@ class PixelOutcomesLog {
   std::map<std::pair<std::string, uint32_t>, int> switch_jumps_;
   std::map<uint32_t, int> rejected_;
   std::string rejected_examples_;
+  // A moving object's lighting as uploaded, frame to frame: registers that
+  // jump between consecutive frames, and flips (back to two frames ago).
+  void FrameChanges(uint32_t start, uint64_t tick, float amount) {
+    const PixelConstantBlender& blender = GetPixelConstantBlender();
+    const std::vector<float>& now = blender.last_blended();
+    if (now.size() != 63 * 4) {
+      return;
+    }
+    auto [object, occurrence] = blender.last_key();
+    History& h = history_[{object, occurrence, start}];
+    bool consecutive = h.frame + 1 == frame_counter_;
+    if (consecutive && h.previous.size() == now.size()) {
+      bool has_older = h.older.size() == now.size() && h.older_frame + 2 == frame_counter_;
+      for (uint32_t i = 0; i < now.size(); i++) {
+        float a = h.previous[i], b = now[i];
+        if (a == b || std::abs(b - a) <= 0.3f * std::max(std::abs(a), std::abs(b)) + 0.2f) {
+          continue;
+        }
+        uint32_t r = i / 4;
+        bool slot = (r >= 8 && r < 40) || (r >= 47 && r < 63);
+        float o = has_older ? h.older[i] : 0;
+        bool flip = has_older && std::abs(b - o) <= 0.1f * std::max(std::abs(b), std::abs(o)) + 0.05f;
+        (flip ? frame_flips_ : frame_jumps_)[i]++;
+        if (change_lines_++ < 16) {
+          REXLOG_INFO("pixel outcomes: frame {} c{}.{} ({}), object {:016X}: {} -> {:.4g} -> "
+                      "{:.4g}, tick {} amount {:.2f} (last frame tick {} amount {:.2f}), {}",
+                      flip ? "flip" : "jump", start + r, "xyzw"[i % 4],
+                      slot ? "light slot" : "other", object,
+                      has_older ? fmt::format("{:.4g}", o) : std::string("-"), a, b, tick, amount,
+                      h.tick, h.amount, kOutcomeNames[int(blender.outcome())]);
+        }
+      }
+    }
+    h.older = std::move(h.previous);
+    h.older_frame = h.frame;
+    h.previous = now;
+    h.frame = frame_counter_;
+    h.tick = tick;
+    h.amount = amount;
+  }
+
+  static constexpr const char* kOutcomeNames[] = {"no object", "unpaired", "not as recorded",
+                                                  "rejected",  "unchanged", "blended"};
+  struct History {
+    std::vector<float> previous, older;
+    uint64_t frame = 0, older_frame = 0, tick = 0;
+    float amount = 0;
+  };
+  std::map<std::tuple<uint64_t, int, uint32_t>, History> history_;
+  uint64_t frame_counter_ = 0;
+  std::map<uint32_t, int> frame_jumps_, frame_flips_;
+  int change_lines_ = 0;
+
   // Every 5 s, one moving object's light slots (c8-c11 positions, c24-c27
   // directions) followed upload by upload for 4 ticks, from the first one
   // that isn't as recorded or is blended.
