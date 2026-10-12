@@ -165,6 +165,7 @@ struct ProductInputs {
 
 // A multiply made during a logic pass, as the render thread redoes it.
 struct ReplayedProduct {
+  uint64_t identity = 0;  // the same multiply in every tick (its pairing key)
   Matrix4 written;  // the product, as written to the output address
   ProductInputs now;
   std::optional<ProductInputs> before;  // the previous tick's, if paired
@@ -656,7 +657,7 @@ class DrawState {
           continue;
         }
         auto before = previous_tick_.find(output.key);
-        frame->products[out] = {output.written, now->second,
+        frame->products[out] = {ProductKeyHash()(output.key), output.written, now->second,
                                 before != previous_tick_.end() ? std::optional(before->second)
                                                                : std::nullopt};
       }
@@ -798,11 +799,14 @@ class ReplayCameras {
  public:
   void OnFrameStart() {
     LogStats();
+    last_identity_ = 0;
     std::lock_guard lock(g_replay_mutex);
     frame_ = g_replay_frame;
   }
 
   uint64_t tick() const { return frame_ ? frame_->tick : 0; }
+  // The last camera product replayed: identifies the object being drawn.
+  uint64_t last_identity() const { return last_identity_; }
   float amount() const { return frame_ ? frame_->amount : 1.0f; }
 
   // Render thread diagnostics: why an upload was or wasn't substituted.
@@ -849,6 +853,7 @@ class ReplayCameras {
     if (it == frame_->products.end() || it->second.written != m) {
       return std::nullopt;
     }
+    last_identity_ = it->second.identity;
     return BlendProduct(it->second, frame_->amount, stats_.blend);
   }
 
@@ -883,6 +888,7 @@ class ReplayCameras {
   }
 
   std::shared_ptr<const ReplayFrame> frame_;
+  uint64_t last_identity_ = 0;
   struct {
     int frames = 0;
     int uploads = 0;
@@ -982,7 +988,8 @@ ReplayedConstantsLog& GetReplayedConstantsLog() {
 // Render thread: per-object pixel shader constants (sub_82595490's 63
 // registers: lighting, including the headlights' position and direction)
 // are recorded with the tick's values. Each upload is paired with the same
-// one (by order in the frame) as of the previous tick, and given the frame's
+// one as of the previous tick, identified by the object's camera product
+// replayed just before it (which is paired reliably), and given the frame's
 // linear blend of the two; a value that jumps (a flag, a cut) keeps the
 // tick's.
 class PixelConstantBlender {
@@ -1003,9 +1010,12 @@ class PixelConstantBlender {
 
   // Blends the upload in place; returns the original to put back after.
   std::optional<std::vector<float>> Apply(uint8_t* base, uint32_t payload, uint32_t packed,
-                                          float amount) {
+                                          float amount, uint64_t object) {
+    if (object == 0) {
+      return std::nullopt;  // no object to pair by
+    }
     uint32_t start = (packed >> 8) & 0xFF, count = packed & 0xFF;
-    Key key{start, count, occurrences_[{start, count, 0}]++};
+    Key key{object, start, count, occurrences_[{object, start, count, 0}]++};
     std::vector<float> now(count * 4);
     for (uint32_t i = 0; i < now.size(); i++) {
       now[i] = guest::LoadFloat(base, payload + 4 * i);
@@ -1037,6 +1047,7 @@ class PixelConstantBlender {
 
  private:
   struct Key {
+    uint64_t object;
     uint32_t start, count;
     int occurrence;
     auto operator<=>(const Key&) const = default;
@@ -1188,7 +1199,8 @@ void BlendState_ReplayConstants(uint8_t* base, uint32_t payload, uint32_t packed
   if (REXCVAR_GET(interpolate_draw_state) && REXCVAR_GET(blend_pixel_constants) && stage == 1 &&
       ((packed >> 16) & 0xFF) == 1) {
     original_pixel =
-        GetPixelConstantBlender().Apply(base, payload, packed, GetReplayCameras().amount());
+        GetPixelConstantBlender().Apply(base, payload, packed, GetReplayCameras().amount(),
+                                        GetReplayCameras().last_identity());
   }
   GetSteppingConstantsLog().OnUpload(base, payload, packed,
                                      original.has_value() || original_pixel.has_value());
