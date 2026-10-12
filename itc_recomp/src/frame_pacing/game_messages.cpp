@@ -210,9 +210,6 @@ void DispatchMessages(PPCContext& ctx, uint8_t* base, uint32_t dispatcher) {
       counts.draws++;
       interpolation::BlendState_BeforeDraw(base, g_render_only_pass);
       Deliver(ctx, base, dispatcher, message);
-      if (g_render_only_pass) {
-        PerFrameLogic_AfterRenderOnlyDraw(ctx, base);
-      }
       interpolation::BlendState_AfterDraw(base);
       continue;
     } else {
