@@ -6,7 +6,6 @@
 #include <rex/cvar.h>
 #include <rex/logging.h>
 
-#include <algorithm>
 #include <chrono>
 #include <map>
 
@@ -170,22 +169,11 @@ extern "C" REX_FUNC(sub_821062E8) {
   frame_pacing::DispatchMessages(ctx, base, ctx.r3.u32);
 }
 
-// The main loop's tick handlers (App::Run calls each through this invoker).
-// Each is an object whose vtable slot 1 is its tick; delegates keep their
-// target at +8. In the original game each ran once per 30 Hz pass; a
-// render-only pass runs only the ones drawing needs, so the rest (scene
-// update, race start countdown, ...) keep the game's 30 Hz.
+// Diagnostics (--log_tick_handlers): the main loop's tick handlers that run
+// on render-only passes, once a second. Each handler is an object whose
+// vtable slot 1 is its tick; delegates keep their target at +8.
 REXCVAR_DEFINE_BOOL(log_tick_handlers, false, "ITC",
                     "Log the main loop tick handlers run on render-only passes, once a second");
-REXCVAR_DEFINE_BOOL(render_only_skip_tick_handlers, true, "ITC",
-                    "On render-only passes, run only the tick handlers drawing needs");
-
-namespace {
-// Run on every pass: the message dispatcher (delivers Draw), the wait for
-// the frame in flight, the render thread's kick, and the app's own handler
-// (quit checks).
-constexpr uint32_t kDrawingTickHandlers[] = {0x82093DC0, 0x820920D8, 0x82091A58, 0x820902C8};
-}  // namespace
 
 namespace {
 std::map<std::pair<uint32_t, uint32_t>, int> g_tick_handlers;
@@ -195,14 +183,6 @@ std::chrono::steady_clock::time_point g_tick_handlers_logged{};
 // TickHandler_Invoke: r3 = app, r4 = (handler object in the low word).
 extern "C" REX_FUNC(sub_82099A98) {
   REX_FUNC_PROLOGUE();
-  if (frame_pacing::GameMessages_IsRenderOnlyPass() &&
-      REXCVAR_GET(render_only_skip_tick_handlers)) {
-    uint32_t target = guest::LoadU32(base, ctx.r4.u32 + 8);
-    if (std::find(std::begin(kDrawingTickHandlers), std::end(kDrawingTickHandlers), target) ==
-        std::end(kDrawingTickHandlers)) {
-      return;
-    }
-  }
   if (REXCVAR_GET(log_tick_handlers) && frame_pacing::GameMessages_IsRenderOnlyPass()) {
     uint32_t handler = ctx.r4.u32;
     uint32_t tick = guest::LoadU32(base, guest::LoadU32(base, handler) + 4);
