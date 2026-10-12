@@ -454,9 +454,11 @@ Three more things are blended, outside the products:
   light slot k (of 8, the lights nearest the object) is registers 8+k
   (position), 16+k, 24+k (direction), 32+k, 47+k and 55+k (colour and
   strength among them). For the 63-register uploads:
-  - Only the light slots' positions and directions blend
-    (`--blend_only_light_slots`), which moves the cars' headlights' light
-    with the cars; the rest is left as recorded.
+  - All of it blends; the light slots' positions and directions are what
+    move the cars' headlights' light with the cars.
+    `--blend_only_light_slots` blends only those and leaves the rest as
+    recorded: added while chasing the flash below, before its cause was
+    found, and not needed since.
   - A slot whose light moved more than 4 m in a tick, or any of whose
     registers jumped, holds another light (passing a street lamp, the next
     one along takes its slot) and takes the tick's light
@@ -467,8 +469,8 @@ Three more things are blended, outside the products:
     under lamps. Before slots were switched on their own, any slot change
     rejected the whole upload, so the car's lighting stayed at the tick for
     a tick (a flicker).
-  - With `--blend_only_light_slots=false`, c0-c4 blend together as a
-    camera, or take the tick's together on a cut (`--blend_lighting_camera`;
+  - c0-c4 blend together as a camera, or take the tick's together on a cut
+    (`--blend_lighting_camera`;
     treated by component as switches, as they once were, a view matrix
     entry that changed past the tolerance while turning kept the tick's
     value while the rest blended).
@@ -522,7 +524,8 @@ and target, and recorder world matrices), mostly for comparison.
 | `--motion_blur` | The game's velocity-based motion blur (pixel shader `7EB16456AAD56CBA`), skipped when false (as `run.sh` does, except with `--no-interpolation`). Its velocities come from the tick, so it smears a whole tick of motion at high frame rates. Patch `patches/rexglue-sdk/0002`. |
 | `--blend_pixel_constants` | Blend per-object lighting constants (default on). |
 | `--log_fps` | Frames and ticks per second. |
-| `--blend_only_light_slots`, `--switch_light_slots`, `--blend_lighting_camera` | Which parts of the per-object lighting blend (default on); see "What gets blended". |
+| `--switch_light_slots`, `--blend_lighting_camera` | How the per-object lighting's light slots and camera blend (default on); see "What gets blended". |
+| `--blend_only_light_slots` | Blend only the per-object lighting's light positions and directions (default off). |
 | `--log_pixel_outcomes` | Every 2 s: what the lighting uploads got (blended, unpaired, not as recorded, rejected, unchanged) per frame for moving and still objects, which components differ or were rejected (with the object and its callers), frame-to-frame jumps in moving objects' uploaded lighting, an object followed for 10 frames after its lighting's camera jumps, and every 5 s one moving object's light slots traced for 4 ticks. |
 | `--pixel_blend_from_latest` | Blend per-object lighting from the previous tick's last value (default on); see "What gets blended". |
 | `--log_blend_state` | Per second: products published, blended, unpaired, rejected cameras with the reason, and uploads left alone. Unpaired or rejected counts above zero in steady driving mean something is stepping at 30 Hz. |

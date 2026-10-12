@@ -91,9 +91,9 @@ REXCVAR_DEFINE_BOOL(pixel_blend_from_latest, true, "ITC",
                     "Blend per-object lighting from the last value recorded in the previous "
                     "tick to this frame's (false: only frames recording the tick's first value "
                     "are blended)");
-REXCVAR_DEFINE_BOOL(blend_only_light_slots, true, "ITC",
+REXCVAR_DEFINE_BOOL(blend_only_light_slots, false, "ITC",
                     "Blend only the per-object lighting's light positions and directions (the "
-                    "headlights); the rest is left as recorded (false: blend all of it)");
+                    "headlights) and leave the rest as recorded (default: blend all of it)");
 REXCVAR_DEFINE_BOOL(blend_lighting_camera, true, "ITC",
                     "Blend the per-object lighting's camera (c0-c3 view, c4 position) as a whole "
                     "(false: by component, with c1.x, c3.xyz and c4.x as switches)");
@@ -1804,10 +1804,11 @@ class PixelConstantBlender {
         camera_cut = camera_cut || !std::isfinite(entry.previous[i]) || !std::isfinite(now[i]);
       }
     }
-    // Only the light slots' positions (c8-c15) and directions (c24-c31)
-    // blend, which move the cars' headlights' light with the cars; the rest
-    // is left as recorded. Blending all of it made opponents' cars flash
-    // brighter for a tick now and then (the cause wasn't found).
+    // --blend_only_light_slots: only the light slots' positions (c8-c15) and
+    // directions (c24-c31) blend, which move the cars' headlights' light with
+    // the cars, and the rest is left as recorded. Added while opponents' cars
+    // flashed passing under lamps, before the cause (slots taking the next
+    // lamp, see slot_switched) was found; blending all of it is fine since.
     bool only_lights = count == 63 && REXCVAR_GET(blend_only_light_slots);
     auto blends = [&](uint32_t i) {
       uint32_t r = i / 4;
