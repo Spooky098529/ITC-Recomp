@@ -13,6 +13,16 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 if(REXSDK_DIR)
     file(GLOB ITC_SDK_PATCHES "${CMAKE_CURRENT_SOURCE_DIR}/../patches/rexglue-sdk/*.patch")
     list(SORT ITC_SDK_PATCHES)
+    # Patches touching nearby lines can't each be checked alone once a later
+    # one is applied. They're always applied in order, so if the last one is
+    # applied, they all are.
+    list(GET ITC_SDK_PATCHES -1 last_patch)
+    execute_process(
+        COMMAND git -C "${REXSDK_DIR}" apply --reverse --check "${last_patch}"
+        RESULT_VARIABLE all_applied OUTPUT_QUIET ERROR_QUIET)
+    if(all_applied EQUAL 0)
+        set(ITC_SDK_PATCHES "")
+    endif()
     foreach(patch IN LISTS ITC_SDK_PATCHES)
         execute_process(
             COMMAND git -C "${REXSDK_DIR}" apply --reverse --check "${patch}"
@@ -38,6 +48,7 @@ set(ITC_SOURCES
     src/frame_pacing/frame_pacer.cpp
     src/frame_pacing/renderer_hooks.cpp
     src/debug/state_capture.cpp
+    src/debug/frame_state_diff.cpp
     src/interpolation/interpolator.cpp
     src/interpolation/transform.cpp
     src/interpolation/command_list.cpp

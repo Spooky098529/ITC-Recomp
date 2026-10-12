@@ -14,6 +14,7 @@
 // Render thread: draws exactly one frame each time it's asked (as the game
 // originally did), without the game's 2-vblank wait.
 
+#include "debug/frame_state_diff.h"
 #include "debug/state_capture.h"
 #include "frame_pacer.h"
 #include "game_messages.h"
@@ -98,6 +99,7 @@ void Renderer_WaitForFrame(PPCContext& ctx, uint8_t* base, uint32_t renderer) {
   }
   pacer.OnFrameStarted();
   frame_pacing::GameMessages_SetRenderOnlyPass(render_only);
+  debug::FrameStateDiff_OnPassStart(base, render_only);
 }
 
 void VideoOutput_WaitForVblank(PPCContext& ctx, uint8_t* base, uint32_t video_output) {

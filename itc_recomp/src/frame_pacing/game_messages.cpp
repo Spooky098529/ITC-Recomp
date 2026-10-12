@@ -1,5 +1,6 @@
 #include "game_messages.h"
 
+#include "debug/frame_state_diff.h"
 #include "guest.h"
 #include "interpolation/blend_state.h"
 
@@ -76,7 +77,9 @@ void Deliver(PPCContext& ctx, uint8_t* base, uint32_t dispatcher, uint32_t messa
     ctx.r3.u64 = object;
     ctx.r4.u64 = dispatcher;
     ctx.lr = 0x82106388;
+    debug::FrameStateDiff_Before(base);
     REX_CALL_INDIRECT_FUNC(method);
+    debug::FrameStateDiff_After(base, "message handler", method);
   }
 }
 
@@ -198,5 +201,8 @@ extern "C" REX_FUNC(sub_82099A98) {
       g_tick_handlers_logged = now;
     }
   }
+  uint32_t target = guest::LoadU32(base, ctx.r4.u32 + 8);
+  debug::FrameStateDiff_Before(base);
   __imp__sub_82099A98(ctx, base);
+  debug::FrameStateDiff_After(base, "tick handler", target);
 }
