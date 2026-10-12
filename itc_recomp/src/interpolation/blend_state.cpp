@@ -2067,7 +2067,8 @@ class PixelOutcomesLog {
         float o = has_older ? h.older[i] : 0;
         bool flip = has_older && std::abs(b - o) <= 0.1f * std::max(std::abs(b), std::abs(o)) + 0.05f;
         (flip ? frame_flips_ : frame_jumps_)[i]++;
-        if (follow_frames_ == 0 &&
+        // Followed: jumps in the lighting's camera (c0-c4).
+        if (follow_frames_ == 0 && i < 20 &&
             std::chrono::steady_clock::now() - follow_last_ >= std::chrono::seconds(3)) {
           follow_last_ = std::chrono::steady_clock::now();
           follow_key_ = {object, occurrence, start};
