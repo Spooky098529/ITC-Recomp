@@ -39,7 +39,7 @@ place (search for `PATCH:`).
 | `sub_8215B4F8` | `Race::DrawStep` | Wrapped | The race's draw step (Draw message). Its running marks the pass as in a race. |
 | `sub_820A3978` | `CameraPass::Update` | | Rebuilds a camera pass's view (+0x10) from its eye, target and up vector (+0x190, +0x1A0, +0x1B0), and its view-projection (+0x90 = view * projection at +0x50). Called several times per Draw for pass 0. |
 | `sub_8209BD50` | `Matrix::Multiply` | Wrapped | out (r3) = a (r4) * b (r5), 4x4. Interpolation notes every multiply into a camera (see "Interpolation"). |
-| `sub_825953D0` | `Recorder::RecordObject` | Wrapped | The bulk per-object recorder, ~150 calls per pass in a race: records command 7 with vertex constants 0-8: world (r5) * camera view-projection (r4), the world matrix, and a vector. The camera is often a stack copy, not a camera pass. |
+| `sub_825953D0` | `Recorder::RecordObject` | Wrapped | The bulk per-object recorder, ~150 calls per pass in a race: records command 7 with vertex constants 0-8: world (r5) * camera view-projection (r4) in c0-c3, the world matrix in c4-c7 (for some objects a projective matrix instead), and the camera's world position in c8. The camera is often a stack copy, not a camera pass. |
 | `sub_825951E0` | | | Multiplies a world matrix and camera into a stack temporary; not recorded (likely a visibility test). |
 | `sub_8258FD48` | `Command::SetShaderConstants` | Wrapped | Render thread, command 7: r3 = payload, r4 = register count, r5 = stage << 24 \| type << 16 \| start << 8 \| count. Interpolation substitutes blended values here. |
 | `sub_8258CAA0` | `CommandList::AllocateSlots` | Wrapped | r3 = list, r4 = slot count; returns the first 16-byte slot. Wrapped only for diagnostics (`--log_slot_callers`). |
@@ -404,7 +404,18 @@ Blending a product:
   turns more than 0.5 rad in a tick (and isn't a wheel), or the projection
   changes by more than a few percent (a cut, or two different cameras).
 
-Two more things are blended, outside the products:
+Three more things are blended, outside the products:
+
+- **The rest of the per-object upload.** `sub_825953D0`'s upload (c0 x9)
+  also holds the world matrix (c4-c7) and the camera's world position (c8),
+  which the paint's reflections use. As c0-c3 is substituted, c4-c7 gets the
+  blended world matrix if it holds the product's world matrix, and c8 the
+  blended camera's position if it's within 5 cm of the tick's camera
+  position; otherwise they're left alone. Without this the car's reflections
+  stepped at 30 Hz against the blended car ("shifting perspective", most
+  visible on the wing mirror housing in first person).
+  `--blend_object_extras=false` turns it off; `--log_object_extras` logs
+  how often they change and are replaced.
 
 - **Light billboards' facing.** `sub_8209C6E0` builds the light glows' quads
   on the CPU in Draw, turned to face its camera pass. For that call alone the
@@ -442,7 +453,7 @@ and target, and recorder world matrices), mostly for comparison.
 | `--per_tick_blink_timers`, `--per_tick_ui_movies`, `--per_tick_play_time`, `--per_tick_texture_animations` | The per-frame logic fixes (default on); see "Per-frame logic". |
 | `--find_per_frame_state`, `--render_only_skip`, `--log_recording_by_pass` and others | Finding per-frame logic; see "Per-frame logic". |
 | `--log_game_messages`, `--log_slot_callers` | Message delivery per pass; which code allocates constant slots. |
-| `--log_upload_owners`, `--debug_zero_owners` | Which code recorded each vertex constant upload; replay a recorder's uploads as zeros to see what it draws. The fastest way to identify a draw; see "World-space sprites". |
+| `--log_upload_owners`, `--debug_zero_owners` | Which code recorded each vertex constant upload; replay a recorder's vertex or pixel constant uploads as zeros (with `--log_slot_callers`) to see what it draws. The fastest way to identify a draw; see "World-space sprites". |
 | `--log_overlay_products`, `--log_overlay_uploads` | The race overlays' camera products and uploads, as replayed. |
 | `--log_world_sprites`, `--log_single_sprites` | The world-space sprites as recorded. |
 | `--log_camera_pass_records` | Which camera passes are recorded on logic and render-only passes, by message handler. |
@@ -469,6 +480,13 @@ and target, and recorder world matrices), mostly for comparison.
 - **Pairing pixel constants by order in the frame.** Objects coming into or
   leaving view shifted the order; pairing by the preceding camera product
   fixed it.
+- **The car's reflections, before c4-c8 were found.** Zeroing c100 x4
+  (`821364D0`, each view's previous view-projection) and c14 x4
+  (`820C79F8`) changed nothing visible; zeroing `82147074`/`8214717C`
+  (`sub_82146BD0`) blacked out the world geometry. Treating more pixel
+  constant components as switches (the most-rejected ones, c2.x, c8.y,
+  c48.x...) made no visible difference: the rejections moved to the same
+  registers' other components.
 
 ### Finding what still steps
 
@@ -497,7 +515,8 @@ constants:
   "Per-frame logic" for how they were found.
 - **Some uploads still step on purpose**: the shadow lookup matrices (c70 and
   c74, orthographic, kept at the tick to match the shadow map), c14 x4 (a
-  texture projection) and c100 x4. Nothing visible steps in testing; see
+  texture projection) and c100 x4 (zeroing either changes nothing visible).
+  Nothing visible steps in testing; see
   "Finding what still steps" if something does.
 - **A piece of geometry flickers while the car moves**, at native 30 fps
   too, so not interpolation: probably the game's own effect (a broken light).
