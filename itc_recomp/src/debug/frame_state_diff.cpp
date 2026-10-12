@@ -323,7 +323,6 @@ ITC_FRAME_STATE_WRAP(8209F900)
 ITC_FRAME_STATE_WRAP(820C5DE8)
 ITC_FRAME_STATE_WRAP(820F6068)
 ITC_FRAME_STATE_WRAP(82130978)
-ITC_FRAME_STATE_WRAP(82133960)
 // The render orchestrator's (sub_820C5DE8) callees.
 ITC_FRAME_STATE_WRAP(8209F7A8)
 ITC_FRAME_STATE_WRAP(820A0958)
@@ -367,6 +366,45 @@ ITC_FRAME_STATE_WRAP(820E7328)
 ITC_FRAME_STATE_WRAP(820E8908)
 ITC_FRAME_STATE_WRAP(820ECE28)
 #undef ITC_FRAME_STATE_WRAP
+
+// Draw step part 0x82133960, rewritten to also name each view's draw: for
+// the 15 per-view objects at 0x826C5D80 whose camera pass (index at
+// 0x826174C8 + 36 * i) is active and whose +52 is clear, calls vtable slot 0,
+// then clears +8056 and +48 and flips +8060 (logged as "view draw").
+extern "C" REX_FUNC(sub_82133960) {
+  REX_FUNC_PROLOGUE();
+  if (debug::IsHidden(0x82133960)) {
+    return;
+  }
+  constexpr uint32_t kViews = 0x826C5D80;
+  constexpr uint32_t kViewPassIndices = 0x826174C8;
+  constexpr uint32_t kCameraPasses = 0x826BAC00;
+  debug::FrameStateDiff_Before(base);
+  {
+    guest::StackFrame frame(ctx, 128);  // the original's stwu r1,-128(r1)
+    for (uint32_t i = 0; i < 15; i++) {
+      uint32_t view = guest::LoadU32(base, kViews + 4 * i);
+      if (view == 0) {
+        continue;
+      }
+      uint32_t pass = kCameraPasses + 592 * guest::LoadU32(base, kViewPassIndices + 36 * i);
+      if (guest::LoadU32(base, pass + 588) == 0 || guest::LoadU32(base, view + 52) != 0) {
+        continue;
+      }
+      uint32_t draw = guest::LoadU32(base, guest::LoadU32(base, view));
+      debug::FrameStateDiff_Before(base);
+      ctx.r3.u64 = view;
+      REX_CALL_INDIRECT_FUNC(draw);
+      debug::FrameStateDiff_After(base, "view draw", draw);
+      view = guest::LoadU32(base, kViews + 4 * i);
+      uint32_t flip = guest::LoadU32(base, view + 8060);
+      guest::StoreU32(base, view + 8056, 0);
+      guest::StoreU32(base, view + 48, 0);
+      guest::StoreU32(base, view + 8060, flip ^ 1);
+    }
+  }
+  debug::FrameStateDiff_After(base, "draw step part", 0x82133960);
+}
 
 // Tick handler 0x82096340 is a thunk calling vtable slot 1 of the object in
 // r3; name the function it reaches (logged as "thunk target").
