@@ -38,7 +38,7 @@ uint32_t g_current_handler = 0;
 uint32_t g_current_message = ~0u;
 }  // namespace
 
-REXCVAR_DEFINE_BOOL(restore_draw_cameras, true, "ITC",
+REXCVAR_DEFINE_BOOL(restore_draw_cameras, false, "ITC",
                     "On render-only passes, start Draw with the camera passes as the logic "
                     "pass's Update left them");
 

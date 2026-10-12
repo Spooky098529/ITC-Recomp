@@ -66,6 +66,13 @@ REXCVAR_DEFINE_BOOL(log_overlay_products, false, "ITC",
 REXCVAR_DEFINE_BOOL(log_overlay_uploads, false, "ITC",
                     "Log every shader constant upload the race overlays recorded, as replayed, "
                     "12 frames every 3 s");
+REXCVAR_DEFINE_STRING(debug_zero_owners, "", "ITC",
+                      "Testing: vertex constant uploads recorded by these callers (hex, "
+                      "comma-separated; needs --log_slot_callers) are replayed as zeros, so "
+                      "their draws vanish");
+REXCVAR_DEFINE_BOOL(log_upload_owners, false, "ITC",
+                    "Log the callers recording vertex constant uploads, with uploads per "
+                    "frame, every 5 s (needs --log_slot_callers)");
 REXCVAR_DEFINE_BOOL(log_blend_state, false, "ITC",
                     "Log how many cameras and objects were blended, once a second");
 REXCVAR_DEFINE_BOOL(log_replayed_constants, false, "ITC",
@@ -1576,9 +1583,46 @@ void BlendState_ReplayConstants(uint8_t* base, uint32_t payload, uint32_t packed
     }
   }
   GetReplayedConstantsLog().OnUpload(base, payload, packed, original.has_value());
+  std::vector<uint32_t> zeroed;
+  if (stage == 0) {
+    uint32_t owner = SlotOwner(payload - 16);
+    if (REXCVAR_GET(log_upload_owners)) {
+      static std::map<uint32_t, int> owners;
+      static int frames = 0;
+      static uint64_t last_tick = 0;
+      static auto last = std::chrono::steady_clock::now();
+      owners[owner]++;
+      if (GetReplayCameras().tick() != last_tick) {
+        last_tick = GetReplayCameras().tick();
+        frames++;
+      }
+      auto now = std::chrono::steady_clock::now();
+      if (now - last >= std::chrono::seconds(5)) {
+        last = now;
+        std::string line;
+        for (const auto& [who, n] : owners) {
+          line += fmt::format(" {:08X}:{}", who, n / std::max(frames, 1));
+        }
+        REXLOG_INFO("upload owners (caller:uploads per tick):{}", line);
+        owners.clear();
+        frames = 0;
+      }
+    }
+    std::string list = REXCVAR_GET(debug_zero_owners);
+    if (!list.empty() && owner != 0 &&
+        list.find(fmt::format("{:08X}", owner)) != std::string::npos) {
+      for (uint32_t i = 0; i < count * 4; i++) {
+        zeroed.push_back(guest::LoadU32(base, payload + 4 * i));
+        guest::StoreU32(base, payload + 4 * i, 0);
+      }
+    }
+  }
   GetOverlayUploadsLog().OnUpload(base, payload, packed,
                                   original.has_value() || original_pixel.has_value(), original);
   upload();
+  for (uint32_t i = 0; i < zeroed.size(); i++) {
+    guest::StoreU32(base, payload + 4 * i, zeroed[i]);
+  }
   if (original) {
     StoreMatrix(base, payload, *original);
   }
