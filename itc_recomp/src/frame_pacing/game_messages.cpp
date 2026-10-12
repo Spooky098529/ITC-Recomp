@@ -7,6 +7,7 @@
 #include <rex/logging.h>
 
 #include <chrono>
+#include <map>
 
 REXCVAR_DEFINE_BOOL(log_game_messages, false, "ITC",
                     "Log game messages delivered and skipped, once a second");
@@ -166,4 +167,36 @@ extern "C" REX_FUNC(sub_8215B4F8) {
 extern "C" REX_FUNC(sub_821062E8) {
   REX_FUNC_PROLOGUE();
   frame_pacing::DispatchMessages(ctx, base, ctx.r3.u32);
+}
+
+// Diagnostics (--log_tick_handlers): the main loop's tick handlers that run
+// on render-only passes, once a second. Each handler is an object whose
+// vtable slot 1 is its tick; delegates keep their target at +8.
+REXCVAR_DEFINE_BOOL(log_tick_handlers, false, "ITC",
+                    "Log the main loop tick handlers run on render-only passes, once a second");
+
+namespace {
+std::map<std::pair<uint32_t, uint32_t>, int> g_tick_handlers;
+std::chrono::steady_clock::time_point g_tick_handlers_logged{};
+}  // namespace
+
+// TickHandler_Invoke: r3 = app, r4 = (handler object in the low word).
+extern "C" REX_FUNC(sub_82099A98) {
+  REX_FUNC_PROLOGUE();
+  if (REXCVAR_GET(log_tick_handlers) && frame_pacing::GameMessages_IsRenderOnlyPass()) {
+    uint32_t handler = ctx.r4.u32;
+    uint32_t tick = guest::LoadU32(base, guest::LoadU32(base, handler) + 4);
+    uint32_t target = guest::LoadU32(base, handler + 8);
+    g_tick_handlers[{tick, target}]++;
+    auto now = std::chrono::steady_clock::now();
+    if (now - g_tick_handlers_logged >= std::chrono::seconds(1)) {
+      for (const auto& [key, n] : g_tick_handlers) {
+        REXLOG_INFO("tick handler on render-only passes: tick {:08X} target {:08X}: {} calls",
+                    key.first, key.second, n);
+      }
+      g_tick_handlers.clear();
+      g_tick_handlers_logged = now;
+    }
+  }
+  __imp__sub_82099A98(ctx, base);
 }
