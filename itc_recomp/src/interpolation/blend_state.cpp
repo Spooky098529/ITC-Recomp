@@ -691,6 +691,7 @@ class ReplayedConstantsLog {
     previous_ = std::move(frame_);
     frame_.clear();
     lines_.clear();
+    full_lines_ = 0;
     changed_ = 0;
   }
 
@@ -709,6 +710,16 @@ class ReplayedConstantsLog {
     bool changed = index >= previous_.size() || previous_[index] != m;
     changed_ += changed;
     frame_.push_back(m);
+    if (logging_ && start == 9 && count == 5 && full_lines_ < 12) {
+      full_lines_++;
+      std::string values;
+      for (uint32_t i = 0; i < 20; i++) {
+        values += fmt::format("{}{:.4g}", i % 4 == 0 ? (i ? " | " : "") : " ",
+                              guest::LoadFloat(base, payload + 4 * i));
+      }
+      lines_.push_back(fmt::format("#{} c9 x5 from {:08X} {}: {}", index, payload,
+                                   changed ? "changed" : "same", values));
+    }
     if (logging_ && lines_.size() < 120) {
       lines_.push_back(fmt::format(
           "#{} c{} x{} from {:08X} {}{} [{:.3g} {:.3g} {:.3g} {:.3g} | ... | {:.4g} {:.4g} "
@@ -723,6 +734,7 @@ class ReplayedConstantsLog {
   std::vector<Matrix4> frame_, previous_;
   std::vector<std::string> lines_;
   int changed_ = 0;
+  int full_lines_ = 0;
   int frames_since_tick_ = 0;
   bool logging_ = false;
   std::chrono::steady_clock::time_point last_log_{};
