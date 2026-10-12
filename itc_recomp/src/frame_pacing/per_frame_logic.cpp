@@ -24,6 +24,9 @@
 #include <vector>
 
 REXCVAR_DECLARE(bool, interpolate_draw_state);
+REXCVAR_DEFINE_DOUBLE(debug_overlay_vehicle_lift, 0.0, "ITC",
+                      "Testing: raise the cars this many metres while the race overlays "
+                      "record");
 REXCVAR_DEFINE_BOOL(per_tick_blink_timers, true, "ITC",
                     "Advance the car blink timers once per tick on render-only passes");
 REXCVAR_DEFINE_BOOL(per_tick_ui_movies, true, "ITC",
@@ -202,10 +205,22 @@ void RecordVehiclePoses(uint8_t* base) {
 // Sets each car's world matrix to the frame's blend; returns what to put back.
 std::vector<std::pair<uint32_t, interpolation::Matrix4>> BlendVehiclePoses(uint8_t* base) {
   std::vector<std::pair<uint32_t, interpolation::Matrix4>> saved;
-  if (!REXCVAR_GET(interpolate_draw_state)) {
+  if (!REXCVAR_GET(interpolate_draw_state) && REXCVAR_GET(debug_overlay_vehicle_lift) == 0) {
     return saved;
   }
   float amount = frame_pacing::GetFramePacer().TickProgress();
+  float lift = float(REXCVAR_GET(debug_overlay_vehicle_lift));
+  if (lift != 0) {
+    for (uint32_t vehicle : g_vehicles) {
+      for (uint32_t offset : {kVehicleWorldOffset, kVehicleWorldCopyOffset}) {
+        interpolation::Matrix4 m = LoadMatrix(base, vehicle + offset);
+        saved.push_back({vehicle + offset, m});
+        m[13] += lift;
+        StoreMatrix(base, vehicle + offset, m);
+      }
+    }
+    return saved;
+  }
   for (const auto& [vehicle, poses] : g_vehicle_poses) {
     if (!poses.before || !poses.now) {
       continue;
