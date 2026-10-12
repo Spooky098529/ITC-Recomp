@@ -193,10 +193,19 @@ constexpr uint32_t kRecorderMultiplyReturn = 0x82595438;
 // Blends a multiply's result between ticks: the world matrix and the camera
 // each as a rigid motion (positions straight, rotations along the shortest
 // arc), falling back to the current tick's where they aren't.
-Matrix4 BlendProduct(const ReplayedProduct& product, float amount) {
+struct BlendStats {
+  int blended = 0;
+  int unpaired = 0;
+  int world_not_blended = 0;
+  int camera_not_blended = 0;
+};
+
+Matrix4 BlendProduct(const ReplayedProduct& product, float amount, BlendStats& stats) {
   if (!product.before) {
+    stats.unpaired++;
     return product.written;
   }
+  stats.blended++;
   const ProductInputs& a = *product.before;
   const ProductInputs& b = product.now;
   Matrix4 world = b.world;
@@ -204,6 +213,8 @@ Matrix4 BlendProduct(const ReplayedProduct& product, float amount) {
   std::optional<ScaledTransform> wb = ScaledTransformFromWorldMatrix(b.world);
   if (wa && wb && !IsCut(wa->transform, wb->transform)) {
     world = WorldMatrixFromScaledTransform(Blend(*wa, *wb, amount));
+  } else if (a.world != b.world) {
+    stats.world_not_blended++;
   }
   Matrix4 view_projection = b.view_projection;
   if (a.view_projection != b.view_projection) {
@@ -211,6 +222,8 @@ Matrix4 BlendProduct(const ReplayedProduct& product, float amount) {
         motion && Distance(motion->motion.position, Vec3{}) < 1e6f &&
         AngleBetween(motion->motion.rotation, Quaternion{}) <= kCutAngle) {
       view_projection = BlendRigidMotion(*motion, amount);
+    } else {
+      stats.camera_not_blended++;
     }
   }
   return Multiply(world, view_projection);
@@ -549,13 +562,33 @@ DrawState& GetDrawState() {
 class ReplayCameras {
  public:
   void OnFrameStart() {
+    LogStats();
     std::lock_guard lock(g_replay_mutex);
     frame_ = g_replay_frame;
   }
 
+  // Render thread, for each vertex constant upload of 4+ registers.
+  void CountUpload(uint8_t* base, uint32_t payload, bool substituted) {
+    if (!REXCVAR_GET(log_blend_state)) {
+      return;
+    }
+    stats_.uploads++;
+    if (substituted) {
+      return;
+    }
+    Matrix4 m = LoadMatrix(base, payload);
+    auto it = last_values_.find(payload);
+    if (it != last_values_.end() && it->second == m) {
+      stats_.not_substituted_same++;
+    } else {
+      stats_.not_substituted_changed++;
+    }
+    last_values_[payload] = m;
+  }
+
   // The value to upload from `payload` in place of `m`, if it's a camera
   // product of the tick still as written.
-  std::optional<Matrix4> Substitute(uint32_t payload, const Matrix4& m) const {
+  std::optional<Matrix4> Substitute(uint32_t payload, const Matrix4& m) {
     if (!frame_) {
       return std::nullopt;
     }
@@ -563,11 +596,41 @@ class ReplayCameras {
     if (it == frame_->products.end() || it->second.written != m) {
       return std::nullopt;
     }
-    return BlendProduct(it->second, frame_->amount);
+    return BlendProduct(it->second, frame_->amount, stats_.blend);
   }
 
  private:
+  void LogStats() {
+    if (!REXCVAR_GET(log_blend_state)) {
+      return;
+    }
+    stats_.frames++;
+    auto now = std::chrono::steady_clock::now();
+    if (now - last_log_ < std::chrono::seconds(1)) {
+      return;
+    }
+    int f = std::max(stats_.frames, 1);
+    REXLOG_INFO(
+        "replay: {} frames; per frame {} uploads, {} blended ({} world, {} camera not blended), "
+        "{} unpaired, not replaced: {} unchanged since last frame, {} changed",
+        stats_.frames, stats_.uploads / f, stats_.blend.blended / f,
+        stats_.blend.world_not_blended / f, stats_.blend.camera_not_blended / f,
+        stats_.blend.unpaired / f, stats_.not_substituted_same / f,
+        stats_.not_substituted_changed / f);
+    stats_ = {};
+    last_log_ = now;
+  }
+
   std::shared_ptr<const ReplayFrame> frame_;
+  struct {
+    int frames = 0;
+    int uploads = 0;
+    int not_substituted_same = 0;
+    int not_substituted_changed = 0;
+    BlendStats blend;
+  } stats_;
+  std::unordered_map<uint32_t, Matrix4> last_values_;
+  std::chrono::steady_clock::time_point last_log_{};
 };
 
 ReplayCameras& GetReplayCameras() {
@@ -685,6 +748,9 @@ void BlendState_ReplayConstants(uint8_t* base, uint32_t payload, uint32_t packed
       StoreMatrix(base, payload, *substitute);
       GetDrawState().CountReplayedProduct();
     }
+  }
+  if (stage == 0 && count >= 4) {
+    GetReplayCameras().CountUpload(base, payload, original.has_value());
   }
   GetReplayedConstantsLog().OnUpload(base, payload, packed, original.has_value());
   upload();
