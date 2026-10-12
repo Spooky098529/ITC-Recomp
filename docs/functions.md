@@ -607,6 +607,9 @@ constants:
   "Finding what still steps" if something does.
 - **A piece of geometry flickers while the car moves**, at native 30 fps
   too, so not interpolation: probably the game's own effect (a broken light).
+- **The player's headlight beam on the road can jump in very sharp turns.**
+  Reported before the light slot fixes (frame lag, switching, 4 m rule) and
+  not rechecked since; the release notes still list it.
 - **Projective matrices from `0x82596D9C`** (the per-object recorder's
   other caller seen moving in races) can't be split into position and
   rotation, so they're drawn at the tick (`--log_moving_products` lists them

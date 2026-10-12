@@ -84,3 +84,8 @@ Not done yet:
   shows the render thread is the limit (6-8 ms a frame, our blending under
   1 ms of it); next step is profiling with `perf` (not installed yet).
 - Menus still run at 30 fps (see Known issues).
+- Other per-object draws (caller `0x82596D9C`) use projective matrices that
+  aren't blended, so they step at 30 Hz; what they draw isn't known yet
+  (see Known issues; `--log_moving_products` lists them).
+- Recheck whether the player's beam on the road still jumps in sharp turns
+  (Known issues); if it's gone, drop it from the next release's limits.
