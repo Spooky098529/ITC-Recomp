@@ -378,9 +378,30 @@ into a command 7 payload. So blending happens there, in two halves:
      a table that once reset when full unpaired everything,
    - how many times that combination was multiplied earlier in the pass.
 
-   Each key is paired with the same key from the previous tick. Render-only
+   Each key is paired with the same key from the previous tick, except the
+   per-object recorder's products (`--pair_by_object`, see below). Render-only
    passes draw unchanged state, so their multiplies must have the same inputs
    as the logic pass's under the same key; a mismatch is left alone.
+
+   **Cars' parts are paired by position.** Numbering by order paired a part
+   with whatever took its place when something was culled or the cars were
+   drawn in another order: a wheel with another wheel of the same car (3.5 m
+   away, so it was blended between the two and drawn in the wrong place for
+   a moment) or a part with another car's (150 m, drawn unblended). The
+   recorder's caller for cars' parts (`0x820D0564`) keeps the part's mesh in
+   r31, so the key also holds the caller and r31; but the mesh is shared by
+   cars of a model and by a car's four wheels, so within each group of
+   products alike but for their order, `MatchTick` matches by position once
+   a tick: first the parts alone within 8 m in both ticks (a car's body),
+   then the rest at their position moved back by the nearest such part's
+   movement (so a front wheel isn't taken for where the rear wheel was at
+   speed). Each object keeps an identity along the pairing from tick to
+   tick, which the pixel constants are paired by; their entries are dropped
+   two ticks after last seen. `--log_moving_products` logs moving objects
+   drawn out of step: render-only mismatches, products not blended or
+   unpaired, pairings that moved unlike everything within 4 m (another
+   wheel), and jumps between frames, with the recorder's caller and its
+   r24-r31.
 2. **Render thread, replay.** After each Draw the main thread publishes, by
    payload address, the products recorded and their two ticks' inputs, plus
    the frame's amount. As `sub_8258FD48` replays a constant upload from a
@@ -489,6 +510,8 @@ and target, and recorder world matrices), mostly for comparison.
 | `--log_upload_owners`, `--debug_zero_owners` | Which code recorded each vertex constant upload; replay a recorder's vertex or pixel constant uploads as zeros (with `--log_slot_callers`) to see what it draws. The fastest way to identify a draw; see "World-space sprites". |
 | `--log_overlay_products`, `--log_overlay_uploads` | The race overlays' camera products and uploads, as replayed. |
 | `--log_world_sprites`, `--log_single_sprites` | The world-space sprites as recorded. |
+| `--pair_by_object` | Pair the per-object recorder's products by position within groups alike but for their order (default on); see "What gets blended". |
+| `--log_moving_products` | Moving objects drawn out of step, event by event; see "What gets blended". |
 | `--log_camera_pass_records` | Which camera passes are recorded on logic and render-only passes, by message handler. |
 
 ### What didn't work, and why
@@ -511,6 +534,9 @@ and target, and recorder world matrices), mostly for comparison.
   ticks by draw order (the `--interpolate` option). It paired the wrong
   objects whenever draws came and went, and showed up in the settings
   overlay as a buggy "interpolate" toggle; removed.
+- **Pairing cars' parts by r31 alone.** It's the part's mesh, not the car:
+  two cars of a model 152 m apart had the same r31, and the four wheels
+  share one, so order still decided within it. Matching by position did it.
 - **Pairing pixel constants by order in the frame.** Objects coming into or
   leaving view shifted the order; pairing by the preceding camera product
   fixed it.
@@ -554,5 +580,16 @@ constants:
   "Finding what still steps" if something does.
 - **A piece of geometry flickers while the car moves**, at native 30 fps
   too, so not interpolation: probably the game's own effect (a broken light).
+- **Projective matrices from `0x82596D9C`** (the per-object recorder's
+  other caller seen moving in races) can't be split into position and
+  rotation, so they're drawn at the tick (`--log_moving_products` lists them
+  as not blended, moving 1-8 m a tick). What they draw isn't known yet.
+- **Opponents' cars flash brighter for a tick now and then.** Pairing cars
+  by position made more of their lighting uploads pair correctly, and those
+  whose light slots change light between ticks (a streetlight in place of a
+  headlight) are rejected and left at the tick, a flicker. Branch
+  `opponent-lighting` works on it: slots switched on their own, the
+  lighting's camera (c0-c4, not switches) blended as a whole, and finally
+  only light positions and directions blended; the flash is still there.
 - **One tick of latency**: drawing shows between the previous and the
   current tick, as usual for this kind of interpolation.
