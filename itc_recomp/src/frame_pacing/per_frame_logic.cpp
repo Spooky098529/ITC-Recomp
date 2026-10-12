@@ -319,8 +319,35 @@ REXCVAR_DEFINE_BOOL(blend_world_sprites, true, "ITC",
                     "Blend world-space sprites (the marker above opponents) between ticks");
 
 // Wrapped in draw_tags.cpp (sub_82128750); `record` runs the original.
+REXCVAR_DEFINE_BOOL(log_world_sprites, false, "ITC",
+                    "Log the world-space sprite lists as recorded, every 2 s");
+
 void PerFrameLogic_RecordWorldSprites(uint8_t* base, uint32_t list,
                                       const std::function<void()>& record) {
+  if (REXCVAR_GET(log_world_sprites)) {
+    static std::chrono::steady_clock::time_point last{};
+    static int lines = 0;
+    auto now = std::chrono::steady_clock::now();
+    if (now - last >= std::chrono::seconds(2)) {
+      last = now;
+      lines = 0;
+    }
+    if (lines < 40) {
+      lines++;
+      uint32_t n = guest::LoadU32(base, list + kSpriteCountOffset);
+      auto f = [&](uint32_t a) { return guest::LoadFloat(base, a); };
+      SpriteList& s = g_sprite_lists[list];
+      REXLOG_INFO("world sprites: list {:08X} pass {} {} in race {} amount {:.2f} count {} "
+                  "matrix row3 ({:.5g} {:.5g} {:.5g}) corner0 ({:.5g} {:.5g} {:.5g}) "
+                  "corner1 ({:.5g} {:.5g} {:.5g}) kept {}/{}",
+                  list, frame_pacing::GameMessages_PassNumber(),
+                  frame_pacing::GameMessages_IsRenderOnlyPass() ? "render-only" : "logic",
+                  frame_pacing::GameMessages_InRace(),
+                  frame_pacing::GetFramePacer().TickProgress(), n, f(list + 48), f(list + 52),
+                  f(list + 56), f(list + 80), f(list + 84), f(list + 88), f(list + 96),
+                  f(list + 100), f(list + 104), s.before.size() / 16, s.now.size() / 16);
+    }
+  }
   if (!REXCVAR_GET(interpolate_draw_state) || !REXCVAR_GET(blend_world_sprites) ||
       !frame_pacing::GameMessages_InRace()) {
     record();
@@ -368,6 +395,10 @@ void PerFrameLogic_RecordWorldSprites(uint8_t* base, uint32_t list,
       saved.push_back({corner(i, k), b[k]});
       guest::StoreFloat(base, corner(i, k), a[k] + (b[k] - a[k]) * amount);
     }
+  }
+  if (REXCVAR_GET(log_world_sprites) && !saved.empty()) {
+    REXLOG_INFO("world sprites: list {:08X} blended {} words at amount {:.2f}", list, saved.size(),
+                amount);
   }
   record();
   for (const auto& [address, value] : saved) {
