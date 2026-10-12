@@ -22,6 +22,9 @@ void FrameStateDiff_OnPassStart(uint8_t* base, bool render_only);
 void FrameStateDiff_Before(uint8_t* base);
 void FrameStateDiff_After(uint8_t* base, const char* kind, uint32_t id);
 
+// Watches a guest word from now on, logging every change with its values.
+void FrameStateDiff_Watch(uint32_t address);
+
 // Testing (--debug_hide): whether a wrapped draw function is never to run.
 bool IsHidden(uint32_t function);
 

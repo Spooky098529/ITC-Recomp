@@ -276,6 +276,8 @@ so with frames uncapped it's fast; at `--max_fps=30` it's right.
   count in frames;
   `--find_per_frame_state_interval_ms=0` samples every pass (very slow);
   `--watch_addresses` watches given addresses from the start.
+  `--watch_lights` watches the light billboards' lights (the lists drawn by
+  `sub_8209CC38`: count at +32, 48-byte lights at +36, sizes at +32/+36).
 - `--render_only_skip=<hex,...>` skips tick handlers or message handlers (by
   target) on render-only passes, to bisect. Skipping the UI handler
   `0x8216C330` fixed the countdown's speed but hid the HUD on render-only

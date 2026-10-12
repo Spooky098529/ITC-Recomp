@@ -35,6 +35,9 @@ REXCVAR_DEFINE_BOOL(find_any_steps, false, "ITC",
                     "With --find_per_frame_state, look for any steady step (a float changing "
                     "by less than 1, or an integer by up to 4, by the same amount in two "
                     "samples) instead of timer steps only");
+REXCVAR_DEFINE_BOOL(watch_lights, false, "ITC",
+                    "With --find_per_frame_state, watch the light billboards' lights (the "
+                    "first 4 of each list drawn by sub_8209CC38), logging every change");
 REXCVAR_DEFINE_BOOL(find_countdowns, false, "ITC",
                     "With --find_per_frame_state, look for values counting down (a float in "
                     "0..10 going down, or a small integer going down by one) instead of any "
@@ -106,7 +109,9 @@ const char* CountdownStep(uint32_t before, uint32_t after) {
 // or a small integer by up to 4. Sets `step` to the change.
 const char* AnyStep(uint32_t before, uint32_t after, double& step) {
   float a = AsFloat(before), b = AsFloat(after);
-  auto plain = [](float f) { return f == 0 || (std::isnormal(f) && std::abs(f) < 1e5f); };
+  auto plain = [](float f) {
+    return f == 0 || (std::abs(f) >= 1e-6f && std::abs(f) < 1e5f);
+  };
   if (plain(a) && plain(b) && a != b && std::abs(b - a) < 1) {
     step = double(b) - double(a);
     return "float";
@@ -290,31 +295,47 @@ class FrameStateDiff {
       return;
     }
     forced_added_ = true;
-    std::string list = REXCVAR_GET(watch_addresses);
-    size_t start = 0;
-    while (start < list.size()) {
-      size_t end = list.find(',', start);
-      std::string item = list.substr(start, end == std::string::npos ? std::string::npos : end - start);
-      if (!item.empty()) {
-        uint32_t address = uint32_t(std::stoul(item, nullptr, 16));
-        forced_.insert(address);
-        if (std::find(watched_.begin(), watched_.end(), address) == watched_.end()) {
-          watched_.insert(watched_.begin(), address);
+    if (!forced_parsed_) {
+      forced_parsed_ = true;
+      std::string list = REXCVAR_GET(watch_addresses);
+      size_t start = 0;
+      while (start < list.size()) {
+        size_t end = list.find(',', start);
+        std::string item =
+            list.substr(start, end == std::string::npos ? std::string::npos : end - start);
+        if (!item.empty()) {
+          forced_.insert(uint32_t(std::stoul(item, nullptr, 16)));
         }
+        if (end == std::string::npos) {
+          break;
+        }
+        start = end + 1;
       }
-      if (end == std::string::npos) {
-        break;
+    }
+    for (uint32_t address : forced_) {
+      if (std::find(watched_.begin(), watched_.end(), address) == watched_.end()) {
+        watched_.insert(watched_.begin(), address);
       }
-      start = end + 1;
     }
   }
 
+ public:
+  // Watches a word from now on, as --watch_addresses does.
+  void Watch(uint32_t address) {
+    if (forced_.insert(address).second) {
+      forced_added_ = false;
+    }
+  }
+
+ private:
+
   // Every change to a --watch_addresses word is logged with its values, up
   // to this many per 2 s.
-  static constexpr int kMaxLoggedValues = 60;
+  static constexpr int kMaxLoggedValues = 200;
   int logged_values_ = 0;
   std::set<uint32_t> forced_;
   bool forced_added_ = false;
+  bool forced_parsed_ = false;
   bool render_only_ = false;
   bool snapshot_taken_ = false;
   std::vector<Range> ranges_;
@@ -363,6 +384,10 @@ void FrameStateDiff_After(uint8_t* base, const char* kind, uint32_t id) {
   Get().After(base, kind, id);
 }
 
+void FrameStateDiff_Watch(uint32_t address) {
+  Get().Watch(address);
+}
+
 }  // namespace debug
 
 // The race draw step's parts (sub_8215B4F8 calls these), wrapped only to
@@ -398,8 +423,27 @@ ITC_FRAME_STATE_WRAP(82597118)
 ITC_FRAME_STATE_WRAP(82597518)
 ITC_FRAME_STATE_WRAP(82597610)
 ITC_FRAME_STATE_WRAP(82598768)
-// The light billboards' batch (calls sub_8209C1A0 and sub_8209C6E0).
-ITC_FRAME_STATE_WRAP(8209CC38)
+// The light billboards' batch (calls sub_8209C1A0 and sub_8209C6E0); r4 is
+// the light list: count at +32, 48-byte lights at +36 (position at +0, size
+// at +32 and +36; a light with neither size above 0 is skipped).
+// --watch_lights watches every word of its first lights.
+extern "C" REX_FUNC(sub_8209CC38) {
+  REX_FUNC_PROLOGUE();
+  if (debug::IsHidden(0x8209CC38)) {
+    return;
+  }
+  if (REXCVAR_GET(watch_lights) && REXCVAR_GET(find_per_frame_state)) {
+    uint32_t list = ctx.r4.u32;
+    uint32_t lights = guest::LoadU32(base, list + 36);
+    uint32_t count = std::min<uint32_t>(guest::LoadU32(base, list + 32), 4);
+    for (uint32_t i = 0; i < count * 48; i += 4) {
+      debug::FrameStateDiff_Watch(lights + i);
+    }
+  }
+  debug::FrameStateDiff_Before(base);
+  __imp__sub_8209CC38(ctx, base);
+  debug::FrameStateDiff_After(base, "draw step part", 0x8209CC38);
+}
 // The per-car update called from Draw (sub_820DAC68), and its callees.
 ITC_FRAME_STATE_WRAP(820DAC68)
 ITC_FRAME_STATE_WRAP(820C5C88)
