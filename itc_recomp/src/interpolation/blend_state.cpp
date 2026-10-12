@@ -206,7 +206,13 @@ int PassOfViewProjection(uint32_t address) {
 struct ProductInputs {
   Matrix4 world;
   Matrix4 view_projection;
+  // Diagnostics (--log_moving_products): for the per-object recorder's
+  // multiply, its caller (lr) and the caller's r24-r31 at the call.
+  std::array<uint32_t, 9> context{};
 };
+
+// Main thread: the per-object recorder's caller context while it runs.
+std::array<uint32_t, 9> g_record_context{};
 
 // A multiply made during a logic pass, as the render thread redoes it.
 struct ReplayedProduct {
@@ -457,6 +463,9 @@ class DrawState {
     bool render_only = frame_pacing::GameMessages_IsRenderOnlyPass();
     bool recorder = caller == kRecorderMultiplyReturn;
     ProductInputs inputs{LoadMatrix(base, a), LoadMatrix(base, b)};
+    if (recorder) {
+      inputs.context = g_record_context;
+    }
     // Any multiply by a camera: the recorder's, one by a camera pass, or one
     // by a perspective view-projection wherever it's kept (the light
     // billboards' recorder, sub_8209C1A0, builds one on its stack).
@@ -1021,7 +1030,9 @@ class MovingProductsLog {
     r.now = Translation(product.now.world);
     r.shown = Translation(world_shown);
     r.outcome = outcome;
+    r.context_now = product.now.context;
     if (product.before) {
+      r.context_before = product.before->context;
       r.before = Translation(product.before->world);
       std::optional<ScaledTransform> a = ScaledTransformFromWorldMatrix(product.before->world);
       std::optional<ScaledTransform> b = ScaledTransformFromWorldMatrix(product.now.world);
@@ -1064,6 +1075,7 @@ class MovingProductsLog {
     std::optional<Vec3> before;
     float angle = -1;
     Outcome outcome = Outcome::kBlended;
+    std::array<uint32_t, 9> context_now{}, context_before{};
     float Moved() const { return before ? Distance(*before, now) : 0.0f; }
   };
   struct Shown {
@@ -1087,10 +1099,16 @@ class MovingProductsLog {
     std::string before = r.before ? fmt::format("{:.3f} {:.3f} {:.3f}", (*r.before)[0],
                                                 (*r.before)[1], (*r.before)[2])
                                   : std::string("-");
+    auto context = [](const std::array<uint32_t, 9>& c) {
+      return fmt::format("lr {:08X} r24-r31 {:08X} {:08X} {:08X} {:08X} {:08X} {:08X} {:08X} {:08X}",
+                         c[0], c[1], c[2], c[3], c[4], c[5], c[6], c[7], c[8]);
+    };
     return fmt::format("id {:016X} payload {:08X} handler {:08X} {}: before {} now {:.3f} {:.3f} "
-                       "{:.3f} shown {:.3f} {:.3f} {:.3f}, moved {:.3f} turned {:.3f}",
+                       "{:.3f} shown {:.3f} {:.3f} {:.3f}, moved {:.3f} turned {:.3f}; now {}; "
+                       "before {}",
                        r.identity, r.payload, r.handler, Name(r.outcome), before, r.now[0],
-                       r.now[1], r.now[2], r.shown[0], r.shown[1], r.shown[2], r.Moved(), r.angle);
+                       r.now[1], r.now[2], r.shown[0], r.shown[1], r.shown[2], r.Moved(), r.angle,
+                       context(r.context_now), r.before ? context(r.context_before) : "-");
   }
 
   void Check() {
@@ -2425,6 +2443,12 @@ extern "C" REX_FUNC(sub_8258FD48) {
 extern "C" REX_FUNC(sub_825953D0) {
   REX_FUNC_PROLOGUE();
   interpolation::BlendState_BeforeRecordObject(base, ctx.r4.u32, ctx.r5.u32);
+  if (REXCVAR_GET(log_moving_products)) {
+    interpolation::g_record_context = {uint32_t(ctx.lr), ctx.r24.u32, ctx.r25.u32, ctx.r26.u32,
+                                       ctx.r27.u32,      ctx.r28.u32, ctx.r29.u32, ctx.r30.u32,
+                                       ctx.r31.u32};
+  }
   __imp__sub_825953D0(ctx, base);
+  interpolation::g_record_context = {};
   interpolation::BlendState_AfterRecordObject(base);
 }
