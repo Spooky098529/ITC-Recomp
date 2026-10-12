@@ -23,6 +23,9 @@ REXCVAR_DEFINE_BOOL(find_per_frame_state, false, "ITC",
 REXCVAR_DEFINE_INT32(find_per_frame_state_interval_ms, 2000, "ITC",
                      "How often --find_per_frame_state samples a render-only pass (0 = every "
                      "one; slow)");
+REXCVAR_DEFINE_STRING(watch_addresses, "", "ITC",
+                      "With --find_per_frame_state, guest addresses (hex, comma-separated) to "
+                      "watch from the start, logging every change with the code making it");
 REXCVAR_DEFINE_BOOL(find_countdowns, false, "ITC",
                     "With --find_per_frame_state, look for values counting down (a float in "
                     "0..10 going down, or a small integer going down by one) instead of any "
@@ -137,7 +140,11 @@ class FrameStateDiff {
   }
 
   void Before(uint8_t* base) {
-    if (!REXCVAR_GET(find_per_frame_state) || !render_only_ || watched_.empty()) {
+    if (!REXCVAR_GET(find_per_frame_state) || !render_only_) {
+      return;
+    }
+    AddForcedWatches();
+    if (watched_.empty()) {
       return;
     }
     std::vector<uint32_t> values(watched_.size());
@@ -200,6 +207,7 @@ class FrameStateDiff {
       hits_[address]++;
     }
     watched_.clear();
+    forced_added_ = false;
     for (const auto& [address, hits] : hits_) {
       if (hits >= 2 && watched_.size() < kMaxWatched) {
         watched_.push_back(address);
@@ -222,6 +230,30 @@ class FrameStateDiff {
     changes_.clear();
   }
 
+  void AddForcedWatches() {
+    if (forced_added_) {
+      return;
+    }
+    forced_added_ = true;
+    std::string list = REXCVAR_GET(watch_addresses);
+    size_t start = 0;
+    while (start < list.size()) {
+      size_t end = list.find(',', start);
+      std::string item = list.substr(start, end == std::string::npos ? std::string::npos : end - start);
+      if (!item.empty()) {
+        uint32_t address = uint32_t(std::stoul(item, nullptr, 16));
+        if (std::find(watched_.begin(), watched_.end(), address) == watched_.end()) {
+          watched_.insert(watched_.begin(), address);
+        }
+      }
+      if (end == std::string::npos) {
+        break;
+      }
+      start = end + 1;
+    }
+  }
+
+  bool forced_added_ = false;
   bool render_only_ = false;
   bool snapshot_taken_ = false;
   std::vector<Range> ranges_;
