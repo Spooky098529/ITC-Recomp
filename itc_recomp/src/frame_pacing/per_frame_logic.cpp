@@ -300,7 +300,9 @@ extern "C" REX_FUNC(sub_8215DEA0) {
 // blended between ticks; left at the tick's corners, a sprite was ahead of
 // its blended car early in each tick and caught up by the end (two markers).
 // The corners are blended between their last two ticks, by index, while it
-// records, then put back.
+// records, then put back. The list is shared: each overlay fills it and
+// records it in turn (the marker, then particles), so each recording is
+// matched with the logic pass's by its order in the pass.
 namespace {
 constexpr uint32_t kSpriteCountOffset = 0x109F0;
 constexpr uint32_t kSpriteCornersOffset = 80;
@@ -309,10 +311,21 @@ constexpr uint32_t kMaxSprites = 500;
 constexpr float kMaxSpriteStep = 10.0f;  // further in a tick is a new sprite
 
 struct SpriteList {
-  uint64_t pass = ~0ull;
   std::vector<float> before, now;  // corners after the last two ticks
 };
-std::unordered_map<uint32_t, SpriteList> g_sprite_lists;
+struct SpriteListKey {
+  uint32_t list;
+  int occurrence;  // recordings of the list earlier in the pass
+  bool operator==(const SpriteListKey&) const = default;
+};
+struct SpriteListKeyHash {
+  size_t operator()(const SpriteListKey& k) const {
+    return (size_t(k.list) << 10) ^ size_t(k.occurrence);
+  }
+};
+std::unordered_map<SpriteListKey, SpriteList, SpriteListKeyHash> g_sprite_lists;
+uint64_t g_sprite_pass = ~0ull;
+std::unordered_map<uint32_t, int> g_sprite_occurrences;
 }  // namespace
 
 REXCVAR_DEFINE_BOOL(blend_world_sprites, true, "ITC",
@@ -336,7 +349,8 @@ void PerFrameLogic_RecordWorldSprites(uint8_t* base, uint32_t list,
       lines++;
       uint32_t n = guest::LoadU32(base, list + kSpriteCountOffset);
       auto f = [&](uint32_t a) { return guest::LoadFloat(base, a); };
-      SpriteList& s = g_sprite_lists[list];
+      auto it = g_sprite_lists.find({list, g_sprite_occurrences[list]});
+      SpriteList s = it != g_sprite_lists.end() ? it->second : SpriteList{};
       REXLOG_INFO("world sprites: list {:08X} pass {} {} in race {} amount {:.2f} count {} "
                   "matrix row3 ({:.5g} {:.5g} {:.5g}) corner0 ({:.5g} {:.5g} {:.5g}) "
                   "corner1 ({:.5g} {:.5g} {:.5g}) kept {}/{}",
@@ -357,18 +371,18 @@ void PerFrameLogic_RecordWorldSprites(uint8_t* base, uint32_t list,
   auto corner = [&](uint32_t i, uint32_t k) {
     return list + kSpriteCornersOffset + kSpriteStride * i + 4 * k;  // k: 16 floats
   };
-  SpriteList& sprites = g_sprite_lists[list];
+  uint64_t pass = frame_pacing::GameMessages_PassNumber();
+  if (pass != g_sprite_pass) {
+    g_sprite_pass = pass;
+    g_sprite_occurrences.clear();
+  }
+  SpriteList& sprites = g_sprite_lists[{list, g_sprite_occurrences[list]++}];
   if (!frame_pacing::GameMessages_IsRenderOnlyPass()) {
-    uint64_t pass = frame_pacing::GameMessages_PassNumber();
-    if (pass != sprites.pass) {
-      // The first recording of this tick (it's recorded once per view).
-      sprites.pass = pass;
-      sprites.before = std::move(sprites.now);
-      sprites.now.resize(count * 16);
-      for (uint32_t i = 0; i < count; i++) {
-        for (uint32_t k = 0; k < 16; k++) {
-          sprites.now[i * 16 + k] = guest::LoadFloat(base, corner(i, k));
-        }
+    sprites.before = std::move(sprites.now);
+    sprites.now.resize(count * 16);
+    for (uint32_t i = 0; i < count; i++) {
+      for (uint32_t k = 0; k < 16; k++) {
+        sprites.now[i * 16 + k] = guest::LoadFloat(base, corner(i, k));
       }
     }
   }
