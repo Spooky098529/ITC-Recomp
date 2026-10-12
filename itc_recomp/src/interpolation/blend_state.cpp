@@ -1262,6 +1262,12 @@ class PixelConstantBlender {
     }
     if (entry.current != now) {
       outcome_ = Outcome::kNotAsRecorded;  // differs from the tick's first value
+      differing_.clear();
+      for (uint32_t i = 0; i < now.size(); i++) {
+        if (i < entry.current.size() && entry.current[i] != now[i]) {
+          differing_.push_back({i, entry.current[i], now[i]});
+        }
+      }
       return std::nullopt;
     }
     // Some components are per-object switches that legitimately jump
@@ -1319,8 +1325,16 @@ class PixelConstantBlender {
   // The rejected component (from the upload's start) and its two ticks' values.
   uint32_t rejected() const { return rejected_; }
   std::pair<float, float> rejected_values() const { return rejected_values_; }
+  // For kNotAsRecorded: the components (from the upload's start) that differ
+  // from the tick's first value, with both values.
+  struct Difference {
+    uint32_t i;
+    float first, now;
+  };
+  const std::vector<Difference>& differing() const { return differing_; }
 
  private:
+  std::vector<Difference> differing_;
   static void LogRejection(uint32_t i, float a, float b);
 
   Outcome outcome_ = Outcome::kNoObject;
@@ -1382,6 +1396,20 @@ class PixelOutcomesLog {
     if (outcome == Outcome::kBlended && blender.switch_jumps() > 0) {
       switch_jumps_[{kind, start}]++;
     }
+    if (outcome == Outcome::kNotAsRecorded && moving) {
+      std::string components;
+      for (const auto& d : blender.differing()) {
+        differing_[d.i]++;
+        if (components.size() < 160) {
+          components += fmt::format(" c{}.{} {:.4g}->{:.4g}", start + d.i / 4, "xyzw"[d.i % 4],
+                                    d.first, d.now);
+        }
+      }
+      if (not_as_recorded_examples_.size() < 6) {
+        not_as_recorded_examples_.push_back(
+            fmt::format("{} differ:{}", blender.differing().size(), components));
+      }
+    }
     if (outcome == Outcome::kRejected && moving) {
       auto [a, b] = blender.rejected_values();
       rejected_[blender.rejected()]++;
@@ -1420,6 +1448,19 @@ class PixelOutcomesLog {
       REXLOG_INFO("pixel outcomes: moving objects rejected by (register from start.component:count):{}; e.g.{}",
                   line, rejected_examples_);
     }
+    if (!differing_.empty()) {
+      std::string line;
+      for (const auto& [i, n] : differing_) {
+        line += fmt::format(" +{}.{}:{}", i / 4, "xyzw"[i % 4], n);
+      }
+      REXLOG_INFO("pixel outcomes: moving objects not as recorded, differing (register from "
+                  "start.component:count):{}", line);
+      for (const std::string& example : not_as_recorded_examples_) {
+        REXLOG_INFO("pixel outcomes: not as recorded, e.g. {}", example);
+      }
+    }
+    differing_.clear();
+    not_as_recorded_examples_.clear();
     counts_.clear();
     switch_jumps_.clear();
     rejected_.clear();
@@ -1432,6 +1473,8 @@ class PixelOutcomesLog {
   std::map<std::pair<std::string, uint32_t>, int> switch_jumps_;
   std::map<uint32_t, int> rejected_;
   std::string rejected_examples_;
+  std::map<uint32_t, int> differing_;
+  std::vector<std::string> not_as_recorded_examples_;
   int frames_ = 0;
   std::chrono::steady_clock::time_point last_ = std::chrono::steady_clock::now();
 };
