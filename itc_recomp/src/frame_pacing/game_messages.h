@@ -29,9 +29,9 @@ void GameMessages_OnPassFinished();
 void GameMessages_SetRenderOnlyPass(bool render_only);
 bool GameMessages_IsRenderOnlyPass();
 
-// Main thread, on a render-only pass just before Draw: draws what the game
-// draws only during Update (per_frame_logic.cpp).
-void PerFrameLogic_RenderOnlyRedraws(PPCContext& ctx, uint8_t* base);
+// Main thread, after a render-only pass's Draw: draws what the game draws
+// only during Update (per_frame_logic.cpp).
+void PerFrameLogic_AfterRenderOnlyDraw(PPCContext& ctx, uint8_t* base);
 
 // Which main loop pass this is (counts up by one per pass).
 uint64_t GameMessages_PassNumber();
