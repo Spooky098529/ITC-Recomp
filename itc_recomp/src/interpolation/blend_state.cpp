@@ -420,12 +420,14 @@ class DrawState {
         handler_ == kRaceOverlaysHandler ? 0 : camera_ids_.Of(inputs.view_projection);
     ProductKey key{camera, world, signature, handler_,
                    product_occurrences_[{camera, world, signature, handler_, 0}]++};
-    if (!render_only && REXCVAR_GET(log_overlay_products) && handler_ == kRaceOverlaysHandler &&
-        overlay_keys_logged_ < 12) {
+    if (REXCVAR_GET(log_overlay_products) && handler_ == kRaceOverlaysHandler &&
+        overlay_keys_logged_ < 24) {
       overlay_keys_logged_++;
-      REXLOG_INFO("overlay key: out {:08X} camera {:08X} world {:08X} id {} occurrence {} "
-                  "(tick {})",
-                  out, key.camera, key.world, key.signature, key.occurrence, ticks_);
+      REXLOG_INFO("overlay key ({}): out {:08X} camera {:08X} world {:08X} id {} occurrence {} "
+                  "(tick {}) in current tick {} previous {}",
+                  render_only ? "render-only" : "logic", out, key.camera, key.world,
+                  key.signature, key.occurrence, ticks_, current_tick_.count(key),
+                  previous_tick_.count(key));
     }
     if (!render_only) {
       collecting_[key] = inputs;
