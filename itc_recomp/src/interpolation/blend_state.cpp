@@ -384,6 +384,7 @@ class DrawState {
   }
 
   void AfterDraw(uint8_t* base) {
+    base_ = base;
     if (logic_pass_) {
       // This tick's products are complete (its Update and Draw).
       previous_tick_ = std::move(current_tick_);
@@ -581,11 +582,24 @@ class DrawState {
         counts_.objects_not_transforms / draws, counts_.replayed_products.load() / draws,
         counts_.camera_cuts, counts_.object_cuts, counts_.products_published / draws,
         counts_.mismatched_products / draws);
+    if (REXCVAR_GET(log_replayed_constants)) {
+      auto print = [&](const char* name, uint32_t offset) {
+        Matrix4 m = LoadMatrix(base_, CameraPass(0) + offset);
+        REXLOG_INFO("pass 0 {}: {:.4g} {:.4g} {:.4g} {:.4g} | {:.4g} {:.4g} {:.4g} {:.4g} | {:.4g} "
+                    "{:.4g} {:.4g} {:.4g} | {:.4g} {:.4g} {:.4g} {:.4g}",
+                    name, m[0], m[1], m[2], m[3], m[4], m[5], m[6], m[7], m[8], m[9], m[10],
+                    m[11], m[12], m[13], m[14], m[15]);
+      };
+      print("view", kViewOffset);
+      print("projection", kProjectionOffset);
+      print("view-projection", kViewProjectionOffset);
+    }
     counts_.Reset();
     counts_.last_log = now;
   }
 
   std::thread::id main_thread_;
+  uint8_t* base_ = nullptr;
   bool logic_pass_ = false;
   bool enabled_ = false;
   float amount_ = 0;
