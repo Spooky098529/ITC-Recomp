@@ -20,6 +20,7 @@
 #include <cstring>
 #include <functional>
 #include <map>
+#include <tuple>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -445,10 +446,12 @@ REXCVAR_DEFINE_BOOL(log_camera_pass_records, false, "ITC",
 extern "C" REX_FUNC(sub_820A3978) {
   REX_FUNC_PROLOGUE();
   if (REXCVAR_GET(log_camera_pass_records) && frame_pacing::GameMessages_InRace()) {
-    static std::map<std::pair<uint32_t, uint32_t>, std::pair<int, int>> counts;
+    static std::map<std::tuple<uint32_t, uint32_t, uint32_t>, std::pair<int, int>> counts;
     static auto last = std::chrono::steady_clock::now();
     static uint64_t logic_start = 0, render_start = 0;
-    auto& entry = counts[{ctx.r3.u32, uint32_t(ctx.lr)}];
+    uint32_t handler, message;
+    frame_pacing::GameMessages_CurrentHandler(handler, message);
+    auto& entry = counts[{ctx.r3.u32, handler, message}];
     (frame_pacing::GameMessages_IsRenderOnlyPass() ? entry.second : entry.first)++;
     auto now = std::chrono::steady_clock::now();
     if (now - last >= std::chrono::seconds(2)) {
@@ -456,9 +459,10 @@ extern "C" REX_FUNC(sub_820A3978) {
       uint64_t logic, render;
       frame_pacing::GameMessages_PassCounts(logic, render);
       for (const auto& [key, n] : counts) {
-        REXLOG_INFO("camera pass record: pass {:08X} (type {}) from {:08X}: {} "
+        auto [pass, handler, message] = key;
+        REXLOG_INFO("camera pass record: pass {:08X} (type {}) in handler {:08X} message {}: {} "
                     "on {} logic, {} on {} render-only passes",
-                    key.first, guest::LoadU32(base, key.first + 584), key.second, n.first,
+                    pass, guest::LoadU32(base, pass + 584), handler, int32_t(message), n.first,
                     logic - logic_start, n.second, render - render_start);
       }
       counts.clear();

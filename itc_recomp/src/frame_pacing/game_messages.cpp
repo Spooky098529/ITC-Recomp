@@ -33,6 +33,16 @@ REXCVAR_DEFINE_STRING(render_only_skip, "", "ITC",
 
 namespace frame_pacing {
 namespace {
+uint32_t g_current_handler = 0;
+uint32_t g_current_message = ~0u;
+}  // namespace
+
+void GameMessages_CurrentHandler(uint32_t& handler, uint32_t& message) {
+  handler = g_current_handler;
+  message = g_current_message;
+}
+
+namespace {
 
 bool InTargetList(const std::string& list, uint32_t target) {
   size_t start = 0;
@@ -175,7 +185,11 @@ void Deliver(PPCContext& ctx, uint8_t* base, uint32_t dispatcher, uint32_t messa
     uint32_t used_before = list ? guest::LoadU32(base, list + kCommandListUsedOffset) : 0;
     debug::FrameStateDiff_Before(base);
     interpolation::BlendState_SetHandler(target);
+    g_current_handler = target;
+    g_current_message = guest::LoadU32(base, message);
     REX_CALL_INDIRECT_FUNC(method);
+    g_current_handler = 0;
+    g_current_message = ~0u;
     interpolation::BlendState_SetHandler(0);
     debug::FrameStateDiff_After(base, "message handler", target);
     if (REXCVAR_GET(log_recording_handlers) && list &&
