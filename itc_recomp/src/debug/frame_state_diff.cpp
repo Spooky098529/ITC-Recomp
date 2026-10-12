@@ -210,7 +210,7 @@ void FrameStateDiff_After(uint8_t* base, const char* kind, uint32_t id) {
 }  // namespace debug
 
 // The race draw step's parts (sub_8215B4F8 calls these), wrapped only to
-// name which one advances per-frame state.
+// name which one advances per-frame state (logged as "draw step part").
 #define ITC_FRAME_STATE_WRAP(address)                       \
   extern "C" REX_FUNC(sub_##address) {                      \
     REX_FUNC_PROLOGUE();                                    \
@@ -224,4 +224,21 @@ ITC_FRAME_STATE_WRAP(820C5DE8)
 ITC_FRAME_STATE_WRAP(820F6068)
 ITC_FRAME_STATE_WRAP(82130978)
 ITC_FRAME_STATE_WRAP(82133960)
+// The render orchestrator's (sub_820C5DE8) callees.
+ITC_FRAME_STATE_WRAP(8209F7A8)
+ITC_FRAME_STATE_WRAP(820A0958)
+ITC_FRAME_STATE_WRAP(820AA1A8)
+ITC_FRAME_STATE_WRAP(820AB560)
+ITC_FRAME_STATE_WRAP(820C4EB8)
+ITC_FRAME_STATE_WRAP(820C4FB8)
+ITC_FRAME_STATE_WRAP(820DAA38)
+ITC_FRAME_STATE_WRAP(820DAAC8)
+ITC_FRAME_STATE_WRAP(820DAB10)
+ITC_FRAME_STATE_WRAP(820DAC68)
+ITC_FRAME_STATE_WRAP(820FFD88)
+ITC_FRAME_STATE_WRAP(82593FC0)
+ITC_FRAME_STATE_WRAP(82597118)
+ITC_FRAME_STATE_WRAP(82597518)
+ITC_FRAME_STATE_WRAP(82597610)
+ITC_FRAME_STATE_WRAP(82598768)
 #undef ITC_FRAME_STATE_WRAP
