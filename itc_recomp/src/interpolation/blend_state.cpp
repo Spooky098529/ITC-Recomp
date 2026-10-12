@@ -713,6 +713,21 @@ class ReplayCameras {
     frame_ = g_replay_frame;
   }
 
+  // Render thread diagnostics: why an upload was or wasn't substituted.
+  std::string Status(uint32_t payload, const Matrix4& m) const {
+    if (!frame_) {
+      return "no frame";
+    }
+    auto it = frame_->products.find(payload);
+    if (it == frame_->products.end()) {
+      return "not published";
+    }
+    if (it->second.written != m) {
+      return "published, value differs";
+    }
+    return it->second.before ? "substituted" : "published, unpaired";
+  }
+
   // Render thread, for each vertex constant upload of 4+ registers.
   void CountUpload(uint8_t* base, uint32_t payload, bool substituted) {
     if (!REXCVAR_GET(log_blend_state)) {
@@ -917,6 +932,23 @@ void BlendState_ReplayConstants(uint8_t* base, uint32_t payload, uint32_t packed
   }
   if (stage == 0 && count >= 4) {
     GetReplayCameras().CountUpload(base, payload, original.has_value());
+    // Temporary: main-camera matrices uploaded to c0, with their status.
+    uint32_t start = (packed >> 8) & 0xFF;
+    Matrix4 m = original ? *original : LoadMatrix(base, payload);
+    static auto last = std::chrono::steady_clock::now();
+    static int logged = 0;
+    auto now = std::chrono::steady_clock::now();
+    if (now - last > std::chrono::seconds(1)) {
+      last = now;
+      logged = 0;
+    }
+    if (start == 0 && std::abs(m[5]) > 1.2f && logged < 60 && REXCVAR_GET(log_replayed_constants)) {
+      logged++;
+      REXLOG_INFO("c0 upload t={} from {:08X} x{} {}: {:.4g} {:.4g} {:.4g} {:.4g} ... {:.4g} {:.4g} {:.4g} {:.4g}",
+                  std::chrono::duration_cast<std::chrono::microseconds>(now.time_since_epoch()).count() % 100000000,
+                  payload, count, GetReplayCameras().Status(payload, m), m[0], m[1], m[2], m[3],
+                  m[12], m[13], m[14], m[15]);
+    }
   }
   GetReplayedConstantsLog().OnUpload(base, payload, packed, original.has_value());
   upload();
