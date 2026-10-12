@@ -1031,13 +1031,14 @@ class PixelConstantBlender {
       return std::nullopt;  // not paired, or not the recorded value
     }
     // Some components are per-object switches that legitimately jump
-    // between ticks (c1.x, c3.x, c3.y, c4.x: which lights reach the object,
-    // and how strongly); they take the tick's value and the rest blends. A
+    // between ticks (c1.x, c3.xyz, c4.x of an upload: which lights reach the
+    // object, and how strongly); they take the tick's value and the rest blends. A
     // jump anywhere else means this isn't the same object (or something cut),
     // so the whole upload is left as recorded rather than mix two objects.
     auto is_switch = [&](uint32_t i) {
-      uint32_t index = start * 4 + i;  // register * 4 + component
-      return index == 1 * 4 + 0 || index == 3 * 4 + 0 || index == 3 * 4 + 1 || index == 4 * 4 + 0;
+      // Register * 4 + component, from the start of the upload (the same
+      // layout is uploaded at c0 and at c63).
+      return i == 1 * 4 + 0 || i == 3 * 4 + 0 || i == 3 * 4 + 1 || i == 3 * 4 + 2 || i == 4 * 4 + 0;
     };
     std::vector<bool> jumps(now.size(), false);
     bool changed = false;
