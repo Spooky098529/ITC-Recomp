@@ -92,6 +92,7 @@ void Renderer_WaitForFrame(PPCContext& ctx, uint8_t* base, uint32_t renderer) {
     render_only = false;
   }
   if (!render_only) {
+    interpolation::BlendState_OnLogicPassStart();
     interpolation::BlendState_OnReplayTick();
     pacer.OnTickReleased();
   }

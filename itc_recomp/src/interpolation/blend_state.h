@@ -14,6 +14,9 @@
 
 namespace interpolation {
 
+// Main thread, before a logic pass (one that runs game logic) starts.
+void BlendState_OnLogicPassStart();
+
 // Main thread, around the delivery of a Draw message.
 void BlendState_BeforeDraw(uint8_t* base, bool render_only_pass);
 void BlendState_AfterDraw(uint8_t* base);
