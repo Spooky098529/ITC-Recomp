@@ -284,17 +284,42 @@ Matrix4 BlendProduct(const ReplayedProduct& product, float amount, BlendStats& s
 // Which camera a view-projection belongs to, as far as can be told from
 // its projection: aspect ratio and depth mapping stay the same for a view
 // while its field of view changes. Several views share stack copies of their
-// cameras, so this tells them apart. 0 for a non-perspective camera.
-uint64_t CameraSignature(const Matrix4& view_projection) {
-  std::optional<PerspectiveCamera> camera = SplitViewProjection(view_projection);
-  if (!camera || !(camera->y_scale != 0)) {
-    return 0;
+// cameras, so this tells them apart. Each distinct camera seen gets a stable
+// number (matched within a tolerance, so rounding can't split one camera);
+// 0 for a non-perspective one. Main thread.
+class CameraIds {
+ public:
+  uint64_t Of(const Matrix4& view_projection) {
+    std::optional<PerspectiveCamera> camera = SplitViewProjection(view_projection);
+    if (!camera || !(camera->y_scale != 0) || !(camera->depth_offset != 0)) {
+      return 0;
+    }
+    Signature signature{camera->x_scale / camera->y_scale, camera->depth_offset,
+                        camera->depth_scale / camera->depth_offset};
+    for (size_t i = 0; i < known_.size(); i++) {
+      if (IsClose(known_[i], signature)) {
+        return i + 1;
+      }
+    }
+    if (known_.size() >= 256) {
+      known_.clear();  // shouldn't happen; start again rather than grow
+    }
+    known_.push_back(signature);
+    return known_.size();
   }
-  auto quantise = [](float v, float step) { return uint64_t(int64_t(std::lround(v / step)) & 0xFFFFF); };
-  return 1 | quantise(camera->x_scale / camera->y_scale, 1e-3f) << 1 |
-         quantise(camera->depth_offset, 1e-3f) << 21 |
-         quantise(camera->depth_scale / std::max(std::abs(camera->depth_offset), 1e-6f), 1e-3f) << 41;
-}
+
+ private:
+  using Signature = std::array<float, 3>;
+  static bool IsClose(const Signature& a, const Signature& b) {
+    for (int i = 0; i < 3; i++) {
+      if (!(std::abs(a[i] - b[i]) <= 0.01f * std::max({std::abs(a[i]), std::abs(b[i]), 1e-3f}))) {
+        return false;
+      }
+    }
+    return true;
+  }
+  std::vector<Signature> known_;
+};
 
 class DrawState {
  public:
@@ -312,7 +337,7 @@ class DrawState {
       return;
     }
     ProductInputs inputs{LoadMatrix(base, a), LoadMatrix(base, b)};
-    uint64_t signature = CameraSignature(inputs.view_projection);
+    uint64_t signature = camera_ids_.Of(inputs.view_projection);
     ProductKey key{b, a, signature, product_occurrences_[{b, a, signature, 0}]++};
     if (!render_only) {
       collecting_[key] = inputs;
@@ -583,12 +608,12 @@ class DrawState {
   std::unordered_map<uint32_t, int> recorded_;
 
   // A multiply, identified across ticks by its operands' addresses, which
-  // camera it was (see CameraSignature), and how many times that combination
+  // camera it was (see CameraIds), and how many times that combination
   // was multiplied earlier in the pass.
   struct ProductKey {
     uint32_t camera;     // address
     uint32_t world;      // address
-    uint64_t signature;  // CameraSignature
+    uint64_t signature;  // CameraIds number
     int occurrence;
     bool operator==(const ProductKey&) const = default;
   };
@@ -603,6 +628,7 @@ class DrawState {
   ProductInputsByKey current_tick_;
   ProductInputsByKey previous_tick_;
   std::unordered_map<ProductKey, int, ProductKeyHash> product_occurrences_;
+  CameraIds camera_ids_;
 
   struct Output {
     ProductKey key;
