@@ -7,6 +7,7 @@
 
 #include "game_messages.h"
 #include "guest.h"
+#include "interpolation/blend_state.h"
 
 #include <rex/cvar.h>
 
@@ -143,7 +144,9 @@ extern "C" REX_FUNC(sub_8211D2F8) {
 // (slot 5). The marker above opponent cars is one, recorded only during
 // Update and lasting a frame, so it showed on logic passes only (flicker).
 // Render-only passes deliver Update to this handler alone (see
-// game_messages.cpp), and here only the recording runs.
+// game_messages.cpp), and here only the recording runs. Both loops are run
+// here (as the original does) to give each its own numbering for camera
+// products.
 //
 // The overlays place themselves with the camera passes as game logic left
 // them. By a render-only pass's Update, Draw has reused the passes for other
@@ -157,31 +160,47 @@ std::vector<uint8_t> g_overlay_cameras;  // as of the logic pass's overlays
 
 extern "C" REX_FUNC(sub_8215DEA0) {
   REX_FUNC_PROLOGUE();
-  uint8_t* cameras = base + kCameraPasses;
-  if (!frame_pacing::GameMessages_IsRenderOnlyPass()) {
-    g_overlay_cameras.assign(cameras, cameras + kCameraPassesBytes);
-    __imp__sub_8215DEA0(ctx, base);
-    return;
-  }
-  std::vector<uint8_t> current(cameras, cameras + kCameraPassesBytes);
-  if (g_overlay_cameras.size() == kCameraPassesBytes) {
-    std::memcpy(cameras, g_overlay_cameras.data(), kCameraPassesBytes);
-  }
   constexpr uint32_t kOverlayCount = 25;
+  constexpr uint32_t kUpdateSlot = 16;  // vtable offset of slot 4
   constexpr uint32_t kRecordSlot = 20;  // vtable offset of slot 5
+  // Numbering contexts for camera products (blend_state.h): the recording
+  // loop numbers its products the same on every pass, whether or not the
+  // update loop ran before it, so they pair with the logic pass's.
+  constexpr uint32_t kUpdateContext = 0x8215E151;
+  constexpr uint32_t kRecordContext = 0x8215E150;
   uint32_t list = ctx.r3.u32;
-  // The same stack frame as the original (stwu r1,-112(r1)), so the
-  // overlays' stack temporaries are where they are on a logic pass (camera
-  // products are keyed by their operands' addresses).
-  guest::StackFrame frame(ctx, 112);
-  for (uint32_t i = 0; i < kOverlayCount; i++) {
-    uint32_t overlay = guest::LoadU32(base, list + 4 * i);
-    if (overlay == 0) {
-      continue;
+  bool render_only = frame_pacing::GameMessages_IsRenderOnlyPass();
+  uint8_t* cameras = base + kCameraPasses;
+  std::vector<uint8_t> current;
+  if (!render_only) {
+    g_overlay_cameras.assign(cameras, cameras + kCameraPassesBytes);
+  } else {
+    current.assign(cameras, cameras + kCameraPassesBytes);
+    if (g_overlay_cameras.size() == kCameraPassesBytes) {
+      std::memcpy(cameras, g_overlay_cameras.data(), kCameraPassesBytes);
     }
-    uint32_t record = guest::LoadU32(base, guest::LoadU32(base, overlay) + kRecordSlot);
-    ctx.r3.u64 = overlay;
-    REX_CALL_INDIRECT_FUNC(record);
   }
-  std::memcpy(cameras, current.data(), kCameraPassesBytes);
+  // The original's stack frame (stwu r1,-112(r1)), so the overlays' stack
+  // temporaries are at the same addresses on every pass (camera products are
+  // keyed by their operands' addresses).
+  guest::StackFrame frame(ctx, 112);
+  auto for_each_overlay = [&](uint32_t slot) {
+    for (uint32_t i = 0; i < kOverlayCount; i++) {
+      uint32_t overlay = guest::LoadU32(base, list + 4 * i);
+      if (overlay == 0) {
+        continue;
+      }
+      ctx.r3.u64 = overlay;
+      REX_CALL_INDIRECT_FUNC(guest::LoadU32(base, guest::LoadU32(base, overlay) + slot));
+    }
+  };
+  if (!render_only) {
+    interpolation::BlendState_SetHandler(kUpdateContext);
+    for_each_overlay(kUpdateSlot);
+  }
+  interpolation::BlendState_SetHandler(kRecordContext);
+  for_each_overlay(kRecordSlot);
+  if (render_only) {
+    std::memcpy(cameras, current.data(), kCameraPassesBytes);
+  }
 }
