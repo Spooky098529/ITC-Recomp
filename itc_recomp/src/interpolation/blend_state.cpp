@@ -1754,9 +1754,19 @@ class PixelConstantBlender {
     // car's headlight) takes the tick's light, as the game switches it, and
     // the rest of the upload still blends; rejecting the whole upload left
     // the car's lighting at the tick for a tick (a flicker).
+    // A slot's light position (8+k) is a world position, where the relative
+    // tolerance allows hundreds of metres: a slot taking the next street lamp
+    // along was blended as one light sliding 30 m across the car in a tick
+    // (a flash passing under lamps). It's another light if it moved more than
+    // kSlotLightMove; cars' headlights move at most about 3 m a tick.
+    constexpr float kSlotLightMove = 4.0f;  // metres
     std::array<bool, 8> slot_switched{};
     if (count == 63 && REXCVAR_GET(switch_light_slots)) {
       for (uint32_t k = 0; k < 8; k++) {
+        uint32_t p = (8 + k) * 4;
+        Vec3 before{entry.previous[p], entry.previous[p + 1], entry.previous[p + 2]};
+        Vec3 after{now[p], now[p + 1], now[p + 2]};
+        slot_switched[k] = !(Distance(before, after) <= kSlotLightMove);
         for (uint32_t r : {8u, 16u, 24u, 32u, 47u, 55u}) {
           for (uint32_t c = 0; c < 4; c++) {
             slot_switched[k] = slot_switched[k] || jumped((r + k) * 4 + c);
