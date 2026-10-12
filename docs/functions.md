@@ -210,17 +210,23 @@ Almost everything drawn in 3D gets its transform through the matrix multiply
 `sub_8209BD50`: out = world * a camera's view-projection, written straight
 into a command 7 payload. So blending happens there, in two halves:
 
-1. **Main thread, recording.** Every multiply by a camera is noted: the
-   per-object recorder's (return address `0x82595438`, every pass) and, on
-   logic passes, any multiply whose second operand is a camera pass's
-   view-projection (the scenery's, during Update). On a logic pass a copy of
-   both inputs (world, view-projection) is kept, keyed by:
+1. **Main thread, recording.** Every multiply by a camera is noted, on every
+   pass: the per-object recorder's (return address `0x82595438`), any
+   multiply whose second operand is a camera pass's view-projection (the
+   scenery's, during Update), and any multiply whose second operand is a
+   perspective view-projection wherever it's kept (the light billboards'
+   recorder `sub_8209C1A0` builds one on its stack). Matrix copies
+   (`sub_820A0AC0`) carry on: a copy of a camera counts as identity * camera
+   (the headlight projector's matrix, built by `sub_82597610`, arrives this
+   way), and a copy of a noted product as that product. On a logic pass a
+   copy of both inputs (world, view-projection) is kept, keyed by:
    - the operands' addresses (often the same stack temporaries for many
      objects),
-   - which camera it is: a stable id per distinct projection (aspect ratio
-     and depth mapping, matched within 1%), because the main view, mirror
-     and reflection cameras share stack copies and their order varies between
-     ticks,
+   - which camera it is: a permanent id per distinct projection (aspect
+     ratio and depth mapping, matched within 1% through log-scale buckets),
+     because the main view, mirror and reflection cameras share stack copies
+     and their order varies between ticks. Ids must never be renumbered:
+     a table that once reset when full unpaired everything,
    - how many times that combination was multiplied earlier in the pass.
 
    Each key is paired with the same key from the previous tick. Render-only
@@ -232,14 +238,41 @@ into a command 7 payload. So blending happens there, in two halves:
    published address that still holds the recorded value, it uploads the
    blend instead and puts the command list back afterwards.
 
-Blending a product: the world matrix as position, rotation and per-axis
-scale; the camera split into placement (blended rigidly: position straight,
-rotation along the shortest arc) and a symmetric perspective projection
-(scales and depth mapping, blended linearly), then multiplied back together.
-Splitting the camera keeps field-of-view changes in fast turns blending. A
-pair is drawn unblended if the world or camera moves more than 8 m or turns
-more than 0.5 rad in a tick, or the projection changes by more than a few
-percent (a cut, or two different cameras).
+Blending a product:
+
+- **World matrix**: position, rotation and per-axis scale. One that turns
+  more than 0.5 rad in a tick about mostly one local axis is a wheel: its
+  turn is split into a twist about that axis and the rest (steering, the car
+  turning); position and the rest blend, and the twist (the spin, which
+  can't be interpolated at speed) is the newer tick's.
+- **Camera**: split into placement (blended rigidly: position straight,
+  rotation along the shortest arc) and a symmetric perspective projection
+  (scales and depth mapping, blended linearly), then multiplied back
+  together. Splitting keeps field-of-view changes in fast turns blending.
+  A mirrored camera (a reflection) has the mirror moved into a negative x
+  scale. Non-perspective cameras (the orthographic shadow map's, refitted
+  around the car each tick) aren't blended: everything using one must agree
+  within a frame, and only the objects move.
+- A pair is drawn unblended if the world or camera moves more than 8 m or
+  turns more than 0.5 rad in a tick (and isn't a wheel), or the projection
+  changes by more than a few percent (a cut, or two different cameras).
+
+Two more things are blended, outside the products:
+
+- **Light billboards' facing.** `sub_8209C6E0` builds the light glows' quads
+  on the CPU in Draw, turned to face its camera pass. For that call alone the
+  pass gets the frame's blended eye, target, up and view, so the quads face
+  the camera they're drawn from (otherwise their lower edge, cut by the
+  road's depth, wobbles).
+- **Per-object pixel constants** (`sub_82595490`, 63 registers at c0, and the
+  same layout at c63: lighting, including the headlights). They hold no
+  object identity, so each is paired by the camera product replayed just
+  before it, and uploaded as the frame's linear blend of the two ticks.
+  Components c1.x, c3.xyz and c4.x of an upload are per-object light switches
+  that legitimately jump between ticks: they keep the newer tick's value. A
+  jump anywhere else means a wrong pairing, and the upload is left as
+  recorded (blending two objects' lighting flashes headlight-colored light
+  onto random geometry). `--blend_pixel_constants=false` turns this off.
 
 Logic and render-only passes both draw the tick's real state; nothing is
 blended while drawing. Blending the camera inside Draw changed what the game
@@ -253,10 +286,12 @@ and target, and recorder world matrices), mostly for comparison.
 |---|---|
 | `--max_fps` | Frame rate cap in races; 0 = unlimited. |
 | `--interpolate_draw_state` | Blending on (default) or off. |
-| `--motion_blur` | The game's velocity-based motion blur (pixel shader `7EB16456AAD56CBA`), skipped when false. Its velocities come from the tick, so it smears a whole tick of motion at high frame rates; best off. Patch `patches/rexglue-sdk/0002`. |
+| `--motion_blur` | The game's velocity-based motion blur (pixel shader `7EB16456AAD56CBA`), skipped when false (as `run.sh` does). Its velocities come from the tick, so it smears a whole tick of motion at high frame rates. Patch `patches/rexglue-sdk/0002`. |
+| `--blend_pixel_constants` | Blend per-object lighting constants (default on). |
 | `--log_fps` | Frames and ticks per second. |
 | `--log_blend_state` | Per second: products published, blended, unpaired, rejected cameras with the reason, and uploads left alone. Unpaired or rejected counts above zero in steady driving mean something is stepping at 30 Hz. |
 | `--log_replayed_constants` | One frame per second: every vertex constant upload replayed, whether it changed since the last frame, and whether it was substituted. |
+| `--log_stepping_constants` | With `--log_slot_callers`: every 2 s, the constant uploads left as recorded that change about 30 times a second (stuck to the tick) rather than every frame, with the code that recorded them. The quickest way to find what still steps. |
 | `--log_game_messages`, `--log_slot_callers` | Message delivery per pass; which code allocates constant slots. |
 
 ### What didn't work, and why
@@ -278,6 +313,23 @@ and target, and recorder world matrices), mostly for comparison.
 - **The command list shim** (`--interpolate`, `interpolator.cpp`,
   `command_list.cpp`, `draw_tags.cpp`): blending recorded constants matched
   between ticks by draw order. Left in but off.
+- **Pairing pixel constants by order in the frame.** Objects coming into or
+  leaving view shifted the order; pairing by the preceding camera product
+  fixed it.
+
+### Finding what still steps
+
+The loop that found the light billboards, headlight projector and lighting
+constants:
+
+1. Run with `--log_stepping_constants --log_slot_callers` and drive. Uploads
+   still at 30 Hz are listed with their stage, register, size and recording
+   code (the return address of the slot allocation for the command's
+   header).
+2. Disassemble around that address in `generated/` to find where the
+   payload comes from (a multiply, a copy, or something else).
+3. Keep per-tick copies of that source's inputs and blend them at replay,
+   keyed by something stable across ticks; check with the log again.
 
 ## Known issues
 
@@ -286,9 +338,11 @@ and target, and recorder world matrices), mostly for comparison.
   presses. Unlocking them would mean skipping Update only for the handlers
   that run game logic.
 - **The race HUD updates at 30 fps.** Accepted for now.
-- **Not every upload is blended.** Constant uploads that don't come from a
-  multiply by a camera (the 9-register and 4-register uploads from other
-  recorders) are replayed as recorded. Nothing visible steps in testing so
-  far, but check them first if something does.
+- **Some uploads still step on purpose**: the shadow lookup matrices (c70 and
+  c74, orthographic, kept at the tick to match the shadow map), c14 x4 (a
+  texture projection) and c100 x4. Nothing visible steps in testing; see
+  "Finding what still steps" if something does.
+- **A piece of geometry flickers while the car moves**, at native 30 fps
+  too, so not interpolation: the game or the GPU backend.
 - **One tick of latency**: drawing shows between the previous and the
   current tick, as usual for this kind of interpolation.

@@ -12,5 +12,6 @@ exec "$dir/itc" \
   --game_data_root="$dir" \
   --mnk_mode=true \
   --max_fps=144 \
+  --motion_blur=false \
   --log_fps=true \
   "$@"
