@@ -62,6 +62,9 @@ REXCVAR_DEFINE_BOOL(log_stepping_constants, false, "ITC",
                     "--log_slot_callers");
 REXCVAR_DEFINE_BOOL(log_overlay_products, false, "ITC",
                     "Log the race overlays' camera products as replayed, 12 frames every 3 s");
+REXCVAR_DEFINE_BOOL(log_overlay_uploads, false, "ITC",
+                    "Log every shader constant upload the race overlays recorded, as replayed, "
+                    "12 frames every 3 s");
 REXCVAR_DEFINE_BOOL(log_blend_state, false, "ITC",
                     "Log how many cameras and objects were blended, once a second");
 REXCVAR_DEFINE_BOOL(log_replayed_constants, false, "ITC",
@@ -371,6 +374,21 @@ uint32_t SlotOwner(uint32_t address) {
   return it != g_slot_owners.end() ? it->second : 0;
 }
 
+// Diagnostics (--log_overlay_uploads): command slots allocated while the race
+// overlays ran (by slot address), with the pass that recorded them.
+struct OverlaySlot {
+  uint64_t pass;
+  bool render_only;
+};
+std::mutex g_overlay_slots_mutex;
+std::unordered_map<uint32_t, std::optional<OverlaySlot>> g_overlay_slots;
+
+std::optional<OverlaySlot> OverlaySlotOf(uint32_t address) {
+  std::lock_guard lock(g_overlay_slots_mutex);
+  auto it = g_overlay_slots.find(address);
+  return it != g_overlay_slots.end() ? it->second : std::nullopt;
+}
+
 namespace {
 
 class DrawState {
@@ -488,6 +506,8 @@ class DrawState {
   // Products are numbered per handler, so a handler run alone on a
   // render-only pass (the race overlays) pairs with its logic pass self.
   void SetHandler(uint32_t handler) { handler_ = handler; }
+  uint32_t handler() const { return handler_; }
+  std::thread::id main_thread() const { return main_thread_; }
 
   void BeforeDraw(uint8_t* base, bool logic_pass) {
     drawing_ = true;
@@ -1310,6 +1330,71 @@ SteppingConstantsLog& GetSteppingConstantsLog() {
   return log;
 }
 
+// Diagnostics (--log_overlay_uploads): every constant upload the race
+// overlays recorded, as replayed, for 12 frames in a row every 3 s.
+class OverlayUploadsLog {
+ public:
+  void OnFrameStart() {
+    if (!REXCVAR_GET(log_overlay_uploads)) {
+      return;
+    }
+    frame_++;
+    if (frames_left_ > 0) {
+      frames_left_--;
+      index_ = 0;
+      return;
+    }
+    auto now = std::chrono::steady_clock::now();
+    if (now - last_ >= std::chrono::seconds(3)) {
+      last_ = now;
+      frames_left_ = 12;
+      index_ = 0;
+    }
+  }
+
+  void OnUpload(uint8_t* base, uint32_t payload, uint32_t packed, bool substituted,
+                const std::optional<Matrix4>& original) {
+    if (!REXCVAR_GET(log_overlay_uploads) || frames_left_ == 0) {
+      return;
+    }
+    std::optional<OverlaySlot> slot = OverlaySlotOf(payload - 16);
+    if (!slot) {
+      slot = OverlaySlotOf(payload);
+    }
+    if (!slot) {
+      return;
+    }
+    uint32_t stage = packed >> 24, start = (packed >> 8) & 0xFF, count = packed & 0xFF;
+    std::string values;
+    for (uint32_t i = 0; i < std::min<uint32_t>(count * 4, 20); i++) {
+      values += fmt::format("{}{:.5g}", i % 4 == 0 ? (i ? " | " : "") : " ",
+                            guest::LoadFloat(base, payload + 4 * i));
+    }
+    std::string was;
+    if (original) {
+      was = fmt::format(" (was row3 {:.5g} {:.5g} {:.5g} {:.5g})", (*original)[12],
+                        (*original)[13], (*original)[14], (*original)[15]);
+    }
+    REXLOG_INFO("overlay upload: frame {} tick {} amount {:.2f} #{} recorded on {} pass {} "
+                "{} c{} x{} {}: {}{}",
+                frame_, GetReplayCameras().tick(), GetReplayCameras().amount(), index_++,
+                slot->render_only ? "render-only" : "logic", slot->pass,
+                stage == 0 ? "vs" : "ps", start, count, substituted ? "substituted" : "as recorded",
+                values, was);
+  }
+
+ private:
+  uint64_t frame_ = 0;
+  int frames_left_ = 0;
+  int index_ = 0;
+  std::chrono::steady_clock::time_point last_{};
+};
+
+OverlayUploadsLog& GetOverlayUploadsLog() {
+  static OverlayUploadsLog log;
+  return log;
+}
+
 }  // namespace
 
 void BlendState_BeforeDraw(uint8_t* base, bool render_only_pass) {
@@ -1340,6 +1425,7 @@ void BlendState_OnReplayFrameStart() {
   GetReplayedConstantsLog().OnFrameStart();
   GetSteppingConstantsLog().OnFrameStart();
   GetReplayCameras().OnFrameStart();
+  GetOverlayUploadsLog().OnFrameStart();
   GetPixelConstantBlender().OnFrameStart(GetReplayCameras().tick());
 }
 
@@ -1391,6 +1477,8 @@ void BlendState_ReplayConstants(uint8_t* base, uint32_t payload, uint32_t packed
     }
   }
   GetReplayedConstantsLog().OnUpload(base, payload, packed, original.has_value());
+  GetOverlayUploadsLog().OnUpload(base, payload, packed,
+                                  original.has_value() || original_pixel.has_value(), original);
   upload();
   if (original) {
     StoreMatrix(base, payload, *original);
@@ -1433,6 +1521,22 @@ extern "C" REX_FUNC(sub_8258CAA0) {
   REX_FUNC_PROLOGUE();
   uint32_t count = ctx.r4.u32, caller = uint32_t(ctx.lr);
   __imp__sub_8258CAA0(ctx, base);
+  if (REXCVAR_GET(log_overlay_uploads) && ctx.r3.u32 != 0 &&
+      std::this_thread::get_id() == interpolation::GetDrawState().main_thread()) {
+    uint32_t handler = interpolation::GetDrawState().handler() & ~1u;
+    std::optional<interpolation::OverlaySlot> slot;
+    if (handler == interpolation::kRaceOverlaysHandler) {
+      slot = interpolation::OverlaySlot{frame_pacing::GameMessages_PassNumber(),
+                                        frame_pacing::GameMessages_IsRenderOnlyPass()};
+    }
+    std::lock_guard lock(interpolation::g_overlay_slots_mutex);
+    if (interpolation::g_overlay_slots.size() > 400000) {
+      interpolation::g_overlay_slots.clear();
+    }
+    for (uint32_t i = 0; i < count; i++) {
+      interpolation::g_overlay_slots[ctx.r3.u32 + 16 * i] = slot;
+    }
+  }
   if (REXCVAR_GET(log_slot_callers) && ctx.r3.u32 != 0) {
     std::lock_guard lock(interpolation::g_slot_owners_mutex);
     if (interpolation::g_slot_owners.size() > 200000) {
