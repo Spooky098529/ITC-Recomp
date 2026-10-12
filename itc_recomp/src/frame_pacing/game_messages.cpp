@@ -184,10 +184,7 @@ namespace {
 // Run on every pass: the message dispatcher (delivers Draw), the wait for
 // the frame in flight, the render thread's kick, and the app's own handler
 // (quit checks).
-// Scene::Update (0x820988C8) also runs every pass: skipping it froze race
-// loading (a null write in a loop).
-constexpr uint32_t kDrawingTickHandlers[] = {0x82093DC0, 0x820920D8, 0x82091A58, 0x820902C8,
-                                             0x820988C8};
+constexpr uint32_t kDrawingTickHandlers[] = {0x82093DC0, 0x820920D8, 0x82091A58, 0x820902C8};
 }  // namespace
 
 namespace {
