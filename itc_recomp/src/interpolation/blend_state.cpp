@@ -412,7 +412,12 @@ class DrawState {
   void Note(uint8_t* base, uint32_t out, uint32_t world, uint32_t camera,
             const ProductInputs& inputs, bool render_only) {
 
-    uint64_t signature = camera_ids_.Of(inputs.view_projection);
+    // The race overlays read the camera passes as game logic left them (put
+    // back for their recording on render-only passes), so the address alone
+    // says which camera; their projection there drifts past CameraIds'
+    // tolerance between ticks, which renumbered them and left them unpaired.
+    uint64_t signature =
+        handler_ == kRaceOverlaysHandler ? 0 : camera_ids_.Of(inputs.view_projection);
     ProductKey key{camera, world, signature, handler_,
                    product_occurrences_[{camera, world, signature, handler_, 0}]++};
     if (!render_only && REXCVAR_GET(log_overlay_products) && handler_ == kRaceOverlaysHandler &&
