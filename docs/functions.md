@@ -228,6 +228,32 @@ so the state advances once per tick. Calls are matched by object and order
 within the pass. If the object changed since the logic pass, the call just
 runs.
 
+### World-space sprites
+
+Some sprites are drawn in world space: game logic writes each sprite's four
+corners (x, y, z, pad, 16 floats at +80) once a tick, the recorder writes
+them into the command list as vertices, and c0 x4 is the sprite's matrix
+(+0, identity here) times the camera. The camera product is blended at
+replay, but the corners stayed at the newest tick, so the sprite ran ahead
+of its blended car early in each tick and caught up by the end. Both
+recorders blend the corners between their last two ticks while recording
+and then put them back (`--blend_world_sprites`, in `per_frame_logic.cpp`;
+a corner that moved more than 10 units in a tick is a new sprite):
+
+| What | Recorder | Matched by |
+|---|---|---|
+| The marker above opponents (one sprite, from the race overlays' recording, once a pass) | `sub_821281A8`: r3 = sprite, r4 = camera | Sprite, caller and order in the pass |
+| Light trails behind headlights and tail lights (up to 500 sprites; count at +0x109F0, sprite i at +80 + 64 * i) | `sub_82128750`: r3 = list, r4 = camera | Order in the pass (the list is shared: each overlay fills and records it in turn) |
+
+The marker was found by elimination: `--log_upload_owners` lists the code
+that allocated each vertex constant upload's header (with
+`--log_slot_callers`), and `--debug_zero_owners=<hex,...>` replays those
+uploads as zeros so their draws vanish. Halving the list found 0x82128468,
+in `sub_821281A8`. Before that, a long run of guesses (vehicle poses,
+overlay object state, camera products, the camera passes as Draw sees them)
+changed nothing, because none of them was the corners. `--log_single_sprites`
+and `--log_world_sprites` log the sprites as recorded.
+
 **Finding them.** The race start countdown runs at the main loop pass rate,
 so with frames uncapped it's fast; at `--max_fps=30` it's right.
 
@@ -248,7 +274,8 @@ so with frames uncapped it's fast; at `--max_fps=30` it's right.
   logic passes, or gated by per-frame state. It points at `sub_821281A8`
   (reached from `sub_821225D8`, which steps a counter at +0x150 and draws
   once per view during Update), but hiding `sub_821225D8` entirely leaves
-  the marker above opponents on screen, so that's something else.
+  the marker above opponents on screen: the marker reaches it from the race
+  overlays instead (see "World-space sprites").
 - `--debug_hide=<hex,...>` never runs the given wrapped draw functions, to
   see what each draws.
 - `--log_recording_handlers` lists which message handlers record commands,
@@ -402,8 +429,6 @@ constants:
   that run game logic.
 - **The race HUD updates at 30 fps.** Accepted for now; its animations
   advance once per tick (see "Per-frame logic").
-- **The marker above opponent cars flickers** with frames uncapped (steady
-  at 30 fps). Not yet found; see "Per-frame logic".
 - **More per-frame logic may exist.** Anything that runs too fast or
   flickers only with frames uncapped is probably another case; see
   "Per-frame logic" for how they were found.
