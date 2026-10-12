@@ -208,3 +208,20 @@ void FrameStateDiff_After(uint8_t* base, const char* kind, uint32_t id) {
 }
 
 }  // namespace debug
+
+// The race draw step's parts (sub_8215B4F8 calls these), wrapped only to
+// name which one advances per-frame state.
+#define ITC_FRAME_STATE_WRAP(address)                       \
+  extern "C" REX_FUNC(sub_##address) {                      \
+    REX_FUNC_PROLOGUE();                                    \
+    debug::FrameStateDiff_Before(base);                     \
+    __imp__sub_##address(ctx, base);                        \
+    debug::FrameStateDiff_After(base, "draw step part", 0x##address); \
+  }
+ITC_FRAME_STATE_WRAP(8209F8A0)
+ITC_FRAME_STATE_WRAP(8209F900)
+ITC_FRAME_STATE_WRAP(820C5DE8)
+ITC_FRAME_STATE_WRAP(820F6068)
+ITC_FRAME_STATE_WRAP(82130978)
+ITC_FRAME_STATE_WRAP(82133960)
+#undef ITC_FRAME_STATE_WRAP
