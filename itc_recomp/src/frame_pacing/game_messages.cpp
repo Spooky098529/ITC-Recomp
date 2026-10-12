@@ -232,6 +232,10 @@ void GameMessages_OnPassFinished() {
 
 uint64_t g_passes[2] = {0, 0};  // logic, render-only
 
+uint64_t GameMessages_PassNumber() {
+  return g_passes[0] + g_passes[1];
+}
+
 void GameMessages_PassCounts(uint64_t& logic, uint64_t& render_only) {
   logic = g_passes[0];
   render_only = g_passes[1];

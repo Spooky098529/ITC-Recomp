@@ -30,43 +30,82 @@ extern "C" REX_FUNC(sub_820DC958) {
   __imp__sub_820DC958(ctx, base);
 }
 
-// UI movie update (r3 = movie, r4 = 0 to advance a frame and draw; the HUD,
-// including the race start countdown and the markers above opponents). Its
-// animation state and its drawing are in the same call, so on a render-only
-// pass the call is replayed from the state it had on the logic pass, then
-// that pass's resulting state is put back: it draws what the logic pass drew
-// and the animation advances once per tick.
+// Calls whose animation state and drawing are one: on a render-only pass,
+// replay the call from the state its object had before the logic pass's same
+// call, then put back the state after it. It draws what the logic pass drew,
+// and the state advances once per tick. Calls are matched by object and by
+// order within the pass (an object can be drawn once per view). If the
+// object changed since the logic pass, the call just runs.
 namespace {
-constexpr uint32_t kMovieBytes = 0xA000;  // furthest field used: ~+0x96C8
+class ReplayFromLogicPass {
+ public:
+  explicit ReplayFromLogicPass(uint32_t bytes) : bytes_(bytes) {}
 
-struct MovieStates {
-  std::vector<uint8_t> before, after;  // around the logic pass's call
+  template <typename Call>
+  void Run(uint8_t* base, uint32_t object, Call&& call) {
+    uint64_t pass = frame_pacing::GameMessages_PassNumber();
+    if (pass != pass_) {
+      pass_ = pass;
+      occurrences_.clear();
+    }
+    Key key{object, occurrences_[object]++};
+    uint8_t* state = base + object;
+    if (!frame_pacing::GameMessages_IsRenderOnlyPass()) {
+      States& states = states_[key];
+      states.before.assign(state, state + bytes_);
+      call();
+      states.after.assign(state, state + bytes_);
+      return;
+    }
+    auto it = states_.find(key);
+    if (it == states_.end() || it->second.after.size() != bytes_ ||
+        std::memcmp(state, it->second.after.data(), bytes_) != 0) {
+      call();
+      return;
+    }
+    std::memcpy(state, it->second.before.data(), bytes_);
+    call();
+    std::memcpy(state, it->second.after.data(), bytes_);
+  }
+
+ private:
+  struct Key {
+    uint32_t object;
+    int occurrence;
+    bool operator==(const Key&) const = default;
+  };
+  struct KeyHash {
+    size_t operator()(const Key& k) const { return (size_t(k.object) << 8) ^ size_t(k.occurrence); }
+  };
+  struct States {
+    std::vector<uint8_t> before, after;
+  };
+  uint32_t bytes_;
+  uint64_t pass_ = ~0ull;
+  std::unordered_map<Key, States, KeyHash> states_;
+  std::unordered_map<uint32_t, int> occurrences_;
 };
-std::unordered_map<uint32_t, MovieStates> g_movie_states;
+
+// UI movies (sub_8211D2F8 with r4 = 0 advances a frame and draws; the HUD,
+// including the race start countdown). Furthest field used: ~+0x96C8.
+ReplayFromLogicPass g_ui_movies(0xA000);
+
+// Markers above opponent cars (sub_821225D8, r3 = marker, r4 = camera pass):
+// a state machine stepped (a counter at +0x150 counts down) and drawn per
+// view, which made the marker flicker.
+ReplayFromLogicPass g_opponent_markers(0x400);
 }  // namespace
 
 extern "C" REX_FUNC(sub_8211D2F8) {
   REX_FUNC_PROLOGUE();
-  uint32_t movie = ctx.r3.u32;
   if (ctx.r4.u32 != 0 || !REXCVAR_GET(per_tick_ui_movies)) {
     __imp__sub_8211D2F8(ctx, base);
     return;
   }
-  uint8_t* state = base + movie;
-  if (!frame_pacing::GameMessages_IsRenderOnlyPass()) {
-    MovieStates& states = g_movie_states[movie];
-    states.before.assign(state, state + kMovieBytes);
-    __imp__sub_8211D2F8(ctx, base);
-    states.after.assign(state, state + kMovieBytes);
-    return;
-  }
-  auto it = g_movie_states.find(movie);
-  if (it == g_movie_states.end() || it->second.after.size() != kMovieBytes ||
-      std::memcmp(state, it->second.after.data(), kMovieBytes) != 0) {
-    __imp__sub_8211D2F8(ctx, base);  // changed since the logic pass: run as is
-    return;
-  }
-  std::memcpy(state, it->second.before.data(), kMovieBytes);
-  __imp__sub_8211D2F8(ctx, base);
-  std::memcpy(state, it->second.after.data(), kMovieBytes);
+  g_ui_movies.Run(base, ctx.r3.u32, [&] { __imp__sub_8211D2F8(ctx, base); });
+}
+
+extern "C" REX_FUNC(sub_821225D8) {
+  REX_FUNC_PROLOGUE();
+  g_opponent_markers.Run(base, ctx.r3.u32, [&] { __imp__sub_821225D8(ctx, base); });
 }

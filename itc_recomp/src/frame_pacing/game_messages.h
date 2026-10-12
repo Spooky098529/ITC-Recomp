@@ -27,6 +27,9 @@ void GameMessages_OnPassFinished();
 void GameMessages_SetRenderOnlyPass(bool render_only);
 bool GameMessages_IsRenderOnlyPass();
 
+// Which main loop pass this is (counts up by one per pass).
+uint64_t GameMessages_PassNumber();
+
 // Diagnostics: how many logic and render-only passes have run.
 void GameMessages_PassCounts(uint64_t& logic, uint64_t& render_only);
 
