@@ -46,6 +46,7 @@
 #include <string>
 #include <thread>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 REXCVAR_DEFINE_BOOL(interpolate_draw_state, true, "ITC",
@@ -941,6 +942,27 @@ class ReplayCameras {
   }
   int overlay_frames_left_ = 0;
   std::chrono::steady_clock::time_point overlay_last_{};
+  // Diagnostics: uploads from addresses that held a race overlay product,
+  // left as recorded.
+  void LogOverlayMiss(uint32_t payload, const Matrix4& m) {
+    if (!overlay_payloads_.count(payload)) {
+      return;
+    }
+    auto now = std::chrono::steady_clock::now();
+    if (now - miss_last_ >= std::chrono::seconds(1)) {
+      miss_last_ = now;
+      miss_lines_ = 0;
+    }
+    if (miss_lines_++ >= 30) {
+      return;
+    }
+    REXLOG_INFO("overlay miss: tick {} amount {:.2f} payload {:08X} {}: row3 ({:.5g} {:.5g} "
+                "{:.5g} {:.5g})",
+                tick(), amount(), payload, Status(payload, m), m[12], m[13], m[14], m[15]);
+  }
+  std::unordered_set<uint32_t> overlay_payloads_;
+  std::chrono::steady_clock::time_point miss_last_{};
+  int miss_lines_ = 0;
   // The last camera product replayed: identifies the object being drawn.
   uint64_t last_identity() const { return last_identity_; }
   float amount() const { return frame_ ? frame_->amount : 1.0f; }
@@ -990,6 +1012,9 @@ class ReplayCameras {
       return std::nullopt;
     }
     last_identity_ = it->second.identity;
+    if (it->second.handler == kRaceOverlaysHandler) {
+      overlay_payloads_.insert(payload);
+    }
     Matrix4 result = BlendProduct(it->second, frame_->amount, stats_.blend);
     if (REXCVAR_GET(log_overlay_products) && it->second.handler == kRaceOverlaysHandler) {
       LogOverlay(payload, it->second, result);
@@ -1488,6 +1513,9 @@ void BlendState_ReplayConstants(uint8_t* base, uint32_t payload, uint32_t packed
                                      original.has_value() || original_pixel.has_value());
   if (stage == 0 && count >= 4) {
     GetReplayCameras().CountUpload(base, payload, original.has_value());
+    if (!original && REXCVAR_GET(log_overlay_products)) {
+      GetReplayCameras().LogOverlayMiss(payload, LoadMatrix(base, payload));
+    }
     // Temporary: main-camera matrices uploaded to c0, with their status.
     uint32_t start = (packed >> 8) & 0xFF;
     Matrix4 m = original ? *original : LoadMatrix(base, payload);
