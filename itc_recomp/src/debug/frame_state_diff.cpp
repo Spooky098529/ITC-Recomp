@@ -12,6 +12,7 @@
 #include <fstream>
 #include <algorithm>
 #include <map>
+#include <set>
 #include <tuple>
 #include <sstream>
 #include <string>
@@ -164,8 +165,15 @@ class FrameStateDiff {
     std::vector<uint32_t> values = std::move(before_.back());
     before_.pop_back();
     for (size_t i = 0; i < values.size(); i++) {
-      if (guest::LoadU32(base, watched_[i]) != values[i]) {
+      uint32_t now = guest::LoadU32(base, watched_[i]);
+      if (now != values[i]) {
         changes_[{std::string(kind), id, watched_[i]}]++;
+        if (forced_.count(watched_[i]) && logged_values_ < kMaxLoggedValues) {
+          logged_values_++;
+          REXLOG_INFO("per-frame state: pass {} {} {:08X} wrote {:08X}: {} -> {}",
+                      frame_pacing::GameMessages_PassNumber(), kind, id, watched_[i], values[i],
+                      now);
+        }
       }
     }
   }
@@ -226,6 +234,7 @@ class FrameStateDiff {
       return;
     }
     last_log_ = now;
+    logged_values_ = 0;
     for (const auto& [key, n] : changes_) {
       REXLOG_INFO("per-frame state: {} {:08X} changed {:08X} ({} times)", std::get<0>(key),
                   std::get<1>(key), std::get<2>(key), n);
@@ -245,6 +254,7 @@ class FrameStateDiff {
       std::string item = list.substr(start, end == std::string::npos ? std::string::npos : end - start);
       if (!item.empty()) {
         uint32_t address = uint32_t(std::stoul(item, nullptr, 16));
+        forced_.insert(address);
         if (std::find(watched_.begin(), watched_.end(), address) == watched_.end()) {
           watched_.insert(watched_.begin(), address);
         }
@@ -256,6 +266,11 @@ class FrameStateDiff {
     }
   }
 
+  // Every change to a --watch_addresses word is logged with its values, up
+  // to this many per 2 s.
+  static constexpr int kMaxLoggedValues = 60;
+  int logged_values_ = 0;
+  std::set<uint32_t> forced_;
   bool forced_added_ = false;
   bool render_only_ = false;
   bool snapshot_taken_ = false;
