@@ -91,6 +91,10 @@ REXCVAR_DEFINE_BOOL(pixel_blend_from_latest, true, "ITC",
                     "Blend per-object lighting from the last value recorded in the previous "
                     "tick to this frame's (false: only frames recording the tick's first value "
                     "are blended)");
+REXCVAR_DEFINE_BOOL(switch_light_slots, true, "ITC",
+                    "A per-object light slot whose light changed between ticks takes the tick's "
+                    "light and the rest of the lighting blends (false: the whole upload is left "
+                    "as recorded)");
 REXCVAR_DEFINE_BOOL(pair_by_object, true, "ITC",
                     "Pair the per-object recorder's products between ticks by the part being "
                     "drawn (its caller's r31), not only by order, so culling or reordering "
@@ -1733,6 +1737,39 @@ class PixelConstantBlender {
       // layout is uploaded at c0 and at c63).
       return i == 1 * 4 + 0 || i == 3 * 4 + 0 || i == 3 * 4 + 1 || i == 3 * 4 + 2 || i == 4 * 4 + 0;
     };
+    auto jumped = [&](uint32_t i) {
+      float a = entry.previous[i], b = now[i];
+      return a != b && (!std::isfinite(a) || !std::isfinite(b) ||
+                        !(std::abs(b - a) <= 0.3f * std::max(std::abs(a), std::abs(b)) + 0.2f));
+    };
+    // The 8 light slots: slot k is registers 8+k, 16+k, 24+k, 32+k, 47+k and
+    // 55+k (position, direction, colour and the like; see light_setup_log).
+    // A slot whose light changed between ticks (a streetlight in place of a
+    // car's headlight) takes the tick's light, as the game switches it, and
+    // the rest of the upload still blends; rejecting the whole upload left
+    // the car's lighting at the tick for a tick (a flicker).
+    std::array<bool, 8> slot_switched{};
+    if (count == 63 && REXCVAR_GET(switch_light_slots)) {
+      for (uint32_t k = 0; k < 8; k++) {
+        for (uint32_t r : {8u, 16u, 24u, 32u, 47u, 55u}) {
+          for (uint32_t c = 0; c < 4; c++) {
+            slot_switched[k] = slot_switched[k] || jumped((r + k) * 4 + c);
+          }
+        }
+      }
+    }
+    auto in_switched_slot = [&](uint32_t i) {
+      if (count != 63) {
+        return false;
+      }
+      uint32_t r = i / 4;
+      for (uint32_t base : {8u, 16u, 24u, 32u, 47u, 55u}) {
+        if (r >= base && r < base + 8 && slot_switched[r - base]) {
+          return true;
+        }
+      }
+      return false;
+    };
     std::vector<bool> jumps(now.size(), false);
     bool changed = false;
     for (uint32_t i = 0; i < now.size(); i++) {
@@ -1740,8 +1777,12 @@ class PixelConstantBlender {
       if (a == b) {
         continue;
       }
-      if (!std::isfinite(a) || !std::isfinite(b) ||
-          !(std::abs(b - a) <= 0.3f * std::max(std::abs(a), std::abs(b)) + 0.2f)) {
+      if (in_switched_slot(i)) {
+        jumps[i] = true;  // the tick's light
+        switch_jumps_++;
+        continue;
+      }
+      if (jumped(i)) {
         if (!is_switch(i)) {
           if (REXCVAR_GET(log_blend_state)) {
             LogRejection(start * 4 + i, a, b);
