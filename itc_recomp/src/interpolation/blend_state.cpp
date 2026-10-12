@@ -406,7 +406,8 @@ class DrawState {
   void Note(uint8_t* base, uint32_t out, uint32_t world, uint32_t camera,
             const ProductInputs& inputs, bool render_only) {
     uint64_t signature = camera_ids_.Of(inputs.view_projection);
-    ProductKey key{camera, world, signature, product_occurrences_[{camera, world, signature, 0}]++};
+    ProductKey key{camera, world, signature, handler_,
+                   product_occurrences_[{camera, world, signature, handler_, 0}]++};
     if (!render_only) {
       collecting_[key] = inputs;
     } else if (!enabled_) {
@@ -423,6 +424,11 @@ class DrawState {
     auto& outputs = render_only ? pass_outputs_ : tick_outputs_;
     outputs[out] = {key, LoadMatrix(base, out)};
   }
+
+  // Main thread: which message handler is running (0 between handlers).
+  // Products are numbered per handler, so a handler run alone on a
+  // render-only pass (the race overlays) pairs with its logic pass self.
+  void SetHandler(uint32_t handler) { handler_ = handler; }
 
   void BeforeDraw(uint8_t* base, bool logic_pass) {
     main_thread_ = std::this_thread::get_id();
@@ -715,6 +721,7 @@ class DrawState {
   }
 
   std::thread::id main_thread_;
+  uint32_t handler_ = 0;
   uint8_t* base_ = nullptr;
   uint64_t ticks_ = 0;
   bool logic_pass_ = false;
@@ -737,13 +744,15 @@ class DrawState {
     uint32_t camera;     // address
     uint32_t world;      // address
     uint64_t signature;  // CameraIds number
+    uint32_t handler;    // the message handler running (0 for none)
     int occurrence;
     bool operator==(const ProductKey&) const = default;
   };
   struct ProductKeyHash {
     size_t operator()(const ProductKey& key) const {
       return std::hash<uint64_t>()(((uint64_t(key.world) << 32) | key.camera) ^
-                                   (uint64_t(key.occurrence) << 7) ^ (key.signature * 31));
+                                   (uint64_t(key.occurrence) << 7) ^ (key.signature * 31) ^
+                                   (uint64_t(key.handler) * 0x9E3779B97F4A7C15ull));
     }
   };
   using ProductInputsByKey = std::unordered_map<ProductKey, ProductInputs, ProductKeyHash>;
@@ -1205,6 +1214,10 @@ void BlendState_BeforeDraw(uint8_t* base, bool render_only_pass) {
 
 void BlendState_OnLogicPassStart() {
   GetDrawState().OnLogicPassStart();
+}
+
+void BlendState_SetHandler(uint32_t handler) {
+  GetDrawState().SetHandler(handler);
 }
 
 void BlendState_AfterDraw(uint8_t* base) {

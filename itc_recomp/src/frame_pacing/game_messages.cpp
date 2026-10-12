@@ -174,7 +174,9 @@ void Deliver(PPCContext& ctx, uint8_t* base, uint32_t dispatcher, uint32_t messa
     uint32_t list = guest::LoadU32(base, kCommandListPointer);
     uint32_t used_before = list ? guest::LoadU32(base, list + kCommandListUsedOffset) : 0;
     debug::FrameStateDiff_Before(base);
+    interpolation::BlendState_SetHandler(target);
     REX_CALL_INDIRECT_FUNC(method);
+    interpolation::BlendState_SetHandler(0);
     debug::FrameStateDiff_After(base, "message handler", target);
     if (REXCVAR_GET(log_recording_handlers) && list &&
         guest::LoadU32(base, kCommandListPointer) == list) {
