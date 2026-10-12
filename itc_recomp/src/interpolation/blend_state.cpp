@@ -408,12 +408,7 @@ class DrawState {
   // an identity) and their values.
   void Note(uint8_t* base, uint32_t out, uint32_t world, uint32_t camera,
             const ProductInputs& inputs, bool render_only) {
-    // The race overlays (the marker above opponents, Update handler
-    // sub_8215E150) are left unblended: blended, the logic pass's and the
-    // render-only passes' markers came out a tick apart (two markers).
-    if (handler_ == kRaceOverlaysHandler) {
-      return;
-    }
+
     uint64_t signature = camera_ids_.Of(inputs.view_projection);
     ProductKey key{camera, world, signature, handler_,
                    product_occurrences_[{camera, world, signature, handler_, 0}]++};
@@ -424,8 +419,14 @@ class DrawState {
       // same multiply should have the same inputs; if not, the pairing
       // slipped (something was culled differently) and it's left alone.
       auto tick = current_tick_.find(key);
-      if (tick == current_tick_.end() || tick->second.world != inputs.world ||
-          tick->second.view_projection != inputs.view_projection) {
+      // The race overlays (the marker above opponents, Update handler
+      // sub_8215E150) are recorded again on render-only passes with slightly
+      // different inputs; they're blended from the logic pass's inputs under
+      // the same key, so they match the logic pass's frame (otherwise the
+      // marker drew a tick apart on the two: two markers).
+      bool overlay = handler_ == kRaceOverlaysHandler && tick != current_tick_.end();
+      if (!overlay && (tick == current_tick_.end() || tick->second.world != inputs.world ||
+                       tick->second.view_projection != inputs.view_projection)) {
         counts_.mismatched_products++;
         return;
       }
