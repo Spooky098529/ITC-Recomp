@@ -453,6 +453,16 @@ Three more things are blended, outside the products:
   amount about 0) and the frames after blend towards the new one.
   `--pixel_blend_from_latest=false` brings back the old pairing.
 
+  This was the long-standing "headlight lighting on other cars" issue. It
+  had been described as the beam's edge flickering on an opponent close and
+  diagonal in it, but it was this stepping, easier to see at angles where
+  the light is dimmer. Two earlier attempts went after the wrong cause:
+  branch `headlight-fixes` (light slots matched by the light in them, faded
+  in and out; jumps judged per register; c4-c8 held with the lighting) made
+  opponents worse, and branch `lighting-fixes` (`--recompute_lighting`:
+  rerunning the game's light setup with blended cars, light records and
+  camera) smoothed the road's lighting but not car bodies.
+
 Logic and render-only passes both draw the tick's real state; nothing is
 blended while drawing. Blending the camera inside Draw changed what the game
 culled, so the order-based pairing slipped and bits of the scene stepped at
@@ -544,18 +554,5 @@ constants:
   "Finding what still steps" if something does.
 - **A piece of geometry flickers while the car moves**, at native 30 fps
   too, so not interpolation: probably the game's own effect (a broken light).
-- **Headlight lighting on other cars**: the light on their bodies stepped
-  at 30 Hz because the light slots lag a frame on logic passes; blending
-  from the previous tick's last value fixed that (see "What gets blended").
-  Earlier reports: the beam's edge flickers on an opponent close and
-  diagonal in it, with occasional flashes, and the player's beam can jump
-  in sharp turns; not rechecked since the fix. Branch `lighting-fixes`
-  tried rerunning the game's light setup with blended cars, lights and
-  camera (`--recompute_lighting`); it smoothed the road's lighting but not
-  car bodies, and was dropped for this. Branch `headlight-fixes` holds an
-  attempt (light slots matched by the light in them, faded in and out,
-  switched; jumps judged per register; c4-c8 held with the lighting). None
-  of it was a consistent improvement, and opponents got worse, so it isn't
-  on `main`. Its commits and docs describe what was learned.
 - **One tick of latency**: drawing shows between the previous and the
   current tick, as usual for this kind of interpolation.
