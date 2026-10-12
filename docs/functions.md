@@ -432,7 +432,12 @@ Three more things are blended, outside the products:
   that legitimately jump between ticks: they keep the newer tick's value. A
   jump anywhere else means a wrong pairing, and the upload is left as
   recorded (blending two objects' lighting flashes headlight-colored light
-  onto random geometry). `--blend_pixel_constants=false` turns this off.
+  onto random geometry). After a vertex upload that isn't a known product
+  (world geometry's matrix often isn't), the pixel constants after it
+  aren't paired at all (`--strict_pixel_pairing`): pairing them by an
+  earlier draw's product blended one piece of world geometry's lighting
+  with another's, so buildings' lighting briefly changed.
+  `--blend_pixel_constants=false` turns this off.
 
 Logic and render-only passes both draw the tick's real state; nothing is
 blended while drawing. Blending the camera inside Draw changed what the game
@@ -523,5 +528,12 @@ constants:
   "Finding what still steps" if something does.
 - **A piece of geometry flickers while the car moves**, at native 30 fps
   too, so not interpolation: probably the game's own effect (a broken light).
+- **Headlight lighting on other cars**: the beam's edge flickers on an
+  opponent close and diagonal in it, with occasional flashes, and the
+  player's beam can jump in sharp turns. Branch `headlight-fixes` holds an
+  attempt (light slots matched by the light in them, faded in and out,
+  switched; jumps judged per register; c4-c8 held with the lighting): it
+  fixed the turns but made opponents worse than without it, so it isn't
+  on `main`. Its commits and docs describe what was learned.
 - **One tick of latency**: drawing shows between the previous and the
   current tick, as usual for this kind of interpolation.
