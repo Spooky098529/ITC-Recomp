@@ -18,6 +18,10 @@ namespace interpolation {
 void BlendState_OnLogicPassStart();
 
 // Main thread: the message handler being run (its target), 0 after it.
+// Diagnostics (--log_overlay_uploads): after the race overlays recorded on a
+// logic pass, logs every slot they allocated, every 3 s.
+void BlendState_LogOverlayAllocations(uint8_t* base);
+
 void BlendState_SetHandler(uint32_t handler);
 
 // Main thread, around the delivery of a Draw message.

@@ -383,6 +383,13 @@ struct OverlaySlot {
 std::mutex g_overlay_slots_mutex;
 std::unordered_map<uint32_t, std::optional<OverlaySlot>> g_overlay_slots;
 
+// Allocations made while the race overlays record (logic passes), for
+// OverlayAllocations_Log.
+struct OverlayAllocation {
+  uint32_t address, count, caller;
+};
+std::vector<OverlayAllocation> g_overlay_allocations;
+
 std::optional<OverlaySlot> OverlaySlotOf(uint32_t address) {
   std::lock_guard lock(g_overlay_slots_mutex);
   auto it = g_overlay_slots.find(address);
@@ -1397,6 +1404,31 @@ OverlayUploadsLog& GetOverlayUploadsLog() {
 
 }  // namespace
 
+void BlendState_LogOverlayAllocations(uint8_t* base) {
+  static auto last = std::chrono::steady_clock::now();
+  auto now = std::chrono::steady_clock::now();
+  if (!REXCVAR_GET(log_overlay_uploads) || frame_pacing::GameMessages_IsRenderOnlyPass()) {
+    return;
+  }
+  if (now - last >= std::chrono::seconds(3)) {
+    last = now;
+    for (const OverlayAllocation& a : g_overlay_allocations) {
+      std::string words;
+      for (uint32_t i = 0; i < std::min<uint32_t>(a.count * 4, 24); i++) {
+        uint32_t w = guest::LoadU32(base, a.address + 4 * i);
+        float f;
+        std::memcpy(&f, &w, 4);
+        words += (i % 4 == 0 && i) ? " | " : " ";
+        words += (std::isfinite(f) && std::abs(f) > 1e-4f && std::abs(f) < 1e6f)
+                     ? fmt::format("{:.5g}", f)
+                     : fmt::format("{:08X}", w);
+      }
+      REXLOG_INFO("overlay alloc: {:08X} x{} by {:08X}:{}", a.address, a.count, a.caller, words);
+    }
+  }
+  g_overlay_allocations.clear();
+}
+
 void BlendState_BeforeDraw(uint8_t* base, bool render_only_pass) {
   GetDrawState().BeforeDraw(base, !render_only_pass);
 }
@@ -1526,6 +1558,10 @@ extern "C" REX_FUNC(sub_8258CAA0) {
     uint32_t handler = interpolation::GetDrawState().handler() & ~1u;
     std::optional<interpolation::OverlaySlot> slot;
     if (handler == interpolation::kRaceOverlaysHandler) {
+      if (!frame_pacing::GameMessages_IsRenderOnlyPass() &&
+          interpolation::g_overlay_allocations.size() < 4096) {
+        interpolation::g_overlay_allocations.push_back({ctx.r3.u32, count, caller});
+      }
       slot = interpolation::OverlaySlot{frame_pacing::GameMessages_PassNumber(),
                                         frame_pacing::GameMessages_IsRenderOnlyPass()};
     }

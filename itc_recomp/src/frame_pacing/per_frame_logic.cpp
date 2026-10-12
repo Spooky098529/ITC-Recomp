@@ -281,6 +281,7 @@ extern "C" REX_FUNC(sub_8215DEA0) {
   }
   interpolation::BlendState_SetHandler(kRecordContext);
   for_each_overlay(kRecordSlot);
+  interpolation::BlendState_LogOverlayAllocations(base);
   for (const auto& [overlay, state] : saved) {
     std::memcpy(base + overlay, state.data(), state.size());
   }
