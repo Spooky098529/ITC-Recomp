@@ -25,8 +25,6 @@ REXCVAR_DEFINE_BOOL(per_tick_ui_movies, true, "ITC",
                     "Advance UI movies once per tick on render-only passes");
 REXCVAR_DEFINE_BOOL(redraw_opponent_markers, true, "ITC",
                     "Draw the markers above opponent cars on render-only passes too");
-REXCVAR_DEFINE_BOOL(debug_hide_821225D8, false, "ITC",
-                    "Testing: never run sub_821225D8 (to see what it draws)");
 REXCVAR_DEFINE_BOOL(log_replays, false, "ITC",
                     "Log how replays from the logic pass's state went, every 2 s");
 
@@ -158,9 +156,6 @@ bool g_redrawing_markers = false;
 
 extern "C" REX_FUNC(sub_821225D8) {
   REX_FUNC_PROLOGUE();
-  if (REXCVAR_GET(debug_hide_821225D8)) {
-    return;
-  }
   if (!frame_pacing::GameMessages_IsRenderOnlyPass() && !g_redrawing_markers) {
     uint64_t pass = frame_pacing::GameMessages_PassNumber();
     if (pass != g_marker_calls_pass) {
