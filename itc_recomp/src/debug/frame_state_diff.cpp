@@ -367,3 +367,13 @@ ITC_FRAME_STATE_WRAP(820E7328)
 ITC_FRAME_STATE_WRAP(820E8908)
 ITC_FRAME_STATE_WRAP(820ECE28)
 #undef ITC_FRAME_STATE_WRAP
+
+// Tick handler 0x82096340 is a thunk calling vtable slot 1 of the object in
+// r3; name the function it reaches (logged as "thunk target").
+extern "C" REX_FUNC(sub_82096340) {
+  REX_FUNC_PROLOGUE();
+  uint32_t target = guest::LoadU32(base, guest::LoadU32(base, ctx.r3.u32) + 4);
+  debug::FrameStateDiff_Before(base);
+  __imp__sub_82096340(ctx, base);
+  debug::FrameStateDiff_After(base, "thunk target", target);
+}
