@@ -20,10 +20,88 @@
 #include "game_messages.h"
 #include "guest.h"
 #include "interpolation/blend_state.h"
+#include <algorithm>
+#include <string>
+#include <mutex>
+#include <chrono>
+#include <rex/logging.h>
+#include <rex/cvar.h>
+
+REXCVAR_DEFINE_BOOL(log_frame_times, false, "ITC",
+                    "Log where frame time goes (main thread work, waits, render thread "
+                    "drawing and presenting, blending), every 2 s");
 
 namespace {
 
 using frame_pacing::GetFramePacer;
+
+// Diagnostics (--log_frame_times): durations of each part of a frame, as
+// average and worst over 2 s.
+class FrameTimes {
+ public:
+  using Clock = std::chrono::steady_clock;
+  enum Part {
+    kLogicWork,       // main thread: a logic pass's work (tick handlers)
+    kRenderOnlyWork,  // main thread: a render-only pass's work
+    kWaitForRender,   // main thread: the game's wait for the frame in flight
+    kPacing,          // main thread: held back by the frame cap
+    kDraw,            // render thread: drawing a frame, present included
+    kPresent,         // render thread: present (Renderer::Present)
+    kParts
+  };
+
+  void Add(Part part, Clock::duration d) {
+    std::lock_guard lock(mutex_);
+    Stat& s = stats_[part];
+    double ms = std::chrono::duration<double, std::milli>(d).count();
+    s.total += ms;
+    s.worst = std::max(s.worst, ms);
+    s.count++;
+  }
+
+  // Main thread, once per pass.
+  void MaybeLog() {
+    auto now = Clock::now();
+    if (now - last_log_ < std::chrono::seconds(2)) {
+      return;
+    }
+    last_log_ = now;
+    int64_t blend_ns, upload_ns;
+    interpolation::BlendState_TakeReplayTimes(blend_ns, upload_ns);
+    static const char* kNames[kParts] = {"logic pass work", "render-only pass work",
+                                         "wait for render thread", "frame cap",
+                                         "render thread draw", "present"};
+    std::lock_guard lock(mutex_);
+    std::string line;
+    int frames = std::max(stats_[kDraw].count, 1);
+    for (int i = 0; i < kParts; i++) {
+      const Stat& s = stats_[i];
+      line += fmt::format(" | {} {:.2f} avg {:.2f} worst ({})", kNames[i],
+                          s.count ? s.total / s.count : 0.0, s.worst, s.count);
+      stats_[i] = {};
+    }
+    REXLOG_INFO("frame times (ms):{} | per frame: blending {:.2f}, constant uploads {:.2f}", line,
+                blend_ns / 1e6 / frames, upload_ns / 1e6 / frames);
+  }
+
+  Clock::time_point pass_start;
+  bool pass_render_only = false;
+  bool pass_started = false;
+
+ private:
+  struct Stat {
+    double total = 0, worst = 0;
+    int count = 0;
+  };
+  std::mutex mutex_;
+  Stat stats_[kParts];
+  Clock::time_point last_log_ = Clock::now();
+};
+
+FrameTimes& GetFrameTimes() {
+  static FrameTimes times;
+  return times;
+}
 
 // Renderer object (see Renderer::Init, sub_82092358).
 constexpr uint32_t kRendererTickDoneEventOffset = 388;   // set by logic after a tick
@@ -54,9 +132,13 @@ void Event_Signal(PPCContext& ctx, uint8_t* base, uint32_t event) {
 }
 
 void Renderer_DrawFrame(PPCContext& ctx, uint8_t* base, uint32_t renderer) {
+  auto start = FrameTimes::Clock::now();
   interpolation::BlendState_OnReplayFrameStart();
   ctx.r3.u64 = renderer;
   sub_82091E58(ctx, base);
+  if (REXCVAR_GET(log_frame_times)) {
+    GetFrameTimes().Add(FrameTimes::kDraw, FrameTimes::Clock::now() - start);
+  }
 }
 
 bool Renderer_IsRunning(uint8_t* base, uint32_t renderer) {
@@ -76,8 +158,16 @@ void Renderer_ThreadLoop(PPCContext& ctx, uint8_t* base, uint32_t renderer) {
 // Main thread, once per main-loop pass: the game's own wait for the frame in
 // flight (and its deferred work), then pacing for the coming pass.
 void Renderer_WaitForFrame(PPCContext& ctx, uint8_t* base, uint32_t renderer) {
+  bool timing = REXCVAR_GET(log_frame_times);
+  FrameTimes& times = GetFrameTimes();
+  auto wait_start = FrameTimes::Clock::now();
+  if (timing && times.pass_started) {
+    times.Add(times.pass_render_only ? FrameTimes::kRenderOnlyWork : FrameTimes::kLogicWork,
+              wait_start - times.pass_start);
+  }
   ctx.r3.u64 = renderer;
   __imp__sub_820920D8(ctx, base);
+  auto pacing_start = FrameTimes::Clock::now();
 
   auto& pacer = GetFramePacer();
   frame_pacing::GameMessages_OnPassFinished();
@@ -95,6 +185,15 @@ void Renderer_WaitForFrame(PPCContext& ctx, uint8_t* base, uint32_t renderer) {
     pacer.OnTickReleased();
   }
   pacer.OnFrameStarted();
+  if (timing) {
+    auto now = FrameTimes::Clock::now();
+    times.Add(FrameTimes::kWaitForRender, pacing_start - wait_start);
+    times.Add(FrameTimes::kPacing, now - pacing_start);
+    times.pass_start = now;
+    times.pass_render_only = render_only && frame_pacing::GameMessages_InRace();
+    times.pass_started = true;
+    times.MaybeLog();
+  }
   frame_pacing::GameMessages_SetRenderOnlyPass(render_only);
   debug::FrameStateDiff_OnPassStart(base, render_only);
 }
@@ -126,6 +225,19 @@ extern "C" REX_FUNC(sub_820920D8) {
   uint32_t r1 = ctx.r1.u32;
   Renderer_WaitForFrame(ctx, base, ctx.r3.u32);
   ctx.r1.u32 = r1;
+}
+
+// Renderer::Present: r3 = renderer. Wrapped only to time it
+// (--log_frame_times).
+extern "C" REX_FUNC(sub_82091A60) {
+  REX_FUNC_PROLOGUE();
+  if (!REXCVAR_GET(log_frame_times)) {
+    __imp__sub_82091A60(ctx, base);
+    return;
+  }
+  auto start = FrameTimes::Clock::now();
+  __imp__sub_82091A60(ctx, base);
+  GetFrameTimes().Add(FrameTimes::kPresent, FrameTimes::Clock::now() - start);
 }
 
 // VideoOutput_WaitForVblank: r3 = video output.

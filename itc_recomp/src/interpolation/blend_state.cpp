@@ -66,6 +66,7 @@ REXCVAR_DEFINE_BOOL(log_overlay_products, false, "ITC",
 REXCVAR_DEFINE_BOOL(log_overlay_uploads, false, "ITC",
                     "Log every shader constant upload the race overlays recorded, as replayed, "
                     "12 frames every 3 s");
+REXCVAR_DECLARE(bool, log_frame_times);
 REXCVAR_DEFINE_BOOL(blend_object_extras, true, "ITC",
                     "Blend the per-object uploads' world matrix (c4-c7) and camera position "
                     "(c8) along with c0-c3 (the paint's reflections)");
@@ -1907,11 +1908,32 @@ extern "C" REX_FUNC(sub_8209C6E0) {
 // Command 7, set shader constants (render thread): r3 = payload, r4 =
 // register count, r5 = packed stage/type/start/count. Uploads the frame's
 // blend in place of the tick's camera products and lighting.
+namespace {
+std::atomic<int64_t> g_replay_total_ns = 0, g_replay_upload_ns = 0;
+}  // namespace
+
+void interpolation::BlendState_TakeReplayTimes(int64_t& blend_ns, int64_t& upload_ns) {
+  int64_t total = g_replay_total_ns.exchange(0), upload = g_replay_upload_ns.exchange(0);
+  blend_ns = total - upload;
+  upload_ns = upload;
+}
+
 extern "C" REX_FUNC(sub_8258FD48) {
   REX_FUNC_PROLOGUE();
   uint32_t payload = ctx.r3.u32, packed = ctx.r5.u32;
-  interpolation::BlendState_ReplayConstants(base, payload, packed,
-                                            [&] { __imp__sub_8258FD48(ctx, base); });
+  if (!REXCVAR_GET(log_frame_times)) {
+    interpolation::BlendState_ReplayConstants(base, payload, packed,
+                                              [&] { __imp__sub_8258FD48(ctx, base); });
+    return;
+  }
+  using Clock = std::chrono::steady_clock;
+  Clock::time_point start = Clock::now();
+  interpolation::BlendState_ReplayConstants(base, payload, packed, [&] {
+    Clock::time_point upload_start = Clock::now();
+    __imp__sub_8258FD48(ctx, base);
+    g_replay_upload_ns += (Clock::now() - upload_start).count();
+  });
+  g_replay_total_ns += (Clock::now() - start).count();
 }
 
 // The per-object recorder (~150 calls a pass in a race): r4 = camera

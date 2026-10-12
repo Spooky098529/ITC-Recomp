@@ -43,4 +43,9 @@ void BlendState_OnReplayTick();
 void BlendState_ReplayConstants(uint8_t* base, uint32_t payload, uint32_t packed,
                                 const std::function<void()>& upload);
 
+// Diagnostics (--log_frame_times): render thread time spent replaying
+// constant uploads since the last call, in ours (blending) and in the
+// uploads themselves, in nanoseconds.
+void BlendState_TakeReplayTimes(int64_t& blend_ns, int64_t& upload_ns);
+
 }  // namespace interpolation
