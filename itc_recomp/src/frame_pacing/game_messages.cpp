@@ -162,6 +162,9 @@ void Deliver(PPCContext& ctx, uint8_t* base, uint32_t dispatcher, uint32_t messa
     if (only_targets && !InTargetList(*only_targets, target)) {
       continue;
     }
+    if (debug::IsHidden(target)) {
+      continue;
+    }
     // The command list recorders write to, and its slots used.
     constexpr uint32_t kCommandListPointer = 0x8296B918;
     constexpr uint32_t kCommandListUsedOffset = 12;
