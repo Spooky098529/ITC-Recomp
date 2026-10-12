@@ -27,6 +27,9 @@ void GameMessages_OnPassFinished();
 void GameMessages_SetRenderOnlyPass(bool render_only);
 bool GameMessages_IsRenderOnlyPass();
 
+// Main thread: a vehicle seen by the speed getter (per_frame_logic.cpp).
+void PerFrameLogic_OnVehicleSeen(uint32_t vehicle);
+
 // Which main loop pass this is (counts up by one per pass).
 uint64_t GameMessages_PassNumber();
 

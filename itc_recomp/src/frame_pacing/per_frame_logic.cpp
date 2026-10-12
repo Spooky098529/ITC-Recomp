@@ -7,7 +7,9 @@
 
 #include "game_messages.h"
 #include "guest.h"
+#include "frame_pacer.h"
 #include "interpolation/blend_state.h"
+#include "interpolation/transform.h"
 
 #include <rex/cvar.h>
 
@@ -16,10 +18,12 @@
 #include <chrono>
 #include <cstring>
 #include <map>
+#include <set>
 #include <string>
 #include <unordered_map>
 #include <vector>
 
+REXCVAR_DECLARE(bool, interpolate_draw_state);
 REXCVAR_DEFINE_BOOL(per_tick_blink_timers, true, "ITC",
                     "Advance the car blink timers once per tick on render-only passes");
 REXCVAR_DEFINE_BOOL(per_tick_ui_movies, true, "ITC",
@@ -158,6 +162,81 @@ constexpr uint32_t kCameraPassesBytes = 21 * 592;
 std::vector<uint8_t> g_overlay_cameras;  // as of the logic pass's overlays
 }  // namespace
 
+// The race overlays build the marker above each opponent on the CPU, at
+// that car's position. So that it sits over the car as drawn (blended
+// between ticks), each car's world matrix is set to the frame's blend while
+// the overlays record, then put back.
+namespace {
+constexpr uint32_t kVehicleWorldOffset = 0xD0;
+constexpr uint32_t kVehicleWorldCopyOffset = 0xCF0;  // identical every tick
+
+struct VehiclePoses {
+  std::optional<interpolation::Matrix4> before, now;  // world, last two ticks
+};
+std::set<uint32_t> g_vehicles;  // seen by the speed getter
+std::unordered_map<uint32_t, VehiclePoses> g_vehicle_poses;
+
+interpolation::Matrix4 LoadMatrix(uint8_t* base, uint32_t address) {
+  interpolation::Matrix4 m;
+  for (int i = 0; i < 16; i++) {
+    m[i] = guest::LoadFloat(base, address + 4 * i);
+  }
+  return m;
+}
+
+void StoreMatrix(uint8_t* base, uint32_t address, const interpolation::Matrix4& m) {
+  for (int i = 0; i < 16; i++) {
+    guest::StoreFloat(base, address + 4 * i, m[i]);
+  }
+}
+
+// Logic pass: the cars' poses this tick.
+void RecordVehiclePoses(uint8_t* base) {
+  for (uint32_t vehicle : g_vehicles) {
+    VehiclePoses& poses = g_vehicle_poses[vehicle];
+    poses.before = poses.now;
+    poses.now = LoadMatrix(base, vehicle + kVehicleWorldOffset);
+  }
+}
+
+// Sets each car's world matrix to the frame's blend; returns what to put back.
+std::vector<std::pair<uint32_t, interpolation::Matrix4>> BlendVehiclePoses(uint8_t* base) {
+  std::vector<std::pair<uint32_t, interpolation::Matrix4>> saved;
+  if (!REXCVAR_GET(interpolate_draw_state)) {
+    return saved;
+  }
+  float amount = frame_pacing::GetFramePacer().TickProgress();
+  for (const auto& [vehicle, poses] : g_vehicle_poses) {
+    if (!poses.before || !poses.now) {
+      continue;
+    }
+    auto a = interpolation::ScaledTransformFromWorldMatrix(*poses.before);
+    auto b = interpolation::ScaledTransformFromWorldMatrix(*poses.now);
+    if (!a || !b ||
+        interpolation::Distance(a->transform.position, b->transform.position) > 8.0f) {
+      continue;
+    }
+    interpolation::Matrix4 blended =
+        interpolation::WorldMatrixFromScaledTransform(interpolation::Blend(*a, *b, amount));
+    for (uint32_t offset : {kVehicleWorldOffset, kVehicleWorldCopyOffset}) {
+      if (LoadMatrix(base, vehicle + offset) == *poses.now) {
+        saved.push_back({vehicle + offset, *poses.now});
+        StoreMatrix(base, vehicle + offset, blended);
+      }
+    }
+  }
+  return saved;
+}
+}  // namespace
+
+namespace frame_pacing {
+void PerFrameLogic_OnVehicleSeen(uint32_t vehicle) {
+  if (g_vehicles.size() < 64) {
+    g_vehicles.insert(vehicle);
+  }
+}
+}  // namespace frame_pacing
+
 extern "C" REX_FUNC(sub_8215DEA0) {
   REX_FUNC_PROLOGUE();
   constexpr uint32_t kOverlayCount = 25;
@@ -198,8 +277,15 @@ extern "C" REX_FUNC(sub_8215DEA0) {
     interpolation::BlendState_SetHandler(kUpdateContext);
     for_each_overlay(kUpdateSlot);
   }
+  if (!render_only) {
+    RecordVehiclePoses(base);
+  }
+  auto vehicles = BlendVehiclePoses(base);
   interpolation::BlendState_SetHandler(kRecordContext);
   for_each_overlay(kRecordSlot);
+  for (const auto& [address, matrix] : vehicles) {
+    StoreMatrix(base, address, matrix);
+  }
   if (render_only) {
     std::memcpy(cameras, current.data(), kCameraPassesBytes);
   }
