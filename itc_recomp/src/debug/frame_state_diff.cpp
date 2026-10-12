@@ -247,58 +247,28 @@ ITC_FRAME_STATE_WRAP(82597118)
 ITC_FRAME_STATE_WRAP(82597518)
 ITC_FRAME_STATE_WRAP(82597610)
 ITC_FRAME_STATE_WRAP(82598768)
+// The per-car update called from Draw (sub_820DAC68), and its callees.
+ITC_FRAME_STATE_WRAP(820DAC68)
+ITC_FRAME_STATE_WRAP(820C5C88)
+ITC_FRAME_STATE_WRAP(820D4048)
+ITC_FRAME_STATE_WRAP(820D72D8)
+ITC_FRAME_STATE_WRAP(820D92A0)
+ITC_FRAME_STATE_WRAP(820D9B68)
+ITC_FRAME_STATE_WRAP(820D9C50)
+ITC_FRAME_STATE_WRAP(820D9EA0)
+ITC_FRAME_STATE_WRAP(820DAB58)
+ITC_FRAME_STATE_WRAP(820DBFF8)
+ITC_FRAME_STATE_WRAP(820DC498)
+ITC_FRAME_STATE_WRAP(820DCBC0)
+ITC_FRAME_STATE_WRAP(820DDA60)
+ITC_FRAME_STATE_WRAP(820DDE58)
+ITC_FRAME_STATE_WRAP(820E2E68)
+ITC_FRAME_STATE_WRAP(820E2EE8)
+ITC_FRAME_STATE_WRAP(820E4140)
+ITC_FRAME_STATE_WRAP(820E53F0)
+ITC_FRAME_STATE_WRAP(820E5A68)
+ITC_FRAME_STATE_WRAP(820E6A40)
+ITC_FRAME_STATE_WRAP(820E7328)
+ITC_FRAME_STATE_WRAP(820E8908)
+ITC_FRAME_STATE_WRAP(820ECE28)
 #undef ITC_FRAME_STATE_WRAP
-
-// Per-car update called from Draw (sub_820DAC68, r3 = car): on a render-only
-// pass every two seconds, compare all memory around one call and log every
-// changed range, relative to the car where it's within it.
-extern "C" REX_FUNC(sub_820DAC68) {
-  REX_FUNC_PROLOGUE();
-  static auto last = std::chrono::steady_clock::now();
-  uint32_t car = ctx.r3.u32;
-  bool sample = REXCVAR_GET(find_per_frame_state) && frame_pacing::GameMessages_IsRenderOnlyPass() &&
-                std::chrono::steady_clock::now() - last > std::chrono::seconds(2);
-  std::vector<debug::Range> ranges;
-  std::vector<uint8_t> before;
-  if (sample) {
-    last = std::chrono::steady_clock::now();
-    ranges = debug::ReadableGuestRanges(base);
-    for (const auto& r : ranges) {
-      before.insert(before.end(), base + r.start, base + r.start + r.size);
-    }
-  }
-  debug::FrameStateDiff_Before(base);
-  __imp__sub_820DAC68(ctx, base);
-  debug::FrameStateDiff_After(base, "draw step part", 0x820DAC68);
-  if (sample) {
-    std::string changed;
-    size_t offset = 0;
-    int count = 0;
-    for (const auto& r : ranges) {
-      uint32_t run_start = 0, run_end = 0;
-      auto flush = [&] {
-        if (run_end > run_start && changed.size() < 4000) {
-          bool in_car = run_start >= car && run_start < car + 0x2000;
-          changed += in_car ? fmt::format(" car+{:X}..+{:X}", run_start - car, run_end - car)
-                            : fmt::format(" {:08X}..{:08X}", run_start, run_end);
-        }
-      };
-      for (uint32_t i = 0; i + 4 <= r.size; i += 4) {
-        if (std::memcmp(base + r.start + i, before.data() + offset + i, 4) == 0) {
-          continue;
-        }
-        count++;
-        uint32_t address = r.start + i;
-        if (address != run_end) {
-          flush();
-          run_start = address;
-        }
-        run_end = address + 4;
-      }
-      flush();
-      offset += r.size;
-    }
-    REXLOG_INFO("per-frame state: sub_820DAC68(car {:08X}) changed {} words:{}", car, count,
-                changed);
-  }
-}
