@@ -348,16 +348,18 @@ class DrawState {
   }
 
   // Main thread, after the matrix copy dst = src. A copy of a camera (as
-  // identity * camera) or of a noted product carries on as that product (the
-  // light billboards' constants arrive this way).
+  // identity * camera) or of a noted product carries on as that product.
   void OnCopy(uint8_t* base, uint32_t dst, uint32_t src) {
     if (std::this_thread::get_id() != main_thread_) {
       return;
     }
     bool render_only = frame_pacing::GameMessages_IsRenderOnlyPass();
-    if (PassOfViewProjection(src) >= 0) {
+    Matrix4 value = LoadMatrix(base, src);
+    if (PassOfViewProjection(src) >= 0 || camera_ids_.Of(value) != 0) {
+      // A copy of a camera (a camera pass's, or a perspective one built on
+      // the stack, like the headlight projector's).
       Matrix4 identity{1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
-      Note(base, dst, 0, src, {identity, LoadMatrix(base, src)}, render_only);
+      Note(base, dst, 0, src, {identity, value}, render_only);
       counts_.copies++;
       return;
     }
