@@ -170,6 +170,10 @@ extern "C" REX_FUNC(sub_8215DEA0) {
   constexpr uint32_t kOverlayCount = 25;
   constexpr uint32_t kRecordSlot = 20;  // vtable offset of slot 5
   uint32_t list = ctx.r3.u32;
+  // The same stack frame as the original (stwu r1,-112(r1)), so the
+  // overlays' stack temporaries are where they are on a logic pass (camera
+  // products are keyed by their operands' addresses).
+  guest::StackFrame frame(ctx, 112);
   for (uint32_t i = 0; i < kOverlayCount; i++) {
     uint32_t overlay = guest::LoadU32(base, list + 4 * i);
     if (overlay == 0) {
