@@ -23,6 +23,8 @@ REXCVAR_DEFINE_BOOL(per_tick_blink_timers, true, "ITC",
                     "Advance the car blink timers once per tick on render-only passes");
 REXCVAR_DEFINE_BOOL(per_tick_ui_movies, true, "ITC",
                     "Advance UI movies once per tick on render-only passes");
+REXCVAR_DEFINE_BOOL(redraw_opponent_markers, true, "ITC",
+                    "Draw the markers above opponent cars on render-only passes too");
 REXCVAR_DEFINE_BOOL(log_replays, false, "ITC",
                     "Log how replays from the logic pass's state went, every 2 s");
 
@@ -142,7 +144,41 @@ extern "C" REX_FUNC(sub_8211D2F8) {
   g_ui_movies.Run(base, ctx.r3.u32, [&] { __imp__sub_8211D2F8(ctx, base); });
 }
 
+namespace {
+// The markers drawn on the last logic pass: (marker, camera pass). They're
+// updated and recorded during Update, which render-only passes skip, and
+// what they record lasts one frame, so render-only passes draw them again.
+std::vector<std::pair<uint32_t, uint32_t>> g_marker_calls;
+uint64_t g_marker_calls_pass = ~0ull;
+bool g_redrawing_markers = false;
+}  // namespace
+
 extern "C" REX_FUNC(sub_821225D8) {
   REX_FUNC_PROLOGUE();
+  if (!frame_pacing::GameMessages_IsRenderOnlyPass() && !g_redrawing_markers) {
+    uint64_t pass = frame_pacing::GameMessages_PassNumber();
+    if (pass != g_marker_calls_pass) {
+      g_marker_calls_pass = pass;
+      g_marker_calls.clear();
+    }
+    g_marker_calls.push_back({ctx.r3.u32, ctx.r4.u32});
+  }
   g_opponent_markers.Run(base, ctx.r3.u32, [&] { __imp__sub_821225D8(ctx, base); });
 }
+
+namespace frame_pacing {
+
+void PerFrameLogic_AfterRenderOnlyDraw(PPCContext& ctx, uint8_t* base) {
+  if (!REXCVAR_GET(redraw_opponent_markers)) {
+    return;
+  }
+  g_redrawing_markers = true;
+  for (const auto& [marker, pass] : g_marker_calls) {
+    ctx.r3.u64 = marker;
+    ctx.r4.u64 = pass;
+    sub_821225D8(ctx, base);
+  }
+  g_redrawing_markers = false;
+}
+
+}  // namespace frame_pacing
