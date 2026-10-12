@@ -137,3 +137,29 @@ extern "C" REX_FUNC(sub_8211D2F8) {
   }
   g_ui_movies.Run(base, ctx.r3.u32, [&] { __imp__sub_8211D2F8(ctx, base); });
 }
+
+// Race overlays (sub_8215DEA0, from Update handler sub_8215E150; r3 = a list
+// of 25 objects): updates each (vtable slot 4), then records its drawing
+// (slot 5). The marker above opponent cars is one, recorded only during
+// Update and lasting a frame, so it showed on logic passes only (flicker).
+// Render-only passes deliver Update to this handler alone (see
+// game_messages.cpp), and here only the recording runs.
+extern "C" REX_FUNC(sub_8215DEA0) {
+  REX_FUNC_PROLOGUE();
+  if (!frame_pacing::GameMessages_IsRenderOnlyPass()) {
+    __imp__sub_8215DEA0(ctx, base);
+    return;
+  }
+  constexpr uint32_t kOverlayCount = 25;
+  constexpr uint32_t kRecordSlot = 20;  // vtable offset of slot 5
+  uint32_t list = ctx.r3.u32;
+  for (uint32_t i = 0; i < kOverlayCount; i++) {
+    uint32_t overlay = guest::LoadU32(base, list + 4 * i);
+    if (overlay == 0) {
+      continue;
+    }
+    uint32_t record = guest::LoadU32(base, guest::LoadU32(base, overlay) + kRecordSlot);
+    ctx.r3.u64 = overlay;
+    REX_CALL_INDIRECT_FUNC(record);
+  }
+}
