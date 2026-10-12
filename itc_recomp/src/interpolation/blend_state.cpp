@@ -2038,6 +2038,26 @@ class PixelOutcomesLog {
         float o = has_older ? h.older[i] : 0;
         bool flip = has_older && std::abs(b - o) <= 0.1f * std::max(std::abs(b), std::abs(o)) + 0.05f;
         (flip ? frame_flips_ : frame_jumps_)[i]++;
+        if (follow_frames_ == 0 &&
+            std::chrono::steady_clock::now() - follow_last_ >= std::chrono::seconds(3)) {
+          follow_last_ = std::chrono::steady_clock::now();
+          follow_key_ = {object, occurrence, start};
+          follow_frames_ = 10;
+          auto line = [&](const std::vector<float>& v) {
+            return fmt::format("c3 {:.4g} {:.4g} {:.4g} {:.4g} | c4 {:.4g} {:.4g} {:.4g} {:.4g} | "
+                               "c8 {:.4g} {:.4g} {:.4g} | c9 {:.4g} {:.4g} {:.4g} | c47 {:.4g} "
+                               "{:.4g} {:.4g} {:.4g} | c48 {:.4g} {:.4g} {:.4g} {:.4g}",
+                               v[12], v[13], v[14], v[15], v[16], v[17], v[18], v[19], v[32],
+                               v[33], v[34], v[36], v[37], v[38], v[188], v[189], v[190], v[191],
+                               v[192], v[193], v[194], v[195]);
+          };
+          REXLOG_INFO("pixel follow: object {:016X} c{} jumped at c{}.{}; two frames ago "
+                      "uploaded {}",
+                      object, start, start + r, "xyzw"[i % 4],
+                      has_older ? line(h.older) : std::string("-"));
+          REXLOG_INFO("pixel follow: last frame (tick {} amount {:.2f}) uploaded {}", h.tick,
+                      h.amount, line(h.previous));
+        }
         if (change_lines_++ < 16) {
           REXLOG_INFO("pixel outcomes: frame {} c{}.{} ({}), object {:016X}: {} -> {:.4g} -> "
                       "{:.4g}, tick {} amount {:.2f} (last frame tick {} amount {:.2f}), {}",
@@ -2047,6 +2067,23 @@ class PixelOutcomesLog {
                       h.tick, h.amount, kOutcomeNames[int(blender.outcome())]);
         }
       }
+    }
+    if (follow_frames_ > 0 && follow_key_ == std::make_tuple(object, occurrence, start) &&
+        follow_frame_ != frame_counter_) {
+      follow_frame_ = frame_counter_;
+      follow_frames_--;
+      const std::vector<float>& rec = blender.last_values();
+      auto line = [&](const std::vector<float>& v) {
+        return fmt::format("c3 {:.4g} {:.4g} {:.4g} {:.4g} | c4 {:.4g} {:.4g} {:.4g} {:.4g} | c8 "
+                           "{:.4g} {:.4g} {:.4g} | c9 {:.4g} {:.4g} {:.4g} | c47 {:.4g} {:.4g} "
+                           "{:.4g} {:.4g} | c48 {:.4g} {:.4g} {:.4g} {:.4g}",
+                           v[12], v[13], v[14], v[15], v[16], v[17], v[18], v[19], v[32], v[33],
+                           v[34], v[36], v[37], v[38], v[188], v[189], v[190], v[191], v[192],
+                           v[193], v[194], v[195]);
+      };
+      REXLOG_INFO("pixel follow: tick {} amount {:.2f} {}: recorded {}", tick, amount,
+                  kOutcomeNames[int(blender.outcome())], line(rec));
+      REXLOG_INFO("pixel follow:                       uploaded {}", line(now));
     }
     h.older = std::move(h.previous);
     h.older_frame = h.frame;
@@ -2067,6 +2104,10 @@ class PixelOutcomesLog {
   uint64_t frame_counter_ = 0;
   std::map<uint32_t, int> frame_jumps_, frame_flips_;
   int change_lines_ = 0;
+  std::tuple<uint64_t, int, uint32_t> follow_key_{};
+  int follow_frames_ = 0;
+  uint64_t follow_frame_ = 0;
+  std::chrono::steady_clock::time_point follow_last_{};
 
   // Every 5 s, one moving object's light slots (c8-c11 positions, c24-c27
   // directions) followed upload by upload for 4 ticks, from the first one
