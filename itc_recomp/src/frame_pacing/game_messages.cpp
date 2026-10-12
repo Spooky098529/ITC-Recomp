@@ -7,7 +7,10 @@
 #include <rex/cvar.h>
 #include <rex/logging.h>
 
+#include <algorithm>
 #include <chrono>
+#include <vector>
+#include <string>
 #include <map>
 
 REXCVAR_DEFINE_BOOL(log_game_messages, false, "ITC",
@@ -183,9 +186,44 @@ std::map<std::pair<uint32_t, uint32_t>, int> g_tick_handlers;
 std::chrono::steady_clock::time_point g_tick_handlers_logged{};
 }  // namespace
 
+// Testing: main loop tick handlers to skip on render-only passes, by target
+// (comma-separated hex), to find which one counts frames.
+REXCVAR_DEFINE_STRING(render_only_skip, "", "ITC",
+                      "Testing: tick handler targets (hex, comma-separated) to skip on "
+                      "render-only passes");
+
+namespace {
+bool SkipOnRenderOnlyPass(uint32_t target) {
+  static std::string parsed_from;
+  static std::vector<uint32_t> targets;
+  std::string list = REXCVAR_GET(render_only_skip);
+  if (list != parsed_from) {
+    parsed_from = list;
+    targets.clear();
+    size_t start = 0;
+    while (start < list.size()) {
+      size_t end = list.find(',', start);
+      std::string item = list.substr(start, end == std::string::npos ? std::string::npos : end - start);
+      if (!item.empty()) {
+        targets.push_back(uint32_t(std::stoul(item, nullptr, 16)));
+      }
+      if (end == std::string::npos) {
+        break;
+      }
+      start = end + 1;
+    }
+  }
+  return std::find(targets.begin(), targets.end(), target) != targets.end();
+}
+}  // namespace
+
 // TickHandler_Invoke: r3 = app, r4 = (handler object in the low word).
 extern "C" REX_FUNC(sub_82099A98) {
   REX_FUNC_PROLOGUE();
+  if (frame_pacing::GameMessages_IsRenderOnlyPass() &&
+      SkipOnRenderOnlyPass(guest::LoadU32(base, ctx.r4.u32 + 8))) {
+    return;
+  }
   if (REXCVAR_GET(log_tick_handlers) && frame_pacing::GameMessages_IsRenderOnlyPass()) {
     uint32_t handler = ctx.r4.u32;
     uint32_t tick = guest::LoadU32(base, guest::LoadU32(base, handler) + 4);
