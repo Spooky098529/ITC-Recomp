@@ -1321,6 +1321,23 @@ class SteppingConstantsLog {
                     key.owner, rate, entry.sample);
       }
     }
+    // Uploads blended on some frames and not others, or recorded on only
+    // some frames (a logic pass only, say): candidates for a sprite drawn
+    // in two places.
+    int mixed = 0;
+    for (const auto& [key, entry] : entries_) {
+      bool sometimes_blended = entry.substituted > 0 && entry.frames > 0 &&
+                               std::min(entry.substituted, entry.frames) * 20 > entry.present;
+      bool sometimes_present = entry.present * 10 > frames_ && entry.present * 10 < frames_ * 9;
+      if ((sometimes_blended || sometimes_present) && mixed < 60) {
+        mixed++;
+        REXLOG_INFO("mixed constants: {} c{} x{} #{} by {:08X}: in {} of {} frames, blended in {}, "
+                    "{} changes/s unblended, e.g. {}",
+                    key.stage ? "pixel" : "vertex", key.start, key.count, key.occurrence,
+                    key.owner, entry.present, frames_, entry.substituted, entry.changes / seconds,
+                    entry.sample);
+      }
+    }
     REXLOG_INFO("stepping constants: {} logged of {} upload groups, {} frames", logged,
                 entries_.size(), frames_);
     entries_.clear();
@@ -1328,11 +1345,17 @@ class SteppingConstantsLog {
   }
 
   void OnUpload(uint8_t* base, uint32_t payload, uint32_t packed, bool substituted) {
-    if (!REXCVAR_GET(log_stepping_constants) || substituted) {
+    if (!REXCVAR_GET(log_stepping_constants)) {
       return;
     }
     Key key{packed >> 24, (packed >> 8) & 0xFF, packed & 0xFF, SlotOwner(payload - 16), 0};
     key.occurrence = occurrences_[key]++;
+    Entry& counted = entries_[key];
+    counted.present++;
+    if (substituted) {
+      counted.substituted++;
+      return;
+    }
     uint32_t words = std::min<uint32_t>(key.count * 4, 16);
     std::array<float, 16> value{};
     for (uint32_t i = 0; i < words; i++) {
@@ -1359,8 +1382,10 @@ class SteppingConstantsLog {
     auto operator<=>(const Key&) const = default;
   };
   struct Entry {
-    int frames = 0;
+    int frames = 0;  // not substituted
     int changes = 0;
+    int present = 0;
+    int substituted = 0;
     bool seen = false;
     std::array<float, 16> last{};
     std::string sample;
