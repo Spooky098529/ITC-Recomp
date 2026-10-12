@@ -54,6 +54,7 @@ set(ITC_SOURCES
     src/interpolation/command_list.cpp
     src/interpolation/draw_tags.cpp
     src/frame_pacing/game_messages.cpp
+    src/frame_pacing/per_frame_logic.cpp
     src/interpolation/blend_state.cpp
 )
 
