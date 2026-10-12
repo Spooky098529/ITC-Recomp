@@ -31,6 +31,8 @@ REXCVAR_DEFINE_BOOL(per_tick_blink_timers, true, "ITC",
                     "Advance the car blink timers once per tick on render-only passes");
 REXCVAR_DEFINE_BOOL(per_tick_ui_movies, true, "ITC",
                     "Advance UI movies once per tick on render-only passes");
+REXCVAR_DEFINE_BOOL(per_tick_play_time, true, "ITC",
+                    "Count play time once per tick on render-only passes");
 REXCVAR_DEFINE_BOOL(log_replays, false, "ITC",
                     "Log how replays from the logic pass's state went, every 2 s");
 
@@ -43,6 +45,19 @@ extern "C" REX_FUNC(sub_820DC958) {
     return;
   }
   __imp__sub_820DC958(ctx, base);
+}
+
+// Play time (sub_82107910, from Draw): adds one to the frame counter at
+// 0x826C5B90, which sub_821109B8 turns into hours, minutes and seconds at
+// 30 a second. On a render-only pass, take the one back first, so the
+// counter advances once per tick and the call sees the logic pass's value.
+extern "C" REX_FUNC(sub_82107910) {
+  REX_FUNC_PROLOGUE();
+  constexpr uint32_t kPlayTimeFrames = 0x826C5B90;
+  if (frame_pacing::GameMessages_IsRenderOnlyPass() && REXCVAR_GET(per_tick_play_time)) {
+    guest::StoreU32(base, kPlayTimeFrames, guest::LoadU32(base, kPlayTimeFrames) - 1);
+  }
+  __imp__sub_82107910(ctx, base);
 }
 
 // Calls whose animation state and drawing are one: on a render-only pass,

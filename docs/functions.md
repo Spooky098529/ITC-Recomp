@@ -48,6 +48,8 @@ place (search for `PATCH:`).
 | `sub_82152CD8` | | | Camera shake; scales with speed. |
 | `sub_8213F530` | | | Parent of the speed trail object (switches mode at about 88 km/h). Calls `sub_8213F2E0`, `sub_8213F140` and `sub_8213F4B0`. |
 | `sub_8213D438` | | | Resets the trail history; runs on a camera switch. |
+| `sub_82107910` | | Wrapped | From Draw; adds one to the play time frame counter at `0x826C5B90` (see "Per-frame logic"). |
+| `sub_821109B8` | | | Turns the play time frame counter into hours, minutes and seconds (30, 1800, 108000 frames). |
 | `sub_8218E420` | | Patched | Post-race check; the comparison against 60 was changed to 1 to fix the black screen after quest races. |
 
 ## Frame structure
@@ -217,6 +219,7 @@ render-only passes it ran ~5x fast. Each case found is fixed in
 | What | Function | Fix |
 |---|---|---|
 | Blink timers of the car's sprites (four 64-bit frame counters, called from the car's draw `sub_820DDE58`) | `sub_820DC958` | Skipped on render-only passes (`--per_tick_blink_timers`) |
+| Play time (a frame counter at `0x826C5B90`, which `sub_821109B8` turns into hours, minutes and seconds at 30 a second) | `sub_82107910` | One taken back before the call on render-only passes (`--per_tick_play_time`) |
 | UI movies: the HUD, including the race start countdown (a 240-frame movie, a beep at frames 60, 120, 180, 240) | `sub_8211D2F8`, with r4 = 0 (advance a frame and draw); r4 = 1 only draws | Replayed (below) (`--per_tick_ui_movies`) |
 
 **Race overlays** (the marker above opponents, the light trails). Update
@@ -414,7 +417,7 @@ and target, and recorder world matrices), mostly for comparison.
 | `--log_blend_state` | Per second: products published, blended, unpaired, rejected cameras with the reason, and uploads left alone. Unpaired or rejected counts above zero in steady driving mean something is stepping at 30 Hz. |
 | `--log_replayed_constants` | One frame per second: every vertex constant upload replayed, whether it changed since the last frame, and whether it was substituted. |
 | `--log_stepping_constants` | With `--log_slot_callers`: every 2 s, the constant uploads left as recorded that change about 30 times a second (stuck to the tick) rather than every frame, with the code that recorded them. The quickest way to find what still steps. |
-| `--per_tick_blink_timers`, `--per_tick_ui_movies` | The per-frame logic fixes (default on); see "Per-frame logic". |
+| `--per_tick_blink_timers`, `--per_tick_ui_movies`, `--per_tick_play_time` | The per-frame logic fixes (default on); see "Per-frame logic". |
 | `--find_per_frame_state`, `--render_only_skip`, `--log_recording_by_pass` and others | Finding per-frame logic; see "Per-frame logic". |
 | `--log_game_messages`, `--log_slot_callers` | Message delivery per pass; which code allocates constant slots. |
 | `--log_upload_owners`, `--debug_zero_owners` | Which code recorded each vertex constant upload; replay a recorder's uploads as zeros to see what it draws. The fastest way to identify a draw; see "World-space sprites". |
