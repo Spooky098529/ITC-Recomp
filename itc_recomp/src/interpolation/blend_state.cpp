@@ -451,6 +451,7 @@ class DrawState {
   void SetHandler(uint32_t handler) { handler_ = handler; }
 
   void BeforeDraw(uint8_t* base, bool logic_pass) {
+    drawing_ = true;
     main_thread_ = std::this_thread::get_id();
     logic_pass_ = logic_pass;
     if (logic_pass) {
@@ -486,6 +487,7 @@ class DrawState {
   }
 
   void AfterDraw(uint8_t* base) {
+    drawing_ = false;
     base_ = base;
     if (logic_pass_) {
       ticks_++;
@@ -552,7 +554,10 @@ class DrawState {
   void BeforeBillboards(uint8_t* base, uint32_t pass_address) {
     billboard_saved_.clear();
     billboard_saved_vec3_.clear();
-    if (!REXCVAR_GET(interpolate_draw_state)) {
+    // Only while Draw runs, where amount_ is this frame's: billboards built
+    // during Update (the marker above opponents, by the race overlays) are
+    // left facing the tick's camera, the same on every pass.
+    if (!REXCVAR_GET(interpolate_draw_state) || !drawing_) {
       return;
     }
     for (const LookAtBlend& blend : look_at_blends_) {
@@ -745,6 +750,7 @@ class DrawState {
 
   std::thread::id main_thread_;
   uint32_t handler_ = 0;
+  bool drawing_ = false;  // between BeforeDraw and AfterDraw
   int overlay_keys_logged_ = 0;
   uint8_t* base_ = nullptr;
   uint64_t ticks_ = 0;
