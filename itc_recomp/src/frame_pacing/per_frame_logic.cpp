@@ -147,7 +147,8 @@ extern "C" REX_FUNC(sub_8211D2F8) {
 namespace {
 // The markers drawn on the last logic pass: (marker, camera pass). They're
 // updated and recorded during Update, which render-only passes skip, and
-// what they record lasts one frame, so render-only passes draw them again.
+// what they record lasts one frame, so render-only passes draw them again,
+// before Draw as Update would.
 std::vector<std::pair<uint32_t, uint32_t>> g_marker_calls;
 uint64_t g_marker_calls_pass = ~0ull;
 bool g_redrawing_markers = false;
@@ -168,7 +169,7 @@ extern "C" REX_FUNC(sub_821225D8) {
 
 namespace frame_pacing {
 
-void PerFrameLogic_AfterRenderOnlyDraw(PPCContext& ctx, uint8_t* base) {
+void PerFrameLogic_RenderOnlyRedraws(PPCContext& ctx, uint8_t* base) {
   if (!REXCVAR_GET(redraw_opponent_markers)) {
     return;
   }

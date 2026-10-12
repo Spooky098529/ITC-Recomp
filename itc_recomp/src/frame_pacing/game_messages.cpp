@@ -209,10 +209,12 @@ void DispatchMessages(PPCContext& ctx, uint8_t* base, uint32_t dispatcher) {
     } else if (id == kDraw) {
       counts.draws++;
       interpolation::BlendState_BeforeDraw(base, g_render_only_pass);
-      Deliver(ctx, base, dispatcher, message);
       if (g_render_only_pass) {
-        PerFrameLogic_AfterRenderOnlyDraw(ctx, base);
+        // Where Update would have run: what it draws goes into batches
+        // that Draw then draws.
+        PerFrameLogic_RenderOnlyRedraws(ctx, base);
       }
+      Deliver(ctx, base, dispatcher, message);
       interpolation::BlendState_AfterDraw(base);
       continue;
     } else {
