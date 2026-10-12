@@ -449,11 +449,34 @@ Three more things are blended, outside the products:
   same layout at c63: lighting, including the headlights). They hold no
   object identity, so each is paired by the camera product replayed just
   before it, and uploaded as the frame's linear blend of the two ticks.
-  Components c1.x, c3.xyz and c4.x of an upload are per-object light switches
-  that legitimately jump between ticks: they keep the newer tick's value. A
-  jump anywhere else means a wrong pairing, and the upload is left as
-  recorded (blending two objects' lighting flashes headlight-colored light
-  onto random geometry). After a vertex upload that isn't a known product
+  The upload's layout (the same at c0 and c63): c0-c3 are the view matrix
+  and c4 the position of the camera the lighting is worked out against;
+  light slot k (of 8, the lights nearest the object) is registers 8+k
+  (position), 16+k, 24+k (direction), 32+k, 47+k and 55+k (colour and
+  strength among them). For the 63-register uploads:
+  - Only the light slots' positions and directions blend
+    (`--blend_only_light_slots`), which moves the cars' headlights' light
+    with the cars; the rest is left as recorded.
+  - A slot whose light moved more than 4 m in a tick, or any of whose
+    registers jumped, holds another light (passing a street lamp, the next
+    one along takes its slot) and takes the tick's light
+    (`--switch_light_slots`), as the game switches it. Judged by the
+    relative tolerance alone, a world position may move hundreds of metres,
+    so a slot taking the next lamp was blended as one light sliding 30 m
+    across the car in a tick: opponents' cars flashed brighter passing
+    under lamps. Before slots were switched on their own, any slot change
+    rejected the whole upload, so the car's lighting stayed at the tick for
+    a tick (a flicker).
+  - With `--blend_only_light_slots=false`, c0-c4 blend together as a
+    camera, or take the tick's together on a cut (`--blend_lighting_camera`;
+    treated by component as switches, as they once were, a view matrix
+    entry that changed past the tolerance while turning kept the tick's
+    value while the rest blended).
+
+  Otherwise (and for other uploads), components c1.x, c3.xyz and c4.x keep
+  the newer tick's value when they jump, and a jump anywhere else means a
+  wrong pairing, and the upload is left as recorded (blending two objects'
+  lighting flashes headlight-colored light onto random geometry). After a vertex upload that isn't a known product
   (world geometry's matrix often isn't), the pixel constants after it
   aren't paired at all (`--strict_pixel_pairing`): pairing them by an
   earlier draw's product blended one piece of world geometry's lighting
@@ -499,8 +522,9 @@ and target, and recorder world matrices), mostly for comparison.
 | `--motion_blur` | The game's velocity-based motion blur (pixel shader `7EB16456AAD56CBA`), skipped when false (as `run.sh` does, except with `--no-interpolation`). Its velocities come from the tick, so it smears a whole tick of motion at high frame rates. Patch `patches/rexglue-sdk/0002`. |
 | `--blend_pixel_constants` | Blend per-object lighting constants (default on). |
 | `--log_fps` | Frames and ticks per second. |
+| `--blend_only_light_slots`, `--switch_light_slots`, `--blend_lighting_camera` | Which parts of the per-object lighting blend (default on); see "What gets blended". |
+| `--log_pixel_outcomes` | Every 2 s: what the lighting uploads got (blended, unpaired, not as recorded, rejected, unchanged) per frame for moving and still objects, which components differ or were rejected (with the object and its callers), frame-to-frame jumps in moving objects' uploaded lighting, an object followed for 10 frames after its lighting's camera jumps, and every 5 s one moving object's light slots traced for 4 ticks. |
 | `--pixel_blend_from_latest` | Blend per-object lighting from the previous tick's last value (default on); see "What gets blended". |
-| `--log_pixel_outcomes` | Every 2 s: what the lighting uploads got (blended, unpaired, not as recorded, rejected, unchanged) per frame, for moving and still objects, which components differ or were rejected, and every 5 s one moving object's light slots traced frame by frame for 4 ticks. |
 | `--log_blend_state` | Per second: products published, blended, unpaired, rejected cameras with the reason, and uploads left alone. Unpaired or rejected counts above zero in steady driving mean something is stepping at 30 Hz. |
 | `--log_replayed_constants` | One frame per second: every vertex constant upload replayed, whether it changed since the last frame, and whether it was substituted. |
 | `--log_stepping_constants` | With `--log_slot_callers`: every 2 s, the constant uploads left as recorded that change about 30 times a second (stuck to the tick) rather than every frame, with the code that recorded them. The quickest way to find what still steps. |
@@ -584,12 +608,5 @@ constants:
   other caller seen moving in races) can't be split into position and
   rotation, so they're drawn at the tick (`--log_moving_products` lists them
   as not blended, moving 1-8 m a tick). What they draw isn't known yet.
-- **Opponents' cars flash brighter for a tick now and then.** Pairing cars
-  by position made more of their lighting uploads pair correctly, and those
-  whose light slots change light between ticks (a streetlight in place of a
-  headlight) are rejected and left at the tick, a flicker. Branch
-  `opponent-lighting` works on it: slots switched on their own, the
-  lighting's camera (c0-c4, not switches) blended as a whole, and finally
-  only light positions and directions blended; the flash is still there.
 - **One tick of latency**: drawing shows between the previous and the
   current tick, as usual for this kind of interpolation.
