@@ -15,6 +15,9 @@
 
 REXCVAR_DEFINE_BOOL(log_game_messages, false, "ITC",
                     "Log game messages delivered and skipped, once a second");
+REXCVAR_DEFINE_STRING(render_only_update_handlers, "", "ITC",
+                      "Testing: message handler targets (hex, comma-separated) that still get "
+                      "Update on render-only passes");
 REXCVAR_DEFINE_BOOL(log_recording_handlers, false, "ITC",
                     "Log which message handlers record render commands, by message, once a "
                     "second");
@@ -27,6 +30,22 @@ REXCVAR_DEFINE_STRING(render_only_skip, "", "ITC",
 
 namespace frame_pacing {
 namespace {
+
+bool InTargetList(const std::string& list, uint32_t target) {
+  size_t start = 0;
+  while (start < list.size()) {
+    size_t end = list.find(',', start);
+    std::string item = list.substr(start, end == std::string::npos ? std::string::npos : end - start);
+    if (!item.empty() && uint32_t(std::stoul(item, nullptr, 16)) == target) {
+      return true;
+    }
+    if (end == std::string::npos) {
+      break;
+    }
+    start = end + 1;
+  }
+  return false;
+}
 
 bool SkipOnRenderOnlyPass(uint32_t target) {
   static std::string parsed_from;
@@ -118,7 +137,8 @@ void LogRecording(uint32_t message, uint32_t handler, int slots) {
 }
 
 // Delivers one message to every handler, as the game does.
-void Deliver(PPCContext& ctx, uint8_t* base, uint32_t dispatcher, uint32_t message) {
+void Deliver(PPCContext& ctx, uint8_t* base, uint32_t dispatcher, uint32_t message,
+             const std::string* only_targets = nullptr) {
   uint32_t handler_count = guest::LoadU32(base, dispatcher + kHandlerCountOffset);
   for (uint32_t i = 0; i < handler_count; i++) {
     // sub_82106280 picks the object that handles this message for handler i;
@@ -137,6 +157,9 @@ void Deliver(PPCContext& ctx, uint8_t* base, uint32_t dispatcher, uint32_t messa
                           ? guest::LoadU32(base, object + 8)
                           : method;
     if (g_render_only_pass && SkipOnRenderOnlyPass(target)) {
+      continue;
+    }
+    if (only_targets && !InTargetList(*only_targets, target)) {
       continue;
     }
     // The command list recorders write to, and its slots used.
@@ -177,6 +200,10 @@ void DispatchMessages(PPCContext& ctx, uint8_t* base, uint32_t dispatcher) {
       counts.updates++;
       if (g_render_only_pass) {
         counts.updates_skipped++;
+        std::string only = REXCVAR_GET(render_only_update_handlers);
+        if (!only.empty()) {
+          Deliver(ctx, base, dispatcher, message, &only);
+        }
         continue;
       }
     } else if (id == kDraw) {
