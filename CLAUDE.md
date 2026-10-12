@@ -61,8 +61,9 @@ install -m 755 itc_recomp/run-debug.sh $D/run-debug.sh
 ## Status (`main`, 2026-10-12)
 
 Frame interpolation for races is working: logic runs at 30 Hz and frames are
-blended between ticks. The world, cameras, wheels, lights, shadows,
-headlights (including their light on other cars' bodies), tunnels, the race
+blended between ticks. The world, cameras, wheels (other cars' too, paired
+by position), lights, shadows, headlights (including their light on other
+cars' bodies), other cars' lighting passing street lamps, tunnels, the race
 start countdown, the HUD, the marker above opponents, the light trails, the
 texture animations (flashing lights, signs, the off-ramp chevron), the
 minimap triangle's flashing, the car's reflections, buildings' lighting and
