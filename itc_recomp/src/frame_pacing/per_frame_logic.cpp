@@ -435,3 +435,36 @@ void PerFrameLogic_RecordWorldSprites(uint8_t* base, uint32_t list,
     guest::StoreFloat(base, address, value);
   }
 }
+
+// Diagnostics (--log_camera_pass_records): which camera passes are recorded
+// (sub_820A3978: r3 = camera pass) on logic and on render-only passes, and
+// from where, every 2 s, in races.
+REXCVAR_DEFINE_BOOL(log_camera_pass_records, false, "ITC",
+                    "Log which camera passes are recorded on logic and render-only passes");
+
+extern "C" REX_FUNC(sub_820A3978) {
+  REX_FUNC_PROLOGUE();
+  if (REXCVAR_GET(log_camera_pass_records) && frame_pacing::GameMessages_InRace()) {
+    static std::map<std::pair<uint32_t, uint32_t>, std::pair<int, int>> counts;
+    static auto last = std::chrono::steady_clock::now();
+    static uint64_t logic_start = 0, render_start = 0;
+    auto& entry = counts[{ctx.r3.u32, uint32_t(ctx.lr)}];
+    (frame_pacing::GameMessages_IsRenderOnlyPass() ? entry.second : entry.first)++;
+    auto now = std::chrono::steady_clock::now();
+    if (now - last >= std::chrono::seconds(2)) {
+      last = now;
+      uint64_t logic, render;
+      frame_pacing::GameMessages_PassCounts(logic, render);
+      for (const auto& [key, n] : counts) {
+        REXLOG_INFO("camera pass record: pass {:08X} (type {}) from {:08X}: {} "
+                    "on {} logic, {} on {} render-only passes",
+                    key.first, guest::LoadU32(base, key.first + 584), key.second, n.first,
+                    logic - logic_start, n.second, render - render_start);
+      }
+      counts.clear();
+      logic_start = logic;
+      render_start = render;
+    }
+  }
+  __imp__sub_820A3978(ctx, base);
+}
