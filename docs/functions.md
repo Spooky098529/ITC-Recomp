@@ -343,6 +343,6 @@ constants:
   texture projection) and c100 x4. Nothing visible steps in testing; see
   "Finding what still steps" if something does.
 - **A piece of geometry flickers while the car moves**, at native 30 fps
-  too, so not interpolation: the game or the GPU backend.
+  too, so not interpolation: probably the game's own effect (a broken light).
 - **One tick of latency**: drawing shows between the previous and the
   current tick, as usual for this kind of interpolation.
