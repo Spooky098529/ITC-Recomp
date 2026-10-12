@@ -415,6 +415,13 @@ class DrawState {
     uint64_t signature = camera_ids_.Of(inputs.view_projection);
     ProductKey key{camera, world, signature, handler_,
                    product_occurrences_[{camera, world, signature, handler_, 0}]++};
+    if (!render_only && REXCVAR_GET(log_overlay_products) && handler_ == kRaceOverlaysHandler &&
+        overlay_keys_logged_ < 12) {
+      overlay_keys_logged_++;
+      REXLOG_INFO("overlay key: out {:08X} camera {:08X} world {:08X} id {} occurrence {} "
+                  "(tick {})",
+                  out, key.camera, key.world, key.signature, key.occurrence, ticks_);
+    }
     if (!render_only) {
       collecting_[key] = inputs;
     } else if (!enabled_) {
@@ -482,6 +489,9 @@ class DrawState {
     base_ = base;
     if (logic_pass_) {
       ticks_++;
+      if (ticks_ % 90 == 0 || ticks_ % 90 == 1) {
+        overlay_keys_logged_ = 0;  // log two consecutive ticks every 3 s
+      }
       // This tick's products are complete (its Update and Draw).
       previous_tick_ = std::move(current_tick_);
       current_tick_ = std::move(collecting_);
@@ -735,6 +745,7 @@ class DrawState {
 
   std::thread::id main_thread_;
   uint32_t handler_ = 0;
+  int overlay_keys_logged_ = 0;
   uint8_t* base_ = nullptr;
   uint64_t ticks_ = 0;
   bool logic_pass_ = false;
