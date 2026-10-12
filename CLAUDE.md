@@ -57,16 +57,16 @@ install -m 755 itc_recomp/run.sh $D/run.sh
 (cd $D && python3 -I -m zipfile -c ../$name.zip itc librexruntime.so librexgpu-xenos.so run.sh)
 ```
 
-## Status (branch `fps-reflection-fix`, from `main`, 2026-10-12)
+## Status (branch `player-triangle-fix`, from `main`, 2026-10-12)
 
 Frame interpolation for races is working: logic runs at 30 Hz and frames are
 blended between ticks. The world, cameras, wheels, lights, shadows,
 headlights, tunnels, the race start countdown, the HUD, the marker above
 opponents, the light trails, the texture animations (flashing lights, signs,
-the off-ramp chevron, the minimap triangle), the car's reflections and play
-time are all done. `run.sh` turns interpolation on (marked experimental);
-`./run.sh --no-interpolation` gives the original 30 fps with motion blur.
-Known issues are at the end of `docs/functions.md`.
+the off-ramp chevron), the minimap triangle's flashing, the car's
+reflections and play time are all done. `run.sh` turns interpolation on
+(marked experimental); `./run.sh --no-interpolation` gives the original 30
+fps with motion blur. Known issues are at the end of `docs/functions.md`.
 
 Not done yet:
 

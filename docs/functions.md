@@ -54,6 +54,7 @@ place (search for `PATCH:`).
 | `sub_82146B80` | | | Returns the current frame's entry of animation r4 in set r3 (texture id at +4). |
 | `sub_82146A38` | | | Finds the animation in set r3 whose texture is r4; -1 if none. |
 | `sub_82148658` | | | Draws the light groups: for each group, builds a light list on the stack (count +32, 48-byte lights at +36, from static level data) and picks its texture's current animation frame. Calls `sub_8209CDB0` → `sub_8209CC38`. |
+| `sub_820F5740` | `Minimap::Draw` | Wrapped | From the draw step part `sub_820F6068`; steps the minimap blink clock at `0x826C5AA4`/`0x826C5AA8` after drawing (see "Per-frame logic"). |
 | `sub_82107910` | | Wrapped | From Draw; adds one to the play time frame counter at `0x826C5B90` (see "Per-frame logic"). |
 | `sub_821109B8` | | | Turns the play time frame counter into hours, minutes and seconds (30, 1800, 108000 frames). |
 | `sub_8218E420` | | Patched | Post-race check; the comparison against 60 was changed to 1 to fix the black screen after quest races. |
@@ -225,7 +226,8 @@ render-only passes it ran ~5x fast. Each case found is fixed in
 | What | Function | Fix |
 |---|---|---|
 | Blink timers of the car's sprites (four 64-bit frame counters, called from the car's draw `sub_820DDE58`) | `sub_820DC958` | Skipped on render-only passes (`--per_tick_blink_timers`) |
-| Texture animations: the flashing building lights, the flashing road signs, the chevron over off-ramps and the player's triangle on the minimap (flipbooks: each animation steps a tick counter and picks its frame by it) | `sub_820F11A8` | Skipped on render-only passes (`--per_tick_texture_animations`) |
+| Texture animations: the flashing building lights, the flashing road signs and the chevron over off-ramps (flipbooks: each animation steps a tick counter and picks its frame by it) | `sub_820F11A8` | Skipped on render-only passes (`--per_tick_texture_animations`) |
+| The player's triangle on the minimap flashing where it overlaps other cars' (a frame divider: `0x826C5AA4` counts calls and wraps after 4, then steps the phase `0x826C5AA8`, which wraps after 5) | `sub_820F5740` | Both put back after the call on render-only passes (`--per_tick_minimap_blink`) |
 | Play time (a frame counter at `0x826C5B90`, which `sub_821109B8` turns into hours, minutes and seconds at 30 a second) | `sub_82107910` | One taken back before the call on render-only passes (`--per_tick_play_time`) |
 | UI movies: the HUD, including the race start countdown (a 240-frame movie, a beep at frames 60, 120, 180, 240) | `sub_8211D2F8`, with r4 = 0 (advance a frame and draw); r4 = 1 only draws | Replayed (below) (`--per_tick_ui_movies`) |
 
@@ -450,7 +452,7 @@ and target, and recorder world matrices), mostly for comparison.
 | `--log_blend_state` | Per second: products published, blended, unpaired, rejected cameras with the reason, and uploads left alone. Unpaired or rejected counts above zero in steady driving mean something is stepping at 30 Hz. |
 | `--log_replayed_constants` | One frame per second: every vertex constant upload replayed, whether it changed since the last frame, and whether it was substituted. |
 | `--log_stepping_constants` | With `--log_slot_callers`: every 2 s, the constant uploads left as recorded that change about 30 times a second (stuck to the tick) rather than every frame, with the code that recorded them. The quickest way to find what still steps. |
-| `--per_tick_blink_timers`, `--per_tick_ui_movies`, `--per_tick_play_time`, `--per_tick_texture_animations` | The per-frame logic fixes (default on); see "Per-frame logic". |
+| `--per_tick_blink_timers`, `--per_tick_ui_movies`, `--per_tick_play_time`, `--per_tick_texture_animations`, `--per_tick_minimap_blink` | The per-frame logic fixes (default on); see "Per-frame logic". |
 | `--find_per_frame_state`, `--render_only_skip`, `--log_recording_by_pass` and others | Finding per-frame logic; see "Per-frame logic". |
 | `--log_game_messages`, `--log_slot_callers` | Message delivery per pass; which code allocates constant slots. |
 | `--log_upload_owners`, `--debug_zero_owners` | Which code recorded each vertex constant upload; replay a recorder's vertex or pixel constant uploads as zeros (with `--log_slot_callers`) to see what it draws. The fastest way to identify a draw; see "World-space sprites". |
