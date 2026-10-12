@@ -1298,6 +1298,9 @@ extern "C" REX_FUNC(sub_8209BD50) {
 
 // Diagnostics (--log_slot_callers): who allocates command list slots for
 // shader constants (4 or 9 registers) on the main thread, once a second.
+REXCVAR_DEFINE_BOOL(log_recording_by_pass, false, "ITC",
+                    "Log, for each code allocating command slots, its allocations per logic "
+                    "pass and per render-only pass (in races), every 2 s");
 REXCVAR_DEFINE_BOOL(log_slot_callers, false, "ITC",
                     "Log which code allocates command list slots for constants, once a second");
 
@@ -1320,6 +1323,33 @@ extern "C" REX_FUNC(sub_8258CAA0) {
     }
     for (uint32_t i = 0; i < count; i++) {
       interpolation::g_slot_owners[ctx.r3.u32 + 16 * i] = caller;
+    }
+  }
+  if (REXCVAR_GET(log_recording_by_pass) && frame_pacing::GameMessages_InRace()) {
+    static std::map<uint32_t, std::pair<uint64_t, uint64_t>> by_caller;  // logic, render-only
+    static uint64_t logic_start = 0, render_start = 0;
+    static auto last = std::chrono::steady_clock::now();
+    auto& entry = by_caller[caller];
+    (frame_pacing::GameMessages_IsRenderOnlyPass() ? entry.second : entry.first)++;
+    auto now = std::chrono::steady_clock::now();
+    if (now - last >= std::chrono::seconds(2)) {
+      last = now;
+      uint64_t logic, render;
+      frame_pacing::GameMessages_PassCounts(logic, render);
+      double logic_passes = double(std::max<uint64_t>(logic - logic_start, 1));
+      double render_passes = double(std::max<uint64_t>(render - render_start, 1));
+      for (const auto& [who, n] : by_caller) {
+        double per_logic = n.first / logic_passes, per_render = n.second / render_passes;
+        if (per_logic > per_render + 0.5) {
+          REXLOG_INFO("recording by pass: {:08X}: {:.1f} per logic pass, {:.1f} per render-only pass",
+                      who, per_logic, per_render);
+        }
+      }
+      REXLOG_INFO("recording by pass: {} logic, {} render-only passes", logic - logic_start,
+                  render - render_start);
+      by_caller.clear();
+      logic_start = logic;
+      render_start = render;
     }
   }
   if (!REXCVAR_GET(log_slot_callers) || (count != 4 && count != 9)) {

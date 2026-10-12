@@ -27,6 +27,9 @@ void GameMessages_OnPassFinished();
 void GameMessages_SetRenderOnlyPass(bool render_only);
 bool GameMessages_IsRenderOnlyPass();
 
+// Diagnostics: how many logic and render-only passes have run.
+void GameMessages_PassCounts(uint64_t& logic, uint64_t& render_only);
+
 // Main thread: whether the last logic pass was in a race, where render-only
 // passes are safe. Updated by GameMessages_OnPassFinished.
 bool GameMessages_InRace();

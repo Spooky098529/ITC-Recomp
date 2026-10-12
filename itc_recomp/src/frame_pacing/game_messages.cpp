@@ -230,7 +230,15 @@ void GameMessages_OnPassFinished() {
   }
 }
 
+uint64_t g_passes[2] = {0, 0};  // logic, render-only
+
+void GameMessages_PassCounts(uint64_t& logic, uint64_t& render_only) {
+  logic = g_passes[0];
+  render_only = g_passes[1];
+}
+
 void GameMessages_SetRenderOnlyPass(bool render_only) {
+  g_passes[render_only ? 1 : 0]++;
   g_render_only_pass = render_only;
 }
 
