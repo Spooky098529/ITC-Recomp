@@ -76,7 +76,7 @@ The main thread and the render thread run in lockstep:
 Rendering reads live game objects while the main thread is blocked. There is
 no snapshot of the scene.
 
-With `src/frame_pacing/` (branch `unlock-fps`), every main loop pass still
+With `src/frame_pacing/`, every main loop pass still
 draws one frame, but in a race only some passes run game logic; see
 "Interpolation". `--log_fps=true` logs frames and ticks per second.
 
@@ -191,7 +191,7 @@ safe (an experiment since removed). The approach used instead is below.
 
 ## Interpolation
 
-Branch `unlock-fps`. Game logic stays at a fixed 30 Hz; races draw at any
+Game logic stays at a fixed 30 Hz; races draw at any
 frame rate (`--max_fps`, 0 = unlimited), each frame a blend of the last two
 ticks. Menus stay at 30 fps.
 
@@ -456,12 +456,12 @@ Three more things are blended, outside the products:
   This was the long-standing "headlight lighting on other cars" issue. It
   had been described as the beam's edge flickering on an opponent close and
   diagonal in it, but it was this stepping, easier to see at angles where
-  the light is dimmer. Two earlier attempts went after the wrong cause:
-  branch `headlight-fixes` (light slots matched by the light in them, faded
-  in and out; jumps judged per register; c4-c8 held with the lighting) made
-  opponents worse, and branch `lighting-fixes` (`--recompute_lighting`:
-  rerunning the game's light setup with blended cars, light records and
-  camera) smoothed the road's lighting but not car bodies.
+  the light is dimmer. Two earlier attempts went after the wrong cause and
+  were dropped: matching light slots by the light in them (faded in and
+  out; jumps judged per register; c4-c8 held with the lighting) made
+  opponents worse, and rerunning the game's light setup with blended cars,
+  light records and camera smoothed the road's lighting but not car
+  bodies.
 
 Logic and render-only passes both draw the tick's real state; nothing is
 blended while drawing. Blending the camera inside Draw changed what the game
@@ -538,7 +538,7 @@ constants:
 
 ## Known issues
 
-- **Menus run at 30 fps** (`unlock-fps`): they record their UI and read
+- **Menus run at 30 fps**: they record their UI and read
   input during Update, so render-only passes made them flicker and repeat
   presses. Unlocking them would mean skipping Update only for the handlers
   that run game logic.
