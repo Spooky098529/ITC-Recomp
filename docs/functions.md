@@ -5,8 +5,9 @@ address is the function's location in the original `default.xex`, so it also
 matches Ghidra or IDA. Names are our own guesses; the game shipped without
 symbols.
 
-"Rewritten" means a readable replacement lives in `itc_recomp/src/hooks/` and
-overrides the generated code. "Patched" means the generated code was edited in
+"Rewritten" means a readable replacement lives in `itc_recomp/src/` and
+overrides the generated code; "Wrapped" means a replacement there runs extra
+code around the original (`__imp__sub_XXXXXXXX`). "Patched" means the generated code was edited in
 place (search for `PATCH:`).
 
 | Address | Name | Status | Notes |
@@ -15,8 +16,8 @@ place (search for `PATCH:`).
 | `sub_8209A760` | `App::Run` | | Main loop: calls every handler in the tick list at this+4, repeats until the quit flag at this+12 is set. One logic tick per pass, with no measured time. |
 | `sub_82099D50` | `ForEachTickHandler` | | Calls each handler in a list through a member function pointer. |
 | `sub_82092358` | `Renderer::Init` | | Sets the vblank interval (2 = 30 fps) via `sub_8258D568`, then subscribes renderer callbacks to numbered events (2, 3, 5, 6, 16). |
-| `sub_820920D8` | `Renderer::WaitForFrame` | | Tick handler on the main thread. Blocks until the render thread signals the frame is done (event at this+392), which locks logic to the frame rate. |
-| `sub_82091EF8` | `Renderer::ThreadLoop` | Rewritten | Render thread loop; started through `sub_8258DE50`. Now draws frames until the next 30 Hz tick is due (`src/frame_pacing/`). |
+| `sub_820920D8` | `Renderer::WaitForFrame` | Wrapped | Tick handler on the main thread. Blocks until the render thread signals the frame is done (event at this+392), swaps, and starts the next frame. Frame pacing runs after it (`src/frame_pacing/renderer_hooks.cpp`). |
+| `sub_82091EF8` | `Renderer::ThreadLoop` | Rewritten | Render thread loop; started through `sub_8258DE50`. Draws one frame each time the main thread asks, as the game did, without the 2-vblank wait. |
 | `sub_82091A60` | `Renderer::Present` | | Flushes, waits for the vblank interval (`sub_8258DC58` → `sub_8258DAA8`), then swaps buffers. Event 5. |
 | `sub_82091E58` | `Renderer::DrawFrame` | | Render thread: calls each draw listener in the list at renderer+28. |
 | `sub_82091BC0` | | | Draw listener between the scene draw and present; calls `sub_8258D998` and `sub_8229F1B0`. |
@@ -31,6 +32,17 @@ place (search for `PATCH:`).
 | `sub_822B20D8` | | | Graphics driver present bookkeeping (frame counter at +20024). Library code, not game timing. |
 | `sub_825BA0C8` | `QueryPerformanceCounter` | | System library. |
 | `sub_820C0128` | `Vehicle::GetSpeedKmh` | Rewritten | Returns the float at vehicle+48 (m/s) times 3.6. |
+| `sub_82093DC0` | | | First tick handler: polls input, then walks listener lists that run both game logic and the draw step (see "Separating drawing from the game tick"). |
+| `sub_821062E8` | `GameMessages::Dispatch` | Rewritten | Delivers the game's queued messages to its handlers: 0 = Update (all game logic), 1 = Draw. Skips Update on render-only passes (`src/frame_pacing/game_messages.cpp`). |
+| `sub_82106280` | | | Picks the handler object a message goes to; its method 0 handles it. |
+| `sub_820990F0` | `Input::Update` | Wrapped | Input manager update; skipped on render-only passes so presses aren't seen several times. |
+| `sub_8215B4F8` | `Race::DrawStep` | Wrapped | The race's draw step (Draw message). Its running marks the pass as in a race. |
+| `sub_820A3978` | `CameraPass::Update` | | Rebuilds a camera pass's view (+0x10) from its eye, target and up vector (+0x190, +0x1A0, +0x1B0), and its view-projection (+0x90 = view * projection at +0x50). Called several times per Draw for pass 0. |
+| `sub_8209BD50` | `Matrix::Multiply` | Wrapped | out (r3) = a (r4) * b (r5), 4x4. Interpolation notes every multiply into a camera (see "Interpolation"). |
+| `sub_825953D0` | `Recorder::RecordObject` | Wrapped | The bulk per-object recorder, ~150 calls per pass in a race: records command 7 with vertex constants 0-8: world (r5) * camera view-projection (r4), the world matrix, and a vector. The camera is often a stack copy, not a camera pass. |
+| `sub_825951E0` | | | Multiplies a world matrix and camera into a stack temporary; not recorded (likely a visibility test). |
+| `sub_8258FD48` | `Command::SetShaderConstants` | Wrapped | Render thread, command 7: r3 = payload, r4 = register count, r5 = stage << 24 \| type << 16 \| start << 8 \| count. Interpolation substitutes blended values here. |
+| `sub_8258CAA0` | `CommandList::AllocateSlots` | Wrapped | r3 = list, r4 = slot count; returns the first 16-byte slot. Wrapped only for diagnostics (`--log_slot_callers`). |
 | `sub_820C0150` | `Vehicle::GetDistancePerFrame` | | Speed (m/s) times a hard-coded 1/30 s. |
 | `sub_8210EDB0` | | | Wind sound; scales with speed. |
 | `sub_82152CD8` | | | Camera shake; scales with speed. |
@@ -55,9 +67,9 @@ The main thread and the render thread run in lockstep:
 Rendering reads live game objects while the main thread is blocked. There is
 no snapshot of the scene.
 
-With `src/frame_pacing/`, step 3 repeats until the next tick is due (30 Hz,
-or capped by `--max_fps`), so ticks and frames are no longer one to one.
-`--log_fps=true` logs both rates once a second.
+With `src/frame_pacing/` (branch `unlock-fps`), every main loop pass still
+draws one frame, but in a race only some passes run game logic; see
+"Interpolation". `--log_fps=true` logs frames and ticks per second.
 
 ## Fixed time step
 
@@ -82,12 +94,13 @@ included in these counts.
 | vehicle+0x30 | Speed (float, m/s) | Read by `Vehicle::GetSpeedKmh`. |
 | vehicle+0xD0 | Vehicle world matrix | 4x4 row-major: rotation rows, then position row (w = 1). The car's forward axis is -row 0. |
 | vehicle+0xCF0 | Copy of the world matrix | Identical every tick; not yet known which one drawing reads. |
-| `0x826BAC10` | Camera view matrix | Global in the game's data section; 4x4 row-major view matrix. The camera position is -t·Rᵀ. In the car's frame the views sit at (-5.48, 1.34, 0) for chase, (-0.44, 0.67, 0) for bumper and (-0.26, 0.85, -0.38) for cockpit. Drawing does not read it (raising it 3 m between ticks changed nothing). |
-| `0x826BAC00` | Camera pass array | 21 objects of 592 bytes. Pass settings at +564 to +588, active flag at +588. |
+| `0x826BAC10` | Camera view matrix | Pass 0's view (+0x10). The camera position is -t·Rᵀ. In the car's frame the views sit at (-5.48, 1.34, 0) for chase, (-0.44, 0.67, 0) for bumper and (-0.26, 0.85, -0.38) for cockpit. Writing it has no effect while driving: Draw rebuilds it from the eye and target. |
+| `0x826BAC00` | Camera pass array | 21 objects of 592 bytes: view +0x10, projection +0x50, view-projection +0x90, eye +0x190, look-at target +0x1A0, up +0x1B0. Pass settings at +564 to +588, active flag at +588. Pass 0 is the main 1280x720 view; pass 10 a 1024x1024 reflection and 11 a 512x512 shadow map, both rebuilt in Draw. |
+| `0x70180000` | Main thread stack | During Draw, holds temporary world matrices and camera copies passed to the recorders (for example 0x7018E640). Not render state. |
 
 ## Render command recording
 
-The game records render commands during the logic tick, on the main thread,
+The game records render commands on the main thread, during Update and Draw,
 and the render thread only replays them. Matrices are copied into the
 commands at record time, so changing them between ticks doesn't affect what
 is drawn. Recording happens inside `sub_820C5DE8` (5,600 lines, also game
@@ -112,19 +125,25 @@ recorded commands are replayed.
   `sub_8258EE98` walks item chains (types 0-6), and `sub_8258E698` and others
   dispatch each command through the table at `0x8265EDE0` (38 ids).
 - Command 7 (`sub_8258FD48`) sets shader constants. arg1 is the register
-  count; arg2 is stage << 24 | type << 16 | start << 8 | count. Vertex
-  constants starting at 9 with 5 registers are the per-object transforms
-  (thousands a second in a race); 0 with 9 registers carries per-pass
-  values.
+  count; arg2 is stage << 24 | type << 16 | start << 8 | count. The payload
+  follows the header. In a race a frame replays about 1,200-1,800 vertex
+  constant uploads of 4+ registers. Vertex constants 0 with 9 registers are
+  the per-object constants from `sub_825953D0` (world * view-projection
+  first); 9 with 5 registers come from other recorders.
 
 ### Recorders
 
+- `sub_825953D0` is the bulk per-object recorder (vertex constants 0, 9
+  registers); it allocates the payload with the call returning to
+  `0x82595428` and fills it with the multiply returning to `0x82595438`.
+  It runs on every pass, including render-only ones.
 - `sub_82595550`, `sub_82146BD0` and `sub_820CECA0` record draws with a
-  command 7 (vertex constants 9, 5 registers). `sub_82595550` runs once a
-  tick in a race and its uploads aren't in the replayed list, so the bulk
-  per-object recorder is still to be found.
-- `sub_825953D0` (vertex constants 0, 9 registers) and `sub_82595490` (pixel
-  constants 0, 63 registers) record per-pass constants.
+  command 7 (vertex constants 9, 5 registers). `sub_82595490` records pixel
+  constants 0, 63 registers.
+- `sub_82128750` (from `sub_821292B0`) multiplies by camera passes 0 and 3
+  during Update, about 20 times a tick each.
+- Other 4-register constant uploads come from `0x820C6B14`, `0x820C725C`,
+  `0x820C7640`, `0x820C7A38` and `0x82136518`, once per pass each.
 
 ## Separating drawing from the game tick
 
@@ -158,13 +177,118 @@ a bucket (1,024 buckets of 16 bytes at list+24, count at +12) and advances
 the sequence. `sub_8258EB38` empties a pass list.
 
 Restoring the command list header, the recording pass list (header and
-buckets) and the sequence before a second run makes re-running the draw
-step safe: with both runs every tick, a race looked normal
-(`--debug_redraw_twice`, `src/frame_pacing/draw_step.cpp`).
+buckets) and the sequence before a second run made re-running the draw step
+safe (an experiment since removed). The approach used instead is below.
+
+## Interpolation
+
+Branch `unlock-fps`. Game logic stays at a fixed 30 Hz; races draw at any
+frame rate (`--max_fps`, 0 = unlimited), each frame a blend of the last two
+ticks. Menus stay at 30 fps.
+
+### Passes
+
+`src/frame_pacing/`. After each `Renderer::WaitForFrame`, the pacer decides
+what the coming main loop pass is:
+
+- **Logic pass** (a 30 Hz tick is due): runs normally.
+- **Render-only pass** (in a race, otherwise): `GameMessages::Dispatch`
+  consumes Update messages without delivering them and the input update is
+  skipped, so the pass draws the same game state again.
+
+Only races get render-only passes: menus record their UI and act on input
+during Update, so they flickered and repeated button presses. A pass is "in a
+race" when the last logic pass ran the race draw step `sub_8215B4F8`.
+
+### What gets blended
+
+`src/interpolation/blend_state.cpp`. Drawing runs a tick behind: a logic
+pass's frame shows the previous tick (amount 0) and the following frames move
+towards the current one (amount = time since the tick / 1/30 s).
+
+Almost everything drawn in 3D gets its transform through the matrix multiply
+`sub_8209BD50`: out = world * a camera's view-projection, written straight
+into a command 7 payload. So blending happens there, in two halves:
+
+1. **Main thread, recording.** Every multiply by a camera is noted: the
+   per-object recorder's (return address `0x82595438`, every pass) and, on
+   logic passes, any multiply whose second operand is a camera pass's
+   view-projection (the scenery's, during Update). On a logic pass a copy of
+   both inputs (world, view-projection) is kept, keyed by:
+   - the operands' addresses (often the same stack temporaries for many
+     objects),
+   - which camera it is: a stable id per distinct projection (aspect ratio
+     and depth mapping, matched within 1%), because the main view, mirror
+     and reflection cameras share stack copies and their order varies between
+     ticks,
+   - how many times that combination was multiplied earlier in the pass.
+
+   Each key is paired with the same key from the previous tick. Render-only
+   passes draw unchanged state, so their multiplies must have the same inputs
+   as the logic pass's under the same key; a mismatch is left alone.
+2. **Render thread, replay.** After each Draw the main thread publishes, by
+   payload address, the products recorded and their two ticks' inputs, plus
+   the frame's amount. As `sub_8258FD48` replays a constant upload from a
+   published address that still holds the recorded value, it uploads the
+   blend instead and puts the command list back afterwards.
+
+Blending a product: the world matrix as position, rotation and per-axis
+scale; the camera split into placement (blended rigidly: position straight,
+rotation along the shortest arc) and a symmetric perspective projection
+(scales and depth mapping, blended linearly), then multiplied back together.
+Splitting the camera keeps field-of-view changes in fast turns blending. A
+pair is drawn unblended if the world or camera moves more than 8 m or turns
+more than 0.5 rad in a tick, or the projection changes by more than a few
+percent (a cut, or two different cameras).
+
+Logic and render-only passes both draw the tick's real state; nothing is
+blended while drawing. Blending the camera inside Draw changed what the game
+culled, so the order-based pairing slipped and bits of the scene stepped at
+30 Hz. `--blend_while_drawing` brings back the in-Draw blending (camera eye
+and target, and recorder world matrices), mostly for comparison.
+
+### Options and diagnostics
+
+| Option | What |
+|---|---|
+| `--max_fps` | Frame rate cap in races; 0 = unlimited. |
+| `--interpolate_draw_state` | Blending on (default) or off. |
+| `--motion_blur` | The game's velocity-based motion blur (pixel shader `7EB16456AAD56CBA`), skipped when false. Its velocities come from the tick, so it smears a whole tick of motion at high frame rates; best off. Patch `patches/rexglue-sdk/0002`. |
+| `--log_fps` | Frames and ticks per second. |
+| `--log_blend_state` | Per second: products published, blended, unpaired, rejected cameras with the reason, and uploads left alone. Unpaired or rejected counts above zero in steady driving mean something is stepping at 30 Hz. |
+| `--log_replayed_constants` | One frame per second: every vertex constant upload replayed, whether it changed since the last frame, and whether it was substituted. |
+| `--log_game_messages`, `--log_slot_callers` | Message delivery per pass; which code allocates constant slots. |
+
+### What didn't work, and why
+
+- **Blending matrices in memory before Draw** (camera passes, the
+  0x7018xxxx block). That block is the stack. Draw rebuilds the cameras from
+  eye and target, and the scenery's camera is a stack copy that only changes
+  on ticks.
+- **Matching uploads by value** (find a camera's matrix in the command list,
+  or test whether an upload is "some world * this camera"). Several cameras
+  are similar enough to be confused, which put road in the reflections.
+  Pairing by the multiply's operands is exact.
+- **Rebuilding a product from the camera as Draw left it.** Draw reuses
+  pass 0 for several views within one Draw, so that gave the wrong camera
+  (the car juddered).
+- **Rigid-motion blending of view-projections** (`FindRigidMotion`). It fails
+  when the field of view changes during a turn; the placement/projection
+  split replaced it for perspective cameras.
+- **The command list shim** (`--interpolate`, `interpolator.cpp`,
+  `command_list.cpp`, `draw_tags.cpp`): blending recorded constants matched
+  between ticks by draw order. Left in but off.
 
 ## Known issues
 
-- **UI flickers with unlocked frame rates** (`unlock-fps`): render-only main
-  loop passes skip the Update message, but menus (and probably the race HUD)
-  are recorded while handling Update, so they only appear on logic passes.
-  Planned fix: skip Update only for the handlers that run game logic.
+- **Menus run at 30 fps** (`unlock-fps`): they record their UI and read
+  input during Update, so render-only passes made them flicker and repeat
+  presses. Unlocking them would mean skipping Update only for the handlers
+  that run game logic.
+- **The race HUD updates at 30 fps.** Accepted for now.
+- **Not every upload is blended.** Constant uploads that don't come from a
+  multiply by a camera (the 9-register and 4-register uploads from other
+  recorders) are replayed as recorded. Nothing visible steps in testing so
+  far, but check them first if something does.
+- **One tick of latency**: drawing shows between the previous and the
+  current tick, as usual for this kind of interpolation.

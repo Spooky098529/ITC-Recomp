@@ -1,41 +1,26 @@
 // Interpolated drawing, in the usual engine way: game logic ticks at 30 Hz,
-// and each frame is drawn from a blend of the last two ticks.
+// and each frame is drawn from a blend of the last two ticks. See
+// "Interpolation" in docs/functions.md.
 //
-// What drawing reads (measured in races):
+// Almost everything drawn in 3D gets its transform from the game's matrix
+// multiply (sub_8209BD50): world * a camera's view-projection, written into a
+// shader constant command (command 7) that the render thread replays.
 //
-// - Camera passes: 21 objects of 592 bytes at 0x826BAC00, each with a view
-//   matrix at +0x10, a projection at +0x50 and their product (view *
-//   projection) at +0x90. Pass 0 is the main 1280x720 camera. Draw rebuilds
-//   the view from the camera's eye, look-at target and up vector (+0x190,
-//   +0x1A0, +0x1B0; sub_820A3978), so those are what's blended.
-// - Objects: Draw hands each object's world matrix to the per-object
-//   recorder (sub_825953D0) with a camera's view-projection; the recorder
-//   records world * view-projection and world as shader constants. Each
-//   world matrix is blended with its previous tick's, matched by address and
-//   by how many times that address was recorded earlier in the Draw (objects
-//   are visited in the same order every tick).
-// - Commands recorded once per tick: some (the scenery's per-pass constants)
-//   are recorded only on logic passes, and the render thread replays them
-//   unchanged on every frame of the tick. Their constants are made with the
-//   game's matrix multiply (sub_8209BD50) from a world matrix and a camera
-//   pass's view-projection. During each logic pass, a copy of both inputs of
-//   every such multiply is kept, keyed by camera, world matrix address and
-//   order, and paired with the previous tick's. When the render thread
-//   replays a constant upload from a multiply's output, it uploads the
-//   frame's blend of the two ticks instead.
+// - Main thread: each multiply by a camera is noted by its output address. On
+//   a logic pass, a copy of both inputs is kept, keyed by the operands'
+//   addresses, which camera it is (CameraIds) and order within the pass, and
+//   paired with the previous tick's copy under the same key.
+// - Render thread: when a constant upload is replayed from a noted address
+//   that still holds what was written, the frame's blend of the two ticks'
+//   inputs is uploaded instead (world as position, rotation and scale; the
+//   camera as placement plus projection), and the command list put back.
 //
-//   The per-object recorder (sub_825953D0) multiplies too, every pass, often
-//   with a copy of a camera on the stack that only changes on ticks (the
-//   scenery's); its products are handled the same way, keyed by both
-//   operands' addresses and order within the pass.
-//
-// So that those copies hold the tick's own state, a logic pass draws without
-// blending, and all its uploads are blended at replay; the render-only passes
-// after it blend as they draw.
+// Every pass draws the tick's real state, so the game culls and records the
+// same objects in the same order and the pairing holds. (Blending the camera
+// and objects while drawing is still here behind --blend_while_drawing.)
 //
 // Drawing runs a tick behind: the logic pass's frame shows the previous tick
-// (amount 0) and the frames after it move towards the current one. Blended
-// values are put back after Draw, so game logic never sees them.
+// (amount 0) and the frames after it move towards the current one.
 
 #include "blend_state.h"
 
