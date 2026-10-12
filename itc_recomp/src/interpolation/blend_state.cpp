@@ -47,7 +47,9 @@
 #include <atomic>
 #include <chrono>
 #include <cmath>
+#include <map>
 #include <memory>
+#include <tuple>
 #include <mutex>
 #include <optional>
 #include <string>
@@ -659,4 +661,37 @@ extern "C" REX_FUNC(sub_8209BD50) {
   uint32_t out = ctx.r3.u32, a = ctx.r4.u32, b = ctx.r5.u32;
   __imp__sub_8209BD50(ctx, base);
   interpolation::GetDrawState().OnMultiply(base, out, a, b);
+}
+
+// Diagnostics (--log_slot_callers): who allocates command list slots for
+// shader constants (4 or 9 registers) on the main thread, once a second.
+REXCVAR_DEFINE_BOOL(log_slot_callers, false, "ITC",
+                    "Log which code allocates command list slots for constants, once a second");
+
+namespace {
+std::mutex g_slot_callers_mutex;
+std::map<std::tuple<uint32_t, uint32_t, bool>, int> g_slot_callers;
+std::chrono::steady_clock::time_point g_slot_callers_logged{};
+}  // namespace
+
+// CommandList_AllocateSlots: r3 = list, r4 = slot count; returns r3 = the
+// first slot (16 bytes each), or 0 if the list is full.
+extern "C" REX_FUNC(sub_8258CAA0) {
+  REX_FUNC_PROLOGUE();
+  uint32_t count = ctx.r4.u32, caller = uint32_t(ctx.lr);
+  __imp__sub_8258CAA0(ctx, base);
+  if (!REXCVAR_GET(log_slot_callers) || (count != 4 && count != 9)) {
+    return;
+  }
+  std::lock_guard lock(g_slot_callers_mutex);
+  g_slot_callers[{caller, count, frame_pacing::GameMessages_IsRenderOnlyPass()}]++;
+  auto now = std::chrono::steady_clock::now();
+  if (now - g_slot_callers_logged >= std::chrono::seconds(1)) {
+    for (const auto& [key, n] : g_slot_callers) {
+      REXLOG_INFO("slot callers: {:08X} x{} {} pass: {} calls", std::get<0>(key), std::get<1>(key),
+                  std::get<2>(key) ? "render-only" : "logic", n);
+    }
+    g_slot_callers.clear();
+    g_slot_callers_logged = now;
+  }
 }
