@@ -274,16 +274,3 @@ ITC_SKIPPABLE(82212A38)
 ITC_SKIPPABLE(82212AC8)
 ITC_SKIPPABLE(82211D08)
 #undef ITC_SKIPPABLE
-
-// Testing: the UI movie update (r3 = movie, r4 = 0 or 1; the HUD's countdown
-// is one). Skip its r4 = 0 calls on render-only passes.
-REXCVAR_DEFINE_BOOL(render_only_skip_movie_mode0, false, "ITC",
-                    "Testing: skip UI movie updates with r4 = 0 on render-only passes");
-extern "C" REX_FUNC(sub_8211D2F8) {
-  REX_FUNC_PROLOGUE();
-  if (ctx.r4.u32 == 0 && frame_pacing::GameMessages_IsRenderOnlyPass() &&
-      REXCVAR_GET(render_only_skip_movie_mode0)) {
-    return;
-  }
-  __imp__sub_8211D2F8(ctx, base);
-}
