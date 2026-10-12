@@ -53,6 +53,8 @@ REXCVAR_DEFINE_BOOL(interpolate_draw_state, true, "ITC",
 REXCVAR_DEFINE_BOOL(blend_while_drawing, false, "ITC",
                     "Also blend cameras and objects while render-only passes draw (changes "
                     "what the game culls, so pairings with the logic pass can slip)");
+REXCVAR_DEFINE_BOOL(blend_pixel_constants, true, "ITC",
+                    "Blend per-object pixel shader constants (lighting) between ticks");
 REXCVAR_DEFINE_BOOL(log_stepping_constants, false, "ITC",
                     "Log constant uploads that change at the tick rate rather than every "
                     "frame (left at 30 Hz), with the code that recorded them; needs "
@@ -173,6 +175,7 @@ struct ReplayedProduct {
 struct ReplayFrame {
   std::unordered_map<uint32_t, ReplayedProduct> products;  // by output address
   float amount = 1;
+  uint64_t tick = 0;  // which tick the frame draws
 };
 
 std::mutex g_replay_mutex;
@@ -458,6 +461,7 @@ class DrawState {
   void AfterDraw(uint8_t* base) {
     base_ = base;
     if (logic_pass_) {
+      ticks_++;
       // This tick's products are complete (its Update and Draw).
       previous_tick_ = std::move(current_tick_);
       current_tick_ = std::move(collecting_);
@@ -644,6 +648,7 @@ class DrawState {
   void PublishReplayFrame() {
     auto frame = std::make_shared<ReplayFrame>();
     frame->amount = REXCVAR_GET(interpolate_draw_state) ? amount_ : 1.0f;
+    frame->tick = ticks_;
     for (const auto* outputs : {&tick_outputs_, &pass_outputs_}) {
       for (const auto& [out, output] : *outputs) {
         auto now = current_tick_.find(output.key);
@@ -710,6 +715,7 @@ class DrawState {
 
   std::thread::id main_thread_;
   uint8_t* base_ = nullptr;
+  uint64_t ticks_ = 0;
   bool logic_pass_ = false;
   bool enabled_ = false;
   float amount_ = 0;
@@ -795,6 +801,9 @@ class ReplayCameras {
     std::lock_guard lock(g_replay_mutex);
     frame_ = g_replay_frame;
   }
+
+  uint64_t tick() const { return frame_ ? frame_->tick : 0; }
+  float amount() const { return frame_ ? frame_->amount : 1.0f; }
 
   // Render thread diagnostics: why an upload was or wasn't substituted.
   std::string Status(uint32_t payload, const Matrix4& m) const {
@@ -970,6 +979,82 @@ ReplayedConstantsLog& GetReplayedConstantsLog() {
   return log;
 }
 
+// Render thread: per-object pixel shader constants (sub_82595490's 63
+// registers: lighting, including the headlights' position and direction)
+// are recorded with the tick's values. Each upload is paired with the same
+// one (by order in the frame) as of the previous tick, and given the frame's
+// linear blend of the two; a value that jumps (a flag, a cut) keeps the
+// tick's.
+class PixelConstantBlender {
+ public:
+  void OnFrameStart(uint64_t tick) {
+    occurrences_.clear();
+    if (tick != tick_) {
+      tick_ = tick;
+      // A new tick: what was current becomes the previous tick's.
+      for (auto& [key, entry] : entries_) {
+        if (entry.current_tick + 1 == tick) {
+          entry.previous = entry.current;
+          entry.previous_tick = entry.current_tick;
+        }
+      }
+    }
+  }
+
+  // Blends the upload in place; returns the original to put back after.
+  std::optional<std::vector<float>> Apply(uint8_t* base, uint32_t payload, uint32_t packed,
+                                          float amount) {
+    uint32_t start = (packed >> 8) & 0xFF, count = packed & 0xFF;
+    Key key{start, count, occurrences_[{start, count, 0}]++};
+    std::vector<float> now(count * 4);
+    for (uint32_t i = 0; i < now.size(); i++) {
+      now[i] = guest::LoadFloat(base, payload + 4 * i);
+    }
+    Entry& entry = entries_[key];
+    if (entry.current_tick != tick_) {
+      entry.current = now;  // first time this tick: the tick's own value
+      entry.current_tick = tick_;
+    }
+    if (entry.previous_tick + 1 != tick_ || entry.previous.size() != now.size() ||
+        entry.current != now) {
+      return std::nullopt;  // not paired, or not the recorded value
+    }
+    bool changed = false;
+    for (uint32_t i = 0; i < now.size(); i++) {
+      float a = entry.previous[i], b = now[i];
+      if (a == b || !std::isfinite(a) || !std::isfinite(b) ||
+          !(std::abs(b - a) <= 0.3f * std::max(std::abs(a), std::abs(b)) + 0.2f)) {
+        continue;
+      }
+      guest::StoreFloat(base, payload + 4 * i, a + (b - a) * amount);
+      changed = true;
+    }
+    if (!changed) {
+      return std::nullopt;
+    }
+    return now;
+  }
+
+ private:
+  struct Key {
+    uint32_t start, count;
+    int occurrence;
+    auto operator<=>(const Key&) const = default;
+  };
+  struct Entry {
+    std::vector<float> current, previous;
+    uint64_t current_tick = 0, previous_tick = 0;
+  };
+  std::map<Key, Entry> entries_;
+  std::map<Key, int> occurrences_;
+  uint64_t tick_ = 0;
+};
+
+PixelConstantBlender& GetPixelConstantBlender() {
+  static PixelConstantBlender blender;
+  return blender;
+}
+
 // Diagnostics on the render thread (--log_stepping_constants): constant
 // uploads that weren't substituted, grouped by the code that recorded them,
 // register and order in the frame, with how often their values change. One
@@ -1080,6 +1165,7 @@ void BlendState_OnReplayFrameStart() {
   GetReplayedConstantsLog().OnFrameStart();
   GetSteppingConstantsLog().OnFrameStart();
   GetReplayCameras().OnFrameStart();
+  GetPixelConstantBlender().OnFrameStart(GetReplayCameras().tick());
 }
 
 void BlendState_OnReplayTick() {
@@ -1098,7 +1184,14 @@ void BlendState_ReplayConstants(uint8_t* base, uint32_t payload, uint32_t packed
       GetDrawState().CountReplayedProduct();
     }
   }
-  GetSteppingConstantsLog().OnUpload(base, payload, packed, original.has_value());
+  std::optional<std::vector<float>> original_pixel;
+  if (REXCVAR_GET(interpolate_draw_state) && REXCVAR_GET(blend_pixel_constants) && stage == 1 &&
+      ((packed >> 16) & 0xFF) == 1) {
+    original_pixel =
+        GetPixelConstantBlender().Apply(base, payload, packed, GetReplayCameras().amount());
+  }
+  GetSteppingConstantsLog().OnUpload(base, payload, packed,
+                                     original.has_value() || original_pixel.has_value());
   if (stage == 0 && count >= 4) {
     GetReplayCameras().CountUpload(base, payload, original.has_value());
     // Temporary: main-camera matrices uploaded to c0, with their status.
@@ -1125,6 +1218,11 @@ void BlendState_ReplayConstants(uint8_t* base, uint32_t payload, uint32_t packed
   upload();
   if (original) {
     StoreMatrix(base, payload, *original);
+  }
+  if (original_pixel) {
+    for (uint32_t i = 0; i < original_pixel->size(); i++) {
+      guest::StoreFloat(base, payload + 4 * i, (*original_pixel)[i]);
+    }
   }
 }
 
