@@ -10,6 +10,7 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 
 namespace interpolation {
 
@@ -27,5 +28,10 @@ void BlendState_AfterRecordObject(uint8_t* base);
 void BlendState_OnReplayFrameStart();
 void BlendState_OnReplayTick();
 void BlendState_OnReplayConstants(uint8_t* base, uint32_t payload, uint32_t packed);
+
+// Render thread, around a shader constant upload (command 7) being replayed:
+// gives constants recorded with a tick's camera the frame's blended camera.
+void BlendState_ReplayConstants(uint8_t* base, uint32_t payload, uint32_t packed,
+                                const std::function<void()>& upload);
 
 }  // namespace interpolation

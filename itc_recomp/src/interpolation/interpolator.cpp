@@ -768,7 +768,9 @@ extern "C" REX_FUNC(sub_82098940) {
 // r5 = packed stage/type/start/count. Returns r3 = payload slots used.
 extern "C" REX_FUNC(sub_8258FD48) {
   REX_FUNC_PROLOGUE();
-  interpolation::BlendState_OnReplayConstants(base, ctx.r3.u32, ctx.r5.u32);
-  interpolation::GetInterpolator().OnShaderConstants(
-      base, ctx.r3.u32, [&] { __imp__sub_8258FD48(ctx, base); });
+  uint32_t payload = ctx.r3.u32, packed = ctx.r5.u32;
+  interpolation::BlendState_ReplayConstants(base, payload, packed, [&] {
+    interpolation::GetInterpolator().OnShaderConstants(
+        base, payload, [&] { __imp__sub_8258FD48(ctx, base); });
+  });
 }

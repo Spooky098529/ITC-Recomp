@@ -38,7 +38,9 @@
 #include <cstring>
 #include <fstream>
 #include <atomic>
+#include <functional>
 #include <map>
+#include <memory>
 #include <mutex>
 #include <thread>
 #include <optional>
@@ -262,6 +264,116 @@ class DrawStateDump {
   Matrix4 view_{}, view_projection_{}, previous_view_{}, previous_view_projection_{};
 };
 
+// Commands recorded during Update (the scenery's per-pass constants) hold
+// the tick's view-projection, or an object's world * view-projection, and
+// the render thread replays them unchanged on every frame of the tick. As
+// each is replayed, it's given the frame's blended camera instead.
+struct FrameCamera {
+  Matrix4 tick;     // view-projection as game logic set it this tick
+  Matrix4 blended;  // for the frame being drawn
+};
+
+// Command list slots allocated outside Draw: [start, end) guest ranges.
+using Ranges = std::vector<std::pair<uint32_t, uint32_t>>;
+
+std::mutex g_frame_cameras_mutex;
+std::vector<FrameCamera> g_frame_cameras;  // from the last Draw
+std::shared_ptr<const Ranges> g_update_ranges;  // recorded in the last tick's Update
+
+void PublishFrameCameras(const std::vector<FrameCamera>& cameras) {
+  std::lock_guard lock(g_frame_cameras_mutex);
+  g_frame_cameras = cameras;
+}
+
+void PublishUpdateRanges(std::shared_ptr<const Ranges> ranges) {
+  std::lock_guard lock(g_frame_cameras_mutex);
+  g_update_ranges = std::move(ranges);
+}
+
+bool NearlyEqual(const Matrix4& a, const Matrix4& b) {
+  for (int i = 0; i < 16; i++) {
+    float tolerance = 1e-4f * std::max(1.0f, std::abs(b[i]));
+    if (!(std::abs(a[i] - b[i]) <= tolerance)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+class ReplayCameras {
+ public:
+  // Render thread, as a frame's replay starts.
+  void OnFrameStart() {
+    std::lock_guard lock(g_frame_cameras_mutex);
+    update_ranges_ = g_update_ranges;
+    cameras_.clear();
+    for (const FrameCamera& camera : g_frame_cameras) {
+      std::optional<Matrix4> inverse = Inverse(camera.tick);
+      if (inverse) {
+        cameras_.push_back({camera, *inverse, Multiply(*inverse, camera.blended)});
+      }
+    }
+  }
+
+  // Render thread, before a shader constant upload: the value to upload in
+  // place of `m`, if it was made with a tick camera.
+  std::optional<Matrix4> Substitute(uint32_t payload, const Matrix4& m) {
+    if (!RecordedInUpdate(payload)) {
+      return std::nullopt;  // recorded in Draw, already with the blended camera
+    }
+    for (const Camera& camera : cameras_) {
+      if (NearlyEqual(m, camera.frame.tick)) {
+        return camera.frame.blended;
+      }
+      // m = world * tick: world = m * inverse(tick), an affine transform.
+      Matrix4 world = Multiply(m, camera.tick_inverse);
+      if (IsPlausibleWorld(world)) {
+        return Multiply(m, camera.tick_to_blended);
+      }
+    }
+    return std::nullopt;
+  }
+
+ private:
+  struct Camera {
+    FrameCamera frame;
+    Matrix4 tick_inverse;
+    Matrix4 tick_to_blended;  // inverse(tick) * blended
+  };
+
+  static bool IsPlausibleWorld(const Matrix4& w) {
+    if (!(std::abs(w[3]) < 1e-3f && std::abs(w[7]) < 1e-3f && std::abs(w[11]) < 1e-3f &&
+          std::abs(w[15] - 1) < 1e-3f)) {
+      return false;
+    }
+    for (int i = 0; i < 3; i++) {
+      float length = std::sqrt(w[i * 4] * w[i * 4] + w[i * 4 + 1] * w[i * 4 + 1] +
+                               w[i * 4 + 2] * w[i * 4 + 2]);
+      if (!(length > 1e-3f && length < 1e3f)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  bool RecordedInUpdate(uint32_t address) const {
+    if (!update_ranges_) {
+      return false;
+    }
+    auto it = std::upper_bound(update_ranges_->begin(), update_ranges_->end(),
+                               std::pair{address, UINT32_MAX});
+    return it != update_ranges_->begin() && address < std::prev(it)->second;
+  }
+
+  std::vector<Camera> cameras_;
+  std::shared_ptr<const Ranges> update_ranges_;
+};
+
+ReplayCameras& GetReplayCameras() {
+  static ReplayCameras cameras;
+  return cameras;
+}
+
 // Diagnostics: who multiplies by a camera's view-projection, and when.
 class CameraProductLog {
  public:
@@ -364,6 +476,19 @@ class DrawState {
     products_pending_.push_back({out, pass, LoadMatrix(base, world), LoadMatrix(base, out)});
   }
 
+  // Main thread, after the game allocated command list slots.
+  void OnCommandSlots(uint32_t address, uint32_t count) {
+    if (in_draw_ || address == 0 || std::this_thread::get_id() != main_thread_) {
+      return;
+    }
+    uint32_t end = address + count * 16;
+    if (!update_ranges_pending_.empty() && update_ranges_pending_.back().second == address) {
+      update_ranges_pending_.back().second = end;
+    } else {
+      update_ranges_pending_.push_back({address, end});
+    }
+  }
+
   bool in_draw() const { return in_draw_; }
   CameraProductLog& camera_products() { return camera_products_; }
 
@@ -400,6 +525,7 @@ class DrawState {
       }
       counts_.look_ats++;
     }
+    frame_cameras_.clear();
     std::array<std::optional<Matrix4>, kCameraPassCount> blended{};
     for (const CameraBlend& camera : camera_blends_) {
       uint32_t pass = CameraPass(camera.pass);
@@ -409,35 +535,14 @@ class DrawState {
       Replace(base, saved_, pass + kViewOffset, view);
       Replace(base, saved_, pass + kViewProjectionOffset, view_projection);
       blended[camera.pass] = view_projection;
+      frame_cameras_.push_back({camera.tick_view_projection, view_projection});
       counts_.cameras++;
-    }
-    for (CameraConstant& constant : camera_constants_) {
-      if (!blended[constant.pass] || LoadMatrix(base, constant.payload) != constant.written) {
-        continue;  // recorded over
-      }
-      Matrix4 value = *blended[constant.pass];
-      if (float lift = float(REXCVAR_GET(debug_camera_constant_lift)); lift != 0) {
-        // Moving the eye up moves the world down: world * T(0, -lift, 0) * VP.
-        Matrix4 down = WorldMatrixFromTransform(Transform{{}, {0, -lift, 0}});
-        value = Multiply(down, value);
-      }
-      StoreMatrix(base, constant.payload, value);
-      constant.written = value;
-      counts_.constants++;
-    }
-    // Products game logic made with a camera, still in place: redo them with
-    // the blended camera.
-    for (const CameraProduct& product : products_) {
-      if (!blended[product.pass] || LoadMatrix(base, product.out) != product.value) {
-        continue;
-      }
-      Replace(base, saved_, product.out, Multiply(product.world, *blended[product.pass]));
-      counts_.products++;
     }
   }
 
   void AfterDraw(uint8_t* base) {
     in_draw_ = false;
+    PublishFrameCameras(frame_cameras_);
     Restore(base, saved_);
     for (auto it = saved_vec3_.rbegin(); it != saved_vec3_.rend(); ++it) {
       if (LoadVec3(base, it->address) == it->written) {
@@ -512,6 +617,7 @@ class DrawState {
     Transform from;
     Transform to;
     Matrix4 projection;
+    Matrix4 tick_view_projection;  // as game logic set it this tick
   };
 
   struct CameraConstant {
@@ -540,6 +646,10 @@ class DrawState {
 
   // Main thread, before the Draw of a logic pass (after its Update).
   void OnTick(uint8_t* base) {
+    auto ranges = std::make_shared<Ranges>(std::move(update_ranges_pending_));
+    update_ranges_pending_.clear();
+    std::sort(ranges->begin(), ranges->end());
+    PublishUpdateRanges(std::move(ranges));
     camera_blends_.clear();
     look_at_blends_.clear();
     for (int pass = 0; pass < kCameraPassCount; pass++) {
@@ -549,7 +659,8 @@ class DrawState {
           counts_.camera_cuts++;
         } else {
           camera_blends_.push_back({pass, *cameras_[pass], *camera,
-                                    LoadMatrix(base, CameraPass(pass) + kProjectionOffset)});
+                                    LoadMatrix(base, CameraPass(pass) + kProjectionOffset),
+                                    LoadMatrix(base, CameraPass(pass) + kViewProjectionOffset)});
         }
       }
       cameras_[pass] = camera;
@@ -572,7 +683,6 @@ class DrawState {
     objects_this_tick_.clear();
     products_ = std::move(products_pending_);
     products_pending_.clear();
-    FindCameraConstants(base);
   }
 
   // Commands recorded during Update that set shader constants to a
@@ -688,6 +798,8 @@ class DrawState {
 
   std::array<std::optional<Transform>, kCameraPassCount> cameras_;
   std::vector<CameraBlend> camera_blends_;
+  std::vector<FrameCamera> frame_cameras_;
+  Ranges update_ranges_pending_;
   std::array<std::optional<std::array<Vec3, 3>>, kCameraPassCount> look_ats_;
   std::vector<LookAtBlend> look_at_blends_;
   std::vector<SavedVec3> saved_vec3_;
@@ -799,6 +911,27 @@ void BlendState_BeforeDraw(uint8_t* base, bool render_only_pass) {
 
 void BlendState_OnReplayFrameStart() {
   GetReplayedConstantsLog().OnFrameStart();
+  GetReplayCameras().OnFrameStart();
+}
+
+void BlendState_ReplayConstants(uint8_t* base, uint32_t payload, uint32_t packed,
+                                const std::function<void()>& upload) {
+  GetReplayedConstantsLog().OnUpload(base, payload, packed);
+  uint32_t stage = packed >> 24, count = packed & 0xFF;
+  std::optional<Matrix4> original;
+  if (REXCVAR_GET(interpolate_draw_state) && stage == 0 && count >= 4) {
+    Matrix4 m = LoadMatrix(base, payload);
+    if (IsFinite(m)) {
+      if (std::optional<Matrix4> substitute = GetReplayCameras().Substitute(payload, m)) {
+        original = m;
+        StoreMatrix(base, payload, *substitute);
+      }
+    }
+  }
+  upload();
+  if (original) {
+    StoreMatrix(base, payload, *original);
+  }
 }
 
 void BlendState_OnReplayTick() {
@@ -832,4 +965,13 @@ extern "C" REX_FUNC(sub_8209BD50) {
   uint32_t out = ctx.r3.u32, a = ctx.r4.u32, b = ctx.r5.u32;
   __imp__sub_8209BD50(ctx, base);
   state.OnCameraProduct(base, out, a, b);
+}
+
+// CommandList_AllocateSlots: r3 = list, r4 = slot count; returns r3 = the
+// first slot (16 bytes each), or 0 if the list is full.
+extern "C" REX_FUNC(sub_8258CAA0) {
+  REX_FUNC_PROLOGUE();
+  uint32_t count = ctx.r4.u32;
+  __imp__sub_8258CAA0(ctx, base);
+  interpolation::GetDrawState().OnCommandSlots(ctx.r3.u32, count);
 }
