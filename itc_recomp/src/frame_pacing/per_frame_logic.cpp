@@ -257,6 +257,7 @@ extern "C" REX_FUNC(sub_8215DEA0) {
   constexpr uint32_t kOverlayCount = 25;
   constexpr uint32_t kUpdateSlot = 16;  // vtable offset of slot 4
   constexpr uint32_t kRecordSlot = 20;  // vtable offset of slot 5
+  constexpr uint32_t kOverlayBytes = 0x1000;  // saved around a redone update
   // Numbering contexts for camera products (blend_state.h): the recording
   // loop numbers its products the same on every pass, whether or not the
   // update loop ran before it, so they pair with the logic pass's.
@@ -291,13 +292,29 @@ extern "C" REX_FUNC(sub_8215DEA0) {
   if (!render_only) {
     interpolation::BlendState_SetHandler(kUpdateContext);
     for_each_overlay(kUpdateSlot);
-  }
-  if (!render_only) {
     RecordVehiclePoses(base);
   }
+  // For drawing, the overlays are updated again with the cars at the frame's
+  // blended poses (they place themselves when updated), recorded, and then
+  // both are put back: the game's own state advances once per tick.
   auto vehicles = BlendVehiclePoses(base);
+  std::vector<std::pair<uint32_t, std::vector<uint8_t>>> overlay_states;
+  if (!vehicles.empty()) {
+    for (uint32_t i = 0; i < kOverlayCount; i++) {
+      uint32_t overlay = guest::LoadU32(base, list + 4 * i);
+      if (overlay != 0) {
+        overlay_states.push_back(
+            {overlay, std::vector<uint8_t>(base + overlay, base + overlay + kOverlayBytes)});
+      }
+    }
+    interpolation::BlendState_SetHandler(kUpdateContext);
+    for_each_overlay(kUpdateSlot);
+  }
   interpolation::BlendState_SetHandler(kRecordContext);
   for_each_overlay(kRecordSlot);
+  for (const auto& [overlay, state] : overlay_states) {
+    std::memcpy(base + overlay, state.data(), state.size());
+  }
   for (const auto& [address, matrix] : vehicles) {
     StoreMatrix(base, address, matrix);
   }
