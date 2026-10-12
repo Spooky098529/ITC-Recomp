@@ -328,9 +328,38 @@ class DrawState {
     if (!recorder && (render_only || PassOfViewProjection(b) < 0)) {
       return;
     }
-    ProductInputs inputs{LoadMatrix(base, a), LoadMatrix(base, b)};
+    Note(base, out, a, b, {LoadMatrix(base, a), LoadMatrix(base, b)}, render_only);
+  }
+
+  // Main thread, after the matrix copy dst = src. A copy of a camera (as
+  // identity * camera) or of a noted product carries on as that product (the
+  // light billboards' constants arrive this way).
+  void OnCopy(uint8_t* base, uint32_t dst, uint32_t src) {
+    if (std::this_thread::get_id() != main_thread_) {
+      return;
+    }
+    bool render_only = frame_pacing::GameMessages_IsRenderOnlyPass();
+    if (PassOfViewProjection(src) >= 0) {
+      Matrix4 identity{1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
+      Note(base, dst, 0, src, {identity, LoadMatrix(base, src)}, render_only);
+      counts_.copies++;
+      return;
+    }
+    auto& outputs = render_only ? pass_outputs_ : tick_outputs_;
+    auto it = outputs.find(src);
+    if (it == outputs.end() || it->second.written != LoadMatrix(base, src)) {
+      return;
+    }
+    outputs[dst] = {it->second.key, LoadMatrix(base, dst)};
+    counts_.copies++;
+  }
+
+  // A product out = world * camera, by the operands' addresses (world 0 for
+  // an identity) and their values.
+  void Note(uint8_t* base, uint32_t out, uint32_t world, uint32_t camera,
+            const ProductInputs& inputs, bool render_only) {
     uint64_t signature = camera_ids_.Of(inputs.view_projection);
-    ProductKey key{b, a, signature, product_occurrences_[{b, a, signature, 0}]++};
+    ProductKey key{camera, world, signature, product_occurrences_[{camera, world, signature, 0}]++};
     if (!render_only) {
       collecting_[key] = inputs;
     } else if (!enabled_) {
@@ -576,12 +605,12 @@ class DrawState {
     REXLOG_INFO(
         "blend state: {} draws; per draw {} look-ats, {} cameras, {} objects ({} unmatched, {} "
         "not transforms), {} replayed camera products; {} camera cuts, {} object cuts; {} "
-        "products published per draw, {} mismatched",
+        "products published per draw, {} mismatched, {} copies",
         counts_.draws, counts_.look_ats / draws, counts_.cameras / draws,
         counts_.objects / draws, counts_.objects_unmatched / draws,
         counts_.objects_not_transforms / draws, counts_.replayed_products.load() / draws,
         counts_.camera_cuts, counts_.object_cuts, counts_.products_published / draws,
-        counts_.mismatched_products / draws);
+        counts_.mismatched_products / draws, counts_.copies / draws);
     if (REXCVAR_GET(log_replayed_constants)) {
       auto print = [&](const char* name, uint32_t offset) {
         Matrix4 m = LoadMatrix(base_, CameraPass(0) + offset);
@@ -658,12 +687,13 @@ class DrawState {
     int object_cuts = 0;
     int products_published = 0;
     int mismatched_products = 0;
+    int copies = 0;
     std::atomic<int> replayed_products = 0;  // render thread
     std::chrono::steady_clock::time_point last_log{};
 
     void Reset() {
       draws = look_ats = cameras = objects = objects_unmatched = objects_not_transforms =
-          camera_cuts = object_cuts = products_published = mismatched_products = 0;
+          camera_cuts = object_cuts = products_published = mismatched_products = copies = 0;
       replayed_products = 0;
     }
   } counts_;
@@ -937,4 +967,12 @@ extern "C" REX_FUNC(sub_8258CAA0) {
     g_slot_callers.clear();
     g_slot_callers_logged = now;
   }
+}
+
+// Matrix_Copy: r3 = destination, r4 = source; copies a 4x4 matrix.
+extern "C" REX_FUNC(sub_820A0AC0) {
+  REX_FUNC_PROLOGUE();
+  uint32_t dst = ctx.r3.u32, src = ctx.r4.u32;
+  __imp__sub_820A0AC0(ctx, base);
+  interpolation::GetDrawState().OnCopy(base, dst, src);
 }
