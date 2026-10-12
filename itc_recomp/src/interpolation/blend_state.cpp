@@ -942,11 +942,13 @@ void BlendState_ReplayConstants(uint8_t* base, uint32_t payload, uint32_t packed
       last = now;
       logged = 0;
     }
-    if (start == 0 && std::abs(m[5]) > 1.2f && logged < 60 && REXCVAR_GET(log_replayed_constants)) {
+    std::string status = GetReplayCameras().Status(payload, m);
+    if (start == 0 && status != "substituted" && logged < 400 &&
+        REXCVAR_GET(log_replayed_constants)) {
       logged++;
       REXLOG_INFO("c0 upload t={} from {:08X} x{} {}: {:.4g} {:.4g} {:.4g} {:.4g} ... {:.4g} {:.4g} {:.4g} {:.4g}",
                   std::chrono::duration_cast<std::chrono::microseconds>(now.time_since_epoch()).count() % 100000000,
-                  payload, count, GetReplayCameras().Status(payload, m), m[0], m[1], m[2], m[3],
+                  payload, count, status, m[0], m[1], m[2], m[3],
                   m[12], m[13], m[14], m[15]);
     }
   }
