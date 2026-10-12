@@ -10,7 +10,12 @@
 
 #include <rex/cvar.h>
 
+#include <rex/logging.h>
+
+#include <chrono>
 #include <cstring>
+#include <map>
+#include <string>
 #include <unordered_map>
 #include <vector>
 
@@ -18,6 +23,8 @@ REXCVAR_DEFINE_BOOL(per_tick_blink_timers, true, "ITC",
                     "Advance the car blink timers once per tick on render-only passes");
 REXCVAR_DEFINE_BOOL(per_tick_ui_movies, true, "ITC",
                     "Advance UI movies once per tick on render-only passes");
+REXCVAR_DEFINE_BOOL(log_replays, false, "ITC",
+                    "Log how replays from the logic pass's state went, every 2 s");
 
 // Blink timers (r3 = timer set, from the car's draw, sub_820DDE58): adds one
 // to each of four frame counters (+8, +16, +24, +32, 64-bit) and resets each
@@ -39,7 +46,7 @@ extern "C" REX_FUNC(sub_820DC958) {
 namespace {
 class ReplayFromLogicPass {
  public:
-  explicit ReplayFromLogicPass(uint32_t bytes) : bytes_(bytes) {}
+  ReplayFromLogicPass(const char* name, uint32_t bytes) : name_(name), bytes_(bytes) {}
 
   template <typename Call>
   void Run(uint8_t* base, uint32_t object, Call&& call) {
@@ -58,14 +65,41 @@ class ReplayFromLogicPass {
       return;
     }
     auto it = states_.find(key);
-    if (it == states_.end() || it->second.after.size() != bytes_ ||
-        std::memcmp(state, it->second.after.data(), bytes_) != 0) {
+    if (it == states_.end() || it->second.after.size() != bytes_) {
+      Count("no logic pass state", -1);
       call();
       return;
     }
+    if (std::memcmp(state, it->second.after.data(), bytes_) != 0) {
+      int first = 0;
+      while (state[first] == it->second.after[first]) {
+        first++;
+      }
+      Count("changed since the logic pass", first);
+      call();
+      return;
+    }
+    Count("replayed", -1);
     std::memcpy(state, it->second.before.data(), bytes_);
     call();
     std::memcpy(state, it->second.after.data(), bytes_);
+  }
+
+  void Count(const char* outcome, int offset) {
+    if (!REXCVAR_GET(log_replays)) {
+      return;
+    }
+    counts_[{outcome, offset}]++;
+    auto now = std::chrono::steady_clock::now();
+    if (now - last_log_ < std::chrono::seconds(2)) {
+      return;
+    }
+    last_log_ = now;
+    for (const auto& [key, n] : counts_) {
+      REXLOG_INFO("replay {}: {} {} (first differing byte +{:X})", name_, key.first, n,
+                  key.second);
+    }
+    counts_.clear();
   }
 
  private:
@@ -80,20 +114,23 @@ class ReplayFromLogicPass {
   struct States {
     std::vector<uint8_t> before, after;
   };
+  const char* name_;
   uint32_t bytes_;
   uint64_t pass_ = ~0ull;
+  std::map<std::pair<std::string, int>, int> counts_;
+  std::chrono::steady_clock::time_point last_log_{};
   std::unordered_map<Key, States, KeyHash> states_;
   std::unordered_map<uint32_t, int> occurrences_;
 };
 
 // UI movies (sub_8211D2F8 with r4 = 0 advances a frame and draws; the HUD,
 // including the race start countdown). Furthest field used: ~+0x96C8.
-ReplayFromLogicPass g_ui_movies(0xA000);
+ReplayFromLogicPass g_ui_movies("UI movies", 0xA000);
 
 // Markers above opponent cars (sub_821225D8, r3 = marker, r4 = camera pass):
 // a state machine stepped (a counter at +0x150 counts down) and drawn per
 // view, which made the marker flicker.
-ReplayFromLogicPass g_opponent_markers(0x400);
+ReplayFromLogicPass g_opponent_markers("opponent markers", 0x400);
 }  // namespace
 
 extern "C" REX_FUNC(sub_8211D2F8) {
