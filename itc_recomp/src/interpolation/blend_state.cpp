@@ -18,18 +18,24 @@
 //   are recorded only on logic passes, and the render thread replays them
 //   unchanged on every frame of the tick. Their constants are made with the
 //   game's matrix multiply (sub_8209BD50) from a world matrix and a camera
-//   pass's view-projection, so each multiply into a camera is noted by its
-//   output address; when the render thread replays a constant upload from a
-//   noted address, it uploads world * that camera's view-projection for the
-//   frame instead.
+//   pass's view-projection. During each logic pass, a copy of both inputs of
+//   every such multiply is kept, keyed by camera, world matrix address and
+//   order, and paired with the previous tick's. When the render thread
+//   replays a constant upload from a multiply's output, it uploads the
+//   frame's blend of the two ticks instead.
 //
-// Drawing runs a tick behind: the logic pass draws the previous tick (amount
-// 0) and the passes after it move towards the current one. Blended values are
-// put back after Draw, so game logic never sees them.
+// So that those copies hold the tick's own state, a logic pass draws without
+// blending, and all its uploads are blended at replay; the render-only passes
+// after it blend as they draw.
+//
+// Drawing runs a tick behind: the logic pass's frame shows the previous tick
+// (amount 0) and the frames after it move towards the current one. Blended
+// values are put back after Draw, so game logic never sees them.
 
 #include "blend_state.h"
 
 #include "frame_pacing/frame_pacer.h"
+#include "frame_pacing/game_messages.h"
 #include "guest.h"
 #include "transform.h"
 
@@ -38,6 +44,7 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <chrono>
 #include <cmath>
 #include <memory>
@@ -72,10 +79,6 @@ constexpr uint32_t kLookAtOffsets[] = {0x190, 0x1A0, 0x1B0};
 // drawn without blending.
 constexpr float kCutDistance = 8.0f;  // metres
 constexpr float kCutAngle = 0.5f;     // radians, ~30 degrees
-
-// How long a noted camera product is kept: the command list is double
-// buffered, so a recording is replayed for at most the next tick.
-constexpr uint32_t kProductLifetimeTicks = 2;
 
 Matrix4 LoadMatrix(uint8_t* base, uint32_t address) {
   Matrix4 m;
@@ -153,37 +156,79 @@ int PassOfViewProjection(uint32_t address) {
   return int((address - kCameraPasses) / kCameraPassBytes);
 }
 
-// A constant made with the matrix multiply from a world matrix and a camera.
-struct CameraProduct {
-  int pass;
+// A matrix multiply's inputs: a world matrix and a camera's view-projection.
+struct ProductInputs {
   Matrix4 world;
+  Matrix4 view_projection;
+};
+
+// A multiply made during a logic pass, as the render thread redoes it.
+struct ReplayedProduct {
   Matrix4 written;  // the product, as written to the output address
-  uint32_t tick;
+  ProductInputs now;
+  std::optional<ProductInputs> before;  // the previous tick's, if paired
 };
 
-// What the render thread needs to redo camera products for a frame:
-// published by the main thread after each Draw.
-struct ReplayFrame {
-  std::array<Matrix4, kCameraPassCount> view_projections{};  // as Draw left them
-  std::unordered_map<uint32_t, CameraProduct> products;      // by output address
+// What the render thread needs to blend camera products: published by the
+// main thread after each logic pass's Draw. The frame's amount is published
+// after every Draw.
+struct ReplayTick {
+  std::unordered_map<uint32_t, ReplayedProduct> products;  // by output address
 };
 
-std::mutex g_replay_frame_mutex;
-std::shared_ptr<const ReplayFrame> g_replay_frame;
+std::mutex g_replay_mutex;
+std::shared_ptr<const ReplayTick> g_replay_tick;
+std::atomic<float> g_replay_amount = 0;
+
+// Blends a multiply's result between ticks: the world matrix and the camera
+// each as a rigid motion (positions straight, rotations along the shortest
+// arc), falling back to the current tick's where they aren't.
+Matrix4 BlendProduct(const ReplayedProduct& product, float amount) {
+  if (!product.before) {
+    return product.written;
+  }
+  const ProductInputs& a = *product.before;
+  const ProductInputs& b = product.now;
+  Matrix4 world = b.world;
+  std::optional<ScaledTransform> wa = ScaledTransformFromWorldMatrix(a.world);
+  std::optional<ScaledTransform> wb = ScaledTransformFromWorldMatrix(b.world);
+  if (wa && wb && !IsCut(wa->transform, wb->transform)) {
+    world = WorldMatrixFromScaledTransform(Blend(*wa, *wb, amount));
+  }
+  Matrix4 view_projection = b.view_projection;
+  if (a.view_projection != b.view_projection) {
+    if (std::optional<RigidMotion> motion = FindRigidMotion(a.view_projection, b.view_projection);
+        motion && Distance(motion->motion.position, Vec3{}) < 1e6f &&
+        AngleBetween(motion->motion.rotation, Quaternion{}) <= kCutAngle) {
+      view_projection = BlendRigidMotion(*motion, amount);
+    }
+  }
+  return Multiply(world, view_projection);
+}
 
 class DrawState {
  public:
   // Main thread, after the matrix multiply wrote out = a * b.
   void OnMultiply(uint8_t* base, uint32_t out, uint32_t a, uint32_t b) {
-    // Draw and game logic run on the main thread; loading threads multiply too.
-    if (std::this_thread::get_id() != main_thread_) {
+    // Draw and game logic run on the main thread; loading threads multiply
+    // too. Render-only passes record fresh (already blended) uploads.
+    if (std::this_thread::get_id() != main_thread_ ||
+        frame_pacing::GameMessages_IsRenderOnlyPass()) {
       return;
     }
     int pass = PassOfViewProjection(b);
     if (pass < 0) {
       return;
     }
-    products_[out] = {pass, LoadMatrix(base, a), LoadMatrix(base, out), tick_};
+    ProductKey key{pass, a, product_occurrences_[{pass, a, 0}]++};
+    ProductInputs inputs{LoadMatrix(base, a), LoadMatrix(base, b)};
+    products_this_tick_[key] = inputs;
+    ReplayedProduct& replayed = replay_this_tick_->products[out];
+    replayed.written = LoadMatrix(base, out);
+    replayed.now = inputs;
+    auto before = products_last_tick_.find(key);
+    replayed.before = before != products_last_tick_.end() ? std::optional(before->second)
+                                                          : std::nullopt;
   }
 
   void BeforeDraw(uint8_t* base, bool logic_pass) {
@@ -194,7 +239,8 @@ class DrawState {
     }
     amount_ = frame_pacing::GetFramePacer().TickProgress();
     recorded_.clear();
-    enabled_ = REXCVAR_GET(interpolate_draw_state);
+    // A logic pass draws the tick as it is (its uploads are blended at replay).
+    enabled_ = REXCVAR_GET(interpolate_draw_state) && !logic_pass;
     if (!enabled_) {
       return;
     }
@@ -220,7 +266,17 @@ class DrawState {
   }
 
   void AfterDraw(uint8_t* base) {
-    PublishReplayFrame(base);
+    if (logic_pass_) {
+      // This tick's products are complete (its Update and Draw).
+      std::shared_ptr<const ReplayTick> tick = std::move(replay_this_tick_);
+      replay_this_tick_ = std::make_shared<ReplayTick>();
+      products_last_tick_ = std::move(products_this_tick_);
+      products_this_tick_.clear();
+      product_occurrences_.clear();
+      std::lock_guard lock(g_replay_mutex);
+      g_replay_tick = std::move(tick);
+    }
+    g_replay_amount = REXCVAR_GET(interpolate_draw_state) ? amount_ : 1.0f;
     Restore(base, saved_);
     Restore(base, saved_vec3_);
     counts_.draws++;
@@ -323,7 +379,6 @@ class DrawState {
 
   // Main thread, before the Draw of a logic pass (after its Update).
   void OnTick(uint8_t* base) {
-    tick_++;
     camera_blends_.clear();
     look_at_blends_.clear();
     for (int pass = 0; pass < kCameraPassCount; pass++) {
@@ -354,19 +409,6 @@ class DrawState {
     }
     objects_last_tick_ = std::move(objects_this_tick_);
     objects_this_tick_.clear();
-    std::erase_if(products_, [&](const auto& entry) {
-      return tick_ - entry.second.tick > kProductLifetimeTicks;
-    });
-  }
-
-  void PublishReplayFrame(uint8_t* base) {
-    auto frame = std::make_shared<ReplayFrame>();
-    for (int pass = 0; pass < kCameraPassCount; pass++) {
-      frame->view_projections[pass] = LoadMatrix(base, CameraPass(pass) + kViewProjectionOffset);
-    }
-    frame->products = products_;
-    std::lock_guard lock(g_replay_frame_mutex);
-    g_replay_frame = std::move(frame);
   }
 
   // The camera of a pass whose view-projection is its view * projection.
@@ -398,7 +440,7 @@ class DrawState {
         counts_.draws, counts_.look_ats / draws, counts_.cameras / draws,
         counts_.objects / draws, counts_.objects_unmatched / draws,
         counts_.objects_not_transforms / draws, counts_.replayed_products.load() / draws,
-        counts_.camera_cuts, counts_.object_cuts, products_.size());
+        counts_.camera_cuts, counts_.object_cuts, products_last_tick_.size());
     counts_.Reset();
     counts_.last_log = now;
   }
@@ -407,7 +449,6 @@ class DrawState {
   bool logic_pass_ = false;
   bool enabled_ = false;
   float amount_ = 0;
-  uint32_t tick_ = 0;
 
   std::array<std::optional<Transform>, kCameraPassCount> cameras_;
   std::vector<CameraBlend> camera_blends_;
@@ -418,7 +459,22 @@ class DrawState {
   std::unordered_map<ObjectKey, ScaledTransform, ObjectKeyHash> objects_this_tick_;
   std::unordered_map<uint32_t, int> recorded_;
 
-  std::unordered_map<uint32_t, CameraProduct> products_;  // by output address
+  struct ProductKey {
+    int pass;
+    uint32_t world;  // address
+    int occurrence;  // times this camera and world were multiplied earlier in the tick
+    bool operator==(const ProductKey&) const = default;
+  };
+  struct ProductKeyHash {
+    size_t operator()(const ProductKey& key) const {
+      return std::hash<uint64_t>()((uint64_t(key.world) << 24) ^ (uint64_t(key.pass) << 16) ^
+                                   uint64_t(key.occurrence));
+    }
+  };
+  std::unordered_map<ProductKey, ProductInputs, ProductKeyHash> products_this_tick_;
+  std::unordered_map<ProductKey, ProductInputs, ProductKeyHash> products_last_tick_;
+  std::unordered_map<ProductKey, int, ProductKeyHash> product_occurrences_;
+  std::shared_ptr<ReplayTick> replay_this_tick_ = std::make_shared<ReplayTick>();
 
   std::vector<Saved<Matrix4>> saved_;
   std::vector<Saved<Vec3>> saved_vec3_;
@@ -449,29 +505,31 @@ DrawState& GetDrawState() {
   return state;
 }
 
-// Render thread: redoes noted camera products with the frame's cameras.
+// Render thread: blends the logic pass's camera products for each frame.
 class ReplayCameras {
  public:
   void OnFrameStart() {
-    std::lock_guard lock(g_replay_frame_mutex);
-    frame_ = g_replay_frame;
+    std::lock_guard lock(g_replay_mutex);
+    tick_ = g_replay_tick;
+    amount_ = g_replay_amount;
   }
 
-  // The value to upload from `payload` in place of `m`, if it's a noted
-  // camera product still as written.
+  // The value to upload from `payload` in place of `m`, if it's a camera
+  // product of the tick still as written.
   std::optional<Matrix4> Substitute(uint32_t payload, const Matrix4& m) const {
-    if (!frame_) {
+    if (!tick_) {
       return std::nullopt;
     }
-    auto it = frame_->products.find(payload);
-    if (it == frame_->products.end() || it->second.written != m) {
+    auto it = tick_->products.find(payload);
+    if (it == tick_->products.end() || it->second.written != m) {
       return std::nullopt;
     }
-    return Multiply(it->second.world, frame_->view_projections[it->second.pass]);
+    return BlendProduct(it->second, amount_);
   }
 
  private:
-  std::shared_ptr<const ReplayFrame> frame_;
+  std::shared_ptr<const ReplayTick> tick_;
+  float amount_ = 1;
 };
 
 ReplayCameras& GetReplayCameras() {
