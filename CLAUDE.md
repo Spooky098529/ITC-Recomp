@@ -62,10 +62,11 @@ install -m 755 itc_recomp/run-debug.sh $D/run-debug.sh
 
 Frame interpolation for races is working: logic runs at 30 Hz and frames are
 blended between ticks. The world, cameras, wheels, lights, shadows,
-headlights, tunnels, the race start countdown, the HUD, the marker above
-opponents, the light trails, the texture animations (flashing lights, signs,
-the off-ramp chevron), the minimap triangle's flashing, the car's
-reflections, buildings' lighting and play time are all done. `run.sh` turns
+headlights (including their light on other cars' bodies), tunnels, the race
+start countdown, the HUD, the marker above opponents, the light trails, the
+texture animations (flashing lights, signs, the off-ramp chevron), the
+minimap triangle's flashing, the car's reflections, buildings' lighting and
+play time are all done. `run.sh` turns
 interpolation on (marked experimental) with logging off; `run-debug.sh` is
 the same with logs; `./run.sh --no-interpolation` gives the original 30 fps
 with motion blur. Known issues are at the end of `docs/functions.md`.
@@ -78,9 +79,6 @@ releases).
 Not done yet:
 
 - Ask before pushing to `origin` (github.com/Spooky098529/ITC-Recomp).
-- Branch `car-lighting`: headlight light on other cars' bodies now blends
-  smoothly (`--pixel_blend_from_latest`, confirmed in game), which was the
-  whole headlight issue. Not merged to `main` yet.
 - Races don't hold 144 fps in busy areas (about 105-150). `--log_frame_times`
   shows the render thread is the limit (6-8 ms a frame, our blending under
   1 ms of it); next step is profiling with `perf` (not installed yet).
