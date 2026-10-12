@@ -481,6 +481,44 @@ class DrawState {
     Restore(base, object_saved_);
   }
 
+  // Main thread, around the light billboards' vertex generation
+  // (sub_8209C6E0), which turns each quad to face the camera pass at
+  // `pass_address`: give it the frame's blended camera, so the quads face the
+  // camera they're drawn from (their camera constants are blended at replay).
+  void BeforeBillboards(uint8_t* base, uint32_t pass_address) {
+    billboard_saved_.clear();
+    billboard_saved_vec3_.clear();
+    if (!REXCVAR_GET(interpolate_draw_state)) {
+      return;
+    }
+    for (const LookAtBlend& blend : look_at_blends_) {
+      if (CameraPass(blend.pass) != pass_address) {
+        continue;
+      }
+      for (int i = 0; i < 3; i++) {
+        Vec3 v;
+        for (int k = 0; k < 3; k++) {
+          v[k] = blend.from[i][k] + (blend.to[i][k] - blend.from[i][k]) * amount_;
+        }
+        Replace(base, billboard_saved_vec3_, pass_address + kLookAtOffsets[i], v);
+      }
+    }
+    for (const CameraBlend& camera : camera_blends_) {
+      if (CameraPass(camera.pass) != pass_address) {
+        continue;
+      }
+      Matrix4 view = ViewMatrixFromTransform(Blend(camera.from, camera.to, amount_));
+      Replace(base, billboard_saved_, pass_address + kViewOffset, view);
+      Replace(base, billboard_saved_, pass_address + kViewProjectionOffset,
+              Multiply(view, camera.projection));
+    }
+  }
+
+  void AfterBillboards(uint8_t* base) {
+    Restore(base, billboard_saved_);
+    Restore(base, billboard_saved_vec3_);
+  }
+
   // Main thread, before a logic pass's Update: a new tick's products start.
   void OnLogicPassStart() { tick_outputs_.clear(); }
 
@@ -688,6 +726,8 @@ class DrawState {
   std::vector<Saved<Matrix4>> saved_;
   std::vector<Saved<Vec3>> saved_vec3_;
   std::vector<Saved<Matrix4>> object_saved_;
+  std::vector<Saved<Matrix4>> billboard_saved_;
+  std::vector<Saved<Vec3>> billboard_saved_vec3_;
 
   struct Counts {
     int draws = 0;
@@ -1031,4 +1071,15 @@ extern "C" REX_FUNC(sub_820A0AC0) {
   uint32_t dst = ctx.r3.u32, src = ctx.r4.u32;
   __imp__sub_820A0AC0(ctx, base);
   interpolation::GetDrawState().OnCopy(base, dst, src);
+}
+
+// Billboards_BuildVertices: r3 = billboard set (its +0 is the camera pass it
+// faces), r4 = command list, r5 = the sprites. Writes each light's quad,
+// turned to face that camera.
+extern "C" REX_FUNC(sub_8209C6E0) {
+  REX_FUNC_PROLOGUE();
+  uint32_t pass = guest::LoadU32(base, ctx.r3.u32);
+  interpolation::GetDrawState().BeforeBillboards(base, pass);
+  __imp__sub_8209C6E0(ctx, base);
+  interpolation::GetDrawState().AfterBillboards(base);
 }
