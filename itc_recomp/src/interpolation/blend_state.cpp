@@ -91,6 +91,10 @@ REXCVAR_DEFINE_BOOL(pixel_blend_from_latest, true, "ITC",
                     "Blend per-object lighting from the last value recorded in the previous "
                     "tick to this frame's (false: only frames recording the tick's first value "
                     "are blended)");
+REXCVAR_DEFINE_BOOL(log_moving_products, false, "ITC",
+                    "Log moving objects drawn out of step: render-only mismatches, products not "
+                    "blended or unpaired, pairings that move unlike their neighbours, and jumps "
+                    "between frames");
 REXCVAR_DEFINE_BOOL(log_pixel_outcomes, false, "ITC",
                     "Log what happened to the per-object lighting uploads (blended, unpaired, "
                     "rejected...), for moving and still objects, every 2 s");
@@ -560,6 +564,9 @@ class DrawState {
       if (!overlay && (tick == current_tick_.end() || tick->second.world != inputs.world ||
                        tick->second.view_projection != inputs.view_projection)) {
         counts_.mismatched_products++;
+        if (REXCVAR_GET(log_moving_products)) {
+          LogMismatch(key, tick == current_tick_.end() ? nullptr : &tick->second, inputs);
+        }
         return;
       }
     }
@@ -916,6 +923,40 @@ class DrawState {
   ProductInputsByKey current_tick_;
   ProductInputsByKey previous_tick_;
   std::unordered_map<ProductKey, int, ProductKeyHash> product_occurrences_;
+
+  // Diagnostics (--log_moving_products): a render-only pass's multiply whose
+  // inputs differ from the logic pass's under the same key. It isn't
+  // published, so its upload is drawn as recorded (the tick's state).
+  void LogMismatch(const ProductKey& key, const ProductInputs* tick, const ProductInputs& now) {
+    static auto last = std::chrono::steady_clock::now();
+    static int lines = 0, total = 0;
+    total++;
+    auto t = std::chrono::steady_clock::now();
+    if (t - last >= std::chrono::seconds(2)) {
+      REXLOG_INFO("moving: {} render-only mismatches in the last 2 s", total);
+      last = t;
+      lines = 0;
+      total = 0;
+    }
+    if (lines++ >= 12) {
+      return;
+    }
+    const Matrix4& w = now.world;
+    if (!tick) {
+      REXLOG_INFO("moving: render-only mismatch, key not in the tick: tick {} camera {:08X} world "
+                  "{:08X} id {} handler {:08X} occurrence {}, world at {:.3f} {:.3f} {:.3f}",
+                  ticks_, key.camera, key.world, key.signature, key.handler, key.occurrence,
+                  w[12], w[13], w[14]);
+      return;
+    }
+    const Matrix4& tw = tick->world;
+    REXLOG_INFO("moving: render-only mismatch: tick {} camera {:08X} world {:08X} id {} handler "
+                "{:08X} occurrence {}, world at {:.3f} {:.3f} {:.3f}, logic pass's {:.3f} {:.3f} "
+                "{:.3f}; camera {}",
+                ticks_, key.camera, key.world, key.signature, key.handler, key.occurrence, w[12],
+                w[13], w[14], tw[12], tw[13], tw[14],
+                tick->view_projection == now.view_projection ? "same" : "differs");
+  }
   CameraIds camera_ids_;
 
   struct Output {
@@ -962,6 +1003,188 @@ DrawState& GetDrawState() {
 }
 
 // Render thread: blends the logic pass's camera products for each frame.
+// Diagnostics on the render thread (--log_moving_products): each frame's
+// replayed products, checked once the frame is done for moving objects
+// drawn out of step: not blended or unpaired; paired with something that
+// moved unlike everything near it in the tick (another wheel, say); or drawn
+// somewhere its motion doesn't explain since the last frame.
+class MovingProductsLog {
+ public:
+  enum class Outcome { kBlended, kSpinning, kWorldNotBlended, kUnpaired };
+
+  void OnProduct(uint32_t payload, const ReplayedProduct& product, const Matrix4& world_shown,
+                 Outcome outcome) {
+    Record r;
+    r.identity = product.identity;
+    r.payload = payload;
+    r.handler = product.handler;
+    r.now = Translation(product.now.world);
+    r.shown = Translation(world_shown);
+    r.outcome = outcome;
+    if (product.before) {
+      r.before = Translation(product.before->world);
+      std::optional<ScaledTransform> a = ScaledTransformFromWorldMatrix(product.before->world);
+      std::optional<ScaledTransform> b = ScaledTransformFromWorldMatrix(product.now.world);
+      r.angle = a && b ? AngleBetween(a->transform.rotation, b->transform.rotation) : -1;
+    }
+    records_.push_back(r);
+  }
+
+  // The frame drawn since the last call is complete; `tick` and `amount`
+  // are the next frame's.
+  void OnFrameStart(uint64_t tick, float amount) {
+    Check();
+    std::unordered_map<uint64_t, Shown> shown;
+    for (const Record& r : records_) {
+      shown[r.identity] = {r.shown, tick_, amount_};
+    }
+    last_shown_ = std::move(shown);
+    records_.clear();
+    tick_ = tick;
+    amount_ = amount;
+    auto now = std::chrono::steady_clock::now();
+    if (now - last_log_ >= std::chrono::seconds(2)) {
+      if (frames_ > 0) {
+        REXLOG_INFO("moving: last 2 s, {} frames, {:.1f} moving products a frame; {} not "
+                    "blended, {} unpaired near moving, {} unlike their neighbours, {} jumps",
+                    frames_, double(moving_) / frames_, not_blended_, unpaired_, unlike_, jumps_);
+      }
+      last_log_ = now;
+      lines_ = 0;
+      frames_ = moving_ = not_blended_ = unpaired_ = unlike_ = jumps_ = 0;
+    }
+    frames_++;
+  }
+
+ private:
+  struct Record {
+    uint64_t identity = 0;
+    uint32_t payload = 0, handler = 0;
+    Vec3 now{}, shown{};
+    std::optional<Vec3> before;
+    float angle = -1;
+    Outcome outcome = Outcome::kBlended;
+    float Moved() const { return before ? Distance(*before, now) : 0.0f; }
+  };
+  struct Shown {
+    Vec3 position;
+    uint64_t tick;
+    float amount;
+  };
+
+  static Vec3 Translation(const Matrix4& m) { return {m[12], m[13], m[14]}; }
+  static const char* Name(Outcome o) {
+    switch (o) {
+      case Outcome::kBlended: return "blended";
+      case Outcome::kSpinning: return "spinning";
+      case Outcome::kWorldNotBlended: return "world not blended";
+      case Outcome::kUnpaired: return "unpaired";
+    }
+    return "?";
+  }
+  bool Line() { return lines_++ < 40; }
+  std::string Describe(const Record& r) const {
+    std::string before = r.before ? fmt::format("{:.3f} {:.3f} {:.3f}", (*r.before)[0],
+                                                (*r.before)[1], (*r.before)[2])
+                                  : std::string("-");
+    return fmt::format("id {:016X} payload {:08X} handler {:08X} {}: before {} now {:.3f} {:.3f} "
+                       "{:.3f} shown {:.3f} {:.3f} {:.3f}, moved {:.3f} turned {:.3f}",
+                       r.identity, r.payload, r.handler, Name(r.outcome), before, r.now[0],
+                       r.now[1], r.now[2], r.shown[0], r.shown[1], r.shown[2], r.Moved(), r.angle);
+  }
+
+  void Check() {
+    if (records_.empty()) {
+      return;
+    }
+    std::vector<const Record*> moving;
+    for (const Record& r : records_) {
+      if (r.before && r.Moved() > 0.01f) {
+        moving.push_back(&r);
+      }
+    }
+    moving_ += int(moving.size());
+    auto near_moving = [&](const Vec3& p) {
+      for (const Record* m : moving) {
+        if (Distance(m->now, p) < 4.0f) {
+          return true;
+        }
+      }
+      return false;
+    };
+    for (const Record& r : records_) {
+      // Drawn at the tick (ahead of the blended objects around it).
+      if (r.outcome == Outcome::kWorldNotBlended && r.Moved() > 0.01f) {
+        not_blended_++;
+        if (Line()) {
+          REXLOG_INFO("moving: not blended, tick {} amount {:.2f}: {}", tick_, amount_,
+                      Describe(r));
+        }
+      } else if (r.outcome == Outcome::kUnpaired && near_moving(r.now)) {
+        unpaired_++;
+        if (Line()) {
+          REXLOG_INFO("moving: unpaired near moving, tick {} amount {:.2f}: {}", tick_, amount_,
+                      Describe(r));
+        }
+      }
+      // Drawn somewhere its own motion doesn't explain since the last frame.
+      auto last = last_shown_.find(r.identity);
+      if (last != last_shown_.end() && r.before) {
+        float frames_apart = float(tick_ - last->second.tick) + amount_ - last->second.amount;
+        float expected = r.Moved() * std::abs(frames_apart);
+        float moved = Distance(last->second.position, r.shown);
+        if (moved > 2 * expected + 0.2f) {
+          jumps_++;
+          if (Line()) {
+            REXLOG_INFO("moving: jump of {:.3f} (expected {:.3f}), tick {} amount {:.2f}, last "
+                        "frame tick {} amount {:.2f} at {:.3f} {:.3f} {:.3f}: {}",
+                        moved, expected, tick_, amount_, last->second.tick, last->second.amount,
+                        last->second.position[0], last->second.position[1],
+                        last->second.position[2], Describe(r));
+          }
+        }
+      }
+    }
+    // Paired with something else: moved unlike every moving product near it.
+    for (const Record* r : moving) {
+      Vec3 d = {r->now[0] - (*r->before)[0], r->now[1] - (*r->before)[1],
+                r->now[2] - (*r->before)[2]};
+      int neighbours = 0, agreeing = 0;
+      for (const Record* o : moving) {
+        if (o == r || Distance(o->now, r->now) >= 4.0f) {
+          continue;
+        }
+        neighbours++;
+        Vec3 e = {o->now[0] - (*o->before)[0], o->now[1] - (*o->before)[1],
+                  o->now[2] - (*o->before)[2]};
+        if (Distance(d, e) < 0.3f) {
+          agreeing++;
+        }
+      }
+      if (neighbours >= 2 && agreeing == 0) {
+        unlike_++;
+        if (Line()) {
+          REXLOG_INFO("moving: unlike its {} neighbours, tick {} amount {:.2f}: {}", neighbours,
+                      tick_, amount_, Describe(*r));
+        }
+      }
+    }
+  }
+
+  std::vector<Record> records_;
+  std::unordered_map<uint64_t, Shown> last_shown_;
+  uint64_t tick_ = 0;
+  float amount_ = 0;
+  int frames_ = 0, moving_ = 0, not_blended_ = 0, unpaired_ = 0, unlike_ = 0, jumps_ = 0;
+  int lines_ = 0;
+  std::chrono::steady_clock::time_point last_log_ = std::chrono::steady_clock::now();
+};
+
+MovingProductsLog& GetMovingProductsLog() {
+  static MovingProductsLog log;
+  return log;
+}
+
 class ReplayCameras {
  public:
   void OnFrameStart() {
@@ -975,6 +1198,9 @@ class ReplayCameras {
     last_identity_ = 0;
     std::lock_guard lock(g_replay_mutex);
     frame_ = g_replay_frame;
+    if (REXCVAR_GET(log_moving_products) && frame_) {
+      GetMovingProductsLog().OnFrameStart(frame_->tick, frame_->amount);
+    }
   }
 
   uint64_t tick() const { return frame_ ? frame_->tick : 0; }
@@ -1082,7 +1308,17 @@ class ReplayCameras {
     if (it->second.handler == kRaceOverlaysHandler) {
       overlay_payloads_.insert(payload);
     }
+    BlendStats before = stats_.blend;
     Matrix4 result = BlendProduct(it->second, frame_->amount, stats_.blend, &last_parts_);
+    if (REXCVAR_GET(log_moving_products)) {
+      using Outcome = MovingProductsLog::Outcome;
+      Outcome outcome = stats_.blend.unpaired != before.unpaired       ? Outcome::kUnpaired
+                        : stats_.blend.spinning != before.spinning     ? Outcome::kSpinning
+                        : stats_.blend.world_not_blended != before.world_not_blended
+                            ? Outcome::kWorldNotBlended
+                            : Outcome::kBlended;
+      GetMovingProductsLog().OnProduct(payload, it->second, last_parts_.world, outcome);
+    }
     if (REXCVAR_GET(log_overlay_products) && it->second.handler == kRaceOverlaysHandler) {
       LogOverlay(payload, it->second, result);
     }
