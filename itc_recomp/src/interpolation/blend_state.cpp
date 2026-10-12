@@ -53,6 +53,10 @@ REXCVAR_DEFINE_BOOL(interpolate_draw_state, true, "ITC",
 REXCVAR_DEFINE_BOOL(blend_while_drawing, false, "ITC",
                     "Also blend cameras and objects while render-only passes draw (changes "
                     "what the game culls, so pairings with the logic pass can slip)");
+REXCVAR_DEFINE_BOOL(log_stepping_constants, false, "ITC",
+                    "Log constant uploads that change at the tick rate rather than every "
+                    "frame (left at 30 Hz), with the code that recorded them; needs "
+                    "--log_slot_callers");
 REXCVAR_DEFINE_BOOL(log_blend_state, false, "ITC",
                     "Log how many cameras and objects were blended, once a second");
 REXCVAR_DEFINE_BOOL(log_replayed_constants, false, "ITC",
@@ -966,6 +970,90 @@ ReplayedConstantsLog& GetReplayedConstantsLog() {
   return log;
 }
 
+// Diagnostics on the render thread (--log_stepping_constants): constant
+// uploads that weren't substituted, grouped by the code that recorded them,
+// register and order in the frame, with how often their values change. One
+// that changes about 30 times a second while frames run at 150 is stuck to
+// the game tick.
+class SteppingConstantsLog {
+ public:
+  void OnFrameStart() {
+    if (!REXCVAR_GET(log_stepping_constants)) {
+      return;
+    }
+    frames_++;
+    occurrences_.clear();
+    auto now = std::chrono::steady_clock::now();
+    if (now - last_log_ < std::chrono::seconds(2)) {
+      return;
+    }
+    float seconds = std::chrono::duration<float>(now - last_log_).count();
+    last_log_ = now;
+    int logged = 0;
+    for (const auto& [key, entry] : entries_) {
+      float rate = entry.changes / seconds;
+      if (entry.frames * 2 > frames_ && rate > 15 && rate < 45 && logged < 60) {
+        logged++;
+        REXLOG_INFO("stepping constants: {} c{} x{} #{} by {:08X}: {:.0f} changes/s, e.g. {}",
+                    key.stage ? "pixel" : "vertex", key.start, key.count, key.occurrence,
+                    key.owner, rate, entry.sample);
+      }
+    }
+    REXLOG_INFO("stepping constants: {} logged of {} upload groups, {} frames", logged,
+                entries_.size(), frames_);
+    entries_.clear();
+    frames_ = 0;
+  }
+
+  void OnUpload(uint8_t* base, uint32_t payload, uint32_t packed, bool substituted) {
+    if (!REXCVAR_GET(log_stepping_constants) || substituted) {
+      return;
+    }
+    Key key{packed >> 24, (packed >> 8) & 0xFF, packed & 0xFF, SlotOwner(payload - 16), 0};
+    key.occurrence = occurrences_[key]++;
+    uint32_t words = std::min<uint32_t>(key.count * 4, 16);
+    std::array<float, 16> value{};
+    for (uint32_t i = 0; i < words; i++) {
+      value[i] = guest::LoadFloat(base, payload + 4 * i);
+    }
+    Entry& entry = entries_[key];
+    entry.frames++;
+    if (entry.seen && entry.last != value) {
+      entry.changes++;
+    }
+    entry.seen = true;
+    entry.last = value;
+    if (entry.sample.empty()) {
+      for (uint32_t i = 0; i < std::min<uint32_t>(words, 8); i++) {
+        entry.sample += fmt::format("{:.4g} ", value[i]);
+      }
+    }
+  }
+
+ private:
+  struct Key {
+    uint32_t stage, start, count, owner;
+    int occurrence;
+    auto operator<=>(const Key&) const = default;
+  };
+  struct Entry {
+    int frames = 0;
+    int changes = 0;
+    bool seen = false;
+    std::array<float, 16> last{};
+    std::string sample;
+  };
+  std::map<Key, Entry> entries_;
+  std::map<Key, int> occurrences_;
+  int frames_ = 0;
+  std::chrono::steady_clock::time_point last_log_{};
+};
+
+SteppingConstantsLog& GetSteppingConstantsLog() {
+  static SteppingConstantsLog log;
+  return log;
+}
+
 }  // namespace
 
 void BlendState_BeforeDraw(uint8_t* base, bool render_only_pass) {
@@ -990,6 +1078,7 @@ void BlendState_AfterRecordObject(uint8_t* base) {
 
 void BlendState_OnReplayFrameStart() {
   GetReplayedConstantsLog().OnFrameStart();
+  GetSteppingConstantsLog().OnFrameStart();
   GetReplayCameras().OnFrameStart();
 }
 
@@ -1009,6 +1098,7 @@ void BlendState_ReplayConstants(uint8_t* base, uint32_t payload, uint32_t packed
       GetDrawState().CountReplayedProduct();
     }
   }
+  GetSteppingConstantsLog().OnUpload(base, payload, packed, original.has_value());
   if (stage == 0 && count >= 4) {
     GetReplayCameras().CountUpload(base, payload, original.has_value());
     // Temporary: main-camera matrices uploaded to c0, with their status.
