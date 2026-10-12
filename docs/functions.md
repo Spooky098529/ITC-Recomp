@@ -225,7 +225,7 @@ render-only passes it ran ~5x fast. Each case found is fixed in
 | What | Function | Fix |
 |---|---|---|
 | Blink timers of the car's sprites (four 64-bit frame counters, called from the car's draw `sub_820DDE58`) | `sub_820DC958` | Skipped on render-only passes (`--per_tick_blink_timers`) |
-| Texture animations: the flashing building lights, the flashing road signs and the chevron over off-ramps (flipbooks: each animation steps a tick counter and picks its frame by it) | `sub_820F11A8` | Skipped on render-only passes (`--per_tick_texture_animations`) |
+| Texture animations: the flashing building lights, the flashing road signs, the chevron over off-ramps and the player's triangle on the minimap (flipbooks: each animation steps a tick counter and picks its frame by it) | `sub_820F11A8` | Skipped on render-only passes (`--per_tick_texture_animations`) |
 | Play time (a frame counter at `0x826C5B90`, which `sub_821109B8` turns into hours, minutes and seconds at 30 a second) | `sub_82107910` | One taken back before the call on render-only passes (`--per_tick_play_time`) |
 | UI movies: the HUD, including the race start countdown (a 240-frame movie, a beep at frames 60, 120, 180, 240) | `sub_8211D2F8`, with r4 = 0 (advance a frame and draw); r4 = 1 only draws | Replayed (below) (`--per_tick_ui_movies`) |
 

@@ -63,7 +63,7 @@ Frame interpolation for races is working: logic runs at 30 Hz and frames
 are blended between ticks. The world, cameras, wheels, lights, shadows,
 headlights, tunnels, the race start countdown, the HUD, the marker above
 opponents, the light trails, the texture animations (flashing lights,
-signs, the off-ramp chevron) and play time are all done. `run.sh` turns
+signs, the off-ramp chevron, the minimap triangle) and play time are all done. `run.sh` turns
 interpolation on (marked experimental); `./run.sh --no-interpolation` gives the original
 30 fps with motion blur. Known issues are at the end of `docs/functions.md`.
 
