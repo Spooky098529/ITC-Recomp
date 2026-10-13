@@ -13,6 +13,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstring>
+#include <filesystem>
 #include <future>
 #include <memory>
 #include <string>
@@ -33,8 +34,9 @@ REXCVAR_DEFINE_BOOL(native_renderer_serialize, false, "ITC",
                     "Wait for the GPU to finish each frame before recording the next (a "
                     "debugging aid: rules out frames in flight sharing data)");
 REXCVAR_DEFINE_STRING(native_renderer_dump, "", "ITC",
-                      "Directory to write one race frame's resolve destinations and main view "
-                      "into, as PFM files, once the race has run 10 s (a debugging aid)");
+                      "Directory to dump frames into, as PFM files, with draws.txt describing "
+                      "each draw: once 10 s into a race, and again whenever a file named 'now' "
+                      "appears in it (a debugging aid; see docs/native-renderer.md)");
 
 namespace native {
 namespace {
@@ -160,7 +162,11 @@ class Renderer {
     std::string name;
     TextureCache::Hide hide;
     uint32_t value;
+    uint64_t skip_pixel_shader;
   };
+  bool dumping_ = false;
+  uint32_t dumps_ = 0;
+  std::string dump_directory_;
   std::vector<DumpStep> dump_steps_;
   uint32_t dump_step_ = 0;
   uint32_t race_frames_ = 0;
@@ -446,9 +452,23 @@ VkCommandBuffer Renderer::BeginFrame() {
     begin.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
     vk::vkBeginCommandBuffer(frame.commands, &begin);
     passes_.BeginFrame(frame_index_);
-    // The dump's frames also check the mirror (see Passes::set_check_mirror).
-    passes_.set_check_mirror(!REXCVAR_GET(native_renderer_dump).empty() && race_frames_ >= 599 &&
-                             dump_step_ <= dump_steps_.size());
+    // A dump starts 10 s into a race, or when asked for.
+    const std::string& dump_root = REXCVAR_GET(native_renderer_dump);
+    if (!dump_root.empty() && !dumping_) {
+      std::error_code error;
+      bool asked = std::filesystem::remove(dump_root + "/now", error);
+      if (asked || (dumps_ == 0 && passes_.frame_resolve_count() >= 20 && ++race_frames_ >= 600)) {
+        dumping_ = true;
+        dump_step_ = 0;
+        dump_steps_.clear();
+        dump_directory_ = fmt::format("{}/{}", dump_root, dumps_++);
+        std::filesystem::create_directories(dump_directory_, error);
+        REXLOG_INFO("native renderer: dumping into {}", dump_directory_);
+      }
+    }
+    // Its first frame describes each draw; all check the mirror.
+    passes_.set_record_draws(dumping_ && dump_step_ == 0);
+    passes_.set_check_mirror(dumping_);
     recording_ = true;
   }
   return frame.commands;
@@ -470,15 +490,9 @@ void Renderer::EndFrame() {
   frame_commands_ = frame_draws_ = 0;
 
   VkCommandBuffer commands = BeginFrame();
-  // A dump, once: from the 600th frame with a race's resolves on, the
-  // frame as is (with the resolves), then frames with some textures hidden
-  // (placeholders instead; see DumpSteps).
-  bool dump = false;
-  if (!REXCVAR_GET(native_renderer_dump).empty() &&
-      (dump_step_ == 0 ? passes_.frame_resolve_count() >= 20 && ++race_frames_ >= 600
-                       : dump_step_ <= dump_steps_.size())) {
-    dump = true;
-  }
+  // A dump: the frame as is (with the resolves), then frames with something
+  // left out (see dump_steps_).
+  bool dump = dumping_;
   VkExtent2D source =
       dump ? passes_.EndFrame(commands, REXCVAR_GET(native_renderer_show_resolve), true,
                               dump_step_ ? dump_steps_[dump_step_ - 1].name : "shown",
@@ -569,33 +583,31 @@ void Renderer::EndFrame() {
   }
   if (dump) {
     vk::vkQueueWaitIdle(queue_);
-    passes_.WriteDump(REXCVAR_GET(native_renderer_dump));
+    passes_.WriteDump(dump_directory_);
     Passes::Stats checked = passes_.TakeStats();
     REXLOG_INFO("native renderer: dump frame {}: {} vertex or index ranges changed within the "
                 "frame ({} bytes), e.g. {:08X} ({} bytes)",
                 dump_step_, checked.mirror_rewritten, checked.mirror_rewritten_bytes,
                 checked.mirror_rewritten_sample_address, checked.mirror_rewritten_sample_size);
     if (dump_step_ == 0) {
-      // Everything from memory; each format this game's textures use; all
-      // resolves; each resolve destination.
+      // Each pixel shader the main view was drawn with, left out; then all
+      // textures from memory, and all resolve destinations, hidden.
       using Hide = TextureCache::Hide;
-      dump_steps_.push_back({"hide_memory", Hide::kMemory, 0});
-      for (uint32_t format : {18u, 19u, 20u, 6u, 15u}) {
-        dump_steps_.push_back({fmt::format("hide_memory_format{}", format), Hide::kMemoryFormat,
-                               format});
+      for (uint64_t hash : passes_.main_view_pixel_shaders()) {
+        dump_steps_.push_back({fmt::format("skip_ps_{:016X}", hash), Hide::kNone, 0, hash});
       }
-      dump_steps_.push_back({"hide_resolved", Hide::kResolved, 0});
-      for (uint32_t address : passes_.resolve_addresses()) {
-        dump_steps_.push_back(
-            {fmt::format("hide_resolved_{:08X}", address), Hide::kResolvedAddress, address});
-      }
+      dump_steps_.push_back({"hide_memory", Hide::kMemory, 0, 0});
+      dump_steps_.push_back({"hide_resolved", Hide::kResolved, 0, 0});
     }
     dump_step_++;
     if (dump_step_ <= dump_steps_.size()) {
       const DumpStep& step = dump_steps_[dump_step_ - 1];
       passes_.set_debug_hide(step.hide, step.value);
+      passes_.set_skip_pixel_shader(step.skip_pixel_shader);
     } else {
       passes_.set_debug_hide(TextureCache::Hide::kNone);
+      passes_.set_skip_pixel_shader(0);
+      dumping_ = false;
     }
   }
   frame_index_ = (frame_index_ + 1) % kFramesInFlight;

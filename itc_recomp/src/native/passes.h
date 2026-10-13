@@ -49,6 +49,12 @@ class Passes {
   // A debugging aid: hash each vertex and index range again at every use,
   // counting ranges whose contents changed within a frame (stats).
   void set_check_mirror(bool check);
+  // Debugging aids: skip the draws of a pixel shader (0: none); describe
+  // each draw of the frames recorded, written with the next dump
+  // (draws.txt); the pixel shaders the last frame drew the main view with.
+  void set_skip_pixel_shader(uint64_t hash);
+  void set_record_draws(bool record);
+  std::vector<uint64_t> main_view_pixel_shaders() const;
   // The distinct addresses of the last frame's resolve destinations.
   std::vector<uint32_t> resolve_addresses() const;
   // After a frame that dumped has finished on the GPU: writes each image as

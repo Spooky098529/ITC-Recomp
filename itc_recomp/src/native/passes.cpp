@@ -289,6 +289,13 @@ struct Passes::State {
   // With check_mirror: each range's hash when copied, to find ranges whose
   // contents change within a frame (draws after the change get the first).
   bool check_mirror = false;
+  // Debugging aids: draws of this pixel shader (hash) are skipped; with
+  // record_draws, each draw is described in a line (written with a dump).
+  uint64_t skip_pixel_shader = 0;
+  bool record_draws = false;
+  std::vector<std::string> recorded_draws;
+  // The pixel shaders drawn into the main view this frame and the last.
+  std::vector<uint64_t> frame_pixel_shaders, last_pixel_shaders;
   std::unordered_map<uint64_t, uint64_t> mirrored_hashes;
 
   // Targets by surface (colour or depth, EDRAM base, pitch, samples, the
@@ -1305,6 +1312,7 @@ void Passes::BeginFrame(uint32_t frame_index) {
   s.frame_resolves.clear();
   s.mirrored.clear();
   s.mirrored_hashes.clear();
+  s.frame_pixel_shaders.clear();
   s.texture_sets.clear();
   vk::vkResetDescriptorPool(s.context.device, s.rings[frame_index].texture_pool, 0);
   vk::vkResetDescriptorPool(s.context.device, s.resolve_pools[frame_index], 0);
@@ -1404,6 +1412,42 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
   if (!vertex || (pixel_object && !pixel)) {
     s.stats.failed++;
     return;
+  }
+  bool main_view_draw = color && color->surface.pitch == kMainViewPitch &&
+                        color->samples == VK_SAMPLE_COUNT_2_BIT;
+  if (pixel) {
+    if (main_view_draw && std::find(frame_pixel_shaders.begin(), frame_pixel_shaders.end(),
+                                    pixel->hash) == frame_pixel_shaders.end()) {
+      frame_pixel_shaders.push_back(pixel->hash);
+    }
+    if (pixel->hash == skip_pixel_shader) {
+      return;  // debugging aid
+    }
+  }
+  if (record_draws) {
+    std::string line = fmt::format(
+        "draw {}: {} target pitch {} MSAA {} format {}, depth {}; vs {:016X} ps {:016X}; "
+        "primitive {} x{}",
+        recorded_draws.size(), main_view_draw ? "main view" : "other",
+        color ? color->surface.pitch : depth->surface.pitch,
+        color ? color->surface.msaa : depth->surface.msaa, color ? int(color->surface.format) : -1,
+        depth ? "yes" : "no", vertex->hash, pixel ? pixel->hash : 0, type, primitive_count);
+    for (const TranslatedShader* shader : {vertex, pixel}) {
+      if (!shader) {
+        continue;
+      }
+      for (const ShaderTexture& texture : shader->textures) {
+        const uint32_t* f =
+            &regs.values[XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0 + 6 * texture.fetch_constant];
+        line += fmt::format(
+            "; {} tex {}{}: {:08X} format {} {}x{} dim {} declared {} words {:08X} {:08X} "
+            "{:08X} {:08X} {:08X} {:08X}",
+            shader == vertex ? "vs" : "ps", texture.fetch_constant, texture.is_signed ? "s" : "",
+            f[1] & 0xFFFFF000u, f[1] & 0x3F, (f[2] & 0x1FFF) + 1, ((f[2] >> 13) & 0x1FFF) + 1,
+            (f[5] >> 9) & 3, int(texture.view_type), f[0], f[1], f[2], f[3], f[4], f[5]);
+      }
+    }
+    recorded_draws.push_back(std::move(line));
   }
 
   // Index buffer: +0 bit 31 = 32-bit, bits 29-30 = endianness; +24 address.
@@ -1776,6 +1820,18 @@ void Passes::AfterResolve(VkCommandBuffer commands, uint8_t* base, uint32_t payl
   }
 }
 
+void Passes::set_skip_pixel_shader(uint64_t hash) {
+  state_->skip_pixel_shader = hash;
+}
+
+void Passes::set_record_draws(bool record) {
+  state_->record_draws = record;
+}
+
+std::vector<uint64_t> Passes::main_view_pixel_shaders() const {
+  return state_->last_pixel_shaders;
+}
+
 void Passes::set_check_mirror(bool check) {
   state_->check_mirror = check;
 }
@@ -1799,6 +1855,7 @@ VkExtent2D Passes::EndFrame(VkCommandBuffer commands, int32_t show_resolve, bool
   State& s = *state_;
   s.EndRendering(commands);
   s.last_frame_resolves = s.frame_resolves.size();
+  s.last_pixel_shaders = s.frame_pixel_shaders;
   // The frame's resolves, now and then, to pick one to show.
   if (s.frames++ % 1200 == 600 && !s.frame_resolves.empty()) {
     std::string list;
@@ -2017,6 +2074,15 @@ void Passes::WriteDump(const std::string& directory) {
     std::fclose(file);
   }
   REXLOG_INFO("native renderer: dumped {} images into {}", s.dumped.size(), directory);
+  if (!s.recorded_draws.empty()) {
+    if (FILE* file = std::fopen((directory + "/draws.txt").c_str(), "w")) {
+      for (const std::string& line : s.recorded_draws) {
+        std::fprintf(file, "%s\n", line.c_str());
+      }
+      std::fclose(file);
+    }
+    s.recorded_draws.clear();
+  }
   vk::vkDestroyBuffer(s.context.device, s.dump_buffer, nullptr);
   vk::vkFreeMemory(s.context.device, s.dump_memory, nullptr);
   s.dump_buffer = VK_NULL_HANDLE;
