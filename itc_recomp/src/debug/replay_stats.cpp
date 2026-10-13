@@ -2,6 +2,8 @@
 
 #include "guest.h"
 #include <array>
+#include <map>
+#include <tuple>
 #include <chrono>
 #include <string>
 #include <rex/logging.h>
@@ -14,6 +16,19 @@ REXCVAR_DEFINE_BOOL(log_replay_commands, false, "ITC",
 namespace {
 
 constexpr uint32_t kCommandCount = 38;
+
+// The graphics library's device (see docs/gpu-functions.md).
+constexpr uint32_t kDevicePointer = 0x8296BD90;
+constexpr uint32_t kRenderStateSetters = 56;    // device + 56 + state
+constexpr uint32_t kSamplerStateSetters = 440;  // device + 440 + state
+
+// A render or sampler state id seen, with its setter and values.
+struct StateUse {
+  uint32_t setter = 0;
+  uint32_t last_value = 0;
+  uint32_t distinct_values = 0;
+  uint64_t count = 0;
+};
 
 // Commands not identified from the code yet (docs/gpu-functions.md).
 constexpr bool IsUnknown(uint32_t id) {
@@ -30,6 +45,10 @@ struct Stats {
   std::array<uint64_t, kCommandCount> items{};     // sum of arg1
   std::array<std::string, kCommandCount> sample;   // last arguments seen
   uint32_t frames = 0;
+  // Kept for the whole run; logged when something new turns up.
+  std::map<uint32_t, StateUse> render_states, sampler_states;
+  std::map<std::tuple<uint32_t, uint32_t, uint32_t>, uint64_t> texture_fetches;
+  bool new_states = false;
   std::chrono::steady_clock::time_point last_log = std::chrono::steady_clock::now();
 };
 
@@ -49,6 +68,45 @@ void debug::ReplayStats_OnCommand(uint8_t* base, uint32_t id, uint32_t payload, 
   Stats& s = GetStats();
   s.commands[id]++;
   s.items[id] += arg1;
+  if (id == 1 || id == 2) {
+    // Items: [state, value] (render) or [sampler, state, value].
+    uint32_t device = guest::LoadU32(base, kDevicePointer);
+    for (uint32_t i = 0; i < arg1; i++) {
+      uint32_t item = payload + 16 * i;
+      uint32_t state = guest::LoadU32(base, item + (id == 1 ? 0 : 4));
+      uint32_t value = guest::LoadU32(base, item + (id == 1 ? 4 : 8));
+      auto& uses = id == 1 ? s.render_states : s.sampler_states;
+      auto [it, added] = uses.try_emplace(state);
+      StateUse& use = it->second;
+      if (added) {
+        use.setter = guest::LoadU32(
+            base, device + (id == 1 ? kRenderStateSetters : kSamplerStateSetters) + state);
+        use.last_value = value;
+        use.distinct_values = 1;
+        s.new_states = true;
+      } else if (use.last_value != value && use.distinct_values < 1000) {
+        use.distinct_values++;
+        use.last_value = value;
+      }
+      use.count++;
+    }
+  }
+  if (id == 4) {
+    // Items: [sampler, texture]. The texture's fetch constant is +28..+48.
+    for (uint32_t i = 0; i < arg1; i++) {
+      uint32_t texture = guest::LoadU32(base, payload + 16 * i + 4);
+      if (!texture) {
+        continue;
+      }
+      auto key = std::make_tuple(guest::LoadU32(base, texture + 28),
+                                 guest::LoadU32(base, texture + 32) & 0xFFF,
+                                 guest::LoadU32(base, texture + 36));
+      if (s.texture_fetches[key]++ == 0) {
+        REXLOG_INFO("replay texture fetch (new): dword0 {:08X} dword1&FFF {:03X} dword2 {:08X}",
+                    std::get<0>(key), std::get<1>(key), std::get<2>(key));
+      }
+    }
+  }
   if (IsUnknown(id)) {
     std::string words;
     for (uint32_t i = 0; i < 8; i++) {
@@ -81,7 +139,21 @@ void debug::ReplayStats_OnFrame() {
       REXLOG_INFO("replay command {} sample: {}", id, s.sample[id]);
     }
   }
-  s = {};
+  if (s.new_states) {
+    for (auto& [name, uses] : {std::pair{"render", &s.render_states},
+                               std::pair{"sampler", &s.sampler_states}}) {
+      for (auto& [state, use] : *uses) {
+        REXLOG_INFO("replay {} state {} (0x{:X}): setter {:08X}, {} uses, {} values, last {:08X}",
+                    name, state, state, use.setter, use.count, use.distinct_values,
+                    use.last_value);
+      }
+    }
+    s.new_states = false;
+  }
+  s.commands = {};
+  s.items = {};
+  s.sample = {};
+  s.frames = 0;
   s.last_log = now;
 }
 
