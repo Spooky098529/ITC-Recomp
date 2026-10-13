@@ -87,6 +87,7 @@
   X(vkCmdDrawIndexed)                  \
   X(vkCmdSetViewport)                  \
   X(vkCmdSetScissor)                   \
+  X(vkCmdSetDepthBias)                 \
   X(vkCmdBlitImage)                    \
   X(vkCmdCopyBufferToImage)            \
   X(vkCmdCopyImageToBuffer)            \

@@ -875,9 +875,12 @@ VkPipeline Passes::State::GetPipeline(const PipelineKey& key) {
   bool has_color = key.color_format != VK_FORMAT_UNDEFINED;
   blend.attachmentCount = has_color ? 1 : 0;
   blend.pAttachments = &attachment;
-  VkDynamicState dynamic_states[] = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
+  // Depth bias is set per draw.
+  raster.depthBiasEnable = key.depth;
+  VkDynamicState dynamic_states[] = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR,
+                                     VK_DYNAMIC_STATE_DEPTH_BIAS};
   VkPipelineDynamicStateCreateInfo dynamic{VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO};
-  dynamic.dynamicStateCount = 2;
+  dynamic.dynamicStateCount = 3;
   dynamic.pDynamicStates = dynamic_states;
   VkFormat color_format = VkFormat(key.color_format);
   VkPipelineRenderingCreateInfo rendering{VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO};
@@ -1630,6 +1633,24 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
                         {scissor_right - scissor.offset[0], scissor_bottom - scissor.offset[1]}};
   vk::vkCmdSetViewport(commands, 0, 1, &viewport);
   vk::vkCmdSetScissor(commands, 0, 1, &scissor_rect);
+  // Set for every pipeline (it's dynamic in all of them), used with depth.
+  float slope = 0.0f, constant = 0.0f;
+  if (depth) {
+    // As the plugin sets it for its host render targets: the guest's depth
+    // is float24 (24_8_FLOAT) or unorm24, the slope in 1/16 pixels.
+    draw_util::GetPreferredFacePolygonOffset(regs, primitive.polygonal, slope, constant);
+    constant *= depth->surface.format == uint32_t(xenos::DepthRenderTargetFormat::kD24S8)
+                    ? draw_util::kD3D10PolygonOffsetFactorUnorm24
+                    : draw_util::kD3D10PolygonOffsetFactorFloat24;
+    slope *= xenos::kPolygonOffsetScaleSubpixelUnit;
+    if (constant != 0.0f || slope != 0.0f) {
+      s.stats.depth_biased++;
+    }
+    if (key.z_enable && key.z_func == VK_COMPARE_OP_EQUAL) {
+      s.stats.depth_equal++;
+    }
+  }
+  vk::vkCmdSetDepthBias(commands, constant, 0.0f, slope);
   vk::vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
   VkDescriptorSet sets[4] = {s.shared_memory_set, s.rings[s.frame].constants_set,
                              vertex_textures, pixel_textures};

@@ -620,10 +620,12 @@ void Renderer::LogStats() {
               view.shaders_failed);
   REXLOG_INFO("native renderer: {} targets; per frame {:.1f} clears ({:.1f} with rects), {:.1f} "
               "resolves, {:.1f} skipped; {:.1f} draws with targets 1-3 bound, {:.1f} with "
-              "mismatched sample counts; {} resolves with unknown flags (e.g. {:08X})",
+              "mismatched sample counts, {:.1f} with a depth bias, {:.1f} with an equal depth "
+              "test; {} resolves with unknown flags (e.g. {:08X})",
               view.targets, double(view.clears) / frames, double(view.clear_rects) / frames,
               double(view.resolves) / frames, double(view.resolves_skipped) / frames,
               double(view.extra_targets) / frames, double(view.mismatched_samples) / frames,
+              double(view.depth_biased) / frames, double(view.depth_equal) / frames,
               view.resolve_unknown_flags, view.resolve_flags_sample);
   frames_presented_ = frames_skipped_ = commands_ = draws_ = 0;
   const TextureCache::Stats& t = view.textures;

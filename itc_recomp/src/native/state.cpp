@@ -15,6 +15,9 @@ struct ShadowBlock {
 constexpr ShadowBlock kRegisterBlocks[] = {
     {0x2000, 16, 10240}, {0x2100, 21, 10316}, {0x2180, 5, 10400},
     {0x2200, 12, 10420}, {0x2280, 21, 10468}, {0x2300, 38, 10552},
+    // PA_SU_POLY_OFFSET_FRONT/BACK_SCALE/OFFSET, written by render states 204
+    // and 208.
+    {0x2380, 4, 10704},
 };
 
 // Constants (see the device field table in docs/gpu-functions.md). Float

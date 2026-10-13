@@ -77,6 +77,8 @@ class Passes {
     // Draws with render targets 1-3 bound to another surface than 0 (only 0
     // is drawn), or colour and depth of different sample counts.
     uint64_t extra_targets = 0, mismatched_samples = 0;
+    // Draws with a depth bias, and with an "equal" depth test.
+    uint64_t depth_biased = 0, depth_equal = 0;
     uint64_t clears = 0, clear_rects = 0;
     // Resolves done; skipped (no source or destination, a level or slice
     // other than 0, a destination format we can't draw into); flags with
