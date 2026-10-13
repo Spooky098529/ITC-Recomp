@@ -88,6 +88,7 @@
   X(vkCmdSetViewport)                  \
   X(vkCmdSetScissor)                   \
   X(vkCmdSetDepthBias)                 \
+  X(vkCmdSetBlendConstants)            \
   X(vkCmdBlitImage)                    \
   X(vkCmdCopyBufferToImage)            \
   X(vkCmdCopyImageToBuffer)            \

@@ -332,6 +332,9 @@ struct Passes::State {
     Surface surface;
     uint64_t vertex, pixel;
     uint32_t type, count;
+    // RB_DEPTHCONTROL, RB_BLENDCONTROL0, RB_COLORCONTROL, RB_MODECONTROL,
+    // RB_COLOR_MASK, RB_BLEND_RED/GREEN/BLUE/ALPHA, RB_ALPHA_REF.
+    std::array<uint32_t, 10> render_state;
     struct Texture {
       bool pixel;
       ShaderTexture texture;
@@ -950,9 +953,9 @@ VkPipeline Passes::State::GetPipeline(const PipelineKey& key) {
   // Depth bias is set per draw.
   raster.depthBiasEnable = key.depth;
   VkDynamicState dynamic_states[] = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR,
-                                     VK_DYNAMIC_STATE_DEPTH_BIAS};
+                                     VK_DYNAMIC_STATE_DEPTH_BIAS, VK_DYNAMIC_STATE_BLEND_CONSTANTS};
   VkPipelineDynamicStateCreateInfo dynamic{VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO};
-  dynamic.dynamicStateCount = 3;
+  dynamic.dynamicStateCount = 4;
   dynamic.pDynamicStates = dynamic_states;
   VkFormat color_format = VkFormat(key.color_format);
   VkPipelineRenderingCreateInfo rendering{VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO};
@@ -1504,6 +1507,10 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
     r.pixel = pixel ? pixel->hash : 0;
     r.type = type;
     r.count = primitive_count;
+    r.render_state = {regs.values[0x2200], regs.values[0x2201], regs.values[0x2202],
+                      regs.values[0x2208], regs.values[0x2104], regs.values[0x2105],
+                      regs.values[0x2106], regs.values[0x2107], regs.values[0x2108],
+                      regs.values[0x210E]};
     for (const TranslatedShader* shader : {vertex, pixel}) {
       for (size_t i = 0; shader && i < shader->textures.size(); i++) {
         const ShaderTexture& texture = shader->textures[i];
@@ -1776,6 +1783,10 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
     }
   }
   vk::vkCmdSetDepthBias(commands, constant, 0.0f, slope);
+  // RB_BLEND_RED/GREEN/BLUE/ALPHA, for the constant blend factors.
+  float blend_constants[4];
+  std::memcpy(blend_constants, &regs.values[0x2105], sizeof(blend_constants));
+  vk::vkCmdSetBlendConstants(commands, blend_constants);
   vk::vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
   VkDescriptorSet sets[4] = {s.mirrors[s.frame].set, s.rings[s.frame].constants_set,
                              vertex_textures, pixel_textures};
@@ -2313,6 +2324,14 @@ void Passes::WriteDump(const std::string& directory) {
             "{:016X}; primitive {} x{}",
             n, r.main_view ? "main view" : "other", r.surface.pitch, r.surface.msaa,
             r.surface.format, r.has_color, r.has_depth, r.vertex, r.pixel, r.type, r.count);
+        const auto& rs = r.render_state;
+        float blend[4], alpha_ref;
+        std::memcpy(blend, &rs[5], 16);
+        std::memcpy(&alpha_ref, &rs[9], 4);
+        line += fmt::format(
+            "; depthcontrol {:08X} blendcontrol {:08X} colorcontrol {:08X} modecontrol {:08X} "
+            "color mask {:08X} blend constant {:.3g} {:.3g} {:.3g} {:.3g} alpha ref {:.3g}",
+            rs[0], rs[1], rs[2], rs[3], rs[4], blend[0], blend[1], blend[2], blend[3], alpha_ref);
         for (const State::RecordedDraw::Texture& t : r.textures) {
           const uint32_t* f = t.fetch;
           line += fmt::format(
