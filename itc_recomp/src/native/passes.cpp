@@ -378,6 +378,8 @@ struct Passes::State {
     // RB_DEPTHCONTROL, RB_BLENDCONTROL0, RB_COLORCONTROL, RB_MODECONTROL,
     // RB_COLOR_MASK, RB_BLEND_RED/GREEN/BLUE/ALPHA, RB_ALPHA_REF.
     std::array<uint32_t, 10> render_state;
+    // The vertex fetch constants the vertex shader reads: index, then words.
+    std::vector<std::array<uint32_t, 3>> vertex_fetches;
     struct Texture {
       bool pixel;
       ShaderTexture texture;
@@ -1562,6 +1564,12 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
     r.pixel = pixel ? pixel->hash : 0;
     r.type = type;
     r.count = primitive_count;
+    for (uint32_t k = 0; k < 96; k++) {
+      if (vertex->vertex_fetch_constants[k >> 5] & (1u << (k & 31))) {
+        r.vertex_fetches.push_back({k, regs.values[XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0 + 2 * k],
+                                    regs.values[XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0 + 2 * k + 1]});
+      }
+    }
     r.render_state = {regs.values[0x2200], regs.values[0x2201], regs.values[0x2202],
                       regs.values[0x2208], regs.values[0x2104], regs.values[0x2105],
                       regs.values[0x2106], regs.values[0x2107], regs.values[0x2108],
@@ -2615,6 +2623,10 @@ void Passes::WriteDump(const std::string& directory) {
             "; depthcontrol {:08X} blendcontrol {:08X} colorcontrol {:08X} modecontrol {:08X} "
             "color mask {:08X} blend constant {:.3g} {:.3g} {:.3g} {:.3g} alpha ref {:.3g}",
             rs[0], rs[1], rs[2], rs[3], rs[4], blend[0], blend[1], blend[2], blend[3], alpha_ref);
+        for (const auto& v : r.vertex_fetches) {
+          line += fmt::format("; vfetch {}: {:08X} {:08X} (address {:08X}, {} bytes)", v[0], v[1],
+                              v[2], v[1] & 0x1FFFFFFCu, ((v[2] >> 2) & 0xFFFFFFu) * 4);
+        }
         for (const State::RecordedDraw::Texture& t : r.textures) {
           const uint32_t* f = t.fetch;
           line += fmt::format(
