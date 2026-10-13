@@ -24,6 +24,7 @@
 #include <string>
 #include <mutex>
 #include <chrono>
+#include <ctime>
 #include <rex/logging.h>
 #include <rex/cvar.h>
 
@@ -46,6 +47,7 @@ class FrameTimes {
     kWaitForRender,   // main thread: the game's wait for the frame in flight
     kPacing,          // main thread: held back by the frame cap
     kDraw,            // render thread: drawing a frame, present included
+    kDrawCpu,         // render thread: CPU time used while drawing (kDraw less waits)
     kPresent,         // render thread: present (Renderer::Present)
     kParts
   };
@@ -70,7 +72,8 @@ class FrameTimes {
     interpolation::BlendState_TakeReplayTimes(blend_ns, upload_ns);
     static const char* kNames[kParts] = {"logic pass work", "render-only pass work",
                                          "wait for render thread", "frame cap",
-                                         "render thread draw", "present"};
+                                         "render thread draw", "render thread draw CPU",
+                                         "present"};
     std::lock_guard lock(mutex_);
     std::string line;
     int frames = std::max(stats_[kDraw].count, 1);
@@ -97,6 +100,13 @@ class FrameTimes {
   Stat stats_[kParts];
   Clock::time_point last_log_ = Clock::now();
 };
+
+// CPU time used by the calling thread; time it spends blocked doesn't count.
+FrameTimes::Clock::duration ThreadCpuTime() {
+  timespec ts;
+  clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts);
+  return std::chrono::seconds(ts.tv_sec) + std::chrono::nanoseconds(ts.tv_nsec);
+}
 
 FrameTimes& GetFrameTimes() {
   static FrameTimes times;
@@ -132,12 +142,15 @@ void Event_Signal(PPCContext& ctx, uint8_t* base, uint32_t event) {
 }
 
 void Renderer_DrawFrame(PPCContext& ctx, uint8_t* base, uint32_t renderer) {
+  bool timing = REXCVAR_GET(log_frame_times);
   auto start = FrameTimes::Clock::now();
+  auto cpu_start = timing ? ThreadCpuTime() : FrameTimes::Clock::duration{};
   interpolation::BlendState_OnReplayFrameStart();
   ctx.r3.u64 = renderer;
   sub_82091E58(ctx, base);
-  if (REXCVAR_GET(log_frame_times)) {
+  if (timing) {
     GetFrameTimes().Add(FrameTimes::kDraw, FrameTimes::Clock::now() - start);
+    GetFrameTimes().Add(FrameTimes::kDrawCpu, ThreadCpuTime() - cpu_start);
   }
 }
 
