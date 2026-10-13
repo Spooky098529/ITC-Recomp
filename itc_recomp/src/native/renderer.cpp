@@ -29,6 +29,9 @@ REXCVAR_DEFINE_INT32(native_renderer_show_resolve, -1, "ITC",
                      "Show the frame's nth resolve destination in the native renderer's window "
                      "instead of the main view (a debugging aid; -1 for the main view)");
 
+REXCVAR_DEFINE_BOOL(native_renderer_serialize, false, "ITC",
+                    "Wait for the GPU to finish each frame before recording the next (a "
+                    "debugging aid: rules out frames in flight sharing data)");
 REXCVAR_DEFINE_STRING(native_renderer_dump, "", "ITC",
                       "Directory to write one race frame's resolve destinations and main view "
                       "into, as PFM files, once the race has run 10 s (a debugging aid)");
@@ -435,6 +438,9 @@ VkCommandBuffer Renderer::BeginFrame() {
   Frame& frame = frames_[frame_index_];
   if (!recording_) {
     vk::vkWaitForFences(device_, 1, &frame.done, VK_TRUE, UINT64_MAX);
+    if (REXCVAR_GET(native_renderer_serialize)) {
+      vk::vkQueueWaitIdle(queue_);
+    }
     vk::vkResetCommandBuffer(frame.commands, 0);
     VkCommandBufferBeginInfo begin{VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
     begin.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
