@@ -307,12 +307,55 @@ through the menus and a race (`itc_352.log`):
 - ~390 objects of each kind share these microcodes (an object per
   material).
 
+## A race frame's passes
+
+Traced with `--log_replay_commands` (17 race frames, `itc_353.log`). Each
+row is a render target (or depth-only) pass and the resolves out of it,
+in order; sizes are the destination textures'. "Probably" marks a guess
+from the pass's shape, not checked by hiding it.
+
+| # | Target (EDRAM) | Draws | Resolved to | Probably |
+|---|---|---|---|---|
+| 1 | 8_8_8_8, pitch 560, + depth | 2-27 | 8_8_8_8 512x512 | A projected texture (headlights or the car's shadow) |
+| 2 | 8_8_8_8, pitch 560, no depth (twice) | 1 each | the same 512x512 texture | Blurring it |
+| 3 | 8_8_8_8, pitch 1040, + depth | 0 (clear only) | 8_8_8_8 1024x1024 | Cleared every frame, never drawn |
+| 4 | Depth only, pitch 1040 | 80-168 | 24_8_FLOAT 1024x1024 (flags `0x204`) | Shadow map |
+| 5 | Depth only, pitch 1040 | 4 | 24_8_FLOAT 1024x1024 (flags `0x4`) | A second depth map |
+| 6 | 8_8_8_8, pitch 520, 4x MSAA + depth | ~730 | 2_10_10_10_AS_16_16_16_16 512x128 (flags `0x300`) | Rear-view mirror: only in some frames (camera views) |
+| 7 | 2_10_10_10_FLOAT, pitch 280, 4x MSAA + depth | 420-520 | 2_10_10_10_AS_16_16_16_16 256x256 | Reflection map for the cars' paint |
+| 8 | 8_8_8_8, pitch 280, 4x MSAA | 1 | 8_8_8_8 256x256 | Processing 7 |
+| 9 | 16_16, pitch 560, + depth, cleared to `0x80808000` | 350-470 | 16_16 512x288 | Half-resolution velocity (motion blur) or depth |
+| 10 | **Main view**: 2_10_10_10_FLOAT_AS_16_16_16_16 (7e3 HDR), pitch 1040, **2x MSAA**, + depth at EDRAM tile 936 | 700-860, then ~350 more | 16_16_16_16 1024x576 (rect 0,0-1024,576; flags `0xF4000000`), twice | The scene, then a copy before more drawing (transparent or refracting objects reading it) |
+| 11 | 2_10_10_10_FLOAT, pitch 320 | 1 per step | 16_16_16_16 256x144: 0-3 draws, then 8 resolves (flags `0xF4000100`), then 3 | Bloom: downsample and blur chain (the "GrowBlend" passes; see patch 0001) |
+| 12 | Main view again | 1 | 16_16_16_16 1024x576, then 2_10_10_10_AS_16_16_16_16 **1280x720** (rect 1024x576) | Combining the post-processing, then the frame |
+| 13 | The saved targets (mask `0x8F`), viewport 1280x720 | 29-49 | | Upscale and HUD |
+
+About 24-26 resolves a frame, matching the counts. Findings:
+
+- **The 3D view renders at 1024x576 with 2x MSAA**, not 1280x720: its
+  surface pitch is 1040 (1024 rounded up to whole EDRAM tiles of 80
+  pixels), its resolves copy 1024x576, and its depth starts at tile 936 =
+  13 tiles across x 72 rows (576 lines x 2 samples / 16). In 7e3 colour
+  plus depth that's 9.4 MB of the 10 MB EDRAM. The viewport is still given
+  as 1280x720; how it maps to 1024x576 isn't known yet.
+- The menus resolve their own 1280x720 frame (54 format) the same way.
+- Every surface is EDRAM only, and every texture the passes produce comes
+  from a resolve: a native renderer can render each pass straight into a
+  Vulkan image of the resolve's size and format, and treat the resolve as
+  a copy or a no-op.
+
 ## Not yet known
 
 - Commands 32 and 33 (rare), and what the helper object draws. (20, 22
   and 28 are never replayed.)
 - Confirming the "likely" rows at runtime.
 - Render state 324.
+- How the 1280x720 viewport maps onto the 1024x576 main view, and where the
+  frame is upscaled (likely the draw after the last resolve).
+- The resolve flags: bits 8-9 (`0x300`, `0x100`, `0x204`), and the top
+  bits `0xF4000000` (likely an exponent bias for the HDR copies).
+- Which passes the guesses above really are (hiding each with
+  `--debug_zero_owners` or a resolve skip would settle it).
 - The vertex declaration's element list (past word 16); a native renderer
   may not need it, since the formats are patched into the vertex shader.
 - Texture, vertex buffer and surface objects: their layout in guest memory
