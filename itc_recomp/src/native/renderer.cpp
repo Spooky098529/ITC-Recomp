@@ -41,6 +41,10 @@ REXCVAR_DEFINE_BOOL(native_renderer_watch_draws, false, "ITC",
                     "camera still, only flickering draws should (a debugging aid)");
 REXCVAR_DEFINE_BOOL(native_renderer_hide_cubes, false, "ITC",
                     "Give cube maps the white placeholder (a debugging aid)");
+REXCVAR_DEFINE_STRING(native_renderer_cycle, "", "ITC",
+                      "Directory: when a file named 'now' appears in it, leave out the main "
+                      "view's draws of each pixel shader in turn for 3 s, saving a frame of each "
+                      "(a debugging aid that keeps frames recorded at their usual speed)");
 REXCVAR_DEFINE_STRING(native_renderer_dump, "", "ITC",
                       "Directory to dump frames into, as PFM files, with draws.txt describing "
                       "each draw: once 10 s into a race, and again whenever a file named 'now' "
@@ -173,6 +177,17 @@ class Renderer {
     uint64_t skip_pixel_shader;
   };
   bool dumping_ = false;
+  // The pixel shader cycle (native_renderer_cycle).
+  struct CycleStep {
+    std::string name;
+    uint64_t skip;
+  };
+  std::vector<CycleStep> cycle_steps_;
+  size_t cycle_step_ = 0;
+  Clock::time_point cycle_step_start_;
+  bool cycle_captured_ = false;
+  uint32_t cycles_ = 0;
+  std::string cycle_directory_;
   uint32_t dumps_ = 0;
   std::string dump_directory_;
   std::vector<DumpStep> dump_steps_;
@@ -474,6 +489,29 @@ VkCommandBuffer Renderer::BeginFrame() {
         REXLOG_INFO("native renderer: dumping into {}", dump_directory_);
       }
     }
+    // The cycle: started on request, a step every 3 s.
+    const std::string& cycle_root = REXCVAR_GET(native_renderer_cycle);
+    if (!cycle_root.empty()) {
+      std::error_code error;
+      if (cycle_steps_.empty() && std::filesystem::remove(cycle_root + "/now", error)) {
+        cycle_steps_.push_back({"none", 0});
+        for (uint64_t hash : passes_.main_view_pixel_shaders()) {
+          cycle_steps_.push_back({fmt::format("skip_ps_{:016X}", hash), hash});
+        }
+        cycle_steps_.push_back({"skip_no_pixel_shader", Passes::kSkipNoPixelShader});
+        cycle_steps_.push_back({"none_again", 0});
+        cycle_step_ = 0;
+        cycle_step_start_ = Clock::now();
+        cycle_captured_ = false;
+        cycle_directory_ = fmt::format("{}/{}", cycle_root, cycles_++);
+        std::filesystem::create_directories(cycle_directory_, error);
+        REXLOG_INFO("native renderer: cycling {} steps into {}", cycle_steps_.size(),
+                    cycle_directory_);
+      }
+      if (!cycle_steps_.empty()) {
+        passes_.set_skip_pixel_shader(cycle_steps_[cycle_step_].skip);
+      }
+    }
     // Its first frame describes each draw (cheaply: the effect being looked
     // for went away while frames were recorded slowly).
     passes_.set_record_draws(dumping_ && dump_step_ == 0);
@@ -504,11 +542,19 @@ void Renderer::EndFrame() {
   // A dump: the frame as is (with the resolves), then frames with something
   // left out (see dump_steps_).
   bool dump = dumping_;
+  // The cycle saves a frame 2 s into each step (the pause after it is over
+  // by the next).
+  bool cycle_capture = !cycle_steps_.empty() && !cycle_captured_ &&
+                       Clock::now() - cycle_step_start_ >= std::chrono::seconds(2);
   VkExtent2D source =
       dump ? passes_.EndFrame(commands, REXCVAR_GET(native_renderer_show_resolve), true,
                               dump_step_ ? dump_steps_[dump_step_ - 1].name : "shown",
                               dump_step_ == 0)
-           : passes_.EndFrame(commands, REXCVAR_GET(native_renderer_show_resolve), false);
+      : cycle_capture
+          ? passes_.EndFrame(commands, REXCVAR_GET(native_renderer_show_resolve), true,
+                             fmt::format("{:02}_{}", cycle_step_, cycle_steps_[cycle_step_].name),
+                             false)
+          : passes_.EndFrame(commands, REXCVAR_GET(native_renderer_show_resolve), false);
   Frame& frame = frames_[frame_index_];
 
   // Copy what's shown onto a swapchain image, if one can be had now.
@@ -591,6 +637,21 @@ void Renderer::EndFrame() {
     frames_presented_++;
   } else {
     frames_skipped_++;
+  }
+  if (cycle_capture) {
+    vk::vkQueueWaitIdle(queue_);
+    passes_.WriteDump(cycle_directory_);
+    cycle_captured_ = true;
+  }
+  if (!cycle_steps_.empty() && Clock::now() - cycle_step_start_ >= std::chrono::seconds(3)) {
+    cycle_step_++;
+    cycle_step_start_ = Clock::now();
+    cycle_captured_ = false;
+    if (cycle_step_ >= cycle_steps_.size()) {
+      cycle_steps_.clear();
+      passes_.set_skip_pixel_shader(0);
+      REXLOG_INFO("native renderer: cycle done");
+    }
   }
   if (dump) {
     vk::vkQueueWaitIdle(queue_);

@@ -1489,6 +1489,8 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
     if (pixel->hash == skip_pixel_shader) {
       return;  // debugging aid
     }
+  } else if (skip_pixel_shader == kSkipNoPixelShader) {
+    return;
   }
   if (record_draws) {
     // Raw, to keep recording at its usual speed (the effect being looked for
