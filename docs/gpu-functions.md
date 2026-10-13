@@ -344,14 +344,50 @@ About 24-26 resolves a frame, matching the counts. Findings:
   Vulkan image of the resolve's size and format, and treat the resolve as
   a copy or a no-op.
 
+## The end of a frame
+
+After the command list's last pass (row 13 above), the render thread's
+draw listeners finish the frame outside the command list:
+
+1. `sub_82091BC0` (the listener between `Scene::Draw` and present):
+   - `sub_8258D998(video output = renderer + 64)` resolves the EDRAM
+     frame into one of two front buffer textures,
+     video output + 4 × (68 + *(+268)), with Resolve (`sub_822AFA58`) on the
+     device at video output +140.
+   - `sub_8229F1B0(device)` writes one register (`0x5C8`), then waits until
+     the GPU has read everything written so far (`sub_8229E908` with the
+     current write position) and spins until device +10868 is 0: **a full
+     wait for the GPU every frame**, on top of the ring buffer waits.
+2. `Renderer::Present` (`sub_82091A60`):
+   - `sub_8258DC58`: `sub_822A8A60` (writes a few registers, `0x5C8` and
+     `0xD00`; not identified), the vblank wait (`sub_8258DAA8`, which we
+     reduced to its device call), then **Swap** `sub_822A08A0(device, front
+     buffer)`, which calls the kernel's `VdSwap` and
+     `VdGetSystemCommandBuffer`; then flips the front buffer index
+     (+268, two buffers).
+   - `sub_8258D9F8`: unbinds every texture (16), stream (4), the index
+     buffer and both shaders, dropping the frame's references.
+
+The upscale from the 1024x576 view: the command list's last resolve copies
+the view (rect 1024x576) into the top-left of a 1280x720 texture, and the
+saved 1280x720 targets are set again with a 1280x720 viewport; the draw
+after that most likely samples the view across the screen (the upscale),
+and the rest are the HUD. Not checked.
+
+For a native renderer, present is: take the final 1280x720 image (or the
+1024x576 view and HUD, at any resolution) and present it with a Vulkan
+swapchain; Swap and `VdSwap` aren't called, and the per-frame GPU wait
+goes.
+
 ## Not yet known
 
 - Commands 32 and 33 (rare), and what the helper object draws. (20, 22
   and 28 are never replayed.)
 - Confirming the "likely" rows at runtime.
 - Render state 324.
-- How the 1280x720 viewport maps onto the 1024x576 main view, and where the
-  frame is upscaled (likely the draw after the last resolve).
+- How the 1280x720 viewport maps onto the 1024x576 main view, and whether
+  the draw after the last resolve is the upscale.
+- `sub_822A8A60` at present.
 - The resolve flags: bits 8-9 (`0x300`, `0x100`, `0x204`), and the top
   bits `0xF4000000` (likely an exponent bias for the HDR copies).
 - Which passes the guesses above really are (hiding each with
@@ -362,8 +398,6 @@ About 24-26 resolves a frame, matching the counts. Findings:
   (formats, tiling, sizes), which the native renderer needs to read.
 - The shaders: how commands 8-10 and 12 relate to vertex and pixel shaders
   and vertex declarations.
-- How present and the frame's start and end reach the library
-  (`Renderer::Present`, `sub_82091BC0`).
 
 ## Tools
 
