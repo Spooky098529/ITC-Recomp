@@ -2001,7 +2001,20 @@ void Passes::State::WatchDraw(const TranslatedShader* vertex, const TranslatedSh
   now.vertex_floats.assign(vertex_floats, vertex_floats + 4 * vertex_registers.size());
   now.pixel_floats.assign(pixel_floats, pixel_floats + 4 * pixel_registers.size());
   now.bool_loop.assign(bool_loop, bool_loop + kBoolLoopConstantsRange / 4);
-  now.fetch.assign(fetch, fetch + kFetchConstantsRange / 4);
+  // Only the fetch constants the shaders read (the space is shared: texture
+  // slot n is vertex buffers 3n-3n+2); unused ones are zeroed.
+  now.fetch.assign(kFetchConstantsRange / 4, 0);
+  for (const TranslatedShader* shader : {vertex, pixel}) {
+    for (size_t i = 0; shader && i < shader->textures.size(); i++) {
+      uint32_t slot = shader->textures[i].fetch_constant;
+      std::copy(fetch + 6 * slot, fetch + 6 * slot + 6, now.fetch.begin() + 6 * slot);
+    }
+  }
+  for (uint32_t k = 0; k < 96; k++) {
+    if (vertex->vertex_fetch_constants[k >> 5] & (1u << (k & 31))) {
+      std::copy(fetch + 2 * k, fetch + 2 * k + 2, now.fetch.begin() + 2 * k);
+    }
+  }
   now.key.assign(reinterpret_cast<const char*>(&key), sizeof(key));
   watched_draws++;
   WatchedDraw& last = watched[{vertex->hash, ps, index_address, primitive_count, occurrence}];
@@ -2012,7 +2025,7 @@ void Passes::State::WatchDraw(const TranslatedShader* vertex, const TranslatedSh
                        &vertex_registers) +
         DescribeChange("pixel floats", last.pixel_floats, now.pixel_floats, &pixel_registers) +
         DescribeChange("bool/loop", last.bool_loop, now.bool_loop, nullptr) +
-        DescribeChange("fetch", last.fetch, now.fetch, nullptr) +
+        DescribeChange("fetch (used)", last.fetch, now.fetch, nullptr) +
         (last.key != now.key ? std::string("; pipeline") : std::string());
     if (!change.empty()) {
       watched_changes++;
