@@ -220,18 +220,9 @@ bool Renderer::CreateDevice() {
   vk::vkGetPhysicalDeviceProperties(physical_device_, &properties);
   REXLOG_INFO("native renderer: using {}", properties.deviceName);
 
-  // Importing guest memory (the translated shaders' storage buffer) needs
-  // VK_EXT_external_memory_host; dynamic rendering is core in Vulkan 1.3.
-  uint32_t extension_count = 0;
-  vk::vkEnumerateDeviceExtensionProperties(physical_device_, nullptr, &extension_count, nullptr);
-  std::vector<VkExtensionProperties> available(extension_count);
-  vk::vkEnumerateDeviceExtensionProperties(physical_device_, nullptr, &extension_count,
-                                           available.data());
-  bool host_memory = std::any_of(available.begin(), available.end(), [](const auto& e) {
-    return std::strcmp(e.extensionName, VK_EXT_EXTERNAL_MEMORY_HOST_EXTENSION_NAME) == 0;
-  });
-  if (!host_memory || properties.apiVersion < VK_API_VERSION_1_3) {
-    REXLOG_ERROR("native renderer: needs Vulkan 1.3 and VK_EXT_external_memory_host");
+  // Dynamic rendering is core in Vulkan 1.3.
+  if (properties.apiVersion < VK_API_VERSION_1_3) {
+    REXLOG_ERROR("native renderer: needs Vulkan 1.3");
     return false;
   }
 
@@ -261,13 +252,12 @@ bool Renderer::CreateDevice() {
   queue_info.queueFamilyIndex = queue_family_;
   queue_info.queueCount = 1;
   queue_info.pQueuePriorities = &priority;
-  const char* extensions[] = {VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-                              VK_EXT_EXTERNAL_MEMORY_HOST_EXTENSION_NAME};
+  const char* extensions[] = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
   VkDeviceCreateInfo info{VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO};
   info.pNext = &enabled;
   info.queueCreateInfoCount = 1;
   info.pQueueCreateInfos = &queue_info;
-  info.enabledExtensionCount = 2;
+  info.enabledExtensionCount = 1;
   info.ppEnabledExtensionNames = extensions;
   if (VkResult result = vk::vkCreateDevice(physical_device_, &info, nullptr, &device_);
       result != VK_SUCCESS) {
@@ -534,12 +524,13 @@ void Renderer::LogStats() {
   MainView::Stats view = main_view_.TakeStats();
   REXLOG_INFO("native renderer: {:.0f} frames/s presented, {} skipped; per frame {:.0f} "
               "commands, {:.0f} draws; main view: {:.0f} drawn, {:.0f} unsupported, {:.0f} "
-              "failed, {:.0f} in other passes a frame; {} pipelines; shaders translated {}, "
-              "failed {}",
+              "failed, {:.0f} in other passes a frame; {:.1f} MB copied a frame; {} pipelines; "
+              "shaders translated {}, failed {}",
               frames_presented_ / seconds, frames_skipped_, double(commands_) / frames,
               double(draws_) / frames, double(view.drawn) / frames,
               double(view.unsupported) / frames, double(view.failed) / frames,
-              double(view.other_passes) / frames, view.pipelines, view.shaders_translated,
+              double(view.other_passes) / frames, view.mirrored_bytes / 1048576.0 / frames,
+              view.pipelines, view.shaders_translated,
               view.shaders_failed);
   frames_presented_ = frames_skipped_ = commands_ = draws_ = 0;
   last_log_ = now;

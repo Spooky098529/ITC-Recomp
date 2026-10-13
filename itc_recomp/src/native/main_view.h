@@ -43,7 +43,7 @@ class MainView {
 
   // Logged by the renderer.
   struct Stats {
-    uint64_t drawn = 0, other_passes = 0, unsupported = 0, failed = 0;
+    uint64_t drawn = 0, other_passes = 0, unsupported = 0, failed = 0, mirrored_bytes = 0;
     uint32_t pipelines = 0, shaders_translated = 0, shaders_failed = 0;
   };
   Stats TakeStats();

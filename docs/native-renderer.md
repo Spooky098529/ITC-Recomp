@@ -29,6 +29,21 @@ known about it; this file is the plan and its progress).
   `resolve_resolution_scale_fill_half_pixel_offset`), which are then
   registered twice; setting them on the command line may reach only one
   copy.
+- **Guest memory is mirrored, not imported.** The translated shaders read
+  vertices (and the index buffer is read) from one storage buffer laid out
+  like guest physical memory. Importing guest memory itself
+  (`VK_EXT_external_memory_host`) was the plan, but RADV refuses it:
+  `vkAllocateMemory` returns `VK_ERROR_INVALID_EXTERNAL_HANDLE` both for
+  the whole 512 MB and for a single 64 KB range in use (shader microcode),
+  so it's the kind of memory (a shared mapping of the emulator's memory
+  file), not unallocated pages (2026-10-13). Instead, a 512 MB host-visible
+  buffer mirrors it at the same offsets, and before each draw its index
+  range and the vertex buffers its vertex shader fetches from (the shader's
+  vertex fetch constants: address in word 0, size in words in word 1 bits
+  2-25) are copied in, each range once a frame. This copies static meshes
+  every frame; tracking which ranges changed is for later. Frames in flight
+  share the mirror, so a range rewritten while the GPU still reads the
+  previous frame's copy could glitch.
 - **Development mode first**: with `--native_renderer`, the replay hooks
   draw natively *and* still call the graphics library, so the emulated GPU
   keeps rendering the game's own window and the two can be compared side by
@@ -56,9 +71,18 @@ known about it; this file is the plan and its progress).
   through the menus and attract mode: 76 shaders translated, none failed,
   every draw had its shaders. Their hashes match the plugin's dumps (whose
   `.bin` files hold the words byte-swapped to little-endian).
-- Next: import guest physical memory as the shaders' storage buffer, build
-  the constant buffers from the device's shadow, pipelines from its
-  registers, and draw the main view into a 1024x576 target.
+- `src/native/main_view.cpp` draws the main view (the render target with
+  pitch 1040, 2x MSAA, format 12), command 18 with one item only, into a
+  1280x720 RGBA16F target of ours, copied to the window at the end of the
+  frame. Per draw: the register file is rebuilt from the device's shadow
+  (`src/native/state.cpp`), the shaders translated, the constants written
+  to a per-frame ring (system constants as the plugin computes them for
+  what these draws use, the shader's float constants packed, bool/loop and
+  fetch constants as is), a pipeline made from the registers (topology,
+  primitive restart, cull, depth, blend of target 0, colour mask), and the
+  draw recorded with the base vertex as a system constant (the shader adds
+  it after byte-swapping the index). Textures are white 1x1 placeholders
+  of the declared type.
 
 ## Known issues
 

@@ -113,6 +113,9 @@ TranslatedShader* ShaderCache::Get(ShaderStage stage, const uint8_t* ucode,
   for (uint32_t i = 0; i < 4; i++) {
     result->float_constants[i] = constants.float_bitmap[i];
   }
+  for (uint32_t i = 0; i < 3; i++) {
+    result->vertex_fetch_constants[i] = constants.vertex_fetch_bitmap[i];
+  }
   // Declared as in the translator's texture fetch code: 1D and 2D as 2D
   // arrays, 3D (or stacked) as 3D, cube as cube.
   for (const auto& binding : shader->GetTextureBindingsAfterTranslation()) {

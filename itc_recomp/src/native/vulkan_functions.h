@@ -67,7 +67,6 @@
   X(vkAllocateMemory)                  \
   X(vkFreeMemory)                      \
   X(vkMapMemory)                       \
-  X(vkGetMemoryHostPointerPropertiesEXT) \
   X(vkCreateSampler)                   \
   X(vkCreateDescriptorSetLayout)       \
   X(vkCreatePipelineLayout)            \

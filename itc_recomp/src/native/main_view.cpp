@@ -9,6 +9,7 @@
 #include <cstring>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 #include <rex/graphics/pipeline/shader/spirv_translator.h>
 #include <rex/graphics/register_file.h>
@@ -155,10 +156,14 @@ struct MainView::State {
   VkPhysicalDeviceMemoryProperties memory_properties{};
   uint32_t frames_in_flight = 0;
 
-  // Guest physical memory, imported: the shaders' storage buffer (set 0)
-  // and the index buffer.
+  // A mirror of guest physical memory at the same offsets: the shaders'
+  // storage buffer (set 0) and the index buffer. The driver won't import
+  // guest memory itself (a shared memory-file mapping), so each draw's
+  // index and vertex ranges are copied in, once a frame.
   VkBuffer guest_memory = VK_NULL_HANDLE;
   VkDeviceMemory guest_memory_allocation = VK_NULL_HANDLE;
+  uint8_t* guest_memory_mapped = nullptr;
+  std::unordered_set<uint64_t> mirrored;  // address << 32 | size, this frame
 
   Image color, depth;
   bool rendering = false;
@@ -193,7 +198,8 @@ struct MainView::State {
   bool CreateImage(Image& out, VkImageType type, VkImageViewType view_type, VkFormat format,
                    VkExtent3D extent, uint32_t layers, VkImageUsageFlags usage,
                    VkImageAspectFlags aspect, VkImageCreateFlags flags = 0);
-  bool ImportGuestMemory(uint8_t* base);
+  bool CreateGuestMemoryMirror();
+  void Mirror(uint8_t* base, uint32_t address, uint32_t size);
   bool CreateRings();
   bool CreateDescriptors();
   bool CreateDummyTextures();
@@ -243,21 +249,9 @@ bool MainView::State::CreateImage(Image& out, VkImageType type, VkImageViewType 
   return vk::vkCreateImageView(device, &view, nullptr, &out.view) == VK_SUCCESS;
 }
 
-bool MainView::State::ImportGuestMemory(uint8_t* base) {
+bool MainView::State::CreateGuestMemoryMirror() {
   VkDevice device = context.device;
-  void* host = PhysicalHostAddress(base, 0);
-  VkMemoryHostPointerPropertiesEXT host_properties{
-      VK_STRUCTURE_TYPE_MEMORY_HOST_POINTER_PROPERTIES_EXT};
-  if (vk::vkGetMemoryHostPointerPropertiesEXT(
-          device, VK_EXTERNAL_MEMORY_HANDLE_TYPE_HOST_ALLOCATION_BIT_EXT, host,
-          &host_properties) != VK_SUCCESS) {
-    REXLOG_ERROR("native renderer: guest memory can't be imported");
-    return false;
-  }
-  VkExternalMemoryBufferCreateInfo external{VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_BUFFER_CREATE_INFO};
-  external.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_HOST_ALLOCATION_BIT_EXT;
   VkBufferCreateInfo info{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
-  info.pNext = &external;
   info.size = kPhysicalMemorySize;
   info.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
   info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
@@ -266,30 +260,40 @@ bool MainView::State::ImportGuestMemory(uint8_t* base) {
   }
   VkMemoryRequirements requirements;
   vk::vkGetBufferMemoryRequirements(device, guest_memory, &requirements);
-  VkImportMemoryHostPointerInfoEXT import{VK_STRUCTURE_TYPE_IMPORT_MEMORY_HOST_POINTER_INFO_EXT};
-  import.handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_HOST_ALLOCATION_BIT_EXT;
-  import.pHostPointer = host;
   VkMemoryAllocateInfo alloc{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
-  alloc.pNext = &import;
-  alloc.allocationSize = kPhysicalMemorySize;
+  alloc.allocationSize = requirements.size;
   alloc.memoryTypeIndex =
-      FindMemoryType(memory_properties, requirements.memoryTypeBits & host_properties.memoryTypeBits,
-                     0);
+      FindMemoryType(memory_properties, requirements.memoryTypeBits,
+                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
   if (alloc.memoryTypeIndex == UINT32_MAX) {
-    REXLOG_ERROR("native renderer: no memory type to import guest memory into");
+    REXLOG_ERROR("native renderer: no host-visible memory for the guest memory mirror");
     return false;
   }
   if (VkResult result = vk::vkAllocateMemory(device, &alloc, nullptr, &guest_memory_allocation);
       result != VK_SUCCESS) {
-    REXLOG_ERROR("native renderer: importing guest memory failed: {}", int(result));
+    REXLOG_ERROR("native renderer: allocating the guest memory mirror failed: {}", int(result));
     return false;
   }
-  if (vk::vkBindBufferMemory(device, guest_memory, guest_memory_allocation, 0) != VK_SUCCESS) {
+  if (vk::vkBindBufferMemory(device, guest_memory, guest_memory_allocation, 0) != VK_SUCCESS ||
+      vk::vkMapMemory(device, guest_memory_allocation, 0, VK_WHOLE_SIZE, 0,
+                      reinterpret_cast<void**>(&guest_memory_mapped)) != VK_SUCCESS) {
     return false;
   }
-  REXLOG_INFO("native renderer: imported guest physical memory ({} MB at {})",
-              kPhysicalMemorySize >> 20, fmt::ptr(host));
+  REXLOG_INFO("native renderer: guest memory mirror of {} MB", kPhysicalMemorySize >> 20);
   return true;
+}
+
+void MainView::State::Mirror(uint8_t* base, uint32_t address, uint32_t size) {
+  if (!size || address >= kPhysicalMemorySize) {
+    return;
+  }
+  size = std::min(size, kPhysicalMemorySize - address);
+  uint64_t key = (uint64_t(address) << 32) | size;
+  if (!mirrored.insert(key).second) {
+    return;  // already copied this frame
+  }
+  std::memcpy(guest_memory_mapped + address, PhysicalHostAddress(base, address), size);
+  stats.mirrored_bytes += size;
 }
 
 bool MainView::State::CreateRings() {
@@ -721,7 +725,7 @@ bool MainView::Init(const DeviceContext& context, uint8_t* base, uint32_t frames
   s.context = context;
   s.frames_in_flight = frames_in_flight;
   vk::vkGetPhysicalDeviceMemoryProperties(context.physical_device, &s.memory_properties);
-  if (!s.ImportGuestMemory(base)) {
+  if (!s.CreateGuestMemoryMirror()) {
     return false;
   }
   if (!s.CreateImage(s.color, VK_IMAGE_TYPE_2D, VK_IMAGE_VIEW_TYPE_2D, kColorFormat,
@@ -753,6 +757,7 @@ void MainView::BeginFrame(uint32_t frame_index) {
   state_->frame = frame_index;
   state_->ring_offset = 0;
   state_->rendering = false;
+  state_->mirrored.clear();
 }
 
 void MainView::AfterDraw(VkCommandBuffer commands, uint8_t* base, uint32_t id, uint32_t payload,
@@ -966,6 +971,19 @@ void MainView::AfterDraw(VkCommandBuffer commands, uint8_t* base, uint32_t id, u
   if (!pipeline) {
     s.stats.failed++;
     return;
+  }
+
+  // The draw's indices and vertex buffers, into the mirror. A vertex fetch
+  // constant is two words: the address (word 0, low 2 bits the type) and
+  // the size in words (word 1, bits 2-25).
+  s.Mirror(base, index_address, index_count * (index_32bit ? 4 : 2));
+  for (uint32_t k = 0; k < 96; k++) {
+    if (!(vertex->vertex_fetch_constants[k >> 5] & (1u << (k & 31)))) {
+      continue;
+    }
+    uint32_t word0 = regs.values[XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0 + 2 * k];
+    uint32_t word1 = regs.values[XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0 + 2 * k + 1];
+    s.Mirror(base, word0 & 0x1FFFFFFCu, ((word1 >> 2) & 0xFFFFFFu) * 4);
   }
 
   // Draw.

@@ -30,6 +30,9 @@ struct TranslatedShader {
   // The float constants the shader reads, one bit per register (c0-c255).
   // The translated shader takes only these, packed in order.
   std::array<uint64_t, 4> float_constants{};
+  // The vertex fetch constants it reads (0-95), one bit each: the vertex
+  // buffers it fetches from.
+  std::array<uint32_t, 3> vertex_fetch_constants{};
   // Its texture descriptors (set 2 or 3): images, then samplers.
   std::vector<ShaderTexture> textures;
   uint32_t sampler_count = 0;
