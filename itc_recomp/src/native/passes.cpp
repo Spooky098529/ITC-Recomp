@@ -317,7 +317,8 @@ struct Passes::State {
   std::vector<Dumped> dumped;
   VkBuffer dump_buffer = VK_NULL_HANDLE;
   VkDeviceMemory dump_memory = VK_NULL_HANDLE;
-  void RecordDump(VkCommandBuffer commands, VkExtent2D shown_extent);
+  void RecordDump(VkCommandBuffer commands, VkExtent2D shown_extent, const std::string& prefix,
+                  bool with_resolves);
   bool logged_extra_targets = false;
 
   // Resolves: drawn with our own shaders (src/native/glsl), sampling the
@@ -1724,7 +1725,12 @@ void Passes::AfterResolve(VkCommandBuffer commands, uint8_t* base, uint32_t payl
   }
 }
 
-VkExtent2D Passes::EndFrame(VkCommandBuffer commands, int32_t show_resolve, bool dump) {
+void Passes::set_debug_hide(int hide) {
+  state_->textures.set_debug_hide(hide);
+}
+
+VkExtent2D Passes::EndFrame(VkCommandBuffer commands, int32_t show_resolve, bool dump,
+                            const std::string& dump_prefix, bool dump_resolves) {
   State& s = *state_;
   s.EndRendering(commands);
   s.last_frame_resolves = s.frame_resolves.size();
@@ -1781,7 +1787,7 @@ VkExtent2D Passes::EndFrame(VkCommandBuffer commands, int32_t show_resolve, bool
   Transition(commands, shown, VK_IMAGE_ASPECT_COLOR_BIT, s.shown_layout,
              VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
   if (dump) {
-    s.RecordDump(commands, extent);
+    s.RecordDump(commands, extent, dump_prefix, dump_resolves);
   }
   return extent;
 }
@@ -1865,15 +1871,16 @@ void ToRgb(VkFormat format, const uint8_t* p, float out[3]) {
 
 }  // namespace
 
-void Passes::State::RecordDump(VkCommandBuffer commands, VkExtent2D shown_extent) {
+void Passes::State::RecordDump(VkCommandBuffer commands, VkExtent2D shown_extent,
+                               const std::string& prefix, bool with_resolves) {
   dumped.clear();
   VkDeviceSize size = 0;
   auto add = [&](std::string name, VkFormat format, VkExtent2D extent) {
     dumped.push_back({std::move(name), format, extent, size});
     size += (VkDeviceSize(extent.width) * extent.height * BytesPerPixel(format) + 15) & ~15ull;
   };
-  add("shown", kShownFormat, shown_extent);
-  for (size_t i = 0; i < frame_resolves.size(); i++) {
+  add(prefix, kShownFormat, shown_extent);
+  for (size_t i = 0; with_resolves && i < frame_resolves.size(); i++) {
     const Resolved& r = frame_resolves[i];
     add(fmt::format("resolve_{:02}_{:08X}_format{}", i, r.address, r.format), r.host_format,
         r.extent);

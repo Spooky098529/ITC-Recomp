@@ -58,6 +58,10 @@ class TextureCache {
   };
   bool GetResolveDestination(const uint32_t fetch[6], ResolveDestination& out);
 
+  // A debugging aid: 1 makes GetView give nothing (so placeholders) for
+  // textures from guest memory, 2 for resolve destinations.
+  void set_debug_hide(int hide) { debug_hide_ = hide; }
+
   // This frame's uploads, ended, to be submitted before its drawing; null if
   // none.
   VkCommandBuffer EndUploads();
@@ -79,6 +83,7 @@ class TextureCache {
  private:
   struct State;
   std::unique_ptr<State> state_;
+  int debug_hide_ = 0;
 };
 
 }  // namespace native

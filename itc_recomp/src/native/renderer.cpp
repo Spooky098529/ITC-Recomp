@@ -152,7 +152,7 @@ class Renderer {
   DeviceContext context_{};
   Passes passes_;
   bool recording_ = false;  // this frame's command buffer is open
-  bool dumped_ = false;
+  uint32_t dump_step_ = 0;
   uint32_t race_frames_ = 0;
 
   // This frame's commands (milestone 1: counted only).
@@ -454,14 +454,20 @@ void Renderer::EndFrame() {
   frame_commands_ = frame_draws_ = 0;
 
   VkCommandBuffer commands = BeginFrame();
-  // A dump, once: from the 600th frame with a race's resolves on.
+  // A dump, once: from the 600th frame with a race's resolves on, three
+  // frames: as is (with the resolves), then with textures from guest memory
+  // hidden, then with resolve destinations hidden (placeholders instead).
+  static const char* const kDumpNames[] = {"shown", "shown_without_memory_textures",
+                                           "shown_without_resolved_textures"};
   bool dump = false;
-  if (!dumped_ && !REXCVAR_GET(native_renderer_dump).empty() &&
+  if (dump_step_ < 3 && !REXCVAR_GET(native_renderer_dump).empty() &&
       passes_.frame_resolve_count() >= 20 && ++race_frames_ >= 600) {
-    dump = dumped_ = true;
+    dump = true;
   }
   VkExtent2D source =
-      passes_.EndFrame(commands, REXCVAR_GET(native_renderer_show_resolve), dump);
+      dump ? passes_.EndFrame(commands, REXCVAR_GET(native_renderer_show_resolve), true,
+                              kDumpNames[dump_step_], dump_step_ == 0)
+           : passes_.EndFrame(commands, REXCVAR_GET(native_renderer_show_resolve), false);
   Frame& frame = frames_[frame_index_];
 
   // Copy what's shown onto a swapchain image, if one can be had now.
@@ -548,6 +554,8 @@ void Renderer::EndFrame() {
   if (dump) {
     vk::vkQueueWaitIdle(queue_);
     passes_.WriteDump(REXCVAR_GET(native_renderer_dump));
+    dump_step_++;
+    passes_.set_debug_hide(dump_step_ < 3 ? dump_step_ : 0);
   }
   frame_index_ = (frame_index_ + 1) % kFramesInFlight;
   LogStats();

@@ -634,6 +634,9 @@ VkImageView TextureCache::GetView(uint8_t* base, const uint32_t fetch_words[6],
       r != s.resolved.end() && r->second.loaded) {
     State::Texture& t = r->second;
     s.stats.resolved_hits++;
+    if (debug_hide_ == 2) {
+      return VK_NULL_HANDLE;
+    }
     if (t.guest_format != uint32_t(fetch.format) || t.layout.width != fetch.size_2d.width + 1u ||
         t.layout.height != fetch.size_2d.height + 1u) {
       s.stats.resolved_mismatched++;
@@ -645,6 +648,9 @@ VkImageView TextureCache::GetView(uint8_t* base, const uint32_t fetch_words[6],
     return s.GetSwizzledView(t, fetch.swizzle, VK_IMAGE_VIEW_TYPE_2D_ARRAY);
   }
 
+  if (debug_hide_ == 1) {
+    return VK_NULL_HANDLE;
+  }
   TextureKey key = KeyOf(fetch_words);
   auto it = s.textures.find(key);
   if (it == s.textures.end()) {

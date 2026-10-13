@@ -39,7 +39,12 @@ class Passes {
   // aid). Returns the size of what was put there.
   // dump: also copy the frame's resolve destinations and what's shown
   // into memory, for WriteDump once the frame is done (a debugging aid).
-  VkExtent2D EndFrame(VkCommandBuffer commands, int32_t show_resolve, bool dump);
+  // dump_prefix: the shown image's file name; dump_resolves: the resolves
+  // too.
+  VkExtent2D EndFrame(VkCommandBuffer commands, int32_t show_resolve, bool dump,
+                      const std::string& dump_prefix = "shown", bool dump_resolves = true);
+  // For the next frames: the texture cache's debug_hide (see TextureCache).
+  void set_debug_hide(int hide);
   // After a frame that dumped has finished on the GPU: writes each image as
   // a PFM file into the directory (tools/pfm_to_png.py makes PNGs of them).
   void WriteDump(const std::string& directory);
