@@ -45,6 +45,9 @@ REXCVAR_DEFINE_STRING(native_renderer_cycle, "", "ITC",
                       "Directory: when a file named 'now' appears in it, leave out the main "
                       "view's draws of each pixel shader in turn for 3 s, saving a frame of each "
                       "(a debugging aid that keeps frames recorded at their usual speed)");
+REXCVAR_DEFINE_BOOL(native_renderer_check_late_writes, false, "ITC",
+                    "Log vertex and index ranges written after we copied them, by the end of "
+                    "the frame (a debugging aid)");
 REXCVAR_DEFINE_STRING(native_renderer_dump, "", "ITC",
                       "Directory to dump frames into, as PFM files, with draws.txt describing "
                       "each draw: once 10 s into a race, and again whenever a file named 'now' "
@@ -516,6 +519,7 @@ VkCommandBuffer Renderer::BeginFrame() {
     // for went away while frames were recorded slowly).
     passes_.set_record_draws(dumping_ && dump_step_ == 0);
     passes_.set_check_mirror_frames(REXCVAR_GET(native_renderer_check_mirror));
+    passes_.set_check_late_writes(REXCVAR_GET(native_renderer_check_late_writes));
     passes_.set_watch_draws(REXCVAR_GET(native_renderer_watch_draws));
     passes_.set_hide_cubes(REXCVAR_GET(native_renderer_hide_cubes));
     recording_ = true;
@@ -737,6 +741,9 @@ void Renderer::LogStats() {
     for (const std::string& line : lines) {
       REXLOG_INFO("native renderer: changed: {}", line);
     }
+  }
+  if (REXCVAR_GET(native_renderer_check_late_writes)) {
+    REXLOG_INFO("native renderer: {}", passes_.TakeLateWrites());
   }
   if (REXCVAR_GET(native_renderer_check_mirror)) {
     REXLOG_INFO("native renderer: between frames, {}", passes_.TakeMirrorChanges());

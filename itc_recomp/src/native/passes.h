@@ -61,6 +61,10 @@ class Passes {
   // how often each changes between frames; TakeMirrorChanges describes the
   // ranges that changed since it was last called (the most changed first).
   void set_check_mirror_frames(bool check);
+  // A debugging aid: hash each copied vertex and index range again at the
+  // end of the frame; TakeLateWrites describes those that changed.
+  void set_check_late_writes(bool check);
+  std::string TakeLateWrites();
   std::string TakeMirrorChanges();
   // A debugging aid: compare each main view draw's inputs with the same
   // draw's in the previous frame; TakeWatchLines gives how many changed (of

@@ -317,6 +317,22 @@ struct Passes::State {
   // With check_mirror_frames: each range's hash in the frame it was last
   // copied, and how often it changed since the last log.
   bool check_mirror_frames = false;
+  // With check_late_writes: the ranges copied this frame and their hashes
+  // then, to find ranges written after we copied them (the emulated GPU
+  // reads them much later).
+  bool check_late_writes = false;
+  struct CopiedRange {
+    uint32_t address, size;
+    uint64_t hash;
+    bool index;
+    uint64_t vertex_shader;
+  };
+  std::vector<CopiedRange> copied_ranges;
+  uint64_t current_vertex_shader = 0;
+  uint8_t* last_base = nullptr;
+  uint64_t late_written = 0, late_checked = 0;
+  std::map<uint64_t, uint64_t> late_by_shader;  // vertex shader: count
+  std::string late_sample;
   struct RangeHistory {
     uint64_t hash;
     uint32_t changes;
@@ -561,6 +577,11 @@ void Passes::State::Mirror(uint8_t* base, uint32_t address, uint32_t size, bool 
   }
   if (!mirrored.insert(key).second) {
     return;  // already copied this frame
+  }
+  if (check_late_writes) {
+    // Hashed again at the end of the frame.
+    copied_ranges.push_back({address, size, XXH3_64bits(PhysicalHostAddress(base, address), size),
+                             index, current_vertex_shader});
   }
   if (check_mirror_frames) {
     uint64_t hash = XXH3_64bits(PhysicalHostAddress(base, address), size);
@@ -1524,6 +1545,9 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
     }
   }
 
+  current_vertex_shader = vertex->hash;
+  last_base = base;
+
   // Index buffer: +0 bit 31 = 32-bit, bits 29-30 = endianness; +24 address.
   uint32_t index_buffer = guest::LoadU32(base, device + kDeviceIndexBuffer);
   if (!index_buffer) {
@@ -2073,6 +2097,26 @@ std::vector<std::string> Passes::TakeWatchLines(uint64_t& changes, uint64_t& dra
   return std::exchange(s.watch_lines, {});
 }
 
+void Passes::set_check_late_writes(bool check) {
+  state_->check_late_writes = check;
+}
+
+std::string Passes::TakeLateWrites() {
+  State& s = *state_;
+  std::string text = fmt::format("{} of {} copied ranges changed by the end of the frame",
+                                 s.late_written, s.late_checked);
+  if (!s.late_sample.empty()) {
+    text += ", e.g. " + s.late_sample + "; by vertex shader:";
+    for (const auto& [shader, count] : s.late_by_shader) {
+      text += fmt::format(" {:016X} x{}", shader, count);
+    }
+  }
+  s.late_written = s.late_checked = 0;
+  s.late_by_shader.clear();
+  s.late_sample.clear();
+  return text;
+}
+
 void Passes::set_check_mirror(bool check) {
   state_->check_mirror = check;
 }
@@ -2096,6 +2140,22 @@ VkExtent2D Passes::EndFrame(VkCommandBuffer commands, int32_t show_resolve, bool
   State& s = *state_;
   s.EndRendering(commands);
   s.last_frame_resolves = s.frame_resolves.size();
+  if (s.check_late_writes && s.last_base) {
+    uint8_t* base = s.last_base;
+    for (const State::CopiedRange& r : s.copied_ranges) {
+      s.late_checked++;
+      if (XXH3_64bits(PhysicalHostAddress(base, r.address), r.size) != r.hash) {
+        s.late_written++;
+        s.late_by_shader[r.vertex_shader]++;
+        if (s.late_sample.empty()) {
+          s.late_sample = fmt::format("{} {:08X} ({} bytes) of vs {:016X}",
+                                      r.index ? "index" : "vertex", r.address, r.size,
+                                      r.vertex_shader);
+        }
+      }
+    }
+  }
+  s.copied_ranges.clear();
   s.last_pixel_shaders = s.frame_pixel_shaders;
   // The frame's resolves, now and then, to pick one to show.
   if (s.frames++ % 1200 == 600 && !s.frame_resolves.empty()) {
