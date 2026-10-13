@@ -33,6 +33,9 @@ REXCVAR_DEFINE_INT32(native_renderer_show_resolve, -1, "ITC",
 REXCVAR_DEFINE_BOOL(native_renderer_serialize, false, "ITC",
                     "Wait for the GPU to finish each frame before recording the next (a "
                     "debugging aid: rules out frames in flight sharing data)");
+REXCVAR_DEFINE_BOOL(native_renderer_check_mirror, false, "ITC",
+                    "Log the vertex and index ranges whose contents change between frames "
+                    "(a debugging aid)");
 REXCVAR_DEFINE_STRING(native_renderer_dump, "", "ITC",
                       "Directory to dump frames into, as PFM files, with draws.txt describing "
                       "each draw: once 10 s into a race, and again whenever a file named 'now' "
@@ -469,6 +472,7 @@ VkCommandBuffer Renderer::BeginFrame() {
     // Its first frame describes each draw; all check the mirror.
     passes_.set_record_draws(dumping_ && dump_step_ == 0);
     passes_.set_check_mirror(dumping_);
+    passes_.set_check_mirror_frames(REXCVAR_GET(native_renderer_check_mirror));
     recording_ = true;
   }
   return frame.commands;
@@ -656,6 +660,9 @@ void Renderer::LogStats() {
                 "shader declares view type {}",
                 (t.mismatched_sample >> 8) & 0xFF, t.mismatched_sample & 0xFF, t.mismatched_width,
                 t.mismatched_height, t.mismatched_sample >> 16);
+  }
+  if (REXCVAR_GET(native_renderer_check_mirror)) {
+    REXLOG_INFO("native renderer: between frames, {}", passes_.TakeMirrorChanges());
   }
   if (view.invisible) {
     const auto& v = view.invisible_sample;

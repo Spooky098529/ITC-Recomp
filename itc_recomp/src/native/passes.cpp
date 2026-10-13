@@ -295,6 +295,16 @@ struct Passes::State {
   // With check_mirror: each range's hash when copied, to find ranges whose
   // contents change within a frame (draws after the change get the first).
   bool check_mirror = false;
+  std::unordered_map<uint64_t, uint64_t> mirrored_hashes;
+  // With check_mirror_frames: each range's hash in the frame it was last
+  // copied, and how often it changed since the last log.
+  bool check_mirror_frames = false;
+  struct RangeHistory {
+    uint64_t hash;
+    uint32_t changes;
+    bool index;
+  };
+  std::unordered_map<uint64_t, RangeHistory> range_history;
   // Debugging aids: draws of this pixel shader (hash) are skipped; with
   // record_draws, each draw is described in a line (written with a dump).
   uint64_t skip_pixel_shader = 0;
@@ -302,7 +312,6 @@ struct Passes::State {
   std::vector<std::string> recorded_draws;
   // The pixel shaders drawn into the main view this frame and the last.
   std::vector<uint64_t> frame_pixel_shaders, last_pixel_shaders;
-  std::unordered_map<uint64_t, uint64_t> mirrored_hashes;
 
   // Targets by surface (colour or depth, EDRAM base, pitch, samples, the
   // format they're drawn in), and the ones being drawn into now.
@@ -402,7 +411,7 @@ struct Passes::State {
   void EndRendering(VkCommandBuffer commands);
   bool CreateGuestMemoryMirror();
   bool CreateGuestMemoryMirror(GuestMirror& mirror);
-  void Mirror(uint8_t* base, uint32_t address, uint32_t size);
+  void Mirror(uint8_t* base, uint32_t address, uint32_t size, bool index);
   bool CreateRings();
   bool CreateDescriptors();
   bool CreateDummyTextures();
@@ -498,7 +507,7 @@ bool Passes::State::CreateGuestMemoryMirror(GuestMirror& mirror) {
                          reinterpret_cast<void**>(&mirror.mapped)) == VK_SUCCESS;
 }
 
-void Passes::State::Mirror(uint8_t* base, uint32_t address, uint32_t size) {
+void Passes::State::Mirror(uint8_t* base, uint32_t address, uint32_t size, bool index) {
   if (!size || address >= kPhysicalMemorySize) {
     return;
   }
@@ -519,6 +528,14 @@ void Passes::State::Mirror(uint8_t* base, uint32_t address, uint32_t size) {
   }
   if (!mirrored.insert(key).second) {
     return;  // already copied this frame
+  }
+  if (check_mirror_frames) {
+    uint64_t hash = XXH3_64bits(PhysicalHostAddress(base, address), size);
+    auto [it, added] = range_history.try_emplace(key, RangeHistory{hash, 0, index});
+    if (!added && it->second.hash != hash) {
+      it->second.hash = hash;
+      it->second.changes++;
+    }
   }
   std::memcpy(mirrors[frame].mapped + address, PhysicalHostAddress(base, address), size);
   stats.mirrored_bytes += size;
@@ -1670,14 +1687,14 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
   // The draw's indices and vertex buffers, into the mirror. A vertex fetch
   // constant is two words: the address (word 0, low 2 bits the type) and
   // the size in words (word 1, bits 2-25).
-  s.Mirror(base, index_address, index_count * (index_32bit ? 4 : 2));
+  s.Mirror(base, index_address, index_count * (index_32bit ? 4 : 2), true);
   for (uint32_t k = 0; k < 96; k++) {
     if (!(vertex->vertex_fetch_constants[k >> 5] & (1u << (k & 31)))) {
       continue;
     }
     uint32_t word0 = regs.values[XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0 + 2 * k];
     uint32_t word1 = regs.values[XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0 + 2 * k + 1];
-    s.Mirror(base, word0 & 0x1FFFFFFCu, ((word1 >> 2) & 0xFFFFFFu) * 4);
+    s.Mirror(base, word0 & 0x1FFFFFFCu, ((word1 >> 2) & 0xFFFFFFu) * 4, false);
   }
 
   // Draw.
@@ -1846,6 +1863,34 @@ void Passes::set_record_draws(bool record) {
 
 std::vector<uint64_t> Passes::main_view_pixel_shaders() const {
   return state_->last_pixel_shaders;
+}
+
+void Passes::set_check_mirror_frames(bool check) {
+  state_->check_mirror_frames = check;
+}
+
+std::string Passes::TakeMirrorChanges() {
+  State& s = *state_;
+  // The ranges that changed, the most changed first.
+  std::vector<std::pair<uint64_t, State::RangeHistory>> changed;
+  uint64_t bytes = 0;
+  for (auto& [key, history] : s.range_history) {
+    if (history.changes) {
+      changed.emplace_back(key, history);
+      bytes += key & 0xFFFFFFFF;
+      history.changes = 0;
+    }
+  }
+  std::sort(changed.begin(), changed.end(),
+            [](const auto& a, const auto& b) { return a.second.changes > b.second.changes; });
+  std::string text = fmt::format("{} of {} ranges changed ({:.1f} MB)", changed.size(),
+                                 s.range_history.size(), bytes / 1048576.0);
+  for (size_t i = 0; i < changed.size() && i < 12; i++) {
+    text += fmt::format("; {} {:08X} {} bytes x{}", changed[i].second.index ? "index" : "vertex",
+                        uint32_t(changed[i].first >> 32), uint32_t(changed[i].first),
+                        changed[i].second.changes);
+  }
+  return text;
 }
 
 void Passes::set_check_mirror(bool check) {

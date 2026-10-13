@@ -55,6 +55,11 @@ class Passes {
   void set_skip_pixel_shader(uint64_t hash);
   void set_record_draws(bool record);
   std::vector<uint64_t> main_view_pixel_shaders() const;
+  // A debugging aid: hash each vertex and index range every frame, keeping
+  // how often each changes between frames; TakeMirrorChanges describes the
+  // ranges that changed since it was last called (the most changed first).
+  void set_check_mirror_frames(bool check);
+  std::string TakeMirrorChanges();
   // The distinct addresses of the last frame's resolve destinations.
   std::vector<uint32_t> resolve_addresses() const;
   // After a frame that dumped has finished on the GPU: writes each image as
