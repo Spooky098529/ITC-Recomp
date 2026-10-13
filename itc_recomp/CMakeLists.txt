@@ -49,6 +49,7 @@ set(ITC_SOURCES
     src/frame_pacing/renderer_hooks.cpp
     src/debug/state_capture.cpp
     src/debug/frame_state_diff.cpp
+    src/debug/image_dump.cpp
     src/interpolation/transform.cpp
     src/frame_pacing/game_messages.cpp
     src/frame_pacing/per_frame_logic.cpp

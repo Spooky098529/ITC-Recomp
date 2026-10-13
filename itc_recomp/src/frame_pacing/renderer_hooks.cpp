@@ -15,6 +15,7 @@
 // originally did), without the game's 2-vblank wait.
 
 #include "debug/frame_state_diff.h"
+#include "debug/image_dump.h"
 #include "debug/state_capture.h"
 #include "frame_pacer.h"
 #include "game_messages.h"
@@ -178,6 +179,7 @@ void Renderer_WaitForFrame(PPCContext& ctx, uint8_t* base, uint32_t renderer) {
     times.Add(times.pass_render_only ? FrameTimes::kRenderOnlyWork : FrameTimes::kLogicWork,
               wait_start - times.pass_start);
   }
+  debug::ImageDump_OnPass(base);
   ctx.r3.u64 = renderer;
   __imp__sub_820920D8(ctx, base);
   auto pacing_start = FrameTimes::Clock::now();
