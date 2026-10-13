@@ -50,6 +50,7 @@ set(ITC_SOURCES
     src/debug/state_capture.cpp
     src/debug/frame_state_diff.cpp
     src/debug/image_dump.cpp
+    src/debug/replay_stats.cpp
     src/interpolation/transform.cpp
     src/frame_pacing/game_messages.cpp
     src/frame_pacing/per_frame_logic.cpp

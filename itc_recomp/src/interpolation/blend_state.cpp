@@ -23,6 +23,7 @@
 // (amount 0) and the frames after it move towards the current one.
 
 #include "blend_state.h"
+#include "debug/replay_stats.h"
 
 #include "frame_pacing/frame_pacer.h"
 #include "frame_pacing/game_messages.h"
@@ -2839,6 +2840,7 @@ void interpolation::BlendState_TakeReplayTimes(int64_t& blend_ns, int64_t& uploa
 extern "C" REX_FUNC(sub_8258FD48) {
   REX_FUNC_PROLOGUE();
   uint32_t payload = ctx.r3.u32, packed = ctx.r5.u32;
+  debug::ReplayStats_OnCommand(base, 7, payload, ctx.r4.u32, packed);
   if (!REXCVAR_GET(log_frame_times)) {
     interpolation::BlendState_ReplayConstants(base, payload, packed,
                                               [&] { __imp__sub_8258FD48(ctx, base); });

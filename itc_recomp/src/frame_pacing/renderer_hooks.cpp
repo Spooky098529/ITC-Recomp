@@ -16,6 +16,7 @@
 
 #include "debug/frame_state_diff.h"
 #include "debug/image_dump.h"
+#include "debug/replay_stats.h"
 #include "debug/state_capture.h"
 #include "frame_pacer.h"
 #include "game_messages.h"
@@ -149,6 +150,7 @@ void Renderer_DrawFrame(PPCContext& ctx, uint8_t* base, uint32_t renderer) {
   interpolation::BlendState_OnReplayFrameStart();
   ctx.r3.u64 = renderer;
   sub_82091E58(ctx, base);
+  debug::ReplayStats_OnFrame();
   if (timing) {
     GetFrameTimes().Add(FrameTimes::kDraw, FrameTimes::Clock::now() - start);
     GetFrameTimes().Add(FrameTimes::kDrawCpu, ThreadCpuTime() - cpu_start);
