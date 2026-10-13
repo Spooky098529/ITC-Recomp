@@ -51,8 +51,8 @@ class Passes {
     // first word set when filled).
     uint64_t invisible = 0;
     std::array<uint32_t, 8> invisible_sample{};
-    // Draws with render targets 1-3 bound (only 0 is drawn), or colour and
-    // depth of different sample counts.
+    // Draws with render targets 1-3 bound to another surface than 0 (only 0
+    // is drawn), or colour and depth of different sample counts.
     uint64_t extra_targets = 0, mismatched_samples = 0;
     uint64_t clears = 0, clear_rects = 0;
     // Resolves done; skipped (no source or destination, a level or slice

@@ -1285,7 +1285,10 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
   uint32_t color_object = guest::LoadU32(base, device + kDeviceRenderTarget0);
   uint32_t depth_object = guest::LoadU32(base, device + kDeviceDepthStencil);
   for (uint32_t i = 1; i < 4; i++) {
-    if (uint32_t object = guest::LoadU32(base, device + kDeviceRenderTarget0 + 4 * i)) {
+    // The same surface in another slot (seen: target 1 = target 0) adds
+    // nothing.
+    if (uint32_t object = guest::LoadU32(base, device + kDeviceRenderTarget0 + 4 * i);
+        object && object != color_object) {
       if (!s.logged_extra_targets) {
         s.logged_extra_targets = true;
         Surface extra = ReadSurface(base, object);
