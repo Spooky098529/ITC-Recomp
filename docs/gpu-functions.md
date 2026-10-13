@@ -1,0 +1,144 @@
+# GPU functions
+
+What's known about how the game drives the GPU: the render command replay,
+the graphics library (the Xbox 360's Direct3D, linked into the game) and
+its waits on the GPU. This is the groundwork for a native renderer that
+replaces the emulated GPU (`librexgpu-xenos.so`). Game-side recording,
+interpolation and everything else are in `functions.md`.
+
+Addresses and names follow `functions.md`: names are our own, and
+"likely" marks an identification from argument shapes that hasn't been
+checked at runtime.
+
+## The path from the game to the GPU
+
+1. The main thread records render commands into the command list (see
+   "Render command recording" in `functions.md`).
+2. The render thread replays them: `sub_8258EE98` walks the item chains,
+   and `sub_8258E698` dispatches each command through the table at
+   `0x8265EDE0`.
+3. Each handler calls the graphics library on the device at `0x8296BD90`
+   (`lis rX,-32105` + `-17008`), which writes Xenos GPU packets (PM4) into
+   the ring buffer.
+4. The emulated GPU's thread ("GPU Commands", in the SDK) reads the ring
+   buffer and translates to Vulkan.
+
+A native renderer would replace steps 3 and 4: implement the handlers
+below with Vulkan instead of the graphics library.
+
+## Command format
+
+`sub_8258E698(r4 = first slot)` loops over 16-byte slots:
+
+- Slot header: `[id, arg1, arg2, 0]`; the payload starts in the next slot.
+- The handler is called as `handler(r3 = payload, r4 = arg1, r5 = arg2)`
+  and returns how many payload slots it used; the next command follows.
+- Id 36 ends the chain.
+
+Most handlers treat arg1 as a count of 16-byte items and call one library
+function per item. The exceptions are marked with their item size.
+
+## Command table (`0x8265EDE0`)
+
+| Id | Handler | Item | What it does | Library call |
+|---|---|---|---|---|
+| 0, 36, 37 | `sub_82304258` | | Nothing (returns arg1). 36 ends a chain. | |
+| 1 | `sub_8258FBD0` | 16 | **SetRenderState**: [state, value]. Calls the device's setter for the state at device + state + 56 (the Xbox 360 Direct3D keeps a setter per render state). | per-state setter |
+| 2 | `sub_8258FC30` | 16 | **SetSamplerState**: [sampler, state, value]. Setter at device + state + 440. | per-state setter |
+| 3 | `sub_8258FC90` | 16 | Unknown: [a, b]. | `sub_822A3B30` |
+| 4 | `sub_8258FCE0` | 16 | **SetTexture**, likely: [sampler, texture], with the dirty bit for fetch constant sampler + 20. | `sub_822A6008` |
+| 5 | `sub_8258E9F8` | arg1 × 24 bytes | Inline vertex data for the helper object (below): stores payload and count at state +12, +16. | |
+| 6 | `sub_8258EA20` | arg1 × 2 or 4 bytes | Inline index data for the helper object: payload, count, 32-bit flag (arg2) at state +20, +24, +28. | |
+| 7 | `sub_8258FD48` | arg1 registers | **Set shader constants**. arg2 = stage << 24 \| type << 16 \| start << 8 \| count. Stage 0 = vertex, 1 = pixel; type 0-3 picks a setter. Wrapped by interpolation. | VS `sub_822A84C8`, `sub_822A81F8`, `sub_822A8418`; PS `sub_822A8518`, `sub_822A8308`, `sub_822A8470` |
+| 8 | `sub_8258FF50` | 16 | Unknown: [pointer], stored at device +13156. | `sub_822A8958` |
+| 9 | `sub_8258FFA0` | 16 | Unknown: [pointer]; copies memory. | `sub_822A8618` |
+| 10 | `sub_8258FFF0` | 16 | Unknown: [pointer]. | `sub_822A8960` |
+| 11 | `sub_82590040` | 16 | **SetStreamSource**, likely: [stream, buffer, offset, stride], dirty bit for vertex fetch constant (95 - stream) / 3 + 20. | `sub_822A3758` |
+| 12 | `sub_825900B8` | 16 | Unknown: [pointer]. | `sub_822A3908` |
+| 13, 14 | `sub_8258EA58` | 16 | Helper object set-up: stores [a, b, c] at state +0..+8, calls the helper's vtable slot 2 with the device. | |
+| 15 | `sub_82590108` | 16 | Helper object draw (vtable slot 3) from the stored inline data, with a device flag (+10444 bit 0) toggled around it. | `sub_822A2470`, `sub_822A2430` |
+| 16 | `sub_825901B0` | 16 | Same, vtable slot 4, more arguments (indexed). | same |
+| 17 | `sub_82590268` | 16 | **DrawVertices**, likely: [type, start, count]; the vertex count comes from a per-type table at `0x82000950` (count × a + b). | `sub_825BE300` |
+| 18 | `sub_825902E0` | 12 | **DrawIndexedVertices**, likely: [type, base \| start (16 bits each), count], same table. | `sub_825BE708` |
+| 19 | `sub_82590360` | 12 | **DrawPrimitiveUP**: [type, count, stride (16 bits each), data]; Begin, `memcpy` the vertices, End. | `sub_825BD8F0` (BeginVertices), `sub_825A7410` (memcpy), `sub_825BDDA0` (End) |
+| 20 | `sub_825903D8` | 16 | Unknown: [object], skipped if null. | `sub_822A67B0` |
+| 21 | `sub_8258EAD0` | arg1 bytes | Skips arg1 bytes of payload (inline data or padding). | |
+| 22 | `sub_82591798` | 16 | Unknown: [object, flag]. Asks the object (vtable 2); if not ready and flag = 1, calls vtable 1, `sub_82591540` (with `0x8296BD8C`), vtable 3. | `sub_82591540` |
+| 23 | `sub_82590428` | 16 | **SetRenderTarget**, likely: [index, surface]. | `sub_822A4340` → `sub_822A3D30` |
+| 24 | `sub_82590478` | 16 | **SetDepthStencilSurface**, likely: [surface]. | `sub_822A4060` |
+| 25 | `sub_825904C8` | 68 | **Resolve** (EDRAM to texture): flags, and by bit, source rect, destination texture, destination point, clear colour (4 bytes → floats), parameters; also level, slice, clear Z, stencil. | `sub_822AFA58` |
+| 26 | `sub_82590620` | 280 | **Clear**: [count, rects (if count), flags, colour, Z, stencil]. | `sub_822A04F8` |
+| 27 | `sub_82590698` | 32 | **DrawIndexedPrimitiveUP**: Begin, `memcpy` the indices (2 or 4 bytes each) and vertices, End. | `sub_825BDDC0`, `sub_825A7410`, `sub_825BDDA0` |
+| 28 | `sub_8258EAE0` | 16 | Callback: [object]; calls its vtable slot 0 with the device. | |
+| 29 | `sub_82590768` | 4 | Sets render targets 0-3 (bits 0-3) and depth (bit 7) from the saved set at `0x82970BC0`. | `sub_822A4340`, `sub_822A4060` |
+| 30 | `sub_82590860` | 16 | **SetViewport**: [X, Y, width, height (16 bits each), min Z, max Z]. | `sub_822A3518` |
+| 31 | `sub_825908E0` | 8 | **SetScissorRect**: [left, top, right, bottom (signed 16 bits)], with a device field (+11600) set to 1 first. | `sub_822A3D20`, `sub_822A3450` |
+| 32 | `sub_82590968` | 16 | Unknown: [a, b, c]; a large function that sets viewport and scissor and copies memory. | `sub_825BED08` |
+| 33 | `sub_825909E8` | 16 | Unknown: [a, b]; a large function that sets viewport and scissor and resolves. | `sub_825BF200` |
+| 34 | `sub_82590A68` | | Saves the viewport (to `0x8296BD60`), render targets 0-3 and depth. | `sub_822A3740`, `sub_822A3998`, `sub_822A39E0` |
+| 35 | `sub_82590AD0` | | Restores what 34 saved. | `sub_822A4340`, `sub_822A4060`, `sub_822A3518` |
+
+**The helper object** (commands 5, 6, 13-16): the object at `0x82970BB8`,
+with its state at `0x82970BBC`, draws geometry recorded inline in the
+command list. What it draws, and which library calls its vtable reaches,
+isn't known yet.
+
+## Graphics library
+
+The device is at `0x8296BD90`. Fields used so far:
+
+| Offset | What |
+|---|---|
+| +56 + state | Render state setters (command 1). |
+| +440 + state | Sampler state setters (command 2). |
+| +10444 | Flags; bit 0 read and set around the helper object's draws. |
+| +10768 | Pointer to the GPU's ring buffer read pointer (written back by the GPU). |
+| +10780 | Ring buffer position the waits compare against. |
+| +11600 | Set to 1 before a scissor rect (command 31). |
+| +13156 | Pointer set by command 8. |
+
+The draw functions (`sub_825BE300`, `sub_825BE708`, `sub_825BD8F0`,
+`sub_825BDDC0`) share helpers `sub_8229EB10`, `sub_8229EF48` (73 call
+sites), `sub_822ADC08`, `sub_822ADE30`, `sub_822ADEF0`, `sub_822AE070`,
+`sub_822AE1D0` and `sub_822AED18`: most likely writing pending state and
+packets into the ring buffer.
+
+## Waits on the GPU
+
+`sub_8229D8A0` is one step of a busy-wait: a few `db16cyc`, then it reads
+a tick count (`sub_825B9A60`: r13+256 → +332) and gives up after 5000
+ticks (`sub_822ACAA8`). It's called in loops from:
+
+| Loop in | Callers | What it waits for |
+|---|---|---|
+| `sub_8229E908` (at `0x8229E98C`) | 10 | The GPU's read pointer (device +10768) to pass a position relative to +10780: **space in the ring buffer**. |
+| `sub_8229DC28` (at `0x8229DC78`) | 2 | Unknown. |
+| `sub_8229DCC0` (at `0x8229DD1C`) | 2 | Unknown. |
+| `sub_822B64A0` (at `0x822B64E8`) | 1 | Unknown. |
+
+In the race profile (see "Performance" in `functions.md`), `sub_8229D8A0`
+was 46% of the render thread and `sub_8229E908` 2%: the render thread
+spends about half its time waiting for the emulated GPU to make room in
+the ring buffer. A native renderer has no ring buffer, so these waits go.
+
+## Not yet known
+
+- Commands 3, 8, 9, 10, 12, 20, 22, 28, 32 and 33, and what the helper
+  object draws.
+- Which commands a race and the menus actually use, and how often (a
+  runtime count per command id would settle it, and confirm the "likely"
+  rows).
+- The render state and sampler state ids in use (commands 1 and 2).
+- Texture, vertex buffer and surface objects: their layout in guest memory
+  (formats, tiling, sizes), which the native renderer needs to read.
+- The shaders: how commands 8-10 and 12 relate to vertex and pixel shaders
+  and vertex declarations.
+- How present and the frame's start and end reach the library
+  (`Renderer::Present`, `sub_82091BC0`).
+
+## Tools
+
+- `--dump_image=<path>` writes the loaded executable image
+  (`0x82000000`-`0x82980000`, big-endian) and exits at the first frame.
+  Read tables such as the command table from it; `tools/scan_ptrs.py` also
+  takes it.

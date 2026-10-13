@@ -604,11 +604,10 @@ the samples in our blending code.
   only reads a tick count from the processor block, r13+256 → +332) are
   the game's graphics library waiting on the GPU. `sub_8229D8A0` spins a
   few `db16cyc`, reads the tick count, and gives up after 5000 ticks
-  (`sub_822ACAA8`). It's called in loops from `0x8229DC78`, `0x8229DD1C`,
-  `0x822B64E8` and `0x8229E98C`; the last compares the read pointer
-  writeback (device +10768) against a limit (+10780), so it is likely the
-  wait for ring buffer space. Which loop the time goes to isn't known yet:
-  `perf` can't see callers, since the recompiled code has no frame pointers.
+  (`sub_822ACAA8`). It's called in loops from four functions; the one in
+  `sub_8229E908` waits for space in the ring buffer (see "Waits on the
+  GPU" in `gpu-functions.md`). `perf` can't see callers, since the
+  recompiled code has no frame pointers.
 - **The emulated GPU's thread ("GPU Commands") is busy, not idle**: ~70% of
   a core in user code during the race, nearly all of it command processing
   rather than its idle spin. Its biggest costs are per-register work
