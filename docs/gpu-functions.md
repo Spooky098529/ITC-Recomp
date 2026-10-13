@@ -50,9 +50,9 @@ function per item. The exceptions are marked with their item size.
 | 5 | `sub_8258E9F8` | arg1 × 24 bytes | Inline vertex data for the helper object (below): stores payload and count at state +12, +16. | |
 | 6 | `sub_8258EA20` | arg1 × 2 or 4 bytes | Inline index data for the helper object: payload, count, 32-bit flag (arg2) at state +20, +24, +28. | |
 | 7 | `sub_8258FD48` | arg1 registers | **Set shader constants**. arg2 = stage << 24 \| type << 16 \| start << 8 \| count. Stage 0 = vertex, 1 = pixel; type 0-3 picks a setter. Wrapped by interpolation. | VS `sub_822A84C8`, `sub_822A81F8`, `sub_822A8418`; PS `sub_822A8518`, `sub_822A8308`, `sub_822A8470` |
-| 8 | `sub_8258FF50` | 16 | **SetVertexShader**, likely: [shader]. Stores it at device +12436 (and +13156), takes a reference, sets dirty bit 51 and copies the shader's register patches (at shader +592) into the shadow at device +1024. Replayed as often as 9. | `sub_822A8958` → `sub_822A8808` |
-| 9 | `sub_8258FFA0` | 16 | **SetPixelShader**, likely: [shader]. Stores it at device +12432, sets dirty bits 52 and 49, copies its register patches (at shader +56). | `sub_822A8618` |
-| 10 | `sub_8258FFF0` | 16 | **SetVertexDeclaration**, likely: [declaration]. Stores it at device +11552 and sets dirty bit 51, the vertex shader's. | `sub_822A8960` |
+| 8 | `sub_8258FF50` | 16 | **SetVertexShader**: [shader]. Stores it at device +12436 (and +13156), takes a reference, sets dirty bit 51 and copies the shader's register patches (at shader +592) into the shadow at device +1024. Replayed as often as 9. | `sub_822A8958` → `sub_822A8808` |
+| 9 | `sub_8258FFA0` | 16 | **SetPixelShader**: [shader]. Stores it at device +12432, sets dirty bits 52 and 49, copies its register patches (at shader +56). | `sub_822A8618` |
+| 10 | `sub_8258FFF0` | 16 | **SetVertexDeclaration**: [declaration]. Stores it at device +11552 and sets dirty bit 51, the vertex shader's. | `sub_822A8960` |
 | 11 | `sub_82590040` | 16 | **SetStreamSource**: [stream, buffer, offset, stride]. Writes the buffer's fetch constant (address + offset, size − offset) to vertex fetch constant 95 − stream (device + 1024 + 8 × (95 − stream)); the handler's dirty bit, (95 − stream) / 3 + 20, is the same slot. Buffer pointer at device + 12204 + 4 × stream, stride byte at device + 12272 + stream. | `sub_822A3758` |
 | 12 | `sub_825900B8` | 16 | **SetIndices**: [index buffer]. Stores it at device +12180 and fences the previous one; replayed exactly once per indexed draw (command 18). | `sub_822A3908` |
 | 13, 14 | `sub_8258EA58` | 16 | Helper object set-up: stores [a, b, c] at state +0..+8, calls the helper's vtable slot 2 with the device. | |
@@ -168,9 +168,31 @@ unbind, so the library knows when the GPU is done with it.
   the words.
 - **Vertex buffer**: the vertex fetch constant at +24 (address) and +28
   (size).
-- **Index buffer**, **shaders**, **vertex declaration**: layout not read
-  yet. Shaders carry register patch lists: a list of (offset, count)
-  followed by words, copied or masked into the device's shadow.
+- **Index buffer**: word +0 bit 31 set = 32-bit indices (else 16-bit), and
+  its top bits give the endianness field of the draw packet; +24 is the
+  address. Read by the indexed draw `sub_825BE708`, which writes a
+  `DRAW_INDX` packet (`0xC0032201`).
+- **Shaders** are loaded by the draw helper `sub_822AED18` with the GPU's
+  `IM_LOAD` packet (`0xC0012700`: address with the shader type in bit 0,
+  then size in words):
+
+  | | Vertex shader (device +12436) | Pixel shader (device +12432) |
+  |---|---|---|
+  | Microcode address | +48 | +24 |
+  | Microcode size (bytes) | +600 | +64 |
+  | Register patches (SetXShader) | +592 + *(+604) | +56 + *(+68) |
+  | Program control words (draw) | +592 + *(+612): words 0, 1 → device +10400, +10404 | +56 + *(+76): ORed into the same |
+  | Vertex declaration bound for | +24 (declaration id), +32/+40 (stream masks) | |
+
+  The program control words are SQ_PROGRAM_CNTL and its neighbours; the
+  vertex and pixel halves are combined at draw time.
+- **Vertex declaration** (device +11552): when the bound declaration (its
+  id at +48) differs from the one the vertex shader was last bound for,
+  `sub_822AE340` patches the vertex shader's microcode in place, writing
+  three-word groups (the size of a vertex fetch instruction). So vertex
+  formats end up in the shader's fetch instructions, as on the GPU, and the
+  vertex shader's microcode depends on the declaration: translate it as
+  bound at draw time, not once per object.
 
 The draw functions (`sub_825BE300`, `sub_825BE708`, `sub_825BD8F0`,
 `sub_825BDDC0`) share helpers `sub_8229EB10`, `sub_8229EF48` (73 call
@@ -262,8 +284,7 @@ isn't part of the count) were bound in the same run:
 
 - Commands 32 and 33 (rare), and what the helper object draws. (20, 22
   and 28 are never replayed.)
-- Confirming the "likely" rows at runtime (8, 9, 10: which object is a
-  vertex shader is a guess from its reference counting and dirty bits).
+- Confirming the "likely" rows at runtime.
 - Render states 308-320 and 324.
 - Texture, vertex buffer and surface objects: their layout in guest memory
   (formats, tiling, sizes), which the native renderer needs to read.

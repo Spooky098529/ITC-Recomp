@@ -3,6 +3,9 @@
 #include "guest.h"
 #include <array>
 #include <map>
+#include <set>
+#include <vector>
+#include <rex/hash.h>
 #include <tuple>
 #include <chrono>
 #include <string>
@@ -49,6 +52,8 @@ struct Stats {
   std::map<uint32_t, StateUse> render_states, sampler_states;
   std::map<std::tuple<uint32_t, uint32_t, uint32_t>, uint64_t> texture_fetches;
   bool new_states = false;
+  std::set<std::pair<uint32_t, uint64_t>> shaders;  // (object, microcode hash)
+  std::set<uint32_t> declarations, index_buffers;
   std::chrono::steady_clock::time_point last_log = std::chrono::steady_clock::now();
 };
 
@@ -105,6 +110,43 @@ void debug::ReplayStats_OnCommand(uint8_t* base, uint32_t id, uint32_t payload, 
         REXLOG_INFO("replay texture fetch (new): dword0 {:08X} dword1&FFF {:03X} dword2 {:08X}",
                     std::get<0>(key), std::get<1>(key), std::get<2>(key));
       }
+    }
+  }
+  if (id == 8 || id == 9) {
+    // [shader]. Vertex shader: microcode at +48, size in bytes at +600.
+    // Pixel shader: microcode at +24, size at +64 (see docs/gpu-functions.md).
+    uint32_t shader = guest::LoadU32(base, payload);
+    if (shader) {
+      bool vertex = id == 8;
+      uint32_t ucode = guest::LoadU32(base, shader + (vertex ? 48 : 24));
+      uint32_t size = guest::LoadU32(base, shader + (vertex ? 600 : 64));
+      std::vector<uint8_t> bytes(size < 0x40000 ? size : 0);
+      for (uint32_t i = 0; i < bytes.size(); i++) {
+        bytes[i] = guest::LoadU8(base, ucode + i);
+      }
+      uint64_t hash = XXH3_64bits(bytes.data(), bytes.size());
+      if (s.shaders.emplace(shader, hash).second) {
+        std::string header;
+        for (uint32_t i = 0; i < 20; i++) {
+          header += fmt::format(" {:08X}", guest::LoadU32(base, shader + 4 * i));
+        }
+        REXLOG_INFO("replay {} shader (new) {:08X}: microcode {:08X}, {} bytes, hash {:016X}; "
+                    "words 0-19:{}",
+                    vertex ? "vertex" : "pixel", shader, ucode, size, hash, header);
+      }
+    }
+  }
+  if (id == 10 || id == 12) {
+    // [declaration] or [index buffer]: log each new one's first words.
+    uint32_t object = guest::LoadU32(base, payload);
+    auto& seen = id == 10 ? s.declarations : s.index_buffers;
+    if (object && seen.insert(object).second) {
+      std::string words;
+      for (uint32_t i = 0; i < 16; i++) {
+        words += fmt::format(" {:08X}", guest::LoadU32(base, object + 4 * i));
+      }
+      REXLOG_INFO("replay {} (new) {:08X}: words 0-15:{}",
+                  id == 10 ? "vertex declaration" : "index buffer", object, words);
     }
   }
   if (IsUnknown(id)) {
