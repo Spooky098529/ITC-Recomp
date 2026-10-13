@@ -1,0 +1,56 @@
+// Milestone 2 of the native renderer (docs/native-renderer.md): draws the
+// race's main view (the 1024x576, 2x MSAA, 7e3 render target; see "A race
+// frame's passes" in docs/gpu-functions.md), untextured, into a target of
+// our own, which the renderer copies to its window.
+
+#pragma once
+
+#include <cstdint>
+#include <memory>
+
+#include "vulkan_functions.h"
+
+namespace native {
+
+struct DeviceContext {
+  VkPhysicalDevice physical_device;
+  VkDevice device;
+  uint32_t queue_family;
+  VkQueue queue;
+  uint32_t max_storage_buffer_range;
+  uint32_t min_uniform_buffer_offset_alignment;
+  bool clip_distance, cull_distance, demote_to_helper_invocation;
+};
+
+class MainView {
+ public:
+  MainView();
+  ~MainView();
+
+  // base: the guest memory base (guest physical memory is imported from it).
+  bool Init(const DeviceContext& context, uint8_t* base, uint32_t frames_in_flight);
+
+  // Render thread. Before a frame's first draw.
+  void BeginFrame(uint32_t frame_index);
+  // After a draw command's library call (the device's shadow is complete).
+  void AfterDraw(VkCommandBuffer commands, uint8_t* base, uint32_t id, uint32_t payload,
+                 uint32_t arg1);
+  // Ends the frame's drawing; leaves the target in TRANSFER_SRC_OPTIMAL.
+  void EndFrame(VkCommandBuffer commands);
+
+  VkImage target() const;
+  VkExtent2D target_extent() const;
+
+  // Logged by the renderer.
+  struct Stats {
+    uint64_t drawn = 0, other_passes = 0, unsupported = 0, failed = 0;
+    uint32_t pipelines = 0, shaders_translated = 0, shaders_failed = 0;
+  };
+  Stats TakeStats();
+
+ private:
+  struct State;
+  std::unique_ptr<State> state_;
+};
+
+}  // namespace native

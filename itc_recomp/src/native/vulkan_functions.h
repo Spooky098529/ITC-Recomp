@@ -22,7 +22,11 @@
   X(vkGetPhysicalDeviceSurfacePresentModesKHR) \
   X(vkCreateDevice)                            \
   X(vkGetDeviceProcAddr)                       \
-  X(vkDestroySurfaceKHR)
+  X(vkDestroySurfaceKHR)                       \
+  X(vkGetPhysicalDeviceFeatures2)              \
+  X(vkGetPhysicalDeviceProperties2)            \
+  X(vkGetPhysicalDeviceMemoryProperties)       \
+  X(vkEnumerateDeviceExtensionProperties)
 
 #define NATIVE_VK_DEVICE_FUNCTIONS(X) \
   X(vkDestroyDevice)                  \
@@ -47,7 +51,38 @@
   X(vkWaitForFences)                  \
   X(vkResetFences)                    \
   X(vkCreateSemaphore)                \
-  X(vkDestroySemaphore)
+  X(vkDestroySemaphore)                \
+  X(vkCreateBuffer)                    \
+  X(vkDestroyBuffer)                   \
+  X(vkGetBufferMemoryRequirements)     \
+  X(vkBindBufferMemory)                \
+  X(vkCreateImage)                     \
+  X(vkDestroyImage)                    \
+  X(vkGetImageMemoryRequirements)      \
+  X(vkBindImageMemory)                 \
+  X(vkCreateImageView)                 \
+  X(vkDestroyImageView)                \
+  X(vkAllocateMemory)                  \
+  X(vkFreeMemory)                      \
+  X(vkMapMemory)                       \
+  X(vkGetMemoryHostPointerPropertiesEXT) \
+  X(vkCreateSampler)                   \
+  X(vkCreateDescriptorSetLayout)       \
+  X(vkCreatePipelineLayout)            \
+  X(vkCreateDescriptorPool)            \
+  X(vkAllocateDescriptorSets)          \
+  X(vkUpdateDescriptorSets)            \
+  X(vkCreateShaderModule)              \
+  X(vkCreateGraphicsPipelines)         \
+  X(vkCmdBeginRendering)               \
+  X(vkCmdEndRendering)                 \
+  X(vkCmdBindPipeline)                 \
+  X(vkCmdBindDescriptorSets)           \
+  X(vkCmdBindIndexBuffer)              \
+  X(vkCmdDrawIndexed)                  \
+  X(vkCmdSetViewport)                  \
+  X(vkCmdSetScissor)                   \
+  X(vkCmdBlitImage)
 
 namespace native::vk {
 
