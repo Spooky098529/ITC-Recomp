@@ -51,7 +51,7 @@ set(ITC_SOURCES
     src/debug/frame_state_diff.cpp
     src/debug/image_dump.cpp
     src/debug/replay_stats.cpp
-    src/native/main_view.cpp
+    src/native/passes.cpp
     src/native/renderer.cpp
     src/native/replay_hooks.cpp
     src/native/shaders.cpp

@@ -1,6 +1,6 @@
 #include "renderer.h"
 
-#include "main_view.h"
+#include "passes.h"
 #include "shaders.h"
 #include "vulkan_functions.h"
 
@@ -25,6 +25,9 @@ REXCVAR_DEFINE_BOOL(native_renderer, false, "ITC",
                     "second window (in development; see docs/native-renderer.md)");
 REXCVAR_DEFINE_BOOL(native_renderer_validation, false, "ITC",
                     "Enable the Vulkan validation layer for the native renderer, if installed");
+REXCVAR_DEFINE_INT32(native_renderer_show_resolve, -1, "ITC",
+                     "Show the frame's nth resolve destination in the native renderer's window "
+                     "instead of the main view (a debugging aid; -1 for the main view)");
 
 namespace native {
 namespace {
@@ -106,7 +109,7 @@ class Renderer {
   // Render thread. Returns false if the renderer can't run.
   bool Init(uint8_t* base);
   void OnCommand(uint32_t id, uint32_t arg1);
-  void AfterDraw(uint8_t* base, uint32_t id, uint32_t payload, uint32_t arg1);
+  void AfterCommand(uint8_t* base, uint32_t id, uint32_t payload, uint32_t arg1);
   void EndFrame();
 
  private:
@@ -143,7 +146,7 @@ class Renderer {
   uint32_t frame_index_ = 0;
 
   DeviceContext context_{};
-  MainView main_view_;
+  Passes passes_;
   bool recording_ = false;  // this frame's command buffer is open
 
   // This frame's commands (milestone 1: counted only).
@@ -405,7 +408,7 @@ void Renderer::DestroySwapchain() {
 
 bool Renderer::Init(uint8_t* base) {
   return CreateWindowAndInstance() && CreateDevice() && CreateSwapchain() &&
-         main_view_.Init(context_, base, kFramesInFlight);
+         passes_.Init(context_, base, kFramesInFlight);
 }
 
 void Renderer::OnCommand(uint32_t id, uint32_t arg1) {
@@ -423,14 +426,20 @@ VkCommandBuffer Renderer::BeginFrame() {
     VkCommandBufferBeginInfo begin{VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
     begin.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
     vk::vkBeginCommandBuffer(frame.commands, &begin);
-    main_view_.BeginFrame(frame_index_);
+    passes_.BeginFrame(frame_index_);
     recording_ = true;
   }
   return frame.commands;
 }
 
-void Renderer::AfterDraw(uint8_t* base, uint32_t id, uint32_t payload, uint32_t arg1) {
-  main_view_.AfterDraw(BeginFrame(), base, id, payload, arg1);
+void Renderer::AfterCommand(uint8_t* base, uint32_t id, uint32_t payload, uint32_t arg1) {
+  if (IsDraw(id)) {
+    passes_.AfterDraw(BeginFrame(), base, id, payload, arg1);
+  } else if (id == 25) {
+    passes_.AfterResolve(BeginFrame(), base, payload, arg1);
+  } else if (id == 26) {
+    passes_.AfterClear(BeginFrame(), base, payload, arg1);
+  }
 }
 
 void Renderer::EndFrame() {
@@ -439,10 +448,10 @@ void Renderer::EndFrame() {
   frame_commands_ = frame_draws_ = 0;
 
   VkCommandBuffer commands = BeginFrame();
-  main_view_.EndFrame(commands);
+  VkExtent2D source = passes_.EndFrame(commands, REXCVAR_GET(native_renderer_show_resolve));
   Frame& frame = frames_[frame_index_];
 
-  // Copy the main view onto a swapchain image, if one can be had now.
+  // Copy what's shown onto a swapchain image, if one can be had now.
   bool acquired = false;
   uint32_t image_index = 0;
   if ((!swapchain_stale_ && swapchain_) || CreateSwapchain()) {
@@ -469,13 +478,12 @@ void Renderer::EndFrame() {
     vk::vkCmdPipelineBarrier(commands, VK_PIPELINE_STAGE_TRANSFER_BIT,
                              VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1,
                              &barrier);
-    VkExtent2D source = main_view_.target_extent();
     VkImageBlit blit{};
     blit.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
     blit.srcOffsets[1] = {int32_t(source.width), int32_t(source.height), 1};
     blit.dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
     blit.dstOffsets[1] = {int32_t(swapchain_extent_.width), int32_t(swapchain_extent_.height), 1};
-    vk::vkCmdBlitImage(commands, main_view_.target(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, image,
+    vk::vkCmdBlitImage(commands, passes_.shown(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, image,
                        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit, VK_FILTER_LINEAR);
     barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
     barrier.dstAccessMask = 0;
@@ -501,7 +509,7 @@ void Renderer::EndFrame() {
   // Texture uploads first, then the frame.
   VkCommandBuffer command_buffers[2];
   submit.commandBufferCount = 0;
-  if (VkCommandBuffer uploads = main_view_.EndUploads()) {
+  if (VkCommandBuffer uploads = passes_.EndUploads()) {
     command_buffers[submit.commandBufferCount++] = uploads;
   }
   command_buffers[submit.commandBufferCount++] = commands;
@@ -535,27 +543,34 @@ void Renderer::LogStats() {
   }
   double seconds = std::chrono::duration<double>(now - last_log_).count();
   uint64_t frames = std::max<uint64_t>(frames_presented_ + frames_skipped_, 1);
-  MainView::Stats view = main_view_.TakeStats();
+  Passes::Stats view = passes_.TakeStats();
   REXLOG_INFO("native renderer: {:.0f} frames/s presented, {} skipped; per frame {:.0f} "
-              "commands, {:.0f} draws; main view: {:.0f} drawn, {:.0f} unsupported, {:.0f} "
-              "failed, {:.0f} in other passes a frame; {:.1f} MB copied a frame; {} pipelines; "
-              "shaders translated {}, failed {}",
+              "commands, {:.0f} draws; {:.0f} drawn, {:.0f} unsupported, {:.0f} failed; {:.1f} "
+              "MB copied a frame; {} pipelines; shaders translated {}, failed {}",
               frames_presented_ / seconds, frames_skipped_, double(commands_) / frames,
               double(draws_) / frames, double(view.drawn) / frames,
               double(view.unsupported) / frames, double(view.failed) / frames,
-              double(view.other_passes) / frames, view.mirrored_bytes / 1048576.0 / frames,
-              view.pipelines, view.shaders_translated,
+              view.mirrored_bytes / 1048576.0 / frames, view.pipelines, view.shaders_translated,
               view.shaders_failed);
+  REXLOG_INFO("native renderer: {} targets; per frame {:.1f} clears ({:.1f} with rects), {:.1f} "
+              "resolves, {:.1f} skipped; {:.1f} draws with targets 1-3 bound, {:.1f} with "
+              "mismatched sample counts; {} resolves with unknown flags (e.g. {:08X})",
+              view.targets, double(view.clears) / frames, double(view.clear_rects) / frames,
+              double(view.resolves) / frames, double(view.resolves_skipped) / frames,
+              double(view.extra_targets) / frames, double(view.mismatched_samples) / frames,
+              view.resolve_unknown_flags, view.resolve_flags_sample);
   frames_presented_ = frames_skipped_ = commands_ = draws_ = 0;
   const TextureCache::Stats& t = view.textures;
   REXLOG_INFO("native renderer: textures: {} ({} samplers); {} loaded, {} reloaded, {:.1f} MB; "
               "{} deferred (staging full), {} unsupported (e.g. format {} dimension {}), {} "
-              "of another dimension than declared",
+              "of another dimension than declared; {:.0f} lookups a frame got a resolve "
+              "destination ({:.0f} of another size or format)",
               t.textures, t.samplers, t.loaded, t.reloaded, t.loaded_bytes / 1048576.0,
               t.deferred, t.unsupported,
               t.unsupported_sample == UINT32_MAX ? -1 : int(t.unsupported_sample >> 8),
               t.unsupported_sample == UINT32_MAX ? -1 : int(t.unsupported_sample & 0xFF),
-              t.mismatched);
+              t.mismatched, double(t.resolved_hits) / frames,
+              double(t.resolved_mismatched) / frames);
   if (t.mismatched_sample != UINT32_MAX) {
     REXLOG_INFO("native renderer: e.g. a texture of format {}, dimension {}, {}x{} where the "
                 "shader declares view type {}",
@@ -564,7 +579,7 @@ void Renderer::LogStats() {
   }
   if (view.invisible) {
     const auto& v = view.invisible_sample;
-    REXLOG_INFO("native renderer: {:.0f} main view draws a frame skipped as invisible, e.g. "
+    REXLOG_INFO("native renderer: {:.0f} draws a frame skipped as invisible, e.g. "
                 "viewport {},{} {}x{}, scissor {},{} {}x{}",
                 double(view.invisible) / frames, v[0] & 0x7FFFFFFF, v[1], v[2], v[3], v[4], v[5],
                 v[6], v[7]);
@@ -610,11 +625,11 @@ void Renderer_OnCommand(uint8_t* base, uint32_t id, uint32_t payload, uint32_t a
 
 void Renderer_AfterCommand(uint8_t* base, uint32_t id, uint32_t payload, uint32_t arg1,
                            uint32_t arg2) {
-  if (!Renderer_Enabled() || !IsDraw(id)) {
+  if (!Renderer_Enabled() || !(IsDraw(id) || id == 25 || id == 26)) {
     return;
   }
   if (Renderer* renderer = GetRenderer()) {
-    renderer->AfterDraw(base, id, payload, arg1);
+    renderer->AfterCommand(base, id, payload, arg1);
   }
 }
 

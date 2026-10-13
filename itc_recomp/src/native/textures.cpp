@@ -343,13 +343,20 @@ struct TextureCache::State {
     // The guest memory it's read from: base and mips (address, size).
     std::array<std::pair<uint32_t, uint32_t>, 2> ranges{};
     std::unordered_map<uint32_t, VkImageView> views;  // by swizzle
+    // A resolve destination: drawn into, never loaded.
+    bool resolved = false;
+    uint32_t guest_format = 0;
+    VkImageView attachment_view = VK_NULL_HANDLE;
   };
   std::map<TextureKey, Texture> textures;
+  // Resolve destinations by base address (page).
+  std::unordered_map<uint32_t, Texture> resolved;
   std::unordered_map<uint64_t, VkSampler> samplers;
   Stats stats;
 
   bool CreateTexture(Texture& texture);
   uint64_t Hash(uint8_t* base, const Texture& texture) const;
+  VkImageView GetSwizzledView(Texture& texture, uint32_t swizzle, VkImageViewType natural);
   bool Upload(uint8_t* base, Texture& texture);
   VkCommandBuffer Uploads();
 };
@@ -357,7 +364,7 @@ struct TextureCache::State {
 bool TextureCache::State::CreateTexture(Texture& t) {
   VkDevice device = context.device;
   const Layout& l = t.layout;
-  t.levels = l.max_level + 1;
+  t.levels = t.resolved ? 1 : l.max_level + 1;
   VkImageCreateInfo info{VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO};
   info.flags = l.cube ? VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT : 0;
   info.imageType = VK_IMAGE_TYPE_2D;
@@ -367,7 +374,9 @@ bool TextureCache::State::CreateTexture(Texture& t) {
   info.arrayLayers = l.layers;
   info.samples = VK_SAMPLE_COUNT_1_BIT;
   info.tiling = VK_IMAGE_TILING_OPTIMAL;
-  info.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+  info.usage = t.resolved ? VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
+                                VK_IMAGE_USAGE_TRANSFER_SRC_BIT
+                          : VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
   info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
   if (VkResult result = vk::vkCreateImage(device, &info, nullptr, &t.image);
       result != VK_SUCCESS) {
@@ -389,6 +398,19 @@ bool TextureCache::State::CreateTexture(Texture& t) {
     vk::vkDestroyImage(device, t.image, nullptr);
     t.image = VK_NULL_HANDLE;
     return false;
+  }
+
+  if (t.resolved) {
+    VkImageViewCreateInfo view{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
+    view.image = t.image;
+    view.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    view.format = t.format.format;
+    view.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+    if (vk::vkCreateImageView(device, &view, nullptr, &t.attachment_view) != VK_SUCCESS) {
+      return false;
+    }
+    stats.textures++;
+    return true;
   }
 
   // The memory it's read from: everything up to the last level's storage.
@@ -607,6 +629,22 @@ VkImageView TextureCache::GetView(uint8_t* base, const uint32_t fetch_words[6],
     s.stats.unsupported++;
     return VK_NULL_HANDLE;
   }
+  // A resolve destination at this address takes the place of guest memory.
+  if (auto r = s.resolved.find(fetch.base_address & 0x1FFFF);
+      r != s.resolved.end() && r->second.loaded) {
+    State::Texture& t = r->second;
+    s.stats.resolved_hits++;
+    if (t.guest_format != uint32_t(fetch.format) || t.layout.width != fetch.size_2d.width + 1u ||
+        t.layout.height != fetch.size_2d.height + 1u) {
+      s.stats.resolved_mismatched++;
+    }
+    if (view_type != VK_IMAGE_VIEW_TYPE_2D_ARRAY) {
+      s.stats.mismatched++;
+      return VK_NULL_HANDLE;
+    }
+    return s.GetSwizzledView(t, fetch.swizzle, VK_IMAGE_VIEW_TYPE_2D_ARRAY);
+  }
+
   TextureKey key = KeyOf(fetch_words);
   auto it = s.textures.find(key);
   if (it == s.textures.end()) {
@@ -654,7 +692,11 @@ VkImageView TextureCache::GetView(uint8_t* base, const uint32_t fetch_words[6],
     }
   }
 
-  uint32_t swizzle = fetch.swizzle;
+  return s.GetSwizzledView(t, fetch.swizzle, natural);
+}
+
+VkImageView TextureCache::State::GetSwizzledView(Texture& t, uint32_t swizzle,
+                                                 VkImageViewType natural) {
   VkImageView& view = t.views[swizzle];
   if (!view) {
     auto component = [&](uint32_t i) {
@@ -674,11 +716,57 @@ VkImageView TextureCache::GetView(uint8_t* base, const uint32_t fetch_words[6],
     info.format = t.format.format;
     info.components = {component(0), component(1), component(2), component(3)};
     info.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, t.levels, 0, t.layout.layers};
-    if (vk::vkCreateImageView(s.context.device, &info, nullptr, &view) != VK_SUCCESS) {
+    if (vk::vkCreateImageView(context.device, &info, nullptr, &view) != VK_SUCCESS) {
       view = VK_NULL_HANDLE;
     }
   }
   return view;
+}
+
+bool TextureCache::GetResolveDestination(const uint32_t fetch_words[6], ResolveDestination& out) {
+  State& s = *state_;
+  xenos::xe_gpu_texture_fetch_t fetch = ToFetch(fetch_words);
+  uint32_t page = fetch.base_address & 0x1FFFF;
+  uint32_t width = fetch.size_2d.width + 1, height = fetch.size_2d.height + 1;
+  auto it = s.resolved.find(page);
+  if (it != s.resolved.end() && (it->second.guest_format != uint32_t(fetch.format) ||
+                                 it->second.layout.width != width ||
+                                 it->second.layout.height != height)) {
+    // Another texture at the same address: start over (the old image is
+    // left behind, as frames in flight may still use it).
+    REXLOG_WARN("native renderer: resolve destination at {:08X} changed from format {} {}x{} "
+                "to format {} {}x{}",
+                page << 12, it->second.guest_format, it->second.layout.width,
+                it->second.layout.height, uint32_t(fetch.format), width, height);
+    s.resolved.erase(it);
+    it = s.resolved.end();
+  }
+  if (it == s.resolved.end()) {
+    State::Texture t;
+    t.resolved = true;
+    t.guest_format = uint32_t(fetch.format);
+    if (fetch.format == xenos::TextureFormat::k_24_8 ||
+        fetch.format == xenos::TextureFormat::k_24_8_FLOAT) {
+      t.format = {VK_FORMAT_R32_SFLOAT, 1, 1, 4, 1};  // depth, as the translator samples it
+    } else if (!GetFormat(fetch.format, t.format) || t.format.block_width != 1 ||
+               t.format.conversion != Conversion::kNone) {
+      return false;
+    }
+    t.layout.width = width;
+    t.layout.height = height;
+    t.layout.layers = 1;
+    t.layout.base_address = page << 12;
+    if (!s.CreateTexture(t)) {
+      return false;
+    }
+    REXLOG_INFO("native renderer: resolve destination at {:08X}: format {} {}x{} (host format {})",
+                page << 12, t.guest_format, width, height, int(t.format.format));
+    it = s.resolved.emplace(page, std::move(t)).first;
+  }
+  State::Texture& t = it->second;
+  out = {t.image, t.attachment_view, t.format.format, width, height, !t.loaded};
+  t.loaded = true;  // written by the caller
+  return true;
 }
 
 VkSampler TextureCache::GetSampler(const uint32_t fetch_words[6],

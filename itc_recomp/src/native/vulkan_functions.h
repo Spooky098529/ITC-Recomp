@@ -48,6 +48,10 @@
   X(vkEndCommandBuffer)               \
   X(vkCmdPipelineBarrier)             \
   X(vkCmdClearColorImage)             \
+  X(vkCmdClearDepthStencilImage)      \
+  X(vkCmdResolveImage)                \
+  X(vkCmdPushConstants)               \
+  X(vkCmdDraw)                        \
   X(vkCreateFence)                    \
   X(vkDestroyFence)                   \
   X(vkWaitForFences)                  \

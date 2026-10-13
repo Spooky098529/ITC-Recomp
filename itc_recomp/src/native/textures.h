@@ -43,6 +43,21 @@ class TextureCache {
   // translator's texture_swizzled_signs byte).
   static uint8_t SwizzledSigns(const uint32_t fetch[6]);
 
+  // A resolve's destination texture (fetch: its fetch constant, addresses
+  // physical): an image of its size and format, made on first use, which
+  // draws sampling a texture at its base address then get instead of
+  // guest memory (the emulated GPU doesn't write resolves back). Left in
+  // SHADER_READ_ONLY_OPTIMAL, or UNDEFINED while `fresh`. False if its
+  // format can't be a colour attachment.
+  struct ResolveDestination {
+    VkImage image;
+    VkImageView view;  // all components as is, for drawing into
+    VkFormat format;
+    uint32_t width, height;
+    bool fresh;
+  };
+  bool GetResolveDestination(const uint32_t fetch[6], ResolveDestination& out);
+
   // This frame's uploads, ended, to be submitted before its drawing; null if
   // none.
   VkCommandBuffer EndUploads();
@@ -50,6 +65,9 @@ class TextureCache {
   struct Stats {
     uint64_t loaded = 0, reloaded = 0, loaded_bytes = 0, unsupported = 0, mismatched = 0,
              deferred = 0;
+    // Lookups answered with a resolve destination; of those, ones whose
+    // fetch constant has another size or format than the resolve made.
+    uint64_t resolved_hits = 0, resolved_mismatched = 0;
     uint32_t textures = 0, samplers = 0;
     uint32_t unsupported_sample = UINT32_MAX;  // format << 8 | dimension
     // A texture of another dimension than the shader declares: declared view

@@ -1,4 +1,8 @@
-#include "main_view.h"
+#include "passes.h"
+
+#include "generated_resolve_frag.h"
+#include "generated_resolve_ms_frag.h"
+#include "generated_resolve_vert.h"
 
 #include "guest.h"
 #include "shaders.h"
@@ -6,7 +10,9 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstring>
+#include <map>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -35,10 +41,108 @@ using graphics::XE_GPU_REG_VGT_MIN_VTX_INDX;
 
 namespace {
 
-// Our target: the main view's size (its viewport is 0,0 1024x576).
-constexpr uint32_t kTargetWidth = 1024, kTargetHeight = 576;
-constexpr VkFormat kColorFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
+// Every depth surface (24_8 and 24_8_FLOAT) is drawn as this.
 constexpr VkFormat kDepthFormat = VK_FORMAT_D32_SFLOAT_S8_UINT;
+
+// The main view, which is shown: its surface (pitch 1040, 2x MSAA, 7e3
+// colour, drawn as RGBA16F) and the part of it drawn (its viewport).
+constexpr uint32_t kMainViewPitch = 1040;
+constexpr uint32_t kMainViewWidth = 1024, kMainViewHeight = 576;
+// What's shown is copied into an image of this size.
+constexpr uint32_t kShownWidth = 1280, kShownHeight = 720;
+constexpr VkFormat kShownFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
+
+// EDRAM: 2048 tiles of 80x16 samples at 32 bits a sample.
+constexpr uint32_t kEdramTiles = 2048;
+
+// Device fields: the bound surfaces (render targets 0-3, then depth).
+constexpr uint32_t kDeviceDepthStencil = 12200;
+
+// A surface object's words (see "Resources" in docs/gpu-functions.md):
+// +24 RB_SURFACE_INFO (pitch in bits 0-13, MSAA in bits 16-17), +28
+// RB_COLOR_INFO or RB_DEPTH_INFO (EDRAM base in bits 0-11, format in bits
+// 16-19).
+struct Surface {
+  uint32_t pitch, msaa, edram_base, format;
+};
+Surface ReadSurface(uint8_t* base, uint32_t object) {
+  uint32_t surface_info = guest::LoadU32(base, object + 24);
+  uint32_t info = guest::LoadU32(base, object + 28);
+  return {surface_info & 0x3FFF, (surface_info >> 16) & 3, info & 0xFFF, (info >> 16) & 0xF};
+}
+
+// How a colour format is drawn. 7e3 and its high-precision blending
+// variant (which draws switch between, see render states 308-320) share
+// one; the fixed-point -32..32 formats are drawn as floats.
+VkFormat ColorFormat(uint32_t format) {
+  switch (xenos::ColorRenderTargetFormat(format)) {
+    case xenos::ColorRenderTargetFormat::k_8_8_8_8:
+    case xenos::ColorRenderTargetFormat::k_8_8_8_8_GAMMA:
+      return VK_FORMAT_R8G8B8A8_UNORM;
+    case xenos::ColorRenderTargetFormat::k_2_10_10_10:
+    case xenos::ColorRenderTargetFormat::k_2_10_10_10_AS_10_10_10_10:
+      return VK_FORMAT_A2B10G10R10_UNORM_PACK32;
+    case xenos::ColorRenderTargetFormat::k_2_10_10_10_FLOAT:
+    case xenos::ColorRenderTargetFormat::k_2_10_10_10_FLOAT_AS_16_16_16_16:
+    case xenos::ColorRenderTargetFormat::k_16_16_16_16:
+    case xenos::ColorRenderTargetFormat::k_16_16_16_16_FLOAT:
+      return VK_FORMAT_R16G16B16A16_SFLOAT;
+    case xenos::ColorRenderTargetFormat::k_16_16:
+    case xenos::ColorRenderTargetFormat::k_16_16_FLOAT:
+      return VK_FORMAT_R16G16_SFLOAT;
+    case xenos::ColorRenderTargetFormat::k_32_FLOAT:
+      return VK_FORMAT_R32_SFLOAT;
+    case xenos::ColorRenderTargetFormat::k_32_32_FLOAT:
+      return VK_FORMAT_R32G32_SFLOAT;
+    default:
+      return VK_FORMAT_UNDEFINED;
+  }
+}
+
+VkSampleCountFlagBits SampleCount(uint32_t msaa) {
+  return msaa == 2 ? VK_SAMPLE_COUNT_4_BIT : msaa == 1 ? VK_SAMPLE_COUNT_2_BIT
+                                                       : VK_SAMPLE_COUNT_1_BIT;
+}
+
+// Each surface gets an image of its pitch, as tall as the EDRAM from its
+// base holds (2x MSAA doubles the samples down, 4x also across).
+VkExtent2D SurfaceExtent(const Surface& surface, bool depth) {
+  uint32_t samples_x = surface.msaa == 2 ? 2 : 1, samples_y = surface.msaa ? 2 : 1;
+  bool wide = !depth && xenos::IsColorRenderTargetFormat64bpp(
+                            xenos::ColorRenderTargetFormat(surface.format));
+  uint32_t tiles_across = std::max((surface.pitch * samples_x + 79) / 80, 1u) * (wide ? 2 : 1);
+  uint32_t tile_rows = (kEdramTiles - std::min(surface.edram_base, kEdramTiles - 1)) / tiles_across;
+  uint32_t height = tile_rows * 16 / samples_y;
+  return {std::max(surface.pitch, 1u), std::clamp(height, 16u, 4096u)};
+}
+
+constexpr VkAccessFlags kAllAccess = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
+
+// Changes an image's layout, waiting for everything before.
+void Transition(VkCommandBuffer commands, VkImage image, VkImageAspectFlags aspect,
+                VkImageLayout& layout, VkImageLayout wanted) {
+  if (layout == wanted) {
+    return;
+  }
+  VkImageMemoryBarrier barrier{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
+  barrier.srcAccessMask = kAllAccess;
+  barrier.dstAccessMask = kAllAccess;
+  barrier.oldLayout = layout;
+  barrier.newLayout = wanted;
+  barrier.srcQueueFamilyIndex = barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+  barrier.image = image;
+  barrier.subresourceRange = {aspect, 0, VK_REMAINING_MIP_LEVELS, 0, VK_REMAINING_ARRAY_LAYERS};
+  vk::vkCmdPipelineBarrier(commands, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+                           VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr, 0, nullptr, 1,
+                           &barrier);
+  layout = wanted;
+}
+
+constexpr VkImageAspectFlags kDepthStencilAspects =
+    VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
+
+// Resolve draws a frame can make (a descriptor set each).
+constexpr uint32_t kResolvesPerFrame = 256;
 
 // Per frame in flight: the draws' constants.
 constexpr VkDeviceSize kConstantRingSize = 32u << 20;
@@ -135,12 +239,29 @@ struct PipelineKey {
   uint32_t z_enable, z_write, z_func;
   uint32_t blend_enable, src_color, dst_color, color_op, src_alpha, dst_alpha, alpha_op;
   uint32_t write_mask;
+  // The targets: colour format (UNDEFINED for none), depth or not, samples.
+  uint32_t color_format, depth, samples;
 };
 
 struct Image {
   VkImage image = VK_NULL_HANDLE;
   VkDeviceMemory memory = VK_NULL_HANDLE;
   VkImageView view = VK_NULL_HANDLE;
+};
+
+// A surface's image: what's drawn while it's bound, and resolved from.
+struct Target {
+  bool depth;
+  Surface surface;
+  VkFormat format;
+  VkSampleCountFlagBits samples;
+  VkExtent2D extent;
+  Image image;               // view: for drawing (depth and stencil)
+  VkImageView sample_view;   // for resolving (depth only, for depth)
+  VkImageLayout layout = VK_IMAGE_LAYOUT_UNDEFINED;
+  VkImageAspectFlags aspects() const {
+    return depth ? kDepthStencilAspects : VK_IMAGE_ASPECT_COLOR_BIT;
+  }
 };
 
 // Texture descriptor sets (sets 2 and 3) a frame can allocate, and their
@@ -150,7 +271,7 @@ constexpr uint32_t kTextureDescriptorsPerFrame = 16384;
 
 }  // namespace
 
-struct MainView::State {
+struct Passes::State {
   DeviceContext context{};
   VkPhysicalDeviceMemoryProperties memory_properties{};
   uint32_t frames_in_flight = 0;
@@ -164,8 +285,35 @@ struct MainView::State {
   uint8_t* guest_memory_mapped = nullptr;
   std::unordered_set<uint64_t> mirrored;  // address << 32 | size, this frame
 
-  Image color, depth;
+  // Targets by surface (colour or depth, EDRAM base, pitch, samples, the
+  // format they're drawn in), and the ones being drawn into now.
+  std::map<std::array<uint32_t, 5>, Target> targets;
+  Target* bound_color = nullptr;
+  Target* bound_depth = nullptr;
+  VkExtent2D render_extent{};
   bool rendering = false;
+  Target* main_view = nullptr;  // drawn into this frame
+
+  // What's shown, and this frame's resolve destinations (for showing one).
+  Image shown;
+  VkImageLayout shown_layout = VK_IMAGE_LAYOUT_UNDEFINED;
+  struct Resolved {
+    VkImage image;
+    VkExtent2D extent;
+  };
+  std::vector<Resolved> frame_resolves;
+
+  // Resolves: drawn with our own shaders (src/native/glsl), sampling the
+  // source target; pipelines by destination format and multisampling.
+  VkDescriptorSetLayout resolve_set_layout = VK_NULL_HANDLE;
+  VkPipelineLayout resolve_layout = VK_NULL_HANDLE;
+  VkShaderModule resolve_vertex = VK_NULL_HANDLE, resolve_pixel = VK_NULL_HANDLE,
+                 resolve_pixel_ms = VK_NULL_HANDLE;
+  VkSampler resolve_sampler = VK_NULL_HANDLE;
+  std::map<std::pair<VkFormat, bool>, VkPipeline> resolve_pipelines;
+  std::vector<VkDescriptorPool> resolve_pools;  // per frame in flight
+  // Source and destination pairs logged so far.
+  std::unordered_set<uint64_t> logged_resolves;
 
   struct Ring {
     VkBuffer buffer = VK_NULL_HANDLE;
@@ -202,7 +350,20 @@ struct MainView::State {
 
   bool CreateImage(Image& out, VkImageType type, VkImageViewType view_type, VkFormat format,
                    VkExtent3D extent, uint32_t layers, VkImageUsageFlags usage,
-                   VkImageAspectFlags aspect, VkImageCreateFlags flags = 0);
+                   VkImageAspectFlags aspect, VkImageCreateFlags flags = 0,
+                   VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT);
+  // The bound surface's target, made (and cleared) on first use; null if
+  // its format isn't drawn.
+  Target* GetTarget(VkCommandBuffer commands, uint8_t* base, uint32_t object, bool depth);
+  // Clears the whole target (aspects: all if 0).
+  void ClearTarget(VkCommandBuffer commands, Target& target, const VkClearValue& value,
+                   VkImageAspectFlags aspects = 0);
+  // Draws the source's rectangle into the resolve's destination texture.
+  bool ResolveInto(VkCommandBuffer commands, uint8_t* base, Target& source, uint32_t destination,
+                   uint32_t item, uint32_t fields, uint32_t flags);
+  bool CreateResolveResources();
+  VkPipeline GetResolvePipeline(VkFormat format, bool multisample);
+  void EndRendering(VkCommandBuffer commands);
   bool CreateGuestMemoryMirror();
   void Mirror(uint8_t* base, uint32_t address, uint32_t size);
   bool CreateRings();
@@ -216,13 +377,14 @@ struct MainView::State {
   VkShaderModule GetModule(TranslatedShader* shader);
   VkPipeline GetPipeline(const PipelineKey& key);
   bool Reserve(VkDeviceSize size, uint32_t& offset, uint8_t*& data);
-  void BeginRendering(VkCommandBuffer commands, float clear_depth);
+  void BeginRendering(VkCommandBuffer commands, Target* color, Target* depth);
+  void Draw(VkCommandBuffer commands, uint8_t* base, uint32_t device, uint32_t item);
 };
 
-bool MainView::State::CreateImage(Image& out, VkImageType type, VkImageViewType view_type,
+bool Passes::State::CreateImage(Image& out, VkImageType type, VkImageViewType view_type,
                                   VkFormat format, VkExtent3D extent, uint32_t layers,
                                   VkImageUsageFlags usage, VkImageAspectFlags aspect,
-                                  VkImageCreateFlags flags) {
+                                  VkImageCreateFlags flags, VkSampleCountFlagBits samples) {
   VkDevice device = context.device;
   VkImageCreateInfo info{VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO};
   info.flags = flags;
@@ -231,7 +393,7 @@ bool MainView::State::CreateImage(Image& out, VkImageType type, VkImageViewType 
   info.extent = extent;
   info.mipLevels = 1;
   info.arrayLayers = layers;
-  info.samples = VK_SAMPLE_COUNT_1_BIT;
+  info.samples = samples;
   info.tiling = VK_IMAGE_TILING_OPTIMAL;
   info.usage = usage;
   info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
@@ -257,7 +419,7 @@ bool MainView::State::CreateImage(Image& out, VkImageType type, VkImageViewType 
   return vk::vkCreateImageView(device, &view, nullptr, &out.view) == VK_SUCCESS;
 }
 
-bool MainView::State::CreateGuestMemoryMirror() {
+bool Passes::State::CreateGuestMemoryMirror() {
   VkDevice device = context.device;
   VkBufferCreateInfo info{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
   info.size = kPhysicalMemorySize;
@@ -291,7 +453,7 @@ bool MainView::State::CreateGuestMemoryMirror() {
   return true;
 }
 
-void MainView::State::Mirror(uint8_t* base, uint32_t address, uint32_t size) {
+void Passes::State::Mirror(uint8_t* base, uint32_t address, uint32_t size) {
   if (!size || address >= kPhysicalMemorySize) {
     return;
   }
@@ -304,7 +466,7 @@ void MainView::State::Mirror(uint8_t* base, uint32_t address, uint32_t size) {
   stats.mirrored_bytes += size;
 }
 
-bool MainView::State::CreateRings() {
+bool Passes::State::CreateRings() {
   VkDevice device = context.device;
   rings.resize(frames_in_flight);
   for (Ring& ring : rings) {
@@ -345,7 +507,7 @@ bool MainView::State::CreateRings() {
   return true;
 }
 
-bool MainView::State::CreateDescriptors() {
+bool Passes::State::CreateDescriptors() {
   VkDevice device = context.device;
   VkDescriptorPoolSize sizes[] = {
       {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 4},
@@ -428,7 +590,7 @@ bool MainView::State::CreateDescriptors() {
   return vk::vkCreateSampler(device, &sampler_info, nullptr, &sampler) == VK_SUCCESS;
 }
 
-bool MainView::State::CreateDummyTextures() {
+bool Passes::State::CreateDummyTextures() {
   constexpr VkImageUsageFlags kUsage =
       VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
   if (!CreateImage(dummy_2d_array, VK_IMAGE_TYPE_2D, VK_IMAGE_VIEW_TYPE_2D_ARRAY,
@@ -496,7 +658,7 @@ bool MainView::State::CreateDummyTextures() {
   return true;
 }
 
-VkDescriptorSetLayout MainView::State::GetTextureLayout(const TranslatedShader* shader,
+VkDescriptorSetLayout Passes::State::GetTextureLayout(const TranslatedShader* shader,
                                                        VkShaderStageFlags stage) {
   // Keyed by stage, the image types and the sampler count.
   std::string key(1, char(stage));
@@ -530,7 +692,7 @@ VkDescriptorSetLayout MainView::State::GetTextureLayout(const TranslatedShader* 
   return layout;
 }
 
-VkDescriptorSet MainView::State::GetTextureSet(uint8_t* base, const TranslatedShader* shader,
+VkDescriptorSet Passes::State::GetTextureSet(uint8_t* base, const TranslatedShader* shader,
                                                VkDescriptorSetLayout layout) {
   // The views and samplers for the shader's bindings, from the current
   // fetch constants; placeholders for what can't be had.
@@ -594,7 +756,7 @@ VkDescriptorSet MainView::State::GetTextureSet(uint8_t* base, const TranslatedSh
   return it->second;
 }
 
-VkPipelineLayout MainView::State::GetPipelineLayout(VkDescriptorSetLayout vertex,
+VkPipelineLayout Passes::State::GetPipelineLayout(VkDescriptorSetLayout vertex,
                                                     VkDescriptorSetLayout pixel) {
   std::string key(reinterpret_cast<const char*>(&vertex), sizeof(vertex));
   key.append(reinterpret_cast<const char*>(&pixel), sizeof(pixel));
@@ -609,7 +771,7 @@ VkPipelineLayout MainView::State::GetPipelineLayout(VkDescriptorSetLayout vertex
   return layout;
 }
 
-VkShaderModule MainView::State::GetModule(TranslatedShader* shader) {
+VkShaderModule Passes::State::GetModule(TranslatedShader* shader) {
   if (!shader) {
     return VK_NULL_HANDLE;
   }
@@ -622,7 +784,7 @@ VkShaderModule MainView::State::GetModule(TranslatedShader* shader) {
   return shader->module;
 }
 
-VkPipeline MainView::State::GetPipeline(const PipelineKey& key) {
+VkPipeline Passes::State::GetPipeline(const PipelineKey& key) {
   std::string key_bytes(reinterpret_cast<const char*>(&key), sizeof(key));
   auto [it, added] = pipelines.try_emplace(key_bytes, VK_NULL_HANDLE);
   if (!added) {
@@ -657,7 +819,7 @@ VkPipeline MainView::State::GetPipeline(const PipelineKey& key) {
   raster.lineWidth = 1.0f;
   VkPipelineMultisampleStateCreateInfo multisample{
       VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO};
-  multisample.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+  multisample.rasterizationSamples = VkSampleCountFlagBits(key.samples);
   VkPipelineDepthStencilStateCreateInfo depth{
       VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO};
   depth.depthTestEnable = key.z_enable;
@@ -673,18 +835,19 @@ VkPipeline MainView::State::GetPipeline(const PipelineKey& key) {
   attachment.alphaBlendOp = VkBlendOp(key.alpha_op);
   attachment.colorWriteMask = key.write_mask;
   VkPipelineColorBlendStateCreateInfo blend{VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO};
-  blend.attachmentCount = 1;
+  bool has_color = key.color_format != VK_FORMAT_UNDEFINED;
+  blend.attachmentCount = has_color ? 1 : 0;
   blend.pAttachments = &attachment;
   VkDynamicState dynamic_states[] = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
   VkPipelineDynamicStateCreateInfo dynamic{VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO};
   dynamic.dynamicStateCount = 2;
   dynamic.pDynamicStates = dynamic_states;
-  VkFormat color_format = kColorFormat;
+  VkFormat color_format = VkFormat(key.color_format);
   VkPipelineRenderingCreateInfo rendering{VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO};
-  rendering.colorAttachmentCount = 1;
+  rendering.colorAttachmentCount = has_color ? 1 : 0;
   rendering.pColorAttachmentFormats = &color_format;
-  rendering.depthAttachmentFormat = kDepthFormat;
-  rendering.stencilAttachmentFormat = kDepthFormat;
+  rendering.depthAttachmentFormat = key.depth ? kDepthFormat : VK_FORMAT_UNDEFINED;
+  rendering.stencilAttachmentFormat = rendering.depthAttachmentFormat;
 
   VkGraphicsPipelineCreateInfo info{VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO};
   info.pNext = &rendering;
@@ -710,7 +873,7 @@ VkPipeline MainView::State::GetPipeline(const PipelineKey& key) {
   return it->second;
 }
 
-bool MainView::State::Reserve(VkDeviceSize size, uint32_t& offset, uint8_t*& data) {
+bool Passes::State::Reserve(VkDeviceSize size, uint32_t& offset, uint8_t*& data) {
   VkDeviceSize alignment = std::max<VkDeviceSize>(context.min_uniform_buffer_offset_alignment, 16);
   VkDeviceSize start = (ring_offset + alignment - 1) / alignment * alignment;
   if (start + size > kConstantRingSize) {
@@ -722,53 +885,350 @@ bool MainView::State::Reserve(VkDeviceSize size, uint32_t& offset, uint8_t*& dat
   return true;
 }
 
-void MainView::State::BeginRendering(VkCommandBuffer commands, float clear_depth) {
-  VkImageMemoryBarrier barriers[2] = {};
-  for (VkImageMemoryBarrier& barrier : barriers) {
-    barrier = {VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
-    barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    barrier.srcQueueFamilyIndex = barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+void Passes::State::EndRendering(VkCommandBuffer commands) {
+  if (rendering) {
+    vk::vkCmdEndRendering(commands);
+    rendering = false;
   }
-  barriers[0].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-  barriers[0].newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-  barriers[0].image = color.image;
-  barriers[0].subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-  barriers[1].dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-  barriers[1].newLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-  barriers[1].image = depth.image;
-  barriers[1].subresourceRange = {VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT, 0, 1,
-                                  0, 1};
-  vk::vkCmdPipelineBarrier(commands, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                           VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
-                               VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
-                           0, 0, nullptr, 0, nullptr, 2, barriers);
+}
+
+void Passes::State::BeginRendering(VkCommandBuffer commands, Target* color, Target* depth) {
+  if (rendering && bound_color == color && bound_depth == depth) {
+    return;
+  }
+  EndRendering(commands);
   VkRenderingAttachmentInfo color_attachment{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
-  color_attachment.imageView = color.view;
-  color_attachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-  color_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-  color_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-  color_attachment.clearValue.color = {{0.0f, 0.0f, 0.0f, 1.0f}};
   VkRenderingAttachmentInfo depth_attachment{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
-  depth_attachment.imageView = depth.view;
-  depth_attachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-  depth_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-  depth_attachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-  depth_attachment.clearValue.depthStencil = {clear_depth, 0};
   VkRenderingInfo info{VK_STRUCTURE_TYPE_RENDERING_INFO};
-  info.renderArea = {{0, 0}, {kTargetWidth, kTargetHeight}};
+  VkExtent2D extent{UINT32_MAX, UINT32_MAX};
+  if (color) {
+    Transition(commands, color->image.image, color->aspects(), color->layout,
+               VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+    color_attachment.imageView = color->image.view;
+    color_attachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    color_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+    color_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    info.colorAttachmentCount = 1;
+    info.pColorAttachments = &color_attachment;
+    extent = color->extent;
+  }
+  if (depth) {
+    Transition(commands, depth->image.image, depth->aspects(), depth->layout,
+               VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+    depth_attachment.imageView = depth->image.view;
+    depth_attachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    depth_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+    depth_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    info.pDepthAttachment = &depth_attachment;
+    info.pStencilAttachment = &depth_attachment;
+    extent = {std::min(extent.width, depth->extent.width),
+              std::min(extent.height, depth->extent.height)};
+  }
+  info.renderArea = {{0, 0}, extent};
   info.layerCount = 1;
-  info.colorAttachmentCount = 1;
-  info.pColorAttachments = &color_attachment;
-  info.pDepthAttachment = &depth_attachment;
-  info.pStencilAttachment = &depth_attachment;
   vk::vkCmdBeginRendering(commands, &info);
+  bound_color = color;
+  bound_depth = depth;
+  render_extent = extent;
   rendering = true;
 }
 
-MainView::MainView() : state_(std::make_unique<State>()) {}
-MainView::~MainView() = default;
+Target* Passes::State::GetTarget(VkCommandBuffer commands, uint8_t* base, uint32_t object,
+                                 bool depth) {
+  Surface surface = ReadSurface(base, object);
+  VkFormat format = depth ? kDepthFormat : ColorFormat(surface.format);
+  if (format == VK_FORMAT_UNDEFINED || !surface.pitch) {
+    return nullptr;
+  }
+  std::array<uint32_t, 5> key{uint32_t(depth), surface.edram_base, surface.pitch, surface.msaa,
+                              uint32_t(format)};
+  auto [it, added] = targets.try_emplace(key);
+  Target& t = it->second;
+  if (!added) {
+    return t.image.image ? &t : nullptr;
+  }
+  t.depth = depth;
+  t.surface = surface;
+  t.format = format;
+  t.samples = SampleCount(surface.msaa);
+  t.extent = SurfaceExtent(surface, depth);
+  VkImageUsageFlags usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
+                            VK_IMAGE_USAGE_TRANSFER_DST_BIT |
+                            (depth ? VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT
+                                   : VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
+  if (!CreateImage(t.image, VK_IMAGE_TYPE_2D, VK_IMAGE_VIEW_TYPE_2D, format,
+                   {t.extent.width, t.extent.height, 1}, 1, usage, t.aspects(), 0, t.samples)) {
+    REXLOG_ERROR("native renderer: couldn't create a {}x{} target", t.extent.width,
+                 t.extent.height);
+    t.image = {};
+    return nullptr;
+  }
+  t.sample_view = t.image.view;
+  if (depth) {
+    VkImageViewCreateInfo view{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
+    view.image = t.image.image;
+    view.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    view.format = format;
+    view.subresourceRange = {VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1};
+    vk::vkCreateImageView(context.device, &view, nullptr, &t.sample_view);
+  }
+  REXLOG_INFO("native renderer: {} target: EDRAM base {}, pitch {}, MSAA {}, format {}; {}x{}",
+              depth ? "depth" : "colour", surface.edram_base, surface.pitch, surface.msaa,
+              surface.format, t.extent.width, t.extent.height);
+  stats.targets++;
+  VkClearValue initial{};
+  initial.depthStencil = {1.0f, 0};
+  if (!depth) {
+    initial.color = {{0.0f, 0.0f, 0.0f, 0.0f}};
+  }
+  ClearTarget(commands, t, initial);
+  return &t;
+}
 
-bool MainView::Init(const DeviceContext& context, uint8_t* base, uint32_t frames_in_flight) {
+void Passes::State::ClearTarget(VkCommandBuffer commands, Target& target,
+                                const VkClearValue& value, VkImageAspectFlags aspects) {
+  EndRendering(commands);
+  Transition(commands, target.image.image, target.aspects(), target.layout,
+             VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+  VkImageSubresourceRange range{aspects ? aspects : target.aspects(), 0, 1, 0, 1};
+  if (target.depth) {
+    vk::vkCmdClearDepthStencilImage(commands, target.image.image,
+                                    VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &value.depthStencil, 1,
+                                    &range);
+  } else {
+    vk::vkCmdClearColorImage(commands, target.image.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                             &value.color, 1, &range);
+  }
+}
+
+bool Passes::State::CreateResolveResources() {
+  VkDevice device = context.device;
+  VkDescriptorSetLayoutBinding binding{0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1,
+                                       VK_SHADER_STAGE_FRAGMENT_BIT, nullptr};
+  VkDescriptorSetLayoutCreateInfo set_info{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
+  set_info.bindingCount = 1;
+  set_info.pBindings = &binding;
+  if (vk::vkCreateDescriptorSetLayout(device, &set_info, nullptr, &resolve_set_layout) !=
+      VK_SUCCESS) {
+    return false;
+  }
+  VkPushConstantRange push{VK_SHADER_STAGE_FRAGMENT_BIT, 0, 16};
+  VkPipelineLayoutCreateInfo layout_info{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
+  layout_info.setLayoutCount = 1;
+  layout_info.pSetLayouts = &resolve_set_layout;
+  layout_info.pushConstantRangeCount = 1;
+  layout_info.pPushConstantRanges = &push;
+  if (vk::vkCreatePipelineLayout(device, &layout_info, nullptr, &resolve_layout) != VK_SUCCESS) {
+    return false;
+  }
+  auto module = [&](const uint32_t* code, size_t size, VkShaderModule& out) {
+    VkShaderModuleCreateInfo info{VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO};
+    info.codeSize = size;
+    info.pCode = code;
+    return vk::vkCreateShaderModule(device, &info, nullptr, &out) == VK_SUCCESS;
+  };
+  if (!module(k_resolve_vert, sizeof(k_resolve_vert), resolve_vertex) ||
+      !module(k_resolve_frag, sizeof(k_resolve_frag), resolve_pixel) ||
+      !module(k_resolve_ms_frag, sizeof(k_resolve_ms_frag), resolve_pixel_ms)) {
+    return false;
+  }
+  VkSamplerCreateInfo sampler_info{VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO};
+  sampler_info.addressModeU = sampler_info.addressModeV = sampler_info.addressModeW =
+      VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+  if (vk::vkCreateSampler(device, &sampler_info, nullptr, &resolve_sampler) != VK_SUCCESS) {
+    return false;
+  }
+  resolve_pools.resize(frames_in_flight);
+  for (VkDescriptorPool& pool : resolve_pools) {
+    VkDescriptorPoolSize size{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, kResolvesPerFrame};
+    VkDescriptorPoolCreateInfo pool_info{VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
+    pool_info.maxSets = kResolvesPerFrame;
+    pool_info.poolSizeCount = 1;
+    pool_info.pPoolSizes = &size;
+    if (vk::vkCreateDescriptorPool(device, &pool_info, nullptr, &pool) != VK_SUCCESS) {
+      return false;
+    }
+  }
+  return true;
+}
+
+VkPipeline Passes::State::GetResolvePipeline(VkFormat format, bool multisample) {
+  auto [it, added] = resolve_pipelines.try_emplace({format, multisample}, VK_NULL_HANDLE);
+  if (!added) {
+    return it->second;
+  }
+  VkPipelineShaderStageCreateInfo stages[2] = {};
+  for (VkPipelineShaderStageCreateInfo& stage : stages) {
+    stage = {VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO};
+    stage.pName = "main";
+  }
+  stages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
+  stages[0].module = resolve_vertex;
+  stages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+  stages[1].module = multisample ? resolve_pixel_ms : resolve_pixel;
+  VkPipelineVertexInputStateCreateInfo vertex_input{
+      VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO};
+  VkPipelineInputAssemblyStateCreateInfo input_assembly{
+      VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO};
+  input_assembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+  VkPipelineViewportStateCreateInfo viewport{VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO};
+  viewport.viewportCount = 1;
+  viewport.scissorCount = 1;
+  VkPipelineRasterizationStateCreateInfo raster{
+      VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO};
+  raster.polygonMode = VK_POLYGON_MODE_FILL;
+  raster.cullMode = VK_CULL_MODE_NONE;
+  raster.lineWidth = 1.0f;
+  VkPipelineMultisampleStateCreateInfo multisample_state{
+      VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO};
+  multisample_state.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+  VkPipelineColorBlendAttachmentState attachment{};
+  attachment.colorWriteMask = 0xF;
+  VkPipelineColorBlendStateCreateInfo blend{VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO};
+  blend.attachmentCount = 1;
+  blend.pAttachments = &attachment;
+  VkDynamicState dynamic_states[] = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
+  VkPipelineDynamicStateCreateInfo dynamic{VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO};
+  dynamic.dynamicStateCount = 2;
+  dynamic.pDynamicStates = dynamic_states;
+  VkPipelineRenderingCreateInfo rendering{VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO};
+  rendering.colorAttachmentCount = 1;
+  rendering.pColorAttachmentFormats = &format;
+  VkGraphicsPipelineCreateInfo info{VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO};
+  info.pNext = &rendering;
+  info.stageCount = 2;
+  info.pStages = stages;
+  info.pVertexInputState = &vertex_input;
+  info.pInputAssemblyState = &input_assembly;
+  info.pViewportState = &viewport;
+  info.pRasterizationState = &raster;
+  info.pMultisampleState = &multisample_state;
+  info.pColorBlendState = &blend;
+  info.pDynamicState = &dynamic;
+  info.layout = resolve_layout;
+  if (vk::vkCreateGraphicsPipelines(context.device, VK_NULL_HANDLE, 1, &info, nullptr,
+                                    &it->second) != VK_SUCCESS) {
+    REXLOG_ERROR("native renderer: couldn't create a resolve pipeline for format {}",
+                 int(format));
+    it->second = VK_NULL_HANDLE;
+  }
+  return it->second;
+}
+
+bool Passes::State::ResolveInto(VkCommandBuffer commands, uint8_t* base, Target& source,
+                                uint32_t destination, uint32_t item, uint32_t fields,
+                                uint32_t flags) {
+  // The destination texture's fetch constant (+28..+48), its addresses
+  // made physical as SetTexture makes them.
+  uint32_t fetch[6];
+  for (uint32_t k = 0; k < 6; k++) {
+    fetch[k] = guest::LoadU32(base, destination + 28 + 4 * k);
+  }
+  fetch[1] = (fetch[1] & 0xFFFu) | GpuPhysicalAddress(fetch[1] & 0xFFFFF000u);
+  fetch[5] = (fetch[5] & 0xFFFu) | GpuPhysicalAddress(fetch[5] & 0xFFFFF000u);
+  TextureCache::ResolveDestination dest;
+  if (!textures.GetResolveDestination(fetch, dest)) {
+    return false;
+  }
+  // Source rectangle (left, top, right, bottom) and destination point.
+  int32_t left = 0, top = 0, right = int32_t(dest.width), bottom = int32_t(dest.height);
+  if (fields & 1) {
+    left = int32_t(guest::LoadU32(base, item + 8));
+    top = int32_t(guest::LoadU32(base, item + 12));
+    right = int32_t(guest::LoadU32(base, item + 16));
+    bottom = int32_t(guest::LoadU32(base, item + 20));
+  }
+  int32_t x = 0, y = 0;
+  if (fields & 4) {
+    x = int32_t(guest::LoadU32(base, item + 28));
+    y = int32_t(guest::LoadU32(base, item + 32));
+  }
+  left = std::max(left, 0);
+  top = std::max(top, 0);
+  right = std::min(right, int32_t(source.extent.width));
+  bottom = std::min(bottom, int32_t(source.extent.height));
+  int32_t width = std::min(right - left, int32_t(dest.width) - x);
+  int32_t height = std::min(bottom - top, int32_t(dest.height) - y);
+  uint64_t log_key = uint64_t(reinterpret_cast<uintptr_t>(&source)) * 31 + (fetch[1] >> 12);
+  if (logged_resolves.insert(log_key).second) {
+    REXLOG_INFO("native renderer: resolve from {} target (EDRAM base {}, pitch {}, MSAA {}, "
+                "format {}) rect {},{}-{},{} to {:08X} at {},{}, flags {:08X}",
+                source.depth ? "depth" : "colour", source.surface.edram_base,
+                source.surface.pitch, source.surface.msaa, source.surface.format, left, top, right,
+                bottom, fetch[1] & 0xFFFFF000u, x, y, flags);
+  }
+  if (width <= 0 || height <= 0 || x < 0 || y < 0) {
+    return false;
+  }
+  VkPipeline pipeline = GetResolvePipeline(dest.format, source.samples != VK_SAMPLE_COUNT_1_BIT);
+  if (!pipeline) {
+    return false;
+  }
+  VkDescriptorSet set;
+  VkDescriptorSetAllocateInfo alloc{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
+  alloc.descriptorPool = resolve_pools[frame];
+  alloc.descriptorSetCount = 1;
+  alloc.pSetLayouts = &resolve_set_layout;
+  if (vk::vkAllocateDescriptorSets(context.device, &alloc, &set) != VK_SUCCESS) {
+    return false;
+  }
+  VkImageLayout read_layout = source.depth ? VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL
+                                           : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+  VkDescriptorImageInfo image_info{resolve_sampler, source.sample_view, read_layout};
+  VkWriteDescriptorSet write{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+  write.dstSet = set;
+  write.descriptorCount = 1;
+  write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+  write.pImageInfo = &image_info;
+  vk::vkUpdateDescriptorSets(context.device, 1, &write, 0, nullptr);
+
+  EndRendering(commands);
+  Transition(commands, source.image.image, source.aspects(), source.layout, read_layout);
+  VkImageLayout dest_layout =
+      dest.fresh ? VK_IMAGE_LAYOUT_UNDEFINED : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+  Transition(commands, dest.image, VK_IMAGE_ASPECT_COLOR_BIT, dest_layout,
+             VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+  VkRect2D rect{{x, y}, {uint32_t(width), uint32_t(height)}};
+  VkRenderingAttachmentInfo attachment{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
+  attachment.imageView = dest.view;
+  attachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+  attachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+  attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+  VkRenderingInfo info{VK_STRUCTURE_TYPE_RENDERING_INFO};
+  info.renderArea = rect;
+  info.layerCount = 1;
+  info.colorAttachmentCount = 1;
+  info.pColorAttachments = &attachment;
+  vk::vkCmdBeginRendering(commands, &info);
+  VkViewport viewport{float(x), float(y), float(width), float(height), 0.0f, 1.0f};
+  vk::vkCmdSetViewport(commands, 0, 1, &viewport);
+  vk::vkCmdSetScissor(commands, 0, 1, &rect);
+  vk::vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+  vk::vkCmdBindDescriptorSets(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, resolve_layout, 0, 1,
+                              &set, 0, nullptr);
+  // The exponent bias: flags bits 26-31, signed (likely; 0xF4000000 is -3
+  // on the main view's HDR copies).
+  struct {
+    int32_t offset[2];
+    int32_t samples;
+    float scale;
+  } constants{{left - x, top - y},
+              source.depth ? 1 : int32_t(source.samples),
+              std::ldexp(1.0f, int32_t(flags) >> 26)};
+  vk::vkCmdPushConstants(commands, resolve_layout, VK_SHADER_STAGE_FRAGMENT_BIT, 0,
+                         sizeof(constants), &constants);
+  vk::vkCmdDraw(commands, 3, 1, 0, 0);
+  vk::vkCmdEndRendering(commands);
+  Transition(commands, dest.image, VK_IMAGE_ASPECT_COLOR_BIT, dest_layout,
+             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+  frame_resolves.push_back({dest.image, {dest.width, dest.height}});
+  return true;
+}
+
+Passes::Passes() : state_(std::make_unique<State>()) {}
+Passes::~Passes() = default;
+
+bool Passes::Init(const DeviceContext& context, uint8_t* base, uint32_t frames_in_flight) {
   State& s = *state_;
   s.context = context;
   s.frames_in_flight = frames_in_flight;
@@ -776,21 +1236,13 @@ bool MainView::Init(const DeviceContext& context, uint8_t* base, uint32_t frames
   if (!s.CreateGuestMemoryMirror()) {
     return false;
   }
-  if (!s.CreateImage(s.color, VK_IMAGE_TYPE_2D, VK_IMAGE_VIEW_TYPE_2D, kColorFormat,
-                     {kTargetWidth, kTargetHeight, 1}, 1,
-                     VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
-                         VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+  if (!s.CreateImage(s.shown, VK_IMAGE_TYPE_2D, VK_IMAGE_VIEW_TYPE_2D, kShownFormat,
+                     {kShownWidth, kShownHeight, 1}, 1,
+                     VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
                      VK_IMAGE_ASPECT_COLOR_BIT) ||
-      !s.CreateImage(s.depth, VK_IMAGE_TYPE_2D, VK_IMAGE_VIEW_TYPE_2D, kDepthFormat,
-                     {kTargetWidth, kTargetHeight, 1}, 1,
-                     VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
-                     VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT)) {
-    REXLOG_ERROR("native renderer: couldn't create the main view's target");
-    return false;
-  }
-  if (!s.CreateRings() || !s.CreateDescriptors() || !s.CreateDummyTextures() ||
-      !s.textures.Init(context, frames_in_flight)) {
-    REXLOG_ERROR("native renderer: couldn't create the main view's resources");
+      !s.CreateRings() || !s.CreateDescriptors() || !s.CreateDummyTextures() ||
+      !s.CreateResolveResources() || !s.textures.Init(context, frames_in_flight)) {
+    REXLOG_ERROR("native renderer: couldn't create the passes' resources");
     return false;
   }
   ShaderFeatures features;
@@ -802,48 +1254,60 @@ bool MainView::Init(const DeviceContext& context, uint8_t* base, uint32_t frames
   return true;
 }
 
-void MainView::BeginFrame(uint32_t frame_index) {
-  state_->frame = frame_index;
-  state_->ring_offset = 0;
-  state_->rendering = false;
-  state_->mirrored.clear();
-  state_->texture_sets.clear();
-  vk::vkResetDescriptorPool(state_->context.device, state_->rings[frame_index].texture_pool, 0);
-  state_->textures.BeginFrame(frame_index);
+void Passes::BeginFrame(uint32_t frame_index) {
+  State& s = *state_;
+  s.frame = frame_index;
+  s.ring_offset = 0;
+  s.rendering = false;
+  s.bound_color = s.bound_depth = nullptr;
+  s.main_view = nullptr;
+  s.frame_resolves.clear();
+  s.mirrored.clear();
+  s.texture_sets.clear();
+  vk::vkResetDescriptorPool(s.context.device, s.rings[frame_index].texture_pool, 0);
+  vk::vkResetDescriptorPool(s.context.device, s.resolve_pools[frame_index], 0);
+  s.textures.BeginFrame(frame_index);
 }
 
-VkCommandBuffer MainView::EndUploads() {
+VkCommandBuffer Passes::EndUploads() {
   return state_->textures.EndUploads();
 }
 
-void MainView::AfterDraw(VkCommandBuffer commands, uint8_t* base, uint32_t id, uint32_t payload,
-                         uint32_t arg1) {
-  State& s = *state_;
+void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t device,
+                         uint32_t item) {
+  State& s = *this;
   auto& regs = s.regs;
-  uint32_t device = guest::LoadU32(base, kDevicePointer);
-  ReadRegisters(base, device, regs);
+  // The bound surfaces: render target 0 and depth (others aren't drawn).
+  uint32_t color_object = guest::LoadU32(base, device + kDeviceRenderTarget0);
+  uint32_t depth_object = guest::LoadU32(base, device + kDeviceDepthStencil);
+  for (uint32_t i = 1; i < 4; i++) {
+    if (guest::LoadU32(base, device + kDeviceRenderTarget0 + 4 * i)) {
+      s.stats.extra_targets++;
+      break;
+    }
+  }
+  Target* color = color_object ? s.GetTarget(commands, base, color_object, false) : nullptr;
+  Target* depth = depth_object ? s.GetTarget(commands, base, depth_object, true) : nullptr;
+  if (!color && !depth) {
+    s.stats.failed++;
+    return;
+  }
+  if (color && depth && color->samples != depth->samples) {
+    s.stats.mismatched_samples++;
+    return;
+  }
+  // The area both can be drawn in.
+  VkExtent2D extent = color ? color->extent : depth->extent;
+  if (color && depth) {
+    extent = {std::min(color->extent.width, depth->extent.width),
+              std::min(color->extent.height, depth->extent.height)};
+  }
 
-  // Only the main view for now.
-  auto surface_info = regs.Get<reg::RB_SURFACE_INFO>();
-  auto color_info = regs.Get<reg::RB_COLOR_INFO>(reg::RB_COLOR_INFO::rt_register_indices[0]);
-  // Its format switches per draw between 2_10_10_10_FLOAT (3) and the
-  // high-precision blending variant (12), by render states 308-320.
-  bool main_view_format =
-      color_info.color_format == xenos::ColorRenderTargetFormat::k_2_10_10_10_FLOAT ||
-      color_info.color_format == xenos::ColorRenderTargetFormat::k_2_10_10_10_FLOAT_AS_16_16_16_16;
-  if (surface_info.surface_pitch != 1040 || surface_info.msaa_samples != xenos::MsaaSamples::k2X ||
-      !main_view_format) {
-    s.stats.other_passes++;
-    return;
-  }
-  // Only single indexed draws for now (command 18 with one item).
-  if (id != 18 || arg1 != 1) {
-    s.stats.unsupported++;
-    return;
-  }
-  uint32_t type = guest::LoadU32(base, payload);
-  uint32_t base_start = guest::LoadU32(base, payload + 4);
-  uint32_t primitive_count = guest::LoadU32(base, payload + 8);
+  // Command 18's item: [primitive type, base vertex << 16 | start index,
+  // primitive count].
+  uint32_t type = guest::LoadU32(base, item);
+  uint32_t base_start = guest::LoadU32(base, item + 4);
+  uint32_t primitive_count = guest::LoadU32(base, item + 8);
   PrimitiveInfo primitive;
   if (!GetPrimitiveInfo(type, primitive)) {
     s.stats.unsupported++;
@@ -898,7 +1362,7 @@ void MainView::AfterDraw(VkCommandBuffer commands, uint8_t* base, uint32_t id, u
   // blocks, so take it as the library keeps it: enabled by render state 200
   // (device +11600), rectangle (left, top, right, bottom) at +12416 from
   // SetScissorRect; otherwise the whole target.
-  draw_util::Scissor scissor{{0, 0}, {kTargetWidth, kTargetHeight}};
+  draw_util::Scissor scissor{{0, 0}, {extent.width, extent.height}};
   if (guest::LoadU32(base, device + kDeviceScissorEnable)) {
     int32_t left = int32_t(guest::LoadU32(base, device + kDeviceScissorRect));
     int32_t top = int32_t(guest::LoadU32(base, device + kDeviceScissorRect + 4));
@@ -909,8 +1373,8 @@ void MainView::AfterDraw(VkCommandBuffer commands, uint8_t* base, uint32_t id, u
     scissor.extent[0] = uint32_t(std::max(right - int32_t(scissor.offset[0]), 0));
     scissor.extent[1] = uint32_t(std::max(bottom - int32_t(scissor.offset[1]), 0));
   }
-  uint32_t scissor_right = std::min(scissor.offset[0] + scissor.extent[0], kTargetWidth);
-  uint32_t scissor_bottom = std::min(scissor.offset[1] + scissor.extent[1], kTargetHeight);
+  uint32_t scissor_right = std::min(scissor.offset[0] + scissor.extent[0], extent.width);
+  uint32_t scissor_bottom = std::min(scissor.offset[1] + scissor.extent[1], extent.height);
   if (!viewport_info.xy_extent[0] || !viewport_info.xy_extent[1] ||
       scissor.offset[0] >= scissor_right || scissor.offset[1] >= scissor_bottom) {
     s.stats.invisible++;
@@ -1048,9 +1512,14 @@ void MainView::AfterDraw(VkCommandBuffer commands, uint8_t* base, uint32_t id, u
   key.cull_mode = (mode.cull_front ? VK_CULL_MODE_FRONT_BIT : 0) |
                   (mode.cull_back ? VK_CULL_MODE_BACK_BIT : 0);
   key.front_clockwise = mode.face != 0;
-  key.z_enable = depth_control.z_enable;
-  key.z_write = depth_control.z_write_enable;
-  key.z_func = uint32_t(depth_control.zfunc);
+  if (depth) {
+    key.z_enable = depth_control.z_enable;
+    key.z_write = depth_control.z_write_enable;
+    key.z_func = uint32_t(depth_control.zfunc);
+  }
+  key.color_format = color ? color->format : VK_FORMAT_UNDEFINED;
+  key.depth = depth != nullptr;
+  key.samples = color ? color->samples : depth->samples;
   auto blend = regs.Get<reg::RB_BLENDCONTROL>(reg::RB_BLENDCONTROL::rt_register_indices[0]);
   key.src_color = BlendFactor(uint32_t(blend.color_srcblend));
   key.dst_color = BlendFactor(uint32_t(blend.color_destblend));
@@ -1087,9 +1556,10 @@ void MainView::AfterDraw(VkCommandBuffer commands, uint8_t* base, uint32_t id, u
   }
 
   // Draw.
-  if (!s.rendering) {
-    // Reversed depth (greater, greater or equal) clears to 0.
-    s.BeginRendering(commands, key.z_func == 4 || key.z_func == 6 ? 0.0f : 1.0f);
+  s.BeginRendering(commands, color, depth);
+  if (color && color->surface.pitch == kMainViewPitch && color->samples == VK_SAMPLE_COUNT_2_BIT &&
+      color->format == VK_FORMAT_R16G16B16A16_SFLOAT) {
+    s.main_view = color;
   }
   VkViewport viewport{float(viewport_info.xy_offset[0]), float(viewport_info.xy_offset[1]),
                       float(viewport_info.xy_extent[0]), float(viewport_info.xy_extent[1]),
@@ -1109,57 +1579,181 @@ void MainView::AfterDraw(VkCommandBuffer commands, uint8_t* base, uint32_t id, u
   s.stats.drawn++;
 }
 
-void MainView::EndFrame(VkCommandBuffer commands) {
+void Passes::AfterDraw(VkCommandBuffer commands, uint8_t* base, uint32_t id, uint32_t payload,
+                       uint32_t arg1) {
   State& s = *state_;
-  VkImageMemoryBarrier barrier{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
-  barrier.srcQueueFamilyIndex = barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-  barrier.image = s.color.image;
-  barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-  if (s.rendering) {
-    vk::vkCmdEndRendering(commands);
-    s.rendering = false;
-    barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-    barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-    barrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-    vk::vkCmdPipelineBarrier(commands, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                             VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1,
-                             &barrier);
+  // Only indexed draws for now (command 18, 12 bytes an item).
+  if (id != 18) {
+    s.stats.unsupported += arg1;
     return;
   }
-  // No main view this frame (menus): a dark blue target.
-  barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-  barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-  barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-  vk::vkCmdPipelineBarrier(commands, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                           VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1, &barrier);
-  VkClearColorValue colour{{0.0f, 0.05f, 0.15f, 1.0f}};
-  vk::vkCmdClearColorImage(commands, s.color.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &colour,
-                           1, &barrier.subresourceRange);
-  barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-  barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-  barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-  barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-  vk::vkCmdPipelineBarrier(commands, VK_PIPELINE_STAGE_TRANSFER_BIT,
-                           VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1, &barrier);
+  uint32_t device = guest::LoadU32(base, kDevicePointer);
+  ReadRegisters(base, device, s.regs);
+  for (uint32_t i = 0; i < arg1; i++) {
+    s.Draw(commands, base, device, payload + 12 * i);
+  }
 }
 
-VkImage MainView::target() const {
-  return state_->color.image;
+void Passes::AfterClear(VkCommandBuffer commands, uint8_t* base, uint32_t payload,
+                        uint32_t arg1) {
+  State& s = *state_;
+  uint32_t device = guest::LoadU32(base, kDevicePointer);
+  // Command 26's item (280 bytes): +4 rect count (rects from +12), +8 flags
+  // (bits 0-3 render targets 0-3, 0x10 Z, 0x20 stencil), +268 colour
+  // (D3DCOLOR), +272 Z, +276 stencil. Rects aren't kept: the whole target
+  // is cleared.
+  for (uint32_t i = 0; i < arg1; i++) {
+    uint32_t item = payload + 280 * i;
+    uint32_t flags = guest::LoadU32(base, item + 8);
+    s.stats.clears++;
+    if (guest::LoadU32(base, item + 4)) {
+      s.stats.clear_rects++;
+    }
+    if (flags & 0xF) {
+      uint32_t color = guest::LoadU32(base, item + 268);
+      VkClearValue value{};
+      value.color = {{float((color >> 16) & 0xFF) / 255.0f, float((color >> 8) & 0xFF) / 255.0f,
+                      float(color & 0xFF) / 255.0f, float(color >> 24) / 255.0f}};
+      if (flags & 0xE) {
+        s.stats.extra_targets++;
+      }
+      if (uint32_t object = guest::LoadU32(base, device + kDeviceRenderTarget0); object && (flags & 1)) {
+        if (Target* target = s.GetTarget(commands, base, object, false)) {
+          s.ClearTarget(commands, *target, value);
+        }
+      }
+    }
+    if (flags & 0x30) {
+      uint32_t object = guest::LoadU32(base, device + kDeviceDepthStencil);
+      Target* target = object ? s.GetTarget(commands, base, object, true) : nullptr;
+      if (target) {
+        VkClearValue value{};
+        uint32_t z = guest::LoadU32(base, item + 272);
+        std::memcpy(&value.depthStencil.depth, &z, 4);
+        value.depthStencil.stencil = guest::LoadU32(base, item + 276) & 0xFF;
+        s.ClearTarget(commands, *target, value,
+                      ((flags & 0x10) ? VK_IMAGE_ASPECT_DEPTH_BIT : 0) |
+                          ((flags & 0x20) ? VK_IMAGE_ASPECT_STENCIL_BIT : 0));
+      }
+    }
+  }
 }
 
-VkExtent2D MainView::target_extent() const {
-  return {kTargetWidth, kTargetHeight};
+void Passes::AfterResolve(VkCommandBuffer commands, uint8_t* base, uint32_t payload,
+                          uint32_t arg1) {
+  State& s = *state_;
+  uint32_t device = guest::LoadU32(base, kDevicePointer);
+  // Command 25's item (68 bytes; see "Pass command items" in
+  // docs/gpu-functions.md). Flags as the XDK's D3DRESOLVE ones, likely:
+  // bits 0-1 render target, 0x4 depth instead, 0x100 then clear the render
+  // target, 0x200 clear depth and stencil, bits 26-31 exponent bias.
+  constexpr uint32_t kKnownFlags = 0xFC000000u | 0x300 | 0x7;
+  for (uint32_t i = 0; i < arg1; i++) {
+    uint32_t item = payload + 68 * i;
+    uint32_t fields = guest::LoadU32(base, item);
+    uint32_t flags = guest::LoadU32(base, item + 4);
+    if (flags & ~kKnownFlags) {
+      s.stats.resolve_unknown_flags++;
+      s.stats.resolve_flags_sample = flags;
+    }
+    bool from_depth = flags & 4;
+    uint32_t color_object = guest::LoadU32(base, device + kDeviceRenderTarget0 + 4 * (flags & 3));
+    uint32_t depth_object = guest::LoadU32(base, device + kDeviceDepthStencil);
+    uint32_t source_object = from_depth ? depth_object : color_object;
+    Target* source =
+        source_object ? s.GetTarget(commands, base, source_object, from_depth) : nullptr;
+    uint32_t destination = (fields & 2) ? guest::LoadU32(base, item + 24) : 0;
+    bool level_or_slice = guest::LoadU32(base, item + 36) || guest::LoadU32(base, item + 40);
+    if (source && destination && !level_or_slice &&
+        s.ResolveInto(commands, base, *source, destination, item, fields, flags)) {
+      s.stats.resolves++;
+    } else {
+      s.stats.resolves_skipped++;
+    }
+    if ((flags & 0x100) && color_object) {
+      if (Target* target = s.GetTarget(commands, base, color_object, false)) {
+        VkClearValue value{};
+        if (fields & 8) {
+          for (uint32_t c = 0; c < 4; c++) {
+            value.color.float32[c] = float(guest::LoadU8(base, item + 44 + c)) / 255.0f;
+          }
+        }
+        s.ClearTarget(commands, *target, value);
+      }
+    }
+    if ((flags & 0x200) && depth_object) {
+      if (Target* target = s.GetTarget(commands, base, depth_object, true)) {
+        VkClearValue value{};
+        uint32_t z = guest::LoadU32(base, item + 48);
+        std::memcpy(&value.depthStencil.depth, &z, 4);
+        value.depthStencil.stencil = guest::LoadU32(base, item + 52) & 0xFF;
+        s.ClearTarget(commands, *target, value);
+      }
+    }
+  }
 }
 
-MainView::Stats MainView::TakeStats() {
+VkExtent2D Passes::EndFrame(VkCommandBuffer commands, int32_t show_resolve) {
+  State& s = *state_;
+  s.EndRendering(commands);
+  VkImage shown = s.shown.image;
+  Transition(commands, shown, VK_IMAGE_ASPECT_COLOR_BIT, s.shown_layout,
+             VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+  VkExtent2D extent{kMainViewWidth, kMainViewHeight};
+  if (show_resolve >= 0 && size_t(show_resolve) < s.frame_resolves.size()) {
+    // A resolve destination, as is.
+    const State::Resolved& resolved = s.frame_resolves[show_resolve];
+    extent = {std::min(resolved.extent.width, kShownWidth),
+              std::min(resolved.extent.height, kShownHeight)};
+    VkImageLayout layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    Transition(commands, resolved.image, VK_IMAGE_ASPECT_COLOR_BIT, layout,
+               VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+    VkImageBlit blit{};
+    blit.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+    blit.srcOffsets[1] = {int32_t(extent.width), int32_t(extent.height), 1};
+    blit.dstSubresource = blit.srcSubresource;
+    blit.dstOffsets[1] = blit.srcOffsets[1];
+    vk::vkCmdBlitImage(commands, resolved.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, shown,
+                       VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit, VK_FILTER_NEAREST);
+    Transition(commands, resolved.image, VK_IMAGE_ASPECT_COLOR_BIT, layout,
+               VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+  } else if (Target* main = s.main_view) {
+    // The main view's drawn part, its samples averaged.
+    Transition(commands, main->image.image, main->aspects(), main->layout,
+               VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+    extent = {std::min(kMainViewWidth, main->extent.width),
+              std::min(kMainViewHeight, main->extent.height)};
+    VkImageResolve region{};
+    region.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+    region.dstSubresource = region.srcSubresource;
+    region.extent = {extent.width, extent.height, 1};
+    vk::vkCmdResolveImage(commands, main->image.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, shown,
+                          VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+  } else {
+    // No main view this frame (menus): dark blue.
+    VkClearColorValue colour{{0.0f, 0.05f, 0.15f, 1.0f}};
+    VkImageSubresourceRange range{VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+    vk::vkCmdClearColorImage(commands, shown, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &colour, 1,
+                             &range);
+  }
+  Transition(commands, shown, VK_IMAGE_ASPECT_COLOR_BIT, s.shown_layout,
+             VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+  return extent;
+}
+
+VkImage Passes::shown() const {
+  return state_->shown.image;
+}
+
+Passes::Stats Passes::TakeStats() {
   Stats stats = state_->stats;
   stats.textures = state_->textures.TakeStats();
   stats.shaders_translated = state_->shaders->translated();
   stats.shaders_failed = state_->shaders->failed();
-  uint32_t pipelines = state_->stats.pipelines;
+  uint32_t pipelines = state_->stats.pipelines, targets = state_->stats.targets;
   state_->stats = {};
   state_->stats.pipelines = pipelines;
+  state_->stats.targets = targets;
   return stats;
 }
 
