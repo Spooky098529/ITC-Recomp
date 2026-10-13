@@ -301,9 +301,23 @@ struct Passes::State {
     VkImage image;
     VkExtent2D extent;
     uint32_t address, format, flags;
+    VkFormat host_format;
   };
   std::vector<Resolved> frame_resolves;
   uint64_t frames = 0;  // for logging the resolve list now and then
+  size_t last_frame_resolves = 0;
+
+  // A dump being read back: the images' data, one after another.
+  struct Dumped {
+    std::string name;
+    VkFormat format;
+    VkExtent2D extent;
+    VkDeviceSize offset;
+  };
+  std::vector<Dumped> dumped;
+  VkBuffer dump_buffer = VK_NULL_HANDLE;
+  VkDeviceMemory dump_memory = VK_NULL_HANDLE;
+  void RecordDump(VkCommandBuffer commands, VkExtent2D shown_extent);
   bool logged_extra_targets = false;
 
   // Resolves: drawn with our own shaders (src/native/glsl), sampling the
@@ -1225,7 +1239,7 @@ bool Passes::State::ResolveInto(VkCommandBuffer commands, uint8_t* base, Target&
   Transition(commands, dest.image, VK_IMAGE_ASPECT_COLOR_BIT, dest_layout,
              VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
   frame_resolves.push_back({dest.image, {dest.width, dest.height}, fetch[1] & 0xFFFFF000u,
-                            fetch[1] & 0x3F, flags});
+                            fetch[1] & 0x3F, flags, dest.format});
   return true;
 }
 
@@ -1710,9 +1724,10 @@ void Passes::AfterResolve(VkCommandBuffer commands, uint8_t* base, uint32_t payl
   }
 }
 
-VkExtent2D Passes::EndFrame(VkCommandBuffer commands, int32_t show_resolve) {
+VkExtent2D Passes::EndFrame(VkCommandBuffer commands, int32_t show_resolve, bool dump) {
   State& s = *state_;
   s.EndRendering(commands);
+  s.last_frame_resolves = s.frame_resolves.size();
   // The frame's resolves, now and then, to pick one to show.
   if (s.frames++ % 1200 == 600 && !s.frame_resolves.empty()) {
     std::string list;
@@ -1765,7 +1780,176 @@ VkExtent2D Passes::EndFrame(VkCommandBuffer commands, int32_t show_resolve) {
   }
   Transition(commands, shown, VK_IMAGE_ASPECT_COLOR_BIT, s.shown_layout,
              VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+  if (dump) {
+    s.RecordDump(commands, extent);
+  }
   return extent;
+}
+
+size_t Passes::frame_resolve_count() const {
+  return state_->last_frame_resolves;
+}
+
+namespace {
+
+uint32_t BytesPerPixel(VkFormat format) {
+  switch (format) {
+    case VK_FORMAT_R16G16B16A16_UNORM:
+    case VK_FORMAT_R16G16B16A16_SFLOAT:
+    case VK_FORMAT_R32G32_SFLOAT:
+      return 8;
+    case VK_FORMAT_R32G32B32A32_SFLOAT:
+      return 16;
+    case VK_FORMAT_R8_UNORM:
+      return 1;
+    case VK_FORMAT_R8G8_UNORM:
+    case VK_FORMAT_R16_UNORM:
+    case VK_FORMAT_R16_SFLOAT:
+      return 2;
+    default:
+      return 4;
+  }
+}
+
+float HalfToFloat(uint16_t h) {
+  uint32_t sign = uint32_t(h >> 15) << 31, exponent = (h >> 10) & 0x1F, mantissa = h & 0x3FF;
+  float value;
+  if (exponent == 0) {
+    value = std::ldexp(float(mantissa), -24);
+  } else if (exponent == 31) {
+    value = mantissa ? NAN : INFINITY;
+  } else {
+    value = std::ldexp(float(mantissa | 0x400), int(exponent) - 25);
+  }
+  return sign ? -value : value;
+}
+
+// A pixel as RGB floats (missing components 0).
+void ToRgb(VkFormat format, const uint8_t* p, float out[3]) {
+  out[0] = out[1] = out[2] = 0.0f;
+  uint16_t h[4];
+  uint32_t w;
+  float f;
+  switch (format) {
+    case VK_FORMAT_R8G8B8A8_UNORM:
+      for (int c = 0; c < 3; c++) out[c] = p[c] / 255.0f;
+      break;
+    case VK_FORMAT_A2B10G10R10_UNORM_PACK32:
+      std::memcpy(&w, p, 4);
+      for (int c = 0; c < 3; c++) out[c] = float((w >> (10 * c)) & 0x3FF) / 1023.0f;
+      break;
+    case VK_FORMAT_R16G16B16A16_UNORM:
+      std::memcpy(h, p, 8);
+      for (int c = 0; c < 3; c++) out[c] = h[c] / 65535.0f;
+      break;
+    case VK_FORMAT_R16G16_UNORM:
+      std::memcpy(h, p, 4);
+      for (int c = 0; c < 2; c++) out[c] = h[c] / 65535.0f;
+      break;
+    case VK_FORMAT_R16G16B16A16_SFLOAT:
+      std::memcpy(h, p, 8);
+      for (int c = 0; c < 3; c++) out[c] = HalfToFloat(h[c]);
+      break;
+    case VK_FORMAT_R16G16_SFLOAT:
+      std::memcpy(h, p, 4);
+      for (int c = 0; c < 2; c++) out[c] = HalfToFloat(h[c]);
+      break;
+    case VK_FORMAT_R32_SFLOAT:
+      std::memcpy(&f, p, 4);
+      out[0] = out[1] = out[2] = f;
+      break;
+    default:
+      break;
+  }
+}
+
+}  // namespace
+
+void Passes::State::RecordDump(VkCommandBuffer commands, VkExtent2D shown_extent) {
+  dumped.clear();
+  VkDeviceSize size = 0;
+  auto add = [&](std::string name, VkFormat format, VkExtent2D extent) {
+    dumped.push_back({std::move(name), format, extent, size});
+    size += (VkDeviceSize(extent.width) * extent.height * BytesPerPixel(format) + 15) & ~15ull;
+  };
+  add("shown", kShownFormat, shown_extent);
+  for (size_t i = 0; i < frame_resolves.size(); i++) {
+    const Resolved& r = frame_resolves[i];
+    add(fmt::format("resolve_{:02}_{:08X}_format{}", i, r.address, r.format), r.host_format,
+        r.extent);
+  }
+  VkBufferCreateInfo info{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
+  info.size = size;
+  info.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+  VkMemoryRequirements requirements;
+  if (vk::vkCreateBuffer(context.device, &info, nullptr, &dump_buffer) != VK_SUCCESS) {
+    dumped.clear();
+    return;
+  }
+  vk::vkGetBufferMemoryRequirements(context.device, dump_buffer, &requirements);
+  VkMemoryAllocateInfo alloc{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
+  alloc.allocationSize = requirements.size;
+  alloc.memoryTypeIndex =
+      FindMemoryType(memory_properties, requirements.memoryTypeBits,
+                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+  if (vk::vkAllocateMemory(context.device, &alloc, nullptr, &dump_memory) != VK_SUCCESS ||
+      vk::vkBindBufferMemory(context.device, dump_buffer, dump_memory, 0) != VK_SUCCESS) {
+    dumped.clear();
+    return;
+  }
+  for (size_t i = 0; i < dumped.size(); i++) {
+    VkImage image = i == 0 ? shown.image : frame_resolves[i - 1].image;
+    VkImageLayout layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    if (i) {
+      Transition(commands, image, VK_IMAGE_ASPECT_COLOR_BIT, layout,
+                 VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+    }
+    VkBufferImageCopy copy{};
+    copy.bufferOffset = dumped[i].offset;
+    copy.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+    copy.imageExtent = {dumped[i].extent.width, dumped[i].extent.height, 1};
+    vk::vkCmdCopyImageToBuffer(commands, image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, dump_buffer,
+                               1, &copy);
+    if (i) {
+      Transition(commands, image, VK_IMAGE_ASPECT_COLOR_BIT, layout,
+                 VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    }
+  }
+}
+
+void Passes::WriteDump(const std::string& directory) {
+  State& s = *state_;
+  if (s.dumped.empty()) {
+    return;
+  }
+  uint8_t* data = nullptr;
+  vk::vkMapMemory(s.context.device, s.dump_memory, 0, VK_WHOLE_SIZE, 0,
+                  reinterpret_cast<void**>(&data));
+  for (const State::Dumped& d : s.dumped) {
+    std::string path = directory + "/" + d.name + ".pfm";
+    FILE* file = std::fopen(path.c_str(), "wb");
+    if (!file) {
+      REXLOG_ERROR("native renderer: couldn't write {}", path);
+      continue;
+    }
+    // PFM: rows bottom to top, little-endian floats.
+    std::fprintf(file, "PF\n%u %u\n-1.0\n", d.extent.width, d.extent.height);
+    uint32_t bpp = BytesPerPixel(d.format);
+    std::vector<float> row(size_t(d.extent.width) * 3);
+    for (uint32_t y = d.extent.height; y-- > 0;) {
+      for (uint32_t x = 0; x < d.extent.width; x++) {
+        ToRgb(d.format, data + d.offset + (size_t(y) * d.extent.width + x) * bpp, &row[3 * x]);
+      }
+      std::fwrite(row.data(), sizeof(float), row.size(), file);
+    }
+    std::fclose(file);
+  }
+  REXLOG_INFO("native renderer: dumped {} images into {}", s.dumped.size(), directory);
+  vk::vkDestroyBuffer(s.context.device, s.dump_buffer, nullptr);
+  vk::vkFreeMemory(s.context.device, s.dump_memory, nullptr);
+  s.dump_buffer = VK_NULL_HANDLE;
+  s.dump_memory = VK_NULL_HANDLE;
+  s.dumped.clear();
 }
 
 VkImage Passes::shown() const {

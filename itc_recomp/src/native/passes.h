@@ -9,6 +9,7 @@
 #include <array>
 #include <cstdint>
 #include <memory>
+#include <string>
 
 #include "device_context.h"
 #include "textures.h"
@@ -36,7 +37,14 @@ class Passes {
   // `shown()` returns, in TRANSFER_SRC_OPTIMAL: the main view, or with
   // show_resolve >= 0 that resolve of the frame's destination (a debugging
   // aid). Returns the size of what was put there.
-  VkExtent2D EndFrame(VkCommandBuffer commands, int32_t show_resolve);
+  // dump: also copy the frame's resolve destinations and what's shown
+  // into memory, for WriteDump once the frame is done (a debugging aid).
+  VkExtent2D EndFrame(VkCommandBuffer commands, int32_t show_resolve, bool dump);
+  // After a frame that dumped has finished on the GPU: writes each image as
+  // a PFM file into the directory (tools/pfm_to_png.py makes PNGs of them).
+  void WriteDump(const std::string& directory);
+  // How many resolves the last frame made (a race frame makes about 25).
+  size_t frame_resolve_count() const;
   VkImage shown() const;
   // The frame's texture uploads, to be submitted before its commands; null
   // if none.

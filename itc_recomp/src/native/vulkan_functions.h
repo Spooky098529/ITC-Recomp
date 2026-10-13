@@ -89,6 +89,8 @@
   X(vkCmdSetScissor)                   \
   X(vkCmdBlitImage)                    \
   X(vkCmdCopyBufferToImage)            \
+  X(vkCmdCopyImageToBuffer)            \
+  X(vkQueueWaitIdle)                   \
   X(vkResetCommandPool)                \
   X(vkResetDescriptorPool)
 

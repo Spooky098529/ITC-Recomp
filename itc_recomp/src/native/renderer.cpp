@@ -29,6 +29,10 @@ REXCVAR_DEFINE_INT32(native_renderer_show_resolve, -1, "ITC",
                      "Show the frame's nth resolve destination in the native renderer's window "
                      "instead of the main view (a debugging aid; -1 for the main view)");
 
+REXCVAR_DEFINE_STRING(native_renderer_dump, "", "ITC",
+                      "Directory to write one race frame's resolve destinations and main view "
+                      "into, as PFM files, once the race has run 10 s (a debugging aid)");
+
 namespace native {
 namespace {
 
@@ -148,6 +152,8 @@ class Renderer {
   DeviceContext context_{};
   Passes passes_;
   bool recording_ = false;  // this frame's command buffer is open
+  bool dumped_ = false;
+  uint32_t race_frames_ = 0;
 
   // This frame's commands (milestone 1: counted only).
   uint32_t frame_commands_ = 0, frame_draws_ = 0;
@@ -448,7 +454,14 @@ void Renderer::EndFrame() {
   frame_commands_ = frame_draws_ = 0;
 
   VkCommandBuffer commands = BeginFrame();
-  VkExtent2D source = passes_.EndFrame(commands, REXCVAR_GET(native_renderer_show_resolve));
+  // A dump, once: from the 600th frame with a race's resolves on.
+  bool dump = false;
+  if (!dumped_ && !REXCVAR_GET(native_renderer_dump).empty() &&
+      passes_.frame_resolve_count() >= 20 && ++race_frames_ >= 600) {
+    dump = dumped_ = true;
+  }
+  VkExtent2D source =
+      passes_.EndFrame(commands, REXCVAR_GET(native_renderer_show_resolve), dump);
   Frame& frame = frames_[frame_index_];
 
   // Copy what's shown onto a swapchain image, if one can be had now.
@@ -531,6 +544,10 @@ void Renderer::EndFrame() {
     frames_presented_++;
   } else {
     frames_skipped_++;
+  }
+  if (dump) {
+    vk::vkQueueWaitIdle(queue_);
+    passes_.WriteDump(REXCVAR_GET(native_renderer_dump));
   }
   frame_index_ = (frame_index_ + 1) % kFramesInFlight;
   LogStats();
