@@ -187,6 +187,7 @@ own window shows them right. What's known (2026-10-13):
   their first 240), none reloaded.
 - Not resolve destinations: no lookup got one of another size or format.
 - Not z-fighting: no draw uses an equal depth test; depth bias didn't help.
+- Not the interpolation: still there with `--interpolate_draw_state=false`.
 - Smooth gradients look like a texture's small mips sampled with stretched
   coordinates, which would point at a constant (texture coordinate
   transform) read wrong; not checked.
@@ -264,6 +265,9 @@ texture objects ("Resources"). The approach:
    (a log line names an example since `2c13992`; not run yet).
 
 ## Known issues
+
+- **The rainbow effect** on buildings (see "The rainbow effect" under
+  milestone 4): cause not found; set aside until more of the frame is drawn.
 
 - Textures are never freed: memory reused for different textures (another
   race) leaves the old images behind.
