@@ -309,7 +309,19 @@ struct Passes::State {
   // record_draws, each draw is described in a line (written with a dump).
   uint64_t skip_pixel_shader = 0;
   bool record_draws = false;
-  std::vector<std::string> recorded_draws;
+  struct RecordedDraw {
+    bool main_view, has_color, has_depth;
+    Surface surface;
+    uint64_t vertex, pixel;
+    uint32_t type, count;
+    struct Texture {
+      bool pixel;
+      ShaderTexture texture;
+      uint32_t fetch[6];
+    };
+    std::vector<Texture> textures;
+  };
+  std::vector<RecordedDraw> recorded_draws;
   // The pixel shaders drawn into the main view this frame and the last.
   std::vector<uint64_t> frame_pixel_shaders, last_pixel_shaders;
 
@@ -1458,29 +1470,28 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
     }
   }
   if (record_draws) {
-    std::string line = fmt::format(
-        "draw {}: {} target pitch {} MSAA {} format {}, depth {}; vs {:016X} ps {:016X}; "
-        "primitive {} x{}",
-        recorded_draws.size(), main_view_draw ? "main view" : "other",
-        color ? color->surface.pitch : depth->surface.pitch,
-        color ? color->surface.msaa : depth->surface.msaa, color ? int(color->surface.format) : -1,
-        depth ? "yes" : "no", vertex->hash, pixel ? pixel->hash : 0, type, primitive_count);
+    // Raw, to keep recording at its usual speed (the effect being looked for
+    // depends on timing); formatted with the dump.
+    RecordedDraw& r = recorded_draws.emplace_back();
+    r.main_view = main_view_draw;
+    r.surface = color ? color->surface : depth->surface;
+    r.has_color = color != nullptr;
+    r.has_depth = depth != nullptr;
+    r.vertex = vertex->hash;
+    r.pixel = pixel ? pixel->hash : 0;
+    r.type = type;
+    r.count = primitive_count;
     for (const TranslatedShader* shader : {vertex, pixel}) {
-      if (!shader) {
-        continue;
-      }
-      for (const ShaderTexture& texture : shader->textures) {
-        const uint32_t* f =
-            &regs.values[XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0 + 6 * texture.fetch_constant];
-        line += fmt::format(
-            "; {} tex {}{}: {:08X} format {} {}x{} dim {} declared {} words {:08X} {:08X} "
-            "{:08X} {:08X} {:08X} {:08X}",
-            shader == vertex ? "vs" : "ps", texture.fetch_constant, texture.is_signed ? "s" : "",
-            f[1] & 0xFFFFF000u, f[1] & 0x3F, (f[2] & 0x1FFF) + 1, ((f[2] >> 13) & 0x1FFF) + 1,
-            (f[5] >> 9) & 3, int(texture.view_type), f[0], f[1], f[2], f[3], f[4], f[5]);
+      for (size_t i = 0; shader && i < shader->textures.size(); i++) {
+        const ShaderTexture& texture = shader->textures[i];
+        RecordedDraw::Texture& t = r.textures.emplace_back();
+        t.pixel = shader == pixel;
+        t.texture = texture;
+        std::memcpy(t.fetch,
+                    &regs.values[XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0 + 6 * texture.fetch_constant],
+                    sizeof(t.fetch));
       }
     }
-    recorded_draws.push_back(std::move(line));
   }
 
   // Index buffer: +0 bit 31 = 32-bit, bits 29-30 = endianness; +24 address.
@@ -2137,7 +2148,22 @@ void Passes::WriteDump(const std::string& directory) {
   REXLOG_INFO("native renderer: dumped {} images into {}", s.dumped.size(), directory);
   if (!s.recorded_draws.empty()) {
     if (FILE* file = std::fopen((directory + "/draws.txt").c_str(), "w")) {
-      for (const std::string& line : s.recorded_draws) {
+      for (size_t n = 0; n < s.recorded_draws.size(); n++) {
+        const State::RecordedDraw& r = s.recorded_draws[n];
+        std::string line = fmt::format(
+            "draw {}: {} target pitch {} MSAA {} format {}, colour {}, depth {}; vs {:016X} ps "
+            "{:016X}; primitive {} x{}",
+            n, r.main_view ? "main view" : "other", r.surface.pitch, r.surface.msaa,
+            r.surface.format, r.has_color, r.has_depth, r.vertex, r.pixel, r.type, r.count);
+        for (const State::RecordedDraw::Texture& t : r.textures) {
+          const uint32_t* f = t.fetch;
+          line += fmt::format(
+              "; {} tex {}{}: {:08X} format {} {}x{} dim {} declared {} words {:08X} {:08X} "
+              "{:08X} {:08X} {:08X} {:08X}",
+              t.pixel ? "ps" : "vs", t.texture.fetch_constant, t.texture.is_signed ? "s" : "",
+              f[1] & 0xFFFFF000u, f[1] & 0x3F, (f[2] & 0x1FFF) + 1, ((f[2] >> 13) & 0x1FFF) + 1,
+              (f[5] >> 9) & 3, int(t.texture.view_type), f[0], f[1], f[2], f[3], f[4], f[5]);
+        }
         std::fprintf(file, "%s\n", line.c_str());
       }
       std::fclose(file);

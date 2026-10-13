@@ -469,9 +469,9 @@ VkCommandBuffer Renderer::BeginFrame() {
         REXLOG_INFO("native renderer: dumping into {}", dump_directory_);
       }
     }
-    // Its first frame describes each draw; all check the mirror.
+    // Its first frame describes each draw (cheaply: the effect being looked
+    // for went away while frames were recorded slowly).
     passes_.set_record_draws(dumping_ && dump_step_ == 0);
-    passes_.set_check_mirror(dumping_);
     passes_.set_check_mirror_frames(REXCVAR_GET(native_renderer_check_mirror));
     recording_ = true;
   }
@@ -588,11 +588,6 @@ void Renderer::EndFrame() {
   if (dump) {
     vk::vkQueueWaitIdle(queue_);
     passes_.WriteDump(dump_directory_);
-    Passes::Stats checked = passes_.TakeStats();
-    REXLOG_INFO("native renderer: dump frame {}: {} vertex or index ranges changed within the "
-                "frame ({} bytes), e.g. {:08X} ({} bytes)",
-                dump_step_, checked.mirror_rewritten, checked.mirror_rewritten_bytes,
-                checked.mirror_rewritten_sample_address, checked.mirror_rewritten_sample_size);
     if (dump_step_ == 0) {
       // Each pixel shader the main view was drawn with, left out; then all
       // textures from memory, and all resolve destinations, hidden.
