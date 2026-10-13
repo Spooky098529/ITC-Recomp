@@ -1,6 +1,6 @@
 // Milestone 2 of the native renderer (docs/native-renderer.md): draws the
 // race's main view (the 1024x576, 2x MSAA, 7e3 render target; see "A race
-// frame's passes" in docs/gpu-functions.md), untextured, into a target of
+// frame's passes" in docs/gpu-functions.md), textured, into a target of
 // our own, which the renderer copies to its window.
 
 #pragma once
@@ -9,19 +9,11 @@
 #include <cstdint>
 #include <memory>
 
+#include "device_context.h"
+#include "textures.h"
 #include "vulkan_functions.h"
 
 namespace native {
-
-struct DeviceContext {
-  VkPhysicalDevice physical_device;
-  VkDevice device;
-  uint32_t queue_family;
-  VkQueue queue;
-  uint32_t max_storage_buffer_range;
-  uint32_t min_uniform_buffer_offset_alignment;
-  bool clip_distance, cull_distance, demote_to_helper_invocation;
-};
 
 class MainView {
  public:
@@ -38,6 +30,9 @@ class MainView {
                  uint32_t arg1);
   // Ends the frame's drawing; leaves the target in TRANSFER_SRC_OPTIMAL.
   void EndFrame(VkCommandBuffer commands);
+  // The frame's texture uploads, to be submitted before its commands; null
+  // if none.
+  VkCommandBuffer EndUploads();
 
   VkImage target() const;
   VkExtent2D target_extent() const;
@@ -51,6 +46,7 @@ class MainView {
     // first word set when filled).
     uint64_t invisible = 0;
     std::array<uint32_t, 8> invisible_sample{};
+    TextureCache::Stats textures;
   };
   Stats TakeStats();
 

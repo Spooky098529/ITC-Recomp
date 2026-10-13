@@ -143,10 +143,10 @@ struct Image {
   VkImageView view = VK_NULL_HANDLE;
 };
 
-struct TextureSet {
-  VkDescriptorSetLayout layout = VK_NULL_HANDLE;
-  VkDescriptorSet set = VK_NULL_HANDLE;
-};
+// Texture descriptor sets (sets 2 and 3) a frame can allocate, and their
+// descriptors.
+constexpr uint32_t kTextureSetsPerFrame = 4096;
+constexpr uint32_t kTextureDescriptorsPerFrame = 16384;
 
 }  // namespace
 
@@ -172,6 +172,8 @@ struct MainView::State {
     VkDeviceMemory memory = VK_NULL_HANDLE;
     uint8_t* mapped = nullptr;
     VkDescriptorSet constants_set = VK_NULL_HANDLE;
+    // This frame's texture descriptor sets, reset with the frame.
+    VkDescriptorPool texture_pool = VK_NULL_HANDLE;
   };
   std::vector<Ring> rings;
   uint32_t frame = 0;
@@ -182,11 +184,15 @@ struct MainView::State {
   VkDescriptorSetLayout constants_layout = VK_NULL_HANDLE;
   VkDescriptorSet shared_memory_set = VK_NULL_HANDLE;
 
-  // Untextured for now: every texture binding gets a white 1x1 image of
-  // the declared type.
+  // Textures, and white 1x1 placeholders of each declared type for what
+  // can't be had yet.
+  TextureCache textures;
   Image dummy_2d_array, dummy_3d, dummy_cube;
   VkSampler sampler = VK_NULL_HANDLE;
-  std::unordered_map<std::string, TextureSet> texture_sets;
+  // Texture set layouts by the shader's bindings; this frame's sets by
+  // their contents.
+  std::unordered_map<std::string, VkDescriptorSetLayout> texture_layouts;
+  std::unordered_map<std::string, VkDescriptorSet> texture_sets;
   std::unordered_map<std::string, VkPipelineLayout> pipeline_layouts;
   std::unordered_map<std::string, VkPipeline> pipelines;
 
@@ -202,8 +208,11 @@ struct MainView::State {
   bool CreateRings();
   bool CreateDescriptors();
   bool CreateDummyTextures();
-  TextureSet* GetTextureSet(const TranslatedShader* shader, VkShaderStageFlags stage);
-  VkPipelineLayout GetPipelineLayout(const TextureSet& vertex, const TextureSet& pixel);
+  VkDescriptorSetLayout GetTextureLayout(const TranslatedShader* shader,
+                                         VkShaderStageFlags stage);
+  VkDescriptorSet GetTextureSet(uint8_t* base, const TranslatedShader* shader,
+                                VkDescriptorSetLayout layout);
+  VkPipelineLayout GetPipelineLayout(VkDescriptorSetLayout vertex, VkDescriptorSetLayout pixel);
   VkShaderModule GetModule(TranslatedShader* shader);
   VkPipeline GetPipeline(const PipelineKey& key);
   bool Reserve(VkDeviceSize size, uint32_t& offset, uint8_t*& data);
@@ -320,6 +329,18 @@ bool MainView::State::CreateRings() {
                         reinterpret_cast<void**>(&ring.mapped)) != VK_SUCCESS) {
       return false;
     }
+    VkDescriptorPoolSize sizes[] = {
+        {VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kTextureDescriptorsPerFrame},
+        {VK_DESCRIPTOR_TYPE_SAMPLER, kTextureDescriptorsPerFrame},
+    };
+    VkDescriptorPoolCreateInfo pool_info{VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
+    pool_info.maxSets = kTextureSetsPerFrame;
+    pool_info.poolSizeCount = 2;
+    pool_info.pPoolSizes = sizes;
+    if (vk::vkCreateDescriptorPool(device, &pool_info, nullptr, &ring.texture_pool) !=
+        VK_SUCCESS) {
+      return false;
+    }
   }
   return true;
 }
@@ -329,12 +350,10 @@ bool MainView::State::CreateDescriptors() {
   VkDescriptorPoolSize sizes[] = {
       {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 4},
       {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 5 * frames_in_flight},
-      {VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 4096},
-      {VK_DESCRIPTOR_TYPE_SAMPLER, 4096},
   };
   VkDescriptorPoolCreateInfo pool_info{VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
-  pool_info.maxSets = 1024;
-  pool_info.poolSizeCount = 4;
+  pool_info.maxSets = 1 + frames_in_flight;
+  pool_info.poolSizeCount = 2;
   pool_info.pPoolSizes = sizes;
   if (vk::vkCreateDescriptorPool(device, &pool_info, nullptr, &pool) != VK_SUCCESS) {
     return false;
@@ -477,81 +496,111 @@ bool MainView::State::CreateDummyTextures() {
   return true;
 }
 
-TextureSet* MainView::State::GetTextureSet(const TranslatedShader* shader,
-                                           VkShaderStageFlags stage) {
+VkDescriptorSetLayout MainView::State::GetTextureLayout(const TranslatedShader* shader,
+                                                       VkShaderStageFlags stage) {
   // Keyed by stage, the image types and the sampler count.
   std::string key(1, char(stage));
-  uint32_t sampler_count = shader ? shader->sampler_count : 0;
   if (shader) {
     for (const ShaderTexture& texture : shader->textures) {
       key += char('0' + texture.view_type);
     }
+    key += ':' + std::to_string(shader->samplers.size());
   }
-  key += ':' + std::to_string(sampler_count);
-  auto [it, added] = texture_sets.try_emplace(key);
-  TextureSet& set = it->second;
-  if (!added) {
-    return set.layout ? &set : nullptr;
+  VkDescriptorSetLayout& layout = texture_layouts[key];
+  if (layout) {
+    return layout;
   }
-  VkDevice device = context.device;
-  size_t texture_count = shader ? shader->textures.size() : 0;
   std::vector<VkDescriptorSetLayoutBinding> bindings;
-  for (uint32_t i = 0; i < texture_count; i++) {
-    bindings.push_back({i, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1, stage, nullptr});
-  }
-  for (uint32_t i = 0; i < sampler_count; i++) {
-    bindings.push_back(
-        {uint32_t(texture_count + i), VK_DESCRIPTOR_TYPE_SAMPLER, 1, stage, nullptr});
+  if (shader) {
+    for (uint32_t i = 0; i < shader->textures.size(); i++) {
+      bindings.push_back({i, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1, stage, nullptr});
+    }
+    for (uint32_t i = 0; i < shader->samplers.size(); i++) {
+      bindings.push_back({uint32_t(shader->textures.size() + i), VK_DESCRIPTOR_TYPE_SAMPLER, 1,
+                          stage, nullptr});
+    }
   }
   VkDescriptorSetLayoutCreateInfo layout_info{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
   layout_info.bindingCount = uint32_t(bindings.size());
   layout_info.pBindings = bindings.data();
-  VkDescriptorSetLayout layout;
-  if (vk::vkCreateDescriptorSetLayout(device, &layout_info, nullptr, &layout) != VK_SUCCESS) {
-    return nullptr;
+  if (vk::vkCreateDescriptorSetLayout(context.device, &layout_info, nullptr, &layout) !=
+      VK_SUCCESS) {
+    layout = VK_NULL_HANDLE;
+  }
+  return layout;
+}
+
+VkDescriptorSet MainView::State::GetTextureSet(uint8_t* base, const TranslatedShader* shader,
+                                               VkDescriptorSetLayout layout) {
+  // The views and samplers for the shader's bindings, from the current
+  // fetch constants; placeholders for what can't be had.
+  size_t texture_count = shader ? shader->textures.size() : 0;
+  size_t sampler_count = shader ? shader->samplers.size() : 0;
+  std::vector<VkDescriptorImageInfo> infos(texture_count + sampler_count);
+  for (size_t i = 0; i < texture_count; i++) {
+    const ShaderTexture& texture = shader->textures[i];
+    const uint32_t* fetch =
+        &regs.values[XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0 + 6 * texture.fetch_constant];
+    // The signed binding gets the same (unsigned) view: it's read only for
+    // components whose sign is signed, which this game's textures don't
+    // have (logged if they do).
+    VkImageView view = textures.GetView(base, fetch, texture.view_type);
+    if (!view) {
+      view = texture.view_type == VK_IMAGE_VIEW_TYPE_3D     ? dummy_3d.view
+             : texture.view_type == VK_IMAGE_VIEW_TYPE_CUBE ? dummy_cube.view
+                                                            : dummy_2d_array.view;
+    }
+    infos[i] = {VK_NULL_HANDLE, view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
+  }
+  for (size_t i = 0; i < sampler_count; i++) {
+    const ShaderSampler& binding = shader->samplers[i];
+    const uint32_t* fetch =
+        &regs.values[XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0 + 6 * binding.fetch_constant];
+    VkSampler texture_sampler = textures.GetSampler(
+        fetch, {binding.fetch_constant, binding.mag_filter, binding.min_filter, binding.mip_filter,
+                binding.aniso_filter});
+    infos[texture_count + i] = {texture_sampler ? texture_sampler : sampler, VK_NULL_HANDLE,
+                                VK_IMAGE_LAYOUT_UNDEFINED};
+  }
+
+  // One set per distinct contents a frame.
+  std::string key(reinterpret_cast<const char*>(&layout), sizeof(layout));
+  key.append(reinterpret_cast<const char*>(infos.data()), infos.size() * sizeof(infos[0]));
+  auto [it, added] = texture_sets.try_emplace(key, VK_NULL_HANDLE);
+  if (!added) {
+    return it->second;
   }
   VkDescriptorSetAllocateInfo alloc{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
-  alloc.descriptorPool = pool;
+  alloc.descriptorPool = rings[frame].texture_pool;
   alloc.descriptorSetCount = 1;
   alloc.pSetLayouts = &layout;
-  if (vk::vkAllocateDescriptorSets(device, &alloc, &set.set) != VK_SUCCESS) {
-    REXLOG_ERROR("native renderer: out of texture descriptor sets");
-    return nullptr;
+  if (vk::vkAllocateDescriptorSets(context.device, &alloc, &it->second) != VK_SUCCESS) {
+    it->second = VK_NULL_HANDLE;
+    return VK_NULL_HANDLE;
   }
-  set.layout = layout;
-  std::vector<VkDescriptorImageInfo> infos(bindings.size());
-  std::vector<VkWriteDescriptorSet> writes(bindings.size());
-  for (size_t i = 0; i < bindings.size(); i++) {
-    if (i < texture_count) {
-      VkImageViewType type = shader->textures[i].view_type;
-      VkImageView view = type == VK_IMAGE_VIEW_TYPE_3D     ? dummy_3d.view
-                         : type == VK_IMAGE_VIEW_TYPE_CUBE ? dummy_cube.view
-                                                           : dummy_2d_array.view;
-      infos[i] = {VK_NULL_HANDLE, view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
-    } else {
-      infos[i] = {sampler, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_UNDEFINED};
-    }
+  std::vector<VkWriteDescriptorSet> writes(infos.size());
+  for (size_t i = 0; i < infos.size(); i++) {
     writes[i] = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
-    writes[i].dstSet = set.set;
+    writes[i].dstSet = it->second;
     writes[i].dstBinding = uint32_t(i);
     writes[i].descriptorCount = 1;
-    writes[i].descriptorType = bindings[i].descriptorType;
+    writes[i].descriptorType =
+        i < texture_count ? VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE : VK_DESCRIPTOR_TYPE_SAMPLER;
     writes[i].pImageInfo = &infos[i];
   }
   if (!writes.empty()) {
-    vk::vkUpdateDescriptorSets(device, uint32_t(writes.size()), writes.data(), 0, nullptr);
+    vk::vkUpdateDescriptorSets(context.device, uint32_t(writes.size()), writes.data(), 0, nullptr);
   }
-  return &set;
+  return it->second;
 }
 
-VkPipelineLayout MainView::State::GetPipelineLayout(const TextureSet& vertex,
-                                                    const TextureSet& pixel) {
-  std::string key(reinterpret_cast<const char*>(&vertex.layout), sizeof(vertex.layout));
-  key.append(reinterpret_cast<const char*>(&pixel.layout), sizeof(pixel.layout));
+VkPipelineLayout MainView::State::GetPipelineLayout(VkDescriptorSetLayout vertex,
+                                                    VkDescriptorSetLayout pixel) {
+  std::string key(reinterpret_cast<const char*>(&vertex), sizeof(vertex));
+  key.append(reinterpret_cast<const char*>(&pixel), sizeof(pixel));
   VkPipelineLayout& layout = pipeline_layouts[key];
   if (!layout) {
-    VkDescriptorSetLayout sets[4] = {shared_memory_layout, constants_layout, vertex.layout,
-                                     pixel.layout};
+    VkDescriptorSetLayout sets[4] = {shared_memory_layout, constants_layout, vertex, pixel};
     VkPipelineLayoutCreateInfo info{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
     info.setLayoutCount = 4;
     info.pSetLayouts = sets;
@@ -739,7 +788,8 @@ bool MainView::Init(const DeviceContext& context, uint8_t* base, uint32_t frames
     REXLOG_ERROR("native renderer: couldn't create the main view's target");
     return false;
   }
-  if (!s.CreateRings() || !s.CreateDescriptors() || !s.CreateDummyTextures()) {
+  if (!s.CreateRings() || !s.CreateDescriptors() || !s.CreateDummyTextures() ||
+      !s.textures.Init(context, frames_in_flight)) {
     REXLOG_ERROR("native renderer: couldn't create the main view's resources");
     return false;
   }
@@ -757,6 +807,13 @@ void MainView::BeginFrame(uint32_t frame_index) {
   state_->ring_offset = 0;
   state_->rendering = false;
   state_->mirrored.clear();
+  state_->texture_sets.clear();
+  vk::vkResetDescriptorPool(state_->context.device, state_->rings[frame_index].texture_pool, 0);
+  state_->textures.BeginFrame(frame_index);
+}
+
+VkCommandBuffer MainView::EndUploads() {
+  return state_->textures.EndUploads();
 }
 
 void MainView::AfterDraw(VkCommandBuffer commands, uint8_t* base, uint32_t id, uint32_t payload,
@@ -904,6 +961,18 @@ void MainView::AfterDraw(VkCommandBuffer commands, uint8_t* base, uint32_t id, u
     system.ndc_offset[i] = viewport_info.ndc_offset[i];
   }
   system.alpha_test_reference = regs.Get<float>(XE_GPU_REG_RB_ALPHA_REF);
+  // Each sampled texture's post-swizzle signs, a byte per fetch constant.
+  for (const TranslatedShader* shader : {vertex, pixel}) {
+    if (!shader) {
+      continue;
+    }
+    for (const ShaderTexture& texture : shader->textures) {
+      uint32_t index = texture.fetch_constant;
+      uint8_t signs = TextureCache::SwizzledSigns(
+          &regs.values[XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0 + 6 * index]);
+      system.texture_swizzled_signs[index >> 2] |= uint32_t(signs) << (8 * (index & 3));
+    }
+  }
   for (uint32_t i = 0; i < 4; i++) {
     auto info = regs.Get<reg::RB_COLOR_INFO>(reg::RB_COLOR_INFO::rt_register_indices[i]);
     int32_t bias = info.color_exp_bias;
@@ -955,9 +1024,15 @@ void MainView::AfterDraw(VkCommandBuffer commands, uint8_t* base, uint32_t id, u
   }
   std::memcpy(data, &regs.values[XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0], kFetchConstantsRange);
 
-  // Pipeline.
-  TextureSet* vertex_textures = s.GetTextureSet(vertex, VK_SHADER_STAGE_VERTEX_BIT);
-  TextureSet* pixel_textures = s.GetTextureSet(pixel, VK_SHADER_STAGE_FRAGMENT_BIT);
+  // Pipeline and textures.
+  VkDescriptorSetLayout vertex_layout = s.GetTextureLayout(vertex, VK_SHADER_STAGE_VERTEX_BIT);
+  VkDescriptorSetLayout pixel_layout = s.GetTextureLayout(pixel, VK_SHADER_STAGE_FRAGMENT_BIT);
+  if (!vertex_layout || !pixel_layout) {
+    s.stats.failed++;
+    return;
+  }
+  VkDescriptorSet vertex_textures = s.GetTextureSet(base, vertex, vertex_layout);
+  VkDescriptorSet pixel_textures = s.GetTextureSet(base, pixel, pixel_layout);
   if (!vertex_textures || !pixel_textures) {
     s.stats.failed++;
     return;
@@ -966,7 +1041,7 @@ void MainView::AfterDraw(VkCommandBuffer commands, uint8_t* base, uint32_t id, u
   std::memset(&key, 0, sizeof(key));
   key.vertex = s.GetModule(vertex);
   key.pixel = s.GetModule(pixel);
-  key.layout = s.GetPipelineLayout(*vertex_textures, *pixel_textures);
+  key.layout = s.GetPipelineLayout(vertex_layout, pixel_layout);
   key.topology = primitive.topology;
   auto mode = regs.Get<reg::PA_SU_SC_MODE_CNTL>();
   key.primitive_restart = primitive.strip && mode.multi_prim_ib_ena;
@@ -1025,7 +1100,7 @@ void MainView::AfterDraw(VkCommandBuffer commands, uint8_t* base, uint32_t id, u
   vk::vkCmdSetScissor(commands, 0, 1, &scissor_rect);
   vk::vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
   VkDescriptorSet sets[4] = {s.shared_memory_set, s.rings[s.frame].constants_set,
-                             vertex_textures->set, pixel_textures->set};
+                             vertex_textures, pixel_textures};
   vk::vkCmdBindDescriptorSets(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, key.layout, 0, 4, sets,
                               5, offsets);
   vk::vkCmdBindIndexBuffer(commands, s.guest_memory, index_address,
@@ -1079,6 +1154,7 @@ VkExtent2D MainView::target_extent() const {
 
 MainView::Stats MainView::TakeStats() {
   Stats stats = state_->stats;
+  stats.textures = state_->textures.TakeStats();
   stats.shaders_translated = state_->shaders->translated();
   stats.shaders_failed = state_->shaders->failed();
   uint32_t pipelines = state_->stats.pipelines;

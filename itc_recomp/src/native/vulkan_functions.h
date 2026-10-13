@@ -83,7 +83,10 @@
   X(vkCmdDrawIndexed)                  \
   X(vkCmdSetViewport)                  \
   X(vkCmdSetScissor)                   \
-  X(vkCmdBlitImage)
+  X(vkCmdBlitImage)                    \
+  X(vkCmdCopyBufferToImage)            \
+  X(vkResetCommandPool)                \
+  X(vkResetDescriptorPool)
 
 namespace native::vk {
 

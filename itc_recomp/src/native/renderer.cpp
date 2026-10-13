@@ -228,6 +228,8 @@ bool Renderer::CreateDevice() {
 
   // Features: what the GPU has, of what the translated shaders can use.
   VkPhysicalDeviceVulkan13Features supported13{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES};
+  VkPhysicalDeviceVulkan12Features supported12{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES};
+  supported13.pNext = &supported12;
   VkPhysicalDeviceFeatures2 supported{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2};
   supported.pNext = &supported13;
   vk::vkGetPhysicalDeviceFeatures2(physical_device_, &supported);
@@ -238,6 +240,9 @@ bool Renderer::CreateDevice() {
   VkPhysicalDeviceVulkan13Features enabled13{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES};
   enabled13.dynamicRendering = VK_TRUE;
   enabled13.shaderDemoteToHelperInvocation = supported13.shaderDemoteToHelperInvocation;
+  VkPhysicalDeviceVulkan12Features enabled12{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES};
+  enabled12.samplerMirrorClampToEdge = supported12.samplerMirrorClampToEdge;
+  enabled13.pNext = &enabled12;
   VkPhysicalDeviceFeatures2 enabled{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2};
   enabled.pNext = &enabled13;
   enabled.features.shaderClipDistance = supported.features.shaderClipDistance;
@@ -279,6 +284,9 @@ bool Renderer::CreateDevice() {
   context_.clip_distance = enabled.features.shaderClipDistance;
   context_.cull_distance = enabled.features.shaderCullDistance;
   context_.demote_to_helper_invocation = enabled13.shaderDemoteToHelperInvocation;
+  context_.sampler_anisotropy = enabled.features.samplerAnisotropy;
+  context_.max_sampler_anisotropy = properties.limits.maxSamplerAnisotropy;
+  context_.sampler_mirror_clamp_to_edge = enabled12.samplerMirrorClampToEdge;
 
   for (Frame& frame : frames_) {
     VkCommandPoolCreateInfo pool_info{VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO};
@@ -490,8 +498,14 @@ void Renderer::EndFrame() {
     submit.signalSemaphoreCount = 1;
     submit.pSignalSemaphores = &render_done_[image_index];
   }
-  submit.commandBufferCount = 1;
-  submit.pCommandBuffers = &commands;
+  // Texture uploads first, then the frame.
+  VkCommandBuffer command_buffers[2];
+  submit.commandBufferCount = 0;
+  if (VkCommandBuffer uploads = main_view_.EndUploads()) {
+    command_buffers[submit.commandBufferCount++] = uploads;
+  }
+  command_buffers[submit.commandBufferCount++] = commands;
+  submit.pCommandBuffers = command_buffers;
   if (VkResult result = vk::vkQueueSubmit(queue_, 1, &submit, frame.done); result != VK_SUCCESS) {
     REXLOG_ERROR("native renderer: vkQueueSubmit: {}", int(result));
   }
@@ -533,6 +547,15 @@ void Renderer::LogStats() {
               view.pipelines, view.shaders_translated,
               view.shaders_failed);
   frames_presented_ = frames_skipped_ = commands_ = draws_ = 0;
+  const TextureCache::Stats& t = view.textures;
+  REXLOG_INFO("native renderer: textures: {} ({} samplers); {} loaded, {} reloaded, {:.1f} MB; "
+              "{} deferred (staging full), {} unsupported (e.g. format {} dimension {}), {} "
+              "of another dimension than declared",
+              t.textures, t.samplers, t.loaded, t.reloaded, t.loaded_bytes / 1048576.0,
+              t.deferred, t.unsupported,
+              t.unsupported_sample == UINT32_MAX ? -1 : int(t.unsupported_sample >> 8),
+              t.unsupported_sample == UINT32_MAX ? -1 : int(t.unsupported_sample & 0xFF),
+              t.mismatched);
   if (view.invisible) {
     const auto& v = view.invisible_sample;
     REXLOG_INFO("native renderer: {:.0f} main view draws a frame skipped as invisible, e.g. "

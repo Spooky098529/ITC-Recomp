@@ -125,9 +125,13 @@ TranslatedShader* ShaderCache::Get(ShaderStage stage, const uint8_t* ucode,
     } else if (binding.dimension == graphics::xenos::FetchOpDimension::kCube) {
       view_type = VK_IMAGE_VIEW_TYPE_CUBE;
     }
-    result->textures.push_back({binding.fetch_constant, view_type});
+    result->textures.push_back({binding.fetch_constant, view_type, bool(binding.is_signed)});
   }
-  result->sampler_count = uint32_t(shader->GetSamplerBindingsAfterTranslation().size());
+  for (const auto& binding : shader->GetSamplerBindingsAfterTranslation()) {
+    result->samplers.push_back({binding.fetch_constant, uint32_t(binding.mag_filter),
+                                uint32_t(binding.min_filter), uint32_t(binding.mip_filter),
+                                uint32_t(binding.aniso_filter)});
+  }
   translated_++;
   REXLOG_DEBUG("native renderer: translated {} shader {:016X}: {} SPIR-V words", stage_name, hash,
               result->spirv.size());

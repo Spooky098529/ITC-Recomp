@@ -1,0 +1,63 @@
+// Milestone 3 of the native renderer (docs/native-renderer.md): textures
+// from the texture fetch constants, read from guest memory, untiled and
+// byte-swapped into Vulkan images, and samplers. Our own code (layout,
+// untiling and format mapping as the 360's GPU stores textures; see
+// "Textures" in docs/gpu-functions.md), not the SDK's texture cache.
+
+#pragma once
+
+#include <cstdint>
+#include <memory>
+
+#include "device_context.h"
+#include "vulkan_functions.h"
+
+namespace native {
+
+// A shader's sampler binding: the fetch constant and the instruction's
+// filter overrides (xenos::TextureFilter, AnisoFilter values; 3 and 7 mean
+// "from the fetch constant").
+struct SamplerOverrides {
+  uint32_t fetch_constant;
+  uint32_t mag_filter, min_filter, mip_filter, aniso_filter;
+};
+
+class TextureCache {
+ public:
+  TextureCache();
+  ~TextureCache();
+
+  bool Init(const DeviceContext& context, uint32_t frames_in_flight);
+
+  // Render thread. After the frame's fence has been waited on.
+  void BeginFrame(uint32_t frame_index);
+
+  // The fetch constant's texture as a view of the given type, with the
+  // fetch constant's swizzle; loaded (or reloaded, if its memory changed)
+  // as needed. Null if the texture can't be had (unsupported format or
+  // dimension, view type mismatch, staging full): use a placeholder.
+  // fetch: the 6 words, in host order.
+  VkImageView GetView(uint8_t* base, const uint32_t fetch[6], VkImageViewType view_type);
+  VkSampler GetSampler(const uint32_t fetch[6], const SamplerOverrides& overrides);
+  // The post-swizzle signedness of each component, 2 bits each (the
+  // translator's texture_swizzled_signs byte).
+  static uint8_t SwizzledSigns(const uint32_t fetch[6]);
+
+  // This frame's uploads, ended, to be submitted before its drawing; null if
+  // none.
+  VkCommandBuffer EndUploads();
+
+  struct Stats {
+    uint64_t loaded = 0, reloaded = 0, loaded_bytes = 0, unsupported = 0, mismatched = 0,
+             deferred = 0;
+    uint32_t textures = 0, samplers = 0;
+    uint32_t unsupported_sample = UINT32_MAX;  // format << 8 | dimension
+  };
+  Stats TakeStats();
+
+ private:
+  struct State;
+  std::unique_ptr<State> state_;
+};
+
+}  // namespace native

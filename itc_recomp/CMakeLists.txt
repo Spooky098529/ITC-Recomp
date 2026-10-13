@@ -56,6 +56,7 @@ set(ITC_SOURCES
     src/native/replay_hooks.cpp
     src/native/shaders.cpp
     src/native/state.cpp
+    src/native/textures.cpp
     src/native/vulkan_functions.cpp
     src/interpolation/transform.cpp
     src/frame_pacing/game_messages.cpp

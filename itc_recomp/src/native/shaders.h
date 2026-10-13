@@ -21,6 +21,16 @@ enum class ShaderStage { kVertex, kPixel };
 struct ShaderTexture {
   uint32_t fetch_constant;
   VkImageViewType view_type;
+  // The translator binds a signed and an unsigned view of a texture
+  // separately, and picks per component by the system constants' signs.
+  bool is_signed;
+};
+
+// A sampler the shader uses: its fetch constant and the fetch instruction's
+// filter overrides (xenos::TextureFilter and AnisoFilter values).
+struct ShaderSampler {
+  uint32_t fetch_constant;
+  uint32_t mag_filter, min_filter, mip_filter, aniso_filter;
 };
 
 struct TranslatedShader {
@@ -35,7 +45,7 @@ struct TranslatedShader {
   std::array<uint32_t, 3> vertex_fetch_constants{};
   // Its texture descriptors (set 2 or 3): images, then samplers.
   std::vector<ShaderTexture> textures;
-  uint32_t sampler_count = 0;
+  std::vector<ShaderSampler> samplers;
   VkShaderModule module = VK_NULL_HANDLE;  // created by the renderer
 };
 
