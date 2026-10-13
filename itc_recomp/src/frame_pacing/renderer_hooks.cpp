@@ -22,6 +22,7 @@
 #include "game_messages.h"
 #include "guest.h"
 #include "interpolation/blend_state.h"
+#include "native/renderer.h"
 #include <algorithm>
 #include <string>
 #include <mutex>
@@ -151,6 +152,7 @@ void Renderer_DrawFrame(PPCContext& ctx, uint8_t* base, uint32_t renderer) {
   ctx.r3.u64 = renderer;
   sub_82091E58(ctx, base);
   debug::ReplayStats_OnFrame();
+  native::Renderer_EndFrame();
   if (timing) {
     GetFrameTimes().Add(FrameTimes::kDraw, FrameTimes::Clock::now() - start);
     GetFrameTimes().Add(FrameTimes::kDrawCpu, ThreadCpuTime() - cpu_start);

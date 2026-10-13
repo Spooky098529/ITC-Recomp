@@ -51,6 +51,9 @@ set(ITC_SOURCES
     src/debug/frame_state_diff.cpp
     src/debug/image_dump.cpp
     src/debug/replay_stats.cpp
+    src/native/renderer.cpp
+    src/native/replay_hooks.cpp
+    src/native/vulkan_functions.cpp
     src/interpolation/transform.cpp
     src/frame_pacing/game_messages.cpp
     src/frame_pacing/per_frame_logic.cpp
@@ -66,6 +69,13 @@ endif()
 rexglue_setup_target(itc GPU_PLUGINS xenos)
 
 target_include_directories(itc PRIVATE src)
+
+# The native renderer (src/native/) uses SDL, which lives in librexruntime,
+# and loads Vulkan at runtime: it needs only the headers. Both are the SDK's
+# third-party copies.
+target_include_directories(itc PRIVATE
+    ${REXSDK_DIR}/thirdparty/sdl3/include
+    ${REXSDK_DIR}/thirdparty/vulkan-headers/include)
 
 # rex::runtime doesn't propagate imgui's include path, which rex_app.cpp and
 # the app header need. Headers only: the symbols already live in librexruntime.
