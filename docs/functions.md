@@ -589,6 +589,43 @@ constants:
 3. Keep per-tick copies of that source's inputs and blend them at replay,
    keyed by something stable across ticks; check with the log again.
 
+## Performance
+
+Measured 2026-10-13 in a race (9800X3D, RX 7900), with `--log_frame_times`
+and `perf record -e cycles:u -g` over the whole run, cut to the race by
+the samples in our blending code.
+
+- **The render thread is the limit**: in busy areas it takes 7.5-7.8 ms a
+  frame (129-134 fps) while the main thread's pass takes ~3.3 ms and then
+  waits. Its CPU time is within 0.1 ms of its wall time, so it never
+  sleeps.
+- **About half of the render thread's time is a busy-wait on the emulated
+  GPU.** `sub_8229D8A0` (46% of its samples) and `sub_825B9A60` (7%, it
+  only reads a tick count from the processor block, r13+256 → +332) are
+  the game's graphics library waiting on the GPU. `sub_8229D8A0` spins a
+  few `db16cyc`, reads the tick count, and gives up after 5000 ticks
+  (`sub_822ACAA8`). It's called in loops from `0x8229DC78`, `0x8229DD1C`,
+  `0x822B64E8` and `0x8229E98C`; the last compares the read pointer
+  writeback (device +10768) against a limit (+10780), so it is likely the
+  wait for ring buffer space. Which loop the time goes to isn't known yet:
+  `perf` can't see callers, since the recompiled code has no frame pointers.
+- **The emulated GPU's thread ("GPU Commands") is busy, not idle**: ~70% of
+  a core in user code during the race, nearly all of it command processing
+  rather than its idle spin. Its biggest costs are per-register work
+  (`VulkanCommandProcessor::WriteRegister` 7.5%,
+  `CommandProcessor::WriteRegister` 7.3%, `RegisterFile::GetRegisterInfo`
+  4%, `ExecutePacketType0` 3.7%), `pthread_mutex_lock` 3.9%, binding
+  updates, and ~3% looking up cvars by name (`cvar::HasNonDefaultValue`,
+  a string-keyed hash table, in the draw path). The Vulkan driver itself is
+  ~12% of it.
+- Our blending is ~4-10% of the render thread (`BlendState_ReplayConstants`
+  and the upload wrapper).
+- Unrelated to frame rate: the "Audio Worker" thread spins at ~80% of a
+  core (`pthread_mutex_trylock`) the whole time.
+
+So the frame rate in busy areas is set by how fast the emulated GPU
+processes the game's commands; the render thread mostly waits for it.
+
 ## Known issues
 
 - **Menus run at 30 fps**: they record their UI and read

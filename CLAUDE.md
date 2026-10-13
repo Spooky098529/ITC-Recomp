@@ -80,9 +80,11 @@ releases).
 Not done yet:
 
 - Ask before pushing to `origin` (github.com/Spooky098529/ITC-Recomp).
-- Races don't hold 144 fps in busy areas (about 105-150). `--log_frame_times`
-  shows the render thread is the limit (6-8 ms a frame, our blending under
-  1 ms of it); next step is profiling with `perf` (not installed yet).
+- Races don't hold 144 fps in busy areas (about 105-150). The render thread
+  is the limit, and about half of it is the game busy-waiting on the
+  emulated GPU, whose command thread is the real bottleneck (see
+  "Performance" in `docs/functions.md`). Investigation on branch
+  `perf-investigation`.
 - Menus still run at 30 fps (see Known issues).
 - Other per-object draws (caller `0x82596D9C`) use projective matrices that
   aren't blended, so they step at 30 Hz; what they draw isn't known yet
