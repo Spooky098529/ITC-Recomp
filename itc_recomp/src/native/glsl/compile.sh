@@ -18,3 +18,4 @@ compile() {  # name, source, extra arguments
 compile resolve_vert resolve.vert
 compile resolve_frag resolve.frag
 compile resolve_ms_frag resolve.frag -DMULTISAMPLE
+compile id_frag id.frag

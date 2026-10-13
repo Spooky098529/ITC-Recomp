@@ -1,5 +1,6 @@
 #include "passes.h"
 
+#include "generated_id_frag.h"
 #include "generated_resolve_frag.h"
 #include "generated_resolve_ms_frag.h"
 #include "generated_resolve_vert.h"
@@ -299,6 +300,31 @@ struct Passes::State {
   // those it is), to log what changes between frames when the camera
   // stands still.
   bool watch_draws = false;
+  // The draw ID pass (with record_draws): each main view draw drawn again
+  // after the frame, with its vertex shader, geometry, constants and depth
+  // state, writing its number in recorded_draws into an R32_UINT image.
+  struct IdDraw {
+    uint32_t number;
+    VkShaderModule vertex;
+    VkPipelineLayout layout;
+    VkDescriptorSet sets[4];
+    uint32_t offsets[5];
+    VkViewport viewport;
+    VkRect2D scissor;
+    VkDeviceSize index_offset;
+    VkIndexType index_type;
+    uint32_t index_count;
+    PipelineKey key;
+    float bias_constant, bias_slope;
+  };
+  std::vector<IdDraw> id_draws;
+  std::unordered_map<VkPipelineLayout, VkPipelineLayout> id_layouts;
+  std::unordered_map<std::string, VkPipeline> id_pipelines;
+  VkShaderModule id_pixel = VK_NULL_HANDLE;
+  Image id_image, id_depth;
+  bool id_drawn = false;  // this frame, for the dump
+  VkPipeline GetIdPipeline(const IdDraw& draw);
+  void DrawIds(VkCommandBuffer commands);
   uint64_t watch_pixel_shader = 0;  // only its draws, if set
   bool hide_cubes = false;  // placeholders for cube maps (debugging aid)
   struct WatchedDraw {
@@ -901,6 +927,11 @@ VkPipelineLayout Passes::State::GetPipelineLayout(VkDescriptorSetLayout vertex,
     info.setLayoutCount = 4;
     info.pSetLayouts = sets;
     vk::vkCreatePipelineLayout(context.device, &info, nullptr, &layout);
+    // The same with the ID pass's push constant (its sets stay compatible).
+    VkPushConstantRange push{VK_SHADER_STAGE_FRAGMENT_BIT, 0, 4};
+    info.pushConstantRangeCount = 1;
+    info.pPushConstantRanges = &push;
+    vk::vkCreatePipelineLayout(context.device, &info, nullptr, &id_layouts[layout]);
   }
   return layout;
 }
@@ -1402,6 +1433,8 @@ void Passes::BeginFrame(uint32_t frame_index) {
   s.frame_resolves.clear();
   s.mirrored.clear();
   s.mirrored_hashes.clear();
+  s.id_draws.clear();
+  s.id_drawn = false;
   s.watched_this_frame.clear();
   s.frame_pixel_shaders.clear();
   s.texture_sets.clear();
@@ -1822,6 +1855,178 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
                            index_32bit ? VK_INDEX_TYPE_UINT32 : VK_INDEX_TYPE_UINT16);
   vk::vkCmdDrawIndexed(commands, index_count, 1, 0, 0, 0);
   s.stats.drawn++;
+  if (s.record_draws && main_view_draw) {
+    IdDraw& id = s.id_draws.emplace_back();
+    id.number = uint32_t(s.recorded_draws.size() - 1);
+    id.vertex = key.vertex;
+    id.layout = key.layout;
+    std::copy(sets, sets + 4, id.sets);
+    std::copy(offsets, offsets + 5, id.offsets);
+    id.viewport = viewport;
+    id.scissor = scissor_rect;
+    id.index_offset = index_address;
+    id.index_type = index_32bit ? VK_INDEX_TYPE_UINT32 : VK_INDEX_TYPE_UINT16;
+    id.index_count = index_count;
+    id.key = key;
+    id.bias_constant = constant;
+    id.bias_slope = slope;
+  }
+}
+
+VkPipeline Passes::State::GetIdPipeline(const IdDraw& draw) {
+  PipelineKey key = draw.key;
+  key.pixel = VK_NULL_HANDLE;
+  key.blend_enable = key.src_color = key.dst_color = key.color_op = 0;
+  key.src_alpha = key.dst_alpha = key.alpha_op = key.write_mask = 0;
+  key.color_format = key.samples = 0;
+  std::string bytes(reinterpret_cast<const char*>(&key), sizeof(key));
+  auto [it, added] = id_pipelines.try_emplace(bytes, VK_NULL_HANDLE);
+  if (!added) {
+    return it->second;
+  }
+  if (!id_pixel) {
+    VkShaderModuleCreateInfo info{VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO};
+    info.codeSize = sizeof(k_id_frag);
+    info.pCode = k_id_frag;
+    vk::vkCreateShaderModule(context.device, &info, nullptr, &id_pixel);
+  }
+  VkPipelineShaderStageCreateInfo stages[2] = {};
+  for (VkPipelineShaderStageCreateInfo& stage : stages) {
+    stage = {VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO};
+    stage.pName = "main";
+  }
+  stages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
+  stages[0].module = draw.vertex;
+  stages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+  stages[1].module = id_pixel;
+  VkPipelineVertexInputStateCreateInfo vertex_input{
+      VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO};
+  VkPipelineInputAssemblyStateCreateInfo input_assembly{
+      VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO};
+  input_assembly.topology = VkPrimitiveTopology(key.topology);
+  input_assembly.primitiveRestartEnable = key.primitive_restart;
+  VkPipelineViewportStateCreateInfo viewport{VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO};
+  viewport.viewportCount = 1;
+  viewport.scissorCount = 1;
+  VkPipelineRasterizationStateCreateInfo raster{
+      VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO};
+  raster.polygonMode = VK_POLYGON_MODE_FILL;
+  raster.cullMode = key.cull_mode;
+  raster.frontFace = key.front_clockwise ? VK_FRONT_FACE_CLOCKWISE : VK_FRONT_FACE_COUNTER_CLOCKWISE;
+  raster.depthBiasEnable = VK_TRUE;
+  raster.lineWidth = 1.0f;
+  VkPipelineMultisampleStateCreateInfo multisample{
+      VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO};
+  multisample.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+  VkPipelineDepthStencilStateCreateInfo depth{
+      VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO};
+  depth.depthTestEnable = key.z_enable;
+  depth.depthWriteEnable = key.z_write;
+  depth.depthCompareOp = VkCompareOp(key.z_func);
+  VkPipelineColorBlendAttachmentState attachment{};
+  attachment.colorWriteMask = 0xF;
+  VkPipelineColorBlendStateCreateInfo blend{VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO};
+  blend.attachmentCount = 1;
+  blend.pAttachments = &attachment;
+  VkDynamicState dynamic_states[] = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR,
+                                     VK_DYNAMIC_STATE_DEPTH_BIAS};
+  VkPipelineDynamicStateCreateInfo dynamic{VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO};
+  dynamic.dynamicStateCount = 3;
+  dynamic.pDynamicStates = dynamic_states;
+  VkFormat color_format = VK_FORMAT_R32_UINT;
+  VkPipelineRenderingCreateInfo rendering{VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO};
+  rendering.colorAttachmentCount = 1;
+  rendering.pColorAttachmentFormats = &color_format;
+  rendering.depthAttachmentFormat = kDepthFormat;
+  rendering.stencilAttachmentFormat = kDepthFormat;
+  VkGraphicsPipelineCreateInfo info{VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO};
+  info.pNext = &rendering;
+  info.stageCount = 2;
+  info.pStages = stages;
+  info.pVertexInputState = &vertex_input;
+  info.pInputAssemblyState = &input_assembly;
+  info.pViewportState = &viewport;
+  info.pRasterizationState = &raster;
+  info.pMultisampleState = &multisample;
+  info.pDepthStencilState = &depth;
+  info.pColorBlendState = &blend;
+  info.pDynamicState = &dynamic;
+  info.layout = id_layouts[draw.layout];
+  if (vk::vkCreateGraphicsPipelines(context.device, VK_NULL_HANDLE, 1, &info, nullptr,
+                                    &it->second) != VK_SUCCESS) {
+    it->second = VK_NULL_HANDLE;
+  }
+  return it->second;
+}
+
+void Passes::State::DrawIds(VkCommandBuffer commands) {
+  if (!id_image.image &&
+      (!CreateImage(id_image, VK_IMAGE_TYPE_2D, VK_IMAGE_VIEW_TYPE_2D, VK_FORMAT_R32_UINT,
+                    {kMainViewWidth, kMainViewHeight, 1}, 1,
+                    VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+                    VK_IMAGE_ASPECT_COLOR_BIT) ||
+       !CreateImage(id_depth, VK_IMAGE_TYPE_2D, VK_IMAGE_VIEW_TYPE_2D, kDepthFormat,
+                    {kMainViewWidth, kMainViewHeight, 1}, 1,
+                    VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, kDepthStencilAspects))) {
+    return;
+  }
+  EndRendering(commands);
+  VkImageLayout color_layout = VK_IMAGE_LAYOUT_UNDEFINED, depth_layout = VK_IMAGE_LAYOUT_UNDEFINED;
+  Transition(commands, id_image.image, VK_IMAGE_ASPECT_COLOR_BIT, color_layout,
+             VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+  Transition(commands, id_depth.image, kDepthStencilAspects, depth_layout,
+             VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+  // Depth cleared to far: 0 for the game's reversed depth (greater tests).
+  bool reversed = false;
+  for (const IdDraw& draw : id_draws) {
+    reversed |= draw.key.z_enable && (draw.key.z_func == VK_COMPARE_OP_GREATER ||
+                                      draw.key.z_func == VK_COMPARE_OP_GREATER_OR_EQUAL);
+  }
+  VkRenderingAttachmentInfo color{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
+  color.imageView = id_image.view;
+  color.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+  color.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+  color.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+  color.clearValue.color.uint32[0] = UINT32_MAX;
+  VkRenderingAttachmentInfo depth{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
+  depth.imageView = id_depth.view;
+  depth.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+  depth.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+  depth.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+  depth.clearValue.depthStencil = {reversed ? 0.0f : 1.0f, 0};
+  VkRenderingInfo info{VK_STRUCTURE_TYPE_RENDERING_INFO};
+  info.renderArea = {{0, 0}, {kMainViewWidth, kMainViewHeight}};
+  info.layerCount = 1;
+  info.colorAttachmentCount = 1;
+  info.pColorAttachments = &color;
+  info.pDepthAttachment = &depth;
+  info.pStencilAttachment = &depth;
+  vk::vkCmdBeginRendering(commands, &info);
+  for (const IdDraw& draw : id_draws) {
+    VkPipeline pipeline = GetIdPipeline(draw);
+    if (!pipeline) {
+      continue;
+    }
+    VkRect2D scissor = draw.scissor;
+    scissor.extent.width = std::min<uint32_t>(
+        scissor.extent.width, uint32_t(std::max(0, int32_t(kMainViewWidth) - scissor.offset.x)));
+    scissor.extent.height = std::min<uint32_t>(
+        scissor.extent.height, uint32_t(std::max(0, int32_t(kMainViewHeight) - scissor.offset.y)));
+    vk::vkCmdSetViewport(commands, 0, 1, &draw.viewport);
+    vk::vkCmdSetScissor(commands, 0, 1, &scissor);
+    vk::vkCmdSetDepthBias(commands, draw.bias_constant, 0.0f, draw.bias_slope);
+    vk::vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+    VkPipelineLayout layout = id_layouts[draw.layout];
+    vk::vkCmdBindDescriptorSets(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, layout, 0, 4,
+                                draw.sets, 5, draw.offsets);
+    vk::vkCmdPushConstants(commands, layout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, 4, &draw.number);
+    vk::vkCmdBindIndexBuffer(commands, mirrors[frame].buffer, draw.index_offset, draw.index_type);
+    vk::vkCmdDrawIndexed(commands, draw.index_count, 1, 0, 0, 0);
+  }
+  vk::vkCmdEndRendering(commands);
+  Transition(commands, id_image.image, VK_IMAGE_ASPECT_COLOR_BIT, color_layout,
+             VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+  id_drawn = true;
 }
 
 void Passes::AfterDraw(VkCommandBuffer commands, uint8_t* base, uint32_t id, uint32_t payload,
@@ -2213,6 +2418,9 @@ VkExtent2D Passes::EndFrame(VkCommandBuffer commands, int32_t show_resolve, bool
   Transition(commands, shown, VK_IMAGE_ASPECT_COLOR_BIT, s.shown_layout,
              VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
   if (dump) {
+    if (!s.id_draws.empty()) {
+      s.DrawIds(commands);
+    }
     s.RecordDump(commands, extent, dump_prefix, dump_resolves);
   }
   return extent;
@@ -2286,6 +2494,10 @@ void ToRgb(VkFormat format, const uint8_t* p, float out[3]) {
       std::memcpy(h, p, 4);
       for (int c = 0; c < 2; c++) out[c] = HalfToFloat(h[c]);
       break;
+    case VK_FORMAT_R32_UINT:
+      std::memcpy(&w, p, 4);
+      out[0] = out[1] = out[2] = w == UINT32_MAX ? -1.0f : float(w);
+      break;
     case VK_FORMAT_R32_SFLOAT:
       std::memcpy(&f, p, 4);
       out[0] = out[1] = out[2] = f;
@@ -2306,10 +2518,17 @@ void Passes::State::RecordDump(VkCommandBuffer commands, VkExtent2D shown_extent
     size += (VkDeviceSize(extent.width) * extent.height * BytesPerPixel(format) + 15) & ~15ull;
   };
   add(prefix, kShownFormat, shown_extent);
+  std::vector<VkImage> images = {shown.image};
   for (size_t i = 0; with_resolves && i < frame_resolves.size(); i++) {
     const Resolved& r = frame_resolves[i];
     add(fmt::format("resolve_{:02}_{:08X}_format{}", i, r.address, r.format), r.host_format,
         r.extent);
+    images.push_back(r.image);
+  }
+  size_t resolve_end = images.size();
+  if (id_drawn) {
+    add("draw_ids", VK_FORMAT_R32_UINT, {kMainViewWidth, kMainViewHeight});
+    images.push_back(id_image.image);
   }
   VkBufferCreateInfo info{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
   info.size = size;
@@ -2331,9 +2550,10 @@ void Passes::State::RecordDump(VkCommandBuffer commands, VkExtent2D shown_extent
     return;
   }
   for (size_t i = 0; i < dumped.size(); i++) {
-    VkImage image = i == 0 ? shown.image : frame_resolves[i - 1].image;
+    VkImage image = images[i];
     VkImageLayout layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    if (i) {
+    bool resolve = i && i < resolve_end;  // in SHADER_READ_ONLY_OPTIMAL
+    if (resolve) {
       Transition(commands, image, VK_IMAGE_ASPECT_COLOR_BIT, layout,
                  VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
     }
@@ -2343,7 +2563,7 @@ void Passes::State::RecordDump(VkCommandBuffer commands, VkExtent2D shown_extent
     copy.imageExtent = {dumped[i].extent.width, dumped[i].extent.height, 1};
     vk::vkCmdCopyImageToBuffer(commands, image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, dump_buffer,
                                1, &copy);
-    if (i) {
+    if (resolve) {
       Transition(commands, image, VK_IMAGE_ASPECT_COLOR_BIT, layout,
                  VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     }
