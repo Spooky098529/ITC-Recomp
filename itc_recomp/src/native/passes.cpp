@@ -1954,6 +1954,16 @@ std::string DescribeChange(const char* name, const std::vector<uint32_t>& before
     if (before[i] == after[i]) {
       continue;
     }
+    if (float_registers) {
+      // The camera moves in its last digits even standing still: ignore
+      // changes under 0.1%.
+      float a, b;
+      std::memcpy(&a, &before[i], 4);
+      std::memcpy(&b, &after[i], 4);
+      if (std::abs(a - b) <= 1e-3f * std::max(1.0f, std::abs(a))) {
+        continue;
+      }
+    }
     changed++;
     if (shown++ < 4) {
       float a, b;
