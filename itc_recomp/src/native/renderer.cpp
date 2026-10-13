@@ -749,6 +749,8 @@ void Renderer::LogStats() {
                 (t.mismatched_sample >> 8) & 0xFF, t.mismatched_sample & 0xFF, t.mismatched_width,
                 t.mismatched_height, t.mismatched_sample >> 16);
   }
+  REXLOG_INFO("native renderer: {:.1f} draws a frame with PsParamGen;{}",
+              double(view.param_gen_draws) / frames, passes_.TakeInterfaces());
   if (view.clamped_draws) {
     const auto& c = view.clamped_sample;
     REXLOG_INFO("native renderer: {:.1f} draws a frame have indices outside VGT_MIN/MAX_VTX_INDX, "

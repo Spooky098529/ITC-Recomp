@@ -328,7 +328,12 @@ struct Passes::State {
   void DrawIds(VkCommandBuffer commands);
   uint64_t watch_pixel_shader = 0;  // only its draws, if set
   bool hide_cubes = false;
-  bool no_index_clamp = false;  // debugging aid  // placeholders for cube maps (debugging aid)
+  bool no_index_clamp = false;  // debugging aid
+  // Pixel shaders given PsParamGen (interpolators, a bit each), and the
+  // interpolator masks each was translated with (bits 16-31: with
+  // SQ_PROGRAM_CNTL's param_gen set).
+  std::map<uint64_t, uint32_t> param_gen_by_shader;
+  std::map<uint64_t, uint64_t> interpolators_by_shader;  // placeholders for cube maps (debugging aid)
   struct WatchedDraw {
     uint64_t frame = 0;
     std::vector<uint32_t> system, vertex_floats, pixel_floats, bool_loop, fetch;
@@ -1540,6 +1545,15 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
       vertex_ucode, vertex_size, pixel_ucode, pixel_size, program_control,
       regs.values[XE_GPU_REG_SQ_CONTEXT_MISC]);
   interface.param_gen_point = type == 1;  // point list
+  if (pixel_ucode && interface.param_gen_interpolator < 16) {
+    s.stats.param_gen_draws++;
+    s.param_gen_by_shader[XXH3_64bits(pixel_ucode, pixel_size)] |=
+        1u << interface.param_gen_interpolator;
+  }
+  if (pixel_ucode) {
+    s.interpolators_by_shader[XXH3_64bits(pixel_ucode, pixel_size)] |=
+        uint64_t(interface.interpolator_mask) << 16 * (program_control >> 18 & 1);
+  }
   TranslatedShader* vertex = s.shaders->Get(ShaderStage::kVertex, vertex_ucode, vertex_size,
                                             program_control & 0x3F, interface);
   TranslatedShader* pixel = nullptr;
@@ -2361,6 +2375,20 @@ void Passes::State::WatchDraw(const TranslatedShader* vertex, const TranslatedSh
 
 void Passes::set_base_level_only(bool base_only) {
   state_->textures.set_base_level_only(base_only);
+}
+
+std::string Passes::TakeInterfaces() {
+  State& s = *state_;
+  std::string text;
+  for (const auto& [hash, interpolators] : s.param_gen_by_shader) {
+    text += fmt::format(" ps {:016X} param gen in {:04X};", hash, interpolators);
+  }
+  for (const auto& [hash, masks] : s.interpolators_by_shader) {
+    text += fmt::format(" ps {:016X} interpolators {:08X};", hash, masks);
+  }
+  s.param_gen_by_shader.clear();
+  s.interpolators_by_shader.clear();
+  return text;
 }
 
 void Passes::set_no_index_clamp(bool off) {

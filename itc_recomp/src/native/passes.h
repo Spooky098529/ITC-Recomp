@@ -73,6 +73,8 @@ class Passes {
   // A debugging aid: cube maps get the white placeholder.
   void set_hide_cubes(bool hide);
   void set_no_index_clamp(bool off);
+  // Which pixel shaders got PsParamGen, and with which interpolators.
+  std::string TakeInterfaces();
   void set_base_level_only(bool base_only);
   std::vector<std::string> TakeWatchLines(uint64_t& changes, uint64_t& draws);
   // The distinct addresses of the last frame's resolve destinations.
@@ -114,7 +116,7 @@ class Passes {
     uint64_t base_vertex_differs = 0;
     // Draws with indices outside VGT_MIN/MAX_VTX_INDX (the shader clamps
     // them), and an example: lowest and highest index, the registers.
-    uint64_t clamped_draws = 0;
+    uint64_t clamped_draws = 0, param_gen_draws = 0;
     std::array<uint32_t, 4> clamped_sample{};
     std::array<uint32_t, 2> base_vertex_sample{};
     std::array<uint32_t, 5> vertex_overrun_sample{};
