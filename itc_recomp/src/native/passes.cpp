@@ -33,7 +33,6 @@ namespace xenos = rex::graphics::xenos;
 namespace draw_util = rex::graphics::draw_util;
 using Translator = graphics::SpirvShaderTranslator;
 using graphics::XE_GPU_REG_RB_ALPHA_REF;
-using graphics::XE_GPU_REG_RB_COLOR_MASK;
 using graphics::XE_GPU_REG_SHADER_CONSTANT_BOOL_000_031;
 using graphics::XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0;
 using graphics::XE_GPU_REG_SQ_CONTEXT_MISC;
@@ -1706,7 +1705,13 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
       !(key.src_color == VK_BLEND_FACTOR_ONE && key.dst_color == VK_BLEND_FACTOR_ZERO &&
         key.color_op == VK_BLEND_OP_ADD && key.src_alpha == VK_BLEND_FACTOR_ONE &&
         key.dst_alpha == VK_BLEND_FACTOR_ZERO && key.alpha_op == VK_BLEND_OP_ADD);
-  key.write_mask = regs.values[XE_GPU_REG_RB_COLOR_MASK] & 0xF;
+  // As the plugin normalizes it: nothing without a pixel shader, for a
+  // target the pixel shader doesn't write, or in depth-only EDRAM mode.
+  // (With the raw mask, those draws wrote Vulkan's undefined fragment output:
+  // the rainbow effect on buildings, from ~230 main view draws a frame
+  // without a pixel shader.)
+  key.write_mask =
+      draw_util::GetNormalizedColorMask(regs, pixel ? pixel->writes_color_targets : 0) & 0xF;
   if (!key.vertex || (pixel && !key.pixel) || !key.layout) {
     s.stats.failed++;
     return;

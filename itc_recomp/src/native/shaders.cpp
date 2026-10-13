@@ -175,6 +175,7 @@ TranslatedShader* ShaderCache::Get(ShaderStage stage, const uint8_t* ucode, uint
                                 uint32_t(binding.min_filter), uint32_t(binding.mip_filter),
                                 uint32_t(binding.aniso_filter)});
   }
+  result->writes_color_targets = shader->writes_color_targets();
   translated_++;
   REXLOG_DEBUG("native renderer: translated {} shader {:016X}: {} SPIR-V words", stage_name, hash,
               result->spirv.size());
