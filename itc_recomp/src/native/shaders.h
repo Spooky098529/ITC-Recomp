@@ -61,11 +61,27 @@ class ShaderCache {
   explicit ShaderCache(const ShaderFeatures& features);
   ~ShaderCache();
 
+  // How a vertex and a pixel shader connect (as the plugin works it out):
+  // the interpolators the vertex shader writes and the pixel shader reads,
+  // and the one the pixel shader gets its generated parameter (PsParamGen)
+  // in, if any. An interpolator the pixel shader reads that isn't in the
+  // mask reads as zero; with all of them on, it was undefined (flickering
+  // garbage).
+  struct Interface {
+    uint32_t interpolator_mask = 0;
+    uint32_t param_gen_interpolator = UINT32_MAX;
+    bool param_gen_point = false;
+  };
+  // sq_program_cntl, sq_context_misc: the registers.
+  Interface GetInterface(const uint8_t* vertex_ucode, uint32_t vertex_size_bytes,
+                         const uint8_t* pixel_ucode, uint32_t pixel_size_bytes,
+                         uint32_t sq_program_cntl, uint32_t sq_context_misc);
+
   // ucode: the microcode as in guest memory (big-endian words). num_reg is
   // the stage's register count from SQ_PROGRAM_CNTL (value minus 1).
   // Returns null if the shader can't be translated.
   TranslatedShader* Get(ShaderStage stage, const uint8_t* ucode, uint32_t size_bytes,
-                        uint32_t num_reg);
+                        uint32_t num_reg, const Interface& interface);
 
   uint32_t translated() const { return translated_; }
   uint32_t failed() const { return failed_; }

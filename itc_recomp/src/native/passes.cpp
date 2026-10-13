@@ -36,6 +36,7 @@ using graphics::XE_GPU_REG_RB_ALPHA_REF;
 using graphics::XE_GPU_REG_RB_COLOR_MASK;
 using graphics::XE_GPU_REG_SHADER_CONSTANT_BOOL_000_031;
 using graphics::XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0;
+using graphics::XE_GPU_REG_SQ_CONTEXT_MISC;
 using graphics::XE_GPU_REG_SQ_PROGRAM_CNTL;
 using graphics::XE_GPU_REG_VGT_MAX_VTX_INDX;
 using graphics::XE_GPU_REG_VGT_MIN_VTX_INDX;
@@ -1376,16 +1377,26 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
     s.stats.failed++;
     return;
   }
-  TranslatedShader* vertex = s.shaders->Get(
-      ShaderStage::kVertex,
-      PhysicalHostAddress(base, GpuPhysicalAddress(guest::LoadU32(base, vertex_object + 48))),
-      guest::LoadU32(base, vertex_object + 600), program_control & 0x3F);
+  const uint8_t* vertex_ucode =
+      PhysicalHostAddress(base, GpuPhysicalAddress(guest::LoadU32(base, vertex_object + 48)));
+  uint32_t vertex_size = guest::LoadU32(base, vertex_object + 600);
+  const uint8_t* pixel_ucode =
+      pixel_object
+          ? PhysicalHostAddress(base, GpuPhysicalAddress(guest::LoadU32(base, pixel_object + 24)))
+          : nullptr;
+  uint32_t pixel_size = pixel_object ? guest::LoadU32(base, pixel_object + 64) : 0;
+  // Which interpolators connect them (an unconnected one the pixel shader
+  // reads would be undefined).
+  ShaderCache::Interface interface = s.shaders->GetInterface(
+      vertex_ucode, vertex_size, pixel_ucode, pixel_size, program_control,
+      regs.values[XE_GPU_REG_SQ_CONTEXT_MISC]);
+  interface.param_gen_point = type == 1;  // point list
+  TranslatedShader* vertex = s.shaders->Get(ShaderStage::kVertex, vertex_ucode, vertex_size,
+                                            program_control & 0x3F, interface);
   TranslatedShader* pixel = nullptr;
   if (pixel_object) {
-    pixel = s.shaders->Get(
-        ShaderStage::kPixel,
-        PhysicalHostAddress(base, GpuPhysicalAddress(guest::LoadU32(base, pixel_object + 24))),
-        guest::LoadU32(base, pixel_object + 64), (program_control >> 8) & 0x3F);
+    pixel = s.shaders->Get(ShaderStage::kPixel, pixel_ucode, pixel_size,
+                           (program_control >> 8) & 0x3F, interface);
   }
   if (!vertex || (pixel_object && !pixel)) {
     s.stats.failed++;

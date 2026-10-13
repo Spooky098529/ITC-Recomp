@@ -44,21 +44,68 @@ struct ShaderCache::State {
       : translator(TranslatorFeatures(features), false, false, false) {}
   graphics::SpirvShaderTranslator translator;
   rex::string::StringBuffer disassembly;
-  // Keyed by stage, microcode hash and register count (the modification
-  // depends on it).
-  std::map<std::tuple<ShaderStage, uint64_t, uint32_t>, std::unique_ptr<TranslatedShader>>
+  // Keyed by stage, microcode hash, register count and interface (the
+  // modification depends on them).
+  std::map<std::tuple<ShaderStage, uint64_t, uint32_t, uint32_t, uint32_t, bool>,
+           std::unique_ptr<TranslatedShader>>
       translations;
   std::map<std::pair<ShaderStage, uint64_t>, std::unique_ptr<graphics::SpirvShader>> shaders;
+
+  // The shader, its microcode analyzed (made on first use).
+  graphics::SpirvShader* Analyzed(ShaderStage stage, const uint8_t* ucode, uint32_t size_bytes,
+                                  uint64_t hash) {
+    auto& shader = shaders[{stage, hash}];
+    if (!shader) {
+      std::vector<uint32_t> words(size_bytes / 4);
+      std::memcpy(words.data(), ucode, words.size() * 4);
+      shader = std::make_unique<graphics::SpirvShader>(
+          stage == ShaderStage::kVertex ? graphics::xenos::ShaderType::kVertex
+                                        : graphics::xenos::ShaderType::kPixel,
+          hash, words.data(), words.size(), std::endian::big);
+      shader->AnalyzeUcode(disassembly);
+    }
+    return shader.get();
+  }
 };
 
 ShaderCache::ShaderCache(const ShaderFeatures& features)
     : state_(std::make_unique<State>(features)) {}
 ShaderCache::~ShaderCache() = default;
 
-TranslatedShader* ShaderCache::Get(ShaderStage stage, const uint8_t* ucode,
-                                         uint32_t size_bytes, uint32_t num_reg) {
+ShaderCache::Interface ShaderCache::GetInterface(const uint8_t* vertex_ucode,
+                                                 uint32_t vertex_size_bytes,
+                                                 const uint8_t* pixel_ucode,
+                                                 uint32_t pixel_size_bytes,
+                                                 uint32_t sq_program_cntl,
+                                                 uint32_t sq_context_misc) {
+  // As the plugin's command processor: what the vertex shader writes and the
+  // pixel shader reads, without the generated parameter's interpolator.
+  Interface result;
+  if (!pixel_ucode) {
+    return result;
+  }
+  graphics::SpirvShader* vertex =
+      state_->Analyzed(ShaderStage::kVertex, vertex_ucode, vertex_size_bytes,
+                       XXH3_64bits(vertex_ucode, vertex_size_bytes));
+  graphics::SpirvShader* pixel =
+      state_->Analyzed(ShaderStage::kPixel, pixel_ucode, pixel_size_bytes,
+                       XXH3_64bits(pixel_ucode, pixel_size_bytes));
+  graphics::reg::SQ_PROGRAM_CNTL program_cntl;
+  program_cntl.value = sq_program_cntl;
+  graphics::reg::SQ_CONTEXT_MISC context_misc;
+  context_misc.value = sq_context_misc;
+  uint32_t param_gen = UINT32_MAX;
+  result.interpolator_mask = vertex->writes_interpolators() &
+                             pixel->GetInterpolatorInputMask(program_cntl, context_misc, param_gen);
+  result.param_gen_interpolator = param_gen;
+  return result;
+}
+
+TranslatedShader* ShaderCache::Get(ShaderStage stage, const uint8_t* ucode, uint32_t size_bytes,
+                                   uint32_t num_reg, const Interface& interface) {
   uint64_t hash = XXH3_64bits(ucode, size_bytes);
-  auto key = std::make_tuple(stage, hash, num_reg);
+  auto key = std::make_tuple(stage, hash, num_reg, interface.interpolator_mask,
+                             interface.param_gen_interpolator, interface.param_gen_point);
   if (auto it = state_->translations.find(key); it != state_->translations.end()) {
     return it->second->spirv.empty() ? nullptr : it->second.get();
   }
@@ -70,27 +117,23 @@ TranslatedShader* ShaderCache::Get(ShaderStage stage, const uint8_t* ucode,
   result->stage = stage;
   result->hash = hash;
 
-  auto& shader = state_->shaders[{stage, hash}];
-  if (!shader) {
-    std::vector<uint32_t> words(size_bytes / 4);
-    std::memcpy(words.data(), ucode, words.size() * 4);
-    shader = std::make_unique<graphics::SpirvShader>(
-        stage == ShaderStage::kVertex ? graphics::xenos::ShaderType::kVertex
-                                      : graphics::xenos::ShaderType::kPixel,
-        hash, words.data(), words.size(), std::endian::big);
-    shader->AnalyzeUcode(state_->disassembly);
-  }
+  graphics::SpirvShader* shader = state_->Analyzed(stage, ucode, size_bytes, hash);
   uint32_t registers = shader->GetDynamicAddressableRegisterCount(num_reg);
-  // All 16 interpolators on both sides, so every vertex shader's outputs
-  // match every pixel shader's inputs (exact masks: later).
+  // The interface as the plugin's pipeline cache sets it (without centroid
+  // sampling and the depth modes, for now).
   graphics::SpirvShaderTranslator::Modification modification(
       stage == ShaderStage::kVertex
           ? state_->translator.GetDefaultVertexShaderModification(registers)
           : state_->translator.GetDefaultPixelShaderModification(registers));
   if (stage == ShaderStage::kVertex) {
-    modification.vertex.interpolator_mask = 0xFFFF;
+    modification.vertex.interpolator_mask = interface.interpolator_mask;
   } else {
-    modification.pixel.interpolator_mask = 0xFFFF;
+    modification.pixel.interpolator_mask = interface.interpolator_mask;
+    if (interface.param_gen_interpolator < 16) {
+      modification.pixel.param_gen_enable = 1;
+      modification.pixel.param_gen_interpolator = interface.param_gen_interpolator;
+      modification.pixel.param_gen_point = interface.param_gen_point;
+    }
   }
   graphics::Shader::Translation* translation =
       shader->GetOrCreateTranslation(modification.value);
