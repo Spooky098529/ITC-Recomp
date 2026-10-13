@@ -660,6 +660,16 @@ VkImageView TextureCache::GetView(uint8_t* base, const uint32_t fetch_words[6],
     if (!s.CreateTexture(t)) {
       return VK_NULL_HANDLE;
     }
+    if (t.format.block_width == 1) {
+      // Uncompressed: few, and the likeliest to be decoded wrong.
+      REXLOG_INFO("native renderer: texture at {:08X}: format {} {}x{}x{} levels {}-{}, endian "
+                  "{}, tiled {}, pitch {}, signs {:02X}, swizzle {:03o}, exp adjust {}",
+                  t.layout.base_address ? t.layout.base_address : t.layout.mip_address,
+                  uint32_t(fetch.format), t.layout.width, t.layout.height, t.layout.layers,
+                  t.layout.min_level, t.layout.max_level, uint32_t(t.endian), t.layout.tiled,
+                  t.layout.pitch_texels, (fetch.dword_0 >> 2) & 0xFF, uint32_t(fetch.swizzle),
+                  int32_t(fetch.exp_adjust));
+    }
     it = s.textures.emplace(key, std::move(t)).first;
   }
   State::Texture& t = it->second;
