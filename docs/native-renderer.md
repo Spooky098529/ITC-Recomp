@@ -126,6 +126,57 @@ known about it; this file is the plan and its progress).
   textures that are resolve targets (whatever is in guest memory there),
   to be confirmed.
 
+## Code map (`itc_recomp/src/native/`)
+
+- `replay_hooks.cpp`: wraps each replay handler; calls
+  `Renderer_OnCommand` before and `Renderer_AfterCommand` after the
+  library call (command 7 is wrapped in `interpolation/blend_state.cpp`).
+- `renderer.cpp`: window, device (`DeviceContext` in `device_context.h`),
+  swapchain, per-frame command buffers and fences, submit (texture uploads
+  first) and present (blits `MainView`'s target to the window), stats
+  every 5 s. Only draw ids reach `MainView::AfterDraw` today.
+- `main_view.cpp`: everything per draw: register file from the shadow
+  (`state.cpp`), shaders (`shaders.cpp`), constants ring, guest memory
+  mirror, pipelines, texture descriptor sets, and the one render target.
+  It skips every draw that isn't the main view (pitch 1040, 2x MSAA,
+  format 3 or 12: `other_passes` in the stats).
+- `textures.cpp`: the texture cache (milestone 3).
+- Testing: build, run the game in the background with
+  `--native_renderer=true`; the user starts a race, sends a screenshot of
+  the "ITC native renderer" window and quits; read the `native renderer:`
+  lines in the log.
+
+## Plan for milestone 4
+
+What's known is in `gpu-functions.md`: the passes of a race frame ("A race
+frame's passes"), the command items ("Pass command items") and surface and
+texture objects ("Resources"). The approach:
+
+1. **Track the bound targets**: handle commands 23, 24, 29, 34/35 (or
+   read device +12184.. and +12200 per draw, as the main view check does
+   now) and draw every pass, not only the main view: a render target per
+   distinct surface setup (EDRAM base, pitch, format, MSAA), with its
+   depth. Begin and end dynamic rendering when the targets change.
+   Pipelines then need the target's format and sample count in their key.
+2. **Clears** (command 26) as attachment clears or load ops (decode the
+   flags first).
+3. **Resolves** (command 25): copy (or resolve, for MSAA) the source rect
+   of the bound target into a Vulkan image of the destination texture's
+   size and format, and register that image in the texture cache under the
+   destination's base address, so later draws sampling that fetch constant
+   get it instead of loading guest memory (which holds garbage: the
+   emulated GPU doesn't write resolves back). Depth resolves
+   (`24_8_FLOAT`) need a depth-to-colour copy (a small shader) into a
+   format the shaders sample (R32_SFLOAT, as the translator expects for
+   depth textures: check). Format conversions on resolve (7e3 to
+   16_16_16_16, the `0xF4000000` flags' likely exponent bias) need
+   checking against the emulated GPU's output.
+4. The rainbow smears on buildings and the black mirror should go once
+   resolves feed the texture cache; check that guess first by logging
+   which texture addresses are resolve destinations.
+5. Open: the textures logged as "of another dimension than declared"
+   (a log line names an example since `2c13992`; not run yet).
+
 ## Known issues
 
 - Textures are never freed: memory reused for different textures (another

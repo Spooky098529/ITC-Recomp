@@ -386,6 +386,28 @@ About 24-26 resolves a frame, matching the counts. Findings:
   Vulkan image of the resolve's size and format, and treat the resolve as
   a copy or a no-op.
 
+### Pass command items
+
+As `--log_replay_commands`' frame trace decodes them
+(`src/debug/replay_stats.cpp`, `TraceCommand`); arg1 is the item count;
+words are big-endian.
+
+- **23 SetRenderTarget**, 16 bytes an item: +0 index (0-3), +4 surface.
+- **24 SetDepthStencil**, 16 bytes: +0 surface (0 = none).
+- **25 Resolve**, 68 bytes: +0 which optional fields are present (bit 0
+  rect, bit 1 destination, bit 2 point, bit 3 clear colour); +4 flags;
+  +8 source rect (4 words: left, top, right, bottom); +24 destination
+  texture object (its fetch constant at +28..+48, so the base address is
+  the one later draws sample it by); +28 destination point (2 words); +36
+  level; +40 slice; +44 clear colour; +48 clear Z; +52 clear stencil. The
+  resolve copies from the bound render target (or the depth surface: the
+  `24_8_FLOAT` resolves of depth-only passes).
+- **26 Clear**, 280 bytes: +4 rect count (rects follow, if any), +8
+  flags, +268 colour, +272 Z, +276 stencil.
+- **29**: +0 mask (bits 0-3 render targets, bit 7 depth).
+- **30 SetViewport**: words as the frame trace prints them (x, y, width,
+  height, then Z range).
+
 ## The end of a frame
 
 After the command list's last pass (row 13 above), the render thread's
@@ -436,10 +458,8 @@ goes.
   `--debug_zero_owners` or a resolve skip would settle it).
 - The vertex declaration's element list (past word 16); a native renderer
   may not need it, since the formats are patched into the vertex shader.
-- Texture, vertex buffer and surface objects: their layout in guest memory
-  (formats, tiling, sizes), which the native renderer needs to read.
-- The shaders: how commands 8-10 and 12 relate to vertex and pixel shaders
-  and vertex declarations.
+- The clear flags (which of colour, Z, stencil) and the clear rects'
+  layout: not decoded yet.
 
 ## Tools
 
