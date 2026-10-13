@@ -5,7 +5,8 @@ ReXGlue (`rexglue-sdk/`, a submodule patched from `patches/rexglue-sdk/`).
 `docs/functions.md` is the reference: what's known about the game's code,
 how frame interpolation works, every diagnostic option, and what didn't
 work. `docs/gpu-functions.md` covers how the game drives the GPU (the
-render command replay and the graphics library), for the native renderer
+render command replay and the graphics library), and
+`docs/native-renderer.md` is the plan and progress of the native renderer
 that's to replace the emulated GPU. Read the relevant section before changing anything, and keep it up to
 date as you learn things.
 
