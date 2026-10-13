@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include <array>
 #include <cstdint>
 #include <memory>
 
@@ -45,6 +46,11 @@ class MainView {
   struct Stats {
     uint64_t drawn = 0, other_passes = 0, unsupported = 0, failed = 0, mirrored_bytes = 0;
     uint32_t pipelines = 0, shaders_translated = 0, shaders_failed = 0;
+    // Draws skipped as having an empty viewport or scissor, and one example:
+    // viewport offset and extent, scissor offset and extent (bit 31 of the
+    // first word set when filled).
+    uint64_t invisible = 0;
+    std::array<uint32_t, 8> invisible_sample{};
   };
   Stats TakeStats();
 

@@ -82,7 +82,15 @@ known about it; this file is the plan and its progress).
   primitive restart, cull, depth, blend of target 0, colour mask), and the
   draw recorded with the base vertex as a system constant (the shader adds
   it after byte-swapping the index). Textures are white 1x1 placeholders
-  of the declared type.
+  of the declared type. The scissor comes from the device (render state 200 at
+  +11600, rectangle at +12416), not the registers: the window scissor
+  registers aren't in the shadow's flushed blocks and read as zero (which
+  first skipped every draw as invisible).
+- First result (attract-mode race, 2026-10-13): ~950 main view draws a
+  frame drawn, ~80 not yet supported (other draw commands, several items),
+  41 pipelines, 39 shaders, no failures; ~15 MB a frame copied into the
+  mirror; the game at 100-125 fps instead of 130-150 with the renderer on.
+  The viewport comes out as 0,0 1024x576, as expected.
 
 ## Known issues
 

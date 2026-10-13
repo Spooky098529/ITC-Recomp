@@ -533,6 +533,13 @@ void Renderer::LogStats() {
               view.pipelines, view.shaders_translated,
               view.shaders_failed);
   frames_presented_ = frames_skipped_ = commands_ = draws_ = 0;
+  if (view.invisible) {
+    const auto& v = view.invisible_sample;
+    REXLOG_INFO("native renderer: {:.0f} main view draws a frame skipped as invisible, e.g. "
+                "viewport {},{} {}x{}, scissor {},{} {}x{}",
+                double(view.invisible) / frames, v[0] & 0x7FFFFFFF, v[1], v[2], v[3], v[4], v[5],
+                v[6], v[7]);
+  }
   last_log_ = now;
 }
 

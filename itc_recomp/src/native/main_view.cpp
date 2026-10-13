@@ -770,8 +770,13 @@ void MainView::AfterDraw(VkCommandBuffer commands, uint8_t* base, uint32_t id, u
   // Only the main view for now.
   auto surface_info = regs.Get<reg::RB_SURFACE_INFO>();
   auto color_info = regs.Get<reg::RB_COLOR_INFO>(reg::RB_COLOR_INFO::rt_register_indices[0]);
+  // Its format switches per draw between 2_10_10_10_FLOAT (3) and the
+  // high-precision blending variant (12), by render states 308-320.
+  bool main_view_format =
+      color_info.color_format == xenos::ColorRenderTargetFormat::k_2_10_10_10_FLOAT ||
+      color_info.color_format == xenos::ColorRenderTargetFormat::k_2_10_10_10_FLOAT_AS_16_16_16_16;
   if (surface_info.surface_pitch != 1040 || surface_info.msaa_samples != xenos::MsaaSamples::k2X ||
-      color_info.color_format != xenos::ColorRenderTargetFormat::k_2_10_10_10_FLOAT_AS_16_16_16_16) {
+      !main_view_format) {
     s.stats.other_passes++;
     return;
   }
@@ -833,12 +838,33 @@ void MainView::AfterDraw(VkCommandBuffer commands, uint8_t* base, uint32_t id, u
   draw_util::ViewportInfo viewport_info;
   draw_util::GetHostViewportInfo(regs, 1, 1, false, 8192, 8192, true, depth_control, false,
                                  false, false, viewport_info);
-  draw_util::Scissor scissor;
-  draw_util::GetScissor(regs, scissor);
+  // Scissor: the window scissor registers aren't in the shadow's flushed
+  // blocks, so take it as the library keeps it: enabled by render state 200
+  // (device +11600), rectangle (left, top, right, bottom) at +12416 from
+  // SetScissorRect; otherwise the whole target.
+  draw_util::Scissor scissor{{0, 0}, {kTargetWidth, kTargetHeight}};
+  if (guest::LoadU32(base, device + kDeviceScissorEnable)) {
+    int32_t left = int32_t(guest::LoadU32(base, device + kDeviceScissorRect));
+    int32_t top = int32_t(guest::LoadU32(base, device + kDeviceScissorRect + 4));
+    int32_t right = int32_t(guest::LoadU32(base, device + kDeviceScissorRect + 8));
+    int32_t bottom = int32_t(guest::LoadU32(base, device + kDeviceScissorRect + 12));
+    scissor.offset[0] = uint32_t(std::max(left, 0));
+    scissor.offset[1] = uint32_t(std::max(top, 0));
+    scissor.extent[0] = uint32_t(std::max(right - int32_t(scissor.offset[0]), 0));
+    scissor.extent[1] = uint32_t(std::max(bottom - int32_t(scissor.offset[1]), 0));
+  }
   uint32_t scissor_right = std::min(scissor.offset[0] + scissor.extent[0], kTargetWidth);
   uint32_t scissor_bottom = std::min(scissor.offset[1] + scissor.extent[1], kTargetHeight);
   if (!viewport_info.xy_extent[0] || !viewport_info.xy_extent[1] ||
       scissor.offset[0] >= scissor_right || scissor.offset[1] >= scissor_bottom) {
+    s.stats.invisible++;
+    if (!s.stats.invisible_sample[0]) {  // one example per log line
+      s.stats.invisible_sample = {viewport_info.xy_offset[0], viewport_info.xy_offset[1],
+                                  viewport_info.xy_extent[0], viewport_info.xy_extent[1],
+                                  scissor.offset[0], scissor.offset[1], scissor.extent[0],
+                                  scissor.extent[1]};
+      s.stats.invisible_sample[0] |= 0x80000000u;  // mark as set
+    }
     return;  // nothing visible
   }
 

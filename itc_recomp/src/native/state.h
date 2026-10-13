@@ -15,6 +15,9 @@ constexpr uint32_t kDevicePointer = 0x8296BD90;
 constexpr uint32_t kDevicePixelShader = 12432, kDeviceVertexShader = 12436;
 constexpr uint32_t kDeviceIndexBuffer = 12180;
 constexpr uint32_t kDeviceRenderTarget0 = 12184;
+// Scissor: enable (render state 200) and rectangle (left, top, right,
+// bottom) from SetScissorRect.
+constexpr uint32_t kDeviceScissorEnable = 11600, kDeviceScissorRect = 12416;
 // Float constants c0-c255, 16 bytes each: vertex shader's, then pixel
 // shader's.
 constexpr uint32_t kDeviceVertexFloatConstants = 1792, kDevicePixelFloatConstants = 5888;

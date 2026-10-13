@@ -368,6 +368,12 @@ from the pass's shape, not checked by hiding it.
 
 About 24-26 resolves a frame, matching the counts. Findings:
 
+- **The main view's format changes per draw**: the trace shows its colour
+  format as 12 (2_10_10_10_FLOAT_AS_16_16_16_16), as bound, but draws
+  switch it with render states 308-320: in an attract-mode race, 747,509
+  of its indexed draws went to format 3 (2_10_10_10_FLOAT) and 29,733 to
+  format 12 (2026-10-13). Identify it by pitch 1040 and 2x MSAA with
+  either format.
 - **The 3D view renders at 1024x576 with 2x MSAA**, not 1280x720: its
   surface pitch is 1040 (1024 rounded up to whole EDRAM tiles of 80
   pixels), its resolves copy 1024x576, and its depth starts at tile 936 =
