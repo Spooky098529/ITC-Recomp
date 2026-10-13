@@ -48,6 +48,9 @@ REXCVAR_DEFINE_STRING(native_renderer_cycle, "", "ITC",
 REXCVAR_DEFINE_BOOL(native_renderer_check_late_writes, false, "ITC",
                     "Log vertex and index ranges written after we copied them, by the end of "
                     "the frame (a debugging aid)");
+REXCVAR_DEFINE_STRING(native_renderer_watch_pixel_shader, "", "ITC",
+                      "With native_renderer_watch_draws: only the draws of this pixel shader "
+                      "(hash in hex)");
 REXCVAR_DEFINE_STRING(native_renderer_dump, "", "ITC",
                       "Directory to dump frames into, as PFM files, with draws.txt describing "
                       "each draw: once 10 s into a race, and again whenever a file named 'now' "
@@ -520,7 +523,9 @@ VkCommandBuffer Renderer::BeginFrame() {
     passes_.set_record_draws(dumping_ && dump_step_ == 0);
     passes_.set_check_mirror_frames(REXCVAR_GET(native_renderer_check_mirror));
     passes_.set_check_late_writes(REXCVAR_GET(native_renderer_check_late_writes));
-    passes_.set_watch_draws(REXCVAR_GET(native_renderer_watch_draws));
+    passes_.set_watch_draws(
+        REXCVAR_GET(native_renderer_watch_draws),
+        std::strtoull(REXCVAR_GET(native_renderer_watch_pixel_shader).c_str(), nullptr, 16));
     passes_.set_hide_cubes(REXCVAR_GET(native_renderer_hide_cubes));
     recording_ = true;
   }

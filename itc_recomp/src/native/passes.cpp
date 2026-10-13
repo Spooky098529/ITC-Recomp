@@ -299,6 +299,7 @@ struct Passes::State {
   // those it is), to log what changes between frames when the camera
   // stands still.
   bool watch_draws = false;
+  uint64_t watch_pixel_shader = 0;  // only its draws, if set
   bool hide_cubes = false;  // placeholders for cube maps (debugging aid)
   struct WatchedDraw {
     uint64_t frame = 0;
@@ -1750,7 +1751,8 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
     return;
   }
   VkPipeline pipeline = s.GetPipeline(key);
-  if (s.watch_draws && main_view_draw) {
+  if (s.watch_draws && main_view_draw &&
+      (!s.watch_pixel_shader || (pixel && pixel->hash == s.watch_pixel_shader))) {
     s.WatchDraw(vertex, pixel, index_address, primitive_count, key,
                 reinterpret_cast<const uint32_t*>(s.rings[s.frame].mapped + offsets[0]),
                 reinterpret_cast<const uint32_t*>(s.rings[s.frame].mapped + offsets[1]),
@@ -2071,7 +2073,7 @@ void Passes::State::WatchDraw(const TranslatedShader* vertex, const TranslatedSh
         (last.key != now.key ? std::string("; pipeline") : std::string());
     if (!change.empty()) {
       watched_changes++;
-      if (watch_lines.size() < 40) {
+      if (watch_lines.size() < (watch_pixel_shader ? 200u : 40u)) {
         watch_lines.push_back(fmt::format("vs {:016X} ps {:016X} indices {:08X} x{} #{}{}",
                                           vertex->hash, ps, index_address, primitive_count,
                                           occurrence, change));
@@ -2085,8 +2087,9 @@ void Passes::set_hide_cubes(bool hide) {
   state_->hide_cubes = hide;
 }
 
-void Passes::set_watch_draws(bool watch) {
+void Passes::set_watch_draws(bool watch, uint64_t pixel_shader) {
   state_->watch_draws = watch;
+  state_->watch_pixel_shader = pixel_shader;
 }
 
 std::vector<std::string> Passes::TakeWatchLines(uint64_t& changes, uint64_t& draws) {
