@@ -55,6 +55,8 @@ REXCVAR_DEFINE_STRING(native_renderer_skip_pixel_shader, "", "ITC",
                       "Leave out the draws of this pixel shader (hash in hex; a debugging aid)");
 REXCVAR_DEFINE_BOOL(native_renderer_base_level_only, false, "ITC",
                     "Sample only each texture's first level (a debugging aid)");
+REXCVAR_DEFINE_BOOL(native_renderer_no_index_clamp, false, "ITC",
+                    "Don't clamp indices to VGT_MIN/MAX_VTX_INDX (a debugging aid)");
 REXCVAR_DEFINE_STRING(native_renderer_dump, "", "ITC",
                       "Directory to dump frames into, as PFM files, with draws.txt describing "
                       "each draw: once 10 s into a race, and again whenever a file named 'now' "
@@ -534,6 +536,7 @@ VkCommandBuffer Renderer::BeginFrame() {
         REXCVAR_GET(native_renderer_watch_draws),
         std::strtoull(REXCVAR_GET(native_renderer_watch_pixel_shader).c_str(), nullptr, 16));
     passes_.set_hide_cubes(REXCVAR_GET(native_renderer_hide_cubes));
+    passes_.set_no_index_clamp(REXCVAR_GET(native_renderer_no_index_clamp));
     passes_.set_base_level_only(REXCVAR_GET(native_renderer_base_level_only));
     recording_ = true;
   }
@@ -745,6 +748,12 @@ void Renderer::LogStats() {
                 "shader declares view type {}",
                 (t.mismatched_sample >> 8) & 0xFF, t.mismatched_sample & 0xFF, t.mismatched_width,
                 t.mismatched_height, t.mismatched_sample >> 16);
+  }
+  if (view.clamped_draws) {
+    const auto& c = view.clamped_sample;
+    REXLOG_INFO("native renderer: {:.1f} draws a frame have indices outside VGT_MIN/MAX_VTX_INDX, "
+                "e.g. {}-{} against {}-{}",
+                double(view.clamped_draws) / frames, c[0], c[1], c[2], c[3]);
   }
   if (view.base_vertex_differs) {
     REXLOG_INFO("native renderer: {:.1f} draws a frame have a base vertex in their item other "

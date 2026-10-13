@@ -327,7 +327,8 @@ struct Passes::State {
   VkPipeline GetIdPipeline(const IdDraw& draw);
   void DrawIds(VkCommandBuffer commands);
   uint64_t watch_pixel_shader = 0;  // only its draws, if set
-  bool hide_cubes = false;  // placeholders for cube maps (debugging aid)
+  bool hide_cubes = false;
+  bool no_index_clamp = false;  // debugging aid  // placeholders for cube maps (debugging aid)
   struct WatchedDraw {
     uint64_t frame = 0;
     std::vector<uint32_t> system, vertex_floats, pixel_floats, bool_loop, fetch;
@@ -1648,6 +1649,29 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
     return;  // nothing visible
   }
 
+  uint32_t max_vertex = 0, min_vertex = UINT32_MAX;
+  for (uint32_t i = 0; i < index_count; i++) {
+    uint32_t index;
+    if (index_32bit) {
+      std::memcpy(&index, PhysicalHostAddress(base, index_address + 4 * i), 4);
+      if (index_endian == uint32_t(xenos::Endian::k8in32)) {
+        index = __builtin_bswap32(index);
+      } else if (index_endian == uint32_t(xenos::Endian::k8in16)) {
+        index = ((index & 0x00FF00FFu) << 8) | ((index >> 8) & 0x00FF00FFu);
+      } else if (index_endian == uint32_t(xenos::Endian::k16in32)) {
+        index = (index << 16) | (index >> 16);
+      }
+    } else {
+      uint16_t raw;
+      std::memcpy(&raw, PhysicalHostAddress(base, index_address + 2 * i), 2);
+      index = index_endian == uint32_t(xenos::Endian::k8in16) ? __builtin_bswap16(raw) : raw;
+    }
+    if ((primitive.strip && regs.Get<reg::PA_SU_SC_MODE_CNTL>().multi_prim_ib_ena) && index == (index_32bit ? 0xFFFFFFFFu : 0xFFFFu)) {
+      continue;
+    }
+    max_vertex = std::max(max_vertex, uint32_t(int32_t(index) + base_vertex));
+    min_vertex = std::min(min_vertex, uint32_t(int32_t(index) + base_vertex));
+  }
   // System constants (as the plugin's UpdateSystemConstantValues, for what
   // these draws use).
   Translator::SystemConstants system{};
@@ -1677,6 +1701,19 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
   system.vertex_index_min = regs.values[XE_GPU_REG_VGT_MIN_VTX_INDX];
   system.vertex_index_max = regs.values[XE_GPU_REG_VGT_MAX_VTX_INDX];
   if (system.vertex_index_max <= system.vertex_index_min) {
+    system.vertex_index_min = 0;
+    system.vertex_index_max = xenos::kVertexIndexMask;
+  }
+  // Indices the clamp changes (the registers may be another draw's).
+  if (index_count && (max_vertex > system.vertex_index_max ||
+                      min_vertex < system.vertex_index_min)) {
+    s.stats.clamped_draws++;
+    if (!s.stats.clamped_sample[1]) {
+      s.stats.clamped_sample = {min_vertex, max_vertex, system.vertex_index_min,
+                                system.vertex_index_max};
+    }
+  }
+  if (s.no_index_clamp) {
     system.vertex_index_min = 0;
     system.vertex_index_max = xenos::kVertexIndexMask;
   }
@@ -1824,28 +1861,6 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
   // The highest vertex the draw uses (indices as the GPU reads them, after
   // the base vertex): a vertex buffer is copied up to it even past the size
   // its fetch constant gives, as the GPU reads whatever is there.
-  uint32_t max_vertex = 0;
-  for (uint32_t i = 0; i < index_count; i++) {
-    uint32_t index;
-    if (index_32bit) {
-      std::memcpy(&index, PhysicalHostAddress(base, index_address + 4 * i), 4);
-      if (index_endian == uint32_t(xenos::Endian::k8in32)) {
-        index = __builtin_bswap32(index);
-      } else if (index_endian == uint32_t(xenos::Endian::k8in16)) {
-        index = ((index & 0x00FF00FFu) << 8) | ((index >> 8) & 0x00FF00FFu);
-      } else if (index_endian == uint32_t(xenos::Endian::k16in32)) {
-        index = (index << 16) | (index >> 16);
-      }
-    } else {
-      uint16_t raw;
-      std::memcpy(&raw, PhysicalHostAddress(base, index_address + 2 * i), 2);
-      index = index_endian == uint32_t(xenos::Endian::k8in16) ? __builtin_bswap16(raw) : raw;
-    }
-    if (key.primitive_restart && index == (index_32bit ? 0xFFFFFFFFu : 0xFFFFu)) {
-      continue;
-    }
-    max_vertex = std::max(max_vertex, uint32_t(int32_t(index) + base_vertex));
-  }
   for (uint32_t k = 0; k < 96; k++) {
     if (!(vertex->vertex_fetch_constants[k >> 5] & (1u << (k & 31)))) {
       continue;
@@ -2346,6 +2361,10 @@ void Passes::State::WatchDraw(const TranslatedShader* vertex, const TranslatedSh
 
 void Passes::set_base_level_only(bool base_only) {
   state_->textures.set_base_level_only(base_only);
+}
+
+void Passes::set_no_index_clamp(bool off) {
+  state_->no_index_clamp = off;
 }
 
 void Passes::set_hide_cubes(bool hide) {
