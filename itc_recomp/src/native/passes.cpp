@@ -300,8 +300,11 @@ struct Passes::State {
   struct Resolved {
     VkImage image;
     VkExtent2D extent;
+    uint32_t address, format, flags;
   };
   std::vector<Resolved> frame_resolves;
+  uint64_t frames = 0;  // for logging the resolve list now and then
+  bool logged_extra_targets = false;
 
   // Resolves: drawn with our own shaders (src/native/glsl), sampling the
   // source target; pipelines by destination format and multisampling.
@@ -1221,7 +1224,8 @@ bool Passes::State::ResolveInto(VkCommandBuffer commands, uint8_t* base, Target&
   vk::vkCmdEndRendering(commands);
   Transition(commands, dest.image, VK_IMAGE_ASPECT_COLOR_BIT, dest_layout,
              VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-  frame_resolves.push_back({dest.image, {dest.width, dest.height}});
+  frame_resolves.push_back({dest.image, {dest.width, dest.height}, fetch[1] & 0xFFFFF000u,
+                            fetch[1] & 0x3F, flags});
   return true;
 }
 
@@ -1281,7 +1285,17 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
   uint32_t color_object = guest::LoadU32(base, device + kDeviceRenderTarget0);
   uint32_t depth_object = guest::LoadU32(base, device + kDeviceDepthStencil);
   for (uint32_t i = 1; i < 4; i++) {
-    if (guest::LoadU32(base, device + kDeviceRenderTarget0 + 4 * i)) {
+    if (uint32_t object = guest::LoadU32(base, device + kDeviceRenderTarget0 + 4 * i)) {
+      if (!s.logged_extra_targets) {
+        s.logged_extra_targets = true;
+        Surface extra = ReadSurface(base, object);
+        Surface first = color_object ? ReadSurface(base, color_object) : Surface{};
+        REXLOG_INFO("native renderer: render target {} bound ({:08X}: EDRAM base {}, pitch {}, "
+                    "MSAA {}, format {}) with target 0 {:08X} (EDRAM base {}, pitch {}, MSAA {}, "
+                    "format {})",
+                    i, object, extra.edram_base, extra.pitch, extra.msaa, extra.format,
+                    color_object, first.edram_base, first.pitch, first.msaa, first.format);
+      }
       s.stats.extra_targets++;
       break;
     }
@@ -1696,6 +1710,16 @@ void Passes::AfterResolve(VkCommandBuffer commands, uint8_t* base, uint32_t payl
 VkExtent2D Passes::EndFrame(VkCommandBuffer commands, int32_t show_resolve) {
   State& s = *state_;
   s.EndRendering(commands);
+  // The frame's resolves, now and then, to pick one to show.
+  if (s.frames++ % 1200 == 600 && !s.frame_resolves.empty()) {
+    std::string list;
+    for (size_t i = 0; i < s.frame_resolves.size(); i++) {
+      const State::Resolved& r = s.frame_resolves[i];
+      list += fmt::format("{}{}: {:08X} format {} {}x{} flags {:X}", i ? "; " : "", i, r.address,
+                          r.format, r.extent.width, r.extent.height, r.flags);
+    }
+    REXLOG_INFO("native renderer: this frame's resolves: {}", list);
+  }
   VkImage shown = s.shown.image;
   Transition(commands, shown, VK_IMAGE_ASPECT_COLOR_BIT, s.shown_layout,
              VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
