@@ -31,9 +31,19 @@ known about it; this file is the plan and its progress).
 
 | # | Milestone | Done when | Status |
 |---|---|---|---|
-| 1 | **Skeleton**: `--native_renderer` creates our own Vulkan device, window and swapchain; the replay hooks pass each frame's commands to it. | A window clears and presents every frame. | In progress |
-| 2 | **Main view geometry**: vertex and index buffers read from guest memory, shaders translated, render states mapped to pipelines. | Race geometry is visible in our window, untextured. | |
+| 1 | **Skeleton**: `--native_renderer` creates our own Vulkan device, window and swapchain; the replay hooks pass each frame's commands to it. | A window clears and presents every frame. | Done (2026-10-13): presents every frame in menus (30 fps) and races (113-128 fps, ~26,800 commands and ~2,900 draws a frame), the game unaffected. |
+| 2 | **Main view geometry**: vertex and index buffers read from guest memory, shaders translated, render states mapped to pipelines. | Race geometry is visible in our window, untextured. | In progress |
 | 3 | **Textures**: untile and upload (mostly BC1-BC3), samplers from the fetch constants. | The main view looks right without effects. | |
 | 4 | **The other passes**: each pass renders into a Vulkan image of its resolve's size and format; resolves become copies. | Shadows, reflections and the mirror work. | |
 | 5 | **Post-processing, HUD, present**, then exclusive mode. | A race is fully native; measure the frame rate. | |
 | 6 | **Menus**. | The emulated GPU is no longer needed. | |
+
+## Known issues
+
+- **Resizing the window doesn't resize the swapchain** on Wayland: the
+  compositor leaves the size to us and never reports the swapchain out of
+  date, so the image stays 1280x720. Fix later by watching the window's
+  size-change events (on the main thread) and recreating the swapchain.
+- No Vulkan validation layer here yet (`--native_renderer_validation` falls
+  back without it); install `vulkan-validation-layers` before drawing gets
+  complicated.
