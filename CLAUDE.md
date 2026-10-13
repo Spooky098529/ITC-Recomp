@@ -14,6 +14,8 @@ date as you learn things.
 - Only search inside this repo. Ask for the location of anything outside it.
 - Commit often. Never revert or `git checkout` uncommitted work without
   committing it first.
+- Push work branches to `origin` (github.com/Spooky098529/ITC-Recomp) after
+  each commit. Ask before pushing to `main` or pushing tags.
 - No `-march=native`.
 - US English spelling is fine.
 - Find problems with logs, not guesses: add logging, have the user run the
@@ -81,7 +83,6 @@ releases).
 
 Not done yet:
 
-- Ask before pushing to `origin` (github.com/Spooky098529/ITC-Recomp).
 - Races don't hold 144 fps in busy areas (about 105-150). The render thread
   is the limit, and about half of it is the game busy-waiting on the
   emulated GPU, whose command thread is the real bottleneck (see
