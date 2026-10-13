@@ -108,6 +108,10 @@ class Passes {
     // and an example: address, size, size needed, highest vertex, stride
     // in words.
     uint64_t vertex_overruns = 0;
+    // Draws whose item's base vertex differs from VGT_INDX_OFFSET, and an
+    // example (item's, register's).
+    uint64_t base_vertex_differs = 0;
+    std::array<uint32_t, 2> base_vertex_sample{};
     std::array<uint32_t, 5> vertex_overrun_sample{};
     uint64_t clears = 0, clear_rects = 0;
     // Resolves done; skipped (no source or destination, a level or slice

@@ -746,6 +746,12 @@ void Renderer::LogStats() {
                 (t.mismatched_sample >> 8) & 0xFF, t.mismatched_sample & 0xFF, t.mismatched_width,
                 t.mismatched_height, t.mismatched_sample >> 16);
   }
+  if (view.base_vertex_differs) {
+    REXLOG_INFO("native renderer: {:.1f} draws a frame have a base vertex in their item other "
+                "than VGT_INDX_OFFSET, e.g. {} and {}",
+                double(view.base_vertex_differs) / frames, int32_t(view.base_vertex_sample[0]),
+                int32_t(view.base_vertex_sample[1]));
+  }
   if (view.vertex_overruns) {
     const auto& v = view.vertex_overrun_sample;
     REXLOG_INFO("native renderer: {:.1f} draws a frame read vertices past their fetch "

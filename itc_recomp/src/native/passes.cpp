@@ -38,6 +38,7 @@ using graphics::XE_GPU_REG_SHADER_CONSTANT_BOOL_000_031;
 using graphics::XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0;
 using graphics::XE_GPU_REG_SQ_CONTEXT_MISC;
 using graphics::XE_GPU_REG_SQ_PROGRAM_CNTL;
+using graphics::XE_GPU_REG_VGT_INDX_OFFSET;
 using graphics::XE_GPU_REG_VGT_MAX_VTX_INDX;
 using graphics::XE_GPU_REG_VGT_MIN_VTX_INDX;
 
@@ -1502,7 +1503,17 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
     s.stats.unsupported++;
     return;
   }
-  int32_t base_vertex = int32_t(base_start) >> 16;
+  // The base vertex the GPU adds to each index: VGT_INDX_OFFSET, as the
+  // plugin takes it (the item's upper half is the library's argument, which
+  // it may already have applied to the vertex buffers' addresses).
+  int32_t item_base_vertex = int32_t(base_start) >> 16;
+  int32_t base_vertex = int32_t(regs.values[XE_GPU_REG_VGT_INDX_OFFSET]);
+  if (base_vertex != item_base_vertex) {
+    s.stats.base_vertex_differs++;
+    if (!s.stats.base_vertex_sample[0] && !s.stats.base_vertex_sample[1]) {
+      s.stats.base_vertex_sample = {uint32_t(item_base_vertex), uint32_t(base_vertex)};
+    }
+  }
   uint32_t start_index = base_start & 0xFFFF;
   uint32_t index_count = primitive_count * primitive.a + primitive.b;
 
