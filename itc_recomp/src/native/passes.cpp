@@ -2296,6 +2296,10 @@ void Passes::State::WatchDraw(const TranslatedShader* vertex, const TranslatedSh
   last = std::move(now);
 }
 
+void Passes::set_base_level_only(bool base_only) {
+  state_->textures.set_base_level_only(base_only);
+}
+
 void Passes::set_hide_cubes(bool hide) {
   state_->hide_cubes = hide;
 }

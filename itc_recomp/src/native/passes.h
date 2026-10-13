@@ -72,6 +72,7 @@ class Passes {
   void set_watch_draws(bool watch, uint64_t pixel_shader = 0);
   // A debugging aid: cube maps get the white placeholder.
   void set_hide_cubes(bool hide);
+  void set_base_level_only(bool base_only);
   std::vector<std::string> TakeWatchLines(uint64_t& changes, uint64_t& draws);
   // The distinct addresses of the last frame's resolve destinations.
   std::vector<uint32_t> resolve_addresses() const;

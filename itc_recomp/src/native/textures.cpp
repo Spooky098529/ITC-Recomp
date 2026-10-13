@@ -825,7 +825,7 @@ VkSampler TextureCache::GetSampler(const uint32_t fetch_words[6],
     min_level = layout.min_level;
     max_level = layout.max_level;
   }
-  if (mip == uint32_t(xenos::TextureFilter::kBaseMap)) {
+  if (mip == uint32_t(xenos::TextureFilter::kBaseMap) || base_level_only_) {
     max_level = min_level;
   }
   uint32_t clamp[3] = {uint32_t(fetch.clamp_x), uint32_t(fetch.clamp_y), uint32_t(fetch.clamp_z)};
@@ -836,7 +836,7 @@ VkSampler TextureCache::GetSampler(const uint32_t fetch_words[6],
   uint64_t key = uint64_t(mag & 1) | uint64_t(min & 1) << 1 | uint64_t(mip & 3) << 2 |
                  uint64_t(aniso & 7) << 4 | uint64_t(clamp[0]) << 7 | uint64_t(clamp[1]) << 10 |
                  uint64_t(clamp[2]) << 13 | uint64_t(border) << 16 | uint64_t(min_level) << 18 |
-                 uint64_t(max_level) << 22;
+                 uint64_t(max_level) << 22 | uint64_t(base_level_only_) << 30;
   VkSampler& sampler = s.samplers[key];
   if (sampler) {
     return sampler;

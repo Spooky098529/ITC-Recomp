@@ -53,6 +53,8 @@ REXCVAR_DEFINE_STRING(native_renderer_watch_pixel_shader, "", "ITC",
                       "(hash in hex)");
 REXCVAR_DEFINE_STRING(native_renderer_skip_pixel_shader, "", "ITC",
                       "Leave out the draws of this pixel shader (hash in hex; a debugging aid)");
+REXCVAR_DEFINE_BOOL(native_renderer_base_level_only, false, "ITC",
+                    "Sample only each texture's first level (a debugging aid)");
 REXCVAR_DEFINE_STRING(native_renderer_dump, "", "ITC",
                       "Directory to dump frames into, as PFM files, with draws.txt describing "
                       "each draw: once 10 s into a race, and again whenever a file named 'now' "
@@ -532,6 +534,7 @@ VkCommandBuffer Renderer::BeginFrame() {
         REXCVAR_GET(native_renderer_watch_draws),
         std::strtoull(REXCVAR_GET(native_renderer_watch_pixel_shader).c_str(), nullptr, 16));
     passes_.set_hide_cubes(REXCVAR_GET(native_renderer_hide_cubes));
+    passes_.set_base_level_only(REXCVAR_GET(native_renderer_base_level_only));
     recording_ = true;
   }
   return frame.commands;

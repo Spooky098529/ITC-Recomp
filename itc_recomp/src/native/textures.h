@@ -62,6 +62,8 @@ class TextureCache {
   // textures: from guest memory (all, or of one format), or resolve
   // destinations (all, or at one address).
   enum class Hide { kNone, kMemory, kMemoryFormat, kResolved, kResolvedAddress };
+  // A debugging aid: samplers use only each texture's first level.
+  void set_base_level_only(bool base_only) { base_level_only_ = base_only; }
   void set_debug_hide(Hide hide, uint32_t value = 0) {
     debug_hide_ = hide;
     debug_hide_value_ = value;
@@ -94,6 +96,7 @@ class TextureCache {
   struct State;
   std::unique_ptr<State> state_;
   Hide debug_hide_ = Hide::kNone;
+  bool base_level_only_ = false;
   uint32_t debug_hide_value_ = 0;
 };
 
