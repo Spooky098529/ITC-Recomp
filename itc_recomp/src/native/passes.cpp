@@ -278,13 +278,19 @@ struct Passes::State {
   VkPhysicalDeviceMemoryProperties memory_properties{};
   uint32_t frames_in_flight = 0;
 
-  // A mirror of guest physical memory at the same offsets: the shaders'
+  // Mirrors of guest physical memory at the same offsets: the shaders'
   // storage buffer (set 0) and the index buffer. The driver won't import
   // guest memory itself (a shared memory-file mapping), so each draw's
-  // index and vertex ranges are copied in, once a frame.
-  VkBuffer guest_memory = VK_NULL_HANDLE;
-  VkDeviceMemory guest_memory_allocation = VK_NULL_HANDLE;
-  uint8_t* guest_memory_mapped = nullptr;
+  // index and vertex ranges are copied in, once a frame. One per frame in
+  // flight: with one shared, the next frame's copies overwrote vertices the
+  // GPU was still drawing (buildings showing a rainbow texture).
+  struct GuestMirror {
+    VkBuffer buffer = VK_NULL_HANDLE;
+    VkDeviceMemory memory = VK_NULL_HANDLE;
+    uint8_t* mapped = nullptr;
+    VkDescriptorSet set = VK_NULL_HANDLE;
+  };
+  std::vector<GuestMirror> mirrors;
   std::unordered_set<uint64_t> mirrored;  // address << 32 | size, this frame
   // With check_mirror: each range's hash when copied, to find ranges whose
   // contents change within a frame (draws after the change get the first).
@@ -361,7 +367,6 @@ struct Passes::State {
   VkDescriptorPool pool = VK_NULL_HANDLE;
   VkDescriptorSetLayout shared_memory_layout = VK_NULL_HANDLE;
   VkDescriptorSetLayout constants_layout = VK_NULL_HANDLE;
-  VkDescriptorSet shared_memory_set = VK_NULL_HANDLE;
 
   // Textures, and white 1x1 placeholders of each declared type for what
   // can't be had yet.
@@ -396,6 +401,7 @@ struct Passes::State {
   VkPipeline GetResolvePipeline(VkFormat format, bool multisample);
   void EndRendering(VkCommandBuffer commands);
   bool CreateGuestMemoryMirror();
+  bool CreateGuestMemoryMirror(GuestMirror& mirror);
   void Mirror(uint8_t* base, uint32_t address, uint32_t size);
   bool CreateRings();
   bool CreateDescriptors();
@@ -451,16 +457,28 @@ bool Passes::State::CreateImage(Image& out, VkImageType type, VkImageViewType vi
 }
 
 bool Passes::State::CreateGuestMemoryMirror() {
+  mirrors.resize(frames_in_flight);
+  for (GuestMirror& mirror : mirrors) {
+    if (!CreateGuestMemoryMirror(mirror)) {
+      return false;
+    }
+  }
+  REXLOG_INFO("native renderer: {} guest memory mirrors of {} MB", mirrors.size(),
+              kPhysicalMemorySize >> 20);
+  return true;
+}
+
+bool Passes::State::CreateGuestMemoryMirror(GuestMirror& mirror) {
   VkDevice device = context.device;
   VkBufferCreateInfo info{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
   info.size = kPhysicalMemorySize;
   info.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
   info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-  if (vk::vkCreateBuffer(device, &info, nullptr, &guest_memory) != VK_SUCCESS) {
+  if (vk::vkCreateBuffer(device, &info, nullptr, &mirror.buffer) != VK_SUCCESS) {
     return false;
   }
   VkMemoryRequirements requirements;
-  vk::vkGetBufferMemoryRequirements(device, guest_memory, &requirements);
+  vk::vkGetBufferMemoryRequirements(device, mirror.buffer, &requirements);
   VkMemoryAllocateInfo alloc{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
   alloc.allocationSize = requirements.size;
   alloc.memoryTypeIndex =
@@ -470,18 +488,14 @@ bool Passes::State::CreateGuestMemoryMirror() {
     REXLOG_ERROR("native renderer: no host-visible memory for the guest memory mirror");
     return false;
   }
-  if (VkResult result = vk::vkAllocateMemory(device, &alloc, nullptr, &guest_memory_allocation);
+  if (VkResult result = vk::vkAllocateMemory(device, &alloc, nullptr, &mirror.memory);
       result != VK_SUCCESS) {
     REXLOG_ERROR("native renderer: allocating the guest memory mirror failed: {}", int(result));
     return false;
   }
-  if (vk::vkBindBufferMemory(device, guest_memory, guest_memory_allocation, 0) != VK_SUCCESS ||
-      vk::vkMapMemory(device, guest_memory_allocation, 0, VK_WHOLE_SIZE, 0,
-                      reinterpret_cast<void**>(&guest_memory_mapped)) != VK_SUCCESS) {
-    return false;
-  }
-  REXLOG_INFO("native renderer: guest memory mirror of {} MB", kPhysicalMemorySize >> 20);
-  return true;
+  return vk::vkBindBufferMemory(device, mirror.buffer, mirror.memory, 0) == VK_SUCCESS &&
+         vk::vkMapMemory(device, mirror.memory, 0, VK_WHOLE_SIZE, 0,
+                         reinterpret_cast<void**>(&mirror.mapped)) == VK_SUCCESS;
 }
 
 void Passes::State::Mirror(uint8_t* base, uint32_t address, uint32_t size) {
@@ -506,7 +520,7 @@ void Passes::State::Mirror(uint8_t* base, uint32_t address, uint32_t size) {
   if (!mirrored.insert(key).second) {
     return;  // already copied this frame
   }
-  std::memcpy(guest_memory_mapped + address, PhysicalHostAddress(base, address), size);
+  std::memcpy(mirrors[frame].mapped + address, PhysicalHostAddress(base, address), size);
   stats.mirrored_bytes += size;
 }
 
@@ -554,11 +568,11 @@ bool Passes::State::CreateRings() {
 bool Passes::State::CreateDescriptors() {
   VkDevice device = context.device;
   VkDescriptorPoolSize sizes[] = {
-      {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 4},
+      {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, frames_in_flight},
       {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 5 * frames_in_flight},
   };
   VkDescriptorPoolCreateInfo pool_info{VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
-  pool_info.maxSets = 1 + frames_in_flight;
+  pool_info.maxSets = 2 * frames_in_flight;
   pool_info.poolSizeCount = 2;
   pool_info.pPoolSizes = sizes;
   if (vk::vkCreateDescriptorPool(device, &pool_info, nullptr, &pool) != VK_SUCCESS) {
@@ -591,17 +605,19 @@ bool Passes::State::CreateDescriptors() {
   alloc.descriptorPool = pool;
   alloc.descriptorSetCount = 1;
   alloc.pSetLayouts = &shared_memory_layout;
-  if (vk::vkAllocateDescriptorSets(device, &alloc, &shared_memory_set) != VK_SUCCESS) {
-    return false;
+  for (GuestMirror& mirror : mirrors) {
+    if (vk::vkAllocateDescriptorSets(device, &alloc, &mirror.set) != VK_SUCCESS) {
+      return false;
+    }
+    VkDescriptorBufferInfo shared_buffer{mirror.buffer, 0, VK_WHOLE_SIZE};
+    VkWriteDescriptorSet write{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+    write.dstSet = mirror.set;
+    write.dstBinding = 0;
+    write.descriptorCount = 1;
+    write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    write.pBufferInfo = &shared_buffer;
+    vk::vkUpdateDescriptorSets(device, 1, &write, 0, nullptr);
   }
-  VkDescriptorBufferInfo shared_buffer{guest_memory, 0, VK_WHOLE_SIZE};
-  VkWriteDescriptorSet write{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
-  write.dstSet = shared_memory_set;
-  write.dstBinding = 0;
-  write.descriptorCount = 1;
-  write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-  write.pBufferInfo = &shared_buffer;
-  vk::vkUpdateDescriptorSets(device, 1, &write, 0, nullptr);
 
   const uint32_t ranges[5] = {uint32_t(sizeof(Translator::SystemConstants)),
                               kFloatConstantsRange, kFloatConstantsRange,
@@ -1696,11 +1712,11 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
   }
   vk::vkCmdSetDepthBias(commands, constant, 0.0f, slope);
   vk::vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
-  VkDescriptorSet sets[4] = {s.shared_memory_set, s.rings[s.frame].constants_set,
+  VkDescriptorSet sets[4] = {s.mirrors[s.frame].set, s.rings[s.frame].constants_set,
                              vertex_textures, pixel_textures};
   vk::vkCmdBindDescriptorSets(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, key.layout, 0, 4, sets,
                               5, offsets);
-  vk::vkCmdBindIndexBuffer(commands, s.guest_memory, index_address,
+  vk::vkCmdBindIndexBuffer(commands, s.mirrors[s.frame].buffer, index_address,
                            index_32bit ? VK_INDEX_TYPE_UINT32 : VK_INDEX_TYPE_UINT16);
   vk::vkCmdDrawIndexed(commands, index_count, 1, 0, 0, 0);
   s.stats.drawn++;
