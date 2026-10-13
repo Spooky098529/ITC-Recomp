@@ -93,6 +93,10 @@ The device pointer is at `0x8296BD90`. Fields used so far:
 | +56 + state | Render state setters (command 1). |
 | +440 + state | Sampler state setters (command 2). |
 | +1024 | Fetch constant shadow (register `0x4800` on): 32 texture fetch constants of 24 bytes, the same space seen as 96 vertex fetch constants of 8 bytes. Shaders' register patches are copied in here too. |
+| +1792 + 16 × c | Vertex shader float constants c0-c255 (registers `0x4000` on; command 7 type 1, `sub_822A81F8`). |
+| +5888 + 16 × c | Pixel shader float constants c0-c255 (registers `0x4400` on; `sub_822A8308`). |
+| +9984, +10000 | Bool constants, vertex and pixel, one bit each (command 7 type 2; `sub_822A8418`, `sub_822A8470`). |
+| +10016, +10080 | Loop (integer) constants, vertex and pixel, one word each (command 7 type 0; `sub_822A84C8`, `sub_822A8518`). |
 | +10240 + 4 × (reg − `0x2000`) | Surface registers: RB_SURFACE_INFO, RB_COLOR_INFO, RB_DEPTH_INFO, RB_COLOR1-3_INFO (`0x2000`-`0x2005`). |
 | +10424 + 4 × (reg − `0x2201`) | Shadow of the render backend and setup registers, from RB_BLENDCONTROL0 (`0x2201`). Checked for `0x2201`-`0x220B` (command 3) and `0x2206` below. |
 | +10444 | PA_CL_VTE_CNTL (`0x2206`): bit 0 (viewport X scale enable) is read, cleared and restored around the helper object's draws, which are in screen space. |
@@ -105,6 +109,30 @@ The device pointer is at `0x8296BD90`. Fields used so far:
 | +12432, +12436 | Pixel shader, vertex shader (commands 9, 8). |
 | +13156 | Also set by command 8. |
 | +13168, +13172 | Write pointer and limit of a small buffer of resource fences (written when a bound resource is replaced). |
+
+### The register shadow as a whole
+
+At each draw, the library writes the dirty parts of the shadow into the
+ring buffer: `sub_822ADE30(device, dirty mask, first register, shadow)`
+writes each run of set bits as a type-0 register write, register = first
++ k from shadow + 4k. Its callers (in the draw path, around
+`0x822AFEEC`-`0x822B0030`, and in `0x8229F6E8`-) give the blocks:
+
+| Registers | Shadow |
+|---|---|
+| `0x2000`- | +10240 |
+| `0x2100`- | +10316 |
+| `0x2180`- | +10400 |
+| `0x2200`- | +10420 |
+| `0x2280`- | +10468 |
+| `0x2300`- | +10552 |
+
+Fetch constants are flushed by `sub_822AE070` (from +1024 to `0x4800`).
+So the device holds every register and constant a draw needs, in guest
+memory: a native renderer can read the GPU's state at each draw straight
+from it. It must read it after the library's draw call: some of it is
+filled in at draw time (the combined SQ_PROGRAM_CNTL at +10400, the vertex
+shader patched for its declaration).
 
 ## Render states and sampler states
 
