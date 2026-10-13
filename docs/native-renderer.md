@@ -57,7 +57,7 @@ known about it; this file is the plan and its progress).
 |---|---|---|---|
 | 1 | **Skeleton**: `--native_renderer` creates our own Vulkan device, window and swapchain; the replay hooks pass each frame's commands to it. | A window clears and presents every frame. | Done (2026-10-13): presents every frame in menus (30 fps) and races (113-128 fps, ~26,800 commands and ~2,900 draws a frame), the game unaffected. |
 | 2 | **Main view geometry**: vertex and index buffers read from guest memory, shaders translated, render states mapped to pipelines. | Race geometry is visible in our window, untextured. | Done (2026-10-13): the cockpit view's geometry, the right way up, solid, with the game's coloured lighting on white placeholder textures (screenshot checked). |
-| 3 | **Textures**: untile and upload (mostly BC1-BC3), samplers from the fetch constants. | The main view looks right without effects. | Next |
+| 3 | **Textures**: untile and upload (mostly BC1-BC3), samplers from the fetch constants. | The main view looks right without effects. | Done (2026-10-13): signs, gauges, fences, buildings and road textured correctly (screenshot checked); what comes from resolves is still missing. |
 | 4 | **The other passes**: each pass renders into a Vulkan image of its resolve's size and format; resolves become copies. | Shadows, reflections and the mirror work. | |
 | 5 | **Post-processing, HUD, present**, then exclusive mode. | A race is fully native; measure the frame rate. | |
 | 6 | **Menus**. | The emulated GPU is no longer needed. | |
@@ -96,7 +96,40 @@ known about it; this file is the plan and its progress).
   the buildings and the opponent's red tail lights. The target was then cut
   to the view's 1024x576.
 
+## Progress on milestone 3
+
+- `src/native/textures.cpp` loads textures itself (not the SDK's texture
+  cache): the fetch constant's layout (as the SDK reads it: mip range, base
+  and mip addresses), the 360's tiled addressing, mips padded as levels of
+  a power-of-two texture, the packed mip tail, rows and row counts padded
+  to 32 blocks, layers to 4 KB; byte swaps per the fetch constant;
+  `4_4_4_4` converted to RGBA8, DXT1/2_3/4_5 as BC1-BC3. 2D (and stacked)
+  and cube only. Images are keyed by the fetch constant's data fields (not
+  swizzle or sampling); a view per swizzle (the translator expects the
+  swizzle in the view, with missing components repeating the last one).
+  Uploads go through a 64 MB staging buffer per frame in flight, into a
+  command buffer submitted before the frame's; a texture whose staging
+  doesn't fit waits for the next frame. Loaded textures' memory is hashed
+  again every 240 frames (8 a frame at most) and reloaded if it changed.
+- Samplers from the fetch constant (filters, clamp modes, border, mip
+  range, anisotropy) with the shader's fetch instruction overriding the
+  filters. The texture's post-swizzle signs go into the system constants;
+  signed bindings get the unsigned view (no signed textures expected).
+- Texture descriptor sets are allocated per draw from a per-frame pool,
+  shared between draws with the same views and samplers.
+- First result (race, 2026-10-13): 408 textures, 50.7 MB, loaded in the
+  race's first frame without deferring, none reloaded; 18 samplers; ~101
+  fps. Unsupported: `24_8_FLOAT` (the shadow depth map). About 2,200
+  lookups a second find a texture of another dimension than the shader
+  declares (now logged with an example). Still wrong, all for milestone 4:
+  the mirror is black, and some buildings show rainbow smears, likely
+  textures that are resolve targets (whatever is in guest memory there),
+  to be confirmed.
+
 ## Known issues
+
+- Textures are never freed: memory reused for different textures (another
+  race) leaves the old images behind.
 
 - **Resizing the window doesn't resize the swapchain** on Wayland: the
   compositor leaves the size to us and never reports the swapchain out of

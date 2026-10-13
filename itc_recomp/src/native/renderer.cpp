@@ -556,6 +556,12 @@ void Renderer::LogStats() {
               t.unsupported_sample == UINT32_MAX ? -1 : int(t.unsupported_sample >> 8),
               t.unsupported_sample == UINT32_MAX ? -1 : int(t.unsupported_sample & 0xFF),
               t.mismatched);
+  if (t.mismatched_sample != UINT32_MAX) {
+    REXLOG_INFO("native renderer: e.g. a texture of format {}, dimension {}, {}x{} where the "
+                "shader declares view type {}",
+                (t.mismatched_sample >> 8) & 0xFF, t.mismatched_sample & 0xFF, t.mismatched_width,
+                t.mismatched_height, t.mismatched_sample >> 16);
+  }
   if (view.invisible) {
     const auto& v = view.invisible_sample;
     REXLOG_INFO("native renderer: {:.0f} main view draws a frame skipped as invisible, e.g. "

@@ -628,6 +628,12 @@ VkImageView TextureCache::GetView(uint8_t* base, const uint32_t fetch_words[6],
   VkImageViewType natural = t.layout.cube ? VK_IMAGE_VIEW_TYPE_CUBE : VK_IMAGE_VIEW_TYPE_2D_ARRAY;
   if (view_type != natural) {
     s.stats.mismatched++;
+    if (s.stats.mismatched_sample == UINT32_MAX) {
+      s.stats.mismatched_sample = uint32_t(view_type) << 16 | uint32_t(fetch.format) << 8 |
+                                  uint32_t(fetch.dimension);
+      s.stats.mismatched_width = t.layout.width;
+      s.stats.mismatched_height = t.layout.height;
+    }
     return VK_NULL_HANDLE;
   }
 

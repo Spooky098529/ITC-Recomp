@@ -52,6 +52,9 @@ class TextureCache {
              deferred = 0;
     uint32_t textures = 0, samplers = 0;
     uint32_t unsupported_sample = UINT32_MAX;  // format << 8 | dimension
+    // A texture of another dimension than the shader declares: declared view
+    // type << 16 | format << 8 | dimension, and its size.
+    uint32_t mismatched_sample = UINT32_MAX, mismatched_width = 0, mismatched_height = 0;
   };
   Stats TakeStats();
 
