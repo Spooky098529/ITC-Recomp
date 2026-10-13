@@ -45,16 +45,16 @@ function per item. The exceptions are marked with their item size.
 | 0, 36, 37 | `sub_82304258` | | Nothing (returns arg1). 36 ends a chain. | |
 | 1 | `sub_8258FBD0` | 16 | **SetRenderState**: [state, value]. Calls the device's setter for the state at device + state + 56 (the Xbox 360 Direct3D keeps a setter per render state). | per-state setter |
 | 2 | `sub_8258FC30` | 16 | **SetSamplerState**: [sampler, state, value]. Setter at device + state + 440. | per-state setter |
-| 3 | `sub_8258FC90` | 16 | Unknown: [a, b]. | `sub_822A3B30` |
-| 4 | `sub_8258FCE0` | 16 | **SetTexture**, likely: [sampler, texture], with the dirty bit for fetch constant sampler + 20. | `sub_822A6008` |
+| 3 | `sub_8258FC90` | 16 | **SetBlendState**: [render target, blend control]. Writes the register shadow for RB_BLENDCONTROL0 (`0x2201`) for target 0, or `0x2201` + 7 + target (`0x2209`-`0x220B`, RB_BLENDCONTROL1-3) for the others. The value is the register's: `0x00010001` = colour and alpha source ONE, destination ZERO. | `sub_822A3B30` |
+| 4 | `sub_8258FCE0` | 16 | **SetTexture**: [sampler, texture]. Merges the texture's fetch constant (+28..+48) into the fetch constant shadow at device + 1024 + 24 × sampler (see "Resources"), and fences the texture it replaces. | `sub_822A6008` |
 | 5 | `sub_8258E9F8` | arg1 × 24 bytes | Inline vertex data for the helper object (below): stores payload and count at state +12, +16. | |
 | 6 | `sub_8258EA20` | arg1 × 2 or 4 bytes | Inline index data for the helper object: payload, count, 32-bit flag (arg2) at state +20, +24, +28. | |
 | 7 | `sub_8258FD48` | arg1 registers | **Set shader constants**. arg2 = stage << 24 \| type << 16 \| start << 8 \| count. Stage 0 = vertex, 1 = pixel; type 0-3 picks a setter. Wrapped by interpolation. | VS `sub_822A84C8`, `sub_822A81F8`, `sub_822A8418`; PS `sub_822A8518`, `sub_822A8308`, `sub_822A8470` |
-| 8 | `sub_8258FF50` | 16 | Unknown: [pointer], stored at device +13156. Replayed as often as 9: likely one of a vertex/pixel shader pair. | `sub_822A8958` |
-| 9 | `sub_8258FFA0` | 16 | Unknown: [pointer]; copies memory. Replayed as often as 8. | `sub_822A8618` |
-| 10 | `sub_8258FFF0` | 16 | Unknown: [pointer]. | `sub_822A8960` |
-| 11 | `sub_82590040` | 16 | **SetStreamSource**, likely: [stream, buffer, offset, stride], dirty bit for vertex fetch constant (95 - stream) / 3 + 20. | `sub_822A3758` |
-| 12 | `sub_825900B8` | 16 | Unknown: [pointer]. Replayed exactly as often as command 18, so probably the index buffer for each indexed draw. | `sub_822A3908` |
+| 8 | `sub_8258FF50` | 16 | **SetVertexShader**, likely: [shader]. Stores it at device +12436 (and +13156), takes a reference, sets dirty bit 51 and copies the shader's register patches (at shader +592) into the shadow at device +1024. Replayed as often as 9. | `sub_822A8958` → `sub_822A8808` |
+| 9 | `sub_8258FFA0` | 16 | **SetPixelShader**, likely: [shader]. Stores it at device +12432, sets dirty bits 52 and 49, copies its register patches (at shader +56). | `sub_822A8618` |
+| 10 | `sub_8258FFF0` | 16 | **SetVertexDeclaration**, likely: [declaration]. Stores it at device +11552 and sets dirty bit 51, the vertex shader's. | `sub_822A8960` |
+| 11 | `sub_82590040` | 16 | **SetStreamSource**: [stream, buffer, offset, stride]. Writes the buffer's fetch constant (address + offset, size − offset) to vertex fetch constant 95 − stream (device + 1024 + 8 × (95 − stream)); the handler's dirty bit, (95 − stream) / 3 + 20, is the same slot. Buffer pointer at device + 12204 + 4 × stream, stride byte at device + 12272 + stream. | `sub_822A3758` |
+| 12 | `sub_825900B8` | 16 | **SetIndices**: [index buffer]. Stores it at device +12180 and fences the previous one; replayed exactly once per indexed draw (command 18). | `sub_822A3908` |
 | 13, 14 | `sub_8258EA58` | 16 | Helper object set-up: stores [a, b, c] at state +0..+8, calls the helper's vtable slot 2 with the device. | |
 | 15 | `sub_82590108` | 16 | Helper object draw (vtable slot 3) from the stored inline data, with a device flag (+10444 bit 0) toggled around it. | `sub_822A2470`, `sub_822A2430` |
 | 16 | `sub_825901B0` | 16 | Same, vtable slot 4, more arguments (indexed). | same |
@@ -85,17 +85,43 @@ isn't known yet.
 
 ## Graphics library
 
-The device is at `0x8296BD90`. Fields used so far:
+The device pointer is at `0x8296BD90`. Fields used so far:
 
 | Offset | What |
 |---|---|
+| +8, +16, +24 | Dirty masks (64-bit). Setters OR bits in; the draw functions write out what's dirty. |
 | +56 + state | Render state setters (command 1). |
 | +440 + state | Sampler state setters (command 2). |
-| +10444 | Flags; bit 0 read and set around the helper object's draws. |
+| +1024 | Fetch constant shadow (register `0x4800` on): 32 texture fetch constants of 24 bytes, the same space seen as 96 vertex fetch constants of 8 bytes. Shaders' register patches are copied in here too. |
+| +10424 + 4 × (reg − `0x2201`) | Shadow of the render backend and setup registers, from RB_BLENDCONTROL0 (`0x2201`). Checked for `0x2201`-`0x220B` (command 3) and `0x2206` below. |
+| +10444 | PA_CL_VTE_CNTL (`0x2206`): bit 0 (viewport X scale enable) is read, cleared and restored around the helper object's draws, which are in screen space. |
 | +10768 | Pointer to the GPU's ring buffer read pointer (written back by the GPU). |
 | +10780 | Ring buffer position the waits compare against. |
 | +11600 | Set to 1 before a scissor rect (command 31). |
-| +13156 | Pointer set by command 8. |
+| +11552 | Vertex declaration (command 10). |
+| +12180 | Index buffer (command 12). |
+| +12204 + 4 × stream | Stream source buffers (command 11). |
+| +12432, +12436 | Pixel shader, vertex shader (commands 9, 8). |
+| +13156 | Also set by command 8. |
+| +13168, +13172 | Write pointer and limit of a small buffer of resource fences (written when a bound resource is replaced). |
+
+## Resources
+
+Resources start with the Xbox 360 Direct3D resource header; the setters
+write the ring buffer position into +8 (the fence) of a resource they
+unbind, so the library knows when the GPU is done with it.
+
+- **Texture**: the GPU texture fetch constant (6 words) at +28..+48:
+  word 1 (+32) holds the format and base address, word 2 (+36) the size,
+  word 5 (+48) the mip address. SetTexture converts the addresses to the
+  GPU's physical form (`addr & 0x1FFFFFFF`, plus `0x1000` when the top
+  bits of the address say so). The SDK's `xe_gpu_texture_fetch_t` describes
+  the words.
+- **Vertex buffer**: the vertex fetch constant at +24 (address) and +28
+  (size).
+- **Index buffer**, **shaders**, **vertex declaration**: layout not read
+  yet. Shaders carry register patch lists: a list of (offset, count)
+  followed by words, copied or masked into the device's shadow.
 
 The draw functions (`sub_825BE300`, `sub_825BE708`, `sub_825BD8F0`,
 `sub_825BDDC0`) share helpers `sub_8229EB10`, `sub_8229EF48` (73 call
@@ -171,8 +197,10 @@ Sample arguments of the unknown commands (payload words):
 
 ## Not yet known
 
-- Commands 3, 8, 9, 10, 12, 20, 22, 28, 32 and 33, and what the helper
-  object draws.
+- Commands 32 and 33 (rare), and what the helper object draws. (20, 22
+  and 28 are never replayed.)
+- Confirming the "likely" rows at runtime (8, 9, 10: which object is a
+  vertex shader is a guess from its reference counting and dirty bits).
 - The render state and sampler state ids in use (commands 1 and 2).
 - Texture, vertex buffer and surface objects: their layout in guest memory
   (formats, tiling, sizes), which the native renderer needs to read.
