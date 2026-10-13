@@ -58,9 +58,14 @@ class TextureCache {
   };
   bool GetResolveDestination(const uint32_t fetch[6], ResolveDestination& out);
 
-  // A debugging aid: 1 makes GetView give nothing (so placeholders) for
-  // textures from guest memory, 2 for resolve destinations.
-  void set_debug_hide(int hide) { debug_hide_ = hide; }
+  // A debugging aid: makes GetView give nothing (so placeholders) for some
+  // textures: from guest memory (all, or of one format), or resolve
+  // destinations (all, or at one address).
+  enum class Hide { kNone, kMemory, kMemoryFormat, kResolved, kResolvedAddress };
+  void set_debug_hide(Hide hide, uint32_t value = 0) {
+    debug_hide_ = hide;
+    debug_hide_value_ = value;
+  }
 
   // This frame's uploads, ended, to be submitted before its drawing; null if
   // none.
@@ -83,7 +88,8 @@ class TextureCache {
  private:
   struct State;
   std::unique_ptr<State> state_;
-  int debug_hide_ = 0;
+  Hide debug_hide_ = Hide::kNone;
+  uint32_t debug_hide_value_ = 0;
 };
 
 }  // namespace native

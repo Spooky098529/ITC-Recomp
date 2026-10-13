@@ -10,6 +10,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "device_context.h"
 #include "textures.h"
@@ -44,7 +45,9 @@ class Passes {
   VkExtent2D EndFrame(VkCommandBuffer commands, int32_t show_resolve, bool dump,
                       const std::string& dump_prefix = "shown", bool dump_resolves = true);
   // For the next frames: the texture cache's debug_hide (see TextureCache).
-  void set_debug_hide(int hide);
+  void set_debug_hide(TextureCache::Hide hide, uint32_t value = 0);
+  // The distinct addresses of the last frame's resolve destinations.
+  std::vector<uint32_t> resolve_addresses() const;
   // After a frame that dumped has finished on the GPU: writes each image as
   // a PFM file into the directory (tools/pfm_to_png.py makes PNGs of them).
   void WriteDump(const std::string& directory);

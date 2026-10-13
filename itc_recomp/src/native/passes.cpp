@@ -1725,8 +1725,18 @@ void Passes::AfterResolve(VkCommandBuffer commands, uint8_t* base, uint32_t payl
   }
 }
 
-void Passes::set_debug_hide(int hide) {
-  state_->textures.set_debug_hide(hide);
+void Passes::set_debug_hide(TextureCache::Hide hide, uint32_t value) {
+  state_->textures.set_debug_hide(hide, value);
+}
+
+std::vector<uint32_t> Passes::resolve_addresses() const {
+  std::vector<uint32_t> addresses;
+  for (const State::Resolved& r : state_->frame_resolves) {
+    if (std::find(addresses.begin(), addresses.end(), r.address) == addresses.end()) {
+      addresses.push_back(r.address);
+    }
+  }
+  return addresses;
 }
 
 VkExtent2D Passes::EndFrame(VkCommandBuffer commands, int32_t show_resolve, bool dump,

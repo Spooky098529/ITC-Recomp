@@ -152,6 +152,13 @@ class Renderer {
   DeviceContext context_{};
   Passes passes_;
   bool recording_ = false;  // this frame's command buffer is open
+  // The dump's frames after the first: what each hides.
+  struct DumpStep {
+    std::string name;
+    TextureCache::Hide hide;
+    uint32_t value;
+  };
+  std::vector<DumpStep> dump_steps_;
   uint32_t dump_step_ = 0;
   uint32_t race_frames_ = 0;
 
@@ -454,19 +461,19 @@ void Renderer::EndFrame() {
   frame_commands_ = frame_draws_ = 0;
 
   VkCommandBuffer commands = BeginFrame();
-  // A dump, once: from the 600th frame with a race's resolves on, three
-  // frames: as is (with the resolves), then with textures from guest memory
-  // hidden, then with resolve destinations hidden (placeholders instead).
-  static const char* const kDumpNames[] = {"shown", "shown_without_memory_textures",
-                                           "shown_without_resolved_textures"};
+  // A dump, once: from the 600th frame with a race's resolves on, the
+  // frame as is (with the resolves), then frames with some textures hidden
+  // (placeholders instead; see DumpSteps).
   bool dump = false;
-  if (dump_step_ < 3 && !REXCVAR_GET(native_renderer_dump).empty() &&
-      passes_.frame_resolve_count() >= 20 && ++race_frames_ >= 600) {
+  if (!REXCVAR_GET(native_renderer_dump).empty() &&
+      (dump_step_ == 0 ? passes_.frame_resolve_count() >= 20 && ++race_frames_ >= 600
+                       : dump_step_ <= dump_steps_.size())) {
     dump = true;
   }
   VkExtent2D source =
       dump ? passes_.EndFrame(commands, REXCVAR_GET(native_renderer_show_resolve), true,
-                              kDumpNames[dump_step_], dump_step_ == 0)
+                              dump_step_ ? dump_steps_[dump_step_ - 1].name : "shown",
+                              dump_step_ == 0)
            : passes_.EndFrame(commands, REXCVAR_GET(native_renderer_show_resolve), false);
   Frame& frame = frames_[frame_index_];
 
@@ -554,8 +561,28 @@ void Renderer::EndFrame() {
   if (dump) {
     vk::vkQueueWaitIdle(queue_);
     passes_.WriteDump(REXCVAR_GET(native_renderer_dump));
+    if (dump_step_ == 0) {
+      // Everything from memory; each format this game's textures use; all
+      // resolves; each resolve destination.
+      using Hide = TextureCache::Hide;
+      dump_steps_.push_back({"hide_memory", Hide::kMemory, 0});
+      for (uint32_t format : {18u, 19u, 20u, 6u, 15u}) {
+        dump_steps_.push_back({fmt::format("hide_memory_format{}", format), Hide::kMemoryFormat,
+                               format});
+      }
+      dump_steps_.push_back({"hide_resolved", Hide::kResolved, 0});
+      for (uint32_t address : passes_.resolve_addresses()) {
+        dump_steps_.push_back(
+            {fmt::format("hide_resolved_{:08X}", address), Hide::kResolvedAddress, address});
+      }
+    }
     dump_step_++;
-    passes_.set_debug_hide(dump_step_ < 3 ? dump_step_ : 0);
+    if (dump_step_ <= dump_steps_.size()) {
+      const DumpStep& step = dump_steps_[dump_step_ - 1];
+      passes_.set_debug_hide(step.hide, step.value);
+    } else {
+      passes_.set_debug_hide(TextureCache::Hide::kNone);
+    }
   }
   frame_index_ = (frame_index_ + 1) % kFramesInFlight;
   LogStats();
