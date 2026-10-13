@@ -46,6 +46,8 @@ struct TranslatedShader {
   // Its texture descriptors (set 2 or 3): images, then samplers.
   std::vector<ShaderTexture> textures;
   std::vector<ShaderSampler> samplers;
+  // The vertex buffers it fetches from: fetch constant and stride in words.
+  std::vector<std::pair<uint32_t, uint32_t>> vertex_strides;
   // The render targets the (pixel) shader writes, a bit each.
   uint32_t writes_color_targets = 0;
   VkShaderModule module = VK_NULL_HANDLE;  // created by the renderer

@@ -1810,13 +1810,50 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
   // constant is two words: the address (word 0, low 2 bits the type) and
   // the size in words (word 1, bits 2-25).
   s.Mirror(base, index_address, index_count * (index_32bit ? 4 : 2), true);
+  // The highest vertex the draw uses (indices as the GPU reads them, after
+  // the base vertex): a vertex buffer is copied up to it even past the size
+  // its fetch constant gives, as the GPU reads whatever is there.
+  uint32_t max_vertex = 0;
+  for (uint32_t i = 0; i < index_count; i++) {
+    uint32_t index;
+    if (index_32bit) {
+      std::memcpy(&index, PhysicalHostAddress(base, index_address + 4 * i), 4);
+      if (index_endian == uint32_t(xenos::Endian::k8in32)) {
+        index = __builtin_bswap32(index);
+      } else if (index_endian == uint32_t(xenos::Endian::k8in16)) {
+        index = ((index & 0x00FF00FFu) << 8) | ((index >> 8) & 0x00FF00FFu);
+      } else if (index_endian == uint32_t(xenos::Endian::k16in32)) {
+        index = (index << 16) | (index >> 16);
+      }
+    } else {
+      uint16_t raw;
+      std::memcpy(&raw, PhysicalHostAddress(base, index_address + 2 * i), 2);
+      index = index_endian == uint32_t(xenos::Endian::k8in16) ? __builtin_bswap16(raw) : raw;
+    }
+    if (key.primitive_restart && index == (index_32bit ? 0xFFFFFFFFu : 0xFFFFu)) {
+      continue;
+    }
+    max_vertex = std::max(max_vertex, uint32_t(int32_t(index) + base_vertex));
+  }
   for (uint32_t k = 0; k < 96; k++) {
     if (!(vertex->vertex_fetch_constants[k >> 5] & (1u << (k & 31)))) {
       continue;
     }
     uint32_t word0 = regs.values[XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0 + 2 * k];
     uint32_t word1 = regs.values[XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0 + 2 * k + 1];
-    s.Mirror(base, word0 & 0x1FFFFFFCu, ((word1 >> 2) & 0xFFFFFFu) * 4, false);
+    uint32_t size = ((word1 >> 2) & 0xFFFFFFu) * 4;
+    for (const auto& [fetch_constant, stride_words] : vertex->vertex_strides) {
+      uint64_t needed = (uint64_t(max_vertex) + 1) * stride_words * 4;
+      if (fetch_constant == k && needed > size && needed < (64u << 20)) {
+        s.stats.vertex_overruns++;
+        if (!s.stats.vertex_overrun_sample[1]) {
+          s.stats.vertex_overrun_sample = {word0 & 0x1FFFFFFCu, size, uint32_t(needed),
+                                           max_vertex, stride_words};
+        }
+        size = uint32_t(needed);
+      }
+    }
+    s.Mirror(base, word0 & 0x1FFFFFFCu, size, false);
   }
 
   // Draw.

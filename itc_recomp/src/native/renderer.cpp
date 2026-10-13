@@ -746,6 +746,12 @@ void Renderer::LogStats() {
                 (t.mismatched_sample >> 8) & 0xFF, t.mismatched_sample & 0xFF, t.mismatched_width,
                 t.mismatched_height, t.mismatched_sample >> 16);
   }
+  if (view.vertex_overruns) {
+    const auto& v = view.vertex_overrun_sample;
+    REXLOG_INFO("native renderer: {:.1f} draws a frame read vertices past their fetch "
+                "constant's size, e.g. {:08X}: {} bytes, {} needed (vertex {}, stride {} words)",
+                double(view.vertex_overruns) / frames, v[0], v[1], v[2], v[3], v[4]);
+  }
   if (REXCVAR_GET(native_renderer_watch_draws)) {
     uint64_t changes, watched;
     std::vector<std::string> lines = passes_.TakeWatchLines(changes, watched);
