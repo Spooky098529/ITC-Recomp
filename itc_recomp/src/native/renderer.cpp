@@ -51,6 +51,8 @@ REXCVAR_DEFINE_BOOL(native_renderer_check_late_writes, false, "ITC",
 REXCVAR_DEFINE_STRING(native_renderer_watch_pixel_shader, "", "ITC",
                       "With native_renderer_watch_draws: only the draws of this pixel shader "
                       "(hash in hex)");
+REXCVAR_DEFINE_STRING(native_renderer_skip_pixel_shader, "", "ITC",
+                      "Leave out the draws of this pixel shader (hash in hex; a debugging aid)");
 REXCVAR_DEFINE_STRING(native_renderer_dump, "", "ITC",
                       "Directory to dump frames into, as PFM files, with draws.txt describing "
                       "each draw: once 10 s into a race, and again whenever a file named 'now' "
@@ -517,6 +519,9 @@ VkCommandBuffer Renderer::BeginFrame() {
       if (!cycle_steps_.empty()) {
         passes_.set_skip_pixel_shader(cycle_steps_[cycle_step_].skip);
       }
+    }
+    if (const std::string& skip = REXCVAR_GET(native_renderer_skip_pixel_shader); !skip.empty()) {
+      passes_.set_skip_pixel_shader(std::strtoull(skip.c_str(), nullptr, 16));
     }
     // Its first frame describes each draw (cheaply: the effect being looked
     // for went away while frames were recorded slowly).
