@@ -54,6 +54,10 @@ struct Stats {
   bool new_states = false;
   std::set<std::pair<uint32_t, uint64_t>> shaders;  // (object, microcode hash)
   std::set<uint32_t> declarations, index_buffers;
+  // Frame pass trace: one whole frame every 10 s.
+  bool tracing = false;
+  uint32_t trace_draws = 0;  // draws since the last traced command
+  std::chrono::steady_clock::time_point last_trace = std::chrono::steady_clock::now();
   std::chrono::steady_clock::time_point last_log = std::chrono::steady_clock::now();
 };
 
@@ -61,6 +65,99 @@ struct Stats {
 Stats& GetStats() {
   static Stats stats;
   return stats;
+}
+
+std::string Words(uint8_t* base, uint32_t address, uint32_t count) {
+  std::string words;
+  for (uint32_t i = 0; i < count; i++) {
+    words += fmt::format(" {:08X}", guest::LoadU32(base, address + 4 * i));
+  }
+  return words;
+}
+
+// A surface: +24 surface info (pitch, MSAA), +28 colour/depth info (EDRAM
+// base, format), +32 HiZ (depth).
+std::string Surface(uint8_t* base, uint32_t surface) {
+  if (!surface) {
+    return "none";
+  }
+  return fmt::format("{:08X} [info{}]", surface, Words(base, surface + 24, 3));
+}
+
+// A texture: its fetch constant (+28..+48).
+std::string Texture(uint8_t* base, uint32_t texture) {
+  if (!texture) {
+    return "none";
+  }
+  return fmt::format("{:08X} [fetch{}]", texture, Words(base, texture + 28, 6));
+}
+
+// One line per pass-structure command of a traced frame.
+void TraceCommand(uint8_t* base, uint32_t id, uint32_t payload, uint32_t arg1, uint32_t arg2) {
+  Stats& s = GetStats();
+  if (id == 17 || id == 18 || id == 19 || id == 15 || id == 27) {
+    s.trace_draws++;
+    return;
+  }
+  std::string what;
+  switch (id) {
+    case 23:
+      for (uint32_t i = 0; i < arg1; i++) {
+        what += fmt::format(" rt{}={}", guest::LoadU32(base, payload + 16 * i),
+                            Surface(base, guest::LoadU32(base, payload + 16 * i + 4)));
+      }
+      break;
+    case 24:
+      for (uint32_t i = 0; i < arg1; i++) {
+        what += " depth=" + Surface(base, guest::LoadU32(base, payload + 16 * i));
+      }
+      break;
+    case 25:
+      for (uint32_t i = 0; i < arg1; i++) {
+        uint32_t item = payload + 68 * i;
+        uint32_t present = guest::LoadU32(base, item);
+        what += fmt::format(" [flags {:08X}", guest::LoadU32(base, item + 4));
+        if (present & 1) {
+          what += " rect" + Words(base, item + 8, 4);
+        }
+        if (present & 2) {
+          what += " dest " + Texture(base, guest::LoadU32(base, item + 24));
+        }
+        if (present & 4) {
+          what += " point" + Words(base, item + 28, 2);
+        }
+        what += fmt::format(" level {} slice {}", guest::LoadU32(base, item + 36),
+                            guest::LoadU32(base, item + 40));
+        if (present & 8) {
+          what += fmt::format(" clear colour {:08X}", guest::LoadU32(base, item + 44));
+        }
+        what += fmt::format(" z {:08X} stencil {}]", guest::LoadU32(base, item + 48),
+                            guest::LoadU32(base, item + 52));
+      }
+      break;
+    case 26:
+      for (uint32_t i = 0; i < arg1; i++) {
+        uint32_t item = payload + 280 * i;
+        what += fmt::format(" [rects {} flags {:08X} colour {:08X} z {:08X} stencil {}]",
+                            guest::LoadU32(base, item + 4), guest::LoadU32(base, item + 8),
+                            guest::LoadU32(base, item + 268), guest::LoadU32(base, item + 272),
+                            guest::LoadU32(base, item + 276));
+      }
+      break;
+    case 29:
+      what = fmt::format(" mask {:08X}", guest::LoadU32(base, payload));
+      break;
+    case 30:
+      what = Words(base, payload, 4 * arg1);
+      break;
+    case 34:
+    case 35:
+      break;
+    default:
+      return;
+  }
+  REXLOG_INFO("frame trace: {} draws, then command {}:{}", s.trace_draws, id, what);
+  s.trace_draws = 0;
 }
 
 }  // namespace
@@ -71,6 +168,9 @@ void debug::ReplayStats_OnCommand(uint8_t* base, uint32_t id, uint32_t payload, 
     return;
   }
   Stats& s = GetStats();
+  if (s.tracing) {
+    TraceCommand(base, id, payload, arg1, arg2);
+  }
   s.commands[id]++;
   s.items[id] += arg1;
   if (id == 1 || id == 2) {
@@ -165,6 +265,15 @@ void debug::ReplayStats_OnFrame() {
   Stats& s = GetStats();
   s.frames++;
   auto now = std::chrono::steady_clock::now();
+  if (s.tracing) {
+    REXLOG_INFO("frame trace: {} draws, then the frame ends", s.trace_draws);
+    s.tracing = false;
+  } else if (now - s.last_trace >= std::chrono::seconds(10)) {
+    REXLOG_INFO("frame trace: starts");
+    s.tracing = true;
+    s.trace_draws = 0;
+    s.last_trace = now;
+  }
   if (now - s.last_log < std::chrono::seconds(2)) {
     return;
   }

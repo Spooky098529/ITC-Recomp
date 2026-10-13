@@ -64,8 +64,8 @@ function per item. The exceptions are marked with their item size.
 | 20 | `sub_825903D8` | 16 | Unknown: [object], skipped if null. | `sub_822A67B0` |
 | 21 | `sub_8258EAD0` | arg1 bytes | Skips arg1 bytes of payload (inline data or padding). | |
 | 22 | `sub_82591798` | 16 | Unknown: [object, flag]. Asks the object (vtable 2); if not ready and flag = 1, calls vtable 1, `sub_82591540` (with `0x8296BD8C`), vtable 3. | `sub_82591540` |
-| 23 | `sub_82590428` | 16 | **SetRenderTarget**, likely: [index, surface]. | `sub_822A4340` → `sub_822A3D30` |
-| 24 | `sub_82590478` | 16 | **SetDepthStencilSurface**, likely: [surface]. | `sub_822A4060` |
+| 23 | `sub_82590428` | 16 | **SetRenderTarget**: [index, surface]. Stores the surface at device +12184 + 4 × index and its colour info (+28) in the RB_COLOR_INFO shadow (target 0: `0x2001`; 1-3: `0x2003`-`0x2005`); target 0 also sets the surface info and a full viewport (`sub_822A3C88`). | `sub_822A4340` → `sub_822A3D30` |
+| 24 | `sub_82590478` | 16 | **SetDepthStencilSurface**: [surface]. Stores it at device +12200; its +28 goes to RB_DEPTH_INFO (`0x2002`), +32 to the HiZ control. | `sub_822A4060` |
 | 25 | `sub_825904C8` | 68 | **Resolve** (EDRAM to texture): flags, and by bit, source rect, destination texture, destination point, clear colour (4 bytes → floats), parameters; also level, slice, clear Z, stencil. | `sub_822AFA58` |
 | 26 | `sub_82590620` | 280 | **Clear**: [count, rects (if count), flags, colour, Z, stencil]. | `sub_822A04F8` |
 | 27 | `sub_82590698` | 32 | **DrawIndexedPrimitiveUP**: Begin, `memcpy` the indices (2 or 4 bytes each) and vertices, End. | `sub_825BDDC0`, `sub_825A7410`, `sub_825BDDA0` |
@@ -93,6 +93,7 @@ The device pointer is at `0x8296BD90`. Fields used so far:
 | +56 + state | Render state setters (command 1). |
 | +440 + state | Sampler state setters (command 2). |
 | +1024 | Fetch constant shadow (register `0x4800` on): 32 texture fetch constants of 24 bytes, the same space seen as 96 vertex fetch constants of 8 bytes. Shaders' register patches are copied in here too. |
+| +10240 + 4 × (reg − `0x2000`) | Surface registers: RB_SURFACE_INFO, RB_COLOR_INFO, RB_DEPTH_INFO, RB_COLOR1-3_INFO (`0x2000`-`0x2005`). |
 | +10424 + 4 × (reg − `0x2201`) | Shadow of the render backend and setup registers, from RB_BLENDCONTROL0 (`0x2201`). Checked for `0x2201`-`0x220B` (command 3) and `0x2206` below. |
 | +10444 | PA_CL_VTE_CNTL (`0x2206`): bit 0 (viewport X scale enable) is read, cleared and restored around the helper object's draws, which are in screen space. |
 | +10768 | Pointer to the GPU's ring buffer read pointer (written back by the GPU). |
@@ -133,7 +134,7 @@ the value differed from the previous one (capped at 1000).
 | 208 | `sub_822A1DB8` | Polygon offset (+10708, +10716) and the same enables | Depth bias | 18,648 | changes |
 | 212 | `sub_822A1EB0` | +10332 bits 0-3, only with render target 0 bound | Colour write mask | 23,970 | changes |
 | 304 | `sub_822A2430` | PA_CL_VTE_CNTL (+10444) | Viewport transform enable | 34,236 | changes |
-| 308-320 | `sub_822A2480`, `sub_822A2530`, `sub_822A25E0`, `sub_822A2690` | Per render target 0-3 (+12184.., +11772..): switches the bound surface's format between two variants (formats 2, 3, 10, 12) | Unknown; one per target | 89,328 each | changes |
+| 308-320 | `sub_822A2480`, `sub_822A2530`, `sub_822A25E0`, `sub_822A2690` | Per render target 0-3 (surface at device +12184.., value kept at +11772..): switches the bound surface's colour format between 2_10_10_10 (2) and 2_10_10_10_AS_10_10_10_10 (10), or 2_10_10_10_FLOAT (3) and 2_10_10_10_FLOAT_AS_16_16_16_16 (12), and updates RB_COLOR*_INFO | High-precision blend, per target | 89,328 each | changes |
 | 324 | `sub_822A27E8` | +10560 bit 0 | Unknown | 14,193 | changes |
 | 328 | `sub_822A2820` | PA_SU_SC_MODE_CNTL bit 21 (MULTI_PRIM_IB_ENA) | Primitive reset enable | 2,397 | always 1 |
 | 332 | `sub_822A2850` | +10328 | Primitive reset index | 2,397 | always `0xFFFF` |
@@ -170,6 +171,12 @@ unbind, so the library knows when the GPU is done with it.
   the words.
 - **Vertex buffer**: the vertex fetch constant at +24 (address) and +28
   (size).
+- **Surface** (render target or depth): +24 is RB_SURFACE_INFO (`0x2000`,
+  device +10240): pitch, and the MSAA mode in bits 16-17, from which the
+  library sets the AA config (+10556: 0, `0x8001` or `0xC003`); +28 is
+  RB_COLOR_INFO or RB_DEPTH_INFO (EDRAM base in bits 0-11, format in bits
+  16-19); +32 is the depth surface's HiZ control. A surface is EDRAM only:
+  it reaches a texture through a resolve.
 - **Index buffer**: word +0 bit 31 set = 32-bit indices (else 16-bit), and
   bits 29-30 give the endianness of the draw packet; +24 is the address,
   +28 the size in bytes. All 3,189 index buffers seen in a run were
@@ -305,7 +312,7 @@ through the menus and a race (`itc_352.log`):
 - Commands 32 and 33 (rare), and what the helper object draws. (20, 22
   and 28 are never replayed.)
 - Confirming the "likely" rows at runtime.
-- Render states 308-320 and 324.
+- Render state 324.
 - The vertex declaration's element list (past word 16); a native renderer
   may not need it, since the formats are patched into the vertex shader.
 - Texture, vertex buffer and surface objects: their layout in guest memory
@@ -317,6 +324,12 @@ through the menus and a race (`itc_352.log`):
 
 ## Tools
 
+- `--log_replay_commands` also traces one whole frame every 10 s
+  ("frame trace" lines): each surface, resolve, clear, viewport and
+  save/restore command in order, with its arguments decoded and the number
+  of draws since the previous one. It logs each new shader (with its
+  microcode hash), vertex declaration and index buffer, every render and
+  sampler state id with its setter, and every new texture fetch constant.
 - `--log_replay_commands` logs, every 2 s, how often each command id is
   replayed per frame (and its items), plus the last arguments of each
   unknown command. It wraps every handler but 0/36/37
