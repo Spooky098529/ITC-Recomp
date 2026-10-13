@@ -105,6 +105,55 @@ The device pointer is at `0x8296BD90`. Fields used so far:
 | +13156 | Also set by command 8. |
 | +13168, +13172 | Write pointer and limit of a small buffer of resource fences (written when a bound resource is replaced). |
 
+## Render states and sampler states
+
+States are byte offsets into the device's setter tables (command 1: device
++ 56 + state; command 2: device + 440 + state). Each setter writes fields of
+the device's register shadow. These are all the states the game set in a
+run through the menus and a race (`itc_351.log`, `--log_replay_commands`),
+named by the register field their setter writes. "Changes" counts how often
+the value differed from the previous one (capped at 1000).
+
+| State | Setter | Writes | Name | Uses | Values seen |
+|---|---|---|---|---|---|
+| 40 | `sub_822A18D8` | RB_DEPTHCONTROL (+10420) bit 1, only with a depth buffer bound | Z enable | 116,071 | changes |
+| 44 | `sub_822A1950` | RB_DEPTHCONTROL bits 4-6 | Z function | 96,156 | always 6 |
+| 48 | `sub_822A1920` | RB_DEPTHCONTROL bit 2 | Z write enable | 196,087 | changes |
+| 52 | `sub_822A1290` | PA_SU_SC_MODE_CNTL (+10440) bits 3-10 | Fill mode | 95,880 | always 0 |
+| 56 | `sub_822A1260` | PA_SU_SC_MODE_CNTL bits 0-2 | Cull mode | 776,726 | changes |
+| 60 | `sub_822A1300` | Blend enable (software copy +11596 bit 31); writes RB_BLENDCONTROL0-3 (+10424, +10456..+10464), `0x00010001` when off | Alpha blend enable | 335,797 | changes |
+| 72 | `sub_822A1420` | Blend control bits 0-4 (and alpha's, unless separate alpha is on) | Source blend | 236,700 | changes |
+| 76 | `sub_822A14B0` | Blend control bits 8-12 | Destination blend | 236,700 | changes |
+| 80 | `sub_822A1390` | Blend control bits 5-7 | Blend op | 4,530 | always 0 |
+| 96 | `sub_822A12C0` | RB_COLORCONTROL (+10428) bit 3 | Alpha test enable | 502,197 | changes |
+| 100 | `sub_822A1728` | Float (value × a constant at `0x82002200`) at +10372 | Alpha reference | 623,676 | changes |
+| 104 | `sub_822A1790` | RB_COLORCONTROL bits 0-2 | Alpha function | 83,895 | changes |
+| 200 | `sub_822A3D20` | +11600, then reapplies the scissor rect | Scissor enable | 186,753 | always 0 |
+| 204 | `sub_822A1CF0` | Polygon offset scale (+10704, +10712, value × a constant) and PA_SU_SC_MODE_CNTL bits 11-12 | Slope-scaled depth bias | 9,588 | changes |
+| 208 | `sub_822A1DB8` | Polygon offset (+10708, +10716) and the same enables | Depth bias | 18,648 | changes |
+| 212 | `sub_822A1EB0` | +10332 bits 0-3, only with render target 0 bound | Colour write mask | 23,970 | changes |
+| 304 | `sub_822A2430` | PA_CL_VTE_CNTL (+10444) | Viewport transform enable | 34,236 | changes |
+| 308-320 | `sub_822A2480`, `sub_822A2530`, `sub_822A25E0`, `sub_822A2690` | Per render target 0-3 (+12184.., +11772..): switches the bound surface's format between two variants (formats 2, 3, 10, 12) | Unknown; one per target | 89,328 each | changes |
+| 324 | `sub_822A27E8` | +10560 bit 0 | Unknown | 14,193 | changes |
+| 328 | `sub_822A2820` | PA_SU_SC_MODE_CNTL bit 21 (MULTI_PRIM_IB_ENA) | Primitive reset enable | 2,397 | always 1 |
+| 332 | `sub_822A2850` | +10328 | Primitive reset index | 2,397 | always `0xFFFF` |
+
+Sampler states write the sampler's texture fetch constant in the shadow
+(device + 1024 + 24 × sampler):
+
+| State | Setter | Writes | Name | Uses |
+|---|---|---|---|---|
+| 0 | `sub_822A31A0` | Word 0 bits 10-12 (clamp X) | Address U | 657,718 |
+| 4 | `sub_822A31F0` | Word 0 bits 13-15 (clamp Y) | Address V | 657,718 |
+| 16 | `sub_822A2BF8` | Word 3 bits 19-20 (mag filter) and 25-27 (anisotropic filter) | Mag filter | 715,677 |
+| 20 | `sub_822A2A70` | Word 3 bits 21-22 (min filter) and 25-27 | Min filter | 714,021 |
+| 24 | `sub_822A2D80` | Word 3 bits 23-24 | Mip filter | 825,638 |
+| 28 | `sub_822A2F90` | Word 4 bits 12-21 (value × a constant) | LOD bias | 236,852 |
+| 36 | `sub_822A2E70` | Word 3 bits 25-27 via a table at `0x82013628`, when anisotropic filtering is on; kept per sampler at +11668 | Max anisotropy | 102,775 |
+
+So samplers map straight onto the GPU's fetch constant fields, and render
+states onto a few registers (depth, blend, colour control, setup).
+
 ## Resources
 
 Resources start with the Xbox 360 Direct3D resource header; the setters
@@ -195,13 +244,27 @@ Sample arguments of the unknown commands (payload words):
 - 32: `[0, 3, 0x82600360]` (a static object in the executable's data).
 - 33: `[0x303, 0x40070350]`.
 
+## Textures in use
+
+167 distinct texture fetch constants (format, flags and size; the address
+isn't part of the count) were bound in the same run:
+
+- **Formats**: DXT4/5 85, DXT1 42, DXT2/3 17, 8_8_8_8 12, 4_4_4_4 3,
+  2_10_10_10_AS_16_16_16_16 3, 16_16_16_16 2, 16_16 1, 24_8_FLOAT 1 (a
+  depth buffer read as a texture), 32_FLOAT 1. Nearly all compressed, which
+  Vulkan supports as BC1-BC3.
+- **Tiled**: 163 of 167 (the 360's tiled layout; they need untiling).
+- **Endianness**: 8-in-16 for 149, 8-in-32 for 18 (byte swaps).
+- **Sizes**: mostly powers of two up to 1024x1024; two 1280x720 (screen
+  copies, from resolves).
+
 ## Not yet known
 
 - Commands 32 and 33 (rare), and what the helper object draws. (20, 22
   and 28 are never replayed.)
 - Confirming the "likely" rows at runtime (8, 9, 10: which object is a
   vertex shader is a guess from its reference counting and dirty bits).
-- The render state and sampler state ids in use (commands 1 and 2).
+- Render states 308-320 and 324.
 - Texture, vertex buffer and surface objects: their layout in guest memory
   (formats, tiling, sizes), which the native renderer needs to read.
 - The shaders: how commands 8-10 and 12 relate to vertex and pixel shaders
