@@ -12,9 +12,11 @@
 #define REPLAY_COUNTED_HANDLER(address, id)                                         \
   extern "C" REX_FUNC(sub_##address) {                                              \
     REX_FUNC_PROLOGUE();                                                            \
-    debug::ReplayStats_OnCommand(base, id, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);     \
-    native::Renderer_OnCommand(base, id, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);      \
+    uint32_t payload = ctx.r3.u32, arg1 = ctx.r4.u32, arg2 = ctx.r5.u32;           \
+    debug::ReplayStats_OnCommand(base, id, payload, arg1, arg2);                    \
+    native::Renderer_OnCommand(base, id, payload, arg1, arg2);                      \
     __imp__sub_##address(ctx, base);                                                \
+    native::Renderer_AfterCommand(base, id, payload, arg1, arg2);                   \
   }
 
 REPLAY_COUNTED_HANDLER(8258FBD0, 1)

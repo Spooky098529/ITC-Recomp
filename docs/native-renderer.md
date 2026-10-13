@@ -19,7 +19,16 @@ known about it; this file is the plan and its progress).
   function table), so the build needs no Vulkan library. Headers come from
   the SDK's third-party copy of the Khronos headers.
 - **Shaders: reuse the SDK's Xenos-to-SPIR-V translator** for now, to be
-  replaced with our own later. This is the one part that leans on the SDK.
+  replaced with our own later. This is the one part that leans on the SDK. The plugin builds it with hidden symbols, so
+  `itc_recomp/CMakeLists.txt` compiles its sources into a static library of
+  ours (`itc_xenos_shaders`: the shader, translator and SPIR-V sources,
+  `format/ucode.cpp`, `util/draw.cpp`, `registers.cpp`). The translator
+  reads the `dump_shaders` setting, which only the plugin defines; we
+  supply an empty one in `src/native/shaders.cpp`. `util/draw.cpp` defines
+  two GPU settings of its own (`half_pixel_offset`,
+  `resolve_resolution_scale_fill_half_pixel_offset`), which are then
+  registered twice; setting them on the command line may reach only one
+  copy.
 - **Development mode first**: with `--native_renderer`, the replay hooks
   draw natively *and* still call the graphics library, so the emulated GPU
   keeps rendering the game's own window and the two can be compared side by

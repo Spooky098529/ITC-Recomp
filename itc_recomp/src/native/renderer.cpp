@@ -1,6 +1,9 @@
 #include "renderer.h"
 
+#include "shaders.h"
 #include "vulkan_functions.h"
+
+#include "guest.h"
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_vulkan.h>
@@ -96,11 +99,25 @@ void SDLCALL CreateWindowOnMainThread(void* data) {
   finish("");
 }
 
+// The graphics library's device and the fields read here (see
+// docs/gpu-functions.md).
+constexpr uint32_t kDevicePointer = 0x8296BD90;
+constexpr uint32_t kDevicePixelShader = 12432, kDeviceVertexShader = 12436;
+constexpr uint32_t kDeviceProgramControl = 10400;  // SQ_PROGRAM_CNTL
+constexpr uint32_t kVertexShaderUcode = 48, kVertexShaderUcodeSize = 600;
+constexpr uint32_t kPixelShaderUcode = 24, kPixelShaderUcodeSize = 64;
+
+// Host address of a guest address (as REX_RAW_ADDR).
+const uint8_t* HostAddress(uint8_t* base, uint32_t address) {
+  return base + address + (address >= 0xE0000000u ? 0x1000u : 0u);
+}
+
 class Renderer {
  public:
   // Render thread. Returns false if the renderer can't run.
   bool Init();
   void OnCommand(uint32_t id, uint32_t arg1);
+  void AfterDraw(uint8_t* base);
   void EndFrame();
 
  private:
@@ -133,6 +150,9 @@ class Renderer {
   };
   std::array<Frame, kFramesInFlight> frames_{};
   uint32_t frame_index_ = 0;
+
+  ShaderCache shaders_;
+  uint64_t draws_without_shaders_ = 0;
 
   // This frame's commands (milestone 1: counted only).
   uint32_t frame_commands_ = 0, frame_draws_ = 0;
@@ -355,6 +375,31 @@ void Renderer::OnCommand(uint32_t id, uint32_t arg1) {
   }
 }
 
+void Renderer::AfterDraw(uint8_t* base) {
+  uint32_t device = guest::LoadU32(base, kDevicePointer);
+  uint32_t program_control = guest::LoadU32(base, device + kDeviceProgramControl);
+  uint32_t vertex_shader = guest::LoadU32(base, device + kDeviceVertexShader);
+  uint32_t pixel_shader = guest::LoadU32(base, device + kDevicePixelShader);
+  const TranslatedShader* vertex = nullptr;
+  const TranslatedShader* pixel = nullptr;
+  if (vertex_shader) {
+    vertex = shaders_.Get(
+        ShaderStage::kVertex,
+        HostAddress(base, guest::LoadU32(base, vertex_shader + kVertexShaderUcode)),
+        guest::LoadU32(base, vertex_shader + kVertexShaderUcodeSize), program_control & 0x3F);
+  }
+  if (pixel_shader) {
+    pixel = shaders_.Get(
+        ShaderStage::kPixel,
+        HostAddress(base, guest::LoadU32(base, pixel_shader + kPixelShaderUcode)),
+        guest::LoadU32(base, pixel_shader + kPixelShaderUcodeSize),
+        (program_control >> 8) & 0x3F);
+  }
+  if (!vertex || (pixel_shader && !pixel)) {
+    draws_without_shaders_++;
+  }
+}
+
 void Renderer::EndFrame() {
   commands_ += frame_commands_;
   draws_ += frame_draws_;
@@ -455,9 +500,11 @@ void Renderer::LogStats() {
   double seconds = std::chrono::duration<double>(now - last_log_).count();
   uint64_t frames = std::max<uint64_t>(frames_presented_ + frames_skipped_, 1);
   REXLOG_INFO("native renderer: {:.0f} frames/s presented, {} skipped; per frame {:.0f} "
-              "commands, {:.0f} draws",
+              "commands, {:.0f} draws; shaders translated {}, failed {}; draws without "
+              "shaders {}",
               frames_presented_ / seconds, frames_skipped_, double(commands_) / frames,
-              double(draws_) / frames);
+              double(draws_) / frames, shaders_.translated(), shaders_.failed(),
+              draws_without_shaders_);
   frames_presented_ = frames_skipped_ = commands_ = draws_ = 0;
   last_log_ = now;
 }
@@ -491,6 +538,16 @@ void Renderer_OnCommand(uint8_t* base, uint32_t id, uint32_t payload, uint32_t a
   }
   if (Renderer* renderer = GetRenderer()) {
     renderer->OnCommand(id, arg1);
+  }
+}
+
+void Renderer_AfterCommand(uint8_t* base, uint32_t id, uint32_t payload, uint32_t arg1,
+                           uint32_t arg2) {
+  if (!Renderer_Enabled() || !IsDraw(id)) {
+    return;
+  }
+  if (Renderer* renderer = GetRenderer()) {
+    renderer->AfterDraw(base);
   }
 }
 

@@ -17,6 +17,12 @@ bool Renderer_Enabled();
 void Renderer_OnCommand(uint8_t* base, uint32_t id, uint32_t payload, uint32_t arg1,
                         uint32_t arg2);
 
+// Render thread, after a command handler has run. For draws, the device's
+// register shadow then holds everything the draw used (some of it is filled
+// in by the draw call itself; see docs/gpu-functions.md).
+void Renderer_AfterCommand(uint8_t* base, uint32_t id, uint32_t payload, uint32_t arg1,
+                           uint32_t arg2);
+
 // Render thread, after each frame's replay and present.
 void Renderer_EndFrame();
 

@@ -53,6 +53,7 @@ set(ITC_SOURCES
     src/debug/replay_stats.cpp
     src/native/renderer.cpp
     src/native/replay_hooks.cpp
+    src/native/shaders.cpp
     src/native/vulkan_functions.cpp
     src/interpolation/transform.cpp
     src/frame_pacing/game_messages.cpp
@@ -69,6 +70,35 @@ endif()
 rexglue_setup_target(itc GPU_PLUGINS xenos)
 
 target_include_directories(itc PRIVATE src)
+
+# The SDK's Xenos shader translator (to SPIR-V), built into our binary for
+# the native renderer (docs/native-renderer.md: reused for now, to be
+# replaced). The plugin has its own copy with hidden symbols.
+set(ITC_SDK_GRAPHICS ${REXSDK_DIR}/src/graphics)
+add_library(itc_xenos_shaders STATIC
+    ${ITC_SDK_GRAPHICS}/pipeline/shader/shader.cpp
+    ${ITC_SDK_GRAPHICS}/pipeline/shader/translator.cpp
+    ${ITC_SDK_GRAPHICS}/pipeline/shader/translator_disasm.cpp
+    ${ITC_SDK_GRAPHICS}/pipeline/shader/spirv_builder.cpp
+    ${ITC_SDK_GRAPHICS}/pipeline/shader/spirv.cpp
+    ${ITC_SDK_GRAPHICS}/pipeline/shader/spirv_translator.cpp
+    ${ITC_SDK_GRAPHICS}/pipeline/shader/spirv_translator_alu.cpp
+    ${ITC_SDK_GRAPHICS}/pipeline/shader/spirv_translator_fetch.cpp
+    ${ITC_SDK_GRAPHICS}/pipeline/shader/spirv_translator_memexport.cpp
+    ${ITC_SDK_GRAPHICS}/pipeline/shader/spirv_translator_rb.cpp
+    ${ITC_SDK_GRAPHICS}/format/ucode.cpp
+    ${ITC_SDK_GRAPHICS}/util/draw.cpp
+    ${ITC_SDK_GRAPHICS}/registers.cpp
+)
+target_include_directories(itc_xenos_shaders PUBLIC ${REXSDK_DIR}/thirdparty/renderdoc)
+set_target_properties(itc_xenos_shaders PROPERTIES
+    CXX_VISIBILITY_PRESET hidden
+    VISIBILITY_INLINES_HIDDEN ON)
+target_compile_options(itc_xenos_shaders PRIVATE -Wno-unused-variable)
+target_link_libraries(itc_xenos_shaders PUBLIC
+    rexruntime xxHash::xxhash Vulkan::Headers glslang::SPIRV glslang
+    MachineIndependent GenericCodeGen OSDependent OGLCompiler)
+target_link_libraries(itc PRIVATE itc_xenos_shaders)
 
 # The native renderer (src/native/) uses SDL, which lives in librexruntime,
 # and loads Vulkan at runtime: it needs only the headers. Both are the SDK's
