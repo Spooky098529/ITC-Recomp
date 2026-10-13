@@ -60,6 +60,11 @@ class Passes {
   // ranges that changed since it was last called (the most changed first).
   void set_check_mirror_frames(bool check);
   std::string TakeMirrorChanges();
+  // A debugging aid: compare each main view draw's inputs with the same
+  // draw's in the previous frame; TakeWatchLines gives how many changed (of
+  // how many watched) and descriptions of the first since the last call.
+  void set_watch_draws(bool watch);
+  std::vector<std::string> TakeWatchLines(uint64_t& changes, uint64_t& draws);
   // The distinct addresses of the last frame's resolve destinations.
   std::vector<uint32_t> resolve_addresses() const;
   // After a frame that dumped has finished on the GPU: writes each image as

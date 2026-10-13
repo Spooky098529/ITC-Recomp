@@ -295,6 +295,24 @@ struct Passes::State {
   // With check_mirror: each range's hash when copied, to find ranges whose
   // contents change within a frame (draws after the change get the first).
   bool check_mirror = false;
+  // With watch_draws: each main view draw's inputs, by the draw (shaders,
+  // index address, primitive count, and which of the frame's draws with
+  // those it is), to log what changes between frames when the camera
+  // stands still.
+  bool watch_draws = false;
+  struct WatchedDraw {
+    uint64_t frame = 0;
+    std::vector<uint32_t> system, vertex_floats, pixel_floats, bool_loop, fetch;
+    std::string key;
+  };
+  std::map<std::tuple<uint64_t, uint64_t, uint32_t, uint32_t, uint32_t>, WatchedDraw> watched;
+  std::map<std::tuple<uint64_t, uint64_t, uint32_t, uint32_t>, uint32_t> watched_this_frame;
+  uint64_t watched_changes = 0, watched_draws = 0;
+  std::vector<std::string> watch_lines;
+  void WatchDraw(const TranslatedShader* vertex, const TranslatedShader* pixel,
+                 uint32_t index_address, uint32_t primitive_count, const PipelineKey& key,
+                 const uint32_t* system, const uint32_t* vertex_floats,
+                 const uint32_t* pixel_floats, const uint32_t* bool_loop, const uint32_t* fetch);
   std::unordered_map<uint64_t, uint64_t> mirrored_hashes;
   // With check_mirror_frames: each range's hash in the frame it was last
   // copied, and how often it changed since the last log.
@@ -1357,6 +1375,7 @@ void Passes::BeginFrame(uint32_t frame_index) {
   s.frame_resolves.clear();
   s.mirrored.clear();
   s.mirrored_hashes.clear();
+  s.watched_this_frame.clear();
   s.frame_pixel_shaders.clear();
   s.texture_sets.clear();
   vk::vkResetDescriptorPool(s.context.device, s.rings[frame_index].texture_pool, 0);
@@ -1690,6 +1709,14 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
     return;
   }
   VkPipeline pipeline = s.GetPipeline(key);
+  if (s.watch_draws && main_view_draw) {
+    s.WatchDraw(vertex, pixel, index_address, primitive_count, key,
+                reinterpret_cast<const uint32_t*>(s.rings[s.frame].mapped + offsets[0]),
+                reinterpret_cast<const uint32_t*>(s.rings[s.frame].mapped + offsets[1]),
+                reinterpret_cast<const uint32_t*>(s.rings[s.frame].mapped + offsets[2]),
+                &regs.values[XE_GPU_REG_SHADER_CONSTANT_BOOL_000_031],
+                &regs.values[XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0]);
+  }
   if (!pipeline) {
     s.stats.failed++;
     return;
@@ -1902,6 +1929,100 @@ std::string Passes::TakeMirrorChanges() {
                         changed[i].second.changes);
   }
   return text;
+}
+
+namespace {
+
+// The float constant registers a shader reads, in packed order.
+std::vector<uint32_t> FloatRegisters(const TranslatedShader* shader) {
+  std::vector<uint32_t> registers;
+  for (uint32_t i = 0; shader && i < 256; i++) {
+    if (shader->float_constants[i >> 6] & (uint64_t(1) << (i & 63))) {
+      registers.push_back(i);
+    }
+  }
+  return registers;
+}
+
+// "name: word 3 a -> b, ..." for the words that differ (at most 4 shown).
+std::string DescribeChange(const char* name, const std::vector<uint32_t>& before,
+                           const std::vector<uint32_t>& after,
+                           const std::vector<uint32_t>* float_registers) {
+  std::string text;
+  uint32_t shown = 0, changed = 0;
+  for (size_t i = 0; i < before.size() && i < after.size(); i++) {
+    if (before[i] == after[i]) {
+      continue;
+    }
+    changed++;
+    if (shown++ < 4) {
+      float a, b;
+      std::memcpy(&a, &before[i], 4);
+      std::memcpy(&b, &after[i], 4);
+      if (float_registers) {
+        text += fmt::format(" c{}.{} {:.4g}->{:.4g}", (*float_registers)[i / 4], "xyzw"[i % 4], a,
+                            b);
+      } else {
+        text += fmt::format(" word {} {:08X}->{:08X}", i, before[i], after[i]);
+      }
+    }
+  }
+  return changed ? fmt::format("; {} ({} words):{}", name, changed, text) : std::string();
+}
+
+}  // namespace
+
+void Passes::State::WatchDraw(const TranslatedShader* vertex, const TranslatedShader* pixel,
+                              uint32_t index_address, uint32_t primitive_count,
+                              const PipelineKey& key, const uint32_t* system,
+                              const uint32_t* vertex_floats, const uint32_t* pixel_floats,
+                              const uint32_t* bool_loop, const uint32_t* fetch) {
+  uint64_t ps = pixel ? pixel->hash : 0;
+  uint32_t occurrence =
+      watched_this_frame[{vertex->hash, ps, index_address, primitive_count}]++;
+  WatchedDraw now;
+  now.frame = frames;
+  now.system.assign(system, system + sizeof(Translator::SystemConstants) / 4);
+  std::vector<uint32_t> vertex_registers = FloatRegisters(vertex);
+  std::vector<uint32_t> pixel_registers = FloatRegisters(pixel);
+  now.vertex_floats.assign(vertex_floats, vertex_floats + 4 * vertex_registers.size());
+  now.pixel_floats.assign(pixel_floats, pixel_floats + 4 * pixel_registers.size());
+  now.bool_loop.assign(bool_loop, bool_loop + kBoolLoopConstantsRange / 4);
+  now.fetch.assign(fetch, fetch + kFetchConstantsRange / 4);
+  now.key.assign(reinterpret_cast<const char*>(&key), sizeof(key));
+  watched_draws++;
+  WatchedDraw& last = watched[{vertex->hash, ps, index_address, primitive_count, occurrence}];
+  if (last.frame + 1 == frames) {
+    std::string change =
+        DescribeChange("system", last.system, now.system, nullptr) +
+        DescribeChange("vertex floats", last.vertex_floats, now.vertex_floats,
+                       &vertex_registers) +
+        DescribeChange("pixel floats", last.pixel_floats, now.pixel_floats, &pixel_registers) +
+        DescribeChange("bool/loop", last.bool_loop, now.bool_loop, nullptr) +
+        DescribeChange("fetch", last.fetch, now.fetch, nullptr) +
+        (last.key != now.key ? std::string("; pipeline") : std::string());
+    if (!change.empty()) {
+      watched_changes++;
+      if (watch_lines.size() < 40) {
+        watch_lines.push_back(fmt::format("vs {:016X} ps {:016X} indices {:08X} x{} #{}{}",
+                                          vertex->hash, ps, index_address, primitive_count,
+                                          occurrence, change));
+      }
+    }
+  }
+  last = std::move(now);
+}
+
+void Passes::set_watch_draws(bool watch) {
+  state_->watch_draws = watch;
+}
+
+std::vector<std::string> Passes::TakeWatchLines(uint64_t& changes, uint64_t& draws) {
+  State& s = *state_;
+  changes = s.watched_changes;
+  draws = s.watched_draws;
+  s.watched_changes = s.watched_draws = 0;
+  return std::exchange(s.watch_lines, {});
 }
 
 void Passes::set_check_mirror(bool check) {

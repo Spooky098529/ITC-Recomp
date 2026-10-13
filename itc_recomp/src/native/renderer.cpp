@@ -36,6 +36,9 @@ REXCVAR_DEFINE_BOOL(native_renderer_serialize, false, "ITC",
 REXCVAR_DEFINE_BOOL(native_renderer_check_mirror, false, "ITC",
                     "Log the vertex and index ranges whose contents change between frames "
                     "(a debugging aid)");
+REXCVAR_DEFINE_BOOL(native_renderer_watch_draws, false, "ITC",
+                    "Log what changes in the main view's draws' inputs between frames: with the "
+                    "camera still, only flickering draws should (a debugging aid)");
 REXCVAR_DEFINE_STRING(native_renderer_dump, "", "ITC",
                       "Directory to dump frames into, as PFM files, with draws.txt describing "
                       "each draw: once 10 s into a race, and again whenever a file named 'now' "
@@ -473,6 +476,7 @@ VkCommandBuffer Renderer::BeginFrame() {
     // for went away while frames were recorded slowly).
     passes_.set_record_draws(dumping_ && dump_step_ == 0);
     passes_.set_check_mirror_frames(REXCVAR_GET(native_renderer_check_mirror));
+    passes_.set_watch_draws(REXCVAR_GET(native_renderer_watch_draws));
     recording_ = true;
   }
   return frame.commands;
@@ -660,6 +664,15 @@ void Renderer::LogStats() {
                 "shader declares view type {}",
                 (t.mismatched_sample >> 8) & 0xFF, t.mismatched_sample & 0xFF, t.mismatched_width,
                 t.mismatched_height, t.mismatched_sample >> 16);
+  }
+  if (REXCVAR_GET(native_renderer_watch_draws)) {
+    uint64_t changes, watched;
+    std::vector<std::string> lines = passes_.TakeWatchLines(changes, watched);
+    REXLOG_INFO("native renderer: {} of {} main view draws changed inputs since the previous "
+                "frame", changes, watched);
+    for (const std::string& line : lines) {
+      REXLOG_INFO("native renderer: changed: {}", line);
+    }
   }
   if (REXCVAR_GET(native_renderer_check_mirror)) {
     REXLOG_INFO("native renderer: between frames, {}", passes_.TakeMirrorChanges());
