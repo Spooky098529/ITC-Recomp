@@ -156,7 +156,9 @@ states onto a few registers (depth, blend, colour control, setup).
 
 ## Resources
 
-Resources start with the Xbox 360 Direct3D resource header; the setters
+Resources start with the Xbox 360 Direct3D resource header: +0 is the
+type and flags (low bits: 2 index buffer, 5 vertex declaration, 6 vertex
+shader, 7 pixel shader), +4 the reference count; the setters
 write the ring buffer position into +8 (the fence) of a resource they
 unbind, so the library knows when the GPU is done with it.
 
@@ -169,8 +171,9 @@ unbind, so the library knows when the GPU is done with it.
 - **Vertex buffer**: the vertex fetch constant at +24 (address) and +28
   (size).
 - **Index buffer**: word +0 bit 31 set = 32-bit indices (else 16-bit), and
-  its top bits give the endianness field of the draw packet; +24 is the
-  address. Read by the indexed draw `sub_825BE708`, which writes a
+  bits 29-30 give the endianness of the draw packet; +24 is the address,
+  +28 the size in bytes. All 3,189 index buffers seen in a run were
+  `0x20000002`: 16-bit, 8-in-16 byte swap. Read by the indexed draw `sub_825BE708`, which writes a
   `DRAW_INDX` packet (`0xC0032201`).
 - **Shaders** are loaded by the draw helper `sub_822AED18` with the GPU's
   `IM_LOAD` packet (`0xC0012700`: address with the shader type in bit 0,
@@ -186,7 +189,9 @@ unbind, so the library knows when the GPU is done with it.
 
   The program control words are SQ_PROGRAM_CNTL and its neighbours; the
   vertex and pixel halves are combined at draw time.
-- **Vertex declaration** (device +11552): when the bound declaration (its
+- **Vertex declaration** (device +11552): type 5; +24 is likely the
+  element count (1-7 seen) and +28 the stream count; the id at +48 is 0
+  until first bound, then taken from a counter. The game used 16. When the bound declaration (its
   id at +48) differs from the one the vertex shader was last bound for,
   `sub_822AE340` patches the vertex shader's microcode in place, writing
   three-word groups (the size of a vertex fetch instruction). So vertex
@@ -280,12 +285,29 @@ isn't part of the count) were bound in the same run:
 - **Sizes**: mostly powers of two up to 1024x1024; two 1280x720 (screen
   copies, from resolves).
 
+### Checked at runtime
+
+`--log_replay_commands` hashes each shader's microcode when it's bound, the
+way the SDK names its dumps (XXH3-64 of the raw guest memory), in a run
+through the menus and a race (`itc_352.log`):
+
+- **Pixel shaders**: 46 distinct microcodes, all 46 among the SDK's
+  dumped shaders, sizes matching (36-204 bytes). The layout above is right.
+- **Vertex shaders**: 58 distinct microcodes at bind time, 37 of them among
+  the dumps. Every vertex shader object was seen with more than one hash:
+  its microcode changes as declarations are patched in (the others are
+  states never drawn).
+- ~390 objects of each kind share these microcodes (an object per
+  material).
+
 ## Not yet known
 
 - Commands 32 and 33 (rare), and what the helper object draws. (20, 22
   and 28 are never replayed.)
 - Confirming the "likely" rows at runtime.
 - Render states 308-320 and 324.
+- The vertex declaration's element list (past word 16); a native renderer
+  may not need it, since the formats are patched into the vertex shader.
 - Texture, vertex buffer and surface objects: their layout in guest memory
   (formats, tiling, sizes), which the native renderer needs to read.
 - The shaders: how commands 8-10 and 12 relate to vertex and pixel shaders
