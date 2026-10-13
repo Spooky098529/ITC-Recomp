@@ -26,6 +26,11 @@ constexpr VkDeviceSize kStagingSize = 64u << 20;
 // and at most this many a frame, to catch it being replaced.
 constexpr uint64_t kVerifyInterval = 240;
 constexpr uint32_t kVerifiesPerFrame = 8;
+// For this long after loading, a texture is checked this often, without the
+// limit: its memory may still be being written (streamed in) when it's
+// first used.
+constexpr uint64_t kNewTextureFrames = 240;
+constexpr uint64_t kNewTextureInterval = 4;
 
 uint32_t Log2Ceil(uint32_t v) {
   return v <= 1 ? 0 : 32 - std::countl_zero(v - 1);
@@ -340,6 +345,7 @@ struct TextureCache::State {
     bool loaded = false;
     uint64_t hash = 0;
     uint64_t verified_frame = 0;
+    uint64_t loaded_frame = 0;
     // The guest memory it's read from: base and mips (address, size).
     std::array<std::pair<uint32_t, uint32_t>, 2> ranges{};
     std::unordered_map<uint32_t, VkImageView> views;  // by swizzle
@@ -696,17 +702,29 @@ VkImageView TextureCache::GetView(uint8_t* base, const uint32_t fetch_words[6],
   // Load, or reload when its memory changed (checked now and then).
   if (!t.loaded) {
     t.hash = s.Hash(base, t);
-    t.verified_frame = s.frame_number;
+    t.verified_frame = t.loaded_frame = s.frame_number;
     if (!s.Upload(base, t)) {
       return VK_NULL_HANDLE;
     }
-  } else if (s.frame_number - t.verified_frame >= kVerifyInterval &&
-             s.verified_this_frame < kVerifiesPerFrame) {
-    s.verified_this_frame++;
+  } else if (bool young = s.frame_number - t.loaded_frame < kNewTextureFrames;
+             young ? s.frame_number - t.verified_frame >= kNewTextureInterval
+                   : s.frame_number - t.verified_frame >= kVerifyInterval &&
+                         s.verified_this_frame < kVerifiesPerFrame) {
+    if (!young) {
+      s.verified_this_frame++;
+    }
     t.verified_frame = s.frame_number;
     uint64_t hash = s.Hash(base, t);
     if (hash != t.hash && s.Upload(base, t)) {
       t.hash = hash;
+      if (young) {
+        s.stats.changed_after_load++;
+        if (s.stats.changed_after_load_sample == UINT32_MAX) {
+          s.stats.changed_after_load_sample = t.layout.base_address ? t.layout.base_address
+                                                                     : t.layout.mip_address;
+          s.stats.changed_after_load_frames = uint32_t(s.frame_number - t.loaded_frame);
+        }
+      }
     }
   }
 

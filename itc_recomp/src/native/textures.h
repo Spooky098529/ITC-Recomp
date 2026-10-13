@@ -77,6 +77,11 @@ class TextureCache {
     // Lookups answered with a resolve destination; of those, ones whose
     // fetch constant has another size or format than the resolve made.
     uint64_t resolved_hits = 0, resolved_mismatched = 0;
+    // Textures whose memory changed within 240 frames of loading them (still
+    // being streamed in when first used), and an example: its address and
+    // how many frames after loading.
+    uint64_t changed_after_load = 0;
+    uint32_t changed_after_load_sample = UINT32_MAX, changed_after_load_frames = 0;
     uint32_t textures = 0, samplers = 0;
     uint32_t unsupported_sample = UINT32_MAX;  // format << 8 | dimension
     // A texture of another dimension than the shader declares: declared view

@@ -650,6 +650,11 @@ void Renderer::LogStats() {
               t.unsupported_sample == UINT32_MAX ? -1 : int(t.unsupported_sample & 0xFF),
               t.mismatched, double(t.resolved_hits) / frames,
               double(t.resolved_mismatched) / frames);
+  if (t.changed_after_load) {
+    REXLOG_INFO("native renderer: {} textures changed soon after loading, e.g. {:08X} after {} "
+                "frames",
+                t.changed_after_load, t.changed_after_load_sample, t.changed_after_load_frames);
+  }
   if (t.mismatched_sample != UINT32_MAX) {
     REXLOG_INFO("native renderer: e.g. a texture of format {}, dimension {}, {}x{} where the "
                 "shader declares view type {}",
