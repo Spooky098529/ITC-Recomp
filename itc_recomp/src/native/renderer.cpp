@@ -1,5 +1,6 @@
 #include "renderer.h"
 
+#include "main_view.h"
 #include "shaders.h"
 #include "vulkan_functions.h"
 
@@ -11,6 +12,7 @@
 #include <array>
 #include <chrono>
 #include <cmath>
+#include <cstring>
 #include <future>
 #include <memory>
 #include <string>
@@ -99,42 +101,19 @@ void SDLCALL CreateWindowOnMainThread(void* data) {
   finish("");
 }
 
-// The graphics library's device and the fields read here (see
-// docs/gpu-functions.md).
-constexpr uint32_t kDevicePointer = 0x8296BD90;
-constexpr uint32_t kDevicePixelShader = 12432, kDeviceVertexShader = 12436;
-constexpr uint32_t kDeviceProgramControl = 10400;  // SQ_PROGRAM_CNTL
-constexpr uint32_t kVertexShaderUcode = 48, kVertexShaderUcodeSize = 600;
-constexpr uint32_t kPixelShaderUcode = 24, kPixelShaderUcodeSize = 64;
-
-// The GPU's physical address for a guest address, as the graphics library
-// converts it for the GPU (e.g. IM_LOAD in sub_822AED18, SetTexture).
-uint32_t GpuPhysicalAddress(uint32_t address) {
-  return (address & 0x1FFFFFFFu) + ((((address >> 20) + 0x200u) & 0x1000u));
-}
-
-// Guest physical memory is one 512 MB mapping, 4 GB above the virtual base
-// (rex::memory::Memory: physical_membase = mapping base + 4 GB).
-const uint8_t* PhysicalHostAddress(uint8_t* base, uint32_t physical) {
-  return base + 0x100000000ull + physical;
-}
-
-// Host address of what the GPU reads at a guest address.
-const uint8_t* HostAddress(uint8_t* base, uint32_t address) {
-  return PhysicalHostAddress(base, GpuPhysicalAddress(address));
-}
-
 class Renderer {
  public:
   // Render thread. Returns false if the renderer can't run.
-  bool Init();
+  bool Init(uint8_t* base);
   void OnCommand(uint32_t id, uint32_t arg1);
-  void AfterDraw(uint8_t* base);
+  void AfterDraw(uint8_t* base, uint32_t id, uint32_t payload, uint32_t arg1);
   void EndFrame();
 
  private:
   bool CreateWindowAndInstance();
   bool CreateDevice();
+  // Opens this frame's command buffer, once its previous use is done.
+  VkCommandBuffer BeginFrame();
   bool CreateSwapchain();
   void DestroySwapchain();
   void LogStats();
@@ -163,8 +142,9 @@ class Renderer {
   std::array<Frame, kFramesInFlight> frames_{};
   uint32_t frame_index_ = 0;
 
-  ShaderCache shaders_;
-  uint64_t draws_without_shaders_ = 0;
+  DeviceContext context_{};
+  MainView main_view_;
+  bool recording_ = false;  // this frame's command buffer is open
 
   // This frame's commands (milestone 1: counted only).
   uint32_t frame_commands_ = 0, frame_draws_ = 0;
@@ -240,16 +220,54 @@ bool Renderer::CreateDevice() {
   vk::vkGetPhysicalDeviceProperties(physical_device_, &properties);
   REXLOG_INFO("native renderer: using {}", properties.deviceName);
 
+  // Importing guest memory (the translated shaders' storage buffer) needs
+  // VK_EXT_external_memory_host; dynamic rendering is core in Vulkan 1.3.
+  uint32_t extension_count = 0;
+  vk::vkEnumerateDeviceExtensionProperties(physical_device_, nullptr, &extension_count, nullptr);
+  std::vector<VkExtensionProperties> available(extension_count);
+  vk::vkEnumerateDeviceExtensionProperties(physical_device_, nullptr, &extension_count,
+                                           available.data());
+  bool host_memory = std::any_of(available.begin(), available.end(), [](const auto& e) {
+    return std::strcmp(e.extensionName, VK_EXT_EXTERNAL_MEMORY_HOST_EXTENSION_NAME) == 0;
+  });
+  if (!host_memory || properties.apiVersion < VK_API_VERSION_1_3) {
+    REXLOG_ERROR("native renderer: needs Vulkan 1.3 and VK_EXT_external_memory_host");
+    return false;
+  }
+
+  // Features: what the GPU has, of what the translated shaders can use.
+  VkPhysicalDeviceVulkan13Features supported13{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES};
+  VkPhysicalDeviceFeatures2 supported{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2};
+  supported.pNext = &supported13;
+  vk::vkGetPhysicalDeviceFeatures2(physical_device_, &supported);
+  if (!supported13.dynamicRendering) {
+    REXLOG_ERROR("native renderer: needs dynamic rendering");
+    return false;
+  }
+  VkPhysicalDeviceVulkan13Features enabled13{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES};
+  enabled13.dynamicRendering = VK_TRUE;
+  enabled13.shaderDemoteToHelperInvocation = supported13.shaderDemoteToHelperInvocation;
+  VkPhysicalDeviceFeatures2 enabled{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2};
+  enabled.pNext = &enabled13;
+  enabled.features.shaderClipDistance = supported.features.shaderClipDistance;
+  enabled.features.shaderCullDistance = supported.features.shaderCullDistance;
+  enabled.features.fullDrawIndexUint32 = supported.features.fullDrawIndexUint32;
+  enabled.features.independentBlend = supported.features.independentBlend;
+  enabled.features.samplerAnisotropy = supported.features.samplerAnisotropy;
+  enabled.features.imageCubeArray = supported.features.imageCubeArray;
+
   float priority = 1.0f;
   VkDeviceQueueCreateInfo queue_info{VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO};
   queue_info.queueFamilyIndex = queue_family_;
   queue_info.queueCount = 1;
   queue_info.pQueuePriorities = &priority;
-  const char* extensions[] = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
+  const char* extensions[] = {VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+                              VK_EXT_EXTERNAL_MEMORY_HOST_EXTENSION_NAME};
   VkDeviceCreateInfo info{VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO};
+  info.pNext = &enabled;
   info.queueCreateInfoCount = 1;
   info.pQueueCreateInfos = &queue_info;
-  info.enabledExtensionCount = 1;
+  info.enabledExtensionCount = 2;
   info.ppEnabledExtensionNames = extensions;
   if (VkResult result = vk::vkCreateDevice(physical_device_, &info, nullptr, &device_);
       result != VK_SUCCESS) {
@@ -260,6 +278,17 @@ bool Renderer::CreateDevice() {
     return false;
   }
   vk::vkGetDeviceQueue(device_, queue_family_, 0, &queue_);
+
+  context_.physical_device = physical_device_;
+  context_.device = device_;
+  context_.queue_family = queue_family_;
+  context_.queue = queue_;
+  context_.max_storage_buffer_range = properties.limits.maxStorageBufferRange;
+  context_.min_uniform_buffer_offset_alignment =
+      uint32_t(properties.limits.minUniformBufferOffsetAlignment);
+  context_.clip_distance = enabled.features.shaderClipDistance;
+  context_.cull_distance = enabled.features.shaderCullDistance;
+  context_.demote_to_helper_invocation = enabled13.shaderDemoteToHelperInvocation;
 
   for (Frame& frame : frames_) {
     VkCommandPoolCreateInfo pool_info{VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO};
@@ -376,8 +405,9 @@ void Renderer::DestroySwapchain() {
   swapchain_ = VK_NULL_HANDLE;
 }
 
-bool Renderer::Init() {
-  return CreateWindowAndInstance() && CreateDevice() && CreateSwapchain();
+bool Renderer::Init(uint8_t* base) {
+  return CreateWindowAndInstance() && CreateDevice() && CreateSwapchain() &&
+         main_view_.Init(context_, base, kFramesInFlight);
 }
 
 void Renderer::OnCommand(uint32_t id, uint32_t arg1) {
@@ -387,120 +417,110 @@ void Renderer::OnCommand(uint32_t id, uint32_t arg1) {
   }
 }
 
-void Renderer::AfterDraw(uint8_t* base) {
-  uint32_t device = guest::LoadU32(base, kDevicePointer);
-  uint32_t program_control = guest::LoadU32(base, device + kDeviceProgramControl);
-  uint32_t vertex_shader = guest::LoadU32(base, device + kDeviceVertexShader);
-  uint32_t pixel_shader = guest::LoadU32(base, device + kDevicePixelShader);
-  const TranslatedShader* vertex = nullptr;
-  const TranslatedShader* pixel = nullptr;
-  if (vertex_shader) {
-    vertex = shaders_.Get(
-        ShaderStage::kVertex,
-        HostAddress(base, guest::LoadU32(base, vertex_shader + kVertexShaderUcode)),
-        guest::LoadU32(base, vertex_shader + kVertexShaderUcodeSize), program_control & 0x3F);
+VkCommandBuffer Renderer::BeginFrame() {
+  Frame& frame = frames_[frame_index_];
+  if (!recording_) {
+    vk::vkWaitForFences(device_, 1, &frame.done, VK_TRUE, UINT64_MAX);
+    vk::vkResetCommandBuffer(frame.commands, 0);
+    VkCommandBufferBeginInfo begin{VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
+    begin.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+    vk::vkBeginCommandBuffer(frame.commands, &begin);
+    main_view_.BeginFrame(frame_index_);
+    recording_ = true;
   }
-  if (pixel_shader) {
-    pixel = shaders_.Get(
-        ShaderStage::kPixel,
-        HostAddress(base, guest::LoadU32(base, pixel_shader + kPixelShaderUcode)),
-        guest::LoadU32(base, pixel_shader + kPixelShaderUcodeSize),
-        (program_control >> 8) & 0x3F);
-  }
-  if (!vertex || (pixel_shader && !pixel)) {
-    draws_without_shaders_++;
-  }
+  return frame.commands;
+}
+
+void Renderer::AfterDraw(uint8_t* base, uint32_t id, uint32_t payload, uint32_t arg1) {
+  main_view_.AfterDraw(BeginFrame(), base, id, payload, arg1);
 }
 
 void Renderer::EndFrame() {
   commands_ += frame_commands_;
   draws_ += frame_draws_;
-  uint32_t draws = frame_draws_;
   frame_commands_ = frame_draws_ = 0;
 
-  if ((swapchain_stale_ || !swapchain_) && !CreateSwapchain()) {
-    frames_skipped_++;
-    LogStats();
-    return;
-  }
+  VkCommandBuffer commands = BeginFrame();
+  main_view_.EndFrame(commands);
   Frame& frame = frames_[frame_index_];
-  vk::vkWaitForFences(device_, 1, &frame.done, VK_TRUE, UINT64_MAX);
-  uint32_t image_index;
-  VkResult result = vk::vkAcquireNextImageKHR(device_, swapchain_, 100'000'000,
-                                              frame.image_ready, VK_NULL_HANDLE, &image_index);
-  if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_TIMEOUT || result == VK_NOT_READY) {
-    swapchain_stale_ = result == VK_ERROR_OUT_OF_DATE_KHR;
-    frames_skipped_++;
-    LogStats();
-    return;
-  }
-  if (result == VK_SUBOPTIMAL_KHR) {
-    swapchain_stale_ = true;  // present this one, recreate next frame
-  } else if (result != VK_SUCCESS) {
-    REXLOG_ERROR("native renderer: vkAcquireNextImageKHR: {}", int(result));
-    frames_skipped_++;
-    return;
-  }
-  vk::vkResetFences(device_, 1, &frame.done);
 
-  // Milestone 1: clear to a colour that shows the commands arrive: red with
-  // the frame's draws (full at 3,000), blue pulsing with time.
-  float seconds = std::chrono::duration<float>(Clock::now() - start_).count();
-  VkClearColorValue colour{{std::min(draws / 3000.0f, 1.0f), 0.1f,
-                            0.3f + 0.2f * std::sin(seconds * 2.0f), 1.0f}};
-  VkImage image = swapchain_images_[image_index];
-  VkImageSubresourceRange range{VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-
-  VkCommandBuffer commands = frame.commands;
-  vk::vkResetCommandBuffer(commands, 0);
-  VkCommandBufferBeginInfo begin{VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
-  begin.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-  vk::vkBeginCommandBuffer(commands, &begin);
-  VkImageMemoryBarrier barrier{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
-  barrier.srcAccessMask = 0;
-  barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-  barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-  barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-  barrier.srcQueueFamilyIndex = barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-  barrier.image = image;
-  barrier.subresourceRange = range;
-  vk::vkCmdPipelineBarrier(commands, VK_PIPELINE_STAGE_TRANSFER_BIT,
-                           VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1,
-                           &barrier);
-  vk::vkCmdClearColorImage(commands, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &colour, 1,
-                           &range);
-  barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-  barrier.dstAccessMask = 0;
-  barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-  barrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-  vk::vkCmdPipelineBarrier(commands, VK_PIPELINE_STAGE_TRANSFER_BIT,
-                           VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0, nullptr, 0, nullptr, 1,
-                           &barrier);
+  // Copy the main view onto a swapchain image, if one can be had now.
+  bool acquired = false;
+  uint32_t image_index = 0;
+  if ((!swapchain_stale_ && swapchain_) || CreateSwapchain()) {
+    VkResult result = vk::vkAcquireNextImageKHR(device_, swapchain_, 100'000'000,
+                                                frame.image_ready, VK_NULL_HANDLE, &image_index);
+    if (result == VK_SUCCESS || result == VK_SUBOPTIMAL_KHR) {
+      acquired = true;
+      swapchain_stale_ = result == VK_SUBOPTIMAL_KHR;  // present it, recreate next frame
+    } else if (result == VK_ERROR_OUT_OF_DATE_KHR) {
+      swapchain_stale_ = true;
+    } else if (result != VK_TIMEOUT && result != VK_NOT_READY) {
+      REXLOG_ERROR("native renderer: vkAcquireNextImageKHR: {}", int(result));
+    }
+  }
+  if (acquired) {
+    VkImage image = swapchain_images_[image_index];
+    VkImageMemoryBarrier barrier{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
+    barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    barrier.srcQueueFamilyIndex = barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.image = image;
+    barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+    vk::vkCmdPipelineBarrier(commands, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                             VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1,
+                             &barrier);
+    VkExtent2D source = main_view_.target_extent();
+    VkImageBlit blit{};
+    blit.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+    blit.srcOffsets[1] = {int32_t(source.width), int32_t(source.height), 1};
+    blit.dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+    blit.dstOffsets[1] = {int32_t(swapchain_extent_.width), int32_t(swapchain_extent_.height), 1};
+    vk::vkCmdBlitImage(commands, main_view_.target(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, image,
+                       VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit, VK_FILTER_LINEAR);
+    barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    barrier.dstAccessMask = 0;
+    barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    barrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    vk::vkCmdPipelineBarrier(commands, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                             VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0, nullptr, 0, nullptr, 1,
+                             &barrier);
+  }
   vk::vkEndCommandBuffer(commands);
+  recording_ = false;
 
+  vk::vkResetFences(device_, 1, &frame.done);
   VkPipelineStageFlags wait_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
   VkSubmitInfo submit{VK_STRUCTURE_TYPE_SUBMIT_INFO};
-  submit.waitSemaphoreCount = 1;
-  submit.pWaitSemaphores = &frame.image_ready;
-  submit.pWaitDstStageMask = &wait_stage;
+  if (acquired) {
+    submit.waitSemaphoreCount = 1;
+    submit.pWaitSemaphores = &frame.image_ready;
+    submit.pWaitDstStageMask = &wait_stage;
+    submit.signalSemaphoreCount = 1;
+    submit.pSignalSemaphores = &render_done_[image_index];
+  }
   submit.commandBufferCount = 1;
   submit.pCommandBuffers = &commands;
-  submit.signalSemaphoreCount = 1;
-  submit.pSignalSemaphores = &render_done_[image_index];
-  vk::vkQueueSubmit(queue_, 1, &submit, frame.done);
-
-  VkPresentInfoKHR present{VK_STRUCTURE_TYPE_PRESENT_INFO_KHR};
-  present.waitSemaphoreCount = 1;
-  present.pWaitSemaphores = &render_done_[image_index];
-  present.swapchainCount = 1;
-  present.pSwapchains = &swapchain_;
-  present.pImageIndices = &image_index;
-  result = vk::vkQueuePresentKHR(queue_, &present);
-  if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
-    swapchain_stale_ = true;
+  if (VkResult result = vk::vkQueueSubmit(queue_, 1, &submit, frame.done); result != VK_SUCCESS) {
+    REXLOG_ERROR("native renderer: vkQueueSubmit: {}", int(result));
+  }
+  if (acquired) {
+    VkPresentInfoKHR present{VK_STRUCTURE_TYPE_PRESENT_INFO_KHR};
+    present.waitSemaphoreCount = 1;
+    present.pWaitSemaphores = &render_done_[image_index];
+    present.swapchainCount = 1;
+    present.pSwapchains = &swapchain_;
+    present.pImageIndices = &image_index;
+    VkResult result = vk::vkQueuePresentKHR(queue_, &present);
+    if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
+      swapchain_stale_ = true;
+    }
+    frames_presented_++;
+  } else {
+    frames_skipped_++;
   }
   frame_index_ = (frame_index_ + 1) % kFramesInFlight;
-  frames_presented_++;
   LogStats();
 }
 
@@ -511,12 +531,16 @@ void Renderer::LogStats() {
   }
   double seconds = std::chrono::duration<double>(now - last_log_).count();
   uint64_t frames = std::max<uint64_t>(frames_presented_ + frames_skipped_, 1);
+  MainView::Stats view = main_view_.TakeStats();
   REXLOG_INFO("native renderer: {:.0f} frames/s presented, {} skipped; per frame {:.0f} "
-              "commands, {:.0f} draws; shaders translated {}, failed {}; draws without "
-              "shaders {}",
+              "commands, {:.0f} draws; main view: {:.0f} drawn, {:.0f} unsupported, {:.0f} "
+              "failed, {:.0f} in other passes a frame; {} pipelines; shaders translated {}, "
+              "failed {}",
               frames_presented_ / seconds, frames_skipped_, double(commands_) / frames,
-              double(draws_) / frames, shaders_.translated(), shaders_.failed(),
-              draws_without_shaders_);
+              double(draws_) / frames, double(view.drawn) / frames,
+              double(view.unsupported) / frames, double(view.failed) / frames,
+              double(view.other_passes) / frames, view.pipelines, view.shaders_translated,
+              view.shaders_failed);
   frames_presented_ = frames_skipped_ = commands_ = draws_ = 0;
   last_log_ = now;
 }
@@ -525,10 +549,13 @@ void Renderer::LogStats() {
 Renderer* g_renderer = nullptr;
 bool g_failed = false;
 
+// Guest memory's base, from the command hooks (Renderer_EndFrame has none).
+uint8_t* g_base = nullptr;
+
 Renderer* GetRenderer() {
   if (!g_renderer && !g_failed) {
     g_renderer = new Renderer();
-    if (!g_renderer->Init()) {
+    if (!g_base || !g_renderer->Init(g_base)) {
       REXLOG_ERROR("native renderer: couldn't start; continuing without it");
       g_failed = true;
       g_renderer = nullptr;  // leaked: may hold objects already made
@@ -548,6 +575,7 @@ void Renderer_OnCommand(uint8_t* base, uint32_t id, uint32_t payload, uint32_t a
   if (!Renderer_Enabled()) {
     return;
   }
+  g_base = base;
   if (Renderer* renderer = GetRenderer()) {
     renderer->OnCommand(id, arg1);
   }
@@ -559,12 +587,12 @@ void Renderer_AfterCommand(uint8_t* base, uint32_t id, uint32_t payload, uint32_
     return;
   }
   if (Renderer* renderer = GetRenderer()) {
-    renderer->AfterDraw(base);
+    renderer->AfterDraw(base, id, payload, arg1);
   }
 }
 
 void Renderer_EndFrame() {
-  if (!Renderer_Enabled()) {
+  if (!Renderer_Enabled() || !g_base) {
     return;
   }
   if (Renderer* renderer = GetRenderer()) {

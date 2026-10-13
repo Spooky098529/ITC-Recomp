@@ -1,10 +1,12 @@
 // Vulkan, loaded at runtime through SDL (see docs/native-renderer.md): no
-// Vulkan library at build time, only the Khronos headers.
+// Vulkan library at build time, only the headers.
 
 #pragma once
 
-#define VK_NO_PROTOTYPES
-#include <vulkan/vulkan.h>
+// Through the SDK's Vulkan header, so every Vulkan include in the build
+// agrees on its defines (no prototypes, beta extensions, the Wayland and XCB
+// platforms): the shader translator's headers use the C++ bindings.
+#include <rex/ui/vulkan/api.h>
 
 // Functions by the level they're loaded at.
 #define NATIVE_VK_GLOBAL_FUNCTIONS(X) \

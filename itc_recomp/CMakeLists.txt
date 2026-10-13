@@ -51,9 +51,11 @@ set(ITC_SOURCES
     src/debug/frame_state_diff.cpp
     src/debug/image_dump.cpp
     src/debug/replay_stats.cpp
+    src/native/main_view.cpp
     src/native/renderer.cpp
     src/native/replay_hooks.cpp
     src/native/shaders.cpp
+    src/native/state.cpp
     src/native/vulkan_functions.cpp
     src/interpolation/transform.cpp
     src/frame_pacing/game_messages.cpp
@@ -89,6 +91,7 @@ add_library(itc_xenos_shaders STATIC
     ${ITC_SDK_GRAPHICS}/format/ucode.cpp
     ${ITC_SDK_GRAPHICS}/util/draw.cpp
     ${ITC_SDK_GRAPHICS}/registers.cpp
+    ${ITC_SDK_GRAPHICS}/register_file.cpp
 )
 target_include_directories(itc_xenos_shaders PUBLIC ${REXSDK_DIR}/thirdparty/renderdoc)
 set_target_properties(itc_xenos_shaders PROPERTIES
