@@ -446,6 +446,9 @@ VkCommandBuffer Renderer::BeginFrame() {
     begin.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
     vk::vkBeginCommandBuffer(frame.commands, &begin);
     passes_.BeginFrame(frame_index_);
+    // The dump's frames also check the mirror (see Passes::set_check_mirror).
+    passes_.set_check_mirror(!REXCVAR_GET(native_renderer_dump).empty() && race_frames_ >= 599 &&
+                             dump_step_ <= dump_steps_.size());
     recording_ = true;
   }
   return frame.commands;
@@ -567,6 +570,11 @@ void Renderer::EndFrame() {
   if (dump) {
     vk::vkQueueWaitIdle(queue_);
     passes_.WriteDump(REXCVAR_GET(native_renderer_dump));
+    Passes::Stats checked = passes_.TakeStats();
+    REXLOG_INFO("native renderer: dump frame {}: {} vertex or index ranges changed within the "
+                "frame ({} bytes), e.g. {:08X} ({} bytes)",
+                dump_step_, checked.mirror_rewritten, checked.mirror_rewritten_bytes,
+                checked.mirror_rewritten_sample_address, checked.mirror_rewritten_sample_size);
     if (dump_step_ == 0) {
       // Everything from memory; each format this game's textures use; all
       // resolves; each resolve destination.

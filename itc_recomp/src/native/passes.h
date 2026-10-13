@@ -46,6 +46,9 @@ class Passes {
                       const std::string& dump_prefix = "shown", bool dump_resolves = true);
   // For the next frames: the texture cache's debug_hide (see TextureCache).
   void set_debug_hide(TextureCache::Hide hide, uint32_t value = 0);
+  // A debugging aid: hash each vertex and index range again at every use,
+  // counting ranges whose contents changed within a frame (stats).
+  void set_check_mirror(bool check);
   // The distinct addresses of the last frame's resolve destinations.
   std::vector<uint32_t> resolve_addresses() const;
   // After a frame that dumped has finished on the GPU: writes each image as
@@ -61,6 +64,10 @@ class Passes {
   // Logged by the renderer.
   struct Stats {
     uint64_t drawn = 0, unsupported = 0, failed = 0, mirrored_bytes = 0;
+    // With set_check_mirror: ranges used again in a frame with other
+    // contents, and an example.
+    uint64_t mirror_rewritten = 0, mirror_rewritten_bytes = 0;
+    uint32_t mirror_rewritten_sample_address = 0, mirror_rewritten_sample_size = 0;
     uint32_t pipelines = 0, shaders_translated = 0, shaders_failed = 0, targets = 0;
     // Draws skipped as having an empty viewport or scissor, and one example:
     // viewport offset and extent, scissor offset and extent (bit 31 of the

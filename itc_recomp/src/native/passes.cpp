@@ -22,6 +22,7 @@
 #include <rex/graphics/registers.h>
 #include <rex/graphics/util/draw.h>
 #include <rex/graphics/xenos.h>
+#include <rex/hash.h>
 #include <rex/logging.h>
 
 namespace native {
@@ -284,6 +285,10 @@ struct Passes::State {
   VkDeviceMemory guest_memory_allocation = VK_NULL_HANDLE;
   uint8_t* guest_memory_mapped = nullptr;
   std::unordered_set<uint64_t> mirrored;  // address << 32 | size, this frame
+  // With check_mirror: each range's hash when copied, to find ranges whose
+  // contents change within a frame (draws after the change get the first).
+  bool check_mirror = false;
+  std::unordered_map<uint64_t, uint64_t> mirrored_hashes;
 
   // Targets by surface (colour or depth, EDRAM base, pitch, samples, the
   // format they're drawn in), and the ones being drawn into now.
@@ -477,6 +482,19 @@ void Passes::State::Mirror(uint8_t* base, uint32_t address, uint32_t size) {
   }
   size = std::min(size, kPhysicalMemorySize - address);
   uint64_t key = (uint64_t(address) << 32) | size;
+  if (check_mirror) {
+    uint64_t hash = XXH3_64bits(PhysicalHostAddress(base, address), size);
+    auto [it, added] = mirrored_hashes.try_emplace(key, hash);
+    if (!added && it->second != hash) {
+      it->second = hash;
+      stats.mirror_rewritten++;
+      stats.mirror_rewritten_bytes += size;
+      if (!stats.mirror_rewritten_sample_size) {
+        stats.mirror_rewritten_sample_address = address;
+        stats.mirror_rewritten_sample_size = size;
+      }
+    }
+  }
   if (!mirrored.insert(key).second) {
     return;  // already copied this frame
   }
@@ -1282,6 +1300,7 @@ void Passes::BeginFrame(uint32_t frame_index) {
   s.main_view = nullptr;
   s.frame_resolves.clear();
   s.mirrored.clear();
+  s.mirrored_hashes.clear();
   s.texture_sets.clear();
   vk::vkResetDescriptorPool(s.context.device, s.rings[frame_index].texture_pool, 0);
   vk::vkResetDescriptorPool(s.context.device, s.resolve_pools[frame_index], 0);
@@ -1723,6 +1742,10 @@ void Passes::AfterResolve(VkCommandBuffer commands, uint8_t* base, uint32_t payl
       }
     }
   }
+}
+
+void Passes::set_check_mirror(bool check) {
+  state_->check_mirror = check;
 }
 
 void Passes::set_debug_hide(TextureCache::Hide hide, uint32_t value) {
