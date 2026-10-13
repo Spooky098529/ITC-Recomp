@@ -185,6 +185,14 @@ states onto a few registers (depth, blend, colour control, setup).
 
 ## Resources
 
+**GPU addresses.** The library converts a guest address to the GPU's
+physical address as `(addr & 0x1FFFFFFF) + (((addr >> 20) + 0x200) & 0x1000)`
+(IM_LOAD in `sub_822AED18`, SetTexture, SetStreamSource). Read what the GPU
+reads through guest physical memory (one 512 MB mapping at the guest
+virtual base + 4 GB), not through the CPU's view of the address: for
+`0xE...` addresses the two differ, and the CPU view of a pixel shader's
+microcode gave the start of a vertex shader instead (2026-10-13).
+
 Resources start with the Xbox 360 Direct3D resource header: +0 is the
 type and flags (low bits: 2 index buffer, 5 vertex declaration, 6 vertex
 shader, 7 pixel shader), +4 the reference count; the setters

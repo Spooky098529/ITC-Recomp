@@ -107,9 +107,21 @@ constexpr uint32_t kDeviceProgramControl = 10400;  // SQ_PROGRAM_CNTL
 constexpr uint32_t kVertexShaderUcode = 48, kVertexShaderUcodeSize = 600;
 constexpr uint32_t kPixelShaderUcode = 24, kPixelShaderUcodeSize = 64;
 
-// Host address of a guest address (as REX_RAW_ADDR).
+// The GPU's physical address for a guest address, as the graphics library
+// converts it for the GPU (e.g. IM_LOAD in sub_822AED18, SetTexture).
+uint32_t GpuPhysicalAddress(uint32_t address) {
+  return (address & 0x1FFFFFFFu) + ((((address >> 20) + 0x200u) & 0x1000u));
+}
+
+// Guest physical memory is one 512 MB mapping, 4 GB above the virtual base
+// (rex::memory::Memory: physical_membase = mapping base + 4 GB).
+const uint8_t* PhysicalHostAddress(uint8_t* base, uint32_t physical) {
+  return base + 0x100000000ull + physical;
+}
+
+// Host address of what the GPU reads at a guest address.
 const uint8_t* HostAddress(uint8_t* base, uint32_t address) {
-  return base + address + (address >= 0xE0000000u ? 0x1000u : 0u);
+  return PhysicalHostAddress(base, GpuPhysicalAddress(address));
 }
 
 class Renderer {

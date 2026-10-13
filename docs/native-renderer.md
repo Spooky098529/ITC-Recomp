@@ -47,6 +47,19 @@ known about it; this file is the plan and its progress).
 | 5 | **Post-processing, HUD, present**, then exclusive mode. | A race is fully native; measure the frame rate. | |
 | 6 | **Menus**. | The emulated GPU is no longer needed. | |
 
+## Progress on milestone 2
+
+- After each draw's library call (`Renderer_AfterCommand`), the bound vertex
+  and pixel shaders are read from the device (+12436, +12432), their
+  microcode read through physical memory, and translated to SPIR-V
+  (`src/native/shaders.cpp`, cached by hash and register count). In a run
+  through the menus and attract mode: 76 shaders translated, none failed,
+  every draw had its shaders. Their hashes match the plugin's dumps (whose
+  `.bin` files hold the words byte-swapped to little-endian).
+- Next: import guest physical memory as the shaders' storage buffer, build
+  the constant buffers from the device's shadow, pipelines from its
+  registers, and draw the main view into a 1024x576 target.
+
 ## Known issues
 
 - **Resizing the window doesn't resize the swapchain** on Wayland: the

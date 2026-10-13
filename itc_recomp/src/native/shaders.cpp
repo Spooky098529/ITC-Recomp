@@ -42,6 +42,9 @@ const TranslatedShader* ShaderCache::Get(ShaderStage stage, const uint8_t* ucode
   if (auto it = state_->translations.find(key); it != state_->translations.end()) {
     return it->second->spirv.empty() ? nullptr : it->second.get();
   }
+  const char* stage_name = stage == ShaderStage::kVertex ? "vertex" : "pixel";
+  REXLOG_DEBUG("native renderer: translating {} shader {:016X}, {} bytes, num_reg {}",
+               stage_name, hash, size_bytes, num_reg);
   auto& result = state_->translations[key];
   result = std::make_unique<TranslatedShader>();
   result->hash = hash;
@@ -78,6 +81,8 @@ const TranslatedShader* ShaderCache::Get(ShaderStage stage, const uint8_t* ucode
   result->spirv.resize(binary.size() / 4);
   std::memcpy(result->spirv.data(), binary.data(), result->spirv.size() * 4);
   translated_++;
+  REXLOG_DEBUG("native renderer: translated {} shader {:016X}: {} SPIR-V words", stage_name, hash,
+              result->spirv.size());
   return result.get();
 }
 
