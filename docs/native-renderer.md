@@ -121,7 +121,7 @@ known about it; this file is the plan and its progress).
   fps. Unsupported: `24_8_FLOAT` (the shadow depth map). About 2,200
   lookups a second find a texture of another dimension than the shader
   declares (now logged with an example). Still wrong, all for milestone 4:
-  the mirror is black, and some buildings show rainbow smears, likely
+  the mirror is black, and some buildings show the rainbow effect, likely
   textures that are resolve targets (whatever is in guest memory there),
   to be confirmed.
 
@@ -257,7 +257,7 @@ texture objects ("Resources"). The approach:
    depth textures: check). Format conversions on resolve (7e3 to
    16_16_16_16, the `0xF4000000` flags' likely exponent bias) need
    checking against the emulated GPU's output.
-4. The rainbow smears on buildings and the black mirror should go once
+4. The rainbow effect on buildings and the black mirror should go once
    resolves feed the texture cache; check that guess first by logging
    which texture addresses are resolve destinations.
 5. Open: the textures logged as "of another dimension than declared"
