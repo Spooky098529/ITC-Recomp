@@ -56,8 +56,8 @@ known about it; this file is the plan and its progress).
 | # | Milestone | Done when | Status |
 |---|---|---|---|
 | 1 | **Skeleton**: `--native_renderer` creates our own Vulkan device, window and swapchain; the replay hooks pass each frame's commands to it. | A window clears and presents every frame. | Done (2026-10-13): presents every frame in menus (30 fps) and races (113-128 fps, ~26,800 commands and ~2,900 draws a frame), the game unaffected. |
-| 2 | **Main view geometry**: vertex and index buffers read from guest memory, shaders translated, render states mapped to pipelines. | Race geometry is visible in our window, untextured. | In progress |
-| 3 | **Textures**: untile and upload (mostly BC1-BC3), samplers from the fetch constants. | The main view looks right without effects. | |
+| 2 | **Main view geometry**: vertex and index buffers read from guest memory, shaders translated, render states mapped to pipelines. | Race geometry is visible in our window, untextured. | Done (2026-10-13): the cockpit view's geometry, the right way up, solid, with the game's coloured lighting on white placeholder textures (screenshot checked). |
+| 3 | **Textures**: untile and upload (mostly BC1-BC3), samplers from the fetch constants. | The main view looks right without effects. | Next |
 | 4 | **The other passes**: each pass renders into a Vulkan image of its resolve's size and format; resolves become copies. | Shadows, reflections and the mirror work. | |
 | 5 | **Post-processing, HUD, present**, then exclusive mode. | A race is fully native; measure the frame rate. | |
 | 6 | **Menus**. | The emulated GPU is no longer needed. | |
@@ -90,7 +90,11 @@ known about it; this file is the plan and its progress).
   frame drawn, ~80 not yet supported (other draw commands, several items),
   41 pipelines, 39 shaders, no failures; ~15 MB a frame copied into the
   mirror; the game at 100-125 fps instead of 130-150 with the renderer on.
-  The viewport comes out as 0,0 1024x576, as expected.
+  The viewport comes out as 0,0 1024x576, as expected. Seen in the window: the
+  dashboard, gauges, pillars, walls, overpass, lamps, buildings and road all
+  in place and solid; the game's coloured light (magenta, green, blue) on
+  the buildings and the opponent's red tail lights. The target was then cut
+  to the view's 1024x576.
 
 ## Known issues
 

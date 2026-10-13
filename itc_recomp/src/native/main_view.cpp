@@ -35,9 +35,8 @@ using graphics::XE_GPU_REG_VGT_MIN_VTX_INDX;
 
 namespace {
 
-// Our target. The main view is 1024x576 in EDRAM; the larger target keeps
-// anything the viewport puts outside that visible while we check it.
-constexpr uint32_t kTargetWidth = 1280, kTargetHeight = 720;
+// Our target: the main view's size (its viewport is 0,0 1024x576).
+constexpr uint32_t kTargetWidth = 1024, kTargetHeight = 576;
 constexpr VkFormat kColorFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
 constexpr VkFormat kDepthFormat = VK_FORMAT_D32_SFLOAT_S8_UINT;
 
