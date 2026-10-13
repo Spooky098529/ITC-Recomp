@@ -50,11 +50,11 @@ function per item. The exceptions are marked with their item size.
 | 5 | `sub_8258E9F8` | arg1 × 24 bytes | Inline vertex data for the helper object (below): stores payload and count at state +12, +16. | |
 | 6 | `sub_8258EA20` | arg1 × 2 or 4 bytes | Inline index data for the helper object: payload, count, 32-bit flag (arg2) at state +20, +24, +28. | |
 | 7 | `sub_8258FD48` | arg1 registers | **Set shader constants**. arg2 = stage << 24 \| type << 16 \| start << 8 \| count. Stage 0 = vertex, 1 = pixel; type 0-3 picks a setter. Wrapped by interpolation. | VS `sub_822A84C8`, `sub_822A81F8`, `sub_822A8418`; PS `sub_822A8518`, `sub_822A8308`, `sub_822A8470` |
-| 8 | `sub_8258FF50` | 16 | Unknown: [pointer], stored at device +13156. | `sub_822A8958` |
-| 9 | `sub_8258FFA0` | 16 | Unknown: [pointer]; copies memory. | `sub_822A8618` |
+| 8 | `sub_8258FF50` | 16 | Unknown: [pointer], stored at device +13156. Replayed as often as 9: likely one of a vertex/pixel shader pair. | `sub_822A8958` |
+| 9 | `sub_8258FFA0` | 16 | Unknown: [pointer]; copies memory. Replayed as often as 8. | `sub_822A8618` |
 | 10 | `sub_8258FFF0` | 16 | Unknown: [pointer]. | `sub_822A8960` |
 | 11 | `sub_82590040` | 16 | **SetStreamSource**, likely: [stream, buffer, offset, stride], dirty bit for vertex fetch constant (95 - stream) / 3 + 20. | `sub_822A3758` |
-| 12 | `sub_825900B8` | 16 | Unknown: [pointer]. | `sub_822A3908` |
+| 12 | `sub_825900B8` | 16 | Unknown: [pointer]. Replayed exactly as often as command 18, so probably the index buffer for each indexed draw. | `sub_822A3908` |
 | 13, 14 | `sub_8258EA58` | 16 | Helper object set-up: stores [a, b, c] at state +0..+8, calls the helper's vtable slot 2 with the device. | |
 | 15 | `sub_82590108` | 16 | Helper object draw (vtable slot 3) from the stored inline data, with a device flag (+10444 bit 0) toggled around it. | `sub_822A2470`, `sub_822A2430` |
 | 16 | `sub_825901B0` | 16 | Same, vtable slot 4, more arguments (indexed). | same |
@@ -121,13 +121,58 @@ was 46% of the render thread and `sub_8229E908` 2%: the render thread
 spends about half its time waiting for the emulated GPU to make room in
 the ring buffer. A native renderer has no ring buffer, so these waits go.
 
+## What a frame replays
+
+Counted with `--log_replay_commands` (2026-10-13, `itc_350.log`): calls
+per frame, and items per frame where a call carries several. Menus were
+measured over the main menu screens; the race over 72 two-second windows
+of driving, including camera switches.
+
+| Id | What | Race: calls (items) | Menus: calls (items) |
+|---|---|---|---|
+| 1 | Render states | 3,860 (7,709) | 212 (864) |
+| 2 | Sampler states | 1,984 (9,070) | 115 (727) |
+| 3 | Unknown | 1,407 | 10 |
+| 4 | Textures | 1,898 (2,621) | 75 (80) |
+| 5, 13, 15 | Helper object: data, set-up, draw | 153 each | 61 each |
+| 7 | Shader constants | 3,663 (30,688 registers) | 95 (589 registers) |
+| 8, 9 | Unknown (a pair) | 1,434 each | 22, 25 |
+| 10 | Unknown | 299 | 12 |
+| 11 | Stream sources | 279 (637) | 6 (18) |
+| 12 | Unknown (one per indexed draw) | 2,177 | 11 |
+| 18 | Indexed draws | 2,177 | 11 |
+| 19 | Draws with inline vertices | 35 | 9 |
+| 21 | Inline data (bytes) | 3 (2,579) | 9 (10,451) |
+| 23, 24 | Render target, depth surface | 16.5, 12.5 | 5, 1.4 |
+| 25 | Resolves | 24.6 | 1.7 |
+| 26 | Clears | 9.5 | 2 |
+| 29 | Set saved render targets | 1 | 1.5 |
+| 30 | Viewports | 7.6 | 3.1 |
+| 31 | Scissor rects | 5.9 | 25.5 |
+| 32, 33 | Unknown | rare (one window) | 0.2 each |
+| 34, 35 | Save, restore render targets | 8 each | 4 each |
+
+Never replayed: 6, 16, 17, 20, 22, 27, 28 (14 shares a handler with 13
+and isn't counted apart). A race frame is about 2,200 indexed draws and
+~50,000 state items (render and sampler states, constant registers,
+textures) that the graphics library turns into GPU packets one register at
+a time. 25 resolves a frame cover the reflection, shadow map and
+post-processing passes.
+
+Sample arguments of the unknown commands (payload words):
+
+- 3: `[0, 0x00010001]` in every sample: two 16-bit halves of 1.
+- 8: a 4 KB-aligned address (`0x01BA1000`, `0x02571000`) or 0.
+- 9: a heap object (`0x400C86D0`) or 0.
+- 10: a heap object (`0x400C8310`, `0x40064310`).
+- 12: an address (`0x066C13E0`, `0x07F61F90`).
+- 32: `[0, 3, 0x82600360]` (a static object in the executable's data).
+- 33: `[0x303, 0x40070350]`.
+
 ## Not yet known
 
 - Commands 3, 8, 9, 10, 12, 20, 22, 28, 32 and 33, and what the helper
   object draws.
-- Which commands a race and the menus actually use, and how often (a
-  runtime count per command id would settle it, and confirm the "likely"
-  rows).
 - The render state and sampler state ids in use (commands 1 and 2).
 - Texture, vertex buffer and surface objects: their layout in guest memory
   (formats, tiling, sizes), which the native renderer needs to read.
@@ -137,6 +182,12 @@ the ring buffer. A native renderer has no ring buffer, so these waits go.
   (`Renderer::Present`, `sub_82091BC0`).
 
 ## Tools
+
+- `--log_replay_commands` logs, every 2 s, how often each command id is
+  replayed per frame (and its items), plus the last arguments of each
+  unknown command. It wraps every handler but 0/36/37
+  (`sub_82304258` is used elsewhere too); command 7 is counted in its
+  interpolation wrapper.
 
 - `--dump_image=<path>` writes the loaded executable image
   (`0x82000000`-`0x82980000`, big-endian) and exits at the first frame.
