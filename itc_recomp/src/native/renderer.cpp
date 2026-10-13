@@ -39,6 +39,8 @@ REXCVAR_DEFINE_BOOL(native_renderer_check_mirror, false, "ITC",
 REXCVAR_DEFINE_BOOL(native_renderer_watch_draws, false, "ITC",
                     "Log what changes in the main view's draws' inputs between frames: with the "
                     "camera still, only flickering draws should (a debugging aid)");
+REXCVAR_DEFINE_BOOL(native_renderer_hide_cubes, false, "ITC",
+                    "Give cube maps the white placeholder (a debugging aid)");
 REXCVAR_DEFINE_STRING(native_renderer_dump, "", "ITC",
                       "Directory to dump frames into, as PFM files, with draws.txt describing "
                       "each draw: once 10 s into a race, and again whenever a file named 'now' "
@@ -477,6 +479,7 @@ VkCommandBuffer Renderer::BeginFrame() {
     passes_.set_record_draws(dumping_ && dump_step_ == 0);
     passes_.set_check_mirror_frames(REXCVAR_GET(native_renderer_check_mirror));
     passes_.set_watch_draws(REXCVAR_GET(native_renderer_watch_draws));
+    passes_.set_hide_cubes(REXCVAR_GET(native_renderer_hide_cubes));
     recording_ = true;
   }
   return frame.commands;

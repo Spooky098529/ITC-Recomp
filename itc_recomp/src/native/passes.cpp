@@ -300,6 +300,7 @@ struct Passes::State {
   // those it is), to log what changes between frames when the camera
   // stands still.
   bool watch_draws = false;
+  bool hide_cubes = false;  // placeholders for cube maps (debugging aid)
   struct WatchedDraw {
     uint64_t frame = 0;
     std::vector<uint32_t> system, vertex_floats, pixel_floats, bool_loop, fetch;
@@ -813,7 +814,9 @@ VkDescriptorSet Passes::State::GetTextureSet(uint8_t* base, const TranslatedShad
     // The signed binding gets the same (unsigned) view: it's read only for
     // components whose sign is signed, which this game's textures don't
     // have (logged if they do).
-    VkImageView view = textures.GetView(base, fetch, texture.view_type);
+    VkImageView view = hide_cubes && texture.view_type == VK_IMAGE_VIEW_TYPE_CUBE
+                           ? VK_NULL_HANDLE
+                           : textures.GetView(base, fetch, texture.view_type);
     if (!view) {
       view = texture.view_type == VK_IMAGE_VIEW_TYPE_3D     ? dummy_3d.view
              : texture.view_type == VK_IMAGE_VIEW_TYPE_CUBE ? dummy_cube.view
@@ -2021,6 +2024,10 @@ void Passes::State::WatchDraw(const TranslatedShader* vertex, const TranslatedSh
     }
   }
   last = std::move(now);
+}
+
+void Passes::set_hide_cubes(bool hide) {
+  state_->hide_cubes = hide;
 }
 
 void Passes::set_watch_draws(bool watch) {
