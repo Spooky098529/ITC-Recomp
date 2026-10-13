@@ -1,6 +1,6 @@
 # Import Tuner Challenge Static Recompilation
 
-This was a test run of using AI for this kind of thing. Don't expect perfection, but it does run.
+This is a test run of using AI for this kind of thing. Don't expect perfection, but it does run.
 
 ## Install
 
