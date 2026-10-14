@@ -60,7 +60,7 @@ known about it; this file is the plan and its progress).
 | 3 | **Textures**: untile and upload (mostly BC1-BC3), samplers from the fetch constants. | The main view looks right without effects. | Done (2026-10-13): signs, gauges, fences, buildings and road textured correctly (screenshot checked); what comes from resolves is still missing. |
 | 4 | **The other passes**: each pass renders into a Vulkan image of its resolve's size and format; resolves become copies. | Shadows, reflections and the mirror work. | Done (2026-10-14): every pass draws, inline vertex draws included; clears and resolves work; the user saw the car's shadow, the mirror and the reflections right in our window (cockpit and third person), and the resolves match the emulated GPU's (`--readback_resolve=full`), except its blocky bloom. Menus not checked. |
 | 5 | **The final frame and the menus** (still in development mode): post-processing, HUD, the frame's end, then every menu screen. | Races and menus look as in the game's window, side by side. | In progress: the final frame with the HUD shows (checked by the user in a race); menus' tiled 3D views fixed. |
-| 6 | **Exclusive mode**: the emulated GPU gets no work and then isn't loaded at all; the graphics library is kept for what our renderer needs from it (see "Plan for milestone 6"); then measure. | The GPU plugin isn't loaded; frame rate measured against the emulated GPU. | In progress: the plugin isn't loaded (`run.sh` runs exclusive mode); measured: 135 fps mean uncapped against the emulated GPU's 155, then ~235 after the speed work (step 5; holds the 144 cap in an attract race). The library's remaining packet writers moved to milestone 7 (the user's call, 2026-10-14); the frame's end (step 6) to come. |
+| 6 | **Exclusive mode**: the emulated GPU gets no work and then isn't loaded at all; the graphics library is kept for what our renderer needs from it (see "Plan for milestone 6"); then measure. | The GPU plugin isn't loaded; frame rate measured against the emulated GPU. | Done (2026-10-14): the plugin isn't loaded (`run.sh` runs exclusive mode); measured: 135 fps mean uncapped against the emulated GPU's 155, then ~235 after the speed work (step 5; holds the 144 cap in an attract race). The library's remaining packet writers moved to milestone 7 (the user's call); the frame's end (step 6) measured at ~0.2% of the render thread and left as it is. |
 | 7 | **Known issues cleanup**: what's under Known issues below (the boot movie, gamma, textures replaced in memory, textures never freed, window resizing, the library's remaining packet writers, further speed work on our renderer). | The known issues are fixed or accepted. | |
 
 ## Progress on milestone 2
@@ -381,7 +381,9 @@ measuring come before the speed work):
    patching, inline vertex space, fences).
 6. **The frame's end**: the front buffer resolve stays (it's what's shown);
    the full GPU wait and the swap become no-ops, once it's checked that
-   nothing waits on the swap counter (+4).
+   nothing waits on the swap counter (+4). **Not done**: measured at
+   ~0.2% of the render thread, so left as it is (see "The frame's end,
+   measured" below).
 
 Risks: interrupts the game relies on, and occlusion queries it reads back;
 step 1's logs are there to find them before anything is stubbed.
@@ -699,6 +701,24 @@ step 1's logs are there to find them before anything is stubbed.
   allocated textures and vertex buffers (`0x1Bxxxxxx`) are masked; two
   runs of the same build differ more (they differ in those addresses
   too). The user saw no visual errors.
+- **The frame's end, measured** (step 6, 2026-10-14, on `e6d1d50`;
+  uncapped attract race, 4 s of the render thread profiled 20 s in, ~210
+  fps; inclusive shares, nearly all samples had a usable stack): the
+  front buffer listener `sub_82091BC0` 0.06% (the full GPU wait
+  `sub_8229F1B0` 0.04%, the front buffer resolve 0.03%), Present
+  `sub_82091A60` 0.13% (`sub_822A8A60` 0.05%, Swap `sub_822A08A0` 0.06%
+  with `VdSwap` too small to show, the unbinding `sub_8258D9F8` 0.01%).
+  `--log_frame_times` puts Present under 0.01 ms a frame on average (the
+  frame takes ~4.5 ms), so nothing there blocks either: in exclusive mode
+  the full wait passes at once (our kick shows everything consumed and
+  +10868 stays 0). Making them no-ops would save ~8 µs a frame, below
+  run-to-run noise, while Swap does more than `VdSwap`: it records fences
+  at device +13540 and +13544 (the position at the swap and the previous
+  one) and calls `sub_822B5C58` (with the front buffer), `sub_822B2388`,
+  `sub_8229EC00` (with +13512), `sub_822B20D8` and `sub_822A3B90`, none
+  identified, so stubbing it would need what reads those worked out first.
+  Left as it is (agreed with the user, 2026-10-14); the "swap counter"
+  question (progress block +4) wasn't pursued. That ends milestone 6.
 
 ## Buffers (where vertex and index data comes from)
 
