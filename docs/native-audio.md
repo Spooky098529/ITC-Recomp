@@ -1,8 +1,8 @@
 # Native audio
 
-The plan and progress of replacing the SDK's audio (Xenia's audio system
-and XMA decoder, in `rexglue-sdk/src/audio/` and
-`rexglue-sdk/src/kernel/xboxkrnl/xboxkrnl_audio*.cpp`) with our own, as
+The plan and progress of replacing the SDK's audio output (Xenia's audio
+system, in `rexglue-sdk/src/audio/` and
+`rexglue-sdk/src/kernel/xboxkrnl/xboxkrnl_audio.cpp`) with our own, as
 the native renderer replaced the emulated GPU (`native-renderer.md`). Why:
 the SDK's "Audio Worker" thread takes ~80% of a core for the whole game
 (see "Measured" below). As with rendering, the game's own audio library is
@@ -110,36 +110,35 @@ Not known yet:
 
 ## Decisions
 
-- **Keep the game's XACT and XAudio**; replace the SDK's render driver
-  and, later, its XMA hardware. Replacing XACT itself (e.g. with FAudio)
-  isn't planned: the banks are XACT2-era big-endian files, and the engine
+- **Keep the game's XACT and XAudio**; replace the SDK's render driver.
+  Replacing XACT itself (e.g. with FAudio) isn't planned: the banks are XACT2-era big-endian files, and the engine
   sounds depend on XACT's runtime variables.
+- **Keep the SDK's XMA decoder** (the user's call, 2026-10-14): it costs
+  nothing measurable, so replacing it gains no speed. (Considered:
+  converting the XMA wave banks to PCM banks on first launch, decoded once
+  with FFmpeg and opened instead of the originals through the `CreateFile`
+  wrapper `sub_82295508`, so that XACT plays music and menu sounds through
+  its PCM path and no XMA context is made. Its open question was whether
+  this XACT streams PCM from banks laid out for XMA.)
 - **No SDK patch**: override the game's functions in `itc_recomp/src/`,
   as the native renderer does.
 
 ## Plan
 
-1. **Our own render driver** (`itc_recomp/src/audio/`). Override
-   `sub_824657E0` (register) and `sub_82465870` (submit) so the SDK's
-   `XAudioRegisterRenderDriverClient` and Audio Worker are never used. Our
+1. **Our own render driver** (`itc_recomp/src/audio/`). Override the
+   game's driver object's register (`sub_824657E0`), submit
+   (`sub_82465870`) and destructor (`sub_824658C8`, which unregisters) so
+   the SDK's `XAudio*RenderDriver*` functions are never called, and give
+   the runtime our own audio system (a subclass of the SDK's, set in
+   `OnPreSetup`) that sets up only the XMA decoder, so the Audio Worker
+   never starts. Our
    own thread runs the game's mixer callback paced by an SDL3 audio
    stream, with a blocking wait (no polling), and converts the 6-channel
    big-endian frames itself. Open: the callback needs a guest thread
    context; the SDK's `XHostThread`, as its worker uses, is the likely
    answer. **Done when** sound plays as before, the Audio Worker is gone,
    and CPU use and frame rate are measured against the SDK's driver.
-2. **The XMA hardware**: convert the XMA wave banks to PCM banks once, on
-   first launch (decoded with FFmpeg's XMA decoder, entries rewritten with
-   offsets and sizes recomputed and the 2048-byte alignment kept), kept in
-   a cache folder and opened instead of the originals through the
-   `CreateFile` wrapper (`sub_82295508`). XACT then plays the music and
-   menu sounds through its PCM path, no XMA context is made, and the SDK's
-   XMA registers, decoder thread and FFmpeg aren't used at runtime. Not a
-   speed change (XMA costs nothing measurable); it removes the SDK's code.
-   Risks: whether this XACT streams PCM from banks laid out for XMA
-   (streaming buffer sizes, seek tables). Try one music bank converted by
-   hand first.
-3. **Only if a later profile shows it**: the game's mixer (native mixing
+2. **Only if a later profile shows it**: the game's mixer (native mixing
    loops) or locks the audio thread shares with the render thread. Neither
    showed up in the profile above.
 
