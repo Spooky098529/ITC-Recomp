@@ -1658,7 +1658,9 @@ bool Passes::State::ResolveInto(VkCommandBuffer commands, uint8_t* base, Target&
   return true;
 }
 
-Passes::Passes() : state_(std::make_unique<State>()) {}
+Passes::Passes() : state_(std::make_unique<State>()) {
+  std::memset(state_->regs.values, 0, sizeof(state_->regs.values));  // see ReadRegisters
+}
 Passes::~Passes() = default;
 
 bool Passes::Init(const DeviceContext& context, uint8_t* base, uint32_t frames_in_flight) {

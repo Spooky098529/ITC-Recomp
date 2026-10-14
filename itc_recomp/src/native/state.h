@@ -47,7 +47,9 @@ constexpr uint32_t kDeviceVertexFloatConstants = 1792, kDevicePixelFloatConstant
 
 // Fills regs (host byte order) from the device's shadow: the register
 // blocks the draw path flushes, and the fetch, bool and loop constants
-// (not the float constants). Registers outside them are zero.
+// (not the float constants). Registers outside them are left as they are:
+// zero regs once before the first call (clearing all 80 KB every draw was
+// ~10% of the render thread).
 void ReadRegisters(uint8_t* base, uint32_t device, rex::graphics::RegisterFile& regs);
 
 // The GPU's physical address for a guest address, as the graphics library

@@ -40,7 +40,6 @@ void CopyBlock(uint8_t* base, uint32_t device, const ShadowBlock& block,
 }  // namespace
 
 void ReadRegisters(uint8_t* base, uint32_t device, rex::graphics::RegisterFile& regs) {
-  std::memset(regs.values, 0, sizeof(regs.values));
   for (const ShadowBlock& block : kRegisterBlocks) {
     CopyBlock(base, device, block, regs);
   }
