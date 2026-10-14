@@ -9,8 +9,8 @@ Built with AI assistance (Claude Code).
 ## Features
 
 - **Native Vulkan renderer.** The game's Direct3D calls are drawn directly
-  with Vulkan; no GPU emulation. Motion blur and the light bloom are drawn
-  as on the console.
+  with Vulkan, this avoids relying on the xenia GPU backend of rexglue and should run faster (WIP, still quite slow from my testing)
+  
 - **Frame interpolation in races.** Game logic still runs at its original
   30 Hz, and frames are blended between ticks, so races play smoothly at up
   to 144 fps (or uncapped). `./run.sh --no-interpolation` gives the original
