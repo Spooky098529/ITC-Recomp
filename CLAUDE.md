@@ -103,8 +103,8 @@ or shipped. Uncapped attract race: ~235 fps mean against the emulated GPU's
 remaining packet writers, speed) are milestone 7 in
 `docs/native-renderer.md`.
 
-Sound goes through our own audio output (`--native_audio`, on in `run.sh`;
-branch `native-audio`): our thread runs the game's mixer, replacing the
+Sound goes through our own audio output (`--native_audio`, on in `run.sh`,
+since v0.3.2): our thread runs the game's mixer, replacing the
 SDK's Audio Worker, whose polling took ~80% of a core. The SDK's XMA
 decoder is kept. See `docs/native-audio.md`.
 
