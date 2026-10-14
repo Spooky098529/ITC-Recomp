@@ -14,6 +14,7 @@
 #include <rex/cvar.h>
 #include <rex/logging.h>
 
+#include <atomic>
 #include <string>
 
 REXCVAR_DEFINE_BOOL(log_boot_modes, false, "ITC",
@@ -35,6 +36,9 @@ constexpr int32_t kTicksPerSecond = 30;
 
 bool g_first_race_started = false;
 bool g_in_movie_wait = false;
+// Set by the render thread once it has started the boot movie (see
+// sub_820AE958).
+std::atomic<bool> g_movie_started{false};
 
 }  // namespace
 
@@ -92,7 +96,8 @@ extern "C" REX_FUNC(sub_820988C8) {
 // The boot's movie step, run every tick while a movie plays (the Ubisoft
 // logo): ends the step when the movie is skippable (0x826C5BC4) and a button
 // is pressed, or when the movie has finished (sub_820A4450 returns 1) and
-// this+9608 is 1. With --skip_intro the movie reports finished at once.
+// this+9608 is 1. With --skip_intro the movie reports finished as soon as
+// the render thread has started it.
 extern "C" REX_FUNC(sub_82107C58) {
   REX_FUNC_PROLOGUE();
   if (REXCVAR_GET(log_boot_modes)) {
@@ -107,9 +112,21 @@ extern "C" REX_FUNC(sub_82107C58) {
 // Whether the playing movie has finished (1 = finished).
 extern "C" REX_FUNC(sub_820A4450) {
   REX_FUNC_PROLOGUE();
-  if (g_in_movie_wait) {
+  if (g_in_movie_wait && g_movie_started) {
     ctx.r3.u64 = 1;
     return;
   }
   __imp__sub_820A4450(ctx, base);
+}
+
+// The render thread's command that starts the boot movie (1280x720, through
+// sub_82481A70); it waits in the movie player (sub_82491C50) for the first
+// decoded frame. If the movie step ends the movie before then, the main
+// thread waits on the render thread in Boot::EndMovie and the decoder never
+// delivers: --skip_intro stalled about 1 boot in 6 that way without the GPU
+// plugin. So --skip_intro waits for this to return.
+extern "C" REX_FUNC(sub_820AE958) {
+  REX_FUNC_PROLOGUE();
+  __imp__sub_820AE958(ctx, base);
+  g_movie_started = true;
 }
