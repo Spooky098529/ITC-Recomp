@@ -1036,9 +1036,19 @@ To be fixed (or accepted) in milestone 7.
   part of the guest memory mirror, are fixed at 32 MB, and running out is
   its own failed-draw reason. Each growth is logged ("block N added",
   "pool N added"). Checked with 2 MB blocks and 256-set pools (up to 14
-  blocks a frame): no failed draws, the frame dumped looked right. Not yet
-  confirmed by the user in a driven race; whether the freezes had the same
-  cause isn't known.
+  blocks a frame): no failed draws, the frame dumped looked right. A
+  driven race on v0.3.0 (`run-debug.sh`) then logged "constants ring full"
+  in its busiest 5 s (3,122 draws a frame on average), and nothing else
+  failing, so the constants ring is the one that runs out; the HUD didn't
+  visibly drop out that time. A driven race on the fix (2,867 draws a
+  frame at most) grew nothing. The stutter and freezes weren't seen in
+  either run: their cause isn't known.
+- **No window when Vulkan has no surface support**: with `XDG_DATA_DIRS`
+  missing `/usr/share` (as in VS Code's terminal), the Vulkan loader finds
+  no drivers, SDL fails to make the window ("Installed Vulkan doesn't
+  implement the VK_KHR_surface extension"), and the renderer logs "couldn't
+  start; continuing without it": the game runs with no window and no
+  message to the player. It should stop with an error instead.
 - **Performance: locked instructions are slow on the render thread** (a
   few hundred cycles each, 2026-10-14: the thread's many stores have to
   drain first). The shader reference count's compare-and-swap still costs
