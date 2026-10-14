@@ -60,7 +60,7 @@ known about it; this file is the plan and its progress).
 | 3 | **Textures**: untile and upload (mostly BC1-BC3), samplers from the fetch constants. | The main view looks right without effects. | Done (2026-10-13): signs, gauges, fences, buildings and road textured correctly (screenshot checked); what comes from resolves is still missing. |
 | 4 | **The other passes**: each pass renders into a Vulkan image of its resolve's size and format; resolves become copies. | Shadows, reflections and the mirror work. | Done (2026-10-14): every pass draws, inline vertex draws included; clears and resolves work; the user saw the car's shadow, the mirror and the reflections right in our window (cockpit and third person), and the resolves match the emulated GPU's (`--readback_resolve=full`), except its blocky bloom. Menus not checked. |
 | 5 | **The final frame and the menus** (still in development mode): post-processing, HUD, the frame's end, then every menu screen. | Races and menus look as in the game's window, side by side. | In progress: the final frame with the HUD shows (checked by the user in a race); menus' tiled 3D views fixed. |
-| 6 | **Exclusive mode**: the emulated GPU gets no work and then isn't loaded at all; the graphics library is kept for what our renderer needs from it (see "Plan for milestone 6"); then measure. | The GPU plugin isn't loaded; frame rate measured against the emulated GPU. | In progress: the emulated GPU gets no work (`--native_renderer_exclusive`). |
+| 6 | **Exclusive mode**: the emulated GPU gets no work and then isn't loaded at all; the graphics library is kept for what our renderer needs from it (see "Plan for milestone 6"); then measure. | The GPU plugin isn't loaded; frame rate measured against the emulated GPU. | In progress: the plugin isn't loaded (`run.sh` runs exclusive mode); measured: 135 fps mean uncapped against the emulated GPU's 155. Speed work and the frame's end to come. |
 | 7 | **Known issues cleanup**: what's under Known issues below (the boot movie, gamma, textures replaced in memory, textures never freed, window resizing). | The known issues are fixed or accepted. | |
 
 ## Progress on milestone 2
@@ -526,6 +526,31 @@ step 1's logs are there to find them before anything is stubbed.
   8248466C" in the log has stalled; restart it. (The vblank interrupts
   and the MMIO range at `0x7FC80000`, the earlier candidates, weren't
   needed to explain it.)
+
+- **No GPU plugin** (step 3, 2026-10-14): `run.sh` (and so `run-debug.sh`)
+  runs `--native_renderer=true --native_renderer_exclusive=true` with no
+  `--gpu_plugin`, and the zips (CI's and the local ones) leave out
+  `librexgpu-xenos.so`; the game doesn't link it, it was only loaded by
+  `--gpu_plugin`. Nothing had to stand in for the plugin: no vblank
+  interrupts and no GPU registers at `0x7FC80000` are needed for boot,
+  menus or races. A packaged zip run without `--skip_intro` played the
+  boot movie, the menus and an attract race.
+- **Measured without the plugin** (step 4, 2026-10-14): the same 45 s of
+  an attract race (from the second after the race starts), fps per
+  second, `--skip_intro --attract_after_s=1`, no extra logging:
+
+  | Setup | Cap | Mean | 10th percentile | Median | Min | Max |
+  |---|---|---|---|---|---|---|
+  | Emulated GPU alone (`--gpu_plugin=xenos`) | 144 | 143 | 127 | 149 | 122 | 151 |
+  | Exclusive mode, no plugin | 144 | 129 | 104 | 133 | 100 | 149 |
+  | Emulated GPU alone | none | 155 | 126 | 159 | 121 | 191 |
+  | Exclusive mode, no plugin | none | 135 | 106 | 134 | 101 | 184 |
+
+  Our renderer is about 13% slower on average, and about 18% slower in the
+  busy seconds (the 10th percentile, 106 against 126 uncapped). It matches
+  the earlier measurement with the plugin loaded (127 against 141), so
+  loading the plugin wasn't costing anything. Step 5 is the speed work.
+  Menus and predicated tiling still need checking by the user.
 
 ## Tools (all debugging aids)
 
