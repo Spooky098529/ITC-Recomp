@@ -56,6 +56,7 @@ set(ITC_SOURCES
     src/debug/replay_stats.cpp
     src/native/app_window.cpp
     src/native/buffers.cpp
+    src/native/draw_packets.cpp
     src/native/gpu_link.cpp
     src/native/passes.cpp
     src/native/renderer.cpp

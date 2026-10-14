@@ -2,6 +2,7 @@
 // docs/gpu-functions.md), wrapped to pass each command on before it runs.
 
 #include "debug/replay_stats.h"
+#include "draw_packets.h"
 #include "guest.h"
 #include "renderer.h"
 #include "state.h"
@@ -186,9 +187,18 @@ extern "C" REX_FUNC(sub_8258D998) {
     }                                                                                 \
     __imp__sub_##address(ctx, base);                                                  \
   }
-LOG_OUTSIDE_WRAPPER(825BE708, "DrawIndexedVertices", 18)
 LOG_OUTSIDE_WRAPPER(825BE300, "DrawVertices", 17)
 LOG_OUTSIDE_WRAPPER(825BDDC0, "BeginIndexedVertices", 27)
+
+// DrawIndexedVertices: in exclusive mode without its packets (see
+// draw_packets.cpp).
+extern "C" REX_FUNC(sub_825BE708) {
+  REX_FUNC_PROLOGUE();
+  if (native::g_current_command != 18) {
+    LogOutside("DrawIndexedVertices", 0x825BE708, uint32_t(ctx.lr), native::g_current_command);
+  }
+  native::DrawPackets_IndexedDraw(ctx, base);
+}
 
 // The library's Resolve (r3 device, r4 flags, r5 source rect, r6
 // destination texture, r7 destination point, r8 level, r9 slice, r10 clear

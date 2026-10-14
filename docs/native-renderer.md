@@ -606,6 +606,47 @@ step 1's logs are there to find them before anything is stubbed.
 
   So skipping the packet writing could save at most ~10%, nearly all of it
   inside the indexed draw; the AddRef/Release mutex is a separate ~6%.
+- **The indexed draw without its packets** (step 5, 2026-10-14,
+  `draw_packets.cpp`). DrawIndexedVertices (`sub_825BE708`) works through
+  five 64-bit dirty masks at device +0 (vertex constants), +8 (pixel
+  constants), +16 (shaders, fetch constants, some registers), +24 and +32
+  (register blocks), calling a helper per set bit, clears them, then writes
+  DRAW_INDX. From the code, only the shader load `sub_822AED18` writes
+  more than packets: the shadow (SQ_PROGRAM_CNTL and +10404 at +10400,
+  +10408, +10432, +10452, +12440), vertex shader patching, the shaders'
+  fences (+8), and it returns more dirty bits. The draw itself also sets
+  device +11584 when +24 bit 1 is dirty, and in predicated tiling records
+  each DRAW_INDX's address in a list at +12976 for EndTiling.
+  `--native_renderer_check_draw_writes` confirmed it (a 45 s attract race,
+  device snapshot around each call): `sub_822AE1D0`, `sub_822ADE30`,
+  `sub_822ADEF0`, `sub_822AE070` and `sub_822ADC08` change no device field
+  but the command pointer (+40); the draw without a shader load changes
+  only the masks; no predicated draws in a race. (+13564-+13572 changed
+  under every helper a few times in 5 s, of a million calls: another
+  thread.)
+
+  So in exclusive mode the draw now calls only the shader load and clears
+  the masks (predicated draws keep the library's draw). First result: the
+  same draws, 8 times fewer kicks, but **draws using the library's patched
+  shader copy rose from 9 to 136 a frame**: a shader's fence is the command
+  position it was loaded at, and the library patches in place only once
+  the GPU has passed it; with so few kicks the position stays unkicked
+  longer. Nothing reads the shaders behind the library, so the bound
+  shaders' fences are cleared before the shader load, and copies went to
+  0. Uncapped attract race, same build:
+
+  | Setup | Mean | 10th pct | Median | Min |
+  |---|---|---|---|---|
+  | Library's packets (`--native_renderer_library_packets`) | 209 | 165 | 209 | 159 |
+  | Draw without packets | 219 | 172 | 222 | 167 |
+  | ... and shader fences cleared | 232 | 181 | 233 | 176 |
+
+  At `--max_fps=144`: mean 150, slowest second 147. Kicks went from ~100,000
+  to ~9,000 a second. Frames dumped at the same moments
+  (`--native_renderer_dump_every`) had identical `draws.txt` (shaders,
+  render state, fetch constants of every draw); the pixels differ only by
+  the interpolated camera's position (edges everywhere, from frame
+  timing).
 
 ## Buffers (where vertex and index data comes from)
 
@@ -741,6 +782,13 @@ memory).
   callback got, and the progress block; a trace of the first 60 kicks,
   40 every 10 s, and those holding rare packets (scratch registers,
   INTERRUPT, COND_WRITE, queries...). Works with the emulated GPU too.
+- `--native_renderer_check_draw_writes`: keep the library's indexed draw,
+  and log every 5 s the device fields its packet-writing helpers and the
+  draw itself change besides the command pointer (calls ending a command
+  segment aren't compared), and how many draws were predicated or loaded
+  shaders.
+- `--native_renderer_library_packets`: in exclusive mode, let the
+  library's indexed draw write its packets as before.
 - `--native_renderer_copy_all`: copy every vertex and index range into the
   mirror every frame, as before memcpy's writes were tracked.
 - `--native_renderer_verify_mirror`: compare every range not copied with
@@ -778,6 +826,9 @@ memory).
   `--native_renderer_log_gpu`, and exclusive mode's kick.
 - `buffers.cpp`: `--native_renderer_log_buffers` (buffer objects, and the
   library's memcpy `sub_825A7410` wrapped to record what it writes).
+- `draw_packets.cpp`: exclusive mode's indexed draw without packets (the
+  library's `sub_825BE708` is wrapped in `replay_hooks.cpp` and calls
+  it), and `--native_renderer_check_draw_writes`.
 - `app_window.cpp`: exclusive mode's one window (hides the SDK's, routes
   our window's events to it).
 - `glsl/`: our own shaders (resolves), compiled into `generated_*.h`.
