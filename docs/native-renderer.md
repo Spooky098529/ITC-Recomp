@@ -554,6 +554,23 @@ step 1's logs are there to find them before anything is stubbed.
   and a race from the packaged zip with no plugin: all fine, no errors in
   the log. Steps 3 and 4 are done.
 
+- **Speed, first changes** (step 5, 2026-10-14; uncapped attract race, mean
+  and 10th percentile of fps per second; one run each). A profile of the
+  render thread (`perf record -e cycles:u --call-graph dwarf`) showed our
+  renderer's per-draw work, not the library, as most of it (`AfterDraw`
+  71%):
+
+  | Change | Mean | 10th pct |
+  |---|---|---|
+  | Before (emulated GPU alone: 155 / 126) | 135 | 106 |
+  | Index range scan as one vectorised loop per format (was ~20%; checked equal on 10 million draws) | 167 | 130 |
+  | Register file cleared once, not 80 KB a draw (was ~10%) | 182 | 144 |
+  | Texture set layouts cached per shader; texture set key and infos reuse their buffers | 190 | 149 |
+  | Shader caches as hash maps instead of ordered maps of tuples | 198 | 156 |
+
+  What's left (second profile): the mirror copies ~12%, texture sets ~9%
+  (string keys), our blending ~8%, `Draw` itself ~8%, shader lookups ~4%
+  (see Known issues), the guest's global lock in the library ~3.5%.
 - **What the mirror copies** (step 5, 2026-10-14,
   `--native_renderer_check_mirror`, an uncapped attract race, 55 s): of the
   13-19 MB copied a frame (vertex buffers 11-17 MB, the rest indices),
