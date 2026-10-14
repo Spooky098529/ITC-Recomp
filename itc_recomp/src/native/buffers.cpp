@@ -1,7 +1,10 @@
 // The vertex and index buffers draws use, and where their data comes from
-// (milestone 6 step 5: finding where the game creates and fills its
-// buffers, to upload them once instead of mirroring guest memory every
-// frame; see "Buffers" in docs/native-renderer.md).
+// (milestone 6 step 5; see "Buffers" in docs/native-renderer.md).
+//
+// The game fills its vertex and index buffers with the library's memcpy
+// (sub_825A7410), wrapped here: with the native renderer on, each copy into
+// the physical views is recorded once it's done, so the mirror only copies
+// a range again when memcpy has written it since (Buffers_NewestWrite).
 //
 // With --native_renderer_log_buffers:
 // - each buffer object the first time SetStreamSource (command 11) or
@@ -18,13 +21,16 @@
 #include "buffers.h"
 
 #include "guest.h"
+#include "renderer.h"
 #include "state.h"
 
 #include <rex/cvar.h>
 #include <rex/logging.h>
 
+#include <atomic>
 #include <chrono>
 #include <map>
+#include <vector>
 #include <mutex>
 #include <string>
 #include <unordered_map>
@@ -60,22 +66,34 @@ struct RangeStats {
 } g_range_stats;
 uint32_t g_range_lines = 200;
 
-// Any thread (under g_mutex): what memcpy wrote into the physical views, as
-// non-overlapping segments (start: end, sequence, caller), and the headers
-// of known buffer objects (object: end).
+// Any thread (under g_pending_mutex): memcpy's writes into the physical
+// views not yet taken by the render thread.
+struct PendingWrite {
+  uint32_t start, end, caller;
+};
+std::mutex g_pending_mutex;
+std::vector<PendingWrite> g_pending;
+std::atomic<bool> g_has_pending{false};
+
+// Render thread: what memcpy wrote into the physical views, as
+// non-overlapping segments (start: end, sequence, caller).
 struct Write {
   uint32_t end;
   uint64_t sequence;
   uint32_t caller;
 };
-std::mutex g_mutex;
 std::map<uint32_t, Write> g_writes;
 uint64_t g_sequence = 0;
+std::vector<PendingWrite> g_taken;
+
+// Any thread (under g_mutex), for the logging: the headers of known buffer
+// objects (object: end).
+std::mutex g_mutex;
 std::map<uint32_t, uint32_t> g_headers;
 uint64_t g_header_copies = 0, g_physical_copies = 0, g_physical_copy_bytes = 0;
 uint32_t g_header_lines = 100;
 
-// Records [start, end) as written now by caller (g_mutex held).
+// Records [start, end) as written now by caller (render thread).
 void RecordWrite(uint32_t start, uint32_t end, uint32_t caller) {
   uint64_t sequence = ++g_sequence;
   // Trim or split segments overlapping the new one.
@@ -103,8 +121,24 @@ void RecordWrite(uint32_t start, uint32_t end, uint32_t caller) {
   g_writes[start] = Write{end, sequence, caller};
 }
 
+// Takes the pending writes into g_writes (render thread).
+void TakePending() {
+  if (!g_has_pending.load(std::memory_order_acquire)) {
+    return;
+  }
+  {
+    std::lock_guard lock(g_pending_mutex);
+    g_taken.swap(g_pending);
+    g_has_pending.store(false, std::memory_order_relaxed);
+  }
+  for (const PendingWrite& write : g_taken) {
+    RecordWrite(write.start, write.end, write.caller);
+  }
+  g_taken.clear();
+}
+
 // The bytes of [start, end) memcpy has written, the newest write's sequence
-// and caller, and the first segment's caller (g_mutex held).
+// and caller, and the first segment's caller (render thread).
 struct Coverage {
   uint64_t bytes = 0, newest = 0;
   uint32_t newest_caller = 0, first_caller = 0;
@@ -239,13 +273,28 @@ void Buffers_OnCommand(uint8_t* base, uint32_t id, uint32_t payload, uint32_t co
   }
 }
 
+uint64_t Buffers_NewestWrite(uint32_t physical, uint32_t size) {
+  TakePending();
+  // Most ranges lie within one segment (a loader's copy): look that up
+  // first.
+  auto it = g_writes.upper_bound(physical);
+  if (it != g_writes.begin()) {
+    auto segment = std::prev(it);
+    if (segment->second.end >= physical + size) {
+      return segment->second.sequence;
+    }
+  }
+  return CoverageOf(physical, physical + size).newest;
+}
+
+uint64_t Buffers_Sequence() {
+  return g_sequence;
+}
+
 void Buffers_OnMirror(uint32_t physical, uint32_t size, bool index) {
   uint64_t key = (uint64_t(physical) << 32) | size;
-  Coverage coverage;
-  {
-    std::lock_guard lock(g_mutex);
-    coverage = CoverageOf(physical, physical + size);
-  }
+  TakePending();
+  Coverage coverage = CoverageOf(physical, physical + size);
   RangeStats& r = g_range_stats;
   auto [it, added] = g_ranges.try_emplace(key, RangeState{coverage.newest});
   if (added) {
@@ -286,15 +335,15 @@ void Buffers_OnMirror(uint32_t physical, uint32_t size, bool index) {
 
 }  // namespace native
 
-// The library's memcpy (r3 destination, r4 source, r5 size): with
-// --native_renderer_log_buffers, copies into the physical views are recorded
-// and copies into a known buffer header logged.
+// The library's memcpy (r3 destination, r4 source, r5 size): copies into
+// the physical views are recorded once done (see Buffers_NewestWrite); with
+// --native_renderer_log_buffers, copies into a known buffer header logged.
 extern "C" REX_FUNC(sub_825A7410) {
   REX_FUNC_PROLOGUE();
-  if (native::Buffers_Logging() && ctx.r5.u32) {
-    using namespace native;
-    uint32_t destination = ctx.r3.u32, source = ctx.r4.u32, size = ctx.r5.u32;
-    uint32_t caller = uint32_t(ctx.lr);
+  using namespace native;
+  uint32_t destination = ctx.r3.u32, source = ctx.r4.u32, size = ctx.r5.u32;
+  uint32_t caller = uint32_t(ctx.lr);
+  if (Buffers_Logging() && size) {
     uint32_t header_object = 0;
     {
       std::lock_guard lock(g_mutex);
@@ -308,10 +357,8 @@ extern "C" REX_FUNC(sub_825A7410) {
         }
       }
       if (destination >= 0xA0000000u) {  // the physical views
-        uint32_t physical = GpuPhysicalAddress(destination);
         g_physical_copies++;
         g_physical_copy_bytes += size;
-        RecordWrite(physical, physical + size, caller);
       }
     }
     if (header_object) {
@@ -321,4 +368,11 @@ extern "C" REX_FUNC(sub_825A7410) {
     }
   }
   __imp__sub_825A7410(ctx, base);
+  // Recorded after the copy, so a range read meanwhile is read again.
+  if (size && destination >= 0xA0000000u && Renderer_Enabled()) {
+    uint32_t physical = GpuPhysicalAddress(destination);
+    std::lock_guard lock(g_pending_mutex);
+    g_pending.push_back({physical, physical + size, caller});
+    g_has_pending.store(true, std::memory_order_release);
+  }
 }

@@ -83,6 +83,11 @@ class Passes {
   // how often each changes between frames; TakeMirrorChanges describes the
   // ranges that changed since it was last called (the most changed first).
   void set_check_mirror_frames(bool check);
+  // Debugging aids: copy every vertex and index range into the mirror every
+  // frame (as before memcpy's writes were tracked); compare each range not
+  // copied with guest memory (Stats::mirror_stale; slow).
+  void set_copy_all(bool copy_all);
+  void set_verify_mirror(bool verify);
   // A debugging aid: hash each copied vertex and index range again at the
   // end of the frame; TakeLateWrites describes those that changed.
   void set_check_late_writes(bool check);
@@ -123,6 +128,13 @@ class Passes {
   // Logged by the renderer.
   struct Stats {
     uint64_t drawn = 0, unsupported = 0, failed = 0, mirrored_bytes = 0;
+    // Ranges not copied (unchanged since this mirror got them); with
+    // set_verify_mirror, those whose contents differ from guest memory, and
+    // an example.
+    uint64_t mirror_skipped_bytes = 0, mirror_checked = 0, mirror_stale = 0,
+             mirror_stale_bytes = 0;
+    uint32_t mirror_stale_sample_address = 0, mirror_stale_sample_size = 0;
+    bool mirror_stale_sample_index = false;
     // With set_check_mirror: ranges used again in a frame with other
     // contents, and an example.
     uint64_t mirror_rewritten = 0, mirror_rewritten_bytes = 0;

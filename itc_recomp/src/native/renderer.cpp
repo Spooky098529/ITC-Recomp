@@ -43,6 +43,13 @@ REXCVAR_DEFINE_BOOL(native_renderer_serialize, false, "ITC",
 REXCVAR_DEFINE_BOOL(native_renderer_check_mirror, false, "ITC",
                     "Log the vertex and index ranges whose contents change between frames "
                     "(a debugging aid)");
+REXCVAR_DEFINE_BOOL(native_renderer_copy_all, false, "ITC",
+                    "Copy every vertex and index range into the mirror every frame, not only "
+                    "those the library's memcpy wrote since (a debugging aid)");
+REXCVAR_DEFINE_BOOL(native_renderer_verify_mirror, false, "ITC",
+                    "Compare each vertex and index range not copied into the mirror with guest "
+                    "memory every frame, logging those that differ (a debugging aid; slow, ~20 "
+                    "fps in a race)");
 REXCVAR_DEFINE_BOOL(native_renderer_watch_draws, false, "ITC",
                     "Log what changes in the main view's draws' inputs between frames: with the "
                     "camera still, only flickering draws should (a debugging aid)");
@@ -565,6 +572,8 @@ VkCommandBuffer Renderer::BeginFrame() {
     // for went away while frames were recorded slowly).
     passes_.set_record_draws(dumping_ && dump_step_ == 0);
     passes_.set_check_mirror_frames(REXCVAR_GET(native_renderer_check_mirror));
+    passes_.set_copy_all(REXCVAR_GET(native_renderer_copy_all));
+    passes_.set_verify_mirror(REXCVAR_GET(native_renderer_verify_mirror));
     passes_.set_check_late_writes(REXCVAR_GET(native_renderer_check_late_writes));
     passes_.set_check_clobbers(REXCVAR_GET(native_renderer_check_clobbers));
     passes_.set_watch_draws(
@@ -761,12 +770,24 @@ void Renderer::LogStats() {
   Passes::Stats view = passes_.TakeStats();
   REXLOG_INFO("native renderer: {:.0f} frames/s presented, {} skipped; per frame {:.0f} "
               "commands, {:.0f} draws; {:.0f} drawn, {:.0f} unsupported, {:.0f} failed; {:.1f} "
-              "MB copied a frame; {} pipelines; shaders translated {}, failed {}",
+              "MB copied a frame ({:.1f} MB unchanged, not copied); {} pipelines; shaders "
+              "translated {}, failed {}",
               frames_presented_ / seconds, frames_skipped_, double(commands_) / frames,
               double(draws_) / frames, double(view.drawn) / frames,
               double(view.unsupported) / frames, double(view.failed) / frames,
-              view.mirrored_bytes / 1048576.0 / frames, view.pipelines, view.shaders_translated,
-              view.shaders_failed);
+              view.mirrored_bytes / 1048576.0 / frames,
+              view.mirror_skipped_bytes / 1048576.0 / frames, view.pipelines,
+              view.shaders_translated, view.shaders_failed);
+  if (REXCVAR_GET(native_renderer_verify_mirror)) {
+    REXLOG_INFO("native renderer: mirror check: of {} ranges not copied and checked, {} "
+                "differed from guest memory ({:.1f} MB){}",
+                view.mirror_checked, view.mirror_stale, view.mirror_stale_bytes / 1048576.0,
+                view.mirror_stale ? fmt::format(", e.g. {} {:08X} ({} bytes)",
+                                                view.mirror_stale_sample_index ? "index" : "vertex",
+                                                view.mirror_stale_sample_address,
+                                                view.mirror_stale_sample_size)
+                                  : std::string());
+  }
   REXLOG_INFO("native renderer: {} targets; per frame {:.1f} clears ({:.1f} with rects), {:.1f} "
               "resolves, {:.1f} skipped; {:.1f} draws with targets 1-3 bound, {:.1f} with "
               "mismatched sample counts, {:.1f} with a depth bias, {:.1f} with an equal depth "

@@ -13,8 +13,15 @@ bool Buffers_Logging();
 // 11 and 12 bind.
 void Buffers_OnCommand(uint8_t* base, uint32_t id, uint32_t payload, uint32_t count);
 
-// Render thread: a vertex or index range (physical) copied into the mirror,
-// the first time in a frame.
+// Render thread: the sequence number of the newest write the library's
+// memcpy made into [physical, physical + size), 0 if none; and the newest
+// sequence number of all. A range read when the sequence was S needs reading
+// again only if Buffers_NewestWrite returns more than S.
+uint64_t Buffers_NewestWrite(uint32_t physical, uint32_t size);
+uint64_t Buffers_Sequence();
+
+// Render thread, with logging: a vertex or index range (physical) copied
+// into the mirror, the first time in a frame.
 void Buffers_OnMirror(uint32_t physical, uint32_t size, bool index);
 
 }  // namespace native

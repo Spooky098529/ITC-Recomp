@@ -395,6 +395,9 @@ struct Passes::State {
     VkDeviceMemory memory = VK_NULL_HANDLE;
     uint8_t* mapped = nullptr;
     VkDescriptorSet set = VK_NULL_HANDLE;
+    // Each range copied in (address << 32 | size): the memcpy write
+    // sequence (Buffers_Sequence) when it was copied.
+    std::unordered_map<uint64_t, uint64_t> copied;
   };
   std::vector<GuestMirror> mirrors;
   std::unordered_set<uint64_t> mirrored;  // address << 32 | size, this frame
@@ -459,6 +462,9 @@ struct Passes::State {
   // With check_mirror_frames: each range's hash in the frame it was last
   // copied, and how often it changed since the last log.
   bool check_mirror_frames = false;
+  // Copy every range every frame, as before memcpy's writes were tracked;
+  // compare each range not copied with guest memory (debugging aids).
+  bool copy_all = false, verify_mirror = false;
   // With check_late_writes: the ranges copied this frame and their hashes
   // then, to find ranges written after we copied them (the emulated GPU
   // reads them much later).
@@ -825,7 +831,32 @@ void Passes::State::Mirror(uint8_t* base, uint32_t address, uint32_t size, bool 
       mirror_vertex_bytes += size;
     }
   }
-  std::memcpy(mirrors[frame].mapped + address, PhysicalHostAddress(base, address), size);
+  // Only what memcpy has written since this mirror last got the range (see
+  // "Buffers" in docs/native-renderer.md): vertex and index data is
+  // written by the library's memcpy and nothing else.
+  GuestMirror& mirror = mirrors[frame];
+  if (!copy_all) {
+    auto [it, added] = mirror.copied.try_emplace(key, 0);
+    if (!added && Buffers_NewestWrite(address, size) <= it->second) {
+      stats.mirror_skipped_bytes += size;
+      // Slow (the mirror is uncached memory: ~20 fps in a race), but
+      // checks every range every frame.
+      if (verify_mirror &&
+          (stats.mirror_checked++,
+           std::memcmp(mirror.mapped + address, PhysicalHostAddress(base, address), size))) {
+        stats.mirror_stale++;
+        stats.mirror_stale_bytes += size;
+        if (!stats.mirror_stale_sample_size) {
+          stats.mirror_stale_sample_address = address;
+          stats.mirror_stale_sample_size = size;
+          stats.mirror_stale_sample_index = index;
+        }
+      }
+      return;
+    }
+    it->second = Buffers_Sequence();
+  }
+  std::memcpy(mirror.mapped + address, PhysicalHostAddress(base, address), size);
   stats.mirrored_bytes += size;
 }
 
@@ -2793,6 +2824,14 @@ void Passes::set_record_draws(bool record) {
 
 std::vector<uint64_t> Passes::main_view_pixel_shaders() const {
   return state_->last_pixel_shaders;
+}
+
+void Passes::set_copy_all(bool copy_all) {
+  state_->copy_all = copy_all;
+}
+
+void Passes::set_verify_mirror(bool verify) {
+  state_->verify_mirror = verify;
 }
 
 void Passes::set_check_mirror_frames(bool check) {

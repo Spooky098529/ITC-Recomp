@@ -567,6 +567,10 @@ step 1's logs are there to find them before anything is stubbed.
   | Register file cleared once, not 80 KB a draw (was ~10%) | 182 | 144 |
   | Texture set layouts cached per shader; texture set key and infos reuse their buffers | 190 | 149 |
   | Shader caches as hash maps instead of ordered maps of tuples | 198 | 156 |
+  | Mirror copies only ranges memcpy wrote since (see "Buffers") | 215 | 170 |
+
+  At `--max_fps=144` the last holds the cap through the race (mean 150,
+  slowest second 145).
 
   What's left (second profile): the mirror copies ~12%, texture sets ~9%
   (string keys), our blending ~8%, `Draw` itself ~8%, shader lookups ~4%
@@ -632,11 +636,20 @@ memory).
   data read from disc straight into place. Neither showed up (no range
   was used before memcpy wrote it, and the mirror check saw no contents
   change), but a race the user drives may differ.
-- So a range only needs uploading when memcpy has written it since its
-  last upload: the memcpy wrapper can record the physical ranges written
-  (cheaply: a list per frame, not the logging's interval map), and the
-  draw path uploads a range only if a recorded write overlaps it. With
-  that, the data could live in VRAM (see "What the mirror copies").
+- So a range only needs copying when memcpy has written it since its
+  last copy. **Done** (2026-10-14): the memcpy wrapper (`buffers.cpp`)
+  records each copy into the physical views once it's finished (a pending
+  list, taken by the render thread into a map of the newest write per
+  segment), and each mirror keeps, per range, the write sequence when it
+  last got it; a draw copies a range only if a newer write overlaps it
+  (`Buffers_NewestWrite`). Copies fell from 15-21 MB a frame to about
+  0.1 MB; `--native_renderer_verify_mirror` (every skipped range compared
+  with guest memory, every frame) found none different in a 70 s attract
+  race. In that race even ignoring memcpy's writes altogether gave no
+  differences (sections are loaded again with the same contents), so the
+  tracking hasn't yet been seen catching a real change: to check with the
+  user in driven races, and a second race on another track. With that,
+  the data could live in VRAM (see "What the mirror copies").
 
 ## Tools (all debugging aids)
 
@@ -707,6 +720,11 @@ memory).
   callback got, and the progress block; a trace of the first 60 kicks,
   40 every 10 s, and those holding rare packets (scratch registers,
   INTERRUPT, COND_WRITE, queries...). Works with the emulated GPU too.
+- `--native_renderer_copy_all`: copy every vertex and index range into the
+  mirror every frame, as before memcpy's writes were tracked.
+- `--native_renderer_verify_mirror`: compare every range not copied with
+  guest memory, every frame, logging how many were checked and those that
+  differ (slow: ~20 fps in a race, since the mirror is uncached memory).
 - `--native_renderer_log_buffers`: log the vertex and index buffer objects
   draws bind (header, data, later changes), the library's memcpy into
   their headers, and for each range copied into the mirror whether memcpy
