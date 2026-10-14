@@ -192,6 +192,34 @@ own window shows them right. What's known (2026-10-13):
   coordinates, which would point at a constant (texture coordinate
   transform) read wrong; not checked.
 
+Found since (2026-10-14):
+
+- **It comes from the draws of pixel shader `F3C0D413`** (`F3C0D4132DB33EFE`):
+  the car's interior, which samples the cockpit atlas. Found by leaving
+  each main view pixel shader out in turn (`--native_renderer_cycle`) at
+  full speed. That shader reads interpolators `0x3`.
+- The user sees the same objects switch between the rainbow and their own
+  texture. Since textures never change after loading, look at what a draw
+  is given: float, bool/loop and fetch constants, the texture descriptor
+  set (shared between draws with the same views and samplers), system
+  constants, where they land in the per-frame constants ring, the mirror
+  ranges, and reuse of any of these across frames in flight.
+- Not the colour write mask: it's now normalized as the plugin does it (no
+  colour without a pixel shader, for targets the pixel shader doesn't
+  write, or in depth-only EDRAM mode). Before, ~230 main view draws a
+  frame without a pixel shader wrote Vulkan's undefined fragment output;
+  the effect was still there after the fix.
+- Not PsParamGen: in `itc_406` no draw uses it (`0.0 draws a frame`).
+- Not the base vertex or index range: the base vertex is now taken from
+  `VGT_INDX_OFFSET`, as the plugin takes it, and in `itc_406` no draw's
+  differs from its item's, and no draw has indices outside
+  `VGT_MIN/MAX_VTX_INDX` (both are logged only when it happens).
+- 25-70 draws a frame read vertices past their fetch constant's size
+  (e.g. 4,128 bytes, 5,040 needed); vertex buffers are now copied up to the
+  highest vertex a draw uses, so the mirror has the data. Whether those
+  draws are `F3C0D413`'s isn't known.
+- Also added on the way: blend constants from `RB_BLEND_*`.
+
 ## Tools (all debugging aids)
 
 - `--native_renderer_show_resolve=<n>`: the window shows the frame's nth
@@ -203,7 +231,36 @@ own window shows them right. What's known (2026-10-13):
   (each draw's target, shader hashes and textures), then a frame per
   pixel shader the main view uses with its draws left out, then one with
   textures from memory hidden and one with resolve destinations hidden.
-  `tools/pfm_to_png.py <dir>` makes PNGs. The game pauses while it writes.
+  `draws.txt` also records each draw's render state and the vertex fetch
+  constants it reads, and `draw_ids.pfm` holds which draw wrote each
+  pixel of the main view. `tools/pfm_to_png.py <dir>` makes PNGs;
+  `tools/rainbow_draws.py <dump>` names the draws covering most of the
+  rainbow-coloured pixels. The game pauses while it writes, and frames
+  recorded slowly tend not to show the rainbow effect, so a dump may miss
+  it.
+- `--native_renderer_cycle=<dir>`: when a file named `now` appears in
+  `<dir>`, leaves out the main view's draws of each pixel shader in turn
+  for 3 s, saving a frame of each; unlike the dump, frames are recorded at
+  their usual speed.
+- `--native_renderer_skip_pixel_shader=<hash>`: leave out the draws of one
+  pixel shader (hex).
+- `--native_renderer_watch_draws`: log what changes in the main view's
+  draws' inputs between frames (with the camera still, only flickering
+  draws should change). Ignores float changes under 0.1% and compares only
+  the fetch constants a draw's shaders read.
+  `--native_renderer_watch_pixel_shader=<hash>` limits it to one pixel
+  shader.
+- `--native_renderer_check_late_writes`: log vertex and index ranges
+  written after we copied them, by the end of the frame.
+- `--native_renderer_base_level_only`: sample only each texture's first
+  level.
+- `--native_renderer_hide_cubes`: give cube maps the white placeholder.
+- `--native_renderer_no_index_clamp`: don't clamp indices to
+  `VGT_MIN/MAX_VTX_INDX`.
+- Logged every 5 s: draws a frame with PsParamGen and each pixel shader's
+  interpolator mask; draws reading vertices past their fetch constant's
+  size; and, when there are any, draws whose base vertex differs from
+  their item's and draws with indices outside `VGT_MIN/MAX_VTX_INDX`.
 - `--native_renderer_serialize`: wait for the GPU before recording each
   frame.
 - `--native_renderer_check_mirror`: log the vertex and index ranges whose
@@ -232,9 +289,13 @@ own window shows them right. What's known (2026-10-13):
   `--native_renderer=true --skip_intro --attract_after_s=1`. With no input,
   an attract race starts about 1 s after launch (where `fps` goes above 30 in the
   log; see "The title screen" in `functions.md`), so a run can be fully
-  automatic: launch under `timeout`, read the `native renderer:` lines in
-  the log and any dump. For what needs looking at, the user sends a
-  screenshot of the "ITC native renderer" window.
+  automatic: launch under `timeout`, delete the `/dev/shm/xenia_memory_*`
+  files afterwards, and read the `native renderer:` lines in the log and
+  any dump. Screenshots: `spectacle -b -n -f -o <file>.png` while the game
+  runs (a script that launches, sleeps and fires it); it captures the
+  whole screen, so the windows must be visible (tell the user first).
+  Screenshots of the "ITC native renderer" window catch the rainbow effect
+  better than dumps.
 
 ## Plan for milestone 4
 
@@ -270,7 +331,8 @@ texture objects ("Resources"). The approach:
 ## Known issues
 
 - **The rainbow effect** on buildings (see "The rainbow effect" under
-  milestone 4): cause not found; set aside until more of the frame is drawn.
+  milestone 4): comes from pixel shader `F3C0D413`'s draws (the car's
+  interior); cause not found yet.
 
 - Textures are never freed: memory reused for different textures (another
   race) leaves the old images behind.
