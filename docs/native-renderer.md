@@ -1079,8 +1079,7 @@ To be fixed (or accepted) in milestone 7.
   spent loading and hashing textures and the worst frame. A per-frame
   time budget (deferring loads to later frames) was considered and not
   done (the user's call): deferred first loads show white placeholders.
-  If hitches remain on the Steam Deck, next is moving the untiling to a
-  worker thread.
+  What's left to try, in order, is in `texture-handling-optimisation.md`.
 - **The attract race's grayscale filter flickers with the game pinned to
   one CPU** (`taskset -c 0`; seen by the user, 2026-10-15). Since the
   frame pacer fix (`d8c10c5`, a due tick always gets the next pass); the
