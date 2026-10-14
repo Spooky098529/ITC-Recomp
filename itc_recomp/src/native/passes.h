@@ -31,6 +31,13 @@ class Passes {
   // After a draw command's library call (the device's shadow is complete).
   void AfterDraw(VkCommandBuffer commands, uint8_t* base, uint32_t id, uint32_t payload,
                  uint32_t arg1);
+  // A draw of vertices given inline (DrawPrimitiveUP, command 19, and the
+  // helper object's draws, command 15): at the library's End
+  // (sub_825BDDA0), when the vertices have been copied to `data` (a guest
+  // address) and the device's shadow holds the draw's state. type: the
+  // primitive type; count: vertices; stride in bytes.
+  void InlineDraw(VkCommandBuffer commands, uint8_t* base, uint32_t type, uint32_t count,
+                  uint32_t stride, uint32_t data);
   // After a clear (26) or resolve (25) command's library call.
   void AfterClear(VkCommandBuffer commands, uint8_t* base, uint32_t payload, uint32_t arg1);
   void AfterResolve(VkCommandBuffer commands, uint8_t* base, uint32_t payload, uint32_t arg1);
@@ -134,6 +141,10 @@ class Passes {
     // Draws given the vertex shader copy the library patched in the
     // command buffer (the object's own being patched for another declaration).
     uint64_t vertex_shader_copies = 0;
+    // Inline vertex draws drawn (also counted in drawn), and by primitive
+    // type (4, 6, 8 rectangle list, 13 quad list).
+    uint64_t inline_draws = 0;
+    std::array<uint64_t, 16> inline_by_type{};
     std::array<uint32_t, 2> declaration_sample{};
     std::array<uint32_t, 4> clamped_sample{};
     std::array<uint32_t, 2> base_vertex_sample{};

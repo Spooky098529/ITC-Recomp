@@ -57,7 +57,7 @@ known about it; this file is the plan and its progress).
 | 1 | **Skeleton**: `--native_renderer` creates our own Vulkan device, window and swapchain; the replay hooks pass each frame's commands to it. | A window clears and presents every frame. | Done (2026-10-13): presents every frame in menus (30 fps) and races (113-128 fps, ~26,800 commands and ~2,900 draws a frame), the game unaffected. |
 | 2 | **Main view geometry**: vertex and index buffers read from guest memory, shaders translated, render states mapped to pipelines. | Race geometry is visible in our window, untextured. | Done (2026-10-13): the cockpit view's geometry, the right way up, solid, with the game's coloured lighting on white placeholder textures (screenshot checked). |
 | 3 | **Textures**: untile and upload (mostly BC1-BC3), samplers from the fetch constants. | The main view looks right without effects. | Done (2026-10-13): signs, gauges, fences, buildings and road textured correctly (screenshot checked); what comes from resolves is still missing. |
-| 4 | **The other passes**: each pass renders into a Vulkan image of its resolve's size and format; resolves become copies. | Shadows, reflections and the mirror work. | In progress: every pass draws, clears and resolves work; the shadow map, mirror and reflection map come out right (dumped and checked); the rainbow effect is fixed (see below). |
+| 4 | **The other passes**: each pass renders into a Vulkan image of its resolve's size and format; resolves become copies. | Shadows, reflections and the mirror work. | In progress: every pass draws, clears and resolves work; the shadow map, mirror and reflection map come out right (dumped and checked); the rainbow effect is fixed (see below); inline vertex draws (commands 15 and 19) draw, so the projected texture and bloom are drawn. |
 | 5 | **Post-processing, HUD, present**, then exclusive mode. | A race is fully native; measure the frame rate. | |
 | 6 | **Menus**. | The emulated GPU is no longer needed. | |
 
@@ -165,10 +165,35 @@ known about it; this file is the plan and its progress).
   write got undefined values. Depth bias (render states 204/208: registers
   `0x2380`-`0x2383` at device +10704, now read) is set per draw as the
   plugin sets it (~110-130 draws a frame use it).
-- Not yet: draws other than command 18 (inline vertices, 19; the helper
-  object, 15: post-processing, bloom, the projected texture's draws),
-  clear rects, render targets 1-3, resolves to a level or slice other
-  than 0.
+- **Inline vertex draws** (commands 15 and 19, 2026-10-14; see "Inline
+  vertex draws" in `gpu-functions.md`): BeginVertices and End are wrapped
+  (`replay_hooks.cpp`), and each draw is drawn at End
+  (`Passes::InlineDraw`), when the vertices are in place and the shadow
+  holds its state (command 15 changes render state 304 between items, so
+  after the command would be too late). The vertices are copied into the
+  mirror past guest memory (each mirror is 512 MB plus built-in index
+  buffers plus 4 MB of inline vertices), and vertex fetch constant 95 is
+  pointed there (the translator doesn't mask the address), with 93-94 and
+  VGT_INDX_OFFSET as BeginVertices writes them. Rectangle lists use the
+  translator's vertex shader expansion (`kRectangleListAsTriangleStrip`:
+  each invocation runs the guest shader for the rectangle's 3 vertices and
+  makes the 4th) drawn as two-triangle strips with a built-in index
+  buffer, as the plugin's primitive processor does without a geometry
+  shader; quad lists use a built-in index buffer as triangle lists
+  (v0 v1 v2, v0 v2 v3). ~100-140 inline draws a frame in a race; no draws
+  unsupported any more. Compared with the emulated GPU's resolves
+  (`--readback_resolve=full`, see Tools): the projected texture (resolves
+  0-2, the underglow), the 1024x1024 one (3), the paint reflection map
+  and the 16_16 pass match; the bloom chain (11-22) is smooth in ours and
+  blocky in the emulated GPU's, and the user judged ours (and our motion
+  blur) the more correct.
+- Still different from the emulated GPU: the minimap's player triangle is
+  missing (drawn by `sub_8258F5C0` outside the command list, not drawn
+  yet), and some objects' colours differ in the final frame and the
+  mirror (ours: a yellow sign and pink underglow; the emulated GPU's: cyan
+  and blue-violet; tail lights red in both). Not looked into yet.
+- Not yet: clear rects, render targets 1-3, resolves to a level or slice
+  other than 0.
 
 ### The rainbow effect (fixed)
 
@@ -230,6 +255,17 @@ a vertex shader patched for another vertex declaration.
   rainbow-coloured pixels (its saturation test also counts real colour,
   e.g. orange signs: look at the pictures). The game pauses while it
   writes; the frame itself is recorded at full speed.
+- With `--readback_resolve=full` (an SDK setting: the emulated GPU writes
+  each resolve back to guest memory), a dump with resolves also writes
+  `guest_resolve_<n>_<address>_format<f>.pfm`: each resolve destination as
+  guest memory holds it at the end of the frame (the last resolve to that
+  address), i.e. the emulated GPU's result, decoded from memory
+  (uncompressed formats, first level). Pair them with ours
+  (`resolve_<n>_...`) to compare. Run such comparisons with
+  `--motion_blur=true --glow=true`, so the emulated GPU draws the motion
+  blur and the light bloom that `patches/rexglue-sdk/0001` and `0002`
+  otherwise leave out (ours always draws them). The emulated GPU isn't
+  always the right one: its bloom chain comes out blocky.
 - `--native_renderer_dump_every=<s>` (with `--native_renderer_dump`): dump
   only the frame (shown image, draw IDs, `draws.txt`; no resolves or
   left-out steps) every that many seconds of a race. Attract races are
@@ -296,6 +332,10 @@ a vertex shader patched for another vertex declaration.
   runs (a script that launches, sleeps and fires it); it captures the
   whole screen, so the windows must be visible (tell the user first).
   Periodic dumps (`--native_renderer_dump_every`) need no screenshots.
+  To compare with the emulated GPU, add `--motion_blur=true --glow=true
+  --readback_resolve=full` and a full dump (`--native_renderer_dump`
+  without `_every`, 10 s into the race), and put each `guest_resolve_*`
+  next to the `resolve_*` of the same name (a small PIL script).
 
 ## Plan for milestone 4
 

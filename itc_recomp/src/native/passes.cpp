@@ -155,6 +155,41 @@ constexpr uint32_t kFloatConstantsRange = 256 * 16;
 constexpr uint32_t kBoolLoopConstantsRange = 40 * 4;
 constexpr uint32_t kFetchConstantsRange = 32 * 6 * 4;
 
+// Past guest memory, each mirror holds data of ours that the translated
+// shaders and draws read like guest memory: built-in index buffers, then
+// the frame's inline vertices (an inline draw's vertex fetch constant
+// points there; the translator doesn't mask the address).
+constexpr uint32_t kBuiltinPrimitives = 4096;
+// Rectangle lists as two-triangle strips (the translator's
+// kRectangleListAsTriangleStrip): 32-bit, rectangle << 2 | corner, with
+// restarts between rectangles, as the plugin's built-in index buffer.
+constexpr uint32_t kRectangleIndices = kPhysicalMemorySize;
+constexpr uint32_t RectangleIndexCount(uint32_t rectangles) {
+  return 4 * rectangles + (std::max(rectangles, 1u) - 1);
+}
+// Quad lists as triangle lists, 32-bit: (v0, v1, v2), (v0, v2, v3) a quad.
+constexpr uint32_t kQuadIndices = kRectangleIndices + 4 * RectangleIndexCount(kBuiltinPrimitives);
+constexpr uint32_t kInlineVertices = kQuadIndices + 4 * 6 * kBuiltinPrimitives;
+constexpr uint32_t kInlineVerticesSize = 4u << 20;
+constexpr VkDeviceSize kMirrorSize = VkDeviceSize(kInlineVertices) + kInlineVerticesSize;
+
+// An inline draw's vertices: vertex fetch constant 95 (stream 0), as the
+// library's BeginVertices (sub_825BD8F0) writes it into the command buffer
+// instead of the shadow, with 93 and 94 as [1, 0] (the same register write)
+// and VGT_INDX_OFFSET 0; endianness 8-in-32.
+constexpr uint32_t kInlineFetchConstant = 95;
+
+// A draw: command 18's item (an indexed draw) or an inline one.
+struct DrawCall {
+  uint32_t type;
+  // Command 18: the item's base vertex << 16 | start index, and its
+  // primitive count.
+  uint32_t base_start = 0, primitive_count = 0;
+  // Inline vertices: their count, copied to vertex_address in the mirror.
+  bool inline_vertices = false;
+  uint32_t vertex_count = 0, vertex_address = 0;
+};
+
 // Command 18's item: [primitive type, base vertex << 16 | start index,
 // primitive count]; the index count is count * a + b (the table at
 // 0x82000950, see docs/gpu-functions.md).
@@ -185,8 +220,14 @@ bool GetPrimitiveInfo(uint32_t type, PrimitiveInfo& out) {
     case 6:
       out = {VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP, 1, 2, true, true};
       return true;
+    case 8:  // rectangle list: inline draws only, as two-triangle strips
+      out = {VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP, 3, 0, false, true};
+      return true;
+    case 13:  // quad list: inline draws only, as a triangle list
+      out = {VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, 4, 0, false, true};
+      return true;
     default:
-      return false;  // rectangle (8) and quad (13) lists: not yet
+      return false;
   }
 }
 
@@ -293,6 +334,7 @@ struct Passes::State {
   };
   std::vector<GuestMirror> mirrors;
   std::unordered_set<uint64_t> mirrored;  // address << 32 | size, this frame
+  uint32_t inline_offset = 0;  // this frame's inline vertices so far
   // With check_mirror: each range's hash when copied, to find ranges whose
   // contents change within a frame (draws after the change get the first).
   bool check_mirror = false;
@@ -396,7 +438,7 @@ struct Passes::State {
   uint64_t skip_pixel_shader = 0;
   bool record_draws = false;
   struct RecordedDraw {
-    bool main_view, has_color, has_depth;
+    bool main_view, has_color, has_depth, inline_vertices;
     Surface surface;
     uint64_t vertex, pixel;
     uint32_t type, count;
@@ -433,6 +475,7 @@ struct Passes::State {
     VkExtent2D extent;
     uint32_t address, format, flags;
     VkFormat host_format;
+    uint32_t fetch[6];  // the destination's fetch constant, addresses physical
   };
   std::vector<Resolved> frame_resolves;
   uint64_t frames = 0;  // for logging the resolve list now and then
@@ -444,12 +487,14 @@ struct Passes::State {
     VkFormat format;
     VkExtent2D extent;
     VkDeviceSize offset;
+    std::vector<uint8_t> cpu;  // if not empty, the data (not in the buffer)
   };
   std::vector<Dumped> dumped;
   VkBuffer dump_buffer = VK_NULL_HANDLE;
   VkDeviceMemory dump_memory = VK_NULL_HANDLE;
   void RecordDump(VkCommandBuffer commands, VkExtent2D shown_extent, const std::string& prefix,
                   bool with_resolves);
+  void DumpGuestResolves();
   bool logged_extra_targets = false;
 
   // Resolves: drawn with our own shaders (src/native/glsl), sampling the
@@ -528,7 +573,7 @@ struct Passes::State {
   VkPipeline GetPipeline(const PipelineKey& key);
   bool Reserve(VkDeviceSize size, uint32_t& offset, uint8_t*& data);
   void BeginRendering(VkCommandBuffer commands, Target* color, Target* depth);
-  void Draw(VkCommandBuffer commands, uint8_t* base, uint32_t device, uint32_t item);
+  void Draw(VkCommandBuffer commands, uint8_t* base, uint32_t device, const DrawCall& call);
 };
 
 bool Passes::State::CreateImage(Image& out, VkImageType type, VkImageViewType view_type,
@@ -584,7 +629,7 @@ bool Passes::State::CreateGuestMemoryMirror() {
 bool Passes::State::CreateGuestMemoryMirror(GuestMirror& mirror) {
   VkDevice device = context.device;
   VkBufferCreateInfo info{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
-  info.size = kPhysicalMemorySize;
+  info.size = kMirrorSize;
   info.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
   info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
   if (vk::vkCreateBuffer(device, &info, nullptr, &mirror.buffer) != VK_SUCCESS) {
@@ -606,9 +651,28 @@ bool Passes::State::CreateGuestMemoryMirror(GuestMirror& mirror) {
     REXLOG_ERROR("native renderer: allocating the guest memory mirror failed: {}", int(result));
     return false;
   }
-  return vk::vkBindBufferMemory(device, mirror.buffer, mirror.memory, 0) == VK_SUCCESS &&
-         vk::vkMapMemory(device, mirror.memory, 0, VK_WHOLE_SIZE, 0,
-                         reinterpret_cast<void**>(&mirror.mapped)) == VK_SUCCESS;
+  if (vk::vkBindBufferMemory(device, mirror.buffer, mirror.memory, 0) != VK_SUCCESS ||
+      vk::vkMapMemory(device, mirror.memory, 0, VK_WHOLE_SIZE, 0,
+                      reinterpret_cast<void**>(&mirror.mapped)) != VK_SUCCESS) {
+    return false;
+  }
+  // The built-in index buffers.
+  uint32_t* rectangles = reinterpret_cast<uint32_t*>(mirror.mapped + kRectangleIndices);
+  for (uint32_t i = 0; i < kBuiltinPrimitives; i++) {
+    if (i) {
+      *rectangles++ = UINT32_MAX;
+    }
+    for (uint32_t j = 0; j < 4; j++) {
+      *rectangles++ = i << 2 | j;
+    }
+  }
+  uint32_t* quads = reinterpret_cast<uint32_t*>(mirror.mapped + kQuadIndices);
+  for (uint32_t i = 0; i < kBuiltinPrimitives; i++) {
+    for (uint32_t j : {0u, 1u, 2u, 0u, 2u, 3u}) {
+      *quads++ = 4 * i + j;
+    }
+  }
+  return true;
 }
 
 void Passes::State::Mirror(uint8_t* base, uint32_t address, uint32_t size, bool index) {
@@ -1458,8 +1522,10 @@ bool Passes::State::ResolveInto(VkCommandBuffer commands, uint8_t* base, Target&
   vk::vkCmdEndRendering(commands);
   Transition(commands, dest.image, VK_IMAGE_ASPECT_COLOR_BIT, dest_layout,
              VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-  frame_resolves.push_back({dest.image, {dest.width, dest.height}, fetch[1] & 0xFFFFF000u,
-                            fetch[1] & 0x3F, flags, dest.format});
+  Resolved& resolved = frame_resolves.emplace_back();
+  resolved = {dest.image, {dest.width, dest.height}, fetch[1] & 0xFFFFF000u, fetch[1] & 0x3F,
+              flags, dest.format};
+  std::copy(fetch, fetch + 6, resolved.fetch);
   return true;
 }
 
@@ -1501,6 +1567,7 @@ void Passes::BeginFrame(uint32_t frame_index) {
   s.main_view = nullptr;
   s.frame_resolves.clear();
   s.mirrored.clear();
+  s.inline_offset = 0;
   s.mirrored_hashes.clear();
   s.clobber_ranges.clear();
   s.clobber_longest = 0;
@@ -1519,7 +1586,7 @@ VkCommandBuffer Passes::EndUploads() {
 }
 
 void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t device,
-                         uint32_t item) {
+                         const DrawCall& call) {
   State& s = *this;
   auto& regs = s.regs;
   // The bound surfaces: render target 0 and depth (others aren't drawn).
@@ -1561,13 +1628,13 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
               std::min(color->extent.height, depth->extent.height)};
   }
 
-  // Command 18's item: [primitive type, base vertex << 16 | start index,
-  // primitive count].
-  uint32_t type = guest::LoadU32(base, item);
-  uint32_t base_start = guest::LoadU32(base, item + 4);
-  uint32_t primitive_count = guest::LoadU32(base, item + 8);
+  uint32_t type = call.type;
+  uint32_t base_start = call.base_start;
+  uint32_t primitive_count = call.primitive_count;
   PrimitiveInfo primitive;
-  if (!GetPrimitiveInfo(type, primitive)) {
+  bool rectangle_list = type == 8, quad_list = type == 13;
+  if (!GetPrimitiveInfo(type, primitive) ||
+      ((rectangle_list || quad_list) && !call.inline_vertices)) {
     s.stats.unsupported++;
     return;
   }
@@ -1576,14 +1643,17 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
   // it may already have applied to the vertex buffers' addresses).
   int32_t item_base_vertex = int32_t(base_start) >> 16;
   int32_t base_vertex = int32_t(regs.values[XE_GPU_REG_VGT_INDX_OFFSET]);
-  if (base_vertex != item_base_vertex) {
+  if (!call.inline_vertices && base_vertex != item_base_vertex) {
     s.stats.base_vertex_differs++;
     if (!s.stats.base_vertex_sample[0] && !s.stats.base_vertex_sample[1]) {
       s.stats.base_vertex_sample = {uint32_t(item_base_vertex), uint32_t(base_vertex)};
     }
   }
   uint32_t start_index = base_start & 0xFFFF;
-  uint32_t index_count = primitive_count * primitive.a + primitive.b;
+  // Inline draws: the vertices in order (indices only to expand rectangle
+  // and quad lists).
+  uint32_t index_count = call.inline_vertices ? call.vertex_count
+                                              : primitive_count * primitive.a + primitive.b;
 
   // Shaders, read through physical memory as the GPU reads them.
   uint32_t program_control = regs.values[XE_GPU_REG_SQ_PROGRAM_CNTL];
@@ -1635,6 +1705,7 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
       vertex_ucode, vertex_size, pixel_ucode, pixel_size, program_control,
       regs.values[XE_GPU_REG_SQ_CONTEXT_MISC]);
   interface.param_gen_point = type == 1;  // point list
+  interface.rectangle_list = rectangle_list;
   if (pixel_ucode && interface.param_gen_interpolator < 16) {
     s.stats.param_gen_draws++;
     s.param_gen_by_shader[XXH3_64bits(pixel_ucode, pixel_size)] |=
@@ -1679,7 +1750,8 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
     r.vertex = vertex->hash;
     r.pixel = pixel ? pixel->hash : 0;
     r.type = type;
-    r.count = primitive_count;
+    r.count = call.inline_vertices ? call.vertex_count : primitive_count;
+    r.inline_vertices = call.inline_vertices;
     for (uint32_t k = 0; k < 96; k++) {
       if (vertex->vertex_fetch_constants[k >> 5] & (1u << (k & 31))) {
         r.vertex_fetches.push_back({k, regs.values[XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0 + 2 * k],
@@ -1708,16 +1780,20 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
   last_base = base;
 
   // Index buffer: +0 bit 31 = 32-bit, bits 29-30 = endianness; +24 address.
-  uint32_t index_buffer = guest::LoadU32(base, device + kDeviceIndexBuffer);
-  if (!index_buffer) {
-    s.stats.failed++;
-    return;
+  bool index_32bit = false;
+  uint32_t index_endian = 0, index_address = 0;
+  if (!call.inline_vertices) {
+    uint32_t index_buffer = guest::LoadU32(base, device + kDeviceIndexBuffer);
+    if (!index_buffer) {
+      s.stats.failed++;
+      return;
+    }
+    uint32_t index_word = guest::LoadU32(base, index_buffer);
+    index_32bit = index_word >> 31;
+    index_endian = (index_word >> 29) & 3;
+    index_address = GpuPhysicalAddress(guest::LoadU32(base, index_buffer + 24)) +
+                    start_index * (index_32bit ? 4 : 2);
   }
-  uint32_t index_word = guest::LoadU32(base, index_buffer);
-  bool index_32bit = index_word >> 31;
-  uint32_t index_endian = (index_word >> 29) & 3;
-  uint32_t index_address = GpuPhysicalAddress(guest::LoadU32(base, index_buffer + 24)) +
-                           start_index * (index_32bit ? 4 : 2);
 
   // Viewport and scissor.
   reg::RB_DEPTHCONTROL depth_control = draw_util::GetNormalizedDepthControl(regs);
@@ -1755,7 +1831,11 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
   }
 
   uint32_t max_vertex = 0, min_vertex = UINT32_MAX;
-  for (uint32_t i = 0; i < index_count; i++) {
+  if (call.inline_vertices) {
+    min_vertex = 0;
+    max_vertex = call.vertex_count - 1;
+  }
+  for (uint32_t i = 0; !call.inline_vertices && i < index_count; i++) {
     uint32_t index;
     if (index_32bit) {
       std::memcpy(&index, PhysicalHostAddress(base, index_address + 4 * i), 4);
@@ -1805,7 +1885,7 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
   system.vertex_base_index = base_vertex;
   system.vertex_index_min = regs.values[XE_GPU_REG_VGT_MIN_VTX_INDX];
   system.vertex_index_max = regs.values[XE_GPU_REG_VGT_MAX_VTX_INDX];
-  if (system.vertex_index_max <= system.vertex_index_min) {
+  if (system.vertex_index_max <= system.vertex_index_min || call.inline_vertices) {
     system.vertex_index_min = 0;
     system.vertex_index_max = xenos::kVertexIndexMask;
   }
@@ -1910,7 +1990,7 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
   key.layout = s.GetPipelineLayout(vertex_layout, pixel_layout);
   key.topology = primitive.topology;
   auto mode = regs.Get<reg::PA_SU_SC_MODE_CNTL>();
-  key.primitive_restart = primitive.strip && mode.multi_prim_ib_ena;
+  key.primitive_restart = (primitive.strip && mode.multi_prim_ib_ena) || rectangle_list;
   key.cull_mode = (mode.cull_front ? VK_CULL_MODE_FRONT_BIT : 0) |
                   (mode.cull_back ? VK_CULL_MODE_BACK_BIT : 0);
   key.front_clockwise = mode.face != 0;
@@ -1959,14 +2039,17 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
     return;
   }
 
-  // The draw's indices and vertex buffers, into the mirror. A vertex fetch
-  // constant is two words: the address (word 0, low 2 bits the type) and
-  // the size in words (word 1, bits 2-25).
-  s.Mirror(base, index_address, index_count * (index_32bit ? 4 : 2), true);
+  // The draw's indices and vertex buffers, into the mirror (an inline
+  // draw's vertices are there already). A vertex fetch constant is two
+  // words: the address (word 0, low 2 bits the type) and the size in words
+  // (word 1, bits 2-25).
+  if (!call.inline_vertices) {
+    s.Mirror(base, index_address, index_count * (index_32bit ? 4 : 2), true);
+  }
   // The highest vertex the draw uses (indices as the GPU reads them, after
   // the base vertex): a vertex buffer is copied up to it even past the size
   // its fetch constant gives, as the GPU reads whatever is there.
-  for (uint32_t k = 0; k < 96; k++) {
+  for (uint32_t k = 0; k < 96 && !call.inline_vertices; k++) {
     if (!(vertex->vertex_fetch_constants[k >> 5] & (1u << (k & 31)))) {
       continue;
     }
@@ -2027,11 +2110,28 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
                              vertex_textures, pixel_textures};
   vk::vkCmdBindDescriptorSets(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, key.layout, 0, 4, sets,
                               5, offsets);
-  vk::vkCmdBindIndexBuffer(commands, s.mirrors[s.frame].buffer, index_address,
-                           index_32bit ? VK_INDEX_TYPE_UINT32 : VK_INDEX_TYPE_UINT16);
-  vk::vkCmdDrawIndexed(commands, index_count, 1, 0, 0, 0);
+  if (rectangle_list) {
+    vk::vkCmdBindIndexBuffer(commands, s.mirrors[s.frame].buffer, kRectangleIndices,
+                             VK_INDEX_TYPE_UINT32);
+    vk::vkCmdDrawIndexed(commands, RectangleIndexCount(index_count / 3), 1, 0, 0, 0);
+  } else if (quad_list) {
+    vk::vkCmdBindIndexBuffer(commands, s.mirrors[s.frame].buffer, kQuadIndices,
+                             VK_INDEX_TYPE_UINT32);
+    vk::vkCmdDrawIndexed(commands, index_count / 4 * 6, 1, 0, 0, 0);
+  } else if (call.inline_vertices) {
+    vk::vkCmdDraw(commands, index_count, 1, 0, 0);
+  } else {
+    vk::vkCmdBindIndexBuffer(commands, s.mirrors[s.frame].buffer, index_address,
+                             index_32bit ? VK_INDEX_TYPE_UINT32 : VK_INDEX_TYPE_UINT16);
+    vk::vkCmdDrawIndexed(commands, index_count, 1, 0, 0, 0);
+  }
   s.stats.drawn++;
-  if (s.record_draws && main_view_draw) {
+  if (call.inline_vertices) {
+    s.stats.inline_draws++;
+    s.stats.inline_by_type[type & 15]++;
+  }
+  // (The draw ID pass redraws indexed draws only.)
+  if (s.record_draws && main_view_draw && !call.inline_vertices) {
     IdDraw& id = s.id_draws.emplace_back();
     id.number = uint32_t(s.recorded_draws.size() - 1);
     id.vertex = key.vertex;
@@ -2216,8 +2316,45 @@ void Passes::AfterDraw(VkCommandBuffer commands, uint8_t* base, uint32_t id, uin
   uint32_t device = guest::LoadU32(base, kDevicePointer);
   ReadRegisters(base, device, s.regs);
   for (uint32_t i = 0; i < arg1; i++) {
-    s.Draw(commands, base, device, payload + 12 * i);
+    uint32_t item = payload + 12 * i;
+    DrawCall call;
+    call.type = guest::LoadU32(base, item);
+    call.base_start = guest::LoadU32(base, item + 4);
+    call.primitive_count = guest::LoadU32(base, item + 8);
+    s.Draw(commands, base, device, call);
   }
+}
+
+void Passes::InlineDraw(VkCommandBuffer commands, uint8_t* base, uint32_t type, uint32_t count,
+                        uint32_t stride, uint32_t data) {
+  State& s = *state_;
+  uint32_t size = count * stride;
+  uint32_t offset = (s.inline_offset + 15) & ~15u;
+  if (!count || !stride || offset + size > kInlineVerticesSize) {
+    s.stats.failed++;
+    return;
+  }
+  s.inline_offset = offset + size;
+  DrawCall call;
+  call.type = type;
+  call.inline_vertices = true;
+  call.vertex_count = count;
+  call.vertex_address = kInlineVertices + offset;
+  std::memcpy(s.mirrors[s.frame].mapped + call.vertex_address, base + data, size);
+  s.stats.mirrored_bytes += size;
+  uint32_t device = guest::LoadU32(base, kDevicePointer);
+  ReadRegisters(base, device, s.regs);
+  // What BeginVertices wrote to the GPU instead of the shadow.
+  uint32_t* fetch = &s.regs.values[XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0];
+  fetch[2 * (kInlineFetchConstant - 2)] = 1;
+  fetch[2 * (kInlineFetchConstant - 2) + 1] = 0;
+  fetch[2 * (kInlineFetchConstant - 1)] = 1;
+  fetch[2 * (kInlineFetchConstant - 1) + 1] = 0;
+  fetch[2 * kInlineFetchConstant] = call.vertex_address | 3;
+  fetch[2 * kInlineFetchConstant + 1] =
+      0x10000000u | ((size / 4) << 2) | uint32_t(xenos::Endian::k8in32);
+  s.regs.values[XE_GPU_REG_VGT_INDX_OFFSET] = 0;
+  s.Draw(commands, base, device, call);
 }
 
 void Passes::AfterClear(VkCommandBuffer commands, uint8_t* base, uint32_t payload,
@@ -2657,6 +2794,9 @@ VkExtent2D Passes::EndFrame(VkCommandBuffer commands, int32_t show_resolve, bool
       s.DrawIds(commands);
     }
     s.RecordDump(commands, extent, dump_prefix, dump_resolves);
+    if (dump_resolves && s.last_base) {
+      s.DumpGuestResolves();
+    }
   }
   return extent;
 }
@@ -2805,6 +2945,28 @@ void Passes::State::RecordDump(VkCommandBuffer commands, VkExtent2D shown_extent
   }
 }
 
+// Each of the frame's resolve destinations as guest memory holds it at
+// the end of the frame (the last resolve to each address): with
+// --readback_resolve=full, the emulated GPU's result, to compare ours with.
+void Passes::State::DumpGuestResolves() {
+  std::unordered_set<uint32_t> done;
+  for (size_t i = frame_resolves.size(); i-- > 0;) {
+    const Resolved& r = frame_resolves[i];
+    if (!done.insert(r.address).second) {
+      continue;
+    }
+    Dumped d;
+    uint32_t width, height;
+    if (!TextureCache::DecodeGuest(last_base, r.fetch, d.cpu, d.format, width, height)) {
+      continue;
+    }
+    d.name = fmt::format("guest_resolve_{:02}_{:08X}_format{}", i, r.address, r.format);
+    d.extent = {width, height};
+    d.offset = 0;
+    dumped.push_back(std::move(d));
+  }
+}
+
 void Passes::WriteDump(const std::string& directory) {
   State& s = *state_;
   if (s.dumped.empty()) {
@@ -2824,9 +2986,10 @@ void Passes::WriteDump(const std::string& directory) {
     std::fprintf(file, "PF\n%u %u\n-1.0\n", d.extent.width, d.extent.height);
     uint32_t bpp = BytesPerPixel(d.format);
     std::vector<float> row(size_t(d.extent.width) * 3);
+    const uint8_t* source = d.cpu.empty() ? data + d.offset : d.cpu.data();
     for (uint32_t y = d.extent.height; y-- > 0;) {
       for (uint32_t x = 0; x < d.extent.width; x++) {
-        ToRgb(d.format, data + d.offset + (size_t(y) * d.extent.width + x) * bpp, &row[3 * x]);
+        ToRgb(d.format, source + (size_t(y) * d.extent.width + x) * bpp, &row[3 * x]);
       }
       std::fwrite(row.data(), sizeof(float), row.size(), file);
     }
@@ -2839,9 +3002,10 @@ void Passes::WriteDump(const std::string& directory) {
         const State::RecordedDraw& r = s.recorded_draws[n];
         std::string line = fmt::format(
             "draw {}: {} target pitch {} MSAA {} format {}, colour {}, depth {}; vs {:016X} ps "
-            "{:016X}; primitive {} x{}",
+            "{:016X}; primitive {} x{}{}",
             n, r.main_view ? "main view" : "other", r.surface.pitch, r.surface.msaa,
-            r.surface.format, r.has_color, r.has_depth, r.vertex, r.pixel, r.type, r.count);
+            r.surface.format, r.has_color, r.has_depth, r.vertex, r.pixel, r.type, r.count,
+            r.inline_vertices ? " inline" : "");
         const auto& rs = r.render_state;
         float blend[4], alpha_ref;
         std::memcpy(blend, &rs[5], 16);

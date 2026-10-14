@@ -8,6 +8,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <vector>
 
 #include "device_context.h"
 #include "vulkan_functions.h"
@@ -57,6 +58,12 @@ class TextureCache {
     bool fresh;
   };
   bool GetResolveDestination(const uint32_t fetch[6], ResolveDestination& out);
+  // A debugging aid: the texture's first level (first layer) decoded from
+  // guest memory into the host format's bytes, uncompressed formats only.
+  // With --readback_resolve=full, a resolve destination's memory holds what
+  // the emulated GPU resolved.
+  static bool DecodeGuest(uint8_t* base, const uint32_t fetch[6], std::vector<uint8_t>& out,
+                          VkFormat& format, uint32_t& width, uint32_t& height);
 
   // A debugging aid: makes GetView give nothing (so placeholders) for some
   // textures: from guest memory (all, or of one format), or resolve

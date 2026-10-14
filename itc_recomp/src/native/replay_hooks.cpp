@@ -6,6 +6,8 @@
 #include "renderer.h"
 #include "state.h"
 
+#include <rex/logging.h>
+
 // Command handlers, wrapped so the stats logger and the native renderer
 // see every command. Command 7 (sub_8258FD48) is wrapped in blend_state.cpp.
 // Ids 0, 36 and 37 (sub_82304258) aren't wrapped: that function is also
@@ -16,7 +18,10 @@
     uint32_t payload = ctx.r3.u32, arg1 = ctx.r4.u32, arg2 = ctx.r5.u32;           \
     debug::ReplayStats_OnCommand(base, id, payload, arg1, arg2);                    \
     native::Renderer_OnCommand(base, id, payload, arg1, arg2);                      \
+    uint32_t outer_command = native::g_current_command;                             \
+    native::g_current_command = id;                                                 \
     __imp__sub_##address(ctx, base);                                                \
+    native::g_current_command = outer_command;                                      \
     native::Renderer_AfterCommand(base, id, payload, arg1, arg2);                   \
   }
 
@@ -27,6 +32,7 @@ namespace native {
 uint32_t g_vertex_shader_patches = 0;
 uint32_t g_last_patch[3] = {};
 LoadedVertexShader g_loaded_vertex_shader;
+uint32_t g_current_command = 0;
 }
 
 // When the GPU may still be using a vertex shader's microcode, the library
@@ -53,6 +59,46 @@ extern "C" REX_FUNC(sub_822AE340) {
   } else {
     native::g_loaded_vertex_shader.object = 0;  // the object's own, patched in place
   }
+}
+
+// Inline vertex draws (DrawPrimitiveUP, command 19, and the helper object's
+// draws, command 15; see "Inline vertex draws" in docs/gpu-functions.md):
+// BeginVertices (sub_825BD8F0: device, primitive type, vertex count, stride
+// in bytes) returns where in the command buffer the caller copies the
+// vertices; End (sub_825BDDA0) follows the copy, so the native renderer
+// draws them then.
+namespace {
+struct PendingInline {
+  bool pending = false;
+  uint32_t type, count, stride, data, caller;
+} g_pending_inline;
+bool g_logged_other_inline = false;
+}  // namespace
+
+extern "C" REX_FUNC(sub_825BD8F0) {
+  REX_FUNC_PROLOGUE();
+  uint32_t type = ctx.r4.u32, count = ctx.r5.u32, stride = ctx.r6.u32;
+  uint32_t caller = uint32_t(ctx.lr);
+  __imp__sub_825BD8F0(ctx, base);
+  g_pending_inline = {ctx.r3.u32 != 0, type, count, stride, ctx.r3.u32, caller};
+}
+
+extern "C" REX_FUNC(sub_825BDDA0) {
+  REX_FUNC_PROLOGUE();
+  PendingInline draw = g_pending_inline;
+  g_pending_inline.pending = false;
+  if (draw.pending) {
+    uint32_t command = native::g_current_command;
+    if (command == 15 || command == 19) {
+      native::Renderer_InlineDraw(base, draw.type, draw.count, draw.stride, draw.data);
+    } else if (!g_logged_other_inline && native::Renderer_Enabled()) {
+      g_logged_other_inline = true;
+      REXLOG_INFO("native renderer: an inline vertex draw outside commands 15 and 19 (command "
+                  "{}): type {}, {} vertices of {} bytes, from {:08X}; not drawn",
+                  command, draw.type, draw.count, draw.stride, draw.caller);
+    }
+  }
+  __imp__sub_825BDDA0(ctx, base);
 }
 
 REPLAY_COUNTED_HANDLER(8258FBD0, 1)
@@ -88,3 +134,4 @@ REPLAY_COUNTED_HANDLER(82590968, 32)
 REPLAY_COUNTED_HANDLER(825909E8, 33)
 REPLAY_COUNTED_HANDLER(82590A68, 34)
 REPLAY_COUNTED_HANDLER(82590AD0, 35)
+

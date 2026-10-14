@@ -1,12 +1,26 @@
 diff --git a/src/graphics/vulkan/command_processor.cpp b/src/graphics/vulkan/command_processor.cpp
-index 001f36b..00f96b2 100644
+index 001f36b..adbc24a 100644
 --- a/src/graphics/vulkan/command_processor.cpp
 +++ b/src/graphics/vulkan/command_processor.cpp
-@@ -3669,6 +3669,25 @@ bool VulkanCommandProcessor::IssueDraw(xenos::PrimitiveType prim_type, uint32_t
+@@ -3587,6 +3587,12 @@ Shader* VulkanCommandProcessor::LoadShader(xenos::ShaderType shader_type, uint32
+   return pipeline_cache_->LoadShader(shader_type, host_address, dword_count);
+ }
+ 
++// ITC (patches/rexglue-sdk/0001-itc-disable-glow.patch).
++REXCVAR_DEFINE_BOOL(glow, false, "ITC",
++                    "Draw Import Tuner Challenge's light bloom (glow intensity c33.y of "
++                    "pixel shader 9750599DF5ED3B39); off because it leaves smears after "
++                    "camera switches");
++
+ bool VulkanCommandProcessor::IssueDraw(xenos::PrimitiveType prim_type, uint32_t index_count,
+                                        IndexBufferInfo* index_buffer_info,
+                                        bool major_mode_explicit) {
+@@ -3669,6 +3675,27 @@ bool VulkanCommandProcessor::IssueDraw(xenos::PrimitiveType prim_type, uint32_t
        return true;
      }
    }
-+  if (pixel_shader && pixel_shader->ucode_data_hash() == 0x9750599DF5ED3B39ull) {
++  if (!REXCVAR_GET(glow) && pixel_shader &&
++      pixel_shader->ucode_data_hash() == 0x9750599DF5ED3B39ull) {
 +    // ITC WORKAROUND (patches/rexglue-sdk/0001-itc-disable-glow.patch):
 +    // zero the glow intensity (c33.y) of Import Tuner Challenge's bloom combine
 +    // pass, turning its light bloom off. With it on, light glow drawn in
@@ -14,6 +28,7 @@ index 001f36b..00f96b2 100644
 +    // first person, until speed drops below ~60 mph. The game raises c33.y
 +    // from 1.5 above ~120 km/h, and the glow buffers carry over between frames
 +    // (GrowBlend passes), so stale glow from the previous camera survives.
++    // --glow=true draws it (for comparing with the native renderer).
 +    // Investigate next: how the GrowBlend history is reset on a camera switch
 +    // (the game resets its CPU-side trail history in sub_8213D438), and why
 +    // the emulated GPU keeps the old contents; then restore the glow.

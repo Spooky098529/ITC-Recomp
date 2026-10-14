@@ -75,6 +75,11 @@ class ShaderCache {
     uint32_t interpolator_mask = 0;
     uint32_t param_gen_interpolator = UINT32_MAX;
     bool param_gen_point = false;
+    // Vertex shaders: drawing a rectangle list, expanded in the vertex
+    // shader into a two-triangle strip per rectangle (the translator's
+    // kRectangleListAsTriangleStrip: each invocation runs the guest shader
+    // for the rectangle's 3 vertices and makes the 4th).
+    bool rectangle_list = false;
   };
   // sq_program_cntl, sq_context_misc: the registers.
   Interface GetInterface(const uint8_t* vertex_ucode, uint32_t vertex_size_bytes,

@@ -23,6 +23,12 @@ void Renderer_OnCommand(uint8_t* base, uint32_t id, uint32_t payload, uint32_t a
 void Renderer_AfterCommand(uint8_t* base, uint32_t id, uint32_t payload, uint32_t arg1,
                            uint32_t arg2);
 
+// Render thread, at the library's End (sub_825BDDA0) of an inline vertex
+// draw a command made (BeginVertices, sub_825BD8F0): type, vertex count,
+// stride in bytes and where the vertices were copied (a guest address).
+void Renderer_InlineDraw(uint8_t* base, uint32_t type, uint32_t count, uint32_t stride,
+                         uint32_t data);
+
 // Render thread, after each frame's replay and present.
 void Renderer_EndFrame();
 

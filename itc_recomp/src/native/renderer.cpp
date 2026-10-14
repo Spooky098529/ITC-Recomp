@@ -153,6 +153,7 @@ class Renderer {
   bool Init(uint8_t* base);
   void OnCommand(uint32_t id, uint32_t arg1);
   void AfterCommand(uint8_t* base, uint32_t id, uint32_t payload, uint32_t arg1);
+  void InlineDraw(uint8_t* base, uint32_t type, uint32_t count, uint32_t stride, uint32_t data);
   void EndFrame();
 
  private:
@@ -562,8 +563,15 @@ VkCommandBuffer Renderer::BeginFrame() {
   return frame.commands;
 }
 
+void Renderer::InlineDraw(uint8_t* base, uint32_t type, uint32_t count, uint32_t stride,
+                          uint32_t data) {
+  passes_.InlineDraw(BeginFrame(), base, type, count, stride, data);
+}
+
 void Renderer::AfterCommand(uint8_t* base, uint32_t id, uint32_t payload, uint32_t arg1) {
-  if (IsDraw(id)) {
+  // Commands 15 and 19 draw inline vertices, drawn at the library's End
+  // (Renderer_InlineDraw).
+  if (IsDraw(id) && id != 15 && id != 19) {
     passes_.AfterDraw(BeginFrame(), base, id, payload, arg1);
   } else if (id == 25) {
     passes_.AfterResolve(BeginFrame(), base, payload, arg1);
@@ -781,6 +789,13 @@ void Renderer::LogStats() {
                 "e.g. {}-{} against {}-{}",
                 double(view.clamped_draws) / frames, c[0], c[1], c[2], c[3]);
   }
+  if (view.inline_draws) {
+    const auto& t = view.inline_by_type;
+    REXLOG_INFO("native renderer: {:.1f} inline vertex draws a frame (triangle lists {:.1f}, "
+                "strips {:.1f}, rectangle lists {:.1f}, quad lists {:.1f})",
+                double(view.inline_draws) / frames, double(t[4]) / frames, double(t[6]) / frames,
+                double(t[8]) / frames, double(t[13]) / frames);
+  }
   if (view.vertex_shader_copies) {
     REXLOG_INFO("native renderer: {:.1f} draws a frame got their vertex shader from the library's "
                 "patched copy in the command buffer",
@@ -880,6 +895,16 @@ void Renderer_AfterCommand(uint8_t* base, uint32_t id, uint32_t payload, uint32_
   }
   if (Renderer* renderer = GetRenderer()) {
     renderer->AfterCommand(base, id, payload, arg1);
+  }
+}
+
+void Renderer_InlineDraw(uint8_t* base, uint32_t type, uint32_t count, uint32_t stride,
+                         uint32_t data) {
+  if (!Renderer_Enabled()) {
+    return;
+  }
+  if (Renderer* renderer = GetRenderer()) {
+    renderer->InlineDraw(base, type, count, stride, data);
   }
 }
 

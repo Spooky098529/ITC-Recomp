@@ -46,7 +46,7 @@ struct ShaderCache::State {
   rex::string::StringBuffer disassembly;
   // Keyed by stage, microcode hash, register count and interface (the
   // modification depends on them).
-  std::map<std::tuple<ShaderStage, uint64_t, uint32_t, uint32_t, uint32_t, bool>,
+  std::map<std::tuple<ShaderStage, uint64_t, uint32_t, uint32_t, uint32_t, bool, bool>,
            std::unique_ptr<TranslatedShader>>
       translations;
   std::map<std::pair<ShaderStage, uint64_t>, std::unique_ptr<graphics::SpirvShader>> shaders;
@@ -105,7 +105,8 @@ TranslatedShader* ShaderCache::Get(ShaderStage stage, const uint8_t* ucode, uint
                                    uint32_t num_reg, const Interface& interface) {
   uint64_t hash = XXH3_64bits(ucode, size_bytes);
   auto key = std::make_tuple(stage, hash, num_reg, interface.interpolator_mask,
-                             interface.param_gen_interpolator, interface.param_gen_point);
+                             interface.param_gen_interpolator, interface.param_gen_point,
+                             stage == ShaderStage::kVertex && interface.rectangle_list);
   if (auto it = state_->translations.find(key); it != state_->translations.end()) {
     return it->second->spirv.empty() ? nullptr : it->second.get();
   }
@@ -127,6 +128,10 @@ TranslatedShader* ShaderCache::Get(ShaderStage stage, const uint8_t* ucode, uint
           : state_->translator.GetDefaultPixelShaderModification(registers));
   if (stage == ShaderStage::kVertex) {
     modification.vertex.interpolator_mask = interface.interpolator_mask;
+    if (interface.rectangle_list) {
+      modification.vertex.host_vertex_shader_type =
+          graphics::Shader::HostVertexShaderType::kRectangleListAsTriangleStrip;
+    }
   } else {
     modification.pixel.interpolator_mask = interface.interpolator_mask;
     if (interface.param_gen_interpolator < 16) {

@@ -814,6 +814,38 @@ bool TextureCache::GetResolveDestination(const uint32_t fetch_words[6], ResolveD
   return true;
 }
 
+bool TextureCache::DecodeGuest(uint8_t* base, const uint32_t fetch_words[6],
+                               std::vector<uint8_t>& out, VkFormat& format, uint32_t& width,
+                               uint32_t& height) {
+  xenos::xe_gpu_texture_fetch_t fetch = ToFetch(fetch_words);
+  Layout l;
+  Format f;
+  if (!GetLayout(fetch, l) || !l.base_address || !GetFormat(fetch.format, f) ||
+      f.block_width != 1 || f.conversion != Conversion::kNone) {
+    return false;
+  }
+  Placement p = Place(l, f, 0);
+  uint32_t bytes_per_block_log2 = std::countr_zero(f.bytes_per_block);
+  out.assign(size_t(l.width) * l.height * f.bytes_per_block, 0);
+  for (uint32_t y = 0; y < l.height; y++) {
+    uint8_t* row = out.data() + size_t(y) * l.width * f.bytes_per_block;
+    for (uint32_t x = 0; x < l.width; x++) {
+      uint32_t address =
+          p.address + (l.tiled ? TiledOffset2D(x, y, p.pitch_blocks, bytes_per_block_log2)
+                               : y * p.row_pitch_bytes + x * f.bytes_per_block);
+      if (address + f.bytes_per_block <= kPhysicalMemorySize) {
+        std::memcpy(row + x * f.bytes_per_block, PhysicalHostAddress(base, address),
+                    f.bytes_per_block);
+      }
+    }
+    SwapEndian(row, size_t(l.width) * f.bytes_per_block, fetch.endianness);
+  }
+  format = f.format;
+  width = l.width;
+  height = l.height;
+  return true;
+}
+
 VkSampler TextureCache::GetSampler(const uint32_t fetch_words[6],
                                    const SamplerOverrides& overrides) {
   State& s = *state_;

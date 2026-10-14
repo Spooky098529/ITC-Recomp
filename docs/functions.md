@@ -572,6 +572,7 @@ and target, and recorder world matrices), mostly for comparison.
 | `--max_fps` | Frame rate cap in races; 0 = unlimited. |
 | `--interpolate_draw_state` | Blending on (default) or off. |
 | `--motion_blur` | The game's velocity-based motion blur (pixel shader `7EB16456AAD56CBA`), skipped when false (as `run.sh` does, except with `--no-interpolation`). Its velocities come from the tick, so it smears a whole tick of motion at high frame rates. Patch `patches/rexglue-sdk/0002`. |
+| `--glow` | The game's light bloom (glow intensity c33.y of pixel shader `9750599DF5ED3B39`, the bloom combine); off by default, as it leaves smears after camera switches. Patch `patches/rexglue-sdk/0001`. Turned on (with `--motion_blur=true`) when comparing the native renderer with the emulated GPU. |
 | `--blend_pixel_constants` | Blend per-object lighting constants (default on). |
 | `--log_fps` | Frames and ticks per second. |
 | `--switch_light_slots`, `--blend_lighting_camera` | How the per-object lighting's light slots and camera blend (default on); see "What gets blended". |

@@ -80,8 +80,33 @@ function per item. The exceptions are marked with their item size.
 
 **The helper object** (commands 5, 6, 13-16): the object at `0x82970BB8`,
 with its state at `0x82970BBC`, draws geometry recorded inline in the
-command list. What it draws, and which library calls its vtable reaches,
-isn't known yet.
+command list. In a race its draw (vtable slot 3) is `sub_825A17A0`, which
+draws the stored vertices (command 5's 24-byte vertices) through
+BeginVertices: 4-vertex triangle strips (screen-space quads, with
+PA_CL_VTE_CNTL's bit toggled around them by command 15).
+`sub_8258F5C0`, reached only through a table (no direct calls), makes
+the same draw outside the command list: one 3-vertex triangle list a frame
+in a race, likely the minimap's player triangle (not drawn natively yet).
+
+### Inline vertex draws
+
+Commands 15 and 19 (and `sub_8258F5C0`) reach BeginVertices
+(`sub_825BD8F0(device, primitive type, vertex count, stride in bytes)`,
+2026-10-14). It flushes the dirty state as a draw does (with the stream 0
+stride byte at +12272 set to the stride meanwhile, so the vertex shader is
+patched for it), reserves `count × stride` bytes in the command buffer
+(`sub_8229E308`) and writes, straight into the ring rather than the
+shadow: VGT_INDX_OFFSET (`0x2102`) = 0, vertex fetch constants 93 and 94 =
+`[1, 0]` and **95 (stream 0) = the reserved space** (`address | 3`,
+`0x10000002 | size in words << 2`: 8-in-32), and an auto-indexed DRAW_INDX
+of `count` vertices of the type. It returns the reserved space; the
+caller copies the vertices there, then calls End (`sub_825BDDA0`). Types
+seen in a race: 6 (strips, the helper's quads, 70-115 a frame), 8
+(rectangle lists, 19 a frame: post-processing and bloom passes, 40-byte
+vertices), 13 (quad lists, 7-14 a frame), 4 (triangle lists).
+`sub_825BDDC0` (the indexed variant, command 27) and DrawVertices
+(`sub_825BE300`) weren't reached in a race except DrawVertices once
+outside the command list.
 
 ## Graphics library
 
@@ -459,8 +484,7 @@ goes.
 
 ## Not yet known
 
-- Commands 32 and 33 (rare), and what the helper object draws. (20, 22
-  and 28 are never replayed.)
+- Commands 32 and 33 (rare). (20, 22 and 28 are never replayed.)
 - Confirming the "likely" rows at runtime.
 - Render state 324.
 - How the 1280x720 viewport maps onto the 1024x576 main view, and whether
