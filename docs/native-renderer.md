@@ -18,8 +18,9 @@ known about it; this file is the plan and its progress).
 - **Vulkan loaded at runtime** through SDL (`VK_NO_PROTOTYPES`, our own
   function table), so the build needs no Vulkan library. Headers come from
   the SDK's third-party copy of the Khronos headers.
-- **Shaders: reuse the SDK's Xenos-to-SPIR-V translator** for now, to be
-  replaced with our own later. This is the one part that leans on the SDK. The plugin builds it with hidden symbols, so
+- **Shaders: reuse the SDK's Xenos-to-SPIR-V translator**, to stay (the
+  user's call, 2026-10-14: it works well). It's SDK source compiled into
+  our own library and doesn't need the emulated GPU. The plugin builds it with hidden symbols, so
   `itc_recomp/CMakeLists.txt` compiles its sources into a static library of
   ours (`itc_xenos_shaders`: the shader, translator and SPIR-V sources,
   `format/ucode.cpp`, `util/draw.cpp`, `registers.cpp`). The translator
@@ -59,7 +60,7 @@ known about it; this file is the plan and its progress).
 | 3 | **Textures**: untile and upload (mostly BC1-BC3), samplers from the fetch constants. | The main view looks right without effects. | Done (2026-10-13): signs, gauges, fences, buildings and road textured correctly (screenshot checked); what comes from resolves is still missing. |
 | 4 | **The other passes**: each pass renders into a Vulkan image of its resolve's size and format; resolves become copies. | Shadows, reflections and the mirror work. | Done (2026-10-14): every pass draws, inline vertex draws included; clears and resolves work; the user saw the car's shadow, the mirror and the reflections right in our window (cockpit and third person), and the resolves match the emulated GPU's (`--readback_resolve=full`), except its blocky bloom. Menus not checked. |
 | 5 | **The final frame and the menus** (still in development mode): post-processing, HUD, the frame's end, then every menu screen. | Races and menus look as in the game's window, side by side. | In progress: the final frame with the HUD shows (checked by the user in a race); menus' tiled 3D views fixed. |
-| 6 | **Exclusive mode**: stop calling the graphics library (and so the emulated GPU), keeping only what our renderer needs from it; then measure. | The emulated GPU is no longer needed; frame rate measured against it. | |
+| 6 | **Exclusive mode**: the emulated GPU gets no work and then isn't loaded at all; the graphics library is kept for what our renderer needs from it (see "Plan for milestone 6"); then measure. | The GPU plugin isn't loaded; frame rate measured against the emulated GPU. | Planned (2026-10-14). |
 | 7 | **Known issues cleanup**: what's under Known issues below (the boot movie, gamma, textures replaced in memory, textures never freed, window resizing). | The known issues are fixed or accepted. | |
 
 ## Progress on milestone 2
@@ -320,6 +321,69 @@ GPU (exclusive mode) and the frame rate measurement.
   reflection, light beams) nor the Course In screen's night city picture
   (black in ours). The menus also log ~6,000 lookups per 5 s of a texture
   of another dimension than declared.
+
+## Plan for milestone 6
+
+Agreed with the user on 2026-10-14. **Kept**: the game's graphics library
+(the Xbox 360's Direct3D, recompiled guest code, not the SDK): its shadow
+is what we translate, and it does work we'd otherwise rewrite (combining
+SQ_PROGRAM_CNTL, patching vertex shaders for their declaration, inline
+vertex space). The SDK's shader translator and runtime also stay.
+**Dropped**: the emulated GPU (`librexgpu-xenos.so`), not loaded at all by
+the milestone's end.
+
+What's known of how the library reaches the GPU (2026-10-14, from the
+generated code):
+
+- **The kick**: `sub_8229E3F0(device, pairs, count)` writes an
+  INDIRECT_BUFFER packet (`0xC0013F00`, address, size) per (address,
+  size) pair into the primary ring (base device +13496, size mask +13500,
+  write position +10820, waiting for room with `sub_8229DCC0`), then
+  writes CP_RB_WPTR (`0x7FC80714`). That write is the only place the
+  emulated GPU is handed work. (With +10809 bit 1 set it calls an object
+  at +19980 instead: not looked at.)
+- **The GPU's progress** is a block the GPU writes, pointed to by device
+  +10768, read by every wait: +0 against the command buffer position
+  +10780 (`sub_8229E908`, the ring space wait, 46% of the render thread);
+  +4, a counter in `sub_8229DC28` (likely swaps); +60 the primary ring's
+  read pointer (`sub_8229DCC0`).
+- **VdSwap** (the SDK's kernel, `xboxkrnl_video.cpp`) only writes a fetch
+  constant and an XE_SWAP packet into the ring; the swap happens when the
+  GPU processes it.
+
+Steps:
+
+1. **Log first, with the GPU running**: at each kick, walk the indirect
+   buffers and log the packets with effects outside the GPU (MEM_WRITE,
+   EVENT_WRITE*, COND_WRITE, REG_TO_MEM, WAIT_REG_MEM, INTERRUPT,
+   XE_SWAP, VIZ_QUERY), and how the progress block changes over a frame.
+   Find what clears device +10868 (the per-frame full wait
+   `sub_8229F1B0` spins on it; likely an interrupt callback), where vblank
+   interrupts come from, and whether the game waits on query results.
+2. **Exclusive mode, step 1** (`--native_renderer_exclusive`): replace the
+   kick. CP_RB_WPTR isn't written; the effects step 1 finds are made by us,
+   and the progress block is set so the library sees everything consumed
+   at once. Everything else the library does stays, so the renderer is
+   unchanged; with every fence passed, vertex shaders get patched in place
+   (the patched-copy path should go quiet). Measure.
+3. **Step 2**: from a profile of the render thread, skip the library's
+   work that only writes packets (the draws' state flush `sub_822ADE30`
+   and friends, Resolve's and Clear's packets, the swap), keeping what
+   fills the shadow and the four things above (SQ_PROGRAM_CNTL, shader
+   patching, inline vertex space, fences).
+4. **The frame's end**: the front buffer resolve stays (it's what's shown);
+   the full GPU wait and the swap become no-ops, once it's checked that
+   nothing waits on the swap counter (+4).
+5. **No GPU plugin**: supply what it still provides (likely vblank
+   interrupts and swap completion) from a timer and our present, and run
+   without loading it (find out whether the SDK runs with no plugin or
+   needs a stub).
+6. **Check** the menus and predicated tiling, then measure with
+   `--log_fps` and `perf` at the same moments of an attract race: the
+   emulated GPU alone, development mode, exclusive mode.
+
+Risks: interrupts the game relies on, and occlusion queries it reads back;
+step 1's logs are there to find them before anything is stubbed.
 
 ## Tools (all debugging aids)
 
