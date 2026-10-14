@@ -498,6 +498,13 @@ struct Passes::State {
     bool index;
   };
   std::unordered_map<uint64_t, RangeHistory> range_history;
+  // Also with check_mirror_frames, a frame at a time: bytes copied whose
+  // contents differ from that range's last copy, and bytes of ranges never
+  // copied before; and what copying only each draw's vertices (from its
+  // lowest to its highest) would copy, each range once a frame.
+  uint64_t mirror_frames = 0, mirror_changed_bytes = 0, mirror_new_bytes = 0,
+           mirror_vertex_bytes = 0, used_vertex_bytes = 0;
+  std::unordered_set<uint64_t> used_mirrored;
   // Debugging aids: draws of this pixel shader (hash) are skipped; with
   // record_draws, each draw is described in a line (written with a dump).
   uint64_t skip_pixel_shader = 0;
@@ -803,9 +810,15 @@ void Passes::State::Mirror(uint8_t* base, uint32_t address, uint32_t size, bool 
   if (check_mirror_frames) {
     uint64_t hash = XXH3_64bits(PhysicalHostAddress(base, address), size);
     auto [it, added] = range_history.try_emplace(key, RangeHistory{hash, 0, index});
-    if (!added && it->second.hash != hash) {
+    if (added) {
+      mirror_new_bytes += size;
+    } else if (it->second.hash != hash) {
       it->second.hash = hash;
       it->second.changes++;
+      mirror_changed_bytes += size;
+    }
+    if (!index) {
+      mirror_vertex_bytes += size;
     }
   }
   std::memcpy(mirrors[frame].mapped + address, PhysicalHostAddress(base, address), size);
@@ -1719,6 +1732,8 @@ void Passes::BeginFrame(uint32_t frame_index) {
   s.front = nullptr;
   s.frame_resolves.clear();
   s.mirrored.clear();
+  s.used_mirrored.clear();
+  s.mirror_frames++;
   s.inline_offset = 0;
   s.mirrored_hashes.clear();
   s.clobber_ranges.clear();
@@ -2222,6 +2237,28 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
                                            max_vertex, stride_words};
         }
         size = uint32_t(needed);
+      }
+    }
+    if (s.check_mirror_frames) {
+      // The bytes this draw's vertices span in this buffer.
+      uint64_t begin = UINT64_MAX, end = 0;
+      for (const auto& [fetch_constant, stride_words] : vertex->vertex_strides) {
+        if (fetch_constant == k && min_vertex <= max_vertex) {
+          begin = std::min(begin, uint64_t(min_vertex) * stride_words * 4);
+          end = std::max(end, (uint64_t(max_vertex) + 1) * stride_words * 4);
+        }
+      }
+      if (begin >= end) {
+        begin = 0;
+        end = size;  // stride unknown: the whole buffer
+      }
+      end = std::min<uint64_t>(end, size);
+      if (begin < end) {
+        uint32_t address = (word0 & 0x1FFFFFFCu) + uint32_t(begin);
+        uint32_t length = uint32_t(end - begin);
+        if (s.used_mirrored.insert((uint64_t(address) << 32) | length).second) {
+          s.used_vertex_bytes += length;
+        }
       }
     }
     s.Mirror(base, word0 & 0x1FFFFFFCu, size, false);
@@ -2772,8 +2809,16 @@ std::string Passes::TakeMirrorChanges() {
   }
   std::sort(changed.begin(), changed.end(),
             [](const auto& a, const auto& b) { return a.second.changes > b.second.changes; });
-  std::string text = fmt::format("{} of {} ranges changed ({:.1f} MB)", changed.size(),
-                                 s.range_history.size(), bytes / 1048576.0);
+  double frames = double(std::max<uint64_t>(s.mirror_frames, 1));
+  std::string text = fmt::format(
+      "per frame {:.2f} MB copied with changed contents, {:.2f} MB of ranges new, vertex "
+      "buffers {:.2f} MB copied but {:.2f} MB within the draws' vertices; {} of {} ranges "
+      "changed ({:.1f} MB)",
+      s.mirror_changed_bytes / 1048576.0 / frames, s.mirror_new_bytes / 1048576.0 / frames,
+      s.mirror_vertex_bytes / 1048576.0 / frames, s.used_vertex_bytes / 1048576.0 / frames,
+      changed.size(), s.range_history.size(), bytes / 1048576.0);
+  s.mirror_frames = s.mirror_changed_bytes = s.mirror_new_bytes = s.mirror_vertex_bytes =
+      s.used_vertex_bytes = 0;
   for (size_t i = 0; i < changed.size() && i < 12; i++) {
     text += fmt::format("; {} {:08X} {} bytes x{}", changed[i].second.index ? "index" : "vertex",
                         uint32_t(changed[i].first >> 32), uint32_t(changed[i].first),

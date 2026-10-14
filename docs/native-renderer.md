@@ -554,6 +554,21 @@ step 1's logs are there to find them before anything is stubbed.
   and a race from the packaged zip with no plugin: all fine, no errors in
   the log. Steps 3 and 4 are done.
 
+- **What the mirror copies** (step 5, 2026-10-14,
+  `--native_renderer_check_mirror`, an uncapped attract race, 55 s): of the
+  13-19 MB copied a frame (vertex buffers 11-17 MB, the rest indices),
+  **nothing changed between frames**: 0 bytes a frame copied with contents
+  different from that range's previous copy, in every 5 s window, and
+  under 0.01 MB a frame of ranges never seen before (ranges grew from
+  1,301 to 2,643 as the race went on: track sections streamed in at new
+  addresses or sizes). Dynamic geometry goes through inline vertex draws
+  (BeginVertices), which are copied separately, not through these ranges.
+  Copying only each draw's vertices (lowest to highest) instead of the
+  whole buffer would save only 1-8%. So almost all of the mirror's copying
+  (~12% of the render thread) is redundant; what's missing is a cheap way
+  to know when a range's memory is rewritten (streaming reuses memory).
+  Only an attract race was measured.
+
 ## Tools (all debugging aids)
 
 - `--native_renderer_show_resolve=<n>`: the window shows the frame's nth
@@ -624,7 +639,10 @@ step 1's logs are there to find them before anything is stubbed.
   40 every 10 s, and those holding rare packets (scratch registers,
   INTERRUPT, COND_WRITE, queries...). Works with the emulated GPU too.
 - `--native_renderer_check_mirror`: log the vertex and index ranges whose
-  contents change between frames.
+  contents change between frames; and per frame, the bytes copied whose
+  contents differ from that range's last copy, the bytes of ranges new,
+  and how much of the vertex buffers' copies lies within the draws'
+  vertices (lowest to highest).
 - Texture loads of uncompressed formats are logged (format, size,
   endianness, tiling).
 
