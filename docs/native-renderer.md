@@ -589,6 +589,23 @@ step 1's logs are there to find them before anything is stubbed.
   (~12% of the render thread) is redundant; what's missing is a cheap way
   to know when a range's memory is rewritten (streaming reuses memory).
   Only an attract race was measured.
+- **The library's share of the render thread** (step 5, 2026-10-14, after
+  the mirror change; uncapped attract race, 4 s profiled 20 s in, ~230
+  fps). Each sample is given to the innermost frame that is guest code or
+  ours (libc and driver time goes to its caller): **our renderer 72%**,
+  the replay handlers (`0x8258xxxx`-`0x8259xxxx`) 9%, **the game's
+  Direct3D 19%**. The library's part, by what the replay calls:
+
+  | Library call | Share | What it is |
+  |---|---|---|
+  | `sub_825BE708` (DrawIndexedVertices) | 10.4% | Constants into packets (`sub_822AE1D0`, 3.1%: copies the dirty constants' 64-byte blocks), state flush (`sub_822ADE30`, 1.9%), the DRAW_INDX packet itself (1.9%), shader loads (`sub_822AED18`, 1.3%), `sub_8229EF48` 0.8%, `sub_822ADC08` 0.4%, fetch constants (`sub_822AE070`, 0.4%) |
+  | `sub_822A8808` (SetVertexShader) | 6.0% | Almost all the shader's AddRef `sub_822A6738` (4.6%) and Release `sub_822A67B0` (1.2%): an atomic add on the reference count (+4), which the recompiler wraps in a process-wide mutex (its `mfmsr`/`mtmsrd` become `REX_ENTER/LEAVE_GLOBAL_LOCK`). Not packet writing. |
+  | Pixel shader constants, SetIndices, SetTexture, SetPixelShader | ~2% together | |
+  | Inline draws (`sub_825A17A0`) | 0.5% | (1.8% with our `Renderer_InlineDraw` inside End) |
+  | The kick, the ring space wait | ~0.2% | |
+
+  So skipping the packet writing could save at most ~10%, nearly all of it
+  inside the indexed draw; the AddRef/Release mutex is a separate ~6%.
 
 ## Buffers (where vertex and index data comes from)
 
