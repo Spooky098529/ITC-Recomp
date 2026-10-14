@@ -550,7 +550,9 @@ step 1's logs are there to find them before anything is stubbed.
   busy seconds (the 10th percentile, 106 against 126 uncapped). It matches
   the earlier measurement with the plugin loaded (127 against 141), so
   loading the plugin wasn't costing anything. Step 5 is the speed work.
-  Menus and predicated tiling still need checking by the user.
+  The user then went through menus, loading screens (predicated tiling)
+  and a race from the packaged zip with no plugin: all fine, no errors in
+  the log. Steps 3 and 4 are done.
 
 ## Tools (all debugging aids)
 
