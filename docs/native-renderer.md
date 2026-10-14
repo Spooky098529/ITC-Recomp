@@ -351,7 +351,8 @@ generated code):
   constant and an XE_SWAP packet into the ring; the swap happens when the
   GPU processes it.
 
-Steps:
+Steps (reordered 2026-10-14, the user's call: dropping the plugin and
+measuring come before the speed work):
 
 1. **Log first, with the GPU running**: at each kick, walk the indirect
    buffers and log the packets with effects outside the GPU (MEM_WRITE,
@@ -366,21 +367,21 @@ Steps:
    at once. Everything else the library does stays, so the renderer is
    unchanged; with every fence passed, vertex shaders get patched in place
    (the patched-copy path should go quiet). Measure.
-3. **Step 2**: from a profile of the render thread, skip the library's
+3. **No GPU plugin**: supply what it still provides (likely vblank
+   interrupts and swap completion) from a timer and our present, and run
+   without loading it (find out whether the SDK runs with no plugin or
+   needs a stub).
+4. **Check** the menus and predicated tiling, then measure with
+   `--log_fps` and `perf` at the same moments of an attract race: the
+   emulated GPU alone, development mode, exclusive mode.
+5. **Step 2**: from a profile of the render thread, skip the library's
    work that only writes packets (the draws' state flush `sub_822ADE30`
    and friends, Resolve's and Clear's packets, the swap), keeping what
    fills the shadow and the four things above (SQ_PROGRAM_CNTL, shader
    patching, inline vertex space, fences).
-4. **The frame's end**: the front buffer resolve stays (it's what's shown);
+6. **The frame's end**: the front buffer resolve stays (it's what's shown);
    the full GPU wait and the swap become no-ops, once it's checked that
    nothing waits on the swap counter (+4).
-5. **No GPU plugin**: supply what it still provides (likely vblank
-   interrupts and swap completion) from a timer and our present, and run
-   without loading it (find out whether the SDK runs with no plugin or
-   needs a stub).
-6. **Check** the menus and predicated tiling, then measure with
-   `--log_fps` and `perf` at the same moments of an attract race: the
-   emulated GPU alone, development mode, exclusive mode.
 
 Risks: interrupts the game relies on, and occlusion queries it reads back;
 step 1's logs are there to find them before anything is stubbed.
