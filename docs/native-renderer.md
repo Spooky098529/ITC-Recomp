@@ -57,7 +57,7 @@ known about it; this file is the plan and its progress).
 | 1 | **Skeleton**: `--native_renderer` creates our own Vulkan device, window and swapchain; the replay hooks pass each frame's commands to it. | A window clears and presents every frame. | Done (2026-10-13): presents every frame in menus (30 fps) and races (113-128 fps, ~26,800 commands and ~2,900 draws a frame), the game unaffected. |
 | 2 | **Main view geometry**: vertex and index buffers read from guest memory, shaders translated, render states mapped to pipelines. | Race geometry is visible in our window, untextured. | Done (2026-10-13): the cockpit view's geometry, the right way up, solid, with the game's coloured lighting on white placeholder textures (screenshot checked). |
 | 3 | **Textures**: untile and upload (mostly BC1-BC3), samplers from the fetch constants. | The main view looks right without effects. | Done (2026-10-13): signs, gauges, fences, buildings and road textured correctly (screenshot checked); what comes from resolves is still missing. |
-| 4 | **The other passes**: each pass renders into a Vulkan image of its resolve's size and format; resolves become copies. | Shadows, reflections and the mirror work. | In progress: every pass draws, clears and resolves work; the shadow map, mirror and reflection map come out right (dumped and checked); the rainbow effect is fixed (see below); inline vertex draws (commands 15 and 19) draw, so the projected texture and bloom are drawn. |
+| 4 | **The other passes**: each pass renders into a Vulkan image of its resolve's size and format; resolves become copies. | Shadows, reflections and the mirror work. | Done (2026-10-14): every pass draws, inline vertex draws included; clears and resolves work; the user saw the car's shadow, the mirror and the reflections right in our window (cockpit and third person), and the resolves match the emulated GPU's (`--readback_resolve=full`), except its blocky bloom. Menus not checked. |
 | 5 | **Post-processing, HUD, present**, then exclusive mode. | A race is fully native; measure the frame rate. | |
 | 6 | **Menus**. | The emulated GPU is no longer needed. | |
 
@@ -402,6 +402,10 @@ texture objects ("Resources"). The approach:
    paint shaders (see "Progress on milestone 4").
 
 ## Known issues
+
+- **Gamma**: our window is lighter than the game's (seen side by side,
+  2026-10-14): the Xbox 360's output gamma isn't applied yet. For
+  milestone 5 (present).
 
 - **Textures replaced in memory show their old contents for a while.**
   The game streams track sections in during a race, and textures are
