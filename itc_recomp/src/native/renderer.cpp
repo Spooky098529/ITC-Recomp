@@ -247,6 +247,7 @@ class Renderer {
   // Logged every 5 s.
   uint64_t frames_presented_ = 0, frames_skipped_ = 0, commands_ = 0, draws_ = 0;
   Clock::time_point start_ = Clock::now(), last_log_ = Clock::now();
+  Clock::time_point last_present_ = Clock::now();
 };
 
 bool Renderer::CreateWindowAndInstance() {
@@ -615,6 +616,7 @@ void Renderer::AfterCommand(uint8_t* base, uint32_t id, uint32_t payload, uint32
 void Renderer::EndFrame() {
   commands_ += frame_commands_;
   draws_ += frame_draws_;
+  uint32_t frame_draws = frame_draws_;
   frame_commands_ = frame_draws_ = 0;
 
   VkCommandBuffer commands = BeginFrame();
@@ -714,6 +716,14 @@ void Renderer::EndFrame() {
       swapchain_stale_ = true;
     }
     frames_presented_++;
+    // A frame much longer than usual (a hitch the per-second fps hides).
+    auto now = Clock::now();
+    if (auto ms = std::chrono::duration<double, std::milli>(now - last_present_).count();
+        ms >= 100 && frames_presented_ > 1) {
+      REXLOG_INFO("native renderer: long frame: {:.0f} ms since the last present ({} draws)",
+                  ms, frame_draws);
+    }
+    last_present_ = now;
   } else {
     frames_skipped_++;
   }
@@ -778,6 +788,19 @@ void Renderer::LogStats() {
               view.mirrored_bytes / 1048576.0 / frames,
               view.mirror_skipped_bytes / 1048576.0 / frames, view.pipelines,
               view.shaders_translated, view.shaders_failed);
+  if (view.failed) {
+    static constexpr const char* kFailedDrawReasons[] = {
+        "no target", "no vertex shader", "shader translation", "no index buffer",
+        "constants ring full", "texture set layout", "texture set"};
+    std::string reasons;
+    for (size_t i = 0; i < view.failed_by.size(); i++) {
+      if (view.failed_by[i]) {
+        reasons += fmt::format(" {} {:.1f};", kFailedDrawReasons[i],
+                               double(view.failed_by[i]) / frames);
+      }
+    }
+    REXLOG_INFO("native renderer: failed draws a frame by reason:{}", reasons);
+  }
   if (REXCVAR_GET(native_renderer_verify_mirror)) {
     REXLOG_INFO("native renderer: mirror check: of {} ranges not copied and checked, {} "
                 "differed from guest memory ({:.1f} MB){}",

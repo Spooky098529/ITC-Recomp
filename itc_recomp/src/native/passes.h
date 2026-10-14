@@ -128,6 +128,8 @@ class Passes {
   // Logged by the renderer.
   struct Stats {
     uint64_t drawn = 0, unsupported = 0, failed = 0, mirrored_bytes = 0;
+    // Failed draws by reason (kFailedDrawReasons in renderer.cpp).
+    std::array<uint64_t, 7> failed_by{};
     // Ranges not copied (unchanged since this mirror got them); with
     // set_verify_mirror, those whose contents differ from guest memory, and
     // an example.

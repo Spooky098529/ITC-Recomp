@@ -1817,6 +1817,7 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
   Target* depth = depth_object ? s.GetTarget(commands, base, depth_object, true) : nullptr;
   if (!color && !depth) {
     s.stats.failed++;
+    s.stats.failed_by[0]++;
     return;
   }
   if (color && depth && color->samples != depth->samples) {
@@ -1863,6 +1864,7 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
   uint32_t pixel_object = guest::LoadU32(base, device + kDevicePixelShader);
   if (!vertex_object) {
     s.stats.failed++;
+    s.stats.failed_by[1]++;
     return;
   }
   const uint8_t* vertex_ucode =
@@ -1926,6 +1928,7 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
   }
   if (!vertex || (pixel_object && !pixel)) {
     s.stats.failed++;
+    s.stats.failed_by[2]++;
     return;
   }
   bool main_view_draw = color && color->surface.pitch == kMainViewPitch &&
@@ -1988,6 +1991,7 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
     uint32_t index_buffer = guest::LoadU32(base, device + kDeviceIndexBuffer);
     if (!index_buffer) {
       s.stats.failed++;
+      s.stats.failed_by[3]++;
       return;
     }
     uint32_t index_word = guest::LoadU32(base, index_buffer);
@@ -2139,6 +2143,7 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
   uint8_t* data;
   if (!s.Reserve(sizeof(system), offsets[0], data)) {
     s.stats.failed++;
+    s.stats.failed_by[4]++;
     return;
   }
   std::memcpy(data, &system, sizeof(system));
@@ -2148,6 +2153,7 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
                                            : kDevicePixelFloatConstants);
     if (!s.Reserve(kFloatConstantsRange, offsets[1 + stage], data)) {
       s.stats.failed++;
+      s.stats.failed_by[4]++;
       return;
     }
     if (!shader) {
@@ -2168,11 +2174,13 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
   }
   if (!s.Reserve(kBoolLoopConstantsRange, offsets[3], data)) {
     s.stats.failed++;
+    s.stats.failed_by[4]++;
     return;
   }
   std::memcpy(data, &regs.values[XE_GPU_REG_SHADER_CONSTANT_BOOL_000_031], kBoolLoopConstantsRange);
   if (!s.Reserve(kFetchConstantsRange, offsets[4], data)) {
     s.stats.failed++;
+    s.stats.failed_by[4]++;
     return;
   }
   std::memcpy(data, &regs.values[XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0], kFetchConstantsRange);
@@ -2182,12 +2190,14 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
   VkDescriptorSetLayout pixel_layout = s.GetTextureLayout(pixel, VK_SHADER_STAGE_FRAGMENT_BIT);
   if (!vertex_layout || !pixel_layout) {
     s.stats.failed++;
+    s.stats.failed_by[5]++;
     return;
   }
   VkDescriptorSet vertex_textures = s.GetTextureSet(base, vertex, vertex_layout);
   VkDescriptorSet pixel_textures = s.GetTextureSet(base, pixel, pixel_layout);
   if (!vertex_textures || !pixel_textures) {
     s.stats.failed++;
+    s.stats.failed_by[6]++;
     return;
   }
   PipelineKey key;
