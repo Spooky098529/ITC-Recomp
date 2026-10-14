@@ -569,6 +569,58 @@ step 1's logs are there to find them before anything is stubbed.
   to know when a range's memory is rewritten (streaming reuses memory).
   Only an attract race was measured.
 
+## Buffers (where vertex and index data comes from)
+
+Found 2026-10-14 with `--native_renderer_log_buffers` (`buffers.cpp`), in
+uncapped attract races of 70 s, to replace the per-frame mirror copies
+with uploads when the game fills its buffers (the user's direction: draw
+from buffers made like a regular program's, not from a copy of guest
+memory).
+
+- **Buffer objects** are Xbox 360 Direct3D resource headers in the game's
+  heap (`0x04xxxxxx`-`0x0Axxxxxx`): +0 type (`00000001` vertex,
+  `20000002` index: 16-bit, 8-in-16), +24 and +28 the GPU's own words:
+  for a vertex buffer the vertex fetch constant's two words (address with
+  type 3 in the low bits, then `0x10000000 | size in words << 2 | endian`),
+  for an index buffer the address and the size in bytes. Data addresses
+  are in the physical views (`F7xxxxxx`-`FCxxxxxx`). Draws bind them with
+  SetStreamSource (command 11) and SetIndices (command 12).
+- **They appear as track sections stream in**: 1,301 objects (934 index)
+  bound in the first 5 s, 2,810 after 70 s. Some objects' headers change
+  later (205 in a 50 s race), in groups, data address moved by the same
+  amount and size unchanged. Those aren't moves: the section's memory is
+  freed and allocated again (the kernel's `NtAllocateVirtualMemory`,
+  called from the game's `sub_82295398` in its streaming code
+  `sub_820D07C8`, zeroes the headers; caught with a gdb watchpoint) and
+  the same section is loaded again at the same header addresses, its data
+  elsewhere.
+- **Everything is written by the library's memcpy (`sub_825A7410`)**:
+  - Headers: copied in whole blocks (25-315 KB) from a read buffer at
+    `002B0000` by the resource loader `sub_825963F0` (call at
+    `0x82596448`), a few by `sub_8258B678` (`0x8258B6B4`) from the heap.
+    The final data addresses must then be written into the headers by
+    plain stores (not seen by the memcpy wrapper).
+  - Data: 1-3 MB copies from read buffers (`002B5500`, `003EBFBC`) into
+    the physical views by `sub_825963F0` (`0x8259676C`, ~90% of the
+    ranges) and `sub_82596F68` (`0x82597014`); 2-4 ranges at a time by
+    game code not yet looked at (`sub_820E7598`, `sub_820E7CA0`,
+    `sub_820E8028`).
+  - **Every vertex and index range a draw used was written whole by
+    memcpy before its first use** (2,900 ranges, none partly or not at
+    all). Ranges written again after first use (30-70 per 5 s, ~0.2 MB)
+    were rewritten by the same loaders: a section loaded again into the
+    same memory (with the same contents, as the mirror check shows: no
+    range's contents changed between frames).
+- What this doesn't see: writes by plain stores rather than memcpy, and
+  data read from disc straight into place. Neither showed up (no range
+  was used before memcpy wrote it, and the mirror check saw no contents
+  change), but a race the user drives may differ.
+- So a range only needs uploading when memcpy has written it since its
+  last upload: the memcpy wrapper can record the physical ranges written
+  (cheaply: a list per frame, not the logging's interval map), and the
+  draw path uploads a range only if a recorded write overlaps it. With
+  that, the data could live in VRAM (see "What the mirror copies").
+
 ## Tools (all debugging aids)
 
 - `--native_renderer_show_resolve=<n>`: the window shows the frame's nth
@@ -638,6 +690,10 @@ step 1's logs are there to find them before anything is stubbed.
   callback got, and the progress block; a trace of the first 60 kicks,
   40 every 10 s, and those holding rare packets (scratch registers,
   INTERRUPT, COND_WRITE, queries...). Works with the emulated GPU too.
+- `--native_renderer_log_buffers`: log the vertex and index buffer objects
+  draws bind (header, data, later changes), the library's memcpy into
+  their headers, and for each range copied into the mirror whether memcpy
+  wrote it before its first use and again afterwards (see "Buffers").
 - `--native_renderer_check_mirror`: log the vertex and index ranges whose
   contents change between frames; and per frame, the bytes copied whose
   contents differ from that range's last copy, the bytes of ranges new,
@@ -664,6 +720,8 @@ step 1's logs are there to find them before anything is stubbed.
 - `gpu_link.cpp`: the kick (`sub_8229E3F0`), the deferred kick
   (`sub_8229E848`) and the library's interrupt callback:
   `--native_renderer_log_gpu`, and exclusive mode's kick.
+- `buffers.cpp`: `--native_renderer_log_buffers` (buffer objects, and the
+  library's memcpy `sub_825A7410` wrapped to record what it writes).
 - `app_window.cpp`: exclusive mode's one window (hides the SDK's, routes
   our window's events to it).
 - `glsl/`: our own shaders (resolves), compiled into `generated_*.h`.

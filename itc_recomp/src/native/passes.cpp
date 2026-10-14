@@ -5,6 +5,7 @@
 #include "generated_resolve_ms_frag.h"
 #include "generated_resolve_vert.h"
 
+#include "buffers.h"
 #include "guest.h"
 #include "shaders.h"
 #include "state.h"
@@ -798,6 +799,9 @@ void Passes::State::Mirror(uint8_t* base, uint32_t address, uint32_t size, bool 
   }
   if (!mirrored.insert(key).second) {
     return;  // already copied this frame
+  }
+  if (Buffers_Logging()) {
+    Buffers_OnMirror(address, size, index);
   }
   if (check_late_writes) {
     // Hashed again at the end of the frame.

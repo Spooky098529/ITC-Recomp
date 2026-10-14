@@ -1,4 +1,6 @@
 #include "renderer.h"
+
+#include "buffers.h"
 #include "app_window.h"
 #include "state.h"
 
@@ -909,6 +911,7 @@ void Renderer_OnCommand(uint8_t* base, uint32_t id, uint32_t payload, uint32_t a
     return;
   }
   g_base = base;
+  Buffers_OnCommand(base, id, payload, arg1);
   if (Renderer* renderer = GetRenderer()) {
     renderer->OnCommand(id, arg1);
   }
