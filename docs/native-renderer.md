@@ -137,7 +137,8 @@ known about it; this file is the plan and its progress).
 - **Clears** (command 26): flags decoded from the library (`sub_8229FC40`):
   bits 0-3 render targets 0-3, `0x10` Z, `0x20` stencil; colour is a
   D3DCOLOR (ARGB). The library clips the clear to the viewport and scissor;
-  we clear the whole target. Rects at +12 (16 bytes each), not used.
+  we clear the whole target (see "Clears' rectangles" below). Rects at +12
+  (16 bytes each), not used.
 - **Resolves** (command 25): the handler calls `Resolve(flags, src rect
   (+8, field bit 0), dest texture (+24, bit 1), dest point (+28, bit 2),
   level +36, slice +40, clear colour bytes +44 (bit 3), Z +48, stencil +52,
@@ -196,8 +197,16 @@ known about it; this file is the plan and its progress).
   tail lights in both). Ours are right: the user sees them yellow in the
   game's own window too, so the read-back copy (or its decoding) has red
   and blue swapped for some formats. Keep that in mind when comparing.
-- Not yet: clear rects, render targets 1-3, resolves to a level or slice
-  other than 0.
+- **Clears' rectangles** (2026-10-14): in a race no clear has rects, and
+  every clear's viewport starts at 0,0 and covers the pass's drawn area
+  (1280x720, 1024x576, 512x512, 1024x1024, 256x256, 512x288; the bloom
+  target's 8192x8192, i.e. unbounded) with the scissor off. So clipping
+  to them would clear only what's drawn anyway, and clearing the whole
+  target is kept. Menus not checked.
+- Render targets 1-3 and resolves to a level or slice other than 0: none
+  in a race (the per-5 s log shows 0 draws with targets 1-3 bound to
+  another surface than 0, and 0 resolves skipped; 2026-10-14), so nothing
+  to do for races. Menus not checked.
 
 ### The rainbow effect (fixed)
 
