@@ -63,6 +63,7 @@ set(ITC_SOURCES
     src/debug/idle_timer_scan.cpp
     src/debug/image_dump.cpp
     src/debug/replay_stats.cpp
+    src/debug/thread_cpu.cpp
     src/native/app_window.cpp
     src/native/buffers.cpp
     src/native/draw_packets.cpp

@@ -7,6 +7,7 @@
 #include <rex/rex_app.h>
 
 #include "audio/native_audio.h"
+#include "debug/thread_cpu.h"
 #include "native/app_window.h"
 
 class ItcApp : public rex::ReXApp {
@@ -34,15 +35,17 @@ class ItcApp : public rex::ReXApp {
     native_audio::Configure(config);
   }
 
+  // --log_thread_cpu (src/debug/thread_cpu.cpp).
+  void OnPostSetup() override { debug::ThreadCpu_Start(); }
+  void OnShutdown() override { debug::ThreadCpu_Stop(); }
+
   // Override virtual hooks for customization:
   // void OnPostInitLogging() override {}
   // void OnLoadXexImage(std::string& xex_image) override {}
   // void OnPostLoadXexImage() override {}
-  // void OnPostSetup() override {}
   // void OnCreateDialogs(rex::ui::ImGuiDrawer* drawer) override {}
   // std::unique_ptr<rex::ui::ImGuiDialog> CreateAchievementsOverlay() override;
   // std::unique_ptr<rex::ui::AchievementNotificationDialog>
   // CreateAchievementNotificationDialog() override;
-  // void OnShutdown() override {}
   // void OnConfigurePaths(rex::PathConfig& paths) override {}
 };

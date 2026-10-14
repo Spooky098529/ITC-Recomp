@@ -592,6 +592,7 @@ and target, and recorder world matrices), mostly for comparison.
 | `--log_world_sprites`, `--log_single_sprites` | The world-space sprites as recorded. |
 | `--pair_by_object` | Pair the per-object recorder's products by position within groups alike but for their order (default on); see "What gets blended". |
 | `--log_moving_products` | Moving objects drawn out of step, event by event; see "What gets blended". |
+| `--log_thread_cpu` | Every 2 s: the process's and the machine's CPU use, and each thread using 5% of a core or more, by name: its share of a core (system time in brackets), the CPU it last ran on, and its voluntary/involuntary context switches (many involuntary ones mean it's waiting for a core). On in `run-debug.sh`; Linux only. For finding a thread that pegs a core on slower machines (the Steam Deck). |
 | `--log_camera_pass_records` | Which camera passes are recorded on logic and render-only passes, by message handler. |
 
 ### What didn't work, and why
