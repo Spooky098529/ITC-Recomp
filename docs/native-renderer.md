@@ -424,8 +424,8 @@ texture objects ("Resources"). The approach:
 ## Known issues
 
 - **Gamma**: our window is lighter than the game's (seen side by side,
-  2026-10-14): the Xbox 360's output gamma isn't applied yet. For
-  milestone 5 (present).
+  2026-10-14): the Xbox 360's output gamma isn't applied yet. A known
+  issue, not part of milestone 5 (the user's call).
 
 - **Textures replaced in memory show their old contents for a while.**
   The game streams track sections in during a race, and textures are
