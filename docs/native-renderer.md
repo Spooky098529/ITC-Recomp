@@ -646,10 +646,14 @@ memory).
   0.1 MB; `--native_renderer_verify_mirror` (every skipped range compared
   with guest memory, every frame) found none different in a 70 s attract
   race. In that race even ignoring memcpy's writes altogether gave no
-  differences (sections are loaded again with the same contents), so the
-  tracking hasn't yet been seen catching a real change: to check with the
-  user in driven races, and a second race on another track. With that,
-  the data could live in VRAM (see "What the mirror copies").
+  differences (sections are loaded again with the same contents). The
+  user then drove two races with the check on, the second at another time
+  of day (the game has one world map that all races use; the time of day
+  changes the lighting): 4.8 million ranges checked, none different, and
+  nothing wrong on screen. So the tracking hasn't been seen catching a
+  real change, but nothing in the game was found that changes vertex or
+  index data after loading it. With that, the data could live in VRAM
+  (see "What the mirror copies").
 
 ## Tools (all debugging aids)
 
