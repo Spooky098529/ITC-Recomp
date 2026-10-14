@@ -647,6 +647,58 @@ step 1's logs are there to find them before anything is stubbed.
   render state, fetch constants of every draw); the pixels differ only by
   the interpolated camera's position (edges everywhere, from frame
   timing).
+- **The shader reference count** (step 5, 2026-10-14, `refcount.cpp`).
+  The library's AddRef `sub_822A6738` and Release `sub_822A67B0` are a
+  lwarx/stwcx loop on the object's count at +4; the recompiler turns the
+  `mfmsr`/`mtmsrd` around it into the process-wide global lock, taken
+  twice per pass (`REX_CHECK_GLOBAL_LOCK` locks it as well as
+  `REX_ENTER_GLOBAL_LOCK`). Profile before (shares of the render thread's
+  samples with a usable stack, about half of them; same method as above):
+  AddRef 5.5% (two thirds waiting on the mutex), Release 1.0%. AddRef has
+  7 callers, SetVertexShader's `sub_822A8808` the hot one; Release ~40,
+  many in game code on other threads. Release at 0 releases +24 (type 4
+  objects with +0 bit `0x40000000`, as AddRef does at 1), calls
+  `sub_822A6210` on the object (likely its destroy) and returns 0.
+
+  Safe without the lock, from the code: the stwcx is already a
+  compare-and-swap on the guest word, and no global-lock region anywhere
+  in `generated/` does a plain store (the only regions without lwarx are
+  two 64-bit range trackers on other data, `sub_8229DE48` and
+  `sub_8229DDD8`); the SDK's own users of the lock (filesystem, kernel
+  objects, memory) don't touch the library's objects; the library's other
+  atomics on these objects (`sub_822A63F8`, `sub_822A6630`, +-256) are on
+  +0. So both are overridden with the same loop as a native
+  compare-and-swap, behaviour otherwise kept.
+
+  That took the mutex out of the profile but gained only ~2%: the locked
+  instruction itself costs a few hundred cycles on the render thread
+  (perf puts almost all of Release's samples right after `lock cmpxchg`).
+  SetVertexShader AddRefs the new shader and Releases the bound one
+  (device +12436) even when they're the same, which **52% of its ~300,000
+  calls a second** are (logged every 5 s); the pair then changes nothing,
+  and the device's own reference keeps the count above 0, so both are
+  skipped (a thread-local "unchanged shader" the two overrides check;
+  the rest of SetVertexShader runs as before). A first version counted
+  those calls with shared atomic counters, which alone cost 5%: counters
+  on this thread are kept per thread now.
+
+  Uncapped attract race, alternating runs of the same build:
+
+  | Setup | Mean | 10th pct | Median | Min |
+  |---|---|---|---|---|
+  | Global lock (`--refcount_global_lock=true`), run 1 | 222 | 172 | 223 | 168 |
+  | Global lock, run 2 | 233 | 185 | 234 | 180 |
+  | Lock-free, same shader skipped, run 1 | 234 | 184 | 227 | 179 |
+  | Lock-free, same shader skipped, run 2 | 241 | 191 | 242 | 185 |
+
+  About +4%, within run-to-run noise of ~5 fps. AddRef, Release and
+  SetVertexShader together went from ~6.5% of the render thread to ~1%;
+  the library's share from 12% to 9%. Not measured at 144 (already held).
+  Frames dumped every 10 s (`--native_renderer_dump_every`) with the lock
+  and without: `draws.txt` identical once the addresses of dynamically
+  allocated textures and vertex buffers (`0x1Bxxxxxx`) are masked; two
+  runs of the same build differ more (they differ in those addresses
+  too). The user saw no visual errors.
 
 ## Buffers (where vertex and index data comes from)
 
@@ -789,6 +841,9 @@ memory).
   shaders.
 - `--native_renderer_library_packets`: in exclusive mode, let the
   library's indexed draw write its packets as before.
+- `--refcount_global_lock`: let the library's AddRef and Release take the
+  recompiler's global lock as before, and SetVertexShader take and drop a
+  reference when binding the shader already bound.
 - `--native_renderer_copy_all`: copy every vertex and index range into the
   mirror every frame, as before memcpy's writes were tracked.
 - `--native_renderer_verify_mirror`: compare every range not copied with
@@ -829,6 +884,9 @@ memory).
 - `draw_packets.cpp`: exclusive mode's indexed draw without packets (the
   library's `sub_825BE708` is wrapped in `replay_hooks.cpp` and calls
   it), and `--native_renderer_check_draw_writes`.
+- `refcount.cpp`: the library's AddRef (`sub_822A6738`) and Release
+  (`sub_822A67B0`) without the global lock, and SetVertexShader
+  (`sub_822A8808`) skipping both when the shader is already bound.
 - `app_window.cpp`: exclusive mode's one window (hides the SDK's, routes
   our window's events to it).
 - `glsl/`: our own shaders (resolves), compiled into `generated_*.h`.
@@ -945,6 +1003,11 @@ To be fixed (or accepted) in milestone 7.
   failed draw's reason ("failed draws a frame by reason") and any frame
   taking 100 ms or more ("long frame"); the next run that shows either
   should say which.
+- **Performance: locked instructions are slow on the render thread** (a
+  few hundred cycles each, 2026-10-14: the thread's many stores have to
+  drain first). The shader reference count's compare-and-swap still costs
+  ~1%, and any atomic added to per-draw code (counters included) shows up:
+  keep per-draw counters per thread.
 - No Vulkan validation layer here yet (`--native_renderer_validation` falls
   back without it); install `vulkan-validation-layers` before drawing gets
   complicated.
