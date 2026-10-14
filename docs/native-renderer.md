@@ -1002,11 +1002,12 @@ To be fixed (or accepted) in milestone 7.
   patched version of a vertex shader is translated once; the cost is
   finding which one a draw uses. Each draw hashes the same microcode
   several times: `ShaderCache::GetInterface` (both shaders, through
-  `Analyzed`), `ShaderCache::Get` (each again), and the two diagnostic
-  maps `param_gen_by_shader` and `interpolators_by_shader` in
-  `passes.cpp` (the pixel shader twice more). Cheap fix: hash each once a
-  draw and pass the hash along, and hash for the diagnostics only when
-  they're logged. Further: key by what the library tracks (the shader
+  `Analyzed`) and `ShaderCache::Get` (each again); with logging at info
+  or below, also the two diagnostic maps `param_gen_by_shader` and
+  `interpolators_by_shader` in `passes.cpp` (the pixel shader twice more;
+  ~0.7% of the render thread, skipped since 2026-10-14 when `--log_level`
+  is warn or above, as in `run.sh`). Cheap fix: hash each once a draw and
+  pass the hash along. Further: key by what the library tracks (the shader
   object and the declaration it's patched for; `sub_822AE340` is already
   wrapped) instead of hashing, but a freed object's memory reused for
   another shader would then draw with a stale translation unless shader

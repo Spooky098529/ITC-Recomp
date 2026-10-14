@@ -24,8 +24,11 @@
 #include <rex/graphics/registers.h>
 #include <rex/graphics/util/draw.h>
 #include <rex/graphics/xenos.h>
+#include <rex/cvar.h>
 #include <rex/hash.h>
 #include <rex/logging.h>
+
+REXCVAR_DECLARE(std::string, log_level);
 
 namespace native {
 
@@ -445,6 +448,9 @@ struct Passes::State {
   // SQ_PROGRAM_CNTL's param_gen set).
   std::map<uint64_t, uint32_t> param_gen_by_shader;
   std::map<uint64_t, uint64_t> interpolators_by_shader;  // placeholders for cube maps (debugging aid)
+  // Whether to fill the two maps above: they're only logged (at info level),
+  // and cost two shader hashes a draw.
+  bool collect_interfaces = true;
   struct WatchedDraw {
     uint64_t frame = 0;
     std::vector<uint32_t> system, vertex_floats, pixel_floats, bool_loop, fetch;
@@ -1735,6 +1741,8 @@ bool Passes::Init(const DeviceContext& context, uint8_t* base, uint32_t frames_i
   State& s = *state_;
   s.context = context;
   s.frames_in_flight = frames_in_flight;
+  const std::string& log_level = REXCVAR_GET(log_level);
+  s.collect_interfaces = log_level == "trace" || log_level == "debug" || log_level == "info";
   vk::vkGetPhysicalDeviceMemoryProperties(context.physical_device, &s.memory_properties);
   if (!s.CreateGuestMemoryMirror()) {
     return false;
@@ -1912,10 +1920,12 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
   interface.rectangle_list = rectangle_list;
   if (pixel_ucode && interface.param_gen_interpolator < 16) {
     s.stats.param_gen_draws++;
-    s.param_gen_by_shader[XXH3_64bits(pixel_ucode, pixel_size)] |=
-        1u << interface.param_gen_interpolator;
+    if (s.collect_interfaces) {
+      s.param_gen_by_shader[XXH3_64bits(pixel_ucode, pixel_size)] |=
+          1u << interface.param_gen_interpolator;
+    }
   }
-  if (pixel_ucode) {
+  if (pixel_ucode && s.collect_interfaces) {
     s.interpolators_by_shader[XXH3_64bits(pixel_ucode, pixel_size)] |=
         uint64_t(interface.interpolator_mask) << 16 * (program_control >> 18 & 1);
   }
