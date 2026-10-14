@@ -3,6 +3,7 @@
 #include <cstring>
 #include <map>
 #include <tuple>
+#include <unordered_map>
 #include <rex/graphics/pipeline/shader/spirv.h>
 #include <rex/graphics/pipeline/shader/spirv_translator.h>
 #include <rex/hash.h>
@@ -37,6 +38,25 @@ graphics::SpirvShaderTranslator::Features TranslatorFeatures(const ShaderFeature
   return features;
 }
 
+// Hashes for the caches' keys (looked up twice a draw; ordered maps of
+// tuples were ~3% of the render thread). The microcode hash is already
+// well mixed.
+struct TranslationKeyHash {
+  size_t operator()(
+      const std::tuple<ShaderStage, uint64_t, uint32_t, uint32_t, uint32_t, bool, bool>& key) const {
+    auto [stage, hash, num_reg, interpolators, param_gen, point, rectangle] = key;
+    uint64_t rest = uint64_t(num_reg) | (uint64_t(interpolators) << 8) |
+                    (uint64_t(param_gen) << 24) | (uint64_t(point) << 40) |
+                    (uint64_t(rectangle) << 41) | (uint64_t(stage) << 42);
+    return size_t(hash ^ (rest * 0x9E3779B97F4A7C15ull));
+  }
+};
+struct ShaderKeyHash {
+  size_t operator()(const std::pair<ShaderStage, uint64_t>& key) const {
+    return size_t(key.second ^ uint64_t(key.first));
+  }
+};
+
 }  // namespace
 
 struct ShaderCache::State {
@@ -46,10 +66,12 @@ struct ShaderCache::State {
   rex::string::StringBuffer disassembly;
   // Keyed by stage, microcode hash, register count and interface (the
   // modification depends on them).
-  std::map<std::tuple<ShaderStage, uint64_t, uint32_t, uint32_t, uint32_t, bool, bool>,
-           std::unique_ptr<TranslatedShader>>
+  std::unordered_map<std::tuple<ShaderStage, uint64_t, uint32_t, uint32_t, uint32_t, bool, bool>,
+                     std::unique_ptr<TranslatedShader>, TranslationKeyHash>
       translations;
-  std::map<std::pair<ShaderStage, uint64_t>, std::unique_ptr<graphics::SpirvShader>> shaders;
+  std::unordered_map<std::pair<ShaderStage, uint64_t>, std::unique_ptr<graphics::SpirvShader>,
+                     ShaderKeyHash>
+      shaders;
 
   // The shader, its microcode analyzed (made on first use).
   graphics::SpirvShader* Analyzed(ShaderStage stage, const uint8_t* ucode, uint32_t size_bytes,
