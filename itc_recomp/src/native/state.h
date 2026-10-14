@@ -6,6 +6,7 @@
 #pragma once
 
 #include <cstdint>
+#include <vector>
 #include <rex/graphics/register_file.h>
 
 namespace native {
@@ -14,6 +15,23 @@ namespace native {
 constexpr uint32_t kDevicePointer = 0x8296BD90;
 constexpr uint32_t kDevicePixelShader = 12432, kDeviceVertexShader = 12436;
 constexpr uint32_t kDeviceIndexBuffer = 12180;
+// The vertex declaration (its id at +48; a vertex shader object's +24 holds
+// the id of the one its microcode was last patched for).
+constexpr uint32_t kDeviceVertexDeclaration = 11552;
+// How often the library patched a vertex shader's microcode for a
+// declaration (sub_822AE340; render thread).
+extern uint32_t g_vertex_shader_patches;
+// The last patch's shader object, declaration and the declaration's id.
+extern uint32_t g_last_patch[3];
+// The last vertex shader the library patched as a copy in the command
+// buffer (see sub_822AE340's wrapper in replay_hooks.cpp): its object, the
+// declaration id it's patched for, and the patched microcode. object is 0
+// after a patch in place.
+struct LoadedVertexShader {
+  uint32_t object = 0, declaration_id = 0;
+  std::vector<uint8_t> microcode;
+};
+extern LoadedVertexShader g_loaded_vertex_shader;
 constexpr uint32_t kDeviceRenderTarget0 = 12184;
 // Scissor: enable (render state 200) and rectangle (left, top, right,
 // bottom) from SetScissorRect.

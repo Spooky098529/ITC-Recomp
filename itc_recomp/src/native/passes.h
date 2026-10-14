@@ -65,6 +65,13 @@ class Passes {
   // end of the frame; TakeLateWrites describes those that changed.
   void set_check_late_writes(bool check);
   std::string TakeLateWrites();
+  // A debugging aid: find copies into the mirror that change bytes an
+  // earlier draw's copy this frame put there (that draw then reads the new
+  // ones); TakeClobbers describes them.
+  void set_check_clobbers(bool check);
+  std::string TakeClobbers();
+  // Examples of draws counted in Stats::declaration_mismatches.
+  std::vector<std::string> TakeDeclarationLines();
   std::string TakeMirrorChanges();
   // A debugging aid: compare each main view draw's inputs with the same
   // draw's in the previous frame; TakeWatchLines gives how many changed (of
@@ -76,6 +83,8 @@ class Passes {
   // Which pixel shaders got PsParamGen, and with which interpolators.
   std::string TakeInterfaces();
   void set_base_level_only(bool base_only);
+  // A debugging aid: the texture cache's set_verify_every_frame.
+  void set_verify_textures(bool every_frame);
   std::vector<std::string> TakeWatchLines(uint64_t& changes, uint64_t& draws);
   // The distinct addresses of the last frame's resolve destinations.
   std::vector<uint32_t> resolve_addresses() const;
@@ -117,6 +126,15 @@ class Passes {
     // Draws with indices outside VGT_MIN/MAX_VTX_INDX (the shader clamps
     // them), and an example: lowest and highest index, the registers.
     uint64_t clamped_draws = 0, param_gen_draws = 0;
+    // Draws whose vertex shader's microcode, when read, was patched for
+    // another vertex declaration than the bound one, and an example (the
+    // shader's declaration id, the bound one's).
+    // Of those, draws whose library call patched a vertex shader.
+    uint64_t declaration_mismatches = 0, declaration_mismatches_patched = 0;
+    // Draws given the vertex shader copy the library patched in the
+    // command buffer (the object's own being patched for another declaration).
+    uint64_t vertex_shader_copies = 0;
+    std::array<uint32_t, 2> declaration_sample{};
     std::array<uint32_t, 4> clamped_sample{};
     std::array<uint32_t, 2> base_vertex_sample{};
     std::array<uint32_t, 5> vertex_overrun_sample{};

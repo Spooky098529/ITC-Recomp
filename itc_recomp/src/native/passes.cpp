@@ -362,7 +362,25 @@ struct Passes::State {
     uint64_t vertex_shader;
   };
   std::vector<CopiedRange> copied_ranges;
-  uint64_t current_vertex_shader = 0;
+  uint64_t current_vertex_shader = 0, current_pixel_shader = 0;
+  uint32_t vertex_shader_patches = 0;  // g_vertex_shader_patches at the last draw
+  std::vector<std::string> declaration_lines;
+  // With check_clobbers: the ranges copied this frame, by start (end,
+  // index or not, the shaders of the draw that copied it), to find copies
+  // that change bytes an earlier draw's copy put in the mirror (the GPU
+  // draws the whole frame after its copies, so that draw gets the new
+  // bytes). Counted per pair of shaders: earlier draw's, then this one's.
+  bool check_clobbers = false;
+  struct ClobberRange {
+    uint32_t end;
+    bool index;
+    uint64_t vertex_shader, pixel_shader;
+  };
+  std::multimap<uint32_t, ClobberRange> clobber_ranges;
+  uint32_t clobber_longest = 0;
+  uint64_t clobbers = 0, clobbered_bytes = 0, clobber_copies = 0;
+  std::map<std::array<uint64_t, 4>, uint64_t> clobbers_by_shaders;
+  std::string clobber_sample;
   uint8_t* last_base = nullptr;
   uint64_t late_written = 0, late_checked = 0;
   std::map<uint64_t, uint64_t> late_by_shader;  // vertex shader: count
@@ -497,6 +515,7 @@ struct Passes::State {
   bool CreateGuestMemoryMirror();
   bool CreateGuestMemoryMirror(GuestMirror& mirror);
   void Mirror(uint8_t* base, uint32_t address, uint32_t size, bool index);
+  void CheckClobbers(uint8_t* base, uint32_t address, uint32_t size, bool index);
   bool CreateRings();
   bool CreateDescriptors();
   bool CreateDummyTextures();
@@ -619,6 +638,9 @@ void Passes::State::Mirror(uint8_t* base, uint32_t address, uint32_t size, bool 
     copied_ranges.push_back({address, size, XXH3_64bits(PhysicalHostAddress(base, address), size),
                              index, current_vertex_shader});
   }
+  if (check_clobbers) {
+    CheckClobbers(base, address, size, index);
+  }
   if (check_mirror_frames) {
     uint64_t hash = XXH3_64bits(PhysicalHostAddress(base, address), size);
     auto [it, added] = range_history.try_emplace(key, RangeHistory{hash, 0, index});
@@ -629,6 +651,44 @@ void Passes::State::Mirror(uint8_t* base, uint32_t address, uint32_t size, bool 
   }
   std::memcpy(mirrors[frame].mapped + address, PhysicalHostAddress(base, address), size);
   stats.mirrored_bytes += size;
+}
+
+void Passes::State::CheckClobbers(uint8_t* base, uint32_t address, uint32_t size, bool index) {
+  // Earlier ranges overlapping this one: the mirror holds what their draws
+  // copied (the last copy of each byte); bytes differing from guest memory
+  // now are about to be replaced under them.
+  clobber_copies++;
+  uint32_t end = address + size;
+  uint32_t from = address > clobber_longest ? address - clobber_longest : 0;
+  const uint8_t* mirror = mirrors[frame].mapped;
+  const uint8_t* guest = PhysicalHostAddress(base, 0);
+  for (auto it = clobber_ranges.lower_bound(from);
+       it != clobber_ranges.end() && it->first < end; ++it) {
+    uint32_t lo = std::max(address, it->first), hi = std::min(end, it->second.end);
+    if (lo >= hi || !std::memcmp(mirror + lo, guest + lo, hi - lo)) {
+      continue;
+    }
+    uint32_t differing = 0, first = 0;
+    for (uint32_t a = lo; a < hi; a++) {
+      if (mirror[a] != guest[a]) {
+        first = differing++ ? first : a;
+      }
+    }
+    clobbers++;
+    clobbered_bytes += differing;
+    clobbers_by_shaders[{it->second.vertex_shader, it->second.pixel_shader, current_vertex_shader,
+                         current_pixel_shader}]++;
+    if (clobber_sample.empty()) {
+      clobber_sample = fmt::format(
+          "{} {:08X}-{:08X} of vs {:016X} ps {:016X} by {} {:08X}-{:08X} of vs {:016X} ps "
+          "{:016X}: {} bytes differ from {:08X}",
+          it->second.index ? "index" : "vertex", it->first, it->second.end,
+          it->second.vertex_shader, it->second.pixel_shader, index ? "index" : "vertex", address,
+          end, current_vertex_shader, current_pixel_shader, differing, first);
+    }
+  }
+  clobber_ranges.insert({address, {end, index, current_vertex_shader, current_pixel_shader}});
+  clobber_longest = std::max(clobber_longest, size);
 }
 
 bool Passes::State::CreateRings() {
@@ -1442,6 +1502,8 @@ void Passes::BeginFrame(uint32_t frame_index) {
   s.frame_resolves.clear();
   s.mirrored.clear();
   s.mirrored_hashes.clear();
+  s.clobber_ranges.clear();
+  s.clobber_longest = 0;
   s.id_draws.clear();
   s.id_drawn = false;
   s.watched_this_frame.clear();
@@ -1534,6 +1596,34 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
   const uint8_t* vertex_ucode =
       PhysicalHostAddress(base, GpuPhysicalAddress(guest::LoadU32(base, vertex_object + 48)));
   uint32_t vertex_size = guest::LoadU32(base, vertex_object + 600);
+  uint32_t declaration = guest::LoadU32(base, device + kDeviceVertexDeclaration);
+  uint32_t declaration_id = declaration ? guest::LoadU32(base, declaration + 48) : 0;
+  uint32_t patched_for = guest::LoadU32(base, vertex_object + 24);
+  bool patched = g_vertex_shader_patches != s.vertex_shader_patches;
+  s.vertex_shader_patches = g_vertex_shader_patches;
+  // The object's microcode is patched for another declaration: the GPU runs
+  // the copy the library patched in the command buffer instead.
+  const LoadedVertexShader& loaded = g_loaded_vertex_shader;
+  if (declaration_id != patched_for && loaded.object == vertex_object &&
+      loaded.declaration_id == declaration_id && loaded.microcode.size() == vertex_size) {
+    vertex_ucode = loaded.microcode.data();
+    patched_for = declaration_id;
+    s.stats.vertex_shader_copies++;
+  }
+  if (declaration_id != patched_for) {
+    s.stats.declaration_mismatches++;
+    s.stats.declaration_mismatches_patched += patched;
+    if (s.declaration_lines.size() < 6) {
+      s.declaration_lines.push_back(fmt::format(
+          "vs object {:08X} patched for {} ({:016X}), bound declaration {:08X} id {}; this "
+          "draw patched {}; last patch: object {:08X} declaration {:08X} id {}",
+          vertex_object, patched_for, XXH3_64bits(vertex_ucode, vertex_size), declaration,
+          declaration_id, patched, g_last_patch[0], g_last_patch[1], g_last_patch[2]));
+    }
+    if (!s.stats.declaration_sample[0] && !s.stats.declaration_sample[1]) {
+      s.stats.declaration_sample = {patched_for, declaration_id};
+    }
+  }
   const uint8_t* pixel_ucode =
       pixel_object
           ? PhysicalHostAddress(base, GpuPhysicalAddress(guest::LoadU32(base, pixel_object + 24)))
@@ -1614,6 +1704,7 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
   }
 
   current_vertex_shader = vertex->hash;
+  current_pixel_shader = pixel ? pixel->hash : 0;
   last_base = base;
 
   // Index buffer: +0 bit 31 = 32-bit, bits 29-30 = endianness; +24 address.
@@ -2373,6 +2464,10 @@ void Passes::State::WatchDraw(const TranslatedShader* vertex, const TranslatedSh
   last = std::move(now);
 }
 
+void Passes::set_verify_textures(bool every_frame) {
+  state_->textures.set_verify_every_frame(every_frame);
+}
+
 void Passes::set_base_level_only(bool base_only) {
   state_->textures.set_base_level_only(base_only);
 }
@@ -2429,6 +2524,39 @@ std::string Passes::TakeLateWrites() {
   s.late_written = s.late_checked = 0;
   s.late_by_shader.clear();
   s.late_sample.clear();
+  return text;
+}
+
+void Passes::set_check_clobbers(bool check) {
+  state_->check_clobbers = check;
+}
+
+std::vector<std::string> Passes::TakeDeclarationLines() {
+  return std::exchange(state_->declaration_lines, {});
+}
+
+std::string Passes::TakeClobbers() {
+  State& s = *state_;
+  std::string text =
+      fmt::format("{} of {} copies changed bytes an earlier copy this frame put in the mirror "
+                  "({} bytes)",
+                  s.clobbers, s.clobber_copies, s.clobbered_bytes);
+  if (!s.clobber_sample.empty()) {
+    text += ", e.g. " + s.clobber_sample + "; by shaders (earlier vs/ps, then vs/ps):";
+    std::vector<std::pair<uint64_t, std::array<uint64_t, 4>>> pairs;
+    for (const auto& [shaders, count] : s.clobbers_by_shaders) {
+      pairs.push_back({count, shaders});
+    }
+    std::sort(pairs.rbegin(), pairs.rend());
+    for (size_t i = 0; i < std::min<size_t>(pairs.size(), 12); i++) {
+      const auto& [count, k] = pairs[i];
+      text += fmt::format(" {:08X}/{:08X} by {:08X}/{:08X} x{};", k[0] >> 32, k[1] >> 32,
+                          k[2] >> 32, k[3] >> 32, count);
+    }
+  }
+  s.clobbers = s.clobbered_bytes = s.clobber_copies = 0;
+  s.clobbers_by_shaders.clear();
+  s.clobber_sample.clear();
   return text;
 }
 

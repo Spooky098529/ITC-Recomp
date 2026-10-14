@@ -4,6 +4,7 @@
 #include "debug/replay_stats.h"
 #include "guest.h"
 #include "renderer.h"
+#include "state.h"
 
 // Command handlers, wrapped so the stats logger and the native renderer
 // see every command. Command 7 (sub_8258FD48) is wrapped in blend_state.cpp.
@@ -18,6 +19,41 @@
     __imp__sub_##address(ctx, base);                                                \
     native::Renderer_AfterCommand(base, id, payload, arg1, arg2);                   \
   }
+
+// The library's vertex shader patcher (see "Vertex declaration" in
+// docs/gpu-functions.md): counted, so the native renderer can tell whether a
+// draw's library call patched the shader's microcode.
+namespace native {
+uint32_t g_vertex_shader_patches = 0;
+uint32_t g_last_patch[3] = {};
+LoadedVertexShader g_loaded_vertex_shader;
+}
+
+// When the GPU may still be using a vertex shader's microcode, the library
+// can't patch it in place: sub_822AEBF0 copies it into the command buffer
+// (IM_LOAD_IMMEDIATE) and patches the copy, leaving the object's microcode
+// (+48) and the id it's patched for (+24) as they were. The GPU then runs
+// the copy, and keeps running it while the shader isn't loaded again. So
+// the copy, once patched, is kept here for the native renderer.
+extern "C" REX_FUNC(sub_822AE340) {
+  REX_FUNC_PROLOGUE();
+  uint32_t object = ctx.r3.u32, microcode = ctx.r4.u32, declaration = ctx.r5.u32;
+  bool copy = microcode != guest::LoadU32(base, object + 48);
+  native::g_vertex_shader_patches++;
+  native::g_last_patch[0] = object;
+  native::g_last_patch[1] = declaration;
+  native::g_last_patch[2] = declaration ? guest::LoadU32(base, declaration + 48) : 0;
+  __imp__sub_822AE340(ctx, base);
+  if (copy) {
+    native::LoadedVertexShader& loaded = native::g_loaded_vertex_shader;
+    loaded.object = object;
+    loaded.declaration_id = declaration ? guest::LoadU32(base, declaration + 48) : 0;
+    uint32_t size = guest::LoadU32(base, object + 600);
+    loaded.microcode.assign(base + microcode, base + microcode + size);
+  } else {
+    native::g_loaded_vertex_shader.object = 0;  // the object's own, patched in place
+  }
+}
 
 REPLAY_COUNTED_HANDLER(8258FBD0, 1)
 REPLAY_COUNTED_HANDLER(8258FC30, 2)

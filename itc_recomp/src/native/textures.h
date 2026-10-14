@@ -64,6 +64,10 @@ class TextureCache {
   enum class Hide { kNone, kMemory, kMemoryFormat, kResolved, kResolvedAddress };
   // A debugging aid: samplers use only each texture's first level.
   void set_base_level_only(bool base_only) { base_level_only_ = base_only; }
+  // A debugging aid: hash every texture used again each frame (not every
+  // kVerifyInterval frames, a few a frame), to see whether textures replaced
+  // in memory are what's shown wrong meanwhile.
+  void set_verify_every_frame(bool every) { verify_every_frame_ = every; }
   void set_debug_hide(Hide hide, uint32_t value = 0) {
     debug_hide_ = hide;
     debug_hide_value_ = value;
@@ -83,6 +87,10 @@ class TextureCache {
     // being streamed in when first used), and an example: its address and
     // how many frames after loading.
     uint64_t changed_after_load = 0;
+    // Textures past their first frames found changed, and an example: its
+    // address and how many frames since it was last checked.
+    uint64_t changed_later = 0;
+    uint32_t changed_later_sample = UINT32_MAX, changed_later_frames = 0;
     uint32_t changed_after_load_sample = UINT32_MAX, changed_after_load_frames = 0;
     uint32_t textures = 0, samplers = 0;
     uint32_t unsupported_sample = UINT32_MAX;  // format << 8 | dimension
@@ -97,6 +105,7 @@ class TextureCache {
   std::unique_ptr<State> state_;
   Hide debug_hide_ = Hide::kNone;
   bool base_level_only_ = false;
+  bool verify_every_frame_ = false;
   uint32_t debug_hide_value_ = 0;
 };
 

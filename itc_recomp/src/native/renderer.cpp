@@ -1,4 +1,5 @@
 #include "renderer.h"
+#include "state.h"
 
 #include "passes.h"
 #include "shaders.h"
@@ -48,6 +49,9 @@ REXCVAR_DEFINE_STRING(native_renderer_cycle, "", "ITC",
 REXCVAR_DEFINE_BOOL(native_renderer_check_late_writes, false, "ITC",
                     "Log vertex and index ranges written after we copied them, by the end of "
                     "the frame (a debugging aid)");
+REXCVAR_DEFINE_BOOL(native_renderer_check_clobbers, false, "ITC",
+                    "Log copies into the mirror that change bytes an earlier draw's copy put "
+                    "there in the same frame (a debugging aid)");
 REXCVAR_DEFINE_STRING(native_renderer_watch_pixel_shader, "", "ITC",
                       "With native_renderer_watch_draws: only the draws of this pixel shader "
                       "(hash in hex)");
@@ -55,8 +59,14 @@ REXCVAR_DEFINE_STRING(native_renderer_skip_pixel_shader, "", "ITC",
                       "Leave out the draws of this pixel shader (hash in hex; a debugging aid)");
 REXCVAR_DEFINE_BOOL(native_renderer_base_level_only, false, "ITC",
                     "Sample only each texture's first level (a debugging aid)");
+REXCVAR_DEFINE_BOOL(native_renderer_verify_textures, false, "ITC",
+                    "Hash every texture used again each frame, reloading those whose memory "
+                    "changed (a debugging aid)");
 REXCVAR_DEFINE_BOOL(native_renderer_no_index_clamp, false, "ITC",
                     "Don't clamp indices to VGT_MIN/MAX_VTX_INDX (a debugging aid)");
+REXCVAR_DEFINE_INT32(native_renderer_dump_every, 0, "ITC",
+                     "With native_renderer_dump: dump only the frame itself (shown image, draw "
+                     "IDs, draws.txt) every this many seconds of a race (a debugging aid)");
 REXCVAR_DEFINE_STRING(native_renderer_dump, "", "ITC",
                       "Directory to dump frames into, as PFM files, with draws.txt describing "
                       "each draw: once 10 s into a race, and again whenever a file named 'now' "
@@ -205,6 +215,7 @@ class Renderer {
   std::vector<DumpStep> dump_steps_;
   uint32_t dump_step_ = 0;
   uint32_t race_frames_ = 0;
+  Clock::time_point last_dump_ = Clock::now();
 
   // This frame's commands (milestone 1: counted only).
   uint32_t frame_commands_ = 0, frame_draws_ = 0;
@@ -492,7 +503,13 @@ VkCommandBuffer Renderer::BeginFrame() {
     if (!dump_root.empty() && !dumping_) {
       std::error_code error;
       bool asked = std::filesystem::remove(dump_root + "/now", error);
-      if (asked || (dumps_ == 0 && passes_.frame_resolve_count() >= 20 && ++race_frames_ >= 600)) {
+      // With dump_every: a frame every that many seconds of a race.
+      int32_t every = REXCVAR_GET(native_renderer_dump_every);
+      bool in_race = passes_.frame_resolve_count() >= 20;
+      bool periodic = every > 0 && in_race && Clock::now() - last_dump_ >= std::chrono::seconds(every);
+      if (asked || periodic ||
+          (every <= 0 && dumps_ == 0 && in_race && ++race_frames_ >= 600)) {
+        last_dump_ = Clock::now();
         dumping_ = true;
         dump_step_ = 0;
         dump_steps_.clear();
@@ -532,12 +549,14 @@ VkCommandBuffer Renderer::BeginFrame() {
     passes_.set_record_draws(dumping_ && dump_step_ == 0);
     passes_.set_check_mirror_frames(REXCVAR_GET(native_renderer_check_mirror));
     passes_.set_check_late_writes(REXCVAR_GET(native_renderer_check_late_writes));
+    passes_.set_check_clobbers(REXCVAR_GET(native_renderer_check_clobbers));
     passes_.set_watch_draws(
         REXCVAR_GET(native_renderer_watch_draws),
         std::strtoull(REXCVAR_GET(native_renderer_watch_pixel_shader).c_str(), nullptr, 16));
     passes_.set_hide_cubes(REXCVAR_GET(native_renderer_hide_cubes));
     passes_.set_no_index_clamp(REXCVAR_GET(native_renderer_no_index_clamp));
     passes_.set_base_level_only(REXCVAR_GET(native_renderer_base_level_only));
+    passes_.set_verify_textures(REXCVAR_GET(native_renderer_verify_textures));
     recording_ = true;
   }
   return frame.commands;
@@ -569,7 +588,7 @@ void Renderer::EndFrame() {
   VkExtent2D source =
       dump ? passes_.EndFrame(commands, REXCVAR_GET(native_renderer_show_resolve), true,
                               dump_step_ ? dump_steps_[dump_step_ - 1].name : "shown",
-                              dump_step_ == 0)
+                              dump_step_ == 0 && REXCVAR_GET(native_renderer_dump_every) <= 0)
       : cycle_capture
           ? passes_.EndFrame(commands, REXCVAR_GET(native_renderer_show_resolve), true,
                              fmt::format("{:02}_{}", cycle_step_, cycle_steps_[cycle_step_].name),
@@ -676,7 +695,7 @@ void Renderer::EndFrame() {
   if (dump) {
     vk::vkQueueWaitIdle(queue_);
     passes_.WriteDump(dump_directory_);
-    if (dump_step_ == 0) {
+    if (dump_step_ == 0 && REXCVAR_GET(native_renderer_dump_every) <= 0) {
       // Each pixel shader the main view was drawn with, left out; then all
       // textures from memory, and all resolve destinations, hidden.
       using Hide = TextureCache::Hide;
@@ -743,6 +762,11 @@ void Renderer::LogStats() {
                 "frames",
                 t.changed_after_load, t.changed_after_load_sample, t.changed_after_load_frames);
   }
+  if (t.changed_later) {
+    REXLOG_INFO("native renderer: {} textures changed in memory after their first frames, e.g. "
+                "{:08X}, {} frames after it was last checked",
+                t.changed_later, t.changed_later_sample, t.changed_later_frames);
+  }
   if (t.mismatched_sample != UINT32_MAX) {
     REXLOG_INFO("native renderer: e.g. a texture of format {}, dimension {}, {}x{} where the "
                 "shader declares view type {}",
@@ -756,6 +780,22 @@ void Renderer::LogStats() {
     REXLOG_INFO("native renderer: {:.1f} draws a frame have indices outside VGT_MIN/MAX_VTX_INDX, "
                 "e.g. {}-{} against {}-{}",
                 double(view.clamped_draws) / frames, c[0], c[1], c[2], c[3]);
+  }
+  if (view.vertex_shader_copies) {
+    REXLOG_INFO("native renderer: {:.1f} draws a frame got their vertex shader from the library's "
+                "patched copy in the command buffer",
+                double(view.vertex_shader_copies) / frames);
+  }
+  if (view.declaration_mismatches) {
+    REXLOG_INFO("native renderer: {:.1f} draws a frame had a vertex shader patched for another "
+                "vertex declaration than the bound one ({:.1f} patched in their library call), "
+                "e.g. {} (bound {})",
+                double(view.declaration_mismatches) / frames,
+                double(view.declaration_mismatches_patched) / frames, view.declaration_sample[0],
+                view.declaration_sample[1]);
+  }
+  for (const std::string& line : passes_.TakeDeclarationLines()) {
+    REXLOG_INFO("native renderer: declaration mismatch: {}", line);
   }
   if (view.base_vertex_differs) {
     REXLOG_INFO("native renderer: {:.1f} draws a frame have a base vertex in their item other "
@@ -777,6 +817,9 @@ void Renderer::LogStats() {
     for (const std::string& line : lines) {
       REXLOG_INFO("native renderer: changed: {}", line);
     }
+  }
+  if (REXCVAR_GET(native_renderer_check_clobbers)) {
+    REXLOG_INFO("native renderer: {}", passes_.TakeClobbers());
   }
   if (REXCVAR_GET(native_renderer_check_late_writes)) {
     REXLOG_INFO("native renderer: {}", passes_.TakeLateWrites());

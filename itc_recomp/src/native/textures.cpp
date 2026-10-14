@@ -708,8 +708,10 @@ VkImageView TextureCache::GetView(uint8_t* base, const uint32_t fetch_words[6],
     }
   } else if (bool young = s.frame_number - t.loaded_frame < kNewTextureFrames;
              young ? s.frame_number - t.verified_frame >= kNewTextureInterval
+                   : verify_every_frame_ ? s.frame_number != t.verified_frame
                    : s.frame_number - t.verified_frame >= kVerifyInterval &&
                          s.verified_this_frame < kVerifiesPerFrame) {
+    uint64_t since_verified = s.frame_number - t.verified_frame;
     if (!young) {
       s.verified_this_frame++;
     }
@@ -723,6 +725,13 @@ VkImageView TextureCache::GetView(uint8_t* base, const uint32_t fetch_words[6],
           s.stats.changed_after_load_sample = t.layout.base_address ? t.layout.base_address
                                                                      : t.layout.mip_address;
           s.stats.changed_after_load_frames = uint32_t(s.frame_number - t.loaded_frame);
+        }
+      } else {
+        s.stats.changed_later++;
+        if (s.stats.changed_later_sample == UINT32_MAX) {
+          s.stats.changed_later_sample = t.layout.base_address ? t.layout.base_address
+                                                               : t.layout.mip_address;
+          s.stats.changed_later_frames = uint32_t(since_verified);
         }
       }
     }
