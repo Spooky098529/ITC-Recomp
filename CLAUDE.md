@@ -7,7 +7,9 @@ how frame interpolation works, every diagnostic option, and what didn't
 work. `docs/gpu-functions.md` covers how the game drives the GPU (the
 render command replay and the graphics library), and
 `docs/native-renderer.md` is the plan and progress of the native renderer
-that's to replace the emulated GPU. Read the relevant section before changing anything, and keep it up to
+that's to replace the emulated GPU. `docs/native-audio.md` is the same for
+the SDK's audio (the Audio Worker's spin, the game's sounds, the plan).
+Read the relevant section before changing anything, and keep it up to
 date as you learn things.
 
 ## Rules from the user
@@ -100,6 +102,11 @@ or shipped. Uncapped attract race: ~235 fps mean against the emulated GPU's
 155. Its known issues (boot movie, gamma, textures, window resizing,
 remaining packet writers, speed) are milestone 7 in
 `docs/native-renderer.md`.
+
+Sound goes through our own audio output (`--native_audio`, on in `run.sh`;
+branch `native-audio`): our thread runs the game's mixer, replacing the
+SDK's Audio Worker, whose polling took ~80% of a core. The SDK's XMA
+decoder is kept. See `docs/native-audio.md`.
 
 Releases are made by pushing a `v*` tag: CI builds the zip and publishes a
 GitHub release with generated notes, which are then replaced with notes
