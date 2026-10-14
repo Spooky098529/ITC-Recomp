@@ -933,6 +933,18 @@ To be fixed (or accepted) in milestone 7.
   wrapped) instead of hashing, but a freed object's memory reused for
   another shader would then draw with a stale translation unless shader
   creation and release are hooked too.
+- **A freeze while driving** (seen once by the user, 2026-10-14, in a
+  driven race after `4410ce8`, the indexed draw without packets; to look
+  into later, the user's call). The log (`itc_560.log`) shows no slow
+  second in the race (slowest 131 fps at the 144 cap) and the game's ticks
+  stayed at 30, so either the hitch was under ~0.1 s or the picture
+  stopped changing while frames still went out. The same race had **failed
+  draws** in its busiest 5 s windows (36 and 74 a frame, with 3,000-3,300
+  draws and up to 824 inline draws a frame; earlier logs had them once, 7
+  a frame), not known to be related. Since `895055b` the log names each
+  failed draw's reason ("failed draws a frame by reason") and any frame
+  taking 100 ms or more ("long frame"); the next run that shows either
+  should say which.
 - No Vulkan validation layer here yet (`--native_renderer_validation` falls
   back without it); install `vulkan-validation-layers` before drawing gets
   complicated.
