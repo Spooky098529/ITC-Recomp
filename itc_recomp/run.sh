@@ -5,7 +5,8 @@
 # default.xex, then run ./run.sh. Extra flags are passed on.
 #
 # The game draws with its own Vulkan renderer (the native renderer, in its
-# exclusive mode), not an emulated Xbox 360 GPU.
+# exclusive mode), not an emulated Xbox 360 GPU, and plays sound through
+# its own audio output (--native_audio), not the SDK's.
 #
 #   ./run.sh                     frame interpolation on (the default)
 #   ./run.sh --no-interpolation  the original 30 fps
@@ -33,7 +34,7 @@ done
 
 # The flag parser rejects a flag given twice, so a default is left out when
 # the same flag is passed in.
-flags=(--native_renderer=true --native_renderer_exclusive=true --game_data_root="$dir" --mnk_mode=true "${defaults[@]}" --log_level=off)
+flags=(--native_renderer=true --native_renderer_exclusive=true --native_audio=true --game_data_root="$dir" --mnk_mode=true "${defaults[@]}" --log_level=off)
 final=()
 for flag in "${flags[@]}"; do
   name="${flag%%=*}"

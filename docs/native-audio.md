@@ -187,10 +187,11 @@ Not known yet:
   frames played every 10 s (48,000 / 256 = 187.5 a second) and 0 silence
   fills in the race, 4 frames queued; the only fills were in the last
   window of one run, when `timeout` ended the game.
-- **Still to do**: the user listening (music, engines, menus, the boot
-  movie's sound, an in-race movie), and a stereo device as well as the
-  6-channel one here (a HyperX headset that SDL reports as 6 channels,
-  through PipeWire).
+- **The user listened** (2026-10-14, boot to a race, ~110 s logged): it
+  sounds fine; 0 silence fills. `run.sh` passes `--native_audio=true`
+  (also the flag's default), so release zips use it.
+- **Still to do**: a stereo device as well as the 6-channel one here (a
+  HyperX headset that SDL reports as 6 channels, through PipeWire).
 
 ## Tools
 
