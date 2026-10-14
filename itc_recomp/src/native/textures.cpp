@@ -318,6 +318,7 @@ TextureKey KeyOf(const uint32_t fetch[6]) {
 }  // namespace
 
 struct TextureCache::State {
+  uint64_t mismatched_total = 0;
   DeviceContext context{};
   VkPhysicalDeviceMemoryProperties memory_properties{};
 
@@ -650,6 +651,7 @@ VkImageView TextureCache::GetView(uint8_t* base, const uint32_t fetch_words[6],
     }
     if (view_type != VK_IMAGE_VIEW_TYPE_2D_ARRAY) {
       s.stats.mismatched++;
+    s.mismatched_total++;
       return VK_NULL_HANDLE;
     }
     return s.GetSwizzledView(t, fetch.swizzle, VK_IMAGE_VIEW_TYPE_2D_ARRAY);
@@ -812,6 +814,10 @@ bool TextureCache::GetResolveDestination(const uint32_t fetch_words[6], ResolveD
   out = {t.image, t.attachment_view, t.format.format, width, height, !t.loaded};
   t.loaded = true;  // written by the caller
   return true;
+}
+
+uint64_t TextureCache::mismatched_total() const {
+  return state_->mismatched_total;
 }
 
 bool TextureCache::DecodeGuest(uint8_t* base, const uint32_t fetch_words[6],

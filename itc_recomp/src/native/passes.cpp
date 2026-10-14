@@ -370,6 +370,8 @@ struct Passes::State {
   void DrawIds(VkCommandBuffer commands);
   uint64_t watch_pixel_shader = 0;  // only its draws, if set
   bool hide_cubes = false;
+  uint64_t mismatched_seen = 0;
+  std::unordered_set<std::string> mismatch_lines;
   bool no_index_clamp = false;  // debugging aid
   // Pixel shaders given PsParamGen (interpolators, a bit each), and the
   // interpolator masks each was translated with (bits 16-31: with
@@ -529,6 +531,10 @@ struct Passes::State {
   // can't be had yet.
   TextureCache textures;
   Image dummy_2d_array, dummy_3d, dummy_cube;
+  // Zero (transparent black) ones for a texture of another dimension than
+  // the shader declares: the plugin binds a null descriptor, which reads
+  // as zero.
+  Image zero_2d_array, zero_3d, zero_cube;
   VkSampler sampler = VK_NULL_HANDLE;
   // Texture set layouts by the shader's bindings; this frame's sets by
   // their contents.
@@ -884,16 +890,21 @@ bool Passes::State::CreateDescriptors() {
 bool Passes::State::CreateDummyTextures() {
   constexpr VkImageUsageFlags kUsage =
       VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-  if (!CreateImage(dummy_2d_array, VK_IMAGE_TYPE_2D, VK_IMAGE_VIEW_TYPE_2D_ARRAY,
-                   VK_FORMAT_R8G8B8A8_UNORM, {1, 1, 1}, 1, kUsage, VK_IMAGE_ASPECT_COLOR_BIT) ||
-      !CreateImage(dummy_3d, VK_IMAGE_TYPE_3D, VK_IMAGE_VIEW_TYPE_3D, VK_FORMAT_R8G8B8A8_UNORM,
-                   {1, 1, 1}, 1, kUsage, VK_IMAGE_ASPECT_COLOR_BIT) ||
-      !CreateImage(dummy_cube, VK_IMAGE_TYPE_2D, VK_IMAGE_VIEW_TYPE_CUBE,
-                   VK_FORMAT_R8G8B8A8_UNORM, {1, 1, 1}, 6, kUsage, VK_IMAGE_ASPECT_COLOR_BIT,
-                   VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT)) {
-    return false;
+  for (auto* set : {&dummy_2d_array, &zero_2d_array}) {
+    Image& array = set[0];
+    Image& volume = set == &dummy_2d_array ? dummy_3d : zero_3d;
+    Image& cube = set == &dummy_2d_array ? dummy_cube : zero_cube;
+    if (!CreateImage(array, VK_IMAGE_TYPE_2D, VK_IMAGE_VIEW_TYPE_2D_ARRAY,
+                     VK_FORMAT_R8G8B8A8_UNORM, {1, 1, 1}, 1, kUsage, VK_IMAGE_ASPECT_COLOR_BIT) ||
+        !CreateImage(volume, VK_IMAGE_TYPE_3D, VK_IMAGE_VIEW_TYPE_3D, VK_FORMAT_R8G8B8A8_UNORM,
+                     {1, 1, 1}, 1, kUsage, VK_IMAGE_ASPECT_COLOR_BIT) ||
+        !CreateImage(cube, VK_IMAGE_TYPE_2D, VK_IMAGE_VIEW_TYPE_CUBE, VK_FORMAT_R8G8B8A8_UNORM,
+                     {1, 1, 1}, 6, kUsage, VK_IMAGE_ASPECT_COLOR_BIT,
+                     VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT)) {
+      return false;
+    }
   }
-  // Clear them to white once, and leave them readable.
+  // Clear them to white or zero once, and leave them readable.
   VkDevice device = context.device;
   VkCommandPool command_pool;
   VkCommandPoolCreateInfo pool_info{VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO};
@@ -910,9 +921,16 @@ bool Passes::State::CreateDummyTextures() {
   VkCommandBufferBeginInfo begin{VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
   begin.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
   vk::vkBeginCommandBuffer(commands, &begin);
-  VkClearColorValue white{{1.0f, 1.0f, 1.0f, 1.0f}};
-  for (auto [image, layers] : {std::pair{dummy_2d_array.image, 1u}, std::pair{dummy_3d.image, 1u},
-                               std::pair{dummy_cube.image, 6u}}) {
+  VkClearColorValue white{{1.0f, 1.0f, 1.0f, 1.0f}}, zero{};
+  struct ToClear {
+    VkImage image;
+    uint32_t layers;
+    const VkClearColorValue* value;
+  };
+  for (auto [image, layers, value] :
+       {ToClear{dummy_2d_array.image, 1, &white}, ToClear{dummy_3d.image, 1, &white},
+        ToClear{dummy_cube.image, 6, &white}, ToClear{zero_2d_array.image, 1, &zero},
+        ToClear{zero_3d.image, 1, &zero}, ToClear{zero_cube.image, 6, &zero}}) {
     VkImageSubresourceRange range{VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, layers};
     VkImageMemoryBarrier barrier{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
     barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
@@ -924,7 +942,7 @@ bool Passes::State::CreateDummyTextures() {
     vk::vkCmdPipelineBarrier(commands, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
                              VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1,
                              &barrier);
-    vk::vkCmdClearColorImage(commands, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &white, 1,
+    vk::vkCmdClearColorImage(commands, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, value, 1,
                              &range);
     barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
     barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
@@ -1000,7 +1018,26 @@ VkDescriptorSet Passes::State::GetTextureSet(uint8_t* base, const TranslatedShad
     VkImageView view = hide_cubes && texture.view_type == VK_IMAGE_VIEW_TYPE_CUBE
                            ? VK_NULL_HANDLE
                            : textures.GetView(base, fetch, texture.view_type);
-    if (!view) {
+    bool mismatched = false;
+    if (uint64_t total = textures.mismatched_total(); total != mismatched_seen) {
+      mismatched = true;
+      // Which shaders sample a texture of another dimension than declared.
+      mismatched_seen = total;
+      std::string key = fmt::format(
+          "{} shader {:016X} fetch constant {} declares view type {}; texture {:08X} format {} "
+          "dimension {} {}x{}",
+          shader->stage == ShaderStage::kVertex ? "vertex" : "pixel", shader->hash,
+          texture.fetch_constant, int(texture.view_type), fetch[1] & 0xFFFFF000u, fetch[1] & 0x3F,
+          (fetch[5] >> 9) & 3, (fetch[2] & 0x1FFF) + 1, ((fetch[2] >> 13) & 0x1FFF) + 1);
+      if (mismatch_lines.size() < 20 && mismatch_lines.insert(key).second) {
+        REXLOG_INFO("native renderer: dimension mismatch: {} (frame {})", key, frames);
+      }
+    }
+    if (!view && mismatched) {
+      view = texture.view_type == VK_IMAGE_VIEW_TYPE_3D     ? zero_3d.view
+             : texture.view_type == VK_IMAGE_VIEW_TYPE_CUBE ? zero_cube.view
+                                                            : zero_2d_array.view;
+    } else if (!view) {
       view = texture.view_type == VK_IMAGE_VIEW_TYPE_3D     ? dummy_3d.view
              : texture.view_type == VK_IMAGE_VIEW_TYPE_CUBE ? dummy_cube.view
                                                             : dummy_2d_array.view;

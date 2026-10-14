@@ -106,6 +106,9 @@ class TextureCache {
     uint32_t mismatched_sample = UINT32_MAX, mismatched_width = 0, mismatched_height = 0;
   };
   Stats TakeStats();
+  // Lookups so far that found a texture of another dimension than declared
+  // (not reset by TakeStats).
+  uint64_t mismatched_total() const;
 
  private:
   struct State;

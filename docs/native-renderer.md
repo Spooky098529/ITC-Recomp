@@ -203,6 +203,19 @@ known about it; this file is the plan and its progress).
   target's 8192x8192, i.e. unbounded) with the scissor off. So clipping
   to them would clear only what's drawn anyway, and clearing the whole
   target is kept. Menus not checked.
+- **Textures of another dimension than declared** (2026-10-14): the
+  ~800-1,800 lookups per 5 s are car paint pixel shaders
+  (`919CB09ADFA6FA77`, `7ECFFC514C780F01`, main view, one to eight draws
+  a frame) declaring a cube map at fetch constant 6 while it holds the 2D
+  256x256 paint reflection map (resolve destination `1EC39000`). (The
+  earlier example, a DXT1 cube in a 2D slot, wasn't seen again.) The
+  plugin binds a null descriptor for a dimension it can't use (a 2D fetch
+  takes 1D, 2D or 3D, a cube fetch only a cube), which reads as zero; we
+  now bind zero (transparent black) placeholders for these too, instead of
+  the white ones kept for textures that can't be loaded. Hardly visible:
+  in 14 snapshots of an attract race those draws wrote 37 pixels in one
+  and 2 in another. The log names each shader and texture once
+  ("dimension mismatch").
 - Render targets 1-3 and resolves to a level or slice other than 0: none
   in a race (the per-5 s log shows 0 draws with targets 1-3 bound to
   another surface than 0, and 0 resolves skipped; 2026-10-14), so nothing
@@ -377,8 +390,8 @@ texture objects ("Resources"). The approach:
    checking against the emulated GPU's output.
 4. The black mirror went once resolves fed the texture cache; the rainbow
    effect didn't (it was the vertex shader patching, see above).
-5. Open: the textures logged as "of another dimension than declared"
-   (a log line names an example since `2c13992`; not run yet).
+5. The textures logged as "of another dimension than declared": car
+   paint shaders (see "Progress on milestone 4").
 
 ## Known issues
 
