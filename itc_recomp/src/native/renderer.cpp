@@ -791,7 +791,8 @@ void Renderer::LogStats() {
   if (view.failed) {
     static constexpr const char* kFailedDrawReasons[] = {
         "no target", "no vertex shader", "shader translation", "no index buffer",
-        "constants ring full", "texture set layout", "texture set"};
+        "constants ring full", "texture set layout", "texture set",
+        "inline vertex space full"};
     std::string reasons;
     for (size_t i = 0; i < view.failed_by.size(); i++) {
       if (view.failed_by[i]) {

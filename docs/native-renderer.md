@@ -1024,6 +1024,21 @@ To be fixed (or accepted) in milestone 7.
   failed draw's reason ("failed draws a frame by reason") and any frame
   taking 100 ms or more ("long frame"); the next run that shows either
   should say which.
+  The user then saw, in v0.3.0, the **HUD dropping out and flickering in
+  busy scenes**, with the game stuttering and freezing (2026-10-14). The
+  HUD is drawn last, so it's what a full per-frame buffer loses first: the
+  constants ring (32 MB, ~9 KB a draw, so ~3,500 draws; the failures above
+  came at ~3,050-3,400 attempted draws a frame), the texture descriptor
+  pool (4,096 sets) or the inline vertices (4 MB). Now (`renderer-fixes`)
+  the constants come in 64 MB blocks per frame (~7,000 draws each) and a
+  frame that fills its blocks gets another, kept for later frames; texture
+  sets come in pools of 8,192, grown the same way; the inline vertices,
+  part of the guest memory mirror, are fixed at 32 MB, and running out is
+  its own failed-draw reason. Each growth is logged ("block N added",
+  "pool N added"). Checked with 2 MB blocks and 256-set pools (up to 14
+  blocks a frame): no failed draws, the frame dumped looked right. Not yet
+  confirmed by the user in a driven race; whether the freezes had the same
+  cause isn't known.
 - **Performance: locked instructions are slow on the render thread** (a
   few hundred cycles each, 2026-10-14: the thread's many stores have to
   drain first). The shader reference count's compare-and-swap still costs

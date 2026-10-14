@@ -151,8 +151,10 @@ constexpr VkImageAspectFlags kDepthStencilAspects =
 // Resolve draws a frame can make (a descriptor set each).
 constexpr uint32_t kResolvesPerFrame = 256;
 
-// Per frame in flight: the draws' constants.
-constexpr VkDeviceSize kConstantRingSize = 32u << 20;
+// Per frame in flight: the draws' constants, in blocks of this size (about
+// 7,000 draws each); a frame that fills its blocks gets another, kept for
+// later frames.
+constexpr VkDeviceSize kConstantBlockSize = 64u << 20;
 // Fixed descriptor ranges of the constant buffers (set 1), so one set per
 // frame serves every draw through dynamic offsets.
 constexpr uint32_t kFloatConstantsRange = 256 * 16;
@@ -174,7 +176,7 @@ constexpr uint32_t RectangleIndexCount(uint32_t rectangles) {
 // Quad lists as triangle lists, 32-bit: (v0, v1, v2), (v0, v2, v3) a quad.
 constexpr uint32_t kQuadIndices = kRectangleIndices + 4 * RectangleIndexCount(kBuiltinPrimitives);
 constexpr uint32_t kInlineVertices = kQuadIndices + 4 * 6 * kBuiltinPrimitives;
-constexpr uint32_t kInlineVerticesSize = 4u << 20;
+constexpr uint32_t kInlineVerticesSize = 32u << 20;
 constexpr VkDeviceSize kMirrorSize = VkDeviceSize(kInlineVertices) + kInlineVerticesSize;
 
 // An inline draw's vertices: vertex fetch constant 95 (stream 0), as the
@@ -312,10 +314,11 @@ struct Target {
   }
 };
 
-// Texture descriptor sets (sets 2 and 3) a frame can allocate, and their
-// descriptors.
-constexpr uint32_t kTextureSetsPerFrame = 4096;
-constexpr uint32_t kTextureDescriptorsPerFrame = 16384;
+// Texture descriptor sets (sets 2 and 3) in each of a frame's texture
+// pools, and their descriptors; a frame that fills its pools gets another,
+// kept for later frames.
+constexpr uint32_t kTextureSetsPerPool = 8192;
+constexpr uint32_t kTextureDescriptorsPerPool = 32768;
 
 // The lowest and highest of `count` indices as the GPU reads them, leaving
 // out the restart index (all ones) when `skip_restart`; {UINT32_MAX, 0} if
@@ -600,17 +603,23 @@ struct Passes::State {
   // Source and destination pairs logged so far.
   std::unordered_set<uint64_t> logged_resolves;
 
-  struct Ring {
+  struct ConstantBlock {
     VkBuffer buffer = VK_NULL_HANDLE;
     VkDeviceMemory memory = VK_NULL_HANDLE;
     uint8_t* mapped = nullptr;
-    VkDescriptorSet constants_set = VK_NULL_HANDLE;
+    VkDescriptorPool pool = VK_NULL_HANDLE;
+    VkDescriptorSet set = VK_NULL_HANDLE;
+  };
+  struct Ring {
+    std::vector<ConstantBlock> blocks;
+    size_t block = 0;  // the one in use this frame
     // This frame's texture descriptor sets, reset with the frame.
-    VkDescriptorPool texture_pool = VK_NULL_HANDLE;
+    std::vector<VkDescriptorPool> texture_pools;
+    size_t texture_pool = 0;  // the one in use this frame
   };
   std::vector<Ring> rings;
   uint32_t frame = 0;
-  VkDeviceSize ring_offset = 0;
+  VkDeviceSize ring_offset = 0;  // in the block in use
 
   VkDescriptorPool pool = VK_NULL_HANDLE;
   VkDescriptorSetLayout shared_memory_layout = VK_NULL_HANDLE;
@@ -677,6 +686,12 @@ struct Passes::State {
   void Mirror(uint8_t* base, uint32_t address, uint32_t size, bool index);
   void CheckClobbers(uint8_t* base, uint32_t address, uint32_t size, bool index);
   bool CreateRings();
+  bool CreateConstantBlock(Ring& ring);
+  bool CreateTexturePool(Ring& ring);
+  // Makes room for a draw's constants in one block, moving to the next
+  // block (made if needed) when the one in use can't hold them.
+  bool ReserveDrawConstants();
+  ConstantBlock& constant_block() { return rings[frame].blocks[rings[frame].block]; }
   bool CreateDescriptors();
   bool CreateDummyTextures();
   VkDescriptorSetLayout GetTextureLayout(const TranslatedShader* shader,
@@ -905,43 +920,93 @@ void Passes::State::CheckClobbers(uint8_t* base, uint32_t address, uint32_t size
 }
 
 bool Passes::State::CreateRings() {
-  VkDevice device = context.device;
   rings.resize(frames_in_flight);
   for (Ring& ring : rings) {
-    VkBufferCreateInfo info{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
-    info.size = kConstantRingSize;
-    info.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-    info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    if (vk::vkCreateBuffer(device, &info, nullptr, &ring.buffer) != VK_SUCCESS) {
-      return false;
-    }
-    VkMemoryRequirements requirements;
-    vk::vkGetBufferMemoryRequirements(device, ring.buffer, &requirements);
-    VkMemoryAllocateInfo alloc{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
-    alloc.allocationSize = requirements.size;
-    alloc.memoryTypeIndex =
-        FindMemoryType(memory_properties, requirements.memoryTypeBits,
-                       VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-    if (alloc.memoryTypeIndex == UINT32_MAX ||
-        vk::vkAllocateMemory(device, &alloc, nullptr, &ring.memory) != VK_SUCCESS ||
-        vk::vkBindBufferMemory(device, ring.buffer, ring.memory, 0) != VK_SUCCESS ||
-        vk::vkMapMemory(device, ring.memory, 0, VK_WHOLE_SIZE, 0,
-                        reinterpret_cast<void**>(&ring.mapped)) != VK_SUCCESS) {
-      return false;
-    }
-    VkDescriptorPoolSize sizes[] = {
-        {VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kTextureDescriptorsPerFrame},
-        {VK_DESCRIPTOR_TYPE_SAMPLER, kTextureDescriptorsPerFrame},
-    };
-    VkDescriptorPoolCreateInfo pool_info{VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
-    pool_info.maxSets = kTextureSetsPerFrame;
-    pool_info.poolSizeCount = 2;
-    pool_info.pPoolSizes = sizes;
-    if (vk::vkCreateDescriptorPool(device, &pool_info, nullptr, &ring.texture_pool) !=
-        VK_SUCCESS) {
+    if (!CreateTexturePool(ring)) {
       return false;
     }
   }
+  return true;
+}
+
+bool Passes::State::CreateTexturePool(Ring& ring) {
+  VkDescriptorPoolSize sizes[] = {
+      {VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kTextureDescriptorsPerPool},
+      {VK_DESCRIPTOR_TYPE_SAMPLER, kTextureDescriptorsPerPool},
+  };
+  VkDescriptorPoolCreateInfo pool_info{VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
+  pool_info.maxSets = kTextureSetsPerPool;
+  pool_info.poolSizeCount = 2;
+  pool_info.pPoolSizes = sizes;
+  VkDescriptorPool pool;
+  if (vk::vkCreateDescriptorPool(context.device, &pool_info, nullptr, &pool) != VK_SUCCESS) {
+    return false;
+  }
+  ring.texture_pools.push_back(pool);
+  return true;
+}
+
+// Called once constants_layout exists (CreateDescriptors).
+bool Passes::State::CreateConstantBlock(Ring& ring) {
+  VkDevice device = context.device;
+  ConstantBlock block;
+  VkBufferCreateInfo info{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
+  info.size = kConstantBlockSize;
+  info.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+  info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+  if (vk::vkCreateBuffer(device, &info, nullptr, &block.buffer) != VK_SUCCESS) {
+    return false;
+  }
+  VkMemoryRequirements requirements;
+  vk::vkGetBufferMemoryRequirements(device, block.buffer, &requirements);
+  VkMemoryAllocateInfo alloc{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
+  alloc.allocationSize = requirements.size;
+  alloc.memoryTypeIndex =
+      FindMemoryType(memory_properties, requirements.memoryTypeBits,
+                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+  if (alloc.memoryTypeIndex == UINT32_MAX ||
+      vk::vkAllocateMemory(device, &alloc, nullptr, &block.memory) != VK_SUCCESS) {
+    vk::vkDestroyBuffer(device, block.buffer, nullptr);
+    return false;
+  }
+  if (vk::vkBindBufferMemory(device, block.buffer, block.memory, 0) != VK_SUCCESS ||
+      vk::vkMapMemory(device, block.memory, 0, VK_WHOLE_SIZE, 0,
+                      reinterpret_cast<void**>(&block.mapped)) != VK_SUCCESS) {
+    vk::vkDestroyBuffer(device, block.buffer, nullptr);
+    vk::vkFreeMemory(device, block.memory, nullptr);
+    return false;
+  }
+  VkDescriptorPoolSize size{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 5};
+  VkDescriptorPoolCreateInfo pool_info{VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
+  pool_info.maxSets = 1;
+  pool_info.poolSizeCount = 1;
+  pool_info.pPoolSizes = &size;
+  if (vk::vkCreateDescriptorPool(device, &pool_info, nullptr, &block.pool) != VK_SUCCESS) {
+    return false;
+  }
+  VkDescriptorSetAllocateInfo set_alloc{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
+  set_alloc.descriptorPool = block.pool;
+  set_alloc.descriptorSetCount = 1;
+  set_alloc.pSetLayouts = &constants_layout;
+  if (vk::vkAllocateDescriptorSets(device, &set_alloc, &block.set) != VK_SUCCESS) {
+    return false;
+  }
+  const uint32_t ranges[5] = {uint32_t(sizeof(Translator::SystemConstants)),
+                              kFloatConstantsRange, kFloatConstantsRange,
+                              kBoolLoopConstantsRange, kFetchConstantsRange};
+  VkDescriptorBufferInfo buffers[5];
+  VkWriteDescriptorSet writes[5];
+  for (uint32_t i = 0; i < 5; i++) {
+    buffers[i] = {block.buffer, 0, ranges[i]};
+    writes[i] = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+    writes[i].dstSet = block.set;
+    writes[i].dstBinding = i;
+    writes[i].descriptorCount = 1;
+    writes[i].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+    writes[i].pBufferInfo = &buffers[i];
+  }
+  vk::vkUpdateDescriptorSets(device, 5, writes, 0, nullptr);
+  ring.blocks.push_back(block);
   return true;
 }
 
@@ -949,11 +1014,10 @@ bool Passes::State::CreateDescriptors() {
   VkDevice device = context.device;
   VkDescriptorPoolSize sizes[] = {
       {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, frames_in_flight},
-      {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 5 * frames_in_flight},
   };
   VkDescriptorPoolCreateInfo pool_info{VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
-  pool_info.maxSets = 2 * frames_in_flight;
-  pool_info.poolSizeCount = 2;
+  pool_info.maxSets = frames_in_flight;
+  pool_info.poolSizeCount = 1;
   pool_info.pPoolSizes = sizes;
   if (vk::vkCreateDescriptorPool(device, &pool_info, nullptr, &pool) != VK_SUCCESS) {
     return false;
@@ -999,26 +1063,10 @@ bool Passes::State::CreateDescriptors() {
     vk::vkUpdateDescriptorSets(device, 1, &write, 0, nullptr);
   }
 
-  const uint32_t ranges[5] = {uint32_t(sizeof(Translator::SystemConstants)),
-                              kFloatConstantsRange, kFloatConstantsRange,
-                              kBoolLoopConstantsRange, kFetchConstantsRange};
   for (Ring& ring : rings) {
-    alloc.pSetLayouts = &constants_layout;
-    if (vk::vkAllocateDescriptorSets(device, &alloc, &ring.constants_set) != VK_SUCCESS) {
+    if (!CreateConstantBlock(ring)) {
       return false;
     }
-    VkDescriptorBufferInfo buffers[5];
-    VkWriteDescriptorSet writes[5];
-    for (uint32_t i = 0; i < 5; i++) {
-      buffers[i] = {ring.buffer, 0, ranges[i]};
-      writes[i] = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
-      writes[i].dstSet = ring.constants_set;
-      writes[i].dstBinding = i;
-      writes[i].descriptorCount = 1;
-      writes[i].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
-      writes[i].pBufferInfo = &buffers[i];
-    }
-    vk::vkUpdateDescriptorSets(device, 5, writes, 0, nullptr);
   }
 
   VkSamplerCreateInfo sampler_info{VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO};
@@ -1221,12 +1269,27 @@ VkDescriptorSet Passes::State::GetTextureSet(uint8_t* base, const TranslatedShad
   }
   auto it = texture_sets.emplace(key, VK_NULL_HANDLE).first;
   VkDescriptorSetAllocateInfo alloc{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
-  alloc.descriptorPool = rings[frame].texture_pool;
+  Ring& ring = rings[frame];
+  alloc.descriptorPool = ring.texture_pools[ring.texture_pool];
   alloc.descriptorSetCount = 1;
   alloc.pSetLayouts = &layout;
   if (vk::vkAllocateDescriptorSets(context.device, &alloc, &it->second) != VK_SUCCESS) {
+    // The pool in use is full: on to the next, made if needed.
     it->second = VK_NULL_HANDLE;
-    return VK_NULL_HANDLE;
+    ring.texture_pool++;
+    if (ring.texture_pool == ring.texture_pools.size()) {
+      if (!CreateTexturePool(ring)) {
+        ring.texture_pool--;
+        return VK_NULL_HANDLE;
+      }
+      REXLOG_INFO("native renderer: frame {} texture sets: pool {} added ({} sets each)",
+                  frame, ring.texture_pools.size(), kTextureSetsPerPool);
+    }
+    alloc.descriptorPool = ring.texture_pools[ring.texture_pool];
+    if (vk::vkAllocateDescriptorSets(context.device, &alloc, &it->second) != VK_SUCCESS) {
+      it->second = VK_NULL_HANDLE;
+      return VK_NULL_HANDLE;
+    }
   }
   std::vector<VkWriteDescriptorSet> writes(infos.size());
   for (size_t i = 0; i < infos.size(); i++) {
@@ -1372,12 +1435,33 @@ VkPipeline Passes::State::GetPipeline(const PipelineKey& key) {
 bool Passes::State::Reserve(VkDeviceSize size, uint32_t& offset, uint8_t*& data) {
   VkDeviceSize alignment = std::max<VkDeviceSize>(context.min_uniform_buffer_offset_alignment, 16);
   VkDeviceSize start = (ring_offset + alignment - 1) / alignment * alignment;
-  if (start + size > kConstantRingSize) {
+  if (start + size > kConstantBlockSize) {
     return false;
   }
   ring_offset = start + size;
   offset = uint32_t(start);
-  data = rings[frame].mapped + start;
+  data = constant_block().mapped + start;
+  return true;
+}
+
+bool Passes::State::ReserveDrawConstants() {
+  VkDeviceSize alignment = std::max<VkDeviceSize>(context.min_uniform_buffer_offset_alignment, 16);
+  constexpr VkDeviceSize kDrawConstants = sizeof(Translator::SystemConstants) +
+                                          2 * kFloatConstantsRange + kBoolLoopConstantsRange +
+                                          kFetchConstantsRange;
+  if (ring_offset + kDrawConstants + 5 * alignment <= kConstantBlockSize) {
+    return true;
+  }
+  Ring& ring = rings[frame];
+  if (ring.block + 1 == ring.blocks.size()) {
+    if (!CreateConstantBlock(ring)) {
+      return false;
+    }
+    REXLOG_INFO("native renderer: frame {} constants: block {} added ({} MB each)", frame,
+                ring.blocks.size(), kConstantBlockSize >> 20);
+  }
+  ring.block++;
+  ring_offset = 0;
   return true;
 }
 
@@ -1769,6 +1853,7 @@ void Passes::BeginFrame(uint32_t frame_index) {
   State& s = *state_;
   s.frame = frame_index;
   s.ring_offset = 0;
+  s.rings[frame_index].block = 0;
   s.rendering = false;
   s.bound_color = s.bound_depth = nullptr;
   s.main_view = nullptr;
@@ -1786,7 +1871,11 @@ void Passes::BeginFrame(uint32_t frame_index) {
   s.watched_this_frame.clear();
   s.frame_pixel_shaders.clear();
   s.texture_sets.clear();
-  vk::vkResetDescriptorPool(s.context.device, s.rings[frame_index].texture_pool, 0);
+  auto& ring = s.rings[frame_index];
+  for (size_t i = 0; i <= ring.texture_pool && i < ring.texture_pools.size(); i++) {
+    vk::vkResetDescriptorPool(s.context.device, ring.texture_pools[i], 0);
+  }
+  ring.texture_pool = 0;
   vk::vkResetDescriptorPool(s.context.device, s.resolve_pools[frame_index], 0);
   s.textures.BeginFrame(frame_index);
 }
@@ -2151,7 +2240,7 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
   // bool/loop, fetch.
   uint32_t offsets[5];
   uint8_t* data;
-  if (!s.Reserve(sizeof(system), offsets[0], data)) {
+  if (!s.ReserveDrawConstants() || !s.Reserve(sizeof(system), offsets[0], data)) {
     s.stats.failed++;
     s.stats.failed_by[4]++;
     return;
@@ -2255,9 +2344,9 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
   if (s.watch_draws && main_view_draw &&
       (!s.watch_pixel_shader || (pixel && pixel->hash == s.watch_pixel_shader))) {
     s.WatchDraw(vertex, pixel, index_address, primitive_count, key,
-                reinterpret_cast<const uint32_t*>(s.rings[s.frame].mapped + offsets[0]),
-                reinterpret_cast<const uint32_t*>(s.rings[s.frame].mapped + offsets[1]),
-                reinterpret_cast<const uint32_t*>(s.rings[s.frame].mapped + offsets[2]),
+                reinterpret_cast<const uint32_t*>(s.constant_block().mapped + offsets[0]),
+                reinterpret_cast<const uint32_t*>(s.constant_block().mapped + offsets[1]),
+                reinterpret_cast<const uint32_t*>(s.constant_block().mapped + offsets[2]),
                 &regs.values[XE_GPU_REG_SHADER_CONSTANT_BOOL_000_031],
                 &regs.values[XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0]);
   }
@@ -2355,7 +2444,7 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
   std::memcpy(blend_constants, &regs.values[0x2105], sizeof(blend_constants));
   vk::vkCmdSetBlendConstants(commands, blend_constants);
   vk::vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
-  VkDescriptorSet sets[4] = {s.mirrors[s.frame].set, s.rings[s.frame].constants_set,
+  VkDescriptorSet sets[4] = {s.mirrors[s.frame].set, s.constant_block().set,
                              vertex_textures, pixel_textures};
   vk::vkCmdBindDescriptorSets(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, key.layout, 0, 4, sets,
                               5, offsets);
@@ -2581,6 +2670,7 @@ void Passes::InlineDraw(VkCommandBuffer commands, uint8_t* base, uint32_t type, 
   uint32_t offset = (s.inline_offset + 15) & ~15u;
   if (!count || !stride || offset + size > kInlineVerticesSize) {
     s.stats.failed++;
+    s.stats.failed_by[7]++;
     return;
   }
   s.inline_offset = offset + size;
