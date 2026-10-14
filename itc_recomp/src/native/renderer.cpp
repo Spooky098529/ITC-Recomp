@@ -1,4 +1,5 @@
 #include "renderer.h"
+#include "app_window.h"
 #include "state.h"
 
 #include "passes.h"
@@ -111,6 +112,7 @@ void SDLCALL CreateWindowOnMainThread(void* data) {
   if (!setup->window) {
     return finish(fmt::format("SDL_CreateWindow: {}", SDL_GetError()));
   }
+  AppWindow_AdoptOurWindow(setup->window);
   auto get_instance_proc_addr =
       reinterpret_cast<PFN_vkGetInstanceProcAddr>(SDL_Vulkan_GetVkGetInstanceProcAddr());
   if (!get_instance_proc_addr || !vk::LoadGlobal(get_instance_proc_addr)) {

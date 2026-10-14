@@ -6,6 +6,8 @@
 
 #include <rex/rex_app.h>
 
+#include "native/app_window.h"
+
 class ItcApp : public rex::ReXApp {
  public:
   using rex::ReXApp::ReXApp;
@@ -14,6 +16,16 @@ class ItcApp : public rex::ReXApp {
       rex::ui::WindowedAppContext& ctx) {
     return std::unique_ptr<ItcApp>(new ItcApp(ctx, "itc",
         PPCImageConfig));
+  }
+
+  // The native renderer's exclusive mode hides this window and routes its
+  // own window's events to it (src/native/app_window.cpp).
+  bool SetupPresentation() override {
+    if (!rex::ReXApp::SetupPresentation()) {
+      return false;
+    }
+    native::AppWindow_SetSdkWindow(window());
+    return true;
   }
 
   // Override virtual hooks for customization:
