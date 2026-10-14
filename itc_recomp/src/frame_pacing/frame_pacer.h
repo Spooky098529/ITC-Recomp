@@ -53,6 +53,8 @@ class FramePacer {
   Clock::time_point last_log_{};
   int frames_since_log_ = 0;
   int ticks_since_log_ = 0;
+  int late_ticks_since_log_ = 0;
+  int dropped_ticks_since_log_ = 0;
 };
 
 FramePacer& GetFramePacer();

@@ -255,6 +255,18 @@ what the coming main loop pass is:
   consumes Update messages without delivering them and the input update is
   skipped, so the pass draws the same game state again.
 
+A due tick always wins: when the next tick is due (or overdue), the coming
+pass is a logic pass, even if a frame slot is also due. Until 2026-10-14
+the frame slot, counted from the last frame's start, could lie in the past
+behind an overdue tick after a frame longer than the cap's period, so the
+pass was drawn render-only and the tick waited another frame; a tick more
+than a whole tick late restarts the 30 Hz grid, and that time is lost. On
+the Steam Deck (render thread at ~98% of a core, 20-27 ms frames) races
+ran at 13-16 ticks a second while drawing ~40 fps: slow motion. The same
+happened here pinned to one CPU (`taskset -c 0`: 36-50 fps, 16-27 ticks);
+with the fix, 43-62 fps and 30 ticks. `--log_fps` counts each second's
+ticks released over a quarter of a tick late and grid restarts.
+
 Only races get render-only passes: menus record their UI and act on input
 during Update, so they flickered and repeated button presses. A pass is "in a
 race" when the last logic pass ran the race draw step `sub_8215B4F8`.
