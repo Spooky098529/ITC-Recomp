@@ -9,6 +9,8 @@ render command replay and the graphics library), and
 `docs/native-renderer.md` is the plan and progress of the native renderer
 that's to replace the emulated GPU. `docs/native-audio.md` is the same for
 the SDK's audio (the Audio Worker's spin, the game's sounds, the plan).
+`docs/windows.md` is the Windows build: cross-compiled on Linux, tested
+under Wine (the user has no Windows machine).
 Read the relevant section before changing anything, and keep it up to
 date as you learn things.
 
