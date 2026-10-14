@@ -608,7 +608,12 @@ struct Passes::State {
   // Texture set layouts by the shader's bindings; this frame's sets by
   // their contents.
   std::unordered_map<std::string, VkDescriptorSetLayout> texture_layouts;
+  // Each shader's layout (shaders are never freed, and have one stage).
+  std::unordered_map<const TranslatedShader*, VkDescriptorSetLayout> shader_texture_layouts;
   std::unordered_map<std::string, VkDescriptorSet> texture_sets;
+  // GetTextureSet's buffers, kept to save allocating them every draw.
+  std::vector<VkDescriptorImageInfo> set_infos;
+  std::string set_key;
   std::unordered_map<std::string, VkPipelineLayout> pipeline_layouts;
   std::unordered_map<std::string, VkPipeline> pipelines;
 
@@ -1053,6 +1058,13 @@ bool Passes::State::CreateDummyTextures() {
 
 VkDescriptorSetLayout Passes::State::GetTextureLayout(const TranslatedShader* shader,
                                                        VkShaderStageFlags stage) {
+  VkDescriptorSetLayout* cached = nullptr;
+  if (shader) {
+    cached = &shader_texture_layouts[shader];
+    if (*cached) {
+      return *cached;
+    }
+  }
   // Keyed by stage, the image types and the sampler count.
   std::string key(1, char(stage));
   if (shader) {
@@ -1063,6 +1075,9 @@ VkDescriptorSetLayout Passes::State::GetTextureLayout(const TranslatedShader* sh
   }
   VkDescriptorSetLayout& layout = texture_layouts[key];
   if (layout) {
+    if (cached) {
+      *cached = layout;
+    }
     return layout;
   }
   std::vector<VkDescriptorSetLayoutBinding> bindings;
@@ -1082,6 +1097,9 @@ VkDescriptorSetLayout Passes::State::GetTextureLayout(const TranslatedShader* sh
       VK_SUCCESS) {
     layout = VK_NULL_HANDLE;
   }
+  if (cached) {
+    *cached = layout;
+  }
   return layout;
 }
 
@@ -1091,7 +1109,8 @@ VkDescriptorSet Passes::State::GetTextureSet(uint8_t* base, const TranslatedShad
   // fetch constants; placeholders for what can't be had.
   size_t texture_count = shader ? shader->textures.size() : 0;
   size_t sampler_count = shader ? shader->samplers.size() : 0;
-  std::vector<VkDescriptorImageInfo> infos(texture_count + sampler_count);
+  std::vector<VkDescriptorImageInfo>& infos = set_infos;
+  infos.assign(texture_count + sampler_count, {});
   for (size_t i = 0; i < texture_count; i++) {
     const ShaderTexture& texture = shader->textures[i];
     const uint32_t* fetch =
@@ -1140,12 +1159,13 @@ VkDescriptorSet Passes::State::GetTextureSet(uint8_t* base, const TranslatedShad
   }
 
   // One set per distinct contents a frame.
-  std::string key(reinterpret_cast<const char*>(&layout), sizeof(layout));
+  std::string& key = set_key;
+  key.assign(reinterpret_cast<const char*>(&layout), sizeof(layout));
   key.append(reinterpret_cast<const char*>(infos.data()), infos.size() * sizeof(infos[0]));
-  auto [it, added] = texture_sets.try_emplace(key, VK_NULL_HANDLE);
-  if (!added) {
-    return it->second;
+  if (auto found = texture_sets.find(key); found != texture_sets.end()) {
+    return found->second;
   }
+  auto it = texture_sets.emplace(key, VK_NULL_HANDLE).first;
   VkDescriptorSetAllocateInfo alloc{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
   alloc.descriptorPool = rings[frame].texture_pool;
   alloc.descriptorSetCount = 1;
