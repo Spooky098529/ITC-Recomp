@@ -8,6 +8,8 @@
 #include <chrono>
 #include <cstdint>
 
+#include "log_enabled.h"
+
 namespace native {
 
 struct FrameCosts {
@@ -23,18 +25,26 @@ struct FrameCosts {
 
 inline FrameCosts g_frame_costs;
 
-// Adds the time from construction to destruction to `ns`.
+// Adds the time from construction to destruction to `ns`, when info
+// logging is on (nothing else reads it).
 class ScopedCost {
  public:
-  explicit ScopedCost(int64_t& ns) : ns_(ns), start_(std::chrono::steady_clock::now()) {}
+  explicit ScopedCost(int64_t& ns) : ns_(ns), timed_(InfoLogEnabled()) {
+    if (timed_) {
+      start_ = std::chrono::steady_clock::now();
+    }
+  }
   ~ScopedCost() {
-    ns_ += std::chrono::duration_cast<std::chrono::nanoseconds>(
-               std::chrono::steady_clock::now() - start_)
-               .count();
+    if (timed_) {
+      ns_ += std::chrono::duration_cast<std::chrono::nanoseconds>(
+                 std::chrono::steady_clock::now() - start_)
+                 .count();
+    }
   }
 
  private:
   int64_t& ns_;
+  bool timed_;
   std::chrono::steady_clock::time_point start_;
 };
 

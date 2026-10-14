@@ -916,6 +916,9 @@ memory).
   pipeline cache.
 - `frame_costs.h`: what a frame spent on texture loads, shader
   translations and pipeline creation, for the long frame log.
+- `log_enabled.h`: whether info logging is on. With it off (`run.sh`'s
+  `--log_level=off`), the 5 s stats, the frame cost timing and the
+  dimension mismatch descriptions do no work.
 - Testing: build, run the game in the background with
   `--native_renderer=true --skip_intro --attract_after_s=1`. With no input,
   an attract race starts about 1 s after launch (where `fps` goes above 30 in the

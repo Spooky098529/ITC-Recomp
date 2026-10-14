@@ -1,5 +1,6 @@
 #include "renderer.h"
 #include "frame_costs.h"
+#include "log_enabled.h"
 
 #include "buffers.h"
 #include "app_window.h"
@@ -792,6 +793,11 @@ void Renderer::EndFrame() {
 void Renderer::LogStats() {
   auto now = Clock::now();
   if (now - last_log_ < std::chrono::seconds(5)) {
+    return;
+  }
+  if (!InfoLogEnabled()) {
+    // Nothing would be printed: leave the counters to run on.
+    last_log_ = now;
     return;
   }
   double seconds = std::chrono::duration<double>(now - last_log_).count();

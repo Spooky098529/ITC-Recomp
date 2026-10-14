@@ -1,5 +1,6 @@
 #include "passes.h"
 #include "frame_costs.h"
+#include "log_enabled.h"
 #include "disk_cache.h"
 
 #include "generated_id_frag.h"
@@ -1315,15 +1316,17 @@ VkDescriptorSet Passes::State::GetTextureSet(uint8_t* base, const TranslatedShad
     bool mismatched = false;
     if (uint64_t total = textures.mismatched_total(); total != mismatched_seen) {
       mismatched = true;
-      // Which shaders sample a texture of another dimension than declared.
       mismatched_seen = total;
+    }
+    // Which shaders sample a texture of another dimension than declared.
+    if (mismatched && mismatch_lines.size() < 20 && InfoLogEnabled()) {
       std::string key = fmt::format(
           "{} shader {:016X} fetch constant {} declares view type {}; texture {:08X} format {} "
           "dimension {} {}x{}",
           shader->stage == ShaderStage::kVertex ? "vertex" : "pixel", shader->hash,
           texture.fetch_constant, int(texture.view_type), fetch[1] & 0xFFFFF000u, fetch[1] & 0x3F,
           (fetch[5] >> 9) & 3, (fetch[2] & 0x1FFF) + 1, ((fetch[2] >> 13) & 0x1FFF) + 1);
-      if (mismatch_lines.size() < 20 && mismatch_lines.insert(key).second) {
+      if (mismatch_lines.insert(key).second) {
         REXLOG_INFO("native renderer: dimension mismatch: {} (frame {})", key, frames);
       }
     }
