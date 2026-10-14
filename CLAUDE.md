@@ -37,6 +37,10 @@ XDG_DATA_DIRS=/usr/local/share:/usr/share LD_LIBRARY_PATH=$B:rexglue-sdk/out/lin
 find /dev/shm -maxdepth 1 -user "$USER" -name 'xenia_memory_*' -delete
 ```
 
+- The release preset builds with ThinLTO (`ITC_LTO`, game and SDK), which
+  needs lld (`ld.lld`). Measured 2026-10-14, two alternating uncapped attract
+  races each: 236 and 237 fps mean without, 246 and 239 with; the user kept
+  it. `-DITC_LTO=OFF` turns it off.
 - That's what `run.sh` runs: our own renderer, no GPU plugin. For the
   emulated GPU (to compare), replace the two `--native_renderer` flags
   with `--gpu_plugin=xenos`; the plugin is built but no longer shipped.

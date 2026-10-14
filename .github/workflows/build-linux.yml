@@ -41,6 +41,8 @@ jobs:
           apt-get install -y clang-20 lld-20
           update-alternatives --install /usr/bin/clang clang /usr/bin/clang-20 200
           update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-20 200
+          # The release preset links with lld (ThinLTO, ITC_LTO).
+          update-alternatives --install /usr/bin/ld.lld ld.lld /usr/bin/ld.lld-20 200
 
       - name: Install build dependencies
         run: |

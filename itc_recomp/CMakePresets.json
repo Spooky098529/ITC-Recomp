@@ -107,7 +107,7 @@
             "name": "linux-amd64-release",
             "displayName": "Linux AMD64 Release",
             "inherits": "linux-base",
-            "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
+            "cacheVariables": { "CMAKE_BUILD_TYPE": "Release", "ITC_LTO": "ON" }
         },
         {
             "name": "win-amd64-relwithdebinfo",

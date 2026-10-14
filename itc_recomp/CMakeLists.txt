@@ -39,6 +39,14 @@ if(REXSDK_DIR)
     endforeach()
 endif()
 
+# ThinLTO with lld, for the game and the SDK (set before the SDK is added).
+option(ITC_LTO "Build with ThinLTO (needs lld)" OFF)
+if(ITC_LTO)
+    add_compile_options(-flto=thin)
+    add_link_options(-flto=thin -fuse-ld=lld
+        -Wl,--thinlto-cache-dir=${CMAKE_BINARY_DIR}/thinlto-cache)
+endif()
+
 include(generated/rexglue.cmake)
 
 # Sources
