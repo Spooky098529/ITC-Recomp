@@ -84,9 +84,23 @@ command list. In a race its draw (vtable slot 3) is `sub_825A17A0`, which
 draws the stored vertices (command 5's 24-byte vertices) through
 BeginVertices: 4-vertex triangle strips (screen-space quads, with
 PA_CL_VTE_CNTL's bit toggled around them by command 15).
-`sub_8258F5C0`, reached only through a table (no direct calls), makes
-the same draw outside the command list: one 3-vertex triangle list a frame
-in a race, likely the minimap's player triangle (not drawn natively yet).
+`sub_8258F5C0`, command 15 of the second table (below), makes the same
+draw for the minimap's player triangle (a 3-vertex triangle list).
+
+### Single commands
+
+The chain walker `sub_8258EE98` takes items of kinds 0-6 (the item's first
+halfword) through a jump table: kind 1 is `sub_8258E698` (the command
+lists above), kind 0 `sub_8258E630`, which walks single commands, a
+16-byte slot each (`[id, arguments]`), through a **second table at
+`0x8265ED48`** with the same ids (2026-10-14): e.g. 15 `sub_8258F5C0`, 17
+`sub_8258F770` (DrawVertices: type +4, start +8, count +12), 18
+`sub_8258F7C8` (indexed: type +4, base | start +8, count +12), 19
+`sub_8258F828` (inline: type +4, count +8, stride +10, data +12), 25
+`sub_8258F9A0`, 26 `sub_8258FAC8`, 27 `sub_8258FB20`; 0 and 29-36 are
+`sub_825C8388`. Counted in a race: only 5, 7, 13 and 15, several a frame,
+for the minimap's player triangle. Kinds 2-5 (`sub_8258E718`,
+`sub_8258E780`, `sub_8258E7E8`, `sub_8258E868`) aren't looked at yet.
 
 ### Inline vertex draws
 

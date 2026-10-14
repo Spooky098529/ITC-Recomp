@@ -135,3 +135,18 @@ REPLAY_COUNTED_HANDLER(825909E8, 33)
 REPLAY_COUNTED_HANDLER(82590A68, 34)
 REPLAY_COUNTED_HANDLER(82590AD0, 35)
 
+
+// The chain walker (sub_8258EE98) also has items of single commands, a
+// slot each ([id, arguments]), dispatched by sub_8258E630 through a second
+// table at 0x8265ED48 with the same ids. In a race only 5, 7, 13 and 15
+// come this way (a few a frame: the minimap's player triangle). Its 15,
+// the helper object's draw, is marked as command 15 so the native renderer
+// draws its inline vertices; the others reach the device's shadow, which
+// the renderer reads anyway.
+extern "C" REX_FUNC(sub_8258F5C0) {
+  REX_FUNC_PROLOGUE();
+  uint32_t outer_command = native::g_current_command;
+  native::g_current_command = 15;
+  __imp__sub_8258F5C0(ctx, base);
+  native::g_current_command = outer_command;
+}

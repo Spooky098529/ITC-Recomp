@@ -187,11 +187,15 @@ known about it; this file is the plan and its progress).
   and the 16_16 pass match; the bloom chain (11-22) is smooth in ours and
   blocky in the emulated GPU's, and the user judged ours (and our motion
   blur) the more correct.
-- Still different from the emulated GPU: the minimap's player triangle is
-  missing (drawn by `sub_8258F5C0` outside the command list, not drawn
-  yet), and some objects' colours differ in the final frame and the
-  mirror (ours: a yellow sign and pink underglow; the emulated GPU's: cyan
-  and blue-violet; tail lights red in both). Not looked into yet.
+- The minimap's player triangle comes from the second command table (see
+  "Single commands" in `gpu-functions.md`): its helper draw
+  (`sub_8258F5C0`) is wrapped as command 15, and drawn since.
+- Some colours differ between our resolves and the emulated GPU's as read
+  back from memory (ours: a yellow sign, pink underglow and a yellow
+  minimap triangle; the read-back ones: cyan, blue-violet and cyan; red
+  tail lights in both). Ours are right: the user sees them yellow in the
+  game's own window too, so the read-back copy (or its decoding) has red
+  and blue swapped for some formats. Keep that in mind when comparing.
 - Not yet: clear rects, render targets 1-3, resolves to a level or slice
   other than 0.
 
