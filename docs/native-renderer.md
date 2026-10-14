@@ -505,10 +505,27 @@ step 1's logs are there to find them before anything is stubbed.
   logs the tiling worker's calls and kicks from threads other than the
   render thread. The approach (the user's direction): remove what makes
   the library need a GPU, rather than imitate the GPU's timing.
-- **Without the plugin, boot stalls in about half the runs**, right after
-  the first front buffer resolve and before the boot callback
-  (`82481B68`); not yet looked into. Candidates: the vblank interrupts and
-  the MMIO registers at `0x7FC80000` that the plugin supplied.
+- **The boot stall without the plugin comes from `--skip_intro`**, not
+  from the plugin's absence (2026-10-14). It happened in about 1 boot in 6
+  to 1 in 25, always right after the first front buffer resolve. A stalled
+  run's game threads all sleep, so it's a wait, not a spin. gdb showed:
+  - the render thread inside the boot movie's start (the replay handler
+    `sub_8258E9B8` → `sub_820AE958`, which starts the 1280x720 movie
+    through `sub_82481A70`), asleep in the movie player's loop
+    `sub_82491C50`. That loop waits with no timeout on a kernel event at
+    player +84 or +132 (`sub_824909A0`, `sub_824909E8`), set by
+    `sub_82490A60` and `sub_82490A90`;
+  - the movie's decoder threads asleep (`sub_824908A0`, `sub_824908D0`);
+  - the main thread already in `Boot::EndMovie` (`sub_82107BF8` →
+    `sub_820AE528` → `sub_8258D8C8`), waiting on the render thread.
+
+  `--skip_intro` makes the movie step report the movie finished at once,
+  so the movie is stopped while it's still starting. The user's call: it's
+  fine without `--skip_intro`, so players aren't affected and nothing is
+  changed. For automated runs, a boot that never shows "called from
+  8248466C" in the log has stalled; restart it. (The vblank interrupts
+  and the MMIO range at `0x7FC80000`, the earlier candidates, weren't
+  needed to explain it.)
 
 ## Tools (all debugging aids)
 
