@@ -58,7 +58,7 @@ known about it; this file is the plan and its progress).
 | 2 | **Main view geometry**: vertex and index buffers read from guest memory, shaders translated, render states mapped to pipelines. | Race geometry is visible in our window, untextured. | Done (2026-10-13): the cockpit view's geometry, the right way up, solid, with the game's coloured lighting on white placeholder textures (screenshot checked). |
 | 3 | **Textures**: untile and upload (mostly BC1-BC3), samplers from the fetch constants. | The main view looks right without effects. | Done (2026-10-13): signs, gauges, fences, buildings and road textured correctly (screenshot checked); what comes from resolves is still missing. |
 | 4 | **The other passes**: each pass renders into a Vulkan image of its resolve's size and format; resolves become copies. | Shadows, reflections and the mirror work. | Done (2026-10-14): every pass draws, inline vertex draws included; clears and resolves work; the user saw the car's shadow, the mirror and the reflections right in our window (cockpit and third person), and the resolves match the emulated GPU's (`--readback_resolve=full`), except its blocky bloom. Menus not checked. |
-| 5 | **Post-processing, HUD, present**, then exclusive mode. | A race is fully native; measure the frame rate. | In progress: the final frame (with the attract logo) shows. |
+| 5 | **Post-processing, HUD, present**, then exclusive mode. | A race is fully native; measure the frame rate. | In progress: the final frame with the HUD shows (checked by the user in a race). |
 | 6 | **Menus**. | The emulated GPU is no longer needed. | |
 
 ## Progress on milestone 2
@@ -290,6 +290,16 @@ a vertex shader patched for another vertex declaration.
   "Import Tuner Challenge" logo (a 208x128 texture). Attract races have
   no HUD; the greyscale in some attract shots is the attract mode's own
   effect (the user confirmed).
+- **Checked by the user in a free run race (2026-10-14, cockpit view,
+  side by side):** the whole HUD shows in our window as in the game's
+  (minimap with its triangle and place name, mirror, gauges, gear, speed,
+  ASSIST bar); the only difference seen is the known gamma (ours lighter).
+  81-98 fps in the race with the renderer in development mode.
+- Seen on the way, for milestone 6: in the menus our window draws the 2D
+  interface right but not the 3D car on the Free Run screen (car, floor
+  reflection, light beams) nor the Course In screen's night city picture
+  (black in ours). The menus also log ~6,000 lookups per 5 s of a texture
+  of another dimension than declared.
 
 ## Tools (all debugging aids)
 
