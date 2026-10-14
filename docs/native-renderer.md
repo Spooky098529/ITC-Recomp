@@ -61,7 +61,7 @@ known about it; this file is the plan and its progress).
 | 4 | **The other passes**: each pass renders into a Vulkan image of its resolve's size and format; resolves become copies. | Shadows, reflections and the mirror work. | Done (2026-10-14): every pass draws, inline vertex draws included; clears and resolves work; the user saw the car's shadow, the mirror and the reflections right in our window (cockpit and third person), and the resolves match the emulated GPU's (`--readback_resolve=full`), except its blocky bloom. Menus not checked. |
 | 5 | **The final frame and the menus** (still in development mode): post-processing, HUD, the frame's end, then every menu screen. | Races and menus look as in the game's window, side by side. | In progress: the final frame with the HUD shows (checked by the user in a race); menus' tiled 3D views fixed. |
 | 6 | **Exclusive mode**: the emulated GPU gets no work and then isn't loaded at all; the graphics library is kept for what our renderer needs from it (see "Plan for milestone 6"); then measure. | The GPU plugin isn't loaded; frame rate measured against the emulated GPU. | Done (2026-10-14): the plugin isn't loaded (`run.sh` runs exclusive mode); measured: 135 fps mean uncapped against the emulated GPU's 155, then ~235 after the speed work (step 5; holds the 144 cap in an attract race). The library's remaining packet writers moved to milestone 7 (the user's call); the frame's end (step 6) measured at ~0.2% of the render thread and left as it is. |
-| 7 | **Known issues cleanup**: what's under Known issues below (the boot movie, an in-game movie locking up the game, gamma, textures replaced in memory, textures never freed, window resizing, the library's remaining packet writers, further speed work on our renderer, the freezes while driving to re-examine, no window without Vulkan surface support). | The known issues are fixed or accepted. | |
+| 7 | **Known issues cleanup**: what's under Known issues below (the boot movie, an in-game movie locking up the game, gamma, textures replaced in memory, textures never freed, the library's remaining packet writers, further speed work on our renderer, the freezes while driving to re-examine, no window without Vulkan surface support). | The known issues are fixed or accepted. | |
 
 ## Progress on milestone 2
 
@@ -1002,10 +1002,13 @@ To be fixed (or accepted) in milestone 7.
 - Textures are never freed: memory reused for different textures (another
   race) leaves the old images behind.
 
-- **Resizing the window doesn't resize the swapchain** on Wayland: the
-  compositor leaves the size to us and never reports the swapchain out of
-  date, so the image stays 1280x720. Fix later by watching the window's
-  size-change events (on the main thread) and recreating the swapchain.
+- **Resizing the window and the swapchain** on Wayland: the compositor
+  leaves the size to us and never reports the swapchain out of date, so the
+  swapchain likely stays 1280x720. The user sees the image follow the
+  window's size (2026-10-14), so to players it isn't a problem (maybe the
+  compositor scales it); not a player-facing limit any more. Recreating
+  the swapchain on the window's size-change events would still give a
+  sharper image at other sizes.
 - **Performance: shaders are found by hashing their microcode every
   draw** (~5% of the render thread, 2026-10-14 profile, before the caches
   became hash maps). Translations are cached by content hash, so each
