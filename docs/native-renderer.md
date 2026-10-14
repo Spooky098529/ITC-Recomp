@@ -735,6 +735,21 @@ To be fixed (or accepted) in milestone 7.
   compositor leaves the size to us and never reports the swapchain out of
   date, so the image stays 1280x720. Fix later by watching the window's
   size-change events (on the main thread) and recreating the swapchain.
+- **Performance: shaders are found by hashing their microcode every
+  draw** (~5% of the render thread, 2026-10-14 profile, before the caches
+  became hash maps). Translations are cached by content hash, so each
+  patched version of a vertex shader is translated once; the cost is
+  finding which one a draw uses. Each draw hashes the same microcode
+  several times: `ShaderCache::GetInterface` (both shaders, through
+  `Analyzed`), `ShaderCache::Get` (each again), and the two diagnostic
+  maps `param_gen_by_shader` and `interpolators_by_shader` in
+  `passes.cpp` (the pixel shader twice more). Cheap fix: hash each once a
+  draw and pass the hash along, and hash for the diagnostics only when
+  they're logged. Further: key by what the library tracks (the shader
+  object and the declaration it's patched for; `sub_822AE340` is already
+  wrapped) instead of hashing, but a freed object's memory reused for
+  another shader would then draw with a stale translation unless shader
+  creation and release are hooked too.
 - No Vulkan validation layer here yet (`--native_renderer_validation` falls
   back without it); install `vulkan-validation-layers` before drawing gets
   complicated.
