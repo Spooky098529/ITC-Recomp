@@ -1023,21 +1023,29 @@ To be fixed (or accepted) in milestone 7.
   the swapchain on the window's size-change events would still give a
   sharper image at other sizes.
 - **Performance: shaders are found by hashing their microcode every
-  draw** (~5% of the render thread, 2026-10-14 profile, before the caches
-  became hash maps). Translations are cached by content hash, so each
-  patched version of a vertex shader is translated once; the cost is
-  finding which one a draw uses. Each draw hashes the same microcode
-  several times: `ShaderCache::GetInterface` (both shaders, through
-  `Analyzed`) and `ShaderCache::Get` (each again); with logging at info
-  or below, also the two diagnostic maps `param_gen_by_shader` and
-  `interpolators_by_shader` in `passes.cpp` (the pixel shader twice more;
-  ~0.7% of the render thread, skipped since 2026-10-14 when `--log_level`
-  is warn or above, as in `run.sh`). Cheap fix: hash each once a draw and
-  pass the hash along. Further: key by what the library tracks (the shader
-  object and the declaration it's patched for; `sub_822AE340` is already
-  wrapped) instead of hashing, but a freed object's memory reused for
-  another shader would then draw with a stale translation unless shader
-  creation and release are hooked too.
+  draw.** Translations are cached by content hash, so each patched version
+  of a vertex shader is translated once; the cost is finding which one a
+  draw uses. Since 2026-10-14 each microcode is hashed once a draw
+  (`MicrocodeHash`, passed to `ShaderCache::GetInterface` and `Get`, and
+  used by the diagnostic maps), not four to six times. Further: key by
+  what the library tracks (the shader object and the declaration it's
+  patched for; `sub_822AE340` is already wrapped) instead of hashing, but
+  a freed object's memory reused for another shader would then draw with a
+  stale translation unless shader creation and release are hooked too.
+- **Performance: string-keyed caches** (fixed 2026-10-14). Pipelines, the
+  ID pass's pipelines and pipeline layouts were keyed by `std::string`
+  copies of their keys (a 96-byte `PipelineKey`: a `malloc` and a byte
+  hash and compare every draw), and texture sets by a string of their
+  contents in a map cleared every frame (a node and a key allocated per
+  set). Now `PipelineKey` and handle pairs are the keys, and texture sets
+  use `FrameSetCache` (an open-addressed table and one key buffer, kept
+  between frames). With the shader hashing above: uncapped attract race
+  239 to 258 fps mean (10th percentile 191 to 206; two runs each). The
+  profile before (2026-10-14, uncapped, render thread): recompiled game
+  code and graphics library 21%, libc 16.5% (`memcmp` ~5%, `memcpy`
+  ~2.5%, `malloc` 2%+), `Passes::State::Draw` 12%, the Vulkan driver
+  12%, blending 7%, textures 6.6%, shader lookup 5.2%, the mirror 5.1%,
+  `ReadRegisters` 3.7%.
 - **A freeze while driving** (to re-examine in milestone 7, the user's
   call; seen by the user, 2026-10-14, in a
   driven race after `4410ce8`, the indexed draw without packets; to look

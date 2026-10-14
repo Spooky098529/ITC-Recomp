@@ -90,14 +90,20 @@ struct ShaderCache::State {
   }
 };
 
+uint64_t MicrocodeHash(const uint8_t* ucode, uint32_t size_bytes) {
+  return XXH3_64bits(ucode, size_bytes);
+}
+
 ShaderCache::ShaderCache(const ShaderFeatures& features)
     : state_(std::make_unique<State>(features)) {}
 ShaderCache::~ShaderCache() = default;
 
 ShaderCache::Interface ShaderCache::GetInterface(const uint8_t* vertex_ucode,
                                                  uint32_t vertex_size_bytes,
+                                                 uint64_t vertex_hash,
                                                  const uint8_t* pixel_ucode,
                                                  uint32_t pixel_size_bytes,
+                                                 uint64_t pixel_hash,
                                                  uint32_t sq_program_cntl,
                                                  uint32_t sq_context_misc) {
   // As the plugin's command processor: what the vertex shader writes and the
@@ -107,11 +113,9 @@ ShaderCache::Interface ShaderCache::GetInterface(const uint8_t* vertex_ucode,
     return result;
   }
   graphics::SpirvShader* vertex =
-      state_->Analyzed(ShaderStage::kVertex, vertex_ucode, vertex_size_bytes,
-                       XXH3_64bits(vertex_ucode, vertex_size_bytes));
+      state_->Analyzed(ShaderStage::kVertex, vertex_ucode, vertex_size_bytes, vertex_hash);
   graphics::SpirvShader* pixel =
-      state_->Analyzed(ShaderStage::kPixel, pixel_ucode, pixel_size_bytes,
-                       XXH3_64bits(pixel_ucode, pixel_size_bytes));
+      state_->Analyzed(ShaderStage::kPixel, pixel_ucode, pixel_size_bytes, pixel_hash);
   graphics::reg::SQ_PROGRAM_CNTL program_cntl;
   program_cntl.value = sq_program_cntl;
   graphics::reg::SQ_CONTEXT_MISC context_misc;
@@ -124,8 +128,7 @@ ShaderCache::Interface ShaderCache::GetInterface(const uint8_t* vertex_ucode,
 }
 
 TranslatedShader* ShaderCache::Get(ShaderStage stage, const uint8_t* ucode, uint32_t size_bytes,
-                                   uint32_t num_reg, const Interface& interface) {
-  uint64_t hash = XXH3_64bits(ucode, size_bytes);
+                                   uint64_t hash, uint32_t num_reg, const Interface& interface) {
   auto key = std::make_tuple(stage, hash, num_reg, interface.interpolator_mask,
                              interface.param_gen_interpolator, interface.param_gen_point,
                              stage == ShaderStage::kVertex && interface.rectangle_list);

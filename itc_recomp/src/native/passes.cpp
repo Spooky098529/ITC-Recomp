@@ -291,6 +291,79 @@ struct PipelineKey {
   uint32_t write_mask;
   // The targets: colour format (UNDEFINED for none), depth or not, samples.
   uint32_t color_format, depth, samples;
+
+  bool operator==(const PipelineKey&) const = default;
+};
+// Hashed and compared as a whole (no padding to hold stray bytes).
+static_assert(sizeof(PipelineKey) == 3 * sizeof(void*) + 18 * sizeof(uint32_t));
+struct PipelineKeyHash {
+  size_t operator()(const PipelineKey& key) const { return size_t(XXH3_64bits(&key, sizeof(key))); }
+};
+struct HandlePairHash {
+  size_t operator()(const std::pair<VkDescriptorSetLayout, VkDescriptorSetLayout>& key) const {
+    return std::hash<const void*>()(key.first) ^
+           (std::hash<const void*>()(key.second) * 0x9E3779B97F4A7C15ull);
+  }
+};
+
+// This frame's texture descriptor sets by their contents: an open-addressed
+// table of indices into the entries, the keys' words in one buffer, all
+// kept between frames (the string-keyed map it replaced allocated a node
+// and a key per set, and hashed and compared bytes: ~3% of the render
+// thread with the pipelines' keys).
+class FrameSetCache {
+ public:
+  // Returns the set slot for the key (words), and whether it was added.
+  std::pair<VkDescriptorSet*, bool> FindOrAdd(const uint64_t* words, uint32_t count) {
+    if (entries_.size() * 2 >= table_.size()) {
+      Grow();
+    }
+    uint64_t hash = XXH3_64bits(words, count * sizeof(uint64_t));
+    size_t mask = table_.size() - 1;
+    for (size_t i = size_t(hash) & mask;; i = (i + 1) & mask) {
+      int32_t index = table_[i];
+      if (index < 0) {
+        table_[i] = int32_t(entries_.size());
+        entries_.push_back({hash, uint32_t(words_.size()), count, VK_NULL_HANDLE});
+        words_.insert(words_.end(), words, words + count);
+        return {&entries_.back().set, true};
+      }
+      Entry& e = entries_[index];
+      if (e.hash == hash && e.count == count &&
+          std::equal(words, words + count, words_.begin() + e.offset)) {
+        return {&e.set, false};
+      }
+    }
+  }
+
+  void Clear() {
+    entries_.clear();
+    words_.clear();
+    std::fill(table_.begin(), table_.end(), -1);
+  }
+
+ private:
+  struct Entry {
+    uint64_t hash;
+    uint32_t offset, count;
+    VkDescriptorSet set;
+  };
+
+  void Grow() {
+    table_.assign(std::max<size_t>(table_.size() * 2, 8192), -1);
+    size_t mask = table_.size() - 1;
+    for (size_t k = 0; k < entries_.size(); k++) {
+      size_t i = size_t(entries_[k].hash) & mask;
+      while (table_[i] >= 0) {
+        i = (i + 1) & mask;
+      }
+      table_[i] = int32_t(k);
+    }
+  }
+
+  std::vector<int32_t> table_;
+  std::vector<Entry> entries_;
+  std::vector<uint64_t> words_;
 };
 
 struct Image {
@@ -435,7 +508,7 @@ struct Passes::State {
   };
   std::vector<IdDraw> id_draws;
   std::unordered_map<VkPipelineLayout, VkPipelineLayout> id_layouts;
-  std::unordered_map<std::string, VkPipeline> id_pipelines;
+  std::unordered_map<PipelineKey, VkPipeline, PipelineKeyHash> id_pipelines;
   VkShaderModule id_pixel = VK_NULL_HANDLE;
   Image id_image, id_depth;
   bool id_drawn = false;  // this frame, for the dump
@@ -639,12 +712,15 @@ struct Passes::State {
   std::unordered_map<std::string, VkDescriptorSetLayout> texture_layouts;
   // Each shader's layout (shaders are never freed, and have one stage).
   std::unordered_map<const TranslatedShader*, VkDescriptorSetLayout> shader_texture_layouts;
-  std::unordered_map<std::string, VkDescriptorSet> texture_sets;
+  FrameSetCache texture_sets;
   // GetTextureSet's buffers, kept to save allocating them every draw.
   std::vector<VkDescriptorImageInfo> set_infos;
-  std::string set_key;
-  std::unordered_map<std::string, VkPipelineLayout> pipeline_layouts;
-  std::unordered_map<std::string, VkPipeline> pipelines;
+  std::vector<uint64_t> set_key;
+  std::vector<VkWriteDescriptorSet> set_writes;
+  std::unordered_map<std::pair<VkDescriptorSetLayout, VkDescriptorSetLayout>, VkPipelineLayout,
+                     HandlePairHash>
+      pipeline_layouts;
+  std::unordered_map<PipelineKey, VkPipeline, PipelineKeyHash> pipelines;
 
   std::unique_ptr<ShaderCache> shaders;
   rex::graphics::RegisterFile regs;
@@ -1260,22 +1336,29 @@ VkDescriptorSet Passes::State::GetTextureSet(uint8_t* base, const TranslatedShad
                                 VK_IMAGE_LAYOUT_UNDEFINED};
   }
 
-  // One set per distinct contents a frame.
-  std::string& key = set_key;
-  key.assign(reinterpret_cast<const char*>(&layout), sizeof(layout));
-  key.append(reinterpret_cast<const char*>(infos.data()), infos.size() * sizeof(infos[0]));
-  if (auto found = texture_sets.find(key); found != texture_sets.end()) {
-    return found->second;
+  // One set per distinct contents a frame, keyed by the layout and each
+  // binding's sampler, view and layout (the fields, not the structs' bytes,
+  // which have padding).
+  std::vector<uint64_t>& key = set_key;
+  key.clear();
+  key.push_back(uint64_t(reinterpret_cast<uintptr_t>(layout)));
+  for (const VkDescriptorImageInfo& info : infos) {
+    key.push_back(uint64_t(reinterpret_cast<uintptr_t>(info.sampler)));
+    key.push_back(uint64_t(reinterpret_cast<uintptr_t>(info.imageView)));
+    key.push_back(uint64_t(info.imageLayout));
   }
-  auto it = texture_sets.emplace(key, VK_NULL_HANDLE).first;
+  auto [set, added] = texture_sets.FindOrAdd(key.data(), uint32_t(key.size()));
+  if (!added) {
+    return *set;
+  }
   VkDescriptorSetAllocateInfo alloc{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
   Ring& ring = rings[frame];
   alloc.descriptorPool = ring.texture_pools[ring.texture_pool];
   alloc.descriptorSetCount = 1;
   alloc.pSetLayouts = &layout;
-  if (vk::vkAllocateDescriptorSets(context.device, &alloc, &it->second) != VK_SUCCESS) {
+  if (vk::vkAllocateDescriptorSets(context.device, &alloc, set) != VK_SUCCESS) {
     // The pool in use is full: on to the next, made if needed.
-    it->second = VK_NULL_HANDLE;
+    *set = VK_NULL_HANDLE;
     ring.texture_pool++;
     if (ring.texture_pool == ring.texture_pools.size()) {
       if (!CreateTexturePool(ring)) {
@@ -1286,15 +1369,16 @@ VkDescriptorSet Passes::State::GetTextureSet(uint8_t* base, const TranslatedShad
                   frame, ring.texture_pools.size(), kTextureSetsPerPool);
     }
     alloc.descriptorPool = ring.texture_pools[ring.texture_pool];
-    if (vk::vkAllocateDescriptorSets(context.device, &alloc, &it->second) != VK_SUCCESS) {
-      it->second = VK_NULL_HANDLE;
+    if (vk::vkAllocateDescriptorSets(context.device, &alloc, set) != VK_SUCCESS) {
+      *set = VK_NULL_HANDLE;
       return VK_NULL_HANDLE;
     }
   }
-  std::vector<VkWriteDescriptorSet> writes(infos.size());
+  std::vector<VkWriteDescriptorSet>& writes = set_writes;
+  writes.assign(infos.size(), {});
   for (size_t i = 0; i < infos.size(); i++) {
     writes[i] = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
-    writes[i].dstSet = it->second;
+    writes[i].dstSet = *set;
     writes[i].dstBinding = uint32_t(i);
     writes[i].descriptorCount = 1;
     writes[i].descriptorType =
@@ -1304,14 +1388,12 @@ VkDescriptorSet Passes::State::GetTextureSet(uint8_t* base, const TranslatedShad
   if (!writes.empty()) {
     vk::vkUpdateDescriptorSets(context.device, uint32_t(writes.size()), writes.data(), 0, nullptr);
   }
-  return it->second;
+  return *set;
 }
 
 VkPipelineLayout Passes::State::GetPipelineLayout(VkDescriptorSetLayout vertex,
                                                     VkDescriptorSetLayout pixel) {
-  std::string key(reinterpret_cast<const char*>(&vertex), sizeof(vertex));
-  key.append(reinterpret_cast<const char*>(&pixel), sizeof(pixel));
-  VkPipelineLayout& layout = pipeline_layouts[key];
+  VkPipelineLayout& layout = pipeline_layouts[{vertex, pixel}];
   if (!layout) {
     VkDescriptorSetLayout sets[4] = {shared_memory_layout, constants_layout, vertex, pixel};
     VkPipelineLayoutCreateInfo info{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
@@ -1341,8 +1423,7 @@ VkShaderModule Passes::State::GetModule(TranslatedShader* shader) {
 }
 
 VkPipeline Passes::State::GetPipeline(const PipelineKey& key) {
-  std::string key_bytes(reinterpret_cast<const char*>(&key), sizeof(key));
-  auto [it, added] = pipelines.try_emplace(key_bytes, VK_NULL_HANDLE);
+  auto [it, added] = pipelines.try_emplace(key, VK_NULL_HANDLE);
   if (!added) {
     return it->second;
   }
@@ -1870,7 +1951,7 @@ void Passes::BeginFrame(uint32_t frame_index) {
   s.id_drawn = false;
   s.watched_this_frame.clear();
   s.frame_pixel_shaders.clear();
-  s.texture_sets.clear();
+  s.texture_sets.Clear();
   auto& ring = s.rings[frame_index];
   for (size_t i = 0; i <= ring.texture_pool && i < ring.texture_pools.size(); i++) {
     vk::vkResetDescriptorPool(s.context.device, ring.texture_pools[i], 0);
@@ -2000,29 +2081,32 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
           ? PhysicalHostAddress(base, GpuPhysicalAddress(guest::LoadU32(base, pixel_object + 24)))
           : nullptr;
   uint32_t pixel_size = pixel_object ? guest::LoadU32(base, pixel_object + 64) : 0;
+  // Each microcode hashed once a draw (the cache's lookups take the hash).
+  uint64_t vertex_hash = MicrocodeHash(vertex_ucode, vertex_size);
+  uint64_t pixel_hash = pixel_ucode ? MicrocodeHash(pixel_ucode, pixel_size) : 0;
   // Which interpolators connect them (an unconnected one the pixel shader
   // reads would be undefined).
   ShaderCache::Interface interface = s.shaders->GetInterface(
-      vertex_ucode, vertex_size, pixel_ucode, pixel_size, program_control,
-      regs.values[XE_GPU_REG_SQ_CONTEXT_MISC]);
+      vertex_ucode, vertex_size, vertex_hash, pixel_ucode, pixel_size, pixel_hash,
+      program_control, regs.values[XE_GPU_REG_SQ_CONTEXT_MISC]);
   interface.param_gen_point = type == 1;  // point list
   interface.rectangle_list = rectangle_list;
   if (pixel_ucode && interface.param_gen_interpolator < 16) {
     s.stats.param_gen_draws++;
     if (s.collect_interfaces) {
-      s.param_gen_by_shader[XXH3_64bits(pixel_ucode, pixel_size)] |=
+      s.param_gen_by_shader[pixel_hash] |=
           1u << interface.param_gen_interpolator;
     }
   }
   if (pixel_ucode && s.collect_interfaces) {
-    s.interpolators_by_shader[XXH3_64bits(pixel_ucode, pixel_size)] |=
+    s.interpolators_by_shader[pixel_hash] |=
         uint64_t(interface.interpolator_mask) << 16 * (program_control >> 18 & 1);
   }
   TranslatedShader* vertex = s.shaders->Get(ShaderStage::kVertex, vertex_ucode, vertex_size,
-                                            program_control & 0x3F, interface);
+                                            vertex_hash, program_control & 0x3F, interface);
   TranslatedShader* pixel = nullptr;
   if (pixel_object) {
-    pixel = s.shaders->Get(ShaderStage::kPixel, pixel_ucode, pixel_size,
+    pixel = s.shaders->Get(ShaderStage::kPixel, pixel_ucode, pixel_size, pixel_hash,
                            (program_control >> 8) & 0x3F, interface);
   }
   if (!vertex || (pixel_object && !pixel)) {
@@ -2493,8 +2577,7 @@ VkPipeline Passes::State::GetIdPipeline(const IdDraw& draw) {
   key.blend_enable = key.src_color = key.dst_color = key.color_op = 0;
   key.src_alpha = key.dst_alpha = key.alpha_op = key.write_mask = 0;
   key.color_format = key.samples = 0;
-  std::string bytes(reinterpret_cast<const char*>(&key), sizeof(key));
-  auto [it, added] = id_pipelines.try_emplace(bytes, VK_NULL_HANDLE);
+  auto [it, added] = id_pipelines.try_emplace(key, VK_NULL_HANDLE);
   if (!added) {
     return it->second;
   }
