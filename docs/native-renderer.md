@@ -60,6 +60,7 @@ known about it; this file is the plan and its progress).
 | 4 | **The other passes**: each pass renders into a Vulkan image of its resolve's size and format; resolves become copies. | Shadows, reflections and the mirror work. | Done (2026-10-14): every pass draws, inline vertex draws included; clears and resolves work; the user saw the car's shadow, the mirror and the reflections right in our window (cockpit and third person), and the resolves match the emulated GPU's (`--readback_resolve=full`), except its blocky bloom. Menus not checked. |
 | 5 | **The final frame and the menus** (still in development mode): post-processing, HUD, the frame's end, then every menu screen. | Races and menus look as in the game's window, side by side. | In progress: the final frame with the HUD shows (checked by the user in a race); menus' tiled 3D views fixed. |
 | 6 | **Exclusive mode**: stop calling the graphics library (and so the emulated GPU), keeping only what our renderer needs from it; then measure. | The emulated GPU is no longer needed; frame rate measured against it. | |
+| 7 | **Known issues cleanup**: what's under Known issues below (the boot movie, gamma, textures replaced in memory, textures never freed, window resizing). | The known issues are fixed or accepted. | |
 
 ## Progress on milestone 2
 
@@ -452,6 +453,8 @@ texture objects ("Resources"). The approach:
 
 ## Known issues
 
+To be fixed (or accepted) in milestone 7.
+
 - **The boot movie (`UBI_LOGO.wmv`) isn't drawn** in our window (seen by
   the user). It's drawn outside the command list (see "Movies" in
   `gpu-functions.md`), which the replay hooks don't see; the log names it
@@ -462,14 +465,14 @@ texture objects ("Resources"). The approach:
   vertex), with the texture cache checking that draw's textures every
   frame. It drew on the render thread and showed the logo, but the user
   saw the playback judder in our window, and judged it not worth the
-  effort for now. Not yet known why it juddered; to find out, log per
+  effort for now: for milestone 7. Not yet known why it juddered; to find out, log per
   movie draw the frame number, the three planes' addresses and a hash of
   the Y plane, and look for repeated or out-of-order frames. The code is
   in `2433232` to start from.
 
 - **Gamma**: our window is lighter than the game's (seen side by side,
   2026-10-14): the Xbox 360's output gamma isn't applied yet. A known
-  issue, not part of milestones 5 or 6 (the user's call).
+  issue, for milestone 7 (the user's call).
 
 - **Textures replaced in memory show their old contents for a while.**
   The game streams track sections in during a race, and textures are
