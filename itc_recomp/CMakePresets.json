@@ -98,6 +98,24 @@
             "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
         },
         {
+            "name": "win-amd64-cross-release",
+            "displayName": "Windows AMD64 Release, cross-compiled on Linux",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/out/build/${presetName}",
+            "toolchainFile": "${sourceDir}/cmake/windows-cross.cmake",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "REXGLUE_USE_VULKAN": "ON",
+                "REXGLUE_USE_D3D12": "OFF",
+                "REXSDK_DIR": "${sourceDir}/../rexglue-sdk"
+            },
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Linux"
+            }
+        },
+        {
             "name": "linux-amd64-debug",
             "displayName": "Linux AMD64 Debug",
             "inherits": "linux-base",
