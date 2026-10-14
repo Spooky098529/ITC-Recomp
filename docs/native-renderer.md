@@ -61,7 +61,7 @@ known about it; this file is the plan and its progress).
 | 4 | **The other passes**: each pass renders into a Vulkan image of its resolve's size and format; resolves become copies. | Shadows, reflections and the mirror work. | Done (2026-10-14): every pass draws, inline vertex draws included; clears and resolves work; the user saw the car's shadow, the mirror and the reflections right in our window (cockpit and third person), and the resolves match the emulated GPU's (`--readback_resolve=full`), except its blocky bloom. Menus not checked. |
 | 5 | **The final frame and the menus** (still in development mode): post-processing, HUD, the frame's end, then every menu screen. | Races and menus look as in the game's window, side by side. | In progress: the final frame with the HUD shows (checked by the user in a race); menus' tiled 3D views fixed. |
 | 6 | **Exclusive mode**: the emulated GPU gets no work and then isn't loaded at all; the graphics library is kept for what our renderer needs from it (see "Plan for milestone 6"); then measure. | The GPU plugin isn't loaded; frame rate measured against the emulated GPU. | In progress: the plugin isn't loaded (`run.sh` runs exclusive mode); measured: 135 fps mean uncapped against the emulated GPU's 155, then ~235 after the speed work (step 5; holds the 144 cap in an attract race). The library's remaining packet writers moved to milestone 7 (the user's call, 2026-10-14); the frame's end (step 6) to come. |
-| 7 | **Known issues cleanup**: what's under Known issues below (the boot movie, gamma, textures replaced in memory, textures never freed, window resizing, the library's remaining packet writers). | The known issues are fixed or accepted. | |
+| 7 | **Known issues cleanup**: what's under Known issues below (the boot movie, gamma, textures replaced in memory, textures never freed, window resizing, the library's remaining packet writers, further speed work on our renderer). | The known issues are fixed or accepted. | |
 
 ## Progress on milestone 2
 
@@ -1018,6 +1018,19 @@ To be fixed (or accepted) in milestone 7.
   before the reference count change). Each needs the same check as the
   indexed draw (`--native_renderer_check_draw_writes`: which device fields
   it changes besides the command pointer) before its packets are skipped.
+- **Performance, to do: our renderer's own code** (milestone 7, the
+  user's call, 2026-10-14). After milestone 6's speed work our renderer is
+  ~78% of the render thread, the replay handlers ~11%, the library ~9%.
+  Biggest by the last profile (2026-10-14, after `d74d923`; uncapped
+  attract race, ~235 fps; libc and driver time counted in the caller):
+  `Passes::State::Draw` 27% (much of it in the Vulkan driver),
+  `BlendState_ReplayConstants` 9% (1.3% waiting on its mutex), texture
+  sets (`GetTextureSet`) 7%, `ReadRegisters` 3.6%, `TextureCache::GetView`
+  3.4%, the mirror (`Mirror`, `IndexRange`, `Buffers_NewestWrite`) ~6%,
+  shader lookups (`ShaderCache::Get`, `GetInterface`) 3.7%, `GetTarget`
+  2%, `GetPipeline` 1.6%. Known leads: the shader hashing and the
+  mirror's redundant copies (both above); texture sets keyed by strings.
+  Profile again before picking one.
 - No Vulkan validation layer here yet (`--native_renderer_validation` falls
   back without it); install `vulkan-validation-layers` before drawing gets
   complicated.
