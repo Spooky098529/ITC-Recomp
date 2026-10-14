@@ -383,6 +383,10 @@ bool Renderer::CreateDevice() {
   context_.demote_to_helper_invocation = enabled13.shaderDemoteToHelperInvocation;
   context_.sampler_anisotropy = enabled.features.samplerAnisotropy;
   context_.max_sampler_anisotropy = properties.limits.maxSamplerAnisotropy;
+  context_.vendor_id = properties.vendorID;
+  context_.device_id = properties.deviceID;
+  std::copy(std::begin(properties.pipelineCacheUUID), std::end(properties.pipelineCacheUUID),
+            context_.pipeline_cache_uuid.begin());
   context_.sampler_mirror_clamp_to_edge = enabled12.samplerMirrorClampToEdge;
 
   for (Frame& frame : frames_) {
@@ -789,13 +793,13 @@ void Renderer::LogStats() {
   REXLOG_INFO("native renderer: {:.0f} frames/s presented, {} skipped; per frame {:.0f} "
               "commands, {:.0f} draws; {:.0f} drawn, {:.0f} unsupported, {:.0f} failed; {:.1f} "
               "MB copied a frame ({:.1f} MB unchanged, not copied); {} pipelines; shaders "
-              "translated {}, failed {}",
+              "translated {}, failed {}, from the disk cache {}",
               frames_presented_ / seconds, frames_skipped_, double(commands_) / frames,
               double(draws_) / frames, double(view.drawn) / frames,
               double(view.unsupported) / frames, double(view.failed) / frames,
               view.mirrored_bytes / 1048576.0 / frames,
               view.mirror_skipped_bytes / 1048576.0 / frames, view.pipelines,
-              view.shaders_translated, view.shaders_failed);
+              view.shaders_translated, view.shaders_failed, view.shaders_from_disk);
   if (view.failed) {
     static constexpr const char* kFailedDrawReasons[] = {
         "no target", "no vertex shader", "shader translation", "no index buffer",

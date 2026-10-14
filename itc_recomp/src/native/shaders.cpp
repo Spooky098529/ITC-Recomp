@@ -1,6 +1,7 @@
 #include "shaders.h"
 #include "frame_costs.h"
 
+#include <cstdio>
 #include <cstring>
 #include <map>
 #include <tuple>
@@ -58,18 +59,204 @@ struct ShaderKeyHash {
   }
 };
 
+using TranslationKey = std::tuple<ShaderStage, uint64_t, uint32_t, uint32_t, uint32_t, bool, bool>;
+
+// How a vertex and a pixel shader connect depends on both microcodes and
+// two registers.
+struct InterfaceKey {
+  uint64_t vertex_hash, pixel_hash;
+  uint32_t program_cntl, context_misc;
+  bool operator==(const InterfaceKey&) const = default;
+};
+struct InterfaceKeyHash {
+  size_t operator()(const InterfaceKey& key) const {
+    return size_t(key.vertex_hash ^ (key.pixel_hash * 0x9E3779B97F4A7C15ull) ^
+                  (uint64_t(key.program_cntl) << 32 | key.context_misc));
+  }
+};
+
+// The disk cache file (disk_cache.h): a header, then records, each a kind,
+// a size and that many bytes (the key, then the value). Bump kDiskVersion
+// whenever what a translation produces changes (the SDK's translator, the
+// modification set in ShaderCache::Get, TranslatedShader's fields), or old
+// translations would be used.
+constexpr uint32_t kDiskMagic = 0x53435449;  // "ITCS"
+constexpr uint32_t kDiskVersion = 1;
+enum DiskRecord : uint32_t { kDiskTranslation = 1, kDiskInterface = 2 };
+
+class DiskWriter {
+ public:
+  void U32(uint32_t v) { Bytes(&v, sizeof(v)); }
+  void U64(uint64_t v) { Bytes(&v, sizeof(v)); }
+  void Bytes(const void* data, size_t size) {
+    auto* p = static_cast<const uint8_t*>(data);
+    bytes.insert(bytes.end(), p, p + size);
+  }
+  std::vector<uint8_t> bytes;
+};
+
+class DiskReader {
+ public:
+  DiskReader(const uint8_t* data, size_t size) : p_(data), end_(data + size) {}
+  uint32_t U32() { uint32_t v = 0; Bytes(&v, sizeof(v)); return v; }
+  uint64_t U64() { uint64_t v = 0; Bytes(&v, sizeof(v)); return v; }
+  void Bytes(void* out, size_t size) {
+    if (size_t(end_ - p_) < size) {
+      ok_ = false;
+      return;
+    }
+    std::memcpy(out, p_, size);
+    p_ += size;
+  }
+  // A count of items of `item_size` bytes still to come, or 0 if it can't be.
+  uint32_t Count(size_t item_size) {
+    uint32_t n = U32();
+    if (n > size_t(end_ - p_) / item_size) {
+      ok_ = false;
+      return 0;
+    }
+    return n;
+  }
+  bool ok() const { return ok_; }
+  bool done() const { return p_ == end_; }
+
+ private:
+  const uint8_t* p_;
+  const uint8_t* end_;
+  bool ok_ = true;
+};
+
+void WriteTranslationKey(DiskWriter& w, const TranslationKey& key) {
+  auto [stage, hash, num_reg, interpolators, param_gen, point, rectangle] = key;
+  w.U32(uint32_t(stage));
+  w.U64(hash);
+  w.U32(num_reg);
+  w.U32(interpolators);
+  w.U32(param_gen);
+  w.U32(point);
+  w.U32(rectangle);
+}
+
+TranslationKey ReadTranslationKey(DiskReader& r) {
+  auto stage = ShaderStage(r.U32());
+  uint64_t hash = r.U64();
+  uint32_t num_reg = r.U32(), interpolators = r.U32(), param_gen = r.U32();
+  bool point = r.U32() != 0, rectangle = r.U32() != 0;
+  return {stage, hash, num_reg, interpolators, param_gen, point, rectangle};
+}
+
+void WriteTranslation(DiskWriter& w, const TranslatedShader& t) {
+  w.U32(uint32_t(t.spirv.size()));
+  w.Bytes(t.spirv.data(), t.spirv.size() * 4);
+  for (uint64_t bits : t.float_constants) {
+    w.U64(bits);
+  }
+  for (uint32_t bits : t.vertex_fetch_constants) {
+    w.U32(bits);
+  }
+  w.U32(uint32_t(t.textures.size()));
+  for (const ShaderTexture& texture : t.textures) {
+    w.U32(texture.fetch_constant);
+    w.U32(uint32_t(texture.view_type));
+    w.U32(texture.is_signed);
+  }
+  w.U32(uint32_t(t.samplers.size()));
+  for (const ShaderSampler& sampler : t.samplers) {
+    w.U32(sampler.fetch_constant);
+    w.U32(sampler.mag_filter);
+    w.U32(sampler.min_filter);
+    w.U32(sampler.mip_filter);
+    w.U32(sampler.aniso_filter);
+  }
+  w.U32(uint32_t(t.vertex_strides.size()));
+  for (const auto& [fetch_constant, stride] : t.vertex_strides) {
+    w.U32(fetch_constant);
+    w.U32(stride);
+  }
+  w.U32(t.writes_color_targets);
+}
+
+bool ReadTranslation(DiskReader& r, TranslatedShader& t) {
+  t.spirv.resize(r.Count(4));
+  r.Bytes(t.spirv.data(), t.spirv.size() * 4);
+  for (uint64_t& bits : t.float_constants) {
+    bits = r.U64();
+  }
+  for (uint32_t& bits : t.vertex_fetch_constants) {
+    bits = r.U32();
+  }
+  t.textures.resize(r.Count(12));
+  for (ShaderTexture& texture : t.textures) {
+    texture.fetch_constant = r.U32();
+    texture.view_type = VkImageViewType(r.U32());
+    texture.is_signed = r.U32() != 0;
+  }
+  t.samplers.resize(r.Count(20));
+  for (ShaderSampler& sampler : t.samplers) {
+    sampler.fetch_constant = r.U32();
+    sampler.mag_filter = r.U32();
+    sampler.min_filter = r.U32();
+    sampler.mip_filter = r.U32();
+    sampler.aniso_filter = r.U32();
+  }
+  t.vertex_strides.resize(r.Count(8));
+  for (auto& [fetch_constant, stride] : t.vertex_strides) {
+    fetch_constant = r.U32();
+    stride = r.U32();
+  }
+  t.writes_color_targets = r.U32();
+  return r.ok() && r.done() && !t.spirv.empty();
+}
+
 }  // namespace
 
 struct ShaderCache::State {
   explicit State(const ShaderFeatures& features)
-      : translator(TranslatorFeatures(features), false, false, false) {}
+      : features(features), translator(TranslatorFeatures(features), false, false, false) {}
+  ShaderFeatures features;
   graphics::SpirvShaderTranslator translator;
   rex::string::StringBuffer disassembly;
   // Keyed by stage, microcode hash, register count and interface (the
   // modification depends on them).
-  std::unordered_map<std::tuple<ShaderStage, uint64_t, uint32_t, uint32_t, uint32_t, bool, bool>,
-                     std::unique_ptr<TranslatedShader>, TranslationKeyHash>
+  std::unordered_map<TranslationKey, std::unique_ptr<TranslatedShader>, TranslationKeyHash>
       translations;
+  // Interfaces worked out so far (once per vertex/pixel shader pair, not
+  // every draw).
+  std::unordered_map<InterfaceKey, Interface, InterfaceKeyHash> interfaces;
+
+  // The disk cache: translations from earlier sessions not used yet (the
+  // value as stored), and the file new records are appended to.
+  std::unordered_map<TranslationKey, std::vector<uint8_t>, TranslationKeyHash> stored;
+  std::FILE* disk = nullptr;
+
+  ~State() {
+    if (disk) {
+      std::fclose(disk);
+    }
+  }
+
+  // The header: what translations depend on besides their keys.
+  void WriteHeader(DiskWriter& w) const {
+    w.U32(kDiskMagic);
+    w.U32(kDiskVersion);
+    w.U32(features.max_storage_buffer_range);
+    w.U32(uint32_t(features.clip_distance) | uint32_t(features.cull_distance) << 1 |
+          uint32_t(features.demote_to_helper_invocation) << 2);
+  }
+
+  void Append(DiskRecord kind, const DiskWriter& record) {
+    if (!disk) {
+      return;
+    }
+    uint32_t head[2] = {uint32_t(kind), uint32_t(record.bytes.size())};
+    if (std::fwrite(head, sizeof(head), 1, disk) != 1 ||
+        std::fwrite(record.bytes.data(), record.bytes.size(), 1, disk) != 1 ||
+        std::fflush(disk) != 0) {
+      REXLOG_WARN("native renderer: shader disk cache: write failed; not writing more");
+      std::fclose(disk);
+      disk = nullptr;
+    }
+  }
   std::unordered_map<std::pair<ShaderStage, uint64_t>, std::unique_ptr<graphics::SpirvShader>,
                      ShaderKeyHash>
       shaders;
@@ -95,6 +282,80 @@ uint64_t MicrocodeHash(const uint8_t* ucode, uint32_t size_bytes) {
   return XXH3_64bits(ucode, size_bytes);
 }
 
+void ShaderCache::OpenDiskCache(const std::filesystem::path& file) {
+  State& s = *state_;
+  std::vector<uint8_t> data;
+  if (std::FILE* in = std::fopen(file.c_str(), "rb")) {
+    uint8_t buffer[65536];
+    while (size_t n = std::fread(buffer, 1, sizeof(buffer), in)) {
+      data.insert(data.end(), buffer, buffer + n);
+    }
+    std::fclose(in);
+  }
+  DiskWriter header;
+  s.WriteHeader(header);
+  // Keep the file if its header matches, up to its last whole record (the
+  // game exits without warning, so a record may be cut short).
+  size_t keep = 0;
+  uint32_t translations = 0, interfaces = 0;
+  if (data.size() >= header.bytes.size() &&
+      std::equal(header.bytes.begin(), header.bytes.end(), data.begin())) {
+    keep = header.bytes.size();
+    while (data.size() - keep >= 8) {
+      uint32_t kind, size;
+      std::memcpy(&kind, &data[keep], 4);
+      std::memcpy(&size, &data[keep + 4], 4);
+      if (size > data.size() - keep - 8) {
+        break;
+      }
+      DiskReader r(&data[keep + 8], size);
+      if (kind == kDiskTranslation) {
+        TranslationKey key = ReadTranslationKey(r);
+        size_t key_size = 32;
+        if (!r.ok()) {
+          break;
+        }
+        const uint8_t* value = &data[keep + 8 + key_size];
+        s.stored[key].assign(value, value + (size - key_size));
+        translations++;
+      } else if (kind == kDiskInterface) {
+        InterfaceKey key{r.U64(), r.U64(), r.U32(), r.U32()};
+        Interface interface;
+        interface.interpolator_mask = r.U32();
+        interface.param_gen_interpolator = r.U32();
+        if (!r.ok() || !r.done()) {
+          break;
+        }
+        s.interfaces[key] = interface;
+        interfaces++;
+      } else {
+        break;
+      }
+      keep += 8 + size;
+    }
+  }
+  std::error_code error;
+  if (keep == 0) {
+    s.disk = std::fopen(file.c_str(), "wb");
+    if (s.disk && (std::fwrite(header.bytes.data(), header.bytes.size(), 1, s.disk) != 1 ||
+                   std::fflush(s.disk) != 0)) {
+      std::fclose(s.disk);
+      s.disk = nullptr;
+    }
+  } else {
+    if (keep < data.size()) {
+      std::filesystem::resize_file(file, keep, error);
+    }
+    s.disk = error ? nullptr : std::fopen(file.c_str(), "ab");
+  }
+  if (!s.disk) {
+    REXLOG_WARN("native renderer: shader disk cache: can't write {}", file.string());
+  }
+  REXLOG_INFO("native renderer: shader disk cache {}: {} translations and {} interfaces loaded{}",
+              file.string(), translations, interfaces,
+              keep == 0 && !data.empty() ? " (old or other device's file replaced)" : "");
+}
+
 ShaderCache::ShaderCache(const ShaderFeatures& features)
     : state_(std::make_unique<State>(features)) {}
 ShaderCache::~ShaderCache() = default;
@@ -113,6 +374,10 @@ ShaderCache::Interface ShaderCache::GetInterface(const uint8_t* vertex_ucode,
   if (!pixel_ucode) {
     return result;
   }
+  InterfaceKey key{vertex_hash, pixel_hash, sq_program_cntl, sq_context_misc};
+  if (auto it = state_->interfaces.find(key); it != state_->interfaces.end()) {
+    return it->second;
+  }
   graphics::SpirvShader* vertex =
       state_->Analyzed(ShaderStage::kVertex, vertex_ucode, vertex_size_bytes, vertex_hash);
   graphics::SpirvShader* pixel =
@@ -125,6 +390,15 @@ ShaderCache::Interface ShaderCache::GetInterface(const uint8_t* vertex_ucode,
   result.interpolator_mask = vertex->writes_interpolators() &
                              pixel->GetInterpolatorInputMask(program_cntl, context_misc, param_gen);
   result.param_gen_interpolator = param_gen;
+  state_->interfaces[key] = result;
+  DiskWriter record;
+  record.U64(key.vertex_hash);
+  record.U64(key.pixel_hash);
+  record.U32(key.program_cntl);
+  record.U32(key.context_misc);
+  record.U32(result.interpolator_mask);
+  record.U32(result.param_gen_interpolator);
+  state_->Append(kDiskInterface, record);
   return result;
 }
 
@@ -135,6 +409,22 @@ TranslatedShader* ShaderCache::Get(ShaderStage stage, const uint8_t* ucode, uint
                              stage == ShaderStage::kVertex && interface.rectangle_list);
   if (auto it = state_->translations.find(key); it != state_->translations.end()) {
     return it->second->spirv.empty() ? nullptr : it->second.get();
+  }
+  // From an earlier session (disk_cache.h).
+  if (auto it = state_->stored.find(key); it != state_->stored.end()) {
+    auto shader = std::make_unique<TranslatedShader>();
+    shader->stage = stage;
+    shader->hash = hash;
+    DiskReader r(it->second.data(), it->second.size());
+    bool read = ReadTranslation(r, *shader);
+    state_->stored.erase(it);
+    if (read) {
+      from_disk_++;
+      auto& result = state_->translations[key];
+      result = std::move(shader);
+      return result.get();
+    }
+    REXLOG_WARN("native renderer: shader disk cache: bad record for {:016X}; translating", hash);
   }
   ScopedCost cost(g_frame_costs.shader_ns);
   g_frame_costs.shaders++;
@@ -213,6 +503,10 @@ TranslatedShader* ShaderCache::Get(ShaderStage stage, const uint8_t* ucode, uint
     result->vertex_strides.emplace_back(binding.fetch_constant, binding.stride_words);
   }
   translated_++;
+  DiskWriter record;
+  WriteTranslationKey(record, key);
+  WriteTranslation(record, *result);
+  state_->Append(kDiskTranslation, record);
   REXLOG_DEBUG("native renderer: translated {} shader {:016X}: {} SPIR-V words", stage_name, hash,
               result->spirv.size());
   return result.get();

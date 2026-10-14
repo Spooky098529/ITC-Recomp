@@ -142,6 +142,7 @@ class Passes {
     uint64_t mirror_rewritten = 0, mirror_rewritten_bytes = 0;
     uint32_t mirror_rewritten_sample_address = 0, mirror_rewritten_sample_size = 0;
     uint32_t pipelines = 0, shaders_translated = 0, shaders_failed = 0, targets = 0;
+    uint32_t shaders_from_disk = 0;
     // Draws skipped as having an empty viewport or scissor, and one example:
     // viewport offset and extent, scissor offset and extent (bit 31 of the
     // first word set when filled).

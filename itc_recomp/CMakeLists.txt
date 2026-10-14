@@ -66,6 +66,7 @@ set(ITC_SOURCES
     src/debug/thread_cpu.cpp
     src/native/app_window.cpp
     src/native/buffers.cpp
+    src/native/disk_cache.cpp
     src/native/draw_packets.cpp
     src/native/gpu_link.cpp
     src/native/passes.cpp

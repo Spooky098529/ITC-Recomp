@@ -31,6 +31,9 @@
   X(vkEnumerateDeviceExtensionProperties)
 
 #define NATIVE_VK_DEVICE_FUNCTIONS(X) \
+  X(vkCreatePipelineCache)            \
+  X(vkDestroyPipelineCache)           \
+  X(vkGetPipelineCacheData)           \
   X(vkDestroyDevice)                  \
   X(vkGetDeviceQueue)                 \
   X(vkDeviceWaitIdle)                 \

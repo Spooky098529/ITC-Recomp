@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include <filesystem>
 #include <array>
 #include <cstdint>
 #include <memory>
@@ -101,11 +102,17 @@ class ShaderCache {
 
   uint32_t translated() const { return translated_; }
   uint32_t failed() const { return failed_; }
+  // Translations taken from the disk cache instead of translated.
+  uint32_t from_disk() const { return from_disk_; }
+
+  // Loads earlier sessions' translations and interfaces from `file` and
+  // appends new ones to it (see disk_cache.h).
+  void OpenDiskCache(const std::filesystem::path& file);
 
  private:
   struct State;
   std::unique_ptr<State> state_;
-  uint32_t translated_ = 0, failed_ = 0;
+  uint32_t translated_ = 0, failed_ = 0, from_disk_ = 0;
 };
 
 }  // namespace native

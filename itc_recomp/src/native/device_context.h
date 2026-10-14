@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include <array>
 #include <cstdint>
 
 #include "vulkan_functions.h"
@@ -19,6 +20,9 @@ struct DeviceContext {
   bool clip_distance, cull_distance, demote_to_helper_invocation;
   bool sampler_anisotropy, sampler_mirror_clamp_to_edge;
   float max_sampler_anisotropy;
+  // For checking a saved pipeline cache is this device's.
+  uint32_t vendor_id, device_id;
+  std::array<uint8_t, VK_UUID_SIZE> pipeline_cache_uuid;
 };
 
 }  // namespace native

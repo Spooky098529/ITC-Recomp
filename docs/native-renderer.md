@@ -911,6 +911,11 @@ memory).
   our window's events to it).
 - `glsl/`: our own shaders (resolves), compiled into `generated_*.h`.
 - `textures.cpp`: the texture cache (milestone 3).
+- `disk_cache.cpp`: the disk caches' directory (`cache/` next to the
+  executable); `shaders.cpp` keeps translations there, `passes.cpp` the
+  pipeline cache.
+- `frame_costs.h`: what a frame spent on texture loads, shader
+  translations and pipeline creation, for the long frame log.
 - Testing: build, run the game in the background with
   `--native_renderer=true --skip_intro --attract_after_s=1`. With no input,
   an attract race starts about 1 s after launch (where `fps` goes above 30 in the
@@ -1032,6 +1037,39 @@ To be fixed (or accepted) in milestone 7.
   patched for; `sub_822AE340` is already wrapped) instead of hashing, but
   a freed object's memory reused for another shader would then draw with a
   stale translation unless shader creation and release are hooked too.
+- **Hitches from first-seen shaders** (fixed 2026-10-15: the disk
+  caches). Translating a shader took ~1 ms, and new scenery brings 15-25
+  at once: pinned to one CPU (`taskset -c 0`, a stand-in for the Steam
+  Deck), slow frames spent 21-26 ms translating, every session, since
+  translations were kept only in memory; pipelines were made without a
+  `VkPipelineCache` (Mesa's own disk cache likely covered the driver's
+  compile on Linux). Now both are kept in `cache/` next to the executable
+  (`disk_cache.h`, `--native_renderer_disk_cache=false` to turn off):
+  - `shaders.bin`: each translation (key: stage, microcode hash, register
+    count, interface; value: the SPIR-V and the bindings) and each vertex
+    and pixel shader pair's interface, appended as made and flushed (the
+    game exits without warning). A header holds a version
+    (`kDiskVersion` in `shaders.cpp`: **bump it whenever what a
+    translation produces changes**, the SDK's translator, the
+    modification `ShaderCache::Get` sets or `TranslatedShader`'s fields)
+    and the device features translations depend on; a mismatch starts a
+    new file; a cut-short last record is dropped. Interfaces are now also
+    kept in memory per shader pair instead of worked out every draw.
+  - `pipelines.bin`: the `VkPipelineCache` for all pipelines, loaded if
+    its header is this device and driver's, saved (to `.tmp`, renamed
+    over) at most every 10 s after new pipelines.
+  Second session, pinned to one CPU: all 69 shaders from the cache, none
+  translated; 3 slow frames instead of 8, none translating, 17 pipelines
+  made in 0.3 ms; the one slow frame in the race was texture loading
+  (34.5 ms for 44 textures, 11 MB). Texture streaming is the hitch left.
+- **The attract race's grayscale filter flickers with the game pinned to
+  one CPU** (`taskset -c 0`; seen by the user, 2026-10-15). Since the
+  frame pacer fix (`d8c10c5`, a due tick always gets the next pass); the
+  build before it doesn't flicker pinned (it runs in slow motion
+  instead), and nothing flickers unpinned or on the Steam Deck. Not
+  investigated (the user's call): likely the filter is drawn from
+  something that follows logic passes, and the pass pattern under one
+  CPU differs. A known issue for now.
 - **Performance: string-keyed caches** (fixed 2026-10-14). Pipelines, the
   ID pass's pipelines and pipeline layouts were keyed by `std::string`
   copies of their keys (a 96-byte `PipelineKey`: a `malloc` and a byte
