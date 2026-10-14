@@ -61,6 +61,11 @@ constexpr size_t kMaxWatched = 200;
 
 std::vector<Range> ReadableGuestRanges(uint8_t* base) {
   std::vector<Range> ranges;
+#ifdef _WIN32
+  // Reads the Linux memory map; the scans aren't supported on Windows.
+  (void)base;
+  return ranges;
+#endif
   std::ifstream maps("/proc/self/maps");
   std::string line;
   uint64_t guest_start = reinterpret_cast<uint64_t>(base);

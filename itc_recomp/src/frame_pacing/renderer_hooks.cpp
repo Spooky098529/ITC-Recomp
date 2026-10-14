@@ -108,9 +108,14 @@ class FrameTimes {
 
 // CPU time used by the calling thread; time it spends blocked doesn't count.
 FrameTimes::Clock::duration ThreadCpuTime() {
+#ifdef _WIN32
+  // Not supported on Windows (a diagnostic): reads as zero.
+  return FrameTimes::Clock::duration::zero();
+#else
   timespec ts;
   clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts);
   return std::chrono::seconds(ts.tv_sec) + std::chrono::nanoseconds(ts.tv_nsec);
+#endif
 }
 
 FrameTimes& GetFrameTimes() {
