@@ -142,7 +142,63 @@ Not known yet:
    loops) or locks the audio thread shares with the render thread. Neither
    showed up in the profile above.
 
+## Progress on step 1
+
+- **Done in code** (2026-10-14, `itc_recomp/src/audio/native_audio.cpp`):
+  - `ItcAudioSystem`, a subclass of the SDK's `AudioSystem`, put in the
+    runtime's config by `ItcApp::OnPreSetup`. Its `Setup` starts only the
+    XMA decoder and our thread ("ITC Audio", an `XHostThread`, as the
+    SDK's worker was); `CreateDriver` (the SDK's driver) logs an error if
+    anything asks for it.
+  - The game's driver object calls ours: `sub_824657E0` (register: unregisters
+    any earlier handle, then registers r4 with the argument at +12; handles
+    are `0x4954000n`), `sub_82465870` (submit: the samples' address is the
+    third word of the descriptor `sub_8245F718` fills) and `sub_824658C8`
+    (the destructor: unregisters our handle and clears +16, so the
+    original calls nothing).
+  - Pacing as the SDK's: each client starts with `--audio_maxqframes`
+    credits (8); a mixer call takes one, a frame SDL plays gives one back.
+    The thread runs a client's mixer (`FunctionDispatcher::Execute` with
+    the address of a guest word holding the argument, as the SDK did)
+    while it has credits, and otherwise waits on one condition variable,
+    which SDL's callback notifies after playing a frame.
+  - Output as the SDK's driver: an SDL3 stream per client on the default
+    device, 6 channels unless the device has 2 or fewer (then the stereo
+    fold), converted with the SDK's `conversion.h` and its downmix
+    settings and `--audio_mute`.
+  - `--native_audio=false` gives the runtime the SDK's audio system again,
+    and the three overrides then call the originals.
+- The game registers one client (callback `8245FBE0`, argument
+  `4006DF6C`) at boot and never unregisters it in an attract race.
+- **Measured** (2026-10-14, four alternating uncapped attract races, 45 s
+  each from the race's third second, no profiler attached; thread CPU from
+  `top -H` 25 s in):
+
+  | Audio | Audio thread CPU | Mean fps | 10th pct | Median | Min |
+  |---|---|---|---|---|---|
+  | Ours, run 1 | 0.4% | 245 | 194 | 238 | 188 |
+  | SDK's (`--native_audio=false`), run 1 | 80.1% | 244 | 198 | 245 | 188 |
+  | Ours, run 2 | 0.2% | 243 | 197 | 234 | 189 |
+  | SDK's, run 2 | 79.7% | 244 | 197 | 241 | 189 |
+
+  So the core the Audio Worker took is free, and frame rate is unchanged
+  on this CPU (16 threads): the spin never held up the render or main
+  thread. The log's 10 s counts (`native audio: client 0: ...`) show 1,876
+  frames played every 10 s (48,000 / 256 = 187.5 a second) and 0 silence
+  fills in the race, 4 frames queued; the only fills were in the last
+  window of one run, when `timeout` ended the game.
+- **Still to do**: the user listening (music, engines, menus, the boot
+  movie's sound, an in-race movie), and a stereo device as well as the
+  6-channel one here (a HyperX headset that SDL reports as 6 channels,
+  through PipeWire).
+
 ## Tools
+
+- `--native_audio=false`: the SDK's audio system and render driver, for
+  comparison.
+- With logging on, our audio logs its endpoint, each client registered,
+  and every 10 s each client's frames played, silence fills (frames the
+  mixer didn't have ready in time) and frames queued.
 
 - The profile above: launch an attract race in the background, take the
   `itc` process's pid (`pgrep -n -x itc`; `$!` is `timeout`'s), then

@@ -6,6 +6,7 @@
 
 #include <rex/rex_app.h>
 
+#include "audio/native_audio.h"
 #include "native/app_window.h"
 
 class ItcApp : public rex::ReXApp {
@@ -28,9 +29,13 @@ class ItcApp : public rex::ReXApp {
     return true;
   }
 
+  // Our own audio output instead of the SDK's (src/audio/native_audio.cpp).
+  void OnPreSetup(rex::RuntimeConfig& config) override {
+    native_audio::Configure(config);
+  }
+
   // Override virtual hooks for customization:
   // void OnPostInitLogging() override {}
-  // void OnPreSetup(rex::RuntimeConfig& config) override {}
   // void OnLoadXexImage(std::string& xex_image) override {}
   // void OnPostLoadXexImage() override {}
   // void OnPostSetup() override {}
