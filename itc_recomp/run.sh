@@ -1,8 +1,11 @@
 #!/bin/bash
 # Launch the recompiled Import Tuner Challenge.
 #
-# Put this script, itc, librexruntime.so and librexgpu-xenos.so in the game
-# folder next to default.xex, then run ./run.sh. Extra flags are passed on.
+# Put this script, itc and librexruntime.so in the game folder next to
+# default.xex, then run ./run.sh. Extra flags are passed on.
+#
+# The game draws with its own Vulkan renderer (the native renderer, in its
+# exclusive mode), not an emulated Xbox 360 GPU.
 #
 #   ./run.sh                     frame interpolation on (the default)
 #   ./run.sh --no-interpolation  the original 30 fps, with motion blur
@@ -31,7 +34,7 @@ done
 
 # The flag parser rejects a flag given twice, so a default is left out when
 # the same flag is passed in.
-flags=(--gpu_plugin=xenos --game_data_root="$dir" --mnk_mode=true "${defaults[@]}" --log_level=off)
+flags=(--native_renderer=true --native_renderer_exclusive=true --game_data_root="$dir" --mnk_mode=true "${defaults[@]}" --log_level=off)
 final=()
 for flag in "${flags[@]}"; do
   name="${flag%%=*}"

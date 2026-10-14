@@ -31,17 +31,23 @@ From the repo root:
 cmake --build itc_recomp/out/build/linux-amd64-release -j$(nproc)
 G="$PWD/itc/Import Tuner Challenge (USA)"; B=itc_recomp/out/build/linux-amd64-release
 XDG_DATA_DIRS=/usr/local/share:/usr/share LD_LIBRARY_PATH=$B:rexglue-sdk/out/linux-amd64 \
-  $B/itc --gpu_plugin=xenos --game_data_root="$G" --mnk_mode=true --max_fps=144 \
+  $B/itc --native_renderer=true --native_renderer_exclusive=true \
+  --game_data_root="$G" --mnk_mode=true --max_fps=144 \
   --log_fps=true --motion_blur=false --interpolate_draw_state=true <diagnostic flags>
 find /dev/shm -maxdepth 1 -user "$USER" -name 'xenia_memory_*' -delete
 ```
+
+- That's what `run.sh` runs: our own renderer, no GPU plugin. For the
+  emulated GPU (to compare), replace the two `--native_renderer` flags
+  with `--gpu_plugin=xenos`; the plugin is built but no longer shipped.
 
 - Launch from the repo root; other directories fail (exit 127).
 - `--skip_intro --attract_after_s=1` starts an attract race (AI cars) about
   1 s after launch with no input, so races can be checked without the user:
   run under `timeout`, read the log, and take screenshots with
   `spectacle -b -n -f -o <file>` (see "The title screen" in
-  `docs/functions.md`).
+  `docs/functions.md`). Without the GPU plugin, `--skip_intro` sometimes
+  stalls the boot (no "called from 8248466C" in the log): restart it.
 - Run the game in the background. The user plays: they start a race, drive
   near an opponent and quit, then say what they saw.
 - Logs go to `itc_recomp/out/build/linux-amd64-release/logs/itc_<n>.log`,
@@ -62,10 +68,10 @@ Package them into `itc_recomp/out/dist` with Python's zipfile:
 ```sh
 name=itc-<label>-linux-amd64; D=itc_recomp/out/dist/$name
 rm -rf $D $D.zip; mkdir -p $D
-cp itc_recomp/out/build/linux-amd64-release/itc itc_recomp/out/build/linux-amd64-release/librexgpu-xenos.so rexglue-sdk/out/linux-amd64/librexruntime.so $D/
+cp itc_recomp/out/build/linux-amd64-release/itc rexglue-sdk/out/linux-amd64/librexruntime.so $D/
 install -m 755 itc_recomp/run.sh $D/run.sh
 install -m 755 itc_recomp/run-debug.sh $D/run-debug.sh
-(cd $D && python3 -I -m zipfile -c ../$name.zip itc librexruntime.so librexgpu-xenos.so run.sh run-debug.sh)
+(cd $D && python3 -I -m zipfile -c ../$name.zip itc librexruntime.so run.sh run-debug.sh)
 ```
 
 ## Status (`main`, 2026-10-12)
