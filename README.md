@@ -2,9 +2,7 @@
 
 A native Linux port of *Import Tuner Challenge* (Xbox 360, 2006), made by
 statically recompiling the game's PowerPC code to x86-64 with
-[ReXGlue](https://github.com/rexglue/rexglue-sdk). It's not an emulator: the game's own
-code runs natively, and it draws with its own Vulkan renderer instead of an
-emulated Xbox 360 GPU.
+[ReXGlue](https://github.com/rexglue/rexglue-sdk).
 
 Built with AI assistance (Claude Code).
 
