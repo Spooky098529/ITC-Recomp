@@ -34,16 +34,25 @@ void ThreadCpu_Stop() {}
 #include <unistd.h>
 #include <vector>
 
+#include "guest.h"
+#include <rex/system/kernel_state.h>
+#include <rex/system/xmemory.h>
+#include <rex/system/xthread.h>
+
 namespace {
 
 constexpr auto kInterval = std::chrono::seconds(2);
 // Threads using less of a core than this aren't listed.
 constexpr double kListedShare = 0.05;
+// Threads spending more of a core than this in the kernel get their system
+// calls sampled.
+constexpr double kSyscallSampleShare = 0.10;
 
 struct ThreadSample {
   std::string name;
   uint64_t user = 0, system = 0;  // clock ticks
   uint64_t voluntary = 0, involuntary = 0;  // context switches
+  uint64_t minor_faults = 0, major_faults = 0;  // page faults (kernel time, not system calls)
   int cpu = -1;  // the CPU it last ran on
 };
 
@@ -60,7 +69,8 @@ bool ReadStat(const std::string& path, ThreadSample& s) {
     return false;
   }
   s.name = line.substr(open + 1, close - open - 1);
-  // After ')': field 3 (state) onwards; utime is 14, stime 15, processor 39.
+  // After ')': field 3 (state) onwards; minflt is 10, majflt 12, utime 14,
+  // stime 15, processor 39.
   std::vector<std::string> fields;
   size_t pos = close + 2;
   while (pos < line.size()) {
@@ -74,6 +84,8 @@ bool ReadStat(const std::string& path, ThreadSample& s) {
   if (fields.size() < 37) {
     return false;
   }
+  s.minor_faults = std::stoull(fields[10 - 3]);
+  s.major_faults = std::stoull(fields[12 - 3]);
   s.user = std::stoull(fields[14 - 3]);
   s.system = std::stoull(fields[15 - 3]);
   s.cpu = std::stoi(fields[39 - 3]);
@@ -112,6 +124,62 @@ std::map<int, ThreadSample> SampleThreads() {
   }
   closedir(dir);
   return threads;
+}
+
+// The game starts its threads through sub_8258DE50, which calls slot 1 of
+// the vtable of the object at start context + 8: that function is the
+// thread's own code.
+constexpr uint32_t kGameThreadStart = 0x8258DE50;
+
+// Game threads by their host name ("XThread" and the low 32 bits of the
+// pthread handle, as the SDK names them; /proc shows 15 characters), with
+// their guest entry points, so a busy thread can be found in the code.
+std::map<std::string, std::string> GuestThreadStarts() {
+  std::map<std::string, std::string> starts;
+  auto* kernel = rex::system::kernel_state();
+  if (!kernel) {
+    return starts;
+  }
+  for (auto& thread : kernel->object_table()->GetObjectsByType<rex::system::XThread>()) {
+    if (!thread->is_guest_thread() || !thread->thread()) {
+      continue;
+    }
+    std::string name = fmt::format("XThread{:04X}", thread->thread()->system_id()).substr(0, 15);
+    uint32_t start = thread->creation_params()->start_address;
+    uint32_t context = thread->creation_params()->start_context;
+    std::string label = fmt::format("{:08X}", start);
+    uint8_t* base = kernel->memory()->virtual_membase();
+    if (start == kGameThreadStart && context) {
+      uint32_t object = guest::LoadU32(base, context + 8);
+      uint32_t vtable = object ? guest::LoadU32(base, object) : 0;
+      if (vtable) {
+        label += fmt::format(" -> {:08X} object {:08X}", guest::LoadU32(base, vtable + 4), object);
+      }
+    }
+    starts[name] = label;
+  }
+  return starts;
+}
+
+// What a thread spending time in the kernel is doing: the system call it's
+// in (first field of /proc/.../syscall: a number, "running" or -1), sampled
+// `samples` times 4 ms apart.
+std::string SampleSyscalls(int tid, int samples) {
+  std::map<std::string, int> counts;
+  std::string path = fmt::format("/proc/self/task/{}/syscall", tid);
+  for (int i = 0; i < samples; i++) {
+    std::ifstream f(path);
+    std::string first;
+    if (f >> first) {
+      counts[first]++;
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(4));
+  }
+  std::string out;
+  for (const auto& [call, count] : counts) {
+    out += fmt::format("{}{}x{}", out.empty() ? "" : " ", call, count);
+  }
+  return out;
 }
 
 // The whole machine's busy and total time (/proc/stat's "cpu" line), to see
@@ -174,7 +242,7 @@ class ThreadCpu {
         int tid;
         const ThreadSample* s;
         double user, system;  // share of a core
-        uint64_t voluntary, involuntary;
+        uint64_t voluntary, involuntary, minor_faults, major_faults;
       };
       std::vector<Row> rows;
       double process = 0;
@@ -184,7 +252,8 @@ class ThreadCpu {
         Row r{tid, &s,
               (s.user - (p ? p->user : 0)) / ticks_per_s / seconds,
               (s.system - (p ? p->system : 0)) / ticks_per_s / seconds,
-              s.voluntary - (p ? p->voluntary : 0), s.involuntary - (p ? p->involuntary : 0)};
+              s.voluntary - (p ? p->voluntary : 0), s.involuntary - (p ? p->involuntary : 0),
+              s.minor_faults - (p ? p->minor_faults : 0), s.major_faults - (p ? p->major_faults : 0)};
         process += r.user + r.system;
         if (r.user + r.system >= kListedShare) {
           rows.push_back(r);
@@ -203,13 +272,29 @@ class ThreadCpu {
         machine_total = total;
       }
       std::string line;
+      std::map<std::string, std::string> starts;
+      if (!rows.empty()) {
+        starts = GuestThreadStarts();
+      }
+      std::vector<std::pair<int, std::string>> kernel_heavy;
       for (const Row& r : rows) {
-        line += fmt::format(" | {} ({}) {:.0f}% (sys {:.0f}%) cpu{} sw {}/{}", r.s->name, r.tid,
-                            100 * (r.user + r.system), 100 * r.system, r.s->cpu,
-                            r.voluntary, r.involuntary);
+        std::string guest;
+        if (auto it = starts.find(r.s->name); it != starts.end()) {
+          guest = fmt::format(" [guest {}]", it->second);
+        }
+        line += fmt::format(" | {}{} ({}) {:.0f}% (sys {:.0f}%) cpu{} sw {}/{} faults {}/{}",
+                            r.s->name, guest, r.tid, 100 * (r.user + r.system), 100 * r.system,
+                            r.s->cpu, r.voluntary, r.involuntary, r.minor_faults, r.major_faults);
+        if (r.system >= kSyscallSampleShare) {
+          kernel_heavy.emplace_back(r.tid, r.s->name + guest);
+        }
       }
       REXLOG_INFO("thread cpu: process {:.0f}% of a core, {} threads{}{}", 100 * process,
                   current.size(), machine, line);
+      // Sampled after the totals are logged (0.1 s a thread).
+      for (const auto& [tid, name] : kernel_heavy) {
+        REXLOG_INFO("thread cpu: {} ({}) system calls: {}", name, tid, SampleSyscalls(tid, 25));
+      }
       previous = std::move(current);
     }
   }

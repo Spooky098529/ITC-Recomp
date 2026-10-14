@@ -13,6 +13,8 @@ place (search for `PATCH:`).
 | Address | Name | Status | Notes |
 |---|---|---|---|
 | `sub_82090108` | `main` | | Guest entry point on the main thread. |
+| `sub_8258DE50` | `Thread::Start` | | Entry point of the game's threads: calls vtable slot 1 of the object at start context + 8. |
+| `sub_82095AF0` | | | A worker thread's loop (started through `sub_8258DE50`): waits on an event, runs jobs through function pointers, signals events; it opens the game's data files at boot. On the Steam Deck it spiked to 66-82% of a core with 15-32% in the kernel around race loads; here (2026-10-14) ~29% with ~68,000 minor page faults in 2 s while a race loads. |
 | `sub_8209A760` | `App::Run` | | Main loop: calls every handler in the tick list at this+4, repeats until the quit flag at this+12 is set. One logic tick per pass, with no measured time. |
 | `sub_82099D50` | `ForEachTickHandler` | | Calls each handler in a list through a member function pointer. |
 | `sub_82092358` | `Renderer::Init` | | Sets the vblank interval (2 = 30 fps) via `sub_8258D568`, then subscribes renderer callbacks to numbered events (2, 3, 5, 6, 16). |
@@ -604,7 +606,7 @@ and target, and recorder world matrices), mostly for comparison.
 | `--log_world_sprites`, `--log_single_sprites` | The world-space sprites as recorded. |
 | `--pair_by_object` | Pair the per-object recorder's products by position within groups alike but for their order (default on); see "What gets blended". |
 | `--log_moving_products` | Moving objects drawn out of step, event by event; see "What gets blended". |
-| `--log_thread_cpu` | Every 2 s: the process's and the machine's CPU use, and each thread using 5% of a core or more, by name: its share of a core (system time in brackets), the CPU it last ran on, and its voluntary/involuntary context switches (many involuntary ones mean it's waiting for a core). On in `run-debug.sh`; Linux only. For finding a thread that pegs a core on slower machines (the Steam Deck). |
+| `--log_thread_cpu` | Every 2 s: the process's and the machine's CPU use, and each thread using 5% of a core or more, by name: its share of a core (system time in brackets), the CPU it last ran on, its voluntary/involuntary context switches (many involuntary ones mean it's waiting for a core) and its minor/major page faults. Game threads are labelled with their entry point (`8258DE50 -> <the thread's own function>`). A thread with 10% or more of a core in the kernel gets its system calls sampled (25 reads of `/proc/.../syscall`, 4 ms apart: numbers, `running`, or -1 outside a call). On in `run-debug.sh`; Linux only. For finding a thread that pegs a core on slower machines (the Steam Deck). |
 | `--log_camera_pass_records` | Which camera passes are recorded on logic and render-only passes, by message handler. |
 
 ### What didn't work, and why
