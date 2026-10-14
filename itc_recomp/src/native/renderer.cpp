@@ -18,6 +18,7 @@
 #include <future>
 #include <memory>
 #include <string>
+#include <thread>
 #include <vector>
 #include <rex/logging.h>
 #include <rex/cvar.h>
@@ -159,6 +160,10 @@ class Renderer {
                     uint32_t tile, uint32_t tiles) {
     passes_.TiledResolve(BeginFrame(), base, device, flags, rect, destination, point, clear_color,
                          clear_z, tile, tiles);
+  }
+  void DirectDraw(uint8_t* base, uint32_t device, uint32_t type, uint32_t start,
+                  uint32_t count) {
+    passes_.DirectDraw(BeginFrame(), base, device, type, start, count);
   }
   void FrontBufferResolve(uint8_t* base, uint32_t device, uint32_t front_buffer) {
     passes_.FrontBufferResolve(BeginFrame(), base, device, front_buffer);
@@ -763,13 +768,14 @@ void Renderer::LogStats() {
   REXLOG_INFO("native renderer: {} targets; per frame {:.1f} clears ({:.1f} with rects), {:.1f} "
               "resolves, {:.1f} skipped; {:.1f} draws with targets 1-3 bound, {:.1f} with "
               "mismatched sample counts, {:.1f} with a depth bias, {:.1f} with an equal depth "
-              "test; {} resolves with unknown flags (e.g. {:08X}); {} tilings, {} tiled resolves",
+              "test; {} resolves with unknown flags (e.g. {:08X}); {} tilings, {} tiled resolves, "
+              "{} draws outside the command list",
               view.targets, double(view.clears) / frames, double(view.clear_rects) / frames,
               double(view.resolves) / frames, double(view.resolves_skipped) / frames,
               double(view.extra_targets) / frames, double(view.mismatched_samples) / frames,
               double(view.depth_biased) / frames, double(view.depth_equal) / frames,
               view.resolve_unknown_flags, view.resolve_flags_sample, view.tilings,
-              view.tiled_resolves);
+              view.tiled_resolves, view.direct_draws);
   frames_presented_ = frames_skipped_ = commands_ = draws_ = 0;
   const TextureCache::Stats& t = view.textures;
   REXLOG_INFO("native renderer: textures: {} ({} samplers); {} loaded, {} reloaded, {:.1f} MB; "
@@ -873,6 +879,9 @@ void Renderer::LogStats() {
 Renderer* g_renderer = nullptr;
 bool g_failed = false;
 
+// The thread that ends frames (the game's render thread).
+std::thread::id g_render_thread;
+
 // Guest memory's base, from the command hooks (Renderer_EndFrame has none).
 uint8_t* g_base = nullptr;
 
@@ -925,6 +934,29 @@ void Renderer_InlineDraw(uint8_t* base, uint32_t type, uint32_t count, uint32_t 
   }
 }
 
+void Renderer_DirectDraw(uint8_t* base, uint32_t device, uint32_t type, uint32_t start,
+                         uint32_t count) {
+  if (!Renderer_Enabled()) {
+    return;
+  }
+  // Recording is the render thread's (the one ending frames): a draw from
+  // another thread, or before the first frame's end, is only logged.
+  if (std::this_thread::get_id() != g_render_thread) {
+    static bool logged = false;
+    if (!logged) {
+      logged = true;
+      REXLOG_WARN("native renderer: a DrawVertices outside the command list from another thread "
+                  "than the render thread{}; not drawn",
+                  g_render_thread == std::thread::id() ? " (none yet)" : "");
+    }
+    return;
+  }
+  g_base = base;
+  if (Renderer* renderer = GetRenderer()) {
+    renderer->DirectDraw(base, device, type, start, count);
+  }
+}
+
 void Renderer_TiledResolve(uint8_t* base, uint32_t device, uint32_t flags, uint32_t rect,
                            uint32_t destination, uint32_t point, uint32_t clear_color,
                            float clear_z, uint32_t tile, uint32_t tiles) {
@@ -948,7 +980,11 @@ void Renderer_FrontBufferResolve(uint8_t* base, uint32_t device, uint32_t front_
 }
 
 void Renderer_EndFrame() {
-  if (!Renderer_Enabled() || !g_base) {
+  if (!Renderer_Enabled()) {
+    return;
+  }
+  g_render_thread = std::this_thread::get_id();
+  if (!g_base) {
     return;
   }
   if (Renderer* renderer = GetRenderer()) {

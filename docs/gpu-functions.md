@@ -486,6 +486,19 @@ per tile.
 - Not seen in races (32 and 33 came up in one window of the replay counts,
   probably a menu).
 
+## Movies
+
+(2026-10-14.) The boot movie (`UBI_LOGO.wmv`) is drawn outside the command
+list, on the render thread: `sub_824842C8` (reached through a function
+pointer) sets three textures, shaders, sampler states and stream 0 (a
+buffer at the movie object's +64, stride 20) through the library directly,
+then calls DrawVertices (`sub_825BE300(device = movie object +56, type 4,
+start 0, 6 vertices)`: two triangles) from `0x8248466C`. The textures are
+the frame's planes, format 2 (8-bit), linear, not byte-swapped: Y
+1280x720 (pitch 1280) and two 640x360 (pitch 768), in three rotating sets
+of buffers rewritten as the movie decodes. DrawVertices takes the vertex
+count, not the primitive count (command 17's handler converts).
+
 ## The end of a frame
 
 After the command list's last pass (row 13 above), the render thread's

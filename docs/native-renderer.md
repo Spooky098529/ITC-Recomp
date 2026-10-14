@@ -312,10 +312,17 @@ GPU (exclusive mode) and the frame rate measurement.
   arguments, with the clears after it only on the last tile (we draw the
   whole surface at once). The user saw the menus right after this. Races
   unaffected (same snapshots).
-- Also logged by that: a DrawVertices outside the command list from
-  `sub_824842C8` (from `0x8248466C`), which binds three textures, shaders
-  and a stream and draws: most likely a movie frame (Y, U, V). Not drawn
-  by us yet; not needed for what the user checked.
+- **The boot movie** (2026-10-14; see "Movies" in `gpu-functions.md`):
+  the user saw the Ubisoft movie missing from our window. It's the
+  DrawVertices outside the command list that logging found. DrawVertices
+  is now wrapped: outside the command list, on the render thread (the one
+  ending frames; others are only logged), it's drawn after the library's
+  call (`Passes::DirectDraw`) as an auto-indexed draw whose vertex buffers
+  are copied from their fetch constants like an indexed draw's
+  (`DrawCall::auto_indexed`; inline draws are auto-indexed too). Its
+  textures change every frame, so the texture cache checks every texture
+  of these draws each frame (its verify-every-frame mode, for that draw
+  only): ~40 reloads a second while the movie plays.
 - Seen on the way (fixed above): in the menus our window drew the 2D
   interface right but not the 3D car on the Free Run screen (car, floor
   reflection, light beams) nor the Course In screen's night city picture

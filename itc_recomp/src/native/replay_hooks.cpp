@@ -187,7 +187,22 @@ extern "C" REX_FUNC(sub_8258D998) {
     __imp__sub_##address(ctx, base);                                                  \
   }
 LOG_OUTSIDE_WRAPPER(825BE708, "DrawIndexedVertices", 18)
-LOG_OUTSIDE_WRAPPER(825BE300, "DrawVertices", 17)
+
+// DrawVertices (r3 device, r4 primitive type, r5 start vertex, r6 vertex
+// count): outside the command list (the movies, sub_824842C8), the native
+// renderer draws it after the library's call (the shadow is complete then).
+extern "C" REX_FUNC(sub_825BE300) {
+  REX_FUNC_PROLOGUE();
+  uint32_t command = native::g_current_command;
+  uint32_t device = ctx.r3.u32, type = ctx.r4.u32, start = ctx.r5.u32, count = ctx.r6.u32;
+  if (command != 17) {
+    LogOutside("DrawVertices", 0x825BE300, uint32_t(ctx.lr), command);
+  }
+  __imp__sub_825BE300(ctx, base);
+  if (command == 0) {
+    native::Renderer_DirectDraw(base, device, type, start, count);
+  }
+}
 LOG_OUTSIDE_WRAPPER(825BDDC0, "BeginIndexedVertices", 27)
 
 // The library's Resolve (r3 device, r4 flags, r5 source rect, r6
