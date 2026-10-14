@@ -58,7 +58,7 @@ known about it; this file is the plan and its progress).
 | 2 | **Main view geometry**: vertex and index buffers read from guest memory, shaders translated, render states mapped to pipelines. | Race geometry is visible in our window, untextured. | Done (2026-10-13): the cockpit view's geometry, the right way up, solid, with the game's coloured lighting on white placeholder textures (screenshot checked). |
 | 3 | **Textures**: untile and upload (mostly BC1-BC3), samplers from the fetch constants. | The main view looks right without effects. | Done (2026-10-13): signs, gauges, fences, buildings and road textured correctly (screenshot checked); what comes from resolves is still missing. |
 | 4 | **The other passes**: each pass renders into a Vulkan image of its resolve's size and format; resolves become copies. | Shadows, reflections and the mirror work. | Done (2026-10-14): every pass draws, inline vertex draws included; clears and resolves work; the user saw the car's shadow, the mirror and the reflections right in our window (cockpit and third person), and the resolves match the emulated GPU's (`--readback_resolve=full`), except its blocky bloom. Menus not checked. |
-| 5 | **The final frame and the menus** (still in development mode): post-processing, HUD, the frame's end, then every menu screen. | Races and menus look as in the game's window, side by side. | In progress: the final frame with the HUD shows (checked by the user in a race); menus next. |
+| 5 | **The final frame and the menus** (still in development mode): post-processing, HUD, the frame's end, then every menu screen. | Races and menus look as in the game's window, side by side. | In progress: the final frame with the HUD shows (checked by the user in a race); menus' tiled 3D views fixed. |
 | 6 | **Exclusive mode**: stop calling the graphics library (and so the emulated GPU), keeping only what our renderer needs from it; then measure. | The emulated GPU is no longer needed; frame rate measured against it. | |
 
 ## Progress on milestone 2
@@ -299,7 +299,24 @@ GPU (exclusive mode) and the frame rate measurement.
   (minimap with its triangle and place name, mirror, gauges, gear, speed,
   ASSIST bar); the only difference seen is the known gamma (ours lighter).
   81-98 fps in the race with the renderer in development mode.
-- Seen on the way (to fix in this milestone): in the menus our window draws the 2D
+- **Predicated tiling** (2026-10-14; see "Predicated tiling" in
+  `gpu-functions.md`): the menus' 3D views were missing (black) because
+  they're drawn with predicated tiling, whose resolves (command 33) we
+  didn't make, into a surface too tall for its EDRAM-sized target. Found
+  by logging the library's draws and resolves made outside the commands
+  that usually make them (`replay_hooks.cpp`, once per caller): Resolve
+  from command 33. Now targets made while tiling (between commands 32 and
+  33) are keyed apart and as large as the tiles together (1280x720), are
+  cleared at command 32 with its clear values, and the library's Resolve
+  is wrapped: in command 33 each tile's resolve is made from its
+  arguments, with the clears after it only on the last tile (we draw the
+  whole surface at once). The user saw the menus right after this. Races
+  unaffected (same snapshots).
+- Also logged by that: a DrawVertices outside the command list from
+  `sub_824842C8` (from `0x8248466C`), which binds three textures, shaders
+  and a stream and draws: most likely a movie frame (Y, U, V). Not drawn
+  by us yet; not needed for what the user checked.
+- Seen on the way (fixed above): in the menus our window drew the 2D
   interface right but not the 3D car on the Free Run screen (car, floor
   reflection, light beams) nor the Course In screen's night city picture
   (black in ours). The menus also log ~6,000 lookups per 5 s of a texture

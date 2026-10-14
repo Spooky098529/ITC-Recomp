@@ -154,6 +154,12 @@ class Renderer {
   void OnCommand(uint32_t id, uint32_t arg1);
   void AfterCommand(uint8_t* base, uint32_t id, uint32_t payload, uint32_t arg1);
   void InlineDraw(uint8_t* base, uint32_t type, uint32_t count, uint32_t stride, uint32_t data);
+  void TiledResolve(uint8_t* base, uint32_t device, uint32_t flags, uint32_t rect,
+                    uint32_t destination, uint32_t point, uint32_t clear_color, float clear_z,
+                    uint32_t tile, uint32_t tiles) {
+    passes_.TiledResolve(BeginFrame(), base, device, flags, rect, destination, point, clear_color,
+                         clear_z, tile, tiles);
+  }
   void FrontBufferResolve(uint8_t* base, uint32_t device, uint32_t front_buffer) {
     passes_.FrontBufferResolve(BeginFrame(), base, device, front_buffer);
   }
@@ -580,6 +586,13 @@ void Renderer::AfterCommand(uint8_t* base, uint32_t id, uint32_t payload, uint32
     passes_.AfterResolve(BeginFrame(), base, payload, arg1);
   } else if (id == 26) {
     passes_.AfterClear(BeginFrame(), base, payload, arg1);
+  } else if (id == 32) {
+    // One item of 16 bytes per tiling begun.
+    for (uint32_t i = 0; i < arg1; i++) {
+      passes_.BeginTiling(BeginFrame(), base, payload + 16 * i);
+    }
+  } else if (id == 33) {
+    passes_.EndTiling();
   }
 }
 
@@ -750,12 +763,13 @@ void Renderer::LogStats() {
   REXLOG_INFO("native renderer: {} targets; per frame {:.1f} clears ({:.1f} with rects), {:.1f} "
               "resolves, {:.1f} skipped; {:.1f} draws with targets 1-3 bound, {:.1f} with "
               "mismatched sample counts, {:.1f} with a depth bias, {:.1f} with an equal depth "
-              "test; {} resolves with unknown flags (e.g. {:08X})",
+              "test; {} resolves with unknown flags (e.g. {:08X}); {} tilings, {} tiled resolves",
               view.targets, double(view.clears) / frames, double(view.clear_rects) / frames,
               double(view.resolves) / frames, double(view.resolves_skipped) / frames,
               double(view.extra_targets) / frames, double(view.mismatched_samples) / frames,
               double(view.depth_biased) / frames, double(view.depth_equal) / frames,
-              view.resolve_unknown_flags, view.resolve_flags_sample);
+              view.resolve_unknown_flags, view.resolve_flags_sample, view.tilings,
+              view.tiled_resolves);
   frames_presented_ = frames_skipped_ = commands_ = draws_ = 0;
   const TextureCache::Stats& t = view.textures;
   REXLOG_INFO("native renderer: textures: {} ({} samplers); {} loaded, {} reloaded, {:.1f} MB; "
@@ -893,7 +907,7 @@ void Renderer_OnCommand(uint8_t* base, uint32_t id, uint32_t payload, uint32_t a
 
 void Renderer_AfterCommand(uint8_t* base, uint32_t id, uint32_t payload, uint32_t arg1,
                            uint32_t arg2) {
-  if (!Renderer_Enabled() || !(IsDraw(id) || id == 25 || id == 26)) {
+  if (!Renderer_Enabled() || !(IsDraw(id) || id == 25 || id == 26 || id == 32 || id == 33)) {
     return;
   }
   if (Renderer* renderer = GetRenderer()) {
@@ -908,6 +922,18 @@ void Renderer_InlineDraw(uint8_t* base, uint32_t type, uint32_t count, uint32_t 
   }
   if (Renderer* renderer = GetRenderer()) {
     renderer->InlineDraw(base, type, count, stride, data);
+  }
+}
+
+void Renderer_TiledResolve(uint8_t* base, uint32_t device, uint32_t flags, uint32_t rect,
+                           uint32_t destination, uint32_t point, uint32_t clear_color,
+                           float clear_z, uint32_t tile, uint32_t tiles) {
+  if (!Renderer_Enabled()) {
+    return;
+  }
+  if (Renderer* renderer = GetRenderer()) {
+    renderer->TiledResolve(base, device, flags, rect, destination, point, clear_color, clear_z,
+                           tile, tiles);
   }
 }
 

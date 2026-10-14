@@ -41,6 +41,15 @@ class Passes {
   // After a clear (26) or resolve (25) command's library call.
   void AfterClear(VkCommandBuffer commands, uint8_t* base, uint32_t payload, uint32_t arg1);
   void AfterResolve(VkCommandBuffer commands, uint8_t* base, uint32_t payload, uint32_t arg1);
+  // Predicated tiling (see "Predicated tiling" in docs/gpu-functions.md):
+  // after command 32 (BeginTiling); each Resolve the library's EndTiling
+  // (command 33) makes, tile of tiles, with its arguments (guest addresses
+  // of the rectangle, point and clear colour, 0 if none); after command 33.
+  void BeginTiling(VkCommandBuffer commands, uint8_t* base, uint32_t payload);
+  void TiledResolve(VkCommandBuffer commands, uint8_t* base, uint32_t device, uint32_t flags,
+                    uint32_t rect, uint32_t destination, uint32_t point, uint32_t clear_color,
+                    float clear_z, uint32_t tile, uint32_t tiles);
+  void EndTiling();
   // The frame's end (sub_8258D998, outside the command list): the game
   // resolves render target 0 of `device` whole into a front buffer texture
   // (`front_buffer`, its fetch constant at +28). That target is then shown.
@@ -160,6 +169,8 @@ class Passes {
     // other than 0, a destination format we can't draw into); flags with
     // bits we don't know, and an example.
     uint64_t resolves = 0, resolves_skipped = 0, resolve_unknown_flags = 0;
+    // Predicated tilings begun, and the resolves their ends made.
+    uint64_t tilings = 0, tiled_resolves = 0;
     uint32_t resolve_flags_sample = 0;
     TextureCache::Stats textures;
   };

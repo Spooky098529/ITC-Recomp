@@ -462,7 +462,7 @@ struct Passes::State {
 
   // Targets by surface (colour or depth, EDRAM base, pitch, samples, the
   // format they're drawn in), and the ones being drawn into now.
-  std::map<std::array<uint32_t, 5>, Target> targets;
+  std::map<std::array<uint32_t, 6>, Target> targets;
   Target* bound_color = nullptr;
   Target* bound_depth = nullptr;
   VkExtent2D render_extent{};
@@ -473,6 +473,7 @@ struct Passes::State {
   Target* front = nullptr;
   VkExtent2D front_extent{};
   bool logged_front = false;
+  std::unordered_set<uint64_t> logged_tilings, logged_tiled_resolves;
 
   // What's shown, and this frame's resolve destinations (for showing one).
   Image shown;
@@ -562,9 +563,24 @@ struct Passes::State {
   // Clears the whole target (aspects: all if 0).
   void ClearTarget(VkCommandBuffer commands, Target& target, const VkClearValue& value,
                    VkImageAspectFlags aspects = 0);
-  // Draws the source's rectangle into the resolve's destination texture.
+  // Draws the source's rectangle (left, top, right, bottom; the whole
+  // destination if null) into the resolve's destination texture at the
+  // point (x, y; 0, 0 if null).
   bool ResolveInto(VkCommandBuffer commands, uint8_t* base, Target& source, uint32_t destination,
-                   uint32_t item, uint32_t fields, uint32_t flags);
+                   const int32_t* rect, const int32_t* point, uint32_t flags);
+  // A resolve as the library's Resolve (sub_822AFA58) takes it: flags as
+  // the XDK's D3DRESOLVE, from the device's bound surfaces; then the clears
+  // its flags ask for (0x100 colour, 0x200 depth and stencil), if
+  // apply_clears.
+  void Resolve(VkCommandBuffer commands, uint8_t* base, uint32_t device, uint32_t flags,
+               const int32_t* rect, uint32_t destination, const int32_t* point,
+               bool level_or_slice, const float* clear_color, float clear_z,
+               uint32_t clear_stencil, bool apply_clears);
+  // Predicated tiling (commands 32 and 33; see "Predicated tiling" in
+  // docs/gpu-functions.md): the surfaces are drawn whole, not tile by tile,
+  // so targets made while tiling are as large as the tiles together.
+  bool tiling = false;
+  VkExtent2D tiling_extent{};
   bool CreateResolveResources();
   VkPipeline GetResolvePipeline(VkFormat format, bool multisample);
   void EndRendering(VkCommandBuffer commands);
@@ -1283,8 +1299,10 @@ Target* Passes::State::GetTarget(VkCommandBuffer commands, uint8_t* base, uint32
   if (format == VK_FORMAT_UNDEFINED || !surface.pitch) {
     return nullptr;
   }
-  std::array<uint32_t, 5> key{uint32_t(depth), surface.edram_base, surface.pitch, surface.msaa,
-                              uint32_t(format)};
+  // Surfaces drawn while tiling get targets of their own, as large as the
+  // tiles together (their EDRAM wouldn't hold them).
+  std::array<uint32_t, 6> key{uint32_t(depth), surface.edram_base, surface.pitch, surface.msaa,
+                              uint32_t(format), tiling ? 1u : 0u};
   auto [it, added] = targets.try_emplace(key);
   Target& t = it->second;
   if (!added) {
@@ -1295,6 +1313,10 @@ Target* Passes::State::GetTarget(VkCommandBuffer commands, uint8_t* base, uint32
   t.format = format;
   t.samples = SampleCount(surface.msaa);
   t.extent = SurfaceExtent(surface, depth);
+  if (tiling) {
+    t.extent = {std::max(t.extent.width, tiling_extent.width),
+                std::max(t.extent.height, tiling_extent.height)};
+  }
   VkImageUsageFlags usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
                             VK_IMAGE_USAGE_TRANSFER_DST_BIT |
                             (depth ? VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT
@@ -1315,9 +1337,9 @@ Target* Passes::State::GetTarget(VkCommandBuffer commands, uint8_t* base, uint32
     view.subresourceRange = {VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1};
     vk::vkCreateImageView(context.device, &view, nullptr, &t.sample_view);
   }
-  REXLOG_INFO("native renderer: {} target: EDRAM base {}, pitch {}, MSAA {}, format {}; {}x{}",
+  REXLOG_INFO("native renderer: {} target: EDRAM base {}, pitch {}, MSAA {}, format {}; {}x{}{}",
               depth ? "depth" : "colour", surface.edram_base, surface.pitch, surface.msaa,
-              surface.format, t.extent.width, t.extent.height);
+              surface.format, t.extent.width, t.extent.height, tiling ? " (tiled)" : "");
   stats.targets++;
   VkClearValue initial{};
   initial.depthStencil = {1.0f, 0};
@@ -1459,8 +1481,8 @@ VkPipeline Passes::State::GetResolvePipeline(VkFormat format, bool multisample) 
 }
 
 bool Passes::State::ResolveInto(VkCommandBuffer commands, uint8_t* base, Target& source,
-                                uint32_t destination, uint32_t item, uint32_t fields,
-                                uint32_t flags) {
+                                uint32_t destination, const int32_t* rect,
+                                const int32_t* point, uint32_t flags) {
   // The destination texture's fetch constant (+28..+48), its addresses
   // made physical as SetTexture makes them.
   uint32_t fetch[6];
@@ -1475,17 +1497,13 @@ bool Passes::State::ResolveInto(VkCommandBuffer commands, uint8_t* base, Target&
   }
   // Source rectangle (left, top, right, bottom) and destination point.
   int32_t left = 0, top = 0, right = int32_t(dest.width), bottom = int32_t(dest.height);
-  if (fields & 1) {
-    left = int32_t(guest::LoadU32(base, item + 8));
-    top = int32_t(guest::LoadU32(base, item + 12));
-    right = int32_t(guest::LoadU32(base, item + 16));
-    bottom = int32_t(guest::LoadU32(base, item + 20));
+  if (rect) {
+    left = rect[0];
+    top = rect[1];
+    right = rect[2];
+    bottom = rect[3];
   }
-  int32_t x = 0, y = 0;
-  if (fields & 4) {
-    x = int32_t(guest::LoadU32(base, item + 28));
-    y = int32_t(guest::LoadU32(base, item + 32));
-  }
+  int32_t x = point ? point[0] : 0, y = point ? point[1] : 0;
   left = std::max(left, 0);
   top = std::max(top, 0);
   right = std::min(right, int32_t(source.extent.width));
@@ -1531,21 +1549,21 @@ bool Passes::State::ResolveInto(VkCommandBuffer commands, uint8_t* base, Target&
       dest.fresh ? VK_IMAGE_LAYOUT_UNDEFINED : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
   Transition(commands, dest.image, VK_IMAGE_ASPECT_COLOR_BIT, dest_layout,
              VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-  VkRect2D rect{{x, y}, {uint32_t(width), uint32_t(height)}};
+  VkRect2D area{{x, y}, {uint32_t(width), uint32_t(height)}};
   VkRenderingAttachmentInfo attachment{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
   attachment.imageView = dest.view;
   attachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
   attachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
   attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
   VkRenderingInfo info{VK_STRUCTURE_TYPE_RENDERING_INFO};
-  info.renderArea = rect;
+  info.renderArea = area;
   info.layerCount = 1;
   info.colorAttachmentCount = 1;
   info.pColorAttachments = &attachment;
   vk::vkCmdBeginRendering(commands, &info);
   VkViewport viewport{float(x), float(y), float(width), float(height), 0.0f, 1.0f};
   vk::vkCmdSetViewport(commands, 0, 1, &viewport);
-  vk::vkCmdSetScissor(commands, 0, 1, &rect);
+  vk::vkCmdSetScissor(commands, 0, 1, &area);
   vk::vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
   vk::vkCmdBindDescriptorSets(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, resolve_layout, 0, 1,
                               &set, 0, nullptr);
@@ -2456,53 +2474,159 @@ void Passes::AfterResolve(VkCommandBuffer commands, uint8_t* base, uint32_t payl
   State& s = *state_;
   uint32_t device = guest::LoadU32(base, kDevicePointer);
   // Command 25's item (68 bytes; see "Pass command items" in
-  // docs/gpu-functions.md). Flags as the XDK's D3DRESOLVE ones, likely:
-  // bits 0-1 render target, 0x4 depth instead, 0x100 then clear the render
-  // target, 0x200 clear depth and stencil, bits 26-31 exponent bias.
-  constexpr uint32_t kKnownFlags = 0xFC000000u | 0x300 | 0x7;
+  // docs/gpu-functions.md); its flags are State::Resolve's.
   for (uint32_t i = 0; i < arg1; i++) {
     uint32_t item = payload + 68 * i;
     uint32_t fields = guest::LoadU32(base, item);
     uint32_t flags = guest::LoadU32(base, item + 4);
-    if (flags & ~kKnownFlags) {
-      s.stats.resolve_unknown_flags++;
-      s.stats.resolve_flags_sample = flags;
+    int32_t rect[4], point[2];
+    for (uint32_t k = 0; k < 4; k++) {
+      rect[k] = int32_t(guest::LoadU32(base, item + 8 + 4 * k));
     }
-    bool from_depth = flags & 4;
-    uint32_t color_object = guest::LoadU32(base, device + kDeviceRenderTarget0 + 4 * (flags & 3));
-    uint32_t depth_object = guest::LoadU32(base, device + kDeviceDepthStencil);
-    uint32_t source_object = from_depth ? depth_object : color_object;
-    Target* source =
-        source_object ? s.GetTarget(commands, base, source_object, from_depth) : nullptr;
-    uint32_t destination = (fields & 2) ? guest::LoadU32(base, item + 24) : 0;
-    bool level_or_slice = guest::LoadU32(base, item + 36) || guest::LoadU32(base, item + 40);
-    if (source && destination && !level_or_slice &&
-        s.ResolveInto(commands, base, *source, destination, item, fields, flags)) {
-      s.stats.resolves++;
-    } else {
-      s.stats.resolves_skipped++;
+    point[0] = int32_t(guest::LoadU32(base, item + 28));
+    point[1] = int32_t(guest::LoadU32(base, item + 32));
+    // The clear colour's 4 bytes, as floats (as the handler converts them).
+    float color[4] = {};
+    for (uint32_t c = 0; (fields & 8) && c < 4; c++) {
+      color[c] = float(guest::LoadU8(base, item + 44 + c)) / 255.0f;
     }
-    if ((flags & 0x100) && color_object) {
-      if (Target* target = s.GetTarget(commands, base, color_object, false)) {
-        VkClearValue value{};
-        if (fields & 8) {
-          for (uint32_t c = 0; c < 4; c++) {
-            value.color.float32[c] = float(guest::LoadU8(base, item + 44 + c)) / 255.0f;
-          }
-        }
-        s.ClearTarget(commands, *target, value);
+    uint32_t z = guest::LoadU32(base, item + 48);
+    float clear_z;
+    std::memcpy(&clear_z, &z, 4);
+    s.Resolve(commands, base, device, flags, (fields & 1) ? rect : nullptr,
+              (fields & 2) ? guest::LoadU32(base, item + 24) : 0, (fields & 4) ? point : nullptr,
+              guest::LoadU32(base, item + 36) || guest::LoadU32(base, item + 40), color, clear_z,
+              guest::LoadU32(base, item + 52), true);
+  }
+}
+
+void Passes::State::Resolve(VkCommandBuffer commands, uint8_t* base, uint32_t device,
+                            uint32_t flags, const int32_t* rect, uint32_t destination,
+                            const int32_t* point, bool level_or_slice, const float* clear_color,
+                            float clear_z, uint32_t clear_stencil, bool apply_clears) {
+  // Flags as the XDK's D3DRESOLVE ones, likely: bits 0-1 render target, 0x4
+  // depth instead, 0x100 then clear the render target, 0x200 clear depth
+  // and stencil, bits 26-31 exponent bias.
+  constexpr uint32_t kKnownFlags = 0xFC000000u | 0x300 | 0x7;
+  if (flags & ~kKnownFlags) {
+    stats.resolve_unknown_flags++;
+    stats.resolve_flags_sample = flags;
+  }
+  bool from_depth = flags & 4;
+  uint32_t color_object = guest::LoadU32(base, device + kDeviceRenderTarget0 + 4 * (flags & 3));
+  uint32_t depth_object = guest::LoadU32(base, device + kDeviceDepthStencil);
+  uint32_t source_object = from_depth ? depth_object : color_object;
+  Target* source = source_object ? GetTarget(commands, base, source_object, from_depth) : nullptr;
+  if (source && destination && !level_or_slice &&
+      ResolveInto(commands, base, *source, destination, rect, point, flags)) {
+    stats.resolves++;
+  } else {
+    stats.resolves_skipped++;
+  }
+  if (!apply_clears) {
+    return;
+  }
+  if ((flags & 0x100) && color_object) {
+    if (Target* target = GetTarget(commands, base, color_object, false)) {
+      VkClearValue value{};
+      for (uint32_t c = 0; clear_color && c < 4; c++) {
+        value.color.float32[c] = clear_color[c];
       }
-    }
-    if ((flags & 0x200) && depth_object) {
-      if (Target* target = s.GetTarget(commands, base, depth_object, true)) {
-        VkClearValue value{};
-        uint32_t z = guest::LoadU32(base, item + 48);
-        std::memcpy(&value.depthStencil.depth, &z, 4);
-        value.depthStencil.stencil = guest::LoadU32(base, item + 52) & 0xFF;
-        s.ClearTarget(commands, *target, value);
-      }
+      ClearTarget(commands, *target, value);
     }
   }
+  if ((flags & 0x200) && depth_object) {
+    if (Target* target = GetTarget(commands, base, depth_object, true)) {
+      VkClearValue value{};
+      value.depthStencil.depth = clear_z;
+      value.depthStencil.stencil = clear_stencil & 0xFF;
+      ClearTarget(commands, *target, value);
+    }
+  }
+}
+
+void Passes::BeginTiling(VkCommandBuffer commands, uint8_t* base, uint32_t payload) {
+  State& s = *state_;
+  uint32_t device = guest::LoadU32(base, kDevicePointer);
+  // Command 32's item (16 bytes): +0 flags, +4 tile count, +8 the tiles'
+  // rectangles (16 bytes each: left, top, right, bottom). The handler gives
+  // BeginTiling a clear colour and Z of the float at 0x82000A34, stencil 0.
+  uint32_t flags = guest::LoadU32(base, payload);
+  uint32_t count = guest::LoadU32(base, payload + 4);
+  uint32_t rects = guest::LoadU32(base, payload + 8);
+  uint32_t width = 0, height = 0;
+  std::string tiles;
+  for (uint32_t i = 0; rects && i < count && i < 16; i++) {
+    int32_t r[4];
+    for (uint32_t k = 0; k < 4; k++) {
+      r[k] = int32_t(guest::LoadU32(base, rects + 16 * i + 4 * k));
+    }
+    width = std::max(width, uint32_t(std::max(r[2], 0)));
+    height = std::max(height, uint32_t(std::max(r[3], 0)));
+    tiles += fmt::format(" {},{}-{},{}", r[0], r[1], r[2], r[3]);
+  }
+  uint32_t clear_bits = guest::LoadU32(base, 0x82000A34);
+  float clear;
+  std::memcpy(&clear, &clear_bits, 4);
+  if (s.logged_tilings.insert(uint64_t(rects) << 32 | count).second) {
+    REXLOG_INFO("native renderer: begin tiling: flags {:X}, {} tiles:{}; clear colour and Z {}",
+                flags, count, tiles, clear);
+  }
+  s.EndRendering(commands);
+  s.tiling = true;
+  s.tiling_extent = {std::min(width, 8192u), std::min(height, 8192u)};
+  s.stats.tilings++;
+  // Each tile starts cleared to these.
+  if (uint32_t object = guest::LoadU32(base, device + kDeviceRenderTarget0)) {
+    if (Target* target = s.GetTarget(commands, base, object, false)) {
+      VkClearValue value{};
+      value.color = {{clear, clear, clear, clear}};
+      s.ClearTarget(commands, *target, value);
+    }
+  }
+  if (uint32_t object = guest::LoadU32(base, device + kDeviceDepthStencil)) {
+    if (Target* target = s.GetTarget(commands, base, object, true)) {
+      VkClearValue value{};
+      value.depthStencil = {clear, 0};
+      s.ClearTarget(commands, *target, value);
+    }
+  }
+}
+
+void Passes::TiledResolve(VkCommandBuffer commands, uint8_t* base, uint32_t device,
+                          uint32_t flags, uint32_t rect_address, uint32_t destination,
+                          uint32_t point_address, uint32_t clear_color_address, float clear_z,
+                          uint32_t tile, uint32_t tiles) {
+  State& s = *state_;
+  int32_t rect[4], point[2];
+  for (uint32_t k = 0; rect_address && k < 4; k++) {
+    rect[k] = int32_t(guest::LoadU32(base, rect_address + 4 * k));
+  }
+  for (uint32_t k = 0; point_address && k < 2; k++) {
+    point[k] = int32_t(guest::LoadU32(base, point_address + 4 * k));
+  }
+  float color[4] = {};
+  for (uint32_t c = 0; clear_color_address && c < 4; c++) {
+    uint32_t bits = guest::LoadU32(base, clear_color_address + 4 * c);
+    std::memcpy(&color[c], &bits, 4);
+  }
+  if (s.logged_tiled_resolves.insert(uint64_t(destination) << 8 | tile).second) {
+    REXLOG_INFO("native renderer: tiled resolve {} of {}: flags {:08X}, rect {},{}-{},{}, to "
+                "{:08X} at {},{}",
+                tile + 1, tiles, flags, rect_address ? rect[0] : -1, rect_address ? rect[1] : -1,
+                rect_address ? rect[2] : -1, rect_address ? rect[3] : -1, destination,
+                point_address ? point[0] : -1, point_address ? point[1] : -1);
+  }
+  // The library clears the target after each tile but the last for the
+  // next tile; the whole surface is drawn at once here, so only the last
+  // tile's clears are made.
+  s.Resolve(commands, base, device, flags, rect_address ? rect : nullptr, destination,
+            point_address ? point : nullptr, false, color, clear_z, 0, tile + 1 >= tiles);
+  s.stats.tiled_resolves++;
+}
+
+void Passes::EndTiling() {
+  state_->tiling = false;
 }
 
 void Passes::FrontBufferResolve(VkCommandBuffer commands, uint8_t* base, uint32_t device,

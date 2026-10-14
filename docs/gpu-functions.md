@@ -73,8 +73,8 @@ function per item. The exceptions are marked with their item size.
 | 29 | `sub_82590768` | 4 | Sets render targets 0-3 (bits 0-3) and depth (bit 7) from the saved set at `0x82970BC0`. | `sub_822A4340`, `sub_822A4060` |
 | 30 | `sub_82590860` | 16 | **SetViewport**: [X, Y, width, height (16 bits each), min Z, max Z]. | `sub_822A3518` |
 | 31 | `sub_825908E0` | 8 | **SetScissorRect**: [left, top, right, bottom (signed 16 bits)], with a device field (+11600) set to 1 first. | `sub_822A3D20`, `sub_822A3450` |
-| 32 | `sub_82590968` | 16 | Unknown: [a, b, c]; a large function that sets viewport and scissor and copies memory. | `sub_825BED08` |
-| 33 | `sub_825909E8` | 16 | Unknown: [a, b]; a large function that sets viewport and scissor and resolves. | `sub_825BF200` |
+| 32 | `sub_82590968` | 16 | **BeginTiling** (predicated tiling, below): [flags, tile count, tile rects]. | `sub_825BED08` |
+| 33 | `sub_825909E8` | 16 | **EndTiling**: [flags, destination texture]; resolves each tile. | `sub_825BF200` |
 | 34 | `sub_82590A68` | | Saves the viewport (to `0x8296BD60`), render targets 0-3 and depth. | `sub_822A3740`, `sub_822A3998`, `sub_822A39E0` |
 | 35 | `sub_82590AD0` | | Restores what 34 saved. | `sub_822A4340`, `sub_822A4060`, `sub_822A3518` |
 
@@ -461,6 +461,31 @@ words are big-endian.
 - **30 SetViewport**: words as the frame trace prints them (x, y, width,
   height, then Z range).
 
+## Predicated tiling
+
+(2026-10-14.) The menus' 3D views (the car on the Free Run screen, the
+Course In city picture) are drawn into a 1280x720, 4x MSAA, 32-bit
+surface with depth: about 14 MB, more than the 10 MB of EDRAM. So the
+menus use the XDK's predicated tiling: the GPU replays the commands once
+per tile.
+
+- **Command 32**, BeginTiling (`sub_825BED08(device, flags, count, rects,
+  clear colour, Z, stencil)`): item +0 flags (0 seen), +4 tile count, +8
+  the tiles' rectangles (16 bytes each). The handler passes a clear colour
+  (4 floats) and Z all equal to the float at `0x82000A34` (0 seen), stencil
+  0. Seen: 3 tiles, `0,0-1280,256`, `0,256-1280,512`, `0,512-1280,720`.
+  The library keeps the count at device +12488 and the rectangles at
+  +12492.
+- **Command 33**, EndTiling (`sub_825BF200(device, flags, no rects,
+  destination, clear colour, ...)`): item +0 flags (`0x303` seen), +4 the
+  destination texture. For each tile it calls Resolve (from `0x825BF348`,
+  and `0x825BF378` for the last) with the tile's rectangle as source and
+  its top-left as the destination point; on every tile but the last it
+  adds `0x100` (if a render target is bound) and `0x200` (if depth is)
+  so the next tile starts cleared.
+- Not seen in races (32 and 33 came up in one window of the replay counts,
+  probably a menu).
+
 ## The end of a frame
 
 After the command list's last pass (row 13 above), the render thread's
@@ -500,7 +525,8 @@ goes.
 
 ## Not yet known
 
-- Commands 32 and 33 (rare). (20, 22 and 28 are never replayed.)
+- (20, 22 and 28 are never replayed. 32 and 33 are predicated tiling,
+  below.)
 - Confirming the "likely" rows at runtime.
 - Render state 324.
 - How the 1280x720 viewport maps onto the 1024x576 main view, and whether

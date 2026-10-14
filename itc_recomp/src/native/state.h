@@ -34,6 +34,9 @@ struct LoadedVertexShader {
 extern LoadedVertexShader g_loaded_vertex_shader;
 // The command whose handler is running (0: none).
 extern uint32_t g_current_command;
+// Bumped by each command handler call (to tell one command's library calls from
+// the next's).
+extern uint32_t g_command_serial;
 constexpr uint32_t kDeviceRenderTarget0 = 12184;
 // Scissor: enable (render state 200) and rectangle (left, top, right,
 // bottom) from SetScissorRect.

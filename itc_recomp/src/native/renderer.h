@@ -34,6 +34,12 @@ void Renderer_InlineDraw(uint8_t* base, uint32_t type, uint32_t count, uint32_t 
 // texture `front_buffer`.
 void Renderer_FrontBufferResolve(uint8_t* base, uint32_t device, uint32_t front_buffer);
 
+// Render thread, in command 33 (EndTiling): each Resolve (sub_822AFA58)
+// call, with its arguments (guest addresses), tile of tiles.
+void Renderer_TiledResolve(uint8_t* base, uint32_t device, uint32_t flags, uint32_t rect,
+                           uint32_t destination, uint32_t point, uint32_t clear_color,
+                           float clear_z, uint32_t tile, uint32_t tiles);
+
 // Render thread, after each frame's replay and present.
 void Renderer_EndFrame();
 
