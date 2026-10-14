@@ -46,6 +46,7 @@ set(ITC_SOURCES
     src/main.cpp
     src/hooks/vehicle.cpp
     src/hooks/title_screen.cpp
+    src/hooks/create_file.cpp
     src/frame_pacing/frame_pacer.cpp
     src/frame_pacing/renderer_hooks.cpp
     src/debug/state_capture.cpp

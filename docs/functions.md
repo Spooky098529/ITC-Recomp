@@ -57,6 +57,11 @@ place (search for `PATCH:`).
 | `sub_820F5740` | `Minimap::Draw` | Wrapped | From the draw step part `sub_820F6068`; steps the minimap blink clock at `0x826C5AA4`/`0x826C5AA8` after drawing (see "Per-frame logic"). |
 | `sub_82107910` | | Wrapped | From Draw; adds one to the play time frame counter at `0x826C5B90` (see "Per-frame logic"). |
 | `sub_821109B8` | | | Turns the play time frame counter into hours, minutes and seconds (30, 1800, 108000 frames). |
+| `sub_82107B90` | `Boot::StartMovie` | | Message handler: plays the next boot movie, id from the table at `0x826C5BAC` (index at `0x826C5BC8`), via `sub_820A43A8` (name table at `0x82340BEC`). See "The title screen". |
+| `sub_82107C58` | `Boot::WaitForMovie` | Wrapped | Message handler, every tick while a boot movie plays; ends the step on a button press if skippable (`0x826C5BC4`) or when the movie has finished. `--skip_intro` makes it finish at once. |
+| `sub_82107BF8` | `Boot::EndMovie` | | Message handler: stops the movie; the front end (Genki logo, title) follows. |
+| `sub_820A4450` | `Movie::IsFinished` | Wrapped | 1 when the playing movie has finished. |
+| `sub_82295508` | `CreateFile` | Wrapped | The only caller of `NtCreateFile`; r3 = path. `--log_file_opens` logs every path. |
 | `sub_822221A0` | `TitleScreen::Update` | Wrapped | Counts idle ticks and starts the attract race at 600 (see "The title screen"). `--attract_after_s` shortens the wait. |
 | `sub_8218E420` | | Patched | Post-race check; the comparison against 60 was changed to 1 to fix the black screen after quest races. |
 
@@ -111,25 +116,46 @@ included in these counts.
 
 ## The title screen
 
-Left idle, the title screen loads an attract-mode race (AI cars on a
-street course, with no input), about 39 s after launch: ~19 s of boot and
-logos, then 20 s on the title screen. `sub_822221A0` (the title screen's
-update) adds one to +36 of the object at `[0x82814E34]` each tick and, at
-600, sets the state at +4 to 5 (via 8), which starts the race. After the
-race (~60 s) the game goes back to the title screen and the next race
-follows ~22 s later.
+From launch, with no input (times as measured here):
 
-`--attract_after_s=<n>` makes the wait n seconds: after a tick that
-counted, the counter jumps to 599. With 1, the race starts about 21 s
-after launch with no input, which is what automated test runs use (see
-"Testing" in `native-renderer.md`).
+| Time | What | Driven by |
+|---|---|---|
+| 0-9.5 s | Ubisoft logo movie (`UBI_LOGO.wmv`) | The boot sequence's message handlers `sub_82107B90` (start), `sub_82107C58` (wait, every tick), `sub_82107BF8` (end). The movie decodes on a worker thread (`sub_820AE5D0`) and plays at its own rate. |
+| 9.5-15.7 s | Genki logo (an image) | UI animation counters, ~190 ticks. |
+| 15.7-18.4 s | The title logo animating in | UI animation counters, ~80 ticks. |
+| 18.4-38.4 s | Title screen, "press start" | `sub_822221A0`: idle ticks at +36 of `[0x82814E34]`, attract race at 600. |
 
-Found with `--find_idle_timer` (`src/debug/idle_timer_scan.cpp`): outside
-races it compares guest memory every 30 logic passes and logs words that
+`sub_822221A0` (the title screen's update) checks four controllers for a
+button (152) and otherwise adds one to +36 of the object at `[0x82814E34]`.
+At 600 ticks (20 s) it sets the state at +4 to 5 (via 8), which starts an
+attract-mode race (AI cars, no input). After the race (~60 s) the game goes
+back to the title screen, and the next race follows ~22 s later. The front
+end's state objects are at `[0x82814E2C]`, `[0x82814E30]` and
+`[0x82814E34]`, created when the movie ends.
+
+Options for automated runs (both off by default):
+
+- `--skip_intro`: the movie step reports the movie finished at once
+  (`sub_820A4450` returns 1 inside `sub_82107C58`), and menus run without
+  the 30 Hz tick wait until the first race, so the tick-counted Genki logo
+  and title animation pass in a fraction of a second.
+  Failing the movie file's open instead makes the game show the dirty disc
+  error.
+- `--attract_after_s=<n>`: the title screen's wait becomes n seconds: after
+  a tick that counted, the counter jumps to 599.
+
+With `--skip_intro --attract_after_s=1` the attract race starts about 1 s
+after launch (21 s with only `--attract_after_s=1`, 39 s with neither).
+
+How these were found: `--find_idle_timer` (`src/debug/idle_timer_scan.cpp`)
+compares guest memory every 30 logic passes outside races, logs words that
 step steadily like a timer (an integer by 30 or 60 ticks or about 1000 ms,
-a float by about 1 s or 30 or 60), then logs which tick handler or message
-handler changes them. Here the counter at `01A70024` counted to 600 and the
-race's loading (message handler `8216CA28`) reset it.
+a float by about 1 s or 30 or 60), and then logs which tick handler or
+message handler changes them; the counter at `01A70024` counted to 600.
+`--log_boot_modes` logs the front end's state objects as they change and
+each tick handler and message handler the first time it runs, which showed
+the boot sequence's handlers. `--log_file_opens` and screenshots
+(`spectacle -b -n -f -o <file>`) named the phases.
 
 ## Render command recording
 
@@ -557,7 +583,8 @@ and target, and recorder world matrices), mostly for comparison.
 | `--log_stepping_constants` | With `--log_slot_callers`: every 2 s, the constant uploads left as recorded that change about 30 times a second (stuck to the tick) rather than every frame, with the code that recorded them. The quickest way to find what still steps. |
 | `--per_tick_blink_timers`, `--per_tick_ui_movies`, `--per_tick_play_time`, `--per_tick_texture_animations`, `--per_tick_minimap_blink` | The per-frame logic fixes (default on); see "Per-frame logic". |
 | `--find_per_frame_state`, `--render_only_skip`, `--log_recording_by_pass` and others | Finding per-frame logic; see "Per-frame logic". |
-| `--attract_after_s`, `--find_idle_timer` | The title screen's wait before the attract race; finding timers in menus. See "The title screen". |
+| `--skip_intro`, `--attract_after_s` | Skip the logos and shorten the title screen's wait, so an attract race starts ~1 s after launch. See "The title screen". |
+| `--find_idle_timer`, `--log_boot_modes`, `--log_file_opens` | Finding timers in menus; the boot sequence; files opened. See "The title screen". |
 | `--log_game_messages`, `--log_slot_callers` | Message delivery per pass; which code allocates constant slots. |
 | `--log_upload_owners`, `--debug_zero_owners` | Which code recorded each vertex constant upload; replay a recorder's vertex or pixel constant uploads as zeros (with `--log_slot_callers`) to see what it draws. The fastest way to identify a draw; see "World-space sprites". |
 | `--log_overlay_products`, `--log_overlay_uploads` | The race overlays' camera products and uploads, as replayed. |

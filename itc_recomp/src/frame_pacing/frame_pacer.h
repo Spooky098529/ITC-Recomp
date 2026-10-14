@@ -29,6 +29,10 @@ class FramePacer {
   // Sleeps until the next tick is due.
   void WaitForNextTick();
 
+  // Restarts the 30 Hz grid from now, for ticks released without waiting
+  // (--skip_intro), so the grid doesn't run ahead of the clock.
+  void RestartTickGrid() { next_tick_ = Clock::now(); }
+
   // Call when releasing game logic for its next tick. Schedules the tick
   // after it.
   void OnTickReleased();

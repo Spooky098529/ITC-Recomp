@@ -37,9 +37,11 @@ find /dev/shm -maxdepth 1 -user "$USER" -name 'xenia_memory_*' -delete
 ```
 
 - Launch from the repo root; other directories fail (exit 127).
-- `--attract_after_s=1` starts the attract race about 21 s after launch with
-  no input (the game waits 20 s on the title screen otherwise), so races
-  can be checked without the user: run under `timeout` and read the log.
+- `--skip_intro --attract_after_s=1` starts an attract race (AI cars) about
+  1 s after launch with no input, so races can be checked without the user:
+  run under `timeout`, read the log, and take screenshots with
+  `spectacle -b -n -f -o <file>` (see "The title screen" in
+  `docs/functions.md`).
 - Run the game in the background. The user plays: they start a race, drive
   near an opponent and quit, then say what they saw.
 - Logs go to `itc_recomp/out/build/linux-amd64-release/logs/itc_<n>.log`,

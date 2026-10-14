@@ -27,6 +27,8 @@ REXCVAR_DEFINE_BOOL(find_idle_timer, false, "ITC",
                     "Log guest words that step steadily like a timer in menus (to find the "
                     "title screen's idle timer)");
 
+REXCVAR_DECLARE(bool, log_boot_modes);
+
 namespace debug {
 
 struct Range {
@@ -218,6 +220,13 @@ void IdleTimerScan_Before(uint8_t* base) {
 }
 
 void IdleTimerScan_After(uint8_t* base, const char* kind, uint32_t id) {
+  if (REXCVAR_GET(log_boot_modes)) {
+    // Each handler the first time it runs, to see what runs when in the boot.
+    static std::set<std::pair<std::string, uint32_t>> seen;
+    if (seen.insert({kind, id}).second) {
+      REXLOG_INFO("boot modes: first {} {:08X}", kind, id);
+    }
+  }
   if (REXCVAR_GET(find_idle_timer) && g_logic_pass) {
     Get().After(base, kind, id);
   }

@@ -1,14 +1,27 @@
-// The title screen's idle wait before the attract race (--attract_after_s).
+// The boot up to the title screen, and the title screen's idle wait before
+// the attract race: --skip_intro and --attract_after_s for automated runs,
+// --log_boot_modes to see the sequence.
 //
 // The title screen's update (sub_822221A0) counts idle ticks in +36 of the
 // object at [0x82814E34] and, at 600 (20 s at 30 Hz), sets the object's
 // state (+4) to 5, which loads an attract-mode race. See "The title screen"
 // in docs/functions.md.
 
+#include "title_screen.h"
+
 #include "guest.h"
 
 #include <rex/cvar.h>
+#include <rex/logging.h>
 
+#include <string>
+
+REXCVAR_DEFINE_BOOL(log_boot_modes, false, "ITC",
+                    "Log the front end's state objects as they change, and each tick and "
+                    "message handler the first time it runs");
+REXCVAR_DEFINE_BOOL(skip_intro, false, "ITC",
+                    "Testing: skip the Ubisoft logo movie, and run the Genki logo and the "
+                    "title screen's intro without the 30 Hz tick wait (until the first race)");
 REXCVAR_DEFINE_INT32(attract_after_s, 0, "ITC",
                      "Testing: seconds the title screen waits before the attract race "
                      "(0 = the game's 20)");
@@ -20,7 +33,21 @@ constexpr uint32_t kIdleTicksOffset = 36;
 constexpr int32_t kAttractTicks = 600;
 constexpr int32_t kTicksPerSecond = 30;
 
+bool g_first_race_started = false;
+bool g_in_movie_wait = false;
+
 }  // namespace
+
+namespace hooks {
+
+bool TitleScreen_SkipTickWait(bool in_race) {
+  if (in_race) {
+    g_first_race_started = true;
+  }
+  return REXCVAR_GET(skip_intro) && !g_first_race_started;
+}
+
+}  // namespace hooks
 
 // TitleScreen_Update.
 extern "C" REX_FUNC(sub_822221A0) {
@@ -38,4 +65,51 @@ extern "C" REX_FUNC(sub_822221A0) {
   if (now == before + 1 && now >= after && now < kAttractTicks - 1) {
     guest::StoreU32(base, title + kIdleTicksOffset, uint32_t(kAttractTicks - 1));
   }
+}
+
+// Scene::Update: r3 = scene. Hooked for --log_boot_modes: logs the front
+// end's state objects at [0x82814E2C] and [0x82814E34] as they change.
+extern "C" REX_FUNC(sub_820988C8) {
+  REX_FUNC_PROLOGUE();
+  if (REXCVAR_GET(log_boot_modes)) {
+    static std::string last;
+    std::string now;
+    for (uint32_t pointer : {0x82814E2Cu, 0x82814E30u, kTitleScreenPointer}) {
+      uint32_t object = guest::LoadU32(base, pointer);
+      now += fmt::format(" [{:08X}]={:08X}:", pointer, object);
+      for (uint32_t i = 0; object && i < 24; i += 4) {
+        now += fmt::format(" {}", int32_t(guest::LoadU32(base, object + i)));
+      }
+    }
+    if (now != last) {
+      REXLOG_INFO("boot modes:{}", now);
+      last = now;
+    }
+  }
+  __imp__sub_820988C8(ctx, base);
+}
+
+// The boot's movie step, run every tick while a movie plays (the Ubisoft
+// logo): ends the step when the movie is skippable (0x826C5BC4) and a button
+// is pressed, or when the movie has finished (sub_820A4450 returns 1) and
+// this+9608 is 1. With --skip_intro the movie reports finished at once.
+extern "C" REX_FUNC(sub_82107C58) {
+  REX_FUNC_PROLOGUE();
+  if (REXCVAR_GET(log_boot_modes)) {
+    REXLOG_INFO("boot modes: movie wait, this {:08X} +9608 {}", ctx.r3.u32,
+                guest::LoadU32(base, ctx.r3.u32 + 9608));
+  }
+  g_in_movie_wait = REXCVAR_GET(skip_intro);
+  __imp__sub_82107C58(ctx, base);
+  g_in_movie_wait = false;
+}
+
+// Whether the playing movie has finished (1 = finished).
+extern "C" REX_FUNC(sub_820A4450) {
+  REX_FUNC_PROLOGUE();
+  if (g_in_movie_wait) {
+    ctx.r3.u64 = 1;
+    return;
+  }
+  __imp__sub_820A4450(ctx, base);
 }
