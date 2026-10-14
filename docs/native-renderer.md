@@ -191,12 +191,20 @@ known about it; this file is the plan and its progress).
 - The minimap's player triangle comes from the second command table (see
   "Single commands" in `gpu-functions.md`): its helper draw
   (`sub_8258F5C0`) is wrapped as command 15, and drawn since.
-- Some colours differ between our resolves and the emulated GPU's as read
-  back from memory (ours: a yellow sign, pink underglow and a yellow
-  minimap triangle; the read-back ones: cyan, blue-violet and cyan; red
-  tail lights in both). Ours are right: the user sees them yellow in the
-  game's own window too, so the read-back copy (or its decoding) has red
-  and blue swapped for some formats. Keep that in mind when comparing.
+- **Red and blue swapped in resolves** (fixed 2026-10-14): the mirror,
+  the paint reflections and the minimap triangle showed red and blue
+  exchanged (an orange lane line blue in the mirror; seen by the user side
+  by side with the game's window). The library's Resolve (`sub_822AFA58`)
+  writes RB_COPY_DEST_INFO straight into the ring, not the shadow
+  (endian | format << 7 | number << 13 | exponent bias << 16 | swap <<
+  24), and sets copy_dest_swap when the destination texture's swizzle
+  takes X from another component than the first (fetch word 3 bits 1-3):
+  memory holds the texture as BGRA and its swizzle swaps it back when
+  sampled. Our resolve shader now swaps red and blue then too. (Earlier
+  this was put down to the read-back copy, wrongly: the read-back data is
+  stored swapped, as the GPU stores it, and ours now matches it.) The
+  resolve's format remap, for reference: destination 54 → colour format 7,
+  55 → 16, 56 → 17, 27 → 30, 28 → 31, 29 → 32, 22 and 23 → 6.
 - **Clears' rectangles** (2026-10-14): in a race no clear has rects, and
   every clear's viewport starts at 0,0 and covers the pass's drawn area
   (1280x720, 1024x576, 512x512, 1024x1024, 256x256, 512x288; the bloom

@@ -505,7 +505,11 @@ goes.
   the draw after the last resolve is the upscale.
 - `sub_822A8A60` at present.
 - The resolve flags: bits 8-9 (`0x300`, `0x100`, `0x204`), and the top
-  bits `0xF4000000` (likely an exponent bias for the HDR copies).
+  bits `0xF4000000` (likely an exponent bias for the HDR copies; Resolve
+  puts flags bits 26-31 into RB_COPY_DEST_INFO's exponent bias). The copy
+  registers are written to the ring, not the shadow; RB_COPY_DEST_INFO's
+  swap bit comes from the destination's swizzle (see "Red and blue
+  swapped in resolves" in `native-renderer.md`).
 - Which passes the guesses above really are (hiding each with
   `--debug_zero_owners` or a resolve skip would settle it).
 - The vertex declaration's element list (past word 16); a native renderer

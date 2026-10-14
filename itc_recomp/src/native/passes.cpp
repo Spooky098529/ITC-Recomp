@@ -1350,7 +1350,7 @@ bool Passes::State::CreateResolveResources() {
       VK_SUCCESS) {
     return false;
   }
-  VkPushConstantRange push{VK_SHADER_STAGE_FRAGMENT_BIT, 0, 16};
+  VkPushConstantRange push{VK_SHADER_STAGE_FRAGMENT_BIT, 0, 20};
   VkPipelineLayoutCreateInfo layout_info{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
   layout_info.setLayoutCount = 1;
   layout_info.pSetLayouts = &resolve_set_layout;
@@ -1546,13 +1546,19 @@ bool Passes::State::ResolveInto(VkCommandBuffer commands, uint8_t* base, Target&
                               &set, 0, nullptr);
   // The exponent bias: flags bits 26-31, signed (likely; 0xF4000000 is -3
   // on the main view's HDR copies).
+  // Red and blue swapped as the library's Resolve sets RB_COPY_DEST_INFO's
+  // copy_dest_swap: when the destination's swizzle takes X from another
+  // component than the first (bits 1-3 of fetch word 3), so sampling it
+  // through the swizzle swaps them back.
+  bool swap = !source.depth && ((fetch[3] >> 1) & 7) != 0;
   struct {
     int32_t offset[2];
     int32_t samples;
     float scale;
+    int32_t swap_red_blue;
   } constants{{left - x, top - y},
               source.depth ? 1 : int32_t(source.samples),
-              std::ldexp(1.0f, int32_t(flags) >> 26)};
+              std::ldexp(1.0f, int32_t(flags) >> 26), swap ? 1 : 0};
   vk::vkCmdPushConstants(commands, resolve_layout, VK_SHADER_STAGE_FRAGMENT_BIT, 0,
                          sizeof(constants), &constants);
   vk::vkCmdDraw(commands, 3, 1, 0, 0);
