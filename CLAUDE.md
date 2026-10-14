@@ -74,7 +74,7 @@ install -m 755 itc_recomp/run-debug.sh $D/run-debug.sh
 (cd $D && python3 -I -m zipfile -c ../$name.zip itc librexruntime.so run.sh run-debug.sh)
 ```
 
-## Status (`main`, 2026-10-12)
+## Status (`main`, 2026-10-14)
 
 Frame interpolation for races is working: logic runs at 30 Hz and frames are
 blended between ticks. The world, cameras, wheels (other cars' too, paired
@@ -88,6 +88,13 @@ interpolation on (marked experimental) with logging off; `run-debug.sh` is
 the same with logs; `./run.sh --no-interpolation` gives the original 30 fps
 with motion blur. Known issues are at the end of `docs/functions.md`.
 
+The game draws with our own Vulkan renderer (the native renderer, exclusive
+mode; merged from `native-renderer`): the emulated GPU plugin isn't loaded
+or shipped. Uncapped attract race: ~235 fps mean against the emulated GPU's
+155. Its known issues (boot movie, gamma, textures, window resizing,
+remaining packet writers, speed) are milestone 7 in
+`docs/native-renderer.md`.
+
 Releases are made by pushing a `v*` tag: CI builds the zip and publishes a
 GitHub release with generated notes, which are then replaced with notes
 written for players (title "vX.Y.Z: <summary>", same layout as earlier
@@ -95,11 +102,6 @@ releases).
 
 Not done yet:
 
-- Races don't hold 144 fps in busy areas (about 105-150). The render thread
-  is the limit, and about half of it is the game busy-waiting on the
-  emulated GPU, whose command thread is the real bottleneck (see
-  "Performance" in `docs/functions.md`). Investigation on branch
-  `perf-investigation`.
 - Menus still run at 30 fps (see Known issues).
 - Other per-object draws (caller `0x82596D9C`) use projective matrices that
   aren't blended, so they step at 30 Hz; what they draw isn't known yet
