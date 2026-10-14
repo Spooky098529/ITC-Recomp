@@ -60,8 +60,8 @@ known about it; this file is the plan and its progress).
 | 3 | **Textures**: untile and upload (mostly BC1-BC3), samplers from the fetch constants. | The main view looks right without effects. | Done (2026-10-13): signs, gauges, fences, buildings and road textured correctly (screenshot checked); what comes from resolves is still missing. |
 | 4 | **The other passes**: each pass renders into a Vulkan image of its resolve's size and format; resolves become copies. | Shadows, reflections and the mirror work. | Done (2026-10-14): every pass draws, inline vertex draws included; clears and resolves work; the user saw the car's shadow, the mirror and the reflections right in our window (cockpit and third person), and the resolves match the emulated GPU's (`--readback_resolve=full`), except its blocky bloom. Menus not checked. |
 | 5 | **The final frame and the menus** (still in development mode): post-processing, HUD, the frame's end, then every menu screen. | Races and menus look as in the game's window, side by side. | In progress: the final frame with the HUD shows (checked by the user in a race); menus' tiled 3D views fixed. |
-| 6 | **Exclusive mode**: the emulated GPU gets no work and then isn't loaded at all; the graphics library is kept for what our renderer needs from it (see "Plan for milestone 6"); then measure. | The GPU plugin isn't loaded; frame rate measured against the emulated GPU. | In progress: the plugin isn't loaded (`run.sh` runs exclusive mode); measured: 135 fps mean uncapped against the emulated GPU's 155, then 215 after the first speed work (step 5, in progress; holds the 144 cap in an attract race). The rest of step 5 and the frame's end (step 6) to come. |
-| 7 | **Known issues cleanup**: what's under Known issues below (the boot movie, gamma, textures replaced in memory, textures never freed, window resizing). | The known issues are fixed or accepted. | |
+| 6 | **Exclusive mode**: the emulated GPU gets no work and then isn't loaded at all; the graphics library is kept for what our renderer needs from it (see "Plan for milestone 6"); then measure. | The GPU plugin isn't loaded; frame rate measured against the emulated GPU. | In progress: the plugin isn't loaded (`run.sh` runs exclusive mode); measured: 135 fps mean uncapped against the emulated GPU's 155, then ~235 after the speed work (step 5; holds the 144 cap in an attract race). The library's remaining packet writers moved to milestone 7 (the user's call, 2026-10-14); the frame's end (step 6) to come. |
+| 7 | **Known issues cleanup**: what's under Known issues below (the boot movie, gamma, textures replaced in memory, textures never freed, window resizing, the library's remaining packet writers). | The known issues are fixed or accepted. | |
 
 ## Progress on milestone 2
 
@@ -1008,6 +1008,16 @@ To be fixed (or accepted) in milestone 7.
   drain first). The shader reference count's compare-and-swap still costs
   ~1%, and any atomic added to per-draw code (counters included) shows up:
   keep per-draw counters per thread.
+- **Performance, to do: the library's remaining packet writers** (moved
+  here from milestone 6's step 5, the user's call, 2026-10-14: not clearly
+  worth it now). Besides the indexed draw (done, see "The indexed draw
+  without its packets"), the library still writes GPU packets nothing
+  reads in exclusive mode: the shader loads' own packets (~1% of the
+  render thread), inline draws (`sub_825A17A0`), SetTexture, SetIndices,
+  pixel shader constants and others, ~3-4% together (2026-10-14 profile,
+  before the reference count change). Each needs the same check as the
+  indexed draw (`--native_renderer_check_draw_writes`: which device fields
+  it changes besides the command pointer) before its packets are skipped.
 - No Vulkan validation layer here yet (`--native_renderer_validation` falls
   back without it); install `vulkan-validation-layers` before drawing gets
   complicated.
