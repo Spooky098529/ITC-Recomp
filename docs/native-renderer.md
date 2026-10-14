@@ -58,7 +58,7 @@ known about it; this file is the plan and its progress).
 | 2 | **Main view geometry**: vertex and index buffers read from guest memory, shaders translated, render states mapped to pipelines. | Race geometry is visible in our window, untextured. | Done (2026-10-13): the cockpit view's geometry, the right way up, solid, with the game's coloured lighting on white placeholder textures (screenshot checked). |
 | 3 | **Textures**: untile and upload (mostly BC1-BC3), samplers from the fetch constants. | The main view looks right without effects. | Done (2026-10-13): signs, gauges, fences, buildings and road textured correctly (screenshot checked); what comes from resolves is still missing. |
 | 4 | **The other passes**: each pass renders into a Vulkan image of its resolve's size and format; resolves become copies. | Shadows, reflections and the mirror work. | Done (2026-10-14): every pass draws, inline vertex draws included; clears and resolves work; the user saw the car's shadow, the mirror and the reflections right in our window (cockpit and third person), and the resolves match the emulated GPU's (`--readback_resolve=full`), except its blocky bloom. Menus not checked. |
-| 5 | **Post-processing, HUD, present**, then exclusive mode. | A race is fully native; measure the frame rate. | |
+| 5 | **Post-processing, HUD, present**, then exclusive mode. | A race is fully native; measure the frame rate. | In progress: the final frame (with the attract logo) shows. |
 | 6 | **Menus**. | The emulated GPU is no longer needed. | |
 
 ## Progress on milestone 2
@@ -270,6 +270,26 @@ a vertex shader patched for another vertex declaration.
   `--native_renderer_base_level_only` showing the gradients didn't come from
   the texture; then the shader dumps showing the same program with
   different vertex fetch strides on one vertex buffer.
+
+## Progress on milestone 5
+
+- **The final frame is shown** (2026-10-14): `sub_8258D998` (the front
+  buffer resolve at the frame's end, outside the command list) is wrapped
+  (`replay_hooks.cpp`) and the window shows what render target 0 holds
+  then (`Passes::FrontBufferResolve`), instead of the main view. Logged
+  in a race: `Resolve(device, flags 0, no rect, front buffer, no point,
+  level 0, slice 0)` from render target 0 = the pitch 1280, no-MSAA,
+  8_8_8_8 surface at EDRAM base 0, into a 1280x720 8_8_8_8 (format 6)
+  front buffer. The device is the video output's (+140, `40021B00`);
+  the device pointer at `0x8296BD90` reads 0 there, so it seems to be set
+  only during the replay. Frames without a front buffer resolve still
+  show the main view.
+- The last pass (saved targets, viewport 1280x720) in an attract race is
+  two inline strips: the upscale (sampling the 1280x720 format 54
+  resolve destination, the view in its top-left 1024x576) and the
+  "Import Tuner Challenge" logo (a 208x128 texture). Attract races have
+  no HUD; the greyscale in some attract shots is the attract mode's own
+  effect (the user confirmed).
 
 ## Tools (all debugging aids)
 

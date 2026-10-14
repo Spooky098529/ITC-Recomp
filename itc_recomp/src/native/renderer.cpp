@@ -154,6 +154,9 @@ class Renderer {
   void OnCommand(uint32_t id, uint32_t arg1);
   void AfterCommand(uint8_t* base, uint32_t id, uint32_t payload, uint32_t arg1);
   void InlineDraw(uint8_t* base, uint32_t type, uint32_t count, uint32_t stride, uint32_t data);
+  void FrontBufferResolve(uint8_t* base, uint32_t device, uint32_t front_buffer) {
+    passes_.FrontBufferResolve(BeginFrame(), base, device, front_buffer);
+  }
   void EndFrame();
 
  private:
@@ -905,6 +908,16 @@ void Renderer_InlineDraw(uint8_t* base, uint32_t type, uint32_t count, uint32_t 
   }
   if (Renderer* renderer = GetRenderer()) {
     renderer->InlineDraw(base, type, count, stride, data);
+  }
+}
+
+void Renderer_FrontBufferResolve(uint8_t* base, uint32_t device, uint32_t front_buffer) {
+  if (!Renderer_Enabled()) {
+    return;
+  }
+  g_base = base;
+  if (Renderer* renderer = GetRenderer()) {
+    renderer->FrontBufferResolve(base, device, front_buffer);
   }
 }
 

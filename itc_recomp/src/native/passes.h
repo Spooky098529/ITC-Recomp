@@ -41,8 +41,14 @@ class Passes {
   // After a clear (26) or resolve (25) command's library call.
   void AfterClear(VkCommandBuffer commands, uint8_t* base, uint32_t payload, uint32_t arg1);
   void AfterResolve(VkCommandBuffer commands, uint8_t* base, uint32_t payload, uint32_t arg1);
+  // The frame's end (sub_8258D998, outside the command list): the game
+  // resolves render target 0 of `device` whole into a front buffer texture
+  // (`front_buffer`, its fetch constant at +28). That target is then shown.
+  void FrontBufferResolve(VkCommandBuffer commands, uint8_t* base, uint32_t device,
+                          uint32_t front_buffer);
   // Ends the frame's drawing and puts what's to be shown into the image
-  // `shown()` returns, in TRANSFER_SRC_OPTIMAL: the main view, or with
+  // `shown()` returns, in TRANSFER_SRC_OPTIMAL: the frame resolved to the
+  // front buffer (else the main view, as in frames without one), or with
   // show_resolve >= 0 that resolve of the frame's destination (a debugging
   // aid). Returns the size of what was put there.
   // dump: also copy the frame's resolve destinations and what's shown

@@ -29,6 +29,11 @@ void Renderer_AfterCommand(uint8_t* base, uint32_t id, uint32_t payload, uint32_
 void Renderer_InlineDraw(uint8_t* base, uint32_t type, uint32_t count, uint32_t stride,
                          uint32_t data);
 
+// Render thread, at the frame's end (sub_8258D998, outside the command
+// list): the game resolves render target 0 of `device` into the front buffer
+// texture `front_buffer`.
+void Renderer_FrontBufferResolve(uint8_t* base, uint32_t device, uint32_t front_buffer);
+
 // Render thread, after each frame's replay and present.
 void Renderer_EndFrame();
 

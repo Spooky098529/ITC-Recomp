@@ -150,3 +150,16 @@ extern "C" REX_FUNC(sub_8258F5C0) {
   __imp__sub_8258F5C0(ctx, base);
   native::g_current_command = outer_command;
 }
+
+// The frame's end (see "The end of a frame" in docs/gpu-functions.md):
+// sub_8258D998(video output) resolves render target 0 into one of two front
+// buffer textures (video output + 4 * (68 + *(+268))) with the library's
+// Resolve, outside command 25; the native renderer shows that target.
+extern "C" REX_FUNC(sub_8258D998) {
+  REX_FUNC_PROLOGUE();
+  uint32_t video_output = ctx.r3.u32;
+  uint32_t front_buffer =
+      guest::LoadU32(base, video_output + 4 * (68 + guest::LoadU32(base, video_output + 268)));
+  native::Renderer_FrontBufferResolve(base, guest::LoadU32(base, video_output + 140), front_buffer);
+  __imp__sub_8258D998(ctx, base);
+}

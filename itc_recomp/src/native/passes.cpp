@@ -468,6 +468,11 @@ struct Passes::State {
   VkExtent2D render_extent{};
   bool rendering = false;
   Target* main_view = nullptr;  // drawn into this frame
+  // The target resolved to the front buffer this frame, and the front
+  // buffer's size.
+  Target* front = nullptr;
+  VkExtent2D front_extent{};
+  bool logged_front = false;
 
   // What's shown, and this frame's resolve destinations (for showing one).
   Image shown;
@@ -1608,6 +1613,7 @@ void Passes::BeginFrame(uint32_t frame_index) {
   s.rendering = false;
   s.bound_color = s.bound_depth = nullptr;
   s.main_view = nullptr;
+  s.front = nullptr;
   s.frame_resolves.clear();
   s.mirrored.clear();
   s.inline_offset = 0;
@@ -2499,6 +2505,29 @@ void Passes::AfterResolve(VkCommandBuffer commands, uint8_t* base, uint32_t payl
   }
 }
 
+void Passes::FrontBufferResolve(VkCommandBuffer commands, uint8_t* base, uint32_t device,
+                                uint32_t front_buffer) {
+  State& s = *state_;
+  uint32_t object = guest::LoadU32(base, device + kDeviceRenderTarget0);
+  Target* target = object ? s.GetTarget(commands, base, object, false) : nullptr;
+  // The front buffer's size, from its fetch constant's word 2 (2D: width - 1
+  // in bits 0-12, height - 1 in bits 13-25).
+  uint32_t size = front_buffer ? guest::LoadU32(base, front_buffer + 28 + 8) : 0;
+  s.front_extent = {(size & 0x1FFF) + 1, ((size >> 13) & 0x1FFF) + 1};
+  s.front = target;
+  if (!s.logged_front) {
+    s.logged_front = true;
+    Surface surface = object ? ReadSurface(base, object) : Surface{};
+    uint32_t format = front_buffer ? guest::LoadU32(base, front_buffer + 28 + 4) & 0x3F : 0;
+    REXLOG_INFO("native renderer: front buffer resolve: device {:08X} (ours {:08X}), render "
+                "target 0 {:08X} (pitch {}, MSAA {}, format {}, EDRAM base {}), into {:08X}: "
+                "{}x{} format {}",
+                device, guest::LoadU32(base, kDevicePointer), object, surface.pitch, surface.msaa,
+                surface.format, surface.edram_base, front_buffer, s.front_extent.width,
+                s.front_extent.height, format);
+  }
+}
+
 void Passes::set_skip_pixel_shader(uint64_t hash) {
   state_->skip_pixel_shader = hash;
 }
@@ -2811,6 +2840,29 @@ VkExtent2D Passes::EndFrame(VkCommandBuffer commands, int32_t show_resolve, bool
                        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit, VK_FILTER_NEAREST);
     Transition(commands, resolved.image, VK_IMAGE_ASPECT_COLOR_BIT, layout,
                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+  } else if (Target* front = s.front) {
+    // The frame as the game resolves it to the front buffer.
+    s.EndRendering(commands);
+    Transition(commands, front->image.image, front->aspects(), front->layout,
+               VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+    extent = {std::min({s.front_extent.width, front->extent.width, kShownWidth}),
+              std::min({s.front_extent.height, front->extent.height, kShownHeight})};
+    if (front->samples == VK_SAMPLE_COUNT_1_BIT) {
+      VkImageBlit blit{};
+      blit.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+      blit.srcOffsets[1] = {int32_t(extent.width), int32_t(extent.height), 1};
+      blit.dstSubresource = blit.srcSubresource;
+      blit.dstOffsets[1] = blit.srcOffsets[1];
+      vk::vkCmdBlitImage(commands, front->image.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, shown,
+                         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit, VK_FILTER_NEAREST);
+    } else if (front->format == kShownFormat) {  // a resolve doesn't convert
+      VkImageResolve region{};
+      region.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+      region.dstSubresource = region.srcSubresource;
+      region.extent = {extent.width, extent.height, 1};
+      vk::vkCmdResolveImage(commands, front->image.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                            shown, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+    }
   } else if (Target* main = s.main_view) {
     // The main view's drawn part, its samples averaged.
     Transition(commands, main->image.image, main->aspects(), main->layout,

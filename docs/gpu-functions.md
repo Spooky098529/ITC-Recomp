@@ -488,8 +488,10 @@ draw listeners finish the frame outside the command list:
 The upscale from the 1024x576 view: the command list's last resolve copies
 the view (rect 1024x576) into the top-left of a 1280x720 texture, and the
 saved 1280x720 targets are set again with a 1280x720 viewport; the draw
-after that most likely samples the view across the screen (the upscale),
-and the rest are the HUD. Not checked.
+after that samples the view across the screen (the upscale; seen in an
+attract race, 2026-10-14), and the rest are the HUD (in attract races, only
+the game's logo). The front buffer resolve copies render target 0 (that
+pitch 1280, 8_8_8_8 surface) whole into a 1280x720 8_8_8_8 texture.
 
 For a native renderer, present is: take the final 1280x720 image (or the
 1024x576 view and HUD, at any resolution) and present it with a Vulkan
