@@ -17,13 +17,14 @@ Built with AI assistance (Claude Code).
   30 Hz, and frames are blended between ticks, so races play smoothly at up
   to 144 fps (or uncapped). `./run.sh --no-interpolation` gives the original
   30 fps game.
-- Keyboard and gamepad input.
-
+  
 ## Requirements
 
 - Linux on a 64-bit x86 CPU with SSE4.2 (most CPUs from 2009 on).
 - A GPU with Vulkan support.
 - Your own copy of the game, extracted from a backup.
+
+(Windows will come later, just trying to get this to work first)
 
 ## Install
 
@@ -46,7 +47,7 @@ Built with AI assistance (Claude Code).
 
 - Only races are interpolated; menus run at 30 fps, and HUD animations
   advance at 30 Hz.
-- The Ubisoft logo movie at startup isn't shown.
+- In game movies are not shown.
 - Colours are a little lighter than on the console (the console's output
   gamma isn't applied yet).
 - On Wayland, resizing the window doesn't change the rendered image's size.
