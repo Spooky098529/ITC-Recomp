@@ -1,4 +1,5 @@
 #include "passes.h"
+#include "frame_costs.h"
 
 #include "generated_id_frag.h"
 #include "generated_resolve_frag.h"
@@ -1427,6 +1428,8 @@ VkPipeline Passes::State::GetPipeline(const PipelineKey& key) {
   if (!added) {
     return it->second;
   }
+  ScopedCost cost(g_frame_costs.pipeline_ns);
+  g_frame_costs.pipelines++;
   VkPipelineShaderStageCreateInfo stages[2] = {};
   uint32_t stage_count = 0;
   stages[stage_count] = {VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO};

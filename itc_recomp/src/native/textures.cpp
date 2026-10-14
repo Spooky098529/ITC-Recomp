@@ -1,4 +1,5 @@
 #include "textures.h"
+#include "frame_costs.h"
 
 #include "state.h"
 
@@ -481,6 +482,9 @@ bool TextureCache::State::Upload(uint8_t* base, Texture& t) {
     stats.deferred++;
     return false;
   }
+  ScopedCost cost(g_frame_costs.texture_ns);
+  g_frame_costs.textures++;
+  g_frame_costs.texture_bytes += needed;
 
   Frame& frame_data = frames[frame];
   std::vector<VkBufferImageCopy> copies;

@@ -1057,8 +1057,10 @@ To be fixed (or accepted) in milestone 7.
   draws and up to 824 inline draws a frame; earlier logs had them once, 7
   a frame), not known to be related. Since `895055b` the log names each
   failed draw's reason ("failed draws a frame by reason") and any frame
-  taking 100 ms or more ("long frame"); the next run that shows either
-  should say which.
+  taking 100 ms or more ("long frame", since 2026-10-15 40 ms or more,
+  with the frame's texture loads, shader translations and pipeline
+  creations and the time each took: `frame_costs.h`); the next run that
+  shows either should say which.
   The user then saw, in v0.3.0, the **HUD dropping out and flickering in
   busy scenes**, with the game stuttering and freezing (2026-10-14). The
   HUD is drawn last, so it's what a full per-frame buffer loses first: the

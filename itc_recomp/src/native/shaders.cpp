@@ -1,4 +1,5 @@
 #include "shaders.h"
+#include "frame_costs.h"
 
 #include <cstring>
 #include <map>
@@ -135,6 +136,8 @@ TranslatedShader* ShaderCache::Get(ShaderStage stage, const uint8_t* ucode, uint
   if (auto it = state_->translations.find(key); it != state_->translations.end()) {
     return it->second->spirv.empty() ? nullptr : it->second.get();
   }
+  ScopedCost cost(g_frame_costs.shader_ns);
+  g_frame_costs.shaders++;
   const char* stage_name = stage == ShaderStage::kVertex ? "vertex" : "pixel";
   REXLOG_DEBUG("native renderer: translating {} shader {:016X}, {} bytes, num_reg {}",
                stage_name, hash, size_bytes, num_reg);

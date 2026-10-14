@@ -1,4 +1,5 @@
 #include "renderer.h"
+#include "frame_costs.h"
 
 #include "buffers.h"
 #include "app_window.h"
@@ -716,13 +717,20 @@ void Renderer::EndFrame() {
       swapchain_stale_ = true;
     }
     frames_presented_++;
-    // A frame much longer than usual (a hitch the per-second fps hides).
+    // A frame much longer than usual (a hitch the per-second fps hides),
+    // with what it spent on work that comes and goes (frame_costs.h).
     auto now = Clock::now();
     if (auto ms = std::chrono::duration<double, std::milli>(now - last_present_).count();
-        ms >= 100 && frames_presented_ > 1) {
-      REXLOG_INFO("native renderer: long frame: {:.0f} ms since the last present ({} draws)",
-                  ms, frame_draws);
+        ms >= 40 && frames_presented_ > 1) {
+      const FrameCosts& c = g_frame_costs;
+      REXLOG_INFO(
+          "native renderer: long frame: {:.0f} ms since the last present ({} draws): "
+          "{} textures loaded ({:.1f} MB) in {:.1f} ms, {} shaders translated in {:.1f} ms, "
+          "{} pipelines made in {:.1f} ms",
+          ms, frame_draws, c.textures, c.texture_bytes / 1048576.0, c.texture_ns / 1e6,
+          c.shaders, c.shader_ns / 1e6, c.pipelines, c.pipeline_ns / 1e6);
     }
+    g_frame_costs = {};
     last_present_ = now;
   } else {
     frames_skipped_++;
