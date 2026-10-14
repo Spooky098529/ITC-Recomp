@@ -964,7 +964,8 @@ To be fixed (or accepted) in milestone 7.
   2026-10-14, with frame interpolation). Not investigated. The bloom is
   the glow chain whose combine is pixel shader `9750599DF5ED3B39` (see
   `--glow` in `functions.md`); what it reads that stays at the tick (a
-  previous frame's image, constants not blended) isn't known yet.
+  previous frame's image, constants not blended) isn't known yet. The
+  user suspects it reads the 30 Hz tick, as the motion blur does (below).
 - **Motion blur reads the 30 Hz tick.** The game's velocity-based motion
   blur (pixel shader `7EB16456AAD56CBA`) gets its velocities from the
   tick, so at interpolated frame rates each frame smears a whole tick of
