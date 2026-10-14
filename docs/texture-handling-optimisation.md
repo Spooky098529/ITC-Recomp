@@ -86,12 +86,14 @@ changes without memcpy, which bytes changed. With
 frame, so every change is found. An 80 s attract race (`itc_663.log`,
 `itc_666.log`):
 
-- **First loads**: of 1,463 textures, 1,455 were written whole by memcpy,
-  nearly all from the resource loader `sub_82596F68` (`0x82597014`), the
+- **First loads**: of 1,465 textures, 1,449 were written whole by memcpy,
+  11 partly and 5 not at all; nearly all from the resource loader `sub_82596F68` (`0x82597014`), the
   same loader as vertex and index data. A few 300x150 RGBA textures
   come from `sub_820ED6D0` (`0x820ED910`, `0x820ED920`), and are later
   redrawn by `sub_820ED630` (`0x820ED6B8`), a rectangle copy (a memcpy
   per row): images the game composes on the CPU, also through memcpy.
+  They're among the "partly" ones: memcpy writes their rows, not the
+  padding past the last row that the range includes (see below).
 - Five first loads had no memcpy writes at all (a 256x144, a 1024x1024
   and three 16x16; addresses vary between runs). None of them changed
   afterwards. Their writer isn't known.
