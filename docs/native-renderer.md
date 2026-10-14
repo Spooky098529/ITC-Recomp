@@ -57,7 +57,7 @@ known about it; this file is the plan and its progress).
 | 1 | **Skeleton**: `--native_renderer` creates our own Vulkan device, window and swapchain; the replay hooks pass each frame's commands to it. | A window clears and presents every frame. | Done (2026-10-13): presents every frame in menus (30 fps) and races (113-128 fps, ~26,800 commands and ~2,900 draws a frame), the game unaffected. |
 | 2 | **Main view geometry**: vertex and index buffers read from guest memory, shaders translated, render states mapped to pipelines. | Race geometry is visible in our window, untextured. | Done (2026-10-13): the cockpit view's geometry, the right way up, solid, with the game's coloured lighting on white placeholder textures (screenshot checked). |
 | 3 | **Textures**: untile and upload (mostly BC1-BC3), samplers from the fetch constants. | The main view looks right without effects. | Done (2026-10-13): signs, gauges, fences, buildings and road textured correctly (screenshot checked); what comes from resolves is still missing. |
-| 4 | **The other passes**: each pass renders into a Vulkan image of its resolve's size and format; resolves become copies. | Shadows, reflections and the mirror work. | In progress: every pass draws, clears and resolves work; the shadow map, mirror and reflection map come out right (dumped and checked); buildings sometimes show the rainbow effect (see below). |
+| 4 | **The other passes**: each pass renders into a Vulkan image of its resolve's size and format; resolves become copies. | Shadows, reflections and the mirror work. | In progress: every pass draws, clears and resolves work; the shadow map, mirror and reflection map come out right (dumped and checked); the rainbow effect is fixed (see below). |
 | 5 | **Post-processing, HUD, present**, then exclusive mode. | A race is fully native; measure the frame rate. | |
 | 6 | **Menus**. | The emulated GPU is no longer needed. | |
 
@@ -121,9 +121,8 @@ known about it; this file is the plan and its progress).
   fps. Unsupported: `24_8_FLOAT` (the shadow depth map). About 2,200
   lookups a second find a texture of another dimension than the shader
   declares (now logged with an example). Still wrong, all for milestone 4:
-  the mirror is black, and some buildings show the rainbow effect, likely
-  textures that are resolve targets (whatever is in guest memory there),
-  to be confirmed.
+  the mirror is black, and some buildings show the rainbow effect (not
+  resolve targets, as guessed then: see "The rainbow effect").
 
 ## Progress on milestone 4
 
@@ -171,54 +170,47 @@ known about it; this file is the plan and its progress).
   clear rects, render targets 1-3, resolves to a level or slice other
   than 0.
 
-### The rainbow effect
+### The rainbow effect (fixed)
 
-Buildings sometimes show a rainbow-coloured texture (smooth colour
-gradients) instead of theirs, for a while, then their own again; the game's
-own window shows them right. What's known (2026-10-13):
+Buildings, pillars and overpasses showed smooth rainbow gradients (and
+green or red tints) instead of their own colours, on and off; the game's own
+window showed them right. **Fixed 2026-10-14 (`88f2c28`)**: those draws ran
+a vertex shader patched for another vertex declaration.
 
-- It depends on timing: frames recorded slowly don't have it (dumps that
-  hashed every vertex range or formatted a line per draw; the frames after
-  a dump's pause), waiting for the GPU before each frame makes it rarer.
-- Not frames in flight sharing the mirror (a mirror each now, still there).
-- Not vertex or index data: none of ~2,000 ranges changed between frames
-  or within a frame.
-- Not textures: none changed after loading (checked every 4 frames for
-  their first 240), none reloaded.
-- Not resolve destinations: no lookup got one of another size or format.
-- Not z-fighting: no draw uses an equal depth test; depth bias didn't help.
-- Not the interpolation: still there with `--interpolate_draw_state=false`.
-- Smooth gradients look like a texture's small mips sampled with stretched
-  coordinates, which would point at a constant (texture coordinate
-  transform) read wrong; not checked.
-
-Found since (2026-10-14):
-
-- **It comes from the draws of pixel shader `F3C0D413`** (`F3C0D4132DB33EFE`):
-  the car's interior, which samples the cockpit atlas. Found by leaving
-  each main view pixel shader out in turn (`--native_renderer_cycle`) at
-  full speed. That shader reads interpolators `0x3`.
-- The user sees the same objects switch between the rainbow and their own
-  texture. Since textures never change after loading, look at what a draw
-  is given: float, bool/loop and fetch constants, the texture descriptor
-  set (shared between draws with the same views and samplers), system
-  constants, where they land in the per-frame constants ring, the mirror
-  ranges, and reuse of any of these across frames in flight.
-- Not the colour write mask: it's now normalized as the plugin does it (no
-  colour without a pixel shader, for targets the pixel shader doesn't
-  write, or in depth-only EDRAM mode). Before, ~230 main view draws a
-  frame without a pixel shader wrote Vulkan's undefined fragment output;
-  the effect was still there after the fix.
-- Not PsParamGen: in `itc_406` no draw uses it (`0.0 draws a frame`).
-- Not the base vertex or index range: the base vertex is now taken from
-  `VGT_INDX_OFFSET`, as the plugin takes it, and in `itc_406` no draw's
-  differs from its item's, and no draw has indices outside
-  `VGT_MIN/MAX_VTX_INDX` (both are logged only when it happens).
-- 25-70 draws a frame read vertices past their fetch constant's size
-  (e.g. 4,128 bytes, 5,040 needed); vertex buffers are now copied up to the
-  highest vertex a draw uses, so the mirror has the data. Whether those
-  draws are `F3C0D413`'s isn't known.
-- Also added on the way: blend constants from `RB_BLEND_*`.
+- The library patches a vertex shader's vertex fetch instructions for the
+  bound declaration (see "Vertex declaration" in `gpu-functions.md`). When
+  the GPU may still be using the shader's microcode, it can't patch it in
+  place: `sub_822AEBF0` copies the microcode into the command buffer
+  (IM_LOAD_IMMEDIATE) and patches the copy. The object's own microcode
+  (+48) stays patched for the previous declaration, and +24 still names
+  that one. We translated the object's microcode, so ~100-400 draws a
+  frame fetched vertices with another declaration's layout: in the case
+  looked at, the colour and texture coordinate stream (12 bytes a vertex)
+  read with an 8-byte stride, giving garbage vertex colours and texture
+  coordinates.
+- Now `sub_822AE340` (the patcher) is wrapped: when it patches a copy, the
+  patched bytes are kept with the shader object and the declaration id, and
+  a draw whose object is patched for another declaration than the bound
+  one uses them (`g_loaded_vertex_shader`, `replay_hooks.cpp`). The log
+  counts these draws, and logs draws still mismatched (none since).
+- Why it depended on timing: the copy is made only while the emulated GPU
+  hasn't finished with the shader, so frames recorded slowly (dumps,
+  `--native_renderer_serialize`) mostly patched in place, and looked right.
+- The same fix ended the draws reading vertices past their fetch
+  constant's size (25-70 a frame): those were wrong strides too.
+- Misleading leads, for the record: leaving out pixel shader `F3C0D413`
+  (the cockpit's gauges) with `--native_renderer_cycle` seemed to remove
+  the effect, but that was a single frame of an effect that comes and goes;
+  attract races (no cockpit) showed it all the same. The colour write mask
+  (now normalized as the plugin does it), PsParamGen (no draw uses it), the
+  base vertex and index range, mirror copies overwriting each other
+  (`--native_renderer_check_clobbers`: none) and stale textures
+  (`--native_renderer_verify_textures`: no change) were all ruled out on
+  the way. What found it: periodic dumps at full speed
+  (`--native_renderer_dump_every`) with the draw IDs naming the draws;
+  `--native_renderer_base_level_only` showing the gradients didn't come from
+  the texture; then the shader dumps showing the same program with
+  different vertex fetch strides on one vertex buffer.
 
 ## Tools (all debugging aids)
 
@@ -235,9 +227,14 @@ Found since (2026-10-14):
   constants it reads, and `draw_ids.pfm` holds which draw wrote each
   pixel of the main view. `tools/pfm_to_png.py <dir>` makes PNGs;
   `tools/rainbow_draws.py <dump>` names the draws covering most of the
-  rainbow-coloured pixels. The game pauses while it writes, and frames
-  recorded slowly tend not to show the rainbow effect, so a dump may miss
-  it.
+  rainbow-coloured pixels (its saturation test also counts real colour,
+  e.g. orange signs: look at the pictures). The game pauses while it
+  writes; the frame itself is recorded at full speed.
+- `--native_renderer_dump_every=<s>` (with `--native_renderer_dump`): dump
+  only the frame (shown image, draw IDs, `draws.txt`; no resolves or
+  left-out steps) every that many seconds of a race. Attract races are
+  deterministic, so two runs' dumps show the same moments and can be
+  compared with a flag on and off.
 - `--native_renderer_cycle=<dir>`: when a file named `now` appears in
   `<dir>`, leaves out the main view's draws of each pixel shader in turn
   for 3 s, saving a frame of each; unlike the dump, frames are recorded at
@@ -254,6 +251,10 @@ Found since (2026-10-14):
   written after we copied them, by the end of the frame.
 - `--native_renderer_base_level_only`: sample only each texture's first
   level.
+- `--native_renderer_check_clobbers`: log copies into the mirror that change
+  bytes an earlier draw's copy put there in the same frame.
+- `--native_renderer_verify_textures`: hash every texture used again each
+  frame, reloading the changed ones.
 - `--native_renderer_hide_cubes`: give cube maps the white placeholder.
 - `--native_renderer_no_index_clamp`: don't clamp indices to
   `VGT_MIN/MAX_VTX_INDX`.
@@ -294,8 +295,7 @@ Found since (2026-10-14):
   any dump. Screenshots: `spectacle -b -n -f -o <file>.png` while the game
   runs (a script that launches, sleeps and fires it); it captures the
   whole screen, so the windows must be visible (tell the user first).
-  Screenshots of the "ITC native renderer" window catch the rainbow effect
-  better than dumps.
+  Periodic dumps (`--native_renderer_dump_every`) need no screenshots.
 
 ## Plan for milestone 4
 
@@ -322,17 +322,22 @@ texture objects ("Resources"). The approach:
    depth textures: check). Format conversions on resolve (7e3 to
    16_16_16_16, the `0xF4000000` flags' likely exponent bias) need
    checking against the emulated GPU's output.
-4. The rainbow effect on buildings and the black mirror should go once
-   resolves feed the texture cache; check that guess first by logging
-   which texture addresses are resolve destinations.
+4. The black mirror went once resolves fed the texture cache; the rainbow
+   effect didn't (it was the vertex shader patching, see above).
 5. Open: the textures logged as "of another dimension than declared"
    (a log line names an example since `2c13992`; not run yet).
 
 ## Known issues
 
-- **The rainbow effect** on buildings (see "The rainbow effect" under
-  milestone 4): comes from pixel shader `F3C0D413`'s draws (the car's
-  interior); cause not found yet.
+- **Textures replaced in memory show their old contents for a while.**
+  The game streams track sections in during a race, and textures are
+  rewritten in place (in a 75 s attract race, several a few seconds apart,
+  59 in one 5 s window). A texture past its first 240 frames is hashed
+  again at most every 240 frames and at most 8 a frame, so a change was
+  noticed 240-3,200 frames late (logged as "textures changed in memory
+  after their first frames"). `--native_renderer_verify_textures` checks
+  every texture used each frame; something cheaper (watching writes) is
+  needed before this is the default.
 
 - Textures are never freed: memory reused for different textures (another
   race) leaves the old images behind.

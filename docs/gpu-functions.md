@@ -241,6 +241,20 @@ unbind, so the library knows when the GPU is done with it.
   formats end up in the shader's fetch instructions, as on the GPU, and the
   vertex shader's microcode depends on the declaration: translate it as
   bound at draw time, not once per object.
+- **Patched copies** (2026-10-14): `sub_822AED18` patches in place only
+  when the GPU is done with the shader's last use (shader +8 against the
+  GPU's progress). Otherwise `sub_822AEBF0` reserves room in the command
+  buffer, writes a type-3 packet with opcode `0x2B` (IM_LOAD_IMMEDIATE:
+  `0xC0002B00 | count << 16`, 0, size in words, then the microcode), copies
+  the object's microcode there and patches the copy (`sub_822AE340` with
+  the copy's address in r4). The object's microcode and +24 stay as they
+  were, and the GPU keeps the copy loaded until the shader is loaded
+  again. In a race 100-400 draws a frame run such a copy. After a patch
+  in place, the caller stores the declaration's id at shader +24 (giving
+  the declaration one from a counter if it has none) and the stream masks
+  (device +12272, +12280) at +32, +40. Patching happens only when the
+  draw's dirty flags have bit 51 (SetVertexShader) and shader +592 bit
+  `0x40` is clear.
 
 The draw functions (`sub_825BE300`, `sub_825BE708`, `sub_825BD8F0`,
 `sub_825BDDC0`) share helpers `sub_8229EB10`, `sub_8229EF48` (73 call
