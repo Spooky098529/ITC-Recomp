@@ -313,6 +313,69 @@ struct Target {
 constexpr uint32_t kTextureSetsPerFrame = 4096;
 constexpr uint32_t kTextureDescriptorsPerFrame = 16384;
 
+// The lowest and highest of `count` indices as the GPU reads them, leaving
+// out the restart index (all ones) when `skip_restart`; {UINT32_MAX, 0} if
+// there are none. One plain loop per format, so the compiler vectorises it
+// (scanning an index at a time with the format checks inside was ~20% of
+// the render thread).
+template <typename T, typename Swap>
+std::pair<uint32_t, uint32_t> IndexRangeOf(const uint8_t* data, uint32_t count, bool skip_restart,
+                                           Swap swap) {
+  constexpr T kRestart = T(~T(0));
+  T low = kRestart, high = 0;
+  if (skip_restart) {
+    // The restart index is the type's largest value, so it never lowers the
+    // minimum; it's left out of the maximum.
+    for (uint32_t i = 0; i < count; i++) {
+      T value;
+      std::memcpy(&value, data + sizeof(T) * i, sizeof(T));
+      value = swap(value);
+      low = std::min(low, value);
+      high = std::max(high, value == kRestart ? T(0) : value);
+    }
+    if (low == kRestart) {
+      return {UINT32_MAX, 0};  // only restarts
+    }
+  } else {
+    for (uint32_t i = 0; i < count; i++) {
+      T value;
+      std::memcpy(&value, data + sizeof(T) * i, sizeof(T));
+      value = swap(value);
+      low = std::min(low, value);
+      high = std::max(high, value);
+    }
+  }
+  if (!count) {
+    return {UINT32_MAX, 0};
+  }
+  return {low, high};
+}
+
+std::pair<uint32_t, uint32_t> IndexRange(const uint8_t* data, uint32_t count, bool index_32bit,
+                                         uint32_t endian, bool skip_restart) {
+  if (!index_32bit) {
+    if (endian == uint32_t(xenos::Endian::k8in16)) {
+      return IndexRangeOf<uint16_t>(data, count, skip_restart,
+                                    [](uint16_t v) { return uint16_t(__builtin_bswap16(v)); });
+    }
+    return IndexRangeOf<uint16_t>(data, count, skip_restart, [](uint16_t v) { return v; });
+  }
+  switch (xenos::Endian(endian)) {
+    case xenos::Endian::k8in32:
+      return IndexRangeOf<uint32_t>(data, count, skip_restart,
+                                    [](uint32_t v) { return __builtin_bswap32(v); });
+    case xenos::Endian::k8in16:
+      return IndexRangeOf<uint32_t>(data, count, skip_restart, [](uint32_t v) {
+        return ((v & 0x00FF00FFu) << 8) | ((v >> 8) & 0x00FF00FFu);
+      });
+    case xenos::Endian::k16in32:
+      return IndexRangeOf<uint32_t>(data, count, skip_restart,
+                                    [](uint32_t v) { return (v << 16) | (v >> 16); });
+    default:
+      return IndexRangeOf<uint32_t>(data, count, skip_restart, [](uint32_t v) { return v; });
+  }
+}
+
 }  // namespace
 
 struct Passes::State {
@@ -1902,27 +1965,32 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
     min_vertex = 0;
     max_vertex = call.vertex_count - 1;
   }
-  for (uint32_t i = 0; !call.inline_vertices && i < index_count; i++) {
-    uint32_t index;
-    if (index_32bit) {
-      std::memcpy(&index, PhysicalHostAddress(base, index_address + 4 * i), 4);
-      if (index_endian == uint32_t(xenos::Endian::k8in32)) {
-        index = __builtin_bswap32(index);
-      } else if (index_endian == uint32_t(xenos::Endian::k8in16)) {
-        index = ((index & 0x00FF00FFu) << 8) | ((index >> 8) & 0x00FF00FFu);
-      } else if (index_endian == uint32_t(xenos::Endian::k16in32)) {
-        index = (index << 16) | (index >> 16);
+  if (!call.inline_vertices && index_count) {
+    bool skip_restart = primitive.strip && regs.Get<reg::PA_SU_SC_MODE_CNTL>().multi_prim_ib_ena;
+    auto [low, high] = IndexRange(PhysicalHostAddress(base, index_address), index_count,
+                                  index_32bit, index_endian, skip_restart);
+    if (low <= high) {
+      // After the base vertex, as the GPU reads them. Adding it to the
+      // extremes keeps their order unless the sum wraps (a negative base
+      // vertex under some index), where each index is taken again.
+      int64_t low_sum = int64_t(int32_t(low)) + base_vertex;
+      int64_t high_sum = int64_t(int32_t(high)) + base_vertex;
+      if (low_sum >= 0 && high_sum <= INT32_MAX && int32_t(low) >= 0 && int32_t(high) >= 0) {
+        min_vertex = uint32_t(low_sum);
+        max_vertex = uint32_t(high_sum);
+      } else {
+        for (uint32_t i = 0; i < index_count; i++) {
+          auto [index, unused] = IndexRange(PhysicalHostAddress(base, index_address) +
+                                                (index_32bit ? 4 : 2) * i,
+                                            1, index_32bit, index_endian, skip_restart);
+          if (index == UINT32_MAX && !unused) {
+            continue;  // the restart index
+          }
+          max_vertex = std::max(max_vertex, uint32_t(int32_t(index) + base_vertex));
+          min_vertex = std::min(min_vertex, uint32_t(int32_t(index) + base_vertex));
+        }
       }
-    } else {
-      uint16_t raw;
-      std::memcpy(&raw, PhysicalHostAddress(base, index_address + 2 * i), 2);
-      index = index_endian == uint32_t(xenos::Endian::k8in16) ? __builtin_bswap16(raw) : raw;
     }
-    if ((primitive.strip && regs.Get<reg::PA_SU_SC_MODE_CNTL>().multi_prim_ib_ena) && index == (index_32bit ? 0xFFFFFFFFu : 0xFFFFu)) {
-      continue;
-    }
-    max_vertex = std::max(max_vertex, uint32_t(int32_t(index) + base_vertex));
-    min_vertex = std::min(min_vertex, uint32_t(int32_t(index) + base_vertex));
   }
   // System constants (as the plugin's UpdateSystemConstantValues, for what
   // these draws use).
