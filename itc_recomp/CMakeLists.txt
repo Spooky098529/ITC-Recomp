@@ -54,6 +54,7 @@ set(ITC_SOURCES
     src/debug/idle_timer_scan.cpp
     src/debug/image_dump.cpp
     src/debug/replay_stats.cpp
+    src/native/gpu_link.cpp
     src/native/passes.cpp
     src/native/renderer.cpp
     src/native/replay_hooks.cpp

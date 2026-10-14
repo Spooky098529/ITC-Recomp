@@ -12,6 +12,10 @@ namespace native {
 
 bool Renderer_Enabled();
 
+// Exclusive mode (milestone 6): the emulated GPU gets no work; see
+// gpu_link.cpp.
+bool Renderer_Exclusive();
+
 // Render thread, before a command handler runs (see the table in
 // docs/gpu-functions.md): r3 = payload, r4 = arg1, r5 = arg2.
 void Renderer_OnCommand(uint8_t* base, uint32_t id, uint32_t payload, uint32_t arg1,

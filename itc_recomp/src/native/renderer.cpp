@@ -25,6 +25,9 @@
 REXCVAR_DEFINE_BOOL(native_renderer, false, "ITC",
                     "Draw the game's render commands with our own Vulkan renderer, in a "
                     "second window (in development; see docs/native-renderer.md)");
+REXCVAR_DEFINE_BOOL(native_renderer_exclusive, false, "ITC",
+                    "With native_renderer: hand the emulated GPU no work, drawing only in our "
+                    "window (milestone 6; see docs/native-renderer.md)");
 REXCVAR_DEFINE_BOOL(native_renderer_validation, false, "ITC",
                     "Enable the Vulkan validation layer for the native renderer, if installed");
 REXCVAR_DEFINE_INT32(native_renderer_show_resolve, -1, "ITC",
@@ -892,6 +895,10 @@ Renderer* GetRenderer() {
 
 bool Renderer_Enabled() {
   return REXCVAR_GET(native_renderer);
+}
+
+bool Renderer_Exclusive() {
+  return REXCVAR_GET(native_renderer) && REXCVAR_GET(native_renderer_exclusive);
 }
 
 void Renderer_OnCommand(uint8_t* base, uint32_t id, uint32_t payload, uint32_t arg1,
