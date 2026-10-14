@@ -60,7 +60,7 @@ known about it; this file is the plan and its progress).
 | 3 | **Textures**: untile and upload (mostly BC1-BC3), samplers from the fetch constants. | The main view looks right without effects. | Done (2026-10-13): signs, gauges, fences, buildings and road textured correctly (screenshot checked); what comes from resolves is still missing. |
 | 4 | **The other passes**: each pass renders into a Vulkan image of its resolve's size and format; resolves become copies. | Shadows, reflections and the mirror work. | Done (2026-10-14): every pass draws, inline vertex draws included; clears and resolves work; the user saw the car's shadow, the mirror and the reflections right in our window (cockpit and third person), and the resolves match the emulated GPU's (`--readback_resolve=full`), except its blocky bloom. Menus not checked. |
 | 5 | **The final frame and the menus** (still in development mode): post-processing, HUD, the frame's end, then every menu screen. | Races and menus look as in the game's window, side by side. | In progress: the final frame with the HUD shows (checked by the user in a race); menus' tiled 3D views fixed. |
-| 6 | **Exclusive mode**: the emulated GPU gets no work and then isn't loaded at all; the graphics library is kept for what our renderer needs from it (see "Plan for milestone 6"); then measure. | The GPU plugin isn't loaded; frame rate measured against the emulated GPU. | Planned (2026-10-14). |
+| 6 | **Exclusive mode**: the emulated GPU gets no work and then isn't loaded at all; the graphics library is kept for what our renderer needs from it (see "Plan for milestone 6"); then measure. | The GPU plugin isn't loaded; frame rate measured against the emulated GPU. | In progress: the emulated GPU gets no work (`--native_renderer_exclusive`). |
 | 7 | **Known issues cleanup**: what's under Known issues below (the boot movie, gamma, textures replaced in memory, textures never freed, window resizing). | The known issues are fixed or accepted. | |
 
 ## Progress on milestone 2
@@ -385,6 +385,91 @@ Steps:
 Risks: interrupts the game relies on, and occlusion queries it reads back;
 step 1's logs are there to find them before anything is stubbed.
 
+## Progress on milestone 6
+
+- **What the GPU does outside itself** (step 1, 2026-10-14,
+  `--native_renderer_log_gpu`, `src/native/gpu_link.cpp`; boot and an
+  attract race):
+  - The library kicks ~45,000 times a second (one buffer each, ~500 words
+    on average). Every segment ends with two EVENT_WRITE_SHD packets
+    (initiator 3): the fence (the command position before the kick) to
+    progress block +0, and the command buffer address the GPU reached
+    (`BFxxxxxx`, a virtual alias) to +4. The block is at `FFC93000`
+    (physical `1FC94000`); +60 is the ring's read pointer write-back
+    (`VdEnableRingBufferRPtrWriteBack`, in `sub_822AD190`).
+  - Every other kick is 11 words: COHER_STATUS/SIZE/BASE (`0A31`, `0A2F`,
+    `0A30`) for the command buffer range `1FB90000` (1 MB) and a
+    WAIT_REG_MEM on COHER_STATUS_HOST: making the GPU see the CPU's
+    writes. Also in the stream: WAIT_UNTIL (`05C8`), cache flush events
+    (EVENT_WRITE 6 and 15), `0D00`, the binning packets (`60`-`63`),
+    XE_SWAP with display registers (`1844`, `0F01`). None writes memory.
+  - At boot only: the scratch registers' set-up (SCRATCH_ADDR `1FC93000`,
+    which is the interrupt callback's block, device +10772 → `FFC92000`;
+    SCRATCH_UMSK `0x33`), the display's gamma table (COND_WRITE on `1925`,
+    registers `19xx`), and one inserted callback: scratch 4 and 5 =
+    `82481B68`, `400D1DA0`, scratch 0 = 2, WAIT_REG_MEM on its write-back,
+    INTERRUPT (CPU mask 2), wait for 0, scratch 4 = `0BADF00D`. The
+    library's interrupt callback (`sub_8229DEA0`, source 1) calls the
+    function in callback block +16 with +20 and clears its CPU's bit in
+    +0.
+  - Vblank interrupts (source 0, 60 a second) come from the SDK's vsync
+    thread, not the command stream: `sub_8229DEA0` counts them (+15148),
+    counts down +15156 (zeroing callback block +4 at 0) and calls a
+    callback at +15144 (set by `sub_824F0030`, in the movie code).
+  - No MEM_WRITE, REG_TO_MEM, queries (EVENT_WRITE_ZPD, VIZ_QUERY) or
+    screen extents in a race. Device +10868 (the full wait's flag) stayed
+    0: it counts deferred kicks (`sub_8229E848`). `sub_822ACAA8` is the
+    library's "GPU hung" handler (after a wait times out: sets +10809 bit
+    1, progress = position − 2).
+- **Exclusive mode, step 1** (`--native_renderer_exclusive`, 2026-10-14):
+  the kick (`sub_8229E3F0`) no longer calls the library's: it walks the
+  buffers and makes their effects itself, as the SDK's command processor
+  would (EVENT_WRITE_SHD, MEM_WRITE, REG_TO_MEM, COND_WRITE, REG_RMW, the
+  scratch registers' write-back, INTERRUPT by calling the callback block's
+  function), and counts what it doesn't handle (logged every 5 s).
+  CP_RB_WPTR is never written, so the emulated GPU gets nothing (its
+  window stays black); the primary ring stays empty, so +60 needs no
+  update. First run: no hang, the boot callback made, nothing unhandled,
+  every draw drawn; attract race frames look right (the sepia and
+  greyscale shots are the attract mode's, the user confirmed).
+- **Measured** (2026-10-14, the same 46 s of an attract race,
+  `--max_fps=144`, no dumps or extra logging; fps per second of the
+  race):
+
+  | Setup | Mean | 10th percentile | Median | Max |
+  |---|---|---|---|---|
+  | Emulated GPU alone (no `--native_renderer`) | 141 | 123 | 147 | 151 |
+  | Development mode | 87 | 73 | 90 | 112 |
+  | Exclusive mode, step 1 | 127 | 104 | 128 | 149 |
+
+  So exclusive mode is still **slower than the emulated GPU alone** (which
+  sits at the cap much of the time; an uncapped comparison is still to be
+  made). With the waits gone, the render thread does two jobs: the game's
+  Direct3D still writes every GPU packet (~45,000 kicks a second, now
+  read by nothing but our kick's walk), and our renderer's own work per
+  draw (e.g. ~15 MB of vertex data copied into the mirror every frame).
+  Neither is profiled yet. (An uncapped try failed: `--max_fps` given
+  twice, and the log then said "no GPU emulation loaded (gpu_plugin not
+  set)" despite `--gpu_plugin=xenos`; the game sat at boot with a window
+  open. Likely the repeated flag broke the command line; not checked.)
+- **What still depends on the SDK's GPU plugin** in exclusive mode: its
+  window (the SDK app's window, black now, and the one that gets input:
+  the user found two windows confusing, rightly) and the vblank
+  interrupts from its vsync thread (`GraphicsSystem::MarkVblank`). Also
+  the MMIO registers at `0x7FC80000` (CP_RB_WPTR `0x714`, interrupt
+  status `0x6544` read by the callback, `0x6110` written by Swap, others
+  read by `sub_822A0688`) are mapped by the plugin's GraphicsSystem
+  (`AddVirtualMappedRange`). Without the plugin the kernel ignores
+  `VdSetGraphicsInterruptCallback`, `VdInitializeRingBuffer` and
+  `VdEnableRingBufferRPtrWriteBack`.
+- **The SDK's "detached" mode** (`rexglue-sdk/src/ui/rex_app.cpp`,
+  around line 360): with no graphics system, ReXApp still makes its window
+  (`rex::ui::Window`, an SDL window: `WindowSDL::sdl_window_`) and calls
+  `OnCreateImmediateDrawer()`, leaving the surface and the present cadence
+  to the app. Plan (agreed direction, 2026-10-14): our renderer draws into
+  that window instead of opening its own, so there's one window and input
+  works as it does now.
+
 ## Tools (all debugging aids)
 
 - `--native_renderer_show_resolve=<n>`: the window shows the frame's nth
@@ -448,6 +533,12 @@ step 1's logs are there to find them before anything is stubbed.
   their item's and draws with indices outside `VGT_MIN/MAX_VTX_INDX`.
 - `--native_renderer_serialize`: wait for the GPU before recording each
   frame.
+- `--native_renderer_log_gpu`: every 5 s, the packets in the library's
+  kicks with effects outside the GPU (with an example of each), register
+  writes below the context registers, the interrupts the library's
+  callback got, and the progress block; a trace of the first 60 kicks,
+  40 every 10 s, and those holding rare packets (scratch registers,
+  INTERRUPT, COND_WRITE, queries...). Works with the emulated GPU too.
 - `--native_renderer_check_mirror`: log the vertex and index ranges whose
   contents change between frames.
 - Texture loads of uncompressed formats are logged (format, size,
@@ -468,6 +559,8 @@ step 1's logs are there to find them before anything is stubbed.
   mirrors, pipelines, texture descriptor sets; targets, clears and
   resolves; what's shown (the main view, pitch 1040 and 2x MSAA, resolved
   to 1024x576) and the dumps.
+- `gpu_link.cpp`: the kick (`sub_8229E3F0`) and the library's interrupt
+  callback: `--native_renderer_log_gpu`, and exclusive mode's kick.
 - `glsl/`: our own shaders (resolves), compiled into `generated_*.h`.
 - `textures.cpp`: the texture cache (milestone 3).
 - Testing: build, run the game in the background with
