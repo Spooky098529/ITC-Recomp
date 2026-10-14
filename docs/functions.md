@@ -14,7 +14,7 @@ place (search for `PATCH:`).
 |---|---|---|---|
 | `sub_82090108` | `main` | | Guest entry point on the main thread. |
 | `sub_8258DE50` | `Thread::Start` | | Entry point of the game's threads: calls vtable slot 1 of the object at start context + 8. |
-| `sub_82095AF0` | | | A worker thread's loop (started through `sub_8258DE50`): waits on an event, runs jobs through function pointers, signals events; it opens the game's data files at boot. On the Steam Deck it spiked to 66-82% of a core with 15-32% in the kernel around race loads; here (2026-10-14) ~29% with ~68,000 minor page faults in 2 s while a race loads. |
+| `sub_82095AF0` | | | A worker thread's loop (started through `sub_8258DE50`): waits on an event, runs jobs through function pointers, signals events; it opens the game's data files at boot. On the Steam Deck it spiked to 66-82% of a core with 15-32% in the kernel around race loads; here (2026-10-14) ~29% with ~68,000 minor page faults in 2 s while a race loads. On the Deck (`itc_041.log`) the kernel time is page faults: 37-69% of a core (19-24% kernel) with 27,000-52,000 minor faults and no major ones per 2 s, its system call samples all `running` (in a fault, not a call) but once `202` (futex: waiting). Only around loads (2-4 s each); in a race it's at 0-15%. The fix, if worth it: populate the guest memory's pages in advance (e.g. `MADV_POPULATE_WRITE` on the views), moving the cost to startup. |
 | `sub_8209A760` | `App::Run` | | Main loop: calls every handler in the tick list at this+4, repeats until the quit flag at this+12 is set. One logic tick per pass, with no measured time. |
 | `sub_82099D50` | `ForEachTickHandler` | | Calls each handler in a list through a member function pointer. |
 | `sub_82092358` | `Renderer::Init` | | Sets the vblank interval (2 = 30 fps) via `sub_8258D568`, then subscribes renderer callbacks to numbered events (2, 3, 5, 6, 16). |
@@ -267,7 +267,10 @@ the Steam Deck (render thread at ~98% of a core, 20-27 ms frames) races
 ran at 13-16 ticks a second while drawing ~40 fps: slow motion. The same
 happened here pinned to one CPU (`taskset -c 0`: 36-50 fps, 16-27 ticks);
 with the fix, 43-62 fps and 30 ticks. `--log_fps` counts each second's
-ticks released over a quarter of a tick late and grid restarts.
+ticks released over a quarter of a tick late and grid restarts. On the
+Deck with the fix (`itc_041.log`, an attract race and some driving): 30
+ticks every second in races at 40-66 fps (15-25 ticks a second released
+over 8 ms late, no grid restarts), restarts only at loads.
 
 Only races get render-only passes: menus record their UI and act on input
 during Update, so they flickered and repeated button presses. A pass is "in a
