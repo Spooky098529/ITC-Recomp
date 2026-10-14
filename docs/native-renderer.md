@@ -470,6 +470,45 @@ step 1's logs are there to find them before anything is stubbed.
   that window instead of opening its own, so there's one window and input
   works as it does now.
 
+- **One window, ours** (2026-10-14, `src/native/app_window.cpp`; the
+  user's call: our renderer's window stays, the SDK's goes, rather than
+  drawing into the SDK's "detached" window). ReXApp always opens its
+  window, and the SDK's input (the keyboard driver of `--mnk_mode`, the
+  binds) and its close path hang off that window object. In exclusive mode
+  `ItcApp::SetupPresentation` hides it (`SDL_GetWindows`: it's the only
+  window then), and when our window is made it's registered in the SDK's
+  event table (`SDLWindowedAppContext::RegisterWindow`) against the SDK's
+  window object, so our window's keyboard, focus and close events reach the
+  SDK as before. Mouse capture would act on the SDK's own window, but the
+  game has no mouse controls (`--mnk_mouse` is off); gamepads come from
+  SDL events whatever the window. No SDK patch. Checked by the user:
+  keyboard, gamepad, one window.
+- **Interrupts are made at the library's level, not the GPU's.** Running
+  the command stream's INTERRUPT callbacks inside the kick hung loading
+  screens. EndTiling (`sub_825BF200`) ends with `sub_822B6BF8`, which
+  inserts the callback `sub_822B6A78`: it wakes the worker thread of the
+  CPU it runs on (`sub_822B69A8`, event at device +11244 + 56 × CPU, CPU
+  from PCR +268), which submits the library's **deferred kicks**:
+  `sub_8229E848(device, r4, address, size, interrupts, list)` queues a
+  buffer on the list at device +13036 while device +10868 (interrupts
+  still to come from the GPU) isn't 0, and otherwise adds to +10868 and
+  kicks. Calling the callback on the render thread first woke the wrong
+  CPU's worker (the PCR's CPU is now set to the packet's for the call);
+  with that fixed, the worker kicked at once and raced the render thread:
+  fences went backwards and +10868 dropped below 0, so the full wait spun
+  forever. Our GPU never lags, so in exclusive mode `sub_8229E848` now
+  kicks at once and leaves +10868 at 0, and the worker's wake is skipped
+  (counted as "deferred kick worker wakes skipped"). The user went through
+  loading screens and raced (2026-10-14) and found the rendering "more
+  faithful to the real thing" overall. `--native_renderer_log_gpu` also
+  logs the tiling worker's calls and kicks from threads other than the
+  render thread. The approach (the user's direction): remove what makes
+  the library need a GPU, rather than imitate the GPU's timing.
+- **Without the plugin, boot stalls in about half the runs**, right after
+  the first front buffer resolve and before the boot callback
+  (`82481B68`); not yet looked into. Candidates: the vblank interrupts and
+  the MMIO registers at `0x7FC80000` that the plugin supplied.
+
 ## Tools (all debugging aids)
 
 - `--native_renderer_show_resolve=<n>`: the window shows the frame's nth
@@ -559,8 +598,11 @@ step 1's logs are there to find them before anything is stubbed.
   mirrors, pipelines, texture descriptor sets; targets, clears and
   resolves; what's shown (the main view, pitch 1040 and 2x MSAA, resolved
   to 1024x576) and the dumps.
-- `gpu_link.cpp`: the kick (`sub_8229E3F0`) and the library's interrupt
-  callback: `--native_renderer_log_gpu`, and exclusive mode's kick.
+- `gpu_link.cpp`: the kick (`sub_8229E3F0`), the deferred kick
+  (`sub_8229E848`) and the library's interrupt callback:
+  `--native_renderer_log_gpu`, and exclusive mode's kick.
+- `app_window.cpp`: exclusive mode's one window (hides the SDK's, routes
+  our window's events to it).
 - `glsl/`: our own shaders (resolves), compiled into `generated_*.h`.
 - `textures.cpp`: the texture cache (milestone 3).
 - Testing: build, run the game in the background with

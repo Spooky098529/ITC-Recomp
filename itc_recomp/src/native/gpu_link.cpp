@@ -46,6 +46,9 @@ constexpr uint32_t kDeviceFlags = 10809;  // bit 1 (0x2): the kick takes another
 constexpr uint32_t kDevicePrimaryWrite = 10820;
 constexpr uint32_t kDevicePendingKicks = 10868;
 constexpr uint32_t kDeviceVblankCount = 15148;
+// sub_822B6A78: inserted by sub_822B6BF8 (at EndTiling's end); wakes the
+// library's worker thread on CPU 2, which submits the deferred kicks.
+constexpr uint32_t kDeferredKickWorkerCallback = 0x822B6A78;
 
 const char* OpcodeName(uint32_t opcode) {
   switch (opcode) {
@@ -113,6 +116,7 @@ uint32_t g_trace_kicks = 60;
 Clock::time_point g_last_trace = Clock::now();
 uint32_t g_rare_traces = 300;
 bool g_rare = false;  // the walk met a rare packet
+std::atomic<int> g_tiling_logs{400};  // see sub_822B6BF8
 
 uint32_t ReadPhysical(uint8_t* base, uint32_t physical) {
   const uint8_t* p = PhysicalHostAddress(base, physical & 0x1FFFFFFCu);
@@ -239,7 +243,7 @@ struct Effects {
   // registers' write-back, COND_WRITE, REG_TO_MEM and REG_RMW).
   std::array<uint32_t, 0x2000> registers{};
   uint64_t fences = 0, scratch_writes = 0, memory_writes = 0, interrupts = 0, callbacks = 0,
-           kicks = 0, words = 0;
+           kicks = 0, words = 0, worker_wakes_skipped = 0;
   std::map<uint32_t, uint64_t> unhandled;  // opcode: count
 } g_effects;
 
@@ -307,7 +311,11 @@ bool Compare(uint32_t function, uint32_t value, uint32_t reference) {
 // interrupt callback (sub_8229DEA0, source 1) does, for the CPU named by the
 // packet rather than the calling thread's: call the function in the
 // callback block (+16, written by scratch register 4) with +20 (scratch 5),
-// unless it's 0BADF00D, then clear the CPU's bit in +0.
+// unless it's 0BADF00D, then clear the CPU's bit in +0. The thread's CPU
+// number (PCR +268) is set to the packet's for the call, as the SDK's
+// interrupt dispatch does: callbacks read it (sub_822B6A78 sets the event of
+// that CPU's worker thread, sub_822B69A8; the render thread's own CPU left
+// it unwoken, hanging loading screens).
 void Interrupt(PPCContext& ctx, uint8_t* base, uint32_t device, uint32_t mask) {
   Effects& e = g_effects;
   uint32_t block = guest::LoadU32(base, device + kDeviceCallbackBlock);
@@ -317,16 +325,24 @@ void Interrupt(PPCContext& ctx, uint8_t* base, uint32_t device, uint32_t mask) {
     }
     e.interrupts++;
     uint32_t function = guest::LoadU32(base, block + 16);
-    if (function == 0x0BADF00D) {
+    if (function == kDeferredKickWorkerCallback) {
+      // Wakes the worker that submits deferred kicks; there are none (see
+      // sub_8229E848).
+      e.worker_wakes_skipped++;
+    } else if (function == 0x0BADF00D) {
       REXLOG_ERROR("native renderer: gpu: interrupt with no callback (0BADF00D)");
     } else if (function) {
       e.callbacks++;
-      REXLOG_INFO("native renderer: gpu: interrupt on cpu {}: calling {:08X}({:08X})", cpu,
-                  function, guest::LoadU32(base, block + 20));
+      uint32_t own_cpu = guest::LoadU8(base, ctx.r13.u32 + 268);
+      REXLOG_INFO("native renderer: gpu: interrupt on cpu {} (the kicking thread's is {}): "
+                  "calling {:08X}({:08X})",
+                  cpu, own_cpu, function, guest::LoadU32(base, block + 20));
       PPCContext saved = ctx;
+      guest::StoreU8(base, ctx.r13.u32 + 268, uint8_t(cpu));
       ctx.r3.u32 = guest::LoadU32(base, block + 20);
       REX_CALL_INDIRECT_FUNC(function);
       ctx = saved;
+      guest::StoreU8(base, ctx.r13.u32 + 268, uint8_t(own_cpu));
     }
     guest::StoreU32(base, block, guest::LoadU32(base, block) & ~(1u << cpu) & 0x3F);
   }
@@ -456,11 +472,12 @@ void LogEffects() {
     unhandled += fmt::format(" {}({:02X})={}", OpcodeName(opcode & 0xFF), opcode, count);
   }
   REXLOG_INFO("native renderer: exclusive: {} kicks ({} words) made by us: {} fences, {} scratch "
-              "write-backs, {} memory writes, {} interrupts ({} callbacks); unhandled:{}",
+              "write-backs, {} memory writes, {} interrupts ({} callbacks, {} deferred kick "
+              "worker wakes skipped); unhandled:{}",
               e.kicks, e.words, e.fences, e.scratch_writes, e.memory_writes, e.interrupts,
-              e.callbacks, unhandled.empty() ? " none" : unhandled);
+              e.callbacks, e.worker_wakes_skipped, unhandled.empty() ? " none" : unhandled);
   e.kicks = e.words = e.fences = e.scratch_writes = e.memory_writes = e.interrupts = e.callbacks =
-      0;
+      e.worker_wakes_skipped = 0;
   e.unhandled.clear();
 }
 }  // namespace
@@ -512,6 +529,17 @@ extern "C" REX_FUNC(sub_8229E3F0) {
   if (Renderer_Exclusive()) {
     uint32_t device = ctx.r3.u32, pairs = ctx.r4.u32, count = ctx.r5.u32;
     g_effects.kicks++;
+    if (uint32_t cpu = guest::LoadU8(base, ctx.r13.u32 + 268);
+        cpu != 1 && REXCVAR_GET(native_renderer_log_gpu) && g_tiling_logs > 0) {
+      g_tiling_logs--;
+      std::string buffers;
+      for (uint32_t i = 0; i < count; i++) {
+        buffers += fmt::format(" {:08X} ({} words)", guest::LoadU32(base, pairs + 8 * i + 4),
+                               guest::LoadU32(base, pairs + 8 * i));
+      }
+      REXLOG_INFO("native renderer: tiling: kick on cpu {} (lr {:08X}):{}", cpu,
+                  uint32_t(ctx.lr), buffers);
+    }
     for (uint32_t i = 0; i < count; i++) {
       ApplyBuffer(ctx, base, device, guest::LoadU32(base, pairs + 8 * i + 4),
                   guest::LoadU32(base, pairs + 8 * i), 0);
@@ -545,4 +573,92 @@ extern "C" REX_FUNC(sub_8229DEA0) {
     }
   }
   __imp__sub_8229DEA0(ctx, base);
+}
+
+// Tiling's worker (milestone 6, finding why loading screens hang in
+// exclusive mode): EndTiling (sub_825BF200) calls sub_822B6BF8, which
+// inserts the callback sub_822B6A78 into the command stream; the GPU's
+// interrupt on CPU 2 runs it, and it wakes CPU 2's worker thread
+// (sub_822B69A8), which runs sub_822B6780. Logged with
+// --native_renderer_log_gpu, the first few hundred calls.
+namespace native {
+namespace {
+bool TilingLog() {
+  return REXCVAR_GET(native_renderer_log_gpu) && g_tiling_logs.fetch_sub(1) > 0;
+}
+uint32_t Cpu(PPCContext& ctx, uint8_t* base) {
+  return guest::LoadU8(base, ctx.r13.u32 + 268);
+}
+}  // namespace
+}  // namespace native
+
+extern "C" REX_FUNC(sub_822B6BF8) {
+  REX_FUNC_PROLOGUE();
+  if (native::TilingLog()) {
+    REXLOG_INFO("native renderer: tiling: insert worker callback (822B6BF8) on cpu {}: r4 {:08X} "
+                "r5 {:08X}, lr {:08X}",
+                native::Cpu(ctx, base), ctx.r4.u32, ctx.r5.u32, uint32_t(ctx.lr));
+  }
+  __imp__sub_822B6BF8(ctx, base);
+}
+
+extern "C" REX_FUNC(sub_822B6A78) {
+  REX_FUNC_PROLOGUE();
+  if (native::TilingLog()) {
+    REXLOG_INFO("native renderer: tiling: callback 822B6A78({:08X}) on cpu {}", ctx.r3.u32,
+                native::Cpu(ctx, base));
+  }
+  __imp__sub_822B6A78(ctx, base);
+}
+
+extern "C" REX_FUNC(sub_822B6780) {
+  REX_FUNC_PROLOGUE();
+  uint32_t block = ctx.r3.u32;
+  bool log = native::TilingLog();
+  uint32_t state = log ? guest::LoadU32(base, block) : 0;
+  if (log) {
+    REXLOG_INFO("native renderer: tiling: worker job 822B6780({:08X}) on cpu {}: +0 {:08X} +4 "
+                "{:08X}; state +4 {:08X} +396 {:08X}",
+                block, native::Cpu(ctx, base), state, guest::LoadU32(base, block + 4),
+                state ? guest::LoadU32(base, state + 4) : 0,
+                state ? guest::LoadU32(base, state + 396) : 0);
+  }
+  __imp__sub_822B6780(ctx, base);
+  if (log) {
+    REXLOG_INFO("native renderer: tiling: worker job done on cpu {}: state +4 {:08X} +396 {:08X}",
+                native::Cpu(ctx, base), state ? guest::LoadU32(base, state + 4) : 0,
+                state ? guest::LoadU32(base, state + 396) : 0);
+  }
+}
+
+// The library's deferred kick: r3 device, r4 returned as is, r5 address,
+// r6 size in words, r7 interrupts the buffer will raise, r8 the list of
+// deferred kicks (device +13036). While interrupts are outstanding (device
+// +10868) it queues the buffer for the worker thread (sub_822B69A8, woken
+// by sub_822B6A78) to kick once the GPU reaches them; otherwise it adds r7
+// and kicks. The GPU's lag behind the CPU is why it exists. In exclusive
+// mode every kick completes at once, so nothing is ever deferred: kick
+// straight away and leave the count at 0. (Delivering the interrupts at
+// the kick instead raced the worker against the render thread and drove
+// the count below 0, hanging loading screens.)
+extern "C" REX_FUNC(sub_8229E848) {
+  REX_FUNC_PROLOGUE();
+  if (!native::Renderer_Exclusive()) {
+    __imp__sub_8229E848(ctx, base);
+    return;
+  }
+  uint32_t device = ctx.r3.u32, result = ctx.r4.u32;
+  PPCContext saved = ctx;
+  {
+    guest::StackFrame frame(ctx, 96);
+    uint32_t pair = frame.Local(80);
+    guest::StoreU32(base, pair, saved.r6.u32);      // size
+    guest::StoreU32(base, pair + 4, saved.r5.u32);  // address
+    ctx.r3.u32 = device;
+    ctx.r4.u32 = pair;
+    ctx.r5.u32 = 1;
+    sub_8229E3F0(ctx, base);
+  }
+  ctx = saved;
+  ctx.r3.u32 = result;
 }
