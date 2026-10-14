@@ -57,6 +57,7 @@ place (search for `PATCH:`).
 | `sub_820F5740` | `Minimap::Draw` | Wrapped | From the draw step part `sub_820F6068`; steps the minimap blink clock at `0x826C5AA4`/`0x826C5AA8` after drawing (see "Per-frame logic"). |
 | `sub_82107910` | | Wrapped | From Draw; adds one to the play time frame counter at `0x826C5B90` (see "Per-frame logic"). |
 | `sub_821109B8` | | | Turns the play time frame counter into hours, minutes and seconds (30, 1800, 108000 frames). |
+| `sub_822221A0` | `TitleScreen::Update` | Wrapped | Counts idle ticks and starts the attract race at 600 (see "The title screen"). `--attract_after_s` shortens the wait. |
 | `sub_8218E420` | | Patched | Post-race check; the comparison against 60 was changed to 1 to fix the black screen after quest races. |
 
 ## Frame structure
@@ -105,7 +106,30 @@ included in these counts.
 | vehicle+0xCF0 | Copy of the world matrix | Identical every tick; not yet known which one drawing reads. |
 | `0x826BAC10` | Camera view matrix | Pass 0's view (+0x10). The camera position is -t·Rᵀ. In the car's frame the views sit at (-5.48, 1.34, 0) for chase, (-0.44, 0.67, 0) for bumper and (-0.26, 0.85, -0.38) for cockpit. Writing it has no effect while driving: Draw rebuilds it from the eye and target. |
 | `0x826BAC00` | Camera pass array | 21 objects of 592 bytes: view +0x10, projection +0x50, view-projection +0x90, eye +0x190, look-at target +0x1A0, up +0x1B0. Pass settings at +564 to +588, active flag at +588. Pass 0 is the main 1280x720 view; pass 10 a 1024x1024 reflection and 11 a 512x512 shadow map, both rebuilt in Draw. |
+| `[0x82814E34]` | Title screen object | +4 state (5 = start the attract race), +36 idle ticks. See "The title screen". |
 | `0x70180000` | Main thread stack | During Draw, holds temporary world matrices and camera copies passed to the recorders (for example 0x7018E640). Not render state. |
+
+## The title screen
+
+Left idle, the title screen loads an attract-mode race (AI cars on a
+street course, with no input), about 39 s after launch: ~19 s of boot and
+logos, then 20 s on the title screen. `sub_822221A0` (the title screen's
+update) adds one to +36 of the object at `[0x82814E34]` each tick and, at
+600, sets the state at +4 to 5 (via 8), which starts the race. After the
+race (~60 s) the game goes back to the title screen and the next race
+follows ~22 s later.
+
+`--attract_after_s=<n>` makes the wait n seconds: after a tick that
+counted, the counter jumps to 599. With 1, the race starts about 21 s
+after launch with no input, which is what automated test runs use (see
+"Testing" in `native-renderer.md`).
+
+Found with `--find_idle_timer` (`src/debug/idle_timer_scan.cpp`): outside
+races it compares guest memory every 30 logic passes and logs words that
+step steadily like a timer (an integer by 30 or 60 ticks or about 1000 ms,
+a float by about 1 s or 30 or 60), then logs which tick handler or message
+handler changes them. Here the counter at `01A70024` counted to 600 and the
+race's loading (message handler `8216CA28`) reset it.
 
 ## Render command recording
 
@@ -533,6 +557,7 @@ and target, and recorder world matrices), mostly for comparison.
 | `--log_stepping_constants` | With `--log_slot_callers`: every 2 s, the constant uploads left as recorded that change about 30 times a second (stuck to the tick) rather than every frame, with the code that recorded them. The quickest way to find what still steps. |
 | `--per_tick_blink_timers`, `--per_tick_ui_movies`, `--per_tick_play_time`, `--per_tick_texture_animations`, `--per_tick_minimap_blink` | The per-frame logic fixes (default on); see "Per-frame logic". |
 | `--find_per_frame_state`, `--render_only_skip`, `--log_recording_by_pass` and others | Finding per-frame logic; see "Per-frame logic". |
+| `--attract_after_s`, `--find_idle_timer` | The title screen's wait before the attract race; finding timers in menus. See "The title screen". |
 | `--log_game_messages`, `--log_slot_callers` | Message delivery per pass; which code allocates constant slots. |
 | `--log_upload_owners`, `--debug_zero_owners` | Which code recorded each vertex constant upload; replay a recorder's vertex or pixel constant uploads as zeros (with `--log_slot_callers`) to see what it draws. The fastest way to identify a draw; see "World-space sprites". |
 | `--log_overlay_products`, `--log_overlay_uploads` | The race overlays' camera products and uploads, as replayed. |

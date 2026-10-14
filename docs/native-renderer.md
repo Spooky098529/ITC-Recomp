@@ -229,9 +229,12 @@ own window shows them right. What's known (2026-10-13):
 - `glsl/`: our own shaders (resolves), compiled into `generated_*.h`.
 - `textures.cpp`: the texture cache (milestone 3).
 - Testing: build, run the game in the background with
-  `--native_renderer=true`; the user starts a race, sends a screenshot of
-  the "ITC native renderer" window and quits; read the `native renderer:`
-  lines in the log.
+  `--native_renderer=true --attract_after_s=1`. With no input, an attract
+  race starts about 21 s after launch (where `fps` goes above 30 in the
+  log; see "The title screen" in `functions.md`), so a run can be fully
+  automatic: launch under `timeout`, read the `native renderer:` lines in
+  the log and any dump. For what needs looking at, the user sends a
+  screenshot of the "ITC native renderer" window.
 
 ## Plan for milestone 4
 

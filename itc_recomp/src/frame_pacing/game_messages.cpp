@@ -1,6 +1,7 @@
 #include "game_messages.h"
 
 #include "debug/frame_state_diff.h"
+#include "debug/idle_timer_scan.h"
 #include "guest.h"
 #include "interpolation/blend_state.h"
 
@@ -185,6 +186,7 @@ void Deliver(PPCContext& ctx, uint8_t* base, uint32_t dispatcher, uint32_t messa
     uint32_t list = guest::LoadU32(base, kCommandListPointer);
     uint32_t used_before = list ? guest::LoadU32(base, list + kCommandListUsedOffset) : 0;
     debug::FrameStateDiff_Before(base);
+    debug::IdleTimerScan_Before(base);
     interpolation::BlendState_SetHandler(target);
     g_current_handler = target;
     g_current_message = guest::LoadU32(base, message);
@@ -192,6 +194,7 @@ void Deliver(PPCContext& ctx, uint8_t* base, uint32_t dispatcher, uint32_t messa
     g_current_handler = 0;
     g_current_message = ~0u;
     interpolation::BlendState_SetHandler(0);
+    debug::IdleTimerScan_After(base, "message handler", target);
     debug::FrameStateDiff_After(base, "message handler", target);
     if (REXCVAR_GET(log_recording_handlers) && list &&
         guest::LoadU32(base, kCommandListPointer) == list) {
@@ -353,6 +356,8 @@ extern "C" REX_FUNC(sub_82099A98) {
   }
   uint32_t target = guest::LoadU32(base, ctx.r4.u32 + 8);
   debug::FrameStateDiff_Before(base);
+  debug::IdleTimerScan_Before(base);
   __imp__sub_82099A98(ctx, base);
+  debug::IdleTimerScan_After(base, "tick handler", target);
   debug::FrameStateDiff_After(base, "tick handler", target);
 }

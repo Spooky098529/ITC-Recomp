@@ -45,10 +45,12 @@ include(generated/rexglue.cmake)
 set(ITC_SOURCES
     src/main.cpp
     src/hooks/vehicle.cpp
+    src/hooks/title_screen.cpp
     src/frame_pacing/frame_pacer.cpp
     src/frame_pacing/renderer_hooks.cpp
     src/debug/state_capture.cpp
     src/debug/frame_state_diff.cpp
+    src/debug/idle_timer_scan.cpp
     src/debug/image_dump.cpp
     src/debug/replay_stats.cpp
     src/native/passes.cpp

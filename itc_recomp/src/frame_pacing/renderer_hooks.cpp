@@ -15,6 +15,7 @@
 // originally did), without the game's 2-vblank wait.
 
 #include "debug/frame_state_diff.h"
+#include "debug/idle_timer_scan.h"
 #include "debug/image_dump.h"
 #include "debug/replay_stats.h"
 #include "debug/state_capture.h"
@@ -215,6 +216,7 @@ void Renderer_WaitForFrame(PPCContext& ctx, uint8_t* base, uint32_t renderer) {
   }
   frame_pacing::GameMessages_SetRenderOnlyPass(render_only);
   debug::FrameStateDiff_OnPassStart(base, render_only);
+  debug::IdleTimerScan_OnPassStart(base, render_only, frame_pacing::GameMessages_InRace());
 }
 
 void VideoOutput_WaitForVblank(PPCContext& ctx, uint8_t* base, uint32_t video_output) {
