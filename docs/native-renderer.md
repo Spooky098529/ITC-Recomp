@@ -312,17 +312,8 @@ GPU (exclusive mode) and the frame rate measurement.
   arguments, with the clears after it only on the last tile (we draw the
   whole surface at once). The user saw the menus right after this. Races
   unaffected (same snapshots).
-- **The boot movie** (2026-10-14; see "Movies" in `gpu-functions.md`):
-  the user saw the Ubisoft movie missing from our window. It's the
-  DrawVertices outside the command list that logging found. DrawVertices
-  is now wrapped: outside the command list, on the render thread (the one
-  ending frames; others are only logged), it's drawn after the library's
-  call (`Passes::DirectDraw`) as an auto-indexed draw whose vertex buffers
-  are copied from their fetch constants like an indexed draw's
-  (`DrawCall::auto_indexed`; inline draws are auto-indexed too). Its
-  textures change every frame, so the texture cache checks every texture
-  of these draws each frame (its verify-every-frame mode, for that draw
-  only): ~40 reloads a second while the movie plays.
+- **The boot movie isn't drawn** (left for later, the user's call,
+  2026-10-14): see Known issues.
 - Seen on the way (fixed above): in the menus our window drew the 2D
   interface right but not the 3D car on the Free Run screen (car, floor
   reflection, light beams) nor the Course In screen's night city picture
@@ -460,6 +451,21 @@ texture objects ("Resources"). The approach:
    paint shaders (see "Progress on milestone 4").
 
 ## Known issues
+
+- **The boot movie (`UBI_LOGO.wmv`) isn't drawn** in our window (seen by
+  the user). It's drawn outside the command list (see "Movies" in
+  `gpu-functions.md`), which the replay hooks don't see; the log names it
+  ("DrawVertices ... called from 8248466C ... outside the command list").
+  Tried 2026-10-14 (`2433232`, then removed): wrapping DrawVertices and
+  drawing it after the library's call as an auto-indexed draw (vertex
+  buffers copied from the fetch constants, `vkCmdDraw` from the start
+  vertex), with the texture cache checking that draw's textures every
+  frame. It drew on the render thread and showed the logo, but the user
+  saw the playback judder in our window, and judged it not worth the
+  effort for now. Not yet known why it juddered; to find out, log per
+  movie draw the frame number, the three planes' addresses and a hash of
+  the Y plane, and look for repeated or out-of-order frames. The code is
+  in `2433232` to start from.
 
 - **Gamma**: our window is lighter than the game's (seen side by side,
   2026-10-14): the Xbox 360's output gamma isn't applied yet. A known

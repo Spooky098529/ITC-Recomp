@@ -40,11 +40,6 @@ void Renderer_TiledResolve(uint8_t* base, uint32_t device, uint32_t flags, uint3
                            uint32_t destination, uint32_t point, uint32_t clear_color,
                            float clear_z, uint32_t tile, uint32_t tiles);
 
-// A DrawVertices (sub_825BE300) outside the command list, after the
-// library's call: device, primitive type, start vertex, vertex count.
-void Renderer_DirectDraw(uint8_t* base, uint32_t device, uint32_t type, uint32_t start,
-                         uint32_t count);
-
 // Render thread, after each frame's replay and present.
 void Renderer_EndFrame();
 

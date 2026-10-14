@@ -185,11 +185,9 @@ struct DrawCall {
   // Command 18: the item's base vertex << 16 | start index, and its
   // primitive count.
   uint32_t base_start = 0, primitive_count = 0;
-  // Auto-indexed draws (no index buffer): vertex_count vertices from
-  // start_vertex. Inline vertices are auto-indexed too, already copied to
-  // vertex_address in the mirror.
-  bool auto_indexed = false, inline_vertices = false;
-  uint32_t vertex_count = 0, start_vertex = 0, vertex_address = 0;
+  // Inline vertices: their count, copied to vertex_address in the mirror.
+  bool inline_vertices = false;
+  uint32_t vertex_count = 0, vertex_address = 0;
 };
 
 // Command 18's item: [primitive type, base vertex << 16 | start index,
@@ -475,7 +473,7 @@ struct Passes::State {
   Target* front = nullptr;
   VkExtent2D front_extent{};
   bool logged_front = false;
-  std::unordered_set<uint64_t> logged_tilings, logged_tiled_resolves, logged_direct_draws;
+  std::unordered_set<uint64_t> logged_tilings, logged_tiled_resolves;
 
   // What's shown, and this frame's resolve destinations (for showing one).
   Image shown;
@@ -582,7 +580,6 @@ struct Passes::State {
   // docs/gpu-functions.md): the surfaces are drawn whole, not tile by tile,
   // so targets made while tiling are as large as the tiles together.
   bool tiling = false;
-  bool verify_textures = false;  // set_verify_textures
   VkExtent2D tiling_extent{};
   bool CreateResolveResources();
   VkPipeline GetResolvePipeline(VkFormat format, bool multisample);
@@ -1704,7 +1701,7 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
   PrimitiveInfo primitive;
   bool rectangle_list = type == 8, quad_list = type == 13;
   if (!GetPrimitiveInfo(type, primitive) ||
-      ((rectangle_list || quad_list) && !call.auto_indexed)) {
+      ((rectangle_list || quad_list) && !call.inline_vertices)) {
     s.stats.unsupported++;
     return;
   }
@@ -1713,7 +1710,7 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
   // it may already have applied to the vertex buffers' addresses).
   int32_t item_base_vertex = int32_t(base_start) >> 16;
   int32_t base_vertex = int32_t(regs.values[XE_GPU_REG_VGT_INDX_OFFSET]);
-  if (!call.auto_indexed && base_vertex != item_base_vertex) {
+  if (!call.inline_vertices && base_vertex != item_base_vertex) {
     s.stats.base_vertex_differs++;
     if (!s.stats.base_vertex_sample[0] && !s.stats.base_vertex_sample[1]) {
       s.stats.base_vertex_sample = {uint32_t(item_base_vertex), uint32_t(base_vertex)};
@@ -1722,8 +1719,8 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
   uint32_t start_index = base_start & 0xFFFF;
   // Inline draws: the vertices in order (indices only to expand rectangle
   // and quad lists).
-  uint32_t index_count = call.auto_indexed ? call.vertex_count
-                                           : primitive_count * primitive.a + primitive.b;
+  uint32_t index_count = call.inline_vertices ? call.vertex_count
+                                              : primitive_count * primitive.a + primitive.b;
 
   // Shaders, read through physical memory as the GPU reads them.
   uint32_t program_control = regs.values[XE_GPU_REG_SQ_PROGRAM_CNTL];
@@ -1820,7 +1817,7 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
     r.vertex = vertex->hash;
     r.pixel = pixel ? pixel->hash : 0;
     r.type = type;
-    r.count = call.auto_indexed ? call.vertex_count : primitive_count;
+    r.count = call.inline_vertices ? call.vertex_count : primitive_count;
     r.inline_vertices = call.inline_vertices;
     for (uint32_t k = 0; k < 96; k++) {
       if (vertex->vertex_fetch_constants[k >> 5] & (1u << (k & 31))) {
@@ -1852,7 +1849,7 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
   // Index buffer: +0 bit 31 = 32-bit, bits 29-30 = endianness; +24 address.
   bool index_32bit = false;
   uint32_t index_endian = 0, index_address = 0;
-  if (!call.auto_indexed) {
+  if (!call.inline_vertices) {
     uint32_t index_buffer = guest::LoadU32(base, device + kDeviceIndexBuffer);
     if (!index_buffer) {
       s.stats.failed++;
@@ -1901,11 +1898,11 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
   }
 
   uint32_t max_vertex = 0, min_vertex = UINT32_MAX;
-  if (call.auto_indexed) {
-    min_vertex = uint32_t(int32_t(call.start_vertex) + base_vertex);
-    max_vertex = min_vertex + call.vertex_count - 1;
+  if (call.inline_vertices) {
+    min_vertex = 0;
+    max_vertex = call.vertex_count - 1;
   }
-  for (uint32_t i = 0; !call.auto_indexed && i < index_count; i++) {
+  for (uint32_t i = 0; !call.inline_vertices && i < index_count; i++) {
     uint32_t index;
     if (index_32bit) {
       std::memcpy(&index, PhysicalHostAddress(base, index_address + 4 * i), 4);
@@ -1955,7 +1952,7 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
   system.vertex_base_index = base_vertex;
   system.vertex_index_min = regs.values[XE_GPU_REG_VGT_MIN_VTX_INDX];
   system.vertex_index_max = regs.values[XE_GPU_REG_VGT_MAX_VTX_INDX];
-  if (system.vertex_index_max <= system.vertex_index_min || call.auto_indexed) {
+  if (system.vertex_index_max <= system.vertex_index_min || call.inline_vertices) {
     system.vertex_index_min = 0;
     system.vertex_index_max = xenos::kVertexIndexMask;
   }
@@ -2113,7 +2110,7 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
   // draw's vertices are there already). A vertex fetch constant is two
   // words: the address (word 0, low 2 bits the type) and the size in words
   // (word 1, bits 2-25).
-  if (!call.auto_indexed) {
+  if (!call.inline_vertices) {
     s.Mirror(base, index_address, index_count * (index_32bit ? 4 : 2), true);
   }
   // The highest vertex the draw uses (indices as the GPU reads them, after
@@ -2183,14 +2180,13 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
   if (rectangle_list) {
     vk::vkCmdBindIndexBuffer(commands, s.mirrors[s.frame].buffer, kRectangleIndices,
                              VK_INDEX_TYPE_UINT32);
-    vk::vkCmdDrawIndexed(commands, RectangleIndexCount(index_count / 3), 1, 0,
-                         int32_t(call.start_vertex), 0);
+    vk::vkCmdDrawIndexed(commands, RectangleIndexCount(index_count / 3), 1, 0, 0, 0);
   } else if (quad_list) {
     vk::vkCmdBindIndexBuffer(commands, s.mirrors[s.frame].buffer, kQuadIndices,
                              VK_INDEX_TYPE_UINT32);
-    vk::vkCmdDrawIndexed(commands, index_count / 4 * 6, 1, 0, int32_t(call.start_vertex), 0);
-  } else if (call.auto_indexed) {
-    vk::vkCmdDraw(commands, index_count, 1, call.start_vertex, 0);
+    vk::vkCmdDrawIndexed(commands, index_count / 4 * 6, 1, 0, 0, 0);
+  } else if (call.inline_vertices) {
+    vk::vkCmdDraw(commands, index_count, 1, 0, 0);
   } else {
     vk::vkCmdBindIndexBuffer(commands, s.mirrors[s.frame].buffer, index_address,
                              index_32bit ? VK_INDEX_TYPE_UINT32 : VK_INDEX_TYPE_UINT16);
@@ -2202,7 +2198,7 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
     s.stats.inline_by_type[type & 15]++;
   }
   // (The draw ID pass redraws indexed draws only.)
-  if (s.record_draws && main_view_draw && !call.auto_indexed) {
+  if (s.record_draws && main_view_draw && !call.inline_vertices) {
     IdDraw& id = s.id_draws.emplace_back();
     id.number = uint32_t(s.recorded_draws.size() - 1);
     id.vertex = key.vertex;
@@ -2408,7 +2404,7 @@ void Passes::InlineDraw(VkCommandBuffer commands, uint8_t* base, uint32_t type, 
   s.inline_offset = offset + size;
   DrawCall call;
   call.type = type;
-  call.auto_indexed = call.inline_vertices = true;
+  call.inline_vertices = true;
   call.vertex_count = count;
   call.vertex_address = kInlineVertices + offset;
   std::memcpy(s.mirrors[s.frame].mapped + call.vertex_address, base + data, size);
@@ -2426,28 +2422,6 @@ void Passes::InlineDraw(VkCommandBuffer commands, uint8_t* base, uint32_t type, 
       0x10000000u | ((size / 4) << 2) | uint32_t(xenos::Endian::k8in32);
   s.regs.values[XE_GPU_REG_VGT_INDX_OFFSET] = 0;
   s.Draw(commands, base, device, call);
-}
-
-void Passes::DirectDraw(VkCommandBuffer commands, uint8_t* base, uint32_t device,
-                        uint32_t type, uint32_t start, uint32_t count) {
-  State& s = *state_;
-  if (s.logged_direct_draws.insert(uint64_t(type) << 32 | count).second) {
-    REXLOG_INFO("native renderer: a DrawVertices outside the command list: type {}, {} vertices "
-                "from {}, VGT_INDX_OFFSET {}",
-                type, count, start,
-                guest::LoadU32(base, device + 10240 + 4 * (XE_GPU_REG_VGT_INDX_OFFSET - 0x2000)));
-  }
-  ReadRegisters(base, device, s.regs);
-  DrawCall call;
-  call.type = type;
-  call.auto_indexed = true;
-  call.vertex_count = count;
-  call.start_vertex = start;
-  // Such draws (the movies') sample textures rewritten every frame.
-  s.textures.set_verify_every_frame(true);
-  s.Draw(commands, base, device, call);
-  s.textures.set_verify_every_frame(s.verify_textures);
-  s.stats.direct_draws++;
 }
 
 void Passes::AfterClear(VkCommandBuffer commands, uint8_t* base, uint32_t payload,
@@ -2824,7 +2798,6 @@ void Passes::State::WatchDraw(const TranslatedShader* vertex, const TranslatedSh
 }
 
 void Passes::set_verify_textures(bool every_frame) {
-  state_->verify_textures = every_frame;
   state_->textures.set_verify_every_frame(every_frame);
 }
 

@@ -38,11 +38,6 @@ class Passes {
   // primitive type; count: vertices; stride in bytes.
   void InlineDraw(VkCommandBuffer commands, uint8_t* base, uint32_t type, uint32_t count,
                   uint32_t stride, uint32_t data);
-  // A DrawVertices (sub_825BE300) outside the command list, after the
-  // library's call (the movies' frames: see "Movies" in
-  // docs/gpu-functions.md): type, start vertex, vertex count.
-  void DirectDraw(VkCommandBuffer commands, uint8_t* base, uint32_t device, uint32_t type,
-                  uint32_t start, uint32_t count);
   // After a clear (26) or resolve (25) command's library call.
   void AfterClear(VkCommandBuffer commands, uint8_t* base, uint32_t payload, uint32_t arg1);
   void AfterResolve(VkCommandBuffer commands, uint8_t* base, uint32_t payload, uint32_t arg1);
@@ -176,8 +171,6 @@ class Passes {
     uint64_t resolves = 0, resolves_skipped = 0, resolve_unknown_flags = 0;
     // Predicated tilings begun, and the resolves their ends made.
     uint64_t tilings = 0, tiled_resolves = 0;
-    // DrawVertices outside the command list (movies) drawn.
-    uint64_t direct_draws = 0;
     uint32_t resolve_flags_sample = 0;
     TextureCache::Stats textures;
   };
