@@ -33,7 +33,7 @@ G="$PWD/itc/Import Tuner Challenge (USA)"; B=itc_recomp/out/build/linux-amd64-re
 XDG_DATA_DIRS=/usr/local/share:/usr/share LD_LIBRARY_PATH=$B:rexglue-sdk/out/linux-amd64 \
   $B/itc --native_renderer=true --native_renderer_exclusive=true \
   --game_data_root="$G" --mnk_mode=true --max_fps=144 \
-  --log_fps=true --motion_blur=false --interpolate_draw_state=true <diagnostic flags>
+  --log_fps=true --interpolate_draw_state=true <diagnostic flags>
 find /dev/shm -maxdepth 1 -user "$USER" -name 'xenia_memory_*' -delete
 ```
 
@@ -85,8 +85,10 @@ texture animations (flashing lights, signs, the off-ramp chevron), the
 minimap triangle's flashing, the car's reflections, buildings' lighting and
 play time are all done. `run.sh` turns
 interpolation on (marked experimental) with logging off; `run-debug.sh` is
-the same with logs; `./run.sh --no-interpolation` gives the original 30 fps
-with motion blur. Known issues are at the end of `docs/functions.md`.
+the same with logs; `./run.sh --no-interpolation` gives the original 30 fps.
+Our renderer always draws motion blur and glow (`--motion_blur` and
+`--glow` only affect the emulated GPU). Known issues are at the end of
+`docs/functions.md`.
 
 The game draws with our own Vulkan renderer (the native renderer, exclusive
 mode; merged from `native-renderer`): the emulated GPU plugin isn't loaded

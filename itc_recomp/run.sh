@@ -8,7 +8,7 @@
 # exclusive mode), not an emulated Xbox 360 GPU.
 #
 #   ./run.sh                     frame interpolation on (the default)
-#   ./run.sh --no-interpolation  the original 30 fps, with motion blur
+#   ./run.sh --no-interpolation  the original 30 fps
 #
 # Logging is off; ./run-debug.sh runs the same with logs (in logs/), for
 # reporting problems.
@@ -16,17 +16,16 @@
 # Frame interpolation (experimental): game logic stays at 30 Hz and races
 # draw up to --max_fps (144 here; pass --max_fps=N to change it, 0 for
 # unlimited), each frame blended between the last two ticks. Menus stay at
-# 30 fps. Motion blur is off with it, because it smears a whole tick of
-# motion at high frame rates.
+# 30 fps. Motion blur and glow are always drawn.
 dir="$(cd "$(dirname "$0")" && pwd)"
 
 export LD_LIBRARY_PATH="$dir${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 
-defaults=(--interpolate_draw_state=true --max_fps=144 --motion_blur=false)
+defaults=(--interpolate_draw_state=true --max_fps=144)
 args=()
 for arg in "$@"; do
   if [ "$arg" = "--no-interpolation" ]; then
-    defaults=(--interpolate_draw_state=false --max_fps=30 --motion_blur=true)
+    defaults=(--interpolate_draw_state=false --max_fps=30)
   else
     args+=("$arg")
   fi
