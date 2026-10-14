@@ -1,22 +1,31 @@
 #include "textures.h"
 #include "frame_costs.h"
 
+#include "buffers.h"
 #include "state.h"
 
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <bit>
 #include <cstring>
 #include <map>
+#include <string>
 #include <unordered_map>
 #include <vector>
 #include <rex/graphics/xenos.h>
+#include <rex/cvar.h>
 #include <rex/hash.h>
 #include <rex/logging.h>
 
 #if defined(__SSSE3__)
 #include <tmmintrin.h>
 #endif
+
+REXCVAR_DEFINE_BOOL(native_renderer_log_texture_writes, false, "ITC",
+                    "Log which code writes textures' memory: on first load and when a texture "
+                    "is found changed, what the library's memcpy wrote there (a debugging aid; "
+                    "with --native_renderer_verify_textures every change is found)");
 
 namespace native {
 
@@ -404,6 +413,9 @@ struct TextureCache::State {
     uint64_t hash = 0;
     uint64_t verified_frame = 0;
     uint64_t loaded_frame = 0;
+    // With --native_renderer_log_texture_writes: the memcpy sequence when
+    // last loaded.
+    uint64_t write_sequence = 0;
     // The guest memory it's read from: base and mips (address, size).
     std::array<std::pair<uint32_t, uint32_t>, 2> ranges{};
     std::unordered_map<uint32_t, VkImageView> views;  // by swizzle
@@ -418,12 +430,143 @@ struct TextureCache::State {
   std::unordered_map<uint64_t, VkSampler> samplers;
   Stats stats;
 
+  // --native_renderer_log_texture_writes: who wrote textures' memory.
+  struct WriteStats {
+    uint64_t first = 0, first_bytes = 0, covered = 0, partly = 0, uncovered = 0,
+             uncovered_bytes = 0, changed = 0, changed_by_memcpy = 0, changed_otherwise = 0;
+    std::map<uint32_t, uint64_t> first_callers, change_callers;
+    // Textures changed without memcpy: address: changes, and a description.
+    std::map<uint32_t, std::pair<uint64_t, std::string>> changed_otherwise_by;
+  } writes;
+  // Textures changed without memcpy: their memory when last checked, to
+  // log which bytes changed.
+  std::unordered_map<uint32_t, std::vector<uint8_t>> write_snapshots;
+  uint32_t write_lines = 200;
+  std::chrono::steady_clock::time_point writes_logged = std::chrono::steady_clock::now();
+  uint8_t* guest_base = nullptr;
+  void LogWrite(const Texture& t, bool first, uint64_t frames);
+  void LogWriteSummary();
+
   bool CreateTexture(Texture& texture);
   uint64_t Hash(uint8_t* base, const Texture& texture) const;
   VkImageView GetSwizzledView(Texture& texture, uint32_t swizzle, VkImageViewType natural);
   bool Upload(uint8_t* base, Texture& texture);
   VkCommandBuffer Uploads();
 };
+
+std::string WriteCallers(const std::map<uint32_t, uint64_t>& callers) {
+  std::string text;
+  for (auto& [caller, count] : callers) {
+    text += fmt::format(" {:08X}={}", caller, count);
+  }
+  return text.empty() ? " none" : text;
+}
+
+// A texture loaded for the first time (first) or found changed: what the
+// library's memcpy wrote into its memory.
+void TextureCache::State::LogWrite(const Texture& t, bool first, uint64_t frames) {
+  uint64_t size = 0, bytes = 0, newest = 0;
+  uint32_t first_caller = 0, newest_caller = 0;
+  for (const auto& [address, range_size] : t.ranges) {
+    if (!range_size) {
+      continue;
+    }
+    Buffers_Coverage c = Buffers_CoverageOf(address, range_size);
+    size += range_size;
+    bytes += c.bytes;
+    if (c.bytes && !first_caller) {
+      first_caller = c.first_caller;
+    }
+    if (c.newest > newest) {
+      newest = c.newest;
+      newest_caller = c.newest_caller;
+    }
+  }
+  uint32_t address = t.layout.base_address ? t.layout.base_address : t.layout.mip_address;
+  WriteStats& w = writes;
+  if (first) {
+    w.first++;
+    w.first_bytes += size;
+    if (bytes >= size) {
+      w.covered++;
+    } else if (bytes) {
+      w.partly++;
+    } else {
+      w.uncovered++;
+      w.uncovered_bytes += size;
+    }
+    if (bytes) {
+      w.first_callers[first_caller]++;
+    }
+    if (bytes < size && write_lines) {
+      write_lines--;
+      REXLOG_INFO("native renderer: texture writes: {:08X} ({}x{}, {} bytes) first loaded with "
+                  "{} bytes written by memcpy{}",
+                  address, t.layout.width, t.layout.height, size, bytes,
+                  bytes ? fmt::format(" (first from {:08X})", first_caller) : std::string());
+    }
+    return;
+  }
+  w.changed++;
+  bool by_memcpy = newest > t.write_sequence;
+  (by_memcpy ? w.changed_by_memcpy : w.changed_otherwise)++;
+  if (by_memcpy) {
+    w.change_callers[newest_caller]++;
+  } else {
+    auto& [count, text] = w.changed_otherwise_by[address];
+    if (!count++) {
+      text = fmt::format("{}x{} format {} levels {}-{}", t.layout.width, t.layout.height,
+                         int(t.format.format), t.layout.min_level, t.layout.max_level);
+    }
+    // Which bytes of the first range changed since the last change.
+    auto [start, range_size] = t.ranges[0].second ? t.ranges[0] : t.ranges[1];
+    const uint8_t* now = PhysicalHostAddress(guest_base, start);
+    std::vector<uint8_t>& was = write_snapshots[address];
+    if (was.size() == range_size && write_lines) {
+      uint32_t first = UINT32_MAX, last = 0, changed = 0;
+      for (uint32_t i = 0; i < range_size; i++) {
+        if (now[i] != was[i]) {
+          first = std::min(first, i);
+          last = i;
+          changed++;
+        }
+      }
+      write_lines--;
+      REXLOG_INFO("native renderer: texture writes: {:08X}: {} bytes changed, offsets {}-{}",
+                  address, changed, first, last);
+    }
+    was.assign(now, now + range_size);
+  }
+  if (by_memcpy && write_lines) {
+    write_lines--;
+    REXLOG_INFO("native renderer: texture writes: {:08X} ({}x{}, {} bytes) changed {} frames "
+                "after loading: {}",
+                address, t.layout.width, t.layout.height, size, frames,
+                by_memcpy ? fmt::format("memcpy from {:08X} wrote it", newest_caller)
+                          : std::string("not written by memcpy since"));
+  }
+}
+
+void TextureCache::State::LogWriteSummary() {
+  auto now = std::chrono::steady_clock::now();
+  if (now - writes_logged < std::chrono::seconds(5)) {
+    return;
+  }
+  writes_logged = now;
+  WriteStats& w = writes;
+  REXLOG_INFO("native renderer: texture writes: {} first loads ({:.1f} MB): {} written wholly by "
+              "memcpy, {} partly, {} not at all ({:.1f} MB); by first writer:{}",
+              w.first, w.first_bytes / 1048576.0, w.covered, w.partly, w.uncovered,
+              w.uncovered_bytes / 1048576.0, WriteCallers(w.first_callers));
+  REXLOG_INFO("native renderer: texture writes: {} changed: {} written by memcpy since loading, "
+              "{} not; by writer:{}",
+              w.changed, w.changed_by_memcpy, w.changed_otherwise, WriteCallers(w.change_callers));
+  for (auto& [address, entry] : w.changed_otherwise_by) {
+    REXLOG_INFO("native renderer: texture writes: {:08X} ({}) changed {} times without memcpy",
+                address, entry.second, entry.first);
+  }
+  w = WriteStats{};
+}
 
 bool TextureCache::State::CreateTexture(Texture& t) {
   VkDevice device = context.device;
@@ -757,11 +900,20 @@ VkImageView TextureCache::GetView(uint8_t* base, const uint32_t fetch_words[6],
   }
 
   // Load, or reload when its memory changed (checked now and then).
+  bool log_writes = REXCVAR_GET(native_renderer_log_texture_writes);
+  if (log_writes) {
+    s.guest_base = base;
+    s.LogWriteSummary();
+  }
   if (!t.loaded) {
     t.hash = s.Hash(base, t);
     t.verified_frame = t.loaded_frame = s.frame_number;
     if (!s.Upload(base, t)) {
       return VK_NULL_HANDLE;
+    }
+    if (log_writes) {
+      s.LogWrite(t, true, 0);
+      t.write_sequence = Buffers_Sequence();
     }
   } else if (bool young = s.frame_number - t.loaded_frame < kNewTextureFrames;
              young ? s.frame_number - t.verified_frame >= kNewTextureInterval
@@ -776,6 +928,10 @@ VkImageView TextureCache::GetView(uint8_t* base, const uint32_t fetch_words[6],
     uint64_t hash = s.Hash(base, t);
     if (hash != t.hash && s.Upload(base, t)) {
       t.hash = hash;
+      if (log_writes) {
+        s.LogWrite(t, false, s.frame_number - t.loaded_frame);
+        t.write_sequence = Buffers_Sequence();
+      }
       if (young) {
         s.stats.changed_after_load++;
         if (s.stats.changed_after_load_sample == UINT32_MAX) {

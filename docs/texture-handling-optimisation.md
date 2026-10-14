@@ -68,6 +68,68 @@ texture work at a few ms a frame and deferring the rest would bound the
 hitch, but deferred first loads show the white placeholder for several
 frames: visible pop-in.
 
+## Who writes textures' memory (2026-10-15)
+
+The hashing exists because the game writes textures with plain CPU
+stores and copies, and nothing tells us. The aim is to replace it with
+being told: a flag set on a texture when its memory is written.
+
+The library's memcpy (`sub_825A7410`) is already wrapped in `buffers.cpp`
+and records every copy into the physical views (range, caller, a
+sequence number); the vertex and index mirror uses that record instead of
+hashing (see "Buffers" in `native-renderer.md`).
+`--native_renderer_log_texture_writes` checks textures against it: on
+first load, how much of the texture's memory memcpy wrote and from
+where; on a change, whether memcpy wrote it since the last load, and for
+changes without memcpy, which bytes changed. With
+`--native_renderer_verify_textures` every texture used is hashed every
+frame, so every change is found. An 80 s attract race (`itc_663.log`,
+`itc_666.log`):
+
+- **First loads**: of 1,463 textures, 1,455 were written whole by memcpy,
+  nearly all from the resource loader `sub_82596F68` (`0x82597014`), the
+  same loader as vertex and index data. A few 300x150 RGBA textures
+  come from `sub_820ED6D0` (`0x820ED910`, `0x820ED920`), and are later
+  redrawn by `sub_820ED630` (`0x820ED6B8`), a rectangle copy (a memcpy
+  per row): images the game composes on the CPU, also through memcpy.
+- Five first loads had no memcpy writes at all (a 256x144, a 1024x1024
+  and three 16x16; addresses vary between runs). None of them changed
+  afterwards. Their writer isn't known.
+- **Changes**: 748 found. 7 were written by memcpy since loading. The
+  other 741 were one texture (`18DAD000`, 300x150, untiled, pitch 320) and
+  once its neighbour, and **they weren't changes to the texture**: the
+  bytes that changed were at offsets 192,517-200,319, past the image's
+  last row (150 rows of 1,280 bytes end at 192,000). The hashed range pads
+  the row count to 32 (160 rows) as the tiled layout needs; for an
+  untiled texture that padding is other data, which the game updates
+  every tick. So the cache reloaded an unchanged 200 KB texture whenever
+  it rechecked it.
+
+So every real change seen went through memcpy, as for vertex and index
+data. A gdb watchpoint on the texture's pixels (all three CPU views of
+physical memory) caught nothing, as expected, since its pixels never
+changed. (Attaching gdb to a running game isn't allowed here,
+`ptrace_scope` 1: start the game under gdb and interrupt it with
+`kill -INT` instead.)
+
+### The plan from this
+
+1. Hash only the bytes the texture uses: for untiled textures, up to the
+   end of the last row's data, not the padded row count. This removes the
+   false changes, today and in the verification below.
+2. Mark textures dirty from memcpy's record instead of hashing: once a
+   frame, take the new writes and flag the textures they overlap (a map
+   of textures by address); a draw only checks the flag. Reload flagged
+   textures.
+3. Keep hashing only for checking (`--native_renderer_verify_textures`):
+   log any texture whose memory changed without a recorded write. Then
+   no hashing in normal play, the first-load hash included, and changes
+   picked up at once instead of up to 240 frames late.
+
+Open: the five textures with no memcpy writes. They're loaded at first
+use and never change in these runs; a race the user drives may differ,
+which step 3's check would show.
+
 ## What's left to try
 
 In the order suggested. Gains are estimates until measured.
@@ -90,7 +152,8 @@ In the order suggested. Gains are estimates until measured.
    read it back, so the swap would have to happen on the way in. Check
    the memory type first; the gain is likely small.
 
-4. **Hash young textures less.** A new texture is hashed every 4 frames
+4. **Hash young textures less** (superseded by "The plan from this"
+   above, which removes hashing). A new texture is hashed every 4 frames
    for 240 frames: about 60 hashes each, 36 a second for its first 1.7 s
    at 144 fps. This is there because the game can still be writing a
    texture when it's first drawn ("Textures replaced in memory" in

@@ -287,6 +287,12 @@ uint64_t Buffers_NewestWrite(uint32_t physical, uint32_t size) {
   return CoverageOf(physical, physical + size).newest;
 }
 
+Buffers_Coverage Buffers_CoverageOf(uint32_t physical, uint32_t size) {
+  TakePending();
+  Coverage c = CoverageOf(physical, physical + size);
+  return {c.bytes, c.newest, c.newest_caller, c.first_caller};
+}
+
 uint64_t Buffers_Sequence() {
   return g_sequence;
 }

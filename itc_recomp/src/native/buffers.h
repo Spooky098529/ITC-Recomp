@@ -19,6 +19,14 @@ void Buffers_OnCommand(uint8_t* base, uint32_t id, uint32_t payload, uint32_t co
 // again only if Buffers_NewestWrite returns more than S.
 uint64_t Buffers_NewestWrite(uint32_t physical, uint32_t size);
 uint64_t Buffers_Sequence();
+// Render thread: what the library's memcpy wrote into [physical, physical +
+// size): bytes covered, the first segment's caller, and the newest write's
+// sequence and caller.
+struct Buffers_Coverage {
+  uint64_t bytes = 0, newest = 0;
+  uint32_t newest_caller = 0, first_caller = 0;
+};
+Buffers_Coverage Buffers_CoverageOf(uint32_t physical, uint32_t size);
 
 // Render thread, with logging: a vertex or index range (physical) copied
 // into the mirror, the first time in a frame.
