@@ -48,7 +48,7 @@ known about it; this file is the plan and its progress).
   keeps rendering the game's own window and the two can be compared side by
   side; the game stays playable throughout. Input goes to the game's
   window, not ours. An exclusive mode, which stops calling the library,
-  comes at milestone 5.
+  comes at milestone 6.
 
 ## Milestones
 
@@ -58,8 +58,8 @@ known about it; this file is the plan and its progress).
 | 2 | **Main view geometry**: vertex and index buffers read from guest memory, shaders translated, render states mapped to pipelines. | Race geometry is visible in our window, untextured. | Done (2026-10-13): the cockpit view's geometry, the right way up, solid, with the game's coloured lighting on white placeholder textures (screenshot checked). |
 | 3 | **Textures**: untile and upload (mostly BC1-BC3), samplers from the fetch constants. | The main view looks right without effects. | Done (2026-10-13): signs, gauges, fences, buildings and road textured correctly (screenshot checked); what comes from resolves is still missing. |
 | 4 | **The other passes**: each pass renders into a Vulkan image of its resolve's size and format; resolves become copies. | Shadows, reflections and the mirror work. | Done (2026-10-14): every pass draws, inline vertex draws included; clears and resolves work; the user saw the car's shadow, the mirror and the reflections right in our window (cockpit and third person), and the resolves match the emulated GPU's (`--readback_resolve=full`), except its blocky bloom. Menus not checked. |
-| 5 | **Post-processing, HUD, present**, then exclusive mode. | A race is fully native; measure the frame rate. | In progress: the final frame with the HUD shows (checked by the user in a race). |
-| 6 | **Menus**. | The emulated GPU is no longer needed. | |
+| 5 | **The final frame and the menus** (still in development mode): post-processing, HUD, the frame's end, then every menu screen. | Races and menus look as in the game's window, side by side. | In progress: the final frame with the HUD shows (checked by the user in a race); menus next. |
+| 6 | **Exclusive mode**: stop calling the graphics library (and so the emulated GPU), keeping only what our renderer needs from it; then measure. | The emulated GPU is no longer needed; frame rate measured against it. | |
 
 ## Progress on milestone 2
 
@@ -273,6 +273,10 @@ a vertex shader patched for another vertex declaration.
 
 ## Progress on milestone 5
 
+Restructured on 2026-10-14 at the user's request: the menus moved into
+milestone 5, and milestone 6 is now the full disconnect from the emulated
+GPU (exclusive mode) and the frame rate measurement.
+
 - **The final frame is shown** (2026-10-14): `sub_8258D998` (the front
   buffer resolve at the frame's end, outside the command list) is wrapped
   (`replay_hooks.cpp`) and the window shows what render target 0 holds
@@ -295,7 +299,7 @@ a vertex shader patched for another vertex declaration.
   (minimap with its triangle and place name, mirror, gauges, gear, speed,
   ASSIST bar); the only difference seen is the known gamma (ours lighter).
   81-98 fps in the race with the renderer in development mode.
-- Seen on the way, for milestone 6: in the menus our window draws the 2D
+- Seen on the way (to fix in this milestone): in the menus our window draws the 2D
   interface right but not the 3D car on the Free Run screen (car, floor
   reflection, light beams) nor the Course In screen's night city picture
   (black in ours). The menus also log ~6,000 lookups per 5 s of a texture
@@ -435,7 +439,7 @@ texture objects ("Resources"). The approach:
 
 - **Gamma**: our window is lighter than the game's (seen side by side,
   2026-10-14): the Xbox 360's output gamma isn't applied yet. A known
-  issue, not part of milestone 5 (the user's call).
+  issue, not part of milestones 5 or 6 (the user's call).
 
 - **Textures replaced in memory show their old contents for a while.**
   The game streams track sections in during a race, and textures are
