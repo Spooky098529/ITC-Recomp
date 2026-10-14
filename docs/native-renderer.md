@@ -1062,6 +1062,22 @@ To be fixed (or accepted) in milestone 7.
   translated; 3 slow frames instead of 8, none translating, 17 pipelines
   made in 0.3 ms; the one slow frame in the race was texture loading
   (34.5 ms for 44 textures, 11 MB). Texture streaming is the hitch left.
+- **Hitches from texture streaming** (improved 2026-10-15). New track
+  sections bring textures loaded on the render thread in the frame that
+  first uses them. Untiling went block by block (an address computed and
+  a `memcpy` per 8- or 16-byte block); now `GatherTiledRow` copies whole
+  runs (the tiled layout keeps 16 bytes contiguous, aligned in x; 8 for
+  1-byte blocks), checked equal to the old gather on 180,224 rows of a
+  race, and the byte swap uses SSSE3 shuffles (x86-64-v2 has them;
+  scalar elsewhere). Pinned to one CPU, the race's first frame (44
+  textures, 11 MB) went from 33.2 ms to 9.8 ms; during the race the
+  frame spending the most on textures in each 5 s took 3-11 ms. The log
+  now gives hashing time in "long frame" lines and, every 5 s, the time
+  spent loading and hashing textures and the worst frame. A per-frame
+  time budget (deferring loads to later frames) was considered and not
+  done (the user's call): deferred first loads show white placeholders.
+  If hitches remain on the Steam Deck, next is moving the untiling to a
+  worker thread.
 - **The attract race's grayscale filter flickers with the game pinned to
   one CPU** (`taskset -c 0`; seen by the user, 2026-10-15). Since the
   frame pacer fix (`d8c10c5`, a due tick always gets the next pass); the

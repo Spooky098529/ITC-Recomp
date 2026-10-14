@@ -247,6 +247,9 @@ class Renderer {
 
   // Logged every 5 s.
   uint64_t frames_presented_ = 0, frames_skipped_ = 0, commands_ = 0, draws_ = 0;
+  // Texture loading and hashing (frame_costs.h) since the last stats: total
+  // and the frame that spent the most.
+  int64_t texture_ns_ = 0, texture_ns_max_ = 0;
   Clock::time_point start_ = Clock::now(), last_log_ = Clock::now();
   Clock::time_point last_present_ = Clock::now();
 };
@@ -729,11 +732,15 @@ void Renderer::EndFrame() {
       const FrameCosts& c = g_frame_costs;
       REXLOG_INFO(
           "native renderer: long frame: {:.0f} ms since the last present ({} draws): "
-          "{} textures loaded ({:.1f} MB) in {:.1f} ms, {} shaders translated in {:.1f} ms, "
-          "{} pipelines made in {:.1f} ms",
+          "{} textures loaded ({:.1f} MB) in {:.1f} ms (hashing {:.1f} ms), {} shaders "
+          "translated in {:.1f} ms, {} pipelines made in {:.1f} ms",
           ms, frame_draws, c.textures, c.texture_bytes / 1048576.0, c.texture_ns / 1e6,
+          c.hash_ns / 1e6,
           c.shaders, c.shader_ns / 1e6, c.pipelines, c.pipeline_ns / 1e6);
     }
+    texture_ns_ += g_frame_costs.texture_ns + g_frame_costs.hash_ns;
+    texture_ns_max_ =
+        std::max(texture_ns_max_, g_frame_costs.texture_ns + g_frame_costs.hash_ns);
     g_frame_costs = {};
     last_present_ = now;
   } else {
@@ -836,16 +843,19 @@ void Renderer::LogStats() {
               view.tiled_resolves);
   frames_presented_ = frames_skipped_ = commands_ = draws_ = 0;
   const TextureCache::Stats& t = view.textures;
-  REXLOG_INFO("native renderer: textures: {} ({} samplers); {} loaded, {} reloaded, {:.1f} MB; "
+  REXLOG_INFO("native renderer: textures: {} ({} samplers); {} loaded, {} reloaded, {:.1f} MB "
+              "(loading and hashing {:.1f} ms, at most {:.1f} ms a frame); "
               "{} deferred (staging full), {} unsupported (e.g. format {} dimension {}), {} "
               "of another dimension than declared; {:.0f} lookups a frame got a resolve "
               "destination ({:.0f} of another size or format)",
               t.textures, t.samplers, t.loaded, t.reloaded, t.loaded_bytes / 1048576.0,
+              texture_ns_ / 1e6, texture_ns_max_ / 1e6,
               t.deferred, t.unsupported,
               t.unsupported_sample == UINT32_MAX ? -1 : int(t.unsupported_sample >> 8),
               t.unsupported_sample == UINT32_MAX ? -1 : int(t.unsupported_sample & 0xFF),
               t.mismatched, double(t.resolved_hits) / frames,
               double(t.resolved_mismatched) / frames);
+  texture_ns_ = texture_ns_max_ = 0;
   if (t.changed_after_load) {
     REXLOG_INFO("native renderer: {} textures changed soon after loading, e.g. {:08X} after {} "
                 "frames",

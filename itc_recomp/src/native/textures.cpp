@@ -14,6 +14,10 @@
 #include <rex/hash.h>
 #include <rex/logging.h>
 
+#if defined(__SSSE3__)
+#include <tmmintrin.h>
+#endif
+
 namespace native {
 
 namespace xenos = rex::graphics::xenos;
@@ -273,26 +277,78 @@ Placement Place(const Layout& layout, const Format& format, uint32_t level) {
 }
 
 void SwapEndian(uint8_t* data, size_t size, xenos::Endian endian) {
+  size_t i = 0;
+#if defined(__SSSE3__)
+  // 16 bytes a shuffle; the scalar loops below finish the tail.
+  __m128i shuffle;
   switch (endian) {
     case xenos::Endian::k8in16:
-      for (size_t i = 0; i + 2 <= size; i += 2) {
+      shuffle = _mm_setr_epi8(1, 0, 3, 2, 5, 4, 7, 6, 9, 8, 11, 10, 13, 12, 15, 14);
+      break;
+    case xenos::Endian::k8in32:
+      shuffle = _mm_setr_epi8(3, 2, 1, 0, 7, 6, 5, 4, 11, 10, 9, 8, 15, 14, 13, 12);
+      break;
+    case xenos::Endian::k16in32:
+      shuffle = _mm_setr_epi8(2, 3, 0, 1, 6, 7, 4, 5, 10, 11, 8, 9, 14, 15, 12, 13);
+      break;
+    default:
+      return;
+  }
+  for (; i + 16 <= size; i += 16) {
+    __m128i v = _mm_loadu_si128(reinterpret_cast<const __m128i*>(data + i));
+    _mm_storeu_si128(reinterpret_cast<__m128i*>(data + i), _mm_shuffle_epi8(v, shuffle));
+  }
+#endif
+  switch (endian) {
+    case xenos::Endian::k8in16:
+      for (; i + 2 <= size; i += 2) {
         std::swap(data[i], data[i + 1]);
       }
       break;
     case xenos::Endian::k8in32:
-      for (size_t i = 0; i + 4 <= size; i += 4) {
+      for (; i + 4 <= size; i += 4) {
         std::swap(data[i], data[i + 3]);
         std::swap(data[i + 1], data[i + 2]);
       }
       break;
     case xenos::Endian::k16in32:
-      for (size_t i = 0; i + 4 <= size; i += 4) {
+      for (; i + 4 <= size; i += 4) {
         std::swap(data[i], data[i + 2]);
         std::swap(data[i + 1], data[i + 3]);
       }
       break;
     default:
       break;
+  }
+}
+
+// A row of a tiled level, gathered: blocks [x, x + count) of row y. The
+// tiled layout keeps runs of 16 bytes contiguous (8 for 1-byte blocks: the
+// micro tile's 8 columns), aligned in x, so whole runs are copied at once
+// rather than block by block.
+void GatherTiledRow(uint8_t* out, const uint8_t* base, uint32_t layer_address, uint32_t x,
+                    uint32_t y, uint32_t count, uint32_t pitch_blocks,
+                    uint32_t bytes_per_block_log2) {
+  uint32_t run_blocks_log2 = bytes_per_block_log2 ? 4 - std::min(bytes_per_block_log2, 4u) : 3;
+  uint32_t run_blocks = 1u << run_blocks_log2;
+  uint32_t end = x + count;
+  while (x < end) {
+    uint32_t address =
+        layer_address + TiledOffset2D(x, y, pitch_blocks, bytes_per_block_log2);
+    uint32_t n = std::min(run_blocks - (x & (run_blocks - 1)), end - x);
+    uint32_t bytes = n << bytes_per_block_log2;
+    if (address + bytes <= kPhysicalMemorySize) {
+      const uint8_t* in = PhysicalHostAddress(const_cast<uint8_t*>(base), address);
+      if (bytes == 16) {
+        std::memcpy(out, in, 16);
+      } else if (bytes == 8) {
+        std::memcpy(out, in, 8);
+      } else {
+        std::memcpy(out, in, bytes);
+      }
+    }
+    out += bytes;
+    x += n;
   }
 }
 
@@ -444,6 +500,7 @@ bool TextureCache::State::CreateTexture(Texture& t) {
 }
 
 uint64_t TextureCache::State::Hash(uint8_t* base, const Texture& t) const {
+  ScopedCost cost(g_frame_costs.hash_ns);
   uint64_t hash = 0;
   for (const auto& [address, size] : t.ranges) {
     if (size) {
@@ -503,14 +560,8 @@ bool TextureCache::State::Upload(uint8_t* base, Texture& t) {
       for (uint32_t y = 0; y < height_blocks; y++) {
         // Gather a row of blocks, swap, then convert into staging.
         if (l.tiled) {
-          for (uint32_t x = 0; x < width_blocks; x++) {
-            uint32_t address = layer_address + TiledOffset2D(x + p.x, y + p.y, p.pitch_blocks,
-                                                             bytes_per_block_log2);
-            if (address + f.bytes_per_block <= kPhysicalMemorySize) {
-              std::memcpy(row.data() + x * f.bytes_per_block, PhysicalHostAddress(base, address),
-                          f.bytes_per_block);
-            }
-          }
+          GatherTiledRow(row.data(), base, layer_address, p.x, y + p.y, width_blocks,
+                         p.pitch_blocks, bytes_per_block_log2);
         } else {
           uint32_t address =
               layer_address + (y + p.y) * p.row_pitch_bytes + p.x * f.bytes_per_block;
