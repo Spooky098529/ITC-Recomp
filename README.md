@@ -39,7 +39,10 @@ Built with AI assistance (Claude Code).
 | `./run.sh` | Frame interpolation on, up to 144 fps in races, no logging. |
 | `./run.sh --max_fps=N` | A different frame cap; `--max_fps=0` is unlimited. |
 | `./run.sh --no-interpolation` | The original 30 fps game. |
+| `./run.sh --skip_intro` | Skips the Ubisoft logo movie and speeds through the Genki logo and the title screen's intro. Now and then the game hangs at startup with this; if it does, close it and start it again. |
 | `./run-debug.sh` | The same as `run.sh`, with logging on (written to `logs/`). |
+
+Options can be combined, e.g. `./run.sh --skip_intro --max_fps=0`.
 
 ## Known limitations
 
