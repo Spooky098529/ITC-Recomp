@@ -672,8 +672,10 @@ the samples in our blending code.
   ~12% of it.
 - Our blending is ~4-10% of the render thread (`BlendState_ReplayConstants`
   and the upload wrapper).
-- Unrelated to frame rate: the "Audio Worker" thread spins at ~80% of a
-  core (`pthread_mutex_trylock`) the whole time.
+- The "Audio Worker" thread spins at ~80% of a core
+  (`pthread_mutex_trylock`) the whole time: the SDK's polling wait, not
+  audio work; whether it costs frame rate isn't measured yet. See
+  `native-audio.md`.
 
 So the frame rate in busy areas is set by how fast the emulated GPU
 processes the game's commands; the render thread mostly waits for it.

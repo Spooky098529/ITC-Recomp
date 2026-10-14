@@ -7,7 +7,9 @@ how frame interpolation works, every diagnostic option, and what didn't
 work. `docs/gpu-functions.md` covers how the game drives the GPU (the
 render command replay and the graphics library), and
 `docs/native-renderer.md` is the plan and progress of the native renderer
-that's to replace the emulated GPU. Read the relevant section before changing anything, and keep it up to
+that's to replace the emulated GPU. `docs/native-audio.md` is the same for
+the SDK's audio (the Audio Worker's spin, the game's sounds, the plan).
+Read the relevant section before changing anything, and keep it up to
 date as you learn things.
 
 ## Rules from the user

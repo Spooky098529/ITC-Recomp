@@ -82,3 +82,5 @@ with `itc_recomp/run.sh` and `itc_recomp/run-debug.sh`.
   GPU.
 - [docs/native-renderer.md](docs/native-renderer.md): the native renderer's
   design and progress.
+- [docs/native-audio.md](docs/native-audio.md): how the game's audio works
+  and the plan to replace the emulated audio.
