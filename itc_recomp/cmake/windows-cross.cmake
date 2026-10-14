@@ -36,8 +36,13 @@ set(CMAKE_CXX_FLAGS_INIT "${ITC_WIN_FLAGS}")
 
 file(GLOB ITC_WIN_SDK_INCLUDE LIST_DIRECTORIES true "${XWIN_DIR}/Windows Kits/10/Include/*")
 file(GLOB ITC_WIN_CRT_INCLUDE LIST_DIRECTORIES true "${XWIN_DIR}/VC/Tools/MSVC/*/include")
-# llvm-rc needs the SDK headers too (SDL's version resource).
-set(CMAKE_RC_FLAGS_INIT "/I \"${ITC_WIN_SDK_INCLUDE}/um\" /I \"${ITC_WIN_SDK_INCLUDE}/shared\" /I \"${ITC_WIN_SDK_INCLUDE}/ucrt\" /I \"${ITC_WIN_CRT_INCLUDE}\"")
+# Resources (SDL's version resource) need the SDK headers too. CMake
+# preprocesses them with clang++ before llvm-rc, so -I, not /I.
+set(CMAKE_RC_FLAGS_INIT "")
+foreach(dir "${ITC_WIN_SDK_INCLUDE}/um" "${ITC_WIN_SDK_INCLUDE}/shared"
+        "${ITC_WIN_SDK_INCLUDE}/ucrt" "${ITC_WIN_CRT_INCLUDE}")
+    string(APPEND CMAKE_RC_FLAGS_INIT " -I \"${dir}\"")
+endforeach()
 
 set(ITC_WIN_LINK_FLAGS "-fuse-ld=lld -Xmicrosoft-windows-sys-root \"${XWIN_DIR}\"")
 set(CMAKE_EXE_LINKER_FLAGS_INIT "${ITC_WIN_LINK_FLAGS}")
