@@ -1256,7 +1256,12 @@ To be fixed (or accepted) in milestone 7.
   consecutive registers (`countr_zero`/`countr_one`) and each run, like
   each of `ReadRegisters`' blocks, is copied by `guest::CopyU32s`, one
   plain loop the compiler vectorizes (`pshufb`) that also reports whether
-  any word changed (for the constants reuse). A temporary check computing
+  any word changed (for the constants reuse). It takes the host address
+  once per range, so a range crossing 0xE0000000 (where the SDK's host
+  offset changes; the device is at `0x40021B00`, far from it) is copied in
+  two parts; tested against `LoadU32` word by word around the line. Kept
+  out of a recursive call: that stopped the copy being inlined and
+  vectorized. A temporary check computing
   every draw's constants both ways over a whole race: 0 mismatches in
   ~3.6 billion float words and ~12 billion register words. Uncapped
   attract race, alternating, 20 s runs: 284.6 and 284.9 fps mean before,
