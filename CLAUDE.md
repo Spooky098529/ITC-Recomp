@@ -71,9 +71,9 @@ find /dev/shm -maxdepth 1 -user "$USER" -name 'xenia_memory_*' -delete
 - Launch from the repo root; other directories fail (exit 127).
 - `--skip_intro --attract_after_s=1` starts an attract race (AI cars) about
   1 s after launch with no input, so races can be checked without the user:
-  run under `timeout`, read the log, and take screenshots with
-  `spectacle -b -n -f -o <file>` (see "The title screen" in
-  `docs/functions.md`). Without the GPU plugin, `--skip_intro` sometimes
+  run under `timeout`, read the log, and look at frames with the
+  renderer's dump (`--native_renderer_dump=<dir>`, 10 s into a race or
+  when `<dir>/now` appears). Never screenshot the user's desktop. Without the GPU plugin, `--skip_intro` sometimes
   stalls the boot (no "called from 8248466C" in the log): restart it.
 - Run the game in the background. The user plays: they start a race, drive
   near an opponent and quit, then say what they saw.
@@ -101,7 +101,7 @@ install -m 755 itc_recomp/run-debug.sh $D/run-debug.sh
 (cd $D && python3 -I -m zipfile -c ../$name.zip itc librexruntime.so run.sh run-debug.sh)
 ```
 
-## Status (`main`, 2026-10-15, v0.3.7 plus `blend-math` and `read-registers`)
+## Status (`main`, 2026-10-15, v0.3.7 plus `blend-math`, `read-registers` and `mirrors-fix`)
 
 Frame interpolation for races is working: logic runs at 30 Hz and frames are
 blended between ticks. The world, cameras, wheels (other cars' too, paired
@@ -164,6 +164,14 @@ Not done yet:
   ~12% of the render thread's cycles a draw (by profile, attract race;
   not yet checked on the Deck). Where the render thread's time goes, what's
   done and what's next: "Performance: the render thread" in
-  `docs/native-renderer.md`.
+  `docs/native-renderer.md`. Since `mirrors-fix` (merged): the
+  mirrors are updated at frame starts instead of checked draw by draw
+  (`--native_renderer_mirror_by_tick` and `--native_renderer_mirror_to_both`,
+  off by default, on in `run.sh`): -14.7% render thread cycles a frame,
+  checked in attract races and a race the user drove ("Hypothesis to test:
+  the mirrors updated once a tick" and what follows it). Still to decide:
+  `Buffers_OnCommand`'s ~90k cycles a frame with its log off (perf's
+  attribution there looks wrong), the old per-draw path's future,
+  and a Steam Deck test.
 - Recheck whether the player's beam on the road still jumps in sharp turns
   (Known issues); if it's gone, drop it from the next release's limits.

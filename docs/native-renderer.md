@@ -1945,6 +1945,346 @@ the old blender over whole attract races, both blend modes; keep
 `--log_blend_state`'s rejection counts per frame. Unmeasured: comparing
 ~1 KB per upload may eat most of the gain.
 
+### Profile of 2026-10-15, after `read-registers` (`mirrors-fix`)
+
+On `843af98` (`main` with `blend-math` and `read-registers`),
+`profile_render_thread.sh`, two runs: 14.43 and 14.13 million cycles a
+frame (4,193 and 4,295 frames in the 12 s). `itc` 77%, libc 11.3%, the
+Vulkan driver 10.7%, libstdc++ 0.8%. By group (share of the render
+thread, two runs):
+
+| Part | Share | Biggest items (run a) |
+|---|---|---|
+| Replay handlers and library (guest, `sub_8...`) | ~26% | Release 2.4, `8258FBD0` 2.1, `8258FC30` 1.7 |
+| `Passes::State::Draw` itself | ~10.2% | |
+| Texture binding | ~8.9% | `GetView` 3.5, `GetTextureSet` 1.6, `GetSwizzledView` 1.5, `GetSampler` 1.3 |
+| Mirror | ~8.4% | `IndexRange` 3.4 (~485 thousand cycles a frame), `Buffers_NewestWrite` 1.5 (~215), the `mirrored` set's insert 1.5, `Mirror` 1.2 (~172), `TakePending` 0.7 (~100) |
+| Shader lookup | ~4.7% | XXH3 of the microcode 1.6, `ShaderCache::Get` 1.3, `GetInterface` 1.0 |
+| Interpolation | ~4.8% | `BlendState_ReplayConstants` 4.4 |
+| Reading state | ~3.1% | `GetTarget` 1.6, `ReadRegisters` 1.1 |
+| Pipeline lookup | ~1.0% | the `PipelineKey` `unordered_map` 1.1 |
+
+Also: memcpy's write tracking (`RecordWrite`: the `std::map` of segments,
+its `operator[]` and tree rebalancing) ~1%. The script runs with info
+logging (it counts frames from the `fps` lines), so its profiles include
+`collect_interfaces`' `std::map` (`interpolators_by_shader`, 1.0%), which
+`run.sh` (`--log_level=off`) doesn't pay; the same in every build, so
+comparisons hold.
+
+So the mirror is now the largest of our own parts after `Draw`, ~1.2
+million cycles a frame (~560 a draw at ~2,150 draws). Where it goes, per
+draw:
+- `IndexRange` scans every index of the draw (vectorized, `passes.cpp`)
+  to find the lowest and highest vertex, though most index buffers are
+  static and drawn again every frame (and several times a frame).
+- `Mirror` inserts each range into `mirrored` (an `unordered_set`, a
+  node allocated per new range and all freed at the frame's start) to copy
+  a range at most once a frame, then looks it up in the frame's
+  `GuestMirror::copied` and asks `Buffers_NewestWrite` (a `std::map`
+  lookup, after `TakePending`) whether memcpy wrote it since.
+
+Plan, to measure first (`CLAUDE.md`: logs before changes): count per
+frame the index ranges seen, the distinct ones, how many were written by
+memcpy since last seen, and the memcpy writes taken. Then:
+1. Cache `IndexRange`'s result by (address, count, format, endian,
+   restart), valid while memcpy hasn't written the range (its sequence, as
+   the mirror keeps).
+2. Replace `mirrored` with a flat open-addressed table stamped by frame
+   (as `ProductTable`), so nothing is allocated or cleared.
+3. Answer "written since?" cheaply when nothing was written since the last
+   question (`Buffers_Sequence` unchanged), before the `std::map` lookup.
+
+**Measured** (`--native_renderer_log_index_ranges`, uncapped attract race,
+`itc_744.log`; per frame, the race's 5 s lines):
+- **Index ranges are almost never rewritten.** ~1,700-2,200 scans a frame
+  (~1.5-2.5 million indices), ~650-830 distinct ranges. Of the scans,
+  ~61% repeat a range already scanned this frame, and ~100% find it
+  unwritten by memcpy since its last scan (first seen and written since:
+  0.0% when rounded). An unwritten range's kept result was the same as the
+  scan for every one (0 mismatches over the race), so nothing but memcpy
+  writes them. A cache would remove nearly all of `IndexRange`.
+- **memcpy writes ~130-260 times a frame**, so the sequence is never
+  unchanged between a range's copy and the mirror's next question (0% of
+  ~1,100 questions a frame): plan item 3 as written gains nothing.
+- **The mirror** is called ~4,800-6,100 times a frame (index and vertex
+  ranges), 81% for a range already copied that frame (the `mirrored`
+  insert finds it), and asks `Buffers_NewestWrite` ~950-1,150 times.
+
+So a cache's check matters: `IndexRange` costs ~230 cycles a draw (~485
+thousand a frame over ~2,100 draws), and `Buffers_NewestWrite` ~195 a
+question (~215 thousand over ~1,100), about the same. Checking each cached
+range with `Buffers_NewestWrite` on every draw would gain little. Instead:
+- check each cached index range once a frame, as the mirror already does
+  for the same range (same address and size; the mirror already assumes
+  memcpy doesn't write a range between two draws of a frame, which
+  `--native_renderer_check_late_writes` checks): ~61% of draws then need
+  only the lookup;
+- and make the "written since?" question itself cheaper, e.g. a table of
+  the newest write's sequence per 4 KB page (1 MB for 512 MB), so a range
+  is a few loads instead of a `std::map` search; a write in the same page
+  but outside the range only costs an extra scan or copy. Count how often
+  that happens before choosing it.
+
+**Done: the index range cache** (`IndexRangeCache` in `passes.cpp`,
+`--native_renderer_cache_index_ranges`, on by default). An open-addressed
+table by address, count and format (emptied if it reaches 32,768 ranges)
+keeps each range's lowest and highest index, the write sequence when
+scanned, and the frame it was last found unwritten in. A draw whose range
+was found this frame takes the result; otherwise `Buffers_NewestWrite`
+decides once a frame whether it's scanned again. Checked with
+`--native_renderer_check_index_cache` (scanned anyway and compared;
+removed 2026-10-15 once the mirror work was done, in its last version
+`2b7f2a2`): two whole attract races, ~62 million cached results, 0 differ.
+Profiles, one binary with the cache off and on, three runs each,
+alternating (`ITC_ARGS`, a new option of `profile_render_thread.sh`),
+thousand cycles a frame:
+
+| Cache | Render thread | `IndexRange` | `DrawIndexRange` | `Buffers_NewestWrite` |
+|---|---|---|---|---|
+| off | 14,463, 14,539, 14,207 (14,403) | 495, 458, 470 | 16, 17, 11 | 204, 193, 199 |
+| on | 14,016, 13,452, 13,793 (13,754) | 0 | 83, 83, 86 | 313, 308, 308 |
+
+So `IndexRange`'s ~475 is gone, for ~70 more in the lookup and ~110 more
+in `Buffers_NewestWrite` (the once-a-frame checks): ~−290 directly, ~2% of
+the thread (the total fell ~650, ~4.5%, but that's within its noise added
+to the direct gain). Next: the mirror asks the same question of the same
+range in the same draw (`Mirror` of the index range), so the cache's
+answer can be passed to it, removing the added ~110.
+
+**Done: the cache's answer passed to the mirror.** `DrawIndexRange`
+keeps what `Buffers_NewestWrite` said of the draw's index range when it
+asked (`draw_index_newest`, reset at each draw's start), and `Draw` passes
+it to `Mirror`, which asks itself only without it (or when the range was
+clipped at the end of physical memory). This relies on what the mirror
+already did: no memcpy write to an index range between two points of one
+draw. Checked over an attract race with `--native_renderer_verify_mirror`
+(every range not copied compared with guest memory: 2.1 million, 0
+differ) and `--native_renderer_check_index_cache` (4 million, 0 differ).
+Profiles against the previous commit (separate binaries, three runs each,
+alternating), thousand cycles a frame:
+
+| Build | Render thread | `Buffers_NewestWrite` | `DrawIndexRange` |
+|---|---|---|---|
+| cache only | 13,795, 13,758, 12,584 | 338, 354, 311 | 139, 129, 121 |
+| answer passed | 13,441, 13,656, 13,613 | 230, 285, 272 | 77, 94, 93 |
+
+So ~−115 for the two together, as expected (the thread's totals are too
+noisy to show it: the third "cache only" run drew ~8% more frames than
+any other). Over both steps the mirror's per-draw work is ~−400 thousand
+cycles a frame (~3% of the render thread).
+### Hypothesis to test: the mirrors updated once a tick (the user's, 2026-10-15)
+
+For a new session to test. Read "Buffers" and the "Guest memory is
+mirrored" decision above first, and "Render command recording" and
+"Interpolation" in `functions.md`.
+
+**Where things stand.** Branch `mirrors-fix` (not merged; whether to
+start from it or merge it first is the user's call; ask before creating
+branches) has, on top of `main`:
+- the render thread profile after `read-registers`: the mirror ~8.4% of
+  the render thread, the largest of our parts after `Draw`;
+- `--native_renderer_log_index_ranges` (counts below);
+- the index range cache (`IndexRangeCache`, `DrawIndexRange`), and its
+  write check passed to `Mirror` (`draw_index_newest`): ~-400 thousand
+  cycles a frame of ~14,000 together (~3%), checked over attract races;
+- `--native_renderer_check_index_cache`, temporary (removed after the
+  mirror work, see below);
+- `profile_render_thread.sh` takes extra game flags in `ITC_ARGS`.
+
+What the mirror still costs a frame on that branch, thousand cycles:
+"written since?" (`Buffers_NewestWrite`, a `std::map` search of every
+segment memcpy ever wrote) ~260 and `TakePending` ~95, `Mirror`'s own
+time ~140 (mostly, by inference, the inlined lookup in
+`GuestMirror::copied`), the `mirrored` set's inserts ~1.8%. All of it is
+bookkeeping: ~6,000 `Mirror` calls a frame (81% for a range already handled
+that frame) decide what to copy, and ~0.1 MB a frame is copied.
+
+**Why the question is asked at all.** The mirrors (two 512 MB host-visible
+buffers made once at start, one per frame in flight, used in turn) are
+copies of guest memory, since RADV won't import it. The game writes vertex
+and index data with plain memcpy (as on the 360, where the GPU read the
+same memory) and never says what changed, so every copy is checked before
+use: has memcpy written its range since? In every race checked, no range's
+contents changed after loading (sections reloaded in place carry the same
+data); the check guards memory reused for other data.
+
+**The hypothesis.** The game was written for a fixed 30 Hz tick: logic
+(and, the hypothesis says, everything that writes what the GPU reads)
+runs only on ticks. So guest memory the GPU reads only changes on logic
+passes, and the mirrors need updating once a tick, not checked draw by
+draw. Then the mirrors work as front and back buffers alternating by tick:
+the GPU draws from a mirror that doesn't change while it's in use, and the
+other takes the writes. Draws do no mirror work at all.
+
+**What's known that bears on it** (`functions.md`):
+- Every frame is a main loop pass. Logic passes (a 30 Hz tick due) run
+  Update and Draw; render-only passes (in races) skip Update, and Draw
+  records a new command list from the same game state. The command list is
+  double-buffered and flipped every pass; the render thread replays the
+  previous pass's list while the main thread runs the next pass. So drawing
+  runs one pass behind, overlapping the next pass's logic, as it did one
+  tick behind on the 360 (not a new hazard from interpolation; an earlier
+  claim in this session that it was is wrong).
+- memcpy writes into the physical views (`F7xxxxxx`-`FCxxxxxx`) ~130-260
+  times **per render frame** (`--native_renderer_log_index_ranges`'s
+  "memcpy writes taken", uncapped attract race, ~330 fps), yet index ranges
+  drawn were 0% rewritten. So something writes physical memory every frame,
+  most likely not vertex or index data (textures are written by the same
+  memcpy, see `texture-handling-optimisation.md`; or dynamic data). If
+  those writes happen on render-only passes and include ranges draws read,
+  the hypothesis fails for them.
+- Pass type and number: `frame_pacing::GameMessages_IsRenderOnlyPass()`,
+  `GameMessages_PassNumber()` (`game_messages.h`; main thread). The memcpy
+  wrapper is `sub_825A7410` in `native/buffers.cpp` (writes into the
+  physical views are queued in `g_pending` with their caller).
+
+**Test first, with logs** (CLAUDE.md: logs, not guesses). Add a flag that,
+for each memcpy into the physical views, records: the calling thread (main
+or which other), the pass number and whether it's a logic or render-only
+pass, the caller (`lr`), and whether the range overlaps a vertex or index
+range drawn in the last two frames (the mirror's ranges; a per-frame list
+is enough) or a texture. Summarize every 5 s by caller: writes and bytes
+on logic and on render-only passes, by thread, and how many overlapped
+drawn ranges. Run attract races and, with the user, a driven race (new
+sections stream in as the car moves; attract races may not cover it).
+- Hypothesis holds if every write overlapping drawn vertex or index data
+  is on a logic pass (or is the same contents again). Writes on render-only
+  passes into other memory (textures, non-drawn data) don't matter to the
+  mirror.
+- Also count writes landing in a range the render thread is drawing from
+  at that moment (the list being replayed): if any, the game relies on the
+  overlap being harmless, and the snapshot point below matters.
+
+**If it holds, the design** (estimates; work out each before building):
+- Each mirror is guest memory as of a pass's recording. A write goes into
+  the back mirror at once (from the memcpy wrapper, on its thread; the
+  mirrors are mapped, any thread can write) or is queued, and the front
+  gets the writes it missed when it becomes the back.
+- The swap: at the first pass after a logic pass whose list the render
+  thread replays. Before writing into the old front, wait for the fences
+  of frames still drawing from it (at most two frames in flight).
+- Inline vertices are in the mirror too (`inline_offset`, written every
+  frame by the render thread): move them to a small per-frame-slot buffer,
+  or they'd change under a frame in flight.
+- The index range cache (`mirrors-fix`) drops entries overlapping each
+  applied write instead of asking `Buffers_NewestWrite`; the `mirrored`
+  set, `GuestMirror::copied` and the per-draw `Buffers_NewestWrite` go.
+  `g_writes` (the segment map) stays for the logging tools.
+- At start: copy every segment memcpy wrote before the mirrors existed.
+- It still assumes vertex and index data only arrives by memcpy (as now).
+
+**Checking it**: `--native_renderer_verify_mirror` (every range not copied
+compared with guest memory; adapt it to compare each drawn range with
+guest memory as of the snapshot), `--native_renderer_check_late_writes`,
+and the pictures (a driven race by the user). **Measuring it**:
+`profile_render_thread.sh`, old and new binaries in their own directories,
+three runs each, alternating; expect the mirror's ~1 million cycles a
+frame mostly gone.
+
+**A cheaper fallback** if it doesn't hold: a table of each 4 KB page's
+newest write sequence instead of the `std::map` search (count first how
+often a write lands in a cached range's page but outside the range), and a
+flat table stamped by frame instead of the `mirrored` set.
+
+**Test results, attract races (2026-10-15).** `--native_renderer_log_physical_writes`
+(`buffers.cpp`): each memcpy into the physical views with its thread
+(main, or numbered by first write), pass number and type, caller, the
+render frame and whether a list was being replayed then, and whether the
+bytes were already the same; checked a frame later against the vertex and
+index ranges the mirror got in the frames from two before the write's to
+one after, against the replayed frame's ranges, and against the texture
+cache. Every 5 s a summary, overall and by caller and thread; each write
+changing drawn data on a render-only pass or under the replay is logged
+on its own line with the frames that drew it. Two uncapped attract races
+(40 s and 70 s, logs `itc_753`, `itc_754`):
+- ~75,000 writes a second (~250 a frame at ~300 fps, ~10-15 MB a second).
+  ~95% are from one thread (thread 3; callers `822AE900`, `825A17FC`,
+  `822B0278`, `825903B4`, `822A00AC`, `822A0060`, `8229F8D8`, `8229F88C`),
+  steadily on every pass, never into drawn ranges or textures: by its
+  steadiness most likely audio (not checked). Another thread (2; `820ED6B8`,
+  `820ED910`, `820ED920`) writes textures in bursts, on any pass.
+- **Drawn data does change on render-only passes**: 35 writes in the
+  70 s race, in 4 bursts (one pass each, e.g. pass 1785, 12761), on the
+  main thread from game code (`820E78E8`, `820E7DDC`, `820E7F5C`,
+  `820E82B0`, `820E8368`, `820E8420`, `820E84D8`, `820E8590`: in
+  `sub_820E7598`, `sub_820E7CA0`, `sub_820E8028`, see "Buffers"; all three
+  called from one function near `820E86F0`-`820E8890`; small vertex
+  ranges, 64 bytes to 26 KB, in pairs of the same size; what they hold
+  isn't known). So with the mirrors swapped only on ticks, those ranges
+  would be drawn from a mirror without them.
+- But **every one of those ranges was drawn only in the frame after the
+  write** (new data, drawn first by that pass's own list), never in the
+  frames before it; logic passes' writes into drawn ranges likewise. **No
+  write landed in a range the list being replayed reads** (0 in both
+  races). So no range was changed while a frame could be drawing it.
+- Not yet covered: a race the user drives (sections streamed as the car
+  moves).
+
+So the hypothesis's core holds in these races (nothing a frame in flight
+reads is ever written), and only its timing doesn't (new data also
+arrives on render-only passes).
+
+**The experiment (2026-10-15).** `--native_renderer_mirror_by_tick` builds
+the design above: draws read the front mirror, swapped as a logic pass's
+list starts replaying (the main thread queues each list's pass type as
+`Renderer::WaitForFrame` hands it over, `Renderer_OnListHandedOver`; the
+render thread takes one per frame, `Renderer_OnReplayStart`); memcpy's
+writes are applied at frame starts to the back mirror (free with two
+frames in flight as long as it wasn't the front in the frame before);
+inline vertices get half their region per frame slot. Draws do no
+copying. `--native_renderer_verify_mirror` is no use with it (it slows
+frames below 30, so every frame swaps), so drawn ranges are instead looked
+up in the writes the front hasn't had (exact, given memcpy is the only
+writer). 70 s attract race (`itc_756`): 150 swaps per 5 s (one a tick) in
+~1,700 frames; drawn ranges missing a write: none in logic passes' lists;
+in render-only passes' lists, exactly the loader bursts above (vertex
+ranges of 768-25856 bytes, `820E7xxx` callers), each stale for the 2
+frames left in its tick. Pictures otherwise right.
+
+`--native_renderer_mirror_to_both` (with it): the writes taken at each
+frame's start also go into the front mirror. 70 s race (`itc_757`): no
+drawn range missing a write; the write log saw 45 writes changing drawn
+data, every one drawn only in the frame after, none under the replay.
+Speed, uncapped attract races alternating (seconds 3-18): default 360 and
+358 fps, to both 372 and 366 (~+3%, near the run-to-run noise; draws
+still make the `mirrored` set's inserts and the index range work, which
+this would let go).
+
+**Draws' mirror work removed (2026-10-15, `7d62381`).** With
+`--native_renderer_mirror_by_tick` and none of the mirror's diagnostics,
+draws skip the index range (`DrawIndexRange`), the vertex sizes and
+`Mirror` (the `mirrored` set) altogether, as the mirrors need nothing from
+them; the segment map (`g_writes`) isn't kept either (only diagnostics
+and `--native_renderer_log_texture_writes` read it). With the mode,
+`--native_renderer_verify_mirror` looks each drawn range up in the writes
+the mirror hasn't had (fast; none missing over a 60 s race with
+`--native_renderer_mirror_to_both`). Render thread profiles, same build,
+alternating, `ITC_ARGS` off and on (`--native_renderer_mirror_by_tick=true
+--native_renderer_mirror_to_both=true`), Mcycles a frame: off 13.643,
+13.679, 13.622; on 11.649, 11.537, 11.722: **-14.7%** (frames drawn in the
+12 s window 4,445 against 5,113). Gone: `Buffers_NewestWrite` ~245k,
+`Mirror` ~185k, `TakePending` ~90k, `DrawIndexRange` ~70k cycles a frame,
+and the inlined set and map work. Left: `Buffers_OnCommand` ~90k a frame,
+though it returns at once without `--native_renderer_log_buffers` (worth
+a look).
+
+**A race the user drove (2026-10-15, `itc_769`)**, with both flags and
+`--native_renderer_verify_mirror`, capped at 144: ~3.5 minutes, ~140 s
+racing; no drawn range missing a write in any 5 s summary, and the
+pictures looked right to the user.
+
+Was suggested first (for the user to decide): since writes only
+land in memory no frame in flight reads, each write could be copied into
+both mirrors when memcpy makes it (on its thread), and draws would do no
+mirror work at all; no swap and no fence wait. Inline vertices would
+still need their own per-slot buffer, and the start-up catch-up copy
+stays. Its risk is the same assumption as now (vertex and index data only
+by memcpy), plus that nothing rewrites memory a frame in flight reads,
+which `--native_renderer_check_late_writes` and
+`--native_renderer_verify_mirror` would catch. Separately, thread 3's
+writes are ~95% of what `TakePending` and the segment map handle each
+frame for nothing.
+
 Checking a change: run the old code beside the new over a whole attract
 race and compare every result, as for steps 1-4 (the lighting blender:
 cherry-pick `2c82ae6` and `5942f31`, then `--check_pixel_blender=true`; the

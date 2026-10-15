@@ -12,6 +12,17 @@ namespace native {
 
 bool Renderer_Enabled();
 
+// Main thread, as a pass's command list is handed to the render thread
+// (before Renderer::WaitForFrame): whether a logic pass recorded it. Render
+// thread, as a frame's replay starts: takes the next list's. Then whether
+// the list being replayed came from a logic pass (--native_renderer_mirror_by_tick).
+void Renderer_OnListHandedOver(bool logic_pass);
+void Renderer_OnReplayStart();
+bool Renderer_ReplayingLogicList();
+// Since the last call: frames replayed with no list handed over, and the
+// most lists waiting at a frame's start.
+void Renderer_TakeListStats(uint64_t& missing, uint64_t& most);
+
 // Exclusive mode (milestone 6): the emulated GPU gets no work; see
 // gpu_link.cpp.
 bool Renderer_Exclusive();

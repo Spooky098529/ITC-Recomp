@@ -13,6 +13,8 @@
 # symbol matching the pattern (an extended regex, default
 # BlendState_ReplayConstants), its share and thousand cycles a frame. The
 # profile is kept as itc_recomp/out/profiles/<name>.data for perf report.
+# ITC_ARGS adds flags to the game's command line (e.g. to compare one build
+# with an option on and off).
 set -e
 D=$1; NAME=$2; PATTERN=${3:-BlendState_ReplayConstants}
 B=itc_recomp/out/build/linux-amd64-release; G="$PWD/itc/Import Tuner Challenge (USA)"
@@ -20,7 +22,7 @@ mkdir -p itc_recomp/out/profiles; O=itc_recomp/out/profiles/$NAME.data
 XDG_DATA_DIRS=/usr/local/share:/usr/share LD_LIBRARY_PATH=$B:rexglue-sdk/out/linux-amd64 \
   timeout 30 "$D/itc" --native_renderer=true --native_renderer_exclusive=true \
   --game_data_root="$G" --mnk_mode=true --max_fps=0 --log_fps=true --interpolate_draw_state=true \
-  --skip_intro --attract_after_s=1 > /dev/null 2>&1 &
+  --skip_intro --attract_after_s=1 $ITC_ARGS > /dev/null 2>&1 &
 sleep 14
 P=$(pgrep -n -x itc)
 T=$(ps -L -o tid=,pcpu= -p "$P" | sort -k2 -nr | head -1 | awk '{print $1}')

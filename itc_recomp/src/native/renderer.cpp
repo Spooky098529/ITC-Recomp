@@ -13,6 +13,9 @@
 #include "guest.h"
 
 #include <SDL3/SDL.h>
+#include <algorithm>
+#include <deque>
+#include <mutex>
 #include <SDL3/SDL_vulkan.h>
 #include <algorithm>
 #include <array>
@@ -57,13 +60,27 @@ REXCVAR_DEFINE_BOOL(native_renderer_log_constant_changes, false, "ITC",
 REXCVAR_DEFINE_BOOL(native_renderer_log_register_reads, false, "ITC",
                     "Log how often the device's register shadow is read a frame, how many words "
                     "are copied (those marked dirty) and what changed since the last read");
+REXCVAR_DEFINE_BOOL(native_renderer_cache_index_ranges, true, "ITC",
+                    "Keep each draw's lowest and highest index until memcpy writes its index "
+                    "range, instead of scanning the indices every draw");
+REXCVAR_DEFINE_BOOL(native_renderer_log_index_ranges, false, "ITC",
+                    "Log how often draws' index ranges are scanned again unchanged since memcpy "
+                    "last wrote them, and how the guest memory mirror's checks go");
 REXCVAR_DEFINE_BOOL(native_renderer_copy_all, false, "ITC",
                     "Copy every vertex and index range into the mirror every frame, not only "
                     "those the library's memcpy wrote since (a debugging aid)");
+REXCVAR_DEFINE_BOOL(native_renderer_mirror_by_tick, false, "ITC",
+                    "Draws read a guest memory mirror updated only as a logic pass's list starts "
+                    "replaying, the two mirrors alternating (an experiment; see 'Hypothesis to "
+                    "test: the mirrors updated once a tick' in docs/native-renderer.md)");
+REXCVAR_DEFINE_BOOL(native_renderer_mirror_to_both, false, "ITC",
+                    "With --native_renderer_mirror_by_tick: memcpy's writes go into both mirrors "
+                    "at each frame's start, the one draws read included (an experiment)");
 REXCVAR_DEFINE_BOOL(native_renderer_verify_mirror, false, "ITC",
                     "Compare each vertex and index range not copied into the mirror with guest "
                     "memory every frame, logging those that differ (a debugging aid; slow, ~20 "
-                    "fps in a race)");
+                    "fps in a race). With --native_renderer_mirror_by_tick: each drawn range "
+                    "looked up in the writes the mirror hasn't had instead (fast)");
 REXCVAR_DEFINE_BOOL(native_renderer_watch_draws, false, "ITC",
                     "Log what changes in the main view's draws' inputs between frames: with the "
                     "camera still, only flickering draws should (a debugging aid)");
@@ -521,8 +538,13 @@ void Renderer::DestroySwapchain() {
 }
 
 bool Renderer::Init(uint8_t* base) {
-  return CreateWindowAndInstance() && CreateDevice() && CreateSwapchain() &&
-         passes_.Init(context_, base, kFramesInFlight);
+  if (!CreateWindowAndInstance() || !CreateDevice() || !CreateSwapchain() ||
+      !passes_.Init(context_, base, kFramesInFlight)) {
+    return false;
+  }
+  passes_.set_mirror_by_tick(REXCVAR_GET(native_renderer_mirror_by_tick));
+  passes_.set_mirror_to_both(REXCVAR_GET(native_renderer_mirror_to_both));
+  return true;
 }
 
 void Renderer::OnCommand(uint32_t id, uint32_t arg1) {
@@ -599,6 +621,8 @@ VkCommandBuffer Renderer::BeginFrame() {
     passes_.set_reuse_constants(REXCVAR_GET(native_renderer_reuse_constants));
     passes_.set_log_constant_changes(REXCVAR_GET(native_renderer_log_constant_changes));
     passes_.set_log_register_reads(REXCVAR_GET(native_renderer_log_register_reads));
+    passes_.set_log_index_ranges(REXCVAR_GET(native_renderer_log_index_ranges));
+    passes_.set_cache_index_ranges(REXCVAR_GET(native_renderer_cache_index_ranges));
     passes_.set_verify_mirror(REXCVAR_GET(native_renderer_verify_mirror));
     passes_.set_check_late_writes(REXCVAR_GET(native_renderer_check_late_writes));
     passes_.set_check_clobbers(REXCVAR_GET(native_renderer_check_clobbers));
@@ -844,6 +868,13 @@ void Renderer::LogStats() {
     }
     REXLOG_INFO("native renderer: failed draws a frame by reason:{}", reasons);
   }
+  if (std::string by_tick = passes_.TakeMirrorByTick(); !by_tick.empty()) {
+    uint64_t missing, most;
+    Renderer_TakeListStats(missing, most);
+    REXLOG_INFO("native renderer: mirror by tick: {}; lists replayed without a hand-over {}, "
+                "most waiting {}",
+                by_tick, missing, most);
+  }
   if (REXCVAR_GET(native_renderer_verify_mirror)) {
     REXLOG_INFO("native renderer: mirror check: of {} ranges not copied and checked, {} "
                 "differed from guest memory ({:.1f} MB){}",
@@ -1002,6 +1033,9 @@ void Renderer::LogStats() {
   if (REXCVAR_GET(native_renderer_check_mirror)) {
     REXLOG_INFO("native renderer: between frames, {}", passes_.TakeMirrorChanges());
   }
+  if (REXCVAR_GET(native_renderer_log_index_ranges)) {
+    REXLOG_INFO("native renderer: {}", passes_.TakeIndexRanges());
+  }
   if (view.invisible) {
     const auto& v = view.invisible_sample;
     REXLOG_INFO("native renderer: {:.0f} draws a frame skipped as invisible, e.g. "
@@ -1093,6 +1127,45 @@ void Renderer_FrontBufferResolve(uint8_t* base, uint32_t device, uint32_t front_
   if (Renderer* renderer = GetRenderer()) {
     renderer->FrontBufferResolve(base, device, front_buffer);
   }
+}
+
+namespace {
+// Lists handed over and not yet replayed: whether a logic pass recorded
+// each (any thread, under g_lists_mutex); and the one being replayed
+// (render thread).
+std::mutex g_lists_mutex;
+std::deque<bool> g_lists;
+bool g_replaying_logic_list = true;
+uint64_t g_lists_missing = 0, g_lists_queued_most = 0;
+}  // namespace
+
+void Renderer_OnListHandedOver(bool logic_pass) {
+  std::lock_guard lock(g_lists_mutex);
+  g_lists.push_back(logic_pass);
+}
+
+void Renderer_OnReplayStart() {
+  std::lock_guard lock(g_lists_mutex);
+  g_lists_queued_most = std::max<uint64_t>(g_lists_queued_most, g_lists.size());
+  if (g_lists.empty()) {
+    // Not handed over by WaitForFrame: taken as a logic pass's.
+    g_lists_missing++;
+    g_replaying_logic_list = true;
+    return;
+  }
+  g_replaying_logic_list = g_lists.front();
+  g_lists.pop_front();
+}
+
+bool Renderer_ReplayingLogicList() {
+  return g_replaying_logic_list;
+}
+
+void Renderer_TakeListStats(uint64_t& missing, uint64_t& most) {
+  std::lock_guard lock(g_lists_mutex);
+  missing = g_lists_missing;
+  most = g_lists_queued_most;
+  g_lists_missing = g_lists_queued_most = 0;
 }
 
 void Renderer_EndFrame() {

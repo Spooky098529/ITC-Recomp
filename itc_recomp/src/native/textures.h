@@ -58,6 +58,9 @@ class TextureCache {
     bool fresh;
   };
   bool GetResolveDestination(const uint32_t fetch[6], ResolveDestination& out);
+
+  // Diagnostics: whether [start, end) (physical) overlaps a texture held.
+  bool Holds(uint32_t start, uint32_t end) const;
   // A debugging aid: the texture's first level (first layer) decoded from
   // guest memory into the host format's bytes, uncompressed formats only.
   // With --readback_resolve=full, a resolve destination's memory holds what

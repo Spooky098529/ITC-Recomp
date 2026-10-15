@@ -10,6 +10,7 @@
 
 #include "buffers.h"
 #include "guest.h"
+#include "renderer.h"
 #include "shaders.h"
 #include "state.h"
 
@@ -462,6 +463,61 @@ std::pair<uint32_t, uint32_t> IndexRange(const uint8_t* data, uint32_t count, bo
   }
 }
 
+// Draws' index ranges (IndexRange's result) by address, count and format,
+// so a range drawn again needn't be scanned: index data is written by the
+// library's memcpy and nothing else (measured with
+// --native_renderer_log_index_ranges), so a result holds while
+// Buffers_NewestWrite says the range wasn't written since its scan. That's
+// asked once a frame per range (as the mirror does), and the ~60% of draws
+// repeating a range already drawn this frame only look it up. An
+// open-addressed table (a multiply and a probe), emptied when it fills.
+class IndexRangeCache {
+ public:
+  struct Entry {
+    uint64_t key;  // see Key; 0 for an empty slot
+    uint64_t sequence;  // Buffers_Sequence when scanned
+    uint64_t frame;     // the frame it was last found unwritten in
+    uint32_t low, high;
+  };
+
+  static uint64_t Key(uint32_t address, uint32_t count, bool index_32bit, uint32_t endian,
+                      bool skip_restart) {
+    // A draw's count is far below 2^28, leaving room for the format; the
+    // address is a physical one (below 2^29), so a key is never 0.
+    return (uint64_t(address | 0x80000000u) << 32) | (count & 0x0FFFFFFFu) |
+           (uint64_t(index_32bit) << 28) | (uint64_t(endian & 3) << 29) |
+           (uint64_t(skip_restart) << 31);
+  }
+
+  // The entry for `key`, or an empty slot to fill (its key 0).
+  Entry& Find(uint64_t key) {
+    if (size_ * 2 >= slots_.size()) {
+      Reset(slots_.size() < kMaxSlots ? slots_.size() * 2 : slots_.size());
+    }
+    size_t mask = slots_.size() - 1;
+    size_t i = (key * 0x9E3779B97F4A7C15ull) >> shift_;
+    while (slots_[i].key && slots_[i].key != key) {
+      i = (i + 1) & mask;
+    }
+    return slots_[i];
+  }
+
+  // After filling the slot Find returned.
+  void Added() { size_++; }
+
+ private:
+  static constexpr size_t kMaxSlots = size_t(1) << 16;
+  void Reset(size_t slots) {
+    slots = std::max<size_t>(slots, 4096);
+    shift_ = 64 - std::countr_zero(slots);
+    slots_.assign(slots, Entry{});
+    size_ = 0;
+  }
+  std::vector<Entry> slots_;
+  size_t size_ = 0;
+  uint32_t shift_ = 64;
+};
+
 }  // namespace
 
 struct Passes::State {
@@ -485,6 +541,39 @@ struct Passes::State {
     std::unordered_map<uint64_t, uint64_t> copied;
   };
   std::vector<GuestMirror> mirrors;
+  // With mirror_by_tick (two mirrors; "Hypothesis to test: the mirrors
+  // updated once a tick" in docs/native-renderer.md): draws read the front
+  // mirror, swapped only as a logic pass's list starts replaying; memcpy's
+  // writes are applied at frame starts to the other mirror, which no frame
+  // in flight reads, and each mirror keeps the writes it hasn't had yet.
+  // Inline vertices get a part of their region per frame slot.
+  bool mirror_by_tick = false, mirror_to_both = false;
+  uint8_t* guest_base = nullptr;
+  uint32_t front_mirror = 0;
+  std::vector<std::pair<uint32_t, uint32_t>> mirror_pending[2], mirror_taken;
+  // The writes the front mirror hasn't had, sorted by start, to count drawn
+  // ranges it's missing data of (memcpy being the only writer).
+  std::vector<std::pair<uint32_t, uint32_t>> front_missing;
+  uint32_t front_missing_longest = 0;
+  struct MirrorByTickStats {
+    uint64_t frames = 0, swaps = 0, writes = 0, bytes = 0;
+    uint64_t stale[2] = {}, stale_bytes[2] = {};  // [render-only list]
+    uint64_t stale_lines = 200;
+  } by_tick;
+  // The mirror this frame's draws read.
+  GuestMirror& draw_mirror() { return mirrors[mirror_by_tick ? front_mirror : frame]; }
+  // Whether draws work out their vertex and index ranges and pass them to
+  // Mirror: always, except with mirror_by_tick and none of the mirror's
+  // diagnostics (then the mirror needs nothing from draws).
+  bool MirrorPerDraw() const {
+    return !mirror_by_tick || check_mirror || check_mirror_frames || check_late_writes ||
+           check_clobbers || verify_mirror || log_index_ranges ||
+           Buffers_Logging() || Buffers_LogPhysicalWrites();
+  }
+  uint32_t inline_slot_size() const {
+    return mirror_by_tick ? kInlineVerticesSize / frames_in_flight : kInlineVerticesSize;
+  }
+  void MirrorByTickFrameStart(uint8_t* base);
   std::unordered_set<uint64_t> mirrored;  // address << 32 | size, this frame
   uint32_t inline_offset = 0;  // this frame's inline vertices so far
   // With check_mirror: each range's hash when copied, to find ranges whose
@@ -602,6 +691,38 @@ struct Passes::State {
   uint64_t mirror_frames = 0, mirror_changed_bytes = 0, mirror_new_bytes = 0,
            mirror_vertex_bytes = 0, used_vertex_bytes = 0;
   std::unordered_set<uint64_t> used_mirrored;
+  IndexRangeCache index_cache;
+  bool cache_index_ranges = true;
+  // IndexRange's result for the draw's indices, from index_cache when it
+  // holds.
+  // What DrawIndexRange learned from Buffers_NewestWrite for the draw's
+  // index range (kNewestUnknown if it didn't ask), for Mirror.
+  uint64_t draw_index_newest = kNewestUnknown;
+  std::pair<uint32_t, uint32_t> DrawIndexRange(uint8_t* base, uint32_t address, uint32_t count,
+                                               bool index_32bit, uint32_t endian,
+                                               bool skip_restart);
+  // With log_index_ranges: each draw's index range (address, count and
+  // format) as last scanned, to see how often a scan could be reused (the
+  // range not written by memcpy since) and whether the reused result would
+  // be the same; and how often the mirror's question to Buffers_NewestWrite
+  // comes with no write taken since the range was copied.
+  bool log_index_ranges = false;
+  struct IndexRangeSeen {
+    uint64_t sequence;  // Buffers_Sequence when scanned
+    uint32_t low, high;
+    uint64_t frame;  // mirror_frames when last seen
+  };
+  std::unordered_map<uint64_t, IndexRangeSeen> index_ranges_seen;
+  struct IndexRangeCounts {
+    uint64_t frames = 0, scans = 0, indices = 0, first = 0, same_frame = 0, written = 0,
+             unchanged = 0, unchanged_indices = 0, mismatched = 0, distinct = 0,
+             mirror_calls = 0, mirror_repeats = 0, newest_asked = 0, nothing_taken = 0,
+             writes = 0;
+    uint64_t frame_sequence = 0;  // Buffers_Sequence at the frame's start
+    uint32_t mismatch_sample[6] = {};  // address, count, cached low/high, scanned low/high
+  } index_range_counts;
+  void CountIndexRange(uint32_t address, uint32_t count, bool index_32bit, uint32_t endian,
+                       bool skip_restart, uint32_t low, uint32_t high);
   // Debugging aids: draws of this pixel shader (hash) are skipped; with
   // record_draws, each draw is described in a line (written with a dump).
   uint64_t skip_pixel_shader = 0;
@@ -823,7 +944,11 @@ struct Passes::State {
   void EndRendering(VkCommandBuffer commands);
   bool CreateGuestMemoryMirror();
   bool CreateGuestMemoryMirror(GuestMirror& mirror);
-  void Mirror(uint8_t* base, uint32_t address, uint32_t size, bool index);
+  // `newest`: Buffers_NewestWrite's answer for exactly this range if the
+  // caller has just asked it (kNewestUnknown otherwise), to not ask twice.
+  static constexpr uint64_t kNewestUnknown = ~uint64_t(0);
+  void Mirror(uint8_t* base, uint32_t address, uint32_t size, bool index,
+              uint64_t newest = kNewestUnknown);
   void CheckClobbers(uint8_t* base, uint32_t address, uint32_t size, bool index);
   bool CreateRings();
   bool CreateConstantBlock(Ring& ring);
@@ -945,11 +1070,15 @@ bool Passes::State::CreateGuestMemoryMirror(GuestMirror& mirror) {
   return true;
 }
 
-void Passes::State::Mirror(uint8_t* base, uint32_t address, uint32_t size, bool index) {
+void Passes::State::Mirror(uint8_t* base, uint32_t address, uint32_t size, bool index,
+                           uint64_t newest) {
   if (!size || address >= kPhysicalMemorySize) {
     return;
   }
-  size = std::min(size, kPhysicalMemorySize - address);
+  if (size > kPhysicalMemorySize - address) {
+    size = kPhysicalMemorySize - address;
+    newest = kNewestUnknown;  // asked of a larger range
+  }
   uint64_t key = (uint64_t(address) << 32) | size;
   if (check_mirror) {
     uint64_t hash = XXH3_64bits(PhysicalHostAddress(base, address), size);
@@ -964,11 +1093,20 @@ void Passes::State::Mirror(uint8_t* base, uint32_t address, uint32_t size, bool 
       }
     }
   }
+  if (log_index_ranges) {
+    index_range_counts.mirror_calls++;
+  }
   if (!mirrored.insert(key).second) {
+    if (log_index_ranges) {
+      index_range_counts.mirror_repeats++;
+    }
     return;  // already copied this frame
   }
   if (Buffers_Logging()) {
     Buffers_OnMirror(address, size, index);
+  }
+  if (Buffers_LogPhysicalWrites()) {
+    Buffers_OnDrawnRange(address, size, index);
   }
   if (check_late_writes) {
     // Hashed again at the end of the frame.
@@ -992,13 +1130,56 @@ void Passes::State::Mirror(uint8_t* base, uint32_t address, uint32_t size, bool 
       mirror_vertex_bytes += size;
     }
   }
+  if (mirror_by_tick) {
+    // The mirror has memcpy's writes as of the last logic pass's list (or,
+    // with mirror_to_both, as of this frame's start). With verify_mirror,
+    // the drawn ranges it misses a write of (memcpy being the only writer;
+    // comparing with guest memory slows frames below the tick).
+    if (!verify_mirror) {
+      return;
+    }
+    stats.mirror_checked++;
+    uint32_t end = address + size;
+    auto it = std::lower_bound(
+        front_missing.begin(), front_missing.end(),
+        std::make_pair(address > front_missing_longest ? address - front_missing_longest : 0, 0u));
+    for (; it != front_missing.end() && it->first < end; ++it) {
+      if (it->second <= address) {
+        continue;
+      }
+      bool render_only = !Renderer_ReplayingLogicList();
+      by_tick.stale[render_only]++;
+      by_tick.stale_bytes[render_only] += size;
+      stats.mirror_stale++;
+      stats.mirror_stale_bytes += size;
+      if (by_tick.stale_lines) {
+        by_tick.stale_lines--;
+        REXLOG_INFO("native renderer: mirror by tick: frame {}, {} list: {} range {:08X} ({} "
+                    "bytes) misses a write to {:08X}-{:08X}",
+                    by_tick.frames, render_only ? "a render-only pass's" : "a logic pass's",
+                    index ? "index" : "vertex", address, size, it->first, it->second);
+      }
+      break;
+    }
+    return;
+  }
   // Only what memcpy has written since this mirror last got the range (see
   // "Buffers" in docs/native-renderer.md): vertex and index data is
   // written by the library's memcpy and nothing else.
   GuestMirror& mirror = mirrors[frame];
   if (!copy_all) {
     auto [it, added] = mirror.copied.try_emplace(key, 0);
-    if (!added && Buffers_NewestWrite(address, size) <= it->second) {
+    if (log_index_ranges && !added) {
+      // No write taken since the copy (Buffers_NewestWrite takes the
+      // pending ones): the answer is known without the lookup.
+      index_range_counts.newest_asked++;
+      Buffers_NewestWrite(address, size);
+      if (Buffers_Sequence() == it->second) {
+        index_range_counts.nothing_taken++;
+      }
+    }
+    if (!added && (newest != kNewestUnknown ? newest : Buffers_NewestWrite(address, size)) <=
+                      it->second) {
       stats.mirror_skipped_bytes += size;
       // Slow (the mirror is uncached memory: ~20 fps in a race), but
       // checks every range every frame.
@@ -1021,6 +1202,122 @@ void Passes::State::Mirror(uint8_t* base, uint32_t address, uint32_t size, bool 
   stats.mirrored_bytes += size;
 }
 
+void Passes::State::MirrorByTickFrameStart(uint8_t* base) {
+  by_tick.frames++;
+  mirror_taken.clear();
+  Buffers_TakeMirrorWrites(mirror_taken);
+  for (auto& pending : mirror_pending) {
+    pending.insert(pending.end(), mirror_taken.begin(), mirror_taken.end());
+  }
+  // The back mirror: no frame in flight reads it. It was last read by the
+  // frame before it stopped being the front, which, with two frames in
+  // flight, is done by now (this frame slot's fence has been waited on) as
+  // long as the front changed in an earlier frame than this one.
+  uint32_t back = front_mirror ^ 1;
+  auto apply = [&](uint32_t m) {
+    for (auto [start, end] : mirror_pending[m]) {
+      end = std::min(end, kPhysicalMemorySize);
+      if (start < end) {
+        std::memcpy(mirrors[m].mapped + start, PhysicalHostAddress(base, start), end - start);
+        by_tick.writes++;
+        by_tick.bytes += end - start;
+      }
+    }
+    mirror_pending[m].clear();
+  };
+  apply(back);
+  // With mirror_to_both, the front too: frames in flight read it, but no
+  // write has been seen landing in data a frame drew around it
+  // (--native_renderer_log_physical_writes).
+  if (mirror_to_both) {
+    apply(front_mirror);
+  }
+  if (Renderer_ReplayingLogicList()) {
+    front_mirror = back;
+    by_tick.swaps++;
+  }
+  front_missing.clear();
+  front_missing_longest = 0;
+  for (auto [start, end] : verify_mirror ? mirror_pending[front_mirror]
+                                          : std::vector<std::pair<uint32_t, uint32_t>>{}) {
+    end = std::min(end, kPhysicalMemorySize);
+    if (start < end) {
+      front_missing.emplace_back(start, end);
+      front_missing_longest = std::max(front_missing_longest, end - start);
+    }
+  }
+  std::sort(front_missing.begin(), front_missing.end());
+}
+
+std::pair<uint32_t, uint32_t> Passes::State::DrawIndexRange(uint8_t* base, uint32_t address,
+                                                            uint32_t count, bool index_32bit,
+                                                            uint32_t endian, bool skip_restart) {
+  if (!cache_index_ranges) {
+    return IndexRange(PhysicalHostAddress(base, address), count, index_32bit, endian,
+                      skip_restart);
+  }
+  uint64_t key = IndexRangeCache::Key(address, count, index_32bit, endian, skip_restart);
+  IndexRangeCache::Entry& entry = index_cache.Find(key);
+  std::pair<uint32_t, uint32_t> range;
+  if (entry.key && entry.frame != mirror_frames) {
+    draw_index_newest = Buffers_NewestWrite(address, count * (index_32bit ? 4 : 2));
+  }
+  if (entry.key && (entry.frame == mirror_frames || draw_index_newest <= entry.sequence)) {
+    entry.frame = mirror_frames;
+    range = {entry.low, entry.high};
+    return range;
+  }
+  // Writes not yet taken get later sequences, so the entry is scanned again
+  // once they are.
+  uint64_t sequence = Buffers_Sequence();
+  range = IndexRange(PhysicalHostAddress(base, address), count, index_32bit, endian,
+                     skip_restart);
+  if (!entry.key) {
+    index_cache.Added();
+  }
+  entry = {key, sequence, mirror_frames, range.first, range.second};
+  return range;
+}
+
+void Passes::State::CountIndexRange(uint32_t address, uint32_t count, bool index_32bit,
+                                    uint32_t endian, bool skip_restart, uint32_t low,
+                                    uint32_t high) {
+  IndexRangeCounts& c = index_range_counts;
+  c.scans++;
+  c.indices += count;
+  // A draw's count is far below 2^28, leaving room for the format.
+  uint64_t key = (uint64_t(address) << 32) | (count & 0x0FFFFFFFu) |
+                 (uint64_t(index_32bit) << 28) | (uint64_t(endian & 3) << 29) |
+                 (uint64_t(skip_restart) << 31);
+  uint64_t newest = Buffers_NewestWrite(address, count * (index_32bit ? 4 : 2));
+  auto [it, added] = index_ranges_seen.try_emplace(
+      key, IndexRangeSeen{Buffers_Sequence(), low, high, mirror_frames});
+  if (added) {
+    c.first++;
+    c.distinct++;
+    return;
+  }
+  IndexRangeSeen& seen = it->second;
+  if (seen.frame == mirror_frames) {
+    c.same_frame++;
+  } else {
+    c.distinct++;
+  }
+  if (newest > seen.sequence) {
+    c.written++;
+  } else {
+    c.unchanged++;
+    c.unchanged_indices += count;
+    if (seen.low != low || seen.high != high) {
+      if (!c.mismatched++) {
+        uint32_t sample[] = {address, count, seen.low, seen.high, low, high};
+        std::copy(std::begin(sample), std::end(sample), c.mismatch_sample);
+      }
+    }
+  }
+  seen = IndexRangeSeen{Buffers_Sequence(), low, high, mirror_frames};
+}
+
 void Passes::State::CheckClobbers(uint8_t* base, uint32_t address, uint32_t size, bool index) {
   // Earlier ranges overlapping this one: the mirror holds what their draws
   // copied (the last copy of each byte); bytes differing from guest memory
@@ -1028,7 +1325,7 @@ void Passes::State::CheckClobbers(uint8_t* base, uint32_t address, uint32_t size
   clobber_copies++;
   uint32_t end = address + size;
   uint32_t from = address > clobber_longest ? address - clobber_longest : 0;
-  const uint8_t* mirror = mirrors[frame].mapped;
+  const uint8_t* mirror = draw_mirror().mapped;
   const uint8_t* guest = PhysicalHostAddress(base, 0);
   for (auto it = clobber_ranges.lower_bound(from);
        it != clobber_ranges.end() && it->first < end; ++it) {
@@ -2005,6 +2302,7 @@ Passes::~Passes() = default;
 bool Passes::Init(const DeviceContext& context, uint8_t* base, uint32_t frames_in_flight) {
   State& s = *state_;
   s.context = context;
+  s.guest_base = base;
   s.frames_in_flight = frames_in_flight;
   const std::string& log_level = REXCVAR_GET(log_level);
   s.collect_interfaces = log_level == "trace" || log_level == "debug" || log_level == "info";
@@ -2126,6 +2424,22 @@ void Passes::BeginFrame(uint32_t frame_index) {
   s.mirrored.clear();
   s.used_mirrored.clear();
   s.mirror_frames++;
+  if (s.mirror_by_tick) {
+    Buffers_KeepSegments(s.MirrorPerDraw());
+    s.MirrorByTickFrameStart(s.guest_base);
+  }
+  if (Buffers_LogPhysicalWrites()) {
+    Buffers_OnFrameStart([&s](uint32_t start, uint32_t end) { return s.textures.Holds(start, end); });
+  }
+  if (s.log_index_ranges) {
+    // Writes taken since the last frame's start (memcpy's, into the
+    // physical views).
+    Buffers_NewestWrite(0, 0);
+    State::IndexRangeCounts& c = s.index_range_counts;
+    c.frames++;
+    c.writes += Buffers_Sequence() - c.frame_sequence;
+    c.frame_sequence = Buffers_Sequence();
+  }
   s.inline_offset = 0;
   s.mirrored_hashes.clear();
   s.clobber_ranges.clear();
@@ -2403,14 +2717,20 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
   }
 
   uint32_t max_vertex = 0, min_vertex = UINT32_MAX;
+  s.draw_index_newest = State::kNewestUnknown;
   if (call.inline_vertices) {
     min_vertex = 0;
     max_vertex = call.vertex_count - 1;
   }
-  if (!call.inline_vertices && index_count) {
+  bool mirror_per_draw = s.MirrorPerDraw();
+  if (!call.inline_vertices && index_count && mirror_per_draw) {
     bool skip_restart = primitive.strip && regs.Get<reg::PA_SU_SC_MODE_CNTL>().multi_prim_ib_ena;
-    auto [low, high] = IndexRange(PhysicalHostAddress(base, index_address), index_count,
-                                  index_32bit, index_endian, skip_restart);
+    auto [low, high] = s.DrawIndexRange(base, index_address, index_count, index_32bit,
+                                        index_endian, skip_restart);
+    if (s.log_index_ranges) {
+      s.CountIndexRange(index_address, index_count, index_32bit, index_endian, skip_restart, low,
+                        high);
+    }
     if (low <= high) {
       // After the base vertex, as the GPU reads them. Adding it to the
       // extremes keeps their order unless the sum wraps (a negative base
@@ -2667,13 +2987,14 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
   // draw's vertices are there already). A vertex fetch constant is two
   // words: the address (word 0, low 2 bits the type) and the size in words
   // (word 1, bits 2-25).
-  if (!call.inline_vertices) {
-    s.Mirror(base, index_address, index_count * (index_32bit ? 4 : 2), true);
+  if (!call.inline_vertices && mirror_per_draw) {
+    s.Mirror(base, index_address, index_count * (index_32bit ? 4 : 2), true,
+             s.draw_index_newest);
   }
   // The highest vertex the draw uses (indices as the GPU reads them, after
   // the base vertex): a vertex buffer is copied up to it even past the size
   // its fetch constant gives, as the GPU reads whatever is there.
-  for (uint32_t k = 0; k < 96 && !call.inline_vertices; k++) {
+  for (uint32_t k = 0; k < 96 && !call.inline_vertices && mirror_per_draw; k++) {
     if (!(vertex->vertex_fetch_constants[k >> 5] & (1u << (k & 31)))) {
       continue;
     }
@@ -2747,7 +3068,7 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
   // RB_BLEND_RED/GREEN/BLUE/ALPHA, for the constant blend factors.
   float blend_constants[4];
   std::memcpy(blend_constants, &regs.values[0x2105], sizeof(blend_constants));
-  VkDescriptorSet sets[4] = {s.mirrors[s.frame].set, s.constant_block().set,
+  VkDescriptorSet sets[4] = {s.draw_mirror().set, s.constant_block().set,
                              vertex_textures, pixel_textures};
 
   // The state this draw needs. Indexed draws bind the mirror at offset 0
@@ -2765,7 +3086,7 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
   std::memcpy(now.sets, sets, sizeof(sets));
   std::memcpy(now.offsets, offsets, sizeof(offsets));
   now.indexed = rectangle_list || quad_list || !call.inline_vertices;
-  now.index_buffer = s.mirrors[s.frame].buffer;
+  now.index_buffer = s.draw_mirror().buffer;
   now.index_type = rectangle_list || quad_list || index_32bit ? VK_INDEX_TYPE_UINT32
                                                               : VK_INDEX_TYPE_UINT16;
   uint32_t index_bytes = now.index_type == VK_INDEX_TYPE_UINT32 ? 4 : 2;
@@ -3024,7 +3345,7 @@ void Passes::State::DrawIds(VkCommandBuffer commands) {
     vk::vkCmdBindDescriptorSets(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, layout, 0, 4,
                                 draw.sets, 5, draw.offsets);
     vk::vkCmdPushConstants(commands, layout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, 4, &draw.number);
-    vk::vkCmdBindIndexBuffer(commands, mirrors[frame].buffer, draw.index_offset, draw.index_type);
+    vk::vkCmdBindIndexBuffer(commands, draw_mirror().buffer, draw.index_offset, draw.index_type);
     vk::vkCmdDrawIndexed(commands, draw.index_count, 1, 0, 0, 0);
   }
   vk::vkCmdEndRendering(commands);
@@ -3059,7 +3380,7 @@ void Passes::InlineDraw(VkCommandBuffer commands, uint8_t* base, uint32_t type, 
   State& s = *state_;
   uint32_t size = count * stride;
   uint32_t offset = (s.inline_offset + 15) & ~15u;
-  if (!count || !stride || offset + size > kInlineVerticesSize) {
+  if (!count || !stride || offset + size > s.inline_slot_size()) {
     s.stats.failed++;
     s.stats.failed_by[7]++;
     return;
@@ -3069,8 +3390,9 @@ void Passes::InlineDraw(VkCommandBuffer commands, uint8_t* base, uint32_t type, 
   call.type = type;
   call.inline_vertices = true;
   call.vertex_count = count;
-  call.vertex_address = kInlineVertices + offset;
-  std::memcpy(s.mirrors[s.frame].mapped + call.vertex_address, base + data, size);
+  call.vertex_address =
+      kInlineVertices + (s.mirror_by_tick ? s.frame * s.inline_slot_size() : 0) + offset;
+  std::memcpy(s.draw_mirror().mapped + call.vertex_address, base + data, size);
   s.stats.mirrored_bytes += size;
   uint32_t device = guest::LoadU32(base, kDevicePointer);
   s.ReadState(base, device);
@@ -3347,8 +3669,78 @@ void Passes::set_log_register_reads(bool log) {
   state_->log_register_reads = log;
 }
 
+void Passes::set_cache_index_ranges(bool cache) {
+  state_->cache_index_ranges = cache;
+}
+
+void Passes::set_log_index_ranges(bool log) {
+  state_->log_index_ranges = log;
+}
+
+std::string Passes::TakeIndexRanges() {
+  State::IndexRangeCounts& c = state_->index_range_counts;
+  double frames = double(std::max<uint64_t>(c.frames, 1));
+  double scans = double(std::max<uint64_t>(c.scans, 1));
+  double asked = double(std::max<uint64_t>(c.newest_asked, 1));
+  std::string text = fmt::format(
+      "index ranges: {:.1f} scans a frame ({:.0f} indices), {:.1f} distinct; of the scans, "
+      "first seen {:.1f}%, seen earlier this frame {:.1f}%, written by memcpy since last "
+      "scanned {:.1f}%, unchanged {:.1f}% ({:.0f} indices a frame), unchanged with another "
+      "result {}; memcpy writes taken {:.1f} a frame; mirror: {:.1f} calls a frame, {:.1f}% "
+      "already copied this frame, {:.1f} asked whether written, {:.1f}% of those with no "
+      "write taken since the copy; {} ranges known",
+      c.scans / frames, c.indices / frames, c.distinct / frames, 100.0 * c.first / scans,
+      100.0 * c.same_frame / scans, 100.0 * c.written / scans, 100.0 * c.unchanged / scans,
+      c.unchanged_indices / frames, c.mismatched, c.writes / frames, c.mirror_calls / frames,
+      100.0 * c.mirror_repeats / double(std::max<uint64_t>(c.mirror_calls, 1)),
+      c.newest_asked / frames, 100.0 * c.nothing_taken / asked,
+      state_->index_ranges_seen.size());
+  if (c.mismatched) {
+    const uint32_t* m = c.mismatch_sample;
+    text += fmt::format(" (e.g. {:08X} x{}: {}-{} kept, {}-{} scanned)", m[0], m[1], m[2], m[3],
+                        m[4], m[5]);
+  }
+  uint64_t frame_sequence = c.frame_sequence;
+  c = {};
+  c.frame_sequence = frame_sequence;
+  return text;
+}
+
 void Passes::set_copy_all(bool copy_all) {
   state_->copy_all = copy_all;
+}
+
+void Passes::set_mirror_to_both(bool to_both) {
+  state_->mirror_to_both = to_both;
+}
+
+void Passes::set_mirror_by_tick(bool by_tick) {
+  State& s = *state_;
+  if (by_tick && s.mirrors.size() != 2) {
+    REXLOG_WARN("native renderer: mirror by tick needs two mirrors, not {}: off",
+                s.mirrors.size());
+    return;
+  }
+  s.mirror_by_tick = by_tick;
+  if (by_tick) {
+    Buffers_CollectMirrorWrites();
+  }
+}
+
+std::string Passes::TakeMirrorByTick() {
+  State& s = *state_;
+  if (!s.mirror_by_tick) {
+    return {};
+  }
+  State::MirrorByTickStats& b = s.by_tick;
+  std::string text = fmt::format(
+      "{} frames, {} swaps; {} writes applied ({:.1f} MB); drawn ranges missing a write: {} in "
+      "logic passes' lists ({:.2f} MB), {} in render-only passes' ({:.2f} MB)",
+      b.frames, b.swaps, b.writes, b.bytes / 1048576.0, b.stale[0], b.stale_bytes[0] / 1048576.0,
+      b.stale[1], b.stale_bytes[1] / 1048576.0);
+  b.frames = b.swaps = b.writes = b.bytes = 0;
+  b.stale[0] = b.stale[1] = b.stale_bytes[0] = b.stale_bytes[1] = 0;
+  return text;
 }
 
 void Passes::set_verify_mirror(bool verify) {
@@ -3614,6 +4006,9 @@ VkExtent2D Passes::EndFrame(VkCommandBuffer commands, int32_t show_resolve, bool
                             const std::string& dump_prefix, bool dump_resolves) {
   State& s = *state_;
   s.EndRendering(commands);
+  if (Buffers_LogPhysicalWrites()) {
+    Buffers_OnFrameEnd();
+  }
   s.last_frame_resolves = s.frame_resolves.size();
   if (s.check_late_writes && s.last_base) {
     uint8_t* base = s.last_base;

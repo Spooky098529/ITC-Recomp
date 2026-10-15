@@ -94,6 +94,22 @@ class Passes {
   // offset_differs; a diagnostic, off by default).
   void set_log_constant_changes(bool log);
   void set_log_register_reads(bool log);
+  // A diagnostic: how often each draw's index range is scanned again
+  // unchanged, and how the mirror's checks go; TakeIndexRanges describes
+  // them since it was last called.
+  // Keep draws' index ranges' lowest and highest index until memcpy writes
+  // them (on by default).
+  void set_cache_index_ranges(bool cache);
+  void set_log_index_ranges(bool log);
+  std::string TakeIndexRanges();
+  // Fixed at start (--native_renderer_mirror_by_tick): draws read a mirror
+  // updated only as a logic pass's list starts replaying (an experiment);
+  // TakeMirrorByTick describes it since it was last called.
+  void set_mirror_by_tick(bool by_tick);
+  // With it (--native_renderer_mirror_to_both): memcpy's writes also go into
+  // the front mirror at each frame's start.
+  void set_mirror_to_both(bool to_both);
+  std::string TakeMirrorByTick();
   void set_verify_mirror(bool verify);
   // A debugging aid: hash each copied vertex and index range again at the
   // end of the frame; TakeLateWrites describes those that changed.
