@@ -181,9 +181,11 @@ Not done yet:
   (`--native_renderer_mirror_by_tick` and `--native_renderer_mirror_to_both`,
   off by default, on in `run.sh`): -14.7% render thread cycles a frame,
   checked in attract races and a race the user drove ("Hypothesis to test:
-  the mirrors updated once a tick" and what follows it). Still to decide:
-  `Buffers_OnCommand`'s ~90k cycles a frame with its log off (perf's
-  attribution there looks wrong), the old per-draw path's future,
-  and a Steam Deck test.
+  the mirrors updated once a tick" and what follows it). Then (2026-10-16)
+  `Buffers_OnCommand`, `ReplayStats_OnCommand` and `GetRenderer` stopped
+  setting up big stack frames on every call (ThinLTO had inlined their
+  logging or start-up into them; ~-2% and ~150k cycles a frame, see
+  "`Buffers_OnCommand`'s cost"). Still to decide: the old per-draw path's
+  future, and a Steam Deck test.
 - Recheck whether the player's beam on the road still jumps in sharp turns
   (Known issues); if it's gone, drop it from the next release's limits.

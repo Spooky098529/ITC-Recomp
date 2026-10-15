@@ -134,6 +134,36 @@ speed).
   the mirror is black, and some buildings show the rainbow effect (not
   resolve targets, as guessed then: see "The rainbow effect").
 
+## Plan for milestone 4
+
+What's known is in `gpu-functions.md`: the passes of a race frame ("A race
+frame's passes"), the command items ("Pass command items") and surface and
+texture objects ("Resources"). The approach:
+
+1. **Track the bound targets**: handle commands 23, 24, 29, 34/35 (or
+   read device +12184.. and +12200 per draw, as the main view check does
+   now) and draw every pass, not only the main view: a render target per
+   distinct surface setup (EDRAM base, pitch, format, MSAA), with its
+   depth. Begin and end dynamic rendering when the targets change.
+   Pipelines then need the target's format and sample count in their key.
+2. **Clears** (command 26) as attachment clears or load ops (decode the
+   flags first).
+3. **Resolves** (command 25): copy (or resolve, for MSAA) the source rect
+   of the bound target into a Vulkan image of the destination texture's
+   size and format, and register that image in the texture cache under the
+   destination's base address, so later draws sampling that fetch constant
+   get it instead of loading guest memory (which holds garbage: the
+   emulated GPU doesn't write resolves back). Depth resolves
+   (`24_8_FLOAT`) need a depth-to-colour copy (a small shader) into a
+   format the shaders sample (R32_SFLOAT, as the translator expects for
+   depth textures: check). Format conversions on resolve (7e3 to
+   16_16_16_16, the `0xF4000000` flags' likely exponent bias) need
+   checking against the emulated GPU's output.
+4. The black mirror went once resolves fed the texture cache; the rainbow
+   effect didn't (it was the vertex shader patching, see above).
+5. The textures logged as "of another dimension than declared": car
+   paint shaders (see "Progress on milestone 4").
+
 ## Progress on milestone 4
 
 - `src/native/passes.cpp` (was `main_view.cpp`) draws every pass. A target
@@ -928,6 +958,25 @@ memory).
   contents differ from that range's last copy, the bytes of ranges new,
   and how much of the vertex buffers' copies lies within the draws'
   vertices (lowest to highest).
+- `--native_renderer_log_index_ranges`: per frame, how often draws' index
+  ranges are scanned, how many are distinct and how many memcpy wrote
+  since their last scan, and how the mirror's checks go (see "Profile of
+  2026-10-15, after `read-registers`").
+- `--native_renderer_cache_index_ranges=false`: scan every draw's indices
+  again instead of keeping each range's lowest and highest index until
+  memcpy writes it (on by default; see "Done: the index range cache").
+- `--native_renderer_log_register_reads`: how often the register shadow is
+  read a frame, the words copied (those marked dirty) and what changed
+  since the last read (see "Register reads").
+- `--native_renderer_log_texture_writes`: which code writes textures'
+  memory: on first load, and when a texture is found changed, what the
+  library's memcpy wrote there (with `--native_renderer_verify_textures`
+  every change is found; see `texture-handling-optimisation.md`).
+- `--native_renderer_disk_cache=false`: don't keep translated shaders and
+  pipelines in `cache/` next to the executable (see "Hitches from
+  first-seen shaders" in Known issues).
+- `--native_renderer_validation`: turn on the Vulkan validation layer, if
+  installed (it isn't on this PC yet; see Known issues).
 - Texture loads of uncompressed formats are logged (format, size,
   endianness, tiling).
 
@@ -975,44 +1024,13 @@ memory).
   log; see "The title screen" in `functions.md`), so a run can be fully
   automatic: launch under `timeout`, delete the `/dev/shm/xenia_memory_*`
   files afterwards, and read the `native renderer:` lines in the log and
-  any dump. Screenshots: `spectacle -b -n -f -o <file>.png` while the game
-  runs (a script that launches, sleeps and fires it); it captures the
-  whole screen, so the windows must be visible (tell the user first).
-  Periodic dumps (`--native_renderer_dump_every`) need no screenshots.
+  any dump. Never screenshot the user's desktop: look at frames with the
+  renderer's own dump (`--native_renderer_dump`, 10 s into a race or when
+  `<dir>/now` appears; `--native_renderer_dump_every` for periodic ones).
   To compare with the emulated GPU, add `--motion_blur=true --glow=true
   --readback_resolve=full` and a full dump (`--native_renderer_dump`
   without `_every`, 10 s into the race), and put each `guest_resolve_*`
   next to the `resolve_*` of the same name (a small PIL script).
-
-## Plan for milestone 4
-
-What's known is in `gpu-functions.md`: the passes of a race frame ("A race
-frame's passes"), the command items ("Pass command items") and surface and
-texture objects ("Resources"). The approach:
-
-1. **Track the bound targets**: handle commands 23, 24, 29, 34/35 (or
-   read device +12184.. and +12200 per draw, as the main view check does
-   now) and draw every pass, not only the main view: a render target per
-   distinct surface setup (EDRAM base, pitch, format, MSAA), with its
-   depth. Begin and end dynamic rendering when the targets change.
-   Pipelines then need the target's format and sample count in their key.
-2. **Clears** (command 26) as attachment clears or load ops (decode the
-   flags first).
-3. **Resolves** (command 25): copy (or resolve, for MSAA) the source rect
-   of the bound target into a Vulkan image of the destination texture's
-   size and format, and register that image in the texture cache under the
-   destination's base address, so later draws sampling that fetch constant
-   get it instead of loading guest memory (which holds garbage: the
-   emulated GPU doesn't write resolves back). Depth resolves
-   (`24_8_FLOAT`) need a depth-to-colour copy (a small shader) into a
-   format the shaders sample (R32_SFLOAT, as the translator expects for
-   depth textures: check). Format conversions on resolve (7e3 to
-   16_16_16_16, the `0xF4000000` flags' likely exponent bias) need
-   checking against the emulated GPU's output.
-4. The black mirror went once resolves fed the texture cache; the rainbow
-   effect didn't (it was the vertex shader patching, see above).
-5. The textures logged as "of another dimension than declared": car
-   paint shaders (see "Progress on milestone 4").
 
 ## Known issues
 
@@ -1378,8 +1396,11 @@ To be fixed (or accepted) in milestone 7.
   Profiled again 2026-10-15 (the method, the breakdown and the next steps
   are in "Performance: the render thread", "Profile of 2026-10-15", below); the
   repeated state calls and the replay's diagnostics are done (above).
+  The shares in this item are from 2026-10-14 and out of date: the latest
+  breakdown is "Profile of 2026-10-15, after `read-registers`", and what's
+  been done since is in that section's status.
 - No Vulkan validation layer here yet (`--native_renderer_validation` falls
-  back without it); install `vulkan-validation-layers` before drawing gets
+  back without it; still missing on 2026-10-16); install `vulkan-validation-layers` before drawing gets
   complicated.
 
 ## Performance: the render thread
@@ -1408,8 +1429,12 @@ profile; see "Against v0.3.7"). Then the mirrors updated once a frame
 (`mirrors-fix`, opt-in, on in `run.sh`): -14.7% render thread cycles a
 frame ("Hypothesis to test: the mirrors updated once a tick" and what
 follows). All of it released in v0.3.8 (uncapped attract race with
-`run.sh`'s flags ~430 fps). None of it checked on the Deck yet, and no
-profile taken in cockpit view itself.
+`run.sh`'s flags ~430 fps). Since v0.3.9 (2026-10-16, on `main`):
+`Buffers_OnCommand` and `ReplayStats_OnCommand` check their flag before
+setting up their logging's stack frame (~-2% of the render thread's cycles
+a frame), and `GetRenderer` no longer sets up `Init`'s stack frame on every
+call (~-150 thousand cycles a frame); see "`Buffers_OnCommand`'s cost". None
+of it checked on the Deck yet, and no profile taken in cockpit view itself.
 
 ### What the user reported: first-person views slower on the Deck
 
@@ -1492,7 +1517,8 @@ Measure on the PC before and after any change. For changes under a few
 percent (most of them now), profile the render thread instead of counting
 frames (`itc_recomp/tools/profile_render_thread.sh`, see "Measuring small
 changes" and "Against v0.3.7"). For larger ones, an uncapped attract race
-(`--max_fps=0`, ~340 fps mean on `blend-math`; `timeout 20`, mean over
+(`--max_fps=0`, ~430 fps mean with `run.sh`'s flags since v0.3.8;
+`timeout 20`, mean over
 seconds 3-18 of the race, as in `CLAUDE.md`), alternating old and new
 builds (keep a copy of the old binary outside the build directory; a copy
 writes its logs to `logs/` beside itself, so read the newest log there and
@@ -2158,6 +2184,7 @@ So ~−115 for the two together, as expected (the thread's totals are too
 noisy to show it: the third "cache only" run drew ~8% more frames than
 any other). Over both steps the mirror's per-draw work is ~−400 thousand
 cycles a frame (~3% of the render thread).
+
 ### Hypothesis to test: the mirrors updated once a tick (the user's, 2026-10-15)
 
 **Outcome:** done and merged (`mirrors-fix`, released in v0.3.8, opt-in
