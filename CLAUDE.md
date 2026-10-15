@@ -2,6 +2,10 @@
 
 A static recompilation of Import Tuner Challenge (Xbox 360) built on
 ReXGlue (`rexglue-sdk/`, a submodule patched from `patches/rexglue-sdk/`).
+`git status` showing `rexglue-sdk` as modified (`m`) is expected: those are
+our patches applied in the submodule, not something to look into. The
+working tree may also hold patch 0003 (Windows SDL as a DLL) from the
+`windows` branch; it only changes Windows builds.
 `docs/functions.md` is the reference: what's known about the game's code,
 how frame interpolation works, every diagnostic option, and what didn't
 work. `docs/gpu-functions.md` covers how the game drives the GPU (the
