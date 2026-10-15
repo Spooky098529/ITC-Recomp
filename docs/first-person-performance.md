@@ -585,6 +585,32 @@ Readers of `RegisterFile` could also learn what changed (the masks say
 it), e.g. to skip comparing the fetch block when no fetch bit was set;
 not tried.
 
+### Against v0.3.7 (2026-10-15)
+
+v0.3.7 built from its tag in the same tree (only `itc_recomp/src`
+differs; same compiler, ThinLTO) against `read-registers` at `4f8f436`
+(`blend-math`, the register reads, the temporary noinline markers
+removed). `profile_render_thread.sh`, three runs each, alternating, after
+a warm-up run of v0.3.7 for its shader cache. The draws are the same
+(~2,100 a frame in the attract race, from the log), so cycles a draw
+compare directly; the cockpit's lower frame rate is its larger number of
+draws at this cost a draw.
+
+| Build | Render thread, million cycles a frame | Per draw | Frames in the 12 s |
+|---|---|---|---|
+| v0.3.7 | 16.10, 16.12, 16.02 (16.08) | ~7,660 | 3,793, 3,798, 3,815 |
+| current | 14.20, 14.07, 14.29 (14.19) | ~6,760 | 4,284, 4,333, 4,241 |
+
+−11.8% of the render thread's cycles a draw, ~+13% frames. Biggest
+changes by symbol (one pair, thousand cycles a frame):
+`BlendState_ReplayConstants` 1,092 to 633 (planned blends, cameras once a
+frame, the byte swap, and its parts inlined again), `State::Draw` 1,801
+to 1,425 (constants' byte swap), `ReadRegisters` 427 to 148, `GetTarget`
+453 to 225 (not changed on purpose; probably `CopyU32s` inlined into it,
+not checked), `QuaternionFromRotation` and `SplitViewProjection` ~130 to
+~11 (once a tick). Larger: `IndexRange` +46, `ShaderCache::GetInterface`
++35, `Buffers_OnCommand` +36 (noise or inlining, not looked into).
+
 **To investigate: reusing the lighting blender's decisions within a tick.**
 After the above, `Apply`'s per-component loop (does each component blend,
 keep the tick's value, or reject the upload) is still ~28% of it, and the
