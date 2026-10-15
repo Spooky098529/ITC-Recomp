@@ -2477,3 +2477,19 @@ translator's scale changes nothing in this game's translations, so
 shaders are translated at scale 1 and the scaling is done in our renderer
 alone (no SDK patch). A shader that does use them shows in the
 "analyzed" lines.
+
+**Done: the scale** (2026-10-16). `--width`/`--height` set the window
+(one alone keeps 16:9; neither, 1280x720) and `--resolution_scale` the
+drawing scale (0, the default: the largest that fits the window, so
+1920x1080 draws at 1.5x). `Passes` keeps each target's guest extent and
+draws into an image of it times the scale; viewports are scaled, scissors
+and resolve rectangles scaled with each edge rounded the same way in
+source and destination (so resolves stay one-to-one copies), resolve
+destinations are made at the scaled size by the texture cache
+(`set_resolution_scale`), and the depth bias slope is multiplied by the
+scale (as the plugin does). Shown frame and main view sizes scale with it.
+Checked in attract races: at 1920x1080 every target and resolve at 1.5x
+(3D view 1536x864, glow 384x216, shadow maps 1536x1536, frame 1920x1080),
+the dumped frame right (`itc_786.log`; the user agreed it looks fine); at
+the default, the same sizes as before, the 144 cap held, no failed draws
+(`itc_787.log`).

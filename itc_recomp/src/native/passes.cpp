@@ -389,7 +389,8 @@ struct Target {
   Surface surface;
   VkFormat format;
   VkSampleCountFlagBits samples;
-  VkExtent2D extent;
+  VkExtent2D guest_extent;  // the surface's, in the guest's pixels
+  VkExtent2D extent;        // the image's: guest_extent times the resolution scale
   Image image;               // view: for drawing (depth and stencil)
   VkImageView sample_view;   // for resolving (depth only, for depth)
   VkImageLayout layout = VK_IMAGE_LAYOUT_UNDEFINED;
@@ -528,6 +529,22 @@ struct Passes::State {
   DeviceContext context{};
   VkPhysicalDeviceMemoryProperties memory_properties{};
   uint32_t frames_in_flight = 0;
+
+  // Resolution scaling (see "Resolution" in docs/native-renderer.md): every
+  // target and resolve destination is this many times its guest size, and
+  // positions in the guest's pixels (viewports, scissors, resolve
+  // rectangles) are scaled and rounded to whole pixels. Shaders are
+  // translated unscaled: none of this game's reads the pixel position or
+  // fetches in texels.
+  float scale = 1.0f;
+  int32_t Scaled(int32_t guest) const { return int32_t(std::lround(guest * scale)); }
+  uint32_t Scaled(uint32_t guest) const { return uint32_t(std::lround(guest * scale)); }
+  VkExtent2D Scaled(VkExtent2D guest) const {
+    return {std::max(Scaled(guest.width), 1u), std::max(Scaled(guest.height), 1u)};
+  }
+  // What's shown and the main view's drawn part, scaled.
+  VkExtent2D shown_extent{kShownWidth, kShownHeight};
+  VkExtent2D main_view_extent{kMainViewWidth, kMainViewHeight};
 
   // Mirrors of guest physical memory at the same offsets: the shaders'
   // storage buffer (set 0) and the index buffer. The driver won't import
@@ -2034,11 +2051,12 @@ Target* Passes::State::GetTarget(VkCommandBuffer commands, uint8_t* base, uint32
   t.surface = surface;
   t.format = format;
   t.samples = SampleCount(surface.msaa);
-  t.extent = SurfaceExtent(surface, depth);
+  t.guest_extent = SurfaceExtent(surface, depth);
   if (tiling) {
-    t.extent = {std::max(t.extent.width, tiling_extent.width),
-                std::max(t.extent.height, tiling_extent.height)};
+    t.guest_extent = {std::max(t.guest_extent.width, tiling_extent.width),
+                      std::max(t.guest_extent.height, tiling_extent.height)};
   }
+  t.extent = Scaled(t.guest_extent);
   VkImageUsageFlags usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
                             VK_IMAGE_USAGE_TRANSFER_DST_BIT |
                             (depth ? VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT
@@ -2059,9 +2077,11 @@ Target* Passes::State::GetTarget(VkCommandBuffer commands, uint8_t* base, uint32
     view.subresourceRange = {VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1};
     vk::vkCreateImageView(context.device, &view, nullptr, &t.sample_view);
   }
-  REXLOG_INFO("native renderer: {} target: EDRAM base {}, pitch {}, MSAA {}, format {}; {}x{}{}",
+  REXLOG_INFO("native renderer: {} target: EDRAM base {}, pitch {}, MSAA {}, format {}; {}x{}{} "
+              "({}x{} drawn)",
               depth ? "depth" : "colour", surface.edram_base, surface.pitch, surface.msaa,
-              surface.format, t.extent.width, t.extent.height, tiling ? " (tiled)" : "");
+              surface.format, t.guest_extent.width, t.guest_extent.height,
+              tiling ? " (tiled)" : "", t.extent.width, t.extent.height);
   stats.targets++;
   VkClearValue initial{};
   initial.depthStencil = {1.0f, 0};
@@ -2228,8 +2248,8 @@ bool Passes::State::ResolveInto(VkCommandBuffer commands, uint8_t* base, Target&
   int32_t x = point ? point[0] : 0, y = point ? point[1] : 0;
   left = std::max(left, 0);
   top = std::max(top, 0);
-  right = std::min(right, int32_t(source.extent.width));
-  bottom = std::min(bottom, int32_t(source.extent.height));
+  right = std::min(right, int32_t(source.guest_extent.width));
+  bottom = std::min(bottom, int32_t(source.guest_extent.height));
   int32_t width = std::min(right - left, int32_t(dest.width) - x);
   int32_t height = std::min(bottom - top, int32_t(dest.height) - y);
   uint64_t log_key = uint64_t(reinterpret_cast<uintptr_t>(&source)) * 31 + (fetch[1] >> 12);
@@ -2241,6 +2261,19 @@ bool Passes::State::ResolveInto(VkCommandBuffer commands, uint8_t* base, Target&
                 bottom, fetch[1] & 0xFFFFF000u, x, y, flags);
   }
   if (width <= 0 || height <= 0 || x < 0 || y < 0) {
+    return false;
+  }
+  // In the images' pixels: each edge scaled and rounded, the same in the
+  // source and the destination, so the copy stays one to one.
+  int32_t host_x = Scaled(x), host_y = Scaled(y);
+  int32_t host_left = Scaled(left), host_top = Scaled(top);
+  int32_t host_width = std::min({Scaled(x + width) - host_x, Scaled(left + width) - host_left,
+                                 int32_t(dest.host_width) - host_x,
+                                 int32_t(source.extent.width) - host_left});
+  int32_t host_height = std::min({Scaled(y + height) - host_y, Scaled(top + height) - host_top,
+                                  int32_t(dest.host_height) - host_y,
+                                  int32_t(source.extent.height) - host_top});
+  if (host_width <= 0 || host_height <= 0) {
     return false;
   }
   VkPipeline pipeline = GetResolvePipeline(dest.format, source.samples != VK_SAMPLE_COUNT_1_BIT);
@@ -2271,7 +2304,7 @@ bool Passes::State::ResolveInto(VkCommandBuffer commands, uint8_t* base, Target&
       dest.fresh ? VK_IMAGE_LAYOUT_UNDEFINED : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
   Transition(commands, dest.image, VK_IMAGE_ASPECT_COLOR_BIT, dest_layout,
              VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-  VkRect2D area{{x, y}, {uint32_t(width), uint32_t(height)}};
+  VkRect2D area{{host_x, host_y}, {uint32_t(host_width), uint32_t(host_height)}};
   VkRenderingAttachmentInfo attachment{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
   attachment.imageView = dest.view;
   attachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
@@ -2283,7 +2316,8 @@ bool Passes::State::ResolveInto(VkCommandBuffer commands, uint8_t* base, Target&
   info.colorAttachmentCount = 1;
   info.pColorAttachments = &attachment;
   vk::vkCmdBeginRendering(commands, &info);
-  VkViewport viewport{float(x), float(y), float(width), float(height), 0.0f, 1.0f};
+  VkViewport viewport{float(host_x), float(host_y), float(host_width), float(host_height), 0.0f,
+                      1.0f};
   vk::vkCmdSetViewport(commands, 0, 1, &viewport);
   vk::vkCmdSetScissor(commands, 0, 1, &area);
   vk::vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
@@ -2301,7 +2335,7 @@ bool Passes::State::ResolveInto(VkCommandBuffer commands, uint8_t* base, Target&
     int32_t samples;
     float scale;
     int32_t swap_red_blue;
-  } constants{{left - x, top - y},
+  } constants{{host_left - host_x, host_top - host_y},
               source.depth ? 1 : int32_t(source.samples),
               std::ldexp(1.0f, int32_t(flags) >> 26), swap ? 1 : 0};
   vk::vkCmdPushConstants(commands, resolve_layout, VK_SHADER_STAGE_FRAGMENT_BIT, 0,
@@ -2312,8 +2346,8 @@ bool Passes::State::ResolveInto(VkCommandBuffer commands, uint8_t* base, Target&
   Transition(commands, dest.image, VK_IMAGE_ASPECT_COLOR_BIT, dest_layout,
              VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
   Resolved& resolved = frame_resolves.emplace_back();
-  resolved = {dest.image, {dest.width, dest.height}, fetch[1] & 0xFFFFF000u, fetch[1] & 0x3F,
-              flags, dest.format};
+  resolved = {dest.image, {dest.host_width, dest.host_height}, fetch[1] & 0xFFFFF000u,
+              fetch[1] & 0x3F, flags, dest.format};
   std::copy(fetch, fetch + 6, resolved.fetch);
   if (log_glow && dest.width == 256 && dest.height == 144 && !(flags & 0x100)) {
     uint32_t address = resolved.address & 0x1FFFF000u;
@@ -2332,9 +2366,17 @@ Passes::Passes() : state_(std::make_unique<State>()) {
 }
 Passes::~Passes() = default;
 
-bool Passes::Init(const DeviceContext& context, uint8_t* base, uint32_t frames_in_flight) {
+bool Passes::Init(const DeviceContext& context, uint8_t* base, uint32_t frames_in_flight,
+                  float resolution_scale) {
   State& s = *state_;
   s.context = context;
+  s.scale = resolution_scale > 0.0f ? resolution_scale : 1.0f;
+  s.shown_extent = s.Scaled(VkExtent2D{kShownWidth, kShownHeight});
+  s.main_view_extent = s.Scaled(VkExtent2D{kMainViewWidth, kMainViewHeight});
+  s.textures.set_resolution_scale(s.scale);
+  REXLOG_INFO("native renderer: resolution scale {}: frame {}x{}, 3D view {}x{}", s.scale,
+              s.shown_extent.width, s.shown_extent.height, s.main_view_extent.width,
+              s.main_view_extent.height);
   s.guest_base = base;
   s.frames_in_flight = frames_in_flight;
   const std::string& log_level = REXCVAR_GET(log_level);
@@ -2344,7 +2386,7 @@ bool Passes::Init(const DeviceContext& context, uint8_t* base, uint32_t frames_i
     return false;
   }
   if (!s.CreateImage(s.shown, VK_IMAGE_TYPE_2D, VK_IMAGE_VIEW_TYPE_2D, kShownFormat,
-                     {kShownWidth, kShownHeight, 1}, 1,
+                     {s.shown_extent.width, s.shown_extent.height, 1}, 1,
                      VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
                      VK_IMAGE_ASPECT_COLOR_BIT) ||
       !s.CreateRings() || !s.CreateDescriptors() || !s.CreateDummyTextures() ||
@@ -2532,9 +2574,12 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
     s.stats.mismatched_samples++;
     return;
   }
-  // The area both can be drawn in.
+  // The area both can be drawn in, in the guest's pixels and the images'.
+  VkExtent2D guest_extent = color ? color->guest_extent : depth->guest_extent;
   VkExtent2D extent = color ? color->extent : depth->extent;
   if (color && depth) {
+    guest_extent = {std::min(color->guest_extent.width, depth->guest_extent.width),
+                    std::min(color->guest_extent.height, depth->guest_extent.height)};
     extent = {std::min(color->extent.width, depth->extent.width),
               std::min(color->extent.height, depth->extent.height)};
   }
@@ -2754,7 +2799,7 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
   // blocks, so take it as the library keeps it: enabled by render state 200
   // (device +11600), rectangle (left, top, right, bottom) at +12416 from
   // SetScissorRect; otherwise the whole target.
-  draw_util::Scissor scissor{{0, 0}, {extent.width, extent.height}};
+  draw_util::Scissor scissor{{0, 0}, {guest_extent.width, guest_extent.height}};
   if (guest::LoadU32(base, device + kDeviceScissorEnable)) {
     int32_t left = int32_t(guest::LoadU32(base, device + kDeviceScissorRect));
     int32_t top = int32_t(guest::LoadU32(base, device + kDeviceScissorRect + 4));
@@ -2765,8 +2810,8 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
     scissor.extent[0] = uint32_t(std::max(right - int32_t(scissor.offset[0]), 0));
     scissor.extent[1] = uint32_t(std::max(bottom - int32_t(scissor.offset[1]), 0));
   }
-  uint32_t scissor_right = std::min(scissor.offset[0] + scissor.extent[0], extent.width);
-  uint32_t scissor_bottom = std::min(scissor.offset[1] + scissor.extent[1], extent.height);
+  uint32_t scissor_right = std::min(scissor.offset[0] + scissor.extent[0], guest_extent.width);
+  uint32_t scissor_bottom = std::min(scissor.offset[1] + scissor.extent[1], guest_extent.height);
   if (!viewport_info.xy_extent[0] || !viewport_info.xy_extent[1] ||
       scissor.offset[0] >= scissor_right || scissor.offset[1] >= scissor_bottom) {
     s.stats.invisible++;
@@ -3107,11 +3152,19 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
       color->format == VK_FORMAT_R16G16B16A16_SFLOAT) {
     s.main_view = color;
   }
-  VkViewport viewport{float(viewport_info.xy_offset[0]), float(viewport_info.xy_offset[1]),
-                      float(viewport_info.xy_extent[0]), float(viewport_info.xy_extent[1]),
-                      viewport_info.z_min, viewport_info.z_max};
-  VkRect2D scissor_rect{{int32_t(scissor.offset[0]), int32_t(scissor.offset[1])},
-                        {scissor_right - scissor.offset[0], scissor_bottom - scissor.offset[1]}};
+  // Both scaled from the guest's pixels (the NDC scale and offset are
+  // ratios, unchanged).
+  VkViewport viewport{float(viewport_info.xy_offset[0]) * s.scale,
+                      float(viewport_info.xy_offset[1]) * s.scale,
+                      float(viewport_info.xy_extent[0]) * s.scale,
+                      float(viewport_info.xy_extent[1]) * s.scale,
+                      viewport_info.z_min,
+                      viewport_info.z_max};
+  uint32_t scissor_left = s.Scaled(scissor.offset[0]), scissor_top = s.Scaled(scissor.offset[1]);
+  VkRect2D scissor_rect{
+      {int32_t(scissor_left), int32_t(scissor_top)},
+      {std::min(s.Scaled(scissor_right), extent.width) - std::min(scissor_left, extent.width),
+       std::min(s.Scaled(scissor_bottom), extent.height) - std::min(scissor_top, extent.height)}};
   // Set for every pipeline (it's dynamic in all of them), used with depth.
   float slope = 0.0f, constant = 0.0f;
   if (depth) {
@@ -3121,7 +3174,9 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
     constant *= depth->surface.format == uint32_t(xenos::DepthRenderTargetFormat::kD24S8)
                     ? draw_util::kD3D10PolygonOffsetFactorUnorm24
                     : draw_util::kD3D10PolygonOffsetFactorFloat24;
-    slope *= xenos::kPolygonOffsetScaleSubpixelUnit;
+    // Per pixel: scaled pixels are smaller, so the slope (as the plugin
+    // scales it).
+    slope *= xenos::kPolygonOffsetScaleSubpixelUnit * std::max(s.scale, 1.0f);
     if (constant != 0.0f || slope != 0.0f) {
       s.stats.depth_biased++;
     }
@@ -3351,11 +3406,11 @@ VkPipeline Passes::State::GetIdPipeline(const IdDraw& draw) {
 void Passes::State::DrawIds(VkCommandBuffer commands) {
   if (!id_image.image &&
       (!CreateImage(id_image, VK_IMAGE_TYPE_2D, VK_IMAGE_VIEW_TYPE_2D, VK_FORMAT_R32_UINT,
-                    {kMainViewWidth, kMainViewHeight, 1}, 1,
+                    {main_view_extent.width, main_view_extent.height, 1}, 1,
                     VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
                     VK_IMAGE_ASPECT_COLOR_BIT) ||
        !CreateImage(id_depth, VK_IMAGE_TYPE_2D, VK_IMAGE_VIEW_TYPE_2D, kDepthFormat,
-                    {kMainViewWidth, kMainViewHeight, 1}, 1,
+                    {main_view_extent.width, main_view_extent.height, 1}, 1,
                     VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, kDepthStencilAspects))) {
     return;
   }
@@ -3384,7 +3439,7 @@ void Passes::State::DrawIds(VkCommandBuffer commands) {
   depth.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
   depth.clearValue.depthStencil = {reversed ? 0.0f : 1.0f, 0};
   VkRenderingInfo info{VK_STRUCTURE_TYPE_RENDERING_INFO};
-  info.renderArea = {{0, 0}, {kMainViewWidth, kMainViewHeight}};
+  info.renderArea = {{0, 0}, main_view_extent};
   info.layerCount = 1;
   info.colorAttachmentCount = 1;
   info.pColorAttachments = &color;
@@ -3398,9 +3453,11 @@ void Passes::State::DrawIds(VkCommandBuffer commands) {
     }
     VkRect2D scissor = draw.scissor;
     scissor.extent.width = std::min<uint32_t>(
-        scissor.extent.width, uint32_t(std::max(0, int32_t(kMainViewWidth) - scissor.offset.x)));
+        scissor.extent.width,
+        uint32_t(std::max(0, int32_t(main_view_extent.width) - scissor.offset.x)));
     scissor.extent.height = std::min<uint32_t>(
-        scissor.extent.height, uint32_t(std::max(0, int32_t(kMainViewHeight) - scissor.offset.y)));
+        scissor.extent.height,
+        uint32_t(std::max(0, int32_t(main_view_extent.height) - scissor.offset.y)));
     vk::vkCmdSetViewport(commands, 0, 1, &draw.viewport);
     vk::vkCmdSetScissor(commands, 0, 1, &scissor);
     vk::vkCmdSetDepthBias(commands, draw.bias_constant, 0.0f, draw.bias_slope);
@@ -4164,12 +4221,12 @@ VkExtent2D Passes::EndFrame(VkCommandBuffer commands, int32_t show_resolve, bool
   VkImage shown = s.shown.image;
   Transition(commands, shown, VK_IMAGE_ASPECT_COLOR_BIT, s.shown_layout,
              VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-  VkExtent2D extent{kMainViewWidth, kMainViewHeight};
+  VkExtent2D extent = s.main_view_extent;
   if (show_resolve >= 0 && size_t(show_resolve) < s.frame_resolves.size()) {
     // A resolve destination, as is.
     const State::Resolved& resolved = s.frame_resolves[show_resolve];
-    extent = {std::min(resolved.extent.width, kShownWidth),
-              std::min(resolved.extent.height, kShownHeight)};
+    extent = {std::min(resolved.extent.width, s.shown_extent.width),
+              std::min(resolved.extent.height, s.shown_extent.height)};
     VkImageLayout layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
     Transition(commands, resolved.image, VK_IMAGE_ASPECT_COLOR_BIT, layout,
                VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
@@ -4187,8 +4244,9 @@ VkExtent2D Passes::EndFrame(VkCommandBuffer commands, int32_t show_resolve, bool
     s.EndRendering(commands);
     Transition(commands, front->image.image, front->aspects(), front->layout,
                VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
-    extent = {std::min({s.front_extent.width, front->extent.width, kShownWidth}),
-              std::min({s.front_extent.height, front->extent.height, kShownHeight})};
+    VkExtent2D front_extent = s.Scaled(s.front_extent);
+    extent = {std::min({front_extent.width, front->extent.width, s.shown_extent.width}),
+              std::min({front_extent.height, front->extent.height, s.shown_extent.height})};
     if (front->samples == VK_SAMPLE_COUNT_1_BIT) {
       VkImageBlit blit{};
       blit.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
@@ -4209,8 +4267,8 @@ VkExtent2D Passes::EndFrame(VkCommandBuffer commands, int32_t show_resolve, bool
     // The main view's drawn part, its samples averaged.
     Transition(commands, main->image.image, main->aspects(), main->layout,
                VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
-    extent = {std::min(kMainViewWidth, main->extent.width),
-              std::min(kMainViewHeight, main->extent.height)};
+    extent = {std::min(s.main_view_extent.width, main->extent.width),
+              std::min(s.main_view_extent.height, main->extent.height)};
     VkImageResolve region{};
     region.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
     region.dstSubresource = region.srcSubresource;
@@ -4339,7 +4397,7 @@ void Passes::State::RecordDump(VkCommandBuffer commands, VkExtent2D shown_extent
   }
   size_t resolve_end = images.size();
   if (id_drawn) {
-    add("draw_ids", VK_FORMAT_R32_UINT, {kMainViewWidth, kMainViewHeight});
+    add("draw_ids", VK_FORMAT_R32_UINT, main_view_extent);
     images.push_back(id_image.image);
   }
   VkBufferCreateInfo info{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};

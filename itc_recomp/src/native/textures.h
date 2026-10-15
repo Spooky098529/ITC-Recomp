@@ -44,8 +44,14 @@ class TextureCache {
   // translator's texture_swizzled_signs byte).
   static uint8_t SwizzledSigns(const uint32_t fetch[6]);
 
+  // Resolution scaling (see "Resolution" in docs/native-renderer.md):
+  // resolve destinations' images are this many times their guest size.
+  // Set before the first resolve.
+  void set_resolution_scale(float scale);
+
   // A resolve's destination texture (fetch: its fetch constant, addresses
-  // physical): an image of its size and format, made on first use, which
+  // physical): an image of its size (times the resolution scale) and
+  // format, made on first use, which
   // draws sampling a texture at its base address then get instead of
   // guest memory (the emulated GPU doesn't write resolves back). Left in
   // SHADER_READ_ONLY_OPTIMAL, or UNDEFINED while `fresh`. False if its
@@ -54,7 +60,8 @@ class TextureCache {
     VkImage image;
     VkImageView view;  // all components as is, for drawing into
     VkFormat format;
-    uint32_t width, height;
+    uint32_t width, height;            // the guest's
+    uint32_t host_width, host_height;  // the image's (scaled)
     bool fresh;
   };
   bool GetResolveDestination(const uint32_t fetch[6], ResolveDestination& out);

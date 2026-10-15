@@ -118,6 +118,14 @@ REXCVAR_DEFINE_STRING(native_renderer_dump, "", "ITC",
                       "Directory to dump frames into, as PFM files, with draws.txt describing "
                       "each draw: once 10 s into a race, and again whenever a file named 'now' "
                       "appears in it (a debugging aid; see docs/native-renderer.md)");
+REXCVAR_DEFINE_INT32(width, 0, "ITC",
+                     "Window width in pixels; 0: 1280, or from height at 16:9");
+REXCVAR_DEFINE_INT32(height, 0, "ITC",
+                     "Window height in pixels; 0: 720, or from width at 16:9");
+REXCVAR_DEFINE_DOUBLE(resolution_scale, 0.0, "ITC",
+                      "Draw this many times the game's own resolution (1280x720 frame, 1024x576 "
+                      "3D view); 0: as large as fits the window (see \"Resolution\" in "
+                      "docs/native-renderer.md)");
 
 namespace native {
 namespace {
@@ -126,6 +134,29 @@ using Clock = std::chrono::steady_clock;
 
 constexpr uint32_t kFramesInFlight = 2;
 constexpr uint32_t kDefaultWidth = 1280, kDefaultHeight = 720;
+
+// The window's size from --width and --height (one alone keeps 16:9).
+VkExtent2D WindowSize() {
+  int32_t width = REXCVAR_GET(width), height = REXCVAR_GET(height);
+  if (width <= 0 && height <= 0) {
+    return {kDefaultWidth, kDefaultHeight};
+  }
+  if (width <= 0) {
+    width = (height * 16 + 8) / 9;
+  } else if (height <= 0) {
+    height = (width * 9 + 8) / 16;
+  }
+  return {uint32_t(width), uint32_t(height)};
+}
+
+// --resolution_scale, or the largest that fits the window's size.
+float ResolutionScale() {
+  if (double scale = REXCVAR_GET(resolution_scale); scale > 0.0) {
+    return float(scale);
+  }
+  VkExtent2D size = WindowSize();
+  return std::min(float(size.width) / kDefaultWidth, float(size.height) / kDefaultHeight);
+}
 
 // Draw commands (see docs/gpu-functions.md).
 bool IsDraw(uint32_t id) {
@@ -150,7 +181,8 @@ void SDLCALL CreateWindowOnMainThread(void* data) {
     setup->done.set_value();
     delete static_cast<std::shared_ptr<WindowSetup>*>(data);
   };
-  setup->window = SDL_CreateWindow("ITC native renderer", kDefaultWidth, kDefaultHeight,
+  VkExtent2D size = WindowSize();
+  setup->window = SDL_CreateWindow("ITC native renderer", int(size.width), int(size.height),
                                    SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE);
   if (!setup->window) {
     return finish(fmt::format("SDL_CreateWindow: {}", SDL_GetError()));
@@ -450,7 +482,8 @@ bool Renderer::CreateSwapchain() {
   VkExtent2D extent = caps.currentExtent;
   if (extent.width == UINT32_MAX) {
     // The window system leaves the size to us (Wayland).
-    int width = kDefaultWidth, height = kDefaultHeight;
+    VkExtent2D size = WindowSize();
+    int width = int(size.width), height = int(size.height);
     SDL_GetWindowSizeInPixels(window_, &width, &height);
     extent = {std::clamp<uint32_t>(width, caps.minImageExtent.width, caps.maxImageExtent.width),
               std::clamp<uint32_t>(height, caps.minImageExtent.height,
@@ -542,7 +575,7 @@ void Renderer::DestroySwapchain() {
 
 bool Renderer::Init(uint8_t* base) {
   if (!CreateWindowAndInstance() || !CreateDevice() || !CreateSwapchain() ||
-      !passes_.Init(context_, base, kFramesInFlight)) {
+      !passes_.Init(context_, base, kFramesInFlight, ResolutionScale())) {
     return false;
   }
   passes_.set_mirror_by_tick(REXCVAR_GET(native_renderer_mirror_by_tick));

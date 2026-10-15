@@ -24,8 +24,11 @@ class Passes {
   Passes();
   ~Passes();
 
-  // base: the guest memory base.
-  bool Init(const DeviceContext& context, uint8_t* base, uint32_t frames_in_flight);
+  // base: the guest memory base. resolution_scale: every target and resolve
+  // destination is drawn this many times its guest size (see "Resolution"
+  // in docs/native-renderer.md).
+  bool Init(const DeviceContext& context, uint8_t* base, uint32_t frames_in_flight,
+            float resolution_scale);
 
   // Render thread. Before a frame's first command.
   void BeginFrame(uint32_t frame_index);

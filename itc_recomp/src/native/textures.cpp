@@ -8,6 +8,7 @@
 #include <array>
 #include <chrono>
 #include <bit>
+#include <cmath>
 #include <cstring>
 #include <map>
 #include <string>
@@ -429,6 +430,7 @@ struct TextureCache::State {
     // A resolve destination: drawn into, never loaded.
     bool resolved = false;
     uint32_t guest_format = 0;
+    uint32_t host_width = 0, host_height = 0;  // the image's (scaled)
     VkImageView attachment_view = VK_NULL_HANDLE;
   };
   std::map<TextureKey, Texture> textures;
@@ -441,6 +443,7 @@ struct TextureCache::State {
   void MarkWritten();
   // Resolve destinations by base address (page).
   std::unordered_map<uint32_t, Texture> resolved;
+  float resolution_scale = 1.0f;
   std::unordered_map<uint64_t, VkSampler> samplers;
   Stats stats;
 
@@ -572,7 +575,8 @@ bool TextureCache::State::CreateTexture(Texture& t) {
   info.flags = l.cube ? VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT : 0;
   info.imageType = VK_IMAGE_TYPE_2D;
   info.format = t.format.format;
-  info.extent = {l.width, l.height, 1};
+  info.extent = t.resolved ? VkExtent3D{t.host_width, t.host_height, 1}
+                           : VkExtent3D{l.width, l.height, 1};
   info.mipLevels = t.levels;
   info.arrayLayers = l.layers;
   info.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -1042,19 +1046,28 @@ bool TextureCache::GetResolveDestination(const uint32_t fetch_words[6], ResolveD
     }
     t.layout.width = width;
     t.layout.height = height;
+    t.host_width = std::max(uint32_t(std::lround(width * s.resolution_scale)), 1u);
+    t.host_height = std::max(uint32_t(std::lround(height * s.resolution_scale)), 1u);
     t.layout.layers = 1;
     t.layout.base_address = page << 12;
     if (!s.CreateTexture(t)) {
       return false;
     }
-    REXLOG_INFO("native renderer: resolve destination at {:08X}: format {} {}x{} (host format {})",
-                page << 12, t.guest_format, width, height, int(t.format.format));
+    REXLOG_INFO("native renderer: resolve destination at {:08X}: format {} {}x{} (host format {}, "
+                "{}x{})",
+                page << 12, t.guest_format, width, height, int(t.format.format), t.host_width,
+                t.host_height);
     it = s.resolved.emplace(page, std::move(t)).first;
   }
   State::Texture& t = it->second;
-  out = {t.image, t.attachment_view, t.format.format, width, height, !t.loaded};
+  out = {t.image, t.attachment_view, t.format.format, width, height, t.host_width, t.host_height,
+         !t.loaded};
   t.loaded = true;  // written by the caller
   return true;
+}
+
+void TextureCache::set_resolution_scale(float scale) {
+  state_->resolution_scale = scale;
 }
 
 uint64_t TextureCache::mismatched_total() const {
