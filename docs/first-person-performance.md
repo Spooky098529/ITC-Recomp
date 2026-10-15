@@ -323,8 +323,30 @@ branch-record run is skewed, so take shares from a plain run):
   ~3% with AddRef's own 0.8%.
 
 **Next, from this** (estimates):
-1. **Interpolation's allocations and the replay's lookups** (~7% plus
-   ~1.7%): the per-upload `std::vector` and `shared_ptr`.
+1. **Interpolation's allocations and the replay's lookups: done**
+   (2026-10-15, branch `replay-allocations`). The lighting blender
+   (`PixelConstantBlender::Apply`, inlined into
+   `BlendState_ReplayConstants` with `Substitute` and `BlendProduct`; the
+   matrix math in `transform.cpp` keeps its own symbols, ~1.5%) allocated a
+   252-float vector per upload and copied it three times, allocated a
+   `vector<bool>`, looked objects up in two `std::map`s (one cleared every
+   frame, so a node per upload) and compared the upload with a copy of
+   itself. It now reuses its buffers, keys both maps by hash (the
+   occurrence counts go stale by frame instead of being cleared, and are
+   pruned with the entries), skips that compare when blending from the
+   latest value (the default), and copies what `--log_pixel_outcomes`
+   reads only with it. The per-object extras are a fixed array, and the
+   replay frame the render thread drops (~1,500 products, a node each) is
+   freed by the main thread when it publishes the next. Checked over two
+   whole attract races (~30 million lighting uploads each) against the old
+   blender run side by side: every value uploaded and put back the same;
+   outcomes differed only for uploads holding a NaN at the race's end
+   (old "not as recorded", since NaN never equals itself; new "rejected";
+   both left as recorded). Uncapped attract race, alternating, 20 s runs:
+   312.7, 321.8, 320.5 fps mean before, 330.8, 331.4, 330.2 after (~+4%;
+   10th percentile 271/281/281 against 289/289/285). Render thread:
+   `BlendState_ReplayConstants` 7.1% to 6.0%, libc's `free` ~1.6% to
+   ~0.5%.
 2. **The mirror's per-draw work** (~7%): cache each draw's index range
    (lowest, highest) by index buffer, count and format, dropped on a
    memcpy write as the mirror's copies are; a flat table instead of the
