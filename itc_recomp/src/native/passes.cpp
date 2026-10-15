@@ -739,6 +739,24 @@ struct Passes::State {
   void MaybeSavePipelineCache();
   rex::graphics::RegisterFile regs;
   Stats stats;
+  // The state the last draw recorded into the frame's command buffer, to
+  // count the state calls that repeat it (stats.state_repeated). Forgotten
+  // at each frame's start and after anything else that sets state (a
+  // resolve's draw, the ID pass).
+  struct RecordedState {
+    bool valid = false;
+    VkViewport viewport;
+    VkRect2D scissor;
+    float bias[2];
+    float blend_constants[4];
+    VkPipeline pipeline;
+    VkPipelineLayout layout;
+    VkDescriptorSet sets[4];
+    bool indexed;  // index buffer below bound
+    VkBuffer index_buffer;
+    VkDeviceSize index_offset;
+    VkIndexType index_type;
+  } recorded;
 
   bool CreateImage(Image& out, VkImageType type, VkImageViewType view_type, VkFormat format,
                    VkExtent3D extent, uint32_t layers, VkImageUsageFlags usage,
@@ -1906,6 +1924,7 @@ bool Passes::State::ResolveInto(VkCommandBuffer commands, uint8_t* base, Target&
                          sizeof(constants), &constants);
   vk::vkCmdDraw(commands, 3, 1, 0, 0);
   vk::vkCmdEndRendering(commands);
+  recorded.valid = false;
   Transition(commands, dest.image, VK_IMAGE_ASPECT_COLOR_BIT, dest_layout,
              VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
   Resolved& resolved = frame_resolves.emplace_back();
@@ -2035,6 +2054,7 @@ void Passes::BeginFrame(uint32_t frame_index) {
   s.ring_offset = 0;
   s.rings[frame_index].block = 0;
   s.rendering = false;
+  s.recorded.valid = false;
   s.bound_color = s.bound_depth = nullptr;
   s.main_view = nullptr;
   s.front = nullptr;
@@ -2646,6 +2666,56 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
                              index_32bit ? VK_INDEX_TYPE_UINT32 : VK_INDEX_TYPE_UINT16);
     vk::vkCmdDrawIndexed(commands, index_count, 1, 0, 0, 0);
   }
+  {
+    // Which state calls repeated the previous draw's (counted only).
+    State::RecordedState now{};
+    now.valid = true;
+    now.viewport = viewport;
+    now.scissor = scissor_rect;
+    now.bias[0] = constant;
+    now.bias[1] = slope;
+    std::memcpy(now.blend_constants, blend_constants, sizeof(blend_constants));
+    now.pipeline = pipeline;
+    now.layout = key.layout;
+    std::memcpy(now.sets, sets, sizeof(sets));
+    now.indexed = rectangle_list || quad_list || !call.inline_vertices;
+    now.index_buffer = s.mirrors[s.frame].buffer;
+    now.index_offset = rectangle_list ? kRectangleIndices
+                       : quad_list    ? kQuadIndices
+                                      : index_address;
+    now.index_type = rectangle_list || quad_list || index_32bit ? VK_INDEX_TYPE_UINT32
+                                                                : VK_INDEX_TYPE_UINT16;
+    const State::RecordedState& last = s.recorded;
+    if (last.valid) {
+      auto same = [](const auto& a, const auto& b) { return !std::memcmp(&a, &b, sizeof(a)); };
+      auto& r = s.stats.state_repeated;
+      s.stats.state_compared++;
+      r[0] += same(last.viewport, now.viewport);
+      r[1] += same(last.scissor, now.scissor);
+      r[2] += same(last.bias, now.bias);
+      r[3] += same(last.blend_constants, now.blend_constants);
+      r[4] += last.pipeline == now.pipeline;
+      r[5] += last.layout == now.layout && same(last.sets, now.sets);
+      bool both_indexed = now.indexed && last.indexed;
+      r[6] += both_indexed && last.index_offset == now.index_offset &&
+              last.index_type == now.index_type;
+      r[7] += both_indexed && last.index_type == now.index_type;
+    }
+    if (now.indexed || !last.valid) {
+      s.recorded = now;
+    } else {
+      // A draw without indices leaves the earlier binding in place.
+      VkBuffer buffer = last.index_buffer;
+      VkDeviceSize offset = last.index_offset;
+      VkIndexType type = last.index_type;
+      bool indexed = last.indexed;
+      s.recorded = now;
+      s.recorded.indexed = indexed;
+      s.recorded.index_buffer = buffer;
+      s.recorded.index_offset = offset;
+      s.recorded.index_type = type;
+    }
+  }
   s.stats.drawn++;
   if (call.inline_vertices) {
     s.stats.inline_draws++;
@@ -2820,6 +2890,7 @@ void Passes::State::DrawIds(VkCommandBuffer commands) {
     vk::vkCmdDrawIndexed(commands, draw.index_count, 1, 0, 0, 0);
   }
   vk::vkCmdEndRendering(commands);
+  recorded.valid = false;
   Transition(commands, id_image.image, VK_IMAGE_ASPECT_COLOR_BIT, color_layout,
              VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
   id_drawn = true;

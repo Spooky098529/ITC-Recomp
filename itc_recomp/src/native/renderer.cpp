@@ -893,6 +893,16 @@ void Renderer::LogStats() {
                 double(view.inline_draws) / frames, double(t[4]) / frames, double(t[6]) / frames,
                 double(t[8]) / frames, double(t[13]) / frames);
   }
+  if (view.state_compared) {
+    const auto& r = view.state_repeated;
+    auto share = [&](uint64_t n) { return 100.0 * double(n) / double(view.state_compared); };
+    REXLOG_INFO("native renderer: of {:.1f} draws a frame following another draw, repeating its "
+                "viewport {:.0f}%, scissor {:.0f}%, depth bias {:.0f}%, blend constants {:.0f}%, "
+                "pipeline {:.0f}%, descriptor sets {:.0f}%, index buffer binding {:.0f}% (buffer "
+                "and type {:.0f}%)",
+                double(view.state_compared) / frames, share(r[0]), share(r[1]), share(r[2]),
+                share(r[3]), share(r[4]), share(r[5]), share(r[6]), share(r[7]));
+  }
   if (view.vertex_shader_copies) {
     REXLOG_INFO("native renderer: {:.1f} draws a frame got their vertex shader from the library's "
                 "patched copy in the command buffer",
