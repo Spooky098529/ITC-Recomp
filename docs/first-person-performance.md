@@ -91,3 +91,47 @@ perf-debug`, then `gh run download <id> -D itc_recomp/out/dist/<name>`;
 the release preset is `-O3` with ThinLTO and `-march=x86-64-v2`). The
 user unzips it on the Deck (`chmod +x itc run.sh run-debug.sh`) and
 repeats the three views in order with `run-debug.sh`.
+
+## Ideas for lightening the render load
+
+Written 2026-10-15, before any profile in cockpit view: estimates, to be
+checked. The game draws 2,000-3,000 draws a frame, little for a modern
+GPU; the cost is our per-draw overhead from emulating how the 360 drew:
+about 7 µs a draw on the Deck, roughly 1.5 µs on the user's PC (258 fps
+uncapped at roughly 2,500 draws; a rough figure), where native renderers
+manage well under 1 µs. Roughly by payoff for the effort:
+
+1. **Redraw fewer passes on interpolated frames.** A race frame has ~25
+   resolves: the shadow maps (two 1024x1024 depth passes), the 512x512
+   and 1024x1024 reflection passes, the 256x144 glow chain, the 512x128
+   one that may be the mirror. With interpolation, every in-between frame
+   redraws all of them from the same tick. Shadows and reflections
+   refreshed once a tick (30 Hz) likely wouldn't be noticed, and reusing
+   the tick's images could remove a large share of the draws on most
+   frames. Count draws per pass first (the dump tools in
+   `native-renderer.md` can) to see what's at stake.
+2. **Upload less constant data.** About 9 KB of shader constants is
+   uploaded per draw (`native-renderer.md`, Known issues, the constants
+   ring): at 2,800 draws ~25 MB a frame, ~1.25 GB/s of copying at 50 fps,
+   on the render thread. The translated shaders know which constants they
+   read: upload only those, or only what changed since the last draw.
+3. **Re-derive state only when it changed.** Every draw reads the whole
+   register file, looks up shaders, builds a pipeline key and finds a
+   texture set. The game's graphics library keeps dirty flags for exactly
+   this; following them would skip most lookups, as consecutive draws
+   usually change little (constants, maybe a texture).
+4. **Split the render thread in two.** One thread replays the game's
+   command list and runs the library, and also translates and records
+   Vulkan. Recording on a second thread, pipelined a frame behind, could
+   nearly double what the Deck can feed (its 4 cores are ~30% busy). The
+   biggest structural change and the most work.
+5. **Cheaper Vulkan calls**: push descriptors or descriptor buffers
+   instead of allocating descriptor sets, more dynamic state, skipping
+   rebinds of unchanged state (the last profile had `Passes::State::Draw`
+   at 27%, much of it in the driver).
+6. **Smaller items**: the interpolation blending (~2.5-3 ms a frame on
+   the Deck in cockpit; SIMD), and the library's remaining packet writers
+   (~3-4%, in Known issues).
+
+Start with the profile in cockpit view and a draws-per-pass count: they
+show whether 1 and 2 are as big as estimated.
