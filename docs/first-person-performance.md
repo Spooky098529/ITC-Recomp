@@ -504,8 +504,9 @@ decompositions ~60. All of `interpolation::` ~1,170.
    (`_mm_shuffle_epi8`, part of x86-64-v2), the rest one by one; scalar
    without SSSE3. Checked against the scalar loops for counts 0-70 at
    every alignment. `CopyU32s` is also how the renderer reads registers
-   and constants, which were scalar at run time too (`ReadRegisters` had
-   `pshufb` in it, on a path not taken): `ReadRegisters` ~453 to ~46,
+   and constants, which were slow too (`ReadRegisters` already had
+   `pshufb` in its disassembly; why the time went anyway wasn't looked
+   into): `ReadRegisters` ~453 to ~46,
    `Passes::State::Draw` (constants) ~1,730 to ~1,500, `Apply` ~408 to
    ~350, all of `interpolation::` ~923 to ~837 thousand cycles a frame.
    Uncapped attract races, alternating: 341.8, 345.7, 346.1 fps mean
