@@ -1945,6 +1945,55 @@ the old blender over whole attract races, both blend modes; keep
 `--log_blend_state`'s rejection counts per frame. Unmeasured: comparing
 ~1 KB per upload may eat most of the gain.
 
+### Profile of 2026-10-15, after `read-registers` (`mirrors-fix`)
+
+On `843af98` (`main` with `blend-math` and `read-registers`),
+`profile_render_thread.sh`, two runs: 14.43 and 14.13 million cycles a
+frame (4,193 and 4,295 frames in the 12 s). `itc` 77%, libc 11.3%, the
+Vulkan driver 10.7%, libstdc++ 0.8%. By group (share of the render
+thread, two runs):
+
+| Part | Share | Biggest items (run a) |
+|---|---|---|
+| Replay handlers and library (guest, `sub_8...`) | ~26% | Release 2.4, `8258FBD0` 2.1, `8258FC30` 1.7 |
+| `Passes::State::Draw` itself | ~10.2% | |
+| Texture binding | ~8.9% | `GetView` 3.5, `GetTextureSet` 1.6, `GetSwizzledView` 1.5, `GetSampler` 1.3 |
+| Mirror | ~8.4% | `IndexRange` 3.4 (~485 thousand cycles a frame), `Buffers_NewestWrite` 1.5 (~215), the `mirrored` set's insert 1.5, `Mirror` 1.2 (~172), `TakePending` 0.7 (~100) |
+| Shader lookup | ~4.7% | XXH3 of the microcode 1.6, `ShaderCache::Get` 1.3, `GetInterface` 1.0 |
+| Interpolation | ~4.8% | `BlendState_ReplayConstants` 4.4 |
+| Reading state | ~3.1% | `GetTarget` 1.6, `ReadRegisters` 1.1 |
+| Pipeline lookup | ~1.0% | the `PipelineKey` `unordered_map` 1.1 |
+
+Also: memcpy's write tracking (`RecordWrite`: the `std::map` of segments,
+its `operator[]` and tree rebalancing) ~1%. The script runs with info
+logging (it counts frames from the `fps` lines), so its profiles include
+`collect_interfaces`' `std::map` (`interpolators_by_shader`, 1.0%), which
+`run.sh` (`--log_level=off`) doesn't pay; the same in every build, so
+comparisons hold.
+
+So the mirror is now the largest of our own parts after `Draw`, ~1.2
+million cycles a frame (~560 a draw at ~2,150 draws). Where it goes, per
+draw:
+- `IndexRange` scans every index of the draw (vectorized, `passes.cpp`)
+  to find the lowest and highest vertex, though most index buffers are
+  static and drawn again every frame (and several times a frame).
+- `Mirror` inserts each range into `mirrored` (an `unordered_set`, a
+  node allocated per new range and all freed at the frame's start) to copy
+  a range at most once a frame, then looks it up in the frame's
+  `GuestMirror::copied` and asks `Buffers_NewestWrite` (a `std::map`
+  lookup, after `TakePending`) whether memcpy wrote it since.
+
+Plan, to measure first (`CLAUDE.md`: logs before changes): count per
+frame the index ranges seen, the distinct ones, how many were written by
+memcpy since last seen, and the memcpy writes taken. Then:
+1. Cache `IndexRange`'s result by (address, count, format, endian,
+   restart), valid while memcpy hasn't written the range (its sequence, as
+   the mirror keeps).
+2. Replace `mirrored` with a flat open-addressed table stamped by frame
+   (as `ProductTable`), so nothing is allocated or cleared.
+3. Answer "written since?" cheaply when nothing was written since the last
+   question (`Buffers_Sequence` unchanged), before the `std::map` lookup.
+
 Checking a change: run the old code beside the new over a whole attract
 race and compare every result, as for steps 1-4 (the lighting blender:
 cherry-pick `2c82ae6` and `5942f31`, then `--check_pixel_blender=true`; the
