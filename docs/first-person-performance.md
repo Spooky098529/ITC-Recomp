@@ -381,9 +381,18 @@ branch-record run is skewed, so take shares from a plain run):
       runs vary more than such a change; see below): `BlendState_
       ReplayConstants` 919 to 822 thousand cycles a frame (two runs each),
       ~0.6% of the render thread.
-   3. `Apply`'s sorting loop: the flags it writes are bytes, which may
-      alias anything, so the vectors' data and sizes are reloaded every
-      iteration; take them into locals.
+   3. **`Apply`'s loops through local pointers: done.** The flags it
+      writes are bytes, which may alias anything, so the loops reloaded
+      the vectors' start and end and recomputed the size every iteration
+      (seen in the disassembly: `mov (%r12)`, `mov 0x8(%r12)`, `sar`,
+      before; a compare with a register after). Also switched slots by a
+      per-register table instead of a scan of six ranges per component.
+      Checked against the old blender as before (both blend modes; only
+      the NaN uploads' outcome differs). `BlendState_ReplayConstants`
+      834, 809, 823, 854, 833 thousand cycles a frame (step 2's runs) to
+      813, 783, 761 (~-45 thousand, ~0.3% of the render thread; less than
+      the split's ~0.9% for the whole loop: the reloads were only part of
+      it).
    4. Storing the blend and putting it back: a whole buffer written with
       one vectorized loop each.
 
