@@ -17,6 +17,7 @@ struct FrameCosts {
   uint32_t textures = 0;
   uint64_t texture_bytes = 0;
   int64_t hash_ns = 0;  // hashing textures' memory (first loads and rechecks)
+  int64_t mark_ns = 0;  // marking textures memcpy wrote
   int64_t shader_ns = 0;
   uint32_t shaders = 0;
   int64_t pipeline_ns = 0;

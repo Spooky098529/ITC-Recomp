@@ -14,18 +14,19 @@ This file is what's been measured, what's done, and what's left to try.
 `TextureCache::GetView`, per draw, per texture binding:
 
 1. Look the texture up by its fetch constant's data fields.
-2. First use: hash its guest memory (`State::Hash`, XXH3 over the base
-   and mip ranges), then `State::Upload`:
+2. First use: `State::Upload`:
    - for every level and layer, row by row: gather the row from the 360's
      tiled layout (`GatherTiledRow`) into a row buffer, byte-swap it
      (`SwapEndian`), convert if needed (`4_4_4_4` to RGBA8) and copy it
      into this frame's 64 MB staging buffer;
    - record a barrier, `vkCmdCopyBufferToImage` and a barrier into the
      upload command buffer (submitted before the frame's drawing).
-3. Later uses: hash again now and then to catch the game rewriting the
-   texture in place: every 4 frames for the first 240 frames after
-   loading, then every 240 frames (8 a frame at most). A changed hash
-   reloads it.
+3. Later uses: reload it if it's marked written. At the start of each
+   frame (`MarkWritten`), the writes the library's memcpy made into the
+   physical views since the last frame (`Buffers_TakeNewWrites`) mark the
+   textures they overlap (found through `by_address`, the textures'
+   ranges by start address). Nothing is hashed (since 2026-10-15; see
+   "Who writes textures' memory").
 
 A texture that doesn't fit in what's left of staging is deferred to a
 later frame; meanwhile draws get a white 1x1 placeholder.
@@ -38,7 +39,8 @@ automated attract race (see `CLAUDE.md`). The log gives:
 - "long frame" lines for any frame of 40 ms or more: textures loaded,
   MB, time loading and time hashing (`frame_costs.h`);
 - every 5 s, in the "textures:" line: textures loaded and reloaded, MB,
-  the time spent loading and hashing, and the worst frame.
+  the time spent loading and hashing, and the worst frame; and a line with
+  memcpy's writes, the textures they marked and the time marking took.
 
 These need info logging (`run-debug.sh`); `run.sh` turns it off and the
 timing with it (`log_enabled.h`).
@@ -114,7 +116,7 @@ changed. (Attaching gdb to a running game isn't allowed here,
 `ptrace_scope` 1: start the game under gdb and interrupt it with
 `kill -INT` instead.)
 
-### The plan from this
+### The plan from this (done, see below)
 
 1. Hash only the bytes the texture uses: for untiled textures, up to the
    end of the last row's data, not the padded row count. This removes the
@@ -131,6 +133,34 @@ changed. (Attaching gdb to a running game isn't allowed here,
 Open: the five textures with no memcpy writes. They're loaded at first
 use and never change in these runs; a race the user drives may differ,
 which step 3's check would show.
+
+## Done: textures marked written instead of hashed (2026-10-15)
+
+The plan above, as described in "How a texture is loaded":
+
+- Untiled textures' ranges end with their last row's data (`LevelEnd`);
+  tiled ones still cover whole tiles.
+- Textures are marked written from memcpy's record once a frame and
+  reloaded on their next use; nothing is hashed in normal play.
+- `--native_renderer_verify_textures` hashes every texture used every
+  frame and counts (and reloads) any that changed with no write recorded
+  ("textures changed in memory with no write recorded"); with
+  `--native_renderer_log_texture_writes` it also logs which bytes changed.
+  An 80 s attract race with both (`itc_667.log`): none.
+
+Pinned to one CPU, loading and hashing textures took, per 5 s of the
+race (`itc_659.log` before, `itc_668.log` after):
+
+| | Before | After |
+|---|---|---|
+| Time per 5 s (after the first window) | 6-102 ms, mostly 30-40 | 1-11 ms |
+| Worst frame per 5 s | 0.4-11 ms | 0.5-11 ms, mostly under 3 |
+| Long frames (40 ms+) from textures | the race's first frame (52 ms) | none |
+
+The time saved is the hashing: each new texture was hashed about 60
+times in its first 240 frames, plus the false reloads of the 300x150
+texture. Marking costs 3-26 ms per 5 s pinned (50,000-80,000 memcpy writes
+per 5 s, mostly vertex data, each a search of `by_address`).
 
 ## What's left to try
 
@@ -154,14 +184,12 @@ In the order suggested. Gains are estimates until measured.
    read it back, so the swap would have to happen on the way in. Check
    the memory type first; the gain is likely small.
 
-4. **Hash young textures less** (superseded by "The plan from this"
-   above, which removes hashing). A new texture is hashed every 4 frames
-   for 240 frames: about 60 hashes each, 36 a second for its first 1.7 s
-   at 144 fps. This is there because the game can still be writing a
-   texture when it's first drawn ("Textures replaced in memory" in
-   `native-renderer.md`). Options: lengthen the interval as the texture
-   ages, or hash a sample of its memory. Split the hashing time out of
-   the 5 s line first to see what it costs.
+4. **Cheaper marking.** Each memcpy write searches `by_address` back by
+   the longest texture's size, though most writes (vertex data) overlap no
+   texture. A bitmap of the 4 KB pages holding textures would reject those
+   with a bit test or two. Tried 2026-10-15: no measurable change pinned
+   (3-26 ms per 5 s against 6-25, within run-to-run noise), so left out;
+   worth trying again if marking shows up in a profile.
 
 5. **A worker thread for the CPU work.** The biggest win for the Deck,
    which has spare cores (~30% of the machine busy). The worker hashes,

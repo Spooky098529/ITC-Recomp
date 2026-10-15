@@ -4,6 +4,8 @@
 #pragma once
 
 #include <cstdint>
+#include <utility>
+#include <vector>
 
 namespace native {
 
@@ -27,6 +29,10 @@ struct Buffers_Coverage {
   uint32_t newest_caller = 0, first_caller = 0;
 };
 Buffers_Coverage Buffers_CoverageOf(uint32_t physical, uint32_t size);
+// Render thread: the ranges [start, end) memcpy has written into the
+// physical views since the last call, appended to `out` (the texture cache
+// marks the textures they overlap as changed).
+void Buffers_TakeNewWrites(std::vector<std::pair<uint32_t, uint32_t>>& out);
 
 // Render thread, with logging: a vertex or index range (physical) copied
 // into the mirror, the first time in a frame.

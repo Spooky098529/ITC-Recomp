@@ -75,8 +75,8 @@ REXCVAR_DEFINE_STRING(native_renderer_skip_pixel_shader, "", "ITC",
 REXCVAR_DEFINE_BOOL(native_renderer_base_level_only, false, "ITC",
                     "Sample only each texture's first level (a debugging aid)");
 REXCVAR_DEFINE_BOOL(native_renderer_verify_textures, false, "ITC",
-                    "Hash every texture used again each frame, reloading those whose memory "
-                    "changed (a debugging aid)");
+                    "Hash every texture used each frame, logging and reloading those whose "
+                    "memory changed with no memcpy write recorded (a debugging aid)");
 REXCVAR_DEFINE_BOOL(native_renderer_no_index_clamp, false, "ITC",
                     "Don't clamp indices to VGT_MIN/MAX_VTX_INDX (a debugging aid)");
 REXCVAR_DEFINE_INT32(native_renderer_dump_every, 0, "ITC",
@@ -250,7 +250,7 @@ class Renderer {
   uint64_t frames_presented_ = 0, frames_skipped_ = 0, commands_ = 0, draws_ = 0;
   // Texture loading and hashing (frame_costs.h) since the last stats: total
   // and the frame that spent the most.
-  int64_t texture_ns_ = 0, texture_ns_max_ = 0;
+  int64_t texture_ns_ = 0, texture_ns_max_ = 0, mark_ns_ = 0;
   Clock::time_point start_ = Clock::now(), last_log_ = Clock::now();
   Clock::time_point last_present_ = Clock::now();
 };
@@ -740,6 +740,7 @@ void Renderer::EndFrame() {
           c.shaders, c.shader_ns / 1e6, c.pipelines, c.pipeline_ns / 1e6);
     }
     texture_ns_ += g_frame_costs.texture_ns + g_frame_costs.hash_ns;
+    mark_ns_ += g_frame_costs.mark_ns;
     texture_ns_max_ =
         std::max(texture_ns_max_, g_frame_costs.texture_ns + g_frame_costs.hash_ns);
     g_frame_costs = {};
@@ -862,15 +863,14 @@ void Renderer::LogStats() {
               t.mismatched, double(t.resolved_hits) / frames,
               double(t.resolved_mismatched) / frames);
   texture_ns_ = texture_ns_max_ = 0;
-  if (t.changed_after_load) {
-    REXLOG_INFO("native renderer: {} textures changed soon after loading, e.g. {:08X} after {} "
-                "frames",
-                t.changed_after_load, t.changed_after_load_sample, t.changed_after_load_frames);
-  }
-  if (t.changed_later) {
-    REXLOG_INFO("native renderer: {} textures changed in memory after their first frames, e.g. "
-                "{:08X}, {} frames after it was last checked",
-                t.changed_later, t.changed_later_sample, t.changed_later_frames);
+  REXLOG_INFO("native renderer: textures: {} memcpy writes, {} textures marked written ({:.1f} "
+              "ms marking)",
+              t.writes, t.marked, mark_ns_ / 1e6);
+  mark_ns_ = 0;
+  if (t.unrecorded) {
+    REXLOG_INFO("native renderer: {} textures changed in memory with no write recorded, e.g. "
+                "{:08X}, {} frames after it was first loaded",
+                t.unrecorded, t.unrecorded_sample, t.unrecorded_frames);
   }
   if (t.mismatched_sample != UINT32_MAX) {
     REXLOG_INFO("native renderer: e.g. a texture of format {}, dimension {}, {}x{} where the "

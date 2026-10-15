@@ -85,6 +85,8 @@ struct Write {
 std::map<uint32_t, Write> g_writes;
 uint64_t g_sequence = 0;
 std::vector<PendingWrite> g_taken;
+// Writes taken since Buffers_TakeNewWrites last ran.
+std::vector<std::pair<uint32_t, uint32_t>> g_new_writes;
 
 // Any thread (under g_mutex), for the logging: the headers of known buffer
 // objects (object: end).
@@ -133,6 +135,7 @@ void TakePending() {
   }
   for (const PendingWrite& write : g_taken) {
     RecordWrite(write.start, write.end, write.caller);
+    g_new_writes.emplace_back(write.start, write.end);
   }
   g_taken.clear();
 }
@@ -291,6 +294,12 @@ Buffers_Coverage Buffers_CoverageOf(uint32_t physical, uint32_t size) {
   TakePending();
   Coverage c = CoverageOf(physical, physical + size);
   return {c.bytes, c.newest, c.newest_caller, c.first_caller};
+}
+
+void Buffers_TakeNewWrites(std::vector<std::pair<uint32_t, uint32_t>>& out) {
+  TakePending();
+  out.insert(out.end(), g_new_writes.begin(), g_new_writes.end());
+  g_new_writes.clear();
 }
 
 uint64_t Buffers_Sequence() {

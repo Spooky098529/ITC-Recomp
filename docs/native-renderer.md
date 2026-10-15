@@ -110,8 +110,9 @@ known about it; this file is the plan and its progress).
   swizzle in the view, with missing components repeating the last one).
   Uploads go through a 64 MB staging buffer per frame in flight, into a
   command buffer submitted before the frame's; a texture whose staging
-  doesn't fit waits for the next frame. Loaded textures' memory is hashed
-  again every 240 frames (8 a frame at most) and reloaded if it changed.
+  doesn't fit waits for the next frame. Loaded textures are reloaded when
+  the library's memcpy writes their memory (since 2026-10-15; before, they
+  were hashed again now and then: see `texture-handling-optimisation.md`).
 - Samplers from the fetch constant (filters, clamp modes, border, mip
   range, anisotropy) with the shader's fetch instruction overriding the
   filters. The texture's post-swizzle signs go into the system constants;
@@ -1010,15 +1011,15 @@ To be fixed (or accepted) in milestone 7.
   2026-10-14): the Xbox 360's output gamma isn't applied yet. A known
   issue, for milestone 7 (the user's call).
 
-- **Textures replaced in memory show their old contents for a while.**
-  The game streams track sections in during a race, and textures are
-  rewritten in place (in a 75 s attract race, several a few seconds apart,
-  59 in one 5 s window). A texture past its first 240 frames is hashed
-  again at most every 240 frames and at most 8 a frame, so a change was
-  noticed 240-3,200 frames late (logged as "textures changed in memory
-  after their first frames"). `--native_renderer_verify_textures` checks
-  every texture used each frame; something cheaper (watching writes) is
-  needed before this is the default.
+- **Textures replaced in memory showed their old contents for a while**
+  (fixed 2026-10-15). The game rewrites textures in place as it streams
+  track sections; they were hashed again only every 240 frames, so a
+  change was noticed up to 3,200 frames late. Now the library's memcpy,
+  which writes them (as it does vertex and index data), marks them to be
+  reloaded at the next frame; `--native_renderer_verify_textures` checks
+  that nothing else changes them (none in an attract race). Five textures
+  a race aren't written by memcpy at all, and their writer isn't known;
+  they didn't change. Details in `texture-handling-optimisation.md`.
 
 - Textures are never freed: memory reused for different textures (another
   race) leaves the old images behind.
@@ -1079,7 +1080,10 @@ To be fixed (or accepted) in milestone 7.
   spent loading and hashing textures and the worst frame. A per-frame
   time budget (deferring loads to later frames) was considered and not
   done (the user's call): deferred first loads show white placeholders.
-  What's left to try, in order, is in `texture-handling-optimisation.md`.
+  Since then hashing is gone too (textures are marked written by the
+  library's memcpy instead): texture time per 5 s pinned went from 30-40
+  ms to 1-11 ms. What's left to try, in order, is in
+  `texture-handling-optimisation.md`.
 - **The attract race's grayscale filter flickers with the game pinned to
   one CPU** (`taskset -c 0`; seen by the user, 2026-10-15). Since the
   frame pacer fix (`d8c10c5`, a due tick always gets the next pass); the

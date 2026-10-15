@@ -36,15 +36,6 @@ namespace {
 // Per frame in flight: texture data on its way into images. A frame that
 // needs more defers the rest to the next frames (placeholders meanwhile).
 constexpr VkDeviceSize kStagingSize = 64u << 20;
-// A loaded texture's memory is hashed again at most this often (frames),
-// and at most this many a frame, to catch it being replaced.
-constexpr uint64_t kVerifyInterval = 240;
-constexpr uint32_t kVerifiesPerFrame = 8;
-// For this long after loading, a texture is checked this often, without the
-// limit: its memory may still be being written (streamed in) when it's
-// first used.
-constexpr uint64_t kNewTextureFrames = 240;
-constexpr uint64_t kNewTextureInterval = 4;
 
 uint32_t Log2Ceil(uint32_t v) {
   return v <= 1 ? 0 : 32 - std::countl_zero(v - 1);
@@ -285,6 +276,22 @@ Placement Place(const Layout& layout, const Format& format, uint32_t level) {
   return p;
 }
 
+// Where a level's data ends (physical): a tiled level fills whole 32x32
+// block tiles, so its last layer's storage; an untiled one ends with its
+// last row's data, as the padding after it can hold other data (an untiled
+// 300x150 texture's padding rows changed every tick, 2026-10-15).
+uint32_t LevelEnd(const Layout& layout, const Format& format, uint32_t level) {
+  Placement p = Place(layout, format, level);
+  uint32_t last_layer = p.address + (layout.layers - 1) * p.layer_stride;
+  if (layout.tiled) {
+    return last_layer + p.layer_stride;
+  }
+  uint32_t width_blocks = DivideUp(std::max(layout.width >> level, 1u), format.block_width);
+  uint32_t height_blocks = DivideUp(std::max(layout.height >> level, 1u), format.block_height);
+  return last_layer + (p.y + height_blocks - 1) * p.row_pitch_bytes +
+         (p.x + width_blocks) * format.bytes_per_block;
+}
+
 void SwapEndian(uint8_t* data, size_t size, xenos::Endian endian) {
   size_t i = 0;
 #if defined(__SSSE3__)
@@ -400,7 +407,6 @@ struct TextureCache::State {
   uint64_t frame_number = 0;
   VkDeviceSize staging_used = 0;
   bool recording = false;
-  uint32_t verified_this_frame = 0;
 
   struct Texture {
     Layout layout{};
@@ -410,12 +416,13 @@ struct TextureCache::State {
     VkDeviceMemory memory = VK_NULL_HANDLE;
     uint32_t levels = 0;
     bool loaded = false;
+    // The library's memcpy wrote its memory since it was loaded: reload.
+    bool changed = false;
+    // With verify_every_frame_: its memory's hash when loaded or last
+    // checked, and when that was.
     uint64_t hash = 0;
     uint64_t verified_frame = 0;
     uint64_t loaded_frame = 0;
-    // With --native_renderer_log_texture_writes: the memcpy sequence when
-    // last loaded.
-    uint64_t write_sequence = 0;
     // The guest memory it's read from: base and mips (address, size).
     std::array<std::pair<uint32_t, uint32_t>, 2> ranges{};
     std::unordered_map<uint32_t, VkImageView> views;  // by swizzle
@@ -425,6 +432,13 @@ struct TextureCache::State {
     VkImageView attachment_view = VK_NULL_HANDLE;
   };
   std::map<TextureKey, Texture> textures;
+  // Loaded textures' ranges by start address (with the longest range's
+  // size, to find those overlapping a write), and memcpy's writes taken
+  // this frame.
+  std::multimap<uint32_t, std::pair<uint32_t, Texture*>> by_address;
+  uint32_t longest_range = 0;
+  std::vector<std::pair<uint32_t, uint32_t>> new_writes;
+  void MarkWritten();
   // Resolve destinations by base address (page).
   std::unordered_map<uint32_t, Texture> resolved;
   std::unordered_map<uint64_t, VkSampler> samplers;
@@ -433,18 +447,19 @@ struct TextureCache::State {
   // --native_renderer_log_texture_writes: who wrote textures' memory.
   struct WriteStats {
     uint64_t first = 0, first_bytes = 0, covered = 0, partly = 0, uncovered = 0,
-             uncovered_bytes = 0, changed = 0, changed_by_memcpy = 0, changed_otherwise = 0;
-    std::map<uint32_t, uint64_t> first_callers, change_callers;
-    // Textures changed without memcpy: address: changes, and a description.
-    std::map<uint32_t, std::pair<uint64_t, std::string>> changed_otherwise_by;
+             uncovered_bytes = 0;
+    std::map<uint32_t, uint64_t> first_callers;
+    // Textures changed without a recorded write (found by verify_every_frame_):
+    // address: changes, and a description.
+    std::map<uint32_t, std::pair<uint64_t, std::string>> unrecorded_by;
   } writes;
-  // Textures changed without memcpy: their memory when last checked, to
-  // log which bytes changed.
+  // Textures changed without a recorded write: their memory when last
+  // checked, to log which bytes changed.
   std::unordered_map<uint32_t, std::vector<uint8_t>> write_snapshots;
   uint32_t write_lines = 200;
   std::chrono::steady_clock::time_point writes_logged = std::chrono::steady_clock::now();
-  uint8_t* guest_base = nullptr;
-  void LogWrite(const Texture& t, bool first, uint64_t frames);
+  void LogFirstLoad(const Texture& t);
+  void LogUnrecordedChange(uint8_t* base, const Texture& t);
   void LogWriteSummary();
 
   bool CreateTexture(Texture& texture);
@@ -462,11 +477,11 @@ std::string WriteCallers(const std::map<uint32_t, uint64_t>& callers) {
   return text.empty() ? " none" : text;
 }
 
-// A texture loaded for the first time (first) or found changed: what the
-// library's memcpy wrote into its memory.
-void TextureCache::State::LogWrite(const Texture& t, bool first, uint64_t frames) {
-  uint64_t size = 0, bytes = 0, newest = 0;
-  uint32_t first_caller = 0, newest_caller = 0;
+// A texture loaded for the first time: what the library's memcpy wrote
+// into its memory.
+void TextureCache::State::LogFirstLoad(const Texture& t) {
+  uint64_t size = 0, bytes = 0;
+  uint32_t first_caller = 0;
   for (const auto& [address, range_size] : t.ranges) {
     if (!range_size) {
       continue;
@@ -477,74 +492,57 @@ void TextureCache::State::LogWrite(const Texture& t, bool first, uint64_t frames
     if (c.bytes && !first_caller) {
       first_caller = c.first_caller;
     }
-    if (c.newest > newest) {
-      newest = c.newest;
-      newest_caller = c.newest_caller;
-    }
   }
   uint32_t address = t.layout.base_address ? t.layout.base_address : t.layout.mip_address;
   WriteStats& w = writes;
-  if (first) {
-    w.first++;
-    w.first_bytes += size;
-    if (bytes >= size) {
-      w.covered++;
-    } else if (bytes) {
-      w.partly++;
-    } else {
-      w.uncovered++;
-      w.uncovered_bytes += size;
-    }
-    if (bytes) {
-      w.first_callers[first_caller]++;
-    }
-    if (bytes < size && write_lines) {
-      write_lines--;
-      REXLOG_INFO("native renderer: texture writes: {:08X} ({}x{}, {} bytes) first loaded with "
-                  "{} bytes written by memcpy{}",
-                  address, t.layout.width, t.layout.height, size, bytes,
-                  bytes ? fmt::format(" (first from {:08X})", first_caller) : std::string());
-    }
-    return;
-  }
-  w.changed++;
-  bool by_memcpy = newest > t.write_sequence;
-  (by_memcpy ? w.changed_by_memcpy : w.changed_otherwise)++;
-  if (by_memcpy) {
-    w.change_callers[newest_caller]++;
+  w.first++;
+  w.first_bytes += size;
+  if (bytes >= size) {
+    w.covered++;
+  } else if (bytes) {
+    w.partly++;
   } else {
-    auto& [count, text] = w.changed_otherwise_by[address];
-    if (!count++) {
-      text = fmt::format("{}x{} format {} levels {}-{}", t.layout.width, t.layout.height,
-                         int(t.format.format), t.layout.min_level, t.layout.max_level);
-    }
-    // Which bytes of the first range changed since the last change.
-    auto [start, range_size] = t.ranges[0].second ? t.ranges[0] : t.ranges[1];
-    const uint8_t* now = PhysicalHostAddress(guest_base, start);
-    std::vector<uint8_t>& was = write_snapshots[address];
-    if (was.size() == range_size && write_lines) {
-      uint32_t first = UINT32_MAX, last = 0, changed = 0;
-      for (uint32_t i = 0; i < range_size; i++) {
-        if (now[i] != was[i]) {
-          first = std::min(first, i);
-          last = i;
-          changed++;
-        }
-      }
-      write_lines--;
-      REXLOG_INFO("native renderer: texture writes: {:08X}: {} bytes changed, offsets {}-{}",
-                  address, changed, first, last);
-    }
-    was.assign(now, now + range_size);
+    w.uncovered++;
+    w.uncovered_bytes += size;
   }
-  if (by_memcpy && write_lines) {
+  if (bytes) {
+    w.first_callers[first_caller]++;
+  }
+  if (bytes < size && write_lines) {
     write_lines--;
-    REXLOG_INFO("native renderer: texture writes: {:08X} ({}x{}, {} bytes) changed {} frames "
-                "after loading: {}",
-                address, t.layout.width, t.layout.height, size, frames,
-                by_memcpy ? fmt::format("memcpy from {:08X} wrote it", newest_caller)
-                          : std::string("not written by memcpy since"));
+    REXLOG_INFO("native renderer: texture writes: {:08X} ({}x{}, {} bytes) first loaded with "
+                "{} bytes written by memcpy{}",
+                address, t.layout.width, t.layout.height, size, bytes,
+                bytes ? fmt::format(" (first from {:08X})", first_caller) : std::string());
   }
+}
+
+// A texture whose memory changed with no write recorded: which bytes of its
+// first range changed since the last such change.
+void TextureCache::State::LogUnrecordedChange(uint8_t* base, const Texture& t) {
+  uint32_t address = t.layout.base_address ? t.layout.base_address : t.layout.mip_address;
+  auto& [count, text] = writes.unrecorded_by[address];
+  if (!count++) {
+    text = fmt::format("{}x{} format {} levels {}-{}", t.layout.width, t.layout.height,
+                       int(t.format.format), t.layout.min_level, t.layout.max_level);
+  }
+  auto [start, range_size] = t.ranges[0].second ? t.ranges[0] : t.ranges[1];
+  const uint8_t* now = PhysicalHostAddress(base, start);
+  std::vector<uint8_t>& was = write_snapshots[address];
+  if (was.size() == range_size && write_lines) {
+    uint32_t first = UINT32_MAX, last = 0, changed = 0;
+    for (uint32_t i = 0; i < range_size; i++) {
+      if (now[i] != was[i]) {
+        first = std::min(first, i);
+        last = i;
+        changed++;
+      }
+    }
+    write_lines--;
+    REXLOG_INFO("native renderer: texture writes: {:08X}: {} bytes changed, offsets {}-{}",
+                address, changed, first, last);
+  }
+  was.assign(now, now + range_size);
 }
 
 void TextureCache::State::LogWriteSummary() {
@@ -558,11 +556,9 @@ void TextureCache::State::LogWriteSummary() {
               "memcpy, {} partly, {} not at all ({:.1f} MB); by first writer:{}",
               w.first, w.first_bytes / 1048576.0, w.covered, w.partly, w.uncovered,
               w.uncovered_bytes / 1048576.0, WriteCallers(w.first_callers));
-  REXLOG_INFO("native renderer: texture writes: {} changed: {} written by memcpy since loading, "
-              "{} not; by writer:{}",
-              w.changed, w.changed_by_memcpy, w.changed_otherwise, WriteCallers(w.change_callers));
-  for (auto& [address, entry] : w.changed_otherwise_by) {
-    REXLOG_INFO("native renderer: texture writes: {:08X} ({}) changed {} times without memcpy",
+  for (auto& [address, entry] : w.unrecorded_by) {
+    REXLOG_INFO("native renderer: texture writes: {:08X} ({}) changed {} times without a "
+                "recorded write",
                 address, entry.second, entry.first);
   }
   w = WriteStats{};
@@ -620,16 +616,18 @@ bool TextureCache::State::CreateTexture(Texture& t) {
     return true;
   }
 
-  // The memory it's read from: everything up to the last level's storage.
+  // The memory it's read from: the base level, and the mips up to the end of
+  // the furthest one's data.
   const Layout& layout = t.layout;
   if (layout.base_address) {
-    Placement p = Place(layout, t.format, 0);
-    t.ranges[0] = {p.address, p.layer_stride * layout.layers};
+    t.ranges[0] = {layout.base_address, LevelEnd(layout, t.format, 0) - layout.base_address};
   }
   if (layout.mip_address && layout.max_level) {
-    Placement p = Place(layout, t.format, layout.max_level);
-    t.ranges[1] = {layout.mip_address,
-                   p.address - layout.mip_address + p.layer_stride * layout.layers};
+    uint32_t end = layout.mip_address;
+    for (uint32_t level = 1; level <= layout.max_level; level++) {
+      end = std::max(end, LevelEnd(layout, t.format, level));
+    }
+    t.ranges[1] = {layout.mip_address, end - layout.mip_address};
   }
   for (auto& [address, size] : t.ranges) {
     if (address >= kPhysicalMemorySize) {
@@ -822,8 +820,28 @@ void TextureCache::BeginFrame(uint32_t frame_index) {
   s.frame_number++;
   s.staging_used = 0;
   s.recording = false;
-  s.verified_this_frame = 0;
   vk::vkResetCommandPool(s.context.device, s.frames[frame_index].pool, 0);
+  s.MarkWritten();
+}
+
+// The textures memcpy has written since the last frame are marked to be
+// reloaded (the game writes textures' memory with the library's memcpy:
+// see docs/texture-handling-optimisation.md).
+void TextureCache::State::MarkWritten() {
+  new_writes.clear();
+  Buffers_TakeNewWrites(new_writes);
+  ScopedCost cost(g_frame_costs.mark_ns);
+  stats.writes += new_writes.size();
+  for (const auto& [start, end] : new_writes) {
+    auto it = by_address.lower_bound(start > longest_range ? start - longest_range : 0);
+    for (; it != by_address.end() && it->first < end; ++it) {
+      auto& [size, texture] = it->second;
+      if (it->first + size > start && !texture->changed) {
+        texture->changed = true;
+        stats.marked++;
+      }
+    }
+  }
 }
 
 VkImageView TextureCache::GetView(uint8_t* base, const uint32_t fetch_words[6],
@@ -885,6 +903,13 @@ VkImageView TextureCache::GetView(uint8_t* base, const uint32_t fetch_words[6],
                   int32_t(fetch.exp_adjust));
     }
     it = s.textures.emplace(key, std::move(t)).first;
+    State::Texture& added = it->second;
+    for (const auto& [address, size] : added.ranges) {
+      if (size) {
+        s.by_address.emplace(address, std::make_pair(size, &added));
+        s.longest_range = std::max(s.longest_range, size);
+      }
+    }
   }
   State::Texture& t = it->second;
   VkImageViewType natural = t.layout.cube ? VK_IMAGE_VIEW_TYPE_CUBE : VK_IMAGE_VIEW_TYPE_2D_ARRAY;
@@ -899,53 +924,47 @@ VkImageView TextureCache::GetView(uint8_t* base, const uint32_t fetch_words[6],
     return VK_NULL_HANDLE;
   }
 
-  // Load, or reload when its memory changed (checked now and then).
+  // Load; reload when memcpy has written its memory since (MarkWritten).
+  // With verify_every_frame_, also hash it every frame, and reload it (and
+  // log it) if it changed without a recorded write.
   bool log_writes = REXCVAR_GET(native_renderer_log_texture_writes);
   if (log_writes) {
-    s.guest_base = base;
     s.LogWriteSummary();
   }
   if (!t.loaded) {
-    t.hash = s.Hash(base, t);
-    t.verified_frame = t.loaded_frame = s.frame_number;
+    if (verify_every_frame_) {
+      t.hash = s.Hash(base, t);
+      t.verified_frame = s.frame_number;
+    }
     if (!s.Upload(base, t)) {
       return VK_NULL_HANDLE;
     }
+    t.changed = false;
+    t.loaded_frame = s.frame_number;
     if (log_writes) {
-      s.LogWrite(t, true, 0);
-      t.write_sequence = Buffers_Sequence();
+      s.LogFirstLoad(t);
     }
-  } else if (bool young = s.frame_number - t.loaded_frame < kNewTextureFrames;
-             young ? s.frame_number - t.verified_frame >= kNewTextureInterval
-                   : verify_every_frame_ ? s.frame_number != t.verified_frame
-                   : s.frame_number - t.verified_frame >= kVerifyInterval &&
-                         s.verified_this_frame < kVerifiesPerFrame) {
-    uint64_t since_verified = s.frame_number - t.verified_frame;
-    if (!young) {
-      s.verified_this_frame++;
-    }
-    t.verified_frame = s.frame_number;
-    uint64_t hash = s.Hash(base, t);
-    if (hash != t.hash && s.Upload(base, t)) {
+  } else if (t.changed) {
+    uint64_t hash = verify_every_frame_ ? s.Hash(base, t) : 0;
+    if (s.Upload(base, t)) {  // else the old contents until it fits
+      t.changed = false;
       t.hash = hash;
-      if (log_writes) {
-        s.LogWrite(t, false, s.frame_number - t.loaded_frame);
-        t.write_sequence = Buffers_Sequence();
+      t.verified_frame = s.frame_number;
+    }
+  } else if (verify_every_frame_ && t.verified_frame != s.frame_number) {
+    t.verified_frame = s.frame_number;
+    if (uint64_t hash = s.Hash(base, t); hash != t.hash) {
+      s.stats.unrecorded++;
+      if (s.stats.unrecorded_sample == UINT32_MAX) {
+        s.stats.unrecorded_sample =
+            t.layout.base_address ? t.layout.base_address : t.layout.mip_address;
+        s.stats.unrecorded_frames = uint32_t(s.frame_number - t.loaded_frame);
       }
-      if (young) {
-        s.stats.changed_after_load++;
-        if (s.stats.changed_after_load_sample == UINT32_MAX) {
-          s.stats.changed_after_load_sample = t.layout.base_address ? t.layout.base_address
-                                                                     : t.layout.mip_address;
-          s.stats.changed_after_load_frames = uint32_t(s.frame_number - t.loaded_frame);
-        }
-      } else {
-        s.stats.changed_later++;
-        if (s.stats.changed_later_sample == UINT32_MAX) {
-          s.stats.changed_later_sample = t.layout.base_address ? t.layout.base_address
-                                                               : t.layout.mip_address;
-          s.stats.changed_later_frames = uint32_t(since_verified);
-        }
+      if (log_writes) {
+        s.LogUnrecordedChange(base, t);
+      }
+      if (s.Upload(base, t)) {
+        t.hash = hash;
       }
     }
   }
