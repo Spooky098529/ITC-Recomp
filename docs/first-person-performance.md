@@ -393,8 +393,23 @@ branch-record run is skewed, so take shares from a plain run):
       813, 783, 761 (~-45 thousand, ~0.3% of the render thread; less than
       the split's ~0.9% for the whole loop: the reloads were only part of
       it).
-   4. Storing the blend and putting it back: a whole buffer written with
-      one vectorized loop each.
+   4. **Storing the blend and putting it back: done.** The blender
+      computes the whole upload into a buffer (the blend where it blends,
+      the recorded bits elsewhere) and writes it with `guest::StoreU32s`
+      (the store counterpart of `CopyU32s`); the restore after the upload
+      uses it too. The select loop vectorized only once written without
+      branches (the blend computed for every component, chosen with `&`
+      rather than `&&`): check the disassembly for `mulps`/`subps`.
+      Checked against the old blender as before, bit for bit (both blend
+      modes). `BlendState_ReplayConstants` 796, 790, 818 thousand cycles
+      a frame (step 3, alternating) to 733, 746, 731 (~-60 thousand, ~0.4%
+      of the render thread).
+
+   Over steps 1-4, `BlendState_ReplayConstants` went from ~920 to ~737
+   thousand cycles a frame (5.9% to 4.8% of the render thread), on top of
+   the allocations removed before (7.1% to 6.0%, and libc's `free` ~1.6%
+   to ~0.5%): from ~1.1 million cycles a frame to ~0.74, about 2.3% of
+   the render thread, plus ~1.1% of `free`.
 
    **Measuring small changes.** Fps in alternating runs varies ~±1.5%
    between runs of one build, and so does the render thread's total
