@@ -1968,16 +1968,20 @@ class PixelConstantBlender {
       return false;
     }
     outcome_ = Outcome::kBlended;
-    float* kept = keep_blended_ ? last_blended_.data() : nullptr;
+    // The whole upload, blended where it blends and as recorded (the same
+    // bits) elsewhere, written with one vectorized loop.
+    blended_.resize(size);
+    uint32_t* out = blended_.data();
     for (uint32_t i = 0; i < size; i++) {
+      // Without branches (computed for every component, chosen with & not
+      // &&), so the loop vectorizes.
       float a = previous[i], b = recorded[i];
-      if (a != b && !jumps[i]) {
-        float blended = a + (b - a) * amount;
-        guest::StoreFloat(base, payload + 4 * i, blended);
-        if (kept) {
-          kept[i] = blended;
-        }
-      }
+      bool blend = (a != b) & (jumps[i] == 0);
+      out[i] = blend ? std::bit_cast<uint32_t>(a + (b - a) * amount) : std::bit_cast<uint32_t>(b);
+    }
+    guest::StoreU32s(base, payload, out, size);
+    if (keep_blended_) {
+      std::memcpy(last_blended_.data(), out, size * sizeof(float));
     }
     return true;
   }
@@ -2014,6 +2018,7 @@ class PixelConstantBlender {
   std::vector<float> now_;
   const std::vector<float>* recorded_ = &now_;  // now_ or an entry's current
   std::vector<uint8_t> jumps_;
+  std::vector<uint32_t> blended_;  // the upload as blended, the floats' bits
   std::vector<float> last_blended_;
   bool keep_blended_ = false;
   static void LogRejection(uint32_t i, float a, float b);
@@ -2838,9 +2843,7 @@ void BlendState_ReplayConstants(uint8_t* base, uint32_t payload, uint32_t packed
   }
   if (pixel_blended) {
     const std::vector<float>& recorded = GetPixelConstantBlender().recorded();
-    for (uint32_t i = 0; i < recorded.size(); i++) {
-      guest::StoreFloat(base, payload + 4 * i, recorded[i]);
-    }
+    guest::StoreU32s(base, payload, recorded.data(), uint32_t(recorded.size()));
   }
 }
 
