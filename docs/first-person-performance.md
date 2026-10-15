@@ -128,7 +128,10 @@ manage well under 1 µs. Roughly by payoff for the effort:
 5. **Cheaper Vulkan calls**: push descriptors or descriptor buffers
    instead of allocating descriptor sets, more dynamic state, skipping
    rebinds of unchanged state (the last profile had `Passes::State::Draw`
-   at 27%, much of it in the driver).
+   at 27%, much of it in the driver). **Skipping repeated state: done**
+   (2026-10-15, `--native_renderer_skip_repeated_state`, see "Performance:
+   repeated state calls" in `native-renderer.md`): +6.5% uncapped. The
+   descriptor sets are still bound every draw.
 6. **Smaller items**: the interpolation blending (~2.5-3 ms a frame on
    the Deck in cockpit; SIMD), and the library's remaining packet writers
    (~3-4%, in Known issues).

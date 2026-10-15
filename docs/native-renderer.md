@@ -865,6 +865,10 @@ memory).
 - `--refcount_global_lock`: let the library's AddRef and Release take the
   recompiler's global lock as before, and SetVertexShader take and drop a
   reference when binding the shader already bound.
+- `--native_renderer_skip_repeated_state=false`: record every draw's
+  viewport, scissor, depth bias, blend constants, pipeline and index
+  buffer binding, as before they were skipped when repeated (see
+  "Performance: repeated state calls").
 - `--native_renderer_copy_all`: copy every vertex and index range into the
   mirror every frame, as before memcpy's writes were tracked.
 - `--native_renderer_verify_mirror`: compare every range not copied with
@@ -1166,6 +1170,30 @@ To be fixed (or accepted) in milestone 7.
   flat out in all views, at about 7 µs a draw, and the cockpit drawing
   ~600 more a frame. Measurements and next steps (a profile in cockpit
   view) in `first-person-performance.md`; the fix is the item below.
+- **Performance: repeated state calls** (fixed 2026-10-15). Every draw
+  recorded its viewport, scissor, depth bias, blend constants, pipeline,
+  descriptor sets and index buffer, then the draw. A profile of the
+  render thread (uncapped attract race, branch records `perf record -j
+  any_call,u` to charge library time to its caller: unwinding through
+  `itc` fails, and the release build has no line tables) put ~12% in the
+  Vulkan driver, 9% of it from `Draw`, and ~5% in `memcmp`, some of it
+  called by the driver. Counted over an attract race (the "following
+  another draw" line every 5 s), of ~2,200 draws a frame each repeated the
+  previous draw's viewport, scissor, depth bias and blend constants
+  ~100%, its pipeline 70-74%, its descriptor sets (offsets aside) 44-51%,
+  and its index buffer binding 1% (the same buffer and type 93-97%, at
+  another offset). Now `Draw` records only what changed since the last
+  draw (`RecordedState`, forgotten at a frame's start, after a resolve's
+  draw and after the ID pass), and indexed draws bind the mirror at offset
+  0 and start with `firstIndex` (97% then repeat the binding). Descriptor
+  sets are still bound every draw: the constants' dynamic offsets change.
+  `--native_renderer_skip_repeated_state=false` brings back the old calls.
+  Frames dumped every 5 s of an attract race at 30 fps
+  (`--native_renderer_dump_every=5`, interpolation off) were
+  pixel-identical with and without. Uncapped attract race, alternating
+  runs: 257 and 260 fps mean without, 275 and 276 with (10th percentile
+  205/204 to 218/224). Pinned to one CPU: 51, 51, 59 without and 53, 62,
+  62 with; noisy, so a small gain there at best.
 - **Performance, to do: our renderer's own code** (milestone 7, the
   user's call, 2026-10-14). After milestone 6's speed work our renderer is
   ~78% of the render thread, the replay handlers ~11%, the library ~9%.
