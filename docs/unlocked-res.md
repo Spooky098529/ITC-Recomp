@@ -51,11 +51,13 @@ cockpit view).
   race, 150 fps at the cap, before the 3D view was drawn at full size),
   and a 1400x1050 window (black bars above and below, resizing and
   maximizing).
+- The user: fullscreen at 4K with the 3D view at full size (2026-10-16,
+  `itc_795.log`): 3D view and frame 3840x2160, ~3 minutes of racing at
+  150-151 fps at the 144 cap (two seconds at 138-139), the render thread at
+  ~48-57% of a core (waiting on the cap); "looks sick".
 
 ## Still open
 
-- Fullscreen at 4K since the 3D view is drawn at full size (about 1.56
-  times its pixels before): frame rate and looks.
 - The bloom and motion blur at high scales, judged while driving (nothing
   wrong seen yet).
 - The Steam Deck (fullscreen on its 1280x800 screen: 1x with bars).
