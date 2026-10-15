@@ -2186,6 +2186,50 @@ newest write sequence instead of the `std::map` search (count first how
 often a write lands in a cached range's page but outside the range), and a
 flat table stamped by frame instead of the `mirrored` set.
 
+**Test results, attract races (2026-10-15).** `--native_renderer_log_physical_writes`
+(`buffers.cpp`): each memcpy into the physical views with its thread
+(main, or numbered by first write), pass number and type, caller, the
+render frame and whether a list was being replayed then, and whether the
+bytes were already the same; checked a frame later against the vertex and
+index ranges the mirror got in the frames from two before the write's to
+one after, against the replayed frame's ranges, and against the texture
+cache. Every 5 s a summary, overall and by caller and thread; each write
+changing drawn data on a render-only pass or under the replay is logged
+on its own line with the frames that drew it. Two uncapped attract races
+(40 s and 70 s, logs `itc_753`, `itc_754`):
+- ~75,000 writes a second (~250 a frame at ~300 fps, ~10-15 MB a second).
+  ~95% are from one thread (thread 3; callers `822AE900`, `825A17FC`,
+  `822B0278`, `825903B4`, `822A00AC`, `822A0060`, `8229F8D8`, `8229F88C`),
+  steadily on every pass, never into drawn ranges or textures: by its
+  steadiness most likely audio (not checked). Another thread (2; `820ED6B8`,
+  `820ED910`, `820ED920`) writes textures in bursts, on any pass.
+- **Drawn data does change on render-only passes**: 35 writes in the
+  70 s race, in 4 bursts (one pass each, e.g. pass 1785, 12761), on the
+  main thread from the game's loaders (`820E78E8`, `820E7DDC`, `820E7F5C`,
+  `820E82B0`, `820E8368`, `820E8420`, `820E84D8`, `820E8590`: in
+  `sub_820E7598`, `sub_820E7CA0`, `sub_820E8028`, see "Buffers"). So the
+  hypothesis as stated fails: with the mirrors swapped only on ticks,
+  those sections would be drawn from a mirror without them.
+- But **every one of those ranges was drawn only in the frame after the
+  write** (new data, drawn first by that pass's own list), never in the
+  frames before it; logic passes' writes into drawn ranges likewise. **No
+  write landed in a range the list being replayed reads** (0 in both
+  races). So no range was changed while a frame could be drawing it.
+- Not yet covered: a race the user drives (sections streamed as the car
+  moves).
+
+What this suggests instead (for the user to decide): since writes only
+land in memory no frame in flight reads, each write could be copied into
+both mirrors when memcpy makes it (on its thread), and draws would do no
+mirror work at all; no swap and no fence wait. Inline vertices would
+still need their own per-slot buffer, and the start-up catch-up copy
+stays. Its risk is the same assumption as now (vertex and index data only
+by memcpy), plus that nothing rewrites memory a frame in flight reads,
+which `--native_renderer_check_late_writes` and
+`--native_renderer_verify_mirror` would catch. Separately, thread 3's
+writes are ~95% of what `TakePending` and the segment map handle each
+frame for nothing.
+
 Checking a change: run the old code beside the new over a whole attract
 race and compare every result, as for steps 1-4 (the lighting blender:
 cherry-pick `2c82ae6` and `5942f31`, then `--check_pixel_blender=true`; the

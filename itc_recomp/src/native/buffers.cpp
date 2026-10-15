@@ -319,6 +319,7 @@ struct WriteStats {
   uint64_t drawn[2] = {};          // overlapping vertex or index ranges drawn within 2 frames
   uint64_t drawn_changed[2] = {};  // ... and changing their contents
   uint64_t vertex = 0, index = 0;  // overlapping drawn ranges, by kind
+  uint64_t drawn_after = 0;        // ... drawn in the frame after the write's
   uint64_t replaying = 0, replaying_changed = 0;  // into the replayed list's ranges, while replayed
   uint64_t textures = 0;           // overlapping a texture the cache holds
   uint64_t first_pass = 0, last_pass = 0;
@@ -357,11 +358,12 @@ void LogWriteSummary() {
   for (auto& [key, w] : g_write_stats) {
     REXLOG_INFO("native renderer: physical writes: from {:08X} on {}: logic {} ({} bytes, {} "
                 "same, {} drawn, {} changing drawn), render-only {} ({} bytes, {} same, {} "
-                "drawn, {} changing drawn); vertex {} index {}; while replayed {} ({} "
+                "drawn, {} changing drawn); vertex {} index {} (drawn in the next frame {}); while "
+                "replayed {} ({} "
                 "changing); textures {}; passes {}-{}",
                 key.first, ThreadName(key.second), w.writes[0], w.bytes[0], w.same[0], w.drawn[0],
                 w.drawn_changed[0], w.writes[1], w.bytes[1], w.same[1], w.drawn[1],
-                w.drawn_changed[1], w.vertex, w.index, w.replaying, w.replaying_changed,
+                w.drawn_changed[1], w.vertex, w.index, w.drawn_after, w.replaying, w.replaying_changed,
                 w.textures, w.first_pass, w.last_pass);
   }
   g_write_stats.clear();
@@ -388,11 +390,16 @@ void CheckLoggedWrites(const std::function<bool(uint32_t, uint32_t)>& is_texture
       g_unchecked++;
       continue;
     }
-    int kinds = 0;
+    // Which frames drew it (bit 0: two frames before the write's, bit 3:
+    // the one after), and as what.
+    int kinds = 0, frames = 0;
     for (uint32_t f = w.frame - 2; f != w.frame + 2; f++) {
       const FrameRanges& ranges = g_frame_ranges[f % kRangeFrames];
       if (ranges.frame == f) {
-        kinds |= ranges.Overlaps(w.start, w.end);
+        if (int k = ranges.Overlaps(w.start, w.end)) {
+          kinds |= k;
+          frames |= 1 << (f - (w.frame - 2));
+        }
       }
     }
     const FrameRanges& replayed = g_frame_ranges[w.frame % kRangeFrames];
@@ -414,6 +421,7 @@ void CheckLoggedWrites(const std::function<bool(uint32_t, uint32_t)>& is_texture
       s.drawn_changed[r] += !w.same;
       s.vertex += (kinds & 1) != 0;
       s.index += (kinds & 2) != 0;
+      s.drawn_after += (frames & 8) != 0;
     }
     if (into_replayed) {
       s.replaying++;
@@ -425,13 +433,14 @@ void CheckLoggedWrites(const std::function<bool(uint32_t, uint32_t)>& is_texture
     if (!w.same && ((kinds && w.render_only) || into_replayed) && g_write_lines) {
       g_write_lines--;
       REXLOG_INFO("native renderer: physical writes: {:08X}-{:08X} ({} bytes) from {:08X} on {}, "
-                  "pass {} ({}), frame {}{}: changes drawn {}{}{}",
+                  "pass {} ({}), frame {}{}: changes drawn {}{}{}; drawn in frames{}{}{}{}",
                   w.start, w.end, w.end - w.start, w.caller, ThreadName(w.thread), w.pass,
                   w.render_only ? "render-only" : "logic", w.frame,
                   w.replaying ? " while recorded" : "",
                   kinds == 3 ? "vertex and index data" : kinds == 2 ? "index data" : "vertex data",
                   into_replayed ? ", read by the list being replayed" : "",
-                  texture ? ", and a texture" : "");
+                  texture ? ", and a texture" : "", frames & 1 ? " -2" : "",
+                  frames & 2 ? " -1" : "", frames & 4 ? " 0" : "", frames & 8 ? " +1" : "");
     }
   }
   g_logged_taken.resize(kept);
