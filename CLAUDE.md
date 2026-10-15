@@ -117,8 +117,8 @@ by position), lights, shadows, headlights (including their light on other
 cars' bodies), other cars' lighting passing street lamps, tunnels, the race
 start countdown, the HUD, the marker above opponents, the light trails, the
 texture animations (flashing lights, signs, the off-ramp chevron), the
-minimap triangle's flashing, the car's reflections, buildings' lighting and
-play time are all done. `run.sh` turns
+minimap triangle's flashing, the car's reflections, buildings' lighting,
+play time and the glow (bloom; `src/interpolation/glow.cpp`) are all done. `run.sh` turns
 interpolation on (marked experimental) with logging off; `run-debug.sh` is
 the same with logs; `./run.sh --no-interpolation` gives the original 30 fps.
 Our renderer always draws motion blur and glow (`--motion_blur` and
