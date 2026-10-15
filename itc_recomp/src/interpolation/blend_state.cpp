@@ -512,22 +512,6 @@ class CameraBlends {
   } else if (plan.camera >= 0) {
     // A perspective camera: blend its placement and projection separately.
     const CameraBlends::Blended& blended = cameras.Get(*plans, plan.camera, amount);
-    {  // TEMPORARY: check against blending per product
-      static uint64_t checked = 0, mismatches = 0;
-      static auto last = std::chrono::steady_clock::now();
-      const CameraPair& camera = plans->cameras[size_t(plan.camera)];
-      PerspectiveCamera direct = Blend(camera.a, camera.b, amount);
-      Matrix4 direct_vp = ViewProjectionFromCamera(direct);
-      checked++;
-      if (std::memcmp(&direct_vp, &blended.view_projection, sizeof(Matrix4)) != 0 ||
-          std::memcmp(&direct.camera.position, &blended.eye, sizeof(Vec3)) != 0) {
-        mismatches++;
-      }
-      if (std::chrono::steady_clock::now() - last >= std::chrono::seconds(2)) {
-        last = std::chrono::steady_clock::now();
-        REXLOG_INFO("check camera blends: {} checked, {} mismatches", checked, mismatches);
-      }
-    }
     view_projection = blended.view_projection;
     if (parts) {
       parts->eye_now = plans->cameras[size_t(plan.camera)].b.camera.position;
