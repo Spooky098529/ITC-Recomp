@@ -772,6 +772,7 @@ struct Passes::State {
     alignas(16) uint8_t bytes[5][kFloatConstantsRange];
   } last_constants;
   bool reuse_constants = true;
+  bool log_constant_changes = false;
   // Points offset at a copy of the block's size bytes in the constant
   // block in use: the last one written if the same (and reuse_constants),
   // or a new one, reserving range bytes. With copied, the bytes are
@@ -2533,10 +2534,47 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
       return;
     }
   }
+  // Why the fetch block changed (log_constant_changes): in the fetch
+  // constants the shaders read (textures, vertices), or only in others.
+  const uint32_t* fetch = &regs.values[XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0];
+  if (s.log_constant_changes && s.last_constants.valid[4] && s.last_constants.sizes[4] == kFetchConstantsRange) {
+    const uint32_t* last = reinterpret_cast<const uint32_t*>(s.last_constants.bytes[4]);
+    if (std::memcmp(last, fetch, kFetchConstantsRange)) {
+      s.stats.fetch_changed++;
+      bool texture_differs = false, vertex_differs = false, vertex_address_only = true;
+      for (const TranslatedShader* shader : {vertex, pixel}) {
+        if (!shader) {
+          continue;
+        }
+        for (const ShaderTexture& texture : shader->textures) {
+          uint32_t i = 6 * texture.fetch_constant;
+          texture_differs |= !!std::memcmp(last + i, fetch + i, 24);
+        }
+        for (const ShaderSampler& sampler : shader->samplers) {
+          uint32_t i = 6 * sampler.fetch_constant;
+          texture_differs |= !!std::memcmp(last + i, fetch + i, 24);
+        }
+      }
+      for (uint32_t k = 0; vertex && k < 96; k++) {
+        if (!(vertex->vertex_fetch_constants[k >> 5] & (1u << (k & 31)))) {
+          continue;
+        }
+        if (last[2 * k + 1] != fetch[2 * k + 1]) {
+          vertex_differs = true;
+          vertex_address_only = false;
+        } else if (last[2 * k] != fetch[2 * k]) {
+          vertex_differs = true;
+        }
+      }
+      s.stats.fetch_changed_texture += texture_differs;
+      s.stats.fetch_changed_vertex += vertex_differs;
+      s.stats.fetch_changed_vertex_address += vertex_differs && vertex_address_only;
+      s.stats.fetch_changed_unread += !texture_differs && !vertex_differs;
+    }
+  }
   if (!s.PlaceConstants(3, &regs.values[XE_GPU_REG_SHADER_CONSTANT_BOOL_000_031],
                         kBoolLoopConstantsRange, kBoolLoopConstantsRange, offsets[3]) ||
-      !s.PlaceConstants(4, &regs.values[XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0],
-                        kFetchConstantsRange, kFetchConstantsRange, offsets[4])) {
+      !s.PlaceConstants(4, fetch, kFetchConstantsRange, kFetchConstantsRange, offsets[4])) {
     s.stats.failed++;
     s.stats.failed_by[4]++;
     return;
@@ -2752,6 +2790,17 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
     s.stats.state_compared++;
     for (int i = 0; i < 9; i++) {
       s.stats.state_repeated[i] += repeated[i];
+    }
+    if (s.log_constant_changes && repeated[5] && !repeated[8]) {
+      s.stats.offsets_differ++;
+      uint32_t differ = 0;
+      for (int i = 0; i < 5; i++) {
+        if (last.offsets[i] != now.offsets[i]) {
+          s.stats.offset_differs[i]++;
+          differ |= 1u << i;
+        }
+      }
+      s.stats.only_fetch_offset_differs += differ == 1u << 4;
     }
   }
   bool skip = s.skip_repeated_state;
@@ -3273,6 +3322,10 @@ void Passes::set_skip_repeated_state(bool skip) {
 
 void Passes::set_reuse_constants(bool reuse) {
   state_->reuse_constants = reuse;
+}
+
+void Passes::set_log_constant_changes(bool log) {
+  state_->log_constant_changes = log;
 }
 
 void Passes::set_copy_all(bool copy_all) {

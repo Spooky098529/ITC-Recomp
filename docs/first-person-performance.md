@@ -208,8 +208,12 @@ not worth SIMD.
    reused; sets are bound for 62% of draws instead of all, constants
    written fell from 4.5 to 1.5 MB a frame, and uncapped went up ~1.4%
    (272.7/268.6 to 276.4/272.6 fps), less than hoped. The fetch block,
-   reused for only ~40% of draws, limits the binds skipped; packing only
-   the fetch constants a shader reads is the next step there, if worth it.
+   reused for only ~40% of draws, limits the binds skipped, but not
+   worth more work (measured 2026-10-15): it changes only where the draw
+   reads it (a texture ~50% of draws, a vertex buffer ~15%), mostly along
+   with the texture descriptor sets, so reusing it more could skip binds
+   for at most ~8% more draws (~0.3% by the gain above). Details in
+   "Performance: constants written every draw".
 2. **Allocations in interpolation**: `PixelConstantBlender::Apply`
    returns a `std::vector` per lighting upload, and a `shared_ptr` is freed
    in the blending path. Check with a new profile whether any mutex is

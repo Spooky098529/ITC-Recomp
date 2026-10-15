@@ -873,6 +873,11 @@ memory).
   blocks into the ring and bind its descriptor sets, as before blocks the
   same as the last written were reused (see "Performance: constants
   written every draw").
+- `--native_renderer_log_constant_changes`: in the 5 s stats, why the
+  fetch block differs from the last written (texture or vertex fetch
+  constants the draw reads, or only unread ones), and, for draws repeating
+  the last draw's descriptor sets with other offsets, which blocks'
+  offsets differ. Off by default (a memcmp of the block per draw).
 - `--native_renderer_copy_all`: copy every vertex and index range into the
   mirror every frame, as before memcpy's writes were tracked.
 - `--native_renderer_verify_mirror`: compare every range not copied with
@@ -1223,10 +1228,23 @@ To be fixed (or accepted) in milestone 7.
   line). Frames dumped every 5 s at 30 fps were pixel-identical with and
   without. Uncapped attract race, alternating: 272.7 and 268.6 fps mean
   without, 276.4 and 272.6 with (~+1.4%; 10th percentile 222/215 against
-  221/218). The fetch block limits the binds skipped: it holds all 32
-  texture fetch constants (768 bytes) though a shader reads a few; packing
-  only those it reads, as for the floats, would likely raise its reuse
-  (not tried; the gain in frame rate may be small, as here).
+  221/218).
+  **Why the fetch block changes** (measured 2026-10-15,
+  `--native_renderer_log_constant_changes`, uncapped attract race). The
+  block (all 32 texture fetch constants, 768 bytes) differs from the last
+  one written for ~60% of draws, and always in a fetch constant the draw's
+  shaders read: a texture fetch constant read ~50% of draws, a vertex fetch
+  constant read ~15% (its address alone ~5%), only unread ones 0%. So
+  comparing or packing only the slots read would gain nothing. (The
+  shaders read the block only at the fetch constants their instructions
+  name, which `textures`, `samplers` and `vertex_fetch_constants` list,
+  except `getWeights`, which reads a texture's size with no binding.) And
+  the bind skips it could add are few: the texture descriptor sets
+  themselves repeat for only ~47% of draws, and of those, the offsets
+  differ for ~10% of draws, the fetch block's alone for 7-9%. Even a fetch
+  block never changing would raise binds skipped from ~38% to ~46% of
+  draws; the first 38% gained ~1.4%, so this is likely ~0.3%, within run
+  to run noise. Not pursued: the texture changes rebind the sets anyway.
 - **Performance: diagnostics on every constant replay** (fixed
   2026-10-15). `BlendState_ReplayConstants` ran, for each vertex constant
   upload of 4+ registers (~1,500 a frame) and with logging off: a clock

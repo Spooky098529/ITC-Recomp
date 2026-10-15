@@ -51,6 +51,9 @@ REXCVAR_DEFINE_BOOL(native_renderer_skip_repeated_state, true, "ITC",
 REXCVAR_DEFINE_BOOL(native_renderer_reuse_constants, true, "ITC",
                     "Point a draw at the constants the last draw wrote, block by block, when "
                     "they're the same, instead of writing them again");
+REXCVAR_DEFINE_BOOL(native_renderer_log_constant_changes, false, "ITC",
+                    "Log why draws' constants aren't reused: what differs in the fetch block, "
+                    "and which blocks' offsets differ when the descriptor sets repeat");
 REXCVAR_DEFINE_BOOL(native_renderer_copy_all, false, "ITC",
                     "Copy every vertex and index range into the mirror every frame, not only "
                     "those the library's memcpy wrote since (a debugging aid)");
@@ -591,6 +594,7 @@ VkCommandBuffer Renderer::BeginFrame() {
     passes_.set_copy_all(REXCVAR_GET(native_renderer_copy_all));
     passes_.set_skip_repeated_state(REXCVAR_GET(native_renderer_skip_repeated_state));
     passes_.set_reuse_constants(REXCVAR_GET(native_renderer_reuse_constants));
+    passes_.set_log_constant_changes(REXCVAR_GET(native_renderer_log_constant_changes));
     passes_.set_verify_mirror(REXCVAR_GET(native_renderer_verify_mirror));
     passes_.set_check_late_writes(REXCVAR_GET(native_renderer_check_late_writes));
     passes_.set_check_clobbers(REXCVAR_GET(native_renderer_check_clobbers));
@@ -910,6 +914,14 @@ void Renderer::LogStats() {
                 "binding {:.0f}% (buffer and type {:.0f}%)",
                 double(view.state_compared) / frames, share(r[0]), share(r[1]), share(r[2]),
                 share(r[3]), share(r[4]), share(r[5]), share(r[8]), share(r[6]), share(r[7]));
+    const auto& o = view.offset_differs;
+    if (view.offsets_differ) {
+      REXLOG_INFO("native renderer: descriptor sets repeated with other offsets for {:.0f}% of "
+                  "draws: system {:.0f}%, vertex floats {:.0f}%, pixel floats {:.0f}%, "
+                  "bool/loop {:.0f}%, fetch {:.0f}% (fetch alone {:.0f}%)",
+                  share(view.offsets_differ), share(o[0]), share(o[1]), share(o[2]),
+                  share(o[3]), share(o[4]), share(view.only_fetch_offset_differs));
+    }
   }
   if (view.constants_draws) {
     const auto& r = view.constants_reused;
@@ -919,6 +931,14 @@ void Renderer::LogStats() {
                 "{:.0f}%, fetch {:.0f}%; {:.0f} KB written a frame",
                 double(view.constants_draws) / frames, share(r[0]), share(r[1]), share(r[2]),
                 share(r[3]), share(r[4]), double(view.constant_bytes) / frames / 1024);
+    if (view.fetch_changed) {
+      REXLOG_INFO("native renderer: fetch block differed from the last written for {:.0f}% of "
+                  "draws: in a texture fetch constant read {:.0f}%, a vertex fetch constant "
+                  "read {:.0f}% (address only {:.0f}%), only in unread ones {:.0f}%",
+                  share(view.fetch_changed), share(view.fetch_changed_texture),
+                  share(view.fetch_changed_vertex), share(view.fetch_changed_vertex_address),
+                  share(view.fetch_changed_unread));
+    }
   }
   if (view.vertex_shader_copies) {
     REXLOG_INFO("native renderer: {:.1f} draws a frame got their vertex shader from the library's "
