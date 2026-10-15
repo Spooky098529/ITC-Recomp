@@ -18,6 +18,11 @@
 # draw up to --max_fps (144 here; pass --max_fps=N to change it, 0 for
 # unlimited), each frame blended between the last two ticks. Menus stay at
 # 30 fps. Motion blur and glow are always drawn.
+#
+# The renderer's copies of guest memory are updated once a frame instead of
+# checked draw by draw (--native_renderer_mirror_by_tick and
+# --native_renderer_mirror_to_both; pass
+# --native_renderer_mirror_by_tick=false for the old way).
 dir="$(cd "$(dirname "$0")" && pwd)"
 
 export LD_LIBRARY_PATH="$dir${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
@@ -34,7 +39,7 @@ done
 
 # The flag parser rejects a flag given twice, so a default is left out when
 # the same flag is passed in.
-flags=(--native_renderer=true --native_renderer_exclusive=true --native_audio=true --game_data_root="$dir" --mnk_mode=true "${defaults[@]}" --log_level=off)
+flags=(--native_renderer=true --native_renderer_exclusive=true --native_audio=true --game_data_root="$dir" --mnk_mode=true --native_renderer_mirror_by_tick=true --native_renderer_mirror_to_both=true "${defaults[@]}" --log_level=off)
 final=()
 for flag in "${flags[@]}"; do
   name="${flag%%=*}"
