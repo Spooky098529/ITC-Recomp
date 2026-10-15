@@ -2972,7 +2972,15 @@ void BlendState_ReplayConstants(uint8_t* base, uint32_t payload, uint32_t packed
       check.blended += pixel_blended;
       if (check.legacy_blended != pixel_blended ||
           check.legacy_outcome != int(GetPixelConstantBlender().outcome())) {
-        check.outcome_mismatches++;
+        if (check.outcome_mismatches++ < 20) {
+          int nans = 0;
+          for (uint32_t v : check.in) nans += (v & 0x7F800000) == 0x7F800000;
+          REXLOG_INFO("pixel blender check: outcome {} (old) against {} (new), blended {}/{}, "
+                      "{} non-finite of {}, tick {} c{} x{}",
+                      check.legacy_outcome, int(GetPixelConstantBlender().outcome()),
+                      check.legacy_blended, pixel_blended, nans, check.in.size(),
+                      GetReplayCameras().tick(), (packed >> 8) & 0xFF, count);
+        }
       }
       for (uint32_t i = 0; i < count * 4; i++) {
         if (guest::LoadU32(base, payload + 4 * i) != check.legacy_out[i]) {
