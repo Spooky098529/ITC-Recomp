@@ -1245,6 +1245,25 @@ To be fixed (or accepted) in milestone 7.
   block never changing would raise binds skipped from ~38% to ~46% of
   draws; the first 38% gained ~1.4%, so this is likely ~0.3%, within run
   to run noise. Not pursued: the texture changes rebind the sets anyway.
+- **Performance: reading constants from guest memory** (fixed
+  2026-10-15, branch `descriptor-reuse`). Profile of the render thread
+  (uncapped attract race, user-time samples): packing each draw's float
+  constants took ~14% (vertex 7.8%, pixel 6.6%) and `ReadRegisters` ~4.7%.
+  In the packing loop ~85% of the samples were on testing each of the 256
+  bits of the shader's `float_constants` mask in turn, a mispredicted
+  branch; the loads were `REX_LOAD_U32`, a volatile load and byte swap per
+  word, which can't be vectorized. Now the mask is walked run by run of
+  consecutive registers (`countr_zero`/`countr_one`) and each run, like
+  each of `ReadRegisters`' blocks, is copied by `guest::CopyU32s`, one
+  plain loop the compiler vectorizes (`pshufb`) that also reports whether
+  any word changed (for the constants reuse). A temporary check computing
+  every draw's constants both ways over a whole race: 0 mismatches in
+  ~3.6 billion float words and ~12 billion register words. Uncapped
+  attract race, alternating, 20 s runs: 284.6 and 284.9 fps mean before,
+  329.1 and 319.9 after (~+14%; 10th percentile 247/244 against 284/277).
+  (Frames dumped at the same moments can't check such changes any more:
+  two runs of the same build already differ, the attract race allocating
+  its vertex buffers at other addresses.)
 - **Performance: diagnostics on every constant replay** (fixed
   2026-10-15). `BlendState_ReplayConstants` ran, for each vertex constant
   upload of 4+ registers (~1,500 a frame) and with logging off: a clock

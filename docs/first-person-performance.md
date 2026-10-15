@@ -215,6 +215,13 @@ not worth SIMD.
    with the texture descriptor sets, so reusing it more could skip binds
    for at most ~8% more draws (~0.3% by the gain above). Details in
    "Performance: constants written every draw".
+   **Reading constants from guest memory: done** (2026-10-15, same
+   branch): packing the float constants walked all 256 bits of the
+   shader's mask with a mispredicted branch each, and every word was a
+   volatile load; ~19% of the render thread with `ReadRegisters`. Now run
+   by run, copied with a vectorized byte swap: uncapped ~285 to ~325 fps
+   (+14%). See "Performance: reading constants from guest memory" in
+   `native-renderer.md`.
 2. **Allocations in interpolation**: `PixelConstantBlender::Apply`
    returns a `std::vector` per lighting upload, and a `shared_ptr` is freed
    in the blending path. Check with a new profile whether any mutex is

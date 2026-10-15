@@ -10,6 +10,7 @@
 
 #include <bit>
 #include <cstdint>
+#include <cstring>
 
 namespace guest {
 
@@ -27,6 +28,23 @@ inline uint32_t LoadU32(uint8_t* base, uint32_t address) {
 
 inline void StoreU32(uint8_t* base, uint32_t address, uint32_t value) {
   REX_STORE_U32(address, value);
+}
+
+// Copies count words from guest memory at address into out, in host byte
+// order, and returns whether any differed from what out held. One loop the
+// compiler vectorizes, unlike LoadU32's volatile loads one by one (the
+// range mustn't cross 0xE0000000, where the host offset changes).
+inline bool CopyU32s(uint8_t* base, uint32_t address, uint32_t* out, uint32_t count) {
+  const uint8_t* in = REX_RAW_ADDR(address);
+  uint32_t differ = 0;
+  for (uint32_t i = 0; i < count; i++) {
+    uint32_t value;
+    std::memcpy(&value, in + 4 * i, 4);
+    value = __builtin_bswap32(value);
+    differ |= out[i] ^ value;
+    out[i] = value;
+  }
+  return differ != 0;
 }
 
 inline float LoadFloat(uint8_t* base, uint32_t address) {

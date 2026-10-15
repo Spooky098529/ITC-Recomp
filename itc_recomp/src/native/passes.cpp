@@ -2509,23 +2509,24 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
     uint32_t source = device + (stage == 0 ? kDeviceVertexFloatConstants
                                            : kDevicePixelFloatConstants);
     // Only the registers the shader reads, packed in order, into the last
-    // copy, noting whether any differ.
-    uint8_t* copy = s.last_constants.bytes[1 + stage];
+    // copy, noting whether any differ: run by run of consecutive registers
+    // (testing each of the 256 bits in turn was ~14% of the render thread,
+    // mostly mispredicted branches).
+    uint32_t* copy = reinterpret_cast<uint32_t*>(s.last_constants.bytes[1 + stage]);
     bool same = s.last_constants.valid[1 + stage];
     uint32_t packed = 0;
-    for (uint32_t i = 0; shader && i < 256; i++) {
-      if (!(shader->float_constants[i >> 6] & (uint64_t(1) << (i & 63)))) {
-        continue;
-      }
-      for (uint32_t c = 0; c < 4; c++) {
-        uint32_t value = guest::LoadU32(base, source + 16 * i + 4 * c);
-        uint32_t* slot = reinterpret_cast<uint32_t*>(copy + 16 * packed + 4 * c);
-        if (*slot != value) {
-          *slot = value;
+    for (uint32_t w = 0; shader && w < 4; w++) {
+      uint64_t bits = shader->float_constants[w];
+      while (bits) {
+        uint32_t first = std::countr_zero(bits);
+        uint32_t count = std::countr_one(bits >> first);
+        bits = count == 64 ? 0 : bits & ~(((uint64_t(1) << count) - 1) << first);
+        if (guest::CopyU32s(base, source + 16 * (64 * w + first), copy + 4 * packed,
+                            4 * count)) {
           same = false;
         }
+        packed += count;
       }
-      packed++;
     }
     if (!s.PlaceConstants(1 + stage, copy, 16 * packed, kFloatConstantsRange,
                           offsets[1 + stage], true, same)) {
@@ -2537,7 +2538,8 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
   // Why the fetch block changed (log_constant_changes): in the fetch
   // constants the shaders read (textures, vertices), or only in others.
   const uint32_t* fetch = &regs.values[XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0];
-  if (s.log_constant_changes && s.last_constants.valid[4] && s.last_constants.sizes[4] == kFetchConstantsRange) {
+  if (s.log_constant_changes && s.last_constants.valid[4] &&
+      s.last_constants.sizes[4] == kFetchConstantsRange) {
     const uint32_t* last = reinterpret_cast<const uint32_t*>(s.last_constants.bytes[4]);
     if (std::memcmp(last, fetch, kFetchConstantsRange)) {
       s.stats.fetch_changed++;
