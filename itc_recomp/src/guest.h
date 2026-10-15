@@ -62,6 +62,28 @@ inline bool CopyU32s(uint8_t* base, uint32_t address, uint32_t* out, uint32_t co
   return SwapU32s(REX_RAW_ADDR(address), out, count);
 }
 
+// CopyU32s for floats (no comparison).
+inline void SwapFloats(const uint8_t* in, float* out, uint32_t count) {
+  for (uint32_t i = 0; i < count; i++) {
+    uint32_t value;
+    std::memcpy(&value, in + 4 * i, 4);
+    out[i] = std::bit_cast<float>(__builtin_bswap32(value));
+  }
+}
+
+inline void CopyFloats(uint8_t* base, uint32_t address, float* out, uint32_t count) {
+  constexpr uint32_t kOffsetChange = 0xE0000000u;
+  if (count && address < kOffsetChange &&
+      uint64_t(address) + 4 * uint64_t(count - 1) >= kOffsetChange) {
+    uint32_t below = (kOffsetChange - address + 3) / 4;
+    SwapFloats(REX_RAW_ADDR(address), out, below);
+    uint32_t rest = address + 4 * below;
+    SwapFloats(REX_RAW_ADDR(rest), out + below, count - below);
+    return;
+  }
+  SwapFloats(REX_RAW_ADDR(address), out, count);
+}
+
 inline float LoadFloat(uint8_t* base, uint32_t address) {
   return std::bit_cast<float>(REX_LOAD_U32(address));
 }

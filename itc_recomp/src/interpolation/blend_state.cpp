@@ -1690,6 +1690,7 @@ class PixelConstantBlender {
  public:
   void OnFrameStart(uint64_t tick) {
     frame_++;
+    recorded_ = &now_;  // entries may go below
     if (tick != tick_) {
       tick_ = tick;
       // A new tick: what was current becomes the previous tick's. Objects
@@ -1728,16 +1729,6 @@ class PixelConstantBlender {
       seen = {frame_, tick_, 0};
     }
     Key key{object, start, count, seen.count++};
-    std::vector<float>& now = now_;
-    now.resize(count * 4);
-    for (uint32_t i = 0; i < now.size(); i++) {
-      now[i] = guest::LoadFloat(base, payload + 4 * i);
-    }
-    last_key_ = {object, key.occurrence};
-    keep_blended_ = REXCVAR_GET(log_pixel_outcomes);
-    if (keep_blended_) {
-      last_blended_ = now;
-    }
     Entry& entry = entries_[key];
     // The light slots (cars' headlights among them) are recorded on a tick's
     // logic pass before the lights move, so they hold the previous tick's
@@ -1745,16 +1736,26 @@ class PixelConstantBlender {
     // the last value recorded in the previous tick to this frame's gives the
     // previous tick's lights at the tick (amount about 0) and a blend after.
     bool from_latest = REXCVAR_GET(pixel_blend_from_latest);
-    if (entry.current_tick != tick_ || from_latest) {
-      entry.current = now;  // first time this tick: the tick's own value
-      entry.current_tick = tick_;
+    bool first = entry.current_tick != tick_;  // the tick's own value
+    // The upload, loaded straight into the entry when it becomes its current
+    // value (the entry's node stays put until OnFrameStart).
+    std::vector<float>& now = first || from_latest ? entry.current : now_;
+    now.resize(count * 4);
+    guest::CopyFloats(base, payload, now.data(), count * 4);
+    entry.current_tick = tick_;
+    recorded_ = &now;
+    last_key_ = {object, key.occurrence};
+    keep_blended_ = REXCVAR_GET(log_pixel_outcomes);
+    if (keep_blended_) {
+      last_blended_ = now;
     }
     if (entry.previous_tick + 1 != tick_ || entry.previous.size() != now.size()) {
       outcome_ = Outcome::kUnpaired;
       return false;
     }
-    // From the latest, current was just set to now.
-    if (!from_latest && entry.current != now) {
+    // Loaded into current, it's the same; otherwise compare with the tick's
+    // first value.
+    if (&now == &now_ && entry.current != now) {
       outcome_ = Outcome::kNotAsRecorded;  // differs from the tick's first value
       differing_.clear();
       for (uint32_t i = 0; i < now.size(); i++) {
@@ -1762,6 +1763,11 @@ class PixelConstantBlender {
           differing_.push_back({i, entry.current[i], now[i]});
         }
       }
+      return false;
+    }
+    // The same as last tick, bit for bit: nothing to blend.
+    if (std::memcmp(entry.previous.data(), now.data(), now.size() * sizeof(float)) == 0) {
+      outcome_ = Outcome::kUnchanged;
       return false;
     }
     // Some components are per-object switches that legitimately jump
@@ -1905,7 +1911,7 @@ class PixelConstantBlender {
   }
 
   // The last upload as recorded (what Apply blended over).
-  const std::vector<float>& recorded() const { return now_; }
+  const std::vector<float>& recorded() const { return *recorded_; }
 
   // What the last Apply did, for --log_pixel_outcomes.
   enum class Outcome { kNoObject, kUnpaired, kNotAsRecorded, kRejected, kUnchanged, kBlended };
@@ -1923,7 +1929,7 @@ class PixelConstantBlender {
   const std::vector<Difference>& differing() const { return differing_; }
   // The last upload's object and occurrence, and its values as recorded.
   std::pair<uint64_t, int> last_key() const { return last_key_; }
-  const std::vector<float>& last_values() const { return now_; }
+  const std::vector<float>& last_values() const { return *recorded_; }
   // ...and as uploaded (the blend, or as recorded); kept only with
   // --log_pixel_outcomes.
   const std::vector<float>& last_blended() const { return last_blended_; }
@@ -1934,6 +1940,7 @@ class PixelConstantBlender {
   // The upload being blended, as recorded, and which components keep the
   // tick's value: kept between uploads so as not to allocate each time.
   std::vector<float> now_;
+  const std::vector<float>* recorded_ = &now_;  // now_ or an entry's current
   std::vector<uint8_t> jumps_;
   std::vector<float> last_blended_;
   bool keep_blended_ = false;
