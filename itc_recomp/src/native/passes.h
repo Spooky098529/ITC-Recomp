@@ -97,6 +97,12 @@ class Passes {
   // A diagnostic: how often each draw's index range is scanned again
   // unchanged, and how the mirror's checks go; TakeIndexRanges describes
   // them since it was last called.
+  // Keep draws' index ranges' lowest and highest index until memcpy writes
+  // them (on by default); a debugging aid scanning them anyway and comparing,
+  // TakeIndexCacheCheck describing the differences since it was last called.
+  void set_cache_index_ranges(bool cache);
+  void set_check_index_cache(bool check);
+  std::string TakeIndexCacheCheck();
   void set_log_index_ranges(bool log);
   std::string TakeIndexRanges();
   void set_verify_mirror(bool verify);

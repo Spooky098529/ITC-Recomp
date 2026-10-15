@@ -462,6 +462,61 @@ std::pair<uint32_t, uint32_t> IndexRange(const uint8_t* data, uint32_t count, bo
   }
 }
 
+// Draws' index ranges (IndexRange's result) by address, count and format,
+// so a range drawn again needn't be scanned: index data is written by the
+// library's memcpy and nothing else (measured with
+// --native_renderer_log_index_ranges), so a result holds while
+// Buffers_NewestWrite says the range wasn't written since its scan. That's
+// asked once a frame per range (as the mirror does), and the ~60% of draws
+// repeating a range already drawn this frame only look it up. An
+// open-addressed table (a multiply and a probe), emptied when it fills.
+class IndexRangeCache {
+ public:
+  struct Entry {
+    uint64_t key;  // see Key; 0 for an empty slot
+    uint64_t sequence;  // Buffers_Sequence when scanned
+    uint64_t frame;     // the frame it was last found unwritten in
+    uint32_t low, high;
+  };
+
+  static uint64_t Key(uint32_t address, uint32_t count, bool index_32bit, uint32_t endian,
+                      bool skip_restart) {
+    // A draw's count is far below 2^28, leaving room for the format; the
+    // address is a physical one (below 2^29), so a key is never 0.
+    return (uint64_t(address | 0x80000000u) << 32) | (count & 0x0FFFFFFFu) |
+           (uint64_t(index_32bit) << 28) | (uint64_t(endian & 3) << 29) |
+           (uint64_t(skip_restart) << 31);
+  }
+
+  // The entry for `key`, or an empty slot to fill (its key 0).
+  Entry& Find(uint64_t key) {
+    if (size_ * 2 >= slots_.size()) {
+      Reset(slots_.size() < kMaxSlots ? slots_.size() * 2 : slots_.size());
+    }
+    size_t mask = slots_.size() - 1;
+    size_t i = (key * 0x9E3779B97F4A7C15ull) >> shift_;
+    while (slots_[i].key && slots_[i].key != key) {
+      i = (i + 1) & mask;
+    }
+    return slots_[i];
+  }
+
+  // After filling the slot Find returned.
+  void Added() { size_++; }
+
+ private:
+  static constexpr size_t kMaxSlots = size_t(1) << 16;
+  void Reset(size_t slots) {
+    slots = std::max<size_t>(slots, 4096);
+    shift_ = 64 - std::countr_zero(slots);
+    slots_.assign(slots, Entry{});
+    size_ = 0;
+  }
+  std::vector<Entry> slots_;
+  size_t size_ = 0;
+  uint32_t shift_ = 64;
+};
+
 }  // namespace
 
 struct Passes::State {
@@ -602,6 +657,18 @@ struct Passes::State {
   uint64_t mirror_frames = 0, mirror_changed_bytes = 0, mirror_new_bytes = 0,
            mirror_vertex_bytes = 0, used_vertex_bytes = 0;
   std::unordered_set<uint64_t> used_mirrored;
+  IndexRangeCache index_cache;
+  bool cache_index_ranges = true;
+  // With check_index_cache, every draw's indices are scanned too and
+  // compared with the cache's result.
+  bool check_index_cache = false;
+  uint64_t index_cache_checked = 0, index_cache_mismatched = 0;
+  uint32_t index_cache_mismatch_sample[6] = {};  // address, count, cached, scanned low/high
+  // IndexRange's result for the draw's indices, from index_cache when it
+  // holds.
+  std::pair<uint32_t, uint32_t> DrawIndexRange(uint8_t* base, uint32_t address, uint32_t count,
+                                               bool index_32bit, uint32_t endian,
+                                               bool skip_restart);
   // With log_index_ranges: each draw's index range (address, count and
   // format) as last scanned, to see how often a scan could be reused (the
   // range not written by memcpy since) and whether the reused result would
@@ -1056,6 +1123,45 @@ void Passes::State::Mirror(uint8_t* base, uint32_t address, uint32_t size, bool 
   }
   std::memcpy(mirror.mapped + address, PhysicalHostAddress(base, address), size);
   stats.mirrored_bytes += size;
+}
+
+std::pair<uint32_t, uint32_t> Passes::State::DrawIndexRange(uint8_t* base, uint32_t address,
+                                                            uint32_t count, bool index_32bit,
+                                                            uint32_t endian, bool skip_restart) {
+  if (!cache_index_ranges) {
+    return IndexRange(PhysicalHostAddress(base, address), count, index_32bit, endian,
+                      skip_restart);
+  }
+  uint64_t key = IndexRangeCache::Key(address, count, index_32bit, endian, skip_restart);
+  IndexRangeCache::Entry& entry = index_cache.Find(key);
+  std::pair<uint32_t, uint32_t> range;
+  if (entry.key && (entry.frame == mirror_frames ||
+                    Buffers_NewestWrite(address, count * (index_32bit ? 4 : 2)) <=
+                        entry.sequence)) {
+    entry.frame = mirror_frames;
+    range = {entry.low, entry.high};
+    if (check_index_cache) {
+      index_cache_checked++;
+      auto scanned = IndexRange(PhysicalHostAddress(base, address), count, index_32bit, endian,
+                                skip_restart);
+      if (scanned != range && !index_cache_mismatched++) {
+        uint32_t sample[] = {address, count, range.first, range.second, scanned.first,
+                             scanned.second};
+        std::copy(std::begin(sample), std::end(sample), index_cache_mismatch_sample);
+      }
+    }
+    return range;
+  }
+  // Writes not yet taken get later sequences, so the entry is scanned again
+  // once they are.
+  uint64_t sequence = Buffers_Sequence();
+  range = IndexRange(PhysicalHostAddress(base, address), count, index_32bit, endian,
+                     skip_restart);
+  if (!entry.key) {
+    index_cache.Added();
+  }
+  entry = {key, sequence, mirror_frames, range.first, range.second};
+  return range;
 }
 
 void Passes::State::CountIndexRange(uint32_t address, uint32_t count, bool index_32bit,
@@ -2494,8 +2600,8 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
   }
   if (!call.inline_vertices && index_count) {
     bool skip_restart = primitive.strip && regs.Get<reg::PA_SU_SC_MODE_CNTL>().multi_prim_ib_ena;
-    auto [low, high] = IndexRange(PhysicalHostAddress(base, index_address), index_count,
-                                  index_32bit, index_endian, skip_restart);
+    auto [low, high] = s.DrawIndexRange(base, index_address, index_count, index_32bit,
+                                        index_endian, skip_restart);
     if (s.log_index_ranges) {
       s.CountIndexRange(index_address, index_count, index_32bit, index_endian, skip_restart, low,
                         high);
@@ -3434,6 +3540,27 @@ void Passes::set_log_constant_changes(bool log) {
 
 void Passes::set_log_register_reads(bool log) {
   state_->log_register_reads = log;
+}
+
+void Passes::set_cache_index_ranges(bool cache) {
+  state_->cache_index_ranges = cache;
+}
+
+void Passes::set_check_index_cache(bool check) {
+  state_->check_index_cache = check;
+}
+
+std::string Passes::TakeIndexCacheCheck() {
+  State& s = *state_;
+  std::string text = fmt::format("index range cache: {} results checked against a scan, {} differ",
+                                 s.index_cache_checked, s.index_cache_mismatched);
+  if (s.index_cache_mismatched) {
+    const uint32_t* m = s.index_cache_mismatch_sample;
+    text += fmt::format(" (e.g. {:08X} x{}: {}-{} cached, {}-{} scanned)", m[0], m[1], m[2], m[3],
+                        m[4], m[5]);
+  }
+  s.index_cache_checked = s.index_cache_mismatched = 0;
+  return text;
 }
 
 void Passes::set_log_index_ranges(bool log) {

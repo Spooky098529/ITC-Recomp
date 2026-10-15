@@ -2025,6 +2025,32 @@ range with `Buffers_NewestWrite` on every draw would gain little. Instead:
   but outside the range only costs an extra scan or copy. Count how often
   that happens before choosing it.
 
+**Done: the index range cache** (`IndexRangeCache` in `passes.cpp`,
+`--native_renderer_cache_index_ranges`, on by default). An open-addressed
+table by address, count and format (emptied if it reaches 32,768 ranges)
+keeps each range's lowest and highest index, the write sequence when
+scanned, and the frame it was last found unwritten in. A draw whose range
+was found this frame takes the result; otherwise `Buffers_NewestWrite`
+decides once a frame whether it's scanned again. Checked with
+`--native_renderer_check_index_cache` (scans anyway and compares; kept
+until the next step, which changes how validity is decided): two whole
+attract races, ~62 million cached results, 0 differ.
+Profiles, one binary with the cache off and on, three runs each,
+alternating (`ITC_ARGS`, a new option of `profile_render_thread.sh`),
+thousand cycles a frame:
+
+| Cache | Render thread | `IndexRange` | `DrawIndexRange` | `Buffers_NewestWrite` |
+|---|---|---|---|---|
+| off | 14,463, 14,539, 14,207 (14,403) | 495, 458, 470 | 16, 17, 11 | 204, 193, 199 |
+| on | 14,016, 13,452, 13,793 (13,754) | 0 | 83, 83, 86 | 313, 308, 308 |
+
+So `IndexRange`'s ~475 is gone, for ~70 more in the lookup and ~110 more
+in `Buffers_NewestWrite` (the once-a-frame checks): ~−290 directly, ~2% of
+the thread (the total fell ~650, ~4.5%, but that's within its noise added
+to the direct gain). Next: the mirror asks the same question of the same
+range in the same draw (`Mirror` of the index range), so the cache's
+answer can be passed to it, removing the added ~110.
+
 Checking a change: run the old code beside the new over a whole attract
 race and compare every result, as for steps 1-4 (the lighting blender:
 cherry-pick `2c82ae6` and `5942f31`, then `--check_pixel_blender=true`; the
