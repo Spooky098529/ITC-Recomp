@@ -1161,6 +1161,11 @@ To be fixed (or accepted) in milestone 7.
   before the reference count change). Each needs the same check as the
   indexed draw (`--native_renderer_check_draw_writes`: which device fields
   it changes besides the command pointer) before its packets are skipped.
+- **First-person views are slower on the Steam Deck** (2026-10-15):
+  cockpit 42-52 fps against 55-71 in third person, the render thread
+  flat out in all views, at about 7 µs a draw, and the cockpit drawing
+  ~600 more a frame. Measurements and next steps (a profile in cockpit
+  view) in `first-person-performance.md`; the fix is the item below.
 - **Performance, to do: our renderer's own code** (milestone 7, the
   user's call, 2026-10-14). After milestone 6's speed work our renderer is
   ~78% of the render thread, the replay handlers ~11%, the library ~9%.
