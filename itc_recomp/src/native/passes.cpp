@@ -666,6 +666,9 @@ struct Passes::State {
   uint32_t index_cache_mismatch_sample[6] = {};  // address, count, cached, scanned low/high
   // IndexRange's result for the draw's indices, from index_cache when it
   // holds.
+  // What DrawIndexRange learned from Buffers_NewestWrite for the draw's
+  // index range (kNewestUnknown if it didn't ask), for Mirror.
+  uint64_t draw_index_newest = kNewestUnknown;
   std::pair<uint32_t, uint32_t> DrawIndexRange(uint8_t* base, uint32_t address, uint32_t count,
                                                bool index_32bit, uint32_t endian,
                                                bool skip_restart);
@@ -912,7 +915,11 @@ struct Passes::State {
   void EndRendering(VkCommandBuffer commands);
   bool CreateGuestMemoryMirror();
   bool CreateGuestMemoryMirror(GuestMirror& mirror);
-  void Mirror(uint8_t* base, uint32_t address, uint32_t size, bool index);
+  // `newest`: Buffers_NewestWrite's answer for exactly this range if the
+  // caller has just asked it (kNewestUnknown otherwise), to not ask twice.
+  static constexpr uint64_t kNewestUnknown = ~uint64_t(0);
+  void Mirror(uint8_t* base, uint32_t address, uint32_t size, bool index,
+              uint64_t newest = kNewestUnknown);
   void CheckClobbers(uint8_t* base, uint32_t address, uint32_t size, bool index);
   bool CreateRings();
   bool CreateConstantBlock(Ring& ring);
@@ -1034,11 +1041,15 @@ bool Passes::State::CreateGuestMemoryMirror(GuestMirror& mirror) {
   return true;
 }
 
-void Passes::State::Mirror(uint8_t* base, uint32_t address, uint32_t size, bool index) {
+void Passes::State::Mirror(uint8_t* base, uint32_t address, uint32_t size, bool index,
+                           uint64_t newest) {
   if (!size || address >= kPhysicalMemorySize) {
     return;
   }
-  size = std::min(size, kPhysicalMemorySize - address);
+  if (size > kPhysicalMemorySize - address) {
+    size = kPhysicalMemorySize - address;
+    newest = kNewestUnknown;  // asked of a larger range
+  }
   uint64_t key = (uint64_t(address) << 32) | size;
   if (check_mirror) {
     uint64_t hash = XXH3_64bits(PhysicalHostAddress(base, address), size);
@@ -1102,7 +1113,8 @@ void Passes::State::Mirror(uint8_t* base, uint32_t address, uint32_t size, bool 
         index_range_counts.nothing_taken++;
       }
     }
-    if (!added && Buffers_NewestWrite(address, size) <= it->second) {
+    if (!added && (newest != kNewestUnknown ? newest : Buffers_NewestWrite(address, size)) <=
+                      it->second) {
       stats.mirror_skipped_bytes += size;
       // Slow (the mirror is uncached memory: ~20 fps in a race), but
       // checks every range every frame.
@@ -1135,9 +1147,10 @@ std::pair<uint32_t, uint32_t> Passes::State::DrawIndexRange(uint8_t* base, uint3
   uint64_t key = IndexRangeCache::Key(address, count, index_32bit, endian, skip_restart);
   IndexRangeCache::Entry& entry = index_cache.Find(key);
   std::pair<uint32_t, uint32_t> range;
-  if (entry.key && (entry.frame == mirror_frames ||
-                    Buffers_NewestWrite(address, count * (index_32bit ? 4 : 2)) <=
-                        entry.sequence)) {
+  if (entry.key && entry.frame != mirror_frames) {
+    draw_index_newest = Buffers_NewestWrite(address, count * (index_32bit ? 4 : 2));
+  }
+  if (entry.key && (entry.frame == mirror_frames || draw_index_newest <= entry.sequence)) {
     entry.frame = mirror_frames;
     range = {entry.low, entry.high};
     if (check_index_cache) {
@@ -2594,6 +2607,7 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
   }
 
   uint32_t max_vertex = 0, min_vertex = UINT32_MAX;
+  s.draw_index_newest = State::kNewestUnknown;
   if (call.inline_vertices) {
     min_vertex = 0;
     max_vertex = call.vertex_count - 1;
@@ -2863,7 +2877,8 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
   // words: the address (word 0, low 2 bits the type) and the size in words
   // (word 1, bits 2-25).
   if (!call.inline_vertices) {
-    s.Mirror(base, index_address, index_count * (index_32bit ? 4 : 2), true);
+    s.Mirror(base, index_address, index_count * (index_32bit ? 4 : 2), true,
+             s.draw_index_newest);
   }
   // The highest vertex the draw uses (indices as the GPU reads them, after
   // the base vertex): a vertex buffer is copied up to it even past the size

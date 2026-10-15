@@ -2051,6 +2051,28 @@ to the direct gain). Next: the mirror asks the same question of the same
 range in the same draw (`Mirror` of the index range), so the cache's
 answer can be passed to it, removing the added ~110.
 
+**Done: the cache's answer passed to the mirror.** `DrawIndexRange`
+keeps what `Buffers_NewestWrite` said of the draw's index range when it
+asked (`draw_index_newest`, reset at each draw's start), and `Draw` passes
+it to `Mirror`, which asks itself only without it (or when the range was
+clipped at the end of physical memory). This relies on what the mirror
+already did: no memcpy write to an index range between two points of one
+draw. Checked over an attract race with `--native_renderer_verify_mirror`
+(every range not copied compared with guest memory: 2.1 million, 0
+differ) and `--native_renderer_check_index_cache` (4 million, 0 differ).
+Profiles against the previous commit (separate binaries, three runs each,
+alternating), thousand cycles a frame:
+
+| Build | Render thread | `Buffers_NewestWrite` | `DrawIndexRange` |
+|---|---|---|---|
+| cache only | 13,795, 13,758, 12,584 | 338, 354, 311 | 139, 129, 121 |
+| answer passed | 13,441, 13,656, 13,613 | 230, 285, 272 | 77, 94, 93 |
+
+So ~−115 for the two together, as expected (the thread's totals are too
+noisy to show it: the third "cache only" run drew ~8% more frames than
+any other). Over both steps the mirror's per-draw work is ~−400 thousand
+cycles a frame (~3% of the render thread).
+
 Checking a change: run the old code beside the new over a whole attract
 race and compare every result, as for steps 1-4 (the lighting blender:
 cherry-pick `2c82ae6` and `5942f31`, then `--check_pixel_blender=true`; the
