@@ -13,6 +13,7 @@
 #include <vector>
 
 #include "device_context.h"
+#include "state.h"
 #include "textures.h"
 #include "vulkan_functions.h"
 
@@ -92,6 +93,7 @@ class Passes {
   // Counts why constants aren't reused (Stats::fetch_changed and
   // offset_differs; a diagnostic, off by default).
   void set_log_constant_changes(bool log);
+  void set_log_register_reads(bool log);
   void set_verify_mirror(bool verify);
   // A debugging aid: hash each copied vertex and index range again at the
   // end of the frame; TakeLateWrites describes those that changed.
@@ -215,6 +217,8 @@ class Passes {
     // Predicated tilings begun, and the resolves their ends made.
     uint64_t tilings = 0, tiled_resolves = 0;
     uint32_t resolve_flags_sample = 0;
+    // With log_register_reads.
+    RegisterReadStats register_reads;
     TextureCache::Stats textures;
   };
   Stats TakeStats();

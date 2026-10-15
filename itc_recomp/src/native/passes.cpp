@@ -773,6 +773,15 @@ struct Passes::State {
   } last_constants;
   bool reuse_constants = true;
   bool log_constant_changes = false;
+  bool log_register_reads = false;
+  // ReadRegisters into regs, counted with log_register_reads.
+  void ReadState(uint8_t* base, uint32_t device) {
+    if (log_register_reads) {
+      ReadRegisters(base, device, regs, stats.register_reads);
+    } else {
+      ReadRegisters(base, device, regs);
+    }
+  }
   // Points offset at a copy of the block's size bytes in the constant
   // block in use: the last one written if the same (and reuse_constants),
   // or a new one, reserving range bytes. With copied, the bytes are
@@ -3034,7 +3043,7 @@ void Passes::AfterDraw(VkCommandBuffer commands, uint8_t* base, uint32_t id, uin
     return;
   }
   uint32_t device = guest::LoadU32(base, kDevicePointer);
-  ReadRegisters(base, device, s.regs);
+  s.ReadState(base, device);
   for (uint32_t i = 0; i < arg1; i++) {
     uint32_t item = payload + 12 * i;
     DrawCall call;
@@ -3064,7 +3073,7 @@ void Passes::InlineDraw(VkCommandBuffer commands, uint8_t* base, uint32_t type, 
   std::memcpy(s.mirrors[s.frame].mapped + call.vertex_address, base + data, size);
   s.stats.mirrored_bytes += size;
   uint32_t device = guest::LoadU32(base, kDevicePointer);
-  ReadRegisters(base, device, s.regs);
+  s.ReadState(base, device);
   // What BeginVertices wrote to the GPU instead of the shadow.
   uint32_t* fetch = &s.regs.values[XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0];
   fetch[2 * (kInlineFetchConstant - 2)] = 1;
@@ -3076,6 +3085,10 @@ void Passes::InlineDraw(VkCommandBuffer commands, uint8_t* base, uint32_t type, 
       0x10000000u | ((size / 4) << 2) | uint32_t(xenos::Endian::k8in32);
   s.regs.values[XE_GPU_REG_VGT_INDX_OFFSET] = 0;
   s.Draw(commands, base, device, call);
+  // Read them from the shadow again next time.
+  static_assert((kInlineFetchConstant - 2) / 3 == kInlineFetchConstant / 3);
+  MarkFetchConstantsDirty(1ull << (63 - kInlineFetchConstant / 3));
+  MarkRegistersDirty(XE_GPU_REG_VGT_INDX_OFFSET, 1ull << 63);
 }
 
 void Passes::AfterClear(VkCommandBuffer commands, uint8_t* base, uint32_t payload,
@@ -3328,6 +3341,10 @@ void Passes::set_reuse_constants(bool reuse) {
 
 void Passes::set_log_constant_changes(bool log) {
   state_->log_constant_changes = log;
+}
+
+void Passes::set_log_register_reads(bool log) {
+  state_->log_register_reads = log;
 }
 
 void Passes::set_copy_all(bool copy_all) {
