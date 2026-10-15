@@ -323,8 +323,103 @@ branch-record run is skewed, so take shares from a plain run):
   ~3% with AddRef's own 0.8%.
 
 **Next, from this** (estimates):
-1. **Interpolation's allocations and the replay's lookups** (~7% plus
-   ~1.7%): the per-upload `std::vector` and `shared_ptr`.
+1. **Interpolation's allocations and the replay's lookups: done**
+   (2026-10-15, branch `replay-allocations`). The lighting blender
+   (`PixelConstantBlender::Apply`, inlined into
+   `BlendState_ReplayConstants` with `Substitute` and `BlendProduct`; the
+   matrix math in `transform.cpp` keeps its own symbols, ~1.5%) allocated a
+   252-float vector per upload and copied it three times, allocated a
+   `vector<bool>`, looked objects up in two `std::map`s (one cleared every
+   frame, so a node per upload) and compared the upload with a copy of
+   itself. It now reuses its buffers, keys both maps by hash (the
+   occurrence counts go stale by frame instead of being cleared, and are
+   pruned with the entries), skips that compare when blending from the
+   latest value (the default), and copies what `--log_pixel_outcomes`
+   reads only with it. The per-object extras are a fixed array, and the
+   replay frame the render thread drops (~1,500 products, a node each) is
+   freed by the main thread when it publishes the next. Checked over two
+   whole attract races (~30 million lighting uploads each) against the old
+   blender run side by side: every value uploaded and put back the same;
+   outcomes differed only for uploads holding a NaN at the race's end
+   (old "not as recorded", since NaN never equals itself; new "rejected";
+   both left as recorded). Uncapped attract race, alternating, 20 s runs:
+   312.7, 321.8, 320.5 fps mean before, 330.8, 331.4, 330.2 after (~+4%;
+   10th percentile 271/281/281 against 289/289/285). Render thread:
+   `BlendState_ReplayConstants` 7.1% to 6.0%, libc's `free` ~1.6% to
+   ~0.5%.
+   Then, the same day: lighting uploads loaded with `guest::CopyFloats` (a
+   vectorized byte-swapping loop) straight into the entry, without the
+   copy, stopping early when equal to last tick's bit for bit. Checked the
+   same way (also with `--pixel_blend_from_latest=false`): every value
+   the same. **No measurable gain**: `BlendState_ReplayConstants` stayed at
+   6.0%, fps within noise (328.2, 328.2, 320.7 before; 330.4, 330.8, 331.6
+   after). So the lighting uploads' loads and copies weren't where the
+   remaining 6% goes; what is isn't known (the camera products'
+   `Substitute`, matrix loads and stores, or the ~20 cvar reads an upload
+   are the candidates): split it with a profile (functions marked
+   `noinline`, or sample offsets within the function) before more work.
+   **The split** (a build with `Apply`, `Substitute`, `BlendProduct`, the
+   matrix loads and stores and the logs' upload hooks `noinline`):
+   `PixelConstantBlender::Apply` 3.6% (~24% its loop sorting the 252
+   components, ~17% the loop storing the blend, ~15% at its entry),
+   `BlendState_ReplayConstants` itself 1.8% (~20% a locked increment per
+   camera product, ~25% putting the lighting upload back float by
+   float), `ReplayCameras::Substitute` 1.1% (~55% the `unordered_map`
+   lookup: a divide, then a chain of nodes), the matrix math ~1.5%, the
+   logs' hooks ~0.6%. Fixes, one at a time:
+   1. **The locked increment: done.** `counts_.replayed_products`, a
+      `std::atomic` read only by `--log_blend_state`, is counted only with
+      it. `BlendState_ReplayConstants` 6.01% to 5.75%; fps within noise
+      (325.0 to 327.4 mean over three alternating pairs, one pair the
+      other way).
+   2. **`Substitute`'s lookup: done.** The frame's products are in an
+      open-addressed table (`ProductTable`: slots of address and index, at
+      most half full, a multiplicative hash; the products stored together)
+      built by the main thread. Checked over a whole attract race against
+      the `unordered_map` kept beside it: the same product for all 33.8
+      million lookups. Measured by profile, not fps (the user's call: fps
+      runs vary more than such a change; see below): `BlendState_
+      ReplayConstants` 919 to 822 thousand cycles a frame (two runs each),
+      ~0.6% of the render thread.
+   3. **`Apply`'s loops through local pointers: done.** The flags it
+      writes are bytes, which may alias anything, so the loops reloaded
+      the vectors' start and end and recomputed the size every iteration
+      (seen in the disassembly: `mov (%r12)`, `mov 0x8(%r12)`, `sar`,
+      before; a compare with a register after). Also switched slots by a
+      per-register table instead of a scan of six ranges per component.
+      Checked against the old blender as before (both blend modes; only
+      the NaN uploads' outcome differs). `BlendState_ReplayConstants`
+      834, 809, 823, 854, 833 thousand cycles a frame (step 2's runs) to
+      813, 783, 761 (~-45 thousand, ~0.3% of the render thread; less than
+      the split's ~0.9% for the whole loop: the reloads were only part of
+      it).
+   4. **Storing the blend and putting it back: done.** The blender
+      computes the whole upload into a buffer (the blend where it blends,
+      the recorded bits elsewhere) and writes it with `guest::StoreU32s`
+      (the store counterpart of `CopyU32s`); the restore after the upload
+      uses it too. The select loop vectorized only once written without
+      branches (the blend computed for every component, chosen with `&`
+      rather than `&&`): check the disassembly for `mulps`/`subps`.
+      Checked against the old blender as before, bit for bit (both blend
+      modes). `BlendState_ReplayConstants` 796, 790, 818 thousand cycles
+      a frame (step 3, alternating) to 733, 746, 731 (~-60 thousand, ~0.4%
+      of the render thread).
+
+   Over steps 1-4, `BlendState_ReplayConstants` went from ~920 to ~737
+   thousand cycles a frame (5.9% to 4.8% of the render thread), on top of
+   the allocations removed before (7.1% to 6.0%, and libc's `free` ~1.6%
+   to ~0.5%): from ~1.1 million cycles a frame to ~0.74, about 2.3% of
+   the render thread, plus ~1.1% of `free`.
+
+   **Measuring small changes.** Fps in alternating runs varies ~±1.5%
+   between runs of one build, and so does the render thread's total
+   cycles per frame (15.55 and 15.79 million for one build), so changes
+   under a few percent don't show in either. Instead, profile both builds
+   at the same point of an attract race and compare the changed
+   function's **cycles per frame**: its share of the profile times the
+   thread's cycles (perf's "Event count"), over the frames drawn in the
+   profiled seconds (the `--log_fps` lines stamped within them). Two runs
+   each agreed within ~3%.
 2. **The mirror's per-draw work** (~7%): cache each draw's index range
    (lowest, highest) by index buffer, count and format, dropped on a
    memcpy write as the mirror's copies are; a flat table instead of the

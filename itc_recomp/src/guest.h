@@ -62,6 +62,56 @@ inline bool CopyU32s(uint8_t* base, uint32_t address, uint32_t* out, uint32_t co
   return SwapU32s(REX_RAW_ADDR(address), out, count);
 }
 
+// CopyU32s for floats (no comparison).
+inline void SwapFloats(const uint8_t* in, float* out, uint32_t count) {
+  for (uint32_t i = 0; i < count; i++) {
+    uint32_t value;
+    std::memcpy(&value, in + 4 * i, 4);
+    out[i] = std::bit_cast<float>(__builtin_bswap32(value));
+  }
+}
+
+inline void CopyFloats(uint8_t* base, uint32_t address, float* out, uint32_t count) {
+  constexpr uint32_t kOffsetChange = 0xE0000000u;
+  if (count && address < kOffsetChange &&
+      uint64_t(address) + 4 * uint64_t(count - 1) >= kOffsetChange) {
+    uint32_t below = (kOffsetChange - address + 3) / 4;
+    SwapFloats(REX_RAW_ADDR(address), out, below);
+    uint32_t rest = address + 4 * below;
+    SwapFloats(REX_RAW_ADDR(rest), out + below, count - below);
+    return;
+  }
+  SwapFloats(REX_RAW_ADDR(address), out, count);
+}
+
+// Byte-swaps count words from in into guest memory at out (host memory,
+// contiguous). For StoreU32s.
+inline void SwapStoreU32s(uint8_t* out, const uint8_t* in, uint32_t count) {
+  for (uint32_t i = 0; i < count; i++) {
+    uint32_t value;
+    std::memcpy(&value, in + 4 * i, 4);
+    value = __builtin_bswap32(value);
+    std::memcpy(out + 4 * i, &value, 4);
+  }
+}
+
+// Stores count words (floats or integers, in host byte order) to guest
+// memory at address, as StoreU32 would one by one, in one loop the compiler
+// vectorizes. Split at 0xE0000000 as CopyU32s.
+inline void StoreU32s(uint8_t* base, uint32_t address, const void* words, uint32_t count) {
+  const uint8_t* in = static_cast<const uint8_t*>(words);
+  constexpr uint32_t kOffsetChange = 0xE0000000u;
+  if (count && address < kOffsetChange &&
+      uint64_t(address) + 4 * uint64_t(count - 1) >= kOffsetChange) {
+    uint32_t below = (kOffsetChange - address + 3) / 4;
+    SwapStoreU32s(REX_RAW_ADDR(address), in, below);
+    uint32_t rest = address + 4 * below;
+    SwapStoreU32s(REX_RAW_ADDR(rest), in + 4 * below, count - below);
+    return;
+  }
+  SwapStoreU32s(REX_RAW_ADDR(address), in, count);
+}
+
 inline float LoadFloat(uint8_t* base, uint32_t address) {
   return std::bit_cast<float>(REX_LOAD_U32(address));
 }
