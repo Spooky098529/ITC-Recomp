@@ -20,7 +20,7 @@ D=$1; NAME=$2; PATTERN=${3:-BlendState_ReplayConstants}
 B=itc_recomp/out/build/linux-amd64-release; G="$PWD/itc/Import Tuner Challenge (USA)"
 mkdir -p itc_recomp/out/profiles; O=itc_recomp/out/profiles/$NAME.data
 XDG_DATA_DIRS=/usr/local/share:/usr/share LD_LIBRARY_PATH=$B:rexglue-sdk/out/linux-amd64 \
-  timeout 30 "$D/itc" --native_renderer=true --native_renderer_exclusive=true \
+  timeout 30 "$D/itc" --native_renderer=true --native_renderer_exclusive=true --native_audio=true \
   --game_data_root="$G" --mnk_mode=true --max_fps=0 --log_fps=true --interpolate_draw_state=true \
   --skip_intro --attract_after_s=1 $ITC_ARGS > /dev/null 2>&1 &
 sleep 14
