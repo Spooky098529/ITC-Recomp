@@ -164,6 +164,9 @@ Not done yet:
   ~12% of the render thread's cycles a draw (by profile, attract race;
   not yet checked on the Deck). Where the render thread's time goes, what's
   done and what's next: "Performance: the render thread" in
-  `docs/native-renderer.md`.
+  `docs/native-renderer.md`. Next there: test the user's hypothesis that
+  the guest memory mirrors need updating only once a tick ("Hypothesis to
+  test: the mirrors updated once a tick"), on `mirrors-fix` (not merged
+  yet; it also holds the index range cache for the mirror).
 - Recheck whether the player's beam on the road still jumps in sharp turns
   (Known issues); if it's gone, drop it from the next release's limits.
