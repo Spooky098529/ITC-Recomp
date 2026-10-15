@@ -376,7 +376,7 @@ struct ProductBlendParts {
   const ReplayedProduct* product = nullptr;
 };
 
-Matrix4 BlendProduct(const ReplayedProduct& product, float amount, BlendStats& stats,
+[[gnu::noinline]] Matrix4 BlendProduct(const ReplayedProduct& product, float amount, BlendStats& stats,
                      ProductBlendParts* parts = nullptr) {
   if (parts) {
     *parts = {product.now.world, product.now.world, std::nullopt, std::nullopt, &product};
@@ -1558,7 +1558,7 @@ class ReplayCameras {
   }
 
   // Render thread, for each vertex constant upload of 4+ registers.
-  void CountUpload(uint8_t* base, uint32_t payload, bool substituted) {
+  [[gnu::noinline]] void CountUpload(uint8_t* base, uint32_t payload, bool substituted) {
     if (!REXCVAR_GET(log_blend_state)) {
       return;
     }
@@ -1578,7 +1578,7 @@ class ReplayCameras {
 
   // The value to upload from `payload` in place of `m`, if it's a camera
   // product of the tick still as written.
-  std::optional<Matrix4> Substitute(uint32_t payload, const Matrix4& m) {
+  [[gnu::noinline]] std::optional<Matrix4> Substitute(uint32_t payload, const Matrix4& m) {
     if (!frame_) {
       return std::nullopt;
     }
@@ -1657,7 +1657,7 @@ class ReplayCameras {
   std::chrono::steady_clock::time_point last_log_{};
 };
 
-ReplayCameras& GetReplayCameras() {
+[[gnu::noinline]] ReplayCameras& GetReplayCameras() {
   static ReplayCameras cameras;
   return cameras;
 }
@@ -1694,7 +1694,7 @@ class ReplayedConstantsLog {
 
   void OnTick() { frames_since_tick_ = 0; }
 
-  void OnUpload(uint8_t* base, uint32_t payload, uint32_t packed, bool substituted) {
+  [[gnu::noinline]] void OnUpload(uint8_t* base, uint32_t payload, uint32_t packed, bool substituted) {
     if (!REXCVAR_GET(log_replayed_constants)) {
       return;
     }
@@ -1779,7 +1779,7 @@ class PixelConstantBlender {
 
   // Blends the upload in place and returns true; recorded() then holds the
   // upload as recorded, to put back after.
-  bool Apply(uint8_t* base, uint32_t payload, uint32_t packed, float amount, uint64_t object) {
+  [[gnu::noinline]] bool Apply(uint8_t* base, uint32_t payload, uint32_t packed, float amount, uint64_t object) {
     outcome_ = Outcome::kNoObject;
     switch_jumps_ = 0;
     if (object == 0) {
@@ -2076,7 +2076,7 @@ void PixelConstantBlender::LogRejection(uint32_t i, float a, float b) {
   rejections.clear();
 }
 
-PixelConstantBlender& GetPixelConstantBlender() {
+[[gnu::noinline]] PixelConstantBlender& GetPixelConstantBlender() {
   static PixelConstantBlender blender;
   return blender;
 }
@@ -2088,7 +2088,7 @@ PixelConstantBlender& GetPixelConstantBlender() {
 // shows the tick's lighting on a blended object.
 class PixelOutcomesLog {
  public:
-  void OnUpload(uint32_t start, bool has_object, bool moving, uint64_t tick, float amount,
+  [[gnu::noinline]] void OnUpload(uint32_t start, bool has_object, bool moving, uint64_t tick, float amount,
                 const Vec3& world_now, const Vec3& world) {
     using Outcome = PixelConstantBlender::Outcome;
     const PixelConstantBlender& blender = GetPixelConstantBlender();
@@ -2429,7 +2429,7 @@ class SteppingConstantsLog {
     frames_ = 0;
   }
 
-  void OnUpload(uint8_t* base, uint32_t payload, uint32_t packed, bool substituted) {
+  [[gnu::noinline]] void OnUpload(uint8_t* base, uint32_t payload, uint32_t packed, bool substituted) {
     if (!REXCVAR_GET(log_stepping_constants)) {
       return;
     }
@@ -2508,7 +2508,7 @@ class OverlayUploadsLog {
     }
   }
 
-  void OnUpload(uint8_t* base, uint32_t payload, uint32_t packed, bool substituted,
+  [[gnu::noinline]] void OnUpload(uint8_t* base, uint32_t payload, uint32_t packed, bool substituted,
                 const std::optional<Matrix4>& original) {
     if (!REXCVAR_GET(log_overlay_uploads) || frames_left_ == 0) {
       return;
@@ -2635,7 +2635,7 @@ class ObjectExtrasLog {
     }
   }
 
-  void OnUpload(uint8_t* base, uint32_t payload) {
+  [[gnu::noinline]] void OnUpload(uint8_t* base, uint32_t payload) {
     uploads_++;
     std::array<float, 20> extras;
     for (uint32_t i = 0; i < 20; i++) {
