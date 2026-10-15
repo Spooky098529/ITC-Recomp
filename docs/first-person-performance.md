@@ -97,8 +97,11 @@ with a profile of the render thread **in the cockpit view**:
 - If the mirror pass is a real cost, see whether its draws can be
   cheaper (it may redraw the scene with the same states).
 
-Measure on the PC before and after any change: an uncapped attract race
-(`--max_fps=0`, about 320 fps mean since `descriptor-reuse`; `timeout 20`, mean over
+Measure on the PC before and after any change. For changes under a few
+percent (most of them now), profile the render thread instead of counting
+frames (`itc_recomp/tools/profile_render_thread.sh`, see "Measuring small
+changes" and "Against v0.3.7"). For larger ones, an uncapped attract race
+(`--max_fps=0`, ~340 fps mean on `blend-math`; `timeout 20`, mean over
 seconds 3-18 of the race, as in `CLAUDE.md`), alternating old and new
 builds (keep a copy of the old binary outside the build directory; a copy
 writes its logs to `logs/` beside itself, so read the newest log there and
@@ -147,7 +150,10 @@ manage well under 1 µs. Roughly by payoff for the effort:
    register file, looks up shaders, builds a pipeline key and finds a
    texture set. The game's graphics library keeps dirty flags for exactly
    this; following them would skip most lookups, as consecutive draws
-   usually change little (constants, maybe a texture).
+   usually change little (constants, maybe a texture). **Register reads:
+   done** (`read-registers`, see "Register reads"): the register file is
+   now read only where the dirty masks say. The lookups (shaders,
+   pipeline key, texture set) don't use the masks yet.
 4. **Split the render thread in two.** One thread replays the game's
    command list and runs the library, and also translates and records
    Vulkan. Recording on a second thread, pipelined a frame behind, could
@@ -162,8 +168,10 @@ manage well under 1 µs. Roughly by payoff for the effort:
    descriptor sets have since been bound only when they change (62% of
    draws).
 6. **Smaller items**: the interpolation blending (~2.5-3 ms a frame on
-   the Deck in cockpit; SIMD), and the library's remaining packet writers
-   (~3-4%, in Known issues).
+   the Deck in cockpit; SIMD; largely done since: no allocations, blends
+   planned once a tick, the byte swap vectorized, see "Done on
+   `blend-math`"), and the library's remaining packet writers (~3-4%, in
+   Known issues).
 
 Start with the profile in cockpit view and a draws-per-pass count: they
 show whether 1 and 2 are as big as estimated.
@@ -472,9 +480,10 @@ Leads, not yet measured:
   tick, render-only frames upload the same values, so its outcome and
   which components keep the tick's value could be kept per entry and
   reused while the upload is bit for bit the one sorted.
-- A fresh split first: mark `Apply`, `Substitute`, `BlendProduct` and
-  the logs' upload hooks `[[gnu::noinline]]` in a temporary commit (as
-  `adf4a8f` did), profile, revert.
+- A fresh split first (done on `blend-math`, below): mark `Apply`,
+  `Substitute`, `BlendProduct` and the logs' upload hooks
+  `[[gnu::noinline]]` in a temporary commit (as `adf4a8f` did), profile,
+  revert (`76fe176`'s markers were only reverted on `read-registers`).
 
 ### Done on `blend-math` (2026-10-15)
 
