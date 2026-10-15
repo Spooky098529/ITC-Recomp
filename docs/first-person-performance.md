@@ -1,12 +1,15 @@
 # First-person views: lower frame rate on the Steam Deck
 
-Status (2026-10-15, v0.3.6): measured on the Deck; the cause is the cost
+Status (2026-10-15, v0.3.7): measured on the Deck; the cause is the cost
 of each draw on the render thread, and the cockpit simply draws more (its
 interior and the rear-view mirror). So the work is making every draw
 cheaper, in any view. Done so far: skipping repeated state calls and
 diagnostics left running (about +9% uncapped together, see "Profile of
 2026-10-15" below); reusing constant blocks and skipping descriptor binds
-(~+1.4%, branch `descriptor-reuse`); not yet checked on the Deck. Read `CLAUDE.md` first
+(~+1.4%) and copying constants from guest memory vectorized (~+14%), both
+from `descriptor-reuse`, released in v0.3.7 (uncapped ~285 to ~320 fps); not
+yet checked on the Deck. The next step is a fresh profile (the latest is in
+"Profile of 2026-10-15", second part), then the "Next" list there. Read `CLAUDE.md` first
 (rules: find problems with logs, commit and push work branches after each
 commit, keep docs up to date; no Windows code on branches off `main`).
 
@@ -89,8 +92,17 @@ with a profile of the render thread **in the cockpit view**:
 
 Measure on the PC before and after any change: an uncapped attract race
 (`--max_fps=0`, about 320 fps mean since `descriptor-reuse`; `timeout 20`, mean over
-seconds 3-18 of the race, as in `CLAUDE.md`), and a
-pinned one (`taskset -c 0`) as a stand-in for the Deck. Then a build for
+seconds 3-18 of the race, as in `CLAUDE.md`), alternating old and new
+builds (keep a copy of the old binary outside the build directory; a copy
+writes its logs to `logs/` beside itself, so read the newest log there and
+check its time), and, only when the user agrees, a pinned one (`taskset -c
+0`) as a stand-in for the Deck. Correctness: frames dumped at the same
+moments (`--native_renderer_dump_every`) no longer match even between two
+runs of the same build (the attract race allocates its buffers at other
+addresses), so they can't check a change. Instead, for a change that
+should give the same results by a faster path, add a temporary check that
+computes both ways on every draw and logs the mismatches, run a whole race,
+then remove it (as for the constant copies: 0 mismatches). Then a build for
 the user's Deck: local builds need a newer glibc than SteamOS has, so
 push the branch and run CI on it (`gh workflow run build-linux.yml --ref
 perf-debug`, then `gh run download <id> -D itc_recomp/out/dist/<name>`;
@@ -173,6 +185,17 @@ tid=,pcpu=,comm= -p <pid>`), then `perf record -e cycles:u -t <tid>`.
 - libc has no symbols perf reads, but `objdump -d /usr/lib/libc.so.6`
   names its internal functions (`__memcmp_evex_movbe`, ...); the load
   address is in `perf script --show-mmap-events`.
+- Within a big function (`Draw` is ~15 KB, much of it inlined), `perf
+  annotate` doesn't work on this build: it shows other functions'
+  instructions under the name. Instead take `perf script -F ip,sym,symoff`
+  (the `ip` alone is a run-time address, the executable being
+  position-independent), add each sample's `symoff` to the function's
+  address from `nm -S`, and count the samples in address ranges of `objdump
+  -d --start-address=... --stop-address=...` of it: e.g. the loop between
+  two branches. That's how the float constant loop was found.
+- After changing code meant to be vectorized, check the disassembly for
+  it (`pshufb` for byte swaps on x86-64-v2): a change can quietly stop the
+  compiler inlining or vectorizing it.
 
 **Render thread, before the changes below** (uncapped, ~260 fps):
 
@@ -185,6 +208,16 @@ tid=,pcpu=,comm= -p <pid>`), then `perf record -e cycles:u -t <tid>`.
 | `memcpy` | ~4.4%: 2.9% `Draw` writing constants into the ring, 1.1% the mirror |
 | Interpolation | ~10%: `BlendState_ReplayConstants` 6%, its mutex ~1.6%, malloc/free ~1% |
 | malloc/free elsewhere, other mutexes | ~2-3% |
+
+**Render thread, after v0.3.6, before the constant copies** (uncapped,
+~285 fps, `perf record -e cycles:u`, user time only; 2026-10-15): `Draw`
+~20% of which the float constant loops ~14% (vertex 7.8%, pixel 6.6%),
+`BlendState_ReplayConstants` ~6-7%, `ReadRegisters` ~4.7%,
+`TextureCache::GetView` 3.2%, `IndexRange` 2.2%, `GetTarget` 2.1%, the
+library's AddRef/Release and packet writers ~1-2% each; libc ~11% and the
+Vulkan driver ~8.5% of all samples. The float loops and `ReadRegisters`
+are now much cheaper (see Next, 1); no profile has been taken since, so
+take one before choosing what's next.
 
 The matrix math in `interpolation/transform.cpp` is only ~1.5% (~137 ns
 a product, ~470 blended products a frame, measured with a benchmark):
@@ -228,4 +261,12 @@ not worth SIMD.
    still taken per upload (the per-upload `SlotOwner` lock is gone).
 3. The bigger ideas above: fewer passes redrawn on interpolated frames
    (1), following the library's dirty flags (3), splitting the render
-   thread (4).
+   thread (4). Discussed with the user (2026-10-15), not tried: a host-side
+   copy of the device's constants and state, kept up to date by hooking
+   whatever sets them, so draws don't read guest memory. Guest memory has
+   to be written as now regardless (the library reads its own device
+   struct), and a write missed by the hooks gives wrong rendering, so the
+   byte swaps it would save (now cheap) don't justify it alone; the
+   payoff would be knowing what changed since the last draw without
+   comparing, which is (3) and could skip shader, pipeline and texture
+   set lookups too.
