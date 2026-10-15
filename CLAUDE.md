@@ -14,6 +14,8 @@ render command replay and the graphics library), and
 that replaced the emulated GPU, and (its last section) the investigation
 of the render thread's performance. `docs/native-audio.md` is the same for
 the SDK's audio (the Audio Worker's spin, the game's sounds, the plan).
+`docs/unlocked-res.md` covers drawing at other resolutions (`--width`,
+`--height`, `--fullscreen`, black bars) and what's left to try.
 Read the relevant section before changing anything, and keep it up to
 date as you learn things.
 
