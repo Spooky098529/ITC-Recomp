@@ -69,6 +69,9 @@ REXCVAR_DEFINE_BOOL(log_overlay_uploads, false, "ITC",
                     "Log every shader constant upload the race overlays recorded, as replayed, "
                     "12 frames every 3 s");
 REXCVAR_DECLARE(bool, log_frame_times);
+REXCVAR_DEFINE_BOOL(check_blend_plan, false, "ITC",
+                    "TEMPORARY: blend camera products the old way beside the planned and log "
+                    "mismatches");
 REXCVAR_DEFINE_BOOL(strict_pixel_pairing, true, "ITC",
                     "Leave per-object pixel constants unblended after a draw that isn't a known "
                     "camera product, instead of pairing them by the product before it");
@@ -489,6 +492,61 @@ ProductPlan PlanProduct(const ProductInputs& a, const ProductInputs& b, TickPlan
     if (parts) {
       parts->eye_now = camera.b.camera.position;
       parts->eye = blended.camera.position;
+    }
+  }
+  if (parts) {
+    parts->world = world;
+  }
+  // Other cameras (orthographic: the shadow map's, refitted around the car
+  // every tick) stay at the tick's, so everything using one agrees within a
+  // frame; only the objects move.
+  return Multiply(world, view_projection);
+}
+
+// TEMPORARY (--check_blend_plan): the blend before plans, to compare.
+Matrix4 BlendProductOld(const ReplayedProduct& product, float amount, BlendStats& stats,
+                     ProductBlendParts* parts = nullptr) {
+  if (parts) {
+    *parts = {product.now.world, product.now.world, std::nullopt, std::nullopt, &product};
+  }
+  if (!product.before) {
+    stats.unpaired++;
+    return product.written;
+  }
+  stats.blended++;
+  const ProductInputs& a = *product.before;
+  const ProductInputs& b = product.now;
+  Matrix4 world = b.world;
+  std::optional<ScaledTransform> wa = ScaledTransformFromWorldMatrix(a.world);
+  std::optional<ScaledTransform> wb = ScaledTransformFromWorldMatrix(b.world);
+  if (wa && wb && !IsCut(wa->transform, wb->transform)) {
+    world = WorldMatrixFromScaledTransform(Blend(*wa, *wb, amount));
+  } else if (std::optional<ScaledTransform> spinning;
+             wa && wb && Distance(wa->transform.position, wb->transform.position) <= kCutDistance &&
+             (spinning = BlendSpinning(*wa, *wb, amount, kCutAngle))) {
+    // A wheel: too much spin to blend, but its position and steering can be.
+    world = WorldMatrixFromScaledTransform(*spinning);
+    stats.spinning++;
+  } else if (a.world != b.world) {
+    stats.world_not_blended++;
+  }
+  Matrix4 view_projection = b.view_projection;
+  std::optional<PerspectiveCamera> ca, cb;
+  if (a.view_projection != b.view_projection) {
+    ca = SplitViewProjection(a.view_projection);
+    cb = SplitViewProjection(b.view_projection);
+  }
+  if (ca && cb) {
+    // A perspective camera: blend its placement and projection separately.
+    if (!IsSameCamera(*ca, *cb)) {
+      stats.camera_not_blended++;
+    } else {
+      PerspectiveCamera blended = Blend(*ca, *cb, amount);
+      view_projection = ViewProjectionFromCamera(blended);
+      if (parts) {
+        parts->eye_now = cb->camera.position;
+        parts->eye = blended.camera.position;
+      }
     }
   }
   if (parts) {
@@ -1699,6 +1757,9 @@ class ReplayCameras {
     BlendStats before = stats_.blend;
     Matrix4 result =
         BlendProduct(*product, frame_->plans.get(), frame_->amount, stats_.blend, &last_parts_);
+    if (REXCVAR_GET(check_blend_plan)) {
+      CheckPlan(*product, result, before);
+    }
     if (REXCVAR_GET(log_moving_products)) {
       using Outcome = MovingProductsLog::Outcome;
       Outcome outcome = stats_.blend.unpaired != before.unpaired       ? Outcome::kUnpaired
@@ -1743,6 +1804,53 @@ class ReplayCameras {
     stats_ = {};
     last_log_ = now;
   }
+
+  // TEMPORARY (--check_blend_plan).
+  void CheckPlan(const ReplayedProduct& product, const Matrix4& result, const BlendStats& before) {
+    BlendStats old_stats = before;
+    ProductBlendParts old_parts;
+    Matrix4 old = BlendProductOld(product, frame_->amount, old_stats, &old_parts);
+    auto same = [](const auto& x, const auto& y) { return std::memcmp(&x, &y, sizeof(x)) == 0; };
+    auto same_eye = [&](const std::optional<Vec3>& x, const std::optional<Vec3>& y) {
+      return x.has_value() == y.has_value() && (!x || same(*x, *y));
+    };
+    const BlendStats& n = stats_.blend;
+    bool ok = same(old, result) && same(old_parts.world, last_parts_.world) &&
+              same(old_parts.world_now, last_parts_.world_now) &&
+              same_eye(old_parts.eye_now, last_parts_.eye_now) &&
+              same_eye(old_parts.eye, last_parts_.eye) && old_stats.blended == n.blended &&
+              old_stats.unpaired == n.unpaired && old_stats.spinning == n.spinning &&
+              old_stats.world_not_blended == n.world_not_blended &&
+              old_stats.camera_not_blended == n.camera_not_blended;
+    check_.products++;
+    check_.spinning += n.spinning - before.spinning;
+    check_.cameras += last_parts_.eye.has_value();
+    if (!ok) {
+      check_.mismatches++;
+      if (check_.lines++ < 10) {
+        REXLOG_INFO("check plan: mismatch: tick {} amount {} plan {} row3 old ({} {} {} {}) new ({} "
+                    "{} {} {}) stats old b{} u{} s{} w{} c{} new b{} u{} s{} w{} c{}",
+                    frame_->tick, frame_->amount, product.plan, old[12], old[13], old[14],
+                    old[15], result[12], result[13], result[14], result[15], old_stats.blended,
+                    old_stats.unpaired, old_stats.spinning, old_stats.world_not_blended,
+                    old_stats.camera_not_blended, n.blended, n.unpaired, n.spinning,
+                    n.world_not_blended, n.camera_not_blended);
+      }
+    }
+    auto now = std::chrono::steady_clock::now();
+    if (now - check_.last >= std::chrono::seconds(2)) {
+      REXLOG_INFO("check plan: {} products compared ({} spinning, {} with a blended camera), {} "
+                  "mismatches",
+                  check_.products, check_.spinning, check_.cameras, check_.mismatches);
+      check_.last = now;
+      check_.lines = 0;
+    }
+  }
+  struct {
+    uint64_t products = 0, spinning = 0, cameras = 0, mismatches = 0;
+    int lines = 0;
+    std::chrono::steady_clock::time_point last{};
+  } check_;
 
   std::shared_ptr<const ReplayFrame> frame_;
   uint64_t last_identity_ = 0;
