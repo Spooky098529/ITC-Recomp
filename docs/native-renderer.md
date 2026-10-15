@@ -2205,11 +2205,13 @@ on its own line with the frames that drew it. Two uncapped attract races
   `820ED910`, `820ED920`) writes textures in bursts, on any pass.
 - **Drawn data does change on render-only passes**: 35 writes in the
   70 s race, in 4 bursts (one pass each, e.g. pass 1785, 12761), on the
-  main thread from the game's loaders (`820E78E8`, `820E7DDC`, `820E7F5C`,
+  main thread from game code (`820E78E8`, `820E7DDC`, `820E7F5C`,
   `820E82B0`, `820E8368`, `820E8420`, `820E84D8`, `820E8590`: in
-  `sub_820E7598`, `sub_820E7CA0`, `sub_820E8028`, see "Buffers"). So the
-  hypothesis as stated fails: with the mirrors swapped only on ticks,
-  those sections would be drawn from a mirror without them.
+  `sub_820E7598`, `sub_820E7CA0`, `sub_820E8028`, see "Buffers"; all three
+  called from one function near `820E86F0`-`820E8890`; small vertex
+  ranges, 64 bytes to 26 KB, in pairs of the same size; what they hold
+  isn't known). So with the mirrors swapped only on ticks, those ranges
+  would be drawn from a mirror without them.
 - But **every one of those ranges was drawn only in the frame after the
   write** (new data, drawn first by that pass's own list), never in the
   frames before it; logic passes' writes into drawn ranges likewise. **No
@@ -2218,7 +2220,37 @@ on its own line with the frames that drew it. Two uncapped attract races
 - Not yet covered: a race the user drives (sections streamed as the car
   moves).
 
-What this suggests instead (for the user to decide): since writes only
+So the hypothesis's core holds in these races (nothing a frame in flight
+reads is ever written), and only its timing doesn't (new data also
+arrives on render-only passes).
+
+**The experiment (2026-10-15).** `--native_renderer_mirror_by_tick` builds
+the design above: draws read the front mirror, swapped as a logic pass's
+list starts replaying (the main thread queues each list's pass type as
+`Renderer::WaitForFrame` hands it over, `Renderer_OnListHandedOver`; the
+render thread takes one per frame, `Renderer_OnReplayStart`); memcpy's
+writes are applied at frame starts to the back mirror (free with two
+frames in flight as long as it wasn't the front in the frame before);
+inline vertices get half their region per frame slot. Draws do no
+copying. `--native_renderer_verify_mirror` is no use with it (it slows
+frames below 30, so every frame swaps), so drawn ranges are instead looked
+up in the writes the front hasn't had (exact, given memcpy is the only
+writer). 70 s attract race (`itc_756`): 150 swaps per 5 s (one a tick) in
+~1,700 frames; drawn ranges missing a write: none in logic passes' lists;
+in render-only passes' lists, exactly the loader bursts above (vertex
+ranges of 768-25856 bytes, `820E7xxx` callers), each stale for the 2
+frames left in its tick. Pictures otherwise right.
+
+`--native_renderer_mirror_to_both` (with it): the writes taken at each
+frame's start also go into the front mirror. 70 s race (`itc_757`): no
+drawn range missing a write; the write log saw 45 writes changing drawn
+data, every one drawn only in the frame after, none under the replay.
+Speed, uncapped attract races alternating (seconds 3-18): default 360 and
+358 fps, to both 372 and 366 (~+3%, near the run-to-run noise; draws
+still make the `mirrored` set's inserts and the index range work, which
+this would let go).
+
+Was suggested first (for the user to decide): since writes only
 land in memory no frame in flight reads, each write could be copied into
 both mirrors when memcpy makes it (on its thread), and draws would do no
 mirror work at all; no swap and no fence wait. Inline vertices would

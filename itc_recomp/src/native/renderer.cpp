@@ -76,6 +76,9 @@ REXCVAR_DEFINE_BOOL(native_renderer_mirror_by_tick, false, "ITC",
                     "Draws read a guest memory mirror updated only as a logic pass's list starts "
                     "replaying, the two mirrors alternating (an experiment; see 'Hypothesis to "
                     "test: the mirrors updated once a tick' in docs/native-renderer.md)");
+REXCVAR_DEFINE_BOOL(native_renderer_mirror_to_both, false, "ITC",
+                    "With --native_renderer_mirror_by_tick: memcpy's writes go into both mirrors "
+                    "at each frame's start, the one draws read included (an experiment)");
 REXCVAR_DEFINE_BOOL(native_renderer_verify_mirror, false, "ITC",
                     "Compare each vertex and index range not copied into the mirror with guest "
                     "memory every frame, logging those that differ (a debugging aid; slow, ~20 "
@@ -542,6 +545,7 @@ bool Renderer::Init(uint8_t* base) {
     return false;
   }
   passes_.set_mirror_by_tick(REXCVAR_GET(native_renderer_mirror_by_tick));
+  passes_.set_mirror_to_both(REXCVAR_GET(native_renderer_mirror_to_both));
   return true;
 }
 

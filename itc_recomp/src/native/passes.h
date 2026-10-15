@@ -109,6 +109,9 @@ class Passes {
   // updated only as a logic pass's list starts replaying (an experiment);
   // TakeMirrorByTick describes it since it was last called.
   void set_mirror_by_tick(bool by_tick);
+  // With it (--native_renderer_mirror_to_both): memcpy's writes also go into
+  // the front mirror at each frame's start.
+  void set_mirror_to_both(bool to_both);
   std::string TakeMirrorByTick();
   void set_verify_mirror(bool verify);
   // A debugging aid: hash each copied vertex and index range again at the

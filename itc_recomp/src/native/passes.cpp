@@ -547,7 +547,7 @@ struct Passes::State {
   // writes are applied at frame starts to the other mirror, which no frame
   // in flight reads, and each mirror keeps the writes it hasn't had yet.
   // Inline vertices get a part of their region per frame slot.
-  bool mirror_by_tick = false;
+  bool mirror_by_tick = false, mirror_to_both = false;
   uint8_t* guest_base = nullptr;
   uint32_t front_mirror = 0;
   std::vector<std::pair<uint32_t, uint32_t>> mirror_pending[2], mirror_taken;
@@ -1221,15 +1221,24 @@ void Passes::State::MirrorByTickFrameStart(uint8_t* base) {
   // flight, is done by now (this frame slot's fence has been waited on) as
   // long as the front changed in an earlier frame than this one.
   uint32_t back = front_mirror ^ 1;
-  for (auto [start, end] : mirror_pending[back]) {
-    end = std::min(end, kPhysicalMemorySize);
-    if (start < end) {
-      std::memcpy(mirrors[back].mapped + start, PhysicalHostAddress(base, start), end - start);
-      by_tick.writes++;
-      by_tick.bytes += end - start;
+  auto apply = [&](uint32_t m) {
+    for (auto [start, end] : mirror_pending[m]) {
+      end = std::min(end, kPhysicalMemorySize);
+      if (start < end) {
+        std::memcpy(mirrors[m].mapped + start, PhysicalHostAddress(base, start), end - start);
+        by_tick.writes++;
+        by_tick.bytes += end - start;
+      }
     }
+    mirror_pending[m].clear();
+  };
+  apply(back);
+  // With mirror_to_both, the front too: frames in flight read it, but no
+  // write has been seen landing in data a frame drew around it
+  // (--native_renderer_log_physical_writes).
+  if (mirror_to_both) {
+    apply(front_mirror);
   }
-  mirror_pending[back].clear();
   if (Renderer_ReplayingLogicList()) {
     front_mirror = back;
     by_tick.swaps++;
@@ -3730,6 +3739,10 @@ std::string Passes::TakeIndexRanges() {
 
 void Passes::set_copy_all(bool copy_all) {
   state_->copy_all = copy_all;
+}
+
+void Passes::set_mirror_to_both(bool to_both) {
+  state_->mirror_to_both = to_both;
 }
 
 void Passes::set_mirror_by_tick(bool by_tick) {
