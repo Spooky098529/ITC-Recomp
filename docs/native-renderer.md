@@ -68,7 +68,7 @@ speed).
 | 4 | **The other passes**: each pass renders into a Vulkan image of its resolve's size and format; resolves become copies. | Shadows, reflections and the mirror work. | Done (2026-10-14): every pass draws, inline vertex draws included; clears and resolves work; the user saw the car's shadow, the mirror and the reflections right in our window (cockpit and third person), and the resolves match the emulated GPU's (`--readback_resolve=full`), except its blocky bloom. Menus not checked. |
 | 5 | **The final frame and the menus** (still in development mode): post-processing, HUD, the frame's end, then every menu screen. | Races and menus look as in the game's window, side by side. | In progress: the final frame with the HUD shows (checked by the user in a race); menus' tiled 3D views fixed. |
 | 6 | **Exclusive mode**: the emulated GPU gets no work and then isn't loaded at all; the graphics library is kept for what our renderer needs from it (see "Plan for milestone 6"); then measure. | The GPU plugin isn't loaded; frame rate measured against the emulated GPU. | Done (2026-10-14): the plugin isn't loaded (`run.sh` runs exclusive mode); measured: 135 fps mean uncapped against the emulated GPU's 155, then ~235 after the speed work (step 5; holds the 144 cap in an attract race). The library's remaining packet writers moved to milestone 7 (the user's call); the frame's end (step 6) measured at ~0.2% of the render thread and left as it is. |
-| 7 | **Known issues cleanup**: what's under Known issues below (the boot movie, an in-game movie locking up the game, the bloom's ghosting, motion blur at the tick's length, gamma, textures replaced in memory, textures never freed, the library's remaining packet writers, further speed work on our renderer, the freezes while driving to re-examine, no window without Vulkan surface support). | The known issues are fixed or accepted. | |
+| 7 | **Known issues cleanup**: what's under Known issues below (the boot movie, an in-game movie locking up the game, the bloom's ghosting (fixed 2026-10-15), motion blur at the tick's length, gamma, textures replaced in memory, textures never freed, the library's remaining packet writers, further speed work on our renderer, the freezes while driving to re-examine, no window without Vulkan surface support). | The known issues are fixed or accepted. | |
 
 ## Progress on milestone 2
 
@@ -840,6 +840,13 @@ memory).
   their usual speed.
 - `--native_renderer_skip_pixel_shader=<hash>`: leave out the draws of one
   pixel shader (hex).
+- `--native_renderer_log_glow`: once a second, by logic and render-only
+  frames: the glow history's cross-fades (pixel shader
+  `E0D070FB58A4EA03`), the texture they read, the 256x144 resolves without
+  a clear and which of them write that texture back, and the cross-fade's
+  pixel constants and vertex colour (see the bloom under Known issues).
+- `--native_renderer_log_shader_ucode=<hash>`: log a shader's microcode
+  disassembly when it's first used.
 - `--native_renderer_watch_draws`: log what changes in the main view's
   draws' inputs between frames (with the camera still, only flickering
   draws should change). Ignores float changes under 0.1% and compares only
@@ -1011,12 +1018,60 @@ texture objects ("Resources"). The approach:
 
 To be fixed (or accepted) in milestone 7.
 
-- **The bloom isn't interpolated: visible ghosting** (seen by the user,
-  2026-10-14, with frame interpolation). Not investigated. The bloom is
-  the glow chain whose combine is pixel shader `9750599DF5ED3B39` (see
-  `--glow` in `functions.md`); what it reads that stays at the tick (a
-  previous frame's image, constants not blended) isn't known yet. The
-  user suspects it reads the 30 Hz tick, as the motion blur does (below).
+- **The bloom's ghosting (fixed 2026-10-15)**: not interpolated, it
+  ghosted with frame interpolation (seen by the user, 2026-10-14). Fixed
+  on `glow-interpolation-fix` (merged): the user drove a race uncapped
+  and saw no ghosting. The bloom is the glow chain whose combine is
+  pixel shader `9750599DF5ED3B39` (see `--glow` in `functions.md`). What
+  the logs show (2026-10-15, attract races):
+  - **The glow keeps a history, written back at tick rate.** In the
+    256x144 target, two draws shrink the HDR copy, then the cross-fade
+    (pixel shader `E0D070FB58A4EA03`, blendcontrol `00010706`: colour =
+    src x src alpha + dst x (1 - src alpha)) blends in the history texture
+    (`1B0E3000` in these races), and then the blur steps and the combine
+    run. `--native_renderer_log_glow`: every frame cross-fades with the
+    history, but only logic frames resolve into it (30 a second; 4
+    non-clearing 256x144 resolves on a logic frame, 3 on a render-only
+    one).
+  - Why: the post-processing objects' draw (`sub_821379D8`, recorded for
+    each object by `sub_82133960` from the race draw step) records the
+    history resolve (`sub_82133F58` into `*(+8408)`) only when `+48` is
+    set and `+44` isn't, and `sub_82133960` clears `+48` after each draw
+    (and toggles `+8060`). `+48` and `+44` are written by `sub_821351F0`
+    (not yet checked: presumably once a tick, which render-only passes
+    don't run).
+  - So between ticks every frame blends in the history as the last logic
+    frame left it, while the scene moves smoothly: the glow's trail
+    likely moves in 30 Hz steps (the ghosting, not yet confirmed).
+  - **The glow's strength steps at 30 Hz too**: `--log_stepping_constants`
+    lists pixel c33 recorded by `82133D28` (`sub_82133D00`, from
+    `sub_821379D8`, twice a frame) changing ~30 times a second. c33 is
+    {`+8440` (0.7) or `+8436` (~0.8-0.86, every tick), `+8452` (the glow
+    strength, ~2.7-3.2), `+8456` (0.75), `+8476` (0)} of the object;
+    `+8452` is written by `sub_82136F18`. Nothing else stepping looks like
+    the glow's (the rest are the known c14, c70, c74 and c100).
+  - **The cross-fade's weight is its quad's vertex colour alpha**: the
+    shader (`--native_renderer_log_shader_ucode=E0D070FB58A4EA03`) is
+    `tfetch2D r0.xyz, tf0; oC0.w = r1.w; oC0.xyz = r0 * r1`, no
+    constants. `sub_821379D8` builds the quad (`sub_82133E30`) with colour
+    (8, 8, 8, `+8460`), or a fixed alpha when `+40` (a reset) is set; the
+    8 undoes the history's 1/8 (its resolve's exponent bias). `+8460` was
+    ~0.55 in attract races (0.545-0.58, changing every tick): each tick,
+    history = 0.55 x history + 0.45 x this frame's glow.
+  - **The fix** (`src/interpolation/glow.cpp`, wrapping `sub_821379D8`, in
+    races with interpolation on): c33's fields and `+8460` are blended
+    between the last two ticks by the tick progress (as world-space
+    sprites); on render-only passes `+48` is set as the last logic pass
+    had it, so the game records the history resolve every frame; and the
+    weight is raised to the pass's share of a tick (time since the
+    object's last pass over 1/30 s), so the history fades as fast in time
+    as at 30 Hz. Checked in an attract race at the 144 cap: the history
+    written on all 120 render-only frames a second, per-frame weights
+    0.85-0.91 for shares of 0.16-0.29, c33 no longer listed by
+    `--log_stepping_constants`, 150 fps as before. The user then drove
+    uncapped and judged it fixed.
+    `--blend_glow=false` and `--glow_history_every_frame=false` turn the
+    two parts off.
 - **Motion blur reads the 30 Hz tick.** The game's velocity-based motion
   blur (pixel shader `7EB16456AAD56CBA`) gets its velocities from the
   tick, so at interpolated frame rates each frame smears a whole tick of

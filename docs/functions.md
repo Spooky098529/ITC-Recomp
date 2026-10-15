@@ -591,6 +591,8 @@ and target, and recorder world matrices), mostly for comparison.
 | `--motion_blur` | The game's velocity-based motion blur (pixel shader `7EB16456AAD56CBA`), skipped by the emulated GPU when false (`run.sh` did so until the native renderer, which always draws it and ignores this flag). Its velocities come from the tick, so it smears a whole tick of motion at high frame rates. Patch `patches/rexglue-sdk/0002`. |
 | `--glow` | The game's light bloom (glow intensity c33.y of pixel shader `9750599DF5ED3B39`, the bloom combine); off by default, as it leaves smears after camera switches. Emulated GPU only: the native renderer always draws it, without the smears. Patch `patches/rexglue-sdk/0001`. Turned on (with `--motion_blur=true`) when comparing the native renderer with the emulated GPU. |
 | `--blend_pixel_constants` | Blend per-object lighting constants (default on). |
+| `--blend_glow`, `--glow_history_every_frame` | The glow between ticks (default on; `src/interpolation/glow.cpp`): its strength and history weight blended between ticks, and its history written every frame with the weight raised to the frame's share of a tick. See the bloom under Known issues in `native-renderer.md`. |
+| `--log_glow_recorder` | Every 2 s: the glow recorder's passes, history writes (the game's and added), the tick's history weight and the weights used. |
 | `--log_fps` | Frames and ticks per second. |
 | `--switch_light_slots`, `--blend_lighting_camera` | How the per-object lighting's light slots and camera blend (default on); see "What gets blended". |
 | `--blend_only_light_slots` | Blend only the per-object lighting's light positions and directions (default off). |

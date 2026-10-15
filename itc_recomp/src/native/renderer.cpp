@@ -101,6 +101,9 @@ REXCVAR_DEFINE_STRING(native_renderer_watch_pixel_shader, "", "ITC",
                       "(hash in hex)");
 REXCVAR_DEFINE_STRING(native_renderer_skip_pixel_shader, "", "ITC",
                       "Leave out the draws of this pixel shader (hash in hex; a debugging aid)");
+REXCVAR_DEFINE_BOOL(native_renderer_log_glow, false, "ITC",
+                    "Log the glow history's cross-fades and write-backs once a second, by logic "
+                    "and render-only frames (a debugging aid)");
 REXCVAR_DEFINE_BOOL(native_renderer_base_level_only, false, "ITC",
                     "Sample only each texture's first level (a debugging aid)");
 REXCVAR_DEFINE_BOOL(native_renderer_verify_textures, false, "ITC",
@@ -622,6 +625,7 @@ VkCommandBuffer Renderer::BeginFrame() {
     passes_.set_log_constant_changes(REXCVAR_GET(native_renderer_log_constant_changes));
     passes_.set_log_register_reads(REXCVAR_GET(native_renderer_log_register_reads));
     passes_.set_log_index_ranges(REXCVAR_GET(native_renderer_log_index_ranges));
+    passes_.set_log_glow(REXCVAR_GET(native_renderer_log_glow));
     passes_.set_cache_index_ranges(REXCVAR_GET(native_renderer_cache_index_ranges));
     passes_.set_verify_mirror(REXCVAR_GET(native_renderer_verify_mirror));
     passes_.set_check_late_writes(REXCVAR_GET(native_renderer_check_late_writes));

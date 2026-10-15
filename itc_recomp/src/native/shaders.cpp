@@ -20,6 +20,10 @@ std::string& FLAGS_dump_shaders_storage_() {
   return dump_shaders;
 }
 
+REXCVAR_DEFINE_STRING(native_renderer_log_shader_ucode, "", "ITC",
+                      "Log the microcode disassembly of this shader (hash in hex) when first "
+                      "used (a debugging aid)");
+
 namespace native {
 
 namespace graphics = rex::graphics;
@@ -216,6 +220,7 @@ struct ShaderCache::State {
   ShaderFeatures features;
   graphics::SpirvShaderTranslator translator;
   rex::string::StringBuffer disassembly;
+  bool ucode_logged = false;  // --native_renderer_log_shader_ucode
   // Keyed by stage, microcode hash, register count and interface (the
   // modification depends on them).
   std::unordered_map<TranslationKey, std::unique_ptr<TranslatedShader>, TranslationKeyHash>
@@ -409,6 +414,13 @@ TranslatedShader* ShaderCache::Get(ShaderStage stage, const uint8_t* ucode, uint
                              stage == ShaderStage::kVertex && interface.rectangle_list);
   if (auto it = state_->translations.find(key); it != state_->translations.end()) {
     return it->second->spirv.empty() ? nullptr : it->second.get();
+  }
+  if (const std::string& logged = REXCVAR_GET(native_renderer_log_shader_ucode);
+      !logged.empty() && std::strtoull(logged.c_str(), nullptr, 16) == hash &&
+      !state_->ucode_logged) {
+    state_->ucode_logged = true;
+    REXLOG_INFO("native renderer: shader {:016X}'s microcode:\n{}", hash,
+                state_->Analyzed(stage, ucode, size_bytes, hash)->ucode_disassembly());
   }
   // From an earlier session (disk_cache.h).
   if (auto it = state_->stored.find(key); it != state_->stored.end()) {

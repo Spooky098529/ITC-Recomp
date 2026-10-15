@@ -61,6 +61,10 @@ constexpr VkFormat kDepthFormat = VK_FORMAT_D32_SFLOAT_S8_UINT;
 // The main view, which is shown: its surface (pitch 1040, 2x MSAA, 7e3
 // colour, drawn as RGBA16F) and the part of it drawn (its viewport).
 constexpr uint32_t kMainViewPitch = 1040;
+// The glow's history cross-fade: blends last frame's glow (a 256x144
+// texture) over this frame's downsample (see "The bloom" in
+// docs/native-renderer.md's known issues).
+constexpr uint64_t kGlowCrossFade = 0xE0D070FB58A4EA03ull;
 constexpr uint32_t kMainViewWidth = 1024, kMainViewHeight = 576;
 // What's shown is copied into an image of this size.
 constexpr uint32_t kShownWidth = 1280, kShownHeight = 720;
@@ -723,10 +727,30 @@ struct Passes::State {
   } index_range_counts;
   void CountIndexRange(uint32_t address, uint32_t count, bool index_32bit, uint32_t endian,
                        bool skip_restart, uint32_t low, uint32_t high);
+  void LogGlow();
   // Debugging aids: draws of this pixel shader (hash) are skipped; with
   // record_draws, each draw is described in a line (written with a dump).
   uint64_t skip_pixel_shader = 0;
   bool record_draws = false;
+  // With log_glow: per frame, the glow history's cross-fade draws (pixel
+  // shader kGlowCrossFade) and the texture they read, and 256x144 resolves
+  // without a clear (the history written back); logged once a second by
+  // whether a logic pass recorded the frame.
+  bool log_glow = false;
+  struct GlowFrame {
+    uint32_t cross_fades = 0, history_resolves = 0, cross_fade_texture = 0,
+             history_address = 0;
+    std::vector<uint32_t> addresses;  // the 256x144 resolves without a clear
+    std::string constants;  // the cross-fade's pixel float constants
+  } glow_frame;
+  std::array<std::string, 2> glow_addresses;  // an example frame's, by kind
+  std::array<std::string, 2> glow_constants;  // the last cross-fade's, by kind
+  struct GlowCounts {
+    uint64_t frames = 0, cross_fades = 0, history_resolves = 0, reads_history = 0;
+  };
+  std::array<GlowCounts, 2> glow_counts{};  // render-only, logic
+  std::string glow_pattern;
+  std::chrono::steady_clock::time_point glow_last_log{};
   struct RecordedDraw {
     bool main_view, has_color, has_depth, inline_vertices;
     Surface surface;
@@ -2291,6 +2315,15 @@ bool Passes::State::ResolveInto(VkCommandBuffer commands, uint8_t* base, Target&
   resolved = {dest.image, {dest.width, dest.height}, fetch[1] & 0xFFFFF000u, fetch[1] & 0x3F,
               flags, dest.format};
   std::copy(fetch, fetch + 6, resolved.fetch);
+  if (log_glow && dest.width == 256 && dest.height == 144 && !(flags & 0x100)) {
+    uint32_t address = resolved.address & 0x1FFFF000u;
+    glow_frame.addresses.push_back(address);
+    if (address == glow_frame.cross_fade_texture) {
+      // The texture the cross-fade reads: the history.
+      glow_frame.history_resolves++;
+      glow_frame.history_address = address;
+    }
+  }
   return true;
 }
 
@@ -2657,6 +2690,37 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
                     &regs.values[XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0 + 6 * texture.fetch_constant],
                     sizeof(t.fetch));
       }
+    }
+  }
+
+  if (log_glow && pixel && pixel->hash == kGlowCrossFade) {
+    glow_frame.cross_fades++;
+    glow_frame.constants.clear();
+    if (call.inline_vertices) {
+      // Its weight: the vertices' colour alpha (the shader outputs the
+      // history times the colour, and the colour's alpha).
+      uint8_t* vertices = draw_mirror().mapped;
+      glow_frame.constants += fmt::format(
+          "vertex colour {:.4g} {:.4g} {:.4g} {:.4g}; ",
+          guest::LoadFloat(vertices, call.vertex_address + 16),
+          guest::LoadFloat(vertices, call.vertex_address + 20),
+          guest::LoadFloat(vertices, call.vertex_address + 24),
+          guest::LoadFloat(vertices, call.vertex_address + 28));
+    }
+    for (uint32_t c = 0; c < 256; c++) {
+      if (pixel->float_constants[c >> 6] & (uint64_t(1) << (c & 63))) {
+        uint32_t at = device + kDevicePixelFloatConstants + 16 * c;
+        glow_frame.constants += fmt::format(
+            "c{} {:.4g} {:.4g} {:.4g} {:.4g}; ", c, guest::LoadFloat(base, at),
+            guest::LoadFloat(base, at + 4), guest::LoadFloat(base, at + 8),
+            guest::LoadFloat(base, at + 12));
+      }
+    }
+    for (const ShaderTexture& texture : pixel->textures) {
+      glow_frame.cross_fade_texture =
+          regs.values[XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0 + 6 * texture.fetch_constant + 1] &
+          0x1FFFF000u;
+      break;
     }
   }
 
@@ -3641,6 +3705,63 @@ void Passes::FrontBufferResolve(VkCommandBuffer commands, uint8_t* base, uint32_
   }
 }
 
+void Passes::State::LogGlow() {
+  bool logic = Renderer_ReplayingLogicList();
+  GlowCounts& counts = glow_counts[logic];
+  counts.frames++;
+  counts.cross_fades += glow_frame.cross_fades;
+  counts.history_resolves += glow_frame.history_resolves;
+  counts.reads_history += glow_frame.cross_fades && glow_frame.history_resolves &&
+                          glow_frame.cross_fade_texture == glow_frame.history_address;
+  if (glow_frame.cross_fades) {
+    glow_constants[logic] = glow_frame.constants;
+  }
+  if (glow_addresses[logic].empty()) {
+    for (uint32_t address : glow_frame.addresses) {
+      glow_addresses[logic] += fmt::format("{:08X} ", address);
+    }
+  }
+  // A frame: L (logic) or r, then x if it cross-faded, h if it wrote the
+  // history back.
+  if (glow_pattern.size() < 120) {
+    glow_pattern += logic ? 'L' : 'r';
+    if (glow_frame.cross_fades) {
+      glow_pattern += 'x';
+    }
+    if (glow_frame.history_resolves) {
+      glow_pattern += 'h';
+    }
+    glow_pattern += ' ';
+  }
+  auto now = std::chrono::steady_clock::now();
+  if (now - glow_last_log >= std::chrono::seconds(1)) {
+    glow_last_log = now;
+    REXLOG_INFO("native renderer: glow: logic frames {} (cross-fades {}, history resolves {}, "
+                "reading the history {}), render-only frames {} ({}, {}, {}); last read "
+                "{:08X}, last history {:08X}; 256x144 resolves of a logic frame: {}, of a "
+                "render-only frame: {}; frames: {}",
+                glow_counts[1].frames, glow_counts[1].cross_fades,
+                glow_counts[1].history_resolves, glow_counts[1].reads_history,
+                glow_counts[0].frames, glow_counts[0].cross_fades,
+                glow_counts[0].history_resolves, glow_counts[0].reads_history,
+                glow_frame.cross_fade_texture, glow_frame.history_address, glow_addresses[1],
+                glow_addresses[0], glow_pattern);
+    REXLOG_INFO("native renderer: glow cross-fade constants: logic frame: {}render-only "
+                "frame: {}",
+                glow_constants[1], glow_constants[0]);
+    glow_counts = {};
+    glow_addresses = {};
+    glow_pattern.clear();
+  }
+  glow_frame.cross_fades = glow_frame.history_resolves = 0;
+  glow_frame.history_address = 0;
+  glow_frame.addresses.clear();
+}
+
+void Passes::set_log_glow(bool log) {
+  state_->log_glow = log;
+}
+
 void Passes::set_skip_pixel_shader(uint64_t hash) {
   state_->skip_pixel_shader = hash;
 }
@@ -4010,6 +4131,9 @@ VkExtent2D Passes::EndFrame(VkCommandBuffer commands, int32_t show_resolve, bool
     Buffers_OnFrameEnd();
   }
   s.last_frame_resolves = s.frame_resolves.size();
+  if (s.log_glow) {
+    s.LogGlow();
+  }
   if (s.check_late_writes && s.last_base) {
     uint8_t* base = s.last_base;
     for (const State::CopiedRange& r : s.copied_ranges) {
