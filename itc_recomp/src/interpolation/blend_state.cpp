@@ -302,7 +302,6 @@ class ProductTable {
 // published by the main thread after each Draw.
 struct ReplayFrame {
   ProductTable products;  // by output address
-  std::unordered_map<uint32_t, ReplayedProduct> check_products;  // TEMPORARY
   float amount = 1;
   uint64_t tick = 0;  // which tick the frame draws
 };
@@ -950,10 +949,6 @@ class DrawState {
             out, {identity != identities_.end() ? identity->second : ProductKeyHash()(output.key),
                   output.key.handler, output.written, now->second,
                   before != previous_tick_.end() ? std::optional(before->second) : std::nullopt});
-        frame->check_products[out] = {
-            identity != identities_.end() ? identity->second : ProductKeyHash()(output.key),
-            output.key.handler, output.written, now->second,
-            before != previous_tick_.end() ? std::optional(before->second) : std::nullopt};
       }
     }
     counts_.products_published += int(frame->products.size());
@@ -1588,33 +1583,6 @@ class ReplayCameras {
       return std::nullopt;
     }
     const ReplayedProduct* product = frame_->products.Find(payload);
-    {  // TEMPORARY: the table against the map
-      static uint64_t lookups = 0, found = 0, mismatches = 0;
-      static auto last = std::chrono::steady_clock::now();
-      auto it = frame_->check_products.find(payload);
-      const ReplayedProduct* expected = it != frame_->check_products.end() ? &it->second : nullptr;
-      lookups++;
-      found += expected != nullptr;
-      auto same_inputs = [](const ProductInputs& a, const ProductInputs& b) {
-        return a.world == b.world && a.view_projection == b.view_projection &&
-               a.context == b.context;
-      };
-      bool same = (product == nullptr) == (expected == nullptr) &&
-                  (!product ||
-                   (product->identity == expected->identity &&
-                    product->handler == expected->handler && product->written == expected->written &&
-                    same_inputs(product->now, expected->now) &&
-                    product->before.has_value() == expected->before.has_value() &&
-                    (!product->before || same_inputs(*product->before, *expected->before))));
-      mismatches += !same;
-      if (frame_->products.size() != frame_->check_products.size()) mismatches++;
-      auto now = std::chrono::steady_clock::now();
-      if (now - last >= std::chrono::seconds(5)) {
-        last = now;
-        REXLOG_INFO("product table check: {} lookups, {} found, {} mismatches", lookups, found,
-                    mismatches);
-      }
-    }
     if (!product || product->written != m) {
       // A draw that isn't a known product (world geometry's matrix often
       // isn't): the pixel constants after it belong to it, not to the last
