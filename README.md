@@ -74,7 +74,7 @@ This builds `itc_recomp/out/build/linux-amd64-release/itc` and
 `rexglue-sdk/out/linux-amd64/librexruntime.so`. Put both in the game folder
 with `itc_recomp/run.sh` and `itc_recomp/run-debug.sh`.
 
-## Documentation
+## Documentation (This is written by LLMs primarily for LLMs)
 
 - [docs/functions.md](docs/functions.md): what's known about the game's
   code, how frame interpolation works, and the diagnostic options.
