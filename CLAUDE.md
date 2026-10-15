@@ -80,7 +80,7 @@ install -m 755 itc_recomp/run-debug.sh $D/run-debug.sh
 (cd $D && python3 -I -m zipfile -c ../$name.zip itc librexruntime.so run.sh run-debug.sh)
 ```
 
-## Status (`main`, 2026-10-14)
+## Status (`main`, 2026-10-15)
 
 Frame interpolation for races is working: logic runs at 30 Hz and frames are
 blended between ticks. The world, cameras, wheels (other cars' too, paired
@@ -98,8 +98,11 @@ Our renderer always draws motion blur and glow (`--motion_blur` and
 
 The game draws with our own Vulkan renderer (the native renderer, exclusive
 mode; merged from `native-renderer`): the emulated GPU plugin isn't loaded
-or shipped. Uncapped attract race: ~235 fps mean against the emulated GPU's
-155. Its known issues (boot movie, gamma, textures, window resizing,
+or shipped. Uncapped attract race: ~258 fps mean against the emulated GPU's
+155. Translated shaders and pipelines are kept on disk (`cache/` next to
+the executable), and textures are reloaded when the game's memcpy writes
+them instead of being hashed (`docs/texture-handling-optimisation.md`);
+merged from `perf-debug` for Steam Deck hitches. Its known issues (boot movie, gamma, textures, window resizing,
 remaining packet writers, speed) are milestone 7 in
 `docs/native-renderer.md`.
 
@@ -119,5 +122,8 @@ Not done yet:
 - Other per-object draws (caller `0x82596D9C`) use projective matrices that
   aren't blended, so they step at 30 Hz; what they draw isn't known yet
   (see Known issues; `--log_moving_products` lists them).
+- First-person views (cockpit, bumper) run slower than third person on the
+  Steam Deck: the render thread is the limit, at ~7 µs a draw. Next step
+  and measurements in `docs/first-person-performance.md`.
 - Recheck whether the player's beam on the road still jumps in sharp turns
   (Known issues); if it's gone, drop it from the next release's limits.
