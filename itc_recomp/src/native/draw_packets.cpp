@@ -132,9 +132,10 @@ void LogCheck() {
 }  // namespace
 }  // namespace native
 
-#define NATIVE_CHECKED_HELPER(address, helper)                                            \
+#define NATIVE_CHECKED_HELPER(address, helper, mark)                                      \
   extern "C" REX_FUNC(sub_##address) {                                                    \
     REX_FUNC_PROLOGUE();                                                                  \
+    mark;                                                                                 \
     if (!native::Checking()) {                                                            \
       __imp__sub_##address(ctx, base);                                                    \
       return;                                                                             \
@@ -144,12 +145,18 @@ void LogCheck() {
 
 // The draw's packet writers, r3 the device: shader constants into packets,
 // register blocks from the shadow, fetch constants, and the HiZ / surface
-// set-up (sub_822ADC08).
-NATIVE_CHECKED_HELPER(822AE1D0, native::kConstants)
-NATIVE_CHECKED_HELPER(822ADE30, native::kRegisters)
-NATIVE_CHECKED_HELPER(822ADEF0, native::kRegisters2)
-NATIVE_CHECKED_HELPER(822AE070, native::kFetchConstants)
-NATIVE_CHECKED_HELPER(822ADC08, native::kHiz)
+// set-up (sub_822ADC08). The register blocks' and fetch constants' masks
+// (r4; r5 the first register) are what the native renderer is to read
+// again (draws other than the indexed draw in exclusive mode flush with
+// them).
+NATIVE_CHECKED_HELPER(822AE1D0, native::kConstants, )
+NATIVE_CHECKED_HELPER(822ADE30, native::kRegisters,
+                      native::MarkRegistersDirty(ctx.r5.u32, ctx.r4.u64))
+NATIVE_CHECKED_HELPER(822ADEF0, native::kRegisters2, )
+NATIVE_CHECKED_HELPER(822AE070, native::kFetchConstants,
+                      native::MarkFetchConstantsDirty(ctx.r4.u64))
+// sub_822ADC08 writes register 0x2203 (r5) itself.
+NATIVE_CHECKED_HELPER(822ADC08, native::kHiz, native::MarkRegistersDirty(0x2203, 1ull << 63))
 
 // Ends the command segment when the buffer is full (kicking it); counted
 // so the check can leave those calls out.
@@ -206,8 +213,13 @@ void native::DrawPackets_IndexedDraw(PPCContext& ctx, uint8_t* base) {
     ctx.r3.u64 = device;
     ctx.r4.u64 = shader_state;
     sub_822AED18(ctx, base);
+    // The mask with the bits for what it wrote in the shadow.
+    shader_state |= ctx.r3.u64;
     ctx = saved;
   }
+  // What the library's draw would have flushed: read again.
+  MarkDeviceDirty(shader_state, REX_LOAD_U64(device + kDeviceRenderStateDirty),
+                  REX_LOAD_U64(device + kDeviceOtherStateDirty));
   REX_STORE_U64(device + kDeviceShaderStateDirty, 0);
   if (REX_LOAD_U64(device + kDeviceRenderStateDirty) & 0x2) {
     REX_STORE_U64(device + kDeviceHizState, 0xFFFFFFFFFF000000ull);  // lis r11,-256; std

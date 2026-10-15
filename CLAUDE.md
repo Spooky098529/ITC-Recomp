@@ -98,7 +98,7 @@ install -m 755 itc_recomp/run-debug.sh $D/run-debug.sh
 (cd $D && python3 -I -m zipfile -c ../$name.zip itc librexruntime.so run.sh run-debug.sh)
 ```
 
-## Status (`main`, 2026-10-15, v0.3.7)
+## Status (`main`, 2026-10-15, v0.3.7 plus `blend-math` and `read-registers`)
 
 Frame interpolation for races is working: logic runs at 30 Hz and frames are
 blended between ticks. The world, cameras, wheels (other cars' too, paired
@@ -126,7 +126,11 @@ with their flags; see "Performance: repeated state calls" in
 `docs/native-renderer.md`; ~285 before `descriptor-reuse`: constant blocks
 the same as the last written are reused, and constants are copied from
 guest memory run by run with a vectorized byte swap, see "Performance:
-reading constants from guest memory"). Translated shaders and pipelines are kept on disk (`cache/` next to
+reading constants from guest memory"). Since then (`blend-math`, `read-registers`): blends planned once a tick,
+cameras blended once a frame, guest words byte-swapped with `pshufb`, and
+the register shadow read only where the library's dirty masks say
+(`docs/first-person-performance.md`: "Done on `blend-math`", "Register
+reads", "Against v0.3.7"). Translated shaders and pipelines are kept on disk (`cache/` next to
 the executable), and textures are reloaded when the game's memcpy writes
 them instead of being hashed (`docs/texture-handling-optimisation.md`);
 merged from `perf-debug` for Steam Deck hitches. Its known issues (boot movie, gamma, textures, window resizing,
@@ -153,7 +157,9 @@ Not done yet:
 - First-person views (cockpit, bumper) run slower than third person on the
   Steam Deck: the render thread is the limit, at ~7 µs a draw, and the
   cockpit draws more (the interior, the mirror). So any cut in the cost of
-  a draw helps there. Where the render thread's time goes (profile of
-  2026-10-15), what's done and what's next: `docs/first-person-performance.md`.
+  a draw helps there. Since v0.3.7, `blend-math` and `read-registers` cut
+  ~12% of the render thread's cycles a draw (by profile, attract race;
+  not yet checked on the Deck). Where the render thread's time goes, what's
+  done and what's next: `docs/first-person-performance.md`.
 - Recheck whether the player's beam on the road still jumps in sharp turns
   (Known issues); if it's gone, drop it from the next release's limits.

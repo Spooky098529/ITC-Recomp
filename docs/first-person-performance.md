@@ -10,7 +10,13 @@ diagnostics left running (about +9% uncapped together, see "Profile of
 from `descriptor-reuse`, released in v0.3.7 (uncapped ~285 to ~320 fps); not
 yet checked on the Deck. A fresh profile after v0.3.7 is in "Profile of
 2026-10-15, after v0.3.7", with where libc and driver time comes from and
-the next steps. Read `CLAUDE.md` first
+the next steps. Since v0.3.7 (merged 2026-10-15 from `replay-allocations`,
+`blend-math` and `read-registers`): interpolation's replay without
+allocations, blends planned once a tick and cameras blended once a frame,
+the byte swap by hand, and register reads of only what the library marked
+dirty; together ~12% fewer render thread cycles a draw than v0.3.7 (~7,660
+to ~6,760, by profile; see "Against v0.3.7"); not yet checked on the Deck.
+Read `CLAUDE.md` first
 (rules: find problems with logs, commit and push work branches after each
 commit, keep docs up to date; no Windows code on branches off `main`).
 
@@ -348,7 +354,8 @@ branch-record run is skewed, so take shares from a plain run):
    `BlendState_ReplayConstants` 7.1% to 6.0%, libc's `free` ~1.6% to
    ~0.5%.
    Then, the same day: lighting uploads loaded with `guest::CopyFloats` (a
-   vectorized byte-swapping loop) straight into the entry, without the
+   byte-swapping loop meant to vectorize; it didn't once inlined, see
+   "Done on `blend-math`") straight into the entry, without the
    copy, stopping early when equal to last tick's bit for bit. Checked the
    same way (also with `--pixel_blend_from_latest=false`): every value
    the same. **No measurable gain**: `BlendState_ReplayConstants` stayed at
@@ -452,7 +459,8 @@ decompositions ~60, blends ~45, `Multiply` ~16.
 
 Leads, not yet measured:
 
-- **Decompositions repeated every frame.** `BlendProduct` decomposes both
+- **Decompositions repeated every frame** (done, see "Done on
+  `blend-math`"). `BlendProduct` decomposes both
   ticks' world matrices (`ScaledTransformFromWorldMatrix`, quaternions) and
   splits both ticks' cameras (`SplitViewProjection`) for every product on
   every frame, though they depend only on the tick's inputs; at ~330 fps a
@@ -467,6 +475,162 @@ Leads, not yet measured:
 - A fresh split first: mark `Apply`, `Substitute`, `BlendProduct` and
   the logs' upload hooks `[[gnu::noinline]]` in a temporary commit (as
   `adf4a8f` did), profile, revert.
+
+### Done on `blend-math` (2026-10-15)
+
+Measured with `profile_render_thread.sh`, two or three runs a build,
+alternating. Builds with `PixelConstantBlender::Apply`, `Substitute`,
+`BlendProduct` and the logs' upload hooks `[[gnu::noinline]]` (a temporary
+commit, `76fe176`, removed on `read-registers`: all of this section's and
+"Register reads"' profiles were taken with it), so the parts show apart. **The split** (thousand cycles a frame):
+`Apply` ~370-410, `BlendState_ReplayConstants` itself ~250, `Substitute`
+~85, and the math that depends only on the tick ~235:
+`QuaternionFromRotation` ~130, `SplitViewProjection` ~50, the
+decompositions ~60. All of `interpolation::` ~1,170.
+
+1. **Blends planned once a tick.** The main thread, after `MatchTick`,
+   works out each paired product's `ProductPlan` (both world matrices
+   decomposed, which path the world takes: blend, wheel or the tick's) and
+   splits each distinct pair of view-projections once (`CameraPair`,
+   keyed by both matrices' bits); the replay frame shares the tick's
+   plans. The render thread only blends and multiplies. Checked over two
+   whole attract races (17 million products) against the old
+   `BlendProduct` run beside it: the same matrix, parts and stats for
+   every one. `interpolation::` ~1,170 to ~950 thousand cycles a frame.
+   (`--log_blend_state`'s sample of rejected cameras is now logged once a
+   tick per distinct pair rather than per product.)
+2. **Each camera blended once a frame** (`CameraBlends`, by the plan's
+   camera index, stamped by frame). Checked the same way (15.5 million
+   camera products, the same view-projection and eye). ~993 to ~920.
+3. **The byte swap by hand.** An annotated profile of `Apply` (by
+   address: the build has no line info, and `perf annotate -s <name>`
+   silently annotated another function) showed the sorting loop ~28%
+   (mostly the per-component "unchanged" test), loading the upload
+   (`CopyFloats`) ~16% and storing it (`StoreU32s`) ~8.5%, both a scalar
+   `bswap` per word: the loops in `guest.h` vectorize alone but stayed
+   scalar once inlined. They now swap four words with SSSE3's `pshufb`
+   (`_mm_shuffle_epi8`, part of x86-64-v2), the rest one by one; scalar
+   without SSSE3. Checked against the scalar loops for counts 0-70 at
+   every alignment. `CopyU32s` is also how the renderer reads registers
+   and constants. Its old loop did have `pshufb` in it, but only on the
+   path for a range crossing 0xE0000000, which never happens: the
+   ordinary path was the scalar one (~60% of `ReadRegisters`' samples in
+   it). The hand-written swap serves both paths. Per symbol, thousand
+   cycles a frame, three runs each: `Passes::State::Draw` (constants)
+   ~1,733 to ~1,501, `Apply` ~409 to ~351, `BlendState_ReplayConstants`
+   ~221 to ~184 (putting the lighting upload back), `ReadRegisters` ~453
+   to ~417 (now ~46 plus ~371 in `CopyBlock`, no longer inlined: filter
+   profiles by more than one name). The render thread ~330 thousand
+   cycles a frame lower overall (~2.2%).
+   `ReadRegisters` copies ~350 words a draw and is still ~417 with the
+   copy vectorized (most samples on the `pshufb` after the load): see
+   "Register reads" below for why, and the fix.
+   Uncapped attract races, alternating: 341.8, 345.7, 346.1 fps mean
+   against 332.1, 337.9, 335.6 before (~+2.8%).
+
+### Register reads (`read-registers`, 2026-10-15)
+
+`ReadRegisters` (`native/state.cpp`) fills the renderer's `RegisterFile`
+from the device's shadow: 7 register blocks and the fetch, bool and loop
+constants, 349 words. Measured with `--native_renderer_log_register_reads`
+(uncapped attract race):
+
+- **It runs once per draw**, ~2,150 times a frame (`AfterDraw`; command
+  18's items come one per command), copying ~750,000 words a frame
+  (~3 MB). Only ~9,000 of them change (~4 a read); 40% of reads change
+  nothing. By block, the share of reads changing it: fetch constants
+  ~60%, 0x2180 ~27%, 0x2200 ~12%, 0x2100 ~10%, the rest ~1% or 0.
+- **Not mainly memory stalls.** Timed with the time stamp counter, a copy
+  took ~300 cycles and the same copy repeated right after ~233, so
+  ~three quarters of it was the copy itself, not waiting on the shadow
+  (the guest's library, which writes the shadow, runs on the render
+  thread too, so the shadow should be in cache). The timing itself proved
+  unreliable for small copies (it read ~200 whatever the code did, so
+  the fences dominate), so changes were judged by profile; `perf stat`
+  cache-miss counts weren't taken.
+- **What changes is known already**: the library's setters mark what they
+  write in three dirty masks (device +16, +24, +32), and its draw flushes
+  the marked units and clears the masks (layout in "The register shadow
+  as a whole", `docs/gpu-functions.md`). In exclusive mode our
+  `DrawPackets_IndexedDraw` clears them itself, so it now hands the masks
+  (with the bits the shader load returns) to `MarkDeviceDirty` first. Other
+  library paths that flush (other draws, clears, predicated draws) go
+  through the flush helpers, whose hooks mark what they're given
+  (`sub_822ADE30`, `sub_822AE070`, and `sub_822ADC08`, which writes 0x2203
+  itself), and InlineDraw marks the words it overwrites in `regs`.
+  `ReadRegisters` copies only what's marked: ~15 words a read.
+
+Checked over a whole attract race (boot, title, race; ~2,200 reads a
+frame) against reading every block whole after each read: 0 words
+differ. The first try differed only in 0x2203 (~1 a frame), until
+`sub_822ADC08`'s hook marked it. Menus, other modes and the cockpit
+weren't covered by the check.
+
+Profiles, three runs each, alternating, thousand cycles a frame:
+
+| Build | `ReadRegisters` (+`CopyBlock`) | `DrawPackets_IndexedDraw` | Marking | Render thread |
+|---|---|---|---|---|
+| `blend-math` | 431, 403, 478 | 53, 49, 56 | | 14,594, 14,929, 14,657 |
+| dirty runs, by block (first try) | 239, 228, 239 | 74, 79, 83 | ~3 | 14,486, 14,696, 14,377 |
+| dirty bits through a table | 141, 167, 151 | 75, 73, 87 | 30, 22, 26 | 14,133, 14,380, 14,528 |
+
+So about −215 thousand cycles a frame (~1.5% of the render thread); the
+thread's total fell ~380 on average, within its noise. The first try
+converted the masks per block with `__builtin_bitreverse64` (the library
+numbers units from the top bit) and looped over all 10 blocks, finding
+runs: ~110 cycles a read for ~15 words, spread over the loop's
+bookkeeping (no x86 instruction reverses bits, so each is a long run of
+shifts and masks). Now the draw only ORs the masks, and the read walks
+each mask's set bits through a 3×64 table (shadow offset, register,
+words).
+
+Left, unexplained or not done: `ReadRegisters` is still ~150 thousand
+cycles a frame (~70 a read) for ~15 words, and the marking in the draw
+~25 more; `MarkRegistersDirty` grew from ~3 to ~25 between the two builds
+for no reason found (it's called from the flush helpers' hooks only).
+Readers of `RegisterFile` could also learn what changed (the masks say
+it), e.g. to skip comparing the fetch block when no fetch bit was set;
+not tried.
+
+### Against v0.3.7 (2026-10-15)
+
+v0.3.7 built from its tag in the same tree (only `itc_recomp/src`
+differs; same compiler, ThinLTO) against `read-registers` at `4f8f436`
+(`blend-math`, the register reads, the temporary noinline markers
+removed). `profile_render_thread.sh`, three runs each, alternating, after
+a warm-up run of v0.3.7 for its shader cache. The draws are the same
+(~2,100 a frame in the attract race, from the log), so cycles a draw
+compare directly; the cockpit's lower frame rate is its larger number of
+draws at this cost a draw.
+
+| Build | Render thread, million cycles a frame | Per draw | Frames in the 12 s |
+|---|---|---|---|
+| v0.3.7 | 16.10, 16.12, 16.02 (16.08) | ~7,660 | 3,793, 3,798, 3,815 |
+| current | 14.20, 14.07, 14.29 (14.19) | ~6,760 | 4,284, 4,333, 4,241 |
+
+−11.8% of the render thread's cycles a draw, ~+13% frames. Biggest
+changes by symbol (one pair, thousand cycles a frame):
+`BlendState_ReplayConstants` 1,092 to 633 (planned blends, cameras once a
+frame, the byte swap, and its parts inlined again), `State::Draw` 1,801
+to 1,425 (constants' byte swap), `ReadRegisters` 427 to 148, `GetTarget`
+453 to 225 (not changed on purpose; probably `CopyU32s` inlined into it,
+not checked), `QuaternionFromRotation` and `SplitViewProjection` ~130 to
+~11 (once a tick). Larger: `IndexRange` +46, `ShaderCache::GetInterface`
++35, `Buffers_OnCommand` +36 (noise or inlining, not looked into).
+
+**To investigate: reusing the lighting blender's decisions within a tick.**
+After the above, `Apply`'s per-component loop (does each component blend,
+keep the tick's value, or reject the upload) is still ~28% of it, and the
+light slot checks ~11%. The decisions depend only on the previous tick's
+values (fixed within a tick), the upload as recorded and a few options, so
+an entry could keep them with the upload they were made on and reuse them
+while a frame's upload is bit for bit the same (the blend itself is still
+computed per frame with that frame's amount). Not keyed by tick alone: the
+light slots hold the previous tick's lights on a logic pass and the tick's
+own after, so the first frame after it must decide again. Check against
+the old blender over whole attract races, both blend modes; keep
+`--log_blend_state`'s rejection counts per frame. Unmeasured: comparing
+~1 KB per upload may eat most of the gain.
 
 Checking a change: run the old code beside the new over a whole attract
 race and compare every result, as for steps 1-4 (the lighting blender:
