@@ -1,7 +1,7 @@
 #!/bin/bash
 # Profiles the render thread in an uncapped attract race and reports cycles
 # per frame: the way to judge changes of a few percent, which fps runs can't
-# show (see "Measuring small changes" in docs/first-person-performance.md).
+# show (see "Measuring small changes" in docs/native-renderer.md).
 #
 #   itc_recomp/tools/profile_render_thread.sh <dir holding itc> <name> [symbol pattern]
 #
