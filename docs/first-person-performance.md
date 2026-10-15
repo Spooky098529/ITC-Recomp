@@ -348,7 +348,8 @@ branch-record run is skewed, so take shares from a plain run):
    `BlendState_ReplayConstants` 7.1% to 6.0%, libc's `free` ~1.6% to
    ~0.5%.
    Then, the same day: lighting uploads loaded with `guest::CopyFloats` (a
-   vectorized byte-swapping loop) straight into the entry, without the
+   byte-swapping loop meant to vectorize; it didn't once inlined, see
+   "Done on `blend-math`") straight into the entry, without the
    copy, stopping early when equal to last tick's bit for bit. Checked the
    same way (also with `--pixel_blend_from_latest=false`): every value
    the same. **No measurable gain**: `BlendState_ReplayConstants` stayed at
@@ -467,6 +468,48 @@ Leads, not yet measured:
 - A fresh split first: mark `Apply`, `Substitute`, `BlendProduct` and
   the logs' upload hooks `[[gnu::noinline]]` in a temporary commit (as
   `adf4a8f` did), profile, revert.
+
+### Done on `blend-math` (2026-10-15)
+
+Measured with `profile_render_thread.sh`, two or three runs a build,
+alternating. Builds with `PixelConstantBlender::Apply`, `Substitute`,
+`BlendProduct` and the logs' upload hooks `[[gnu::noinline]]` (a temporary
+commit), so the parts show apart. **The split** (thousand cycles a frame):
+`Apply` ~370-410, `BlendState_ReplayConstants` itself ~250, `Substitute`
+~85, and the math that depends only on the tick ~235:
+`QuaternionFromRotation` ~130, `SplitViewProjection` ~50, the
+decompositions ~60. All of `interpolation::` ~1,170.
+
+1. **Blends planned once a tick.** The main thread, after `MatchTick`,
+   works out each paired product's `ProductPlan` (both world matrices
+   decomposed, which path the world takes: blend, wheel or the tick's) and
+   splits each distinct pair of view-projections once (`CameraPair`,
+   keyed by both matrices' bits); the replay frame shares the tick's
+   plans. The render thread only blends and multiplies. Checked over two
+   whole attract races (17 million products) against the old
+   `BlendProduct` run beside it: the same matrix, parts and stats for
+   every one. `interpolation::` ~1,170 to ~950 thousand cycles a frame.
+   (`--log_blend_state`'s sample of rejected cameras is now logged once a
+   tick per distinct pair rather than per product.)
+2. **Each camera blended once a frame** (`CameraBlends`, by the plan's
+   camera index, stamped by frame). Checked the same way (15.5 million
+   camera products, the same view-projection and eye). ~993 to ~920.
+3. **The byte swap by hand.** An annotated profile of `Apply` (by
+   address: the build has no line info, and `perf annotate -s <name>`
+   silently annotated another function) showed the sorting loop ~28%
+   (mostly the per-component "unchanged" test), loading the upload
+   (`CopyFloats`) ~16% and storing it (`StoreU32s`) ~8.5%, both a scalar
+   `bswap` per word: the loops in `guest.h` vectorize alone but stayed
+   scalar once inlined. They now swap four words with SSSE3's `pshufb`
+   (`_mm_shuffle_epi8`, part of x86-64-v2), the rest one by one; scalar
+   without SSSE3. Checked against the scalar loops for counts 0-70 at
+   every alignment. `CopyU32s` is also how the renderer reads registers
+   and constants, which were scalar at run time too (`ReadRegisters` had
+   `pshufb` in it, on a path not taken): `ReadRegisters` ~453 to ~46,
+   `Passes::State::Draw` (constants) ~1,730 to ~1,500, `Apply` ~408 to
+   ~350, all of `interpolation::` ~923 to ~837 thousand cycles a frame.
+   Uncapped attract races, alternating: 341.8, 345.7, 346.1 fps mean
+   against 332.1, 337.9, 335.6 before (~+2.8%).
 
 Checking a change: run the old code beside the new over a whole attract
 race and compare every result, as for steps 1-4 (the lighting blender:
