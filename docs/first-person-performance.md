@@ -504,11 +504,19 @@ decompositions ~60. All of `interpolation::` ~1,170.
    (`_mm_shuffle_epi8`, part of x86-64-v2), the rest one by one; scalar
    without SSSE3. Checked against the scalar loops for counts 0-70 at
    every alignment. `CopyU32s` is also how the renderer reads registers
-   and constants, which were slow too (`ReadRegisters` already had
-   `pshufb` in its disassembly; why the time went anyway wasn't looked
-   into): `ReadRegisters` ~453 to ~46,
-   `Passes::State::Draw` (constants) ~1,730 to ~1,500, `Apply` ~408 to
-   ~350, all of `interpolation::` ~923 to ~837 thousand cycles a frame.
+   and constants. Its old loop did have `pshufb` in it, but only on the
+   path for a range crossing 0xE0000000, which never happens: the
+   ordinary path was the scalar one (~60% of `ReadRegisters`' samples in
+   it). The hand-written swap serves both paths. Per symbol, thousand
+   cycles a frame, three runs each: `Passes::State::Draw` (constants)
+   ~1,733 to ~1,501, `Apply` ~409 to ~351, `BlendState_ReplayConstants`
+   ~221 to ~184 (putting the lighting upload back), `ReadRegisters` ~453
+   to ~417 (now ~46 plus ~371 in `CopyBlock`, no longer inlined: filter
+   profiles by more than one name). The render thread ~330 thousand
+   cycles a frame lower overall (~2.2%).
+   `ReadRegisters` copies ~350 words a draw and is still ~417 with the
+   copy vectorized (most samples on the `pshufb` after the load): why it
+   costs that much isn't known yet.
    Uncapped attract races, alternating: 341.8, 345.7, 346.1 fps mean
    against 332.1, 337.9, 335.6 before (~+2.8%).
 
