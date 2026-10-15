@@ -2521,3 +2521,22 @@ swapchain is made again when SDL reports our window's pixel size changed
 window (`itc_788.log`): swapchain 1600x1000, drawn at 1.25x (1600x900),
 the cap held. Not done: toggling fullscreen while running, and the drawing
 scale following a resized window (it's fixed at start).
+
+**Done: the 3D view at the frame's resolution** (2026-10-16, the user's
+request). With one scale for everything, the 3D view (1024x576, 80% of
+the 1280x720 frame) came out at 80% of the chosen size and the game's
+upscale draw stretched it. Now, at any scale but 1, the main view's
+surfaces (pitch 1040, 2x MSAA, colour and depth: `IsMainViewSurface`) are
+drawn at the scale times 1.25 (`main_view_scale`), and each target keeps
+its own scale (`Target::scale`): viewports, scissors and the depth bias
+slope use the draw's target's. A resolve destination is made at the scale
+of the target resolved into it, one image per scale (`TextureCache`'s
+`resolved` by address and scale, `current` the one written last, which
+draws sample): the upscale's source `1ECB9000` (1280x720) is also where the
+menus resolve their frame, at the frame's scale, so it has two. The
+upscale draw samples the left 80% of it in normalized coordinates, which
+at 1.25 times the scale is exactly the frame's width: a one-to-one copy.
+The default size (scale 1) keeps the console's 1024x576 upscaled. At
+1920x1080 (`itc_793.log`): 3D view 1920x1080, its 1024x576 copies
+1920x1080, `1ECB9000` 1920x1080 (menus) and 2400x1350 (race); the dumped
+frame (cockpit view, with the mirror and HUD) right.

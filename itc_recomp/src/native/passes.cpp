@@ -390,7 +390,8 @@ struct Target {
   VkFormat format;
   VkSampleCountFlagBits samples;
   VkExtent2D guest_extent;  // the surface's, in the guest's pixels
-  VkExtent2D extent;        // the image's: guest_extent times the resolution scale
+  VkExtent2D extent;        // the image's: guest_extent times scale
+  float scale;              // the resolution scale it's drawn at
   Image image;               // view: for drawing (depth and stencil)
   VkImageView sample_view;   // for resolving (depth only, for depth)
   VkImageLayout layout = VK_IMAGE_LAYOUT_UNDEFINED;
@@ -537,10 +538,21 @@ struct Passes::State {
   // translated unscaled: none of this game's reads the pixel position or
   // fetches in texels.
   float scale = 1.0f;
-  int32_t Scaled(int32_t guest) const { return int32_t(std::lround(guest * scale)); }
-  uint32_t Scaled(uint32_t guest) const { return uint32_t(std::lround(guest * scale)); }
-  VkExtent2D Scaled(VkExtent2D guest) const {
-    return {std::max(Scaled(guest.width), 1u), std::max(Scaled(guest.height), 1u)};
+  // Above or below 1, the 3D view (1024x576, upscaled to the 1280x720 frame
+  // by the game) is drawn 1.25 times larger again, as are the textures it's
+  // resolved into, so the game's upscale becomes a copy one to one.
+  float main_view_scale = 1.0f;
+  static int32_t ScaledBy(int32_t guest, float by) { return int32_t(std::lround(guest * by)); }
+  static uint32_t ScaledBy(uint32_t guest, float by) {
+    return uint32_t(std::lround(guest * by));
+  }
+  static VkExtent2D ScaledBy(VkExtent2D guest, float by) {
+    return {std::max(ScaledBy(guest.width, by), 1u), std::max(ScaledBy(guest.height, by), 1u)};
+  }
+  VkExtent2D Scaled(VkExtent2D guest) const { return ScaledBy(guest, scale); }
+  // The main view's surfaces (colour and depth): pitch 1040, 2x MSAA.
+  static bool IsMainViewSurface(const Surface& surface) {
+    return surface.pitch == kMainViewPitch && surface.msaa == 1;
   }
   // What's shown and the main view's drawn part, scaled.
   VkExtent2D shown_extent{kShownWidth, kShownHeight};
@@ -2056,7 +2068,8 @@ Target* Passes::State::GetTarget(VkCommandBuffer commands, uint8_t* base, uint32
     t.guest_extent = {std::max(t.guest_extent.width, tiling_extent.width),
                       std::max(t.guest_extent.height, tiling_extent.height)};
   }
-  t.extent = Scaled(t.guest_extent);
+  t.scale = IsMainViewSurface(surface) ? main_view_scale : scale;
+  t.extent = ScaledBy(t.guest_extent, t.scale);
   VkImageUsageFlags usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
                             VK_IMAGE_USAGE_TRANSFER_DST_BIT |
                             (depth ? VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT
@@ -2234,7 +2247,7 @@ bool Passes::State::ResolveInto(VkCommandBuffer commands, uint8_t* base, Target&
   fetch[1] = (fetch[1] & 0xFFFu) | GpuPhysicalAddress(fetch[1] & 0xFFFFF000u);
   fetch[5] = (fetch[5] & 0xFFFu) | GpuPhysicalAddress(fetch[5] & 0xFFFFF000u);
   TextureCache::ResolveDestination dest;
-  if (!textures.GetResolveDestination(fetch, dest)) {
+  if (!textures.GetResolveDestination(fetch, source.scale, dest)) {
     return false;
   }
   // Source rectangle (left, top, right, bottom) and destination point.
@@ -2264,15 +2277,19 @@ bool Passes::State::ResolveInto(VkCommandBuffer commands, uint8_t* base, Target&
     return false;
   }
   // In the images' pixels: each edge scaled and rounded, the same in the
-  // source and the destination, so the copy stays one to one.
-  int32_t host_x = Scaled(x), host_y = Scaled(y);
-  int32_t host_left = Scaled(left), host_top = Scaled(top);
-  int32_t host_width = std::min({Scaled(x + width) - host_x, Scaled(left + width) - host_left,
-                                 int32_t(dest.host_width) - host_x,
-                                 int32_t(source.extent.width) - host_left});
-  int32_t host_height = std::min({Scaled(y + height) - host_y, Scaled(top + height) - host_top,
-                                  int32_t(dest.host_height) - host_y,
-                                  int32_t(source.extent.height) - host_top});
+  // source and the destination (made at the source's scale), so the copy
+  // stays one to one.
+  float source_scale = source.scale, dest_scale = dest.scale;
+  int32_t host_x = ScaledBy(x, dest_scale), host_y = ScaledBy(y, dest_scale);
+  int32_t host_left = ScaledBy(left, source_scale), host_top = ScaledBy(top, source_scale);
+  int32_t host_width =
+      std::min({ScaledBy(x + width, dest_scale) - host_x,
+                ScaledBy(left + width, source_scale) - host_left,
+                int32_t(dest.host_width) - host_x, int32_t(source.extent.width) - host_left});
+  int32_t host_height =
+      std::min({ScaledBy(y + height, dest_scale) - host_y,
+                ScaledBy(top + height, source_scale) - host_top,
+                int32_t(dest.host_height) - host_y, int32_t(source.extent.height) - host_top});
   if (host_width <= 0 || host_height <= 0) {
     return false;
   }
@@ -2371,12 +2388,14 @@ bool Passes::Init(const DeviceContext& context, uint8_t* base, uint32_t frames_i
   State& s = *state_;
   s.context = context;
   s.scale = resolution_scale > 0.0f ? resolution_scale : 1.0f;
+  s.main_view_scale =
+      s.scale == 1.0f ? 1.0f : s.scale * float(kShownWidth) / float(kMainViewWidth);
   s.shown_extent = s.Scaled(VkExtent2D{kShownWidth, kShownHeight});
-  s.main_view_extent = s.Scaled(VkExtent2D{kMainViewWidth, kMainViewHeight});
-  s.textures.set_resolution_scale(s.scale);
-  REXLOG_INFO("native renderer: resolution scale {}: frame {}x{}, 3D view {}x{}", s.scale,
-              s.shown_extent.width, s.shown_extent.height, s.main_view_extent.width,
-              s.main_view_extent.height);
+  s.main_view_extent = State::ScaledBy(VkExtent2D{kMainViewWidth, kMainViewHeight},
+                                       s.main_view_scale);
+  REXLOG_INFO("native renderer: resolution scale {}: frame {}x{}, 3D view {}x{} (scale {})",
+              s.scale, s.shown_extent.width, s.shown_extent.height, s.main_view_extent.width,
+              s.main_view_extent.height, s.main_view_scale);
   s.guest_base = base;
   s.frames_in_flight = frames_in_flight;
   const std::string& log_level = REXCVAR_GET(log_level);
@@ -3153,18 +3172,23 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
     s.main_view = color;
   }
   // Both scaled from the guest's pixels (the NDC scale and offset are
-  // ratios, unchanged).
-  VkViewport viewport{float(viewport_info.xy_offset[0]) * s.scale,
-                      float(viewport_info.xy_offset[1]) * s.scale,
-                      float(viewport_info.xy_extent[0]) * s.scale,
-                      float(viewport_info.xy_extent[1]) * s.scale,
+  // ratios, unchanged), by the targets' scale (colour and depth share one:
+  // the main view's surfaces are both scaled alike).
+  float draw_scale = color ? color->scale : depth->scale;
+  VkViewport viewport{float(viewport_info.xy_offset[0]) * draw_scale,
+                      float(viewport_info.xy_offset[1]) * draw_scale,
+                      float(viewport_info.xy_extent[0]) * draw_scale,
+                      float(viewport_info.xy_extent[1]) * draw_scale,
                       viewport_info.z_min,
                       viewport_info.z_max};
-  uint32_t scissor_left = s.Scaled(scissor.offset[0]), scissor_top = s.Scaled(scissor.offset[1]);
+  uint32_t scissor_left = State::ScaledBy(scissor.offset[0], draw_scale);
+  uint32_t scissor_top = State::ScaledBy(scissor.offset[1], draw_scale);
+  uint32_t scissor_right_scaled = State::ScaledBy(scissor_right, draw_scale);
+  uint32_t scissor_bottom_scaled = State::ScaledBy(scissor_bottom, draw_scale);
   VkRect2D scissor_rect{
       {int32_t(scissor_left), int32_t(scissor_top)},
-      {std::min(s.Scaled(scissor_right), extent.width) - std::min(scissor_left, extent.width),
-       std::min(s.Scaled(scissor_bottom), extent.height) - std::min(scissor_top, extent.height)}};
+      {std::min(scissor_right_scaled, extent.width) - std::min(scissor_left, extent.width),
+       std::min(scissor_bottom_scaled, extent.height) - std::min(scissor_top, extent.height)}};
   // Set for every pipeline (it's dynamic in all of them), used with depth.
   float slope = 0.0f, constant = 0.0f;
   if (depth) {
@@ -3176,7 +3200,7 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
                     : draw_util::kD3D10PolygonOffsetFactorFloat24;
     // Per pixel: scaled pixels are smaller, so the slope (as the plugin
     // scales it).
-    slope *= xenos::kPolygonOffsetScaleSubpixelUnit * std::max(s.scale, 1.0f);
+    slope *= xenos::kPolygonOffsetScaleSubpixelUnit * std::max(draw_scale, 1.0f);
     if (constant != 0.0f || slope != 0.0f) {
       s.stats.depth_biased++;
     }
