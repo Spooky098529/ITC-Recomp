@@ -81,6 +81,7 @@ set(ITC_SOURCES
     src/frame_pacing/game_messages.cpp
     src/frame_pacing/per_frame_logic.cpp
     src/interpolation/blend_state.cpp
+    src/interpolation/glow.cpp
 )
 
 if(WIN32)

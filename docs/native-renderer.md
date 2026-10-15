@@ -843,8 +843,10 @@ memory).
 - `--native_renderer_log_glow`: once a second, by logic and render-only
   frames: the glow history's cross-fades (pixel shader
   `E0D070FB58A4EA03`), the texture they read, the 256x144 resolves without
-  a clear and which of them write that texture back (see the bloom under
-  Known issues).
+  a clear and which of them write that texture back, and the cross-fade's
+  pixel constants and vertex colour (see the bloom under Known issues).
+- `--native_renderer_log_shader_ucode=<hash>`: log a shader's microcode
+  disassembly when it's first used.
 - `--native_renderer_watch_draws`: log what changes in the main view's
   draws' inputs between frames (with the camera still, only flickering
   draws should change). Ignores float changes under 0.1% and compares only
@@ -1047,8 +1049,28 @@ To be fixed (or accepted) in milestone 7.
     strength, ~2.7-3.2), `+8456` (0.75), `+8476` (0)} of the object;
     `+8452` is written by `sub_82136F18`. Nothing else stepping looks like
     the glow's (the rest are the known c14, c70, c74 and c100).
-  - Not known yet: where the cross-fade's alpha comes from (a constant,
-    perhaps c33.x, or the history's alpha) and its value.
+  - **The cross-fade's weight is its quad's vertex colour alpha**: the
+    shader (`--native_renderer_log_shader_ucode=E0D070FB58A4EA03`) is
+    `tfetch2D r0.xyz, tf0; oC0.w = r1.w; oC0.xyz = r0 * r1`, no
+    constants. `sub_821379D8` builds the quad (`sub_82133E30`) with colour
+    (8, 8, 8, `+8460`), or a fixed alpha when `+40` (a reset) is set; the
+    8 undoes the history's 1/8 (its resolve's exponent bias). `+8460` was
+    ~0.55 in attract races (0.545-0.58, changing every tick): each tick,
+    history = 0.55 x history + 0.45 x this frame's glow.
+  - **The fix** (`src/interpolation/glow.cpp`, wrapping `sub_821379D8`, in
+    races with interpolation on): c33's fields and `+8460` are blended
+    between the last two ticks by the tick progress (as world-space
+    sprites); on render-only passes `+48` is set as the last logic pass
+    had it, so the game records the history resolve every frame; and the
+    weight is raised to the pass's share of a tick (time since the
+    object's last pass over 1/30 s), so the history fades as fast in time
+    as at 30 Hz. Checked in an attract race at the 144 cap: the history
+    written on all 120 render-only frames a second, per-frame weights
+    0.85-0.91 for shares of 0.16-0.29, c33 no longer listed by
+    `--log_stepping_constants`, 150 fps as before. Whether the ghosting
+    is gone is for the user to check driving.
+    `--blend_glow=false` and `--glow_history_every_frame=false` turn the
+    two parts off.
 - **Motion blur reads the 30 Hz tick.** The game's velocity-based motion
   blur (pixel shader `7EB16456AAD56CBA`) gets its velocities from the
   tick, so at interpolated frame rates each frame smears a whole tick of

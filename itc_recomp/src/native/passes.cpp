@@ -741,8 +741,10 @@ struct Passes::State {
     uint32_t cross_fades = 0, history_resolves = 0, cross_fade_texture = 0,
              history_address = 0;
     std::vector<uint32_t> addresses;  // the 256x144 resolves without a clear
+    std::string constants;  // the cross-fade's pixel float constants
   } glow_frame;
   std::array<std::string, 2> glow_addresses;  // an example frame's, by kind
+  std::array<std::string, 2> glow_constants;  // the last cross-fade's, by kind
   struct GlowCounts {
     uint64_t frames = 0, cross_fades = 0, history_resolves = 0, reads_history = 0;
   };
@@ -2693,6 +2695,27 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
 
   if (log_glow && pixel && pixel->hash == kGlowCrossFade) {
     glow_frame.cross_fades++;
+    glow_frame.constants.clear();
+    if (call.inline_vertices) {
+      // Its weight: the vertices' colour alpha (the shader outputs the
+      // history times the colour, and the colour's alpha).
+      uint8_t* vertices = draw_mirror().mapped;
+      glow_frame.constants += fmt::format(
+          "vertex colour {:.4g} {:.4g} {:.4g} {:.4g}; ",
+          guest::LoadFloat(vertices, call.vertex_address + 16),
+          guest::LoadFloat(vertices, call.vertex_address + 20),
+          guest::LoadFloat(vertices, call.vertex_address + 24),
+          guest::LoadFloat(vertices, call.vertex_address + 28));
+    }
+    for (uint32_t c = 0; c < 256; c++) {
+      if (pixel->float_constants[c >> 6] & (uint64_t(1) << (c & 63))) {
+        uint32_t at = device + kDevicePixelFloatConstants + 16 * c;
+        glow_frame.constants += fmt::format(
+            "c{} {:.4g} {:.4g} {:.4g} {:.4g}; ", c, guest::LoadFloat(base, at),
+            guest::LoadFloat(base, at + 4), guest::LoadFloat(base, at + 8),
+            guest::LoadFloat(base, at + 12));
+      }
+    }
     for (const ShaderTexture& texture : pixel->textures) {
       glow_frame.cross_fade_texture =
           regs.values[XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0 + 6 * texture.fetch_constant + 1] &
@@ -3690,6 +3713,9 @@ void Passes::State::LogGlow() {
   counts.history_resolves += glow_frame.history_resolves;
   counts.reads_history += glow_frame.cross_fades && glow_frame.history_resolves &&
                           glow_frame.cross_fade_texture == glow_frame.history_address;
+  if (glow_frame.cross_fades) {
+    glow_constants[logic] = glow_frame.constants;
+  }
   if (glow_addresses[logic].empty()) {
     for (uint32_t address : glow_frame.addresses) {
       glow_addresses[logic] += fmt::format("{:08X} ", address);
@@ -3720,6 +3746,9 @@ void Passes::State::LogGlow() {
                 glow_counts[0].history_resolves, glow_counts[0].reads_history,
                 glow_frame.cross_fade_texture, glow_frame.history_address, glow_addresses[1],
                 glow_addresses[0], glow_pattern);
+    REXLOG_INFO("native renderer: glow cross-fade constants: logic frame: {}render-only "
+                "frame: {}",
+                glow_constants[1], glow_constants[0]);
     glow_counts = {};
     glow_addresses = {};
     glow_pattern.clear();
