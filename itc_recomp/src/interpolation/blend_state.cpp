@@ -89,8 +89,6 @@ REXCVAR_DEFINE_BOOL(log_blend_state, false, "ITC",
                     "Log how many cameras and objects were blended, once a second");
 REXCVAR_DEFINE_BOOL(log_replayed_constants, false, "ITC",
                     "Log the vertex constant matrices the render thread replays, once a second");
-REXCVAR_DEFINE_BOOL(check_pixel_blender, false, "ITC",
-                    "TEMPORARY: run the old lighting blender beside the new and log mismatches");
 REXCVAR_DEFINE_BOOL(pixel_blend_from_latest, true, "ITC",
                     "Blend per-object lighting from the last value recorded in the previous "
                     "tick to this frame's (false: only frames recording the tick's first value "
@@ -2078,287 +2076,6 @@ PixelConstantBlender& GetPixelConstantBlender() {
   return blender;
 }
 
-// TEMPORARY (check_pixel_blender): the blender as it was, run side by side.
-class LegacyPixelConstantBlender {
- public:
-  void OnFrameStart(uint64_t tick) {
-    occurrences_.clear();
-    if (tick != tick_) {
-      tick_ = tick;
-      // A new tick: what was current becomes the previous tick's. Objects
-      // not seen for two ticks are gone (identities aren't reused).
-      for (auto it = entries_.begin(); it != entries_.end();) {
-        Entry& entry = it->second;
-        if (entry.current_tick + 2 < tick) {
-          it = entries_.erase(it);
-          continue;
-        }
-        if (entry.current_tick + 1 == tick) {
-          entry.previous = entry.current;
-          entry.previous_tick = entry.current_tick;
-        }
-        ++it;
-      }
-    }
-  }
-
-  // Blends the upload in place; returns the original to put back after.
-  std::optional<std::vector<float>> Apply(uint8_t* base, uint32_t payload, uint32_t packed,
-                                          float amount, uint64_t object) {
-    outcome_ = Outcome::kNoObject;
-    switch_jumps_ = 0;
-    if (object == 0) {
-      return std::nullopt;  // no object to pair by
-    }
-    uint32_t start = (packed >> 8) & 0xFF, count = packed & 0xFF;
-    Key key{object, start, count, occurrences_[{object, start, count, 0}]++};
-    std::vector<float> now(count * 4);
-    for (uint32_t i = 0; i < now.size(); i++) {
-      now[i] = guest::LoadFloat(base, payload + 4 * i);
-    }
-    last_key_ = {object, key.occurrence};
-    last_values_ = now;
-    last_blended_ = now;
-    Entry& entry = entries_[key];
-    // The light slots (cars' headlights among them) are recorded on a tick's
-    // logic pass before the lights move, so they hold the previous tick's
-    // lights there, and the tick's own on the frames after. Blending from
-    // the last value recorded in the previous tick to this frame's gives the
-    // previous tick's lights at the tick (amount about 0) and a blend after.
-    bool from_latest = REXCVAR_GET(pixel_blend_from_latest);
-    if (entry.current_tick != tick_ || from_latest) {
-      entry.current = now;  // first time this tick: the tick's own value
-      entry.current_tick = tick_;
-    }
-    if (entry.previous_tick + 1 != tick_ || entry.previous.size() != now.size()) {
-      outcome_ = Outcome::kUnpaired;
-      return std::nullopt;
-    }
-    if (entry.current != now) {
-      outcome_ = Outcome::kNotAsRecorded;  // differs from the tick's first value
-      differing_.clear();
-      for (uint32_t i = 0; i < now.size(); i++) {
-        if (i < entry.current.size() && entry.current[i] != now[i]) {
-          differing_.push_back({i, entry.current[i], now[i]});
-        }
-      }
-      return std::nullopt;
-    }
-    // Some components are per-object switches that legitimately jump
-    // between ticks (c1.x, c3.xyz, c4.x of an upload: which lights reach the
-    // object, and how strongly); they take the tick's value and the rest blends. A
-    // jump anywhere else means this isn't the same object (or something cut),
-    // so the whole upload is left as recorded rather than mix two objects.
-    auto is_switch = [&](uint32_t i) {
-      // Register * 4 + component, from the start of the upload (the same
-      // layout is uploaded at c0 and at c63).
-      return i == 1 * 4 + 0 || i == 3 * 4 + 0 || i == 3 * 4 + 1 || i == 3 * 4 + 2 || i == 4 * 4 + 0;
-    };
-    auto jumped = [&](uint32_t i) {
-      float a = entry.previous[i], b = now[i];
-      return a != b && (!std::isfinite(a) || !std::isfinite(b) ||
-                        !(std::abs(b - a) <= 0.3f * std::max(std::abs(a), std::abs(b)) + 0.2f));
-    };
-    // The 8 light slots: slot k is registers 8+k, 16+k, 24+k, 32+k, 47+k and
-    // 55+k (position, direction, colour and the like; see light_setup_log).
-    // A slot whose light changed between ticks (a streetlight in place of a
-    // car's headlight) takes the tick's light, as the game switches it, and
-    // the rest of the upload still blends; rejecting the whole upload left
-    // the car's lighting at the tick for a tick (a flicker).
-    // A slot's light position (8+k) is a world position, where the relative
-    // tolerance allows hundreds of metres: a slot taking the next street lamp
-    // along was blended as one light sliding 30 m across the car in a tick
-    // (a flash passing under lamps). It's another light if it moved more than
-    // kSlotLightMove; cars' headlights move at most about 3 m a tick.
-    constexpr float kSlotLightMove = 4.0f;  // metres
-    std::array<bool, 8> slot_switched{};
-    if (count == 63 && REXCVAR_GET(switch_light_slots)) {
-      for (uint32_t k = 0; k < 8; k++) {
-        uint32_t p = (8 + k) * 4;
-        Vec3 before{entry.previous[p], entry.previous[p + 1], entry.previous[p + 2]};
-        Vec3 after{now[p], now[p + 1], now[p + 2]};
-        slot_switched[k] = !(Distance(before, after) <= kSlotLightMove);
-        for (uint32_t r : {8u, 16u, 24u, 32u, 47u, 55u}) {
-          for (uint32_t c = 0; c < 4; c++) {
-            slot_switched[k] = slot_switched[k] || jumped((r + k) * 4 + c);
-          }
-        }
-      }
-    }
-    auto in_switched_slot = [&](uint32_t i) {
-      if (count != 63) {
-        return false;
-      }
-      uint32_t r = i / 4;
-      for (uint32_t base : {8u, 16u, 24u, 32u, 47u, 55u}) {
-        if (r >= base && r < base + 8 && slot_switched[r - base]) {
-          return true;
-        }
-      }
-      return false;
-    };
-    // c0-c3 are the view matrix and c4 the position of the camera the
-    // lighting is worked out against (copied from the camera pass by the
-    // render orchestrator): they blend together as a camera, or on a cut
-    // (the camera moved more than kCutDistance) take the tick's together.
-    // Judged by component, a view matrix entry that moved more than the
-    // tolerance kept the tick's value while the rest blended, so the car was
-    // lit against an inconsistent camera for a tick (a flash).
-    bool camera = count == 63 && REXCVAR_GET(blend_lighting_camera);
-    bool camera_cut = false;
-    if (camera) {
-      Vec3 eye_before{entry.previous[16], entry.previous[17], entry.previous[18]};
-      Vec3 eye_now{now[16], now[17], now[18]};
-      camera_cut = !IsFinite(eye_before) || !IsFinite(eye_now) ||
-                   !(Distance(eye_before, eye_now) <= kCutDistance);
-      for (uint32_t i = 0; i < 20; i++) {
-        camera_cut = camera_cut || !std::isfinite(entry.previous[i]) || !std::isfinite(now[i]);
-      }
-    }
-    // --blend_only_light_slots: only the light slots' positions (c8-c15) and
-    // directions (c24-c31) blend, which move the cars' headlights' light with
-    // the cars, and the rest is left as recorded. Added while opponents' cars
-    // flashed passing under lamps, before the cause (slots taking the next
-    // lamp, see slot_switched) was found; blending all of it is fine since.
-    bool only_lights = count == 63 && REXCVAR_GET(blend_only_light_slots);
-    auto blends = [&](uint32_t i) {
-      uint32_t r = i / 4;
-      return !only_lights || (r >= 8 && r < 16) || (r >= 24 && r < 32);
-    };
-    std::vector<bool> jumps(now.size(), false);
-    bool changed = false;
-    for (uint32_t i = 0; i < now.size(); i++) {
-      float a = entry.previous[i], b = now[i];
-      if (a == b) {
-        continue;
-      }
-      if (!blends(i)) {
-        jumps[i] = true;  // as recorded
-        continue;
-      }
-      if (camera && i < 20) {
-        if (camera_cut) {
-          jumps[i] = true;  // the tick's camera
-        } else {
-          changed = true;
-        }
-        continue;
-      }
-      if (in_switched_slot(i)) {
-        jumps[i] = true;  // the tick's light
-        switch_jumps_++;
-        continue;
-      }
-      if (jumped(i)) {
-        if (!is_switch(i)) {
-          if (REXCVAR_GET(log_blend_state)) {
-            LogRejection(start * 4 + i, a, b);
-          }
-          outcome_ = Outcome::kRejected;
-          rejected_ = i;
-          rejected_values_ = {a, b};
-          return std::nullopt;
-        }
-        jumps[i] = true;
-        switch_jumps_++;
-        continue;
-      }
-      changed = true;
-    }
-    if (!changed) {
-      outcome_ = Outcome::kUnchanged;
-      return std::nullopt;
-    }
-    outcome_ = Outcome::kBlended;
-    last_blended_ = now;
-    for (uint32_t i = 0; i < now.size(); i++) {
-      float a = entry.previous[i], b = now[i];
-      if (a != b && !jumps[i]) {
-        last_blended_[i] = a + (b - a) * amount;
-        guest::StoreFloat(base, payload + 4 * i, last_blended_[i]);
-      }
-    }
-    return now;
-  }
-
-  // What the last Apply did, for --log_pixel_outcomes.
-  enum class Outcome { kNoObject, kUnpaired, kNotAsRecorded, kRejected, kUnchanged, kBlended };
-  Outcome outcome() const { return outcome_; }
-  int switch_jumps() const { return switch_jumps_; }
-  // The rejected component (from the upload's start) and its two ticks' values.
-  uint32_t rejected() const { return rejected_; }
-  std::pair<float, float> rejected_values() const { return rejected_values_; }
-  // For kNotAsRecorded: the components (from the upload's start) that differ
-  // from the tick's first value, with both values.
-  struct Difference {
-    uint32_t i;
-    float first, now;
-  };
-  const std::vector<Difference>& differing() const { return differing_; }
-  // The last upload's object and occurrence, and its values as recorded.
-  std::pair<uint64_t, int> last_key() const { return last_key_; }
-  const std::vector<float>& last_values() const { return last_values_; }
-  // ...and as uploaded (the blend, or as recorded).
-  const std::vector<float>& last_blended() const { return last_blended_; }
-
- private:
-  std::vector<Difference> differing_;
-  std::pair<uint64_t, int> last_key_{};
-  std::vector<float> last_values_, last_blended_;
-  static void LogRejection(uint32_t i, float a, float b);
-
-  Outcome outcome_ = Outcome::kNoObject;
-  int switch_jumps_ = 0;
-  uint32_t rejected_ = 0;
-  std::pair<float, float> rejected_values_{};
-
-  struct Key {
-    uint64_t object;
-    uint32_t start, count;
-    int occurrence;
-    auto operator<=>(const Key&) const = default;
-  };
-  struct Entry {
-    std::vector<float> current, previous;
-    uint64_t current_tick = 0, previous_tick = 0;
-  };
-  std::map<Key, Entry> entries_;
-  std::map<Key, int> occurrences_;
-  uint64_t tick_ = 0;
-};
-
-void LegacyPixelConstantBlender::LogRejection(uint32_t i, float a, float b) {
-  static std::map<uint32_t, int> rejections;  // by register * 4 + component
-  static auto last = std::chrono::steady_clock::now();
-  rejections[i]++;
-  auto now = std::chrono::steady_clock::now();
-  if (now - last < std::chrono::seconds(2)) {
-    return;
-  }
-  last = now;
-  std::string line;
-  for (const auto& [index, n] : rejections) {
-    line += fmt::format(" c{}.{}:{}", index / 4, "xyzw"[index % 4], n);
-  }
-  REXLOG_INFO("pixel constants rejected (register.component:count):{}; e.g. c{}.{} {} -> {}", line,
-              i / 4, "xyzw"[i % 4], a, b);
-  rejections.clear();
-}
-
-LegacyPixelConstantBlender& GetLegacyPixelConstantBlender() {
-  static LegacyPixelConstantBlender blender;
-  return blender;
-}
-struct PixelBlenderCheck {
-  uint64_t uploads = 0, blended = 0, outcome_mismatches = 0, value_mismatches = 0,
-           restore_mismatches = 0;
-  std::chrono::steady_clock::time_point last = std::chrono::steady_clock::now();
-  std::vector<uint32_t> in, legacy_out;
-  int legacy_outcome = 0;
-  bool legacy_blended = false;
-};
-PixelBlenderCheck g_pixel_check;
-
 // Diagnostics (--log_pixel_outcomes): what the pixel constant blender did with
 // each lighting upload, by the object it was paired by: moving (its world
 // matrix blends, so a car, a wheel, a car body) or still (road, buildings),
@@ -2971,9 +2688,6 @@ void BlendState_OnReplayFrameStart() {
   GetReplayCameras().OnFrameStart();
   GetOverlayUploadsLog().OnFrameStart();
   GetPixelConstantBlender().OnFrameStart(GetReplayCameras().tick());
-  if (REXCVAR_GET(check_pixel_blender)) {
-    GetLegacyPixelConstantBlender().OnFrameStart(GetReplayCameras().tick());
-  }
   if (REXCVAR_GET(log_pixel_outcomes)) {
     GetPixelOutcomesLog().OnFrameStart();
   }
@@ -3027,47 +2741,9 @@ void BlendState_ReplayConstants(uint8_t* base, uint32_t payload, uint32_t packed
   bool pixel_blended = false;
   if (REXCVAR_GET(interpolate_draw_state) && REXCVAR_GET(blend_pixel_constants) && stage == 1 &&
       ((packed >> 16) & 0xFF) == 1) {
-    PixelBlenderCheck& check = g_pixel_check;
-    bool checking = REXCVAR_GET(check_pixel_blender);
-    if (checking) {
-      check.in.resize(count * 4);
-      check.legacy_out.resize(count * 4);
-      for (uint32_t i = 0; i < count * 4; i++) check.in[i] = guest::LoadU32(base, payload + 4 * i);
-      auto legacy = GetLegacyPixelConstantBlender().Apply(base, payload, packed,
-                                                          GetReplayCameras().amount(),
-                                                          GetReplayCameras().last_identity());
-      check.legacy_blended = legacy.has_value();
-      check.legacy_outcome = int(GetLegacyPixelConstantBlender().outcome());
-      for (uint32_t i = 0; i < count * 4; i++) {
-        check.legacy_out[i] = guest::LoadU32(base, payload + 4 * i);
-        guest::StoreU32(base, payload + 4 * i, check.in[i]);
-      }
-    }
     pixel_blended =
         GetPixelConstantBlender().Apply(base, payload, packed, GetReplayCameras().amount(),
                                         GetReplayCameras().last_identity());
-    if (checking) {
-      check.uploads++;
-      check.blended += pixel_blended;
-      if (check.legacy_blended != pixel_blended ||
-          check.legacy_outcome != int(GetPixelConstantBlender().outcome())) {
-        if (check.outcome_mismatches++ < 20) {
-          int nans = 0;
-          for (uint32_t v : check.in) nans += (v & 0x7F800000) == 0x7F800000;
-          REXLOG_INFO("pixel blender check: outcome {} (old) against {} (new), blended {}/{}, "
-                      "{} non-finite of {}, tick {} c{} x{}",
-                      check.legacy_outcome, int(GetPixelConstantBlender().outcome()),
-                      check.legacy_blended, pixel_blended, nans, check.in.size(),
-                      GetReplayCameras().tick(), (packed >> 8) & 0xFF, count);
-        }
-      }
-      for (uint32_t i = 0; i < count * 4; i++) {
-        if (guest::LoadU32(base, payload + 4 * i) != check.legacy_out[i]) {
-          check.value_mismatches++;
-          break;
-        }
-      }
-    }
     if (REXCVAR_GET(log_pixel_outcomes)) {
       const ProductBlendParts& parts = GetReplayCameras().last_parts();
       GetPixelOutcomesLog().OnUpload(
@@ -3164,24 +2840,6 @@ void BlendState_ReplayConstants(uint8_t* base, uint32_t payload, uint32_t packed
     const std::vector<float>& recorded = GetPixelConstantBlender().recorded();
     for (uint32_t i = 0; i < recorded.size(); i++) {
       guest::StoreFloat(base, payload + 4 * i, recorded[i]);
-    }
-  }
-  if (REXCVAR_GET(check_pixel_blender) && stage == 1 && ((packed >> 16) & 0xFF) == 1 &&
-      g_pixel_check.in.size() == count * 4) {
-    PixelBlenderCheck& check = g_pixel_check;
-    for (uint32_t i = 0; i < count * 4; i++) {
-      if (guest::LoadU32(base, payload + 4 * i) != check.in[i]) {
-        check.restore_mismatches++;
-        break;
-      }
-    }
-    auto now = std::chrono::steady_clock::now();
-    if (now - check.last >= std::chrono::seconds(5)) {
-      check.last = now;
-      REXLOG_INFO("pixel blender check: {} uploads ({} blended), {} outcome mismatches, {} value "
-                  "mismatches, {} restore mismatches",
-                  check.uploads, check.blended, check.outcome_mismatches, check.value_mismatches,
-                  check.restore_mismatches);
     }
   }
 }
