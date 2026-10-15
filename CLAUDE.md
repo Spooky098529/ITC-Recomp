@@ -109,7 +109,7 @@ install -m 755 itc_recomp/run-debug.sh $D/run-debug.sh
 (cd $D && python3 -I -m zipfile -c ../$name.zip itc librexruntime.so run.sh run-debug.sh)
 ```
 
-## Status (`main`, 2026-10-15, v0.3.7 plus `blend-math`, `read-registers` and `mirrors-fix`)
+## Status (`main`, 2026-10-15, v0.3.8)
 
 Frame interpolation for races is working: logic runs at 30 Hz and frames are
 blended between ticks. The world, cameras, wheels (other cars' too, paired
@@ -141,7 +141,11 @@ reading constants from guest memory"). Since then (`blend-math`, `read-registers
 cameras blended once a frame, guest words byte-swapped with `pshufb`, and
 the register shadow read only where the library's dirty masks say
 ("Performance: the render thread" in `docs/native-renderer.md`: "Done on
-`blend-math`", "Register reads", "Against v0.3.7"). Translated shaders and pipelines are kept on disk (`cache/` next to
+`blend-math`", "Register reads", "Against v0.3.7"); then (`mirrors-fix`)
+the guest memory mirrors given memcpy's writes once a frame instead of
+checked draw by draw (opt-in, on in `run.sh`; "Hypothesis to test: the
+mirrors updated once a tick"). All released in v0.3.8: ~430 fps uncapped
+in an attract race with `run.sh`'s flags (2026-10-15). Translated shaders and pipelines are kept on disk (`cache/` next to
 the executable), and textures are reloaded when the game's memcpy writes
 them instead of being hashed (`docs/texture-handling-optimisation.md`);
 merged from `perf-debug` for Steam Deck hitches. Its known issues (boot movie, gamma, textures, window resizing,

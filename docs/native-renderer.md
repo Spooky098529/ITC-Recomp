@@ -45,7 +45,12 @@ speed).
   range and the vertex buffers its vertex shader fetches from (the shader's
   vertex fetch constants: address in word 0, size in words in word 1 bits
   2-25) are copied in, each range once a frame. This copies static meshes
-  every frame; tracking which ranges changed is for later.
+  every frame; tracking which ranges changed is for later. (Later: only
+  ranges memcpy wrote since, see "Buffers"; since v0.3.8, with
+  `--native_renderer_mirror_by_tick` and `--native_renderer_mirror_to_both`,
+  on in `run.sh`, the mirrors take memcpy's writes at frame starts and
+  draws don't copy at all, see "Hypothesis to test: the mirrors updated
+  once a tick".)
 - **Development mode first**: with `--native_renderer`, the replay hooks
   draw natively *and* still call the graphics library, so the emulated GPU
   keeps rendering the game's own window and the two can be compared side by
@@ -787,6 +792,13 @@ memory).
   real change, but nothing in the game was found that changes vertex or
   index data after loading it. With that, the data could live in VRAM
   (see "What the mirror copies").
+- **Since v0.3.8** (2026-10-15, opt-in, on in `run.sh`): with
+  `--native_renderer_mirror_by_tick` and `--native_renderer_mirror_to_both`
+  the mirrors are given memcpy's writes at each frame's start instead, and
+  draws skip the index range, the vertex sizes and `Mirror`: -14.7% of the
+  render thread's cycles a frame. Why that's safe (no write lands in data a
+  frame in flight reads) and how it was checked: "Hypothesis to test: the
+  mirrors updated once a tick" and what follows it.
 
 ## Tools (all debugging aids)
 
@@ -885,6 +897,21 @@ memory).
 - `--native_renderer_verify_mirror`: compare every range not copied with
   guest memory, every frame, logging how many were checked and those that
   differ (slow: ~20 fps in a race, since the mirror is uncached memory).
+  With `--native_renderer_mirror_by_tick` it instead looks each drawn range
+  up in the writes the mirror draws read hasn't had (fast, exact as long as
+  memcpy is the only writer), logging the ranges missing one.
+- `--native_renderer_mirror_by_tick`: draws read a mirror swapped as a
+  logic pass's list starts replaying, memcpy's writes applied at frame
+  starts to the other; draws do no mirror work. With
+  `--native_renderer_mirror_to_both` the writes go into the mirror draws
+  read as well (both on in `run.sh` since v0.3.8; the first alone leaves new
+  data out for the rest of a tick). Fixed at start.
+- `--native_renderer_log_physical_writes`: each memcpy into the physical
+  views by thread, pass (logic or render-only) and caller, checked against
+  the vertex and index ranges drawn from two frames before it to one after,
+  the list being replayed and the texture cache; a summary every 5 s, and
+  each write changing drawn data on a render-only pass or under the replay
+  on its own line.
 - `--native_renderer_log_buffers`: log the vertex and index buffer objects
   draws bind (header, data, later changes), the library's memcpy into
   their headers, and for each range copied into the mirror whether memcpy
@@ -1322,8 +1349,12 @@ v0.3.7 (merged 2026-10-15 from `replay-allocations`, `blend-math` and
 planned once a tick and cameras blended once a frame, the byte swap by
 hand, and register reads of only what the library marked dirty; together
 ~12% fewer render thread cycles a draw than v0.3.7 (~7,660 to ~6,760, by
-profile; see "Against v0.3.7"). None of it checked on the Deck yet, and
-no profile taken in cockpit view itself.
+profile; see "Against v0.3.7"). Then the mirrors updated once a frame
+(`mirrors-fix`, opt-in, on in `run.sh`): -14.7% render thread cycles a
+frame ("Hypothesis to test: the mirrors updated once a tick" and what
+follows). All of it released in v0.3.8 (uncapped attract race with
+`run.sh`'s flags ~430 fps). None of it checked on the Deck yet, and no
+profile taken in cockpit view itself.
 
 ### What the user reported: first-person views slower on the Deck
 
@@ -2073,6 +2104,11 @@ noisy to show it: the third "cache only" run drew ~8% more frames than
 any other). Over both steps the mirror's per-draw work is ~−400 thousand
 cycles a frame (~3% of the render thread).
 ### Hypothesis to test: the mirrors updated once a tick (the user's, 2026-10-15)
+
+**Outcome:** done and merged (`mirrors-fix`, released in v0.3.8, opt-in
+and on in `run.sh`); the handover below is kept as written, with the
+results after it ("Test results", "The experiment", "Draws' mirror work
+removed", "A race the user drove").
 
 For a new session to test. Read "Buffers" and the "Guest memory is
 mirrored" decision above first, and "Render command recording" and
