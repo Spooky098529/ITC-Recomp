@@ -512,6 +512,20 @@ decompositions ~60. All of `interpolation::` ~1,170.
    Uncapped attract races, alternating: 341.8, 345.7, 346.1 fps mean
    against 332.1, 337.9, 335.6 before (~+2.8%).
 
+**To investigate: reusing the lighting blender's decisions within a tick.**
+After the above, `Apply`'s per-component loop (does each component blend,
+keep the tick's value, or reject the upload) is still ~28% of it, and the
+light slot checks ~11%. The decisions depend only on the previous tick's
+values (fixed within a tick), the upload as recorded and a few options, so
+an entry could keep them with the upload they were made on and reuse them
+while a frame's upload is bit for bit the same (the blend itself is still
+computed per frame with that frame's amount). Not keyed by tick alone: the
+light slots hold the previous tick's lights on a logic pass and the tick's
+own after, so the first frame after it must decide again. Check against
+the old blender over whole attract races, both blend modes; keep
+`--log_blend_state`'s rejection counts per frame. Unmeasured: comparing
+~1 KB per upload may eat most of the gain.
+
 Checking a change: run the old code beside the new over a whole attract
 race and compare every result, as for steps 1-4 (the lighting blender:
 cherry-pick `2c82ae6` and `5942f31`, then `--check_pixel_blender=true`; the
