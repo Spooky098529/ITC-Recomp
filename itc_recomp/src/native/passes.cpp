@@ -567,7 +567,7 @@ struct Passes::State {
   // diagnostics (then the mirror needs nothing from draws).
   bool MirrorPerDraw() const {
     return !mirror_by_tick || check_mirror || check_mirror_frames || check_late_writes ||
-           check_clobbers || verify_mirror || log_index_ranges || check_index_cache ||
+           check_clobbers || verify_mirror || log_index_ranges ||
            Buffers_Logging() || Buffers_LogPhysicalWrites();
   }
   uint32_t inline_slot_size() const {
@@ -693,11 +693,6 @@ struct Passes::State {
   std::unordered_set<uint64_t> used_mirrored;
   IndexRangeCache index_cache;
   bool cache_index_ranges = true;
-  // With check_index_cache, every draw's indices are scanned too and
-  // compared with the cache's result.
-  bool check_index_cache = false;
-  uint64_t index_cache_checked = 0, index_cache_mismatched = 0;
-  uint32_t index_cache_mismatch_sample[6] = {};  // address, count, cached, scanned low/high
   // IndexRange's result for the draw's indices, from index_cache when it
   // holds.
   // What DrawIndexRange learned from Buffers_NewestWrite for the draw's
@@ -1270,16 +1265,6 @@ std::pair<uint32_t, uint32_t> Passes::State::DrawIndexRange(uint8_t* base, uint3
   if (entry.key && (entry.frame == mirror_frames || draw_index_newest <= entry.sequence)) {
     entry.frame = mirror_frames;
     range = {entry.low, entry.high};
-    if (check_index_cache) {
-      index_cache_checked++;
-      auto scanned = IndexRange(PhysicalHostAddress(base, address), count, index_32bit, endian,
-                                skip_restart);
-      if (scanned != range && !index_cache_mismatched++) {
-        uint32_t sample[] = {address, count, range.first, range.second, scanned.first,
-                             scanned.second};
-        std::copy(std::begin(sample), std::end(sample), index_cache_mismatch_sample);
-      }
-    }
     return range;
   }
   // Writes not yet taken get later sequences, so the entry is scanned again
@@ -3686,23 +3671,6 @@ void Passes::set_log_register_reads(bool log) {
 
 void Passes::set_cache_index_ranges(bool cache) {
   state_->cache_index_ranges = cache;
-}
-
-void Passes::set_check_index_cache(bool check) {
-  state_->check_index_cache = check;
-}
-
-std::string Passes::TakeIndexCacheCheck() {
-  State& s = *state_;
-  std::string text = fmt::format("index range cache: {} results checked against a scan, {} differ",
-                                 s.index_cache_checked, s.index_cache_mismatched);
-  if (s.index_cache_mismatched) {
-    const uint32_t* m = s.index_cache_mismatch_sample;
-    text += fmt::format(" (e.g. {:08X} x{}: {}-{} cached, {}-{} scanned)", m[0], m[1], m[2], m[3],
-                        m[4], m[5]);
-  }
-  s.index_cache_checked = s.index_cache_mismatched = 0;
-  return text;
 }
 
 void Passes::set_log_index_ranges(bool log) {

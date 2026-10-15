@@ -170,8 +170,8 @@ Not done yet:
   off by default, on in `run.sh`): -14.7% render thread cycles a frame,
   checked in attract races and a race the user drove ("Hypothesis to test:
   the mirrors updated once a tick" and what follows it). Still to decide:
-  `Buffers_OnCommand`'s ~90k cycles a frame with its log off, removing
-  `--native_renderer_check_index_cache`, the old per-draw path's future,
+  `Buffers_OnCommand`'s ~90k cycles a frame with its log off (perf's
+  attribution there looks wrong), the old per-draw path's future,
   and a Steam Deck test.
 - Recheck whether the player's beam on the road still jumps in sharp turns
   (Known issues); if it's gone, drop it from the next release's limits.

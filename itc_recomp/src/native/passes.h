@@ -98,11 +98,8 @@ class Passes {
   // unchanged, and how the mirror's checks go; TakeIndexRanges describes
   // them since it was last called.
   // Keep draws' index ranges' lowest and highest index until memcpy writes
-  // them (on by default); a debugging aid scanning them anyway and comparing,
-  // TakeIndexCacheCheck describing the differences since it was last called.
+  // them (on by default).
   void set_cache_index_ranges(bool cache);
-  void set_check_index_cache(bool check);
-  std::string TakeIndexCacheCheck();
   void set_log_index_ranges(bool log);
   std::string TakeIndexRanges();
   // Fixed at start (--native_renderer_mirror_by_tick): draws read a mirror

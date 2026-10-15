@@ -2032,9 +2032,9 @@ keeps each range's lowest and highest index, the write sequence when
 scanned, and the frame it was last found unwritten in. A draw whose range
 was found this frame takes the result; otherwise `Buffers_NewestWrite`
 decides once a frame whether it's scanned again. Checked with
-`--native_renderer_check_index_cache` (scans anyway and compares; kept
-until the next step, which changes how validity is decided): two whole
-attract races, ~62 million cached results, 0 differ.
+`--native_renderer_check_index_cache` (scanned anyway and compared;
+removed 2026-10-15 once the mirror work was done, in its last version
+`2b7f2a2`): two whole attract races, ~62 million cached results, 0 differ.
 Profiles, one binary with the cache off and on, three runs each,
 alternating (`ITC_ARGS`, a new option of `profile_render_thread.sh`),
 thousand cycles a frame:
@@ -2087,8 +2087,8 @@ branches) has, on top of `main`:
 - the index range cache (`IndexRangeCache`, `DrawIndexRange`), and its
   write check passed to `Mirror` (`draw_index_newest`): ~-400 thousand
   cycles a frame of ~14,000 together (~3%), checked over attract races;
-- `--native_renderer_check_index_cache`, temporary (remove when the mirror
-  work is done);
+- `--native_renderer_check_index_cache`, temporary (removed after the
+  mirror work, see below);
 - `profile_render_thread.sh` takes extra game flags in `ITC_ARGS`.
 
 What the mirror still costs a frame on that branch, thousand cycles:

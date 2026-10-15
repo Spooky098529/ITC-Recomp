@@ -63,9 +63,6 @@ REXCVAR_DEFINE_BOOL(native_renderer_log_register_reads, false, "ITC",
 REXCVAR_DEFINE_BOOL(native_renderer_cache_index_ranges, true, "ITC",
                     "Keep each draw's lowest and highest index until memcpy writes its index "
                     "range, instead of scanning the indices every draw");
-REXCVAR_DEFINE_BOOL(native_renderer_check_index_cache, false, "ITC",
-                    "Scan every draw's indices anyway and log where the index range cache's "
-                    "result differs (a debugging aid)");
 REXCVAR_DEFINE_BOOL(native_renderer_log_index_ranges, false, "ITC",
                     "Log how often draws' index ranges are scanned again unchanged since memcpy "
                     "last wrote them, and how the guest memory mirror's checks go");
@@ -626,7 +623,6 @@ VkCommandBuffer Renderer::BeginFrame() {
     passes_.set_log_register_reads(REXCVAR_GET(native_renderer_log_register_reads));
     passes_.set_log_index_ranges(REXCVAR_GET(native_renderer_log_index_ranges));
     passes_.set_cache_index_ranges(REXCVAR_GET(native_renderer_cache_index_ranges));
-    passes_.set_check_index_cache(REXCVAR_GET(native_renderer_check_index_cache));
     passes_.set_verify_mirror(REXCVAR_GET(native_renderer_verify_mirror));
     passes_.set_check_late_writes(REXCVAR_GET(native_renderer_check_late_writes));
     passes_.set_check_clobbers(REXCVAR_GET(native_renderer_check_clobbers));
@@ -1036,9 +1032,6 @@ void Renderer::LogStats() {
   }
   if (REXCVAR_GET(native_renderer_check_mirror)) {
     REXLOG_INFO("native renderer: between frames, {}", passes_.TakeMirrorChanges());
-  }
-  if (REXCVAR_GET(native_renderer_check_index_cache)) {
-    REXLOG_INFO("native renderer: {}", passes_.TakeIndexCacheCheck());
   }
   if (REXCVAR_GET(native_renderer_log_index_ranges)) {
     REXLOG_INFO("native renderer: {}", passes_.TakeIndexRanges());
