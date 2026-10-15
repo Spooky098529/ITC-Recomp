@@ -11,7 +11,8 @@ how frame interpolation works, every diagnostic option, and what didn't
 work. `docs/gpu-functions.md` covers how the game drives the GPU (the
 render command replay and the graphics library), and
 `docs/native-renderer.md` is the plan and progress of the native renderer
-that's to replace the emulated GPU. `docs/native-audio.md` is the same for
+that replaced the emulated GPU, and (its last section) the investigation
+of the render thread's performance. `docs/native-audio.md` is the same for
 the SDK's audio (the Audio Worker's spin, the game's sounds, the plan).
 Read the relevant section before changing anything, and keep it up to
 date as you learn things.
@@ -120,7 +121,7 @@ or shipped. Uncapped attract race: ~330 fps mean against the emulated GPU's
 155 (~320 before `replay-allocations`: interpolation's constant replay
 no longer allocates per upload, finds products in a flat table and
 blends lighting vectorized, see "Profile of 2026-10-15, after v0.3.7" in
-`docs/first-person-performance.md`; 258 before `redundant-state`: draws no longer record state calls that
+`docs/native-renderer.md`; 258 before `redundant-state`: draws no longer record state calls that
 repeat the previous draw's, and the constant replay's diagnostics run only
 with their flags; see "Performance: repeated state calls" in
 `docs/native-renderer.md`; ~285 before `descriptor-reuse`: constant blocks
@@ -129,8 +130,8 @@ guest memory run by run with a vectorized byte swap, see "Performance:
 reading constants from guest memory"). Since then (`blend-math`, `read-registers`): blends planned once a tick,
 cameras blended once a frame, guest words byte-swapped with `pshufb`, and
 the register shadow read only where the library's dirty masks say
-(`docs/first-person-performance.md`: "Done on `blend-math`", "Register
-reads", "Against v0.3.7"). Translated shaders and pipelines are kept on disk (`cache/` next to
+("Performance: the render thread" in `docs/native-renderer.md`: "Done on
+`blend-math`", "Register reads", "Against v0.3.7"). Translated shaders and pipelines are kept on disk (`cache/` next to
 the executable), and textures are reloaded when the game's memcpy writes
 them instead of being hashed (`docs/texture-handling-optimisation.md`);
 merged from `perf-debug` for Steam Deck hitches. Its known issues (boot movie, gamma, textures, window resizing,
@@ -160,6 +161,7 @@ Not done yet:
   a draw helps there. Since v0.3.7, `blend-math` and `read-registers` cut
   ~12% of the render thread's cycles a draw (by profile, attract race;
   not yet checked on the Deck). Where the render thread's time goes, what's
-  done and what's next: `docs/first-person-performance.md`.
+  done and what's next: "Performance: the render thread" in
+  `docs/native-renderer.md`.
 - Recheck whether the player's beam on the road still jumps in sharp turns
   (Known issues); if it's gone, drop it from the next release's limits.

@@ -189,7 +189,7 @@ at bit lo+n-1-k:
 | | 49-54 | `sub_822ADEF0` (other registers) |
 
 The native renderer reads only the marked units (see "Register reads" in
-`docs/first-person-performance.md`).
+"Performance: the render thread" in `docs/native-renderer.md`).
 
 So the device holds every register and constant a draw needs, in guest
 memory: a native renderer can read the GPU's state at each draw straight
