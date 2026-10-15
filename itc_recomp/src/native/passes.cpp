@@ -1076,6 +1076,9 @@ void Passes::State::Mirror(uint8_t* base, uint32_t address, uint32_t size, bool 
   if (Buffers_Logging()) {
     Buffers_OnMirror(address, size, index);
   }
+  if (Buffers_LogPhysicalWrites()) {
+    Buffers_OnDrawnRange(address, size, index);
+  }
   if (check_late_writes) {
     // Hashed again at the end of the frame.
     copied_ranges.push_back({address, size, XXH3_64bits(PhysicalHostAddress(base, address), size),
@@ -2321,6 +2324,9 @@ void Passes::BeginFrame(uint32_t frame_index) {
   s.mirrored.clear();
   s.used_mirrored.clear();
   s.mirror_frames++;
+  if (Buffers_LogPhysicalWrites()) {
+    Buffers_OnFrameStart([&s](uint32_t start, uint32_t end) { return s.textures.Holds(start, end); });
+  }
   if (s.log_index_ranges) {
     // Writes taken since the last frame's start (memcpy's, into the
     // physical views).
@@ -3878,6 +3884,9 @@ VkExtent2D Passes::EndFrame(VkCommandBuffer commands, int32_t show_resolve, bool
                             const std::string& dump_prefix, bool dump_resolves) {
   State& s = *state_;
   s.EndRendering(commands);
+  if (Buffers_LogPhysicalWrites()) {
+    Buffers_OnFrameEnd();
+  }
   s.last_frame_resolves = s.frame_resolves.size();
   if (s.check_late_writes && s.last_base) {
     uint8_t* base = s.last_base;

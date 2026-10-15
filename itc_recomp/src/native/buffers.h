@@ -4,6 +4,7 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <utility>
 #include <vector>
 
@@ -37,5 +38,14 @@ void Buffers_TakeNewWrites(std::vector<std::pair<uint32_t, uint32_t>>& out);
 // Render thread, with logging: a vertex or index range (physical) copied
 // into the mirror, the first time in a frame.
 void Buffers_OnMirror(uint32_t physical, uint32_t size, bool index);
+
+// --native_renderer_log_physical_writes (see buffers.cpp).
+bool Buffers_LogPhysicalWrites();
+// Render thread: a frame's recording starts (is_texture: whether a physical
+// range overlaps a texture the cache holds) and ends; and each vertex or
+// index range it draws, the first time in the frame.
+void Buffers_OnFrameStart(const std::function<bool(uint32_t, uint32_t)>& is_texture);
+void Buffers_OnFrameEnd();
+void Buffers_OnDrawnRange(uint32_t physical, uint32_t size, bool index);
 
 }  // namespace native

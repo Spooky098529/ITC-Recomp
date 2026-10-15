@@ -844,6 +844,17 @@ void TextureCache::State::MarkWritten() {
   }
 }
 
+bool TextureCache::Holds(uint32_t start, uint32_t end) const {
+  const State& s = *state_;
+  auto it = s.by_address.lower_bound(start > s.longest_range ? start - s.longest_range : 0);
+  for (; it != s.by_address.end() && it->first < end; ++it) {
+    if (it->first + it->second.first > start) {
+      return true;
+    }
+  }
+  return false;
+}
+
 VkImageView TextureCache::GetView(uint8_t* base, const uint32_t fetch_words[6],
                                   VkImageViewType view_type) {
   State& s = *state_;

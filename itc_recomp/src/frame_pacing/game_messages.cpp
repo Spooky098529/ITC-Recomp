@@ -9,11 +9,13 @@
 #include <rex/logging.h>
 
 #include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <cstring>
 #include <vector>
 #include <string>
 #include <map>
+#include <thread>
 
 REXCVAR_DEFINE_BOOL(log_game_messages, false, "ITC",
                     "Log game messages delivered and skipped, once a second");
@@ -263,6 +265,9 @@ void GameMessages_OnPassFinished() {
 }
 
 uint64_t g_passes[2] = {0, 0};  // logic, render-only
+// For other threads: the pass number << 1 | render-only, and the main thread.
+std::atomic<uint64_t> g_pass_snapshot{0};
+std::atomic<std::thread::id> g_main_thread{};
 
 uint64_t GameMessages_PassNumber() {
   return g_passes[0] + g_passes[1];
@@ -276,6 +281,15 @@ void GameMessages_PassCounts(uint64_t& logic, uint64_t& render_only) {
 void GameMessages_SetRenderOnlyPass(bool render_only) {
   g_passes[render_only ? 1 : 0]++;
   g_render_only_pass = render_only;
+  g_pass_snapshot.store((GameMessages_PassNumber() << 1) | render_only, std::memory_order_relaxed);
+  g_main_thread.store(std::this_thread::get_id(), std::memory_order_relaxed);
+}
+
+void GameMessages_PassFromAnyThread(uint64_t& number, bool& render_only, bool& main_thread) {
+  uint64_t snapshot = g_pass_snapshot.load(std::memory_order_relaxed);
+  number = snapshot >> 1;
+  render_only = snapshot & 1;
+  main_thread = g_main_thread.load(std::memory_order_relaxed) == std::this_thread::get_id();
 }
 
 bool GameMessages_InRace() {
