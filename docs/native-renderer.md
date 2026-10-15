@@ -840,6 +840,11 @@ memory).
   their usual speed.
 - `--native_renderer_skip_pixel_shader=<hash>`: leave out the draws of one
   pixel shader (hex).
+- `--native_renderer_log_glow`: once a second, by logic and render-only
+  frames: the glow history's cross-fades (pixel shader
+  `E0D070FB58A4EA03`), the texture they read, the 256x144 resolves without
+  a clear and which of them write that texture back (see the bloom under
+  Known issues).
 - `--native_renderer_watch_draws`: log what changes in the main view's
   draws' inputs between frames (with the camera still, only flickering
   draws should change). Ignores float changes under 0.1% and compares only
@@ -1012,11 +1017,38 @@ texture objects ("Resources"). The approach:
 To be fixed (or accepted) in milestone 7.
 
 - **The bloom isn't interpolated: visible ghosting** (seen by the user,
-  2026-10-14, with frame interpolation). Not investigated. The bloom is
-  the glow chain whose combine is pixel shader `9750599DF5ED3B39` (see
-  `--glow` in `functions.md`); what it reads that stays at the tick (a
-  previous frame's image, constants not blended) isn't known yet. The
-  user suspects it reads the 30 Hz tick, as the motion blur does (below).
+  2026-10-14, with frame interpolation). Being worked on in branch
+  `glow-interpolation-fix`. The bloom is the glow chain whose combine is
+  pixel shader `9750599DF5ED3B39` (see `--glow` in `functions.md`). What
+  the logs show (2026-10-15, attract races):
+  - **The glow keeps a history, written back at tick rate.** In the
+    256x144 target, two draws shrink the HDR copy, then the cross-fade
+    (pixel shader `E0D070FB58A4EA03`, blendcontrol `00010706`: colour =
+    src x src alpha + dst x (1 - src alpha)) blends in the history texture
+    (`1B0E3000` in these races), and then the blur steps and the combine
+    run. `--native_renderer_log_glow`: every frame cross-fades with the
+    history, but only logic frames resolve into it (30 a second; 4
+    non-clearing 256x144 resolves on a logic frame, 3 on a render-only
+    one).
+  - Why: the post-processing objects' draw (`sub_821379D8`, recorded for
+    each object by `sub_82133960` from the race draw step) records the
+    history resolve (`sub_82133F58` into `*(+8408)`) only when `+48` is
+    set and `+44` isn't, and `sub_82133960` clears `+48` after each draw
+    (and toggles `+8060`). `+48` and `+44` are written by `sub_821351F0`
+    (not yet checked: presumably once a tick, which render-only passes
+    don't run).
+  - So between ticks every frame blends in the history as the last logic
+    frame left it, while the scene moves smoothly: the glow's trail
+    likely moves in 30 Hz steps (the ghosting, not yet confirmed).
+  - **The glow's strength steps at 30 Hz too**: `--log_stepping_constants`
+    lists pixel c33 recorded by `82133D28` (`sub_82133D00`, from
+    `sub_821379D8`, twice a frame) changing ~30 times a second. c33 is
+    {`+8440` (0.7) or `+8436` (~0.8-0.86, every tick), `+8452` (the glow
+    strength, ~2.7-3.2), `+8456` (0.75), `+8476` (0)} of the object;
+    `+8452` is written by `sub_82136F18`. Nothing else stepping looks like
+    the glow's (the rest are the known c14, c70, c74 and c100).
+  - Not known yet: where the cross-fade's alpha comes from (a constant,
+    perhaps c33.x, or the history's alpha) and its value.
 - **Motion blur reads the 30 Hz tick.** The game's velocity-based motion
   blur (pixel shader `7EB16456AAD56CBA`) gets its velocities from the
   tick, so at interpolated frame rates each frame smears a whole tick of

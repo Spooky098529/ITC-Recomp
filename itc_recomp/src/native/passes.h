@@ -79,6 +79,9 @@ class Passes {
   // For set_skip_pixel_shader: skip the draws without a pixel shader.
   static constexpr uint64_t kSkipNoPixelShader = 1;
   void set_record_draws(bool record);
+  // A diagnostic: log the glow history's cross-fades and write-backs once a
+  // second, by logic and render-only frames.
+  void set_log_glow(bool log);
   std::vector<uint64_t> main_view_pixel_shaders() const;
   // A debugging aid: hash each vertex and index range every frame, keeping
   // how often each changes between frames; TakeMirrorChanges describes the
