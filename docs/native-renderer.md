@@ -2479,9 +2479,11 @@ alone (no SDK patch). A shader that does use them shows in the
 "analyzed" lines.
 
 **Done: the scale** (2026-10-16). `--width`/`--height` set the window
-(one alone keeps 16:9; neither, 1280x720) and `--resolution_scale` the
-drawing scale (0, the default: the largest that fits the window, so
-1920x1080 draws at 1.5x). `Passes` keeps each target's guest extent and
+in pixels (one alone keeps 16:9; neither, 1280x720), and the drawing
+scale is the largest that fits the window's pixels (the swapchain's size
+at start), so 1920x1080 draws at 1.5x. (A `--resolution_scale` flag was
+dropped as redundant, the user's call: fullscreen with `--width`/`--height`
+already draws at a resolution other than the screen's.) `Passes` keeps each target's guest extent and
 draws into an image of it times the scale; viewports are scaled, scissors
 and resolve rectangles scaled with each edge rounded the same way in
 source and destination (so resolves stay one-to-one copies), resolve
@@ -2499,8 +2501,15 @@ SDK's `--fullscreen` (default true, as the SDK's own window; `run.sh` and
 the test command in `CLAUDE.md` pass `--fullscreen=false`, and a bare
 `--fullscreen` or `--no-fullscreen` works): borderless at the desktop's
 resolution. In fullscreen `--width`/`--height` set only the drawing
-resolution; without them the scale fits the screen (`SDL_GetDesktopDisplayMode`
-times its pixel density; this PC's 4K screen reports 3840x2161, so 3x).
+resolution; without them the scale fits the screen.
+**High pixel density**: the first fullscreen run (`itc_789.log`) got a
+2648x1490 swapchain on this PC's 3840x2160 screen at 145% desktop scaling:
+without `SDL_WINDOW_HIGH_PIXEL_DENSITY`, SDL gives the window's size in
+the desktop's units and the compositor stretches it, so a 3x frame was
+shrunk and stretched back. The window now asks for real pixels, and a
+windowed `--width`/`--height` is divided by the pixel density for SDL
+(`itc_790.log`: density 1.45, a 1920x1080 window got a 1920x1080
+swapchain).
 At present the frame is blitted as large as fits, centred, the rest of
 the swapchain image cleared black (`FitOffsets` in `renderer.cpp`). The
 swapchain is made again when SDL reports our window's pixel size changed

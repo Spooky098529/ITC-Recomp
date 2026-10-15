@@ -125,10 +125,6 @@ REXCVAR_DEFINE_INT32(width, 0, "ITC",
 REXCVAR_DEFINE_INT32(height, 0, "ITC",
                      "Window height in pixels (in fullscreen, the drawing height); 0: 720, or "
                      "from width at 16:9");
-REXCVAR_DEFINE_DOUBLE(resolution_scale, 0.0, "ITC",
-                      "Draw this many times the game's own resolution (1280x720 frame, 1024x576 "
-                      "3D view); 0: as large as fits --width and --height, or the screen in "
-                      "fullscreen without them (see \"Resolution\" in docs/native-renderer.md)");
 // The SDK's (it also makes the SDK's own window, hidden in exclusive mode,
 // fullscreen); ours follows it.
 REXCVAR_DECLARE(bool, fullscreen);
@@ -155,16 +151,16 @@ VkExtent2D WindowSize() {
   return {uint32_t(width), uint32_t(height)};
 }
 
-// --resolution_scale, or the largest that fits --width and --height (in
-// fullscreen without them, the screen: `display`, in pixels).
-float ResolutionScale(VkExtent2D display) {
-  if (double scale = REXCVAR_GET(resolution_scale); scale > 0.0) {
-    return float(scale);
-  }
+// How many times the game's own resolution (1280x720 frame, 1024x576 3D
+// view) is drawn (see "Resolution" in docs/native-renderer.md): in
+// fullscreen with --width or --height, the largest that fits them;
+// otherwise the largest that fits the window's pixels (`pixels`, the
+// swapchain's size).
+float ResolutionScale(VkExtent2D pixels) {
   bool sized = REXCVAR_GET(width) > 0 || REXCVAR_GET(height) > 0;
-  VkExtent2D size = REXCVAR_GET(fullscreen) && !sized && display.width && display.height
-                        ? display
-                        : WindowSize();
+  VkExtent2D size = (REXCVAR_GET(fullscreen) && sized) || !pixels.width || !pixels.height
+                        ? WindowSize()
+                        : pixels;
   return std::min(float(size.width) / kDefaultWidth, float(size.height) / kDefaultHeight);
 }
 
@@ -206,6 +202,7 @@ struct WindowSetup {
   bool validation = false;
   SDL_Window* window = nullptr;
   VkExtent2D display{};  // its screen's size in pixels
+  float density = 1.0f;  // pixels per unit of the desktop's
   VkInstance instance = VK_NULL_HANDLE;
   VkSurfaceKHR surface = VK_NULL_HANDLE;
   std::string error;
@@ -221,7 +218,11 @@ void SDLCALL CreateWindowOnMainThread(void* data) {
   };
   VkExtent2D size = WindowSize();
   // Fullscreen: borderless, at the desktop's resolution (no mode change).
+  // High pixel density: real pixels under the desktop's scaling, not a
+  // smaller surface the compositor stretches (2648x1490 for a 3840x2160
+  // screen at 145%).
   SDL_WindowFlags flags = SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE |
+                          SDL_WINDOW_HIGH_PIXEL_DENSITY |
                           (REXCVAR_GET(fullscreen) ? SDL_WINDOW_FULLSCREEN : 0);
   setup->window =
       SDL_CreateWindow("ITC native renderer", int(size.width), int(size.height), flags);
@@ -233,6 +234,15 @@ void SDLCALL CreateWindowOnMainThread(void* data) {
     setup->display = {uint32_t(std::lround(mode->w * mode->pixel_density)),
                       uint32_t(std::lround(mode->h * mode->pixel_density))};
   }
+  // The window's size is given in pixels: in the desktop's (scaled) units,
+  // it's that over the pixel density.
+  if (float density = SDL_GetWindowPixelDensity(setup->window);
+      density > 0.0f && density != 1.0f && !REXCVAR_GET(fullscreen)) {
+    SDL_SetWindowSize(setup->window, int(std::lround(size.width / density)),
+                      int(std::lround(size.height / density)));
+    SDL_SyncWindow(setup->window);
+  }
+  setup->density = SDL_GetWindowPixelDensity(setup->window);
   g_window_id = SDL_GetWindowID(setup->window);
   SDL_AddEventWatch(WatchWindowEvents, nullptr);
   AppWindow_AdoptOurWindow(setup->window);
@@ -393,9 +403,10 @@ bool Renderer::CreateWindowAndInstance() {
   }
   window_ = setup->window;
   display_ = setup->display;
-  REXLOG_INFO("native renderer: window {}x{}{}, screen {}x{}", WindowSize().width,
-              WindowSize().height, REXCVAR_GET(fullscreen) ? " (fullscreen)" : "", display_.width,
-              display_.height);
+  REXLOG_INFO("native renderer: window {}x{}{}, screen {}x{}, pixel density {}",
+              WindowSize().width, WindowSize().height,
+              REXCVAR_GET(fullscreen) ? " (fullscreen)" : "", display_.width, display_.height,
+              setup->density);
   instance_ = setup->instance;
   surface_ = setup->surface;
   return true;
@@ -628,7 +639,7 @@ void Renderer::DestroySwapchain() {
 
 bool Renderer::Init(uint8_t* base) {
   if (!CreateWindowAndInstance() || !CreateDevice() || !CreateSwapchain() ||
-      !passes_.Init(context_, base, kFramesInFlight, ResolutionScale(display_))) {
+      !passes_.Init(context_, base, kFramesInFlight, ResolutionScale(swapchain_extent_))) {
     return false;
   }
   passes_.set_mirror_by_tick(REXCVAR_GET(native_renderer_mirror_by_tick));
