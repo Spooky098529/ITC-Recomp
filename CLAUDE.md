@@ -43,7 +43,9 @@ find /dev/shm -maxdepth 1 -user "$USER" -name 'xenia_memory_*' -delete
   header ... was built" (clang was updated), delete the stale headers:
   `find itc_recomp/out/build/linux-amd64-release -name 'cmake_pch*.pch' -delete`.
 - Compare frame rates uncapped (`--max_fps=0`), alternating runs: this PC
-  holds the 144 cap, which hides differences. A run pinned to one CPU
+  holds the 144 cap, which hides differences. An attract race under
+  `timeout 20` is enough: the race starts ~2 s after launch (the first
+  `fps` line with `ticks/s 30`); take the mean over its seconds 3-18. A run pinned to one CPU
   (`taskset -c 0`) stands in for the Steam Deck but varies by ~15% from run
   to run.
 - The release preset builds with ThinLTO (`ITC_LTO`, game and SDK), which
