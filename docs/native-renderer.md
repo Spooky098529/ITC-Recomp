@@ -1194,6 +1194,15 @@ To be fixed (or accepted) in milestone 7.
   runs: 257 and 260 fps mean without, 275 and 276 with (10th percentile
   205/204 to 218/224). Pinned to one CPU: 51, 51, 59 without and 53, 62,
   62 with; noisy, so a small gain there at best.
+- **Performance: diagnostics on every constant replay** (fixed
+  2026-10-15). `BlendState_ReplayConstants` ran, for each vertex constant
+  upload of 4+ registers (~1,500 a frame) and with logging off: a clock
+  read, a matrix load and a status string (allocated) for a
+  `--log_replayed_constants` line, and `SlotOwner`, a mutex and a map
+  lookup in a table filled only with `--log_slot_callers`, for
+  `--log_upload_owners`. Both now run only with their flag. Uncapped
+  attract race, alternating: 276 and 275 fps mean before, 284 and 279
+  after.
 - **Performance, to do: our renderer's own code** (milestone 7, the
   user's call, 2026-10-14). After milestone 6's speed work our renderer is
   ~78% of the render thread, the replay handlers ~11%, the library ~9%.
