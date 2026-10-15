@@ -230,6 +230,26 @@ struct ProductInputs {
 // Main thread: the per-object recorder's caller context while it runs.
 std::array<uint32_t, 9> g_record_context{};
 
+// How a paired product blends, worked out once a tick from its two ticks'
+// inputs: the decompositions and camera splits don't depend on the frame's
+// amount, so the render thread only blends and multiplies.
+struct ProductPlan {
+  enum class World : uint8_t { kNone, kBlend, kSpinning };
+  World world = World::kNone;
+  bool world_differs = false;    // the ticks' world matrices differ (for the stats)
+  bool camera_rejected = false;  // perspective cameras that can't be one camera
+  int32_t camera = -1;           // into TickPlans::cameras, if the camera blends
+  ScaledTransform wa, wb;        // the world matrices, for kBlend and kSpinning
+};
+// A perspective camera in both ticks, shared by the products using it.
+struct CameraPair {
+  PerspectiveCamera a, b;
+};
+struct TickPlans {
+  std::vector<ProductPlan> products;
+  std::vector<CameraPair> cameras;
+};
+
 // A multiply made during a logic pass, as the render thread redoes it.
 struct ReplayedProduct {
   uint64_t identity = 0;  // the same multiply in every tick (its pairing key)
@@ -237,6 +257,7 @@ struct ReplayedProduct {
   Matrix4 written;  // the product, as written to the output address
   ProductInputs now;
   std::optional<ProductInputs> before;  // the previous tick's, if paired
+  int32_t plan = -1;  // into the frame's TickPlans::products, if paired
 };
 
 // The products of a frame by output address: an open-addressed table, so the
@@ -302,6 +323,7 @@ class ProductTable {
 // published by the main thread after each Draw.
 struct ReplayFrame {
   ProductTable products;  // by output address
+  std::shared_ptr<const TickPlans> plans;  // the tick's, shared by its frames
   float amount = 1;
   uint64_t tick = 0;  // which tick the frame draws
 };
@@ -319,9 +341,6 @@ constexpr uint32_t kRecorderMultiplyReturn = 0x82595438;
 // The Update handler that records the race overlays (see per_frame_logic.cpp).
 constexpr uint32_t kRaceOverlaysHandler = 0x8215E150;
 
-// Blends a multiply's result between ticks: the world matrix and the camera
-// each as a rigid motion (positions straight, rotations along the shortest
-// arc), falling back to the current tick's where they aren't.
 // Whether two perspective cameras from consecutive ticks can be the same
 // camera: placement within a cut, and nearly the same projection (field of
 // view changes slowly, aspect and depth range don't). Stack copies of
@@ -376,49 +395,100 @@ struct ProductBlendParts {
   const ReplayedProduct* product = nullptr;
 };
 
-[[gnu::noinline]] Matrix4 BlendProduct(const ReplayedProduct& product, float amount, BlendStats& stats,
-                     ProductBlendParts* parts = nullptr) {
+// Once a tick (main thread): how the product with these inputs blends.
+// `cameras` holds the tick's camera pairs seen so far by their two
+// view-projections' bits: an index into plans.cameras, or -1 for a pair
+// that doesn't blend.
+using CameraPairKey = std::array<uint32_t, 32>;
+struct CameraPairKeyHash {
+  size_t operator()(const CameraPairKey& key) const {
+    uint64_t h = 0;
+    for (uint32_t v : key) {
+      h = (h ^ v) * 0x9E3779B97F4A7C15ull;
+    }
+    return size_t(h ^ (h >> 29));
+  }
+};
+ProductPlan PlanProduct(const ProductInputs& a, const ProductInputs& b, TickPlans& plans,
+                        std::unordered_map<CameraPairKey, int32_t, CameraPairKeyHash>& cameras) {
+  ProductPlan plan;
+  std::optional<ScaledTransform> wa = ScaledTransformFromWorldMatrix(a.world);
+  std::optional<ScaledTransform> wb = ScaledTransformFromWorldMatrix(b.world);
+  if (wa && wb) {
+    plan.wa = *wa;
+    plan.wb = *wb;
+    if (!IsCut(wa->transform, wb->transform)) {
+      plan.world = ProductPlan::World::kBlend;
+    } else if (Distance(wa->transform.position, wb->transform.position) <= kCutDistance &&
+               BlendSpinning(*wa, *wb, 0, kCutAngle)) {
+      // A wheel: too much spin to blend, but its position and steering can
+      // be. (Whether BlendSpinning blends doesn't depend on the amount.)
+      plan.world = ProductPlan::World::kSpinning;
+    }
+  }
+  plan.world_differs = a.world != b.world;
+  if (a.view_projection != b.view_projection) {
+    CameraPairKey key;
+    std::memcpy(key.data(), a.view_projection.data(), sizeof(Matrix4));
+    std::memcpy(key.data() + 16, b.view_projection.data(), sizeof(Matrix4));
+    auto [it, added] = cameras.try_emplace(key, -1);
+    if (added) {
+      std::optional<PerspectiveCamera> ca = SplitViewProjection(a.view_projection);
+      std::optional<PerspectiveCamera> cb = SplitViewProjection(b.view_projection);
+      if (ca && cb) {
+        if (IsSameCamera(*ca, *cb)) {
+          it->second = int32_t(plans.cameras.size());
+          plans.cameras.push_back({*ca, *cb});
+        } else {
+          it->second = -2;
+        }
+      }
+    }
+    plan.camera = std::max(it->second, int32_t(-1));
+    plan.camera_rejected = it->second == -2;
+  }
+  return plan;
+}
+
+// Blends a multiply's result between ticks, as planned for its tick: the
+// world matrix and the camera each as a rigid motion (positions straight,
+// rotations along the shortest arc), falling back to the current tick's
+// where they aren't.
+[[gnu::noinline]] Matrix4 BlendProduct(const ReplayedProduct& product, const TickPlans* plans,
+                                       float amount, BlendStats& stats,
+                                       ProductBlendParts* parts = nullptr) {
   if (parts) {
     *parts = {product.now.world, product.now.world, std::nullopt, std::nullopt, &product};
   }
-  if (!product.before) {
+  if (product.plan < 0) {
     stats.unpaired++;
     return product.written;
   }
   stats.blended++;
-  const ProductInputs& a = *product.before;
+  const ProductPlan& plan = plans->products[size_t(product.plan)];
   const ProductInputs& b = product.now;
   Matrix4 world = b.world;
-  std::optional<ScaledTransform> wa = ScaledTransformFromWorldMatrix(a.world);
-  std::optional<ScaledTransform> wb = ScaledTransformFromWorldMatrix(b.world);
-  if (wa && wb && !IsCut(wa->transform, wb->transform)) {
-    world = WorldMatrixFromScaledTransform(Blend(*wa, *wb, amount));
-  } else if (std::optional<ScaledTransform> spinning;
-             wa && wb && Distance(wa->transform.position, wb->transform.position) <= kCutDistance &&
-             (spinning = BlendSpinning(*wa, *wb, amount, kCutAngle))) {
-    // A wheel: too much spin to blend, but its position and steering can be.
+  std::optional<ScaledTransform> spinning;
+  if (plan.world == ProductPlan::World::kBlend) {
+    world = WorldMatrixFromScaledTransform(Blend(plan.wa, plan.wb, amount));
+  } else if (plan.world == ProductPlan::World::kSpinning &&
+             (spinning = BlendSpinning(plan.wa, plan.wb, amount, kCutAngle))) {
     world = WorldMatrixFromScaledTransform(*spinning);
     stats.spinning++;
-  } else if (a.world != b.world) {
+  } else if (plan.world_differs) {
     stats.world_not_blended++;
   }
   Matrix4 view_projection = b.view_projection;
-  std::optional<PerspectiveCamera> ca, cb;
-  if (a.view_projection != b.view_projection) {
-    ca = SplitViewProjection(a.view_projection);
-    cb = SplitViewProjection(b.view_projection);
-  }
-  if (ca && cb) {
+  if (plan.camera_rejected) {
+    stats.camera_not_blended++;
+  } else if (plan.camera >= 0) {
     // A perspective camera: blend its placement and projection separately.
-    if (!IsSameCamera(*ca, *cb)) {
-      stats.camera_not_blended++;
-    } else {
-      PerspectiveCamera blended = Blend(*ca, *cb, amount);
-      view_projection = ViewProjectionFromCamera(blended);
-      if (parts) {
-        parts->eye_now = cb->camera.position;
-        parts->eye = blended.camera.position;
-      }
+    const CameraPair& camera = plans->cameras[size_t(plan.camera)];
+    PerspectiveCamera blended = Blend(camera.a, camera.b, amount);
+    view_projection = ViewProjectionFromCamera(blended);
+    if (parts) {
+      parts->eye_now = camera.b.camera.position;
+      parts->eye = blended.camera.position;
     }
   }
   if (parts) {
@@ -730,6 +800,7 @@ class DrawState {
       current_tick_ = std::move(collecting_);
       collecting_.clear();
       MatchTick();
+      PlanTick();
       overlay_keys_ = std::move(overlay_keys_this_tick_);
       overlay_keys_this_tick_.clear();
     }
@@ -934,6 +1005,7 @@ class DrawState {
     auto frame = std::make_shared<ReplayFrame>();
     frame->amount = REXCVAR_GET(interpolate_draw_state) ? amount_ : 1.0f;
     frame->tick = ticks_;
+    frame->plans = plans_;
     frame->products.Reserve(tick_outputs_.size() + pass_outputs_.size());
     for (const auto* outputs : {&tick_outputs_, &pass_outputs_}) {
       for (const auto& [out, output] : *outputs) {
@@ -945,10 +1017,15 @@ class DrawState {
         auto before = paired != paired_.end() ? previous_tick_.find(paired->second)
                                               : previous_tick_.end();
         auto identity = identities_.find(output.key);
+        int32_t plan = -1;
+        if (before != previous_tick_.end()) {
+          plan = plan_of_.find(output.key)->second;
+        }
         frame->products.Set(
             out, {identity != identities_.end() ? identity->second : ProductKeyHash()(output.key),
                   output.key.handler, output.written, now->second,
-                  before != previous_tick_.end() ? std::optional(before->second) : std::nullopt});
+                  before != previous_tick_.end() ? std::optional(before->second) : std::nullopt,
+                  plan});
       }
     }
     counts_.products_published += int(frame->products.size());
@@ -1061,6 +1138,28 @@ class DrawState {
   std::unordered_map<ProductKey, ProductKey, ProductKeyHash> paired_;
   std::unordered_map<ProductKey, uint64_t, ProductKeyHash> identities_;
   uint64_t next_identity_ = 1;
+  // How each paired product of the tick blends (see PlanProduct).
+  std::shared_ptr<const TickPlans> plans_;
+  std::unordered_map<ProductKey, int32_t, ProductKeyHash> plan_of_;  // into plans_->products
+  std::unordered_map<CameraPairKey, int32_t, CameraPairKeyHash> camera_pairs_;
+
+  // Once a tick, after MatchTick: plans the blend of each paired product.
+  void PlanTick() {
+    auto plans = std::make_shared<TickPlans>();
+    plans->products.reserve(paired_.size());
+    plan_of_.clear();
+    camera_pairs_.clear();
+    for (const auto& [key, before_key] : paired_) {
+      auto now = current_tick_.find(key);
+      auto before = previous_tick_.find(before_key);
+      if (now == current_tick_.end() || before == previous_tick_.end()) {
+        continue;
+      }
+      plan_of_[key] = int32_t(plans->products.size());
+      plans->products.push_back(PlanProduct(before->second, now->second, *plans, camera_pairs_));
+    }
+    plans_ = std::move(plans);
+  }
 
   // Once a tick: pairs this tick's products with the previous tick's.
   // Products are numbered by order among those with the same operands, and
@@ -1598,7 +1697,8 @@ class ReplayCameras {
       overlay_payloads_.insert(payload);
     }
     BlendStats before = stats_.blend;
-    Matrix4 result = BlendProduct(*product, frame_->amount, stats_.blend, &last_parts_);
+    Matrix4 result =
+        BlendProduct(*product, frame_->plans.get(), frame_->amount, stats_.blend, &last_parts_);
     if (REXCVAR_GET(log_moving_products)) {
       using Outcome = MovingProductsLog::Outcome;
       Outcome outcome = stats_.blend.unpaired != before.unpaired       ? Outcome::kUnpaired
