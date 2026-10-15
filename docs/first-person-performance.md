@@ -347,6 +347,17 @@ branch-record run is skewed, so take shares from a plain run):
    10th percentile 271/281/281 against 289/289/285). Render thread:
    `BlendState_ReplayConstants` 7.1% to 6.0%, libc's `free` ~1.6% to
    ~0.5%.
+   Then, the same day: lighting uploads loaded with `guest::CopyFloats` (a
+   vectorized byte-swapping loop) straight into the entry, without the
+   copy, stopping early when equal to last tick's bit for bit. Checked the
+   same way (also with `--pixel_blend_from_latest=false`): every value
+   the same. **No measurable gain**: `BlendState_ReplayConstants` stayed at
+   6.0%, fps within noise (328.2, 328.2, 320.7 before; 330.4, 330.8, 331.6
+   after). So the lighting uploads' loads and copies weren't where the
+   remaining 6% goes; what is isn't known (the camera products'
+   `Substitute`, matrix loads and stores, or the ~20 cvar reads an upload
+   are the candidates): split it with a profile (functions marked
+   `noinline`, or sample offsets within the function) before more work.
 2. **The mirror's per-draw work** (~7%): cache each draw's index range
    (lowest, highest) by index buffer, count and format, dropped on a
    memcpy write as the mirror's copies are; a flat table instead of the
