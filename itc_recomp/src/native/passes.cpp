@@ -562,6 +562,14 @@ struct Passes::State {
   } by_tick;
   // The mirror this frame's draws read.
   GuestMirror& draw_mirror() { return mirrors[mirror_by_tick ? front_mirror : frame]; }
+  // Whether draws work out their vertex and index ranges and pass them to
+  // Mirror: always, except with mirror_by_tick and none of the mirror's
+  // diagnostics (then the mirror needs nothing from draws).
+  bool MirrorPerDraw() const {
+    return !mirror_by_tick || check_mirror || check_mirror_frames || check_late_writes ||
+           check_clobbers || verify_mirror || log_index_ranges || check_index_cache ||
+           Buffers_Logging() || Buffers_LogPhysicalWrites();
+  }
   uint32_t inline_slot_size() const {
     return mirror_by_tick ? kInlineVerticesSize / frames_in_flight : kInlineVerticesSize;
   }
@@ -1128,7 +1136,14 @@ void Passes::State::Mirror(uint8_t* base, uint32_t address, uint32_t size, bool 
     }
   }
   if (mirror_by_tick) {
-    // The mirror has memcpy's writes as of the last logic pass's list.
+    // The mirror has memcpy's writes as of the last logic pass's list (or,
+    // with mirror_to_both, as of this frame's start). With verify_mirror,
+    // the drawn ranges it misses a write of (memcpy being the only writer;
+    // comparing with guest memory slows frames below the tick).
+    if (!verify_mirror) {
+      return;
+    }
+    stats.mirror_checked++;
     uint32_t end = address + size;
     auto it = std::lower_bound(
         front_missing.begin(), front_missing.end(),
@@ -1140,6 +1155,8 @@ void Passes::State::Mirror(uint8_t* base, uint32_t address, uint32_t size, bool 
       bool render_only = !Renderer_ReplayingLogicList();
       by_tick.stale[render_only]++;
       by_tick.stale_bytes[render_only] += size;
+      stats.mirror_stale++;
+      stats.mirror_stale_bytes += size;
       if (by_tick.stale_lines) {
         by_tick.stale_lines--;
         REXLOG_INFO("native renderer: mirror by tick: frame {}, {} list: {} range {:08X} ({} "
@@ -1148,25 +1165,6 @@ void Passes::State::Mirror(uint8_t* base, uint32_t address, uint32_t size, bool 
                     index ? "index" : "vertex", address, size, it->first, it->second);
       }
       break;
-    }
-    if (verify_mirror) {
-      stats.mirror_checked++;
-      if (std::memcmp(draw_mirror().mapped + address, PhysicalHostAddress(base, address), size)) {
-        stats.mirror_stale++;
-        stats.mirror_stale_bytes += size;
-        if (!stats.mirror_stale_sample_size) {
-          stats.mirror_stale_sample_address = address;
-          stats.mirror_stale_sample_size = size;
-          stats.mirror_stale_sample_index = index;
-        }
-        if (by_tick.stale_lines) {
-          by_tick.stale_lines--;
-          REXLOG_INFO("native renderer: mirror by tick: {} range {:08X} ({} bytes) differs from "
-                      "guest memory, frame {} ({} list)",
-                      index ? "index" : "vertex", address, size, by_tick.frames,
-                      Renderer_ReplayingLogicList() ? "a logic pass's" : "a render-only pass's");
-        }
-      }
     }
     return;
   }
@@ -1245,7 +1243,8 @@ void Passes::State::MirrorByTickFrameStart(uint8_t* base) {
   }
   front_missing.clear();
   front_missing_longest = 0;
-  for (auto [start, end] : mirror_pending[front_mirror]) {
+  for (auto [start, end] : verify_mirror ? mirror_pending[front_mirror]
+                                          : std::vector<std::pair<uint32_t, uint32_t>>{}) {
     end = std::min(end, kPhysicalMemorySize);
     if (start < end) {
       front_missing.emplace_back(start, end);
@@ -2441,6 +2440,7 @@ void Passes::BeginFrame(uint32_t frame_index) {
   s.used_mirrored.clear();
   s.mirror_frames++;
   if (s.mirror_by_tick) {
+    Buffers_KeepSegments(s.MirrorPerDraw());
     s.MirrorByTickFrameStart(s.guest_base);
   }
   if (Buffers_LogPhysicalWrites()) {
@@ -2737,7 +2737,8 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
     min_vertex = 0;
     max_vertex = call.vertex_count - 1;
   }
-  if (!call.inline_vertices && index_count) {
+  bool mirror_per_draw = s.MirrorPerDraw();
+  if (!call.inline_vertices && index_count && mirror_per_draw) {
     bool skip_restart = primitive.strip && regs.Get<reg::PA_SU_SC_MODE_CNTL>().multi_prim_ib_ena;
     auto [low, high] = s.DrawIndexRange(base, index_address, index_count, index_32bit,
                                         index_endian, skip_restart);
@@ -3001,14 +3002,14 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
   // draw's vertices are there already). A vertex fetch constant is two
   // words: the address (word 0, low 2 bits the type) and the size in words
   // (word 1, bits 2-25).
-  if (!call.inline_vertices) {
+  if (!call.inline_vertices && mirror_per_draw) {
     s.Mirror(base, index_address, index_count * (index_32bit ? 4 : 2), true,
              s.draw_index_newest);
   }
   // The highest vertex the draw uses (indices as the GPU reads them, after
   // the base vertex): a vertex buffer is copied up to it even past the size
   // its fetch constant gives, as the GPU reads whatever is there.
-  for (uint32_t k = 0; k < 96 && !call.inline_vertices; k++) {
+  for (uint32_t k = 0; k < 96 && !call.inline_vertices && mirror_per_draw; k++) {
     if (!(vertex->vertex_fetch_constants[k >> 5] & (1u << (k & 31)))) {
       continue;
     }

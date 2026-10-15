@@ -40,6 +40,11 @@ void Buffers_TakeNewWrites(std::vector<std::pair<uint32_t, uint32_t>>& out);
 // writes are kept until taken).
 void Buffers_CollectMirrorWrites();
 void Buffers_TakeMirrorWrites(std::vector<std::pair<uint32_t, uint32_t>>& out);
+// Render thread: whether to keep the segments memcpy wrote (for
+// Buffers_NewestWrite and Buffers_CoverageOf; on by default). Off with
+// --native_renderer_mirror_by_tick unless a diagnostic asks of them: writes
+// taken while off are missing from the answers.
+void Buffers_KeepSegments(bool keep);
 
 // Render thread, with logging: a vertex or index range (physical) copied
 // into the mirror, the first time in a frame.

@@ -82,7 +82,8 @@ REXCVAR_DEFINE_BOOL(native_renderer_mirror_to_both, false, "ITC",
 REXCVAR_DEFINE_BOOL(native_renderer_verify_mirror, false, "ITC",
                     "Compare each vertex and index range not copied into the mirror with guest "
                     "memory every frame, logging those that differ (a debugging aid; slow, ~20 "
-                    "fps in a race)");
+                    "fps in a race). With --native_renderer_mirror_by_tick: each drawn range "
+                    "looked up in the writes the mirror hasn't had instead (fast)");
 REXCVAR_DEFINE_BOOL(native_renderer_watch_draws, false, "ITC",
                     "Log what changes in the main view's draws' inputs between frames: with the "
                     "camera still, only flickering draws should (a debugging aid)");

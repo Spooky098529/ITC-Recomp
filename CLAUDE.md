@@ -71,9 +71,9 @@ find /dev/shm -maxdepth 1 -user "$USER" -name 'xenia_memory_*' -delete
 - Launch from the repo root; other directories fail (exit 127).
 - `--skip_intro --attract_after_s=1` starts an attract race (AI cars) about
   1 s after launch with no input, so races can be checked without the user:
-  run under `timeout`, read the log, and take screenshots with
-  `spectacle -b -n -f -o <file>` (see "The title screen" in
-  `docs/functions.md`). Without the GPU plugin, `--skip_intro` sometimes
+  run under `timeout`, read the log, and look at frames with the
+  renderer's dump (`--native_renderer_dump=<dir>`, 10 s into a race or
+  when `<dir>/now` appears). Never screenshot the user's desktop. Without the GPU plugin, `--skip_intro` sometimes
   stalls the boot (no "called from 8248466C" in the log): restart it.
 - Run the game in the background. The user plays: they start a race, drive
   near an opponent and quit, then say what they saw.

@@ -51,6 +51,7 @@
 REXCVAR_DEFINE_BOOL(native_renderer_log_buffers, false, "ITC",
                     "Log the vertex and index buffer objects draws bind, and where their data "
                     "comes from (a debugging aid for the native renderer)");
+REXCVAR_DECLARE(bool, native_renderer_log_texture_writes);
 REXCVAR_DEFINE_BOOL(native_renderer_log_physical_writes, false, "ITC",
                     "Log memcpy's writes into the physical views by thread, pass and caller, and "
                     "whether they land in vertex or index data drawn around them (a debugging aid "
@@ -107,6 +108,8 @@ std::vector<std::pair<uint32_t, uint32_t>> g_new_writes;
 // With Buffers_CollectMirrorWrites: writes taken since
 // Buffers_TakeMirrorWrites last ran.
 bool g_collect_mirror_writes = false;
+// Whether g_writes is kept (Buffers_KeepSegments).
+bool g_keep_segments = true;
 std::vector<std::pair<uint32_t, uint32_t>> g_mirror_writes;
 
 // Any thread (under g_mutex), for the logging: the headers of known buffer
@@ -155,7 +158,11 @@ void TakePending() {
     g_has_pending.store(false, std::memory_order_relaxed);
   }
   for (const PendingWrite& write : g_taken) {
-    RecordWrite(write.start, write.end, write.caller);
+    if (g_keep_segments) {
+      RecordWrite(write.start, write.end, write.caller);
+    } else {
+      g_sequence++;
+    }
     g_new_writes.emplace_back(write.start, write.end);
     if (g_collect_mirror_writes) {
       g_mirror_writes.emplace_back(write.start, write.end);
@@ -537,6 +544,11 @@ void Buffers_TakeNewWrites(std::vector<std::pair<uint32_t, uint32_t>>& out) {
   TakePending();
   out.insert(out.end(), g_new_writes.begin(), g_new_writes.end());
   g_new_writes.clear();
+}
+
+void Buffers_KeepSegments(bool keep) {
+  // The texture cache's write log asks of them too.
+  g_keep_segments = keep || REXCVAR_GET(native_renderer_log_texture_writes);
 }
 
 void Buffers_CollectMirrorWrites() {
