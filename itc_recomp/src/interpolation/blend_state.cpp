@@ -450,12 +450,40 @@ ProductPlan PlanProduct(const ProductInputs& a, const ProductInputs& b, TickPlan
   return plan;
 }
 
+// Render thread: each of the tick's cameras blended once a frame, for the
+// ~1,500 products a frame that share a handful of them.
+class CameraBlends {
+ public:
+  struct Blended {
+    uint64_t frame = 0;  // the frame it was blended for
+    Matrix4 view_projection;
+    Vec3 eye;
+  };
+  void OnFrameStart() { frame_++; }
+  const Blended& Get(const TickPlans& plans, int32_t index, float amount) {
+    if (blended_.size() < plans.cameras.size()) {
+      blended_.resize(plans.cameras.size());
+    }
+    Blended& out = blended_[size_t(index)];
+    if (out.frame != frame_) {
+      const CameraPair& camera = plans.cameras[size_t(index)];
+      PerspectiveCamera blended = Blend(camera.a, camera.b, amount);
+      out = {frame_, ViewProjectionFromCamera(blended), blended.camera.position};
+    }
+    return out;
+  }
+
+ private:
+  uint64_t frame_ = 1;
+  std::vector<Blended> blended_;
+};
+
 // Blends a multiply's result between ticks, as planned for its tick: the
 // world matrix and the camera each as a rigid motion (positions straight,
 // rotations along the shortest arc), falling back to the current tick's
 // where they aren't.
 [[gnu::noinline]] Matrix4 BlendProduct(const ReplayedProduct& product, const TickPlans* plans,
-                                       float amount, BlendStats& stats,
+                                       float amount, BlendStats& stats, CameraBlends& cameras,
                                        ProductBlendParts* parts = nullptr) {
   if (parts) {
     *parts = {product.now.world, product.now.world, std::nullopt, std::nullopt, &product};
@@ -483,12 +511,11 @@ ProductPlan PlanProduct(const ProductInputs& a, const ProductInputs& b, TickPlan
     stats.camera_not_blended++;
   } else if (plan.camera >= 0) {
     // A perspective camera: blend its placement and projection separately.
-    const CameraPair& camera = plans->cameras[size_t(plan.camera)];
-    PerspectiveCamera blended = Blend(camera.a, camera.b, amount);
-    view_projection = ViewProjectionFromCamera(blended);
+    const CameraBlends::Blended& blended = cameras.Get(*plans, plan.camera, amount);
+    view_projection = blended.view_projection;
     if (parts) {
-      parts->eye_now = camera.b.camera.position;
-      parts->eye = blended.camera.position;
+      parts->eye_now = plans->cameras[size_t(plan.camera)].b.camera.position;
+      parts->eye = blended.eye;
     }
   }
   if (parts) {
@@ -1579,6 +1606,7 @@ class ReplayCameras {
       }
     }
     last_identity_ = 0;
+    camera_blends_.OnFrameStart();
     std::lock_guard lock(g_replay_mutex);
     if (frame_ != g_replay_frame) {
       if (frame_) {
@@ -1698,7 +1726,8 @@ class ReplayCameras {
     }
     BlendStats before = stats_.blend;
     Matrix4 result =
-        BlendProduct(*product, frame_->plans.get(), frame_->amount, stats_.blend, &last_parts_);
+        BlendProduct(*product, frame_->plans.get(), frame_->amount, stats_.blend, camera_blends_,
+                     &last_parts_);
     if (REXCVAR_GET(log_moving_products)) {
       using Outcome = MovingProductsLog::Outcome;
       Outcome outcome = stats_.blend.unpaired != before.unpaired       ? Outcome::kUnpaired
@@ -1745,6 +1774,7 @@ class ReplayCameras {
   }
 
   std::shared_ptr<const ReplayFrame> frame_;
+  CameraBlends camera_blends_;
   uint64_t last_identity_ = 0;
   struct {
     int frames = 0;
