@@ -2264,9 +2264,24 @@ alternating, `ITC_ARGS` off and on (`--native_renderer_mirror_by_tick=true
 13.679, 13.622; on 11.649, 11.537, 11.722: **-14.7%** (frames drawn in the
 12 s window 4,445 against 5,113). Gone: `Buffers_NewestWrite` ~245k,
 `Mirror` ~185k, `TakePending` ~90k, `DrawIndexRange` ~70k cycles a frame,
-and the inlined set and map work. Left: `Buffers_OnCommand` ~90k a frame,
-though it returns at once without `--native_renderer_log_buffers` (worth
-a look).
+and the inlined set and map work. Left: `Buffers_OnCommand` ~90k a frame
+(see "To check" below).
+
+**To check: `Buffers_OnCommand`'s cost.** `Buffers_OnCommand`
+(`native/buffers.cpp`) is called from `Renderer_OnCommand`
+(`native/renderer.cpp`) for every replayed command, and without
+`--native_renderer_log_buffers` it returns at once (one cvar read). Yet
+profiles give it 78-105 thousand cycles a frame (~0.7% of the render
+thread; the six profiles above, mode off and on alike), and it was +36
+thousand against v0.3.7 ("Against v0.3.7"). `perf annotate` of it
+(`by_tick_2`) put most of its samples at addresses inside other
+functions' code (`Seen`, `Buffers_OnFrameStart`), so perf's symbol
+attribution in this ThinLTO build (code in `.ltext`) may be wrong, and
+the cycles may belong elsewhere. To find out: profile a build with the
+check moved to the call site (`if (Buffers_Logging())` around the call in
+`Renderer_OnCommand`), or with `-DITC_LTO=OFF`, and see whether the 90k
+goes or moves to another symbol; `perf report --sort sym,srcline` may
+also show where the samples really are.
 
 **A race the user drove (2026-10-15, `itc_769`)**, with both flags and
 `--native_renderer_verify_mirror`, capped at 144: ~3.5 minutes, ~140 s
