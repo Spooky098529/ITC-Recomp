@@ -94,6 +94,8 @@ frame, so every change is found. An 80 s attract race (`itc_663.log`,
   come from `sub_820ED6D0` (`0x820ED910`, `0x820ED920`), and are later
   redrawn by `sub_820ED630` (`0x820ED6B8`), a rectangle copy (a memcpy
   per row): images the game composes on the CPU, also through memcpy.
+  Likely the logo shown on screen in attract races (the user's
+  identification; `18DAD000` was used for ~25 s of the attract race).
   They're among the "partly" ones: memcpy writes their rows, not the
   padding past the last row that the range includes (see below).
 - Five first loads had no memcpy writes at all (a 256x144, a 1024x1024
