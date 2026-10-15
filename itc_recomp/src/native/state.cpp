@@ -2,7 +2,6 @@
 
 #include "guest.h"
 #include <cstring>
-#include <x86intrin.h>
 
 namespace native {
 
@@ -41,38 +40,73 @@ constexpr ShadowBlock kBlocks[kRegisterReadBlocks] = {
     {0x4908, 32, 10016, kRenderState, 1, 1},  // loop constants, vertex then pixel
 };
 constexpr size_t kFetchBlock = 7;
-// Shader state bit 8 has the draw call sub_822ADC08, which writes register
-// 0x2203 (+10432, unit 3 of block 0x2200) itself: the shader load sets it
-// after changing it.
-constexpr uint64_t kShaderStateHiz = 0x100;
-constexpr size_t kHizBlock = 3;
-constexpr uint64_t kHizUnit = 1ull << 3;
 
 constexpr uint64_t LowBits(uint32_t n) {
   return n >= 64 ? ~0ull : (1ull << n) - 1;
 }
 
-// Units not read since the library marked them dirty, by block: bit k is
-// unit k. All at first (regs starts zeroed). Render thread.
+// What each bit of the device's masks has copied: shadow offset, first
+// register, words (0: none of ours).
+struct BitCopy {
+  uint16_t shadow_offset = 0, first_register = 0;
+  uint8_t words = 0;
+};
+struct BitCopies {
+  BitCopy bits[3][64];
+  uint64_t known[3] = {};
+};
+constexpr BitCopies MakeBitCopies() {
+  BitCopies copies;
+  for (const ShadowBlock& block : kBlocks) {
+    if (block.width == 1) {
+      // Bool and loop constants: one bit for both blocks, contiguous.
+      BitCopy& copy = copies.bits[block.mask][block.lo];
+      if (!copy.words) {
+        copy = {uint16_t(block.shadow_offset), uint16_t(block.first_register), 0};
+      }
+      copy.words += uint8_t(block.units);
+      copies.known[block.mask] |= 1ull << block.lo;
+      continue;
+    }
+    for (uint32_t k = 0; k < block.units; k++) {
+      uint32_t bit = block.lo + block.width - 1 - k, word = k * block.words_per_unit;
+      copies.bits[block.mask][bit] = {uint16_t(block.shadow_offset + 4 * word),
+                                      uint16_t(block.first_register + word),
+                                      uint8_t(block.words_per_unit)};
+      copies.known[block.mask] |= 1ull << bit;
+    }
+  }
+  return copies;
+}
+constexpr BitCopies kBitCopies = MakeBitCopies();
+static_assert(kBitCopies.bits[kRenderState][1].words == 40);
+static_assert(kBitCopies.bits[kRenderState][1].shadow_offset == 9984);
+
+// The device's masks taken from draws (MarkDeviceDirty, ORed). Units marked
+// dirty otherwise (by hand, or by the library's flush helpers), by block:
+// bit k is unit k, and which blocks have any. All at first (regs starts
+// zeroed). Render thread.
+uint64_t g_device_dirty[3] = {};
 uint64_t g_pending[kRegisterReadBlocks] = {~0ull, ~0ull, ~0ull, ~0ull, ~0ull,
                                            ~0ull, ~0ull, ~0ull, ~0ull, ~0ull};
+uint32_t g_pending_blocks = (1u << kRegisterReadBlocks) - 1;
+
+// The units of block b dirty (for the counts of --native_renderer_log_register_reads).
+uint64_t PendingUnits(size_t b) {
+  const ShadowBlock& block = kBlocks[b];
+  uint64_t field = (g_device_dirty[block.mask] >> block.lo) & LowBits(block.width);
+  // Field bit width-1-k is unit k.
+  uint64_t units = block.width == 1 ? (field ? ~0ull : 0)
+                                    : __builtin_bitreverse64(field) >> (64 - block.width);
+  return (g_pending[b] | units) & LowBits(block.units);
+}
 
 }  // namespace
 
 void MarkDeviceDirty(uint64_t shader_state, uint64_t render_state, uint64_t other_state) {
-  const uint64_t masks[3] = {shader_state, render_state, other_state};
-  for (size_t b = 0; b < kRegisterReadBlocks; b++) {
-    const ShadowBlock& block = kBlocks[b];
-    uint64_t field = (masks[block.mask] >> block.lo) & LowBits(block.width);
-    if (field) {
-      // Field bit width-1-k is unit k.
-      g_pending[b] |= block.width == 1 ? ~0ull
-                                       : __builtin_bitreverse64(field) >> (64 - block.width);
-    }
-  }
-  if (shader_state & kShaderStateHiz) {
-    g_pending[kHizBlock] |= kHizUnit;
-  }
+  g_device_dirty[kShaderState] |= shader_state;
+  g_device_dirty[kRenderState] |= render_state;
+  g_device_dirty[kOtherState] |= other_state;
 }
 
 void MarkRegistersDirty(uint32_t first_register, uint64_t mask) {
@@ -83,40 +117,55 @@ void MarkRegistersDirty(uint32_t first_register, uint64_t mask) {
     if (b == kFetchBlock) {
       continue;
     }
+    uint64_t units = 0;
     if (block.first_register >= first_register) {
       if (uint32_t shift = block.first_register - first_register; shift < 64) {
-        g_pending[b] |= registers >> shift;
+        units = registers >> shift;
       }
     } else if (uint32_t shift = first_register - block.first_register; shift < 64) {
-      g_pending[b] |= registers << shift;
+      units = registers << shift;
     }
+    units &= LowBits(block.units);
+    g_pending[b] |= units;
+    g_pending_blocks |= uint32_t(units != 0) << b;
   }
 }
 
 void MarkFetchConstantsDirty(uint64_t mask) {
   g_pending[kFetchBlock] |= __builtin_bitreverse64(mask);
-}
-
-void MarkAllDirty() {
-  for (uint64_t& pending : g_pending) {
-    pending = ~0ull;
-  }
+  g_pending_blocks |= uint32_t(mask != 0) << kFetchBlock;
 }
 
 void ReadRegisters(uint8_t* base, uint32_t device, rex::graphics::RegisterFile& regs) {
-  for (size_t b = 0; b < kRegisterReadBlocks; b++) {
+  // Each bit of the device's masks: a register, a fetch constant (6 words),
+  // or the bool and loop constants.
+  for (size_t m = 0; m < 3; m++) {
+    uint64_t bits = g_device_dirty[m] & kBitCopies.known[m];
+    g_device_dirty[m] = 0;
+    while (bits) {
+      const BitCopy& copy = kBitCopies.bits[m][__builtin_ctzll(bits)];
+      bits &= bits - 1;
+      if (copy.words == 1) {
+        regs.values[copy.first_register] = guest::LoadU32(base, device + copy.shadow_offset);
+      } else {
+        guest::CopyU32s(base, device + copy.shadow_offset, &regs.values[copy.first_register],
+                        copy.words);
+      }
+    }
+  }
+  // Units marked otherwise (rare).
+  while (g_pending_blocks) {
+    size_t b = size_t(__builtin_ctz(g_pending_blocks));
+    g_pending_blocks &= g_pending_blocks - 1;
     const ShadowBlock& block = kBlocks[b];
     uint64_t bits = g_pending[b] & LowBits(block.units);
     g_pending[b] = 0;
-    // Each run of dirty units.
     while (bits) {
-      uint32_t first = uint32_t(__builtin_ctzll(bits));
-      uint64_t from_first = bits >> first;
-      uint32_t count = ~from_first ? uint32_t(__builtin_ctzll(~from_first)) : 64 - first;
-      bits &= ~(LowBits(count) << first);
-      uint32_t word = first * block.words_per_unit;
-      guest::CopyU32s(base, device + block.shadow_offset + 4 * word,
-                      &regs.values[block.first_register + word], count * block.words_per_unit);
+      uint32_t k = uint32_t(__builtin_ctzll(bits));
+      bits &= bits - 1;
+      guest::CopyU32s(base, device + block.shadow_offset + 4 * block.words_per_unit * k,
+                      &regs.values[block.first_register + block.words_per_unit * k],
+                      block.words_per_unit);
     }
   }
 }
@@ -131,15 +180,9 @@ void ReadRegisters(uint8_t* base, uint32_t device, rex::graphics::RegisterFile& 
     uint32_t words = block.units * block.words_per_unit;
     std::memcpy(old + n, &regs.values[block.first_register], 4 * words);
     n += words;
-    stats.words_copied += uint32_t(__builtin_popcountll(g_pending[b] & LowBits(block.units))) *
-                          block.words_per_unit;
+    stats.words_copied += uint32_t(__builtin_popcountll(PendingUnits(b))) * block.words_per_unit;
   }
-  _mm_lfence();
-  uint64_t start = __rdtsc();
-  _mm_lfence();
   ReadRegisters(base, device, regs);
-  _mm_lfence();
-  stats.copy_cycles += __rdtsc() - start;
   stats.calls++;
   stats.words += n;
   bool any = false;
@@ -147,21 +190,9 @@ void ReadRegisters(uint8_t* base, uint32_t device, rex::graphics::RegisterFile& 
   for (size_t b = 0; b < kRegisterReadBlocks; b++) {
     const ShadowBlock& block = kBlocks[b];
     uint32_t words = block.units * block.words_per_unit;
-    // What reading the whole block gives (as ReadRegisters did before
-    // reading only what's dirty).
-    uint32_t full[256];
-    guest::CopyU32s(base, device + block.shadow_offset, full, words);
     uint32_t changed = 0;
     for (uint32_t i = 0; i < words; i++) {
-      uint32_t value = regs.values[block.first_register + i];
-      changed += old[n + i] != value;
-      if (value != full[i]) {
-        if (!stats.mismatched_words) {
-          stats.mismatch_sample = {block.first_register + i, value, full[i]};
-        }
-        stats.mismatched_words++;
-        stats.blocks_mismatched[b]++;
-      }
+      changed += old[n + i] != regs.values[block.first_register + i];
     }
     n += words;
     stats.words_changed += changed;

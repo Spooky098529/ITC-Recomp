@@ -55,8 +55,8 @@ REXCVAR_DEFINE_BOOL(native_renderer_log_constant_changes, false, "ITC",
                     "Log why draws' constants aren't reused: what differs in the fetch block, "
                     "and which blocks' offsets differ when the descriptor sets repeat");
 REXCVAR_DEFINE_BOOL(native_renderer_log_register_reads, false, "ITC",
-                    "Log how often the device's register shadow is read a frame, what changed "
-                    "since the last read, and the time stamp counter cycles the copy took");
+                    "Log how often the device's register shadow is read a frame, how many words "
+                    "are copied (those marked dirty) and what changed since the last read");
 REXCVAR_DEFINE_BOOL(native_renderer_copy_all, false, "ITC",
                     "Copy every vertex and index range into the mirror every frame, not only "
                     "those the library's memcpy wrote since (a debugging aid)");
@@ -933,25 +933,11 @@ void Renderer::LogStats() {
     REXLOG_INFO("native renderer: register reads: {:.1f} a frame, of {:.0f} words a frame {:.0f} "
                 "copied (dirty), {:.1f} changed; {:.0f}% changed anything; changed by block: "
                 "2000 {:.0f}%, 2100 {:.0f}%, 2180 {:.0f}%, 2200 {:.0f}%, 2280 {:.0f}%, 2300 "
-                "{:.0f}%, 2380 {:.0f}%, fetch {:.0f}%, bool {:.0f}%, loop {:.0f}%; TSC cycles a "
-                "read {:.0f}",
+                "{:.0f}%, 2380 {:.0f}%, fetch {:.0f}%, bool {:.0f}%, loop {:.0f}%",
                 double(r.calls) / frames, double(r.words) / frames,
                 double(r.words_copied) / frames, double(r.words_changed) / frames,
                 share(r.calls_changed), share(b[0]), share(b[1]), share(b[2]), share(b[3]),
-                share(b[4]), share(b[5]), share(b[6]), share(b[7]), share(b[8]), share(b[9]),
-                double(r.copy_cycles) / r.calls);
-    std::string mismatched;
-    for (size_t i = 0; i < kRegisterReadBlocks; i++) {
-      mismatched += fmt::format(" {}", r.blocks_mismatched[i]);
-    }
-    REXLOG_INFO("native renderer: register reads: {} words differ from reading every block "
-                "whole (by block:{}){}",
-                r.mismatched_words, mismatched,
-                r.mismatched_words
-                    ? fmt::format(", e.g. register {:04X} read {:08X}, shadow {:08X}",
-                                  r.mismatch_sample[0], r.mismatch_sample[1],
-                                  r.mismatch_sample[2])
-                    : "");
+                share(b[4]), share(b[5]), share(b[6]), share(b[7]), share(b[8]), share(b[9]));
   }
   if (view.constants_draws) {
     const auto& r = view.constants_reused;

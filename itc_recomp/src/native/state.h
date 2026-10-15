@@ -5,7 +5,6 @@
 
 #pragma once
 
-#include <array>
 #include <cstdint>
 #include <vector>
 #include <rex/graphics/register_file.h>
@@ -61,28 +60,21 @@ void ReadRegisters(uint8_t* base, uint32_t device, rex::graphics::RegisterFile& 
 // draws clear them after flushing. MarkDeviceDirty takes the masks before
 // a draw clears them; MarkRegistersDirty and MarkFetchConstantsDirty take
 // the masks the library's flush helpers sub_822ADE30 (first register, top
-// bit first) and sub_822AE070 (top bit fetch constant 0) are given.
-// MarkRegistersDirty also marks words changed in regs by hand.
+// bit first) and sub_822AE070 (top bit fetch constant 0) are given, and
+// register 0x2203, which sub_822ADC08 writes itself. MarkRegistersDirty
+// also marks words changed in regs by hand.
 void MarkDeviceDirty(uint64_t shader_state, uint64_t render_state, uint64_t other_state);
 void MarkRegistersDirty(uint32_t first_register, uint64_t mask);
 void MarkFetchConstantsDirty(uint64_t mask);
-void MarkAllDirty();
 
 // ReadRegisters, counted (--native_renderer_log_register_reads): calls,
 // calls where anything changed since the last, words in the blocks, words
 // copied (dirty) and changed, calls changing each block (7 register blocks,
-// then fetch, bool, loop constants), and time stamp counter cycles of the
-// copy. Each call is checked against reading every block whole (as before
-// only dirty words were read): words differing, by block, and the first
-// (register, value read, value in the shadow).
+// then fetch, bool, loop constants).
 constexpr size_t kRegisterReadBlocks = 10;
 struct RegisterReadStats {
   uint64_t calls = 0, calls_changed = 0, words = 0, words_copied = 0, words_changed = 0;
   uint64_t blocks_changed[kRegisterReadBlocks] = {};
-  uint64_t copy_cycles = 0;
-  uint64_t mismatched_words = 0;
-  uint64_t blocks_mismatched[kRegisterReadBlocks] = {};
-  std::array<uint32_t, 3> mismatch_sample{};
 };
 void ReadRegisters(uint8_t* base, uint32_t device, rex::graphics::RegisterFile& regs,
                    RegisterReadStats& stats);
