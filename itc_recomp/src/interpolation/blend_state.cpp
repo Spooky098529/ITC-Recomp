@@ -1839,13 +1839,19 @@ class PixelConstantBlender {
     // object, and how strongly); they take the tick's value and the rest blends. A
     // jump anywhere else means this isn't the same object (or something cut),
     // so the whole upload is left as recorded rather than mix two objects.
+    // The loops below go through raw pointers: the flags written are bytes,
+    // which may alias anything, so through the vectors their data and sizes
+    // were loaded again on every iteration.
+    const float* previous = entry.previous.data();
+    const float* recorded = now.data();
+    const uint32_t size = uint32_t(now.size());
     auto is_switch = [&](uint32_t i) {
       // Register * 4 + component, from the start of the upload (the same
       // layout is uploaded at c0 and at c63).
       return i == 1 * 4 + 0 || i == 3 * 4 + 0 || i == 3 * 4 + 1 || i == 3 * 4 + 2 || i == 4 * 4 + 0;
     };
     auto jumped = [&](uint32_t i) {
-      float a = entry.previous[i], b = now[i];
+      float a = previous[i], b = recorded[i];
       return a != b && (!std::isfinite(a) || !std::isfinite(b) ||
                         !(std::abs(b - a) <= 0.3f * std::max(std::abs(a), std::abs(b)) + 0.2f));
     };
@@ -1865,8 +1871,8 @@ class PixelConstantBlender {
     if (count == 63 && REXCVAR_GET(switch_light_slots)) {
       for (uint32_t k = 0; k < 8; k++) {
         uint32_t p = (8 + k) * 4;
-        Vec3 before{entry.previous[p], entry.previous[p + 1], entry.previous[p + 2]};
-        Vec3 after{now[p], now[p + 1], now[p + 2]};
+        Vec3 before{previous[p], previous[p + 1], previous[p + 2]};
+        Vec3 after{recorded[p], recorded[p + 1], recorded[p + 2]};
         slot_switched[k] = !(Distance(before, after) <= kSlotLightMove);
         for (uint32_t r : {8u, 16u, 24u, 32u, 47u, 55u}) {
           for (uint32_t c = 0; c < 4; c++) {
@@ -1875,18 +1881,16 @@ class PixelConstantBlender {
         }
       }
     }
-    auto in_switched_slot = [&](uint32_t i) {
-      if (count != 63) {
-        return false;
-      }
-      uint32_t r = i / 4;
+    // By register: whether it belongs to a switched slot.
+    std::array<bool, 64> register_switched{};
+    if (count == 63) {
       for (uint32_t base : {8u, 16u, 24u, 32u, 47u, 55u}) {
-        if (r >= base && r < base + 8 && slot_switched[r - base]) {
-          return true;
+        for (uint32_t k = 0; k < 8; k++) {
+          register_switched[base + k] = register_switched[base + k] || slot_switched[k];
         }
       }
-      return false;
-    };
+    }
+    auto in_switched_slot = [&](uint32_t i) { return count == 63 && register_switched[i / 4]; };
     // c0-c3 are the view matrix and c4 the position of the camera the
     // lighting is worked out against (copied from the camera pass by the
     // render orchestrator): they blend together as a camera, or on a cut
@@ -1897,12 +1901,12 @@ class PixelConstantBlender {
     bool camera = count == 63 && REXCVAR_GET(blend_lighting_camera);
     bool camera_cut = false;
     if (camera) {
-      Vec3 eye_before{entry.previous[16], entry.previous[17], entry.previous[18]};
-      Vec3 eye_now{now[16], now[17], now[18]};
+      Vec3 eye_before{previous[16], previous[17], previous[18]};
+      Vec3 eye_now{recorded[16], recorded[17], recorded[18]};
       camera_cut = !IsFinite(eye_before) || !IsFinite(eye_now) ||
                    !(Distance(eye_before, eye_now) <= kCutDistance);
       for (uint32_t i = 0; i < 20; i++) {
-        camera_cut = camera_cut || !std::isfinite(entry.previous[i]) || !std::isfinite(now[i]);
+        camera_cut = camera_cut || !std::isfinite(previous[i]) || !std::isfinite(recorded[i]);
       }
     }
     // --blend_only_light_slots: only the light slots' positions (c8-c15) and
@@ -1915,11 +1919,12 @@ class PixelConstantBlender {
       uint32_t r = i / 4;
       return !only_lights || (r >= 8 && r < 16) || (r >= 24 && r < 32);
     };
-    std::vector<uint8_t>& jumps = jumps_;
-    jumps.assign(now.size(), 0);
+    jumps_.assign(size, 0);
+    uint8_t* jumps = jumps_.data();
+    int switch_jumps = 0;
     bool changed = false;
-    for (uint32_t i = 0; i < now.size(); i++) {
-      float a = entry.previous[i], b = now[i];
+    for (uint32_t i = 0; i < size; i++) {
+      float a = previous[i], b = recorded[i];
       if (a == b) {
         continue;
       }
@@ -1937,7 +1942,7 @@ class PixelConstantBlender {
       }
       if (in_switched_slot(i)) {
         jumps[i] = true;  // the tick's light
-        switch_jumps_++;
+        switch_jumps++;
         continue;
       }
       if (jumped(i)) {
@@ -1945,29 +1950,32 @@ class PixelConstantBlender {
           if (REXCVAR_GET(log_blend_state)) {
             LogRejection(start * 4 + i, a, b);
           }
+          switch_jumps_ = switch_jumps;
           outcome_ = Outcome::kRejected;
           rejected_ = i;
           rejected_values_ = {a, b};
           return false;
         }
         jumps[i] = true;
-        switch_jumps_++;
+        switch_jumps++;
         continue;
       }
       changed = true;
     }
+    switch_jumps_ = switch_jumps;
     if (!changed) {
       outcome_ = Outcome::kUnchanged;
       return false;
     }
     outcome_ = Outcome::kBlended;
-    for (uint32_t i = 0; i < now.size(); i++) {
-      float a = entry.previous[i], b = now[i];
+    float* kept = keep_blended_ ? last_blended_.data() : nullptr;
+    for (uint32_t i = 0; i < size; i++) {
+      float a = previous[i], b = recorded[i];
       if (a != b && !jumps[i]) {
         float blended = a + (b - a) * amount;
         guest::StoreFloat(base, payload + 4 * i, blended);
-        if (keep_blended_) {
-          last_blended_[i] = blended;
+        if (kept) {
+          kept[i] = blended;
         }
       }
     }
