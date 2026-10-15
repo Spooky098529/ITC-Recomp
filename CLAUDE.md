@@ -93,7 +93,7 @@ install -m 755 itc_recomp/run-debug.sh $D/run-debug.sh
 (cd $D && python3 -I -m zipfile -c ../$name.zip itc librexruntime.so run.sh run-debug.sh)
 ```
 
-## Status (`main`, 2026-10-15, v0.3.6)
+## Status (`main`, 2026-10-15, v0.3.6 + `descriptor-reuse`)
 
 Frame interpolation for races is working: logic runs at 30 Hz and frames are
 blended between ticks. The world, cameras, wheels (other cars' too, paired
@@ -111,11 +111,14 @@ Our renderer always draws motion blur and glow (`--motion_blur` and
 
 The game draws with our own Vulkan renderer (the native renderer, exclusive
 mode; merged from `native-renderer`): the emulated GPU plugin isn't loaded
-or shipped. Uncapped attract race: ~280 fps mean against the emulated GPU's
+or shipped. Uncapped attract race: ~320 fps mean against the emulated GPU's
 155 (258 before `redundant-state`: draws no longer record state calls that
 repeat the previous draw's, and the constant replay's diagnostics run only
 with their flags; see "Performance: repeated state calls" in
-`docs/native-renderer.md`). Translated shaders and pipelines are kept on disk (`cache/` next to
+`docs/native-renderer.md`; ~285 before `descriptor-reuse`: constant blocks
+the same as the last written are reused, and constants are copied from
+guest memory run by run with a vectorized byte swap, see "Performance:
+reading constants from guest memory"). Translated shaders and pipelines are kept on disk (`cache/` next to
 the executable), and textures are reloaded when the game's memcpy writes
 them instead of being hashed (`docs/texture-handling-optimisation.md`);
 merged from `perf-debug` for Steam Deck hitches. Its known issues (boot movie, gamma, textures, window resizing,

@@ -88,7 +88,7 @@ with a profile of the render thread **in the cockpit view**:
   cheaper (it may redraw the scene with the same states).
 
 Measure on the PC before and after any change: an uncapped attract race
-(`--max_fps=0`, about 280 fps mean since v0.3.6; `timeout 20`, mean over
+(`--max_fps=0`, about 320 fps mean since `descriptor-reuse`; `timeout 20`, mean over
 seconds 3-18 of the race, as in `CLAUDE.md`), and a
 pinned one (`taskset -c 0`) as a stand-in for the Deck. Then a build for
 the user's Deck: local builds need a newer glibc than SteamOS has, so
