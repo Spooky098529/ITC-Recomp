@@ -2627,31 +2627,33 @@ void BlendState_ReplayConstants(uint8_t* base, uint32_t payload, uint32_t packed
     if (!original && REXCVAR_GET(log_overlay_products)) {
       GetReplayCameras().LogOverlayMiss(payload, LoadMatrix(base, payload));
     }
-    // Temporary: main-camera matrices uploaded to c0, with their status.
-    uint32_t start = (packed >> 8) & 0xFF;
-    Matrix4 m = original ? *original : LoadMatrix(base, payload);
-    static auto last = std::chrono::steady_clock::now();
-    static int logged = 0;
-    auto now = std::chrono::steady_clock::now();
-    if (now - last > std::chrono::seconds(1)) {
-      last = now;
-      logged = 0;
-    }
-    std::string status = GetReplayCameras().Status(payload, m);
-    if (start == 0 && status != "substituted" && logged < 400 &&
-        REXCVAR_GET(log_replayed_constants)) {
-      logged++;
-      REXLOG_INFO("c0 upload t={} from {:08X} (slot by {:08X}, header by {:08X}) x{} {}: {:.4g} {:.4g} {:.4g} {:.4g} ... {:.4g} {:.4g} {:.4g} {:.4g}",
-                  std::chrono::duration_cast<std::chrono::microseconds>(now.time_since_epoch()).count() % 100000000,
-                  payload, SlotOwner(payload), SlotOwner(payload - 16), count, status, m[0], m[1], m[2], m[3],
-                  m[12], m[13], m[14], m[15]);
+    // Diagnostics (--log_replayed_constants): main-camera matrices uploaded
+    // to c0, with their status.
+    if (REXCVAR_GET(log_replayed_constants)) {
+      uint32_t start = (packed >> 8) & 0xFF;
+      Matrix4 m = original ? *original : LoadMatrix(base, payload);
+      static auto last = std::chrono::steady_clock::now();
+      static int logged = 0;
+      auto now = std::chrono::steady_clock::now();
+      if (now - last > std::chrono::seconds(1)) {
+        last = now;
+        logged = 0;
+      }
+      std::string status = GetReplayCameras().Status(payload, m);
+      if (start == 0 && status != "substituted" && logged < 400) {
+        logged++;
+        REXLOG_INFO("c0 upload t={} from {:08X} (slot by {:08X}, header by {:08X}) x{} {}: {:.4g} {:.4g} {:.4g} {:.4g} ... {:.4g} {:.4g} {:.4g} {:.4g}",
+                    std::chrono::duration_cast<std::chrono::microseconds>(now.time_since_epoch()).count() % 100000000,
+                    payload, SlotOwner(payload), SlotOwner(payload - 16), count, status, m[0], m[1], m[2], m[3],
+                    m[12], m[13], m[14], m[15]);
+      }
     }
   }
   GetReplayedConstantsLog().OnUpload(base, payload, packed, original.has_value());
   std::vector<uint32_t> zeroed;
   if (stage == 0) {
-    uint32_t owner = SlotOwner(payload - 16);
     if (REXCVAR_GET(log_upload_owners)) {
+      uint32_t owner = SlotOwner(payload - 16);
       static std::map<uint32_t, int> owners;
       static int frames = 0;
       static uint64_t last_tick = 0;
@@ -2675,7 +2677,7 @@ void BlendState_ReplayConstants(uint8_t* base, uint32_t payload, uint32_t packed
     }
   }
   // Vertex or pixel constants, by the code that allocated the header.
-  if (std::string list = REXCVAR_GET(debug_zero_owners); !list.empty()) {
+  if (const std::string& list = REXCVAR_GET(debug_zero_owners); !list.empty()) {
     uint32_t owner = SlotOwner(payload - 16);
     if (owner != 0 && list.find(fmt::format("{:08X}", owner)) != std::string::npos) {
       for (uint32_t i = 0; i < count * 4; i++) {

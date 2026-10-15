@@ -39,6 +39,13 @@ XDG_DATA_DIRS=/usr/local/share:/usr/share LD_LIBRARY_PATH=$B:rexglue-sdk/out/lin
 find /dev/shm -maxdepth 1 -user "$USER" -name 'xenia_memory_*' -delete
 ```
 
+- If the build fails with "file ... has been modified since the precompiled
+  header ... was built" (clang was updated), delete the stale headers:
+  `find itc_recomp/out/build/linux-amd64-release -name 'cmake_pch*.pch' -delete`.
+- Compare frame rates uncapped (`--max_fps=0`), alternating runs: this PC
+  holds the 144 cap, which hides differences. A run pinned to one CPU
+  (`taskset -c 0`) stands in for the Steam Deck but varies by ~15% from run
+  to run.
 - The release preset builds with ThinLTO (`ITC_LTO`, game and SDK), which
   needs lld (`ld.lld`). Measured 2026-10-14, two alternating uncapped attract
   races each: 236 and 237 fps mean without, 246 and 239 with; the user kept
@@ -80,7 +87,7 @@ install -m 755 itc_recomp/run-debug.sh $D/run-debug.sh
 (cd $D && python3 -I -m zipfile -c ../$name.zip itc librexruntime.so run.sh run-debug.sh)
 ```
 
-## Status (`main`, 2026-10-15)
+## Status (`main`, 2026-10-15, v0.3.6)
 
 Frame interpolation for races is working: logic runs at 30 Hz and frames are
 blended between ticks. The world, cameras, wheels (other cars' too, paired
@@ -98,8 +105,11 @@ Our renderer always draws motion blur and glow (`--motion_blur` and
 
 The game draws with our own Vulkan renderer (the native renderer, exclusive
 mode; merged from `native-renderer`): the emulated GPU plugin isn't loaded
-or shipped. Uncapped attract race: ~258 fps mean against the emulated GPU's
-155. Translated shaders and pipelines are kept on disk (`cache/` next to
+or shipped. Uncapped attract race: ~280 fps mean against the emulated GPU's
+155 (258 before `redundant-state`: draws no longer record state calls that
+repeat the previous draw's, and the constant replay's diagnostics run only
+with their flags; see "Performance: repeated state calls" in
+`docs/native-renderer.md`). Translated shaders and pipelines are kept on disk (`cache/` next to
 the executable), and textures are reloaded when the game's memcpy writes
 them instead of being hashed (`docs/texture-handling-optimisation.md`);
 merged from `perf-debug` for Steam Deck hitches. Its known issues (boot movie, gamma, textures, window resizing,
@@ -123,7 +133,9 @@ Not done yet:
   aren't blended, so they step at 30 Hz; what they draw isn't known yet
   (see Known issues; `--log_moving_products` lists them).
 - First-person views (cockpit, bumper) run slower than third person on the
-  Steam Deck: the render thread is the limit, at ~7 µs a draw. Next step
-  and measurements in `docs/first-person-performance.md`.
+  Steam Deck: the render thread is the limit, at ~7 µs a draw, and the
+  cockpit draws more (the interior, the mirror). So any cut in the cost of
+  a draw helps there. Where the render thread's time goes (profile of
+  2026-10-15), what's done and what's next: `docs/first-person-performance.md`.
 - Recheck whether the player's beam on the road still jumps in sharp turns
   (Known issues); if it's gone, drop it from the next release's limits.

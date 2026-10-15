@@ -87,6 +87,7 @@ class Passes {
   // frame (as before memcpy's writes were tracked); compare each range not
   // copied with guest memory (Stats::mirror_stale; slow).
   void set_copy_all(bool copy_all);
+  void set_skip_repeated_state(bool skip);
   void set_verify_mirror(bool verify);
   // A debugging aid: hash each copied vertex and index range again at the
   // end of the frame; TakeLateWrites describes those that changed.
@@ -175,6 +176,13 @@ class Passes {
     // type (4, 6, 8 rectangle list, 13 quad list).
     uint64_t inline_draws = 0;
     std::array<uint64_t, 16> inline_by_type{};
+    // Draws compared with the draw before them (nothing else recorded in
+    // between), and how many repeated each of its state calls: viewport,
+    // scissor, depth bias, blend constants, pipeline, descriptor sets (their
+    // dynamic offsets aside), index buffer binding, and the index buffer and
+    // type alone (another offset).
+    uint64_t state_compared = 0;
+    std::array<uint64_t, 8> state_repeated{};
     std::array<uint32_t, 2> declaration_sample{};
     std::array<uint32_t, 4> clamped_sample{};
     std::array<uint32_t, 2> base_vertex_sample{};

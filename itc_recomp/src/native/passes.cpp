@@ -553,6 +553,8 @@ struct Passes::State {
   // Copy every range every frame, as before memcpy's writes were tracked;
   // compare each range not copied with guest memory (debugging aids).
   bool copy_all = false, verify_mirror = false;
+  // Don't record state calls that repeat what the command buffer holds.
+  bool skip_repeated_state = true;
   // With check_late_writes: the ranges copied this frame and their hashes
   // then, to find ranges written after we copied them (the emulated GPU
   // reads them much later).
@@ -739,6 +741,24 @@ struct Passes::State {
   void MaybeSavePipelineCache();
   rex::graphics::RegisterFile regs;
   Stats stats;
+  // The state the last draw recorded into the frame's command buffer, to
+  // count the state calls that repeat it (stats.state_repeated). Forgotten
+  // at each frame's start and after anything else that sets state (a
+  // resolve's draw, the ID pass).
+  struct RecordedState {
+    bool valid = false;
+    VkViewport viewport;
+    VkRect2D scissor;
+    float bias[2];
+    float blend_constants[4];
+    VkPipeline pipeline;
+    VkPipelineLayout layout;
+    VkDescriptorSet sets[4];
+    bool indexed;  // index buffer below bound
+    VkBuffer index_buffer;
+    VkDeviceSize index_offset;
+    VkIndexType index_type;
+  } recorded;
 
   bool CreateImage(Image& out, VkImageType type, VkImageViewType view_type, VkFormat format,
                    VkExtent3D extent, uint32_t layers, VkImageUsageFlags usage,
@@ -1906,6 +1926,7 @@ bool Passes::State::ResolveInto(VkCommandBuffer commands, uint8_t* base, Target&
                          sizeof(constants), &constants);
   vk::vkCmdDraw(commands, 3, 1, 0, 0);
   vk::vkCmdEndRendering(commands);
+  recorded.valid = false;
   Transition(commands, dest.image, VK_IMAGE_ASPECT_COLOR_BIT, dest_layout,
              VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
   Resolved& resolved = frame_resolves.emplace_back();
@@ -2035,6 +2056,7 @@ void Passes::BeginFrame(uint32_t frame_index) {
   s.ring_offset = 0;
   s.rings[frame_index].block = 0;
   s.rendering = false;
+  s.recorded.valid = false;
   s.bound_color = s.bound_depth = nullptr;
   s.main_view = nullptr;
   s.front = nullptr;
@@ -2602,8 +2624,6 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
                       viewport_info.z_min, viewport_info.z_max};
   VkRect2D scissor_rect{{int32_t(scissor.offset[0]), int32_t(scissor.offset[1])},
                         {scissor_right - scissor.offset[0], scissor_bottom - scissor.offset[1]}};
-  vk::vkCmdSetViewport(commands, 0, 1, &viewport);
-  vk::vkCmdSetScissor(commands, 0, 1, &scissor_rect);
   // Set for every pipeline (it's dynamic in all of them), used with depth.
   float slope = 0.0f, constant = 0.0f;
   if (depth) {
@@ -2621,31 +2641,102 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
       s.stats.depth_equal++;
     }
   }
-  vk::vkCmdSetDepthBias(commands, constant, 0.0f, slope);
   // RB_BLEND_RED/GREEN/BLUE/ALPHA, for the constant blend factors.
   float blend_constants[4];
   std::memcpy(blend_constants, &regs.values[0x2105], sizeof(blend_constants));
-  vk::vkCmdSetBlendConstants(commands, blend_constants);
-  vk::vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
   VkDescriptorSet sets[4] = {s.mirrors[s.frame].set, s.constant_block().set,
                              vertex_textures, pixel_textures};
+
+  // The state this draw needs. Indexed draws bind the mirror at offset 0
+  // and start at their indices with firstIndex, so consecutive draws share
+  // the binding (unless an address isn't a multiple of the index size).
+  State::RecordedState now{};
+  now.valid = true;
+  now.viewport = viewport;
+  now.scissor = scissor_rect;
+  now.bias[0] = constant;
+  now.bias[1] = slope;
+  std::memcpy(now.blend_constants, blend_constants, sizeof(blend_constants));
+  now.pipeline = pipeline;
+  now.layout = key.layout;
+  std::memcpy(now.sets, sets, sizeof(sets));
+  now.indexed = rectangle_list || quad_list || !call.inline_vertices;
+  now.index_buffer = s.mirrors[s.frame].buffer;
+  now.index_type = rectangle_list || quad_list || index_32bit ? VK_INDEX_TYPE_UINT32
+                                                              : VK_INDEX_TYPE_UINT16;
+  uint32_t index_bytes = now.index_type == VK_INDEX_TYPE_UINT32 ? 4 : 2;
+  uint64_t index_start = rectangle_list ? kRectangleIndices
+                         : quad_list    ? kQuadIndices
+                                        : index_address;
+  uint32_t first_index = 0;
+  if (s.skip_repeated_state && index_start % index_bytes == 0) {
+    first_index = uint32_t(index_start / index_bytes);
+  } else {
+    now.index_offset = index_start;
+  }
+
+  // Which state calls repeat what the command buffer already holds (the
+  // previous draw's, with nothing else recorded since); with
+  // skip_repeated_state they aren't recorded again.
+  const State::RecordedState& last = s.recorded;
+  auto same = [](const auto& a, const auto& b) { return !std::memcmp(&a, &b, sizeof(a)); };
+  bool repeated[8] = {};
+  bool both_indexed = last.valid && now.indexed && last.indexed;
+  if (last.valid) {
+    repeated[0] = same(last.viewport, now.viewport);
+    repeated[1] = same(last.scissor, now.scissor);
+    repeated[2] = same(last.bias, now.bias);
+    repeated[3] = same(last.blend_constants, now.blend_constants);
+    repeated[4] = last.pipeline == now.pipeline;
+    repeated[5] = last.layout == now.layout && same(last.sets, now.sets);
+    repeated[6] = both_indexed && last.index_buffer == now.index_buffer &&
+                  last.index_offset == now.index_offset && last.index_type == now.index_type;
+    repeated[7] = both_indexed && last.index_buffer == now.index_buffer &&
+                  last.index_type == now.index_type;
+    s.stats.state_compared++;
+    for (int i = 0; i < 8; i++) {
+      s.stats.state_repeated[i] += repeated[i];
+    }
+  }
+  bool skip = s.skip_repeated_state;
+  if (!(skip && repeated[0])) {
+    vk::vkCmdSetViewport(commands, 0, 1, &viewport);
+  }
+  if (!(skip && repeated[1])) {
+    vk::vkCmdSetScissor(commands, 0, 1, &scissor_rect);
+  }
+  if (!(skip && repeated[2])) {
+    vk::vkCmdSetDepthBias(commands, constant, 0.0f, slope);
+  }
+  if (!(skip && repeated[3])) {
+    vk::vkCmdSetBlendConstants(commands, blend_constants);
+  }
+  if (!(skip && repeated[4])) {
+    vk::vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+  }
+  // Every draw: the constants' dynamic offsets change with each draw.
   vk::vkCmdBindDescriptorSets(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, key.layout, 0, 4, sets,
                               5, offsets);
+  if (now.indexed && !(skip && repeated[6])) {
+    vk::vkCmdBindIndexBuffer(commands, now.index_buffer, now.index_offset, now.index_type);
+  }
   if (rectangle_list) {
-    vk::vkCmdBindIndexBuffer(commands, s.mirrors[s.frame].buffer, kRectangleIndices,
-                             VK_INDEX_TYPE_UINT32);
-    vk::vkCmdDrawIndexed(commands, RectangleIndexCount(index_count / 3), 1, 0, 0, 0);
+    vk::vkCmdDrawIndexed(commands, RectangleIndexCount(index_count / 3), 1, first_index, 0, 0);
   } else if (quad_list) {
-    vk::vkCmdBindIndexBuffer(commands, s.mirrors[s.frame].buffer, kQuadIndices,
-                             VK_INDEX_TYPE_UINT32);
-    vk::vkCmdDrawIndexed(commands, index_count / 4 * 6, 1, 0, 0, 0);
+    vk::vkCmdDrawIndexed(commands, index_count / 4 * 6, 1, first_index, 0, 0);
   } else if (call.inline_vertices) {
     vk::vkCmdDraw(commands, index_count, 1, 0, 0);
   } else {
-    vk::vkCmdBindIndexBuffer(commands, s.mirrors[s.frame].buffer, index_address,
-                             index_32bit ? VK_INDEX_TYPE_UINT32 : VK_INDEX_TYPE_UINT16);
-    vk::vkCmdDrawIndexed(commands, index_count, 1, 0, 0, 0);
+    vk::vkCmdDrawIndexed(commands, index_count, 1, first_index, 0, 0);
   }
+  if (!now.indexed && last.valid) {
+    // A draw without indices leaves the earlier binding in place.
+    now.indexed = last.indexed;
+    now.index_buffer = last.index_buffer;
+    now.index_offset = last.index_offset;
+    now.index_type = last.index_type;
+  }
+  s.recorded = now;
   s.stats.drawn++;
   if (call.inline_vertices) {
     s.stats.inline_draws++;
@@ -2820,6 +2911,7 @@ void Passes::State::DrawIds(VkCommandBuffer commands) {
     vk::vkCmdDrawIndexed(commands, draw.index_count, 1, 0, 0, 0);
   }
   vk::vkCmdEndRendering(commands);
+  recorded.valid = false;
   Transition(commands, id_image.image, VK_IMAGE_ASPECT_COLOR_BIT, color_layout,
              VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
   id_drawn = true;
@@ -3116,6 +3208,10 @@ void Passes::set_record_draws(bool record) {
 
 std::vector<uint64_t> Passes::main_view_pixel_shaders() const {
   return state_->last_pixel_shaders;
+}
+
+void Passes::set_skip_repeated_state(bool skip) {
+  state_->skip_repeated_state = skip;
 }
 
 void Passes::set_copy_all(bool copy_all) {
