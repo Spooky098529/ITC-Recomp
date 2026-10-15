@@ -372,12 +372,30 @@ branch-record run is skewed, so take shares from a plain run):
       it. `BlendState_ReplayConstants` 6.01% to 5.75%; fps within noise
       (325.0 to 327.4 mean over three alternating pairs, one pair the
       other way).
-   2. `Substitute`'s lookup: a flat table built by the main thread.
+   2. **`Substitute`'s lookup: done.** The frame's products are in an
+      open-addressed table (`ProductTable`: slots of address and index, at
+      most half full, a multiplicative hash; the products stored together)
+      built by the main thread. Checked over a whole attract race against
+      the `unordered_map` kept beside it: the same product for all 33.8
+      million lookups. Measured by profile, not fps (the user's call: fps
+      runs vary more than such a change; see below): `BlendState_
+      ReplayConstants` 919 to 822 thousand cycles a frame (two runs each),
+      ~0.6% of the render thread.
    3. `Apply`'s sorting loop: the flags it writes are bytes, which may
       alias anything, so the vectors' data and sizes are reloaded every
       iteration; take them into locals.
    4. Storing the blend and putting it back: a whole buffer written with
       one vectorized loop each.
+
+   **Measuring small changes.** Fps in alternating runs varies ~±1.5%
+   between runs of one build, and so does the render thread's total
+   cycles per frame (15.55 and 15.79 million for one build), so changes
+   under a few percent don't show in either. Instead, profile both builds
+   at the same point of an attract race and compare the changed
+   function's **cycles per frame**: its share of the profile times the
+   thread's cycles (perf's "Event count"), over the frames drawn in the
+   profiled seconds (the `--log_fps` lines stamped within them). Two runs
+   each agreed within ~3%.
 2. **The mirror's per-draw work** (~7%): cache each draw's index range
    (lowest, highest) by index buffer, count and format, dropped on a
    memcpy write as the mirror's copies are; a flat table instead of the
