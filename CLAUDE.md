@@ -2,6 +2,10 @@
 
 A static recompilation of Import Tuner Challenge (Xbox 360) built on
 ReXGlue (`rexglue-sdk/`, a submodule patched from `patches/rexglue-sdk/`).
+`git status` showing `rexglue-sdk` as modified (`m`) is expected: those are
+our patches applied in the submodule, not something to look into. The
+working tree may also hold patch 0003 (Windows SDL as a DLL) from the
+`windows` branch; it only changes Windows builds.
 `docs/functions.md` is the reference: what's known about the game's code,
 how frame interpolation works, every diagnostic option, and what didn't
 work. `docs/gpu-functions.md` covers how the game drives the GPU (the
@@ -43,7 +47,9 @@ find /dev/shm -maxdepth 1 -user "$USER" -name 'xenia_memory_*' -delete
   header ... was built" (clang was updated), delete the stale headers:
   `find itc_recomp/out/build/linux-amd64-release -name 'cmake_pch*.pch' -delete`.
 - Compare frame rates uncapped (`--max_fps=0`), alternating runs: this PC
-  holds the 144 cap, which hides differences. A run pinned to one CPU
+  holds the 144 cap, which hides differences. An attract race under
+  `timeout 20` is enough: the race starts ~2 s after launch (the first
+  `fps` line with `ticks/s 30`); take the mean over its seconds 3-18. A run pinned to one CPU
   (`taskset -c 0`) stands in for the Steam Deck but varies by ~15% from run
   to run.
 - The release preset builds with ThinLTO (`ITC_LTO`, game and SDK), which

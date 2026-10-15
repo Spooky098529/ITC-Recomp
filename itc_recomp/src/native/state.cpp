@@ -31,10 +31,8 @@ constexpr ShadowBlock kConstantBlocks[] = {
 
 void CopyBlock(uint8_t* base, uint32_t device, const ShadowBlock& block,
                rex::graphics::RegisterFile& regs) {
-  for (uint32_t i = 0; i < block.count; i++) {
-    regs.values[block.first_register + i] =
-        guest::LoadU32(base, device + block.shadow_offset + 4 * i);
-  }
+  guest::CopyU32s(base, device + block.shadow_offset, &regs.values[block.first_register],
+                  block.count);
 }
 
 }  // namespace

@@ -88,6 +88,10 @@ class Passes {
   // copied with guest memory (Stats::mirror_stale; slow).
   void set_copy_all(bool copy_all);
   void set_skip_repeated_state(bool skip);
+  void set_reuse_constants(bool reuse);
+  // Counts why constants aren't reused (Stats::fetch_changed and
+  // offset_differs; a diagnostic, off by default).
+  void set_log_constant_changes(bool log);
   void set_verify_mirror(bool verify);
   // A debugging aid: hash each copied vertex and index range again at the
   // end of the frame; TakeLateWrites describes those that changed.
@@ -179,10 +183,26 @@ class Passes {
     // Draws compared with the draw before them (nothing else recorded in
     // between), and how many repeated each of its state calls: viewport,
     // scissor, depth bias, blend constants, pipeline, descriptor sets (their
-    // dynamic offsets aside), index buffer binding, and the index buffer and
-    // type alone (another offset).
+    // dynamic offsets aside), index buffer binding, the index buffer and
+    // type alone (another offset), and descriptor sets with their offsets.
     uint64_t state_compared = 0;
-    std::array<uint64_t, 8> state_repeated{};
+    std::array<uint64_t, 9> state_repeated{};
+    // Draws given constants, and how many pointed at the last copy of each
+    // block (system, vertex floats, pixel floats, bool/loop, fetch) instead
+    // of writing it; the bytes of constants written.
+    uint64_t constants_draws = 0, constant_bytes = 0;
+    std::array<uint64_t, 5> constants_reused{};
+    // Draws whose fetch block differed from the last one written, and of
+    // those, how many differed in a texture fetch constant their shaders
+    // read, in a vertex fetch constant they read (and in its address
+    // alone), or in neither (only unread slots).
+    // With log_constant_changes: draws repeating the last draw's
+    // descriptor sets but not their offsets: how many had each block's offset differ, and the fetch
+    // block's alone.
+    std::array<uint64_t, 5> offset_differs{};
+    uint64_t offsets_differ = 0, only_fetch_offset_differs = 0;
+    uint64_t fetch_changed = 0, fetch_changed_texture = 0, fetch_changed_vertex = 0,
+             fetch_changed_vertex_address = 0, fetch_changed_unread = 0;
     std::array<uint32_t, 2> declaration_sample{};
     std::array<uint32_t, 4> clamped_sample{};
     std::array<uint32_t, 2> base_vertex_sample{};

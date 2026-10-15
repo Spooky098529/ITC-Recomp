@@ -5,7 +5,8 @@ of each draw on the render thread, and the cockpit simply draws more (its
 interior and the rear-view mirror). So the work is making every draw
 cheaper, in any view. Done so far: skipping repeated state calls and
 diagnostics left running (about +9% uncapped together, see "Profile of
-2026-10-15" below); not yet checked on the Deck. Read `CLAUDE.md` first
+2026-10-15" below); reusing constant blocks and skipping descriptor binds
+(~+1.4%, branch `descriptor-reuse`); not yet checked on the Deck. Read `CLAUDE.md` first
 (rules: find problems with logs, commit and push work branches after each
 commit, keep docs up to date; no Windows code on branches off `main`).
 
@@ -87,7 +88,8 @@ with a profile of the render thread **in the cockpit view**:
   cheaper (it may redraw the scene with the same states).
 
 Measure on the PC before and after any change: an uncapped attract race
-(`--max_fps=0`, about 280 fps mean since v0.3.6, seconds 3-48 of the race), and a
+(`--max_fps=0`, about 280 fps mean since v0.3.6; `timeout 20`, mean over
+seconds 3-18 of the race, as in `CLAUDE.md`), and a
 pinned one (`taskset -c 0`) as a stand-in for the Deck. Then a build for
 the user's Deck: local builds need a newer glibc than SteamOS has, so
 push the branch and run CI on it (`gh workflow run build-linux.yml --ref
@@ -114,7 +116,10 @@ manage well under 1 µs. Roughly by payoff for the effort:
    the tick's images could remove a large share of the draws on most
    frames. Count draws per pass first (the dump tools in
    `native-renderer.md` can) to see what's at stake.
-2. **Upload less constant data.** About 9 KB of shader constants is
+2. **Upload less constant data.** (Done in part: blocks the same as the
+   last written are reused, see "Profile of 2026-10-15", Next. The
+   estimate below was too high: ~9 KB a draw is reserved in the ring, but
+   only ~2 KB written, the floats being packed.) About 9 KB of shader constants is
    uploaded per draw (`native-renderer.md`, Known issues, the constants
    ring): at 2,800 draws ~25 MB a frame, ~1.25 GB/s of copying at 50 fps,
    on the render thread. The translated shaders know which constants they
@@ -198,13 +203,25 @@ not worth SIMD.
   Deck's result is still to be seen.
 
 **Next, in order of payoff for the effort:**
-1. **Bind descriptor sets only when they change.** Still bound every
-   draw: the constants go to a new place in the ring each draw, so the
-   dynamic offsets always differ. If a block (system, each stage's floats,
-   bool/loop, fetch) equals the last one written, reuse its offset. The
-   sets themselves repeat for 44-51% of draws. Also saves most of the 2.9%
-   of `memcpy` into the ring. Count first (how often each block repeats),
-   as was done for the state calls.
+1. **Bind descriptor sets only when they change: done** (2026-10-15,
+   branch `descriptor-reuse`; "Performance: constants written every draw"
+   in `native-renderer.md`). A block the same as the last one written is
+   reused; sets are bound for 62% of draws instead of all, constants
+   written fell from 4.5 to 1.5 MB a frame, and uncapped went up ~1.4%
+   (272.7/268.6 to 276.4/272.6 fps), less than hoped. The fetch block,
+   reused for only ~40% of draws, limits the binds skipped, but not
+   worth more work (measured 2026-10-15): it changes only where the draw
+   reads it (a texture ~50% of draws, a vertex buffer ~15%), mostly along
+   with the texture descriptor sets, so reusing it more could skip binds
+   for at most ~8% more draws (~0.3% by the gain above). Details in
+   "Performance: constants written every draw".
+   **Reading constants from guest memory: done** (2026-10-15, same
+   branch): packing the float constants walked all 256 bits of the
+   shader's mask with a mispredicted branch each, and every word was a
+   volatile load; ~19% of the render thread with `ReadRegisters`. Now run
+   by run, copied with a vectorized byte swap: uncapped ~285 to ~325 fps
+   (+14%). See "Performance: reading constants from guest memory" in
+   `native-renderer.md`.
 2. **Allocations in interpolation**: `PixelConstantBlender::Apply`
    returns a `std::vector` per lighting upload, and a `shared_ptr` is freed
    in the blending path. Check with a new profile whether any mutex is

@@ -10,6 +10,7 @@
 
 #include <bit>
 #include <cstdint>
+#include <cstring>
 
 namespace guest {
 
@@ -27,6 +28,38 @@ inline uint32_t LoadU32(uint8_t* base, uint32_t address) {
 
 inline void StoreU32(uint8_t* base, uint32_t address, uint32_t value) {
   REX_STORE_U32(address, value);
+}
+
+// Byte-swaps count words from in (host memory, contiguous) into out;
+// whether any differed from what out held. For CopyU32s.
+inline bool SwapU32s(const uint8_t* in, uint32_t* out, uint32_t count) {
+  uint32_t differ = 0;
+  for (uint32_t i = 0; i < count; i++) {
+    uint32_t value;
+    std::memcpy(&value, in + 4 * i, 4);
+    value = __builtin_bswap32(value);
+    differ |= out[i] ^ value;
+    out[i] = value;
+  }
+  return differ != 0;
+}
+
+// Copies count words from guest memory at address into out, in host byte
+// order, and returns whether any differed from what out held. One loop the
+// compiler vectorizes, unlike LoadU32's volatile loads one by one. The host
+// offset is taken once, so a range with words starting both below
+// 0xE0000000 and at or above it (where it changes, by each word's start as
+// in LoadU32) is copied in two parts.
+inline bool CopyU32s(uint8_t* base, uint32_t address, uint32_t* out, uint32_t count) {
+  constexpr uint32_t kOffsetChange = 0xE0000000u;
+  if (count && address < kOffsetChange &&
+      uint64_t(address) + 4 * uint64_t(count - 1) >= kOffsetChange) {
+    uint32_t below = (kOffsetChange - address + 3) / 4;
+    bool differ = SwapU32s(REX_RAW_ADDR(address), out, below);
+    uint32_t rest = address + 4 * below;
+    return SwapU32s(REX_RAW_ADDR(rest), out + below, count - below) || differ;
+  }
+  return SwapU32s(REX_RAW_ADDR(address), out, count);
 }
 
 inline float LoadFloat(uint8_t* base, uint32_t address) {
