@@ -45,6 +45,9 @@ REXCVAR_DEFINE_BOOL(native_renderer_serialize, false, "ITC",
 REXCVAR_DEFINE_BOOL(native_renderer_check_mirror, false, "ITC",
                     "Log the vertex and index ranges whose contents change between frames "
                     "(a debugging aid)");
+REXCVAR_DEFINE_BOOL(native_renderer_skip_repeated_state, true, "ITC",
+                    "Don't record a draw's viewport, scissor, depth bias, blend constants, "
+                    "pipeline or index buffer again when the command buffer already holds them");
 REXCVAR_DEFINE_BOOL(native_renderer_copy_all, false, "ITC",
                     "Copy every vertex and index range into the mirror every frame, not only "
                     "those the library's memcpy wrote since (a debugging aid)");
@@ -583,6 +586,7 @@ VkCommandBuffer Renderer::BeginFrame() {
     passes_.set_record_draws(dumping_ && dump_step_ == 0);
     passes_.set_check_mirror_frames(REXCVAR_GET(native_renderer_check_mirror));
     passes_.set_copy_all(REXCVAR_GET(native_renderer_copy_all));
+    passes_.set_skip_repeated_state(REXCVAR_GET(native_renderer_skip_repeated_state));
     passes_.set_verify_mirror(REXCVAR_GET(native_renderer_verify_mirror));
     passes_.set_check_late_writes(REXCVAR_GET(native_renderer_check_late_writes));
     passes_.set_check_clobbers(REXCVAR_GET(native_renderer_check_clobbers));

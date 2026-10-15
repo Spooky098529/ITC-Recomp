@@ -87,6 +87,7 @@ class Passes {
   // frame (as before memcpy's writes were tracked); compare each range not
   // copied with guest memory (Stats::mirror_stale; slow).
   void set_copy_all(bool copy_all);
+  void set_skip_repeated_state(bool skip);
   void set_verify_mirror(bool verify);
   // A debugging aid: hash each copied vertex and index range again at the
   // end of the frame; TakeLateWrites describes those that changed.
