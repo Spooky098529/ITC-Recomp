@@ -1994,6 +1994,37 @@ memcpy since last seen, and the memcpy writes taken. Then:
 3. Answer "written since?" cheaply when nothing was written since the last
    question (`Buffers_Sequence` unchanged), before the `std::map` lookup.
 
+**Measured** (`--native_renderer_log_index_ranges`, uncapped attract race,
+`itc_744.log`; per frame, the race's 5 s lines):
+- **Index ranges are almost never rewritten.** ~1,700-2,200 scans a frame
+  (~1.5-2.5 million indices), ~650-830 distinct ranges. Of the scans,
+  ~61% repeat a range already scanned this frame, and ~100% find it
+  unwritten by memcpy since its last scan (first seen and written since:
+  0.0% when rounded). An unwritten range's kept result was the same as the
+  scan for every one (0 mismatches over the race), so nothing but memcpy
+  writes them. A cache would remove nearly all of `IndexRange`.
+- **memcpy writes ~130-260 times a frame**, so the sequence is never
+  unchanged between a range's copy and the mirror's next question (0% of
+  ~1,100 questions a frame): plan item 3 as written gains nothing.
+- **The mirror** is called ~4,800-6,100 times a frame (index and vertex
+  ranges), 81% for a range already copied that frame (the `mirrored`
+  insert finds it), and asks `Buffers_NewestWrite` ~950-1,150 times.
+
+So a cache's check matters: `IndexRange` costs ~230 cycles a draw (~485
+thousand a frame over ~2,100 draws), and `Buffers_NewestWrite` ~195 a
+question (~215 thousand over ~1,100), about the same. Checking each cached
+range with `Buffers_NewestWrite` on every draw would gain little. Instead:
+- check each cached index range once a frame, as the mirror already does
+  for the same range (same address and size; the mirror already assumes
+  memcpy doesn't write a range between two draws of a frame, which
+  `--native_renderer_check_late_writes` checks): ~61% of draws then need
+  only the lookup;
+- and make the "written since?" question itself cheaper, e.g. a table of
+  the newest write's sequence per 4 KB page (1 MB for 512 MB), so a range
+  is a few loads instead of a `std::map` search; a write in the same page
+  but outside the range only costs an extra scan or copy. Count how often
+  that happens before choosing it.
+
 Checking a change: run the old code beside the new over a whole attract
 race and compare every result, as for steps 1-4 (the lighting blender:
 cherry-pick `2c82ae6` and `5942f31`, then `--check_pixel_blender=true`; the

@@ -57,6 +57,9 @@ REXCVAR_DEFINE_BOOL(native_renderer_log_constant_changes, false, "ITC",
 REXCVAR_DEFINE_BOOL(native_renderer_log_register_reads, false, "ITC",
                     "Log how often the device's register shadow is read a frame, how many words "
                     "are copied (those marked dirty) and what changed since the last read");
+REXCVAR_DEFINE_BOOL(native_renderer_log_index_ranges, false, "ITC",
+                    "Log how often draws' index ranges are scanned again unchanged since memcpy "
+                    "last wrote them, and how the guest memory mirror's checks go");
 REXCVAR_DEFINE_BOOL(native_renderer_copy_all, false, "ITC",
                     "Copy every vertex and index range into the mirror every frame, not only "
                     "those the library's memcpy wrote since (a debugging aid)");
@@ -599,6 +602,7 @@ VkCommandBuffer Renderer::BeginFrame() {
     passes_.set_reuse_constants(REXCVAR_GET(native_renderer_reuse_constants));
     passes_.set_log_constant_changes(REXCVAR_GET(native_renderer_log_constant_changes));
     passes_.set_log_register_reads(REXCVAR_GET(native_renderer_log_register_reads));
+    passes_.set_log_index_ranges(REXCVAR_GET(native_renderer_log_index_ranges));
     passes_.set_verify_mirror(REXCVAR_GET(native_renderer_verify_mirror));
     passes_.set_check_late_writes(REXCVAR_GET(native_renderer_check_late_writes));
     passes_.set_check_clobbers(REXCVAR_GET(native_renderer_check_clobbers));
@@ -1001,6 +1005,9 @@ void Renderer::LogStats() {
   }
   if (REXCVAR_GET(native_renderer_check_mirror)) {
     REXLOG_INFO("native renderer: between frames, {}", passes_.TakeMirrorChanges());
+  }
+  if (REXCVAR_GET(native_renderer_log_index_ranges)) {
+    REXLOG_INFO("native renderer: {}", passes_.TakeIndexRanges());
   }
   if (view.invisible) {
     const auto& v = view.invisible_sample;

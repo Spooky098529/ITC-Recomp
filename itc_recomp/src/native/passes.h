@@ -94,6 +94,11 @@ class Passes {
   // offset_differs; a diagnostic, off by default).
   void set_log_constant_changes(bool log);
   void set_log_register_reads(bool log);
+  // A diagnostic: how often each draw's index range is scanned again
+  // unchanged, and how the mirror's checks go; TakeIndexRanges describes
+  // them since it was last called.
+  void set_log_index_ranges(bool log);
+  std::string TakeIndexRanges();
   void set_verify_mirror(bool verify);
   // A debugging aid: hash each copied vertex and index range again at the
   // end of the frame; TakeLateWrites describes those that changed.
