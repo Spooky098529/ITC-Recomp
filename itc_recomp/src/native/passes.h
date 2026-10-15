@@ -88,6 +88,7 @@ class Passes {
   // copied with guest memory (Stats::mirror_stale; slow).
   void set_copy_all(bool copy_all);
   void set_skip_repeated_state(bool skip);
+  void set_reuse_constants(bool reuse);
   void set_verify_mirror(bool verify);
   // A debugging aid: hash each copied vertex and index range again at the
   // end of the frame; TakeLateWrites describes those that changed.
@@ -179,10 +180,15 @@ class Passes {
     // Draws compared with the draw before them (nothing else recorded in
     // between), and how many repeated each of its state calls: viewport,
     // scissor, depth bias, blend constants, pipeline, descriptor sets (their
-    // dynamic offsets aside), index buffer binding, and the index buffer and
-    // type alone (another offset).
+    // dynamic offsets aside), index buffer binding, the index buffer and
+    // type alone (another offset), and descriptor sets with their offsets.
     uint64_t state_compared = 0;
-    std::array<uint64_t, 8> state_repeated{};
+    std::array<uint64_t, 9> state_repeated{};
+    // Draws given constants, and how many pointed at the last copy of each
+    // block (system, vertex floats, pixel floats, bool/loop, fetch) instead
+    // of writing it; the bytes of constants written.
+    uint64_t constants_draws = 0, constant_bytes = 0;
+    std::array<uint64_t, 5> constants_reused{};
     std::array<uint32_t, 2> declaration_sample{};
     std::array<uint32_t, 4> clamped_sample{};
     std::array<uint32_t, 2> base_vertex_sample{};

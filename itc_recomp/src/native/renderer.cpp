@@ -48,6 +48,9 @@ REXCVAR_DEFINE_BOOL(native_renderer_check_mirror, false, "ITC",
 REXCVAR_DEFINE_BOOL(native_renderer_skip_repeated_state, true, "ITC",
                     "Don't record a draw's viewport, scissor, depth bias, blend constants, "
                     "pipeline or index buffer again when the command buffer already holds them");
+REXCVAR_DEFINE_BOOL(native_renderer_reuse_constants, true, "ITC",
+                    "Point a draw at the constants the last draw wrote, block by block, when "
+                    "they're the same, instead of writing them again");
 REXCVAR_DEFINE_BOOL(native_renderer_copy_all, false, "ITC",
                     "Copy every vertex and index range into the mirror every frame, not only "
                     "those the library's memcpy wrote since (a debugging aid)");
@@ -587,6 +590,7 @@ VkCommandBuffer Renderer::BeginFrame() {
     passes_.set_check_mirror_frames(REXCVAR_GET(native_renderer_check_mirror));
     passes_.set_copy_all(REXCVAR_GET(native_renderer_copy_all));
     passes_.set_skip_repeated_state(REXCVAR_GET(native_renderer_skip_repeated_state));
+    passes_.set_reuse_constants(REXCVAR_GET(native_renderer_reuse_constants));
     passes_.set_verify_mirror(REXCVAR_GET(native_renderer_verify_mirror));
     passes_.set_check_late_writes(REXCVAR_GET(native_renderer_check_late_writes));
     passes_.set_check_clobbers(REXCVAR_GET(native_renderer_check_clobbers));
@@ -902,10 +906,19 @@ void Renderer::LogStats() {
     auto share = [&](uint64_t n) { return 100.0 * double(n) / double(view.state_compared); };
     REXLOG_INFO("native renderer: of {:.1f} draws a frame following another draw, repeating its "
                 "viewport {:.0f}%, scissor {:.0f}%, depth bias {:.0f}%, blend constants {:.0f}%, "
-                "pipeline {:.0f}%, descriptor sets {:.0f}%, index buffer binding {:.0f}% (buffer "
-                "and type {:.0f}%)",
+                "pipeline {:.0f}%, descriptor sets {:.0f}% (with offsets {:.0f}%), index buffer "
+                "binding {:.0f}% (buffer and type {:.0f}%)",
                 double(view.state_compared) / frames, share(r[0]), share(r[1]), share(r[2]),
-                share(r[3]), share(r[4]), share(r[5]), share(r[6]), share(r[7]));
+                share(r[3]), share(r[4]), share(r[5]), share(r[8]), share(r[6]), share(r[7]));
+  }
+  if (view.constants_draws) {
+    const auto& r = view.constants_reused;
+    auto share = [&](uint64_t n) { return 100.0 * double(n) / double(view.constants_draws); };
+    REXLOG_INFO("native renderer: of {:.1f} draws a frame given constants, reusing the last "
+                "written system {:.0f}%, vertex floats {:.0f}%, pixel floats {:.0f}%, bool/loop "
+                "{:.0f}%, fetch {:.0f}%; {:.0f} KB written a frame",
+                double(view.constants_draws) / frames, share(r[0]), share(r[1]), share(r[2]),
+                share(r[3]), share(r[4]), double(view.constant_bytes) / frames / 1024);
   }
   if (view.vertex_shader_copies) {
     REXLOG_INFO("native renderer: {:.1f} draws a frame got their vertex shader from the library's "

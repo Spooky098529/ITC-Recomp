@@ -754,11 +754,31 @@ struct Passes::State {
     VkPipeline pipeline;
     VkPipelineLayout layout;
     VkDescriptorSet sets[4];
+    uint32_t offsets[5];  // the constants' dynamic offsets
     bool indexed;  // index buffer below bound
     VkBuffer index_buffer;
     VkDeviceSize index_offset;
     VkIndexType index_type;
   } recorded;
+  // The constants each block (system, vertex floats, pixel floats,
+  // bool/loop, fetch) last had written into the constant block in use: a
+  // copy of the bytes and where they went, so a draw whose block holds the
+  // same bytes points at them instead of writing them again
+  // (reuse_constants). Forgotten when the frame or the block changes.
+  struct LastConstants {
+    bool valid[5] = {};
+    uint32_t offsets[5];
+    uint32_t sizes[5];  // bytes written
+    alignas(16) uint8_t bytes[5][kFloatConstantsRange];
+  } last_constants;
+  bool reuse_constants = true;
+  // Points offset at a copy of the block's size bytes in the constant
+  // block in use: the last one written if the same (and reuse_constants),
+  // or a new one, reserving range bytes. With copied, the bytes are
+  // already in last_constants.bytes[block] and differ from the last ones
+  // written unless same.
+  bool PlaceConstants(uint32_t block, const void* bytes, uint32_t size, uint32_t range,
+                      uint32_t& offset, bool copied = false, bool same = false);
 
   bool CreateImage(Image& out, VkImageType type, VkImageViewType view_type, VkFormat format,
                    VkExtent3D extent, uint32_t layers, VkImageUsageFlags usage,
@@ -1581,6 +1601,37 @@ bool Passes::State::ReserveDrawConstants() {
   }
   ring.block++;
   ring_offset = 0;
+  std::fill(std::begin(last_constants.valid), std::end(last_constants.valid), false);
+  return true;
+}
+
+bool Passes::State::PlaceConstants(uint32_t block, const void* bytes, uint32_t size,
+                                   uint32_t range, uint32_t& offset, bool copied, bool same) {
+  LastConstants& last = last_constants;
+  uint8_t* copy = last.bytes[block];
+  if (!copied) {
+    same = last.valid[block] && last.sizes[block] == size && !std::memcmp(copy, bytes, size);
+  }
+  // (A block with nothing to read can point anywhere.)
+  if (reuse_constants && last.valid[block] &&
+      (size == 0 || (same && last.sizes[block] == size))) {
+    offset = last.offsets[block];
+    stats.constants_reused[block]++;
+    return true;
+  }
+  uint8_t* data;
+  if (!Reserve(range, offset, data)) {
+    last.valid[block] = false;
+    return false;
+  }
+  if (!copied) {
+    std::memcpy(copy, bytes, size);
+  }
+  std::memcpy(data, copy, size);
+  last.valid[block] = true;
+  last.offsets[block] = offset;
+  last.sizes[block] = size;
+  stats.constant_bytes += size;
   return true;
 }
 
@@ -2058,6 +2109,7 @@ void Passes::BeginFrame(uint32_t frame_index) {
   s.rendering = false;
   s.recorded.valid = false;
   s.bound_color = s.bound_depth = nullptr;
+  std::fill(std::begin(s.last_constants.valid), std::end(s.last_constants.valid), false);
   s.main_view = nullptr;
   s.front = nullptr;
   s.frame_resolves.clear();
@@ -2442,52 +2494,54 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
   }
 
   // Constants into this frame's ring: system, vertex float, pixel float,
-  // bool/loop, fetch.
+  // bool/loop, fetch. A block the same as the last one written points at it.
+  static_assert(sizeof(system) <= kFloatConstantsRange);
   uint32_t offsets[5];
-  uint8_t* data;
-  if (!s.ReserveDrawConstants() || !s.Reserve(sizeof(system), offsets[0], data)) {
+  if (!s.ReserveDrawConstants() ||
+      !s.PlaceConstants(0, &system, sizeof(system), sizeof(system), offsets[0])) {
     s.stats.failed++;
     s.stats.failed_by[4]++;
     return;
   }
-  std::memcpy(data, &system, sizeof(system));
   for (uint32_t stage = 0; stage < 2; stage++) {
     const TranslatedShader* shader = stage == 0 ? vertex : pixel;
     uint32_t source = device + (stage == 0 ? kDeviceVertexFloatConstants
                                            : kDevicePixelFloatConstants);
-    if (!s.Reserve(kFloatConstantsRange, offsets[1 + stage], data)) {
-      s.stats.failed++;
-      s.stats.failed_by[4]++;
-      return;
-    }
-    if (!shader) {
-      continue;
-    }
-    // Only the registers the shader reads, packed in order.
+    // Only the registers the shader reads, packed in order, into the last
+    // copy, noting whether any differ.
+    uint8_t* copy = s.last_constants.bytes[1 + stage];
+    bool same = s.last_constants.valid[1 + stage];
     uint32_t packed = 0;
-    for (uint32_t i = 0; i < 256; i++) {
+    for (uint32_t i = 0; shader && i < 256; i++) {
       if (!(shader->float_constants[i >> 6] & (uint64_t(1) << (i & 63)))) {
         continue;
       }
       for (uint32_t c = 0; c < 4; c++) {
         uint32_t value = guest::LoadU32(base, source + 16 * i + 4 * c);
-        std::memcpy(data + 16 * packed + 4 * c, &value, 4);
+        uint32_t* slot = reinterpret_cast<uint32_t*>(copy + 16 * packed + 4 * c);
+        if (*slot != value) {
+          *slot = value;
+          same = false;
+        }
       }
       packed++;
     }
+    if (!s.PlaceConstants(1 + stage, copy, 16 * packed, kFloatConstantsRange,
+                          offsets[1 + stage], true, same)) {
+      s.stats.failed++;
+      s.stats.failed_by[4]++;
+      return;
+    }
   }
-  if (!s.Reserve(kBoolLoopConstantsRange, offsets[3], data)) {
+  if (!s.PlaceConstants(3, &regs.values[XE_GPU_REG_SHADER_CONSTANT_BOOL_000_031],
+                        kBoolLoopConstantsRange, kBoolLoopConstantsRange, offsets[3]) ||
+      !s.PlaceConstants(4, &regs.values[XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0],
+                        kFetchConstantsRange, kFetchConstantsRange, offsets[4])) {
     s.stats.failed++;
     s.stats.failed_by[4]++;
     return;
   }
-  std::memcpy(data, &regs.values[XE_GPU_REG_SHADER_CONSTANT_BOOL_000_031], kBoolLoopConstantsRange);
-  if (!s.Reserve(kFetchConstantsRange, offsets[4], data)) {
-    s.stats.failed++;
-    s.stats.failed_by[4]++;
-    return;
-  }
-  std::memcpy(data, &regs.values[XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0], kFetchConstantsRange);
+  s.stats.constants_draws++;
 
   // Pipeline and textures.
   VkDescriptorSetLayout vertex_layout = s.GetTextureLayout(vertex, VK_SHADER_STAGE_VERTEX_BIT);
@@ -2660,6 +2714,7 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
   now.pipeline = pipeline;
   now.layout = key.layout;
   std::memcpy(now.sets, sets, sizeof(sets));
+  std::memcpy(now.offsets, offsets, sizeof(offsets));
   now.indexed = rectangle_list || quad_list || !call.inline_vertices;
   now.index_buffer = s.mirrors[s.frame].buffer;
   now.index_type = rectangle_list || quad_list || index_32bit ? VK_INDEX_TYPE_UINT32
@@ -2680,7 +2735,7 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
   // skip_repeated_state they aren't recorded again.
   const State::RecordedState& last = s.recorded;
   auto same = [](const auto& a, const auto& b) { return !std::memcmp(&a, &b, sizeof(a)); };
-  bool repeated[8] = {};
+  bool repeated[9] = {};
   bool both_indexed = last.valid && now.indexed && last.indexed;
   if (last.valid) {
     repeated[0] = same(last.viewport, now.viewport);
@@ -2693,8 +2748,9 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
                   last.index_offset == now.index_offset && last.index_type == now.index_type;
     repeated[7] = both_indexed && last.index_buffer == now.index_buffer &&
                   last.index_type == now.index_type;
+    repeated[8] = repeated[5] && same(last.offsets, now.offsets);
     s.stats.state_compared++;
-    for (int i = 0; i < 8; i++) {
+    for (int i = 0; i < 9; i++) {
       s.stats.state_repeated[i] += repeated[i];
     }
   }
@@ -2714,9 +2770,10 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
   if (!(skip && repeated[4])) {
     vk::vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
   }
-  // Every draw: the constants' dynamic offsets change with each draw.
-  vk::vkCmdBindDescriptorSets(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, key.layout, 0, 4, sets,
-                              5, offsets);
+  if (!(skip && repeated[8])) {
+    vk::vkCmdBindDescriptorSets(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, key.layout, 0, 4, sets,
+                                5, offsets);
+  }
   if (now.indexed && !(skip && repeated[6])) {
     vk::vkCmdBindIndexBuffer(commands, now.index_buffer, now.index_offset, now.index_type);
   }
@@ -3212,6 +3269,10 @@ std::vector<uint64_t> Passes::main_view_pixel_shaders() const {
 
 void Passes::set_skip_repeated_state(bool skip) {
   state_->skip_repeated_state = skip;
+}
+
+void Passes::set_reuse_constants(bool reuse) {
+  state_->reuse_constants = reuse;
 }
 
 void Passes::set_copy_all(bool copy_all) {
