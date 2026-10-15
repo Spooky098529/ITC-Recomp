@@ -159,6 +159,9 @@ race (`itc_659.log` before, `itc_668.log` after):
 | Worst frame per 5 s | 0.4-11 ms | 0.5-11 ms, mostly under 3 |
 | Long frames (40 ms+) from textures | the race's first frame (52 ms) | none |
 
+On the Steam Deck (CI build of `47484c8`), the user found driving
+"definitely less hitchy" (2026-10-15); no log yet.
+
 The time saved is the hashing: each new texture was hashed about 60
 times in its first 240 frames, plus the false reloads of the 300x150
 texture. Marking costs 3-26 ms per 5 s pinned (50,000-80,000 memcpy writes
