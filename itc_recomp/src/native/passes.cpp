@@ -551,8 +551,14 @@ struct Passes::State {
   uint8_t* guest_base = nullptr;
   uint32_t front_mirror = 0;
   std::vector<std::pair<uint32_t, uint32_t>> mirror_pending[2], mirror_taken;
+  // The writes the front mirror hasn't had, sorted by start, to count drawn
+  // ranges it's missing data of (memcpy being the only writer).
+  std::vector<std::pair<uint32_t, uint32_t>> front_missing;
+  uint32_t front_missing_longest = 0;
   struct MirrorByTickStats {
-    uint64_t frames = 0, swaps = 0, writes = 0, bytes = 0, stale_lines = 100;
+    uint64_t frames = 0, swaps = 0, writes = 0, bytes = 0;
+    uint64_t stale[2] = {}, stale_bytes[2] = {};  // [render-only list]
+    uint64_t stale_lines = 200;
   } by_tick;
   // The mirror this frame's draws read.
   GuestMirror& draw_mirror() { return mirrors[mirror_by_tick ? front_mirror : frame]; }
@@ -1123,6 +1129,26 @@ void Passes::State::Mirror(uint8_t* base, uint32_t address, uint32_t size, bool 
   }
   if (mirror_by_tick) {
     // The mirror has memcpy's writes as of the last logic pass's list.
+    uint32_t end = address + size;
+    auto it = std::lower_bound(
+        front_missing.begin(), front_missing.end(),
+        std::make_pair(address > front_missing_longest ? address - front_missing_longest : 0, 0u));
+    for (; it != front_missing.end() && it->first < end; ++it) {
+      if (it->second <= address) {
+        continue;
+      }
+      bool render_only = !Renderer_ReplayingLogicList();
+      by_tick.stale[render_only]++;
+      by_tick.stale_bytes[render_only] += size;
+      if (by_tick.stale_lines) {
+        by_tick.stale_lines--;
+        REXLOG_INFO("native renderer: mirror by tick: frame {}, {} list: {} range {:08X} ({} "
+                    "bytes) misses a write to {:08X}-{:08X}",
+                    by_tick.frames, render_only ? "a render-only pass's" : "a logic pass's",
+                    index ? "index" : "vertex", address, size, it->first, it->second);
+      }
+      break;
+    }
     if (verify_mirror) {
       stats.mirror_checked++;
       if (std::memcmp(draw_mirror().mapped + address, PhysicalHostAddress(base, address), size)) {
@@ -1208,6 +1234,16 @@ void Passes::State::MirrorByTickFrameStart(uint8_t* base) {
     front_mirror = back;
     by_tick.swaps++;
   }
+  front_missing.clear();
+  front_missing_longest = 0;
+  for (auto [start, end] : mirror_pending[front_mirror]) {
+    end = std::min(end, kPhysicalMemorySize);
+    if (start < end) {
+      front_missing.emplace_back(start, end);
+      front_missing_longest = std::max(front_missing_longest, end - start);
+    }
+  }
+  std::sort(front_missing.begin(), front_missing.end());
 }
 
 std::pair<uint32_t, uint32_t> Passes::State::DrawIndexRange(uint8_t* base, uint32_t address,
@@ -3715,9 +3751,13 @@ std::string Passes::TakeMirrorByTick() {
     return {};
   }
   State::MirrorByTickStats& b = s.by_tick;
-  std::string text = fmt::format("{} frames, {} swaps; {} writes applied ({:.1f} MB)", b.frames,
-                                 b.swaps, b.writes, b.bytes / 1048576.0);
+  std::string text = fmt::format(
+      "{} frames, {} swaps; {} writes applied ({:.1f} MB); drawn ranges missing a write: {} in "
+      "logic passes' lists ({:.2f} MB), {} in render-only passes' ({:.2f} MB)",
+      b.frames, b.swaps, b.writes, b.bytes / 1048576.0, b.stale[0], b.stale_bytes[0] / 1048576.0,
+      b.stale[1], b.stale_bytes[1] / 1048576.0);
   b.frames = b.swaps = b.writes = b.bytes = 0;
+  b.stale[0] = b.stale[1] = b.stale_bytes[0] = b.stale_bytes[1] = 0;
   return text;
 }
 
