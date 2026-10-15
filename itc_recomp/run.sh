@@ -10,6 +10,8 @@
 #
 #   ./run.sh                     frame interpolation on (the default)
 #   ./run.sh --no-interpolation  the original 30 fps
+#   ./run.sh --width=1920 --height=1080   a bigger window, drawn sharper
+#   ./run.sh --fullscreen        fill the screen, drawn at its resolution
 #
 # Logging is off; ./run-debug.sh runs the same with logs (in logs/), for
 # reporting problems.
@@ -19,11 +21,20 @@
 # unlimited), each frame blended between the last two ticks. Menus stay at
 # 30 fps. Motion blur and glow are always drawn.
 #
-# The window is 1280x720 and draws at the game's own resolution. --width
-# and --height size the window and draw as sharp as it allows (e.g.
-# --width=1920 --height=1080); --fullscreen fills the screen at its own
-# resolution (with --width/--height, draws at that resolution instead).
-# Screens and windows that aren't 16:9 get black bars.
+# Resolution (none of these is on by default: out of the box the game runs
+# in a 1280x720 window at its own resolution, its 3D view drawn at 1024x576
+# and upscaled, as on the console):
+#   --width=W --height=H  the window's size in pixels; the game is drawn at
+#                         the largest 16:9 resolution that fits it. Give
+#                         one alone and the other follows at 16:9.
+#   --fullscreen          fill the screen (borderless, no display mode
+#                         change), drawn at the screen's resolution; with
+#                         --width/--height, drawn at that resolution and
+#                         scaled to the screen (e.g. to go easier on a weak
+#                         GPU).
+# At any size but 1280x720 the 3D view is drawn at the full resolution too,
+# not upscaled. Screens and windows that aren't 16:9 get black bars. Higher
+# resolutions cost GPU time only.
 #
 # The renderer's copies of guest memory are updated once a frame instead of
 # checked draw by draw (--native_renderer_mirror_by_tick and
