@@ -2369,9 +2369,16 @@ every replayed command (~27,000 a frame) before checking the flag.
 `[[gnu::noinline]]` function for the logging; the check inlines into the
 call site. Render thread, Mcycles a frame, alternating: before 11.442,
 11.979, 11.883, 11.867, 11.796; after both fixes 11.699, 11.367, 11.592
-(~-2%); neither symbol shows in the profile any more. The same pattern
-(a diagnostic's flag checked inside a big inlined function on a hot path)
-is worth looking for elsewhere. What was written before:
+(~-2%); neither symbol shows in the profile any more. Looking for the same pattern elsewhere (the render
+thread's hot functions ranked by the share of their samples in their
+first 64 bytes) found `GetRenderer()` (`renderer.cpp`): 1.3-2% of the
+thread, 58% of it at entry, as `new Renderer()` and `Init` were inlined
+into it with a 0x948-byte frame, set up on every call (several per
+command). The start is now `[[gnu::noinline]] StartRenderer()` and
+`GetRenderer` inlines into its callers: one profile each, 11.732 before,
+11.402 after (~150 thousand cycles a frame, its share before). The rest
+with many samples at entry (`sub_8258FD48`, `sub_8258FF50`) are wrappers
+with small frames, not this pattern. What was written before:
 
 **To check: `Buffers_OnCommand`'s cost.** `Buffers_OnCommand`
 (`native/buffers.cpp`) is called from `Renderer_OnCommand`

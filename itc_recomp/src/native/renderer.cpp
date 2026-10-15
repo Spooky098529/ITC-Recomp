@@ -1057,14 +1057,20 @@ bool g_failed = false;
 // Guest memory's base, from the command hooks (Renderer_EndFrame has none).
 uint8_t* g_base = nullptr;
 
+// Kept out of line: inlined, Init's stack frame was set up on every call to
+// GetRenderer (several per replayed command), ~2% of the render thread.
+[[gnu::noinline]] void StartRenderer() {
+  g_renderer = new Renderer();
+  if (!g_base || !g_renderer->Init(g_base)) {
+    REXLOG_ERROR("native renderer: couldn't start; continuing without it");
+    g_failed = true;
+    g_renderer = nullptr;  // leaked: may hold objects already made
+  }
+}
+
 Renderer* GetRenderer() {
   if (!g_renderer && !g_failed) {
-    g_renderer = new Renderer();
-    if (!g_base || !g_renderer->Init(g_base)) {
-      REXLOG_ERROR("native renderer: couldn't start; continuing without it");
-      g_failed = true;
-      g_renderer = nullptr;  // leaked: may hold objects already made
-    }
+    StartRenderer();
   }
   return g_renderer;
 }
