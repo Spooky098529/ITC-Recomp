@@ -22,6 +22,8 @@ date as you learn things.
 - Only search inside this repo. Ask for the location of anything outside it.
 - Commit often. Never revert or `git checkout` uncommitted work without
   committing it first.
+- Don't create branches (local or pushed) without asking the user first;
+  work on the branch you're on unless they say otherwise.
 - Push work branches to `origin` (github.com/Spooky098529/ITC-Recomp) after
   each commit. Ask before pushing to `main` or pushing tags.
 - No `-march=native`.
