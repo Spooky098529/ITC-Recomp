@@ -358,6 +358,26 @@ branch-record run is skewed, so take shares from a plain run):
    `Substitute`, matrix loads and stores, or the ~20 cvar reads an upload
    are the candidates): split it with a profile (functions marked
    `noinline`, or sample offsets within the function) before more work.
+   **The split** (a build with `Apply`, `Substitute`, `BlendProduct`, the
+   matrix loads and stores and the logs' upload hooks `noinline`):
+   `PixelConstantBlender::Apply` 3.6% (~24% its loop sorting the 252
+   components, ~17% the loop storing the blend, ~15% at its entry),
+   `BlendState_ReplayConstants` itself 1.8% (~20% a locked increment per
+   camera product, ~25% putting the lighting upload back float by
+   float), `ReplayCameras::Substitute` 1.1% (~55% the `unordered_map`
+   lookup: a divide, then a chain of nodes), the matrix math ~1.5%, the
+   logs' hooks ~0.6%. Fixes, one at a time:
+   1. **The locked increment: done.** `counts_.replayed_products`, a
+      `std::atomic` read only by `--log_blend_state`, is counted only with
+      it. `BlendState_ReplayConstants` 6.01% to 5.75%; fps within noise
+      (325.0 to 327.4 mean over three alternating pairs, one pair the
+      other way).
+   2. `Substitute`'s lookup: a flat table built by the main thread.
+   3. `Apply`'s sorting loop: the flags it writes are bytes, which may
+      alias anything, so the vectors' data and sizes are reloaded every
+      iteration; take them into locals.
+   4. Storing the blend and putting it back: a whole buffer written with
+      one vectorized loop each.
 2. **The mirror's per-draw work** (~7%): cache each draw's index range
    (lowest, highest) by index buffer, count and format, dropped on a
    memcpy write as the mirror's copies are; a flat table instead of the
