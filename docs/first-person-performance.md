@@ -8,8 +8,9 @@ diagnostics left running (about +9% uncapped together, see "Profile of
 2026-10-15" below); reusing constant blocks and skipping descriptor binds
 (~+1.4%) and copying constants from guest memory vectorized (~+14%), both
 from `descriptor-reuse`, released in v0.3.7 (uncapped ~285 to ~320 fps); not
-yet checked on the Deck. The next step is a fresh profile (the latest is in
-"Profile of 2026-10-15", second part), then the "Next" list there. Read `CLAUDE.md` first
+yet checked on the Deck. A fresh profile after v0.3.7 is in "Profile of
+2026-10-15, after v0.3.7", with where libc and driver time comes from and
+the next steps. Read `CLAUDE.md` first
 (rules: find problems with logs, commit and push work branches after each
 commit, keep docs up to date; no Windows code on branches off `main`).
 
@@ -152,7 +153,8 @@ manage well under 1 µs. Roughly by payoff for the effort:
    at 27%, much of it in the driver). **Skipping repeated state: done**
    (2026-10-15, `--native_renderer_skip_repeated_state`, see "Performance:
    repeated state calls" in `native-renderer.md`): +6.5% uncapped. The
-   descriptor sets are still bound every draw.
+   descriptor sets have since been bound only when they change (62% of
+   draws).
 6. **Smaller items**: the interpolation blending (~2.5-3 ms a frame on
    the Deck in cockpit; SIMD), and the library's remaining packet writers
    (~3-4%, in Known issues).
@@ -270,3 +272,74 @@ not worth SIMD.
    payoff would be knowing what changed since the last draw without
    comparing, which is (3) and could skip shader, pipeline and texture
    set lookups too.
+
+## Profile of 2026-10-15, after v0.3.7 (PC, attract race)
+
+On `8ee1120` (v0.3.7 plus docs), uncapped attract race, ~318 fps mean
+over the race's seconds 3-18; the render thread at ~98% of a core, the
+main thread ~65%. Flat profile (`perf record -e cycles:u -t <tid>`, 12 s
+from 14 s after launch, `--log_level=off` as `run.sh` runs; a run with
+info logging gave the same picture plus ~1% of its interface maps):
+`itc` 77%, libc 12%, the Vulkan driver 9.4%, libstdc++ 0.9%. Nothing
+dominates any more:
+
+| Part | Share | Biggest items |
+|---|---|---|
+| `Passes::State::Draw` itself | 10.8% | |
+| Vulkan driver | 9.4% | see below |
+| libc | 12% | see below |
+| Texture binding | ~8% | `GetView` 3.5, `GetSwizzledView` 1.4, `GetTextureSet` 1.4, `GetSampler` 1.2, `SwizzledSigns`, `GetTextureLayout` |
+| Mirror | ~7% | `IndexRange` 2.8, `Buffers_NewestWrite` 1.4, the per-frame `mirrored` set's insert 1.3 (`unordered_set<uint64_t>`), `Mirror` 0.8, `TakePending` |
+| Interpolation | ~7% (+ ~1.3% of libc) | `BlendState_ReplayConstants` 7.1, `QuaternionFromRotation` 0.5 |
+| Reading state | ~6% | `ReadRegisters` 2.9, `GetTarget` 2.6, `GetHostViewportInfo` 0.7 |
+| Shader lookup | ~4% | `ShaderCache::Get` 1.7, XXH3 of the microcode 1.4, `GetInterface` |
+| Replay handlers and library (guest) | ~15% | render states 2.0, sampler states 1.7, the shader reference count ~3 (below), SetIndices 0.8 |
+
+**Where libc and driver time comes from** (branch records, `-j any_call,u`,
+8 s; each sample outside `itc` charged to the source of the first branch
+from `itc`, by a script over `perf script -F period,ip,dso,brstack` with
+the load addresses from `--show-mmap-events`; the flat profile of a
+branch-record run is skewed, so take shares from a plain run):
+
+- `Draw` calls 10.3% of the thread's time outside `itc`: the driver 6.6%
+  (call sites, by the function table offset they call through and their
+  arguments: `vkCmdBindDescriptorSets` 2.3%, `vkCmdDrawIndexed` 2.2%,
+  `vkCmdBindPipeline` 1.3%, one more 0.8%), `memcpy` 0.7% (one site),
+  `memcmp` ~2% spread over ~10 sites, some of it the driver's (tail jumps
+  aren't recorded, so a driver function that jumps to `memcmp` is charged
+  to the call before).
+- `PlaceConstants`: `memcpy` 0.9% and `memcmp` 0.8% (writing and
+  comparing constant blocks).
+- Interpolation's allocations: `_int_free` from a `shared_ptr`'s control
+  block 0.9%, malloc/free from `BlendState_ReplayConstants` ~0.6%,
+  `vector<float>` copies 0.2%: ~1.7% with libstdc++.
+- `BeginFrame` freeing 0.4%; `GetTextureSet` into the driver 0.6% (sets
+  allocated); `Resolve` into the driver 0.4%.
+- **The "Release" samples (`sub_822A67B0`, 2.3%)** follow a call to AddRef
+  from SetVertexShader (`__imp__sub_822A8808`) in every sample: it calls
+  AddRef on the new shader, then reaches Release of the old one by a tail
+  jump (not recorded). So that's the locked compare-and-swap of binding a
+  different vertex shader (the ~48% of binds that aren't the same one),
+  ~3% with AddRef's own 0.8%.
+
+**Next, from this** (estimates):
+1. **Interpolation's allocations and the replay's lookups** (~7% plus
+   ~1.7%): the per-upload `std::vector` and `shared_ptr`.
+2. **The mirror's per-draw work** (~7%): cache each draw's index range
+   (lowest, highest) by index buffer, count and format, dropped on a
+   memcpy write as the mirror's copies are; a flat table instead of the
+   `mirrored` `unordered_set`.
+3. **Texture binding** (~8%): cache what `GetView`, `GetSampler` and
+   `SwizzledSigns` work out per fetch constant (its 6 words).
+4. **Descriptor binds** (2.3% in the driver plus our share of `Draw`):
+   bound for ~62% of draws, mostly for new constant offsets. Push
+   descriptors, or constants reached through one buffer with offsets in
+   push constants, would cut them; a change to how the translated shaders
+   read constants.
+5. **The shader reference count** (~3%): the counts' atomics can't simply
+   go (Release has ~40 callers, some on other threads). One option: hold a
+   reference of our own to each vertex shader once bound, so SetVertexShader
+   needn't touch counts; shaders would then never be destroyed (the user's
+   call).
+6. **Shader lookup** (~4%): key by object and declaration (Known issues
+   in `native-renderer.md`).
