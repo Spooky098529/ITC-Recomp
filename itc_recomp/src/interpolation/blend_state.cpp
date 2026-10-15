@@ -249,6 +249,9 @@ struct ReplayFrame {
 
 std::mutex g_replay_mutex;
 std::shared_ptr<const ReplayFrame> g_replay_frame;
+// Frames the render thread is done with, freed by the main thread: a frame
+// holds ~1,500 products, each a node to free.
+std::vector<std::shared_ptr<const ReplayFrame>> g_retired_replay_frames;
 
 // The matrix multiply's return address in the per-object recorder
 // (sub_825953D0): out = the command's constants, a = world, b = camera.
@@ -885,8 +888,13 @@ class DrawState {
       }
     }
     counts_.products_published += int(frame->products.size());
-    std::lock_guard lock(g_replay_mutex);
-    g_replay_frame = std::move(frame);
+    std::shared_ptr<const ReplayFrame> replaced = std::move(frame);
+    {
+      std::lock_guard lock(g_replay_mutex);
+      std::swap(g_replay_frame, replaced);
+      retired_frames_.swap(g_retired_replay_frames);  // hands back an emptied one
+    }
+    retired_frames_.clear();  // the frames are freed here, outside the lock
   }
 
   // The camera of a pass whose view-projection is its view * projection.
@@ -954,6 +962,9 @@ class DrawState {
   std::unordered_map<ObjectKey, ScaledTransform, ObjectKeyHash> objects_last_tick_;
   std::unordered_map<ObjectKey, ScaledTransform, ObjectKeyHash> objects_this_tick_;
   std::unordered_map<uint32_t, int> recorded_;
+  // Exchanged with g_retired_replay_frames, so the render thread's list keeps
+  // its capacity.
+  std::vector<std::shared_ptr<const ReplayFrame>> retired_frames_;
 
   // A multiply, identified across ticks by its operands' addresses, which
   // camera it was (see CameraIds), and how many times that combination
@@ -1406,7 +1417,12 @@ class ReplayCameras {
     }
     last_identity_ = 0;
     std::lock_guard lock(g_replay_mutex);
-    frame_ = g_replay_frame;
+    if (frame_ != g_replay_frame) {
+      if (frame_) {
+        g_retired_replay_frames.push_back(std::move(frame_));
+      }
+      frame_ = g_replay_frame;
+    }
     if (REXCVAR_GET(log_moving_products) && frame_) {
       GetMovingProductsLog().OnFrameStart(frame_->tick, frame_->amount);
     }
@@ -1673,7 +1689,7 @@ ReplayedConstantsLog& GetReplayedConstantsLog() {
 class PixelConstantBlender {
  public:
   void OnFrameStart(uint64_t tick) {
-    occurrences_.clear();
+    frame_++;
     if (tick != tick_) {
       tick_ = tick;
       // A new tick: what was current becomes the previous tick's. Objects
@@ -1685,31 +1701,43 @@ class PixelConstantBlender {
           continue;
         }
         if (entry.current_tick + 1 == tick) {
-          entry.previous = entry.current;
+          entry.previous.swap(entry.current);  // current is rewritten before it's read
           entry.previous_tick = entry.current_tick;
         }
         ++it;
       }
+      for (auto it = occurrences_.begin(); it != occurrences_.end();) {
+        it = it->second.tick + 2 < tick ? occurrences_.erase(it) : std::next(it);
+      }
     }
   }
 
-  // Blends the upload in place; returns the original to put back after.
-  std::optional<std::vector<float>> Apply(uint8_t* base, uint32_t payload, uint32_t packed,
-                                          float amount, uint64_t object) {
+  // Blends the upload in place and returns true; recorded() then holds the
+  // upload as recorded, to put back after.
+  bool Apply(uint8_t* base, uint32_t payload, uint32_t packed, float amount, uint64_t object) {
     outcome_ = Outcome::kNoObject;
     switch_jumps_ = 0;
     if (object == 0) {
-      return std::nullopt;  // no object to pair by
+      return false;  // no object to pair by
     }
     uint32_t start = (packed >> 8) & 0xFF, count = packed & 0xFF;
-    Key key{object, start, count, occurrences_[{object, start, count, 0}]++};
-    std::vector<float> now(count * 4);
+    // How many uploads of this object, start and count came earlier in the
+    // frame (counts from earlier frames are stale, not cleared).
+    Occurrence& seen = occurrences_[{object, start, count, 0}];
+    if (seen.frame != frame_) {
+      seen = {frame_, tick_, 0};
+    }
+    Key key{object, start, count, seen.count++};
+    std::vector<float>& now = now_;
+    now.resize(count * 4);
     for (uint32_t i = 0; i < now.size(); i++) {
       now[i] = guest::LoadFloat(base, payload + 4 * i);
     }
     last_key_ = {object, key.occurrence};
-    last_values_ = now;
-    last_blended_ = now;
+    keep_blended_ = REXCVAR_GET(log_pixel_outcomes);
+    if (keep_blended_) {
+      last_blended_ = now;
+    }
     Entry& entry = entries_[key];
     // The light slots (cars' headlights among them) are recorded on a tick's
     // logic pass before the lights move, so they hold the previous tick's
@@ -1723,9 +1751,10 @@ class PixelConstantBlender {
     }
     if (entry.previous_tick + 1 != tick_ || entry.previous.size() != now.size()) {
       outcome_ = Outcome::kUnpaired;
-      return std::nullopt;
+      return false;
     }
-    if (entry.current != now) {
+    // From the latest, current was just set to now.
+    if (!from_latest && entry.current != now) {
       outcome_ = Outcome::kNotAsRecorded;  // differs from the tick's first value
       differing_.clear();
       for (uint32_t i = 0; i < now.size(); i++) {
@@ -1733,7 +1762,7 @@ class PixelConstantBlender {
           differing_.push_back({i, entry.current[i], now[i]});
         }
       }
-      return std::nullopt;
+      return false;
     }
     // Some components are per-object switches that legitimately jump
     // between ticks (c1.x, c3.xyz, c4.x of an upload: which lights reach the
@@ -1816,7 +1845,8 @@ class PixelConstantBlender {
       uint32_t r = i / 4;
       return !only_lights || (r >= 8 && r < 16) || (r >= 24 && r < 32);
     };
-    std::vector<bool> jumps(now.size(), false);
+    std::vector<uint8_t>& jumps = jumps_;
+    jumps.assign(now.size(), 0);
     bool changed = false;
     for (uint32_t i = 0; i < now.size(); i++) {
       float a = entry.previous[i], b = now[i];
@@ -1848,7 +1878,7 @@ class PixelConstantBlender {
           outcome_ = Outcome::kRejected;
           rejected_ = i;
           rejected_values_ = {a, b};
-          return std::nullopt;
+          return false;
         }
         jumps[i] = true;
         switch_jumps_++;
@@ -1858,19 +1888,24 @@ class PixelConstantBlender {
     }
     if (!changed) {
       outcome_ = Outcome::kUnchanged;
-      return std::nullopt;
+      return false;
     }
     outcome_ = Outcome::kBlended;
-    last_blended_ = now;
     for (uint32_t i = 0; i < now.size(); i++) {
       float a = entry.previous[i], b = now[i];
       if (a != b && !jumps[i]) {
-        last_blended_[i] = a + (b - a) * amount;
-        guest::StoreFloat(base, payload + 4 * i, last_blended_[i]);
+        float blended = a + (b - a) * amount;
+        guest::StoreFloat(base, payload + 4 * i, blended);
+        if (keep_blended_) {
+          last_blended_[i] = blended;
+        }
       }
     }
-    return now;
+    return true;
   }
+
+  // The last upload as recorded (what Apply blended over).
+  const std::vector<float>& recorded() const { return now_; }
 
   // What the last Apply did, for --log_pixel_outcomes.
   enum class Outcome { kNoObject, kUnpaired, kNotAsRecorded, kRejected, kUnchanged, kBlended };
@@ -1888,14 +1923,20 @@ class PixelConstantBlender {
   const std::vector<Difference>& differing() const { return differing_; }
   // The last upload's object and occurrence, and its values as recorded.
   std::pair<uint64_t, int> last_key() const { return last_key_; }
-  const std::vector<float>& last_values() const { return last_values_; }
-  // ...and as uploaded (the blend, or as recorded).
+  const std::vector<float>& last_values() const { return now_; }
+  // ...and as uploaded (the blend, or as recorded); kept only with
+  // --log_pixel_outcomes.
   const std::vector<float>& last_blended() const { return last_blended_; }
 
  private:
   std::vector<Difference> differing_;
   std::pair<uint64_t, int> last_key_{};
-  std::vector<float> last_values_, last_blended_;
+  // The upload being blended, as recorded, and which components keep the
+  // tick's value: kept between uploads so as not to allocate each time.
+  std::vector<float> now_;
+  std::vector<uint8_t> jumps_;
+  std::vector<float> last_blended_;
+  bool keep_blended_ = false;
   static void LogRejection(uint32_t i, float a, float b);
 
   Outcome outcome_ = Outcome::kNoObject;
@@ -1907,15 +1948,30 @@ class PixelConstantBlender {
     uint64_t object;
     uint32_t start, count;
     int occurrence;
-    auto operator<=>(const Key&) const = default;
+    bool operator==(const Key&) const = default;
+  };
+  struct KeyHash {
+    size_t operator()(const Key& key) const {
+      uint64_t h = key.object * 0x9E3779B97F4A7C15ull;
+      h ^= (uint64_t(key.start) << 40 | uint64_t(key.count) << 32 | uint32_t(key.occurrence)) +
+           0x632BE59BD9B4E019ull + (h << 6) + (h >> 2);
+      return size_t(h ^ (h >> 29));
+    }
   };
   struct Entry {
     std::vector<float> current, previous;
     uint64_t current_tick = 0, previous_tick = 0;
   };
-  std::map<Key, Entry> entries_;
-  std::map<Key, int> occurrences_;
+  struct Occurrence {
+    uint64_t frame = 0, tick = 0;  // when last counted
+    int count = 0;
+  };
+  std::unordered_map<Key, Entry, KeyHash> entries_;
+  // Uploads of an object, start and count so far in the frame (occurrence 0
+  // in the key).
+  std::unordered_map<Key, Occurrence, KeyHash> occurrences_;
   uint64_t tick_ = 0;
+  uint64_t frame_ = 0;
 };
 
 void PixelConstantBlender::LogRejection(uint32_t i, float a, float b) {
@@ -2578,11 +2634,12 @@ void BlendState_ReplayConstants(uint8_t* base, uint32_t payload, uint32_t packed
   // world matrix (c4-c7) and the camera's position (c8), which the paint's
   // reflections use: give them the same blend as c0-c3, when they hold
   // what the product was made from.
-  std::vector<float> original_extras;
-  if (original && count >= 9 && REXCVAR_GET(blend_object_extras)) {
+  std::array<float, 20> original_extras;
+  bool extras = original && count >= 9 && REXCVAR_GET(blend_object_extras);
+  if (extras) {
     const ProductBlendParts& parts = GetReplayCameras().last_parts();
     for (uint32_t i = 0; i < 20; i++) {
-      original_extras.push_back(guest::LoadFloat(base, payload + 64 + 4 * i));
+      original_extras[i] = guest::LoadFloat(base, payload + 64 + 4 * i);
     }
     bool world = LoadMatrix(base, payload + 64) == parts.world_now;
     if (world) {
@@ -2602,10 +2659,10 @@ void BlendState_ReplayConstants(uint8_t* base, uint32_t payload, uint32_t packed
       GetObjectExtrasLog().OnReplaced(world, eye_distance);
     }
   }
-  std::optional<std::vector<float>> original_pixel;
+  bool pixel_blended = false;
   if (REXCVAR_GET(interpolate_draw_state) && REXCVAR_GET(blend_pixel_constants) && stage == 1 &&
       ((packed >> 16) & 0xFF) == 1) {
-    original_pixel =
+    pixel_blended =
         GetPixelConstantBlender().Apply(base, payload, packed, GetReplayCameras().amount(),
                                         GetReplayCameras().last_identity());
     if (REXCVAR_GET(log_pixel_outcomes)) {
@@ -2618,7 +2675,7 @@ void BlendState_ReplayConstants(uint8_t* base, uint32_t payload, uint32_t packed
     }
   }
   GetSteppingConstantsLog().OnUpload(base, payload, packed,
-                                     original.has_value() || original_pixel.has_value());
+                                     original.has_value() || pixel_blended);
   if (REXCVAR_GET(log_object_extras) && stage == 0 && count == 9 && original) {
     GetObjectExtrasLog().OnUpload(base, payload);
   }
@@ -2687,7 +2744,7 @@ void BlendState_ReplayConstants(uint8_t* base, uint32_t payload, uint32_t packed
     }
   }
   GetOverlayUploadsLog().OnUpload(base, payload, packed,
-                                  original.has_value() || original_pixel.has_value(), original);
+                                  original.has_value() || pixel_blended, original);
   upload();
   for (uint32_t i = 0; i < zeroed.size(); i++) {
     guest::StoreU32(base, payload + 4 * i, zeroed[i]);
@@ -2695,12 +2752,15 @@ void BlendState_ReplayConstants(uint8_t* base, uint32_t payload, uint32_t packed
   if (original) {
     StoreMatrix(base, payload, *original);
   }
-  for (uint32_t i = 0; i < original_extras.size(); i++) {
-    guest::StoreFloat(base, payload + 64 + 4 * i, original_extras[i]);
+  if (extras) {
+    for (uint32_t i = 0; i < 20; i++) {
+      guest::StoreFloat(base, payload + 64 + 4 * i, original_extras[i]);
+    }
   }
-  if (original_pixel) {
-    for (uint32_t i = 0; i < original_pixel->size(); i++) {
-      guest::StoreFloat(base, payload + 4 * i, (*original_pixel)[i]);
+  if (pixel_blended) {
+    const std::vector<float>& recorded = GetPixelConstantBlender().recorded();
+    for (uint32_t i = 0; i < recorded.size(); i++) {
+      guest::StoreFloat(base, payload + 4 * i, recorded[i]);
     }
   }
 }
