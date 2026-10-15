@@ -1216,6 +1216,9 @@ To be fixed (or accepted) in milestone 7.
   2%, `GetPipeline` 1.6%. Known leads: the shader hashing and the
   mirror's redundant copies (both above); texture sets keyed by strings.
   Profile again before picking one.
+  Profiled again 2026-10-15 (the method, the breakdown and the next steps
+  are in `first-person-performance.md`, "Profile of 2026-10-15"); the
+  repeated state calls and the replay's diagnostics are done (above).
 - No Vulkan validation layer here yet (`--native_renderer_validation` falls
   back without it); install `vulkan-validation-layers` before drawing gets
   complicated.

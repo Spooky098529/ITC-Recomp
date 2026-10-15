@@ -1,9 +1,13 @@
 # First-person views: lower frame rate on the Steam Deck
 
-Status (2026-10-15): measured on the Deck, cause narrowed down, not fixed.
-Branch `perf-debug`. Read `CLAUDE.md` first (rules: find problems with
-logs, commit and push work branches after each commit, keep docs up to
-date; no Windows code on this branch).
+Status (2026-10-15, v0.3.6): measured on the Deck; the cause is the cost
+of each draw on the render thread, and the cockpit simply draws more (its
+interior and the rear-view mirror). So the work is making every draw
+cheaper, in any view. Done so far: skipping repeated state calls and
+diagnostics left running (about +9% uncapped together, see "Profile of
+2026-10-15" below); not yet checked on the Deck. Read `CLAUDE.md` first
+(rules: find problems with logs, commit and push work branches after each
+commit, keep docs up to date; no Windows code on branches off `main`).
 
 ## What the user reported
 
@@ -83,7 +87,7 @@ with a profile of the render thread **in the cockpit view**:
   cheaper (it may redraw the scene with the same states).
 
 Measure on the PC before and after any change: an uncapped attract race
-(`--max_fps=0`, about 258 fps mean, seconds 3-48 of the race), and a
+(`--max_fps=0`, about 280 fps mean since v0.3.6, seconds 3-48 of the race), and a
 pinned one (`taskset -c 0`) as a stand-in for the Deck. Then a build for
 the user's Deck: local builds need a newer glibc than SteamOS has, so
 push the branch and run CI on it (`gh workflow run build-linux.yml --ref
@@ -138,3 +142,73 @@ manage well under 1 µs. Roughly by payoff for the effort:
 
 Start with the profile in cockpit view and a draws-per-pass count: they
 show whether 1 and 2 are as big as estimated.
+
+## Profile of 2026-10-15 (PC, attract race)
+
+The user's view (2026-10-15): the cockpit just draws more, so general
+render optimisations are the way; a cockpit profile isn't needed first.
+
+**How it was profiled, with the release build as is** (no debug build:
+`-O0` changes what's slow). Start the game uncapped in the background, take
+the render thread's tid (the busiest `XThread...` in `ps -L -o
+tid=,pcpu=,comm= -p <pid>`), then `perf record -e cycles:u -t <tid>`.
+- A flat profile (`perf report --no-children --sort dso,sym`) is reliable.
+- Call stacks don't work: `--call-graph dwarf` drops every sample whose
+  stack passes through `itc` (unwinding fails there), and the release build
+  has no line tables (`addr2line` gives `passes.cpp:?`), though perf does
+  name inlined functions.
+- To charge libc and driver time to the function of ours that called it,
+  record the CPU's branch records instead: `perf record -e cycles:u -j
+  any_call,u -t <tid>`, then `perf script -F period,ip,sym,dso,brstacksym`
+  (or `brstack` for addresses) and take the first branch whose source is in
+  `itc`. Calls go through the GOT (`call *(%r15,%rbx,1)`), so disassembly
+  doesn't name the target, but `brstack`'s target addresses do. Tail
+  jumps aren't recorded, so a function entered by `jmp` (e.g. `memcmp`)
+  is charged to the call before it: treat those with care.
+- libc has no symbols perf reads, but `objdump -d /usr/lib/libc.so.6`
+  names its internal functions (`__memcmp_evex_movbe`, ...); the load
+  address is in `perf script --show-mmap-events`.
+
+**Render thread, before the changes below** (uncapped, ~260 fps):
+
+| Part | Share |
+|---|---|
+| Our renderer (`native::`) | ~37%: `Passes::State::Draw` 13%, textures ~8%, mirror/buffers ~5%, shader lookups ~3.5%, `ReadRegisters` 3% |
+| The game's Direct3D library and replay handlers (guest code) | ~21% |
+| Vulkan driver (`libvulkan_radeon`) | ~12%, 9% of it called from `Draw` |
+| `memcmp` | ~5%, some of it called by the driver |
+| `memcpy` | ~4.4%: 2.9% `Draw` writing constants into the ring, 1.1% the mirror |
+| Interpolation | ~10%: `BlendState_ReplayConstants` 6%, its mutex ~1.6%, malloc/free ~1% |
+| malloc/free elsewhere, other mutexes | ~2-3% |
+
+The matrix math in `interpolation/transform.cpp` is only ~1.5% (~137 ns
+a product, ~470 blended products a frame, measured with a benchmark):
+not worth SIMD.
+
+**Done** (v0.3.6; details under "Performance: repeated state calls" and
+"Performance: diagnostics on every constant replay" in
+`native-renderer.md`):
+- Draws record viewport, scissor, depth bias, blend constants, pipeline
+  and index buffer binding only when changed
+  (`--native_renderer_skip_repeated_state`); indexed draws use
+  `firstIndex`. Pixel-identical frames; uncapped 258 to 275 fps.
+- The constant replay's diagnostics (a clock read and a status string,
+  and a mutex-guarded lookup) run only with their flags: 275 to ~281.
+- Pinned to one CPU the gain didn't show clearly (runs vary ~15%); the
+  Deck's result is still to be seen.
+
+**Next, in order of payoff for the effort:**
+1. **Bind descriptor sets only when they change.** Still bound every
+   draw: the constants go to a new place in the ring each draw, so the
+   dynamic offsets always differ. If a block (system, each stage's floats,
+   bool/loop, fetch) equals the last one written, reuse its offset. The
+   sets themselves repeat for 44-51% of draws. Also saves most of the 2.9%
+   of `memcpy` into the ring. Count first (how often each block repeats),
+   as was done for the state calls.
+2. **Allocations in interpolation**: `PixelConstantBlender::Apply`
+   returns a `std::vector` per lighting upload, and a `shared_ptr` is freed
+   in the blending path. Check with a new profile whether any mutex is
+   still taken per upload (the per-upload `SlotOwner` lock is gone).
+3. The bigger ideas above: fewer passes redrawn on interpolated frames
+   (1), following the library's dirty flags (3), splitting the render
+   thread (4).
