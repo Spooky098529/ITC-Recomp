@@ -515,10 +515,74 @@ decompositions ~60. All of `interpolation::` ~1,170.
    profiles by more than one name). The render thread ~330 thousand
    cycles a frame lower overall (~2.2%).
    `ReadRegisters` copies ~350 words a draw and is still ~417 with the
-   copy vectorized (most samples on the `pshufb` after the load): why it
-   costs that much isn't known yet.
+   copy vectorized (most samples on the `pshufb` after the load): see
+   "Register reads" below for why, and the fix.
    Uncapped attract races, alternating: 341.8, 345.7, 346.1 fps mean
    against 332.1, 337.9, 335.6 before (~+2.8%).
+
+### Register reads (`read-registers`, 2026-10-15)
+
+`ReadRegisters` (`native/state.cpp`) fills the renderer's `RegisterFile`
+from the device's shadow: 7 register blocks and the fetch, bool and loop
+constants, 349 words. Measured with `--native_renderer_log_register_reads`
+(uncapped attract race):
+
+- **It runs once per draw**, ~2,150 times a frame (`AfterDraw`; command
+  18's items come one per command), copying ~750,000 words a frame
+  (~3 MB). Only ~9,000 of them change (~4 a read); 40% of reads change
+  nothing. By block, the share of reads changing it: fetch constants
+  ~60%, 0x2180 ~27%, 0x2200 ~12%, 0x2100 ~10%, the rest ~1% or 0.
+- **Not mainly memory stalls.** Timed with the time stamp counter, a copy
+  took ~300 cycles and the same copy repeated right after ~233, so
+  ~three quarters of it was the copy itself, not waiting on the shadow
+  (the guest's library, which writes the shadow, runs on the render
+  thread too, so the shadow should be in cache). The timing itself proved
+  unreliable for small copies (it read ~200 whatever the code did, so
+  the fences dominate), so changes were judged by profile; `perf stat`
+  cache-miss counts weren't taken.
+- **What changes is known already**: the library's setters mark what they
+  write in three dirty masks (device +16, +24, +32), and its draw flushes
+  the marked units and clears the masks (layout in "The register shadow
+  as a whole", `docs/gpu-functions.md`). In exclusive mode our
+  `DrawPackets_IndexedDraw` clears them itself, so it now hands the masks
+  (with the bits the shader load returns) to `MarkDeviceDirty` first. Other
+  library paths that flush (other draws, clears, predicated draws) go
+  through the flush helpers, whose hooks mark what they're given
+  (`sub_822ADE30`, `sub_822AE070`, and `sub_822ADC08`, which writes 0x2203
+  itself), and InlineDraw marks the words it overwrites in `regs`.
+  `ReadRegisters` copies only what's marked: ~15 words a read.
+
+Checked over a whole attract race (boot, title, race; ~2,200 reads a
+frame) against reading every block whole after each read: 0 words
+differ. The first try differed only in 0x2203 (~1 a frame), until
+`sub_822ADC08`'s hook marked it. Menus, other modes and the cockpit
+weren't covered by the check.
+
+Profiles, three runs each, alternating, thousand cycles a frame:
+
+| Build | `ReadRegisters` (+`CopyBlock`) | `DrawPackets_IndexedDraw` | Marking | Render thread |
+|---|---|---|---|---|
+| `blend-math` | 431, 403, 478 | 53, 49, 56 | | 14,594, 14,929, 14,657 |
+| dirty runs, by block (first try) | 239, 228, 239 | 74, 79, 83 | ~3 | 14,486, 14,696, 14,377 |
+| dirty bits through a table | 141, 167, 151 | 75, 73, 87 | 30, 22, 26 | 14,133, 14,380, 14,528 |
+
+So about −215 thousand cycles a frame (~1.5% of the render thread); the
+thread's total fell ~380 on average, within its noise. The first try
+converted the masks per block with `__builtin_bitreverse64` (the library
+numbers units from the top bit) and looped over all 10 blocks, finding
+runs: ~110 cycles a read for ~15 words, spread over the loop's
+bookkeeping (no x86 instruction reverses bits, so each is a long run of
+shifts and masks). Now the draw only ORs the masks, and the read walks
+each mask's set bits through a 3×64 table (shadow offset, register,
+words).
+
+Left, unexplained or not done: `ReadRegisters` is still ~150 thousand
+cycles a frame (~70 a read) for ~15 words, and the marking in the draw
+~25 more; `MarkRegistersDirty` grew from ~3 to ~25 between the two builds
+for no reason found (it's called from the flush helpers' hooks only).
+Readers of `RegisterFile` could also learn what changed (the masks say
+it), e.g. to skip comparing the fetch block when no fetch bit was set;
+not tried.
 
 **To investigate: reusing the lighting blender's decisions within a tick.**
 After the above, `Apply`'s per-component loop (does each component blend,

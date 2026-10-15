@@ -167,6 +167,30 @@ writes each run of set bits as a type-0 register write, register = first
 | `0x2300`- | +10552 |
 
 Fetch constants are flushed by `sub_822AE070` (from +1024 to `0x4800`).
+**Dirty masks.** The setters mark what they write in three 64-bit masks
+of the device, and DrawIndexedVertices flushes the marked units and
+clears the masks. `sub_822ADE30` and `sub_822AE070` take the top bit
+(`cntlzd`) as unit 0, so a block taking mask bits lo..lo+n-1 has unit k
+at bit lo+n-1-k:
+
+| Mask | Bits | Units |
+|---|---|---|
+| +16 shader state | 0-11 | `0x2200`-`0x220B` (bit 11 is `0x2200`) |
+| | 8 | also has `sub_822ADC08` called, which writes `0x2203` (+10432) itself |
+| | 12-43 | fetch constants 0-31, 6 words each (bit 43 is constant 0) |
+| | 44-48 | `0x2180`-`0x2184` |
+| | 49-52 | shaders: the shader load `sub_822AED18`, which writes the shadow and returns the mask with more bits |
+| +24 render state | 1 | bool and loop constants, all 40 words (`0x4900`-, +9984) |
+| | 2-22 | `0x2100`-`0x2114` |
+| | 23-38 | `0x2000`-`0x200F` |
+| | 39-59 | `0x2280`-`0x2294` |
+| +32 other state | 0-37 | `0x2300`-`0x2325` |
+| | 38-45 | `0x2380`-`0x2387` |
+| | 49-54 | `sub_822ADEF0` (other registers) |
+
+The native renderer reads only the marked units (see "Register reads" in
+`docs/first-person-performance.md`).
+
 So the device holds every register and constant a draw needs, in guest
 memory: a native renderer can read the GPU's state at each draw straight
 from it. It must read it after the library's draw call: some of it is
