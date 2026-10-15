@@ -2250,6 +2250,24 @@ Speed, uncapped attract races alternating (seconds 3-18): default 360 and
 still make the `mirrored` set's inserts and the index range work, which
 this would let go).
 
+**Draws' mirror work removed (2026-10-15, `7d62381`).** With
+`--native_renderer_mirror_by_tick` and none of the mirror's diagnostics,
+draws skip the index range (`DrawIndexRange`), the vertex sizes and
+`Mirror` (the `mirrored` set) altogether, as the mirrors need nothing from
+them; the segment map (`g_writes`) isn't kept either (only diagnostics
+and `--native_renderer_log_texture_writes` read it). With the mode,
+`--native_renderer_verify_mirror` looks each drawn range up in the writes
+the mirror hasn't had (fast; none missing over a 60 s race with
+`--native_renderer_mirror_to_both`). Render thread profiles, same build,
+alternating, `ITC_ARGS` off and on (`--native_renderer_mirror_by_tick=true
+--native_renderer_mirror_to_both=true`), Mcycles a frame: off 13.643,
+13.679, 13.622; on 11.649, 11.537, 11.722: **-14.7%** (frames drawn in the
+12 s window 4,445 against 5,113). Gone: `Buffers_NewestWrite` ~245k,
+`Mirror` ~185k, `TakePending` ~90k, `DrawIndexRange` ~70k cycles a frame,
+and the inlined set and map work. Left: `Buffers_OnCommand` ~90k a frame,
+though it returns at once without `--native_renderer_log_buffers` (worth
+a look).
+
 Was suggested first (for the user to decide): since writes only
 land in memory no frame in flight reads, each write could be copied into
 both mirrors when memcpy makes it (on its thread), and draws would do no
