@@ -465,10 +465,11 @@ bool Buffers_Logging() {
   return REXCVAR_GET(native_renderer_log_buffers);
 }
 
-void Buffers_OnCommand(uint8_t* base, uint32_t id, uint32_t payload, uint32_t count) {
-  if (!Buffers_Logging()) {
-    return;
-  }
+// Kept out of line: inlined, its stack frame (Seen's and the summary's) was
+// set up on every replayed command before the flag was checked, ~75 thousand
+// cycles a frame with the log off.
+[[gnu::noinline]] static void OnCommandLogged(uint8_t* base, uint32_t id, uint32_t payload,
+                                             uint32_t count) {
   if (id == 11 || id == 12) {
     for (uint32_t i = 0; i < count; i++) {
       uint32_t item = payload + 16 * i;
@@ -483,6 +484,12 @@ void Buffers_OnCommand(uint8_t* base, uint32_t id, uint32_t payload, uint32_t co
   if (auto now = Clock::now(); now - g_last_log >= std::chrono::seconds(5)) {
     g_last_log = now;
     LogSummary();
+  }
+}
+
+void Buffers_OnCommand(uint8_t* base, uint32_t id, uint32_t payload, uint32_t count) {
+  if (Buffers_Logging()) {
+    OnCommandLogged(base, id, payload, count);
   }
 }
 

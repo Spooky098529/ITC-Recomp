@@ -160,13 +160,11 @@ void TraceCommand(uint8_t* base, uint32_t id, uint32_t payload, uint32_t arg1, u
   s.trace_draws = 0;
 }
 
-}  // namespace
-
-void debug::ReplayStats_OnCommand(uint8_t* base, uint32_t id, uint32_t payload, uint32_t arg1,
-                                  uint32_t arg2) {
-  if (!REXCVAR_GET(log_replay_commands) || id >= kCommandCount) {
-    return;
-  }
+// Kept out of line: inlined, its stack frame was set up on every replayed
+// command before the flag was checked (~0.6% of the render thread with the
+// log off).
+[[gnu::noinline]] void OnCommandLogged(uint8_t* base, uint32_t id, uint32_t payload,
+                                       uint32_t arg1, uint32_t arg2) {
   Stats& s = GetStats();
   if (s.tracing) {
     TraceCommand(base, id, payload, arg1, arg2);
@@ -255,6 +253,15 @@ void debug::ReplayStats_OnCommand(uint8_t* base, uint32_t id, uint32_t payload, 
       words += fmt::format(" {:08X}", guest::LoadU32(base, payload + 4 * i));
     }
     s.sample[id] = fmt::format("arg1 {} arg2 {:08X} payload{}", arg1, arg2, words);
+  }
+}
+
+}  // namespace
+
+void debug::ReplayStats_OnCommand(uint8_t* base, uint32_t id, uint32_t payload, uint32_t arg1,
+                                  uint32_t arg2) {
+  if (REXCVAR_GET(log_replay_commands) && id < kCommandCount) {
+    OnCommandLogged(base, id, payload, arg1, arg2);
   }
 }
 

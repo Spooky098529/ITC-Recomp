@@ -2358,6 +2358,21 @@ alternating, `ITC_ARGS` off and on (`--native_renderer_mirror_by_tick=true
 and the inlined set and map work. Left: `Buffers_OnCommand` ~90k a frame
 (see "To check" below).
 
+**`Buffers_OnCommand`'s cost (fixed 2026-10-16).** Perf's attribution
+was right; the `perf annotate` above was likely read against a rebuilt
+binary. In a fresh profile the samples sat on the function's own prologue
+and epilogue: ThinLTO had inlined `Seen` and the summary into it, so it
+saved six registers, set up a 0x258-byte frame and a stack protector on
+every replayed command (~27,000 a frame) before checking the flag.
+`debug::ReplayStats_OnCommand` (`--log_replay_commands`) did the same,
+~0.6% of the render thread. Both now check their flag and call a
+`[[gnu::noinline]]` function for the logging; the check inlines into the
+call site. Render thread, Mcycles a frame, alternating: before 11.442,
+11.979, 11.883, 11.867, 11.796; after both fixes 11.699, 11.367, 11.592
+(~-2%); neither symbol shows in the profile any more. The same pattern
+(a diagnostic's flag checked inside a big inlined function on a hot path)
+is worth looking for elsewhere. What was written before:
+
 **To check: `Buffers_OnCommand`'s cost.** `Buffers_OnCommand`
 (`native/buffers.cpp`) is called from `Renderer_OnCommand`
 (`native/renderer.cpp`) for every replayed command, and without
