@@ -109,7 +109,7 @@ install -m 755 itc_recomp/run-debug.sh $D/run-debug.sh
 (cd $D && python3 -I -m zipfile -c ../$name.zip itc librexruntime.so run.sh run-debug.sh)
 ```
 
-## Status (`main`, 2026-10-15, v0.3.8)
+## Status (`main`, 2026-10-15, v0.3.9)
 
 Frame interpolation for races is working: logic runs at 30 Hz and frames are
 blended between ticks. The world, cameras, wheels (other cars' too, paired
@@ -118,7 +118,7 @@ cars' bodies), other cars' lighting passing street lamps, tunnels, the race
 start countdown, the HUD, the marker above opponents, the light trails, the
 texture animations (flashing lights, signs, the off-ramp chevron), the
 minimap triangle's flashing, the car's reflections, buildings' lighting,
-play time and the glow (bloom; `src/interpolation/glow.cpp`) are all done. `run.sh` turns
+play time and the glow (bloom; `src/interpolation/glow.cpp`, v0.3.9) are all done. `run.sh` turns
 interpolation on (marked experimental) with logging off; `run-debug.sh` is
 the same with logs; `./run.sh --no-interpolation` gives the original 30 fps.
 Our renderer always draws motion blur and glow (`--motion_blur` and
