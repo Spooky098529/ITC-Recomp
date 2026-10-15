@@ -869,6 +869,10 @@ memory).
   viewport, scissor, depth bias, blend constants, pipeline and index
   buffer binding, as before they were skipped when repeated (see
   "Performance: repeated state calls").
+- `--native_renderer_reuse_constants=false`: write every draw's constant
+  blocks into the ring and bind its descriptor sets, as before blocks the
+  same as the last written were reused (see "Performance: constants
+  written every draw").
 - `--native_renderer_copy_all`: copy every vertex and index range into the
   mirror every frame, as before memcpy's writes were tracked.
 - `--native_renderer_verify_mirror`: compare every range not copied with
@@ -1186,7 +1190,9 @@ To be fixed (or accepted) in milestone 7.
   draw (`RecordedState`, forgotten at a frame's start, after a resolve's
   draw and after the ID pass), and indexed draws bind the mirror at offset
   0 and start with `firstIndex` (97% then repeat the binding). Descriptor
-  sets are still bound every draw: the constants' dynamic offsets change.
+  sets were still bound every draw, the constants' dynamic offsets
+  changing; now only when they change (see "Performance: constants
+  written every draw").
   `--native_renderer_skip_repeated_state=false` brings back the old calls.
   Frames dumped every 5 s of an attract race at 30 fps
   (`--native_renderer_dump_every=5`, interpolation off) were
@@ -1194,6 +1200,33 @@ To be fixed (or accepted) in milestone 7.
   runs: 257 and 260 fps mean without, 275 and 276 with (10th percentile
   205/204 to 218/224). Pinned to one CPU: 51, 51, 59 without and 53, 62,
   62 with; noisy, so a small gain there at best.
+- **Performance: constants written every draw** (improved 2026-10-15,
+  branch `descriptor-reuse`). Each draw wrote its five constant blocks
+  (system, vertex floats, pixel floats, bool/loop, fetch) to new space in
+  the constants ring and bound its descriptor sets with the new offsets,
+  though the game sets only the constants that change (on the 360 they
+  stayed in the GPU's registers between draws). Each draw reserves ~9 KB
+  of the ring (4 KB per float stage), but writes less: only the float
+  registers its shaders read are packed in, ~2 KB a draw on average.
+  Now `PlaceConstants` compares each block with the last one written in
+  the block of the ring in use (`LastConstants`, a host copy; the ring
+  itself is uncached memory, not read back) and, when the same, points the
+  draw at it; the float registers are compared as they're packed, in the
+  same pass. Descriptor sets are bound only when they or their offsets
+  differ from the last draw's. Forgotten at a frame's start and when the
+  ring moves to another block. `--native_renderer_reuse_constants=false`
+  writes every block as before. Over an attract race (the "given
+  constants" line every 5 s), blocks reused: system 88-90%, vertex floats
+  74-75%, pixel floats 74-75%, bool/loop 100%, fetch 39-43%; constants
+  written a frame 4.5 MB to 1.5 MB; descriptor sets bound again for 62% of
+  draws instead of all ("with offsets" in the "following another draw"
+  line). Frames dumped every 5 s at 30 fps were pixel-identical with and
+  without. Uncapped attract race, alternating: 272.7 and 268.6 fps mean
+  without, 276.4 and 272.6 with (~+1.4%; 10th percentile 222/215 against
+  221/218). The fetch block limits the binds skipped: it holds all 32
+  texture fetch constants (768 bytes) though a shader reads a few; packing
+  only those it reads, as for the floats, would likely raise its reuse
+  (not tried; the gain in frame rate may be small, as here).
 - **Performance: diagnostics on every constant replay** (fixed
   2026-10-15). `BlendState_ReplayConstants` ran, for each vertex constant
   upload of 4+ registers (~1,500 a frame) and with logging off: a clock

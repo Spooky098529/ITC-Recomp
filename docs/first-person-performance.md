@@ -5,7 +5,8 @@ of each draw on the render thread, and the cockpit simply draws more (its
 interior and the rear-view mirror). So the work is making every draw
 cheaper, in any view. Done so far: skipping repeated state calls and
 diagnostics left running (about +9% uncapped together, see "Profile of
-2026-10-15" below); not yet checked on the Deck. Read `CLAUDE.md` first
+2026-10-15" below); reusing constant blocks and skipping descriptor binds
+(~+1.4%, branch `descriptor-reuse`); not yet checked on the Deck. Read `CLAUDE.md` first
 (rules: find problems with logs, commit and push work branches after each
 commit, keep docs up to date; no Windows code on branches off `main`).
 
@@ -114,7 +115,10 @@ manage well under 1 µs. Roughly by payoff for the effort:
    the tick's images could remove a large share of the draws on most
    frames. Count draws per pass first (the dump tools in
    `native-renderer.md` can) to see what's at stake.
-2. **Upload less constant data.** About 9 KB of shader constants is
+2. **Upload less constant data.** (Done in part: blocks the same as the
+   last written are reused, see "Profile of 2026-10-15", Next. The
+   estimate below was too high: ~9 KB a draw is reserved in the ring, but
+   only ~2 KB written, the floats being packed.) About 9 KB of shader constants is
    uploaded per draw (`native-renderer.md`, Known issues, the constants
    ring): at 2,800 draws ~25 MB a frame, ~1.25 GB/s of copying at 50 fps,
    on the render thread. The translated shaders know which constants they
@@ -198,13 +202,14 @@ not worth SIMD.
   Deck's result is still to be seen.
 
 **Next, in order of payoff for the effort:**
-1. **Bind descriptor sets only when they change.** Still bound every
-   draw: the constants go to a new place in the ring each draw, so the
-   dynamic offsets always differ. If a block (system, each stage's floats,
-   bool/loop, fetch) equals the last one written, reuse its offset. The
-   sets themselves repeat for 44-51% of draws. Also saves most of the 2.9%
-   of `memcpy` into the ring. Count first (how often each block repeats),
-   as was done for the state calls.
+1. **Bind descriptor sets only when they change: done** (2026-10-15,
+   branch `descriptor-reuse`; "Performance: constants written every draw"
+   in `native-renderer.md`). A block the same as the last one written is
+   reused; sets are bound for 62% of draws instead of all, constants
+   written fell from 4.5 to 1.5 MB a frame, and uncapped went up ~1.4%
+   (272.7/268.6 to 276.4/272.6 fps), less than hoped. The fetch block,
+   reused for only ~40% of draws, limits the binds skipped; packing only
+   the fetch constants a shader reads is the next step there, if worth it.
 2. **Allocations in interpolation**: `PixelConstantBlender::Apply`
    returns a `std::vector` per lighting upload, and a `shared_ptr` is freed
    in the blending path. Check with a new profile whether any mutex is
