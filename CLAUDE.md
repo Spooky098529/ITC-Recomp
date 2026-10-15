@@ -41,14 +41,18 @@ cmake --build itc_recomp/out/build/linux-amd64-release -j$(nproc)
 G="$PWD/itc/Import Tuner Challenge (USA)"; B=itc_recomp/out/build/linux-amd64-release
 XDG_DATA_DIRS=/usr/local/share:/usr/share LD_LIBRARY_PATH=$B:rexglue-sdk/out/linux-amd64 \
   $B/itc --native_renderer=true --native_renderer_exclusive=true --native_audio=true \
+  --native_renderer_mirror_by_tick=true --native_renderer_mirror_to_both=true \
   --game_data_root="$G" --mnk_mode=true --max_fps=144 \
   --log_fps=true --interpolate_draw_state=true <diagnostic flags>
 find /dev/shm -maxdepth 1 -user "$USER" -name 'xenia_memory_*' -delete
 ```
 
-- Always pass `--native_audio=true` in test runs, as `run.sh` does:
-  without it the SDK's Audio Worker spins on a core and frame rates come
-  out lower than players get.
+- Test runs use what `run.sh` passes: always `--native_audio=true`
+  (without it the SDK's Audio Worker spins on a core and frame rates come
+  out lower than players get) and the mirrors updated once a frame
+  (`--native_renderer_mirror_by_tick=true
+  --native_renderer_mirror_to_both=true`; `=false` on the first for the
+  old per-draw mirror). `profile_render_thread.sh` does the same.
 
 - If the build fails with "file ... has been modified since the precompiled
   header ... was built" (clang was updated), delete the stale headers:

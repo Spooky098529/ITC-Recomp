@@ -14,15 +14,28 @@
 # BlendState_ReplayConstants), its share and thousand cycles a frame. The
 # profile is kept as itc_recomp/out/profiles/<name>.data for perf report.
 # ITC_ARGS adds flags to the game's command line (e.g. to compare one build
-# with an option on and off).
+# with an option on and off); a default flag it names again is left out (the
+# game rejects a flag given twice), e.g.
+# ITC_ARGS=--native_renderer_mirror_by_tick=false for the old mirror.
 set -e
 D=$1; NAME=$2; PATTERN=${3:-BlendState_ReplayConstants}
 B=itc_recomp/out/build/linux-amd64-release; G="$PWD/itc/Import Tuner Challenge (USA)"
 mkdir -p itc_recomp/out/profiles; O=itc_recomp/out/profiles/$NAME.data
+# As run.sh: our audio and the mirrors updated once a frame.
+defaults=(--native_renderer=true --native_renderer_exclusive=true --native_audio=true
+  --native_renderer_mirror_by_tick=true --native_renderer_mirror_to_both=true
+  --game_data_root="$G" --mnk_mode=true --max_fps=0 --log_fps=true --interpolate_draw_state=true
+  --skip_intro --attract_after_s=1)
+read -ra extra <<< "${ITC_ARGS:-}"
+flags=()
+for flag in "${defaults[@]}"; do
+  for arg in "${extra[@]}"; do
+    [ "${arg%%=*}" = "${flag%%=*}" ] && continue 2
+  done
+  flags+=("$flag")
+done
 XDG_DATA_DIRS=/usr/local/share:/usr/share LD_LIBRARY_PATH=$B:rexglue-sdk/out/linux-amd64 \
-  timeout 30 "$D/itc" --native_renderer=true --native_renderer_exclusive=true --native_audio=true \
-  --game_data_root="$G" --mnk_mode=true --max_fps=0 --log_fps=true --interpolate_draw_state=true \
-  --skip_intro --attract_after_s=1 $ITC_ARGS > /dev/null 2>&1 &
+  timeout 30 "$D/itc" "${flags[@]}" "${extra[@]}" > /dev/null 2>&1 &
 sleep 14
 P=$(pgrep -n -x itc)
 T=$(ps -L -o tid=,pcpu= -p "$P" | sort -k2 -nr | head -1 | awk '{print $1}')
