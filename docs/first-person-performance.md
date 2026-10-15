@@ -474,7 +474,8 @@ Leads, not yet measured:
 Measured with `profile_render_thread.sh`, two or three runs a build,
 alternating. Builds with `PixelConstantBlender::Apply`, `Substitute`,
 `BlendProduct` and the logs' upload hooks `[[gnu::noinline]]` (a temporary
-commit), so the parts show apart. **The split** (thousand cycles a frame):
+commit, `76fe176`, removed on `read-registers`: all of this section's and
+"Register reads"' profiles were taken with it), so the parts show apart. **The split** (thousand cycles a frame):
 `Apply` ~370-410, `BlendState_ReplayConstants` itself ~250, `Substitute`
 ~85, and the math that depends only on the tick ~235:
 `QuaternionFromRotation` ~130, `SplitViewProjection` ~50, the
