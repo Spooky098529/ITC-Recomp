@@ -2509,7 +2509,11 @@ the desktop's units and the compositor stretches it, so a 3x frame was
 shrunk and stretched back. The window now asks for real pixels, and a
 windowed `--width`/`--height` is divided by the pixel density for SDL
 (`itc_790.log`: density 1.45, a 1920x1080 window got a 1920x1080
-swapchain).
+swapchain). Fullscreen then (`itc_791.log`, a race the user
+drove): swapchain 3840x2161 (the screen's 1490 desktop units times 1.45),
+drawn at 3x (frame 3840x2160, 3D view 3072x1728; one black row below),
+150-151 fps at the 144 cap, no failed draws; the user found it looks
+good.
 At present the frame is blitted as large as fits, centred, the rest of
 the swapchain image cleared black (`FitOffsets` in `renderer.cpp`). The
 swapchain is made again when SDL reports our window's pixel size changed
