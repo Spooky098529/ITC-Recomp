@@ -2268,6 +2268,11 @@ and the inlined set and map work. Left: `Buffers_OnCommand` ~90k a frame,
 though it returns at once without `--native_renderer_log_buffers` (worth
 a look).
 
+**A race the user drove (2026-10-15, `itc_769`)**, with both flags and
+`--native_renderer_verify_mirror`, capped at 144: ~3.5 minutes, ~140 s
+racing; no drawn range missing a write in any 5 s summary, and the
+pictures looked right to the user.
+
 Was suggested first (for the user to decide): since writes only
 land in memory no frame in flight reads, each write could be copied into
 both mirrors when memcpy makes it (on its thread), and draws would do no
