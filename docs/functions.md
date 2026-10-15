@@ -589,7 +589,7 @@ and target, and recorder world matrices), mostly for comparison.
 | `--max_fps` | Frame rate cap in races; 0 = unlimited. |
 | `--interpolate_draw_state` | Blending on (default) or off. |
 | `--motion_blur` | The game's velocity-based motion blur (pixel shader `7EB16456AAD56CBA`), skipped by the emulated GPU when false (`run.sh` did so until the native renderer, which always draws it and ignores this flag). Its velocities come from the tick, so it smears a whole tick of motion at high frame rates. Patch `patches/rexglue-sdk/0002`. |
-| `--glow` | The game's light bloom (glow intensity c33.y of pixel shader `9750599DF5ED3B39`, the bloom combine); off by default, as it leaves smears after camera switches. Emulated GPU only: the native renderer always draws it, without the smears. Patch `patches/rexglue-sdk/0001`. Turned on (with `--motion_blur=true`) when comparing the native renderer with the emulated GPU. |
+| `--glow` | Emulated GPU only (the native renderer always draws the glow and ignores this flag): the game's light bloom (glow intensity c33.y of pixel shader `9750599DF5ED3B39`, the bloom combine), off by default there, as it leaves smears after camera switches. Patch `patches/rexglue-sdk/0001`. Turned on (with `--motion_blur=true`) when comparing the native renderer with the emulated GPU. |
 | `--blend_pixel_constants` | Blend per-object lighting constants (default on). |
 | `--blend_glow`, `--glow_history_every_frame` | The glow between ticks (default on; `src/interpolation/glow.cpp`): its strength and history weight blended between ticks, and its history written every frame with the weight raised to the frame's share of a tick. See the bloom under Known issues in `native-renderer.md`. |
 | `--log_glow_recorder` | Every 2 s: the glow recorder's passes, history writes (the game's and added), the tick's history weight and the weights used. |
@@ -664,6 +664,13 @@ constants:
 
 ## Performance
 
+**Historical: the emulated GPU (2026-10-13).** This is what limited the
+frame rate before the native renderer and native audio. Neither the
+emulated GPU nor the Audio Worker runs any more by default, so none of it
+describes the game as `run.sh` runs it now. For the current limit (the
+render thread's own work), see "Performance: the render thread" in
+`native-renderer.md`.
+
 Measured 2026-10-13 in a race (9800X3D, RX 7900), with `--log_frame_times`
 and `perf record -e cycles:u -g` over the whole run, cut to the race by
 the samples in our blending code.
@@ -694,8 +701,8 @@ the samples in our blending code.
   and the upload wrapper).
 - The "Audio Worker" thread spins at ~80% of a core
   (`pthread_mutex_trylock`) the whole time: the SDK's polling wait, not
-  audio work; whether it costs frame rate isn't measured yet. See
-  `native-audio.md`.
+  audio work. Measured since: it didn't cost frame rate on this PC, and
+  our own audio output replaced it (see `native-audio.md`).
 
 So the frame rate in busy areas is set by how fast the emulated GPU
 processes the game's commands; the render thread mostly waits for it.

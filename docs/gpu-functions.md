@@ -23,8 +23,12 @@ checked at runtime.
 4. The emulated GPU's thread ("GPU Commands", in the SDK) reads the ring
    buffer and translates to Vulkan.
 
-A native renderer would replace steps 3 and 4: implement the handlers
-below with Vulkan instead of the graphics library.
+The native renderer (`native-renderer.md`, the default since milestone
+6) replaces step 4 and most of step 3: the replay hooks draw each command
+with Vulkan, and the graphics library is kept only for what the renderer
+still reads from it (see "Plan for milestone 6" there); its remaining
+packet writers are a milestone 7 item. The emulated GPU plugin is built
+but not loaded.
 
 ## Command format
 
