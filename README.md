@@ -12,8 +12,7 @@ Built with AI assistance (Claude Code).
   with Vulkan, this avoids relying on the xenia GPU backend of rexglue and should run faster (WIP)
   
 - **Frame interpolation in races.** Game logic still runs at its original
-  30 Hz, and frames are blended between ticks, so races play smoothly at up
-  to 144 fps (or uncapped). `./run.sh --no-interpolation` gives the original
+  30 Hz, and frames are blended between ticks, so races play smoothly at an uncapped FPS (`--max_fps=0`), or with a cap specified on the command line with (`--max_fps=n`). `./run.sh --no-interpolation` gives the original
   30 fps game. Be aware that the internal game logic is still expecting a consistent 30hz update rate, if your machine cannot keep up, the game will run in slow motion.
   
 ## Requirements
