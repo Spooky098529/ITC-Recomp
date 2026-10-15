@@ -38,10 +38,15 @@ Built with AI assistance (Claude Code).
 | `./run.sh` | Frame interpolation on, up to 144 fps in races, no logging. |
 | `./run.sh --max_fps=N` | A different frame cap; `--max_fps=0` is unlimited. |
 | `./run.sh --no-interpolation` | The original 30 fps game. |
+| `./run.sh --width=1920 --height=1080` | A bigger window, drawn at that resolution instead of the game's 1280x720. |
+| `./run.sh --fullscreen` | Fills the screen, drawn at the screen's resolution. With `--width`/`--height`, drawn at that resolution and scaled to the screen. |
 | `./run.sh --skip_intro` | Skips the Ubisoft logo movie and speeds through the Genki logo and the title screen's intro. Now and then the game hangs at startup with this; if it does, close it and start it again. |
 | `./run-debug.sh` | The same as `run.sh`, with logging on (written to `logs/`). |
 
 Options can be combined, e.g. `./run.sh --skip_intro --max_fps=0`.
+
+By default the game runs in a 1280x720 window at its own resolution, as on
+the console. Screens and windows that aren't 16:9 get black bars.
 
 ## Known limitations
 

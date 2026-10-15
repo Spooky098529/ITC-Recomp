@@ -111,7 +111,7 @@ install -m 755 itc_recomp/run-debug.sh $D/run-debug.sh
 (cd $D && python3 -I -m zipfile -c ../$name.zip itc librexruntime.so run.sh run-debug.sh)
 ```
 
-## Status (`main`, 2026-10-15, v0.3.9)
+## Status (`main`, 2026-10-16, v0.4.0)
 
 Frame interpolation for races is working: logic runs at 30 Hz and frames are
 blended between ticks. The world, cameras, wheels (other cars' too, paired
@@ -126,6 +126,13 @@ the same with logs; `./run.sh --no-interpolation` gives the original 30 fps.
 Our renderer always draws motion blur and glow (`--motion_blur` and
 `--glow` only affect the emulated GPU). Known issues are at the end of
 `docs/functions.md`.
+
+Other resolutions (v0.4.0, merged from `unlocked-resolution`):
+`--width`/`--height` and `--fullscreen`, off by default (a 1280x720 window
+at the game's own resolution out of the box); at other sizes every pass is
+drawn scaled and the 3D view at the full resolution, with black bars on
+shapes other than 16:9. See `docs/unlocked-res.md` (a more native frame
+without the game's upscale draw is for later).
 
 The game draws with our own Vulkan renderer (the native renderer, exclusive
 mode; merged from `native-renderer`): the emulated GPU plugin isn't loaded
