@@ -438,3 +438,38 @@ branch-record run is skewed, so take shares from a plain run):
    call).
 6. **Shader lookup** (~4%): key by object and declaration (Known issues
    in `native-renderer.md`).
+
+## Next: interpolation's blending logic and matrix math
+
+After `replay-allocations` (merged 2026-10-15), measured with
+`itc_recomp/tools/profile_render_thread.sh` (uncapped attract race, render
+thread ~15.5 million cycles a frame): `BlendState_ReplayConstants` ~772
+thousand cycles a frame (5.0%; `PixelConstantBlender::Apply`,
+`ReplayCameras::Substitute` and `BlendProduct` are inlined into it), and
+the matrix math in `transform.cpp` ~290 thousand (1.9%):
+`QuaternionFromRotation` ~100, `SplitViewProjection` ~53, the transform
+decompositions ~60, blends ~45, `Multiply` ~16.
+
+Leads, not yet measured:
+
+- **Decompositions repeated every frame.** `BlendProduct` decomposes both
+  ticks' world matrices (`ScaledTransformFromWorldMatrix`, quaternions) and
+  splits both ticks' cameras (`SplitViewProjection`) for every product on
+  every frame, though they depend only on the tick's inputs; at ~330 fps a
+  tick is ~11 frames. And ~1,500 products a frame share a handful of
+  cameras, each split again per product. Computing them once per tick (or
+  per distinct matrix) would leave only the blend and the multiply per
+  frame.
+- **The lighting blender's per-component sorting** (in `Apply`): within a
+  tick, render-only frames upload the same values, so its outcome and
+  which components keep the tick's value could be kept per entry and
+  reused while the upload is bit for bit the one sorted.
+- A fresh split first: mark `Apply`, `Substitute`, `BlendProduct` and
+  the logs' upload hooks `[[gnu::noinline]]` in a temporary commit (as
+  `adf4a8f` did), profile, revert.
+
+Checking a change: run the old code beside the new over a whole attract
+race and compare every result, as for steps 1-4 (the lighting blender:
+cherry-pick `2c82ae6` and `5942f31`, then `--check_pixel_blender=true`; the
+known difference is the outcome label of NaN uploads at the race's end;
+the product table: `13ac56f`, which checked every lookup).

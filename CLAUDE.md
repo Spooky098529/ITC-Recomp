@@ -49,7 +49,12 @@ find /dev/shm -maxdepth 1 -user "$USER" -name 'xenia_memory_*' -delete
 - Compare frame rates uncapped (`--max_fps=0`), alternating runs: this PC
   holds the 144 cap, which hides differences. An attract race under
   `timeout 20` is enough: the race starts ~2 s after launch (the first
-  `fps` line with `ticks/s 30`); take the mean over its seconds 3-18. A run pinned to one CPU
+  `fps` line with `ticks/s 30`); take the mean over its seconds 3-18.
+  Runs vary ~±1.5%, so for changes smaller than a few percent compare
+  profiles instead (the user's call): `itc_recomp/tools/profile_render_thread.sh
+  <dir holding itc> <name> [symbol regex]` gives the render thread's and
+  each matching function's cycles a frame; two or three runs per build,
+  alternating. A run pinned to one CPU
   (`taskset -c 0`) stands in for the Steam Deck but varies by ~15% from run
   to run.
 - The release preset builds with ThinLTO (`ITC_LTO`, game and SDK), which
@@ -111,8 +116,11 @@ Our renderer always draws motion blur and glow (`--motion_blur` and
 
 The game draws with our own Vulkan renderer (the native renderer, exclusive
 mode; merged from `native-renderer`): the emulated GPU plugin isn't loaded
-or shipped. Uncapped attract race: ~320 fps mean against the emulated GPU's
-155 (258 before `redundant-state`: draws no longer record state calls that
+or shipped. Uncapped attract race: ~330 fps mean against the emulated GPU's
+155 (~320 before `replay-allocations`: interpolation's constant replay
+no longer allocates per upload, finds products in a flat table and
+blends lighting vectorized, see "Profile of 2026-10-15, after v0.3.7" in
+`docs/first-person-performance.md`; 258 before `redundant-state`: draws no longer record state calls that
 repeat the previous draw's, and the constant replay's diagnostics run only
 with their flags; see "Performance: repeated state calls" in
 `docs/native-renderer.md`; ~285 before `descriptor-reuse`: constant blocks
