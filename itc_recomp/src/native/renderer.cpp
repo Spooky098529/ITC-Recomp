@@ -19,6 +19,7 @@
 #include <SDL3/SDL_vulkan.h>
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <chrono>
 #include <cmath>
 #include <cstring>
@@ -119,13 +120,18 @@ REXCVAR_DEFINE_STRING(native_renderer_dump, "", "ITC",
                       "each draw: once 10 s into a race, and again whenever a file named 'now' "
                       "appears in it (a debugging aid; see docs/native-renderer.md)");
 REXCVAR_DEFINE_INT32(width, 0, "ITC",
-                     "Window width in pixels; 0: 1280, or from height at 16:9");
+                     "Window width in pixels (in fullscreen, the drawing width); 0: 1280, or "
+                     "from height at 16:9");
 REXCVAR_DEFINE_INT32(height, 0, "ITC",
-                     "Window height in pixels; 0: 720, or from width at 16:9");
+                     "Window height in pixels (in fullscreen, the drawing height); 0: 720, or "
+                     "from width at 16:9");
 REXCVAR_DEFINE_DOUBLE(resolution_scale, 0.0, "ITC",
                       "Draw this many times the game's own resolution (1280x720 frame, 1024x576 "
-                      "3D view); 0: as large as fits the window (see \"Resolution\" in "
-                      "docs/native-renderer.md)");
+                      "3D view); 0: as large as fits --width and --height, or the screen in "
+                      "fullscreen without them (see \"Resolution\" in docs/native-renderer.md)");
+// The SDK's (it also makes the SDK's own window, hidden in exclusive mode,
+// fullscreen); ours follows it.
+REXCVAR_DECLARE(bool, fullscreen);
 
 namespace native {
 namespace {
@@ -149,13 +155,44 @@ VkExtent2D WindowSize() {
   return {uint32_t(width), uint32_t(height)};
 }
 
-// --resolution_scale, or the largest that fits the window's size.
-float ResolutionScale() {
+// --resolution_scale, or the largest that fits --width and --height (in
+// fullscreen without them, the screen: `display`, in pixels).
+float ResolutionScale(VkExtent2D display) {
   if (double scale = REXCVAR_GET(resolution_scale); scale > 0.0) {
     return float(scale);
   }
-  VkExtent2D size = WindowSize();
+  bool sized = REXCVAR_GET(width) > 0 || REXCVAR_GET(height) > 0;
+  VkExtent2D size = REXCVAR_GET(fullscreen) && !sized && display.width && display.height
+                        ? display
+                        : WindowSize();
   return std::min(float(size.width) / kDefaultWidth, float(size.height) / kDefaultHeight);
+}
+
+// Set (from the main thread's event loop) when our window's size in pixels
+// changes: the swapchain is made again (Wayland never reports it out of
+// date).
+std::atomic<bool> g_window_resized{false};
+SDL_WindowID g_window_id = 0;
+bool SDLCALL WatchWindowEvents(void*, SDL_Event* event) {
+  if (event->type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED &&
+      event->window.windowID == g_window_id) {
+    g_window_resized = true;
+  }
+  return true;
+}
+
+// Where a frame of `source`'s shape goes in `target`: as large as fits,
+// centred (black bars on the sides or above and below).
+VkOffset3D FitOffsets(VkExtent2D source, VkExtent2D target, VkOffset3D& end) {
+  uint64_t width = target.width, height = target.height;
+  if (uint64_t(target.width) * source.height > uint64_t(target.height) * source.width) {
+    width = (uint64_t(target.height) * source.width + source.height / 2) / source.height;
+  } else {
+    height = (uint64_t(target.width) * source.height + source.width / 2) / source.width;
+  }
+  VkOffset3D start{int32_t((target.width - width) / 2), int32_t((target.height - height) / 2), 0};
+  end = {start.x + int32_t(width), start.y + int32_t(height), 1};
+  return start;
 }
 
 // Draw commands (see docs/gpu-functions.md).
@@ -168,6 +205,7 @@ bool IsDraw(uint32_t id) {
 struct WindowSetup {
   bool validation = false;
   SDL_Window* window = nullptr;
+  VkExtent2D display{};  // its screen's size in pixels
   VkInstance instance = VK_NULL_HANDLE;
   VkSurfaceKHR surface = VK_NULL_HANDLE;
   std::string error;
@@ -182,11 +220,21 @@ void SDLCALL CreateWindowOnMainThread(void* data) {
     delete static_cast<std::shared_ptr<WindowSetup>*>(data);
   };
   VkExtent2D size = WindowSize();
-  setup->window = SDL_CreateWindow("ITC native renderer", int(size.width), int(size.height),
-                                   SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE);
+  // Fullscreen: borderless, at the desktop's resolution (no mode change).
+  SDL_WindowFlags flags = SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE |
+                          (REXCVAR_GET(fullscreen) ? SDL_WINDOW_FULLSCREEN : 0);
+  setup->window =
+      SDL_CreateWindow("ITC native renderer", int(size.width), int(size.height), flags);
   if (!setup->window) {
     return finish(fmt::format("SDL_CreateWindow: {}", SDL_GetError()));
   }
+  if (const SDL_DisplayMode* mode =
+          SDL_GetDesktopDisplayMode(SDL_GetDisplayForWindow(setup->window))) {
+    setup->display = {uint32_t(std::lround(mode->w * mode->pixel_density)),
+                      uint32_t(std::lround(mode->h * mode->pixel_density))};
+  }
+  g_window_id = SDL_GetWindowID(setup->window);
+  SDL_AddEventWatch(WatchWindowEvents, nullptr);
   AppWindow_AdoptOurWindow(setup->window);
   auto get_instance_proc_addr =
       reinterpret_cast<PFN_vkGetInstanceProcAddr>(SDL_Vulkan_GetVkGetInstanceProcAddr());
@@ -255,6 +303,7 @@ class Renderer {
   void LogStats();
 
   SDL_Window* window_ = nullptr;
+  VkExtent2D display_{};  // the window's screen, in pixels
   VkInstance instance_ = VK_NULL_HANDLE;
   VkSurfaceKHR surface_ = VK_NULL_HANDLE;
   VkPhysicalDevice physical_device_ = VK_NULL_HANDLE;
@@ -343,6 +392,10 @@ bool Renderer::CreateWindowAndInstance() {
     return false;
   }
   window_ = setup->window;
+  display_ = setup->display;
+  REXLOG_INFO("native renderer: window {}x{}{}, screen {}x{}", WindowSize().width,
+              WindowSize().height, REXCVAR_GET(fullscreen) ? " (fullscreen)" : "", display_.width,
+              display_.height);
   instance_ = setup->instance;
   surface_ = setup->surface;
   return true;
@@ -575,7 +628,7 @@ void Renderer::DestroySwapchain() {
 
 bool Renderer::Init(uint8_t* base) {
   if (!CreateWindowAndInstance() || !CreateDevice() || !CreateSwapchain() ||
-      !passes_.Init(context_, base, kFramesInFlight, ResolutionScale())) {
+      !passes_.Init(context_, base, kFramesInFlight, ResolutionScale(display_))) {
     return false;
   }
   passes_.set_mirror_by_tick(REXCVAR_GET(native_renderer_mirror_by_tick));
@@ -727,6 +780,9 @@ void Renderer::EndFrame() {
   // Copy what's shown onto a swapchain image, if one can be had now.
   bool acquired = false;
   uint32_t image_index = 0;
+  if (g_window_resized.exchange(false)) {
+    swapchain_stale_ = true;
+  }
   if ((!swapchain_stale_ && swapchain_) || CreateSwapchain()) {
     VkResult result = vk::vkAcquireNextImageKHR(device_, swapchain_, 100'000'000,
                                                 frame.image_ready, VK_NULL_HANDLE, &image_index);
@@ -751,11 +807,25 @@ void Renderer::EndFrame() {
     vk::vkCmdPipelineBarrier(commands, VK_PIPELINE_STAGE_TRANSFER_BIT,
                              VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1,
                              &barrier);
+    // The frame keeps its shape: black bars where the window's differs.
     VkImageBlit blit{};
     blit.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
     blit.srcOffsets[1] = {int32_t(source.width), int32_t(source.height), 1};
     blit.dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
-    blit.dstOffsets[1] = {int32_t(swapchain_extent_.width), int32_t(swapchain_extent_.height), 1};
+    blit.dstOffsets[0] = FitOffsets(source, swapchain_extent_, blit.dstOffsets[1]);
+    if (blit.dstOffsets[0].x || blit.dstOffsets[0].y ||
+        blit.dstOffsets[1].x != int32_t(swapchain_extent_.width) ||
+        blit.dstOffsets[1].y != int32_t(swapchain_extent_.height)) {
+      VkClearColorValue black{{0.0f, 0.0f, 0.0f, 1.0f}};
+      VkImageSubresourceRange range{VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+      vk::vkCmdClearColorImage(commands, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &black, 1,
+                               &range);
+      barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+      barrier.oldLayout = barrier.newLayout;
+      vk::vkCmdPipelineBarrier(commands, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                               VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1,
+                               &barrier);
+    }
     vk::vkCmdBlitImage(commands, passes_.shown(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, image,
                        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit, VK_FILTER_LINEAR);
     barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;

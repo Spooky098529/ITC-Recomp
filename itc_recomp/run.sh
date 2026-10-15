@@ -19,6 +19,12 @@
 # unlimited), each frame blended between the last two ticks. Menus stay at
 # 30 fps. Motion blur and glow are always drawn.
 #
+# The window is 1280x720 and draws at the game's own resolution. --width
+# and --height size the window and draw as sharp as it allows (e.g.
+# --width=1920 --height=1080); --fullscreen fills the screen at its own
+# resolution (with --width/--height, draws at that resolution instead).
+# Screens and windows that aren't 16:9 get black bars.
+#
 # The renderer's copies of guest memory are updated once a frame instead of
 # checked draw by draw (--native_renderer_mirror_by_tick and
 # --native_renderer_mirror_to_both; pass
@@ -39,7 +45,7 @@ done
 
 # The flag parser rejects a flag given twice, so a default is left out when
 # the same flag is passed in.
-flags=(--native_renderer=true --native_renderer_exclusive=true --native_audio=true --game_data_root="$dir" --mnk_mode=true --native_renderer_mirror_by_tick=true --native_renderer_mirror_to_both=true "${defaults[@]}" --log_level=off)
+flags=(--native_renderer=true --native_renderer_exclusive=true --native_audio=true --game_data_root="$dir" --mnk_mode=true --native_renderer_mirror_by_tick=true --native_renderer_mirror_to_both=true --fullscreen=false "${defaults[@]}" --log_level=off)
 final=()
 for flag in "${flags[@]}"; do
   name="${flag%%=*}"

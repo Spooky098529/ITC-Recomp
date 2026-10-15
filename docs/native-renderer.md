@@ -2493,3 +2493,18 @@ Checked in attract races: at 1920x1080 every target and resolve at 1.5x
 the dumped frame right (`itc_786.log`; the user agreed it looks fine); at
 the default, the same sizes as before, the 144 cap held, no failed draws
 (`itc_787.log`).
+
+**Done: fullscreen and black bars** (2026-10-16). Our window follows the
+SDK's `--fullscreen` (default true, as the SDK's own window; `run.sh` and
+the test command in `CLAUDE.md` pass `--fullscreen=false`, and a bare
+`--fullscreen` or `--no-fullscreen` works): borderless at the desktop's
+resolution. In fullscreen `--width`/`--height` set only the drawing
+resolution; without them the scale fits the screen (`SDL_GetDesktopDisplayMode`
+times its pixel density; this PC's 4K screen reports 3840x2161, so 3x).
+At present the frame is blitted as large as fits, centred, the rest of
+the swapchain image cleared black (`FitOffsets` in `renderer.cpp`). The
+swapchain is made again when SDL reports our window's pixel size changed
+(an event watch), since Wayland never reports it out of date. A 1600x1000
+window (`itc_788.log`): swapchain 1600x1000, drawn at 1.25x (1600x900),
+the cap held. Not done: toggling fullscreen while running, and the drawing
+scale following a resized window (it's fixed at start).
