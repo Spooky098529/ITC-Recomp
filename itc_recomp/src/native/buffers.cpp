@@ -104,6 +104,10 @@ uint64_t g_sequence = 0;
 std::vector<PendingWrite> g_taken;
 // Writes taken since Buffers_TakeNewWrites last ran.
 std::vector<std::pair<uint32_t, uint32_t>> g_new_writes;
+// With Buffers_CollectMirrorWrites: writes taken since
+// Buffers_TakeMirrorWrites last ran.
+bool g_collect_mirror_writes = false;
+std::vector<std::pair<uint32_t, uint32_t>> g_mirror_writes;
 
 // Any thread (under g_mutex), for the logging: the headers of known buffer
 // objects (object: end).
@@ -153,6 +157,9 @@ void TakePending() {
   for (const PendingWrite& write : g_taken) {
     RecordWrite(write.start, write.end, write.caller);
     g_new_writes.emplace_back(write.start, write.end);
+    if (g_collect_mirror_writes) {
+      g_mirror_writes.emplace_back(write.start, write.end);
+    }
   }
   g_taken.clear();
 }
@@ -530,6 +537,23 @@ void Buffers_TakeNewWrites(std::vector<std::pair<uint32_t, uint32_t>>& out) {
   TakePending();
   out.insert(out.end(), g_new_writes.begin(), g_new_writes.end());
   g_new_writes.clear();
+}
+
+void Buffers_CollectMirrorWrites() {
+  if (g_collect_mirror_writes) {
+    return;
+  }
+  g_collect_mirror_writes = true;
+  // What was taken before (none if called before the first frame).
+  for (const auto& [start, write] : g_writes) {
+    g_mirror_writes.emplace_back(start, write.end);
+  }
+}
+
+void Buffers_TakeMirrorWrites(std::vector<std::pair<uint32_t, uint32_t>>& out) {
+  TakePending();
+  out.insert(out.end(), g_mirror_writes.begin(), g_mirror_writes.end());
+  g_mirror_writes.clear();
 }
 
 uint64_t Buffers_Sequence() {

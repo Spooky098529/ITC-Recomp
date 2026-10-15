@@ -105,6 +105,11 @@ class Passes {
   std::string TakeIndexCacheCheck();
   void set_log_index_ranges(bool log);
   std::string TakeIndexRanges();
+  // Fixed at start (--native_renderer_mirror_by_tick): draws read a mirror
+  // updated only as a logic pass's list starts replaying (an experiment);
+  // TakeMirrorByTick describes it since it was last called.
+  void set_mirror_by_tick(bool by_tick);
+  std::string TakeMirrorByTick();
   void set_verify_mirror(bool verify);
   // A debugging aid: hash each copied vertex and index range again at the
   // end of the frame; TakeLateWrites describes those that changed.

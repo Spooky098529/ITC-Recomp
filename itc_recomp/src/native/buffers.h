@@ -34,6 +34,12 @@ Buffers_Coverage Buffers_CoverageOf(uint32_t physical, uint32_t size);
 // physical views since the last call, appended to `out` (the texture cache
 // marks the textures they overlap as changed).
 void Buffers_TakeNewWrites(std::vector<std::pair<uint32_t, uint32_t>>& out);
+// Render thread (--native_renderer_mirror_by_tick): from the first call
+// to Buffers_CollectMirrorWrites on, the same writes kept for the mirrors,
+// taken by Buffers_TakeMirrorWrites (all of them since start up, as pending
+// writes are kept until taken).
+void Buffers_CollectMirrorWrites();
+void Buffers_TakeMirrorWrites(std::vector<std::pair<uint32_t, uint32_t>>& out);
 
 // Render thread, with logging: a vertex or index range (physical) copied
 // into the mirror, the first time in a frame.

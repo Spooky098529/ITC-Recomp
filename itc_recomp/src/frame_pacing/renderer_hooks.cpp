@@ -151,6 +151,7 @@ void Renderer_DrawFrame(PPCContext& ctx, uint8_t* base, uint32_t renderer) {
   auto start = FrameTimes::Clock::now();
   auto cpu_start = timing ? ThreadCpuTime() : FrameTimes::Clock::duration{};
   interpolation::BlendState_OnReplayFrameStart();
+  native::Renderer_OnReplayStart();
   ctx.r3.u64 = renderer;
   sub_82091E58(ctx, base);
   debug::ReplayStats_OnFrame();
@@ -186,6 +187,7 @@ void Renderer_WaitForFrame(PPCContext& ctx, uint8_t* base, uint32_t renderer) {
               wait_start - times.pass_start);
   }
   debug::ImageDump_OnPass(base);
+  native::Renderer_OnListHandedOver(!frame_pacing::GameMessages_IsRenderOnlyPass());
   ctx.r3.u64 = renderer;
   __imp__sub_820920D8(ctx, base);
   auto pacing_start = FrameTimes::Clock::now();
