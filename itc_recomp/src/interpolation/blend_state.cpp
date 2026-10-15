@@ -239,10 +239,69 @@ struct ReplayedProduct {
   std::optional<ProductInputs> before;  // the previous tick's, if paired
 };
 
+// The products of a frame by output address: an open-addressed table, so the
+// render thread's lookup (one per constant upload) is a multiply and a probe
+// of addresses kept together, rather than a divide and a chain of nodes.
+class ProductTable {
+ public:
+  // Before adding: at most `count` products.
+  void Reserve(size_t count) {
+    uint32_t bits = 4;
+    while ((size_t(1) << bits) < 2 * count) {
+      bits++;
+    }
+    shift_ = 32 - bits;
+    slots_.assign(size_t(1) << bits, Slot{0, kEmpty});
+    products_.clear();
+    products_.reserve(count);
+  }
+
+  // Adds the product at `address`, replacing one already there.
+  void Set(uint32_t address, ReplayedProduct product) {
+    Slot& slot = slots_[Probe(address)];
+    if (slot.index != kEmpty) {
+      products_[slot.index] = std::move(product);
+      return;
+    }
+    slot = {address, uint32_t(products_.size())};
+    products_.push_back(std::move(product));
+  }
+
+  const ReplayedProduct* Find(uint32_t address) const {
+    if (slots_.empty()) {
+      return nullptr;
+    }
+    const Slot& slot = slots_[Probe(address)];
+    return slot.index != kEmpty ? &products_[slot.index] : nullptr;
+  }
+
+  size_t size() const { return products_.size(); }
+
+ private:
+  static constexpr uint32_t kEmpty = ~0u;
+  struct Slot {
+    uint32_t address;
+    uint32_t index;  // into products_, or kEmpty
+  };
+  // The slot holding `address`, or the empty one where it would go (the table
+  // is at most half full, so there is one).
+  size_t Probe(uint32_t address) const {
+    size_t mask = slots_.size() - 1;
+    size_t i = (address * 0x9E3779B1u) >> shift_;
+    while (slots_[i].index != kEmpty && slots_[i].address != address) {
+      i = (i + 1) & mask;
+    }
+    return i;
+  }
+  std::vector<Slot> slots_;
+  std::vector<ReplayedProduct> products_;
+  uint32_t shift_ = 28;
+};
+
 // What the render thread needs to blend camera products for a frame:
 // published by the main thread after each Draw.
 struct ReplayFrame {
-  std::unordered_map<uint32_t, ReplayedProduct> products;  // by output address
+  ProductTable products;  // by output address
   float amount = 1;
   uint64_t tick = 0;  // which tick the frame draws
 };
@@ -875,6 +934,7 @@ class DrawState {
     auto frame = std::make_shared<ReplayFrame>();
     frame->amount = REXCVAR_GET(interpolate_draw_state) ? amount_ : 1.0f;
     frame->tick = ticks_;
+    frame->products.Reserve(tick_outputs_.size() + pass_outputs_.size());
     for (const auto* outputs : {&tick_outputs_, &pass_outputs_}) {
       for (const auto& [out, output] : *outputs) {
         auto now = current_tick_.find(output.key);
@@ -885,11 +945,10 @@ class DrawState {
         auto before = paired != paired_.end() ? previous_tick_.find(paired->second)
                                               : previous_tick_.end();
         auto identity = identities_.find(output.key);
-        frame->products[out] = {identity != identities_.end() ? identity->second
-                                                              : ProductKeyHash()(output.key),
-                                output.key.handler, output.written, now->second,
-                                before != previous_tick_.end() ? std::optional(before->second)
-                                                               : std::nullopt};
+        frame->products.Set(
+            out, {identity != identities_.end() ? identity->second : ProductKeyHash()(output.key),
+                  output.key.handler, output.written, now->second,
+                  before != previous_tick_.end() ? std::optional(before->second) : std::nullopt});
       }
     }
     counts_.products_published += int(frame->products.size());
@@ -1488,14 +1547,14 @@ class ReplayCameras {
     if (!frame_) {
       return "no frame";
     }
-    auto it = frame_->products.find(payload);
-    if (it == frame_->products.end()) {
+    const ReplayedProduct* product = frame_->products.Find(payload);
+    if (!product) {
       return "not published";
     }
-    if (it->second.written != m) {
+    if (product->written != m) {
       return "published, value differs";
     }
-    return it->second.before ? "substituted" : "published, unpaired";
+    return product->before ? "substituted" : "published, unpaired";
   }
 
   // Render thread, for each vertex constant upload of 4+ registers.
@@ -1523,8 +1582,8 @@ class ReplayCameras {
     if (!frame_) {
       return std::nullopt;
     }
-    auto it = frame_->products.find(payload);
-    if (it == frame_->products.end() || it->second.written != m) {
+    const ReplayedProduct* product = frame_->products.Find(payload);
+    if (!product || product->written != m) {
       // A draw that isn't a known product (world geometry's matrix often
       // isn't): the pixel constants after it belong to it, not to the last
       // product, so they mustn't be paired by that product's identity (that
@@ -1534,12 +1593,12 @@ class ReplayCameras {
       }
       return std::nullopt;
     }
-    last_identity_ = it->second.identity;
-    if (it->second.handler == kRaceOverlaysHandler) {
+    last_identity_ = product->identity;
+    if (product->handler == kRaceOverlaysHandler) {
       overlay_payloads_.insert(payload);
     }
     BlendStats before = stats_.blend;
-    Matrix4 result = BlendProduct(it->second, frame_->amount, stats_.blend, &last_parts_);
+    Matrix4 result = BlendProduct(*product, frame_->amount, stats_.blend, &last_parts_);
     if (REXCVAR_GET(log_moving_products)) {
       using Outcome = MovingProductsLog::Outcome;
       Outcome outcome = stats_.blend.unpaired != before.unpaired       ? Outcome::kUnpaired
@@ -1547,10 +1606,10 @@ class ReplayCameras {
                         : stats_.blend.world_not_blended != before.world_not_blended
                             ? Outcome::kWorldNotBlended
                             : Outcome::kBlended;
-      GetMovingProductsLog().OnProduct(payload, it->second, last_parts_.world, outcome);
+      GetMovingProductsLog().OnProduct(payload, *product, last_parts_.world, outcome);
     }
-    if (REXCVAR_GET(log_overlay_products) && it->second.handler == kRaceOverlaysHandler) {
-      LogOverlay(payload, it->second, result);
+    if (REXCVAR_GET(log_overlay_products) && product->handler == kRaceOverlaysHandler) {
+      LogOverlay(payload, *product, result);
     }
     return result;
   }
