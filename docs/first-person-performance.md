@@ -10,7 +10,13 @@ diagnostics left running (about +9% uncapped together, see "Profile of
 from `descriptor-reuse`, released in v0.3.7 (uncapped ~285 to ~320 fps); not
 yet checked on the Deck. A fresh profile after v0.3.7 is in "Profile of
 2026-10-15, after v0.3.7", with where libc and driver time comes from and
-the next steps. Read `CLAUDE.md` first
+the next steps. Since v0.3.7 (merged 2026-10-15 from `replay-allocations`,
+`blend-math` and `read-registers`): interpolation's replay without
+allocations, blends planned once a tick and cameras blended once a frame,
+the byte swap by hand, and register reads of only what the library marked
+dirty; together ~12% fewer render thread cycles a draw than v0.3.7 (~7,660
+to ~6,760, by profile; see "Against v0.3.7"); not yet checked on the Deck.
+Read `CLAUDE.md` first
 (rules: find problems with logs, commit and push work branches after each
 commit, keep docs up to date; no Windows code on branches off `main`).
 
@@ -453,7 +459,8 @@ decompositions ~60, blends ~45, `Multiply` ~16.
 
 Leads, not yet measured:
 
-- **Decompositions repeated every frame.** `BlendProduct` decomposes both
+- **Decompositions repeated every frame** (done, see "Done on
+  `blend-math`"). `BlendProduct` decomposes both
   ticks' world matrices (`ScaledTransformFromWorldMatrix`, quaternions) and
   splits both ticks' cameras (`SplitViewProjection`) for every product on
   every frame, though they depend only on the tick's inputs; at ~330 fps a
