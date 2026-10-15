@@ -278,12 +278,24 @@ struct ShaderCache::State {
                                         : graphics::xenos::ShaderType::kPixel,
           hash, words.data(), words.size(), std::endian::big);
       shader->AnalyzeUcode(disassembly);
-      // Memory export (eM writes) decides whether resolution scaling must
-      // stay a whole number (see docs/native-renderer.md, "Resolution").
+      // What resolution scaling changes in a translation (see
+      // docs/native-renderer.md, "Resolution"): memory export (eM writes),
+      // and texture fetches the translator scales for scaled textures
+      // (unnormalized coordinates, getWeights, texel offsets).
+      const std::string& text = shader->ucode_disassembly();
+      auto count = [&](std::string_view what) {
+        size_t n = 0;
+        for (size_t at = text.find(what); at != std::string::npos; at = text.find(what, at + 1)) {
+          n++;
+        }
+        return n;
+      };
       REXLOG_INFO("native renderer: analyzed {} shader {:016X}: memexport eM {:02X}, {} stream "
-                  "constants",
+                  "constants; fetches: {} unnormalized, {} getWeights, {} with offsets",
                   stage == ShaderStage::kVertex ? "vertex" : "pixel", hash,
-                  shader->memexport_eM_written(), shader->memexport_stream_constants().size());
+                  shader->memexport_eM_written(), shader->memexport_stream_constants().size(),
+                  count("UnnormalizedTextureCoords=true"), count("getWeights"),
+                  count("OffsetX=") + count("OffsetY="));
     }
     return shader.get();
   }

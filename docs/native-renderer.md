@@ -2466,4 +2466,14 @@ scale only needs memory export to be absent.
 `--native_renderer_disk_cache=false` so every shader is analyzed again,
 the "analyzed ... shader" lines (`shaders.cpp`) show eM 00 and no stream
 constants for all 74 shaders of the boot, title screen and an attract
-race. Menus, other race modes and the cockpit view aren't covered yet.
+race; the user's menu session (`itc_784.log`, 4 shaders more) found
+none either. Races in cockpit and bumper view aren't covered yet.
+
+**Nor does any fetch the translator would scale** (`itc_785.log`, the
+same run with the line extended): no shader uses unnormalized texture
+coordinates, getWeights or texel offsets, and no draw uses the pixel
+position (`0.0 draws a frame with PsParamGen`). With these, the
+translator's scale changes nothing in this game's translations, so
+shaders are translated at scale 1 and the scaling is done in our renderer
+alone (no SDK patch). A shader that does use them shows in the
+"analyzed" lines.
