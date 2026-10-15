@@ -51,7 +51,7 @@ Options can be combined, e.g. `./run.sh --skip_intro --max_fps=0`.
 - In game movies are not shown.
 - Colours are a little lighter than on the console (the console's output
   gamma isn't applied yet).
-- Tested on Linux on a small number of machines and the Steam Deck so far.
+- Tested on Linux on my PC (9800x3d, 7900XT) and the Steam Deck.
 
 ## Reporting problems
 
