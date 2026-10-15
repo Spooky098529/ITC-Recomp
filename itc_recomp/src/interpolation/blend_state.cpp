@@ -777,8 +777,13 @@ class DrawState {
   // Main thread, before a logic pass's Update: a new tick's products start.
   void OnLogicPassStart() { tick_outputs_.clear(); }
 
-  // Render thread diagnostics.
-  void CountReplayedProduct() { counts_.replayed_products++; }
+  // Render thread diagnostics; counted only when logged, as the increment
+  // is a locked instruction (costly on the render thread).
+  void CountReplayedProduct() {
+    if (REXCVAR_GET(log_blend_state)) {
+      counts_.replayed_products.fetch_add(1, std::memory_order_relaxed);
+    }
+  }
 
  private:
   struct LookAtBlend {
