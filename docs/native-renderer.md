@@ -2445,3 +2445,25 @@ race and compare every result, as for steps 1-4 (the lighting blender:
 cherry-pick `2c82ae6` and `5942f31`, then `--check_pixel_blender=true`; the
 known difference is the outcome label of NaN uploads at the race's end;
 the product table: `13ac56f`, which checked every lookup).
+
+## Resolution (branch `unlocked-resolution`, 2026-10-16)
+
+Goal: `--width`/`--height` and fullscreen. The game draws its 3D view at
+1024x576 (2x MSAA) and its final frame at 1280x720; the plan is to scale
+every render target and resolve destination by a factor per axis, for
+any 16:9 size, and to letterbox other shapes (a real widescreen mode would
+mean changing the game's projections, HUD and culling: not planned).
+
+**The translator's scale.** The SDK's `SpirvShaderTranslator` takes
+`draw_resolution_scale_x/y` as whole numbers, but uses them as floats
+(pixel position `floor(gl_FragCoord) / scale`; scaled textures'
+unnormalized coordinates and sizes times the scale), except for memory
+export (eM writes, made once per guest pixel by `fragcoord mod scale`) and
+the EDRAM emulation's tile sizes, which we don't use. So a fractional
+scale only needs memory export to be absent.
+
+**No shader writes memory** (2026-10-16, `itc_783.log`): with
+`--native_renderer_disk_cache=false` so every shader is analyzed again,
+the "analyzed ... shader" lines (`shaders.cpp`) show eM 00 and no stream
+constants for all 74 shaders of the boot, title screen and an attract
+race. Menus, other race modes and the cockpit view aren't covered yet.

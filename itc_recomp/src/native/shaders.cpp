@@ -278,6 +278,12 @@ struct ShaderCache::State {
                                         : graphics::xenos::ShaderType::kPixel,
           hash, words.data(), words.size(), std::endian::big);
       shader->AnalyzeUcode(disassembly);
+      // Memory export (eM writes) decides whether resolution scaling must
+      // stay a whole number (see docs/native-renderer.md, "Resolution").
+      REXLOG_INFO("native renderer: analyzed {} shader {:016X}: memexport eM {:02X}, {} stream "
+                  "constants",
+                  stage == ShaderStage::kVertex ? "vertex" : "pixel", hash,
+                  shader->memexport_eM_written(), shader->memexport_stream_constants().size());
     }
     return shader.get();
   }
