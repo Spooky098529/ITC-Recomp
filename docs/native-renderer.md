@@ -1152,6 +1152,38 @@ To be fixed (or accepted) in milestone 7.
   2026-10-14): the Xbox 360's output gamma isn't applied yet. A known
   issue, for milestone 7 (the user's call).
 
+  Found 2026-10-16 (branch `xbox-gamma`): at boot the graphics library
+  writes the display controller's 256-entry gamma table (DC_LUT_RW_MODE
+  0, DC_LUTA_CONTROL 0; `DC_LUT_30_COLOR`, 10 bits a channel, the same
+  for all three). It isn't linear: entry 64 is 193/1023, 128 is 462, 255
+  is 1023, which is exactly the sRGB curve decoded and re-encoded as
+  BT.709 (0.5 → 0.450): the library builds it from the display type the
+  kernel reports (`VdGetCurrentDisplayGamma`, type 2, BT.709, in the
+  SDK's `xboxkrnl_video.cpp`). The 360's display output sends every pixel
+  through it; we didn't. The tables were logged in exclusive mode
+  (`gpu_link.cpp` in `f25f871`, at the swap after the table changes;
+  removed once copied). So as not to depend on what the SDK reports, they
+  are copied from those logs into
+  `xbox_gamma_table.h`, one per display type, each captured with the
+  SDK's `kDisplayGammaType` changed for one boot (not committed):
+
+  | Type | Table | Entries 16 / 64 / 128 (of 1023; a straight line: 64 / 257 / 514) |
+  |---|---|---|
+  | 0, linear | the same as type 2 | |
+  | 1, sRGB | a straight line (4 × i): no change | |
+  | 2, BT.709 (HDTV; the SDK's) | `kXboxGammaHdtv`: darker | 24 / 193 / 462 |
+  | 3, power 2.2222 (the SDK's) | `kXboxGammaPower`: lighter shadows | 96 / 268 / 513 |
+
+  `--xbox_gamma=off|hdtv|power` (default `off`, anything else warns and
+  is off) applies one to the shown image in place at the frame's end
+  (`glsl/gamma.comp`, a compute pass; values between entries blended),
+  before the copy to the window, so dumps show it too; it doesn't need
+  exclusive mode. Checked with `hdtv` in two attract races with a dump a
+  second: the same 19 moments 10-24% darker on average, blacks and whites
+  unchanged; the user found it works. The user compared `hdtv` against
+  the 360 (2026-10-16): pretty close, but kept off by default (`run.sh`
+  passes `--xbox_gamma=off` and lists the choices in its notes).
+
 - **Textures replaced in memory showed their old contents for a while**
   (fixed 2026-10-15). The game rewrites textures in place as it streams
   track sections; they were hashed again only every 240 frames, so a

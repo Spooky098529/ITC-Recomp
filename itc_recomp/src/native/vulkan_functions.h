@@ -97,7 +97,11 @@
   X(vkCmdCopyImageToBuffer)            \
   X(vkQueueWaitIdle)                   \
   X(vkResetCommandPool)                \
-  X(vkResetDescriptorPool)
+  X(vkResetDescriptorPool)             \
+  X(vkCreateComputePipelines)          \
+  X(vkDestroyShaderModule)             \
+  X(vkCmdDispatch)                     \
+  X(vkCmdUpdateBuffer)
 
 namespace native::vk {
 

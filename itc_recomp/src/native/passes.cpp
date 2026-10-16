@@ -3,7 +3,9 @@
 #include "log_enabled.h"
 #include "disk_cache.h"
 
+#include "generated_gamma_comp.h"
 #include "generated_id_frag.h"
+#include "xbox_gamma_table.h"
 #include "generated_resolve_frag.h"
 #include "generated_resolve_ms_frag.h"
 #include "generated_resolve_vert.h"
@@ -36,6 +38,12 @@
 #include <rex/logging.h>
 
 REXCVAR_DECLARE(std::string, log_level);
+
+REXCVAR_DEFINE_STRING(xbox_gamma, "off", "ITC",
+                      "Show the frame through the display gamma table the game sets for a kind "
+                      "of display, as the Xbox 360's video output does (native renderer): off "
+                      "(a PC monitor, sRGB: no change), hdtv (darker mid-tones and shadows), "
+                      "power (lighter shadows)");
 
 namespace native {
 
@@ -980,6 +988,19 @@ struct Passes::State {
   // What's shown, and this frame's resolve destinations (for showing one).
   Image shown;
   VkImageLayout shown_layout = VK_IMAGE_LAYOUT_UNDEFINED;
+  // --xbox_gamma: a gamma table (xbox_gamma_table.h) applied to `shown` in
+  // place (gamma.comp).
+  const uint16_t* gamma_values = nullptr;
+  VkBuffer gamma_table = VK_NULL_HANDLE;
+  VkDeviceMemory gamma_table_memory = VK_NULL_HANDLE;
+  VkDescriptorSetLayout gamma_set_layout = VK_NULL_HANDLE;
+  VkPipelineLayout gamma_layout = VK_NULL_HANDLE;
+  VkPipeline gamma_pipeline = VK_NULL_HANDLE;
+  VkDescriptorPool gamma_pool = VK_NULL_HANDLE;
+  VkDescriptorSet gamma_set = VK_NULL_HANDLE;
+  bool gamma_ready = false;  // the table has been uploaded
+  bool CreateGammaResources();
+  void ApplyGamma(VkCommandBuffer commands);
   struct Resolved {
     VkImage image;
     VkExtent2D extent;
@@ -2548,6 +2569,127 @@ bool Passes::State::CreateResolveResources() {
   return true;
 }
 
+bool Passes::State::CreateGammaResources() {
+  VkDevice device = context.device;
+  VkBufferCreateInfo buffer_info{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
+  buffer_info.size = 256 * sizeof(uint32_t);
+  buffer_info.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+  buffer_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+  if (vk::vkCreateBuffer(device, &buffer_info, nullptr, &gamma_table) != VK_SUCCESS) {
+    return false;
+  }
+  VkMemoryRequirements requirements;
+  vk::vkGetBufferMemoryRequirements(device, gamma_table, &requirements);
+  VkMemoryAllocateInfo alloc{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
+  alloc.allocationSize = requirements.size;
+  alloc.memoryTypeIndex = FindMemoryType(memory_properties, requirements.memoryTypeBits,
+                                         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+  if (alloc.memoryTypeIndex == UINT32_MAX ||
+      vk::vkAllocateMemory(device, &alloc, nullptr, &gamma_table_memory) != VK_SUCCESS ||
+      vk::vkBindBufferMemory(device, gamma_table, gamma_table_memory, 0) != VK_SUCCESS) {
+    return false;
+  }
+  VkDescriptorSetLayoutBinding bindings[2] = {
+      {0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
+      {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr}};
+  VkDescriptorSetLayoutCreateInfo set_info{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
+  set_info.bindingCount = 2;
+  set_info.pBindings = bindings;
+  if (vk::vkCreateDescriptorSetLayout(device, &set_info, nullptr, &gamma_set_layout) !=
+      VK_SUCCESS) {
+    return false;
+  }
+  VkPushConstantRange push{VK_SHADER_STAGE_COMPUTE_BIT, 0, 8};
+  VkPipelineLayoutCreateInfo layout_info{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
+  layout_info.setLayoutCount = 1;
+  layout_info.pSetLayouts = &gamma_set_layout;
+  layout_info.pushConstantRangeCount = 1;
+  layout_info.pPushConstantRanges = &push;
+  if (vk::vkCreatePipelineLayout(device, &layout_info, nullptr, &gamma_layout) != VK_SUCCESS) {
+    return false;
+  }
+  VkDescriptorPoolSize sizes[2] = {{VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1},
+                                   {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1}};
+  VkDescriptorPoolCreateInfo pool_info{VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
+  pool_info.maxSets = 1;
+  pool_info.poolSizeCount = 2;
+  pool_info.pPoolSizes = sizes;
+  if (vk::vkCreateDescriptorPool(device, &pool_info, nullptr, &gamma_pool) != VK_SUCCESS) {
+    return false;
+  }
+  VkDescriptorSetAllocateInfo set_alloc{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
+  set_alloc.descriptorPool = gamma_pool;
+  set_alloc.descriptorSetCount = 1;
+  set_alloc.pSetLayouts = &gamma_set_layout;
+  if (vk::vkAllocateDescriptorSets(device, &set_alloc, &gamma_set) != VK_SUCCESS) {
+    return false;
+  }
+  // `shown` is only ever written by transfers and this pass, and lives as
+  // long as the set: the set is written once.
+  VkDescriptorImageInfo image_info{VK_NULL_HANDLE, shown.view, VK_IMAGE_LAYOUT_GENERAL};
+  VkDescriptorBufferInfo table_info{gamma_table, 0, VK_WHOLE_SIZE};
+  VkWriteDescriptorSet writes[2] = {{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET},
+                                    {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET}};
+  writes[0].dstSet = writes[1].dstSet = gamma_set;
+  writes[0].dstBinding = 0;
+  writes[0].descriptorCount = 1;
+  writes[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+  writes[0].pImageInfo = &image_info;
+  writes[1].dstBinding = 1;
+  writes[1].descriptorCount = 1;
+  writes[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+  writes[1].pBufferInfo = &table_info;
+  vk::vkUpdateDescriptorSets(device, 2, writes, 0, nullptr);
+  VkShaderModuleCreateInfo module_info{VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO};
+  module_info.codeSize = sizeof(k_gamma_comp);
+  module_info.pCode = k_gamma_comp;
+  VkShaderModule module;
+  if (vk::vkCreateShaderModule(device, &module_info, nullptr, &module) != VK_SUCCESS) {
+    return false;
+  }
+  VkComputePipelineCreateInfo info{VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO};
+  info.stage = {VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO};
+  info.stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+  info.stage.module = module;
+  info.stage.pName = "main";
+  info.layout = gamma_layout;
+  VkResult result =
+      vk::vkCreateComputePipelines(device, pipeline_cache, 1, &info, nullptr, &gamma_pipeline);
+  vk::vkDestroyShaderModule(device, module, nullptr);
+  if (result != VK_SUCCESS) {
+    gamma_pipeline = VK_NULL_HANDLE;
+    return false;
+  }
+  REXLOG_INFO("native renderer: --xbox_gamma={}: the Xbox 360's gamma table for that display is "
+              "applied to the frame",
+              REXCVAR_GET(xbox_gamma));
+  return true;
+}
+
+void Passes::State::ApplyGamma(VkCommandBuffer commands) {
+  if (!gamma_ready) {  // the first frame: the table into its buffer
+    uint32_t table[256];
+    std::copy(gamma_values, gamma_values + 256, table);
+    vk::vkCmdUpdateBuffer(commands, gamma_table, 0, sizeof(table), table);
+    VkMemoryBarrier barrier{VK_STRUCTURE_TYPE_MEMORY_BARRIER};
+    barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    vk::vkCmdPipelineBarrier(commands, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                             VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 1, &barrier, 0, nullptr, 0,
+                             nullptr);
+    gamma_ready = true;
+  }
+  Transition(commands, shown.image, VK_IMAGE_ASPECT_COLOR_BIT, shown_layout,
+             VK_IMAGE_LAYOUT_GENERAL);
+  vk::vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE, gamma_pipeline);
+  vk::vkCmdBindDescriptorSets(commands, VK_PIPELINE_BIND_POINT_COMPUTE, gamma_layout, 0, 1,
+                              &gamma_set, 0, nullptr);
+  int32_t extent[2] = {int32_t(shown_extent.width), int32_t(shown_extent.height)};
+  vk::vkCmdPushConstants(commands, gamma_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(extent),
+                         extent);
+  vk::vkCmdDispatch(commands, (shown_extent.width + 7) / 8, (shown_extent.height + 7) / 8, 1);
+}
+
 VkPipeline Passes::State::GetResolvePipeline(VkFormat format, bool multisample) {
   auto [it, added] = resolve_pipelines.try_emplace({format, multisample}, VK_NULL_HANDLE);
   if (!added) {
@@ -2780,11 +2922,20 @@ bool Passes::Init(const DeviceContext& context, uint8_t* base, uint32_t frames_i
   if (!s.CreateGuestMemoryMirror()) {
     return false;
   }
+  const std::string& gamma = REXCVAR_GET(xbox_gamma);
+  if (gamma == "hdtv") {
+    s.gamma_values = kXboxGammaHdtv;
+  } else if (gamma == "power") {
+    s.gamma_values = kXboxGammaPower;
+  } else if (gamma != "off") {
+    REXLOG_WARN("native renderer: --xbox_gamma={}: not off, hdtv or power; off", gamma);
+  }
   if (!s.CreateImage(s.shown, VK_IMAGE_TYPE_2D, VK_IMAGE_VIEW_TYPE_2D, kShownFormat,
                      {s.shown_extent.width, s.shown_extent.height, 1}, 1,
-                     VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+                     VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT |
+                         (s.gamma_values ? VK_IMAGE_USAGE_STORAGE_BIT : 0),
                      VK_IMAGE_ASPECT_COLOR_BIT) ||
-      !s.CreateRings() || !s.CreateDescriptors() || !s.CreateDummyTextures() ||
+      (s.gamma_values && !s.CreateGammaResources()) || !s.CreateRings() || !s.CreateDescriptors() || !s.CreateDummyTextures() ||
       !s.CreateResolveResources() || !s.textures.Init(context, frames_in_flight)) {
     REXLOG_ERROR("native renderer: couldn't create the passes' resources");
     return false;
@@ -4816,6 +4967,9 @@ VkExtent2D Passes::EndFrame(VkCommandBuffer commands, int32_t show_resolve, bool
     VkImageSubresourceRange range{VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
     vk::vkCmdClearColorImage(commands, shown, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &colour, 1,
                              &range);
+  }
+  if (s.gamma_pipeline) {
+    s.ApplyGamma(commands);
   }
   Transition(commands, shown, VK_IMAGE_ASPECT_COLOR_BIT, s.shown_layout,
              VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
