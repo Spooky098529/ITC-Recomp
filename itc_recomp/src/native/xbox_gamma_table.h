@@ -1,9 +1,10 @@
 // The display gamma tables Import Tuner Challenge writes at boot
 // (DC_LUT_30_COLOR, 10 bits, the same for red, green and blue), copied from
-// the log (gpu_link.cpp) of 2026-10-16 so the renderer doesn't depend on what
-// the SDK tells the game about the display. The library builds one for the
-// display type the kernel reports (VdGetCurrentDisplayGamma): each was
-// captured with the SDK set to that type for one run. See "Gamma" in
+// a log of 2026-10-16 (gpu_link.cpp in f25f871) so the renderer doesn't
+// depend on what the SDK tells the game about the display. The library
+// builds one for the display type the kernel reports
+// (VdGetCurrentDisplayGamma): each was captured with the SDK set to that
+// type for one run. See "Gamma" in
 // docs/native-renderer.md.
 #pragma once
 #include <cstdint>

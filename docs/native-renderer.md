@@ -1160,9 +1160,10 @@ To be fixed (or accepted) in milestone 7.
   BT.709 (0.5 → 0.450): the library builds it from the display type the
   kernel reports (`VdGetCurrentDisplayGamma`, type 2, BT.709, in the
   SDK's `xboxkrnl_video.cpp`). The 360's display output sends every pixel
-  through it; we didn't. Exclusive mode logs the table (`gpu_link.cpp`,
-  at the swap after it changes; a debugging aid). So as not to depend on
-  what the SDK reports, the tables are copied from those logs into
+  through it; we didn't. The tables were logged in exclusive mode
+  (`gpu_link.cpp` in `f25f871`, at the swap after the table changes;
+  removed once copied). So as not to depend on what the SDK reports, they
+  are copied from those logs into
   `xbox_gamma_table.h`, one per display type, each captured with the
   SDK's `kDisplayGammaType` changed for one boot (not committed):
 
