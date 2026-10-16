@@ -1437,7 +1437,9 @@ from a table by the fetch constant's words, the signed binding reusing the
 unsigned one's view, the table's key built in registers and its hash
 fixed: texture binding from ~1,190 to ~350 thousand cycles a frame, the render thread
 ~5% fewer cycles a frame; then each stage's last texture set reused when
-nothing it was built from changed, ~-2.4% more (see "Texture binding").
+nothing it was built from changed, ~-2.4% more. Against `main`: -6.9%
+render thread cycles a frame, +2.8% uncapped fps (see "Texture
+binding").
 
 ### The Deck's log (2026-10-15)
 
@@ -2599,6 +2601,22 @@ this branch (`9a83010`) 445.4, 450.8, 438.1 (444.8): +2.8%, each run above
 the one before it. Less than the ~7% the profiles above add up to: those
 are steps against different baselines, and fps also depends on the other
 threads and the GPU.
+
+**Against `main` by profile** (`profile_render_thread.sh`, three runs
+each, alternating, `7774a95` against `9a83010`):
+
+| | `7774a95` | `9a83010` |
+|---|---|---|
+| Render thread, million cycles a frame | 11.61, 11.61, 11.50 | 10.67, 10.85, 10.82 |
+| Texture binding (`GetView`, `GetSwizzledView`, `GetSampler`, `BindingTable::Find`, `GetTextureSet`, `SwizzledSigns`, `GetTextureLayout`), thousand | 1,252, 1,190, 1,174 | 428, 426, 391 |
+| Frames in the 12 s | 5,059, 5,058, 5,160 | 5,336, 5,209, 5,302 |
+
+-6.9% render thread cycles a frame (~-793 thousand), nearly all of it
+texture binding (~-790, -66%); the set reuse's libc and XXH3 savings
+show elsewhere, and other parts moved within noise. Frames drawn rose
+only ~3%: on this PC the render thread isn't the only limit (it waits on
+the main thread and the GPU too). On the Deck, where it was flat out,
+the gain should be nearer the cycles' 7%; not measured.
 
 **Left to try**, unmeasured estimates:
 
