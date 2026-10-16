@@ -456,7 +456,15 @@ class BindingTable {
     for (uint64_t word : words) {
       h = (h ^ word) * 0x9E3779B97F4A7C15ull;
     }
-    return size_t(h ^ (h >> 32));
+    // Multiplying carries bits only upward, and the address is in the high
+    // half of a word: mixed down (MurmurHash3's finalizer), or the index
+    // (the low bits) hardly depended on it (6-10 probes a lookup, not ~1).
+    h ^= h >> 33;
+    h *= 0xFF51AFD7ED558CCDull;
+    h ^= h >> 33;
+    h *= 0xC4CEB9FE1A85EC53ull;
+    h ^= h >> 33;
+    return size_t(h);
   }
   void Grow() {
     std::vector<Entry> old = std::move(entries_);
