@@ -139,6 +139,13 @@ drawn scaled and the 3D view at the full resolution, with black bars on
 shapes other than 16:9. See `docs/unlocked-res.md` (a more native frame
 without the game's upscale draw is for later).
 
+Xbox 360 gamma (merged from `xbox-gamma`, 2026-10-16; not released yet):
+`--xbox_gamma=off|hdtv|power`, off by default (`run.sh` passes `off` and
+lists the choices). The display gamma tables the game writes at boot,
+copied into `src/native/xbox_gamma_table.h` (not read from the SDK), are
+applied to the frame by a compute pass; `hdtv` looked pretty close to the
+360 to the user. See "Gamma" in `docs/native-renderer.md`'s known issues.
+
 Windows (merged from `windows`, 2026-10-16; not released yet):
 cross-compiled on Linux with xwin, ThinLTO (`ITC_WIN_LTO`), `run.bat`
 with `run.sh`'s defaults, the Visual C++ runtime DLLs in the zip, and a
