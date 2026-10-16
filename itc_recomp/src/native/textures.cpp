@@ -31,9 +31,6 @@ REXCVAR_DEFINE_BOOL(native_renderer_log_texture_writes, false, "ITC",
 REXCVAR_DEFINE_BOOL(native_renderer_cache_texture_bindings, true, "ITC",
                     "Answer texture views and samplers from a table of earlier answers by the "
                     "fetch constant's words, instead of looking the texture up every binding");
-REXCVAR_DEFINE_BOOL(native_renderer_check_texture_bindings, false, "ITC",
-                    "Also work out in full every texture view and sampler answered from the "
-                    "table, counting those that differ (a temporary check of the table)");
 
 namespace native {
 
@@ -902,7 +899,6 @@ void TextureCache::BeginFrame(uint32_t frame_index) {
   s.recording = false;
   vk::vkResetCommandPool(s.context.device, s.frames[frame_index].pool, 0);
   cache_bindings_ = REXCVAR_GET(native_renderer_cache_texture_bindings);
-  check_bindings_ = REXCVAR_GET(native_renderer_check_texture_bindings);
   log_writes_ = REXCVAR_GET(native_renderer_log_texture_writes);
   if (log_writes_) {
     s.LogWriteSummary();
@@ -976,14 +972,6 @@ VkImageView TextureCache::GetView(uint8_t* base, const uint32_t fetch_words[6],
   key[6] = uint32_t(view_type);
   BindingTable::Entry& e = s.view_answers.Find(key);
   if (e.generation == generation_) {
-    if (check_bindings_) {
-      VkImageView view = LookUpView(base, fetch_words, view_type, cacheable);
-      s.stats.binding_checks++;
-      if (HandleBits(view) != e.value && !s.stats.binding_mismatches++) {
-        s.stats.binding_mismatch_sample = {fetch_words[0], fetch_words[1], fetch_words[2],
-                                           fetch_words[5], uint32_t(view_type)};
-      }
-    }
     return FromBits<VkImageView>(e.value);
   }
   VkImageView view = LookUpView(base, fetch_words, view_type, cacheable);
@@ -1262,14 +1250,6 @@ VkSampler TextureCache::GetSampler(const uint32_t fetch_words[6],
            (overrides.mip_filter & 0xFF) << 16 | (overrides.aniso_filter & 0xFF) << 24;
   BindingTable::Entry& e = s.sampler_answers.Find(key);
   if (e.generation == sampler_generation_) {
-    if (check_bindings_) {
-      VkSampler sampler = LookUpSampler(fetch_words, overrides);
-      s.stats.binding_checks++;
-      if (HandleBits(sampler) != e.value && !s.stats.binding_mismatches++) {
-        s.stats.binding_mismatch_sample = {fetch_words[0], fetch_words[1], fetch_words[2],
-                                           fetch_words[5], UINT32_MAX};
-      }
-    }
     return FromBits<VkSampler>(e.value);
   }
   VkSampler sampler = LookUpSampler(fetch_words, overrides);

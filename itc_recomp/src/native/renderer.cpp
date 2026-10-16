@@ -1036,12 +1036,6 @@ void Renderer::LogStats() {
               "ms marking)",
               t.writes, t.marked, mark_ns_ / 1e6);
   mark_ns_ = 0;
-  if (t.binding_checks) {
-    const auto& m = t.binding_mismatch_sample;
-    REXLOG_INFO("native renderer: texture bindings checked: {} answered from the table, {} "
-                "otherwise in full (e.g. fetch {:08X} {:08X} {:08X} {:08X}, view type {})",
-                t.binding_checks, t.binding_mismatches, m[0], m[1], m[2], m[3], int32_t(m[4]));
-  }
   if (t.unrecorded) {
     REXLOG_INFO("native renderer: {} textures changed in memory with no write recorded, e.g. "
                 "{:08X}, {} frames after it was first loaded",

@@ -6,7 +6,6 @@
 
 #pragma once
 
-#include <array>
 #include <cstdint>
 #include <memory>
 #include <vector>
@@ -135,11 +134,6 @@ class TextureCache {
     // A texture of another dimension than the shader declares: declared view
     // type << 16 | format << 8 | dimension, and its size.
     uint32_t mismatched_sample = UINT32_MAX, mismatched_width = 0, mismatched_height = 0;
-    // With --native_renderer_check_texture_bindings: calls answered from the
-    // table, also worked out in full, and those that came out otherwise; an
-    // example (fetch constant's words 0, 1, 2, 5, sampler or view type).
-    uint64_t binding_checks = 0, binding_mismatches = 0;
-    std::array<uint32_t, 5> binding_mismatch_sample{};
   };
   Stats TakeStats();
   // Lookups so far that found a texture of another dimension than declared
@@ -155,7 +149,6 @@ class TextureCache {
   VkSampler LookUpSampler(const uint32_t fetch[6], const SamplerOverrides& overrides);
   std::unique_ptr<State> state_;
   bool cache_bindings_ = true;
-  bool check_bindings_ = false;
   bool log_writes_ = false;
   uint64_t sampler_generation_ = 0;
   Hide debug_hide_ = Hide::kNone;
