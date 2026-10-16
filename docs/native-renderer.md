@@ -1434,8 +1434,8 @@ call (~-150 thousand cycles a frame); see "`Buffers_OnCommand`'s cost". None
 of it checked on the Deck yet.
 Then (`texture-binding`, 2026-10-16): texture views and samplers answered
 from a table by the fetch constant's words, the signed binding reusing the
-unsigned one's view, and the table's key built in registers: texture
-binding from ~1,190 to ~400 thousand cycles a frame, the render thread
+unsigned one's view, the table's key built in registers and its hash
+fixed: texture binding from ~1,190 to ~350 thousand cycles a frame, the render thread
 ~5% fewer cycles a frame (see "Texture binding").
 
 ### The Deck's log (2026-10-15)
@@ -2544,6 +2544,25 @@ thread and within its noise: the lookups' remaining ~400 thousand
 cycles a frame don't shrink much by arranging them differently. `393d641`
 was kept for having the lowest mean (the user's call). Leaving out the
 records with the SSE key (`a51218d`) moved more of `Find` back (~180).
+
+**Then: the hash** (`0c67c5e`). What was left of `Find` was its probe
+loop (~28% of its samples) and loads of entries: lookups walked long runs
+of occupied slots. Counted for one attract race (a temporary counter, not
+committed): 6.4-10.2 probes a lookup with the table 13-17% full (~1.1
+expected), runs up to 72, worse as textures were added (`itc_809.log`).
+The hash multiplied each 64-bit word in, which carries bits only upward,
+then folded bits 32-43 down; the texture's address is in the high half of
+the second word, so the index (the low 12 bits) hardly depended on it.
+Mixed down with MurmurHash3's finalizer (`fmix64`): 1.04-1.07 probes,
+runs up to 4 (`itc_810.log`). Profiles against `393d641`, three runs each,
+alternating, thousand cycles a frame:
+
+| Build | `Find` | `GetTextureSet` | Sum |
+|---|---|---|---|
+| `393d641` | 103, 119, 111 | 288, 287, 292 | 391, 406, 403 |
+| `0c67c5e` | 56, 68, 58 | 239, 331, 281 | 295, 400, 339 |
+
+`Find` halved in every run (~-50); `GetTextureSet` was noisier.
 
 **Left to try**, unmeasured estimates:
 
