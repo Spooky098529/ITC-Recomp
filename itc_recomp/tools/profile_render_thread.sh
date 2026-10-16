@@ -7,7 +7,7 @@
 #
 # Run from the repo root. Launches <dir>/itc (to compare builds, copy each
 # into its own directory with the build's cache/; logs go to <dir>/logs),
-# records the busiest thread 14-26 s after launch with
+# records the render thread 14-26 s after launch with
 # `perf record -e cycles:u`, and counts the frames drawn meanwhile from the
 # --log_fps lines. Prints the thread's million cycles a frame and, for each
 # symbol matching the pattern (an extended regex, default
@@ -39,7 +39,11 @@ XDG_DATA_DIRS=/usr/local/share:/usr/share LD_LIBRARY_PATH=$B:rexglue-sdk/out/lin
   timeout 30 "$D/itc" "${flags[@]}" "${extra[@]}" > /dev/null 2>&1 &
 sleep 14
 P=$(pgrep -n -x itc)
-T=$(ps -L -o tid=,pcpu= -p "$P" | sort -k2 -nr | head -1 | awk '{print $1}')
+# The render thread: the busiest but the main thread (its name changes from
+# run to run; the main thread can be as busy since the render thread got
+# lighter).
+T=$(ps -L -o tid=,pcpu=,comm= -p "$P" | grep -v "Main XThread" | sort -k2 -nr | head -1 |
+  awk '{print $1}')
 t0=$(date +%s); perf record -q -e cycles:u -t "$T" -o "$O" -- sleep 12 2>/dev/null; t1=$(date +%s)
 wait || true
 find /dev/shm -maxdepth 1 -user "$USER" -name 'xenia_memory_*' -delete 2>/dev/null || true

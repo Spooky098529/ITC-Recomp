@@ -971,6 +971,16 @@ memory).
   draws repeating the last draw's shaders and the fetch constants they
   read, descriptor sets found already made, and what bumps the texture
   cache's generation (see "Texture binding").
+- `--native_renderer_log_shader_lookups`: every 5 s, how often draws'
+  shader lookups repeat the last draw's or an earlier one, keyed by what
+  the draw reads from the shader objects, and how often such a key met
+  before came with microcode that hashes differently (stale: a cache by
+  the key would give the wrong shader), with a sample (see "Shader
+  lookup").
+- `--native_renderer_cache_shader_lookups=false`: hash every draw's
+  shader microcode and look the interface and translations up in full,
+  instead of answering from the table by what the draw reads from the
+  shader objects (on by default; see "Shader lookup").
 - `--native_renderer_cache_texture_bindings=false`: look every texture view
   and sampler up in full instead of answering from the table by the fetch
   constant's words (on by default; see "Texture binding").
@@ -1454,6 +1464,9 @@ fixed: texture binding from ~1,190 to ~350 thousand cycles a frame, the render t
 nothing it was built from changed, ~-2.4% more. Against `main`: -6.9%
 render thread cycles a frame, +2.8% uncapped fps (see "Texture
 binding").
+Then (`shader-lookup`, 2026-10-16): shader lookups kept by what draws
+read from the shader objects instead of hashing the microcode every draw:
+-5.2% render thread cycles a frame (see "Shader lookup").
 
 ### The Deck's log (2026-10-15)
 
@@ -1557,6 +1570,10 @@ manage well under 1 µs. Roughly by payoff for the effort:
    Known issues).
 
 A draws-per-pass count shows whether 1 and 2 are as big as estimated.
+
+Since (2026-10-16): a larger version of 1, translating every draw once a
+tick and replaying our own list on in-between frames instead of the
+game's, is written up as a lead in `docs/tick-replay.md`.
 
 ### Profile of 2026-10-15 (PC, attract race)
 
@@ -2679,6 +2696,100 @@ hashed on every draw) is now bigger than texture binding, and pipeline
 lookup has grown to ~2.6%. The driver and libc callers weren't split
 this time (the branch-record method in "Profile of 2026-10-15, after
 v0.3.7").
+
+### Shader lookup (`shader-lookup`, 2026-10-16)
+
+Every draw (`Passes::State::Draw`, `passes.cpp`) reads the shader objects
+from the device, hashes both microcodes with XXH3 (`MicrocodeHash`), finds
+the interface in `GetInterface` by both hashes and two registers, and the
+translations in `ShaderCache::Get` by hash: ~6% of the render thread in
+the profile above. The idea, as for texture binding: key the answer by
+what the draw reads from the shader objects instead of the microcode's
+contents. A stage's key: the object, the microcode's address and size
+(vertex shader +48, +600; pixel +24, +64), and for the vertex shader the
+id it's patched for (+24), the bound declaration's id and whether the
+patched copy (`g_loaded_vertex_shader`) is drawn. The whole lookup adds
+`SQ_PROGRAM_CNTL`, `SQ_CONTEXT_MISC` and the point and rectangle list
+flags.
+
+The risk is a key whose microcode changed behind it. The game's own code
+doesn't write microcode (its HLSL was compiled offline and handed to its
+Direct3D), so the writers are the game's Direct3D: creating a shader,
+patching a vertex shader for a declaration (`sub_822AE340`, hooked: in
+place, which changes the patched-for id at +24, or into a copy in the
+command buffer), and memory reused after a shader is freed. A game can
+also place resources in its own memory and register them with Direct3D
+(`XGSetVertexShaderHeader` and the like); whether this one does isn't
+known.
+
+**Measured** (`--native_renderer_log_shader_lookups`, every 5 s; a key is
+stale when met before this session with microcode hashing differently):
+
+- An attract race, uncapped (`itc_817.log`, 40 s): 1,170-2,310 draws a
+  frame; the same keys as the last draw 68-73% (vertex, pixel and the
+  whole lookup alike); seen before 100.0%; **stale 0**; the patched copy
+  drawn 0 times; ~40-50 thousand vertex shader patches per 5 s (~20 a
+  frame), so a generation bumped by every patch would empty a cache
+  constantly. The patched-for id in the key makes one unneeded.
+- The user's run with `run.sh`'s flags, capped at 144 (`itc_818.log`,
+  ~4 minutes): menus, a race (20:53:15-20:54:30), menus, a second race
+  (20:54:45-20:56:20; ~85 new keys at its start, new scenery or a new
+  track). Up to 3,670 draws a frame in the second; the same keys as the
+  last draw 65-74% in races (40-95% in menus); seen before 99.8-100.0%;
+  **stale 0** in every window, for both stages; the patched copy never
+  drawn; keys this session grew to 596 vertex, 582 pixel, 602 whole
+  lookups.
+
+So a cache by these keys would answer nearly every lookup, and no key
+ever went stale here. Not covered: whether freed shaders' memory is
+reused for others (the keys only grew, so a reuse with the same address
+and size wasn't seen).
+
+**Done: lookups kept by the key** (`294d611`; the check removed in
+`31e1474`). `Draw` builds the key (12 words: both objects, their
+microcode's address and size, the patched-for and declaration ids,
+`SQ_PROGRAM_CNTL`, `SQ_CONTEXT_MISC`, the flags), compares it with the
+last draw's, else looks it up in `ShaderLookupTable` (`passes.cpp`, open
+addressing at most half full, never emptied); the answer is both
+translations, the interface and the two hashes (for the diagnostics keyed
+by them, `collect_interfaces`). Not kept: failed translations, draws of
+the patched copy (its contents change at one host address), and with
+`--native_renderer_log_shader_lookups` (it needs the hashes worked out).
+Translations are never freed, so their pointers stay good.
+`--native_renderer_cache_shader_lookups=false` turns it off.
+
+Checked with a temporary `--native_renderer_check_shader_lookups` (each
+kept answer also looked up in full and compared) over two 90 s attract
+races (`itc_819.log`, `itc_820.log`): 0 of 72.5 million kept answers
+differed in each (71.0% the last draw's, the rest from the table).
+
+Profiles (`profile_render_thread.sh`, one binary, `ITC_ARGS` with the
+cache off and on, three runs each, alternating), million cycles a frame:
+off 10.855, 10.952, 10.795 (10.867); on 10.396, 10.303, 10.212 (10.304):
+**-5.2%** (~-560 thousand), every run on below every run off. Gone,
+thousand cycles a frame: `ShaderCache::Get` ~314, XXH3 of the long
+microcodes ~220, `GetInterface` ~140, one of the two short-microcode
+XXH3 copies ~65, a clone of `Draw` ~70; `Draw` itself within noise
+(~1,040 against ~1,100) with the key's work inlined into it.
+
+**The profile script recorded the wrong thread** in two of the first
+runs with the cache on: it took the busiest thread at 14 s, and with the
+render thread this light the main thread (~88% of a core, the render
+thread ~87%) can be busier. `profile_render_thread.sh` now takes the
+busiest thread but `Main XThread` (`74d8739`; the render thread's name,
+`XThread<address>`, changes from run to run). Profiles made before it
+were of the render thread (it was then clearly the busiest). On this PC,
+the render thread is no longer the only limit: the main thread is about
+as busy.
+
+**Against v0.4.1 in pictures** (2026-10-16): the v0.4.1 release zip and
+this branch (`0436f4f`), attract races of 20 s with `run.sh`'s flags and
+`--native_renderer_dump_every=1`, twice each: 19 frames a run, the same
+moments (camera, traffic) in both, nothing drawn differently. The
+replay's colour filters (none, black and white, sepia) are chosen at
+random each run, so pixel differences between runs mean nothing; one
+dump a run falls either side of a camera cut (~1 s of drift, in either
+build). The user looked at the montages and passed it for merging.
 
 ## Resolution (branch `unlocked-resolution`, 2026-10-16)
 
