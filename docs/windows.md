@@ -53,6 +53,11 @@ branch.
   instead, as the parser rejects an option given twice; batch can't do
   that easily, since it splits arguments at `=`.) `--no-interpolation` is
   handled by the script and also reaches the game, which ignores it.
+  Its defaults match `run.sh`'s (the mirrors updated by tick,
+  `--fullscreen=false`; brought up to date 2026-10-16 after merging
+  v0.4.0, checked under Wine: a 1280x720 window, the mirrors by tick, and
+  `run.bat --fullscreen` overriding the default). Keep the two in step
+  when `run.sh` changes.
 - Players need the Visual C++ runtime (`MSVCP140.dll`, `VCRUNTIME140.dll`;
   Wine has its own). Not shipped yet.
 
