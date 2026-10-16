@@ -51,6 +51,8 @@
 #include <unordered_set>
 #include <vector>
 
+#include <x86intrin.h>
+
 REXCVAR_DEFINE_BOOL(interpolate_draw_state, true, "ITC",
                     "Smooth motion between 30 Hz ticks in races by blending cameras and "
                     "object transforms");
@@ -118,6 +120,8 @@ REXCVAR_DEFINE_BOOL(cache_camera_ids, true, "ITC",
                     "Remember the camera number of recently seen view-projections by their "
                     "bytes, so a repeated one skips splitting it and the table lookup (same "
                     "numbers)");
+REXCVAR_DEFINE_BOOL(check_draw_state, false, "ITC",
+                    "Temporary: log DrawState's call counts, table sizes and timings every 2 s");
 
 namespace interpolation {
 namespace {
@@ -697,7 +701,12 @@ class DrawState {
     if (!recorder && PassOfViewProjection(b) < 0 && camera_ids_.Of(inputs.view_projection) == 0) {
       return;
     }
+    uint64_t t0 = REXCVAR_GET(check_draw_state) ? __rdtsc() : 0;
     Note(base, out, a, b, inputs, render_only);
+    if (t0) {
+      check_.note_cycles += __rdtsc() - t0;
+      check_.notes[render_only]++;
+    }
   }
 
   // Main thread, after the matrix copy dst = src. A copy of a camera (as
@@ -712,7 +721,13 @@ class DrawState {
       // A copy of a camera (a camera pass's, or a perspective one built on
       // the stack, like the headlight projector's).
       Matrix4 identity{1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
+      uint64_t t0 = REXCVAR_GET(check_draw_state) ? __rdtsc() : 0;
       Note(base, dst, 0, src, {identity, value}, render_only);
+      if (t0) {
+        check_.note_cycles += __rdtsc() - t0;
+        check_.notes[render_only]++;
+        check_.copy_notes++;
+      }
       counts_.copies++;
       return;
     }
@@ -863,6 +878,11 @@ class DrawState {
   }
 
   void AfterDraw(uint8_t* base) {
+    bool check = REXCVAR_GET(check_draw_state);
+    uint64_t t0 = check ? __rdtsc() : 0, t1 = 0, t2 = 0;
+    if (check) {
+      CheckSizes();
+    }
     drawing_ = false;
     base_ = base;
     if (logic_pass_) {
@@ -879,9 +899,18 @@ class DrawState {
       overlay_keys_ = std::move(overlay_keys_this_tick_);
       overlay_keys_this_tick_.clear();
     }
+    if (check) {
+      t1 = __rdtsc();
+    }
     PublishReplayFrame();
+    if (check) {
+      t2 = __rdtsc();
+    }
     pass_outputs_.clear();
     product_occurrences_.clear();
+    if (check) {
+      CheckTimes(t0, t1, t2);
+    }
     Restore(base, saved_);
     Restore(base, saved_vec3_);
     counts_.draws++;
@@ -1368,6 +1397,56 @@ class DrawState {
           identity != previous_identities.end() ? identity->second : next_identity_++;
     }
   }
+  // --check_draw_state (temporary).
+  struct {
+    uint64_t frames = 0, logic_frames = 0, notes[2] = {}, copy_notes = 0;
+    uint64_t note_cycles = 0, tick_cycles = 0, publish_cycles = 0, after_cycles = 0;
+    uint64_t tick_outputs = 0, pass_outputs = 0, occurrences = 0, published = 0;
+    uint64_t current = 0, paired = 0, logic_tick_outputs = 0;
+    std::chrono::steady_clock::time_point last_log{};
+  } check_;
+
+  [[gnu::noinline]] void CheckSizes() {
+    check_.frames++;
+    check_.logic_frames += logic_pass_;
+    check_.tick_outputs += tick_outputs_.size();
+    check_.pass_outputs += pass_outputs_.size();
+    check_.occurrences += product_occurrences_.size();
+    if (logic_pass_) {
+      check_.logic_tick_outputs += tick_outputs_.size();
+      check_.current += collecting_.size();
+      check_.paired += paired_.size();
+    }
+  }
+
+  [[gnu::noinline]] void CheckTimes(uint64_t t0, uint64_t t1, uint64_t t2) {
+    uint64_t t3 = __rdtsc();
+    check_.tick_cycles += t1 - t0;
+    check_.publish_cycles += t2 - t1;
+    check_.after_cycles += t3 - t0;
+    check_.published += g_replay_frame ? g_replay_frame->products.size() : 0;
+    auto now = std::chrono::steady_clock::now();
+    if (now - check_.last_log < std::chrono::seconds(2)) {
+      return;
+    }
+    double f = double(std::max<uint64_t>(check_.frames, 1));
+    double l = double(std::max<uint64_t>(check_.logic_frames, 1));
+    REXLOG_INFO(
+        "draw state check: {} frames ({} logic); a frame: notes {:.0f} logic + {:.0f} render-only "
+        "({:.0f} copies), tick outputs {:.0f}, pass outputs {:.0f}, occurrences {:.0f}, published "
+        "{:.0f}; a logic frame: tick outputs {:.0f}, products {:.0f}, paired {:.0f}; tsc kcycles a "
+        "frame: notes {:.1f}, after draw {:.1f} (tick {:.1f}, publish {:.1f})",
+        check_.frames, check_.logic_frames, check_.notes[0] / f, check_.notes[1] / f,
+        check_.copy_notes / f, check_.tick_outputs / f, check_.pass_outputs / f,
+        check_.occurrences / f, check_.published / f, check_.logic_tick_outputs / l,
+        check_.current / l, check_.paired / l, check_.note_cycles / f / 1e3,
+        check_.after_cycles / f / 1e3, check_.tick_cycles / f / 1e3,
+        check_.publish_cycles / f / 1e3);
+    auto last = now;
+    check_ = {};
+    check_.last_log = last;
+  }
+
   struct {
     int ticks = 0, keyed = 0, shared = 0;
     std::chrono::steady_clock::time_point last_log{};

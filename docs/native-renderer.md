@@ -3014,6 +3014,48 @@ frame): `__imp__sub_821298C0` 16%, `__imp__sub_8209C6E0` 10%,
 5.4%, `__imp__sub_825951E0` 3.8%, `DrawState::Note` 2.7%. Not looked at
 yet: `AfterDraw` and `Note`.
 
+#### DrawState::Note and AfterDraw
+
+Main thread on `main` at `7026d84` (7.98 million cycles a frame, one
+run): `DrawState::AfterDraw` 5.1% (~406 thousand cycles a frame),
+`DrawState::Note` 2.4% (~189), the `ProductKey` to `ProductInputs` maps'
+lookups 1.5% (~122), `pass_outputs_`/`tick_outputs_`' `operator[]` and
+`find` 1.3% (~100), `Replace`/`Restore` 1.2% (~97, `BeforeRecordObject`'s
+blends). libc's samples aren't symbolized (its symbols are stripped);
+their callers come from a recording with branch stacks (`perf record -j
+any_call,u`, the first entry of each sample's stack): libc's `memcpy`
+(2.2%) is nearly all called by `AfterDraw`, `memcmp` (2.0%) by the
+game's `sub_8209BD50` (not ours), and `malloc` (~2%, with its lock) by
+`Note`, `AfterDraw` and `operator new`.
+
+`AfterDraw` runs once a Draw, that is once a frame, not once a draw call.
+A temporary check (`--check_draw_state`: counts, table sizes, `rdtsc`
+around the parts) over an attract race, a frame on average:
+
+- **~1,400 `Note` calls**, ~90 on the logic pass (1 frame in ~15) and
+  ~1,310-1,480 on render-only passes (~24 from `OnCopy`). Products are
+  numbered among ~170 groups of the same operands (`product_occurrences_`).
+- ~740 pass outputs (render-only products by address) and ~770 tick
+  outputs (the logic pass's, unchanged until the next one), so **~1,480
+  products published a frame**: their addresses differ, as each pass
+  records into new command list memory.
+- `PublishReplayFrame` ~490 thousand tsc cycles a frame (~330 a product):
+  for each, five hash lookups by `ProductKey` (`current_tick_`, `paired_`,
+  `previous_tick_`, `identities_`, `plan_of_`) and a ~420-byte
+  `ReplayedProduct` (the product, both ticks' inputs and the plan) copied
+  into a table allocated for the frame: ~620 KB written a frame, the same
+  tick data again every frame.
+- `MatchTick` and `PlanTick`, once a tick: ~2 million tsc cycles, ~140
+  thousand a frame.
+- `Note` ~370 tsc cycles a call (with the `rdtsc`s): an
+  `operator[]` on `product_occurrences_` (cleared every frame, so a node
+  allocated again for each group), a `current_tick_` lookup and two matrix
+  compares (render-only passes check their inputs against the logic
+  pass's), and an `operator[]` on `pass_outputs_` (also cleared every
+  frame: a node allocated for each output).
+- `Note`'s prologue saves six registers, reserves 0x308 bytes and checks
+  a stack canary: `--log_overlay_products`' logging is inlined into it.
+
 ## Resolution (branch `unlocked-resolution`, 2026-10-16)
 
 Goal: `--width`/`--height` and fullscreen. The game draws its 3D view at
