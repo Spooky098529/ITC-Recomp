@@ -977,6 +977,10 @@ memory).
   before came with microcode that hashes differently (stale: a cache by
   the key would give the wrong shader), with a sample (see "Shader
   lookup").
+- `--native_renderer_cache_shader_lookups=false`: hash every draw's
+  shader microcode and look the interface and translations up in full,
+  instead of answering from the table by what the draw reads from the
+  shader objects (on by default; see "Shader lookup").
 - `--native_renderer_cache_texture_bindings=false`: look every texture view
   and sampler up in full instead of answering from the table by the fetch
   constant's words (on by default; see "Texture binding").
@@ -1460,6 +1464,9 @@ fixed: texture binding from ~1,190 to ~350 thousand cycles a frame, the render t
 nothing it was built from changed, ~-2.4% more. Against `main`: -6.9%
 render thread cycles a frame, +2.8% uncapped fps (see "Texture
 binding").
+Then (`shader-lookup`, 2026-10-16): shader lookups kept by what draws
+read from the shader objects instead of hashing the microcode every draw:
+-5.2% render thread cycles a frame (see "Shader lookup").
 
 ### The Deck's log (2026-10-15)
 
@@ -2733,6 +2740,43 @@ So a cache by these keys would answer nearly every lookup, and no key
 ever went stale here. Not covered: whether freed shaders' memory is
 reused for others (the keys only grew, so a reuse with the same address
 and size wasn't seen).
+
+**Done: lookups kept by the key** (`294d611`; the check removed in
+`31e1474`). `Draw` builds the key (12 words: both objects, their
+microcode's address and size, the patched-for and declaration ids,
+`SQ_PROGRAM_CNTL`, `SQ_CONTEXT_MISC`, the flags), compares it with the
+last draw's, else looks it up in `ShaderLookupTable` (`passes.cpp`, open
+addressing at most half full, never emptied); the answer is both
+translations, the interface and the two hashes (for the diagnostics keyed
+by them, `collect_interfaces`). Not kept: failed translations, draws of
+the patched copy (its contents change at one host address), and with
+`--native_renderer_log_shader_lookups` (it needs the hashes worked out).
+Translations are never freed, so their pointers stay good.
+`--native_renderer_cache_shader_lookups=false` turns it off.
+
+Checked with a temporary `--native_renderer_check_shader_lookups` (each
+kept answer also looked up in full and compared) over two 90 s attract
+races (`itc_819.log`, `itc_820.log`): 0 of 72.5 million kept answers
+differed in each (71.0% the last draw's, the rest from the table).
+
+Profiles (`profile_render_thread.sh`, one binary, `ITC_ARGS` with the
+cache off and on, three runs each, alternating), million cycles a frame:
+off 10.855, 10.952, 10.795 (10.867); on 10.396, 10.303, 10.212 (10.304):
+**-5.2%** (~-560 thousand), every run on below every run off. Gone,
+thousand cycles a frame: `ShaderCache::Get` ~314, XXH3 of the long
+microcodes ~220, `GetInterface` ~140, one of the two short-microcode
+XXH3 copies ~65, a clone of `Draw` ~70; `Draw` itself within noise
+(~1,040 against ~1,100) with the key's work inlined into it.
+
+**The profile script recorded the wrong thread** in two of the first
+runs with the cache on: it took the busiest thread at 14 s, and with the
+render thread this light the main thread (~88% of a core, the render
+thread ~87%) can be busier. `profile_render_thread.sh` now takes the
+busiest thread but `Main XThread` (`74d8739`; the render thread's name,
+`XThread<address>`, changes from run to run). Profiles made before it
+were of the render thread (it was then clearly the busiest). On this PC,
+the render thread is no longer the only limit: the main thread is about
+as busy.
 
 ## Resolution (branch `unlocked-resolution`, 2026-10-16)
 
