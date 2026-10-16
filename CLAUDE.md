@@ -19,6 +19,8 @@ the SDK's audio (the Audio Worker's spin, the game's sounds, the plan).
 under Wine (the user has no Windows machine).
 `docs/old-hardware.md` is the plan (not started) for running below
 Vulkan 1.3, and why not OpenGL.
+`docs/tick-replay.md` is a lead (not started): translating draws once a
+tick and replaying our own list on in-between frames.
 Read the relevant section before changing anything, and keep it up to
 date as you learn things.
 

@@ -1571,6 +1571,10 @@ manage well under 1 µs. Roughly by payoff for the effort:
 
 A draws-per-pass count shows whether 1 and 2 are as big as estimated.
 
+Since (2026-10-16): a larger version of 1, translating every draw once a
+tick and replaying our own list on in-between frames instead of the
+game's, is written up as a lead in `docs/tick-replay.md`.
+
 ### Profile of 2026-10-15 (PC, attract race)
 
 **How it was profiled, with the release build as is** (no debug build:
