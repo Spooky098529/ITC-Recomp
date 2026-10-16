@@ -3056,6 +3056,65 @@ around the parts) over an attract race, a frame on average:
 - `Note`'s prologue saves six registers, reserves 0x308 bytes and checks
   a stack canary: `--log_overlay_products`' logging is inlined into it.
 
+**Done** (`drawstate-investigate`), in four steps, each checked by
+`--check_draw_state` over a 90 s attract race (no differences: ~58
+million published products compared field by field with the per-frame
+lookups, ~58 million notes' occurrence numbers and tick inputs with
+`std::unordered_map`'s and `current_tick_`'s, the billboard cameras bit
+for bit in ~39,000 frames):
+
+1. `--publish_by_tick` (default on): `ReplayedProduct` is now the product
+   written and a pointer to a `TickProduct` (identity, handler, plan, both
+   ticks' inputs), built once a tick in `PlanTick` and kept in the tick's
+   `TickPlans`, with an open-addressed index by key. The logic pass's
+   outputs are resolved once a tick (again if one changes), each pass
+   output with one lookup, and frames nobody holds any more are reused
+   with their tables. Main thread, one binary, off 6.91, 7.52, 7.46
+   (7.30), on 7.01, 7.10, 6.99 (7.03): -3.6%; by symbol, publishing
+   from ~580 thousand cycles a frame (lookups, copies, libc's `memcpy`) to
+   ~90, and `memcpy` gone from the profile.
+2. `product_occurrences_`, `tick_outputs_` and `pass_outputs_` became
+   `FlatMap`s (entries in a vector, an open-addressed index; clearing keeps
+   the memory, so no node is allocated a note). `Note`'s render-only check
+   finds the tick's inputs through the index and gives Publish the place
+   found. `--log_overlay_products`' logging moved out of `Note` (its frame
+   from 0x308 bytes with a canary to 0x128 without). Against step 1, two
+   builds alternating: 6.99, 6.98, 6.90 (6.96) against 6.66, 6.68, 6.50
+   (6.61): -5.0%; `malloc` from ~25 to ~8 thousand cycles a frame.
+3. `Note`'s samples were then memory waits: 17% on the index slot's load
+   (48-byte slots, ~200 KB, at random), ~35% in the matrix compares against
+   the tick's inputs (~580 KB, scattered). Render-only passes note in the
+   logic pass's order, so the tick's products are built in the order noted
+   and `Note` tries the one after the last found before the index: 85% of
+   all notes are found that way, read in order. The compares take four
+   floats at a time (`SameMatrix`, the same `==` per float). `Note` from
+   ~193 to ~107 thousand cycles a frame (totals 6.48 against 6.52, within
+   the runs' spread).
+4. `Replace`/`Restore` (~95 thousand cycles a frame) and `Blend`/
+   `Multiply` came from the light billboards' override (`sub_8209C6E0`),
+   which blended the camera again for every billboard set:
+   `--cache_billboard_cameras` (default on) blends them once a Draw.
+   `LoadMatrix`/`StoreMatrix` swap four words at a time with `pshufb`
+   (the same bits) instead of sixteen volatile 4-byte accesses. Against
+   step 3: 6.48, 6.50, 6.62 (6.53) against 6.02, 6.22, 6.06 (6.10): -6.6%.
+   The game's `__imp__sub_8209C6E0` itself fell from ~1,020 to ~730
+   thousand cycles a frame, probably as it reads the camera we write with
+   16-byte loads, which our 4-byte stores kept from forwarding (not
+   checked by IP).
+
+Main thread against `main` (`7026d84`), three runs each, alternating:
+`main` 7.88, 7.79, 7.94 (7.87); this 6.14, 6.11, 6.18 (6.14): **-22.0%**.
+DrawState's symbols together from ~1,300 to ~280 thousand cycles a frame.
+Render thread unchanged (two runs each: 10.22, 10.33 against 10.33,
+10.28); `BlendState_ReplayConstants` from ~604 to ~562 thousand cycles a
+frame, reading the tick's products in place of a fresh copy each frame.
+No fps runs: at this point the profiles' cycles are the measure.
+
+Left: `Note` ~110 thousand cycles a frame (~75 a call), `AfterDraw` ~40
+(`MatchTick` and `PlanTick` once a tick still use `std::unordered_map`),
+and the billboards' `__imp__sub_8209C6E0` at ~12% of the main thread,
+the largest after `__imp__sub_821298C0`.
+
 ## Resolution (branch `unlocked-resolution`, 2026-10-16)
 
 Goal: `--width`/`--height` and fullscreen. The game draws its 3D view at
