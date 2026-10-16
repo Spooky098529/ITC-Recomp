@@ -211,8 +211,9 @@ Not done yet:
   logging or start-up into them; ~-2% and ~150k cycles a frame, see
   "`Buffers_OnCommand`'s cost"). On `texture-binding` (2026-10-16, not
   merged): texture views and samplers answered from a table by the fetch
-  constant's words, ~-5% render thread cycles a frame by profile ("Texture
-  binding" in `docs/native-renderer.md`). Still to decide: the old per-draw path's
+  constant's words, ~-5% render thread cycles a frame by profile, then the
+  last texture set reused when unchanged, ~-2.4% more ("Texture binding"
+  in `docs/native-renderer.md`). Still to decide: the old per-draw path's
   future, and a Steam Deck test.
 - Recheck whether the player's beam on the road still jumps in sharp turns
   (Known issues); if it's gone, drop it from the next release's limits.

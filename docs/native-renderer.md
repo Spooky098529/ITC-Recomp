@@ -1436,7 +1436,8 @@ Then (`texture-binding`, 2026-10-16): texture views and samplers answered
 from a table by the fetch constant's words, the signed binding reusing the
 unsigned one's view, the table's key built in registers and its hash
 fixed: texture binding from ~1,190 to ~350 thousand cycles a frame, the render thread
-~5% fewer cycles a frame (see "Texture binding").
+~5% fewer cycles a frame; then each stage's last texture set reused when
+nothing it was built from changed, ~-2.4% more (see "Texture binding").
 
 ### The Deck's log (2026-10-15)
 
@@ -2564,11 +2565,38 @@ alternating, thousand cycles a frame:
 
 `Find` halved in every run (~-50); `GetTextureSet` was noisier.
 
+**Then: each stage's last set reused** (`f496710`; its check removed in
+`9a83010`). `GetTextureSet` keeps, per stage, the last set built and what
+it was built from: the shader, the layout, the words of the fetch
+constants the shader reads (a mask worked out when the shader changes)
+and the texture cache's two generations. When all are unchanged, the set
+is given again: no lookups, no key, no `FrameSetCache`. A set isn't kept
+when any answer it was built from wasn't kept by the texture cache
+(`TextureCache::unkept_answers()`: placeholders, deferred reloads, the
+table off), with `--native_renderer_hide_cubes`, or past the frame (sets
+are the frame's). `--native_renderer_reuse_texture_sets=false` turns it
+off. Checked with a temporary `--native_renderer_check_texture_sets`
+(each reuse also built in full; the frame's set cache gives the same set
+for the same contents) over two attract races (`itc_811.log`,
+`itc_812.log`): 0 of 106.5 and 107.6 million reuses differed.
+
+Counted (a temporary counter, uncommitted): vertex stage 73% reused, but
+no vertex shader here samples a texture, so those skip only the empty
+set's lookup; pixel stage 46-48% reused. Profiles against `0c67c5e`, three
+runs each, alternating: render thread 10.91, 10.80, 10.86 million cycles
+a frame against 10.56, 10.77, 10.47 (~-2.4%). `GetTextureSet` and `Find`
+hardly moved (~240 and ~60): the reused draws' lookups were likely the
+cheap ones (entries already in cache). The saving is where the set
+lookup's work was, by symbol: libc at `0x184a65` 299 to 151 thousand
+cycles a frame (by its address range likely `memcmp`: `FrameSetCache`
+compares keys with `std::equal`), other libc spots nearby ~-50, XXH3 (the
+set key's hash) 25 to 2.5.
+
 **Left to try**, unmeasured estimates:
 
-- Reuse the last draw's descriptor set when the shader and the fetch
-  constants it reads are unchanged (pixel stage 43-50% of draws, vertex
-  71-75%): skips the lookups, the set's key and `FrameSetCache` for them.
+- Make building a set cheaper for the rest: `FrameSetCache`'s compare
+  inline (fixed-size keys) instead of `memcmp`, and a cheaper hash than
+  XXH3 for short keys.
 - Keep descriptor sets from frame to frame: ~10% of sets are allocated
   and written each frame only because the pools are reset with the frame
   (`GetTextureSet`'s driver calls, ~1% of the thread).
