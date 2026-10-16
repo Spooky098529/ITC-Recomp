@@ -67,6 +67,7 @@ the console. Screens and windows that aren't 16:9 get black bars.
 - The Windows version is experimental: it has only been tested under Wine
   on Linux, not on a real Windows PC yet. Reports of how it runs are
   welcome.
+- Pause menus in races currently poll the controller too fast, so the menus are annoying to navigate
 
 ## Reporting problems
 
