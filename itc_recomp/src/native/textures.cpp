@@ -28,6 +28,13 @@ REXCVAR_DEFINE_BOOL(native_renderer_log_texture_writes, false, "ITC",
                     "is found changed, what the library's memcpy wrote there (a debugging aid; "
                     "with --native_renderer_verify_textures every change is found)");
 
+REXCVAR_DEFINE_BOOL(native_renderer_cache_texture_bindings, true, "ITC",
+                    "Answer texture views and samplers from a table of earlier answers by the "
+                    "fetch constant's words, instead of looking the texture up every binding");
+REXCVAR_DEFINE_BOOL(native_renderer_check_texture_bindings, false, "ITC",
+                    "Also work out in full every texture view and sampler answered from the "
+                    "table, counting those that differ (a temporary check of the table)");
+
 namespace native {
 
 namespace xenos = rex::graphics::xenos;
@@ -389,6 +396,67 @@ TextureKey KeyOf(const uint32_t fetch[6]) {
           fetch[5] & 0xFFFFFE00u};
 }
 
+// GetView's and GetSampler's answers by what they're asked: the fetch
+// constant's 6 words and the view type, or the packed filter overrides.
+// An entry holds while its generation is current; nearly every call
+// repeats an earlier one ("Texture binding" in docs/native-renderer.md).
+class BindingTable {
+ public:
+  using Key = std::array<uint32_t, 7>;
+  struct Entry {
+    Key key;
+    bool used;
+    uint64_t value;       // the handle
+    uint64_t generation;  // UINT64_MAX: not to be kept
+  };
+
+  // The key's entry, added unfilled (generation UINT64_MAX) if new. Valid
+  // until the next call.
+  Entry& Find(const Key& key) {
+    if (used_ * 2 >= entries_.size()) {
+      Grow();
+    }
+    size_t mask = entries_.size() - 1;
+    for (size_t i = HashOf(key) & mask;; i = (i + 1) & mask) {
+      Entry& e = entries_[i];
+      if (!e.used) {
+        e = {key, true, 0, UINT64_MAX};
+        used_++;
+        return e;
+      }
+      if (e.key == key) {
+        return e;
+      }
+    }
+  }
+
+ private:
+  static size_t HashOf(const Key& key) {
+    uint64_t h = 0;
+    for (uint32_t word : key) {
+      h = (h ^ word) * 0x9E3779B97F4A7C15ull;
+    }
+    return size_t(h ^ (h >> 32));
+  }
+  void Grow() {
+    std::vector<Entry> old = std::move(entries_);
+    entries_.assign(std::max<size_t>(old.size() * 2, 4096), Entry{});
+    size_t mask = entries_.size() - 1;
+    for (const Entry& e : old) {
+      if (!e.used) {
+        continue;
+      }
+      size_t i = HashOf(e.key) & mask;
+      while (entries_[i].used) {
+        i = (i + 1) & mask;
+      }
+      entries_[i] = e;
+    }
+  }
+  std::vector<Entry> entries_;
+  size_t used_ = 0;
+};
+
 }  // namespace
 
 struct TextureCache::State {
@@ -452,6 +520,7 @@ struct TextureCache::State {
     return uint64_t(std::bit_cast<uint32_t>(scale)) << 32 | page;
   }
   std::unordered_map<uint64_t, VkSampler> samplers;
+  BindingTable view_answers, sampler_answers;
   Stats stats;
 
   // --native_renderer_log_texture_writes: who wrote textures' memory.
@@ -832,6 +901,12 @@ void TextureCache::BeginFrame(uint32_t frame_index) {
   s.staging_used = 0;
   s.recording = false;
   vk::vkResetCommandPool(s.context.device, s.frames[frame_index].pool, 0);
+  cache_bindings_ = REXCVAR_GET(native_renderer_cache_texture_bindings);
+  check_bindings_ = REXCVAR_GET(native_renderer_check_texture_bindings);
+  log_writes_ = REXCVAR_GET(native_renderer_log_texture_writes);
+  if (log_writes_) {
+    s.LogWriteSummary();
+  }
   uint64_t marked = s.stats.marked;
   s.MarkWritten();
   if (s.stats.marked != marked) {
@@ -877,9 +952,52 @@ bool TextureCache::Holds(uint32_t start, uint32_t end) const {
   return false;
 }
 
+namespace {
+template <typename Handle>
+uint64_t HandleBits(Handle handle) {
+  return uint64_t(reinterpret_cast<uintptr_t>(handle));
+}
+template <typename Handle>
+Handle FromBits(uint64_t bits) {
+  return reinterpret_cast<Handle>(uintptr_t(bits));
+}
+}  // namespace
+
 VkImageView TextureCache::GetView(uint8_t* base, const uint32_t fetch_words[6],
                                   VkImageViewType view_type) {
+  bool cacheable;
+  // Hashing every texture every frame needs every call.
+  if (!cache_bindings_ || verify_every_frame_) {
+    return LookUpView(base, fetch_words, view_type, cacheable);
+  }
   State& s = *state_;
+  BindingTable::Key key;
+  std::memcpy(key.data(), fetch_words, 24);
+  key[6] = uint32_t(view_type);
+  BindingTable::Entry& e = s.view_answers.Find(key);
+  if (e.generation == generation_) {
+    if (check_bindings_) {
+      VkImageView view = LookUpView(base, fetch_words, view_type, cacheable);
+      s.stats.binding_checks++;
+      if (HandleBits(view) != e.value && !s.stats.binding_mismatches++) {
+        s.stats.binding_mismatch_sample = {fetch_words[0], fetch_words[1], fetch_words[2],
+                                           fetch_words[5], uint32_t(view_type)};
+      }
+    }
+    return FromBits<VkImageView>(e.value);
+  }
+  VkImageView view = LookUpView(base, fetch_words, view_type, cacheable);
+  e.value = HandleBits(view);
+  // Not kept: nothing (a placeholder, maybe only until staging has room), or
+  // a texture still to be reloaded.
+  e.generation = cacheable && view ? generation_ : UINT64_MAX;
+  return view;
+}
+
+VkImageView TextureCache::LookUpView(uint8_t* base, const uint32_t fetch_words[6],
+                                     VkImageViewType view_type, bool& cacheable) {
+  State& s = *state_;
+  cacheable = false;
   xenos::xe_gpu_texture_fetch_t fetch = ToFetch(fetch_words);
   if (fetch.type != xenos::FetchConstantType::kTexture) {
     s.stats.unsupported++;
@@ -903,6 +1021,7 @@ VkImageView TextureCache::GetView(uint8_t* base, const uint32_t fetch_words[6],
     s.mismatched_total++;
       return VK_NULL_HANDLE;
     }
+    cacheable = true;
     return s.GetSwizzledView(t, fetch.swizzle, VK_IMAGE_VIEW_TYPE_2D_ARRAY);
   }
 
@@ -961,10 +1080,7 @@ VkImageView TextureCache::GetView(uint8_t* base, const uint32_t fetch_words[6],
   // Load; reload when memcpy has written its memory since (MarkWritten).
   // With verify_every_frame_, also hash it every frame, and reload it (and
   // log it) if it changed without a recorded write.
-  bool log_writes = REXCVAR_GET(native_renderer_log_texture_writes);
-  if (log_writes) {
-    s.LogWriteSummary();
-  }
+  bool log_writes = log_writes_;
   if (!t.loaded) {
     if (verify_every_frame_) {
       t.hash = s.Hash(base, t);
@@ -1003,6 +1119,7 @@ VkImageView TextureCache::GetView(uint8_t* base, const uint32_t fetch_words[6],
     }
   }
 
+  cacheable = !t.changed;  // else staging was full: try again next call
   return s.GetSwizzledView(t, fetch.swizzle, natural);
 }
 
@@ -1135,6 +1252,34 @@ bool TextureCache::DecodeGuest(uint8_t* base, const uint32_t fetch_words[6],
 
 VkSampler TextureCache::GetSampler(const uint32_t fetch_words[6],
                                    const SamplerOverrides& overrides) {
+  if (!cache_bindings_) {
+    return LookUpSampler(fetch_words, overrides);
+  }
+  State& s = *state_;
+  BindingTable::Key key;
+  std::memcpy(key.data(), fetch_words, 24);
+  key[6] = (overrides.mag_filter & 0xFF) | (overrides.min_filter & 0xFF) << 8 |
+           (overrides.mip_filter & 0xFF) << 16 | (overrides.aniso_filter & 0xFF) << 24;
+  BindingTable::Entry& e = s.sampler_answers.Find(key);
+  if (e.generation == sampler_generation_) {
+    if (check_bindings_) {
+      VkSampler sampler = LookUpSampler(fetch_words, overrides);
+      s.stats.binding_checks++;
+      if (HandleBits(sampler) != e.value && !s.stats.binding_mismatches++) {
+        s.stats.binding_mismatch_sample = {fetch_words[0], fetch_words[1], fetch_words[2],
+                                           fetch_words[5], UINT32_MAX};
+      }
+    }
+    return FromBits<VkSampler>(e.value);
+  }
+  VkSampler sampler = LookUpSampler(fetch_words, overrides);
+  e.value = HandleBits(sampler);
+  e.generation = sampler ? sampler_generation_ : UINT64_MAX;
+  return sampler;
+}
+
+VkSampler TextureCache::LookUpSampler(const uint32_t fetch_words[6],
+                                      const SamplerOverrides& overrides) {
   State& s = *state_;
   xenos::xe_gpu_texture_fetch_t fetch = ToFetch(fetch_words);
   auto pick = [](uint32_t override_value, uint32_t from_fetch, uint32_t use_fetch) {

@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include <array>
 #include <cstdint>
 #include <memory>
 #include <vector>
@@ -37,7 +38,10 @@ class TextureCache {
   // fetch constant's swizzle; loaded as needed, and reloaded after the
   // library's memcpy writes its memory. Null if the texture can't be had (unsupported format or
   // dimension, view type mismatch, staging full): use a placeholder.
-  // fetch: the 6 words, in host order.
+  // fetch: the 6 words, in host order. Both answer from a table of earlier
+  // answers by the same words while the generation (below) holds
+  // (--native_renderer_cache_texture_bindings), so Stats count only the
+  // calls that weren't answered from it.
   VkImageView GetView(uint8_t* base, const uint32_t fetch[6], VkImageViewType view_type);
   VkSampler GetSampler(const uint32_t fetch[6], const SamplerOverrides& overrides);
   // The post-swizzle signedness of each component, 2 bits each (the
@@ -77,7 +81,12 @@ class TextureCache {
   // destinations (all, or at one address).
   enum class Hide { kNone, kMemory, kMemoryFormat, kResolved, kResolvedAddress };
   // A debugging aid: samplers use only each texture's first level.
-  void set_base_level_only(bool base_only) { base_level_only_ = base_only; }
+  void set_base_level_only(bool base_only) {
+    if (base_only != base_level_only_) {
+      sampler_generation_++;
+    }
+    base_level_only_ = base_only;
+  }
   // A debugging aid: hash every texture used each frame, to check that the
   // library's memcpy is how textures' memory changes (a change without a
   // recorded write is counted and reloaded).
@@ -126,6 +135,11 @@ class TextureCache {
     // A texture of another dimension than the shader declares: declared view
     // type << 16 | format << 8 | dimension, and its size.
     uint32_t mismatched_sample = UINT32_MAX, mismatched_width = 0, mismatched_height = 0;
+    // With --native_renderer_check_texture_bindings: calls answered from the
+    // table, also worked out in full, and those that came out otherwise; an
+    // example (fetch constant's words 0, 1, 2, 5, sampler or view type).
+    uint64_t binding_checks = 0, binding_mismatches = 0;
+    std::array<uint32_t, 5> binding_mismatch_sample{};
   };
   Stats TakeStats();
   // Lookups so far that found a texture of another dimension than declared
@@ -134,7 +148,16 @@ class TextureCache {
 
  private:
   struct State;
+  // GetView and GetSampler worked out in full; `cacheable`: whether the
+  // answer may be kept until the generation changes.
+  VkImageView LookUpView(uint8_t* base, const uint32_t fetch[6], VkImageViewType view_type,
+                         bool& cacheable);
+  VkSampler LookUpSampler(const uint32_t fetch[6], const SamplerOverrides& overrides);
   std::unique_ptr<State> state_;
+  bool cache_bindings_ = true;
+  bool check_bindings_ = false;
+  bool log_writes_ = false;
+  uint64_t sampler_generation_ = 0;
   Hide debug_hide_ = Hide::kNone;
   bool base_level_only_ = false;
   bool verify_every_frame_ = false;

@@ -1746,6 +1746,17 @@ VkDescriptorSet Passes::State::GetTextureSet(uint8_t* base, const TranslatedShad
       uint32_t extra[4] = {uint32_t(texture.view_type), 0, 0, 0};
       CountBinding(true, texture.fetch_constant, fetch, extra);
     }
+    // The translator binds a signed and an unsigned view of each texture:
+    // both get the same.
+    size_t same = 0;
+    while (same < i && (shader->textures[same].fetch_constant != texture.fetch_constant ||
+                        shader->textures[same].view_type != texture.view_type)) {
+      same++;
+    }
+    if (same < i) {
+      infos[i] = infos[same];
+      continue;
+    }
     VkImageView view = hide_cubes && texture.view_type == VK_IMAGE_VIEW_TYPE_CUBE
                            ? VK_NULL_HANDLE
                            : textures.GetView(base, fetch, texture.view_type);
