@@ -2782,6 +2782,15 @@ were of the render thread (it was then clearly the busiest). On this PC,
 the render thread is no longer the only limit: the main thread is about
 as busy.
 
+**Against v0.4.1 in pictures** (2026-10-16): the v0.4.1 release zip and
+this branch (`0436f4f`), attract races of 20 s with `run.sh`'s flags and
+`--native_renderer_dump_every=1`, twice each: 19 frames a run, the same
+moments (camera, traffic) in both, nothing drawn differently. The
+replay's colour filters (none, black and white, sepia) are chosen at
+random each run, so pixel differences between runs mean nothing; one
+dump a run falls either side of a camera cut (~1 s of drift, in either
+build). The user looked at the montages and passed it for merging.
+
 ## Resolution (branch `unlocked-resolution`, 2026-10-16)
 
 Goal: `--width`/`--height` and fullscreen. The game draws its 3D view at
