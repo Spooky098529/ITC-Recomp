@@ -124,6 +124,9 @@ REXCVAR_DEFINE_BOOL(publish_by_tick, true, "ITC",
                     "Work out what the render thread needs of each of the tick's products once "
                     "a tick, shared by its frames, instead of looking it up and copying it "
                     "every frame (same products)");
+REXCVAR_DEFINE_BOOL(cache_billboard_cameras, true, "ITC",
+                    "Blend the cameras the light billboards face once a frame, instead of on "
+                    "every billboard set (same values)");
 REXCVAR_DEFINE_BOOL(check_draw_state, false, "ITC",
                     "Temporary: log DrawState's call counts, table sizes and timings every 2 s");
 
@@ -144,8 +147,24 @@ constexpr uint32_t kLookAtOffsets[] = {0x190, 0x1A0, 0x1B0};
 constexpr float kCutDistance = 8.0f;  // metres
 constexpr float kCutAngle = 0.5f;     // radians, ~30 degrees
 
+// Whether a matrix's 16 words at address are all on one side of 0xE0000000,
+// where the host offset changes (see guest::CopyU32s).
+bool OneHostRange(uint32_t address) {
+  return address >= 0xE0000000u || address + 60u < 0xE0000000u;
+}
+
+// Four words at a time (pshufb), rather than LoadFloat's volatile loads one
+// by one.
 Matrix4 LoadMatrix(uint8_t* base, uint32_t address) {
   Matrix4 m;
+  if (OneHostRange(address)) {
+    const uint8_t* p = REX_RAW_ADDR(address);
+    for (int i = 0; i < 4; i++) {
+      __m128i v = _mm_loadu_si128(reinterpret_cast<const __m128i*>(p + 16 * i));
+      _mm_storeu_si128(reinterpret_cast<__m128i*>(&m[4 * i]), guest::SwapVector(v));
+    }
+    return m;
+  }
   for (int i = 0; i < 16; i++) {
     m[i] = guest::LoadFloat(base, address + 4 * i);
   }
@@ -153,6 +172,14 @@ Matrix4 LoadMatrix(uint8_t* base, uint32_t address) {
 }
 
 void StoreMatrix(uint8_t* base, uint32_t address, const Matrix4& m) {
+  if (OneHostRange(address)) {
+    uint8_t* p = REX_RAW_ADDR(address);
+    for (int i = 0; i < 4; i++) {
+      __m128i v = _mm_loadu_si128(reinterpret_cast<const __m128i*>(&m[4 * i]));
+      _mm_storeu_si128(reinterpret_cast<__m128i*>(p + 16 * i), guest::SwapVector(v));
+    }
+    return;
+  }
   for (int i = 0; i < 16; i++) {
     guest::StoreFloat(base, address + 4 * i, m[i]);
   }
@@ -980,6 +1007,7 @@ class DrawState {
 
   void BeforeDraw(uint8_t* base, bool logic_pass) {
     drawing_ = true;
+    billboard_cameras_ready_ = false;
     main_thread_ = std::this_thread::get_id();
     logic_pass_ = logic_pass;
     if (logic_pass) {
@@ -1122,6 +1150,28 @@ class DrawState {
     if (!REXCVAR_GET(interpolate_draw_state) || !drawing_) {
       return;
     }
+    if (REXCVAR_GET(cache_billboard_cameras)) {
+      // The same for every set drawn in the frame: blended on the first.
+      if (!billboard_cameras_ready_) {
+        BlendBillboardCameras();
+      }
+      for (const BlendedLookAt& look_at : billboard_look_ats_) {
+        if (look_at.pass_address == pass_address) {
+          for (int i = 0; i < 3; i++) {
+            Replace(base, billboard_saved_vec3_, pass_address + kLookAtOffsets[i],
+                    look_at.vectors[i]);
+          }
+        }
+      }
+      for (const BlendedCamera& camera : billboard_cameras_) {
+        if (camera.pass_address == pass_address) {
+          Replace(base, billboard_saved_, pass_address + kViewOffset, camera.view);
+          Replace(base, billboard_saved_, pass_address + kViewProjectionOffset,
+                  camera.view_projection);
+        }
+      }
+      return;
+    }
     for (const LookAtBlend& blend : look_at_blends_) {
       if (CameraPass(blend.pass) != pass_address) {
         continue;
@@ -1144,6 +1194,66 @@ class DrawState {
               Multiply(view, camera.projection));
     }
   }
+
+  // The frame's blends of look_at_blends_ and camera_blends_, as
+  // BeforeBillboards made them on each call before --cache_billboard_cameras.
+  struct BlendedLookAt {
+    uint32_t pass_address;
+    std::array<Vec3, 3> vectors;
+  };
+  struct BlendedCamera {
+    uint32_t pass_address;
+    Matrix4 view, view_projection;
+  };
+  void BlendBillboardCameras() {
+    billboard_look_ats_.clear();
+    billboard_cameras_.clear();
+    for (const LookAtBlend& blend : look_at_blends_) {
+      BlendedLookAt& look_at = billboard_look_ats_.emplace_back();
+      look_at.pass_address = CameraPass(blend.pass);
+      for (int i = 0; i < 3; i++) {
+        for (int k = 0; k < 3; k++) {
+          look_at.vectors[i][k] = blend.from[i][k] + (blend.to[i][k] - blend.from[i][k]) * amount_;
+        }
+      }
+    }
+    for (const CameraBlend& blend : camera_blends_) {
+      Matrix4 view = ViewMatrixFromTransform(Blend(blend.from, blend.to, amount_));
+      billboard_cameras_.push_back({CameraPass(blend.pass), view, Multiply(view, blend.projection)});
+    }
+    billboard_cameras_ready_ = true;
+    if (REXCVAR_GET(check_draw_state)) [[unlikely]] {
+      CheckBillboardCameras();
+    }
+  }
+  // --check_draw_state: blended again the way BeforeBillboards did, compared
+  // bit for bit.
+  [[gnu::noinline]] void CheckBillboardCameras() {
+    for (size_t j = 0; j < look_at_blends_.size(); j++) {
+      const LookAtBlend& blend = look_at_blends_[j];
+      for (int i = 0; i < 3; i++) {
+        Vec3 v;
+        for (int k = 0; k < 3; k++) {
+          v[k] = blend.from[i][k] + (blend.to[i][k] - blend.from[i][k]) * amount_;
+        }
+        check_.billboard_mismatches +=
+            std::memcmp(&v, &billboard_look_ats_[j].vectors[i], sizeof(v)) != 0;
+      }
+    }
+    for (size_t j = 0; j < camera_blends_.size(); j++) {
+      const CameraBlend& camera = camera_blends_[j];
+      Matrix4 view = ViewMatrixFromTransform(Blend(camera.from, camera.to, amount_));
+      Matrix4 view_projection = Multiply(view, camera.projection);
+      check_.billboard_mismatches +=
+          std::memcmp(&view, &billboard_cameras_[j].view, sizeof(view)) != 0 ||
+          std::memcmp(&view_projection, &billboard_cameras_[j].view_projection,
+                      sizeof(view_projection)) != 0;
+    }
+    check_.billboard_frames++;
+  }
+  std::vector<BlendedLookAt> billboard_look_ats_;
+  std::vector<BlendedCamera> billboard_cameras_;
+  bool billboard_cameras_ready_ = false;  // for this Draw
 
   void AfterBillboards(uint8_t* base) {
     Restore(base, billboard_saved_);
@@ -1695,6 +1805,7 @@ class DrawState {
     uint64_t current = 0, paired = 0, logic_tick_outputs = 0;
     uint64_t publish_compared = 0, publish_mismatches = 0, publish_frames_differing = 0;
     uint64_t notes_checked = 0, note_mismatches = 0, cursor_hits = 0;
+    uint64_t billboard_frames = 0, billboard_mismatches = 0;
     std::chrono::steady_clock::time_point last_log{};
   } check_;
 
@@ -1728,14 +1839,15 @@ class DrawState {
         "({:.0f} copies), tick outputs {:.0f}, pass outputs {:.0f}, occurrences {:.0f}, published "
         "{:.0f}; a logic frame: tick outputs {:.0f}, products {:.0f}, paired {:.0f}; tsc kcycles a "
         "frame: notes {:.1f}, after draw {:.1f} (tick {:.1f}, publish {:.1f}); published products "
-        "compared {}, differing {} in {} frames (by tick: {}); notes checked {}, differing {}, found next along {}",
+        "compared {}, differing {} in {} frames (by tick: {}); notes checked {}, differing {}, found next along {}; billboard cameras checked in {} frames, differing {}",
         check_.frames, check_.logic_frames, check_.notes[0] / f, check_.notes[1] / f,
         check_.copy_notes / f, check_.tick_outputs / f, check_.pass_outputs / f,
         check_.occurrences / f, check_.published / f, check_.logic_tick_outputs / l,
         check_.current / l, check_.paired / l, check_.note_cycles / f / 1e3,
         check_.after_cycles / f / 1e3, check_.tick_cycles / f / 1e3,
         check_.publish_cycles / f / 1e3, check_.publish_compared, check_.publish_mismatches,
-        check_.publish_frames_differing, by_tick_, check_.notes_checked, check_.note_mismatches, check_.cursor_hits);
+        check_.publish_frames_differing, by_tick_, check_.notes_checked, check_.note_mismatches, check_.cursor_hits, check_.billboard_frames,
+        check_.billboard_mismatches);
     auto last = now;
     check_ = {};
     check_.last_log = last;
