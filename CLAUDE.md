@@ -231,7 +231,13 @@ Not done yet:
   of hashing the microcode every draw: -5.2% render thread cycles a
   frame; the main thread is now about as busy as the render thread on
   this PC, so `profile_render_thread.sh` skips `Main XThread` ("Shader
-  lookup" in `docs/native-renderer.md`). A larger lead, translating
+  lookup" in `docs/native-renderer.md`). Merged from `allocate-slots`
+  (2026-10-16): the main thread had become the limit on this PC (99% of
+  a core, the render thread 87%); `CommandList::AllocateSlots` (~51,000
+  calls a frame) done natively with its diagnostics out of line: -14.4%
+  main thread cycles a frame, +3.6% uncapped fps ("The main thread" in
+  `docs/native-renderer.md`; `ITC_THREAD=main profile_render_thread.sh`
+  profiles it). A larger lead, translating
   draws once a tick: `docs/tick-replay.md`. Still to decide: the old
   per-draw path's future, and a Steam Deck test.
 - Recheck whether the player's beam on the road still jumps in sharp turns
