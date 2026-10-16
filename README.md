@@ -9,11 +9,10 @@ Built with AI assistance (Claude Code).
 ## Features
 
 - **Native Vulkan renderer.** The game's Direct3D calls are drawn directly
-  with Vulkan, this avoids relying on the xenia GPU backend of rexglue and should run faster (WIP, still quite slow from my testing)
+  with Vulkan, this avoids relying on the xenia GPU backend of rexglue and should run faster (WIP)
   
 - **Frame interpolation in races.** Game logic still runs at its original
-  30 Hz, and frames are blended between ticks, so races play smoothly at up
-  to 144 fps (or uncapped). `./run.sh --no-interpolation` gives the original
+  30 Hz, and frames are blended between ticks, so races play smoothly at an uncapped FPS (`--max_fps=0`), or with a cap specified on the command line with (`--max_fps=n`). `./run.sh --no-interpolation` gives the original
   30 fps game. Be aware that the internal game logic is still expecting a consistent 30hz update rate, if your machine cannot keep up, the game will run in slow motion.
   
 ## Requirements
@@ -39,10 +38,15 @@ Built with AI assistance (Claude Code).
 | `./run.sh` | Frame interpolation on, up to 144 fps in races, no logging. |
 | `./run.sh --max_fps=N` | A different frame cap; `--max_fps=0` is unlimited. |
 | `./run.sh --no-interpolation` | The original 30 fps game. |
+| `./run.sh --width=1920 --height=1080` | A bigger window, drawn at that resolution instead of the game's 1280x720. |
+| `./run.sh --fullscreen` | Fills the screen, drawn at the screen's resolution. With `--width`/`--height`, drawn at that resolution and scaled to the screen. |
 | `./run.sh --skip_intro` | Skips the Ubisoft logo movie and speeds through the Genki logo and the title screen's intro. Now and then the game hangs at startup with this; if it does, close it and start it again. |
 | `./run-debug.sh` | The same as `run.sh`, with logging on (written to `logs/`). |
 
 Options can be combined, e.g. `./run.sh --skip_intro --max_fps=0`.
+
+By default the game runs in a 1280x720 window at its own resolution, as on
+the console. Screens and windows that aren't 16:9 get black bars.
 
 ## Known limitations
 
@@ -51,7 +55,7 @@ Options can be combined, e.g. `./run.sh --skip_intro --max_fps=0`.
 - In game movies are not shown.
 - Colours are a little lighter than on the console (the console's output
   gamma isn't applied yet).
-- Tested on Linux on a small number of machines so far.
+- Tested on Linux on my PC (9800x3d, 7900XT) and the Steam Deck.
 
 ## Reporting problems
 
@@ -74,7 +78,7 @@ This builds `itc_recomp/out/build/linux-amd64-release/itc` and
 `rexglue-sdk/out/linux-amd64/librexruntime.so`. Put both in the game folder
 with `itc_recomp/run.sh` and `itc_recomp/run-debug.sh`.
 
-## Documentation
+## Documentation (This is written by LLMs primarily for LLMs)
 
 - [docs/functions.md](docs/functions.md): what's known about the game's
   code, how frame interpolation works, and the diagnostic options.

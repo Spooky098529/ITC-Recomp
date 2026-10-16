@@ -4,6 +4,9 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
+#include <utility>
+#include <vector>
 
 namespace native {
 
@@ -19,9 +22,41 @@ void Buffers_OnCommand(uint8_t* base, uint32_t id, uint32_t payload, uint32_t co
 // again only if Buffers_NewestWrite returns more than S.
 uint64_t Buffers_NewestWrite(uint32_t physical, uint32_t size);
 uint64_t Buffers_Sequence();
+// Render thread: what the library's memcpy wrote into [physical, physical +
+// size): bytes covered, the first segment's caller, and the newest write's
+// sequence and caller.
+struct Buffers_Coverage {
+  uint64_t bytes = 0, newest = 0;
+  uint32_t newest_caller = 0, first_caller = 0;
+};
+Buffers_Coverage Buffers_CoverageOf(uint32_t physical, uint32_t size);
+// Render thread: the ranges [start, end) memcpy has written into the
+// physical views since the last call, appended to `out` (the texture cache
+// marks the textures they overlap as changed).
+void Buffers_TakeNewWrites(std::vector<std::pair<uint32_t, uint32_t>>& out);
+// Render thread (--native_renderer_mirror_by_tick): from the first call
+// to Buffers_CollectMirrorWrites on, the same writes kept for the mirrors,
+// taken by Buffers_TakeMirrorWrites (all of them since start up, as pending
+// writes are kept until taken).
+void Buffers_CollectMirrorWrites();
+void Buffers_TakeMirrorWrites(std::vector<std::pair<uint32_t, uint32_t>>& out);
+// Render thread: whether to keep the segments memcpy wrote (for
+// Buffers_NewestWrite and Buffers_CoverageOf; on by default). Off with
+// --native_renderer_mirror_by_tick unless a diagnostic asks of them: writes
+// taken while off are missing from the answers.
+void Buffers_KeepSegments(bool keep);
 
 // Render thread, with logging: a vertex or index range (physical) copied
 // into the mirror, the first time in a frame.
 void Buffers_OnMirror(uint32_t physical, uint32_t size, bool index);
+
+// --native_renderer_log_physical_writes (see buffers.cpp).
+bool Buffers_LogPhysicalWrites();
+// Render thread: a frame's recording starts (is_texture: whether a physical
+// range overlaps a texture the cache holds) and ends; and each vertex or
+// index range it draws, the first time in the frame.
+void Buffers_OnFrameStart(const std::function<bool(uint32_t, uint32_t)>& is_texture);
+void Buffers_OnFrameEnd();
+void Buffers_OnDrawnRange(uint32_t physical, uint32_t size, bool index);
 
 }  // namespace native

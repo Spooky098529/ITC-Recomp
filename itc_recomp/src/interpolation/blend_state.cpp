@@ -230,6 +230,26 @@ struct ProductInputs {
 // Main thread: the per-object recorder's caller context while it runs.
 std::array<uint32_t, 9> g_record_context{};
 
+// How a paired product blends, worked out once a tick from its two ticks'
+// inputs: the decompositions and camera splits don't depend on the frame's
+// amount, so the render thread only blends and multiplies.
+struct ProductPlan {
+  enum class World : uint8_t { kNone, kBlend, kSpinning };
+  World world = World::kNone;
+  bool world_differs = false;    // the ticks' world matrices differ (for the stats)
+  bool camera_rejected = false;  // perspective cameras that can't be one camera
+  int32_t camera = -1;           // into TickPlans::cameras, if the camera blends
+  ScaledTransform wa, wb;        // the world matrices, for kBlend and kSpinning
+};
+// A perspective camera in both ticks, shared by the products using it.
+struct CameraPair {
+  PerspectiveCamera a, b;
+};
+struct TickPlans {
+  std::vector<ProductPlan> products;
+  std::vector<CameraPair> cameras;
+};
+
 // A multiply made during a logic pass, as the render thread redoes it.
 struct ReplayedProduct {
   uint64_t identity = 0;  // the same multiply in every tick (its pairing key)
@@ -237,18 +257,82 @@ struct ReplayedProduct {
   Matrix4 written;  // the product, as written to the output address
   ProductInputs now;
   std::optional<ProductInputs> before;  // the previous tick's, if paired
+  int32_t plan = -1;  // into the frame's TickPlans::products, if paired
+};
+
+// The products of a frame by output address: an open-addressed table, so the
+// render thread's lookup (one per constant upload) is a multiply and a probe
+// of addresses kept together, rather than a divide and a chain of nodes.
+class ProductTable {
+ public:
+  // Before adding: at most `count` products.
+  void Reserve(size_t count) {
+    uint32_t bits = 4;
+    while ((size_t(1) << bits) < 2 * count) {
+      bits++;
+    }
+    shift_ = 32 - bits;
+    slots_.assign(size_t(1) << bits, Slot{0, kEmpty});
+    products_.clear();
+    products_.reserve(count);
+  }
+
+  // Adds the product at `address`, replacing one already there.
+  void Set(uint32_t address, ReplayedProduct product) {
+    Slot& slot = slots_[Probe(address)];
+    if (slot.index != kEmpty) {
+      products_[slot.index] = std::move(product);
+      return;
+    }
+    slot = {address, uint32_t(products_.size())};
+    products_.push_back(std::move(product));
+  }
+
+  const ReplayedProduct* Find(uint32_t address) const {
+    if (slots_.empty()) {
+      return nullptr;
+    }
+    const Slot& slot = slots_[Probe(address)];
+    return slot.index != kEmpty ? &products_[slot.index] : nullptr;
+  }
+
+  size_t size() const { return products_.size(); }
+
+ private:
+  static constexpr uint32_t kEmpty = ~0u;
+  struct Slot {
+    uint32_t address;
+    uint32_t index;  // into products_, or kEmpty
+  };
+  // The slot holding `address`, or the empty one where it would go (the table
+  // is at most half full, so there is one).
+  size_t Probe(uint32_t address) const {
+    size_t mask = slots_.size() - 1;
+    size_t i = (address * 0x9E3779B1u) >> shift_;
+    while (slots_[i].index != kEmpty && slots_[i].address != address) {
+      i = (i + 1) & mask;
+    }
+    return i;
+  }
+  std::vector<Slot> slots_;
+  std::vector<ReplayedProduct> products_;
+  uint32_t shift_ = 28;
 };
 
 // What the render thread needs to blend camera products for a frame:
 // published by the main thread after each Draw.
 struct ReplayFrame {
-  std::unordered_map<uint32_t, ReplayedProduct> products;  // by output address
+  ProductTable products;  // by output address
+  std::shared_ptr<const TickPlans> plans;  // the tick's, shared by its frames
   float amount = 1;
   uint64_t tick = 0;  // which tick the frame draws
 };
 
 std::mutex g_replay_mutex;
 std::shared_ptr<const ReplayFrame> g_replay_frame;
+// Frames the render thread is done with, freed by the main thread: a frame
+// holds ~1,500 products, each a node to free.
+std::vector<std::shared_ptr<const ReplayFrame>> g_retired_replay_frames;
 
 // The matrix multiply's return address in the per-object recorder
 // (sub_825953D0): out = the command's constants, a = world, b = camera.
@@ -257,9 +341,6 @@ constexpr uint32_t kRecorderMultiplyReturn = 0x82595438;
 // The Update handler that records the race overlays (see per_frame_logic.cpp).
 constexpr uint32_t kRaceOverlaysHandler = 0x8215E150;
 
-// Blends a multiply's result between ticks: the world matrix and the camera
-// each as a rigid motion (positions straight, rotations along the shortest
-// arc), falling back to the current tick's where they aren't.
 // Whether two perspective cameras from consecutive ticks can be the same
 // camera: placement within a cut, and nearly the same projection (field of
 // view changes slowly, aspect and depth range don't). Stack copies of
@@ -314,49 +395,127 @@ struct ProductBlendParts {
   const ReplayedProduct* product = nullptr;
 };
 
-Matrix4 BlendProduct(const ReplayedProduct& product, float amount, BlendStats& stats,
-                     ProductBlendParts* parts = nullptr) {
+// Once a tick (main thread): how the product with these inputs blends.
+// `cameras` holds the tick's camera pairs seen so far by their two
+// view-projections' bits: an index into plans.cameras, or -1 for a pair
+// that doesn't blend.
+using CameraPairKey = std::array<uint32_t, 32>;
+struct CameraPairKeyHash {
+  size_t operator()(const CameraPairKey& key) const {
+    uint64_t h = 0;
+    for (uint32_t v : key) {
+      h = (h ^ v) * 0x9E3779B97F4A7C15ull;
+    }
+    return size_t(h ^ (h >> 29));
+  }
+};
+ProductPlan PlanProduct(const ProductInputs& a, const ProductInputs& b, TickPlans& plans,
+                        std::unordered_map<CameraPairKey, int32_t, CameraPairKeyHash>& cameras) {
+  ProductPlan plan;
+  std::optional<ScaledTransform> wa = ScaledTransformFromWorldMatrix(a.world);
+  std::optional<ScaledTransform> wb = ScaledTransformFromWorldMatrix(b.world);
+  if (wa && wb) {
+    plan.wa = *wa;
+    plan.wb = *wb;
+    if (!IsCut(wa->transform, wb->transform)) {
+      plan.world = ProductPlan::World::kBlend;
+    } else if (Distance(wa->transform.position, wb->transform.position) <= kCutDistance &&
+               BlendSpinning(*wa, *wb, 0, kCutAngle)) {
+      // A wheel: too much spin to blend, but its position and steering can
+      // be. (Whether BlendSpinning blends doesn't depend on the amount.)
+      plan.world = ProductPlan::World::kSpinning;
+    }
+  }
+  plan.world_differs = a.world != b.world;
+  if (a.view_projection != b.view_projection) {
+    CameraPairKey key;
+    std::memcpy(key.data(), a.view_projection.data(), sizeof(Matrix4));
+    std::memcpy(key.data() + 16, b.view_projection.data(), sizeof(Matrix4));
+    auto [it, added] = cameras.try_emplace(key, -1);
+    if (added) {
+      std::optional<PerspectiveCamera> ca = SplitViewProjection(a.view_projection);
+      std::optional<PerspectiveCamera> cb = SplitViewProjection(b.view_projection);
+      if (ca && cb) {
+        if (IsSameCamera(*ca, *cb)) {
+          it->second = int32_t(plans.cameras.size());
+          plans.cameras.push_back({*ca, *cb});
+        } else {
+          it->second = -2;
+        }
+      }
+    }
+    plan.camera = std::max(it->second, int32_t(-1));
+    plan.camera_rejected = it->second == -2;
+  }
+  return plan;
+}
+
+// Render thread: each of the tick's cameras blended once a frame, for the
+// ~1,500 products a frame that share a handful of them.
+class CameraBlends {
+ public:
+  struct Blended {
+    uint64_t frame = 0;  // the frame it was blended for
+    Matrix4 view_projection;
+    Vec3 eye;
+  };
+  void OnFrameStart() { frame_++; }
+  const Blended& Get(const TickPlans& plans, int32_t index, float amount) {
+    if (blended_.size() < plans.cameras.size()) {
+      blended_.resize(plans.cameras.size());
+    }
+    Blended& out = blended_[size_t(index)];
+    if (out.frame != frame_) {
+      const CameraPair& camera = plans.cameras[size_t(index)];
+      PerspectiveCamera blended = Blend(camera.a, camera.b, amount);
+      out = {frame_, ViewProjectionFromCamera(blended), blended.camera.position};
+    }
+    return out;
+  }
+
+ private:
+  uint64_t frame_ = 1;
+  std::vector<Blended> blended_;
+};
+
+// Blends a multiply's result between ticks, as planned for its tick: the
+// world matrix and the camera each as a rigid motion (positions straight,
+// rotations along the shortest arc), falling back to the current tick's
+// where they aren't.
+Matrix4 BlendProduct(const ReplayedProduct& product, const TickPlans* plans,
+                                       float amount, BlendStats& stats, CameraBlends& cameras,
+                                       ProductBlendParts* parts = nullptr) {
   if (parts) {
     *parts = {product.now.world, product.now.world, std::nullopt, std::nullopt, &product};
   }
-  if (!product.before) {
+  if (product.plan < 0) {
     stats.unpaired++;
     return product.written;
   }
   stats.blended++;
-  const ProductInputs& a = *product.before;
+  const ProductPlan& plan = plans->products[size_t(product.plan)];
   const ProductInputs& b = product.now;
   Matrix4 world = b.world;
-  std::optional<ScaledTransform> wa = ScaledTransformFromWorldMatrix(a.world);
-  std::optional<ScaledTransform> wb = ScaledTransformFromWorldMatrix(b.world);
-  if (wa && wb && !IsCut(wa->transform, wb->transform)) {
-    world = WorldMatrixFromScaledTransform(Blend(*wa, *wb, amount));
-  } else if (std::optional<ScaledTransform> spinning;
-             wa && wb && Distance(wa->transform.position, wb->transform.position) <= kCutDistance &&
-             (spinning = BlendSpinning(*wa, *wb, amount, kCutAngle))) {
-    // A wheel: too much spin to blend, but its position and steering can be.
+  std::optional<ScaledTransform> spinning;
+  if (plan.world == ProductPlan::World::kBlend) {
+    world = WorldMatrixFromScaledTransform(Blend(plan.wa, plan.wb, amount));
+  } else if (plan.world == ProductPlan::World::kSpinning &&
+             (spinning = BlendSpinning(plan.wa, plan.wb, amount, kCutAngle))) {
     world = WorldMatrixFromScaledTransform(*spinning);
     stats.spinning++;
-  } else if (a.world != b.world) {
+  } else if (plan.world_differs) {
     stats.world_not_blended++;
   }
   Matrix4 view_projection = b.view_projection;
-  std::optional<PerspectiveCamera> ca, cb;
-  if (a.view_projection != b.view_projection) {
-    ca = SplitViewProjection(a.view_projection);
-    cb = SplitViewProjection(b.view_projection);
-  }
-  if (ca && cb) {
+  if (plan.camera_rejected) {
+    stats.camera_not_blended++;
+  } else if (plan.camera >= 0) {
     // A perspective camera: blend its placement and projection separately.
-    if (!IsSameCamera(*ca, *cb)) {
-      stats.camera_not_blended++;
-    } else {
-      PerspectiveCamera blended = Blend(*ca, *cb, amount);
-      view_projection = ViewProjectionFromCamera(blended);
-      if (parts) {
-        parts->eye_now = cb->camera.position;
-        parts->eye = blended.camera.position;
-      }
+    const CameraBlends::Blended& blended = cameras.Get(*plans, plan.camera, amount);
+    view_projection = blended.view_projection;
+    if (parts) {
+      parts->eye_now = plans->cameras[size_t(plan.camera)].b.camera.position;
+      parts->eye = blended.eye;
     }
   }
   if (parts) {
@@ -668,6 +827,7 @@ class DrawState {
       current_tick_ = std::move(collecting_);
       collecting_.clear();
       MatchTick();
+      PlanTick();
       overlay_keys_ = std::move(overlay_keys_this_tick_);
       overlay_keys_this_tick_.clear();
     }
@@ -774,8 +934,13 @@ class DrawState {
   // Main thread, before a logic pass's Update: a new tick's products start.
   void OnLogicPassStart() { tick_outputs_.clear(); }
 
-  // Render thread diagnostics.
-  void CountReplayedProduct() { counts_.replayed_products++; }
+  // Render thread diagnostics; counted only when logged, as the increment
+  // is a locked instruction (costly on the render thread).
+  void CountReplayedProduct() {
+    if (REXCVAR_GET(log_blend_state)) {
+      counts_.replayed_products.fetch_add(1, std::memory_order_relaxed);
+    }
+  }
 
  private:
   struct LookAtBlend {
@@ -867,6 +1032,8 @@ class DrawState {
     auto frame = std::make_shared<ReplayFrame>();
     frame->amount = REXCVAR_GET(interpolate_draw_state) ? amount_ : 1.0f;
     frame->tick = ticks_;
+    frame->plans = plans_;
+    frame->products.Reserve(tick_outputs_.size() + pass_outputs_.size());
     for (const auto* outputs : {&tick_outputs_, &pass_outputs_}) {
       for (const auto& [out, output] : *outputs) {
         auto now = current_tick_.find(output.key);
@@ -877,16 +1044,25 @@ class DrawState {
         auto before = paired != paired_.end() ? previous_tick_.find(paired->second)
                                               : previous_tick_.end();
         auto identity = identities_.find(output.key);
-        frame->products[out] = {identity != identities_.end() ? identity->second
-                                                              : ProductKeyHash()(output.key),
-                                output.key.handler, output.written, now->second,
-                                before != previous_tick_.end() ? std::optional(before->second)
-                                                               : std::nullopt};
+        int32_t plan = -1;
+        if (before != previous_tick_.end()) {
+          plan = plan_of_.find(output.key)->second;
+        }
+        frame->products.Set(
+            out, {identity != identities_.end() ? identity->second : ProductKeyHash()(output.key),
+                  output.key.handler, output.written, now->second,
+                  before != previous_tick_.end() ? std::optional(before->second) : std::nullopt,
+                  plan});
       }
     }
     counts_.products_published += int(frame->products.size());
-    std::lock_guard lock(g_replay_mutex);
-    g_replay_frame = std::move(frame);
+    std::shared_ptr<const ReplayFrame> replaced = std::move(frame);
+    {
+      std::lock_guard lock(g_replay_mutex);
+      std::swap(g_replay_frame, replaced);
+      retired_frames_.swap(g_retired_replay_frames);  // hands back an emptied one
+    }
+    retired_frames_.clear();  // the frames are freed here, outside the lock
   }
 
   // The camera of a pass whose view-projection is its view * projection.
@@ -954,6 +1130,9 @@ class DrawState {
   std::unordered_map<ObjectKey, ScaledTransform, ObjectKeyHash> objects_last_tick_;
   std::unordered_map<ObjectKey, ScaledTransform, ObjectKeyHash> objects_this_tick_;
   std::unordered_map<uint32_t, int> recorded_;
+  // Exchanged with g_retired_replay_frames, so the render thread's list keeps
+  // its capacity.
+  std::vector<std::shared_ptr<const ReplayFrame>> retired_frames_;
 
   // A multiply, identified across ticks by its operands' addresses, which
   // camera it was (see CameraIds), and how many times that combination
@@ -986,6 +1165,28 @@ class DrawState {
   std::unordered_map<ProductKey, ProductKey, ProductKeyHash> paired_;
   std::unordered_map<ProductKey, uint64_t, ProductKeyHash> identities_;
   uint64_t next_identity_ = 1;
+  // How each paired product of the tick blends (see PlanProduct).
+  std::shared_ptr<const TickPlans> plans_;
+  std::unordered_map<ProductKey, int32_t, ProductKeyHash> plan_of_;  // into plans_->products
+  std::unordered_map<CameraPairKey, int32_t, CameraPairKeyHash> camera_pairs_;
+
+  // Once a tick, after MatchTick: plans the blend of each paired product.
+  void PlanTick() {
+    auto plans = std::make_shared<TickPlans>();
+    plans->products.reserve(paired_.size());
+    plan_of_.clear();
+    camera_pairs_.clear();
+    for (const auto& [key, before_key] : paired_) {
+      auto now = current_tick_.find(key);
+      auto before = previous_tick_.find(before_key);
+      if (now == current_tick_.end() || before == previous_tick_.end()) {
+        continue;
+      }
+      plan_of_[key] = int32_t(plans->products.size());
+      plans->products.push_back(PlanProduct(before->second, now->second, *plans, camera_pairs_));
+    }
+    plans_ = std::move(plans);
+  }
 
   // Once a tick: pairs this tick's products with the previous tick's.
   // Products are numbered by order among those with the same operands, and
@@ -1405,8 +1606,14 @@ class ReplayCameras {
       }
     }
     last_identity_ = 0;
+    camera_blends_.OnFrameStart();
     std::lock_guard lock(g_replay_mutex);
-    frame_ = g_replay_frame;
+    if (frame_ != g_replay_frame) {
+      if (frame_) {
+        g_retired_replay_frames.push_back(std::move(frame_));
+      }
+      frame_ = g_replay_frame;
+    }
     if (REXCVAR_GET(log_moving_products) && frame_) {
       GetMovingProductsLog().OnFrameStart(frame_->tick, frame_->amount);
     }
@@ -1467,14 +1674,14 @@ class ReplayCameras {
     if (!frame_) {
       return "no frame";
     }
-    auto it = frame_->products.find(payload);
-    if (it == frame_->products.end()) {
+    const ReplayedProduct* product = frame_->products.Find(payload);
+    if (!product) {
       return "not published";
     }
-    if (it->second.written != m) {
+    if (product->written != m) {
       return "published, value differs";
     }
-    return it->second.before ? "substituted" : "published, unpaired";
+    return product->before ? "substituted" : "published, unpaired";
   }
 
   // Render thread, for each vertex constant upload of 4+ registers.
@@ -1502,8 +1709,8 @@ class ReplayCameras {
     if (!frame_) {
       return std::nullopt;
     }
-    auto it = frame_->products.find(payload);
-    if (it == frame_->products.end() || it->second.written != m) {
+    const ReplayedProduct* product = frame_->products.Find(payload);
+    if (!product || product->written != m) {
       // A draw that isn't a known product (world geometry's matrix often
       // isn't): the pixel constants after it belong to it, not to the last
       // product, so they mustn't be paired by that product's identity (that
@@ -1513,12 +1720,14 @@ class ReplayCameras {
       }
       return std::nullopt;
     }
-    last_identity_ = it->second.identity;
-    if (it->second.handler == kRaceOverlaysHandler) {
+    last_identity_ = product->identity;
+    if (product->handler == kRaceOverlaysHandler) {
       overlay_payloads_.insert(payload);
     }
     BlendStats before = stats_.blend;
-    Matrix4 result = BlendProduct(it->second, frame_->amount, stats_.blend, &last_parts_);
+    Matrix4 result =
+        BlendProduct(*product, frame_->plans.get(), frame_->amount, stats_.blend, camera_blends_,
+                     &last_parts_);
     if (REXCVAR_GET(log_moving_products)) {
       using Outcome = MovingProductsLog::Outcome;
       Outcome outcome = stats_.blend.unpaired != before.unpaired       ? Outcome::kUnpaired
@@ -1526,10 +1735,10 @@ class ReplayCameras {
                         : stats_.blend.world_not_blended != before.world_not_blended
                             ? Outcome::kWorldNotBlended
                             : Outcome::kBlended;
-      GetMovingProductsLog().OnProduct(payload, it->second, last_parts_.world, outcome);
+      GetMovingProductsLog().OnProduct(payload, *product, last_parts_.world, outcome);
     }
-    if (REXCVAR_GET(log_overlay_products) && it->second.handler == kRaceOverlaysHandler) {
-      LogOverlay(payload, it->second, result);
+    if (REXCVAR_GET(log_overlay_products) && product->handler == kRaceOverlaysHandler) {
+      LogOverlay(payload, *product, result);
     }
     return result;
   }
@@ -1565,6 +1774,7 @@ class ReplayCameras {
   }
 
   std::shared_ptr<const ReplayFrame> frame_;
+  CameraBlends camera_blends_;
   uint64_t last_identity_ = 0;
   struct {
     int frames = 0;
@@ -1673,7 +1883,8 @@ ReplayedConstantsLog& GetReplayedConstantsLog() {
 class PixelConstantBlender {
  public:
   void OnFrameStart(uint64_t tick) {
-    occurrences_.clear();
+    frame_++;
+    recorded_ = &now_;  // entries may go below
     if (tick != tick_) {
       tick_ = tick;
       // A new tick: what was current becomes the previous tick's. Objects
@@ -1685,31 +1896,33 @@ class PixelConstantBlender {
           continue;
         }
         if (entry.current_tick + 1 == tick) {
-          entry.previous = entry.current;
+          entry.previous.swap(entry.current);  // current is rewritten before it's read
           entry.previous_tick = entry.current_tick;
         }
         ++it;
       }
+      for (auto it = occurrences_.begin(); it != occurrences_.end();) {
+        it = it->second.tick + 2 < tick ? occurrences_.erase(it) : std::next(it);
+      }
     }
   }
 
-  // Blends the upload in place; returns the original to put back after.
-  std::optional<std::vector<float>> Apply(uint8_t* base, uint32_t payload, uint32_t packed,
-                                          float amount, uint64_t object) {
+  // Blends the upload in place and returns true; recorded() then holds the
+  // upload as recorded, to put back after.
+  bool Apply(uint8_t* base, uint32_t payload, uint32_t packed, float amount, uint64_t object) {
     outcome_ = Outcome::kNoObject;
     switch_jumps_ = 0;
     if (object == 0) {
-      return std::nullopt;  // no object to pair by
+      return false;  // no object to pair by
     }
     uint32_t start = (packed >> 8) & 0xFF, count = packed & 0xFF;
-    Key key{object, start, count, occurrences_[{object, start, count, 0}]++};
-    std::vector<float> now(count * 4);
-    for (uint32_t i = 0; i < now.size(); i++) {
-      now[i] = guest::LoadFloat(base, payload + 4 * i);
+    // How many uploads of this object, start and count came earlier in the
+    // frame (counts from earlier frames are stale, not cleared).
+    Occurrence& seen = occurrences_[{object, start, count, 0}];
+    if (seen.frame != frame_) {
+      seen = {frame_, tick_, 0};
     }
-    last_key_ = {object, key.occurrence};
-    last_values_ = now;
-    last_blended_ = now;
+    Key key{object, start, count, seen.count++};
     Entry& entry = entries_[key];
     // The light slots (cars' headlights among them) are recorded on a tick's
     // logic pass before the lights move, so they hold the previous tick's
@@ -1717,15 +1930,26 @@ class PixelConstantBlender {
     // the last value recorded in the previous tick to this frame's gives the
     // previous tick's lights at the tick (amount about 0) and a blend after.
     bool from_latest = REXCVAR_GET(pixel_blend_from_latest);
-    if (entry.current_tick != tick_ || from_latest) {
-      entry.current = now;  // first time this tick: the tick's own value
-      entry.current_tick = tick_;
+    bool first = entry.current_tick != tick_;  // the tick's own value
+    // The upload, loaded straight into the entry when it becomes its current
+    // value (the entry's node stays put until OnFrameStart).
+    std::vector<float>& now = first || from_latest ? entry.current : now_;
+    now.resize(count * 4);
+    guest::CopyFloats(base, payload, now.data(), count * 4);
+    entry.current_tick = tick_;
+    recorded_ = &now;
+    last_key_ = {object, key.occurrence};
+    keep_blended_ = REXCVAR_GET(log_pixel_outcomes);
+    if (keep_blended_) {
+      last_blended_ = now;
     }
     if (entry.previous_tick + 1 != tick_ || entry.previous.size() != now.size()) {
       outcome_ = Outcome::kUnpaired;
-      return std::nullopt;
+      return false;
     }
-    if (entry.current != now) {
+    // Loaded into current, it's the same; otherwise compare with the tick's
+    // first value.
+    if (&now == &now_ && entry.current != now) {
       outcome_ = Outcome::kNotAsRecorded;  // differs from the tick's first value
       differing_.clear();
       for (uint32_t i = 0; i < now.size(); i++) {
@@ -1733,20 +1957,31 @@ class PixelConstantBlender {
           differing_.push_back({i, entry.current[i], now[i]});
         }
       }
-      return std::nullopt;
+      return false;
+    }
+    // The same as last tick, bit for bit: nothing to blend.
+    if (std::memcmp(entry.previous.data(), now.data(), now.size() * sizeof(float)) == 0) {
+      outcome_ = Outcome::kUnchanged;
+      return false;
     }
     // Some components are per-object switches that legitimately jump
     // between ticks (c1.x, c3.xyz, c4.x of an upload: which lights reach the
     // object, and how strongly); they take the tick's value and the rest blends. A
     // jump anywhere else means this isn't the same object (or something cut),
     // so the whole upload is left as recorded rather than mix two objects.
+    // The loops below go through raw pointers: the flags written are bytes,
+    // which may alias anything, so through the vectors their data and sizes
+    // were loaded again on every iteration.
+    const float* previous = entry.previous.data();
+    const float* recorded = now.data();
+    const uint32_t size = uint32_t(now.size());
     auto is_switch = [&](uint32_t i) {
       // Register * 4 + component, from the start of the upload (the same
       // layout is uploaded at c0 and at c63).
       return i == 1 * 4 + 0 || i == 3 * 4 + 0 || i == 3 * 4 + 1 || i == 3 * 4 + 2 || i == 4 * 4 + 0;
     };
     auto jumped = [&](uint32_t i) {
-      float a = entry.previous[i], b = now[i];
+      float a = previous[i], b = recorded[i];
       return a != b && (!std::isfinite(a) || !std::isfinite(b) ||
                         !(std::abs(b - a) <= 0.3f * std::max(std::abs(a), std::abs(b)) + 0.2f));
     };
@@ -1766,8 +2001,8 @@ class PixelConstantBlender {
     if (count == 63 && REXCVAR_GET(switch_light_slots)) {
       for (uint32_t k = 0; k < 8; k++) {
         uint32_t p = (8 + k) * 4;
-        Vec3 before{entry.previous[p], entry.previous[p + 1], entry.previous[p + 2]};
-        Vec3 after{now[p], now[p + 1], now[p + 2]};
+        Vec3 before{previous[p], previous[p + 1], previous[p + 2]};
+        Vec3 after{recorded[p], recorded[p + 1], recorded[p + 2]};
         slot_switched[k] = !(Distance(before, after) <= kSlotLightMove);
         for (uint32_t r : {8u, 16u, 24u, 32u, 47u, 55u}) {
           for (uint32_t c = 0; c < 4; c++) {
@@ -1776,18 +2011,16 @@ class PixelConstantBlender {
         }
       }
     }
-    auto in_switched_slot = [&](uint32_t i) {
-      if (count != 63) {
-        return false;
-      }
-      uint32_t r = i / 4;
+    // By register: whether it belongs to a switched slot.
+    std::array<bool, 64> register_switched{};
+    if (count == 63) {
       for (uint32_t base : {8u, 16u, 24u, 32u, 47u, 55u}) {
-        if (r >= base && r < base + 8 && slot_switched[r - base]) {
-          return true;
+        for (uint32_t k = 0; k < 8; k++) {
+          register_switched[base + k] = register_switched[base + k] || slot_switched[k];
         }
       }
-      return false;
-    };
+    }
+    auto in_switched_slot = [&](uint32_t i) { return count == 63 && register_switched[i / 4]; };
     // c0-c3 are the view matrix and c4 the position of the camera the
     // lighting is worked out against (copied from the camera pass by the
     // render orchestrator): they blend together as a camera, or on a cut
@@ -1798,12 +2031,12 @@ class PixelConstantBlender {
     bool camera = count == 63 && REXCVAR_GET(blend_lighting_camera);
     bool camera_cut = false;
     if (camera) {
-      Vec3 eye_before{entry.previous[16], entry.previous[17], entry.previous[18]};
-      Vec3 eye_now{now[16], now[17], now[18]};
+      Vec3 eye_before{previous[16], previous[17], previous[18]};
+      Vec3 eye_now{recorded[16], recorded[17], recorded[18]};
       camera_cut = !IsFinite(eye_before) || !IsFinite(eye_now) ||
                    !(Distance(eye_before, eye_now) <= kCutDistance);
       for (uint32_t i = 0; i < 20; i++) {
-        camera_cut = camera_cut || !std::isfinite(entry.previous[i]) || !std::isfinite(now[i]);
+        camera_cut = camera_cut || !std::isfinite(previous[i]) || !std::isfinite(recorded[i]);
       }
     }
     // --blend_only_light_slots: only the light slots' positions (c8-c15) and
@@ -1816,10 +2049,12 @@ class PixelConstantBlender {
       uint32_t r = i / 4;
       return !only_lights || (r >= 8 && r < 16) || (r >= 24 && r < 32);
     };
-    std::vector<bool> jumps(now.size(), false);
+    jumps_.assign(size, 0);
+    uint8_t* jumps = jumps_.data();
+    int switch_jumps = 0;
     bool changed = false;
-    for (uint32_t i = 0; i < now.size(); i++) {
-      float a = entry.previous[i], b = now[i];
+    for (uint32_t i = 0; i < size; i++) {
+      float a = previous[i], b = recorded[i];
       if (a == b) {
         continue;
       }
@@ -1837,7 +2072,7 @@ class PixelConstantBlender {
       }
       if (in_switched_slot(i)) {
         jumps[i] = true;  // the tick's light
-        switch_jumps_++;
+        switch_jumps++;
         continue;
       }
       if (jumped(i)) {
@@ -1845,32 +2080,44 @@ class PixelConstantBlender {
           if (REXCVAR_GET(log_blend_state)) {
             LogRejection(start * 4 + i, a, b);
           }
+          switch_jumps_ = switch_jumps;
           outcome_ = Outcome::kRejected;
           rejected_ = i;
           rejected_values_ = {a, b};
-          return std::nullopt;
+          return false;
         }
         jumps[i] = true;
-        switch_jumps_++;
+        switch_jumps++;
         continue;
       }
       changed = true;
     }
+    switch_jumps_ = switch_jumps;
     if (!changed) {
       outcome_ = Outcome::kUnchanged;
-      return std::nullopt;
+      return false;
     }
     outcome_ = Outcome::kBlended;
-    last_blended_ = now;
-    for (uint32_t i = 0; i < now.size(); i++) {
-      float a = entry.previous[i], b = now[i];
-      if (a != b && !jumps[i]) {
-        last_blended_[i] = a + (b - a) * amount;
-        guest::StoreFloat(base, payload + 4 * i, last_blended_[i]);
-      }
+    // The whole upload, blended where it blends and as recorded (the same
+    // bits) elsewhere, written with one vectorized loop.
+    blended_.resize(size);
+    uint32_t* out = blended_.data();
+    for (uint32_t i = 0; i < size; i++) {
+      // Without branches (computed for every component, chosen with & not
+      // &&), so the loop vectorizes.
+      float a = previous[i], b = recorded[i];
+      bool blend = (a != b) & (jumps[i] == 0);
+      out[i] = blend ? std::bit_cast<uint32_t>(a + (b - a) * amount) : std::bit_cast<uint32_t>(b);
     }
-    return now;
+    guest::StoreU32s(base, payload, out, size);
+    if (keep_blended_) {
+      std::memcpy(last_blended_.data(), out, size * sizeof(float));
+    }
+    return true;
   }
+
+  // The last upload as recorded (what Apply blended over).
+  const std::vector<float>& recorded() const { return *recorded_; }
 
   // What the last Apply did, for --log_pixel_outcomes.
   enum class Outcome { kNoObject, kUnpaired, kNotAsRecorded, kRejected, kUnchanged, kBlended };
@@ -1888,14 +2135,22 @@ class PixelConstantBlender {
   const std::vector<Difference>& differing() const { return differing_; }
   // The last upload's object and occurrence, and its values as recorded.
   std::pair<uint64_t, int> last_key() const { return last_key_; }
-  const std::vector<float>& last_values() const { return last_values_; }
-  // ...and as uploaded (the blend, or as recorded).
+  const std::vector<float>& last_values() const { return *recorded_; }
+  // ...and as uploaded (the blend, or as recorded); kept only with
+  // --log_pixel_outcomes.
   const std::vector<float>& last_blended() const { return last_blended_; }
 
  private:
   std::vector<Difference> differing_;
   std::pair<uint64_t, int> last_key_{};
-  std::vector<float> last_values_, last_blended_;
+  // The upload being blended, as recorded, and which components keep the
+  // tick's value: kept between uploads so as not to allocate each time.
+  std::vector<float> now_;
+  const std::vector<float>* recorded_ = &now_;  // now_ or an entry's current
+  std::vector<uint8_t> jumps_;
+  std::vector<uint32_t> blended_;  // the upload as blended, the floats' bits
+  std::vector<float> last_blended_;
+  bool keep_blended_ = false;
   static void LogRejection(uint32_t i, float a, float b);
 
   Outcome outcome_ = Outcome::kNoObject;
@@ -1907,15 +2162,30 @@ class PixelConstantBlender {
     uint64_t object;
     uint32_t start, count;
     int occurrence;
-    auto operator<=>(const Key&) const = default;
+    bool operator==(const Key&) const = default;
+  };
+  struct KeyHash {
+    size_t operator()(const Key& key) const {
+      uint64_t h = key.object * 0x9E3779B97F4A7C15ull;
+      h ^= (uint64_t(key.start) << 40 | uint64_t(key.count) << 32 | uint32_t(key.occurrence)) +
+           0x632BE59BD9B4E019ull + (h << 6) + (h >> 2);
+      return size_t(h ^ (h >> 29));
+    }
   };
   struct Entry {
     std::vector<float> current, previous;
     uint64_t current_tick = 0, previous_tick = 0;
   };
-  std::map<Key, Entry> entries_;
-  std::map<Key, int> occurrences_;
+  struct Occurrence {
+    uint64_t frame = 0, tick = 0;  // when last counted
+    int count = 0;
+  };
+  std::unordered_map<Key, Entry, KeyHash> entries_;
+  // Uploads of an object, start and count so far in the frame (occurrence 0
+  // in the key).
+  std::unordered_map<Key, Occurrence, KeyHash> occurrences_;
   uint64_t tick_ = 0;
+  uint64_t frame_ = 0;
 };
 
 void PixelConstantBlender::LogRejection(uint32_t i, float a, float b) {
@@ -2578,11 +2848,12 @@ void BlendState_ReplayConstants(uint8_t* base, uint32_t payload, uint32_t packed
   // world matrix (c4-c7) and the camera's position (c8), which the paint's
   // reflections use: give them the same blend as c0-c3, when they hold
   // what the product was made from.
-  std::vector<float> original_extras;
-  if (original && count >= 9 && REXCVAR_GET(blend_object_extras)) {
+  std::array<float, 20> original_extras;
+  bool extras = original && count >= 9 && REXCVAR_GET(blend_object_extras);
+  if (extras) {
     const ProductBlendParts& parts = GetReplayCameras().last_parts();
     for (uint32_t i = 0; i < 20; i++) {
-      original_extras.push_back(guest::LoadFloat(base, payload + 64 + 4 * i));
+      original_extras[i] = guest::LoadFloat(base, payload + 64 + 4 * i);
     }
     bool world = LoadMatrix(base, payload + 64) == parts.world_now;
     if (world) {
@@ -2602,10 +2873,10 @@ void BlendState_ReplayConstants(uint8_t* base, uint32_t payload, uint32_t packed
       GetObjectExtrasLog().OnReplaced(world, eye_distance);
     }
   }
-  std::optional<std::vector<float>> original_pixel;
+  bool pixel_blended = false;
   if (REXCVAR_GET(interpolate_draw_state) && REXCVAR_GET(blend_pixel_constants) && stage == 1 &&
       ((packed >> 16) & 0xFF) == 1) {
-    original_pixel =
+    pixel_blended =
         GetPixelConstantBlender().Apply(base, payload, packed, GetReplayCameras().amount(),
                                         GetReplayCameras().last_identity());
     if (REXCVAR_GET(log_pixel_outcomes)) {
@@ -2618,7 +2889,7 @@ void BlendState_ReplayConstants(uint8_t* base, uint32_t payload, uint32_t packed
     }
   }
   GetSteppingConstantsLog().OnUpload(base, payload, packed,
-                                     original.has_value() || original_pixel.has_value());
+                                     original.has_value() || pixel_blended);
   if (REXCVAR_GET(log_object_extras) && stage == 0 && count == 9 && original) {
     GetObjectExtrasLog().OnUpload(base, payload);
   }
@@ -2627,31 +2898,33 @@ void BlendState_ReplayConstants(uint8_t* base, uint32_t payload, uint32_t packed
     if (!original && REXCVAR_GET(log_overlay_products)) {
       GetReplayCameras().LogOverlayMiss(payload, LoadMatrix(base, payload));
     }
-    // Temporary: main-camera matrices uploaded to c0, with their status.
-    uint32_t start = (packed >> 8) & 0xFF;
-    Matrix4 m = original ? *original : LoadMatrix(base, payload);
-    static auto last = std::chrono::steady_clock::now();
-    static int logged = 0;
-    auto now = std::chrono::steady_clock::now();
-    if (now - last > std::chrono::seconds(1)) {
-      last = now;
-      logged = 0;
-    }
-    std::string status = GetReplayCameras().Status(payload, m);
-    if (start == 0 && status != "substituted" && logged < 400 &&
-        REXCVAR_GET(log_replayed_constants)) {
-      logged++;
-      REXLOG_INFO("c0 upload t={} from {:08X} (slot by {:08X}, header by {:08X}) x{} {}: {:.4g} {:.4g} {:.4g} {:.4g} ... {:.4g} {:.4g} {:.4g} {:.4g}",
-                  std::chrono::duration_cast<std::chrono::microseconds>(now.time_since_epoch()).count() % 100000000,
-                  payload, SlotOwner(payload), SlotOwner(payload - 16), count, status, m[0], m[1], m[2], m[3],
-                  m[12], m[13], m[14], m[15]);
+    // Diagnostics (--log_replayed_constants): main-camera matrices uploaded
+    // to c0, with their status.
+    if (REXCVAR_GET(log_replayed_constants)) {
+      uint32_t start = (packed >> 8) & 0xFF;
+      Matrix4 m = original ? *original : LoadMatrix(base, payload);
+      static auto last = std::chrono::steady_clock::now();
+      static int logged = 0;
+      auto now = std::chrono::steady_clock::now();
+      if (now - last > std::chrono::seconds(1)) {
+        last = now;
+        logged = 0;
+      }
+      std::string status = GetReplayCameras().Status(payload, m);
+      if (start == 0 && status != "substituted" && logged < 400) {
+        logged++;
+        REXLOG_INFO("c0 upload t={} from {:08X} (slot by {:08X}, header by {:08X}) x{} {}: {:.4g} {:.4g} {:.4g} {:.4g} ... {:.4g} {:.4g} {:.4g} {:.4g}",
+                    std::chrono::duration_cast<std::chrono::microseconds>(now.time_since_epoch()).count() % 100000000,
+                    payload, SlotOwner(payload), SlotOwner(payload - 16), count, status, m[0], m[1], m[2], m[3],
+                    m[12], m[13], m[14], m[15]);
+      }
     }
   }
   GetReplayedConstantsLog().OnUpload(base, payload, packed, original.has_value());
   std::vector<uint32_t> zeroed;
   if (stage == 0) {
-    uint32_t owner = SlotOwner(payload - 16);
     if (REXCVAR_GET(log_upload_owners)) {
+      uint32_t owner = SlotOwner(payload - 16);
       static std::map<uint32_t, int> owners;
       static int frames = 0;
       static uint64_t last_tick = 0;
@@ -2675,7 +2948,7 @@ void BlendState_ReplayConstants(uint8_t* base, uint32_t payload, uint32_t packed
     }
   }
   // Vertex or pixel constants, by the code that allocated the header.
-  if (std::string list = REXCVAR_GET(debug_zero_owners); !list.empty()) {
+  if (const std::string& list = REXCVAR_GET(debug_zero_owners); !list.empty()) {
     uint32_t owner = SlotOwner(payload - 16);
     if (owner != 0 && list.find(fmt::format("{:08X}", owner)) != std::string::npos) {
       for (uint32_t i = 0; i < count * 4; i++) {
@@ -2685,7 +2958,7 @@ void BlendState_ReplayConstants(uint8_t* base, uint32_t payload, uint32_t packed
     }
   }
   GetOverlayUploadsLog().OnUpload(base, payload, packed,
-                                  original.has_value() || original_pixel.has_value(), original);
+                                  original.has_value() || pixel_blended, original);
   upload();
   for (uint32_t i = 0; i < zeroed.size(); i++) {
     guest::StoreU32(base, payload + 4 * i, zeroed[i]);
@@ -2693,13 +2966,14 @@ void BlendState_ReplayConstants(uint8_t* base, uint32_t payload, uint32_t packed
   if (original) {
     StoreMatrix(base, payload, *original);
   }
-  for (uint32_t i = 0; i < original_extras.size(); i++) {
-    guest::StoreFloat(base, payload + 64 + 4 * i, original_extras[i]);
-  }
-  if (original_pixel) {
-    for (uint32_t i = 0; i < original_pixel->size(); i++) {
-      guest::StoreFloat(base, payload + 4 * i, (*original_pixel)[i]);
+  if (extras) {
+    for (uint32_t i = 0; i < 20; i++) {
+      guest::StoreFloat(base, payload + 64 + 4 * i, original_extras[i]);
     }
+  }
+  if (pixel_blended) {
+    const std::vector<float>& recorded = GetPixelConstantBlender().recorded();
+    guest::StoreU32s(base, payload, recorded.data(), uint32_t(recorded.size()));
   }
 }
 

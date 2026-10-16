@@ -13,6 +13,8 @@ place (search for `PATCH:`).
 | Address | Name | Status | Notes |
 |---|---|---|---|
 | `sub_82090108` | `main` | | Guest entry point on the main thread. |
+| `sub_8258DE50` | `Thread::Start` | | Entry point of the game's threads: calls vtable slot 1 of the object at start context + 8. |
+| `sub_82095AF0` | | | A worker thread's loop (started through `sub_8258DE50`): waits on an event, runs jobs through function pointers, signals events; it opens the game's data files at boot. On the Steam Deck it spiked to 66-82% of a core with 15-32% in the kernel around race loads; here (2026-10-14) ~29% with ~68,000 minor page faults in 2 s while a race loads. On the Deck (`itc_041.log`) the kernel time is page faults: 37-69% of a core (19-24% kernel) with 27,000-52,000 minor faults and no major ones per 2 s, its system call samples all `running` (in a fault, not a call) but once `202` (futex: waiting). Only around loads (2-4 s each); in a race it's at 0-15%. The fix, if worth it: populate the guest memory's pages in advance (e.g. `MADV_POPULATE_WRITE` on the views), moving the cost to startup. |
 | `sub_8209A760` | `App::Run` | | Main loop: calls every handler in the tick list at this+4, repeats until the quit flag at this+12 is set. One logic tick per pass, with no measured time. |
 | `sub_82099D50` | `ForEachTickHandler` | | Calls each handler in a list through a member function pointer. |
 | `sub_82092358` | `Renderer::Init` | | Sets the vblank interval (2 = 30 fps) via `sub_8258D568`, then subscribes renderer callbacks to numbered events (2, 3, 5, 6, 16). |
@@ -254,6 +256,21 @@ what the coming main loop pass is:
 - **Render-only pass** (in a race, otherwise): `GameMessages::Dispatch`
   consumes Update messages without delivering them and the input update is
   skipped, so the pass draws the same game state again.
+
+A due tick always wins: when the next tick is due (or overdue), the coming
+pass is a logic pass, even if a frame slot is also due. Until 2026-10-14
+the frame slot, counted from the last frame's start, could lie in the past
+behind an overdue tick after a frame longer than the cap's period, so the
+pass was drawn render-only and the tick waited another frame; a tick more
+than a whole tick late restarts the 30 Hz grid, and that time is lost. On
+the Steam Deck (render thread at ~98% of a core, 20-27 ms frames) races
+ran at 13-16 ticks a second while drawing ~40 fps: slow motion. The same
+happened here pinned to one CPU (`taskset -c 0`: 36-50 fps, 16-27 ticks);
+with the fix, 43-62 fps and 30 ticks. `--log_fps` counts each second's
+ticks released over a quarter of a tick late and grid restarts. On the
+Deck with the fix (`itc_041.log`, an attract race and some driving): 30
+ticks every second in races at 40-66 fps (15-25 ticks a second released
+over 8 ms late, no grid restarts), restarts only at loads.
 
 Only races get render-only passes: menus record their UI and act on input
 during Update, so they flickered and repeated button presses. A pass is "in a
@@ -572,8 +589,10 @@ and target, and recorder world matrices), mostly for comparison.
 | `--max_fps` | Frame rate cap in races; 0 = unlimited. |
 | `--interpolate_draw_state` | Blending on (default) or off. |
 | `--motion_blur` | The game's velocity-based motion blur (pixel shader `7EB16456AAD56CBA`), skipped by the emulated GPU when false (`run.sh` did so until the native renderer, which always draws it and ignores this flag). Its velocities come from the tick, so it smears a whole tick of motion at high frame rates. Patch `patches/rexglue-sdk/0002`. |
-| `--glow` | The game's light bloom (glow intensity c33.y of pixel shader `9750599DF5ED3B39`, the bloom combine); off by default, as it leaves smears after camera switches. Emulated GPU only: the native renderer always draws it, without the smears. Patch `patches/rexglue-sdk/0001`. Turned on (with `--motion_blur=true`) when comparing the native renderer with the emulated GPU. |
+| `--glow` | Emulated GPU only (the native renderer always draws the glow and ignores this flag): the game's light bloom (glow intensity c33.y of pixel shader `9750599DF5ED3B39`, the bloom combine), off by default there, as it leaves smears after camera switches. Patch `patches/rexglue-sdk/0001`. Turned on (with `--motion_blur=true`) when comparing the native renderer with the emulated GPU. |
 | `--blend_pixel_constants` | Blend per-object lighting constants (default on). |
+| `--blend_glow`, `--glow_history_every_frame` | The glow between ticks (default on; `src/interpolation/glow.cpp`): its strength and history weight blended between ticks, and its history written every frame with the weight raised to the frame's share of a tick. See the bloom under Known issues in `native-renderer.md`. |
+| `--log_glow_recorder` | Every 2 s: the glow recorder's passes, history writes (the game's and added), the tick's history weight and the weights used. |
 | `--log_fps` | Frames and ticks per second. |
 | `--switch_light_slots`, `--blend_lighting_camera` | How the per-object lighting's light slots and camera blend (default on); see "What gets blended". |
 | `--blend_only_light_slots` | Blend only the per-object lighting's light positions and directions (default off). |
@@ -592,6 +611,7 @@ and target, and recorder world matrices), mostly for comparison.
 | `--log_world_sprites`, `--log_single_sprites` | The world-space sprites as recorded. |
 | `--pair_by_object` | Pair the per-object recorder's products by position within groups alike but for their order (default on); see "What gets blended". |
 | `--log_moving_products` | Moving objects drawn out of step, event by event; see "What gets blended". |
+| `--log_thread_cpu` | Every 2 s: the process's and the machine's CPU use, and each thread using 5% of a core or more, by name: its share of a core (system time in brackets), the CPU it last ran on, its voluntary/involuntary context switches (many involuntary ones mean it's waiting for a core) and its minor/major page faults. Game threads are labelled with their entry point (`8258DE50 -> <the thread's own function>`). A thread with 10% or more of a core in the kernel gets its system calls sampled (25 reads of `/proc/.../syscall`, 4 ms apart: numbers, `running`, or -1 outside a call). On in `run-debug.sh`; Linux only. For finding a thread that pegs a core on slower machines (the Steam Deck). |
 | `--log_camera_pass_records` | Which camera passes are recorded on logic and render-only passes, by message handler. |
 
 ### What didn't work, and why
@@ -644,6 +664,13 @@ constants:
 
 ## Performance
 
+**Historical: the emulated GPU (2026-10-13).** This is what limited the
+frame rate before the native renderer and native audio. Neither the
+emulated GPU nor the Audio Worker runs any more by default, so none of it
+describes the game as `run.sh` runs it now. For the current limit (the
+render thread's own work), see "Performance: the render thread" in
+`native-renderer.md`.
+
 Measured 2026-10-13 in a race (9800X3D, RX 7900), with `--log_frame_times`
 and `perf record -e cycles:u -g` over the whole run, cut to the race by
 the samples in our blending code.
@@ -674,8 +701,8 @@ the samples in our blending code.
   and the upload wrapper).
 - The "Audio Worker" thread spins at ~80% of a core
   (`pthread_mutex_trylock`) the whole time: the SDK's polling wait, not
-  audio work; whether it costs frame rate isn't measured yet. See
-  `native-audio.md`.
+  audio work. Measured since: it didn't cost frame rate on this PC, and
+  our own audio output replaced it (see `native-audio.md`).
 
 So the frame rate in busy areas is set by how fast the emulated GPU
 processes the game's commands; the render thread mostly waits for it.

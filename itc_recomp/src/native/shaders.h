@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include <filesystem>
 #include <array>
 #include <cstdint>
 #include <memory>
@@ -60,6 +61,9 @@ struct ShaderFeatures {
   bool demote_to_helper_invocation = false;
 };
 
+// The cache's key for a shader's microcode (as in guest memory).
+uint64_t MicrocodeHash(const uint8_t* ucode, uint32_t size_bytes);
+
 class ShaderCache {
  public:
   explicit ShaderCache(const ShaderFeatures& features);
@@ -81,24 +85,34 @@ class ShaderCache {
     // for the rectangle's 3 vertices and makes the 4th).
     bool rectangle_list = false;
   };
-  // sq_program_cntl, sq_context_misc: the registers.
+  // sq_program_cntl, sq_context_misc: the registers. The hashes are each
+  // microcode's XXH3-64 (MicrocodeHash), worked out once a draw by the
+  // caller: hashing the microcode was ~5% of the render thread when each
+  // lookup did it again.
   Interface GetInterface(const uint8_t* vertex_ucode, uint32_t vertex_size_bytes,
-                         const uint8_t* pixel_ucode, uint32_t pixel_size_bytes,
+                         uint64_t vertex_hash, const uint8_t* pixel_ucode,
+                         uint32_t pixel_size_bytes, uint64_t pixel_hash,
                          uint32_t sq_program_cntl, uint32_t sq_context_misc);
 
   // ucode: the microcode as in guest memory (big-endian words). num_reg is
   // the stage's register count from SQ_PROGRAM_CNTL (value minus 1).
-  // Returns null if the shader can't be translated.
+  // Returns null if the shader can't be translated. hash: MicrocodeHash.
   TranslatedShader* Get(ShaderStage stage, const uint8_t* ucode, uint32_t size_bytes,
-                        uint32_t num_reg, const Interface& interface);
+                        uint64_t hash, uint32_t num_reg, const Interface& interface);
 
   uint32_t translated() const { return translated_; }
   uint32_t failed() const { return failed_; }
+  // Translations taken from the disk cache instead of translated.
+  uint32_t from_disk() const { return from_disk_; }
+
+  // Loads earlier sessions' translations and interfaces from `file` and
+  // appends new ones to it (see disk_cache.h).
+  void OpenDiskCache(const std::filesystem::path& file);
 
  private:
   struct State;
   std::unique_ptr<State> state_;
-  uint32_t translated_ = 0, failed_ = 0;
+  uint32_t translated_ = 0, failed_ = 0, from_disk_ = 0;
 };
 
 }  // namespace native

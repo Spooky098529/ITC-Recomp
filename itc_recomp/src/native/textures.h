@@ -34,8 +34,8 @@ class TextureCache {
   void BeginFrame(uint32_t frame_index);
 
   // The fetch constant's texture as a view of the given type, with the
-  // fetch constant's swizzle; loaded (or reloaded, if its memory changed)
-  // as needed. Null if the texture can't be had (unsupported format or
+  // fetch constant's swizzle; loaded as needed, and reloaded after the
+  // library's memcpy writes its memory. Null if the texture can't be had (unsupported format or
   // dimension, view type mismatch, staging full): use a placeholder.
   // fetch: the 6 words, in host order.
   VkImageView GetView(uint8_t* base, const uint32_t fetch[6], VkImageViewType view_type);
@@ -45,7 +45,9 @@ class TextureCache {
   static uint8_t SwizzledSigns(const uint32_t fetch[6]);
 
   // A resolve's destination texture (fetch: its fetch constant, addresses
-  // physical): an image of its size and format, made on first use, which
+  // physical): an image of its size and format, made on first use at
+  // `scale` times its size (the resolution scale of the target first
+  // resolved into it; see "Resolution" in docs/native-renderer.md), which
   // draws sampling a texture at its base address then get instead of
   // guest memory (the emulated GPU doesn't write resolves back). Left in
   // SHADER_READ_ONLY_OPTIMAL, or UNDEFINED while `fresh`. False if its
@@ -54,10 +56,15 @@ class TextureCache {
     VkImage image;
     VkImageView view;  // all components as is, for drawing into
     VkFormat format;
-    uint32_t width, height;
+    uint32_t width, height;            // the guest's
+    uint32_t host_width, host_height;  // the image's (scaled)
+    float scale;                       // the scale it was made at
     bool fresh;
   };
-  bool GetResolveDestination(const uint32_t fetch[6], ResolveDestination& out);
+  bool GetResolveDestination(const uint32_t fetch[6], float scale, ResolveDestination& out);
+
+  // Diagnostics: whether [start, end) (physical) overlaps a texture held.
+  bool Holds(uint32_t start, uint32_t end) const;
   // A debugging aid: the texture's first level (first layer) decoded from
   // guest memory into the host format's bytes, uncompressed formats only.
   // With --readback_resolve=full, a resolve destination's memory holds what
@@ -71,9 +78,9 @@ class TextureCache {
   enum class Hide { kNone, kMemory, kMemoryFormat, kResolved, kResolvedAddress };
   // A debugging aid: samplers use only each texture's first level.
   void set_base_level_only(bool base_only) { base_level_only_ = base_only; }
-  // A debugging aid: hash every texture used again each frame (not every
-  // kVerifyInterval frames, a few a frame), to see whether textures replaced
-  // in memory are what's shown wrong meanwhile.
+  // A debugging aid: hash every texture used each frame, to check that the
+  // library's memcpy is how textures' memory changes (a change without a
+  // recorded write is counted and reloaded).
   void set_verify_every_frame(bool every) { verify_every_frame_ = every; }
   void set_debug_hide(Hide hide, uint32_t value = 0) {
     debug_hide_ = hide;
@@ -90,15 +97,14 @@ class TextureCache {
     // Lookups answered with a resolve destination; of those, ones whose
     // fetch constant has another size or format than the resolve made.
     uint64_t resolved_hits = 0, resolved_mismatched = 0;
-    // Textures whose memory changed within 240 frames of loading them (still
-    // being streamed in when first used), and an example: its address and
-    // how many frames after loading.
-    uint64_t changed_after_load = 0;
-    // Textures past their first frames found changed, and an example: its
-    // address and how many frames since it was last checked.
-    uint64_t changed_later = 0;
-    uint32_t changed_later_sample = UINT32_MAX, changed_later_frames = 0;
-    uint32_t changed_after_load_sample = UINT32_MAX, changed_after_load_frames = 0;
+    // memcpy's writes into the physical views, and textures they marked to be
+    // reloaded.
+    uint64_t writes = 0, marked = 0;
+    // With verify_every_frame: textures whose memory changed with no write
+    // recorded, and an example: its address and how many frames after it was
+    // first loaded.
+    uint64_t unrecorded = 0;
+    uint32_t unrecorded_sample = UINT32_MAX, unrecorded_frames = 0;
     uint32_t textures = 0, samplers = 0;
     uint32_t unsupported_sample = UINT32_MAX;  // format << 8 | dimension
     // A texture of another dimension than the shader declares: declared view

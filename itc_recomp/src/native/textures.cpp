@@ -1,17 +1,32 @@
 #include "textures.h"
+#include "frame_costs.h"
 
+#include "buffers.h"
 #include "state.h"
 
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <bit>
+#include <cmath>
 #include <cstring>
 #include <map>
+#include <string>
 #include <unordered_map>
 #include <vector>
 #include <rex/graphics/xenos.h>
+#include <rex/cvar.h>
 #include <rex/hash.h>
 #include <rex/logging.h>
+
+#if defined(__SSSE3__)
+#include <tmmintrin.h>
+#endif
+
+REXCVAR_DEFINE_BOOL(native_renderer_log_texture_writes, false, "ITC",
+                    "Log which code writes textures' memory: on first load and when a texture "
+                    "is found changed, what the library's memcpy wrote there (a debugging aid; "
+                    "with --native_renderer_verify_textures every change is found)");
 
 namespace native {
 
@@ -22,15 +37,6 @@ namespace {
 // Per frame in flight: texture data on its way into images. A frame that
 // needs more defers the rest to the next frames (placeholders meanwhile).
 constexpr VkDeviceSize kStagingSize = 64u << 20;
-// A loaded texture's memory is hashed again at most this often (frames),
-// and at most this many a frame, to catch it being replaced.
-constexpr uint64_t kVerifyInterval = 240;
-constexpr uint32_t kVerifiesPerFrame = 8;
-// For this long after loading, a texture is checked this often, without the
-// limit: its memory may still be being written (streamed in) when it's
-// first used.
-constexpr uint64_t kNewTextureFrames = 240;
-constexpr uint64_t kNewTextureInterval = 4;
 
 uint32_t Log2Ceil(uint32_t v) {
   return v <= 1 ? 0 : 32 - std::countl_zero(v - 1);
@@ -271,27 +277,95 @@ Placement Place(const Layout& layout, const Format& format, uint32_t level) {
   return p;
 }
 
+// Where a level's data ends (physical): a tiled level fills whole 32x32
+// block tiles, so its last layer's storage; an untiled one ends with its
+// last row's data, as the padding after it can hold other data (an untiled
+// 300x150 texture's padding rows changed every tick, 2026-10-15).
+uint32_t LevelEnd(const Layout& layout, const Format& format, uint32_t level) {
+  Placement p = Place(layout, format, level);
+  uint32_t last_layer = p.address + (layout.layers - 1) * p.layer_stride;
+  if (layout.tiled) {
+    return last_layer + p.layer_stride;
+  }
+  uint32_t width_blocks = DivideUp(std::max(layout.width >> level, 1u), format.block_width);
+  uint32_t height_blocks = DivideUp(std::max(layout.height >> level, 1u), format.block_height);
+  return last_layer + (p.y + height_blocks - 1) * p.row_pitch_bytes +
+         (p.x + width_blocks) * format.bytes_per_block;
+}
+
 void SwapEndian(uint8_t* data, size_t size, xenos::Endian endian) {
+  size_t i = 0;
+#if defined(__SSSE3__)
+  // 16 bytes a shuffle; the scalar loops below finish the tail.
+  __m128i shuffle;
   switch (endian) {
     case xenos::Endian::k8in16:
-      for (size_t i = 0; i + 2 <= size; i += 2) {
+      shuffle = _mm_setr_epi8(1, 0, 3, 2, 5, 4, 7, 6, 9, 8, 11, 10, 13, 12, 15, 14);
+      break;
+    case xenos::Endian::k8in32:
+      shuffle = _mm_setr_epi8(3, 2, 1, 0, 7, 6, 5, 4, 11, 10, 9, 8, 15, 14, 13, 12);
+      break;
+    case xenos::Endian::k16in32:
+      shuffle = _mm_setr_epi8(2, 3, 0, 1, 6, 7, 4, 5, 10, 11, 8, 9, 14, 15, 12, 13);
+      break;
+    default:
+      return;
+  }
+  for (; i + 16 <= size; i += 16) {
+    __m128i v = _mm_loadu_si128(reinterpret_cast<const __m128i*>(data + i));
+    _mm_storeu_si128(reinterpret_cast<__m128i*>(data + i), _mm_shuffle_epi8(v, shuffle));
+  }
+#endif
+  switch (endian) {
+    case xenos::Endian::k8in16:
+      for (; i + 2 <= size; i += 2) {
         std::swap(data[i], data[i + 1]);
       }
       break;
     case xenos::Endian::k8in32:
-      for (size_t i = 0; i + 4 <= size; i += 4) {
+      for (; i + 4 <= size; i += 4) {
         std::swap(data[i], data[i + 3]);
         std::swap(data[i + 1], data[i + 2]);
       }
       break;
     case xenos::Endian::k16in32:
-      for (size_t i = 0; i + 4 <= size; i += 4) {
+      for (; i + 4 <= size; i += 4) {
         std::swap(data[i], data[i + 2]);
         std::swap(data[i + 1], data[i + 3]);
       }
       break;
     default:
       break;
+  }
+}
+
+// A row of a tiled level, gathered: blocks [x, x + count) of row y. The
+// tiled layout keeps runs of 16 bytes contiguous (8 for 1-byte blocks: the
+// micro tile's 8 columns), aligned in x, so whole runs are copied at once
+// rather than block by block.
+void GatherTiledRow(uint8_t* out, const uint8_t* base, uint32_t layer_address, uint32_t x,
+                    uint32_t y, uint32_t count, uint32_t pitch_blocks,
+                    uint32_t bytes_per_block_log2) {
+  uint32_t run_blocks_log2 = bytes_per_block_log2 ? 4 - std::min(bytes_per_block_log2, 4u) : 3;
+  uint32_t run_blocks = 1u << run_blocks_log2;
+  uint32_t end = x + count;
+  while (x < end) {
+    uint32_t address =
+        layer_address + TiledOffset2D(x, y, pitch_blocks, bytes_per_block_log2);
+    uint32_t n = std::min(run_blocks - (x & (run_blocks - 1)), end - x);
+    uint32_t bytes = n << bytes_per_block_log2;
+    if (address + bytes <= kPhysicalMemorySize) {
+      const uint8_t* in = PhysicalHostAddress(const_cast<uint8_t*>(base), address);
+      if (bytes == 16) {
+        std::memcpy(out, in, 16);
+      } else if (bytes == 8) {
+        std::memcpy(out, in, 8);
+      } else {
+        std::memcpy(out, in, bytes);
+      }
+    }
+    out += bytes;
+    x += n;
   }
 }
 
@@ -334,7 +408,6 @@ struct TextureCache::State {
   uint64_t frame_number = 0;
   VkDeviceSize staging_used = 0;
   bool recording = false;
-  uint32_t verified_this_frame = 0;
 
   struct Texture {
     Layout layout{};
@@ -344,6 +417,10 @@ struct TextureCache::State {
     VkDeviceMemory memory = VK_NULL_HANDLE;
     uint32_t levels = 0;
     bool loaded = false;
+    // The library's memcpy wrote its memory since it was loaded: reload.
+    bool changed = false;
+    // With verify_every_frame_: its memory's hash when loaded or last
+    // checked, and when that was.
     uint64_t hash = 0;
     uint64_t verified_frame = 0;
     uint64_t loaded_frame = 0;
@@ -353,13 +430,47 @@ struct TextureCache::State {
     // A resolve destination: drawn into, never loaded.
     bool resolved = false;
     uint32_t guest_format = 0;
+    uint32_t host_width = 0, host_height = 0;  // the image's (scaled)
+    float scale = 1.0f;
     VkImageView attachment_view = VK_NULL_HANDLE;
   };
   std::map<TextureKey, Texture> textures;
-  // Resolve destinations by base address (page).
-  std::unordered_map<uint32_t, Texture> resolved;
+  // Loaded textures' ranges by start address (with the longest range's
+  // size, to find those overlapping a write), and memcpy's writes taken
+  // this frame.
+  std::multimap<uint32_t, std::pair<uint32_t, Texture*>> by_address;
+  uint32_t longest_range = 0;
+  std::vector<std::pair<uint32_t, uint32_t>> new_writes;
+  void MarkWritten();
+  // Resolve destinations by base address (page) and the scale they're
+  // drawn at (ResolveKey): one image per scale, for an address resolved
+  // into from targets of different scales (the menus' frame and the race's
+  // 3D view share one); draws sample the one written last (`current`).
+  std::unordered_map<uint64_t, Texture> resolved;
+  std::unordered_map<uint32_t, Texture*> current;
+  static uint64_t ResolveKey(uint32_t page, float scale) {
+    return uint64_t(std::bit_cast<uint32_t>(scale)) << 32 | page;
+  }
   std::unordered_map<uint64_t, VkSampler> samplers;
   Stats stats;
+
+  // --native_renderer_log_texture_writes: who wrote textures' memory.
+  struct WriteStats {
+    uint64_t first = 0, first_bytes = 0, covered = 0, partly = 0, uncovered = 0,
+             uncovered_bytes = 0;
+    std::map<uint32_t, uint64_t> first_callers;
+    // Textures changed without a recorded write (found by verify_every_frame_):
+    // address: changes, and a description.
+    std::map<uint32_t, std::pair<uint64_t, std::string>> unrecorded_by;
+  } writes;
+  // Textures changed without a recorded write: their memory when last
+  // checked, to log which bytes changed.
+  std::unordered_map<uint32_t, std::vector<uint8_t>> write_snapshots;
+  uint32_t write_lines = 200;
+  std::chrono::steady_clock::time_point writes_logged = std::chrono::steady_clock::now();
+  void LogFirstLoad(const Texture& t);
+  void LogUnrecordedChange(uint8_t* base, const Texture& t);
+  void LogWriteSummary();
 
   bool CreateTexture(Texture& texture);
   uint64_t Hash(uint8_t* base, const Texture& texture) const;
@@ -367,6 +478,101 @@ struct TextureCache::State {
   bool Upload(uint8_t* base, Texture& texture);
   VkCommandBuffer Uploads();
 };
+
+std::string WriteCallers(const std::map<uint32_t, uint64_t>& callers) {
+  std::string text;
+  for (auto& [caller, count] : callers) {
+    text += fmt::format(" {:08X}={}", caller, count);
+  }
+  return text.empty() ? " none" : text;
+}
+
+// A texture loaded for the first time: what the library's memcpy wrote
+// into its memory.
+void TextureCache::State::LogFirstLoad(const Texture& t) {
+  uint64_t size = 0, bytes = 0;
+  uint32_t first_caller = 0;
+  for (const auto& [address, range_size] : t.ranges) {
+    if (!range_size) {
+      continue;
+    }
+    Buffers_Coverage c = Buffers_CoverageOf(address, range_size);
+    size += range_size;
+    bytes += c.bytes;
+    if (c.bytes && !first_caller) {
+      first_caller = c.first_caller;
+    }
+  }
+  uint32_t address = t.layout.base_address ? t.layout.base_address : t.layout.mip_address;
+  WriteStats& w = writes;
+  w.first++;
+  w.first_bytes += size;
+  if (bytes >= size) {
+    w.covered++;
+  } else if (bytes) {
+    w.partly++;
+  } else {
+    w.uncovered++;
+    w.uncovered_bytes += size;
+  }
+  if (bytes) {
+    w.first_callers[first_caller]++;
+  }
+  if (bytes < size && write_lines) {
+    write_lines--;
+    REXLOG_INFO("native renderer: texture writes: {:08X} ({}x{}, {} bytes) first loaded with "
+                "{} bytes written by memcpy{}",
+                address, t.layout.width, t.layout.height, size, bytes,
+                bytes ? fmt::format(" (first from {:08X})", first_caller) : std::string());
+  }
+}
+
+// A texture whose memory changed with no write recorded: which bytes of its
+// first range changed since the last such change.
+void TextureCache::State::LogUnrecordedChange(uint8_t* base, const Texture& t) {
+  uint32_t address = t.layout.base_address ? t.layout.base_address : t.layout.mip_address;
+  auto& [count, text] = writes.unrecorded_by[address];
+  if (!count++) {
+    text = fmt::format("{}x{} format {} levels {}-{}", t.layout.width, t.layout.height,
+                       int(t.format.format), t.layout.min_level, t.layout.max_level);
+  }
+  auto [start, range_size] = t.ranges[0].second ? t.ranges[0] : t.ranges[1];
+  const uint8_t* now = PhysicalHostAddress(base, start);
+  std::vector<uint8_t>& was = write_snapshots[address];
+  if (was.size() == range_size && write_lines) {
+    uint32_t first = UINT32_MAX, last = 0, changed = 0;
+    for (uint32_t i = 0; i < range_size; i++) {
+      if (now[i] != was[i]) {
+        first = std::min(first, i);
+        last = i;
+        changed++;
+      }
+    }
+    write_lines--;
+    REXLOG_INFO("native renderer: texture writes: {:08X}: {} bytes changed, offsets {}-{}",
+                address, changed, first, last);
+  }
+  was.assign(now, now + range_size);
+}
+
+void TextureCache::State::LogWriteSummary() {
+  auto now = std::chrono::steady_clock::now();
+  if (now - writes_logged < std::chrono::seconds(5)) {
+    return;
+  }
+  writes_logged = now;
+  WriteStats& w = writes;
+  REXLOG_INFO("native renderer: texture writes: {} first loads ({:.1f} MB): {} written wholly by "
+              "memcpy, {} partly, {} not at all ({:.1f} MB); by first writer:{}",
+              w.first, w.first_bytes / 1048576.0, w.covered, w.partly, w.uncovered,
+              w.uncovered_bytes / 1048576.0, WriteCallers(w.first_callers));
+  for (auto& [address, entry] : w.unrecorded_by) {
+    REXLOG_INFO("native renderer: texture writes: {:08X} ({}) changed {} times without a "
+                "recorded write",
+                address, entry.second, entry.first);
+  }
+  w = WriteStats{};
+}
 
 bool TextureCache::State::CreateTexture(Texture& t) {
   VkDevice device = context.device;
@@ -376,7 +582,8 @@ bool TextureCache::State::CreateTexture(Texture& t) {
   info.flags = l.cube ? VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT : 0;
   info.imageType = VK_IMAGE_TYPE_2D;
   info.format = t.format.format;
-  info.extent = {l.width, l.height, 1};
+  info.extent = t.resolved ? VkExtent3D{t.host_width, t.host_height, 1}
+                           : VkExtent3D{l.width, l.height, 1};
   info.mipLevels = t.levels;
   info.arrayLayers = l.layers;
   info.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -420,16 +627,18 @@ bool TextureCache::State::CreateTexture(Texture& t) {
     return true;
   }
 
-  // The memory it's read from: everything up to the last level's storage.
+  // The memory it's read from: the base level, and the mips up to the end of
+  // the furthest one's data.
   const Layout& layout = t.layout;
   if (layout.base_address) {
-    Placement p = Place(layout, t.format, 0);
-    t.ranges[0] = {p.address, p.layer_stride * layout.layers};
+    t.ranges[0] = {layout.base_address, LevelEnd(layout, t.format, 0) - layout.base_address};
   }
   if (layout.mip_address && layout.max_level) {
-    Placement p = Place(layout, t.format, layout.max_level);
-    t.ranges[1] = {layout.mip_address,
-                   p.address - layout.mip_address + p.layer_stride * layout.layers};
+    uint32_t end = layout.mip_address;
+    for (uint32_t level = 1; level <= layout.max_level; level++) {
+      end = std::max(end, LevelEnd(layout, t.format, level));
+    }
+    t.ranges[1] = {layout.mip_address, end - layout.mip_address};
   }
   for (auto& [address, size] : t.ranges) {
     if (address >= kPhysicalMemorySize) {
@@ -443,6 +652,7 @@ bool TextureCache::State::CreateTexture(Texture& t) {
 }
 
 uint64_t TextureCache::State::Hash(uint8_t* base, const Texture& t) const {
+  ScopedCost cost(g_frame_costs.hash_ns);
   uint64_t hash = 0;
   for (const auto& [address, size] : t.ranges) {
     if (size) {
@@ -481,6 +691,9 @@ bool TextureCache::State::Upload(uint8_t* base, Texture& t) {
     stats.deferred++;
     return false;
   }
+  ScopedCost cost(g_frame_costs.texture_ns);
+  g_frame_costs.textures++;
+  g_frame_costs.texture_bytes += needed;
 
   Frame& frame_data = frames[frame];
   std::vector<VkBufferImageCopy> copies;
@@ -499,14 +712,8 @@ bool TextureCache::State::Upload(uint8_t* base, Texture& t) {
       for (uint32_t y = 0; y < height_blocks; y++) {
         // Gather a row of blocks, swap, then convert into staging.
         if (l.tiled) {
-          for (uint32_t x = 0; x < width_blocks; x++) {
-            uint32_t address = layer_address + TiledOffset2D(x + p.x, y + p.y, p.pitch_blocks,
-                                                             bytes_per_block_log2);
-            if (address + f.bytes_per_block <= kPhysicalMemorySize) {
-              std::memcpy(row.data() + x * f.bytes_per_block, PhysicalHostAddress(base, address),
-                          f.bytes_per_block);
-            }
-          }
+          GatherTiledRow(row.data(), base, layer_address, p.x, y + p.y, width_blocks,
+                         p.pitch_blocks, bytes_per_block_log2);
         } else {
           uint32_t address =
               layer_address + (y + p.y) * p.row_pitch_bytes + p.x * f.bytes_per_block;
@@ -624,8 +831,39 @@ void TextureCache::BeginFrame(uint32_t frame_index) {
   s.frame_number++;
   s.staging_used = 0;
   s.recording = false;
-  s.verified_this_frame = 0;
   vk::vkResetCommandPool(s.context.device, s.frames[frame_index].pool, 0);
+  s.MarkWritten();
+}
+
+// The textures memcpy has written since the last frame are marked to be
+// reloaded (the game writes textures' memory with the library's memcpy:
+// see docs/texture-handling-optimisation.md).
+void TextureCache::State::MarkWritten() {
+  new_writes.clear();
+  Buffers_TakeNewWrites(new_writes);
+  ScopedCost cost(g_frame_costs.mark_ns);
+  stats.writes += new_writes.size();
+  for (const auto& [start, end] : new_writes) {
+    auto it = by_address.lower_bound(start > longest_range ? start - longest_range : 0);
+    for (; it != by_address.end() && it->first < end; ++it) {
+      auto& [size, texture] = it->second;
+      if (it->first + size > start && !texture->changed) {
+        texture->changed = true;
+        stats.marked++;
+      }
+    }
+  }
+}
+
+bool TextureCache::Holds(uint32_t start, uint32_t end) const {
+  const State& s = *state_;
+  auto it = s.by_address.lower_bound(start > s.longest_range ? start - s.longest_range : 0);
+  for (; it != s.by_address.end() && it->first < end; ++it) {
+    if (it->first + it->second.first > start) {
+      return true;
+    }
+  }
+  return false;
 }
 
 VkImageView TextureCache::GetView(uint8_t* base, const uint32_t fetch_words[6],
@@ -637,9 +875,9 @@ VkImageView TextureCache::GetView(uint8_t* base, const uint32_t fetch_words[6],
     return VK_NULL_HANDLE;
   }
   // A resolve destination at this address takes the place of guest memory.
-  if (auto r = s.resolved.find(fetch.base_address & 0x1FFFF);
-      r != s.resolved.end() && r->second.loaded) {
-    State::Texture& t = r->second;
+  if (auto r = s.current.find(fetch.base_address & 0x1FFFF);
+      r != s.current.end() && r->second->loaded) {
+    State::Texture& t = *r->second;
     s.stats.resolved_hits++;
     if (debug_hide_ == Hide::kResolved ||
         (debug_hide_ == Hide::kResolvedAddress && debug_hide_value_ == t.layout.base_address)) {
@@ -687,6 +925,13 @@ VkImageView TextureCache::GetView(uint8_t* base, const uint32_t fetch_words[6],
                   int32_t(fetch.exp_adjust));
     }
     it = s.textures.emplace(key, std::move(t)).first;
+    State::Texture& added = it->second;
+    for (const auto& [address, size] : added.ranges) {
+      if (size) {
+        s.by_address.emplace(address, std::make_pair(size, &added));
+        s.longest_range = std::max(s.longest_range, size);
+      }
+    }
   }
   State::Texture& t = it->second;
   VkImageViewType natural = t.layout.cube ? VK_IMAGE_VIEW_TYPE_CUBE : VK_IMAGE_VIEW_TYPE_2D_ARRAY;
@@ -701,40 +946,47 @@ VkImageView TextureCache::GetView(uint8_t* base, const uint32_t fetch_words[6],
     return VK_NULL_HANDLE;
   }
 
-  // Load, or reload when its memory changed (checked now and then).
+  // Load; reload when memcpy has written its memory since (MarkWritten).
+  // With verify_every_frame_, also hash it every frame, and reload it (and
+  // log it) if it changed without a recorded write.
+  bool log_writes = REXCVAR_GET(native_renderer_log_texture_writes);
+  if (log_writes) {
+    s.LogWriteSummary();
+  }
   if (!t.loaded) {
-    t.hash = s.Hash(base, t);
-    t.verified_frame = t.loaded_frame = s.frame_number;
+    if (verify_every_frame_) {
+      t.hash = s.Hash(base, t);
+      t.verified_frame = s.frame_number;
+    }
     if (!s.Upload(base, t)) {
       return VK_NULL_HANDLE;
     }
-  } else if (bool young = s.frame_number - t.loaded_frame < kNewTextureFrames;
-             young ? s.frame_number - t.verified_frame >= kNewTextureInterval
-                   : verify_every_frame_ ? s.frame_number != t.verified_frame
-                   : s.frame_number - t.verified_frame >= kVerifyInterval &&
-                         s.verified_this_frame < kVerifiesPerFrame) {
-    uint64_t since_verified = s.frame_number - t.verified_frame;
-    if (!young) {
-      s.verified_this_frame++;
+    t.changed = false;
+    t.loaded_frame = s.frame_number;
+    if (log_writes) {
+      s.LogFirstLoad(t);
     }
-    t.verified_frame = s.frame_number;
-    uint64_t hash = s.Hash(base, t);
-    if (hash != t.hash && s.Upload(base, t)) {
+  } else if (t.changed) {
+    uint64_t hash = verify_every_frame_ ? s.Hash(base, t) : 0;
+    if (s.Upload(base, t)) {  // else the old contents until it fits
+      t.changed = false;
       t.hash = hash;
-      if (young) {
-        s.stats.changed_after_load++;
-        if (s.stats.changed_after_load_sample == UINT32_MAX) {
-          s.stats.changed_after_load_sample = t.layout.base_address ? t.layout.base_address
-                                                                     : t.layout.mip_address;
-          s.stats.changed_after_load_frames = uint32_t(s.frame_number - t.loaded_frame);
-        }
-      } else {
-        s.stats.changed_later++;
-        if (s.stats.changed_later_sample == UINT32_MAX) {
-          s.stats.changed_later_sample = t.layout.base_address ? t.layout.base_address
-                                                               : t.layout.mip_address;
-          s.stats.changed_later_frames = uint32_t(since_verified);
-        }
+      t.verified_frame = s.frame_number;
+    }
+  } else if (verify_every_frame_ && t.verified_frame != s.frame_number) {
+    t.verified_frame = s.frame_number;
+    if (uint64_t hash = s.Hash(base, t); hash != t.hash) {
+      s.stats.unrecorded++;
+      if (s.stats.unrecorded_sample == UINT32_MAX) {
+        s.stats.unrecorded_sample =
+            t.layout.base_address ? t.layout.base_address : t.layout.mip_address;
+        s.stats.unrecorded_frames = uint32_t(s.frame_number - t.loaded_frame);
+      }
+      if (log_writes) {
+        s.LogUnrecordedChange(base, t);
+      }
+      if (s.Upload(base, t)) {
+        t.hash = hash;
       }
     }
   }
@@ -770,12 +1022,14 @@ VkImageView TextureCache::State::GetSwizzledView(Texture& t, uint32_t swizzle,
   return view;
 }
 
-bool TextureCache::GetResolveDestination(const uint32_t fetch_words[6], ResolveDestination& out) {
+bool TextureCache::GetResolveDestination(const uint32_t fetch_words[6], float scale,
+                                         ResolveDestination& out) {
   State& s = *state_;
   xenos::xe_gpu_texture_fetch_t fetch = ToFetch(fetch_words);
   uint32_t page = fetch.base_address & 0x1FFFF;
   uint32_t width = fetch.size_2d.width + 1, height = fetch.size_2d.height + 1;
-  auto it = s.resolved.find(page);
+  uint64_t key = State::ResolveKey(page, scale);
+  auto it = s.resolved.find(key);
   if (it != s.resolved.end() && (it->second.guest_format != uint32_t(fetch.format) ||
                                  it->second.layout.width != width ||
                                  it->second.layout.height != height)) {
@@ -785,6 +1039,9 @@ bool TextureCache::GetResolveDestination(const uint32_t fetch_words[6], ResolveD
                 "to format {} {}x{}",
                 page << 12, it->second.guest_format, it->second.layout.width,
                 it->second.layout.height, uint32_t(fetch.format), width, height);
+    if (auto c = s.current.find(page); c != s.current.end() && c->second == &it->second) {
+      s.current.erase(c);
+    }
     s.resolved.erase(it);
     it = s.resolved.end();
   }
@@ -801,17 +1058,24 @@ bool TextureCache::GetResolveDestination(const uint32_t fetch_words[6], ResolveD
     }
     t.layout.width = width;
     t.layout.height = height;
+    t.scale = scale;
+    t.host_width = std::max(uint32_t(std::lround(width * scale)), 1u);
+    t.host_height = std::max(uint32_t(std::lround(height * scale)), 1u);
     t.layout.layers = 1;
     t.layout.base_address = page << 12;
     if (!s.CreateTexture(t)) {
       return false;
     }
-    REXLOG_INFO("native renderer: resolve destination at {:08X}: format {} {}x{} (host format {})",
-                page << 12, t.guest_format, width, height, int(t.format.format));
-    it = s.resolved.emplace(page, std::move(t)).first;
+    REXLOG_INFO("native renderer: resolve destination at {:08X}: format {} {}x{} (host format {}, "
+                "{}x{}, scale {})",
+                page << 12, t.guest_format, width, height, int(t.format.format), t.host_width,
+                t.host_height, scale);
+    it = s.resolved.emplace(key, std::move(t)).first;
   }
   State::Texture& t = it->second;
-  out = {t.image, t.attachment_view, t.format.format, width, height, !t.loaded};
+  s.current[page] = &t;
+  out = {t.image,        t.attachment_view, t.format.format, width, height, t.host_width,
+         t.host_height, t.scale,           !t.loaded};
   t.loaded = true;  // written by the caller
   return true;
 }

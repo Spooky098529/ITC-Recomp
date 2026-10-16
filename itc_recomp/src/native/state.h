@@ -47,10 +47,37 @@ constexpr uint32_t kDeviceVertexFloatConstants = 1792, kDevicePixelFloatConstant
 
 // Fills regs (host byte order) from the device's shadow: the register
 // blocks the draw path flushes, and the fetch, bool and loop constants
-// (not the float constants). Registers outside them are left as they are:
-// zero regs once before the first call (clearing all 80 KB every draw was
-// ~10% of the render thread).
+// (not the float constants). Only the words the graphics library marked
+// dirty since the last call (MarkDeviceDirty and the others below; all
+// before the first call) are copied: the rest of regs is as it was. Zero
+// regs once before the first call (clearing all 80 KB every draw was ~10%
+// of the render thread).
 void ReadRegisters(uint8_t* base, uint32_t device, rex::graphics::RegisterFile& regs);
+
+// What ReadRegisters is to copy next (render thread). The library marks
+// what its setters write in the shadow as dirty in three masks of the
+// device (+16 shader state, +24 render state, +32 other state), and its
+// draws clear them after flushing. MarkDeviceDirty takes the masks before
+// a draw clears them; MarkRegistersDirty and MarkFetchConstantsDirty take
+// the masks the library's flush helpers sub_822ADE30 (first register, top
+// bit first) and sub_822AE070 (top bit fetch constant 0) are given, and
+// register 0x2203, which sub_822ADC08 writes itself. MarkRegistersDirty
+// also marks words changed in regs by hand.
+void MarkDeviceDirty(uint64_t shader_state, uint64_t render_state, uint64_t other_state);
+void MarkRegistersDirty(uint32_t first_register, uint64_t mask);
+void MarkFetchConstantsDirty(uint64_t mask);
+
+// ReadRegisters, counted (--native_renderer_log_register_reads): calls,
+// calls where anything changed since the last, words in the blocks, words
+// copied (dirty) and changed, calls changing each block (7 register blocks,
+// then fetch, bool, loop constants).
+constexpr size_t kRegisterReadBlocks = 10;
+struct RegisterReadStats {
+  uint64_t calls = 0, calls_changed = 0, words = 0, words_copied = 0, words_changed = 0;
+  uint64_t blocks_changed[kRegisterReadBlocks] = {};
+};
+void ReadRegisters(uint8_t* base, uint32_t device, rex::graphics::RegisterFile& regs,
+                   RegisterReadStats& stats);
 
 // The GPU's physical address for a guest address, as the graphics library
 // converts it (IM_LOAD, SetTexture, SetStreamSource).

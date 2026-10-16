@@ -13,6 +13,7 @@
 #include <vector>
 
 #include "device_context.h"
+#include "state.h"
 #include "textures.h"
 #include "vulkan_functions.h"
 
@@ -23,8 +24,11 @@ class Passes {
   Passes();
   ~Passes();
 
-  // base: the guest memory base.
-  bool Init(const DeviceContext& context, uint8_t* base, uint32_t frames_in_flight);
+  // base: the guest memory base. resolution_scale: every target and resolve
+  // destination is drawn this many times its guest size (see "Resolution"
+  // in docs/native-renderer.md).
+  bool Init(const DeviceContext& context, uint8_t* base, uint32_t frames_in_flight,
+            float resolution_scale);
 
   // Render thread. Before a frame's first command.
   void BeginFrame(uint32_t frame_index);
@@ -78,6 +82,9 @@ class Passes {
   // For set_skip_pixel_shader: skip the draws without a pixel shader.
   static constexpr uint64_t kSkipNoPixelShader = 1;
   void set_record_draws(bool record);
+  // A diagnostic: log the glow history's cross-fades and write-backs once a
+  // second, by logic and render-only frames.
+  void set_log_glow(bool log);
   std::vector<uint64_t> main_view_pixel_shaders() const;
   // A debugging aid: hash each vertex and index range every frame, keeping
   // how often each changes between frames; TakeMirrorChanges describes the
@@ -87,6 +94,28 @@ class Passes {
   // frame (as before memcpy's writes were tracked); compare each range not
   // copied with guest memory (Stats::mirror_stale; slow).
   void set_copy_all(bool copy_all);
+  void set_skip_repeated_state(bool skip);
+  void set_reuse_constants(bool reuse);
+  // Counts why constants aren't reused (Stats::fetch_changed and
+  // offset_differs; a diagnostic, off by default).
+  void set_log_constant_changes(bool log);
+  void set_log_register_reads(bool log);
+  // A diagnostic: how often each draw's index range is scanned again
+  // unchanged, and how the mirror's checks go; TakeIndexRanges describes
+  // them since it was last called.
+  // Keep draws' index ranges' lowest and highest index until memcpy writes
+  // them (on by default).
+  void set_cache_index_ranges(bool cache);
+  void set_log_index_ranges(bool log);
+  std::string TakeIndexRanges();
+  // Fixed at start (--native_renderer_mirror_by_tick): draws read a mirror
+  // updated only as a logic pass's list starts replaying (an experiment);
+  // TakeMirrorByTick describes it since it was last called.
+  void set_mirror_by_tick(bool by_tick);
+  // With it (--native_renderer_mirror_to_both): memcpy's writes also go into
+  // the front mirror at each frame's start.
+  void set_mirror_to_both(bool to_both);
+  std::string TakeMirrorByTick();
   void set_verify_mirror(bool verify);
   // A debugging aid: hash each copied vertex and index range again at the
   // end of the frame; TakeLateWrites describes those that changed.
@@ -142,6 +171,7 @@ class Passes {
     uint64_t mirror_rewritten = 0, mirror_rewritten_bytes = 0;
     uint32_t mirror_rewritten_sample_address = 0, mirror_rewritten_sample_size = 0;
     uint32_t pipelines = 0, shaders_translated = 0, shaders_failed = 0, targets = 0;
+    uint32_t shaders_from_disk = 0;
     // Draws skipped as having an empty viewport or scissor, and one example:
     // viewport offset and extent, scissor offset and extent (bit 31 of the
     // first word set when filled).
@@ -174,6 +204,29 @@ class Passes {
     // type (4, 6, 8 rectangle list, 13 quad list).
     uint64_t inline_draws = 0;
     std::array<uint64_t, 16> inline_by_type{};
+    // Draws compared with the draw before them (nothing else recorded in
+    // between), and how many repeated each of its state calls: viewport,
+    // scissor, depth bias, blend constants, pipeline, descriptor sets (their
+    // dynamic offsets aside), index buffer binding, the index buffer and
+    // type alone (another offset), and descriptor sets with their offsets.
+    uint64_t state_compared = 0;
+    std::array<uint64_t, 9> state_repeated{};
+    // Draws given constants, and how many pointed at the last copy of each
+    // block (system, vertex floats, pixel floats, bool/loop, fetch) instead
+    // of writing it; the bytes of constants written.
+    uint64_t constants_draws = 0, constant_bytes = 0;
+    std::array<uint64_t, 5> constants_reused{};
+    // Draws whose fetch block differed from the last one written, and of
+    // those, how many differed in a texture fetch constant their shaders
+    // read, in a vertex fetch constant they read (and in its address
+    // alone), or in neither (only unread slots).
+    // With log_constant_changes: draws repeating the last draw's
+    // descriptor sets but not their offsets: how many had each block's offset differ, and the fetch
+    // block's alone.
+    std::array<uint64_t, 5> offset_differs{};
+    uint64_t offsets_differ = 0, only_fetch_offset_differs = 0;
+    uint64_t fetch_changed = 0, fetch_changed_texture = 0, fetch_changed_vertex = 0,
+             fetch_changed_vertex_address = 0, fetch_changed_unread = 0;
     std::array<uint32_t, 2> declaration_sample{};
     std::array<uint32_t, 4> clamped_sample{};
     std::array<uint32_t, 2> base_vertex_sample{};
@@ -186,6 +239,8 @@ class Passes {
     // Predicated tilings begun, and the resolves their ends made.
     uint64_t tilings = 0, tiled_resolves = 0;
     uint32_t resolve_flags_sample = 0;
+    // With log_register_reads.
+    RegisterReadStats register_reads;
     TextureCache::Stats textures;
   };
   Stats TakeStats();

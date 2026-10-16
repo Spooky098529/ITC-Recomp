@@ -30,6 +30,10 @@ bool GameMessages_IsRenderOnlyPass();
 // Which main loop pass this is (counts up by one per pass).
 uint64_t GameMessages_PassNumber();
 
+// Any thread, for diagnostics: the current pass's number and type as of its
+// start, and whether the caller is the main thread.
+void GameMessages_PassFromAnyThread(uint64_t& number, bool& render_only, bool& main_thread);
+
 // Diagnostics: the message handler running (by its target) and the
 // message's id, or 0 and ~0 between handlers.
 void GameMessages_CurrentHandler(uint32_t& handler, uint32_t& message);

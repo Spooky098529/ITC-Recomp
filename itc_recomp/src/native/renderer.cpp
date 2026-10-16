@@ -1,4 +1,6 @@
 #include "renderer.h"
+#include "frame_costs.h"
+#include "log_enabled.h"
 
 #include "buffers.h"
 #include "app_window.h"
@@ -11,9 +13,13 @@
 #include "guest.h"
 
 #include <SDL3/SDL.h>
+#include <algorithm>
+#include <deque>
+#include <mutex>
 #include <SDL3/SDL_vulkan.h>
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <chrono>
 #include <cmath>
 #include <cstring>
@@ -43,13 +49,39 @@ REXCVAR_DEFINE_BOOL(native_renderer_serialize, false, "ITC",
 REXCVAR_DEFINE_BOOL(native_renderer_check_mirror, false, "ITC",
                     "Log the vertex and index ranges whose contents change between frames "
                     "(a debugging aid)");
+REXCVAR_DEFINE_BOOL(native_renderer_skip_repeated_state, true, "ITC",
+                    "Don't record a draw's viewport, scissor, depth bias, blend constants, "
+                    "pipeline or index buffer again when the command buffer already holds them");
+REXCVAR_DEFINE_BOOL(native_renderer_reuse_constants, true, "ITC",
+                    "Point a draw at the constants the last draw wrote, block by block, when "
+                    "they're the same, instead of writing them again");
+REXCVAR_DEFINE_BOOL(native_renderer_log_constant_changes, false, "ITC",
+                    "Log why draws' constants aren't reused: what differs in the fetch block, "
+                    "and which blocks' offsets differ when the descriptor sets repeat");
+REXCVAR_DEFINE_BOOL(native_renderer_log_register_reads, false, "ITC",
+                    "Log how often the device's register shadow is read a frame, how many words "
+                    "are copied (those marked dirty) and what changed since the last read");
+REXCVAR_DEFINE_BOOL(native_renderer_cache_index_ranges, true, "ITC",
+                    "Keep each draw's lowest and highest index until memcpy writes its index "
+                    "range, instead of scanning the indices every draw");
+REXCVAR_DEFINE_BOOL(native_renderer_log_index_ranges, false, "ITC",
+                    "Log how often draws' index ranges are scanned again unchanged since memcpy "
+                    "last wrote them, and how the guest memory mirror's checks go");
 REXCVAR_DEFINE_BOOL(native_renderer_copy_all, false, "ITC",
                     "Copy every vertex and index range into the mirror every frame, not only "
                     "those the library's memcpy wrote since (a debugging aid)");
+REXCVAR_DEFINE_BOOL(native_renderer_mirror_by_tick, false, "ITC",
+                    "Draws read a guest memory mirror updated only as a logic pass's list starts "
+                    "replaying, the two mirrors alternating (an experiment; see 'Hypothesis to "
+                    "test: the mirrors updated once a tick' in docs/native-renderer.md)");
+REXCVAR_DEFINE_BOOL(native_renderer_mirror_to_both, false, "ITC",
+                    "With --native_renderer_mirror_by_tick: memcpy's writes go into both mirrors "
+                    "at each frame's start, the one draws read included (an experiment)");
 REXCVAR_DEFINE_BOOL(native_renderer_verify_mirror, false, "ITC",
                     "Compare each vertex and index range not copied into the mirror with guest "
                     "memory every frame, logging those that differ (a debugging aid; slow, ~20 "
-                    "fps in a race)");
+                    "fps in a race). With --native_renderer_mirror_by_tick: each drawn range "
+                    "looked up in the writes the mirror hasn't had instead (fast)");
 REXCVAR_DEFINE_BOOL(native_renderer_watch_draws, false, "ITC",
                     "Log what changes in the main view's draws' inputs between frames: with the "
                     "camera still, only flickering draws should (a debugging aid)");
@@ -70,11 +102,14 @@ REXCVAR_DEFINE_STRING(native_renderer_watch_pixel_shader, "", "ITC",
                       "(hash in hex)");
 REXCVAR_DEFINE_STRING(native_renderer_skip_pixel_shader, "", "ITC",
                       "Leave out the draws of this pixel shader (hash in hex; a debugging aid)");
+REXCVAR_DEFINE_BOOL(native_renderer_log_glow, false, "ITC",
+                    "Log the glow history's cross-fades and write-backs once a second, by logic "
+                    "and render-only frames (a debugging aid)");
 REXCVAR_DEFINE_BOOL(native_renderer_base_level_only, false, "ITC",
                     "Sample only each texture's first level (a debugging aid)");
 REXCVAR_DEFINE_BOOL(native_renderer_verify_textures, false, "ITC",
-                    "Hash every texture used again each frame, reloading those whose memory "
-                    "changed (a debugging aid)");
+                    "Hash every texture used each frame, logging and reloading those whose "
+                    "memory changed with no memcpy write recorded (a debugging aid)");
 REXCVAR_DEFINE_BOOL(native_renderer_no_index_clamp, false, "ITC",
                     "Don't clamp indices to VGT_MIN/MAX_VTX_INDX (a debugging aid)");
 REXCVAR_DEFINE_INT32(native_renderer_dump_every, 0, "ITC",
@@ -84,6 +119,15 @@ REXCVAR_DEFINE_STRING(native_renderer_dump, "", "ITC",
                       "Directory to dump frames into, as PFM files, with draws.txt describing "
                       "each draw: once 10 s into a race, and again whenever a file named 'now' "
                       "appears in it (a debugging aid; see docs/native-renderer.md)");
+REXCVAR_DEFINE_INT32(width, 0, "ITC",
+                     "Window width in pixels (in fullscreen, the drawing width); 0: 1280, or "
+                     "from height at 16:9");
+REXCVAR_DEFINE_INT32(height, 0, "ITC",
+                     "Window height in pixels (in fullscreen, the drawing height); 0: 720, or "
+                     "from width at 16:9");
+// The SDK's (it also makes the SDK's own window, hidden in exclusive mode,
+// fullscreen); ours follows it.
+REXCVAR_DECLARE(bool, fullscreen);
 
 namespace native {
 namespace {
@@ -92,6 +136,60 @@ using Clock = std::chrono::steady_clock;
 
 constexpr uint32_t kFramesInFlight = 2;
 constexpr uint32_t kDefaultWidth = 1280, kDefaultHeight = 720;
+
+// The window's size from --width and --height (one alone keeps 16:9).
+VkExtent2D WindowSize() {
+  int32_t width = REXCVAR_GET(width), height = REXCVAR_GET(height);
+  if (width <= 0 && height <= 0) {
+    return {kDefaultWidth, kDefaultHeight};
+  }
+  if (width <= 0) {
+    width = (height * 16 + 8) / 9;
+  } else if (height <= 0) {
+    height = (width * 9 + 8) / 16;
+  }
+  return {uint32_t(width), uint32_t(height)};
+}
+
+// How many times the game's own resolution (1280x720 frame, 1024x576 3D
+// view) is drawn (see "Resolution" in docs/native-renderer.md): in
+// fullscreen with --width or --height, the largest that fits them;
+// otherwise the largest that fits the window's pixels (`pixels`, the
+// swapchain's size).
+float ResolutionScale(VkExtent2D pixels) {
+  bool sized = REXCVAR_GET(width) > 0 || REXCVAR_GET(height) > 0;
+  VkExtent2D size = (REXCVAR_GET(fullscreen) && sized) || !pixels.width || !pixels.height
+                        ? WindowSize()
+                        : pixels;
+  return std::min(float(size.width) / kDefaultWidth, float(size.height) / kDefaultHeight);
+}
+
+// Set (from the main thread's event loop) when our window's size in pixels
+// changes: the swapchain is made again (Wayland never reports it out of
+// date).
+std::atomic<bool> g_window_resized{false};
+SDL_WindowID g_window_id = 0;
+bool SDLCALL WatchWindowEvents(void*, SDL_Event* event) {
+  if (event->type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED &&
+      event->window.windowID == g_window_id) {
+    g_window_resized = true;
+  }
+  return true;
+}
+
+// Where a frame of `source`'s shape goes in `target`: as large as fits,
+// centred (black bars on the sides or above and below).
+VkOffset3D FitOffsets(VkExtent2D source, VkExtent2D target, VkOffset3D& end) {
+  uint64_t width = target.width, height = target.height;
+  if (uint64_t(target.width) * source.height > uint64_t(target.height) * source.width) {
+    width = (uint64_t(target.height) * source.width + source.height / 2) / source.height;
+  } else {
+    height = (uint64_t(target.width) * source.height + source.width / 2) / source.width;
+  }
+  VkOffset3D start{int32_t((target.width - width) / 2), int32_t((target.height - height) / 2), 0};
+  end = {start.x + int32_t(width), start.y + int32_t(height), 1};
+  return start;
+}
 
 // Draw commands (see docs/gpu-functions.md).
 bool IsDraw(uint32_t id) {
@@ -103,6 +201,8 @@ bool IsDraw(uint32_t id) {
 struct WindowSetup {
   bool validation = false;
   SDL_Window* window = nullptr;
+  VkExtent2D display{};  // its screen's size in pixels
+  float density = 1.0f;  // pixels per unit of the desktop's
   VkInstance instance = VK_NULL_HANDLE;
   VkSurfaceKHR surface = VK_NULL_HANDLE;
   std::string error;
@@ -116,11 +216,35 @@ void SDLCALL CreateWindowOnMainThread(void* data) {
     setup->done.set_value();
     delete static_cast<std::shared_ptr<WindowSetup>*>(data);
   };
-  setup->window = SDL_CreateWindow("ITC native renderer", kDefaultWidth, kDefaultHeight,
-                                   SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE);
+  VkExtent2D size = WindowSize();
+  // Fullscreen: borderless, at the desktop's resolution (no mode change).
+  // High pixel density: real pixels under the desktop's scaling, not a
+  // smaller surface the compositor stretches (2648x1490 for a 3840x2160
+  // screen at 145%).
+  SDL_WindowFlags flags = SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE |
+                          SDL_WINDOW_HIGH_PIXEL_DENSITY |
+                          (REXCVAR_GET(fullscreen) ? SDL_WINDOW_FULLSCREEN : 0);
+  setup->window =
+      SDL_CreateWindow("ITC native renderer", int(size.width), int(size.height), flags);
   if (!setup->window) {
     return finish(fmt::format("SDL_CreateWindow: {}", SDL_GetError()));
   }
+  if (const SDL_DisplayMode* mode =
+          SDL_GetDesktopDisplayMode(SDL_GetDisplayForWindow(setup->window))) {
+    setup->display = {uint32_t(std::lround(mode->w * mode->pixel_density)),
+                      uint32_t(std::lround(mode->h * mode->pixel_density))};
+  }
+  // The window's size is given in pixels: in the desktop's (scaled) units,
+  // it's that over the pixel density.
+  if (float density = SDL_GetWindowPixelDensity(setup->window);
+      density > 0.0f && density != 1.0f && !REXCVAR_GET(fullscreen)) {
+    SDL_SetWindowSize(setup->window, int(std::lround(size.width / density)),
+                      int(std::lround(size.height / density)));
+    SDL_SyncWindow(setup->window);
+  }
+  setup->density = SDL_GetWindowPixelDensity(setup->window);
+  g_window_id = SDL_GetWindowID(setup->window);
+  SDL_AddEventWatch(WatchWindowEvents, nullptr);
   AppWindow_AdoptOurWindow(setup->window);
   auto get_instance_proc_addr =
       reinterpret_cast<PFN_vkGetInstanceProcAddr>(SDL_Vulkan_GetVkGetInstanceProcAddr());
@@ -189,6 +313,7 @@ class Renderer {
   void LogStats();
 
   SDL_Window* window_ = nullptr;
+  VkExtent2D display_{};  // the window's screen, in pixels
   VkInstance instance_ = VK_NULL_HANDLE;
   VkSurfaceKHR surface_ = VK_NULL_HANDLE;
   VkPhysicalDevice physical_device_ = VK_NULL_HANDLE;
@@ -246,6 +371,9 @@ class Renderer {
 
   // Logged every 5 s.
   uint64_t frames_presented_ = 0, frames_skipped_ = 0, commands_ = 0, draws_ = 0;
+  // Texture loading and hashing (frame_costs.h) since the last stats: total
+  // and the frame that spent the most.
+  int64_t texture_ns_ = 0, texture_ns_max_ = 0, mark_ns_ = 0;
   Clock::time_point start_ = Clock::now(), last_log_ = Clock::now();
   Clock::time_point last_present_ = Clock::now();
 };
@@ -274,6 +402,11 @@ bool Renderer::CreateWindowAndInstance() {
     return false;
   }
   window_ = setup->window;
+  display_ = setup->display;
+  REXLOG_INFO("native renderer: window {}x{}{}, screen {}x{}, pixel density {}",
+              WindowSize().width, WindowSize().height,
+              REXCVAR_GET(fullscreen) ? " (fullscreen)" : "", display_.width, display_.height,
+              setup->density);
   instance_ = setup->instance;
   surface_ = setup->surface;
   return true;
@@ -382,6 +515,10 @@ bool Renderer::CreateDevice() {
   context_.demote_to_helper_invocation = enabled13.shaderDemoteToHelperInvocation;
   context_.sampler_anisotropy = enabled.features.samplerAnisotropy;
   context_.max_sampler_anisotropy = properties.limits.maxSamplerAnisotropy;
+  context_.vendor_id = properties.vendorID;
+  context_.device_id = properties.deviceID;
+  std::copy(std::begin(properties.pipelineCacheUUID), std::end(properties.pipelineCacheUUID),
+            context_.pipeline_cache_uuid.begin());
   context_.sampler_mirror_clamp_to_edge = enabled12.samplerMirrorClampToEdge;
 
   for (Frame& frame : frames_) {
@@ -409,7 +546,8 @@ bool Renderer::CreateSwapchain() {
   VkExtent2D extent = caps.currentExtent;
   if (extent.width == UINT32_MAX) {
     // The window system leaves the size to us (Wayland).
-    int width = kDefaultWidth, height = kDefaultHeight;
+    VkExtent2D size = WindowSize();
+    int width = int(size.width), height = int(size.height);
     SDL_GetWindowSizeInPixels(window_, &width, &height);
     extent = {std::clamp<uint32_t>(width, caps.minImageExtent.width, caps.maxImageExtent.width),
               std::clamp<uint32_t>(height, caps.minImageExtent.height,
@@ -500,8 +638,13 @@ void Renderer::DestroySwapchain() {
 }
 
 bool Renderer::Init(uint8_t* base) {
-  return CreateWindowAndInstance() && CreateDevice() && CreateSwapchain() &&
-         passes_.Init(context_, base, kFramesInFlight);
+  if (!CreateWindowAndInstance() || !CreateDevice() || !CreateSwapchain() ||
+      !passes_.Init(context_, base, kFramesInFlight, ResolutionScale(swapchain_extent_))) {
+    return false;
+  }
+  passes_.set_mirror_by_tick(REXCVAR_GET(native_renderer_mirror_by_tick));
+  passes_.set_mirror_to_both(REXCVAR_GET(native_renderer_mirror_to_both));
+  return true;
 }
 
 void Renderer::OnCommand(uint32_t id, uint32_t arg1) {
@@ -574,6 +717,13 @@ VkCommandBuffer Renderer::BeginFrame() {
     passes_.set_record_draws(dumping_ && dump_step_ == 0);
     passes_.set_check_mirror_frames(REXCVAR_GET(native_renderer_check_mirror));
     passes_.set_copy_all(REXCVAR_GET(native_renderer_copy_all));
+    passes_.set_skip_repeated_state(REXCVAR_GET(native_renderer_skip_repeated_state));
+    passes_.set_reuse_constants(REXCVAR_GET(native_renderer_reuse_constants));
+    passes_.set_log_constant_changes(REXCVAR_GET(native_renderer_log_constant_changes));
+    passes_.set_log_register_reads(REXCVAR_GET(native_renderer_log_register_reads));
+    passes_.set_log_index_ranges(REXCVAR_GET(native_renderer_log_index_ranges));
+    passes_.set_log_glow(REXCVAR_GET(native_renderer_log_glow));
+    passes_.set_cache_index_ranges(REXCVAR_GET(native_renderer_cache_index_ranges));
     passes_.set_verify_mirror(REXCVAR_GET(native_renderer_verify_mirror));
     passes_.set_check_late_writes(REXCVAR_GET(native_renderer_check_late_writes));
     passes_.set_check_clobbers(REXCVAR_GET(native_renderer_check_clobbers));
@@ -641,6 +791,9 @@ void Renderer::EndFrame() {
   // Copy what's shown onto a swapchain image, if one can be had now.
   bool acquired = false;
   uint32_t image_index = 0;
+  if (g_window_resized.exchange(false)) {
+    swapchain_stale_ = true;
+  }
   if ((!swapchain_stale_ && swapchain_) || CreateSwapchain()) {
     VkResult result = vk::vkAcquireNextImageKHR(device_, swapchain_, 100'000'000,
                                                 frame.image_ready, VK_NULL_HANDLE, &image_index);
@@ -665,11 +818,25 @@ void Renderer::EndFrame() {
     vk::vkCmdPipelineBarrier(commands, VK_PIPELINE_STAGE_TRANSFER_BIT,
                              VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1,
                              &barrier);
+    // The frame keeps its shape: black bars where the window's differs.
     VkImageBlit blit{};
     blit.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
     blit.srcOffsets[1] = {int32_t(source.width), int32_t(source.height), 1};
     blit.dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
-    blit.dstOffsets[1] = {int32_t(swapchain_extent_.width), int32_t(swapchain_extent_.height), 1};
+    blit.dstOffsets[0] = FitOffsets(source, swapchain_extent_, blit.dstOffsets[1]);
+    if (blit.dstOffsets[0].x || blit.dstOffsets[0].y ||
+        blit.dstOffsets[1].x != int32_t(swapchain_extent_.width) ||
+        blit.dstOffsets[1].y != int32_t(swapchain_extent_.height)) {
+      VkClearColorValue black{{0.0f, 0.0f, 0.0f, 1.0f}};
+      VkImageSubresourceRange range{VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+      vk::vkCmdClearColorImage(commands, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &black, 1,
+                               &range);
+      barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+      barrier.oldLayout = barrier.newLayout;
+      vk::vkCmdPipelineBarrier(commands, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                               VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1,
+                               &barrier);
+    }
     vk::vkCmdBlitImage(commands, passes_.shown(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, image,
                        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit, VK_FILTER_LINEAR);
     barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
@@ -716,13 +883,25 @@ void Renderer::EndFrame() {
       swapchain_stale_ = true;
     }
     frames_presented_++;
-    // A frame much longer than usual (a hitch the per-second fps hides).
+    // A frame much longer than usual (a hitch the per-second fps hides),
+    // with what it spent on work that comes and goes (frame_costs.h).
     auto now = Clock::now();
     if (auto ms = std::chrono::duration<double, std::milli>(now - last_present_).count();
-        ms >= 100 && frames_presented_ > 1) {
-      REXLOG_INFO("native renderer: long frame: {:.0f} ms since the last present ({} draws)",
-                  ms, frame_draws);
+        ms >= 40 && frames_presented_ > 1) {
+      const FrameCosts& c = g_frame_costs;
+      REXLOG_INFO(
+          "native renderer: long frame: {:.0f} ms since the last present ({} draws): "
+          "{} textures loaded ({:.1f} MB) in {:.1f} ms (hashing {:.1f} ms), {} shaders "
+          "translated in {:.1f} ms, {} pipelines made in {:.1f} ms",
+          ms, frame_draws, c.textures, c.texture_bytes / 1048576.0, c.texture_ns / 1e6,
+          c.hash_ns / 1e6,
+          c.shaders, c.shader_ns / 1e6, c.pipelines, c.pipeline_ns / 1e6);
     }
+    texture_ns_ += g_frame_costs.texture_ns + g_frame_costs.hash_ns;
+    mark_ns_ += g_frame_costs.mark_ns;
+    texture_ns_max_ =
+        std::max(texture_ns_max_, g_frame_costs.texture_ns + g_frame_costs.hash_ns);
+    g_frame_costs = {};
     last_present_ = now;
   } else {
     frames_skipped_++;
@@ -775,19 +954,24 @@ void Renderer::LogStats() {
   if (now - last_log_ < std::chrono::seconds(5)) {
     return;
   }
+  if (!InfoLogEnabled()) {
+    // Nothing would be printed: leave the counters to run on.
+    last_log_ = now;
+    return;
+  }
   double seconds = std::chrono::duration<double>(now - last_log_).count();
   uint64_t frames = std::max<uint64_t>(frames_presented_ + frames_skipped_, 1);
   Passes::Stats view = passes_.TakeStats();
   REXLOG_INFO("native renderer: {:.0f} frames/s presented, {} skipped; per frame {:.0f} "
               "commands, {:.0f} draws; {:.0f} drawn, {:.0f} unsupported, {:.0f} failed; {:.1f} "
               "MB copied a frame ({:.1f} MB unchanged, not copied); {} pipelines; shaders "
-              "translated {}, failed {}",
+              "translated {}, failed {}, from the disk cache {}",
               frames_presented_ / seconds, frames_skipped_, double(commands_) / frames,
               double(draws_) / frames, double(view.drawn) / frames,
               double(view.unsupported) / frames, double(view.failed) / frames,
               view.mirrored_bytes / 1048576.0 / frames,
               view.mirror_skipped_bytes / 1048576.0 / frames, view.pipelines,
-              view.shaders_translated, view.shaders_failed);
+              view.shaders_translated, view.shaders_failed, view.shaders_from_disk);
   if (view.failed) {
     static constexpr const char* kFailedDrawReasons[] = {
         "no target", "no vertex shader", "shader translation", "no index buffer",
@@ -801,6 +985,13 @@ void Renderer::LogStats() {
       }
     }
     REXLOG_INFO("native renderer: failed draws a frame by reason:{}", reasons);
+  }
+  if (std::string by_tick = passes_.TakeMirrorByTick(); !by_tick.empty()) {
+    uint64_t missing, most;
+    Renderer_TakeListStats(missing, most);
+    REXLOG_INFO("native renderer: mirror by tick: {}; lists replayed without a hand-over {}, "
+                "most waiting {}",
+                by_tick, missing, most);
   }
   if (REXCVAR_GET(native_renderer_verify_mirror)) {
     REXLOG_INFO("native renderer: mirror check: of {} ranges not copied and checked, {} "
@@ -824,25 +1015,27 @@ void Renderer::LogStats() {
               view.tiled_resolves);
   frames_presented_ = frames_skipped_ = commands_ = draws_ = 0;
   const TextureCache::Stats& t = view.textures;
-  REXLOG_INFO("native renderer: textures: {} ({} samplers); {} loaded, {} reloaded, {:.1f} MB; "
+  REXLOG_INFO("native renderer: textures: {} ({} samplers); {} loaded, {} reloaded, {:.1f} MB "
+              "(loading and hashing {:.1f} ms, at most {:.1f} ms a frame); "
               "{} deferred (staging full), {} unsupported (e.g. format {} dimension {}), {} "
               "of another dimension than declared; {:.0f} lookups a frame got a resolve "
               "destination ({:.0f} of another size or format)",
               t.textures, t.samplers, t.loaded, t.reloaded, t.loaded_bytes / 1048576.0,
+              texture_ns_ / 1e6, texture_ns_max_ / 1e6,
               t.deferred, t.unsupported,
               t.unsupported_sample == UINT32_MAX ? -1 : int(t.unsupported_sample >> 8),
               t.unsupported_sample == UINT32_MAX ? -1 : int(t.unsupported_sample & 0xFF),
               t.mismatched, double(t.resolved_hits) / frames,
               double(t.resolved_mismatched) / frames);
-  if (t.changed_after_load) {
-    REXLOG_INFO("native renderer: {} textures changed soon after loading, e.g. {:08X} after {} "
-                "frames",
-                t.changed_after_load, t.changed_after_load_sample, t.changed_after_load_frames);
-  }
-  if (t.changed_later) {
-    REXLOG_INFO("native renderer: {} textures changed in memory after their first frames, e.g. "
-                "{:08X}, {} frames after it was last checked",
-                t.changed_later, t.changed_later_sample, t.changed_later_frames);
+  texture_ns_ = texture_ns_max_ = 0;
+  REXLOG_INFO("native renderer: textures: {} memcpy writes, {} textures marked written ({:.1f} "
+              "ms marking)",
+              t.writes, t.marked, mark_ns_ / 1e6);
+  mark_ns_ = 0;
+  if (t.unrecorded) {
+    REXLOG_INFO("native renderer: {} textures changed in memory with no write recorded, e.g. "
+                "{:08X}, {} frames after it was first loaded",
+                t.unrecorded, t.unrecorded_sample, t.unrecorded_frames);
   }
   if (t.mismatched_sample != UINT32_MAX) {
     REXLOG_INFO("native renderer: e.g. a texture of format {}, dimension {}, {}x{} where the "
@@ -864,6 +1057,53 @@ void Renderer::LogStats() {
                 "strips {:.1f}, rectangle lists {:.1f}, quad lists {:.1f})",
                 double(view.inline_draws) / frames, double(t[4]) / frames, double(t[6]) / frames,
                 double(t[8]) / frames, double(t[13]) / frames);
+  }
+  if (view.state_compared) {
+    const auto& r = view.state_repeated;
+    auto share = [&](uint64_t n) { return 100.0 * double(n) / double(view.state_compared); };
+    REXLOG_INFO("native renderer: of {:.1f} draws a frame following another draw, repeating its "
+                "viewport {:.0f}%, scissor {:.0f}%, depth bias {:.0f}%, blend constants {:.0f}%, "
+                "pipeline {:.0f}%, descriptor sets {:.0f}% (with offsets {:.0f}%), index buffer "
+                "binding {:.0f}% (buffer and type {:.0f}%)",
+                double(view.state_compared) / frames, share(r[0]), share(r[1]), share(r[2]),
+                share(r[3]), share(r[4]), share(r[5]), share(r[8]), share(r[6]), share(r[7]));
+    const auto& o = view.offset_differs;
+    if (view.offsets_differ) {
+      REXLOG_INFO("native renderer: descriptor sets repeated with other offsets for {:.0f}% of "
+                  "draws: system {:.0f}%, vertex floats {:.0f}%, pixel floats {:.0f}%, "
+                  "bool/loop {:.0f}%, fetch {:.0f}% (fetch alone {:.0f}%)",
+                  share(view.offsets_differ), share(o[0]), share(o[1]), share(o[2]),
+                  share(o[3]), share(o[4]), share(view.only_fetch_offset_differs));
+    }
+  }
+  if (const RegisterReadStats& r = view.register_reads; r.calls) {
+    auto share = [&](uint64_t n) { return 100.0 * double(n) / double(r.calls); };
+    const auto& b = r.blocks_changed;
+    REXLOG_INFO("native renderer: register reads: {:.1f} a frame, of {:.0f} words a frame {:.0f} "
+                "copied (dirty), {:.1f} changed; {:.0f}% changed anything; changed by block: "
+                "2000 {:.0f}%, 2100 {:.0f}%, 2180 {:.0f}%, 2200 {:.0f}%, 2280 {:.0f}%, 2300 "
+                "{:.0f}%, 2380 {:.0f}%, fetch {:.0f}%, bool {:.0f}%, loop {:.0f}%",
+                double(r.calls) / frames, double(r.words) / frames,
+                double(r.words_copied) / frames, double(r.words_changed) / frames,
+                share(r.calls_changed), share(b[0]), share(b[1]), share(b[2]), share(b[3]),
+                share(b[4]), share(b[5]), share(b[6]), share(b[7]), share(b[8]), share(b[9]));
+  }
+  if (view.constants_draws) {
+    const auto& r = view.constants_reused;
+    auto share = [&](uint64_t n) { return 100.0 * double(n) / double(view.constants_draws); };
+    REXLOG_INFO("native renderer: of {:.1f} draws a frame given constants, reusing the last "
+                "written system {:.0f}%, vertex floats {:.0f}%, pixel floats {:.0f}%, bool/loop "
+                "{:.0f}%, fetch {:.0f}%; {:.0f} KB written a frame",
+                double(view.constants_draws) / frames, share(r[0]), share(r[1]), share(r[2]),
+                share(r[3]), share(r[4]), double(view.constant_bytes) / frames / 1024);
+    if (view.fetch_changed) {
+      REXLOG_INFO("native renderer: fetch block differed from the last written for {:.0f}% of "
+                  "draws: in a texture fetch constant read {:.0f}%, a vertex fetch constant "
+                  "read {:.0f}% (address only {:.0f}%), only in unread ones {:.0f}%",
+                  share(view.fetch_changed), share(view.fetch_changed_texture),
+                  share(view.fetch_changed_vertex), share(view.fetch_changed_vertex_address),
+                  share(view.fetch_changed_unread));
+    }
   }
   if (view.vertex_shader_copies) {
     REXLOG_INFO("native renderer: {:.1f} draws a frame got their vertex shader from the library's "
@@ -911,6 +1151,9 @@ void Renderer::LogStats() {
   if (REXCVAR_GET(native_renderer_check_mirror)) {
     REXLOG_INFO("native renderer: between frames, {}", passes_.TakeMirrorChanges());
   }
+  if (REXCVAR_GET(native_renderer_log_index_ranges)) {
+    REXLOG_INFO("native renderer: {}", passes_.TakeIndexRanges());
+  }
   if (view.invisible) {
     const auto& v = view.invisible_sample;
     REXLOG_INFO("native renderer: {:.0f} draws a frame skipped as invisible, e.g. "
@@ -928,14 +1171,20 @@ bool g_failed = false;
 // Guest memory's base, from the command hooks (Renderer_EndFrame has none).
 uint8_t* g_base = nullptr;
 
+// Kept out of line: inlined, Init's stack frame was set up on every call to
+// GetRenderer (several per replayed command), ~2% of the render thread.
+[[gnu::noinline]] void StartRenderer() {
+  g_renderer = new Renderer();
+  if (!g_base || !g_renderer->Init(g_base)) {
+    REXLOG_ERROR("native renderer: couldn't start; continuing without it");
+    g_failed = true;
+    g_renderer = nullptr;  // leaked: may hold objects already made
+  }
+}
+
 Renderer* GetRenderer() {
   if (!g_renderer && !g_failed) {
-    g_renderer = new Renderer();
-    if (!g_base || !g_renderer->Init(g_base)) {
-      REXLOG_ERROR("native renderer: couldn't start; continuing without it");
-      g_failed = true;
-      g_renderer = nullptr;  // leaked: may hold objects already made
-    }
+    StartRenderer();
   }
   return g_renderer;
 }
@@ -1002,6 +1251,45 @@ void Renderer_FrontBufferResolve(uint8_t* base, uint32_t device, uint32_t front_
   if (Renderer* renderer = GetRenderer()) {
     renderer->FrontBufferResolve(base, device, front_buffer);
   }
+}
+
+namespace {
+// Lists handed over and not yet replayed: whether a logic pass recorded
+// each (any thread, under g_lists_mutex); and the one being replayed
+// (render thread).
+std::mutex g_lists_mutex;
+std::deque<bool> g_lists;
+bool g_replaying_logic_list = true;
+uint64_t g_lists_missing = 0, g_lists_queued_most = 0;
+}  // namespace
+
+void Renderer_OnListHandedOver(bool logic_pass) {
+  std::lock_guard lock(g_lists_mutex);
+  g_lists.push_back(logic_pass);
+}
+
+void Renderer_OnReplayStart() {
+  std::lock_guard lock(g_lists_mutex);
+  g_lists_queued_most = std::max<uint64_t>(g_lists_queued_most, g_lists.size());
+  if (g_lists.empty()) {
+    // Not handed over by WaitForFrame: taken as a logic pass's.
+    g_lists_missing++;
+    g_replaying_logic_list = true;
+    return;
+  }
+  g_replaying_logic_list = g_lists.front();
+  g_lists.pop_front();
+}
+
+bool Renderer_ReplayingLogicList() {
+  return g_replaying_logic_list;
+}
+
+void Renderer_TakeListStats(uint64_t& missing, uint64_t& most) {
+  std::lock_guard lock(g_lists_mutex);
+  missing = g_lists_missing;
+  most = g_lists_queued_most;
+  g_lists_missing = g_lists_queued_most = 0;
 }
 
 void Renderer_EndFrame() {
