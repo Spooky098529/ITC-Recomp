@@ -2912,7 +2912,7 @@ Re-checked on `main` at `c18f74b` first: in an uncapped attract race
 
 `sub_820F4128` (14.4-14.9% of the main thread, ~1,480 thousand cycles a
 frame) collects the lights nearest a point, nearest first (what it does is
-in `functions.md`). `--check_nearest_lights` counted, over a whole attract
+in `functions.md`). The check below also counted, over a whole attract
 race: ~3 calls a frame (93% on render-only passes), each testing **~6,240
 lights** for ~1-7 that pass; and ~63 groups a call scanned again (an
 entry's count above 1 makes it scan the same group again), ~1,465 of
@@ -2934,8 +2934,9 @@ again. Only `r3` is set: the caller reads nothing else after the call.
 Comparisons the original makes in double are made in float, so calls
 whose f2 or f3 isn't a float go to the original (the caller passes
 floats). `--native_nearest_lights=false` turns it off;
-`--check_nearest_lights` (temporary) runs both and logs differences: none
-in two whole attract races (~67,000 calls each). Differences could only
+a temporary check (`--check_nearest_lights`, since removed) ran both on
+every call and compared them: no differences in two whole attract races
+(~67,000 calls each). Differences could only
 come from denormals (the original's vector instructions flush them, ours
 don't).
 

@@ -11,25 +11,19 @@
 // 1/sqrt and one Newton step), so the same lights pass. The lights that do are
 // then merged and sorted one by one as the original does.
 
-#include "frame_pacing/game_messages.h"
 #include "guest.h"
 
 #include <rex/cvar.h>
-#include <rex/logging.h>
 
 #include <smmintrin.h>
 
+#include <cstring>
 #include <iterator>
 #include <utility>
-#include <chrono>
-#include <cstring>
 
 REXCVAR_DEFINE_BOOL(native_nearest_lights, true, "ITC",
                     "Find the lights nearest a point (sub_820F4128) natively, four lights "
                     "tested at once, instead of through the translated code (same results)");
-REXCVAR_DEFINE_BOOL(check_nearest_lights, false, "ITC",
-                    "Run both the native and the translated sub_820F4128 on every call, log "
-                    "any difference and how often it's called (temporary)");
 
 namespace {
 
@@ -62,13 +56,6 @@ struct Query {
 struct Search {
   Kept kept[kMostLights + 1];  // the last one is where a light goes when it's full
   int32_t count = 0;
-};
-
-struct Counts {
-  uint64_t lights_tested = 0;
-  uint64_t lights_passed = 0;
-  uint64_t repeated_scans = 0;  // groups scanned again (an entry's count above 1)
-  uint64_t repeated_lights = 0;  // lights in those scans (taken from the first scan's)
 };
 
 // The lights of a group that passed both tests, in order: a group scanned
@@ -129,7 +116,7 @@ void Keep(uint8_t* base, const Query& query, Search& search, uint32_t light, flo
 
 // Tests count lights from lights, four at a time.
 void ScanGroup(uint8_t* base, const Query& query, Search& search, uint32_t lights,
-               uint32_t count, Passed* passed_lights, Counts* counts) {
+               uint32_t count, Passed* passed_lights) {
   const __m128 px = _mm_set1_ps(query.px), py = _mm_set1_ps(query.py),
                pz = _mm_set1_ps(query.pz);
   const __m128 zero = _mm_setzero_ps(), one = _mm_set1_ps(1.0f), half = _mm_set1_ps(0.5f);
@@ -147,9 +134,6 @@ void ScanGroup(uint8_t* base, const Query& query, Search& search, uint32_t light
         _mm_add_ps(_mm_mul_ps(dz, dz), _mm_add_ps(_mm_mul_ps(dy, dy), _mm_mul_ps(dx, dx)));
     int valid = (1 << in_group) - 1;
     int near = _mm_movemask_ps(_mm_cmpngt_ps(distance, query.farthest)) & valid;
-    if (counts) {
-      counts->lights_tested += in_group;
-    }
     if (near == 0) {
       continue;
     }
@@ -166,9 +150,6 @@ void ScanGroup(uint8_t* base, const Query& query, Search& search, uint32_t light
     __m128 dot = _mm_add_ps(_mm_add_ps(zero, _mm_mul_ps(nz, query.dz)),
                             _mm_add_ps(_mm_mul_ps(ny, query.dy), _mm_mul_ps(nx, query.dx)));
     int passed = near & _mm_movemask_ps(_mm_cmpnlt_ps(dot, query.least_dot));
-    if (counts) {
-      counts->lights_passed += __builtin_popcount(passed);
-    }
     if (passed == 0) {
       continue;
     }
@@ -198,8 +179,7 @@ void ScanGroup(uint8_t* base, const Query& query, Search& search, uint32_t light
 // table), and the entry's group of lights as many times as its count says
 // (the scans after the first take the lights the first passed, unless there
 // were too many to keep).
-void FindNearest(uint8_t* base, uint32_t owner, const Query& query, Search& search,
-                 Counts* counts) {
+void FindNearest(uint8_t* base, uint32_t owner, const Query& query, Search& search) {
   uint32_t list = owner + kSetListOffset;
   for (uint32_t i = 0; i < guest::LoadU32(base, list); i++) {
     uint32_t entry = guest::LoadU32(base, list + 8) + kSetEntryStride * i;
@@ -214,19 +194,15 @@ void FindNearest(uint8_t* base, uint32_t owner, const Query& query, Search& sear
       if (lights == 0) {
         continue;
       }
-      if (counts && scans > 1) {
-        counts->repeated_scans += scans - 1;
-        counts->repeated_lights += uint64_t(scans - 1) * lights;
-      }
       if (scans == 1) {
-        ScanGroup(base, query, search, block + kGroupLightsOffset, lights, nullptr, counts);
+        ScanGroup(base, query, search, block + kGroupLightsOffset, lights, nullptr);
         continue;
       }
       Passed passed;
       for (uint32_t scan = 0; scan < scans; scan++) {
         if (scan == 0 || passed.overflowed) {
           ScanGroup(base, query, search, block + kGroupLightsOffset, lights,
-                    scan == 0 ? &passed : nullptr, counts);
+                    scan == 0 ? &passed : nullptr);
           continue;
         }
         for (uint32_t k = 0; k < passed.count; k++) {
@@ -253,53 +229,6 @@ void Write(uint8_t* base, const Search& search, uint32_t output) {
 
 bool IsFloat(double value) {
   return double(float(value)) == value;
-}
-
-// --check_nearest_lights: the native search beside the original's, and how
-// often it runs, logged every 2 s.
-[[gnu::noinline]] void CheckNearestLights(PPCContext& ctx, uint8_t* base, const Query& query) {
-  static uint64_t calls = 0, render_only_calls = 0, mismatches = 0;
-  static Counts counts;
-  static auto last = std::chrono::steady_clock::now();
-  static uint64_t logic_start = 0, render_start = 0;
-  uint32_t owner = ctx.r3.u32, output = ctx.r4.u32;
-  Search search;
-  FindNearest(base, owner, query, search, &counts);
-  __imp__sub_820F4128(ctx, base);
-  calls++;
-  render_only_calls += frame_pacing::GameMessages_IsRenderOnlyPass();
-  bool same = int64_t(ctx.r3.s64) == search.count;
-  for (int32_t i = 0; same && i < search.count; i++) {
-    uint8_t expected[kOutputStride];
-    const uint8_t* out = REX_RAW_ADDR(output + kOutputStride * i);
-    std::memcpy(expected, search.kept[i].bytes, 12);
-    std::memcpy(expected + 12, REX_RAW_ADDR(kOutputW), 4);
-    std::memcpy(expected + 16, search.kept[i].bytes + 16, 16);
-    same = std::memcmp(expected, out, kOutputStride) == 0;
-  }
-  if (!same && ++mismatches <= 20) {
-    REXLOG_WARN("nearest lights: differ from the original: {} found natively, {} by it "
-                "(point {} {} {})",
-                search.count, ctx.r3.s64, query.px, query.py, query.pz);
-  }
-  auto now = std::chrono::steady_clock::now();
-  if (now - last >= std::chrono::seconds(2)) {
-    uint64_t logic, render;
-    frame_pacing::GameMessages_PassCounts(logic, render);
-    uint64_t passes = logic - logic_start + render - render_start;
-    REXLOG_INFO("nearest lights: {} calls ({} on render-only passes) in {} passes ({} logic), "
-                "{:.1f} lights tested and {:.2f} passed a call, {} repeated group scans "
-                "({:.1f} lights a call), {} mismatches",
-                calls, render_only_calls, passes, logic - logic_start,
-                double(counts.lights_tested) / double(calls ? calls : 1),
-                double(counts.lights_passed) / double(calls ? calls : 1), counts.repeated_scans,
-                double(counts.repeated_lights) / double(calls ? calls : 1), mismatches);
-    calls = render_only_calls = 0;
-    counts = {};
-    logic_start = logic;
-    render_start = render;
-    last = now;
-  }
 }
 
 }  // namespace
@@ -337,12 +266,8 @@ extern "C" REX_FUNC(sub_820F4128) {
   query.farthest = _mm_set1_ps(float(ctx.f2.f64));
   query.least_dot = _mm_set1_ps(float(ctx.f3.f64));
   query.most = most;
-  if (REXCVAR_GET(check_nearest_lights)) [[unlikely]] {
-    CheckNearestLights(ctx, base, query);
-    return;
-  }
   Search search;
-  FindNearest(base, owner, query, search, nullptr);
+  FindNearest(base, owner, query, search);
   Write(base, search, ctx.r4.u32);
   ctx.r3.s64 = search.count;
 }
