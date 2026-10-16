@@ -73,9 +73,6 @@ REXCVAR_DEFINE_BOOL(native_renderer_log_texture_bindings, false, "ITC",
 REXCVAR_DEFINE_BOOL(native_renderer_reuse_texture_sets, true, "ITC",
                     "Give a draw the last draw's texture descriptor set when its shader and the "
                     "fetch constants it reads are unchanged, and no texture changed");
-REXCVAR_DEFINE_BOOL(native_renderer_check_texture_sets, false, "ITC",
-                    "Also build every reused texture set in full and count those that differ (a "
-                    "temporary check)");
 REXCVAR_DEFINE_BOOL(native_renderer_copy_all, false, "ITC",
                     "Copy every vertex and index range into the mirror every frame, not only "
                     "those the library's memcpy wrote since (a debugging aid)");
@@ -732,8 +729,7 @@ VkCommandBuffer Renderer::BeginFrame() {
     passes_.set_log_register_reads(REXCVAR_GET(native_renderer_log_register_reads));
     passes_.set_log_index_ranges(REXCVAR_GET(native_renderer_log_index_ranges));
     passes_.set_log_texture_bindings(REXCVAR_GET(native_renderer_log_texture_bindings));
-    passes_.set_reuse_texture_sets(REXCVAR_GET(native_renderer_reuse_texture_sets),
-                                   REXCVAR_GET(native_renderer_check_texture_sets));
+    passes_.set_reuse_texture_sets(REXCVAR_GET(native_renderer_reuse_texture_sets));
     passes_.set_log_glow(REXCVAR_GET(native_renderer_log_glow));
     passes_.set_cache_index_ranges(REXCVAR_GET(native_renderer_cache_index_ranges));
     passes_.set_verify_mirror(REXCVAR_GET(native_renderer_verify_mirror));
@@ -1165,9 +1161,6 @@ void Renderer::LogStats() {
   }
   if (REXCVAR_GET(native_renderer_log_index_ranges)) {
     REXLOG_INFO("native renderer: {}", passes_.TakeIndexRanges());
-  }
-  if (REXCVAR_GET(native_renderer_check_texture_sets)) {
-    REXLOG_INFO("native renderer: {}", passes_.TakeTextureSetChecks());
   }
   if (REXCVAR_GET(native_renderer_log_texture_bindings)) {
     REXLOG_INFO("native renderer: {}", passes_.TakeTextureBindings());

@@ -1068,10 +1068,6 @@ struct Passes::State {
     VkDescriptorSet set = VK_NULL_HANDLE;
   } last_texture_sets[2];
   bool reuse_texture_sets = true;
-  // Temporary (--native_renderer_check_texture_sets): each reuse also built
-  // in full, and compared.
-  bool check_texture_sets = false;
-  uint64_t texture_set_reuses = 0, texture_set_checks = 0, texture_set_mismatches = 0;
   VkPipelineLayout GetPipelineLayout(VkDescriptorSetLayout vertex, VkDescriptorSetLayout pixel);
   VkShaderModule GetModule(TranslatedShader* shader);
   VkPipeline GetPipeline(const PipelineKey& key);
@@ -1765,11 +1761,6 @@ VkDescriptorSet Passes::State::GetTextureSet(uint8_t* base, const TranslatedShad
       same = !std::memcmp(last.fetch + i, fetch + i, 24);
     }
     if (same) {
-      texture_set_reuses++;
-      if (check_texture_sets) {
-        texture_set_checks++;
-        texture_set_mismatches += BuildTextureSet(base, shader, layout) != last.set;
-      }
       return last.set;
     }
   }
@@ -4126,19 +4117,8 @@ std::string Passes::TakeIndexRanges() {
   return text;
 }
 
-void Passes::set_reuse_texture_sets(bool reuse, bool check) {
+void Passes::set_reuse_texture_sets(bool reuse) {
   state_->reuse_texture_sets = reuse;
-  state_->check_texture_sets = check;
-}
-
-std::string Passes::TakeTextureSetChecks() {
-  State& s = *state_;
-  std::string text = fmt::format("texture sets: {} reused, {} checked by building in full, {} "
-                                 "differed",
-                                 s.texture_set_reuses, s.texture_set_checks,
-                                 s.texture_set_mismatches);
-  s.texture_set_reuses = s.texture_set_checks = s.texture_set_mismatches = 0;
-  return text;
 }
 
 void Passes::set_log_texture_bindings(bool log) {
