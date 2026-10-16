@@ -1742,10 +1742,6 @@ VkDescriptorSet Passes::State::GetTextureSet(uint8_t* base, const TranslatedShad
     // The signed binding gets the same (unsigned) view: it's read only for
     // components whose sign is signed, which this game's textures don't
     // have (logged if they do).
-    if (log_texture_bindings) {
-      uint32_t extra[4] = {uint32_t(texture.view_type), 0, 0, 0};
-      CountBinding(true, texture.fetch_constant, fetch, extra);
-    }
     // The translator binds a signed and an unsigned view of each texture:
     // both get the same.
     size_t same = 0;
@@ -1756,6 +1752,11 @@ VkDescriptorSet Passes::State::GetTextureSet(uint8_t* base, const TranslatedShad
     if (same < i) {
       infos[i] = infos[same];
       continue;
+    }
+    // Counted as asked of the texture cache (not the copies above).
+    if (log_texture_bindings) {
+      uint32_t extra[4] = {uint32_t(texture.view_type), 0, 0, 0};
+      CountBinding(true, texture.fetch_constant, fetch, extra);
     }
     VkImageView view = hide_cubes && texture.view_type == VK_IMAGE_VIEW_TYPE_CUBE
                            ? VK_NULL_HANDLE
