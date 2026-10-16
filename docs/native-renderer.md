@@ -2618,6 +2618,9 @@ only ~3%: on this PC the render thread isn't the only limit (it waits on
 the main thread and the GPU too). On the Deck, where it was flat out,
 the gain should be nearer the cycles' 7%; not measured.
 
+The user drove with `run.sh` (build of `9a83010`, 2026-10-16): looks
+fine.
+
 **Left to try**, unmeasured estimates:
 
 - Make building a set cheaper for the rest: `FrameSetCache`'s compare
