@@ -2875,7 +2875,7 @@ reads it back 64 bits wide). The overflow path calls the game's debug
 print (`sub_825A1318`, formatting into a 4 KB stack buffer; 37 callers);
 it never ran (no samples in it or its formatter `sub_825A71B0`).
 
-**Done** (uncommitted on `main` at the time of writing): the override in
+**Done** (`allocate-slots`, `0ab828e`): the override in
 `blend_state.cpp` allocates natively (two loads, compare, two stores),
 setting `r3`, `r9`-`r12` and `cr6` as the original leaves them, and calls
 the original only for a full list. `--native_allocate_slots=false` turns
