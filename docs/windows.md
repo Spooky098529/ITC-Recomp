@@ -36,7 +36,19 @@ branch.
   at the same points in the race on both, so the gap is spread evenly,
   not in a few spots. Where it comes from (Wine, the MSVC runtime,
   ThinLTO being off) is still unmeasured; only real Windows would say
-  what players there get.
+  what players there get. (ThinLTO has since been turned on, below.)
+- **ThinLTO** (`ITC_WIN_LTO`, on in the `win-amd64-cross-release` preset;
+  2026-10-16): a separate option from Linux's `ITC_LTO`, whose link
+  options are for ELF `ld.lld`; this one gives `lld-link`
+  `/lldltocache:<dir>`, and only applies when `WIN32`. `rexruntime.dll`'s
+  exports (the SDK's `WINDOWS_EXPORT_ALL_SYMBOLS`) are then read from
+  bitcode objects: ~6900 instead of ~10600, the difference inline and
+  template code (the standard library, CLI11, spdlog). The import library
+  comes from the same list and `itc.exe` links and runs, so nothing it
+  uses is missing. Same PC and method as above, under Wine, alternating,
+  four runs each: 329.9, 324.6, 321.6, 326.1 without (mean 325.6);
+  335.5, 332.8, 335.6, 338.3 with (mean 335.6, +3.1%). Every run with it
+  was faster than every run without.
 - Not tested yet: playing with keyboard and gamepad, the menus, real
   Windows.
 
@@ -149,7 +161,6 @@ cp $B/itc.exe $B/rexruntime.dll $B/SDL3.dll itc_recomp/run.bat itc_recomp/run-de
   Windows zip too; the SDK's own `_build-platform.yaml` builds Windows on a
   `windows-latest` runner with clang from Chocolatey.
 - The frame rate under Wine (above).
-- ThinLTO on Windows (`ITC_LTO`'s link options are written for ELF lld).
 - The Visual C++ runtime for players (ship the DLLs or point to Microsoft's
   installer).
 - README: Windows install and requirements.

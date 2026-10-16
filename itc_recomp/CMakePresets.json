@@ -107,6 +107,7 @@
                 "CMAKE_BUILD_TYPE": "Release",
                 "REXGLUE_USE_VULKAN": "ON",
                 "REXGLUE_USE_D3D12": "OFF",
+                "ITC_WIN_LTO": "ON",
                 "REXSDK_DIR": "${sourceDir}/../rexglue-sdk"
             },
             "condition": {
