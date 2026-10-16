@@ -1199,19 +1199,12 @@ struct Passes::State {
   bool reuse_texture_sets = true;
   // Draws' shader lookups kept by what they read from the shader objects
   // (cache_shader_lookups; ShaderLookupTable), the last draw's checked
-  // first. With check_shader_lookups, each answer kept is also worked out
-  // in full and compared.
+  // first.
   bool cache_shader_lookups = true;
-  bool check_shader_lookups = false;
   ShaderLookupTable shader_lookups;
   ShaderLookupTable::Key last_shader_key = {};
   ShaderLookup last_shader_lookup;
   bool last_shader_valid = false;
-  struct ShaderLookupChecks {
-    uint64_t kept = 0, last = 0, differ = 0;
-    ShaderLookupTable::Key sample = {};
-    bool sampled = false;
-  } shader_checks;
   VkPipelineLayout GetPipelineLayout(VkDescriptorSetLayout vertex, VkDescriptorSetLayout pixel);
   VkShaderModule GetModule(TranslatedShader* shader);
   VkPipeline GetPipeline(const PipelineKey& key);
@@ -3107,28 +3100,6 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
     }
     if (kept) {
       lookup = *kept;
-      if (s.check_shader_lookups) {
-        ShaderLookup full = look_up();
-        State::ShaderLookupChecks& c = s.shader_checks;
-        c.kept++;
-        c.last += last;
-        bool same = full.vertex == lookup.vertex && full.pixel == lookup.pixel &&
-                    full.vertex_hash == lookup.vertex_hash &&
-                    full.pixel_hash == lookup.pixel_hash &&
-                    full.interface.interpolator_mask == lookup.interface.interpolator_mask &&
-                    full.interface.param_gen_interpolator ==
-                        lookup.interface.param_gen_interpolator &&
-                    full.interface.param_gen_point == lookup.interface.param_gen_point &&
-                    full.interface.rectangle_list == lookup.interface.rectangle_list;
-        if (!same) {
-          c.differ++;
-          if (!c.sampled) {
-            c.sample = key;
-            c.sampled = true;
-          }
-          lookup = full;
-        }
-      }
     } else {
       lookup = look_up();
       // Failed translations aren't kept.
@@ -4410,28 +4381,6 @@ std::string Passes::TakeTextureBindings() {
 
 void Passes::set_cache_shader_lookups(bool cache) {
   state_->cache_shader_lookups = cache;
-}
-
-void Passes::set_check_shader_lookups(bool check) {
-  state_->check_shader_lookups = check;
-}
-
-std::string Passes::TakeShaderLookupChecks() {
-  State::ShaderLookupChecks& c = state_->shader_checks;
-  std::string text = fmt::format(
-      "shader lookup check: {} answers kept ({} the last draw's), {} differ from the lookup in "
-      "full",
-      c.kept, c.last, c.differ);
-  if (c.sampled) {
-    const uint32_t* w = c.sample.words;
-    text += fmt::format(
-        ", e.g. vertex shader {:08X} microcode {:08X} size {} patched for {} declaration {}, "
-        "pixel shader {:08X} microcode {:08X} size {}, program control {:08X} context misc {:08X} "
-        "flags {}",
-        w[0], w[1], w[2], w[3], w[4], w[5], w[6], w[7], w[8], w[9], w[10]);
-  }
-  c = {};
-  return text;
 }
 
 void Passes::set_log_shader_lookups(bool log) {

@@ -73,8 +73,6 @@ REXCVAR_DEFINE_BOOL(native_renderer_log_texture_bindings, false, "ITC",
 REXCVAR_DEFINE_BOOL(native_renderer_cache_shader_lookups, true, "ITC",
                     "Keep draws' shader lookups by what they read from the shader objects "
                     "instead of hashing the shaders' microcode every draw");
-REXCVAR_DEFINE_BOOL(native_renderer_check_shader_lookups, false, "ITC",
-                    "Also look up every shader lookup kept in full, and log the differences");
 REXCVAR_DEFINE_BOOL(native_renderer_log_shader_lookups, false, "ITC",
                     "Log how often draws' shader lookups repeat the last ones and whether a key "
                     "of the shader objects' fields would ever give a shader whose microcode "
@@ -740,7 +738,6 @@ VkCommandBuffer Renderer::BeginFrame() {
     passes_.set_log_texture_bindings(REXCVAR_GET(native_renderer_log_texture_bindings));
     passes_.set_log_shader_lookups(REXCVAR_GET(native_renderer_log_shader_lookups));
     passes_.set_cache_shader_lookups(REXCVAR_GET(native_renderer_cache_shader_lookups));
-    passes_.set_check_shader_lookups(REXCVAR_GET(native_renderer_check_shader_lookups));
     passes_.set_reuse_texture_sets(REXCVAR_GET(native_renderer_reuse_texture_sets));
     passes_.set_log_glow(REXCVAR_GET(native_renderer_log_glow));
     passes_.set_cache_index_ranges(REXCVAR_GET(native_renderer_cache_index_ranges));
@@ -1179,9 +1176,6 @@ void Renderer::LogStats() {
   }
   if (REXCVAR_GET(native_renderer_log_shader_lookups)) {
     REXLOG_INFO("native renderer: {}", passes_.TakeShaderLookups());
-  }
-  if (REXCVAR_GET(native_renderer_check_shader_lookups)) {
-    REXLOG_INFO("native renderer: {}", passes_.TakeShaderLookupChecks());
   }
   if (view.invisible) {
     const auto& v = view.invisible_sample;

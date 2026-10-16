@@ -121,12 +121,8 @@ class Passes {
   // ever give a shader whose microcode changed (to judge caching by it);
   // TakeShaderLookups describes it since it was last called.
   // Keep draws' shader lookups by what they read from the shader objects
-  // instead of hashing the microcode (on by default); with the check, each
-  // answer kept is also worked out in full, and TakeShaderLookupChecks
-  // counts the differences.
+  // instead of hashing the microcode (on by default).
   void set_cache_shader_lookups(bool cache);
-  void set_check_shader_lookups(bool check);
-  std::string TakeShaderLookupChecks();
   void set_log_shader_lookups(bool log);
   std::string TakeShaderLookups();
   // Fixed at start (--native_renderer_mirror_by_tick): draws read a mirror
