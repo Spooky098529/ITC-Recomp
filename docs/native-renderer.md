@@ -1160,15 +1160,27 @@ To be fixed (or accepted) in milestone 7.
   BT.709 (0.5 → 0.450): the library builds it from the display type the
   kernel reports (`VdGetCurrentDisplayGamma`, type 2, BT.709, in the
   SDK's `xboxkrnl_video.cpp`). The 360's display output sends every pixel
-  through it; we didn't. Exclusive mode now keeps the table
-  (`gpu_link.cpp`, logged at the swap after it changes), and
-  `--xbox_gamma=true` (off by default) applies it to the shown image in
-  place at the frame's end (`glsl/gamma.comp`, a compute pass; values
-  between entries blended), before the copy to the window, so dumps show
-  it too. Without exclusive mode no table arrives and nothing changes.
-  Checked in two attract races with a dump a second: the same 19 moments
-  10-24% darker on average, blacks and whites unchanged. Still to do:
-  the user's comparison against the 360.
+  through it; we didn't. Exclusive mode logs the table (`gpu_link.cpp`,
+  at the swap after it changes; a debugging aid). So as not to depend on
+  what the SDK reports, the tables are copied from those logs into
+  `xbox_gamma_table.h`, one per display type, each captured with the
+  SDK's `kDisplayGammaType` changed for one boot (not committed):
+
+  | Type | Table | Entries 16 / 64 / 128 (of 1023; a straight line: 64 / 257 / 514) |
+  |---|---|---|
+  | 0, linear | the same as type 2 | |
+  | 1, sRGB | a straight line (4 × i): no change | |
+  | 2, BT.709 (HDTV; the SDK's) | `kXboxGammaHdtv`: darker | 24 / 193 / 462 |
+  | 3, power 2.2222 (the SDK's) | `kXboxGammaPower`: lighter shadows | 96 / 268 / 513 |
+
+  `--xbox_gamma=off|hdtv|power` (default `off`, anything else warns and
+  is off) applies one to the shown image in place at the frame's end
+  (`glsl/gamma.comp`, a compute pass; values between entries blended),
+  before the copy to the window, so dumps show it too; it doesn't need
+  exclusive mode. Checked with `hdtv` in two attract races with a dump a
+  second: the same 19 moments 10-24% darker on average, blacks and whites
+  unchanged; the user found it works. Still to do: comparing against the
+  360.
 
 - **Textures replaced in memory showed their old contents for a while**
   (fixed 2026-10-15). The game rewrites textures in place as it streams

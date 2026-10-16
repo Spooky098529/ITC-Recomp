@@ -39,9 +39,11 @@
 
 REXCVAR_DECLARE(std::string, log_level);
 
-REXCVAR_DEFINE_BOOL(xbox_gamma, false, "ITC",
-                    "Show the frame through the display gamma table the game sets, as the "
-                    "Xbox 360's video output does (darker; native renderer)");
+REXCVAR_DEFINE_STRING(xbox_gamma, "off", "ITC",
+                      "Show the frame through the display gamma table the game sets for a kind "
+                      "of display, as the Xbox 360's video output does (native renderer): off "
+                      "(a PC monitor, sRGB: no change), hdtv (darker mid-tones and shadows), "
+                      "power (lighter shadows)");
 
 namespace native {
 
@@ -986,8 +988,9 @@ struct Passes::State {
   // What's shown, and this frame's resolve destinations (for showing one).
   Image shown;
   VkImageLayout shown_layout = VK_IMAGE_LAYOUT_UNDEFINED;
-  // --xbox_gamma: the gamma table (xbox_gamma_table.h) applied to `shown`
-  // in place (gamma.comp).
+  // --xbox_gamma: a gamma table (xbox_gamma_table.h) applied to `shown` in
+  // place (gamma.comp).
+  const uint16_t* gamma_values = nullptr;
   VkBuffer gamma_table = VK_NULL_HANDLE;
   VkDeviceMemory gamma_table_memory = VK_NULL_HANDLE;
   VkDescriptorSetLayout gamma_set_layout = VK_NULL_HANDLE;
@@ -2657,14 +2660,16 @@ bool Passes::State::CreateGammaResources() {
     gamma_pipeline = VK_NULL_HANDLE;
     return false;
   }
-  REXLOG_INFO("native renderer: --xbox_gamma: the Xbox 360's gamma table is applied to the frame");
+  REXLOG_INFO("native renderer: --xbox_gamma={}: the Xbox 360's gamma table for that display is "
+              "applied to the frame",
+              REXCVAR_GET(xbox_gamma));
   return true;
 }
 
 void Passes::State::ApplyGamma(VkCommandBuffer commands) {
   if (!gamma_ready) {  // the first frame: the table into its buffer
     uint32_t table[256];
-    std::copy(std::begin(kXboxGammaTable), std::end(kXboxGammaTable), table);
+    std::copy(gamma_values, gamma_values + 256, table);
     vk::vkCmdUpdateBuffer(commands, gamma_table, 0, sizeof(table), table);
     VkMemoryBarrier barrier{VK_STRUCTURE_TYPE_MEMORY_BARRIER};
     barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
@@ -2917,12 +2922,20 @@ bool Passes::Init(const DeviceContext& context, uint8_t* base, uint32_t frames_i
   if (!s.CreateGuestMemoryMirror()) {
     return false;
   }
+  const std::string& gamma = REXCVAR_GET(xbox_gamma);
+  if (gamma == "hdtv") {
+    s.gamma_values = kXboxGammaHdtv;
+  } else if (gamma == "power") {
+    s.gamma_values = kXboxGammaPower;
+  } else if (gamma != "off") {
+    REXLOG_WARN("native renderer: --xbox_gamma={}: not off, hdtv or power; off", gamma);
+  }
   if (!s.CreateImage(s.shown, VK_IMAGE_TYPE_2D, VK_IMAGE_VIEW_TYPE_2D, kShownFormat,
                      {s.shown_extent.width, s.shown_extent.height, 1}, 1,
                      VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT |
-                         (REXCVAR_GET(xbox_gamma) ? VK_IMAGE_USAGE_STORAGE_BIT : 0),
+                         (s.gamma_values ? VK_IMAGE_USAGE_STORAGE_BIT : 0),
                      VK_IMAGE_ASPECT_COLOR_BIT) ||
-      (REXCVAR_GET(xbox_gamma) && !s.CreateGammaResources()) || !s.CreateRings() || !s.CreateDescriptors() || !s.CreateDummyTextures() ||
+      (s.gamma_values && !s.CreateGammaResources()) || !s.CreateRings() || !s.CreateDescriptors() || !s.CreateDummyTextures() ||
       !s.CreateResolveResources() || !s.textures.Init(context, frames_in_flight)) {
     REXLOG_ERROR("native renderer: couldn't create the passes' resources");
     return false;

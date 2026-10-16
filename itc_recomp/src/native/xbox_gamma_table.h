@@ -1,14 +1,18 @@
-// The display gamma table Import Tuner Challenge writes at boot (DC_LUT_30_COLOR,
-// 10 bits, the same for red, green and blue), copied from the log
-// (gpu_link.cpp) of 2026-10-16 so the renderer doesn't depend on what the SDK
-// tells the game about the display. The sRGB curve re-encoded as BT.709 (the
-// library built it for an HDTV); see "Gamma" in docs/native-renderer.md.
+// The display gamma tables Import Tuner Challenge writes at boot
+// (DC_LUT_30_COLOR, 10 bits, the same for red, green and blue), copied from
+// the log (gpu_link.cpp) of 2026-10-16 so the renderer doesn't depend on what
+// the SDK tells the game about the display. The library builds one for the
+// display type the kernel reports (VdGetCurrentDisplayGamma): each was
+// captured with the SDK set to that type for one run. See "Gamma" in
+// docs/native-renderer.md.
 #pragma once
 #include <cstdint>
 
 namespace native {
 
-inline constexpr uint16_t kXboxGammaTable[256] = {
+// Type 2, an HDTV (BT.709; type 0, linear, gives the same): the sRGB curve
+// re-encoded as BT.709. Darker mid-tones and shadows.
+inline constexpr uint16_t kXboxGammaHdtv[256] = {
     0, 1, 3, 4, 6, 7, 8, 10, 11, 13, 14, 15,
     17, 18, 20, 22, 24, 26, 28, 30, 32, 34, 37, 39,
     42, 45, 47, 50, 53, 56, 59, 63, 66, 70, 73, 77,
@@ -31,6 +35,34 @@ inline constexpr uint16_t kXboxGammaTable[256] = {
     901, 905, 910, 914, 919, 923, 928, 932, 937, 941, 946, 950,
     955, 959, 963, 968, 972, 977, 981, 986, 990, 995, 999, 1004,
     1008, 1013, 1017, 1023,
+};
+
+// Type 3, a power (2.2222, the SDK's): the sRGB curve re-encoded with that
+// power. Lighter shadows, mid-tones and highlights almost as they are.
+// (Type 1, sRGB, is a straight line: no change.)
+inline constexpr uint16_t kXboxGammaPower[256] = {
+    0, 27, 36, 44, 50, 55, 60, 64, 68, 72, 75, 79,
+    82, 85, 89, 92, 96, 99, 103, 106, 109, 113, 116, 120,
+    123, 127, 130, 134, 137, 141, 145, 148, 152, 155, 159, 162,
+    166, 169, 173, 177, 180, 184, 187, 191, 195, 198, 202, 206,
+    209, 213, 217, 220, 224, 227, 231, 235, 238, 242, 246, 250,
+    253, 257, 261, 264, 268, 272, 275, 279, 283, 287, 290, 294,
+    298, 302, 305, 309, 313, 317, 320, 324, 328, 332, 335, 339,
+    343, 348, 351, 355, 359, 363, 367, 370, 374, 378, 382, 386,
+    389, 393, 397, 401, 405, 408, 412, 416, 420, 424, 428, 431,
+    435, 439, 443, 447, 451, 455, 458, 462, 466, 470, 474, 478,
+    482, 485, 489, 493, 497, 501, 505, 509, 513, 517, 520, 524,
+    528, 532, 536, 540, 544, 548, 552, 556, 560, 563, 567, 571,
+    575, 579, 583, 587, 591, 595, 599, 603, 607, 611, 615, 618,
+    622, 626, 630, 634, 638, 642, 646, 650, 654, 658, 662, 666,
+    670, 674, 679, 683, 687, 691, 695, 699, 703, 707, 711, 715,
+    719, 723, 727, 731, 735, 739, 743, 747, 751, 755, 759, 763,
+    767, 771, 775, 779, 783, 787, 791, 795, 799, 803, 807, 811,
+    815, 819, 823, 827, 831, 835, 839, 843, 847, 851, 855, 859,
+    863, 867, 871, 875, 879, 883, 888, 892, 896, 900, 904, 908,
+    912, 916, 920, 924, 928, 932, 936, 940, 944, 948, 953, 957,
+    961, 965, 969, 973, 977, 981, 985, 989, 993, 997, 1002, 1006,
+    1010, 1014, 1018, 1023,
 };
 
 }  // namespace native
