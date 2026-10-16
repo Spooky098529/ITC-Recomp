@@ -1432,6 +1432,11 @@ setting up their logging's stack frame (~-2% of the render thread's cycles
 a frame), and `GetRenderer` no longer sets up `Init`'s stack frame on every
 call (~-150 thousand cycles a frame); see "`Buffers_OnCommand`'s cost". None
 of it checked on the Deck yet.
+Then (`texture-binding`, 2026-10-16): texture views and samplers answered
+from a table by the fetch constant's words, the signed binding reusing the
+unsigned one's view, and the table's key built in registers: texture
+binding from ~1,190 to ~400 thousand cycles a frame, the render thread
+~5% fewer cycles a frame (see "Texture binding").
 
 ### The Deck's log (2026-10-15)
 
@@ -2503,15 +2508,42 @@ the thread's total fell ~5% (all three new runs under all three old).
 `GetView` and `GetSampler` are inlined into `GetTextureSet` and `Find`
 now. `SwizzledSigns`, unchanged, came out ~30 higher; not looked into.
 
-**Tried, no gain: each fetch constant's last answer before the table**
-(`93a189f`, reverted in `0c9d0d7`). A copy of the last entry per fetch
-constant (32 for views, 32 for samplers), checked by key and generation
-before hashing. `Find` fell to ~28, but `GetView` and `GetSampler` were no
-longer inlined and came to ~250 together: the functions it touches summed
-to 431, 433, 433 against 381, 409, 420 without it (thread totals 10.76,
-10.95, 11.13 against 11.04, 11.09, 11.14, within noise). The table's
-lookup was already cheap, so the hash it skips (on ~44% of calls) saved
-about what the extra compare and copy cost.
+**Then: the lookups' stalls** (`393d641`, kept). Annotated by
+instruction (`perf script -F ip,sym,symoff` against `objdump -d`: `perf
+annotate` shows other functions' code for this ThinLTO build), most of
+`Find`'s cycles (71%) were one stall: `GetView` built the 28-byte key on
+the stack with stores of 16, 8 and 4 bytes, and `Find` read it back with a
+16-byte load at byte 12, spanning them. A load spanning several stores
+can't take its data from them (store forwarding fails), so it waits for
+them to be written, ~10-15 cycles. Now the key is two 16-byte SSE2 halves
+built in registers (`BindingTable::Key`: words 0-3; words 4-5, the view
+type or packed overrides, 0), stored and loaded whole. And each fetch
+constant's last answer (a copy of its entry, 32 for views and 32 for
+samplers) is checked before hashing (42-46% of calls repeat it,
+`itc_808.log`, counting only views asked of the cache). With those, the
+signed binding's copy of the unsigned one's `VkDescriptorImageInfo` stalled
+the same way (44% of `GetTextureSet`: an 8-byte read of the layout and
+padding just after the 4-byte store of the layout), so it copies only the
+view now.
+
+Each against `0ab2ff7` (the plain table), three runs each, alternating;
+the sum of `GetView`, `GetSampler`, `BindingTable::Find` and
+`GetTextureSet` (whichever are inlined where), thousand cycles a frame:
+
+| Variant | Its runs | `0ab2ff7`'s runs alongside |
+|---|---|---|
+| The per-fetch-constant records (`93a189f`) | 431, 433, 433 | 381, 409, 420 |
+| + the SSE key (stall in the copy) | 419, 402, 428 | 401, 403, 402 |
+| + the copy by field (`393d641`, kept) | 400, 385, 393 | 388, 402, 417 |
+| The SSE key without the records (`a51218d`, reverted) | 443, 433, 410 | 354, 380, 408 |
+
+In `393d641`, `Find` is ~110 (from ~270) and `GetTextureSet` ~280 (from
+~130, with `GetView` and `GetSampler` inlined into it), no single stall
+left. All the variants are within ~±30 of each other, ~0.3% of the
+thread and within its noise: the lookups' remaining ~400 thousand
+cycles a frame don't shrink much by arranging them differently. `393d641`
+was kept for having the lowest mean (the user's call). Leaving out the
+records with the SSE key (`a51218d`) moved more of `Find` back (~180).
 
 **Left to try**, unmeasured estimates:
 
