@@ -21,6 +21,22 @@ branch.
   looked into: Wine's overhead, the MSVC runtime (its mutexes and
   atomics) and ThinLTO being off (~2% on Linux) are all candidates.
   Profile before changing anything. On real Windows it's unmeasured.
+- **Against Linux after merging v0.4.0** (2026-10-16, same PC, both
+  built from `windows` at `46a85fe`): uncapped attract races at the
+  default 1280x720 with `run.sh`'s flags (`--max_fps=0`), `timeout 25`,
+  Linux and Windows alternating, mean fps over the race's seconds 3-18:
+
+  | Run | Linux | Windows (Wine) |
+  |---|---|---|
+  | 1 | 439.6 | 326.1 |
+  | 2 | 439.9 | 324.7 |
+  | Mean | 439.8 | 325.4 |
+
+  Windows under Wine is ~26% slower. The per-second rates go up and down
+  at the same points in the race on both, so the gap is spread evenly,
+  not in a few spots. Where it comes from (Wine, the MSVC runtime,
+  ThinLTO being off) is still unmeasured; only real Windows would say
+  what players there get.
 - Not tested yet: playing with keyboard and gamepad, the menus, real
   Windows.
 
