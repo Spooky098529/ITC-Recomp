@@ -1750,7 +1750,9 @@ VkDescriptorSet Passes::State::GetTextureSet(uint8_t* base, const TranslatedShad
       same++;
     }
     if (same < i) {
-      infos[i] = infos[same];
+      // Field by field: copied whole, the 8-byte read of its layout and
+      // padding waited on the 4-byte store of the layout just made.
+      infos[i] = {VK_NULL_HANDLE, infos[same].imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
       continue;
     }
     // Counted as asked of the texture cache (not the copies above).

@@ -19,6 +19,7 @@
 #include <rex/hash.h>
 #include <rex/logging.h>
 
+#include <emmintrin.h>
 #if defined(__SSSE3__)
 #include <tmmintrin.h>
 #endif
@@ -397,9 +398,27 @@ TextureKey KeyOf(const uint32_t fetch[6]) {
 // constant's 6 words and the view type, or the packed filter overrides.
 // An entry holds while its generation is current; nearly every call
 // repeats an earlier one ("Texture binding" in docs/native-renderer.md).
+//
+// The key is two 16-byte halves built in registers. Assembled on the stack
+// from the words (stores of 16, 8 and 4 bytes) and read back with 16-byte
+// loads, it cost most of the lookup: a load spanning several stores waits
+// for them to be written (store forwarding fails).
 class BindingTable {
  public:
-  using Key = std::array<uint32_t, 7>;
+  struct Key {
+    __m128i low, high;  // words 0-3; words 4-5, the extra word and 0
+
+    Key(const uint32_t words[6], uint32_t extra)
+        : low(_mm_loadu_si128(reinterpret_cast<const __m128i*>(words))),
+          high(_mm_unpacklo_epi64(
+              _mm_loadl_epi64(reinterpret_cast<const __m128i*>(words + 4)),
+              _mm_cvtsi32_si128(int(extra)))) {}
+    Key() : low(_mm_setzero_si128()), high(_mm_setzero_si128()) {}
+    bool operator==(const Key& other) const {
+      __m128i differ = _mm_or_si128(_mm_xor_si128(low, other.low), _mm_xor_si128(high, other.high));
+      return _mm_movemask_epi8(_mm_cmpeq_epi8(differ, _mm_setzero_si128())) == 0xFFFF;
+    }
+  };
   struct Entry {
     Key key;
     bool used;
@@ -429,8 +448,12 @@ class BindingTable {
 
  private:
   static size_t HashOf(const Key& key) {
+    uint64_t words[4] = {uint64_t(_mm_cvtsi128_si64(key.low)),
+                         uint64_t(_mm_cvtsi128_si64(_mm_unpackhi_epi64(key.low, key.low))),
+                         uint64_t(_mm_cvtsi128_si64(key.high)),
+                         uint64_t(_mm_cvtsi128_si64(_mm_unpackhi_epi64(key.high, key.high)))};
     uint64_t h = 0;
-    for (uint32_t word : key) {
+    for (uint64_t word : words) {
       h = (h ^ word) * 0x9E3779B97F4A7C15ull;
     }
     return size_t(h ^ (h >> 32));
@@ -977,9 +1000,7 @@ VkImageView TextureCache::GetView(uint8_t* base, const uint32_t fetch_words[6],
     return LookUpView(base, fetch_words, view_type, cacheable);
   }
   State& s = *state_;
-  BindingTable::Key key;
-  std::memcpy(key.data(), fetch_words, 24);
-  key[6] = uint32_t(view_type);
+  BindingTable::Key key(fetch_words, uint32_t(view_type));
   // The same as this fetch constant's last call (about 44% of calls in a
   // race): no need to hash.
   BindingTable::Entry& last = s.last_views[fetch_constant & 31];
@@ -1260,10 +1281,10 @@ VkSampler TextureCache::GetSampler(const uint32_t fetch_words[6],
     return LookUpSampler(fetch_words, overrides);
   }
   State& s = *state_;
-  BindingTable::Key key;
-  std::memcpy(key.data(), fetch_words, 24);
-  key[6] = (overrides.mag_filter & 0xFF) | (overrides.min_filter & 0xFF) << 8 |
-           (overrides.mip_filter & 0xFF) << 16 | (overrides.aniso_filter & 0xFF) << 24;
+  BindingTable::Key key(fetch_words, (overrides.mag_filter & 0xFF) |
+                                         (overrides.min_filter & 0xFF) << 8 |
+                                         (overrides.mip_filter & 0xFF) << 16 |
+                                         (overrides.aniso_filter & 0xFF) << 24);
   BindingTable::Entry& last = s.last_samplers[overrides.fetch_constant & 31];
   if (last.generation == sampler_generation_ && last.key == key) {
     return FromBits<VkSampler>(last.value);
