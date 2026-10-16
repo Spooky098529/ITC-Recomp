@@ -86,8 +86,18 @@ branch.
   v0.4.0, checked under Wine: a 1280x720 window, the mirrors by tick, and
   `run.bat --fullscreen` overriding the default). Keep the two in step
   when `run.sh` changes.
-- Players need the Visual C++ runtime (`MSVCP140.dll`, `VCRUNTIME140.dll`;
-  Wine has its own). Not shipped yet.
+- **The Visual C++ runtime ships in the zip** (`MSVCP140.dll`,
+  `MSVCP140_ATOMIC_WAIT.dll`, `VCRUNTIME140.dll`, `VCRUNTIME140_1.dll`:
+  what the three binaries import; Windows 10 and 11 have the Universal
+  CRT, `api-ms-win-crt-*`, but not these). xwin doesn't splat them, so
+  `itc_recomp/tools/fetch_vc_redist.py` takes them from the same Visual
+  Studio manifest xwin reads: the redist package of the MSVC version xwin
+  splatted (`Microsoft.VC.<version>.CRT.Redist.X64.base`, 14.44.35211 on
+  2026-10-16), SHA-256 checked. Microsoft's license allows shipping them.
+  Checked under Wine with them forced over Wine's own
+  (`WINEDLLOVERRIDES=...;msvcp140,msvcp140_atomic_wait,vcruntime140,vcruntime140_1=n`,
+  `WINEDEBUG=+loaddll` shows them loaded from the zip's folder): boots
+  and races.
 
 ## Building (on Linux)
 
@@ -151,16 +161,27 @@ Test zips, as for Linux:
 name=itc-<label>-win-amd64; D=itc_recomp/out/dist/$name; B=itc_recomp/out/build/win-amd64-cross-release
 rm -rf $D $D.zip; mkdir -p $D
 cp $B/itc.exe $B/rexruntime.dll $B/SDL3.dll itc_recomp/run.bat itc_recomp/run-debug.bat $D/
-(cd $D && python3 -I -m zipfile -c ../$name.zip itc.exe rexruntime.dll SDL3.dll run.bat run-debug.bat)
+runtime=$(for f in itc.exe rexruntime.dll SDL3.dll; do llvm-readobj --coff-imports $D/$f | sed -n 's/^ *Name: //p'; done \
+  | grep -iE '^(msvcp|vcruntime|concrt|vccorlib)' | sort -fu)
+python3 -I itc_recomp/tools/fetch_vc_redist.py itc_recomp/out/xwin-sdk $D $runtime
+(cd $D && python3 -I -m zipfile -c ../$name.zip *)
 ```
+
+## CI
+
+`.github/workflows/build-windows.yml` (2026-10-16) builds as above on
+`ubuntu-24.04`: clang 20 from apt.llvm.org (its `bin` directory on `PATH`,
+for the plain tool names the toolchain file uses), xwin's splat cached
+between runs (~630 MB; the key names xwin's version, bump its `-v1` for a
+newer CRT), sccache, then the zip with the runtime DLLs. Packaging fails
+if a binary imports one of our DLLs or a runtime DLL the zip lacks. It
+runs on pushes to `windows`, pull requests, by hand, and on `v*` tags; it
+only exists on this branch, so only a tag pushed from `windows` builds
+Windows, and then `build-linux.yml` runs too and both zips go on the same
+release.
 
 ## To do
 
 - The user plays under Wine (keyboard, gamepad, menus, a driven race).
-- A Windows job in CI (`.github/workflows`), so tagged releases get a
-  Windows zip too; the SDK's own `_build-platform.yaml` builds Windows on a
-  `windows-latest` runner with clang from Chocolatey.
 - The frame rate under Wine (above).
-- The Visual C++ runtime for players (ship the DLLs or point to Microsoft's
-  installer).
 - README: Windows install and requirements.

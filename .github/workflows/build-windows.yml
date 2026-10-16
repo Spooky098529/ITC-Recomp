@@ -1,0 +1,128 @@
+name: Build Windows
+
+# Cross-compiled on Linux, as in docs/windows.md: clang for the MSVC target,
+# lld-link, and Microsoft's CRT and Windows SDK from xwin. A v* tag pushed
+# from this branch runs this and Build Linux, and both add their zip to the
+# same release.
+on:
+  push:
+    branches: [windows]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  XWIN_VERSION: "0.10.0"
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      # The toolchain file calls clang, lld-link, llvm-rc, llvm-ar and the rest
+      # by their plain names, which LLVM's bin directory has.
+      - name: Install clang 20
+        run: |
+          wget -qO llvm.sh https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh 20
+          sudo apt-get install -y clang-20 lld-20 llvm-20 ninja-build
+          echo /usr/lib/llvm-20/bin >> "$GITHUB_PATH"
+
+      # Accepts Microsoft's license for the CRT and Windows SDK, as the local
+      # build does. Kept between runs (~630 MB) so every build uses the same.
+      - name: Cache the CRT and Windows SDK
+        id: xwin-cache
+        uses: actions/cache@v4
+        with:
+          path: itc_recomp/out/xwin-sdk
+          key: xwin-${{ env.XWIN_VERSION }}-splat-v1
+
+      - name: Download the CRT and Windows SDK
+        if: steps.xwin-cache.outputs.cache-hit != 'true'
+        run: |
+          base=xwin-${XWIN_VERSION}-x86_64-unknown-linux-musl
+          curl -sSL "https://github.com/Jake-Shadle/xwin/releases/download/${XWIN_VERSION}/${base}.tar.gz" | tar xz
+          ./${base}/xwin --accept-license --arch x86_64 --temp \
+            splat --use-winsysroot-style --preserve-ms-arch-notation --output itc_recomp/out/xwin-sdk
+
+      # Headers our code and the SDK include with another case than the SDK's
+      # files; rerun every build, as it depends on the sources.
+      - name: Case links
+        run: python3 -I itc_recomp/tools/xwin_case_links.py itc_recomp/out/xwin-sdk rexglue-sdk itc_recomp/src
+
+      - name: Set up sccache
+        uses: hendrikmuhs/ccache-action@v1.2.22
+        with:
+          variant: sccache
+          key: itc-win-amd64
+
+      - name: Configure
+        working-directory: itc_recomp
+        run: >
+          cmake --preset win-amd64-cross-release
+          -DCMAKE_C_COMPILER_LAUNCHER=sccache
+          -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
+
+      - name: Build
+        working-directory: itc_recomp
+        run: cmake --build out/build/win-amd64-cross-release --parallel
+
+      - name: Package
+        id: package
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            version="${GITHUB_REF_NAME}"
+          else
+            version="$(git rev-parse --short HEAD)"
+          fi
+          name="itc-${version}-win-amd64"
+          B=itc_recomp/out/build/win-amd64-cross-release
+          D="dist/${name}"
+          mkdir -p "$D"
+          cp $B/itc.exe $B/rexruntime.dll $B/SDL3.dll itc_recomp/run.bat itc_recomp/run-debug.bat "$D/"
+
+          # The Visual C++ runtime DLLs the binaries import (Windows has the
+          # Universal CRT, api-ms-win-crt-*, but not these), from Microsoft's
+          # redist package of the CRT version we linked against.
+          imports=$(for f in itc.exe rexruntime.dll SDL3.dll; do
+            llvm-readobj --coff-imports "$D/$f" | sed -n 's/^ *Name: //p'; done | sort -fu)
+          runtime=$(grep -iE '^(msvcp|vcruntime|concrt|vccorlib)' <<<"$imports")
+          python3 -I itc_recomp/tools/fetch_vc_redist.py itc_recomp/out/xwin-sdk "$D" $runtime
+
+          # Fail if a binary needs one of our DLLs or a runtime DLL the zip
+          # doesn't carry (the rest are Windows' own).
+          missing=""
+          for dll in $(grep -iE '^(msvcp|vcruntime|concrt|vccorlib|rexruntime|sdl3)' <<<"$imports"); do
+            ls "$D" | grep -qix "$dll" || missing="$missing $dll"
+          done
+          if [[ -n "$missing" ]]; then
+            echo "Missing DLLs:$missing"; exit 1
+          fi
+
+          (cd "$D" && zip -9 "../${name}.zip" *)
+          echo "name=${name}" >> "$GITHUB_OUTPUT"
+
+      - name: sccache stats
+        if: always()
+        run: sccache --show-stats || true
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.package.outputs.name }}
+          path: dist/${{ steps.package.outputs.name }}.zip
+
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/${{ steps.package.outputs.name }}.zip
+          generate_release_notes: true
