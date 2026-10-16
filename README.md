@@ -68,6 +68,7 @@ the console. Screens and windows that aren't 16:9 get black bars.
   on Linux, not on a real Windows PC yet. Reports of how it runs are
   welcome.
 - Pause menus in races currently poll the controller too fast, so the menus are annoying to navigate
+- The game probably uses more RAM than necessary, currently it maintains several copies of the xbox 360 memory pool for performance reasons. This is going to be an issue until the rexglue runtime is removed. RAM usage can hit about 1gb in races.
 
 ## Reporting problems
 
