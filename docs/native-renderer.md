@@ -1180,8 +1180,9 @@ To be fixed (or accepted) in milestone 7.
   before the copy to the window, so dumps show it too; it doesn't need
   exclusive mode. Checked with `hdtv` in two attract races with a dump a
   second: the same 19 moments 10-24% darker on average, blacks and whites
-  unchanged; the user found it works. Still to do: comparing against the
-  360.
+  unchanged; the user found it works. The user compared `hdtv` against
+  the 360 (2026-10-16): pretty close, but kept off by default (`run.sh`
+  passes `--xbox_gamma=off` and lists the choices in its notes).
 
 - **Textures replaced in memory showed their old contents for a while**
   (fixed 2026-10-15). The game rewrites textures in place as it streams
