@@ -120,6 +120,10 @@ REXCVAR_DEFINE_BOOL(cache_camera_ids, true, "ITC",
                     "Remember the camera number of recently seen view-projections by their "
                     "bytes, so a repeated one skips splitting it and the table lookup (same "
                     "numbers)");
+REXCVAR_DEFINE_BOOL(publish_by_tick, true, "ITC",
+                    "Work out what the render thread needs of each of the tick's products once "
+                    "a tick, shared by its frames, instead of looking it up and copying it "
+                    "every frame (same products)");
 REXCVAR_DEFINE_BOOL(check_draw_state, false, "ITC",
                     "Temporary: log DrawState's call counts, table sizes and timings every 2 s");
 
@@ -253,19 +257,26 @@ struct ProductPlan {
 struct CameraPair {
   PerspectiveCamera a, b;
 };
+// A multiply made during a logic pass, as the render thread redoes it: the
+// same for every frame of the tick.
+struct TickProduct {
+  uint64_t identity = 0;  // the same multiply in every tick (its pairing key)
+  uint32_t handler = 0;   // the numbering context it was made in
+  int32_t plan = -1;      // into the frame's TickPlans::products, if paired
+  ProductInputs now;
+  std::optional<ProductInputs> before;  // the previous tick's, if paired
+};
 struct TickPlans {
   std::vector<ProductPlan> products;
   std::vector<CameraPair> cameras;
+  // Each of the tick's products (--publish_by_tick).
+  std::vector<TickProduct> tick_products;
 };
 
-// A multiply made during a logic pass, as the render thread redoes it.
+// A product written in a frame, at its output address.
 struct ReplayedProduct {
-  uint64_t identity = 0;  // the same multiply in every tick (its pairing key)
-  uint32_t handler = 0;   // the numbering context it was made in
   Matrix4 written;  // the product, as written to the output address
-  ProductInputs now;
-  std::optional<ProductInputs> before;  // the previous tick's, if paired
-  int32_t plan = -1;  // into the frame's TickPlans::products, if paired
+  const TickProduct* tick = nullptr;  // in the frame's plans, or its own_products
 };
 
 // The products of a frame by output address: an open-addressed table, so the
@@ -331,6 +342,9 @@ class ProductTable {
 // published by the main thread after each Draw.
 struct ReplayFrame {
   ProductTable products;  // by output address
+  // The tick products the frame's products point to, with
+  // --publish_by_tick=false (otherwise they're the plans').
+  std::vector<TickProduct> own_products;
   std::shared_ptr<const TickPlans> plans;  // the tick's, shared by its frames
   float amount = 1;
   uint64_t tick = 0;  // which tick the frame draws
@@ -494,15 +508,15 @@ Matrix4 BlendProduct(const ReplayedProduct& product, const TickPlans* plans,
                                        float amount, BlendStats& stats, CameraBlends& cameras,
                                        ProductBlendParts* parts = nullptr) {
   if (parts) {
-    *parts = {product.now.world, product.now.world, std::nullopt, std::nullopt, &product};
+    *parts = {product.tick->now.world, product.tick->now.world, std::nullopt, std::nullopt, &product};
   }
-  if (product.plan < 0) {
+  if (product.tick->plan < 0) {
     stats.unpaired++;
     return product.written;
   }
   stats.blended++;
-  const ProductPlan& plan = plans->products[size_t(product.plan)];
-  const ProductInputs& b = product.now;
+  const ProductPlan& plan = plans->products[size_t(product.tick->plan)];
+  const ProductInputs& b = product.tick->now;
   Matrix4 world = b.world;
   std::optional<ScaledTransform> spinning;
   if (plan.world == ProductPlan::World::kBlend) {
@@ -682,6 +696,28 @@ std::optional<OverlaySlot> OverlaySlotOf(uint32_t address) {
 namespace {
 
 class DrawState {
+ private:
+  // A multiply, identified across ticks by its operands' addresses, which
+  // camera it was (see CameraIds), and how many times that combination
+  // was multiplied earlier in the pass.
+  struct ProductKey {
+    uint32_t camera;     // address
+    uint32_t world;      // address
+    uint64_t signature;  // CameraIds number
+    uint32_t handler;    // the message handler running (0 for none)
+    uint64_t object;     // the part being drawn, if known (--pair_by_object)
+    int occurrence;
+    bool operator==(const ProductKey&) const = default;
+  };
+  struct ProductKeyHash {
+    size_t operator()(const ProductKey& key) const {
+      return std::hash<uint64_t>()(((uint64_t(key.world) << 32) | key.camera) ^
+                                   (uint64_t(key.occurrence) << 7) ^ (key.signature * 31) ^
+                                   (uint64_t(key.handler) * 0x9E3779B97F4A7C15ull) ^
+                                   (key.object * 0xC2B2AE3D27D4EB4Full));
+    }
+  };
+
  public:
   // Main thread, after the matrix multiply wrote out = a * b.
   void OnMultiply(uint8_t* base, uint32_t out, uint32_t a, uint32_t b, uint32_t caller) {
@@ -751,6 +787,7 @@ class DrawState {
       return;
     }
     outputs[dst] = {it->second.key, LoadMatrix(base, dst)};
+    tick_published_stale_ |= !render_only;
     counts_.copies++;
   }
 
@@ -832,6 +869,7 @@ class DrawState {
     }
     auto& outputs = render_only ? pass_outputs_ : tick_outputs_;
     outputs[out] = {key, LoadMatrix(base, out)};
+    tick_published_stale_ |= !render_only;
   }
 
   // Main thread: which message handler is running (0 between handlers).
@@ -895,6 +933,7 @@ class DrawState {
       current_tick_ = std::move(collecting_);
       collecting_.clear();
       MatchTick();
+      by_tick_ = REXCVAR_GET(publish_by_tick);
       PlanTick();
       overlay_keys_ = std::move(overlay_keys_this_tick_);
       overlay_keys_this_tick_.clear();
@@ -1009,7 +1048,10 @@ class DrawState {
   }
 
   // Main thread, before a logic pass's Update: a new tick's products start.
-  void OnLogicPassStart() { tick_outputs_.clear(); }
+  void OnLogicPassStart() {
+    tick_outputs_.clear();
+    tick_published_stale_ = true;
+  }
 
   // Render thread diagnostics; counted only when logged, as the increment
   // is a locked instruction (costly on the render thread).
@@ -1106,31 +1148,49 @@ class DrawState {
   }
 
   void PublishReplayFrame() {
-    auto frame = std::make_shared<ReplayFrame>();
+    std::shared_ptr<ReplayFrame> frame = by_tick_ ? SpareFrame() : std::make_shared<ReplayFrame>();
     frame->amount = REXCVAR_GET(interpolate_draw_state) ? amount_ : 1.0f;
     frame->tick = ticks_;
     frame->plans = plans_;
     frame->products.Reserve(tick_outputs_.size() + pass_outputs_.size());
-    for (const auto* outputs : {&tick_outputs_, &pass_outputs_}) {
-      for (const auto& [out, output] : *outputs) {
-        auto now = current_tick_.find(output.key);
-        if (now == current_tick_.end()) {
-          continue;
+    frame->own_products.clear();
+    if (by_tick_) {
+      // The tick's products are worked out once a tick (PlanTick), and the
+      // logic pass's outputs, which don't change until the next one, once.
+      if (tick_published_stale_) {
+        tick_published_.clear();
+        for (const auto& [out, output] : tick_outputs_) {
+          int32_t i = tick_index_.Find(output.key);
+          if (i >= 0) {
+            tick_published_.push_back({out, {output.written, &plans_->tick_products[size_t(i)]}});
+          }
         }
-        auto paired = paired_.find(output.key);
-        auto before = paired != paired_.end() ? previous_tick_.find(paired->second)
-                                              : previous_tick_.end();
-        auto identity = identities_.find(output.key);
-        int32_t plan = -1;
-        if (before != previous_tick_.end()) {
-          plan = plan_of_.find(output.key)->second;
-        }
-        frame->products.Set(
-            out, {identity != identities_.end() ? identity->second : ProductKeyHash()(output.key),
-                  output.key.handler, output.written, now->second,
-                  before != previous_tick_.end() ? std::optional(before->second) : std::nullopt,
-                  plan});
+        tick_published_stale_ = false;
       }
+      for (const auto& [out, product] : tick_published_) {
+        frame->products.Set(out, product);
+      }
+      for (const auto& [out, output] : pass_outputs_) {
+        int32_t i = tick_index_.Find(output.key);
+        if (i >= 0) {
+          frame->products.Set(out, {output.written, &plans_->tick_products[size_t(i)]});
+        }
+      }
+    } else {
+      frame->own_products.reserve(tick_outputs_.size() + pass_outputs_.size());
+      for (const auto* outputs : {&tick_outputs_, &pass_outputs_}) {
+        for (const auto& [out, output] : *outputs) {
+          auto now = current_tick_.find(output.key);
+          if (now == current_tick_.end()) {
+            continue;
+          }
+          frame->own_products.push_back(TickProductOf(output.key, now->second));
+          frame->products.Set(out, {output.written, &frame->own_products.back()});
+        }
+      }
+    }
+    if (REXCVAR_GET(check_draw_state)) [[unlikely]] {
+      CheckPublished(*frame);
     }
     counts_.products_published += int(frame->products.size());
     std::shared_ptr<const ReplayFrame> replaced = std::move(frame);
@@ -1139,7 +1199,83 @@ class DrawState {
       std::swap(g_replay_frame, replaced);
       retired_frames_.swap(g_retired_replay_frames);  // hands back an emptied one
     }
+    if (by_tick_) {
+      // Frames nobody else holds are kept for reuse, with their tables'
+      // memory.
+      Recycle(std::move(replaced));
+      for (auto& retired : retired_frames_) {
+        Recycle(std::move(retired));
+      }
+    }
     retired_frames_.clear();  // the frames are freed here, outside the lock
+  }
+
+  std::shared_ptr<ReplayFrame> SpareFrame() {
+    if (spare_frames_.empty()) {
+      return std::make_shared<ReplayFrame>();
+    }
+    std::shared_ptr<ReplayFrame> frame = std::move(spare_frames_.back());
+    spare_frames_.pop_back();
+    return frame;
+  }
+
+  // A frame out of g_replay_frame and given back by the render thread (or
+  // never taken) can't be taken again, so if this is its last holder, no one
+  // else reads it.
+  void Recycle(std::shared_ptr<const ReplayFrame> frame) {
+    if (frame && frame.use_count() == 1 && spare_frames_.size() < 4) {
+      spare_frames_.push_back(std::const_pointer_cast<ReplayFrame>(std::move(frame)));
+    }
+  }
+
+  // What the render thread needs of one of the tick's products.
+  TickProduct TickProductOf(const ProductKey& key, const ProductInputs& now) const {
+    auto paired = paired_.find(key);
+    auto before = paired != paired_.end() ? previous_tick_.find(paired->second)
+                                          : previous_tick_.end();
+    auto identity = identities_.find(key);
+    TickProduct product;
+    product.identity = identity != identities_.end() ? identity->second : ProductKeyHash()(key);
+    product.handler = key.handler;
+    product.now = now;
+    if (before != previous_tick_.end()) {
+      product.before = before->second;
+      product.plan = plan_of_.find(key)->second;
+    }
+    return product;
+  }
+
+  // --check_draw_state: the frame's products against the per-frame lookups.
+  [[gnu::noinline]] void CheckPublished(const ReplayFrame& frame) {
+    auto same_inputs = [](const ProductInputs& a, const ProductInputs& b) {
+      return a.world == b.world && a.view_projection == b.view_projection &&
+             a.context == b.context;
+    };
+    std::unordered_map<uint32_t, TickProduct> expected;
+    std::unordered_map<uint32_t, Matrix4> written;
+    for (const auto* outputs : {&tick_outputs_, &pass_outputs_}) {
+      for (const auto& [out, output] : *outputs) {
+        auto now = current_tick_.find(output.key);
+        if (now == current_tick_.end()) {
+          continue;
+        }
+        expected[out] = TickProductOf(output.key, now->second);
+        written[out] = output.written;
+      }
+    }
+    check_.publish_compared += expected.size();
+    bool differs = expected.size() != frame.products.size();
+    for (const auto& [out, e] : expected) {
+      const ReplayedProduct* p = frame.products.Find(out);
+      if (!p || p->written != written[out] || p->tick->identity != e.identity ||
+          p->tick->handler != e.handler || p->tick->plan != e.plan ||
+          !same_inputs(p->tick->now, e.now) || p->tick->before.has_value() != e.before.has_value() ||
+          (e.before && !same_inputs(*p->tick->before, *e.before))) {
+        differs = true;
+        check_.publish_mismatches++;
+      }
+    }
+    check_.publish_frames_differing += differs;
   }
 
   // The camera of a pass whose view-projection is its view * projection.
@@ -1211,26 +1347,6 @@ class DrawState {
   // its capacity.
   std::vector<std::shared_ptr<const ReplayFrame>> retired_frames_;
 
-  // A multiply, identified across ticks by its operands' addresses, which
-  // camera it was (see CameraIds), and how many times that combination
-  // was multiplied earlier in the pass.
-  struct ProductKey {
-    uint32_t camera;     // address
-    uint32_t world;      // address
-    uint64_t signature;  // CameraIds number
-    uint32_t handler;    // the message handler running (0 for none)
-    uint64_t object;     // the part being drawn, if known (--pair_by_object)
-    int occurrence;
-    bool operator==(const ProductKey&) const = default;
-  };
-  struct ProductKeyHash {
-    size_t operator()(const ProductKey& key) const {
-      return std::hash<uint64_t>()(((uint64_t(key.world) << 32) | key.camera) ^
-                                   (uint64_t(key.occurrence) << 7) ^ (key.signature * 31) ^
-                                   (uint64_t(key.handler) * 0x9E3779B97F4A7C15ull) ^
-                                   (key.object * 0xC2B2AE3D27D4EB4Full));
-    }
-  };
   using ProductInputsByKey = std::unordered_map<ProductKey, ProductInputs, ProductKeyHash>;
   ProductInputsByKey collecting_;  // this logic pass's
   ProductInputsByKey current_tick_;
@@ -1247,6 +1363,47 @@ class DrawState {
   std::unordered_map<ProductKey, int32_t, ProductKeyHash> plan_of_;  // into plans_->products
   std::unordered_map<CameraPairKey, int32_t, CameraPairKeyHash> camera_pairs_;
 
+  // The tick's products by key, as indexes into plans_->tick_products: an
+  // open-addressed table, looked up for each product published.
+  class ProductIndex {
+   public:
+    void Reset(size_t count) {
+      uint32_t bits = 4;
+      while ((size_t(1) << bits) < 2 * count) {
+        bits++;
+      }
+      shift_ = 64 - bits;
+      slots_.assign(size_t(1) << bits, Slot{{}, -1});
+    }
+    void Insert(const ProductKey& key, int32_t value) { slots_[Probe(key)] = {key, value}; }
+    int32_t Find(const ProductKey& key) const {
+      return slots_.empty() ? -1 : slots_[Probe(key)].value;
+    }
+
+   private:
+    struct Slot {
+      ProductKey key;
+      int32_t value;  // -1 for an empty slot
+    };
+    size_t Probe(const ProductKey& key) const {
+      size_t mask = slots_.size() - 1;
+      size_t i = (ProductKeyHash()(key) * 0x9E3779B97F4A7C15ull) >> shift_;
+      while (slots_[i].value >= 0 && !(slots_[i].key == key)) {
+        i = (i + 1) & mask;
+      }
+      return i;
+    }
+    std::vector<Slot> slots_;
+    uint32_t shift_ = 60;
+  };
+  bool by_tick_ = false;  // --publish_by_tick, for this tick
+  ProductIndex tick_index_;
+  // The logic pass's outputs as published (with --publish_by_tick), until
+  // they or the tick change.
+  std::vector<std::pair<uint32_t, ReplayedProduct>> tick_published_;
+  bool tick_published_stale_ = true;
+  std::vector<std::shared_ptr<ReplayFrame>> spare_frames_;
+
   // Once a tick, after MatchTick: plans the blend of each paired product.
   void PlanTick() {
     auto plans = std::make_shared<TickPlans>();
@@ -1262,6 +1419,15 @@ class DrawState {
       plan_of_[key] = int32_t(plans->products.size());
       plans->products.push_back(PlanProduct(before->second, now->second, *plans, camera_pairs_));
     }
+    if (by_tick_) {
+      plans->tick_products.reserve(current_tick_.size());
+      tick_index_.Reset(current_tick_.size());
+      for (const auto& [key, now] : current_tick_) {
+        tick_index_.Insert(key, int32_t(plans->tick_products.size()));
+        plans->tick_products.push_back(TickProductOf(key, now));
+      }
+    }
+    tick_published_stale_ = true;
     plans_ = std::move(plans);
   }
 
@@ -1403,6 +1569,7 @@ class DrawState {
     uint64_t note_cycles = 0, tick_cycles = 0, publish_cycles = 0, after_cycles = 0;
     uint64_t tick_outputs = 0, pass_outputs = 0, occurrences = 0, published = 0;
     uint64_t current = 0, paired = 0, logic_tick_outputs = 0;
+    uint64_t publish_compared = 0, publish_mismatches = 0, publish_frames_differing = 0;
     std::chrono::steady_clock::time_point last_log{};
   } check_;
 
@@ -1435,13 +1602,15 @@ class DrawState {
         "draw state check: {} frames ({} logic); a frame: notes {:.0f} logic + {:.0f} render-only "
         "({:.0f} copies), tick outputs {:.0f}, pass outputs {:.0f}, occurrences {:.0f}, published "
         "{:.0f}; a logic frame: tick outputs {:.0f}, products {:.0f}, paired {:.0f}; tsc kcycles a "
-        "frame: notes {:.1f}, after draw {:.1f} (tick {:.1f}, publish {:.1f})",
+        "frame: notes {:.1f}, after draw {:.1f} (tick {:.1f}, publish {:.1f}); published products "
+        "compared {}, differing {} in {} frames (by tick: {})",
         check_.frames, check_.logic_frames, check_.notes[0] / f, check_.notes[1] / f,
         check_.copy_notes / f, check_.tick_outputs / f, check_.pass_outputs / f,
         check_.occurrences / f, check_.published / f, check_.logic_tick_outputs / l,
         check_.current / l, check_.paired / l, check_.note_cycles / f / 1e3,
         check_.after_cycles / f / 1e3, check_.tick_cycles / f / 1e3,
-        check_.publish_cycles / f / 1e3);
+        check_.publish_cycles / f / 1e3, check_.publish_compared, check_.publish_mismatches,
+        check_.publish_frames_differing, by_tick_);
     auto last = now;
     check_ = {};
     check_.last_log = last;
@@ -1543,18 +1712,18 @@ class MovingProductsLog {
   void OnProduct(uint32_t payload, const ReplayedProduct& product, const Matrix4& world_shown,
                  Outcome outcome) {
     Record r;
-    r.identity = product.identity;
+    r.identity = product.tick->identity;
     r.payload = payload;
-    r.handler = product.handler;
-    r.now = Translation(product.now.world);
+    r.handler = product.tick->handler;
+    r.now = Translation(product.tick->now.world);
     r.shown = Translation(world_shown);
     r.outcome = outcome;
-    r.context_now = product.now.context;
-    if (product.before) {
-      r.context_before = product.before->context;
-      r.before = Translation(product.before->world);
-      std::optional<ScaledTransform> a = ScaledTransformFromWorldMatrix(product.before->world);
-      std::optional<ScaledTransform> b = ScaledTransformFromWorldMatrix(product.now.world);
+    r.context_now = product.tick->now.context;
+    if (product.tick->before) {
+      r.context_before = product.tick->before->context;
+      r.before = Translation(product.tick->before->world);
+      std::optional<ScaledTransform> a = ScaledTransformFromWorldMatrix(product.tick->before->world);
+      std::optional<ScaledTransform> b = ScaledTransformFromWorldMatrix(product.tick->now.world);
       r.angle = a && b ? AngleBetween(a->transform.rotation, b->transform.rotation) : -1;
     }
     records_.push_back(r);
@@ -1762,9 +1931,9 @@ class ReplayCameras {
     const Matrix4& w = product.written;
     REXLOG_INFO("overlay: tick {} amount {:.2f} payload {:08X} paired {} written row3 ({:.4g} {:.4g} "
                 "{:.4g} {:.4g}) now ({:.4g} {:.4g} {:.4g} {:.4g}) result ({:.4g} {:.4g} {:.4g} {:.4g})",
-                frame_->tick, frame_->amount, payload, product.before.has_value(), w[12], w[13],
-                w[14], w[15], product.now.world[12], product.now.world[13], product.now.world[14],
-                product.now.world[15], result[12], result[13], result[14], result[15]);
+                frame_->tick, frame_->amount, payload, product.tick->before.has_value(), w[12], w[13],
+                w[14], w[15], product.tick->now.world[12], product.tick->now.world[13], product.tick->now.world[14],
+                product.tick->now.world[15], result[12], result[13], result[14], result[15]);
   }
   int overlay_frames_left_ = 0;
   std::chrono::steady_clock::time_point overlay_last_{};
@@ -1808,7 +1977,7 @@ class ReplayCameras {
     if (product->written != m) {
       return "published, value differs";
     }
-    return product->before ? "substituted" : "published, unpaired";
+    return product->tick->before ? "substituted" : "published, unpaired";
   }
 
   // Render thread, for each vertex constant upload of 4+ registers.
@@ -1847,8 +2016,8 @@ class ReplayCameras {
       }
       return std::nullopt;
     }
-    last_identity_ = product->identity;
-    if (product->handler == kRaceOverlaysHandler) {
+    last_identity_ = product->tick->identity;
+    if (product->tick->handler == kRaceOverlaysHandler) {
       overlay_payloads_.insert(payload);
     }
     BlendStats before = stats_.blend;
@@ -1864,7 +2033,7 @@ class ReplayCameras {
                             : Outcome::kBlended;
       GetMovingProductsLog().OnProduct(payload, *product, last_parts_.world, outcome);
     }
-    if (REXCVAR_GET(log_overlay_products) && product->handler == kRaceOverlaysHandler) {
+    if (REXCVAR_GET(log_overlay_products) && product->tick->handler == kRaceOverlaysHandler) {
       LogOverlay(payload, *product, result);
     }
     return result;
@@ -2382,19 +2551,19 @@ class PixelOutcomesLog {
       }
       const ReplayedProduct* product = GetReplayCameras().last_parts().product;
       if (product && rejected_lines_++ < 12) {
-        const Matrix4& w = product->now.world;
-        const auto& c = product->now.context;
+        const Matrix4& w = product->tick->now.world;
+        const auto& c = product->tick->now.context;
         std::string before = "-";
-        if (product->before) {
-          const Matrix4& v = product->before->world;
-          const auto& d = product->before->context;
+        if (product->tick->before) {
+          const Matrix4& v = product->tick->before->world;
+          const auto& d = product->tick->before->context;
           before = fmt::format("{:.3f} {:.3f} {:.3f} (lr {:08X} r31 {:08X})", v[12], v[13], v[14],
                                d[0], d[8]);
         }
         REXLOG_INFO("pixel outcomes: rejected c{}.{} {:.4g}->{:.4g}, object {:016X}: now {:.3f} "
                     "{:.3f} {:.3f} (lr {:08X} r31 {:08X}), before {}",
                     start + blender.rejected() / 4, "xyzw"[blender.rejected() % 4], a, b,
-                    product->identity, w[12], w[13], w[14], c[0], c[8], before);
+                    product->tick->identity, w[12], w[13], w[14], c[0], c[8], before);
       }
     }
   }
