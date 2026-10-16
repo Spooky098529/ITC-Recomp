@@ -1,6 +1,6 @@
 # Import Tuner Challenge Static Recompilation
 
-A native Linux port of *Import Tuner Challenge* (Xbox 360, 2006), made by
+A native Linux and Windows port of *Import Tuner Challenge* (Xbox 360, 2006), made by
 statically recompiling the game's PowerPC code to x86-64 with
 [ReXGlue](https://github.com/rexglue/rexglue-sdk).
 
@@ -17,19 +17,19 @@ Built with AI assistance (Claude Code).
   
 ## Requirements
 
-- Linux on a 64-bit x86 CPU with SSE4.2 (most CPUs from 2009 on).
+- Linux, or Windows 10 or 11 (experimental, see below), on a 64-bit x86
+  CPU with SSE4.2 (most CPUs from 2009 on).
 - A GPU with Vulkan support.
 - Your own copy of the game, extracted from a backup.
-
-(Windows will come later, just trying to get this to work first)
 
 ## Install
 
 1. Extract the game's files from your backup into a folder.
-2. Download the latest zip from
-   [Releases](https://github.com/Spooky098529/ITC-Recomp/releases) and
-   extract its files into that folder, next to `default.xex`.
-3. Run `./run.sh`.
+2. Download the latest zip for your system from
+   [Releases](https://github.com/Spooky098529/ITC-Recomp/releases)
+   (`linux-amd64` or `win-amd64`) and extract its files into that folder,
+   next to `default.xex`.
+3. Run `./run.sh` on Linux, or `run.bat` on Windows.
 
 ## Running it
 
@@ -43,7 +43,8 @@ Built with AI assistance (Claude Code).
 | `./run.sh --skip_intro` | Skips the Ubisoft logo movie and speeds through the Genki logo and the title screen's intro. Now and then the game hangs at startup with this; if it does, close it and start it again. |
 | `./run-debug.sh` | The same as `run.sh`, with logging on (written to `logs/`). |
 
-Options can be combined, e.g. `./run.sh --skip_intro --max_fps=0`.
+Options can be combined, e.g. `./run.sh --skip_intro --max_fps=0`. On
+Windows, use `run.bat` and `run-debug.bat` the same way.
 
 By default the game runs in a 1280x720 window at its own resolution, as on
 the console. Screens and windows that aren't 16:9 get black bars.
@@ -56,10 +57,13 @@ the console. Screens and windows that aren't 16:9 get black bars.
 - Colours are a little lighter than on the console (the console's output
   gamma isn't applied yet).
 - Tested on Linux on my PC (9800x3d, 7900XT) and the Steam Deck.
+- The Windows version is experimental: it has only been tested under Wine
+  on Linux, not on a real Windows PC yet. Reports of how it runs are
+  welcome.
 
 ## Reporting problems
 
-Play with `./run-debug.sh`, then open an
+Play with `./run-debug.sh` (`run-debug.bat` on Windows), then open an
 [issue](https://github.com/Spooky098529/ITC-Recomp/issues) describing what
 you saw, and attach the newest file from the `logs` folder.
 
@@ -78,6 +82,9 @@ This builds `itc_recomp/out/build/linux-amd64-release/itc` and
 `rexglue-sdk/out/linux-amd64/librexruntime.so`. Put both in the game folder
 with `itc_recomp/run.sh` and `itc_recomp/run-debug.sh`.
 
+The Windows version is cross-compiled on Linux (clang and Microsoft's
+libraries fetched with xwin); see [docs/windows.md](docs/windows.md).
+
 ## Documentation (This is written by LLMs primarily for LLMs)
 
 - [docs/functions.md](docs/functions.md): what's known about the game's
@@ -88,3 +95,7 @@ with `itc_recomp/run.sh` and `itc_recomp/run-debug.sh`.
   design and progress.
 - [docs/native-audio.md](docs/native-audio.md): how the game's audio works
   and the plan to replace the emulated audio.
+- [docs/unlocked-res.md](docs/unlocked-res.md): drawing at other
+  resolutions.
+- [docs/windows.md](docs/windows.md): the Windows build, how it's made and
+  tested.

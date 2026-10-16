@@ -184,4 +184,3 @@ release.
 
 - The user plays under Wine (keyboard, gamepad, menus, a driven race).
 - The frame rate under Wine (above).
-- README: Windows install and requirements.
