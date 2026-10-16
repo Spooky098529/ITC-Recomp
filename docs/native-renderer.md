@@ -1014,7 +1014,9 @@ memory).
   reach `Passes`.
 - `passes.cpp`: everything per draw: register file from the shadow
   (`state.cpp`), shaders (`shaders.cpp`), constants ring, guest memory
-  mirrors, pipelines, texture descriptor sets; targets, clears and
+  mirrors, pipelines, texture descriptor sets, shader lookups kept by
+  the shader objects' fields (`ShaderLookupTable`, "Shader lookup");
+  targets, clears and
   resolves; what's shown (the main view, pitch 1040 and 2x MSAA, resolved
   to 1024x576) and the dumps.
 - `gpu_link.cpp`: the kick (`sub_8229E3F0`), the deferred kick
@@ -1171,7 +1173,10 @@ To be fixed (or accepted) in milestone 7.
   the swapchain on the window's size-change events would still give a
   sharper image at other sizes.
 - **Performance: shaders are found by hashing their microcode every
-  draw.** Translations are cached by content hash, so each patched version
+  draw** (fixed 2026-10-16, `shader-lookup`: lookups kept by what draws
+  read from the shader objects, see "Shader lookup"; measured over races,
+  a key never came back with other microcode, so no hooks on creation and
+  release were needed). Translations are cached by content hash, so each patched version
   of a vertex shader is translated once; the cost is finding which one a
   draw uses. Since 2026-10-14 each microcode is hashed once a draw
   (`MicrocodeHash`, passed to `ShaderCache::GetInterface` and `Get`, and
@@ -1850,6 +1855,7 @@ branch-record run is skewed, so take shares from a plain run):
    needn't touch counts; shaders would then never be destroyed (the user's
    call).
 6. **Shader lookup** (~4%): key by object and declaration (Known issues).
+   **Done** (`shader-lookup`, 2026-10-16; see "Shader lookup").
 
 ### Next: interpolation's blending logic and matrix math
 

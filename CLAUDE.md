@@ -181,7 +181,10 @@ Releases are made by pushing a `v*` tag: CI builds the zip and publishes a
 GitHub release with generated notes, which are then replaced with notes
 written for players: title "vX.Y.Z: <summary>", and just a couple of
 bullet points naming the changes (not the long layout of v0.3.5 and
-earlier). A tag runs both `build-linux.yml` and `build-windows.yml`, and
+earlier). `build-linux.yml` configures with `clang-20`/`clang++-20` by
+name: since 2026-10-16 its build dependencies pull in Ubuntu 22.04's clang
+14 package, which replaces `/usr/bin/clang` (the SDK needs 18 or newer).
+A tag runs both `build-linux.yml` and `build-windows.yml`, and
 both zips go on the release (see "CI" in `docs/windows.md`). Linux
 release zips (`v*` tags only) are fully stripped (`strip --strip-all`: no
 debug info or symbol table, nothing for gdb to go on, as the user wants;
