@@ -38,6 +38,12 @@ branch.
 - **The frame cap's sleep**: Windows rounds sleeps up to the system timer
   (often 15.6 ms), so `frame_pacer.cpp` sleeps on a high-resolution
   waitable timer until 1 ms before and spins the rest.
+- **The disk cache** (`cache/` next to the executable, `disk_cache.cpp`):
+  the executable comes from `GetModuleFileNameW` instead of
+  `/proc/self/exe`, and the cache files are opened with `native::OpenFile`,
+  which uses `_wfopen` on Windows (a `std::filesystem::path` is a wide
+  string there, so `std::fopen(path.c_str())` doesn't compile). Checked
+  under Wine 2026-10-16: written on the first run, loaded on the second.
 - **Stubbed on Windows** (debug tools only): the guest memory scans
   (`--find_per_frame_state` and friends, the state capture), which read
   `/proc/self/maps`, and `--log_frame_times`' thread CPU time (reads 0).

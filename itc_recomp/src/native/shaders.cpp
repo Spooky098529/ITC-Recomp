@@ -1,4 +1,5 @@
 #include "shaders.h"
+#include "disk_cache.h"
 #include "frame_costs.h"
 
 #include <cstdio>
@@ -308,7 +309,7 @@ uint64_t MicrocodeHash(const uint8_t* ucode, uint32_t size_bytes) {
 void ShaderCache::OpenDiskCache(const std::filesystem::path& file) {
   State& s = *state_;
   std::vector<uint8_t> data;
-  if (std::FILE* in = std::fopen(file.c_str(), "rb")) {
+  if (std::FILE* in = OpenFile(file, "rb")) {
     uint8_t buffer[65536];
     while (size_t n = std::fread(buffer, 1, sizeof(buffer), in)) {
       data.insert(data.end(), buffer, buffer + n);
@@ -359,7 +360,7 @@ void ShaderCache::OpenDiskCache(const std::filesystem::path& file) {
   }
   std::error_code error;
   if (keep == 0) {
-    s.disk = std::fopen(file.c_str(), "wb");
+    s.disk = OpenFile(file, "wb");
     if (s.disk && (std::fwrite(header.bytes.data(), header.bytes.size(), 1, s.disk) != 1 ||
                    std::fflush(s.disk) != 0)) {
       std::fclose(s.disk);
@@ -369,7 +370,7 @@ void ShaderCache::OpenDiskCache(const std::filesystem::path& file) {
     if (keep < data.size()) {
       std::filesystem::resize_file(file, keep, error);
     }
-    s.disk = error ? nullptr : std::fopen(file.c_str(), "ab");
+    s.disk = error ? nullptr : OpenFile(file, "ab");
   }
   if (!s.disk) {
     REXLOG_WARN("native renderer: shader disk cache: can't write {}", file.string());
