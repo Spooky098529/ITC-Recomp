@@ -36,6 +36,15 @@
 # not upscaled. Screens and windows that aren't 16:9 get black bars. Higher
 # resolutions cost GPU time only.
 #
+# Xbox 360 gamma (off by default): the console sends its picture through a
+# gamma table made for the kind of display it's connected to, so on a TV it
+# looks darker than here.
+#   --xbox_gamma=off    no change, as made for a PC monitor (the default)
+#   --xbox_gamma=hdtv   as the 360 sends it to an HDTV: darker mid-tones and
+#                       shadows
+#   --xbox_gamma=power  the 360's table for a display with a set gamma
+#                       power: lighter shadows
+#
 # The renderer's copies of guest memory are updated once a frame instead of
 # checked draw by draw (--native_renderer_mirror_by_tick and
 # --native_renderer_mirror_to_both; pass
@@ -56,7 +65,7 @@ done
 
 # The flag parser rejects a flag given twice, so a default is left out when
 # the same flag is passed in.
-flags=(--native_renderer=true --native_renderer_exclusive=true --native_audio=true --game_data_root="$dir" --mnk_mode=true --native_renderer_mirror_by_tick=true --native_renderer_mirror_to_both=true --fullscreen=false "${defaults[@]}" --log_level=off)
+flags=(--native_renderer=true --native_renderer_exclusive=true --native_audio=true --game_data_root="$dir" --mnk_mode=true --native_renderer_mirror_by_tick=true --native_renderer_mirror_to_both=true --fullscreen=false --xbox_gamma=off "${defaults[@]}" --log_level=off)
 final=()
 for flag in "${flags[@]}"; do
   name="${flag%%=*}"
