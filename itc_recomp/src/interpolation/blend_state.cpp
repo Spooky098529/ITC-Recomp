@@ -118,9 +118,6 @@ REXCVAR_DEFINE_BOOL(cache_camera_ids, true, "ITC",
                     "Remember the camera number of recently seen view-projections by their "
                     "bytes, so a repeated one skips splitting it and the table lookup (same "
                     "numbers)");
-REXCVAR_DEFINE_BOOL(check_camera_ids, false, "ITC",
-                    "Number every view-projection both with and without the cache, log any "
-                    "difference and how often it's called, every 2 s (temporary)");
 
 namespace interpolation {
 namespace {
@@ -542,18 +539,11 @@ Matrix4 BlendProduct(const ReplayedProduct& product, const TickPlans* plans,
 // camera); 0 for a non-perspective one. Main thread.
 class CameraIds {
  public:
-  // Where Of was called from, for --check_camera_ids.
-  enum Site { kMultiply, kCopy, kNote, kSiteCount };
-
-  uint64_t Of(const Matrix4& view_projection, Site site) {
-    if (REXCVAR_GET(check_camera_ids)) [[unlikely]] {
-      return Check(view_projection, site);
-    }
+  uint64_t Of(const Matrix4& view_projection) {
     if (!REXCVAR_GET(cache_camera_ids)) {
       return Compute(view_projection);
     }
-    bool hit;
-    return Cached(view_projection, hit);
+    return Cached(view_projection);
   }
 
  private:
@@ -576,71 +566,20 @@ class CameraIds {
                  (words[6] * 0x94D049BB133111EBull) ^ (words[7] * 0xBF58476D1CE4E5B9ull);
     return (h ^ (h >> 31)) * 0x9E3779B97F4A7C15ull;
   }
-  uint64_t Cached(const Matrix4& view_projection, bool& hit) {
+  uint64_t Cached(const Matrix4& view_projection) {
     // Two in five calls are for the previous call's matrix.
     if (last_ && std::memcmp(last_->matrix.data(), view_projection.data(), sizeof(Matrix4)) == 0) {
-      hit = true;
       return last_->id;
     }
     CacheEntry& entry = cache_[HashOf(view_projection) >> (64 - kCacheBits)];
-    hit = entry.valid &&
-          std::memcmp(entry.matrix.data(), view_projection.data(), sizeof(Matrix4)) == 0;
-    if (!hit) {
+    if (!entry.valid ||
+        std::memcmp(entry.matrix.data(), view_projection.data(), sizeof(Matrix4)) != 0) {
       entry.matrix = view_projection;
       entry.id = Compute(view_projection);
       entry.valid = true;
     }
     last_ = &entry;
     return entry.id;
-  }
-
-  // --check_camera_ids: both ways, and how often and from where it's called.
-  [[gnu::noinline]] uint64_t Check(const Matrix4& view_projection, Site site) {
-    bool hit;
-    uint64_t cached = Cached(view_projection, hit);
-    uint64_t computed = Compute(view_projection);
-    check_.calls[site]++;
-    check_.hits += hit;
-    check_.same_as_last += view_projection == check_.last;
-    check_.last = view_projection;
-    check_.nonzero += computed != 0;
-    if (cached != computed && ++check_.mismatches <= 20) {
-      REXLOG_WARN("camera ids: cached {} but computed {}", cached, computed);
-    }
-    uint64_t logic, render;
-    frame_pacing::GameMessages_PassCounts(logic, render);
-    if (logic + render != check_.pass) {
-      check_.distinct_total += check_.distinct.size();
-      check_.distinct_max = std::max<uint64_t>(check_.distinct_max, check_.distinct.size());
-      check_.ids_total += check_.ids.size();
-      check_.distinct.clear();
-      check_.ids.clear();
-      check_.pass = logic + render;
-      check_.passes++;
-    }
-    check_.distinct.insert(HashOf(view_projection));
-    check_.ids.insert(computed);
-    auto now = std::chrono::steady_clock::now();
-    if (now - check_.logged >= std::chrono::seconds(2)) {
-      uint64_t calls = check_.calls[kMultiply] + check_.calls[kCopy] + check_.calls[kNote];
-      double passes = double(check_.passes ? check_.passes : 1);
-      REXLOG_INFO("camera ids: {:.0f} calls a pass ({:.0f} multiply, {:.0f} copy, {:.0f} note), "
-                  "{:.1f}% cache hits, {:.1f}% same as the last call, {:.1f}% perspective; "
-                  "{:.1f} distinct matrices a pass (max {}), {:.1f} ids a pass, {} ids in all, "
-                  "{} mismatches",
-                  double(calls) / passes, double(check_.calls[kMultiply]) / passes,
-                  double(check_.calls[kCopy]) / passes, double(check_.calls[kNote]) / passes,
-                  100.0 * double(check_.hits) / double(calls ? calls : 1),
-                  100.0 * double(check_.same_as_last) / double(calls ? calls : 1),
-                  100.0 * double(check_.nonzero) / double(calls ? calls : 1),
-                  double(check_.distinct_total) / passes, check_.distinct_max,
-                  double(check_.ids_total) / passes, count_, check_.mismatches);
-      check_.calls = {};
-      check_.hits = check_.same_as_last = check_.nonzero = 0;
-      check_.distinct_total = check_.distinct_max = check_.ids_total = check_.passes = 0;
-      check_.logged = now;
-    }
-    return computed;
   }
 
   uint64_t Compute(const Matrix4& view_projection) {
@@ -700,14 +639,6 @@ class CameraIds {
   uint64_t count_ = 0;
   std::array<CacheEntry, 1 << kCacheBits> cache_{};
   CacheEntry* last_ = nullptr;
-  struct {
-    std::array<uint64_t, kSiteCount> calls{};
-    uint64_t hits = 0, same_as_last = 0, nonzero = 0, mismatches = 0;
-    Matrix4 last{};
-    uint64_t pass = 0, passes = 0, distinct_total = 0, distinct_max = 0, ids_total = 0;
-    std::unordered_set<uint64_t> distinct, ids;
-    std::chrono::steady_clock::time_point logged = std::chrono::steady_clock::now();
-  } check_;
 };
 
 }  // namespace
@@ -763,7 +694,7 @@ class DrawState {
     // Any multiply by a camera: the recorder's, one by a camera pass, or one
     // by a perspective view-projection wherever it's kept (the light
     // billboards' recorder, sub_8209C1A0, builds one on its stack).
-    if (!recorder && PassOfViewProjection(b) < 0 && camera_ids_.Of(inputs.view_projection, CameraIds::kMultiply) == 0) {
+    if (!recorder && PassOfViewProjection(b) < 0 && camera_ids_.Of(inputs.view_projection) == 0) {
       return;
     }
     Note(base, out, a, b, inputs, render_only);
@@ -777,7 +708,7 @@ class DrawState {
     }
     bool render_only = frame_pacing::GameMessages_IsRenderOnlyPass();
     Matrix4 value = LoadMatrix(base, src);
-    if (PassOfViewProjection(src) >= 0 || camera_ids_.Of(value, CameraIds::kCopy) != 0) {
+    if (PassOfViewProjection(src) >= 0 || camera_ids_.Of(value) != 0) {
       // A copy of a camera (a camera pass's, or a perspective one built on
       // the stack, like the headlight projector's).
       Matrix4 identity{1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
@@ -818,7 +749,7 @@ class DrawState {
     // says which camera; their projection there drifts past CameraIds'
     // tolerance between ticks, which renumbered them and left them unpaired.
     uint64_t signature =
-        handler_ == kRaceOverlaysHandler ? 0 : camera_ids_.Of(inputs.view_projection, CameraIds::kNote);
+        handler_ == kRaceOverlaysHandler ? 0 : camera_ids_.Of(inputs.view_projection);
     // The per-object recorder's caller (0x820D0564 for cars' parts) keeps a
     // pointer to the part it draws in r31. Numbering products by order alone
     // paired a wheel with another wheel, or another car, whenever a part was
