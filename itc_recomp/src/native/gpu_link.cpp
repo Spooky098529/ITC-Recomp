@@ -21,7 +21,6 @@
 #include <rex/cvar.h>
 #include <rex/logging.h>
 
-#include <algorithm>
 #include <array>
 #include <atomic>
 #include <chrono>
@@ -252,7 +251,8 @@ struct Effects {
 // SDK's command processor keeps it (command_processor.cpp): the 256-entry
 // table (DC_LUT_30_COLOR, 10 bits a channel, or three DC_LUT_SEQ_COLOR
 // writes) and the 128-entry PWL one (DC_LUT_PWL_DATA, a channel a write).
-// Logged at the next swap after it changes.
+// Logged at the next swap after it changes (a debugging aid: --xbox_gamma
+// uses our own copy, xbox_gamma_table.h).
 constexpr uint32_t kDcLutRwMode = 0x1921, kDcLutRwIndex = 0x1922, kDcLutSeqColor = 0x1923,
                    kDcLutPwlData = 0x1924, kDcLut30Color = 0x1925, kDcLutWriteEnMask = 0x1927,
                    kDcLutaControl = 0x1930;
@@ -337,16 +337,6 @@ void LogGammaRamp() {
   g.changed = false;
 }
 
-// The table as of the last swap, for the renderer (--xbox_gamma).
-std::mutex g_gamma_mutex;
-std::array<uint32_t, 256> g_gamma_shown{};
-std::atomic<bool> g_gamma_new{false};
-
-void PublishGammaRamp() {
-  std::lock_guard lock(g_gamma_mutex);
-  g_gamma_shown = g_gamma.table;
-  g_gamma_new.store(true, std::memory_order_release);
-}
 
 void StorePhysical(uint8_t* base, uint32_t address, uint32_t value) {
   // Endianness in the address's low bits as the GPU takes it; the game uses
@@ -555,7 +545,6 @@ void ApplyBuffer(PPCContext& ctx, uint8_t* base, uint32_t device, uint32_t addre
         break;
       case 0x64:  // XE_SWAP
         if (g_gamma.changed) {
-          PublishGammaRamp();
           LogGammaRamp();
         }
         break;
@@ -590,16 +579,6 @@ void LogEffects() {
   e.unhandled.clear();
 }
 }  // namespace
-
-bool GammaRamp_Take(uint32_t (&table)[256]) {
-  if (!g_gamma_new.load(std::memory_order_acquire)) {
-    return false;
-  }
-  std::lock_guard lock(g_gamma_mutex);
-  std::copy(g_gamma_shown.begin(), g_gamma_shown.end(), table);
-  g_gamma_new.store(false, std::memory_order_relaxed);
-  return true;
-}
 }  // namespace native
 
 // The kick (see "Plan for milestone 6"): r3 device, r4 pairs of (size in

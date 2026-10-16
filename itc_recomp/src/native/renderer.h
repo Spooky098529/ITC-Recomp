@@ -27,11 +27,6 @@ void Renderer_TakeListStats(uint64_t& missing, uint64_t& most);
 // gpu_link.cpp.
 bool Renderer_Exclusive();
 
-// The display's 256-entry gamma table as the game last wrote it
-// (DC_LUT_30_COLOR words; exclusive mode only, see gpu_link.cpp): copied
-// into `table` and true if it changed since the last call.
-bool GammaRamp_Take(uint32_t (&table)[256]);
-
 // Render thread, before a command handler runs (see the table in
 // docs/gpu-functions.md): r3 = payload, r4 = arg1, r5 = arg2.
 void Renderer_OnCommand(uint8_t* base, uint32_t id, uint32_t payload, uint32_t arg1,

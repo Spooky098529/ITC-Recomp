@@ -1,12 +1,13 @@
 #version 450
 // --xbox_gamma: the frame through the display's 256-entry gamma table, as
 // the Xbox 360's display output does (each channel's 8-bit value picks an
-// entry, 10 bits a channel), in place. Values between entries are blended.
+// entry, out of 1023; the same table for all three), in place. Values
+// between entries are blended.
 
 layout(local_size_x = 8, local_size_y = 8) in;
 
 layout(set = 0, binding = 0, rgba16f) uniform image2D frame;
-// DC_LUT_30_COLOR words: blue in bits 0-9, green 10-19, red 20-29.
+// xbox_gamma_table.h.
 layout(set = 0, binding = 1) readonly buffer Table {
   uint entries[256];
 } table;
@@ -15,12 +16,12 @@ layout(push_constant) uniform Constants {
   ivec2 extent;
 } constants;
 
-float Channel(float value, int shift) {
+float Channel(float value) {
   float position = clamp(value, 0.0, 1.0) * 255.0;
   int low = int(position);
   int high = min(low + 1, 255);
-  float a = float((table.entries[low] >> shift) & 0x3FFu);
-  float b = float((table.entries[high] >> shift) & 0x3FFu);
+  float a = float(table.entries[low]);
+  float b = float(table.entries[high]);
   return mix(a, b, position - float(low)) / 1023.0;
 }
 
@@ -31,5 +32,5 @@ void main() {
   }
   vec4 color = imageLoad(frame, position);
   imageStore(frame, position,
-             vec4(Channel(color.r, 20), Channel(color.g, 10), Channel(color.b, 0), color.a));
+             vec4(Channel(color.r), Channel(color.g), Channel(color.b), color.a));
 }

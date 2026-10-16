@@ -5,6 +5,7 @@
 
 #include "generated_gamma_comp.h"
 #include "generated_id_frag.h"
+#include "xbox_gamma_table.h"
 #include "generated_resolve_frag.h"
 #include "generated_resolve_ms_frag.h"
 #include "generated_resolve_vert.h"
@@ -39,8 +40,8 @@
 REXCVAR_DECLARE(std::string, log_level);
 
 REXCVAR_DEFINE_BOOL(xbox_gamma, false, "ITC",
-                    "Show the frame through the display's gamma table the game writes, as the "
-                    "Xbox 360's video output does (darker; native renderer, exclusive mode)");
+                    "Show the frame through the display gamma table the game sets, as the "
+                    "Xbox 360's video output does (darker; native renderer)");
 
 namespace native {
 
@@ -985,8 +986,8 @@ struct Passes::State {
   // What's shown, and this frame's resolve destinations (for showing one).
   Image shown;
   VkImageLayout shown_layout = VK_IMAGE_LAYOUT_UNDEFINED;
-  // --xbox_gamma: the gamma table applied to `shown` in place (gamma.comp),
-  // from the first table the game writes on.
+  // --xbox_gamma: the gamma table (xbox_gamma_table.h) applied to `shown`
+  // in place (gamma.comp).
   VkBuffer gamma_table = VK_NULL_HANDLE;
   VkDeviceMemory gamma_table_memory = VK_NULL_HANDLE;
   VkDescriptorSetLayout gamma_set_layout = VK_NULL_HANDLE;
@@ -994,7 +995,7 @@ struct Passes::State {
   VkPipeline gamma_pipeline = VK_NULL_HANDLE;
   VkDescriptorPool gamma_pool = VK_NULL_HANDLE;
   VkDescriptorSet gamma_set = VK_NULL_HANDLE;
-  bool gamma_ready = false;  // a table has been uploaded
+  bool gamma_ready = false;  // the table has been uploaded
   bool CreateGammaResources();
   void ApplyGamma(VkCommandBuffer commands);
   struct Resolved {
@@ -2656,30 +2657,22 @@ bool Passes::State::CreateGammaResources() {
     gamma_pipeline = VK_NULL_HANDLE;
     return false;
   }
-  REXLOG_INFO("native renderer: --xbox_gamma: the game's gamma table is applied to the frame");
+  REXLOG_INFO("native renderer: --xbox_gamma: the Xbox 360's gamma table is applied to the frame");
   return true;
 }
 
 void Passes::State::ApplyGamma(VkCommandBuffer commands) {
-  uint32_t table[256];
-  if (GammaRamp_Take(table)) {
-    // After everything before (the last frame's pass may still read it).
-    VkMemoryBarrier barrier{VK_STRUCTURE_TYPE_MEMORY_BARRIER};
-    barrier.srcAccessMask = kAllAccess;
-    barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-    vk::vkCmdPipelineBarrier(commands, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-                             VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 1, &barrier, 0, nullptr, 0,
-                             nullptr);
+  if (!gamma_ready) {  // the first frame: the table into its buffer
+    uint32_t table[256];
+    std::copy(std::begin(kXboxGammaTable), std::end(kXboxGammaTable), table);
     vk::vkCmdUpdateBuffer(commands, gamma_table, 0, sizeof(table), table);
+    VkMemoryBarrier barrier{VK_STRUCTURE_TYPE_MEMORY_BARRIER};
     barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
     barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
     vk::vkCmdPipelineBarrier(commands, VK_PIPELINE_STAGE_TRANSFER_BIT,
                              VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 1, &barrier, 0, nullptr, 0,
                              nullptr);
     gamma_ready = true;
-  }
-  if (!gamma_ready) {
-    return;  // no table yet (or not in exclusive mode): shown as is
   }
   Transition(commands, shown.image, VK_IMAGE_ASPECT_COLOR_BIT, shown_layout,
              VK_IMAGE_LAYOUT_GENERAL);
