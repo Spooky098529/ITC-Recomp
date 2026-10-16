@@ -524,6 +524,102 @@ class IndexRangeCache {
   uint32_t shift_ = 64;
 };
 
+// What a draw's shader lookup finds: the translations, how they connect,
+// and the microcodes' hashes (for the diagnostics keyed by them).
+struct ShaderLookup {
+  TranslatedShader* vertex = nullptr;
+  TranslatedShader* pixel = nullptr;
+  ShaderCache::Interface interface;
+  uint64_t vertex_hash = 0, pixel_hash = 0;
+};
+
+// Shader lookups kept by what the draw reads from the shader objects instead
+// of the microcode's hash (see "Shader lookup" in docs/native-renderer.md):
+// both objects, their microcode's address and size, the id the vertex
+// shader is patched for and the bound declaration's, and the registers and
+// flags the interface depends on. Measured over races, a key never came back
+// with other microcode: the game's Direct3D changes a vertex shader's only by
+// patching it, which changes the id it's patched for. Translations are never
+// freed, so their pointers stay good. An open-addressed table, at most half
+// full; never emptied (a session meets ~600 keys).
+class ShaderLookupTable {
+ public:
+  struct Key {
+    uint32_t words[12];
+    bool operator==(const Key& other) const {
+      return std::memcmp(words, other.words, sizeof(words)) == 0;
+    }
+  };
+
+  // The key's answer, or null.
+  const ShaderLookup* Find(const Key& key) const {
+    if (slots_.empty()) {
+      return nullptr;
+    }
+    size_t mask = slots_.size() - 1;
+    for (size_t i = HashOf(key) & mask;; i = (i + 1) & mask) {
+      const Slot& slot = slots_[i];
+      if (!slot.used) {
+        return nullptr;
+      }
+      if (slot.key == key) {
+        return &slot.value;
+      }
+    }
+  }
+
+  // After Find gave null.
+  void Add(const Key& key, const ShaderLookup& value) {
+    if ((size_ + 1) * 2 > slots_.size()) {
+      Grow();
+    }
+    Place(key, value);
+    size_++;
+  }
+
+ private:
+  struct Slot {
+    Key key;
+    bool used;
+    ShaderLookup value;
+  };
+  static size_t HashOf(const Key& key) {
+    uint64_t h = 0;
+    for (int i = 0; i < 12; i += 2) {
+      uint64_t word;
+      std::memcpy(&word, &key.words[i], 8);
+      h = (h ^ word) * 0x9E3779B97F4A7C15ull;
+    }
+    // Mixed down (MurmurHash3's finalizer), as multiplying carries bits
+    // only upward.
+    h ^= h >> 33;
+    h *= 0xFF51AFD7ED558CCDull;
+    h ^= h >> 33;
+    h *= 0xC4CEB9FE1A85EC53ull;
+    h ^= h >> 33;
+    return size_t(h);
+  }
+  void Place(const Key& key, const ShaderLookup& value) {
+    size_t mask = slots_.size() - 1;
+    size_t i = HashOf(key) & mask;
+    while (slots_[i].used) {
+      i = (i + 1) & mask;
+    }
+    slots_[i] = {key, true, value};
+  }
+  void Grow() {
+    std::vector<Slot> old = std::move(slots_);
+    slots_.assign(std::max<size_t>(old.size() * 2, 1024), Slot{});
+    for (const Slot& slot : old) {
+      if (slot.used) {
+        Place(slot.key, slot.value);
+      }
+    }
+  }
+  std::vector<Slot> slots_;
+  size_t size_ = 0;
+};
+
 }  // namespace
 
 struct Passes::State {
@@ -1101,6 +1197,21 @@ struct Passes::State {
     VkDescriptorSet set = VK_NULL_HANDLE;
   } last_texture_sets[2];
   bool reuse_texture_sets = true;
+  // Draws' shader lookups kept by what they read from the shader objects
+  // (cache_shader_lookups; ShaderLookupTable), the last draw's checked
+  // first. With check_shader_lookups, each answer kept is also worked out
+  // in full and compared.
+  bool cache_shader_lookups = true;
+  bool check_shader_lookups = false;
+  ShaderLookupTable shader_lookups;
+  ShaderLookupTable::Key last_shader_key = {};
+  ShaderLookup last_shader_lookup;
+  bool last_shader_valid = false;
+  struct ShaderLookupChecks {
+    uint64_t kept = 0, last = 0, differ = 0;
+    ShaderLookupTable::Key sample = {};
+    bool sampled = false;
+  } shader_checks;
   VkPipelineLayout GetPipelineLayout(VkDescriptorSetLayout vertex, VkDescriptorSetLayout pixel);
   VkShaderModule GetModule(TranslatedShader* shader);
   VkPipeline GetPipeline(const PipelineKey& key);
@@ -2920,8 +3031,8 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
     s.stats.failed_by[1]++;
     return;
   }
-  const uint8_t* vertex_ucode =
-      PhysicalHostAddress(base, GpuPhysicalAddress(guest::LoadU32(base, vertex_object + 48)));
+  uint32_t vertex_address = guest::LoadU32(base, vertex_object + 48);
+  const uint8_t* vertex_ucode = PhysicalHostAddress(base, GpuPhysicalAddress(vertex_address));
   uint32_t vertex_size = guest::LoadU32(base, vertex_object + 600);
   uint32_t declaration = guest::LoadU32(base, device + kDeviceVertexDeclaration);
   uint32_t declaration_id = declaration ? guest::LoadU32(base, declaration + 48) : 0;
@@ -2953,30 +3064,92 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
       s.stats.declaration_sample = {patched_for, declaration_id};
     }
   }
+  uint32_t pixel_address = pixel_object ? guest::LoadU32(base, pixel_object + 24) : 0;
   const uint8_t* pixel_ucode =
-      pixel_object
-          ? PhysicalHostAddress(base, GpuPhysicalAddress(guest::LoadU32(base, pixel_object + 24)))
-          : nullptr;
+      pixel_object ? PhysicalHostAddress(base, GpuPhysicalAddress(pixel_address)) : nullptr;
   uint32_t pixel_size = pixel_object ? guest::LoadU32(base, pixel_object + 64) : 0;
-  // Each microcode hashed once a draw (the cache's lookups take the hash).
-  uint64_t vertex_hash = MicrocodeHash(vertex_ucode, vertex_size);
-  uint64_t pixel_hash = pixel_ucode ? MicrocodeHash(pixel_ucode, pixel_size) : 0;
-  // Which interpolators connect them (an unconnected one the pixel shader
-  // reads would be undefined).
-  ShaderCache::Interface interface = s.shaders->GetInterface(
-      vertex_ucode, vertex_size, vertex_hash, pixel_ucode, pixel_size, pixel_hash,
-      program_control, regs.values[XE_GPU_REG_SQ_CONTEXT_MISC]);
-  interface.param_gen_point = type == 1;  // point list
-  interface.rectangle_list = rectangle_list;
+  uint32_t context_misc = regs.values[XE_GPU_REG_SQ_CONTEXT_MISC];
+  // The lookup in full: each microcode hashed once (the cache's lookups take
+  // the hash), which interpolators connect them (an unconnected one the
+  // pixel shader reads would be undefined), and the translations.
+  auto look_up = [&] {
+    ShaderLookup r;
+    r.vertex_hash = MicrocodeHash(vertex_ucode, vertex_size);
+    r.pixel_hash = pixel_ucode ? MicrocodeHash(pixel_ucode, pixel_size) : 0;
+    r.interface = s.shaders->GetInterface(vertex_ucode, vertex_size, r.vertex_hash, pixel_ucode,
+                                          pixel_size, r.pixel_hash, program_control,
+                                          context_misc);
+    r.interface.param_gen_point = type == 1;  // point list
+    r.interface.rectangle_list = rectangle_list;
+    r.vertex = s.shaders->Get(ShaderStage::kVertex, vertex_ucode, vertex_size, r.vertex_hash,
+                              program_control & 0x3F, r.interface);
+    if (pixel_object) {
+      r.pixel = s.shaders->Get(ShaderStage::kPixel, pixel_ucode, pixel_size, r.pixel_hash,
+                               (program_control >> 8) & 0x3F, r.interface);
+    }
+    return r;
+  };
+  // Kept by what the draw read from the shader objects (ShaderLookupTable),
+  // except for the patched copy (its contents change at one address) and
+  // with the diagnostic that needs the hashes worked out.
+  ShaderLookup lookup;
+  if (s.cache_shader_lookups && !vertex_copy && !s.log_shader_lookups) {
+    ShaderLookupTable::Key key = {{vertex_object, vertex_address, vertex_size, patched_for,
+                                   declaration_id, pixel_object, pixel_address, pixel_size,
+                                   program_control, context_misc,
+                                   uint32_t(type == 1) | uint32_t(rectangle_list) << 1, 0}};
+    const ShaderLookup* kept = nullptr;
+    bool last = s.last_shader_valid && key == s.last_shader_key;
+    if (last) {
+      kept = &s.last_shader_lookup;
+    } else {
+      kept = s.shader_lookups.Find(key);
+    }
+    if (kept) {
+      lookup = *kept;
+      if (s.check_shader_lookups) {
+        ShaderLookup full = look_up();
+        State::ShaderLookupChecks& c = s.shader_checks;
+        c.kept++;
+        c.last += last;
+        bool same = full.vertex == lookup.vertex && full.pixel == lookup.pixel &&
+                    full.vertex_hash == lookup.vertex_hash &&
+                    full.pixel_hash == lookup.pixel_hash &&
+                    full.interface.interpolator_mask == lookup.interface.interpolator_mask &&
+                    full.interface.param_gen_interpolator ==
+                        lookup.interface.param_gen_interpolator &&
+                    full.interface.param_gen_point == lookup.interface.param_gen_point &&
+                    full.interface.rectangle_list == lookup.interface.rectangle_list;
+        if (!same) {
+          c.differ++;
+          if (!c.sampled) {
+            c.sample = key;
+            c.sampled = true;
+          }
+          lookup = full;
+        }
+      }
+    } else {
+      lookup = look_up();
+      // Failed translations aren't kept.
+      if (lookup.vertex && (!pixel_object || lookup.pixel)) {
+        s.shader_lookups.Add(key, lookup);
+      }
+    }
+    s.last_shader_key = key;
+    s.last_shader_lookup = lookup;
+    s.last_shader_valid = lookup.vertex && (!pixel_object || lookup.pixel);
+  } else {
+    lookup = look_up();
+  }
+  const ShaderCache::Interface& interface = lookup.interface;
+  uint64_t pixel_hash = lookup.pixel_hash;
   if (s.log_shader_lookups) {
     State::ShaderKey keys[2] = {
-        {vertex_object, guest::LoadU32(base, vertex_object + 48), vertex_size, patched_for,
-         declaration_id, vertex_copy},
-        {pixel_object, pixel_object ? guest::LoadU32(base, pixel_object + 24) : 0, pixel_size, 0,
-         0, 0}};
-    uint64_t hashes[2] = {vertex_hash, pixel_hash};
-    s.CountShaderLookup(keys, hashes, program_control, regs.values[XE_GPU_REG_SQ_CONTEXT_MISC],
-                        type == 1, rectangle_list);
+        {vertex_object, vertex_address, vertex_size, patched_for, declaration_id, vertex_copy},
+        {pixel_object, pixel_address, pixel_size, 0, 0, 0}};
+    uint64_t hashes[2] = {lookup.vertex_hash, pixel_hash};
+    s.CountShaderLookup(keys, hashes, program_control, context_misc, type == 1, rectangle_list);
   }
   if (pixel_ucode && interface.param_gen_interpolator < 16) {
     s.stats.param_gen_draws++;
@@ -2989,13 +3162,8 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
     s.interpolators_by_shader[pixel_hash] |=
         uint64_t(interface.interpolator_mask) << 16 * (program_control >> 18 & 1);
   }
-  TranslatedShader* vertex = s.shaders->Get(ShaderStage::kVertex, vertex_ucode, vertex_size,
-                                            vertex_hash, program_control & 0x3F, interface);
-  TranslatedShader* pixel = nullptr;
-  if (pixel_object) {
-    pixel = s.shaders->Get(ShaderStage::kPixel, pixel_ucode, pixel_size, pixel_hash,
-                           (program_control >> 8) & 0x3F, interface);
-  }
+  TranslatedShader* vertex = lookup.vertex;
+  TranslatedShader* pixel = lookup.pixel;
   if (!vertex || (pixel_object && !pixel)) {
     s.stats.failed++;
     s.stats.failed_by[2]++;
@@ -4237,6 +4405,32 @@ std::string Passes::TakeTextureBindings() {
       e.resolve_changes, e.created);
   c = {};
   c.generation = s.textures.generation();
+  return text;
+}
+
+void Passes::set_cache_shader_lookups(bool cache) {
+  state_->cache_shader_lookups = cache;
+}
+
+void Passes::set_check_shader_lookups(bool check) {
+  state_->check_shader_lookups = check;
+}
+
+std::string Passes::TakeShaderLookupChecks() {
+  State::ShaderLookupChecks& c = state_->shader_checks;
+  std::string text = fmt::format(
+      "shader lookup check: {} answers kept ({} the last draw's), {} differ from the lookup in "
+      "full",
+      c.kept, c.last, c.differ);
+  if (c.sampled) {
+    const uint32_t* w = c.sample.words;
+    text += fmt::format(
+        ", e.g. vertex shader {:08X} microcode {:08X} size {} patched for {} declaration {}, "
+        "pixel shader {:08X} microcode {:08X} size {}, program control {:08X} context misc {:08X} "
+        "flags {}",
+        w[0], w[1], w[2], w[3], w[4], w[5], w[6], w[7], w[8], w[9], w[10]);
+  }
+  c = {};
   return text;
 }
 
