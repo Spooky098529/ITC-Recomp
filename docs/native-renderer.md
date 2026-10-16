@@ -2648,6 +2648,38 @@ fine.
 - `SwizzledSigns` (~75) from the table's entry; `GetTextureLayout` (~60) on
   the shader.
 
+### Profile of 2026-10-16, after `texture-binding` (`main` at `596cb3d`)
+
+`profile_render_thread.sh`, two runs (`main_596cb3d_a`, `_b`): 10.66 and
+11.70 million cycles a frame (5,343 and 4,864 frames in the 12 s; the
+second run drew ~9% fewer frames, the noise seen before). `itc` 75%, the
+Vulkan driver 14.2-14.5%, libc 10.4-10.6%. By group (both runs within
+~0.3 of each other; the driver's group misses ~2.7% of its samples that
+the by-library count has):
+
+| Part | Share | Biggest items (run a), share and thousand cycles a frame |
+|---|---|---|
+| Replay handlers and library (guest) | ~37.4% | Release `822A67B0` 3.35 (357) and AddRef `822A6738` 1.5 (163), SetRenderState `8258FBD0` 2.7 (278), SetSamplerState `8258FC30` 2.4 (246), SetShaderConstants `8258FD48` 1.8, replay kind 3 `8258E7E8` 1.7, shader load `822AED18` 1.6, `8258EC38` 1.5, SetTexture `8258FCE0` 1.3, `822A3908` (SetIndices' caller) 1.3, DrawIndexedVertices `825902E0` 1.2, `822A6008` 1.2, SetVertexShader `822A8808` 1.2 and `8258FF50` 1.1, constants `822A8308`/`822A81F8` ~1.1 each, memcpy `825A7410` 1.1, SetBlendState `8258FC90` 1.0 |
+| Vulkan driver | ~14.3% | one spot at `+0x235ab2` 2.5 |
+| libc | ~10.5% | `0x184a65` 1.5 (likely `memcmp`), `0x18e093` 1.4 and `0x18e286` 0.9 (likely `memcpy`) |
+| `Passes::State::Draw` itself | ~10.0% | 1,088 and 1,156 |
+| Shader lookup | ~6.0% | XXH3 2.0 (215) + 1.1 for short microcode, `ShaderCache::Get` 1.8 (191), `GetInterface` 1.1 (115) |
+| Interpolation | ~5.8% | `BlendState_ReplayConstants` 5.7 (604 and 679) |
+| Reading state | ~4.4% | `GetTarget` 1.9, `ReadRegisters` 1.4, `GetHostViewportInfo` 1.1 |
+| Texture binding | ~3.9% | `GetTextureSet` 2.3 (241), `SwizzledSigns` 0.5, `GetTextureLayout` 0.5, `Find` 0.5 |
+| Pipeline lookup | ~2.6% | the `PipelineKey` `unordered_map` 1.7 (182), `GetPipelineLayout` 1.0 |
+| Other renderer | ~2.2% | `ApplyBuffer` 0.7, `PlaceConstants` 0.5, `DrawPackets_IndexedDraw` 0.4 |
+
+`interpolators_by_shader`'s `std::map` (1.2%) is the script's info
+logging (`collect_interfaces`), as before; `run.sh` doesn't pay it.
+
+So with texture binding down to ~4%, the guest side (over a third) is the
+largest part by far; of our own code, shader lookup (~6%: the microcode
+hashed on every draw) is now bigger than texture binding, and pipeline
+lookup has grown to ~2.6%. The driver and libc callers weren't split
+this time (the branch-record method in "Profile of 2026-10-15, after
+v0.3.7").
+
 ## Resolution (branch `unlocked-resolution`, 2026-10-16)
 
 Goal: `--width`/`--height` and fullscreen. The game draws its 3D view at
