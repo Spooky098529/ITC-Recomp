@@ -1046,8 +1046,32 @@ struct Passes::State {
   bool CreateDummyTextures();
   VkDescriptorSetLayout GetTextureLayout(const TranslatedShader* shader,
                                          VkShaderStageFlags stage);
+  // The texture set for the shader's bindings from the current fetch
+  // constants (stage: 0 vertex, 1 pixel): the last one for the stage again
+  // when nothing it was built from changed (reuse_texture_sets), else
+  // BuildTextureSet's.
   VkDescriptorSet GetTextureSet(uint8_t* base, const TranslatedShader* shader,
-                                VkDescriptorSetLayout layout);
+                                VkDescriptorSetLayout layout, uint32_t stage);
+  VkDescriptorSet BuildTextureSet(uint8_t* base, const TranslatedShader* shader,
+                                  VkDescriptorSetLayout layout);
+  // Each stage's last texture set and what it was built from: the shader,
+  // the layout, the fetch constants the shader reads (a bit each, and their
+  // words), and the texture cache's generations. Null set: none to reuse
+  // (forgotten each frame, as sets are; not kept when an answer it was
+  // built from wasn't kept by the texture cache, e.g. a placeholder).
+  struct LastTextureSet {
+    const TranslatedShader* shader = nullptr;
+    VkDescriptorSetLayout layout = VK_NULL_HANDLE;
+    uint64_t generation = 0, sampler_generation = 0;
+    uint32_t fetch_mask = 0;
+    uint32_t fetch[32 * 6];
+    VkDescriptorSet set = VK_NULL_HANDLE;
+  } last_texture_sets[2];
+  bool reuse_texture_sets = true;
+  // Temporary (--native_renderer_check_texture_sets): each reuse also built
+  // in full, and compared.
+  bool check_texture_sets = false;
+  uint64_t texture_set_reuses = 0, texture_set_checks = 0, texture_set_mismatches = 0;
   VkPipelineLayout GetPipelineLayout(VkDescriptorSetLayout vertex, VkDescriptorSetLayout pixel);
   VkShaderModule GetModule(TranslatedShader* shader);
   VkPipeline GetPipeline(const PipelineKey& key);
@@ -1728,7 +1752,54 @@ VkDescriptorSetLayout Passes::State::GetTextureLayout(const TranslatedShader* sh
 }
 
 VkDescriptorSet Passes::State::GetTextureSet(uint8_t* base, const TranslatedShader* shader,
-                                               VkDescriptorSetLayout layout) {
+                                               VkDescriptorSetLayout layout, uint32_t stage) {
+  LastTextureSet& last = last_texture_sets[stage];
+  const uint32_t* fetch = &regs.values[XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0];
+  uint64_t generation = textures.generation();
+  uint64_t sampler_generation = textures.sampler_generation();
+  if (reuse_texture_sets && last.set && last.shader == shader && last.layout == layout &&
+      last.generation == generation && last.sampler_generation == sampler_generation) {
+    bool same = true;
+    for (uint32_t mask = last.fetch_mask; mask && same; mask &= mask - 1) {
+      uint32_t i = 6 * uint32_t(std::countr_zero(mask));
+      same = !std::memcmp(last.fetch + i, fetch + i, 24);
+    }
+    if (same) {
+      texture_set_reuses++;
+      if (check_texture_sets) {
+        texture_set_checks++;
+        texture_set_mismatches += BuildTextureSet(base, shader, layout) != last.set;
+      }
+      return last.set;
+    }
+  }
+  uint64_t unkept = textures.unkept_answers();
+  VkDescriptorSet set = BuildTextureSet(base, shader, layout);
+  if (shader != last.shader) {
+    last.shader = shader;
+    last.fetch_mask = 0;
+    if (shader) {
+      for (const ShaderTexture& texture : shader->textures) {
+        last.fetch_mask |= 1u << (texture.fetch_constant & 31);
+      }
+      for (const ShaderSampler& sampler : shader->samplers) {
+        last.fetch_mask |= 1u << (sampler.fetch_constant & 31);
+      }
+    }
+  }
+  last.layout = layout;
+  last.generation = generation;
+  last.sampler_generation = sampler_generation;
+  for (uint32_t mask = last.fetch_mask; mask; mask &= mask - 1) {
+    uint32_t i = 6 * uint32_t(std::countr_zero(mask));
+    std::memcpy(last.fetch + i, fetch + i, 24);
+  }
+  last.set = textures.unkept_answers() == unkept && !(hide_cubes && shader) ? set : VK_NULL_HANDLE;
+  return set;
+}
+
+VkDescriptorSet Passes::State::BuildTextureSet(uint8_t* base, const TranslatedShader* shader,
+                                                 VkDescriptorSetLayout layout) {
   // The views and samplers for the shader's bindings, from the current
   // fetch constants; placeholders for what can't be had.
   size_t texture_count = shader ? shader->textures.size() : 0;
@@ -2684,6 +2755,9 @@ void Passes::BeginFrame(uint32_t frame_index) {
   s.watched_this_frame.clear();
   s.frame_pixel_shaders.clear();
   s.texture_sets.Clear();
+  for (State::LastTextureSet& last : s.last_texture_sets) {
+    last.set = VK_NULL_HANDLE;
+  }
   auto& ring = s.rings[frame_index];
   for (size_t i = 0; i <= ring.texture_pool && i < ring.texture_pools.size(); i++) {
     vk::vkResetDescriptorPool(s.context.device, ring.texture_pools[i], 0);
@@ -3192,8 +3266,8 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
   if (s.log_texture_bindings) {
     s.CountDrawBindings(vertex, pixel);
   }
-  VkDescriptorSet vertex_textures = s.GetTextureSet(base, vertex, vertex_layout);
-  VkDescriptorSet pixel_textures = s.GetTextureSet(base, pixel, pixel_layout);
+  VkDescriptorSet vertex_textures = s.GetTextureSet(base, vertex, vertex_layout, 0);
+  VkDescriptorSet pixel_textures = s.GetTextureSet(base, pixel, pixel_layout, 1);
   if (!vertex_textures || !pixel_textures) {
     s.stats.failed++;
     s.stats.failed_by[6]++;
@@ -4049,6 +4123,21 @@ std::string Passes::TakeIndexRanges() {
   uint64_t frame_sequence = c.frame_sequence;
   c = {};
   c.frame_sequence = frame_sequence;
+  return text;
+}
+
+void Passes::set_reuse_texture_sets(bool reuse, bool check) {
+  state_->reuse_texture_sets = reuse;
+  state_->check_texture_sets = check;
+}
+
+std::string Passes::TakeTextureSetChecks() {
+  State& s = *state_;
+  std::string text = fmt::format("texture sets: {} reused, {} checked by building in full, {} "
+                                 "differed",
+                                 s.texture_set_reuses, s.texture_set_checks,
+                                 s.texture_set_mismatches);
+  s.texture_set_reuses = s.texture_set_checks = s.texture_set_mismatches = 0;
   return text;
 }
 

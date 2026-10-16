@@ -112,6 +112,11 @@ class Passes {
   // (to judge caching it); TakeTextureBindings describes it since it was
   // last called.
   void set_log_texture_bindings(bool log);
+  // Reuse each stage's last texture set when nothing it was built from
+  // changed; with check (temporary), also build it and count differences
+  // (TakeTextureSetChecks).
+  void set_reuse_texture_sets(bool reuse, bool check);
+  std::string TakeTextureSetChecks();
   std::string TakeTextureBindings();
   // Fixed at start (--native_renderer_mirror_by_tick): draws read a mirror
   // updated only as a logic pass's list starts replaying (an experiment);

@@ -1005,6 +1005,7 @@ VkImageView TextureCache::GetView(uint8_t* base, const uint32_t fetch_words[6],
   bool cacheable;
   // Hashing every texture every frame needs every call.
   if (!cache_bindings_ || verify_every_frame_) {
+    unkept_answers_++;
     return LookUpView(base, fetch_words, view_type, cacheable);
   }
   State& s = *state_;
@@ -1022,6 +1023,7 @@ VkImageView TextureCache::GetView(uint8_t* base, const uint32_t fetch_words[6],
     // Not kept: nothing (a placeholder, maybe only until staging has room),
     // or a texture still to be reloaded.
     e.generation = cacheable && view ? generation_ : UINT64_MAX;
+    unkept_answers_ += e.generation == UINT64_MAX;
   }
   last = e;
   return FromBits<VkImageView>(e.value);
@@ -1286,6 +1288,7 @@ bool TextureCache::DecodeGuest(uint8_t* base, const uint32_t fetch_words[6],
 VkSampler TextureCache::GetSampler(const uint32_t fetch_words[6],
                                    const SamplerOverrides& overrides) {
   if (!cache_bindings_) {
+    unkept_answers_++;
     return LookUpSampler(fetch_words, overrides);
   }
   State& s = *state_;
@@ -1302,6 +1305,7 @@ VkSampler TextureCache::GetSampler(const uint32_t fetch_words[6],
     VkSampler sampler = LookUpSampler(fetch_words, overrides);
     e.value = HandleBits(sampler);
     e.generation = sampler ? sampler_generation_ : UINT64_MAX;
+    unkept_answers_ += !sampler;
   }
   last = e;
   return FromBits<VkSampler>(e.value);

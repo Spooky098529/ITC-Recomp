@@ -107,6 +107,12 @@ class TextureCache {
   // again. Not for first loads or new textures: those happen only on a
   // fetch constant's first use.
   uint64_t generation() const { return generation_; }
+  // The same for samplers (bumped when base_level_only changes).
+  uint64_t sampler_generation() const { return sampler_generation_; }
+  // GetView and GetSampler answers not kept in the table so far (null, a
+  // reload deferred, or the table off): a caller keeping what it built from
+  // answers can tell whether all of them would be asked again.
+  uint64_t unkept_answers() const { return unkept_answers_; }
   // What bumped it, and textures made, since the last call (a diagnostic).
   struct GenerationEvents {
     uint64_t marked_frames = 0, resolve_changes = 0, created = 0;
@@ -153,6 +159,7 @@ class TextureCache {
   bool cache_bindings_ = true;
   bool log_writes_ = false;
   uint64_t sampler_generation_ = 0;
+  uint64_t unkept_answers_ = 0;
   Hide debug_hide_ = Hide::kNone;
   bool base_level_only_ = false;
   bool verify_every_frame_ = false;
