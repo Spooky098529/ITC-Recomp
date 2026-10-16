@@ -1760,8 +1760,7 @@ VkDescriptorSet Passes::State::GetTextureSet(uint8_t* base, const TranslatedShad
     }
     VkImageView view = hide_cubes && texture.view_type == VK_IMAGE_VIEW_TYPE_CUBE
                            ? VK_NULL_HANDLE
-                           : textures.GetView(base, fetch, texture.view_type,
-                                                              texture.fetch_constant);
+                           : textures.GetView(base, fetch, texture.view_type);
     bool mismatched = false;
     if (uint64_t total = textures.mismatched_total(); total != mismatched_seen) {
       mismatched = true;
