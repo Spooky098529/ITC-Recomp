@@ -237,7 +237,12 @@ Not done yet:
   calls a frame) done natively with its diagnostics out of line: -14.4%
   main thread cycles a frame, +3.6% uncapped fps ("The main thread" in
   `docs/native-renderer.md`; `ITC_THREAD=main profile_render_thread.sh`
-  profiles it). A larger lead, translating
+  profiles it). Merged from `perf-investigate` (2026-10-16): the lights
+  nearest a point (`sub_820F4128`, ~6,240 lights tested a call, ~3 calls
+  a frame) found natively, four lights tested at once with the same
+  results: -14.1% main thread cycles a frame, +0.9% fps; the render
+  thread (94%) limits again, the main thread at 84% ("Lights::FindNearest"
+  in `docs/native-renderer.md`). A larger lead, translating
   draws once a tick: `docs/tick-replay.md`. Still to decide: the old
   per-draw path's future, and a Steam Deck test.
 - Recheck whether the player's beam on the road still jumps in sharp turns
