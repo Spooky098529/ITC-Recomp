@@ -2838,6 +2838,68 @@ above every v0.4.1 run. Since v0.4.1: texture-binding and shader-lookup.
 The release is a CI build (clang 20, stripped) and `main` a local one
 (the same preset), which may account for some of it.
 
+### The main thread (2026-10-16, `main` at `2b33ade`)
+
+Render thread baseline first (`profile_render_thread.sh`, two runs):
+10.17 and 10.27 million cycles a frame; `itc` 73%, the driver 14.4%, libc
+12.0%. But in the same uncapped attract race `top -H` had **`Main XThread`
+at 99% of a core and the render thread at 87%**: the main thread (which
+runs the game and records its command lists) is now the limit on this PC.
+`ITC_THREAD=main profile_render_thread.sh ...` records it instead.
+
+Its profile (8 s): `itc` 93%, libc 5.3%. `__imp__sub_8258CAA0`
+(`CommandList::AllocateSlots`) 24.0%, `sub_820F4128` 13.1%,
+`sub_821298C0` 10.0%, `CameraIds::Of` 7.4%, `sub_8209C6E0` (light
+billboards) 6.4%, `DrawState::AfterDraw` 3.6%, `SplitViewProjection`
+2.9%, `sub_825951E0` 2.5%.
+
+**`perf annotate` is wrong on this binary**: it has two executable
+segments with different file-offset-to-address deltas (`.ltext` 0x1000,
+`.text` 0x3000), and annotate puts samples 0x2000 off (it showed a hot
+spot in `__restvmx_87`, which nothing calls). `perf report`'s symbols are
+right. To find hot instructions, take the IPs from `perf script -F
+ip,sym` and map them by hand: address = IP - (the `r-xp` mapping's start
+in `--show-mmap-events`) + 0x79000, then `objdump -d` there.
+
+#### AllocateSlots
+
+A ten-instruction function at a quarter of the thread: a temporary
+counter (removed) found **~24 million calls a second, ~51,000 a frame**
+at ~470 fps, 1.37 slots each on average, never a full list. Most come from
+`sub_82146BD0` (the world geometry recorder), which has 70 call sites,
+nearly all for one slot: every command header is its own call (~20 a
+draw). So ~45 cycles a call, spent on the translated function's guest
+stack frame (`stw lr`, `stwu r1`: byte-swapped guest stores) and a
+store-forwarding stall (`stwu` writes `ctx.r1` 32 bits wide, the epilogue
+reads it back 64 bits wide). The overflow path calls the game's debug
+print (`sub_825A1318`, formatting into a 4 KB stack buffer; 37 callers);
+it never ran (no samples in it or its formatter `sub_825A71B0`).
+
+**Done** (uncommitted on `main` at the time of writing): the override in
+`blend_state.cpp` allocates natively (two loads, compare, two stores),
+setting `r3`, `r9`-`r12` and `cr6` as the original leaves them, and calls
+the original only for a full list. `--native_allocate_slots=false` turns
+it off. Then the override's diagnostics (`--log_overlay_uploads`,
+`--log_slot_callers`, `--log_recording_by_pass`) moved into a
+`[[gnu::noinline]]` function: inlined, they made every call save six
+registers, reserve ~700 bytes of stack and check a stack canary (as with
+`Buffers_OnCommand`).
+
+Main thread, million cycles a frame, three runs each, alternating, one
+binary: native path only 11.31 (off) against 10.36 (on); with the
+diagnostics split, 10.55 (off) against **9.68** (on), -8.2%, every run on
+below every run off. Against `2b33ade` (11.31): **-14.4%**.
+`AllocateSlots` from ~2,500 to ~460 thousand cycles a frame (~9 a call).
+Frames counted in the 12 s barely moved (~5,500 to ~5,650): the render
+thread (~87%) is nearly as busy, so the fps gain needs measuring, and both
+threads now matter.
+
+Next on the main thread: `sub_820F4128` (13%, its hot spot a 4-byte store
+to the guest stack followed by a 16-byte `lvx` of the same spot, also a
+failed store forward), `sub_821298C0` (10%), and our `CameraIds::Of`
+(7.4%), `DrawState::AfterDraw` and `SplitViewProjection`; other hot
+overrides may have inlined diagnostics too.
+
 ## Resolution (branch `unlocked-resolution`, 2026-10-16)
 
 Goal: `--width`/`--height` and fullscreen. The game draws its 3D view at

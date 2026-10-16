@@ -2993,6 +2993,9 @@ extern "C" REX_FUNC(sub_8209BD50) {
 REXCVAR_DEFINE_BOOL(log_recording_by_pass, false, "ITC",
                     "Log, for each code allocating command slots, its allocations per logic "
                     "pass and per render-only pass (in races), every 2 s");
+REXCVAR_DEFINE_BOOL(native_allocate_slots, true, "ITC",
+                    "Allocate command list slots natively instead of through the translated "
+                    "CommandList::AllocateSlots (same results, without its guest stack frame)");
 REXCVAR_DEFINE_BOOL(log_slot_callers, false, "ITC",
                     "Log which code allocates command list slots for constants, once a second");
 
@@ -3004,10 +3007,11 @@ std::chrono::steady_clock::time_point g_slot_callers_logged{};
 
 // CommandList_AllocateSlots: r3 = list, r4 = slot count; returns r3 = the
 // first slot (16 bytes each), or 0 if the list is full.
-extern "C" REX_FUNC(sub_8258CAA0) {
-  REX_FUNC_PROLOGUE();
-  uint32_t count = ctx.r4.u32, caller = uint32_t(ctx.lr);
-  __imp__sub_8258CAA0(ctx, base);
+namespace {
+// AllocateSlots' diagnostics, kept out of the override so its fast path needs
+// no stack frame (they made it reserve ~700 bytes and save six registers).
+[[gnu::noinline]] void AllocateSlots_Diagnostics(PPCContext& ctx, uint32_t count,
+                                                 uint32_t caller) {
   if (REXCVAR_GET(log_overlay_uploads) && ctx.r3.u32 != 0 &&
       std::this_thread::get_id() == interpolation::GetDrawState().main_thread()) {
     uint32_t handler = interpolation::GetDrawState().handler() & ~1u;
@@ -3077,6 +3081,38 @@ extern "C" REX_FUNC(sub_8258CAA0) {
     }
     g_slot_callers.clear();
     g_slot_callers_logged = now;
+  }
+}
+}  // namespace
+
+extern "C" REX_FUNC(sub_8258CAA0) {
+  REX_FUNC_PROLOGUE();
+  uint32_t count = ctx.r4.u32;
+  // The game makes ~50,000 of these calls a frame (most for one slot), and the
+  // translated original spent ~45 cycles on each, mostly on its stack frame
+  // (see "AllocateSlots" in docs/native-renderer.md). Done here without the
+  // frame, leaving the registers it changes as it would; a full list goes to
+  // the original (it prints a message and returns 0).
+  uint32_t list = ctx.r3.u32;
+  uint32_t used = guest::LoadU32(base, list + 12) + count;
+  uint32_t limit = guest::LoadU32(base, list + 8);
+  if (REXCVAR_GET(native_allocate_slots) && used < limit) {
+    uint32_t first = guest::LoadU32(base, list + 44);
+    uint32_t next = first + (count << 4);
+    guest::StoreU32(base, list + 12, used);
+    guest::StoreU32(base, list + 44, next);
+    ctx.cr6.compare<uint32_t>(used, limit, ctx.xer);
+    ctx.r12.u64 = ctx.lr;
+    ctx.r11.u64 = list;
+    ctx.r10.u64 = uint64_t(count << 4) + first;
+    ctx.r9.u64 = count << 4;
+    ctx.r3.u64 = first;
+  } else {
+    __imp__sub_8258CAA0(ctx, base);
+  }
+  if (REXCVAR_GET(log_overlay_uploads) || REXCVAR_GET(log_slot_callers) ||
+      REXCVAR_GET(log_recording_by_pass)) [[unlikely]] {
+    AllocateSlots_Diagnostics(ctx, count, uint32_t(ctx.lr));
   }
 }
 
