@@ -2464,6 +2464,66 @@ in the first are similar):
 
 So the hypothesis holds: nearly all of the work is repeated.
 
+(These counts include the signed binding's calls. Counting only the views
+still asked of the texture cache once the signed binding copies the
+unsigned one's, below, `itc_808.log`: 2,150-2,690 views a frame, the same
+as the fetch constant's last 42-46%, as for samplers.)
+
+**Done: answers kept by the fetch constant's words** (`06c72d2`; the
+check removed in `0ab2ff7`). `TextureCache::GetView` and `GetSampler`
+look the words up in a flat hash table (`BindingTable`, `textures.cpp`):
+views by the 6 words and the view type, samplers by the 6 words and the
+packed filter overrides. A view's entry holds while
+`TextureCache::generation()` is unchanged (bumped when memcpy marks a
+texture written, a resolve changes an address's image, or the debug hide
+changes); a sampler's while `base_level_only` is. Not kept: null answers
+(placeholders, perhaps only until staging has room) and textures still
+marked changed (a reload deferred). With `verify_every_frame_` every call
+takes the full path. `GetTextureSet` gives the signed binding the
+unsigned one's view instead of asking again. The texture cache's stats
+(loads, mismatches, resolve hits) now count only the calls not answered
+from the table. `--native_renderer_cache_texture_bindings=false` turns the
+table off.
+
+Checked with a temporary `--native_renderer_check_texture_bindings`
+(each answer from the table also worked out in full) over two whole
+attract races with their results screens (`itc_806.log`, `itc_807.log`):
+0 of 206 and 204 million answers differed.
+
+Profiles (`profile_render_thread.sh`, three runs each, alternating;
+`main`'s code at `7774a95` against `0ab2ff7`), thousand cycles a frame:
+
+| Build | `GetView` | `GetSwizzledView` | `GetSampler` | `BindingTable::Find` | `GetTextureSet` | `SwizzledSigns` | `GetTextureLayout` | Sum | Render thread, million |
+|---|---|---|---|---|---|---|---|---|---|
+| `7774a95` | 468, 523, 506 | 191, 202, 195 | 167, 185, 180 | | 231, 218, 191 | 48, 42, 41 | 62, 56, 59 | 1,167, 1,225, 1,172 | 11.31, 11.59, 11.36 |
+| `0ab2ff7` | (inlined) | | (inlined) | 253, 259, 240 | 130, 134, 129 | 73, 71, 77 | 61, 60, 70 | 517, 524, 515 | 10.86, 10.96, 10.69 |
+
+So texture binding went from ~1,190 to ~520 thousand cycles a frame, and
+the thread's total fell ~5% (all three new runs under all three old).
+`GetView` and `GetSampler` are inlined into `GetTextureSet` and `Find`
+now. `SwizzledSigns`, unchanged, came out ~30 higher; not looked into.
+
+**Tried, no gain: each fetch constant's last answer before the table**
+(`93a189f`, reverted in `0c9d0d7`). A copy of the last entry per fetch
+constant (32 for views, 32 for samplers), checked by key and generation
+before hashing. `Find` fell to ~28, but `GetView` and `GetSampler` were no
+longer inlined and came to ~250 together: the functions it touches summed
+to 431, 433, 433 against 381, 409, 420 without it (thread totals 10.76,
+10.95, 11.13 against 11.04, 11.09, 11.14, within noise). The table's
+lookup was already cheap, so the hash it skips (on ~44% of calls) saved
+about what the extra compare and copy cost.
+
+**Left to try**, unmeasured estimates:
+
+- Reuse the last draw's descriptor set when the shader and the fetch
+  constants it reads are unchanged (pixel stage 43-50% of draws, vertex
+  71-75%): skips the lookups, the set's key and `FrameSetCache` for them.
+- Keep descriptor sets from frame to frame: ~10% of sets are allocated
+  and written each frame only because the pools are reset with the frame
+  (`GetTextureSet`'s driver calls, ~1% of the thread).
+- `SwizzledSigns` (~75) from the table's entry; `GetTextureLayout` (~60) on
+  the shader.
+
 ## Resolution (branch `unlocked-resolution`, 2026-10-16)
 
 Goal: `--width`/`--height` and fullscreen. The game draws its 3D view at
