@@ -66,8 +66,13 @@ jobs:
 
       - name: Configure
         working-directory: itc_recomp
+        # clang-20 by name: since 2026-10-16 the build dependencies pull in
+        # jammy's clang package, whose /usr/bin/clang (14) replaces the
+        # alternative set above. clang-20 finds its own ld.lld.
         run: >
           cmake --preset linux-amd64-release
+          -DCMAKE_C_COMPILER=clang-20
+          -DCMAKE_CXX_COMPILER=clang++-20
           -DCMAKE_C_COMPILER_LAUNCHER=sccache
           -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
 
