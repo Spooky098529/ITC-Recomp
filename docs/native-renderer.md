@@ -965,6 +965,18 @@ memory).
 - `--native_renderer_cache_index_ranges=false`: scan every draw's indices
   again instead of keeping each range's lowest and highest index until
   memcpy writes it (on by default; see "Done: the index range cache").
+- `--native_renderer_log_texture_bindings`: every 5 s, how often draws'
+  texture bindings repeat: views and samplers asked of the texture cache
+  and how many repeat their fetch constant's last call or an earlier one,
+  draws repeating the last draw's shaders and the fetch constants they
+  read, descriptor sets found already made, and what bumps the texture
+  cache's generation (see "Texture binding").
+- `--native_renderer_cache_texture_bindings=false`: look every texture view
+  and sampler up in full instead of answering from the table by the fetch
+  constant's words (on by default; see "Texture binding").
+- `--native_renderer_reuse_texture_sets=false`: build every draw's texture
+  sets instead of reusing a stage's last one when nothing it was built
+  from changed (on by default; see "Texture binding").
 - `--native_renderer_log_register_reads`: how often the register shadow is
   read a frame, the words copied (those marked dirty) and what changed
   since the last read (see "Register reads").
@@ -1009,7 +1021,9 @@ memory).
 - `app_window.cpp`: exclusive mode's one window (hides the SDK's, routes
   our window's events to it).
 - `glsl/`: our own shaders (resolves), compiled into `generated_*.h`.
-- `textures.cpp`: the texture cache (milestone 3).
+- `textures.cpp`: the texture cache (milestone 3), and the table of views
+  and samplers by fetch constant words (`BindingTable`, "Texture
+  binding").
 - `disk_cache.cpp`: the disk caches' directory (`cache/` next to the
   executable); `shaders.cpp` keeps translations there, `passes.cpp` the
   pipeline cache.
@@ -1805,7 +1819,9 @@ branch-record run is skewed, so take shares from a plain run):
    memcpy write as the mirror's copies are; a flat table instead of the
    `mirrored` `unordered_set`.
 3. **Texture binding** (~8%): cache what `GetView`, `GetSampler` and
-   `SwizzledSigns` work out per fetch constant (its 6 words).
+   `SwizzledSigns` work out per fetch constant (its 6 words). **Done**
+   for views and samplers, and texture sets reused (`texture-binding`,
+   2026-10-16; see "Texture binding"); `SwizzledSigns` not.
 4. **Descriptor binds** (2.3% in the driver plus our share of `Draw`):
    bound for ~62% of draws, mostly for new constant offsets. Push
    descriptors, or constants reached through one buffer with offsets in

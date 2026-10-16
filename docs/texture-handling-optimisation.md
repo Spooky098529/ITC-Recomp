@@ -11,7 +11,13 @@ This file is what's been measured, what's done, and what's left to try.
 
 ## How a texture is loaded
 
-`TextureCache::GetView`, per draw, per texture binding:
+`TextureCache::GetView`, per draw, per texture binding. Since 2026-10-16
+it first looks the fetch constant's words up in a table of earlier
+answers, which holds until a texture is marked written or a resolve
+changes an address's image; the steps below run only when it doesn't
+answer (first use, or after a write; see "Texture binding" in
+`native-renderer.md`). A draw whose shader and fetch constants are the
+same as the last draw's also reuses the last texture set without asking.
 
 1. Look the texture up by its fetch constant's data fields.
 2. First use: `State::Upload`:
