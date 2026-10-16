@@ -70,6 +70,10 @@ REXCVAR_DEFINE_BOOL(native_renderer_log_index_ranges, false, "ITC",
 REXCVAR_DEFINE_BOOL(native_renderer_log_texture_bindings, false, "ITC",
                     "Log how often draws' texture bindings repeat the last ones (fetch constants, "
                     "views, samplers, descriptor sets) and what would empty a cache of them");
+REXCVAR_DEFINE_BOOL(native_renderer_log_shader_lookups, false, "ITC",
+                    "Log how often draws' shader lookups repeat the last ones and whether a key "
+                    "of the shader objects' fields would ever give a shader whose microcode "
+                    "changed");
 REXCVAR_DEFINE_BOOL(native_renderer_reuse_texture_sets, true, "ITC",
                     "Give a draw the last draw's texture descriptor set when its shader and the "
                     "fetch constants it reads are unchanged, and no texture changed");
@@ -729,6 +733,7 @@ VkCommandBuffer Renderer::BeginFrame() {
     passes_.set_log_register_reads(REXCVAR_GET(native_renderer_log_register_reads));
     passes_.set_log_index_ranges(REXCVAR_GET(native_renderer_log_index_ranges));
     passes_.set_log_texture_bindings(REXCVAR_GET(native_renderer_log_texture_bindings));
+    passes_.set_log_shader_lookups(REXCVAR_GET(native_renderer_log_shader_lookups));
     passes_.set_reuse_texture_sets(REXCVAR_GET(native_renderer_reuse_texture_sets));
     passes_.set_log_glow(REXCVAR_GET(native_renderer_log_glow));
     passes_.set_cache_index_ranges(REXCVAR_GET(native_renderer_cache_index_ranges));
@@ -1164,6 +1169,9 @@ void Renderer::LogStats() {
   }
   if (REXCVAR_GET(native_renderer_log_texture_bindings)) {
     REXLOG_INFO("native renderer: {}", passes_.TakeTextureBindings());
+  }
+  if (REXCVAR_GET(native_renderer_log_shader_lookups)) {
+    REXLOG_INFO("native renderer: {}", passes_.TakeShaderLookups());
   }
   if (view.invisible) {
     const auto& v = view.invisible_sample;

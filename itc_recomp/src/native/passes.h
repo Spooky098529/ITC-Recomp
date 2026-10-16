@@ -116,6 +116,12 @@ class Passes {
   // changed (on by default).
   void set_reuse_texture_sets(bool reuse);
   std::string TakeTextureBindings();
+  // A diagnostic: how much of the shader lookup repeats from draw to draw,
+  // and whether a key of what draws read from the shader objects would
+  // ever give a shader whose microcode changed (to judge caching by it);
+  // TakeShaderLookups describes it since it was last called.
+  void set_log_shader_lookups(bool log);
+  std::string TakeShaderLookups();
   // Fixed at start (--native_renderer_mirror_by_tick): draws read a mirror
   // updated only as a logic pass's list starts replaying (an experiment);
   // TakeMirrorByTick describes it since it was last called.

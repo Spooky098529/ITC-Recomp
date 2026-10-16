@@ -788,6 +788,39 @@ struct Passes::State {
   } last_draw;
   void CountBinding(bool view, uint32_t slot, const uint32_t* fetch, const uint32_t extra[4]);
   void CountDrawBindings(const TranslatedShader* vertex, const TranslatedShader* pixel);
+  // With log_shader_lookups: how much of the shader lookup repeats, to
+  // judge keying it by what the draw reads from the shader objects instead
+  // of hashing the microcode (TakeShaderLookups describes it). A stage's
+  // key is its object, microcode address and size, and for the vertex
+  // shader the id it's patched for, the bound declaration's and whether the
+  // patched copy is drawn. A key met before (this session) whose microcode
+  // now hashes differently is stale: a cache by the key would have given
+  // the wrong shader. Split by whether a patch (g_vertex_shader_patches)
+  // came between.
+  bool log_shader_lookups = false;
+  struct ShaderKey {
+    uint32_t object, microcode, size, patched_for, declaration_id, copy;
+  };
+  struct ShaderSeen {
+    uint64_t hash;
+    uint32_t patches;  // g_vertex_shader_patches when last seen
+  };
+  std::unordered_map<uint64_t, ShaderSeen> shaders_seen[2];  // by key hash; vertex, pixel
+  std::unordered_set<uint64_t> lookups_seen;  // whole lookups' key hashes
+  struct ShaderLookupCounts {
+    uint64_t frames = 0, draws = 0, copies = 0, lookup_same = 0, lookup_seen = 0;
+    uint64_t same[2] = {}, seen[2] = {}, stale[2] = {}, stale_patched[2] = {};
+    ShaderKey stale_sample[2] = {};
+    uint64_t stale_hashes[2][2] = {};  // the sample's hash before and now
+    uint32_t patches = 0;  // g_vertex_shader_patches when last taken
+  } lookup_counts;
+  struct LastLookup {
+    uint64_t key[2], lookup;
+    bool valid;
+  } last_lookup = {};
+  void CountShaderLookup(const ShaderKey keys[2], const uint64_t hashes[2],
+                         uint32_t program_control, uint32_t context_misc, bool point,
+                         bool rectangle_list);
   void LogGlow();
   // Debugging aids: draws of this pixel shader (hash) are skipped; with
   // record_draws, each draw is described in a line (written with a dump).
@@ -1961,6 +1994,45 @@ void Passes::State::CountBinding(bool view, uint32_t slot, const uint32_t* fetch
   }
 }
 
+void Passes::State::CountShaderLookup(const ShaderKey keys[2], const uint64_t hashes[2],
+                                      uint32_t program_control, uint32_t context_misc,
+                                      bool point, bool rectangle_list) {
+  ShaderLookupCounts& c = lookup_counts;
+  LastLookup& last = last_lookup;
+  c.draws++;
+  c.copies += keys[0].copy;
+  uint64_t key_hashes[2];
+  for (int stage = 0; stage < 2; stage++) {
+    key_hashes[stage] = XXH3_64bits(&keys[stage], sizeof(ShaderKey));
+    c.same[stage] += last.valid && last.key[stage] == key_hashes[stage];
+    auto [it, added] =
+        shaders_seen[stage].try_emplace(key_hashes[stage], ShaderSeen{hashes[stage], 0});
+    if (!added) {
+      c.seen[stage]++;
+      if (it->second.hash != hashes[stage]) {
+        bool patched = it->second.patches != g_vertex_shader_patches;
+        c.stale[stage]++;
+        c.stale_patched[stage] += patched;
+        if (!patched && !c.stale_sample[stage].object) {
+          c.stale_sample[stage] = keys[stage];
+          c.stale_hashes[stage][0] = it->second.hash;
+          c.stale_hashes[stage][1] = hashes[stage];
+        }
+        it->second.hash = hashes[stage];
+      }
+    }
+    it->second.patches = g_vertex_shader_patches;
+  }
+  // The whole lookup: both stages' keys and what the interface depends on.
+  uint64_t lookup[4] = {key_hashes[0], key_hashes[1],
+                        uint64_t(program_control) << 32 | context_misc,
+                        uint64_t(point) | uint64_t(rectangle_list) << 1};
+  uint64_t lookup_hash = XXH3_64bits(lookup, sizeof(lookup));
+  c.lookup_same += last.valid && last.lookup == lookup_hash;
+  c.lookup_seen += !lookups_seen.insert(lookup_hash).second;
+  last = {{key_hashes[0], key_hashes[1]}, lookup_hash, true};
+}
+
 void Passes::State::CountDrawBindings(const TranslatedShader* vertex,
                                       const TranslatedShader* pixel) {
   TextureBindingCounts& c = binding_counts;
@@ -2728,6 +2800,9 @@ void Passes::BeginFrame(uint32_t frame_index) {
   if (s.log_texture_bindings) {
     s.binding_counts.frames++;
   }
+  if (s.log_shader_lookups) {
+    s.lookup_counts.frames++;
+  }
   if (s.log_index_ranges) {
     // Writes taken since the last frame's start (memcpy's, into the
     // physical views).
@@ -2856,10 +2931,12 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
   // The object's microcode is patched for another declaration: the GPU runs
   // the copy the library patched in the command buffer instead.
   const LoadedVertexShader& loaded = g_loaded_vertex_shader;
+  bool vertex_copy = false;
   if (declaration_id != patched_for && loaded.object == vertex_object &&
       loaded.declaration_id == declaration_id && loaded.microcode.size() == vertex_size) {
     vertex_ucode = loaded.microcode.data();
     patched_for = declaration_id;
+    vertex_copy = true;
     s.stats.vertex_shader_copies++;
   }
   if (declaration_id != patched_for) {
@@ -2891,6 +2968,16 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
       program_control, regs.values[XE_GPU_REG_SQ_CONTEXT_MISC]);
   interface.param_gen_point = type == 1;  // point list
   interface.rectangle_list = rectangle_list;
+  if (s.log_shader_lookups) {
+    State::ShaderKey keys[2] = {
+        {vertex_object, guest::LoadU32(base, vertex_object + 48), vertex_size, patched_for,
+         declaration_id, vertex_copy},
+        {pixel_object, pixel_object ? guest::LoadU32(base, pixel_object + 24) : 0, pixel_size, 0,
+         0, 0}};
+    uint64_t hashes[2] = {vertex_hash, pixel_hash};
+    s.CountShaderLookup(keys, hashes, program_control, regs.values[XE_GPU_REG_SQ_CONTEXT_MISC],
+                        type == 1, rectangle_list);
+  }
   if (pixel_ucode && interface.param_gen_interpolator < 16) {
     s.stats.param_gen_draws++;
     if (s.collect_interfaces) {
@@ -4150,6 +4237,42 @@ std::string Passes::TakeTextureBindings() {
       e.resolve_changes, e.created);
   c = {};
   c.generation = s.textures.generation();
+  return text;
+}
+
+void Passes::set_log_shader_lookups(bool log) {
+  state_->log_shader_lookups = log;
+}
+
+std::string Passes::TakeShaderLookups() {
+  State& s = *state_;
+  State::ShaderLookupCounts& c = s.lookup_counts;
+  double frames = double(std::max<uint64_t>(c.frames, 1));
+  auto share = [](uint64_t n, uint64_t of) { return 100.0 * double(n) / double(std::max<uint64_t>(of, 1)); };
+  std::string text = fmt::format(
+      "shader lookups: {:.1f} draws a frame ({:.1f} with the patched copy); the same keys as "
+      "the last draw: vertex {:.1f}%, pixel {:.1f}%, whole lookup {:.1f}%; seen before: vertex "
+      "{:.1f}%, pixel {:.1f}%, whole lookup {:.1f}%; stale (seen, microcode changed): vertex {} "
+      "({} with a patch between), pixel {} ({} with a patch between); {} vertex shader patches; "
+      "keys this session: vertex {}, pixel {}, whole lookups {}",
+      c.draws / frames, c.copies / frames, share(c.same[0], c.draws), share(c.same[1], c.draws),
+      share(c.lookup_same, c.draws), share(c.seen[0], c.draws), share(c.seen[1], c.draws),
+      share(c.lookup_seen, c.draws), c.stale[0], c.stale_patched[0], c.stale[1],
+      c.stale_patched[1], g_vertex_shader_patches - c.patches, s.shaders_seen[0].size(),
+      s.shaders_seen[1].size(), s.lookups_seen.size());
+  static const char* const kStage[2] = {"vertex", "pixel"};
+  for (int stage = 0; stage < 2; stage++) {
+    const State::ShaderKey& k = c.stale_sample[stage];
+    if (k.object) {
+      text += fmt::format(
+          "; stale {} sample without a patch: object {:08X} microcode {:08X} size {} patched for "
+          "{} declaration {} copy {}, hash {:016X} then {:016X}",
+          kStage[stage], k.object, k.microcode, k.size, k.patched_for, k.declaration_id, k.copy,
+          c.stale_hashes[stage][0], c.stale_hashes[stage][1]);
+    }
+  }
+  c = {};
+  c.patches = g_vertex_shader_patches;
   return text;
 }
 
