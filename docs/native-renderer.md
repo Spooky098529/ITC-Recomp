@@ -2592,6 +2592,14 @@ cycles a frame (by its address range likely `memcmp`: `FrameSetCache`
 compares keys with `std::equal`), other libc spots nearby ~-50, XXH3 (the
 set key's hash) 25 to 2.5.
 
+**Against `main` in fps** (2026-10-16): uncapped attract races with
+`run.sh`'s flags, alternating, mean over the race's seconds 3-18 (as in
+`CLAUDE.md`): `main`'s code (`7774a95`) 439.4, 434.9, 423.5 (432.6);
+this branch (`9a83010`) 445.4, 450.8, 438.1 (444.8): +2.8%, each run above
+the one before it. Less than the ~7% the profiles above add up to: those
+are steps against different baselines, and fps also depends on the other
+threads and the GPU.
+
 **Left to try**, unmeasured estimates:
 
 - Make building a set cheaper for the rest: `FrameSetCache`'s compare
