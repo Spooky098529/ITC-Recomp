@@ -247,6 +247,95 @@ struct Effects {
   std::map<uint32_t, uint64_t> unhandled;  // opcode: count
 } g_effects;
 
+// The display's gamma table (registers 19xx, written at boot), kept as the
+// SDK's command processor keeps it (command_processor.cpp): the 256-entry
+// table (DC_LUT_30_COLOR, 10 bits a channel, or three DC_LUT_SEQ_COLOR
+// writes) and the 128-entry PWL one (DC_LUT_PWL_DATA, a channel a write).
+// Logged at the next swap after it changes.
+constexpr uint32_t kDcLutRwMode = 0x1921, kDcLutRwIndex = 0x1922, kDcLutSeqColor = 0x1923,
+                   kDcLutPwlData = 0x1924, kDcLut30Color = 0x1925, kDcLutWriteEnMask = 0x1927,
+                   kDcLutaControl = 0x1930;
+struct GammaRamp {
+  std::array<uint32_t, 256> table{};                // DC_LUT_30_COLOR words
+  std::array<std::array<uint32_t, 3>, 128> pwl{};  // DC_LUT_PWL_DATA words, r g b
+  uint32_t component = 0;  // the next of the three sequential writes
+  uint64_t writes = 0;
+  bool changed = false;
+} g_gamma;
+
+void OnGammaRegister(uint32_t reg, uint32_t value) {
+  GammaRamp& g = g_gamma;
+  const auto& regs = g_effects.registers;
+  uint32_t index = regs[kDcLutRwIndex] & 0xFF;
+  bool enabled = false;
+  switch (reg) {
+    case kDcLutRwIndex:
+      g.component = 0;
+      return;
+    case kDcLutSeqColor: {
+      enabled = (regs[kDcLutWriteEnMask] >> (2 - g.component)) & 1;
+      if (enabled) {
+        uint32_t shift = 20 - 10 * g.component;  // red, green, blue
+        g.table[index] = (g.table[index] & ~(0x3FFu << shift)) | (((value & 0xFFFF) >> 6) << shift);
+      }
+      break;
+    }
+    case kDcLutPwlData:
+      enabled = (regs[kDcLutWriteEnMask] >> (2 - g.component)) & 1;
+      if (enabled) {
+        g.pwl[index & 0x7F][g.component] = value & 0xFFC0FFC0u;
+      }
+      break;
+    case kDcLut30Color: {
+      uint32_t mask = regs[kDcLutWriteEnMask] & 7;
+      for (uint32_t c = 0; c < 3; c++) {  // bit 0 blue, 1 green, 2 red
+        if ((mask >> c) & 1) {
+          g.table[index] = (g.table[index] & ~(0x3FFu << (10 * c))) | (value & (0x3FFu << (10 * c)));
+        }
+      }
+      g.writes += mask != 0;
+      g.changed |= mask != 0;
+      return;
+    }
+    default:
+      g.changed = true;  // the mode or the control
+      return;
+  }
+  g.writes += enabled;
+  g.changed |= enabled;
+  if (++g.component >= 3) {  // the index steps after the third channel
+    g.component = 0;
+    uint32_t next = reg == kDcLutPwlData ? (index & ~0x7Fu) | ((index + 1) & 0x7F) : index + 1;
+    g_effects.registers[kDcLutRwIndex] = (regs[kDcLutRwIndex] & ~0xFFu) | (next & 0xFF);
+  }
+}
+
+void LogGammaRamp() {
+  GammaRamp& g = g_gamma;
+  const auto& regs = g_effects.registers;
+  REXLOG_INFO("native renderer: gamma: {} writes; DC_LUTA_CONTROL {:08X}, DC_LUT_RW_MODE {:08X} "
+              "({}), D1GRPH_CONTROL {:08X}",
+              g.writes, regs[kDcLutaControl], regs[kDcLutRwMode],
+              (regs[kDcLutRwMode] & 1) ? "PWL" : "256 entries", regs[0x1841]);
+  for (uint32_t row = 0; row < 256; row += 16) {
+    std::string line;
+    for (uint32_t i = row; i < row + 16; i++) {
+      uint32_t v = g.table[i];
+      line += fmt::format(" {}:{}/{}/{}", i, (v >> 20) & 0x3FF, (v >> 10) & 0x3FF, v & 0x3FF);
+    }
+    REXLOG_INFO("native renderer: gamma table (r/g/b of 1023):{}", line);
+  }
+  for (uint32_t row = 0; row < 128; row += 16) {
+    std::string line;
+    for (uint32_t i = row; i < row + 16; i++) {
+      line += fmt::format(" {}:{:08X}/{:08X}/{:08X}", i, g.pwl[i][0], g.pwl[i][1], g.pwl[i][2]);
+    }
+    REXLOG_INFO("native renderer: gamma PWL (delta<<16|base, r/g/b):{}", line);
+  }
+  g.writes = 0;
+  g.changed = false;
+}
+
 void StorePhysical(uint8_t* base, uint32_t address, uint32_t value) {
   // Endianness in the address's low bits as the GPU takes it; the game uses
   // 8-in-32 (2), the guest's own order. 0 (none) stores it little-endian.
@@ -287,6 +376,9 @@ void WriteRegister(uint8_t* base, uint32_t reg, uint32_t value) {
     return;  // context registers: the GPU's own state
   }
   e.registers[reg] = value;
+  if (reg >= kDcLutRwMode && reg <= kDcLutaControl) {
+    OnGammaRegister(reg, value);
+  }
   // The scratch registers write back to memory where SCRATCH_UMSK says so.
   if (reg >= 0x578 && reg <= 0x57F && (e.registers[0x1DC] >> (reg - 0x578)) & 1) {
     StorePhysical(base, (e.registers[0x1DD] + 4 * (reg - 0x578)) | 2, value);
@@ -448,7 +540,11 @@ void ApplyBuffer(PPCContext& ctx, uint8_t* base, uint32_t device, uint32_t addre
       // caches), cache events, the swap (our window presents itself), and
       // the GPU's own work.
       case 0x3C:  // WAIT_REG_MEM
+        break;
       case 0x64:  // XE_SWAP
+        if (g_gamma.changed) {
+          LogGammaRamp();
+        }
         break;
       case 0x46:  // EVENT_WRITE
         if (count > 1) {
