@@ -209,11 +209,11 @@ Not done yet:
   `Buffers_OnCommand`, `ReplayStats_OnCommand` and `GetRenderer` stopped
   setting up big stack frames on every call (ThinLTO had inlined their
   logging or start-up into them; ~-2% and ~150k cycles a frame, see
-  "`Buffers_OnCommand`'s cost"). On `texture-binding` (2026-10-16, not
-  merged): texture views and samplers answered from a table by the fetch
-  constant's words, ~-5% render thread cycles a frame by profile, then the
-  last texture set reused when unchanged: against `main`, -6.9% render
-  thread cycles a frame and +2.8% uncapped fps ("Texture binding" in
+  "`Buffers_OnCommand`'s cost"). Merged from `texture-binding`
+  (2026-10-16): texture views and samplers answered from a table by the
+  fetch constant's words, and each stage's last texture set reused when
+  unchanged: -6.9% render thread cycles a frame and +2.8% uncapped fps
+  against the `main` before it ("Texture binding" in
   `docs/native-renderer.md`). Still to decide: the old per-draw path's
   future, and a Steam Deck test.
 - Recheck whether the player's beam on the road still jumps in sharp turns
