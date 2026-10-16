@@ -2,7 +2,7 @@
 
 The Windows build, cross-compiled on Linux and tested under Wine (there's
 no Windows machine to test on yet). Started 2026-10-14 on the `windows`
-branch.
+branch, merged into `main` 2026-10-16.
 
 ## Status
 
@@ -173,12 +173,17 @@ python3 -I itc_recomp/tools/fetch_vc_redist.py itc_recomp/out/xwin-sdk $D $runti
 `ubuntu-24.04`: clang 20 from apt.llvm.org (its `bin` directory on `PATH`,
 for the plain tool names the toolchain file uses), xwin's splat cached
 between runs (~630 MB; the key names xwin's version, bump its `-v1` for a
-newer CRT), sccache, then the zip with the runtime DLLs. Packaging fails
-if a binary imports one of our DLLs or a runtime DLL the zip lacks. It
-runs on pushes to `windows`, pull requests, by hand, and on `v*` tags; it
-only exists on this branch, so only a tag pushed from `windows` builds
-Windows, and then `build-linux.yml` runs too and both zips go on the same
-release.
+newer CRT), then the zip with the runtime DLLs. Packaging fails if a
+binary imports one of our DLLs or a runtime DLL the zip lacks. It runs on
+pushes to `main`, pull requests, by hand, and on `v*` tags, like
+`build-linux.yml`; on a tag both zips go on the same release. A build
+takes ~15 minutes: sccache is set up but caches nothing, as it takes
+`-Xmicrosoft-windows-sys-root`'s directory for a second input file
+("multiple input files" for every compile; clang has no joined form of
+the option). Passing the CRT and SDK through `INCLUDE`/`LIB` instead might
+fix it; the user was fine with the longer builds (2026-10-16). First run
+checked 2026-10-16: its zip boots and races under Wine from an empty
+folder, the runtime DLLs loaded from it (`WINEDEBUG=+loaddll`).
 
 ## To do
 

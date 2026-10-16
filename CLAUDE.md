@@ -3,9 +3,8 @@
 A static recompilation of Import Tuner Challenge (Xbox 360) built on
 ReXGlue (`rexglue-sdk/`, a submodule patched from `patches/rexglue-sdk/`).
 `git status` showing `rexglue-sdk` as modified (`m`) is expected: those are
-our patches applied in the submodule, not something to look into. The
-working tree may also hold patch 0003 (Windows SDL as a DLL) from the
-`windows` branch; it only changes Windows builds.
+our patches applied in the submodule, not something to look into
+(patch 0003, Windows SDL as a DLL, only changes Windows builds).
 `docs/functions.md` is the reference: what's known about the game's code,
 how frame interpolation works, every diagnostic option, and what didn't
 work. `docs/gpu-functions.md` covers how the game drives the GPU (the
@@ -138,6 +137,12 @@ drawn scaled and the 3D view at the full resolution, with black bars on
 shapes other than 16:9. See `docs/unlocked-res.md` (a more native frame
 without the game's upscale draw is for later).
 
+Windows (merged from `windows`, 2026-10-16; not released yet):
+cross-compiled on Linux with xwin, ThinLTO (`ITC_WIN_LTO`), `run.bat`
+with `run.sh`'s defaults, the Visual C++ runtime DLLs in the zip, and a
+CI job beside Linux's. Tested only under Wine: ~26% slower than Linux
+there before ThinLTO, which then gave +3.1%. See `docs/windows.md`.
+
 The game draws with our own Vulkan renderer (the native renderer, exclusive
 mode; merged from `native-renderer`): the emulated GPU plugin isn't loaded
 or shipped. Uncapped attract race: ~330 fps mean against the emulated GPU's
@@ -174,9 +179,8 @@ Releases are made by pushing a `v*` tag: CI builds the zip and publishes a
 GitHub release with generated notes, which are then replaced with notes
 written for players: title "vX.Y.Z: <summary>", and just a couple of
 bullet points naming the changes (not the long layout of v0.3.5 and
-earlier). A tag on a `windows` commit also runs `build-windows.yml`, so
-that release gets the Windows zip too; a tag on `main` builds Linux only
-(the workflow isn't there; see "CI" in `docs/windows.md`).
+earlier). A tag runs both `build-linux.yml` and `build-windows.yml`, and
+both zips go on the release (see "CI" in `docs/windows.md`).
 
 Not done yet:
 

@@ -1,12 +1,11 @@
 name: Build Windows
 
 # Cross-compiled on Linux, as in docs/windows.md: clang for the MSVC target,
-# lld-link, and Microsoft's CRT and Windows SDK from xwin. A v* tag pushed
-# from this branch runs this and Build Linux, and both add their zip to the
-# same release.
+# lld-link, and Microsoft's CRT and Windows SDK from xwin. A v* tag runs
+# this and Build Linux, and both add their zip to the same release.
 on:
   push:
-    branches: [windows]
+    branches: [main]
     tags: ["v*"]
   pull_request:
   workflow_dispatch:
