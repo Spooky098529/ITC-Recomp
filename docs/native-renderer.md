@@ -2446,6 +2446,37 @@ cherry-pick `2c82ae6` and `5942f31`, then `--check_pixel_blender=true`; the
 known difference is the outcome label of NaN uploads at the race's end;
 the product table: `13ac56f`, which checked every lookup).
 
+### Profile of 2026-10-16 (`main` at `2e7b4df`, v0.4.0 plus CI)
+
+`profile_render_thread.sh`, two runs: 11.62 and 11.51 million cycles a
+frame (5,104 and 5,186 frames in the 12 s). `itc` 75%, the Vulkan driver
+13.5%, libc 10.6% (`memcmp` 5.1, `memcpy` 4.7). With the mirror's draw
+work gone, the shares moved. By group (both runs within ~0.5 of each other):
+
+| Part | Share | Biggest items |
+|---|---|---|
+| Replay handlers and library (guest) | ~34.5% | Release `822A67B0` 3.2 and AddRef `822A6738` 1.4, SetRenderState `8258FBD0` 2.5, SetSamplerState `8258FC30` 2.1, `8258E7E8` 1.5, `8258EC38` 1.4, shader load `822AED18` 1.3, `822A6008` 1.1, `8258FD48` 1.1+0.5, SetVertexShader `822A8808` 1.0, SetTexture `8258FCE0` 1.0, `822A3908` 1.0, constants `822A8308`/`822A81F8` ~1 each |
+| Vulkan driver | ~13.5% | see below |
+| Texture binding | ~10.7% | `GetView` 4.7, `GetTextureSet` 1.9, `GetSwizzledView` 1.8, `GetSampler` 1.4 |
+| libc | ~10.6% | see below |
+| `Passes::State::Draw` itself | ~8.7% | |
+| Interpolation | ~5.9% | `BlendState_ReplayConstants` 5.5 |
+| Shader lookup | ~5.1% | XXH3 2.4, `ShaderCache::Get` 1.4, `GetInterface` 0.9 |
+| Reading state | ~4.8% | `GetTarget` 1.7, `ReadRegisters` 1.2, `GetHostViewportInfo` 1.0 |
+| Pipeline lookup | ~2.1% | the `PipelineKey` `unordered_map` 1.2, `GetPipelineLayout` 0.7 |
+
+`interpolators_by_shader`'s `std::map` (1.3%) is the script's info logging
+only, as before.
+
+**Callers of libc and the driver** (branch records, 8 s, `--log_level=off`,
+charged to the first caller in `itc`): `Draw` into the driver 9.2% (by
+their arguments: `vkCmdBindDescriptorSets` with 4 sets and 5 dynamic
+offsets 3.1, `vkCmdDrawIndexed` 2.9, `vkCmdBindPipeline` 1.9, one more call
+at `+0x38ac` 1.0); `Draw` into libc 4.3%, over ~15 sites; `PlaceConstants`
+into libc 2.2% (`memcmp` with the last block 1.4, `memcpy` 0.6);
+`GetTextureSet` 1.7% (driver 1.0, libc 0.7); `Resolve` 0.8%; 2.3% of driver
+time had no `itc` caller in the stack (the driver's own calls).
+
 ## Resolution (branch `unlocked-resolution`, 2026-10-16)
 
 Goal: `--width`/`--height` and fullscreen. The game draws its 3D view at
