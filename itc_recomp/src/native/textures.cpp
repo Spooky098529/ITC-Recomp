@@ -832,7 +832,18 @@ void TextureCache::BeginFrame(uint32_t frame_index) {
   s.staging_used = 0;
   s.recording = false;
   vk::vkResetCommandPool(s.context.device, s.frames[frame_index].pool, 0);
+  uint64_t marked = s.stats.marked;
   s.MarkWritten();
+  if (s.stats.marked != marked) {
+    generation_++;
+    events_.marked_frames++;
+  }
+}
+
+TextureCache::GenerationEvents TextureCache::TakeGenerationEvents() {
+  GenerationEvents events = events_;
+  events_ = {};
+  return events;
 }
 
 // The textures memcpy has written since the last frame are marked to be
@@ -925,6 +936,7 @@ VkImageView TextureCache::GetView(uint8_t* base, const uint32_t fetch_words[6],
                   int32_t(fetch.exp_adjust));
     }
     it = s.textures.emplace(key, std::move(t)).first;
+    events_.created++;
     State::Texture& added = it->second;
     for (const auto& [address, size] : added.ranges) {
       if (size) {
@@ -1071,9 +1083,14 @@ bool TextureCache::GetResolveDestination(const uint32_t fetch_words[6], float sc
                 page << 12, t.guest_format, width, height, int(t.format.format), t.host_width,
                 t.host_height, scale);
     it = s.resolved.emplace(key, std::move(t)).first;
+    events_.created++;
   }
   State::Texture& t = it->second;
-  s.current[page] = &t;
+  if (State::Texture*& current = s.current[page]; current != &t || !t.loaded) {
+    current = &t;
+    generation_++;
+    events_.resolve_changes++;
+  }
   out = {t.image,        t.attachment_view, t.format.format, width, height, t.host_width,
          t.host_height, t.scale,           !t.loaded};
   t.loaded = true;  // written by the caller

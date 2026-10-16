@@ -756,6 +756,38 @@ struct Passes::State {
   } index_range_counts;
   void CountIndexRange(uint32_t address, uint32_t count, bool index_32bit, uint32_t endian,
                        bool skip_restart, uint32_t low, uint32_t high);
+  // With log_texture_bindings: how much of texture binding repeats, to
+  // judge caching it (TakeTextureBindings describes it). A binding repeats
+  // its fetch constant's last when the words (and view type, or filter
+  // overrides) are the same with no texture cache generation between;
+  // "seen" counts those met earlier in the same generation (any fetch
+  // constant). A draw repeats the last when both shaders and the fetch
+  // constants they read do.
+  bool log_texture_bindings = false;
+  struct TextureBindingCounts {
+    uint64_t frames = 0, draws = 0, draws_textured = 0, draws_same = 0, draws_same_words = 0,
+             vertex_same = 0, pixel_same = 0, views = 0, view_same_slot = 0,
+             view_same_slot_words = 0, view_seen = 0, samplers = 0, sampler_same_slot = 0,
+             sampler_seen = 0, sets = 0, sets_found = 0;
+    uint64_t generation = 0;  // the texture cache's when last taken
+  } binding_counts;
+  struct LastBinding {
+    uint32_t words[10];  // the fetch constant, then the view type or overrides
+    uint64_t generation;
+    bool valid;
+  };
+  LastBinding last_view[32] = {}, last_sampler[32] = {};
+  std::unordered_map<uint64_t, uint64_t> views_seen;  // by key hash: generation
+  std::unordered_set<uint64_t> samplers_seen;
+  struct LastDraw {
+    const TranslatedShader* vertex = nullptr;
+    const TranslatedShader* pixel = nullptr;
+    uint64_t generation = 0;
+    uint32_t fetch[192] = {};
+    bool valid = false;
+  } last_draw;
+  void CountBinding(bool view, uint32_t slot, const uint32_t* fetch, const uint32_t extra[4]);
+  void CountDrawBindings(const TranslatedShader* vertex, const TranslatedShader* pixel);
   void LogGlow();
   // Debugging aids: draws of this pixel shader (hash) are skipped; with
   // record_draws, each draw is described in a line (written with a dump).
@@ -1710,6 +1742,10 @@ VkDescriptorSet Passes::State::GetTextureSet(uint8_t* base, const TranslatedShad
     // The signed binding gets the same (unsigned) view: it's read only for
     // components whose sign is signed, which this game's textures don't
     // have (logged if they do).
+    if (log_texture_bindings) {
+      uint32_t extra[4] = {uint32_t(texture.view_type), 0, 0, 0};
+      CountBinding(true, texture.fetch_constant, fetch, extra);
+    }
     VkImageView view = hide_cubes && texture.view_type == VK_IMAGE_VIEW_TYPE_CUBE
                            ? VK_NULL_HANDLE
                            : textures.GetView(base, fetch, texture.view_type);
@@ -1745,6 +1781,11 @@ VkDescriptorSet Passes::State::GetTextureSet(uint8_t* base, const TranslatedShad
     const ShaderSampler& binding = shader->samplers[i];
     const uint32_t* fetch =
         &regs.values[XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0 + 6 * binding.fetch_constant];
+    if (log_texture_bindings) {
+      uint32_t extra[4] = {binding.mag_filter, binding.min_filter, binding.mip_filter,
+                           binding.aniso_filter};
+      CountBinding(false, binding.fetch_constant, fetch, extra);
+    }
     VkSampler texture_sampler = textures.GetSampler(
         fetch, {binding.fetch_constant, binding.mag_filter, binding.min_filter, binding.mip_filter,
                 binding.aniso_filter});
@@ -1764,6 +1805,10 @@ VkDescriptorSet Passes::State::GetTextureSet(uint8_t* base, const TranslatedShad
     key.push_back(uint64_t(info.imageLayout));
   }
   auto [set, added] = texture_sets.FindOrAdd(key.data(), uint32_t(key.size()));
+  if (log_texture_bindings) {
+    binding_counts.sets++;
+    binding_counts.sets_found += !added;
+  }
   if (!added) {
     return *set;
   }
@@ -1805,6 +1850,84 @@ VkDescriptorSet Passes::State::GetTextureSet(uint8_t* base, const TranslatedShad
     vk::vkUpdateDescriptorSets(context.device, uint32_t(writes.size()), writes.data(), 0, nullptr);
   }
   return *set;
+}
+
+void Passes::State::CountBinding(bool view, uint32_t slot, const uint32_t* fetch,
+                                 const uint32_t extra[4]) {
+  TextureBindingCounts& c = binding_counts;
+  uint64_t generation = textures.generation();
+  uint32_t words[10];
+  std::memcpy(words, fetch, 24);
+  std::memcpy(words + 6, extra, 16);
+  LastBinding& last = (view ? last_view : last_sampler)[slot & 31];
+  bool same_words = last.valid && !std::memcmp(last.words, words, sizeof(words));
+  // Samplers don't depend on textures: no generation.
+  bool same = same_words && (!view || last.generation == generation);
+  std::memcpy(last.words, words, sizeof(words));
+  last.generation = generation;
+  last.valid = true;
+  uint64_t hash = XXH3_64bits(words, sizeof(words));
+  if (view) {
+    c.views++;
+    c.view_same_slot += same;
+    c.view_same_slot_words += same_words;
+    auto [it, added] = views_seen.try_emplace(hash, generation);
+    c.view_seen += !added && it->second == generation;
+    it->second = generation;
+    if (views_seen.size() > (1u << 20)) {
+      views_seen.clear();
+    }
+  } else {
+    c.samplers++;
+    c.sampler_same_slot += same;
+    c.sampler_seen += !samplers_seen.insert(hash).second;
+  }
+}
+
+void Passes::State::CountDrawBindings(const TranslatedShader* vertex,
+                                      const TranslatedShader* pixel) {
+  TextureBindingCounts& c = binding_counts;
+  const uint32_t* fetch = &regs.values[XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0];
+  uint64_t generation = textures.generation();
+  LastDraw& last = last_draw;
+  // Whether a stage's shader and the fetch constants it reads are as at the
+  // last draw.
+  auto stage_same = [&](const TranslatedShader* shader, const TranslatedShader* last_shader) {
+    if (!last.valid || shader != last_shader) {
+      return false;
+    }
+    if (!shader) {
+      return true;
+    }
+    for (const ShaderTexture& texture : shader->textures) {
+      uint32_t i = 6 * (texture.fetch_constant & 31);
+      if (std::memcmp(last.fetch + i, fetch + i, 24)) {
+        return false;
+      }
+    }
+    for (const ShaderSampler& sampler : shader->samplers) {
+      uint32_t i = 6 * (sampler.fetch_constant & 31);
+      if (std::memcmp(last.fetch + i, fetch + i, 24)) {
+        return false;
+      }
+    }
+    return true;
+  };
+  bool vertex_same = stage_same(vertex, last.vertex);
+  bool pixel_same = stage_same(pixel, last.pixel);
+  bool same_generation = last.generation == generation;
+  c.draws++;
+  c.draws_textured += (vertex && (!vertex->textures.empty() || !vertex->samplers.empty())) ||
+                      (pixel && (!pixel->textures.empty() || !pixel->samplers.empty()));
+  c.draws_same_words += vertex_same && pixel_same;
+  c.draws_same += vertex_same && pixel_same && same_generation;
+  c.vertex_same += vertex_same && same_generation;
+  c.pixel_same += pixel_same && same_generation;
+  last.vertex = vertex;
+  last.pixel = pixel;
+  last.generation = generation;
+  std::memcpy(last.fetch, fetch, sizeof(last.fetch));
+  last.valid = true;
 }
 
 VkPipelineLayout Passes::State::GetPipelineLayout(VkDescriptorSetLayout vertex,
@@ -2525,6 +2648,9 @@ void Passes::BeginFrame(uint32_t frame_index) {
   if (Buffers_LogPhysicalWrites()) {
     Buffers_OnFrameStart([&s](uint32_t start, uint32_t end) { return s.textures.Holds(start, end); });
   }
+  if (s.log_texture_bindings) {
+    s.binding_counts.frames++;
+  }
   if (s.log_index_ranges) {
     // Writes taken since the last frame's start (memcpy's, into the
     // physical views).
@@ -3047,6 +3173,9 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
     s.stats.failed++;
     s.stats.failed_by[5]++;
     return;
+  }
+  if (s.log_texture_bindings) {
+    s.CountDrawBindings(vertex, pixel);
   }
   VkDescriptorSet vertex_textures = s.GetTextureSet(base, vertex, vertex_layout);
   VkDescriptorSet pixel_textures = s.GetTextureSet(base, pixel, pixel_layout);
@@ -3905,6 +4034,38 @@ std::string Passes::TakeIndexRanges() {
   uint64_t frame_sequence = c.frame_sequence;
   c = {};
   c.frame_sequence = frame_sequence;
+  return text;
+}
+
+void Passes::set_log_texture_bindings(bool log) {
+  state_->log_texture_bindings = log;
+}
+
+std::string Passes::TakeTextureBindings() {
+  State& s = *state_;
+  State::TextureBindingCounts& c = s.binding_counts;
+  TextureCache::GenerationEvents e = s.textures.TakeGenerationEvents();
+  double frames = double(std::max<uint64_t>(c.frames, 1));
+  auto share = [](uint64_t n, uint64_t of) { return 100.0 * double(n) / double(std::max<uint64_t>(of, 1)); };
+  uint64_t generations = s.textures.generation() - c.generation;
+  std::string text = fmt::format(
+      "texture bindings: {:.1f} draws a frame ({:.1f} with textures or samplers), repeating the "
+      "last draw's shaders and the fetch constants they read {:.1f}% ({:.1f}% ignoring "
+      "generations; vertex stage {:.1f}%, pixel {:.1f}%); {:.1f} views a frame, the same as the "
+      "fetch constant's last {:.1f}% ({:.1f}% ignoring generations), seen this generation "
+      "{:.1f}%; {:.1f} samplers a frame, the same as the fetch constant's last {:.1f}%, seen "
+      "before {:.1f}%; {:.1f} sets a frame, found this frame {:.1f}%; in {} frames, {} "
+      "generations (frames with textures marked written {}, resolves changing an address's "
+      "image {}), {} textures made",
+      c.draws / frames, c.draws_textured / frames, share(c.draws_same, c.draws),
+      share(c.draws_same_words, c.draws), share(c.vertex_same, c.draws),
+      share(c.pixel_same, c.draws), c.views / frames, share(c.view_same_slot, c.views),
+      share(c.view_same_slot_words, c.views), share(c.view_seen, c.views), c.samplers / frames,
+      share(c.sampler_same_slot, c.samplers), share(c.sampler_seen, c.samplers), c.sets / frames,
+      share(c.sets_found, c.sets), c.frames, generations, e.marked_frames,
+      e.resolve_changes, e.created);
+  c = {};
+  c.generation = s.textures.generation();
   return text;
 }
 

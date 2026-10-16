@@ -108,6 +108,11 @@ class Passes {
   void set_cache_index_ranges(bool cache);
   void set_log_index_ranges(bool log);
   std::string TakeIndexRanges();
+  // A diagnostic: how much of texture binding repeats from draw to draw
+  // (to judge caching it); TakeTextureBindings describes it since it was
+  // last called.
+  void set_log_texture_bindings(bool log);
+  std::string TakeTextureBindings();
   // Fixed at start (--native_renderer_mirror_by_tick): draws read a mirror
   // updated only as a logic pass's list starts replaying (an experiment);
   // TakeMirrorByTick describes it since it was last called.

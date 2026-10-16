@@ -2477,6 +2477,54 @@ into libc 2.2% (`memcmp` with the last block 1.4, `memcpy` 0.6);
 `GetTextureSet` 1.7% (driver 1.0, libc 0.7); `Resolve` 0.8%; 2.3% of driver
 time had no `itc` caller in the stack (the driver's own calls).
 
+### Texture binding (`texture-binding`, 2026-10-16)
+
+Texture binding was the largest item in the profile above (~10.7%). For
+every draw, `GetTextureSet` (`passes.cpp`) asks `TextureCache::GetView`
+for each of the shaders' texture bindings and `GetSampler` for each
+sampler, then builds a key from the results and finds the frame's
+descriptor set by it; `SwizzledSigns` reads the same fetch constants again
+for the system constants. `GetView` unpacks the 6 words (`ToFetch`), looks
+the address up among resolve destinations (`current`, an
+`unordered_map`), then the texture in `textures` (a `std::map` of 6-word
+keys), reads a cvar, checks loaded/changed, and finds the view for the
+swizzle (another `unordered_map`).
+
+**Measured first** (`--native_renderer_log_texture_bindings`, every 5 s;
+uncapped attract race, `itc_805.log`, 40 s). Race windows (boot and title
+in the first are similar):
+
+| A frame | |
+|---|---|
+| Draws | 1,750-2,300 (1,075-1,300 with textures or samplers) |
+| `GetView` calls | 4,300-5,360 |
+| `GetSampler` calls | 2,150-2,680 |
+| Descriptor sets asked for | 3,500-4,600 (two a draw), 90-91% found already made this frame |
+
+- **`GetView` is called twice for every texture**: the translator binds
+  a signed and an unsigned view of each (`ShaderTexture::is_signed`),
+  and both get the same view. So half the calls repeat the one just
+  before.
+- **The same words as the fetch constant's last call**: views 71-73%
+  (much of it the signed binding), samplers 42-46%.
+- **Seen earlier in the same generation** (any fetch constant; a
+  generation ends when a cache would have to be emptied, below): views
+  100.0% to one decimal, samplers 100.0% (samplers depend on nothing
+  else). So a cache keyed by the fetch constant's words would answer
+  nearly every call; textures new to it are 5-57 per 5 s.
+- **What would empty a cache** (`TextureCache::generation()`, now
+  counted): frames in which memcpy marked a texture written, 1-7 per 5 s
+  (of ~2,000 frames); a resolve changing which image an address samples,
+  15 in the boot window and none in the race. First loads and new
+  textures don't need to empty it: they happen only on a key's first
+  use (results that can change, such as the placeholder for a texture
+  deferred because staging is full, mustn't be kept).
+- **Whole draws**: the shaders and the fetch constants they read are the
+  same as the last draw's for 43-50% of draws (vertex stage 71-75%, pixel
+  43-50%). Generations change nothing here (the same to one decimal).
+
+So the hypothesis holds: nearly all of the work is repeated.
+
 ## Resolution (branch `unlocked-resolution`, 2026-10-16)
 
 Goal: `--width`/`--height` and fullscreen. The game draws its 3D view at

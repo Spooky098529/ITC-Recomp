@@ -83,9 +83,25 @@ class TextureCache {
   // recorded write is counted and reloaded).
   void set_verify_every_frame(bool every) { verify_every_frame_ = every; }
   void set_debug_hide(Hide hide, uint32_t value = 0) {
+    if (hide != debug_hide_ || value != debug_hide_value_) {
+      generation_++;
+    }
     debug_hide_ = hide;
     debug_hide_value_ = value;
   }
+
+  // Bumped whenever GetView's result for some fetch constant may change
+  // without its words changing, or a call may have work to do (a texture
+  // marked written, to reload; a resolve changing which image an address
+  // samples; the debug hide), so results kept from before must be asked
+  // again. Not for first loads or new textures: those happen only on a
+  // fetch constant's first use.
+  uint64_t generation() const { return generation_; }
+  // What bumped it, and textures made, since the last call (a diagnostic).
+  struct GenerationEvents {
+    uint64_t marked_frames = 0, resolve_changes = 0, created = 0;
+  };
+  GenerationEvents TakeGenerationEvents();
 
   // This frame's uploads, ended, to be submitted before its drawing; null if
   // none.
@@ -123,6 +139,8 @@ class TextureCache {
   bool base_level_only_ = false;
   bool verify_every_frame_ = false;
   uint32_t debug_hide_value_ = 0;
+  uint64_t generation_ = 0;
+  GenerationEvents events_;
 };
 
 }  // namespace native
