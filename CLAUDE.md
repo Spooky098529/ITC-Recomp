@@ -18,6 +18,8 @@ the SDK's audio (the Audio Worker's spin, the game's sounds, the plan).
 `--height`, `--fullscreen`, black bars) and what's left to try.
 `docs/windows.md` is the Windows build: cross-compiled on Linux, tested
 under Wine (the user has no Windows machine).
+`docs/old-hardware.md` is the plan (not started) for running below
+Vulkan 1.3, and why not OpenGL.
 Read the relevant section before changing anything, and keep it up to
 date as you learn things.
 
