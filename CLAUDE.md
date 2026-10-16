@@ -181,9 +181,10 @@ written for players: title "vX.Y.Z: <summary>", and just a couple of
 bullet points naming the changes (not the long layout of v0.3.5 and
 earlier). A tag runs both `build-linux.yml` and `build-windows.yml`, and
 both zips go on the release (see "CI" in `docs/windows.md`). Linux
-release zips (`v*` tags only) are stripped of debug info (`strip
---strip-debug`; symbol names kept); CI artifacts from other runs, local
-builds and test zips keep it for debugging, as the user wants.
+release zips (`v*` tags only) are fully stripped (`strip --strip-all`: no
+debug info or symbol table, nothing for gdb to go on, as the user wants;
+the dynamic symbols stay, as loading needs them); CI artifacts from other
+runs, local builds and test zips keep both for debugging.
 Stripping doesn't change speed (2026-10-16: 431.5 against 432.0 fps mean,
 two alternating uncapped attract races each).
 
