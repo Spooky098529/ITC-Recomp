@@ -971,6 +971,12 @@ memory).
   draws repeating the last draw's shaders and the fetch constants they
   read, descriptor sets found already made, and what bumps the texture
   cache's generation (see "Texture binding").
+- `--native_renderer_log_shader_lookups`: every 5 s, how often draws'
+  shader lookups repeat the last draw's or an earlier one, keyed by what
+  the draw reads from the shader objects, and how often such a key met
+  before came with microcode that hashes differently (stale: a cache by
+  the key would give the wrong shader), with a sample (see "Shader
+  lookup").
 - `--native_renderer_cache_texture_bindings=false`: look every texture view
   and sampler up in full instead of answering from the table by the fetch
   constant's words (on by default; see "Texture binding").
@@ -2679,6 +2685,54 @@ hashed on every draw) is now bigger than texture binding, and pipeline
 lookup has grown to ~2.6%. The driver and libc callers weren't split
 this time (the branch-record method in "Profile of 2026-10-15, after
 v0.3.7").
+
+### Shader lookup (`shader-lookup`, 2026-10-16)
+
+Every draw (`Passes::State::Draw`, `passes.cpp`) reads the shader objects
+from the device, hashes both microcodes with XXH3 (`MicrocodeHash`), finds
+the interface in `GetInterface` by both hashes and two registers, and the
+translations in `ShaderCache::Get` by hash: ~6% of the render thread in
+the profile above. The idea, as for texture binding: key the answer by
+what the draw reads from the shader objects instead of the microcode's
+contents. A stage's key: the object, the microcode's address and size
+(vertex shader +48, +600; pixel +24, +64), and for the vertex shader the
+id it's patched for (+24), the bound declaration's id and whether the
+patched copy (`g_loaded_vertex_shader`) is drawn. The whole lookup adds
+`SQ_PROGRAM_CNTL`, `SQ_CONTEXT_MISC` and the point and rectangle list
+flags.
+
+The risk is a key whose microcode changed behind it. The game's own code
+doesn't write microcode (its HLSL was compiled offline and handed to its
+Direct3D), so the writers are the game's Direct3D: creating a shader,
+patching a vertex shader for a declaration (`sub_822AE340`, hooked: in
+place, which changes the patched-for id at +24, or into a copy in the
+command buffer), and memory reused after a shader is freed. A game can
+also place resources in its own memory and register them with Direct3D
+(`XGSetVertexShaderHeader` and the like); whether this one does isn't
+known.
+
+**Measured** (`--native_renderer_log_shader_lookups`, every 5 s; a key is
+stale when met before this session with microcode hashing differently):
+
+- An attract race, uncapped (`itc_817.log`, 40 s): 1,170-2,310 draws a
+  frame; the same keys as the last draw 68-73% (vertex, pixel and the
+  whole lookup alike); seen before 100.0%; **stale 0**; the patched copy
+  drawn 0 times; ~40-50 thousand vertex shader patches per 5 s (~20 a
+  frame), so a generation bumped by every patch would empty a cache
+  constantly. The patched-for id in the key makes one unneeded.
+- The user's run with `run.sh`'s flags, capped at 144 (`itc_818.log`,
+  ~4 minutes): menus, a race (20:53:15-20:54:30), menus, a second race
+  (20:54:45-20:56:20; ~85 new keys at its start, new scenery or a new
+  track). Up to 3,670 draws a frame in the second; the same keys as the
+  last draw 65-74% in races (40-95% in menus); seen before 99.8-100.0%;
+  **stale 0** in every window, for both stages; the patched copy never
+  drawn; keys this session grew to 596 vertex, 582 pixel, 602 whole
+  lookups.
+
+So a cache by these keys would answer nearly every lookup, and no key
+ever went stale here. Not covered: whether freed shaders' memory is
+reused for others (the keys only grew, so a reuse with the same address
+and size wasn't seen).
 
 ## Resolution (branch `unlocked-resolution`, 2026-10-16)
 
