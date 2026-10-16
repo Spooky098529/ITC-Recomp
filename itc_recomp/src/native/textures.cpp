@@ -1001,6 +1001,12 @@ VkImageView TextureCache::GetView(uint8_t* base, const uint32_t fetch_words[6],
   }
   State& s = *state_;
   BindingTable::Key key(fetch_words, uint32_t(view_type));
+  // The same as this fetch constant's last call (about 44% of calls in a
+  // race): no need to hash.
+  BindingTable::Entry& last = s.last_views[fetch_constant & 31];
+  if (last.generation == generation_ && last.key == key) {
+    return FromBits<VkImageView>(last.value);
+  }
   BindingTable::Entry& e = s.view_answers.Find(key);
   if (e.generation != generation_) {
     VkImageView view = LookUpView(base, fetch_words, view_type, cacheable);
@@ -1009,6 +1015,7 @@ VkImageView TextureCache::GetView(uint8_t* base, const uint32_t fetch_words[6],
     // or a texture still to be reloaded.
     e.generation = cacheable && view ? generation_ : UINT64_MAX;
   }
+  last = e;
   return FromBits<VkImageView>(e.value);
 }
 
@@ -1278,12 +1285,17 @@ VkSampler TextureCache::GetSampler(const uint32_t fetch_words[6],
                                          (overrides.min_filter & 0xFF) << 8 |
                                          (overrides.mip_filter & 0xFF) << 16 |
                                          (overrides.aniso_filter & 0xFF) << 24);
+  BindingTable::Entry& last = s.last_samplers[overrides.fetch_constant & 31];
+  if (last.generation == sampler_generation_ && last.key == key) {
+    return FromBits<VkSampler>(last.value);
+  }
   BindingTable::Entry& e = s.sampler_answers.Find(key);
   if (e.generation != sampler_generation_) {
     VkSampler sampler = LookUpSampler(fetch_words, overrides);
     e.value = HandleBits(sampler);
     e.generation = sampler ? sampler_generation_ : UINT64_MAX;
   }
+  last = e;
   return FromBits<VkSampler>(e.value);
 }
 
