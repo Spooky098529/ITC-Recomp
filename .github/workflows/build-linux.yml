@@ -22,6 +22,8 @@ jobs:
       # The container starts bare, and checkout needs git before it can clone.
       - name: Bootstrap container
         run: |
+          # Retry failed downloads (mirrors sometimes answer 503)
+          echo 'Acquire::Retries "5";' > /etc/apt/apt.conf.d/80-retries
           apt-get update
           apt-get install -y --no-install-recommends \
             ca-certificates curl wget gnupg git git-lfs zip
@@ -35,7 +37,7 @@ jobs:
       - name: Install clang 20
         run: |
           apt-get install -y --no-install-recommends software-properties-common lsb-release
-          wget -qO llvm.sh https://apt.llvm.org/llvm.sh
+          curl -fsSL --retry 5 --retry-all-errors -o llvm.sh https://apt.llvm.org/llvm.sh
           chmod +x llvm.sh
           ./llvm.sh 20
           apt-get install -y clang-20 lld-20
@@ -46,11 +48,11 @@ jobs:
 
       - name: Install build dependencies
         run: |
-          wget -qO- https://packages.lunarg.com/lunarg-signing-key-pub.asc | tee /etc/apt/trusted.gpg.d/lunarg.asc
-          wget -qO /etc/apt/sources.list.d/lunarg-vulkan-jammy.list http://packages.lunarg.com/vulkan/lunarg-vulkan-jammy.list
+          curl -fsSL --retry 5 --retry-all-errors https://packages.lunarg.com/lunarg-signing-key-pub.asc | tee /etc/apt/trusted.gpg.d/lunarg.asc
+          curl -fsSL --retry 5 --retry-all-errors -o /etc/apt/sources.list.d/lunarg-vulkan-jammy.list http://packages.lunarg.com/vulkan/lunarg-vulkan-jammy.list
           # jammy's libstdc++ 11 has no <format>, and its cmake is 3.22 against a 3.25 minimum
           add-apt-repository -y ppa:ubuntu-toolchain-r/test
-          wget -qO- https://apt.kitware.com/keys/kitware-archive-latest.asc | gpg --dearmor -o /usr/share/keyrings/kitware.gpg
+          curl -fsSL --retry 5 --retry-all-errors https://apt.kitware.com/keys/kitware-archive-latest.asc | gpg --dearmor -o /usr/share/keyrings/kitware.gpg
           echo "deb [signed-by=/usr/share/keyrings/kitware.gpg] https://apt.kitware.com/ubuntu/ jammy main" > /etc/apt/sources.list.d/kitware.list
           apt-get update
           apt-get install -y cmake ninja-build build-essential g++-13 git curl unzip zip autoconf python3-venv \

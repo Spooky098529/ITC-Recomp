@@ -28,7 +28,9 @@ jobs:
       # by their plain names, which LLVM's bin directory has.
       - name: Install clang 20
         run: |
-          wget -qO llvm.sh https://apt.llvm.org/llvm.sh
+          # Retry failed downloads (mirrors sometimes answer 503)
+          echo 'Acquire::Retries "5";' | sudo tee /etc/apt/apt.conf.d/80-retries
+          curl -fsSL --retry 5 --retry-all-errors -o llvm.sh https://apt.llvm.org/llvm.sh
           chmod +x llvm.sh
           sudo ./llvm.sh 20
           sudo apt-get install -y clang-20 lld-20 llvm-20 ninja-build
@@ -47,7 +49,7 @@ jobs:
         if: steps.xwin-cache.outputs.cache-hit != 'true'
         run: |
           base=xwin-${XWIN_VERSION}-x86_64-unknown-linux-musl
-          curl -sSL "https://github.com/Jake-Shadle/xwin/releases/download/${XWIN_VERSION}/${base}.tar.gz" | tar xz
+          curl -fsSL --retry 5 --retry-all-errors "https://github.com/Jake-Shadle/xwin/releases/download/${XWIN_VERSION}/${base}.tar.gz" | tar xz
           ./${base}/xwin --accept-license --arch x86_64 --temp \
             splat --use-winsysroot-style --preserve-ms-arch-notation --output itc_recomp/out/xwin-sdk
 
