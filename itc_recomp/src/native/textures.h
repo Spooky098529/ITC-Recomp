@@ -40,8 +40,10 @@ class TextureCache {
   // fetch: the 6 words, in host order. Both answer from a table of earlier
   // answers by the same words while the generation (below) holds
   // (--native_renderer_cache_texture_bindings), so Stats count only the
-  // calls that weren't answered from it.
-  VkImageView GetView(uint8_t* base, const uint32_t fetch[6], VkImageViewType view_type);
+  // calls that weren't answered from it. Before the table, each fetch
+  // constant's last answer (fetch_constant: its index, 0-31).
+  VkImageView GetView(uint8_t* base, const uint32_t fetch[6], VkImageViewType view_type,
+                      uint32_t fetch_constant);
   VkSampler GetSampler(const uint32_t fetch[6], const SamplerOverrides& overrides);
   // The post-swizzle signedness of each component, 2 bits each (the
   // translator's texture_swizzled_signs byte).
