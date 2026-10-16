@@ -16,6 +16,10 @@ of the render thread's performance. `docs/native-audio.md` is the same for
 the SDK's audio (the Audio Worker's spin, the game's sounds, the plan).
 `docs/unlocked-res.md` covers drawing at other resolutions (`--width`,
 `--height`, `--fullscreen`, black bars) and what's left to try.
+`docs/windows.md` is the Windows build: cross-compiled on Linux, tested
+under Wine (the user has no Windows machine).
+`docs/old-hardware.md` is the plan (not started) for running below
+Vulkan 1.3, and why not OpenGL.
 Read the relevant section before changing anything, and keep it up to
 date as you learn things.
 
@@ -170,7 +174,9 @@ Releases are made by pushing a `v*` tag: CI builds the zip and publishes a
 GitHub release with generated notes, which are then replaced with notes
 written for players: title "vX.Y.Z: <summary>", and just a couple of
 bullet points naming the changes (not the long layout of v0.3.5 and
-earlier).
+earlier). A tag on a `windows` commit also runs `build-windows.yml`, so
+that release gets the Windows zip too; a tag on `main` builds Linux only
+(the workflow isn't there; see "CI" in `docs/windows.md`).
 
 Not done yet:
 

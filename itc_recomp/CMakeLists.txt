@@ -47,6 +47,14 @@ if(ITC_LTO)
         -Wl,--thinlto-cache-dir=${CMAKE_BINARY_DIR}/thinlto-cache)
 endif()
 
+# ThinLTO for the Windows build, kept apart from ITC_LTO: lld-link takes
+# its own options (/lldltocache, not --thinlto-cache-dir).
+option(ITC_WIN_LTO "Windows: build with ThinLTO (lld-link)" OFF)
+if(WIN32 AND ITC_WIN_LTO)
+    add_compile_options(-flto=thin)
+    add_link_options(-flto=thin "LINKER:/lldltocache:${CMAKE_BINARY_DIR}/thinlto-cache")
+endif()
+
 include(generated/rexglue.cmake)
 
 # Sources

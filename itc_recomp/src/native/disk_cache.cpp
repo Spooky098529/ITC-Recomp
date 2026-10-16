@@ -3,6 +3,15 @@
 #include <rex/cvar.h>
 #include <rex/logging.h>
 
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <windows.h>
+
+#include <cstring>
+#include <string>
+#endif
+
 REXCVAR_DEFINE_BOOL(native_renderer_disk_cache, true, "ITC",
                     "Keep translated shaders and compiled pipelines in cache/ next to the "
                     "executable between sessions");
@@ -15,7 +24,20 @@ std::filesystem::path DiskCacheDirectory() {
   }
   static const std::filesystem::path directory = [] {
     std::error_code error;
+#ifdef _WIN32
+    std::wstring name(MAX_PATH, L'\0');
+    DWORD length;
+    while ((length = GetModuleFileNameW(nullptr, name.data(), DWORD(name.size()))) ==
+           name.size()) {
+      name.resize(name.size() * 2);
+    }
+    if (length == 0) {
+      error = std::error_code(int(GetLastError()), std::system_category());
+    }
+    std::filesystem::path exe(name.substr(0, length));
+#else
     std::filesystem::path exe = std::filesystem::read_symlink("/proc/self/exe", error);
+#endif
     if (error) {
       REXLOG_WARN("native renderer: no disk cache: can't find the executable ({})",
                   error.message());
@@ -31,6 +53,15 @@ std::filesystem::path DiskCacheDirectory() {
     return path;
   }();
   return directory;
+}
+
+std::FILE* OpenFile(const std::filesystem::path& path, const char* mode) {
+#ifdef _WIN32
+  std::wstring wide_mode(mode, mode + std::strlen(mode));
+  return _wfopen(path.c_str(), wide_mode.c_str());
+#else
+  return std::fopen(path.c_str(), mode);
+#endif
 }
 
 }  // namespace native

@@ -2430,7 +2430,7 @@ bool Passes::Init(const DeviceContext& context, uint8_t* base, uint32_t frames_i
 void Passes::State::OpenPipelineCache() {
   std::vector<uint8_t> data;
   if (!pipeline_cache_file.empty()) {
-    if (std::FILE* in = std::fopen(pipeline_cache_file.c_str(), "rb")) {
+    if (std::FILE* in = OpenFile(pipeline_cache_file, "rb")) {
       uint8_t buffer[65536];
       while (size_t n = std::fread(buffer, 1, sizeof(buffer), in)) {
         data.insert(data.end(), buffer, buffer + n);
@@ -2487,7 +2487,7 @@ void Passes::State::MaybeSavePipelineCache() {
   // Written aside and renamed over, so an exit mid-write leaves the old file.
   std::filesystem::path temporary = pipeline_cache_file;
   temporary += ".tmp";
-  std::FILE* out = std::fopen(temporary.c_str(), "wb");
+  std::FILE* out = OpenFile(temporary, "wb");
   bool written = out && std::fwrite(data.data(), 1, size, out) == size;
   if (out) {
     written = std::fclose(out) == 0 && written;

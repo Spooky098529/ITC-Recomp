@@ -149,6 +149,11 @@ class StateCapture {
   // Guest address ranges that are readable, from the host's memory map.
   static std::vector<Region> ReadableGuestRanges(uint8_t* base) {
     std::vector<Region> ranges;
+#ifdef _WIN32
+    // Reads the Linux memory map; captures aren't supported on Windows.
+    (void)base;
+    return ranges;
+#endif
     std::ifstream maps("/proc/self/maps");
     std::string line;
     uint64_t guest_start = reinterpret_cast<uint64_t>(base);

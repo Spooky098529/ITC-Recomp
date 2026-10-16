@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include <cstdio>
 #include <filesystem>
 
 namespace native {
@@ -13,5 +14,9 @@ namespace native {
 // The cache directory (created if needed), or empty if the caches are off
 // or it can't be made.
 std::filesystem::path DiskCacheDirectory();
+
+// std::fopen for a path: on Windows paths are wide strings, opened with
+// _wfopen so folders with non-ASCII names work.
+std::FILE* OpenFile(const std::filesystem::path& path, const char* mode);
 
 }  // namespace native
