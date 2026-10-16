@@ -1152,6 +1152,24 @@ To be fixed (or accepted) in milestone 7.
   2026-10-14): the Xbox 360's output gamma isn't applied yet. A known
   issue, for milestone 7 (the user's call).
 
+  Found 2026-10-16 (branch `xbox-gamma`): at boot the graphics library
+  writes the display controller's 256-entry gamma table (DC_LUT_RW_MODE
+  0, DC_LUTA_CONTROL 0; `DC_LUT_30_COLOR`, 10 bits a channel, the same
+  for all three). It isn't linear: entry 64 is 193/1023, 128 is 462, 255
+  is 1023, which is exactly the sRGB curve decoded and re-encoded as
+  BT.709 (0.5 → 0.450): the library builds it from the display type the
+  kernel reports (`VdGetCurrentDisplayGamma`, type 2, BT.709, in the
+  SDK's `xboxkrnl_video.cpp`). The 360's display output sends every pixel
+  through it; we didn't. Exclusive mode now keeps the table
+  (`gpu_link.cpp`, logged at the swap after it changes), and
+  `--xbox_gamma=true` (off by default) applies it to the shown image in
+  place at the frame's end (`glsl/gamma.comp`, a compute pass; values
+  between entries blended), before the copy to the window, so dumps show
+  it too. Without exclusive mode no table arrives and nothing changes.
+  Checked in two attract races with a dump a second: the same 19 moments
+  10-24% darker on average, blacks and whites unchanged. Still to do:
+  the user's comparison against the 360.
+
 - **Textures replaced in memory showed their old contents for a while**
   (fixed 2026-10-15). The game rewrites textures in place as it streams
   track sections; they were hashed again only every 240 frames, so a
