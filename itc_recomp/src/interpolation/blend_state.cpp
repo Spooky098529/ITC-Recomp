@@ -114,6 +114,10 @@ REXCVAR_DEFINE_BOOL(log_moving_products, false, "ITC",
 REXCVAR_DEFINE_BOOL(log_pixel_outcomes, false, "ITC",
                     "Log what happened to the per-object lighting uploads (blended, unpaired, "
                     "rejected...), for moving and still objects, every 2 s");
+REXCVAR_DEFINE_BOOL(cache_camera_ids, true, "ITC",
+                    "Remember the camera number of recently seen view-projections by their "
+                    "bytes, so a repeated one skips splitting it and the table lookup (same "
+                    "numbers)");
 
 namespace interpolation {
 namespace {
@@ -536,6 +540,49 @@ Matrix4 BlendProduct(const ReplayedProduct& product, const TickPlans* plans,
 class CameraIds {
  public:
   uint64_t Of(const Matrix4& view_projection) {
+    if (!REXCVAR_GET(cache_camera_ids)) {
+      return Compute(view_projection);
+    }
+    return Cached(view_projection);
+  }
+
+ private:
+  // The number is a function of the matrix: once a signature has a number,
+  // the same signature finds it again. So a matrix's number can be kept.
+  // A direct-mapped table by a hash of its bytes.
+  static constexpr int kCacheBits = 10;
+  struct CacheEntry {
+    Matrix4 matrix;
+    uint64_t id;
+    bool valid = false;
+  };
+  static uint64_t HashOf(const Matrix4& m) {
+    uint64_t words[8];
+    std::memcpy(words, m.data(), sizeof(words));
+    // Independent multiplies, so they overlap.
+    uint64_t h = (words[0] * 0x9E3779B97F4A7C15ull) ^ (words[1] * 0xC2B2AE3D27D4EB4Full) ^
+                 (words[2] * 0x165667B19E3779F9ull) ^ (words[3] * 0xD6E8FEB86659FD93ull) ^
+                 (words[4] * 0xFF51AFD7ED558CCDull) ^ (words[5] * 0xC4CEB9FE1A85EC53ull) ^
+                 (words[6] * 0x94D049BB133111EBull) ^ (words[7] * 0xBF58476D1CE4E5B9ull);
+    return (h ^ (h >> 31)) * 0x9E3779B97F4A7C15ull;
+  }
+  uint64_t Cached(const Matrix4& view_projection) {
+    // Two in five calls are for the previous call's matrix.
+    if (last_ && std::memcmp(last_->matrix.data(), view_projection.data(), sizeof(Matrix4)) == 0) {
+      return last_->id;
+    }
+    CacheEntry& entry = cache_[HashOf(view_projection) >> (64 - kCacheBits)];
+    if (!entry.valid ||
+        std::memcmp(entry.matrix.data(), view_projection.data(), sizeof(Matrix4)) != 0) {
+      entry.matrix = view_projection;
+      entry.id = Compute(view_projection);
+      entry.valid = true;
+    }
+    last_ = &entry;
+    return entry.id;
+  }
+
+  uint64_t Compute(const Matrix4& view_projection) {
     std::optional<PerspectiveCamera> camera = SplitViewProjection(view_projection);
     if (!camera || !(camera->y_scale != 0) || !(camera->depth_offset != 0)) {
       return 0;
@@ -565,7 +612,6 @@ class CameraIds {
     return id;
   }
 
- private:
   using Signature = std::array<float, 3>;
   static bool IsClose(const Signature& a, const Signature& b) {
     for (int i = 0; i < 3; i++) {
@@ -591,6 +637,8 @@ class CameraIds {
   }
   std::unordered_map<uint64_t, std::vector<std::pair<Signature, uint64_t>>> buckets_;
   uint64_t count_ = 0;
+  std::array<CacheEntry, 1 << kCacheBits> cache_{};
+  CacheEntry* last_ = nullptr;
 };
 
 }  // namespace
