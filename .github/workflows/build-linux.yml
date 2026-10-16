@@ -92,6 +92,14 @@ jobs:
           install -m 755 itc_recomp/run.sh "dist/${name}/run.sh"
           install -m 755 itc_recomp/run-debug.sh "dist/${name}/run-debug.sh"
 
+          # Release zips (v* tags) without debug info (~20 MB of line tables
+          # in itc): it doesn't change speed. Other runs' artifacts and local
+          # builds keep it for debugging. Symbol names stay, for backtraces
+          # and profiles.
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            strip --strip-debug "dist/${name}/itc" "dist/${name}/librexruntime.so"
+          fi
+
           # Fail if the executable needs a library the zip doesn't carry.
           missing=$(cd "dist/${name}" && ldd ./itc | grep 'not found' || true)
           if [[ -n "$missing" ]]; then
