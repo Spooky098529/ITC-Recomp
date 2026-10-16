@@ -116,7 +116,7 @@ install -m 755 itc_recomp/run-debug.sh $D/run-debug.sh
 (cd $D && python3 -I -m zipfile -c ../$name.zip itc librexruntime.so run.sh run-debug.sh)
 ```
 
-## Status (`main`, 2026-10-16, v0.4.0)
+## Status (`main`, 2026-10-16, v0.4.1)
 
 Frame interpolation for races is working: logic runs at 30 Hz and frames are
 blended between ticks. The world, cameras, wheels (other cars' too, paired
@@ -216,7 +216,13 @@ Not done yet:
   fetch constant's words, and each stage's last texture set reused when
   unchanged: -6.9% render thread cycles a frame and +2.8% uncapped fps
   against the `main` before it ("Texture binding" in
-  `docs/native-renderer.md`). Still to decide: the old per-draw path's
-  future, and a Steam Deck test.
+  `docs/native-renderer.md`). Merged from `shader-lookup` (2026-10-16):
+  shader lookups kept by what draws read from the shader objects instead
+  of hashing the microcode every draw: -5.2% render thread cycles a
+  frame; the main thread is now about as busy as the render thread on
+  this PC, so `profile_render_thread.sh` skips `Main XThread` ("Shader
+  lookup" in `docs/native-renderer.md`). A larger lead, translating
+  draws once a tick: `docs/tick-replay.md`. Still to decide: the old
+  per-draw path's future, and a Steam Deck test.
 - Recheck whether the player's beam on the road still jumps in sharp turns
   (Known issues); if it's gone, drop it from the next release's limits.
