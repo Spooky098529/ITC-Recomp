@@ -2797,6 +2797,15 @@ random each run, so pixel differences between runs mean nothing; one
 dump a run falls either side of a camera cut (~1 s of drift, in either
 build). The user looked at the montages and passed it for merging.
 
+**Against v0.4.1 in fps** (2026-10-16, after merging): the v0.4.1
+release zip against a local build of `main`'s code (`31e1474`),
+uncapped attract races with `run.sh`'s flags, alternating, mean over the
+race's seconds 3-17 (the logs end a second early): v0.4.1 427.3, 426.4,
+426.8 (426.8); `main` 449.7, 452.3, 457.1 (453.0): **+6.1%**, every run
+above every v0.4.1 run. Since v0.4.1: texture-binding and shader-lookup.
+The release is a CI build (clang 20, stripped) and `main` a local one
+(the same preset), which may account for some of it.
+
 ## Resolution (branch `unlocked-resolution`, 2026-10-16)
 
 Goal: `--width`/`--height` and fullscreen. The game draws its 3D view at
