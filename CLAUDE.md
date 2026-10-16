@@ -194,10 +194,9 @@ Not done yet:
 - Other per-object draws (caller `0x82596D9C`) use projective matrices that
   aren't blended, so they step at 30 Hz; what they draw isn't known yet
   (see Known issues; `--log_moving_products` lists them).
-- First-person views (cockpit, bumper) run slower than third person on the
-  Steam Deck: the render thread is the limit, at ~7 µs a draw, and the
-  cockpit draws more (the interior, the mirror). So any cut in the cost of
-  a draw helps there. Since v0.3.7, `blend-math` and `read-registers` cut
+- General renderer load: the render thread is the limit (flat out on the
+  Steam Deck, at ~7 µs a draw), so any cut in the cost of a draw helps.
+  Since v0.3.7, `blend-math` and `read-registers` cut
   ~12% of the render thread's cycles a draw (by profile, attract race;
   not yet checked on the Deck). Where the render thread's time goes, what's
   done and what's next: "Performance: the render thread" in
