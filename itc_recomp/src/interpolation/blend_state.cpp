@@ -279,6 +279,77 @@ struct ReplayedProduct {
   const TickProduct* tick = nullptr;  // in the frame's plans, or its own_products
 };
 
+// A hash map for the main thread's tables refilled every frame: entries in a
+// vector (iterated in insertion order), found through an open-addressed index
+// of positions. Clearing keeps the memory, so a frame's inserts don't
+// allocate (std::unordered_map allocated a node for each). No erase.
+template <typename K, typename V, typename Hash>
+class FlatMap {
+ public:
+  using value_type = std::pair<K, V>;
+  using iterator = value_type*;
+  using const_iterator = const value_type*;
+
+  V& operator[](const K& key) {
+    if (2 * (entries_.size() + 1) > index_.size()) {
+      Grow();
+    }
+    size_t slot = Probe(key);
+    if (index_[slot] < 0) {
+      index_[slot] = int32_t(entries_.size());
+      entries_.push_back({key, V{}});
+      slots_.push_back(uint32_t(slot));
+    }
+    return entries_[size_t(index_[slot])].second;
+  }
+  iterator find(const K& key) {
+    if (index_.empty()) {
+      return end();
+    }
+    int32_t i = index_[Probe(key)];
+    return i >= 0 ? &entries_[size_t(i)] : end();
+  }
+  const_iterator find(const K& key) const { return const_cast<FlatMap*>(this)->find(key); }
+  size_t count(const K& key) const { return find(key) != end() ? 1 : 0; }
+  void clear() {
+    for (uint32_t slot : slots_) {
+      index_[slot] = -1;
+    }
+    entries_.clear();
+    slots_.clear();
+  }
+  size_t size() const { return entries_.size(); }
+  bool empty() const { return entries_.empty(); }
+  iterator begin() { return entries_.data(); }
+  iterator end() { return entries_.data() + entries_.size(); }
+  const_iterator begin() const { return entries_.data(); }
+  const_iterator end() const { return entries_.data() + entries_.size(); }
+
+ private:
+  size_t Probe(const K& key) const {
+    size_t mask = index_.size() - 1;
+    size_t i = (uint64_t(Hash()(key)) * 0x9E3779B97F4A7C15ull) >> shift_;
+    while (index_[i] >= 0 && !(entries_[size_t(index_[i])].first == key)) {
+      i = (i + 1) & mask;
+    }
+    return i;
+  }
+  void Grow() {
+    uint32_t bits = index_.empty() ? 6 : 64 - shift_ + 1;
+    shift_ = 64 - bits;
+    index_.assign(size_t(1) << bits, -1);
+    for (size_t e = 0; e < entries_.size(); e++) {
+      size_t slot = Probe(entries_[e].first);
+      index_[slot] = int32_t(e);
+      slots_[e] = uint32_t(slot);
+    }
+  }
+  std::vector<value_type> entries_;
+  std::vector<uint32_t> slots_;  // each entry's place in index_
+  std::vector<int32_t> index_;   // into entries_, or -1
+  uint32_t shift_ = 64;
+};
+
 // The products of a frame by output address: an open-addressed table, so the
 // render thread's lookup (one per constant upload) is a multiply and a probe
 // of addresses kept together, rather than a divide and a chain of nodes.
@@ -811,20 +882,16 @@ class DrawState {
                           : 0;
     ProductKey key{camera, world, signature, handler_, object,
                    product_occurrences_[{camera, world, signature, handler_, object, 0}]++};
+    if (REXCVAR_GET(check_draw_state)) [[unlikely]] {
+      CheckOccurrence(key);
+    }
     if (object != 0 && !render_only) {
       object_keys_.keyed++;
       object_keys_.shared += key.occurrence > 0;
     }
     if (REXCVAR_GET(log_overlay_products) && handler_ == kRaceOverlaysHandler &&
-        overlay_keys_logged_ < 24 &&
-        (!render_only || previous_tick_.count(key) == 0)) {
-      overlay_keys_logged_++;
-      REXLOG_INFO("overlay key ({}{}): out {:08X} camera {:08X} world {:08X} id {} occurrence {} "
-                  "(tick {}) in current tick {} previous {}",
-                  render_only ? "render-only" : "logic", world == 0 ? ", copy" : "", out,
-                  key.camera, key.world,
-                  key.signature, key.occurrence, ticks_, current_tick_.count(key),
-                  previous_tick_.count(key));
+        overlay_keys_logged_ < 24) [[unlikely]] {
+      LogOverlayKey(out, world, key, render_only);
     }
     if (handler_ == kRaceOverlaysHandler) {
       // The race overlays' recording on a render-only pass replays the logic
@@ -845,30 +912,43 @@ class DrawState {
         return;
       }
     }
+    int32_t tick_product = -1;
     if (!render_only) {
       collecting_[key] = inputs;
     } else if (!enabled_) {
       // A render-only pass draws the same state as the logic pass, so the
       // same multiply should have the same inputs; if not, the pairing
       // slipped (something was culled differently) and it's left alone.
-      auto tick = current_tick_.find(key);
+      // With --publish_by_tick, the tick's products hold the same inputs
+      // (current_tick_'s), and the place found saves Publish a lookup.
+      const ProductInputs* tick = nullptr;
+      if (by_tick_) {
+        tick_product = tick_index_.Find(key);
+        tick = tick_product >= 0 ? &plans_->tick_products[size_t(tick_product)].now : nullptr;
+      } else {
+        auto it = current_tick_.find(key);
+        tick = it != current_tick_.end() ? &it->second : nullptr;
+      }
+      if (REXCVAR_GET(check_draw_state)) [[unlikely]] {
+        CheckTickInputs(key, tick);
+      }
       // The race overlays (the marker above opponents, Update handler
       // sub_8215E150) are recorded again on render-only passes with slightly
       // different inputs; they're blended from the logic pass's inputs under
       // the same key, so they match the logic pass's frame (otherwise the
       // marker drew a tick apart on the two: two markers).
-      bool overlay = handler_ == kRaceOverlaysHandler && tick != current_tick_.end();
-      if (!overlay && (tick == current_tick_.end() || tick->second.world != inputs.world ||
-                       tick->second.view_projection != inputs.view_projection)) {
+      bool overlay = handler_ == kRaceOverlaysHandler && tick;
+      if (!overlay && (!tick || tick->world != inputs.world ||
+                       tick->view_projection != inputs.view_projection)) {
         counts_.mismatched_products++;
         if (REXCVAR_GET(log_moving_products)) {
-          LogMismatch(key, tick == current_tick_.end() ? nullptr : &tick->second, inputs);
+          LogMismatch(key, tick, inputs);
         }
         return;
       }
     }
     auto& outputs = render_only ? pass_outputs_ : tick_outputs_;
-    outputs[out] = {key, LoadMatrix(base, out)};
+    outputs[out] = {key, LoadMatrix(base, out), tick_product};
     tick_published_stale_ |= !render_only;
   }
 
@@ -947,6 +1027,7 @@ class DrawState {
     }
     pass_outputs_.clear();
     product_occurrences_.clear();
+    check_occurrences_.clear();
     if (check) {
       CheckTimes(t0, t1, t2);
     }
@@ -1171,7 +1252,7 @@ class DrawState {
         frame->products.Set(out, product);
       }
       for (const auto& [out, output] : pass_outputs_) {
-        int32_t i = tick_index_.Find(output.key);
+        int32_t i = output.tick_product >= 0 ? output.tick_product : tick_index_.Find(output.key);
         if (i >= 0) {
           frame->products.Set(out, {output.written, &plans_->tick_products[size_t(i)]});
         }
@@ -1351,7 +1432,8 @@ class DrawState {
   ProductInputsByKey collecting_;  // this logic pass's
   ProductInputsByKey current_tick_;
   ProductInputsByKey previous_tick_;
-  std::unordered_map<ProductKey, int, ProductKeyHash> product_occurrences_;
+  FlatMap<ProductKey, int, ProductKeyHash> product_occurrences_;
+  std::unordered_map<ProductKey, int, ProductKeyHash> check_occurrences_;  // --check_draw_state
   // Each of this tick's products' previous-tick counterpart, and a number
   // that stays with an object from tick to tick (carried along the pairing),
   // which the pixel constants are paired by.
@@ -1570,6 +1652,7 @@ class DrawState {
     uint64_t tick_outputs = 0, pass_outputs = 0, occurrences = 0, published = 0;
     uint64_t current = 0, paired = 0, logic_tick_outputs = 0;
     uint64_t publish_compared = 0, publish_mismatches = 0, publish_frames_differing = 0;
+    uint64_t notes_checked = 0, note_mismatches = 0;
     std::chrono::steady_clock::time_point last_log{};
   } check_;
 
@@ -1603,14 +1686,14 @@ class DrawState {
         "({:.0f} copies), tick outputs {:.0f}, pass outputs {:.0f}, occurrences {:.0f}, published "
         "{:.0f}; a logic frame: tick outputs {:.0f}, products {:.0f}, paired {:.0f}; tsc kcycles a "
         "frame: notes {:.1f}, after draw {:.1f} (tick {:.1f}, publish {:.1f}); published products "
-        "compared {}, differing {} in {} frames (by tick: {})",
+        "compared {}, differing {} in {} frames (by tick: {}); notes checked {}, differing {}",
         check_.frames, check_.logic_frames, check_.notes[0] / f, check_.notes[1] / f,
         check_.copy_notes / f, check_.tick_outputs / f, check_.pass_outputs / f,
         check_.occurrences / f, check_.published / f, check_.logic_tick_outputs / l,
         check_.current / l, check_.paired / l, check_.note_cycles / f / 1e3,
         check_.after_cycles / f / 1e3, check_.tick_cycles / f / 1e3,
         check_.publish_cycles / f / 1e3, check_.publish_compared, check_.publish_mismatches,
-        check_.publish_frames_differing, by_tick_);
+        check_.publish_frames_differing, by_tick_, check_.notes_checked, check_.note_mismatches);
     auto last = now;
     check_ = {};
     check_.last_log = last;
@@ -1621,10 +1704,43 @@ class DrawState {
     std::chrono::steady_clock::time_point last_log{};
   } object_keys_;  // --log_moving_products
 
+  // --log_overlay_products, out of Note's way.
+  [[gnu::noinline]] void LogOverlayKey(uint32_t out, uint32_t world, const ProductKey& key,
+                                       bool render_only) {
+    if (render_only && previous_tick_.count(key) != 0) {
+      return;
+    }
+    overlay_keys_logged_++;
+    REXLOG_INFO("overlay key ({}{}): out {:08X} camera {:08X} world {:08X} id {} occurrence {} "
+                "(tick {}) in current tick {} previous {}",
+                render_only ? "render-only" : "logic", world == 0 ? ", copy" : "", out,
+                key.camera, key.world, key.signature, key.occurrence, ticks_,
+                current_tick_.count(key), previous_tick_.count(key));
+  }
+
+  // --check_draw_state: the occurrence by std::unordered_map, and the tick's
+  // inputs by current_tick_.
+  [[gnu::noinline]] void CheckOccurrence(const ProductKey& key) {
+    ProductKey group = key;
+    group.occurrence = 0;
+    check_.notes_checked++;
+    check_.note_mismatches += check_occurrences_[group]++ != key.occurrence;
+  }
+  [[gnu::noinline]] void CheckTickInputs(const ProductKey& key, const ProductInputs* tick) {
+    auto it = current_tick_.find(key);
+    const ProductInputs* expected = it != current_tick_.end() ? &it->second : nullptr;
+    check_.note_mismatches +=
+        (expected == nullptr) != (tick == nullptr) ||
+        (tick && (tick->world != expected->world ||
+                  tick->view_projection != expected->view_projection ||
+                  tick->context != expected->context));
+  }
+
   // Diagnostics (--log_moving_products): a render-only pass's multiply whose
   // inputs differ from the logic pass's under the same key. It isn't
   // published, so its upload is drawn as recorded (the tick's state).
-  void LogMismatch(const ProductKey& key, const ProductInputs* tick, const ProductInputs& now) {
+  [[gnu::noinline]] void LogMismatch(const ProductKey& key, const ProductInputs* tick,
+                                     const ProductInputs& now) {
     static auto last = std::chrono::steady_clock::now();
     static int lines = 0, total = 0;
     total++;
@@ -1659,9 +1775,11 @@ class DrawState {
   struct Output {
     ProductKey key;
     Matrix4 written;
+    // Its place in plans_->tick_products if Note found it (--publish_by_tick).
+    int32_t tick_product = -1;
   };
-  std::unordered_map<uint32_t, Output> tick_outputs_;  // by address, from the logic pass
-  std::unordered_map<uint32_t, Output> pass_outputs_;  // from this render-only pass
+  FlatMap<uint32_t, Output, std::hash<uint32_t>> tick_outputs_;  // by address, from the logic pass
+  FlatMap<uint32_t, Output, std::hash<uint32_t>> pass_outputs_;  // from this render-only pass
   // The race overlays' products on the logic pass, by value (see Note).
   std::unordered_map<uint64_t, ProductKey> overlay_keys_this_tick_, overlay_keys_;
 
