@@ -2955,6 +2955,65 @@ fps only once the render thread gets lighter.
 Not done: 93% of the calls are on render-only passes, whose inputs may
 be the tick's; if so, the result could be kept a tick (not checked).
 
+#### CameraIds::Of
+
+Main thread on `main` at `c3e4a51` (8.65 million cycles a frame):
+`__imp__sub_821298C0` 13.3%, `__imp__sub_8209C6E0` (light billboards)
+12.0%, our `interpolation::CameraIds::Of` 9.9% and `SplitViewProjection`
+3.3%, which only `CameraIds::Of` calls on this thread: ~13% together.
+
+`CameraIds::Of` (`blend_state.cpp`) numbers a view-projection's camera by
+its projection (aspect ratio and depth mapping, matched within 1% in a
+table bucketed on a log scale). Every call split the matrix
+(`SplitViewProjection`, in double, then a quaternion it doesn't use),
+took three `log`s and made up to 27 hash map lookups: ~345 cycles a call.
+No diagnostics were inlined into it (its large frame is the split's
+result on the stack). A temporary check (`--check_camera_ids`, since
+removed) counted over a whole attract race:
+
+- **~3,300 calls a frame**: ~1,400 from `DrawState::OnMultiply` (every
+  multiply on the main thread that isn't the recorder's or by a camera
+  pass, to find out whether `b` is a camera), ~550 from `OnCopy`, ~1,350
+  from `Note` (each product noted, often the same matrix `OnMultiply`
+  just checked). ~70% are perspective.
+- Only **~250 distinct matrices a frame** (at most ~410) and 12 camera
+  ids; **40% of calls are for the previous call's matrix**.
+- The ids seen in all keep growing, ~25 a second (~1,580 after 90 s):
+  some camera's projection drifts past the tolerance and gets new numbers
+  (as the race overlays' did, see `Note`). Not looked into; the table
+  grows by those few entries a second.
+
+**Done** (`camera-ids`): the number is a function of the matrix (a
+signature that has a number finds it again; the check confirmed it), so
+`Of` keeps it by the matrix's bytes: the previous call's matrix first,
+then a direct-mapped table of 1,024 entries (80 KB) by a hash of the 64
+bytes, compared in full; a miss numbers it as before. 98% of calls hit
+(95% with 256 entries). The hash is eight independent multiplies xored
+(a chain of dependent ones cost ~30 cycles a call). `--cache_camera_ids=false`
+turns it off. The check computed every call both ways: no differences
+over a 90 s attract race.
+
+Main thread, million cycles a frame, three runs each, alternating, one
+binary: first version (chained hash, no previous-call check) off 8.20,
+8.17, 8.27 (8.22), on 7.06, 7.11, 7.17 (7.11), -13.4%, the lookup still
+~160 thousand cycles a frame; final version off 8.36, 8.33, 8.27 (8.32),
+on 6.60, 7.09, 7.11 (6.93): **-16.7%** (-14.7% without the low 6.60).
+`Compute` and `SplitViewProjection` from ~1,140 to ~10 thousand cycles a
+frame, the lookup (`Cached`, `Of` now inlined) ~33 (~10 cycles a call).
+`DrawState::Note` rose from ~160 to ~190, probably as the lookup is
+inlined there.
+
+Fps against `main` (`c3e4a51`), uncapped attract races, alternating, mean
+over seconds 3-17: `main` 476.9, 443.6, 464.1 (461.5); this 462.2,
+465.6, 466.1 (464.6): +0.7%, within the runs' spread. The render thread
+limits, as after `Lights::FindNearest`.
+
+Main thread after it (first-version profile, ~7.1 million cycles a
+frame): `__imp__sub_821298C0` 16%, `__imp__sub_8209C6E0` 10%,
+`AllocateSlots` 6-7%, `__imp__sub_82146BD0` 5.5%, `DrawState::AfterDraw`
+5.4%, `__imp__sub_825951E0` 3.8%, `DrawState::Note` 2.7%. Not looked at
+yet: `AfterDraw` and `Note`.
+
 ## Resolution (branch `unlocked-resolution`, 2026-10-16)
 
 Goal: `--width`/`--height` and fullscreen. The game draws its 3D view at

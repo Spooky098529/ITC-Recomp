@@ -116,7 +116,7 @@ install -m 755 itc_recomp/run-debug.sh $D/run-debug.sh
 (cd $D && python3 -I -m zipfile -c ../$name.zip itc librexruntime.so run.sh run-debug.sh)
 ```
 
-## Status (`main`, 2026-10-16, v0.4.1)
+## Status (`main`, 2026-10-17, v0.4.1)
 
 Frame interpolation for races is working: logic runs at 30 Hz and frames are
 blended between ticks. The world, cameras, wheels (other cars' too, paired
@@ -242,7 +242,12 @@ Not done yet:
   a frame) found natively, four lights tested at once with the same
   results: -14.1% main thread cycles a frame, +0.9% fps; the render
   thread (94%) limits again, the main thread at 84% ("Lights::FindNearest"
-  in `docs/native-renderer.md`). A larger lead, translating
+  in `docs/native-renderer.md`). Merged from `camera-ids` (2026-10-17):
+  `CameraIds::Of` (~3,300 calls a frame, ~250 distinct matrices) keeps
+  each matrix's camera number in a 1,024-entry table by its bytes
+  (`--cache_camera_ids`), 98% hits, same numbers: -16.7% main thread
+  cycles a frame, +0.7% fps (render thread limits; "CameraIds::Of" in
+  `docs/native-renderer.md`). A larger lead, translating
   draws once a tick: `docs/tick-replay.md`. Still to decide: the old
   per-draw path's future, and a Steam Deck test.
 - Recheck whether the player's beam on the road still jumps in sharp turns
