@@ -168,6 +168,16 @@ uint64_t HashMatrix(const Matrix4& m) {
   return h;
 }
 
+// a == b, four floats at a time (the same per float: NaN unequal, -0 == 0).
+bool SameMatrix(const Matrix4& a, const Matrix4& b) {
+  __m128 eq = _mm_and_ps(
+      _mm_and_ps(_mm_cmpeq_ps(_mm_loadu_ps(&a[0]), _mm_loadu_ps(&b[0])),
+                 _mm_cmpeq_ps(_mm_loadu_ps(&a[4]), _mm_loadu_ps(&b[4]))),
+      _mm_and_ps(_mm_cmpeq_ps(_mm_loadu_ps(&a[8]), _mm_loadu_ps(&b[8])),
+                 _mm_cmpeq_ps(_mm_loadu_ps(&a[12]), _mm_loadu_ps(&b[12]))));
+  return _mm_movemask_ps(eq) == 0xF;
+}
+
 bool IsFinite(const Matrix4& m) {
   return std::all_of(m.begin(), m.end(), [](float v) { return std::isfinite(v); });
 }
@@ -915,6 +925,7 @@ class DrawState {
     int32_t tick_product = -1;
     if (!render_only) {
       collecting_[key] = inputs;
+      collecting_order_.push_back(key);
     } else if (!enabled_) {
       // A render-only pass draws the same state as the logic pass, so the
       // same multiply should have the same inputs; if not, the pairing
@@ -923,7 +934,15 @@ class DrawState {
       // (current_tick_'s), and the place found saves Publish a lookup.
       const ProductInputs* tick = nullptr;
       if (by_tick_) {
-        tick_product = tick_index_.Find(key);
+        if (tick_cursor_ < tick_product_keys_.size() && tick_product_keys_[tick_cursor_] == key) {
+          tick_product = int32_t(tick_cursor_);
+          check_.cursor_hits++;
+        } else {
+          tick_product = tick_index_.Find(key);
+        }
+        if (tick_product >= 0) {
+          tick_cursor_ = size_t(tick_product) + 1;
+        }
         tick = tick_product >= 0 ? &plans_->tick_products[size_t(tick_product)].now : nullptr;
       } else {
         auto it = current_tick_.find(key);
@@ -938,8 +957,8 @@ class DrawState {
       // the same key, so they match the logic pass's frame (otherwise the
       // marker drew a tick apart on the two: two markers).
       bool overlay = handler_ == kRaceOverlaysHandler && tick;
-      if (!overlay && (!tick || tick->world != inputs.world ||
-                       tick->view_projection != inputs.view_projection)) {
+      if (!overlay && (!tick || !SameMatrix(tick->world, inputs.world) ||
+                       !SameMatrix(tick->view_projection, inputs.view_projection))) {
         counts_.mismatched_products++;
         if (REXCVAR_GET(log_moving_products)) {
           LogMismatch(key, tick, inputs);
@@ -1012,6 +1031,8 @@ class DrawState {
       previous_tick_ = std::move(current_tick_);
       current_tick_ = std::move(collecting_);
       collecting_.clear();
+      current_order_ = std::move(collecting_order_);
+      collecting_order_.clear();
       MatchTick();
       by_tick_ = REXCVAR_GET(publish_by_tick);
       PlanTick();
@@ -1028,6 +1049,7 @@ class DrawState {
     pass_outputs_.clear();
     product_occurrences_.clear();
     check_occurrences_.clear();
+    tick_cursor_ = 0;
     if (check) {
       CheckTimes(t0, t1, t2);
     }
@@ -1430,6 +1452,9 @@ class DrawState {
 
   using ProductInputsByKey = std::unordered_map<ProductKey, ProductInputs, ProductKeyHash>;
   ProductInputsByKey collecting_;  // this logic pass's
+  // The keys in the order noted (render-only passes note them in the same
+  // order), this logic pass's and the current tick's.
+  std::vector<ProductKey> collecting_order_, current_order_;
   ProductInputsByKey current_tick_;
   ProductInputsByKey previous_tick_;
   FlatMap<ProductKey, int, ProductKeyHash> product_occurrences_;
@@ -1480,6 +1505,8 @@ class DrawState {
   };
   bool by_tick_ = false;  // --publish_by_tick, for this tick
   ProductIndex tick_index_;
+  std::vector<ProductKey> tick_product_keys_;  // each of plans_->tick_products'
+  size_t tick_cursor_ = 0;  // the tick product after the last one Note found
   // The logic pass's outputs as published (with --publish_by_tick), until
   // they or the tick change.
   std::vector<std::pair<uint32_t, ReplayedProduct>> tick_published_;
@@ -1501,12 +1528,27 @@ class DrawState {
       plan_of_[key] = int32_t(plans->products.size());
       plans->products.push_back(PlanProduct(before->second, now->second, *plans, camera_pairs_));
     }
+    tick_product_keys_.clear();
     if (by_tick_) {
+      // In the order noted, so a render-only pass finds each the next along
+      // (Note), reading them in order.
       plans->tick_products.reserve(current_tick_.size());
       tick_index_.Reset(current_tick_.size());
+      auto add = [&](const ProductKey& key, const ProductInputs& now) {
+        if (tick_index_.Find(key) < 0) {
+          tick_index_.Insert(key, int32_t(plans->tick_products.size()));
+          plans->tick_products.push_back(TickProductOf(key, now));
+          tick_product_keys_.push_back(key);
+        }
+      };
+      for (const ProductKey& key : current_order_) {
+        auto now = current_tick_.find(key);
+        if (now != current_tick_.end()) {
+          add(key, now->second);
+        }
+      }
       for (const auto& [key, now] : current_tick_) {
-        tick_index_.Insert(key, int32_t(plans->tick_products.size()));
-        plans->tick_products.push_back(TickProductOf(key, now));
+        add(key, now);
       }
     }
     tick_published_stale_ = true;
@@ -1652,7 +1694,7 @@ class DrawState {
     uint64_t tick_outputs = 0, pass_outputs = 0, occurrences = 0, published = 0;
     uint64_t current = 0, paired = 0, logic_tick_outputs = 0;
     uint64_t publish_compared = 0, publish_mismatches = 0, publish_frames_differing = 0;
-    uint64_t notes_checked = 0, note_mismatches = 0;
+    uint64_t notes_checked = 0, note_mismatches = 0, cursor_hits = 0;
     std::chrono::steady_clock::time_point last_log{};
   } check_;
 
@@ -1686,14 +1728,14 @@ class DrawState {
         "({:.0f} copies), tick outputs {:.0f}, pass outputs {:.0f}, occurrences {:.0f}, published "
         "{:.0f}; a logic frame: tick outputs {:.0f}, products {:.0f}, paired {:.0f}; tsc kcycles a "
         "frame: notes {:.1f}, after draw {:.1f} (tick {:.1f}, publish {:.1f}); published products "
-        "compared {}, differing {} in {} frames (by tick: {}); notes checked {}, differing {}",
+        "compared {}, differing {} in {} frames (by tick: {}); notes checked {}, differing {}, found next along {}",
         check_.frames, check_.logic_frames, check_.notes[0] / f, check_.notes[1] / f,
         check_.copy_notes / f, check_.tick_outputs / f, check_.pass_outputs / f,
         check_.occurrences / f, check_.published / f, check_.logic_tick_outputs / l,
         check_.current / l, check_.paired / l, check_.note_cycles / f / 1e3,
         check_.after_cycles / f / 1e3, check_.tick_cycles / f / 1e3,
         check_.publish_cycles / f / 1e3, check_.publish_compared, check_.publish_mismatches,
-        check_.publish_frames_differing, by_tick_, check_.notes_checked, check_.note_mismatches);
+        check_.publish_frames_differing, by_tick_, check_.notes_checked, check_.note_mismatches, check_.cursor_hits);
     auto last = now;
     check_ = {};
     check_.last_log = last;
