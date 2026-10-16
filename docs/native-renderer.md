@@ -2891,8 +2891,13 @@ diagnostics split, 10.55 (off) against **9.68** (on), -8.2%, every run on
 below every run off. Against `2b33ade` (11.31): **-14.4%**.
 `AllocateSlots` from ~2,500 to ~460 thousand cycles a frame (~9 a call).
 Frames counted in the 12 s barely moved (~5,500 to ~5,650): the render
-thread (~87%) is nearly as busy, so the fps gain needs measuring, and both
-threads now matter.
+thread (~87%) is nearly as busy, so both threads now matter.
+
+Fps against `main` (`2b33ade`), uncapped attract races with `run.sh`'s
+flags, alternating, mean over the race's seconds 3-17: `main` 446.4,
+438.5, 449.1 (444.7); `allocate-slots` 470.2, 455.1, 456.1 (460.5):
+**+3.6%**, every run above every `main` run. Smaller than the main
+thread's -14.4%, as the render thread is close behind.
 
 Next on the main thread: `sub_820F4128` (13%, its hot spot a 4-byte store
 to the guest stack followed by a 16-byte `lvx` of the same spot, also a
