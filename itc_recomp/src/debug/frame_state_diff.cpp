@@ -42,6 +42,14 @@ REXCVAR_DEFINE_BOOL(find_countdowns, false, "ITC",
                     "With --find_per_frame_state, look for values counting down (a float in "
                     "0..10 going down, or a small integer going down by one) instead of any "
                     "timer step");
+REXCVAR_DEFINE_BOOL(find_all_changes, false, "ITC",
+                    "With --find_per_frame_state, log every word a render-only pass changes "
+                    "(in two samples or more), as address ranges, instead of timer steps; "
+                    "for smoothed values that step by varying amounts");
+REXCVAR_DEFINE_STRING(find_all_changes_dir, "", "ITC",
+                      "With --find_all_changes, write each sample's whole list to "
+                      "<dir>/changes_<pass>.txt (address before after, hex) instead of "
+                      "logging the first 300 ranges");
 
 namespace debug {
 
@@ -218,6 +226,10 @@ class FrameStateDiff {
     int found = 0;
     std::string sample;
     std::vector<uint32_t> stepped_now;
+    struct Change {
+      uint32_t address, before, after;
+    };
+    std::vector<Change> changed_now;
     for (const Range& r : ranges_) {
       const uint8_t* now = base + r.start;
       const uint8_t* then = snapshot_.data() + offset;
@@ -229,6 +241,10 @@ class FrameStateDiff {
         uint32_t before = __builtin_bswap32(*reinterpret_cast<const uint32_t*>(then + i));
         uint32_t after = guest::LoadU32(base, address);
         const char* step;
+        if (REXCVAR_GET(find_all_changes)) {
+          changed_now.push_back({address, before, after});
+          continue;
+        }
         if (REXCVAR_GET(find_any_steps)) {
           // Only steps equal to the word's step in an earlier sample: a
           // steady rate, not a buffer being rewritten.
@@ -260,6 +276,10 @@ class FrameStateDiff {
       }
       offset += r.size;
     }
+    if (REXCVAR_GET(find_all_changes)) {
+      LogAllChanges(changed_now);
+      return;
+    }
     REXLOG_INFO("per-frame state: {} words stepped like timers over a render-only pass:{}", found,
                 sample);
     // Watch words that stepped in more than one sampled pass: steady
@@ -279,6 +299,55 @@ class FrameStateDiff {
     }
     if (last_step_.size() > 2000000) {
       last_step_.clear();
+    }
+  }
+
+  // --find_all_changes: the words this render-only pass changed that also
+  // changed in an earlier sample, as ranges (words up to 16 bytes apart),
+  // each with its first words' values (as floats when they look like ones).
+  template <typename Change>
+  void LogAllChanges(const std::vector<Change>& changes) {
+    std::vector<const Change*> repeated;
+    for (const Change& c : changes) {
+      if (++hits_[c.address] >= 2) {
+        repeated.push_back(&c);
+      }
+    }
+    if (hits_.size() > 2000000) {
+      hits_.clear();
+    }
+    auto value = [](uint32_t bits) {
+      float f = AsFloat(bits);
+      if (bits != 0 && std::isfinite(f) && std::abs(f) >= 1e-4f && std::abs(f) < 1e6f) {
+        return fmt::format("{:.6g}", f);
+      }
+      return fmt::format("{:X}", bits);
+    };
+    REXLOG_INFO("per-frame state: pass {} changed {} words, {} of them in an earlier sample too",
+                frame_pacing::GameMessages_PassNumber(), changes.size(), repeated.size());
+    if (const std::string& dir = REXCVAR_GET(find_all_changes_dir); !dir.empty()) {
+      std::ofstream out(
+          fmt::format("{}/changes_{}.txt", dir, frame_pacing::GameMessages_PassNumber()));
+      for (const Change& c : changes) {
+        out << fmt::format("{:08X} {:08X} {:08X}\n", c.address, c.before, c.after);
+      }
+      return;
+    }
+    int lines = 0;
+    for (size_t i = 0; i < repeated.size() && lines < 300;) {
+      size_t j = i + 1;
+      while (j < repeated.size() && repeated[j]->address - repeated[j - 1]->address <= 16) {
+        j++;
+      }
+      std::string values;
+      for (size_t k = i; k < j && k < i + 6; k++) {
+        values += fmt::format(" {:08X}:{}->{}", repeated[k]->address, value(repeated[k]->before),
+                              value(repeated[k]->after));
+      }
+      REXLOG_INFO("per-frame state: {:08X}-{:08X} {} words:{}", repeated[i]->address,
+                  repeated[j - 1]->address + 3, j - i, values);
+      lines++;
+      i = j;
     }
   }
 
