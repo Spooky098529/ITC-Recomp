@@ -713,3 +713,58 @@ extern "C" REX_FUNC(sub_820DBD38) {
   interpolation::BlendState_SetParentWorld(base, 0);
   changes.After(base);
 }
+
+// Diagnostics (--log_gauge_constants): the vertex constants c9-c12 that a
+// gauge model's materials are drawn with (sub_820CECA0: r3 = model, r4 =
+// mesh, r5 = material pass). The gauges (sub_820DB980, sub_820DBA38) set
+// the model's +440 around their draw, which selects vertex shader 1005.
+// Each material (512 bytes, from [[model + 40] + 544 * mesh + 396] + 16)
+// takes up to 4 (+128) vec4s: xyz from the model's array at [model + 320]
+// by the indices at +208, w from +240; an index of -1 gives (0, 0, 0, 1).
+// Logged per call, 80 lines every 2 s.
+REXCVAR_DEFINE_BOOL(log_gauge_constants, false, "ITC",
+                    "Log the gauge models' per-material vertex constants c9-c12 as drawn");
+
+extern "C" REX_FUNC(sub_820CECA0) {
+  REX_FUNC_PROLOGUE();
+  uint32_t model = ctx.r3.u32, mesh = ctx.r4.u32, pass = ctx.r5.u32;
+  if (REXCVAR_GET(log_gauge_constants) && model && guest::LoadU32(base, model + 440) != 0) {
+    static std::chrono::steady_clock::time_point last{};
+    static int lines = 0;
+    auto now = std::chrono::steady_clock::now();
+    if (now - last >= std::chrono::seconds(2)) {
+      last = now;
+      lines = 0;
+    }
+    uint32_t mesh_entry = guest::LoadU32(base, model + 40) + 544 * mesh;
+    uint32_t set = guest::LoadU32(base, mesh_entry + 396);
+    uint32_t first = guest::LoadU32(base, set + 8);
+    uint32_t count = guest::LoadU32(base, set + (pass ? 12 : 8));
+    uint32_t table = guest::LoadU32(base, model + 320);
+    for (uint32_t i = 0; i < std::min<uint32_t>(count, 16) && lines < 80; i++, lines++) {
+      uint32_t material = set + 16 + 512 * ((pass ? first : 0) + i);
+      uint32_t n = std::min<uint32_t>(guest::LoadU32(base, material + 128), 4);
+      std::string values;
+      for (uint32_t k = 0; k < n; k++) {
+        int32_t index = int32_t(guest::LoadU32(base, material + 208 + 4 * k));
+        float w = guest::LoadFloat(base, material + 240 + 4 * k);
+        if (index == -1) {
+          values += fmt::format(" c{}[-1] w {:.5g}", 9 + k, w);
+        } else {
+          uint32_t v = table + 16 * uint32_t(index);
+          values += fmt::format(" c{}[{}] ({:.5g} {:.5g} {:.5g}) w {:.5g}", 9 + k, index,
+                                guest::LoadFloat(base, v), guest::LoadFloat(base, v + 4),
+                                guest::LoadFloat(base, v + 8), w);
+        }
+      }
+      REXLOG_INFO("gauge constants: pass {} {} model {:08X} flag {} mesh {} material pass {} #{} "
+                  "type {} table {:08X} c13.w {:.5g}:{}",
+                  frame_pacing::GameMessages_PassNumber(),
+                  frame_pacing::GameMessages_IsRenderOnlyPass() ? "render-only" : "logic", model,
+                  guest::LoadU32(base, model + 440), mesh, pass, i,
+                  guest::LoadU32(base, material + 392), table, guest::LoadFloat(base, material + 12),
+                  values);
+    }
+  }
+  __imp__sub_820CECA0(ctx, base);
+}
