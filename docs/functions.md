@@ -301,6 +301,19 @@ render-only passes it ran ~5x fast. Each case found is fixed in
 | Play time (a frame counter at `0x826C5B90`, which `sub_821109B8` turns into hours, minutes and seconds at 30 a second) | `sub_82107910` | One taken back before the call on render-only passes (`--per_tick_play_time`) |
 | UI movies: the HUD, including the race start countdown (a 240-frame movie, a beep at frames 60, 120, 180, 240) | `sub_8211D2F8`, with r4 = 0 (advance a frame and draw); r4 = 1 only draws | Replayed (below) (`--per_tick_ui_movies`) |
 
+**Checked and left alone: the per-car draw's counter** (2026-10-17).
+`sub_820DAC68` (called from Draw for each car, r3 = car) is the car's draw:
+it loads the car's parts on first use (flags at +5036 to +5112) and draws
+them (`sub_820E6A40`, `sub_820ECE28`, `sub_820DDE58`, `sub_820E2EE8`,
+`sub_820E53F0`), so it must run on every pass. Its one write to game state
+is `+4992 -= 1.0` (the float at `0x82000A30`) on every call, so on
+render-only passes the counter goes on down (to about -4 at 150 fps).
+Nothing else reads or writes +4992 by that offset, and the tick sets it
+outright before Draw, from its own state: the values a tick writes are the
+same at 30 and 60 fps (`--log_car_counter`: 0.1666, 0.1716, 0.1807, ... in
+both). The extra decrements are thrown away each tick and nothing reads
+them, so they change nothing; found with `--find_all_changes`.
+
 **How the texture animations were found.** `--find_per_frame_state`
 finds only ±1 steps, and the counters it found first (at 0x4005xxxx, half
 the pass rate) were the command lists' per-buffer bookkeeping, not
@@ -363,6 +376,15 @@ so with frames uncapped it's fast; at `--max_fps=30` it's right.
   `--find_any_steps` for any steady step (a float by under 1, an integer
   by up to 4, the same amount in two samples), for animations that don't
   count in frames;
+  `--find_all_changes` lists every word a render-only pass changes (in
+  two samples or more) instead of timer steps, for smoothed values that
+  step by varying amounts, and watches the words most often changed like
+  a smoothed value (a float moving by 0.02% to 90%, outside stacks and
+  runs of over 48 changed words), logging the code that changes them;
+  `--find_all_changes_dir=<dir>` writes each sample's whole list to
+  `<dir>/changes_<pass>.txt` (address, before, after). Most of what it
+  lists is the command lists being rewritten; heap addresses differ from
+  run to run, so runs can't be compared by address;
   `--find_per_frame_state_interval_ms=0` samples every pass (very slow);
   `--watch_addresses` watches given addresses from the start.
   `--watch_lights` watches the light billboards' lights (the lists drawn by

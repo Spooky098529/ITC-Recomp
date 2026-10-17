@@ -577,7 +577,38 @@ extern "C" REX_FUNC(sub_8209CC38) {
   debug::FrameStateDiff_After(base, "draw step part", 0x8209CC38);
 }
 // The per-car update called from Draw (sub_820DAC68), and its callees.
-ITC_FRAME_STATE_WRAP(820DAC68)
+// The per-car draw (sub_820DAC68, r3 = car), which also subtracts the float
+// at 0x82000A30 from the car's +4992 on every call. --log_car_counter logs
+// the counter before and after each call, by pass, 60 lines every 2 s.
+REXCVAR_DEFINE_BOOL(log_car_counter, false, "ITC",
+                    "Log the per-car draw's counter (+4992) around each call, every 2 s");
+extern "C" REX_FUNC(sub_820DAC68) {
+  REX_FUNC_PROLOGUE();
+  if (debug::IsHidden(0x820DAC68)) {
+    return;
+  }
+  uint32_t car = ctx.r3.u32;
+  float before = guest::LoadFloat(base, car + 4992);
+  debug::FrameStateDiff_Before(base);
+  __imp__sub_820DAC68(ctx, base);
+  debug::FrameStateDiff_After(base, "draw step part", 0x820DAC68);
+  if (REXCVAR_GET(log_car_counter)) {
+    static std::chrono::steady_clock::time_point last{};
+    static int lines = 0;
+    auto now = std::chrono::steady_clock::now();
+    if (now - last >= std::chrono::seconds(2)) {
+      last = now;
+      lines = 0;
+    }
+    if (lines++ < 60) {
+      REXLOG_INFO("car counter: pass {} {} car {:08X} state {} +4992 {} -> {} (step {})",
+                  frame_pacing::GameMessages_PassNumber(),
+                  frame_pacing::GameMessages_IsRenderOnlyPass() ? "render-only" : "logic", car,
+                  guest::LoadU32(base, car + 32), before, guest::LoadFloat(base, car + 4992),
+                  guest::LoadFloat(base, 0x82000A30));
+    }
+  }
+}
 ITC_FRAME_STATE_WRAP(820C5C88)
 ITC_FRAME_STATE_WRAP(820D4048)
 ITC_FRAME_STATE_WRAP(820D72D8)
