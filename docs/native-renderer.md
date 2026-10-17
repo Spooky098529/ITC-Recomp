@@ -3112,6 +3112,12 @@ No fps runs: at this point the profiles' cycles are the measure.
 
 The check (`--check_draw_state`) was removed before merging.
 
+Against the last release, v0.4.3 (`2b33ade`, before `allocate-slots`,
+`perf-investigate`, `camera-ids` and this), built locally the same way,
+alternating: main thread 11.14, 10.97, 11.14 (11.08) against 6.51, 6.37,
+6.51 (6.46) million cycles a frame, **-41.7%**; render thread 10.27, 10.31
+against 10.39, 10.26 (unchanged), so the render thread is what limits.
+
 Left of ours: `Note` ~110 thousand cycles a frame (~75 a call),
 `AfterDraw` ~40 (`MatchTick` and `PlanTick`, once a tick, still use
 `std::unordered_map`).
