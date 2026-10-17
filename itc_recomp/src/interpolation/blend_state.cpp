@@ -3154,10 +3154,12 @@ PixelOutcomesLog& GetPixelOutcomesLog() {
 // the game tick.
 class SteppingConstantsLog {
  public:
-  void OnFrameStart() {
+  void OnFrameStart(uint64_t tick) {
     if (!REXCVAR_GET(log_stepping_constants)) {
       return;
     }
+    new_tick_ = tick != tick_;
+    tick_ = tick;
     frames_++;
     occurrences_.clear();
     auto now = std::chrono::steady_clock::now();
@@ -3193,8 +3195,23 @@ class SteppingConstantsLog {
                     entry.sample);
       }
     }
-    REXLOG_INFO("stepping constants: {} logged of {} upload groups, {} frames", logged,
-                entries_.size(), frames_);
+    // Uploads whose whole value changed only on a tick's first frame, never
+    // between ticks: stuck to the tick however seldom they change (a gauge
+    // needle moves only while the revs change).
+    int at_ticks = 0;
+    for (const auto& [key, entry] : entries_) {
+      if (entry.changes_at_tick >= 2 && entry.changes_within_tick == 0 && at_ticks < 80) {
+        at_ticks++;
+        REXLOG_INFO("tick-stepped constants: {} c{} x{} #{} by {:08X}: changed on {} new ticks "
+                    "of {} frames, first at c{}: {}",
+                    key.stage ? "pixel" : "vertex", key.start, key.count, key.occurrence,
+                    key.owner, entry.changes_at_tick, entry.frames, entry.first_changed,
+                    entry.change_sample);
+      }
+    }
+    REXLOG_INFO("stepping constants: {} logged of {} upload groups, {} frames, {} stepped at "
+                "ticks only",
+                logged, entries_.size(), frames_, at_ticks);
     entries_.clear();
     frames_ = 0;
   }
@@ -3223,6 +3240,30 @@ class SteppingConstantsLog {
     }
     entry.seen = true;
     entry.last = value;
+    // The whole upload, for the tick-only test.
+    uint32_t all_words = std::min<uint32_t>(key.count * 4, 1024);
+    std::vector<float> whole(all_words);
+    for (uint32_t i = 0; i < all_words; i++) {
+      whole[i] = guest::LoadFloat(base, payload + 4 * i);
+    }
+    if (entry.whole.size() == whole.size() && entry.whole != whole) {
+      if (new_tick_) {
+        entry.changes_at_tick++;
+      } else {
+        entry.changes_within_tick++;
+      }
+      uint32_t first = 0;
+      while (whole[first] == entry.whole[first]) {
+        first++;
+      }
+      if (entry.change_sample.empty()) {
+        entry.first_changed = key.start + first / 4;
+        for (uint32_t i = first & ~3u; i < std::min<uint32_t>(all_words, (first & ~3u) + 16); i++) {
+          entry.change_sample += fmt::format("{:.4g}->{:.4g} ", entry.whole[i], whole[i]);
+        }
+      }
+    }
+    entry.whole = std::move(whole);
     if (entry.sample.empty()) {
       for (uint32_t i = 0; i < std::min<uint32_t>(words, 8); i++) {
         entry.sample += fmt::format("{:.4g} ", value[i]);
@@ -3244,10 +3285,16 @@ class SteppingConstantsLog {
     bool seen = false;
     std::array<float, 16> last{};
     std::string sample;
+    std::vector<float> whole;  // the whole upload, last frame
+    int changes_at_tick = 0, changes_within_tick = 0;
+    uint32_t first_changed = 0;
+    std::string change_sample;
   };
   std::map<Key, Entry> entries_;
   std::map<Key, int> occurrences_;
   int frames_ = 0;
+  uint64_t tick_ = 0;
+  bool new_tick_ = false;
   std::chrono::steady_clock::time_point last_log_{};
 };
 
@@ -3467,7 +3514,7 @@ void BlendState_OnReplayFrameStart() {
     GetObjectExtrasLog().OnFrameStart();
   }
   GetReplayedConstantsLog().OnFrameStart();
-  GetSteppingConstantsLog().OnFrameStart();
+  GetSteppingConstantsLog().OnFrameStart(GetReplayCameras().tick());
   GetReplayCameras().OnFrameStart();
   GetOverlayUploadsLog().OnFrameStart();
   GetPixelConstantBlender().OnFrameStart(GetReplayCameras().tick());
