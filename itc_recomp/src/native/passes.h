@@ -114,6 +114,17 @@ class Passes {
   // vertices, each constant block); TakeTickRepeats describes it since it
   // was last called.
   void set_log_tick_repeats(bool log);
+  // --native_renderer_tick_replay (docs/tick-replay.md, step 2): a tick's
+  // first render-only frame is stored as it's drawn (capturing_frame;
+  // NoteUpload gets the frame's constant uploads as recorded), and
+  // DrawStoredFrame draws it again in place of a frame the main thread
+  // didn't draw, with the frame's blends. TakeStoredFrames describes it
+  // since it was last called.
+  void set_tick_replay(bool on);
+  bool capturing_frame() const;
+  void NoteUpload(uint8_t* base, uint32_t payload, uint32_t arg1, uint32_t packed);
+  void DrawStoredFrame(VkCommandBuffer commands, uint8_t* base);
+  std::string TakeStoredFrames();
   // Draws translated once a tick (docs/tick-replay.md, step 1): on the
   // frames after a tick's first, a draw made from the same state as the one
   // at its place on that frame reuses what it came to, packing only its

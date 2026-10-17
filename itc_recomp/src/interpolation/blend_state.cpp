@@ -986,6 +986,13 @@ class DrawState {
   std::thread::id main_thread() const { return main_thread_; }
 
   void BeforeDraw(uint8_t* base, bool logic_pass) {
+    // The tick's first render-only pass: its products are kept for the
+    // passes after it that don't draw (--native_renderer_tick_replay).
+    capture_pass_ = !logic_pass && after_logic_;
+    after_logic_ = logic_pass;
+    if (logic_pass) {
+      kept_outputs_.clear();
+    }
     drawing_ = true;
     billboard_cameras_ready_ = false;
     main_thread_ = std::this_thread::get_id();
@@ -1043,6 +1050,12 @@ class DrawState {
       overlay_keys_this_tick_.clear();
     }
     PublishReplayFrame();
+    if (capture_pass_) {
+      kept_outputs_.clear();
+      for (const auto& entry : pass_outputs_) {
+        kept_outputs_.push_back(entry);
+      }
+    }
     pass_outputs_.clear();
     product_occurrences_.clear();
     tick_cursor_ = 0;
@@ -1195,6 +1208,18 @@ class DrawState {
   void AfterBillboards(uint8_t* base) {
     Restore(base, billboard_saved_);
     Restore(base, billboard_saved_vec3_);
+  }
+
+  // Main thread, a pass that doesn't draw (--native_renderer_tick_replay):
+  // the frame's amount, with the products of the tick's first render-only
+  // pass, whose recording the render thread replays.
+  void PublishFastFrame() {
+    amount_ = frame_pacing::GetFramePacer().TickProgress();
+    for (const auto& [out, output] : kept_outputs_) {
+      pass_outputs_[out] = output;
+    }
+    PublishReplayFrame();
+    pass_outputs_.clear();
   }
 
   // Main thread, before a logic pass's Update: a new tick's products start.
@@ -1760,6 +1785,9 @@ class DrawState {
   };
   FlatMap<uint32_t, Output, std::hash<uint32_t>> tick_outputs_;  // by address, from the logic pass
   FlatMap<uint32_t, Output, std::hash<uint32_t>> pass_outputs_;  // from this render-only pass
+  // The tick's first render-only pass's outputs (PublishFastFrame).
+  std::vector<std::pair<uint32_t, Output>> kept_outputs_;
+  bool capture_pass_ = false, after_logic_ = false;
   // The race overlays' products on the logic pass, by value (see Note).
   std::unordered_map<uint64_t, ProductKey> overlay_keys_this_tick_, overlay_keys_;
 
@@ -2303,7 +2331,11 @@ class PixelConstantBlender {
 
   // Blends the upload in place and returns true; recorded() then holds the
   // upload as recorded, to put back after.
-  bool Apply(uint8_t* base, uint32_t payload, uint32_t packed, float amount, uint64_t object) {
+  // With source, the upload's values come from there (host order) instead
+  // of guest memory, and with result the blend goes there instead (a stored
+  // upload, --native_renderer_tick_replay).
+  bool Apply(uint8_t* base, uint32_t payload, uint32_t packed, float amount, uint64_t object,
+             const float* source = nullptr, float* result = nullptr) {
     outcome_ = Outcome::kNoObject;
     switch_jumps_ = 0;
     if (object == 0) {
@@ -2329,7 +2361,11 @@ class PixelConstantBlender {
     // value (the entry's node stays put until OnFrameStart).
     std::vector<float>& now = first || from_latest ? entry.current : now_;
     now.resize(count * 4);
-    guest::CopyFloats(base, payload, now.data(), count * 4);
+    if (source) {
+      std::memcpy(now.data(), source, count * 4 * sizeof(float));
+    } else {
+      guest::CopyFloats(base, payload, now.data(), count * 4);
+    }
     entry.current_tick = tick_;
     recorded_ = &now;
     last_key_ = {object, key.occurrence};
@@ -2503,7 +2539,11 @@ class PixelConstantBlender {
       bool blend = (a != b) & (jumps[i] == 0);
       out[i] = blend ? std::bit_cast<uint32_t>(a + (b - a) * amount) : std::bit_cast<uint32_t>(b);
     }
-    guest::StoreU32s(base, payload, out, size);
+    if (result) {
+      std::memcpy(result, out, size * sizeof(float));
+    } else {
+      guest::StoreU32s(base, payload, out, size);
+    }
     if (keep_blended_) {
       std::memcpy(last_blended_.data(), out, size * sizeof(float));
     }
@@ -3104,6 +3144,45 @@ void BlendState_LogOverlayAllocations(uint8_t* base) {
 
 void BlendState_BeforeDraw(uint8_t* base, bool render_only_pass) {
   GetDrawState().BeforeDraw(base, !render_only_pass);
+}
+
+void BlendState_PublishFastFrame() {
+  GetDrawState().PublishFastFrame();
+}
+
+void BlendState_BlendStoredUpload(uint32_t payload, uint32_t packed, float* values) {
+  uint32_t stage = packed >> 24, count = packed & 0xFF;
+  bool substituted = false;
+  if (REXCVAR_GET(interpolate_draw_state) && stage == 0 && count >= 4) {
+    Matrix4 m;
+    std::memcpy(m.data(), values, sizeof(m));
+    if (std::optional<Matrix4> substitute = GetReplayCameras().Substitute(payload, m)) {
+      std::memcpy(values, substitute->data(), sizeof(m));
+      substituted = true;
+    }
+  }
+  // As BlendState_ReplayConstants: the per-object recorder's c4-c7 and c8.
+  if (substituted && count >= 9 && REXCVAR_GET(blend_object_extras)) {
+    const ProductBlendParts& parts = GetReplayCameras().last_parts();
+    Matrix4 world;
+    std::memcpy(world.data(), values + 16, sizeof(world));
+    if (world == parts.world_now) {
+      std::memcpy(values + 16, parts.world.data(), sizeof(world));
+    }
+    if (parts.eye_now && parts.eye) {
+      float* c8 = values + 32;
+      if (Distance({c8[0], c8[1], c8[2]}, *parts.eye_now) < 0.05f) {
+        for (uint32_t i = 0; i < 3; i++) {
+          c8[i] = (*parts.eye)[i];
+        }
+      }
+    }
+  }
+  if (REXCVAR_GET(interpolate_draw_state) && REXCVAR_GET(blend_pixel_constants) && stage == 1 &&
+      ((packed >> 16) & 0xFF) == 1) {
+    GetPixelConstantBlender().Apply(nullptr, payload, packed, GetReplayCameras().amount(),
+                                    GetReplayCameras().last_identity(), values, values);
+  }
 }
 
 void BlendState_OnLogicPassStart() {

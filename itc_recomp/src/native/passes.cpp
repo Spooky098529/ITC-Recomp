@@ -12,6 +12,7 @@
 
 #include "buffers.h"
 #include "guest.h"
+#include "interpolation/blend_state.h"
 #include "renderer.h"
 #include "shaders.h"
 #include "state.h"
@@ -216,6 +217,9 @@ struct DrawCall {
   // With log_tick_repeats: a hash of the inline vertices (their address in
   // the mirror changes from frame to frame).
   uint64_t inline_hash = 0;
+  // Inline vertices: where they came from (guest) and their size, for the
+  // stored list (--native_renderer_tick_replay).
+  uint32_t inline_data = 0, inline_size = 0;
 };
 
 // Command 18's item: [primitive type, base vertex << 16 | start index,
@@ -995,6 +999,9 @@ struct Passes::State {
     uint64_t differ[kDrawParts] = {};  // draws, aligned, in frames with the same count
     uint64_t structure_differ = 0;     // draws with any structural part differing
     std::vector<std::string> samples;
+    // Draws whose inline vertices or pixel floats differ, by pixel shader
+    // and pass.
+    std::map<std::pair<uint64_t, uint32_t>, std::array<uint64_t, 3>> by_shader;
   } tick_repeats;
   struct RecordedState;
   // Records the draw (binding the targets), its state calls left out where
@@ -1172,13 +1179,111 @@ struct Passes::State {
     uint64_t checked = 0, check_mismatches = 0;
     std::vector<std::string> check_samples;
   } tick_counts;
+  // --native_renderer_tick_replay (step 2 in docs/tick-replay.md): on a
+  // tick's first render-only frame (capturing_frame), the frame as ops:
+  // constant uploads (as recorded, before blending), draws as worked out,
+  // clears, resolves and the front buffer. The frames after it in the tick
+  // (the main thread didn't draw them) are drawn from it (DrawStoredFrame),
+  // the uploads blended into float_shadow, which stands in for the
+  // device's float constants.
+  struct StoredUpload {
+    uint32_t payload, packed, word;  // word: the first of its values in words
+  };
+  struct StoredDraw {
+    TickDraw draw;
+    uint32_t bool_loop[kBoolLoopConstantsRange / 4];
+    uint32_t fetch[kFetchConstantsRange / 4];
+    uint32_t inline_offset = 0, inline_size = 0;  // into inline_bytes
+  };
+  struct StoredClear {
+    Target* target;
+    VkClearValue value;
+    VkImageAspectFlags aspects;
+  };
+  struct StoredResolve {
+    Target* source;
+    uint32_t destination, flags;
+    bool has_rect, has_point;
+    int32_t rect[4], point[2];
+  };
+  // kSet: float registers set other than by an upload (a pixel shader's
+  // literal constants, c245-c255, loaded as it's bound), as the device held
+  // them at the draw that read them; not blended.
+  enum class StoredKind : uint8_t { kUpload, kSet, kDraw, kClear, kResolve, kFront };
+  struct StoredOp {
+    StoredKind kind;
+    uint32_t index;
+  };
+  struct StoredFrame {
+    std::vector<StoredOp> ops;
+    std::vector<StoredUpload> uploads;
+    std::vector<uint32_t> words;
+    std::vector<StoredDraw> draws;
+    std::vector<StoredClear> clears;
+    std::vector<StoredResolve> resolves;
+    std::vector<uint8_t> inline_bytes;
+    Target* front = nullptr;
+    VkExtent2D front_extent{};
+    uint32_t device = 0;
+    bool valid = false;
+    std::string invalid_reason;
+    void clear() {
+      ops.clear();
+      uploads.clear();
+      words.clear();
+      draws.clear();
+      clears.clear();
+      resolves.clear();
+      inline_bytes.clear();
+      front = nullptr;
+      device = 0;
+      valid = true;
+      invalid_reason.clear();
+    }
+    void Invalidate(const char* reason) {
+      if (valid) {
+        valid = false;
+        invalid_reason = reason;
+      }
+    }
+  };
+  bool tick_replay = false;      // the option
+  bool capturing_frame = false;  // this frame is stored
+  bool creating_target = false;  // GetTarget's first clear (not stored)
+  int last_kind = 0;
+  uint64_t capture_failed_at_start = 0;
+  StoredFrame stored_capture, stored;
+  alignas(16) uint32_t float_shadow[2][256 * 4];
+  // A check while capturing: the device's float constants as command 7's
+  // uploads alone leave them (pending: the last upload, read back from the
+  // device at the next upload or draw), compared at each draw with what the
+  // device holds.
+  alignas(16) uint32_t check_shadow[2][256 * 4];
+  bool check_shadow_ready = false;
+  int32_t check_pending[3] = {-1, 0, 0};  // stage, start, count
+  uint64_t check_draws = 0, check_differ = 0;
+  std::map<std::pair<uint32_t, uint32_t>, uint64_t> check_registers;  // (stage, register)
+  void CheckShadowFlush(uint8_t* base, uint32_t device);
+  Target* last_front = nullptr;
+  VkExtent2D last_front_extent{};
+  struct StoredCounts {
+    uint64_t captures = 0, invalid = 0, frames = 0, missing = 0, draws = 0, uploads = 0;
+    std::string invalid_reason;
+  } stored_counts;
+  // Whether nothing in the way of reusing draws (diagnostics that need every
+  // draw worked out, the per-draw mirror).
+  bool ReuseAllowed() const;
+  void CaptureDraw(const DrawCall& call, Target* color, Target* depth,
+                   const TranslatedShader* vertex, const TranslatedShader* pixel,
+                   const void* system, const DrawEmit& e, bool main_view_draw, uint32_t device);
+  void DrawStored(VkCommandBuffer commands, uint8_t* base, const StoredDraw& d);
   void MakeTickKey(uint8_t* base, uint32_t device, const DrawCall& call, TickDrawKey& key);
   static uint64_t TextureWordsHash(const uint32_t* fetch, uint32_t mask);
   // On a render-only frame: draws the stored result for this draw if its
   // key matches; false to work it out in full.
   const TickDraw* FindTickDraw(const TickDrawKey& key);
   void DrawFromTick(VkCommandBuffer commands, uint8_t* base, uint32_t device,
-                    const TickDraw& d);
+                    const DrawCall& call, const TickDraw& d);
   // With check_tick_draws: a draw that matched its stored one is worked
   // out in full as well, and the two compared.
   bool check_tick_draws = false;
@@ -1188,9 +1293,11 @@ struct Passes::State {
                      const void* system, const DrawEmit* e);
   // The vertex and pixel float constants the shaders read, packed, into
   // the ring (offsets[1], offsets[2]); packed_bytes gets each's size.
+  // With host, the registers come from there (host order, 256 per stage)
+  // instead of the device.
   bool PlaceFloatConstants(uint8_t* base, uint32_t device, const TranslatedShader* vertex,
                            const TranslatedShader* pixel, uint32_t offsets[5],
-                           uint32_t packed_bytes[2]);
+                           uint32_t packed_bytes[2], const uint32_t* const* host = nullptr);
 
   VkDescriptorPool pool = VK_NULL_HANDLE;
   VkDescriptorSetLayout shared_memory_layout = VK_NULL_HANDLE;
@@ -2182,7 +2289,7 @@ VkDescriptorSet Passes::State::BuildTextureSet(uint8_t* base, const TranslatedSh
     return *set;
   }
   VkDescriptorSetAllocateInfo alloc{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
-  Ring& ring = tick_capturing ? tick_rings[tick_ring] : rings[frame];
+  Ring& ring = tick_capturing || capturing_frame ? tick_rings[tick_ring] : rings[frame];
   if (ring.texture_pools.empty() && !CreateTexturePool(ring)) {
     return VK_NULL_HANDLE;
   }
@@ -2635,12 +2742,18 @@ Target* Passes::State::GetTarget(VkCommandBuffer commands, uint8_t* base, uint32
   if (!depth) {
     initial.color = {{0.0f, 0.0f, 0.0f, 0.0f}};
   }
+  creating_target = true;
   ClearTarget(commands, t, initial);
+  creating_target = false;
   return &t;
 }
 
 void Passes::State::ClearTarget(VkCommandBuffer commands, Target& target,
                                 const VkClearValue& value, VkImageAspectFlags aspects) {
+  if (capturing_frame && !creating_target) {
+    stored_capture.ops.push_back({StoredKind::kClear, uint32_t(stored_capture.clears.size())});
+    stored_capture.clears.push_back({&target, value, aspects});
+  }
   EndRendering(commands);
   Transition(commands, target.image.image, target.aspects(), target.layout,
              VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
@@ -2893,6 +3006,17 @@ VkPipeline Passes::State::GetResolvePipeline(VkFormat format, bool multisample) 
 bool Passes::State::ResolveInto(VkCommandBuffer commands, uint8_t* base, Target& source,
                                 uint32_t destination, const int32_t* rect,
                                 const int32_t* point, uint32_t flags) {
+  if (capturing_frame) {
+    StoredResolve& r = stored_capture.resolves.emplace_back();
+    r = {&source, destination, flags, rect != nullptr, point != nullptr, {}, {}};
+    if (rect) {
+      std::copy(rect, rect + 4, r.rect);
+    }
+    if (point) {
+      std::copy(point, point + 2, r.point);
+    }
+    stored_capture.ops.push_back({StoredKind::kResolve, uint32_t(stored_capture.resolves.size() - 1)});
+  }
   // The destination texture's fetch constant (+28..+48), its addresses
   // made physical as SetTexture makes them.
   uint32_t fetch[6];
@@ -3187,20 +3311,32 @@ void Passes::BeginFrame(uint32_t frame_index) {
   s.draw_calls = 0;
   // Draws translated once a tick: off with the diagnostics that need every
   // draw worked out (or that the reused draws don't feed).
-  s.tick_draws_active = s.tick_draws && !s.MirrorPerDraw() && !s.record_draws &&
-                        !s.watch_draws && !s.skip_pixel_shader && !s.log_glow &&
-                        !s.check_mirror_frames && !s.log_tick_repeats &&
-                        !s.log_constant_changes && !s.log_texture_bindings &&
-                        !s.log_shader_lookups;
-  s.tick_capturing = s.tick_draws_active && Renderer_ReplayingLogicList();
-  if (s.tick_capturing) {
-    s.tick_capture.clear();
+  bool reuse = s.ReuseAllowed();
+  int kind = Renderer_ReplayingKind();
+  s.tick_draws_active = s.tick_draws && reuse && kind != 2;
+  s.tick_capturing = s.tick_draws_active && kind == 0;
+  // A tick's first render-only frame is stored (the main thread draws no
+  // more until the next tick).
+  s.capturing_frame = s.tick_replay && reuse && kind == 1 && s.last_kind == 0;
+  s.last_kind = kind;
+  if (s.capturing_frame) {
+    s.stored_capture.clear();
+    s.check_shadow_ready = false;
+    s.check_pending[0] = -1;
+    s.capture_failed_at_start = s.stats.failed + s.stats.unsupported + s.stats.mismatched_samples;
+  }
+  // Texture sets made on a tick's first frames (kept, or stored) come from a
+  // tick ring, a new one each tick.
+  if (kind == 0 && (s.tick_draws_active || (s.tick_replay && reuse))) {
     s.tick_ring = (s.tick_ring + 1) % State::kTickRings;
     State::Ring& tick = s.tick_rings[s.tick_ring];
     for (size_t i = 0; i <= tick.texture_pool && i < tick.texture_pools.size(); i++) {
       vk::vkResetDescriptorPool(s.context.device, tick.texture_pools[i], 0);
     }
     tick.texture_pool = 0;
+  }
+  if (s.tick_capturing) {
+    s.tick_capture.clear();
     s.tick_counts.captured_frames++;
   } else if (s.tick_draws_active) {
     s.tick_counts.frames++;
@@ -3260,7 +3396,7 @@ VkCommandBuffer Passes::EndUploads() {
 bool Passes::State::PlaceFloatConstants(uint8_t* base, uint32_t device,
                                         const TranslatedShader* vertex,
                                         const TranslatedShader* pixel, uint32_t offsets[5],
-                                        uint32_t packed_bytes[2]) {
+                                        uint32_t packed_bytes[2], const uint32_t* const* host) {
   for (uint32_t stage = 0; stage < 2; stage++) {
     const TranslatedShader* shader = stage == 0 ? vertex : pixel;
     uint32_t source = device + (stage == 0 ? kDeviceVertexFloatConstants
@@ -3278,8 +3414,14 @@ bool Passes::State::PlaceFloatConstants(uint8_t* base, uint32_t device,
         uint32_t first = std::countr_zero(bits);
         uint32_t count = std::countr_one(bits >> first);
         bits = count == 64 ? 0 : bits & ~(((uint64_t(1) << count) - 1) << first);
-        if (guest::CopyU32s(base, source + 16 * (64 * w + first), copy + 4 * packed,
-                            4 * count)) {
+        if (host) {
+          const uint32_t* from = host[stage] + 4 * (64 * w + first);
+          if (std::memcmp(copy + 4 * packed, from, 16 * count)) {
+            std::memcpy(copy + 4 * packed, from, 16 * count);
+            same = false;
+          }
+        } else if (guest::CopyU32s(base, source + 16 * (64 * w + first), copy + 4 * packed,
+                                   4 * count)) {
           same = false;
         }
         packed += count;
@@ -3501,7 +3643,7 @@ const Passes::State::TickDraw* Passes::State::FindTickDraw(const TickDrawKey& ke
 }
 
 void Passes::State::DrawFromTick(VkCommandBuffer commands, uint8_t* base, uint32_t device,
-                                 const TickDraw& d) {
+                                 const DrawCall& call, const TickDraw& d) {
   TickDrawCounts& c = tick_counts;
   const uint32_t* fetch = &regs.values[XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0];
   if (!d.drawn) {
@@ -3529,8 +3671,133 @@ void Passes::State::DrawFromTick(VkCommandBuffer commands, uint8_t* base, uint32
           frame_pixel_shaders.end()) {
     frame_pixel_shaders.push_back(d.pixel->hash);
   }
+  if (capturing_frame) {
+    CaptureDraw(call, d.color, d.depth, d.vertex, d.pixel, &d.system, d.emit, d.main_view_draw,
+                device);
+  }
   RecordDraw(commands, d.color, d.depth, d.emit, offsets);
   c.reused++;
+}
+
+bool Passes::State::ReuseAllowed() const {
+  return !MirrorPerDraw() && !record_draws && !watch_draws && !skip_pixel_shader && !log_glow &&
+         !check_mirror_frames && !log_tick_repeats && !log_constant_changes &&
+         !log_texture_bindings && !log_shader_lookups;
+}
+
+void Passes::State::CheckShadowFlush(uint8_t* base, uint32_t device) {
+  if (!check_shadow_ready) {
+    for (uint32_t stage = 0; stage < 2; stage++) {
+      guest::CopyU32s(base, device + (stage == 0 ? kDeviceVertexFloatConstants
+                                                 : kDevicePixelFloatConstants),
+                      check_shadow[stage], 256 * 4);
+    }
+    check_shadow_ready = true;
+  }
+  if (check_pending[0] >= 0) {
+    uint32_t stage = uint32_t(check_pending[0]);
+    guest::CopyU32s(base,
+                    device + (stage == 0 ? kDeviceVertexFloatConstants : kDevicePixelFloatConstants) +
+                        16 * uint32_t(check_pending[1]),
+                    check_shadow[stage] + 4 * check_pending[1], 4 * uint32_t(check_pending[2]));
+    check_pending[0] = -1;
+  }
+}
+
+void Passes::State::CaptureDraw(const DrawCall& call, Target* color, Target* depth,
+                                const TranslatedShader* vertex, const TranslatedShader* pixel,
+                                const void* system, const DrawEmit& e, bool main_view_draw,
+                                uint32_t device) {
+  StoredFrame& f = stored_capture;
+  CheckShadowFlush(last_base, device);
+  check_draws++;
+  bool differ = false;
+  for (uint32_t stage = 0; stage < 2; stage++) {
+    const TranslatedShader* shader = stage == 0 ? vertex : pixel;
+    uint32_t source = device + (stage == 0 ? kDeviceVertexFloatConstants : kDevicePixelFloatConstants);
+    for (uint32_t r = 0; shader && r < 256; r++) {
+      if (!(shader->float_constants[r >> 6] & (uint64_t(1) << (r & 63)))) {
+        continue;
+      }
+      uint32_t now[4];
+      guest::CopyU32s(last_base, source + 16 * r, now, 4);
+      if (std::memcmp(now, check_shadow[stage] + 4 * r, 16)) {
+        differ = true;
+        check_registers[{stage, r}]++;
+        std::memcpy(check_shadow[stage] + 4 * r, now, 16);  // count each change once
+        f.uploads.push_back({0, (stage << 24) | (1u << 16) | (r << 8) | 1u,
+                             uint32_t(f.words.size())});
+        f.words.insert(f.words.end(), now, now + 4);
+        f.ops.push_back({StoredKind::kSet, uint32_t(f.uploads.size() - 1)});
+      }
+    }
+  }
+  check_differ += differ;
+  f.device = device;
+  StoredDraw& d = f.draws.emplace_back();
+  d.draw.drawn = true;
+  d.draw.eligible = true;
+  d.draw.color = color;
+  d.draw.depth = depth;
+  d.draw.vertex = vertex;
+  d.draw.pixel = pixel;
+  std::memcpy(&d.draw.system, system, sizeof(d.draw.system));
+  d.draw.emit = e;
+  d.draw.main_view_draw = main_view_draw;
+  // A texture set made from the frame's pool would be gone in two frames.
+  if (!e.textures[0] || !e.textures[1] || (!tick_capturing && !capturing_frame)) {
+    f.Invalidate("a texture set");
+  }
+  std::memcpy(d.bool_loop, &regs.values[XE_GPU_REG_SHADER_CONSTANT_BOOL_000_031],
+              sizeof(d.bool_loop));
+  std::memcpy(d.fetch, &regs.values[XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0], sizeof(d.fetch));
+  if (call.inline_vertices) {
+    if (!call.inline_data) {
+      f.Invalidate("inline vertices from elsewhere");
+    }
+    d.inline_offset = uint32_t(f.inline_bytes.size());
+    d.inline_size = call.inline_size;
+    f.inline_bytes.resize(f.inline_bytes.size() + call.inline_size);
+    std::memcpy(f.inline_bytes.data() + d.inline_offset, last_base + call.inline_data,
+                call.inline_size);
+  }
+  f.ops.push_back({StoredKind::kDraw, uint32_t(f.draws.size() - 1)});
+}
+
+void Passes::State::DrawStored(VkCommandBuffer commands, uint8_t* base, const StoredDraw& d) {
+  const TickDraw& t = d.draw;
+  uint32_t fetch[kFetchConstantsRange / 4];
+  std::memcpy(fetch, d.fetch, sizeof(fetch));
+  if (t.emit.inline_vertices) {
+    // Into this frame's inline vertices, as InlineDraw puts them.
+    uint32_t offset = (inline_offset + 15) & ~15u;
+    if (offset + d.inline_size > inline_slot_size()) {
+      stats.failed++;
+      stats.failed_by[7]++;
+      return;
+    }
+    inline_offset = offset + d.inline_size;
+    uint32_t address =
+        kInlineVertices + (mirror_by_tick ? frame * inline_slot_size() : 0) + offset;
+    std::memcpy(draw_mirror().mapped + address, stored.inline_bytes.data() + d.inline_offset,
+                d.inline_size);
+    fetch[2 * kInlineFetchConstant] = address | 3;
+  }
+  uint32_t offsets[5];
+  uint32_t packed_bytes[2];
+  const uint32_t* host[2] = {float_shadow[0], float_shadow[1]};
+  if (!ReserveDrawConstants() ||
+      !PlaceConstants(0, &t.system, sizeof(t.system), sizeof(t.system), offsets[0]) ||
+      !PlaceFloatConstants(base, 0, t.vertex, t.pixel, offsets, packed_bytes, host) ||
+      !PlaceConstants(3, d.bool_loop, kBoolLoopConstantsRange, kBoolLoopConstantsRange,
+                      offsets[3]) ||
+      !PlaceConstants(4, fetch, kFetchConstantsRange, kFetchConstantsRange, offsets[4])) {
+    stats.failed++;
+    stats.failed_by[4]++;
+    return;
+  }
+  stats.constants_draws++;
+  RecordDraw(commands, t.color, t.depth, t.emit, offsets);
 }
 
 void Passes::State::CheckTickDraw(const TickDraw& d, bool drawn, Target* color, Target* depth,
@@ -3584,7 +3851,7 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
       capture->key = tick_key;
     } else if (const TickDraw* d = s.FindTickDraw(tick_key)) {
       if (!s.check_tick_draws) {
-        s.DrawFromTick(commands, base, device, *d);
+        s.DrawFromTick(commands, base, device, call, *d);
         return;
       }
       s.tick_expected = d;
@@ -4302,6 +4569,9 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
   if (s.tick_expected) {
     s.CheckTickDraw(*s.tick_expected, true, color, depth, vertex, pixel, &system, &e);
   }
+  if (s.capturing_frame) {
+    s.CaptureDraw(call, color, depth, vertex, pixel, &system, e, main_view_draw, device);
+  }
   State::RecordedState now = s.RecordDraw(commands, color, depth, e, offsets);
   uint32_t first_index = e.first_index;
   const VkDescriptorSet* sets = now.sets;
@@ -4551,6 +4821,8 @@ void Passes::InlineDraw(VkCommandBuffer commands, uint8_t* base, uint32_t type, 
   call.vertex_count = count;
   call.vertex_address =
       kInlineVertices + (s.mirror_by_tick ? s.frame * s.inline_slot_size() : 0) + offset;
+  call.inline_data = data;
+  call.inline_size = size;
   std::memcpy(s.draw_mirror().mapped + call.vertex_address, base + data, size);
   if (s.log_tick_repeats) {
     call.inline_hash = XXH3_64bits(base + data, size) ^ (uint64_t(stride) << 32);
@@ -4790,6 +5062,11 @@ void Passes::FrontBufferResolve(VkCommandBuffer commands, uint8_t* base, uint32_
   uint32_t size = front_buffer ? guest::LoadU32(base, front_buffer + 28 + 8) : 0;
   s.front_extent = {(size & 0x1FFF) + 1, ((size >> 13) & 0x1FFF) + 1};
   s.front = target;
+  if (s.capturing_frame) {
+    s.stored_capture.front = target;
+    s.stored_capture.front_extent = s.front_extent;
+    s.stored_capture.ops.push_back({State::StoredKind::kFront, 0});
+  }
   if (!s.logged_front) {
     s.logged_front = true;
     Surface surface = object ? ReadSurface(base, object) : Surface{};
@@ -4982,6 +5259,13 @@ void Passes::State::CompareTickRepeats() {
         }
       }
     }
+    if (f.size() == t.size() && (mask & ((1u << kPartInline) | (1u << kPartPixelFloats) |
+                                         (1u << kPartVertexFloats)))) {
+      auto& counts = c.by_shader[{f[i].pixel, f[i].pass}];
+      counts[0] += !!(mask & (1u << kPartInline));
+      counts[1] += !!(mask & (1u << kPartPixelFloats));
+      counts[2] += !!(mask & (1u << kPartVertexFloats));
+    }
     bool structure = mask & ((1u << kStructureParts) - 1);
     c.structure_differ += structure && f.size() == t.size();
     structure_same &= !structure;
@@ -5008,6 +5292,126 @@ void Passes::State::CompareTickRepeats() {
   c.all_but_floats_same += but_floats_same;
   c.all_same += all_same;
   frame_parts.clear();
+}
+
+bool Passes::capturing_frame() const {
+  return state_->capturing_frame;
+}
+
+void Passes::NoteUpload(uint8_t* base, uint32_t payload, uint32_t arg1, uint32_t packed) {
+  State& s = *state_;
+  State::StoredFrame& f = s.stored_capture;
+  uint32_t stage = packed >> 24, type = (packed >> 16) & 0xFF, start = (packed >> 8) & 0xFF,
+           count = packed & 0xFF;
+  if (type != 1) {
+    // Bool and loop constants: kept with each draw (bool_loop).
+    if (type != 0 && type != 2) {
+      f.Invalidate("a constant upload of another type");
+    }
+    return;
+  }
+  if (stage > 1 || count != arg1 || start + count > 256) {
+    f.Invalidate("a float constant upload out of range");
+    return;
+  }
+  uint32_t device = guest::LoadU32(base, kDevicePointer);
+  s.CheckShadowFlush(base, device);
+  s.check_pending[0] = int32_t(stage);
+  s.check_pending[1] = int32_t(start);
+  s.check_pending[2] = int32_t(count);
+  f.uploads.push_back({payload, packed, uint32_t(f.words.size())});
+  f.words.resize(f.words.size() + 4 * count);
+  guest::CopyU32s(base, payload, f.words.data() + f.words.size() - 4 * count, 4 * count);
+  f.ops.push_back({State::StoredKind::kUpload, uint32_t(f.uploads.size() - 1)});
+}
+
+void Passes::DrawStoredFrame(VkCommandBuffer commands, uint8_t* base) {
+  State& s = *state_;
+  State::StoredCounts& c = s.stored_counts;
+  c.frames++;
+  const State::StoredFrame& f = s.stored;
+  if (!f.valid) {
+    // Nothing to draw it from: the last frame shown again.
+    c.missing++;
+    s.front = s.last_front;
+    s.front_extent = s.last_front_extent;
+    return;
+  }
+  s.last_base = base;
+  float values[256 * 4];
+  for (const State::StoredOp& op : f.ops) {
+    switch (op.kind) {
+      case State::StoredKind::kUpload: {
+        const State::StoredUpload& u = f.uploads[op.index];
+        uint32_t stage = u.packed >> 24, start = (u.packed >> 8) & 0xFF, count = u.packed & 0xFF;
+        std::memcpy(values, f.words.data() + u.word, 16 * count);
+        interpolation::BlendState_BlendStoredUpload(u.payload, u.packed, values);
+        std::memcpy(s.float_shadow[stage] + 4 * start, values, 16 * count);
+        c.uploads++;
+        break;
+      }
+      case State::StoredKind::kSet: {
+        const State::StoredUpload& u = f.uploads[op.index];
+        uint32_t stage = u.packed >> 24, start = (u.packed >> 8) & 0xFF;
+        std::memcpy(s.float_shadow[stage] + 4 * start, f.words.data() + u.word, 16);
+        break;
+      }
+      case State::StoredKind::kDraw:
+        s.DrawStored(commands, base, f.draws[op.index]);
+        c.draws++;
+        break;
+      case State::StoredKind::kClear: {
+        const State::StoredClear& clear = f.clears[op.index];
+        s.ClearTarget(commands, *clear.target, clear.value, clear.aspects);
+        break;
+      }
+      case State::StoredKind::kResolve: {
+        const State::StoredResolve& r = f.resolves[op.index];
+        if (s.ResolveInto(commands, base, *r.source, r.destination, r.has_rect ? r.rect : nullptr,
+                          r.has_point ? r.point : nullptr, r.flags)) {
+          s.stats.resolves++;
+        } else {
+          s.stats.resolves_skipped++;
+        }
+        break;
+      }
+      case State::StoredKind::kFront:
+        s.front = f.front;
+        s.front_extent = f.front_extent;
+        break;
+    }
+  }
+}
+
+std::string Passes::TakeStoredFrames() {
+  State::StoredCounts& c = state_->stored_counts;
+  double frames = double(std::max<uint64_t>(c.frames, 1));
+  std::string text = fmt::format(
+      "tick replay: {} frames stored ({} not usable{}{}), {} frames drawn from them ({} with none "
+      "to draw from), {:.1f} draws and {:.1f} uploads a frame",
+      c.captures, c.invalid, c.invalid ? ", e.g. " : "", c.invalid_reason, c.frames, c.missing,
+      c.draws / frames, c.uploads / frames);
+  State& s = *state_;
+  text += fmt::format("; of {} draws stored, {} read float constants set other than by "
+                      "uploads (stored as sets):",
+                      s.check_draws, s.check_differ);
+  std::vector<std::pair<uint64_t, std::pair<uint32_t, uint32_t>>> top;
+  for (const auto& [reg, n] : s.check_registers) {
+    top.push_back({n, reg});
+  }
+  std::sort(top.rbegin(), top.rend());
+  for (size_t i = 0; i < top.size() && i < 24; i++) {
+    text += fmt::format(" {}c{} {};", top[i].second.first ? "ps " : "vs ", top[i].second.second,
+                        top[i].first);
+  }
+  s.check_draws = s.check_differ = 0;
+  s.check_registers.clear();
+  c = {};
+  return text;
+}
+
+void Passes::set_tick_replay(bool on) {
+  state_->tick_replay = on;
 }
 
 void Passes::set_tick_draws(bool on, bool check) {
@@ -5068,6 +5472,13 @@ std::string Passes::TakeTickRepeats() {
       100.0 * c.all_same / frames, 100.0 * c.structure_differ / draws, differ);
   for (const std::string& sample : c.samples) {
     text += "; e.g. " + sample;
+  }
+  text += "; inline / pixel floats / vertex floats differing a frame, by pixel shader and pass:";
+  for (const auto& [key, n] : c.by_shader) {
+    if (n[0] * 10 >= c.frames || n[1] * 10 >= c.frames) {
+      text += fmt::format(" {:016X} p{} {:.1f}/{:.1f}/{:.1f};", key.first, key.second,
+                          n[0] / frames, n[1] / frames, n[2] / frames);
+    }
   }
   c = {};
   return text;
@@ -5490,6 +5901,39 @@ VkExtent2D Passes::EndFrame(VkCommandBuffer commands, int32_t show_resolve, bool
     Buffers_OnFrameEnd();
   }
   s.last_frame_resolves = s.frame_resolves.size();
+  if (s.capturing_frame) {
+    State::StoredFrame& f = s.stored_capture;
+    if (s.stats.failed + s.stats.unsupported + s.stats.mismatched_samples !=
+        s.capture_failed_at_start) {
+      f.Invalidate("failed draws");
+    }
+    if (s.tiling) {
+      f.Invalidate("tiling");
+    }
+    if (!f.device) {
+      f.Invalidate("no draws");
+    }
+    s.stored_counts.captures++;
+    if (f.valid) {
+      // The device's float constants as the frame left them, for the frames
+      // drawn from it to start from.
+      for (uint32_t stage = 0; stage < 2; stage++) {
+        guest::CopyU32s(s.last_base, f.device + (stage == 0 ? kDeviceVertexFloatConstants
+                                                            : kDevicePixelFloatConstants),
+                        s.float_shadow[stage], 256 * 4);
+      }
+    } else {
+      s.stored_counts.invalid++;
+      s.stored_counts.invalid_reason = f.invalid_reason;
+    }
+    std::swap(s.stored, f);
+    Renderer_SetTickReplayReady(s.stored.valid);
+    s.capturing_frame = false;
+  }
+  if (s.front) {
+    s.last_front = s.front;
+    s.last_front_extent = s.front_extent;
+  }
   if (s.tick_capturing) {
     s.tick_counts.captured += s.tick_capture.size();
     s.tick_list.swap(s.tick_capture);

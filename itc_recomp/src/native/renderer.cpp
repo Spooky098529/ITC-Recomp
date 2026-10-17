@@ -71,6 +71,10 @@ REXCVAR_DEFINE_BOOL(native_renderer_tick_draws, false, "ITC",
                     "Translate draws once a tick: on the frames after a tick's first, a draw made "
                     "from the same state as the one at its place reuses what it came to, packing "
                     "only its constants again (see docs/tick-replay.md)");
+REXCVAR_DEFINE_BOOL(native_renderer_tick_replay, false, "ITC",
+                    "In races, draw the frames after a tick's first render-only frame from that "
+                    "frame's stored list, with the frame's blends, without running the game's "
+                    "Draw step or its Direct3D (see docs/tick-replay.md, step 2)");
 REXCVAR_DEFINE_BOOL(native_renderer_check_tick_draws, false, "ITC",
                     "With --native_renderer_tick_draws: work out the draws reused in full as well "
                     "and log those that come out differently");
@@ -323,6 +327,14 @@ class Renderer {
   }
   void FrontBufferResolve(uint8_t* base, uint32_t device, uint32_t front_buffer) {
     passes_.FrontBufferResolve(BeginFrame(), base, device, front_buffer);
+  }
+  void DrawStoredFrame(uint8_t* base) {
+    passes_.DrawStoredFrame(BeginFrame(), base);
+  }
+  void OnUpload(uint8_t* base, uint32_t payload, uint32_t arg1, uint32_t packed) {
+    if (passes_.capturing_frame()) {
+      passes_.NoteUpload(base, payload, arg1, packed);
+    }
   }
   void EndFrame();
 
@@ -746,6 +758,7 @@ VkCommandBuffer Renderer::BeginFrame() {
     passes_.set_log_register_reads(REXCVAR_GET(native_renderer_log_register_reads));
     passes_.set_log_index_ranges(REXCVAR_GET(native_renderer_log_index_ranges));
     passes_.set_log_tick_repeats(REXCVAR_GET(native_renderer_log_tick_repeats));
+    passes_.set_tick_replay(REXCVAR_GET(native_renderer_tick_replay));
     passes_.set_tick_draws(REXCVAR_GET(native_renderer_tick_draws),
                            REXCVAR_GET(native_renderer_check_tick_draws));
     passes_.set_log_texture_bindings(REXCVAR_GET(native_renderer_log_texture_bindings));
@@ -1190,6 +1203,9 @@ void Renderer::LogStats() {
   if (REXCVAR_GET(native_renderer_tick_draws)) {
     REXLOG_INFO("native renderer: {}", passes_.TakeTickDraws());
   }
+  if (REXCVAR_GET(native_renderer_tick_replay)) {
+    REXLOG_INFO("native renderer: {}", passes_.TakeStoredFrames());
+  }
   if (REXCVAR_GET(native_renderer_log_texture_bindings)) {
     REXLOG_INFO("native renderer: {}", passes_.TakeTextureBindings());
   }
@@ -1250,6 +1266,9 @@ void Renderer_OnCommand(uint8_t* base, uint32_t id, uint32_t payload, uint32_t a
   Buffers_OnCommand(base, id, payload, arg1);
   if (Renderer* renderer = GetRenderer()) {
     renderer->OnCommand(id, arg1);
+    if (id == 7) {
+      renderer->OnUpload(base, payload, arg1, arg2);
+    }
   }
 }
 
@@ -1300,14 +1319,16 @@ namespace {
 // each (any thread, under g_lists_mutex); and the one being replayed
 // (render thread).
 std::mutex g_lists_mutex;
-std::deque<bool> g_lists;
+std::deque<int> g_lists;
+int g_replaying_kind = 0;
 bool g_replaying_logic_list = true;
+std::atomic<bool> g_tick_replay_ready{false};
 uint64_t g_lists_missing = 0, g_lists_queued_most = 0;
 }  // namespace
 
-void Renderer_OnListHandedOver(bool logic_pass) {
+void Renderer_OnListHandedOver(int kind) {
   std::lock_guard lock(g_lists_mutex);
-  g_lists.push_back(logic_pass);
+  g_lists.push_back(kind);
 }
 
 void Renderer_OnReplayStart() {
@@ -1316,15 +1337,43 @@ void Renderer_OnReplayStart() {
   if (g_lists.empty()) {
     // Not handed over by WaitForFrame: taken as a logic pass's.
     g_lists_missing++;
+    g_replaying_kind = 0;
     g_replaying_logic_list = true;
     return;
   }
-  g_replaying_logic_list = g_lists.front();
+  g_replaying_kind = g_lists.front();
+  g_replaying_logic_list = g_replaying_kind == 0;
   g_lists.pop_front();
 }
 
 bool Renderer_ReplayingLogicList() {
   return g_replaying_logic_list;
+}
+
+int Renderer_ReplayingKind() {
+  return g_replaying_kind;
+}
+
+bool Renderer_ReplayingStoredFrame() {
+  return g_replaying_kind == 2;
+}
+
+bool Renderer_TickReplayReady() {
+  return REXCVAR_GET(native_renderer_tick_replay) && g_tick_replay_ready.load(std::memory_order_relaxed);
+}
+
+void Renderer_SetTickReplayReady(bool ready) {
+  g_tick_replay_ready.store(ready, std::memory_order_relaxed);
+}
+
+void Renderer_DrawStoredFrame(uint8_t* base) {
+  if (!Renderer_Enabled() || !base) {
+    return;
+  }
+  g_base = base;
+  if (Renderer* renderer = GetRenderer()) {
+    renderer->DrawStoredFrame(base);
+  }
 }
 
 void Renderer_TakeListStats(uint64_t& missing, uint64_t& most) {

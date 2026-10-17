@@ -26,6 +26,10 @@ void GameMessages_OnPassFinished();
 // Main thread: whether the coming main-loop pass is render-only.
 void GameMessages_SetRenderOnlyPass(bool render_only);
 bool GameMessages_IsRenderOnlyPass();
+// Main thread: 0 a logic pass, 1 render-only, 2 render-only and not drawn
+// (the render thread draws the tick's first render-only pass's stored list
+// again, --native_renderer_tick_replay).
+int GameMessages_PassKind();
 
 // Which main loop pass this is (counts up by one per pass).
 uint64_t GameMessages_PassNumber();

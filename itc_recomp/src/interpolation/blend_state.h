@@ -43,6 +43,14 @@ void BlendState_OnReplayTick();
 void BlendState_ReplayConstants(uint8_t* base, uint32_t payload, uint32_t packed,
                                 const std::function<void()>& upload);
 
+// --native_renderer_tick_replay. Main thread, on a pass that doesn't draw:
+// publishes the frame's amount with the products of the tick's first
+// render-only pass. Render thread, a frame drawn from that pass's stored
+// list: blends a stored constant upload (values in host order, as the
+// command's payload held them) in place, as BlendState_ReplayConstants does.
+void BlendState_PublishFastFrame();
+void BlendState_BlendStoredUpload(uint32_t payload, uint32_t packed, float* values);
+
 // Diagnostics (--log_frame_times): render thread time spent replaying
 // constant uploads since the last call, in ours (blending) and in the
 // uploads themselves, in nanoseconds.

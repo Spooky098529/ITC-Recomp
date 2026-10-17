@@ -4,6 +4,7 @@
 #include "debug/idle_timer_scan.h"
 #include "guest.h"
 #include "interpolation/blend_state.h"
+#include "native/renderer.h"
 
 #include <rex/cvar.h>
 #include <rex/logging.h>
@@ -102,6 +103,11 @@ enum MessageId : uint32_t {
 };
 
 bool g_render_only_pass = false;
+// A render-only pass after the tick's first: Update and Draw aren't
+// delivered, the render thread draws the first's stored list again
+// (--native_renderer_tick_replay).
+bool g_fast_pass = false;
+int g_render_only_since_logic = 0;
 bool g_race_draw_step_seen = false;  // during the current logic pass
 bool g_in_race = false;              // as of the last logic pass
 
@@ -224,6 +230,16 @@ void DispatchMessages(PPCContext& ctx, uint8_t* base, uint32_t dispatcher) {
     }
 
     uint32_t id = guest::LoadU32(base, message);
+    if (g_fast_pass && (id == kUpdate || id == kDraw)) {
+      if (id == kDraw) {
+        counts.draws++;
+        interpolation::BlendState_PublishFastFrame();
+      } else {
+        counts.updates++;
+        counts.updates_skipped++;
+      }
+      continue;
+    }
     if (id == kUpdate) {
       counts.updates++;
       if (g_render_only_pass) {
@@ -281,6 +297,8 @@ void GameMessages_PassCounts(uint64_t& logic, uint64_t& render_only) {
 void GameMessages_SetRenderOnlyPass(bool render_only) {
   g_passes[render_only ? 1 : 0]++;
   g_render_only_pass = render_only;
+  g_render_only_since_logic = render_only ? g_render_only_since_logic + 1 : 0;
+  g_fast_pass = render_only && g_render_only_since_logic >= 2 && native::Renderer_TickReplayReady();
   g_pass_snapshot.store((GameMessages_PassNumber() << 1) | render_only, std::memory_order_relaxed);
   g_main_thread.store(std::this_thread::get_id(), std::memory_order_relaxed);
 }
@@ -302,6 +320,10 @@ bool SkipTickHandlerOnRenderOnlyPass(uint32_t target) {
 
 bool GameMessages_IsRenderOnlyPass() {
   return g_render_only_pass;
+}
+
+int GameMessages_PassKind() {
+  return g_fast_pass ? 2 : g_render_only_pass ? 1 : 0;
 }
 
 }  // namespace frame_pacing

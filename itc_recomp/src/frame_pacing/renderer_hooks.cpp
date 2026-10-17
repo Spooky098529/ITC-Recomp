@@ -157,8 +157,14 @@ void Renderer_DrawFrame(PPCContext& ctx, uint8_t* base, uint32_t renderer) {
   auto cpu_start = timing ? ThreadCpuTime() : FrameTimes::Clock::duration{};
   interpolation::BlendState_OnReplayFrameStart();
   native::Renderer_OnReplayStart();
-  ctx.r3.u64 = renderer;
-  sub_82091E58(ctx, base);
+  if (native::Renderer_ReplayingStoredFrame()) {
+    // A pass that didn't draw: the tick's stored list again, in place of
+    // the game's frame (its replay, front buffer resolve and present).
+    native::Renderer_DrawStoredFrame(base);
+  } else {
+    ctx.r3.u64 = renderer;
+    sub_82091E58(ctx, base);
+  }
   debug::ReplayStats_OnFrame();
   native::Renderer_EndFrame();
   if (timing) {
@@ -192,7 +198,7 @@ void Renderer_WaitForFrame(PPCContext& ctx, uint8_t* base, uint32_t renderer) {
               wait_start - times.pass_start);
   }
   debug::ImageDump_OnPass(base);
-  native::Renderer_OnListHandedOver(!frame_pacing::GameMessages_IsRenderOnlyPass());
+  native::Renderer_OnListHandedOver(frame_pacing::GameMessages_PassKind());
   ctx.r3.u64 = renderer;
   __imp__sub_820920D8(ctx, base);
   auto pacing_start = FrameTimes::Clock::now();

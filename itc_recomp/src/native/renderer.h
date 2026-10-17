@@ -13,12 +13,28 @@ namespace native {
 bool Renderer_Enabled();
 
 // Main thread, as a pass's command list is handed to the render thread
-// (before Renderer::WaitForFrame): whether a logic pass recorded it. Render
-// thread, as a frame's replay starts: takes the next list's. Then whether
-// the list being replayed came from a logic pass (--native_renderer_mirror_by_tick).
-void Renderer_OnListHandedOver(bool logic_pass);
+// (before Renderer::WaitForFrame): the pass's kind (GameMessages_PassKind:
+// 0 logic, 1 render-only, 2 render-only and not drawn). Render thread, as a
+// frame's replay starts: takes the next list's. Then whether the list being
+// replayed came from a logic pass (--native_renderer_mirror_by_tick), and
+// whether the frame is one that wasn't drawn, to be drawn from the tick's
+// stored list (--native_renderer_tick_replay).
+void Renderer_OnListHandedOver(int kind);
 void Renderer_OnReplayStart();
 bool Renderer_ReplayingLogicList();
+bool Renderer_ReplayingStoredFrame();
+// Render thread, in place of the game's frame (its replay, front buffer
+// resolve and present) on a frame that wasn't drawn: the tick's stored list
+// again, with this frame's blends.
+void Renderer_DrawStoredFrame(uint8_t* base);
+// Any thread (--native_renderer_tick_replay): whether passes after a tick's
+// first render-only pass may go undrawn; on, and the last tick's stored
+// list was made.
+bool Renderer_TickReplayReady();
+// Render thread: the kind of the list being replayed (as handed over), and
+// whether a tick's stored list was made (or not) for the frames after it.
+int Renderer_ReplayingKind();
+void Renderer_SetTickReplayReady(bool ready);
 // Since the last call: frames replayed with no list handed over, and the
 // most lists waiting at a frame's start.
 void Renderer_TakeListStats(uint64_t& missing, uint64_t& most);
