@@ -587,10 +587,16 @@ class CockpitChanges {
       return;
     }
     active_ = true;
-    ranges_ = {{"cockpit", cockpit, 0xD00},
-               {"car+4288", car, 0x400},
-               {"gauge A", guest::LoadU32(base, cockpit + 720 + 244), 0x800},
-               {"gauge B", guest::LoadU32(base, cockpit + 1440 + 4), 0x800}};
+    // The gauge models' per-material shader values (vec4s at [model + 320],
+    // uploaded as vertex c9-c12 by sub_820CECA0) and the models themselves.
+    uint32_t gauge_a = guest::LoadU32(base, cockpit + 720 + 244);
+    uint32_t gauge_b = guest::LoadU32(base, cockpit + 1440 + 4);
+    auto params = [&](uint32_t model) { return model ? guest::LoadU32(base, model + 320) : 0; };
+    ranges_ = {{"gauge A values", params(gauge_a), 0x200},
+               {"gauge B values", params(gauge_b), 0x200},
+               {"gauge A", gauge_a, 0x200},
+               {"gauge B", gauge_b, 0x200}};
+    (void)car;
     static auto last = std::chrono::steady_clock::now();
     auto now = std::chrono::steady_clock::now();
     if (now - last >= std::chrono::seconds(2)) {
