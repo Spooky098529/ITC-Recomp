@@ -105,6 +105,12 @@ REXCVAR_DEFINE_BOOL(switch_light_slots, true, "ITC",
                     "A per-object light slot whose light changed between ticks takes the tick's "
                     "light and the rest of the lighting blends (false: the whole upload is left "
                     "as recorded)");
+REXCVAR_DEFINE_BOOL(blend_about_pivot, true, "ITC",
+                    "Blend the cockpit's moving parts (the gauge needles) about the point they "
+                    "turn about in the car's frame, not their origin, and never as wheels");
+REXCVAR_DEFINE_BOOL(log_parented_products, false, "ITC",
+                    "Log the cockpit's parts turning in the car's frame: their pivot, and how far "
+                    "off it the plain blend would put them mid-tick, 40 lines every 2 s");
 REXCVAR_DEFINE_BOOL(pair_by_object, true, "ITC",
                     "Pair the per-object recorder's products between ticks by the part being "
                     "drawn (its caller's r31), not only by order, so culling or reordering "
@@ -235,6 +241,121 @@ void Store(uint8_t* base, uint32_t address, const Vec3& v) {
   StoreVec3(base, address, v);
 }
 
+Vec3 TransformPoint(const Vec3& x, const Matrix4& m) {
+  Vec3 out;
+  for (int j = 0; j < 3; j++) {
+    out[j] = x[0] * m[j] + x[1] * m[4 + j] + x[2] * m[8 + j] + m[12 + j];
+  }
+  return out;
+}
+
+// The inverse of a world matrix (rows 0-2 any invertible 3x3, row 3 the
+// translation, column 3 (0, 0, 0, 1)).
+std::optional<Matrix4> InverseWorldMatrix(const Matrix4& m) {
+  auto at = [&](int r, int c) { return double(m[r * 4 + c]); };
+  double c00 = at(1, 1) * at(2, 2) - at(1, 2) * at(2, 1);
+  double c01 = at(1, 2) * at(2, 0) - at(1, 0) * at(2, 2);
+  double c02 = at(1, 0) * at(2, 1) - at(1, 1) * at(2, 0);
+  double det = at(0, 0) * c00 + at(0, 1) * c01 + at(0, 2) * c02;
+  if (!(std::abs(det) > 1e-12)) {
+    return std::nullopt;
+  }
+  double inv[3][3] = {
+      {c00 / det, (at(0, 2) * at(2, 1) - at(0, 1) * at(2, 2)) / det,
+       (at(0, 1) * at(1, 2) - at(0, 2) * at(1, 1)) / det},
+      {c01 / det, (at(0, 0) * at(2, 2) - at(0, 2) * at(2, 0)) / det,
+       (at(0, 2) * at(1, 0) - at(0, 0) * at(1, 2)) / det},
+      {c02 / det, (at(0, 1) * at(2, 0) - at(0, 0) * at(2, 1)) / det,
+       (at(0, 0) * at(1, 1) - at(0, 1) * at(1, 0)) / det}};
+  Matrix4 out{};
+  for (int r = 0; r < 3; r++) {
+    for (int c = 0; c < 3; c++) {
+      out[r * 4 + c] = float(inv[r][c]);
+    }
+  }
+  for (int c = 0; c < 3; c++) {
+    out[12 + c] = -float(at(3, 0) * inv[0][c] + at(3, 1) * inv[1][c] + at(3, 2) * inv[2][c]);
+  }
+  out[15] = 1;
+  return out;
+}
+
+// For a part whose world matrix is local * parent in both ticks: the point
+// (in the part's coordinates) that stays put in the parent's frame between
+// the ticks, if the part turns in that frame (a gauge needle about its
+// spindle). Least squares, so a turn about an axis gives the point on the
+// axis nearest the part's origin.
+struct Pivot {
+  Vec3 local;
+  float turn;  // radians, in the parent's frame
+};
+std::optional<Pivot> PivotInParent(const Matrix4& a, const Matrix4& pa, const Matrix4& b,
+                                   const Matrix4& pb) {
+  std::optional<Matrix4> ia = InverseWorldMatrix(pa), ib = InverseWorldMatrix(pb);
+  if (!ia || !ib) {
+    return std::nullopt;
+  }
+  Matrix4 la = Multiply(a, *ia), lb = Multiply(b, *ib);
+  std::optional<ScaledTransform> sa = ScaledTransformFromWorldMatrix(la);
+  std::optional<ScaledTransform> sb = ScaledTransformFromWorldMatrix(lb);
+  if (!sa || !sb) {
+    return std::nullopt;
+  }
+  float turn = AngleBetween(sa->transform.rotation, sb->transform.rotation);
+  if (!(turn > 0.01f)) {
+    return std::nullopt;
+  }
+  // x * (La - Lb) = lb - la for the 3x3 parts K and translations: x K = d.
+  double k[3][3], d[3];
+  for (int i = 0; i < 3; i++) {
+    for (int j = 0; j < 3; j++) {
+      k[i][j] = double(la[i * 4 + j]) - double(lb[i * 4 + j]);
+    }
+    d[i] = double(lb[12 + i]) - double(la[12 + i]);
+  }
+  // Normal equations: (K K^T + lambda I) x = K d.
+  double g[3][3], h[3];
+  double trace = 0;
+  for (int i = 0; i < 3; i++) {
+    h[i] = 0;
+    for (int j = 0; j < 3; j++) {
+      g[i][j] = 0;
+      for (int c = 0; c < 3; c++) {
+        g[i][j] += k[i][c] * k[j][c];
+      }
+    }
+    for (int c = 0; c < 3; c++) {
+      h[i] += k[i][c] * d[c];
+    }
+    trace += g[i][i];
+  }
+  for (int i = 0; i < 3; i++) {
+    g[i][i] += 1e-6 * trace;
+  }
+  Matrix4 gm{};
+  for (int i = 0; i < 3; i++) {
+    for (int j = 0; j < 3; j++) {
+      gm[i * 4 + j] = float(g[i][j]);
+    }
+  }
+  gm[15] = 1;
+  std::optional<Matrix4> gi = InverseWorldMatrix(gm);
+  if (!gi) {
+    return std::nullopt;
+  }
+  Pivot pivot;
+  pivot.turn = turn;
+  for (int j = 0; j < 3; j++) {
+    pivot.local[j] =
+        float(h[0] * (*gi)[j] + h[1] * (*gi)[4 + j] + h[2] * (*gi)[8 + j]);  // symmetric
+  }
+  if (!std::isfinite(pivot.local[0]) || !std::isfinite(pivot.local[1]) ||
+      !std::isfinite(pivot.local[2])) {
+    return std::nullopt;
+  }
+  return pivot;
+}
+
 bool IsCut(const Transform& a, const Transform& b) {
   return Distance(a.position, b.position) > kCutDistance ||
          AngleBetween(a.rotation, b.rotation) > kCutAngle;
@@ -272,10 +393,16 @@ struct ProductInputs {
   // For the per-object recorder's multiply, its caller (lr) and the
   // caller's r24-r31 at the call: r31 identifies the part (--pair_by_object).
   std::array<uint32_t, 9> context{};
+  // The world matrix of the object it's a part of, where known (the
+  // cockpit's parts: the car's), for blending in that object's frame.
+  std::optional<Matrix4> parent;
 };
 
 // Main thread: the per-object recorder's caller context while it runs.
 std::array<uint32_t, 9> g_record_context{};
+// Main thread: the parent world matrix for products made now (the cockpit's
+// draw sets the car's).
+std::optional<Matrix4> g_record_parent;
 
 // How a paired product blends, worked out once a tick from its two ticks'
 // inputs: the decompositions and camera splits don't depend on the frame's
@@ -287,6 +414,11 @@ struct ProductPlan {
   bool camera_rejected = false;  // perspective cameras that can't be one camera
   int32_t camera = -1;           // into TickPlans::cameras, if the camera blends
   ScaledTransform wa, wb;        // the world matrices, for kBlend and kSpinning
+  // For a part turning in its parent's frame (--blend_about_pivot): the
+  // point it turns about, in its own coordinates, and where that point is in
+  // each tick; the blend is moved so the pivot is where it would be.
+  bool has_pivot = false;
+  Vec3 pivot{}, pivot_a{}, pivot_b{};
 };
 // A perspective camera in both ticks, shared by the products using it.
 struct CameraPair {
@@ -545,7 +677,48 @@ ProductPlan PlanProduct(const ProductInputs& a, const ProductInputs& b, TickPlan
   if (wa && wb) {
     plan.wa = *wa;
     plan.wb = *wb;
-    if (!IsCut(wa->transform, wb->transform)) {
+    // A part of a known parent (the cockpit's, of the car): it moves with
+    // the car and turns about a point of its own (a needle), never a wheel.
+    std::optional<Pivot> pivot;
+    if (a.parent && b.parent && REXCVAR_GET(blend_about_pivot)) {
+      pivot = PivotInParent(a.world, *a.parent, b.world, *b.parent);
+    }
+    bool parented = pivot && Distance(wa->transform.position, wb->transform.position) <= kCutDistance;
+    if (parented) {
+      plan.world = ProductPlan::World::kBlend;
+      plan.has_pivot = true;
+      plan.pivot = pivot->local;
+      plan.pivot_a = TransformPoint(pivot->local, a.world);
+      plan.pivot_b = TransformPoint(pivot->local, b.world);
+      if (REXCVAR_GET(log_parented_products)) {
+        static std::chrono::steady_clock::time_point last{};
+        static int lines = 0;
+        auto now = std::chrono::steady_clock::now();
+        if (now - last >= std::chrono::seconds(2)) {
+          last = now;
+          lines = 0;
+        }
+        if (lines++ < 40) {
+          Matrix4 mid = WorldMatrixFromScaledTransform(Blend(*wa, *wb, 0.5f));
+          Vec3 p = TransformPoint(pivot->local, mid);
+          Vec3 want;
+          for (int k = 0; k < 3; k++) {
+            want[k] = 0.5f * (plan.pivot_a[k] + plan.pivot_b[k]);
+          }
+          float r = std::sqrt(pivot->local[0] * pivot->local[0] +
+                              pivot->local[1] * pivot->local[1] +
+                              pivot->local[2] * pivot->local[2]);
+          REXLOG_INFO("parented: lr {:08X} r31 {:08X} turn in car {:.3f} rad, world turn {:.3f}, "
+                      "pivot ({:.4f} {:.4f} {:.4f}) {:.4f} from its origin, pivot moved {:.4f}; "
+                      "plain blend at 0.5 puts the pivot {:.4f} off{}",
+                      a.context[0], a.context[8], pivot->turn,
+                      AngleBetween(wa->transform.rotation, wb->transform.rotation),
+                      pivot->local[0], pivot->local[1], pivot->local[2], r,
+                      Distance(plan.pivot_a, plan.pivot_b), Distance(p, want),
+                      IsCut(wa->transform, wb->transform) ? " (was a cut or wheel)" : "");
+        }
+      }
+    } else if (!IsCut(wa->transform, wb->transform)) {
       plan.world = ProductPlan::World::kBlend;
     } else if (Distance(wa->transform.position, wb->transform.position) <= kCutDistance &&
                BlendSpinning(*wa, *wb, 0, kCutAngle)) {
@@ -627,6 +800,13 @@ Matrix4 BlendProduct(const ReplayedProduct& product, const TickPlans* plans,
   std::optional<ScaledTransform> spinning;
   if (plan.world == ProductPlan::World::kBlend) {
     world = WorldMatrixFromScaledTransform(Blend(plan.wa, plan.wb, amount));
+    if (plan.has_pivot) {
+      // Turned about its pivot: put the pivot where it would be.
+      Vec3 p = TransformPoint(plan.pivot, world);
+      for (int k = 0; k < 3; k++) {
+        world[12 + k] += plan.pivot_a[k] + (plan.pivot_b[k] - plan.pivot_a[k]) * amount - p[k];
+      }
+    }
   } else if (plan.world == ProductPlan::World::kSpinning &&
              (spinning = BlendSpinning(plan.wa, plan.wb, amount, kCutAngle))) {
     world = WorldMatrixFromScaledTransform(*spinning);
@@ -837,6 +1017,7 @@ class DrawState {
     if (recorder) {
       inputs.context = g_record_context;
     }
+    inputs.parent = g_record_parent;
     // Any multiply by a camera: the recorder's, one by a camera pass, or one
     // by a perspective view-projection wherever it's kept (the light
     // billboards' recorder, sub_8209C1A0, builds one on its stack).
@@ -3129,6 +3310,14 @@ void BlendState_BeforeDraw(uint8_t* base, bool render_only_pass) {
 
 void BlendState_OnLogicPassStart() {
   GetDrawState().OnLogicPassStart();
+}
+
+void BlendState_SetParentWorld(uint8_t* base, uint32_t address) {
+  if (address) {
+    g_record_parent = LoadMatrix(base, address);
+  } else {
+    g_record_parent.reset();
+  }
 }
 
 void BlendState_SetHandler(uint32_t handler) {

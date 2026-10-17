@@ -693,13 +693,17 @@ extern "C" REX_FUNC(sub_820DBD38) {
     }
   }
   CockpitChanges changes(base, ctx.r3.u32, ctx.r4.u32);
+  // The cockpit's parts are drawn with the car's world matrix (r4 + 16):
+  // their products blend in its frame, about their pivots (blend_state.cpp).
+  constexpr uint32_t kCarWorldOffset = 16;
+  interpolation::BlendState_SetParentWorld(base, ctx.r4.u32 + kCarWorldOffset);
   if (!blend) {
     __imp__sub_820DBD38(ctx, base);
-    changes.After(base);
-    return;
+  } else {
+    guest::StoreFloat(base, address, drawn);
+    __imp__sub_820DBD38(ctx, base);
+    guest::StoreFloat(base, address, value);
   }
-  guest::StoreFloat(base, address, drawn);
-  __imp__sub_820DBD38(ctx, base);
-  guest::StoreFloat(base, address, value);
+  interpolation::BlendState_SetParentWorld(base, 0);
   changes.After(base);
 }

@@ -24,6 +24,11 @@ void BlendState_LogOverlayAllocations(uint8_t* base);
 
 void BlendState_SetHandler(uint32_t handler);
 
+// Main thread: the world matrix at `address` is the parent of the products
+// made until it's set to 0 (the cockpit's draw: the car's), so they blend
+// in its frame (--blend_about_pivot).
+void BlendState_SetParentWorld(uint8_t* base, uint32_t address);
+
 // Main thread, around the delivery of a Draw message.
 void BlendState_BeforeDraw(uint8_t* base, bool render_only_pass);
 void BlendState_AfterDraw(uint8_t* base);
