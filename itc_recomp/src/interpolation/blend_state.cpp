@@ -403,6 +403,26 @@ std::array<uint32_t, 9> g_record_context{};
 // Main thread: the parent world matrix for products made now (the cockpit's
 // draw sets the car's).
 std::optional<Matrix4> g_record_parent;
+// --log_parented_products: counts, logged every 2 s.
+struct ParentedCounts {
+  int multiplies = 0, camera_multiplies = 0, paired = 0, pivots = 0, unsplit = 0;
+  float max_turn = 0;
+};
+ParentedCounts g_parented_counts;
+void LogParentedCounts() {
+  static std::chrono::steady_clock::time_point last{};
+  auto now = std::chrono::steady_clock::now();
+  if (now - last < std::chrono::seconds(2)) {
+    return;
+  }
+  last = now;
+  const ParentedCounts& c = g_parented_counts;
+  REXLOG_INFO("parented: last 2 s, {} multiplies in the cockpit's draw, {} by a camera; {} "
+              "paired with a parent in both ticks, {} not rigid, {} turning (largest turn in "
+              "the car's frame {:.3f} rad)",
+              c.multiplies, c.camera_multiplies, c.paired, c.unsplit, c.pivots, c.max_turn);
+  g_parented_counts = {};
+}
 
 // How a paired product blends, worked out once a tick from its two ticks'
 // inputs: the decompositions and camera splits don't depend on the frame's
@@ -674,6 +694,22 @@ ProductPlan PlanProduct(const ProductInputs& a, const ProductInputs& b, TickPlan
   ProductPlan plan;
   std::optional<ScaledTransform> wa = ScaledTransformFromWorldMatrix(a.world);
   std::optional<ScaledTransform> wb = ScaledTransformFromWorldMatrix(b.world);
+  if (REXCVAR_GET(log_parented_products) && a.parent && b.parent) {
+    g_parented_counts.paired++;
+    if (!wa || !wb) {
+      g_parented_counts.unsplit++;
+    }
+    std::optional<Matrix4> ia = InverseWorldMatrix(*a.parent), ib = InverseWorldMatrix(*b.parent);
+    if (ia && ib) {
+      std::optional<ScaledTransform> la = ScaledTransformFromWorldMatrix(Multiply(a.world, *ia));
+      std::optional<ScaledTransform> lb = ScaledTransformFromWorldMatrix(Multiply(b.world, *ib));
+      if (la && lb) {
+        g_parented_counts.max_turn = std::max(
+            g_parented_counts.max_turn, AngleBetween(la->transform.rotation, lb->transform.rotation));
+      }
+    }
+    LogParentedCounts();
+  }
   if (wa && wb) {
     plan.wa = *wa;
     plan.wb = *wb;
@@ -685,6 +721,7 @@ ProductPlan PlanProduct(const ProductInputs& a, const ProductInputs& b, TickPlan
     }
     bool parented = pivot && Distance(wa->transform.position, wb->transform.position) <= kCutDistance;
     if (parented) {
+      g_parented_counts.pivots++;
       plan.world = ProductPlan::World::kBlend;
       plan.has_pivot = true;
       plan.pivot = pivot->local;
@@ -1013,6 +1050,13 @@ class DrawState {
     }
     bool render_only = frame_pacing::GameMessages_IsRenderOnlyPass();
     bool recorder = caller == kRecorderMultiplyReturn;
+    if (g_record_parent && REXCVAR_GET(log_parented_products)) {
+      g_parented_counts.multiplies++;
+      if (recorder || PassOfViewProjection(b) >= 0) {
+        g_parented_counts.camera_multiplies++;
+      }
+      LogParentedCounts();
+    }
     ProductInputs inputs{LoadMatrix(base, a), LoadMatrix(base, b)};
     if (recorder) {
       inputs.context = g_record_context;
