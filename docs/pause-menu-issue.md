@@ -104,3 +104,57 @@ Called multiple times throughout the codebase (see calls in `itc_recomp.14.cpp`,
 - Menus run at 30 fps (not interpolated)
 - Pause menu is a special case needing different input handling
 - Need to search for pause-related flags/variables in SDK source
+
+
+
+## Handoff point
+
+
+Summary of Findings on Pause State Detection
+     
+  Based on my analysis of the generated assembly code, here's what I've discovered:
+
+  Key Observation: Conditional Function Calls
+
+  In itc_recomp.19.cpp, there's a critical pattern around lines 79-95:
+
+  // Line 79-84: Load byte from offset 112 of r31 and compare to 0
+  ctx.r11.u64 = REX_LOAD_U8(ctx.r31.u32 + 112);
+  ctx.cr0.compare<uint32_t>(ctx.r11.u32, 0, ctx.xer);
+
+  // Line 91-92: If byte equals 0, branch to loc_82093E90
+  if (ctx.cr0.eq) goto loc_82093E90;
+
+  // Line 93-95: Otherwise, call sub_8258CEB0 once
+  sub_8258CEB0(ctx, base);
+
+  What This Suggests
+
+  1. State Tracking: The byte at offset 112 of r31 appears to track some state (possibly pause state)
+     - If the byte is 0 → branch to special handling (loc_82093E90)
+     - If non-zero → call sub_8258CEB0 once
+  2. Double Call Path: At loc_82093E90, sub_8258CEB0 is called again, suggesting this might be a retry or special handling path
+  3. Helper Functions:
+     - sub_8258CEB0 → calls sub_82592500 (line 33291)
+     - sub_8258CEE0 → calls sub_82592520 (line 32814)
+
+  Memory Layout Pattern
+
+  The code frequently checks/stores bytes at offsets 112 and 113 of r31:
+  - Offset 112: Appears to be a flag/check byte
+  - Offset 113: Appears to be another related flag
+  
+  Next Steps Needed
+
+  To fully understand the pause state detection:
+
+  1. Find where offset 112 is initialized - Need to trace back to see what sets this value
+  2. Understand sub_82592500 and sub_82592520 - These are called from the helper functions
+  3. Search for "pause" terminology in the original SDK source (not generated code)
+  4. Look at the calling convention - What's passed in r3/r4 to these functions?
+
+  Would you like me to:
+  1. Search for where offset 112 is initialized?
+  2. Analyze sub_82592500 and sub_82592520 in more detail?
+  3. Search the SDK source for pause-related code? 
+  
