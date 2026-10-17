@@ -571,6 +571,93 @@ struct GaugeValue {
 std::unordered_map<uint32_t, GaugeValue> g_gauge_values;  // by the car + 4288
 }  // namespace
 
+// --log_cockpit_changes: the words of the cockpit, the car + 4288 and the
+// two gauge models (at [cockpit + 964] and [cockpit + 1444]) that change
+// inside the cockpit's draw, and those that changed since the last draw (by
+// game logic or other drawing), by pass, for finding what drives the
+// needles.
+REXCVAR_DEFINE_BOOL(log_cockpit_changes, false, "ITC",
+                    "Log the cockpit's words changed in and between its draws, every 2 s");
+
+namespace {
+class CockpitChanges {
+ public:
+  CockpitChanges(uint8_t* base, uint32_t cockpit, uint32_t car) {
+    if (!REXCVAR_GET(log_cockpit_changes)) {
+      return;
+    }
+    active_ = true;
+    ranges_ = {{"cockpit", cockpit, 0xD00},
+               {"car+4288", car, 0x400},
+               {"gauge A", guest::LoadU32(base, cockpit + 720 + 244), 0x800},
+               {"gauge B", guest::LoadU32(base, cockpit + 1440 + 4), 0x800}};
+    static auto last = std::chrono::steady_clock::now();
+    auto now = std::chrono::steady_clock::now();
+    if (now - last >= std::chrono::seconds(2)) {
+      last = now;
+      lines_ = 0;
+    }
+    before_ = Read(base);
+    if (previous_.size() == before_.size()) {
+      Log(previous_, before_, "since the last draw");
+    }
+  }
+
+  void After(uint8_t* base) {
+    if (!active_) {
+      return;
+    }
+    std::vector<uint32_t> after = Read(base);
+    Log(before_, after, "in the draw");
+    previous_ = std::move(after);
+  }
+
+ private:
+  struct Range {
+    const char* name;
+    uint32_t start, size;
+  };
+
+  std::vector<uint32_t> Read(uint8_t* base) {
+    std::vector<uint32_t> words;
+    for (const Range& r : ranges_) {
+      for (uint32_t i = 0; i < r.size; i += 4) {
+        words.push_back(r.start ? guest::LoadU32(base, r.start + i) : 0);
+      }
+    }
+    return words;
+  }
+
+  void Log(const std::vector<uint32_t>& a, const std::vector<uint32_t>& b, const char* when) {
+    size_t k = 0;
+    std::string line;
+    for (const Range& r : ranges_) {
+      for (uint32_t i = 0; i < r.size; i += 4, k++) {
+        if (a[k] != b[k] && line.size() < 1500) {
+          float fa, fb;
+          std::memcpy(&fa, &a[k], 4);
+          std::memcpy(&fb, &b[k], 4);
+          line += fmt::format(" {}+{}:{:08X}->{:08X}({:.5g}->{:.5g})", r.name, i, a[k], b[k], fa,
+                              fb);
+        }
+      }
+    }
+    if (!line.empty() && lines_++ < 80) {
+      REXLOG_INFO("cockpit changes: pass {} {} amount {:.2f} {}:{}",
+                  frame_pacing::GameMessages_PassNumber(),
+                  frame_pacing::GameMessages_IsRenderOnlyPass() ? "render-only" : "logic",
+                  frame_pacing::GetFramePacer().TickProgress(), when, line);
+    }
+  }
+
+  bool active_ = false;
+  std::vector<Range> ranges_;
+  std::vector<uint32_t> before_;
+  static inline std::vector<uint32_t> previous_;
+  static inline int lines_ = 0;
+};
+}  // namespace
+
 extern "C" REX_FUNC(sub_820DBD38) {
   REX_FUNC_PROLOGUE();
   constexpr uint32_t kGaugeValueOffset = 628;
@@ -605,11 +692,14 @@ extern "C" REX_FUNC(sub_820DBD38) {
                   ctx.r4.u32, amount, value, gauge.before, gauge.now, drawn, blend);
     }
   }
+  CockpitChanges changes(base, ctx.r3.u32, ctx.r4.u32);
   if (!blend) {
     __imp__sub_820DBD38(ctx, base);
+    changes.After(base);
     return;
   }
   guest::StoreFloat(base, address, drawn);
   __imp__sub_820DBD38(ctx, base);
   guest::StoreFloat(base, address, value);
+  changes.After(base);
 }
