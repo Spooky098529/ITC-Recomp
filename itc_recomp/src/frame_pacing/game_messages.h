@@ -17,6 +17,8 @@
 #pragma once
 
 #include <cstdint>
+#include <utility>
+#include <vector>
 
 namespace frame_pacing {
 
@@ -30,6 +32,15 @@ bool GameMessages_IsRenderOnlyPass();
 // (the render thread draws the tick's first render-only pass's stored list
 // again, --native_renderer_tick_replay).
 int GameMessages_PassKind();
+// Main thread, at the pass's hand-over: the command list ranges written by
+// the calls made again on fast passes (and noted on the tick's first
+// render-only pass), in order.
+std::vector<std::pair<uint32_t, uint32_t>> GameMessages_TakeRebuiltRanges();
+// Main thread, around the draw step part that draws the light groups'
+// billboards and the minimap (sub_820F6068, r3): on the tick's first
+// render-only pass it's noted, to be made again on the passes after it.
+uint32_t GameMessages_BeforeRebuiltCall(uint8_t* base);
+void GameMessages_AfterRebuiltCall(uint8_t* base, uint32_t function, uint32_t r3, uint32_t start);
 
 // Which main loop pass this is (counts up by one per pass).
 uint64_t GameMessages_PassNumber();

@@ -1194,6 +1194,12 @@ struct Passes::State {
     uint32_t bool_loop[kBoolLoopConstantsRange / 4];
     uint32_t fetch[kFetchConstantsRange / 4];
     uint32_t inline_offset = 0, inline_size = 0;  // into inline_bytes
+    // A light (or overlay) draw: its vertices came from the main thread's
+    // call `rebuilt` (Renderer_ReplayingRanges), rebuilt_offset into what
+    // it wrote, and are taken from there again on each frame drawn from
+    // this one; -1 for the rest.
+    int32_t rebuilt = -1;
+    uint32_t rebuilt_offset = 0, rebuilt_size = 0;  // the call's output's size
   };
   struct StoredClear {
     Target* target;
@@ -1268,6 +1274,7 @@ struct Passes::State {
   VkExtent2D last_front_extent{};
   struct StoredCounts {
     uint64_t captures = 0, invalid = 0, frames = 0, missing = 0, draws = 0, uploads = 0;
+    uint64_t tagged = 0, fresh = 0, stale = 0;  // light draws (StoredDraw::rebuilt)
     std::string invalid_reason;
   } stored_counts;
   // Whether nothing in the way of reusing draws (diagnostics that need every
@@ -3760,6 +3767,21 @@ void Passes::State::CaptureDraw(const DrawCall& call, Target* color, Target* dep
     f.inline_bytes.resize(f.inline_bytes.size() + call.inline_size);
     std::memcpy(f.inline_bytes.data() + d.inline_offset, last_base + call.inline_data,
                 call.inline_size);
+    // Tagged once here, if its vertices came from a call made again on the
+    // frames drawn from this one.
+    uint32_t source;
+    if (Buffers_LastCopy(call.inline_data, call.inline_size, source)) {
+      const auto& ranges = Renderer_ReplayingRanges();
+      for (size_t i = 0; i < ranges.size(); i++) {
+        if (source >= ranges[i].first && source + call.inline_size <= ranges[i].second) {
+          d.rebuilt = int32_t(i);
+          d.rebuilt_offset = source - ranges[i].first;
+          d.rebuilt_size = ranges[i].second - ranges[i].first;
+          stored_counts.tagged++;
+          break;
+        }
+      }
+    }
   }
   f.ops.push_back({StoredKind::kDraw, uint32_t(f.draws.size() - 1)});
 }
@@ -3779,8 +3801,20 @@ void Passes::State::DrawStored(VkCommandBuffer commands, uint8_t* base, const St
     inline_offset = offset + d.inline_size;
     uint32_t address =
         kInlineVertices + (mirror_by_tick ? frame * inline_slot_size() : 0) + offset;
-    std::memcpy(draw_mirror().mapped + address, stored.inline_bytes.data() + d.inline_offset,
-                d.inline_size);
+    // A light's vertices as the main thread built them this frame, if its
+    // call wrote as much as when stored; otherwise the stored ones.
+    const uint8_t* vertices = stored.inline_bytes.data() + d.inline_offset;
+    if (d.rebuilt >= 0) {
+      const auto& ranges = Renderer_ReplayingRanges();
+      if (size_t(d.rebuilt) < ranges.size() &&
+          ranges[d.rebuilt].second - ranges[d.rebuilt].first == d.rebuilt_size) {
+        vertices = base + ranges[d.rebuilt].first + d.rebuilt_offset;
+        stored_counts.fresh++;
+      } else {
+        stored_counts.stale++;
+      }
+    }
+    std::memcpy(draw_mirror().mapped + address, vertices, d.inline_size);
     fetch[2 * kInlineFetchConstant] = address | 3;
   }
   uint32_t offsets[5];
@@ -5388,9 +5422,12 @@ std::string Passes::TakeStoredFrames() {
   double frames = double(std::max<uint64_t>(c.frames, 1));
   std::string text = fmt::format(
       "tick replay: {} frames stored ({} not usable{}{}), {} frames drawn from them ({} with none "
-      "to draw from), {:.1f} draws and {:.1f} uploads a frame",
+      "to draw from), {:.1f} draws and {:.1f} uploads a frame; light draws: {:.1f} tagged a stored "
+      "frame, {:.1f} a frame with fresh vertices, {:.1f} with stored ones (size changed)",
       c.captures, c.invalid, c.invalid ? ", e.g. " : "", c.invalid_reason, c.frames, c.missing,
-      c.draws / frames, c.uploads / frames);
+      c.draws / frames, c.uploads / frames,
+      double(c.tagged) / double(std::max<uint64_t>(c.captures, 1)), c.fresh / frames,
+      c.stale / frames);
   State& s = *state_;
   text += fmt::format("; of {} draws stored, {} read float constants set other than by "
                       "uploads (stored as sets):",

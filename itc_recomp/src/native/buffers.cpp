@@ -626,6 +626,23 @@ void Buffers_OnMirror(uint32_t physical, uint32_t size, bool index) {
 // The library's memcpy (r3 destination, r4 source, r5 size): copies into
 // the physical views are recorded once done (see Buffers_NewestWrite); with
 // --native_renderer_log_buffers, copies into a known buffer header logged.
+namespace native {
+namespace {
+struct LastCopy {
+  uint32_t destination = 0, source = 0, size = 0;
+};
+thread_local LastCopy g_last_copy;
+}  // namespace
+
+bool Buffers_LastCopy(uint32_t destination, uint32_t size, uint32_t& source) {
+  if (g_last_copy.destination != destination || g_last_copy.size != size) {
+    return false;
+  }
+  source = g_last_copy.source;
+  return true;
+}
+}  // namespace native
+
 extern "C" REX_FUNC(sub_825A7410) {
   REX_FUNC_PROLOGUE();
   using namespace native;
@@ -677,6 +694,7 @@ extern "C" REX_FUNC(sub_825A7410) {
     std::lock_guard lock(g_logged_mutex);
     g_logged.push_back(write);
   }
+  g_last_copy = {destination, source, size};
   // Recorded after the copy, so a range read meanwhile is read again.
   if (size && destination >= 0xA0000000u && Renderer_Enabled()) {
     uint32_t physical = GpuPhysicalAddress(destination);

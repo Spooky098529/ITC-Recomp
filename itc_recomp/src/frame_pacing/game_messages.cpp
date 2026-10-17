@@ -36,6 +36,8 @@ REXCVAR_DEFINE_STRING(render_only_skip, "", "ITC",
                       "Testing: tick handler or message handler targets (hex, "
                       "comma-separated) to skip on render-only passes");
 
+REXCVAR_DECLARE(bool, native_renderer_tick_replay);
+
 namespace frame_pacing {
 namespace {
 uint32_t g_current_handler = 0;
@@ -108,6 +110,31 @@ bool g_render_only_pass = false;
 // (--native_renderer_tick_replay).
 bool g_fast_pass = false;
 int g_render_only_since_logic = 0;
+
+// Calls made again on fast passes, as the tick's first render-only pass
+// made them, for what they build into the list that changes from frame to
+// frame (the light groups' billboards and the minimap, sub_820F6068); the race overlays'
+// Update is delivered again for theirs (the marker, the light trails).
+// Each call's (and the overlays') command list range is handed over with
+// the list, so the render thread can take the fresh vertices.
+struct RebuiltCall {
+  uint32_t function;
+  uint32_t r3, r4, r5, r6;
+};
+std::vector<RebuiltCall> g_rebuilt_calls, g_rebuilt_capture;
+std::vector<std::pair<uint32_t, uint32_t>> g_rebuilt_ranges;
+bool g_capture_pass = false;  // the tick's first render-only pass
+constexpr uint32_t kCommandListPointer = 0x8296B918;
+constexpr uint32_t kCommandListWriteOffset = 44;
+
+uint32_t ListWritePointer(uint8_t* base) {
+  uint32_t list = guest::LoadU32(base, kCommandListPointer);
+  return list ? guest::LoadU32(base, list + kCommandListWriteOffset) : 0;
+}
+
+bool Rebuilding() {
+  return REXCVAR_GET(native_renderer_tick_replay);
+}
 bool g_race_draw_step_seen = false;  // during the current logic pass
 bool g_in_race = false;              // as of the last logic pass
 
@@ -233,10 +260,35 @@ void DispatchMessages(PPCContext& ctx, uint8_t* base, uint32_t dispatcher) {
     if (g_fast_pass && (id == kUpdate || id == kDraw)) {
       if (id == kDraw) {
         counts.draws++;
+        // What changes from frame to frame, built again.
+        interpolation::BlendState_BeginFastFrame();
+        static int logged = 0;
+        for (const RebuiltCall& call : g_rebuilt_calls) {
+          uint32_t start = ListWritePointer(base);
+          if (logged < 40) {
+            logged++;
+            REXLOG_INFO("tick replay: rebuilt call {:08X}({:08X}, {:08X}, {:08X}, {:08X}), list "
+                        "at {:08X}",
+                        call.function, call.r3, call.r4, call.r5, call.r6, start);
+          }
+          ctx.r3.u64 = call.r3;
+          ctx.r4.u64 = call.r4;
+          ctx.r5.u64 = call.r5;
+          ctx.r6.u64 = call.r6;
+          ctx.lr = 0x82106388;
+          REX_CALL_INDIRECT_FUNC(call.function);
+          g_rebuilt_ranges.push_back({start, ListWritePointer(base)});
+        }
         interpolation::BlendState_PublishFastFrame();
       } else {
         counts.updates++;
         counts.updates_skipped++;
+        if (REXCVAR_GET(redraw_race_overlays)) {
+          std::string only = "8215E150";
+          uint32_t start = ListWritePointer(base);
+          Deliver(ctx, base, dispatcher, message, &only);
+          g_rebuilt_ranges.push_back({start, ListWritePointer(base)});
+        }
       }
       continue;
     }
@@ -252,7 +304,11 @@ void DispatchMessages(PPCContext& ctx, uint8_t* base, uint32_t dispatcher) {
           only += only.empty() ? "8215E150" : ",8215E150";
         }
         if (!only.empty()) {
+          uint32_t start = ListWritePointer(base);
           Deliver(ctx, base, dispatcher, message, &only);
+          if (Rebuilding() && g_capture_pass) {
+            g_rebuilt_ranges.push_back({start, ListWritePointer(base)});
+          }
         }
         continue;
       }
@@ -298,6 +354,16 @@ void GameMessages_SetRenderOnlyPass(bool render_only) {
   g_passes[render_only ? 1 : 0]++;
   g_render_only_pass = render_only;
   g_render_only_since_logic = render_only ? g_render_only_since_logic + 1 : 0;
+  // The calls the tick's first render-only pass made are made again on the
+  // passes after it.
+  if (g_capture_pass) {
+    g_rebuilt_calls.swap(g_rebuilt_capture);
+  }
+  if (!render_only) {
+    g_rebuilt_calls.clear();
+  }
+  g_rebuilt_capture.clear();
+  g_capture_pass = render_only && g_render_only_since_logic == 1;
   g_fast_pass = render_only && g_render_only_since_logic >= 2 && native::Renderer_TickReplayReady();
   g_pass_snapshot.store((GameMessages_PassNumber() << 1) | render_only, std::memory_order_relaxed);
   g_main_thread.store(std::this_thread::get_id(), std::memory_order_relaxed);
@@ -324,6 +390,28 @@ bool GameMessages_IsRenderOnlyPass() {
 
 int GameMessages_PassKind() {
   return g_fast_pass ? 2 : g_render_only_pass ? 1 : 0;
+}
+
+std::vector<std::pair<uint32_t, uint32_t>> GameMessages_TakeRebuiltRanges() {
+  return std::move(g_rebuilt_ranges);
+}
+
+uint32_t GameMessages_BeforeRebuiltCall(uint8_t* base) {
+  return g_capture_pass && Rebuilding() ? ListWritePointer(base) : 0;
+}
+
+void GameMessages_AfterRebuiltCall(uint8_t* base, uint32_t function, uint32_t r3, uint32_t start) {
+  if (!g_capture_pass || !Rebuilding()) {
+    return;
+  }
+  static int logged = 0;
+  if (logged < 20) {
+    logged++;
+    REXLOG_INFO("tick replay: noted call {:08X}({:08X}), list {:08X}-{:08X}", function, r3, start,
+                ListWritePointer(base));
+  }
+  g_rebuilt_capture.push_back({function, r3, 0, 0, 0});
+  g_rebuilt_ranges.push_back({start, ListWritePointer(base)});
 }
 
 }  // namespace frame_pacing

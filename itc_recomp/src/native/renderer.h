@@ -7,6 +7,8 @@
 #pragma once
 
 #include <cstdint>
+#include <utility>
+#include <vector>
 
 namespace native {
 
@@ -19,7 +21,11 @@ bool Renderer_Enabled();
 // replayed came from a logic pass (--native_renderer_mirror_by_tick), and
 // whether the frame is one that wasn't drawn, to be drawn from the tick's
 // stored list (--native_renderer_tick_replay).
-void Renderer_OnListHandedOver(int kind);
+// With the kind, the command list ranges the main thread's rebuilt calls
+// wrote in the pass, in order (GameMessages_TakeRebuiltRanges).
+void Renderer_OnListHandedOver(int kind, std::vector<std::pair<uint32_t, uint32_t>> ranges = {});
+// Render thread: those of the list being replayed.
+const std::vector<std::pair<uint32_t, uint32_t>>& Renderer_ReplayingRanges();
 void Renderer_OnReplayStart();
 bool Renderer_ReplayingLogicList();
 bool Renderer_ReplayingStoredFrame();

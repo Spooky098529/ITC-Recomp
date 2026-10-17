@@ -52,6 +52,10 @@ void Buffers_OnMirror(uint32_t physical, uint32_t size, bool index);
 
 // --native_renderer_log_physical_writes (see buffers.cpp).
 bool Buffers_LogPhysicalWrites();
+// This thread's last copy by the library's memcpy, if it was to destination
+// and size bytes long: where it came from (for an inline draw's vertices,
+// a place in the command list).
+bool Buffers_LastCopy(uint32_t destination, uint32_t size, uint32_t& source);
 // Render thread: a frame's recording starts (is_texture: whether a physical
 // range overlaps a texture the cache holds) and ends; and each vertex or
 // index range it draws, the first time in the frame.

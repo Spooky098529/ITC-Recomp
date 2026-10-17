@@ -410,7 +410,20 @@ void FrameStateDiff_Watch(uint32_t address) {
 ITC_FRAME_STATE_WRAP(8209F8A0)
 ITC_FRAME_STATE_WRAP(8209F900)
 ITC_FRAME_STATE_WRAP(820C5DE8)
-ITC_FRAME_STATE_WRAP(820F6068)
+// Also noted to be made again on the passes that don't draw
+// (--native_renderer_tick_replay; frame_pacing/game_messages.cpp).
+extern "C" REX_FUNC(sub_820F6068) {
+  REX_FUNC_PROLOGUE();
+  if (debug::IsHidden(0x820F6068)) {
+    return;
+  }
+  uint32_t r3 = ctx.r3.u32;
+  uint32_t start = frame_pacing::GameMessages_BeforeRebuiltCall(base);
+  debug::FrameStateDiff_Before(base);
+  __imp__sub_820F6068(ctx, base);
+  debug::FrameStateDiff_After(base, "draw step part", 0x820F6068);
+  frame_pacing::GameMessages_AfterRebuiltCall(base, 0x820F6068, r3, start);
+}
 ITC_FRAME_STATE_WRAP(82130978)
 // The render orchestrator's (sub_820C5DE8) callees.
 ITC_FRAME_STATE_WRAP(8209F7A8)

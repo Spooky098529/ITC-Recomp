@@ -48,6 +48,7 @@ void BlendState_ReplayConstants(uint8_t* base, uint32_t payload, uint32_t packed
 // render-only pass. Render thread, a frame drawn from that pass's stored
 // list: blends a stored constant upload (values in host order, as the
 // command's payload held them) in place, as BlendState_ReplayConstants does.
+void BlendState_BeginFastFrame();
 void BlendState_PublishFastFrame();
 void BlendState_BlendStoredUpload(uint32_t payload, uint32_t packed, float* values);
 

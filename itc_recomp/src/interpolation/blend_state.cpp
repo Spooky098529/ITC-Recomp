@@ -1213,7 +1213,18 @@ class DrawState {
   // Main thread, a pass that doesn't draw (--native_renderer_tick_replay):
   // the frame's amount, with the products of the tick's first render-only
   // pass, whose recording the render thread replays.
+  // Before the calls made again on a pass that doesn't draw: billboards
+  // built then face the frame's blended camera, as in Draw.
+  void BeginFastFrame() {
+    drawing_ = true;
+    billboard_cameras_ready_ = false;
+    amount_ = frame_pacing::GetFramePacer().TickProgress();
+  }
+
   void PublishFastFrame() {
+    drawing_ = false;
+    product_occurrences_.clear();
+    tick_cursor_ = 0;
     amount_ = frame_pacing::GetFramePacer().TickProgress();
     for (const auto& [out, output] : kept_outputs_) {
       pass_outputs_[out] = output;
@@ -3144,6 +3155,10 @@ void BlendState_LogOverlayAllocations(uint8_t* base) {
 
 void BlendState_BeforeDraw(uint8_t* base, bool render_only_pass) {
   GetDrawState().BeforeDraw(base, !render_only_pass);
+}
+
+void BlendState_BeginFastFrame() {
+  GetDrawState().BeginFastFrame();
 }
 
 void BlendState_PublishFastFrame() {

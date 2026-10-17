@@ -1319,16 +1319,25 @@ namespace {
 // each (any thread, under g_lists_mutex); and the one being replayed
 // (render thread).
 std::mutex g_lists_mutex;
-std::deque<int> g_lists;
+struct HandedList {
+  int kind;
+  std::vector<std::pair<uint32_t, uint32_t>> ranges;
+};
+std::deque<HandedList> g_lists;
 int g_replaying_kind = 0;
+std::vector<std::pair<uint32_t, uint32_t>> g_replaying_ranges;
 bool g_replaying_logic_list = true;
 std::atomic<bool> g_tick_replay_ready{false};
 uint64_t g_lists_missing = 0, g_lists_queued_most = 0;
 }  // namespace
 
-void Renderer_OnListHandedOver(int kind) {
+void Renderer_OnListHandedOver(int kind, std::vector<std::pair<uint32_t, uint32_t>> ranges) {
   std::lock_guard lock(g_lists_mutex);
-  g_lists.push_back(kind);
+  g_lists.push_back({kind, std::move(ranges)});
+}
+
+const std::vector<std::pair<uint32_t, uint32_t>>& Renderer_ReplayingRanges() {
+  return g_replaying_ranges;
 }
 
 void Renderer_OnReplayStart() {
@@ -1339,9 +1348,11 @@ void Renderer_OnReplayStart() {
     g_lists_missing++;
     g_replaying_kind = 0;
     g_replaying_logic_list = true;
+    g_replaying_ranges.clear();
     return;
   }
-  g_replaying_kind = g_lists.front();
+  g_replaying_kind = g_lists.front().kind;
+  g_replaying_ranges.swap(g_lists.front().ranges);
   g_replaying_logic_list = g_replaying_kind == 0;
   g_lists.pop_front();
 }
