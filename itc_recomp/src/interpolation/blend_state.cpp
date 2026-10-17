@@ -51,7 +51,7 @@
 #include <unordered_set>
 #include <vector>
 
-#include <x86intrin.h>
+#include <x86intrin.h>  // SameMatrix
 
 REXCVAR_DEFINE_BOOL(interpolate_draw_state, true, "ITC",
                     "Smooth motion between 30 Hz ticks in races by blending cameras and "
@@ -127,8 +127,6 @@ REXCVAR_DEFINE_BOOL(publish_by_tick, true, "ITC",
 REXCVAR_DEFINE_BOOL(cache_billboard_cameras, true, "ITC",
                     "Blend the cameras the light billboards face once a frame, instead of on "
                     "every billboard set (same values)");
-REXCVAR_DEFINE_BOOL(check_draw_state, false, "ITC",
-                    "Temporary: log DrawState's call counts, table sizes and timings every 2 s");
 
 namespace interpolation {
 namespace {
@@ -845,12 +843,7 @@ class DrawState {
     if (!recorder && PassOfViewProjection(b) < 0 && camera_ids_.Of(inputs.view_projection) == 0) {
       return;
     }
-    uint64_t t0 = REXCVAR_GET(check_draw_state) ? __rdtsc() : 0;
     Note(base, out, a, b, inputs, render_only);
-    if (t0) {
-      check_.note_cycles += __rdtsc() - t0;
-      check_.notes[render_only]++;
-    }
   }
 
   // Main thread, after the matrix copy dst = src. A copy of a camera (as
@@ -865,13 +858,7 @@ class DrawState {
       // A copy of a camera (a camera pass's, or a perspective one built on
       // the stack, like the headlight projector's).
       Matrix4 identity{1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
-      uint64_t t0 = REXCVAR_GET(check_draw_state) ? __rdtsc() : 0;
       Note(base, dst, 0, src, {identity, value}, render_only);
-      if (t0) {
-        check_.note_cycles += __rdtsc() - t0;
-        check_.notes[render_only]++;
-        check_.copy_notes++;
-      }
       counts_.copies++;
       return;
     }
@@ -919,9 +906,6 @@ class DrawState {
                           : 0;
     ProductKey key{camera, world, signature, handler_, object,
                    product_occurrences_[{camera, world, signature, handler_, object, 0}]++};
-    if (REXCVAR_GET(check_draw_state)) [[unlikely]] {
-      CheckOccurrence(key);
-    }
     if (object != 0 && !render_only) {
       object_keys_.keyed++;
       object_keys_.shared += key.occurrence > 0;
@@ -963,7 +947,6 @@ class DrawState {
       if (by_tick_) {
         if (tick_cursor_ < tick_product_keys_.size() && tick_product_keys_[tick_cursor_] == key) {
           tick_product = int32_t(tick_cursor_);
-          check_.cursor_hits++;
         } else {
           tick_product = tick_index_.Find(key);
         }
@@ -974,9 +957,6 @@ class DrawState {
       } else {
         auto it = current_tick_.find(key);
         tick = it != current_tick_.end() ? &it->second : nullptr;
-      }
-      if (REXCVAR_GET(check_draw_state)) [[unlikely]] {
-        CheckTickInputs(key, tick);
       }
       // The race overlays (the marker above opponents, Update handler
       // sub_8215E150) are recorded again on render-only passes with slightly
@@ -1043,11 +1023,6 @@ class DrawState {
   }
 
   void AfterDraw(uint8_t* base) {
-    bool check = REXCVAR_GET(check_draw_state);
-    uint64_t t0 = check ? __rdtsc() : 0, t1 = 0, t2 = 0;
-    if (check) {
-      CheckSizes();
-    }
     drawing_ = false;
     base_ = base;
     if (logic_pass_) {
@@ -1067,20 +1042,10 @@ class DrawState {
       overlay_keys_ = std::move(overlay_keys_this_tick_);
       overlay_keys_this_tick_.clear();
     }
-    if (check) {
-      t1 = __rdtsc();
-    }
     PublishReplayFrame();
-    if (check) {
-      t2 = __rdtsc();
-    }
     pass_outputs_.clear();
     product_occurrences_.clear();
-    check_occurrences_.clear();
     tick_cursor_ = 0;
-    if (check) {
-      CheckTimes(t0, t1, t2);
-    }
     Restore(base, saved_);
     Restore(base, saved_vec3_);
     counts_.draws++;
@@ -1222,34 +1187,6 @@ class DrawState {
       billboard_cameras_.push_back({CameraPass(blend.pass), view, Multiply(view, blend.projection)});
     }
     billboard_cameras_ready_ = true;
-    if (REXCVAR_GET(check_draw_state)) [[unlikely]] {
-      CheckBillboardCameras();
-    }
-  }
-  // --check_draw_state: blended again the way BeforeBillboards did, compared
-  // bit for bit.
-  [[gnu::noinline]] void CheckBillboardCameras() {
-    for (size_t j = 0; j < look_at_blends_.size(); j++) {
-      const LookAtBlend& blend = look_at_blends_[j];
-      for (int i = 0; i < 3; i++) {
-        Vec3 v;
-        for (int k = 0; k < 3; k++) {
-          v[k] = blend.from[i][k] + (blend.to[i][k] - blend.from[i][k]) * amount_;
-        }
-        check_.billboard_mismatches +=
-            std::memcmp(&v, &billboard_look_ats_[j].vectors[i], sizeof(v)) != 0;
-      }
-    }
-    for (size_t j = 0; j < camera_blends_.size(); j++) {
-      const CameraBlend& camera = camera_blends_[j];
-      Matrix4 view = ViewMatrixFromTransform(Blend(camera.from, camera.to, amount_));
-      Matrix4 view_projection = Multiply(view, camera.projection);
-      check_.billboard_mismatches +=
-          std::memcmp(&view, &billboard_cameras_[j].view, sizeof(view)) != 0 ||
-          std::memcmp(&view_projection, &billboard_cameras_[j].view_projection,
-                      sizeof(view_projection)) != 0;
-    }
-    check_.billboard_frames++;
   }
   std::vector<BlendedLookAt> billboard_look_ats_;
   std::vector<BlendedCamera> billboard_cameras_;
@@ -1402,9 +1339,6 @@ class DrawState {
         }
       }
     }
-    if (REXCVAR_GET(check_draw_state)) [[unlikely]] {
-      CheckPublished(*frame);
-    }
     counts_.products_published += int(frame->products.size());
     std::shared_ptr<const ReplayFrame> replaced = std::move(frame);
     {
@@ -1456,39 +1390,6 @@ class DrawState {
       product.plan = plan_of_.find(key)->second;
     }
     return product;
-  }
-
-  // --check_draw_state: the frame's products against the per-frame lookups.
-  [[gnu::noinline]] void CheckPublished(const ReplayFrame& frame) {
-    auto same_inputs = [](const ProductInputs& a, const ProductInputs& b) {
-      return a.world == b.world && a.view_projection == b.view_projection &&
-             a.context == b.context;
-    };
-    std::unordered_map<uint32_t, TickProduct> expected;
-    std::unordered_map<uint32_t, Matrix4> written;
-    for (const auto* outputs : {&tick_outputs_, &pass_outputs_}) {
-      for (const auto& [out, output] : *outputs) {
-        auto now = current_tick_.find(output.key);
-        if (now == current_tick_.end()) {
-          continue;
-        }
-        expected[out] = TickProductOf(output.key, now->second);
-        written[out] = output.written;
-      }
-    }
-    check_.publish_compared += expected.size();
-    bool differs = expected.size() != frame.products.size();
-    for (const auto& [out, e] : expected) {
-      const ReplayedProduct* p = frame.products.Find(out);
-      if (!p || p->written != written[out] || p->tick->identity != e.identity ||
-          p->tick->handler != e.handler || p->tick->plan != e.plan ||
-          !same_inputs(p->tick->now, e.now) || p->tick->before.has_value() != e.before.has_value() ||
-          (e.before && !same_inputs(*p->tick->before, *e.before))) {
-        differs = true;
-        check_.publish_mismatches++;
-      }
-    }
-    check_.publish_frames_differing += differs;
   }
 
   // The camera of a pass whose view-projection is its view * projection.
@@ -1568,7 +1469,6 @@ class DrawState {
   ProductInputsByKey current_tick_;
   ProductInputsByKey previous_tick_;
   FlatMap<ProductKey, int, ProductKeyHash> product_occurrences_;
-  std::unordered_map<ProductKey, int, ProductKeyHash> check_occurrences_;  // --check_draw_state
   // Each of this tick's products' previous-tick counterpart, and a number
   // that stays with an object from tick to tick (carried along the pairing),
   // which the pixel constants are paired by.
@@ -1797,62 +1697,6 @@ class DrawState {
           identity != previous_identities.end() ? identity->second : next_identity_++;
     }
   }
-  // --check_draw_state (temporary).
-  struct {
-    uint64_t frames = 0, logic_frames = 0, notes[2] = {}, copy_notes = 0;
-    uint64_t note_cycles = 0, tick_cycles = 0, publish_cycles = 0, after_cycles = 0;
-    uint64_t tick_outputs = 0, pass_outputs = 0, occurrences = 0, published = 0;
-    uint64_t current = 0, paired = 0, logic_tick_outputs = 0;
-    uint64_t publish_compared = 0, publish_mismatches = 0, publish_frames_differing = 0;
-    uint64_t notes_checked = 0, note_mismatches = 0, cursor_hits = 0;
-    uint64_t billboard_frames = 0, billboard_mismatches = 0;
-    std::chrono::steady_clock::time_point last_log{};
-  } check_;
-
-  [[gnu::noinline]] void CheckSizes() {
-    check_.frames++;
-    check_.logic_frames += logic_pass_;
-    check_.tick_outputs += tick_outputs_.size();
-    check_.pass_outputs += pass_outputs_.size();
-    check_.occurrences += product_occurrences_.size();
-    if (logic_pass_) {
-      check_.logic_tick_outputs += tick_outputs_.size();
-      check_.current += collecting_.size();
-      check_.paired += paired_.size();
-    }
-  }
-
-  [[gnu::noinline]] void CheckTimes(uint64_t t0, uint64_t t1, uint64_t t2) {
-    uint64_t t3 = __rdtsc();
-    check_.tick_cycles += t1 - t0;
-    check_.publish_cycles += t2 - t1;
-    check_.after_cycles += t3 - t0;
-    check_.published += g_replay_frame ? g_replay_frame->products.size() : 0;
-    auto now = std::chrono::steady_clock::now();
-    if (now - check_.last_log < std::chrono::seconds(2)) {
-      return;
-    }
-    double f = double(std::max<uint64_t>(check_.frames, 1));
-    double l = double(std::max<uint64_t>(check_.logic_frames, 1));
-    REXLOG_INFO(
-        "draw state check: {} frames ({} logic); a frame: notes {:.0f} logic + {:.0f} render-only "
-        "({:.0f} copies), tick outputs {:.0f}, pass outputs {:.0f}, occurrences {:.0f}, published "
-        "{:.0f}; a logic frame: tick outputs {:.0f}, products {:.0f}, paired {:.0f}; tsc kcycles a "
-        "frame: notes {:.1f}, after draw {:.1f} (tick {:.1f}, publish {:.1f}); published products "
-        "compared {}, differing {} in {} frames (by tick: {}); notes checked {}, differing {}, found next along {}; billboard cameras checked in {} frames, differing {}",
-        check_.frames, check_.logic_frames, check_.notes[0] / f, check_.notes[1] / f,
-        check_.copy_notes / f, check_.tick_outputs / f, check_.pass_outputs / f,
-        check_.occurrences / f, check_.published / f, check_.logic_tick_outputs / l,
-        check_.current / l, check_.paired / l, check_.note_cycles / f / 1e3,
-        check_.after_cycles / f / 1e3, check_.tick_cycles / f / 1e3,
-        check_.publish_cycles / f / 1e3, check_.publish_compared, check_.publish_mismatches,
-        check_.publish_frames_differing, by_tick_, check_.notes_checked, check_.note_mismatches, check_.cursor_hits, check_.billboard_frames,
-        check_.billboard_mismatches);
-    auto last = now;
-    check_ = {};
-    check_.last_log = last;
-  }
-
   struct {
     int ticks = 0, keyed = 0, shared = 0;
     std::chrono::steady_clock::time_point last_log{};
@@ -1870,24 +1714,6 @@ class DrawState {
                 render_only ? "render-only" : "logic", world == 0 ? ", copy" : "", out,
                 key.camera, key.world, key.signature, key.occurrence, ticks_,
                 current_tick_.count(key), previous_tick_.count(key));
-  }
-
-  // --check_draw_state: the occurrence by std::unordered_map, and the tick's
-  // inputs by current_tick_.
-  [[gnu::noinline]] void CheckOccurrence(const ProductKey& key) {
-    ProductKey group = key;
-    group.occurrence = 0;
-    check_.notes_checked++;
-    check_.note_mismatches += check_occurrences_[group]++ != key.occurrence;
-  }
-  [[gnu::noinline]] void CheckTickInputs(const ProductKey& key, const ProductInputs* tick) {
-    auto it = current_tick_.find(key);
-    const ProductInputs* expected = it != current_tick_.end() ? &it->second : nullptr;
-    check_.note_mismatches +=
-        (expected == nullptr) != (tick == nullptr) ||
-        (tick && (tick->world != expected->world ||
-                  tick->view_projection != expected->view_projection ||
-                  tick->context != expected->context));
   }
 
   // Diagnostics (--log_moving_products): a render-only pass's multiply whose

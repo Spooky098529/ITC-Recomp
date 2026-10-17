@@ -3110,10 +3110,24 @@ Render thread unchanged (two runs each: 10.22, 10.33 against 10.33,
 frame, reading the tick's products in place of a fresh copy each frame.
 No fps runs: at this point the profiles' cycles are the measure.
 
-Left: `Note` ~110 thousand cycles a frame (~75 a call), `AfterDraw` ~40
-(`MatchTick` and `PlanTick` once a tick still use `std::unordered_map`),
-and the billboards' `__imp__sub_8209C6E0` at ~12% of the main thread,
-the largest after `__imp__sub_821298C0`.
+The check (`--check_draw_state`) was removed before merging.
+
+Left of ours: `Note` ~110 thousand cycles a frame (~75 a call),
+`AfterDraw` ~40 (`MatchTick` and `PlanTick`, once a tick, still use
+`std::unordered_map`).
+
+**To investigate next** on the main thread (both translated game code,
+the largest left; main thread ~6.1 million cycles a frame):
+
+- `__imp__sub_821298C0`, ~16% of the main thread, the largest; not looked
+  at yet (what it does isn't known).
+- `__imp__sub_8209C6E0` (the light billboards' vertex generation), ~12%
+  (~730 thousand cycles a frame) after the change above. It fell ~30% when
+  the camera we write into the pass went from 4-byte to 16-byte stores,
+  which suggests store forwarding stalls (vector loads of what was just
+  stored, as in `Lights::FindNearest`); find its hot instructions by IP
+  (see the mapping above) and whether its own stack traffic stalls the
+  same way.
 
 ## Resolution (branch `unlocked-resolution`, 2026-10-16)
 
