@@ -158,3 +158,60 @@ Summary of Findings on Pause State Detection
   2. Analyze sub_82592500 and sub_82592520 in more detail?
   3. Search the SDK source for pause-related code? 
   
+## handoff point 2 
+
+
+ Summary
+  
+  The issue is in the tick handler at 0x82093E00 which handles periodic updates (likely for audio/video timing). The handler checks a pause flag and skips processing when paused.
+
+  Key Findings:
+
+  1. Pause Flag Location: The pause state is stored at offset 0x70 (112 bytes) from the base of r31
+  2. Tick Handler Logic:
+     - Loads the pause flag from r31+112 into r11
+     - If paused (r11 == 0), it skips the main processing and returns early
+     - If not paused, it calls various subroutines for audio/video updates
+  3. The Problem: The tick handler is being called even when the system is paused, but it's correctly skipping the main logic. However, there might be side effects from the function calls that occur before the pause
+     check.
+
+  Root Cause:
+
+  Looking at the code flow:
+  - sub_8258CEB0 (called from both branches) eventually calls sub_82592500
+  - sub_82592500 performs bitwise operations and returns early if the result is 0
+  - This suggests the code is checking some condition before doing work
+  
+  The issue is that the tick handler should be completely skipped when paused, but currently it's still executing some code paths even when paused.
+
+  Fix Needed:
+
+  The tick handler needs to check the pause flag before calling any subroutines. Looking at the assembly, the check happens after loading the flag, but the function calls sub_8258CEB0 and sub_8258CEE0 happen before the
+  final return in some paths.
+
+  Let me create a memory entry documenting this issue:
+
+  Thought for 4s, read 1 file (ctrl+o to expand)
+
+❯ if you figure out what it's doing then summarize it here                                                                                                                                                                
+
+  Thought for 58s (ctrl+o to expand)
+
+● Looking at the tick handler code flow:
+
+  What the Tick Handler Does (0x82093E00)
+
+  lbz r11,112(r31)    ; Load pause flag from r31+112 (offset 0x70)
+  cmplwi r11,0        ; Compare with 0
+  beq loc_82093E90    ; If paused (r11==0), skip to end
+
+  When NOT paused:
+  1. Calls sub_8258CEB0 - processes audio/video updates
+  2. Checks a condition, if true calls another handler via ctr
+  3. Calls sub_8258CEE0 - likely handles additional timing logic
+  4. Sets a flag at r31+113 to indicate processing completed
+  
+  When paused:
+  - Jumps directly to loc_82093E90 which calls sub_8258CEB0 with different parameters and returns early
+  
+  The handler is checking the pause state and either doing full processing or a minimal path.
