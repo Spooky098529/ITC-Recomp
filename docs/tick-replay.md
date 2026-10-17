@@ -192,3 +192,57 @@ frame: **-12.6%**. Frames drawn about the same (5,612/6,264 against
 5,760/5,972 in the 12 s): the main thread, still running the game's Draw
 step every frame, limits instead. What's left of the render thread's work
 on in-between frames is mostly the game's Direct3D replay (step 2).
+
+## Step 2: in-between frames drawn from a stored frame (2026-10-17, `tick-replay`)
+
+`--native_renderer_tick_replay` (off by default):
+
+- **Pass kinds.** `GameMessages_PassKind`: 0 logic, 1 render-only, 2 render-only
+  and not drawn (a "fast pass": the second render-only pass of a tick on,
+  once a stored frame has been made, `Renderer_TickReplayReady`). Handed to
+  the render thread with each list (`Renderer_OnListHandedOver`).
+- **Main thread, fast passes.** Neither Update (the race overlays included)
+  nor Draw is delivered (`DispatchMessages`); `BlendState_PublishFastFrame`
+  publishes the frame's amount with the products of the tick's first
+  render-only pass, kept by `DrawState` (`kept_outputs_`).
+- **Render thread, the tick's first render-only frame** (`capturing_frame`):
+  replayed as usual and stored as ops (`StoredFrame`): each float constant
+  upload as recorded (before blending, from `Renderer_OnCommand`), each draw
+  as worked out (`CaptureDraw`: `TickDraw` with its bool/loop and fetch
+  constants and its inline vertices), clears (`ClearTarget`, not
+  `GetTarget`'s first one), resolves (`ResolveInto`'s arguments) and the
+  front buffer. Texture sets made on it come from the tick rings. Not usable
+  with failed draws or tiling.
+- **Render thread, fast frames** (`Renderer_DrawStoredFrame`, in place of the
+  game's frame, its front buffer resolve and present): the ops again; each
+  upload blended (`BlendState_BlendStoredUpload`: products, the per-object
+  extras, lighting, as `BlendState_ReplayConstants` does) into
+  `float_shadow`, which stands in for the device's float constants (from
+  the device as the stored frame left them), each draw's floats packed from
+  it. A fast frame with no usable stored frame shows the last frame again.
+- **Registers set other than by uploads.** The first version came out with
+  wildly wrong lighting (saturated colours, blown-out glow; the user's
+  screenshots). A check (kept: it's how they're stored) follows the device's
+  float constants as uploads alone would leave them and compares them with
+  the device at each draw while storing: pixel c245-c255 (and vertex c0-c3
+  once a frame) change without an upload, ~330 draws a frame: the pixel
+  shaders' literal constants, loaded as a shader is bound. They're stored
+  as plain sets (`StoredKind::kSet`) before the draw that reads them.
+  Frames dumped then look right; the user: "it's looking good".
+
+Profiles (`profile_render_thread.sh`, uncapped attract race, two runs each,
+off/on alternating, one binary): render thread 10.28, 10.21 against 4.34,
+4.28 million cycles a frame (**-58%**); main thread 6.09, 6.06 against 1.26,
+1.31 (**-79%**). Frames counted about the same (5,770-5,957 in 12 s): on this
+PC the GPU is about the limit at these rates.
+
+Not done yet: what the main thread builds into the list while recording
+(found by `--native_renderer_log_tick_repeats`) is stored as the tick's first
+render-only frame had it, so on fast frames it moves at 30 Hz: the light
+billboards and world sprites (pixel shader `9567C79307ACC6F5`, ~40-70 inline
+draws a frame, the marker above opponents and the light trails among them),
+~7 inline draws in pass 7 (`46E16128D157D50B`, the minimap's target), the
+glow's cross-fade weight (`E0D070FB58A4EA03`) and strength (c33 of
+`9750599DF5ED3B39`), and a few constants in passes 11 and 23. Each needs its
+blend done on the stored data. Then step 3 (command buffers recorded once a
+tick).
