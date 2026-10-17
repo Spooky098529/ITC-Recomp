@@ -66,3 +66,41 @@ Called multiple times throughout the codebase (see calls in `itc_recomp.14.cpp`,
 
 - Menus still run at 30 fps (not interpolated) - see `docs/native-renderer.md`
 - Other per-object draws use projective matrices that aren't blended
+
+## Key Functions Identified
+
+### Input Processing Chain
+1. **`sub_82093DC0`** - First tick handler (input polling at 30 Hz)
+   - Location: `itc_recomp.19.cpp:39`
+   - Called from `itc_init.cpp:187`
+
+2. **`sub_8258CEB0`** - Input Processing
+   - Location: `itc_recomp.50.cpp:33270`
+   - Called from `sub_82093DC0` after checking input state condition
+
+3. **`sub_8258CAA0`** - Input State Handler
+   - Location: `itc_recomp.70.cpp:31444`
+   - Called multiple times throughout codebase (`.11.cpp`, `.14.cpp`, `.19.cpp`)
+
+4. **`sub_8258E530`** - Additional input handler
+   - Location: `itc_recomp.88.cpp:32744`
+   - Called from `sub_82094CD0` in `itc_recomp.13.cpp:91`
+
+### Distribution Across Generated Files
+- Functions appear in multiple `.cpp` files (`.11`, `.13`, `.14`, `.15`, `.19`, etc.)
+- Registered in `itc_init.cpp` function tables at various offsets
+- Called from both game logic and menu-related code paths
+
+## Next Steps Needed
+
+1. **Pause state detection**: How does the game detect when paused?
+2. **Input filtering**: How are inputs filtered when paused vs playing?
+3. **Menu navigation**: How are menu inputs processed?
+4. **Resume condition**: How is the pause state exited?
+
+## Investigation Notes
+
+- Main loop polls input at 30 Hz before walking listener lists
+- Menus run at 30 fps (not interpolated)
+- Pause menu is a special case needing different input handling
+- Need to search for pause-related flags/variables in SDK source
