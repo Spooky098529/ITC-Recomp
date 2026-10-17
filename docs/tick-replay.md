@@ -1,9 +1,10 @@
-# Translating draws once a tick (a lead, not started)
+# Translating draws once a tick (a lead; first step measured)
 
 Written 2026-10-16 on `shader-lookup`, from a question of the user's: the
 game only changes its state on 30 Hz ticks, so why does the renderer
-work every draw out again on every frame? Nothing here is measured yet;
-the first step is the diagnostic below.
+work every draw out again on every frame? The first step, the diagnostic
+below, was measured on `tick-replay` (2026-10-17): render-only frames do
+repeat the tick's draws (see "Measured").
 
 ## What happens now on an in-between frame
 
@@ -107,3 +108,42 @@ If most frames match exactly and the differences are a known handful
 the render thread's half can be built behind a flag, with a check that
 replays the game's list beside it and compares what each draw comes to.
 If the sequences diverge often, this lead stops there.
+
+## Measured (2026-10-17, `tick-replay`)
+
+`--native_renderer_log_tick_repeats` (`passes.cpp`, `NoteDrawParts` and
+`CompareTickRepeats`): each draw's parts hashed as drawn (target, the
+pipeline, the texture fetch constants its shaders read, the vertex fetch
+constants it reads, type and indices, viewport/scissor/depth bias/blend
+constants, an inline draw's vertices, and each constant block), and each
+render-only frame compared draw by draw with its tick's first frame
+(`Renderer_ReplayingLogicList`). Every 5 s. An uncapped attract race
+(`itc_887.log`), five windows of ~150 ticks and ~1,850-2,300 render-only
+frames:
+
+- The tick's draw count: 96-100% of render-only frames (else 1-9 apart).
+- Target, pipeline, textures, vertex fetch, indices and dynamic state:
+  the tick's for 99.9% of draws (0.01-0.12% differ); for every draw of
+  the frame in 76-87% of frames. The differences sampled are all one
+  inline draw (pixel shader `9567C79307ACC6F5`, pass 6 or 10) whose
+  vertex count changes.
+- Inline vertices differ for 3-6% of draws (what the game builds per pass:
+  the world sprites and light billboards, blended while recorded).
+- Vertex float constants differ for 90-98% of draws and pixel float
+  constants for 21-26% (the blended cameras, objects and lighting, as
+  expected); system and bool/loop constants ~0%.
+
+So the design holds: within a tick the frame is the same draws. What a
+render-only frame has to supply fresh is the blended float constants and
+the inline draws' vertices (and their count), and a frame whose draws
+don't line up with the tick's (a few percent) has to fall back to the
+full replay. The inline vertices come from the main thread's recording of
+that pass, so the render thread's half still reads them from the new
+list; the main thread's half (not running the game's Draw) would need
+them made another way.
+
+First person (2026-10-17, a race the user drove, `itc_885.log`): 26%
+fewer fps uncapped than the chase view, from a pass more (the mirror) and
+~800 draws a frame more, the render thread's cost per draw unchanged
+(see "Tools" in `native-renderer.md`). Tick replay cuts every pass's
+draws alike, the mirror's included, which stays drawn every frame.

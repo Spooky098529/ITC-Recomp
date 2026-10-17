@@ -213,6 +213,9 @@ struct DrawCall {
   // Inline vertices: their count, copied to vertex_address in the mirror.
   bool inline_vertices = false;
   uint32_t vertex_count = 0, vertex_address = 0;
+  // With log_tick_repeats: a hash of the inline vertices (their address in
+  // the mirror changes from frame to frame).
+  uint64_t inline_hash = 0;
 };
 
 // Command 18's item: [primitive type, base vertex << 16 | start index,
@@ -935,6 +938,36 @@ struct Passes::State {
   // without a clear (the history written back); logged once a second by
   // whether a logic pass recorded the frame.
   bool log_glow = false;
+  // With log_tick_repeats (docs/tick-replay.md): each draw's parts hashed,
+  // and each render-only frame's draws compared with its tick's first
+  // frame's, draw by draw.
+  enum DrawPart {
+    kPartTarget, kPartPipeline, kPartTextures, kPartVertexFetch, kPartIndices, kPartDynamic,
+    kPartInline, kPartSystem, kPartVertexFloats, kPartPixelFloats, kPartBoolLoop, kDrawParts
+  };
+  static constexpr uint32_t kStructureParts = 6;  // kPartTarget to kPartDynamic
+  struct DrawParts {
+    uint64_t hash[kDrawParts];
+    uint64_t pixel;  // the pixel shader's hash, for the samples
+    uint32_t pass;   // the frame's resolves before it
+  };
+  bool log_tick_repeats = false;
+  std::vector<DrawParts> frame_parts, tick_parts;
+  bool tick_parts_valid = false;
+  struct TickRepeatCounts {
+    uint64_t logic_frames = 0, frames = 0, same_count = 0, structure_same = 0,
+             all_but_floats_same = 0, all_same = 0, draws = 0, count_delta = 0;
+    uint64_t differ[kDrawParts] = {};  // draws, aligned, in frames with the same count
+    uint64_t structure_differ = 0;     // draws with any structural part differing
+    std::vector<std::string> samples;
+  } tick_repeats;
+  struct RecordedState;
+  void NoteDrawParts(const DrawCall& call, const Target* color, const Target* depth,
+                     const RecordedState& now, const TranslatedShader* vertex,
+                     const TranslatedShader* pixel, uint64_t index_start, uint32_t index_count,
+                     uint32_t first_index, const void* system, size_t system_size,
+                     const uint32_t packed_bytes[2]);
+  void CompareTickRepeats();
   struct GlowFrame {
     uint32_t cross_fades = 0, history_resolves = 0, cross_fade_texture = 0,
              history_address = 0;
@@ -3549,6 +3582,7 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
   // bool/loop, fetch. A block the same as the last one written points at it.
   static_assert(sizeof(system) <= kFloatConstantsRange);
   uint32_t offsets[5];
+  uint32_t packed_bytes[2] = {};
   if (!s.ReserveDrawConstants() ||
       !s.PlaceConstants(0, &system, sizeof(system), sizeof(system), offsets[0])) {
     s.stats.failed++;
@@ -3579,6 +3613,7 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
         packed += count;
       }
     }
+    packed_bytes[stage] = 16 * packed;
     if (!s.PlaceConstants(1 + stage, copy, 16 * packed, kFloatConstantsRange,
                           offsets[1 + stage], true, same)) {
       s.stats.failed++;
@@ -3917,6 +3952,10 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
   s.recorded = now;
   s.stats.drawn++;
   s.frame_draws++;
+  if (s.log_tick_repeats) {
+    s.NoteDrawParts(call, color, depth, now, vertex, pixel, index_start, index_count, first_index,
+                    &system, sizeof(system), packed_bytes);
+  }
   if (call.inline_vertices) {
     s.stats.inline_draws++;
     s.stats.inline_by_type[type & 15]++;
@@ -4136,6 +4175,9 @@ void Passes::InlineDraw(VkCommandBuffer commands, uint8_t* base, uint32_t type, 
   call.vertex_address =
       kInlineVertices + (s.mirror_by_tick ? s.frame * s.inline_slot_size() : 0) + offset;
   std::memcpy(s.draw_mirror().mapped + call.vertex_address, base + data, size);
+  if (s.log_tick_repeats) {
+    call.inline_hash = XXH3_64bits(base + data, size) ^ (uint64_t(stride) << 32);
+  }
   s.stats.mirrored_bytes += size;
   uint32_t device = guest::LoadU32(base, kDevicePointer);
   s.ReadState(base, device);
@@ -4467,6 +4509,160 @@ void Passes::set_log_constant_changes(bool log) {
 
 void Passes::set_log_register_reads(bool log) {
   state_->log_register_reads = log;
+}
+
+void Passes::State::NoteDrawParts(const DrawCall& call, const Target* color, const Target* depth,
+                                  const RecordedState& now, const TranslatedShader* vertex,
+                                  const TranslatedShader* pixel, uint64_t index_start,
+                                  uint32_t index_count, uint32_t first_index, const void* system,
+                                  size_t system_size, const uint32_t packed_bytes[2]) {
+  DrawParts& d = frame_parts.emplace_back();
+  const uint32_t* fetch = &regs.values[XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0];
+  auto hash = [](const void* data, size_t size) { return XXH3_64bits(data, size); };
+  const void* targets[2] = {color, depth};
+  d.hash[kPartTarget] = hash(targets, sizeof(targets));
+  d.hash[kPartPipeline] = hash(&now.pipeline, sizeof(now.pipeline));
+  // The texture fetch constants the shaders read (textures and samplers).
+  std::vector<uint32_t> words;
+  for (const TranslatedShader* shader : {vertex, pixel}) {
+    for (size_t i = 0; shader && i < shader->textures.size(); i++) {
+      uint32_t k = shader->textures[i].fetch_constant;
+      words.push_back(k);
+      words.insert(words.end(), fetch + 6 * k, fetch + 6 * k + 6);
+    }
+    for (size_t i = 0; shader && i < shader->samplers.size(); i++) {
+      uint32_t k = shader->samplers[i].fetch_constant;
+      words.push_back(k);
+      words.insert(words.end(), fetch + 6 * k, fetch + 6 * k + 6);
+    }
+  }
+  d.hash[kPartTextures] = hash(words.data(), 4 * words.size());
+  // The vertex fetch constants it reads; an inline draw's own (93-95: its
+  // vertices' place in the mirror) left out.
+  words.clear();
+  for (uint32_t k = 0; vertex && k < 96; k++) {
+    if ((vertex->vertex_fetch_constants[k >> 5] & (1u << (k & 31))) &&
+        !(call.inline_vertices && k >= kInlineFetchConstant - 2)) {
+      words.insert(words.end(), {k, fetch[2 * k], fetch[2 * k + 1]});
+    }
+  }
+  d.hash[kPartVertexFetch] = hash(words.data(), 4 * words.size());
+  uint64_t indices[5] = {call.type, call.inline_vertices ? 0 : index_start, index_count,
+                         call.inline_vertices ? 0 : first_index, uint64_t(now.index_type)};
+  d.hash[kPartIndices] = hash(indices, sizeof(indices));
+  d.hash[kPartDynamic] = hash(&now.viewport, sizeof(now.viewport)) ^
+                         3 * hash(&now.scissor, sizeof(now.scissor)) ^
+                         5 * hash(now.bias, sizeof(now.bias)) ^
+                         7 * hash(now.blend_constants, sizeof(now.blend_constants));
+  d.hash[kPartInline] = call.inline_hash;
+  d.hash[kPartSystem] = hash(system, system_size);
+  d.hash[kPartVertexFloats] = hash(last_constants.bytes[1], packed_bytes[0]);
+  d.hash[kPartPixelFloats] = hash(last_constants.bytes[2], packed_bytes[1]);
+  d.hash[kPartBoolLoop] =
+      hash(&regs.values[XE_GPU_REG_SHADER_CONSTANT_BOOL_000_031], kBoolLoopConstantsRange);
+  d.pixel = pixel ? pixel->hash : 0;
+  d.pass = uint32_t(frame_resolves.size());
+}
+
+void Passes::State::CompareTickRepeats() {
+  TickRepeatCounts& c = tick_repeats;
+  if (Renderer_ReplayingLogicList()) {
+    // A tick's first frame: what the frames after it are compared with.
+    tick_parts.swap(frame_parts);
+    tick_parts_valid = true;
+    c.logic_frames++;
+    frame_parts.clear();
+    return;
+  }
+  if (!tick_parts_valid) {
+    frame_parts.clear();
+    return;
+  }
+  static constexpr const char* kPartNames[kDrawParts] = {
+      "target", "pipeline", "textures", "vertex fetch", "indices", "dynamic state",
+      "inline vertices", "system constants", "vertex floats", "pixel floats", "bool/loop"};
+  c.frames++;
+  c.draws += frame_parts.size();
+  const std::vector<DrawParts>& t = tick_parts;
+  const std::vector<DrawParts>& f = frame_parts;
+  if (f.size() != t.size()) {
+    c.count_delta += f.size() > t.size() ? f.size() - t.size() : t.size() - f.size();
+  } else {
+    c.same_count++;
+  }
+  // Aligned draw by draw up to the shorter; the first divergence sampled.
+  size_t n = std::min(f.size(), t.size());
+  bool structure_same = f.size() == t.size(), but_floats_same = structure_same,
+       all_same = structure_same;
+  bool sampled = false;
+  for (size_t i = 0; i < n; i++) {
+    uint32_t mask = 0;
+    for (uint32_t k = 0; k < kDrawParts; k++) {
+      if (f[i].hash[k] != t[i].hash[k]) {
+        mask |= 1u << k;
+        if (f.size() == t.size()) {
+          c.differ[k]++;
+        }
+      }
+    }
+    bool structure = mask & ((1u << kStructureParts) - 1);
+    c.structure_differ += structure && f.size() == t.size();
+    structure_same &= !structure;
+    but_floats_same &= !(mask & ~((1u << kPartVertexFloats) | (1u << kPartPixelFloats)));
+    all_same &= !mask;
+    if (structure && !sampled && c.samples.size() < 4) {
+      sampled = true;
+      std::string parts;
+      for (uint32_t k = 0; k < kDrawParts; k++) {
+        if (mask & (1u << k)) {
+          parts += fmt::format("{}{}", parts.empty() ? "" : ", ", kPartNames[k]);
+        }
+      }
+      c.samples.push_back(fmt::format(
+          "draw {} of {} (tick's {}), pass {} (tick's {}), ps {:016X} (tick's {:016X}): {}", i,
+          f.size(), t.size(), f[i].pass, t[i].pass, f[i].pixel, t[i].pixel, parts));
+    }
+  }
+  if (!sampled && f.size() != t.size() && c.samples.size() < 4) {
+    c.samples.push_back(fmt::format("{} draws against the tick's {}, the same up to there",
+                                    f.size(), t.size()));
+  }
+  c.structure_same += structure_same;
+  c.all_but_floats_same += but_floats_same;
+  c.all_same += all_same;
+  frame_parts.clear();
+}
+
+void Passes::set_log_tick_repeats(bool log) {
+  state_->log_tick_repeats = log;
+}
+
+std::string Passes::TakeTickRepeats() {
+  State::TickRepeatCounts& c = state_->tick_repeats;
+  static constexpr const char* kPartNames[State::kDrawParts] = {
+      "target", "pipeline", "textures", "vertex fetch", "indices", "dynamic", "inline",
+      "system", "vertex floats", "pixel floats", "bool/loop"};
+  double frames = double(std::max<uint64_t>(c.frames, 1));
+  double draws = double(std::max<uint64_t>(c.draws, 1));
+  std::string differ;
+  for (uint32_t k = 0; k < State::kDrawParts; k++) {
+    differ += fmt::format("{}{} {:.2f}%", k ? ", " : "", kPartNames[k], 100.0 * c.differ[k] / draws);
+  }
+  std::string text = fmt::format(
+      "tick repeats: {} logic and {} render-only frames ({:.1f} draws a frame); of the "
+      "render-only frames, the tick's draw count {:.1f}% (else {:.1f} draws apart on average), "
+      "every draw's target, pipeline, textures, vertex fetch, indices and dynamic state the "
+      "tick's {:.1f}%, all but the float constants {:.1f}%, everything {:.1f}%; draws differing "
+      "from the tick's (frames of its count): structure {:.2f}%, by part: {}",
+      c.logic_frames, c.frames, c.draws / frames, 100.0 * c.same_count / frames,
+      c.frames > c.same_count ? double(c.count_delta) / double(c.frames - c.same_count) : 0.0,
+      100.0 * c.structure_same / frames, 100.0 * c.all_but_floats_same / frames,
+      100.0 * c.all_same / frames, 100.0 * c.structure_differ / draws, differ);
+  for (const std::string& sample : c.samples) {
+    text += "; e.g. " + sample;
+  }
+  c = {};
+  return text;
 }
 
 void Passes::set_cache_index_ranges(bool cache) {
@@ -4886,6 +5082,9 @@ VkExtent2D Passes::EndFrame(VkCommandBuffer commands, int32_t show_resolve, bool
     Buffers_OnFrameEnd();
   }
   s.last_frame_resolves = s.frame_resolves.size();
+  if (s.log_tick_repeats) {
+    s.CompareTickRepeats();
+  }
   if (s.log_glow) {
     s.LogGlow();
   }

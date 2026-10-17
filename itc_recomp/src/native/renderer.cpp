@@ -67,6 +67,9 @@ REXCVAR_DEFINE_BOOL(native_renderer_cache_index_ranges, true, "ITC",
 REXCVAR_DEFINE_BOOL(native_renderer_log_index_ranges, false, "ITC",
                     "Log how often draws' index ranges are scanned again unchanged since memcpy "
                     "last wrote them, and how the guest memory mirror's checks go");
+REXCVAR_DEFINE_BOOL(native_renderer_log_tick_repeats, false, "ITC",
+                    "Log whether render-only frames' draws are the same as their tick's first "
+                    "frame's, part by part (see docs/tick-replay.md)");
 REXCVAR_DEFINE_BOOL(native_renderer_log_texture_bindings, false, "ITC",
                     "Log how often draws' texture bindings repeat the last ones (fetch constants, "
                     "views, samplers, descriptor sets) and what would empty a cache of them");
@@ -735,6 +738,7 @@ VkCommandBuffer Renderer::BeginFrame() {
     passes_.set_log_constant_changes(REXCVAR_GET(native_renderer_log_constant_changes));
     passes_.set_log_register_reads(REXCVAR_GET(native_renderer_log_register_reads));
     passes_.set_log_index_ranges(REXCVAR_GET(native_renderer_log_index_ranges));
+    passes_.set_log_tick_repeats(REXCVAR_GET(native_renderer_log_tick_repeats));
     passes_.set_log_texture_bindings(REXCVAR_GET(native_renderer_log_texture_bindings));
     passes_.set_log_shader_lookups(REXCVAR_GET(native_renderer_log_shader_lookups));
     passes_.set_cache_shader_lookups(REXCVAR_GET(native_renderer_cache_shader_lookups));
@@ -1170,6 +1174,9 @@ void Renderer::LogStats() {
   }
   if (REXCVAR_GET(native_renderer_log_index_ranges)) {
     REXLOG_INFO("native renderer: {}", passes_.TakeIndexRanges());
+  }
+  if (REXCVAR_GET(native_renderer_log_tick_repeats)) {
+    REXLOG_INFO("native renderer: {}", passes_.TakeTickRepeats());
   }
   if (REXCVAR_GET(native_renderer_log_texture_bindings)) {
     REXLOG_INFO("native renderer: {}", passes_.TakeTextureBindings());

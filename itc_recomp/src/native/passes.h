@@ -108,6 +108,13 @@ class Passes {
   void set_cache_index_ranges(bool cache);
   void set_log_index_ranges(bool log);
   std::string TakeIndexRanges();
+  // A diagnostic (docs/tick-replay.md): whether each render-only frame's
+  // draws are the same as its tick's first frame's, part by part (target,
+  // pipeline, textures, vertex fetch, indices, dynamic state, inline
+  // vertices, each constant block); TakeTickRepeats describes it since it
+  // was last called.
+  void set_log_tick_repeats(bool log);
+  std::string TakeTickRepeats();
   // A diagnostic: how much of texture binding repeats from draw to draw
   // (to judge caching it); TakeTextureBindings describes it since it was
   // last called.
