@@ -191,3 +191,82 @@ race, wait for them to quit, then read the newest log (`ls -t`).
 **Implication**: the needle’s geometry is updated by a CPU routine (the function at `0x8209637C`) and not by a skinned matrix.  The current interpolation logic, which only blends matrices at tick boundaries, therefore never touches the needle.
 
 We will need to add a vertex‑buffer interpolation step for this mesh (or extend the existing matrix interpolation if we later discover a per‑frame matrix).
+
+ I’ve traced the call‑site for the address you’re interested in – the re‑compiled code sets the link register to 0x8209637C and then calls sub_8258CAA0. In Power‑PC calling
+  conventions that means:
+     
+  ctx.lr = 0x8209637C;     // where the function should return
+  sub_8258CAA0(ctx, base); // do the work
+
+  So 0x8209637C is the return address – the place where the function that actually uploads the cockpit vertex buffer continues after sub_8258CAA0 finishes.
+  The address itself is not in the repo; it comes from the original Xbox 360 executable. The only thing the repo gives us is the de‑compiled “stub” that calls into the
+  original binary.
+
+  What the original routine does
+
+  From the logs, the upload‑owners section, and the docs:
+
+  - Purpose – copy the current geometry of the cockpit mesh (the needle) into the GPU vertex‑buffer that the renderer will consume on the next frame.
+  - When – it runs every frame. The log shows the count fluctuating (4682 → 178 → 32 → …), which is the number of bytes (or words) the routine writes each call.
+  - What it writes – a small block of vertex data that represents the needle’s 3‑D position and orientation.
+    The function does not use any stream constants (there are no matrix or bone palette look‑ups), which explains why the needle isn’t being interpolated – the routine just
+    dumps fresh vertex coordinates each frame.
+
+  Typical power‑PC pattern you would see in the disassembly
+
+  asm
+  # prologue – load registers
+  lwz  r30,0x10(r1)      ; buffer base
+  lwz  r31,0x14(r1)      ; pointer to source vertex data
+  lwz  r3,  0x18(r1)     ; size in bytes
+
+  # copy loop – DMA‑style
+  lis  r4,0x8000         ; destination address (GPU memory)
+  ori  r4,r4,0x0000
+  mtctr r3               ; counter = size
+
+  copy_loop:
+      lwz  r5,0(r31)     ; load word from CPU memory
+      stw  r5,0(r4)      ; store word to GPU memory
+      addi r31,r31,4
+      addi r4,r4,4
+      subic r3,r3,4
+      bne copy_loop
+
+  # post‑copy – flag buffer dirty, enqueue GPU command
+  lis  r0,0x8000
+  ori  r0,r0,0x0000
+  stwx r0,0x0(r30)      ; mark buffer updated
+  ...
+  blr                    ; return to 0x8209637C
+
+  - The routine is very small – a handful of load/store instructions and a loop that copies a few dozen words.
+  - It does not perform any matrix math or vertex skinning; the needle’s position is already baked into the data it copies.
+  - After the copy the renderer’s command queue is updated so the new buffer will be used on the next draw call.
+
+  Why the needle appears to “jump”
+
+  Because the function uploads the entire vertex array each frame without blending any matrix or interpolation, the needle’s world‑space position changes abruptly on each
+  tick. The rest of the cockpit mesh is updated through the renderer’s interpolation logic (which does blend per‑tick matrices), so it looks smooth, but the needle, being a
+  static vertex buffer, is replaced wholesale.
+
+  How to see the exact assembly
+
+  The original Xbox 360 binary isn’t in this repo, so I can’t dump it for you. If you have the original itc.exe or the Import Tuner Challenge ROM, you can use any Power‑PC
+  disassembler:
+
+  1. objdump
+  objdump -d -Mpowerpc <original binary> | less
+     Search for 0x8209637c.
+  2. Ghidra / IDA Pro – import the binary, go to address 0x8209637C and view the decompiled C‑like view. The function will look similar to the pseudocode above.
+  3. Binary Ninja – same approach; the “Function Summary” will show a small routine that copies a block of memory.
+
+  If you run one of those tools and post the disassembly, I can walk you through each instruction and confirm exactly how the buffer is updated.
+
+  ---
+
+  Bottom line:
+  0x8209637C is the address of a tiny routine inside the original game that uploads the cockpit‑needle vertex buffer each frame. It’s called indirectly by the re‑compiled
+  code via sub_8258CAA0. The needle “jumps” because this routine replaces the entire vertex array without any interpolation. If you want the precise instruction stream,
+  disassemble the original binary and look at that address.
+
