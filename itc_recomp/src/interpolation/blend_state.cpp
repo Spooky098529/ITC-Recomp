@@ -3783,6 +3783,8 @@ namespace {
 extern "C" REX_FUNC(sub_8258CAA0) {
   REX_FUNC_PROLOGUE();
   uint32_t count = ctx.r4.u32;
+
+  REXLOG_INFO("needle_interpolation stub: dst=0x{:08X} src=0x{:08X}", ctx.r3.u32, ctx.r4.u32);
   // The game makes ~50,000 of these calls a frame (most for one slot), and the
   // translated original spent ~45 cycles on each, mostly on its stack frame
   // (see "AllocateSlots" in docs/native-renderer.md). Done here without the
