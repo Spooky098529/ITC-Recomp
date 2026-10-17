@@ -549,3 +549,67 @@ extern "C" REX_FUNC(sub_821281A8) {
     guest::StoreFloat(base, sprite + kSpriteCornersOffset + 4 * k, corners[k]);
   }
 }
+
+// Cockpit gauges (sub_820DBD38: r3 = the cockpit, r4 = the car + 4288). Its
+// gauges (sub_820DB980 and sub_820DBA38) set their needle animations' frame
+// (sub_820D1B38) straight from the float at r4 + 628 (the car's +4916),
+// which game logic sets once a tick. Drawn at that value, the tachometer's
+// needle stepped at 30 Hz against the blended cockpit (jumping when braking
+// hard, as the value falls fast). The value is blended between its last two
+// ticks while the cockpit draws, then put back.
+REXCVAR_DEFINE_BOOL(blend_cockpit_gauges, true, "ITC",
+                    "Blend the cockpit gauges' needle value between ticks");
+REXCVAR_DEFINE_BOOL(log_cockpit_gauges, false, "ITC",
+                    "Log the cockpit gauges' needle value as drawn, 60 lines every 2 s");
+
+namespace {
+struct GaugeValue {
+  float before = 0, now = 0;
+  int ticks = 0;
+  uint64_t pass = ~0ull;  // the logic pass last recorded (the cockpit may draw more than once)
+};
+std::unordered_map<uint32_t, GaugeValue> g_gauge_values;  // by the car + 4288
+}  // namespace
+
+extern "C" REX_FUNC(sub_820DBD38) {
+  REX_FUNC_PROLOGUE();
+  constexpr uint32_t kGaugeValueOffset = 628;
+  uint32_t address = ctx.r4.u32 + kGaugeValueOffset;
+  float value = guest::LoadFloat(base, address);
+  bool render_only = frame_pacing::GameMessages_IsRenderOnlyPass();
+  GaugeValue& gauge = g_gauge_values[ctx.r4.u32];
+  uint64_t pass = frame_pacing::GameMessages_PassNumber();
+  if (!render_only && pass != gauge.pass) {
+    gauge.pass = pass;
+    gauge.before = gauge.ticks > 0 ? gauge.now : value;
+    gauge.now = value;
+    gauge.ticks++;
+  }
+  float amount = frame_pacing::GetFramePacer().TickProgress();
+  bool blend = REXCVAR_GET(interpolate_draw_state) && REXCVAR_GET(blend_cockpit_gauges) &&
+               frame_pacing::GameMessages_InRace() && gauge.ticks >= 2 && value == gauge.now &&
+               std::isfinite(gauge.before);
+  float drawn = blend ? gauge.before + (gauge.now - gauge.before) * amount : value;
+  if (REXCVAR_GET(log_cockpit_gauges)) {
+    static std::chrono::steady_clock::time_point last{};
+    static int lines = 0;
+    auto now = std::chrono::steady_clock::now();
+    if (now - last >= std::chrono::seconds(2)) {
+      last = now;
+      lines = 0;
+    }
+    if (lines++ < 60) {
+      REXLOG_INFO("cockpit gauges: pass {} {} car {:08X} amount {:.2f} value {} ticks {} -> {} "
+                  "drawn {} blend {}",
+                  frame_pacing::GameMessages_PassNumber(), render_only ? "render-only" : "logic",
+                  ctx.r4.u32, amount, value, gauge.before, gauge.now, drawn, blend);
+    }
+  }
+  if (!blend) {
+    __imp__sub_820DBD38(ctx, base);
+    return;
+  }
+  guest::StoreFloat(base, address, drawn);
+  __imp__sub_820DBD38(ctx, base);
+  guest::StoreFloat(base, address, value);
+}

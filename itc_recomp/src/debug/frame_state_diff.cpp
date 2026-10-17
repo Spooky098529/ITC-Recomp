@@ -46,6 +46,9 @@ REXCVAR_DEFINE_BOOL(find_all_changes, false, "ITC",
                     "With --find_per_frame_state, log every word a render-only pass changes "
                     "(in two samples or more), as address ranges, instead of timer steps; "
                     "for smoothed values that step by varying amounts");
+REXCVAR_DEFINE_STRING(find_all_changes_skip, "", "ITC",
+                      "With --find_all_changes, address ranges (hex start-end, comma-separated) "
+                      "not to watch, such as the command lists");
 REXCVAR_DEFINE_STRING(find_all_changes_dir, "", "ITC",
                       "With --find_all_changes, write each sample's whole list to "
                       "<dir>/changes_<pass>.txt (address before after, hex) instead of "
@@ -373,7 +376,8 @@ class FrameStateDiff {
     for (size_t i = 0; i < changes.size(); i++) {
       const Change& c = changes[i];
       float a = AsFloat(c.before), b = AsFloat(c.after);
-      if (in_run[i] || c.address >= 0x70000000 || !std::isfinite(a) || !std::isfinite(b) ||
+      if (in_run[i] || c.address >= 0x70000000 || Skipped(c.address) || !std::isfinite(a) ||
+          !std::isfinite(b) ||
           std::abs(a) > 1e7f || std::abs(b) > 1e7f) {
         continue;
       }
@@ -401,6 +405,34 @@ class FrameStateDiff {
     if (smooth_hits_.size() > 2000000) {
       smooth_hits_.clear();
     }
+  }
+
+  bool Skipped(uint32_t address) {
+    if (!skip_parsed_) {
+      skip_parsed_ = true;
+      std::string list = REXCVAR_GET(find_all_changes_skip);
+      size_t start = 0;
+      while (start < list.size()) {
+        size_t end = list.find(',', start);
+        std::string item =
+            list.substr(start, end == std::string::npos ? std::string::npos : end - start);
+        size_t dash = item.find('-');
+        if (dash != std::string::npos) {
+          skip_.push_back({uint32_t(std::stoul(item.substr(0, dash), nullptr, 16)),
+                           uint32_t(std::stoul(item.substr(dash + 1), nullptr, 16))});
+        }
+        if (end == std::string::npos) {
+          break;
+        }
+        start = end + 1;
+      }
+    }
+    for (const auto& [first, last] : skip_) {
+      if (address >= first && address < last) {
+        return true;
+      }
+    }
+    return false;
   }
 
   void LogChanges(std::chrono::steady_clock::time_point now) {
@@ -470,6 +502,8 @@ class FrameStateDiff {
   std::vector<uint32_t> watched_;
   std::map<uint32_t, int> hits_;  // sampled passes each word stepped in
   std::map<uint32_t, int> smooth_hits_;  // --find_all_changes
+  std::vector<std::pair<uint32_t, uint32_t>> skip_;  // --find_all_changes_skip
+  bool skip_parsed_ = false;
   std::unordered_map<uint32_t, double> last_step_;  // --find_any_steps
   std::vector<std::vector<uint32_t>> before_;  // nested: messages within handlers
   std::map<std::tuple<std::string, uint32_t, uint32_t>, int> changes_;
