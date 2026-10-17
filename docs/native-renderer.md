@@ -834,7 +834,14 @@ memory).
 
 - `--native_renderer_show_resolve=<n>`: the window shows the frame's nth
   resolve destination instead of the main view; the log lists the frame's
-  resolves by index every 1,200 frames.
+  resolves by index every 1,200 frames, each with the draws since the
+  previous resolve (its pass's) and the source target's size and samples,
+  then the draws after the last resolve and the frame's total. A race in
+  chase view (2026-10-17, `itc_886.log`): main view 490-945 then 137-204,
+  the 512x288 16_16 pass 261-473, the paint reflection map 285-356, the
+  shadow maps 37-80 of 1,340-2,040 draws. First person adds a resolve (the
+  mirror) and ~800 draws a frame, -26% fps uncapped (371 to 276), the
+  render thread's cycles a frame +36%, about the same per draw.
 - `--native_renderer_dump=<dir>`: dumps 10 s into a race and whenever a
   file named `now` appears in `<dir>`, into `<dir>/<n>`: the frame as PFM
   files (what's shown and each resolve destination) with `draws.txt`

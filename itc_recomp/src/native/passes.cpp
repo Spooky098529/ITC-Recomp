@@ -1007,9 +1007,15 @@ struct Passes::State {
     uint32_t address, format, flags;
     VkFormat host_format;
     uint32_t fetch[6];  // the destination's fetch constant, addresses physical
+    // For the resolve list's log: the draws since the frame's previous
+    // resolve (the pass's), and the source target's guest size and samples.
+    uint32_t draws;
+    VkExtent2D source;
+    VkSampleCountFlagBits samples;
   };
   std::vector<Resolved> frame_resolves;
   uint64_t frames = 0;  // for logging the resolve list now and then
+  uint32_t frame_draws = 0, draws_at_resolve = 0;  // draws this frame, and by its last resolve
   size_t last_frame_resolves = 0;
 
   // A dump being read back: the images' data, one after another.
@@ -2884,6 +2890,10 @@ bool Passes::State::ResolveInto(VkCommandBuffer commands, uint8_t* base, Target&
   resolved = {dest.image, {dest.host_width, dest.host_height}, fetch[1] & 0xFFFFF000u,
               fetch[1] & 0x3F, flags, dest.format};
   std::copy(fetch, fetch + 6, resolved.fetch);
+  resolved.draws = frame_draws - draws_at_resolve;
+  draws_at_resolve = frame_draws;
+  resolved.source = source.guest_extent;
+  resolved.samples = source.samples;
   if (log_glow && dest.width == 256 && dest.height == 144 && !(flags & 0x100)) {
     uint32_t address = resolved.address & 0x1FFFF000u;
     glow_frame.addresses.push_back(address);
@@ -3042,6 +3052,7 @@ void Passes::BeginFrame(uint32_t frame_index) {
   s.main_view = nullptr;
   s.front = nullptr;
   s.frame_resolves.clear();
+  s.frame_draws = s.draws_at_resolve = 0;
   s.mirrored.clear();
   s.used_mirrored.clear();
   s.mirror_frames++;
@@ -3905,6 +3916,7 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
   }
   s.recorded = now;
   s.stats.drawn++;
+  s.frame_draws++;
   if (call.inline_vertices) {
     s.stats.inline_draws++;
     s.stats.inline_by_type[type & 15]++;
@@ -4899,10 +4911,13 @@ VkExtent2D Passes::EndFrame(VkCommandBuffer commands, int32_t show_resolve, bool
     std::string list;
     for (size_t i = 0; i < s.frame_resolves.size(); i++) {
       const State::Resolved& r = s.frame_resolves[i];
-      list += fmt::format("{}{}: {:08X} format {} {}x{} flags {:X}", i ? "; " : "", i, r.address,
-                          r.format, r.extent.width, r.extent.height, r.flags);
+      list += fmt::format("{}{}: {:08X} format {} {}x{} flags {:X} after {} draws from {}x{} x{}",
+                          i ? "; " : "", i, r.address, r.format, r.extent.width,
+                          r.extent.height, r.flags, r.draws, r.source.width, r.source.height,
+                          uint32_t(r.samples));
     }
-    REXLOG_INFO("native renderer: this frame's resolves: {}", list);
+    REXLOG_INFO("native renderer: this frame's resolves: {}; then {} draws ({} in all)", list,
+                s.frame_draws - s.draws_at_resolve, s.frame_draws);
   }
   VkImage shown = s.shown.image;
   Transition(commands, shown, VK_IMAGE_ASPECT_COLOR_BIT, s.shown_layout,
