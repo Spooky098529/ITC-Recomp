@@ -325,7 +325,19 @@ extern "C" REX_FUNC(sub_820990F0) {
 // The race's draw step: r3 = its argument. Noted to tell races from menus.
 extern "C" REX_FUNC(sub_8215B4F8) {
   REX_FUNC_PROLOGUE();
-  frame_pacing::g_race_draw_step_seen = true;
+
+  //This appears to be the pause flag
+  uint32_t var_588_r31 = guest::LoadU32(base, ctx.r31.u32 + 588);
+  REXLOG_INFO("VAR_588_R31 {}", var_588_r31);
+
+  //but this fix feels like shit, it takes a fraction of a second for the fps to pick back up
+  if (var_588_r31) {
+    frame_pacing::g_race_draw_step_seen = false;
+  }
+  else 
+  {
+    frame_pacing::g_race_draw_step_seen = true;
+  }
   __imp__sub_8215B4F8(ctx, base);
 }
 
