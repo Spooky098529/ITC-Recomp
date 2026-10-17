@@ -3014,6 +3014,121 @@ frame): `__imp__sub_821298C0` 16%, `__imp__sub_8209C6E0` 10%,
 5.4%, `__imp__sub_825951E0` 3.8%, `DrawState::Note` 2.7%. Not looked at
 yet: `AfterDraw` and `Note`.
 
+#### DrawState::Note and AfterDraw
+
+Main thread on `main` at `7026d84` (7.98 million cycles a frame, one
+run): `DrawState::AfterDraw` 5.1% (~406 thousand cycles a frame),
+`DrawState::Note` 2.4% (~189), the `ProductKey` to `ProductInputs` maps'
+lookups 1.5% (~122), `pass_outputs_`/`tick_outputs_`' `operator[]` and
+`find` 1.3% (~100), `Replace`/`Restore` 1.2% (~97, `BeforeRecordObject`'s
+blends). libc's samples aren't symbolized (its symbols are stripped);
+their callers come from a recording with branch stacks (`perf record -j
+any_call,u`, the first entry of each sample's stack): libc's `memcpy`
+(2.2%) is nearly all called by `AfterDraw`, `memcmp` (2.0%) by the
+game's `sub_8209BD50` (not ours), and `malloc` (~2%, with its lock) by
+`Note`, `AfterDraw` and `operator new`.
+
+`AfterDraw` runs once a Draw, that is once a frame, not once a draw call.
+A temporary check (`--check_draw_state`: counts, table sizes, `rdtsc`
+around the parts) over an attract race, a frame on average:
+
+- **~1,400 `Note` calls**, ~90 on the logic pass (1 frame in ~15) and
+  ~1,310-1,480 on render-only passes (~24 from `OnCopy`). Products are
+  numbered among ~170 groups of the same operands (`product_occurrences_`).
+- ~740 pass outputs (render-only products by address) and ~770 tick
+  outputs (the logic pass's, unchanged until the next one), so **~1,480
+  products published a frame**: their addresses differ, as each pass
+  records into new command list memory.
+- `PublishReplayFrame` ~490 thousand tsc cycles a frame (~330 a product):
+  for each, five hash lookups by `ProductKey` (`current_tick_`, `paired_`,
+  `previous_tick_`, `identities_`, `plan_of_`) and a ~420-byte
+  `ReplayedProduct` (the product, both ticks' inputs and the plan) copied
+  into a table allocated for the frame: ~620 KB written a frame, the same
+  tick data again every frame.
+- `MatchTick` and `PlanTick`, once a tick: ~2 million tsc cycles, ~140
+  thousand a frame.
+- `Note` ~370 tsc cycles a call (with the `rdtsc`s): an
+  `operator[]` on `product_occurrences_` (cleared every frame, so a node
+  allocated again for each group), a `current_tick_` lookup and two matrix
+  compares (render-only passes check their inputs against the logic
+  pass's), and an `operator[]` on `pass_outputs_` (also cleared every
+  frame: a node allocated for each output).
+- `Note`'s prologue saves six registers, reserves 0x308 bytes and checks
+  a stack canary: `--log_overlay_products`' logging is inlined into it.
+
+**Done** (`drawstate-investigate`), in four steps, each checked by
+`--check_draw_state` over a 90 s attract race (no differences: ~58
+million published products compared field by field with the per-frame
+lookups, ~58 million notes' occurrence numbers and tick inputs with
+`std::unordered_map`'s and `current_tick_`'s, the billboard cameras bit
+for bit in ~39,000 frames):
+
+1. `--publish_by_tick` (default on): `ReplayedProduct` is now the product
+   written and a pointer to a `TickProduct` (identity, handler, plan, both
+   ticks' inputs), built once a tick in `PlanTick` and kept in the tick's
+   `TickPlans`, with an open-addressed index by key. The logic pass's
+   outputs are resolved once a tick (again if one changes), each pass
+   output with one lookup, and frames nobody holds any more are reused
+   with their tables. Main thread, one binary, off 6.91, 7.52, 7.46
+   (7.30), on 7.01, 7.10, 6.99 (7.03): -3.6%; by symbol, publishing
+   from ~580 thousand cycles a frame (lookups, copies, libc's `memcpy`) to
+   ~90, and `memcpy` gone from the profile.
+2. `product_occurrences_`, `tick_outputs_` and `pass_outputs_` became
+   `FlatMap`s (entries in a vector, an open-addressed index; clearing keeps
+   the memory, so no node is allocated a note). `Note`'s render-only check
+   finds the tick's inputs through the index and gives Publish the place
+   found. `--log_overlay_products`' logging moved out of `Note` (its frame
+   from 0x308 bytes with a canary to 0x128 without). Against step 1, two
+   builds alternating: 6.99, 6.98, 6.90 (6.96) against 6.66, 6.68, 6.50
+   (6.61): -5.0%; `malloc` from ~25 to ~8 thousand cycles a frame.
+3. `Note`'s samples were then memory waits: 17% on the index slot's load
+   (48-byte slots, ~200 KB, at random), ~35% in the matrix compares against
+   the tick's inputs (~580 KB, scattered). Render-only passes note in the
+   logic pass's order, so the tick's products are built in the order noted
+   and `Note` tries the one after the last found before the index: 85% of
+   all notes are found that way, read in order. The compares take four
+   floats at a time (`SameMatrix`, the same `==` per float). `Note` from
+   ~193 to ~107 thousand cycles a frame (totals 6.48 against 6.52, within
+   the runs' spread).
+4. `Replace`/`Restore` (~95 thousand cycles a frame) and `Blend`/
+   `Multiply` came from the light billboards' override (`sub_8209C6E0`),
+   which blended the camera again for every billboard set:
+   `--cache_billboard_cameras` (default on) blends them once a Draw.
+   `LoadMatrix`/`StoreMatrix` swap four words at a time with `pshufb`
+   (the same bits) instead of sixteen volatile 4-byte accesses. Against
+   step 3: 6.48, 6.50, 6.62 (6.53) against 6.02, 6.22, 6.06 (6.10): -6.6%.
+   The game's `__imp__sub_8209C6E0` itself fell from ~1,020 to ~730
+   thousand cycles a frame, probably as it reads the camera we write with
+   16-byte loads, which our 4-byte stores kept from forwarding (not
+   checked by IP).
+
+Main thread against `main` (`7026d84`), three runs each, alternating:
+`main` 7.88, 7.79, 7.94 (7.87); this 6.14, 6.11, 6.18 (6.14): **-22.0%**.
+DrawState's symbols together from ~1,300 to ~280 thousand cycles a frame.
+Render thread unchanged (two runs each: 10.22, 10.33 against 10.33,
+10.28); `BlendState_ReplayConstants` from ~604 to ~562 thousand cycles a
+frame, reading the tick's products in place of a fresh copy each frame.
+No fps runs: at this point the profiles' cycles are the measure.
+
+The check (`--check_draw_state`) was removed before merging.
+
+Left of ours: `Note` ~110 thousand cycles a frame (~75 a call),
+`AfterDraw` ~40 (`MatchTick` and `PlanTick`, once a tick, still use
+`std::unordered_map`).
+
+**To investigate next** on the main thread (both translated game code,
+the largest left; main thread ~6.1 million cycles a frame):
+
+- `__imp__sub_821298C0`, ~16% of the main thread, the largest; not looked
+  at yet (what it does isn't known).
+- `__imp__sub_8209C6E0` (the light billboards' vertex generation), ~12%
+  (~730 thousand cycles a frame) after the change above. It fell ~30% when
+  the camera we write into the pass went from 4-byte to 16-byte stores,
+  which suggests store forwarding stalls (vector loads of what was just
+  stored, as in `Lights::FindNearest`); find its hot instructions by IP
+  (see the mapping above) and whether its own stack traffic stalls the
+  same way.
+
 ## Resolution (branch `unlocked-resolution`, 2026-10-16)
 
 Goal: `--width`/`--height` and fullscreen. The game draws its 3D view at

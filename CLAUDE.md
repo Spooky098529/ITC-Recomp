@@ -88,7 +88,9 @@ find /dev/shm -maxdepth 1 -user "$USER" -name 'xenia_memory_*' -delete
   1 s after launch with no input, so races can be checked without the user:
   run under `timeout`, read the log, and look at frames with the
   renderer's dump (`--native_renderer_dump=<dir>`, 10 s into a race or
-  when `<dir>/now` appears). Never screenshot the user's desktop. Without the GPU plugin, `--skip_intro` sometimes
+  when `<dir>/now` appears). The attract mode puts a random sepia or
+  greyscale filter over the screen: a grey or brown frame from an attract
+  race is the game's, not a rendering bug. Never screenshot the user's desktop. Without the GPU plugin, `--skip_intro` sometimes
   stalls the boot (no "called from 8248466C" in the log): restart it.
 - Run the game in the background. The user plays: they start a race, drive
   near an opponent and quit, then say what they saw.
@@ -247,7 +249,14 @@ Not done yet:
   each matrix's camera number in a 1,024-entry table by its bytes
   (`--cache_camera_ids`), 98% hits, same numbers: -16.7% main thread
   cycles a frame, +0.7% fps (render thread limits; "CameraIds::Of" in
-  `docs/native-renderer.md`). A larger lead, translating
+  `docs/native-renderer.md`). Merged from `drawstate-investigate`
+  (2026-10-17): the tick's products worked out once a tick and shared by
+  its frames (`--publish_by_tick`), `Note`'s per-frame maps as flat tables
+  and its lookups in the order noted, the billboards' cameras blended once a
+  frame (`--cache_billboard_cameras`), guest matrices loaded and stored four
+  words at a time: -22.0% main thread cycles a frame, render thread
+  unchanged ("DrawState::Note and AfterDraw" in `docs/native-renderer.md`;
+  next leads there: the game's `sub_821298C0` and `sub_8209C6E0`). A larger lead, translating
   draws once a tick: `docs/tick-replay.md`. Still to decide: the old
   per-draw path's future, and a Steam Deck test.
 - Recheck whether the player's beam on the road still jumps in sharp turns
