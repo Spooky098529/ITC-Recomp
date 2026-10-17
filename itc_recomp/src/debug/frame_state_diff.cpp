@@ -325,6 +325,7 @@ class FrameStateDiff {
     };
     REXLOG_INFO("per-frame state: pass {} changed {} words, {} of them in an earlier sample too",
                 frame_pacing::GameMessages_PassNumber(), changes.size(), repeated.size());
+    WatchSmoothChanges(changes);
     if (const std::string& dir = REXCVAR_GET(find_all_changes_dir); !dir.empty()) {
       std::ofstream out(
           fmt::format("{}/changes_{}.txt", dir, frame_pacing::GameMessages_PassNumber()));
@@ -348,6 +349,57 @@ class FrameStateDiff {
                   repeated[j - 1]->address + 3, j - i, values);
       lines++;
       i = j;
+    }
+  }
+
+  // --find_all_changes: watch (as --watch_addresses does, logging the code
+  // that changes them) the words most often changed like a smoothed value:
+  // a float moving by 0.02% to 90% of its size, outside the stacks
+  // (0x70000000 up) and outside runs of more than 48 changed words 8 bytes
+  // apart or less (buffers being rewritten).
+  template <typename Change>
+  void WatchSmoothChanges(const std::vector<Change>& changes) {
+    std::vector<bool> in_run(changes.size());
+    for (size_t i = 0; i < changes.size();) {
+      size_t j = i + 1;
+      while (j < changes.size() && changes[j].address - changes[j - 1].address <= 8) {
+        j++;
+      }
+      for (size_t k = i; k < j; k++) {
+        in_run[k] = j - i > 48;
+      }
+      i = j;
+    }
+    for (size_t i = 0; i < changes.size(); i++) {
+      const Change& c = changes[i];
+      float a = AsFloat(c.before), b = AsFloat(c.after);
+      if (in_run[i] || c.address >= 0x70000000 || !std::isfinite(a) || !std::isfinite(b) ||
+          std::abs(a) > 1e7f || std::abs(b) > 1e7f) {
+        continue;
+      }
+      float size = std::max({std::abs(a), std::abs(b), 1e-6f});
+      float relative = std::abs(b - a) / size;
+      if (relative > 2e-4f && relative < 0.9f) {
+        smooth_hits_[c.address]++;
+      }
+    }
+    std::vector<std::pair<int, uint32_t>> best;
+    for (const auto& [address, hits] : smooth_hits_) {
+      if (hits >= 3) {
+        best.push_back({-hits, address});
+      }
+    }
+    std::sort(best.begin(), best.end());
+    watched_.clear();
+    forced_added_ = false;
+    for (const auto& [hits, address] : best) {
+      if (watched_.size() >= kMaxWatched) {
+        break;
+      }
+      watched_.push_back(address);
+    }
+    if (smooth_hits_.size() > 2000000) {
+      smooth_hits_.clear();
     }
   }
 
@@ -417,6 +469,7 @@ class FrameStateDiff {
   std::chrono::steady_clock::time_point last_snapshot_{}, last_log_{};
   std::vector<uint32_t> watched_;
   std::map<uint32_t, int> hits_;  // sampled passes each word stepped in
+  std::map<uint32_t, int> smooth_hits_;  // --find_all_changes
   std::unordered_map<uint32_t, double> last_step_;  // --find_any_steps
   std::vector<std::vector<uint32_t>> before_;  // nested: messages within handlers
   std::map<std::tuple<std::string, uint32_t, uint32_t>, int> changes_;
