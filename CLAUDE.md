@@ -21,6 +21,9 @@ under Wine (the user has no Windows machine).
 Vulkan 1.3, and why not OpenGL.
 `docs/tick-replay.md` is a lead (not started): translating draws once a
 tick and replaying our own list on in-between frames.
+`docs/cockpit-anim-fix.md` is the handover for the cockpit tachometer
+needle looking off its spindle with interpolation (branch
+`cockpit-anim-fix`, in progress).
 Read the relevant section before changing anything, and keep it up to
 date as you learn things.
 
