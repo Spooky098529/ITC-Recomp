@@ -411,6 +411,41 @@ struct Target {
   }
 };
 
+// A draw as worked out, for RecordDraw to record: the dynamic state, the
+// pipeline, the texture sets and the draw call.
+struct DrawEmit {
+  VkViewport viewport;
+  VkRect2D scissor;
+  float bias[2];  // constant, slope
+  float blend_constants[4];
+  VkPipeline pipeline;
+  VkPipelineLayout layout;
+  VkDescriptorSet textures[2];
+  bool indexed;  // vkCmdDrawIndexed (else vkCmdDraw)
+  VkIndexType index_type;
+  VkDeviceSize index_offset;
+  uint32_t first_index, count;
+  bool depth_biased, depth_equal, inline_vertices;
+  uint32_t type;
+};
+
+// Draws translated once a tick (--native_renderer_tick_draws, step 1 in
+// docs/tick-replay.md): what a draw was worked out from, cheap to gather at
+// every draw, and with it what it came to on the tick's first frame.
+// Render-only frames give a draw whose key equals the stored one at the
+// same place the stored result, packing only its constants afresh.
+struct TickDrawKey {
+  uint32_t call[5];      // type, base | start, primitive count, inline, vertex count
+  uint32_t surfaces[6];  // colour and depth objects, each's +24 and +28
+  uint32_t shaders[10];  // vertex object, +48, +600, +24, declaration id, a patched
+                         // copy used; pixel object, +24, +64; tiling
+  uint32_t indices[3];   // the index buffer object, its +0 and +24
+  uint32_t scissor[5];   // device +11600, the rectangle
+  uint64_t registers;    // a hash of the register blocks ReadRegisters fills
+  uint64_t generations[2];  // the texture cache's (views, samplers)
+  bool operator==(const TickDrawKey&) const = default;
+};
+
 // Texture descriptor sets (sets 2 and 3) in each of a frame's texture
 // pools, and their descriptors; a frame that fills its pools gets another,
 // kept for later frames.
@@ -962,6 +997,11 @@ struct Passes::State {
     std::vector<std::string> samples;
   } tick_repeats;
   struct RecordedState;
+  // Records the draw (binding the targets), its state calls left out where
+  // they repeat the last draw's (skip_repeated_state); returns what the
+  // command buffer then holds.
+  RecordedState RecordDraw(VkCommandBuffer commands, Target* color, Target* depth,
+                           const DrawEmit& e, const uint32_t offsets[5]);
   void NoteDrawParts(const DrawCall& call, const Target* color, const Target* depth,
                      const RecordedState& now, const TranslatedShader* vertex,
                      const TranslatedShader* pixel, uint64_t index_start, uint32_t index_count,
@@ -1096,6 +1136,61 @@ struct Passes::State {
   std::vector<Ring> rings;
   uint32_t frame = 0;
   VkDeviceSize ring_offset = 0;  // in the block in use
+
+  // --native_renderer_tick_draws (TickDrawKey): on a frame replaying a
+  // logic pass's list (the tick's first), each draw's key and result into
+  // tick_capture, kept as tick_list at the frame's end; on the frames after
+  // it, a draw whose key equals tick_list's at its place reuses its result.
+  // Texture sets made while capturing come from tick rings, kept until
+  // three ticks later (no frame in flight can still use them by then).
+  struct TickDraw {
+    TickDrawKey key;
+    uint32_t texture_mask = 0;  // the texture fetch constants its shaders read
+    uint64_t textures_hash = 0;  // a hash of their words
+    bool eligible = false;  // false: failed, or something not kept
+    bool drawn = false;     // false: invisible (nothing to draw)
+    Target* color = nullptr;
+    Target* depth = nullptr;
+    const TranslatedShader* vertex = nullptr;
+    const TranslatedShader* pixel = nullptr;
+    Translator::SystemConstants system;
+    DrawEmit emit;
+    bool main_view_draw = false;
+  };
+  bool tick_draws = false;          // the option
+  bool tick_draws_active = false;   // this frame: on, with no diagnostic in the way
+  bool tick_capturing = false;      // this frame is a tick's first
+  std::vector<TickDraw> tick_capture, tick_list;
+  uint32_t draw_calls = 0;  // Draw calls this frame, failed and invisible ones included
+  static constexpr uint32_t kTickRings = 3;
+  Ring tick_rings[kTickRings];
+  uint32_t tick_ring = 0;
+  struct TickDrawCounts {
+    uint64_t captured_frames = 0, captured = 0, frames = 0, matched = 0, reused = 0, invisible = 0,
+             no_entry = 0, ineligible = 0, key_differs = 0, textures_differ = 0;
+    uint64_t key_parts[8] = {};  // which part of the key differed
+    uint64_t checked = 0, check_mismatches = 0;
+    std::vector<std::string> check_samples;
+  } tick_counts;
+  void MakeTickKey(uint8_t* base, uint32_t device, const DrawCall& call, TickDrawKey& key);
+  static uint64_t TextureWordsHash(const uint32_t* fetch, uint32_t mask);
+  // On a render-only frame: draws the stored result for this draw if its
+  // key matches; false to work it out in full.
+  const TickDraw* FindTickDraw(const TickDrawKey& key);
+  void DrawFromTick(VkCommandBuffer commands, uint8_t* base, uint32_t device,
+                    const TickDraw& d);
+  // With check_tick_draws: a draw that matched its stored one is worked
+  // out in full as well, and the two compared.
+  bool check_tick_draws = false;
+  const TickDraw* tick_expected = nullptr;
+  void CheckTickDraw(const TickDraw& d, bool drawn, Target* color, Target* depth,
+                     const TranslatedShader* vertex, const TranslatedShader* pixel,
+                     const void* system, const DrawEmit* e);
+  // The vertex and pixel float constants the shaders read, packed, into
+  // the ring (offsets[1], offsets[2]); packed_bytes gets each's size.
+  bool PlaceFloatConstants(uint8_t* base, uint32_t device, const TranslatedShader* vertex,
+                           const TranslatedShader* pixel, uint32_t offsets[5],
+                           uint32_t packed_bytes[2]);
 
   VkDescriptorPool pool = VK_NULL_HANDLE;
   VkDescriptorSetLayout shared_memory_layout = VK_NULL_HANDLE;
@@ -2087,7 +2182,10 @@ VkDescriptorSet Passes::State::BuildTextureSet(uint8_t* base, const TranslatedSh
     return *set;
   }
   VkDescriptorSetAllocateInfo alloc{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
-  Ring& ring = rings[frame];
+  Ring& ring = tick_capturing ? tick_rings[tick_ring] : rings[frame];
+  if (ring.texture_pools.empty() && !CreateTexturePool(ring)) {
+    return VK_NULL_HANDLE;
+  }
   alloc.descriptorPool = ring.texture_pools[ring.texture_pool];
   alloc.descriptorSetCount = 1;
   alloc.pSetLayouts = &layout;
@@ -3086,6 +3184,29 @@ void Passes::BeginFrame(uint32_t frame_index) {
   s.front = nullptr;
   s.frame_resolves.clear();
   s.frame_draws = s.draws_at_resolve = 0;
+  s.draw_calls = 0;
+  // Draws translated once a tick: off with the diagnostics that need every
+  // draw worked out (or that the reused draws don't feed).
+  s.tick_draws_active = s.tick_draws && !s.MirrorPerDraw() && !s.record_draws &&
+                        !s.watch_draws && !s.skip_pixel_shader && !s.log_glow &&
+                        !s.check_mirror_frames && !s.log_tick_repeats &&
+                        !s.log_constant_changes && !s.log_texture_bindings &&
+                        !s.log_shader_lookups;
+  s.tick_capturing = s.tick_draws_active && Renderer_ReplayingLogicList();
+  if (s.tick_capturing) {
+    s.tick_capture.clear();
+    s.tick_ring = (s.tick_ring + 1) % State::kTickRings;
+    State::Ring& tick = s.tick_rings[s.tick_ring];
+    for (size_t i = 0; i <= tick.texture_pool && i < tick.texture_pools.size(); i++) {
+      vk::vkResetDescriptorPool(s.context.device, tick.texture_pools[i], 0);
+    }
+    tick.texture_pool = 0;
+    s.tick_counts.captured_frames++;
+  } else if (s.tick_draws_active) {
+    s.tick_counts.frames++;
+  } else {
+    s.tick_list.clear();
+  }
   s.mirrored.clear();
   s.used_mirrored.clear();
   s.mirror_frames++;
@@ -3136,10 +3257,344 @@ VkCommandBuffer Passes::EndUploads() {
   return state_->textures.EndUploads();
 }
 
+bool Passes::State::PlaceFloatConstants(uint8_t* base, uint32_t device,
+                                        const TranslatedShader* vertex,
+                                        const TranslatedShader* pixel, uint32_t offsets[5],
+                                        uint32_t packed_bytes[2]) {
+  for (uint32_t stage = 0; stage < 2; stage++) {
+    const TranslatedShader* shader = stage == 0 ? vertex : pixel;
+    uint32_t source = device + (stage == 0 ? kDeviceVertexFloatConstants
+                                           : kDevicePixelFloatConstants);
+    // Only the registers the shader reads, packed in order, into the last
+    // copy, noting whether any differ: run by run of consecutive registers
+    // (testing each of the 256 bits in turn was ~14% of the render thread,
+    // mostly mispredicted branches).
+    uint32_t* copy = reinterpret_cast<uint32_t*>(last_constants.bytes[1 + stage]);
+    bool same = last_constants.valid[1 + stage];
+    uint32_t packed = 0;
+    for (uint32_t w = 0; shader && w < 4; w++) {
+      uint64_t bits = shader->float_constants[w];
+      while (bits) {
+        uint32_t first = std::countr_zero(bits);
+        uint32_t count = std::countr_one(bits >> first);
+        bits = count == 64 ? 0 : bits & ~(((uint64_t(1) << count) - 1) << first);
+        if (guest::CopyU32s(base, source + 16 * (64 * w + first), copy + 4 * packed,
+                            4 * count)) {
+          same = false;
+        }
+        packed += count;
+      }
+    }
+    packed_bytes[stage] = 16 * packed;
+    if (!PlaceConstants(1 + stage, copy, 16 * packed, kFloatConstantsRange, offsets[1 + stage],
+                        true, same)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+Passes::State::RecordedState Passes::State::RecordDraw(VkCommandBuffer commands, Target* color,
+                                                     Target* depth, const DrawEmit& e,
+                                                     const uint32_t offsets[5]) {
+  State& s = *this;
+  s.BeginRendering(commands, color, depth);
+  if (color && color->surface.pitch == kMainViewPitch && color->samples == VK_SAMPLE_COUNT_2_BIT &&
+      color->format == VK_FORMAT_R16G16B16A16_SFLOAT) {
+    s.main_view = color;
+  }
+  s.stats.depth_biased += e.depth_biased;
+  s.stats.depth_equal += e.depth_equal;
+  VkDescriptorSet sets[4] = {s.draw_mirror().set, s.constant_block().set, e.textures[0],
+                             e.textures[1]};
+  State::RecordedState now{};
+  now.valid = true;
+  now.viewport = e.viewport;
+  now.scissor = e.scissor;
+  now.bias[0] = e.bias[0];
+  now.bias[1] = e.bias[1];
+  std::memcpy(now.blend_constants, e.blend_constants, sizeof(e.blend_constants));
+  now.pipeline = e.pipeline;
+  now.layout = e.layout;
+  std::memcpy(now.sets, sets, sizeof(sets));
+  std::memcpy(now.offsets, offsets, sizeof(now.offsets));
+  now.indexed = e.indexed;
+  now.index_buffer = s.draw_mirror().buffer;
+  now.index_type = e.index_type;
+  now.index_offset = e.index_offset;
+
+  // Which state calls repeat what the command buffer already holds (the
+  // previous draw's, with nothing else recorded since); with
+  // skip_repeated_state they aren't recorded again.
+  const State::RecordedState& last = s.recorded;
+  auto same = [](const auto& a, const auto& b) { return !std::memcmp(&a, &b, sizeof(a)); };
+  bool repeated[9] = {};
+  bool both_indexed = last.valid && now.indexed && last.indexed;
+  if (last.valid) {
+    repeated[0] = same(last.viewport, now.viewport);
+    repeated[1] = same(last.scissor, now.scissor);
+    repeated[2] = same(last.bias, now.bias);
+    repeated[3] = same(last.blend_constants, now.blend_constants);
+    repeated[4] = last.pipeline == now.pipeline;
+    repeated[5] = last.layout == now.layout && same(last.sets, now.sets);
+    repeated[6] = both_indexed && last.index_buffer == now.index_buffer &&
+                  last.index_offset == now.index_offset && last.index_type == now.index_type;
+    repeated[7] = both_indexed && last.index_buffer == now.index_buffer &&
+                  last.index_type == now.index_type;
+    repeated[8] = repeated[5] && same(last.offsets, now.offsets);
+    s.stats.state_compared++;
+    for (int i = 0; i < 9; i++) {
+      s.stats.state_repeated[i] += repeated[i];
+    }
+    if (s.log_constant_changes && repeated[5] && !repeated[8]) {
+      s.stats.offsets_differ++;
+      uint32_t differ = 0;
+      for (int i = 0; i < 5; i++) {
+        if (last.offsets[i] != now.offsets[i]) {
+          s.stats.offset_differs[i]++;
+          differ |= 1u << i;
+        }
+      }
+      s.stats.only_fetch_offset_differs += differ == 1u << 4;
+    }
+  }
+  bool skip = s.skip_repeated_state;
+  if (!(skip && repeated[0])) {
+    vk::vkCmdSetViewport(commands, 0, 1, &now.viewport);
+  }
+  if (!(skip && repeated[1])) {
+    vk::vkCmdSetScissor(commands, 0, 1, &now.scissor);
+  }
+  if (!(skip && repeated[2])) {
+    vk::vkCmdSetDepthBias(commands, now.bias[0], 0.0f, now.bias[1]);
+  }
+  if (!(skip && repeated[3])) {
+    vk::vkCmdSetBlendConstants(commands, now.blend_constants);
+  }
+  if (!(skip && repeated[4])) {
+    vk::vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, now.pipeline);
+  }
+  if (!(skip && repeated[8])) {
+    vk::vkCmdBindDescriptorSets(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, now.layout, 0, 4,
+                                now.sets, 5, now.offsets);
+  }
+  if (now.indexed && !(skip && repeated[6])) {
+    vk::vkCmdBindIndexBuffer(commands, now.index_buffer, now.index_offset, now.index_type);
+  }
+  if (e.indexed) {
+    vk::vkCmdDrawIndexed(commands, e.count, 1, e.first_index, 0, 0);
+  } else {
+    vk::vkCmdDraw(commands, e.count, 1, 0, 0);
+  }
+  if (!now.indexed && last.valid) {
+    // A draw without indices leaves the earlier binding in place.
+    now.indexed = last.indexed;
+    now.index_buffer = last.index_buffer;
+    now.index_offset = last.index_offset;
+    now.index_type = last.index_type;
+  }
+  s.recorded = now;
+  s.stats.drawn++;
+  s.frame_draws++;
+  if (e.inline_vertices) {
+    s.stats.inline_draws++;
+    s.stats.inline_by_type[e.type & 15]++;
+  }
+  return now;
+}
+
+uint64_t Passes::State::TextureWordsHash(const uint32_t* fetch, uint32_t mask) {
+  uint32_t words[32 * 6];
+  uint32_t n = 0;
+  for (; mask; mask &= mask - 1) {
+    std::memcpy(words + n, fetch + 6 * std::countr_zero(mask), 24);
+    n += 6;
+  }
+  return XXH3_64bits(words, 4 * n);
+}
+
+void Passes::State::MakeTickKey(uint8_t* base, uint32_t device, const DrawCall& call,
+                                TickDrawKey& key) {
+  key.call[0] = call.type;
+  key.call[1] = call.base_start;
+  key.call[2] = call.primitive_count;
+  key.call[3] = call.inline_vertices;
+  key.call[4] = call.vertex_count;
+  uint32_t color_object = guest::LoadU32(base, device + kDeviceRenderTarget0);
+  uint32_t depth_object = guest::LoadU32(base, device + kDeviceDepthStencil);
+  key.surfaces[0] = color_object;
+  key.surfaces[1] = color_object ? guest::LoadU32(base, color_object + 24) : 0;
+  key.surfaces[2] = color_object ? guest::LoadU32(base, color_object + 28) : 0;
+  key.surfaces[3] = depth_object;
+  key.surfaces[4] = depth_object ? guest::LoadU32(base, depth_object + 24) : 0;
+  key.surfaces[5] = depth_object ? guest::LoadU32(base, depth_object + 28) : 0;
+  uint32_t vertex_object = guest::LoadU32(base, device + kDeviceVertexShader);
+  uint32_t pixel_object = guest::LoadU32(base, device + kDevicePixelShader);
+  uint32_t declaration = guest::LoadU32(base, device + kDeviceVertexDeclaration);
+  uint32_t declaration_id = declaration ? guest::LoadU32(base, declaration + 48) : 0;
+  key.shaders[0] = vertex_object;
+  key.shaders[1] = vertex_object ? guest::LoadU32(base, vertex_object + 48) : 0;
+  key.shaders[2] = vertex_object ? guest::LoadU32(base, vertex_object + 600) : 0;
+  key.shaders[3] = vertex_object ? guest::LoadU32(base, vertex_object + 24) : 0;
+  key.shaders[4] = declaration_id;
+  key.shaders[5] = g_loaded_vertex_shader.object == vertex_object &&
+                   g_loaded_vertex_shader.declaration_id == declaration_id;
+  key.shaders[6] = pixel_object;
+  key.shaders[7] = pixel_object ? guest::LoadU32(base, pixel_object + 24) : 0;
+  key.shaders[8] = pixel_object ? guest::LoadU32(base, pixel_object + 64) : 0;
+  key.shaders[9] = tiling;
+  uint32_t index_buffer = call.inline_vertices ? 0 : guest::LoadU32(base, device + kDeviceIndexBuffer);
+  key.indices[0] = index_buffer;
+  key.indices[1] = index_buffer ? guest::LoadU32(base, index_buffer) : 0;
+  key.indices[2] = index_buffer ? guest::LoadU32(base, index_buffer + 24) : 0;
+  key.scissor[0] = guest::LoadU32(base, device + kDeviceScissorEnable);
+  for (uint32_t i = 0; i < 4; i++) {
+    key.scissor[1 + i] = guest::LoadU32(base, device + kDeviceScissorRect + 4 * i);
+  }
+  // The register blocks ReadRegisters fills (all state but constants).
+  static constexpr uint32_t kBlocks[][2] = {{0x2000, 16}, {0x2100, 21}, {0x2180, 5},
+                                             {0x2200, 12}, {0x2280, 21}, {0x2300, 38},
+                                             {0x2380, 4}};
+  uint32_t words[117];
+  uint32_t n = 0;
+  for (const auto& [first, count] : kBlocks) {
+    std::memcpy(words + n, &regs.values[first], 4 * count);
+    n += count;
+  }
+  key.registers = XXH3_64bits(words, sizeof(words));
+  key.generations[0] = textures.generation();
+  key.generations[1] = textures.sampler_generation();
+}
+
+const Passes::State::TickDraw* Passes::State::FindTickDraw(const TickDrawKey& key) {
+  TickDrawCounts& c = tick_counts;
+  uint32_t index = draw_calls - 1;
+  if (index >= tick_list.size()) {
+    c.no_entry++;
+    return nullptr;
+  }
+  const TickDraw& d = tick_list[index];
+  if (!d.eligible) {
+    c.ineligible++;
+    return nullptr;
+  }
+  if (!(d.key == key)) {
+    c.key_differs++;
+    const TickDrawKey& k = d.key;
+    auto differs = [](const auto& a, const auto& b) { return !!std::memcmp(&a, &b, sizeof(a)); };
+    c.key_parts[0] += differs(k.call, key.call);
+    c.key_parts[1] += differs(k.surfaces, key.surfaces);
+    c.key_parts[2] += differs(k.shaders, key.shaders);
+    c.key_parts[3] += differs(k.indices, key.indices);
+    c.key_parts[4] += differs(k.scissor, key.scissor);
+    c.key_parts[5] += k.registers != key.registers;
+    c.key_parts[6] += differs(k.generations, key.generations);
+    return nullptr;
+  }
+  if (TextureWordsHash(&regs.values[XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0], d.texture_mask) !=
+      d.textures_hash) {
+    c.textures_differ++;
+    return nullptr;
+  }
+  c.matched++;
+  return &d;
+}
+
+void Passes::State::DrawFromTick(VkCommandBuffer commands, uint8_t* base, uint32_t device,
+                                 const TickDraw& d) {
+  TickDrawCounts& c = tick_counts;
+  const uint32_t* fetch = &regs.values[XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0];
+  if (!d.drawn) {
+    c.invisible++;
+    return;  // invisible on the tick's frame too
+  }
+  uint32_t offsets[5];
+  uint32_t packed_bytes[2];
+  if (!ReserveDrawConstants() ||
+      !PlaceConstants(0, &d.system, sizeof(d.system), sizeof(d.system), offsets[0]) ||
+      !PlaceFloatConstants(base, device, d.vertex, d.pixel, offsets, packed_bytes) ||
+      !PlaceConstants(3, &regs.values[XE_GPU_REG_SHADER_CONSTANT_BOOL_000_031],
+                      kBoolLoopConstantsRange, kBoolLoopConstantsRange, offsets[3]) ||
+      !PlaceConstants(4, fetch, kFetchConstantsRange, kFetchConstantsRange, offsets[4])) {
+    stats.failed++;
+    stats.failed_by[4]++;
+    return;
+  }
+  stats.constants_draws++;
+  current_vertex_shader = d.vertex->hash;
+  current_pixel_shader = d.pixel ? d.pixel->hash : 0;
+  last_base = base;
+  if (d.main_view_draw && d.pixel &&
+      std::find(frame_pixel_shaders.begin(), frame_pixel_shaders.end(), d.pixel->hash) ==
+          frame_pixel_shaders.end()) {
+    frame_pixel_shaders.push_back(d.pixel->hash);
+  }
+  RecordDraw(commands, d.color, d.depth, d.emit, offsets);
+  c.reused++;
+}
+
+void Passes::State::CheckTickDraw(const TickDraw& d, bool drawn, Target* color, Target* depth,
+                                  const TranslatedShader* vertex,
+                                  const TranslatedShader* pixel, const void* system,
+                                  const DrawEmit* e) {
+  TickDrawCounts& c = tick_counts;
+  c.checked++;
+  std::string differs;
+  auto note = [&](bool same, const char* what) {
+    if (!same) {
+      differs += fmt::format("{}{}", differs.empty() ? "" : ", ", what);
+    }
+  };
+  note(d.drawn == drawn, "drawn");
+  if (d.drawn && drawn) {
+    auto same = [](const auto& a, const auto& b) { return !std::memcmp(&a, &b, sizeof(a)); };
+    note(d.color == color && d.depth == depth, "targets");
+    note(d.vertex == vertex && d.pixel == pixel, "shaders");
+    note(!std::memcmp(&d.system, system, sizeof(d.system)), "system constants");
+    note(d.emit.pipeline == e->pipeline && d.emit.layout == e->layout, "pipeline");
+    note(same(d.emit.viewport, e->viewport), "viewport");
+    note(same(d.emit.scissor, e->scissor), "scissor");
+    note(same(d.emit.bias, e->bias), "depth bias");
+    note(same(d.emit.blend_constants, e->blend_constants), "blend constants");
+    note(d.emit.indexed == e->indexed && d.emit.index_type == e->index_type &&
+             d.emit.index_offset == e->index_offset && d.emit.first_index == e->first_index &&
+             d.emit.count == e->count,
+         "draw call");
+  }
+  if (!differs.empty()) {
+    c.check_mismatches++;
+    if (c.check_samples.size() < 4) {
+      c.check_samples.push_back(fmt::format("draw {}: {}", draw_calls - 1, differs));
+    }
+  }
+}
+
 void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t device,
                          const DrawCall& call) {
   State& s = *this;
   auto& regs = s.regs;
+  // Draws translated once a tick (TickDrawKey).
+  TickDraw* capture = nullptr;
+  if (s.tick_draws_active) {
+    s.draw_calls++;
+    TickDrawKey tick_key;
+    s.MakeTickKey(base, device, call, tick_key);
+    if (s.tick_capturing) {
+      capture = &s.tick_capture.emplace_back();
+      capture->key = tick_key;
+    } else if (const TickDraw* d = s.FindTickDraw(tick_key)) {
+      if (!s.check_tick_draws) {
+        s.DrawFromTick(commands, base, device, *d);
+        return;
+      }
+      s.tick_expected = d;
+    }
+  }
+  // (Cleared when this draw is done, whichever way it ends.)
+  struct ExpectedGuard {
+    const TickDraw*& expected;
+    ~ExpectedGuard() { expected = nullptr; }
+  } expected_guard{s.tick_expected};
   // The bound surfaces: render target 0 and depth (others aren't drawn).
   uint32_t color_object = guest::LoadU32(base, device + kDeviceRenderTarget0);
   uint32_t depth_object = guest::LoadU32(base, device + kDeviceDepthStencil);
@@ -3468,6 +3923,13 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
                                   scissor.extent[1]};
       s.stats.invisible_sample[0] |= 0x80000000u;  // mark as set
     }
+    if (capture) {
+      capture->eligible = !vertex_copy;
+      capture->drawn = false;
+    }
+    if (s.tick_expected) {
+      s.CheckTickDraw(*s.tick_expected, false, color, depth, vertex, pixel, nullptr, nullptr);
+    }
     return;  // nothing visible
   }
 
@@ -3589,37 +4051,10 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
     s.stats.failed_by[4]++;
     return;
   }
-  for (uint32_t stage = 0; stage < 2; stage++) {
-    const TranslatedShader* shader = stage == 0 ? vertex : pixel;
-    uint32_t source = device + (stage == 0 ? kDeviceVertexFloatConstants
-                                           : kDevicePixelFloatConstants);
-    // Only the registers the shader reads, packed in order, into the last
-    // copy, noting whether any differ: run by run of consecutive registers
-    // (testing each of the 256 bits in turn was ~14% of the render thread,
-    // mostly mispredicted branches).
-    uint32_t* copy = reinterpret_cast<uint32_t*>(s.last_constants.bytes[1 + stage]);
-    bool same = s.last_constants.valid[1 + stage];
-    uint32_t packed = 0;
-    for (uint32_t w = 0; shader && w < 4; w++) {
-      uint64_t bits = shader->float_constants[w];
-      while (bits) {
-        uint32_t first = std::countr_zero(bits);
-        uint32_t count = std::countr_one(bits >> first);
-        bits = count == 64 ? 0 : bits & ~(((uint64_t(1) << count) - 1) << first);
-        if (guest::CopyU32s(base, source + 16 * (64 * w + first), copy + 4 * packed,
-                            4 * count)) {
-          same = false;
-        }
-        packed += count;
-      }
-    }
-    packed_bytes[stage] = 16 * packed;
-    if (!s.PlaceConstants(1 + stage, copy, 16 * packed, kFloatConstantsRange,
-                          offsets[1 + stage], true, same)) {
-      s.stats.failed++;
-      s.stats.failed_by[4]++;
-      return;
-    }
+  if (!s.PlaceFloatConstants(base, device, vertex, pixel, offsets, packed_bytes)) {
+    s.stats.failed++;
+    s.stats.failed_by[4]++;
+    return;
   }
   // Why the fetch block changed (log_constant_changes): in the fetch
   // constants the shaders read (textures, vertices), or only in others.
@@ -3798,11 +4233,6 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
   }
 
   // Draw.
-  s.BeginRendering(commands, color, depth);
-  if (color && color->surface.pitch == kMainViewPitch && color->samples == VK_SAMPLE_COUNT_2_BIT &&
-      color->format == VK_FORMAT_R16G16B16A16_SFLOAT) {
-    s.main_view = color;
-  }
   // Both scaled from the guest's pixels (the NDC scale and offset are
   // ratios, unchanged), by the targets' scale (colour and depth share one:
   // the main view's surfaces are both scaled alike).
@@ -3823,6 +4253,7 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
        std::min(scissor_bottom_scaled, extent.height) - std::min(scissor_top, extent.height)}};
   // Set for every pipeline (it's dynamic in all of them), used with depth.
   float slope = 0.0f, constant = 0.0f;
+  DrawEmit e{};
   if (depth) {
     // As the plugin sets it for its host render targets: the guest's depth
     // is float24 (24_8_FLOAT) or unorm24, the slope in 1/16 pixels.
@@ -3833,132 +4264,78 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
     // Per pixel: scaled pixels are smaller, so the slope (as the plugin
     // scales it).
     slope *= xenos::kPolygonOffsetScaleSubpixelUnit * std::max(draw_scale, 1.0f);
-    if (constant != 0.0f || slope != 0.0f) {
-      s.stats.depth_biased++;
-    }
-    if (key.z_enable && key.z_func == VK_COMPARE_OP_EQUAL) {
-      s.stats.depth_equal++;
-    }
+    e.depth_biased = constant != 0.0f || slope != 0.0f;
+    e.depth_equal = key.z_enable && key.z_func == VK_COMPARE_OP_EQUAL;
   }
+  e.viewport = viewport;
+  e.scissor = scissor_rect;
+  e.bias[0] = constant;
+  e.bias[1] = slope;
   // RB_BLEND_RED/GREEN/BLUE/ALPHA, for the constant blend factors.
-  float blend_constants[4];
-  std::memcpy(blend_constants, &regs.values[0x2105], sizeof(blend_constants));
-  VkDescriptorSet sets[4] = {s.draw_mirror().set, s.constant_block().set,
-                             vertex_textures, pixel_textures};
-
-  // The state this draw needs. Indexed draws bind the mirror at offset 0
-  // and start at their indices with firstIndex, so consecutive draws share
-  // the binding (unless an address isn't a multiple of the index size).
-  State::RecordedState now{};
-  now.valid = true;
-  now.viewport = viewport;
-  now.scissor = scissor_rect;
-  now.bias[0] = constant;
-  now.bias[1] = slope;
-  std::memcpy(now.blend_constants, blend_constants, sizeof(blend_constants));
-  now.pipeline = pipeline;
-  now.layout = key.layout;
-  std::memcpy(now.sets, sets, sizeof(sets));
-  std::memcpy(now.offsets, offsets, sizeof(offsets));
-  now.indexed = rectangle_list || quad_list || !call.inline_vertices;
-  now.index_buffer = s.draw_mirror().buffer;
-  now.index_type = rectangle_list || quad_list || index_32bit ? VK_INDEX_TYPE_UINT32
-                                                              : VK_INDEX_TYPE_UINT16;
-  uint32_t index_bytes = now.index_type == VK_INDEX_TYPE_UINT32 ? 4 : 2;
+  std::memcpy(e.blend_constants, &regs.values[0x2105], sizeof(e.blend_constants));
+  e.pipeline = pipeline;
+  e.layout = key.layout;
+  e.textures[0] = vertex_textures;
+  e.textures[1] = pixel_textures;
+  // Indexed draws bind the mirror at offset 0 and start at their indices
+  // with firstIndex, so consecutive draws share the binding (unless an
+  // address isn't a multiple of the index size).
+  e.indexed = rectangle_list || quad_list || !call.inline_vertices;
+  e.index_type = rectangle_list || quad_list || index_32bit ? VK_INDEX_TYPE_UINT32
+                                                            : VK_INDEX_TYPE_UINT16;
+  uint32_t index_bytes = e.index_type == VK_INDEX_TYPE_UINT32 ? 4 : 2;
   uint64_t index_start = rectangle_list ? kRectangleIndices
                          : quad_list    ? kQuadIndices
                                         : index_address;
-  uint32_t first_index = 0;
+  e.first_index = 0;
+  e.index_offset = 0;
   if (s.skip_repeated_state && index_start % index_bytes == 0) {
-    first_index = uint32_t(index_start / index_bytes);
+    e.first_index = uint32_t(index_start / index_bytes);
   } else {
-    now.index_offset = index_start;
+    e.index_offset = index_start;
   }
-
-  // Which state calls repeat what the command buffer already holds (the
-  // previous draw's, with nothing else recorded since); with
-  // skip_repeated_state they aren't recorded again.
-  const State::RecordedState& last = s.recorded;
-  auto same = [](const auto& a, const auto& b) { return !std::memcmp(&a, &b, sizeof(a)); };
-  bool repeated[9] = {};
-  bool both_indexed = last.valid && now.indexed && last.indexed;
-  if (last.valid) {
-    repeated[0] = same(last.viewport, now.viewport);
-    repeated[1] = same(last.scissor, now.scissor);
-    repeated[2] = same(last.bias, now.bias);
-    repeated[3] = same(last.blend_constants, now.blend_constants);
-    repeated[4] = last.pipeline == now.pipeline;
-    repeated[5] = last.layout == now.layout && same(last.sets, now.sets);
-    repeated[6] = both_indexed && last.index_buffer == now.index_buffer &&
-                  last.index_offset == now.index_offset && last.index_type == now.index_type;
-    repeated[7] = both_indexed && last.index_buffer == now.index_buffer &&
-                  last.index_type == now.index_type;
-    repeated[8] = repeated[5] && same(last.offsets, now.offsets);
-    s.stats.state_compared++;
-    for (int i = 0; i < 9; i++) {
-      s.stats.state_repeated[i] += repeated[i];
-    }
-    if (s.log_constant_changes && repeated[5] && !repeated[8]) {
-      s.stats.offsets_differ++;
-      uint32_t differ = 0;
-      for (int i = 0; i < 5; i++) {
-        if (last.offsets[i] != now.offsets[i]) {
-          s.stats.offset_differs[i]++;
-          differ |= 1u << i;
-        }
+  e.count = rectangle_list ? RectangleIndexCount(index_count / 3)
+            : quad_list    ? index_count / 4 * 6
+                           : index_count;
+  e.inline_vertices = call.inline_vertices;
+  e.type = type;
+  if (s.tick_expected) {
+    s.CheckTickDraw(*s.tick_expected, true, color, depth, vertex, pixel, &system, &e);
+  }
+  State::RecordedState now = s.RecordDraw(commands, color, depth, e, offsets);
+  uint32_t first_index = e.first_index;
+  const VkDescriptorSet* sets = now.sets;
+  if (capture) {
+    capture->eligible = !vertex_copy;
+    capture->drawn = true;
+    capture->color = color;
+    capture->depth = depth;
+    capture->vertex = vertex;
+    capture->pixel = pixel;
+    capture->system = system;
+    capture->emit = e;
+    capture->main_view_draw = main_view_draw;
+    uint32_t mask = 0;
+    for (const TranslatedShader* shader : {vertex, pixel}) {
+      for (size_t i = 0; shader && i < shader->textures.size(); i++) {
+        mask |= 1u << (shader->textures[i].fetch_constant & 31);
       }
-      s.stats.only_fetch_offset_differs += differ == 1u << 4;
+      for (size_t i = 0; shader && i < shader->samplers.size(); i++) {
+        mask |= 1u << (shader->samplers[i].fetch_constant & 31);
+      }
+    }
+    capture->texture_mask = mask;
+    capture->textures_hash =
+        TextureWordsHash(&regs.values[XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0], mask);
+    // A texture set not kept (a placeholder for a texture not loaded yet,
+    // see GetTextureSet) is asked again each frame.
+    if (!s.last_texture_sets[0].set || !s.last_texture_sets[1].set) {
+      capture->eligible = false;
     }
   }
-  bool skip = s.skip_repeated_state;
-  if (!(skip && repeated[0])) {
-    vk::vkCmdSetViewport(commands, 0, 1, &viewport);
-  }
-  if (!(skip && repeated[1])) {
-    vk::vkCmdSetScissor(commands, 0, 1, &scissor_rect);
-  }
-  if (!(skip && repeated[2])) {
-    vk::vkCmdSetDepthBias(commands, constant, 0.0f, slope);
-  }
-  if (!(skip && repeated[3])) {
-    vk::vkCmdSetBlendConstants(commands, blend_constants);
-  }
-  if (!(skip && repeated[4])) {
-    vk::vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
-  }
-  if (!(skip && repeated[8])) {
-    vk::vkCmdBindDescriptorSets(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, key.layout, 0, 4, sets,
-                                5, offsets);
-  }
-  if (now.indexed && !(skip && repeated[6])) {
-    vk::vkCmdBindIndexBuffer(commands, now.index_buffer, now.index_offset, now.index_type);
-  }
-  if (rectangle_list) {
-    vk::vkCmdDrawIndexed(commands, RectangleIndexCount(index_count / 3), 1, first_index, 0, 0);
-  } else if (quad_list) {
-    vk::vkCmdDrawIndexed(commands, index_count / 4 * 6, 1, first_index, 0, 0);
-  } else if (call.inline_vertices) {
-    vk::vkCmdDraw(commands, index_count, 1, 0, 0);
-  } else {
-    vk::vkCmdDrawIndexed(commands, index_count, 1, first_index, 0, 0);
-  }
-  if (!now.indexed && last.valid) {
-    // A draw without indices leaves the earlier binding in place.
-    now.indexed = last.indexed;
-    now.index_buffer = last.index_buffer;
-    now.index_offset = last.index_offset;
-    now.index_type = last.index_type;
-  }
-  s.recorded = now;
-  s.stats.drawn++;
-  s.frame_draws++;
   if (s.log_tick_repeats) {
     s.NoteDrawParts(call, color, depth, now, vertex, pixel, index_start, index_count, first_index,
                     &system, sizeof(system), packed_bytes);
-  }
-  if (call.inline_vertices) {
-    s.stats.inline_draws++;
-    s.stats.inline_by_type[type & 15]++;
   }
   // (The draw ID pass redraws indexed draws only.)
   if (s.record_draws && main_view_draw && !call.inline_vertices) {
@@ -4633,6 +5010,37 @@ void Passes::State::CompareTickRepeats() {
   frame_parts.clear();
 }
 
+void Passes::set_tick_draws(bool on, bool check) {
+  state_->tick_draws = on;
+  state_->check_tick_draws = check;
+}
+
+std::string Passes::TakeTickDraws() {
+  State::TickDrawCounts& c = state_->tick_counts;
+  uint64_t asked = c.matched + c.no_entry + c.ineligible + c.key_differs + c.textures_differ;
+  double a = double(std::max<uint64_t>(asked, 1));
+  std::string text = fmt::format(
+      "tick draws: {} ticks captured ({:.1f} draws each), {} frames after them: of {:.1f} draws "
+      "a frame, reused {:.1f}% (invisible {:.1f}%), worked out because: no draw stored at its "
+      "place {:.2f}%, the stored one not kept {:.2f}%, key differs {:.2f}% (call {}, surfaces "
+      "{}, shaders {}, indices {}, scissor {}, registers {}, texture generations {}), texture "
+      "fetch constants differ {:.2f}%",
+      c.captured_frames, double(c.captured) / double(std::max<uint64_t>(c.captured_frames, 1)),
+      c.frames, a / double(std::max<uint64_t>(c.frames, 1)), 100.0 * c.matched / a,
+      100.0 * c.invisible / a, 100.0 * c.no_entry / a, 100.0 * c.ineligible / a,
+      100.0 * c.key_differs / a, c.key_parts[0], c.key_parts[1], c.key_parts[2], c.key_parts[3],
+      c.key_parts[4], c.key_parts[5], c.key_parts[6], 100.0 * c.textures_differ / a);
+  if (state_->check_tick_draws) {
+    text += fmt::format("; checked {}, differing from the full path {}", c.checked,
+                        c.check_mismatches);
+    for (const std::string& sample : c.check_samples) {
+      text += "; e.g. " + sample;
+    }
+  }
+  c = {};
+  return text;
+}
+
 void Passes::set_log_tick_repeats(bool log) {
   state_->log_tick_repeats = log;
 }
@@ -5082,6 +5490,10 @@ VkExtent2D Passes::EndFrame(VkCommandBuffer commands, int32_t show_resolve, bool
     Buffers_OnFrameEnd();
   }
   s.last_frame_resolves = s.frame_resolves.size();
+  if (s.tick_capturing) {
+    s.tick_counts.captured += s.tick_capture.size();
+    s.tick_list.swap(s.tick_capture);
+  }
   if (s.log_tick_repeats) {
     s.CompareTickRepeats();
   }

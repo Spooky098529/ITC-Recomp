@@ -114,6 +114,13 @@ class Passes {
   // vertices, each constant block); TakeTickRepeats describes it since it
   // was last called.
   void set_log_tick_repeats(bool log);
+  // Draws translated once a tick (docs/tick-replay.md, step 1): on the
+  // frames after a tick's first, a draw made from the same state as the one
+  // at its place on that frame reuses what it came to, packing only its
+  // constants again; with check, such a draw is worked out in full too and
+  // the two compared. TakeTickDraws describes it since it was last called.
+  void set_tick_draws(bool on, bool check);
+  std::string TakeTickDraws();
   std::string TakeTickRepeats();
   // A diagnostic: how much of texture binding repeats from draw to draw
   // (to judge caching it); TakeTextureBindings describes it since it was

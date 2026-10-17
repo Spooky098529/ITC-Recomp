@@ -147,3 +147,48 @@ fewer fps uncapped than the chase view, from a pass more (the mirror) and
 ~800 draws a frame more, the render thread's cost per draw unchanged
 (see "Tools" in `native-renderer.md`). Tick replay cuts every pass's
 draws alike, the mirror's included, which stays drawn every frame.
+
+## Step 1: draws translated once a tick (done, 2026-10-17, `tick-replay`)
+
+The plan agreed with the user, in three steps: (1) our translation of each
+draw done once a tick and kept; (2) on in-between frames, neither the
+game's Draw step (main thread) nor its Direct3D replay (render thread)
+runs, the kept draws issued with interpolation's blends applied to them
+directly; (3) the frame's Vulkan command buffers recorded once a tick and
+submitted again with only the constants rewritten.
+
+Step 1, `--native_renderer_tick_draws` (off by default; `passes.cpp`,
+`TickDrawKey`, `FindTickDraw`, `DrawFromTick`): on a frame replaying a
+logic pass's list each draw stores a key of what it was worked out from
+(the call, the surfaces' objects and words, the shader objects' fields and
+the declaration, the index buffer object, the scissor, a hash of the
+register blocks `ReadRegisters` fills, the texture cache's generations)
+with what it came to (targets, shaders, system constants, pipeline,
+texture sets, viewport, scissor, depth bias, blend constants, index setup,
+draw call; `DrawEmit`), and the fetch constants its textures read with
+their hash. On the frames after it, a draw whose key and texture words
+equal the stored draw's at the same place (`draw_calls`) records the
+stored result, packing only its float, bool/loop and fetch constants from
+the device as before (the replay still runs, so interpolation's blended
+uploads are there); others are worked out in full. Texture sets made on
+the tick's frame come from tick rings (`tick_rings`, three, reset in turn
+as ticks are captured), as the frames' pools are reset every frame. The
+float constant packing (`PlaceFloatConstants`) and the recording
+(`RecordDraw`) are shared by both paths. Off with diagnostics that need
+every draw worked out (dumps, `--native_renderer_watch_draws`, the glow
+log, `--native_renderer_log_tick_repeats`...) and with the per-draw
+mirror.
+
+`--native_renderer_check_tick_draws` works out each matched draw in full
+as well and compares the two (`CheckTickDraw`). An uncapped attract race
+(`itc_888.log`): ~98% of the draws on in-between frames matched (~2,230 a
+frame; the rest mostly the texture cache's generation having moved, then
+the register blocks, the call and indices: the inline draws), 4.1-4.6
+million checked per 5 s, **none different**.
+
+Render thread, `profile_render_thread.sh`, two runs each, alternating, one
+binary: off 10.41, 9.54 (9.97), on 8.62, 8.80 (8.71) million cycles a
+frame: **-12.6%**. Frames drawn about the same (5,612/6,264 against
+5,760/5,972 in the 12 s): the main thread, still running the game's Draw
+step every frame, limits instead. What's left of the render thread's work
+on in-between frames is mostly the game's Direct3D replay (step 2).
