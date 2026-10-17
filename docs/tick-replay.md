@@ -1,10 +1,10 @@
-# Translating draws once a tick (a lead; first step measured)
+# Translating draws once a tick (in progress on `tick-replay`)
 
 Written 2026-10-16 on `shader-lookup`, from a question of the user's: the
 game only changes its state on 30 Hz ticks, so why does the renderer
-work every draw out again on every frame? The first step, the diagnostic
-below, was measured on `tick-replay` (2026-10-17): render-only frames do
-repeat the tick's draws (see "Measured").
+work every draw out again on every frame? Built on `tick-replay`
+(2026-10-17): steps 1 and 2 work behind options, off by default; what's
+left is in "Handoff: state and what's left" at the end.
 
 ## What happens now on an in-between frame
 
@@ -236,13 +236,150 @@ off/on alternating, one binary): render thread 10.28, 10.21 against 4.34,
 1.31 (**-79%**). Frames counted about the same (5,770-5,957 in 12 s): on this
 PC the GPU is about the limit at these rates.
 
-Not done yet: what the main thread builds into the list while recording
-(found by `--native_renderer_log_tick_repeats`) is stored as the tick's first
-render-only frame had it, so on fast frames it moves at 30 Hz: the light
-billboards and world sprites (pixel shader `9567C79307ACC6F5`, ~40-70 inline
-draws a frame, the marker above opponents and the light trails among them),
-~7 inline draws in pass 7 (`46E16128D157D50B`, the minimap's target), the
-glow's cross-fade weight (`E0D070FB58A4EA03`) and strength (c33 of
-`9750599DF5ED3B39`), and a few constants in passes 11 and 23. Each needs its
-blend done on the stored data. Then step 3 (command buffers recorded once a
-tick).
+### Rebuilt calls: what the main thread builds into the list per frame
+
+What the main thread builds into the list while recording (found by
+`--native_renderer_log_tick_repeats`, the "by pixel shader and pass" part of
+its line) was at first stored as the tick's first render-only frame had it,
+so on fast frames it moved at 30 Hz (the user: light trails "look bad").
+Now (`e001686`) those builders run again on fast passes and the stored
+draws take their fresh vertices:
+
+- **Main thread** (`game_messages.cpp`): on fast passes the race overlays'
+  Update (`8215E150`: the marker above opponents, the light trails) is
+  delivered again, and the draw step part `sub_820F6068` (the light groups'
+  billboards and the minimap) is called again with the `r3` it had on the
+  tick's first render-only pass (noted in its override in
+  `debug/frame_state_diff.cpp`, through `GameMessages_BeforeRebuiltCall` /
+  `GameMessages_AfterRebuiltCall`), between `BlendState_BeginFastFrame` (so
+  billboards face the frame's blended camera, as in Draw) and
+  `BlendState_PublishFastFrame`. The command list range each wrote
+  (the list's write pointer, `0x8296B918` +44, before and after) is handed
+  over with the list (`GameMessages_TakeRebuiltRanges`,
+  `Renderer_ReplayingRanges`). Calling the light groups' own draw
+  (`sub_82148658`) again crashed the game at the attract race's start (a
+  stream of reads of guest `0x50`): its `r3` is an object on
+  `sub_820F6068`'s stack, gone by then.
+- **Render thread** (`CaptureDraw`, `DrawStored`): while storing a frame,
+  an inline draw whose vertices the library's memcpy copied from inside one
+  of those ranges (`Buffers_LastCopy`; the helper draw `sub_825A17A0` and
+  command 19 both copy the list's vertices verbatim) is tagged with the
+  range's index and its offset in it, once a tick. On fast frames a tagged
+  draw copies its vertices from the fresh range at that offset if the range
+  is the same size as when stored, else uses the stored ones.
+- Attract race: 45-80 draws tagged per stored frame, all but ~0.1 a frame
+  given fresh vertices. A race the user drove (`itc_913.log`): 180-235
+  tagged, all but 0-0.3 a frame fresh, no errors; "trails look ok now".
+
+## Handoff: state and what's left (2026-10-17)
+
+For whoever picks this up. Everything is on the branch `tick-replay`
+(pushed), off by default, behind two options:
+`--native_renderer_tick_draws` (step 1) and `--native_renderer_tick_replay`
+(step 2, independent of step 1; both on is fine). Neither is in `run.sh`
+yet. Commits, in order: `e819bc0` (resolve list log), `88bd7d0`
+(`--native_renderer_log_tick_repeats`), `440e565` (step 1), the step 2
+commits, `e001686` (rebuilt calls).
+
+**How to run it.** The command in `CLAUDE.md` plus
+`--native_renderer_tick_replay=true` (and `--native_renderer_tick_draws=true`
+for step 1). With logging on, every 5 s: `tick replay: N frames stored (M
+not usable...), K frames drawn from them (J with none to draw from)...;
+light draws: ... tagged ..., ... with fresh vertices, ... with stored ones;
+of D draws stored, ... set other than by uploads (stored as sets): ps c255
+...`. M and J should be 0, and "with stored ones" near 0. The two lines
+`tick replay: noted call` / `rebuilt call` (the first 20/40) show the
+rebuilt call's argument and list addresses; they can go once this settles.
+Attract races (`--skip_intro --attract_after_s=1`) exercise all of it
+except the HUD and the player's driving. Dumps (`--native_renderer_dump`,
+`_every`) work: on a fast frame they show the stored frame (no
+`draws.txt`, as no draw is worked out). A log full of `Unhandled guest
+access violation` rotates away its start: catch the lines before the first
+one with `tail -F <log> | grep -m1 -B40 'access violation'` while it runs.
+
+**Still to do, in order:**
+
+1. **The glow (bloom) on fast frames.** Its cross-fade's weight (the
+   vertex colour alpha of the inline quad drawn with pixel shader
+   `E0D070FB58A4EA03` in pass 11, ~1 a frame) and its strength (pixel c33,
+   uploaded for `9750599DF5ED3B39` in pass 20, recorded by `82133D28` inside
+   `sub_821379D8`) are both set per pass by `src/interpolation/glow.cpp`
+   while the main thread records, so on fast frames they're the tick's first
+   render-only frame's. The history resolve itself is in the stored ops, so
+   it's written every frame. Options: call the post-processing objects'
+   draw (`sub_821379D8`, recorded for each object by `sub_82133960` from the
+   race draw step; check its arguments persist, unlike `sub_82148658`'s)
+   again on fast passes, and extend the tagging to **uploads**: a stored
+   upload whose payload lies in a rebuilt range takes the fresh values (same
+   offset, same range size), as inline draws do. The cross-fade quad is an
+   inline draw and would be tagged as is. Or compute the two values natively
+   from glow.cpp's state (the weight is the blended `+8460` raised to the
+   frame's share of a tick, the strength the blended c33 fields) and patch
+   the stored upload and quad. The first keeps the game doing the maths, as
+   for the lights.
+2. **Two more pixel constants that change between a tick's frames**:
+   `0E2F6DFFB4C83835` in pass 11 (2 draws a frame) and `CC253DC700BC8028`
+   in pass 23 (1 a frame), from the same diagnostic. Not identified; pass
+   11 is the glow chain, so they may come with item 1. Pass 23 is near the
+   frame's end (post-processing combine, or the attract mode's filter).
+   Find their recorder with `--log_stepping_constants --log_slot_callers`
+   (tick replay off), then treat them as item 1.
+3. **A check for step 2**, before it ships: on fast passes, let the game
+   draw the frame as now and, beside it, work out what the stored frame
+   would give each draw (the blended float blocks, the inline vertices),
+   and compare. It needs its own `ReplayCameras` and `PixelConstantBlender`
+   instances (both keep per-frame and per-tick state, so calling them twice
+   a frame would corrupt it). `--native_renderer_check_tick_draws` is the
+   model (step 1's). Without it, correctness rests on dumps and the user's
+   eyes.
+4. **Profile with the rebuilt calls.** The -58%/-79% above was measured
+   before them. Calling `sub_820F6068` and the overlays again costs the
+   main thread something (the billboards alone were ~0.7 million cycles a
+   frame); measure both threads with `profile_render_thread.sh`
+   (`ITC_ARGS=--native_renderer_tick_replay=true`, `ITC_THREAD=main`), two
+   or three alternating runs each. Compare cycles, not fps: on this PC the
+   GPU is about the limit at these rates.
+5. **What the user hasn't checked yet**: the light glows on buildings and
+   lamps, the marker above opponents, the minimap (its triangle's flashing
+   is per-frame logic, put back on render-only passes), first person (the
+   mirror pass), camera switches and cuts, the race start countdown, the
+   pause menu during a race, the end of a race and the next race's loading
+   (stored frames and tick rings across a load), other resolutions
+   (`--width`/`--height`), and the Windows build (it should compile; not
+   built since).
+6. **Edge cases to look at:** a fast frame whose tick's stored frame
+   wasn't usable shows the last frame again (the main thread decides a
+   pass is fast from the *previous* tick's stored frame, as it can't wait
+   for this one's); a texture rewritten mid-tick isn't reloaded until the
+   next tick's first frames (fast frames ask the texture cache nothing);
+   with the old per-draw mirror (`--native_renderer_mirror_by_tick=false`)
+   both steps stay off.
+7. **Step 3: the frame's Vulkan commands recorded once a tick.** On fast
+   frames the render thread now still records every draw's Vulkan calls
+   (`RecordDraw`, ~6% of what's left of it) and packs every draw's
+   constants. Record the stored frame into a command buffer once per frame
+   in flight per tick (two a tick), with each draw's constant blocks at a
+   fixed offset in that frame's ring and its inline vertices in a fixed
+   place, then on each fast frame only write the blended blocks and the
+   fresh inline vertices and submit it again. Needs: no constant block
+   reuse by comparison (`PlaceConstants`) inside the recorded part, the
+   present blit and texture uploads kept in their own command buffers
+   (`Renderer::EndFrame` records the blit into the frame's buffer today),
+   and the stored ops' resolves and clears recorded with it.
+8. **Then:** turn it on in `run.sh` and `run.bat` (keep them in step), the
+   status in `CLAUDE.md`, a pointer from "Performance: the render thread"
+   in `native-renderer.md`, and a merge into `main` (ask the user first).
+
+**Where the code is:** `native/passes.cpp` (`TickDrawKey`/`TickDraw`,
+`FindTickDraw`, `DrawFromTick`, `CheckTickDraw` for step 1; `StoredFrame`,
+`CaptureDraw`, `NoteUpload`, `CheckShadowFlush`, `DrawStored`,
+`DrawStoredFrame`, `TakeStoredFrames` for step 2; `RecordDraw`,
+`PlaceFloatConstants` shared), `native/renderer.cpp` (the options, the
+lists' kinds and ranges, `Renderer_DrawStoredFrame`),
+`native/buffers.cpp` (`Buffers_LastCopy`),
+`frame_pacing/game_messages.cpp` (fast passes, rebuilt calls),
+`frame_pacing/renderer_hooks.cpp` (the hand-over, the stored frame in place
+of the game's), `interpolation/blend_state.cpp`
+(`BlendState_BlendStoredUpload`, `BeginFastFrame`, `PublishFastFrame`,
+`kept_outputs_`, `PixelConstantBlender::Apply`'s host source),
+`debug/frame_state_diff.cpp` (`sub_820F6068`'s override).
