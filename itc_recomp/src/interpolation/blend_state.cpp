@@ -1846,6 +1846,11 @@ class MovingProductsLog {
                     "blended, {} unpaired near moving, {} unlike their neighbours, {} jumps",
                     frames_, double(moving_) / frames_, not_blended_, unpaired_, unlike_, jumps_);
       }
+      for (const auto& [caller, sp] : spinning_) {
+        REXLOG_INFO("moving: spinning from {:08X}: {} in {} frames, largest turn {:.3f} rad: {}",
+                    caller, sp.count, frames_, sp.max_angle, sp.example);
+      }
+      spinning_.clear();
       last_log_ = now;
       lines_ = 0;
       frames_ = moving_ = not_blended_ = unpaired_ = unlike_ = jumps_ = 0;
@@ -1917,6 +1922,16 @@ class MovingProductsLog {
       return false;
     };
     for (const Record& r : records_) {
+      // Spinning (more than kCutAngle in a tick about mostly one axis: the
+      // spin is the newer tick's), summed by the recorder's caller.
+      if (r.outcome == Outcome::kSpinning) {
+        Spinning& s = spinning_[r.context_now[0]];
+        s.count++;
+        if (r.angle > s.max_angle) {
+          s.max_angle = r.angle;
+          s.example = Describe(r);
+        }
+      }
       // Drawn at the tick (ahead of the blended objects around it).
       if (r.outcome == Outcome::kWorldNotBlended && r.Moved() > 0.01f) {
         not_blended_++;
@@ -1975,6 +1990,12 @@ class MovingProductsLog {
     }
   }
 
+  struct Spinning {
+    int count = 0;
+    float max_angle = -1;
+    std::string example;
+  };
+  std::map<uint32_t, Spinning> spinning_;  // by the recorder's caller
   std::vector<Record> records_;
   std::unordered_map<uint64_t, Shown> last_shown_;
   uint64_t tick_ = 0;
