@@ -180,3 +180,14 @@ base command plus one diagnostic set, e.g.:
 
 Run it in the background (no `timeout`), tell the user what to do in the
 race, wait for them to quit, then read the newest log (`ls -t`).
+
+
+## New diagnostics from 2026-10-17
+
+- **upload owners** shows that the function at **0x8209637C** uploads data to the vertex buffer that contains the cockpit mesh (which includes the needle).  The count fluctuates each frame, so the buffer is rewritten on every frame.
+- **slot callers** is empty – the vertex shader `vs 113604C3002A6A21` has no stream constants (no matrix or bone palette), confirming that the needle is not animated via a matrix.
+- **debug_zero_owners** is also empty, indicating the buffer is always written with real vertex data.
+
+**Implication**: the needle’s geometry is updated by a CPU routine (the function at `0x8209637C`) and not by a skinned matrix.  The current interpolation logic, which only blends matrices at tick boundaries, therefore never touches the needle.
+
+We will need to add a vertex‑buffer interpolation step for this mesh (or extend the existing matrix interpolation if we later discover a per‑frame matrix).
