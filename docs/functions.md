@@ -514,7 +514,10 @@ Three more things are blended, outside the products:
   on the CPU in Draw, turned to face its camera pass. For that call alone the
   pass gets the frame's blended eye, target, up and view, so the quads face
   the camera they're drawn from (otherwise their lower edge, cut by the
-  road's depth, wobbles).
+  road's depth, wobbles). The blended camera is the same for every set in
+  a frame, so it's blended once a Draw (`--cache_billboard_cameras`, since
+  v0.4.4). The function itself is ~12% of the main thread, a lead for later
+  ("DrawState::Note and AfterDraw" in `native-renderer.md`).
 - **Per-object pixel constants** (`sub_82595490`, 63 registers at c0, and the
   same layout at c63: lighting, including the headlights). They hold no
   object identity, so each is paired by the camera product replayed just

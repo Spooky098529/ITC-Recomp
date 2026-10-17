@@ -118,7 +118,7 @@ install -m 755 itc_recomp/run-debug.sh $D/run-debug.sh
 (cd $D && python3 -I -m zipfile -c ../$name.zip itc librexruntime.so run.sh run-debug.sh)
 ```
 
-## Status (`main`, 2026-10-17, v0.4.1)
+## Status (`main`, 2026-10-17, v0.4.4)
 
 Frame interpolation for races is working: logic runs at 30 Hz and frames are
 blended between ticks. The world, cameras, wheels (other cars' too, paired
@@ -141,14 +141,14 @@ drawn scaled and the 3D view at the full resolution, with black bars on
 shapes other than 16:9. See `docs/unlocked-res.md` (a more native frame
 without the game's upscale draw is for later).
 
-Xbox 360 gamma (merged from `xbox-gamma`, 2026-10-16; not released yet):
+Xbox 360 gamma (merged from `xbox-gamma`, 2026-10-16; released in v0.4.3):
 `--xbox_gamma=off|hdtv|power`, off by default (`run.sh` passes `off` and
 lists the choices). The display gamma tables the game writes at boot,
 copied into `src/native/xbox_gamma_table.h` (not read from the SDK), are
 applied to the frame by a compute pass; `hdtv` looked pretty close to the
 360 to the user. See "Gamma" in `docs/native-renderer.md`'s known issues.
 
-Windows (merged from `windows`, 2026-10-16; not released yet):
+Windows (merged from `windows`, 2026-10-16; released in v0.4.1, experimental):
 cross-compiled on Linux with xwin, ThinLTO (`ITC_WIN_LTO`), `run.bat`
 with `run.sh`'s defaults, the Visual C++ runtime DLLs in the zip, and a
 CI job beside Linux's. Tested only under Wine: ~26% slower than Linux
@@ -250,7 +250,8 @@ Not done yet:
   (`--cache_camera_ids`), 98% hits, same numbers: -16.7% main thread
   cycles a frame, +0.7% fps (render thread limits; "CameraIds::Of" in
   `docs/native-renderer.md`). Merged from `drawstate-investigate`
-  (2026-10-17): the tick's products worked out once a tick and shared by
+  (2026-10-17, released in v0.4.4 with the three before it: main thread
+  -41.7% cycles a frame against v0.4.3): the tick's products worked out once a tick and shared by
   its frames (`--publish_by_tick`), `Note`'s per-frame maps as flat tables
   and its lookups in the order noted, the billboards' cameras blended once a
   frame (`--cache_billboard_cameras`), guest matrices loaded and stored four
