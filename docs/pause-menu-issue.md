@@ -215,3 +215,96 @@ Summary of Findings on Pause State Detection
   - Jumps directly to loc_82093E90 which calls sub_8258CEB0 with different parameters and returns early
   
   The handler is checking the pause state and either doing full processing or a minimal path.
+
+
+  ## handoff point 3
+
+   Summary: Input Polling Mechanism in ReXGlue
+
+  I found the input polling implementation in /home/sam/repos/recomptest/rexglue-sdk/src/input/sdl/sdl_input_driver.cpp. Here's what I discovered:
+
+  Key Polling Components:
+
+  1. Event Queue System (lines 39-42, 395-421):
+     - Events are buffered in pending_events_ (max 64 events)
+     - SDL_AddEventWatch callback routes controller events to HandleEvent()
+     - DrainAndLock() drains the queue and processes events under controllers_mutex_
+  2. Polling Trigger (lines 671-681):
+     - QueueControllerUpdate() is called from GetState() when input is active
+     - Uses SDL_PumpEvents() to process pending SDL events
+     - Prevents duplicate pumping with sdl_pumpevents_queued_ flag
+  3. Event Processing (lines 423-441):
+     - Handles SDL_EVENT_GAMEPAD_ADDED, REMOVED, AXIS_MOTION, BUTTON_DOWN/UP
+     - Updates controller state and marks state_changed = true when inputs change
+  4. State Management (lines 194-225):
+     - GetDeviceState() increments packet number only when state actually changed
+     - Simulates "untouched" controllers by zeroing button state
+  5. Key Repeat Handling (lines 324-342):
+     - Tracks repeat state with HID_SDL_REPEAT_DELAY and HID_SDL_REPEAT_RATE
+     - Sends repeating keystrokes after delay, then at regular rate
+
+  Polling Flow:
+
+  GetState() → QueueControllerUpdate() → SDL_PumpEvents() → Process events → Update state
+
+  The system uses event-driven polling rather than continuous polling, which is efficient and matches the Xbox 360's input model.
+
+✻ Brewed for 42s · done 22:19
+
+❯ and how does this link back to the generated assembly, since we're looking for input events being sent too many times on the pause menu                                                                                 
+
+  Thought for 3m 10s, searched for 5 patterns, read 2 files (ctrl+o to expand)
+
+● Connection Between Assembly and Input Polling
+     
+  Here's how sub_825BA3F8 (XInputGetState) links to the polling mechanism:
+
+  Call Chain:
+
+  Game code → sub_825BA3F8 (itc_recomp/generated/default/itc_recomp.29.cpp:31891)
+      ↓
+  __imp__XamInputGetState (xam_input.cpp:95)
+      ↓
+  input_system()->GetState() (input_system.cpp:215)
+      ↓
+  SDLInputDriver::
+
+
+## handoff point 4
+
+  Summary: Pause Menu Input Event Issue
+
+  Root Cause: The tick handler at 0x82093E00 (in itc_recomp.19.cpp) checks a pause flag at offset 112 of r31, but still executes code paths even when paused.
+
+  The Problem Flow:
+
+  sub_82093DC0 (tick handler)
+    ├─ Load pause flag from r31+112
+    ├─ If paused (flag == 0) → branch to loc_82093E90
+    └─ If NOT paused → call sub_8258CEB0 for input processing
+
+  loc_82093E90 (pause path):
+    └─ Still calls sub_8258CEB0 with different parameters
+        └─ Which calls sub_82592500 (bitwise operations)
+            └─ May still trigger input events
+
+  Key Finding:
+
+  The issue is that even when paused, the code at loc_82093E90 calls sub_8258CEB0, which eventually calls sub_82592500. This function performs bitwise operations and returns early if the result is 0, but there may be
+  side effects from earlier code paths that still send input events.
+
+  Where to Fix:
+
+  The tick handler needs to completely skip all processing when paused, not just skip the main logic. The fix should:
+  1. Check pause flag at the very beginning of sub_82093DC0
+  2. Return immediately if paused without calling any subroutines
+  3. Only call input processing functions (sub_8258CEB0, sub_8258CAA0) when NOT paused
+  
+  Files to Modify:
+
+  - itc_recomp/generated/default/itc_recomp.19.cpp - Main tick handler (lines 79-95)
+  - itc_recomp/generated/default/itc_recomp.50.cpp - Input processing (sub_8258CEB0)
+
+  Would you like me to look at the original SDK source code to find where this pause flag is set and how to properly gate the input polling?
+
+
