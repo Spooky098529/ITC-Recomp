@@ -61,8 +61,6 @@ the console. Screens and windows that aren't 16:9 get black bars.
 - Only races are interpolated; menus run at 30 fps, and HUD animations
   advance at 30 Hz.
 - In game movies are not shown.
-- Colours are a little lighter than on the console (the console's output
-  gamma isn't applied yet).
 - Tested on Linux on my PC (9800x3d, 7900XT) and the Steam Deck.
 - The Windows version is experimental: it has only been tested under Wine
   on Linux, not on a real Windows PC yet. Reports of how it runs are
