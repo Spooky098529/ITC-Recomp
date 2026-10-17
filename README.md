@@ -69,7 +69,7 @@ the console. Screens and windows that aren't 16:9 get black bars.
   welcome.
 - Pause menus in races currently poll the controller too fast, so the menus are annoying to navigate
 - The game probably uses more RAM than necessary, currently it maintains several copies of the xbox 360 memory pool for performance reasons. This is going to be an issue until the rexglue runtime is removed. RAM usage can hit about 1gb in races.
-- Cockpit anims are bugged for eg. the tachometer
+- Cockpit dials are not interpolated properly, most noticeable when doing something that moves them quickly like sharp breaking
 ## Reporting problems
 
 Play with `./run-debug.sh` (`run-debug.bat` on Windows), then open an
