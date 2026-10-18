@@ -63,6 +63,15 @@ std::optional<ScaledTransform> BlendSpinning(const ScaledTransform& a, const Sca
 // line, so a part that turns about a point away from its origin (a dial's
 // needle) keeps that point in place, where Blend moves its origin straight.
 // The scale blends linearly.
+struct ScrewMotion {
+  bool turns = false;  // false: blend as Blend does (hardly any turn)
+  Quaternion turn;     // the turn, applied after a's rotation
+  Vec3 point{};        // a point on the line, relative to a's position
+  Vec3 slide{};        // the slide along the line
+};
+ScrewMotion ScrewBetween(const Transform& a, const Transform& b);
+ScaledTransform BlendScrew(const ScaledTransform& a, const ScaledTransform& b,
+                           const ScrewMotion& screw, float amount);
 ScaledTransform BlendScrew(const ScaledTransform& a, const ScaledTransform& b, float amount);
 // The point on the line the motion from `a` to `b` turns about that is
 // nearest `near`, or nothing if it hardly turns.

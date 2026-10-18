@@ -142,60 +142,12 @@ Matrix3 Multiply(const Matrix3& x, const Matrix3& y) {
   return out;
 }
 
-// The motion from a to b in the world, x -> (x - a's position) * turn +
-// b's position, as a screw: `turn` about the line through a's position +
-// `point` along `axis`, and `slide` along it.
-struct Screw {
-  Matrix3 ra;
-  Vec3 origin;  // a's position
-  Quaternion turn;
-  bool turns = false;  // false: a pure translation by `offset`
-  Vec3 offset;         // b's position - a's
-  Vec3 axis, point;
-  float slide = 0;
-};
-Screw ScrewOf(const Transform& a, const Transform& b) {
-  Screw s;
-  s.ra = RotationFromQuaternion(a.rotation);
-  s.origin = a.position;
-  Matrix3 rd = Multiply(Transposed(s.ra), RotationFromQuaternion(b.rotation));
-  s.turn = QuaternionFromRotation(rd);
-  for (int k = 0; k < 3; k++) {
-    s.offset[k] = b.position[k] - a.position[k];
-  }
-  float sine = std::sqrt(s.turn.x * s.turn.x + s.turn.y * s.turn.y + s.turn.z * s.turn.z);
-  // Under ~0.001 rad the line is too far off to place; blend straight.
-  if (!(sine > 5e-4f)) {
-    return s;
-  }
-  s.turns = true;
-  s.axis = {s.turn.x / sine, s.turn.y / sine, s.turn.z / sine};
-  const Vec3& u = s.axis;
-  s.slide = s.offset[0] * u[0] + s.offset[1] * u[1] + s.offset[2] * u[2];
-  double across[3], m[3][3];
-  for (int i = 0; i < 3; i++) {
-    across[i] = s.offset[i] - s.slide * u[i];
-    // The line's points c satisfy c - c * rd = across; c * u = 0 picks one.
-    for (int j = 0; j < 3; j++) {
-      m[i][j] = (i == j ? 1.0 : 0.0) - rd[j][i] + double(u[i]) * u[j];
-    }
-  }
-  double det = m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1]) -
-               m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0]) +
-               m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]);
-  for (int k = 0; k < 3; k++) {
-    double column[3][3];
-    for (int i = 0; i < 3; i++) {
-      for (int j = 0; j < 3; j++) {
-        column[i][j] = j == k ? across[i] : m[i][j];
-      }
-    }
-    double dk = column[0][0] * (column[1][1] * column[2][2] - column[1][2] * column[2][1]) -
-                column[0][1] * (column[1][0] * column[2][2] - column[1][2] * column[2][0]) +
-                column[0][2] * (column[1][0] * column[2][1] - column[1][1] * column[2][0]);
-    s.point[k] = float(dk / det);
-  }
-  return s;
+// q then r, as RotationFromQuaternion(q) * RotationFromQuaternion(r).
+Quaternion Then(const Quaternion& q, const Quaternion& r) {
+  return {q.w * r.x + q.x * r.w + q.y * r.z - q.z * r.y,
+          q.w * r.y - q.x * r.z + q.y * r.w + q.z * r.x,
+          q.w * r.z + q.x * r.y - q.y * r.x + q.z * r.w,
+          q.w * r.w - q.x * r.x - q.y * r.y - q.z * r.z};
 }
 
 Matrix4 MatrixFrom(const Matrix3& rotation, const Vec3& translation) {
@@ -737,41 +689,93 @@ std::optional<ScaledTransform> BlendSpinning(const ScaledTransform& a, const Sca
   return out;
 }
 
-ScaledTransform BlendScrew(const ScaledTransform& a, const ScaledTransform& b, float amount) {
+// The motion from a to b in the world, x -> (x - a's position) * turn +
+// b's position, as a turn about the line through a's position + `point`
+// and a slide along it.
+ScrewMotion ScrewBetween(const Transform& a, const Transform& b) {
+  ScrewMotion s;
+  Matrix3 rd = Multiply(Transposed(RotationFromQuaternion(a.rotation)),
+                        RotationFromQuaternion(b.rotation));
+  s.turn = QuaternionFromRotation(rd);
+  float sine = std::sqrt(s.turn.x * s.turn.x + s.turn.y * s.turn.y + s.turn.z * s.turn.z);
+  // Under ~0.001 rad the line is too far off to place; blend straight.
+  if (!(sine > 5e-4f)) {
+    return s;
+  }
+  s.turns = true;
+  Vec3 u{s.turn.x / sine, s.turn.y / sine, s.turn.z / sine};
+  Vec3 offset;
+  for (int k = 0; k < 3; k++) {
+    offset[k] = b.position[k] - a.position[k];
+  }
+  float slide = offset[0] * u[0] + offset[1] * u[1] + offset[2] * u[2];
+  double across[3], m[3][3];
+  for (int i = 0; i < 3; i++) {
+    s.slide[i] = slide * u[i];
+    across[i] = offset[i] - s.slide[i];
+    // The line's points c satisfy c - c * rd = across; c * u = 0 picks one.
+    for (int j = 0; j < 3; j++) {
+      m[i][j] = (i == j ? 1.0 : 0.0) - rd[j][i] + double(u[i]) * u[j];
+    }
+  }
+  auto determinant = [](const double (&x)[3][3]) {
+    return x[0][0] * (x[1][1] * x[2][2] - x[1][2] * x[2][1]) -
+           x[0][1] * (x[1][0] * x[2][2] - x[1][2] * x[2][0]) +
+           x[0][2] * (x[1][0] * x[2][1] - x[1][1] * x[2][0]);
+  };
+  double det = determinant(m);
+  for (int k = 0; k < 3; k++) {
+    double column[3][3];
+    for (int i = 0; i < 3; i++) {
+      for (int j = 0; j < 3; j++) {
+        column[i][j] = j == k ? across[i] : m[i][j];
+      }
+    }
+    s.point[k] = float(determinant(column) / det);
+  }
+  return s;
+}
+
+ScaledTransform BlendScrew(const ScaledTransform& a, const ScaledTransform& b,
+                           const ScrewMotion& screw, float amount) {
+  if (!screw.turns) {
+    return Blend(a, b, amount);
+  }
   ScaledTransform out;
   for (int k = 0; k < 3; k++) {
     out.scale[k] = a.scale[k] + (b.scale[k] - a.scale[k]) * amount;
   }
-  Screw s = ScrewOf(a.transform, b.transform);
-  if (!s.turns) {
-    out.transform = Blend(a.transform, b.transform, amount);
-    return out;
-  }
   // a, then the screw's part: x -> (x - point) * turn^amount + point +
-  // amount * slide * axis, about a's position.
-  Matrix3 partial = RotationFromQuaternion(Slerp(Quaternion{}, s.turn, amount));
-  out.transform.rotation = QuaternionFromRotation(Multiply(s.ra, partial));
-  Vec3 turned = Multiply(s.point, partial);
+  // amount * slide, about a's position.
+  Quaternion partial = Slerp(Quaternion{}, screw.turn, amount);
+  out.transform.rotation = Normalized(Then(a.transform.rotation, partial));
+  Vec3 turned = Multiply(screw.point, RotationFromQuaternion(partial));
   for (int k = 0; k < 3; k++) {
     out.transform.position[k] =
-        s.origin[k] + s.point[k] - turned[k] + amount * s.slide * s.axis[k];
+        a.transform.position[k] + screw.point[k] - turned[k] + amount * screw.slide[k];
   }
   return out;
 }
 
+ScaledTransform BlendScrew(const ScaledTransform& a, const ScaledTransform& b, float amount) {
+  return BlendScrew(a, b, ScrewBetween(a.transform, b.transform), amount);
+}
+
 std::optional<Vec3> ScrewAxisPoint(const Transform& a, const Transform& b, const Vec3& near) {
-  Screw s = ScrewOf(a, b);
+  ScrewMotion s = ScrewBetween(a, b);
   if (!s.turns) {
     return std::nullopt;
   }
+  float sine = std::sqrt(s.turn.x * s.turn.x + s.turn.y * s.turn.y + s.turn.z * s.turn.z);
+  Vec3 u{s.turn.x / sine, s.turn.y / sine, s.turn.z / sine};
   Vec3 c;
   float along = 0;
   for (int k = 0; k < 3; k++) {
-    c[k] = s.origin[k] + s.point[k];
-    along += (near[k] - c[k]) * s.axis[k];
+    c[k] = a.position[k] + s.point[k];
+    along += (near[k] - c[k]) * u[k];
   }
   for (int k = 0; k < 3; k++) {
-    c[k] += along * s.axis[k];
+    c[k] += along * u[k];
   }
   return c;
 }

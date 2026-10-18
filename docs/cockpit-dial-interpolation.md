@@ -218,6 +218,22 @@ and where it should be, by the turn a tick:
   turns of 0.1-2.0 rad a tick; the normal blend misses by 2.0 cm at 0.45
   rad and 36 cm at 2 rad.
 
+## `--screw_blend` (2026-10-18, off by default, to test)
+
+With the user's agreement: products planned `kBlend` (turning under
+`kCutAngle` a tick) blend as a screw. `PlanProduct` works out the screw
+once a tick (`ScrewBetween`: the turn, a point on its line relative to the
+older tick's origin, and the slide along it; kept in `ProductPlan`), and
+`BlendProduct` blends along it each frame (`BlendScrew`). Under ~0.001 rad
+a tick it's the old blend. The wheel case (`kSpinning`) is unchanged, so
+the needle's swings over 0.5 rad a tick still jump; that needs a better
+wheel test (next).
+
+- Standalone check: ends exactly at the newer tick (within 6e-5), keeps the
+  point turned about within 0.2 mm at amounts 0.3 and 0.5.
+- Cost: none measurable. Uncapped attract races, alternating: 486 and 479
+  fps on, 484 and 485 off.
+
 ## Next
 
 1. ~~Log the pairing~~: done, not swapped (above).

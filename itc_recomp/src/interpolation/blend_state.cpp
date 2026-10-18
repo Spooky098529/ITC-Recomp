@@ -110,6 +110,11 @@ REXCVAR_DEFINE_BOOL(pair_by_object, true, "ITC",
                     "Pair the per-object recorder's products between ticks by the part being "
                     "drawn (its caller's r31), not only by order, so culling or reordering "
                     "doesn't pair a wheel with another wheel or car");
+REXCVAR_DEFINE_BOOL(screw_blend, false, "ITC",
+                    "Blend world matrices that turn less than kCutAngle a tick as a screw: the "
+                    "turn about the line it's made about plus a slide along it, so a part turning "
+                    "about a point away from its origin (a cockpit needle) stays on it (false: "
+                    "the origin moves straight and the part turns about it)");
 REXCVAR_DEFINE_BOOL(log_moving_products, false, "ITC",
                     "Log moving objects drawn out of step: render-only mismatches, products not "
                     "blended or unpaired, pairings that move unlike their neighbours, and jumps "
@@ -320,6 +325,8 @@ struct ProductPlan {
   bool camera_rejected = false;  // perspective cameras that can't be one camera
   int32_t camera = -1;           // into TickPlans::cameras, if the camera blends
   ScaledTransform wa, wb;        // the world matrices, for kBlend and kSpinning
+  bool screw = false;            // kBlend as a screw (--screw_blend)
+  ScrewMotion screw_motion;
 };
 // A perspective camera in both ticks, shared by the products using it.
 struct CameraPair {
@@ -589,6 +596,10 @@ ProductPlan PlanProduct(const ProductInputs& a, const ProductInputs& b, TickPlan
     plan.wb = *wb;
     if (!IsCut(wa->transform, wb->transform)) {
       plan.world = ProductPlan::World::kBlend;
+      if (REXCVAR_GET(screw_blend)) {
+        plan.screw = true;
+        plan.screw_motion = ScrewBetween(wa->transform, wb->transform);
+      }
     } else if (Distance(wa->transform.position, wb->transform.position) <= kCutDistance &&
                BlendSpinning(*wa, *wb, 0, kCutAngle)) {
       // A wheel: too much spin to blend, but its position and steering can
@@ -668,7 +679,9 @@ Matrix4 BlendProduct(const ReplayedProduct& product, const TickPlans* plans,
   Matrix4 world = b.world;
   std::optional<ScaledTransform> spinning;
   if (plan.world == ProductPlan::World::kBlend) {
-    world = WorldMatrixFromScaledTransform(Blend(plan.wa, plan.wb, amount));
+    world = WorldMatrixFromScaledTransform(
+        plan.screw ? BlendScrew(plan.wa, plan.wb, plan.screw_motion, amount)
+                   : Blend(plan.wa, plan.wb, amount));
   } else if (plan.world == ProductPlan::World::kSpinning &&
              (spinning = BlendSpinning(plan.wa, plan.wb, amount, kCutAngle))) {
     world = WorldMatrixFromScaledTransform(*spinning);
