@@ -957,9 +957,10 @@ sub-menu, with the skip on):
 - **`82119B80` restores the movie's rest pose.** `82119B80(movie, live
   tree, rest tree, ...)` walks the live tree's children (by index, through
   `8259D658`) with the rest tree's matching ones, and for nodes whose tag
-  (word +0) is one of six types (`0x47525000` "GRP" recursed into,
-  `0x50494300`, `0x50524D00`, `0x53434500`, `0x54584D00`, `0x54465400`-ish:
-  the six constants in the function) copies the rest node's fields over
+  (word +0) is one of six types (`0x47525000` "GRP", recursed into;
+  `0x50494300` "PIC", `0x50524D00` "PRM", `0x53434500` "SCE",
+  `0x54464D00` "TFM", and `0x54585400` "TXT")
+  copies the rest node's fields over
   the live one: +12..+60 and +68..+80 for all of them, and per type
   +100..+136 or more (`82119D74` copies a sub-list through `8259D628`).
 - So each update applies the tracks onto the rest pose, draws, and
