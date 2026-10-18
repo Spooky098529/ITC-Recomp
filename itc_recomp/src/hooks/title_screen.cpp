@@ -9,6 +9,7 @@
 
 #include "title_screen.h"
 
+#include "frame_pacing/game_messages.h"
 #include "guest.h"
 
 #include <rex/cvar.h>
@@ -23,6 +24,11 @@ REXCVAR_DEFINE_BOOL(log_boot_modes, false, "ITC",
 REXCVAR_DEFINE_BOOL(skip_intro, false, "ITC",
                     "Testing: skip the Ubisoft logo movie, and run the Genki logo and the "
                     "title screen's intro without the 30 Hz tick wait (until the first race)");
+// docs/pause-menu-fix.md: Scene::Update runs on every pass, render-only
+// ones too; this bisects which part of it acts on input there.
+REXCVAR_DEFINE_STRING(render_only_scene_skip, "", "ITC",
+                      "Testing: parts of Scene::Update (sub_820988C8) to skip on render-only "
+                      "passes (comma-separated: swap, toggle, slot6, slot2)");
 REXCVAR_DEFINE_INT32(attract_after_s, 0, "ITC",
                      "Testing: seconds the title screen waits before the attract race "
                      "(0 = the game's 20)");
@@ -90,7 +96,53 @@ extern "C" REX_FUNC(sub_820988C8) {
       last = now;
     }
   }
-  __imp__sub_820988C8(ctx, base);
+  std::string skip = REXCVAR_GET(render_only_scene_skip);
+  if (skip.empty()) {
+    __imp__sub_820988C8(ctx, base);
+    return;
+  }
+  // The same calls as the translated code, each skippable on render-only
+  // passes. r3 = scene; r3 + 8 is a double buffer (sub_8258C9C0 flips its
+  // index, sub_8258C998 moves its count); sub_82591838 flips the flag at
+  // 0x82970BC4; r3 + 64 is the scene's screen object (vtable slots 6, 2).
+  auto skipped = [&](const char* part) {
+    return frame_pacing::GameMessages_IsRenderOnlyPass() &&
+           (',' + skip + ',').find(std::string(",") + part + ",") != std::string::npos;
+  };
+  uint32_t scene = ctx.r3.u32;
+  uint64_t saved_lr = ctx.lr;
+  if (!skipped("swap")) {
+    ctx.r3.u64 = scene + 8;
+    ctx.lr = 0x820988EC;
+    sub_8258C9C0(ctx, base);
+    ctx.r3.u64 = scene + 8;
+    ctx.lr = 0x820988F4;
+    sub_8258C998(ctx, base);
+  }
+  if (!skipped("toggle")) {
+    ctx.lr = 0x820988F8;
+    sub_82591838(ctx, base);
+  }
+  uint32_t screen = scene + 64;
+  uint32_t vtable = guest::LoadU32(base, screen);
+  static bool logged = false;
+  if (!logged) {
+    logged = true;
+    REXLOG_INFO("scene update: scene {:08X} screen vtable {:08X} slot 6 {:08X} slot 2 {:08X}",
+                scene, vtable, guest::LoadU32(base, vtable + 24),
+                guest::LoadU32(base, vtable + 8));
+  }
+  if (!skipped("slot6")) {
+    ctx.r3.u64 = screen;
+    ctx.lr = 0x82098910;
+    REX_CALL_INDIRECT_FUNC(guest::LoadU32(base, vtable + 24));
+  }
+  if (!skipped("slot2")) {
+    ctx.r3.u64 = screen;
+    ctx.lr = 0x82098924;
+    REX_CALL_INDIRECT_FUNC(guest::LoadU32(base, guest::LoadU32(base, screen) + 8));
+  }
+  ctx.lr = saved_lr;
 }
 
 // The boot's movie step, run every tick while a movie plays (the Ubisoft
