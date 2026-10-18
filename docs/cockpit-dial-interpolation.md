@@ -397,6 +397,43 @@ over 0.3 rad off, or the hub over 2 cm off its place on the car.
   Knowing the parent needs the game's hierarchy: whether the multiplies
   of a part's local matrix by its parent's can be seen is not known yet.
 
+## The angle cut removed (2026-10-19)
+
+`PlanProduct` no longer cuts on the angle: a product blends unless it jumps
+over kCutDistance, and any turn blends the short way. The wheel path
+(kSpinning, `BlendSpinning`, its stats and log fields) is gone from the
+game; `BlendSpinning` stays in `transform.cpp` for the tests. The angle cut
+stays for cameras (`IsSameCamera`, the camera passes) and the per-object
+path. In the tests, "normal" and "screw" are now the game's blends without
+the cut. "relative" keeps the old cut, for comparison.
+
+The tests again (worst frame):
+
+- **Needles, plain blend (the default):** the wheel path's 0.3-1.2 m are
+  gone, but the plain blend's own error grows with the swing: 26 mm at
+  0.6 rad a tick, 71 mm at 1.0, 266 mm at 2.0 (parked); 42 mm at 0.6 with
+  the car turning 0.2 a tick. No flips under pi a tick.
+- **Needles, `--screw_blend`:** exact when parked at any speed under pi
+  a tick, but off once the car moves (1 m a tick: 21 mm at 0.6, 75 mm at
+  2.0; turning 0.2 a tick: 83 mm at 0.6, 514 mm at 3.0).
+- **Needles, relative uncut (not in the game):** exact as before (0.0-0.5
+  mm) up to 3.0 rad a tick.
+- **Wheels, plain blend: exact up to 108 km/h** (0-2 px, hub under 1 mm)
+  for the player's car and other cars, where they stepped at 30 Hz with
+  the cut. Above 108 km/h, blended the short way (44 of 55 frames wrong,
+  rim ~80 px off), as expected.
+- **Wheels, `--screw_blend`: off their hubs at every speed** without the
+  cut, since fast wheels now reach the screw: 15 mm at 22 km/h, 99 mm at
+  54 km/h, ~470 mm at 108 km/h, 618 mm for another car at 270 km/h. So
+  without the cut, `--screw_blend` breaks wheels. Before, the cut kept
+  them on the wheel path.
+
+So with the cut gone, the default (plain) blend interpolates wheels
+properly up to 108 km/h, but leaves needles off their spindle on fast
+swings. `--screw_blend` fixes parked needles but breaks wheels. The rule
+that works for both is still to blend each part relative to its parent
+(the previous section's conclusion).
+
 ## Next
 
 1. ~~Log the pairing~~: done, not swapped (above).

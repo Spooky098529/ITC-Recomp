@@ -76,10 +76,12 @@ bool IsSameCamera(const PerspectiveCamera& a, const PerspectiveCamera& b) {
          close(a.x_scale / a.y_scale, b.x_scale / b.y_scale, 0.01f) &&
          close(a.depth_scale, b.depth_scale, 0.01f) && close(a.depth_offset, b.depth_offset, 0.01f);
 }
-// kNormal and kScrew are the game's blends (--screw_blend off and on);
+// kNormal and kScrew are the game's blends (--screw_blend off and on), with
+// no angle cut since 2026-10-19 (any turn blends, the short way).
 // kRelative is a proposal: the product blended relative to its camera
-// (world * view, as a screw), then drawn with the blended camera.
-// kRelativeUncut is that without kCutAngle: any turn blends, the short way.
+// (world * view, as a screw), then drawn with the blended camera; it keeps
+// the old angle cut (past kCutAngle, the wheel path) for comparison.
+// kRelativeUncut is that without the cut.
 enum class Mode { kNormal, kScrew, kRelative, kRelativeUncut };
 struct ProductPlan {
   enum class World { kNone, kBlend, kSpinning } world = World::kNone;
@@ -118,9 +120,9 @@ ProductPlan PlanProduct(const Matrix4& world_a, const Matrix4& vp_a, const Matri
   if (wa && wb) {
     plan.wa = *wa;
     plan.wb = *wb;
-    bool cut = mode == Mode::kRelativeUncut
-                   ? Distance(wa->transform.position, wb->transform.position) > kCutDistance
-                   : IsCut(wa->transform, wb->transform);
+    bool cut = mode == Mode::kRelative
+                   ? IsCut(wa->transform, wb->transform)
+                   : Distance(wa->transform.position, wb->transform.position) > kCutDistance;
     if (!cut) {
       plan.world = ProductPlan::World::kBlend;
       if (screw_blend) {

@@ -111,7 +111,7 @@ REXCVAR_DEFINE_BOOL(pair_by_object, true, "ITC",
                     "drawn (its caller's r31), not only by order, so culling or reordering "
                     "doesn't pair a wheel with another wheel or car");
 REXCVAR_DEFINE_BOOL(screw_blend, false, "ITC",
-                    "Blend world matrices that turn less than kCutAngle a tick as a screw: the "
+                    "Blend world matrices as a screw: the "
                     "turn about the line it's made about plus a slide along it, so a part turning "
                     "about a point away from its origin (a cockpit needle) stays on it (false: "
                     "the origin moves straight and the part turns about it)");
@@ -333,12 +333,12 @@ std::array<uint32_t, 9> g_record_context{};
 // inputs: the decompositions and camera splits don't depend on the frame's
 // amount, so the render thread only blends and multiplies.
 struct ProductPlan {
-  enum class World : uint8_t { kNone, kBlend, kSpinning };
+  enum class World : uint8_t { kNone, kBlend };
   World world = World::kNone;
   bool world_differs = false;    // the ticks' world matrices differ (for the stats)
   bool camera_rejected = false;  // perspective cameras that can't be one camera
   int32_t camera = -1;           // into TickPlans::cameras, if the camera blends
-  ScaledTransform wa, wb;        // the world matrices, for kBlend and kSpinning
+  ScaledTransform wa, wb;        // the world matrices, for kBlend
   bool screw = false;            // kBlend as a screw (--screw_blend)
   ScrewMotion screw_motion;
 };
@@ -589,7 +589,6 @@ struct BlendStats {
   int unpaired = 0;
   int world_not_blended = 0;
   int camera_not_blended = 0;
-  int spinning = 0;
 };
 
 // What went into a blended product, for the per-object recorder's other
@@ -623,17 +622,16 @@ ProductPlan PlanProduct(const ProductInputs& a, const ProductInputs& b, TickPlan
   if (wa && wb) {
     plan.wa = *wa;
     plan.wb = *wb;
-    if (!IsCut(wa->transform, wb->transform)) {
+    // Only a jump is a cut: any turn blends, the short way round. (A turn
+    // over kCutAngle used to take the newer tick's spin about one of the
+    // mesh's axes, for wheels, which put parts turning about a point away
+    // from their origin, cockpit needles, far off it; tests/needle_blend.cpp.)
+    if (Distance(wa->transform.position, wb->transform.position) <= kCutDistance) {
       plan.world = ProductPlan::World::kBlend;
       if (REXCVAR_GET(screw_blend)) {
         plan.screw = true;
         plan.screw_motion = ScrewBetween(wa->transform, wb->transform);
       }
-    } else if (Distance(wa->transform.position, wb->transform.position) <= kCutDistance &&
-               BlendSpinning(*wa, *wb, 0, kCutAngle)) {
-      // A wheel: too much spin to blend, but its position and steering can
-      // be. (Whether BlendSpinning blends doesn't depend on the amount.)
-      plan.world = ProductPlan::World::kSpinning;
     }
   }
   plan.world_differs = a.world != b.world;
@@ -709,15 +707,10 @@ Matrix4 BlendProduct(const ReplayedProduct& product, const TickPlans* plans,
   const ProductPlan& plan = plans->products[size_t(product.tick->plan)];
   const ProductInputs& b = product.tick->now;
   Matrix4 world = b.world;
-  std::optional<ScaledTransform> spinning;
   if (plan.world == ProductPlan::World::kBlend) {
     world = WorldMatrixFromScaledTransform(
         plan.screw ? BlendScrew(plan.wa, plan.wb, plan.screw_motion, amount)
                    : Blend(plan.wa, plan.wb, amount));
-  } else if (plan.world == ProductPlan::World::kSpinning &&
-             (spinning = BlendSpinning(plan.wa, plan.wb, amount, kCutAngle))) {
-    world = WorldMatrixFromScaledTransform(*spinning);
-    stats.spinning++;
   } else if (plan.world_differs) {
     stats.world_not_blended++;
   }
@@ -1616,13 +1609,13 @@ class DrawState {
   // Diagnostics (--log_near_camera_turns): a paired product near its camera
   // (in cockpit view, the dashboard) whose world matrix turns relative to the
   // camera between ticks. Blending moves a world matrix's origin in a
-  // straight line and turns it about that origin (or, past kCutAngle, takes
-  // the newer tick's turn as for a wheel), so a part turning about a point
-  // away from its origin leaves that point mid-blend.
+  // straight line and turns it about that origin (without --screw_blend), so
+  // a part turning about a point away from its origin leaves that point
+  // mid-blend.
   struct NearCameraTurns {
     int ticks = 0;
-    int turning[3] = {0, 0, 0};  // by ProductPlan::World
-    float largest[3] = {0, 0, 0};
+    int turning[2] = {0, 0};  // by ProductPlan::World
+    float largest[2] = {0, 0};
     int lines_this_tick = 0;
   } near_turns_;
   void LogNearCameraTurn(const ProductInputs& a, const ProductInputs& b, const ProductPlan& plan,
@@ -1684,7 +1677,7 @@ class DrawState {
     // In the world (what the blend works on): its own turn and movement.
     float world_turn = AngleBetween(plan.wa.transform.rotation, plan.wb.transform.rotation);
     float world_moved = Distance(plan.wa.transform.position, plan.wb.transform.position);
-    static const char* kKinds[] = {"not blended", "blend", "spinning"};
+    static const char* kKinds[] = {"not blended", "blend"};
     REXLOG_INFO("near turn: tick {} {} turn {:.3f} rad (world {:.3f}) origin moved {:.4f} m "
                 "(world {:.3f}) radius {:.4f} m, view pos {:.3f} {:.3f} {:.3f} scale {:.3f}, "
                 "caller {:08X} r31 {:08X}",
@@ -1696,11 +1689,10 @@ class DrawState {
     if (++near_turns_.ticks % 60 != 0) {
       return;
     }
-    REXLOG_INFO("near turns (2 s): not blended {} (largest {:.3f} rad), blend {} ({:.3f}), "
-                "spinning {} ({:.3f})",
+    REXLOG_INFO("near turns (2 s): not blended {} (largest {:.3f} rad), blend {} ({:.3f})",
                 near_turns_.turning[0], near_turns_.largest[0], near_turns_.turning[1],
-                near_turns_.largest[1], near_turns_.turning[2], near_turns_.largest[2]);
-    for (int k = 0; k < 3; k++) {
+                near_turns_.largest[1]);
+    for (int k = 0; k < 2; k++) {
       near_turns_.turning[k] = 0;
       near_turns_.largest[k] = 0;
     }
@@ -2130,7 +2122,7 @@ DrawState& GetDrawState() {
 // somewhere its motion doesn't explain since the last frame.
 class MovingProductsLog {
  public:
-  enum class Outcome { kBlended, kSpinning, kWorldNotBlended, kUnpaired };
+  enum class Outcome { kBlended, kWorldNotBlended, kUnpaired };
 
   void OnProduct(uint32_t payload, const ReplayedProduct& product, const Matrix4& world_shown,
                  Outcome outcome) {
@@ -2199,7 +2191,6 @@ class MovingProductsLog {
   static const char* Name(Outcome o) {
     switch (o) {
       case Outcome::kBlended: return "blended";
-      case Outcome::kSpinning: return "spinning";
       case Outcome::kWorldNotBlended: return "world not blended";
       case Outcome::kUnpaired: return "unpaired";
     }
@@ -2457,7 +2448,6 @@ class ReplayCameras {
     if (REXCVAR_GET(log_moving_products)) {
       using Outcome = MovingProductsLog::Outcome;
       Outcome outcome = stats_.blend.unpaired != before.unpaired       ? Outcome::kUnpaired
-                        : stats_.blend.spinning != before.spinning     ? Outcome::kSpinning
                         : stats_.blend.world_not_blended != before.world_not_blended
                             ? Outcome::kWorldNotBlended
                             : Outcome::kBlended;
@@ -2481,7 +2471,7 @@ class ReplayCameras {
     struct Record {
       uint64_t frame, tick;
       float amount, turn;
-      uint8_t world;  // ProductPlan::World, or 3 for unpaired
+      uint8_t world;  // ProductPlan::World
       uint32_t caller, r26;
       std::array<float, 2> drawn, ideal, screw;
       uint32_t r31 = 0;
@@ -2586,7 +2576,7 @@ class ReplayCameras {
       if (!file) {
         return;
       }
-      static const char* kKinds[] = {"none", "blend", "spinning", "unpaired"};
+      static const char* kKinds[] = {"none", "blend"};
       for (const Record& r : records) {
         float dx = r.drawn[0] - r.ideal[0], dy = r.drawn[1] - r.ideal[1];
         float sx = r.screw[0] - r.ideal[0], sy = r.screw[1] - r.ideal[1];
@@ -2645,10 +2635,9 @@ class ReplayCameras {
       }
     }
     REXLOG_INFO(
-        "replay: {} frames; per frame {} uploads, {} blended ({} spinning, {} world, {} camera not "
-        "blended), "
+        "replay: {} frames; per frame {} uploads, {} blended ({} world, {} camera not blended), "
         "{} unpaired, not replaced: {} unchanged since last frame, {} changed",
-        stats_.frames, stats_.uploads / f, stats_.blend.blended / f, stats_.blend.spinning / f,
+        stats_.frames, stats_.uploads / f, stats_.blend.blended / f,
         stats_.blend.world_not_blended / f, stats_.blend.camera_not_blended / f,
         stats_.blend.unpaired / f, stats_.not_substituted_same / f,
         stats_.not_substituted_changed / f);
