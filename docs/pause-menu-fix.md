@@ -593,8 +593,13 @@ override moved there from `pause_menu_log.cpp`, which now counts the
 update's runs through `debug::PauseMenuLog_NoteMapperUpdate`, so skipped
 calls aren't counted). An attract race with the flag on (`itc_028.log`)
 shows the update on logic passes only, 30 a second, and none on
-render-only passes. Next: the user's run with the flag, and a
-`--max_fps=30` reference run (pause, hold the stick down ~5 s).
+render-only passes. Next: the user's run with the flag.
+
+**Checked by the user** (2026-10-18, 144 fps, `--pause_workaround=false`,
+runs with the flag on, off, and on again): with the flag on the pause
+menu's repeat is right, and driving feels the same as with it off. The
+`--max_fps=30` reference run in the log wasn't done; the user's check
+stands in for it.
 
 ### Step 3: remove the workaround
 
