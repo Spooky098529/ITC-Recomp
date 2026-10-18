@@ -58,6 +58,17 @@ ScaledTransform Blend(const ScaledTransform& a, const ScaledTransform& b, float 
 std::optional<ScaledTransform> BlendSpinning(const ScaledTransform& a, const ScaledTransform& b,
                                              float amount, float max_swing);
 
+// The point, in `a` and `b`'s scaled local frame (local * scale), that both
+// place at the same spot: the point an object turning about a fixed point
+// (a dial's spindle) turns about. The one nearest the local origin along the
+// turn's axis. Returns nothing unless the scales match and the point lands
+// within `tolerance` of the same spot in both.
+std::optional<Vec3> FixedPoint(const ScaledTransform& a, const ScaledTransform& b, float tolerance);
+// Blends a turn about such a point: the rotation along the shortest arc, and
+// the position so the point stays put (blended straight, if it moved).
+ScaledTransform BlendAboutPoint(const ScaledTransform& a, const ScaledTransform& b,
+                                const Vec3& point, float amount);
+
 // Blends between two 4x4 matrices that differ by a rigid motion, such as
 // view-projection or world-view-projection matrices from consecutive ticks:
 // a * D or D * a for a rotation plus translation D, in either layout. Blends

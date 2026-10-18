@@ -113,6 +113,10 @@ REXCVAR_DEFINE_BOOL(log_moving_products, false, "ITC",
                     "Log moving objects drawn out of step: render-only mismatches, products not "
                     "blended or unpaired, pairings that move unlike their neighbours, and jumps "
                     "between frames");
+REXCVAR_DEFINE_BOOL(blend_about_spindle, true, "ITC",
+                    "Parts near the camera that turn about a point away from their origin "
+                    "(cockpit dials' needles) blend turning about that point in the camera's "
+                    "frame, instead of moving their origin straight (or, turning fast, as wheels)");
 REXCVAR_DEFINE_BOOL(log_near_camera_turns, false, "ITC",
                     "Once a tick: products within 3 m of their camera whose world matrix turns "
                     "relative to the camera between ticks (cockpit dials), with how they blend "
@@ -291,6 +295,15 @@ struct ProductPlan {
   bool camera_rejected = false;  // perspective cameras that can't be one camera
   int32_t camera = -1;           // into TickPlans::cameras, if the camera blends
   ScaledTransform wa, wb;        // the world matrices, for kBlend and kSpinning
+  int32_t spindle = -1;          // into TickPlans::spindles (--blend_about_spindle)
+};
+// A part turning about a point away from its origin, relative to its camera
+// (a dial's needle): both ticks' world matrices in camera space, the point,
+// and the cameras' placements.
+struct SpindlePlan {
+  ScaledTransform ra, rb;
+  Vec3 point;  // in the part's scaled local frame
+  Transform camera_a, camera_b;
 };
 // A perspective camera in both ticks, shared by the products using it.
 struct CameraPair {
@@ -308,6 +321,7 @@ struct TickProduct {
 struct TickPlans {
   std::vector<ProductPlan> products;
   std::vector<CameraPair> cameras;
+  std::vector<SpindlePlan> spindles;
   // Each of the tick's products (--publish_by_tick).
   std::vector<TickProduct> tick_products;
 };
@@ -516,6 +530,7 @@ struct BlendStats {
   int world_not_blended = 0;
   int camera_not_blended = 0;
   int spinning = 0;
+  int spindle = 0;
 };
 
 // What went into a blended product, for the per-object recorder's other
@@ -541,6 +556,57 @@ struct CameraPairKeyHash {
     return size_t(h ^ (h >> 29));
   }
 };
+// --blend_about_spindle: whether the part turns, relative to its camera,
+// about a point away from its origin (the tachometer's needle: 0.8 m, its
+// origin being the car's), and if so how to blend it. Blending its world
+// matrix moves the origin straight across the arc it follows, so the
+// spindle wanders mid-tick, and past kCutAngle it's taken for a wheel: its
+// turn snaps to the newer tick while its origin slides. Parts turning about
+// their own origin (wheels) are left as they were. Any motion in a plane
+// turns about some point (a wheel rolling past the camera), so PlanTick
+// also wants the same point of the part in consecutive ticks.
+std::optional<SpindlePlan> SpindleCandidate(const ProductInputs& a, const ProductInputs& b,
+                                            const ProductPlan& plan, const TickPlans& plans) {
+  constexpr float kMinTurn = 0.005f;   // radians in a tick
+  constexpr float kMaxTurn = 2.5f;     // below half a turn, so the arc is the right one
+  constexpr float kNear = 3.0f;        // metres from the camera
+  constexpr float kMinRadius = 0.01f;  // metres from the origin to the point
+  if (plan.camera_rejected || !(plan.world_differs) ||
+      AngleBetween(plan.wa.transform.rotation, plan.wb.transform.rotation) < kMinTurn) {
+    return std::nullopt;
+  }
+  Transform camera_a, camera_b;
+  if (plan.camera >= 0) {
+    camera_a = plans.cameras[size_t(plan.camera)].a.camera;
+    camera_b = plans.cameras[size_t(plan.camera)].b.camera;
+  } else if (a.view_projection == b.view_projection) {
+    std::optional<PerspectiveCamera> camera = SplitViewProjection(b.view_projection);
+    if (!camera) {
+      return std::nullopt;
+    }
+    camera_a = camera_b = camera->camera;
+  } else {
+    return std::nullopt;
+  }
+  std::optional<ScaledTransform> ra =
+      ScaledTransformFromWorldMatrix(Multiply(a.world, ViewMatrixFromTransform(camera_a)));
+  std::optional<ScaledTransform> rb =
+      ScaledTransformFromWorldMatrix(Multiply(b.world, ViewMatrixFromTransform(camera_b)));
+  if (!ra || !rb) {
+    return std::nullopt;
+  }
+  const Vec3& position = rb->transform.position;
+  float turn = AngleBetween(ra->transform.rotation, rb->transform.rotation);
+  if (Distance(position, {0, 0, 0}) > kNear || turn < kMinTurn || turn > kMaxTurn) {
+    return std::nullopt;
+  }
+  std::optional<Vec3> point = FixedPoint(*ra, *rb, 0.002f);
+  if (!point || Distance(*point, {0, 0, 0}) < kMinRadius) {
+    return std::nullopt;
+  }
+  return SpindlePlan{*ra, *rb, *point, camera_a, camera_b};
+}
+
 ProductPlan PlanProduct(const ProductInputs& a, const ProductInputs& b, TickPlans& plans,
                         std::unordered_map<CameraPairKey, int32_t, CameraPairKeyHash>& cameras) {
   ProductPlan plan;
@@ -629,7 +695,16 @@ Matrix4 BlendProduct(const ReplayedProduct& product, const TickPlans* plans,
   const ProductInputs& b = product.tick->now;
   Matrix4 world = b.world;
   std::optional<ScaledTransform> spinning;
-  if (plan.world == ProductPlan::World::kBlend) {
+  if (plan.spindle >= 0) {
+    // Turned about its spindle in the camera's frame, then put back in the
+    // world by the camera as blended below.
+    const SpindlePlan& spindle = plans->spindles[size_t(plan.spindle)];
+    Matrix4 relative =
+        WorldMatrixFromScaledTransform(BlendAboutPoint(spindle.ra, spindle.rb, spindle.point, amount));
+    world = Multiply(relative,
+                     WorldMatrixFromTransform(Blend(spindle.camera_a, spindle.camera_b, amount)));
+    stats.spindle++;
+  } else if (plan.world == ProductPlan::World::kBlend) {
     world = WorldMatrixFromScaledTransform(Blend(plan.wa, plan.wb, amount));
   } else if (plan.world == ProductPlan::World::kSpinning &&
              (spinning = BlendSpinning(plan.wa, plan.wb, amount, kCutAngle))) {
@@ -1536,6 +1611,8 @@ class DrawState {
   struct NearCameraTurns {
     int ticks = 0;
     int turning[3] = {0, 0, 0};  // by ProductPlan::World
+    int spindles = 0;            // of them, blended about their spindle
+    int spindle_plans = 0;       // every product blended about its spindle
     float largest[3] = {0, 0, 0};
     int lines_this_tick = 0;
   } near_turns_;
@@ -1562,6 +1639,7 @@ class DrawState {
     }
     int kind = int(plan.world);
     near_turns_.turning[kind]++;
+    near_turns_.spindles += plan.spindle >= 0;
     near_turns_.largest[kind] = std::max(near_turns_.largest[kind], turn);
     if (near_turns_.lines_this_tick++ >= 12) {
       return;
@@ -1574,10 +1652,10 @@ class DrawState {
     float world_turn = AngleBetween(plan.wa.transform.rotation, plan.wb.transform.rotation);
     float world_moved = Distance(plan.wa.transform.position, plan.wb.transform.position);
     static const char* kKinds[] = {"not blended", "blend", "spinning"};
-    REXLOG_INFO("near turn: tick {} {} turn {:.3f} rad (world {:.3f}) origin moved {:.4f} m "
+    REXLOG_INFO("near turn: tick {} {}{} turn {:.3f} rad (world {:.3f}) origin moved {:.4f} m "
                 "(world {:.3f}) radius {:.4f} m, view pos {:.3f} {:.3f} {:.3f} scale {:.3f}, "
                 "caller {:08X} r31 {:08X}",
-                near_turns_.ticks, kKinds[kind], turn, world_turn, moved, world_moved, radius,
+                near_turns_.ticks, kKinds[kind], plan.spindle >= 0 ? " (about spindle)" : "", turn, world_turn, moved, world_moved, radius,
                 pb[0], pb[1], pb[2], vb->scale[0], b.context[0], b.context[8]);
   }
   void LogNearCameraTurnsSummary() {
@@ -1586,12 +1664,35 @@ class DrawState {
       return;
     }
     REXLOG_INFO("near turns (2 s): not blended {} (largest {:.3f} rad), blend {} ({:.3f}), "
-                "spinning {} ({:.3f})",
+                "spinning {} ({:.3f}); about their spindle {} (all products: {})",
                 near_turns_.turning[0], near_turns_.largest[0], near_turns_.turning[1],
-                near_turns_.largest[1], near_turns_.turning[2], near_turns_.largest[2]);
+                near_turns_.largest[1], near_turns_.turning[2], near_turns_.largest[2],
+                near_turns_.spindles, near_turns_.spindle_plans);
+    near_turns_.spindles = 0;
+    near_turns_.spindle_plans = 0;
     for (int k = 0; k < 3; k++) {
       near_turns_.turning[k] = 0;
       near_turns_.largest[k] = 0;
+    }
+  }
+
+  // --blend_about_spindle: each part's spindle as last found (in its scaled
+  // local frame), by its key in the previous tick, and as found this tick.
+  std::unordered_map<ProductKey, Vec3, ProductKeyHash> spindle_points_, next_spindle_points_;
+  void PlanSpindle(const ProductKey& key, const ProductKey& before_key, const ProductInputs& a,
+                   const ProductInputs& b, TickPlans& plans) {
+    constexpr float kSamePoint = 0.005f;  // metres
+    ProductPlan& plan = plans.products.back();
+    std::optional<SpindlePlan> candidate = SpindleCandidate(a, b, plan, plans);
+    auto known = spindle_points_.empty() ? spindle_points_.end() : spindle_points_.find(before_key);
+    if (candidate) {
+      if (known != spindle_points_.end() && Distance(known->second, candidate->point) <= kSamePoint) {
+        plan.spindle = int32_t(plans.spindles.size());
+        plans.spindles.push_back(*candidate);
+      }
+      next_spindle_points_[key] = candidate->point;
+    } else if (known != spindle_points_.end()) {
+      next_spindle_points_[key] = known->second;  // kept while it rests
     }
   }
 
@@ -1609,11 +1710,17 @@ class DrawState {
       }
       plan_of_[key] = int32_t(plans->products.size());
       plans->products.push_back(PlanProduct(before->second, now->second, *plans, camera_pairs_));
+      if (REXCVAR_GET(blend_about_spindle)) {
+        PlanSpindle(key, before_key, before->second, now->second, *plans);
+      }
       if (REXCVAR_GET(log_near_camera_turns)) {
         LogNearCameraTurn(before->second, now->second, plans->products.back());
       }
     }
+    std::swap(spindle_points_, next_spindle_points_);
+    next_spindle_points_.clear();
     if (REXCVAR_GET(log_near_camera_turns)) {
+      near_turns_.spindle_plans += int(plans->spindles.size());
       LogNearCameraTurnsSummary();
     }
     tick_product_keys_.clear();
