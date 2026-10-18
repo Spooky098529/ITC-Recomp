@@ -352,7 +352,7 @@ through render-only copies (`OnCopy`, kept, harmless), restoring the camera
 passes before Draw (since removed), and hiding
 `sub_821225D8`, `sub_820DDE58`, `820F6068` and HUD handlers.
 
-**The rival logo at the race start** (not fixed yet; branch
+**The rival logo at the race start** (fix being tested; branch
 `rival-logo-flicker`). Entering a race against a rival plays the rival
 intro cutscene (about 13 s): the rival's cars, with the rival's 2D logo
 over them. The logo flickers with frames above 30; the attract race's
@@ -385,9 +385,28 @@ with logs (2026-10-18, `itc_064.log` to `itc_066.log`):
   `sub_821591F0`), then makes virtual calls (slot 0) on the objects at
   this + 0x10BB0 and (if set) this + 0x10BB4, then calls `sub_820AAE40`
   (a jump to `sub_820AA550`) on `[[0x826C2CE8]]` and on
-  `[[0x826C2CE8] + 4]`. Which of these step the cutscene and which reaches
-  the logo's movie (`sub_82211A28`) isn't known yet; the calls are virtual, so
-  it needs a log, not a read.
+  `[[0x826C2CE8] + 4]`.
+- The logo's draw, read from `generated/`: `sub_82211A28` has one caller,
+  `sub_82155A28` (at `0x82155BDC`, r3 = its object + 10760, when bit 8 of
+  object + 10764 is set, behind several branches on the cutscene's
+  state), which is called only from `sub_821561F8`, which has no direct
+  caller (a virtual method; most likely slot 0 of the object at
+  this + 0x10BB0, not checked). So the logo's draw is nested inside the
+  cutscene's step, not one of `sub_821594B8`'s own calls.
+- `sub_82211A28(entry)`: if bit 8 of `entry + 4` (shown) is set, looks up
+  the movie by its id at `entry + 8` (`sub_8211B3F0` on `0x826C5CCC`),
+  advances and draws it (`sub_8211E1B8`, r4 = 0, which jumps to the UI
+  movie update `sub_8211D2F8`; the call at `0x82211A74`); if that returns
+  0 (the movie ended), calls `sub_8211DF20(movie, id)` and sets bit 16 of
+  `entry + 4`.
+- Fix (the user's design, `--redraw_rival_logo`, on by default): a native
+  override of `sub_821594B8` (`per_frame_logic.cpp`). Render-only passes
+  deliver Update to `82159948` too (`game_messages.cpp`, as for the race
+  overlays). On logic passes the override runs the original, and a
+  pass-through hook on `sub_82211A28` notes the entry it's called with
+  during it; on render-only passes it runs nothing of the cutscene, only
+  `sub_82211A28` (the game's) on that entry, if the logic pass drew. The
+  UI movie replay keeps the logo advancing once a tick.
 
 **Replaying** (`ReplayFromLogicPass`): when a call both steps an object's
 state and draws it, skipping it would stop the drawing too (the HUD
