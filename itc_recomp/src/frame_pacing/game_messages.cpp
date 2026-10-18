@@ -2,6 +2,7 @@
 
 #include "debug/frame_state_diff.h"
 #include "debug/idle_timer_scan.h"
+#include "debug/menu_selection_scan.h"
 #include "guest.h"
 #include "interpolation/blend_state.h"
 
@@ -128,6 +129,7 @@ constexpr uint32_t kPauseScreenDraw = 0x8216CF08;
 bool g_pause_drawn_this_pass = false;
 bool g_paused = false;
 uint32_t g_current_tick = 0;  // the tick handler running (its target), or 0
+uint32_t g_input_listener0 = 0;
 
 // Diagnostics (--log_input): the pause signs as of the race draw step's last
 // entry, and the message and tick handlers run, by pass type and those signs.
@@ -370,6 +372,7 @@ void Deliver(PPCContext& ctx, uint8_t* base, uint32_t dispatcher, uint32_t messa
     uint32_t used_before = list ? guest::LoadU32(base, list + kCommandListUsedOffset) : 0;
     debug::FrameStateDiff_Before(base);
     debug::IdleTimerScan_Before(base);
+    debug::MenuSelectionScan_Before(base);
     interpolation::BlendState_SetHandler(target);
     g_current_handler = target;
     g_current_message = guest::LoadU32(base, message);
@@ -383,6 +386,7 @@ void Deliver(PPCContext& ctx, uint8_t* base, uint32_t dispatcher, uint32_t messa
     g_current_handler = 0;
     g_current_message = ~0u;
     interpolation::BlendState_SetHandler(0);
+    debug::MenuSelectionScan_After(base, "message handler", target);
     debug::IdleTimerScan_After(base, "message handler", target);
     debug::FrameStateDiff_After(base, "message handler", target);
     if (REXCVAR_GET(log_recording_handlers) && list &&
@@ -484,6 +488,14 @@ void GameMessages_PassFromAnyThread(uint64_t& number, bool& render_only, bool& m
 
 bool GameMessages_InRace() {
   return g_in_race;
+}
+
+bool GameMessages_Paused() {
+  return g_paused;
+}
+
+uint32_t GameMessages_InputListener0() {
+  return g_input_listener0;
 }
 
 bool SkipTickHandlerOnRenderOnlyPass(uint32_t target) {
@@ -634,6 +646,13 @@ extern "C" REX_FUNC(sub_820990F0) {
     g_input_manager_logged = true;
     LogInputManager(ctx, base, ctx.r3.u32);
   }
+  {
+    // Listener 0's object (first node of listener slot 0), for diagnostics.
+    uint32_t s = ctx.r3.u32 + 3924;
+    uint32_t head = guest::LoadU32(base, s);
+    uint32_t node = head && guest::LoadU32(base, s + 4) ? guest::LoadU32(base, head + 4) : 0;
+    frame_pacing::g_input_listener0 = node && node != head ? guest::LoadU32(base, node + 8) : 0;
+  }
   if (REXCVAR_GET(log_input_writes)) {
     // The manager (its last part, the listener slots, ends at +3984) and
     // each listener's first object, 416 bytes (the processors' size: they
@@ -711,11 +730,13 @@ extern "C" REX_FUNC(sub_82099A98) {
                              guest::LoadU32(base, guest::LoadU32(base, ctx.r4.u32) + 4), target);
   debug::FrameStateDiff_Before(base);
   debug::IdleTimerScan_Before(base);
+  debug::MenuSelectionScan_Before(base);
   frame_pacing::InputWatch_Before(base);
   frame_pacing::g_current_tick = target;
   __imp__sub_82099A98(ctx, base);
   frame_pacing::g_current_tick = 0;
   frame_pacing::InputWatch_After(base, frame_pacing::kTickRun, target);
+  debug::MenuSelectionScan_After(base, "tick handler", target);
   debug::IdleTimerScan_After(base, "tick handler", target);
   debug::FrameStateDiff_After(base, "tick handler", target);
 }

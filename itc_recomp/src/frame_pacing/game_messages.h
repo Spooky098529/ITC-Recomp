@@ -45,4 +45,10 @@ void GameMessages_PassCounts(uint64_t& logic, uint64_t& render_only);
 // passes are safe. Updated by GameMessages_OnPassFinished.
 bool GameMessages_InRace();
 
+// Diagnostics: whether the pause screen's Draw handler ran on the last pass,
+// and input listener 0's guest address (0 until Input::Update has run in a
+// race).
+bool GameMessages_Paused();
+uint32_t GameMessages_InputListener0();
+
 }  // namespace frame_pacing
