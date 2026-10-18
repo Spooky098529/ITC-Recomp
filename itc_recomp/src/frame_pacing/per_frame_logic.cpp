@@ -9,6 +9,7 @@
 #include "guest.h"
 #include "frame_pacer.h"
 #include "debug/frame_state_diff.h"
+#include "debug/pause_movie_log.h"
 #include "interpolation/blend_state.h"
 
 #include <rex/cvar.h>
@@ -211,19 +212,33 @@ extern "C" REX_FUNC(sub_8220B9E8) {
   g_in_pause_menu_draw = false;
 }
 
-extern "C" REX_FUNC(sub_8211D2F8) {
-  REX_FUNC_PROLOGUE();
-  if (g_in_pause_menu_draw && ctx.r4.u32 == 0 && REXCVAR_GET(per_tick_pause_menu_movie) &&
-      frame_pacing::GameMessages_IsRenderOnlyPass()) {
-    ctx.r4.u64 = 1;
-    __imp__sub_8211D2F8(ctx, base);
-    return;
-  }
+namespace {
+void UpdateUiMovie(PPCContext& ctx, uint8_t* base) {
   if (ctx.r4.u32 != 0 || !REXCVAR_GET(per_tick_ui_movies)) {
     __imp__sub_8211D2F8(ctx, base);
     return;
   }
   g_ui_movies.Run(base, ctx.r3.u32, [&] { __imp__sub_8211D2F8(ctx, base); });
+}
+}  // namespace
+
+extern "C" REX_FUNC(sub_8211D2F8) {
+  REX_FUNC_PROLOGUE();
+  if (!g_in_pause_menu_draw) {
+    UpdateUiMovie(ctx, base);
+    return;
+  }
+  uint32_t movie = ctx.r3.u32, r4 = ctx.r4.u32;
+  bool draw_only = r4 == 0 && REXCVAR_GET(per_tick_pause_menu_movie) &&
+                   frame_pacing::GameMessages_IsRenderOnlyPass();
+  debug::PauseMovieLog_Before(base, movie, r4, draw_only);
+  if (draw_only) {
+    ctx.r4.u64 = 1;
+    __imp__sub_8211D2F8(ctx, base);
+  } else {
+    UpdateUiMovie(ctx, base);
+  }
+  debug::PauseMovieLog_After(base);
 }
 
 // Race overlays (sub_8215DEA0, from Update handler sub_8215E150; r3 = a list
