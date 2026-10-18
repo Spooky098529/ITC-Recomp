@@ -808,3 +808,43 @@ object's bookkeeping; nothing that looks like a position. Next, a test:
 `--paused_render_only_skip=8258E5E0,8258ED78` skips Scene::Update's two
 screen calls (which run on every pass and update the front end's
 screens) on render-only passes while paused.
+
+Result: skipping both crashed the game on pausing ("Call to invalid or
+unregistered function at guest address 0x00000000", `itc_047.log`).
+Reading them, neither is the arrow: slot 6 `8258E5E0` flips a 0/1
+buffer index, and slot 2 `8258ED78` calls the screen's vtable slot 7, then
+`8258EB38`, which clears its lists. They are the render lists' double
+buffering. Not worth trying one at a time; `--paused_render_only_skip`
+stays as a test flag for the other functions wrapped there.
+
+**The sub-menus' draw** (read 2026-10-18). The pause screen's Draw
+`8216CF08` calls `82211D08` (`r3 = [r3 + 1012]`, then a jump to
+`8220FB10`). `8220FB10`, on every pass:
+
+- if the sub-screen state `[0x826D84D8]`'s +12 isn't -1, it calls one of
+  21 transition functions (a table on the stack, `0x821Fxxxx` and
+  `0x8220xxxx`) with r3 = state + 24, then `8220BA28(state, result)`;
+  `8220BA68(state, a, b, c)`, the "screen switch" in the logs, sets +4,
+  +12 and +16 to a, b and c and +0 to -1 (or +0 to a and +12, +16 to -1
+  when b is -1);
+- otherwise it updates the movie `[r3]` (r4 = 0, from `8220FC78`);
+- then calls `82218F30` when the state's +0 is 4.
+
+Transition 8 is `8220DD98`, the selection change: the sub-menu
+`8220DB98` switches to it (`8220BA68(state, 1, 8, -1)`, from `8220DBE0`)
+on every move. Its first call starts the animations and returns after
+updating the movie (`8220DF24`). So each pass either runs a transition
+or updates the movie from `8220FC78`, at any frame rate, and the
+movie's timeline per tick comes out the same at 30 and 144 fps, as the
+logs show.
+
+So far, ruled out as the cause: the input repeat (the game's own: the
+held list moves every tick at 30 fps too), interpolation (wrong with it
+off at 144 fps), the movie's state and animations (replayed, clocks per
+tick, keyframes set from the time), Scene::Update's screen calls (render
+list bookkeeping). Not ruled out: the transition functions other than 8
+(the sub-screens' opening ones run on render-only passes:
+`8220EE08`, `8220EF84`, `8220F054`, ...), `82218F30`, the HUD's movie
+under the pause (`822128C8`), and draws that aren't UI movies at all.
+Next: a frame dump while paused (`--native_renderer_dump`) to see the
+arrow and find its draw.
