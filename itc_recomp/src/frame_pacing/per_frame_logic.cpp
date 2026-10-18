@@ -111,6 +111,10 @@ extern "C" REX_FUNC(sub_82107910) {
 // object changed since the logic pass, or the logic pass had no such call,
 // the call runs from the object's current state, which is then put back.
 namespace {
+// What the last ReplayFromLogicPass::Run did, for --log_pause_movie.
+const char* g_replay_outcome = "";
+int g_replay_occurrence = -1;
+
 class ReplayFromLogicPass {
  public:
   ReplayFromLogicPass(const char* name, uint32_t bytes) : name_(name), bytes_(bytes) {}
@@ -123,9 +127,11 @@ class ReplayFromLogicPass {
       occurrences_.clear();
     }
     Key key{object, occurrences_[object]++};
+    g_replay_occurrence = key.occurrence;
     uint8_t* state = base + object;
     if (!frame_pacing::GameMessages_IsRenderOnlyPass()) {
       States& states = states_[key];
+      g_replay_outcome = "logic pass";
       states.before.assign(state, state + bytes_);
       call();
       states.after.assign(state, state + bytes_);
@@ -134,6 +140,7 @@ class ReplayFromLogicPass {
     auto it = states_.find(key);
     if (it == states_.end() || it->second.after.size() != bytes_) {
       Count("no logic pass state", -1);
+      g_replay_outcome = "no logic pass state";
       CallFromCurrentState(state, call);
       return;
     }
@@ -143,10 +150,12 @@ class ReplayFromLogicPass {
         first++;
       }
       Count("changed since the logic pass", first);
+      g_replay_outcome = "changed since the logic pass";
       CallFromCurrentState(state, call);
       return;
     }
     Count("replayed", -1);
+    g_replay_outcome = "replayed";
     std::memcpy(state, it->second.before.data(), bytes_);
     call();
     std::memcpy(state, it->second.after.data(), bytes_);
@@ -227,8 +236,10 @@ extern "C" REX_FUNC(sub_8211D2F8) {
   REX_FUNC_PROLOGUE();
   uint32_t movie = ctx.r3.u32, r4 = ctx.r4.u32, caller = uint32_t(ctx.lr);
   debug::PauseMovieLog_Before(base, movie, r4, caller);
+  g_replay_outcome = "not replayed";
+  g_replay_occurrence = -1;
   UpdateUiMovie(ctx, base);
-  debug::PauseMovieLog_After(base, movie);
+  debug::PauseMovieLog_After(base, movie, caller, g_replay_outcome, g_replay_occurrence);
 }
 
 // Race overlays (sub_8215DEA0, from Update handler sub_8215E150; r3 = a list

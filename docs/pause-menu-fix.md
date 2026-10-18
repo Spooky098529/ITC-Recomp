@@ -759,3 +759,25 @@ Result (`itc_039.log`, a race the user drove, paused, used a sub-menu):
   i.e. `--interpolate_draw_state=false --max_fps=30`, with
   `--log_pause_movie=true`), to see whether the arrow does the same
   there and the list repeats as often.
+
+**At 30 fps** (`itc_042.log`, `--interpolate_draw_state=false
+--max_fps=30`) the user saw the arrow right, and the held list moved
+every tick there too (ticks 2080-2133): the repeat is the game's own, so
+the difference is how the movie is updated between ticks. Per caller
+while paused, the sub-menus' movie `417E7260` is updated once a pass from
+`8220FC78` (in `8220FB10`), and on top of that on some ticks by the
+sub-screens (`8220DF24` in `8220DD98`, `8220EE08`, `8220EF84`,
+`8220F054`, `8220C62C`, `8220C794`, ...), at 144 fps on render-only
+passes too, except `8220DF24`.
+
+`8220DD98` is the selection change (it runs when its state +0 is 0): it
+starts the movie's animations (`8211DE38`/`8211D978` with r4 = 8, r5 =
+item + 4; `8211DDD8`; `8211DF20` 20 and 19; and `8211DAC8` with 20
+after a move down, 19 up: probably the arrow's slide), then updates the
+movie once more, on logic passes only. So a move tick's logic pass
+updates the movie twice (`8220DF24`, then `8220FC78`) and its render-only
+passes once, and the replay, matching calls by order in the pass,
+compares the render-only `8220FC78` call with the logic pass's
+`8220DD98` one. `--log_pause_movie` now also logs those animation calls
+and, for 12 passes after each, every movie update with its caller, its
+occurrence in the pass, the replay's outcome and the three clocks.

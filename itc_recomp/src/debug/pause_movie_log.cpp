@@ -298,7 +298,13 @@ void CountUpdate(uint32_t movie, uint32_t r4, uint32_t caller, bool draw_only) {
 int g_call_lines = 0;
 std::chrono::steady_clock::time_point g_call_lines_since{};
 
+constexpr uint64_t kTracePasses = 12;
+uint64_t g_trace_until_pass = 0;
+
 void LogCall(const char* name, PPCContext& ctx) {
+  if (REXCVAR_GET(log_pause_movie) && frame_pacing::GameMessages_Paused()) {
+    g_trace_until_pass = frame_pacing::GameMessages_PassNumber() + kTracePasses;
+  }
   if (!REXCVAR_GET(log_pause_movie) || !frame_pacing::GameMessages_Paused() ||
       !TakeLine(g_call_lines, g_call_lines_since, kMaxCallLines)) {
     return;
@@ -321,11 +327,24 @@ void PauseMovieLog_Before(uint8_t* base, uint32_t movie, uint32_t r4, uint32_t c
   g_logs[movie].Before(base, movie, r4, draw_only);
 }
 
-void PauseMovieLog_After(uint8_t* base, uint32_t movie) {
+void PauseMovieLog_After(uint8_t* base, uint32_t movie, uint32_t caller, const char* outcome,
+                         int occurrence) {
   if (!REXCVAR_GET(log_pause_movie)) {
     return;
   }
   g_logs[movie].After(base);
+  // Every update for a few passes after an animation call, with the replay's
+  // outcome and the sub-menus' movie's animation clocks.
+  uint64_t pass = frame_pacing::GameMessages_PassNumber();
+  if (frame_pacing::GameMessages_Paused() && pass <= g_trace_until_pass &&
+      TakeLine(g_call_lines, g_call_lines_since, kMaxCallLines)) {
+    REXLOG_INFO(
+        "pause movie update: tick {} pass {} {} movie {:08X} from {:08X} occurrence {} {}: "
+        "clocks +9154 {:g} +96E0 {:g} +9708 {:g}",
+        Ticks(), pass, PassType(), movie, caller, occurrence, outcome,
+        guest::LoadFloat(base, movie + 0x9154), guest::LoadFloat(base, movie + 0x96E0),
+        guest::LoadFloat(base, movie + 0x9708));
+  }
 }
 
 }  // namespace debug
@@ -351,6 +370,41 @@ extern "C" REX_FUNC(sub_8220D040) {
   REX_FUNC_PROLOGUE();
   debug::LogCall("8220D040 node and flags by selection", ctx);
   __imp__sub_8220D040(ctx, base);
+}
+
+// The selection-change handler sub_8220DD98 (r3 = its state; runs when +0
+// is 0) starts the movie's animations: sub_8211DE38 and sub_8211D978 (r3 =
+// movie, r4 = 8, r5 = item + 4: the items'), sub_8211DDD8 and sub_8211DF20
+// (r4 = 8, 20, 19), and sub_8211DAC8 (r4 = 20 after a move down, 19 up),
+// then updates the movie once (from 8220DF24).
+extern "C" REX_FUNC(sub_8211DAC8) {
+  REX_FUNC_PROLOGUE();
+  debug::LogCall("8211DAC8 start animation", ctx);
+  __imp__sub_8211DAC8(ctx, base);
+}
+
+extern "C" REX_FUNC(sub_8211D978) {
+  REX_FUNC_PROLOGUE();
+  debug::LogCall("8211D978 start item animation", ctx);
+  __imp__sub_8211D978(ctx, base);
+}
+
+extern "C" REX_FUNC(sub_8211DE38) {
+  REX_FUNC_PROLOGUE();
+  debug::LogCall("8211DE38", ctx);
+  __imp__sub_8211DE38(ctx, base);
+}
+
+extern "C" REX_FUNC(sub_8211DDD8) {
+  REX_FUNC_PROLOGUE();
+  debug::LogCall("8211DDD8", ctx);
+  __imp__sub_8211DDD8(ctx, base);
+}
+
+extern "C" REX_FUNC(sub_8211DF20) {
+  REX_FUNC_PROLOGUE();
+  debug::LogCall("8211DF20", ctx);
+  __imp__sub_8211DF20(ctx, base);
 }
 
 extern "C" REX_FUNC(sub_8220BA68) {
