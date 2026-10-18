@@ -38,6 +38,7 @@ place (search for `PATCH:`).
 | `sub_821062E8` | `GameMessages::Dispatch` | Rewritten | Delivers the game's queued messages to its handlers: 0 = Update (all game logic), 1 = Draw. Skips Update on render-only passes (`src/frame_pacing/game_messages.cpp`). |
 | `sub_82106280` | | | Picks the handler object a message goes to; its method 0 handles it. |
 | `sub_820990F0` | `Input::Update` | Wrapped | Input manager update; skipped on render-only passes so presses aren't seen several times. |
+| `sub_8210B018` | `ActionMappers::Update` | Wrapped | Updates every action mapper (`sub_8210C370` each: held, pressed, fired words and the repeat objects). Skipped on render-only passes (`--input_mappers_by_tick`, on by default), so menu input repeats count ticks; see `docs/pause-menu-fix.md`. |
 | `sub_8215B4F8` | `Race::DrawStep` | Wrapped | The race's draw step (Draw message). Its running marks the pass as in a race. |
 | `sub_820A3978` | `CameraPass::Update` | | Rebuilds a camera pass's view (+0x10) from its eye, target and up vector (+0x190, +0x1A0, +0x1B0), and its view-projection (+0x90 = view * projection at +0x50). Called several times per Draw for pass 0. |
 | `sub_8209BD50` | `Matrix::Multiply` | Wrapped | out (r3) = a (r4) * b (r5), 4x4. Interpolation notes every multiply into a camera (see "Interpolation"). |
@@ -248,7 +249,8 @@ safe (an experiment since removed). The approach used instead is below.
 
 Game logic stays at a fixed 30 Hz; races draw at any
 frame rate (`--max_fps`, 0 = unlimited), each frame a blend of the last two
-ticks. Menus stay at 30 fps.
+ticks. Menus stay at 30 fps; the pause menu, drawn over a race, runs at
+the race's frame rate.
 
 ### Passes
 
@@ -715,10 +717,12 @@ processes the game's commands; the render thread mostly waits for it.
 
 ## Known issues
 
-- **Menus run at 30 fps**: they record their UI and read
-  input during Update, so render-only passes made them flicker and repeat
-  presses. Unlocking them would mean skipping Update only for the handlers
-  that run game logic.
+- **Menus run at 30 fps** (the front end's; the pause menu in a race runs
+  at the race's frame rate since `pause-menu`, its input repeat fixed by
+  updating the action mappers once a tick, see `docs/pause-menu-fix.md`):
+  they record their UI and read input during Update, so render-only passes
+  made them flicker and repeat presses. Unlocking them would mean skipping
+  Update only for the handlers that run game logic.
 - **The race HUD updates at 30 fps.** Accepted for now; its animations
   advance once per tick (see "Per-frame logic").
 - **More per-frame logic may exist.** Anything that runs too fast or

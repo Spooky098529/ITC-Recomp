@@ -65,11 +65,14 @@ set(ITC_SOURCES
     src/hooks/title_screen.cpp
     src/hooks/create_file.cpp
     src/hooks/lights.cpp
+    src/hooks/input.cpp
     src/frame_pacing/frame_pacer.cpp
     src/frame_pacing/renderer_hooks.cpp
     src/debug/state_capture.cpp
     src/debug/frame_state_diff.cpp
     src/debug/idle_timer_scan.cpp
+    src/debug/menu_selection_scan.cpp
+    src/debug/pause_menu_log.cpp
     src/debug/image_dump.cpp
     src/debug/replay_stats.cpp
     src/debug/thread_cpu.cpp
