@@ -781,3 +781,13 @@ compares the render-only `8220FC78` call with the logic pass's
 `8220DD98` one. `--log_pause_movie` now also logs those animation calls
 and, for 12 passes after each, every movie update with its caller, its
 occurrence in the pass, the replay's outcome and the three clocks.
+
+Result (`itc_043.log`, 144 fps): the movie side looks right. All 30
+arrow slides (`8211DAC8`, from `8220DF14`) start on logic passes, followed
+by the movie update from `8220DF24`; the render-only passes after each
+replay `8220FC78`'s update from it ("replayed", clocks unchanged until the
+next tick), as at 30 fps. Only a sub-screen opening starts animations on
+render-only passes (`8220EE70`, `8220EEB0`, `8220C6C0`, `8220C8C8`, once
+each). So the movie isn't what moves the arrow wrongly. The 30 fps
+reference also had interpolation off, which blends HUD draws between
+ticks: next, 144 fps with `--interpolate_draw_state=false`.
