@@ -696,3 +696,348 @@ document's status, and CLAUDE.md's line for this document.
 Done (2026-10-18): `docs/functions.md` has a row for `sub_8210B018`
 (the `Input::Update` row was still right) and the known issue says the
 pause menu runs at the race's rate.
+
+## The sub-menus' arrow (`pause-menu-arrow`, 2026-10-18, fixed)
+
+In every pause sub-menu, an arrow points at the selected item. At 144 fps
+the user sees it slide fast in the direction pressed and end up out of
+position; after the second build below "it moves at 30 fps, but then keeps
+moving, like something keeps reading the input and playing its
+animation". Not fixed yet.
+
+**What draws it.** The sub-screens (`8220DB98`, `8220E988`, `8220EBD8`,
+`8220C578`, `8220C5D0`, picked by `8220F638`) don't queue text like the
+main list: they look up nodes of a UI movie (`8211A578(root, type,
+index)`, through `8259D658`; the root is `[[0x826D84D0]]`) and set flags
+at +80 and +108 on them, or call `8211C7E8(movie, node, id, value)`
+(from `8220E5FC`-`8220E6E0` when a sub-screen opens, and from
+`8220D040`). `--log_pause_movie` (`src/debug/pause_movie_log.cpp`)
+counts every UI movie update (`sub_8211D2F8`, reached through
+`8211E1B8` from 634 call sites) by movie, caller and pass type, and
+while paused compares each updated movie (its 0xA000 bytes, what the
+UI movie replay keeps, and objects up to two pointers away, 0x200 bytes
+each) before and after each update ("in update") and since the last
+update ("between").
+
+Result (`itc_039.log`, a race the user drove, paused, used a sub-menu):
+
+- While paused two movies are updated (r4 = 0, advance and draw) on
+  every pass: `400D25A0` from `822128C8` and the sub-menus' movie
+  `417E7260` (the r3 of the `8211C7E8` calls), mostly from `8220FC78`
+  and also from `8220EF84`, `8220F054`, `8220EE08`, `8220EEE4`,
+  `8220DF24`, `8220C85C`.
+- **Not the pause menu's own draw.** `8220B9E8` (from the pause
+  screen's Draw `8216CF08`; movie 18 of the table at `0x826C5CCC`,
+  `41620060`) is updated on every pass from the race start until ~30 s
+  in, and not at all while paused. A first fix that made its
+  render-only updates draw-only (`--per_tick_pause_menu_movie`, commit
+  `816356d`) changed nothing and was removed.
+- In `417E7260` the only words its updates change are animation clocks
+  at +0x9154, +0x96E0 and +0x9708 (floats, +2 an update; reset to 0 when
+  an animation starts, running to 40 or 120). On logic passes they
+  advance once a tick: the UI movie replay works.
+- Except right after an animation starts: the sub-menu starts it after
+  the logic pass's movie update (pass 1780: new animation slots at
+  +0x96C0..+0x970C, clocks reset), so the replay finds the movie
+  "changed since the logic pass" and ran the update for real on each
+  render-only pass of that tick (0 -> 8 by the next tick instead of 2).
+  `--per_tick_changed_ui_movies` (on by default, commit `b9ef4ec`) now
+  runs those updates from the current state and puts it back. With it
+  the user saw **no change** (`itc_041.log`: the fallback happens ~4
+  times every 2 s, those extra steps aren't what's seen). Kept for now;
+  it's correct, but whether to keep it is open.
+- Nothing else in the watched objects changes on render-only passes.
+  So either the arrow's state is outside them (deeper objects, or not in
+  a UI movie at all), or what's seen is the game's own behavior at its
+  repeat rate.
+- **The sub-menu list repeats every tick.** In `itc_037.log`, holding a
+  direction in `8220DB98`'s sub-menu moved its list (`8220C1E0`, then
+  the screen switch from `8220DBE0`) on every tick for ~2 s (64 moves),
+  starting 11 ticks after the press; each move restarts the arrow's
+  slide. The main pause list repeats every 4 ticks. Not compared with
+  30 fps yet: that's the next run (`./run.sh --no-interpolation` flags,
+  i.e. `--interpolate_draw_state=false --max_fps=30`, with
+  `--log_pause_movie=true`), to see whether the arrow does the same
+  there and the list repeats as often.
+
+**At 30 fps** (`itc_042.log`, `--interpolate_draw_state=false
+--max_fps=30`) the user saw the arrow right, and the held list moved
+every tick there too (ticks 2080-2133): the repeat is the game's own, so
+the difference is how the movie is updated between ticks. Per caller
+while paused, the sub-menus' movie `417E7260` is updated once a pass from
+`8220FC78` (in `8220FB10`), and on top of that on some ticks by the
+sub-screens (`8220DF24` in `8220DD98`, `8220EE08`, `8220EF84`,
+`8220F054`, `8220C62C`, `8220C794`, ...), at 144 fps on render-only
+passes too, except `8220DF24`.
+
+`8220DD98` is the selection change (it runs when its state +0 is 0): it
+starts the movie's animations (`8211DE38`/`8211D978` with r4 = 8, r5 =
+item + 4; `8211DDD8`; `8211DF20` 20 and 19; and `8211DAC8` with 20
+after a move down, 19 up: probably the arrow's slide), then updates the
+movie once more, on logic passes only. So a move tick's logic pass
+updates the movie twice (`8220DF24`, then `8220FC78`) and its render-only
+passes once, and the replay, matching calls by order in the pass,
+compares the render-only `8220FC78` call with the logic pass's
+`8220DD98` one. `--log_pause_movie` now also logs those animation calls
+and, for 12 passes after each, every movie update with its caller, its
+occurrence in the pass, the replay's outcome and the three clocks.
+
+Result (`itc_043.log`, 144 fps): the movie side looks right. All 30
+arrow slides (`8211DAC8`, from `8220DF14`) start on logic passes, followed
+by the movie update from `8220DF24`; the render-only passes after each
+replay `8220FC78`'s update from it ("replayed", clocks unchanged until the
+next tick), as at 30 fps. Only a sub-screen opening starts animations on
+render-only passes (`8220EE70`, `8220EEB0`, `8220C6C0`, `8220C8C8`, once
+each). So the movie isn't what moves the arrow wrongly. The 30 fps
+reference also had interpolation off, which blends HUD draws between
+ticks: next, 144 fps with `--interpolate_draw_state=false`.
+
+`825A08E0`, which each movie update calls per playing animation, is
+keyframe interpolation (it finds the keys around the animation's time and
+applies t = (time - k0) / (k1 - k0), clamped): it sets values from the
+time, so replays can't step it. The game never measures time (see
+"Fixed time step" in `docs/functions.md`), so the arrow isn't scaled by
+frame time; something steps once a pass. With interpolation off at 144
+fps the user still saw the arrow wrong, so it isn't the blending either.
+
+The movie's nodes are at 0x03xxxxxx (`035D1B80` etc.), which the first
+logs didn't follow; `itc_046.log` watches them (three pointer levels,
+~4,900 objects). Inside render-only updates only counters change
+(0xE8xx: draw stamps, in 0x0224xxxx and 0x0532xxxx) besides the scene
+object's bookkeeping; nothing that looks like a position. Next, a test:
+`--paused_render_only_skip=8258E5E0,8258ED78` skips Scene::Update's two
+screen calls (which run on every pass and update the front end's
+screens) on render-only passes while paused.
+
+Result: skipping both crashed the game on pausing ("Call to invalid or
+unregistered function at guest address 0x00000000", `itc_047.log`).
+Reading them, neither is the arrow: slot 6 `8258E5E0` flips a 0/1
+buffer index, and slot 2 `8258ED78` calls the screen's vtable slot 7, then
+`8258EB38`, which clears its lists. They are the render lists' double
+buffering. Not worth trying one at a time; `--paused_render_only_skip`
+stays as a test flag for the other functions wrapped there.
+
+**The sub-menus' draw** (read 2026-10-18). The pause screen's Draw
+`8216CF08` calls `82211D08` (`r3 = [r3 + 1012]`, then a jump to
+`8220FB10`). `8220FB10`, on every pass:
+
+- if the sub-screen state `[0x826D84D8]`'s +12 isn't -1, it calls one of
+  21 transition functions (a table on the stack, `0x821Fxxxx` and
+  `0x8220xxxx`) with r3 = state + 24, then `8220BA28(state, result)`;
+  `8220BA68(state, a, b, c)`, the "screen switch" in the logs, sets +4,
+  +12 and +16 to a, b and c and +0 to -1 (or +0 to a and +12, +16 to -1
+  when b is -1);
+- otherwise it updates the movie `[r3]` (r4 = 0, from `8220FC78`);
+- then calls `82218F30` when the state's +0 is 4.
+
+Transition 8 is `8220DD98`, the selection change: the sub-menu
+`8220DB98` switches to it (`8220BA68(state, 1, 8, -1)`, from `8220DBE0`)
+on every move. Its first call starts the animations and returns after
+updating the movie (`8220DF24`). So each pass either runs a transition
+or updates the movie from `8220FC78`, at any frame rate, and the
+movie's timeline per tick comes out the same at 30 and 144 fps, as the
+logs show.
+
+So far, ruled out as the cause: the input repeat (the game's own: the
+held list moves every tick at 30 fps too), interpolation (wrong with it
+off at 144 fps), the movie's state and animations (replayed, clocks per
+tick, keyframes set from the time), Scene::Update's screen calls (render
+list bookkeeping). Not ruled out: the transition functions other than 8
+(the sub-screens' opening ones run on render-only passes:
+`8220EE08`, `8220EF84`, `8220F054`, ...), `82218F30`, the HUD's movie
+under the pause (`822128C8`), and draws that aren't UI movies at all.
+Next: a frame dump while paused (`--native_renderer_dump`) to see the
+arrow and find its draw.
+
+**Found (2026-10-18): the tracks add to their nodes.** A frame dump while
+paused (`--native_renderer_dump_every=1`) showed the arrow: a line from
+the screen's left edge ending in a point at the selected item. With the
+first item ("Road Map") selected it's there; after a move to another item
+it's gone from the screen. The user's idea, an add scaled by the frame
+rate, was right. `825A08E0`, run by each movie update for every playing
+animation, applies each track with `825A0548`, which ends with: when the
+track descriptor's byte +8 is 0, `[node + offset] += value` (floats and
+ints alike), otherwise `= value`. The nodes are outside the bytes the UI
+movie replay restores, so each render-only replay added the track's
+value again: ~5 adds a tick at 144 fps, the arrow sliding ~5x as far and
+off its item. The movie's clocks were right all along; the node watch
+probably didn't reach the arrow's node.
+
+The fix (`--per_tick_ui_movie_tracks`, on by default, `per_frame_logic.cpp`):
+inside a UI movie update (`sub_8211D2F8`) on a render-only pass,
+`825A0548` doesn't run. The nodes keep what the logic pass applied for
+the tick, so the render-only frame draws the same as the logic pass, and
+each add happens once a tick. Applies outside a movie update (the
+animation starts `8211DF20`, `8211DE38`, `8211DFF8`) run as before. This
+covers every UI movie, the race HUD's too.
+
+Result: the arrow's position was right, but the pause menu flickered, and
+on first opening it the sub-menus showed overlapped for a moment.
+Skipping every track was too broad: tracks that set a value are needed
+on every pass. Now only adding tracks are skipped. The track's property
+id is its word +0 (`[r4]`); `8259FE68` returns that property's 12-byte
+entry in a static table at `0x82970C28` (64 entries, filled on first use,
+byte `0x82970C20` set then): +0 the node offset, +4 the type, byte +8 set
+(non-zero) or add (0), byte +9 indirect. The override reads byte +8 there.
+
+The first build of that read the property id as `[[r4]]` instead of
+`[r4]` and crashed on the race loading screen ("read of guest
+0x00000018", `itc_050.log`; render-only passes apply tracks during
+loading). Fixed in `75271ce`; an attract race then loaded and ran.
+
+**Result of skipping only adding tracks** (user, 2026-10-18, 144 fps): the
+arrow's position is right, but there is **ghosting when the arrow moves**,
+and **the race start countdown flickered** (also a UI movie, in the HUD).
+So skipping isn't exact: some adding tracks start from a value that's
+reset or set elsewhere during the update (the user's guess: alpha), so a
+render-only frame without them draws something different from the logic
+pass. The earlier build that skipped all tracks made the pause menu
+flicker and showed the sub-menus overlapped for a moment on first
+opening (not rechecked since).
+
+**Planned, then superseded (see "Finding the arrow's track"): replay the tracks' writes exactly**, the
+way `ReplayFromLogicPass` replays the movie object, instead of skipping:
+
+- On a logic pass, in the `sub_825A0548` override inside a UI movie
+  update, record each write's target address with its value before and
+  after the call, per movie and per call occurrence (the replay's key).
+- On a render-only replay of that call: put every recorded target back
+  to its "before" value, let all tracks apply normally (set and add, so
+  the frame draws exactly what the logic pass drew), then put the
+  "after" values back.
+- The fallbacks (`changed since the logic pass`, `no logic pass state`)
+  need a choice: record the targets' values before the call and put them
+  back after (as `--per_tick_changed_ui_movies` does for the movie).
+- The target of a track (from `825A0548`): `node = r3`, `desc =
+  0x82970C28 + 12 * [r4]`; `target = node + [desc + 0]`, plus, when
+  byte `desc + 9` (indirect) is non-zero, `8259D600([r4 + 12], [node +
+  112])`, which is `16 * (a + 2 * (b + 4))` (`addi r11,r4,4; slwi 1;
+  add r3; slwi 4`). The value written is 4 bytes (float or int, by the
+  type at `desc + 4`). Check the formula against the generated code
+  before relying on it, or record writes generically by comparing the
+  node's bytes around the target before and after.
+- Check with the user: the arrow's position and no ghosting, the pause
+  menu without flicker or overlap, and the race start countdown.
+
+**Finding the arrow's track** (2026-10-18). Which adding track moves the
+arrow had never been logged; the skip above covers every adding track in
+every UI movie. `--log_pause_movie` now logs, while paused and for the 12
+passes after each of the sub-menus' animation calls (the arrow's slide
+`8211DAC8` among them):
+
+- `pause movie track:` every adding track applied, and every setting track
+  on a word an adding track has moved: movie, `adds`/`sets`, property,
+  type, node, target word (and its offset in the node), value before and
+  after with the difference, `skipped` on render-only passes. The target is
+  worked out from the descriptor as above, checked against `generated/`:
+  `825A0548`'s only store outside the stack is the one word at `r25`, none
+  for types 3 and up, and the helpers it calls write only to the stack.
+- `pause movie targets:` the words adding tracks have moved, at the start
+  and end of each UI movie update.
+- `pause movie target written:` which of the update's other calls
+  (`82119B80`, `8259FA00`, `8211CD90`, `8259DAC0`, `8211B4D0`, `8211B080`,
+  wrapped in `pause_movie_log.cpp`) changed one of those words.
+
+Results (`itc_054`-`itc_056`, 144 fps, the user moving the selection in a
+sub-menu, with the skip on):
+
+- Only two adding properties are applied while paused, both in the
+  sub-menus' movie `417E7260`: property 1 (float, node +0x10) and
+  property 0 (float, node +0xC). Only three targets ever change:
+  `035D19B0` (node `035D19A0` +0x10), `035D1A50` (node `035D1A40` +0x10,
+  now and then) and `035DF5CC` (node `035DF5C0` +0xC, from 1280).
+- **The arrow's track is property 1 on node `035D19A0`** (+0x10, its y):
+  every slide moves it, from its rest value 6 to 27.6 then 39.6 on the
+  first two ticks after a move down (r4 = 20), to -16.3 then -28.3 after a
+  move up (19).
+- Within one update the value goes 6 (update start) -> 27.6 (the track) ->
+  6 (update end). What puts it back is **`82119B80`**, called at the end of
+  the update (from `8211D7CC`, r3 = the movie, r4 = `035D05F0`, the tree's
+  root), recursing into groups from `82119E90`.
+- **`82119B80` restores the movie's rest pose.** `82119B80(movie, live
+  tree, rest tree, ...)` walks the live tree's children (by index, through
+  `8259D658`) with the rest tree's matching ones, and for nodes whose tag
+  (word +0) is one of six types (`0x47525000` "GRP", recursed into;
+  `0x50494300` "PIC", `0x50524D00` "PRM", `0x53434500` "SCE",
+  `0x54464D00` "TFM", and `0x54585400` "TXT")
+  copies the rest node's fields over
+  the live one: +12..+60 and +68..+80 for all of them, and per type
+  +100..+136 or more (`82119D74` copies a sub-list through `8259D628`).
+- So each update applies the tracks onto the rest pose, draws, and
+  copies the rest pose back. **Adds on fields `82119B80` restores can't
+  pile up**: re-applying them on render-only passes gives the same value as
+  the logic pass. Skipping them only makes render-only frames draw the
+  rest pose: **that's the ghosting** (the arrow drawn mid-slide on logic
+  frames and at its rest position on render-only frames). The countdown
+  flicker is likely the same in the HUD's movie (not logged: the trace is
+  paused-only).
+- What the skip fixed (the arrow sliding too far) must then be adding
+  tracks on fields or nodes `82119B80` doesn't restore (another node
+  type, a field outside the copied ranges, or a movie updated without it);
+  not identified yet. The arrow's own track isn't one, in the first two
+  ticks of its slides that the trace covers.
+
+**The fix** (`65b0a73`, `--per_tick_ui_movie_tracks`, on by default,
+`per_frame_logic.cpp`). This is **a workaround to support frame rates
+above 30**: the game only ever ran one movie update a tick, and at 30 fps
+(no render-only passes) none of it does anything. On a logic pass, each
+adding track's target is noted as put back (its value at the end of the
+update is the one from before its first track in that update: the rest
+pose restored it) or not. On render-only passes, adding tracks run as
+usual when their target was put back, and are skipped otherwise, so adds
+that really pile up happen once a tick. Setting tracks always run. The
+movie's own bytes are still replayed as before (`--per_tick_ui_movies`).
+
+Result (user, 2026-10-18, 144 fps, `itc_059.log`): **the arrow stops on
+its item, no pause menu flicker or overlap, and the race start countdown is
+right.** The arrow still leaves a trail when it moves: that's **the game's
+own effect**, also seen on the same arrow in the front-end menus at 30 fps,
+just easier to see at 144 fps. The ghosting the earlier skip caused was a
+position problem (render-only frames drawing the rest pose).
+
+In `itc_059.log` (a new session: the sub-menus' movie was `42170060`) the
+targets still skipped were few: most often `039F18D0` (property 1), which
+flips between "put back" and "not put back" every ~5 ticks, so it's put back
+on ticks where its add is 0 and not when the add moves it: the adds that
+pile up. Skipping it on zero ticks or not makes no difference (the
+render-only replay adds the same 0). Others: `421A40E0` property 6
+(eight targets), and a few in `40B00060` and `400F0030`.
+`--log_pause_movie` logs each target's change of classification (`pause
+movie track target:`, paused or not) and the skipped tracks every 2 s
+(`pause movie skipped tracks:`).
+
+Not done (later, if ever): a native fix instead of the workaround, e.g. the
+UI movie update run once a tick with its drawing replayed (see
+`docs/tick-replay.md`), or the adds that don't get put back identified and
+made per tick by name. The exact replay planned above isn't needed.
+
+**The front-end arrow snapping to the first item** (user, 2026-10-18):
+in the front-end menus the arrow snaps when moving to a menu's first item,
+instead of the trail it shows on other moves. Not caused by this branch:
+
+- The front end has no render-only passes (`itc_058.log`, `itc_059.log`:
+  every `fps` line equals `ticks/s`, 30/30), so the track skip and the
+  movie replay's fallback never run there. On logic passes the
+  `825A0548` override only reads memory and calls the original, and the
+  wrappers in `pause_movie_log.cpp` only log (with `--log_pause_movie`).
+- The user saw the same snap on a build from before the branch
+  (`out/dist/itc-texture-binding-linux-amd64`, 2026-10-16).
+
+The user then found a video of the Xbox 360 game doing the same: **it's
+the game's own behavior**, nothing to fix.
+
+**State of the branch** (`pause-menu-arrow`, all committed and pushed):
+
+| Flag | Default | What | Keep? |
+|---|---|---|---|
+| `--per_tick_ui_movie_tracks` | on | Workaround for frame rates above 30: on render-only passes, skips adding tracks (`825A0548`) in UI movie updates whose target the update doesn't put back. Fixes the arrow; no ghosting or countdown flicker | Keep |
+| `--per_tick_changed_ui_movies` | on | Render-only UI movie updates that fall back (movie changed since the logic pass, or no logic pass call to match) run from the current state, which is put back | Correct but made no visible difference; the user decides |
+| `--log_pause_movie` | off | Logs UI movie updates by caller and pass type; while paused, diffs each movie and objects 3 pointers away; logs the sub-menus' animation calls and, after each, every update with its replay outcome and clocks, every adding track applied, the words they move around each update and which call writes them. Off, its wrappers and call sites check the flag first and only call the game's function, like the other debug logs | Debug |
+| `--paused_render_only_skip` | off | Skipped functions wrapped in `menu_selection_scan.cpp` on render-only passes while paused | Removed |
+
+Useful logs: `itc_037`-`itc_039` (first movie logs), `itc_042` (30 fps
+reference), `itc_043` (the update trace around moves), `itc_046` (nodes
+watched), `itc_047` (Scene::Update skip crash), `itc_050` (loading
+crash). Frame dumps from the paused run (`shown_<n>.png`, the arrow at
+"Road Map" and missing after moves) were in the session scratchpad, not
+the repo.

@@ -70,6 +70,13 @@ place (search for `PATCH:`).
 | `sub_820C9170` | | | Asks `sub_820F4128` for up to 10 lights near a point (r1+112) in a cone (cosine-like value from `sub_825A8978` of a setting at `[r27+11844]+5500` times a constant) of the light set at `[0x826C551C]`. Probably feeds the 8 per-object light slots of the pixel constants (see "Per-object pixel constants"; not checked). Called from `0x820E1DF0`, `0x820E6B00` and `0x820DC3B8`. |
 | `sub_82294730` | | | r3 a light set, r4 an index: returns r3 plus the r4-th of the little-endian offsets at r3+4 (the count at +0 bounds r4); with r5's low byte set, 0 for an entry whose first word is 0. `sub_820F4128` passes r5 = 0. |
 | `sub_8218E420` | | Patched | Post-race check; the comparison against 60 was changed to 1 to fix the black screen after quest races. |
+| `sub_8211D2F8` | `UiMovie::Update` | Wrapped | r3 = movie, r4 = 0 advance a frame and draw, 1 draw only; reached through `sub_8211E1B8` from 634 call sites (the HUD, the race start countdown, the pause menus). Replayed on render-only passes, and its adding tracks handled per tick (see "Per-frame logic"; `docs/pause-menu-fix.md`, "The sub-menus' arrow"). |
+| `sub_825A08E0` | `UiMovie::ApplyAnimation` | | Run by each movie update for every playing animation: finds the keys around the animation's time and applies each track with t = (time - k0) / (k1 - k0), clamped, through `sub_825A0548`. Sets values from the time, so it doesn't step by itself. |
+| `sub_825A0548` | `UiMovie::ApplyTrack` | Wrapped | r3 = node, r4 = track (word +0 its property id), f1 = t, r5/r6 = the keys. Writes one word, at node + the descriptor's offset (plus `sub_8259D600` when indirect): sets it (descriptor byte +8 non-zero) or adds to it (0); nothing for types 3 and up. Adds the update doesn't put back are skipped on render-only passes (`--per_tick_ui_movie_tracks`). |
+| `sub_8259FE68` | `UiMovie::TrackProperty` | | r3 = property id; returns its 12-byte descriptor in the table at `0x82970C28` (64 entries, filled on first use, byte `0x82970C20` set): +0 node offset, +4 type (0 float, 1 and 2 integer), byte +8 set/add, byte +9 indirect. |
+| `sub_8259D600` | | | r3, r4: returns 16 * (r3 + 2 * (r4 + 4)); the indirect tracks' extra offset (r3 = [node + 112], r4 = [track + 12]). |
+| `sub_8259D658` | `UiMovie::Child` | | r3 = node, r4 = index: returns that child (the count is at node + 112). |
+| `sub_82119B80` | `UiMovie::RestorePose` | Wrapped | r3 = movie, r4 = live tree, r5 = rest tree: for each child of six tagged types (GRP recursed into; PIC, PRM, SCE, TFM, TXT) copies the rest node's fields (+12..+80, and per type +100..+136) over the live one. Called at the end of each movie update (from `8211D7CC`), so tracks' adds start from the rest pose every update. Wrapped only for `--log_pause_movie`. |
 
 ## Frame structure
 
@@ -302,6 +309,7 @@ render-only passes it ran ~5x fast. Each case found is fixed in
 | The player's triangle on the minimap flashing where it overlaps other cars' (a frame divider: `0x826C5AA4` counts calls and wraps after 4, then steps the phase `0x826C5AA8`, which wraps after 5) | `sub_820F5740` | Both put back after the call on render-only passes (`--per_tick_minimap_blink`) |
 | Play time (a frame counter at `0x826C5B90`, which `sub_821109B8` turns into hours, minutes and seconds at 30 a second) | `sub_82107910` | One taken back before the call on render-only passes (`--per_tick_play_time`) |
 | UI movies: the HUD, including the race start countdown (a 240-frame movie, a beep at frames 60, 120, 180, 240) | `sub_8211D2F8`, with r4 = 0 (advance a frame and draw); r4 = 1 only draws | Replayed (below) (`--per_tick_ui_movies`) |
+| UI movies' adding animation tracks (the pause sub-menus' arrow slid ~5x as far): they write into the movie's nodes, outside the replayed bytes | `sub_825A0548`, inside `sub_8211D2F8` | A workaround for frame rates above 30: on render-only passes, adds whose target the update doesn't put back to the rest pose (`sub_82119B80`) are skipped (`--per_tick_ui_movie_tracks`; `docs/pause-menu-fix.md`, "The sub-menus' arrow") |
 
 **How the texture animations were found.** `--find_per_frame_state`
 finds only ±1 steps, and the counters it found first (at 0x4005xxxx, half
