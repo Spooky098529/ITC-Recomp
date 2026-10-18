@@ -32,6 +32,9 @@ REXCVAR_DEFINE_BOOL(per_tick_blink_timers, true, "ITC",
                     "Advance the car blink timers once per tick on render-only passes");
 REXCVAR_DEFINE_BOOL(per_tick_ui_movies, true, "ITC",
                     "Advance UI movies once per tick on render-only passes");
+REXCVAR_DEFINE_BOOL(per_tick_pause_menu_movie, true, "ITC",
+                    "Advance the pause menu's movie (the sub-menus' arrow) once per tick; "
+                    "render-only passes only draw it");
 REXCVAR_DEFINE_BOOL(per_tick_texture_animations, true, "ITC",
                     "Advance texture animations (flashing lights) once per tick on "
                     "render-only passes");
@@ -191,8 +194,31 @@ ReplayFromLogicPass g_ui_movies("UI movies", 0xA000);
 
 }  // namespace
 
+// The pause menu's movie (sub_8220B9E8, from the pause screen's Draw handler
+// sub_8216CF08; movie 18 of the table at 0x826C5CCC) is advanced and drawn
+// (r4 = 0) on every pass. Its sub-menus' arrow slides toward the selected
+// item, and the slide's state isn't in the bytes the replay puts back, so it
+// slid ~5 times a tick and overshot. On render-only passes the call is made
+// draw-only (r4 = 1) instead: drawn every frame, advanced once a tick.
+namespace {
+bool g_in_pause_menu_draw = false;
+}  // namespace
+
+extern "C" REX_FUNC(sub_8220B9E8) {
+  REX_FUNC_PROLOGUE();
+  g_in_pause_menu_draw = true;
+  __imp__sub_8220B9E8(ctx, base);
+  g_in_pause_menu_draw = false;
+}
+
 extern "C" REX_FUNC(sub_8211D2F8) {
   REX_FUNC_PROLOGUE();
+  if (g_in_pause_menu_draw && ctx.r4.u32 == 0 && REXCVAR_GET(per_tick_pause_menu_movie) &&
+      frame_pacing::GameMessages_IsRenderOnlyPass()) {
+    ctx.r4.u64 = 1;
+    __imp__sub_8211D2F8(ctx, base);
+    return;
+  }
   if (ctx.r4.u32 != 0 || !REXCVAR_GET(per_tick_ui_movies)) {
     __imp__sub_8211D2F8(ctx, base);
     return;
