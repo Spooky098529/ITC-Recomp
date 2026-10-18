@@ -15,7 +15,9 @@
 // nodes (sub_8211C7E8, sub_821BE5A8, sub_8220D040) and their state switch
 // (sub_8220BA68) are logged with their arguments. For a few passes after
 // each of those, every adding animation track applied (sub_825A0548, the
-// arrow's slide among them) is logged with its target word's values.
+// arrow's slide among them) is logged with its target word's values, and
+// the words they moved are logged at the start and end of each update and
+// whenever a setting track writes them.
 
 #include "debug/pause_movie_log.h"
 #include "frame_pacing/game_messages.h"
@@ -29,6 +31,7 @@
 #include <chrono>
 #include <cstring>
 #include <map>
+#include <string>
 #include <tuple>
 #include <unordered_map>
 #include <vector>
@@ -299,11 +302,30 @@ void CountUpdate(uint32_t movie, uint32_t r4, uint32_t caller, bool draw_only) {
   g_updates.clear();
 }
 
-int g_call_lines = 0;
-std::chrono::steady_clock::time_point g_call_lines_since{};
-
+// Words adding tracks have moved (after != before), watched around updates.
+std::vector<uint32_t> g_moving_targets;
+constexpr size_t kMaxMovingTargets = 16;
+int g_track_lines = 0;
+std::chrono::steady_clock::time_point g_track_lines_since{};
 constexpr uint64_t kTracePasses = 12;
 uint64_t g_trace_until_pass = 0;
+
+void LogMovingTargets(uint8_t* base, uint32_t movie, const char* when) {
+  if (g_moving_targets.empty() || !frame_pacing::GameMessages_Paused() ||
+      frame_pacing::GameMessages_PassNumber() > g_trace_until_pass ||
+      !TakeLine(g_track_lines, g_track_lines_since, kMaxTrackLines)) {
+    return;
+  }
+  std::string line;
+  for (uint32_t target : g_moving_targets) {
+    line += fmt::format(" {:08X}={:g}", target, guest::LoadFloat(base, target));
+  }
+  REXLOG_INFO("pause movie targets: tick {} pass {} {} movie {:08X} {}:{}", Ticks(),
+              frame_pacing::GameMessages_PassNumber(), PassType(), movie, when, line);
+}
+
+int g_call_lines = 0;
+std::chrono::steady_clock::time_point g_call_lines_since{};
 
 void LogCall(const char* name, PPCContext& ctx) {
   if (REXCVAR_GET(log_pause_movie) && frame_pacing::GameMessages_Paused()) {
@@ -329,6 +351,7 @@ void PauseMovieLog_Before(uint8_t* base, uint32_t movie, uint32_t r4, uint32_t c
   }
   CountUpdate(movie, r4, caller, draw_only);
   g_logs[movie].Before(base, movie, r4, draw_only);
+  LogMovingTargets(base, movie, "update start");
 }
 
 void PauseMovieLog_After(uint8_t* base, uint32_t movie, uint32_t caller, const char* outcome,
@@ -337,6 +360,7 @@ void PauseMovieLog_After(uint8_t* base, uint32_t movie, uint32_t caller, const c
     return;
   }
   g_logs[movie].After(base);
+  LogMovingTargets(base, movie, "update end");
   // Every update for a few passes after an animation call, with the replay's
   // outcome and the sub-menus' movie's animation clocks.
   uint64_t pass = frame_pacing::GameMessages_PassNumber();
@@ -351,25 +375,30 @@ void PauseMovieLog_After(uint8_t* base, uint32_t movie, uint32_t caller, const c
   }
 }
 
-int g_track_lines = 0;
-std::chrono::steady_clock::time_point g_track_lines_since{};
-
 bool PauseMovieLog_TracksWanted() {
   return REXCVAR_GET(log_pause_movie) && frame_pacing::GameMessages_Paused() &&
          frame_pacing::GameMessages_PassNumber() <= g_trace_until_pass;
 }
 
 void PauseMovieLog_Track(uint32_t movie, uint32_t node, uint32_t property, uint32_t type,
-                         uint32_t target, uint32_t before, uint32_t after, bool skipped) {
-  if (!TakeLine(g_track_lines, g_track_lines_since, kMaxTrackLines)) {
+                         bool adds, uint32_t target, uint32_t before, uint32_t after,
+                         bool skipped) {
+  bool moving = std::find(g_moving_targets.begin(), g_moving_targets.end(), target) !=
+                g_moving_targets.end();
+  if (adds && after != before && !moving && g_moving_targets.size() < kMaxMovingTargets) {
+    g_moving_targets.push_back(target);
+    moving = true;
+  }
+  if ((!adds && !moving) || !TakeLine(g_track_lines, g_track_lines_since, kMaxTrackLines)) {
     return;
   }
   // Type 0 is a float, 1 and 2 integers (sub_825A0548).
   float before_f = std::bit_cast<float>(before), after_f = std::bit_cast<float>(after);
   REXLOG_INFO(
-      "pause movie track: tick {} pass {} {} movie {:08X} property {} type {} node {:08X} "
+      "pause movie track: tick {} pass {} {} movie {:08X} {} property {} type {} node {:08X} "
       "target {:08X} (+{:X}) {} -> {} ({:+}){}",
-      Ticks(), frame_pacing::GameMessages_PassNumber(), PassType(), movie, property, type, node,
+      Ticks(), frame_pacing::GameMessages_PassNumber(), PassType(), movie,
+      adds ? "adds" : "sets", property, type, node,
       target, target - node, type == 0 ? fmt::format("{:g}", before_f) : fmt::format("{}", int32_t(before)),
       type == 0 ? fmt::format("{:g}", after_f) : fmt::format("{}", int32_t(after)),
       type == 0 ? double(after_f - before_f) : double(int32_t(after - before)),

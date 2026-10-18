@@ -280,8 +280,8 @@ extern "C" REX_FUNC(sub_825A0548) {
   uint32_t descriptor = kTrackProperties + 12 * property;
   bool adds = property < kTrackPropertyCount && guest::LoadU8(base, descriptor + 8) == 0;
   bool skip = g_skip_ui_movie_tracks && adds;
-  uint32_t type = adds ? guest::LoadU32(base, descriptor + 4) : 0;
-  if (!adds || type >= 3 || !debug::PauseMovieLog_TracksWanted()) {
+  uint32_t type = property < kTrackPropertyCount ? guest::LoadU32(base, descriptor + 4) : 3;
+  if (type >= 3 || !debug::PauseMovieLog_TracksWanted()) {
     if (!skip) {
       __imp__sub_825A0548(ctx, base);
     }
@@ -292,7 +292,7 @@ extern "C" REX_FUNC(sub_825A0548) {
   if (!skip) {
     __imp__sub_825A0548(ctx, base);
   }
-  debug::PauseMovieLog_Track(g_ui_movie, node, property, type, target, before,
+  debug::PauseMovieLog_Track(g_ui_movie, node, property, type, adds, target, before,
                              guest::LoadU32(base, target), skip);
 }
 
