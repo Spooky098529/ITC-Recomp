@@ -370,6 +370,17 @@ calls the component's vtable slot 1 (r3 = component, r4 = app + 20).
 Next: `--menu_watch=40000168` (watching without the scan) with
 `82092968` wrapped, to name the component writing it.
 
+Result (`--menu_watch=40000168`, a race the user drove): outside the
+pause `40000168` takes unrelated values (256, `0x2000000`, 8192) from many
+handlers, so it's reused memory, not one variable. While paused it holds
+bit flags (1, 2, 8, 16, 40 = 32|8, 64, 512): set by a component that is a
+delegate (`82233460`, its target at +8), mostly on render-only passes and
+sometimes several times in a tick (`8 -> 40`, `8 -> 513 -> 512`); read and
+cleared by the pause screen's Update `8216DB70` on the next logic pass
+(inside the component `8223A3F0`, the message dispatch). So a component
+run every frame posts events the pause menu acts on. Next: the delegate's
+target and the component's address (the wrapper now resolves delegates).
+
 ### Step 1: native Input::Update (`src/hooks/input.cpp`, `--native_input`)
 
 Follow `src/hooks/lights.cpp` (a `REXCVAR_DEFINE_BOOL`, the override
