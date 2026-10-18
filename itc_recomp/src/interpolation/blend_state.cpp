@@ -303,6 +303,20 @@ std::array<float, 2> ScreenPoint(const Matrix4& m, const Vec3& p) {
   return {(c[0] / w + 1) * 640, (1 - c[1] / w) * 360};
 }
 
+// The angle of `p` about the line through `centre` along unit `axis`, from
+// the camera's up direction (view space): a dial needle's angle, given its
+// origin, which turns with it.
+float AngleOnDial(const Vec3& centre, const Vec3& axis, const Vec3& p) {
+  auto dot = [](const Vec3& a, const Vec3& b) { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]; };
+  Vec3 up{0, 1, 0};
+  float along = dot(up, axis);
+  Vec3 ref{up[0] - along * axis[0], up[1] - along * axis[1], up[2] - along * axis[2]};
+  Vec3 v{p[0] - centre[0], p[1] - centre[1], p[2] - centre[2]};
+  Vec3 cross{ref[1] * v[2] - ref[2] * v[1], ref[2] * v[0] - ref[0] * v[2],
+             ref[0] * v[1] - ref[1] * v[0]};
+  return std::atan2(dot(cross, axis), dot(ref, v));
+}
+
 // A matrix multiply's inputs: a world matrix and a camera's view-projection.
 struct ProductInputs {
   Matrix4 world;
@@ -331,7 +345,19 @@ struct ProductPlan {
 // A perspective camera in both ticks, shared by the products using it.
 struct CameraPair {
   PerspectiveCamera a, b;
+  ScrewMotion screw;  // the camera's placement as a screw (--screw_blend)
 };
+// The camera between its ticks: as a screw with --screw_blend, so whatever
+// moves with it (the cockpit in cockpit view) stays with it.
+PerspectiveCamera BlendCamera(const CameraPair& pair, float amount) {
+  PerspectiveCamera out = Blend(pair.a, pair.b, amount);
+  if (pair.screw.turns) {
+    out.camera = BlendScrew(ScaledTransform{pair.a.camera}, ScaledTransform{pair.b.camera},
+                            pair.screw, amount)
+                     .transform;
+  }
+  return out;
+}
 // A multiply made during a logic pass, as the render thread redoes it: the
 // same for every frame of the tick.
 struct TickProduct {
@@ -353,6 +379,9 @@ struct TickPlans {
     int32_t plan;
     Vec3 local, view;
     float turn;
+    Vec3 axis;  // the turn's axis in view space, pointing back at the camera
+    float angle_before, angle_now;  // the ticks' angles about it (AngleOnDial)
+    Vec3 origin_before, origin_now;  // the ticks' mesh origins in view space
   };
   std::vector<NearSpindle> near_spindles;
 };
@@ -620,6 +649,9 @@ ProductPlan PlanProduct(const ProductInputs& a, const ProductInputs& b, TickPlan
         if (IsSameCamera(*ca, *cb)) {
           it->second = int32_t(plans.cameras.size());
           plans.cameras.push_back({*ca, *cb});
+          if (REXCVAR_GET(screw_blend)) {
+            plans.cameras.back().screw = ScrewBetween(ca->camera, cb->camera);
+          }
         } else {
           it->second = -2;
         }
@@ -648,7 +680,7 @@ class CameraBlends {
     Blended& out = blended_[size_t(index)];
     if (out.frame != frame_) {
       const CameraPair& camera = plans.cameras[size_t(index)];
-      PerspectiveCamera blended = Blend(camera.a, camera.b, amount);
+      PerspectiveCamera blended = BlendCamera(camera, amount);
       out = {frame_, ViewProjectionFromCamera(blended), blended.camera.position};
     }
     return out;
@@ -1024,6 +1056,9 @@ class DrawState {
         counts_.mismatched_products++;
         if (REXCVAR_GET(log_moving_products)) {
           LogMismatch(key, tick, inputs);
+        }
+        if (key.object != 0 && !REXCVAR_GET(log_near_camera_frames).empty()) [[unlikely]] {
+          NoteNearMismatch(key, tick, inputs);
         }
         return;
       }
@@ -1619,8 +1654,18 @@ class DrawState {
           ScrewAxisPoint(va->transform, vb->transform, vb->transform.position);
       std::optional<Matrix4> to_mesh =
           Inverse(Multiply(b.world, ViewMatrixFromTransform(cb->camera)));
-      if (point && to_mesh) {
-        plans.near_spindles.push_back({index, ApplyToPoint(*to_mesh, *point), *point, turn});
+      ScrewMotion screw = ScrewBetween(va->transform, vb->transform);
+      if (point && to_mesh && screw.turns) {
+        Vec3 axis{screw.turn.x, screw.turn.y, screw.turn.z};
+        float length = std::sqrt(axis[0] * axis[0] + axis[1] * axis[1] + axis[2] * axis[2]);
+        float toward = -(axis[0] * (*point)[0] + axis[1] * (*point)[1] + axis[2] * (*point)[2]);
+        for (float& v : axis) {
+          v = v / length * (toward < 0 ? -1.0f : 1.0f);
+        }
+        plans.near_spindles.push_back({index, ApplyToPoint(*to_mesh, *point), *point, turn, axis,
+                                       AngleOnDial(*point, axis, va->transform.position),
+                                       AngleOnDial(*point, axis, vb->transform.position),
+                                       va->transform.position, vb->transform.position});
       }
     }
     if (!REXCVAR_GET(log_near_camera_turns)) {
@@ -1972,6 +2017,63 @@ class DrawState {
                 ticks_, key.camera, key.world, key.signature, key.handler, key.occurrence, w[12],
                 w[13], w[14], tw[12], tw[13], tw[14],
                 tick->view_projection == now.view_projection ? "same" : "differs");
+  }
+  // --log_near_camera_frames: the per-object recorder's products near their
+  // camera whose render-only pass inputs differ from the logic pass's (left
+  // as drawn, not blended), kept and written to <file>.mismatch every 10 s.
+  struct NearMismatch {
+    uint64_t tick;
+    int64_t micros;
+    uint32_t r31;
+    int occurrence;
+    bool in_tick;
+    Vec3 pass_view, tick_view;  // the world matrix's origin relative to the camera
+    float turn;                 // between the logic pass's world rotation and this pass's
+  };
+  std::vector<NearMismatch> near_mismatches_;
+  std::chrono::steady_clock::time_point near_mismatches_written_ = std::chrono::steady_clock::now();
+  [[gnu::noinline]] void NoteNearMismatch(const ProductKey& key, const ProductInputs* tick,
+                                          const ProductInputs& now) {
+    std::optional<PerspectiveCamera> camera = SplitViewProjection(now.view_projection);
+    if (!camera) {
+      return;
+    }
+    Matrix4 view = ViewMatrixFromTransform(camera->camera);
+    Vec3 origin{now.world[12], now.world[13], now.world[14]};
+    if (Distance(origin, camera->camera.position) > 3.0f) {
+      return;
+    }
+    auto t = std::chrono::steady_clock::now();
+    NearMismatch m{ticks_,
+                   std::chrono::duration_cast<std::chrono::microseconds>(t.time_since_epoch()).count(),
+                   uint32_t(key.object), key.occurrence, tick != nullptr};
+    m.pass_view = ApplyToPoint(view, origin);
+    if (tick) {
+      m.tick_view = ApplyToPoint(view, Vec3{tick->world[12], tick->world[13], tick->world[14]});
+      std::optional<Transform> a = TransformFromWorldMatrix(tick->world);
+      std::optional<Transform> b = TransformFromWorldMatrix(now.world);
+      m.turn = a && b ? AngleBetween(a->rotation, b->rotation) : -1;
+    }
+    if (near_mismatches_.size() < 200000) {
+      near_mismatches_.push_back(m);
+    }
+    if (t - near_mismatches_written_ >= std::chrono::seconds(10)) {
+      near_mismatches_written_ = t;
+      std::FILE* file =
+          std::fopen((REXCVAR_GET(log_near_camera_frames) + ".mismatch").c_str(), "a");
+      if (file) {
+        for (const NearMismatch& r : near_mismatches_) {
+          std::fprintf(file,
+                       "tick %llu us %lld r31 %08X #%d %s pass view %.3f %.3f %.3f tick view "
+                       "%.3f %.3f %.3f turn %.3f\n",
+                       (unsigned long long)r.tick, (long long)r.micros, r.r31, r.occurrence,
+                       r.in_tick ? "in tick" : "not in tick", r.pass_view[0], r.pass_view[1],
+                       r.pass_view[2], r.tick_view[0], r.tick_view[1], r.tick_view[2], r.turn);
+        }
+        std::fclose(file);
+      }
+      near_mismatches_.clear();
+    }
   }
   CameraIds camera_ids_;
 
@@ -2330,6 +2432,10 @@ class ReplayCameras {
       return std::nullopt;
     }
     const ReplayedProduct* product = frame_->products.Find(payload);
+    if (near_frames_.on && product && product->written != m && frame_->plans &&
+        !frame_->plans->near_spindles.empty()) [[unlikely]] {
+      near_frames_.OnDiffering(*frame_, *product, m);
+    }
     if (!product || product->written != m) {
       // A draw that isn't a known product (world geometry's matrix often
       // isn't): the pixel constants after it belong to it, not to the last
@@ -2361,7 +2467,7 @@ class ReplayCameras {
       LogOverlay(payload, *product, result);
     }
     if (near_frames_.on && frame_->plans && !frame_->plans->near_spindles.empty()) [[unlikely]] {
-      near_frames_.OnProduct(*frame_, *product, result);
+      near_frames_.OnProduct(*frame_, *product, result, last_parts_.world);
     }
     return result;
   }
@@ -2378,6 +2484,12 @@ class ReplayCameras {
       uint8_t world;  // ProductPlan::World, or 3 for unpaired
       uint32_t caller, r26;
       std::array<float, 2> drawn, ideal, screw;
+      uint32_t r31 = 0;
+      float angle = 0, angle_before = 0, angle_now = 0;  // on the dial: drawn, the ticks'
+      // The mesh origin in view space, drawn and the ticks': unlike the
+      // angles, not measured about a line found again every tick.
+      Vec3 origin{}, origin_before{}, origin_now{};
+      bool differing = false;  // the upload wasn't the tick's product: drawn as uploaded
     };
     std::vector<Record> records;
     // Frames whose tick had such parts but drew none of them blended.
@@ -2401,7 +2513,7 @@ class ReplayCameras {
       }
     }
     [[gnu::noinline]] void OnProduct(const ReplayFrame& f, const ReplayedProduct& product,
-                                     const Matrix4& result) {
+                                     const Matrix4& result, const Matrix4& world) {
       const TickPlans& plans = *f.plans;
       const TickPlans::NearSpindle* spindle = nullptr;
       for (const auto& s : plans.near_spindles) {
@@ -2415,14 +2527,22 @@ class ReplayCameras {
       const ProductPlan& plan = plans.products[size_t(spindle->plan)];
       Record r{frame, f.tick, f.amount, spindle->turn, uint8_t(plan.world),
                product.tick->now.context[0], product.tick->now.context[3]};
+      r.r31 = product.tick->now.context[8];
       r.drawn = ScreenPoint(result, spindle->local);
       if (plan.camera >= 0) {
         const CameraPair& pair = plans.cameras[size_t(plan.camera)];
-        PerspectiveCamera camera = Blend(pair.a, pair.b, f.amount);
+        PerspectiveCamera camera = BlendCamera(pair, f.amount);
         Matrix4 view_projection = ViewProjectionFromCamera(camera);
         // The point stays where it is relative to the camera.
         r.ideal = ScreenPoint(view_projection,
                               ApplyToPoint(WorldMatrixFromTransform(camera.camera), spindle->view));
+        Vec3 origin{world[12], world[13], world[14]};
+        r.origin = ApplyToPoint(ViewMatrixFromTransform(camera.camera), origin);
+        r.angle = AngleOnDial(spindle->view, spindle->axis, r.origin);
+        r.origin_before = spindle->origin_before;
+        r.origin_now = spindle->origin_now;
+        r.angle_before = spindle->angle_before;
+        r.angle_now = spindle->angle_now;
         std::optional<ScaledTransform> wa = ScaledTransformFromWorldMatrix(product.tick->before->world);
         std::optional<ScaledTransform> wb = ScaledTransformFromWorldMatrix(product.tick->now.world);
         if (wa && wb) {
@@ -2438,6 +2558,26 @@ class ReplayCameras {
         truncated = true;
       }
     }
+    // An upload at a product's address that differs from the tick's product:
+    // left as uploaded, so not blended.
+    [[gnu::noinline]] void OnDiffering(const ReplayFrame& f, const ReplayedProduct& product,
+                                       const Matrix4& uploaded) {
+      const TickPlans& plans = *f.plans;
+      for (const auto& s : plans.near_spindles) {
+        if (s.plan == product.tick->plan) {
+          Record r{frame, f.tick, f.amount, s.turn, 0, product.tick->now.context[0],
+                   product.tick->now.context[3]};
+          r.r31 = product.tick->now.context[8];
+          r.differing = true;
+          r.drawn = ScreenPoint(uploaded, s.local);
+          r.ideal = ScreenPoint(product.written, s.local);
+          if (records.size() < 200000) {
+            records.push_back(r);
+          }
+          return;
+        }
+      }
+    }
     void Write() {
       if (records.empty() && missed.empty()) {
         return;
@@ -2450,13 +2590,26 @@ class ReplayCameras {
       for (const Record& r : records) {
         float dx = r.drawn[0] - r.ideal[0], dy = r.drawn[1] - r.ideal[1];
         float sx = r.screw[0] - r.ideal[0], sy = r.screw[1] - r.ideal[1];
+        if (r.differing) {
+          std::fprintf(file,
+                       "frame %llu tick %llu amount %.3f turn %.3f caller %08X r31 %08X r26 %u: "
+                       "upload differs from the tick's product, drawn %.1f %.1f (product %.1f "
+                       "%.1f)\n",
+                       (unsigned long long)r.frame, (unsigned long long)r.tick, r.amount, r.turn,
+                       r.caller, r.r31, r.r26, r.drawn[0], r.drawn[1], r.ideal[0], r.ideal[1]);
+          continue;
+        }
         std::fprintf(file,
-                     "frame %llu tick %llu amount %.3f turn %.3f %s caller %08X r26 %u drawn "
-                     "%.1f %.1f ideal %.1f %.1f screw %.1f %.1f off %.1f px (screw %.1f px)\n",
+                     "frame %llu tick %llu amount %.3f turn %.3f %s caller %08X r31 %08X r26 %u drawn "
+                     "%.1f %.1f ideal %.1f %.1f screw %.1f %.1f off %.1f px (screw %.1f px) angle %.3f "
+                     "(ticks %.3f to %.3f) origin %.3f %.3f %.3f (ticks %.3f %.3f %.3f to %.3f %.3f "
+                     "%.3f)\n",
                      (unsigned long long)r.frame, (unsigned long long)r.tick, r.amount, r.turn,
-                     kKinds[r.world], r.caller, r.r26, r.drawn[0], r.drawn[1], r.ideal[0],
+                     kKinds[r.world], r.caller, r.r31, r.r26, r.drawn[0], r.drawn[1], r.ideal[0],
                      r.ideal[1], r.screw[0], r.screw[1], std::sqrt(dx * dx + dy * dy),
-                     std::sqrt(sx * sx + sy * sy));
+                     std::sqrt(sx * sx + sy * sy), r.angle, r.angle_before, r.angle_now, r.origin[0],
+                     r.origin[1], r.origin[2], r.origin_before[0], r.origin_before[1],
+                     r.origin_before[2], r.origin_now[0], r.origin_now[1], r.origin_now[2]);
       }
       for (const auto& [frame_number, tick] : missed) {
         std::fprintf(file, "frame %llu tick %llu: none blended\n",
