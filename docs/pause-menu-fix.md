@@ -1,11 +1,12 @@
 # Pause menu: input repeating too fast
 
 In a race, the pause menu's input repeats too fast with frames uncapped
-or above 30 fps: holding a direction moves through the menu several items
-a tick. This is the plan to fix it and to translate the game's input
+or above 30 fps: holding a direction moves through the menu one item every
+tick once the repeat starts, and the repeat starts too soon. This is the plan to fix it and to translate the game's input
 handling to native code. Step 0 (logging) is done and its results are in
 "Step 0 results" below; the code that repeats too fast is found: the action
-mappers' update `8210B018` runs once a frame (2026-10-18).
+mappers' update `8210B018` runs once a frame (2026-10-18). The fix is
+planned in "Revised plan" (not started).
 
 Addresses below are guest addresses. `0x82000A30` and friends are floats in
 the game's constant data, read with `guest::LoadU32` and bit-cast (their
@@ -73,9 +74,9 @@ In order, it:
    first node of each list is called.
 
 Since pad state already changes once a tick, a native Input::Update with
-the same results won't fix the pause menu on its own. Something that runs
-on every frame uses the pads: a Draw handler, or a tick handler other than
-the input one. It takes a held button as new, or counts repeats per frame.
+the same results won't fix the pause menu on its own. What counts repeats
+per frame is the action mappers' update (`8210B018`), which reads this
+state on every pass; see "The pause menu's code" and its result below.
 
 ### Physical pad (`sub_82591C18`), 212 bytes
 
@@ -479,46 +480,120 @@ Check nothing else needs the mappers once a frame (e.g. the car's
 steering in a race reads them on logic passes only, if they're read
 there at all).
 
-### Step 1: native Input::Update (`src/hooks/input.cpp`, `--native_input`)
+### Revised plan (2026-10-18)
 
-Follow `src/hooks/lights.cpp` (a `REXCVAR_DEFINE_BOOL`, the override
-calling the translated code when the flag is off). Off by default until
-checked.
+The cause is known (above): the action mappers' update `8210B018` (each
+mapper's `8210C370`) runs on every pass, so their repeat objects count
+frames. The menu, Input::Update and the listeners' counters are right.
+So the fix is to update the mappers once a tick, not to change who reads
+them; Input::Update natively is no longer part of the fix and moves to
+later work (step 4).
 
-- `sub_820990F0` keeps its render-only skip; its override moves into
-  `input.cpp` (only one override per function can exist) or calls into it.
-- Physical and logical pads natively, as described above. Call the kernel
-  imports as the thunks do (`__imp__XamInputGetState`,
-  `__imp__XamInputGetCapabilities`, `__imp__XamInputSetState`, with
-  arguments in ctx registers and the structs in guest memory, e.g. on a
-  `guest::StackFrame`), so `--mnk_mode` still works through the SDK.
-- Logical pads sum physical pads' values directly when step 0 shows their
-  slot 1 returns `device + 8`; any other device goes through its guest
-  vtable call (`REX_CALL_INDIRECT_FUNC`).
-- Processors and listeners stay guest calls, with r3/r4 set as above.
-- `--verify_native_input`: run both (translated first into a copy, then
-  native) each tick and log any byte that differs in the 4 physical and 5
-  logical pads. Running XInputGetState twice a tick is harmless; rumble
-  timers aren't, so restore the motors (+168..+191) between the two.
-  Check with an attract race and a race the user drives, then turn the flag on.
+The mapper's read slots (vtable `0x82007F78`; r4 = action id 151-180,
+index = id - 151):
 
-### Step 2: fix the pause menu
+| Slot | Function | Reads |
+|---|---|---|
+| 5 | `8210BA68` | float at +1132 + 4i (an analog value) |
+| 8 | `8210BE70` | bit i of +448, held |
+| 9 | `8210BED8` | bit i of +452, held before |
+| 10 | `8210BF40` | bit i of +456, pressed (new this update) |
+| 11 | `8210BFA8` | bit i of +460, released |
+| 12 | `8210C010` | bit i of +464, fired (pressed or repeat) |
+| 14 | `8210BA28` | u16 at +1072 + 2i (an analog value) |
 
-- Using step 0's log, make the consumer act once a tick: skip it on
-  render-only passes (`--render_only_skip` for a message handler, or the
-  tick handler list for a tick handler), or, if it's one of the processors, give
-  it presses and repeats counted per tick from step 1. The pause screen
-  stays interpolated. Skipping something that also records UI makes it
-  flicker (as menus did, see "Interpolation" in `docs/functions.md`).
-- Remove the `ctx.r31 + 588` check from `sub_8215B4F8`.
+Slots 2, 3, 4, 6, 7 set up actions (boot, `8209F228`); 13 (`8210B6E8`)
+isn't read yet. Callers use the slots through the vtable (the menu
+through `8220C020`, "confirm" `8220BD50` through slot 10), so grep can't
+list them; that's step 1.
 
-### Step 3: later, toward moving off ReXGlue
+### Step 1: who reads the mappers, by pass type (logging)
 
-- The processors natively, once identified.
-- Possibly read SDL directly instead of `XamInputGetState`. This needs our own
-  mouse and keyboard handling to replace `--mnk_mode`.
+Today a render-only pass rebuilds the words and clears the pressed and
+fired bits a logic pass set (pass 2700 in the log above). Once the
+update is skipped there, those bits stay set until the next logic pass:
+harmless for code reading them on logic passes (as at 30 fps, where
+every pass is one), but code reading them on render-only passes would
+see one press ~5 times. Find out before changing anything:
+
+- Add to `--log_pause_menu` (`src/debug/pause_menu_log.cpp`): override
+  the read slots above (`8210BA68`, `8210BE70`, `8210BED8`, `8210BF40`,
+  `8210BFA8`, `8210C010`, `8210BA28`; `grep -rn` each in `src/` first)
+  and count calls once a second by caller (`lr`), slot, action and pass
+  type, separately while paused (`GameMessages_Paused()`) and not. Log
+  calls that return non-zero on render-only passes on their own line.
+- Also log who calls `8210B018` (`lr`; it's called from `82107910` and
+  sits in the table at `0x8207A158`, probably a component's update run
+  through `82092968`) and on which passes.
+- One run the user plays: drive a race a few seconds (steer, brake, use
+  nitro, change camera, horn), pause, hold the stick down ~5 s, press
+  confirm on an item that opens a sub-screen and back, unpause, finish
+  or quit the race through its end screen if possible.
+- Expected: every reader on logic passes only. A reader on render-only
+  passes needs its own fix before step 2 (or it gets the old per-frame
+  words kept for it).
+
+### Step 2: update the mappers once a tick (`--input_mappers_by_tick`)
+
+- Override `sub_8210B018` (not overridden yet) in a new
+  `src/hooks/input.cpp`: return without calling `__imp__sub_8210B018` on
+  render-only passes (`frame_pacing::GameMessages_IsRenderOnlyPass()`),
+  as the `sub_820990F0` override does for Input::Update. Behind
+  `REXCVAR_DEFINE_BOOL(input_mappers_by_tick, ...)`, off by default
+  until checked, then on in `run.sh` and `run.bat` (and `run-debug.*`).
+- Render-only passes only happen in races (menus run every pass as a
+  logic pass), so no in-race check is needed; and the update doesn't
+  record UI, so skipping it doesn't make anything flicker.
+- `--log_pause_menu` should then show the mapper update on logic passes
+  only, the first repeat ~11 ticks after the press and a move every few
+  ticks after that, the same as `--max_fps=30` (compare the two in the
+  log; take the 30 fps run as the reference rather than guessing the
+  game's numbers).
+- Run: the user does step 1's run with `--input_mappers_by_tick=true
+  --pause_workaround=false` and says whether the menu feels like 30 fps
+  and the car drives the same.
+
+### Step 3: remove the workaround
+
+Once step 2 is checked: delete the `ctx.r31 + 588` check from the
+`sub_8215B4F8` wrapper in `src/frame_pacing/game_messages.cpp` and the
+`--pause_workaround` flag (and from `run.sh`/`run.bat` if they pass it).
+The pause screen then stays at the full frame rate, interpolated, with
+no slow return to it on resume.
+
+### Step 4: later, toward moving off ReXGlue (not needed for the fix)
+
+- Native Input::Update (`--native_input`, in `src/hooks/input.cpp`):
+  follow `src/hooks/lights.cpp` (the override calling the translated code
+  when the flag is off), off by default until checked.
+  - `sub_820990F0` keeps its render-only skip; its override moves into
+    `input.cpp` (only one override per function can exist) or calls
+    into it.
+  - Physical and logical pads natively, as described above. Call the
+    kernel imports as the thunks do (`__imp__XamInputGetState`,
+    `__imp__XamInputGetCapabilities`, `__imp__XamInputSetState`, with
+    arguments in ctx registers and the structs in guest memory, e.g. on a
+    `guest::StackFrame`), so `--mnk_mode` still works through the SDK.
+  - Logical pads sum their bound pads' values directly (step 0 showed
+    slot 1 returns `device + 8` for physical pads and `device + 36` for
+    logical ones); any other device goes through its guest vtable call
+    (`REX_CALL_INDIRECT_FUNC`).
+  - Processors and listeners stay guest calls, with r3/r4 set as above.
+  - `--verify_native_input`: run both (translated first into a copy,
+    then native) each tick and log any byte that differs in the 4
+    physical and 5 logical pads. Running XInputGetState twice a tick is
+    harmless; rumble timers aren't, so restore the motors (+168..+191)
+    between the two. Check with an attract race and a race the user
+    drives, then turn the flag on.
+- The action mappers natively (`8210C370`, `8210C0E0`, `8210BBA0` and
+  the repeat objects): layout as in "The pause menu's code"; read the
+  repeat objects' classes and the parameter table at `0x82600B88` first.
+- Possibly read SDL directly instead of `XamInputGetState`. This needs our
+  own mouse and keyboard handling to replace `--mnk_mode`.
 
 ### When done
 
 Update the `Input::Update` row and "Menus run at 30 fps" in
-`docs/functions.md`, and this document's status.
+`docs/functions.md` (the pause menu then runs at the full frame rate with
+the right repeat; the front end's menus still run at 30 fps), this
+document's status, and CLAUDE.md's line for this document.
