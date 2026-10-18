@@ -245,41 +245,72 @@ void UpdateUiMovie(PPCContext& ctx, uint8_t* base) {
 // keep what the logic pass added for the tick. Tracks that set a value still
 // run (skipping them too made the pause menu flicker).
 //
-// sub_825A0548: r4 = the track, whose word +0 is a property id; the
-// property's descriptor (from sub_8259FE68) is entry id of a 12-byte table
-// at 0x82970C28, filled on first use (byte 0x82970C20 set): +0 the node
-// offset, +4 the type, byte +8 set (non-zero) or add (0), byte +9 indirect.
+// sub_825A0548: r3 = the node, r4 = the track, whose word +0 is a property
+// id; the property's descriptor (from sub_8259FE68) is entry id of a 12-byte
+// table at 0x82970C28, filled on first use (byte 0x82970C20 set): +0 the node
+// offset, +4 the type (0 float, 1 and 2 integer, 3 and up write nothing),
+// byte +8 set (non-zero) or add (0), byte +9 indirect. The one word written
+// is node + offset, plus, when indirect, sub_8259D600([node + 112], [track +
+// 12]) = 16 * ([node + 112] + 2 * ([track + 12] + 4)).
 namespace {
 bool g_skip_ui_movie_tracks = false;
+uint32_t g_ui_movie = 0;  // the UI movie being updated, for --log_pause_movie
 constexpr uint32_t kTrackPropertiesReady = 0x82970C20;
 constexpr uint32_t kTrackProperties = 0x82970C28;
 constexpr uint32_t kTrackPropertyCount = 64;
+
+uint32_t TrackTarget(uint8_t* base, uint32_t node, uint32_t track, uint32_t descriptor) {
+  uint32_t target = node + guest::LoadU32(base, descriptor);
+  if (guest::LoadU8(base, descriptor + 9) != 0) {
+    target += 16 * (guest::LoadU32(base, node + 112) +
+                    2 * (guest::LoadU32(base, track + 12) + 4));
+  }
+  return target;
+}
 }  // namespace
 
 extern "C" REX_FUNC(sub_825A0548) {
   REX_FUNC_PROLOGUE();
-  if (g_skip_ui_movie_tracks && guest::LoadU8(base, kTrackPropertiesReady) != 0) {
-    uint32_t property = guest::LoadU32(base, ctx.r4.u32);
-    if (property < kTrackPropertyCount &&
-        guest::LoadU8(base, kTrackProperties + 12 * property + 8) == 0) {
-      return;
-    }
+  if (guest::LoadU8(base, kTrackPropertiesReady) == 0) {
+    __imp__sub_825A0548(ctx, base);
+    return;
   }
-  __imp__sub_825A0548(ctx, base);
+  uint32_t node = ctx.r3.u32, track = ctx.r4.u32;
+  uint32_t property = guest::LoadU32(base, track);
+  uint32_t descriptor = kTrackProperties + 12 * property;
+  bool adds = property < kTrackPropertyCount && guest::LoadU8(base, descriptor + 8) == 0;
+  bool skip = g_skip_ui_movie_tracks && adds;
+  uint32_t type = adds ? guest::LoadU32(base, descriptor + 4) : 0;
+  if (!adds || type >= 3 || !debug::PauseMovieLog_TracksWanted()) {
+    if (!skip) {
+      __imp__sub_825A0548(ctx, base);
+    }
+    return;
+  }
+  uint32_t target = TrackTarget(base, node, track, descriptor);
+  uint32_t before = guest::LoadU32(base, target);
+  if (!skip) {
+    __imp__sub_825A0548(ctx, base);
+  }
+  debug::PauseMovieLog_Track(g_ui_movie, node, property, type, target, before,
+                             guest::LoadU32(base, target), skip);
 }
 
 extern "C" REX_FUNC(sub_8211D2F8) {
   REX_FUNC_PROLOGUE();
   uint32_t movie = ctx.r3.u32, r4 = ctx.r4.u32, caller = uint32_t(ctx.lr);
   bool skip_tracks_before = g_skip_ui_movie_tracks;
+  uint32_t movie_before = g_ui_movie;
   g_skip_ui_movie_tracks = REXCVAR_GET(per_tick_ui_movie_tracks) &&
                            frame_pacing::GameMessages_IsRenderOnlyPass();
+  g_ui_movie = movie;
   debug::PauseMovieLog_Before(base, movie, r4, caller);
   g_replay_outcome = "not replayed";
   g_replay_occurrence = -1;
   UpdateUiMovie(ctx, base);
   debug::PauseMovieLog_After(base, movie, caller, g_replay_outcome, g_replay_occurrence);
   g_skip_ui_movie_tracks = skip_tracks_before;
+  g_ui_movie = movie_before;
 }
 
 // Race overlays (sub_8215DEA0, from Update handler sub_8215E150; r3 = a list

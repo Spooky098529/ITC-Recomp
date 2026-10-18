@@ -13,4 +13,14 @@ void PauseMovieLog_Before(uint8_t* base, uint32_t movie, uint32_t r4, uint32_t c
 void PauseMovieLog_After(uint8_t* base, uint32_t movie, uint32_t caller, const char* outcome,
                          int occurrence);
 
+// Whether to log animation tracks now: paused, within the passes traced
+// after one of the sub-menus' animation calls.
+bool PauseMovieLog_TracksWanted();
+// One adding track applied (sub_825A0548): `movie` the UI movie being
+// updated (0 outside an update), `property` and `type` from its descriptor,
+// `target` the word written, `before` and `after` its value around the call
+// (the same when `skipped`, by --per_tick_ui_movie_tracks).
+void PauseMovieLog_Track(uint32_t movie, uint32_t node, uint32_t property, uint32_t type,
+                         uint32_t target, uint32_t before, uint32_t after, bool skipped);
+
 }  // namespace debug

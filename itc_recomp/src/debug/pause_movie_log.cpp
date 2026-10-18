@@ -13,7 +13,9 @@
 // updates in the last second (drawing bookkeeping); a summary of the busy
 // words is logged once a second. The sub-menus' calls that set the movie's
 // nodes (sub_8211C7E8, sub_821BE5A8, sub_8220D040) and their state switch
-// (sub_8220BA68) are logged with their arguments.
+// (sub_8220BA68) are logged with their arguments. For a few passes after
+// each of those, every adding animation track applied (sub_825A0548, the
+// arrow's slide among them) is logged with its target word's values.
 
 #include "debug/pause_movie_log.h"
 #include "frame_pacing/game_messages.h"
@@ -52,6 +54,7 @@ constexpr size_t kMaxObjects = 16384;
 constexpr int kBusyChanges = 60;     // changes a second that mark a word as bookkeeping
 constexpr int kMaxLines = 800;       // change lines per 2 s
 constexpr int kMaxCallLines = 400;   // call lines per 2 s
+constexpr int kMaxTrackLines = 2000; // track lines per 2 s
 
 const char* PassType() {
   return frame_pacing::GameMessages_IsRenderOnlyPass() ? "render-only" : "logic";
@@ -346,6 +349,31 @@ void PauseMovieLog_After(uint8_t* base, uint32_t movie, uint32_t caller, const c
         guest::LoadFloat(base, movie + 0x9154), guest::LoadFloat(base, movie + 0x96E0),
         guest::LoadFloat(base, movie + 0x9708));
   }
+}
+
+int g_track_lines = 0;
+std::chrono::steady_clock::time_point g_track_lines_since{};
+
+bool PauseMovieLog_TracksWanted() {
+  return REXCVAR_GET(log_pause_movie) && frame_pacing::GameMessages_Paused() &&
+         frame_pacing::GameMessages_PassNumber() <= g_trace_until_pass;
+}
+
+void PauseMovieLog_Track(uint32_t movie, uint32_t node, uint32_t property, uint32_t type,
+                         uint32_t target, uint32_t before, uint32_t after, bool skipped) {
+  if (!TakeLine(g_track_lines, g_track_lines_since, kMaxTrackLines)) {
+    return;
+  }
+  // Type 0 is a float, 1 and 2 integers (sub_825A0548).
+  float before_f = std::bit_cast<float>(before), after_f = std::bit_cast<float>(after);
+  REXLOG_INFO(
+      "pause movie track: tick {} pass {} {} movie {:08X} property {} type {} node {:08X} "
+      "target {:08X} (+{:X}) {} -> {} ({:+}){}",
+      Ticks(), frame_pacing::GameMessages_PassNumber(), PassType(), movie, property, type, node,
+      target, target - node, type == 0 ? fmt::format("{:g}", before_f) : fmt::format("{}", int32_t(before)),
+      type == 0 ? fmt::format("{:g}", after_f) : fmt::format("{}", int32_t(after)),
+      type == 0 ? double(after_f - before_f) : double(int32_t(after - before)),
+      skipped ? " skipped" : "");
 }
 
 }  // namespace debug

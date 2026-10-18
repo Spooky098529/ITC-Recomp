@@ -919,6 +919,22 @@ way `ReplayFromLogicPass` replays the movie object, instead of skipping:
 - Check with the user: the arrow's position and no ghosting, the pause
   menu without flicker or overlap, and the race start countdown.
 
+**Finding the arrow's track** (2026-10-18). Which adding track moves the
+arrow was never logged: the skip above covers every adding track in every
+UI movie, which is likely what reaches the countdown and the ghosting. The
+plan now is to skip only the arrow's track (by property, and by movie if
+needed) instead of the exact replay. `--log_pause_movie` logs, while
+paused and for the 12 passes after each of the sub-menus' animation calls
+(the arrow's slide `8211DAC8` among them), every adding track applied
+(`pause movie track:` lines): movie, property, type, node, target word (and
+its offset in the node), value before and after with the difference, and
+`skipped` on render-only passes. The target is worked out as above, checked
+against `generated/`: the only store outside the stack is the one word at
+`r25`, none for types 3 and up, and the helpers it calls write only to the
+stack. Next: the user runs at 144 fps with the flag, opens a sub-menu and
+moves the selection; the track whose target steps by the slide each tick is
+the arrow's.
+
 **State of the branch** (`pause-menu-arrow`, all committed and pushed):
 
 | Flag | Default | What | Keep? |
