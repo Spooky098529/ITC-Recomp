@@ -343,6 +343,33 @@ global (key bindings), not the input state. Next: `--log_input_reads` also
 logs the callers of the pads' values methods (`82591B30` logical,
 `820988B8` physical), which return the 40 floats with the stick.
 
+Result: neither is called by the menu. Input::Update calls them, and
+`820988B8` turns out to be a generic "return this + 8" shared with draw
+code (called from draws on the scene object on every pass). So the menu
+reads the input state with inline loads, which can't be hooked.
+
+**Finding it from what it writes (`--find_menu_selection`,
+`src/debug/menu_selection_scan.cpp`).** While paused, guest memory is
+compared over a render-only pass every 300 ms; words changing by small
+integer steps only while the stick is held (listener 0's +0x180 or +0x190
+non-zero) are watched around every tick handler, message handler and
+Scene::Update screen call, on every pass, and each change is logged with
+the pass type. In a race the user drove (16 idle, 22 held samples) most
+candidates were draw bookkeeping (changed inside the Draw handlers
+`8215C770` and `8216CF08`). One wasn't: **`40000168`** is set on
+render-only passes by the tick handler `82093DC0` outside any message
+(`0 -> 8`, `0 -> 4`, `0 -> 5`), and cleared on the next logic pass by the
+pause screen's Update handler `8216DB70` (`8 -> 0`, `4 -> 0`, `5 -> 0`).
+Written every frame and consumed once a tick by the pause menu; 4, 5 and 8
+would fit a count of frames (~4.8 a tick at 144 fps). Not proven.
+
+`82093DC0` is the app's update: besides the message dispatch it runs
+component lists (at +28, +40, +52 through `82092BF0`, +76 through
+`82092CD0`, +96 through `82091C48`), calling `82092968` per entry, which
+calls the component's vtable slot 1 (r3 = component, r4 = app + 20).
+Next: `--menu_watch=40000168` (watching without the scan) with
+`82092968` wrapped, to name the component writing it.
+
 ### Step 1: native Input::Update (`src/hooks/input.cpp`, `--native_input`)
 
 Follow `src/hooks/lights.cpp` (a `REXCVAR_DEFINE_BOOL`, the override

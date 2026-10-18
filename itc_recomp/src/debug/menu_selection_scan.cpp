@@ -18,6 +18,9 @@
 REXCVAR_DEFINE_BOOL(find_menu_selection, false, "ITC",
                     "While paused, find words that change on render-only passes only while a "
                     "direction is held, and log the code changing them by pass type");
+REXCVAR_DEFINE_STRING(menu_watch, "", "ITC",
+                      "Guest words (hex, comma-separated) to watch like --find_menu_selection's "
+                      "candidates, without its scan");
 
 namespace debug {
 
@@ -36,11 +39,23 @@ constexpr int kMaxChangeLines = 300;  // per 2 s
 class MenuSelectionScan {
  public:
   void OnPassStart(uint8_t* base, bool render_only, bool paused, uint32_t listener) {
+    render_only_ = render_only;
+    before_.clear();
+    if (!watch_parsed_) {
+      watch_parsed_ = true;
+      std::string list = REXCVAR_GET(menu_watch);
+      for (size_t start = 0; start < list.size();) {
+        size_t end = list.find(',', start);
+        std::string item = list.substr(start, end == std::string::npos ? end : end - start);
+        if (!item.empty()) {
+          candidates_.push_back(uint32_t(std::stoul(item, nullptr, 16)));
+        }
+        start = end == std::string::npos ? list.size() : end + 1;
+      }
+    }
     if (!REXCVAR_GET(find_menu_selection)) {
       return;
     }
-    render_only_ = render_only;
-    before_.clear();
     if (sampling_) {
       Compare(base);
       sampling_ = false;
@@ -65,7 +80,7 @@ class MenuSelectionScan {
   }
 
   void Before(uint8_t* base) {
-    if (!REXCVAR_GET(find_menu_selection) || candidates_.empty()) {
+    if (candidates_.empty()) {
       return;
     }
     std::vector<uint32_t> values(candidates_.size());
@@ -76,7 +91,7 @@ class MenuSelectionScan {
   }
 
   void After(uint8_t* base, const char* kind, uint32_t id) {
-    if (!REXCVAR_GET(find_menu_selection) || before_.empty()) {
+    if (before_.empty()) {
       return;
     }
     std::vector<uint32_t> values = std::move(before_.back());
@@ -166,6 +181,7 @@ class MenuSelectionScan {
     uint32_t before = 0, after = 0;  // the last held change
   };
   bool render_only_ = false;
+  bool watch_parsed_ = false;
   bool sampling_ = false;
   bool held_ = false;
   int held_samples_ = 0, idle_samples_ = 0;
@@ -212,3 +228,15 @@ void MenuSelectionScan_After(uint8_t* base, const char* kind, uint32_t id) {
 ITC_MENU_SCAN_WRAP(8258E5E0)
 ITC_MENU_SCAN_WRAP(8258ED78)
 #undef ITC_MENU_SCAN_WRAP
+
+// The app's update (tick handler 82093DC0) runs its component lists through
+// this: r4's low word is a component, whose vtable slot 1 it calls (r4 =
+// the app + 20). Logged as "component" with that slot's target.
+extern "C" REX_FUNC(sub_82092968) {
+  REX_FUNC_PROLOGUE();
+  uint32_t component = ctx.r4.u32;
+  uint32_t update = component ? guest::LoadU32(base, guest::LoadU32(base, component) + 4) : 0;
+  debug::MenuSelectionScan_Before(base);
+  __imp__sub_82092968(ctx, base);
+  debug::MenuSelectionScan_After(base, "component", update);
+}
