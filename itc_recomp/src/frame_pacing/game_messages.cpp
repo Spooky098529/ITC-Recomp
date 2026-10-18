@@ -748,7 +748,7 @@ void InputRead_Note(uint32_t function, uint32_t caller, uint32_t object, uint32_
     return;
   }
   g_input_reads_logged = now;
-  constexpr size_t kMaxLines = 100;
+  constexpr size_t kMaxLines = 400;
   size_t lines = 0;
   for (const auto& [k, n] : g_input_reads) {
     if (lines++ == kMaxLines) {
@@ -786,3 +786,21 @@ ITC_INPUT_READ(8258CF10)
 ITC_INPUT_READ(8258CEB0)
 ITC_INPUT_READ(8258CEE0)
 #undef ITC_INPUT_READ
+
+// The pads' values (vtable slot 1, r3 = pad, returns a pointer to its 40
+// floats, the stick's among them): 82591B30 a logical pad's (+36), 820988B8
+// a physical pad's (+8). Input::Update calls them itself; any other caller
+// reads the stick. Logged like the button tests, with mask and result 0.
+#define ITC_INPUT_VALUES(address)                                                  \
+  extern "C" REX_FUNC(sub_##address) {                                             \
+    REX_FUNC_PROLOGUE();                                                           \
+    uint32_t caller = uint32_t(ctx.lr);                                            \
+    uint32_t object = ctx.r3.u32;                                                  \
+    __imp__sub_##address(ctx, base);                                               \
+    if (REXCVAR_GET(log_input_reads)) {                                            \
+      InputRead_Note(0x##address, caller, object, 0, 0);                           \
+    }                                                                              \
+  }
+ITC_INPUT_VALUES(82591B30)
+ITC_INPUT_VALUES(820988B8)
+#undef ITC_INPUT_VALUES
