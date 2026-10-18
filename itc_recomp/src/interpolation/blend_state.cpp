@@ -117,6 +117,10 @@ REXCVAR_DEFINE_BOOL(log_near_camera_turns, false, "ITC",
                     "Once a tick: products within 3 m of their camera whose world matrix turns "
                     "relative to the camera between ticks (cockpit dials), with how they blend "
                     "and how far their origin is from the point they turn about");
+REXCVAR_DEFINE_BOOL(log_near_camera_pairs, false, "ITC",
+                    "Once a tick: groups of the per-object recorder's products sharing a key "
+                    "(same caller, part, mesh and camera) within 3 m of their camera, with each "
+                    "one's r24-r30, position and the previous tick's product it was paired with");
 REXCVAR_DEFINE_BOOL(log_pixel_outcomes, false, "ITC",
                     "Log what happened to the per-object lighting uploads (blended, unpaired, "
                     "rejected...), for moving and still objects, every 2 s");
@@ -1713,6 +1717,9 @@ class DrawState {
         if (candidates == 1 && !has_sibling(before->second, match)) {
           paired_[n->first] = match->first;
           used.insert(match);
+          if (REXCVAR_GET(log_near_camera_pairs)) [[unlikely]] {
+            anchored_.insert(n->first);
+          }
           Vec3 p = position(n->second), q = position(match->second);
           anchors.push_back({p, {p[0] - q[0], p[1] - q[1], p[2] - q[2]}});
         }
@@ -1767,12 +1774,85 @@ class DrawState {
         used.insert(c.b);
       }
     }
+    if (REXCVAR_GET(log_near_camera_pairs)) [[unlikely]] {
+      LogNearCameraPairs(now_groups, before_groups);
+      anchored_.clear();
+    }
     for (const Entry& entry : current_tick_) {
       auto paired = paired_.find(entry.first);
       auto identity = paired != paired_.end() ? previous_identities.find(paired->second)
                                               : previous_identities.end();
       identities_[entry.first] =
           identity != previous_identities.end() ? identity->second : next_identity_++;
+    }
+  }
+  // Diagnostics (--log_near_camera_pairs): MatchTick's pairing of groups of
+  // products sharing a key near their camera (in cockpit view, gauges that
+  // may share a needle's mesh), to see whether they get swapped.
+  std::unordered_set<ProductKey, ProductKeyHash> anchored_;  // paired as anchors this tick
+  template <typename Groups>
+  [[gnu::noinline]] void LogNearCameraPairs(const Groups& now_groups, const Groups& before_groups) {
+    int lines = 0;
+    for (const auto& [group, now] : now_groups) {
+      auto before = before_groups.find(group);
+      size_t before_size = before != before_groups.end() ? before->second.size() : 0;
+      if (now.size() < 2 && before_size < 2) {
+        continue;
+      }
+      std::optional<PerspectiveCamera> camera =
+          SplitViewProjection(now.front()->second.view_projection);
+      if (!camera) {
+        continue;
+      }
+      const Vec3& eye = camera->camera.position;
+      auto range = [&](const ProductInputs& inputs) {
+        return Distance(Vec3{inputs.world[12], inputs.world[13], inputs.world[14]}, eye);
+      };
+      bool near = false;
+      for (const auto* n : now) {
+        near |= range(n->second) <= 3.0f;
+      }
+      if (!near) {
+        continue;
+      }
+      if (lines >= 24) {
+        return;
+      }
+      lines++;
+      REXLOG_INFO("near pairs: tick {} caller {:08X} r31 {:08X} world {:08X} camera {:08X}: "
+                  "{} now, {} before",
+                  ticks_, uint32_t(group.object >> 32), uint32_t(group.object), group.world,
+                  group.camera, now.size(), before_size);
+      auto registers = [](const ProductInputs& inputs) {
+        const auto& c = inputs.context;
+        return fmt::format("{:08X} {:08X} {:08X} {:08X} {:08X} {:08X} {:08X}", c[1], c[2], c[3],
+                           c[4], c[5], c[6], c[7]);
+      };
+      for (const auto* n : now) {
+        const ProductInputs& in = n->second;
+        std::string with = "unpaired";
+        auto paired = paired_.find(n->first);
+        if (paired != paired_.end()) {
+          auto b = previous_tick_.find(paired->second);
+          if (b != previous_tick_.end()) {
+            const ProductInputs& bin = b->second;
+            with = fmt::format(
+                "{} #{} pos {:.3f} {:.3f} {:.3f} (moved {:.3f} m) r24-r30 {}",
+                anchored_.count(n->first) ? "anchor" : "rest", paired->second.occurrence,
+                bin.world[12], bin.world[13], bin.world[14],
+                Distance(Vec3{in.world[12], in.world[13], in.world[14]},
+                         Vec3{bin.world[12], bin.world[13], bin.world[14]}),
+                registers(bin) == registers(in) ? "same" : registers(bin));
+          }
+        }
+        if (lines++ >= 24) {
+          return;
+        }
+        REXLOG_INFO("near pairs:   #{} r24-r30 {} pos {:.3f} {:.3f} {:.3f} ({:.2f} m from "
+                    "camera), paired with {}",
+                    n->first.occurrence, registers(in), in.world[12], in.world[13], in.world[14],
+                    range(in), with);
+      }
     }
   }
   struct {
