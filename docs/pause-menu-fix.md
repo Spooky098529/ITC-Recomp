@@ -879,3 +879,58 @@ id is its word +0 (`[r4]`); `8259FE68` returns that property's 12-byte
 entry in a static table at `0x82970C28` (64 entries, filled on first use,
 byte `0x82970C20` set then): +0 the node offset, +4 the type, byte +8 set
 (non-zero) or add (0), byte +9 indirect. The override reads byte +8 there.
+
+The first build of that read the property id as `[[r4]]` instead of
+`[r4]` and crashed on the race loading screen ("read of guest
+0x00000018", `itc_050.log`; render-only passes apply tracks during
+loading). Fixed in `75271ce`; an attract race then loaded and ran.
+
+**Result of skipping only adding tracks** (user, 2026-10-18, 144 fps): the
+arrow's position is right, but there is **ghosting when the arrow moves**,
+and **the race start countdown flickered** (also a UI movie, in the HUD).
+So skipping isn't exact: some adding tracks start from a value that's
+reset or set elsewhere during the update (the user's guess: alpha), so a
+render-only frame without them draws something different from the logic
+pass. The earlier build that skipped all tracks made the pause menu
+flicker and showed the sub-menus overlapped for a moment on first
+opening (not rechecked since).
+
+**Next (planned, not started): replay the tracks' writes exactly**, the
+way `ReplayFromLogicPass` replays the movie object, instead of skipping:
+
+- On a logic pass, in the `sub_825A0548` override inside a UI movie
+  update, record each write's target address with its value before and
+  after the call, per movie and per call occurrence (the replay's key).
+- On a render-only replay of that call: put every recorded target back
+  to its "before" value, let all tracks apply normally (set and add, so
+  the frame draws exactly what the logic pass drew), then put the
+  "after" values back.
+- The fallbacks (`changed since the logic pass`, `no logic pass state`)
+  need a choice: record the targets' values before the call and put them
+  back after (as `--per_tick_changed_ui_movies` does for the movie).
+- The target of a track (from `825A0548`): `node = r3`, `desc =
+  0x82970C28 + 12 * [r4]`; `target = node + [desc + 0]`, plus, when
+  byte `desc + 9` (indirect) is non-zero, `8259D600([r4 + 12], [node +
+  112])`, which is `16 * (a + 2 * (b + 4))` (`addi r11,r4,4; slwi 1;
+  add r3; slwi 4`). The value written is 4 bytes (float or int, by the
+  type at `desc + 4`). Check the formula against the generated code
+  before relying on it, or record writes generically by comparing the
+  node's bytes around the target before and after.
+- Check with the user: the arrow's position and no ghosting, the pause
+  menu without flicker or overlap, and the race start countdown.
+
+**State of the branch** (`pause-menu-arrow`, all committed and pushed):
+
+| Flag | Default | What | Keep? |
+|---|---|---|---|
+| `--per_tick_ui_movie_tracks` | on | Skips adding tracks (`825A0548`) in UI movie updates on render-only passes: fixes the arrow's position, causes ghosting and countdown flicker | Replace with the exact replay above |
+| `--per_tick_changed_ui_movies` | on | Render-only UI movie updates that fall back (movie changed since the logic pass, or no logic pass call to match) run from the current state, which is put back | Correct but made no visible difference; the user decides |
+| `--log_pause_movie` | off | Logs UI movie updates by caller and pass type; while paused, diffs each movie and objects 3 pointers away; logs the sub-menus' animation calls and, after each, every update with its replay outcome and clocks | Debug |
+| `--paused_render_only_skip` | off | Skips functions wrapped in `menu_selection_scan.cpp` on render-only passes while paused | Test only; remove |
+
+Useful logs: `itc_037`-`itc_039` (first movie logs), `itc_042` (30 fps
+reference), `itc_043` (the update trace around moves), `itc_046` (nodes
+watched), `itc_047` (Scene::Update skip crash), `itc_050` (loading
+crash). Frame dumps from the paused run (`shown_<n>.png`, the arrow at
+"Road Map" and missing after moves) were in the session scratchpad, not
+the repo.
