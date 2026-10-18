@@ -79,6 +79,8 @@ class MenuSelectionScan {
     sampling_ = true;
   }
 
+  bool Active() const { return !candidates_.empty(); }
+
   void Before(uint8_t* base) {
     if (candidates_.empty()) {
       return;
@@ -206,6 +208,10 @@ void MenuSelectionScan_OnPassStart(uint8_t* base, bool render_only, bool paused,
   Get().OnPassStart(base, render_only, paused, listener);
 }
 
+bool MenuSelectionScan_Active() {
+  return Get().Active();
+}
+
 void MenuSelectionScan_Before(uint8_t* base) {
   Get().Before(base);
 }
@@ -243,6 +249,10 @@ ITC_MENU_SCAN_WRAP(82118C18)
 // (a delegate's, sub_8223A3F0 or sub_82233460, is at +8).
 extern "C" REX_FUNC(sub_82092968) {
   REX_FUNC_PROLOGUE();
+  if (!debug::MenuSelectionScan_Active()) {
+    __imp__sub_82092968(ctx, base);
+    return;
+  }
   uint32_t component = ctx.r4.u32;
   uint32_t update = component ? guest::LoadU32(base, guest::LoadU32(base, component) + 4) : 0;
   if (update == 0x8223A3F0 || update == 0x82233460) {
