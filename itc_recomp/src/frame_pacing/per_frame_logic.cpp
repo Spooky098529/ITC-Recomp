@@ -31,6 +31,7 @@
 #include <vector>
 
 REXCVAR_DECLARE(bool, interpolate_draw_state);
+REXCVAR_DECLARE(bool, log_pause_movie);
 REXCVAR_DEFINE_BOOL(per_tick_blink_timers, true, "ITC",
                     "Advance the car blink timers once per tick on render-only passes");
 REXCVAR_DEFINE_BOOL(per_tick_ui_movies, true, "ITC",
@@ -294,7 +295,7 @@ void NotePutBackTargets(uint8_t* base, uint32_t movie, const std::vector<AddedTa
     bool put_back = guest::LoadU32(base, it->target) == it->before;
     bool changed = put_back ? g_put_back_targets.insert(it->target).second
                             : g_put_back_targets.erase(it->target) != 0;
-    if (changed) {
+    if (changed && REXCVAR_GET(log_pause_movie)) {
       debug::PauseMovieLog_PutBack(movie, it->property, it->target, put_back);
     }
   }
@@ -313,7 +314,7 @@ extern "C" REX_FUNC(sub_825A0548) {
   bool adds = property < kTrackPropertyCount && guest::LoadU8(base, descriptor + 8) == 0;
   uint32_t type = property < kTrackPropertyCount ? guest::LoadU32(base, descriptor + 4) : 3;
   bool noted = adds && g_added != nullptr;
-  bool log = debug::PauseMovieLog_TracksWanted();
+  bool log = REXCVAR_GET(log_pause_movie) && debug::PauseMovieLog_TracksWanted();
   if (type >= 3 || (!noted && !log)) {
     __imp__sub_825A0548(ctx, base);
     return;
@@ -329,7 +330,9 @@ extern "C" REX_FUNC(sub_825A0548) {
     }
   }
   if (skip) {
-    debug::PauseMovieLog_Skipped(g_ui_movie, property, target);
+    if (REXCVAR_GET(log_pause_movie)) {
+      debug::PauseMovieLog_Skipped(g_ui_movie, property, target);
+    }
   } else {
     __imp__sub_825A0548(ctx, base);
   }
@@ -352,12 +355,17 @@ extern "C" REX_FUNC(sub_8211D2F8) {
     g_added = &g_added_by_depth[g_update_depth++];
     g_added->clear();
   }
-  g_ui_movie = movie;
-  debug::PauseMovieLog_Before(base, movie, r4, caller);
-  g_replay_outcome = "not replayed";
-  g_replay_occurrence = -1;
+  bool log = REXCVAR_GET(log_pause_movie);
+  if (log) {
+    g_ui_movie = movie;
+    debug::PauseMovieLog_Before(base, movie, r4, caller);
+    g_replay_outcome = "not replayed";
+    g_replay_occurrence = -1;
+  }
   UpdateUiMovie(ctx, base);
-  debug::PauseMovieLog_After(base, movie, caller, g_replay_outcome, g_replay_occurrence);
+  if (log) {
+    debug::PauseMovieLog_After(base, movie, caller, g_replay_outcome, g_replay_occurrence);
+  }
   if (tracks) {
     if (!frame_pacing::GameMessages_IsRenderOnlyPass()) {
       NotePutBackTargets(base, movie, *g_added);

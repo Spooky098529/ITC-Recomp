@@ -474,6 +474,10 @@ void WatchMovingTargets(const char* name, PPCContext& ctx, uint8_t* base, Call&&
 #define WATCH_MOVIE_CALL(address)                                                       \
   extern "C" REX_FUNC(sub_##address) {                                                  \
     REX_FUNC_PROLOGUE();                                                                \
+    if (!REXCVAR_GET(log_pause_movie)) {                                                \
+      __imp__sub_##address(ctx, base);                                                  \
+      return;                                                                           \
+    }                                                                                   \
     debug::WatchMovingTargets(#address, ctx, base, [&] { __imp__sub_##address(ctx, base); }); \
   }
 WATCH_MOVIE_CALL(82119B80)
@@ -491,18 +495,30 @@ WATCH_MOVIE_CALL(8211B080)
 // sub_8220BA68 (r3 = the screen state [0x826D84D8]) switches sub-screens.
 extern "C" REX_FUNC(sub_8211C7E8) {
   REX_FUNC_PROLOGUE();
+  if (!REXCVAR_GET(log_pause_movie)) {
+    __imp__sub_8211C7E8(ctx, base);
+    return;
+  }
   debug::LogCall("8211C7E8 movie node", ctx);
   __imp__sub_8211C7E8(ctx, base);
 }
 
 extern "C" REX_FUNC(sub_821BE5A8) {
   REX_FUNC_PROLOGUE();
+  if (!REXCVAR_GET(log_pause_movie)) {
+    __imp__sub_821BE5A8(ctx, base);
+    return;
+  }
   debug::LogCall("821BE5A8 flags by selection", ctx);
   __imp__sub_821BE5A8(ctx, base);
 }
 
 extern "C" REX_FUNC(sub_8220D040) {
   REX_FUNC_PROLOGUE();
+  if (!REXCVAR_GET(log_pause_movie)) {
+    __imp__sub_8220D040(ctx, base);
+    return;
+  }
   debug::LogCall("8220D040 node and flags by selection", ctx);
   __imp__sub_8220D040(ctx, base);
 }
@@ -514,36 +530,60 @@ extern "C" REX_FUNC(sub_8220D040) {
 // then updates the movie once (from 8220DF24).
 extern "C" REX_FUNC(sub_8211DAC8) {
   REX_FUNC_PROLOGUE();
+  if (!REXCVAR_GET(log_pause_movie)) {
+    __imp__sub_8211DAC8(ctx, base);
+    return;
+  }
   debug::LogCall("8211DAC8 start animation", ctx);
   __imp__sub_8211DAC8(ctx, base);
 }
 
 extern "C" REX_FUNC(sub_8211D978) {
   REX_FUNC_PROLOGUE();
+  if (!REXCVAR_GET(log_pause_movie)) {
+    __imp__sub_8211D978(ctx, base);
+    return;
+  }
   debug::LogCall("8211D978 start item animation", ctx);
   __imp__sub_8211D978(ctx, base);
 }
 
 extern "C" REX_FUNC(sub_8211DE38) {
   REX_FUNC_PROLOGUE();
+  if (!REXCVAR_GET(log_pause_movie)) {
+    __imp__sub_8211DE38(ctx, base);
+    return;
+  }
   debug::LogCall("8211DE38", ctx);
   __imp__sub_8211DE38(ctx, base);
 }
 
 extern "C" REX_FUNC(sub_8211DDD8) {
   REX_FUNC_PROLOGUE();
+  if (!REXCVAR_GET(log_pause_movie)) {
+    __imp__sub_8211DDD8(ctx, base);
+    return;
+  }
   debug::LogCall("8211DDD8", ctx);
   __imp__sub_8211DDD8(ctx, base);
 }
 
 extern "C" REX_FUNC(sub_8211DF20) {
   REX_FUNC_PROLOGUE();
+  if (!REXCVAR_GET(log_pause_movie)) {
+    __imp__sub_8211DF20(ctx, base);
+    return;
+  }
   debug::LogCall("8211DF20", ctx);
   __imp__sub_8211DF20(ctx, base);
 }
 
 extern "C" REX_FUNC(sub_8220BA68) {
   REX_FUNC_PROLOGUE();
+  if (!REXCVAR_GET(log_pause_movie)) {
+    __imp__sub_8220BA68(ctx, base);
+    return;
+  }
   debug::LogCall("8220BA68 screen switch", ctx);
   __imp__sub_8220BA68(ctx, base);
 }

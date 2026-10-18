@@ -1032,7 +1032,7 @@ the game's own behavior**, nothing to fix.
 |---|---|---|---|
 | `--per_tick_ui_movie_tracks` | on | Workaround for frame rates above 30: on render-only passes, skips adding tracks (`825A0548`) in UI movie updates whose target the update doesn't put back. Fixes the arrow; no ghosting or countdown flicker | Keep |
 | `--per_tick_changed_ui_movies` | on | Render-only UI movie updates that fall back (movie changed since the logic pass, or no logic pass call to match) run from the current state, which is put back | Correct but made no visible difference; the user decides |
-| `--log_pause_movie` | off | Logs UI movie updates by caller and pass type; while paused, diffs each movie and objects 3 pointers away; logs the sub-menus' animation calls and, after each, every update with its replay outcome and clocks, every adding track applied, the words they move around each update and which call writes them | Debug |
+| `--log_pause_movie` | off | Logs UI movie updates by caller and pass type; while paused, diffs each movie and objects 3 pointers away; logs the sub-menus' animation calls and, after each, every update with its replay outcome and clocks, every adding track applied, the words they move around each update and which call writes them. Off, its wrappers and call sites check the flag first and only call the game's function, like the other debug logs | Debug |
 | `--paused_render_only_skip` | off | Skipped functions wrapped in `menu_selection_scan.cpp` on render-only passes while paused | Removed |
 
 Useful logs: `itc_037`-`itc_039` (first movie logs), `itc_042` (30 fps
