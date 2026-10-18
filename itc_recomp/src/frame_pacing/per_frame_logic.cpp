@@ -33,9 +33,9 @@ REXCVAR_DEFINE_BOOL(per_tick_blink_timers, true, "ITC",
                     "Advance the car blink timers once per tick on render-only passes");
 REXCVAR_DEFINE_BOOL(per_tick_ui_movies, true, "ITC",
                     "Advance UI movies once per tick on render-only passes");
-REXCVAR_DEFINE_BOOL(per_tick_pause_menu_movie, true, "ITC",
-                    "Advance the pause menu's movie (the sub-menus' arrow) once per tick; "
-                    "render-only passes only draw it");
+REXCVAR_DEFINE_BOOL(per_tick_changed_ui_movies, true, "ITC",
+                    "On render-only passes, draw UI movies changed since the logic pass "
+                    "without advancing them (the pause sub-menus' arrow)");
 REXCVAR_DEFINE_BOOL(per_tick_texture_animations, true, "ITC",
                     "Advance texture animations (flashing lights) once per tick on "
                     "render-only passes");
@@ -108,7 +108,8 @@ extern "C" REX_FUNC(sub_82107910) {
 // call, then put back the state after it. It draws what the logic pass drew,
 // and the state advances once per tick. Calls are matched by object and by
 // order within the pass (an object can be drawn once per view). If the
-// object changed since the logic pass, the call just runs.
+// object changed since the logic pass, or the logic pass had no such call,
+// the call runs from the object's current state, which is then put back.
 namespace {
 class ReplayFromLogicPass {
  public:
@@ -133,7 +134,7 @@ class ReplayFromLogicPass {
     auto it = states_.find(key);
     if (it == states_.end() || it->second.after.size() != bytes_) {
       Count("no logic pass state", -1);
-      call();
+      CallFromCurrentState(state, call);
       return;
     }
     if (std::memcmp(state, it->second.after.data(), bytes_) != 0) {
@@ -142,13 +143,29 @@ class ReplayFromLogicPass {
         first++;
       }
       Count("changed since the logic pass", first);
-      call();
+      CallFromCurrentState(state, call);
       return;
     }
     Count("replayed", -1);
     std::memcpy(state, it->second.before.data(), bytes_);
     call();
     std::memcpy(state, it->second.after.data(), bytes_);
+  }
+
+  // The object changed after the logic pass's call (an animation started
+  // by code later in that pass: the pause sub-menus' arrow), or has no call
+  // there to match: run from the state it has now and put that back, so it
+  // still advances once a tick (--per_tick_changed_ui_movies; without it the
+  // call just runs, advancing on every pass).
+  template <typename Call>
+  void CallFromCurrentState(uint8_t* state, Call&& call) {
+    if (!REXCVAR_GET(per_tick_changed_ui_movies)) {
+      call();
+      return;
+    }
+    current_.assign(state, state + bytes_);
+    call();
+    std::memcpy(state, current_.data(), bytes_);
   }
 
   void Count(const char* outcome, int offset) {
@@ -187,6 +204,7 @@ class ReplayFromLogicPass {
   std::chrono::steady_clock::time_point last_log_{};
   std::unordered_map<Key, States, KeyHash> states_;
   std::unordered_map<uint32_t, int> occurrences_;
+  std::vector<uint8_t> current_;
 };
 
 // UI movies (sub_8211D2F8 with r4 = 0 advances a frame and draws; the HUD,
@@ -194,23 +212,6 @@ class ReplayFromLogicPass {
 ReplayFromLogicPass g_ui_movies("UI movies", 0xA000);
 
 }  // namespace
-
-// The pause menu's movie (sub_8220B9E8, from the pause screen's Draw handler
-// sub_8216CF08; movie 18 of the table at 0x826C5CCC) is advanced and drawn
-// (r4 = 0) on every pass. Its sub-menus' arrow slides toward the selected
-// item, and the slide's state isn't in the bytes the replay puts back, so it
-// slid ~5 times a tick and overshot. On render-only passes the call is made
-// draw-only (r4 = 1) instead: drawn every frame, advanced once a tick.
-namespace {
-bool g_in_pause_menu_draw = false;
-}  // namespace
-
-extern "C" REX_FUNC(sub_8220B9E8) {
-  REX_FUNC_PROLOGUE();
-  g_in_pause_menu_draw = true;
-  __imp__sub_8220B9E8(ctx, base);
-  g_in_pause_menu_draw = false;
-}
 
 namespace {
 void UpdateUiMovie(PPCContext& ctx, uint8_t* base) {
@@ -225,15 +226,8 @@ void UpdateUiMovie(PPCContext& ctx, uint8_t* base) {
 extern "C" REX_FUNC(sub_8211D2F8) {
   REX_FUNC_PROLOGUE();
   uint32_t movie = ctx.r3.u32, r4 = ctx.r4.u32, caller = uint32_t(ctx.lr);
-  bool draw_only = g_in_pause_menu_draw && r4 == 0 && REXCVAR_GET(per_tick_pause_menu_movie) &&
-                   frame_pacing::GameMessages_IsRenderOnlyPass();
-  debug::PauseMovieLog_Before(base, movie, r4, caller, draw_only);
-  if (draw_only) {
-    ctx.r4.u64 = 1;
-    __imp__sub_8211D2F8(ctx, base);
-  } else {
-    UpdateUiMovie(ctx, base);
-  }
+  debug::PauseMovieLog_Before(base, movie, r4, caller);
+  UpdateUiMovie(ctx, base);
   debug::PauseMovieLog_After(base, movie);
 }
 

@@ -312,8 +312,8 @@ void LogCall(const char* name, PPCContext& ctx) {
 
 }  // namespace
 
-void PauseMovieLog_Before(uint8_t* base, uint32_t movie, uint32_t r4, uint32_t caller,
-                          bool draw_only) {
+void PauseMovieLog_Before(uint8_t* base, uint32_t movie, uint32_t r4, uint32_t caller) {
+  constexpr bool draw_only = false;
   if (!REXCVAR_GET(log_pause_movie)) {
     return;
   }
