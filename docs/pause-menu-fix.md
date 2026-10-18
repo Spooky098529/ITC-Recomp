@@ -302,7 +302,8 @@ loading screen; skipping the flag flip ran the game at ~1800 ticks/s, so
 the loading screen at all suggests render-only passes run during race
 loading (not checked).
 
-**Working hypothesis (not proven):** code that runs on every pass while
+**Working hypothesis (not proven; superseded by "The pause menu's code"
+below: it was the action mappers' update):** code that runs on every pass while
 paused, most likely under the screen update (slot 6 `0x8258E5E0` or slot
 2 `0x8258ED78`), reads the tick's input state and acts on it on each of a
 tick's 4-5 frames. Or the menu keeps its own repeat timer and advances it
@@ -644,6 +645,46 @@ scripts don't need to pass it.
   repeat objects' classes and the parameter table at `0x82600B88` first.
 - Possibly read SDL directly instead of `XamInputGetState`. This needs our
   own mouse and keyboard handling to replace `--mnk_mode`.
+
+What's known and what isn't yet, for whoever picks this up:
+
+- Known well enough to write natively: Input::Update's order, the
+  physical and logical pads (layouts, constants, rounding, rumble), the
+  manager's objects as built in races ("Step 0 results"), and the
+  mapper's words and read slots ("The pause menu's code", "Revised
+  plan"'s table).
+- Known only from the outside: the processors' and listeners' update
+  (vtable `0x8206C0C4` slot 1 `0x82592188`): the button tests read +264,
+  +272, +276 and +284 + 4b, and the counters count ticks, but the update
+  itself isn't read. The plan keeps it a guest call.
+- Not read yet (read these first for the native mappers):
+  - `8210C370`, `8210C0E0`, `8210BBA0` in full: how each action's held
+    bit and its analog values (+1072 u16s, +1132 floats) come from the
+    stick floats (`[+2880]`) and the listener at +2464.
+  - `8210B140` (action id to index; ids 151-180 map to 0-29, 30 means
+    none, but whether it's a plain subtraction isn't checked).
+  - The repeat objects (pointers at +472; `8210B568` looks like one
+    class) and their parameters from the table at `0x82600B88`, set by
+    `8209F228` at boot, and slot 13 `8210B6E8`.
+  - Which input each action id is: only the menu's directions (153-156
+    d-pad, 167-170 stick) are known. The car reads 155, 156, 160, 163,
+    164, 169, 170, 173, 174 (analog, `82102400`), 152, 157, 158, 161,
+    162 (pressed) and 159, 165, 166 (held, `82102468`); the pause menu's
+    "pressed" reads are 152, 158, 159 (`8220BDAC`, `8220BE3C`,
+    `8220BECC`). A run with `--log_pause_menu` pressing one button at a
+    time would name them.
+- Every reader seen runs on logic passes ("Step 1" result), so a native
+  update needs to run once a tick only, as `--input_mappers_by_tick`
+  does now; a `--verify_native_mappers` comparing the +448..+467 words,
+  +1072..+1131 and +1132..+1251 against the translated update each tick
+  would check it, as `--verify_native_input` does for the pads.
+- Reading the code: `grep -n "DEFINE_REX_FUNC(sub_XXXXXXXX)"
+  itc_recomp/generated/default/*.cpp` finds a function; its PowerPC is
+  in the `//` comments (`awk -v s=<line> 'NR>s && /^DEFINE_REX_FUNC/
+  {exit} NR>=s' <file> | grep '^\s*// '`), and `grep -n "// bl
+  0x<lowercase address>$"` lists direct callers. Vtables and tables like
+  `0x82600B88`: `--dump_image=<path>` (see `docs/gpu-functions.md`;
+  big-endian, offset = address - `0x82000000`).
 
 ### When done
 
