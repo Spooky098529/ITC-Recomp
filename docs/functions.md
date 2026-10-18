@@ -310,6 +310,7 @@ render-only passes it ran ~5x fast. Each case found is fixed in
 | Play time (a frame counter at `0x826C5B90`, which `sub_821109B8` turns into hours, minutes and seconds at 30 a second) | `sub_82107910` | One taken back before the call on render-only passes (`--per_tick_play_time`) |
 | UI movies: the HUD, including the race start countdown (a 240-frame movie, a beep at frames 60, 120, 180, 240) | `sub_8211D2F8`, with r4 = 0 (advance a frame and draw); r4 = 1 only draws | Replayed (below) (`--per_tick_ui_movies`) |
 | UI movies' adding animation tracks (the pause sub-menus' arrow slid ~5x as far): they write into the movie's nodes, outside the replayed bytes | `sub_825A0548`, inside `sub_8211D2F8` | A workaround for frame rates above 30: on render-only passes, adds whose target the update doesn't put back to the rest pose (`sub_82119B80`) are skipped (`--per_tick_ui_movie_tracks`; `docs/pause-menu-fix.md`, "The sub-menus' arrow") |
+| The rival's logo in the rival intro cutscene (drawn during Update by handler `82159948`) | `sub_821594B8` (native override), `sub_82211A28` | On render-only passes the handler gets Update but only redraws the logo the logic pass drew (`--redraw_rival_logo`; "The rival logo at the race start" below) |
 
 **How the texture animations were found.** `--find_per_frame_state`
 finds only ±1 steps, and the counters it found first (at 0x4005xxxx, half
@@ -352,8 +353,8 @@ through render-only copies (`OnCopy`, kept, harmless), restoring the camera
 passes before Draw (since removed), and hiding
 `sub_821225D8`, `sub_820DDE58`, `820F6068` and HUD handlers.
 
-**The rival logo at the race start** (fix being tested; branch
-`rival-logo-flicker`). Entering a race against a rival plays the rival
+**The rival logo at the race start** (fixed; branch
+`rival-logo-flicker`, `--redraw_rival_logo`). Entering a race against a rival plays the rival
 intro cutscene (about 13 s): the rival's cars, with the rival's 2D logo
 over them. The logo flickers with frames above 30; the attract race's
 logo (drawn from Draw) doesn't. Found
@@ -407,6 +408,12 @@ with logs (2026-10-18, `itc_064.log` to `itc_066.log`):
   during it; on render-only passes it runs nothing of the cutscene, only
   `sub_82211A28` (the game's) on that entry, if the logic pass drew. The
   UI movie replay keeps the logo advancing once a tick.
+- Checked (2026-10-18, `itc_067.log`, 144 fps cap): the user saw no
+  flicker. The handler recorded on ~150 passes a second (203 slots each)
+  instead of 30; the logo's movie (`42353200`) got 30 logic and ~120
+  render-only updates a second from `0x82211A74`, all render-only ones
+  "replayed" (~240 per 2 s, none "changed since the logic pass"); the
+  cutscene lasted ~13.5 s, as before.
 
 **Replaying** (`ReplayFromLogicPass`): when a call both steps an object's
 state and draws it, skipping it would stop the drawing too (the HUD
@@ -787,10 +794,6 @@ processes the game's commands; the render thread mostly waits for it.
   they record their UI and read input during Update, so render-only passes
   made them flicker and repeat presses. Unlocking them would mean skipping
   Update only for the handlers that run game logic.
-- **The rival logo at the race start flickers** above 30 fps: it's drawn
-  by the rival intro cutscene's Update handler `0x82159948`, on logic
-  passes only. See "The rival
-  logo at the race start" under "Per-frame logic".
 - **The race HUD updates at 30 fps.** Accepted for now; its animations
   advance once per tick (see "Per-frame logic").
 - **More per-frame logic may exist.** Anything that runs too fast or

@@ -160,6 +160,13 @@ back were applied again on render-only passes; now skipped there
 (`--per_tick_ui_movie_tracks`, on by default). Its trail, and its snap to a
 front-end menu's first item, are the game's own (seen on a 360 video).
 
+The rival logo (branch `rival-logo-flicker`, 2026-10-18, not merged):
+the rival intro cutscene's logo flickered above 30 fps, drawn during its
+Update handler (`82159948`, `sub_821594B8`) on logic passes only. A native
+override runs the cutscene on logic passes and only the logo's draw
+(`sub_82211A28`) on render-only passes (`--redraw_rival_logo`, on by
+default). See "The rival logo at the race start" in `docs/functions.md`.
+
 Xbox 360 gamma (merged from `xbox-gamma`, 2026-10-16; released in v0.4.3):
 `--xbox_gamma=off|hdtv|power`, off by default (`run.sh` passes `off` and
 lists the choices). The display gamma tables the game writes at boot,
