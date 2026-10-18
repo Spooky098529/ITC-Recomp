@@ -40,6 +40,9 @@ REXCVAR_DEFINE_STRING(render_only_skip, "", "ITC",
 REXCVAR_DEFINE_BOOL(log_input, false, "ITC",
                     "Log the input manager's objects once a race, the pause signs on change, "
                     "and the handlers run by pass type and pause sign, once a second");
+REXCVAR_DEFINE_BOOL(log_input_writes, false, "ITC",
+                    "Log which tick and message handlers write to the input manager and its "
+                    "listener objects, by pass type and pause sign, once a second");
 // Until step 2 of docs/pause-menu-fix.md: while LoadU32(r31 + 588) is
 // non-zero as the race draw step is entered, the pass isn't a race's, so
 // render-only passes stop (the pause screen at 30 fps).
@@ -148,6 +151,90 @@ void InputLog_Run(int kind, uint32_t id, uint32_t target) {
   }
 }
 
+// --log_input_writes: guest ranges watched (the input manager and its
+// listener objects; set by the sub_820990F0 override), and the words each
+// handler changed in them, logged once a second.
+struct InputRange {
+  uint32_t start;
+  uint32_t words;
+  const char* name;
+  int index;
+};
+std::vector<InputRange> g_input_ranges;
+std::vector<uint32_t> g_input_before, g_input_after;
+struct InputWrite {
+  int count = 0;
+  uint32_t before = 0, after = 0;  // the last change
+};
+// (combo, kind, target, range, offset) -> writes.
+std::map<std::tuple<int, int, uint32_t, int, uint32_t>, InputWrite> g_input_writes;
+std::chrono::steady_clock::time_point g_input_writes_last{};
+
+void InputWatch_SetRanges(std::vector<InputRange> ranges) {
+  g_input_ranges = std::move(ranges);
+}
+
+void InputWatch_Copy(uint8_t* base, std::vector<uint32_t>& out) {
+  size_t words = 0;
+  for (const InputRange& r : g_input_ranges) {
+    words += r.words;
+  }
+  out.resize(words);
+  size_t at = 0;
+  for (const InputRange& r : g_input_ranges) {
+    guest::CopyU32s(base, r.start, out.data() + at, r.words);
+    at += r.words;
+  }
+}
+
+void InputWatch_Before(uint8_t* base) {
+  if (REXCVAR_GET(log_input_writes) && !g_input_ranges.empty()) {
+    InputWatch_Copy(base, g_input_before);
+  }
+}
+
+void InputWatch_After(uint8_t* base, int kind, uint32_t target) {
+  if (!REXCVAR_GET(log_input_writes) || g_input_ranges.empty() || g_input_before.empty()) {
+    return;
+  }
+  InputWatch_Copy(base, g_input_after);
+  if (g_input_after.size() != g_input_before.size()) {
+    return;
+  }
+  size_t at = 0;
+  int combo = InputLogCombo();
+  for (size_t r = 0; r < g_input_ranges.size(); r++) {
+    for (uint32_t w = 0; w < g_input_ranges[r].words; w++, at++) {
+      if (g_input_before[at] != g_input_after[at]) {
+        InputWrite& write = g_input_writes[{combo, kind, target, int(r), 4 * w}];
+        write.count++;
+        write.before = g_input_before[at];
+        write.after = g_input_after[at];
+      }
+    }
+  }
+}
+
+void InputWatch_Flush() {
+  constexpr size_t kMaxLines = 120;
+  size_t lines = 0;
+  for (const auto& [key, write] : g_input_writes) {
+    auto [combo, kind, target, range, offset] = key;
+    if (lines++ == kMaxLines) {
+      REXLOG_INFO("input writes: {} more", g_input_writes.size() - kMaxLines);
+      break;
+    }
+    const InputRange& r = g_input_ranges[std::min<size_t>(range, g_input_ranges.size() - 1)];
+    REXLOG_INFO(
+        "input writes: {} in_race {} r31+588 {} record0 {} ({} passes): {} {:08X}: {} {} +{:X} "
+        "x{} (last {:08X} -> {:08X})",
+        (combo & 1) ? "render-only" : "logic", (combo >> 1) & 1, (combo >> 2) & 1,
+        (combo >> 3) & 1, g_input_log_passes[combo], kind == kMessageRun ? "message" : "tick",
+        target, r.name, r.index, offset, write.count, write.before, write.after);
+  }
+  g_input_writes.clear();
+}
+
 // At a pass's start: counts the pass, and logs what ran once a second.
 void InputLog_OnPassStart() {
   if (!REXCVAR_GET(log_input)) {
@@ -181,6 +268,7 @@ void InputLog_OnPassStart() {
     }
     flush();
     g_input_log_runs.clear();
+    InputWatch_Flush();
     std::fill(std::begin(g_input_log_passes), std::end(g_input_log_passes), 0);
   }
   g_input_log_passes[InputLogCombo()]++;
@@ -277,7 +365,9 @@ void Deliver(PPCContext& ctx, uint8_t* base, uint32_t dispatcher, uint32_t messa
     g_current_handler = target;
     g_current_message = guest::LoadU32(base, message);
     InputLog_Run(kMessageRun, g_current_message, target);
+    InputWatch_Before(base);
     REX_CALL_INDIRECT_FUNC(method);
+    InputWatch_After(base, kMessageRun, target);
     g_current_handler = 0;
     g_current_message = ~0u;
     interpolation::BlendState_SetHandler(0);
@@ -530,6 +620,25 @@ extern "C" REX_FUNC(sub_820990F0) {
     g_input_manager_logged = true;
     LogInputManager(ctx, base, ctx.r3.u32);
   }
+  if (REXCVAR_GET(log_input_writes)) {
+    // The manager (its last part, the listener slots, ends at +3984) and
+    // each listener's first object, 416 bytes (the processors' size: they
+    // share the processors' vtable).
+    uint32_t manager = ctx.r3.u32;
+    std::vector<frame_pacing::InputRange> ranges{{manager, 3984 / 4, "manager", 0}};
+    for (uint32_t j = 0; j < 5; j++) {
+      uint32_t s = manager + 3924 + 12 * j;
+      uint32_t head = guest::LoadU32(base, s);
+      if (!guest::LoadU32(base, s + 4) || !head) {
+        continue;
+      }
+      uint32_t node = guest::LoadU32(base, head + 4);
+      if (node != head) {
+        ranges.push_back({guest::LoadU32(base, node + 8), 416 / 4, "listener", int(j)});
+      }
+    }
+    frame_pacing::InputWatch_SetRanges(std::move(ranges));
+  }
   __imp__sub_820990F0(ctx, base);
 }
 
@@ -588,7 +697,9 @@ extern "C" REX_FUNC(sub_82099A98) {
                              guest::LoadU32(base, guest::LoadU32(base, ctx.r4.u32) + 4), target);
   debug::FrameStateDiff_Before(base);
   debug::IdleTimerScan_Before(base);
+  frame_pacing::InputWatch_Before(base);
   __imp__sub_82099A98(ctx, base);
+  frame_pacing::InputWatch_After(base, frame_pacing::kTickRun, target);
   debug::IdleTimerScan_After(base, "tick handler", target);
   debug::FrameStateDiff_After(base, "tick handler", target);
 }
