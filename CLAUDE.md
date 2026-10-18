@@ -144,6 +144,13 @@ drawn scaled and the 3D view at the full resolution, with black bars on
 shapes other than 16:9. See `docs/unlocked-res.md` (a more native frame
 without the game's upscale draw is for later).
 
+Pause menu (merged from `pause-menu`, 2026-10-18, not released yet): the
+action mappers' update (`sub_8210B018`) runs on logic passes only
+(`--input_mappers_by_tick`, on by default, `src/hooks/input.cpp`), so the
+pause menu's input repeat counts ticks at any frame rate; the old
+workaround (`--pause_workaround`, the pause screen held at 30 fps) is
+removed. See `docs/pause-menu-fix.md`.
+
 Xbox 360 gamma (merged from `xbox-gamma`, 2026-10-16; released in v0.4.3):
 `--xbox_gamma=off|hdtv|power`, off by default (`run.sh` passes `off` and
 lists the choices). The display gamma tables the game writes at boot,
@@ -207,7 +214,8 @@ two alternating uncapped attract races each).
 
 Not done yet:
 
-- Menus still run at 30 fps (see Known issues).
+- Menus still run at 30 fps (the front end's; the pause menu runs at the
+  race's rate; see Known issues).
 - Other per-object draws (caller `0x82596D9C`) use projective matrices that
   aren't blended, so they step at 30 Hz; what they draw isn't known yet
   (see Known issues; `--log_moving_products` lists them).
