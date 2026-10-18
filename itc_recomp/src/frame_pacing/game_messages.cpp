@@ -9,12 +9,14 @@
 #include <rex/logging.h>
 
 #include <algorithm>
+#include <bit>
 #include <atomic>
 #include <chrono>
 #include <cstring>
 #include <vector>
 #include <string>
 #include <map>
+#include <tuple>
 #include <thread>
 
 REXCVAR_DEFINE_BOOL(log_game_messages, false, "ITC",
@@ -34,6 +36,16 @@ REXCVAR_DEFINE_BOOL(log_recording_handlers, false, "ITC",
 REXCVAR_DEFINE_STRING(render_only_skip, "", "ITC",
                       "Testing: tick handler or message handler targets (hex, "
                       "comma-separated) to skip on render-only passes");
+// docs/pause-menu-fix.md, step 0.
+REXCVAR_DEFINE_BOOL(log_input, false, "ITC",
+                    "Log the input manager's objects once a race, the pause signs on change, "
+                    "and the handlers run by pass type and pause sign, once a second");
+// Until step 2 of docs/pause-menu-fix.md: while LoadU32(r31 + 588) is
+// non-zero as the race draw step is entered, the pass isn't a race's, so
+// render-only passes stop (the pause screen at 30 fps).
+REXCVAR_DEFINE_BOOL(pause_workaround, true, "ITC",
+                    "Run at 30 fps while LoadU32(r31 + 588) is non-zero in the race draw step "
+                    "(the pause menu's input repeat)");
 
 namespace frame_pacing {
 namespace {
@@ -104,6 +116,78 @@ enum MessageId : uint32_t {
 bool g_render_only_pass = false;
 bool g_race_draw_step_seen = false;  // during the current logic pass
 bool g_in_race = false;              // as of the last logic pass
+
+// Diagnostics (--log_input): the pause signs as of the race draw step's last
+// entry, and the message and tick handlers run, by pass type and those signs.
+struct PauseSigns {
+  uint32_t records[3] = {};  // LoadU32(0x826BAC00 + 588 + 592k)
+  uint32_t mode = 0;         // LoadU32([0x826C5B2C] + 0xA3AF0)
+  uint32_t r31 = 0;
+  uint32_t r31_value = 0;  // LoadU32(r31 + 588)
+  bool operator==(const PauseSigns&) const = default;
+};
+PauseSigns g_pause_signs;
+
+// Bits: 1 render-only, 2 in a race, 4 r31 + 588 non-zero, 8 record 0's +588
+// non-zero.
+int InputLogCombo() {
+  return (g_render_only_pass ? 1 : 0) | (g_in_race ? 2 : 0) | (g_pause_signs.r31_value ? 4 : 0) |
+         (g_pause_signs.records[0] ? 8 : 0);
+}
+
+constexpr int kMessageRun = 0;
+constexpr int kTickRun = 1;
+// (combo, kind, message id or tick function, target) -> calls.
+std::map<std::tuple<int, int, uint32_t, uint32_t>, int> g_input_log_runs;
+uint64_t g_input_log_passes[16] = {};
+std::chrono::steady_clock::time_point g_input_log_last{};
+
+void InputLog_Run(int kind, uint32_t id, uint32_t target) {
+  if (REXCVAR_GET(log_input)) {
+    g_input_log_runs[{InputLogCombo(), kind, id, target}]++;
+  }
+}
+
+// At a pass's start: counts the pass, and logs what ran once a second.
+void InputLog_OnPassStart() {
+  if (!REXCVAR_GET(log_input)) {
+    return;
+  }
+  auto now = std::chrono::steady_clock::now();
+  if (now - g_input_log_last >= std::chrono::seconds(1)) {
+    g_input_log_last = now;
+    std::string line;
+    auto flush = [&] {
+      if (!line.empty()) {
+        REXLOG_INFO("{}", line);
+        line.clear();
+      }
+    };
+    int last_combo = -1, last_kind = -1;
+    uint32_t last_id = 0;
+    for (const auto& [key, n] : g_input_log_runs) {
+      auto [combo, kind, id, target] = key;
+      if (combo != last_combo || kind != last_kind || id != last_id) {
+        flush();
+        line = fmt::format("input runs: {} in_race {} r31+588 {} record0 {} ({} passes): {} {:X}:",
+                           (combo & 1) ? "render-only" : "logic", (combo >> 1) & 1,
+                           (combo >> 2) & 1, (combo >> 3) & 1, g_input_log_passes[combo],
+                           kind == kMessageRun ? "message" : "tick", id);
+        last_combo = combo;
+        last_kind = kind;
+        last_id = id;
+      }
+      line += fmt::format(" {:08X}x{}", target, n);
+    }
+    flush();
+    g_input_log_runs.clear();
+    std::fill(std::begin(g_input_log_passes), std::end(g_input_log_passes), 0);
+  }
+  g_input_log_passes[InputLogCombo()]++;
+}
+
+// As the race draw step is entered: logs the pause signs when any changed.
+void InputLog_PauseSigns(uint8_t* base, uint32_t r31, uint32_t r31_value);
 
 struct Counts {
   int updates = 0;
@@ -192,6 +276,7 @@ void Deliver(PPCContext& ctx, uint8_t* base, uint32_t dispatcher, uint32_t messa
     interpolation::BlendState_SetHandler(target);
     g_current_handler = target;
     g_current_message = guest::LoadU32(base, message);
+    InputLog_Run(kMessageRun, g_current_message, target);
     REX_CALL_INDIRECT_FUNC(method);
     g_current_handler = 0;
     g_current_message = ~0u;
@@ -281,6 +366,7 @@ void GameMessages_PassCounts(uint64_t& logic, uint64_t& render_only) {
 void GameMessages_SetRenderOnlyPass(bool render_only) {
   g_passes[render_only ? 1 : 0]++;
   g_render_only_pass = render_only;
+  InputLog_OnPassStart();
   g_pass_snapshot.store((GameMessages_PassNumber() << 1) | render_only, std::memory_order_relaxed);
   g_main_thread.store(std::this_thread::get_id(), std::memory_order_relaxed);
 }
@@ -304,6 +390,37 @@ bool GameMessages_IsRenderOnlyPass() {
   return g_render_only_pass;
 }
 
+namespace {
+
+void InputLog_PauseSigns(uint8_t* base, uint32_t r31, uint32_t r31_value) {
+  if (!REXCVAR_GET(log_input)) {
+    return;
+  }
+  // sub_8215B4F8 reads +588 of record 0 of 0x826BAC00 (21 records of 592
+  // bytes), or of records 1 and 2 when the mode word is 4.
+  constexpr uint32_t kRecords = 0x826BAC00;
+  constexpr uint32_t kRecordBytes = 592;
+  PauseSigns signs;
+  for (uint32_t k = 0; k < 3; k++) {
+    signs.records[k] = guest::LoadU32(base, kRecords + k * kRecordBytes + 588);
+  }
+  uint32_t mode_object = guest::LoadU32(base, 0x826C5B2C);
+  signs.mode = mode_object ? guest::LoadU32(base, mode_object + 0xA3AF0) : ~0u;
+  signs.r31 = r31;
+  signs.r31_value = r31_value;
+  if (signs == g_pause_signs) {
+    return;
+  }
+  g_pause_signs = signs;
+  REXLOG_INFO(
+      "input pause signs: pass {} {}: record0+588 {:08X} record1 {:08X} record2 {:08X} mode {:X} "
+      "r31 {:08X} r31+588 {:08X}",
+      GameMessages_PassNumber(), g_render_only_pass ? "render-only" : "logic", signs.records[0],
+      signs.records[1], signs.records[2], signs.mode, signs.r31, signs.r31_value);
+}
+
+}  // namespace
+
 }  // namespace frame_pacing
 
 // Guest entry points. These keep the generated names so the game's calls and
@@ -314,30 +431,116 @@ bool GameMessages_IsRenderOnlyPass() {
 // passes, so input is read and acted on once per 30 Hz tick as the game
 // expects. Otherwise presses read on a render-only pass were lost before
 // game logic saw them, and menu auto-repeat (counted in reads) ran 5x fast.
+namespace {
+
+// --log_input: the input manager's objects (layout in
+// docs/pause-menu-fix.md, "Input::Update"), once a race.
+void LogInputManager(PPCContext& ctx, uint8_t* base, uint32_t manager) {
+  constexpr uint32_t kLogicalPads = 8, kLogicalPadBytes = 196;
+  constexpr uint32_t kPhysicalPads = 988, kPhysicalPadBytes = 212;
+  constexpr uint32_t kProcessors = 1840, kProcessorBytes = 416;
+  constexpr uint32_t kListeners = 3924, kListenerBytes = 12;
+  auto slot1 = [&](uint32_t object) {
+    return guest::LoadU32(base, guest::LoadU32(base, object) + 4);
+  };
+  REXLOG_INFO("input manager {:08X}", manager);
+  for (uint32_t i = 0; i < 4; i++) {
+    uint32_t pad = manager + kPhysicalPads + kPhysicalPadBytes * i;
+    REXLOG_INFO("input physical pad {} at {:08X}: vtable {:08X} slot 1 {:08X} flags {:X}", i, pad,
+                guest::LoadU32(base, pad), slot1(pad), guest::LoadU32(base, pad + 4));
+  }
+  for (uint32_t j = 0; j < 5; j++) {
+    uint32_t processor = manager + kProcessors + kProcessorBytes * j;
+    REXLOG_INFO("input processor {} at {:08X}: vtable {:08X} slot 1 {:08X}", j, processor,
+                guest::LoadU32(base, processor), slot1(processor));
+  }
+  for (uint32_t j = 0; j < 5; j++) {
+    uint32_t s = manager + kListeners + kListenerBytes * j;
+    uint32_t count = guest::LoadU32(base, s + 4);
+    uint32_t head = guest::LoadU32(base, s);
+    if (!count || !head) {
+      REXLOG_INFO("input listener slot {}: count {} head {:08X}", j, count, head);
+      continue;
+    }
+    uint32_t node = guest::LoadU32(base, head + 4);
+    if (node == head) {
+      REXLOG_INFO("input listener slot {}: count {} head {:08X}, empty list", j, count, head);
+      continue;
+    }
+    uint32_t object = guest::LoadU32(base, node + 8);
+    REXLOG_INFO("input listener slot {}: count {} object {:08X} vtable {:08X} slot 1 {:08X}", j,
+                count, object, guest::LoadU32(base, object), slot1(object));
+  }
+  // Each binding's slot 1 is called as sub_82591918 calls it (r3 = device,
+  // returns the values' address in r3); the caller's r3 and lr are kept.
+  uint64_t saved_r3 = ctx.r3.u64;
+  uint64_t saved_lr = ctx.lr;
+  for (uint32_t j = 0; j < 5; j++) {
+    uint32_t pad = manager + kLogicalPads + kLogicalPadBytes * j;
+    for (uint32_t k = 0; k < 4; k++) {
+      uint32_t enabled = guest::LoadU8(base, pad + 4 + 8 * k);
+      uint32_t device = guest::LoadU32(base, pad + 8 + 8 * k);
+      if (!device) {
+        REXLOG_INFO("input logical pad {} binding {}: enabled {} device 0", j, k, enabled);
+        continue;
+      }
+      int physical = -1;
+      if (device >= manager + kPhysicalPads &&
+          (device - manager - kPhysicalPads) % kPhysicalPadBytes == 0 &&
+          (device - manager - kPhysicalPads) / kPhysicalPadBytes < 4) {
+        physical = int((device - manager - kPhysicalPads) / kPhysicalPadBytes);
+      }
+      uint32_t function = slot1(device);
+      std::string values = "not called (disabled)";
+      if (enabled) {
+        ctx.r3.u64 = device;
+        ctx.lr = 0x82591970;
+        REX_CALL_INDIRECT_FUNC(function);
+        uint32_t v = ctx.r3.u32;
+        values = fmt::format("returns {:08X} (device + 8: {})", v, v == device + 8);
+      }
+      REXLOG_INFO(
+          "input logical pad {} binding {}: enabled {} device {:08X} (physical pad {}) vtable "
+          "{:08X} slot 1 {:08X} {}",
+          j, k, enabled, device, physical, guest::LoadU32(base, device), function, values);
+    }
+  }
+  ctx.r3.u64 = saved_r3;
+  ctx.lr = saved_lr;
+  for (uint32_t address :
+       {0x82000A30u, 0x82000A34u, 0x82001BE0u, 0x82002200u, 0x8200223Cu, 0x82002BD4u,
+        0x8206CBFCu}) {
+    uint32_t bits = guest::LoadU32(base, address);
+    REXLOG_INFO("input constant {:08X}: {:08X} = {}", address, bits, std::bit_cast<float>(bits));
+  }
+}
+
+bool g_input_manager_logged = false;  // this race
+
+}  // namespace
+
 extern "C" REX_FUNC(sub_820990F0) {
   REX_FUNC_PROLOGUE();
   if (frame_pacing::GameMessages_IsRenderOnlyPass()) {
     return;
   }
+  if (!frame_pacing::GameMessages_InRace()) {
+    g_input_manager_logged = false;
+  } else if (REXCVAR_GET(log_input) && !g_input_manager_logged) {
+    g_input_manager_logged = true;
+    LogInputManager(ctx, base, ctx.r3.u32);
+  }
   __imp__sub_820990F0(ctx, base);
 }
 
 // The race's draw step: r3 = its argument. Noted to tell races from menus.
+// r31 isn't an argument: it's what the caller (sub_8215C770) left in it.
 extern "C" REX_FUNC(sub_8215B4F8) {
   REX_FUNC_PROLOGUE();
-
-  //This appears to be the pause flag
-  uint32_t var_588_r31 = guest::LoadU32(base, ctx.r31.u32 + 588);
-  REXLOG_INFO("VAR_588_R31 {}", var_588_r31);
-
-  //but this fix feels like shit, it takes a fraction of a second for the fps to pick back up
-  if (var_588_r31) {
-    frame_pacing::g_race_draw_step_seen = false;
-  }
-  else 
-  {
-    frame_pacing::g_race_draw_step_seen = true;
-  }
+  uint32_t r31_value = guest::LoadU32(base, ctx.r31.u32 + 588);
+  frame_pacing::InputLog_PauseSigns(base, ctx.r31.u32, r31_value);
+  // --pause_workaround: a non-zero r31 + 588 happens to come with pausing.
+  frame_pacing::g_race_draw_step_seen = !(REXCVAR_GET(pause_workaround) && r31_value);
   __imp__sub_8215B4F8(ctx, base);
 }
 
@@ -381,6 +584,8 @@ extern "C" REX_FUNC(sub_82099A98) {
     }
   }
   uint32_t target = guest::LoadU32(base, ctx.r4.u32 + 8);
+  frame_pacing::InputLog_Run(frame_pacing::kTickRun,
+                             guest::LoadU32(base, guest::LoadU32(base, ctx.r4.u32) + 4), target);
   debug::FrameStateDiff_Before(base);
   debug::IdleTimerScan_Before(base);
   __imp__sub_82099A98(ctx, base);
