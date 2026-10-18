@@ -24,7 +24,7 @@ tick and replaying our own list on in-between frames.
 `docs/pause-menu-fix.md` is the pause menu's too-fast input repeat: fixed
 (the action mappers updated once a tick, `--input_mappers_by_tick`), and a
 native Input::Update for later. Its last section, "The sub-menus' arrow",
-is fixed on branch `pause-menu-arrow` (not merged yet): UI movie tracks
+is fixed (merged from `pause-menu-arrow`): UI movie tracks
 that add to values the update doesn't put back were re-added on every
 render-only pass; now skipped there (`--per_tick_ui_movie_tracks`, a
 workaround for frame rates above 30).
@@ -153,7 +153,12 @@ action mappers' update (`sub_8210B018`) runs on logic passes only
 (`--input_mappers_by_tick`, on by default, `src/hooks/input.cpp`), so the
 pause menu's input repeat counts ticks at any frame rate; the old
 workaround (`--pause_workaround`, the pause screen held at 30 fps) is
-removed. See `docs/pause-menu-fix.md`.
+removed. See `docs/pause-menu-fix.md`. The pause sub-menus' arrow (merged
+from `pause-menu-arrow`, 2026-10-18, not released yet): at 144 fps it slid
+too far, because UI movie tracks that add to values the update doesn't put
+back were applied again on render-only passes; now skipped there
+(`--per_tick_ui_movie_tracks`, on by default). Its trail, and its snap to a
+front-end menu's first item, are the game's own (seen on a 360 video).
 
 Xbox 360 gamma (merged from `xbox-gamma`, 2026-10-16; released in v0.4.3):
 `--xbox_gamma=off|hdtv|power`, off by default (`run.sh` passes `off` and
