@@ -271,9 +271,42 @@ that runs on render-only passes only while paused.
   drawing bookkeeping (command lists, constants) that changes on every pass
   in every phase; no menu selection.
 
-**Next:** skip `8216CF08` on render-only passes (`--render_only_skip=8216CF08`)
-while paused and see whether the repeat goes back to normal (and whether
-the pause screen flickers, which would mean it records there).
+- The pause screen's Draw handler: with `--render_only_skip=8216CF08` the
+  menu still repeats too fast.
+
+**The game's own repeat timing is right.** Listener 0's counter at +180
+counts ticks while a direction is held, reaches `0x18` (24 ticks), then
+cycles `0x14` -> `0x18` (a repeat every 4 ticks). Only Input::Update writes
+it, once a tick. So whatever repeats too fast acts on that state once a
+frame instead of once a tick, or keeps its own timer.
+
+**Scene::Update (tick handler `820988C8`).** Already overridden in
+`src/hooks/title_screen.cpp` (for `--log_boot_modes`). It runs on every
+pass, render-only ones too, and updates the front end's screens outside
+the Update and Draw messages. With r3 = the scene (`0x40026FE0` in an
+attract run), it:
+
+1. calls `sub_8258C9C0` and `sub_8258C998` on r3+8 (a double buffer: flips
+   the index at +4, moves the count at +12 to +16 and clears it);
+2. calls `sub_82591838`, which flips the global `0x82970BC4` between 0 and 1;
+3. calls slot 6 and slot 2 of the screen object embedded at r3+64 (vtable
+   `0x8206CB8C`: slot 6 = `0x8258E5E0`, slot 2 = `0x8258ED78`).
+
+Skipping parts of it on render-only passes isn't usable (`--render_only_scene_skip`,
+commit `d68b95b`, reverted in `0df87df`): skipping all of it crashed race
+loading (an endless read of guest `0x18`); skipping slot 6 froze the race's
+loading screen; skipping the flag flip ran the game at ~1800 ticks/s, so
+`0x82970BC4` is part of the tick timing, not input. That skipping changed
+the loading screen at all suggests render-only passes run during race
+loading (not checked).
+
+**Working hypothesis (not proven):** code that runs on every pass while
+paused, most likely under the screen update (slot 6 `0x8258E5E0` or slot
+2 `0x8258ED78`), reads the tick's input state and acts on it on each of a
+tick's 4-5 frames. Or the menu keeps its own repeat timer and advances it
+once a frame. The fixes differ (act once a tick against count ticks), so
+find which by logging: find the menu's selection index, then log which
+call changes it, on which kind of pass.
 
 ### Step 1: native Input::Update (`src/hooks/input.cpp`, `--native_input`)
 
