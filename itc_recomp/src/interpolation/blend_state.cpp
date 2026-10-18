@@ -113,6 +113,10 @@ REXCVAR_DEFINE_BOOL(log_moving_products, false, "ITC",
                     "Log moving objects drawn out of step: render-only mismatches, products not "
                     "blended or unpaired, pairings that move unlike their neighbours, and jumps "
                     "between frames");
+REXCVAR_DEFINE_BOOL(log_near_camera_turns, false, "ITC",
+                    "Once a tick: products within 3 m of their camera whose world matrix turns "
+                    "relative to the camera between ticks (cockpit dials), with how they blend "
+                    "and how far their origin is from the point they turn about");
 REXCVAR_DEFINE_BOOL(log_pixel_outcomes, false, "ITC",
                     "Log what happened to the per-object lighting uploads (blended, unpaired, "
                     "rejected...), for moving and still objects, every 2 s");
@@ -1523,6 +1527,74 @@ class DrawState {
   bool tick_published_stale_ = true;
   std::vector<std::shared_ptr<ReplayFrame>> spare_frames_;
 
+  // Diagnostics (--log_near_camera_turns): a paired product near its camera
+  // (in cockpit view, the dashboard) whose world matrix turns relative to the
+  // camera between ticks. Blending moves a world matrix's origin in a
+  // straight line and turns it about that origin (or, past kCutAngle, takes
+  // the newer tick's turn as for a wheel), so a part turning about a point
+  // away from its origin leaves that point mid-blend.
+  struct NearCameraTurns {
+    int ticks = 0;
+    int turning[3] = {0, 0, 0};  // by ProductPlan::World
+    float largest[3] = {0, 0, 0};
+    int lines_this_tick = 0;
+  } near_turns_;
+  void LogNearCameraTurn(const ProductInputs& a, const ProductInputs& b, const ProductPlan& plan) {
+    std::optional<PerspectiveCamera> ca = SplitViewProjection(a.view_projection);
+    std::optional<PerspectiveCamera> cb = SplitViewProjection(b.view_projection);
+    if (!ca || !cb) {
+      return;
+    }
+    // The world matrix in view space: local * world * view.
+    std::optional<ScaledTransform> va =
+        ScaledTransformFromWorldMatrix(Multiply(a.world, ViewMatrixFromTransform(ca->camera)));
+    std::optional<ScaledTransform> vb =
+        ScaledTransformFromWorldMatrix(Multiply(b.world, ViewMatrixFromTransform(cb->camera)));
+    if (!va || !vb) {
+      return;
+    }
+    const Vec3& pb = vb->transform.position;
+    float range = std::sqrt(pb[0] * pb[0] + pb[1] * pb[1] + pb[2] * pb[2]);
+    float turn = AngleBetween(va->transform.rotation, vb->transform.rotation);
+    // Products at the camera itself (the sky) only show the camera turning.
+    if (range > 3.0f || range < 0.05f || turn < 0.01f) {
+      return;
+    }
+    int kind = int(plan.world);
+    near_turns_.turning[kind]++;
+    near_turns_.largest[kind] = std::max(near_turns_.largest[kind], turn);
+    if (near_turns_.lines_this_tick++ >= 12) {
+      return;
+    }
+    // A turn by `turn` about a point r from the origin moves the origin by
+    // 2 r sin(turn / 2).
+    float moved = Distance(va->transform.position, vb->transform.position);
+    float radius = moved / (2 * std::sin(turn / 2));
+    // In the world (what the blend works on): its own turn and movement.
+    float world_turn = AngleBetween(plan.wa.transform.rotation, plan.wb.transform.rotation);
+    float world_moved = Distance(plan.wa.transform.position, plan.wb.transform.position);
+    static const char* kKinds[] = {"not blended", "blend", "spinning"};
+    REXLOG_INFO("near turn: tick {} {} turn {:.3f} rad (world {:.3f}) origin moved {:.4f} m "
+                "(world {:.3f}) radius {:.4f} m, view pos {:.3f} {:.3f} {:.3f} scale {:.3f}, "
+                "caller {:08X} r31 {:08X}",
+                near_turns_.ticks, kKinds[kind], turn, world_turn, moved, world_moved, radius,
+                pb[0], pb[1], pb[2], vb->scale[0], b.context[0], b.context[8]);
+  }
+  void LogNearCameraTurnsSummary() {
+    near_turns_.lines_this_tick = 0;
+    if (++near_turns_.ticks % 60 != 0) {
+      return;
+    }
+    REXLOG_INFO("near turns (2 s): not blended {} (largest {:.3f} rad), blend {} ({:.3f}), "
+                "spinning {} ({:.3f})",
+                near_turns_.turning[0], near_turns_.largest[0], near_turns_.turning[1],
+                near_turns_.largest[1], near_turns_.turning[2], near_turns_.largest[2]);
+    for (int k = 0; k < 3; k++) {
+      near_turns_.turning[k] = 0;
+      near_turns_.largest[k] = 0;
+    }
+  }
+
   // Once a tick, after MatchTick: plans the blend of each paired product.
   void PlanTick() {
     auto plans = std::make_shared<TickPlans>();
@@ -1537,6 +1609,12 @@ class DrawState {
       }
       plan_of_[key] = int32_t(plans->products.size());
       plans->products.push_back(PlanProduct(before->second, now->second, *plans, camera_pairs_));
+      if (REXCVAR_GET(log_near_camera_turns)) {
+        LogNearCameraTurn(before->second, now->second, plans->products.back());
+      }
+    }
+    if (REXCVAR_GET(log_near_camera_turns)) {
+      LogNearCameraTurnsSummary();
     }
     tick_product_keys_.clear();
     if (by_tick_) {
