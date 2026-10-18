@@ -4,8 +4,8 @@ In a race, the pause menu's input repeats too fast with frames uncapped
 or above 30 fps: holding a direction moves through the menu several items
 a tick. This is the plan to fix it and to translate the game's input
 handling to native code. Step 0 (logging) is done and its results are in
-"Step 0 results" below; the code that repeats too fast isn't found yet
-(2026-10-18).
+"Step 0 results" below; the code that repeats too fast is found: the action
+mappers' update `8210B018` runs once a frame (2026-10-18).
 
 Addresses below are guest addresses. `0x82000A30` and friends are floats in
 the game's constant data, read with `guest::LoadU32` and bit-cast (their
@@ -445,6 +445,39 @@ scroll before and after, the mapper's held and fired words), and every
 `8210C370` call with a direction held or fired (fired before and after).
 Direction bits: 2 (153) and 3 (154) d-pad up/down, 16 (167) and 17 (168)
 stick up/down.
+
+**Result: found** (`--log_pause_menu`, a race the user drove at 144 fps,
+`itc_024.log`). The mapper's input update `8210C370` runs on **every
+pass**, render-only ones too; the menu list `8220C1E0` (the pause menu's,
+`[0x826D84DC]` = `0x01A00000`, called from `8220D970` in `8220D898`) runs
+on logic passes only. `8210C370` is called by `8210B018`, which loops over
+the objects of type 2 (`8259C898` count, `8259C818` get) and updates each
+mapper; it's run from the app's update `82093DC0` on every pass. Holding
+the stick down (fired bits `08020000`: bit 17, stick down, and bit 27):
+
+- Tick 1415: pressed, fired on the logic pass, selection 0 -> 1. The
+  render-only passes clear it again.
+- Ticks 1416-1417: not fired. The repeat delay ran out on the 11th
+  update (pass 2710, a render-only pass in tick 1417): about 2 ticks
+  instead of ~11.
+- From then on the bit is set on every update, so every logic pass sees
+  it and the selection moves **one item every tick** (1418: 1 -> 2, 1419:
+  2 -> 3, ... wrapping 4 -> 0), 30 items a second.
+
+So the repeat objects count updates, the updates come once a frame, and
+both the delay and the period run ~4.8 times too fast at 144 fps (the
+period is shorter than the ~5 updates a tick, so it reads as "every
+tick"). The menu itself is fine. This also corrects the `--log_input_reads`
+result above: `8210C370` calls the button-test wrapper `8258CF10`
+unconditionally, so it must have run on render-only passes then too; that
+logging probably missed them (not checked).
+
+The fix (step 2, not started): run `8210B018` (or `8210C370`) on logic
+passes only, so the mappers count ticks as at 30 fps; the fired bits a
+logic pass leaves stay in place for the render-only passes after it.
+Check nothing else needs the mappers once a frame (e.g. the car's
+steering in a race reads them on logic passes only, if they're read
+there at all).
 
 ### Step 1: native Input::Update (`src/hooks/input.cpp`, `--native_input`)
 
