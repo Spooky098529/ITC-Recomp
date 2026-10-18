@@ -305,8 +305,31 @@ paused, most likely under the screen update (slot 6 `0x8258E5E0` or slot
 2 `0x8258ED78`), reads the tick's input state and acts on it on each of a
 tick's 4-5 frames. Or the menu keeps its own repeat timer and advances it
 once a frame. The fixes differ (act once a tick against count ticks), so
-find which by logging: find the menu's selection index, then log which
-call changes it, on which kind of pass.
+find which by logging which code reads the input state, on which kind of
+pass.
+
+**The button tests.** The processors' and listeners' state is read
+through three small functions, each r3 = processor (or listener), r4 =
+pointer to a button mask, returning a bool:
+
+- `825924E0`: every button in the mask held (`(+272 & mask) == mask`).
+- `82592500`: any button in the mask set in +264.
+- `82592520`: pressed or repeating. For the first held button of the mask
+  (bit `b` set in +272), its counter at `+284 + 4b` is 1 or has reached the
+  threshold at +276. (Listener 0's counters at +0x180 and +0x190 are bits
+  25 and 29's.) This is what a menu's repeat would use.
+
+Their only direct callers are the wrappers `8258CF10`, `8258CEB0` and
+`8258CEE0` (same arguments, the mask copied to the stack). Every direct
+call of those is from the tick handler `82093DC0` (and `8210C370` for
+`8258CF10`). `82093DC0` runs on every pass, but it tests masks
+`0x00100000` and `0x00200000` (Start and Back) and switches a mode with
+flags at +112/+113, so it isn't the menu's d-pad. The menu must call the
+wrappers or tests through a vtable, which grep can't find, so
+`--log_input_reads` logs every call of the six once a second by caller
+(`lr`), pass type, pause (the pause screen's Draw handler delivered on
+the pass before), the message or tick handler running, object, mask and
+result. A caller getting `1` on render-only passes while paused is the reader.
 
 ### Step 1: native Input::Update (`src/hooks/input.cpp`, `--native_input`)
 
