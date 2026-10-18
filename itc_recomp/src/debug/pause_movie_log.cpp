@@ -6,7 +6,7 @@
 // Every UI movie update (sub_8211D2F8) is counted once a second by movie,
 // mode, caller (lr: the caller of sub_8211E1B8, which jumps to it) and pass
 // type. While paused, around each update of each movie: the movie object (0xA000 bytes, what the UI movie
-// replay keeps) and the objects up to two pointers away from it (0x200 bytes
+// replay keeps) and the objects up to three pointers away from it (0x200 bytes
 // each) are compared before and after the update ("in update") and against
 // the last update's end ("between": written by other code since). Each
 // changed word is logged with the pass type, unless it changed in 60 or more
@@ -48,7 +48,7 @@ namespace {
 
 constexpr uint32_t kMovieBytes = 0xA000;
 constexpr uint32_t kObjectBytes = 0x200;
-constexpr size_t kMaxObjects = 8192;
+constexpr size_t kMaxObjects = 16384;
 constexpr int kBusyChanges = 60;     // changes a second that mark a word as bookkeeping
 constexpr int kMaxLines = 800;       // change lines per 2 s
 constexpr int kMaxCallLines = 400;   // call lines per 2 s
@@ -152,15 +152,16 @@ class PauseMovieLog {
     }
     objects_.push_back({movie, kMovieBytes, 0});
     std::unordered_map<uint32_t, bool> seen{{movie, true}};
-    // Two levels of pointers: heap words (0x40000000-0x7FFFFFFF) that point
+    // Three levels of pointers: words in 0x01000000-0x7FFFFFFF (the heap, and
+    // the movie data at 0x03xxxxxx where its nodes are) that point
     // at readable memory outside the objects already taken.
-    for (size_t level = 0, from = 0; level < 2; level++) {
+    for (size_t level = 0, from = 0; level < 3; level++) {
       size_t to = objects_.size();
       for (size_t i = from; i < to && objects_.size() < kMaxObjects; i++) {
         const Object o = objects_[i];
         for (uint32_t off = 0; off + 4 <= o.size && objects_.size() < kMaxObjects; off += 4) {
           uint32_t v = guest::LoadU32(base, o.address + off);
-          if (v < 0x40000000 || v >= 0x80000000 || (v & 3) != 0) {
+          if (v < 0x01000000 || v >= 0x80000000 || (v & 3) != 0) {
             continue;
           }
           if (v >= movie && v < movie + kMovieBytes) {
