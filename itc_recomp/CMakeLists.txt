@@ -71,6 +71,7 @@ set(ITC_SOURCES
     src/debug/frame_state_diff.cpp
     src/debug/idle_timer_scan.cpp
     src/debug/menu_selection_scan.cpp
+    src/debug/pause_menu_log.cpp
     src/debug/image_dump.cpp
     src/debug/replay_stats.cpp
     src/debug/thread_cpu.cpp

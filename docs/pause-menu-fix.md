@@ -393,6 +393,59 @@ probably heap or list bookkeeping, not input events. **Dead end** (not
 proven). The memory scan found no other candidate outside the Draw
 handlers.
 
+**The pause menu's code (read 2026-10-18).** From the pause screen's
+Update `8216DB70` down; nothing here reads the pads' floats directly:
+
+- `8216DB70`, when its state (+9612) is 6, updates the HUD under it
+  (`822153A0`, `82212C50`, `82215488` on `[+9608] + 16`) and calls
+  `8220F638`, which calls one of six functions by the index at
+  `[[0x826D84D8]]` (-1: none): `8220D898`, `8220DB98`, `8220E988`,
+  `8220EBD8`, `8220C578`, `8220C5D0`. They are the pause menu and its
+  sub-screens; `8220ba68([0x826D84D8], state, ...)` switches between them.
+- `8220D898` (the main list) queues each item's text (`82106540`, x 100,
+  y 100 + 20i), calls the list update `8220C1E0` on the menu object
+  `[0x826D84DC]`, and plays sound 4 (`821103F0`) when the selection
+  (`8220BC20`, +16) differs from the previous one (`8220BC28`, +20).
+  `8220BD50` is "confirm".
+- **The menu list** (`8220C1E0`, generic: ~50 menus call it): +0 item
+  count, +4 scroll, +12 items shown, **+16 selection** (relative to the
+  scroll), +20 previous selection, +24 last move (1 down, -1 up), +28
+  left/right, +36/+40/+44/+48 the action ids for down, up, left, right,
+  +60 the player, +64 wraps, +68 per-item "disabled" flags. It moves by
+  one item per call when `8220C020(menu, action)` is true.
+- `8220C020` tests action 153 or 167 (up), 154 or 168 (down), 155/169,
+  156/170 (left, right: d-pad and stick ids, either one) with vtable slot
+  12 of an **action mapper**: `[0x826BAB80 + 8 * [0x826BABA4 + 4 *
+  menu[+60]]]` (skipped when the entry's +4 is 1). Mappers 0-3 are at
+  `0x40071140`, `0x40071CA0`, `0x40072800`, `0x40073360` (at boot; in
+  the user's runs the listener objects are at mapper + `0x9A0`).
+- **The action mapper** (vtable `0x82007F78`, 15 slots; 30 actions,
+  ids 151-180, index = id - 151 through `8210B140`). Slot 12 `8210C010`:
+  bit `index` of the "fired" word at +464. Slot 9 `8210BED8`: the word at
+  +452. Slot 1 `8210BDB8` resets. Its input update `8210C370` (called by
+  the app's update `82093DC0`) reads the stick floats through `[+2880]`
+  and the d-pad through the listener at +2464 (`0x9A0`, with the button
+  test `8258CF10`), then `8210C0E0` -> `8210BBA0` rebuilds, at +448:
+  held, held before, pressed (new), released, and **fired** (+464) =
+  pressed, or'ed with each action's repeat object (pointers at +472,
+  vtable slot 1 called with "held") saying it repeats. Repeat parameters
+  per action are set at boot (`8209F228`) from the table at `0x82600B88`.
+  `8210B568` looks like one such repeat: counts calls while held, fires
+  at a start count and then every period, so it counts updates, not time.
+- So the selection moves once per `8220C1E0` call while the fired bit is
+  set, and the fired bit changes once per `8210C370` call. If both ran once
+  a tick the repeat would be right. Earlier logs say the button tests that
+  `8210C370` calls run on logic passes only; nothing yet says how often
+  `8220C1E0` runs per mapper update.
+
+`--log_pause_menu` (`src/debug/pause_menu_log.cpp`) logs every
+`8220C1E0` call that moves a selection or sees a direction held or fired
+(tick, pass, caller, list, whether it's the pause menu's, selection and
+scroll before and after, the mapper's held and fired words), and every
+`8210C370` call with a direction held or fired (fired before and after).
+Direction bits: 2 (153) and 3 (154) d-pad up/down, 16 (167) and 17 (168)
+stick up/down.
+
 ### Step 1: native Input::Update (`src/hooks/input.cpp`, `--native_input`)
 
 Follow `src/hooks/lights.cpp` (a `REXCVAR_DEFINE_BOOL`, the override
