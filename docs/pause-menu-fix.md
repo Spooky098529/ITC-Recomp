@@ -791,3 +791,20 @@ render-only passes (`8220EE70`, `8220EEB0`, `8220C6C0`, `8220C8C8`, once
 each). So the movie isn't what moves the arrow wrongly. The 30 fps
 reference also had interpolation off, which blends HUD draws between
 ticks: next, 144 fps with `--interpolate_draw_state=false`.
+
+`825A08E0`, which each movie update calls per playing animation, is
+keyframe interpolation (it finds the keys around the animation's time and
+applies t = (time - k0) / (k1 - k0), clamped): it sets values from the
+time, so replays can't step it. The game never measures time (see
+"Fixed time step" in `docs/functions.md`), so the arrow isn't scaled by
+frame time; something steps once a pass. With interpolation off at 144
+fps the user still saw the arrow wrong, so it isn't the blending either.
+
+The movie's nodes are at 0x03xxxxxx (`035D1B80` etc.), which the first
+logs didn't follow; `itc_046.log` watches them (three pointer levels,
+~4,900 objects). Inside render-only updates only counters change
+(0xE8xx: draw stamps, in 0x0224xxxx and 0x0532xxxx) besides the scene
+object's bookkeeping; nothing that looks like a position. Next, a test:
+`--paused_render_only_skip=8258E5E0,8258ED78` skips Scene::Update's two
+screen calls (which run on every pass and update the front end's
+screens) on render-only passes while paused.

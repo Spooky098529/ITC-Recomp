@@ -18,6 +18,10 @@
 REXCVAR_DEFINE_BOOL(find_menu_selection, false, "ITC",
                     "While paused, find words that change on render-only passes only while a "
                     "direction is held, and log the code changing them by pass type");
+REXCVAR_DEFINE_STRING(paused_render_only_skip, "", "ITC",
+                      "Testing: functions wrapped in menu_selection_scan.cpp (hex, "
+                      "comma-separated; e.g. Scene::Update's screen calls 8258E5E0, 8258ED78) "
+                      "not to run on render-only passes while paused");
 REXCVAR_DEFINE_STRING(menu_watch, "", "ITC",
                       "Guest words (hex, comma-separated) to watch like --find_menu_selection's "
                       "candidates, without its scan");
@@ -225,9 +229,36 @@ void MenuSelectionScan_After(uint8_t* base, const char* kind, uint32_t id) {
 // Wrapped to name them in --find_menu_selection's log: Scene::Update's two
 // screen calls (slot 6 and slot 2 of the screen object at scene + 64), and
 // others below.
+// --paused_render_only_skip lists the ones (by address) not to run on
+// render-only passes while paused, a test for what moves the pause
+// sub-menus' arrow (docs/pause-menu-fix.md).
+namespace {
+bool SkipWhilePausedRenderOnly(uint32_t address) {
+  static std::vector<uint32_t> skipped = [] {
+    std::vector<uint32_t> list;
+    std::string text = REXCVAR_GET(paused_render_only_skip);
+    for (size_t start = 0; start < text.size();) {
+      size_t end = text.find(',', start);
+      std::string item = text.substr(start, end == std::string::npos ? end : end - start);
+      if (!item.empty()) {
+        list.push_back(uint32_t(std::stoul(item, nullptr, 16)));
+      }
+      start = end == std::string::npos ? text.size() : end + 1;
+    }
+    return list;
+  }();
+  return !skipped.empty() && frame_pacing::GameMessages_Paused() &&
+         frame_pacing::GameMessages_IsRenderOnlyPass() &&
+         std::find(skipped.begin(), skipped.end(), address) != skipped.end();
+}
+}  // namespace
+
 #define ITC_MENU_SCAN_WRAP(address)                         \
   extern "C" REX_FUNC(sub_##address) {                      \
     REX_FUNC_PROLOGUE();                                    \
+    if (SkipWhilePausedRenderOnly(0x##address)) {           \
+      return;                                               \
+    }                                                       \
     debug::MenuSelectionScan_Before(base);                  \
     __imp__sub_##address(ctx, base);                        \
     debug::MenuSelectionScan_After(base, "call", 0x##address); \
