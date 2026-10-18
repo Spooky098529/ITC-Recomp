@@ -406,6 +406,40 @@ void PauseMovieLog_Track(uint32_t movie, uint32_t node, uint32_t property, uint3
       skipped ? " skipped" : "");
 }
 
+int g_put_back_lines = 0;
+std::chrono::steady_clock::time_point g_put_back_lines_since{};
+
+void PauseMovieLog_PutBack(uint32_t movie, uint32_t property, uint32_t target, bool put_back) {
+  if (!REXCVAR_GET(log_pause_movie) ||
+      !TakeLine(g_put_back_lines, g_put_back_lines_since, kMaxCallLines)) {
+    return;
+  }
+  REXLOG_INFO("pause movie track target: tick {} movie {:08X} property {} target {:08X} {}",
+              Ticks(), movie, property, target,
+              put_back ? "put back by the update" : "not put back by the update");
+}
+
+std::map<std::tuple<uint32_t, uint32_t, uint32_t>, int> g_skipped;
+std::chrono::steady_clock::time_point g_skipped_since{};
+
+void PauseMovieLog_Skipped(uint32_t movie, uint32_t property, uint32_t target) {
+  if (!REXCVAR_GET(log_pause_movie)) {
+    return;
+  }
+  g_skipped[{movie, property, target}]++;
+  auto now = std::chrono::steady_clock::now();
+  if (now - g_skipped_since < std::chrono::seconds(2)) {
+    return;
+  }
+  g_skipped_since = now;
+  for (const auto& [key, n] : g_skipped) {
+    const auto& [m, p, t] = key;
+    REXLOG_INFO("pause movie skipped tracks: tick {} movie {:08X} property {} target {:08X}: {}",
+                Ticks(), m, p, t, n);
+  }
+  g_skipped.clear();
+}
+
 // Runs `call`, a function the UI movie update calls, and logs which of the
 // moved words it changes (to find what puts the arrow's track back after
 // the update applies it).

@@ -21,11 +21,13 @@
 #include <chrono>
 #include <cmath>
 #include <cstring>
+#include <deque>
 #include <functional>
 #include <map>
 #include <tuple>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 REXCVAR_DECLARE(bool, interpolate_draw_state);
@@ -35,7 +37,8 @@ REXCVAR_DEFINE_BOOL(per_tick_ui_movies, true, "ITC",
                     "Advance UI movies once per tick on render-only passes");
 REXCVAR_DEFINE_BOOL(per_tick_ui_movie_tracks, true, "ITC",
                     "On render-only passes, don't apply UI movies' animation tracks that add "
-                    "to their node (they moved ~5x as far: the pause sub-menus' arrow)");
+                    "to a value the update doesn't put back (they moved ~5x as far: the pause "
+                    "sub-menus' arrow)");
 REXCVAR_DEFINE_BOOL(per_tick_changed_ui_movies, true, "ITC",
                     "On render-only passes, draw UI movies changed since the logic pass "
                     "without advancing them (the pause sub-menus' arrow)");
@@ -239,11 +242,16 @@ void UpdateUiMovie(PPCContext& ctx, uint8_t* base) {
 // animation (sub_825A08E0, keyframe interpolation at the animation's time),
 // and sub_825A0548 writes one track's value into its node, outside the bytes
 // the replay restores. A track whose descriptor's byte +8 is 0 adds its
-// value to the node instead of setting it, so each render-only update added
-// it again: at 144 fps the pause sub-menus' arrow slid ~5x as far, off its
-// item. On render-only passes the adding tracks aren't applied: their nodes
-// keep what the logic pass added for the tick. Tracks that set a value still
-// run (skipping them too made the pause menu flicker).
+// value to the node instead of setting it. Most nodes are put back to the
+// movie's rest pose at the end of the update (sub_82119B80, from 8211D7CC),
+// so their adds start again from it every update; skipping those on
+// render-only passes drew the rest pose there (the arrow ghosting between
+// its slide and its rest position). Adds on values the update doesn't put
+// back were applied again on every render-only update: at 144 fps the pause
+// sub-menus' arrow slid ~5x as far, off its item. So on a logic pass each
+// adding track's target is noted as put back or not (its value at the end
+// of the update is the one before the track), and on render-only passes
+// only adds on targets not seen put back are skipped.
 //
 // sub_825A0548: r3 = the node, r4 = the track, whose word +0 is a property
 // id; the property's descriptor (from sub_8259FE68) is entry id of a 12-byte
@@ -253,11 +261,21 @@ void UpdateUiMovie(PPCContext& ctx, uint8_t* base) {
 // is node + offset, plus, when indirect, sub_8259D600([node + 112], [track +
 // 12]) = 16 * ([node + 112] + 2 * ([track + 12] + 4)).
 namespace {
-bool g_skip_ui_movie_tracks = false;
 uint32_t g_ui_movie = 0;  // the UI movie being updated, for --log_pause_movie
 constexpr uint32_t kTrackPropertiesReady = 0x82970C20;
 constexpr uint32_t kTrackProperties = 0x82970C28;
 constexpr uint32_t kTrackPropertyCount = 64;
+
+struct AddedTarget {
+  uint32_t target, before, property;
+};
+// The adding tracks' targets of each UI movie update in progress (updates
+// can nest), with their values before the track; null outside an update.
+std::deque<std::vector<AddedTarget>> g_added_by_depth;
+size_t g_update_depth = 0;
+std::vector<AddedTarget>* g_added = nullptr;
+// Targets of adding tracks the last logic pass's update put back.
+std::unordered_set<uint32_t> g_put_back_targets;
 
 uint32_t TrackTarget(uint8_t* base, uint32_t node, uint32_t track, uint32_t descriptor) {
   uint32_t target = node + guest::LoadU32(base, descriptor);
@@ -266,6 +284,20 @@ uint32_t TrackTarget(uint8_t* base, uint32_t node, uint32_t track, uint32_t desc
                     2 * (guest::LoadU32(base, track + 12) + 4));
   }
   return target;
+}
+
+// At the end of a logic pass's update: a target is put back when it holds
+// its value from before its first track in the update (walked from the
+// end, so that track decides).
+void NotePutBackTargets(uint8_t* base, uint32_t movie, const std::vector<AddedTarget>& added) {
+  for (auto it = added.rbegin(); it != added.rend(); ++it) {
+    bool put_back = guest::LoadU32(base, it->target) == it->before;
+    bool changed = put_back ? g_put_back_targets.insert(it->target).second
+                            : g_put_back_targets.erase(it->target) != 0;
+    if (changed) {
+      debug::PauseMovieLog_PutBack(movie, it->property, it->target, put_back);
+    }
+  }
 }
 }  // namespace
 
@@ -279,37 +311,60 @@ extern "C" REX_FUNC(sub_825A0548) {
   uint32_t property = guest::LoadU32(base, track);
   uint32_t descriptor = kTrackProperties + 12 * property;
   bool adds = property < kTrackPropertyCount && guest::LoadU8(base, descriptor + 8) == 0;
-  bool skip = g_skip_ui_movie_tracks && adds;
   uint32_t type = property < kTrackPropertyCount ? guest::LoadU32(base, descriptor + 4) : 3;
-  if (type >= 3 || !debug::PauseMovieLog_TracksWanted()) {
-    if (!skip) {
-      __imp__sub_825A0548(ctx, base);
-    }
+  bool noted = adds && g_added != nullptr;
+  bool log = debug::PauseMovieLog_TracksWanted();
+  if (type >= 3 || (!noted && !log)) {
+    __imp__sub_825A0548(ctx, base);
     return;
   }
   uint32_t target = TrackTarget(base, node, track, descriptor);
   uint32_t before = guest::LoadU32(base, target);
-  if (!skip) {
+  bool skip = false;
+  if (noted) {
+    if (frame_pacing::GameMessages_IsRenderOnlyPass()) {
+      skip = !g_put_back_targets.contains(target);
+    } else {
+      g_added->push_back({target, before, property});
+    }
+  }
+  if (skip) {
+    debug::PauseMovieLog_Skipped(g_ui_movie, property, target);
+  } else {
     __imp__sub_825A0548(ctx, base);
   }
-  debug::PauseMovieLog_Track(g_ui_movie, node, property, type, adds, target, before,
-                             guest::LoadU32(base, target), skip);
+  if (log) {
+    debug::PauseMovieLog_Track(g_ui_movie, node, property, type, adds, target, before,
+                               guest::LoadU32(base, target), skip);
+  }
 }
 
 extern "C" REX_FUNC(sub_8211D2F8) {
   REX_FUNC_PROLOGUE();
   uint32_t movie = ctx.r3.u32, r4 = ctx.r4.u32, caller = uint32_t(ctx.lr);
-  bool skip_tracks_before = g_skip_ui_movie_tracks;
   uint32_t movie_before = g_ui_movie;
-  g_skip_ui_movie_tracks = REXCVAR_GET(per_tick_ui_movie_tracks) &&
-                           frame_pacing::GameMessages_IsRenderOnlyPass();
+  std::vector<AddedTarget>* added_before = g_added;
+  bool tracks = REXCVAR_GET(per_tick_ui_movie_tracks);
+  if (tracks) {
+    if (g_update_depth == g_added_by_depth.size()) {
+      g_added_by_depth.emplace_back();
+    }
+    g_added = &g_added_by_depth[g_update_depth++];
+    g_added->clear();
+  }
   g_ui_movie = movie;
   debug::PauseMovieLog_Before(base, movie, r4, caller);
   g_replay_outcome = "not replayed";
   g_replay_occurrence = -1;
   UpdateUiMovie(ctx, base);
   debug::PauseMovieLog_After(base, movie, caller, g_replay_outcome, g_replay_occurrence);
-  g_skip_ui_movie_tracks = skip_tracks_before;
+  if (tracks) {
+    if (!frame_pacing::GameMessages_IsRenderOnlyPass()) {
+      NotePutBackTargets(base, movie, *g_added);
+    }
+    g_update_depth--;
+  }
+  g_added = added_before;
   g_ui_movie = movie_before;
 }
 

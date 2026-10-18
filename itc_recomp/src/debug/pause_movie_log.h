@@ -26,4 +26,11 @@ void PauseMovieLog_Track(uint32_t movie, uint32_t node, uint32_t property, uint3
                          bool adds, uint32_t target, uint32_t before, uint32_t after,
                          bool skipped);
 
+// --log_pause_movie, paused or not: a UI movie adding track's target seen
+// put back by its update on a logic pass (or no longer), when that changes.
+void PauseMovieLog_PutBack(uint32_t movie, uint32_t property, uint32_t target, bool put_back);
+// An adding track skipped on a render-only pass (its target not seen put
+// back), counted and logged every 2 s.
+void PauseMovieLog_Skipped(uint32_t movie, uint32_t property, uint32_t target);
+
 }  // namespace debug
