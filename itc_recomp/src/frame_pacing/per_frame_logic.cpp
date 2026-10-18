@@ -443,6 +443,50 @@ extern "C" REX_FUNC(sub_8215DEA0) {
   }
 }
 
+// The rival intro cutscene (Update handler 0x82159948, a jump to
+// sub_821594B8): it steps the cutscene and, deep inside (a virtual call,
+// sub_821561F8, sub_82155A28), draws the rival's logo with sub_82211A28 (r3
+// = the logo's movie entry: +4 flags, bit 8 shown, bit 16 finished; +8 the
+// movie's id), which looks up the movie and advances and draws it
+// (sub_8211E1B8, r4 = 0, from 0x82211A74), and when it has ended calls
+// sub_8211DF20 and sets bit 16. During Update only, so the logo showed on
+// logic passes only (flicker). Render-only passes deliver Update to this
+// handler too (--redraw_rival_logo, game_messages.cpp); there the cutscene
+// isn't stepped, only the logo's draw is run, with the entry the logic pass
+// drew. The UI movie replay (sub_8211D2F8 above) keeps the movie advancing
+// once a tick.
+namespace {
+bool g_in_rival_cutscene = false;
+uint32_t g_rival_logo = 0;  // the entry the last logic pass drew, or 0
+}  // namespace
+
+extern "C" REX_FUNC(sub_82211A28) {
+  REX_FUNC_PROLOGUE();
+  if (g_in_rival_cutscene) {
+    g_rival_logo = ctx.r3.u32;
+  }
+  __imp__sub_82211A28(ctx, base);
+}
+
+extern "C" REX_FUNC(sub_821594B8) {
+  REX_FUNC_PROLOGUE();
+  if (!frame_pacing::GameMessages_IsRenderOnlyPass()) {
+    g_rival_logo = 0;
+    g_in_rival_cutscene = true;
+    __imp__sub_821594B8(ctx, base);
+    g_in_rival_cutscene = false;
+    return;
+  }
+  if (g_rival_logo == 0) {
+    return;
+  }
+  // The original's stack frame (stwu r1,-176(r1)).
+  guest::StackFrame frame(ctx, 176);
+  ctx.r3.u64 = g_rival_logo;
+  ctx.lr = 0x82155BE0;
+  sub_82211A28(ctx, base);
+}
+
 // World-space sprite lists (sub_82128750: r3 = list, r4 = camera; from the
 // race overlays: the light trails behind headlights and tail lights). The list holds up to
 // 500 sprites, count at +0x109F0; sprite i's four corners (x, y, z, pad) at

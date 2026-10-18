@@ -310,6 +310,7 @@ render-only passes it ran ~5x fast. Each case found is fixed in
 | Play time (a frame counter at `0x826C5B90`, which `sub_821109B8` turns into hours, minutes and seconds at 30 a second) | `sub_82107910` | One taken back before the call on render-only passes (`--per_tick_play_time`) |
 | UI movies: the HUD, including the race start countdown (a 240-frame movie, a beep at frames 60, 120, 180, 240) | `sub_8211D2F8`, with r4 = 0 (advance a frame and draw); r4 = 1 only draws | Replayed (below) (`--per_tick_ui_movies`) |
 | UI movies' adding animation tracks (the pause sub-menus' arrow slid ~5x as far): they write into the movie's nodes, outside the replayed bytes | `sub_825A0548`, inside `sub_8211D2F8` | A workaround for frame rates above 30: on render-only passes, adds whose target the update doesn't put back to the rest pose (`sub_82119B80`) are skipped (`--per_tick_ui_movie_tracks`; `docs/pause-menu-fix.md`, "The sub-menus' arrow") |
+| The rival's logo in the rival intro cutscene (drawn during Update by handler `82159948`) | `sub_821594B8` (native override), `sub_82211A28` | On render-only passes the handler gets Update but only redraws the logo the logic pass drew (`--redraw_rival_logo`; "The rival logo at the race start" below) |
 
 **How the texture animations were found.** `--find_per_frame_state`
 finds only ±1 steps, and the counters it found first (at 0x4005xxxx, half
@@ -351,6 +352,68 @@ didn't move), blending the overlay objects' first 0x1000 bytes
 through render-only copies (`OnCopy`, kept, harmless), restoring the camera
 passes before Draw (since removed), and hiding
 `sub_821225D8`, `sub_820DDE58`, `820F6068` and HUD handlers.
+
+**The rival logo at the race start** (fixed; merged from
+`rival-logo-flicker`, `--redraw_rival_logo`). Entering a race against a rival plays the rival
+intro cutscene (about 13 s): the rival's cars, with the rival's 2D logo
+over them. The logo flickers with frames above 30; the attract race's
+logo (drawn from Draw) doesn't. Found
+with logs (2026-10-18, `itc_064.log` to `itc_066.log`):
+
+- `--log_recording_handlers`: Update handler `0x82159948` (a jump to
+  `sub_821594B8`) is the rival intro cutscene's (the user). It records
+  commands only while the cutscene plays, 30 times a second at 100-150
+  fps, so only on logic passes.
+- `--log_recording_by_pass`: in the same window, about 30 recorders in
+  the UI movie library (`8259D7DC`-`8259E050`) record 2-7 times a logic
+  pass and never on render-only passes; nothing else in the race does.
+- `--log_pause_movie`: the logo is UI movie `423531F0` (`423531E0` in
+  another run), advanced and drawn (r4 = 0) from `0x82211A74` in
+  `sub_82211A28`, 31 a second, logic passes only. The HUD's movies
+  (`822128C8`, `8221293C`, `822129C8`) run from Draw, so they get about
+  120 render-only updates a second, replayed (see Replaying below).
+- So it's the race overlays' case again: drawing recorded during Update,
+  which render-only passes skip. `--redraw_race_overlays` covers only
+  `8215E150`.
+- `--render_only_update_handlers=82159948` (deliver its Update on
+  render-only passes too): the movie got render-only updates (111-120 a
+  second), but the whole cutscene then ran far too fast (the user; over
+  in ~3 s instead of 13), as the handler is the cutscene. So its logic must
+  stay once a tick and only its drawing (the logo's movie) be repeated, as
+  the race overlays do.
+- `sub_821594B8`, read from `generated/`: works out a mode from its
+  input (the word at `[[0x826C2CE8]] + 1860`, `sub_82156980`,
+  `sub_821591F0`), then makes virtual calls (slot 0) on the objects at
+  this + 0x10BB0 and (if set) this + 0x10BB4, then calls `sub_820AAE40`
+  (a jump to `sub_820AA550`) on `[[0x826C2CE8]]` and on
+  `[[0x826C2CE8] + 4]`.
+- The logo's draw, read from `generated/`: `sub_82211A28` has one caller,
+  `sub_82155A28` (at `0x82155BDC`, r3 = its object + 10760, when bit 8 of
+  object + 10764 is set, behind several branches on the cutscene's
+  state), which is called only from `sub_821561F8`, which has no direct
+  caller (a virtual method; most likely slot 0 of the object at
+  this + 0x10BB0, not checked). So the logo's draw is nested inside the
+  cutscene's step, not one of `sub_821594B8`'s own calls.
+- `sub_82211A28(entry)`: if bit 8 of `entry + 4` (shown) is set, looks up
+  the movie by its id at `entry + 8` (`sub_8211B3F0` on `0x826C5CCC`),
+  advances and draws it (`sub_8211E1B8`, r4 = 0, which jumps to the UI
+  movie update `sub_8211D2F8`; the call at `0x82211A74`); if that returns
+  0 (the movie ended), calls `sub_8211DF20(movie, id)` and sets bit 16 of
+  `entry + 4`.
+- Fix (the user's design, `--redraw_rival_logo`, on by default): a native
+  override of `sub_821594B8` (`per_frame_logic.cpp`). Render-only passes
+  deliver Update to `82159948` too (`game_messages.cpp`, as for the race
+  overlays). On logic passes the override runs the original, and a
+  pass-through hook on `sub_82211A28` notes the entry it's called with
+  during it; on render-only passes it runs nothing of the cutscene, only
+  `sub_82211A28` (the game's) on that entry, if the logic pass drew. The
+  UI movie replay keeps the logo advancing once a tick.
+- Checked (2026-10-18, `itc_067.log`, 144 fps cap): the user saw no
+  flicker. The handler recorded on ~150 passes a second (203 slots each)
+  instead of 30; the logo's movie (`42353200`) got 30 logic and ~120
+  render-only updates a second from `0x82211A74`, all render-only ones
+  "replayed" (~240 per 2 s, none "changed since the logic pass"); the
+  cutscene lasted ~13.5 s, as before.
 
 **Replaying** (`ReplayFromLogicPass`): when a call both steps an object's
 state and draws it, skipping it would stop the drawing too (the HUD

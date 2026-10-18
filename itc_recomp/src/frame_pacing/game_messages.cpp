@@ -28,6 +28,9 @@ REXCVAR_DEFINE_STRING(render_only_update_handlers, "", "ITC",
 REXCVAR_DEFINE_BOOL(redraw_race_overlays, true, "ITC",
                     "Record the race overlays (the marker above opponent cars) on render-only "
                     "passes too");
+REXCVAR_DEFINE_BOOL(redraw_rival_logo, true, "ITC",
+                    "Draw the rival's logo in the rival intro cutscene on render-only passes "
+                    "too (the cutscene still steps once a tick)");
 REXCVAR_DEFINE_BOOL(log_recording_handlers, false, "ITC",
                     "Log which message handlers record render commands, by message, once a "
                     "second");
@@ -419,6 +422,12 @@ void DispatchMessages(PPCContext& ctx, uint8_t* base, uint32_t dispatcher) {
         std::string only = REXCVAR_GET(render_only_update_handlers);
         if (REXCVAR_GET(redraw_race_overlays)) {
           only += only.empty() ? "8215E150" : ",8215E150";
+        }
+        // The rival intro cutscene's handler (82159948, sub_821594B8): on
+        // render-only passes it only draws the rival's logo
+        // (per_frame_logic.cpp).
+        if (REXCVAR_GET(redraw_rival_logo)) {
+          only += only.empty() ? "82159948" : ",82159948";
         }
         if (!only.empty()) {
           Deliver(ctx, base, dispatcher, message, &only);
