@@ -109,3 +109,50 @@ turn can still be blended about the spindle. `cockpit-anim-fix`'s
 `--blend_about_pivot` has pivot code that could be reused, but it cost every
 product 68 bytes on the main thread. It would be better to key it to the
 products the log identifies.
+
+## Findings from `--log_near_camera_turns` (2026-10-18)
+
+`--log_near_camera_turns` (off by default): once a tick, paired products
+within 3 m of their camera that turn relative to it, with how they blend
+(blend / spinning / not blended), the turn, how far the origin moved and
+the radius about the point it turns about, and the recorder's caller and
+r31. Every 2 s a summary by blend kind.
+
+- Attract race (chase camera): nothing near the camera turns, apart from
+  an unknown part ~2.5 m away turning ~0.97 rad a tick (a wheel rolling
+  past, caller `82596D9C` once, `0` in another run).
+- Cockpit drive (`itc_071`): one part turns: caller `820D0564` (the model
+  draw), r31 `055F06A0`, the tachometer's needle. Its origin is **0.80 m
+  from the point it turns about** (in `itc_074`, 0.89-0.94 m), so its
+  mesh's origin isn't on its spindle. Revving, it turns 0.11-0.34 rad a
+  tick and gets the normal blend (origin moved straight: the spindle
+  drifts ~1.1 cm mid-tick at 0.33 rad). Fast swings reach 0.51-0.95 rad a
+  tick and get the wheel blend (turn taken from the newer tick, origin
+  sliding).
+- Each needle line comes twice, once with caller `0` (a second product with
+  the same values).
+- In `itc_074` tick 2306, **two** products with caller `820D0564` and r31
+  `055F06A0` show up, with radii 0.51 m and 0.08 m against the usual
+  0.89-0.94: likely two needles sharing one mesh (tachometer and
+  speedometer?) paired with each other. Parts sharing a key are paired by
+  nearest origin (`MatchTick`), and these needles' origins are ~0.9 m off,
+  swinging up to 0.45 m a tick. Not confirmed.
+
+## Tried and reverted: blending about the spindle
+
+`05d2dd0` (`--blend_about_spindle`, reverted in `160ce3b`): for parts
+within 3 m of the camera, solve the point both ticks place at the same
+spot in camera space, require the same point as the previous tick, and
+blend turning about it. The user: "it still jumps, now it's jumping out of
+the dial across the screen". In the log, most of the fast swings didn't get
+it (they failed the same-point check), which fits a wrong pairing.
+
+## Next
+
+1. Log the pairing of parts sharing a key near the camera: each one's r24-r30,
+   position and what it was paired with, every tick. If the needles get
+   swapped, a register that tells the gauges apart (an object pointer)
+   could go into the key so they pair exactly.
+2. Then, rather than special cases: screw interpolation (dual quaternions)
+   for the normal blend, which doesn't depend on where a mesh's origin is.
+   Fast swings over 0.5 rad, taken for wheels, are still to solve.
