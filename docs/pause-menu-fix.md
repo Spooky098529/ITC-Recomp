@@ -588,6 +588,14 @@ first.
   --pause_workaround=false` and says whether the menu feels like 30 fps
   and the car drives the same.
 
+Done (2026-10-18): `src/hooks/input.cpp` overrides `sub_8210B018` (the
+override moved there from `pause_menu_log.cpp`, which now counts the
+update's runs through `debug::PauseMenuLog_NoteMapperUpdate`, so skipped
+calls aren't counted). An attract race with the flag on (`itc_028.log`)
+shows the update on logic passes only, 30 a second, and none on
+render-only passes. Next: the user's run with the flag, and a
+`--max_fps=30` reference run (pause, hold the stick down ~5 s).
+
 ### Step 3: remove the workaround
 
 Once step 2 is checked: delete the `ctx.r31 + 588` check from the

@@ -16,6 +16,7 @@
 // before the mappers are updated once a tick (docs/pause-menu-fix.md,
 // "Step 1").
 
+#include "debug/pause_menu_log.h"
 #include "frame_pacing/game_messages.h"
 #include "guest.h"
 
@@ -67,7 +68,7 @@ uint32_t MapperOf(uint8_t* base, uint32_t menu) {
 }
 
 // Read counts, keyed by (slot, action, caller, render-only, paused); slot 0
-// is the mappers' update sub_8210B018 (action 0).
+// is the mappers' update sub_8210B018 (action 0), counted when it runs.
 struct ReadCount {
   uint64_t calls = 0;
   uint64_t nonzero = 0;
@@ -171,13 +172,10 @@ PAUSE_MENU_READ_SLOT(8210BA28, 14, double(ctx.r3.u32 & 0xFFFF))
 
 #undef PAUSE_MENU_READ_SLOT
 
-// The mappers' update: updates every mapper (sub_8210C370 each).
-extern "C" REX_FUNC(sub_8210B018) {
-  REX_FUNC_PROLOGUE();
+void debug::PauseMenuLog_NoteMapperUpdate(uint32_t caller) {
   if (REXCVAR_GET(log_pause_menu)) {
-    NoteRead(0, 0, 0, uint32_t(ctx.lr), false, 0);
+    NoteRead(0, 0, 0, caller, false, 0);
   }
-  __imp__sub_8210B018(ctx, base);
 }
 
 // The menu list update.
