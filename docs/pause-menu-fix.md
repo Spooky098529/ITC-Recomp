@@ -3,10 +3,11 @@
 In a race, the pause menu's input repeats too fast with frames uncapped
 or above 30 fps: holding a direction moves through the menu one item every
 tick once the repeat starts, and the repeat starts too soon. This is the plan to fix it and to translate the game's input
-handling to native code. Step 0 (logging) is done and its results are in
-"Step 0 results" below; the code that repeats too fast is found: the action
-mappers' update `8210B018` runs once a frame (2026-10-18). The fix is
-planned in "Revised plan" (not started).
+handling to native code. **Fixed** (2026-10-18, steps 1-3 of "Revised
+plan"): the action mappers' update `8210B018` ran once a frame, so their
+repeats counted frames; it now runs once a tick (`--input_mappers_by_tick`,
+on by default, `src/hooks/input.cpp`), and the workaround that held the
+pause screen at 30 fps is gone. Step 4 (native input) is later work.
 
 Addresses below are guest addresses. `0x82000A30` and friends are floats in
 the game's constant data, read with `guest::LoadU32` and bit-cast (their
@@ -16,7 +17,7 @@ in bytes. Every function named can be read in `generated/` (find it with
 
 ## What's known
 
-### The workaround on `pause-menu` (commit `78456a5`, to be removed)
+### The workaround on `pause-menu` (commit `78456a5`, removed in step 3)
 
 `sub_8215B4F8` (the race draw step) is wrapped in
 `src/frame_pacing/game_messages.cpp` to clear `g_race_draw_step_seen` when
@@ -609,6 +610,11 @@ Once step 2 is checked: delete the `ctx.r31 + 588` check from the
 The pause screen then stays at the full frame rate, interpolated, with
 no slow return to it on resume.
 
+Done (2026-10-18): the check and the flag are removed (no launch script
+passed it); `InputLog_PauseSigns` still logs `r31 + 588` for
+`--log_input`. `--input_mappers_by_tick` is on by default, so the launch
+scripts don't need to pass it.
+
 ### Step 4: later, toward moving off ReXGlue (not needed for the fix)
 
 - Native Input::Update (`--native_input`, in `src/hooks/input.cpp`):
@@ -645,3 +651,7 @@ Update the `Input::Update` row and "Menus run at 30 fps" in
 `docs/functions.md` (the pause menu then runs at the full frame rate with
 the right repeat; the front end's menus still run at 30 fps), this
 document's status, and CLAUDE.md's line for this document.
+
+Done (2026-10-18): `docs/functions.md` has a row for `sub_8210B018`
+(the `Input::Update` row was still right) and the known issue says the
+pause menu runs at the race's rate.

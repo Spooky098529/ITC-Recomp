@@ -16,7 +16,7 @@
 
 #include <rex/cvar.h>
 
-REXCVAR_DEFINE_BOOL(input_mappers_by_tick, false, "ITC",
+REXCVAR_DEFINE_BOOL(input_mappers_by_tick, true, "ITC",
                     "Update the action mappers (sub_8210B018) on logic passes only, so menu "
                     "input repeats at the game's rate at any frame rate");
 

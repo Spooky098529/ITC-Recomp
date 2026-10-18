@@ -21,9 +21,9 @@ under Wine (the user has no Windows machine).
 Vulkan 1.3, and why not OpenGL.
 `docs/tick-replay.md` is a lead (not started): translating draws once a
 tick and replaying our own list on in-between frames.
-`docs/pause-menu-fix.md` is the pause menu's too-fast input repeat: the
-cause is found (the action mappers update once a frame), the fix planned
-(not started), and a native Input::Update for later.
+`docs/pause-menu-fix.md` is the pause menu's too-fast input repeat: fixed
+(the action mappers updated once a tick, `--input_mappers_by_tick`), and a
+native Input::Update for later.
 Read the relevant section before changing anything, and keep it up to
 date as you learn things.
 

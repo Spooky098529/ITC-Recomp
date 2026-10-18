@@ -47,12 +47,6 @@ REXCVAR_DEFINE_BOOL(log_input_writes, false, "ITC",
 REXCVAR_DEFINE_BOOL(log_input_reads, false, "ITC",
                     "Log calls to the input processors' button tests by caller, pass type and "
                     "pause, once a second");
-// Until step 2 of docs/pause-menu-fix.md: while LoadU32(r31 + 588) is
-// non-zero as the race draw step is entered, the pass isn't a race's, so
-// render-only passes stop (the pause screen at 30 fps).
-REXCVAR_DEFINE_BOOL(pause_workaround, true, "ITC",
-                    "Run at 30 fps while LoadU32(r31 + 588) is non-zero in the race draw step "
-                    "(the pause menu's input repeat)");
 
 namespace frame_pacing {
 namespace {
@@ -681,8 +675,7 @@ extern "C" REX_FUNC(sub_8215B4F8) {
   REX_FUNC_PROLOGUE();
   uint32_t r31_value = guest::LoadU32(base, ctx.r31.u32 + 588);
   frame_pacing::InputLog_PauseSigns(base, ctx.r31.u32, r31_value);
-  // --pause_workaround: a non-zero r31 + 588 happens to come with pausing.
-  frame_pacing::g_race_draw_step_seen = !(REXCVAR_GET(pause_workaround) && r31_value);
+  frame_pacing::g_race_draw_step_seen = true;
   __imp__sub_8215B4F8(ctx, base);
 }
 
