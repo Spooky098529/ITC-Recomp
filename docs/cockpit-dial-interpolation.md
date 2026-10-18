@@ -234,6 +234,169 @@ wheel test (next).
 - Cost: none measurable. Uncapped attract races, alternating: 486 and 479
   fps on, 484 and 485 off.
 
+## Uncommitted work (2026-10-19): camera screw blend, the second needle
+
+Not committed at the user's request until it looks right.
+
+**Camera screw blend.** With the parts' screw blend alone, the car looked
+juddery in fast turns in cockpit view: the camera still blended straight
+while the car followed an arc. Under `--screw_blend`, each `CameraPair`
+now also gets a `ScrewMotion` once a tick (`PlanProduct`), and
+`BlendCamera` (used by `CameraBlends::Get` and the frame log) blends the
+camera's placement along it. Things attached to each other share one
+motion between ticks, so with the same blend they stay locked. The look-at
+vectors (billboards, lighting) and the pause menu's cameras still blend
+straight. An attract race ran fine, and the user confirmed it fixed the
+car's judder in fast cockpit turns.
+
+**One car fixed, another not.** The user: the needle stays on its spindle
+in one car, but in another it still jumps. In this car (`itc_084`,
+`itc_085`), two needles turn: r31 `055F06A0` (0.79 m from its spindle,
+blended on all 5 frames of each tick) and r31 `055F0130` (~1.03 m;
+another car in `itc_083` had the same pair as `041706A0` / `04170130`).
+
+- `055F0130` is blended only on the logic pass's frame (1,780 of 1,793
+  ticks). On the four render-only passes, its multiply's inputs differ from
+  the logic pass's (`Note`: render-only mismatch), so it's not published
+  and is drawn as the game recorded it.
+- Its render-only matrix is **always the same pose** relative to the
+  camera (10,519 of 10,519; mesh origin at view 1.058 0.244 -0.057), ~1.9 m
+  and ~2.3 rad from the tick's. The game seems to pose this needle only on
+  logic passes, so render-only passes draw a default pose. That's the
+  game's, at any frame rate above 30, not the blend's.
+- Leads (not decided): for parts keyed by r31, use the tick's product
+  (blended) when a render-only pass draws it differently; or find the
+  update that poses it and run it on render-only passes
+  (`--render_only_update_handlers`, found with `--log_recording_handlers`),
+  which would leave it stepping at 30 Hz.
+
+**The tachometer flipping.** The user: in the second car, the tachometer
+"inverts randomly when it has to move really fast so it points down for a
+fraction of a second". Not seen in the logs yet: in `itc_085`, the
+`055F06A0` needle never turned 0.5 rad or more a tick. Suspected (not
+proven): a swing over half a turn in a tick, which any blend takes the
+short way round (through "down"), the same ambiguity as a wheel's spin.
+It could also be the default pose above. The frame log now records the
+needle's angle on the dial to tell (below).
+
+**Diagnostics added (uncommitted):**
+
+- `--log_near_camera_frames=<file>`: records now carry r31 and the
+  needle's angle on the dial (`AngleOnDial`: the mesh origin's angle about
+  the turn's axis, from the camera's up), drawn each frame, plus both
+  ticks' angles. An upload that differs from the tick's product is written
+  as "upload differs" (none seen so far).
+- `<file>.mismatch`, written alongside it: every render-only mismatch of an
+  r31-keyed product within 3 m of its camera, with the pass's and the
+  tick's origins in view space and the turn between them.
+- Records also carry the mesh origin in view space (`origin x y z (ticks
+  ... to ...)`), drawn and at both ticks, since the angles turned out
+  unreliable (next).
+
+**First angle run (`itc_086`, second car, 2026-10-19).** 7,503 frames of
+the main needle (`055F06A0` r26 6) and 4,958 of its other draw (r26 0):
+no tick turned it more than 0.5 rad (all but 23 under 0.25 rad), so a
+swing over half a turn taken the short way doesn't explain the flip. The
+angle jumps there are (8, up to ~2.3 rad, e.g. ticks 3607-3609: -0.87,
+-3.12, -0.72) all fall at tick boundaries: the newer angle of one tick
+differs from the older angle of the next, though they come from the same
+matrix. That's the measurement: the centre and axis are found again each
+tick from that tick's screw, and on small turns the camera's own movement
+in the car tips the axis. So the angles can't show a flip, hence the
+origins. `055F0130` was again blended only on logic passes (1,396
+frames), drawn at the fixed default pose (view 1.058 0.244 -0.057) on
+render-only ones, 1.0-2.6 rad from the tick's pose; around ticks
+2979-2989 the render-only pose varied instead (e.g. 0.999 0.192 0.384).
+
+## Test harness: `itc_recomp/tests/needle_blend.cpp` (2026-10-19)
+
+A standalone program (build line at its top) that runs the blending on a
+cockpit needle and checks every frame against the needle turning evenly
+between ticks. It uses the real `transform.cpp`, with copies of
+`PlanProduct`, `BlendCamera` and `BlendProduct` (keep them in step). The
+scene: a car carrying the camera and a dial, the needle's mesh origin 0.78 m
+from its spindle. The needle turns at 0.05 to 3.3 rad a tick (steady, or
+revving: five ticks up, then a drop 1.6 times as fast). The car is parked,
+driving 1 m a tick, turning 0.02 to 0.4 rad a tick, rolling, at the game's
+~2 km coordinates, or with a mesh whose axes aren't along the dial. Measured
+through the blended camera in the car's frame: the spindle's displacement,
+the needle tip's on screen (1280x720), the tilt off the dial, and "flips"
+(drawn the other way from the turn, or past the newer tick). `-v` prints
+every frame.
+
+Results (worst frame of 12 ticks):
+
+- **Under kCutAngle, both of the game's blends miss, and more as the car
+  turns.** Normal: up to 23 px at 0.49 rad a tick (parked) and 29 px with
+  the car turning 0.2 a tick. Screw (`--screw_blend`): exact when parked,
+  but worse than normal once the car moves (1 m a tick: 21 px; turning 0.05
+  a tick: 63 px). That's because the needle's screw (car + needle) and the
+  camera's screw (car only) take different paths between ticks.
+- **The cut tests the world matrix's turn, the needle's plus the car's**,
+  so with the car turning 0.2 a tick, a needle at 0.45 is already past it.
+- **Past the cut, the needle takes the wheel path (kSpinning)**, since it
+  turns about one of its own axes. That path takes the newer tick's angle
+  and moves the mesh origin in a straight line, which is right for a wheel
+  (origin on its axle) but puts this needle 0.3-1.2 m off its spindle:
+  357 mm at the start of every tick at 0.6 rad a tick, swept back over the
+  tick (hundreds to thousands of px). With the car turning 0.2 a tick, its
+  angle also goes the wrong way on the first frame of a tick (flips).
+  Where the wheel test fails (the mesh's axes not along the dial), the part
+  isn't blended at all: the newer tick's world matrix with the blended
+  camera, ~1 m off (the car's travel).
+- **Proposal tested, "relative": blend each product relative to its camera
+  (world * view, as a screw), then draw it with the blended camera.**
+  Exact under the cut in every scene (0.0 mm, 0 px; 0.4 mm at 2 km).
+  Parts riding with the camera then only show their own turn, and the cut
+  tests only that.
+- **"Relative, uncut" (no kCutAngle: any turn blends the short way):**
+  exact at every needle speed up to 3.0 rad a tick. It fails only where a
+  tick's turn is over pi (the rev's drop at 2.0, steady 3.3): it stays on
+  its spindle but goes the short way round, which no blend of two ticks can
+  avoid. 45 of 288 cases fail, all of them over pi, against 266 (normal),
+  277 (screw) and 198 (relative with the cut).
+- Wheels: next section.
+
+## Test harness: `itc_recomp/tests/wheel_blend.cpp` (2026-10-19)
+
+The same check for a car's wheel (0.32 m, origin on its axle, spin set by
+the car's speed: half a turn a tick at ~108 km/h), measured against its
+car's body as drawn (blended the same way), from a chase camera on the
+player's car. The scenes: the player's own wheel straight or turning and
+steering, another car's wheel alongside, a wheel first seen at speed,
+accelerating from rest to 270 km/h, and braking from it. A fifth mode,
+"history": relative and uncut, with each product's turn taken as the one
+(plus whole turns) nearest its turn the tick before. "Wrong" frames: spin
+over 0.3 rad off, or the hub over 2 cm off its place on the car.
+
+- **Now (normal, screw, relative with the cut): wheels step at 30 Hz at
+  every speed.** The wheel path takes the newer tick's spin, so 60-100% of
+  frames are wrong and the rim is drawn up to 80 px off. The hub stays on
+  the car (under 1 mm normal; the screw drifts up to 93 mm).
+- **Relative, uncut: the player's own wheels are exact up to 108 km/h**
+  (0 px), and wrong (blended the short way, backwards) above it.
+- **Other cars' wheels come off their hubs when uncut**: 11 mm at 22 km/h,
+  ~110 mm at 97-108 km/h. A screw takes a rolling wheel's motion as a turn
+  about a line near where it touches the road, not about its hub, while
+  its body follows its own screw. This is the needle's failure mirrored:
+  a screw is only consistent with the parent's blend when both turn about
+  the same line. Blending relative to the camera fixes that only for
+  things riding with the camera.
+- **History fixes fast spins only for a wheel seen speeding up from slow**
+  (accelerating from rest to 270 km/h: 0 wrong frames of 415). A wheel
+  first seen at speed takes the short way on its first tick and then
+  stays on that wrong alias (constant 130-270 km/h: 44 of 55 wrong;
+  braking from 270 km/h: 196 of 270).
+- Conclusion: no rule on one product's two ticks alone is right for both
+  a needle (turning about a line away from its origin, its parent moving
+  with the camera) and another car's wheel (turning about its origin,
+  its parent moving). Both are right blended as a screw **relative to
+  their parent** (the car body): the needle turns about its spindle and
+  the wheel about its hub. Then apply the parent's blend. The blend
+  relative to the camera is the case where the parent is the camera.
+  Knowing the parent needs the game's hierarchy: whether the multiplies
+  of a part's local matrix by its parent's can be seen is not known yet.
+
 ## Next
 
 1. ~~Log the pairing~~: done, not swapped (above).
