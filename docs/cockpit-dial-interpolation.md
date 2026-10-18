@@ -178,6 +178,46 @@ turn about the origin, with the origin 0.8 m from the spindle. At 0.45 rad a
 tick the spindle drifts ~1.9 cm mid-tick; with the wheel blend, about
 `0.8 * Δθ / 2`, ~25 cm at 0.62 rad.
 
+## Frame by frame: where the spindle is drawn (2026-10-18)
+
+`--log_near_camera_frames=<file>` (off by default): for each product of
+`--log_near_camera_turns`, the point it turns about (found once a tick, in
+the camera's frame) and, every frame, where that point is drawn on a
+1280x720 screen, where it should be (fixed relative to the camera, with the
+frame's blended camera) and where a screw blend (`BlendScrew` in
+`transform.cpp`: the world matrix's motion between ticks as a turn about a
+line plus a slide along it, blended along that) would put it. Records are
+kept in memory and appended to the file every 10 s, so the frame rate isn't
+affected (the run held 150 fps).
+
+Cockpit drive (`itc_076`, 7,198 frames, one needle record a frame; one
+frame drew no needle blended): pixels between where the spindle is drawn
+and where it should be, by the turn a tick:
+
+| turn a tick | blend | frames | now: median / max | screw: median / max |
+|---|---|---|---|---|
+| < 0.1 rad | normal | 6,009 | 0.5 / 4.4 px | 0.8 / 8.8 px |
+| 0.1-0.3 | normal | 999 | 3.6 / 31 px | 0.9 / 7.9 px |
+| 0.3-0.5 | normal | 175 | 31 / 84 px | 1.6 / 5.9 px |
+| >= 0.5 | normal | 5 | 57 / 84 px | 1.6 / 1.8 px |
+| >= 0.5 | wheel | 10 | 997 / 1,799 px | 1.2 / 4.4 px |
+
+- The off-axis jumps are the blend's: tens of pixels with the normal
+  blend on fast swings, and the wheel blend (over `kCutAngle`) puts the
+  spindle across the screen, as the user saw with the reverted spindle
+  blend and now.
+- A screw blend keeps it within a few pixels on every swing. On slow
+  movement it's slightly worse than now (median 0.8 against 0.5 px, max
+  8.8): the world matrix also carries the car's movement (~0.9 m a tick),
+  which a screw turns into an arc.
+- Caveat: the point measured is the one on the turning line nearest the
+  mesh's origin, which draws below the screen (y ~930), not the dial
+  itself. The errors at the dial will differ in size, not in kind.
+- The standalone check (a part turning about a point 0.8 m from its origin,
+  no other movement): the screw blend keeps the point within 0.2 mm on
+  turns of 0.1-2.0 rad a tick; the normal blend misses by 2.0 cm at 0.45
+  rad and 36 cm at 2 rad.
+
 ## Next
 
 1. ~~Log the pairing~~: done, not swapped (above).
