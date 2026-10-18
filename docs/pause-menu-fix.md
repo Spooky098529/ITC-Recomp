@@ -1023,8 +1023,8 @@ instead of the trail it shows on other moves. Not caused by this branch:
 - The user saw the same snap on a build from before the branch
   (`out/dist/itc-texture-binding-linux-amd64`, 2026-10-16).
 
-So it's the game's own behavior or older than the branch; not compared
-with the emulated GPU or a 360.
+The user then found a video of the Xbox 360 game doing the same: **it's
+the game's own behavior**, nothing to fix.
 
 **State of the branch** (`pause-menu-arrow`, all committed and pushed):
 
