@@ -696,3 +696,66 @@ document's status, and CLAUDE.md's line for this document.
 Done (2026-10-18): `docs/functions.md` has a row for `sub_8210B018`
 (the `Input::Update` row was still right) and the known issue says the
 pause menu runs at the race's rate.
+
+## The sub-menus' arrow (`pause-menu-arrow`, 2026-10-18, open)
+
+In every pause sub-menu, an arrow points at the selected item. At 144 fps
+the user sees it slide fast in the direction pressed and end up out of
+position; after the second build below "it moves at 30 fps, but then keeps
+moving, like something keeps reading the input and playing its
+animation". Not fixed yet.
+
+**What draws it.** The sub-screens (`8220DB98`, `8220E988`, `8220EBD8`,
+`8220C578`, `8220C5D0`, picked by `8220F638`) don't queue text like the
+main list: they look up nodes of a UI movie (`8211A578(root, type,
+index)`, through `8259D658`; the root is `[[0x826D84D0]]`) and set flags
+at +80 and +108 on them, or call `8211C7E8(movie, node, id, value)`
+(from `8220E5FC`-`8220E6E0` when a sub-screen opens, and from
+`8220D040`). `--log_pause_movie` (`src/debug/pause_movie_log.cpp`)
+counts every UI movie update (`sub_8211D2F8`, reached through
+`8211E1B8` from 634 call sites) by movie, caller and pass type, and
+while paused compares each updated movie (its 0xA000 bytes, what the
+UI movie replay keeps, and objects up to two pointers away, 0x200 bytes
+each) before and after each update ("in update") and since the last
+update ("between").
+
+Result (`itc_039.log`, a race the user drove, paused, used a sub-menu):
+
+- While paused two movies are updated (r4 = 0, advance and draw) on
+  every pass: `400D25A0` from `822128C8` and the sub-menus' movie
+  `417E7260` (the r3 of the `8211C7E8` calls), mostly from `8220FC78`
+  and also from `8220EF84`, `8220F054`, `8220EE08`, `8220EEE4`,
+  `8220DF24`, `8220C85C`.
+- **Not the pause menu's own draw.** `8220B9E8` (from the pause
+  screen's Draw `8216CF08`; movie 18 of the table at `0x826C5CCC`,
+  `41620060`) is updated on every pass from the race start until ~30 s
+  in, and not at all while paused. A first fix that made its
+  render-only updates draw-only (`--per_tick_pause_menu_movie`, commit
+  `816356d`) changed nothing and was removed.
+- In `417E7260` the only words its updates change are animation clocks
+  at +0x9154, +0x96E0 and +0x9708 (floats, +2 an update; reset to 0 when
+  an animation starts, running to 40 or 120). On logic passes they
+  advance once a tick: the UI movie replay works.
+- Except right after an animation starts: the sub-menu starts it after
+  the logic pass's movie update (pass 1780: new animation slots at
+  +0x96C0..+0x970C, clocks reset), so the replay finds the movie
+  "changed since the logic pass" and ran the update for real on each
+  render-only pass of that tick (0 -> 8 by the next tick instead of 2).
+  `--per_tick_changed_ui_movies` (on by default, commit `b9ef4ec`) now
+  runs those updates from the current state and puts it back. With it
+  the user saw **no change** (`itc_041.log`: the fallback happens ~4
+  times every 2 s, those extra steps aren't what's seen). Kept for now;
+  it's correct, but whether to keep it is open.
+- Nothing else in the watched objects changes on render-only passes.
+  So either the arrow's state is outside them (deeper objects, or not in
+  a UI movie at all), or what's seen is the game's own behavior at its
+  repeat rate.
+- **The sub-menu list repeats every tick.** In `itc_037.log`, holding a
+  direction in `8220DB98`'s sub-menu moved its list (`8220C1E0`, then
+  the screen switch from `8220DBE0`) on every tick for ~2 s (64 moves),
+  starting 11 ticks after the press; each move restarts the arrow's
+  slide. The main pause list repeats every 4 ticks. Not compared with
+  30 fps yet: that's the next run (`./run.sh --no-interpolation` flags,
+  i.e. `--interpolate_draw_state=false --max_fps=30`, with
+  `--log_pause_movie=true`), to see whether the arrow does the same
+  there and the list repeats as often.
