@@ -39,6 +39,7 @@
 #include <atomic>
 #include <chrono>
 #include <cmath>
+#include <cstdio>
 #include <cstring>
 #include <map>
 #include <memory>
@@ -121,6 +122,12 @@ REXCVAR_DEFINE_BOOL(log_near_camera_pairs, false, "ITC",
                     "Once a tick: groups of the per-object recorder's products sharing a key "
                     "(same caller, part, mesh and camera) within 3 m of their camera, with each "
                     "one's r24-r30, position and the previous tick's product it was paired with");
+REXCVAR_DEFINE_STRING(log_near_camera_frames, "", "ITC",
+                      "File to write, every 10 s, a line per frame for each product near its "
+                      "camera turning about a point away from its origin (cockpit needles): the "
+                      "frame's amount, how it blended, and where that point is drawn on screen "
+                      "against where it should be and where a screw blend would put it "
+                      "(empty: off)");
 REXCVAR_DEFINE_BOOL(log_pixel_outcomes, false, "ITC",
                     "Log what happened to the per-object lighting uploads (blended, unpaired, "
                     "rejected...), for moving and still objects, every 2 s");
@@ -273,6 +280,24 @@ int PassOfViewProjection(uint32_t address) {
   return int((address - kCameraPasses) / kCameraPassBytes);
 }
 
+// p * m for a point (row vector, w = 1), and with the result's w.
+Vec3 ApplyToPoint(const Matrix4& m, const Vec3& p) {
+  Vec3 out;
+  for (int j = 0; j < 3; j++) {
+    out[j] = p[0] * m[j] + p[1] * m[4 + j] + p[2] * m[8 + j] + m[12 + j];
+  }
+  return out;
+}
+// Where a mesh point lands on a 1280x720 screen under world-view-projection m.
+std::array<float, 2> ScreenPoint(const Matrix4& m, const Vec3& p) {
+  float c[4];
+  for (int j = 0; j < 4; j++) {
+    c[j] = p[0] * m[j] + p[1] * m[4 + j] + p[2] * m[8 + j] + m[12 + j];
+  }
+  float w = std::abs(c[3]) > 1e-6f ? c[3] : 1e-6f;
+  return {(c[0] / w + 1) * 640, (1 - c[1] / w) * 360};
+}
+
 // A matrix multiply's inputs: a world matrix and a camera's view-projection.
 struct ProductInputs {
   Matrix4 world;
@@ -314,6 +339,15 @@ struct TickPlans {
   std::vector<CameraPair> cameras;
   // Each of the tick's products (--publish_by_tick).
   std::vector<TickProduct> tick_products;
+  // --log_near_camera_frames: products near their camera turning about a
+  // point (cockpit needles), with that point in the mesh's space and the
+  // camera's.
+  struct NearSpindle {
+    int32_t plan;
+    Vec3 local, view;
+    float turn;
+  };
+  std::vector<NearSpindle> near_spindles;
 };
 
 // A product written in a frame, at its output address.
@@ -1543,7 +1577,8 @@ class DrawState {
     float largest[3] = {0, 0, 0};
     int lines_this_tick = 0;
   } near_turns_;
-  void LogNearCameraTurn(const ProductInputs& a, const ProductInputs& b, const ProductPlan& plan) {
+  void LogNearCameraTurn(const ProductInputs& a, const ProductInputs& b, const ProductPlan& plan,
+                         TickPlans& plans, int32_t index) {
     std::optional<PerspectiveCamera> ca = SplitViewProjection(a.view_projection);
     std::optional<PerspectiveCamera> cb = SplitViewProjection(b.view_projection);
     if (!ca || !cb) {
@@ -1562,6 +1597,20 @@ class DrawState {
     float turn = AngleBetween(va->transform.rotation, vb->transform.rotation);
     // Products at the camera itself (the sky) only show the camera turning.
     if (range > 3.0f || range < 0.05f || turn < 0.01f) {
+      return;
+    }
+    if (!REXCVAR_GET(log_near_camera_frames).empty()) {
+      // The point it turns about, fixed relative to the camera, and where
+      // that is in the mesh.
+      std::optional<Vec3> point =
+          ScrewAxisPoint(va->transform, vb->transform, vb->transform.position);
+      std::optional<Matrix4> to_mesh =
+          Inverse(Multiply(b.world, ViewMatrixFromTransform(cb->camera)));
+      if (point && to_mesh) {
+        plans.near_spindles.push_back({index, ApplyToPoint(*to_mesh, *point), *point, turn});
+      }
+    }
+    if (!REXCVAR_GET(log_near_camera_turns)) {
       return;
     }
     int kind = int(plan.world);
@@ -1605,6 +1654,8 @@ class DrawState {
     plans->products.reserve(paired_.size());
     plan_of_.clear();
     camera_pairs_.clear();
+    bool log_near =
+        REXCVAR_GET(log_near_camera_turns) || !REXCVAR_GET(log_near_camera_frames).empty();
     for (const auto& [key, before_key] : paired_) {
       auto now = current_tick_.find(key);
       auto before = previous_tick_.find(before_key);
@@ -1613,8 +1664,9 @@ class DrawState {
       }
       plan_of_[key] = int32_t(plans->products.size());
       plans->products.push_back(PlanProduct(before->second, now->second, *plans, camera_pairs_));
-      if (REXCVAR_GET(log_near_camera_turns)) {
-        LogNearCameraTurn(before->second, now->second, plans->products.back());
+      if (log_near) {
+        LogNearCameraTurn(before->second, now->second, plans->products.back(), *plans,
+                          int32_t(plans->products.size() - 1));
       }
     }
     if (REXCVAR_GET(log_near_camera_turns)) {
@@ -2159,6 +2211,9 @@ class ReplayCameras {
     }
     last_identity_ = 0;
     camera_blends_.OnFrameStart();
+    if (!REXCVAR_GET(log_near_camera_frames).empty()) [[unlikely]] {
+      near_frames_.OnFrameStart(frame_.get());
+    }
     std::lock_guard lock(g_replay_mutex);
     if (frame_ != g_replay_frame) {
       if (frame_) {
@@ -2292,8 +2347,118 @@ class ReplayCameras {
     if (REXCVAR_GET(log_overlay_products) && product->tick->handler == kRaceOverlaysHandler) {
       LogOverlay(payload, *product, result);
     }
+    if (near_frames_.on && frame_->plans && !frame_->plans->near_spindles.empty()) [[unlikely]] {
+      near_frames_.OnProduct(*frame_, *product, result);
+    }
     return result;
   }
+
+  // Diagnostics (--log_near_camera_frames): each frame's draw of the parts
+  // near their camera that turn about a point (cockpit needles), kept in
+  // memory and written to the file every 10 s, so the frames keep their rate.
+  struct NearFrames {
+    bool on = false;
+    uint64_t frame = 0;
+    struct Record {
+      uint64_t frame, tick;
+      float amount, turn;
+      uint8_t world;  // ProductPlan::World, or 3 for unpaired
+      uint32_t caller, r26;
+      std::array<float, 2> drawn, ideal, screw;
+    };
+    std::vector<Record> records;
+    // Frames whose tick had such parts but drew none of them blended.
+    std::vector<std::pair<uint64_t, uint64_t>> missed;  // frame, tick
+    size_t records_at_frame_start = 0;
+    std::chrono::steady_clock::time_point last_write = std::chrono::steady_clock::now();
+    bool truncated = false;
+
+    [[gnu::noinline]] void OnFrameStart(const ReplayFrame* finished) {
+      on = true;
+      bool expected = finished && finished->plans && !finished->plans->near_spindles.empty();
+      if (expected && records.size() == records_at_frame_start) {
+        missed.push_back({frame, finished->tick});
+      }
+      frame++;
+      records_at_frame_start = records.size();
+      auto now = std::chrono::steady_clock::now();
+      if (now - last_write >= std::chrono::seconds(10)) {
+        last_write = now;
+        Write();
+      }
+    }
+    [[gnu::noinline]] void OnProduct(const ReplayFrame& f, const ReplayedProduct& product,
+                                     const Matrix4& result) {
+      const TickPlans& plans = *f.plans;
+      const TickPlans::NearSpindle* spindle = nullptr;
+      for (const auto& s : plans.near_spindles) {
+        if (s.plan == product.tick->plan) {
+          spindle = &s;
+        }
+      }
+      if (!spindle || !product.tick->before) {
+        return;
+      }
+      const ProductPlan& plan = plans.products[size_t(spindle->plan)];
+      Record r{frame, f.tick, f.amount, spindle->turn, uint8_t(plan.world),
+               product.tick->now.context[0], product.tick->now.context[3]};
+      r.drawn = ScreenPoint(result, spindle->local);
+      if (plan.camera >= 0) {
+        const CameraPair& pair = plans.cameras[size_t(plan.camera)];
+        PerspectiveCamera camera = Blend(pair.a, pair.b, f.amount);
+        Matrix4 view_projection = ViewProjectionFromCamera(camera);
+        // The point stays where it is relative to the camera.
+        r.ideal = ScreenPoint(view_projection,
+                              ApplyToPoint(WorldMatrixFromTransform(camera.camera), spindle->view));
+        std::optional<ScaledTransform> wa = ScaledTransformFromWorldMatrix(product.tick->before->world);
+        std::optional<ScaledTransform> wb = ScaledTransformFromWorldMatrix(product.tick->now.world);
+        if (wa && wb) {
+          r.screw = ScreenPoint(
+              Multiply(WorldMatrixFromScaledTransform(BlendScrew(*wa, *wb, f.amount)),
+                       view_projection),
+              spindle->local);
+        }
+      }
+      if (records.size() < 200000) {
+        records.push_back(r);
+      } else {
+        truncated = true;
+      }
+    }
+    void Write() {
+      if (records.empty() && missed.empty()) {
+        return;
+      }
+      std::FILE* file = std::fopen(REXCVAR_GET(log_near_camera_frames).c_str(), "a");
+      if (!file) {
+        return;
+      }
+      static const char* kKinds[] = {"none", "blend", "spinning", "unpaired"};
+      for (const Record& r : records) {
+        float dx = r.drawn[0] - r.ideal[0], dy = r.drawn[1] - r.ideal[1];
+        float sx = r.screw[0] - r.ideal[0], sy = r.screw[1] - r.ideal[1];
+        std::fprintf(file,
+                     "frame %llu tick %llu amount %.3f turn %.3f %s caller %08X r26 %u drawn "
+                     "%.1f %.1f ideal %.1f %.1f screw %.1f %.1f off %.1f px (screw %.1f px)\n",
+                     (unsigned long long)r.frame, (unsigned long long)r.tick, r.amount, r.turn,
+                     kKinds[r.world], r.caller, r.r26, r.drawn[0], r.drawn[1], r.ideal[0],
+                     r.ideal[1], r.screw[0], r.screw[1], std::sqrt(dx * dx + dy * dy),
+                     std::sqrt(sx * sx + sy * sy));
+      }
+      for (const auto& [frame_number, tick] : missed) {
+        std::fprintf(file, "frame %llu tick %llu: none blended\n",
+                     (unsigned long long)frame_number, (unsigned long long)tick);
+      }
+      if (truncated) {
+        std::fprintf(file, "(records dropped: buffer full)\n");
+        truncated = false;
+      }
+      std::fclose(file);
+      records.clear();
+      missed.clear();
+      records_at_frame_start = 0;
+    }
+  } near_frames_;
 
  private:
   void LogStats() {

@@ -58,6 +58,16 @@ ScaledTransform Blend(const ScaledTransform& a, const ScaledTransform& b, float 
 std::optional<ScaledTransform> BlendSpinning(const ScaledTransform& a, const ScaledTransform& b,
                                              float amount, float max_swing);
 
+// Screw interpolation: the motion from `a` to `b` in the world is a turn about
+// some line plus a slide along it. Blends the turn and the slide about that
+// line, so a part that turns about a point away from its origin (a dial's
+// needle) keeps that point in place, where Blend moves its origin straight.
+// The scale blends linearly.
+ScaledTransform BlendScrew(const ScaledTransform& a, const ScaledTransform& b, float amount);
+// The point on the line the motion from `a` to `b` turns about that is
+// nearest `near`, or nothing if it hardly turns.
+std::optional<Vec3> ScrewAxisPoint(const Transform& a, const Transform& b, const Vec3& near);
+
 // Blends between two 4x4 matrices that differ by a rigid motion, such as
 // view-projection or world-view-projection matrices from consecutive ticks:
 // a * D or D * a for a rotation plus translation D, in either layout. Blends
