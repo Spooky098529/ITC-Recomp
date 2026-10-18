@@ -1011,6 +1011,21 @@ UI movie update run once a tick with its drawing replayed (see
 `docs/tick-replay.md`), or the adds that don't get put back identified and
 made per tick by name. The exact replay planned above isn't needed.
 
+**The front-end arrow snapping to the first item** (user, 2026-10-18):
+in the front-end menus the arrow snaps when moving to a menu's first item,
+instead of the trail it shows on other moves. Not caused by this branch:
+
+- The front end has no render-only passes (`itc_058.log`, `itc_059.log`:
+  every `fps` line equals `ticks/s`, 30/30), so the track skip and the
+  movie replay's fallback never run there. On logic passes the
+  `825A0548` override only reads memory and calls the original, and the
+  wrappers in `pause_movie_log.cpp` only log (with `--log_pause_movie`).
+- The user saw the same snap on a build from before the branch
+  (`out/dist/itc-texture-binding-linux-amd64`, 2026-10-16).
+
+So it's the game's own behavior or older than the branch; not compared
+with the emulated GPU or a 360.
+
 **State of the branch** (`pause-menu-arrow`, all committed and pushed):
 
 | Flag | Default | What | Keep? |
