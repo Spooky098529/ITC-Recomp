@@ -33,6 +33,9 @@ REXCVAR_DEFINE_BOOL(per_tick_blink_timers, true, "ITC",
                     "Advance the car blink timers once per tick on render-only passes");
 REXCVAR_DEFINE_BOOL(per_tick_ui_movies, true, "ITC",
                     "Advance UI movies once per tick on render-only passes");
+REXCVAR_DEFINE_BOOL(per_tick_ui_movie_tracks, true, "ITC",
+                    "On render-only passes, don't apply UI movies' animation tracks (some add "
+                    "to their node, so they moved ~5x as far: the pause sub-menus' arrow)");
 REXCVAR_DEFINE_BOOL(per_tick_changed_ui_movies, true, "ITC",
                     "On render-only passes, draw UI movies changed since the logic pass "
                     "without advancing them (the pause sub-menus' arrow)");
@@ -232,14 +235,38 @@ void UpdateUiMovie(PPCContext& ctx, uint8_t* base) {
 }
 }  // namespace
 
+// UI movie animation tracks: each movie update applies every playing
+// animation (sub_825A08E0, keyframe interpolation at the animation's time),
+// and sub_825A0548 writes one track's value into its node, outside the bytes
+// the replay restores. A track whose descriptor's byte +8 is 0 adds its
+// value to the node instead of setting it, so each render-only update added
+// it again: at 144 fps the pause sub-menus' arrow slid ~5x as far, off its
+// item. On render-only passes the tracks aren't applied: the nodes keep what
+// the logic pass applied for the tick, and the movie draws the same frame.
+namespace {
+bool g_skip_ui_movie_tracks = false;
+}  // namespace
+
+extern "C" REX_FUNC(sub_825A0548) {
+  REX_FUNC_PROLOGUE();
+  if (g_skip_ui_movie_tracks) {
+    return;
+  }
+  __imp__sub_825A0548(ctx, base);
+}
+
 extern "C" REX_FUNC(sub_8211D2F8) {
   REX_FUNC_PROLOGUE();
   uint32_t movie = ctx.r3.u32, r4 = ctx.r4.u32, caller = uint32_t(ctx.lr);
+  bool skip_tracks_before = g_skip_ui_movie_tracks;
+  g_skip_ui_movie_tracks = REXCVAR_GET(per_tick_ui_movie_tracks) &&
+                           frame_pacing::GameMessages_IsRenderOnlyPass();
   debug::PauseMovieLog_Before(base, movie, r4, caller);
   g_replay_outcome = "not replayed";
   g_replay_occurrence = -1;
   UpdateUiMovie(ctx, base);
   debug::PauseMovieLog_After(base, movie, caller, g_replay_outcome, g_replay_occurrence);
+  g_skip_ui_movie_tracks = skip_tracks_before;
 }
 
 // Race overlays (sub_8215DEA0, from Update handler sub_8215E150; r3 = a list

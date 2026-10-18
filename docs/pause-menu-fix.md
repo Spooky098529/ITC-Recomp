@@ -848,3 +848,25 @@ list bookkeeping). Not ruled out: the transition functions other than 8
 under the pause (`822128C8`), and draws that aren't UI movies at all.
 Next: a frame dump while paused (`--native_renderer_dump`) to see the
 arrow and find its draw.
+
+**Found (2026-10-18): the tracks add to their nodes.** A frame dump while
+paused (`--native_renderer_dump_every=1`) showed the arrow: a line from
+the screen's left edge ending in a point at the selected item. With the
+first item ("Road Map") selected it's there; after a move to another item
+it's gone from the screen. The user's idea, an add scaled by the frame
+rate, was right. `825A08E0`, run by each movie update for every playing
+animation, applies each track with `825A0548`, which ends with: when the
+track descriptor's byte +8 is 0, `[node + offset] += value` (floats and
+ints alike), otherwise `= value`. The nodes are outside the bytes the UI
+movie replay restores, so each render-only replay added the track's
+value again: ~5 adds a tick at 144 fps, the arrow sliding ~5x as far and
+off its item. The movie's clocks were right all along; the node watch
+probably didn't reach the arrow's node.
+
+The fix (`--per_tick_ui_movie_tracks`, on by default, `per_frame_logic.cpp`):
+inside a UI movie update (`sub_8211D2F8`) on a render-only pass,
+`825A0548` doesn't run. The nodes keep what the logic pass applied for
+the tick, so the render-only frame draws the same as the logic pass, and
+each add happens once a tick. Applies outside a movie update (the
+animation starts `8211DF20`, `8211DE38`, `8211DFF8`) run as before. This
+covers every UI movie, the race HUD's too.
