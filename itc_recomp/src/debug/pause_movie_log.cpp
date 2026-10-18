@@ -73,7 +73,22 @@ bool TakeLine(int& lines, std::chrono::steady_clock::time_point& last, int max) 
 class PauseMovieLog {
  public:
   void Before(uint8_t* base, uint32_t movie, uint32_t r4, bool draw_only) {
-    active_ = REXCVAR_GET(log_pause_movie) && frame_pacing::GameMessages_Paused();
+    bool paused = frame_pacing::GameMessages_Paused();
+    active_ = REXCVAR_GET(log_pause_movie) && paused;
+    if (REXCVAR_GET(log_pause_movie)) {
+      calls_[paused][frame_pacing::GameMessages_IsRenderOnlyPass()][draw_only]++;
+      auto now = std::chrono::steady_clock::now();
+      if (now - last_calls_ >= std::chrono::seconds(1)) {
+        last_calls_ = now;
+        REXLOG_INFO(
+            "pause movie updates: tick {} movie {:08X} r4 {}: paused logic {} render-only {} "
+            "(draw-only {}), not paused logic {} render-only {}",
+            Ticks(), movie, r4, calls_[1][0][0] + calls_[1][0][1],
+            calls_[1][1][0] + calls_[1][1][1], calls_[1][1][1],
+            calls_[0][0][0] + calls_[0][0][1], calls_[0][1][0] + calls_[0][1][1]);
+        std::memset(calls_, 0, sizeof(calls_));
+      }
+    }
     if (!active_) {
       last_after_.clear();
       return;
@@ -132,8 +147,20 @@ class PauseMovieLog {
     ranges_ = ReadableGuestRanges(base);
     std::sort(ranges_.begin(), ranges_.end(),
               [](const Range& a, const Range& b) { return a.start < b.start; });
+    // Adjacent mappings are one range here.
+    std::vector<Range> merged;
+    for (const Range& r : ranges_) {
+      if (!merged.empty() && uint64_t(merged.back().start) + merged.back().size == r.start) {
+        merged.back().size += r.size;
+      } else {
+        merged.push_back(r);
+      }
+    }
+    ranges_.swap(merged);
     objects_.clear();
     if (!Readable(movie, kMovieBytes)) {
+      REXLOG_INFO("pause movie: tick {} movie {:08X} isn't readable ({} ranges)", Ticks(), movie,
+                  ranges_.size());
       return;
     }
     objects_.push_back({movie, kMovieBytes, 0});
@@ -252,6 +279,8 @@ class PauseMovieLog {
   std::unordered_map<uint32_t, bool> busy_last_second_;
   std::chrono::steady_clock::time_point last_rebuild_{}, last_summary_{}, lines_since_{};
   int lines_ = 0;
+  int calls_[2][2][2] = {};  // [paused][render-only][made draw-only]
+  std::chrono::steady_clock::time_point last_calls_{};
 };
 
 PauseMovieLog g_log;
