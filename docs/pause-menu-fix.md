@@ -381,6 +381,18 @@ cleared by the pause screen's Update `8216DB70` on the next logic pass
 run every frame posts events the pause menu acts on. Next: the delegate's
 target and the component's address (the wrapper now resolves delegates).
 
+Result: the writer is component update `82119118`, run on every pass. It
+calls `8259D1A8` on this+16 (a jump to vtable slot 4 of the object at
++8), `82094B10` on this+1584 when +1596 is 3, `821184E8` twice,
+`82118FB0` and `82118C18` (removes the entries of a list at this+1528
+that a callback picks). With those wrapped, `40000168` was written by
+`8259D1A8` (from component updates `82119118` and `82117E88`, which jumps
+to it on this+16) and by `82118C18`. Generic forwarding and list removal
+writing a word many unrelated handlers also write outside the pause:
+probably heap or list bookkeeping, not input events. **Dead end** (not
+proven). The memory scan found no other candidate outside the Draw
+handlers.
+
 ### Step 1: native Input::Update (`src/hooks/input.cpp`, `--native_input`)
 
 Follow `src/hooks/lights.cpp` (a `REXCVAR_DEFINE_BOOL`, the override
