@@ -544,6 +544,30 @@ only "pressed" (slot 10) reads, of actions 152 and 159, all on logic
 passes (from `821690C0`-`821691F4` and `82222230`-`822222CC`, probably
 the attract mode watching for a press). A race the user drives is next.
 
+**Result** (a race the user drove at 144 fps, `itc_027.log`; `itc_026.log`
+was left in attract mode and not read): **every read is on a logic
+pass**, paused and running. The only call on render-only passes is the
+update `8210B018` itself (from `82107A24`), and no "read on render-only
+pass" line was logged. Readers seen:
+
+- Driving: `82102400` (slot 14, the u16 analog values of actions 155,
+  156, 160, 163, 164, 169, 170, 173, 174; 164, 169 and 170 non-zero most
+  often) and `82102468` (slot 10 pressed: 152, 157, 158, 161, 162; slot
+  8 held: 159, 165, 166), each once a tick.
+- The pause menu: `8220C020`'s tests (`8220C0B4`-`8220C1B8`, slot 12,
+  the eight directions), and `8220BDAC`, `8220BE3C`, `8220BECC` (slot 10,
+  actions 159, 158, 152: probably confirm, back, and a third). Holding
+  the stick down for ~5 s paused gave 114 non-zero "fired" reads of 168,
+  the too-fast repeat.
+- Another menu, `821865E4`-`82186718` (slot 12, the directions) and
+  `82186540` (slot 10: 158, 159, 163), running, not paused (probably the
+  race's end screen), and the `82222230`-`822222CC` reads seen in attract
+  mode.
+
+So skipping the update on render-only passes (step 2) leaves nobody
+reading the words it would have rebuilt there; nothing needs fixing
+first.
+
 ### Step 2: update the mappers once a tick (`--input_mappers_by_tick`)
 
 - Override `sub_8210B018` (not overridden yet) in a new
