@@ -43,6 +43,9 @@ REXCVAR_DEFINE_BOOL(log_input, false, "ITC",
 REXCVAR_DEFINE_BOOL(log_input_writes, false, "ITC",
                     "Log which tick and message handlers write to the input manager and its "
                     "listener objects, by pass type and pause sign, once a second");
+REXCVAR_DEFINE_BOOL(log_input_reads, false, "ITC",
+                    "Log calls to the input processors' button tests by caller, pass type and "
+                    "pause, once a second");
 // Until step 2 of docs/pause-menu-fix.md: while LoadU32(r31 + 588) is
 // non-zero as the race draw step is entered, the pass isn't a race's, so
 // render-only passes stop (the pause screen at 30 fps).
@@ -119,6 +122,12 @@ enum MessageId : uint32_t {
 bool g_render_only_pass = false;
 bool g_race_draw_step_seen = false;  // during the current logic pass
 bool g_in_race = false;              // as of the last logic pass
+// --log_input_reads: the pause screen's Draw handler (8216CF08) delivered on
+// this pass, and on the pass before (taken as paused).
+constexpr uint32_t kPauseScreenDraw = 0x8216CF08;
+bool g_pause_drawn_this_pass = false;
+bool g_paused = false;
+uint32_t g_current_tick = 0;  // the tick handler running (its target), or 0
 
 // Diagnostics (--log_input): the pause signs as of the race draw step's last
 // entry, and the message and tick handlers run, by pass type and those signs.
@@ -365,6 +374,9 @@ void Deliver(PPCContext& ctx, uint8_t* base, uint32_t dispatcher, uint32_t messa
     g_current_handler = target;
     g_current_message = guest::LoadU32(base, message);
     InputLog_Run(kMessageRun, g_current_message, target);
+    if (target == kPauseScreenDraw) {
+      g_pause_drawn_this_pass = true;
+    }
     InputWatch_Before(base);
     REX_CALL_INDIRECT_FUNC(method);
     InputWatch_After(base, kMessageRun, target);
@@ -456,6 +468,8 @@ void GameMessages_PassCounts(uint64_t& logic, uint64_t& render_only) {
 void GameMessages_SetRenderOnlyPass(bool render_only) {
   g_passes[render_only ? 1 : 0]++;
   g_render_only_pass = render_only;
+  g_paused = g_pause_drawn_this_pass;
+  g_pause_drawn_this_pass = false;
   InputLog_OnPassStart();
   g_pass_snapshot.store((GameMessages_PassNumber() << 1) | render_only, std::memory_order_relaxed);
   g_main_thread.store(std::this_thread::get_id(), std::memory_order_relaxed);
@@ -698,8 +712,77 @@ extern "C" REX_FUNC(sub_82099A98) {
   debug::FrameStateDiff_Before(base);
   debug::IdleTimerScan_Before(base);
   frame_pacing::InputWatch_Before(base);
+  frame_pacing::g_current_tick = target;
   __imp__sub_82099A98(ctx, base);
+  frame_pacing::g_current_tick = 0;
   frame_pacing::InputWatch_After(base, frame_pacing::kTickRun, target);
   debug::IdleTimerScan_After(base, "tick handler", target);
   debug::FrameStateDiff_After(base, "tick handler", target);
 }
+
+// --log_input_reads: the input processors' (and listeners') button tests,
+// each r3 = processor, r4 = pointer to a button mask, returning a bool:
+// 825924E0 all held (+272), 82592500 any set in +264, 82592520 pressed or
+// repeating (a held button's counter at +284 + 4 * bit is 1 or has reached
+// +276). Their only direct callers are the wrappers 8258CF10, 8258CEB0 and
+// 8258CEE0 (same arguments). They read the state Input::Update left, which
+// changes once a tick, so a caller that acts on them on every pass acts
+// several times a tick.
+namespace {
+
+struct InputReadKey {
+  bool render_only, paused;
+  uint32_t message, handler, tick, function, caller, object, mask, result;
+  auto operator<=>(const InputReadKey&) const = default;
+};
+std::map<InputReadKey, int> g_input_reads;
+std::chrono::steady_clock::time_point g_input_reads_logged{};
+
+void InputRead_Note(uint32_t function, uint32_t caller, uint32_t object, uint32_t mask,
+                    uint32_t result) {
+  using namespace frame_pacing;
+  g_input_reads[{g_render_only_pass, g_paused, g_current_message, g_current_handler,
+                 g_current_tick, function, caller, object, mask, result}]++;
+  auto now = std::chrono::steady_clock::now();
+  if (now - g_input_reads_logged < std::chrono::seconds(1)) {
+    return;
+  }
+  g_input_reads_logged = now;
+  constexpr size_t kMaxLines = 100;
+  size_t lines = 0;
+  for (const auto& [k, n] : g_input_reads) {
+    if (lines++ == kMaxLines) {
+      REXLOG_INFO("input reads: {} more", g_input_reads.size() - kMaxLines);
+      break;
+    }
+    REXLOG_INFO(
+        "input reads: {} paused {} message {:X} handler {:08X} tick {:08X}: {:08X} from {:08X} "
+        "object {:08X} mask {:08X} -> {} x{}",
+        k.render_only ? "render-only" : "logic", int(k.paused), k.message, k.handler, k.tick,
+        k.function, k.caller, k.object, k.mask, k.result, n);
+  }
+  g_input_reads.clear();
+}
+
+}  // namespace
+
+#define ITC_INPUT_READ(address)                                                    \
+  extern "C" REX_FUNC(sub_##address) {                                             \
+    REX_FUNC_PROLOGUE();                                                           \
+    if (!REXCVAR_GET(log_input_reads)) {                                           \
+      __imp__sub_##address(ctx, base);                                             \
+      return;                                                                      \
+    }                                                                              \
+    uint32_t caller = uint32_t(ctx.lr);                                            \
+    uint32_t object = ctx.r3.u32;                                                  \
+    uint32_t mask = guest::LoadU32(base, ctx.r4.u32);                              \
+    __imp__sub_##address(ctx, base);                                               \
+    InputRead_Note(0x##address, caller, object, mask, ctx.r3.u32 & 0xFF);          \
+  }
+ITC_INPUT_READ(825924E0)
+ITC_INPUT_READ(82592500)
+ITC_INPUT_READ(82592520)
+ITC_INPUT_READ(8258CF10)
+ITC_INPUT_READ(8258CEB0)
+ITC_INPUT_READ(8258CEE0)
+#undef ITC_INPUT_READ
