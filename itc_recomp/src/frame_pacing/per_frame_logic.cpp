@@ -259,7 +259,7 @@ constexpr uint32_t kTrackPropertyCount = 64;
 extern "C" REX_FUNC(sub_825A0548) {
   REX_FUNC_PROLOGUE();
   if (g_skip_ui_movie_tracks && guest::LoadU8(base, kTrackPropertiesReady) != 0) {
-    uint32_t property = guest::LoadU32(base, guest::LoadU32(base, ctx.r4.u32));
+    uint32_t property = guest::LoadU32(base, ctx.r4.u32);
     if (property < kTrackPropertyCount &&
         guest::LoadU8(base, kTrackProperties + 12 * property + 8) == 0) {
       return;
