@@ -353,7 +353,7 @@ through render-only copies (`OnCopy`, kept, harmless), restoring the camera
 passes before Draw (since removed), and hiding
 `sub_821225D8`, `sub_820DDE58`, `820F6068` and HUD handlers.
 
-**The rival logo at the race start** (fixed; branch
+**The rival logo at the race start** (fixed; merged from
 `rival-logo-flicker`, `--redraw_rival_logo`). Entering a race against a rival plays the rival
 intro cutscene (about 13 s): the rival's cars, with the rival's 2D logo
 over them. The logo flickers with frames above 30; the attract race's

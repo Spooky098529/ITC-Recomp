@@ -160,7 +160,7 @@ back were applied again on render-only passes; now skipped there
 (`--per_tick_ui_movie_tracks`, on by default). Its trail, and its snap to a
 front-end menu's first item, are the game's own (seen on a 360 video).
 
-The rival logo (branch `rival-logo-flicker`, 2026-10-18, not merged):
+The rival logo (merged from `rival-logo-flicker`, 2026-10-18, not released yet):
 the rival intro cutscene's logo flickered above 30 fps, drawn during its
 Update handler (`82159948`, `sub_821594B8`) on logic passes only. A native
 override runs the cutscene on logic passes and only the logo's draw
