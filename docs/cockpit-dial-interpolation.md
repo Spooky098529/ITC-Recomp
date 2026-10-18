@@ -147,12 +147,40 @@ blend turning about it. The user: "it still jumps, now it's jumping out of
 the dial across the screen". In the log, most of the fast swings didn't get
 it (they failed the same-point check), which fits a wrong pairing.
 
+## Pairing checked: the needles aren't swapped (2026-10-18)
+
+`--log_near_camera_pairs` (off by default): once a tick, groups of the
+per-object recorder's products sharing a key (caller, r31, world and camera
+addresses) with a part within 3 m of their camera, each member's r24-r30,
+position and the previous tick's product it was paired with (as an anchor
+or in the "rest" loop of `MatchTick`).
+
+Cockpit drive (`itc_075`, ~1,260 ticks of cockpit view, revving and
+braking): five groups near the camera, all caller `820D0564`. The
+needle's (r31 `055F06A0`) has **four** members, always at exactly the
+same position (one needle drawn four times; r26 is 0-3, one per member,
+the same every tick; r29/r30 alternate between two buffers from tick to
+tick). The others (r31 `055F0870`, `05570BC0`, `05570480`, `028D01E0`) have
+two each.
+
+- 12,822 pairings logged, **none** swapped: each member always paired with
+  the previous tick's member with the same occurrence and r26. 22 unpaired,
+  all on a group's first tick.
+- So the wrong-pairing suspicion is ruled out, and so is a second needle
+  sharing the mesh. (Where `itc_074`'s 0.51 m and 0.08 m radii came from
+  is unexplained.)
+- The needle's radius is a steady 0.80 m, swings up to 0.45 rad a tick
+  with the normal blend and 0.62 rad once with the wheel blend (tick 1331).
+  The car moves ~0.88 m a tick in the world.
+
+That leaves the blend itself (the first lead): straight-line origin and a
+turn about the origin, with the origin 0.8 m from the spindle. At 0.45 rad a
+tick the spindle drifts ~1.9 cm mid-tick; with the wheel blend, about
+`0.8 * Δθ / 2`, ~25 cm at 0.62 rad.
+
 ## Next
 
-1. Log the pairing of parts sharing a key near the camera: each one's r24-r30,
-   position and what it was paired with, every tick. If the needles get
-   swapped, a register that tells the gauges apart (an object pointer)
-   could go into the key so they pair exactly.
-2. Then, rather than special cases: screw interpolation (dual quaternions)
+1. ~~Log the pairing~~: done, not swapped (above).
+2. Rather than special cases: screw interpolation (dual quaternions)
    for the normal blend, which doesn't depend on where a mesh's origin is.
    Fast swings over 0.5 rad, taken for wheels, are still to solve.
