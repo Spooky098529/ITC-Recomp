@@ -697,7 +697,7 @@ Done (2026-10-18): `docs/functions.md` has a row for `sub_8210B018`
 (the `Input::Update` row was still right) and the known issue says the
 pause menu runs at the race's rate.
 
-## The sub-menus' arrow (`pause-menu-arrow`, 2026-10-18, open)
+## The sub-menus' arrow (`pause-menu-arrow`, 2026-10-18, fixed)
 
 In every pause sub-menu, an arrow points at the selected item. At 144 fps
 the user sees it slide fast in the direction pressed and end up out of
@@ -977,18 +977,48 @@ sub-menu, with the skip on):
   not identified yet. The arrow's own track isn't one, in the first two
   ticks of its slides that the trace covers.
 
-Next: skip an adding track on render-only passes only when its target
-isn't restored by `82119B80` (seen on the logic pass: which targets it
-writes back). Superseded for now: the exact replay above.
+**The fix** (`65b0a73`, `--per_tick_ui_movie_tracks`, on by default,
+`per_frame_logic.cpp`). This is **a workaround to support frame rates
+above 30**: the game only ever ran one movie update a tick, and at 30 fps
+(no render-only passes) none of it does anything. On a logic pass, each
+adding track's target is noted as put back (its value at the end of the
+update is the one from before its first track in that update: the rest
+pose restored it) or not. On render-only passes, adding tracks run as
+usual when their target was put back, and are skipped otherwise, so adds
+that really pile up happen once a tick. Setting tracks always run. The
+movie's own bytes are still replayed as before (`--per_tick_ui_movies`).
+
+Result (user, 2026-10-18, 144 fps, `itc_059.log`): **the arrow stops on
+its item, no pause menu flicker or overlap, and the race start countdown is
+right.** The arrow still leaves a trail when it moves: that's **the game's
+own effect**, also seen on the same arrow in the front-end menus at 30 fps,
+just easier to see at 144 fps. The ghosting the earlier skip caused was a
+position problem (render-only frames drawing the rest pose).
+
+In `itc_059.log` (a new session: the sub-menus' movie was `42170060`) the
+targets still skipped were few: most often `039F18D0` (property 1), which
+flips between "put back" and "not put back" every ~5 ticks, so it's put back
+on ticks where its add is 0 and not when the add moves it: the adds that
+pile up. Skipping it on zero ticks or not makes no difference (the
+render-only replay adds the same 0). Others: `421A40E0` property 6
+(eight targets), and a few in `40B00060` and `400F0030`.
+`--log_pause_movie` logs each target's change of classification (`pause
+movie track target:`, paused or not) and the skipped tracks every 2 s
+(`pause movie skipped tracks:`).
+
+Not done (later, if ever): a native fix instead of the workaround, e.g. the
+UI movie update run once a tick with its drawing replayed (see
+`docs/tick-replay.md`), or the adds that don't get put back identified and
+made per tick by name. The exact replay planned above isn't needed.
 
 **State of the branch** (`pause-menu-arrow`, all committed and pushed):
 
 | Flag | Default | What | Keep? |
 |---|---|---|---|
-| `--per_tick_ui_movie_tracks` | on | Skips adding tracks (`825A0548`) in UI movie updates on render-only passes: fixes the arrow's position, causes ghosting and countdown flicker | Replace with the exact replay above |
+| `--per_tick_ui_movie_tracks` | on | Workaround for frame rates above 30: on render-only passes, skips adding tracks (`825A0548`) in UI movie updates whose target the update doesn't put back. Fixes the arrow; no ghosting or countdown flicker | Keep |
 | `--per_tick_changed_ui_movies` | on | Render-only UI movie updates that fall back (movie changed since the logic pass, or no logic pass call to match) run from the current state, which is put back | Correct but made no visible difference; the user decides |
 | `--log_pause_movie` | off | Logs UI movie updates by caller and pass type; while paused, diffs each movie and objects 3 pointers away; logs the sub-menus' animation calls and, after each, every update with its replay outcome and clocks, every adding track applied, the words they move around each update and which call writes them | Debug |
-| `--paused_render_only_skip` | off | Skips functions wrapped in `menu_selection_scan.cpp` on render-only passes while paused | Test only; remove |
+| `--paused_render_only_skip` | off | Skipped functions wrapped in `menu_selection_scan.cpp` on render-only passes while paused | Removed |
 
 Useful logs: `itc_037`-`itc_039` (first movie logs), `itc_042` (30 fps
 reference), `itc_043` (the update trace around moves), `itc_046` (nodes

@@ -24,8 +24,10 @@ tick and replaying our own list on in-between frames.
 `docs/pause-menu-fix.md` is the pause menu's too-fast input repeat: fixed
 (the action mappers updated once a tick, `--input_mappers_by_tick`), and a
 native Input::Update for later. Its last section, "The sub-menus' arrow",
-is open work on branch `pause-menu-arrow`: UI movie tracks that add to
-their nodes were re-added on every render-only pass.
+is fixed on branch `pause-menu-arrow` (not merged yet): UI movie tracks
+that add to values the update doesn't put back were re-added on every
+render-only pass; now skipped there (`--per_tick_ui_movie_tracks`, a
+workaround for frame rates above 30).
 Read the relevant section before changing anything, and keep it up to
 date as you learn things.
 
