@@ -3,8 +3,9 @@
 // selected item once the movie is advanced once a tick
 // (docs/pause-menu-fix.md, "The sub-menus' arrow").
 //
-// While paused, around each update of the pause menu's movie (sub_8211D2F8
-// from sub_8220B9E8): the movie object (0xA000 bytes, what the UI movie
+// Every UI movie update (sub_8211D2F8) is counted once a second by movie,
+// mode, caller (lr: the caller of sub_8211E1B8, which jumps to it) and pass
+// type. While paused, around each update of each movie: the movie object (0xA000 bytes, what the UI movie
 // replay keeps) and the objects up to two pointers away from it (0x200 bytes
 // each) are compared before and after the update ("in update") and against
 // the last update's end ("between": written by other code since). Each
@@ -26,6 +27,7 @@
 #include <chrono>
 #include <cstring>
 #include <map>
+#include <tuple>
 #include <unordered_map>
 #include <vector>
 
@@ -73,22 +75,7 @@ bool TakeLine(int& lines, std::chrono::steady_clock::time_point& last, int max) 
 class PauseMovieLog {
  public:
   void Before(uint8_t* base, uint32_t movie, uint32_t r4, bool draw_only) {
-    bool paused = frame_pacing::GameMessages_Paused();
-    active_ = REXCVAR_GET(log_pause_movie) && paused;
-    if (REXCVAR_GET(log_pause_movie)) {
-      calls_[paused][frame_pacing::GameMessages_IsRenderOnlyPass()][draw_only]++;
-      auto now = std::chrono::steady_clock::now();
-      if (now - last_calls_ >= std::chrono::seconds(1)) {
-        last_calls_ = now;
-        REXLOG_INFO(
-            "pause movie updates: tick {} movie {:08X} r4 {}: paused logic {} render-only {} "
-            "(draw-only {}), not paused logic {} render-only {}",
-            Ticks(), movie, r4, calls_[1][0][0] + calls_[1][0][1],
-            calls_[1][1][0] + calls_[1][1][1], calls_[1][1][1],
-            calls_[0][0][0] + calls_[0][0][1], calls_[0][1][0] + calls_[0][1][1]);
-        std::memset(calls_, 0, sizeof(calls_));
-      }
-    }
+    active_ = REXCVAR_GET(log_pause_movie) && frame_pacing::GameMessages_Paused();
     if (!active_) {
       last_after_.clear();
       return;
@@ -232,9 +219,9 @@ class PauseMovieLog {
           if (busy.changes++ < kBusyChanges && quiet &&
               TakeLine(lines_, lines_since_, kMaxLines)) {
             REXLOG_INFO(
-                "pause movie change: tick {} pass {} {} r4 {}{} {} {:08X} (object {:08X} +{:X}, "
-                "parent {:08X}): {:08X} -> {:08X} ({:g} -> {:g})",
-                Ticks(), frame_pacing::GameMessages_PassNumber(), PassType(), r4_,
+                "pause movie change: movie {:08X} tick {} pass {} {} r4 {}{} {} {:08X} (object "
+                "{:08X} +{:X}, parent {:08X}): {:08X} -> {:08X} ({:g} -> {:g})",
+                movie_, Ticks(), frame_pacing::GameMessages_PassNumber(), PassType(), r4_,
                 draw_only_ ? " made draw-only" : "", where, address, o.address, off, o.parent,
                 a, b, std::bit_cast<float>(a), std::bit_cast<float>(b));
           }
@@ -256,9 +243,9 @@ class PauseMovieLog {
       busy_last_second_[address] = true;
       if (lines++ < 40) {
         REXLOG_INFO(
-            "pause movie busy: {:08X}: {} changes (in update {} logic, {} render-only; "
+            "pause movie busy: movie {:08X} {:08X}: {} changes (in update {} logic, {} render-only; "
             "between {}), {:08X} -> {:08X}",
-            address, busy.changes, busy.logic, busy.render_only, busy.between, busy.first,
+            movie_, address, busy.changes, busy.logic, busy.render_only, busy.between, busy.first,
             busy.last);
       }
     }
@@ -279,11 +266,34 @@ class PauseMovieLog {
   std::unordered_map<uint32_t, bool> busy_last_second_;
   std::chrono::steady_clock::time_point last_rebuild_{}, last_summary_{}, lines_since_{};
   int lines_ = 0;
-  int calls_[2][2][2] = {};  // [paused][render-only][made draw-only]
-  std::chrono::steady_clock::time_point last_calls_{};
 };
 
-PauseMovieLog g_log;
+std::unordered_map<uint32_t, PauseMovieLog> g_logs;  // by movie
+
+// Every UI movie update, counted once a second by movie, mode, caller, pass
+// type, pause and whether it was made draw-only.
+using CallKey = std::tuple<uint32_t, uint32_t, uint32_t, bool, bool, bool>;
+std::map<CallKey, int> g_updates;
+std::chrono::steady_clock::time_point g_updates_since{};
+
+void CountUpdate(uint32_t movie, uint32_t r4, uint32_t caller, bool draw_only) {
+  bool paused = frame_pacing::GameMessages_Paused();
+  g_updates[{movie, r4, caller, paused, frame_pacing::GameMessages_IsRenderOnlyPass(),
+             draw_only}]++;
+  auto now = std::chrono::steady_clock::now();
+  if (now - g_updates_since < std::chrono::seconds(1)) {
+    return;
+  }
+  g_updates_since = now;
+  for (const auto& [key, n] : g_updates) {
+    const auto& [m, mode, from, was_paused, render_only, made_draw_only] = key;
+    REXLOG_INFO("pause movie updates: tick {} movie {:08X} r4 {} from {:08X} {} {}{}: {}",
+                Ticks(), m, mode, from, was_paused ? "paused" : "running",
+                render_only ? "render-only" : "logic", made_draw_only ? " made draw-only" : "",
+                n);
+  }
+  g_updates.clear();
+}
 
 int g_call_lines = 0;
 std::chrono::steady_clock::time_point g_call_lines_since{};
@@ -302,11 +312,21 @@ void LogCall(const char* name, PPCContext& ctx) {
 
 }  // namespace
 
-void PauseMovieLog_Before(uint8_t* base, uint32_t movie, uint32_t r4, bool draw_only) {
-  g_log.Before(base, movie, r4, draw_only);
+void PauseMovieLog_Before(uint8_t* base, uint32_t movie, uint32_t r4, uint32_t caller,
+                          bool draw_only) {
+  if (!REXCVAR_GET(log_pause_movie)) {
+    return;
+  }
+  CountUpdate(movie, r4, caller, draw_only);
+  g_logs[movie].Before(base, movie, r4, draw_only);
 }
 
-void PauseMovieLog_After(uint8_t* base) { g_log.After(base); }
+void PauseMovieLog_After(uint8_t* base, uint32_t movie) {
+  if (!REXCVAR_GET(log_pause_movie)) {
+    return;
+  }
+  g_logs[movie].After(base);
+}
 
 }  // namespace debug
 

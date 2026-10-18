@@ -224,21 +224,17 @@ void UpdateUiMovie(PPCContext& ctx, uint8_t* base) {
 
 extern "C" REX_FUNC(sub_8211D2F8) {
   REX_FUNC_PROLOGUE();
-  if (!g_in_pause_menu_draw) {
-    UpdateUiMovie(ctx, base);
-    return;
-  }
-  uint32_t movie = ctx.r3.u32, r4 = ctx.r4.u32;
-  bool draw_only = r4 == 0 && REXCVAR_GET(per_tick_pause_menu_movie) &&
+  uint32_t movie = ctx.r3.u32, r4 = ctx.r4.u32, caller = uint32_t(ctx.lr);
+  bool draw_only = g_in_pause_menu_draw && r4 == 0 && REXCVAR_GET(per_tick_pause_menu_movie) &&
                    frame_pacing::GameMessages_IsRenderOnlyPass();
-  debug::PauseMovieLog_Before(base, movie, r4, draw_only);
+  debug::PauseMovieLog_Before(base, movie, r4, caller, draw_only);
   if (draw_only) {
     ctx.r4.u64 = 1;
     __imp__sub_8211D2F8(ctx, base);
   } else {
     UpdateUiMovie(ctx, base);
   }
-  debug::PauseMovieLog_After(base);
+  debug::PauseMovieLog_After(base, movie);
 }
 
 // Race overlays (sub_8215DEA0, from Update handler sub_8215E150; r3 = a list
