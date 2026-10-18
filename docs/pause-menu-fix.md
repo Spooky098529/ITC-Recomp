@@ -533,6 +533,17 @@ see one press ~5 times. Find out before changing anything:
   passes needs its own fix before step 2 (or it gets the old per-frame
   words kept for it).
 
+Done (2026-10-18): `--log_pause_menu` now overrides the seven read slots
+and `8210B018`, and logs `pause menu reads: tick T running|paused
+logic|render-only slot S (function) action A from LR: calls C non-zero
+Z` once a second per key, plus `pause menu read on render-only pass:`
+for each non-zero read on a render-only pass (own budget, 200 lines per
+2 s). An attract race (`itc_025.log`, 144 fps) showed `8210B018` called
+from `82107A24` on every pass (~30 logic, ~120 render-only a second) and
+only "pressed" (slot 10) reads, of actions 152 and 159, all on logic
+passes (from `821690C0`-`821691F4` and `82222230`-`822222CC`, probably
+the attract mode watching for a press). A race the user drives is next.
+
 ### Step 2: update the mappers once a tick (`--input_mappers_by_tick`)
 
 - Override `sub_8210B018` (not overridden yet) in a new
