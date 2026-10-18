@@ -34,8 +34,8 @@ REXCVAR_DEFINE_BOOL(per_tick_blink_timers, true, "ITC",
 REXCVAR_DEFINE_BOOL(per_tick_ui_movies, true, "ITC",
                     "Advance UI movies once per tick on render-only passes");
 REXCVAR_DEFINE_BOOL(per_tick_ui_movie_tracks, true, "ITC",
-                    "On render-only passes, don't apply UI movies' animation tracks (some add "
-                    "to their node, so they moved ~5x as far: the pause sub-menus' arrow)");
+                    "On render-only passes, don't apply UI movies' animation tracks that add "
+                    "to their node (they moved ~5x as far: the pause sub-menus' arrow)");
 REXCVAR_DEFINE_BOOL(per_tick_changed_ui_movies, true, "ITC",
                     "On render-only passes, draw UI movies changed since the logic pass "
                     "without advancing them (the pause sub-menus' arrow)");
@@ -241,16 +241,29 @@ void UpdateUiMovie(PPCContext& ctx, uint8_t* base) {
 // the replay restores. A track whose descriptor's byte +8 is 0 adds its
 // value to the node instead of setting it, so each render-only update added
 // it again: at 144 fps the pause sub-menus' arrow slid ~5x as far, off its
-// item. On render-only passes the tracks aren't applied: the nodes keep what
-// the logic pass applied for the tick, and the movie draws the same frame.
+// item. On render-only passes the adding tracks aren't applied: their nodes
+// keep what the logic pass added for the tick. Tracks that set a value still
+// run (skipping them too made the pause menu flicker).
+//
+// sub_825A0548: r4 = the track, whose word +0 is a property id; the
+// property's descriptor (from sub_8259FE68) is entry id of a 12-byte table
+// at 0x82970C28, filled on first use (byte 0x82970C20 set): +0 the node
+// offset, +4 the type, byte +8 set (non-zero) or add (0), byte +9 indirect.
 namespace {
 bool g_skip_ui_movie_tracks = false;
+constexpr uint32_t kTrackPropertiesReady = 0x82970C20;
+constexpr uint32_t kTrackProperties = 0x82970C28;
+constexpr uint32_t kTrackPropertyCount = 64;
 }  // namespace
 
 extern "C" REX_FUNC(sub_825A0548) {
   REX_FUNC_PROLOGUE();
-  if (g_skip_ui_movie_tracks) {
-    return;
+  if (g_skip_ui_movie_tracks && guest::LoadU8(base, kTrackPropertiesReady) != 0) {
+    uint32_t property = guest::LoadU32(base, guest::LoadU32(base, ctx.r4.u32));
+    if (property < kTrackPropertyCount &&
+        guest::LoadU8(base, kTrackProperties + 12 * property + 8) == 0) {
+      return;
+    }
   }
   __imp__sub_825A0548(ctx, base);
 }

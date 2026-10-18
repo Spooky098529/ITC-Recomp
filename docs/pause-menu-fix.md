@@ -870,3 +870,12 @@ the tick, so the render-only frame draws the same as the logic pass, and
 each add happens once a tick. Applies outside a movie update (the
 animation starts `8211DF20`, `8211DE38`, `8211DFF8`) run as before. This
 covers every UI movie, the race HUD's too.
+
+Result: the arrow's position was right, but the pause menu flickered, and
+on first opening it the sub-menus showed overlapped for a moment.
+Skipping every track was too broad: tracks that set a value are needed
+on every pass. Now only adding tracks are skipped. The track's property
+id is its word +0 (`[r4]`); `8259FE68` returns that property's 12-byte
+entry in a static table at `0x82970C28` (64 entries, filled on first use,
+byte `0x82970C20` set then): +0 the node offset, +4 the type, byte +8 set
+(non-zero) or add (0), byte +9 indirect. The override reads byte +8 there.
