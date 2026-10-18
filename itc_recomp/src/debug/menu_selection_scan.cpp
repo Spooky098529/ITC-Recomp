@@ -216,17 +216,25 @@ void MenuSelectionScan_After(uint8_t* base, const char* kind, uint32_t id) {
 
 }  // namespace debug
 
-// Scene::Update's two screen calls (slot 6 and slot 2 of the screen object
-// at scene + 64), wrapped to name them in --find_menu_selection's log.
+// Wrapped to name them in --find_menu_selection's log: Scene::Update's two
+// screen calls (slot 6 and slot 2 of the screen object at scene + 64), and
+// others below.
 #define ITC_MENU_SCAN_WRAP(address)                         \
   extern "C" REX_FUNC(sub_##address) {                      \
     REX_FUNC_PROLOGUE();                                    \
     debug::MenuSelectionScan_Before(base);                  \
     __imp__sub_##address(ctx, base);                        \
-    debug::MenuSelectionScan_After(base, "screen update", 0x##address); \
+    debug::MenuSelectionScan_After(base, "call", 0x##address); \
   }
 ITC_MENU_SCAN_WRAP(8258E5E0)
 ITC_MENU_SCAN_WRAP(8258ED78)
+// The callees of component update 82119118 (component 40066EE0 in the
+// user's race), which posts the events the pause screen's Update consumes.
+ITC_MENU_SCAN_WRAP(8259D1A8)
+ITC_MENU_SCAN_WRAP(82094B10)
+ITC_MENU_SCAN_WRAP(821184E8)
+ITC_MENU_SCAN_WRAP(82118FB0)
+ITC_MENU_SCAN_WRAP(82118C18)
 #undef ITC_MENU_SCAN_WRAP
 
 // The app's update (tick handler 82093DC0) runs its component lists through
