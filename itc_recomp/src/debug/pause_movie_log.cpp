@@ -27,6 +27,7 @@
 #include <rex/logging.h>
 
 #include <algorithm>
+#include <array>
 #include <bit>
 #include <chrono>
 #include <cstring>
@@ -405,7 +406,49 @@ void PauseMovieLog_Track(uint32_t movie, uint32_t node, uint32_t property, uint3
       skipped ? " skipped" : "");
 }
 
+// Runs `call`, a function the UI movie update calls, and logs which of the
+// moved words it changes (to find what puts the arrow's track back after
+// the update applies it).
+template <typename Call>
+void WatchMovingTargets(const char* name, PPCContext& ctx, uint8_t* base, Call&& call) {
+  if (g_moving_targets.empty() || !PauseMovieLog_TracksWanted()) {
+    call();
+    return;
+  }
+  uint32_t r3 = ctx.r3.u32, r4 = ctx.r4.u32, lr = uint32_t(ctx.lr);
+  std::array<uint32_t, kMaxMovingTargets> before{};
+  for (size_t i = 0; i < g_moving_targets.size(); i++) {
+    before[i] = guest::LoadU32(base, g_moving_targets[i]);
+  }
+  call();
+  for (size_t i = 0; i < g_moving_targets.size(); i++) {
+    uint32_t after = guest::LoadU32(base, g_moving_targets[i]);
+    if (after != before[i] && TakeLine(g_track_lines, g_track_lines_since, kMaxTrackLines)) {
+      REXLOG_INFO(
+          "pause movie target written: tick {} pass {} {} {} from {:08X} r3 {:08X} r4 {:08X}: "
+          "{:08X} {:g} -> {:g}",
+          Ticks(), frame_pacing::GameMessages_PassNumber(), PassType(), name, lr, r3, r4,
+          g_moving_targets[i], std::bit_cast<float>(before[i]), std::bit_cast<float>(after));
+    }
+  }
+}
+
 }  // namespace debug
+
+// The functions the UI movie update (sub_8211D2F8) calls besides the
+// tracks' sub_825A08E0, watched for writes to the moved words.
+#define WATCH_MOVIE_CALL(address)                                                       \
+  extern "C" REX_FUNC(sub_##address) {                                                  \
+    REX_FUNC_PROLOGUE();                                                                \
+    debug::WatchMovingTargets(#address, ctx, base, [&] { __imp__sub_##address(ctx, base); }); \
+  }
+WATCH_MOVIE_CALL(82119B80)
+WATCH_MOVIE_CALL(8259FA00)
+WATCH_MOVIE_CALL(8211CD90)
+WATCH_MOVIE_CALL(8259DAC0)
+WATCH_MOVIE_CALL(8211B4D0)
+WATCH_MOVIE_CALL(8211B080)
+#undef WATCH_MOVIE_CALL
 
 // The sub-menus' calls on the movie's nodes, logged for --log_pause_movie.
 // sub_8211C7E8 (r3 = movie, r4 = node, r5 = 8, r6 = value, from sub_8220D040)
