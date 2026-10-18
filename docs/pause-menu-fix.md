@@ -895,7 +895,7 @@ pass. The earlier build that skipped all tracks made the pause menu
 flicker and showed the sub-menus overlapped for a moment on first
 opening (not rechecked since).
 
-**Next (planned, not started): replay the tracks' writes exactly**, the
+**Planned, then superseded (see "Finding the arrow's track"): replay the tracks' writes exactly**, the
 way `ReplayFromLogicPass` replays the movie object, instead of skipping:
 
 - On a logic pass, in the `sub_825A0548` override inside a UI movie
@@ -920,20 +920,65 @@ way `ReplayFromLogicPass` replays the movie object, instead of skipping:
   menu without flicker or overlap, and the race start countdown.
 
 **Finding the arrow's track** (2026-10-18). Which adding track moves the
-arrow was never logged: the skip above covers every adding track in every
-UI movie, which is likely what reaches the countdown and the ghosting. The
-plan now is to skip only the arrow's track (by property, and by movie if
-needed) instead of the exact replay. `--log_pause_movie` logs, while
-paused and for the 12 passes after each of the sub-menus' animation calls
-(the arrow's slide `8211DAC8` among them), every adding track applied
-(`pause movie track:` lines): movie, property, type, node, target word (and
-its offset in the node), value before and after with the difference, and
-`skipped` on render-only passes. The target is worked out as above, checked
-against `generated/`: the only store outside the stack is the one word at
-`r25`, none for types 3 and up, and the helpers it calls write only to the
-stack. Next: the user runs at 144 fps with the flag, opens a sub-menu and
-moves the selection; the track whose target steps by the slide each tick is
-the arrow's.
+arrow had never been logged; the skip above covers every adding track in
+every UI movie. `--log_pause_movie` now logs, while paused and for the 12
+passes after each of the sub-menus' animation calls (the arrow's slide
+`8211DAC8` among them):
+
+- `pause movie track:` every adding track applied, and every setting track
+  on a word an adding track has moved: movie, `adds`/`sets`, property,
+  type, node, target word (and its offset in the node), value before and
+  after with the difference, `skipped` on render-only passes. The target is
+  worked out from the descriptor as above, checked against `generated/`:
+  `825A0548`'s only store outside the stack is the one word at `r25`, none
+  for types 3 and up, and the helpers it calls write only to the stack.
+- `pause movie targets:` the words adding tracks have moved, at the start
+  and end of each UI movie update.
+- `pause movie target written:` which of the update's other calls
+  (`82119B80`, `8259FA00`, `8211CD90`, `8259DAC0`, `8211B4D0`, `8211B080`,
+  wrapped in `pause_movie_log.cpp`) changed one of those words.
+
+Results (`itc_054`-`itc_056`, 144 fps, the user moving the selection in a
+sub-menu, with the skip on):
+
+- Only two adding properties are applied while paused, both in the
+  sub-menus' movie `417E7260`: property 1 (float, node +0x10) and
+  property 0 (float, node +0xC). Only three targets ever change:
+  `035D19B0` (node `035D19A0` +0x10), `035D1A50` (node `035D1A40` +0x10,
+  now and then) and `035DF5CC` (node `035DF5C0` +0xC, from 1280).
+- **The arrow's track is property 1 on node `035D19A0`** (+0x10, its y):
+  every slide moves it, from its rest value 6 to 27.6 then 39.6 on the
+  first two ticks after a move down (r4 = 20), to -16.3 then -28.3 after a
+  move up (19).
+- Within one update the value goes 6 (update start) -> 27.6 (the track) ->
+  6 (update end). What puts it back is **`82119B80`**, called at the end of
+  the update (from `8211D7CC`, r3 = the movie, r4 = `035D05F0`, the tree's
+  root), recursing into groups from `82119E90`.
+- **`82119B80` restores the movie's rest pose.** `82119B80(movie, live
+  tree, rest tree, ...)` walks the live tree's children (by index, through
+  `8259D658`) with the rest tree's matching ones, and for nodes whose tag
+  (word +0) is one of six types (`0x47525000` "GRP" recursed into,
+  `0x50494300`, `0x50524D00`, `0x53434500`, `0x54584D00`, `0x54465400`-ish:
+  the six constants in the function) copies the rest node's fields over
+  the live one: +12..+60 and +68..+80 for all of them, and per type
+  +100..+136 or more (`82119D74` copies a sub-list through `8259D628`).
+- So each update applies the tracks onto the rest pose, draws, and
+  copies the rest pose back. **Adds on fields `82119B80` restores can't
+  pile up**: re-applying them on render-only passes gives the same value as
+  the logic pass. Skipping them only makes render-only frames draw the
+  rest pose: **that's the ghosting** (the arrow drawn mid-slide on logic
+  frames and at its rest position on render-only frames). The countdown
+  flicker is likely the same in the HUD's movie (not logged: the trace is
+  paused-only).
+- What the skip fixed (the arrow sliding too far) must then be adding
+  tracks on fields or nodes `82119B80` doesn't restore (another node
+  type, a field outside the copied ranges, or a movie updated without it);
+  not identified yet. The arrow's own track isn't one, in the first two
+  ticks of its slides that the trace covers.
+
+Next: skip an adding track on render-only passes only when its target
+isn't restored by `82119B80` (seen on the logic pass: which targets it
+writes back). Superseded for now: the exact replay above.
 
 **State of the branch** (`pause-menu-arrow`, all committed and pushed):
 
@@ -941,7 +986,7 @@ the arrow's.
 |---|---|---|---|
 | `--per_tick_ui_movie_tracks` | on | Skips adding tracks (`825A0548`) in UI movie updates on render-only passes: fixes the arrow's position, causes ghosting and countdown flicker | Replace with the exact replay above |
 | `--per_tick_changed_ui_movies` | on | Render-only UI movie updates that fall back (movie changed since the logic pass, or no logic pass call to match) run from the current state, which is put back | Correct but made no visible difference; the user decides |
-| `--log_pause_movie` | off | Logs UI movie updates by caller and pass type; while paused, diffs each movie and objects 3 pointers away; logs the sub-menus' animation calls and, after each, every update with its replay outcome and clocks | Debug |
+| `--log_pause_movie` | off | Logs UI movie updates by caller and pass type; while paused, diffs each movie and objects 3 pointers away; logs the sub-menus' animation calls and, after each, every update with its replay outcome and clocks, every adding track applied, the words they move around each update and which call writes them | Debug |
 | `--paused_render_only_skip` | off | Skips functions wrapped in `menu_selection_scan.cpp` on render-only passes while paused | Test only; remove |
 
 Useful logs: `itc_037`-`itc_039` (first movie logs), `itc_042` (30 fps
