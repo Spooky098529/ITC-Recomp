@@ -353,14 +353,16 @@ passes before Draw (since removed), and hiding
 `sub_821225D8`, `sub_820DDE58`, `820F6068` and HUD handlers.
 
 **The rival logo at the race start** (not fixed yet; branch
-`rival-logo-flicker`). Entering a race shows a 2D logo and a short
-cutscene of the cars it belongs to, about 13 s. The logo flickers with
-frames above 30; the attract race's logo (drawn from Draw) doesn't. Found
+`rival-logo-flicker`). Entering a race against a rival plays the rival
+intro cutscene (about 13 s): the rival's cars, with the rival's 2D logo
+over them. The logo flickers with frames above 30; the attract race's
+logo (drawn from Draw) doesn't. Found
 with logs (2026-10-18, `itc_064.log` to `itc_066.log`):
 
 - `--log_recording_handlers`: Update handler `0x82159948` (a jump to
-  `sub_821594B8`) records commands only while the logo is up, 30 times a
-  second at 100-150 fps, so only on logic passes.
+  `sub_821594B8`) is the rival intro cutscene's (the user). It records
+  commands only while the cutscene plays, 30 times a second at 100-150
+  fps, so only on logic passes.
 - `--log_recording_by_pass`: in the same window, about 30 recorders in
   the UI movie library (`8259D7DC`-`8259E050`) record 2-7 times a logic
   pass and never on render-only passes; nothing else in the race does.
@@ -374,17 +376,17 @@ with logs (2026-10-18, `itc_064.log` to `itc_066.log`):
   `8215E150`.
 - `--render_only_update_handlers=82159948` (deliver its Update on
   render-only passes too): the movie got render-only updates (111-120 a
-  second), but the handler also runs the cutscene, which then ran far too
-  fast (the user; logo and cutscene over in ~3 s instead of 13). So the
-  handler's logic must stay once a tick and only its drawing be repeated,
-  as the race overlays do.
+  second), but the whole cutscene then ran far too fast (the user; over
+  in ~3 s instead of 13), as the handler is the cutscene. So its logic must
+  stay once a tick and only its drawing (the logo's movie) be repeated, as
+  the race overlays do.
 - `sub_821594B8`, read from `generated/`: works out a mode from its
   input (the word at `[[0x826C2CE8]] + 1860`, `sub_82156980`,
   `sub_821591F0`), then makes virtual calls (slot 0) on the objects at
   this + 0x10BB0 and (if set) this + 0x10BB4, then calls `sub_820AAE40`
   (a jump to `sub_820AA550`) on `[[0x826C2CE8]]` and on
-  `[[0x826C2CE8] + 4]`. Which of these steps the cutscene and which reaches
-  the movie (`sub_82211A28`) isn't known yet; the calls are virtual, so
+  `[[0x826C2CE8] + 4]`. Which of these step the cutscene and which reaches
+  the logo's movie (`sub_82211A28`) isn't known yet; the calls are virtual, so
   it needs a log, not a read.
 
 **Replaying** (`ReplayFromLogicPass`): when a call both steps an object's
@@ -767,7 +769,8 @@ processes the game's commands; the render thread mostly waits for it.
   made them flicker and repeat presses. Unlocking them would mean skipping
   Update only for the handlers that run game logic.
 - **The rival logo at the race start flickers** above 30 fps: it's drawn
-  from Update handler `0x82159948`, on logic passes only. See "The rival
+  by the rival intro cutscene's Update handler `0x82159948`, on logic
+  passes only. See "The rival
   logo at the race start" under "Per-frame logic".
 - **The race HUD updates at 30 fps.** Accepted for now; its animations
   advance once per tick (see "Per-frame logic").
