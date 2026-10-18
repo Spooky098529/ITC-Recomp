@@ -3,11 +3,13 @@
 In a race, the pause menu's input repeats too fast with frames uncapped
 or above 30 fps: holding a direction moves through the menu several items
 a tick. This is the plan to fix it and to translate the game's input
-handling to native code. Nothing here is done yet (2026-10-18).
+handling to native code. Step 0 (logging) is done and its results are in
+"Step 0 results" below; the code that repeats too fast isn't found yet
+(2026-10-18).
 
 Addresses below are guest addresses. `0x82000A30` and friends are floats in
 the game's constant data, read with `guest::LoadU32` and bit-cast (their
-values aren't known yet; log them once rather than guessing). Offsets are
+values, logged in step 0, are in "Step 0 results"). Offsets are
 in bytes. Every function named can be read in `generated/` (find it with
 `grep -n "DEFINE_REX_FUNC(sub_XXXXXXXX)" itc_recomp/generated/default/*.cpp`).
 
@@ -35,8 +37,9 @@ What it reads isn't the flag `sub_8215B4F8` checks:
 - There, 0 skips the race's body. Our check treats non-zero as paused,
   so it's reading some other object that happens to change on pause.
 
-There's no known reliable pause flag yet: until step 0 finds one, the
-`ctx.r31 + 588` value is the only sign of pausing we have.
+Step 0 showed `ctx.r31 + 588` isn't a pause flag either (it's 1 during the
+race intro too); see "Step 0 results". The workaround is now behind
+`--pause_workaround` (on by default; `=false` for tests).
 
 ### Input::Update (`sub_820990F0`)
 
@@ -182,6 +185,95 @@ What to log:
 - The user runs a race, pauses, holds a direction in the menu and quits
   (`run-debug.sh`-style flags from CLAUDE.md plus `--log_input=true`); read
   the log before choosing step 2.
+
+### Step 0 results (2026-10-18)
+
+From an attract race and three races the user drove, paused, held a
+direction in the pause menu, unpaused and quit (`--log_input=true
+--pause_workaround=false`, then `--log_replays`, `--find_per_frame_state
+--find_any_steps` and `--log_input_writes`).
+
+**Constants**:
+
+| Address | Bits | Value |
+|---|---|---|
+| `0x82000A30` | `3F800000` | 1 |
+| `0x82000A34` | `00000000` | 0 |
+| `0x82001BE0` | `BF800000` | -1 |
+| `0x82002200` | `3B808081` | 1/255 |
+| `0x8200223C` | `477FFF00` | 65535 |
+| `0x82002BD4` | `38000100` | 1/32767 |
+| `0x8206CBFC` | `B8000100` | -1/32767 |
+
+**The manager's objects** (manager at `0x40059F50` in every run):
+
+- Physical pads: vtable `0x8206CBF4`, slot 1 `0x820988B8`, which returns
+  `device + 8` (checked by calling it).
+- Logical pads 0-3: one binding each (binding 0, enabled), physical pad
+  `j`. Bindings 1-3 are empty.
+- Logical pad 4 ("any pad"): all four bindings enabled, bound to logical
+  pads 0-3 (vtable `0x8206CBEC`, slot 1 `0x82591B30`, which returns
+  `device + 36`, the logical pad's values). It's built after them, so step
+  1 can sum their values natively too.
+- Processors 0-4: all vtable `0x8206C0C4`, slot 1 `0x82592188`.
+- Listener slots 0-3: count 1, the first object of the same class (vtable
+  `0x8206C0C4`, slot 1 `0x82592188`), at `0x40071AE0`, `0x40072640`,
+  `0x400731A0` and `0x40073D00`. Slot 4 is empty.
+
+**Processors and listeners' state** (`--log_input_writes`, 416 bytes each).
+Processors 0 and 4 and listener 0 change alike when pad 0 is used: floats at
++20..+104 (stick values; -1 and 1 for a full push), button masks at +108,
++10C and +110 (e.g. `22000000`), and two counters at +180 and +190 that go
+up by one each tick while a direction is held (seen up to 0x17) and go back
+to 0 when it's let go. Nothing but Input::Update (tick handler
+`0x820990F0`) writes to the manager or the listener objects, and nothing
+writes to them on render-only passes: whatever repeats too fast only reads
+them, and keeps its own state elsewhere.
+
+**Pause signs.** Neither candidate is a pause flag:
+
+- `LoadU32(0x826BAC00 + 588)` (what `sub_8215B4F8` checks) becomes 1 when
+  the race starts and stays 1, paused or not. Records 1 and 2 stayed 0.
+- `ctx.r31` on entry was the same object all race (`0x417424B0` in the
+  user's races, `0x40B00060` in the attract race), and its +588 is 1
+  during the race intro and while paused, 0 while driving. In the attract
+  race it's 1 throughout. The workaround worked only because of that.
+- What does mark pausing: message `0x1D`, sent on pause (to `8215C750`,
+  `8216D600`, `82175AE8`) and on resume (to `8215C750`, `8216C658`,
+  `82175B80`), and the Update and Draw handlers that change (below).
+
+**What runs, by phase** (`input runs` lines). Each phase has its own set of
+Update (message 0) handlers and one Draw (message 1) handler, besides those
+always there (`82106540`, `8215D538`, `8215C770`):
+
+| Phase | Update handlers | Draw handler |
+|---|---|---|
+| Race intro | `821594B8`, `8215E150`, `8215FC28`, `82168B80`, `8216C530`, `82174BC0`, `821767A8` | `8216C5B8` |
+| Driving | `821594B8`, `8215E150`, `82160940`, `82169290`, `8216C210`, `82174BC0`, `821767A8` | `8216C2A0` |
+| Paused | `8215E158`, `8216DB70`, `82170560` | `8216CF08` |
+
+While paused, the game still runs 120 render-only passes a second beside its
+30 logic passes. On them: Draw (`82106540` 7 times, `8215C770`,
+`8216CF08`) and all the tick handlers (`820902C8`, `82091A58`,
+`820920D8`, `82093DC0`, `82096330`, `82096340`, `82096350`, `820988C8`,
+`820990F0` (skipped inside), `82099828`, `820A4610`), the same set as in
+every other phase. No Update reaches the pause screen's handlers on
+render-only passes (only `8215E150`, the race overlays, and not while
+paused). So the pause screen's Draw handler `8216CF08` is the only code
+that runs on render-only passes only while paused.
+
+**Ruled out:**
+
+- The UI movie replay (`sub_8211D2F8`, `--per_tick_ui_movies`): with
+  `--log_replays` it replayed every call while paused (~209 a second), none
+  "changed since the logic pass", so UI movies advance once a tick there.
+- `--find_per_frame_state --find_any_steps` while paused found only
+  drawing bookkeeping (command lists, constants) that changes on every pass
+  in every phase; no menu selection.
+
+**Next:** skip `8216CF08` on render-only passes (`--render_only_skip=8216CF08`)
+while paused and see whether the repeat goes back to normal (and whether
+the pause screen flickers, which would mean it records there).
 
 ### Step 1: native Input::Update (`src/hooks/input.cpp`, `--native_input`)
 
