@@ -521,7 +521,8 @@ again is harmless. Car + 704 is probably the speed (mode 5 uses it).
 In an attract race (chase camera), `sub_820E45A8` runs on logic and
 render-only passes alike, with mode 7 and no ranges.
 
-**Second and third drives (second car, cockpit).** The dash is in **mode
+**Second and third drives (second car, cockpit).** (`...0130` turned out
+to be the turbo gauge, not the tachometer.) The dash is in **mode
 5**, so the second needle's angle comes from **car + 704** (clamped), not
 `sub_820D3688`, and the dash's first needle isn't used (`...06A0` is posed
 elsewhere, drawn from `0x820E4474` / `0x820E4594`). `sub_820E45A8` runs on
@@ -530,8 +531,8 @@ But **car + 704 drops by 2.0 on every pass**: -0.4 on a logic pass, then
 -2.4, -4.4, -6.4, -8.4 on the render-only passes, and back on the next
 logic pass. Below its range the angle clamps to -2.14 rad (the logic
 passes' was -1.22 here): that is the rest pose. On logic passes the value
-moves smoothly with the drive (about -0.4 to 1+): a gauge value, likely
-the revs. At 30 fps every pass is a logic pass, so the drift never shows.
+moves smoothly with the drive (about -0.4 to 1+): a gauge value (boost
+pressure, it turned out; see "The fix" below). At 30 fps every pass is a logic pass, so the drift never shows.
 
 **The writer: `sub_820DAC68`, the per-car update called from Draw**
 (`this` = car - 4288; it passes `this + 4288` on as the car). Its first
@@ -564,5 +565,32 @@ wrapper `sub_820DAC68` had (`ITC_FRAME_STATE_WRAP` in
 
 Attract race with `--log_dial_pose` (cut short by the user, who saw nothing
 wrong): 751 dial calls, car + 704 on every render-only pass the same as on
-its logic pass. Still to check: a cockpit drive in the second car (the
-needle following the revs on every frame, no jump to the rest pose).
+its logic pass.
+
+**Cockpit drive with the fix (second car, 2026-10-19; `dial4.log`,
+`near4.log`).** The user: it fixed the **turbo (boost) gauge**, not the
+tachometer, which still has the bad interpolation. So:
+
+- `...0130` (index 9, `sub_820E45A8`'s second needle, mode 5) is the
+  **turbo gauge**, and **car + 704 is boost pressure** (about -0.4 at
+  idle: vacuum). Not the revs, as guessed above.
+- The **tachometer is `...06A0`**, drawn from `0x820E4474` (index 0),
+  `0x820E4594` (index 6), `0x820E31B4` (1) and `0x820E31F8` (3), posed by
+  other code (not `sub_820E45A8`). The game poses it right on every pass:
+  it was blended on every frame in all earlier logs. So its fault is the
+  blend itself: the plain matrix blend cuts across the dial on fast swings
+  (the harness: 26 mm off its spindle at 0.6 rad a tick, 71 mm at 1.0, 266
+  mm at 2.0), the earlier sections' problem.
+- The turbo fix isn't exact yet: on render-only passes car + 704 now holds
+  still, but **1.0 below the logic pass's value** (e.g. 0.6136 on the
+  logic pass, -0.3864 on each render-only pass). Before the fix the
+  render-only passes went -2.0, -4.0, ... from the logic pass's value.
+  So with two `sub_820DAC68` calls a pass in this car, the logic pass's
+  dial seems to read the value before one of them (the order within a
+  logic pass, and where the tick sets the value, still to log). The
+  needle no longer falls to its rest angle, but in-between frames are
+  still drawn off the tick's pose (the blend's inputs check rejects them).
+
+Next: the tachometer (find what poses `...06A0`, and blend its angle
+rather than its matrix, or blend it about its spindle), and the turbo's
+remaining 1.0.
