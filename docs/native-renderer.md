@@ -1216,9 +1216,14 @@ To be fixed (or accepted) in milestone 7.
   load did anyway (the next race's ~500 load in its first seconds).
   Same 5-minute loop: 950-1,200 textures (119-137 MB) freed at each race
   end, VRAM 330-410 MB throughout (906 MB before); the second race's
-  frames drawn right. Left: the growth within a race (~1 MB/s, freed at
-  its end), and resolve destinations (+8 at each of the first four loads,
-  then +1).
+  frames drawn right. Checked in play by the user (2026-10-19,
+  `itc_120.log`): four races with menus between, a pause mid-race (it
+  doesn't leave the race: no free, no reload), nothing drawn wrong; VRAM
+  back to ~370-380 MB after each race. Left: the growth within a race
+  (~1 MB/s, freed at its end; a 107 s race reached 2,268 textures,
+  218 MB, VRAM peaking at 575 MB), and resolve destinations (+8 at each
+  of the first four loads, then +1). Render targets grew once (22 to 26,
+  208 to 285 MB) in the first races and stayed: new targets, not a leak.
 
 - **Resizing the window and the swapchain** on Wayland: the compositor
   leaves the size to us and never reports the swapchain out of date, so the
