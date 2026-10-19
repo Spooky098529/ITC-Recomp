@@ -63,7 +63,7 @@ the console. Screens and windows that aren't 16:9 get black bars.
 - In game movies are not shown.
 - Tested on Linux on my PC (9800x3d, 7900XT) and the Steam Deck.
 - The game probably uses more RAM than necessary, currently it maintains several copies of the xbox 360 memory pool for performance reasons. This is going to be an issue until the rexglue runtime is removed. RAM usage can hit about 1gb in races.
-- Some 2d elements flicker when races are paused, like logos above cars or smoke trails
+- Some 2d elements flicker when races are paused when unlocking the framerate, like logos above cars or smoke trails
 ## Reporting problems
 
 Play with `./run-debug.sh` (`run-debug.bat` on Windows), then open an
