@@ -894,6 +894,14 @@ before; the user saw the beam steady. What was learned:
   two separate ways to be drawn at the tick, logged by different flags
   (`--log_camera_copies`, `--log_moving_products`; `--log_blend_state`).
 
+- **Afterwards: the beam looked like it updated at 30 Hz, sometimes.**
+  Not the beam itself but the motion blur over it: the blur's previous
+  view-projection (c100 x4) was blended on logic frames only, so its
+  length jumped once a tick (fixed on `beam-stepping`,
+  `--motion_blur_by_tick`; see "Motion blur reads the 30 Hz tick" in
+  `docs/native-renderer.md`). The cameras refused far out (above) were
+  ruled out first: a temporary inside `sub_82598768`, never drawn.
+
 Tried on the way, not kept:
 
 - **Positions blended in double** (`--double_precision_blending`, off): the

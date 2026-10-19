@@ -1142,8 +1142,10 @@ To be fixed (or accepted) in milestone 7.
   1.51, 1.21, 0.88, 0.56, 0.23 m through a tick at ~46 m/s, against 1 in
   5 before). Zeroing c100 (`--debug_zero_owners=821364D0`) changes the
   velocity resolve (`1B053000`, 16_16 512x288) from flat to large
-  everywhere, so c100 drives it. Still to check: whether this was the
-  headlight beam that sometimes looked like it updated at 30 Hz.
+  everywhere, so c100 drives it. This was the headlight beam on the road
+  that sometimes looked like it updated at 30 Hz (the blur covers it at
+  speed): the user drove with the fix, fullscreen at 4K, and judged it
+  "pretty good now" (2026-10-19).
 - **An in-game movie locked up the whole game** (closed 2026-10-19: no
   longer happens, not seen in extensive testing since, the user's call;
   never investigated, so the cause isn't known. Seen by the user in
