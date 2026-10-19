@@ -469,3 +469,56 @@ the wrong place", and the wheels look "juddery and broken".
 2. Rather than special cases: screw interpolation (dual quaternions)
    for the normal blend, which doesn't depend on where a mesh's origin is.
    Fast swings over 0.5 rad, taken for wheels, are still to solve.
+
+## Finding the code that poses the needle (`--log_dial_pose`, 2026-10-19)
+
+`--log_dial_pose=<file>` (`src/debug/dial_pose_log.cpp`, written every 5 s)
+logs, by pass type: each draw of the parts whose address ends in
+`--log_dial_pose_parts` (default `0130,06A0`, the two needles) at
+`sub_820D04E8` (caller, world matrix, the part's changed words); each call
+of `sub_820E45A8` (below); and each needle angle it gets from
+`sub_820D3688`.
+
+**First drive (second car, cockpit view).** `--blend_while_drawing` is
+off by default, so render-only passes draw from the game's memory as it
+is: the rest pose is the game's own result.
+
+- Car `055F....`: `055F0130` is drawn as part index 7 (caller
+  `0x820E3B8C`, the same world matrix on every pass of a tick: not posed)
+  and as **index 9 from `0x820E4914`**, the posed needle. On logic passes
+  index 9 gets its real pose. On render-only passes it gets another
+  rotation, ~1.1 m away (e.g. x -1882.0 against -1883.45, height 16.30
+  against 15.22), the same on all render-only passes of a tick and moving
+  with the car each tick: the needle at a rest angle.
+- The part's first 0x200 bytes never change on either pass, so the pose
+  isn't stored in the part.
+
+**`sub_820E45A8(dash = r3, car = r4, r5 = 0x826BAC00, the camera passes)`
+poses the cockpit dials** (one caller, in `itc_recomp.81.cpp`). For each
+needle it works out an angle, turns the identity matrix by it
+(`sub_820A2D30`), multiplies it by the needle's two local matrices and the
+car's world matrix (car + 16) with `sub_8209BD50` / `sub_820A0AC0`, and
+draws it with `sub_820D06F0` (a jump to `sub_820D04E8`):
+
+| Needle | Angle | Local matrices | Drawn |
+|---|---|---|---|
+| first (`...06A0`?) | `sub_820D3688([dash + 5328], [[dash] + 12], car)` | dash + 32, dash + 96 | `sub_820D06F0(dash + 2176, r5 + 144, ...)` |
+| second (`...0130`, index 9) | `sub_820D3688([dash + 5332], [[dash] + 24], car)`; if `[dash + 4]` is 5, from car + 704 clamped | dash + 272, dash + 336 | `sub_820D06F0(dash + 2416, ...)` at `0x820E4914` |
+
+Each needle is skipped unless its model is set (`[[dash] + 8]` and
+`[dash + 1700]` for the first, `[[dash] + 20]` and `[dash + 1940]` for the
+second); `[dash + 5296]` / `[dash + 5300]` (or `5324` in mode 5) is stored
+into the model + 48 first.
+
+**`sub_820D3688(range = r3, kind = r4, car = r5)` is a needle's angle
+from a car value**, with no state: it reads car + 704, 712, 716 or 720
+(`kind` 0-3) and maps it linearly from `[range + 0, range + 4]` to
+`[range + 8, range + 12]`, clamped at both ends, times a constant
+(`[0x82010000 + 10568]`, probably degrees to radians). With no range it
+returns `[0x82010000 + 2612]`. Nothing smooths or accumulates, so calling it
+again is harmless. Car + 704 is probably the speed (mode 5 uses it).
+
+In an attract race (chase camera), `sub_820E45A8` runs on logic and
+render-only passes alike, with mode 7 and no ranges. Next: a cockpit
+drive with the angle log, to see whether the car value reads differently
+on render-only passes or the angle isn't worked out there at all.
