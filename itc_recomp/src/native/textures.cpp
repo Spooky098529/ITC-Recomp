@@ -40,6 +40,10 @@ REXCVAR_DEFINE_BOOL(free_overwritten_textures, true, "ITC",
                     "Free a texture when a new one is loaded over its memory after the game "
                     "wrote there (the game streams textures into reused memory as the car "
                     "drives): without it they're kept until the race ends");
+REXCVAR_DEFINE_BOOL(free_moved_resolve_destinations, true, "ITC",
+                    "Free a resolve destination when a new one is made over its memory at "
+                    "another address and nothing has resolved into it for 2 s (the game makes "
+                    "the race's glow chain again at another address at some race loads)");
 REXCVAR_DECLARE(bool, log_gpu_memory);
 REXCVAR_DEFINE_BOOL(native_renderer_cache_texture_bindings, true, "ITC",
                     "Answer texture views and samplers from a table of earlier answers by the "
@@ -551,6 +555,8 @@ struct TextureCache::State {
     uint32_t host_width = 0, host_height = 0;  // the image's (scaled)
     float scale = 1.0f;
     VkImageView attachment_view = VK_NULL_HANDLE;
+    // A resolve destination's last resolve (GetResolveDestination).
+    std::chrono::steady_clock::time_point last_resolved{};
   };
   std::map<TextureKey, Texture> textures;
   // Loaded textures' ranges by start address (with the longest range's
@@ -600,6 +606,7 @@ struct TextureCache::State {
   // use them are done (RetireLoaded, DestroyRetired).
   struct Retired {
     uint64_t frame_number;
+    gpu_memory::Kind kind;
     VkImage image;
     VkDeviceMemory memory;
     VkDeviceSize memory_size;
@@ -608,6 +615,9 @@ struct TextureCache::State {
   std::vector<Retired> retired;
   void Retire(const Texture& t);
   void RetireOverwritten(const Texture& t);
+  void RetireResolveDestination(uint64_t key);
+  void RetireMovedResolveDestinations(const Texture& t);
+  static std::pair<uint32_t, uint32_t> ResolveRange(const Texture& t);
   void RetireLoaded();
   void DestroyRetired();
 
@@ -1104,13 +1114,65 @@ void TextureCache::State::RetireLoaded() {
 // Its image, memory and views are destroyed once the frames that may
 // use them are done; the caller drops it from the maps.
 void TextureCache::State::Retire(const Texture& t) {
-  Retired r{frame_number, t.image, t.memory, t.memory_size, {}};
+  Retired r{frame_number,
+            t.resolved ? gpu_memory::Kind::kResolved : gpu_memory::Kind::kTexture,
+            t.image,
+            t.memory,
+            t.memory_size,
+            {}};
   for (const auto& [swizzle, view] : t.views) {
     if (view) {
       r.views.push_back(view);
     }
   }
+  if (t.attachment_view) {
+    r.views.push_back(t.attachment_view);
+  }
   retired.push_back(std::move(r));
+}
+
+// A resolve destination leaves `resolved` (and `current`, if it's the one
+// drawn from its address).
+void TextureCache::State::RetireResolveDestination(uint64_t key) {
+  auto it = resolved.find(key);
+  uint32_t page = it->second.layout.base_address >> 12;
+  if (auto c = current.find(page); c != current.end() && c->second == &it->second) {
+    current.erase(c);
+  }
+  Retire(it->second);
+  resolved.erase(it);
+}
+
+// The guest memory a resolve destination stands for: its size in 32x32
+// tiles (the game's own spacing of them matches).
+std::pair<uint32_t, uint32_t> TextureCache::State::ResolveRange(const Texture& t) {
+  uint32_t width = (t.layout.width + 31) & ~31u, height = (t.layout.height + 31) & ~31u;
+  return {t.layout.base_address, t.layout.base_address + width * height * t.format.bytes_per_block};
+}
+
+// A new resolve destination t (not yet held) is made: the held ones at
+// other addresses whose memory it overlaps were moved there by the game
+// (its glow chain is allocated again per race), so they go. Not one
+// resolved into in the last 2 s: a resolve into part of a bigger one.
+void TextureCache::State::RetireMovedResolveDestinations(const Texture& t) {
+  auto [start, end] = ResolveRange(t);
+  auto now = std::chrono::steady_clock::now();
+  std::vector<uint64_t> moved;
+  for (const auto& [key, old] : resolved) {
+    auto [old_start, old_end] = ResolveRange(old);
+    if (old.layout.base_address != t.layout.base_address && old_start < end && start < old_end &&
+        now - old.last_resolved >= std::chrono::seconds(2)) {
+      REXLOG_INFO("native renderer: resolve destination at {:08X} (format {} {}x{}) freed: one "
+                  "made at {:08X} (format {} {}x{}) over its memory",
+                  old.layout.base_address, old.guest_format, old.layout.width,
+                  old.layout.height, t.layout.base_address, t.guest_format, t.layout.width,
+                  t.layout.height);
+      moved.push_back(key);
+    }
+  }
+  for (uint64_t key : moved) {
+    RetireResolveDestination(key);
+  }
 }
 
 // A new texture t (not yet held) is loaded: the held textures its memory
@@ -1167,7 +1229,7 @@ void TextureCache::State::DestroyRetired() {
     gpu_memory::Created(gpu_memory::Object::kImageView, -int64_t(r.views.size()));
     vk::vkDestroyImage(context.device, r.image, nullptr);
     vk::vkFreeMemory(context.device, r.memory, nullptr);
-    gpu_memory::Freed(gpu_memory::Kind::kTexture, r.memory_size);
+    gpu_memory::Freed(r.kind, r.memory_size);
   }
   retired.erase(retired.begin(), due);
 }
@@ -1436,15 +1498,12 @@ bool TextureCache::GetResolveDestination(const uint32_t fetch_words[6], float sc
                                  it->second.layout.width != width ||
                                  it->second.layout.height != height)) {
     // Another texture at the same address: start over (the old image is
-    // left behind, as frames in flight may still use it).
+    // destroyed once the frames in flight that may use it are done).
     REXLOG_WARN("native renderer: resolve destination at {:08X} changed from format {} {}x{} "
                 "to format {} {}x{}",
                 page << 12, it->second.guest_format, it->second.layout.width,
                 it->second.layout.height, uint32_t(fetch.format), width, height);
-    if (auto c = s.current.find(page); c != s.current.end() && c->second == &it->second) {
-      s.current.erase(c);
-    }
-    s.resolved.erase(it);
+    s.RetireResolveDestination(key);
     it = s.resolved.end();
   }
   if (it == s.resolved.end()) {
@@ -1472,10 +1531,18 @@ bool TextureCache::GetResolveDestination(const uint32_t fetch_words[6], float sc
                 "{}x{}, scale {})",
                 page << 12, t.guest_format, width, height, int(t.format.format), t.host_width,
                 t.host_height, scale);
+    if (REXCVAR_GET(free_moved_resolve_destinations)) {
+      size_t held = s.resolved.size();
+      s.RetireMovedResolveDestinations(t);
+      if (s.resolved.size() != held) {
+        generation_++;  // answers and last texture sets may hold their views
+      }
+    }
     it = s.resolved.emplace(key, std::move(t)).first;
     events_.created++;
   }
   State::Texture& t = it->second;
+  t.last_resolved = std::chrono::steady_clock::now();
   if (State::Texture*& current = s.current[page]; current != &t || !t.loaded) {
     current = &t;
     generation_++;
