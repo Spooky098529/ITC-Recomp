@@ -69,6 +69,7 @@ set(ITC_SOURCES
     src/hooks/input.cpp
     src/hooks/input_update.cpp
     src/input/gamepads.cpp
+    src/input/input_processor.cpp
     src/input/logical_pad.cpp
     src/input/physical_pad.cpp
     src/input/xinput.cpp

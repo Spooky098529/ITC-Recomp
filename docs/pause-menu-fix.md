@@ -153,6 +153,48 @@ A physical pad's values (+8, 40 floats) line up with these 40, so its
 vtable slot 1 probably returns `pad + 8`: check that in step 0 (log the
 device pointers' vtables and whether `v == device + 8`).
 
+### The input processors (`sub_82592188`), 416 bytes
+
+Read 2026-10-19 (native since: `src/input/input_processor.cpp`). The
+processors and the listeners' first objects share this class (vtable
+`0x8206C0C4`); slot 1 is the update, r3 = object, r4 = its logical pad.
+It calls nothing but the pad's slot 1 (its 40 values, `pad + 36`), and
+leaves that address in r3.
+
+| Offset | What |
+|---|---|
+| +16 | dead zones, 4 floats (read): x, y, trigger, unused; both sticks use them |
+| +32 | the values 0-7 copied (LX, LY, LT, 0, RX, RY, RT, 0) |
+| +64 | the same with the dead zone taken out |
+| +96, +112 | each stick's (x, y, 0, 0) normalized, or 0 when centered |
+| +128, +132 | each stick's length |
+| +136 | the values 8-39 copied (32 floats) |
+| +264 | pressed: bits newly set this tick |
+| +268 | released: bits newly clear this tick |
+| +272 | held: bit `i` set while value `8 + i` is above 0.5 (`0x82001BE4`) |
+| +276, +280 | repeat delay and period (read) |
+| +284 | 32 hold counters (ticks) |
+
+In order:
+
+1. Copy the values 0-7 to +32.
+2. For each stick (values 0-3, then 4-7), for each of its four values
+   `x` with dead zone `d = +16[i]`: if `x > 0`, `(x - d) / (1 - d)`, then
+   0 if below 0; otherwise `(x + d) / (1 - d)`, then 0 if above 0 (NaN
+   is kept). To +64.
+3. Each stick's length `sqrt(x² + y²)` (an `fmuls` and two `fmadds`) to
+   +128; its direction: (x, y, 0, 0) times the reciprocal square root of
+   its dot product with one Newton step (AltiVec `vmsum3fp128`,
+   `vrsqrtefp`, `vnmsubfp`, `vmaddfp`), or 0 where the dot product is 0,
+   to +96 (stored with `stvx`: the object is 16-byte aligned).
+4. For each value `8 + i`, `i` = 0..31: copy it to +136; if above 0.5,
+   set bit `i` in held, add 1 to counter `i`, and if the counter is then
+   above delay + period (signed), set it back to delay; else counter `i`
+   = 0. This is the hold-to-repeat cycle: the counters seen at +180 and
+   +190 in step 0 are counters 25 and 29 (stick directions).
+5. pressed = held & (held ^ old held); released = (held ^ old held) &
+   old held.
+
 ## Plan
 
 ### Step 0: logging (`--log_input`)
@@ -658,10 +700,8 @@ What's known and what isn't yet, for whoever picks this up:
   manager's objects as built in races ("Step 0 results"), and the
   mapper's words and read slots ("The pause menu's code", "Revised
   plan"'s table).
-- Known only from the outside: the processors' and listeners' update
-  (vtable `0x8206C0C4` slot 1 `0x82592188`): the button tests read +264,
-  +272, +276 and +284 + 4b, and the counters count ticks, but the update
-  itself isn't read. The plan keeps it a guest call.
+- The processors' and listeners' update (vtable `0x8206C0C4` slot 1
+  `0x82592188`): read since (2026-10-19), see "The input processors".
 - Not read yet (read these first for the native mappers):
   - `8210C370`, `8210C0E0`, `8210BBA0` in full: how each action's held
     bit and its analog values (+1072 u16s, +1132 floats) come from the

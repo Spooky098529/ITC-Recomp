@@ -304,6 +304,21 @@ B1. **Input** (3 functions calling `XamInput*`): native, reading A5.
     (menus, a race, the pause menu), all equal; the user noticed no
     difference.
 
+    Then (2026-10-19) Input::Update's last guest calls: the processors'
+    and listeners' update (`sub_82592188`, read and written up in
+    "The input processors" in `docs/pause-menu-fix.md`) is plain C++
+    (`src/input/input_processor.cpp`), called directly by Input::Update
+    for their class, with an adapter override for any recompiled caller
+    (it's reached through a vtable). Input::Update calls guest code only
+    for an object or device of a class it doesn't know, which no race
+    has. Checked with a temporary byte-for-byte comparison of each
+    416-byte object against the recompiled update (not committed):
+    16,200 updates in an attract race and 13,500 while the user played
+    (held directions in menus and the pause menu, a race), all equal;
+    the user noticed no difference. The input path is ours from SDL to
+    the hold counters; the action mappers (`sub_8210B018`, wrapped) read
+    the processors next.
+
 B2. **Audio** (6 functions calling `XAudio*`/`XMA*`, plus what's around
     them): the game's render driver client feeding A6 directly, and its
     XMA users decoding with FFmpeg directly instead of through emulated
