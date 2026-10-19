@@ -618,6 +618,11 @@ scripts don't need to pass it.
 
 ### Step 4: later, toward moving off ReXGlue (not needed for the fix)
 
+Done differently (2026-10-19, see B1 in `docs/rexglue-removal.md`): no
+`--native_input` flag or verify mode; Input::Update, the physical and
+logical pads are native, reading SDL through our own XInput instead of
+the SDK's (no `--mnk_mode` any more). The plan as written:
+
 - Native Input::Update (`--native_input`, in `src/hooks/input.cpp`):
   follow `src/hooks/lights.cpp` (the override calling the translated code
   when the flag is off), off by default until checked.

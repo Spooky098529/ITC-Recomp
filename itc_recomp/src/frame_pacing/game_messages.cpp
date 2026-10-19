@@ -4,6 +4,7 @@
 #include "debug/idle_timer_scan.h"
 #include "debug/menu_selection_scan.h"
 #include "guest.h"
+#include "hooks/input_update.h"
 #include "interpolation/blend_state.h"
 #include "native/textures.h"
 
@@ -687,7 +688,7 @@ extern "C" REX_FUNC(sub_820990F0) {
     }
     frame_pacing::InputWatch_SetRanges(std::move(ranges));
   }
-  __imp__sub_820990F0(ctx, base);
+  input_hooks::InputUpdate_Run(ctx, base);
 }
 
 // The race's draw step: r3 = its argument. Noted to tell races from menus.

@@ -1,8 +1,8 @@
 // The game's physical pad read (sub_82591C18) as plain C++: one pad's
 // connection flags, its 40 values and its rumble, from our XInput
-// (xinput.h). The pad lives in guest memory, where the recompiled logical
-// pads read its values; src/hooks/physical_pad.cpp is the adapter that
-// copies it in and out. See "Physical pad" in docs/pause-menu-fix.md.
+// (xinput.h). The pad stays in guest memory with the rest of the input
+// manager, which recompiled code still reads; our Input::Update
+// (src/hooks/input_update.cpp) copies its fields in and out. See "Physical pad" in docs/pause-menu-fix.md.
 
 #pragma once
 

@@ -68,7 +68,7 @@ function (`grep -rn sub_XXXXXXXX itc_recomp/src` first). For each:
   first done for B1): the logic is a plain C++ function with normal
   arguments and host structs, no `ctx` and no guest memory, in its
   subsystem's directory (e.g. `src/input/xinput.cpp`). The `REX_FUNC`
-  override (e.g. `src/hooks/physical_pad.cpp`) only reads the registers, calls
+  override (e.g. `src/hooks/input_update.cpp`) only reads the registers, calls
   it, stores results big-endian in guest memory and sets `r3`. When the
   caller is made native later, it calls the plain function directly and
   the adapter is deleted, so the `ctx` edge moves up without rewriting
@@ -276,7 +276,7 @@ B1. **Input** (3 functions calling `XamInput*`): native, reading A5.
     Then (2026-10-19) the `ctx` edge moved up one level: the pad read
     `sub_82591C18` is plain C++ (`src/input/physical_pad.cpp`, the
     constants as literals) calling `input::XInput_*` directly, behind an
-    adapter (`src/hooks/physical_pad.cpp`) that copies the pad's fields
+    adapter (first `src/hooks/physical_pad.cpp`) that copies the pad's fields
     in and out of guest memory (the recompiled logical pads read its
     values there). The three XInput adapters (first in
     `src/hooks/xinput.cpp`) were deleted: their only caller is native.
@@ -284,9 +284,25 @@ B1. **Input** (3 functions calling `XamInput*`): native, reading A5.
     comparison of the 212-byte pad every read (not committed): 7,800
     reads in an attract race and 17,400 while the user played (every
     button, both sticks and triggers, rumble, an unplug), all equal but
-    one, where the right stick moved between the two reads. Next:
-    Input::Update (`sub_820990F0`) native, calling `PhysicalPad_Read`
-    directly (its processors and listeners stay guest calls).
+    one, where the right stick moved between the two reads.
+
+    Then (2026-10-19) up one more: Input::Update (`sub_820990F0`) is
+    native (`src/hooks/input_update.cpp`, called from its override in
+    `src/frame_pacing/game_messages.cpp`, which keeps the render-only
+    skip). It reads the physical pads with `PhysicalPad_Read` directly
+    (the pad read's adapter is deleted) and builds the logical pads
+    (`sub_82591918`, now `src/input/logical_pad.cpp`, plain C++); the
+    devices' values getters of the two kinds bound in every race are done
+    natively, any other is called. The processors and listeners (vtable
+    slot 1, `0x82592188`, not read) are still guest calls, inside the
+    recompiled function's 144-byte frame. So the `ctx` edge is now
+    Input::Update itself: native, calling out to recompiled code for those
+    two steps, and the input manager stays in guest memory (they and the
+    action mappers read it). Checked with a temporary comparison of each
+    logical pad against the recompiled `sub_82591918` (not committed):
+    9,000 builds in an attract race and 12,000 while the user played
+    (menus, a race, the pause menu), all equal; the user noticed no
+    difference.
 
 B2. **Audio** (6 functions calling `XAudio*`/`XMA*`, plus what's around
     them): the game's render driver client feeding A6 directly, and its
