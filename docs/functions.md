@@ -77,6 +77,17 @@ place (search for `PATCH:`).
 | `sub_8259D600` | | | r3, r4: returns 16 * (r3 + 2 * (r4 + 4)); the indirect tracks' extra offset (r3 = [node + 112], r4 = [track + 12]). |
 | `sub_8259D658` | `UiMovie::Child` | | r3 = node, r4 = index: returns that child (the count is at node + 112). |
 | `sub_82119B80` | `UiMovie::RestorePose` | Wrapped | r3 = movie, r4 = live tree, r5 = rest tree: for each child of six tagged types (GRP recursed into; PIC, PRM, SCE, TFM, TXT) copies the rest node's fields (+12..+80, and per type +100..+136) over the live one. Called at the end of each movie update (from `8211D7CC`), so tracks' adds start from the rest pose every update. Wrapped only for `--log_pause_movie`. |
+| `sub_820DAC68` | `Car::DrawUpdate` | | Draw's per-car update (r3 = car - 4288; it passes r3 + 4288 on as the car), on every pass: first takes `[0x82000A30]` (1.0) off car + 704 (the boost; the tick sets it again), then poses and draws the car, the cockpit dials among it (`sub_820E51D0`, `sub_820E45A8`). The player's car in cockpit view runs it twice a pass; only the first poses the dials. |
+| `sub_8215C780` | `Car::TickUpdate` | | The tick's car record update (logic passes; r31 = the car record, r26 = the vehicle): copies the car's world matrix into car + 16 and stores the gauge values at car + 696 (`sub_820C0128`, the speed in km/h), + 700 (`sub_820C0140`, the revs), + 704 (`[r26 + 2944]`, the boost) and + 712 (`[r26 + 6260]`). |
+| `sub_820E51D0` | | | Calls `sub_820E42E8` when `[dash + 20]` is set, then `sub_820E39F8` when `[dash + 2180]` is. |
+| `sub_820E42E8` | `Dash::PoseTachometer` | Rewritten | `src/hooks/cockpit_dials.cpp` (`--native_cockpit_dials`; `docs/cockpit-dial-interpolation.md`). r3 = the dash, r4 = the car, r5 = the camera passes. Gets two angles from `sub_820D3740([dash + 2896], car, [dash])`: `a` the speedometer, `b` the tachometer. Each needle's world matrix is `(B * RotZ(angle)) * A * car + 16`, with A, B at dash + 32/+96 for `a` and + 272/+336 for `b`; drawn with `sub_820D06F0(dash + 496 / + 736, r5 + 144, world, 0, 0)`, both part `...06A0`. |
+| `sub_820E45A8` | `Dash::PoseDials` | Rewritten | Same file. r3 = the dash, r4 = the car, r5 = the camera passes. Seven needle slots k = 0-6, each drawn if `[[dash] + 8 + 12k]` and its model (`[dash + 1700]`, `1940`, `2660`, `2900`, `3620`, `3860`, `4100`) are set: stores `[dash + 5296 + 4k]` into the model + 48, angle `sub_820D3688([dash + 5328 + 4k], [[dash] + 12 + 12k], car)`, world `(B * RotZ(angle)) * A * car + 16` with A at dash + 32 + 240k and B 64 bytes on, drawn with `sub_820D06F0` (dash + 2176, 2416, 3136, 3376, 4336, 4576, 4816). In mode 5 (`[dash + 4]`) slot 1 is the turbo gauge: `[dash + 5324]` into the model, angle from car + 704: above 0, `[0x820062E0]` times it, capped at `[0x820062E0]` above 1; below the double at `0x820062D8`, `[0x820062D0]`; else value * `[0x820062CC]` * `[0x820062D0]`. |
+| `sub_820D3688` | `Dial::Angle` | | Done natively for the dials (`DialAngle` in `src/hooks/cockpit_dials.cpp`). r3 = range, r4 = gauge (0-3: car + 704, 712, 716, 720), r5 = the car; returns f1, no state. `[0x82000A34]` with no range. Else from = range + 0, to = + 4, angles + 8, + 12: below from the first angle, above to the second, between `(v - from) / (to - from) * (a1 - a0)` (without `+ a0`, the game's own), all times `[0x82002948]`. |
+| `sub_820D3740` | `Dial::TachometerAngles` | | Done natively for the dials (`TachAngles` in `src/hooks/cockpit_dials.cpp`). r3 = table, r4 = the car, r5 = [dash], r6 = &a, r7 = &b; no state. `a` from car + 696: `[0x82000A34]` below it; up to from (table + 0, or + 8 when `[[dash]]` isn't 0) value / from * table[16]; up to to (+ 4 or + 12) linear to table[20]; above, table[20]. `b` from car + 700: table[28] below table[24], linear over table[24..36] then table[32..44], clamped at table[44]. |
+| `sub_820A2D30` | `Matrix::RotateZ` | | r3 = out, r4 = in, r5 = &angle: out = in * RotZ, rows `(c, s, 0, 0)`, `(-s, c, 0, 0)`, sine and cosine from a polynomial. |
+| `sub_820A0AC0` | `Matrix::Copy` | Wrapped | r3 = destination, r4 = source, 4x4. Interpolation follows copies of cameras and products. |
+| `sub_820D06F0` | `CarPart::Draw` | | r3 = the part (returns if `[part + 4]`, its model, is 0), r4 = the camera, r5 = the world matrix, r6, r7: with r7 = 0, `sub_820D04E8([part + 4], camera, world, [part + 228], r6)`. |
+| `sub_820D04E8` | `Model::Draw` | | Draws a model (r31 = r3): a visibility test (`sub_825951E0`), then the per-object recorder `sub_825953D0` (return address `0x820D0564`, which pairs products by r31). Culls with the camera it's given, so a world matrix away from the tick's can be culled. |
 
 ## Frame structure
 
@@ -125,6 +136,8 @@ included in these counts.
 | `0x826BAC10` | Camera view matrix | Pass 0's view (+0x10). The camera position is -t·Rᵀ. In the car's frame the views sit at (-5.48, 1.34, 0) for chase, (-0.44, 0.67, 0) for bumper and (-0.26, 0.85, -0.38) for cockpit. Writing it has no effect while driving: Draw rebuilds it from the eye and target. |
 | `0x826BAC00` | Camera pass array | 21 objects of 592 bytes: view +0x10, projection +0x50, view-projection +0x90, eye +0x190, look-at target +0x1A0, up +0x1B0. Pass settings at +564 to +588, active flag at +588. Pass 0 is the main 1280x720 view; pass 10 a 1024x1024 reflection and 11 a 512x512 shadow map, both rebuilt in Draw. |
 | `[0x82814E34]` | Title screen object | +4 state (5 = start the attract race), +36 idle ticks. See "The title screen". |
+| car + 16 | The car's world matrix, for drawing | Copied in by `sub_8215C780` each tick; the cockpit dials' parent. |
+| car + 696, + 700, + 704 | Speed (km/h), revs, boost | Set each tick by `sub_8215C780`; the cockpit dials read them (`sub_820E42E8`, `sub_820E45A8`). `sub_820DAC68` takes 1.0 off + 704 every pass. |
 | `0x70180000` | Main thread stack | During Draw, holds temporary world matrices and camera copies passed to the recorders (for example 0x7018E640). Not render state. |
 
 ## The title screen
@@ -310,6 +323,7 @@ render-only passes it ran ~5x fast. Each case found is fixed in
 | Play time (a frame counter at `0x826C5B90`, which `sub_821109B8` turns into hours, minutes and seconds at 30 a second) | `sub_82107910` | One taken back before the call on render-only passes (`--per_tick_play_time`) |
 | UI movies: the HUD, including the race start countdown (a 240-frame movie, a beep at frames 60, 120, 180, 240) | `sub_8211D2F8`, with r4 = 0 (advance a frame and draw); r4 = 1 only draws | Replayed (below) (`--per_tick_ui_movies`) |
 | UI movies' adding animation tracks (the pause sub-menus' arrow slid ~5x as far): they write into the movie's nodes, outside the replayed bytes | `sub_825A0548`, inside `sub_8211D2F8` | A workaround for frame rates above 30: on render-only passes, adds whose target the update doesn't put back to the rest pose (`sub_82119B80`) are skipped (`--per_tick_ui_movie_tracks`; `docs/pause-menu-fix.md`, "The sub-menus' arrow") |
+| The cockpit dials: the turbo gauge reads car + 704, which Draw's per-car update (`sub_820DAC68`) lowers by 1.0 every pass (set again only on ticks), so it fell to its rest angle; and blending the needles' matrices cut across the dials on fast swings | `sub_820E42E8`, `sub_820E45A8` (native, `src/hooks/cockpit_dials.cpp`) | Posed every pass from the tick's gauge values, on the car blended to the frame; replayed as live poses (`--native_cockpit_dials`; "The cockpit dials" under "What gets blended") |
 | The rival's logo in the rival intro cutscene (drawn during Update by handler `82159948`) | `sub_821594B8` (native override), `sub_82211A28` | On render-only passes the handler gets Update but only redraws the logo the logic pass drew (`--redraw_rival_logo`; "The rival logo at the race start" below) |
 
 **How the texture animations were found.** `--find_per_frame_state`
@@ -655,6 +669,16 @@ Three more things are blended, outside the products:
   light records and camera smoothed the road's lighting but not car
   bodies.
 
+**The cockpit dials** (`docs/cockpit-dial-interpolation.md`). A needle's
+world matrix is `(B * RotZ(angle)) * A * car`, turning about its spindle,
+away from its origin, so blending its matrix between ticks cut across the
+dial. The native dial updates hand the game the needle's tick pose (it
+culls with the tick's camera) and, around the draw, its pose on the car
+blended to the frame (`BlendState_SetLivePose`): the recorder's product is
+replayed with that world matrix and only its camera blended. The angle
+comes from the tick's gauge values, so the needles step at 30 Hz, as on
+the 360; the position moves with the car.
+
 Logic and render-only passes both draw the tick's real state; nothing is
 blended while drawing. Blending the camera inside Draw changed what the game
 culled, so the order-based pairing slipped and bits of the scene stepped at
@@ -691,6 +715,7 @@ and target, and recorder world matrices), mostly for comparison.
 | `--pair_by_object` | Pair the per-object recorder's products by position within groups alike but for their order (default on); see "What gets blended". |
 | `--log_moving_products` | Moving objects drawn out of step, event by event; see "What gets blended". |
 | `--log_thread_cpu` | Every 2 s: the process's and the machine's CPU use, and each thread using 5% of a core or more, by name: its share of a core (system time in brackets), the CPU it last ran on, its voluntary/involuntary context switches (many involuntary ones mean it's waiting for a core) and its minor/major page faults. Game threads are labelled with their entry point (`8258DE50 -> <the thread's own function>`). A thread with 10% or more of a core in the kernel gets its system calls sampled (25 reads of `/proc/.../syscall`, 4 ms apart: numbers, `running`, or -1 outside a call). On in `run-debug.sh`; Linux only. For finding a thread that pegs a core on slower machines (the Steam Deck). |
+| `--native_cockpit_dials`, `--check_native_cockpit_dials` | The cockpit dials posed natively (default on), and their angles and poses compared with the translated code on logic passes, logged every 2 s. |
 | `--log_camera_pass_records` | Which camera passes are recorded on logic and render-only passes, by message handler. |
 
 ### What didn't work, and why
