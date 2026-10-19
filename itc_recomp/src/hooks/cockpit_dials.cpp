@@ -17,8 +17,11 @@
 // - the car's world matrix is blended between its last two ticks by the
 //   frame's amount, as the car's parts are (blend_state.cpp's PlanProduct and
 //   BlendProduct);
-// - the needle is drawn as a live pose (BlendState_SetLivePose): the blend
-//   keeps its world matrix and gives it the frame's camera.
+// - the needle is drawn with its tick pose, as the original draws it (the
+//   game culls it with the tick's camera: posed on the blended car, it was
+//   culled on logic passes at speed, behind the cockpit camera), and its
+//   pose on the blended car goes to the replay beside it
+//   (BlendState_SetLivePose), which gives it the frame's camera.
 //
 // The angle maps (sub_820D3688, sub_820D3740) use the game's operations in its
 // order; the rotation's sine and cosine come from the C library rather than
@@ -209,7 +212,8 @@ std::unordered_map<uint32_t, CarDials> g_cars;
 
 struct PoseInputs {
   std::array<float, 6> gauges;
-  Matrix4 world;
+  Matrix4 world;    // the car's, blended for the frame being drawn
+  Matrix4 tick;     // the car's at the tick (car + 16 now)
 };
 
 // Main thread, from a dial function: on a logic pass the gauges as they are
@@ -232,7 +236,7 @@ PoseInputs InputsFor(uint8_t* base, uint32_t car) {
       dials.tick = logic_passes;
     }
   }
-  PoseInputs inputs{dials.gauges, dials.world_now};
+  PoseInputs inputs{dials.gauges, dials.world_now, dials.world_now};
   float amount = interpolation::BlendState_Amount();
   bool blended = false;
   if (dials.has_before && amount < 1.0f) {
@@ -332,21 +336,23 @@ struct Check {
 };
 Check g_check;
 
-// Draws a needle posed for this frame, as the original's sub_820D06F0 calls
-// do: the world matrix at the original's frame + 160, `lr` the original's
-// return address (for diagnostics keyed by caller).
+// Draws a needle as the original's sub_820D06F0 calls do: its tick pose
+// `drawn` (on the tick's car, as the original's: the game culls it with the
+// tick's camera, and products pair across passes by it) at the original's
+// frame + 160, `lr` the original's return address (for diagnostics keyed by
+// caller); `world`, its pose for the frame, goes to the replay.
 void DrawNeedle(PPCContext& ctx, uint8_t* base, uint32_t frame, uint32_t part, uint32_t camera,
-                const Matrix4& world, uint32_t lr) {
+                const Matrix4& drawn, const Matrix4& world, uint32_t lr) {
   uint32_t r1 = ctx.r1.u32;
   uint32_t world_at = frame + 160;
-  StoreMatrix(base, world_at, world);
+  StoreMatrix(base, world_at, drawn);
   ctx.r1.u32 = frame;
   ctx.r3.u32 = part, ctx.r4.u32 = camera, ctx.r5.u32 = world_at;
   ctx.r6.u64 = 0, ctx.r7.u64 = 0;
   ctx.lr = lr;
-  interpolation::BlendState_SetLivePose(true);
+  interpolation::BlendState_SetLivePose(world.data());
   sub_820D06F0(ctx, base);
-  interpolation::BlendState_SetLivePose(false);
+  interpolation::BlendState_SetLivePose(nullptr);
   ctx.r1.u32 = r1;
 }
 
@@ -422,14 +428,15 @@ extern "C" REX_FUNC(sub_820E45A8) {
         g_check.Angle(angle, g_check.GameDialAngle(ctx, base, frame, range, kind, car));
       }
     }
+    Matrix4 drawn = Pose(base, dash + needle.locals, angle, inputs.tick);
     Matrix4 world = Pose(base, dash + needle.locals, angle, inputs.world);
     if (check) {
-      g_check.Pose(ctx, base, frame, dash + needle.locals, angle, inputs.world, world);
+      g_check.Pose(ctx, base, frame, dash + needle.locals, angle, inputs.tick, drawn);
     }
     if (debug::DialPoseLog_Enabled()) [[unlikely]] {
       debug::DialPoseLog_NativeAngle(base, "dials", uint32_t(k), car, angle, inputs.gauges[kBoost]);
     }
-    DrawNeedle(ctx, base, frame, dash + needle.part, camera, world, needle.lr);
+    DrawNeedle(ctx, base, frame, dash + needle.part, camera, drawn, world, needle.lr);
   }
   if (check) {
     g_check.MaybeLog();
@@ -463,15 +470,16 @@ extern "C" REX_FUNC(sub_820E42E8) {
   }
   for (size_t i = 0; i < kTachNeedles.size(); i++) {
     auto [locals, part, lr] = kTachNeedles[i];
+    Matrix4 drawn = Pose(base, dash + locals, angles[i], inputs.tick);
     Matrix4 world = Pose(base, dash + locals, angles[i], inputs.world);
     if (check) {
-      g_check.Pose(ctx, base, frame, dash + locals, angles[i], inputs.world, world);
+      g_check.Pose(ctx, base, frame, dash + locals, angles[i], inputs.tick, drawn);
     }
     if (debug::DialPoseLog_Enabled()) [[unlikely]] {
       debug::DialPoseLog_NativeAngle(base, "tach", uint32_t(i), car, angles[i],
                                      inputs.gauges[i == 0 ? kSpeed : kRevs]);
     }
-    DrawNeedle(ctx, base, frame, dash + part, camera, world, lr);
+    DrawNeedle(ctx, base, frame, dash + part, camera, drawn, world, lr);
   }
   if (check) {
     g_check.MaybeLog();
