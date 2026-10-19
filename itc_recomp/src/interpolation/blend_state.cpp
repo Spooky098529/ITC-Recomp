@@ -1335,6 +1335,21 @@ class DrawState {
         if (old.world == 0 && old.camera == key.camera && old.handler == key.handler) {
           before += fmt::format(" [id {} occurrence {}{}]", old.signature, old.occurrence,
                                 current_tick_.count(old) ? " still here" : "");
+          // The same occurrence under another number: a cut, or the same
+          // camera changed (its eye's movement and turn, and its scales).
+          if (old.occurrence == key.occurrence && old.signature != key.signature) {
+            std::optional<PerspectiveCamera> a = SplitViewProjection(old_inputs.view_projection);
+            std::optional<PerspectiveCamera> b = SplitViewProjection(inputs.view_projection);
+            if (a && b) {
+              before += fmt::format(
+                  " (moved {:.3f} m, turned {:.3f} rad, x {:.4f}->{:.4f} y {:.4f}->{:.4f} depth "
+                  "{:.6g}->{:.6g} {:.6g}->{:.6g})",
+                  Distance(a->camera.position, b->camera.position),
+                  AngleBetween(a->camera.rotation, b->camera.rotation), a->x_scale, b->x_scale,
+                  a->y_scale, b->y_scale, a->depth_scale, b->depth_scale, a->depth_offset,
+                  b->depth_offset);
+            }
+          }
         }
       }
       const Matrix4& m = inputs.view_projection;
