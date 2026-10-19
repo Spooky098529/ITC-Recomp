@@ -15,6 +15,10 @@ Built with AI assistance (Claude Code).
   30 Hz, and frames are blended between ticks, so races play smoothly at an uncapped FPS (`--max_fps=0`), or with a cap specified on the command line with (`--max_fps=n`). `./run.sh --no-interpolation` gives the original
   30 fps game. Be aware that the internal game logic is still expecting a consistent 30hz update rate, if your machine cannot keep up, the game will run in slow motion.
   
+## In progress: removing ReXGlue
+
+See [`rexglue-removal-project`](https://github.com/Spooky098529/ITC-Recomp/tree/rexglue-removal-project).
+
 ## Requirements
 
 - Linux, or Windows 10 or 11 (experimental, see below), on a 64-bit x86
@@ -62,7 +66,7 @@ the console. Screens and windows that aren't 16:9 get black bars.
   advance at 30 Hz (including cockpit elements such as the tachometer).
 - In game movies are not shown.
 - Tested on Linux on my PC (9800x3d, 7900XT) and the Steam Deck.
-- The game probably uses more RAM than necessary, currently it maintains several copies of the xbox 360 memory pool for performance reasons. This is going to be an issue until the rexglue runtime is removed. RAM usage can hit about 1gb in races.
+- The game probably uses more RAM than necessary, currently it maintains several copies of the xbox 360 memory pool for performance reasons. This is going to be an issue until the rexglue runtime is removed (see "In progress: removing ReXGlue" above). RAM usage can hit about 1gb in races.
 - Some 2d elements flicker when races are paused when unlocking the framerate, like logos above cars or smoke trails
 ## Reporting problems
 
@@ -102,3 +106,6 @@ libraries fetched with xwin); see [docs/windows.md](docs/windows.md).
   resolutions.
 - [docs/windows.md](docs/windows.md): the Windows build, how it's made and
   tested.
+- [docs/rexglue-removal.md](https://github.com/Spooky098529/ITC-Recomp/blob/rexglue-removal-project/docs/rexglue-removal.md): the plan for a native port without ReXGlue, and its progress
+  (on the `rexglue-removal-project` branch; the copy on `main` is out of
+  date).
