@@ -54,7 +54,7 @@ the `ctx` edge moves up through its callers (the input path did this on
 | `sub_822B20D8` | | | Graphics driver present bookkeeping (frame counter at +20024). Library code, not game timing. |
 | `sub_825BA0C8` | `QueryPerformanceCounter` | | System library. |
 | `sub_820C0128` | `Vehicle::GetSpeedKmh` | Overridden | Returns the float at vehicle+48 (m/s) times 3.6. |
-| `sub_82093DC0` | | | First tick handler: polls input, then walks listener lists that run both game logic and the draw step (see "Separating drawing from the game tick"). |
+| `sub_82093DC0` | | | First tick handler: polls input, then walks listener lists that run both game logic and the draw step (see "Separating drawing from the game tick"). Tests player 1's input itself, on every pass: processor 0's pressed bits (`sub_8258CEB0`) and held-or-repeating bits (`sub_8258CEE0`), read from the input manager in guest memory ("Who reads the input manager" in `docs/pause-menu-fix.md`). |
 | `sub_821062E8` | `GameMessages::Dispatch` | Overridden | Delivers the game's queued messages to its handlers: 0 = Update (all game logic), 1 = Draw. Skips Update on render-only passes (`src/frame_pacing/game_messages.cpp`). |
 | `sub_82106280` | | | Picks the handler object a message goes to; its method 0 handles it. |
 | `sub_820990F0` | `Input::Update` | Overridden | Input manager update; skipped on render-only passes so presses aren't seen several times. Native (`src/hooks/input_update.cpp`): reads the physical pads and builds the logical pads in plain C++, then updates the processors and listeners (`sub_82592188` natively for their class, any other object called). See B1 in `docs/rexglue-removal.md`. |
