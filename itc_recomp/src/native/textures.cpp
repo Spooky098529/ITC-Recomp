@@ -1089,8 +1089,10 @@ void TextureCache::State::RetireLoaded() {
     bytes += t.memory_size;
     Retire(t);
   }
-  REXLOG_INFO("native renderer: a race ended: {} textures freed ({:.1f} MB)", textures.size(),
-              bytes / 1048576.0);
+  if (log_memory) {
+    REXLOG_INFO("native renderer: a race ended: {} textures freed ({:.1f} MB)", textures.size(),
+                bytes / 1048576.0);
+  }
   textures.clear();
   by_address.clear();
   longest_range = 0;
@@ -1148,11 +1150,13 @@ void TextureCache::State::RetireMovedResolveDestinations(const Texture& t) {
     auto [old_start, old_end] = ResolveRange(old);
     if (old.layout.base_address != t.layout.base_address && old_start < end && start < old_end &&
         now - old.last_resolved >= std::chrono::seconds(2)) {
-      REXLOG_INFO("native renderer: resolve destination at {:08X} (format {} {}x{}) freed: one "
-                  "made at {:08X} (format {} {}x{}) over its memory",
-                  old.layout.base_address, old.guest_format, old.layout.width,
-                  old.layout.height, t.layout.base_address, t.guest_format, t.layout.width,
-                  t.layout.height);
+      if (log_memory) {
+        REXLOG_INFO("native renderer: resolve destination at {:08X} (format {} {}x{}) freed: "
+                    "one made at {:08X} (format {} {}x{}) over its memory",
+                    old.layout.base_address, old.guest_format, old.layout.width,
+                    old.layout.height, t.layout.base_address, t.guest_format, t.layout.width,
+                    t.layout.height);
+      }
       moved.push_back(key);
     }
   }
