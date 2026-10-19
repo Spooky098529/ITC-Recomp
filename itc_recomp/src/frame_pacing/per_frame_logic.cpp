@@ -50,6 +50,9 @@ REXCVAR_DEFINE_BOOL(per_tick_minimap_blink, true, "ITC",
                     "Advance the minimap's blink clock once per tick on render-only passes");
 REXCVAR_DEFINE_BOOL(per_tick_play_time, true, "ITC",
                     "Count play time once per tick on render-only passes");
+REXCVAR_DEFINE_BOOL(per_tick_car_gauges, true, "ITC",
+                    "Step the car gauge value Draw lowers every pass (car + 704, read by the "
+                    "cockpit dials) once per tick on render-only passes");
 REXCVAR_DEFINE_BOOL(log_replays, false, "ITC",
                     "Log how replays from the logic pass's state went, every 2 s");
 
@@ -108,6 +111,30 @@ extern "C" REX_FUNC(sub_82107910) {
     guest::StoreU32(base, kPlayTimeFrames, guest::LoadU32(base, kPlayTimeFrames) - 1);
   }
   __imp__sub_82107910(ctx, base);
+}
+
+// Draw's per-car update (sub_820DAC68, r3 = car - 4288): first of all takes
+// [0x82000A30] (1.0) off car + 704, a gauge value (likely the revs) that the
+// logic tick sets again. The cockpit dials read it (sub_820E45A8: the second
+// needle in mode 5, and sub_820D3688's kind 0), so on render-only passes it
+// fell below the dial's range and the needle was drawn at its rest angle
+// (docs/cockpit-dial-interpolation.md). On a render-only pass, give the step
+// back first, so the call and the dials see what a 30 fps pass sees. Also
+// wrapped for --find_per_frame_state, as the draw step parts are.
+extern "C" REX_FUNC(sub_820DAC68) {
+  REX_FUNC_PROLOGUE();
+  if (debug::IsHidden(0x820DAC68)) {
+    return;
+  }
+  constexpr uint32_t kGaugeOffset = 4288 + 704, kGaugeStep = 0x82000A30;
+  if (frame_pacing::GameMessages_IsRenderOnlyPass() && REXCVAR_GET(per_tick_car_gauges)) {
+    uint32_t gauge = ctx.r3.u32 + kGaugeOffset;
+    guest::StoreFloat(base, gauge,
+                      guest::LoadFloat(base, gauge) + guest::LoadFloat(base, kGaugeStep));
+  }
+  debug::FrameStateDiff_Before(base);
+  __imp__sub_820DAC68(ctx, base);
+  debug::FrameStateDiff_After(base, "draw step part", 0x820DAC68);
 }
 
 // Calls whose animation state and drawing are one: on a render-only pass,

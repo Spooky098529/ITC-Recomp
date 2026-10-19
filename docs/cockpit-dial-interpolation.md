@@ -514,8 +514,8 @@ into the model + 48 first.
 from a car value**, with no state: it reads car + 704, 712, 716 or 720
 (`kind` 0-3) and maps it linearly from `[range + 0, range + 4]` to
 `[range + 8, range + 12]`, clamped at both ends, times a constant
-(`[0x82010000 + 10568]`, probably degrees to radians). With no range it
-returns `[0x82010000 + 2612]`. Nothing smooths or accumulates, so calling it
+(`[0x82000000 + 10568]`, probably degrees to radians). With no range it
+returns `[0x82000000 + 2612]`. Nothing smooths or accumulates, so calling it
 again is harmless. Car + 704 is probably the speed (mode 5 uses it).
 
 In an attract race (chase camera), `sub_820E45A8` runs on logic and
@@ -535,7 +535,7 @@ the revs. At 30 fps every pass is a logic pass, so the drift never shows.
 
 **The writer: `sub_820DAC68`, the per-car update called from Draw**
 (`this` = car - 4288; it passes `this + 4288` on as the car). Its first
-instructions are `[this + 4992] -= [0x82010000 + 2608]` (1.0), before any
+instructions are `[this + 4992] -= [0x82000A30]` (1.0), before any
 branch: car + 704 loses 1.0 every call, on every pass. Found with
 `--find_per_frame_state --watch_addresses=051F1380` in an attract race
 (car `051F10C0`, `itc_094`: tick handler `82093DC0` > message handler
@@ -549,3 +549,20 @@ overrides `sub_820DAC68` (`ITC_FRAME_STATE_WRAP`).
 So the game itself works out the wrong pose between ticks: the needle
 reads a value that Draw's per-car update keeps lowering on every pass,
 which only a logic tick puts right.
+
+## The fix: `--per_tick_car_gauges` (2026-10-19, on by default)
+
+`sub_820DAC68` is now overridden in `src/frame_pacing/per_frame_logic.cpp`
+(beside the play time, which is the same pattern): on a render-only pass
+it adds `[0x82000A30]` (1.0) back to car + 704 before the call, so the
+call's own step leaves it as the logic pass left it. The dials and
+anything else reading it see what a 30 fps pass sees; the logic tick sets
+it as before. The needle's pose then matches the tick's on render-only
+passes, so `Note` blends it like any other part. The `--find_per_frame_state`
+wrapper `sub_820DAC68` had (`ITC_FRAME_STATE_WRAP` in
+`frame_state_diff.cpp`) moved into the override, with `--debug_hide`.
+
+Attract race with `--log_dial_pose` (cut short by the user, who saw nothing
+wrong): 751 dial calls, car + 704 on every render-only pass the same as on
+its logic pass. Still to check: a cockpit drive in the second car (the
+needle following the revs on every frame, no jump to the rest pose).
