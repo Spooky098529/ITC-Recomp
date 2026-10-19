@@ -1096,7 +1096,9 @@ To be fixed (or accepted) in milestone 7.
     {`+8440` (0.7) or `+8436` (~0.8-0.86, every tick), `+8452` (the glow
     strength, ~2.7-3.2), `+8456` (0.75), `+8476` (0)} of the object;
     `+8452` is written by `sub_82136F18`. Nothing else stepping looks like
-    the glow's (the rest are the known c14, c70, c74 and c100).
+    the glow's (the rest are the known c14, c70, c74 and c100; c100, the
+    motion blur's previous view-projection, is blended since
+    `--motion_blur_by_tick`).
   - **The cross-fade's weight is its quad's vertex color alpha**: the
     shader (`--native_renderer_log_shader_ucode=E0D070FB58A4EA03`) is
     `tfetch2D r0.xyz, tf0; oC0.w = r1.w; oC0.xyz = r0 * r1`, no

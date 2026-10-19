@@ -92,6 +92,8 @@ Status:
 | `sub_820A2D30` | `Matrix::RotateZ` | | r3 = out, r4 = in, r5 = &angle: out = in * RotZ, rows `(c, s, 0, 0)`, `(-s, c, 0, 0)`, sine and cosine from a polynomial. |
 | `sub_820A0AC0` | `Matrix::Copy` | Wrapped | r3 = destination, r4 = source, 4x4. Interpolation follows copies of cameras and products. |
 | `sub_82597610` | `Projector::Build` | | r3 = out, r4 = eye, r5 = target, r6 = up (16-byte vectors), f1-f4 = field of view, aspect, near, far: out = look-at (`sub_82597378`) * perspective (`sub_825972A8`) * a fixed bias matrix at `0x8265EED0` (two `sub_8209BD50` multiplies). Called by the render orchestrator `sub_820C5DE8` (return `0x820C6A2C`) for the player's headlight once a view, and by `sub_820F34C8` (return `0x820F3944`) in a loop of up to 5. See "The headlight beam far from the origin". |
+| `sub_821363F0` | `View::UploadPreviousViewProjection` | | r3 = the view (kept in r29). Records vertex c100 x4, the motion blur's previous view-projection: a `Matrix::Copy` (return `8213653C`) from view+8080 (this tick's view-projection) when view+48 is set (passes that ran the game logic) and view+44 is 0, otherwise from view+8144 (the previous tick's). The view moves the pair on right after the logic pass, so it's the same matrix all tick. Header slot allocated at `821364D0` (the owner `--debug_zero_owners` and `--log_slot_callers` name). See "Motion blur reads the 30 Hz tick" in `docs/native-renderer.md`. |
+| `sub_82598768` | `TextureProjection::Fit` | | Builds the c14 x4 texture projection, fitted to a camera object's view; called three times by `sub_820C5DE8` (returns `820C7174`, `820C7558`, `820C7950`; the third's result copied to c14 at `820C79F8`). Its multiply at `82599644` (stack temporary sp+352 = sp+352 * sp+208) reads back as a camera, w 1 with the eye at the origin, and was the group of cameras refused far from the origin; overwritten at `825996FC`, never drawn. See "The headlight beam far from the origin". |
 | `sub_82597378` | `Matrix::LookAt` | | r3 = out, r4 = eye, r5 = target, r6 = up: a row-vector view matrix, forward = target - eye. |
 | `sub_825972A8` | `Matrix::Perspective` | | r3 = out, f1 = field of view, f2 = aspect, f3 = near, f4 = far: y scale = 1 / tan(f1 * the constant at `0x82001BE4`), x scale = y scale / aspect, depth = far / (far - near), offset -near * far / (far - near). |
 | `sub_820D06F0` | `CarPart::Draw` | | r3 = the part (returns if `[part + 4]`, its model, is 0), r4 = the camera, r5 = the world matrix, r6, r7: with r7 = 0, `sub_820D04E8([part + 4], camera, world, [part + 228], r6)`. |
@@ -756,7 +758,8 @@ and target, and recorder world matrices), mostly for comparison.
 | `--blend_only_light_slots` | Blend only the per-object lighting's light positions and directions (default off). |
 | `--log_pixel_outcomes` | Every 2 s: what the lighting uploads got (blended, unpaired, not as recorded, rejected, unchanged) per frame for moving and still objects, which components differ or were rejected (with the object and its callers), frame-to-frame jumps in moving objects' uploaded lighting, an object followed for 10 frames after its lighting's camera jumps, and every 5 s one moving object's light slots traced for 4 ticks. |
 | `--pixel_blend_from_latest` | Blend per-object lighting from the previous tick's last value (default on); see "What gets blended". |
-| `--log_blend_state` | Per second: products published, blended, unpaired, rejected cameras with the reason, and uploads left alone. Unpaired or rejected counts above zero in steady driving mean something is stepping at 30 Hz. |
+| `--log_blend_state` | Per second: products published, blended, unpaired, rejected cameras with the reason, and uploads left alone. Unpaired or rejected counts above zero in steady driving mean something is stepping at 30 Hz. Each rejected camera names its source: the camera and world addresses, the handler, and the return addresses of the multiplies or copies that made it in the two ticks (`from before->now`); disassemble around those in `generated/` to see what builds it. A rejection alone isn't a visible step: compare the per-frame "camera not blended" count (uploads drawn with a rejected camera). |
+| `--log_motion_blur_velocity` | Every 5 s, ~40 passes in a row: the motion blur's previous view-projection (c100 x4) as copied (logic or render-only pass, the view's +44 and +48, which of +8080/+8144 was copied, the camera's motion between the two, their translation rows) and as uploaded (substituted or as recorded, and how far the replay moved it). |
 | `--log_replayed_constants` | One frame per second: every vertex constant upload replayed, whether it changed since the last frame, and whether it was substituted. |
 | `--log_stepping_constants` | With `--log_slot_callers`: every 2 s, the constant uploads left as recorded that change about 30 times a second (stuck to the tick) rather than every frame, with the code that recorded them. The quickest way to find what still steps. |
 | `--per_tick_blink_timers`, `--per_tick_ui_movies`, `--per_tick_play_time`, `--per_tick_texture_animations`, `--per_tick_minimap_blink` | The per-frame logic fixes (default on); see "Per-frame logic". |
@@ -807,7 +810,8 @@ and target, and recorder world matrices), mostly for comparison.
   leaving view shifted the order; pairing by the preceding camera product
   fixed it.
 - **The car's reflections, before c4-c8 were found.** Zeroing c100 x4
-  (`821364D0`, each view's previous view-projection) and c14 x4
+  (`821364D0`, each view's previous view-projection, which turned out to
+  be the motion blur's: these tests ran with the blur off) and c14 x4
   (`820C79F8`) changed nothing visible; zeroing `82147074`/`8214717C`
   (`sub_82146BD0`) blacked out the world geometry. Treating more pixel
   constant components as switches (the most-rejected ones, c2.x, c8.y,
@@ -976,8 +980,11 @@ processes the game's commands; the render thread mostly waits for it.
   "Per-frame logic" for how they were found.
 - **Some uploads still step on purpose**: the shadow lookup matrices (c70 and
   c74, orthographic, kept at the tick to match the shadow map), c14 x4 (a
-  texture projection) and c100 x4 (zeroing either changes nothing visible).
-  Nothing visible steps in testing; see
+  texture projection, built by `sub_82598768`; zeroing it changes nothing
+  visible). c100 x4 used to be listed here too: it's the motion blur's
+  previous view-projection (zeroing it disturbs the blur), now blended on
+  every frame (`--motion_blur_by_tick`; see "Motion blur reads the 30 Hz
+  tick" in `docs/native-renderer.md`). Nothing visible steps in testing; see
   "Finding what still steps" if something does.
 - **A piece of geometry flickers while the car moves**, at native 30 fps
   too, so not interpolation: probably the game's own effect (a broken light).

@@ -441,7 +441,7 @@ from the pass's shape, not checked by hiding it.
 | 6 | 8_8_8_8, pitch 520, 4x MSAA + depth | ~730 | 2_10_10_10_AS_16_16_16_16 512x128 (flags `0x300`) | Rear-view mirror: only in some frames (camera views) |
 | 7 | 2_10_10_10_FLOAT, pitch 280, 4x MSAA + depth | 420-520 | 2_10_10_10_AS_16_16_16_16 256x256 | Reflection map for the cars' paint |
 | 8 | 8_8_8_8, pitch 280, 4x MSAA | 1 | 8_8_8_8 256x256 | The minimap's road outline (seen in a native renderer dump) |
-| 9 | 16_16, pitch 560, + depth, cleared to `0x80808000` | 350-470 | 16_16 512x288 | Half-resolution velocity (motion blur) or depth |
+| 9 | 16_16, pitch 560, + depth, cleared to `0x80808000` | 350-470 | 16_16 512x288 | Half-resolution velocity for the motion blur (resolved to `1B053000`; confirmed 2026-10-19: zeroing c100, the previous view-projection, changes it from flat to large everywhere) |
 | 10 | **Main view**: 2_10_10_10_FLOAT_AS_16_16_16_16 (7e3 HDR), pitch 1040, **2x MSAA**, + depth at EDRAM tile 936 | 700-860, then ~350 more | 16_16_16_16 1024x576 (rect 0,0-1024,576; flags `0xF4000000`), twice | The scene, then a copy before more drawing (transparent or refracting objects reading it) |
 | 11 | 2_10_10_10_FLOAT, pitch 320 | 1 per step | 16_16_16_16 256x144: 0-3 draws, then 8 resolves (flags `0xF4000100`), then 3 | Bloom: downsample and blur chain (the "GrowBlend" passes; see patch 0001) |
 | 12 | Main view again | 1 | 16_16_16_16 1024x576, then 2_10_10_10_AS_16_16_16_16 **1280x720** (rect 1024x576) | Combining the post-processing, then the frame |
