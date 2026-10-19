@@ -67,6 +67,7 @@ set(ITC_SOURCES
     src/hooks/lights.cpp
     src/hooks/cockpit_dials.cpp
     src/hooks/input.cpp
+    src/hooks/xinput.cpp
     src/input/gamepads.cpp
     src/frame_pacing/frame_pacer.cpp
     src/frame_pacing/renderer_hooks.cpp

@@ -26,6 +26,14 @@ inline void StoreU8(uint8_t* base, uint32_t address, uint8_t value) {
   REX_STORE_U8(address, value);
 }
 
+inline uint16_t LoadU16(uint8_t* base, uint32_t address) {
+  return REX_LOAD_U16(address);
+}
+
+inline void StoreU16(uint8_t* base, uint32_t address, uint16_t value) {
+  REX_STORE_U16(address, value);
+}
+
 inline uint32_t LoadU32(uint8_t* base, uint32_t address) {
   return REX_LOAD_U32(address);
 }
