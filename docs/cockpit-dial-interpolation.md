@@ -600,23 +600,22 @@ remaining 1.0.
 **`sub_820E42E8(dash = r3, car = r4, r5 = the camera passes)` poses the
 tachometer's dash** (draws from `0x820E4474`, index 0, and `0x820E4594`,
 index 6; part `...06A0`). It's `sub_820E45A8`'s recipe again: it gets two
-angles from `sub_820D3740([dash + 2896], [dash], car, &a, &b)`, and for
+angles from `sub_820D3740([dash + 2896], car, [dash], &a, &b)`, and for
 each turns the identity by the angle (`sub_820A2D30`), multiplies by two
 local matrices (dash + 32/+96 for the first, dash + 272/+336 for the
 second) and the car's world matrix (car + 16), and draws it with
 `sub_820D06F0` (dash + 496, then dash + 736).
 
-**`sub_820D3740(table = r3, dash's first word's object = r4, car = r5,
-&a = r6, &b = r7)`**, no state, piecewise linear with clamps:
+**`sub_820D3740(table = r3, car = r4, [dash] = r5, &a = r6, &b = r7)`**, no state, piecewise linear with clamps:
 
 - `a` (index 0) from **car + 696**: 0 below `[0x82000A34]`; up to
-  `table + 0` (or `+ 8` when `[r5]`, the dash's word, isn't 0) it's
+  `table + 0` (or `+ 8` when `[[dash]]` isn't 0) it's
   `value / from * table[16]`; up to `table + 4` (or `+ 12`) linear to
   `table[20]`; above, `table[20]`.
 - `b` (index 6) from **car + 700**: `table[28]` if `table[24]` > value,
   else linear over `table[32..44]` in two pieces, clamped to `table[44]`.
 
-Car + 696 and + 700 are written next to + 704 by `sub_8215C780`
-(`sub_820C0128` and `sub_820C0140`'s results), likely the revs and the
-speed. Which of the two needles is the tachometer (index 0 or 6) isn't
+`sub_8215C780` stores `sub_820C0128`'s and `sub_820C0140`'s results at
+r31 + 696 / + 700 next to + 704 (whether r31 there is the car isn't
+confirmed); likely the revs and the speed. Which of the two needles is the tachometer (index 0 or 6) isn't
 logged yet.
