@@ -68,7 +68,7 @@ speed).
 | 4 | **The other passes**: each pass renders into a Vulkan image of its resolve's size and format; resolves become copies. | Shadows, reflections and the mirror work. | Done (2026-10-14): every pass draws, inline vertex draws included; clears and resolves work; the user saw the car's shadow, the mirror and the reflections right in our window (cockpit and third person), and the resolves match the emulated GPU's (`--readback_resolve=full`), except its blocky bloom. Menus not checked. |
 | 5 | **The final frame and the menus** (still in development mode): post-processing, HUD, the frame's end, then every menu screen. | Races and menus look as in the game's window, side by side. | Done (marked 2026-10-19): the final frame with the HUD shows (checked by the user in a race); menus' tiled 3D views fixed; the renderer has drawn races and menus on its own since exclusive mode (milestone 6) and shipped as the only renderer. Not done: a screen-by-screen comparison of every menu against the emulated GPU. |
 | 6 | **Exclusive mode**: the emulated GPU gets no work and then isn't loaded at all; the graphics library is kept for what our renderer needs from it (see "Plan for milestone 6"); then measure. | The GPU plugin isn't loaded; frame rate measured against the emulated GPU. | Done (2026-10-14): the plugin isn't loaded (`run.sh` runs exclusive mode); measured: 135 fps mean uncapped against the emulated GPU's 155, then ~235 after the speed work (step 5; holds the 144 cap in an attract race). The library's remaining packet writers moved to milestone 7 (the user's call); the frame's end (step 6) measured at ~0.2% of the render thread and left as it is. |
-| 7 | **Known issues cleanup**: what's under Known issues below (the boot movie, an in-game movie locking up the game, the bloom's ghosting (fixed 2026-10-15), motion blur at the tick's length, gamma, textures replaced in memory, textures never freed (fixed 2026-10-19), the library's remaining packet writers, further speed work on our renderer, the freezes while driving to re-examine, no window without Vulkan surface support). | The known issues are fixed or accepted. | |
+| 7 | **Known issues cleanup**: what's under Known issues below (the boot movie, an in-game movie locking up the game, the bloom's ghosting (fixed 2026-10-15), motion blur at the tick's length, gamma (done: `--xbox_gamma`, off by default), textures replaced in memory (fixed 2026-10-15), textures never freed (fixed 2026-10-19), the library's remaining packet writers, further speed work on our renderer, the freezes while driving to re-examine, no window without Vulkan surface support). | The known issues are fixed or accepted. | In progress (2026-10-19): done are the bloom's ghosting, gamma, textures replaced in memory, textures never freed, and the speed work's big known costs (~135 to ~486 fps uncapped); open are the boot movie, the in-game movie lock-up, motion blur at the tick's length, the freeze while driving, the remaining packet writers and the missing window's error. |
 
 ## Progress on milestone 2
 
@@ -1148,9 +1148,10 @@ To be fixed (or accepted) in milestone 7.
   the Y plane, and look for repeated or out-of-order frames. The code is
   in `2433232` to start from.
 
-- **Gamma**: our window is lighter than the game's (seen side by side,
-  2026-10-14): the Xbox 360's output gamma isn't applied yet. A known
-  issue, for milestone 7 (the user's call).
+- **Gamma** (done 2026-10-16, `xbox-gamma`; off by default, the user's
+  call, 2026-10-19): our window was lighter than the game's (seen side by
+  side, 2026-10-14), as the Xbox 360's output gamma wasn't applied.
+  `--xbox_gamma=hdtv` applies it; it stays off by default.
 
   Found 2026-10-16 (branch `xbox-gamma`): at boot the graphics library
   writes the display controller's 256-entry gamma table (DC_LUT_RW_MODE
