@@ -126,6 +126,14 @@ extern "C" REX_FUNC(sub_820D04E8) {
 }
 
 namespace {
+// FNV-1a over guest words: whether the needle's local matrices change.
+uint64_t HashWords(uint8_t* base, uint32_t address, uint32_t count) {
+  uint64_t h = 14695981039346656037ull;
+  for (uint32_t i = 0; i < count; i++) {
+    h = (h ^ guest::LoadU32(base, address + 4 * i)) * 1099511628211ull;
+  }
+  return h;
+}
 const char* PassType() {
   return frame_pacing::GameMessages_IsRenderOnlyPass() ? "render-only" : "logic";
 }
@@ -140,10 +148,16 @@ extern "C" REX_FUNC(sub_820E45A8) {
     char line[256];
     uint32_t dash = ctx.r3.u32;
     std::snprintf(line, sizeof(line),
-                  "pass %llu %s dials dash %08X car %08X r5 %08X mode %u ranges %08X %08X\n",
+                  "pass %llu %s dials dash %08X car %08X r5 %08X mode %u ranges %08X %08X "
+                  "car704 %.4f locals %016llX car at %.3f %.3f %.3f\n",
                   (unsigned long long)frame_pacing::GameMessages_PassNumber(), PassType(), dash,
                   ctx.r4.u32, ctx.r5.u32, guest::LoadU32(base, dash + 4),
-                  guest::LoadU32(base, dash + 5328), guest::LoadU32(base, dash + 5332));
+                  guest::LoadU32(base, dash + 5328), guest::LoadU32(base, dash + 5332),
+                  guest::LoadFloat(base, ctx.r4.u32 + 704),
+                  (unsigned long long)HashWords(base, dash + 272, 32),
+                  guest::LoadFloat(base, ctx.r4.u32 + 16 + 48),
+                  guest::LoadFloat(base, ctx.r4.u32 + 16 + 52),
+                  guest::LoadFloat(base, ctx.r4.u32 + 16 + 56));
     debug::GetDialPoseLog().pending += line;
   }
   __imp__sub_820E45A8(ctx, base);
@@ -172,4 +186,20 @@ extern "C" REX_FUNC(sub_820D3688) {
     dial_log.pending += line;
     dial_log.Flush();
   }
+}
+
+// Turns a matrix by an angle: r3 = out, r4 = in, r5 = the angle (a float in
+// guest memory). Logged when called from sub_820E45A8 (the second needle's at
+// 0x820E4864).
+extern "C" REX_FUNC(sub_820A2D30) {
+  REX_FUNC_PROLOGUE();
+  uint32_t lr = uint32_t(ctx.lr);
+  if (!REXCVAR_GET(log_dial_pose).empty() && lr >= 0x820E45A8 && lr < 0x820E4A00) [[unlikely]] {
+    char line[160];
+    std::snprintf(line, sizeof(line), "pass %llu %s rotate caller %08X angle %.4f\n",
+                  (unsigned long long)frame_pacing::GameMessages_PassNumber(), PassType(), lr,
+                  guest::LoadFloat(base, ctx.r5.u32));
+    debug::GetDialPoseLog().pending += line;
+  }
+  __imp__sub_820A2D30(ctx, base);
 }
