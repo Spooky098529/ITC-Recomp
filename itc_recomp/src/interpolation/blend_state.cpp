@@ -87,6 +87,11 @@ REXCVAR_DEFINE_STRING(debug_zero_owners, "", "ITC",
 REXCVAR_DEFINE_BOOL(log_upload_owners, false, "ITC",
                     "Log the callers recording vertex constant uploads, with uploads per "
                     "frame, every 5 s (needs --log_slot_callers)");
+REXCVAR_DEFINE_BOOL(motion_blur_by_tick, false, "ITC",
+                    "Testing (doesn't work yet): on render-only passes, copy the motion blur's "
+                    "previous view-projection from where the tick's logic pass did (the "
+                    "view's +8080 or +8144); the pair moves on after the logic pass, so it "
+                    "isn't the tick's product and isn't blended");
 REXCVAR_DEFINE_BOOL(log_motion_blur_velocity, false, "ITC",
                     "Log, every 5 s for ~40 passes, the motion blur's previous view-projection "
                     "(c100 x4, copied at 8213653C from the view's +8080 or +8144): which one, "
@@ -3840,10 +3845,13 @@ class MotionBlurLog {
                            AngleBetween(a->camera.rotation, b->camera.rotation));
     }
     copies_.lines += fmt::format(
-        "\n  {} pass, amount {:.3f}, view {:08X} (+44 {}, +48 {}), copied +{}{}, {}",
+        "\n  {} pass, amount {:.3f}, view {:08X} (+44 {}, +48 {}), copied +{}{}, {}; "
+        "+8080 row 3 {:.6g} {:.6g} {:.6g} {:.6g}, +8144 row 3 {:.6g} {:.6g} {:.6g} {:.6g}",
         frame_pacing::GameMessages_IsRenderOnlyPass() ? "render-only" : "logic",
         GetDrawState().amount(), view, guest::LoadU32(base, view + 44),
-        guest::LoadU32(base, view + 48), src - view, at_8080 == at_8144 ? " (same)" : "", motion);
+        guest::LoadU32(base, view + 48), src - view, at_8080 == at_8144 ? " (same)" : "", motion,
+        at_8080[12], at_8080[13], at_8080[14], at_8080[15], at_8144[12], at_8144[13],
+        at_8144[14], at_8144[15]);
     copies_.count++;
   }
   // Render thread, at a c100 x4 upload: `original` if the replay
@@ -3904,6 +3912,27 @@ void BlendState_LogMotionBlurCopy(uint8_t* base, uint32_t view, uint32_t src) {
   if (std::this_thread::get_id() == GetDrawState().main_thread()) {
     GetMotionBlurLog().OnCopy(base, view, src);
   }
+}
+
+// --motion_blur_by_tick (testing, doesn't work yet): the source of the
+// motion blur's previous view-projection (c100 x4, copied at 8213653C) on
+// this pass. The view picks +8080 (this tick's view-projection) when
+// view+48 is set, which only passes that ran the game logic do, and +8144
+// (the previous tick's) otherwise. Render-only passes copy from where the
+// tick's logic pass did; but the pair moves on right after the logic
+// pass, so the copy isn't the logic pass's product. Main thread only.
+uint32_t BlendState_MotionBlurSource(uint32_t view, uint32_t src) {
+  static std::unordered_map<uint32_t, uint32_t> chosen;  // by view: offset
+  if (!REXCVAR_GET(interpolate_draw_state) || !REXCVAR_GET(motion_blur_by_tick) ||
+      std::this_thread::get_id() != GetDrawState().main_thread()) {
+    return src;
+  }
+  if (!frame_pacing::GameMessages_IsRenderOnlyPass()) {
+    chosen[view] = src - view;
+    return src;
+  }
+  auto it = chosen.find(view);
+  return it != chosen.end() ? view + it->second : src;
 }
 
 void BlendState_ReplayConstants(uint8_t* base, uint32_t payload, uint32_t packed,
@@ -4200,8 +4229,13 @@ extern "C" REX_FUNC(sub_820A0AC0) {
   REX_FUNC_PROLOGUE();
   uint32_t dst = ctx.r3.u32, src = ctx.r4.u32;
   uint32_t caller = uint32_t(ctx.lr);
-  if (caller == 0x8213653C && REXCVAR_GET(log_motion_blur_velocity)) [[unlikely]] {
-    interpolation::BlendState_LogMotionBlurCopy(base, ctx.r29.u32, src);
+  if (caller == 0x8213653C) [[unlikely]] {
+    // The motion blur's previous view-projection (c100 x4); r29 is the view.
+    src = interpolation::BlendState_MotionBlurSource(ctx.r29.u32, src);
+    ctx.r4.u64 = src;
+    if (REXCVAR_GET(log_motion_blur_velocity)) {
+      interpolation::BlendState_LogMotionBlurCopy(base, ctx.r29.u32, src);
+    }
   }
   __imp__sub_820A0AC0(ctx, base);
   interpolation::GetDrawState().OnCopy(base, dst, src, caller);
