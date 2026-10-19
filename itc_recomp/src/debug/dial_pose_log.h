@@ -20,4 +20,7 @@ void DialPoseLog_Tach(uint8_t* base, uint32_t dash, uint32_t car);
 void DialPoseLog_NativeAngle(uint8_t* base, const char* function, uint32_t needle, uint32_t car,
                              float angle, float value);
 
+// A line for the log, after the pass and its type.
+void DialPoseLog_Append(const char* line);
+
 }  // namespace debug

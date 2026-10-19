@@ -234,6 +234,7 @@ PoseInputs InputsFor(uint8_t* base, uint32_t car) {
   }
   PoseInputs inputs{dials.gauges, dials.world_now};
   float amount = interpolation::BlendState_Amount();
+  bool blended = false;
   if (dials.has_before && amount < 1.0f) {
     auto a = interpolation::ScaledTransformFromWorldMatrix(dials.world_before);
     auto b = interpolation::ScaledTransformFromWorldMatrix(dials.world_now);
@@ -241,7 +242,19 @@ PoseInputs InputsFor(uint8_t* base, uint32_t car) {
                       kCutDistance) {
       inputs.world =
           interpolation::WorldMatrixFromScaledTransform(interpolation::Blend(*a, *b, amount));
+      blended = true;
     }
+  }
+  if (debug::DialPoseLog_Enabled()) [[unlikely]] {
+    auto at = [](const Matrix4& m) { return interpolation::Vec3{m[12], m[13], m[14]}; };
+    char line[256];
+    std::snprintf(line, sizeof(line),
+                  "car %08X tick %llu has_before %d amount %.3f blended %d moved %.4f "
+                  "from now %.4f\n",
+                  car, (unsigned long long)dials.tick, int(dials.has_before), amount,
+                  int(blended), interpolation::Distance(at(dials.world_before), at(dials.world_now)),
+                  interpolation::Distance(at(inputs.world), at(dials.world_now)));
+    debug::DialPoseLog_Append(line);
   }
   return inputs;
 }

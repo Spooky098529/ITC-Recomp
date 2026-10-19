@@ -596,6 +596,9 @@ struct BlendStats {
   int unpaired = 0;
   int world_not_blended = 0;
   int camera_not_blended = 0;
+  // Products posed live (the cockpit dials): all, unpaired (drawn as written,
+  // with the tick's camera), camera rejected, and with no camera to blend.
+  int live = 0, live_unpaired = 0, live_camera_rejected = 0, live_no_camera = 0;
 };
 
 // What went into a blended product, for the per-object recorder's other
@@ -705,6 +708,16 @@ Matrix4 BlendProduct(const ReplayedProduct& product, const TickPlans* plans,
                                        ProductBlendParts* parts = nullptr) {
   if (parts) {
     *parts = {product.tick->now.world, product.tick->now.world, std::nullopt, std::nullopt, &product};
+  }
+  if (product.tick->now.live) {
+    stats.live++;
+    if (product.tick->plan < 0) {
+      stats.live_unpaired++;
+    } else {
+      const ProductPlan& plan = plans->products[size_t(product.tick->plan)];
+      stats.live_camera_rejected += plan.camera_rejected;
+      stats.live_no_camera += !plan.camera_rejected && plan.camera < 0;
+    }
   }
   if (product.tick->plan < 0) {
     stats.unpaired++;
@@ -2678,6 +2691,11 @@ class ReplayCameras {
         stats_.blend.world_not_blended / f, stats_.blend.camera_not_blended / f,
         stats_.blend.unpaired / f, stats_.not_substituted_same / f,
         stats_.not_substituted_changed / f);
+    if (stats_.blend.live) {
+      REXLOG_INFO("replay: {} live poses: {} unpaired, {} camera rejected, {} no camera",
+                  stats_.blend.live, stats_.blend.live_unpaired,
+                  stats_.blend.live_camera_rejected, stats_.blend.live_no_camera);
+    }
     stats_ = {};
     last_log_ = now;
   }

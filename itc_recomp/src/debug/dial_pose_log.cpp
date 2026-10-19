@@ -309,3 +309,12 @@ extern "C" REX_FUNC(sub_8215C780) {
     }
   }
 }
+
+void debug::DialPoseLog_Append(const char* text) {
+  char line[64];
+  std::snprintf(line, sizeof(line), "pass %llu %s ",
+                (unsigned long long)frame_pacing::GameMessages_PassNumber(), PassType());
+  debug::DialPoseLog& log = debug::GetDialPoseLog();
+  log.pending += line;
+  log.pending += text;
+}
