@@ -1067,6 +1067,12 @@ class DrawState {
       // the same key, so they match the logic pass's frame (otherwise the
       // marker drew a tick apart on the two: two markers).
       bool overlay = handler_ == kRaceOverlaysHandler && tick;
+      if (inputs.live) {
+        counts_.live_noted++;
+        counts_.live_no_tick += !tick;
+        counts_.live_camera_differs +=
+            tick && !SameMatrix(tick->view_projection, inputs.view_projection);
+      }
       // A product posed live has this frame's world matrix, not the tick's.
       if (!overlay && (!tick || (!inputs.live && !SameMatrix(tick->world, inputs.world)) ||
                        !SameMatrix(tick->view_projection, inputs.view_projection))) {
@@ -1553,6 +1559,11 @@ class DrawState {
         counts_.objects_not_transforms / draws, counts_.replayed_products.load() / draws,
         counts_.camera_cuts, counts_.object_cuts, counts_.products_published / draws,
         counts_.mismatched_products / draws, counts_.copies / draws);
+    if (counts_.live_noted) {
+      REXLOG_INFO("blend state: {} live poses noted on render-only passes, {} with no tick "
+                  "product, {} with a camera unlike the tick's",
+                  counts_.live_noted, counts_.live_no_tick, counts_.live_camera_differs);
+    }
     if (REXCVAR_GET(log_replayed_constants)) {
       auto print = [&](const char* name, uint32_t offset) {
         Matrix4 m = LoadMatrix(base_, CameraPass(0) + offset);
@@ -2148,12 +2159,16 @@ class DrawState {
     int products_published = 0;
     int mismatched_products = 0;
     int copies = 0;
+    // Products posed live on render-only passes: noted, and left as drawn for
+    // no tick product with their key or a camera unlike the tick's.
+    int live_noted = 0, live_no_tick = 0, live_camera_differs = 0;
     std::atomic<int> replayed_products = 0;  // render thread
     std::chrono::steady_clock::time_point last_log{};
 
     void Reset() {
       draws = look_ats = cameras = objects = objects_unmatched = objects_not_transforms =
           camera_cuts = object_cuts = products_published = mismatched_products = copies = 0;
+      live_noted = live_no_tick = live_camera_differs = 0;
       replayed_products = 0;
     }
   } counts_;
