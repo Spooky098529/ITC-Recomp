@@ -87,6 +87,10 @@ REXCVAR_DEFINE_STRING(debug_zero_owners, "", "ITC",
 REXCVAR_DEFINE_BOOL(log_upload_owners, false, "ITC",
                     "Log the callers recording vertex constant uploads, with uploads per "
                     "frame, every 5 s (needs --log_slot_callers)");
+REXCVAR_DEFINE_BOOL(log_motion_blur_velocity, false, "ITC",
+                    "Log, every 5 s for ~40 passes, the motion blur's previous view-projection "
+                    "(c100 x4, copied at 8213653C from the view's +8080 or +8144): which one, "
+                    "how far the camera moved between the two, and how the replay changed it");
 REXCVAR_DEFINE_BOOL(log_blend_state, false, "ITC",
                     "Log how many cameras and objects were blended, once a second");
 REXCVAR_DEFINE_BOOL(log_replayed_constants, false, "ITC",
@@ -3813,6 +3817,95 @@ void BlendState_OnReplayTick() {
   GetReplayedConstantsLog().OnTick();
 }
 
+// Diagnostics (--log_motion_blur_velocity): the motion blur's previous
+// view-projection, c100 x4. sub_821363F0 copies it (return 8213653C) from
+// the view (its r29) at +8144, or at +8080 when view+48 is nonzero and
+// view+44 is 0. Sampled ~40 entries in a row every 5 s, from the main
+// thread's copies and from the render thread's uploads.
+class MotionBlurLog {
+ public:
+  // Main thread, at the copy.
+  void OnCopy(uint8_t* base, uint32_t view, uint32_t src) {
+    std::lock_guard lock(mutex_);
+    if (!Sampling(copies_)) {
+      return;
+    }
+    Matrix4 at_8080 = LoadMatrix(base, view + 8080), at_8144 = LoadMatrix(base, view + 8144);
+    std::optional<PerspectiveCamera> a = SplitViewProjection(at_8080);
+    std::optional<PerspectiveCamera> b = SplitViewProjection(at_8144);
+    std::string motion = "not perspective";
+    if (a && b) {
+      motion = fmt::format("+8080->+8144 moved {:.3f} m, turned {:.4f} rad",
+                           Distance(a->camera.position, b->camera.position),
+                           AngleBetween(a->camera.rotation, b->camera.rotation));
+    }
+    copies_.lines += fmt::format(
+        "\n  {} pass, amount {:.3f}, view {:08X} (+44 {}, +48 {}), copied +{}{}, {}",
+        frame_pacing::GameMessages_IsRenderOnlyPass() ? "render-only" : "logic",
+        GetDrawState().amount(), view, guest::LoadU32(base, view + 44),
+        guest::LoadU32(base, view + 48), src - view, at_8080 == at_8144 ? " (same)" : "", motion);
+    copies_.count++;
+  }
+  // Render thread, at a c100 x4 upload: `original` if the replay
+  // substituted it.
+  void OnUpload(const Matrix4& uploaded, const std::optional<Matrix4>& original, uint64_t tick,
+                float amount) {
+    std::lock_guard lock(mutex_);
+    if (!Sampling(uploads_)) {
+      return;
+    }
+    std::string change = "as recorded";
+    if (original) {
+      std::optional<PerspectiveCamera> a = SplitViewProjection(*original);
+      std::optional<PerspectiveCamera> b = SplitViewProjection(uploaded);
+      change = a && b ? fmt::format("substituted, moved {:.3f} m, turned {:.4f} rad",
+                                    Distance(a->camera.position, b->camera.position),
+                                    AngleBetween(a->camera.rotation, b->camera.rotation))
+                      : "substituted (not perspective)";
+    }
+    uploads_.lines += fmt::format("\n  tick {}, amount {:.3f}: {}", tick, amount, change);
+    uploads_.count++;
+  }
+
+ private:
+  struct Sample {
+    std::chrono::steady_clock::time_point started{};
+    int count = 0;
+    std::string lines;
+  };
+  static constexpr int kEntries = 40;
+  // Whether to add to this sample, logging it when full.
+  bool Sampling(Sample& sample) {
+    auto now = std::chrono::steady_clock::now();
+    if (sample.count >= kEntries) {
+      REXLOG_INFO("motion blur: {}:{}", &sample == &copies_ ? "c100 copies (main thread)"
+                                                           : "c100 uploads (render thread)",
+                  sample.lines);
+      sample = {now, -1, {}};
+    }
+    if (sample.count < 0) {
+      if (now - sample.started < std::chrono::seconds(5)) {
+        return false;
+      }
+      sample.count = 0;
+    }
+    return true;
+  }
+  std::mutex mutex_;
+  Sample copies_, uploads_;
+};
+
+MotionBlurLog& GetMotionBlurLog() {
+  static MotionBlurLog log;
+  return log;
+}
+
+void BlendState_LogMotionBlurCopy(uint8_t* base, uint32_t view, uint32_t src) {
+  if (std::this_thread::get_id() == GetDrawState().main_thread()) {
+    GetMotionBlurLog().OnCopy(base, view, src);
+  }
+}
+
 void BlendState_ReplayConstants(uint8_t* base, uint32_t payload, uint32_t packed,
                                 const std::function<void()>& upload) {
   uint32_t stage = packed >> 24, count = packed & 0xFF;
@@ -3871,6 +3964,11 @@ void BlendState_ReplayConstants(uint8_t* base, uint32_t payload, uint32_t packed
   }
   GetSteppingConstantsLog().OnUpload(base, payload, packed,
                                      original.has_value() || pixel_blended);
+  if (REXCVAR_GET(log_motion_blur_velocity) && stage == 0 && ((packed >> 8) & 0xFF) == 100 &&
+      count == 4) [[unlikely]] {
+    GetMotionBlurLog().OnUpload(LoadMatrix(base, payload), original, GetReplayCameras().tick(),
+                                GetReplayCameras().amount());
+  }
   if (REXCVAR_GET(log_object_extras) && stage == 0 && count == 9 && original) {
     GetObjectExtrasLog().OnUpload(base, payload);
   }
@@ -4102,6 +4200,9 @@ extern "C" REX_FUNC(sub_820A0AC0) {
   REX_FUNC_PROLOGUE();
   uint32_t dst = ctx.r3.u32, src = ctx.r4.u32;
   uint32_t caller = uint32_t(ctx.lr);
+  if (caller == 0x8213653C && REXCVAR_GET(log_motion_blur_velocity)) [[unlikely]] {
+    interpolation::BlendState_LogMotionBlurCopy(base, ctx.r29.u32, src);
+  }
   __imp__sub_820A0AC0(ctx, base);
   interpolation::GetDrawState().OnCopy(base, dst, src, caller);
 }

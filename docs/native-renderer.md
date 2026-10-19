@@ -1125,6 +1125,20 @@ To be fixed (or accepted) in milestone 7.
   (`--motion_blur=false`, which our renderer ignores); ours always draws
   it. Scaling the velocities to the frame's share of a tick, or an option
   to skip the pass, would fix it.
+  Measured on `beam-stepping` (2026-10-19, `--log_motion_blur_velocity`,
+  attract race at 144 fps): it pulses at 30 Hz, which may be the
+  headlight beam that looks like it updates at 30 Hz. The previous
+  view-projection is vertex c100 x4, which `sub_821363F0` copies (return
+  `8213653C`) from the view at +8080 (the previous tick's view-projection)
+  or +8144 (this tick's), both changed once a tick. It takes +8144 when
+  view+48 is 0 (set only on passes that ran the game logic) or view+44 is
+  nonzero. Logic passes copy +8080, and the replay blends it like a camera:
+  one tick of motion, forward. Render-only passes copy +8144, not
+  substituted (the tick's own value), against a frame camera blended
+  behind it: velocities of -0.78, -0.57, -0.36, -0.15 tick, backward and
+  shrinking. Zeroing c100 (`--debug_zero_owners=821364D0`) changes the
+  velocity resolve (`1B053000`, 16_16 512x288) from flat to large
+  everywhere, so c100 drives it.
 - **An in-game movie locked up the whole game** (closed 2026-10-19: no
   longer happens, not seen in extensive testing since, the user's call;
   never investigated, so the cause isn't known. Seen by the user in
