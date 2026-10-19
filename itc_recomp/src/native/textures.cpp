@@ -32,14 +32,6 @@ REXCVAR_DEFINE_BOOL(native_renderer_log_texture_writes, false, "ITC",
                     "is found changed, what the library's memcpy wrote there (a debugging aid; "
                     "with --native_renderer_verify_textures every change is found)");
 
-REXCVAR_DEFINE_BOOL(free_textures_after_race, true, "ITC",
-                    "Free the textures loaded from guest memory when a race ends (they're "
-                    "loaded again when drawn): without it they're never freed, and graphics "
-                    "memory grows by each race's textures");
-REXCVAR_DEFINE_BOOL(free_overwritten_textures, true, "ITC",
-                    "Free a texture when a new one is loaded over its memory after the game "
-                    "wrote there (the game streams textures into reused memory as the car "
-                    "drives): without it they're kept until the race ends");
 REXCVAR_DEFINE_BOOL(free_moved_resolve_destinations, true, "ITC",
                     "Free a resolve destination when a new one is made over its memory at "
                     "another address and nothing has resolved into it for 2 s (the game makes "
@@ -1022,10 +1014,8 @@ void TextureCache::BeginFrame(uint32_t frame_index) {
   }
   if (uint64_t races = g_races_left.load(std::memory_order_relaxed); races != races_seen_) {
     races_seen_ = races;
-    if (REXCVAR_GET(free_textures_after_race)) {
-      s.RetireLoaded();
-      generation_++;  // answers and last texture sets hold their views
-    }
+    s.RetireLoaded();
+    generation_++;  // answers and last texture sets hold their views
   }
   uint64_t marked = s.stats.marked;
   s.MarkWritten();
@@ -1378,12 +1368,10 @@ VkImageView TextureCache::LookUpView(uint8_t* base, const uint32_t fetch_words[6
         s.by_address.count(start)) {
       gpu_memory::Created(gpu_memory::Object::kTextureAtTakenAddress);
     }
-    if (REXCVAR_GET(free_overwritten_textures)) {
-      size_t held = s.textures.size();
-      s.RetireOverwritten(t);
-      if (s.textures.size() != held) {
-        generation_++;  // answers and last texture sets may hold their views
-      }
+    size_t held = s.textures.size();
+    s.RetireOverwritten(t);
+    if (s.textures.size() != held) {
+      generation_++;  // answers and last texture sets may hold their views
     }
     t.key = key;
     it = s.textures.emplace(key, std::move(t)).first;

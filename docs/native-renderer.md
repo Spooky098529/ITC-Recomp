@@ -1206,8 +1206,8 @@ To be fixed (or accepted) in milestone 7.
   level off. 747 of the new textures started where an older one starts;
   the rest at new addresses, or overlapping old ones elsewhere. On the
   Steam Deck (1 GB VRAM by default) this is what the user saw grow.
-  Fixed for race loads (2026-10-19, `--free_textures_after_race`, on by
-  default): when the game leaves a race (`GameMessages_OnPassFinished`:
+  Fixed for race loads (2026-10-19; was `--free_textures_after_race`,
+  removed once measured free): when the game leaves a race (`GameMessages_OnPassFinished`:
   the race's draw step stops running, once per race end), the texture
   cache retires every texture loaded from guest memory (resolve
   destinations stay: guest memory doesn't hold them), bumps its generation
@@ -1230,7 +1230,7 @@ To be fixed (or accepted) in milestone 7.
   textures overlap held ones, and 97% of those were written since loaded:
   the game streams textures into reused memory. So a texture is freed when
   a new one is loaded over its memory and the game wrote there since it
-  was loaded (`--free_overwritten_textures`, on; unwritten overlaps are
+  was loaded (was `--free_overwritten_textures`; unwritten overlaps are
   left, two textures reading the same memory both staying). Ten attract
   races (`itc_122.log`, 11 minutes): 3,121 overwritten textures freed
   (330 MB), textures at a race's end 76-102 MB (119-137 before), VRAM
@@ -1248,7 +1248,12 @@ To be fixed (or accepted) in milestone 7.
   behind. Ten attract races (`itc_123.log`): each race's new glow chain
   frees the last (all at race entry, ~5 s after their last use); resolve
   destinations stay at 23 (27-32 MB) from the third race on, VRAM peaks
-  at 381 MB; race 8's frame drawn right, glow included.
+  at 381 MB; race 8's frame drawn right, glow included. Frame rate
+  unchanged (one uncapped attract race each with the three fixes off and
+  on: 486.0 and 486.4 fps), so the two texture flags were removed: freeing
+  a texture loaded from guest memory can't draw wrong (it's loaded again
+  when drawn). The resolve destinations' flag stays until a play test, as
+  one freed while still sampled would draw black.
 
 - **Resizing the window and the swapchain** on Wayland: the compositor
   leaves the size to us and never reports the swapchain out of date, so the

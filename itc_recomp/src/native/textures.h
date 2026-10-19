@@ -170,7 +170,7 @@ class TextureCache {
 };
 
 // The game left a race (main thread): the texture cache frees its loaded
-// textures at its next frame (--free_textures_after_race).
+// textures at its next frame.
 void TextureCache_RaceLeft();
 
 }  // namespace native

@@ -765,8 +765,7 @@ and target, and recorder world matrices), mostly for comparison.
 | `--native_cockpit_dials`, `--check_native_cockpit_dials` | The cockpit dials posed natively (default on), and their angles and poses compared with the translated code on logic passes, logged every 2 s. |
 | `--log_camera_pass_records` | Which camera passes are recorded on logic and render-only passes, by message handler. |
 | `--log_gpu_memory` | Every 5 s (native renderer): the GPU memory it holds by what it's for (textures, resolve destinations, images, staging, mirrors, constant blocks), and its counts of views, samplers, descriptor pools, pipelines and new textures starting where an older one starts. For the memory that grows from race to race; see "Textures are never freed" in `native-renderer.md`. |
-| `--free_textures_after_race` | Free the textures loaded from guest memory when a race ends (default on); without it they're never freed. See "Textures are never freed" in `native-renderer.md`. |
-| `--free_overwritten_textures`, `--free_moved_resolve_destinations` | Free a texture when a new one is loaded over its memory after the game wrote there, and a resolve destination when a new one is made over its memory at another address (default on). See "Textures are never freed" in `native-renderer.md`. |
+| `--free_moved_resolve_destinations` | Free a resolve destination when a new one is made over its memory at another address (default on; kept as a flag until checked in play, as freeing one still sampled would draw black). Textures loaded from guest memory are always freed at a race's end and when the game loads a new one over their memory. See "Textures are never freed" in `native-renderer.md`. |
 
 ### What didn't work, and why
 
