@@ -300,6 +300,8 @@ struct ProductInputs {
   // only its camera is blended. Only the frame's own copies of tick products
   // are (see Output::live).
   bool live = false;
+  // The return address of the multiply or copy that made it (diagnostics).
+  uint32_t caller = 0;
 };
 
 // Main thread: the per-object recorder's caller context while it runs.
@@ -511,14 +513,25 @@ bool IsSameCameraCheck(const PerspectiveCamera& a, const PerspectiveCamera& b);
 std::mutex g_camera_rejects_mutex;
 std::string g_camera_rejects;  // a sample, for --log_blend_state
 
-bool IsSameCamera(const PerspectiveCamera& a, const PerspectiveCamera& b) {
+// Which product a camera pair was first seen in, for --log_blend_state: the
+// tick's camera and world addresses, the handler running, and the return
+// addresses of the multiplies or copies that made it in the two ticks.
+struct ProductSource {
+  uint32_t camera = 0, world = 0, handler = 0;
+  uint32_t caller_before = 0, caller_now = 0;
+};
+
+bool IsSameCamera(const PerspectiveCamera& a, const PerspectiveCamera& b,
+                  const ProductSource& source) {
   bool same = IsSameCameraCheck(a, b);
   if (!same && REXCVAR_GET(log_blend_state)) {
     std::lock_guard lock(g_camera_rejects_mutex);
-    if (g_camera_rejects.size() < 600) {
+    if (g_camera_rejects.size() < 1500) {
       g_camera_rejects += fmt::format(
-          "\n  moved {:.2f} m, turned {:.3f} rad, x {:.4g}->{:.4g}, y {:.4g}->{:.4g}, w {:.4g}->{:.4g}, "
+          "\n  camera {:08X}, world {:08X}, handler {:08X}, from {:08X}->{:08X}: "
+          "moved {:.2f} m, turned {:.3f} rad, x {:.4g}->{:.4g}, y {:.4g}->{:.4g}, w {:.4g}->{:.4g}, "
           "depth {:.4g}->{:.4g} {:.4g}->{:.4g}",
+          source.camera, source.world, source.handler, source.caller_before, source.caller_now,
           Distance(a.camera.position, b.camera.position),
           AngleBetween(a.camera.rotation, b.camera.rotation), a.x_scale, b.x_scale, a.y_scale,
           b.y_scale, a.w_scale, b.w_scale, a.depth_scale, b.depth_scale, a.depth_offset,
@@ -582,7 +595,8 @@ struct CameraPairKeyHash {
   }
 };
 ProductPlan PlanProduct(const ProductInputs& a, const ProductInputs& b, TickPlans& plans,
-                        std::unordered_map<CameraPairKey, int32_t, CameraPairKeyHash>& cameras) {
+                        std::unordered_map<CameraPairKey, int32_t, CameraPairKeyHash>& cameras,
+                        ProductSource source) {
   ProductPlan plan;
   std::optional<ScaledTransform> wa = ScaledTransformFromWorldMatrix(a.world);
   std::optional<ScaledTransform> wb = ScaledTransformFromWorldMatrix(b.world);
@@ -608,7 +622,9 @@ ProductPlan PlanProduct(const ProductInputs& a, const ProductInputs& b, TickPlan
       std::optional<PerspectiveCamera> ca = SplitViewProjection(a.view_projection);
       std::optional<PerspectiveCamera> cb = SplitViewProjection(b.view_projection);
       if (ca && cb) {
-        if (IsSameCamera(*ca, *cb)) {
+        source.caller_before = a.caller;
+        source.caller_now = b.caller;
+        if (IsSameCamera(*ca, *cb, source)) {
           it->second = int32_t(plans.cameras.size());
           plans.cameras.push_back({*ca, *cb});
         } else {
@@ -995,6 +1011,7 @@ class DrawState {
     bool render_only = frame_pacing::GameMessages_IsRenderOnlyPass();
     bool recorder = caller == kRecorderMultiplyReturn;
     ProductInputs inputs{LoadMatrix(base, a), LoadMatrix(base, b)};
+    inputs.caller = caller;
     if (recorder) {
       inputs.context = g_record_context;
     }
@@ -1013,7 +1030,7 @@ class DrawState {
 
   // Main thread, after the matrix copy dst = src. A copy of a camera (as
   // identity * camera) or of a noted product carries on as that product.
-  void OnCopy(uint8_t* base, uint32_t dst, uint32_t src) {
+  void OnCopy(uint8_t* base, uint32_t dst, uint32_t src, uint32_t caller) {
     if (std::this_thread::get_id() != main_thread_) {
       return;
     }
@@ -1023,7 +1040,9 @@ class DrawState {
       // A copy of a camera (a camera pass's, or a perspective one built on
       // the stack, like the headlight projector's).
       Matrix4 identity{1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
-      Note(base, dst, 0, src, {identity, value}, render_only);
+      ProductInputs inputs{identity, value};
+      inputs.caller = caller;
+      Note(base, dst, 0, src, inputs, render_only);
       counts_.copies++;
       return;
     }
@@ -1887,7 +1906,8 @@ class DrawState {
         continue;
       }
       plan_of_[key] = int32_t(plans->products.size());
-      plans->products.push_back(PlanProduct(before->second, now->second, *plans, camera_pairs_));
+      plans->products.push_back(PlanProduct(before->second, now->second, *plans, camera_pairs_,
+                                            {key.camera, key.world, key.handler}));
     }
     tick_product_keys_.clear();
     if (by_tick_) {
@@ -4081,8 +4101,9 @@ extern "C" REX_FUNC(sub_8258CAA0) {
 extern "C" REX_FUNC(sub_820A0AC0) {
   REX_FUNC_PROLOGUE();
   uint32_t dst = ctx.r3.u32, src = ctx.r4.u32;
+  uint32_t caller = uint32_t(ctx.lr);
   __imp__sub_820A0AC0(ctx, base);
-  interpolation::GetDrawState().OnCopy(base, dst, src);
+  interpolation::GetDrawState().OnCopy(base, dst, src, caller);
 }
 
 // Billboards_BuildVertices: r3 = billboard set (its +0 is the camera pass it

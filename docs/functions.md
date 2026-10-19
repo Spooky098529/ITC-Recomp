@@ -867,13 +867,22 @@ before; the user saw the beam steady. What was learned:
   (`BlendState_SetLivePose` for the needles' world matrices); drawing it
   only on render-only passes leaves the logic pass's frame to the replay's
   own blend.
-- **Other cameras refused far out.** About once a second a group of
-  cameras with w 1, the eye at the origin, x 0.9-1.4 and y 0.15-0.7 (aspect
-  drifting 2.8 to 24 over a drive; depth offsets -3, -5.4, -7.3, -10.1) is
-  refused, their y scale changing 1-2% a tick (over the check's 1% on
-  aspect). They aren't the player's projector (that one stays square); what
-  builds them and whether it shows isn't known. They also keep CameraIds
-  growing (thousands of numbers over a long drive).
+- **Other cameras refused far out: a temporary, never drawn.** About
+  once a second a group of cameras with w 1, the eye at the origin, x
+  0.9-3.4 and y 0.08-0.7 (aspect drifting 2.5 to 24; depth offsets -3 to
+  -23) is refused, their y scale changing 1-3% a tick (over the check's 1%
+  on aspect). `--log_blend_state` now names each refused pair's camera
+  and world addresses, handler and the multiply's or copy's return address
+  (2026-10-19, `beam-stepping`): all of these are one multiply inside the
+  c14 texture projection's builder `sub_82598768` (return `82599644`,
+  sp+352 = sp+352 * sp+208, camera `7010EA90`, world `7010EB20`, handler
+  `8215C770`), a temporary the builder overwrites two multiplies later
+  (`825996FC`). Its right operand happens to read back as a camera. In an
+  attract race, every second where only it was refused had 0 uploads
+  drawn with a refused camera; the nonzero seconds came with real cuts
+  (the main camera pass `826BAC90`, `7010F1C0` from the per-object
+  recorder, `421E6010`). So it isn't the beam and draws nothing; it does
+  keep CameraIds growing (thousands of numbers over a long drive).
 - **Main camera number switches are real cuts.** The main camera pass
   `826BAC90` switches between two projections (x 0.891, y 1.584, depth
   scale 0.139 and x 1.287, y 2.288, 0.271) with the eye moving 0.5-3.9 m and
