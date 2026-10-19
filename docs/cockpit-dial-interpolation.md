@@ -519,6 +519,33 @@ returns `[0x82010000 + 2612]`. Nothing smooths or accumulates, so calling it
 again is harmless. Car + 704 is probably the speed (mode 5 uses it).
 
 In an attract race (chase camera), `sub_820E45A8` runs on logic and
-render-only passes alike, with mode 7 and no ranges. Next: a cockpit
-drive with the angle log, to see whether the car value reads differently
-on render-only passes or the angle isn't worked out there at all.
+render-only passes alike, with mode 7 and no ranges.
+
+**Second and third drives (second car, cockpit).** The dash is in **mode
+5**, so the second needle's angle comes from **car + 704** (clamped), not
+`sub_820D3688`, and the dash's first needle isn't used (`...06A0` is posed
+elsewhere, drawn from `0x820E4474` / `0x820E4594`). `sub_820E45A8` runs on
+every pass, and its needle's local matrices (dash + 272/336) never change.
+But **car + 704 drops by 2.0 on every pass**: -0.4 on a logic pass, then
+-2.4, -4.4, -6.4, -8.4 on the render-only passes, and back on the next
+logic pass. Below its range the angle clamps to -2.14 rad (the logic
+passes' was -1.22 here): that is the rest pose. On logic passes the value
+moves smoothly with the drive (about -0.4 to 1+): a gauge value, likely
+the revs. At 30 fps every pass is a logic pass, so the drift never shows.
+
+**The writer: `sub_820DAC68`, the per-car update called from Draw**
+(`this` = car - 4288; it passes `this + 4288` on as the car). Its first
+instructions are `[this + 4992] -= [0x82010000 + 2608]` (1.0), before any
+branch: car + 704 loses 1.0 every call, on every pass. Found with
+`--find_per_frame_state --watch_addresses=051F1380` in an attract race
+(car `051F10C0`, `itc_094`: tick handler `82093DC0` > message handler
+`8215C770` > `sub_820C5DE8` > `sub_820DAC68`, 0.232 -> -0.768 -> -1.768
+...); the attract car loses 1.0 a pass, the user's 2.0 (likely two calls
+a pass). The value is set again on logic passes (the watch only covers
+render-only passes; `sub_8215C780` stores `[r26 + 2944]` into a + 704
+field, not yet confirmed to be this one). `frame_state_diff.cpp` already
+overrides `sub_820DAC68` (`ITC_FRAME_STATE_WRAP`).
+
+So the game itself works out the wrong pose between ticks: the needle
+reads a value that Draw's per-car update keeps lowering on every pass,
+which only a logic tick puts right.
