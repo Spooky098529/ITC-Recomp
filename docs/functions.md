@@ -91,6 +91,9 @@ Status:
 | `sub_820D3740` | `Dial::TachometerAngles` | Native | `TachAngles` in `src/hooks/cockpit_dials.cpp`, called by the native `sub_820E42E8` (its only caller; the translated one runs only with `--native_cockpit_dials=false` or for `--check_native_cockpit_dials`). r3 = table, r4 = the car, r5 = [dash], r6 = &a, r7 = &b; no state. `a` from car + 696: `[0x82000A34]` below it; up to from (table + 0, or + 8 when `[[dash]]` isn't 0) value / from * table[16]; up to to (+ 4 or + 12) linear to table[20]; above, table[20]. `b` from car + 700: table[28] below table[24], linear over table[24..36] then table[32..44], clamped at table[44]. |
 | `sub_820A2D30` | `Matrix::RotateZ` | | r3 = out, r4 = in, r5 = &angle: out = in * RotZ, rows `(c, s, 0, 0)`, `(-s, c, 0, 0)`, sine and cosine from a polynomial. |
 | `sub_820A0AC0` | `Matrix::Copy` | Wrapped | r3 = destination, r4 = source, 4x4. Interpolation follows copies of cameras and products. |
+| `sub_82597610` | `Projector::Build` | | r3 = out, r4 = eye, r5 = target, r6 = up (16-byte vectors), f1-f4 = field of view, aspect, near, far: out = look-at (`sub_82597378`) * perspective (`sub_825972A8`) * a fixed bias matrix at `0x8265EED0` (two `sub_8209BD50` multiplies). Called by the render orchestrator `sub_820C5DE8` (return `0x820C6A2C`) for the player's headlight once a view, and by `sub_820F34C8` (return `0x820F3944`) in a loop of up to 5. See "The headlight beam far from the origin". |
+| `sub_82597378` | `Matrix::LookAt` | | r3 = out, r4 = eye, r5 = target, r6 = up: a row-vector view matrix, forward = target - eye. |
+| `sub_825972A8` | `Matrix::Perspective` | | r3 = out, f1 = field of view, f2 = aspect, f3 = near, f4 = far: y scale = 1 / tan(f1 * the constant at `0x82001BE4`), x scale = y scale / aspect, depth = far / (far - near), offset -near * far / (far - near). |
 | `sub_820D06F0` | `CarPart::Draw` | | r3 = the part (returns if `[part + 4]`, its model, is 0), r4 = the camera, r5 = the world matrix, r6, r7: with r7 = 0, `sub_820D04E8([part + 4], camera, world, [part + 228], r6)`. |
 | `sub_820D04E8` | `Model::Draw` | | Draws a model (r31 = r3): a visibility test (`sub_825951E0`), then the per-object recorder `sub_825953D0` (return address `0x820D0564`, which pairs products by r31). Culls with the camera it's given, so a world matrix away from the tick's can be culled. |
 | `sub_82099A98` | `TickHandler::Invoke` | Wrapped | r3 = the app, r4 = the handler (target at +8). Skips some tick handlers on render-only passes (`SkipTickHandlerOnRenderOnlyPass`, `src/frame_pacing/game_messages.cpp`); the diagnostics' before and after hooks (`--log_tick_handlers`, `--find_per_frame_state` and others). |
@@ -576,10 +579,15 @@ into a command 7 payload. So blending happens there, in two halves:
    - the operands' addresses (often the same stack temporaries for many
      objects),
    - which camera it is: a permanent id per distinct projection (aspect
-     ratio and depth mapping, matched within 1% through log-scale buckets),
-     because the main view, mirror and reflection cameras share stack copies
-     and their order varies between ticks. Ids must never be renumbered:
-     a table that once reset when full unpaired everything,
+     ratio and depth scale over w scale, matched within 1% through
+     log-scale buckets; not the depth offset, which drifts far from the
+     origin), because the main view, mirror and reflection cameras share
+     stack copies and their order varies between ticks. Ids must never be
+     renumbered: a table that once reset when full unpaired everything.
+     Each camera address keeps the ids it used with their latest
+     projection and reuses the most recently used one within 1%
+     (`--sticky_camera_ids`), so a projection that drifts (a wide camera's
+     aspect, 2.8 to 24 over a drive) keeps its id,
    - how many times that combination was multiplied earlier in the pass.
 
    Each key is paired with the same key from the previous tick, except the
@@ -762,6 +770,10 @@ and target, and recorder world matrices), mostly for comparison.
 | `--log_world_sprites`, `--log_single_sprites` | The world-space sprites as recorded. |
 | `--pair_by_object` | Pair the per-object recorder's products by position within groups alike but for their order (default on); see "What gets blended". |
 | `--log_moving_products` | Moving objects drawn out of step, event by event; see "What gets blended". |
+| `--camera_ids_ignore_depth_offset`, `--sticky_camera_ids` | Camera numbers and the cut check without the depth offset, and numbers kept by camera address while a projection drifts (default on); see "The headlight beam far from the origin". |
+| `--double_precision_blending` | Blend objects' and cameras' positions in double and multiply only their difference (default off): the blend's own jitter far from the origin from ~1 mm to ~0.01 mm, nothing visible. |
+| `--log_camera_copies` | Every 2 s: copies of cameras left unpaired between ticks, what the previous tick held at the same address (with the eye's movement, turn and scales for a renumbered one), new camera numbers and how many exist. |
+| `--log_cockpit_judder` | Every 2 s: where the camera is in the frame of each part within 3 m of it (the cockpit), frame by frame, its jerk, and the ticks' own camera offsets. |
 | `--log_thread_cpu` | Every 2 s: the process's and the machine's CPU use, and each thread using 5% of a core or more, by name: its share of a core (system time in brackets), the CPU it last ran on, its voluntary/involuntary context switches (many involuntary ones mean it's waiting for a core) and its minor/major page faults. Game threads are labeled with their entry point (`8258DE50 -> <the thread's own function>`). A thread with 10% or more of a core in the kernel gets its system calls sampled (25 reads of `/proc/.../syscall`, 4 ms apart: numbers, `running`, or -1 outside a call). On in `run-debug.sh`; Linux only. For finding a thread that pegs a core on slower machines (the Steam Deck). |
 | `--native_cockpit_dials`, `--check_native_cockpit_dials` | The cockpit dials posed natively (default on), and their angles and poses compared with the translated code on logic passes, logged every 2 s. |
 | `--log_camera_pass_records` | Which camera passes are recorded on logic and render-only passes, by message handler. |
@@ -814,6 +826,77 @@ constants:
    payload comes from (a multiply, a copy, or something else).
 3. Keep per-tick copies of that source's inputs and blend them at replay,
    keyed by something stable across ticks; check with the log again.
+
+### The headlight beam far from the origin
+
+Far from the map's origin (x ≈ -8,000 to -10,000 m), the player's headlight
+beam on the road sometimes lagged the car or flickered, with interpolation
+only. Fixed on `headlight-flicker` (2026-10-19): the cut check no longer
+compares cameras' depth offsets (`--camera_ids_ignore_depth_offset`, on).
+In a 5-minute drive far out, no square projector was refused, against 56
+before; the user saw the beam steady. What was learned:
+
+- **The projector.** The player's headlight is a projected texture: the
+  render orchestrator `sub_820C5DE8` calls `sub_82597610` (return
+  `0x820C6A2C`) once a view, with the eye and the beam's direction worked
+  out from the car's matrix at car + 4304 (fixed local offsets), the field
+  of view from the light's data (+188), aspect 1 and near 1, and copies the
+  result into a per-view array (stride 592, + 144). `sub_820F34C8` (return
+  `0x820F3944`) builds up to 5 more square projectors in the lights code
+  (which lights isn't known). The interpolation sees a projector's copy as
+  identity * camera, and products made with it (the beam on other cars'
+  bodies, ~30-170 a draw) as world * camera, and blends it as a camera.
+  Read back as a camera it's square: x = y = 0.8391, w 1.
+- **Why it stepped.** Its depth offset, read back from the view-projection,
+  is the difference of two terms that grow with the distance from the
+  origin, so float rounding moves it: 0.1000 near x ≈ -1,700, 0.0991 <->
+  0.1002 from tick to tick at x ≈ -8,500. Two things compared it within 1%:
+  the camera numbers (CameraIds), which then flipped between two numbers
+  (unpaired, drawn at the tick), and the cut check (`IsSameCameraCheck`),
+  which refused the pair as a cut (not blended). Either way that frame drew
+  the beam a tick ahead of the car. With `--log_blend_state`, refusals show
+  as "cameras not blended" with x 0.8391. Both now use the depth scale over
+  w scale (from the matrix's rotation part) and not the offset; the
+  numbers also stay with their camera address while the projection drifts
+  (`--sticky_camera_ids`, on), as a wide camera's aspect does (below).
+- **The logic pass's frame.** Drawing runs a tick behind: the logic pass's
+  draw records tick N (later frames blend against it) while its frame shows
+  N-1, made by the replay blending each product back. So anything built for
+  the frame at the source (as the cockpit needles are) still needs the
+  replay to be given the frame's version beside the tick's
+  (`BlendState_SetLivePose` for the needles' world matrices); drawing it
+  only on render-only passes leaves the logic pass's frame to the replay's
+  own blend.
+- **Other cameras refused far out.** About once a second a group of
+  cameras with w 1, the eye at the origin, x 0.9-1.4 and y 0.15-0.7 (aspect
+  drifting 2.8 to 24 over a drive; depth offsets -3, -5.4, -7.3, -10.1) is
+  refused, their y scale changing 1-2% a tick (over the check's 1% on
+  aspect). They aren't the player's projector (that one stays square); what
+  builds them and whether it shows isn't known. They also keep CameraIds
+  growing (thousands of numbers over a long drive).
+- **Main camera number switches are real cuts.** The main camera pass
+  `826BAC90` switches between two projections (x 0.891, y 1.584, depth
+  scale 0.139 and x 1.287, y 2.288, 0.271) with the eye moving 0.5-3.9 m and
+  turning 0.06-0.11 rad: view changes, correctly left unblended.
+- **What the diagnostics see.** `--log_camera_copies` only covers copies of
+  cameras (identity world), not object * camera products; unpaired (no
+  match in the previous tick) and refused (paired, failed the cut check) are
+  two separate ways to be drawn at the tick, logged by different flags
+  (`--log_camera_copies`, `--log_moving_products`; `--log_blend_state`).
+
+Tried on the way, not kept:
+
+- **Positions blended in double** (`--double_precision_blending`, off): the
+  blend's own jitter far out went from ~1 mm to ~0.01 mm, with no visible
+  change to the cockpit judder, which is the game's own (Known issues).
+  Kept as an option.
+- **The projector given per frame**: an override of `sub_82597610` for
+  `0x820C6A2C` working out the frame's projector from its placement blended
+  between ticks, first built on render-only passes only (the logic pass's
+  frame was still refused), then handed to the replay on every pass beside
+  the tick's, never blended as a camera. Its refusals went to 0 in logs, but
+  `sub_820F34C8`'s projectors were still refused and the user still saw
+  flicker; the cut check fix made it unneeded (removed).
 
 ## Performance
 
