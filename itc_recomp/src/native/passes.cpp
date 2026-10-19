@@ -930,6 +930,7 @@ struct Passes::State {
   // Debugging aids: draws of this pixel shader (hash) are skipped; with
   // record_draws, each draw is described in a line (written with a dump).
   uint64_t skip_pixel_shader = 0;
+  bool skip_motion_blur = false;  // --motion_blur=false
   bool record_draws = false;
   // With log_glow: per frame, the glow history's cross-fade draws (pixel
   // shader kGlowCrossFade) and the texture they read, and 256x144 resolves
@@ -3309,6 +3310,12 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
     if (pixel->hash == skip_pixel_shader) {
       return;  // debugging aid
     }
+    // The game's velocity-based motion blur: leaving its one draw out
+    // leaves the frame as drawn, unblurred.
+    constexpr uint64_t kMotionBlur = 0x7EB16456AAD56CBAull;
+    if (skip_motion_blur && pixel->hash == kMotionBlur) {
+      return;
+    }
   } else if (skip_pixel_shader == kSkipNoPixelShader) {
     return;
   }
@@ -4439,6 +4446,10 @@ void Passes::set_log_glow(bool log) {
 
 void Passes::set_skip_pixel_shader(uint64_t hash) {
   state_->skip_pixel_shader = hash;
+}
+
+void Passes::set_skip_motion_blur(bool skip) {
+  state_->skip_motion_blur = skip;
 }
 
 void Passes::set_record_draws(bool record) {

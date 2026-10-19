@@ -145,8 +145,9 @@ minimap triangle's flashing, the car's reflections, buildings' lighting,
 play time and the glow (bloom; `src/interpolation/glow.cpp`, v0.3.9) are all done. `run.sh` turns
 interpolation on (marked experimental) with logging off; `run-debug.sh` is
 the same with logs; `./run.sh --no-interpolation` gives the original 30 fps.
-Our renderer always draws motion blur and glow (`--motion_blur` and
-`--glow` only affect the emulated GPU). Known issues are at the end of
+Our renderer always draws the glow (`--glow` only affects the emulated
+GPU); `--motion_blur=false` leaves out the motion blur (on by default;
+defined in `src/native/renderer.cpp` since SDK patch 0002 was removed). Known issues are at the end of
 `docs/functions.md`.
 
 Other resolutions (v0.4.0, merged from `unlocked-resolution`):

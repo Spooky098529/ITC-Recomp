@@ -19,7 +19,8 @@
 # Frame interpolation (experimental): game logic stays at 30 Hz and races
 # draw up to --max_fps (144 here; pass --max_fps=N to change it, 0 for
 # unlimited), each frame blended between the last two ticks. Menus stay at
-# 30 fps. Motion blur and glow are always drawn.
+# 30 fps. The glow is always drawn; --motion_blur=false leaves out the motion
+# blur.
 #
 # Resolution (none of these is on by default: out of the box the game runs
 # in a 1280x720 window at its own resolution, its 3D view drawn at 1024x576

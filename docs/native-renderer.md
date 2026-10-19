@@ -857,9 +857,10 @@ memory).
   address), i.e. the emulated GPU's result, decoded from memory
   (uncompressed formats, first level). Pair them with ours
   (`resolve_<n>_...`) to compare. Run such comparisons with
-  `--motion_blur=true --glow=true`, so the emulated GPU draws the motion
-  blur and the light bloom that `patches/rexglue-sdk/0001` and `0002`
-  otherwise leave out (ours always draws them). The emulated GPU isn't
+  `--glow=true`, so the emulated GPU draws the light bloom that
+  `patches/rexglue-sdk/0001` otherwise leaves out (ours always draws it).
+  Both draw the motion blur (SDK patch `0002`, which let the emulated GPU
+  leave it out, was removed on 2026-10-19). The emulated GPU isn't
   always the right one: its bloom chain comes out blocky.
 - `--native_renderer_dump_every=<s>` (with `--native_renderer_dump`): dump
   only the frame (shown image, draw IDs, `draws.txt`; no resolves or
@@ -1055,7 +1056,7 @@ memory).
   any dump. Never screenshot the user's desktop: look at frames with the
   renderer's own dump (`--native_renderer_dump`, 10 s into a race or when
   `<dir>/now` appears; `--native_renderer_dump_every` for periodic ones).
-  To compare with the emulated GPU, add `--motion_blur=true --glow=true
+  To compare with the emulated GPU, add `--glow=true
   --readback_resolve=full` and a full dump (`--native_renderer_dump`
   without `_every`, 10 s into the race), and put each `guest_resolve_*`
   next to the `resolve_*` of the same name (a small PIL script).
@@ -1122,9 +1123,9 @@ To be fixed (or accepted) in milestone 7.
   blur (pixel shader `7EB16456AAD56CBA`) gets its velocities from the
   tick, so at interpolated frame rates each frame smears a whole tick of
   motion, more than intended. `run.sh` turned it off with the emulated GPU
-  (`--motion_blur=false`, which our renderer ignores); ours always draws
-  it. Scaling the velocities to the frame's share of a tick, or an option
-  to skip the pass, would fix it.
+  (`--motion_blur=false`); ours draws it too unless `--motion_blur=false`
+  (added 2026-10-19: leaves its one draw out). Scaling the velocities to
+  the frame's share of a tick would fix it.
   The previous position also pulsed at 30 Hz, fixed on `beam-stepping`
   (2026-10-19, `--motion_blur_by_tick`, on). The previous view-projection
   is vertex c100 x4, which `sub_821363F0` copies (return `8213653C`) from
