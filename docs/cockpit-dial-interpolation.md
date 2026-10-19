@@ -690,15 +690,16 @@ gauge in mode 5) natively, on every pass:
   by the frame's amount (`BlendState_Amount()`, what the frame's products are
   blended by: `TickProgress()` reads the clock, so it changes within a pass),
   as `ScaledTransform`s, with `blend_state.cpp`'s 8 m cut.
-- **Drawing:** the world matrix goes where the original put it (the
-  original's stack frame + 160, so products pair across passes as before),
-  with `lr` the original's return address, around
-  `BlendState_SetLivePose(true)`. The recorder's multiply then marks its
-  product `live` (`ProductInputs::live`): `Note` pairs it by key without
-  comparing world matrices, `Publish` gives a render-only pass's live
-  product a copy of the tick's with the world matrix as drawn, and
-  `BlendProduct` keeps that world and blends only the camera. Logic
-  passes' frames are posed the same way (at their own amount).
+- **Drawing:** the game is handed the needle's **tick pose** (on car + 16
+  as it is), where the original put it (the original's stack frame + 160,
+  so products pair across passes as before), with `lr` the original's
+  return address. The pose on the blended car goes beside it, through
+  `BlendState_SetLivePose(world)`: `Note` keeps it with the recorder's
+  product (`Output::live`, the logic pass's for its own frame only),
+  `Publish` gives that product a copy of the tick's with that world
+  (`ProductInputs::live`), and `BlendProduct` keeps that world and blends
+  only the camera. Only the recorder's multiply is marked (the draw makes
+  other camera products too).
 - **Check:** `--check_native_cockpit_dials` runs the translated angle maps,
   rotation and multiplies on logic passes for the same inputs. Attract
   race: angles exact, poses within 1.2e-4 (a float step at the car's
@@ -710,3 +711,27 @@ gauge in mode 5) natively, on every pass:
 
 `--per_tick_car_gauges` is still on: the dials no longer need it, but
 anything else reading car + 704 on render-only passes still does.
+
+### First drive: the needle drifted off the dash (fixed)
+
+At first the game was handed the pose on the blended car. The user: fast
+moves no longer broke the needles, but a needle could move off the dash
+(downwards, say), still at the right angle, and catch up again later.
+`--log_blend_state` (live pose counts) showed render-only passes' needles
+often had **no tick product**, so `Note` left them as the game drew them,
+with the tick's camera. Their keys, next to the logic pass's: some logic
+passes drew no needles at all, or only one. The game culls the part
+(`sub_820D04E8`) with the tick's camera; a logic pass's frame is early in
+the tick, so the needle sat on the car a tick back, which at speed is
+behind the cockpit camera. Hence the tick pose for the game and the
+blended one for the replay, as above.
+
+Drive with the fix (`itc_108`, 2026-10-19): the user says the needles look
+right. 24,102 live poses on render-only passes, 6 with no tick product
+(the race's first passes); of 30,174 replayed, 45 unpaired and 30 with their
+camera rejected (one tick's frames at a time).
+
+Left to do: the needles step at 30 Hz by design; blending the kept gauge
+values in `InputsFor` would make them sweep (the user's call). Whether
+`--per_tick_car_gauges` is still needed for anything else. The harnesses
+(`tests/needle_blend.cpp`, `wheel_blend.cpp`) don't model live poses.
