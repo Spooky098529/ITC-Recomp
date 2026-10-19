@@ -986,8 +986,6 @@ processes the game's commands; the render thread mostly waits for it.
   every frame (`--motion_blur_by_tick`; see "Motion blur reads the 30 Hz
   tick" in `docs/native-renderer.md`). Nothing visible steps in testing; see
   "Finding what still steps" if something does.
-- **A piece of geometry flickers while the car moves**, at native 30 fps
-  too, so not interpolation: probably the game's own effect (a broken light).
 - **The cockpit judders left to right far from the map's origin**
   (x ≈ −8,000 to −10,000 m), with interpolation off too (seen under Wine,
   uncapped, `--interpolate_draw_state=false`, 2026-10-19), so it's the
