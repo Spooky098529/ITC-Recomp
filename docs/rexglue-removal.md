@@ -319,6 +319,15 @@ B1. **Input** (3 functions calling `XamInput*`): native, reading A5.
     the hold counters; the action mappers (`sub_8210B018`, wrapped) read
     the processors next.
 
+    Who else reads that data (2026-10-19, partial; "Who reads the input
+    manager" in `docs/pause-menu-fix.md`): besides the mappers (logical
+    pads 0-3's values 0-7 through mapper +2880, and the listeners' held
+    words), the app's update `sub_82093DC0` reads processor 0's pressed
+    word (+2104) through `sub_8258CEB0`. So native mappers wouldn't yet
+    let the input data leave guest memory: at least that word needs a
+    guest copy (or that reader made native too), and menus and the pause
+    menu driven by a player haven't been watched yet.
+
 B2. **Audio** (6 functions calling `XAudio*`/`XMA*`, plus what's around
     them): the game's render driver client feeding A6 directly, and its
     XMA users decoding with FFmpeg directly instead of through emulated

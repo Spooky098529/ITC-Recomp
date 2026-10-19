@@ -195,6 +195,41 @@ In order:
 5. pressed = held & (held ^ old held); released = (held ^ old held) &
    old held.
 
+### Who reads the input manager (2026-10-19, partial)
+
+Asked for docs/rexglue-removal.md (B1): if the action mappers were
+native, could the input manager (3,984 bytes at `0x40059F50`) and the
+four listener objects (inside the mappers at +0x9A0) stop being written
+to guest memory? Found with a page-protection read watch
+(`--watch_input_reads`, `src/debug/input_read_watch.cpp` and
+`tools/resolve_input_reads.py`, written by a subagent and left
+uncommitted in the working tree; Linux only): the host pages behind the
+ranges are made `PROT_NONE`, each fault logs the host instruction (local
+builds keep symbols, so `addr2line` names the `sub_XXXXXXXX`) and the
+offset, and the page is opened for one single-stepped instruction. Our
+Input::Update runs with the pages open.
+
+Three unattended runs (boot, the front end, attract races; no menus
+driven by a player, no pause menu, no rival intro):
+
+| Reader | Reads | When |
+|---|---|---|
+| `sub_8210C370` (the mappers' update) | logical pads 0-3's values 0-7 (+44..+72 + 196j) | front end, race |
+| `sub_8258CF10` (button test, for the mappers) | listener objects' held word (+272) | front end, race |
+| `sub_8258CEB0` → `sub_82592500` (button test), called twice by `sub_82093DC0` | processor 0's pressed word (manager +2104 = +1840 + 264) | boot, front end |
+| `sub_82093DC0`, `sub_820902C8` (tick handlers) | the manager's vtable (+0) only | every pass |
+
+- The mappers' +2880 points to logical pad `j`'s values (manager +44,
+  +240, +436, +632 for mappers 0-3): they read the sticks from the
+  logical pads, not from the processors.
+- So far one reader outside the mappers: the app's update reads
+  processor 0's pressed bits directly (probably "press Start" at boot or
+  in the front end; not checked).
+- Not covered yet: front-end menus and the pause menu driven by a player
+  (the pause menu reads with inline loads, see above), the rival intro.
+  A run with `--watch_input_reads=true` through those would finish the
+  list.
+
 ## Plan
 
 ### Step 0: logging (`--log_input`)
