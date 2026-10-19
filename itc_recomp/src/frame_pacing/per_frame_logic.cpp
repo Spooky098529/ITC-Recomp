@@ -8,6 +8,7 @@
 #include "game_messages.h"
 #include "guest.h"
 #include "frame_pacer.h"
+#include "debug/dial_pose_log.h"
 #include "debug/frame_state_diff.h"
 #include "debug/pause_movie_log.h"
 #include "interpolation/blend_state.h"
@@ -132,9 +133,14 @@ extern "C" REX_FUNC(sub_820DAC68) {
     guest::StoreFloat(base, gauge,
                       guest::LoadFloat(base, gauge) + guest::LoadFloat(base, kGaugeStep));
   }
+  uint32_t car = ctx.r3.u32 + 4288;
+  float before = debug::DialPoseLog_Enabled() ? guest::LoadFloat(base, car + 704) : 0.0f;
   debug::FrameStateDiff_Before(base);
   __imp__sub_820DAC68(ctx, base);
   debug::FrameStateDiff_After(base, "draw step part", 0x820DAC68);
+  if (debug::DialPoseLog_Enabled()) [[unlikely]] {
+    debug::DialPoseLog_CarStep(base, car, before, guest::LoadFloat(base, car + 704));
+  }
 }
 
 // Calls whose animation state and drawing are one: on a render-only pass,

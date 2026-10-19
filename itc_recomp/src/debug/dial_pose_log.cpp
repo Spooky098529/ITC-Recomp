@@ -10,15 +10,18 @@
 // part's first 0x200 bytes: all of them on the part's first draw, then only
 // the words that changed since its last draw. Written to the file every 5 s.
 
+#include "debug/dial_pose_log.h"
 #include "frame_pacing/game_messages.h"
 #include "guest.h"
 
 #include <rex/cvar.h>
 
+#include <array>
 #include <chrono>
 #include <cstdio>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 REXCVAR_DEFINE_STRING(log_dial_pose, "", "ITC",
@@ -36,6 +39,7 @@ struct DialPoseLog {
   std::vector<uint32_t> suffixes;
   bool parsed = false;
   std::unordered_map<uint32_t, std::vector<uint32_t>> last;  // part -> its words at its last draw
+  std::unordered_set<uint32_t> cars;  // seen in dial calls, for sub_8215C780's stores
   std::string pending;
   std::chrono::steady_clock::time_point written = std::chrono::steady_clock::now();
 
@@ -159,6 +163,7 @@ extern "C" REX_FUNC(sub_820E45A8) {
                   guest::LoadFloat(base, ctx.r4.u32 + 16 + 52),
                   guest::LoadFloat(base, ctx.r4.u32 + 16 + 56));
     debug::GetDialPoseLog().pending += line;
+    debug::GetDialPoseLog().cars.insert(ctx.r4.u32);
   }
   __imp__sub_820E45A8(ctx, base);
 }
@@ -202,4 +207,100 @@ extern "C" REX_FUNC(sub_820A2D30) {
     debug::GetDialPoseLog().pending += line;
   }
   __imp__sub_820A2D30(ctx, base);
+}
+
+namespace {
+// A car's three gauge values, for the log.
+void AppendGauges(std::string& out, uint8_t* base, uint32_t car) {
+  char line[96];
+  std::snprintf(line, sizeof(line), " 696 %.4f 700 %.4f 704 %.4f", guest::LoadFloat(base, car + 696),
+                guest::LoadFloat(base, car + 700), guest::LoadFloat(base, car + 704));
+  out += line;
+}
+}  // namespace
+
+bool debug::DialPoseLog_Enabled() { return !REXCVAR_GET(log_dial_pose).empty(); }
+
+void debug::DialPoseLog_CarStep(uint8_t* base, uint32_t car, float before, float after) {
+  if (!GetDialPoseLog().cars.count(car)) {
+    return;
+  }
+  char line[160];
+  std::snprintf(line, sizeof(line), "pass %llu %s step car %08X 704 %.4f -> %.4f\n",
+                (unsigned long long)frame_pacing::GameMessages_PassNumber(), PassType(), car, before,
+                after);
+  GetDialPoseLog().pending += line;
+}
+
+// The tachometer's dash (sub_820E42E8, one caller, sub_820E51D0): r3 = the
+// dash, r4 = the car. Its two needles' angles come from sub_820D3740.
+extern "C" REX_FUNC(sub_820E42E8) {
+  REX_FUNC_PROLOGUE();
+  if (debug::DialPoseLog_Enabled()) [[unlikely]] {
+    char line[160];
+    std::snprintf(line, sizeof(line), "pass %llu %s tach dash %08X car %08X table %08X",
+                  (unsigned long long)frame_pacing::GameMessages_PassNumber(), PassType(),
+                  ctx.r3.u32, ctx.r4.u32, guest::LoadU32(base, ctx.r3.u32 + 2896));
+    debug::DialPoseLog& log = debug::GetDialPoseLog();
+    log.pending += line;
+    AppendGauges(log.pending, base, ctx.r4.u32);
+    log.pending += '\n';
+    log.cars.insert(ctx.r4.u32);
+  }
+  __imp__sub_820E42E8(ctx, base);
+}
+
+// The tachometer's two angles: r3 = the table, r4 = the car, r5 = [dash],
+// r6 = &a (from car + 696), r7 = &b (from car + 700).
+extern "C" REX_FUNC(sub_820D3740) {
+  REX_FUNC_PROLOGUE();
+  bool log = debug::DialPoseLog_Enabled();
+  uint32_t lr = uint32_t(ctx.lr), table = ctx.r3.u32, car = ctx.r4.u32, dash0 = ctx.r5.u32;
+  uint32_t a = ctx.r6.u32, b = ctx.r7.u32;
+  __imp__sub_820D3740(ctx, base);
+  if (log) [[unlikely]] {
+    char line[256];
+    std::snprintf(line, sizeof(line),
+                  "pass %llu %s tach angles caller %08X table %08X car %08X [[dash]] %u a %.4f b %.4f",
+                  (unsigned long long)frame_pacing::GameMessages_PassNumber(), PassType(), lr, table,
+                  car, dash0 ? guest::LoadU32(base, dash0) : 0u, guest::LoadFloat(base, a),
+                  guest::LoadFloat(base, b));
+    debug::DialPoseLog& dial_log = debug::GetDialPoseLog();
+    dial_log.pending += line;
+    AppendGauges(dial_log.pending, base, car);
+    dial_log.pending += '\n';
+    dial_log.Flush();
+  }
+}
+
+// The tick's car record update (sub_8215C780): copies the car's world matrix
+// into r31 + 16 and stores its gauges at r31 + 696, 700, 704. Logs the cars
+// seen in dial calls whose gauges it changed.
+extern "C" REX_FUNC(sub_8215C780) {
+  REX_FUNC_PROLOGUE();
+  if (!debug::DialPoseLog_Enabled()) [[likely]] {
+    __imp__sub_8215C780(ctx, base);
+    return;
+  }
+  debug::DialPoseLog& log = debug::GetDialPoseLog();
+  std::vector<std::array<uint32_t, 3>> before;
+  for (uint32_t car : log.cars) {
+    before.push_back({guest::LoadU32(base, car + 696), guest::LoadU32(base, car + 700),
+                      guest::LoadU32(base, car + 704)});
+  }
+  uint32_t r3 = ctx.r3.u32;
+  __imp__sub_8215C780(ctx, base);
+  size_t i = 0;
+  for (uint32_t car : log.cars) {
+    const auto& was = before[i++];
+    if (was[0] != guest::LoadU32(base, car + 696) || was[1] != guest::LoadU32(base, car + 700) ||
+        was[2] != guest::LoadU32(base, car + 704)) {
+      char line[160];
+      std::snprintf(line, sizeof(line), "pass %llu %s set r3 %08X car %08X",
+                    (unsigned long long)frame_pacing::GameMessages_PassNumber(), PassType(), r3, car);
+      log.pending += line;
+      AppendGauges(log.pending, base, car);
+      log.pending += '\n';
+    }
+  }
 }
