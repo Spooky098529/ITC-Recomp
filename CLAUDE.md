@@ -19,6 +19,9 @@ the SDK's audio (the Audio Worker's spin, the game's sounds, the plan).
 under Wine (the user has no Windows machine).
 `docs/old-hardware.md` is the plan (not started) for running below
 Vulkan 1.3, and why not OpenGL.
+`docs/rexglue-removal.md` is the plan (not started, branch
+`remove-rexglue`) for removing the ReXGlue SDK piece by piece, a release
+after each phase: what we still use from it, and the steps.
 `docs/tick-replay.md` is a lead (not started): translating draws once a
 tick and replaying our own list on in-between frames.
 `docs/pause-menu-fix.md` is the pause menu's too-fast input repeat: fixed
