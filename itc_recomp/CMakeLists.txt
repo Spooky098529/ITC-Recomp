@@ -66,6 +66,7 @@ set(ITC_SOURCES
     src/hooks/create_file.cpp
     src/hooks/lights.cpp
     src/hooks/cockpit_dials.cpp
+    src/hooks/headlight_projector.cpp
     src/hooks/input.cpp
     src/frame_pacing/frame_pacer.cpp
     src/frame_pacing/renderer_hooks.cpp

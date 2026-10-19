@@ -426,7 +426,6 @@ ITC_FRAME_STATE_WRAP(820FFD88)
 ITC_FRAME_STATE_WRAP(82593FC0)
 ITC_FRAME_STATE_WRAP(82597118)
 ITC_FRAME_STATE_WRAP(82597518)
-ITC_FRAME_STATE_WRAP(82597610)
 ITC_FRAME_STATE_WRAP(82598768)
 // The light billboards' batch (calls sub_8209C1A0 and sub_8209C6E0); r4 is
 // the light list: count at +32, 48-byte lights at +36 (position at +0, size
