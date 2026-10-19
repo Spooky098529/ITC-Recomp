@@ -133,6 +133,11 @@ REXCVAR_DEFINE_BOOL(double_precision_blending, true, "ITC",
                     "Blend an object's and its camera's positions in double precision and "
                     "multiply with only their difference, so float rounding far from the map's "
                     "origin (~1 mm at 10 km) doesn't make the cockpit judder against the view");
+REXCVAR_DEFINE_BOOL(camera_ids_ignore_depth_offset, true, "ITC",
+                    "Number cameras by aspect ratio and depth scale only: the depth offset, read "
+                    "back from the view-projection, drifts with the camera's distance from the "
+                    "map's origin (the headlight projector's by 1% over 7 km), which gave it new "
+                    "numbers far out (the beam lagging the car)");
 REXCVAR_DEFINE_BOOL(cache_camera_ids, true, "ITC",
                     "Remember the camera number of recently seen view-projections by their "
                     "bytes, so a repeated one skips splitting it and the table lookup (same "
@@ -745,7 +750,8 @@ Matrix4 BlendProduct(const ReplayedProduct& product, const TickPlans* plans,
 // camera); 0 for a non-perspective one. Main thread.
 class CameraIds {
  public:
-  // Aspect ratio, depth offset and depth scale over offset.
+  // Aspect ratio, depth offset and depth scale over offset (aspect ratio,
+  // depth scale over w scale and 0 with --camera_ids_ignore_depth_offset).
   using Signature = std::array<float, 3>;
 
   // The number, and the signature it was found by (zeros for 0).
@@ -813,7 +819,15 @@ class CameraIds {
     if (!camera || !(camera->y_scale != 0) || !(camera->depth_offset != 0)) {
       return 0;
     }
-    Signature signature{camera->x_scale / camera->y_scale, camera->depth_offset,
+    // The depth offset is the view-projection's translation row less the
+    // depth scale times the view's: two terms that grow with the camera's
+    // distance from the origin, whose float errors left it drifting (the
+    // headlight projector's 0.1000 near the start, 0.0990 8 km out). The
+    // aspect ratio and depth scale come from the rotation part alone.
+    Signature signature =
+        REXCVAR_GET(camera_ids_ignore_depth_offset)
+            ? Signature{camera->x_scale / camera->y_scale, camera->depth_scale / camera->w_scale, 0}
+            : Signature{camera->x_scale / camera->y_scale, camera->depth_offset,
                         camera->depth_scale / camera->depth_offset};
     out = signature;
     // Look in the signature's bucket and its neighbors, so values either
