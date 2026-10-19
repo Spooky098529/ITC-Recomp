@@ -549,6 +549,9 @@ struct BlendStats {
 struct ProductBlendParts {
   Matrix4 world_now, world;          // the tick's world matrix, and the blend
   std::optional<Vec3> eye_now, eye;  // the camera's position, if it was blended
+  // The blended positions in double (--double_precision_blending), for the
+  // diagnostics: the world's, and the camera's when it was blended.
+  std::array<double, 3> position_exact{}, eye_exact{};
   // Diagnostics: the product it was paired with.
   const ReplayedProduct* product = nullptr;
 };
@@ -663,7 +666,9 @@ Matrix4 BlendProduct(const ReplayedProduct& product, const TickPlans* plans,
                                        float amount, BlendStats& stats, CameraBlends& cameras,
                                        ProductBlendParts* parts = nullptr) {
   if (parts) {
-    *parts = {product.tick->now.world, product.tick->now.world, std::nullopt, std::nullopt, &product};
+    *parts = {};
+    parts->world_now = parts->world = product.tick->now.world;
+    parts->product = &product;
   }
   if (product.tick->now.live && REXCVAR_GET(log_blend_state)) [[unlikely]] {
     stats.live++;
@@ -709,6 +714,8 @@ Matrix4 BlendProduct(const ReplayedProduct& product, const TickPlans* plans,
       parts->eye_now = plans->cameras[size_t(plan.camera)].b.camera.position;
       parts->eye = blended.eye;
       parts->world = world;
+      parts->position_exact = position;
+      parts->eye_exact = blended.eye_exact;
     }
     if (REXCVAR_GET(double_precision_blending) && IsAffineRowLayout(world)) {
       // world * view_projection = (world moved by -eye) * the camera at the
@@ -1240,20 +1247,28 @@ class DrawState {
   uint64_t StickyCameraId(uint32_t address, uint64_t id, const CameraIds::Signature& projection) {
     StickyIds& slots = sticky_ids_[(uint64_t(address) << 32) | handler_];
     sticky_uses_++;
+    // The most recently used number whose projection is close. Preferring
+    // `id` instead flipped with it: two slots had come to follow the same
+    // drifting camera (13 and 570), and the one used changed with the
+    // global number. The other close slots follow the same camera, so
+    // they're dropped.
+    StickyIds::Slot* match = nullptr;
     for (StickyIds::Slot& slot : slots.slots) {
-      if (slot.id == id && CameraIds::IsClose(slot.projection, projection)) {
-        slot.projection = projection;
-        slot.last_use = sticky_uses_;
-        return id;
+      if (slot.id != 0 && CameraIds::IsClose(slot.projection, projection) &&
+          (!match || slot.last_use > match->last_use)) {
+        match = &slot;
       }
     }
-    for (StickyIds::Slot& slot : slots.slots) {
-      if (slot.id != 0 && CameraIds::IsClose(slot.projection, projection)) {
-        slot.projection = projection;
-        slot.last_use = sticky_uses_;
-        camera_copies_.kept++;
-        return slot.id;
+    if (match) {
+      for (StickyIds::Slot& slot : slots.slots) {
+        if (&slot != match && slot.id != 0 && CameraIds::IsClose(slot.projection, projection)) {
+          slot = {};
+        }
       }
+      match->projection = projection;
+      match->last_use = sticky_uses_;
+      camera_copies_.kept += match->id != id;
+      return match->id;
     }
     StickyIds::Slot* oldest = &slots.slots[0];
     for (StickyIds::Slot& slot : slots.slots) {
@@ -2308,22 +2323,47 @@ MovingProductsLog& GetMovingProductsLog() {
 // a part and camera blended out of step make it jerk from frame to frame.
 class CockpitJudderLog {
  public:
-  void OnProduct(const ReplayedProduct& product, const Matrix4& world, const Vec3& eye,
-                 bool camera_blended, bool camera_rejected, bool world_blended) {
-    Vec3 position{world[12], world[13], world[14]};
-    Vec3 d{eye[0] - position[0], eye[1] - position[1], eye[2] - position[2]};
-    if (Distance(eye, position) > 3.0f) {
+  // `world` as drawn; `offset` the camera's position less the world's, in
+  // double where they were blended so (as drawn, --double_precision_blending).
+  // `world_now` and `tick_offset`: the same from the tick's own inputs.
+  void OnProduct(const ReplayedProduct& product, const Matrix4& world,
+                 const std::array<double, 3>& offset, const Matrix4& world_now,
+                 const std::optional<std::array<double, 3>>& tick_offset, bool camera_blended,
+                 bool camera_rejected, bool world_blended) {
+    if (std::sqrt(offset[0] * offset[0] + offset[1] * offset[1] + offset[2] * offset[2]) > 3.0) {
       return;
     }
-    // Row vectors: world = local * R; rows 0-2 are the part's axes (scaled).
-    Vec3 local;
-    for (int i = 0; i < 3; i++) {
-      float x = world[i * 4], y = world[i * 4 + 1], z = world[i * 4 + 2];
-      float length2 = x * x + y * y + z * z;
-      local[i] = length2 > 0 ? (d[0] * x + d[1] * y + d[2] * z) / length2 : 0;
-    }
+    Vec3 local = Local(world, offset);
     Sample sample{local, camera_blended, camera_rejected, world_blended};
     uint64_t identity = product.tick->identity;
+    if (tick_offset) {
+      TickSamples& ticks = ticks_[identity];
+      if (ticks.tick != tick_) {
+        ticks.before = ticks.last;
+        ticks.last = ticks.now;
+        ticks.now = Local(world_now, *tick_offset);
+        ticks.count++;
+        ticks.tick = tick_;
+        if (ticks.count >= 3) {
+          float jerk = 0;
+          for (int i = 0; i < 3; i++) {
+            jerk = std::max(jerk, std::abs(ticks.now[i] - 2 * ticks.last[i] + ticks.before[i]));
+          }
+          tick_jerk_sum_ += jerk;
+          tick_jerk_count_++;
+          tick_max_jerk_ = std::max(tick_max_jerk_, jerk);
+          if (jerk > 0.002f && tick_lines_ < 6) {
+            tick_lines_++;
+            REXLOG_INFO("cockpit judder: tick {}: id {:016X} the tick's own eye in part {:.4f} "
+                        "{:.4f} {:.4f} (ticks before {:.4f} {:.4f} {:.4f}, {:.4f} {:.4f} {:.4f}), "
+                        "jerk {:.4f} m",
+                        tick_, identity, ticks.now[0], ticks.now[1], ticks.now[2],
+                        ticks.last[0], ticks.last[1], ticks.last[2], ticks.before[0],
+                        ticks.before[1], ticks.before[2], jerk);
+          }
+        }
+      }
+    }
     auto& history = now_[identity];
     history = sample;
     auto last = last_.find(identity);
@@ -2357,9 +2397,20 @@ class CockpitJudderLog {
                   : last->second.camera_blended ? "blended"
                                                 : "not",
                   sample.world_blended ? "blended" : "not",
-                  last->second.world_blended ? "blended" : "not", position[0], position[1],
-                  position[2]);
+                  last->second.world_blended ? "blended" : "not", world[12], world[13],
+                  world[14]);
     }
+  }
+
+  // Row vectors: world = local * R; rows 0-2 are the part's axes (scaled).
+  static Vec3 Local(const Matrix4& world, const std::array<double, 3>& d) {
+    Vec3 local;
+    for (int i = 0; i < 3; i++) {
+      double x = world[i * 4], y = world[i * 4 + 1], z = world[i * 4 + 2];
+      double length2 = x * x + y * y + z * z;
+      local[i] = length2 > 0 ? float((d[0] * x + d[1] * y + d[2] * z) / length2) : 0;
+    }
+    return local;
   }
 
   void OnFrameStart(uint64_t tick, float amount) {
@@ -2373,14 +2424,17 @@ class CockpitJudderLog {
     if (now - last_log_ >= std::chrono::seconds(2)) {
       REXLOG_INFO("cockpit judder: last 2 s, {} frames, {:.1f} parts within 3 m a frame ({} "
                   "camera not blended, {} rejected, {} world not blended); jerk mean {:.5f} max "
-                  "{:.5f} m",
+                  "{:.5f} m as drawn; the ticks' own: mean {:.5f} max {:.5f} m",
                   frames_, double(parts_) / std::max(frames_, 1), camera_unblended_,
                   camera_rejected_, world_unblended_, jerk_sum_ / std::max(jerk_count_, 1),
-                  max_jerk_);
+                  max_jerk_, tick_jerk_sum_ / std::max(tick_jerk_count_, 1), tick_max_jerk_);
       last_log_ = now;
       frames_ = parts_ = camera_unblended_ = camera_rejected_ = world_unblended_ = jerk_count_ =
-          lines_ = 0;
-      jerk_sum_ = max_jerk_ = 0;
+          lines_ = tick_jerk_count_ = tick_lines_ = 0;
+      jerk_sum_ = max_jerk_ = tick_jerk_sum_ = tick_max_jerk_ = 0;
+      if (ticks_.size() > 4096) {
+        ticks_.clear();
+      }
     }
   }
 
@@ -2390,6 +2444,15 @@ class CockpitJudderLog {
     bool camera_blended, camera_rejected, world_blended;
   };
   std::unordered_map<uint64_t, Sample> now_, last_, before_;
+  struct TickSamples {
+    uint64_t tick = 0;
+    int count = 0;
+    Vec3 now{}, last{}, before{};
+  };
+  std::unordered_map<uint64_t, TickSamples> ticks_;
+  int tick_jerk_count_ = 0, tick_lines_ = 0;
+  double tick_jerk_sum_ = 0;
+  float tick_max_jerk_ = 0;
   uint64_t tick_ = 0;
   float amount_ = 0;
   int frames_ = 0, parts_ = 0, camera_unblended_ = 0, camera_rejected_ = 0, world_unblended_ = 0;
@@ -2561,19 +2624,36 @@ class ReplayCameras {
  private:
   [[gnu::noinline]] void LogCockpitJudder(const ReplayedProduct& product,
                                           const BlendStats& before) {
-    std::optional<Vec3> eye = last_parts_.eye;
-    if (!eye) {
+    const Matrix4& world = last_parts_.world;
+    const Matrix4& world_now = last_parts_.world_now;
+    std::array<double, 3> offset;
+    if (last_parts_.eye) {
+      for (int k = 0; k < 3; k++) {
+        offset[k] = REXCVAR_GET(double_precision_blending)
+                        ? last_parts_.eye_exact[k] - last_parts_.position_exact[k]
+                        : double((*last_parts_.eye)[k]) - double(world[12 + k]);
+      }
+    } else {
       std::optional<PerspectiveCamera> camera = SplitViewProjection(product.tick->now.view_projection);
       if (!camera) {
         return;
       }
-      eye = camera->camera.position;
+      for (int k = 0; k < 3; k++) {
+        offset[k] = double(camera->camera.position[k]) - double(world[12 + k]);
+      }
+    }
+    std::optional<std::array<double, 3>> tick_offset;
+    if (last_parts_.eye_now) {
+      tick_offset.emplace();
+      for (int k = 0; k < 3; k++) {
+        (*tick_offset)[k] = double((*last_parts_.eye_now)[k]) - double(world_now[12 + k]);
+      }
     }
     bool unpaired = stats_.blend.unpaired != before.unpaired;
     bool rejected = stats_.blend.camera_not_blended != before.camera_not_blended;
     bool world_blended = !unpaired && stats_.blend.world_not_blended == before.world_not_blended;
-    GetCockpitJudderLog().OnProduct(product, last_parts_.world, *eye, last_parts_.eye.has_value(),
-                                    rejected, world_blended);
+    GetCockpitJudderLog().OnProduct(product, world, offset, world_now, tick_offset,
+                                    last_parts_.eye.has_value(), rejected, world_blended);
   }
 
   void LogStats() {
