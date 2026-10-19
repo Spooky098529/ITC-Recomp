@@ -4,6 +4,15 @@ Branch `cockpit-dial-interpolation` (from `main` at `3d09aa6`), started
 2026-10-18. It follows `cockpit-anim-fix` (not merged), whose handover is
 `docs/cockpit-anim-fix.md` on that branch.
 
+**Where it ended up (2026-10-19):** the dials are posed natively
+(`src/hooks/cockpit_dials.cpp`, "Native dials" below), and the blend
+replays them as live poses (`blend_state.cpp`). That is all the branch
+changes in the code. Everything else tried along the way (the screw blend,
+the angle cut's removal, the near-camera diagnostics, `--per_tick_car_gauges`,
+`--log_dial_pose`, the harnesses `tests/needle_blend.cpp` and
+`wheel_blend.cpp`) was removed again, so the flags and files the earlier
+sections name are in this branch's history only ("Cleanup" at the end).
+
 ## The problem
 
 In cockpit view (the 3D dashboard), the dials' needles move erratically when
@@ -706,11 +715,9 @@ gauge in mode 5) natively, on every pass:
   ~2,000 m coordinates). The attract dash (mode 7) draws only
   `sub_820E42E8`'s two needles; `sub_820E45A8`'s needles have no models
   there.
-- `--log_dial_pose` logs `native` lines (needle, value, angle) instead of
-  the translated angle calls, which no longer run.
-
-`--per_tick_car_gauges` is still on: the dials no longer need it, but
-anything else reading car + 704 on render-only passes still does.
+- `--log_blend_state` also counts live poses: on render-only passes, and
+  those left as drawn; replayed, and those unpaired, with their camera
+  rejected or with no camera to blend.
 
 ### First drive: the needle drifted off the dash (fixed)
 
@@ -732,6 +739,28 @@ right. 24,102 live poses on render-only passes, 6 with no tick product
 camera rejected (one tick's frames at a time).
 
 Left to do: the needles step at 30 Hz by design; blending the kept gauge
-values in `InputsFor` would make them sweep (the user's call). Whether
-`--per_tick_car_gauges` is still needed for anything else. The harnesses
-(`tests/needle_blend.cpp`, `wheel_blend.cpp`) don't model live poses.
+values in `InputsFor` would make them sweep (a comment in
+`cockpit_dials.cpp` says how).
+
+## Cleanup (2026-10-19)
+
+The user asked to keep only the native dials. `blend_state.cpp`/`.h` are
+`main`'s again plus the live poses (`ProductInputs::live`,
+`Output::live`, `BlendState_SetLivePose`, `BlendState_Amount`, the counts),
+and `transform.cpp`/`.h`, `per_frame_logic.cpp` and `frame_state_diff.cpp`
+are `main`'s. So:
+
+- `--screw_blend` (products and the camera) is gone: it never fixed the
+  needles and took wheels off their hubs.
+- The angle cut is back, with `main`'s wheel path (`kSpinning`): removing
+  it was for the needles, which the blend no longer blends, and it changed
+  every wheel (spin blended the short way, wrong above ~108 km/h).
+  Smoother wheel spin would be its own change.
+- `--log_near_camera_turns`, `--log_near_camera_pairs`,
+  `--log_near_camera_frames`, `--log_dial_pose` and the harnesses are gone.
+- `--per_tick_car_gauges` is gone: the dials read the kept values, and
+  nothing else is known to read car + 704 between ticks.
+
+Attract race after it: live poses all paired and none left as drawn
+(apart from the camera's cuts), the check exact as before, wheels on
+`main`'s spinning path again.
