@@ -87,6 +87,15 @@ REXCVAR_DEFINE_STRING(debug_zero_owners, "", "ITC",
 REXCVAR_DEFINE_BOOL(log_upload_owners, false, "ITC",
                     "Log the callers recording vertex constant uploads, with uploads per "
                     "frame, every 5 s (needs --log_slot_callers)");
+REXCVAR_DEFINE_BOOL(motion_blur_by_tick, true, "ITC",
+                    "Blend the motion blur's previous view-projection (c100 x4) on render-only "
+                    "frames too: the game copies the same matrix all tick, from the view's "
+                    "+8080 on the logic pass and +8144 after, so it's noted under the logic "
+                    "pass's address (otherwise only logic frames blend it: a 30 Hz pulse)");
+REXCVAR_DEFINE_BOOL(log_motion_blur_velocity, false, "ITC",
+                    "Log, every 5 s for ~40 passes, the motion blur's previous view-projection "
+                    "(c100 x4, copied at 8213653C from the view's +8080 or +8144): which one, "
+                    "how far the camera moved between the two, and how the replay changed it");
 REXCVAR_DEFINE_BOOL(log_blend_state, false, "ITC",
                     "Log how many cameras and objects were blended, once a second");
 REXCVAR_DEFINE_BOOL(log_replayed_constants, false, "ITC",
@@ -300,6 +309,8 @@ struct ProductInputs {
   // only its camera is blended. Only the frame's own copies of tick products
   // are (see Output::live).
   bool live = false;
+  // The return address of the multiply or copy that made it (diagnostics).
+  uint32_t caller = 0;
 };
 
 // Main thread: the per-object recorder's caller context while it runs.
@@ -511,14 +522,25 @@ bool IsSameCameraCheck(const PerspectiveCamera& a, const PerspectiveCamera& b);
 std::mutex g_camera_rejects_mutex;
 std::string g_camera_rejects;  // a sample, for --log_blend_state
 
-bool IsSameCamera(const PerspectiveCamera& a, const PerspectiveCamera& b) {
+// Which product a camera pair was first seen in, for --log_blend_state: the
+// tick's camera and world addresses, the handler running, and the return
+// addresses of the multiplies or copies that made it in the two ticks.
+struct ProductSource {
+  uint32_t camera = 0, world = 0, handler = 0;
+  uint32_t caller_before = 0, caller_now = 0;
+};
+
+bool IsSameCamera(const PerspectiveCamera& a, const PerspectiveCamera& b,
+                  const ProductSource& source) {
   bool same = IsSameCameraCheck(a, b);
   if (!same && REXCVAR_GET(log_blend_state)) {
     std::lock_guard lock(g_camera_rejects_mutex);
-    if (g_camera_rejects.size() < 600) {
+    if (g_camera_rejects.size() < 1500) {
       g_camera_rejects += fmt::format(
-          "\n  moved {:.2f} m, turned {:.3f} rad, x {:.4g}->{:.4g}, y {:.4g}->{:.4g}, w {:.4g}->{:.4g}, "
+          "\n  camera {:08X}, world {:08X}, handler {:08X}, from {:08X}->{:08X}: "
+          "moved {:.2f} m, turned {:.3f} rad, x {:.4g}->{:.4g}, y {:.4g}->{:.4g}, w {:.4g}->{:.4g}, "
           "depth {:.4g}->{:.4g} {:.4g}->{:.4g}",
+          source.camera, source.world, source.handler, source.caller_before, source.caller_now,
           Distance(a.camera.position, b.camera.position),
           AngleBetween(a.camera.rotation, b.camera.rotation), a.x_scale, b.x_scale, a.y_scale,
           b.y_scale, a.w_scale, b.w_scale, a.depth_scale, b.depth_scale, a.depth_offset,
@@ -582,7 +604,8 @@ struct CameraPairKeyHash {
   }
 };
 ProductPlan PlanProduct(const ProductInputs& a, const ProductInputs& b, TickPlans& plans,
-                        std::unordered_map<CameraPairKey, int32_t, CameraPairKeyHash>& cameras) {
+                        std::unordered_map<CameraPairKey, int32_t, CameraPairKeyHash>& cameras,
+                        ProductSource source) {
   ProductPlan plan;
   std::optional<ScaledTransform> wa = ScaledTransformFromWorldMatrix(a.world);
   std::optional<ScaledTransform> wb = ScaledTransformFromWorldMatrix(b.world);
@@ -608,7 +631,9 @@ ProductPlan PlanProduct(const ProductInputs& a, const ProductInputs& b, TickPlan
       std::optional<PerspectiveCamera> ca = SplitViewProjection(a.view_projection);
       std::optional<PerspectiveCamera> cb = SplitViewProjection(b.view_projection);
       if (ca && cb) {
-        if (IsSameCamera(*ca, *cb)) {
+        source.caller_before = a.caller;
+        source.caller_now = b.caller;
+        if (IsSameCamera(*ca, *cb, source)) {
           it->second = int32_t(plans.cameras.size());
           plans.cameras.push_back({*ca, *cb});
         } else {
@@ -995,6 +1020,7 @@ class DrawState {
     bool render_only = frame_pacing::GameMessages_IsRenderOnlyPass();
     bool recorder = caller == kRecorderMultiplyReturn;
     ProductInputs inputs{LoadMatrix(base, a), LoadMatrix(base, b)};
+    inputs.caller = caller;
     if (recorder) {
       inputs.context = g_record_context;
     }
@@ -1013,17 +1039,21 @@ class DrawState {
 
   // Main thread, after the matrix copy dst = src. A copy of a camera (as
   // identity * camera) or of a noted product carries on as that product.
-  void OnCopy(uint8_t* base, uint32_t dst, uint32_t src) {
+  void OnCopy(uint8_t* base, uint32_t dst, uint32_t src, uint32_t caller) {
     if (std::this_thread::get_id() != main_thread_) {
       return;
     }
     bool render_only = frame_pacing::GameMessages_IsRenderOnlyPass();
-    Matrix4 value = LoadMatrix(base, src);
+    // Read from the copy: `src` can be the address it's noted under rather
+    // than where it came from (--motion_blur_by_tick).
+    Matrix4 value = LoadMatrix(base, dst);
     if (PassOfViewProjection(src) >= 0 || camera_ids_.Of(value) != 0) {
       // A copy of a camera (a camera pass's, or a perspective one built on
       // the stack, like the headlight projector's).
       Matrix4 identity{1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
-      Note(base, dst, 0, src, {identity, value}, render_only);
+      ProductInputs inputs{identity, value};
+      inputs.caller = caller;
+      Note(base, dst, 0, src, inputs, render_only);
       counts_.copies++;
       return;
     }
@@ -1887,7 +1917,8 @@ class DrawState {
         continue;
       }
       plan_of_[key] = int32_t(plans->products.size());
-      plans->products.push_back(PlanProduct(before->second, now->second, *plans, camera_pairs_));
+      plans->products.push_back(PlanProduct(before->second, now->second, *plans, camera_pairs_,
+                                            {key.camera, key.world, key.handler}));
     }
     tick_product_keys_.clear();
     if (by_tick_) {
@@ -3793,6 +3824,126 @@ void BlendState_OnReplayTick() {
   GetReplayedConstantsLog().OnTick();
 }
 
+// Diagnostics (--log_motion_blur_velocity): the motion blur's previous
+// view-projection, c100 x4. sub_821363F0 copies it (return 8213653C) from
+// the view (its r29) at +8144, or at +8080 when view+48 is nonzero and
+// view+44 is 0. Sampled ~40 entries in a row every 5 s, from the main
+// thread's copies and from the render thread's uploads.
+class MotionBlurLog {
+ public:
+  // Main thread, at the copy.
+  void OnCopy(uint8_t* base, uint32_t view, uint32_t src) {
+    std::lock_guard lock(mutex_);
+    if (!Sampling(copies_)) {
+      return;
+    }
+    Matrix4 at_8080 = LoadMatrix(base, view + 8080), at_8144 = LoadMatrix(base, view + 8144);
+    std::optional<PerspectiveCamera> a = SplitViewProjection(at_8080);
+    std::optional<PerspectiveCamera> b = SplitViewProjection(at_8144);
+    std::string motion = "not perspective";
+    if (a && b) {
+      motion = fmt::format("+8080->+8144 moved {:.3f} m, turned {:.4f} rad",
+                           Distance(a->camera.position, b->camera.position),
+                           AngleBetween(a->camera.rotation, b->camera.rotation));
+    }
+    copies_.lines += fmt::format(
+        "\n  {} pass, amount {:.3f}, view {:08X} (+44 {}, +48 {}), copied +{}{}, {}; "
+        "+8080 row 3 {:.6g} {:.6g} {:.6g} {:.6g}, +8144 row 3 {:.6g} {:.6g} {:.6g} {:.6g}",
+        frame_pacing::GameMessages_IsRenderOnlyPass() ? "render-only" : "logic",
+        GetDrawState().amount(), view, guest::LoadU32(base, view + 44),
+        guest::LoadU32(base, view + 48), src - view, at_8080 == at_8144 ? " (same)" : "", motion,
+        at_8080[12], at_8080[13], at_8080[14], at_8080[15], at_8144[12], at_8144[13],
+        at_8144[14], at_8144[15]);
+    copies_.count++;
+  }
+  // Render thread, at a c100 x4 upload: `original` if the replay
+  // substituted it.
+  void OnUpload(const Matrix4& uploaded, const std::optional<Matrix4>& original, uint64_t tick,
+                float amount) {
+    std::lock_guard lock(mutex_);
+    if (!Sampling(uploads_)) {
+      return;
+    }
+    std::string change = "as recorded";
+    if (original) {
+      std::optional<PerspectiveCamera> a = SplitViewProjection(*original);
+      std::optional<PerspectiveCamera> b = SplitViewProjection(uploaded);
+      change = a && b ? fmt::format("substituted, moved {:.3f} m, turned {:.4f} rad",
+                                    Distance(a->camera.position, b->camera.position),
+                                    AngleBetween(a->camera.rotation, b->camera.rotation))
+                      : "substituted (not perspective)";
+    }
+    uploads_.lines += fmt::format("\n  tick {}, amount {:.3f}: {}", tick, amount, change);
+    uploads_.count++;
+  }
+
+ private:
+  struct Sample {
+    std::chrono::steady_clock::time_point started{};
+    int count = 0;
+    std::string lines;
+  };
+  static constexpr int kEntries = 40;
+  // Whether to add to this sample, logging it when full.
+  bool Sampling(Sample& sample) {
+    auto now = std::chrono::steady_clock::now();
+    if (sample.count >= kEntries) {
+      REXLOG_INFO("motion blur: {}:{}", &sample == &copies_ ? "c100 copies (main thread)"
+                                                           : "c100 uploads (render thread)",
+                  sample.lines);
+      sample = {now, -1, {}};
+    }
+    if (sample.count < 0) {
+      if (now - sample.started < std::chrono::seconds(5)) {
+        return false;
+      }
+      sample.count = 0;
+    }
+    return true;
+  }
+  std::mutex mutex_;
+  Sample copies_, uploads_;
+};
+
+MotionBlurLog& GetMotionBlurLog() {
+  static MotionBlurLog log;
+  return log;
+}
+
+void BlendState_LogMotionBlurCopy(uint8_t* base, uint32_t view, uint32_t src) {
+  if (std::this_thread::get_id() == GetDrawState().main_thread()) {
+    GetMotionBlurLog().OnCopy(base, view, src);
+  }
+}
+
+// --motion_blur_by_tick: the address to note the copy of the motion blur's
+// previous view-projection (c100 x4, at 8213653C) under. The game copies
+// the same matrix all tick, the previous tick's view-projection: the logic
+// pass from the view's +8080 (view+48 set), and render-only passes from
+// +8144, as the view moves its pair on right after the logic pass. Copies
+// are paired by address, so only the logic pass's was blended and
+// render-only frames had it as recorded, a tick nearer: the blur's length
+// pulsed at 30 Hz. A render-only copy of the matrix the logic pass copied
+// is noted under the logic pass's address. Main thread only.
+uint32_t BlendState_MotionBlurNotedSource(uint8_t* base, uint32_t view, uint32_t src) {
+  struct Copied {
+    uint32_t src;
+    Matrix4 value;
+  };
+  static std::unordered_map<uint32_t, Copied> logic_copies;  // by view
+  if (!REXCVAR_GET(interpolate_draw_state) || !REXCVAR_GET(motion_blur_by_tick) ||
+      std::this_thread::get_id() != GetDrawState().main_thread()) {
+    return src;
+  }
+  Matrix4 value = LoadMatrix(base, src);
+  if (!frame_pacing::GameMessages_IsRenderOnlyPass()) {
+    logic_copies[view] = {src, value};
+    return src;
+  }
+  auto it = logic_copies.find(view);
+  return it != logic_copies.end() && it->second.value == value ? it->second.src : src;
+}
+
 void BlendState_ReplayConstants(uint8_t* base, uint32_t payload, uint32_t packed,
                                 const std::function<void()>& upload) {
   uint32_t stage = packed >> 24, count = packed & 0xFF;
@@ -3851,6 +4002,11 @@ void BlendState_ReplayConstants(uint8_t* base, uint32_t payload, uint32_t packed
   }
   GetSteppingConstantsLog().OnUpload(base, payload, packed,
                                      original.has_value() || pixel_blended);
+  if (REXCVAR_GET(log_motion_blur_velocity) && stage == 0 && ((packed >> 8) & 0xFF) == 100 &&
+      count == 4) [[unlikely]] {
+    GetMotionBlurLog().OnUpload(LoadMatrix(base, payload), original, GetReplayCameras().tick(),
+                                GetReplayCameras().amount());
+  }
   if (REXCVAR_GET(log_object_extras) && stage == 0 && count == 9 && original) {
     GetObjectExtrasLog().OnUpload(base, payload);
   }
@@ -4081,8 +4237,17 @@ extern "C" REX_FUNC(sub_8258CAA0) {
 extern "C" REX_FUNC(sub_820A0AC0) {
   REX_FUNC_PROLOGUE();
   uint32_t dst = ctx.r3.u32, src = ctx.r4.u32;
+  uint32_t caller = uint32_t(ctx.lr);
+  uint32_t noted_src = src;
+  if (caller == 0x8213653C) [[unlikely]] {
+    // The motion blur's previous view-projection (c100 x4); r29 is the view.
+    if (REXCVAR_GET(log_motion_blur_velocity)) {
+      interpolation::BlendState_LogMotionBlurCopy(base, ctx.r29.u32, src);
+    }
+    noted_src = interpolation::BlendState_MotionBlurNotedSource(base, ctx.r29.u32, src);
+  }
   __imp__sub_820A0AC0(ctx, base);
-  interpolation::GetDrawState().OnCopy(base, dst, src);
+  interpolation::GetDrawState().OnCopy(base, dst, noted_src, caller);
 }
 
 // Billboards_BuildVertices: r3 = billboard set (its +0 is the camera pass it

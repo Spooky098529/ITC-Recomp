@@ -857,9 +857,10 @@ memory).
   address), i.e. the emulated GPU's result, decoded from memory
   (uncompressed formats, first level). Pair them with ours
   (`resolve_<n>_...`) to compare. Run such comparisons with
-  `--motion_blur=true --glow=true`, so the emulated GPU draws the motion
-  blur and the light bloom that `patches/rexglue-sdk/0001` and `0002`
-  otherwise leave out (ours always draws them). The emulated GPU isn't
+  `--glow=true`, so the emulated GPU draws the light bloom that
+  `patches/rexglue-sdk/0001` otherwise leaves out (ours always draws it).
+  Both draw the motion blur (SDK patch `0002`, which let the emulated GPU
+  leave it out, was removed on 2026-10-19). The emulated GPU isn't
   always the right one: its bloom chain comes out blocky.
 - `--native_renderer_dump_every=<s>` (with `--native_renderer_dump`): dump
   only the frame (shown image, draw IDs, `draws.txt`; no resolves or
@@ -1055,7 +1056,7 @@ memory).
   any dump. Never screenshot the user's desktop: look at frames with the
   renderer's own dump (`--native_renderer_dump`, 10 s into a race or when
   `<dir>/now` appears; `--native_renderer_dump_every` for periodic ones).
-  To compare with the emulated GPU, add `--motion_blur=true --glow=true
+  To compare with the emulated GPU, add `--glow=true
   --readback_resolve=full` and a full dump (`--native_renderer_dump`
   without `_every`, 10 s into the race), and put each `guest_resolve_*`
   next to the `resolve_*` of the same name (a small PIL script).
@@ -1095,7 +1096,9 @@ To be fixed (or accepted) in milestone 7.
     {`+8440` (0.7) or `+8436` (~0.8-0.86, every tick), `+8452` (the glow
     strength, ~2.7-3.2), `+8456` (0.75), `+8476` (0)} of the object;
     `+8452` is written by `sub_82136F18`. Nothing else stepping looks like
-    the glow's (the rest are the known c14, c70, c74 and c100).
+    the glow's (the rest are the known c14, c70, c74 and c100; c100, the
+    motion blur's previous view-projection, is blended since
+    `--motion_blur_by_tick`).
   - **The cross-fade's weight is its quad's vertex color alpha**: the
     shader (`--native_renderer_log_shader_ucode=E0D070FB58A4EA03`) is
     `tfetch2D r0.xyz, tf0; oC0.w = r1.w; oC0.xyz = r0 * r1`, no
@@ -1122,9 +1125,30 @@ To be fixed (or accepted) in milestone 7.
   blur (pixel shader `7EB16456AAD56CBA`) gets its velocities from the
   tick, so at interpolated frame rates each frame smears a whole tick of
   motion, more than intended. `run.sh` turned it off with the emulated GPU
-  (`--motion_blur=false`, which our renderer ignores); ours always draws
-  it. Scaling the velocities to the frame's share of a tick, or an option
-  to skip the pass, would fix it.
+  (`--motion_blur=false`); ours draws it too unless `--motion_blur=false`
+  (added 2026-10-19: leaves its one draw out). Scaling the velocities to
+  the frame's share of a tick would fix it.
+  The previous position also pulsed at 30 Hz, fixed on `beam-stepping`
+  (2026-10-19, `--motion_blur_by_tick`, on). The previous view-projection
+  is vertex c100 x4, which `sub_821363F0` copies (return `8213653C`) from
+  the view at +8080 (this tick's view-projection) when view+48 is set
+  (only passes that ran the game logic) and view+44 is 0, or from +8144
+  (the previous tick's) otherwise. The view moves the pair on right after
+  the logic pass, so the game copies the same matrix all tick (the logic
+  pass from +8080, render-only passes from +8144), the previous tick's.
+  But copies are paired by address, so only the logic pass's was blended;
+  render-only frames uploaded it as recorded, a tick nearer to the frame's
+  camera than on the logic frame: the blur's length jumped once a tick.
+  Now a render-only copy of the matrix the logic pass copied is noted
+  under the logic pass's address, and the replay blends it on every frame
+  (`--log_motion_blur_velocity`: all c100 uploads substituted, moved back
+  1.51, 1.21, 0.88, 0.56, 0.23 m through a tick at ~46 m/s, against 1 in
+  5 before). Zeroing c100 (`--debug_zero_owners=821364D0`) changes the
+  velocity resolve (`1B053000`, 16_16 512x288) from flat to large
+  everywhere, so c100 drives it. This was the headlight beam on the road
+  that sometimes looked like it updated at 30 Hz (the blur covers it at
+  speed): the user drove with the fix, fullscreen at 4K, and judged it
+  "pretty good now" (2026-10-19).
 - **An in-game movie locked up the whole game** (closed 2026-10-19: no
   longer happens, not seen in extensive testing since, the user's call;
   never investigated, so the cause isn't known. Seen by the user in

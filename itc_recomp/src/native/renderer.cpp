@@ -118,6 +118,9 @@ REXCVAR_DEFINE_BOOL(native_renderer_check_clobbers, false, "ITC",
 REXCVAR_DEFINE_STRING(native_renderer_watch_pixel_shader, "", "ITC",
                       "With native_renderer_watch_draws: only the draws of this pixel shader "
                       "(hash in hex)");
+REXCVAR_DEFINE_BOOL(motion_blur, true, "ITC",
+                    "Draw the game's velocity-based motion blur (pixel shader "
+                    "7EB16456AAD56CBA); false leaves the frame unblurred");
 REXCVAR_DEFINE_STRING(native_renderer_skip_pixel_shader, "", "ITC",
                       "Leave out the draws of this pixel shader (hash in hex; a debugging aid)");
 REXCVAR_DEFINE_BOOL(native_renderer_log_glow, false, "ITC",
@@ -730,6 +733,7 @@ VkCommandBuffer Renderer::BeginFrame() {
     if (const std::string& skip = REXCVAR_GET(native_renderer_skip_pixel_shader); !skip.empty()) {
       passes_.set_skip_pixel_shader(std::strtoull(skip.c_str(), nullptr, 16));
     }
+    passes_.set_skip_motion_blur(!REXCVAR_GET(motion_blur));
     // Its first frame describes each draw (cheaply: the effect being looked
     // for went away while frames were recorded slowly).
     passes_.set_record_draws(dumping_ && dump_step_ == 0);

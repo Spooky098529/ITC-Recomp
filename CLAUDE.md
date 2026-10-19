@@ -145,8 +145,9 @@ minimap triangle's flashing, the car's reflections, buildings' lighting,
 play time and the glow (bloom; `src/interpolation/glow.cpp`, v0.3.9) are all done. `run.sh` turns
 interpolation on (marked experimental) with logging off; `run-debug.sh` is
 the same with logs; `./run.sh --no-interpolation` gives the original 30 fps.
-Our renderer always draws motion blur and glow (`--motion_blur` and
-`--glow` only affect the emulated GPU). Known issues are at the end of
+Our renderer always draws the glow (`--glow` only affects the emulated
+GPU); `--motion_blur=false` leaves out the motion blur (on by default;
+defined in `src/native/renderer.cpp` since SDK patch 0002 was removed). Known issues are at the end of
 `docs/functions.md`.
 
 Other resolutions (v0.4.0, merged from `unlocked-resolution`):
@@ -198,6 +199,21 @@ address while a projection drifts (`--sticky_camera_ids`); both on.
 `--double_precision_blending` is kept off (nothing visible). The cockpit
 judder far out is the game's own (Known issues). See "The headlight beam
 far from the origin" in `docs/functions.md`.
+
+Motion blur (merged from `beam-stepping`, 2026-10-19): the headlight beam
+on the road sometimes looked like it updated at 30 Hz. It was the motion
+blur over it: its previous view-projection (vertex c100 x4, copied by
+`sub_821363F0`) is the same matrix all tick, but copied from the view's
++8080 on logic passes and +8144 on others, and copies pair by address, so
+only logic frames blended it and the blur's length jumped once a tick.
+Now noted under the logic pass's address and blended on every frame
+(`--motion_blur_by_tick`, on); the user judged it fixed at 4K. The motion
+blur is also optional now: `--motion_blur=false` (on by default, in
+`run.sh`'s help), defined in `src/native/renderer.cpp`; SDK patch 0002
+(the emulated GPU's toggle) is removed. The cameras refused far from the
+origin were ruled out: a temporary in `sub_82598768`, never drawn
+(`--log_blend_state` now names each refused camera's source). See
+"Motion blur reads the 30 Hz tick" in `docs/native-renderer.md`.
 
 Graphics memory (merged from `memory-leak`, 2026-10-19, released in
 v0.4.6): textures were never freed,

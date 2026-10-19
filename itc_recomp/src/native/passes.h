@@ -79,6 +79,8 @@ class Passes {
   // each draw of the frames recorded, written with the next dump
   // (draws.txt); the pixel shaders the last frame drew the main view with.
   void set_skip_pixel_shader(uint64_t hash);
+  // Leave out the game's motion blur (its pixel shader's draws; --motion_blur).
+  void set_skip_motion_blur(bool skip);
   // For set_skip_pixel_shader: skip the draws without a pixel shader.
   static constexpr uint64_t kSkipNoPixelShader = 1;
   void set_record_draws(bool record);

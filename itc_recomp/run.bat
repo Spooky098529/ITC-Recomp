@@ -12,6 +12,7 @@ rem   run.bat                     frame interpolation on (the default)
 rem   run.bat --no-interpolation  the original 30 fps
 rem   run.bat --width=1920 --height=1080   a bigger window, drawn sharper
 rem   run.bat --fullscreen        fill the screen, drawn at its resolution
+rem   run.bat --motion_blur=false  no motion blur
 rem
 rem Logging is off; run-debug.bat runs the same with logs (in logs\), for
 rem reporting problems.
@@ -19,7 +20,7 @@ rem
 rem Frame interpolation (experimental): game logic stays at 30 Hz and races
 rem draw up to --max_fps (144 here; pass --max_fps=N to change it, 0 for
 rem unlimited), each frame blended between the last two ticks. Menus stay at
-rem 30 fps. Motion blur and glow are always drawn.
+rem 30 fps.
 rem
 rem Resolution (none of these is on by default: out of the box the game runs
 rem in a 1280x720 window at its own resolution, its 3D view drawn at 1024x576
@@ -35,6 +36,10 @@ rem                         GPU).
 rem At any size but 1280x720 the 3D view is drawn at the full resolution too,
 rem not upscaled. Screens and windows that aren't 16:9 get black bars. Higher
 rem resolutions cost GPU time only.
+rem
+rem Motion blur (on by default): the game's blur of the picture at speed.
+rem   --motion_blur=false   leave it out, for a sharp picture. The glow
+rem                         around lights is always drawn.
 rem
 rem The renderer's copies of guest memory are updated once a frame instead of
 rem checked draw by draw (--native_renderer_mirror_by_tick and
