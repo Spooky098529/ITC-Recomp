@@ -240,6 +240,86 @@ did.
   whether the player's pad is connected and whether it's a wheel. The
   pause menu reads nothing here directly: it goes through the mappers.
 
+### The action mappers' update (read 2026-10-20)
+
+Read for making the mappers native (docs/rexglue-removal.md, B1). One
+mapper per player (vtable `0x82007F78`); `sub_8210B018` updates each
+with `sub_8210C370` (r3 = mapper). Actions are indexed 0-29 (id - 151).
+Offsets are from the mapper.
+
+| Offset | What |
+|---|---|
+| +372 | config: +0 a pointer to 30 words (each action's kind; 1 = digital), +4 to 30 words (a linked action, 30 = none), +8 and +12 two more such pointers for the analog stage (+8 kinds, +12 linked actions) |
+| +388 | 30 u16: this tick's raw value per action |
+| +448 | words: held, held before, pressed, released, fired, then +468 a "pending" word ORed into the next update's held-before and pressed |
+| +472 | 30 repeat objects (vtable slot 1: r4 = held bit, returns "fire") |
+| +1072 | 30 u16: the analog stage's values |
+| +1132 | 30 floats: the analog stage's values through each action's curve |
+| +1252 | 30 curve objects (vtable slot 1: f1 in, f1 out) |
+| +1852 | 30 entries of 20 bytes: {float on, float off, u32 suppress ticks, u32 counter, u8 state} |
+| +2464 | the listener object (416 bytes, our InputProcessor) |
+| +2880 | pointer to logical pad `j`'s 40 values |
+
+`sub_8210C370`, in order:
+
+1. Clear the 30 raw u16s (+388).
+2. Sticks and triggers from the logical pad's values `v`, each as
+   `fctidz(|v * C|)` kept to 16 bits (`C` = float at `0x82007F58`):
+   `v[1]` (LY) > 0 to index 16, < 0 to 17; `v[0]` (LX) < 0 to 18, > 0 to
+   19; `v[5]` (RY) > 0 to 20, < 0 to 21; `v[4]` (RX) < 0 to 22, > 0 to
+   23; `v[2]` (LT) to 12 and `v[6]` (RT) to 13, unconditionally.
+3. Buttons: for 14 (mask, id) pairs, if the listener's held word has
+   every bit of the mask (`sub_8258CF10` → `sub_825924E0`), raw[index of
+   id] = 32767, the index from `sub_8210B140` (a jump table indexed by
+   id - 151 through the bytes at `0x82007F20`, returning 30 for ids out
+   of range; probably the identity, to check). Pairs: 0x1 153, 0x2 154,
+   0x4 155, 0x8 156 (d-pad), 0x10 159 (A), 0x20 158 (B), 0x40 160 (X),
+   0x80 157 (Y), 0x1000 161 (LB), 0x10000 162 (RB), 0x4000 165 (left
+   stick), 0x40000 166 (right stick), 0x100000 152 (Start), 0x200000 151
+   (Back). The masks are the processor's held bits (value slot numbers).
+4. Six axes from pairs of the raw u16s, each `fctidz((0.5 - a*K + b*K)
+   * C)` kept to 16 bits (`K` = float at `0x82007F5C`; `0.5 - a*K` is
+   `fnmsubs`, `+ b*K` `fmadds`, both as `float(fma(double...))` in the
+   translation): d-pad (4 left, 5 right) to 24, (2 up, 3 down) to 25;
+   stick (18, 19) to 26, (16, 17) to 27; right stick (22, 23) to 28,
+   (20, 21) to 29.
+5. `sub_8210C0E0(r3 = mapper + 448, r4 = mapper + 372, r5 = mapper + 388)`.
+
+`sub_8210C0E0` (`M` = mapper + 448):
+
+1. The analog stage, `sub_8210B7D0(mapper + 1072, config + 8, raw)`: for
+   each action `i`, with kind `k` = (+8)[i] and link `l` = (+12)[i]: if
+   `l < i` and raw[l] ≠ 0, `k` = 0. `k` = 0: u16 and float 0. `k` = 1:
+   u16 = raw[i], float = curve[i](raw[i] / 32767) (`sub_8210B4A8`, the
+   constant at `0x82002BD4`). `k` = 2: u16 = raw[i], float =
+   curve[i]((raw[i] - A) * B) (`sub_8210B500`, `A` at `0x82007F64`, `B`
+   at `0x82007F60`). `k` ≥ 3: left as it was.
+2. For each action `i`, `sub_8210B718(M, i, float[i], config)`: `x` =
+   |float[i]| (times -1 when negative); with the entry at +1852 + 20i:
+   if on == off, state = `x > off`; else state = 1 when `x >= on`, 0
+   when `x <= off`, else kept. If the counter is nonzero it counts down
+   and state = 0. When state is 1 and the action's link (config +4) isn't
+   30, the linked action's counter = its suppress ticks. Bit `i` of a
+   local word = state.
+3. `sub_8210BBA0(M, config, &word)`: for each `i`, bit `i` of a new word
+   = bit `i` of the input, if kind (config +0)[i] is 1 and its link `l`
+   is either ≥ `i` or has bit `l` clear in the new word; else 0. Then
+   held before = held | pending; held = new; changed = held before ^
+   held; pressed = (held & changed) | pending; released = changed &
+   ~held; fired = pressed; pending = 0. Then for each `i`, repeat[i]
+   (vtable slot 1, r4 = bit `i` of held); if it returns true, fired |=
+   bit `i`.
+
+Both local words start as whatever is on the guest stack: only bits 0-29
+are written, so bits 30 and 31 of held (and so of held before, pressed
+and released) are stack leftovers. A native version would have them 0;
+whether anything reads bit 30 (`sub_8210B140`'s "none") isn't known.
+
+Not known yet (a run will tell): the constants at `0x82007F58`,
+`0x82007F5C`, `0x82007F60` and `0x82007F64`; the bytes at `0x82007F20`;
+the config's tables; and the classes of the repeat and curve objects
+(their vtables, slot 1) in each mapper.
+
 ## Plan
 
 ### Step 0: logging (`--log_input`)
