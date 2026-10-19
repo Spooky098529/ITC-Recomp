@@ -521,8 +521,9 @@ struct BlendStats {
   int world_not_blended = 0;
   int camera_not_blended = 0;
   int spinning = 0;
-  // Products posed live (the cockpit dials): all, unpaired (drawn as written,
-  // with the tick's camera), camera rejected, and with no camera to blend.
+  // Products posed live (the cockpit dials), with --log_blend_state: all,
+  // unpaired (drawn as written, with the tick's camera), camera rejected, and
+  // with no camera to blend.
   int live = 0, live_unpaired = 0, live_camera_rejected = 0, live_no_camera = 0;
 };
 
@@ -628,7 +629,7 @@ Matrix4 BlendProduct(const ReplayedProduct& product, const TickPlans* plans,
   if (parts) {
     *parts = {product.tick->now.world, product.tick->now.world, std::nullopt, std::nullopt, &product};
   }
-  if (product.tick->now.live) {
+  if (product.tick->now.live && REXCVAR_GET(log_blend_state)) [[unlikely]] {
     stats.live++;
     if (product.tick->plan < 0) {
       stats.live_unpaired++;
@@ -961,7 +962,7 @@ class DrawState {
         return;
       }
     }
-    if (noting_live_ && render_only) {
+    if (noting_live_ && render_only && REXCVAR_GET(log_blend_state)) [[unlikely]] {
       counts_.live_noted++;
     }
     int32_t tick_product = -1;
@@ -998,7 +999,9 @@ class DrawState {
       if (!overlay && (!tick || !SameMatrix(tick->world, inputs.world) ||
                        !SameMatrix(tick->view_projection, inputs.view_projection))) {
         counts_.mismatched_products++;
-        counts_.live_left += noting_live_;
+        if (noting_live_ && REXCVAR_GET(log_blend_state)) [[unlikely]] {
+          counts_.live_left++;
+        }
         if (REXCVAR_GET(log_moving_products)) {
           LogMismatch(key, tick, inputs);
         }
@@ -1864,7 +1867,8 @@ class DrawState {
     int object_cuts = 0;
     int products_published = 0;
     int mismatched_products = 0;
-    // Live poses on render-only passes, and those left as drawn (mismatched).
+    // Live poses on render-only passes, and those left as drawn (mismatched),
+    // with --log_blend_state.
     int live_noted = 0, live_left = 0;
     int copies = 0;
     std::atomic<int> replayed_products = 0;  // render thread
