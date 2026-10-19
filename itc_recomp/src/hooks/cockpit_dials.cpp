@@ -125,10 +125,11 @@ Matrix4 RotationZ(float angle) {
   return {c, s, 0, 0, -s, c, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
 }
 
-// A needle's pose: (B * RotZ(angle)) * A * the car's world matrix.
-Matrix4 Pose(uint8_t* base, uint32_t locals, float angle, const Matrix4& car_world) {
+// A needle on the dash: (B * RotZ(angle)) * A. Its pose is this times the
+// car's world matrix.
+Matrix4 OnDash(uint8_t* base, uint32_t locals, float angle) {
   Matrix4 a = LoadMatrix(base, locals), b = LoadMatrix(base, locals + 64);
-  return Multiply(Multiply(Multiply(b, RotationZ(angle)), a), car_world);
+  return Multiply(Multiply(b, RotationZ(angle)), a);
 }
 
 // sub_820D3688: a dial's angle from gauge `kind` (0-3: car + 704, 712, 716,
@@ -423,8 +424,9 @@ extern "C" REX_FUNC(sub_820E45A8) {
         g_check.Angle(angle, g_check.GameDialAngle(ctx, base, frame, range, kind, car));
       }
     }
-    Matrix4 drawn = Pose(base, dash + needle.locals, angle, inputs.tick);
-    Matrix4 world = Pose(base, dash + needle.locals, angle, inputs.world);
+    Matrix4 on_dash = OnDash(base, dash + needle.locals, angle);
+    Matrix4 drawn = Multiply(on_dash, inputs.tick);
+    Matrix4 world = Multiply(on_dash, inputs.world);
     if (check) {
       g_check.Pose(ctx, base, frame, dash + needle.locals, angle, inputs.tick, drawn);
     }
@@ -459,8 +461,9 @@ extern "C" REX_FUNC(sub_820E42E8) {
   }
   for (size_t i = 0; i < kTachNeedles.size(); i++) {
     auto [locals, part, lr] = kTachNeedles[i];
-    Matrix4 drawn = Pose(base, dash + locals, angles[i], inputs.tick);
-    Matrix4 world = Pose(base, dash + locals, angles[i], inputs.world);
+    Matrix4 on_dash = OnDash(base, dash + locals, angles[i]);
+    Matrix4 drawn = Multiply(on_dash, inputs.tick);
+    Matrix4 world = Multiply(on_dash, inputs.world);
     if (check) {
       g_check.Pose(ctx, base, frame, dash + locals, angles[i], inputs.tick, drawn);
     }
