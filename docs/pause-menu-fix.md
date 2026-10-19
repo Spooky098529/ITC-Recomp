@@ -202,8 +202,9 @@ native, could the input manager (3,984 bytes at `0x40059F50`) and the
 four listener objects (inside the mappers at +0x9A0) stop being written
 to guest memory? Found with a page-protection read watch
 (`--watch_input_reads`, `src/debug/input_read_watch.cpp` and
-`tools/resolve_input_reads.py`, written by a subagent and left
-uncommitted in the working tree; Linux only): the host pages behind the
+`tools/resolve_input_reads.py`, written by a subagent; not committed:
+kept in a git stash, "input read watch (--watch_input_reads) from the
+subagent", `git stash list` to find it; Linux only): the host pages behind the
 ranges are made `PROT_NONE`, each fault logs the host instruction (local
 builds keep symbols, so `addr2line` names the `sub_XXXXXXXX`) and the
 offset, and the page is opened for one single-stepped instruction. Our
