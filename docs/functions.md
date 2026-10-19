@@ -997,9 +997,6 @@ processes the game's commands; the render thread mostly waits for it.
   ~0.01 mm with `--double_precision_blending`. Left as is: the eye/target/up
   the game's camera pass stores are float too, and smoothing the camera's
   offset from the car across ticks would make head movement lag the car.
-- **The player's headlight beam on the road can jump in very sharp turns.**
-  Reported before the light slot fixes (frame lag, switching, 4 m rule) and
-  not rechecked since; the release notes still list it.
 - **Projective matrices from `0x82596D9C`** (the per-object recorder's
   other caller seen moving in races) can't be split into position and
   rotation, so they're drawn at the tick (`--log_moving_products` lists them

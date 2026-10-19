@@ -349,5 +349,3 @@ Not done yet:
   next leads there: the game's `sub_821298C0` and `sub_8209C6E0`). A larger lead, translating
   draws once a tick: `docs/tick-replay.md`. Still to decide: the old
   per-draw path's future, and a Steam Deck test.
-- Recheck whether the player's beam on the road still jumps in sharp turns
-  (Known issues); if it's gone, drop it from the next release's limits.
