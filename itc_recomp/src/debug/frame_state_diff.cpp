@@ -454,8 +454,8 @@ extern "C" REX_FUNC(sub_8209CC38) {
   __imp__sub_8209CC38(ctx, base);
   debug::FrameStateDiff_After(base, "draw step part", 0x8209CC38);
 }
-// The per-car update called from Draw (sub_820DAC68, wrapped in
-// per_frame_logic.cpp), and its callees.
+// The per-car update called from Draw (sub_820DAC68), and its callees.
+ITC_FRAME_STATE_WRAP(820DAC68)
 ITC_FRAME_STATE_WRAP(820C5C88)
 ITC_FRAME_STATE_WRAP(820D4048)
 ITC_FRAME_STATE_WRAP(820D72D8)

@@ -39,7 +39,6 @@
 #include <atomic>
 #include <chrono>
 #include <cmath>
-#include <cstdio>
 #include <cstring>
 #include <map>
 #include <memory>
@@ -110,29 +109,10 @@ REXCVAR_DEFINE_BOOL(pair_by_object, true, "ITC",
                     "Pair the per-object recorder's products between ticks by the part being "
                     "drawn (its caller's r31), not only by order, so culling or reordering "
                     "doesn't pair a wheel with another wheel or car");
-REXCVAR_DEFINE_BOOL(screw_blend, false, "ITC",
-                    "Blend world matrices as a screw: the "
-                    "turn about the line it's made about plus a slide along it, so a part turning "
-                    "about a point away from its origin (a cockpit needle) stays on it (false: "
-                    "the origin moves straight and the part turns about it)");
 REXCVAR_DEFINE_BOOL(log_moving_products, false, "ITC",
                     "Log moving objects drawn out of step: render-only mismatches, products not "
                     "blended or unpaired, pairings that move unlike their neighbours, and jumps "
                     "between frames");
-REXCVAR_DEFINE_BOOL(log_near_camera_turns, false, "ITC",
-                    "Once a tick: products within 3 m of their camera whose world matrix turns "
-                    "relative to the camera between ticks (cockpit dials), with how they blend "
-                    "and how far their origin is from the point they turn about");
-REXCVAR_DEFINE_BOOL(log_near_camera_pairs, false, "ITC",
-                    "Once a tick: groups of the per-object recorder's products sharing a key "
-                    "(same caller, part, mesh and camera) within 3 m of their camera, with each "
-                    "one's r24-r30, position and the previous tick's product it was paired with");
-REXCVAR_DEFINE_STRING(log_near_camera_frames, "", "ITC",
-                      "File to write, every 10 s, a line per frame for each product near its "
-                      "camera turning about a point away from its origin (cockpit needles): the "
-                      "frame's amount, how it blended, and where that point is drawn on screen "
-                      "against where it should be and where a screw blend would put it "
-                      "(empty: off)");
 REXCVAR_DEFINE_BOOL(log_pixel_outcomes, false, "ITC",
                     "Log what happened to the per-object lighting uploads (blended, unpaired, "
                     "rejected...), for moving and still objects, every 2 s");
@@ -285,38 +265,6 @@ int PassOfViewProjection(uint32_t address) {
   return int((address - kCameraPasses) / kCameraPassBytes);
 }
 
-// p * m for a point (row vector, w = 1), and with the result's w.
-Vec3 ApplyToPoint(const Matrix4& m, const Vec3& p) {
-  Vec3 out;
-  for (int j = 0; j < 3; j++) {
-    out[j] = p[0] * m[j] + p[1] * m[4 + j] + p[2] * m[8 + j] + m[12 + j];
-  }
-  return out;
-}
-// Where a mesh point lands on a 1280x720 screen under world-view-projection m.
-std::array<float, 2> ScreenPoint(const Matrix4& m, const Vec3& p) {
-  float c[4];
-  for (int j = 0; j < 4; j++) {
-    c[j] = p[0] * m[j] + p[1] * m[4 + j] + p[2] * m[8 + j] + m[12 + j];
-  }
-  float w = std::abs(c[3]) > 1e-6f ? c[3] : 1e-6f;
-  return {(c[0] / w + 1) * 640, (1 - c[1] / w) * 360};
-}
-
-// The angle of `p` about the line through `centre` along unit `axis`, from
-// the camera's up direction (view space): a dial needle's angle, given its
-// origin, which turns with it.
-float AngleOnDial(const Vec3& centre, const Vec3& axis, const Vec3& p) {
-  auto dot = [](const Vec3& a, const Vec3& b) { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]; };
-  Vec3 up{0, 1, 0};
-  float along = dot(up, axis);
-  Vec3 ref{up[0] - along * axis[0], up[1] - along * axis[1], up[2] - along * axis[2]};
-  Vec3 v{p[0] - centre[0], p[1] - centre[1], p[2] - centre[2]};
-  Vec3 cross{ref[1] * v[2] - ref[2] * v[1], ref[2] * v[0] - ref[0] * v[2],
-             ref[0] * v[1] - ref[1] * v[0]};
-  return std::atan2(dot(cross, axis), dot(ref, v));
-}
-
 // A matrix multiply's inputs: a world matrix and a camera's view-projection.
 struct ProductInputs {
   Matrix4 world;
@@ -342,31 +290,17 @@ Matrix4 g_live_world{};
 // inputs: the decompositions and camera splits don't depend on the frame's
 // amount, so the render thread only blends and multiplies.
 struct ProductPlan {
-  enum class World : uint8_t { kNone, kBlend };
+  enum class World : uint8_t { kNone, kBlend, kSpinning };
   World world = World::kNone;
   bool world_differs = false;    // the ticks' world matrices differ (for the stats)
   bool camera_rejected = false;  // perspective cameras that can't be one camera
   int32_t camera = -1;           // into TickPlans::cameras, if the camera blends
-  ScaledTransform wa, wb;        // the world matrices, for kBlend
-  bool screw = false;            // kBlend as a screw (--screw_blend)
-  ScrewMotion screw_motion;
+  ScaledTransform wa, wb;        // the world matrices, for kBlend and kSpinning
 };
 // A perspective camera in both ticks, shared by the products using it.
 struct CameraPair {
   PerspectiveCamera a, b;
-  ScrewMotion screw;  // the camera's placement as a screw (--screw_blend)
 };
-// The camera between its ticks: as a screw with --screw_blend, so whatever
-// moves with it (the cockpit in cockpit view) stays with it.
-PerspectiveCamera BlendCamera(const CameraPair& pair, float amount) {
-  PerspectiveCamera out = Blend(pair.a, pair.b, amount);
-  if (pair.screw.turns) {
-    out.camera = BlendScrew(ScaledTransform{pair.a.camera}, ScaledTransform{pair.b.camera},
-                            pair.screw, amount)
-                     .transform;
-  }
-  return out;
-}
 // A multiply made during a logic pass, as the render thread redoes it: the
 // same for every frame of the tick.
 struct TickProduct {
@@ -381,18 +315,6 @@ struct TickPlans {
   std::vector<CameraPair> cameras;
   // Each of the tick's products (--publish_by_tick).
   std::vector<TickProduct> tick_products;
-  // --log_near_camera_frames: products near their camera turning about a
-  // point (cockpit needles), with that point in the mesh's space and the
-  // camera's.
-  struct NearSpindle {
-    int32_t plan;
-    Vec3 local, view;
-    float turn;
-    Vec3 axis;  // the turn's axis in view space, pointing back at the camera
-    float angle_before, angle_now;  // the ticks' angles about it (AngleOnDial)
-    Vec3 origin_before, origin_now;  // the ticks' mesh origins in view space
-  };
-  std::vector<NearSpindle> near_spindles;
 };
 
 // A product written in a frame, at its output address.
@@ -598,6 +520,7 @@ struct BlendStats {
   int unpaired = 0;
   int world_not_blended = 0;
   int camera_not_blended = 0;
+  int spinning = 0;
   // Products posed live (the cockpit dials): all, unpaired (drawn as written,
   // with the tick's camera), camera rejected, and with no camera to blend.
   int live = 0, live_unpaired = 0, live_camera_rejected = 0, live_no_camera = 0;
@@ -634,16 +557,13 @@ ProductPlan PlanProduct(const ProductInputs& a, const ProductInputs& b, TickPlan
   if (wa && wb) {
     plan.wa = *wa;
     plan.wb = *wb;
-    // Only a jump is a cut: any turn blends, the short way round. (A turn
-    // over kCutAngle used to take the newer tick's spin about one of the
-    // mesh's axes, for wheels, which put parts turning about a point away
-    // from their origin, cockpit needles, far off it; tests/needle_blend.cpp.)
-    if (Distance(wa->transform.position, wb->transform.position) <= kCutDistance) {
+    if (!IsCut(wa->transform, wb->transform)) {
       plan.world = ProductPlan::World::kBlend;
-      if (REXCVAR_GET(screw_blend)) {
-        plan.screw = true;
-        plan.screw_motion = ScrewBetween(wa->transform, wb->transform);
-      }
+    } else if (Distance(wa->transform.position, wb->transform.position) <= kCutDistance &&
+               BlendSpinning(*wa, *wb, 0, kCutAngle)) {
+      // A wheel: too much spin to blend, but its position and steering can
+      // be. (Whether BlendSpinning blends doesn't depend on the amount.)
+      plan.world = ProductPlan::World::kSpinning;
     }
   }
   plan.world_differs = a.world != b.world;
@@ -659,9 +579,6 @@ ProductPlan PlanProduct(const ProductInputs& a, const ProductInputs& b, TickPlan
         if (IsSameCamera(*ca, *cb)) {
           it->second = int32_t(plans.cameras.size());
           plans.cameras.push_back({*ca, *cb});
-          if (REXCVAR_GET(screw_blend)) {
-            plans.cameras.back().screw = ScrewBetween(ca->camera, cb->camera);
-          }
         } else {
           it->second = -2;
         }
@@ -690,7 +607,7 @@ class CameraBlends {
     Blended& out = blended_[size_t(index)];
     if (out.frame != frame_) {
       const CameraPair& camera = plans.cameras[size_t(index)];
-      PerspectiveCamera blended = BlendCamera(camera, amount);
+      PerspectiveCamera blended = Blend(camera.a, camera.b, amount);
       out = {frame_, ViewProjectionFromCamera(blended), blended.camera.position};
     }
     return out;
@@ -729,12 +646,15 @@ Matrix4 BlendProduct(const ReplayedProduct& product, const TickPlans* plans,
   const ProductPlan& plan = plans->products[size_t(product.tick->plan)];
   const ProductInputs& b = product.tick->now;
   Matrix4 world = b.world;
+  std::optional<ScaledTransform> spinning;
   if (b.live) {
     // Posed for this frame already: keep it as drawn.
   } else if (plan.world == ProductPlan::World::kBlend) {
-    world = WorldMatrixFromScaledTransform(
-        plan.screw ? BlendScrew(plan.wa, plan.wb, plan.screw_motion, amount)
-                   : Blend(plan.wa, plan.wb, amount));
+    world = WorldMatrixFromScaledTransform(Blend(plan.wa, plan.wb, amount));
+  } else if (plan.world == ProductPlan::World::kSpinning &&
+             (spinning = BlendSpinning(plan.wa, plan.wb, amount, kCutAngle))) {
+    world = WorldMatrixFromScaledTransform(*spinning);
+    stats.spinning++;
   } else if (plan.world_differs) {
     stats.world_not_blended++;
   }
@@ -947,7 +867,7 @@ class DrawState {
     if (!recorder && PassOfViewProjection(b) < 0 && camera_ids_.Of(inputs.view_projection) == 0) {
       return;
     }
-    // Only the recorder's multiply is the needle's own product (the draw also
+    // Only the recorder's multiply is a live pose's own product (its draw also
     // multiplies other matrices by the camera).
     noting_live_ = recorder && g_live_pose;
     Note(base, out, a, b, inputs, render_only);
@@ -1041,31 +961,10 @@ class DrawState {
         return;
       }
     }
-    int32_t tick_product = -1;
-    if (noting_live_ && REXCVAR_GET(log_blend_state)) [[unlikely]] {
-      // The logic pass's live keys, logged beside a render-only pass's that
-      // has no tick product.
-      auto text = [&](const ProductKey& k) {
-        return fmt::format("camera {:08X} world {:08X} signature {} handler {:08X} object "
-                           "{:016X} occurrence {}",
-                           k.camera, k.world, k.signature, k.handler, k.object, k.occurrence);
-      };
-      if (!render_only) {
-        if (live_keys_pass_ != frame_pacing::GameMessages_PassNumber()) {
-          live_keys_pass_ = frame_pacing::GameMessages_PassNumber();
-          live_keys_.clear();
-        }
-        live_keys_.push_back(key);
-      } else if (!(by_tick_ ? tick_index_.Find(key) >= 0 : current_tick_.count(key)) &&
-                 counts_.live_keys_logged < 4) {
-        counts_.live_keys_logged++;
-        REXLOG_INFO("live key not found: pass {} {}", frame_pacing::GameMessages_PassNumber(),
-                    text(key));
-        for (const ProductKey& k : live_keys_) {
-          REXLOG_INFO("  logic pass {}: {}", live_keys_pass_, text(k));
-        }
-      }
+    if (noting_live_ && render_only) {
+      counts_.live_noted++;
     }
+    int32_t tick_product = -1;
     if (!render_only) {
       collecting_[key] = inputs;
       collecting_order_.push_back(key);
@@ -1096,27 +995,19 @@ class DrawState {
       // the same key, so they match the logic pass's frame (otherwise the
       // marker drew a tick apart on the two: two markers).
       bool overlay = handler_ == kRaceOverlaysHandler && tick;
-      if (noting_live_) {
-        counts_.live_noted++;
-        counts_.live_no_tick += !tick;
-        counts_.live_camera_differs +=
-            tick && !SameMatrix(tick->view_projection, inputs.view_projection);
-      }
       if (!overlay && (!tick || !SameMatrix(tick->world, inputs.world) ||
                        !SameMatrix(tick->view_projection, inputs.view_projection))) {
         counts_.mismatched_products++;
+        counts_.live_left += noting_live_;
         if (REXCVAR_GET(log_moving_products)) {
           LogMismatch(key, tick, inputs);
-        }
-        if (key.object != 0 && !REXCVAR_GET(log_near_camera_frames).empty()) [[unlikely]] {
-          NoteNearMismatch(key, tick, inputs);
         }
         return;
       }
     }
     auto& outputs = render_only ? pass_outputs_ : tick_outputs_;
-    // Drawn with the tick's pose (so it pairs and is culled as before), with
-    // this frame's world beside it for the replay.
+    // A live pose is drawn with the tick's pose (so it pairs and is culled
+    // as before), with this frame's world beside it for the replay.
     int32_t live = -1;
     if (noting_live_) {
       auto& worlds = render_only ? pass_live_worlds_ : tick_live_worlds_;
@@ -1473,19 +1364,24 @@ class DrawState {
       for (const auto& [out, product] : tick_published_) {
         frame->products.Set(out, product);
       }
-      // Products posed live get their own copy of the tick's, with this
+      // Live poses get their own copy of the tick's product, with this
       // frame's world matrix (own_products isn't otherwise used here, and is
       // reserved so the pointers stay put). The logic pass's are for its own
       // frame only; render-only passes pose their own.
       frame->own_products.reserve(tick_live_worlds_.size() + pass_live_worlds_.size());
+      auto live_copy = [&](const TickProduct& tick, const Matrix4& world) {
+        frame->own_products.push_back(tick);
+        frame->own_products.back().now.world = world;
+        frame->own_products.back().now.live = true;
+        return &frame->own_products.back();
+      };
       if (logic_pass_ && !tick_live_worlds_.empty()) {
         for (const auto& [out, output] : tick_outputs_) {
           int32_t i = output.live >= 0 ? tick_index_.Find(output.key) : -1;
           if (i >= 0) {
-            frame->own_products.push_back(plans_->tick_products[size_t(i)]);
-            frame->own_products.back().now.world = tick_live_worlds_[size_t(output.live)];
-            frame->own_products.back().now.live = true;
-            frame->products.Set(out, {output.written, &frame->own_products.back()});
+            frame->products.Set(out, {output.written,
+                                      live_copy(plans_->tick_products[size_t(i)],
+                                                tick_live_worlds_[size_t(output.live)])});
           }
         }
       }
@@ -1494,10 +1390,7 @@ class DrawState {
         if (i >= 0) {
           const TickProduct* tick = &plans_->tick_products[size_t(i)];
           if (output.live >= 0) {
-            frame->own_products.push_back(*tick);
-            frame->own_products.back().now.world = pass_live_worlds_[size_t(output.live)];
-            frame->own_products.back().now.live = true;
-            tick = &frame->own_products.back();
+            tick = live_copy(*tick, pass_live_worlds_[size_t(output.live)]);
           }
           frame->products.Set(out, {output.written, tick});
         }
@@ -1606,9 +1499,8 @@ class DrawState {
         counts_.camera_cuts, counts_.object_cuts, counts_.products_published / draws,
         counts_.mismatched_products / draws, counts_.copies / draws);
     if (counts_.live_noted) {
-      REXLOG_INFO("blend state: {} live poses noted on render-only passes, {} with no tick "
-                  "product, {} with a camera unlike the tick's",
-                  counts_.live_noted, counts_.live_no_tick, counts_.live_camera_differs);
+      REXLOG_INFO("blend state: {} live poses on render-only passes, {} left as drawn",
+                  counts_.live_noted, counts_.live_left);
     }
     if (REXCVAR_GET(log_replayed_constants)) {
       auto print = [&](const char* name, uint32_t offset) {
@@ -1633,7 +1525,7 @@ class DrawState {
   uint8_t* base_ = nullptr;
   uint64_t ticks_ = 0;
   bool logic_pass_ = false;
-  bool noting_live_ = false;  // Note: a product posed live (OnMultiply)
+  bool noting_live_ = false;  // Note: a live pose's product (OnMultiply)
   bool enabled_ = false;
   float amount_ = 0;
 
@@ -1711,106 +1603,12 @@ class DrawState {
   bool tick_published_stale_ = true;
   std::vector<std::shared_ptr<ReplayFrame>> spare_frames_;
 
-  // Diagnostics (--log_near_camera_turns): a paired product near its camera
-  // (in cockpit view, the dashboard) whose world matrix turns relative to the
-  // camera between ticks. Blending moves a world matrix's origin in a
-  // straight line and turns it about that origin (without --screw_blend), so
-  // a part turning about a point away from its origin leaves that point
-  // mid-blend.
-  struct NearCameraTurns {
-    int ticks = 0;
-    int turning[2] = {0, 0};  // by ProductPlan::World
-    float largest[2] = {0, 0};
-    int lines_this_tick = 0;
-  } near_turns_;
-  void LogNearCameraTurn(const ProductInputs& a, const ProductInputs& b, const ProductPlan& plan,
-                         TickPlans& plans, int32_t index) {
-    std::optional<PerspectiveCamera> ca = SplitViewProjection(a.view_projection);
-    std::optional<PerspectiveCamera> cb = SplitViewProjection(b.view_projection);
-    if (!ca || !cb) {
-      return;
-    }
-    // The world matrix in view space: local * world * view.
-    std::optional<ScaledTransform> va =
-        ScaledTransformFromWorldMatrix(Multiply(a.world, ViewMatrixFromTransform(ca->camera)));
-    std::optional<ScaledTransform> vb =
-        ScaledTransformFromWorldMatrix(Multiply(b.world, ViewMatrixFromTransform(cb->camera)));
-    if (!va || !vb) {
-      return;
-    }
-    const Vec3& pb = vb->transform.position;
-    float range = std::sqrt(pb[0] * pb[0] + pb[1] * pb[1] + pb[2] * pb[2]);
-    float turn = AngleBetween(va->transform.rotation, vb->transform.rotation);
-    // Products at the camera itself (the sky) only show the camera turning.
-    if (range > 3.0f || range < 0.05f || turn < 0.01f) {
-      return;
-    }
-    if (!REXCVAR_GET(log_near_camera_frames).empty()) {
-      // The point it turns about, fixed relative to the camera, and where
-      // that is in the mesh.
-      std::optional<Vec3> point =
-          ScrewAxisPoint(va->transform, vb->transform, vb->transform.position);
-      std::optional<Matrix4> to_mesh =
-          Inverse(Multiply(b.world, ViewMatrixFromTransform(cb->camera)));
-      ScrewMotion screw = ScrewBetween(va->transform, vb->transform);
-      if (point && to_mesh && screw.turns) {
-        Vec3 axis{screw.turn.x, screw.turn.y, screw.turn.z};
-        float length = std::sqrt(axis[0] * axis[0] + axis[1] * axis[1] + axis[2] * axis[2]);
-        float toward = -(axis[0] * (*point)[0] + axis[1] * (*point)[1] + axis[2] * (*point)[2]);
-        for (float& v : axis) {
-          v = v / length * (toward < 0 ? -1.0f : 1.0f);
-        }
-        plans.near_spindles.push_back({index, ApplyToPoint(*to_mesh, *point), *point, turn, axis,
-                                       AngleOnDial(*point, axis, va->transform.position),
-                                       AngleOnDial(*point, axis, vb->transform.position),
-                                       va->transform.position, vb->transform.position});
-      }
-    }
-    if (!REXCVAR_GET(log_near_camera_turns)) {
-      return;
-    }
-    int kind = int(plan.world);
-    near_turns_.turning[kind]++;
-    near_turns_.largest[kind] = std::max(near_turns_.largest[kind], turn);
-    if (near_turns_.lines_this_tick++ >= 12) {
-      return;
-    }
-    // A turn by `turn` about a point r from the origin moves the origin by
-    // 2 r sin(turn / 2).
-    float moved = Distance(va->transform.position, vb->transform.position);
-    float radius = moved / (2 * std::sin(turn / 2));
-    // In the world (what the blend works on): its own turn and movement.
-    float world_turn = AngleBetween(plan.wa.transform.rotation, plan.wb.transform.rotation);
-    float world_moved = Distance(plan.wa.transform.position, plan.wb.transform.position);
-    static const char* kKinds[] = {"not blended", "blend"};
-    REXLOG_INFO("near turn: tick {} {} turn {:.3f} rad (world {:.3f}) origin moved {:.4f} m "
-                "(world {:.3f}) radius {:.4f} m, view pos {:.3f} {:.3f} {:.3f} scale {:.3f}, "
-                "caller {:08X} r31 {:08X}",
-                near_turns_.ticks, kKinds[kind], turn, world_turn, moved, world_moved, radius,
-                pb[0], pb[1], pb[2], vb->scale[0], b.context[0], b.context[8]);
-  }
-  void LogNearCameraTurnsSummary() {
-    near_turns_.lines_this_tick = 0;
-    if (++near_turns_.ticks % 60 != 0) {
-      return;
-    }
-    REXLOG_INFO("near turns (2 s): not blended {} (largest {:.3f} rad), blend {} ({:.3f})",
-                near_turns_.turning[0], near_turns_.largest[0], near_turns_.turning[1],
-                near_turns_.largest[1]);
-    for (int k = 0; k < 2; k++) {
-      near_turns_.turning[k] = 0;
-      near_turns_.largest[k] = 0;
-    }
-  }
-
   // Once a tick, after MatchTick: plans the blend of each paired product.
   void PlanTick() {
     auto plans = std::make_shared<TickPlans>();
     plans->products.reserve(paired_.size());
     plan_of_.clear();
     camera_pairs_.clear();
-    bool log_near =
-        REXCVAR_GET(log_near_camera_turns) || !REXCVAR_GET(log_near_camera_frames).empty();
     for (const auto& [key, before_key] : paired_) {
       auto now = current_tick_.find(key);
       auto before = previous_tick_.find(before_key);
@@ -1819,13 +1617,6 @@ class DrawState {
       }
       plan_of_[key] = int32_t(plans->products.size());
       plans->products.push_back(PlanProduct(before->second, now->second, *plans, camera_pairs_));
-      if (log_near) {
-        LogNearCameraTurn(before->second, now->second, plans->products.back(), *plans,
-                          int32_t(plans->products.size() - 1));
-      }
-    }
-    if (REXCVAR_GET(log_near_camera_turns)) {
-      LogNearCameraTurnsSummary();
     }
     tick_product_keys_.clear();
     if (by_tick_) {
@@ -1924,9 +1715,6 @@ class DrawState {
         if (candidates == 1 && !has_sibling(before->second, match)) {
           paired_[n->first] = match->first;
           used.insert(match);
-          if (REXCVAR_GET(log_near_camera_pairs)) [[unlikely]] {
-            anchored_.insert(n->first);
-          }
           Vec3 p = position(n->second), q = position(match->second);
           anchors.push_back({p, {p[0] - q[0], p[1] - q[1], p[2] - q[2]}});
         }
@@ -1981,85 +1769,12 @@ class DrawState {
         used.insert(c.b);
       }
     }
-    if (REXCVAR_GET(log_near_camera_pairs)) [[unlikely]] {
-      LogNearCameraPairs(now_groups, before_groups);
-      anchored_.clear();
-    }
     for (const Entry& entry : current_tick_) {
       auto paired = paired_.find(entry.first);
       auto identity = paired != paired_.end() ? previous_identities.find(paired->second)
                                               : previous_identities.end();
       identities_[entry.first] =
           identity != previous_identities.end() ? identity->second : next_identity_++;
-    }
-  }
-  // Diagnostics (--log_near_camera_pairs): MatchTick's pairing of groups of
-  // products sharing a key near their camera (in cockpit view, gauges that
-  // may share a needle's mesh), to see whether they get swapped.
-  std::unordered_set<ProductKey, ProductKeyHash> anchored_;  // paired as anchors this tick
-  template <typename Groups>
-  [[gnu::noinline]] void LogNearCameraPairs(const Groups& now_groups, const Groups& before_groups) {
-    int lines = 0;
-    for (const auto& [group, now] : now_groups) {
-      auto before = before_groups.find(group);
-      size_t before_size = before != before_groups.end() ? before->second.size() : 0;
-      if (now.size() < 2 && before_size < 2) {
-        continue;
-      }
-      std::optional<PerspectiveCamera> camera =
-          SplitViewProjection(now.front()->second.view_projection);
-      if (!camera) {
-        continue;
-      }
-      const Vec3& eye = camera->camera.position;
-      auto range = [&](const ProductInputs& inputs) {
-        return Distance(Vec3{inputs.world[12], inputs.world[13], inputs.world[14]}, eye);
-      };
-      bool near = false;
-      for (const auto* n : now) {
-        near |= range(n->second) <= 3.0f;
-      }
-      if (!near) {
-        continue;
-      }
-      if (lines >= 24) {
-        return;
-      }
-      lines++;
-      REXLOG_INFO("near pairs: tick {} caller {:08X} r31 {:08X} world {:08X} camera {:08X}: "
-                  "{} now, {} before",
-                  ticks_, uint32_t(group.object >> 32), uint32_t(group.object), group.world,
-                  group.camera, now.size(), before_size);
-      auto registers = [](const ProductInputs& inputs) {
-        const auto& c = inputs.context;
-        return fmt::format("{:08X} {:08X} {:08X} {:08X} {:08X} {:08X} {:08X}", c[1], c[2], c[3],
-                           c[4], c[5], c[6], c[7]);
-      };
-      for (const auto* n : now) {
-        const ProductInputs& in = n->second;
-        std::string with = "unpaired";
-        auto paired = paired_.find(n->first);
-        if (paired != paired_.end()) {
-          auto b = previous_tick_.find(paired->second);
-          if (b != previous_tick_.end()) {
-            const ProductInputs& bin = b->second;
-            with = fmt::format(
-                "{} #{} pos {:.3f} {:.3f} {:.3f} (moved {:.3f} m) r24-r30 {}",
-                anchored_.count(n->first) ? "anchor" : "rest", paired->second.occurrence,
-                bin.world[12], bin.world[13], bin.world[14],
-                Distance(Vec3{in.world[12], in.world[13], in.world[14]},
-                         Vec3{bin.world[12], bin.world[13], bin.world[14]}),
-                registers(bin) == registers(in) ? "same" : registers(bin));
-          }
-        }
-        if (lines++ >= 24) {
-          return;
-        }
-        REXLOG_INFO("near pairs:   #{} r24-r30 {} pos {:.3f} {:.3f} {:.3f} ({:.2f} m from "
-                    "camera), paired with {}",
-                    n->first.occurrence, registers(in), in.world[12], in.world[13], in.world[14],
-                    range(in), with);
-      }
     }
   }
   struct {
@@ -2115,63 +1830,6 @@ class DrawState {
                 w[13], w[14], tw[12], tw[13], tw[14],
                 tick->view_projection == now.view_projection ? "same" : "differs");
   }
-  // --log_near_camera_frames: the per-object recorder's products near their
-  // camera whose render-only pass inputs differ from the logic pass's (left
-  // as drawn, not blended), kept and written to <file>.mismatch every 10 s.
-  struct NearMismatch {
-    uint64_t tick;
-    int64_t micros;
-    uint32_t r31;
-    int occurrence;
-    bool in_tick;
-    Vec3 pass_view, tick_view;  // the world matrix's origin relative to the camera
-    float turn;                 // between the logic pass's world rotation and this pass's
-  };
-  std::vector<NearMismatch> near_mismatches_;
-  std::chrono::steady_clock::time_point near_mismatches_written_ = std::chrono::steady_clock::now();
-  [[gnu::noinline]] void NoteNearMismatch(const ProductKey& key, const ProductInputs* tick,
-                                          const ProductInputs& now) {
-    std::optional<PerspectiveCamera> camera = SplitViewProjection(now.view_projection);
-    if (!camera) {
-      return;
-    }
-    Matrix4 view = ViewMatrixFromTransform(camera->camera);
-    Vec3 origin{now.world[12], now.world[13], now.world[14]};
-    if (Distance(origin, camera->camera.position) > 3.0f) {
-      return;
-    }
-    auto t = std::chrono::steady_clock::now();
-    NearMismatch m{ticks_,
-                   std::chrono::duration_cast<std::chrono::microseconds>(t.time_since_epoch()).count(),
-                   uint32_t(key.object), key.occurrence, tick != nullptr};
-    m.pass_view = ApplyToPoint(view, origin);
-    if (tick) {
-      m.tick_view = ApplyToPoint(view, Vec3{tick->world[12], tick->world[13], tick->world[14]});
-      std::optional<Transform> a = TransformFromWorldMatrix(tick->world);
-      std::optional<Transform> b = TransformFromWorldMatrix(now.world);
-      m.turn = a && b ? AngleBetween(a->rotation, b->rotation) : -1;
-    }
-    if (near_mismatches_.size() < 200000) {
-      near_mismatches_.push_back(m);
-    }
-    if (t - near_mismatches_written_ >= std::chrono::seconds(10)) {
-      near_mismatches_written_ = t;
-      std::FILE* file =
-          std::fopen((REXCVAR_GET(log_near_camera_frames) + ".mismatch").c_str(), "a");
-      if (file) {
-        for (const NearMismatch& r : near_mismatches_) {
-          std::fprintf(file,
-                       "tick %llu us %lld r31 %08X #%d %s pass view %.3f %.3f %.3f tick view "
-                       "%.3f %.3f %.3f turn %.3f\n",
-                       (unsigned long long)r.tick, (long long)r.micros, r.r31, r.occurrence,
-                       r.in_tick ? "in tick" : "not in tick", r.pass_view[0], r.pass_view[1],
-                       r.pass_view[2], r.tick_view[0], r.tick_view[1], r.tick_view[2], r.turn);
-        }
-        std::fclose(file);
-      }
-      near_mismatches_.clear();
-    }
-  }
   CameraIds camera_ids_;
 
   struct Output {
@@ -2179,16 +1837,13 @@ class DrawState {
     Matrix4 written;
     // Its place in plans_->tick_products if Note found it (--publish_by_tick).
     int32_t tick_product = -1;
-    // Posed live: this frame's world matrix, in pass_live_worlds_ (or, for
+    // A live pose: this frame's world matrix, in pass_live_worlds_ (or, for
     // the logic pass's frame, tick_live_worlds_).
     int32_t live = -1;
   };
   FlatMap<uint32_t, Output, std::hash<uint32_t>> tick_outputs_;  // by address, from the logic pass
   FlatMap<uint32_t, Output, std::hash<uint32_t>> pass_outputs_;  // from this render-only pass
-  std::vector<Matrix4> pass_live_worlds_;  // see Output::live
-  std::vector<Matrix4> tick_live_worlds_;
-  std::vector<ProductKey> live_keys_;  // --log_blend_state: the last logic pass's live keys
-  uint64_t live_keys_pass_ = 0;
+  std::vector<Matrix4> pass_live_worlds_, tick_live_worlds_;  // see Output::live
   // The race overlays' products on the logic pass, by value (see Note).
   std::unordered_map<uint64_t, ProductKey> overlay_keys_this_tick_, overlay_keys_;
 
@@ -2209,18 +1864,16 @@ class DrawState {
     int object_cuts = 0;
     int products_published = 0;
     int mismatched_products = 0;
+    // Live poses on render-only passes, and those left as drawn (mismatched).
+    int live_noted = 0, live_left = 0;
     int copies = 0;
-    // Products posed live on render-only passes: noted, and left as drawn for
-    // no tick product with their key or a camera unlike the tick's.
-    int live_noted = 0, live_no_tick = 0, live_camera_differs = 0;
-    int live_keys_logged = 0;
     std::atomic<int> replayed_products = 0;  // render thread
     std::chrono::steady_clock::time_point last_log{};
 
     void Reset() {
       draws = look_ats = cameras = objects = objects_unmatched = objects_not_transforms =
           camera_cuts = object_cuts = products_published = mismatched_products = copies = 0;
-      live_noted = live_no_tick = live_camera_differs = live_keys_logged = 0;
+      live_noted = live_left = 0;
       replayed_products = 0;
     }
   } counts_;
@@ -2239,7 +1892,7 @@ DrawState& GetDrawState() {
 // somewhere its motion doesn't explain since the last frame.
 class MovingProductsLog {
  public:
-  enum class Outcome { kBlended, kWorldNotBlended, kUnpaired };
+  enum class Outcome { kBlended, kSpinning, kWorldNotBlended, kUnpaired };
 
   void OnProduct(uint32_t payload, const ReplayedProduct& product, const Matrix4& world_shown,
                  Outcome outcome) {
@@ -2308,6 +1961,7 @@ class MovingProductsLog {
   static const char* Name(Outcome o) {
     switch (o) {
       case Outcome::kBlended: return "blended";
+      case Outcome::kSpinning: return "spinning";
       case Outcome::kWorldNotBlended: return "world not blended";
       case Outcome::kUnpaired: return "unpaired";
     }
@@ -2434,9 +2088,6 @@ class ReplayCameras {
     }
     last_identity_ = 0;
     camera_blends_.OnFrameStart();
-    if (!REXCVAR_GET(log_near_camera_frames).empty()) [[unlikely]] {
-      near_frames_.OnFrameStart(frame_.get());
-    }
     std::lock_guard lock(g_replay_mutex);
     if (frame_ != g_replay_frame) {
       if (frame_) {
@@ -2540,10 +2191,6 @@ class ReplayCameras {
       return std::nullopt;
     }
     const ReplayedProduct* product = frame_->products.Find(payload);
-    if (near_frames_.on && product && product->written != m && frame_->plans &&
-        !frame_->plans->near_spindles.empty()) [[unlikely]] {
-      near_frames_.OnDiffering(*frame_, *product, m);
-    }
     if (!product || product->written != m) {
       // A draw that isn't a known product (world geometry's matrix often
       // isn't): the pixel constants after it belong to it, not to the last
@@ -2565,6 +2212,7 @@ class ReplayCameras {
     if (REXCVAR_GET(log_moving_products)) {
       using Outcome = MovingProductsLog::Outcome;
       Outcome outcome = stats_.blend.unpaired != before.unpaired       ? Outcome::kUnpaired
+                        : stats_.blend.spinning != before.spinning     ? Outcome::kSpinning
                         : stats_.blend.world_not_blended != before.world_not_blended
                             ? Outcome::kWorldNotBlended
                             : Outcome::kBlended;
@@ -2573,165 +2221,8 @@ class ReplayCameras {
     if (REXCVAR_GET(log_overlay_products) && product->tick->handler == kRaceOverlaysHandler) {
       LogOverlay(payload, *product, result);
     }
-    if (near_frames_.on && frame_->plans && !frame_->plans->near_spindles.empty()) [[unlikely]] {
-      near_frames_.OnProduct(*frame_, *product, result, last_parts_.world);
-    }
     return result;
   }
-
-  // Diagnostics (--log_near_camera_frames): each frame's draw of the parts
-  // near their camera that turn about a point (cockpit needles), kept in
-  // memory and written to the file every 10 s, so the frames keep their rate.
-  struct NearFrames {
-    bool on = false;
-    uint64_t frame = 0;
-    struct Record {
-      uint64_t frame, tick;
-      float amount, turn;
-      uint8_t world;  // ProductPlan::World
-      uint32_t caller, r26;
-      std::array<float, 2> drawn, ideal, screw;
-      uint32_t r31 = 0;
-      float angle = 0, angle_before = 0, angle_now = 0;  // on the dial: drawn, the ticks'
-      // The mesh origin in view space, drawn and the ticks': unlike the
-      // angles, not measured about a line found again every tick.
-      Vec3 origin{}, origin_before{}, origin_now{};
-      bool differing = false;  // the upload wasn't the tick's product: drawn as uploaded
-    };
-    std::vector<Record> records;
-    // Frames whose tick had such parts but drew none of them blended.
-    std::vector<std::pair<uint64_t, uint64_t>> missed;  // frame, tick
-    size_t records_at_frame_start = 0;
-    std::chrono::steady_clock::time_point last_write = std::chrono::steady_clock::now();
-    bool truncated = false;
-
-    [[gnu::noinline]] void OnFrameStart(const ReplayFrame* finished) {
-      on = true;
-      bool expected = finished && finished->plans && !finished->plans->near_spindles.empty();
-      if (expected && records.size() == records_at_frame_start) {
-        missed.push_back({frame, finished->tick});
-      }
-      frame++;
-      records_at_frame_start = records.size();
-      auto now = std::chrono::steady_clock::now();
-      if (now - last_write >= std::chrono::seconds(10)) {
-        last_write = now;
-        Write();
-      }
-    }
-    [[gnu::noinline]] void OnProduct(const ReplayFrame& f, const ReplayedProduct& product,
-                                     const Matrix4& result, const Matrix4& world) {
-      const TickPlans& plans = *f.plans;
-      const TickPlans::NearSpindle* spindle = nullptr;
-      for (const auto& s : plans.near_spindles) {
-        if (s.plan == product.tick->plan) {
-          spindle = &s;
-        }
-      }
-      if (!spindle || !product.tick->before) {
-        return;
-      }
-      const ProductPlan& plan = plans.products[size_t(spindle->plan)];
-      Record r{frame, f.tick, f.amount, spindle->turn, uint8_t(plan.world),
-               product.tick->now.context[0], product.tick->now.context[3]};
-      r.r31 = product.tick->now.context[8];
-      r.drawn = ScreenPoint(result, spindle->local);
-      if (plan.camera >= 0) {
-        const CameraPair& pair = plans.cameras[size_t(plan.camera)];
-        PerspectiveCamera camera = BlendCamera(pair, f.amount);
-        Matrix4 view_projection = ViewProjectionFromCamera(camera);
-        // The point stays where it is relative to the camera.
-        r.ideal = ScreenPoint(view_projection,
-                              ApplyToPoint(WorldMatrixFromTransform(camera.camera), spindle->view));
-        Vec3 origin{world[12], world[13], world[14]};
-        r.origin = ApplyToPoint(ViewMatrixFromTransform(camera.camera), origin);
-        r.angle = AngleOnDial(spindle->view, spindle->axis, r.origin);
-        r.origin_before = spindle->origin_before;
-        r.origin_now = spindle->origin_now;
-        r.angle_before = spindle->angle_before;
-        r.angle_now = spindle->angle_now;
-        std::optional<ScaledTransform> wa = ScaledTransformFromWorldMatrix(product.tick->before->world);
-        std::optional<ScaledTransform> wb = ScaledTransformFromWorldMatrix(product.tick->now.world);
-        if (wa && wb) {
-          r.screw = ScreenPoint(
-              Multiply(WorldMatrixFromScaledTransform(BlendScrew(*wa, *wb, f.amount)),
-                       view_projection),
-              spindle->local);
-        }
-      }
-      if (records.size() < 200000) {
-        records.push_back(r);
-      } else {
-        truncated = true;
-      }
-    }
-    // An upload at a product's address that differs from the tick's product:
-    // left as uploaded, so not blended.
-    [[gnu::noinline]] void OnDiffering(const ReplayFrame& f, const ReplayedProduct& product,
-                                       const Matrix4& uploaded) {
-      const TickPlans& plans = *f.plans;
-      for (const auto& s : plans.near_spindles) {
-        if (s.plan == product.tick->plan) {
-          Record r{frame, f.tick, f.amount, s.turn, 0, product.tick->now.context[0],
-                   product.tick->now.context[3]};
-          r.r31 = product.tick->now.context[8];
-          r.differing = true;
-          r.drawn = ScreenPoint(uploaded, s.local);
-          r.ideal = ScreenPoint(product.written, s.local);
-          if (records.size() < 200000) {
-            records.push_back(r);
-          }
-          return;
-        }
-      }
-    }
-    void Write() {
-      if (records.empty() && missed.empty()) {
-        return;
-      }
-      std::FILE* file = std::fopen(REXCVAR_GET(log_near_camera_frames).c_str(), "a");
-      if (!file) {
-        return;
-      }
-      static const char* kKinds[] = {"none", "blend"};
-      for (const Record& r : records) {
-        float dx = r.drawn[0] - r.ideal[0], dy = r.drawn[1] - r.ideal[1];
-        float sx = r.screw[0] - r.ideal[0], sy = r.screw[1] - r.ideal[1];
-        if (r.differing) {
-          std::fprintf(file,
-                       "frame %llu tick %llu amount %.3f turn %.3f caller %08X r31 %08X r26 %u: "
-                       "upload differs from the tick's product, drawn %.1f %.1f (product %.1f "
-                       "%.1f)\n",
-                       (unsigned long long)r.frame, (unsigned long long)r.tick, r.amount, r.turn,
-                       r.caller, r.r31, r.r26, r.drawn[0], r.drawn[1], r.ideal[0], r.ideal[1]);
-          continue;
-        }
-        std::fprintf(file,
-                     "frame %llu tick %llu amount %.3f turn %.3f %s caller %08X r31 %08X r26 %u drawn "
-                     "%.1f %.1f ideal %.1f %.1f screw %.1f %.1f off %.1f px (screw %.1f px) angle %.3f "
-                     "(ticks %.3f to %.3f) origin %.3f %.3f %.3f (ticks %.3f %.3f %.3f to %.3f %.3f "
-                     "%.3f)\n",
-                     (unsigned long long)r.frame, (unsigned long long)r.tick, r.amount, r.turn,
-                     kKinds[r.world], r.caller, r.r31, r.r26, r.drawn[0], r.drawn[1], r.ideal[0],
-                     r.ideal[1], r.screw[0], r.screw[1], std::sqrt(dx * dx + dy * dy),
-                     std::sqrt(sx * sx + sy * sy), r.angle, r.angle_before, r.angle_now, r.origin[0],
-                     r.origin[1], r.origin[2], r.origin_before[0], r.origin_before[1],
-                     r.origin_before[2], r.origin_now[0], r.origin_now[1], r.origin_now[2]);
-      }
-      for (const auto& [frame_number, tick] : missed) {
-        std::fprintf(file, "frame %llu tick %llu: none blended\n",
-                     (unsigned long long)frame_number, (unsigned long long)tick);
-      }
-      if (truncated) {
-        std::fprintf(file, "(records dropped: buffer full)\n");
-        truncated = false;
-      }
-      std::fclose(file);
-      records.clear();
-      missed.clear();
-      records_at_frame_start = 0;
-    }
-  } near_frames_;
 
  private:
   void LogStats() {
@@ -2752,9 +2243,10 @@ class ReplayCameras {
       }
     }
     REXLOG_INFO(
-        "replay: {} frames; per frame {} uploads, {} blended ({} world, {} camera not blended), "
+        "replay: {} frames; per frame {} uploads, {} blended ({} spinning, {} world, {} camera not "
+        "blended), "
         "{} unpaired, not replaced: {} unchanged since last frame, {} changed",
-        stats_.frames, stats_.uploads / f, stats_.blend.blended / f,
+        stats_.frames, stats_.uploads / f, stats_.blend.blended / f, stats_.blend.spinning / f,
         stats_.blend.world_not_blended / f, stats_.blend.camera_not_blended / f,
         stats_.blend.unpaired / f, stats_.not_substituted_same / f,
         stats_.not_substituted_changed / f);

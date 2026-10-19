@@ -40,7 +40,6 @@
 // the game's polynomial. --check_native_cockpit_dials compares the angles
 // and poses with the translated code's on logic passes.
 
-#include "debug/dial_pose_log.h"
 #include "frame_pacing/game_messages.h"
 #include "guest.h"
 #include "interpolation/blend_state.h"
@@ -250,7 +249,6 @@ PoseInputs InputsFor(uint8_t* base, uint32_t car) {
   }
   PoseInputs inputs{dials.gauges, dials.world_now, dials.world_now};
   float amount = interpolation::BlendState_Amount();
-  bool blended = false;
   if (dials.has_before && amount < 1.0f) {
     auto a = interpolation::ScaledTransformFromWorldMatrix(dials.world_before);
     auto b = interpolation::ScaledTransformFromWorldMatrix(dials.world_now);
@@ -258,19 +256,7 @@ PoseInputs InputsFor(uint8_t* base, uint32_t car) {
                       kCutDistance) {
       inputs.world =
           interpolation::WorldMatrixFromScaledTransform(interpolation::Blend(*a, *b, amount));
-      blended = true;
     }
-  }
-  if (debug::DialPoseLog_Enabled()) [[unlikely]] {
-    auto at = [](const Matrix4& m) { return interpolation::Vec3{m[12], m[13], m[14]}; };
-    char line[256];
-    std::snprintf(line, sizeof(line),
-                  "car %08X tick %llu has_before %d amount %.3f blended %d moved %.4f "
-                  "from now %.4f\n",
-                  car, (unsigned long long)dials.tick, int(dials.has_before), amount,
-                  int(blended), interpolation::Distance(at(dials.world_before), at(dials.world_now)),
-                  interpolation::Distance(at(inputs.world), at(dials.world_now)));
-    debug::DialPoseLog_Append(line);
   }
   return inputs;
 }
@@ -408,9 +394,6 @@ constexpr std::array<std::array<uint32_t, 3>, 2> kTachNeedles = {{
 // In mode 5 ([dash + 4]) the second needle is the turbo gauge, from car + 704.
 extern "C" REX_FUNC(sub_820E45A8) {
   REX_FUNC_PROLOGUE();
-  if (debug::DialPoseLog_Enabled()) [[unlikely]] {
-    debug::DialPoseLog_Dials(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
-  }
   if (!REXCVAR_GET(native_cockpit_dials)) {
     __imp__sub_820E45A8(ctx, base);
     return;
@@ -445,9 +428,6 @@ extern "C" REX_FUNC(sub_820E45A8) {
     if (check) {
       g_check.Pose(ctx, base, frame, dash + needle.locals, angle, inputs.tick, drawn);
     }
-    if (debug::DialPoseLog_Enabled()) [[unlikely]] {
-      debug::DialPoseLog_NativeAngle(base, "dials", uint32_t(k), car, angle, inputs.gauges[kBoost]);
-    }
     DrawNeedle(ctx, base, frame, dash + needle.part, camera, drawn, world, needle.lr);
   }
   if (check) {
@@ -460,9 +440,6 @@ extern "C" REX_FUNC(sub_820E45A8) {
 // speedometer's and the tachometer's.
 extern "C" REX_FUNC(sub_820E42E8) {
   REX_FUNC_PROLOGUE();
-  if (debug::DialPoseLog_Enabled()) [[unlikely]] {
-    debug::DialPoseLog_Tach(base, ctx.r3.u32, ctx.r4.u32);
-  }
   if (!REXCVAR_GET(native_cockpit_dials)) {
     __imp__sub_820E42E8(ctx, base);
     return;
@@ -486,10 +463,6 @@ extern "C" REX_FUNC(sub_820E42E8) {
     Matrix4 world = Pose(base, dash + locals, angles[i], inputs.world);
     if (check) {
       g_check.Pose(ctx, base, frame, dash + locals, angles[i], inputs.tick, drawn);
-    }
-    if (debug::DialPoseLog_Enabled()) [[unlikely]] {
-      debug::DialPoseLog_NativeAngle(base, "tach", uint32_t(i), car, angles[i],
-                                     inputs.gauges[i == 0 ? kSpeed : kRevs]);
     }
     DrawNeedle(ctx, base, frame, dash + part, camera, drawn, world, lr);
   }
