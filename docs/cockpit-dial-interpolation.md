@@ -619,3 +619,32 @@ second) and the car's world matrix (car + 16), and draws it with
 r31 + 696 / + 700 next to + 704 (whether r31 there is the car isn't
 confirmed); likely the revs and the speed. Which of the two needles is the tachometer (index 0 or 6) isn't
 logged yet.
+
+## Which needle, and the order within a pass (`--log_dial_pose`, 2026-10-19)
+
+The log now also has the tachometer's dash (`tach`: `sub_820E42E8`'s
+car + 696/700/704), its angles (`tach angles`: `sub_820D3740`'s `a` and `b`),
+the tick's stores (`set`: `sub_8215C780`, for the cars seen in dial calls)
+and `sub_820DAC68`'s step (`step`: car + 704 before and after the call,
+written when the call returns, so after the lines of what it called).
+
+- **car + 696 is the speed and car + 700 the revs** (attract: ~179 and
+  ~8,750; the user's drive: 124.5 and 4,815). So **`b` (index 6, drawn
+  from dash + 736 at `0x820E4594`) is the tachometer**, `a` (index 0) the
+  speedometer, both part `...06A0`.
+- **`sub_8215C780` is the tick's car record update** (r31 = the car): it
+  copies the car's world matrix into car + 16 and stores car + 696, 700
+  (`sub_820C0128`, `sub_820C0140`) and 704 (`[r26 + 2944]`). Logic passes
+  only.
+- **The dials are posed inside `sub_820DAC68`** (through `sub_820E51D0`
+  for the tachometer), after its 1.0 step.
+- **The user's car (`dial6.log`, cockpit, mode 5) runs `sub_820DAC68` twice
+  a pass; only the first poses the dials.** Logic pass: set 704 = 1.0363,
+  first step to 0.0363, tach and turbo read 0.0363, second step to
+  -0.9637. Render-only pass (with `--per_tick_car_gauges`): enters at
+  -0.9637, each call gives 1.0 back and takes it again, so the dials read
+  -0.9637. That's the turbo's leftover 1.0: a per-call give-back can't
+  match it, as the logic pass reads between its two steps. The attract car
+  steps once a pass, so its values match.
+- In this drive the tachometer moved up to 0.60 rad a tick (8 ticks over
+  0.3), over 1.35-3.27 rad; the speedometer at most 0.054 rad.
