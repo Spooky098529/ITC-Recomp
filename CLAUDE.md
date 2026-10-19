@@ -129,7 +129,7 @@ install -m 755 itc_recomp/run-debug.sh $D/run-debug.sh
 (cd $D && python3 -I -m zipfile -c ../$name.zip itc librexruntime.so run.sh run-debug.sh)
 ```
 
-## Status (`main`, 2026-10-19, v0.4.5)
+## Status (`main`, 2026-10-19, v0.4.6)
 
 Frame interpolation for races is working: logic runs at 30 Hz and frames are
 blended between ticks. The world, cameras, wheels (other cars' too, paired
@@ -184,7 +184,8 @@ angles, or run the game logic at a higher tick rate. See
 `docs/cockpit-dial-interpolation.md`; the functions are in
 `docs/functions.md`.
 
-Graphics memory (`memory-leak`, 2026-10-19): textures were never freed,
+Graphics memory (merged from `memory-leak`, 2026-10-19, released in
+v0.4.6): textures were never freed,
 so graphics memory grew by ~60-130 MB a race load and ~1 MB/s while
 driving (seen on the Steam Deck, 1 GB of VRAM). Now textures loaded from
 guest memory are freed when a race ends (`TextureCache_RaceLeft`, from
