@@ -1,99 +1,120 @@
-# Removing ReXGlue
+# Removing ReXGlue: toward a native port
 
-The plan (not started; written 2026-10-19 on branch `remove-rexglue`) for
-taking the game off the ReXGlue SDK (`rexglue-sdk/`) piece by piece, with a
-release possible after each phase. The user's long-term goal: replace SDK
-functionality with our own code in `itc_recomp/src/` rather than patching
-the SDK deeper (patches only as a last resort, and say why).
+The plan (not started; written 2026-10-19, restructured the same day, on
+branch `remove-rexglue`) for taking the game off the ReXGlue SDK
+(`rexglue-sdk/`) piece by piece, with releases along the way. The goal
+is a native PC port, not a smaller emulator: in the end no `PPCContext`,
+no guest memory layout, no Xbox kernel calls, no `default.xex`.
 
-How to use this doc: work through the phases in order (2-5 may be
-reordered), one step at a time. When a step is done, mark it `Done
-(<date>, <branch/commit>)` and write what was found below it, the way
-`docs/native-renderer.md` records its milestones. If a step turns out
-wrong, say so here instead of deleting it. CLAUDE.md's rules hold
+How to use this doc: pick the next item from a track, do it, mark it
+`Done (<date>, <branch/commit>)`, and write what was found below it (the
+way `docs/native-renderer.md` records its milestones). If something here
+turns out wrong, say so instead of deleting it. CLAUDE.md's rules hold
 throughout: logs before guesses, commit often and push the work branch,
-ask before touching `main` or tags, never edit `generated/` (overrides go
-in `src/`), American English.
+ask before touching `main` or tags, never edit `generated/` (native code
+goes in `src/` as overrides), American English.
 
-## The dependency today
+## The approach (agreed with the user, 2026-10-19)
+
+- **Don't rebuild what the SDK does.** Writing our own Xbox kernel calls
+  with Xbox behavior (file handles, `KeWaitForSingleObject`, the handle
+  table, heaps) is a second ReXGlue and gets thrown away later. Instead,
+  make the *game's own functions* that call the SDK native; once nothing
+  calls an SDK piece, delete it.
+- **Work from the SDK boundary inward.** Only 449 of the 16,552
+  recompiled functions call kernel imports (see "The boundary" below).
+  Making those native removes the SDK subsystem by subsystem, long before
+  the game logic inside is native.
+- **Two tracks**, independent of each other:
+  - **Track A**, host-side pieces a native port needs anyway (logging,
+    flags, app shell, window, SDL input and audio output, the renderer's
+    leftovers, third-party libraries). Can start now, in any order.
+  - **Track B**, the native port from the boundary inward, subsystem by
+    subsystem; each one deletes its SDK piece when done.
+- **The core stays the SDK's, untouched, until the end**: guest memory,
+  the threads that run recompiled code, the image load, `PPCContext`,
+  the function table, the sync objects shared with recompiled code. These
+  go only when the last recompiled function is gone ("The end state").
+
+### The boundary rule
+
+While any recompiled function remains, data it touches has to stay in
+guest memory in the Xbox layout (big-endian, 32-bit guest pointers). So
+a native function comes in two levels:
+
+1. **Native, guest data**: native C++ (no `ctx` registers inside, no
+   instruction-by-instruction translation) that still reads and writes
+   guest memory through `src/guest.h`, called from and calling recompiled
+   code through `REX_FUNC` overrides. This is how `src/native/`,
+   `src/hooks/lights.cpp` and `src/hooks/cockpit_dials.cpp` work today.
+2. **Native, native data**: real structs and pointers. Possible for a
+   struct only when every function touching it is native.
+
+Track B functions start at level 1. A subsystem moves its data to level 2
+when no recompiled code touches it any more. Shared sync objects (a
+critical section in guest memory locked by both native and recompiled
+code) must keep one implementation for both, which is why threads and
+sync are part of the core, not the boundary.
+
+### How a native override is written and checked
+
+Existing practice (CLAUDE.md, "generated/ is the recompiled code"):
+`extern "C" REX_FUNC(sub_XXXXXXXX)` in `src/`, one override per
+function (`grep -rn sub_XXXXXXXX itc_recomp/src` first). For each:
+
+- Read the function in `generated/` and what's known in
+  `docs/functions.md`; write it down there as it's understood.
+- A flag to fall back to the recompiled version (`__imp__sub_XXXXXXXX`),
+  on by default once checked, in the repo's style
+  (`--native_<subsystem>`), until the recompiled version is dead.
+- Check: log both versions' results on the same inputs where that's
+  possible (pure functions: run both, compare, log differences);
+  otherwise the play checklist below. `src/debug/state_capture.cpp` and
+  `frame_state_diff.cpp` may help.
+- Speed: uncapped A/B, or profiles for small differences (CLAUDE.md).
+
+## What the game uses from the SDK
 
 Measured 2026-10-19 by grepping `itc_recomp/src` and `generated/`.
 
-| Area | What we use from the SDK | Where |
-|---|---|---|
-| Logging, flags, hashes | `REXLOG_*` (~280 uses), `REXCVAR_DEFINE_*`/`REXCVAR_GET`/`REXCVAR_DECLARE` (~370), `rex/hash.h` (xxHash) | almost every file in `src/` |
-| Graphics leftovers | The Xenos to SPIR-V shader translator, built from SDK sources into `itc_xenos_shaders` (`itc_recomp/CMakeLists.txt`); `rex::graphics::RegisterFile` (`src/native/state.h`, `passes.cpp`), `registers.h`, `xenos.h` (`textures.cpp`, `passes.cpp`), `util/draw.h`, `pipeline/shader/spirv*.h` (`shaders.cpp`), `ui/vulkan/api.h` (`vulkan_functions.h`); SDL3 and Vulkan headers from `rexglue-sdk/thirdparty/`. `rexglue_setup_target(itc GPU_PLUGINS xenos)` still builds the emulated GPU plugin for comparisons (not shipped). The game's ~25 `Vd*` imports are still the SDK kernel's (inert without the plugin, see `src/native/gpu_link.cpp`). | `src/native/` |
-| Audio | `rex::audio::AudioSystem` subclass, `AudioDriver`, `conversion.h`, `downmix.h`, `flags.h`, the XMA decoder (`audio/xma/decoder.h`, on FFmpeg), `rex::system::XHostThread`, `FunctionDispatcher`, `KernelState`, guest heap allocs (`memory()->SystemHeapAlloc`). The `XAudio*` (5) and `XMA*` (2) imports are the SDK's. | `src/audio/native_audio.cpp`, `native_audio.h` (`RuntimeConfig`) |
-| Input | `XamInputGetState`, `XamInputSetState`, `XamInputGetCapabilities` are the SDK's input system (SDL gamepads, the `--mnk_mode` keyboard driver and binds). It listens to the SDK's window: our window's events are forwarded into it (`SDLWindowedAppContext::RegisterWindow`). | SDK `src/input/`; `src/native/app_window.cpp` |
-| Files, saves | `NtCreateFile`, `NtOpenFile`, `NtReadFile`, `NtWriteFile`, `NtQueryInformationFile`, `NtQueryFullAttributesFile`, `NtQueryVolumeInformationFile`, `NtSetInformationFile`, `NtFlushBuffersFile`, `Ob*SymbolicLink`, `XamContent*` through the SDK's VFS and `--game_data_root` | SDK `src/filesystem/`, `src/kernel/` |
-| App shell | `rex::ReXApp` (`src/itc_app.h`: `SetupPresentation`, `OnPreSetup`, `OnPostSetup`, `OnShutdown`), `REX_DEFINE_APP` (`src/main.cpp`), `WindowedApp`, imgui (include path only), command-line parsing, log files, `PathConfig` | `src/itc_app.h`, `src/main.cpp` |
-| Kernel core | Guest memory (4 GB virtual mapping plus the physical view at +4 GB, see `src/native/state.h`; the `/dev/shm/xenia_memory_*` files), heaps, threads (`XThread`, the PCR at r13, TLS), sync objects, the handle table (`KernelState::object_table`, also read by `src/debug/thread_cpu.cpp`), time, `Rtl*`, `Xex*`, the XEX loader (decrypt, LZX: `rexglue-sdk/src/system/xex_module.cpp`, `lzx.cpp`), `Xam` user/UI/voice/session, `NetDll_*`, `XMsg*` | SDK `src/kernel/` (~22k lines), `src/system/` (~13k) |
-| Base of the recompiled code | `generated/default/itc_pch.h` includes `rex/ppc.h` (`PPCContext`, `REX_LOAD_*`/`REX_STORE_*`, intrinsics, stack), `rex/image_info.h`, `rex/logging.h`, `rex/chrono/clock.h`, `rex/perf/counter.h`, `rex/thread/mutex.h`, `rex/system/mmio_handler.h`. `itc_init.cpp`/`itc_register.cpp` register all 16,552 functions with the runtime's dispatcher (indirect calls, `REX_CALL_INDIRECT_FUNC`). | `generated/default/` (committed, hand-edited, never regenerated by the build) |
-| Build, packaging | `generated/rexglue.cmake` (`add_subdirectory` of the SDK, `rexglue_setup_target`, the `itc_codegen` target), the patches in `patches/rexglue-sdk/`, `librexruntime.so`/`rexruntime.dll` shipped next to `itc`, SDK-provided third-party libraries (SDL3, fmt, spdlog, FFmpeg, glslang, xxHash, imgui, cli11, tomlplusplus) | `itc_recomp/CMakeLists.txt`, CI, `run.sh`, `run.bat`, CLAUDE.md's packaging steps |
+| Area | What we use from the SDK | Where | Track |
+|---|---|---|---|
+| Logging, flags, hashes | `REXLOG_*` (~280 uses), `REXCVAR_*` (~370), `rex/hash.h` (xxHash) | almost every file in `src/` | A |
+| App shell | `rex::ReXApp` (`src/itc_app.h`), `REX_DEFINE_APP` (`src/main.cpp`), `WindowedApp`, imgui (include path only), command line, log files, `PathConfig`, the SDK's hidden window (`src/native/app_window.cpp`) | `src/itc_app.h`, `src/main.cpp` | A |
+| Renderer leftovers | The Xenos to SPIR-V shader translator built from SDK sources (`itc_xenos_shaders` in `itc_recomp/CMakeLists.txt`), `rex::graphics::RegisterFile` (`src/native/state.h`, `passes.cpp`), `registers.h`, `xenos.h`, `util/draw.h`, `ui/vulkan/api.h`; SDL3 and Vulkan headers from `rexglue-sdk/thirdparty/`; the xenos plugin still built (`GPU_PLUGINS xenos`) for comparisons | `src/native/` | A |
+| Graphics boundary | `Vd*` (25 imports; 17 game functions). In exclusive mode the GPU's job is already ours (`src/native/gpu_link.cpp`) | SDK `src/kernel/` | B |
+| Audio | Output: `AudioDriver`, `REX_AUDIO_BACKEND`, `conversion.h`, `downmix.h` (A). The game side: `XAudio*`, `XMA*` and the SDK's XMA decoder, which emulates the XMA hardware's contexts on FFmpeg (B; 6 game functions). Our mixer (`src/audio/native_audio.cpp`) still runs on an `XHostThread` and allocates from the guest heap | `src/audio/` | A and B |
+| Input | Reading SDL gamepads and the `--mnk_mode` keyboard and binds (A); `XamInput*` (B; 3 game functions) | SDK `src/input/` | A and B |
+| Files, saves | `Nt*File` and friends, `Ob*SymbolicLink`, `XamContent*` through the SDK's VFS and `--game_data_root` (22 game functions; 12 for the file calls) | SDK `src/filesystem/`, `src/kernel/` | B |
+| System services | `Xam` UI, user, profile, sessions, voice, notifications, `XMsg*`, `XamLoader*`, `NetDll_*` (17), `Xex*` (78 game functions) | SDK `src/kernel/xam/` | B |
+| Pure helpers | `Rtl*` strings, time, fills, `sprintf`, `vswprintf`, `KeQuery*`, `XGet*`, `DbgPrint` (55 game functions) | SDK `src/kernel/` | B |
+| Core | Guest memory (4 GB mapping plus the physical view at +4 GB, `src/native/state.h`; `/dev/shm/xenia_memory_*`), allocators (`NtAllocateVirtualMemory`, `Mm*`, `XamAlloc`: 31 game functions), threads and sync (`ExCreateThread`, `Ke*`, `Rtl*CriticalSection`, events, waits, TLS, the handle table: 291 game functions), the PCR, the XEX image load (`Runtime::LoadXexImage`), `rex/ppc.h` and the other headers `generated/default/itc_pch.h` includes, the function table `itc_register.cpp` fills | SDK `src/system/`, `src/kernel/`, `include/rex/` | end |
+| Build, packaging | `generated/rexglue.cmake`, `patches/rexglue-sdk/`, `librexruntime.so`/`rexruntime.dll`, third-party libraries through the SDK (SDL3, fmt, spdlog, FFmpeg, glslang, xxHash, imgui, cli11, tomlplusplus) | CMake, CI, `run.sh`, `run.bat` | A, then end |
 
-The 186 kernel imports the generated code calls (`grep -ohE
-'__imp__[A-Za-z][A-Za-z0-9_]+' itc_recomp/generated/default/*.cpp | grep
--v __imp__sub_ | sort -u`), by group:
+## The boundary
 
-- Threads and sync: `ExCreateThread`, `ExTerminateThread`,
-  `ExRegisterTitleTerminateNotification`, `Ke*` (waits, events,
-  semaphores, spinlocks, IRQL, TLS, affinity, priority, `KeDelayExecutionThread`,
-  `KeResumeThread`, `KeLockL2`/`KeUnlockL2`), `Kf*` spinlocks, `Nt*Event`,
-  `Nt*Timer`, `NtWaitForSingleObjectEx`, `NtSuspendThread`,
-  `NtResumeThread`, `NtClose`, `NtDuplicateObject`,
-  `ObReferenceObjectByHandle`, `ObDereferenceObject`, `Rtl*CriticalSection`,
-  `KiApcNormalRoutineNop`.
-- Memory: `NtAllocateVirtualMemory`, `NtFreeVirtualMemory`,
-  `NtQueryVirtualMemory`, `MmAllocatePhysicalMemoryEx`,
-  `MmFreePhysicalMemory`, `MmGetPhysicalAddress`, `MmQueryAddressProtect`,
-  `MmQueryAllocationSize`, `MmQueryStatistics`, `XamAlloc`, `XamFree`.
-- Files: listed in the table above.
-- Graphics: `Vd*` (25).
-- Audio: `XAudio*`, `XMACreateContext`, `XMAReleaseContext`.
-- Input: `XamInput*`.
-- Pure functions: `Rtl*` strings, time and memory fills,
-  `RtlNtStatusToDosError`, `RtlImageXexHeaderField`, `RtlCaptureContext`,
-  `RtlRaiseException`, `RtlUnwind`, `KeQueryPerformanceFrequency`,
-  `KeQuerySystemTime`, `XGetAVPack`, `XGetLanguage`, `XGetVideoMode`,
-  `ExGetXConfigSetting`, `sprintf`, `vswprintf`, `DbgPrint`,
-  `DbgBreakPoint`, `KeBugCheck*`.
-- System services, mostly to stub: `Xam` UI (`XamShow*`), user and
-  profile (`XamUser*`), sessions, voice, `XamNotifyCreateListener`,
-  `XNotifyGetNext`, `XMsg*`, `XamLoader*`, `XamGetExecutionId`,
-  `XamGetSystemVersion`, `HalReturnToFirmware`, `NetDll_*` (17), `Xex*`.
+Every game function that calls a kernel import directly, made by this
+pipeline (re-run it as things change; it prints `<function> <import>`):
 
-## How piece-by-piece replacement works
+```sh
+cd itc_recomp/generated/default
+awk '/DEFINE_REX_FUNC\(sub_/ {match($0,/sub_[0-9A-F]+/); f=substr($0,RSTART,RLENGTH)}
+     /__imp__[A-Za-z]/ && !/__imp__sub_/ && !/DEFINE_REX_FUNC/ {
+       match($0,/__imp__[A-Za-z][A-Za-z0-9_]+/); print f, substr($0,RSTART+7,RLENGTH-7)}' \
+  itc_recomp.*.cpp | sort -u
+```
 
-Every kernel import is a strong `extern "C"` function named
-`__imp__<Name>` in `librexruntime`, defined with `REX_EXPORT` /
-`REX_EXPORT_STUB` (`rexglue-sdk/include/rex/hook.h`) and registered by name
-for ordinal lookup (`PPCFuncRegistrar`). The generated code calls these
-names directly (`itc_funcs.h` declares them; `itc_init.cpp` lists them
-with their thunk addresses, e.g. `{ 0x825DB714, __imp__NtReadFile }`).
+2026-10-19: 916 pairs, 449 distinct functions. By area (functions):
+threads and sync 291, system services 78, pure helpers 55, memory 31,
+files and saves 22, graphics 17, audio 6, input 3. Overrides in `src/`
+already replace some callers; check each against `grep -rn` before
+counting it as open.
 
-Expected (not yet checked, Phase 0 step 2): defining `extern "C"
-REX_FUNC(__imp__<Name>)` in `src/` makes the game's calls bind to ours. On
-Linux the executable's definition interposes the shared library's; on
-Windows the executable resolves its own symbol before the import. Things
-to watch:
+These are the direct callers only. Making one native often means making
+its close callers native too (a wrapper and the few functions using its
+handles), which is fine: the unit of work is a subsystem, not a function.
 
-- The SDK's own code calling the same export internally: on Linux it may
-  bind to ours too (default ELF interposition), on Windows it won't.
-- The SDK's `PPCFuncRegistrar` registers its copy by name. Check whether
-  anything looks exports up by name or ordinal at runtime (it would get
-  the SDK's), e.g. `XexGetProcedureAddress`.
-- To keep a flag that falls back to the SDK's version for A/B testing,
-  ours needs the original: `dlsym(RTLD_NEXT, "__imp__X")` on Linux,
-  `GetProcAddress(GetModuleHandle("rexruntime.dll"), ...)` on Windows.
-- If interposition fails, the fallback is one SDK patch making the
-  export macros weak symbols (a patch is acceptable here: it's what lets
-  everything else leave the SDK).
-
-Each replacement gets a flag in the repo's style (`--native_<area>`,
-on by default once checked, like `--native_audio` was), so a run can
-compare against the SDK's version until the SDK's copy is gone.
-
-## Testing every phase
+## Testing
 
 - Attract races without the user: `--skip_intro --attract_after_s=1`
   under `timeout`, read the log, frames with `--native_renderer_dump`
@@ -101,210 +122,160 @@ compare against the SDK's version until the SDK's copy is gone.
 - Speed: uncapped (`--max_fps=0`) alternating runs; for changes under a
   few percent, `itc_recomp/tools/profile_render_thread.sh` (also
   `ITC_THREAD=main`).
-- The user's play checklist before each release: boot to the title, the
+- The user's play checklist before a release: boot to the title, the
   menus, load and save a career save made by the last released build, a
   race (opponents, pause menu, rival intro), audio throughout, keyboard
-  and gamepad, quit cleanly. Windows under Wine (`docs/windows.md`).
-- Packaging for the user: CLAUDE.md, "Test builds for the user"; update
-  the file list there when `librexruntime.so` goes (Phase 8).
+  and gamepad, quit cleanly; the Windows build under Wine
+  (`docs/windows.md`).
+- Test zips: CLAUDE.md, "Test builds for the user".
 
-## Phase 0: groundwork (no change for players)
+## Track A: host-side pieces
 
-1. Keep this doc current: what each step found, and the dependency table
-   as things leave.
-2. Check that overriding an import works (see "How piece-by-piece
-   replacement works"). Override a harmless one (`KeQuerySystemTime`):
-   log the first few calls, then return the same thing the SDK did,
-   comparing with the original found through `dlsym(RTLD_NEXT)`. Check
-   Linux and the Windows build under Wine, and whether the SDK's internal
-   callers (`grep -rn KeQuerySystemTime rexglue-sdk/src`) reach ours.
-   Record the result here: every later phase depends on it.
-3. Count which imports are called: an opt-in flag (`--log_kernel_imports`)
-   that counts calls per import and logs the totals at exit and every
-   N seconds. Since the thunks are the SDK's, the simplest way is
-   probably a table of counters bumped from a wrapper, or a one-off SDK
-   build with counting in `REX_EXPORT`'s hook (a local experiment, not a
-   committed patch). The user plays the checklist above; write the list
-   of imports never called (stub candidates) and the ones called here.
-4. Third-party libraries from our own copies (submodules or
-   FetchContent, pinned versions) instead of `rexglue-sdk/thirdparty/`:
-   SDL3, Vulkan headers, fmt, spdlog, xxHash, glslang. Watch the Windows
-   SDL DLL (patch 0003, `docs/windows.md`): only one SDL may be loaded.
-5. Ask the user whether the xenos plugin keeps being built (CLAUDE.md
-   uses it for comparisons) or goes behind an option, off by default.
+Independent of each other; each is releasable alone.
 
-## Phase 1: our own wrappers for logging, flags and hashing
+A1. **Third-party libraries from our own copies** (submodules or
+    FetchContent, pinned versions) instead of `rexglue-sdk/thirdparty/`:
+    SDL3, Vulkan headers, fmt, spdlog, xxHash, glslang. While
+    `librexruntime` exists it links its own; only one SDL may be loaded
+    (see patch 0003 and `docs/windows.md`), so SDL probably stays the
+    SDK's until A4.
 
-6. Add `itc_recomp/src/base/log.h`, `cvar.h`, `hash.h` (names to taste)
-   with our own macro names, implemented for now by forwarding to
-   `REXLOG_*`, `REXCVAR_*` and `rex/hash.h`. Switch every file in `src/`
-   over (mechanical; one commit per area keeps the diffs readable). No
-   change in behavior; afterwards the SDK's logging and flags are named in
-   three files only.
-7. Not yet: our own flag parser and log files. Until Phase 6 the SDK's
-   own flags (`--mnk_mode`, `--game_data_root`, `--fullscreen`, ...) must
-   be parsed from the same command line, so the wrappers keep using the
-   SDK's cvar system underneath.
+A2. **Logging, flags, hashes**: our own headers (`src/base/log.h`,
+    `cvar.h`, `hash.h`, names to taste) with our own macro names, first
+    forwarding to the SDK's, and every file in `src/` switched over
+    (mechanical; one commit per area). Then our own implementations for
+    logging and hashing. Our own flag parser has to wait for A4: until
+    then the SDK's flags (`--mnk_mode`, `--game_data_root`,
+    `--fullscreen`, ...) are parsed from the same command line by the SDK.
+    Log file names and rotation must stay (`logs/itc_<n>.log`,
+    `itc_<n>.1.log`): CLAUDE.md and tools rely on them.
 
-Can ship with Phase 2 instead of on its own.
+A3. **Renderer leftovers**: bring the shader translator into the repo
+    (`src/native/xenos/`; the files `itc_xenos_shaders` builds, listed in
+    `CMakeLists.txt`, and the headers they need). The game's shaders are
+    Xenos microcode in its data, so a native port still translates them;
+    this isn't emulation. Read `rexglue-sdk/LICENSE` first (Tom Clay's
+    work, partly derived from Xenia), keep its notices on copied files,
+    ask the user if the terms are unclear. Our own register array in
+    place of `RegisterFile`; the formats from `xenos.h`/`registers.h`,
+    `draw_util` and the Vulkan function list the same way. Ask the user
+    whether the xenos plugin keeps being built for comparisons (CLAUDE.md
+    uses it) or goes behind an option.
 
-## Phase 2: graphics fully ours
+A4. **App shell**: our own `main`: SDL init, our window as the only one
+    (no hidden SDK window, no event forwarding in `app_window.cpp`), our
+    own flag parser (all flag names kept, including the SDK's that the
+    game still needs while they exist), the `cache/` directory, the close
+    path. Remove `ItcApp`, `REX_DEFINE_APP`, imgui. It still starts the
+    SDK's runtime (memory, kernel, image load) through its API: that's the
+    core and stays. Find the minimal setup in
+    `rexglue-sdk/src/ui/rex_app.cpp` and `src/system/runtime.cpp`.
 
-8. Bring the shader translator into the repo
-   (`itc_recomp/src/native/xenos/`): the files `itc_xenos_shaders` builds
-   from `rexglue-sdk/src/graphics/` (listed in `CMakeLists.txt`) and the
-   headers they need. Read `rexglue-sdk/LICENSE` first (Tom Clay's work,
-   partly derived from Xenia) and keep its notices on the copied files;
-   ask the user if the terms are unclear. A rewrite can come later, if
-   ever.
-9. Our own register array in place of `rex::graphics::RegisterFile`
-   (`src/native/state.h`, `passes.cpp`), with the register indices and
-   formats from `registers.h`/`xenos.h` copied alongside the translator.
-   `draw_util` and `ui/vulkan/api.h` the same way (the latter is only a
-   function list).
-10. Our own `Vd*` imports. In exclusive mode the kick never reaches the
-    emulated GPU (`src/native/gpu_link.cpp`): its buffers are walked and
-    only their effects outside the GPU are made. Move that to the
-    boundary: `VdInitializeRingBuffer`, `VdEnableRingBufferRPtrWriteBack`,
-    `VdSetGraphicsInterruptCallback` (and the vblank interrupts the
-    plugin's vsync thread used to give), `VdSwap`, `VdGetSystemCommandBuffer`,
-    the display mode and gamma queries (`VdGetCurrentDisplayGamma`; the
-    tables in `src/native/xbox_gamma_table.h`), and stubs for the EDRAM
-    and engine calls. Read "Exclusive mode" and "Plan for milestone 6" in
-    `docs/native-renderer.md` first; the MMIO registers at `0x7FC80000`
-    (`CP_RB_WPTR 0x714`, interrupt status `0x6544`, `0x6110`) need a
-    decision: map our own range, or show nothing reads them any more.
-11. Remove `GPU_PLUGINS xenos` (if step 5 allows) and the SDK graphics
-    sources from the build. Test: attract races, dumps, uncapped fps
-    before and after, a race the user drives.
-
-## Phase 3: audio
-
-12. Our own `XAudioRegisterRenderDriverClient`,
-    `XAudioSubmitRenderDriverFrame`, `XAudioUnregisterRenderDriverClient`,
-    `XAudioGetVoiceCategoryVolume*`, with output straight to SDL audio
-    (replacing the SDK's `AudioDriver` and `REX_AUDIO_BACKEND`). Our mixer
-    thread becomes a host thread that calls guest code; until Phase 7 it
-    still needs a guest thread context, so check what `XHostThread` sets
-    up (PCR, stack) before replacing it. Read `docs/native-audio.md`
-    first; keep the overrides of `sub_824657E0`, `sub_82465870`,
-    `sub_824658C8` working.
-13. XMA: `XMACreateContext`, `XMAReleaseContext` and the decoder
-    (context registers and FFmpeg decoding, `rexglue-sdk/src/audio/xma/`).
-    Copy it (same license note as step 8) or replace it at the XACT level
-    later. Downmix and conversion (`conversion.h`, `downmix.h`) are small;
-    copy them.
-14. The user listens through the checklist (menus, race, rival intro).
-
-## Phase 4: input
-
-15. Our own `XamInputGetState`, `XamInputSetState` (rumble),
-    `XamInputGetCapabilities` from SDL gamepads, and a port of the
+A5. **Input reading**: SDL gamepads (rumble too) and a port of the
     keyboard driver and binds `--mnk_mode` uses (same flag names and
-    defaults, so `run.sh` keeps working). Read SDK `src/input/` for the
-    current behavior, and "`guest::StackFrame`" in
-    `docs/pause-menu-fix.md` for how `--mnk_mode` reaches the game.
-16. Our window reads its own events; remove the forwarding into the SDK's
-    window (`AppWindow_SetSdkWindow`, `RegisterWindow`) once nothing
-    else needs it (the close path does: see step 19).
-17. The user checks keyboard, gamepad, rumble, the pause menu's repeat.
+    defaults), as a native module with no Xbox types. Its game side is B1.
 
-## Phase 5: files and saves
+A6. **Audio output**: SDL audio straight from our mixer's output, our own
+    conversion and downmix (`conversion.h`, `downmix.h` are small), in
+    place of `AudioDriver`. Its game side is B2. Read
+    `docs/native-audio.md` first.
 
-18. Our own file imports (the table above) on host files under
-    `--game_data_root`, with the paths the game uses (log them with
-    `--log_file_opens`, `src/hooks/create_file.cpp`), the device names
-    and symbolic links (`ObCreateSymbolicLink`).
-19. `XamContent*` (saves): read and write where the SDK puts them today,
-    byte for byte, so players' saves keep working. Test with a save from
-    the last release before and after. `XamShowDeviceSelectorUI` and
-    friends answer as the SDK does (log what that is first).
-20. File handles must work with `NtClose`, `NtDuplicateObject`,
-    `ObReferenceObjectByHandle` and with waits on async reads (event
-    handles). Until Phase 7, register our file objects in the SDK's handle
-    table through its API: a stated, temporary dependency.
+## Track B: the native port from the boundary inward
 
-## Phase 6: app shell
+Smallest and most self-contained first. Each item: make the game's
+callers (and close neighbors) native at level 1, delete or stop building
+the SDK piece nothing calls any more, release. Start every item by
+listing its functions (the pipeline above), reading them in
+`generated/` and writing them up in `docs/functions.md`.
 
-21. Our own `main`: SDL init, our window as the only window, command-line
-    parsing (the Phase 1 wrappers get a real implementation; all flag
-    names stay the same), log files at the same names and rotation
-    (`logs/itc_<n>.log`, `itc_<n>.1.log`: CLAUDE.md and tools rely on
-    them), the `cache/` directory, the close path. Remove `ItcApp`,
-    `REX_DEFINE_APP`, imgui.
-22. The SDK runtime (memory, kernel, XEX load, the dispatcher) is still
-    started from our `main` through its API until Phase 7. Find the
-    minimal setup by reading `rexglue-sdk/src/ui/rex_app.cpp` and
-    `src/system/runtime.cpp`.
+B1. **Input** (3 functions calling `XamInput*`): native, reading A5.
+    Then the SDK's input system goes. The user checks keyboard, gamepad,
+    rumble, the pause menu's repeat (`docs/pause-menu-fix.md`; the action
+    mappers' override in `src/hooks/input.cpp` stays as it is).
 
-## Phase 7: kernel core
+B2. **Audio** (6 functions calling `XAudio*`/`XMA*`, plus what's around
+    them): the game's render driver client feeding A6 directly, and its
+    XMA users decoding with FFmpeg directly instead of through emulated
+    XMA contexts. Keep the existing overrides (`sub_824657E0`,
+    `sub_82465870`, `sub_824658C8`) working. The mixer thread stays an
+    SDK thread until the core goes (it runs recompiled code). The user
+    listens through menus, a race, the rival intro.
 
-Large; ship it in parts, in this order (each part is a release):
+B3. **Graphics boundary** (17 functions calling `Vd*`): ring buffer
+    setup, the interrupt callback and vblank, swap, display mode and gamma
+    queries. `src/native/gpu_link.cpp` already does the GPU's side; move
+    it to the game's functions (read "Exclusive mode" and "Plan for
+    milestone 6" in `docs/native-renderer.md`). Decide what happens to
+    the MMIO range at `0x7FC80000` (`CP_RB_WPTR 0x714`, interrupt status
+    `0x6544`, `0x6110`): show with logs that nothing reads it, or make
+    its readers native. Then the GPU plugin and the SDK's graphics go.
 
-23. Pure functions: the "Pure functions" group above.
-24. Stubs and offline answers for system services, from Phase 0 step 3's
-    list (log anything unexpected that's called).
-25. Threads, sync and handles together: they share the handle table and
-    the waits. `ExCreateThread` makes host threads with a `PPCContext`,
-    a stack, and a PCR (r13) holding TLS and the CPU number: the graphics
-    library's per-CPU workers read it (PCR +268; see "Interrupts are made
-    at the library's level" in `docs/native-renderer.md`), and the
-    deferred-kick race there shows timing matters. Then move Phase 5's
-    file objects and `src/debug/thread_cpu.cpp` to our table.
-26. Memory: the 4 GB guest mapping and the physical view at +4 GB
-    (`src/native/state.h` depends on the layout), the allocators
-    (`NtAllocateVirtualMemory`, `Mm*`, `XamAlloc`), heap layout as the
-    game saw it before (log the SDK's allocation addresses first and
-    compare), the shared memory files (and their cleanup:
-    CLAUDE.md's `find /dev/shm ... -delete`).
-27. Loading the game's image. Still needed although the code is
-    recompiled: `generated/` holds only the translated code, which reads
-    all the game's data (strings, floats, vtables, tables, initialized
-    globals) from guest addresses in the image (`0x82000000`, the
-    `ctx.r11.s64 = -2113929216` all over `generated/`). That data comes
-    only from `default.xex`, encrypted and compressed. Today `ReXApp`
-    (`rexglue-sdk/src/ui/rex_app.cpp`) calls `Runtime::LoadXexImage`,
-    which decrypts it (AES), decompresses it (LZX) and copies it to the
-    image base (`rexglue-sdk/src/system/xex_module.cpp`, `lzx.cpp`). We
-    can't ship the decrypted image (players supply their own game files),
-    so a loader stays. But it only has to handle this one retail XEX:
-    the retail key, its compression type, the copy to `0x82000000`, and
-    whatever the SDK writes into the image after the copy (import tables
-    or variable imports such as `KeTimeStampBundle`: log what the SDK
-    writes, or compare the image before and after loading, first). No
-    devkit keys, patch (`xexp`) or delta support, or other modules. Also
-    needed: the header fields the game asks for (`RtlImageXexHeaderField`)
-    and `XexGetModuleHandle`/`XexGetProcedureAddress`. Copy only the parts
-    used, with the license note from step 8. (Optionally: decrypt once on
-    first run into the cache, then map that file on later runs.)
-28. With nothing left calling into the SDK's kernel, stop starting its
-    runtime (step 22).
+B4. **Files and saves** (22 functions; the game's `CreateFile`
+    `sub_82295508` is the only caller of `NtCreateFile`): the game's file
+    functions on host files under `--game_data_root` (log the paths with
+    `--log_file_opens`, `src/hooks/create_file.cpp`), with handles that
+    are ours, used only by these functions. Check every user of a file
+    handle is native (waits on async reads, `NtClose`). Saves
+    (`XamContent*`): read and write where the SDK puts them, byte for
+    byte; test with a save from the last release before and after. Then
+    the SDK's VFS goes.
 
-## Phase 8: the generated code's base, then no SDK
+B5. **System services** (78 functions): sign-in, profile, UI dialogs,
+    sessions, voice, network, notifications, the loader. Most should go
+    from the game's side entirely (offline, signed in, no voice). Log
+    which are called in a full play session first (an opt-in counter
+    around the callers), and what the SDK answers today; the game must
+    get the same answers.
 
-29. Bring into the repo what `generated/default/itc_pch.h` includes
-    (`rex/ppc.h` and `rex/ppc/*.h`, `image_info.h`, `mmio_handler.h`, the
-    clock, counter and mutex headers) and the dispatcher that
-    `itc_register.cpp` fills (`SetFunction`). `generated/` itself stays
-    untouched: give the copied headers the same include paths
-    (`<rex/...>`) from our own directory.
-30. Decide with the user about `rexglue codegen` (the `itc_codegen`
-    target): `generated/` is hand-edited and never regenerated by the
-    build, so either keep a pinned SDK checkout as an offline tool only,
-    or drop regeneration.
-31. Remove the `rexglue-sdk` submodule, `patches/rexglue-sdk/`,
-    `generated/rexglue.cmake` (replaced by our CMake), and
-    `librexruntime` from packaging, `run.sh`, `run.bat`, both CI
-    workflows and CLAUDE.md (build line's `LD_LIBRARY_PATH`, packaging
-    steps, the note on the submodule showing modified).
+B6. **Pure helpers** (55 functions): string, time and formatting
+    helpers made native, or their callers made native. Cheap; can be
+    done alongside anything else.
+
+B7. **The game logic inside**: everything else, subsystem by subsystem,
+    in whatever order the user wants (frame interpolation's hooks,
+    vehicles, UI, menus, physics, ...). Each subsystem moves its data to
+    level 2 once no recompiled code touches it. This is most of the
+    work: full decompilations of games this size usually take years. Keep
+    a list of which functions are native (in `docs/functions.md` or a
+    table here) so progress can be measured.
+
+## The end state: removing the core
+
+Only when no recompiled function is left (or none that touches what's
+being removed):
+
+E1. **Threads and sync** (291 boundary functions, plus every recompiled
+    function using the game's locks): host threads and locks in native
+    code. The graphics library's per-CPU workers read the CPU number from
+    the PCR (+268; "Interrupts are made at the library's level" in
+    `docs/native-renderer.md`), and timing has mattered before (the
+    deferred-kick race there).
+
+E2. **Memory**: native allocations once nothing uses guest addresses.
+    No guest mapping, no `/dev/shm` files.
+
+E3. **The game's image data**: the recompiled code reads strings,
+    constants, vtables, tables and initialized globals from the image at
+    `0x82000000`, which today comes from the player's `default.xex`
+    (encrypted, compressed; `Runtime::LoadXexImage`). Native code needs
+    that data as native constants and tables instead. Open decision for
+    the user: put it in the build (release zips then carry the game's
+    data, as they carry its translated code now), or read it from the
+    player's `default.xex` at startup (a small decrypting loader).
+
+E4. **`PPCContext`, `rex/ppc.h`, the function table, `generated/`,
+    and the SDK**: delete the submodule, `patches/rexglue-sdk/`,
+    `generated/rexglue.cmake`, `librexruntime` from packaging, `run.sh`,
+    `run.bat`, both CI workflows and CLAUDE.md (the build line's
+    `LD_LIBRARY_PATH`, packaging, the note on the submodule showing
+    modified). The `rexglue codegen` target goes with it.
 
 ## Risks
 
-- Saves: steps 19 and 26 can break players' saves; test with real ones.
-- Threads and timing (step 25): CPU numbers, priorities, affinity and
-  wait behavior the game relies on.
-- Interposition (Phase 0 step 2): if it fails on a platform, the plan
-  needs the weak-export patch first.
-- The SDK's internals use each other (its audio and VFS use its threads
-  and memory): that's why the kernel core comes after its other users are
-  gone.
+- Saves (B4): players' saves must keep loading.
+- Behavior drift: a native function that differs subtly from the
+  recompiled one (float rounding, big-endian layout, order of side
+  effects). Compare against the recompiled version with a fallback flag
+  before it's removed.
+- Scale (B7): most of the work is the game logic, not the boundary.
+  Track A and B1-B6 are worth doing on their own even if B7 goes slowly.
