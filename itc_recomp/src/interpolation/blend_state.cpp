@@ -113,6 +113,10 @@ REXCVAR_DEFINE_BOOL(log_moving_products, false, "ITC",
                     "Log moving objects drawn out of step: render-only mismatches, products not "
                     "blended or unpaired, pairings that move unlike their neighbors, and jumps "
                     "between frames");
+REXCVAR_DEFINE_BOOL(log_cockpit_judder, false, "ITC",
+                    "Log where the camera is in the frame of each part within 3 m of it (the "
+                    "cockpit) frame by frame, and its jerk (second difference): a part shaking "
+                    "against the view, every 2 s");
 REXCVAR_DEFINE_BOOL(log_pixel_outcomes, false, "ITC",
                     "Log what happened to the per-object lighting uploads (blended, unpaired, "
                     "rejected...), for moving and still objects, every 2 s");
@@ -2254,6 +2258,108 @@ MovingProductsLog& GetMovingProductsLog() {
   return log;
 }
 
+// Diagnostics on the render thread (--log_cockpit_judder): for each part
+// drawn within 3 m of its camera (the cockpit in the cockpit view), the
+// camera's position in the part's own frame. Head motion moves it smoothly;
+// a part and camera blended out of step make it jerk from frame to frame.
+class CockpitJudderLog {
+ public:
+  void OnProduct(const ReplayedProduct& product, const Matrix4& world, const Vec3& eye,
+                 bool camera_blended, bool camera_rejected, bool world_blended) {
+    Vec3 position{world[12], world[13], world[14]};
+    Vec3 d{eye[0] - position[0], eye[1] - position[1], eye[2] - position[2]};
+    if (Distance(eye, position) > 3.0f) {
+      return;
+    }
+    // Row vectors: world = local * R; rows 0-2 are the part's axes (scaled).
+    Vec3 local;
+    for (int i = 0; i < 3; i++) {
+      float x = world[i * 4], y = world[i * 4 + 1], z = world[i * 4 + 2];
+      float length2 = x * x + y * y + z * z;
+      local[i] = length2 > 0 ? (d[0] * x + d[1] * y + d[2] * z) / length2 : 0;
+    }
+    Sample sample{local, camera_blended, camera_rejected, world_blended};
+    uint64_t identity = product.tick->identity;
+    auto& history = now_[identity];
+    history = sample;
+    auto last = last_.find(identity);
+    auto before = before_.find(identity);
+    parts_++;
+    camera_unblended_ += !camera_blended;
+    camera_rejected_ += camera_rejected;
+    world_unblended_ += !world_blended;
+    if (last == last_.end() || before == before_.end()) {
+      return;
+    }
+    float jerk = 0;
+    for (int i = 0; i < 3; i++) {
+      jerk = std::max(jerk, std::abs(local[i] - 2 * last->second.local[i] +
+                                     before->second.local[i]));
+    }
+    jerk_sum_ += jerk;
+    jerk_count_++;
+    max_jerk_ = std::max(max_jerk_, jerk);
+    if (jerk > 0.002f && lines_ < 12) {
+      lines_++;
+      REXLOG_INFO("cockpit judder: tick {} amount {:.3f}: id {:016X} jerk {:.4f} m, eye in part "
+                  "{:.4f} {:.4f} {:.4f} (last {:.4f} {:.4f} {:.4f}, before {:.4f} {:.4f} "
+                  "{:.4f}); camera {} (last {}), world {} (last {}); part at {:.1f} {:.1f} "
+                  "{:.1f}",
+                  tick_, amount_, identity, jerk, local[0], local[1], local[2],
+                  last->second.local[0], last->second.local[1], last->second.local[2],
+                  before->second.local[0], before->second.local[1], before->second.local[2],
+                  sample.camera_rejected ? "rejected" : sample.camera_blended ? "blended" : "not",
+                  last->second.camera_rejected  ? "rejected"
+                  : last->second.camera_blended ? "blended"
+                                                : "not",
+                  sample.world_blended ? "blended" : "not",
+                  last->second.world_blended ? "blended" : "not", position[0], position[1],
+                  position[2]);
+    }
+  }
+
+  void OnFrameStart(uint64_t tick, float amount) {
+    before_ = std::move(last_);
+    last_ = std::move(now_);
+    now_.clear();
+    tick_ = tick;
+    amount_ = amount;
+    frames_++;
+    auto now = std::chrono::steady_clock::now();
+    if (now - last_log_ >= std::chrono::seconds(2)) {
+      REXLOG_INFO("cockpit judder: last 2 s, {} frames, {:.1f} parts within 3 m a frame ({} "
+                  "camera not blended, {} rejected, {} world not blended); jerk mean {:.5f} max "
+                  "{:.5f} m",
+                  frames_, double(parts_) / std::max(frames_, 1), camera_unblended_,
+                  camera_rejected_, world_unblended_, jerk_sum_ / std::max(jerk_count_, 1),
+                  max_jerk_);
+      last_log_ = now;
+      frames_ = parts_ = camera_unblended_ = camera_rejected_ = world_unblended_ = jerk_count_ =
+          lines_ = 0;
+      jerk_sum_ = max_jerk_ = 0;
+    }
+  }
+
+ private:
+  struct Sample {
+    Vec3 local;
+    bool camera_blended, camera_rejected, world_blended;
+  };
+  std::unordered_map<uint64_t, Sample> now_, last_, before_;
+  uint64_t tick_ = 0;
+  float amount_ = 0;
+  int frames_ = 0, parts_ = 0, camera_unblended_ = 0, camera_rejected_ = 0, world_unblended_ = 0;
+  int jerk_count_ = 0, lines_ = 0;
+  double jerk_sum_ = 0;
+  float max_jerk_ = 0;
+  std::chrono::steady_clock::time_point last_log_ = std::chrono::steady_clock::now();
+};
+
+CockpitJudderLog& GetCockpitJudderLog() {
+  static CockpitJudderLog log;
+  return log;
+}
+
 class ReplayCameras {
  public:
   void OnFrameStart() {
@@ -2275,6 +2381,9 @@ class ReplayCameras {
     }
     if (REXCVAR_GET(log_moving_products) && frame_) {
       GetMovingProductsLog().OnFrameStart(frame_->tick, frame_->amount);
+    }
+    if (REXCVAR_GET(log_cockpit_judder) && frame_) [[unlikely]] {
+      GetCockpitJudderLog().OnFrameStart(frame_->tick, frame_->amount);
     }
   }
 
@@ -2396,6 +2505,9 @@ class ReplayCameras {
                             : Outcome::kBlended;
       GetMovingProductsLog().OnProduct(payload, *product, last_parts_.world, outcome);
     }
+    if (REXCVAR_GET(log_cockpit_judder)) [[unlikely]] {
+      LogCockpitJudder(*product, before);
+    }
     if (REXCVAR_GET(log_overlay_products) && product->tick->handler == kRaceOverlaysHandler) {
       LogOverlay(payload, *product, result);
     }
@@ -2403,6 +2515,23 @@ class ReplayCameras {
   }
 
  private:
+  [[gnu::noinline]] void LogCockpitJudder(const ReplayedProduct& product,
+                                          const BlendStats& before) {
+    std::optional<Vec3> eye = last_parts_.eye;
+    if (!eye) {
+      std::optional<PerspectiveCamera> camera = SplitViewProjection(product.tick->now.view_projection);
+      if (!camera) {
+        return;
+      }
+      eye = camera->camera.position;
+    }
+    bool unpaired = stats_.blend.unpaired != before.unpaired;
+    bool rejected = stats_.blend.camera_not_blended != before.camera_not_blended;
+    bool world_blended = !unpaired && stats_.blend.world_not_blended == before.world_not_blended;
+    GetCockpitJudderLog().OnProduct(product, last_parts_.world, *eye, last_parts_.eye.has_value(),
+                                    rejected, world_blended);
+  }
+
   void LogStats() {
     if (!REXCVAR_GET(log_blend_state)) {
       return;
