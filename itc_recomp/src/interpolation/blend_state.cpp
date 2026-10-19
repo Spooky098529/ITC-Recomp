@@ -120,6 +120,11 @@ REXCVAR_DEFINE_BOOL(log_camera_copies, false, "ITC",
                     "Log copies of cameras (the headlight projector's among them) left unpaired "
                     "between ticks, what the previous tick held under the same camera address, "
                     "and how many camera numbers exist, every 2 s");
+REXCVAR_DEFINE_BOOL(sticky_camera_ids, true, "ITC",
+                    "A camera address keeps the camera number it used while its projection stays "
+                    "within the tolerance of the last one there, so a projection that drifts "
+                    "(the headlight projector's) keeps its number instead of taking new ones and "
+                    "flipping between two, which left it unpaired, drawn at the tick");
 REXCVAR_DEFINE_BOOL(cache_camera_ids, true, "ITC",
                     "Remember the camera number of recently seen view-projections by their "
                     "bytes, so a repeated one skips splitting it and the table lookup (same "
@@ -692,13 +697,28 @@ Matrix4 BlendProduct(const ReplayedProduct& product, const TickPlans* plans,
 // camera); 0 for a non-perspective one. Main thread.
 class CameraIds {
  public:
-  uint64_t Of(const Matrix4& view_projection) {
+  // Aspect ratio, depth offset and depth scale over offset.
+  using Signature = std::array<float, 3>;
+
+  // The number, and the signature it was found by (zeros for 0).
+  uint64_t Of(const Matrix4& view_projection, Signature* signature = nullptr) {
+    Signature unused;
+    Signature& out = signature ? *signature : unused;
     if (!REXCVAR_GET(cache_camera_ids)) {
-      return Compute(view_projection);
+      return Compute(view_projection, out);
     }
-    return Cached(view_projection);
+    return Cached(view_projection, out);
   }
   uint64_t count() const { return count_; }  // numbers given so far
+
+  static bool IsClose(const Signature& a, const Signature& b) {
+    for (int i = 0; i < 3; i++) {
+      if (!(std::abs(a[i] - b[i]) <= 0.01f * std::max({std::abs(a[i]), std::abs(b[i]), 1e-3f}))) {
+        return false;
+      }
+    }
+    return true;
+  }
 
  private:
   // The number is a function of the matrix: once a signature has a number,
@@ -708,6 +728,7 @@ class CameraIds {
   struct CacheEntry {
     Matrix4 matrix;
     uint64_t id;
+    Signature signature;
     bool valid = false;
   };
   static uint64_t HashOf(const Matrix4& m) {
@@ -720,29 +741,33 @@ class CameraIds {
                  (words[6] * 0x94D049BB133111EBull) ^ (words[7] * 0xBF58476D1CE4E5B9ull);
     return (h ^ (h >> 31)) * 0x9E3779B97F4A7C15ull;
   }
-  uint64_t Cached(const Matrix4& view_projection) {
+  uint64_t Cached(const Matrix4& view_projection, Signature& signature) {
     // Two in five calls are for the previous call's matrix.
     if (last_ && std::memcmp(last_->matrix.data(), view_projection.data(), sizeof(Matrix4)) == 0) {
+      signature = last_->signature;
       return last_->id;
     }
     CacheEntry& entry = cache_[HashOf(view_projection) >> (64 - kCacheBits)];
     if (!entry.valid ||
         std::memcmp(entry.matrix.data(), view_projection.data(), sizeof(Matrix4)) != 0) {
       entry.matrix = view_projection;
-      entry.id = Compute(view_projection);
+      entry.id = Compute(view_projection, entry.signature);
       entry.valid = true;
     }
     last_ = &entry;
+    signature = entry.signature;
     return entry.id;
   }
 
-  uint64_t Compute(const Matrix4& view_projection) {
+  uint64_t Compute(const Matrix4& view_projection, Signature& out) {
+    out = {};
     std::optional<PerspectiveCamera> camera = SplitViewProjection(view_projection);
     if (!camera || !(camera->y_scale != 0) || !(camera->depth_offset != 0)) {
       return 0;
     }
     Signature signature{camera->x_scale / camera->y_scale, camera->depth_offset,
                         camera->depth_scale / camera->depth_offset};
+    out = signature;
     // Look in the signature's bucket and its neighbors, so values either
     // side of a bucket boundary still match.
     std::array<int32_t, 3> bucket = BucketOf(signature);
@@ -769,7 +794,6 @@ class CameraIds {
     return id;
   }
 
-  using Signature = std::array<float, 3>;
   // Diagnostics (--log_camera_copies): a new number's projection, where its
   // camera is, and the nearest number already given (by the largest relative
   // difference of the signatures' components). At most 10 lines a second.
@@ -814,14 +838,6 @@ class CameraIds {
   }
   std::chrono::steady_clock::time_point new_id_log_start_;
   int new_id_lines_ = 0;
-  static bool IsClose(const Signature& a, const Signature& b) {
-    for (int i = 0; i < 3; i++) {
-      if (!(std::abs(a[i] - b[i]) <= 0.01f * std::max({std::abs(a[i]), std::abs(b[i]), 1e-3f}))) {
-        return false;
-      }
-    }
-    return true;
-  }
   // Buckets about 1% wide, on a log scale, with the sign kept.
   static std::array<int32_t, 3> BucketOf(const Signature& s) {
     std::array<int32_t, 3> b;
@@ -976,8 +992,14 @@ class DrawState {
     // back for their recording on render-only passes), so the address alone
     // says which camera; their projection there drifts past CameraIds'
     // tolerance between ticks, which renumbered them and left them unpaired.
-    uint64_t signature =
-        handler_ == kRaceOverlaysHandler ? 0 : camera_ids_.Of(inputs.view_projection);
+    uint64_t signature = 0;
+    if (handler_ != kRaceOverlaysHandler) {
+      CameraIds::Signature projection;
+      signature = camera_ids_.Of(inputs.view_projection, &projection);
+      if (signature != 0 && REXCVAR_GET(sticky_camera_ids)) {
+        signature = StickyCameraId(camera, signature, projection);
+      }
+    }
     // The per-object recorder's caller (0x820D0564 for cars' parts) keeps a
     // pointer to the part it draws in r31. Numbering products by order alone
     // paired a wheel with another wheel, or another car, whenever a part was
@@ -1164,6 +1186,57 @@ class DrawState {
     }
   }
 
+  // The camera number for a product by the camera at `address`: a number
+  // used there before whose last projection is within CameraIds' tolerance
+  // of this one, else `id`. The numbers match signatures to the first one
+  // given, so a projection that keeps changing (the headlight projector's
+  // aspect went from 2.8 to 24 over a long drive) took a new number every 1%
+  // and, near the edge between two, flipped between them from tick to tick
+  // (and between a tick and its render-only frames): unpaired every time,
+  // drawn at the tick while the car was blended (the beam lagging the car).
+  // Different cameras sharing a stack copy (main view, mirror, reflection)
+  // differ by far more, so they still get their own numbers.
+  uint64_t StickyCameraId(uint32_t address, uint64_t id, const CameraIds::Signature& projection) {
+    StickyIds& slots = sticky_ids_[(uint64_t(address) << 32) | handler_];
+    sticky_uses_++;
+    for (StickyIds::Slot& slot : slots.slots) {
+      if (slot.id == id && CameraIds::IsClose(slot.projection, projection)) {
+        slot.projection = projection;
+        slot.last_use = sticky_uses_;
+        return id;
+      }
+    }
+    for (StickyIds::Slot& slot : slots.slots) {
+      if (slot.id != 0 && CameraIds::IsClose(slot.projection, projection)) {
+        slot.projection = projection;
+        slot.last_use = sticky_uses_;
+        camera_copies_.kept++;
+        return slot.id;
+      }
+    }
+    StickyIds::Slot* oldest = &slots.slots[0];
+    for (StickyIds::Slot& slot : slots.slots) {
+      if (slot.last_use < oldest->last_use) {
+        oldest = &slot;
+      }
+    }
+    *oldest = {id, projection, sticky_uses_};
+    return id;
+  }
+  struct StickyIds {
+    struct Slot {
+      uint64_t id = 0;
+      CameraIds::Signature projection{};
+      uint64_t last_use = 0;
+    };
+    std::array<Slot, 4> slots;
+  };
+  struct U64Hash {
+    size_t operator()(uint64_t v) const { return size_t(v * 0x9E3779B97F4A7C15ull >> 16); }
+  };
+  FlatMap<uint64_t, StickyIds, U64Hash> sticky_ids_;  // by camera address and handler
+  uint64_t sticky_uses_ = 0;
+
   // Diagnostics (--log_camera_copies): copies of cameras (world 0) this tick
   // left unpaired, with what the previous tick held under the same camera
   // address and handler (another camera number, or another occurrence).
@@ -1198,9 +1271,9 @@ class DrawState {
     auto now = std::chrono::steady_clock::now();
     if (now - camera_copies_.last_log >= std::chrono::seconds(2)) {
       REXLOG_INFO("camera copies: last 2 s, {} ticks, {:.1f} copies a tick, {} unpaired; {} "
-                  "camera numbers",
+                  "camera numbers, {} products kept their address's number",
                   camera_copies_.ticks, double(camera_copies_.copies) / camera_copies_.ticks,
-                  camera_copies_.unpaired, camera_ids_.count());
+                  camera_copies_.unpaired, camera_ids_.count(), camera_copies_.kept);
       camera_copies_ = {};
       camera_copies_.last_log = now;
     }
@@ -1932,7 +2005,7 @@ class DrawState {
   }
   CameraIds camera_ids_;
   struct {
-    int ticks = 0, copies = 0, unpaired = 0, lines = 0;
+    int ticks = 0, copies = 0, unpaired = 0, lines = 0, kept = 0;
     std::chrono::steady_clock::time_point last_log;
   } camera_copies_;  // --log_camera_copies
 
