@@ -1,7 +1,7 @@
 # Removing ReXGlue: toward a native port
 
-The plan (not started; written 2026-10-19, restructured the same day, on
-branch `remove-rexglue`) for taking the game off the ReXGlue SDK
+The plan (written 2026-10-19 on branch `remove-rexglue`, restructured the
+same day; in progress on `rexglue-remove-1`: A0, A5 and B1 done) for taking the game off the ReXGlue SDK
 (`rexglue-sdk/`) piece by piece, with releases along the way. The goal
 is a native PC port, not a smaller emulator: in the end no `PPCContext`,
 no guest memory layout, no Xbox kernel calls, no `default.xex`.
@@ -237,6 +237,32 @@ listing its functions (the pipeline above), reading them in
 B1. **Input** (3 functions calling `XamInput*`): native, reading A5.
     Then the SDK's input system goes. The user checks gamepad, rumble, the pause menu's repeat (`docs/pause-menu-fix.md`; the action
     mappers' override in `src/hooks/input.cpp` stays as it is).
+
+    Done (2026-10-19, `rexglue-remove-1`), with no fallback flag (the
+    user's call: no SDK for game input). `src/hooks/xinput.cpp`
+    overrides the three wrappers (`sub_825BA3F0`, `sub_825BA3F8`,
+    `sub_825BA408`; only `sub_82591C18` calls them) with the SDK's
+    structs, return codes and SDL mapping (stick y as `~value`, triggers
+    as `value >> 7`, the guide button left out, packet numbers one more
+    per changed read). Capabilities are fixed (a wired gamepad, every
+    button but the guide): the game stores them on connect (pad +192)
+    and nothing known reads them; the SDK also flagged wireless pads and
+    pads with no d-pad. `ItcApp::OnPreSetup` clears the runtime's
+    `input_factory`, so the SDK's input system (InputSystem, its SDL,
+    XInput, keyboard and nop drivers) isn't created; the log no longer
+    has "SDL input driver initialized". Dropped with it:
+    `--input_backend`, `--guide_button`, `--hid_mappings_file` (a
+    `gamecontrollerdb.txt` we never shipped).
+
+    **Behavior change: an unplugged pad pauses the race.** The SDK's nop
+    driver spoofed a connected, idle pad on user 0 at all times
+    (`rexglue-sdk/src/input/nop/nop_input_driver.cpp`), so the game never
+    saw a pad leave. Now it does, as on a 360 (pausing on a lost
+    controller was a certification rule), and the race pauses. Checked by
+    the user: four unplugs, in a menu and in a race; each seen by the game
+    within ~30 ms (`xinput: user 0 disconnected`), the pad back in slot 0
+    on replugging, and the race resumed fine. Not tried yet: starting with
+    no pad connected.
 
 B2. **Audio** (6 functions calling `XAudio*`/`XMA*`, plus what's around
     them): the game's render driver client feeding A6 directly, and its

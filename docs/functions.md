@@ -43,6 +43,10 @@ Status:
 | `sub_821062E8` | `GameMessages::Dispatch` | Native | Delivers the game's queued messages to its handlers: 0 = Update (all game logic), 1 = Draw. Skips Update on render-only passes (`src/frame_pacing/game_messages.cpp`). |
 | `sub_82106280` | | | Picks the handler object a message goes to; its method 0 handles it. |
 | `sub_820990F0` | `Input::Update` | Wrapped | Input manager update; skipped on render-only passes so presses aren't seen several times. |
+| `sub_82591C18` | `PhysicalPad::Read` | | Reads one pad (r3 = pad, r4 = pointer to the user index) through the three XInput wrappers below, once a tick per pad from Input::Update; see "Physical pad" in `docs/pause-menu-fix.md`. |
+| `sub_825BA3F8` | `XInputGetState` | Native | Wrapper (r3 = user, r4 = state) jumping to `XamInputGetState`. Answered from our SDL gamepad reading (`src/hooks/xinput.cpp`, `src/input/gamepads.cpp`) with the SDK's struct, codes and mapping; the SDK's input system isn't created. See B1 in `docs/rexglue-removal.md`. |
+| `sub_825BA3F0` | `XInputGetCapabilities` | Native | Wrapper (r3 = user, r4 = flags, r5 = capabilities) for `XamInputGetCapabilities`; called on a pad's connect. Fixed capabilities (a wired gamepad, every button but the guide). |
+| `sub_825BA408` | `XInputSetState` | Native | Wrapper (r3 = user, r4 = vibration) for `XamInputSetState`: rumble through SDL, held until the next call. |
 | `sub_8210B018` | `ActionMappers::Update` | Wrapped | Updates every action mapper (`sub_8210C370` each: held, pressed, fired words and the repeat objects). Skipped on render-only passes (`--input_mappers_by_tick`, on by default), so menu input repeats count ticks; see `docs/pause-menu-fix.md`. |
 | `sub_8215B4F8` | `Race::DrawStep` | Wrapped | The race's draw step (Draw message). Its running marks the pass as in a race. |
 | `sub_820A3978` | `CameraPass::Update` | Wrapped | Rebuilds a camera pass's view (+0x10) from its eye, target and up vector (+0x190, +0x1A0, +0x1B0), and its view-projection (+0x90 = view * projection at +0x50). Called several times per Draw for pass 0. Wrapped for `--log_camera_pass_records`. |

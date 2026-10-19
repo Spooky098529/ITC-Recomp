@@ -19,8 +19,9 @@ the SDK's audio (the Audio Worker's spin, the game's sounds, the plan).
 under Wine (the user has no Windows machine).
 `docs/old-hardware.md` is the plan (not started) for running below
 Vulkan 1.3, and why not OpenGL.
-`docs/rexglue-removal.md` is the plan (not started, branch
-`remove-rexglue`) for a native port without the ReXGlue SDK: host-side
+`docs/rexglue-removal.md` is the plan (in progress on branch
+`rexglue-remove-1`: A0, A5 and B1 done, game input no longer goes
+through the SDK) for a native port without the ReXGlue SDK: host-side
 pieces first (track A), then the game's functions made native from the
 SDK boundary inward (track B), the SDK's core removed last.
 `docs/tick-replay.md` is a lead (not started): translating draws once a
