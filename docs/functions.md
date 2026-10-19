@@ -91,6 +91,9 @@ Status:
 | `sub_820D3740` | `Dial::TachometerAngles` | Native | `TachAngles` in `src/hooks/cockpit_dials.cpp`, called by the native `sub_820E42E8` (its only caller; the translated one runs only with `--native_cockpit_dials=false` or for `--check_native_cockpit_dials`). r3 = table, r4 = the car, r5 = [dash], r6 = &a, r7 = &b; no state. `a` from car + 696: `[0x82000A34]` below it; up to from (table + 0, or + 8 when `[[dash]]` isn't 0) value / from * table[16]; up to to (+ 4 or + 12) linear to table[20]; above, table[20]. `b` from car + 700: table[28] below table[24], linear over table[24..36] then table[32..44], clamped at table[44]. |
 | `sub_820A2D30` | `Matrix::RotateZ` | | r3 = out, r4 = in, r5 = &angle: out = in * RotZ, rows `(c, s, 0, 0)`, `(-s, c, 0, 0)`, sine and cosine from a polynomial. |
 | `sub_820A0AC0` | `Matrix::Copy` | Wrapped | r3 = destination, r4 = source, 4x4. Interpolation follows copies of cameras and products. |
+| `sub_82597610` | `Projector::Build` | | r3 = out, r4 = eye, r5 = target, r6 = up (16-byte vectors), f1-f4 = field of view, aspect, near, far: out = look-at (`sub_82597378`) * perspective (`sub_825972A8`) * a fixed bias matrix at `0x8265EED0` (two `sub_8209BD50` multiplies). Called by the render orchestrator `sub_820C5DE8` (return `0x820C6A2C`) for the player's headlight once a view, and by `sub_820F34C8` (return `0x820F3944`) in a loop of up to 5. See "The headlight beam far from the origin". |
+| `sub_82597378` | `Matrix::LookAt` | | r3 = out, r4 = eye, r5 = target, r6 = up: a row-vector view matrix, forward = target - eye. |
+| `sub_825972A8` | `Matrix::Perspective` | | r3 = out, f1 = field of view, f2 = aspect, f3 = near, f4 = far: y scale = 1 / tan(f1 * the constant at `0x82001BE4`), x scale = y scale / aspect, depth = far / (far - near), offset -near * far / (far - near). |
 | `sub_820D06F0` | `CarPart::Draw` | | r3 = the part (returns if `[part + 4]`, its model, is 0), r4 = the camera, r5 = the world matrix, r6, r7: with r7 = 0, `sub_820D04E8([part + 4], camera, world, [part + 228], r6)`. |
 | `sub_820D04E8` | `Model::Draw` | | Draws a model (r31 = r3): a visibility test (`sub_825951E0`), then the per-object recorder `sub_825953D0` (return address `0x820D0564`, which pairs products by r31). Culls with the camera it's given, so a world matrix away from the tick's can be culled. |
 | `sub_82099A98` | `TickHandler::Invoke` | Wrapped | r3 = the app, r4 = the handler (target at +8). Skips some tick handlers on render-only passes (`SkipTickHandlerOnRenderOnlyPass`, `src/frame_pacing/game_messages.cpp`); the diagnostics' before and after hooks (`--log_tick_handlers`, `--find_per_frame_state` and others). |
@@ -815,6 +818,78 @@ constants:
 3. Keep per-tick copies of that source's inputs and blend them at replay,
    keyed by something stable across ticks; check with the log again.
 
+### The headlight beam far from the origin (open)
+
+Far from the map's origin (x ≈ -8,000 to -10,000 m), the player's headlight
+beam on the road sometimes lags the car or flickers, with interpolation
+only. Worked on in October 2026 (branch `headlight-flicker`, kept on
+`origin` as an archive); no fix kept. What was learned:
+
+- **The projector.** The player's headlight is a projected texture: the
+  render orchestrator `sub_820C5DE8` calls `sub_82597610` (return
+  `0x820C6A2C`) once a view, with the eye and the beam's direction worked
+  out from the car's matrix at car + 4304 (fixed local offsets), the field
+  of view from the light's data (+188), aspect 1 and near 1, and copies the
+  result into a per-view array (stride 592, + 144). The interpolation sees
+  that copy as identity * camera, and products made with it (the beam on
+  other cars' bodies, ~30-170 a draw) as world * camera. Read back as a
+  camera it's square: x = y = 0.8391, w 1.
+- **Why it steps.** Blended as a camera, the projector depends on two things
+  that drift far out. Its camera number (CameraIds) flipped between two
+  numbers, leaving it unpaired (drawn at the tick); and the cut check
+  (`IsSameCameraCheck`: depth offset within 1%) refused it: its depth
+  offset, read back from the matrix, moves 0.0991 <-> 0.1002 at x ≈ -8,500
+  (0.1000 near x ≈ -1,700). Either way that frame draws the beam a tick
+  ahead of the car. With `--log_blend_state`, refusals show as "cameras not
+  blended" with x 0.8391; 11 in one drive.
+- **The logic pass's frame.** Drawing runs a tick behind: the logic pass's
+  draw records tick N (later frames blend against it) while its frame shows
+  N-1, made by the replay blending each product back. So anything built for
+  the frame at the source (as the cockpit needles are) still needs the
+  replay to be given the frame's version beside the tick's
+  (`BlendState_SetLivePose` for the needles' world matrices); drawing it
+  only on render-only passes leaves the logic pass's frame to the camera
+  blend and its cut check.
+- **Other cameras refused far out.** About once a second a group of
+  cameras with w 1, the eye at the origin, x 0.9-1.4 and y 0.15-0.7 (aspect
+  drifting 2.8 to 24 over a drive; depth offsets -3, -5.4, -7.3, -10.1) is
+  refused, their y scale changing 1-2% a tick. They aren't the player's
+  projector (that one stays square); what builds them isn't known. They
+  also keep CameraIds growing (thousands of numbers over a long drive). With
+  the player's projector given per frame, a drive still had 56 refusals of
+  square 0.8391 cameras: probably `sub_820F34C8`'s projectors (other cars'
+  lights?), not confirmed.
+- **Main camera number switches are real cuts.** The main camera pass
+  `826BAC90` switches between two projections (x 0.891, y 1.584, depth
+  scale 0.139 and x 1.287, y 2.288, 0.271) with the eye moving 0.5-3.9 m and
+  turning 0.06-0.11 rad: view changes, correctly left unblended.
+- **What the diagnostics see.** `--log_camera_copies` only covers copies of
+  cameras (identity world), not object * camera products; unpaired (no
+  match in the previous tick) and refused (paired, failed the cut check) are
+  two separate ways to be drawn at the tick, logged by different flags
+  (`--log_camera_copies`, `--log_moving_products`; `--log_blend_state`).
+
+Tried on that branch, none of it kept (the user saw the beam still lag or
+flicker):
+
+- **Sticky camera numbers** (`--sticky_camera_ids`): each camera address
+  kept its numbers, reusing the most recently used one within 1%. Fixed the
+  number flipping from aspect drift (logs), not the refusals.
+- **Numbering by aspect and depth scale only**
+  (`--camera_ids_ignore_depth_offset`): the depth offset's drift stopped
+  renumbering the projector; the cut check still uses it.
+- **Positions blended in double** (`--double_precision_blending`): the
+  blend's own jitter far out went from ~1 mm to ~0.01 mm; no visible change
+  to the cockpit judder, which is the game's own (Known issues).
+- **The projector given per frame** (`--native_headlight_projector`): an
+  override of `sub_82597610` for `0x820C6A2C` working out the frame's
+  projector from its placement blended between ticks, first built on
+  render-only passes only (the logic pass's frame still refused), then
+  handed to the replay on every pass beside the tick's
+  (`BlendState_SetFrameCamera`, numbered by slot, never blended as a
+  camera): its refusals and mismatches went to 0 in logs, but the user
+  still saw flicker.
+
 ## Performance
 
 **Historical: the emulated GPU (2026-10-13).** This is what limited the
@@ -880,6 +955,16 @@ processes the game's commands; the render thread mostly waits for it.
   "Finding what still steps" if something does.
 - **A piece of geometry flickers while the car moves**, at native 30 fps
   too, so not interpolation: probably the game's own effect (a broken light).
+- **The cockpit judders left to right far from the map's origin**
+  (x ≈ -8,000 to -10,000 m), with interpolation off too (seen under Wine,
+  uncapped, `--interpolate_draw_state=false`, 2026-10-19), so it's the
+  game's own: its per-tick camera offset from the car wobbles by 1-4 mm a
+  tick out there, the recurring 3.9 mm maximum being 2⁻⁸ m, a float step at
+  that distance. Left as is: the eye/target/up the game's camera pass
+  stores are float too, and smoothing the camera's offset from the car
+  across ticks would make head movement lag the car.
+- **The headlight beam lags or flickers far from the origin**, with
+  interpolation only. Open; see "The headlight beam far from the origin".
 - **The player's headlight beam on the road can jump in very sharp turns.**
   Reported before the light slot fixes (frame lag, switching, 4 m rule) and
   not rechecked since; the release notes still list it.
