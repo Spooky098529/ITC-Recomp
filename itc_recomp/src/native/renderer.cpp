@@ -1340,7 +1340,7 @@ std::string Describe() {
   static constexpr const char* kKinds[] = {"textures", "resolved", "images",   "staging",
                                            "mirrors",  "constants", "other"};
   static constexpr const char* kObjects[] = {"views", "samplers", "descriptor pools",
-                                             "pipelines", "new textures at a taken address"};
+                                             "pipelines"};
   static_assert(std::size(kKinds) == size_t(Kind::kCount));
   static_assert(std::size(kObjects) == size_t(Object::kCount));
   Totals& totals = Get();

@@ -184,6 +184,19 @@ angles, or run the game logic at a higher tick rate. See
 `docs/cockpit-dial-interpolation.md`; the functions are in
 `docs/functions.md`.
 
+Graphics memory (`memory-leak`, 2026-10-19): textures were never freed,
+so graphics memory grew by ~60-130 MB a race load and ~1 MB/s while
+driving (seen on the Steam Deck, 1 GB of VRAM). Now textures loaded from
+guest memory are freed when a race ends (`TextureCache_RaceLeft`, from
+`GameMessages_OnPassFinished`) and when the game loads a new one over
+their memory after writing there (its texture streaming), and a resolve
+destination when a new one is made over its memory at another address
+(the race's glow chain, made again per race); all destroyed after the
+frames in flight. No flags (measured free: 486.0 against 486.4 fps).
+VRAM peaks at ~380-510 MB instead of growing without end; a 6.5-minute
+race levels off at ~155 MB of textures. `--log_gpu_memory` logs what the
+renderer holds. See "Textures are never freed" in `docs/native-renderer.md`.
+
 Xbox 360 gamma (merged from `xbox-gamma`, 2026-10-16; released in v0.4.3):
 `--xbox_gamma=off|hdtv|power`, off by default (`run.sh` passes `off` and
 lists the choices). The display gamma tables the game writes at boot,

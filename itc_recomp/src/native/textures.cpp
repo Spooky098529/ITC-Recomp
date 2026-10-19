@@ -1360,10 +1360,6 @@ VkImageView TextureCache::LookUpView(uint8_t* base, const uint32_t fetch_words[6
     if (s.log_memory) {
       s.NoteOverlaps(t);
     }
-    if (uint32_t start = t.ranges[0].second ? t.ranges[0].first : t.ranges[1].first;
-        s.by_address.count(start)) {
-      gpu_memory::Created(gpu_memory::Object::kTextureAtTakenAddress);
-    }
     size_t held = s.textures.size();
     s.RetireOverwritten(t);
     if (s.textures.size() != held) {

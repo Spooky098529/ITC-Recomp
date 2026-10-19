@@ -29,9 +29,6 @@ enum class Object {
   kSampler,
   kDescriptorPool,
   kPipeline,
-  // New textures starting where an older texture starts (a different key
-  // for the same memory: likely the old one's memory reused).
-  kTextureAtTakenAddress,
   kCount
 };
 

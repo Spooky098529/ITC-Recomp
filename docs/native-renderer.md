@@ -68,7 +68,7 @@ speed).
 | 4 | **The other passes**: each pass renders into a Vulkan image of its resolve's size and format; resolves become copies. | Shadows, reflections and the mirror work. | Done (2026-10-14): every pass draws, inline vertex draws included; clears and resolves work; the user saw the car's shadow, the mirror and the reflections right in our window (cockpit and third person), and the resolves match the emulated GPU's (`--readback_resolve=full`), except its blocky bloom. Menus not checked. |
 | 5 | **The final frame and the menus** (still in development mode): post-processing, HUD, the frame's end, then every menu screen. | Races and menus look as in the game's window, side by side. | In progress: the final frame with the HUD shows (checked by the user in a race); menus' tiled 3D views fixed. |
 | 6 | **Exclusive mode**: the emulated GPU gets no work and then isn't loaded at all; the graphics library is kept for what our renderer needs from it (see "Plan for milestone 6"); then measure. | The GPU plugin isn't loaded; frame rate measured against the emulated GPU. | Done (2026-10-14): the plugin isn't loaded (`run.sh` runs exclusive mode); measured: 135 fps mean uncapped against the emulated GPU's 155, then ~235 after the speed work (step 5; holds the 144 cap in an attract race). The library's remaining packet writers moved to milestone 7 (the user's call); the frame's end (step 6) measured at ~0.2% of the render thread and left as it is. |
-| 7 | **Known issues cleanup**: what's under Known issues below (the boot movie, an in-game movie locking up the game, the bloom's ghosting (fixed 2026-10-15), motion blur at the tick's length, gamma, textures replaced in memory, textures never freed, the library's remaining packet writers, further speed work on our renderer, the freezes while driving to re-examine, no window without Vulkan surface support). | The known issues are fixed or accepted. | |
+| 7 | **Known issues cleanup**: what's under Known issues below (the boot movie, an in-game movie locking up the game, the bloom's ghosting (fixed 2026-10-15), motion blur at the tick's length, gamma, textures replaced in memory, textures never freed (fixed 2026-10-19), the library's remaining packet writers, further speed work on our renderer, the freezes while driving to re-examine, no window without Vulkan surface support). | The known issues are fixed or accepted. | |
 
 ## Progress on milestone 2
 
@@ -1194,8 +1194,8 @@ To be fixed (or accepted) in milestone 7.
   a race aren't written by memcpy at all, and their writer isn't known;
   they didn't change. Details in `texture-handling-optimization.md`.
 
-- Textures are never freed: memory reused for different textures (another
-  race) leaves the old images behind. Measured 2026-10-19 (`memory-leak`,
+- Textures are never freed (fixed 2026-10-19, `memory-leak`): memory
+  reused for different textures (another race) left the old images behind. Measured 2026-10-19 (`memory-leak`,
   `--log_gpu_memory`, a 5-minute attract loop of 5 races): textures grew
   from 65 MB (427) to 611 MB (5,256), ~60 MB at each race load and
   ~1 MB/s during races (new textures keep coming as the car drives);
