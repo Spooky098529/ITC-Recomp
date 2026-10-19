@@ -69,6 +69,7 @@ set(ITC_SOURCES
     src/hooks/input.cpp
     src/hooks/xinput.cpp
     src/input/gamepads.cpp
+    src/input/xinput.cpp
     src/frame_pacing/frame_pacer.cpp
     src/frame_pacing/renderer_hooks.cpp
     src/debug/state_capture.cpp

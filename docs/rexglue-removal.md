@@ -64,6 +64,15 @@ function (`grep -rn sub_XXXXXXXX itc_recomp/src` first). For each:
 
 - Read the function in `generated/` and what's known in
   `docs/functions.md`; write it down there as it's understood.
+- **Plain C++ behind thin adapters** (the user's precedent, 2026-10-19,
+  first done for B1): the logic is a plain C++ function with normal
+  arguments and host structs, no `ctx` and no guest memory, in its
+  subsystem's directory (e.g. `src/input/xinput.cpp`). The `REX_FUNC`
+  override (e.g. `src/hooks/xinput.cpp`) only reads the registers, calls
+  it, stores results big-endian in guest memory and sets `r3`. When the
+  caller is made native later, it calls the plain function directly and
+  the adapter is deleted, so the `ctx` edge moves up without rewriting
+  the logic.
 - A flag to fall back to the recompiled version (`__imp__sub_XXXXXXXX`),
   on by default once checked, in the repo's style
   (`--native_<subsystem>`), until the recompiled version is dead.
