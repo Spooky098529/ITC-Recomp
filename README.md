@@ -59,12 +59,10 @@ the console. Screens and windows that aren't 16:9 get black bars.
 ## Known limitations
 
 - Only races are interpolated; menus run at 30 fps, and HUD animations
-  advance at 30 Hz.
+  advance at 30 Hz (including cockpit elements such as the tachometer).
 - In game movies are not shown.
 - Tested on Linux on my PC (9800x3d, 7900XT) and the Steam Deck.
-- Pause menus in races currently poll the controller too fast, so the menus are annoying to navigate. This is most noticeable at high FPS as the input is per frame.
 - The game probably uses more RAM than necessary, currently it maintains several copies of the xbox 360 memory pool for performance reasons. This is going to be an issue until the rexglue runtime is removed. RAM usage can hit about 1gb in races.
-- Cockpit dials are not interpolated properly, most noticeable when doing something that moves them quickly like sharp breaking
 ## Reporting problems
 
 Play with `./run-debug.sh` (`run-debug.bat` on Windows), then open an
