@@ -84,7 +84,7 @@ Measured 2026-10-19 by grepping `itc_recomp/src` and `generated/`.
 | Renderer leftovers | The Xenos to SPIR-V shader translator built from SDK sources (`itc_xenos_shaders` in `itc_recomp/CMakeLists.txt`), `rex::graphics::RegisterFile` (`src/native/state.h`, `passes.cpp`), `registers.h`, `xenos.h`, `util/draw.h`, `ui/vulkan/api.h`; SDL3 and Vulkan headers from `rexglue-sdk/thirdparty/`; the xenos plugin still built (`GPU_PLUGINS xenos`) for comparisons | `src/native/` | A |
 | Graphics boundary | `Vd*` (25 imports; 17 game functions). In exclusive mode the GPU's job is already ours (`src/native/gpu_link.cpp`) | SDK `src/kernel/` | B |
 | Audio | Output: `AudioDriver`, `REX_AUDIO_BACKEND`, `conversion.h`, `downmix.h` (A). The game side: `XAudio*`, `XMA*` and the SDK's XMA decoder, which emulates the XMA hardware's contexts on FFmpeg (B; 6 game functions). Our mixer (`src/audio/native_audio.cpp`) still runs on an `XHostThread` and allocates from the guest heap | `src/audio/` | A and B |
-| Input | Reading SDL gamepads and the `--mnk_mode` keyboard and binds (A); `XamInput*` (B; 3 game functions) | SDK `src/input/` | A and B |
+| Input | Reading SDL gamepads (A; the `--mnk_mode` keyboard is dropped first, A0); `XamInput*` (B; 3 game functions) | SDK `src/input/` | A and B |
 | Files, saves | `Nt*File` and friends, `Ob*SymbolicLink`, `XamContent*` through the SDK's VFS and `--game_data_root` (22 game functions; 12 for the file calls) | SDK `src/filesystem/`, `src/kernel/` | B |
 | System services | `Xam` UI, user, profile, sessions, voice, notifications, `XMsg*`, `XamLoader*`, `NetDll_*` (17), `Xex*` (78 game functions) | SDK `src/kernel/xam/` | B |
 | Pure helpers | `Rtl*` strings, time, fills, `sprintf`, `vswprintf`, `KeQuery*`, `XGet*`, `DbgPrint` (55 game functions) | SDK `src/kernel/` | B |
@@ -124,14 +124,23 @@ handles), which is fine: the unit of work is a subsystem, not a function.
   `ITC_THREAD=main`).
 - The user's play checklist before a release: boot to the title, the
   menus, load and save a career save made by the last released build, a
-  race (opponents, pause menu, rival intro), audio throughout, keyboard
-  and gamepad, quit cleanly; the Windows build under Wine
+  race (opponents, pause menu, rival intro), audio throughout, gamepad,
+  quit cleanly; the Windows build under Wine
   (`docs/windows.md`).
 - Test zips: CLAUDE.md, "Test builds for the user".
 
 ## Track A: host-side pieces
 
-Independent of each other; each is releasable alone.
+Independent of each other; each is releasable alone, except A0, which
+comes before everything else.
+
+A0. **Drop keyboard input** (the user's call, 2026-10-19): no keyboard in
+    native code until the game is fully native (after B7). Remove
+    `--mnk_mode=true` from `run.sh` and `run.bat` (`REX_MNK_MODE`), and
+    the keyboard from `app_window.cpp`'s forwarding and its comments in
+    `app_window.h`; say in the release notes that keyboard play is gone
+    for now (gamepad only). From then on, input in this plan means
+    gamepads only, and nothing needs the SDK window's listener for keys.
 
 A1. **Third-party libraries from our own copies** (submodules or
     FetchContent, pinned versions) instead of `rexglue-sdk/thirdparty/`:
@@ -145,7 +154,7 @@ A2. **Logging, flags, hashes**: our own headers (`src/base/log.h`,
     forwarding to the SDK's, and every file in `src/` switched over
     (mechanical; one commit per area). Then our own implementations for
     logging and hashing. Our own flag parser has to wait for A4: until
-    then the SDK's flags (`--mnk_mode`, `--game_data_root`,
+    then the SDK's flags (`--game_data_root`,
     `--fullscreen`, ...) are parsed from the same command line by the SDK.
     Log file names and rotation must stay (`logs/itc_<n>.log`,
     `itc_<n>.1.log`): CLAUDE.md and tools rely on them.
@@ -171,34 +180,25 @@ A4. **App shell**: our own `main`: SDL init, our window as the only one
     core and stays. Find the minimal setup in
     `rexglue-sdk/src/ui/rex_app.cpp` and `src/system/runtime.cpp`.
 
-A5. **Input reading**: SDL gamepads (rumble too) and a port of the
-    keyboard driver and binds `--mnk_mode` uses (same flag names and
-    defaults), as a native module with no Xbox types. Its game side is B1;
-    do the two together.
+A5. **Input reading**: SDL gamepads (rumble too) as a native module with
+    no Xbox types. No keyboard (A0). Its game side is B1; do the two
+    together.
 
     It doesn't need our own SDL loop first (checked 2026-10-19). The SDK
     owns the loop today (`SDL_WaitEvent` on the UI thread,
-    `RunMainMessageLoop` in `rexglue-sdk/src/ui/windowed_app_context_sdl.cpp`).
-    Its gamepad driver gets events through `SDL_AddEventWatch`
+    `RunMainMessageLoop` in `rexglue-sdk/src/ui/windowed_app_context_sdl.cpp`),
+    and its gamepad driver gets events through `SDL_AddEventWatch`
     (`src/input/sdl/sdl_input_driver.cpp`, which also asks the UI thread
-    to pump when the game reads input); its keyboard driver
-    (`src/input/mnk/mnk_input_driver.cpp`) through the SDK window's
-    listener, which is why `src/native/app_window.cpp` registers our
-    window against it. Ours: our own event watch (called for every event
-    whoever pumps, so it keeps working when A4 brings our own loop),
-    keyboard events filtered on our window's ID or `SDL_GetKeyboardState`.
-    The watch runs on the pumping thread: guard the state the game thread
-    reads. To avoid clashing with the SDK's input while both exist:
+    to pump when the game reads input). Ours: our own event watch (called
+    for every event whoever pumps, so it keeps working when A4 brings our
+    own loop). The watch runs on the pumping thread: guard the state the
+    game thread reads. To avoid clashing with the SDK's input while both
+    exist:
     - Only one answers the game at a time (B1's fallback flag). Opening
       a gamepad twice is fine in SDL; rumble only from the active path.
     - The same pad as player 1 as the SDK picks
       (`src/input/device_assignment.cpp`), or the user's controller
       changes when the flag flips.
-    - The binds are SDK flags (`keybind_a` and the rest). Defining flags of
-      the same names while the SDK's input is linked would collide: read
-      the SDK's (`REXCVAR_DECLARE`) until B1 deletes its input, then define
-      them ourselves under the same names, so `run.sh` and players'
-      settings keep working.
 
 A6. **Audio output**: SDL audio straight from our mixer's output, our own
     conversion and downmix (`conversion.h`, `downmix.h` are small), in
@@ -214,8 +214,7 @@ listing its functions (the pipeline above), reading them in
 `generated/` and writing them up in `docs/functions.md`.
 
 B1. **Input** (3 functions calling `XamInput*`): native, reading A5.
-    Then the SDK's input system goes. The user checks keyboard, gamepad,
-    rumble, the pause menu's repeat (`docs/pause-menu-fix.md`; the action
+    Then the SDK's input system goes. The user checks gamepad, rumble, the pause menu's repeat (`docs/pause-menu-fix.md`; the action
     mappers' override in `src/hooks/input.cpp` stays as it is).
 
 B2. **Audio** (6 functions calling `XAudio*`/`XMA*`, plus what's around
@@ -267,7 +266,8 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
     the two copies must agree. This is most of the
     work: full decompilations of games this size usually take years. Keep
     a list of which functions are native (in `docs/functions.md` or a
-    table here) so progress can be measured.
+    table here) so progress can be measured. Keyboard input comes back
+    once the game is native (A0).
 
 ## The end state: removing the core
 
