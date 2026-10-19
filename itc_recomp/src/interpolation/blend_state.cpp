@@ -87,11 +87,11 @@ REXCVAR_DEFINE_STRING(debug_zero_owners, "", "ITC",
 REXCVAR_DEFINE_BOOL(log_upload_owners, false, "ITC",
                     "Log the callers recording vertex constant uploads, with uploads per "
                     "frame, every 5 s (needs --log_slot_callers)");
-REXCVAR_DEFINE_BOOL(motion_blur_by_tick, false, "ITC",
-                    "Testing (doesn't work yet): on render-only passes, copy the motion blur's "
-                    "previous view-projection from where the tick's logic pass did (the "
-                    "view's +8080 or +8144); the pair moves on after the logic pass, so it "
-                    "isn't the tick's product and isn't blended");
+REXCVAR_DEFINE_BOOL(motion_blur_by_tick, true, "ITC",
+                    "Blend the motion blur's previous view-projection (c100 x4) on render-only "
+                    "frames too: the game copies the same matrix all tick, from the view's "
+                    "+8080 on the logic pass and +8144 after, so it's noted under the logic "
+                    "pass's address (otherwise only logic frames blend it: a 30 Hz pulse)");
 REXCVAR_DEFINE_BOOL(log_motion_blur_velocity, false, "ITC",
                     "Log, every 5 s for ~40 passes, the motion blur's previous view-projection "
                     "(c100 x4, copied at 8213653C from the view's +8080 or +8144): which one, "
@@ -1044,7 +1044,9 @@ class DrawState {
       return;
     }
     bool render_only = frame_pacing::GameMessages_IsRenderOnlyPass();
-    Matrix4 value = LoadMatrix(base, src);
+    // Read from the copy: `src` can be the address it's noted under rather
+    // than where it came from (--motion_blur_by_tick).
+    Matrix4 value = LoadMatrix(base, dst);
     if (PassOfViewProjection(src) >= 0 || camera_ids_.Of(value) != 0) {
       // A copy of a camera (a camera pass's, or a perspective one built on
       // the stack, like the headlight projector's).
@@ -3914,25 +3916,32 @@ void BlendState_LogMotionBlurCopy(uint8_t* base, uint32_t view, uint32_t src) {
   }
 }
 
-// --motion_blur_by_tick (testing, doesn't work yet): the source of the
-// motion blur's previous view-projection (c100 x4, copied at 8213653C) on
-// this pass. The view picks +8080 (this tick's view-projection) when
-// view+48 is set, which only passes that ran the game logic do, and +8144
-// (the previous tick's) otherwise. Render-only passes copy from where the
-// tick's logic pass did; but the pair moves on right after the logic
-// pass, so the copy isn't the logic pass's product. Main thread only.
-uint32_t BlendState_MotionBlurSource(uint32_t view, uint32_t src) {
-  static std::unordered_map<uint32_t, uint32_t> chosen;  // by view: offset
+// --motion_blur_by_tick: the address to note the copy of the motion blur's
+// previous view-projection (c100 x4, at 8213653C) under. The game copies
+// the same matrix all tick, the previous tick's view-projection: the logic
+// pass from the view's +8080 (view+48 set), and render-only passes from
+// +8144, as the view moves its pair on right after the logic pass. Copies
+// are paired by address, so only the logic pass's was blended and
+// render-only frames had it as recorded, a tick nearer: the blur's length
+// pulsed at 30 Hz. A render-only copy of the matrix the logic pass copied
+// is noted under the logic pass's address. Main thread only.
+uint32_t BlendState_MotionBlurNotedSource(uint8_t* base, uint32_t view, uint32_t src) {
+  struct Copied {
+    uint32_t src;
+    Matrix4 value;
+  };
+  static std::unordered_map<uint32_t, Copied> logic_copies;  // by view
   if (!REXCVAR_GET(interpolate_draw_state) || !REXCVAR_GET(motion_blur_by_tick) ||
       std::this_thread::get_id() != GetDrawState().main_thread()) {
     return src;
   }
+  Matrix4 value = LoadMatrix(base, src);
   if (!frame_pacing::GameMessages_IsRenderOnlyPass()) {
-    chosen[view] = src - view;
+    logic_copies[view] = {src, value};
     return src;
   }
-  auto it = chosen.find(view);
-  return it != chosen.end() ? view + it->second : src;
+  auto it = logic_copies.find(view);
+  return it != logic_copies.end() && it->second.value == value ? it->second.src : src;
 }
 
 void BlendState_ReplayConstants(uint8_t* base, uint32_t payload, uint32_t packed,
@@ -4229,16 +4238,16 @@ extern "C" REX_FUNC(sub_820A0AC0) {
   REX_FUNC_PROLOGUE();
   uint32_t dst = ctx.r3.u32, src = ctx.r4.u32;
   uint32_t caller = uint32_t(ctx.lr);
+  uint32_t noted_src = src;
   if (caller == 0x8213653C) [[unlikely]] {
     // The motion blur's previous view-projection (c100 x4); r29 is the view.
-    src = interpolation::BlendState_MotionBlurSource(ctx.r29.u32, src);
-    ctx.r4.u64 = src;
     if (REXCVAR_GET(log_motion_blur_velocity)) {
       interpolation::BlendState_LogMotionBlurCopy(base, ctx.r29.u32, src);
     }
+    noted_src = interpolation::BlendState_MotionBlurNotedSource(base, ctx.r29.u32, src);
   }
   __imp__sub_820A0AC0(ctx, base);
-  interpolation::GetDrawState().OnCopy(base, dst, src, caller);
+  interpolation::GetDrawState().OnCopy(base, dst, noted_src, caller);
 }
 
 // Billboards_BuildVertices: r3 = billboard set (its +0 is the camera pass it

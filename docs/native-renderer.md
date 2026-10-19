@@ -1125,21 +1125,25 @@ To be fixed (or accepted) in milestone 7.
   (`--motion_blur=false`, which our renderer ignores); ours always draws
   it. Scaling the velocities to the frame's share of a tick, or an option
   to skip the pass, would fix it.
-  Measured on `beam-stepping` (2026-10-19, `--log_motion_blur_velocity`,
-  attract race at 144 fps). The previous view-projection is vertex c100
-  x4, which `sub_821363F0` copies (return `8213653C`) from the view at
-  +8080 (this tick's view-projection: +8144 takes its value a tick later)
-  or +8144 (the previous tick's). It takes +8144 when view+48 is 0 (set
-  only on passes that ran the game logic) or view+44 is nonzero. So the
-  source flips at 30 Hz: logic passes copy +8080 and the replay blends it
-  like a camera; render-only passes copy +8144, left as recorded. The pair
-  also moves on right after the logic pass, so render-only passes see a
-  pair a tick newer than the logic pass before them, and copying +8080
-  there (`--motion_blur_by_tick`, off: doesn't work yet) isn't the tick's
-  product and isn't blended. Each frame's velocity against the camera it
-  shows isn't measured yet. Zeroing c100 (`--debug_zero_owners=821364D0`)
-  changes the velocity resolve (`1B053000`, 16_16 512x288) from flat to
-  large everywhere, so c100 drives it.
+  The previous position also pulsed at 30 Hz, fixed on `beam-stepping`
+  (2026-10-19, `--motion_blur_by_tick`, on). The previous view-projection
+  is vertex c100 x4, which `sub_821363F0` copies (return `8213653C`) from
+  the view at +8080 (this tick's view-projection) when view+48 is set
+  (only passes that ran the game logic) and view+44 is 0, or from +8144
+  (the previous tick's) otherwise. The view moves the pair on right after
+  the logic pass, so the game copies the same matrix all tick (the logic
+  pass from +8080, render-only passes from +8144), the previous tick's.
+  But copies are paired by address, so only the logic pass's was blended;
+  render-only frames uploaded it as recorded, a tick nearer to the frame's
+  camera than on the logic frame: the blur's length jumped once a tick.
+  Now a render-only copy of the matrix the logic pass copied is noted
+  under the logic pass's address, and the replay blends it on every frame
+  (`--log_motion_blur_velocity`: all c100 uploads substituted, moved back
+  1.51, 1.21, 0.88, 0.56, 0.23 m through a tick at ~46 m/s, against 1 in
+  5 before). Zeroing c100 (`--debug_zero_owners=821364D0`) changes the
+  velocity resolve (`1B053000`, 16_16 512x288) from flat to large
+  everywhere, so c100 drives it. Still to check: whether this was the
+  headlight beam that sometimes looked like it updated at 30 Hz.
 - **An in-game movie locked up the whole game** (closed 2026-10-19: no
   longer happens, not seen in extensive testing since, the user's call;
   never investigated, so the cause isn't known. Seen by the user in
