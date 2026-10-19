@@ -2,6 +2,7 @@
 #include "frame_costs.h"
 
 #include "buffers.h"
+#include "gpu_memory.h"
 #include "state.h"
 
 #include <algorithm>
@@ -720,6 +721,8 @@ bool TextureCache::State::CreateTexture(Texture& t) {
     t.image = VK_NULL_HANDLE;
     return false;
   }
+  gpu_memory::Allocated(t.resolved ? gpu_memory::Kind::kResolved : gpu_memory::Kind::kTexture,
+                        alloc.allocationSize);
 
   if (t.resolved) {
     VkImageViewCreateInfo view{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
@@ -730,6 +733,7 @@ bool TextureCache::State::CreateTexture(Texture& t) {
     if (vk::vkCreateImageView(device, &view, nullptr, &t.attachment_view) != VK_SUCCESS) {
       return false;
     }
+    gpu_memory::Created(gpu_memory::Object::kImageView);
     stats.textures++;
     return true;
   }
@@ -915,6 +919,7 @@ bool TextureCache::Init(const DeviceContext& context, uint32_t frames_in_flight)
                         reinterpret_cast<void**>(&f.staging_mapped)) != VK_SUCCESS) {
       return false;
     }
+    gpu_memory::Allocated(gpu_memory::Kind::kStaging, alloc.allocationSize);
     VkCommandPoolCreateInfo pool_info{VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO};
     pool_info.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
     pool_info.queueFamilyIndex = context.queue_family;
@@ -1089,6 +1094,10 @@ VkImageView TextureCache::LookUpView(uint8_t* base, const uint32_t fetch_words[6
                   t.layout.pitch_texels, (fetch.dword_0 >> 2) & 0xFF, uint32_t(fetch.swizzle),
                   int32_t(fetch.exp_adjust));
     }
+    if (uint32_t start = t.ranges[0].second ? t.ranges[0].first : t.ranges[1].first;
+        s.by_address.count(start)) {
+      gpu_memory::Created(gpu_memory::Object::kTextureAtTakenAddress);
+    }
     it = s.textures.emplace(key, std::move(t)).first;
     events_.created++;
     State::Texture& added = it->second;
@@ -1181,6 +1190,8 @@ VkImageView TextureCache::State::GetSwizzledView(Texture& t, uint32_t swizzle,
     info.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, t.levels, 0, t.layout.layers};
     if (vk::vkCreateImageView(context.device, &info, nullptr, &view) != VK_SUCCESS) {
       view = VK_NULL_HANDLE;
+    } else {
+      gpu_memory::Created(gpu_memory::Object::kImageView);
     }
   }
   return view;
@@ -1387,6 +1398,7 @@ VkSampler TextureCache::LookUpSampler(const uint32_t fetch_words[6],
     sampler = VK_NULL_HANDLE;
   } else {
     s.stats.samplers++;
+    gpu_memory::Created(gpu_memory::Object::kSampler);
   }
   return sampler;
 }

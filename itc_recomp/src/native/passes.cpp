@@ -11,6 +11,7 @@
 #include "generated_resolve_vert.h"
 
 #include "buffers.h"
+#include "gpu_memory.h"
 #include "guest.h"
 #include "renderer.h"
 #include "shaders.h"
@@ -1264,6 +1265,7 @@ bool Passes::State::CreateImage(Image& out, VkImageType type, VkImageViewType vi
       vk::vkBindImageMemory(device, out.image, out.memory, 0) != VK_SUCCESS) {
     return false;
   }
+  gpu_memory::Allocated(gpu_memory::Kind::kImage, alloc.allocationSize);
   VkImageViewCreateInfo view{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
   view.image = out.image;
   view.viewType = view_type;
@@ -1309,6 +1311,7 @@ bool Passes::State::CreateGuestMemoryMirror(GuestMirror& mirror) {
     REXLOG_ERROR("native renderer: allocating the guest memory mirror failed: {}", int(result));
     return false;
   }
+  gpu_memory::Allocated(gpu_memory::Kind::kMirror, alloc.allocationSize);
   if (vk::vkBindBufferMemory(device, mirror.buffer, mirror.memory, 0) != VK_SUCCESS ||
       vk::vkMapMemory(device, mirror.memory, 0, VK_WHOLE_SIZE, 0,
                       reinterpret_cast<void**>(&mirror.mapped)) != VK_SUCCESS) {
@@ -1642,6 +1645,7 @@ bool Passes::State::CreateTexturePool(Ring& ring) {
   if (vk::vkCreateDescriptorPool(context.device, &pool_info, nullptr, &pool) != VK_SUCCESS) {
     return false;
   }
+  gpu_memory::Created(gpu_memory::Object::kDescriptorPool);
   ring.texture_pools.push_back(pool);
   return true;
 }
@@ -1676,6 +1680,7 @@ bool Passes::State::CreateConstantBlock(Ring& ring) {
     vk::vkFreeMemory(device, block.memory, nullptr);
     return false;
   }
+  gpu_memory::Allocated(gpu_memory::Kind::kConstants, alloc.allocationSize);
   VkDescriptorPoolSize size{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 5};
   VkDescriptorPoolCreateInfo pool_info{VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
   pool_info.maxSets = 1;
@@ -1684,6 +1689,7 @@ bool Passes::State::CreateConstantBlock(Ring& ring) {
   if (vk::vkCreateDescriptorPool(device, &pool_info, nullptr, &block.pool) != VK_SUCCESS) {
     return false;
   }
+  gpu_memory::Created(gpu_memory::Object::kDescriptorPool);
   VkDescriptorSetAllocateInfo set_alloc{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
   set_alloc.descriptorPool = block.pool;
   set_alloc.descriptorSetCount = 1;
@@ -2324,6 +2330,7 @@ VkPipeline Passes::State::GetPipeline(const PipelineKey& key) {
     it->second = VK_NULL_HANDLE;
   } else {
     stats.pipelines++;
+    gpu_memory::Created(gpu_memory::Object::kPipeline);
   }
   return it->second;
 }
@@ -2589,6 +2596,7 @@ bool Passes::State::CreateGammaResources() {
       vk::vkBindBufferMemory(device, gamma_table, gamma_table_memory, 0) != VK_SUCCESS) {
     return false;
   }
+  gpu_memory::Allocated(gpu_memory::Kind::kOther, alloc.allocationSize);
   VkDescriptorSetLayoutBinding bindings[2] = {
       {0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
       {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr}};
