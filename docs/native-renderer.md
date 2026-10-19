@@ -1224,6 +1224,22 @@ To be fixed (or accepted) in milestone 7.
   218 MB, VRAM peaking at 575 MB), and resolve destinations (+8 at each
   of the first four loads, then +1). Render targets grew once (22 to 26,
   208 to 285 MB) in the first races and stayed: new targets, not a leak.
+  Within a race (2026-10-19, `itc_121.log`): the textures drawn in the
+  last 10 s stay at ~450-650 (65-85 MB); those not drawn for 10 s or more
+  pile up (~460, ~50 MB by a minute's end). From ~20 s in, many new
+  textures overlap held ones, and 97% of those were written since loaded:
+  the game streams textures into reused memory. So a texture is freed when
+  a new one is loaded over its memory and the game wrote there since it
+  was loaded (`--free_overwritten_textures`, on; unwritten overlaps are
+  left, two textures reading the same memory both staying). Ten attract
+  races (`itc_122.log`, 11 minutes): 3,121 overwritten textures freed
+  (330 MB), textures at a race's end 76-102 MB (119-137 before), VRAM
+  peaking at 403 MB and ending at 370; race 6's frame drawn right.
+  Resolve destinations didn't level off: 15 to 48 over ten races. The
+  race's glow chain (one 512x288 format 25, one 1024x576 and six 256x144
+  format 26) is made again at loads 2, 3, 4 and 7 at another address
+  (the game allocates it per race: 1B068000, 1B19B000, 1AA40000,
+  1B118000, 1B198000 for the 512x288), ~7.5 MB each time, never freed.
 
 - **Resizing the window and the swapchain** on Wayland: the compositor
   leaves the size to us and never reports the swapchain out of date, so the
