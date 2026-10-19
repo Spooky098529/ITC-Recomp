@@ -36,6 +36,7 @@ REXCVAR_DEFINE_BOOL(free_textures_after_race, true, "ITC",
                     "Free the textures loaded from guest memory when a race ends (they're "
                     "loaded again when drawn): without it they're never freed, and graphics "
                     "memory grows by each race's textures");
+REXCVAR_DECLARE(bool, log_gpu_memory);
 REXCVAR_DEFINE_BOOL(native_renderer_cache_texture_bindings, true, "ITC",
                     "Answer texture views and samplers from a table of earlier answers by the "
                     "fetch constant's words, instead of looking the texture up every binding");
@@ -524,6 +525,9 @@ struct TextureCache::State {
     VkImage image = VK_NULL_HANDLE;
     VkDeviceMemory memory = VK_NULL_HANDLE;
     VkDeviceSize memory_size = 0;
+    // With --log_gpu_memory: the second (State::now_s) it was last looked up
+    // (with --native_renderer_cache_texture_bindings=false, last drawn).
+    uint32_t last_drawn_s = 0;
     uint32_t levels = 0;
     bool loaded = false;
     // The library's memcpy wrote its memory since it was loaded: reload.
@@ -599,6 +603,18 @@ struct TextureCache::State {
   std::vector<Retired> retired;
   void RetireLoaded();
   void DestroyRetired();
+
+  // --log_gpu_memory: seconds since the cache started (set each frame), and
+  // what new textures overlapped (NoteOverlaps), logged every 5 s
+  // (LogAges).
+  bool log_memory = false;
+  std::chrono::steady_clock::time_point start_time = std::chrono::steady_clock::now();
+  uint32_t now_s = 0, logged_s = 0;
+  struct Overlaps {
+    uint64_t created = 0, overlapping = 0, old = 0, old_changed = 0, old_bytes = 0;
+  } overlaps;
+  void NoteOverlaps(const Texture& t);
+  void LogAges();
   uint32_t write_lines = 200;
   std::chrono::steady_clock::time_point writes_logged = std::chrono::steady_clock::now();
   void LogFirstLoad(const Texture& t);
@@ -976,6 +992,16 @@ void TextureCache::BeginFrame(uint32_t frame_index) {
     s.LogWriteSummary();
   }
   s.DestroyRetired();
+  s.log_memory = REXCVAR_GET(log_gpu_memory);
+  if (s.log_memory) {
+    s.now_s = uint32_t(std::chrono::duration_cast<std::chrono::seconds>(
+                           std::chrono::steady_clock::now() - s.start_time)
+                           .count());
+    if (s.now_s >= s.logged_s + 5) {
+      s.logged_s = s.now_s;
+      s.LogAges();
+    }
+  }
   if (uint64_t races = g_races_left.load(std::memory_order_relaxed); races != races_seen_) {
     races_seen_ = races;
     if (REXCVAR_GET(free_textures_after_race)) {
@@ -989,6 +1015,60 @@ void TextureCache::BeginFrame(uint32_t frame_index) {
     generation_++;
     events_.marked_frames++;
   }
+}
+
+// The textures already held that a new one's memory overlaps: the game
+// putting a texture where another was (the old one is then likely dead).
+void TextureCache::State::NoteOverlaps(const Texture& t) {
+  overlaps.created++;
+  std::vector<const Texture*> found;
+  for (const auto& [start, size] : t.ranges) {
+    if (!size) {
+      continue;
+    }
+    uint32_t end = start + size;
+    auto it = by_address.lower_bound(start > longest_range ? start - longest_range : 0);
+    for (; it != by_address.end() && it->first < end; ++it) {
+      const Texture* old = it->second.second;
+      if (it->first + it->second.first > start &&
+          std::find(found.begin(), found.end(), old) == found.end()) {
+        found.push_back(old);
+      }
+    }
+  }
+  overlaps.overlapping += !found.empty();
+  for (const Texture* old : found) {
+    overlaps.old++;
+    overlaps.old_changed += old->changed;
+    overlaps.old_bytes += old->memory_size;
+  }
+}
+
+// Textures held by time since last looked up, and the overlaps since the
+// last log.
+void TextureCache::State::LogAges() {
+  static constexpr uint32_t kLimits[] = {1, 10, 30, 60, UINT32_MAX};
+  static constexpr const char* kNames[] = {"<1 s", "1-10 s", "10-30 s", "30-60 s", ">60 s"};
+  uint64_t counts[5] = {}, bytes[5] = {};
+  for (const auto& [key, t] : textures) {
+    uint32_t age = now_s - t.last_drawn_s;
+    size_t i = 0;
+    while (age >= kLimits[i]) {
+      i++;
+    }
+    counts[i]++;
+    bytes[i] += t.memory_size;
+  }
+  std::string ages;
+  for (size_t i = 0; i < 5; i++) {
+    ages += fmt::format("{}{} {} ({:.1f} MB)", i ? ", " : "", kNames[i], counts[i],
+                        bytes[i] / 1048576.0);
+  }
+  REXLOG_INFO("native renderer: textures by time since drawn: {}; new {}, {} overlapping "
+              "held textures: {} of them ({} written since loaded, {:.1f} MB)",
+              ages, overlaps.created, overlaps.overlapping, overlaps.old, overlaps.old_changed,
+              overlaps.old_bytes / 1048576.0);
+  overlaps = {};
 }
 
 void TextureCache_RaceLeft() {
@@ -1176,6 +1256,9 @@ VkImageView TextureCache::LookUpView(uint8_t* base, const uint32_t fetch_words[6
                   t.layout.pitch_texels, (fetch.dword_0 >> 2) & 0xFF, uint32_t(fetch.swizzle),
                   int32_t(fetch.exp_adjust));
     }
+    if (s.log_memory) {
+      s.NoteOverlaps(t);
+    }
     if (uint32_t start = t.ranges[0].second ? t.ranges[0].first : t.ranges[1].first;
         s.by_address.count(start)) {
       gpu_memory::Created(gpu_memory::Object::kTextureAtTakenAddress);
@@ -1246,6 +1329,7 @@ VkImageView TextureCache::LookUpView(uint8_t* base, const uint32_t fetch_words[6
   }
 
   cacheable = !t.changed;  // else staging was full: try again next call
+  t.last_drawn_s = s.now_s;
   return s.GetSwizzledView(t, fetch.swizzle, natural);
 }
 
