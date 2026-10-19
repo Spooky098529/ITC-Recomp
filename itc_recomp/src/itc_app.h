@@ -8,6 +8,7 @@
 
 #include "audio/native_audio.h"
 #include "debug/thread_cpu.h"
+#include "input/gamepads.h"
 #include "native/app_window.h"
 
 class ItcApp : public rex::ReXApp {
@@ -27,6 +28,12 @@ class ItcApp : public rex::ReXApp {
       return false;
     }
     native::AppWindow_SetSdkWindow(window());
+    // Our own gamepad reading (src/input/gamepads.cpp); the SDK's UI thread
+    // pumps SDL's events.
+    auto* context = &app_context();
+    input::Gamepads_Start([context](std::function<void()> function) {
+      context->CallInUIThreadDeferred(std::move(function));
+    });
     return true;
   }
 
@@ -37,7 +44,10 @@ class ItcApp : public rex::ReXApp {
 
   // --log_thread_cpu (src/debug/thread_cpu.cpp).
   void OnPostSetup() override { debug::ThreadCpu_Start(); }
-  void OnShutdown() override { debug::ThreadCpu_Stop(); }
+  void OnShutdown() override {
+    debug::ThreadCpu_Stop();
+    input::Gamepads_Stop();
+  }
 
   // Override virtual hooks for customization:
   // void OnPostInitLogging() override {}

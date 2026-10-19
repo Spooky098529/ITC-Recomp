@@ -207,6 +207,20 @@ A5. **Input reading**: SDL gamepads (rumble too) as a native module with
       (`src/input/device_assignment.cpp`), or the user's controller
       changes when the flag flips.
 
+    Step 1 done (2026-10-19, `rexglue-remove-1`): `src/input/gamepads.{h,cpp}`,
+    not yet answering the game. Started from `ItcApp::SetupPresentation`
+    (UI thread). Our event watch only updates four slots (lowest free slot
+    on connect, kept until unplugged, as the SDK does) under our mutex and
+    never calls SDL; pads are opened and closed on the UI thread, queued
+    by the watch (`CallInUIThreadDeferred`), and pads already connected are
+    taken from `SDL_GetGamepads()`. Reads and rumble queue an
+    `SDL_PumpEvents()` on the UI thread, as the SDK's driver does (it
+    queues one on every `XamInputGetState`, capabilities and vibration
+    call, `QueueControllerUpdate`). State is SDL's: buttons as bits by
+    `SDL_GamepadButton`, axes as SDL gives them; B1 converts. Checked in an
+    attract race: the pad found and opened at boot, button presses seen
+    with `--log_gamepads`, clean shutdown. Rumble is untested until B1.
+
 A6. **Audio output**: SDL audio straight from our mixer's output, our own
     conversion and downmix (`conversion.h`, `downmix.h` are small), in
     place of `AudioDriver`. Its game side is B2. Read
