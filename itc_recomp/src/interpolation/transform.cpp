@@ -578,7 +578,7 @@ std::optional<PerspectiveCamera> SplitViewProjection(const Matrix4& vp) {
   double depth_offset = c2[3] - depth_scale * z[3];
   for (int r = 0; r < 3; r++) {
     if (std::abs(c2[r] - depth_scale * z[r]) > 1e-3 * std::max(1.0, std::abs(c2[r]))) {
-      return std::nullopt;  // an off-centre or unusual projection
+      return std::nullopt;  // an off-center or unusual projection
     }
   }
   Matrix4 view{};

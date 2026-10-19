@@ -202,7 +202,7 @@ extern "C" REX_FUNC(sub_825BE708) {
 
 // The library's Resolve (r3 device, r4 flags, r5 source rect, r6
 // destination texture, r7 destination point, r8 level, r9 slice, r10 clear
-// colour as 4 floats, f1 clear Z). Command 25's are handled from its items;
+// color as 4 floats, f1 clear Z). Command 25's are handled from its items;
 // command 33 (EndTiling, see "Predicated tiling" in docs/gpu-functions.md)
 // makes one per tile (the tile count at device +12488), passed on here.
 extern "C" REX_FUNC(sub_822AFA58) {

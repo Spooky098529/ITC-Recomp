@@ -100,7 +100,7 @@ find /dev/shm -maxdepth 1 -user "$USER" -name 'xenia_memory_*' -delete
   run under `timeout`, read the log, and look at frames with the
   renderer's dump (`--native_renderer_dump=<dir>`, 10 s into a race or
   when `<dir>/now` appears). The attract mode puts a random sepia or
-  greyscale filter over the screen: a grey or brown frame from an attract
+  grayscale filter over the screen: a gray or brown frame from an attract
   race is the game's, not a rendering bug. Never screenshot the user's desktop. Without the GPU plugin, `--skip_intro` sometimes
   stalls the boot (no "called from 8248466C" in the log): restart it.
 - Run the game in the background. The user plays: they start a race, drive
@@ -219,7 +219,7 @@ checked draw by draw (opt-in, on in `run.sh`; "Hypothesis to test: the
 mirrors updated once a tick"). All released in v0.3.8: ~430 fps uncapped
 in an attract race with `run.sh`'s flags (2026-10-15). Translated shaders and pipelines are kept on disk (`cache/` next to
 the executable), and textures are reloaded when the game's memcpy writes
-them instead of being hashed (`docs/texture-handling-optimisation.md`);
+them instead of being hashed (`docs/texture-handling-optimization.md`);
 merged from `perf-debug` for Steam Deck hitches. Its known issues (boot movie, gamma, textures, window resizing,
 remaining packet writers, speed) are milestone 7 in
 `docs/native-renderer.md`.

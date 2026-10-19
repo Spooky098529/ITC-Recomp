@@ -84,7 +84,7 @@ drawing the HUD over it. First find out:
 - What the upscale draw's pixel shader does besides sampling (tone
   mapping or gamma going from HDR to 8-bit?). Identify it in a dump's
   `draws.txt` (`--native_renderer_dump`) and read its microcode with
-  `--native_renderer_log_shader_ucode=<hash>`. If it changes colours,
+  `--native_renderer_log_shader_ucode=<hash>`. If it changes colors,
   whatever replaces it must do the same.
 - Whether anything else reads `1ECB9000` or the frame between the upscale
   and the HUD, in races and in menus (which resolve their own frame into

@@ -75,7 +75,7 @@ std::string Words(uint8_t* base, uint32_t address, uint32_t count) {
   return words;
 }
 
-// A surface: +24 surface info (pitch, MSAA), +28 colour/depth info (EDRAM
+// A surface: +24 surface info (pitch, MSAA), +28 color/depth info (EDRAM
 // base, format), +32 HiZ (depth).
 std::string Surface(uint8_t* base, uint32_t surface) {
   if (!surface) {
@@ -129,7 +129,7 @@ void TraceCommand(uint8_t* base, uint32_t id, uint32_t payload, uint32_t arg1, u
         what += fmt::format(" level {} slice {}", guest::LoadU32(base, item + 36),
                             guest::LoadU32(base, item + 40));
         if (present & 8) {
-          what += fmt::format(" clear colour {:08X}", guest::LoadU32(base, item + 44));
+          what += fmt::format(" clear color {:08X}", guest::LoadU32(base, item + 44));
         }
         what += fmt::format(" z {:08X} stencil {}]", guest::LoadU32(base, item + 48),
                             guest::LoadU32(base, item + 52));
@@ -138,7 +138,7 @@ void TraceCommand(uint8_t* base, uint32_t id, uint32_t payload, uint32_t arg1, u
     case 26:
       for (uint32_t i = 0; i < arg1; i++) {
         uint32_t item = payload + 280 * i;
-        what += fmt::format(" [rects {} flags {:08X} colour {:08X} z {:08X} stencil {}]",
+        what += fmt::format(" [rects {} flags {:08X} color {:08X} z {:08X} stencil {}]",
                             guest::LoadU32(base, item + 4), guest::LoadU32(base, item + 8),
                             guest::LoadU32(base, item + 268), guest::LoadU32(base, item + 272),
                             guest::LoadU32(base, item + 276));

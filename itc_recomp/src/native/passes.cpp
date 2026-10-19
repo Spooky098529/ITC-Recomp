@@ -68,7 +68,7 @@ namespace {
 constexpr VkFormat kDepthFormat = VK_FORMAT_D32_SFLOAT_S8_UINT;
 
 // The main view, which is shown: its surface (pitch 1040, 2x MSAA, 7e3
-// colour, drawn as RGBA16F) and the part of it drawn (its viewport).
+// color, drawn as RGBA16F) and the part of it drawn (its viewport).
 constexpr uint32_t kMainViewPitch = 1040;
 // The glow's history cross-fade: blends last frame's glow (a 256x144
 // texture) over this frame's downsample (see "The bloom" in
@@ -98,7 +98,7 @@ Surface ReadSurface(uint8_t* base, uint32_t object) {
   return {surface_info & 0x3FFF, (surface_info >> 16) & 3, info & 0xFFF, (info >> 16) & 0xF};
 }
 
-// How a colour format is drawn. 7e3 and its high-precision blending
+// How a color format is drawn. 7e3 and its high-precision blending
 // variant (which draws switch between, see render states 308-320) share
 // one; the fixed-point -32..32 formats are drawn as floats.
 VkFormat ColorFormat(uint32_t format) {
@@ -309,7 +309,7 @@ struct PipelineKey {
   uint32_t z_enable, z_write, z_func;
   uint32_t blend_enable, src_color, dst_color, color_op, src_alpha, dst_alpha, alpha_op;
   uint32_t write_mask;
-  // The targets: colour format (UNDEFINED for none), depth or not, samples.
+  // The targets: color format (UNDEFINED for none), depth or not, samples.
   uint32_t color_format, depth, samples;
 
   bool operator==(const PipelineKey&) const = default;
@@ -417,7 +417,7 @@ constexpr uint32_t kTextureDescriptorsPerPool = 32768;
 
 // The lowest and highest of `count` indices as the GPU reads them, leaving
 // out the restart index (all ones) when `skip_restart`; {UINT32_MAX, 0} if
-// there are none. One plain loop per format, so the compiler vectorises it
+// there are none. One plain loop per format, so the compiler vectorizes it
 // (scanning an index at a time with the format checks inside was ~20% of
 // the render thread).
 template <typename T, typename Swap>
@@ -655,7 +655,7 @@ struct Passes::State {
     return {std::max(ScaledBy(guest.width, by), 1u), std::max(ScaledBy(guest.height, by), 1u)};
   }
   VkExtent2D Scaled(VkExtent2D guest) const { return ScaledBy(guest, scale); }
-  // The main view's surfaces (colour and depth): pitch 1040, 2x MSAA.
+  // The main view's surfaces (color and depth): pitch 1040, 2x MSAA.
   static bool IsMainViewSurface(const Surface& surface) {
     return surface.pitch == kMainViewPitch && surface.msaa == 1;
   }
@@ -971,7 +971,7 @@ struct Passes::State {
   // The pixel shaders drawn into the main view this frame and the last.
   std::vector<uint64_t> frame_pixel_shaders, last_pixel_shaders;
 
-  // Targets by surface (colour or depth, EDRAM base, pitch, samples, the
+  // Targets by surface (color or depth, EDRAM base, pitch, samples, the
   // format they're drawn in), and the ones being drawn into now.
   std::map<std::array<uint32_t, 6>, Target> targets;
   Target* bound_color = nullptr;
@@ -1164,7 +1164,7 @@ struct Passes::State {
                    const int32_t* rect, const int32_t* point, uint32_t flags);
   // A resolve as the library's Resolve (sub_822AFA58) takes it: flags as
   // the XDK's D3DRESOLVE, from the device's bound surfaces; then the clears
-  // its flags ask for (0x100 colour, 0x200 depth and stencil), if
+  // its flags ask for (0x100 color, 0x200 depth and stencil), if
   // apply_clears.
   void Resolve(VkCommandBuffer commands, uint8_t* base, uint32_t device, uint32_t flags,
                const int32_t* rect, uint32_t destination, const int32_t* point,
@@ -2496,7 +2496,7 @@ Target* Passes::State::GetTarget(VkCommandBuffer commands, uint8_t* base, uint32
   }
   REXLOG_INFO("native renderer: {} target: EDRAM base {}, pitch {}, MSAA {}, format {}; {}x{}{} "
               "({}x{} drawn)",
-              depth ? "depth" : "colour", surface.edram_base, surface.pitch, surface.msaa,
+              depth ? "depth" : "color", surface.edram_base, surface.pitch, surface.msaa,
               surface.format, t.guest_extent.width, t.guest_extent.height,
               tiling ? " (tiled)" : "", t.extent.width, t.extent.height);
   stats.targets++;
@@ -2795,7 +2795,7 @@ bool Passes::State::ResolveInto(VkCommandBuffer commands, uint8_t* base, Target&
   if (logged_resolves.insert(log_key).second) {
     REXLOG_INFO("native renderer: resolve from {} target (EDRAM base {}, pitch {}, MSAA {}, "
                 "format {}) rect {},{}-{},{} to {:08X} at {},{}, flags {:08X}",
-                source.depth ? "depth" : "colour", source.surface.edram_base,
+                source.depth ? "depth" : "color", source.surface.edram_base,
                 source.surface.pitch, source.surface.msaa, source.surface.format, left, top, right,
                 bottom, fetch[1] & 0xFFFFF000u, x, y, flags);
   }
@@ -3352,11 +3352,11 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
     glow_frame.cross_fades++;
     glow_frame.constants.clear();
     if (call.inline_vertices) {
-      // Its weight: the vertices' colour alpha (the shader outputs the
-      // history times the colour, and the colour's alpha).
+      // Its weight: the vertices' color alpha (the shader outputs the
+      // history times the color, and the color's alpha).
       uint8_t* vertices = draw_mirror().mapped;
       glow_frame.constants += fmt::format(
-          "vertex colour {:.4g} {:.4g} {:.4g} {:.4g}; ",
+          "vertex color {:.4g} {:.4g} {:.4g} {:.4g}; ",
           guest::LoadFloat(vertices, call.vertex_address + 16),
           guest::LoadFloat(vertices, call.vertex_address + 20),
           guest::LoadFloat(vertices, call.vertex_address + 24),
@@ -3766,7 +3766,7 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
     s.main_view = color;
   }
   // Both scaled from the guest's pixels (the NDC scale and offset are
-  // ratios, unchanged), by the targets' scale (colour and depth share one:
+  // ratios, unchanged), by the targets' scale (color and depth share one:
   // the main view's surfaces are both scaled alike).
   float draw_scale = color ? color->scale : depth->scale;
   VkViewport viewport{float(viewport_info.xy_offset[0]) * draw_scale,
@@ -4157,7 +4157,7 @@ void Passes::AfterClear(VkCommandBuffer commands, uint8_t* base, uint32_t payloa
   State& s = *state_;
   uint32_t device = guest::LoadU32(base, kDevicePointer);
   // Command 26's item (280 bytes): +4 rect count (rects from +12), +8 flags
-  // (bits 0-3 render targets 0-3, 0x10 Z, 0x20 stencil), +268 colour
+  // (bits 0-3 render targets 0-3, 0x10 Z, 0x20 stencil), +268 color
   // (D3DCOLOR), +272 Z, +276 stencil. Rects aren't kept: the whole target
   // is cleared.
   for (uint32_t i = 0; i < arg1; i++) {
@@ -4213,7 +4213,7 @@ void Passes::AfterResolve(VkCommandBuffer commands, uint8_t* base, uint32_t payl
     }
     point[0] = int32_t(guest::LoadU32(base, item + 28));
     point[1] = int32_t(guest::LoadU32(base, item + 32));
-    // The clear colour's 4 bytes, as floats (as the handler converts them).
+    // The clear color's 4 bytes, as floats (as the handler converts them).
     float color[4] = {};
     for (uint32_t c = 0; (fields & 8) && c < 4; c++) {
       color[c] = float(guest::LoadU8(base, item + 44 + c)) / 255.0f;
@@ -4278,7 +4278,7 @@ void Passes::BeginTiling(VkCommandBuffer commands, uint8_t* base, uint32_t paylo
   uint32_t device = guest::LoadU32(base, kDevicePointer);
   // Command 32's item (16 bytes): +0 flags, +4 tile count, +8 the tiles'
   // rectangles (16 bytes each: left, top, right, bottom). The handler gives
-  // BeginTiling a clear colour and Z of the float at 0x82000A34, stencil 0.
+  // BeginTiling a clear color and Z of the float at 0x82000A34, stencil 0.
   uint32_t flags = guest::LoadU32(base, payload);
   uint32_t count = guest::LoadU32(base, payload + 4);
   uint32_t rects = guest::LoadU32(base, payload + 8);
@@ -4297,7 +4297,7 @@ void Passes::BeginTiling(VkCommandBuffer commands, uint8_t* base, uint32_t paylo
   float clear;
   std::memcpy(&clear, &clear_bits, 4);
   if (s.logged_tilings.insert(uint64_t(rects) << 32 | count).second) {
-    REXLOG_INFO("native renderer: begin tiling: flags {:X}, {} tiles:{}; clear colour and Z {}",
+    REXLOG_INFO("native renderer: begin tiling: flags {:X}, {} tiles:{}; clear color and Z {}",
                 flags, count, tiles, clear);
   }
   s.EndRendering(commands);
@@ -4971,9 +4971,9 @@ VkExtent2D Passes::EndFrame(VkCommandBuffer commands, int32_t show_resolve, bool
                           VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
   } else {
     // No main view this frame (menus): dark blue.
-    VkClearColorValue colour{{0.0f, 0.05f, 0.15f, 1.0f}};
+    VkClearColorValue color{{0.0f, 0.05f, 0.15f, 1.0f}};
     VkImageSubresourceRange range{VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-    vk::vkCmdClearColorImage(commands, shown, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &colour, 1,
+    vk::vkCmdClearColorImage(commands, shown, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &color, 1,
                              &range);
   }
   if (s.gamma_pipeline) {
@@ -5193,7 +5193,7 @@ void Passes::WriteDump(const std::string& directory) {
       for (size_t n = 0; n < s.recorded_draws.size(); n++) {
         const State::RecordedDraw& r = s.recorded_draws[n];
         std::string line = fmt::format(
-            "draw {}: {} target pitch {} MSAA {} format {}, colour {}, depth {}; vs {:016X} ps "
+            "draw {}: {} target pitch {} MSAA {} format {}, color {}, depth {}; vs {:016X} ps "
             "{:016X}; primitive {} x{}{}",
             n, r.main_view ? "main view" : "other", r.surface.pitch, r.surface.msaa,
             r.surface.format, r.has_color, r.has_depth, r.vertex, r.pixel, r.type, r.count,

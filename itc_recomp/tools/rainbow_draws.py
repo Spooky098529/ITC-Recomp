@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Which draws put the rainbow effect's pixels on screen: reads a native
 renderer dump (shown.pfm, draw_ids.pfm, draws.txt), takes the strongly
-coloured pixels of the main view, and prints the draws covering most of
+colored pixels of the main view, and prints the draws covering most of
 them, with their lines from draws.txt. Usage: rainbow_draws.py <dump dir>"""
 
 import collections
@@ -26,7 +26,7 @@ def main():
     shown = read_pfm(folder / "shown.pfm")[:576, :1024]
     ids = read_pfm(folder / "draw_ids.pfm")[..., 0].astype(np.int64)
     draws = (folder / "draws.txt").read_text().splitlines()
-    # Saturated and not dark: the rainbow effect's colours.
+    # Saturated and not dark: the rainbow effect's colors.
     high, low = shown.max(2), shown.min(2)
     rainbow = (high > 0.05) & ((high - low) > 0.6 * high)
     print(f"{rainbow.mean() * 100:.1f}% of pixels look like the rainbow effect")

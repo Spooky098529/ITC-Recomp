@@ -9,7 +9,7 @@
 // count" in docs/native-renderer.md), so the same loop without the lock is
 // still atomic with every other thread's.
 //
-// The behaviour is otherwise the library's: AddRef returns the new count
+// The behavior is otherwise the library's: AddRef returns the new count
 // and, at 1, also AddRefs the object at +24 for type 4 objects with +0 bit
 // 0x40000000; Release returns the new count, and at 0 releases +24 the same
 // way, calls sub_822A6210 on the object (its destroy) and returns 0.

@@ -659,7 +659,7 @@ Three more things are blended, outside the products:
   The upload's layout (the same at c0 and c63): c0-c3 are the view matrix
   and c4 the position of the camera the lighting is worked out against;
   light slot k (of 8, the lights nearest the object) is registers 8+k
-  (position), 16+k, 24+k (direction), 32+k, 47+k and 55+k (colour and
+  (position), 16+k, 24+k (direction), 32+k, 47+k and 55+k (color and
   strength among them). For the 63-register uploads:
   - All of it blends; the light slots' positions and directions are what
     move the cars' headlights' light with the cars.
@@ -670,7 +670,7 @@ Three more things are blended, outside the products:
     registers jumped, holds another light (passing a street lamp, the next
     one along takes its slot) and takes the tick's light
     (`--switch_light_slots`), as the game switches it. Judged by the
-    relative tolerance alone, a world position may move hundreds of metres,
+    relative tolerance alone, a world position may move hundreds of meters,
     so a slot taking the next lamp was blended as one light sliding 30 m
     across the car in a tick: opponents' cars flashed brighter passing
     under lamps. Before slots were switched on their own, any slot change
@@ -761,10 +761,11 @@ and target, and recorder world matrices), mostly for comparison.
 | `--log_world_sprites`, `--log_single_sprites` | The world-space sprites as recorded. |
 | `--pair_by_object` | Pair the per-object recorder's products by position within groups alike but for their order (default on); see "What gets blended". |
 | `--log_moving_products` | Moving objects drawn out of step, event by event; see "What gets blended". |
-| `--log_thread_cpu` | Every 2 s: the process's and the machine's CPU use, and each thread using 5% of a core or more, by name: its share of a core (system time in brackets), the CPU it last ran on, its voluntary/involuntary context switches (many involuntary ones mean it's waiting for a core) and its minor/major page faults. Game threads are labelled with their entry point (`8258DE50 -> <the thread's own function>`). A thread with 10% or more of a core in the kernel gets its system calls sampled (25 reads of `/proc/.../syscall`, 4 ms apart: numbers, `running`, or -1 outside a call). On in `run-debug.sh`; Linux only. For finding a thread that pegs a core on slower machines (the Steam Deck). |
+| `--log_thread_cpu` | Every 2 s: the process's and the machine's CPU use, and each thread using 5% of a core or more, by name: its share of a core (system time in brackets), the CPU it last ran on, its voluntary/involuntary context switches (many involuntary ones mean it's waiting for a core) and its minor/major page faults. Game threads are labeled with their entry point (`8258DE50 -> <the thread's own function>`). A thread with 10% or more of a core in the kernel gets its system calls sampled (25 reads of `/proc/.../syscall`, 4 ms apart: numbers, `running`, or -1 outside a call). On in `run-debug.sh`; Linux only. For finding a thread that pegs a core on slower machines (the Steam Deck). |
 | `--native_cockpit_dials`, `--check_native_cockpit_dials` | The cockpit dials posed natively (default on), and their angles and poses compared with the translated code on logic passes, logged every 2 s. |
 | `--log_camera_pass_records` | Which camera passes are recorded on logic and render-only passes, by message handler. |
 | `--log_gpu_memory` | Every 5 s (native renderer): the GPU memory it holds by what it's for (textures, resolve destinations, images, staging, mirrors, constant blocks), and its counts of views, samplers, descriptor pools, pipelines and new textures starting where an older one starts. For the memory that grows from race to race; see "Textures are never freed" in `native-renderer.md`. |
+| `--free_textures_after_race` | Free the textures loaded from guest memory when a race ends (default on); without it they're never freed. See "Textures are never freed" in `native-renderer.md`. |
 
 ### What didn't work, and why
 

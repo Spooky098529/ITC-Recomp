@@ -56,7 +56,7 @@ class TextureCache {
   // draws sampling a texture at its base address then get instead of
   // guest memory (the emulated GPU doesn't write resolves back). Left in
   // SHADER_READ_ONLY_OPTIMAL, or UNDEFINED while `fresh`. False if its
-  // format can't be a colour attachment.
+  // format can't be a color attachment.
   struct ResolveDestination {
     VkImage image;
     VkImageView view;  // all components as is, for drawing into
@@ -165,7 +165,12 @@ class TextureCache {
   bool verify_every_frame_ = false;
   uint32_t debug_hide_value_ = 0;
   uint64_t generation_ = 0;
+  uint64_t races_seen_ = 0;
   GenerationEvents events_;
 };
+
+// The game left a race (main thread): the texture cache frees its loaded
+// textures at its next frame (--free_textures_after_race).
+void TextureCache_RaceLeft();
 
 }  // namespace native

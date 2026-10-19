@@ -196,7 +196,7 @@ bool SDLCALL WatchWindowEvents(void*, SDL_Event* event) {
 }
 
 // Where a frame of `source`'s shape goes in `target`: as large as fits,
-// centred (black bars on the sides or above and below).
+// centered (black bars on the sides or above and below).
 VkOffset3D FitOffsets(VkExtent2D source, VkExtent2D target, VkOffset3D& end) {
   uint64_t width = target.width, height = target.height;
   if (uint64_t(target.width) * source.height > uint64_t(target.height) * source.width) {

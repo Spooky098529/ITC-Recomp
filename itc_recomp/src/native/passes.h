@@ -48,7 +48,7 @@ class Passes {
   // Predicated tiling (see "Predicated tiling" in docs/gpu-functions.md):
   // after command 32 (BeginTiling); each Resolve the library's EndTiling
   // (command 33) makes, tile of tiles, with its arguments (guest addresses
-  // of the rectangle, point and clear colour, 0 if none); after command 33.
+  // of the rectangle, point and clear color, 0 if none); after command 33.
   void BeginTiling(VkCommandBuffer commands, uint8_t* base, uint32_t payload);
   void TiledResolve(VkCommandBuffer commands, uint8_t* base, uint32_t device, uint32_t flags,
                     uint32_t rect, uint32_t destination, uint32_t point, uint32_t clear_color,
@@ -195,7 +195,7 @@ class Passes {
     uint64_t invisible = 0;
     std::array<uint32_t, 8> invisible_sample{};
     // Draws with render targets 1-3 bound to another surface than 0 (only 0
-    // is drawn), or colour and depth of different sample counts.
+    // is drawn), or color and depth of different sample counts.
     uint64_t extra_targets = 0, mismatched_samples = 0;
     // Draws with a depth bias, and with an "equal" depth test.
     uint64_t depth_biased = 0, depth_equal = 0;

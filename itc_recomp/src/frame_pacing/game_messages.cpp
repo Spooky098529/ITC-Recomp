@@ -5,6 +5,7 @@
 #include "debug/menu_selection_scan.h"
 #include "guest.h"
 #include "interpolation/blend_state.h"
+#include "native/textures.h"
 
 #include <rex/cvar.h>
 #include <rex/logging.h>
@@ -453,6 +454,12 @@ void DispatchMessages(PPCContext& ctx, uint8_t* base, uint32_t dispatcher) {
 void GameMessages_OnPassFinished() {
   if (!g_render_only_pass) {
     // The pass that just ran was a logic pass: it decides whether we're in a race.
+    if (g_in_race != g_race_draw_step_seen) {
+      REXLOG_INFO("game messages: {} a race", g_race_draw_step_seen ? "entered" : "left");
+      if (!g_race_draw_step_seen) {
+        native::TextureCache_RaceLeft();
+      }
+    }
     g_in_race = g_race_draw_step_seen;
     g_race_draw_step_seen = false;
   }

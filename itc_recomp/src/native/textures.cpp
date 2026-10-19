@@ -7,11 +7,13 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <chrono>
 #include <bit>
 #include <cmath>
 #include <cstring>
 #include <map>
+#include <span>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -30,11 +32,20 @@ REXCVAR_DEFINE_BOOL(native_renderer_log_texture_writes, false, "ITC",
                     "is found changed, what the library's memcpy wrote there (a debugging aid; "
                     "with --native_renderer_verify_textures every change is found)");
 
+REXCVAR_DEFINE_BOOL(free_textures_after_race, true, "ITC",
+                    "Free the textures loaded from guest memory when a race ends (they're "
+                    "loaded again when drawn): without it they're never freed, and graphics "
+                    "memory grows by each race's textures");
 REXCVAR_DEFINE_BOOL(native_renderer_cache_texture_bindings, true, "ITC",
                     "Answer texture views and samplers from a table of earlier answers by the "
                     "fetch constant's words, instead of looking the texture up every binding");
 
 namespace native {
+
+namespace {
+// Races left (TextureCache_RaceLeft), counted on the main thread.
+std::atomic<uint64_t> g_races_left{0};
+}  // namespace
 
 namespace xenos = rex::graphics::xenos;
 
@@ -70,7 +81,7 @@ struct Format {
 };
 
 // The formats this game's textures use (see "Textures in use" in
-// docs/gpu-functions.md), and some neighbours. Packed formats store X in the
+// docs/gpu-functions.md), and some neighbors. Packed formats store X in the
 // lowest bits, as Vulkan's PACK formats named from A down to R do.
 bool GetFormat(xenos::TextureFormat guest, Format& out) {
   using F = xenos::TextureFormat;
@@ -512,6 +523,7 @@ struct TextureCache::State {
     xenos::Endian endian = xenos::Endian::kNone;
     VkImage image = VK_NULL_HANDLE;
     VkDeviceMemory memory = VK_NULL_HANDLE;
+    VkDeviceSize memory_size = 0;
     uint32_t levels = 0;
     bool loaded = false;
     // The library's memcpy wrote its memory since it was loaded: reload.
@@ -574,6 +586,19 @@ struct TextureCache::State {
   // Textures changed without a recorded write: their memory when last
   // checked, to log which bytes changed.
   std::unordered_map<uint32_t, std::vector<uint8_t>> write_snapshots;
+
+  // Textures freed after a race: destroyed once the frames that may still
+  // use them are done (RetireLoaded, DestroyRetired).
+  struct Retired {
+    uint64_t frame_number;
+    VkImage image;
+    VkDeviceMemory memory;
+    VkDeviceSize memory_size;
+    std::vector<VkImageView> views;
+  };
+  std::vector<Retired> retired;
+  void RetireLoaded();
+  void DestroyRetired();
   uint32_t write_lines = 200;
   std::chrono::steady_clock::time_point writes_logged = std::chrono::steady_clock::now();
   void LogFirstLoad(const Texture& t);
@@ -721,6 +746,7 @@ bool TextureCache::State::CreateTexture(Texture& t) {
     t.image = VK_NULL_HANDLE;
     return false;
   }
+  t.memory_size = alloc.allocationSize;
   gpu_memory::Allocated(t.resolved ? gpu_memory::Kind::kResolved : gpu_memory::Kind::kTexture,
                         alloc.allocationSize);
 
@@ -949,12 +975,68 @@ void TextureCache::BeginFrame(uint32_t frame_index) {
   if (log_writes_) {
     s.LogWriteSummary();
   }
+  s.DestroyRetired();
+  if (uint64_t races = g_races_left.load(std::memory_order_relaxed); races != races_seen_) {
+    races_seen_ = races;
+    if (REXCVAR_GET(free_textures_after_race)) {
+      s.RetireLoaded();
+      generation_++;  // answers and last texture sets hold their views
+    }
+  }
   uint64_t marked = s.stats.marked;
   s.MarkWritten();
   if (s.stats.marked != marked) {
     generation_++;
     events_.marked_frames++;
   }
+}
+
+void TextureCache_RaceLeft() {
+  g_races_left.fetch_add(1, std::memory_order_relaxed);
+}
+
+// Every texture loaded from guest memory (not resolve destinations, which
+// guest memory doesn't hold) leaves the cache; draws load them again.
+// Called before this frame's draws, so only earlier frames can use them.
+void TextureCache::State::RetireLoaded() {
+  VkDeviceSize bytes = 0;
+  for (auto& [key, t] : textures) {
+    Retired r{frame_number, t.image, t.memory, t.memory_size, {}};
+    for (const auto& [swizzle, view] : t.views) {
+      if (view) {
+        r.views.push_back(view);
+      }
+    }
+    bytes += t.memory_size;
+    retired.push_back(std::move(r));
+  }
+  REXLOG_INFO("native renderer: a race ended: {} textures freed ({:.1f} MB)", textures.size(),
+              bytes / 1048576.0);
+  textures.clear();
+  by_address.clear();
+  longest_range = 0;
+  write_snapshots.clear();
+}
+
+// Each frame's start waits for its slot's last use, so a texture retired
+// at frame N is unused once frame N + frames in flight starts.
+void TextureCache::State::DestroyRetired() {
+  if (retired.empty() || frame_number < retired.front().frame_number + frames.size()) {
+    return;
+  }
+  auto due = std::partition_point(retired.begin(), retired.end(), [&](const Retired& r) {
+    return frame_number >= r.frame_number + frames.size();
+  });
+  for (Retired& r : std::span(retired.begin(), due)) {
+    for (VkImageView view : r.views) {
+      vk::vkDestroyImageView(context.device, view, nullptr);
+    }
+    gpu_memory::Created(gpu_memory::Object::kImageView, -int64_t(r.views.size()));
+    vk::vkDestroyImage(context.device, r.image, nullptr);
+    vk::vkFreeMemory(context.device, r.memory, nullptr);
+    gpu_memory::Freed(gpu_memory::Kind::kTexture, r.memory_size);
+  }
+  retired.erase(retired.begin(), due);
 }
 
 TextureCache::GenerationEvents TextureCache::TakeGenerationEvents() {
@@ -965,7 +1047,7 @@ TextureCache::GenerationEvents TextureCache::TakeGenerationEvents() {
 
 // The textures memcpy has written since the last frame are marked to be
 // reloaded (the game writes textures' memory with the library's memcpy:
-// see docs/texture-handling-optimisation.md).
+// see docs/texture-handling-optimization.md).
 void TextureCache::State::MarkWritten() {
   new_writes.clear();
   Buffers_TakeNewWrites(new_writes);

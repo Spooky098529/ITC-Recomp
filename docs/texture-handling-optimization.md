@@ -109,7 +109,7 @@ frame, so every change is found. An 80 s attract race (`itc_663.log`,
   afterwards. Their writer isn't known.
 - **Changes**: 748 found. 7 were written by memcpy since loading. The
   other 741 were one texture (`18DAD000`, 300x150, untiled, pitch 320) and
-  once its neighbour, and **they weren't changes to the texture**: the
+  once its neighbor, and **they weren't changes to the texture**: the
   bytes that changed were at offsets 192,517-200,319, past the image's
   last row (150 rows of 1,280 bytes end at 192,000). The hashed range pads
   the row count to 32 (160 rows) as the tiled layout needs; for an

@@ -63,7 +63,7 @@ speed).
 | # | Milestone | Done when | Status |
 |---|---|---|---|
 | 1 | **Skeleton**: `--native_renderer` creates our own Vulkan device, window and swapchain; the replay hooks pass each frame's commands to it. | A window clears and presents every frame. | Done (2026-10-13): presents every frame in menus (30 fps) and races (113-128 fps, ~26,800 commands and ~2,900 draws a frame), the game unaffected. |
-| 2 | **Main view geometry**: vertex and index buffers read from guest memory, shaders translated, render states mapped to pipelines. | Race geometry is visible in our window, untextured. | Done (2026-10-13): the cockpit view's geometry, the right way up, solid, with the game's coloured lighting on white placeholder textures (screenshot checked). |
+| 2 | **Main view geometry**: vertex and index buffers read from guest memory, shaders translated, render states mapped to pipelines. | Race geometry is visible in our window, untextured. | Done (2026-10-13): the cockpit view's geometry, the right way up, solid, with the game's colored lighting on white placeholder textures (screenshot checked). |
 | 3 | **Textures**: untile and upload (mostly BC1-BC3), samplers from the fetch constants. | The main view looks right without effects. | Done (2026-10-13): signs, gauges, fences, buildings and road textured correctly (screenshot checked); what comes from resolves is still missing. |
 | 4 | **The other passes**: each pass renders into a Vulkan image of its resolve's size and format; resolves become copies. | Shadows, reflections and the mirror work. | Done (2026-10-14): every pass draws, inline vertex draws included; clears and resolves work; the user saw the car's shadow, the mirror and the reflections right in our window (cockpit and third person), and the resolves match the emulated GPU's (`--readback_resolve=full`), except its blocky bloom. Menus not checked. |
 | 5 | **The final frame and the menus** (still in development mode): post-processing, HUD, the frame's end, then every menu screen. | Races and menus look as in the game's window, side by side. | In progress: the final frame with the HUD shows (checked by the user in a race); menus' tiled 3D views fixed. |
@@ -87,7 +87,7 @@ speed).
   to a per-frame ring (system constants as the plugin computes them for
   what these draws use, the shader's float constants packed, bool/loop and
   fetch constants as is), a pipeline made from the registers (topology,
-  primitive restart, cull, depth, blend of target 0, colour mask), and the
+  primitive restart, cull, depth, blend of target 0, color mask), and the
   draw recorded with the base vertex as a system constant (the shader adds
   it after byte-swapping the index). Textures are white 1x1 placeholders
   of the declared type. The scissor comes from the device (render state 200 at
@@ -100,7 +100,7 @@ speed).
   mirror; the game at 100-125 fps instead of 130-150 with the renderer on.
   The viewport comes out as 0,0 1024x576, as expected. Seen in the window: the
   dashboard, gauges, pillars, walls, overpass, lamps, buildings and road all
-  in place and solid; the game's coloured light (magenta, green, blue) on
+  in place and solid; the game's colored light (magenta, green, blue) on
   the buildings and the opponent's red tail lights. The target was then cut
   to the view's 1024x576.
 
@@ -119,7 +119,7 @@ speed).
   command buffer submitted before the frame's; a texture whose staging
   doesn't fit waits for the next frame. Loaded textures are reloaded when
   the library's memcpy writes their memory (since 2026-10-15; before, they
-  were hashed again now and then: see `texture-handling-optimisation.md`).
+  were hashed again now and then: see `texture-handling-optimization.md`).
 - Samplers from the fetch constant (filters, clamp modes, border, mip
   range, anisotropy) with the shader's fetch instruction overriding the
   filters. The texture's post-swizzle signs go into the system constants;
@@ -154,7 +154,7 @@ texture objects ("Resources"). The approach:
    destination's base address, so later draws sampling that fetch constant
    get it instead of loading guest memory (which holds garbage: the
    emulated GPU doesn't write resolves back). Depth resolves
-   (`24_8_FLOAT`) need a depth-to-colour copy (a small shader) into a
+   (`24_8_FLOAT`) need a depth-to-color copy (a small shader) into a
    format the shaders sample (R32_SFLOAT, as the translator expects for
    depth textures: check). Format conversions on resolve (7e3 to
    16_16_16_16, the `0xF4000000` flags' likely exponent bias) need
@@ -167,21 +167,21 @@ texture objects ("Resources"). The approach:
 ## Progress on milestone 4
 
 - `src/native/passes.cpp` (was `main_view.cpp`) draws every pass. A target
-  per bound surface, keyed by colour or depth, EDRAM base, pitch, MSAA and
+  per bound surface, keyed by color or depth, EDRAM base, pitch, MSAA and
   the format drawn in (7e3 and its blending variant share RGBA16F; the
   fixed-point -32..32 formats are drawn as floats); sized to the pitch and
   as many rows as the EDRAM holds from its base. Bound surfaces are read
   from the surface objects (device +12184.., +12200; +24 surface info, +28
-  colour or depth info). Render target slots 1-3 hold target 0's surface
+  color or depth info). Render target slots 1-3 hold target 0's surface
   in the menus (not extra targets).
 - **Clears** (command 26): flags decoded from the library (`sub_8229FC40`):
-  bits 0-3 render targets 0-3, `0x10` Z, `0x20` stencil; colour is a
+  bits 0-3 render targets 0-3, `0x10` Z, `0x20` stencil; color is a
   D3DCOLOR (ARGB). The library clips the clear to the viewport and scissor;
   we clear the whole target (see "Clears' rectangles" below). Rects at +12
   (16 bytes each), not used.
 - **Resolves** (command 25): the handler calls `Resolve(flags, src rect
   (+8, field bit 0), dest texture (+24, bit 1), dest point (+28, bit 2),
-  level +36, slice +40, clear colour bytes +44 (bit 3), Z +48, stencil +52,
+  level +36, slice +40, clear color bytes +44 (bit 3), Z +48, stencil +52,
   parameters +56 (bit 4))`, the XDK's argument order. Flags as the XDK's
   D3DRESOLVE: bits 0-1 render target, `0x4` depth, `0x100` clear the
   target after, `0x200` clear depth and stencil, bits 26-31 a signed
@@ -243,7 +243,7 @@ texture objects ("Resources"). The approach:
   sampled. Our resolve shader now swaps red and blue then too. (Earlier
   this was put down to the read-back copy, wrongly: the read-back data is
   stored swapped, as the GPU stores it, and ours now matches it.) The
-  resolve's format remap, for reference: destination 54 → colour format 7,
+  resolve's format remap, for reference: destination 54 → color format 7,
   55 → 16, 56 → 17, 27 → 30, 28 → 31, 29 → 32, 22 and 23 → 6.
 - **Clears' rectangles** (2026-10-14): in a race no clear has rects, and
   every clear's viewport starts at 0,0 and covers the pass's drawn area
@@ -272,7 +272,7 @@ texture objects ("Resources"). The approach:
 ### The rainbow effect (fixed)
 
 Buildings, pillars and overpasses showed smooth rainbow gradients (and
-green or red tints) instead of their own colours, on and off; the game's own
+green or red tints) instead of their own colors, on and off; the game's own
 window showed them right. **Fixed 2026-10-14 (`88f2c28`)**: those draws ran
 a vertex shader patched for another vertex declaration.
 
@@ -284,8 +284,8 @@ a vertex shader patched for another vertex declaration.
   (+48) stays patched for the previous declaration, and +24 still names
   that one. We translated the object's microcode, so ~100-400 draws a
   frame fetched vertices with another declaration's layout: in the case
-  looked at, the colour and texture coordinate stream (12 bytes a vertex)
-  read with an 8-byte stride, giving garbage vertex colours and texture
+  looked at, the color and texture coordinate stream (12 bytes a vertex)
+  read with an 8-byte stride, giving garbage vertex colors and texture
   coordinates.
 - Now `sub_822AE340` (the patcher) is wrapped: when it patches a copy, the
   patched bytes are kept with the shader object and the declaration id, and
@@ -300,7 +300,7 @@ a vertex shader patched for another vertex declaration.
 - Misleading leads, for the record: leaving out pixel shader `F3C0D413`
   (the cockpit's gauges) with `--native_renderer_cycle` seemed to remove
   the effect, but that was a single frame of an effect that comes and goes;
-  attract races (no cockpit) showed it all the same. The colour write mask
+  attract races (no cockpit) showed it all the same. The color write mask
   (now normalized as the plugin does it), PsParamGen (no draw uses it), the
   base vertex and index range, mirror copies overwriting each other
   (`--native_renderer_check_clobbers`: none) and stale textures
@@ -332,7 +332,7 @@ GPU (exclusive mode) and the frame rate measurement.
   two inline strips: the upscale (sampling the 1280x720 format 54
   resolve destination, the view in its top-left 1024x576) and the
   "Import Tuner Challenge" logo (a 208x128 texture). Attract races have
-  no HUD; the greyscale in some attract shots is the attract mode's own
+  no HUD; the grayscale in some attract shots is the attract mode's own
   effect (the user confirmed).
 - **Checked by the user in a free run race (2026-10-14, cockpit view,
   side by side):** the whole HUD shows in our window as in the game's
@@ -472,7 +472,7 @@ step 1's logs are there to find them before anything is stubbed.
   window stays black); the primary ring stays empty, so +60 needs no
   update. First run: no hang, the boot callback made, nothing unhandled,
   every draw drawn; attract race frames look right (the sepia and
-  greyscale shots are the attract mode's, the user confirmed).
+  grayscale shots are the attract mode's, the user confirmed).
 - **Measured** (2026-10-14, the same 46 s of an attract race,
   `--max_fps=144`, no dumps or extra logging; fps per second of the
   race):
@@ -603,7 +603,7 @@ step 1's logs are there to find them before anything is stubbed.
   | Change | Mean | 10th pct |
   |---|---|---|
   | Before (emulated GPU alone: 155 / 126) | 135 | 106 |
-  | Index range scan as one vectorised loop per format (was ~20%; checked equal on 10 million draws) | 167 | 130 |
+  | Index range scan as one vectorized loop per format (was ~20%; checked equal on 10 million draws) | 167 | 130 |
   | Register file cleared once, not 80 KB a draw (was ~10%) | 182 | 144 |
   | Texture set layouts cached per shader; texture set key and infos reuse their buffers | 190 | 149 |
   | Shader caches as hash maps instead of ordered maps of tuples | 198 | 156 |
@@ -708,7 +708,7 @@ step 1's logs are there to find them before anything is stubbed.
   objects, memory) don't touch the library's objects; the library's other
   atomics on these objects (`sub_822A63F8`, `sub_822A6630`, +-256) are on
   +0. So both are overridden with the same loop as a native
-  compare-and-swap, behaviour otherwise kept.
+  compare-and-swap, behavior otherwise kept.
 
   That took the mutex out of the profile but gained only ~2%: the locked
   instruction itself costs a few hundred cycles on the render thread
@@ -845,7 +845,7 @@ memory).
   constants it reads, and `draw_ids.pfm` holds which draw wrote each
   pixel of the main view. `tools/pfm_to_png.py <dir>` makes PNGs;
   `tools/rainbow_draws.py <dump>` names the draws covering most of the
-  rainbow-coloured pixels (its saturation test also counts real colour,
+  rainbow-colored pixels (its saturation test also counts real color,
   e.g. orange signs: look at the pictures). The game pauses while it
   writes; the frame itself is recorded at full speed.
 - With `--readback_resolve=full` (an SDK setting: the emulated GPU writes
@@ -874,7 +874,7 @@ memory).
   frames: the glow history's cross-fades (pixel shader
   `E0D070FB58A4EA03`), the texture they read, the 256x144 resolves without
   a clear and which of them write that texture back, and the cross-fade's
-  pixel constants and vertex colour (see the bloom under Known issues).
+  pixel constants and vertex color (see the bloom under Known issues).
 - `--native_renderer_log_shader_ucode=<hash>`: log a shader's microcode
   disassembly when it's first used.
 - `--native_renderer_watch_draws`: log what changes in the main view's
@@ -993,7 +993,7 @@ memory).
 - `--native_renderer_log_texture_writes`: which code writes textures'
   memory: on first load, and when a texture is found changed, what the
   library's memcpy wrote there (with `--native_renderer_verify_textures`
-  every change is found; see `texture-handling-optimisation.md`).
+  every change is found; see `texture-handling-optimization.md`).
 - `--native_renderer_disk_cache=false`: don't keep translated shaders and
   pipelines in `cache/` next to the executable (see "Hitches from
   first-seen shaders" in Known issues).
@@ -1070,7 +1070,7 @@ To be fixed (or accepted) in milestone 7.
   the logs show (2026-10-15, attract races):
   - **The glow keeps a history, written back at tick rate.** In the
     256x144 target, two draws shrink the HDR copy, then the cross-fade
-    (pixel shader `E0D070FB58A4EA03`, blendcontrol `00010706`: colour =
+    (pixel shader `E0D070FB58A4EA03`, blendcontrol `00010706`: color =
     src x src alpha + dst x (1 - src alpha)) blends in the history texture
     (`1B0E3000` in these races), and then the blur steps and the combine
     run. `--native_renderer_log_glow`: every frame cross-fades with the
@@ -1094,10 +1094,10 @@ To be fixed (or accepted) in milestone 7.
     strength, ~2.7-3.2), `+8456` (0.75), `+8476` (0)} of the object;
     `+8452` is written by `sub_82136F18`. Nothing else stepping looks like
     the glow's (the rest are the known c14, c70, c74 and c100).
-  - **The cross-fade's weight is its quad's vertex colour alpha**: the
+  - **The cross-fade's weight is its quad's vertex color alpha**: the
     shader (`--native_renderer_log_shader_ucode=E0D070FB58A4EA03`) is
     `tfetch2D r0.xyz, tf0; oC0.w = r1.w; oC0.xyz = r0 * r1`, no
-    constants. `sub_821379D8` builds the quad (`sub_82133E30`) with colour
+    constants. `sub_821379D8` builds the quad (`sub_82133E30`) with color
     (8, 8, 8, `+8460`), or a fixed alpha when `+40` (a reset) is set; the
     8 undoes the history's 1/8 (its resolve's exponent bias). `+8460` was
     ~0.55 in attract races (0.545-0.58, changing every tick): each tick,
@@ -1192,7 +1192,7 @@ To be fixed (or accepted) in milestone 7.
   reloaded at the next frame; `--native_renderer_verify_textures` checks
   that nothing else changes them (none in an attract race). Five textures
   a race aren't written by memcpy at all, and their writer isn't known;
-  they didn't change. Details in `texture-handling-optimisation.md`.
+  they didn't change. Details in `texture-handling-optimization.md`.
 
 - Textures are never freed: memory reused for different textures (another
   race) leaves the old images behind. Measured 2026-10-19 (`memory-leak`,
@@ -1206,6 +1206,19 @@ To be fixed (or accepted) in milestone 7.
   level off. 747 of the new textures started where an older one starts;
   the rest at new addresses, or overlapping old ones elsewhere. On the
   Steam Deck (1 GB VRAM by default) this is what the user saw grow.
+  Fixed for race loads (2026-10-19, `--free_textures_after_race`, on by
+  default): when the game leaves a race (`GameMessages_OnPassFinished`:
+  the race's draw step stops running, once per race end), the texture
+  cache retires every texture loaded from guest memory (resolve
+  destinations stay: guest memory doesn't hold them), bumps its generation
+  so no answer or last texture set keeps their views, and destroys them
+  once the frames in flight are done. Draws load them again, as a race
+  load did anyway (the next race's ~500 load in its first seconds).
+  Same 5-minute loop: 950-1,200 textures (119-137 MB) freed at each race
+  end, VRAM 330-410 MB throughout (906 MB before); the second race's
+  frames drawn right. Left: the growth within a race (~1 MB/s, freed at
+  its end), and resolve destinations (+8 at each of the first four loads,
+  then +1).
 
 - **Resizing the window and the swapchain** on Wayland: the compositor
   leaves the size to us and never reports the swapchain out of date, so the
@@ -1269,7 +1282,7 @@ To be fixed (or accepted) in milestone 7.
   Since then hashing is gone too (textures are marked written by the
   library's memcpy instead): texture time per 5 s pinned went from 30-40
   ms to 1-11 ms. What's left to try, in order, is in
-  `texture-handling-optimisation.md`.
+  `texture-handling-optimization.md`.
 - **The attract race's grayscale filter flickers with the game pinned to
   one CPU** (`taskset -c 0`; seen by the user, 2026-10-15). Since the
   frame pacer fix (`d8c10c5`, a due tick always gets the next pass); the
@@ -2276,7 +2289,7 @@ other takes the writes. Draws do no mirror work at all.
   "memcpy writes taken", uncapped attract race, ~330 fps), yet index ranges
   drawn were 0% rewritten. So something writes physical memory every frame,
   most likely not vertex or index data (textures are written by the same
-  memcpy, see `texture-handling-optimisation.md`; or dynamic data). If
+  memcpy, see `texture-handling-optimization.md`; or dynamic data). If
   those writes happen on render-only passes and include ranges draws read,
   the hypothesis fails for them.
 - Pass type and number: `frame_pacing::GameMessages_IsRenderOnlyPass()`,
@@ -2834,7 +2847,7 @@ as busy.
 this branch (`0436f4f`), attract races of 20 s with `run.sh`'s flags and
 `--native_renderer_dump_every=1`, twice each: 19 frames a run, the same
 moments (camera, traffic) in both, nothing drawn differently. The
-replay's colour filters (none, black and white, sepia) are chosen at
+replay's color filters (none, black and white, sepia) are chosen at
 random each run, so pixel differences between runs mean nothing; one
 dump a run falls either side of a camera cut (~1 s of drift, in either
 build). The user looked at the montages and passed it for merging.
@@ -3213,7 +3226,7 @@ drove): swapchain 3840x2161 (the screen's 1490 desktop units times 1.45),
 drawn at 3x (frame 3840x2160, 3D view 3072x1728; one black row below),
 150-151 fps at the 144 cap, no failed draws; the user found it looks
 good.
-At present the frame is blitted as large as fits, centred, the rest of
+At present the frame is blitted as large as fits, centered, the rest of
 the swapchain image cleared black (`FitOffsets` in `renderer.cpp`). The
 swapchain is made again when SDL reports our window's pixel size changed
 (an event watch), since Wayland never reports it out of date. A 1600x1000
@@ -3225,7 +3238,7 @@ scale following a resized window (it's fixed at start).
 request). With one scale for everything, the 3D view (1024x576, 80% of
 the 1280x720 frame) came out at 80% of the chosen size and the game's
 upscale draw stretched it. Now, at any scale but 1, the main view's
-surfaces (pitch 1040, 2x MSAA, colour and depth: `IsMainViewSurface`) are
+surfaces (pitch 1040, 2x MSAA, color and depth: `IsMainViewSurface`) are
 drawn at the scale times 1.25 (`main_view_scale`), and each target keeps
 its own scale (`Target::scale`): viewports, scissors and the depth bias
 slope use the draw's target's. A resolve destination is made at the scale
