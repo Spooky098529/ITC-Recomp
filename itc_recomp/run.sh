@@ -12,6 +12,7 @@
 #   ./run.sh --no-interpolation  the original 30 fps
 #   ./run.sh --width=1920 --height=1080   a bigger window, drawn sharper
 #   ./run.sh --fullscreen        fill the screen, drawn at its resolution
+#   ./run.sh --motion_blur=false  no motion blur
 #
 # Logging is off; ./run-debug.sh runs the same with logs (in logs/), for
 # reporting problems.
@@ -19,8 +20,7 @@
 # Frame interpolation (experimental): game logic stays at 30 Hz and races
 # draw up to --max_fps (144 here; pass --max_fps=N to change it, 0 for
 # unlimited), each frame blended between the last two ticks. Menus stay at
-# 30 fps. The glow is always drawn; --motion_blur=false leaves out the motion
-# blur.
+# 30 fps.
 #
 # Resolution (none of these is on by default: out of the box the game runs
 # in a 1280x720 window at its own resolution, its 3D view drawn at 1024x576
@@ -36,6 +36,10 @@
 # At any size but 1280x720 the 3D view is drawn at the full resolution too,
 # not upscaled. Screens and windows that aren't 16:9 get black bars. Higher
 # resolutions cost GPU time only.
+#
+# Motion blur (on by default): the game's blur of the picture at speed.
+#   --motion_blur=false   leave it out, for a sharp picture. The glow
+#                         around lights is always drawn.
 #
 # Xbox 360 gamma (off by default): the console sends its picture through a
 # gamma table made for the kind of display it's connected to, so on a TV it
