@@ -23,6 +23,18 @@
 //   pose on the blended car goes to the replay beside it
 //   (BlendState_SetLivePose), which gives it the frame's camera.
 //
+// So the needle's turn (B * RotZ(angle) * A, the needle on the dash) is the
+// tick's, never blended, and only the car under it is: the needle stays on
+// its spindle while the dial moves with the car.
+//
+// Possible improvement: needles that sweep instead of stepping at 30 Hz. In
+// InputsFor, blend the kept gauge values between the last two ticks by the
+// frame's amount (keeping the previous tick's as the world matrix's are) and
+// work the angle out from them for the frame pose; the tick pose handed to the
+// game stays on the tick's values. The turn would still be RotZ about the
+// spindle, so the needle wouldn't cut across the dial as the old matrix blend
+// did: that blended the finished matrix, not the angle.
+//
 // The angle maps (sub_820D3688, sub_820D3740) use the game's operations in its
 // order; the rotation's sine and cosine come from the C library rather than
 // the game's polynomial. --check_native_cockpit_dials compares the angles
