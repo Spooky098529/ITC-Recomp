@@ -34,6 +34,15 @@ void BlendState_AfterDraw(uint8_t* base);
 // frame being drawn. The products it records are replayed with that world
 // matrix and the frame's camera. nullptr after the draw.
 void BlendState_SetLivePose(const float* world);
+// Main thread, during Draw: a camera built by our own code for the frame being
+// drawn (the headlight projector, hooks/headlight_projector.cpp). The game
+// draws with `tick` (16 floats, the projector as the game built it from the
+// tick); products made with it are replayed with `frame` in its place, never
+// blended as a camera (nor numbered or paired by its projection: `slot`
+// numbers it). Cleared at each Draw.
+void BlendState_SetFrameCamera(const float* tick, const float* frame, uint32_t slot);
+// Diagnostics: products noted with a frame camera since the last call.
+int BlendState_TakeFrameCameraUses();
 // Main thread, during Draw: how far between its two ticks the frame being
 // drawn is (what its products are blended by; 1 without interpolation).
 float BlendState_Amount();
