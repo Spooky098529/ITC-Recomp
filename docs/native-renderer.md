@@ -1195,7 +1195,17 @@ To be fixed (or accepted) in milestone 7.
   they didn't change. Details in `texture-handling-optimisation.md`.
 
 - Textures are never freed: memory reused for different textures (another
-  race) leaves the old images behind.
+  race) leaves the old images behind. Measured 2026-10-19 (`memory-leak`,
+  `--log_gpu_memory`, a 5-minute attract loop of 5 races): textures grew
+  from 65 MB (427) to 611 MB (5,256), ~60 MB at each race load and
+  ~1 MB/s during races (new textures keep coming as the car drives);
+  resolve destinations from 25 to 48 MB (8 more at each of the first
+  four loads). Together that's the driver's whole VRAM growth for the
+  process (fdinfo `drm-memory-vram`, 327 to 906 MB); GTT (mirrors,
+  staging, constant blocks: 1,344 MB) and the pipeline count (111)
+  level off. 747 of the new textures started where an older one starts;
+  the rest at new addresses, or overlapping old ones elsewhere. On the
+  Steam Deck (1 GB VRAM by default) this is what the user saw grow.
 
 - **Resizing the window and the swapchain** on Wayland: the compositor
   leaves the size to us and never reports the swapchain out of date, so the
