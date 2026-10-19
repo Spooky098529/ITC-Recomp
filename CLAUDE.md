@@ -200,6 +200,21 @@ address while a projection drifts (`--sticky_camera_ids`); both on.
 judder far out is the game's own (Known issues). See "The headlight beam
 far from the origin" in `docs/functions.md`.
 
+Motion blur (merged from `beam-stepping`, 2026-10-19): the headlight beam
+on the road sometimes looked like it updated at 30 Hz. It was the motion
+blur over it: its previous view-projection (vertex c100 x4, copied by
+`sub_821363F0`) is the same matrix all tick, but copied from the view's
++8080 on logic passes and +8144 on others, and copies pair by address, so
+only logic frames blended it and the blur's length jumped once a tick.
+Now noted under the logic pass's address and blended on every frame
+(`--motion_blur_by_tick`, on); the user judged it fixed at 4K. The motion
+blur is also optional now: `--motion_blur=false` (on by default, in
+`run.sh`'s help), defined in `src/native/renderer.cpp`; SDK patch 0002
+(the emulated GPU's toggle) is removed. The cameras refused far from the
+origin were ruled out: a temporary in `sub_82598768`, never drawn
+(`--log_blend_state` now names each refused camera's source). See
+"Motion blur reads the 30 Hz tick" in `docs/native-renderer.md`.
+
 Graphics memory (merged from `memory-leak`, 2026-10-19, released in
 v0.4.6): textures were never freed,
 so graphics memory grew by ~60-130 MB a race load and ~1 MB/s while
