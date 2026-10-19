@@ -27,7 +27,7 @@ mkdir -p itc_recomp/out/profiles; O=itc_recomp/out/profiles/$NAME.data
 # fullscreen (the SDK's --fullscreen defaults to true).
 defaults=(--native_renderer=true --native_renderer_exclusive=true --native_audio=true
   --native_renderer_mirror_by_tick=true --native_renderer_mirror_to_both=true
-  --game_data_root="$G" --mnk_mode=true --max_fps=0 --log_fps=true --interpolate_draw_state=true
+  --game_data_root="$G" --max_fps=0 --log_fps=true --interpolate_draw_state=true
   --skip_intro --attract_after_s=1 --fullscreen=false)
 read -ra extra <<< "${ITC_ARGS:-}"
 flags=()

@@ -134,7 +134,14 @@ handles), which is fine: the unit of work is a subsystem, not a function.
 Independent of each other; each is releasable alone, except A0, which
 comes before everything else.
 
-A0. **Drop keyboard input** (the user's call, 2026-10-19): no keyboard in
+A0. Done (2026-10-19, `remove-rexglue`): `--mnk_mode=true` removed from
+    `run.sh`, `run.bat`, `tools/profile_render_thread.sh` and the run lines
+    in CLAUDE.md and `docs/windows.md`. The SDK's flag defaults to off, which
+    only turns its keyboard driver off (`rexglue-sdk/src/input/mnk/`);
+    gamepads go through its SDL driver as before. `app_window.cpp`'s
+    forwarding stays: our window's focus and close events need it (only
+    its comments and log line changed).
+    **Drop keyboard input** (the user's call, 2026-10-19): no keyboard in
     native code until the game is fully native (after B7). Remove
     `--mnk_mode=true` from `run.sh` and `run.bat` (`REX_MNK_MODE`), and
     the keyboard from `app_window.cpp`'s forwarding and its comments in

@@ -65,7 +65,7 @@ done
 
 # The flag parser rejects a flag given twice, so a default is left out when
 # the same flag is passed in.
-flags=(--native_renderer=true --native_renderer_exclusive=true --native_audio=true --game_data_root="$dir" --mnk_mode=true --native_renderer_mirror_by_tick=true --native_renderer_mirror_to_both=true --fullscreen=false --xbox_gamma=off "${defaults[@]}" --log_level=off)
+flags=(--native_renderer=true --native_renderer_exclusive=true --native_audio=true --game_data_root="$dir" --native_renderer_mirror_by_tick=true --native_renderer_mirror_to_both=true --fullscreen=false --xbox_gamma=off "${defaults[@]}" --log_level=off)
 final=()
 for flag in "${flags[@]}"; do
   name="${flag%%=*}"
