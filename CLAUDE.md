@@ -28,6 +28,9 @@ is fixed (merged from `pause-menu-arrow`): UI movie tracks
 that add to values the update doesn't put back were re-added on every
 render-only pass; now skipped there (`--per_tick_ui_movie_tracks`, a
 workaround for frame rates above 30).
+`docs/cockpit-dial-interpolation.md` is the cockpit dials: native dial
+updates, the needles' angles from the tick and their position on the
+blended car (`--native_cockpit_dials`), and the TODO for smooth needles.
 Read the relevant section before changing anything, and keep it up to
 date as you learn things.
 
@@ -166,6 +169,19 @@ Update handler (`82159948`, `sub_821594B8`) on logic passes only. A native
 override runs the cutscene on logic passes and only the logo's draw
 (`sub_82211A28`) on render-only passes (`--redraw_rival_logo`, on by
 default). See "The rival logo at the race start" in `docs/functions.md`.
+
+Cockpit dials (merged from `cockpit-dial-interpolation`, 2026-10-19, not
+released yet): the dial updates (`sub_820E42E8`, `sub_820E45A8`) are native
+(`src/hooks/cockpit_dials.cpp`, `--native_cockpit_dials`, on by default).
+The needles' angles come from the tick's gauge values (30 Hz steps, as on
+the 360) and their position from the car blended to the frame; the game
+draws the tick pose (it culls with the tick's camera) and the blend replays
+the frame pose as a live pose (`BlendState_SetLivePose`: world kept, camera
+blended). Before, blending the needles' matrices cut across the dials, and
+the turbo gauge fell to its rest angle between ticks. TODO: blend the
+angles, or run the game logic at a higher tick rate. See
+`docs/cockpit-dial-interpolation.md`; the functions are in
+`docs/functions.md`.
 
 Xbox 360 gamma (merged from `xbox-gamma`, 2026-10-16; released in v0.4.3):
 `--xbox_gamma=off|hdtv|power`, off by default (`run.sh` passes `off` and
