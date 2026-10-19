@@ -1,5 +1,9 @@
 # Removing ReXGlue: toward a native port
 
+**This copy is out of date.** The removal work, and the current version
+of this plan, live on the branch `rexglue-removal-project`. `main` keeps
+the game in its current playable state with bug fixes.
+
 The plan (not started; written 2026-10-19, restructured the same day, on
 branch `remove-rexglue`) for taking the game off the ReXGlue SDK
 (`rexglue-sdk/`) piece by piece, with releases along the way. The goal
