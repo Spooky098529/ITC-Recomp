@@ -352,8 +352,10 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
     recompiled code still reads a table, it stays in the image too, and
     the two copies must agree. This is most of the
     work: full decompilations of games this size usually take years. Keep
-    a list of which functions are native (in `docs/functions.md` or a
-    table here) so progress can be measured. Keyboard input comes back
+    the statuses in `docs/functions.md` up to date (Wrapped, Overridden,
+    Native, defined at its top) so progress can be measured: Native plus
+    Overridden is how much of the game is ours, Native alone how much no
+    longer needs `ctx`. Keyboard input comes back
     once the game is native (A0).
 
 ## The end state: removing the core
