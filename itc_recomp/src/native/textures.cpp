@@ -32,10 +32,6 @@ REXCVAR_DEFINE_BOOL(native_renderer_log_texture_writes, false, "ITC",
                     "is found changed, what the library's memcpy wrote there (a debugging aid; "
                     "with --native_renderer_verify_textures every change is found)");
 
-REXCVAR_DEFINE_BOOL(free_moved_resolve_destinations, true, "ITC",
-                    "Free a resolve destination when a new one is made over its memory at "
-                    "another address and nothing has resolved into it for 2 s (the game makes "
-                    "the race's glow chain again at another address at some race loads)");
 REXCVAR_DECLARE(bool, log_gpu_memory);
 REXCVAR_DEFINE_BOOL(native_renderer_cache_texture_bindings, true, "ITC",
                     "Answer texture views and samplers from a table of earlier answers by the "
@@ -1519,12 +1515,10 @@ bool TextureCache::GetResolveDestination(const uint32_t fetch_words[6], float sc
                 "{}x{}, scale {})",
                 page << 12, t.guest_format, width, height, int(t.format.format), t.host_width,
                 t.host_height, scale);
-    if (REXCVAR_GET(free_moved_resolve_destinations)) {
-      size_t held = s.resolved.size();
-      s.RetireMovedResolveDestinations(t);
-      if (s.resolved.size() != held) {
-        generation_++;  // answers and last texture sets may hold their views
-      }
+    size_t held = s.resolved.size();
+    s.RetireMovedResolveDestinations(t);
+    if (s.resolved.size() != held) {
+      generation_++;  // answers and last texture sets may hold their views
     }
     it = s.resolved.emplace(key, std::move(t)).first;
     events_.created++;

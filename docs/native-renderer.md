@@ -1240,7 +1240,8 @@ To be fixed (or accepted) in milestone 7.
   format 26) is made again at loads 2, 3, 4 and 7 at another address
   (the game allocates it per race: 1B068000, 1B19B000, 1AA40000,
   1B118000, 1B198000 for the 512x288), ~7.5 MB each time, never freed.
-  Fixed (`--free_moved_resolve_destinations`, on): a new resolve
+  Fixed (was `--free_moved_resolve_destinations`, removed after the
+  play test below): a new resolve
   destination made over the memory of one at another address frees it,
   unless something resolved into it in the last 2 s (a resolve into part
   of a bigger one); one replaced at its own address (another format or
@@ -1260,6 +1261,8 @@ To be fixed (or accepted) in milestone 7.
   from ~98 MB to ~150 MB in its first 3-4 minutes and then levelled off
   (150-161 MB to its end): the textures not drawn for over a minute and
   never written over stop at ~600 (~50 MB). VRAM peaked at 511 MB.
+  With that, the resolve destinations' flag was removed too: all three
+  frees always run.
 
 - **Resizing the window and the swapchain** on Wayland: the compositor
   leaves the size to us and never reports the swapchain out of date, so the
