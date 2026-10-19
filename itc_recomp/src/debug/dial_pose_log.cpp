@@ -89,6 +89,10 @@ struct DialPoseLog {
     }
     pending += '\n';
     last[part] = std::move(words);
+    Flush();
+  }
+
+  void Flush() {
     auto now = std::chrono::steady_clock::now();
     if (now - written >= std::chrono::seconds(5)) {
       written = now;
@@ -119,4 +123,53 @@ extern "C" REX_FUNC(sub_820D04E8) {
     }
   }
   __imp__sub_820D04E8(ctx, base);
+}
+
+namespace {
+const char* PassType() {
+  return frame_pacing::GameMessages_IsRenderOnlyPass() ? "render-only" : "logic";
+}
+}  // namespace
+
+// The cockpit dials' posing (sub_820E45A8, one caller):
+// r3 = the dash, r4 = the car. Its needles' angles come from sub_820D3688
+// unless [dash + 4] is 5.
+extern "C" REX_FUNC(sub_820E45A8) {
+  REX_FUNC_PROLOGUE();
+  if (!REXCVAR_GET(log_dial_pose).empty()) [[unlikely]] {
+    char line[256];
+    uint32_t dash = ctx.r3.u32;
+    std::snprintf(line, sizeof(line),
+                  "pass %llu %s dials dash %08X car %08X r5 %08X mode %u ranges %08X %08X\n",
+                  (unsigned long long)frame_pacing::GameMessages_PassNumber(), PassType(), dash,
+                  ctx.r4.u32, ctx.r5.u32, guest::LoadU32(base, dash + 4),
+                  guest::LoadU32(base, dash + 5328), guest::LoadU32(base, dash + 5332));
+    debug::GetDialPoseLog().pending += line;
+  }
+  __imp__sub_820E45A8(ctx, base);
+}
+
+// A dial's angle from a car value: r3 = its range (from, to, angle from,
+// angle to), r4 = which value (car + 704, 712, 716 or 720), r5 = the car.
+extern "C" REX_FUNC(sub_820D3688) {
+  REX_FUNC_PROLOGUE();
+  uint32_t lr = uint32_t(ctx.lr);
+  bool log = !REXCVAR_GET(log_dial_pose).empty() && lr >= 0x820E45A8 && lr < 0x820E4A00;
+  uint32_t range = ctx.r3.u32, kind = ctx.r4.u32, car = ctx.r5.u32;
+  __imp__sub_820D3688(ctx, base);
+  if (log) [[unlikely]] {
+    char line[320];
+    static constexpr uint32_t kOffsets[4] = {704, 712, 716, 720};
+    float value = range && kind < 4 ? guest::LoadFloat(base, car + kOffsets[kind]) : 0.0f;
+    std::snprintf(line, sizeof(line),
+                  "pass %llu %s angle caller %08X range %08X kind %u car %08X value %.4f "
+                  "car704 %.4f 712 %.4f 716 %.4f 720 %.4f angle %.4f\n",
+                  (unsigned long long)frame_pacing::GameMessages_PassNumber(), PassType(), lr,
+                  range, kind, car, value, guest::LoadFloat(base, car + 704),
+                  guest::LoadFloat(base, car + 712), guest::LoadFloat(base, car + 716),
+                  guest::LoadFloat(base, car + 720), ctx.f1.f64);
+    debug::DialPoseLog& dial_log = debug::GetDialPoseLog();
+    dial_log.pending += line;
+    dial_log.Flush();
+  }
 }
