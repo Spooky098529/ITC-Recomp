@@ -827,15 +827,15 @@ What's known and what isn't yet, for whoever picks this up:
   plan"'s table).
 - The processors' and listeners' update (vtable `0x8206C0C4` slot 1
   `0x82592188`): read since (2026-10-19), see "The input processors".
+- Read since (2026-10-20, "The action mappers' update"): `8210C370`,
+  `8210C0E0`, `8210B7D0`, `8210B718`, `8210BBA0`, and `8210B140` (a jump
+  table; whether it's the identity needs its bytes at `0x82007F20`).
 - Not read yet (read these first for the native mappers):
-  - `8210C370`, `8210C0E0`, `8210BBA0` in full: how each action's held
-    bit and its analog values (+1072 u16s, +1132 floats) come from the
-    stick floats (`[+2880]`) and the listener at +2464.
-  - `8210B140` (action id to index; ids 151-180 map to 0-29, 30 means
-    none, but whether it's a plain subtraction isn't checked).
   - The repeat objects (pointers at +472; `8210B568` looks like one
     class) and their parameters from the table at `0x82600B88`, set by
-    `8209F228` at boot, and slot 13 `8210B6E8`.
+    `8209F228` at boot, and slot 13 `8210B6E8`; the curve objects
+    (pointers at +1252); the constants and config tables listed at the
+    end of "The action mappers' update".
   - Which input each action id is: only the menu's directions (153-156
     d-pad, 167-170 stick) are known. The car reads 155, 156, 160, 163,
     164, 169, 170, 173, 174 (analog, `82102400`), 152, 157, 158, 161,

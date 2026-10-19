@@ -332,6 +332,17 @@ B1. **Input** (3 functions calling `XamInput*`): native, reading A5.
     +272, +276 and counters, and the physical pads' +4 and +192..+211
     would keep a guest copy until those readers are native too.
 
+    The action mappers (2026-10-20): read and written up ("The action
+    mappers' update" in `docs/pause-menu-fix.md`: `sub_8210C370` and the
+    five functions below it), not made native. The user's call: probably
+    more than input needs for now, since the mappers are game logic (the
+    actions, their analog curves, thresholds and repeats), and the data
+    below them can't leave guest memory yet anyway. What's left to read
+    before doing it: the repeat and curve objects' classes, four
+    constants and the config tables. Input stops at the processors for
+    now: from SDL to the hold counters is ours (B1), the mappers up are
+    recompiled.
+
 B2. **Audio** (6 functions calling `XAudio*`/`XMA*`, plus what's around
     them): the game's render driver client feeding A6 directly, and its
     XMA users decoding with FFmpeg directly instead of through emulated

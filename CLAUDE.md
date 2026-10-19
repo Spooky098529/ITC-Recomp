@@ -21,7 +21,8 @@ under Wine (the user has no Windows machine).
 Vulkan 1.3, and why not OpenGL.
 `docs/rexglue-removal.md` is the plan (in progress on branch
 `rexglue-remove-1`: A0, A5 and B1 done, game input no longer goes
-through the SDK) for a native port without the ReXGlue SDK: host-side
+through the SDK, and the input path from SDL to the processors is our own
+C++, `src/input/`; the action mappers above it are read but recompiled) for a native port without the ReXGlue SDK: host-side
 pieces first (track A), then the game's functions made native from the
 SDK boundary inward (track B), the SDK's core removed last.
 `docs/tick-replay.md` is a lead (not started): translating draws once a
