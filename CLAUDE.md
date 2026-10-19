@@ -19,6 +19,10 @@ the SDK's audio (the Audio Worker's spin, the game's sounds, the plan).
 under Wine (the user has no Windows machine).
 `docs/old-hardware.md` is the plan (not started) for running below
 Vulkan 1.3, and why not OpenGL.
+`docs/rexglue-removal.md` is the plan (not started, branch
+`remove-rexglue`) for a native port without the ReXGlue SDK: host-side
+pieces first (track A), then the game's functions made native from the
+SDK boundary inward (track B), the SDK's core removed last.
 `docs/tick-replay.md` is a lead (not started): translating draws once a
 tick and replaying our own list on in-between frames.
 `docs/pause-menu-fix.md` is the pause menu's too-fast input repeat: fixed
@@ -60,7 +64,7 @@ G="$PWD/itc/Import Tuner Challenge (USA)"; B=itc_recomp/out/build/linux-amd64-re
 XDG_DATA_DIRS=/usr/local/share:/usr/share LD_LIBRARY_PATH=$B:rexglue-sdk/out/linux-amd64 \
   $B/itc --native_renderer=true --native_renderer_exclusive=true --native_audio=true \
   --native_renderer_mirror_by_tick=true --native_renderer_mirror_to_both=true \
-  --game_data_root="$G" --mnk_mode=true --max_fps=144 --fullscreen=false \
+  --game_data_root="$G" --max_fps=144 --fullscreen=false \
   --log_fps=true --interpolate_draw_state=true <diagnostic flags>
 find /dev/shm -maxdepth 1 -user "$USER" -name 'xenia_memory_*' -delete
 ```

@@ -58,7 +58,7 @@ void AppWindow_AdoptOurWindow(SDL_Window* window) {
   g_our_window_id = SDL_GetWindowID(window);
   static_cast<rex::ui::SDLWindowedAppContext&>(g_sdk_window->app_context())
       .RegisterWindow(g_our_window_id, g_sdk_window);
-  REXLOG_INFO("native renderer: our window's events go to the SDK's window (input, close)");
+  REXLOG_INFO("native renderer: our window's events go to the SDK's window (focus, close)");
 }
 
 }  // namespace native

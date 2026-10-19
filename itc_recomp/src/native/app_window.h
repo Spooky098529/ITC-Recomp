@@ -1,9 +1,9 @@
 // The SDK app's window and ours (see "One window" in
 // docs/native-renderer.md). In exclusive mode our renderer's window is the
 // only one shown: the SDK's window is hidden, and the SDK's event loop
-// routes our window's events (keyboard, focus, close) to it, so its input
-// drivers and the app's close path work unchanged. Gamepads don't depend on
-// a window.
+// routes our window's events (focus, close) to it, so the app's close path
+// works unchanged. Input is gamepads only (no --mnk_mode since
+// docs/rexglue-removal.md's A0), which don't depend on a window.
 
 #pragma once
 

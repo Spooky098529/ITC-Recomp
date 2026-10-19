@@ -523,7 +523,9 @@ step 1's logs are there to find them before anything is stubbed.
   SDK as before. Mouse capture would act on the SDK's own window, but the
   game has no mouse controls (`--mnk_mouse` is off); gamepads come from
   SDL events whatever the window. No SDK patch. Checked by the user:
-  keyboard, gamepad, one window.
+  keyboard, gamepad, one window. (2026-10-19: keyboard input dropped,
+  `--mnk_mode` no longer passed by `run.sh`/`run.bat`; see A0 in
+  `docs/rexglue-removal.md`. The forwarding stays for focus and close.)
 - **Interrupts are made at the library's level, not the GPU's.** Running
   the command stream's INTERRUPT callbacks inside the kick hung loading
   screens. EndTiling (`sub_825BF200`) ends with `sub_822B6BF8`, which
