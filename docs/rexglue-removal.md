@@ -173,7 +173,32 @@ A4. **App shell**: our own `main`: SDL init, our window as the only one
 
 A5. **Input reading**: SDL gamepads (rumble too) and a port of the
     keyboard driver and binds `--mnk_mode` uses (same flag names and
-    defaults), as a native module with no Xbox types. Its game side is B1.
+    defaults), as a native module with no Xbox types. Its game side is B1;
+    do the two together.
+
+    It doesn't need our own SDL loop first (checked 2026-10-19). The SDK
+    owns the loop today (`SDL_WaitEvent` on the UI thread,
+    `RunMainMessageLoop` in `rexglue-sdk/src/ui/windowed_app_context_sdl.cpp`).
+    Its gamepad driver gets events through `SDL_AddEventWatch`
+    (`src/input/sdl/sdl_input_driver.cpp`, which also asks the UI thread
+    to pump when the game reads input); its keyboard driver
+    (`src/input/mnk/mnk_input_driver.cpp`) through the SDK window's
+    listener, which is why `src/native/app_window.cpp` registers our
+    window against it. Ours: our own event watch (called for every event
+    whoever pumps, so it keeps working when A4 brings our own loop),
+    keyboard events filtered on our window's ID or `SDL_GetKeyboardState`.
+    The watch runs on the pumping thread: guard the state the game thread
+    reads. To avoid clashing with the SDK's input while both exist:
+    - Only one answers the game at a time (B1's fallback flag). Opening
+      a gamepad twice is fine in SDL; rumble only from the active path.
+    - The same pad as player 1 as the SDK picks
+      (`src/input/device_assignment.cpp`), or the user's controller
+      changes when the flag flips.
+    - The binds are SDK flags (`keybind_a` and the rest). Defining flags of
+      the same names while the SDK's input is linked would collide: read
+      the SDK's (`REXCVAR_DECLARE`) until B1 deletes its input, then define
+      them ourselves under the same names, so `run.sh` and players'
+      settings keep working.
 
 A6. **Audio output**: SDL audio straight from our mixer's output, our own
     conversion and downmix (`conversion.h`, `downmix.h` are small), in
