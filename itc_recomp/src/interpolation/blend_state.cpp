@@ -116,6 +116,10 @@ REXCVAR_DEFINE_BOOL(log_moving_products, false, "ITC",
 REXCVAR_DEFINE_BOOL(log_pixel_outcomes, false, "ITC",
                     "Log what happened to the per-object lighting uploads (blended, unpaired, "
                     "rejected...), for moving and still objects, every 2 s");
+REXCVAR_DEFINE_BOOL(log_camera_copies, false, "ITC",
+                    "Log copies of cameras (the headlight projector's among them) left unpaired "
+                    "between ticks, what the previous tick held under the same camera address, "
+                    "and how many camera numbers exist, every 2 s");
 REXCVAR_DEFINE_BOOL(cache_camera_ids, true, "ITC",
                     "Remember the camera number of recently seen view-projections by their "
                     "bytes, so a repeated one skips splitting it and the table lookup (same "
@@ -694,6 +698,7 @@ class CameraIds {
     }
     return Cached(view_projection);
   }
+  uint64_t count() const { return count_; }  // numbers given so far
 
  private:
   // The number is a function of the matrix: once a signature has a number,
@@ -1082,6 +1087,9 @@ class DrawState {
       current_order_ = std::move(collecting_order_);
       collecting_order_.clear();
       MatchTick();
+      if (REXCVAR_GET(log_camera_copies)) [[unlikely]] {
+        LogCameraCopies();
+      }
       by_tick_ = REXCVAR_GET(publish_by_tick);
       PlanTick();
       overlay_keys_ = std::move(overlay_keys_this_tick_);
@@ -1106,6 +1114,48 @@ class DrawState {
         object_keys_ = {};
         object_keys_.last_log = now;
       }
+    }
+  }
+
+  // Diagnostics (--log_camera_copies): copies of cameras (world 0) this tick
+  // left unpaired, with what the previous tick held under the same camera
+  // address and handler (another camera number, or another occurrence).
+  void LogCameraCopies() {
+    camera_copies_.ticks++;
+    for (const auto& [key, inputs] : current_tick_) {
+      if (key.world != 0) {
+        continue;
+      }
+      camera_copies_.copies++;
+      if (paired_.count(key)) {
+        continue;
+      }
+      camera_copies_.unpaired++;
+      if (camera_copies_.lines >= 40) {
+        continue;
+      }
+      camera_copies_.lines++;
+      std::string before;
+      for (const auto& [old, old_inputs] : previous_tick_) {
+        if (old.world == 0 && old.camera == key.camera && old.handler == key.handler) {
+          before += fmt::format(" [id {} occurrence {}{}]", old.signature, old.occurrence,
+                                current_tick_.count(old) ? " still here" : "");
+        }
+      }
+      const Matrix4& m = inputs.view_projection;
+      REXLOG_INFO("camera copies: tick {} unpaired: camera {:08X} handler {:08X} id {} occurrence "
+                  "{}; m00 {:.5f} m11 {:.5f} m22 {:.6f} m32 {:.6f} m23 {:.4f}; before:{}",
+                  ticks_, key.camera, key.handler, key.signature, key.occurrence, m[0], m[5],
+                  m[10], m[14], m[11], before.empty() ? std::string(" none") : before);
+    }
+    auto now = std::chrono::steady_clock::now();
+    if (now - camera_copies_.last_log >= std::chrono::seconds(2)) {
+      REXLOG_INFO("camera copies: last 2 s, {} ticks, {:.1f} copies a tick, {} unpaired; {} "
+                  "camera numbers",
+                  camera_copies_.ticks, double(camera_copies_.copies) / camera_copies_.ticks,
+                  camera_copies_.unpaired, camera_ids_.count());
+      camera_copies_ = {};
+      camera_copies_.last_log = now;
     }
   }
 
@@ -1834,6 +1884,10 @@ class DrawState {
                 tick->view_projection == now.view_projection ? "same" : "differs");
   }
   CameraIds camera_ids_;
+  struct {
+    int ticks = 0, copies = 0, unpaired = 0, lines = 0;
+    std::chrono::steady_clock::time_point last_log;
+  } camera_copies_;  // --log_camera_copies
 
   struct Output {
     ProductKey key;
