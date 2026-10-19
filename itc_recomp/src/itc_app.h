@@ -39,7 +39,7 @@ class ItcApp : public rex::ReXApp {
 
   // Our own audio output instead of the SDK's (src/audio/native_audio.cpp).
   // No SDK input system: the game's XInput calls are answered from our own
-  // gamepad reading (src/hooks/xinput.cpp).
+  // gamepad reading (src/input/xinput.cpp, from src/hooks/physical_pad.cpp).
   void OnPreSetup(rex::RuntimeConfig& config) override {
     native_audio::Configure(config);
     config.input_factory = nullptr;

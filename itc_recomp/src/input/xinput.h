@@ -1,7 +1,9 @@
 // XInput as the game uses it, answered from our gamepad reading
 // (gamepads.h). Plain C++: host structs and arguments, no PowerPC context or
-// guest memory; the game's recompiled code reaches these through the
-// adapters in src/hooks/xinput.cpp. See docs/rexglue-removal.md, B1.
+// guest memory. Called by our physical pad read (physical_pad.h), which
+// replaced the game's only caller of its XInput wrappers (sub_825BA3F0,
+// sub_825BA3F8, sub_825BA408; no longer called). See
+// docs/rexglue-removal.md, B1.
 
 #pragma once
 

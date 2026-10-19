@@ -68,7 +68,7 @@ function (`grep -rn sub_XXXXXXXX itc_recomp/src` first). For each:
   first done for B1): the logic is a plain C++ function with normal
   arguments and host structs, no `ctx` and no guest memory, in its
   subsystem's directory (e.g. `src/input/xinput.cpp`). The `REX_FUNC`
-  override (e.g. `src/hooks/xinput.cpp`) only reads the registers, calls
+  override (e.g. `src/hooks/physical_pad.cpp`) only reads the registers, calls
   it, stores results big-endian in guest memory and sets `r3`. When the
   caller is made native later, it calls the plain function directly and
   the adapter is deleted, so the `ctx` edge moves up without rewriting
@@ -272,6 +272,21 @@ B1. **Input** (3 functions calling `XamInput*`): native, reading A5.
     within ~30 ms (`xinput: user 0 disconnected`), the pad back in slot 0
     on replugging, and the race resumed fine. Not tried yet: starting with
     no pad connected.
+
+    Then (2026-10-19) the `ctx` edge moved up one level: the pad read
+    `sub_82591C18` is plain C++ (`src/input/physical_pad.cpp`, the
+    constants as literals) calling `input::XInput_*` directly, behind an
+    adapter (`src/hooks/physical_pad.cpp`) that copies the pad's fields
+    in and out of guest memory (the recompiled logical pads read its
+    values there). The three XInput adapters (first in
+    `src/hooks/xinput.cpp`) were deleted: their only caller is native.
+    Checked against the recompiled read with a temporary byte-for-byte
+    comparison of the 212-byte pad every read (not committed): 7,800
+    reads in an attract race and 17,400 while the user played (every
+    button, both sticks and triggers, rumble, an unplug), all equal but
+    one, where the right stick moved between the two reads. Next:
+    Input::Update (`sub_820990F0`) native, calling `PhysicalPad_Read`
+    directly (its processors and listeners stay guest calls).
 
 B2. **Audio** (6 functions calling `XAudio*`/`XMA*`, plus what's around
     them): the game's render driver client feeding A6 directly, and its
