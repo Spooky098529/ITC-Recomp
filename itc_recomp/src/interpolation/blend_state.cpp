@@ -1748,7 +1748,7 @@ class DrawState {
   // A frame's own copy of a tick product, with the output's world matrix
   // (live pose) and camera (frame camera) for this frame, if it has them; from
   // the logic pass's tables (`tick_output`) or this render-only pass's.
-  const TickProduct* OwnCopy(ReplayFrame& frame, const TickProduct& tick, const Output& output,
+  const TickProduct* OwnCopy(ReplayFrame& frame, const TickProduct& tick, const auto& output,
                              bool tick_output) {
     frame.own_products.push_back(tick);
     TickProduct& copy = frame.own_products.back();
