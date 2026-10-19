@@ -324,10 +324,17 @@ struct ProductInputs {
   // For the per-object recorder's multiply, its caller (lr) and the
   // caller's r24-r31 at the call: r31 identifies the part (--pair_by_object).
   std::array<uint32_t, 9> context{};
+  // Posed by our own code for the frame being drawn (the cockpit dials,
+  // native/cockpit_dials.cpp): its world matrix is already this frame's, so
+  // only its camera is blended, and on render-only passes it pairs by key
+  // alone.
+  bool live = false;
 };
 
 // Main thread: the per-object recorder's caller context while it runs.
 std::array<uint32_t, 9> g_record_context{};
+// Main thread: whether what's drawn now is posed live (BlendState_SetLivePose).
+bool g_live_pose = false;
 
 // How a paired product blends, worked out once a tick from its two ticks'
 // inputs: the decompositions and camera splits don't depend on the frame's
@@ -707,7 +714,9 @@ Matrix4 BlendProduct(const ReplayedProduct& product, const TickPlans* plans,
   const ProductPlan& plan = plans->products[size_t(product.tick->plan)];
   const ProductInputs& b = product.tick->now;
   Matrix4 world = b.world;
-  if (plan.world == ProductPlan::World::kBlend) {
+  if (b.live) {
+    // Posed for this frame already: keep it as drawn.
+  } else if (plan.world == ProductPlan::World::kBlend) {
     world = WorldMatrixFromScaledTransform(
         plan.screw ? BlendScrew(plan.wa, plan.wb, plan.screw_motion, amount)
                    : Blend(plan.wa, plan.wb, amount));
@@ -916,6 +925,7 @@ class DrawState {
     ProductInputs inputs{LoadMatrix(base, a), LoadMatrix(base, b)};
     if (recorder) {
       inputs.context = g_record_context;
+      inputs.live = g_live_pose;
     }
     // Any multiply by a camera: the recorder's, one by a camera pass, or one
     // by a perspective view-projection wherever it's kept (the light
@@ -1044,7 +1054,8 @@ class DrawState {
       // the same key, so they match the logic pass's frame (otherwise the
       // marker drew a tick apart on the two: two markers).
       bool overlay = handler_ == kRaceOverlaysHandler && tick;
-      if (!overlay && (!tick || !SameMatrix(tick->world, inputs.world) ||
+      // A product posed live has this frame's world matrix, not the tick's.
+      if (!overlay && (!tick || (!inputs.live && !SameMatrix(tick->world, inputs.world)) ||
                        !SameMatrix(tick->view_projection, inputs.view_projection))) {
         counts_.mismatched_products++;
         if (REXCVAR_GET(log_moving_products)) {
@@ -1057,7 +1068,12 @@ class DrawState {
       }
     }
     auto& outputs = render_only ? pass_outputs_ : tick_outputs_;
-    outputs[out] = {key, LoadMatrix(base, out), tick_product};
+    int32_t live = -1;
+    if (render_only && inputs.live) {
+      live = int32_t(pass_live_worlds_.size());
+      pass_live_worlds_.push_back(inputs.world);
+    }
+    outputs[out] = {key, LoadMatrix(base, out), tick_product, live};
     tick_published_stale_ |= !render_only;
   }
 
@@ -1067,6 +1083,8 @@ class DrawState {
   void SetHandler(uint32_t handler) { handler_ = handler; }
   uint32_t handler() const { return handler_; }
   std::thread::id main_thread() const { return main_thread_; }
+  // The amount this pass's frame blends its ticks by (as published).
+  float amount() const { return REXCVAR_GET(interpolate_draw_state) ? amount_ : 1.0f; }
 
   void BeforeDraw(uint8_t* base, bool logic_pass) {
     drawing_ = true;
@@ -1127,6 +1145,7 @@ class DrawState {
     }
     PublishReplayFrame();
     pass_outputs_.clear();
+    pass_live_worlds_.clear();
     product_occurrences_.clear();
     tick_cursor_ = 0;
     Restore(base, saved_);
@@ -1403,10 +1422,21 @@ class DrawState {
       for (const auto& [out, product] : tick_published_) {
         frame->products.Set(out, product);
       }
+      // Products posed live get their own copy of the tick's, with the world
+      // matrix they were drawn with (own_products isn't otherwise used here,
+      // and is reserved so the pointers stay put).
+      frame->own_products.reserve(pass_live_worlds_.size());
       for (const auto& [out, output] : pass_outputs_) {
         int32_t i = output.tick_product >= 0 ? output.tick_product : tick_index_.Find(output.key);
         if (i >= 0) {
-          frame->products.Set(out, {output.written, &plans_->tick_products[size_t(i)]});
+          const TickProduct* tick = &plans_->tick_products[size_t(i)];
+          if (output.live >= 0) {
+            frame->own_products.push_back(*tick);
+            frame->own_products.back().now.world = pass_live_worlds_[size_t(output.live)];
+            frame->own_products.back().now.live = true;
+            tick = &frame->own_products.back();
+          }
+          frame->products.Set(out, {output.written, tick});
         }
       }
     } else {
@@ -1418,6 +1448,10 @@ class DrawState {
             continue;
           }
           frame->own_products.push_back(TickProductOf(output.key, now->second));
+          if (output.live >= 0) {
+            frame->own_products.back().now.world = pass_live_worlds_[size_t(output.live)];
+            frame->own_products.back().now.live = true;
+          }
           frame->products.Set(out, {output.written, &frame->own_products.back()});
         }
       }
@@ -2074,9 +2108,12 @@ class DrawState {
     Matrix4 written;
     // Its place in plans_->tick_products if Note found it (--publish_by_tick).
     int32_t tick_product = -1;
+    // Posed live on a render-only pass: its world matrix, in pass_live_worlds_.
+    int32_t live = -1;
   };
   FlatMap<uint32_t, Output, std::hash<uint32_t>> tick_outputs_;  // by address, from the logic pass
   FlatMap<uint32_t, Output, std::hash<uint32_t>> pass_outputs_;  // from this render-only pass
+  std::vector<Matrix4> pass_live_worlds_;  // see Output::live
   // The race overlays' products on the logic pass, by value (see Note).
   std::unordered_map<uint64_t, ProductKey> overlay_keys_this_tick_, overlay_keys_;
 
@@ -3595,6 +3632,10 @@ void BlendState_SetHandler(uint32_t handler) {
 void BlendState_AfterDraw(uint8_t* base) {
   GetDrawState().AfterDraw(base);
 }
+
+void BlendState_SetLivePose(bool live) { g_live_pose = live; }
+
+float BlendState_Amount() { return GetDrawState().amount(); }
 
 // Diagnostics (--log_object_extras): the per-object uploads (vertex c0 x9,
 // sub_825953D0) whose c0-c3 were substituted: how often their c4-c7 (the

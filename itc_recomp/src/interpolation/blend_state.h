@@ -28,6 +28,14 @@ void BlendState_SetHandler(uint32_t handler);
 void BlendState_BeforeDraw(uint8_t* base, bool render_only_pass);
 void BlendState_AfterDraw(uint8_t* base);
 
+// Main thread, around a draw posed for the frame being drawn by our own code
+// (the cockpit dials, native/cockpit_dials.cpp): the products it records keep
+// their world matrices and only have their cameras blended.
+void BlendState_SetLivePose(bool live);
+// Main thread, during Draw: how far between its two ticks the frame being
+// drawn is (what its products are blended by; 1 without interpolation).
+float BlendState_Amount();
+
 // Main thread, around the per-object recorder (sub_825953D0): r4 is the
 // camera's view-projection matrix and r5 the object's world matrix.
 void BlendState_BeforeRecordObject(uint8_t* base, uint32_t view_projection, uint32_t world);

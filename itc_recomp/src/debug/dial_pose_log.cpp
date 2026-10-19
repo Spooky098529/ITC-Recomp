@@ -143,31 +143,6 @@ const char* PassType() {
 }
 }  // namespace
 
-// The cockpit dials' posing (sub_820E45A8, one caller):
-// r3 = the dash, r4 = the car. Its needles' angles come from sub_820D3688
-// unless [dash + 4] is 5.
-extern "C" REX_FUNC(sub_820E45A8) {
-  REX_FUNC_PROLOGUE();
-  if (!REXCVAR_GET(log_dial_pose).empty()) [[unlikely]] {
-    char line[256];
-    uint32_t dash = ctx.r3.u32;
-    std::snprintf(line, sizeof(line),
-                  "pass %llu %s dials dash %08X car %08X r5 %08X mode %u ranges %08X %08X "
-                  "car704 %.4f locals %016llX car at %.3f %.3f %.3f\n",
-                  (unsigned long long)frame_pacing::GameMessages_PassNumber(), PassType(), dash,
-                  ctx.r4.u32, ctx.r5.u32, guest::LoadU32(base, dash + 4),
-                  guest::LoadU32(base, dash + 5328), guest::LoadU32(base, dash + 5332),
-                  guest::LoadFloat(base, ctx.r4.u32 + 704),
-                  (unsigned long long)HashWords(base, dash + 272, 32),
-                  guest::LoadFloat(base, ctx.r4.u32 + 16 + 48),
-                  guest::LoadFloat(base, ctx.r4.u32 + 16 + 52),
-                  guest::LoadFloat(base, ctx.r4.u32 + 16 + 56));
-    debug::GetDialPoseLog().pending += line;
-    debug::GetDialPoseLog().cars.insert(ctx.r4.u32);
-  }
-  __imp__sub_820E45A8(ctx, base);
-}
-
 // A dial's angle from a car value: r3 = its range (from, to, angle from,
 // angle to), r4 = which value (car + 704, 712, 716 or 720), r5 = the car.
 extern "C" REX_FUNC(sub_820D3688) {
@@ -232,22 +207,52 @@ void debug::DialPoseLog_CarStep(uint8_t* base, uint32_t car, float before, float
   GetDialPoseLog().pending += line;
 }
 
-// The tachometer's dash (sub_820E42E8, one caller, sub_820E51D0): r3 = the
-// dash, r4 = the car. Its two needles' angles come from sub_820D3740.
-extern "C" REX_FUNC(sub_820E42E8) {
-  REX_FUNC_PROLOGUE();
-  if (debug::DialPoseLog_Enabled()) [[unlikely]] {
-    char line[160];
-    std::snprintf(line, sizeof(line), "pass %llu %s tach dash %08X car %08X table %08X",
-                  (unsigned long long)frame_pacing::GameMessages_PassNumber(), PassType(),
-                  ctx.r3.u32, ctx.r4.u32, guest::LoadU32(base, ctx.r3.u32 + 2896));
-    debug::DialPoseLog& log = debug::GetDialPoseLog();
-    log.pending += line;
-    AppendGauges(log.pending, base, ctx.r4.u32);
-    log.pending += '\n';
-    log.cars.insert(ctx.r4.u32);
-  }
-  __imp__sub_820E42E8(ctx, base);
+// The cockpit dials' posing (sub_820E45A8, one caller; hooks/cockpit_dials.cpp):
+// r3 = the dash, r4 = the car. Its needles' angles come from sub_820D3688
+// unless [dash + 4] is 5.
+void debug::DialPoseLog_Dials(uint8_t* base, uint32_t dash, uint32_t car, uint32_t r5) {
+  char line[256];
+  std::snprintf(line, sizeof(line),
+                "pass %llu %s dials dash %08X car %08X r5 %08X mode %u ranges %08X %08X "
+                "car704 %.4f locals %016llX car at %.3f %.3f %.3f\n",
+                (unsigned long long)frame_pacing::GameMessages_PassNumber(), PassType(), dash, car,
+                r5, guest::LoadU32(base, dash + 4), guest::LoadU32(base, dash + 5328),
+                guest::LoadU32(base, dash + 5332), guest::LoadFloat(base, car + 704),
+                (unsigned long long)HashWords(base, dash + 272, 32),
+                guest::LoadFloat(base, car + 16 + 48), guest::LoadFloat(base, car + 16 + 52),
+                guest::LoadFloat(base, car + 16 + 56));
+  debug::DialPoseLog& log = debug::GetDialPoseLog();
+  log.pending += line;
+  log.cars.insert(car);
+}
+
+// The tachometer's dash (sub_820E42E8, one caller, sub_820E51D0;
+// hooks/cockpit_dials.cpp): its two needles' angles come from sub_820D3740.
+void debug::DialPoseLog_Tach(uint8_t* base, uint32_t dash, uint32_t car) {
+  char line[160];
+  std::snprintf(line, sizeof(line), "pass %llu %s tach dash %08X car %08X table %08X",
+                (unsigned long long)frame_pacing::GameMessages_PassNumber(), PassType(), dash, car,
+                guest::LoadU32(base, dash + 2896));
+  debug::DialPoseLog& log = debug::GetDialPoseLog();
+  log.pending += line;
+  AppendGauges(log.pending, base, car);
+  log.pending += '\n';
+  log.cars.insert(car);
+}
+
+// A needle's angle as --native_cockpit_dials posed it, from `value`.
+void debug::DialPoseLog_NativeAngle(uint8_t* base, const char* function, uint32_t needle,
+                                    uint32_t car, float angle, float value) {
+  char line[200];
+  std::snprintf(line, sizeof(line),
+                "pass %llu %s native %s needle %u car %08X value %.4f angle %.4f",
+                (unsigned long long)frame_pacing::GameMessages_PassNumber(), PassType(), function,
+                needle, car, value, angle);
+  debug::DialPoseLog& log = debug::GetDialPoseLog();
+  log.pending += line;
+  AppendGauges(log.pending, base, car);
+  log.pending += '\n';
+  log.Flush();
 }
 
 // The tachometer's two angles: r3 = the table, r4 = the car, r5 = [dash],
