@@ -1254,6 +1254,12 @@ To be fixed (or accepted) in milestone 7.
   a texture loaded from guest memory can't draw wrong (it's loaded again
   when drawn). The resolve destinations' flag stays until a play test, as
   one freed while still sampled would draw black.
+  Play test (2026-10-19, `itc_127.log`): three races, one of 6.5 minutes;
+  the previous race's whole glow chain freed at a race load (8, at
+  14:58:05), nothing drawn wrong. In the long race, textures held grew
+  from ~98 MB to ~150 MB in its first 3-4 minutes and then levelled off
+  (150-161 MB to its end): the textures not drawn for over a minute and
+  never written over stop at ~600 (~50 MB). VRAM peaked at 511 MB.
 
 - **Resizing the window and the swapchain** on Wayland: the compositor
   leaves the size to us and never reports the swapchain out of date, so the
