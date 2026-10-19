@@ -188,6 +188,17 @@ angles, or run the game logic at a higher tick rate. See
 `docs/cockpit-dial-interpolation.md`; the functions are in
 `docs/functions.md`.
 
+Headlight beam far from the origin (merged from `headlight-flicker`,
+2026-10-19): far out (x ≈ -8,000 m), the beam lagged the car or flickered,
+as the headlight projector's depth offset, read back from its matrix,
+drifts with distance and failed the cut check's 1% (and renumbered it).
+Camera numbers and the cut check no longer use it
+(`--camera_ids_ignore_depth_offset`), and numbers stay with their camera
+address while a projection drifts (`--sticky_camera_ids`); both on.
+`--double_precision_blending` is kept off (nothing visible). The cockpit
+judder far out is the game's own (Known issues). See "The headlight beam
+far from the origin" in `docs/functions.md`.
+
 Graphics memory (merged from `memory-leak`, 2026-10-19, released in
 v0.4.6): textures were never freed,
 so graphics memory grew by ~60-130 MB a race load and ~1 MB/s while

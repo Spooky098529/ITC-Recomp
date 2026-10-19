@@ -113,9 +113,32 @@ REXCVAR_DEFINE_BOOL(log_moving_products, false, "ITC",
                     "Log moving objects drawn out of step: render-only mismatches, products not "
                     "blended or unpaired, pairings that move unlike their neighbors, and jumps "
                     "between frames");
+REXCVAR_DEFINE_BOOL(log_cockpit_judder, false, "ITC",
+                    "Log where the camera is in the frame of each part within 3 m of it (the "
+                    "cockpit) frame by frame, and its jerk (second difference): a part shaking "
+                    "against the view, every 2 s");
 REXCVAR_DEFINE_BOOL(log_pixel_outcomes, false, "ITC",
                     "Log what happened to the per-object lighting uploads (blended, unpaired, "
                     "rejected...), for moving and still objects, every 2 s");
+REXCVAR_DEFINE_BOOL(log_camera_copies, false, "ITC",
+                    "Log copies of cameras (the headlight projector's among them) left unpaired "
+                    "between ticks, what the previous tick held under the same camera address, "
+                    "and how many camera numbers exist, every 2 s");
+REXCVAR_DEFINE_BOOL(sticky_camera_ids, true, "ITC",
+                    "A camera address keeps the camera number it used while its projection stays "
+                    "within the tolerance of the last one there, so a projection that drifts "
+                    "(the headlight projector's) keeps its number instead of taking new ones and "
+                    "flipping between two, which left it unpaired, drawn at the tick");
+REXCVAR_DEFINE_BOOL(double_precision_blending, false, "ITC",
+                    "Blend an object's and its camera's positions in double precision and "
+                    "multiply with only their difference, so float rounding far from the map's "
+                    "origin (~1 mm at 10 km) doesn't make the cockpit judder against the view");
+REXCVAR_DEFINE_BOOL(camera_ids_ignore_depth_offset, true, "ITC",
+                    "Number cameras by aspect ratio and depth scale only: the depth offset, read "
+                    "back from the view-projection, drifts with the camera's distance from the "
+                    "map's origin (the headlight projector's by 1% over 7 km), which gave it new "
+                    "numbers far out (the beam lagging the car), and failed the cut check "
+                    "(the beam drawn a tick ahead); the cut check compares the rest");
 REXCVAR_DEFINE_BOOL(cache_camera_ids, true, "ITC",
                     "Remember the camera number of recently seen view-projections by their "
                     "bytes, so a repeated one skips splitting it and the table lookup (same "
@@ -512,7 +535,12 @@ bool IsSameCameraCheck(const PerspectiveCamera& a, const PerspectiveCamera& b) {
   return !IsCut(a.camera, b.camera) && close(a.x_scale, b.x_scale, 0.05f) &&
          close(a.y_scale, b.y_scale, 0.05f) && close(a.w_scale, b.w_scale, 0.01f) &&
          close(a.x_scale / a.y_scale, b.x_scale / b.y_scale, 0.01f) &&
-         close(a.depth_scale, b.depth_scale, 0.01f) && close(a.depth_offset, b.depth_offset, 0.01f);
+         close(a.depth_scale, b.depth_scale, 0.01f) &&
+         // Read back from the view-projection, the depth offset drifts with
+         // the camera's distance from the origin (square projectors' 0.0991
+         // <-> 0.1002 a tick at x ~ -8,500), which refused them as cuts.
+         (REXCVAR_GET(camera_ids_ignore_depth_offset) ||
+          close(a.depth_offset, b.depth_offset, 0.01f));
 }
 
 struct BlendStats {
@@ -532,6 +560,9 @@ struct BlendStats {
 struct ProductBlendParts {
   Matrix4 world_now, world;          // the tick's world matrix, and the blend
   std::optional<Vec3> eye_now, eye;  // the camera's position, if it was blended
+  // The blended positions in double (--double_precision_blending), for the
+  // diagnostics: the world's, and the camera's when it was blended.
+  std::array<double, 3> position_exact{}, eye_exact{};
   // Diagnostics: the product it was paired with.
   const ReplayedProduct* product = nullptr;
 };
@@ -591,6 +622,18 @@ ProductPlan PlanProduct(const ProductInputs& a, const ProductInputs& b, TickPlan
   return plan;
 }
 
+// A position blended straight, in double: rounded to float, positions ~10 km
+// from the origin step by ~1 mm, the object's and its camera's each their
+// own way, so the cockpit (half a meter from the camera) juddered by a pixel
+// against the view from frame to frame.
+std::array<double, 3> BlendPosition(const Vec3& a, const Vec3& b, float amount) {
+  std::array<double, 3> out;
+  for (int k = 0; k < 3; k++) {
+    out[k] = double(a[k]) + (double(b[k]) - double(a[k])) * double(amount);
+  }
+  return out;
+}
+
 // Render thread: each of the tick's cameras blended once a frame, for the
 // ~1,500 products a frame that share a handful of them.
 class CameraBlends {
@@ -599,6 +642,10 @@ class CameraBlends {
     uint64_t frame = 0;  // the frame it was blended for
     Matrix4 view_projection;
     Vec3 eye;
+    // The same camera moved to the origin, and its position in double
+    // (--double_precision_blending).
+    Matrix4 view_projection_at_origin;
+    std::array<double, 3> eye_exact;
   };
   void OnFrameStart() { frame_++; }
   const Blended& Get(const TickPlans& plans, int32_t index, float amount) {
@@ -610,6 +657,9 @@ class CameraBlends {
       const CameraPair& camera = plans.cameras[size_t(index)];
       PerspectiveCamera blended = Blend(camera.a, camera.b, amount);
       out = {frame_, ViewProjectionFromCamera(blended), blended.camera.position};
+      out.eye_exact = BlendPosition(camera.a.camera.position, camera.b.camera.position, amount);
+      blended.camera.position = {0, 0, 0};
+      out.view_projection_at_origin = ViewProjectionFromCamera(blended);
     }
     return out;
   }
@@ -627,7 +677,9 @@ Matrix4 BlendProduct(const ReplayedProduct& product, const TickPlans* plans,
                                        float amount, BlendStats& stats, CameraBlends& cameras,
                                        ProductBlendParts* parts = nullptr) {
   if (parts) {
-    *parts = {product.tick->now.world, product.tick->now.world, std::nullopt, std::nullopt, &product};
+    *parts = {};
+    parts->world_now = parts->world = product.tick->now.world;
+    parts->product = &product;
   }
   if (product.tick->now.live && REXCVAR_GET(log_blend_state)) [[unlikely]] {
     stats.live++;
@@ -647,14 +699,17 @@ Matrix4 BlendProduct(const ReplayedProduct& product, const TickPlans* plans,
   const ProductPlan& plan = plans->products[size_t(product.tick->plan)];
   const ProductInputs& b = product.tick->now;
   Matrix4 world = b.world;
+  std::array<double, 3> position{b.world[12], b.world[13], b.world[14]};
   std::optional<ScaledTransform> spinning;
   if (b.live) {
     // Posed for this frame already: keep it as drawn.
   } else if (plan.world == ProductPlan::World::kBlend) {
     world = WorldMatrixFromScaledTransform(Blend(plan.wa, plan.wb, amount));
+    position = BlendPosition(plan.wa.transform.position, plan.wb.transform.position, amount);
   } else if (plan.world == ProductPlan::World::kSpinning &&
              (spinning = BlendSpinning(plan.wa, plan.wb, amount, kCutAngle))) {
     world = WorldMatrixFromScaledTransform(*spinning);
+    position = BlendPosition(plan.wa.transform.position, plan.wb.transform.position, amount);
     stats.spinning++;
   } else if (plan.world_differs) {
     stats.world_not_blended++;
@@ -669,6 +724,19 @@ Matrix4 BlendProduct(const ReplayedProduct& product, const TickPlans* plans,
     if (parts) {
       parts->eye_now = plans->cameras[size_t(plan.camera)].b.camera.position;
       parts->eye = blended.eye;
+      parts->world = world;
+      parts->position_exact = position;
+      parts->eye_exact = blended.eye_exact;
+    }
+    if (REXCVAR_GET(double_precision_blending) && IsAffineRowLayout(world)) {
+      // world * view_projection = (world moved by -eye) * the camera at the
+      // origin; the difference is small, so float holds it to well under a
+      // millimeter.
+      Matrix4 relative = world;
+      for (int k = 0; k < 3; k++) {
+        relative[12 + k] = float(position[k] - blended.eye_exact[k]);
+      }
+      return Multiply(relative, blended.view_projection_at_origin);
     }
   }
   if (parts) {
@@ -688,11 +756,28 @@ Matrix4 BlendProduct(const ReplayedProduct& product, const TickPlans* plans,
 // camera); 0 for a non-perspective one. Main thread.
 class CameraIds {
  public:
-  uint64_t Of(const Matrix4& view_projection) {
+  // Aspect ratio, depth offset and depth scale over offset (aspect ratio,
+  // depth scale over w scale and 0 with --camera_ids_ignore_depth_offset).
+  using Signature = std::array<float, 3>;
+
+  // The number, and the signature it was found by (zeros for 0).
+  uint64_t Of(const Matrix4& view_projection, Signature* signature = nullptr) {
+    Signature unused;
+    Signature& out = signature ? *signature : unused;
     if (!REXCVAR_GET(cache_camera_ids)) {
-      return Compute(view_projection);
+      return Compute(view_projection, out);
     }
-    return Cached(view_projection);
+    return Cached(view_projection, out);
+  }
+  uint64_t count() const { return count_; }  // numbers given so far
+
+  static bool IsClose(const Signature& a, const Signature& b) {
+    for (int i = 0; i < 3; i++) {
+      if (!(std::abs(a[i] - b[i]) <= 0.01f * std::max({std::abs(a[i]), std::abs(b[i]), 1e-3f}))) {
+        return false;
+      }
+    }
+    return true;
   }
 
  private:
@@ -703,6 +788,7 @@ class CameraIds {
   struct CacheEntry {
     Matrix4 matrix;
     uint64_t id;
+    Signature signature;
     bool valid = false;
   };
   static uint64_t HashOf(const Matrix4& m) {
@@ -715,29 +801,41 @@ class CameraIds {
                  (words[6] * 0x94D049BB133111EBull) ^ (words[7] * 0xBF58476D1CE4E5B9ull);
     return (h ^ (h >> 31)) * 0x9E3779B97F4A7C15ull;
   }
-  uint64_t Cached(const Matrix4& view_projection) {
+  uint64_t Cached(const Matrix4& view_projection, Signature& signature) {
     // Two in five calls are for the previous call's matrix.
     if (last_ && std::memcmp(last_->matrix.data(), view_projection.data(), sizeof(Matrix4)) == 0) {
+      signature = last_->signature;
       return last_->id;
     }
     CacheEntry& entry = cache_[HashOf(view_projection) >> (64 - kCacheBits)];
     if (!entry.valid ||
         std::memcmp(entry.matrix.data(), view_projection.data(), sizeof(Matrix4)) != 0) {
       entry.matrix = view_projection;
-      entry.id = Compute(view_projection);
+      entry.id = Compute(view_projection, entry.signature);
       entry.valid = true;
     }
     last_ = &entry;
+    signature = entry.signature;
     return entry.id;
   }
 
-  uint64_t Compute(const Matrix4& view_projection) {
+  uint64_t Compute(const Matrix4& view_projection, Signature& out) {
+    out = {};
     std::optional<PerspectiveCamera> camera = SplitViewProjection(view_projection);
     if (!camera || !(camera->y_scale != 0) || !(camera->depth_offset != 0)) {
       return 0;
     }
-    Signature signature{camera->x_scale / camera->y_scale, camera->depth_offset,
+    // The depth offset is the view-projection's translation row less the
+    // depth scale times the view's: two terms that grow with the camera's
+    // distance from the origin, whose float errors left it drifting (the
+    // headlight projector's 0.1000 near the start, 0.0990 8 km out). The
+    // aspect ratio and depth scale come from the rotation part alone.
+    Signature signature =
+        REXCVAR_GET(camera_ids_ignore_depth_offset)
+            ? Signature{camera->x_scale / camera->y_scale, camera->depth_scale / camera->w_scale, 0}
+            : Signature{camera->x_scale / camera->y_scale, camera->depth_offset,
                         camera->depth_scale / camera->depth_offset};
+    out = signature;
     // Look in the signature's bucket and its neighbors, so values either
     // side of a bucket boundary still match.
     std::array<int32_t, 3> bucket = BucketOf(signature);
@@ -758,18 +856,56 @@ class CameraIds {
     }
     uint64_t id = ++count_;
     buckets_[Key(bucket)].push_back({signature, id});
+    if (REXCVAR_GET(log_camera_copies)) [[unlikely]] {
+      LogNewId(id, signature, *camera);
+    }
     return id;
   }
 
-  using Signature = std::array<float, 3>;
-  static bool IsClose(const Signature& a, const Signature& b) {
-    for (int i = 0; i < 3; i++) {
-      if (!(std::abs(a[i] - b[i]) <= 0.01f * std::max({std::abs(a[i]), std::abs(b[i]), 1e-3f}))) {
-        return false;
+  // Diagnostics (--log_camera_copies): a new number's projection, where its
+  // camera is, and the nearest number already given (by the largest relative
+  // difference of the signatures' components). At most 10 lines a second.
+  void LogNewId(uint64_t id, const Signature& signature, const PerspectiveCamera& camera) {
+    auto now = std::chrono::steady_clock::now();
+    if (now - new_id_log_start_ >= std::chrono::seconds(1)) {
+      new_id_log_start_ = now;
+      new_id_lines_ = 0;
+    }
+    if (new_id_lines_++ >= 10) {
+      return;
+    }
+    uint64_t nearest = 0;
+    float nearest_difference = 0;
+    Signature nearest_signature{};
+    for (const auto& [key, entries] : buckets_) {
+      for (const auto& [known, known_id] : entries) {
+        if (known_id == id) {
+          continue;
+        }
+        float difference = 0;
+        for (int i = 0; i < 3; i++) {
+          difference = std::max(difference, std::abs(known[i] - signature[i]) /
+                                                std::max({std::abs(known[i]),
+                                                          std::abs(signature[i]), 1e-3f}));
+        }
+        if (nearest == 0 || difference < nearest_difference) {
+          nearest = known_id;
+          nearest_difference = difference;
+          nearest_signature = known;
+        }
       }
     }
-    return true;
+    const Vec3& eye = camera.camera.position;
+    REXLOG_INFO("camera ids: new {}: signature {:.7g} {:.7g} {:.7g} (x {:.7g} y {:.7g} w {:.7g} "
+                "depth scale {:.7g} offset {:.7g}), eye {:.1f} {:.1f} {:.1f}; nearest {} at "
+                "{:.4f}: {:.7g} {:.7g} {:.7g}",
+                id, signature[0], signature[1], signature[2], camera.x_scale, camera.y_scale,
+                camera.w_scale, camera.depth_scale, camera.depth_offset, eye[0], eye[1], eye[2],
+                nearest, nearest_difference, nearest_signature[0], nearest_signature[1],
+                nearest_signature[2]);
   }
+  std::chrono::steady_clock::time_point new_id_log_start_;
+  int new_id_lines_ = 0;
   // Buckets about 1% wide, on a log scale, with the sign kept.
   static std::array<int32_t, 3> BucketOf(const Signature& s) {
     std::array<int32_t, 3> b;
@@ -924,8 +1060,14 @@ class DrawState {
     // back for their recording on render-only passes), so the address alone
     // says which camera; their projection there drifts past CameraIds'
     // tolerance between ticks, which renumbered them and left them unpaired.
-    uint64_t signature =
-        handler_ == kRaceOverlaysHandler ? 0 : camera_ids_.Of(inputs.view_projection);
+    uint64_t signature = 0;
+    if (handler_ != kRaceOverlaysHandler) {
+      CameraIds::Signature projection;
+      signature = camera_ids_.Of(inputs.view_projection, &projection);
+      if (signature != 0 && REXCVAR_GET(sticky_camera_ids)) {
+        signature = StickyCameraId(camera, signature, projection);
+      }
+    }
     // The per-object recorder's caller (0x820D0564 for cars' parts) keeps a
     // pointer to the part it draws in r31. Numbering products by order alone
     // paired a wheel with another wheel, or another car, whenever a part was
@@ -1082,6 +1224,9 @@ class DrawState {
       current_order_ = std::move(collecting_order_);
       collecting_order_.clear();
       MatchTick();
+      if (REXCVAR_GET(log_camera_copies)) [[unlikely]] {
+        LogCameraCopies();
+      }
       by_tick_ = REXCVAR_GET(publish_by_tick);
       PlanTick();
       overlay_keys_ = std::move(overlay_keys_this_tick_);
@@ -1106,6 +1251,129 @@ class DrawState {
         object_keys_ = {};
         object_keys_.last_log = now;
       }
+    }
+  }
+
+  // The camera number for a product by the camera at `address`: a number
+  // used there before whose last projection is within CameraIds' tolerance
+  // of this one, else `id`. The numbers match signatures to the first one
+  // given, so a projection that keeps changing (the headlight projector's
+  // aspect went from 2.8 to 24 over a long drive) took a new number every 1%
+  // and, near the edge between two, flipped between them from tick to tick
+  // (and between a tick and its render-only frames): unpaired every time,
+  // drawn at the tick while the car was blended (the beam lagging the car).
+  // Different cameras sharing a stack copy (main view, mirror, reflection)
+  // differ by far more, so they still get their own numbers.
+  uint64_t StickyCameraId(uint32_t address, uint64_t id, const CameraIds::Signature& projection) {
+    StickyIds& slots = sticky_ids_[(uint64_t(address) << 32) | handler_];
+    sticky_uses_++;
+    // The most recently used number whose projection is close. Preferring
+    // `id` instead flipped with it: two slots had come to follow the same
+    // drifting camera (13 and 570), and the one used changed with the
+    // global number. The other close slots follow the same camera, so
+    // they're dropped.
+    StickyIds::Slot* match = nullptr;
+    for (StickyIds::Slot& slot : slots.slots) {
+      if (slot.id != 0 && CameraIds::IsClose(slot.projection, projection) &&
+          (!match || slot.last_use > match->last_use)) {
+        match = &slot;
+      }
+    }
+    if (match) {
+      for (StickyIds::Slot& slot : slots.slots) {
+        if (&slot != match && slot.id != 0 && CameraIds::IsClose(slot.projection, projection)) {
+          slot = {};
+        }
+      }
+      match->projection = projection;
+      match->last_use = sticky_uses_;
+      camera_copies_.kept += match->id != id;
+      return match->id;
+    }
+    StickyIds::Slot* oldest = &slots.slots[0];
+    for (StickyIds::Slot& slot : slots.slots) {
+      if (slot.last_use < oldest->last_use) {
+        oldest = &slot;
+      }
+    }
+    camera_copies_.evicted += oldest->id != 0;
+    *oldest = {id, projection, sticky_uses_};
+    return id;
+  }
+  struct StickyIds {
+    struct Slot {
+      uint64_t id = 0;
+      CameraIds::Signature projection{};
+      uint64_t last_use = 0;
+    };
+    // A stack copy's address is shared by every camera drawn through it
+    // (main view, mirror, reflection, the headlight projector...); with 4,
+    // more cameras than that in a tick pushed the projector's out, and it
+    // flipped again.
+    std::array<Slot, 16> slots;
+  };
+  struct U64Hash {
+    size_t operator()(uint64_t v) const { return size_t(v * 0x9E3779B97F4A7C15ull >> 16); }
+  };
+  FlatMap<uint64_t, StickyIds, U64Hash> sticky_ids_;  // by camera address and handler
+  uint64_t sticky_uses_ = 0;
+
+  // Diagnostics (--log_camera_copies): copies of cameras (world 0) this tick
+  // left unpaired, with what the previous tick held under the same camera
+  // address and handler (another camera number, or another occurrence).
+  void LogCameraCopies() {
+    camera_copies_.ticks++;
+    for (const auto& [key, inputs] : current_tick_) {
+      if (key.world != 0) {
+        continue;
+      }
+      camera_copies_.copies++;
+      if (paired_.count(key)) {
+        continue;
+      }
+      camera_copies_.unpaired++;
+      if (camera_copies_.lines >= 40) {
+        continue;
+      }
+      camera_copies_.lines++;
+      std::string before;
+      for (const auto& [old, old_inputs] : previous_tick_) {
+        if (old.world == 0 && old.camera == key.camera && old.handler == key.handler) {
+          before += fmt::format(" [id {} occurrence {}{}]", old.signature, old.occurrence,
+                                current_tick_.count(old) ? " still here" : "");
+          // The same occurrence under another number: a cut, or the same
+          // camera changed (its eye's movement and turn, and its scales).
+          if (old.occurrence == key.occurrence && old.signature != key.signature) {
+            std::optional<PerspectiveCamera> a = SplitViewProjection(old_inputs.view_projection);
+            std::optional<PerspectiveCamera> b = SplitViewProjection(inputs.view_projection);
+            if (a && b) {
+              before += fmt::format(
+                  " (moved {:.3f} m, turned {:.3f} rad, x {:.4f}->{:.4f} y {:.4f}->{:.4f} depth "
+                  "{:.6g}->{:.6g} {:.6g}->{:.6g})",
+                  Distance(a->camera.position, b->camera.position),
+                  AngleBetween(a->camera.rotation, b->camera.rotation), a->x_scale, b->x_scale,
+                  a->y_scale, b->y_scale, a->depth_scale, b->depth_scale, a->depth_offset,
+                  b->depth_offset);
+            }
+          }
+        }
+      }
+      const Matrix4& m = inputs.view_projection;
+      REXLOG_INFO("camera copies: tick {} unpaired: camera {:08X} handler {:08X} id {} occurrence "
+                  "{}; m00 {:.5f} m11 {:.5f} m22 {:.6f} m32 {:.6f} m23 {:.4f}; before:{}",
+                  ticks_, key.camera, key.handler, key.signature, key.occurrence, m[0], m[5],
+                  m[10], m[14], m[11], before.empty() ? std::string(" none") : before);
+    }
+    auto now = std::chrono::steady_clock::now();
+    if (now - camera_copies_.last_log >= std::chrono::seconds(2)) {
+      REXLOG_INFO("camera copies: last 2 s, {} ticks, {:.1f} copies a tick, {} unpaired; {} "
+                  "camera numbers, {} products kept their address's number, {} numbers pushed "
+                  "out of an address's slots",
+                  camera_copies_.ticks, double(camera_copies_.copies) / camera_copies_.ticks,
+                  camera_copies_.unpaired, camera_ids_.count(), camera_copies_.kept,
+                  camera_copies_.evicted);
+      camera_copies_ = {};
+      camera_copies_.last_log = now;
     }
   }
 
@@ -1834,6 +2102,10 @@ class DrawState {
                 tick->view_projection == now.view_projection ? "same" : "differs");
   }
   CameraIds camera_ids_;
+  struct {
+    int ticks = 0, copies = 0, unpaired = 0, lines = 0, kept = 0, evicted = 0;
+    std::chrono::steady_clock::time_point last_log;
+  } camera_copies_;  // --log_camera_copies
 
   struct Output {
     ProductKey key;
@@ -2080,6 +2352,156 @@ MovingProductsLog& GetMovingProductsLog() {
   return log;
 }
 
+// Diagnostics on the render thread (--log_cockpit_judder): for each part
+// drawn within 3 m of its camera (the cockpit in the cockpit view), the
+// camera's position in the part's own frame. Head motion moves it smoothly;
+// a part and camera blended out of step make it jerk from frame to frame.
+class CockpitJudderLog {
+ public:
+  // `world` as drawn; `offset` the camera's position less the world's, in
+  // double where they were blended so (as drawn, --double_precision_blending).
+  // `world_now` and `tick_offset`: the same from the tick's own inputs.
+  void OnProduct(const ReplayedProduct& product, const Matrix4& world,
+                 const std::array<double, 3>& offset, const Matrix4& world_now,
+                 const std::optional<std::array<double, 3>>& tick_offset, bool camera_blended,
+                 bool camera_rejected, bool world_blended) {
+    if (std::sqrt(offset[0] * offset[0] + offset[1] * offset[1] + offset[2] * offset[2]) > 3.0) {
+      return;
+    }
+    Vec3 local = Local(world, offset);
+    Sample sample{local, camera_blended, camera_rejected, world_blended};
+    uint64_t identity = product.tick->identity;
+    if (tick_offset) {
+      TickSamples& ticks = ticks_[identity];
+      if (ticks.tick != tick_) {
+        ticks.before = ticks.last;
+        ticks.last = ticks.now;
+        ticks.now = Local(world_now, *tick_offset);
+        ticks.count++;
+        ticks.tick = tick_;
+        if (ticks.count >= 3) {
+          float jerk = 0;
+          for (int i = 0; i < 3; i++) {
+            jerk = std::max(jerk, std::abs(ticks.now[i] - 2 * ticks.last[i] + ticks.before[i]));
+          }
+          tick_jerk_sum_ += jerk;
+          tick_jerk_count_++;
+          tick_max_jerk_ = std::max(tick_max_jerk_, jerk);
+          if (jerk > 0.002f && tick_lines_ < 6) {
+            tick_lines_++;
+            REXLOG_INFO("cockpit judder: tick {}: id {:016X} the tick's own eye in part {:.4f} "
+                        "{:.4f} {:.4f} (ticks before {:.4f} {:.4f} {:.4f}, {:.4f} {:.4f} {:.4f}), "
+                        "jerk {:.4f} m",
+                        tick_, identity, ticks.now[0], ticks.now[1], ticks.now[2],
+                        ticks.last[0], ticks.last[1], ticks.last[2], ticks.before[0],
+                        ticks.before[1], ticks.before[2], jerk);
+          }
+        }
+      }
+    }
+    auto& history = now_[identity];
+    history = sample;
+    auto last = last_.find(identity);
+    auto before = before_.find(identity);
+    parts_++;
+    camera_unblended_ += !camera_blended;
+    camera_rejected_ += camera_rejected;
+    world_unblended_ += !world_blended;
+    if (last == last_.end() || before == before_.end()) {
+      return;
+    }
+    float jerk = 0;
+    for (int i = 0; i < 3; i++) {
+      jerk = std::max(jerk, std::abs(local[i] - 2 * last->second.local[i] +
+                                     before->second.local[i]));
+    }
+    jerk_sum_ += jerk;
+    jerk_count_++;
+    max_jerk_ = std::max(max_jerk_, jerk);
+    if (jerk > 0.002f && lines_ < 12) {
+      lines_++;
+      REXLOG_INFO("cockpit judder: tick {} amount {:.3f}: id {:016X} jerk {:.4f} m, eye in part "
+                  "{:.4f} {:.4f} {:.4f} (last {:.4f} {:.4f} {:.4f}, before {:.4f} {:.4f} "
+                  "{:.4f}); camera {} (last {}), world {} (last {}); part at {:.1f} {:.1f} "
+                  "{:.1f}",
+                  tick_, amount_, identity, jerk, local[0], local[1], local[2],
+                  last->second.local[0], last->second.local[1], last->second.local[2],
+                  before->second.local[0], before->second.local[1], before->second.local[2],
+                  sample.camera_rejected ? "rejected" : sample.camera_blended ? "blended" : "not",
+                  last->second.camera_rejected  ? "rejected"
+                  : last->second.camera_blended ? "blended"
+                                                : "not",
+                  sample.world_blended ? "blended" : "not",
+                  last->second.world_blended ? "blended" : "not", world[12], world[13],
+                  world[14]);
+    }
+  }
+
+  // Row vectors: world = local * R; rows 0-2 are the part's axes (scaled).
+  static Vec3 Local(const Matrix4& world, const std::array<double, 3>& d) {
+    Vec3 local;
+    for (int i = 0; i < 3; i++) {
+      double x = world[i * 4], y = world[i * 4 + 1], z = world[i * 4 + 2];
+      double length2 = x * x + y * y + z * z;
+      local[i] = length2 > 0 ? float((d[0] * x + d[1] * y + d[2] * z) / length2) : 0;
+    }
+    return local;
+  }
+
+  void OnFrameStart(uint64_t tick, float amount) {
+    before_ = std::move(last_);
+    last_ = std::move(now_);
+    now_.clear();
+    tick_ = tick;
+    amount_ = amount;
+    frames_++;
+    auto now = std::chrono::steady_clock::now();
+    if (now - last_log_ >= std::chrono::seconds(2)) {
+      REXLOG_INFO("cockpit judder: last 2 s, {} frames, {:.1f} parts within 3 m a frame ({} "
+                  "camera not blended, {} rejected, {} world not blended); jerk mean {:.5f} max "
+                  "{:.5f} m as drawn; the ticks' own: mean {:.5f} max {:.5f} m",
+                  frames_, double(parts_) / std::max(frames_, 1), camera_unblended_,
+                  camera_rejected_, world_unblended_, jerk_sum_ / std::max(jerk_count_, 1),
+                  max_jerk_, tick_jerk_sum_ / std::max(tick_jerk_count_, 1), tick_max_jerk_);
+      last_log_ = now;
+      frames_ = parts_ = camera_unblended_ = camera_rejected_ = world_unblended_ = jerk_count_ =
+          lines_ = tick_jerk_count_ = tick_lines_ = 0;
+      jerk_sum_ = max_jerk_ = tick_jerk_sum_ = tick_max_jerk_ = 0;
+      if (ticks_.size() > 4096) {
+        ticks_.clear();
+      }
+    }
+  }
+
+ private:
+  struct Sample {
+    Vec3 local;
+    bool camera_blended, camera_rejected, world_blended;
+  };
+  std::unordered_map<uint64_t, Sample> now_, last_, before_;
+  struct TickSamples {
+    uint64_t tick = 0;
+    int count = 0;
+    Vec3 now{}, last{}, before{};
+  };
+  std::unordered_map<uint64_t, TickSamples> ticks_;
+  int tick_jerk_count_ = 0, tick_lines_ = 0;
+  double tick_jerk_sum_ = 0;
+  float tick_max_jerk_ = 0;
+  uint64_t tick_ = 0;
+  float amount_ = 0;
+  int frames_ = 0, parts_ = 0, camera_unblended_ = 0, camera_rejected_ = 0, world_unblended_ = 0;
+  int jerk_count_ = 0, lines_ = 0;
+  double jerk_sum_ = 0;
+  float max_jerk_ = 0;
+  std::chrono::steady_clock::time_point last_log_ = std::chrono::steady_clock::now();
+};
+
+CockpitJudderLog& GetCockpitJudderLog() {
+  static CockpitJudderLog log;
+  return log;
+}
+
 class ReplayCameras {
  public:
   void OnFrameStart() {
@@ -2101,6 +2523,9 @@ class ReplayCameras {
     }
     if (REXCVAR_GET(log_moving_products) && frame_) {
       GetMovingProductsLog().OnFrameStart(frame_->tick, frame_->amount);
+    }
+    if (REXCVAR_GET(log_cockpit_judder) && frame_) [[unlikely]] {
+      GetCockpitJudderLog().OnFrameStart(frame_->tick, frame_->amount);
     }
   }
 
@@ -2222,6 +2647,9 @@ class ReplayCameras {
                             : Outcome::kBlended;
       GetMovingProductsLog().OnProduct(payload, *product, last_parts_.world, outcome);
     }
+    if (REXCVAR_GET(log_cockpit_judder)) [[unlikely]] {
+      LogCockpitJudder(*product, before);
+    }
     if (REXCVAR_GET(log_overlay_products) && product->tick->handler == kRaceOverlaysHandler) {
       LogOverlay(payload, *product, result);
     }
@@ -2229,6 +2657,40 @@ class ReplayCameras {
   }
 
  private:
+  [[gnu::noinline]] void LogCockpitJudder(const ReplayedProduct& product,
+                                          const BlendStats& before) {
+    const Matrix4& world = last_parts_.world;
+    const Matrix4& world_now = last_parts_.world_now;
+    std::array<double, 3> offset;
+    if (last_parts_.eye) {
+      for (int k = 0; k < 3; k++) {
+        offset[k] = REXCVAR_GET(double_precision_blending)
+                        ? last_parts_.eye_exact[k] - last_parts_.position_exact[k]
+                        : double((*last_parts_.eye)[k]) - double(world[12 + k]);
+      }
+    } else {
+      std::optional<PerspectiveCamera> camera = SplitViewProjection(product.tick->now.view_projection);
+      if (!camera) {
+        return;
+      }
+      for (int k = 0; k < 3; k++) {
+        offset[k] = double(camera->camera.position[k]) - double(world[12 + k]);
+      }
+    }
+    std::optional<std::array<double, 3>> tick_offset;
+    if (last_parts_.eye_now) {
+      tick_offset.emplace();
+      for (int k = 0; k < 3; k++) {
+        (*tick_offset)[k] = double((*last_parts_.eye_now)[k]) - double(world_now[12 + k]);
+      }
+    }
+    bool unpaired = stats_.blend.unpaired != before.unpaired;
+    bool rejected = stats_.blend.camera_not_blended != before.camera_not_blended;
+    bool world_blended = !unpaired && stats_.blend.world_not_blended == before.world_not_blended;
+    GetCockpitJudderLog().OnProduct(product, world, offset, world_now, tick_offset,
+                                    last_parts_.eye.has_value(), rejected, world_blended);
+  }
+
   void LogStats() {
     if (!REXCVAR_GET(log_blend_state)) {
       return;
