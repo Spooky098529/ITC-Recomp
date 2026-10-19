@@ -648,3 +648,65 @@ written when the call returns, so after the lines of what it called).
   steps once a pass, so its values match.
 - In this drive the tachometer moved up to 0.60 rad a tick (8 ticks over
   0.3), over 1.35-3.27 rad; the speedometer at most 0.054 rad.
+
+## Native dials (`--native_cockpit_dials`, 2026-10-19, on by default)
+
+The plan agreed with the user: let the dials' own logic run every frame
+instead of blending their matrices, starting with the needles stepping
+once a tick (the tick's gauge values, as on the 360); if that looks bad,
+blend the values in the native code.
+
+`src/hooks/cockpit_dials.cpp` replaces `sub_820E42E8` (the tachometer and
+speedometer) and `sub_820E45A8` (the dash's seven needle slots, the turbo
+gauge in mode 5) natively, on every pass:
+
+- **What the game does** (now worked out in full):
+  - each needle's world matrix is `(B * RotZ(angle)) * A * car world`, A and
+    B its local matrices (dash + 32 + 240k and + 64 from it; for
+    `sub_820E42E8`, dash + 32/96 and 272/336);
+  - `sub_8209BD50(out, a, b)` is `out = a * b`, rows dotted with columns
+    (`vmsum4fp128`);
+  - `sub_820A0AC0` is a matrix copy;
+  - `sub_820A2D30(out, in, &angle)` is `out = in * RotZ`, rows
+    `(c, s, 0, 0)`, `(-s, c, 0, 0)`, with a polynomial sine and cosine;
+  - `sub_820D06F0(part, camera, world, 0, 0)` draws the part (to
+    `sub_820D04E8`) if `[part + 4]` is set.
+
+  `sub_820E45A8`'s needle k is drawn if `[[dash] + 8 + 12k]` and its model
+  (`[dash + 1700]`, `1940`, `2660`, `2900`, `3620`, `3860`, `4100`) are set;
+  `[dash + 5296 + 4k]` (k = 1 in mode 5: `5324`) goes into the model + 48;
+  its angle is `sub_820D3688([dash + 5328 + 4k], [[dash] + 12 + 12k], car)`;
+  the parts drawn are dash + 2176, 2416, 3136, 3376, 4336, 4576, 4816.
+  Mode 5's angle from car + 704: above 0, `[25312]` times it, capped at
+  `[25312]` above 1; else `[25296]` below the double at `25304`, or
+  `v * [25292] * [25296]` (constants at 0x82000000 + offset).
+  `sub_820D3688`'s middle piece is `(v - from) / (to - from) * (aT - aF)`,
+  without `+ aF` (the game's own).
+- **Inputs:** on a logic pass, the gauge values (car + 696, 700, 704, 712,
+  716, 720) are read when posing, and kept with the car's world matrix
+  (car + 16, also kept from the logic pass before). On render-only passes the
+  kept values are used, so the needles step once a tick, and the turbo's
+  1.0 no longer matters to them. The car's world is blended between its last two ticks
+  by the frame's amount (`BlendState_Amount()`, what the frame's products are
+  blended by: `TickProgress()` reads the clock, so it changes within a pass),
+  as `ScaledTransform`s, with `blend_state.cpp`'s 8 m cut.
+- **Drawing:** the world matrix goes where the original put it (the
+  original's stack frame + 160, so products pair across passes as before),
+  with `lr` the original's return address, around
+  `BlendState_SetLivePose(true)`. The recorder's multiply then marks its
+  product `live` (`ProductInputs::live`): `Note` pairs it by key without
+  comparing world matrices, `Publish` gives a render-only pass's live
+  product a copy of the tick's with the world matrix as drawn, and
+  `BlendProduct` keeps that world and blends only the camera. Logic
+  passes' frames are posed the same way (at their own amount).
+- **Check:** `--check_native_cockpit_dials` runs the translated angle maps,
+  rotation and multiplies on logic passes for the same inputs. Attract
+  race: angles exact, poses within 1.2e-4 (a float step at the car's
+  ~2,000 m coordinates). The attract dash (mode 7) draws only
+  `sub_820E42E8`'s two needles; `sub_820E45A8`'s needles have no models
+  there.
+- `--log_dial_pose` logs `native` lines (needle, value, angle) instead of
+  the translated angle calls, which no longer run.
+
+`--per_tick_car_gauges` is still on: the dials no longer need it, but
+anything else reading car + 704 on render-only passes still does.
