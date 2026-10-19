@@ -49,7 +49,7 @@ function per item. The exceptions are marked with their item size.
 | 0, 36, 37 | `sub_82304258` | | Nothing (returns arg1). 36 ends a chain. | |
 | 1 | `sub_8258FBD0` | 16 | **SetRenderState**: [state, value]. Calls the device's setter for the state at device + state + 56 (the Xbox 360 Direct3D keeps a setter per render state). | per-state setter |
 | 2 | `sub_8258FC30` | 16 | **SetSamplerState**: [sampler, state, value]. Setter at device + state + 440. | per-state setter |
-| 3 | `sub_8258FC90` | 16 | **SetBlendState**: [render target, blend control]. Writes the register shadow for RB_BLENDCONTROL0 (`0x2201`) for target 0, or `0x2201` + 7 + target (`0x2209`-`0x220B`, RB_BLENDCONTROL1-3) for the others. The value is the register's: `0x00010001` = colour and alpha source ONE, destination ZERO. | `sub_822A3B30` |
+| 3 | `sub_8258FC90` | 16 | **SetBlendState**: [render target, blend control]. Writes the register shadow for RB_BLENDCONTROL0 (`0x2201`) for target 0, or `0x2201` + 7 + target (`0x2209`-`0x220B`, RB_BLENDCONTROL1-3) for the others. The value is the register's: `0x00010001` = color and alpha source ONE, destination ZERO. | `sub_822A3B30` |
 | 4 | `sub_8258FCE0` | 16 | **SetTexture**: [sampler, texture]. Merges the texture's fetch constant (+28..+48) into the fetch constant shadow at device + 1024 + 24 × sampler (see "Resources"), and fences the texture it replaces. | `sub_822A6008` |
 | 5 | `sub_8258E9F8` | arg1 × 24 bytes | Inline vertex data for the helper object (below): stores payload and count at state +12, +16. | |
 | 6 | `sub_8258EA20` | arg1 × 2 or 4 bytes | Inline index data for the helper object: payload, count, 32-bit flag (arg2) at state +20, +24, +28. | |
@@ -68,10 +68,10 @@ function per item. The exceptions are marked with their item size.
 | 20 | `sub_825903D8` | 16 | Unknown: [object], skipped if null. | `sub_822A67B0` |
 | 21 | `sub_8258EAD0` | arg1 bytes | Skips arg1 bytes of payload (inline data or padding). | |
 | 22 | `sub_82591798` | 16 | Unknown: [object, flag]. Asks the object (vtable 2); if not ready and flag = 1, calls vtable 1, `sub_82591540` (with `0x8296BD8C`), vtable 3. | `sub_82591540` |
-| 23 | `sub_82590428` | 16 | **SetRenderTarget**: [index, surface]. Stores the surface at device +12184 + 4 × index and its colour info (+28) in the RB_COLOR_INFO shadow (target 0: `0x2001`; 1-3: `0x2003`-`0x2005`); target 0 also sets the surface info and a full viewport (`sub_822A3C88`). | `sub_822A4340` → `sub_822A3D30` |
+| 23 | `sub_82590428` | 16 | **SetRenderTarget**: [index, surface]. Stores the surface at device +12184 + 4 × index and its color info (+28) in the RB_COLOR_INFO shadow (target 0: `0x2001`; 1-3: `0x2003`-`0x2005`); target 0 also sets the surface info and a full viewport (`sub_822A3C88`). | `sub_822A4340` → `sub_822A3D30` |
 | 24 | `sub_82590478` | 16 | **SetDepthStencilSurface**: [surface]. Stores it at device +12200; its +28 goes to RB_DEPTH_INFO (`0x2002`), +32 to the HiZ control. | `sub_822A4060` |
-| 25 | `sub_825904C8` | 68 | **Resolve** (EDRAM to texture): flags, and by bit, source rect, destination texture, destination point, clear colour (4 bytes → floats), parameters; also level, slice, clear Z, stencil. | `sub_822AFA58` |
-| 26 | `sub_82590620` | 280 | **Clear**: [count, rects (if count), flags, colour, Z, stencil]. | `sub_822A04F8` |
+| 25 | `sub_825904C8` | 68 | **Resolve** (EDRAM to texture): flags, and by bit, source rect, destination texture, destination point, clear color (4 bytes → floats), parameters; also level, slice, clear Z, stencil. | `sub_822AFA58` |
+| 26 | `sub_82590620` | 280 | **Clear**: [count, rects (if count), flags, color, Z, stencil]. | `sub_822A04F8` |
 | 27 | `sub_82590698` | 32 | **DrawIndexedPrimitiveUP**: Begin, `memcpy` the indices (2 or 4 bytes each) and vertices, End. | `sub_825BDDC0`, `sub_825A7410`, `sub_825BDDA0` |
 | 28 | `sub_8258EAE0` | 16 | Callback: [object]; calls its vtable slot 0 with the device. | |
 | 29 | `sub_82590768` | 4 | Sets render targets 0-3 (bits 0-3) and depth (bit 7) from the saved set at `0x82970BC0`. | `sub_822A4340`, `sub_822A4060` |
@@ -227,9 +227,9 @@ the value differed from the previous one (capped at 1000).
 | 200 | `sub_822A3D20` | +11600, then reapplies the scissor rect | Scissor enable | 186,753 | always 0 |
 | 204 | `sub_822A1CF0` | Polygon offset scale (+10704, +10712, value × a constant) and PA_SU_SC_MODE_CNTL bits 11-12 | Slope-scaled depth bias | 9,588 | changes |
 | 208 | `sub_822A1DB8` | Polygon offset (+10708, +10716) and the same enables | Depth bias | 18,648 | changes |
-| 212 | `sub_822A1EB0` | +10332 bits 0-3, only with render target 0 bound | Colour write mask | 23,970 | changes |
+| 212 | `sub_822A1EB0` | +10332 bits 0-3, only with render target 0 bound | Color write mask | 23,970 | changes |
 | 304 | `sub_822A2430` | PA_CL_VTE_CNTL (+10444) | Viewport transform enable | 34,236 | changes |
-| 308-320 | `sub_822A2480`, `sub_822A2530`, `sub_822A25E0`, `sub_822A2690` | Per render target 0-3 (surface at device +12184.., value kept at +11772..): switches the bound surface's colour format between 2_10_10_10 (2) and 2_10_10_10_AS_10_10_10_10 (10), or 2_10_10_10_FLOAT (3) and 2_10_10_10_FLOAT_AS_16_16_16_16 (12), and updates RB_COLOR*_INFO | High-precision blend, per target | 89,328 each | changes |
+| 308-320 | `sub_822A2480`, `sub_822A2530`, `sub_822A25E0`, `sub_822A2690` | Per render target 0-3 (surface at device +12184.., value kept at +11772..): switches the bound surface's color format between 2_10_10_10 (2) and 2_10_10_10_AS_10_10_10_10 (10), or 2_10_10_10_FLOAT (3) and 2_10_10_10_FLOAT_AS_16_16_16_16 (12), and updates RB_COLOR*_INFO | High-precision blend, per target | 89,328 each | changes |
 | 324 | `sub_822A27E8` | +10560 bit 0 | Unknown | 14,193 | changes |
 | 328 | `sub_822A2820` | PA_SU_SC_MODE_CNTL bit 21 (MULTI_PRIM_IB_ENA) | Primitive reset enable | 2,397 | always 1 |
 | 332 | `sub_822A2850` | +10328 | Primitive reset index | 2,397 | always `0xFFFF` |
@@ -248,7 +248,7 @@ Sampler states write the sampler's texture fetch constant in the shadow
 | 36 | `sub_822A2E70` | Word 3 bits 25-27 via a table at `0x82013628`, when anisotropic filtering is on; kept per sampler at +11668 | Max anisotropy | 102,775 |
 
 So samplers map straight onto the GPU's fetch constant fields, and render
-states onto a few registers (depth, blend, colour control, setup).
+states onto a few registers (depth, blend, color control, setup).
 
 ## Resources
 
@@ -297,7 +297,7 @@ unbind, so the library knows when the GPU is done with it.
   | Program control words (draw) | +592 + *(+612): words 0, 1 → device +10400, +10404 | +56 + *(+76): ORed into the same |
   | Vertex declaration bound for | +24 (declaration id), +32/+40 (stream masks) | |
 
-  The program control words are SQ_PROGRAM_CNTL and its neighbours; the
+  The program control words are SQ_PROGRAM_CNTL and its neighbors; the
   vertex and pixel halves are combined at draw time.
 - **Vertex declaration** (device +11552): type 5; +24 is likely the
   element count (1-7 seen) and +28 the stream count; the id at +48 is 0
@@ -449,7 +449,7 @@ from the pass's shape, not checked by hiding it.
 
 About 24-26 resolves a frame, matching the counts. Findings:
 
-- **The main view's format changes per draw**: the trace shows its colour
+- **The main view's format changes per draw**: the trace shows its color
   format as 12 (2_10_10_10_FLOAT_AS_16_16_16_16), as bound, but draws
   switch it with render states 308-320: in an attract-mode race, 747,509
   of its indexed draws went to format 3 (2_10_10_10_FLOAT) and 29,733 to
@@ -458,7 +458,7 @@ About 24-26 resolves a frame, matching the counts. Findings:
 - **The 3D view renders at 1024x576 with 2x MSAA**, not 1280x720: its
   surface pitch is 1040 (1024 rounded up to whole EDRAM tiles of 80
   pixels), its resolves copy 1024x576, and its depth starts at tile 936 =
-  13 tiles across x 72 rows (576 lines x 2 samples / 16). In 7e3 colour
+  13 tiles across x 72 rows (576 lines x 2 samples / 16). In 7e3 color
   plus depth that's 9.4 MB of the 10 MB EDRAM. The viewport is still given
   as 1280x720; how it maps to 1024x576 isn't known yet.
 - The menus resolve their own 1280x720 frame (54 format) the same way.
@@ -476,15 +476,15 @@ words are big-endian.
 - **23 SetRenderTarget**, 16 bytes an item: +0 index (0-3), +4 surface.
 - **24 SetDepthStencil**, 16 bytes: +0 surface (0 = none).
 - **25 Resolve**, 68 bytes: +0 which optional fields are present (bit 0
-  rect, bit 1 destination, bit 2 point, bit 3 clear colour); +4 flags;
+  rect, bit 1 destination, bit 2 point, bit 3 clear color); +4 flags;
   +8 source rect (4 words: left, top, right, bottom); +24 destination
   texture object (its fetch constant at +28..+48, so the base address is
   the one later draws sample it by); +28 destination point (2 words); +36
-  level; +40 slice; +44 clear colour; +48 clear Z; +52 clear stencil. The
+  level; +40 slice; +44 clear color; +48 clear Z; +52 clear stencil. The
   resolve copies from the bound render target (or the depth surface: the
   `24_8_FLOAT` resolves of depth-only passes).
 - **26 Clear**, 280 bytes: +4 rect count (rects follow, if any), +8
-  flags, +268 colour, +272 Z, +276 stencil.
+  flags, +268 color, +272 Z, +276 stencil.
 - **29**: +0 mask (bits 0-3 render targets, bit 7 depth).
 - **30 SetViewport**: words as the frame trace prints them (x, y, width,
   height, then Z range).
@@ -498,14 +498,14 @@ menus use the XDK's predicated tiling: the GPU replays the commands once
 per tile.
 
 - **Command 32**, BeginTiling (`sub_825BED08(device, flags, count, rects,
-  clear colour, Z, stencil)`): item +0 flags (0 seen), +4 tile count, +8
-  the tiles' rectangles (16 bytes each). The handler passes a clear colour
+  clear color, Z, stencil)`): item +0 flags (0 seen), +4 tile count, +8
+  the tiles' rectangles (16 bytes each). The handler passes a clear color
   (4 floats) and Z all equal to the float at `0x82000A34` (0 seen), stencil
   0. Seen: 3 tiles, `0,0-1280,256`, `0,256-1280,512`, `0,512-1280,720`.
   The library keeps the count at device +12488 and the rectangles at
   +12492.
 - **Command 33**, EndTiling (`sub_825BF200(device, flags, no rects,
-  destination, clear colour, ...)`): item +0 flags (`0x303` seen), +4 the
+  destination, clear color, ...)`): item +0 flags (`0x303` seen), +4 the
   destination texture. For each tile it calls Resolve (from `0x825BF348`,
   and `0x825BF378` for the last) with the tile's rectangle as source and
   its top-left as the destination point; on every tile but the last it

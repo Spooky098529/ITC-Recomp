@@ -43,7 +43,7 @@ struct ScaledTransform {
   Transform transform;
   Vec3 scale{1, 1, 1};
 };
-// Returns nothing unless column 3 is (0, 0, 0, 1) and the rows, normalised,
+// Returns nothing unless column 3 is (0, 0, 0, 1) and the rows, normalized,
 // form a rotation.
 std::optional<ScaledTransform> ScaledTransformFromWorldMatrix(const Matrix4& m);
 Matrix4 WorldMatrixFromScaledTransform(const ScaledTransform& t);
@@ -71,7 +71,7 @@ struct RigidMotion {
   bool applied_first;  // b = D * a (true) or b = a * D
   bool column_layout;  // D's translation is in column 3 rather than row 3
   // The point D's rotation is blended about: the camera's eye for a
-  // perspective matrix. Blending a turn about the world origin (kilometres
+  // perspective matrix. Blending a turn about the world origin (kilometers
   // away) would swing the in-between camera sideways.
   std::optional<Vec3> pivot;
 };

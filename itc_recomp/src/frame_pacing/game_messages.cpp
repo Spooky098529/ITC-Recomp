@@ -5,6 +5,7 @@
 #include "debug/menu_selection_scan.h"
 #include "guest.h"
 #include "interpolation/blend_state.h"
+#include "native/textures.h"
 
 #include <rex/cvar.h>
 #include <rex/logging.h>
@@ -20,6 +21,9 @@
 #include <tuple>
 #include <thread>
 
+REXCVAR_DEFINE_BOOL(log_race_changes, false, "ITC",
+                    "Log when the game enters and leaves a race (the race's draw step starts or "
+                    "stops running)");
 REXCVAR_DEFINE_BOOL(log_game_messages, false, "ITC",
                     "Log game messages delivered and skipped, once a second");
 REXCVAR_DEFINE_STRING(render_only_update_handlers, "", "ITC",
@@ -453,6 +457,14 @@ void DispatchMessages(PPCContext& ctx, uint8_t* base, uint32_t dispatcher) {
 void GameMessages_OnPassFinished() {
   if (!g_render_only_pass) {
     // The pass that just ran was a logic pass: it decides whether we're in a race.
+    if (g_in_race != g_race_draw_step_seen) {
+      if (REXCVAR_GET(log_race_changes)) {
+        REXLOG_INFO("game messages: {} a race", g_race_draw_step_seen ? "entered" : "left");
+      }
+      if (!g_race_draw_step_seen) {
+        native::TextureCache_RaceLeft();
+      }
+    }
     g_in_race = g_race_draw_step_seen;
     g_race_draw_step_seen = false;
   }

@@ -44,7 +44,8 @@ date as you learn things.
 - Push work branches to `origin` (github.com/Spooky098529/ITC-Recomp) after
   each commit. Ask before pushing to `main` or pushing tags.
 - No `-march=native`.
-- US English spelling is fine.
+- Use American English only (spelling and wording) in replies, code,
+  comments, docs and commit messages.
 - Find problems with logs, not guesses: add logging, have the user run the
   game, read the log, then fix what it shows. Guessing at causes cost many
   runs on the marker above opponents (see "World-space sprites").
@@ -99,7 +100,7 @@ find /dev/shm -maxdepth 1 -user "$USER" -name 'xenia_memory_*' -delete
   run under `timeout`, read the log, and look at frames with the
   renderer's dump (`--native_renderer_dump=<dir>`, 10 s into a race or
   when `<dir>/now` appears). The attract mode puts a random sepia or
-  greyscale filter over the screen: a grey or brown frame from an attract
+  grayscale filter over the screen: a gray or brown frame from an attract
   race is the game's, not a rendering bug. Never screenshot the user's desktop. Without the GPU plugin, `--skip_intro` sometimes
   stalls the boot (no "called from 8248466C" in the log): restart it.
 - Run the game in the background. The user plays: they start a race, drive
@@ -183,6 +184,19 @@ angles, or run the game logic at a higher tick rate. See
 `docs/cockpit-dial-interpolation.md`; the functions are in
 `docs/functions.md`.
 
+Graphics memory (`memory-leak`, 2026-10-19): textures were never freed,
+so graphics memory grew by ~60-130 MB a race load and ~1 MB/s while
+driving (seen on the Steam Deck, 1 GB of VRAM). Now textures loaded from
+guest memory are freed when a race ends (`TextureCache_RaceLeft`, from
+`GameMessages_OnPassFinished`) and when the game loads a new one over
+their memory after writing there (its texture streaming), and a resolve
+destination when a new one is made over its memory at another address
+(the race's glow chain, made again per race); all destroyed after the
+frames in flight. No flags (measured free: 486.0 against 486.4 fps).
+VRAM peaks at ~380-510 MB instead of growing without end; a 6.5-minute
+race levels off at ~155 MB of textures. `--log_gpu_memory` logs what the
+renderer holds. See "Textures are never freed" in `docs/native-renderer.md`.
+
 Xbox 360 gamma (merged from `xbox-gamma`, 2026-10-16; released in v0.4.3):
 `--xbox_gamma=off|hdtv|power`, off by default (`run.sh` passes `off` and
 lists the choices). The display gamma tables the game writes at boot,
@@ -218,7 +232,7 @@ checked draw by draw (opt-in, on in `run.sh`; "Hypothesis to test: the
 mirrors updated once a tick"). All released in v0.3.8: ~430 fps uncapped
 in an attract race with `run.sh`'s flags (2026-10-15). Translated shaders and pipelines are kept on disk (`cache/` next to
 the executable), and textures are reloaded when the game's memcpy writes
-them instead of being hashed (`docs/texture-handling-optimisation.md`);
+them instead of being hashed (`docs/texture-handling-optimization.md`);
 merged from `perf-debug` for Steam Deck hitches. Its known issues (boot movie, gamma, textures, window resizing,
 remaining packet writers, speed) are milestone 7 in
 `docs/native-renderer.md`.

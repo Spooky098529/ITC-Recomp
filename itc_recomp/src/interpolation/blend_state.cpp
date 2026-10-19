@@ -111,7 +111,7 @@ REXCVAR_DEFINE_BOOL(pair_by_object, true, "ITC",
                     "doesn't pair a wheel with another wheel or car");
 REXCVAR_DEFINE_BOOL(log_moving_products, false, "ITC",
                     "Log moving objects drawn out of step: render-only mismatches, products not "
-                    "blended or unpaired, pairings that move unlike their neighbours, and jumps "
+                    "blended or unpaired, pairings that move unlike their neighbors, and jumps "
                     "between frames");
 REXCVAR_DEFINE_BOOL(log_pixel_outcomes, false, "ITC",
                     "Log what happened to the per-object lighting uploads (blended, unpaired, "
@@ -142,7 +142,7 @@ constexpr uint32_t kLookAtOffsets[] = {0x190, 0x1A0, 0x1B0};
 
 // Moving further than this in one tick is a cut (a camera switch, a reset):
 // drawn without blending.
-constexpr float kCutDistance = 8.0f;  // metres
+constexpr float kCutDistance = 8.0f;  // meters
 constexpr float kCutAngle = 0.5f;     // radians, ~30 degrees
 
 // Whether a matrix's 16 words at address are all on one side of 0xE0000000,
@@ -738,7 +738,7 @@ class CameraIds {
     }
     Signature signature{camera->x_scale / camera->y_scale, camera->depth_offset,
                         camera->depth_scale / camera->depth_offset};
-    // Look in the signature's bucket and its neighbours, so values either
+    // Look in the signature's bucket and its neighbors, so values either
     // side of a bucket boundary still match.
     std::array<int32_t, 3> bucket = BucketOf(signature);
     for (int d0 = -1; d0 <= 1; d0++) {
@@ -1934,7 +1934,7 @@ class MovingProductsLog {
     if (now - last_log_ >= std::chrono::seconds(2)) {
       if (frames_ > 0) {
         REXLOG_INFO("moving: last 2 s, {} frames, {:.1f} moving products a frame; {} not "
-                    "blended, {} unpaired near moving, {} unlike their neighbours, {} jumps",
+                    "blended, {} unpaired near moving, {} unlike their neighbors, {} jumps",
                     frames_, double(moving_) / frames_, not_blended_, unpaired_, unlike_, jumps_);
       }
       last_log_ = now;
@@ -2044,22 +2044,22 @@ class MovingProductsLog {
     for (const Record* r : moving) {
       Vec3 d = {r->now[0] - (*r->before)[0], r->now[1] - (*r->before)[1],
                 r->now[2] - (*r->before)[2]};
-      int neighbours = 0, agreeing = 0;
+      int neighbors = 0, agreeing = 0;
       for (const Record* o : moving) {
         if (o == r || Distance(o->now, r->now) >= 4.0f) {
           continue;
         }
-        neighbours++;
+        neighbors++;
         Vec3 e = {o->now[0] - (*o->before)[0], o->now[1] - (*o->before)[1],
                   o->now[2] - (*o->before)[2]};
         if (Distance(d, e) < 0.3f) {
           agreeing++;
         }
       }
-      if (neighbours >= 2 && agreeing == 0) {
+      if (neighbors >= 2 && agreeing == 0) {
         unlike_++;
         if (Line()) {
-          REXLOG_INFO("moving: unlike its {} neighbours, tick {} amount {:.2f}: {}", neighbours,
+          REXLOG_INFO("moving: unlike its {} neighbors, tick {} amount {:.2f}: {}", neighbors,
                       tick_, amount_, Describe(*r));
         }
       }
@@ -2476,17 +2476,17 @@ class PixelConstantBlender {
                         !(std::abs(b - a) <= 0.3f * std::max(std::abs(a), std::abs(b)) + 0.2f));
     };
     // The 8 light slots: slot k is registers 8+k, 16+k, 24+k, 32+k, 47+k and
-    // 55+k (position, direction, colour and the like; see light_setup_log).
+    // 55+k (position, direction, color and the like; see light_setup_log).
     // A slot whose light changed between ticks (a streetlight in place of a
     // car's headlight) takes the tick's light, as the game switches it, and
     // the rest of the upload still blends; rejecting the whole upload left
     // the car's lighting at the tick for a tick (a flicker).
     // A slot's light position (8+k) is a world position, where the relative
-    // tolerance allows hundreds of metres: a slot taking the next street lamp
+    // tolerance allows hundreds of meters: a slot taking the next street lamp
     // along was blended as one light sliding 30 m across the car in a tick
     // (a flash passing under lamps). It's another light if it moved more than
     // kSlotLightMove; cars' headlights move at most about 3 m a tick.
-    constexpr float kSlotLightMove = 4.0f;  // metres
+    constexpr float kSlotLightMove = 4.0f;  // meters
     std::array<bool, 8> slot_switched{};
     if (count == 63 && REXCVAR_GET(switch_light_slots)) {
       for (uint32_t k = 0; k < 8; k++) {

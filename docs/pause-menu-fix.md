@@ -334,7 +334,7 @@ wrappers or tests through a vtable, which grep can't find, so
 the pass before), the message or tick handler running, object, mask and
 result. A caller getting `1` on render-only passes while paused is the reader.
 
-Result (a race the user drove, holding down on the analogue stick in the
+Result (a race the user drove, holding down on the analog stick in the
 pause menu): none of the six is called on render-only passes, and the only
 caller is the tick handler `82093DC0` (through `8258CF30` and `8210C624`
 too, indirectly). While paused every test returned 0, for every mask from

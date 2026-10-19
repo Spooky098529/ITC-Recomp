@@ -34,7 +34,7 @@ int main() {
       float yaw = ya + (yb - ya) * t;
       Matrix4 truth = CameraMatrix(yaw, c), with = BlendRigidMotion(*motion, t), without = BlendRigidMotion(no_pivot, t);
       for (float d : {5.0f, 20.0f, 100.0f}) for (float side : {-0.6f, 0.0f, 0.6f}) for (float up : {-0.3f, 0.3f}) {
-        // A point d metres ahead of the true camera, spread across the view.
+        // A point d meters ahead of the true camera, spread across the view.
         // Camera forward is row 2 = (-sin, 0, cos); right is row 0 = (cos, 0, sin).
         float fx = -std::sin(yaw), fz = std::cos(yaw), rx = std::cos(yaw), rz = std::sin(yaw);
         Vec3 x{c[0] + fx * d + rx * side * d, c[1] + up * d, c[2] + fz * d + rz * side * d};

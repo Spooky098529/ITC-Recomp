@@ -3,6 +3,7 @@
 #include "log_enabled.h"
 
 #include "buffers.h"
+#include "gpu_memory.h"
 #include "app_window.h"
 #include "state.h"
 
@@ -31,6 +32,10 @@
 #include <rex/logging.h>
 #include <rex/cvar.h>
 
+REXCVAR_DEFINE_BOOL(log_gpu_memory, false, "ITC",
+                    "Log every 5 s the GPU memory the native renderer holds, by what it's for, "
+                    "and its counts of views, samplers, descriptor pools and pipelines (to find "
+                    "what grows from race to race)");
 REXCVAR_DEFINE_BOOL(native_renderer, false, "ITC",
                     "Draw the game's render commands with our own Vulkan renderer, in a "
                     "second window (in development; see docs/native-renderer.md)");
@@ -191,7 +196,7 @@ bool SDLCALL WatchWindowEvents(void*, SDL_Event* event) {
 }
 
 // Where a frame of `source`'s shape goes in `target`: as large as fits,
-// centred (black bars on the sides or above and below).
+// centered (black bars on the sides or above and below).
 VkOffset3D FitOffsets(VkExtent2D source, VkExtent2D target, VkOffset3D& end) {
   uint64_t width = target.width, height = target.height;
   if (uint64_t(target.width) * source.height > uint64_t(target.height) * source.width) {
@@ -1003,6 +1008,9 @@ void Renderer::LogStats() {
     }
     REXLOG_INFO("native renderer: failed draws a frame by reason:{}", reasons);
   }
+  if (REXCVAR_GET(log_gpu_memory)) {
+    REXLOG_INFO("native renderer: GPU memory: {}", gpu_memory::Describe());
+  }
   if (std::string by_tick = passes_.TakeMirrorByTick(); !by_tick.empty()) {
     uint64_t missing, most;
     Renderer_TakeListStats(missing, most);
@@ -1325,3 +1333,31 @@ void Renderer_EndFrame() {
 }
 
 }  // namespace native
+
+namespace native::gpu_memory {
+
+std::string Describe() {
+  static constexpr const char* kKinds[] = {"textures", "resolved", "images",   "staging",
+                                           "mirrors",  "constants", "other"};
+  static constexpr const char* kObjects[] = {"views", "samplers", "descriptor pools",
+                                             "pipelines"};
+  static_assert(std::size(kKinds) == size_t(Kind::kCount));
+  static_assert(std::size(kObjects) == size_t(Object::kCount));
+  Totals& totals = Get();
+  int64_t total = 0;
+  std::string out;
+  for (size_t i = 0; i < size_t(Kind::kCount); i++) {
+    int64_t bytes = totals.bytes[i].load(std::memory_order_relaxed);
+    total += bytes;
+    out += fmt::format("{} {:.1f} MB ({}); ", kKinds[i], bytes / 1048576.0,
+                       totals.allocations[i].load(std::memory_order_relaxed));
+  }
+  out = fmt::format("{:.1f} MB: ", total / 1048576.0) + out;
+  for (size_t i = 0; i < size_t(Object::kCount); i++) {
+    out += fmt::format("{}{} {}", i ? ", " : "", kObjects[i],
+                       totals.objects[i].load(std::memory_order_relaxed));
+  }
+  return out;
+}
+
+}  // namespace native::gpu_memory

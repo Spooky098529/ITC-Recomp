@@ -22,7 +22,7 @@ class FramePacer {
   // Call just before drawing a frame.
   void OnFrameStarted();
 
-  // Sleeps until the next frame may start, honouring the frame cap.
+  // Sleeps until the next frame may start, honoring the frame cap.
   // Returns false instead if the next tick is due first.
   bool WaitForNextFrame();
 
