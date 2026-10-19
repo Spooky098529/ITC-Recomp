@@ -74,6 +74,7 @@ set(ITC_SOURCES
     src/debug/menu_selection_scan.cpp
     src/debug/pause_menu_log.cpp
     src/debug/pause_movie_log.cpp
+    src/debug/dial_pose_log.cpp
     src/debug/image_dump.cpp
     src/debug/replay_stats.cpp
     src/debug/thread_cpu.cpp
