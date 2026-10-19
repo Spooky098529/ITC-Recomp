@@ -129,6 +129,10 @@ REXCVAR_DEFINE_BOOL(sticky_camera_ids, true, "ITC",
                     "within the tolerance of the last one there, so a projection that drifts "
                     "(the headlight projector's) keeps its number instead of taking new ones and "
                     "flipping between two, which left it unpaired, drawn at the tick");
+REXCVAR_DEFINE_BOOL(double_precision_blending, true, "ITC",
+                    "Blend an object's and its camera's positions in double precision and "
+                    "multiply with only their difference, so float rounding far from the map's "
+                    "origin (~1 mm at 10 km) doesn't make the cockpit judder against the view");
 REXCVAR_DEFINE_BOOL(cache_camera_ids, true, "ITC",
                     "Remember the camera number of recently seen view-projections by their "
                     "bytes, so a repeated one skips splitting it and the table lookup (same "
@@ -604,6 +608,18 @@ ProductPlan PlanProduct(const ProductInputs& a, const ProductInputs& b, TickPlan
   return plan;
 }
 
+// A position blended straight, in double: rounded to float, positions ~10 km
+// from the origin step by ~1 mm, the object's and its camera's each their
+// own way, so the cockpit (half a meter from the camera) juddered by a pixel
+// against the view from frame to frame.
+std::array<double, 3> BlendPosition(const Vec3& a, const Vec3& b, float amount) {
+  std::array<double, 3> out;
+  for (int k = 0; k < 3; k++) {
+    out[k] = double(a[k]) + (double(b[k]) - double(a[k])) * double(amount);
+  }
+  return out;
+}
+
 // Render thread: each of the tick's cameras blended once a frame, for the
 // ~1,500 products a frame that share a handful of them.
 class CameraBlends {
@@ -612,6 +628,10 @@ class CameraBlends {
     uint64_t frame = 0;  // the frame it was blended for
     Matrix4 view_projection;
     Vec3 eye;
+    // The same camera moved to the origin, and its position in double
+    // (--double_precision_blending).
+    Matrix4 view_projection_at_origin;
+    std::array<double, 3> eye_exact;
   };
   void OnFrameStart() { frame_++; }
   const Blended& Get(const TickPlans& plans, int32_t index, float amount) {
@@ -623,6 +643,9 @@ class CameraBlends {
       const CameraPair& camera = plans.cameras[size_t(index)];
       PerspectiveCamera blended = Blend(camera.a, camera.b, amount);
       out = {frame_, ViewProjectionFromCamera(blended), blended.camera.position};
+      out.eye_exact = BlendPosition(camera.a.camera.position, camera.b.camera.position, amount);
+      blended.camera.position = {0, 0, 0};
+      out.view_projection_at_origin = ViewProjectionFromCamera(blended);
     }
     return out;
   }
@@ -660,14 +683,17 @@ Matrix4 BlendProduct(const ReplayedProduct& product, const TickPlans* plans,
   const ProductPlan& plan = plans->products[size_t(product.tick->plan)];
   const ProductInputs& b = product.tick->now;
   Matrix4 world = b.world;
+  std::array<double, 3> position{b.world[12], b.world[13], b.world[14]};
   std::optional<ScaledTransform> spinning;
   if (b.live) {
     // Posed for this frame already: keep it as drawn.
   } else if (plan.world == ProductPlan::World::kBlend) {
     world = WorldMatrixFromScaledTransform(Blend(plan.wa, plan.wb, amount));
+    position = BlendPosition(plan.wa.transform.position, plan.wb.transform.position, amount);
   } else if (plan.world == ProductPlan::World::kSpinning &&
              (spinning = BlendSpinning(plan.wa, plan.wb, amount, kCutAngle))) {
     world = WorldMatrixFromScaledTransform(*spinning);
+    position = BlendPosition(plan.wa.transform.position, plan.wb.transform.position, amount);
     stats.spinning++;
   } else if (plan.world_differs) {
     stats.world_not_blended++;
@@ -682,6 +708,17 @@ Matrix4 BlendProduct(const ReplayedProduct& product, const TickPlans* plans,
     if (parts) {
       parts->eye_now = plans->cameras[size_t(plan.camera)].b.camera.position;
       parts->eye = blended.eye;
+      parts->world = world;
+    }
+    if (REXCVAR_GET(double_precision_blending) && IsAffineRowLayout(world)) {
+      // world * view_projection = (world moved by -eye) * the camera at the
+      // origin; the difference is small, so float holds it to well under a
+      // millimeter.
+      Matrix4 relative = world;
+      for (int k = 0; k < 3; k++) {
+        relative[12 + k] = float(position[k] - blended.eye_exact[k]);
+      }
+      return Multiply(relative, blended.view_projection_at_origin);
     }
   }
   if (parts) {
@@ -1224,6 +1261,7 @@ class DrawState {
         oldest = &slot;
       }
     }
+    camera_copies_.evicted += oldest->id != 0;
     *oldest = {id, projection, sticky_uses_};
     return id;
   }
@@ -1233,7 +1271,11 @@ class DrawState {
       CameraIds::Signature projection{};
       uint64_t last_use = 0;
     };
-    std::array<Slot, 4> slots;
+    // A stack copy's address is shared by every camera drawn through it
+    // (main view, mirror, reflection, the headlight projector...); with 4,
+    // more cameras than that in a tick pushed the projector's out, and it
+    // flipped again.
+    std::array<Slot, 16> slots;
   };
   struct U64Hash {
     size_t operator()(uint64_t v) const { return size_t(v * 0x9E3779B97F4A7C15ull >> 16); }
@@ -1275,9 +1317,11 @@ class DrawState {
     auto now = std::chrono::steady_clock::now();
     if (now - camera_copies_.last_log >= std::chrono::seconds(2)) {
       REXLOG_INFO("camera copies: last 2 s, {} ticks, {:.1f} copies a tick, {} unpaired; {} "
-                  "camera numbers, {} products kept their address's number",
+                  "camera numbers, {} products kept their address's number, {} numbers pushed "
+                  "out of an address's slots",
                   camera_copies_.ticks, double(camera_copies_.copies) / camera_copies_.ticks,
-                  camera_copies_.unpaired, camera_ids_.count(), camera_copies_.kept);
+                  camera_copies_.unpaired, camera_ids_.count(), camera_copies_.kept,
+                  camera_copies_.evicted);
       camera_copies_ = {};
       camera_copies_.last_log = now;
     }
@@ -2009,7 +2053,7 @@ class DrawState {
   }
   CameraIds camera_ids_;
   struct {
-    int ticks = 0, copies = 0, unpaired = 0, lines = 0, kept = 0;
+    int ticks = 0, copies = 0, unpaired = 0, lines = 0, kept = 0, evicted = 0;
     std::chrono::steady_clock::time_point last_log;
   } camera_copies_;  // --log_camera_copies
 
