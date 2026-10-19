@@ -49,7 +49,6 @@
 #include <thread>
 #include <unordered_map>
 #include <unordered_set>
-#include <utility>
 #include <vector>
 
 #include <x86intrin.h>  // SameMatrix
@@ -130,7 +129,7 @@ REXCVAR_DEFINE_BOOL(sticky_camera_ids, true, "ITC",
                     "within the tolerance of the last one there, so a projection that drifts "
                     "(the headlight projector's) keeps its number instead of taking new ones and "
                     "flipping between two, which left it unpaired, drawn at the tick");
-REXCVAR_DEFINE_BOOL(double_precision_blending, true, "ITC",
+REXCVAR_DEFINE_BOOL(double_precision_blending, false, "ITC",
                     "Blend an object's and its camera's positions in double precision and "
                     "multiply with only their difference, so float rounding far from the map's "
                     "origin (~1 mm at 10 km) doesn't make the cockpit judder against the view");
@@ -301,10 +300,6 @@ struct ProductInputs {
   // only its camera is blended. Only the frame's own copies of tick products
   // are (see Output::live).
   bool live = false;
-  // Its camera is given for each frame by our own code (the headlight
-  // projector, BlendState_SetFrameCamera): never blended as a camera. The
-  // frame's own copies hold that frame's camera (see Output::frame_camera).
-  bool frame_camera = false;
 };
 
 // Main thread: the per-object recorder's caller context while it runs.
@@ -313,16 +308,6 @@ std::array<uint32_t, 9> g_record_context{};
 // this frame (BlendState_SetLivePose).
 bool g_live_pose = false;
 Matrix4 g_live_world{};
-// Main thread: this Draw's cameras given for the frame (BlendState_SetFrameCamera).
-struct FrameCamera {
-  Matrix4 tick, frame;
-  uint32_t slot;
-};
-std::vector<FrameCamera> g_frame_cameras;
-int g_frame_camera_uses = 0;  // diagnostics
-// Camera numbers for products made with a frame camera, by its slot: apart
-// from CameraIds' (counted up from 1).
-constexpr uint64_t kFrameCameraIds = uint64_t(1) << 62;
 
 // How a paired product blends, worked out once a tick from its two ticks'
 // inputs: the decompositions and camera splits don't depend on the frame's
@@ -568,9 +553,6 @@ struct BlendStats {
   // unpaired (drawn as written, with the tick's camera), camera rejected, and
   // with no camera to blend.
   int live = 0, live_unpaired = 0, live_camera_rejected = 0, live_no_camera = 0;
-  // Products with a camera given for the frame (the headlight projector's),
-  // paired and unpaired.
-  int frame_camera = 0, frame_camera_unpaired = 0;
 };
 
 // What went into a blended product, for the per-object recorder's other
@@ -617,8 +599,7 @@ ProductPlan PlanProduct(const ProductInputs& a, const ProductInputs& b, TickPlan
     }
   }
   plan.world_differs = a.world != b.world;
-  // A frame camera is given for each frame instead (BlendProduct).
-  if (a.view_projection != b.view_projection && !b.frame_camera) {
+  if (a.view_projection != b.view_projection) {
     CameraPairKey key;
     std::memcpy(key.data(), a.view_projection.data(), sizeof(Matrix4));
     std::memcpy(key.data() + 16, b.view_projection.data(), sizeof(Matrix4));
@@ -712,12 +693,6 @@ Matrix4 BlendProduct(const ReplayedProduct& product, const TickPlans* plans,
   }
   if (product.tick->plan < 0) {
     stats.unpaired++;
-    if (product.tick->now.frame_camera) {
-      stats.frame_camera_unpaired++;
-      // The tick's world with the frame's camera (a copy of the camera
-      // itself has an identity world).
-      return Multiply(product.tick->now.world, product.tick->now.view_projection);
-    }
     return product.written;
   }
   stats.blended++;
@@ -740,10 +715,7 @@ Matrix4 BlendProduct(const ReplayedProduct& product, const TickPlans* plans,
     stats.world_not_blended++;
   }
   Matrix4 view_projection = b.view_projection;
-  if (b.frame_camera) {
-    // Given for this frame (in the frame's own copy): used as it is.
-    stats.frame_camera++;
-  } else if (plan.camera_rejected) {
+  if (plan.camera_rejected) {
     stats.camera_not_blended++;
   } else if (plan.camera >= 0) {
     // A perspective camera: blend its placement and projection separately.
@@ -1074,7 +1046,7 @@ class DrawState {
     if (it->second.written != LoadMatrix(base, src)) {
       return;
     }
-    outputs[dst] = {it->second.key, LoadMatrix(base, dst), -1, -1, it->second.frame_camera};
+    outputs[dst] = {it->second.key, LoadMatrix(base, dst)};
     tick_published_stale_ |= !render_only;
     counts_.copies++;
   }
@@ -1089,19 +1061,7 @@ class DrawState {
     // says which camera; their projection there drifts past CameraIds'
     // tolerance between ticks, which renumbered them and left them unpaired.
     uint64_t signature = 0;
-    // A camera given for the frame (the headlight projector) is numbered by
-    // its slot: its projection, read back as a camera's, drifts.
-    int32_t frame_camera = -1;
-    for (size_t i = 0; i < g_frame_cameras.size(); i++) {
-      if (SameMatrix(g_frame_cameras[i].tick, inputs.view_projection)) {
-        frame_camera = int32_t(i);
-        break;
-      }
-    }
-    if (frame_camera >= 0) {
-      signature = kFrameCameraIds + g_frame_cameras[size_t(frame_camera)].slot;
-      g_frame_camera_uses++;
-    } else if (handler_ != kRaceOverlaysHandler) {
+    if (handler_ != kRaceOverlaysHandler) {
       CameraIds::Signature projection;
       signature = camera_ids_.Of(inputs.view_projection, &projection);
       if (signature != 0 && REXCVAR_GET(sticky_camera_ids)) {
@@ -1150,7 +1110,6 @@ class DrawState {
     int32_t tick_product = -1;
     if (!render_only) {
       collecting_[key] = inputs;
-      collecting_[key].frame_camera = frame_camera >= 0;
       collecting_order_.push_back(key);
     } else if (!enabled_) {
       // A render-only pass draws the same state as the logic pass, so the
@@ -1200,14 +1159,7 @@ class DrawState {
       live = int32_t(worlds.size());
       worlds.push_back(g_live_world);
     }
-    // Likewise a frame camera, with this frame's camera beside it.
-    int32_t frame_camera_at = -1;
-    if (frame_camera >= 0) {
-      auto& cameras = render_only ? pass_frame_cameras_ : tick_frame_cameras_;
-      frame_camera_at = int32_t(cameras.size());
-      cameras.push_back(g_frame_cameras[size_t(frame_camera)].frame);
-    }
-    outputs[out] = {key, LoadMatrix(base, out), tick_product, live, frame_camera_at};
+    outputs[out] = {key, LoadMatrix(base, out), tick_product, live};
     tick_published_stale_ |= !render_only;
   }
 
@@ -1283,7 +1235,6 @@ class DrawState {
     PublishReplayFrame();
     pass_outputs_.clear();
     pass_live_worlds_.clear();
-    pass_frame_cameras_.clear();
     product_occurrences_.clear();
     tick_cursor_ = 0;
     Restore(base, saved_);
@@ -1564,7 +1515,6 @@ class DrawState {
   void OnLogicPassStart() {
     tick_outputs_.clear();
     tick_live_worlds_.clear();
-    tick_frame_cameras_.clear();
     tick_published_stale_ = true;
   }
 
@@ -1685,21 +1635,24 @@ class DrawState {
       for (const auto& [out, product] : tick_published_) {
         frame->products.Set(out, product);
       }
-      // Live poses and frame cameras get their own copy of the tick's
-      // product, with this frame's world matrix or camera (own_products isn't
-      // otherwise used here, and is reserved so the pointers stay put). The
-      // logic pass's are for its own frame only; render-only passes pose
-      // their own.
-      frame->own_products.reserve(tick_live_worlds_.size() + pass_live_worlds_.size() +
-                                  tick_frame_cameras_.size() + pass_frame_cameras_.size());
-      if (logic_pass_ && (!tick_live_worlds_.empty() || !tick_frame_cameras_.empty())) {
+      // Live poses get their own copy of the tick's product, with this
+      // frame's world matrix (own_products isn't otherwise used here, and is
+      // reserved so the pointers stay put). The logic pass's are for its own
+      // frame only; render-only passes pose their own.
+      frame->own_products.reserve(tick_live_worlds_.size() + pass_live_worlds_.size());
+      auto live_copy = [&](const TickProduct& tick, const Matrix4& world) {
+        frame->own_products.push_back(tick);
+        frame->own_products.back().now.world = world;
+        frame->own_products.back().now.live = true;
+        return &frame->own_products.back();
+      };
+      if (logic_pass_ && !tick_live_worlds_.empty()) {
         for (const auto& [out, output] : tick_outputs_) {
-          int32_t i = output.live >= 0 || output.frame_camera >= 0 ? tick_index_.Find(output.key)
-                                                                   : -1;
+          int32_t i = output.live >= 0 ? tick_index_.Find(output.key) : -1;
           if (i >= 0) {
-            frame->products.Set(
-                out, {output.written,
-                      OwnCopy(*frame, plans_->tick_products[size_t(i)], output, true)});
+            frame->products.Set(out, {output.written,
+                                      live_copy(plans_->tick_products[size_t(i)],
+                                                tick_live_worlds_[size_t(output.live)])});
           }
         }
       }
@@ -1707,8 +1660,8 @@ class DrawState {
         int32_t i = output.tick_product >= 0 ? output.tick_product : tick_index_.Find(output.key);
         if (i >= 0) {
           const TickProduct* tick = &plans_->tick_products[size_t(i)];
-          if (output.live >= 0 || output.frame_camera >= 0) {
-            tick = OwnCopy(*frame, *tick, output, false);
+          if (output.live >= 0) {
+            tick = live_copy(*tick, pass_live_worlds_[size_t(output.live)]);
           }
           frame->products.Set(out, {output.written, tick});
         }
@@ -1721,15 +1674,14 @@ class DrawState {
           if (now == current_tick_.end()) {
             continue;
           }
+          frame->own_products.push_back(TickProductOf(output.key, now->second));
           bool tick_output = outputs == &tick_outputs_;
-          if (!tick_output || logic_pass_) {
-            frame->products.Set(out, {output.written,
-                                      OwnCopy(*frame, TickProductOf(output.key, now->second),
-                                              output, tick_output)});
-          } else {
-            frame->own_products.push_back(TickProductOf(output.key, now->second));
-            frame->products.Set(out, {output.written, &frame->own_products.back()});
+          if (output.live >= 0 && (!tick_output || logic_pass_)) {
+            frame->own_products.back().now.world =
+                (tick_output ? tick_live_worlds_ : pass_live_worlds_)[size_t(output.live)];
+            frame->own_products.back().now.live = true;
           }
+          frame->products.Set(out, {output.written, &frame->own_products.back()});
         }
       }
     }
@@ -1749,24 +1701,6 @@ class DrawState {
       }
     }
     retired_frames_.clear();  // the frames are freed here, outside the lock
-  }
-
-  // A frame's own copy of a tick product, with the output's world matrix
-  // (live pose) and camera (frame camera) for this frame, if it has them; from
-  // the logic pass's tables (`tick_output`) or this render-only pass's.
-  const TickProduct* OwnCopy(ReplayFrame& frame, const TickProduct& tick, const auto& output,
-                             bool tick_output) {
-    frame.own_products.push_back(tick);
-    TickProduct& copy = frame.own_products.back();
-    if (output.live >= 0) {
-      copy.now.world = (tick_output ? tick_live_worlds_ : pass_live_worlds_)[size_t(output.live)];
-      copy.now.live = true;
-    }
-    if (output.frame_camera >= 0) {
-      copy.now.view_projection = (tick_output ? tick_frame_cameras_
-                                              : pass_frame_cameras_)[size_t(output.frame_camera)];
-    }
-    return &copy;
   }
 
   std::shared_ptr<ReplayFrame> SpareFrame() {
@@ -2181,14 +2115,10 @@ class DrawState {
     // A live pose: this frame's world matrix, in pass_live_worlds_ (or, for
     // the logic pass's frame, tick_live_worlds_).
     int32_t live = -1;
-    // A frame camera: this frame's camera, in pass_frame_cameras_ (or, for the
-    // logic pass's frame, tick_frame_cameras_).
-    int32_t frame_camera = -1;
   };
   FlatMap<uint32_t, Output, std::hash<uint32_t>> tick_outputs_;  // by address, from the logic pass
   FlatMap<uint32_t, Output, std::hash<uint32_t>> pass_outputs_;  // from this render-only pass
   std::vector<Matrix4> pass_live_worlds_, tick_live_worlds_;  // see Output::live
-  std::vector<Matrix4> pass_frame_cameras_, tick_frame_cameras_;  // see Output::frame_camera
   // The race overlays' products on the logic pass, by value (see Note).
   std::unordered_map<uint64_t, ProductKey> overlay_keys_this_tick_, overlay_keys_;
 
@@ -2786,11 +2716,6 @@ class ReplayCameras {
         stats_.blend.world_not_blended / f, stats_.blend.camera_not_blended / f,
         stats_.blend.unpaired / f, stats_.not_substituted_same / f,
         stats_.not_substituted_changed / f);
-    if (stats_.blend.frame_camera || stats_.blend.frame_camera_unpaired) {
-      REXLOG_INFO("replay: {} products with a frame camera, {} of them unpaired",
-                  stats_.blend.frame_camera + stats_.blend.frame_camera_unpaired,
-                  stats_.blend.frame_camera_unpaired);
-    }
     if (stats_.blend.live) {
       REXLOG_INFO("replay: {} live poses: {} unpaired, {} camera rejected, {} no camera",
                   stats_.blend.live, stats_.blend.live_unpaired,
@@ -3736,7 +3661,6 @@ void BlendState_LogOverlayAllocations(uint8_t* base) {
 }
 
 void BlendState_BeforeDraw(uint8_t* base, bool render_only_pass) {
-  g_frame_cameras.clear();
   GetDrawState().BeforeDraw(base, !render_only_pass);
 }
 
@@ -3758,16 +3682,6 @@ void BlendState_SetLivePose(const float* world) {
     std::memcpy(g_live_world.data(), world, sizeof(Matrix4));
   }
 }
-
-void BlendState_SetFrameCamera(const float* tick, const float* frame, uint32_t slot) {
-  FrameCamera camera;
-  std::memcpy(camera.tick.data(), tick, sizeof(Matrix4));
-  std::memcpy(camera.frame.data(), frame, sizeof(Matrix4));
-  camera.slot = slot;
-  g_frame_cameras.push_back(camera);
-}
-
-int BlendState_TakeFrameCameraUses() { return std::exchange(g_frame_camera_uses, 0); }
 
 float BlendState_Amount() { return GetDrawState().amount(); }
 
