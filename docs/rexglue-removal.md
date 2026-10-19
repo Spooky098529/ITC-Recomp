@@ -257,10 +257,26 @@ Large; ship it in parts, in this order (each part is a release):
     game saw it before (log the SDK's allocation addresses first and
     compare), the shared memory files (and their cleanup:
     CLAUDE.md's `find /dev/shm ... -delete`).
-27. The XEX loader: decrypt, decompress (LZX) and map `default.xex` from
-    the player's game files (`rexglue-sdk/src/system/xex_module.cpp`,
-    `lzx.cpp`; copy it, with the license note), plus
-    `RtlImageXexHeaderField` and `XexGetModuleHandle`/`XexGetProcedureAddress`.
+27. Loading the game's image. Still needed although the code is
+    recompiled: `generated/` holds only the translated code, which reads
+    all the game's data (strings, floats, vtables, tables, initialized
+    globals) from guest addresses in the image (`0x82000000`, the
+    `ctx.r11.s64 = -2113929216` all over `generated/`). That data comes
+    only from `default.xex`, encrypted and compressed. Today `ReXApp`
+    (`rexglue-sdk/src/ui/rex_app.cpp`) calls `Runtime::LoadXexImage`,
+    which decrypts it (AES), decompresses it (LZX) and copies it to the
+    image base (`rexglue-sdk/src/system/xex_module.cpp`, `lzx.cpp`). We
+    can't ship the decrypted image (players supply their own game files),
+    so a loader stays. But it only has to handle this one retail XEX:
+    the retail key, its compression type, the copy to `0x82000000`, and
+    whatever the SDK writes into the image after the copy (import tables
+    or variable imports such as `KeTimeStampBundle`: log what the SDK
+    writes, or compare the image before and after loading, first). No
+    devkit keys, patch (`xexp`) or delta support, or other modules. Also
+    needed: the header fields the game asks for (`RtlImageXexHeaderField`)
+    and `XexGetModuleHandle`/`XexGetProcedureAddress`. Copy only the parts
+    used, with the license note from step 8. (Optionally: decrypt once on
+    first run into the cache, then map that file on later runs.)
 28. With nothing left calling into the SDK's kernel, stop starting its
     runtime (step 22).
 
