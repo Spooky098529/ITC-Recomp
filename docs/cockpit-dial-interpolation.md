@@ -434,6 +434,35 @@ swings. `--screw_blend` fixes parked needles but breaks wheels. The rule
 that works for both is still to blend each part relative to its parent
 (the previous section's conclusion).
 
+## In the game with `--screw_blend`, no angle cut (`itc_088`, 2026-10-19)
+
+The user: the tachometer's needle "is not off axis now but it's moving to
+the wrong place", and the wheels look "juddery and broken".
+
+- Wheels: as `wheel_blend.cpp` predicted. r31 `041900F0` (a wheel ~2.5 m
+  from the camera, ~0.98 rad a tick) is drawn 20-27 px off on most frames,
+  its angle jumping within ticks. Keep `--screw_blend` off for wheels.
+- The car's first needle, r31 `03FC06A0`, is fine: no tick over 0.5 rad,
+  no frame jumps.
+- The second needle, r31 `03FC0130` (`03FB0130` in another car), is again
+  blended only on logic passes (446 frames). On render-only passes the game
+  draws it at one fixed pose (view 1.058 0.244 -0.057; 2,333 times, 98%
+  of the mismatches near the camera), a median 2.8 rad (max 3.14) from the
+  tick's pose: roughly the opposite way. Most likely what the user sees.
+  It isn't known yet which dial it is.
+- Why it isn't blended: on render-only passes the game draws again and
+  each multiply is replaced by its tick's blend only if its inputs match
+  the tick's (`Note`, the render-only check). This one's world matrix
+  differs (the game's rest pose), so it's left as drawn.
+- Two fixes considered. (1) For products keyed by r31, trust the key over
+  the inputs check. (2) The user's preference to investigate: find the
+  game code that poses the needle (only on logic passes) and have it pose
+  it on render-only passes too, without advancing state. The inputs would
+  then match and the blend work as is. Precedent: the rival logo
+  (`--redraw_rival_logo` in `docs/functions.md`), where delivering the
+  whole Update ran the cutscene too fast and a native override repeating
+  only the draw worked.
+
 ## Next
 
 1. ~~Log the pairing~~: done, not swapped (above).
