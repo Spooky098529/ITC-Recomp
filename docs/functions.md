@@ -880,6 +880,15 @@ processes the game's commands; the render thread mostly waits for it.
   "Finding what still steps" if something does.
 - **A piece of geometry flickers while the car moves**, at native 30 fps
   too, so not interpolation: probably the game's own effect (a broken light).
+- **The cockpit judders left to right far from the map's origin**
+  (x ≈ −8,000 to −10,000 m), with interpolation off too (seen under Wine,
+  uncapped, `--interpolate_draw_state=false`, 2026-10-19), so it's the
+  game's own: its per-tick camera offset from the car wobbles by 1–4 mm a
+  tick out there (`--log_cockpit_judder`), the recurring 3.9 mm maximum
+  being 2⁻⁸ m, a float step at that distance. Our blend's own jerk is
+  ~0.01 mm with `--double_precision_blending`. Left as is: the eye/target/up
+  the game's camera pass stores are float too, and smoothing the camera's
+  offset from the car across ticks would make head movement lag the car.
 - **The player's headlight beam on the road can jump in very sharp turns.**
   Reported before the light slot fixes (frame lag, switching, 4 m rule) and
   not rechecked since; the release notes still list it.
