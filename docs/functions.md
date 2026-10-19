@@ -15,20 +15,21 @@ Status:
   longer called (except behind a fallback flag or to check against it).
   The end state for every function.
 - **Overridden**: an `extern "C" REX_FUNC(sub_XXXXXXXX)` override in
-  `itc_recomp/src/` does the work instead of the original: a thin adapter
-  in front of native code (the precedent, "How a native override is
-  written" in `docs/rexglue-removal.md`), or a body that still uses `ctx`
-  (calling guest code, reading registers). It may call the original when
-  its flag is off, or to check itself against it.
+  `itc_recomp/src/` (or a macro defining one) does the work instead of
+  the original: a thin adapter in front of native code, or a body that
+  still uses `ctx` (calling guest code, reading registers). It may call
+  the original when its flag is off, or to check itself against it.
 - **Wrapped**: an override that does something of its own (skipping
   render-only passes, logging, timing) and still calls the original
   (`__imp__sub_XXXXXXXX`) for the work.
-
-A function usually moves Wrapped or recompiled → Overridden → Native as
-the `ctx` edge moves up through its callers (the input path did this on
-2026-10-19: see B1 in `docs/rexglue-removal.md`).
 - **Patched**: the generated code was edited in place (search for
   `PATCH:`).
+
+A function usually moves from recompiled or Wrapped to Overridden to
+Native as the `ctx` edge moves up through its callers.
+`itc_recomp/tools/check_function_statuses.py` checks this column against
+`src/` (an override marked Native, a status with no override, an override
+with no row); run it after changing either, on any branch.
 
 | Address | Name | Status | Notes |
 |---|---|---|---|
@@ -112,9 +113,9 @@ the `ctx` edge moves up through its callers (the input path did this on
 | `sub_820D3740` | `Dial::TachometerAngles` | Native | `TachAngles` in `src/hooks/cockpit_dials.cpp`, called by the native `sub_820E42E8` (its only caller; the translated one runs only with `--native_cockpit_dials=false` or for `--check_native_cockpit_dials`). r3 = table, r4 = the car, r5 = [dash], r6 = &a, r7 = &b; no state. `a` from car + 696: `[0x82000A34]` below it; up to from (table + 0, or + 8 when `[[dash]]` isn't 0) value / from * table[16]; up to to (+ 4 or + 12) linear to table[20]; above, table[20]. `b` from car + 700: table[28] below table[24], linear over table[24..36] then table[32..44], clamped at table[44]. |
 | `sub_820A2D30` | `Matrix::RotateZ` | | r3 = out, r4 = in, r5 = &angle: out = in * RotZ, rows `(c, s, 0, 0)`, `(-s, c, 0, 0)`, sine and cosine from a polynomial. |
 | `sub_820A0AC0` | `Matrix::Copy` | Wrapped | r3 = destination, r4 = source, 4x4. Interpolation follows copies of cameras and products. |
-| `sub_82597610` | `Projector::Build` | | r3 = out, r4 = eye, r5 = target, r6 = up (16-byte vectors), f1-f4 = field of view, aspect, near, far: out = look-at (`sub_82597378`) * perspective (`sub_825972A8`) * a fixed bias matrix at `0x8265EED0` (two `sub_8209BD50` multiplies). Called by the render orchestrator `sub_820C5DE8` (return `0x820C6A2C`) for the player's headlight once a view, and by `sub_820F34C8` (return `0x820F3944`) in a loop of up to 5. See "The headlight beam far from the origin". |
+| `sub_82597610` | `Projector::Build` | Wrapped | r3 = out, r4 = eye, r5 = target, r6 = up (16-byte vectors), f1-f4 = field of view, aspect, near, far: out = look-at (`sub_82597378`) * perspective (`sub_825972A8`) * a fixed bias matrix at `0x8265EED0` (two `sub_8209BD50` multiplies). Called by the render orchestrator `sub_820C5DE8` (return `0x820C6A2C`) for the player's headlight once a view, and by `sub_820F34C8` (return `0x820F3944`) in a loop of up to 5. See "The headlight beam far from the origin". |
 | `sub_821363F0` | `View::UploadPreviousViewProjection` | | r3 = the view (kept in r29). Records vertex c100 x4, the motion blur's previous view-projection: a `Matrix::Copy` (return `8213653C`) from view+8080 (this tick's view-projection) when view+48 is set (passes that ran the game logic) and view+44 is 0, otherwise from view+8144 (the previous tick's). The view moves the pair on right after the logic pass, so it's the same matrix all tick. Header slot allocated at `821364D0` (the owner `--debug_zero_owners` and `--log_slot_callers` name). See "Motion blur reads the 30 Hz tick" in `docs/native-renderer.md`. |
-| `sub_82598768` | `TextureProjection::Fit` | | Builds the c14 x4 texture projection, fitted to a camera object's view; called three times by `sub_820C5DE8` (returns `820C7174`, `820C7558`, `820C7950`; the third's result copied to c14 at `820C79F8`). Its multiply at `82599644` (stack temporary sp+352 = sp+352 * sp+208) reads back as a camera, w 1 with the eye at the origin, and was the group of cameras refused far from the origin; overwritten at `825996FC`, never drawn. See "The headlight beam far from the origin". |
+| `sub_82598768` | `TextureProjection::Fit` | Wrapped | Builds the c14 x4 texture projection, fitted to a camera object's view; called three times by `sub_820C5DE8` (returns `820C7174`, `820C7558`, `820C7950`; the third's result copied to c14 at `820C79F8`). Its multiply at `82599644` (stack temporary sp+352 = sp+352 * sp+208) reads back as a camera, w 1 with the eye at the origin, and was the group of cameras refused far from the origin; overwritten at `825996FC`, never drawn. See "The headlight beam far from the origin". |
 | `sub_82597378` | `Matrix::LookAt` | | r3 = out, r4 = eye, r5 = target, r6 = up: a row-vector view matrix, forward = target - eye. |
 | `sub_825972A8` | `Matrix::Perspective` | | r3 = out, f1 = field of view, f2 = aspect, f3 = near, f4 = far: y scale = 1 / tan(f1 * the constant at `0x82001BE4`), x scale = y scale / aspect, depth = far / (far - near), offset -near * far / (far - near). |
 | `sub_820D06F0` | `CarPart::Draw` | | r3 = the part (returns if `[part + 4]`, its model, is 0), r4 = the camera, r5 = the world matrix, r6, r7: with r7 = 0, `sub_820D04E8([part + 4], camera, world, [part + 228], r6)`. |
