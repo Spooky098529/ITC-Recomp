@@ -763,10 +763,57 @@ class CameraIds {
     }
     uint64_t id = ++count_;
     buckets_[Key(bucket)].push_back({signature, id});
+    if (REXCVAR_GET(log_camera_copies)) [[unlikely]] {
+      LogNewId(id, signature, *camera);
+    }
     return id;
   }
 
   using Signature = std::array<float, 3>;
+  // Diagnostics (--log_camera_copies): a new number's projection, where its
+  // camera is, and the nearest number already given (by the largest relative
+  // difference of the signatures' components). At most 10 lines a second.
+  void LogNewId(uint64_t id, const Signature& signature, const PerspectiveCamera& camera) {
+    auto now = std::chrono::steady_clock::now();
+    if (now - new_id_log_start_ >= std::chrono::seconds(1)) {
+      new_id_log_start_ = now;
+      new_id_lines_ = 0;
+    }
+    if (new_id_lines_++ >= 10) {
+      return;
+    }
+    uint64_t nearest = 0;
+    float nearest_difference = 0;
+    Signature nearest_signature{};
+    for (const auto& [key, entries] : buckets_) {
+      for (const auto& [known, known_id] : entries) {
+        if (known_id == id) {
+          continue;
+        }
+        float difference = 0;
+        for (int i = 0; i < 3; i++) {
+          difference = std::max(difference, std::abs(known[i] - signature[i]) /
+                                                std::max({std::abs(known[i]),
+                                                          std::abs(signature[i]), 1e-3f}));
+        }
+        if (nearest == 0 || difference < nearest_difference) {
+          nearest = known_id;
+          nearest_difference = difference;
+          nearest_signature = known;
+        }
+      }
+    }
+    const Vec3& eye = camera.camera.position;
+    REXLOG_INFO("camera ids: new {}: signature {:.7g} {:.7g} {:.7g} (x {:.7g} y {:.7g} w {:.7g} "
+                "depth scale {:.7g} offset {:.7g}), eye {:.1f} {:.1f} {:.1f}; nearest {} at "
+                "{:.4f}: {:.7g} {:.7g} {:.7g}",
+                id, signature[0], signature[1], signature[2], camera.x_scale, camera.y_scale,
+                camera.w_scale, camera.depth_scale, camera.depth_offset, eye[0], eye[1], eye[2],
+                nearest, nearest_difference, nearest_signature[0], nearest_signature[1],
+                nearest_signature[2]);
+  }
+  std::chrono::steady_clock::time_point new_id_log_start_;
+  int new_id_lines_ = 0;
   static bool IsClose(const Signature& a, const Signature& b) {
     for (int i = 0; i < 3; i++) {
       if (!(std::abs(a[i] - b[i]) <= 0.01f * std::max({std::abs(a[i]), std::abs(b[i]), 1e-3f}))) {
