@@ -128,7 +128,7 @@ install -m 755 itc_recomp/run-debug.sh $D/run-debug.sh
 (cd $D && python3 -I -m zipfile -c ../$name.zip itc librexruntime.so run.sh run-debug.sh)
 ```
 
-## Status (`main`, 2026-10-17, v0.4.4)
+## Status (`main`, 2026-10-19, v0.4.5)
 
 Frame interpolation for races is working: logic runs at 30 Hz and frames are
 blended between ticks. The world, cameras, wheels (other cars' too, paired
@@ -151,27 +151,27 @@ drawn scaled and the 3D view at the full resolution, with black bars on
 shapes other than 16:9. See `docs/unlocked-res.md` (a more native frame
 without the game's upscale draw is for later).
 
-Pause menu (merged from `pause-menu`, 2026-10-18, not released yet): the
+Pause menu (merged from `pause-menu`, 2026-10-18, released in v0.4.5): the
 action mappers' update (`sub_8210B018`) runs on logic passes only
 (`--input_mappers_by_tick`, on by default, `src/hooks/input.cpp`), so the
 pause menu's input repeat counts ticks at any frame rate; the old
 workaround (`--pause_workaround`, the pause screen held at 30 fps) is
 removed. See `docs/pause-menu-fix.md`. The pause sub-menus' arrow (merged
-from `pause-menu-arrow`, 2026-10-18, not released yet): at 144 fps it slid
+from `pause-menu-arrow`, 2026-10-18, released in v0.4.5): at 144 fps it slid
 too far, because UI movie tracks that add to values the update doesn't put
 back were applied again on render-only passes; now skipped there
 (`--per_tick_ui_movie_tracks`, on by default). Its trail, and its snap to a
 front-end menu's first item, are the game's own (seen on a 360 video).
 
-The rival logo (merged from `rival-logo-flicker`, 2026-10-18, not released yet):
+The rival logo (merged from `rival-logo-flicker`, 2026-10-18, released in v0.4.5):
 the rival intro cutscene's logo flickered above 30 fps, drawn during its
 Update handler (`82159948`, `sub_821594B8`) on logic passes only. A native
 override runs the cutscene on logic passes and only the logo's draw
 (`sub_82211A28`) on render-only passes (`--redraw_rival_logo`, on by
 default). See "The rival logo at the race start" in `docs/functions.md`.
 
-Cockpit dials (merged from `cockpit-dial-interpolation`, 2026-10-19, not
-released yet): the dial updates (`sub_820E42E8`, `sub_820E45A8`) are native
+Cockpit dials (merged from `cockpit-dial-interpolation`, 2026-10-19,
+released in v0.4.5): the dial updates (`sub_820E42E8`, `sub_820E45A8`) are native
 (`src/hooks/cockpit_dials.cpp`, `--native_cockpit_dials`, on by default).
 The needles' angles come from the tick's gauge values (30 Hz steps, as on
 the 360) and their position from the car blended to the frame; the game
