@@ -234,7 +234,12 @@ B6. **Pure helpers** (55 functions): string, time and formatting
 B7. **The game logic inside**: everything else, subsystem by subsystem,
     in whatever order the user wants (frame interpolation's hooks,
     vehicles, UI, menus, physics, ...). Each subsystem moves its data to
-    level 2 once no recompiled code touches it. This is most of the
+    level 2 once no recompiled code touches it. A function's constants,
+    strings and tables from the image move into the source with it
+    (literals and arrays, compiled into the exe); big tables are better
+    copied out of the image by a small script than by hand. While
+    recompiled code still reads a table, it stays in the image too, and
+    the two copies must agree. This is most of the
     work: full decompilations of games this size usually take years. Keep
     a list of which functions are native (in `docs/functions.md` or a
     table here) so progress can be measured.
@@ -254,14 +259,14 @@ E1. **Threads and sync** (291 boundary functions, plus every recompiled
 E2. **Memory**: native allocations once nothing uses guest addresses.
     No guest mapping, no `/dev/shm` files.
 
-E3. **The game's image data**: the recompiled code reads strings,
-    constants, vtables, tables and initialized globals from the image at
+E3. **The image load**: the recompiled code reads strings, constants,
+    vtables, tables and initialized globals from the image at
     `0x82000000`, which today comes from the player's `default.xex`
-    (encrypted, compressed; `Runtime::LoadXexImage`). Native code needs
-    that data as native constants and tables instead. Open decision for
-    the user: put it in the build (release zips then carry the game's
-    data, as they carry its translated code now), or read it from the
-    player's `default.xex` at startup (a small decrypting loader).
+    (encrypted, compressed; `Runtime::LoadXexImage`). This isn't a step
+    of its own: native code carries its data as literals and arrays,
+    compiled into the exe (B7). Once no recompiled code reads the image,
+    the load and `default.xex` are no longer needed; the player's `DATA/`
+    still is.
 
 E4. **`PPCContext`, `rex/ppc.h`, the function table, `generated/`,
     and the SDK**: delete the submodule, `patches/rexglue-sdk/`,
