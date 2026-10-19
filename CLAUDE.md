@@ -44,7 +44,8 @@ date as you learn things.
 - Push work branches to `origin` (github.com/Spooky098529/ITC-Recomp) after
   each commit. Ask before pushing to `main` or pushing tags.
 - No `-march=native`.
-- US English spelling is fine.
+- Use American English only (spelling and wording) in replies, code,
+  comments, docs and commit messages.
 - Find problems with logs, not guesses: add logging, have the user run the
   game, read the log, then fix what it shows. Guessing at causes cost many
   runs on the marker above opponents (see "World-space sprites").
