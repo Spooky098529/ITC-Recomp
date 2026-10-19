@@ -138,7 +138,8 @@ REXCVAR_DEFINE_BOOL(camera_ids_ignore_depth_offset, true, "ITC",
                     "Number cameras by aspect ratio and depth scale only: the depth offset, read "
                     "back from the view-projection, drifts with the camera's distance from the "
                     "map's origin (the headlight projector's by 1% over 7 km), which gave it new "
-                    "numbers far out (the beam lagging the car)");
+                    "numbers far out (the beam lagging the car), and failed the cut check "
+                    "(the beam drawn a tick ahead); the cut check compares the rest");
 REXCVAR_DEFINE_BOOL(cache_camera_ids, true, "ITC",
                     "Remember the camera number of recently seen view-projections by their "
                     "bytes, so a repeated one skips splitting it and the table lookup (same "
@@ -549,7 +550,12 @@ bool IsSameCameraCheck(const PerspectiveCamera& a, const PerspectiveCamera& b) {
   return !IsCut(a.camera, b.camera) && close(a.x_scale, b.x_scale, 0.05f) &&
          close(a.y_scale, b.y_scale, 0.05f) && close(a.w_scale, b.w_scale, 0.01f) &&
          close(a.x_scale / a.y_scale, b.x_scale / b.y_scale, 0.01f) &&
-         close(a.depth_scale, b.depth_scale, 0.01f) && close(a.depth_offset, b.depth_offset, 0.01f);
+         close(a.depth_scale, b.depth_scale, 0.01f) &&
+         // Read back from the view-projection, the depth offset drifts with
+         // the camera's distance from the origin (square projectors' 0.0991
+         // <-> 0.1002 a tick at x ~ -8,500), which refused them as cuts.
+         (REXCVAR_GET(camera_ids_ignore_depth_offset) ||
+          close(a.depth_offset, b.depth_offset, 0.01f));
 }
 
 struct BlendStats {
