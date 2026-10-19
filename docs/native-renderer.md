@@ -1240,6 +1240,15 @@ To be fixed (or accepted) in milestone 7.
   format 26) is made again at loads 2, 3, 4 and 7 at another address
   (the game allocates it per race: 1B068000, 1B19B000, 1AA40000,
   1B118000, 1B198000 for the 512x288), ~7.5 MB each time, never freed.
+  Fixed (`--free_moved_resolve_destinations`, on): a new resolve
+  destination made over the memory of one at another address frees it,
+  unless something resolved into it in the last 2 s (a resolve into part
+  of a bigger one); one replaced at its own address (another format or
+  size) is now destroyed after the frames in flight instead of left
+  behind. Ten attract races (`itc_123.log`): each race's new glow chain
+  frees the last (all at race entry, ~5 s after their last use); resolve
+  destinations stay at 23 (27-32 MB) from the third race on, VRAM peaks
+  at 381 MB; race 8's frame drawn right, glow included.
 
 - **Resizing the window and the swapchain** on Wayland: the compositor
   leaves the size to us and never reports the swapchain out of date, so the

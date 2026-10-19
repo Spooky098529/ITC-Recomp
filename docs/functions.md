@@ -766,6 +766,7 @@ and target, and recorder world matrices), mostly for comparison.
 | `--log_camera_pass_records` | Which camera passes are recorded on logic and render-only passes, by message handler. |
 | `--log_gpu_memory` | Every 5 s (native renderer): the GPU memory it holds by what it's for (textures, resolve destinations, images, staging, mirrors, constant blocks), and its counts of views, samplers, descriptor pools, pipelines and new textures starting where an older one starts. For the memory that grows from race to race; see "Textures are never freed" in `native-renderer.md`. |
 | `--free_textures_after_race` | Free the textures loaded from guest memory when a race ends (default on); without it they're never freed. See "Textures are never freed" in `native-renderer.md`. |
+| `--free_overwritten_textures`, `--free_moved_resolve_destinations` | Free a texture when a new one is loaded over its memory after the game wrote there, and a resolve destination when a new one is made over its memory at another address (default on). See "Textures are never freed" in `native-renderer.md`. |
 
 ### What didn't work, and why
 
