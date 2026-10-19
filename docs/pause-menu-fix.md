@@ -195,7 +195,7 @@ In order:
 5. pressed = held & (held ^ old held); released = (held ^ old held) &
    old held.
 
-### Who reads the input manager (2026-10-19, partial)
+### Who reads the input manager (2026-10-19)
 
 Asked for docs/rexglue-removal.md (B1): if the action mappers were
 native, could the input manager (3,984 bytes at `0x40059F50`) and the
@@ -210,26 +210,35 @@ builds keep symbols, so `addr2line` names the `sub_XXXXXXXX`) and the
 offset, and the page is opened for one single-stepped instruction. Our
 Input::Update runs with the pages open.
 
-Three unattended runs (boot, the front end, attract races; no menus
-driven by a player, no pause menu, no rival intro):
+Three unattended runs (boot, the front end, attract races), then a
+session the user played (2026-10-20, `itc_183.log`: the title, front-end
+menus, a race with the rival intro, the pause menu and its sub-menus),
+resolved with `tools/resolve_input_reads.py`:
 
 | Reader | Reads | When |
 |---|---|---|
-| `sub_8210C370` (the mappers' update) | logical pads 0-3's values 0-7 (+44..+72 + 196j) | front end, race |
-| `sub_8258CF10` (button test, for the mappers) | listener objects' held word (+272) | front end, race |
-| `sub_8258CEB0` → `sub_82592500` (button test), called twice by `sub_82093DC0` | processor 0's pressed word (manager +2104 = +1840 + 264) | boot, front end |
-| `sub_82093DC0`, `sub_820902C8` (tick handlers) | the manager's vtable (+0) only | every pass |
+| `sub_8210C370` (the mappers' update) | logical pads 0-3's values 0-7 (+44..+72 + 196j) | front end, race, paused |
+| `sub_8258CF10` → `sub_825924E0` (button test, for the mappers) | listener objects' held word (+272) | front end, race, paused |
+| `sub_8258CEB0` → `sub_82592500` (button test), called twice by `sub_82093DC0` | processor 0's pressed word (manager +2104 = +1840 + 264) | every phase |
+| `sub_8258CEE0` → `sub_82592520`, called by `sub_82093DC0` | processor 0's held word (+2112), and for a held bit its counter (+284 + 4i) against the delay (+276): true on the first tick held or once repeating | every phase, render-only passes too |
+| `sub_8209F340` → `sub_82591C08`, called by `sub_8215FCA8` and `sub_822231B0` | a physical pad's flags (+4; pad 0 at manager +992): connected | race |
+| `sub_8209F3B8`, called by `sub_8215FCA8` | a physical pad's capabilities subtype (+193, bit 2: a wheel, XInput subtype 2, probably) | race |
+| `sub_82093DC0`, `sub_820902C8`, `sub_8209F340`, `sub_8209F3B8` | the manager's vtable (+0) only, to call its methods | every pass |
+
+`sub_8209F340` and `sub_8209F3B8` find the player's physical pad through
+the manager (the global at `0x826BAB78`) and two of its methods (vtable
+slots 9 and 5, with the player index at `[r3] + 2888`). The subtype test
+is why our fixed capabilities report a gamepad (subtype 1), as the SDK
+did.
 
 - The mappers' +2880 points to logical pad `j`'s values (manager +44,
   +240, +436, +632 for mappers 0-3): they read the sticks from the
   logical pads, not from the processors.
-- So far one reader outside the mappers: the app's update reads
-  processor 0's pressed bits directly (probably "press Start" at boot or
-  in the front end; not checked).
-- Not covered yet: front-end menus and the pause menu driven by a player
-  (the pause menu reads with inline loads, see above), the rival intro.
-  A run with `--watch_input_reads=true` through those would finish the
-  list.
+- Readers outside the mappers: the app's update tests processor 0's
+  pressed, held and repeat state directly (`sub_8258CEB0`,
+  `sub_8258CEE0`), and in a race `sub_8215FCA8` and `sub_822231B0` ask
+  whether the player's pad is connected and whether it's a wheel. The
+  pause menu reads nothing here directly: it goes through the mappers.
 
 ## Plan
 

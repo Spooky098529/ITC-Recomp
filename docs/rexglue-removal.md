@@ -319,14 +319,18 @@ B1. **Input** (3 functions calling `XamInput*`): native, reading A5.
     the hold counters; the action mappers (`sub_8210B018`, wrapped) read
     the processors next.
 
-    Who else reads that data (2026-10-19, partial; "Who reads the input
-    manager" in `docs/pause-menu-fix.md`): besides the mappers (logical
-    pads 0-3's values 0-7 through mapper +2880, and the listeners' held
-    words), the app's update `sub_82093DC0` reads processor 0's pressed
-    word (+2104) through `sub_8258CEB0`. So native mappers wouldn't yet
-    let the input data leave guest memory: at least that word needs a
-    guest copy (or that reader made native too), and menus and the pause
-    menu driven by a player haven't been watched yet.
+    Who else reads that data (2026-10-19 and 20; "Who reads the input
+    manager" in `docs/pause-menu-fix.md`, from unattended runs and a
+    session the user played through the front end, a race and the pause
+    menu): besides the mappers (logical pads 0-3's values 0-7 through
+    mapper +2880, and the listeners' held words), the app's update
+    `sub_82093DC0` tests processor 0's pressed, held and repeat state
+    (`sub_8258CEB0`, `sub_8258CEE0`), and in a race `sub_8215FCA8` and
+    `sub_822231B0` read a physical pad's connected flag and capabilities
+    subtype (`sub_8209F340`, `sub_8209F3B8`). So native mappers alone
+    wouldn't let the input data leave guest memory: processor 0's +264,
+    +272, +276 and counters, and the physical pads' +4 and +192..+211
+    would keep a guest copy until those readers are native too.
 
 B2. **Audio** (6 functions calling `XAudio*`/`XMA*`, plus what's around
     them): the game's render driver client feeding A6 directly, and its
