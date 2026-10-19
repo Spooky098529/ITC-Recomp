@@ -1,10 +1,17 @@
 # Removing ReXGlue: toward a native port
 
 The plan (written 2026-10-19 on branch `remove-rexglue`, restructured the
-same day; in progress on `rexglue-remove-1`: A0, A5 and B1 done) for taking the game off the ReXGlue SDK
+same day; A0, A5 and B1 done) for taking the game off the ReXGlue SDK
 (`rexglue-sdk/`) piece by piece, with releases along the way. The goal
 is a native PC port, not a smaller emulator: in the end no `PPCContext`,
 no guest memory layout, no Xbox kernel calls, no `default.xex`.
+
+Branches (the user's call, 2026-10-20): the work lives on the
+long-lived branch `rexglue-removal-project` (first named
+`rexglue-remove-1`), and the plan's steps are merged into it. `main`
+keeps the game in its current playable state, with bug fixes (graphics
+and the like); the project isn't merged into `main` without the user
+saying so.
 
 How to use this doc: pick the next item from a track, do it, mark it
 `Done (<date>, <branch/commit>)`, and write what was found below it (the
@@ -216,7 +223,7 @@ A5. **Input reading**: SDL gamepads (rumble too) as a native module with
       (`src/input/device_assignment.cpp`), or the user's controller
       changes when the flag flips.
 
-    Step 1 done (2026-10-19, `rexglue-remove-1`): `src/input/gamepads.{h,cpp}`,
+    Step 1 done (2026-10-19, `rexglue-removal-project`): `src/input/gamepads.{h,cpp}`,
     not yet answering the game. Started from `ItcApp::SetupPresentation`
     (UI thread). Our event watch only updates four slots (lowest free slot
     on connect, kept until unplugged, as the SDK does) under our mutex and
@@ -247,7 +254,7 @@ B1. **Input** (3 functions calling `XamInput*`): native, reading A5.
     Then the SDK's input system goes. The user checks gamepad, rumble, the pause menu's repeat (`docs/pause-menu-fix.md`; the action
     mappers' override in `src/hooks/input.cpp` stays as it is).
 
-    Done (2026-10-19, `rexglue-remove-1`), with no fallback flag (the
+    Done (2026-10-19, `rexglue-removal-project`), with no fallback flag (the
     user's call: no SDK for game input). `src/hooks/xinput.cpp`
     overrides the three wrappers (`sub_825BA3F0`, `sub_825BA3F8`,
     `sub_825BA408`; only `sub_82591C18` calls them) with the SDK's
