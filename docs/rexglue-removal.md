@@ -1,7 +1,7 @@
 # Removing ReXGlue: toward a native port
 
 The plan (written 2026-10-19 on branch `remove-rexglue`, restructured the
-same day; A0, A5 and B1 done, B6 done for now) for taking the game off the ReXGlue SDK
+same day; A0, A5, B1 and B3 done, B6 done for now) for taking the game off the ReXGlue SDK
 (`rexglue-sdk/`) piece by piece, with releases along the way. The goal
 is a native PC port, not a smaller emulator: in the end no `PPCContext`,
 no guest memory layout, no Xbox kernel calls, no `default.xex`.
@@ -1047,12 +1047,14 @@ B6. **Pure helpers** (55 functions): string, time and formatting
     | `KeGetCurrentProcessType` | `sub_8245A828`, `sub_825776A8` | five heap and memory functions (core) |
     | `RtlInitAnsiString` | none (its 2 pure callers are done) | the file functions `sub_825B9C20`, `sub_825B9F20`, `sub_825B9FD8`, `sub_822B58F0` (B4); `sub_82295508`, CreateFile, is only wrapped for logging |
 
-    Blocked entirely: `RtlFillMemoryUlong` (its caller also sets up the
-    scaler command buffer, B3), `XGetAVPack` and `XGetLanguage` (one
+    Blocked entirely: `XGetAVPack` and `XGetLanguage` (one
     function also reading the console's settings and the executable's
-    privileges, B5), `XGetVideoMode` (B3, above), and `RtlRaiseException`,
+    privileges, B5), and `RtlRaiseException`,
     `RtlUnwind`, `RtlCaptureContext` (the core). Re-run the boundary
     pipeline before starting any of these: the callers may have changed.
+    Cleared by B3 (2026-10-20): `XGetVideoMode` (both callers native) and
+    `RtlFillMemoryUlong` (its only caller, the scaler set-up
+    `sub_822B3FE0`, is Dropped).
 
     **State of B6 (2026-10-20):** every import B6 alone can clear is
     cleared (10; `XGetVideoMode` went to B3). What's left doesn't clear
