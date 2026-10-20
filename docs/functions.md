@@ -62,7 +62,7 @@ with no row); run it after changing either, on any branch.
 | `sub_8258DAA8` | `VideoOutput::WaitForVblank` | Overridden | Waited for the 2-vblank interval; now only makes the preceding device call (`sub_822A0718`). |
 | `sub_8258DD90` | `Event::Wait` | | r3 = event, r4 = pointer to timeout (-1 = forever). |
 | `sub_8258DD78` | `Event::Signal` | | r3 = event. |
-| `sub_822B20D8` | | | Graphics driver present bookkeeping (frame counter at +20024). Library code, not game timing. |
+| `sub_822B20D8` | | | Graphics driver present bookkeeping (frame counter at +20024). Library code, not game timing. Called by Swap once a frame; calls `Device::SetClockGating` (never reached in play), `sub_822B1788`, `sub_822976F8`, `sub_8229B930`, `sub_8229B9C8`, `sub_8229BFE8`, `sub_82106540`. |
 | `sub_825BA0C8` | `QueryPerformanceCounter` | | System library. |
 | `sub_820C0128` | `Vehicle::GetSpeedKmh` | Overridden | Returns the float at vehicle+48 (m/s) times 3.6. |
 | `sub_82093DC0` | | | First tick handler: polls input, then walks listener lists that run both game logic and the draw step (see "Separating drawing from the game tick"). Tests player 1's input itself, on every pass: processor 0's pressed bits (`sub_8258CEB0`) and held-or-repeating bits (`sub_8258CEE0`), read from the input manager in guest memory ("Who reads the input manager" in `docs/pause-menu-fix.md`). |
@@ -217,6 +217,36 @@ with no row); run it after changing either, on any branch.
 | `sub_822976F8` | | | Probably allocates physical memory (r3 size, r4 flags). Not read. |
 | `sub_82297790` | | | Probably frees what `sub_822976F8` allocates. Not read. |
 | `sub_8229F148` | | | Reserves r4 words in the command buffer, returning where. Not read in detail. |
+| `sub_8229DD70` | | | Writes r5 words from r4 into the primary ring at its write position (+10820, wrapping with +13500), after waiting for room (`sub_8229DCC0`); doesn't write CP_RB_WPTR. From `Device::SetUpRing` (ME_INIT, no longer) and `sub_822B6370` (not read). |
+| `sub_8229DCC0` | | | Waits for room in the primary ring, reading its read pointer from progress block +60 (see "Plan for milestone 6" in `docs/native-renderer.md`). Not read in detail. |
+| `sub_8229F0E0` | | | Writes a WAIT_UNTIL (register `0x5C8` = `0x20000`) and register `0xD04` = 0 into the command buffer, ending the segment first if past +48 (`sub_8229EF48`). Only from `Device::SetUpRing`. |
+| `sub_8229F1B0` | | | The full GPU wait (spins on device +10868; see "Plan for milestone 6" in `docs/native-renderer.md`); passes at once in exclusive mode. From `Device::SetUpRing`, `Device::Release`, `Device::SetClockGating`, `RetrainEdram`. Not read in detail. |
+| `sub_8229E908` | | | Waits for room in the command buffer, comparing progress block +0 with the command position (+10780) (see "Plan for milestone 6"). From `sub_8229EC00`. Not read in detail. |
+| `sub_822AC470` | | | From `Device::SetUpRing` when a command buffer was already set up: r3 and r4 its first and last physical addresses minus `0x40000000`. Not read. |
+| `sub_822B6D70` | | | From `Device::Init`: creates the library's worker threads (`ExCreateThread`, `KeSetBasePriorityThread`) and ends the command segment; 0 on failure. Not read in detail. |
+| `sub_822B6370` | | | Calls `sub_8229DD70` (writes into the primary ring). Not read. |
+| `sub_822AC2A0` | | | From `Device::Init` (r3 device); writes into the command buffer (ends the segment through `sub_8229EF48`). Not read. |
+| `sub_822ACB90` | | | From `Device::Init` (r3 device); calls `sub_8229B7D8`, `sub_822A2A40`, `sub_822A6008`, `sub_822A8A60`, `sub_822AA0E8`. Not read. |
+| `sub_822A3B90` | | | From `Device::Init` and Swap (r3 device, r4 0); calls `sub_8229B7D8`, `sub_8229EF48`, `sub_822A0F80`. Not read. |
+| `sub_822B43C0` | | | From `Device::Init` (r3 device); a 0 return makes it print a warning (the string at `82014180`). Not read. |
+| `sub_822B1E70` | | | From `Device::Init` (no arguments): passes two callbacks (28: `822B1AC8`; 47: a block holding 2 and `822B1CB0`) to a function from the kernel variable at `820007B4`, or from the debug monitor data (`820007F0`, +24) if that's set (it points to 0 without a debugger), and clears the global at `82953D14`. Not read in detail. |
+| `sub_822AC530` | | | The library's debug print (r3 a string): calls `DbgPrint` (see B6). From `Device::Init`'s warnings. Not read in detail. |
+| `sub_825B9A60` | | | From `sub_822AD228`; its result goes to device +10760. Not read. |
+| `sub_822A5D08` | | | Probably creates a texture: r3 width, r4 height, then 1, 1, 0, the format, 0, 3; returns it or 0. From `Device::SetUpDisplay` for the front buffer (skipped: the game sets parameters +60). Not read. |
+| `sub_822A5E28` | | | Probably creates a surface: r3 width, r4 height, r5 format, r6 parameters +16, r7 0; returns it or 0. From `Device::SetUpDisplay` (render target, depth surface). Not read. |
+| `sub_822A3D30` | | | Probably `Device::SetRenderTarget` (r3 device, r4 index, r5 surface); from `Device::SetUpDisplay` with the default render target. Not read. |
+| `sub_822A4060` | | | Probably `Device::SetDepthStencilSurface` (r3 device, r4 surface); from `Device::SetUpDisplay` with the default depth surface. Not read. |
+| `sub_822B42D0` | | | The scaler's parameters: r3 device, r4 them (presentation parameters +96); calls `sub_822B2598`, then `sub_822B4250`. From `Device::SetUpDisplay` and Swap. Not read in detail. |
+| `sub_822B4250` | | | Copies 56 bytes (probably the scaler's parameters into the device) and calls `sub_822B2610` (Dropped), returning what it returns. Not read in detail. |
+| `sub_822B2598` | | | From `sub_822B42D0`. Not read. |
+| `sub_822B3798` | | | From `sub_822B3A78` (twice): the scaler's filters. Not read. |
+| `sub_822B0760` | | Native | One piecewise-linear gamma ramp entry (r3 out, r4 in, r5 the curve), from `sub_822B0AB0`: base `curve[in.base >> 6] << 6`, delta the curve's rise to `min(base>>6 + delta>>6, 1023)` `<< 6`. `display::ApplyGammaCurve` does it natively; no longer called. |
+| `sub_822B0C38`, `sub_822B0D18` | | | Called by `sub_822A3A20` and `sub_822A3AA8` after their gamma ramp. Not read. |
+| `sub_822A05A8` | | | From Swap; calls `sub_822B0E08` and `sub_822B0E60` (the default gamma ramps). Not read. |
+| `sub_822B5C58` | | | From Swap (r3 device, r4 the front buffer); calls `sub_822B5208`, the mounting `sub_822B58F0` and `sub_822B4F10`. Not read. |
+| `sub_8229EC00` | | | From Swap (r3 device, r4 the segment size in words, +13512 >> 2); calls `sub_8229E100`, `sub_8229E908`, `sub_822AD690`, `sub_822AD8F8`. Not read. |
+| `sub_822ACFB8`, `sub_822B58C0` | | | From `Device::Release` (never called); both reach `sub_822B4F10`. Not read. |
+| `sub_822B1788` | | | From `sub_822B20D8` (twice); calls `Device::SetClockGating`. Not read. |
 | `sub_825BE708` | `DrawIndexedVertices` | Overridden | Exclusive mode, without its packets (`src/native/draw_packets.cpp`). |
 | `sub_822A6738`, `sub_822A67B0` | `Resource::AddRef`, `Resource::Release` | Overridden | `src/native/refcount.cpp`: reference counts without the library's global lock, skipped for the vertex shader already bound; the original with `--refcount_global_lock`. |
 | `sub_822A8808` | `Device::SetVertexShader` | Wrapped | Same file: marks a rebind of the bound shader, so `AddRef` and `Release` skip it. |
