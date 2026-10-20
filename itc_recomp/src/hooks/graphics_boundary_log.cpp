@@ -33,16 +33,13 @@ struct Counter {
 Counter g_counters[] = {
     {"8229B848 clock gating"},     {"8229F280 ring set-up"},     {"822A08A0 swap"},
     {"822ACB68 terminate"},        {"822ACE00 display mode"},    {"822AD0B0 set display mode"},
-    {"822AD190 engines"},          {"822AD298 device init"},     {"822AD500 device release"},
-    {"822B2388 EDRAM retrain"},
-    {"822B2470 scaler rect"},      {"822B2610 notification"},    {"822B3A78 scaler filters"},
-    {"822B3FE0 scaler buffer"},    {"822B4F10 capture?"},        {"822A0688 reads 7FC8xxxx"},
+    {"822AD298 device init"},      {"822AD500 device release"},  {"822B2470 scaler rect"},
+    {"822B3A78 scaler filters"},   {"822B4F10 capture?"},        {"822A0688 reads 7FC8xxxx"},
     {"822ACB48 engines callback"},
 };
 enum Index {
-  kClockGating, kRingSetup, kSwap, kTerminate, kDisplayMode, kSetDisplayMode, kEngines,
-  kDeviceInit, kDeviceRelease, kEdramRetrain, kScalerRect,
-  kNotification, kScalerFilters, kScalerBuffer, kCapture, kRegisterRead, kEnginesCallback,
+  kClockGating, kRingSetup, kSwap, kTerminate, kDisplayMode, kSetDisplayMode, kDeviceInit,
+  kDeviceRelease, kScalerRect, kScalerFilters, kCapture, kRegisterRead, kEnginesCallback,
 };
 
 std::mutex g_summary_mutex;
@@ -111,16 +108,12 @@ COUNTED(822A08A0, kSwap, DeviceFields(base, r3))
 COUNTED(822ACB68, kTerminate, std::string())
 COUNTED(822ACE00, kDisplayMode, DeviceFields(base, r3))
 COUNTED(822AD0B0, kSetDisplayMode, DeviceFields(base, r3))
-COUNTED(822AD190, kEngines, std::string())
 COUNTED(822AD298, kDeviceInit, DeviceFields(base, r3))
 COUNTED(822AD500, kDeviceRelease, std::string())
-COUNTED(822B2388, kEdramRetrain, std::string())
 COUNTED(822B2470, kScalerRect,
         fmt::format("; display {}x{}", guest::LoadU32(base, r3 + 19988),
                     guest::LoadU32(base, r3 + 19992)))
-COUNTED(822B2610, kNotification, std::string())
 COUNTED(822B3A78, kScalerFilters, std::string())
-COUNTED(822B3FE0, kScalerBuffer, std::string())
 COUNTED(822B4F10, kCapture, std::string())
 COUNTED(822A0688, kRegisterRead, std::string())
 COUNTED(822ACB48, kEnginesCallback, std::string())
