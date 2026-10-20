@@ -433,3 +433,39 @@ extern "C" REX_FUNC(sub_8229F280) {
   });
   ctx.r3.u64 = result;
 }
+
+// Device::SetDisplayMode (from Swap, once, when Device::SetUpDisplay asked
+// for it): r3 device, r4 the presentation parameters (the device's copy),
+// r5 non-zero to set the mode. Runs the default gamma ramp through the
+// display's gamma (sub_822B0E08 and sub_822A3A20, or for formats 7 and 54
+// the piecewise-linear sub_822B0E60 and sub_822A3AA8), and puts the
+// display's size in the device's fields. Left out: VdSetDisplayMode (the SDK
+// ignores it) and VdGetCurrentDisplayInformation: the fields come from our
+// display mode (src/display/display.h), as the SDK's answer did (the front
+// buffer's color format 0).
+extern "C" REX_FUNC(sub_822AD0B0) {
+  REX_FUNC_PROLOGUE();
+  const uint32_t device = ctx.r3.u32, parameters = ctx.r4.u32;
+  const bool set_mode = ctx.r5.u32 != 0;
+  InFrame(ctx, base, 1744, 0x822AD0F4, [&](uint32_t frame) {
+    if (!set_mode) {
+      return;
+    }
+    const uint32_t ramp = frame + 176;
+    const uint32_t format = guest::LoadU32(base, parameters + 64) & 0x3F;
+    const bool piecewise_linear = format == 7 || format == 54;
+    ctx.r3.u64 = ramp;
+    ctx.r4.u64 = 0;
+    ctx.lr = piecewise_linear ? 0x822AD114 : 0x822AD0F4;
+    (piecewise_linear ? sub_822B0E60 : sub_822B0E08)(ctx, base);  // the default ramp
+    ctx.r3.u64 = device;
+    ctx.r4.u64 = 0;
+    ctx.r5.u64 = ramp;
+    ctx.lr = piecewise_linear ? 0x822AD128 : 0x822AD104;
+    (piecewise_linear ? sub_822A3AA8 : sub_822A3A20)(ctx, base);  // set as the gamma ramp
+  });
+  guest::StoreU32(base, device + kDeviceDisplayWidth, display::kWidth);
+  guest::StoreU32(base, device + kDeviceDisplayHeight, display::kHeight);
+  guest::StoreU32(base, device + kDeviceDisplayPitch, display::kWidth);
+  guest::StoreU32(base, device + kDeviceDisplayFormat, 0);
+}

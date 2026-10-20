@@ -125,7 +125,6 @@ std::string DeviceFields(uint8_t* base, uint32_t device) {
 COUNTED(8229B848, kClockGating, DeviceFields(base, r3))
 COUNTED(822A08A0, kSwap, DeviceFields(base, r3))
 COUNTED(822ACB68, kTerminate, std::string())
-COUNTED(822AD0B0, kSetDisplayMode, DeviceFields(base, r3))
 COUNTED(822AD500, kDeviceRelease, std::string())
 COUNTED(822B2470, kScalerRect,
         fmt::format("; display {}x{}", guest::LoadU32(base, r3 + 19988),
