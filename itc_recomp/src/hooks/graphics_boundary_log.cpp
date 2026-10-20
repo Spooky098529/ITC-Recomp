@@ -9,6 +9,7 @@
 // 10 s all the counts.
 
 #include "guest.h"
+#include "graphics_boundary_log.h"
 
 #include <rex/cvar.h>
 #include <rex/logging.h>
@@ -261,23 +262,30 @@ void SwapSummary() {
 
 }  // namespace
 
-extern "C" REX_FUNC(sub_822A08A0) {
-  REX_FUNC_PROLOGUE();
-  bool log = Count(kSwap);
-  uint32_t lr = uint32_t(ctx.lr), r3 = ctx.r3.u32, r4 = ctx.r4.u32, r5 = ctx.r5.u32;
-  std::string entry;
+// Called by the native Swap (src/hooks/graphics_device.cpp), around it.
+namespace graphics_boundary {
+
+SwapEntry SwapEntered(uint8_t* base, uint32_t lr, uint32_t device, uint32_t front_buffer,
+                      uint32_t parameters) {
+  SwapEntry entry{Count(kSwap), lr, device, front_buffer, parameters, {}};
   if (REXCVAR_GET(log_graphics_boundary)) {
-    CountSwap(base, lr, r3, r4, r5);
-    if (log) {
-      entry = SwapEntryFields(base, r3, r4);
+    CountSwap(base, lr, device, front_buffer, parameters);
+    if (entry.log) {
+      entry.fields = SwapEntryFields(base, device, front_buffer);
     }
   }
-  __imp__sub_822A08A0(ctx, base);
-  if (log) {
-    Log(kSwap, lr, r3, r4, r5, ctx.r3.u32,
-        "; at entry: " + entry + "; after: " + SwapExitFields(base, r3) + DeviceFields(base, r3));
+  return entry;
+}
+
+void SwapLeft(uint8_t* base, const SwapEntry& entry, uint32_t result) {
+  if (entry.log) {
+    Log(kSwap, entry.lr, entry.device, entry.front_buffer, entry.parameters, result,
+        "; at entry: " + entry.fields + "; after: " + SwapExitFields(base, entry.device) +
+            DeviceFields(base, entry.device));
   }
   if (REXCVAR_GET(log_graphics_boundary)) {
     SwapSummary();
   }
 }
+
+}  // namespace graphics_boundary

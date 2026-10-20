@@ -5,6 +5,9 @@
 
 #include "guest.h"
 #include "guest_call.h"
+#include "graphics_boundary_log.h"
+
+#include <rex/cvar.h>
 
 #include <bit>
 
@@ -468,4 +471,94 @@ extern "C" REX_FUNC(sub_822AD0B0) {
   guest::StoreU32(base, device + kDeviceDisplayHeight, display::kHeight);
   guest::StoreU32(base, device + kDeviceDisplayPitch, display::kWidth);
   guest::StoreU32(base, device + kDeviceDisplayFormat, 0);
+}
+
+REXCVAR_DEFINE_BOOL(recompiled_swap, false, "ITC",
+                    "Run the recompiled Swap instead of the native one (temporary, for checking "
+                    "rexglue-removal B3)");
+
+namespace {
+
+constexpr uint32_t kDeviceFlags3 = 10811;
+constexpr uint32_t kDeviceScaler = 13312;           // 56 bytes
+constexpr uint32_t kDeviceFrontBufferHeader = 13444;  // a copy of its 52 bytes
+constexpr uint32_t kDeviceFence = 13540;            // the last Swap's command position
+constexpr uint32_t kDeviceFenceBefore = 13544;      // the one before
+
+}  // namespace
+
+// Device::Swap (once a frame, from Renderer::Present's 8258DCA4; also from
+// the movies' sub_822A0E50, the tiling worker and sub_8209ACB8): r3 device,
+// r4 the front buffer (a texture header), r5 parameters (0, or the device's
+// own +13284). Keeps the front buffer's header (sub_822A0718 reads its
+// address every frame), sets the display mode at the first Swap, ends the
+// command segment (the kick our renderer reads), takes the next one and
+// waits for the last Swap's fence (sub_8229EC00, the frame throttle),
+// records the fences, and marks every register block dirty (sub_822A3B90)
+// for the next frame's first draw. r3 is left as sub_822A3B90 leaves it, as
+// the original. Left out (see "Swap, step by step" under B3): the GPU
+// timestamps (sub_822B1F68; only with a debugger), the segment end when
+// 829537C0 is set (no code sets it), the capture check (sub_822B5C58), the
+// kernel's VdGetSystemCommandBuffer and VdSwap and the 64 words reserved for
+// it (+20120, +20432), the parameters' compare (sub_822B42D0; they never
+// differ), the scaler's and gamma's display packets (Device::SetUpScaler,
+// sub_822A05A8), the front buffer register 0x1844 (+20004) and the 7FC86110
+// write, the display persistence (REG_RMW 0x1E4E, VdPersistDisplay,
+// MmFreePhysicalMemory), RetrainEdram (dropped) and the frame statistics
+// for a debugger (sub_822B20D8). The flags those steps clear are cleared.
+extern "C" REX_FUNC(sub_822A08A0) {
+  REX_FUNC_PROLOGUE();
+  const uint32_t device = ctx.r3.u32, front_buffer = ctx.r4.u32;
+  const graphics_boundary::SwapEntry entry =
+      graphics_boundary::SwapEntered(base, uint32_t(ctx.lr), device, front_buffer, ctx.r5.u32);
+  if (REXCVAR_GET(recompiled_swap)) {
+    __imp__sub_822A08A0(ctx, base);
+    graphics_boundary::SwapLeft(base, entry, ctx.r3.u32);
+    return;
+  }
+  auto field = [&](uint32_t offset) { return guest::LoadU32(base, device + offset); };
+  auto set = [&](uint32_t offset, uint32_t value) { guest::StoreU32(base, device + offset, value); };
+  auto clear_bits = [&](uint32_t offset, uint8_t bits) {
+    guest::StoreU8(base, device + offset, guest::LoadU8(base, device + offset) & ~bits);
+  };
+  InFrame(ctx, base, 384, 0x822A08C4, [&](uint32_t) {
+    // Through the game's memcpy, as the original (it's wrapped for the
+    // renderer's memory mirrors).
+    ctx.r3.u64 = device + kDeviceFrontBufferHeader;
+    ctx.r4.u64 = front_buffer;
+    ctx.r5.u64 = 52;
+    ctx.lr = 0x822A08C4;
+    sub_825A7410(ctx, base);
+    if (guest::LoadU8(base, device + kDeviceFlags) & 0x10) {
+      ctx.r3.u64 = device;
+      ctx.r4.u64 = device + kDeviceParameters;
+      ctx.r5.u64 = 1;
+      ctx.lr = 0x822A0AAC;
+      sub_822AD0B0(ctx, base);  // Device::SetDisplayMode
+      clear_bits(kDeviceFlags, 0x10);
+    }
+    if (guest::LoadU8(base, device + kDeviceFlags2) & 0x20) {
+      for (uint32_t i = 0; i < 56; i += 4) {
+        set(kDeviceScaler + i, 0);
+      }
+      clear_bits(kDeviceFlags2, 0x20);
+    }
+    clear_bits(kDeviceFlags3, 0x80);
+    const uint32_t position = field(kDeviceCommandPosition);
+    ctx.r3.u64 = device;
+    ctx.lr = 0x822A0DFC;
+    sub_8229EF48(ctx, base);  // ends the command segment
+    ctx.r3.u64 = device;
+    ctx.r4.u64 = field(kDeviceSegmentBytes) >> 2;
+    ctx.lr = 0x822A0E1C;
+    sub_8229EC00(ctx, base);  // the next segment, and waits for the last Swap's fence
+    clear_bits(kDeviceFlags, 0x20);
+    set(kDeviceFenceBefore, field(kDeviceFence));
+    set(kDeviceFence, position);
+    ctx.r3.u64 = device;
+    ctx.r4.u64 = 0;
+    ctx.lr = 0x822A0E48;
+    sub_822A3B90(ctx, base);  // every register block dirty
+  });
+  graphics_boundary::SwapLeft(base, entry, ctx.r3.u32);
 }
