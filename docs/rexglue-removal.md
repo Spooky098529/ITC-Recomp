@@ -83,11 +83,55 @@ function (`grep -rn sub_XXXXXXXX itc_recomp/src` first). For each:
 - A flag to fall back to the recompiled version (`__imp__sub_XXXXXXXX`),
   on by default once checked, in the repo's style
   (`--native_<subsystem>`), until the recompiled version is dead.
-- Check: log both versions' results on the same inputs where that's
-  possible (pure functions: run both, compare, log differences);
-  otherwise the play checklist below. `src/debug/state_capture.cpp` and
-  `frame_state_diff.cpp` may help.
+- Check: harness cases comparing both versions on the same inputs
+  where that's possible (below), an attract race, and the play
+  checklist (Testing) for what neither reaches.
+  `src/debug/state_capture.cpp` and `frame_state_diff.cpp` may help.
 - Speed: uncapped A/B, or profiles for small differences (CLAUDE.md).
+
+### Checking with a harness
+
+`itc_recomp/src/harnesses/` (since 2026-10-20) keeps the checks: each
+harness runs native functions and the recompiled ones they replace
+(`__imp__sub_XXXXXXXX`) on the same inputs and compares, byte for
+byte, what each leaves in guest memory and r3. They're off unless
+`--run_harnesses` names them (`all`, or a list such as
+`time,strings`); they then run once, from the first Input::Update, log
+`harness: <function>: N cases, M differ` (and the first ten
+differences), and the game carries on. So:
+
+```sh
+itc_recomp/tools/attract_race.sh 25 --run_harnesses=all
+```
+
+- `harness.h` has what they share: `Both` (one case through both
+  versions: the scratch area filled with 0xCD, inputs written, registers
+  set, the function run, the output bytes and r3 kept), `Results`
+  (counts and logs), a seeded `Random` (the same cases each run) and
+  guest memory helpers. The scratch area is 512 bytes below the stack
+  pointer, and calls run with their stack below it.
+- One file per area, registered in `harness.cpp`'s list (and the flag's
+  help text). A new native function gets its cases there, in the same
+  change: random inputs over its branches, edge cases (empty, none,
+  too small, overflow), and the game's real inputs when known.
+- Inputs that come from elsewhere are fed by a stand-in override that
+  answers with made-up data while a harness asks and calls the
+  recompiled function otherwise (the time harness's console time zone
+  read, `sub_8229B440`, Wrapped in `functions.md`). When that function
+  is made native, the stand-in moves into its native version.
+- Where ours deliberately differs, the cases go in a group of their own
+  named "(expected to differ)" (the time conversions outside 1678-2261,
+  where the SDK's overflow), so the others stay at 0.
+- What an attract race uses: a temporary counter override (log the
+  first calls and powers of two, with `ctx.lr`) on the functions in
+  question, removed afterwards (a kept one would block a real override
+  of the same function). Functions the race never calls rely on the
+  harness alone.
+- Not everything fits: functions that wait on hardware or time (the
+  audio library's wait, `sub_8245D288`) are checked by attract races
+  and the user's play.
+- Harnesses need the recompiled functions, so they go when `generated/`
+  does (E4).
 
 ## What the game uses from the SDK
 
@@ -132,9 +176,11 @@ handles), which is fine: the unit of work is a subsystem, not a function.
 
 ## Testing
 
-- Attract races without the user: `--skip_intro --attract_after_s=1`
-  under `timeout`, read the log, frames with `--native_renderer_dump`
-  (CLAUDE.md, "Build and run").
+- Attract races without the user: `itc_recomp/tools/attract_race.sh
+  <seconds> [flags]` (`--skip_intro --attract_after_s=1` under
+  `timeout`; prints the log, seconds raced, errors and harness results),
+  frames with `--native_renderer_dump` (CLAUDE.md, "Build and run").
+- Harnesses: `--run_harnesses=all` (above).
 - Speed: uncapped (`--max_fps=0`) alternating runs; for changes under a
   few percent, `itc_recomp/tools/profile_render_thread.sh` (also
   `ITC_THREAD=main`).
@@ -420,9 +466,9 @@ B6. **Pure helpers** (55 functions): string, time and formatting
 
     Which imports B6 alone clears (2026-10-20: no caller also calls an
     import of another area), done as groups on `pure-helpers`, each
-    checked by an attract race and a temporary harness (not committed;
-    kept in `git stash`) running the recompiled and native versions on
-    the same inputs:
+    checked by an attract race and a harness (first temporary, kept in
+    `src/harnesses/` since; "Checking with a harness") running the
+    recompiled and native versions on the same inputs:
 
     - Time (done): `KeQuerySystemTime`, `RtlTimeToTimeFields`,
       `RtlTimeFieldsToTime`, through GetLocalTime, the time zone state,

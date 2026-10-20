@@ -140,6 +140,13 @@ find /dev/shm -maxdepth 1 -user "$USER" -name 'xenia_memory_*' -delete
   grayscale filter over the screen: a gray or brown frame from an attract
   race is the game's, not a rendering bug. Never screenshot the user's desktop. Without the GPU plugin, `--skip_intro` sometimes
   stalls the boot (no "called from 8248466C" in the log): restart it.
+- `itc_recomp/tools/attract_race.sh <seconds> [flags]` runs such a race
+  with the standard flags and prints the log's path, the seconds raced,
+  error lines and harness results. `--run_harnesses=all` (or a list)
+  compares native functions with the recompiled ones on the same inputs
+  (`src/harnesses/`); every function made native gets harness cases there
+  in the same change (see "Checking with a harness" in
+  `docs/rexglue-removal.md`).
 - Run the game in the background. The user plays: they start a race, drive
   near an opponent and quit, then say what they saw.
 - Logs go to `itc_recomp/out/build/linux-amd64-release/logs/itc_<n>.log`,
