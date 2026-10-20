@@ -23,7 +23,7 @@ branch, merged into `main` 2026-10-16.
   Profile before changing anything. On real Windows it's unmeasured.
 - **Against Linux after merging v0.4.0** (2026-10-16, same PC, both
   built from `windows` at `46a85fe`): uncapped attract races at the
-  default 1280x720 with `run.sh`'s flags (`--max_fps=0`), `timeout 25`,
+  default 1280x720 with the standard flags (`--max_fps=0`), `timeout 25`,
   Linux and Windows alternating, mean fps over the race's seconds 3-18:
 
   | Run | Linux | Windows (Wine) |
@@ -75,17 +75,7 @@ branch, merged into `main` 2026-10-16.
 - **Stubbed on Windows** (debug tools only): the guest memory scans
   (`--find_per_frame_state` and friends, the state capture), which read
   `/proc/self/maps`, and `--log_frame_times`' thread CPU time (reads 0).
-- **`run.bat` sets its defaults as environment variables** (`REX_<OPTION>`,
-  e.g. `REX_MAX_FPS`): the SDK reads them after the command line, so an
-  option given there overrides its default. (`run.sh` leaves a default out
-  instead, as the parser rejects an option given twice; batch can't do
-  that easily, since it splits arguments at `=`.) `--no-interpolation` is
-  handled by the script and also reaches the game, which ignores it.
-  Its defaults match `run.sh`'s (the mirrors updated by tick,
-  `--fullscreen=false`; brought up to date 2026-10-16 after merging
-  v0.4.0, checked under Wine: a 1280x720 window, the mirrors by tick, and
-  `run.bat --fullscreen` overriding the default). Keep the two in step
-  when `run.sh` changes.
+- **Settings come from `itc.toml`** next to `itc.exe`, as on Linux.
 - **The Visual C++ runtime ships in the zip** (`MSVCP140.dll`,
   `MSVCP140_ATOMIC_WAIT.dll`, `VCRUNTIME140.dll`, `VCRUNTIME140_1.dll`:
   what the three binaries import; Windows 10 and 11 have the Universal
@@ -151,16 +141,17 @@ timeout 90 wine $B/itc.exe --native_renderer=true --native_renderer_exclusive=tr
 ```
 
 Logs go to `logs/` next to `itc.exe`. Wine's own messages (stderr) are
-mostly harmless `fixme` lines. To test the scripts, package as below and
-run `wine cmd /c run-debug.bat` in the package's folder (with
-`--game_data_root=...` if it isn't in the game folder).
+mostly harmless `fixme` lines. To test a package as players get it,
+package as below, put it in the game folder and run `wine itc.exe` there
+(add `--log_level=info` for logs; without `--game_data_root`, the game's
+files are looked for next to `itc.exe`).
 
 Test zips, as for Linux:
 
 ```sh
 name=itc-<label>-win-amd64; D=itc_recomp/out/dist/$name; B=itc_recomp/out/build/win-amd64-cross-release
 rm -rf $D $D.zip; mkdir -p $D
-cp $B/itc.exe $B/rexruntime.dll $B/SDL3.dll itc_recomp/run.bat itc_recomp/run-debug.bat $D/
+cp $B/itc.exe $B/rexruntime.dll $B/SDL3.dll itc_recomp/itc.toml $D/
 runtime=$(for f in itc.exe rexruntime.dll SDL3.dll; do llvm-readobj --coff-imports $D/$f | sed -n 's/^ *Name: //p'; done \
   | grep -iE '^(msvcp|vcruntime|concrt|vccorlib)' | sort -fu)
 python3 -I itc_recomp/tools/fetch_vc_redist.py itc_recomp/out/xwin-sdk $D $runtime

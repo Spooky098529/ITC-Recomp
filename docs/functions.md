@@ -802,7 +802,7 @@ and target, and recorder world matrices), mostly for comparison.
 | `--double_precision_blending` | Blend objects' and cameras' positions in double and multiply only their difference (default off): the blend's own jitter far from the origin from ~1 mm to ~0.01 mm, nothing visible. |
 | `--log_camera_copies` | Every 2 s: copies of cameras left unpaired between ticks, what the previous tick held at the same address (with the eye's movement, turn and scales for a renumbered one), new camera numbers and how many exist. |
 | `--log_cockpit_judder` | Every 2 s: where the camera is in the frame of each part within 3 m of it (the cockpit), frame by frame, its jerk, and the ticks' own camera offsets. |
-| `--log_thread_cpu` | Every 2 s: the process's and the machine's CPU use, and each thread using 5% of a core or more, by name: its share of a core (system time in brackets), the CPU it last ran on, its voluntary/involuntary context switches (many involuntary ones mean it's waiting for a core) and its minor/major page faults. Game threads are labeled with their entry point (`8258DE50 -> <the thread's own function>`). A thread with 10% or more of a core in the kernel gets its system calls sampled (25 reads of `/proc/.../syscall`, 4 ms apart: numbers, `running`, or -1 outside a call). On in `run-debug.sh`; Linux only. For finding a thread that pegs a core on slower machines (the Steam Deck). |
+| `--log_thread_cpu` | Every 2 s: the process's and the machine's CPU use, and each thread using 5% of a core or more, by name: its share of a core (system time in brackets), the CPU it last ran on, its voluntary/involuntary context switches (many involuntary ones mean it's waiting for a core) and its minor/major page faults. Game threads are labeled with their entry point (`8258DE50 -> <the thread's own function>`). A thread with 10% or more of a core in the kernel gets its system calls sampled (25 reads of `/proc/.../syscall`, 4 ms apart: numbers, `running`, or -1 outside a call). Among CLAUDE.md's logging flags; Linux only. For finding a thread that pegs a core on slower machines (the Steam Deck). |
 | `--native_cockpit_dials`, `--check_native_cockpit_dials` | The cockpit dials posed natively (default on), and their angles and poses compared with the translated code on logic passes, logged every 2 s. |
 | `--log_camera_pass_records` | Which camera passes are recorded on logic and render-only passes, by message handler. |
 | `--log_gpu_memory` | Every 5 s (native renderer): the GPU memory it holds by what it's for (textures, resolve destinations, images, staging, mirrors, constant blocks), and its counts of views, samplers, descriptor pools and pipelines; with it, the texture cache logs textures by time since drawn, what new textures' memory overlapped, and the textures and resolve destinations it frees. For the memory that grows from race to race; see "Textures are never freed" in `native-renderer.md`. |
@@ -949,7 +949,7 @@ Tried on the way, not kept:
 **Historical: the emulated GPU (2026-10-13).** This is what limited the
 frame rate before the native renderer and native audio. Neither the
 emulated GPU nor the Audio Worker runs any more by default, so none of it
-describes the game as `run.sh` runs it now. For the current limit (the
+describes the game as it runs now. For the current limit (the
 render thread's own work), see "Performance: the render thread" in
 `native-renderer.md`.
 

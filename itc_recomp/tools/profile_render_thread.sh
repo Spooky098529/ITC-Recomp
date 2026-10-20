@@ -23,7 +23,7 @@ set -e
 D=$1; NAME=$2; PATTERN=${3:-BlendState_ReplayConstants}
 B=itc_recomp/out/build/linux-amd64-release; G="$PWD/itc/Import Tuner Challenge (USA)"
 mkdir -p itc_recomp/out/profiles; O=itc_recomp/out/profiles/$NAME.data
-# As run.sh: our audio, the mirrors updated once a frame, and a window, not
+# As players get it: our audio, the mirrors updated once a frame, and a window, not
 # fullscreen (the SDK's --fullscreen defaults to true).
 defaults=(--native_renderer=true --native_renderer_exclusive=true --native_audio=true
   --native_renderer_mirror_by_tick=true --native_renderer_mirror_to_both=true

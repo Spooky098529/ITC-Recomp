@@ -1,0 +1,49 @@
+# Import Tuner Challenge (recompiled): settings.
+#
+# Put itc (itc.exe on Windows), its libraries and this file in the game
+# folder next to default.xex, then run itc. Edit the values below and start
+# the game again for them to take effect. Options given on the command line
+# (for example ./itc --fullscreen=true) win over this file.
+
+# Frame interpolation (experimental): game logic stays at 30 Hz and races
+# are drawn up to max_fps, each frame blended between the last two ticks.
+# Menus stay at 30 fps. For the original 30 fps, set
+# interpolate_draw_state = false and max_fps = 30.
+interpolate_draw_state = true
+
+# Frame rate cap; 0 for unlimited.
+max_fps = 144
+
+# Resolution. With width and height at 0, the game runs in a 1280x720
+# window at its own resolution, its 3D view drawn at 1024x576 and upscaled,
+# as on the console.
+#   width, height  the window's size in pixels; the game is drawn at the
+#                  largest 16:9 resolution that fits it. Set one alone and
+#                  the other follows at 16:9.
+#   fullscreen     fill the screen (borderless, no display mode change),
+#                  drawn at the screen's resolution; with width/height,
+#                  drawn at that resolution and scaled to the screen (e.g.
+#                  to go easier on a weak GPU).
+# At any size but 1280x720 the 3D view is drawn at the full resolution too,
+# not upscaled. Screens and windows that aren't 16:9 get black bars. Higher
+# resolutions cost GPU time only.
+width = 0
+height = 0
+fullscreen = false
+
+# Motion blur: the game's blur of the picture at speed. false for a sharp
+# picture. The glow around lights is always drawn.
+motion_blur = true
+
+# Xbox 360 gamma: the console sends its picture through a gamma table made
+# for the kind of display it's connected to, so on a TV it looks darker
+# than here.
+#   "off"    no change, as made for a PC monitor
+#   "hdtv"   as the 360 sends it to an HDTV: darker mid-tones and shadows
+#   "power"  the 360's table for a display with a set gamma power: lighter
+#            shadows
+xbox_gamma = "off"
+
+# Logging: "off", or "info" to write logs (in the logs folder next to itc)
+# for reporting problems.
+log_level = "off"

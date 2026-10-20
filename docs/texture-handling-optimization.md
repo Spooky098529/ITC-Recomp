@@ -48,8 +48,8 @@ automated attract race (see `CLAUDE.md`). The log gives:
   the time spent loading and hashing, and the worst frame; and a line with
   memcpy's writes, the textures they marked and the time marking took.
 
-These need info logging (`run-debug.sh`); `run.sh` turns it off and the
-timing with it (`log_enabled.h`).
+These need info logging (`--log_level=info`); released builds turn it off
+(`itc.toml`) and the timing with it (`log_enabled.h`).
 
 ## Done
 

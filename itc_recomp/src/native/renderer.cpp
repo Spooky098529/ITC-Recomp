@@ -36,10 +36,11 @@ REXCVAR_DEFINE_BOOL(log_gpu_memory, false, "ITC",
                     "Log every 5 s the GPU memory the native renderer holds, by what it's for, "
                     "and its counts of views, samplers, descriptor pools and pipelines (to find "
                     "what grows from race to race)");
-REXCVAR_DEFINE_BOOL(native_renderer, false, "ITC",
-                    "Draw the game's render commands with our own Vulkan renderer, in a "
-                    "second window (in development; see docs/native-renderer.md)");
-REXCVAR_DEFINE_BOOL(native_renderer_exclusive, false, "ITC",
+REXCVAR_DEFINE_BOOL(native_renderer, true, "ITC",
+                    "Draw the game's render commands with our own Vulkan renderer, in its own "
+                    "window (see docs/native-renderer.md; =false with --gpu_plugin=xenos for "
+                    "the emulated GPU)");
+REXCVAR_DEFINE_BOOL(native_renderer_exclusive, true, "ITC",
                     "With native_renderer: hand the emulated GPU no work, drawing only in our "
                     "window (milestone 6; see docs/native-renderer.md)");
 REXCVAR_DEFINE_BOOL(native_renderer_validation, false, "ITC",
@@ -88,13 +89,14 @@ REXCVAR_DEFINE_BOOL(native_renderer_reuse_texture_sets, true, "ITC",
 REXCVAR_DEFINE_BOOL(native_renderer_copy_all, false, "ITC",
                     "Copy every vertex and index range into the mirror every frame, not only "
                     "those the library's memcpy wrote since (a debugging aid)");
-REXCVAR_DEFINE_BOOL(native_renderer_mirror_by_tick, false, "ITC",
+REXCVAR_DEFINE_BOOL(native_renderer_mirror_by_tick, true, "ITC",
                     "Draws read a guest memory mirror updated only as a logic pass's list starts "
-                    "replaying, the two mirrors alternating (an experiment; see 'Hypothesis to "
-                    "test: the mirrors updated once a tick' in docs/native-renderer.md)");
-REXCVAR_DEFINE_BOOL(native_renderer_mirror_to_both, false, "ITC",
+                    "replaying, the two mirrors alternating (=false for the old per-draw "
+                    "mirror; see 'Hypothesis to test: the mirrors updated once a tick' in "
+                    "docs/native-renderer.md)");
+REXCVAR_DEFINE_BOOL(native_renderer_mirror_to_both, true, "ITC",
                     "With --native_renderer_mirror_by_tick: memcpy's writes go into both mirrors "
-                    "at each frame's start, the one draws read included (an experiment)");
+                    "at each frame's start, the one draws read included");
 REXCVAR_DEFINE_BOOL(native_renderer_verify_mirror, false, "ITC",
                     "Compare each vertex and index range not copied into the mirror with guest "
                     "memory every frame, logging those that differ (a debugging aid; slow, ~20 "

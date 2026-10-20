@@ -352,7 +352,7 @@ What to log:
   and the tick handlers run, to find what runs on render-only passes only
   while paused.
 - The user runs a race, pauses, holds a direction in the menu and quits
-  (`run-debug.sh`-style flags from CLAUDE.md plus `--log_input=true`); read
+  (CLAUDE.md's logging flags plus `--log_input=true`); read
   the log before choosing step 2.
 
 ### Step 0 results (2026-10-18)
@@ -744,7 +744,7 @@ first.
   render-only passes (`frame_pacing::GameMessages_IsRenderOnlyPass()`),
   as the `sub_820990F0` override does for Input::Update. Behind
   `REXCVAR_DEFINE_BOOL(input_mappers_by_tick, ...)`, off by default
-  until checked, then on in `run.sh` and `run.bat` (and `run-debug.*`).
+  until checked, then on by default.
 - Render-only passes only happen in races (menus run every pass as a
   logic pass), so no in-race check is needed; and the update doesn't
   record UI, so skipping it doesn't make anything flicker.
@@ -774,7 +774,7 @@ stands in for it.
 
 Once step 2 is checked: delete the `ctx.r31 + 588` check from the
 `sub_8215B4F8` wrapper in `src/frame_pacing/game_messages.cpp` and the
-`--pause_workaround` flag (and from `run.sh`/`run.bat` if they pass it).
+`--pause_workaround` flag.
 The pause screen then stays at the full frame rate, interpolated, with
 no slow return to it on resume.
 
@@ -925,8 +925,8 @@ Result (`itc_039.log`, a race the user drove, paused, used a sub-menu):
   the screen switch from `8220DBE0`) on every tick for ~2 s (64 moves),
   starting 11 ticks after the press; each move restarts the arrow's
   slide. The main pause list repeats every 4 ticks. Not compared with
-  30 fps yet: that's the next run (`./run.sh --no-interpolation` flags,
-  i.e. `--interpolate_draw_state=false --max_fps=30`, with
+  30 fps yet: that's the next run (the original 30 fps,
+  `--interpolate_draw_state=false --max_fps=30`, with
   `--log_pause_movie=true`), to see whether the arrow does the same
   there and the list repeats as often.
 

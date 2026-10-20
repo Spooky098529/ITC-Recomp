@@ -88,7 +88,7 @@ jobs:
           B=itc_recomp/out/build/win-amd64-cross-release
           D="dist/${name}"
           mkdir -p "$D"
-          cp $B/itc.exe $B/rexruntime.dll $B/SDL3.dll itc_recomp/run.bat itc_recomp/run-debug.bat "$D/"
+          cp $B/itc.exe $B/rexruntime.dll $B/SDL3.dll itc_recomp/itc.toml "$D/"
 
           # The Visual C++ runtime DLLs the binaries import (Windows has the
           # Universal CRT, api-ms-win-crt-*, but not these), from Microsoft's
