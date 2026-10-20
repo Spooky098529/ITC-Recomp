@@ -590,10 +590,14 @@ B3. **Graphics boundary** (17 functions calling `Vd*`): ring buffer
     `VdSetSystemCommandBufferGpuIdentifierAddress`), the display mode
     (`VdQueryVideoMode`), the set display mode (`VdSetDisplayMode`,
     `VdGetCurrentDisplayInformation`) and Swap (`VdSwap`,
-    `VdGetSystemCommandBuffer`, `VdPersistDisplay`; four calls in it not
-    yet identified). Each gets a native version keeping only what the
-    renderer uses. The never-called functions (clock gating, device
-    release, the terminate routine, `sub_822B4F10`, `sub_822A0688`, the
+    `VdGetSystemCommandBuffer`, `VdPersistDisplay`). Each gets a native
+    version keeping only what the renderer uses. All of them are native
+    now (Swap last, below). The functions that still call `Vd*` in
+    `generated/` are the never-called ones that follow,
+    `Device::InitEngines` and the two no longer called, so none has been
+    seen to run. The counter (`--log_graphics_boundary`) stays until the
+    user's session (below) has been read. The never-called functions
+    (clock gating, device release, the terminate routine, `sub_822B4F10`, `sub_822A0688`, the
     engines' callback) keep a blank status; `sub_822B2470` and
     `sub_822B3A78`, no longer called since their callers were dropped, are
     Dropped. None has an override (the counter's wrappers went), and they
@@ -763,6 +767,39 @@ B3. **Graphics boundary** (17 functions calling `Vd*`): ring buffer
     frame), attract races with frame dumps, all harnesses, and a session
     the user plays (front end, a race, the pause menu, a movie, loading
     screens).
+
+    Swap made native (2026-10-20, `src/hooks/graphics_device.cpp`, level 1
+    as proposed). Swap's listing, read again against the proposal, matched
+    it. Its r3 comes back as `sub_822A3B90` leaves it (the last guest call,
+    as in the original): `Renderer::Present` and `sub_8209ACB8` ignore it,
+    and the movies' `sub_822A0E50` returns it to its own callers. The
+    52-byte copy stays a call to the game's memcpy (wrapped for the
+    memory mirrors). The counter's Swap logging moved into
+    `graphics_boundary::SwapEntered`/`SwapLeft`, which the native Swap
+    calls. No game code calls `VdGetSystemCommandBuffer`, `VdSwap` or
+    `VdPersistDisplay` any more (`MmFreePhysicalMemory` still has two
+    other callers, `sub_822965C8` and `sub_822B4680`).
+
+    Checked against the recompiled Swap in the same build (a temporary
+    switch, removed), 30 s attract races with `--log_graphics_boundary`:
+    at the first Swaps and powers of two, the same flags (+10808..+10811),
+    display, surfaces, ring and command buffer fields, fences (+13544
+    always 0, +13540 the position before the kick, progress +0 two behind:
+    the fence always passed), dirty masks (all ones) and branch counts
+    (5,120 Swaps, all from `8258DCA4`; display mode and scaler once, front
+    buffer every frame, the rest never). What differs: +20004 (0, no
+    longer set), +20024 and +20028 (0, no frame statistics), and the
+    segments: the original reserved `VdSwap`'s 64 words before
+    `Device::SetDisplayMode` wrote the gamma ramp's packets, so at the
+    first Swap the ramp no longer fit in the segment (3,760 bytes left)
+    and one more segment was ended. The native one ends one fewer there:
+    command positions 2 lower and segments 4,160 bytes earlier from then
+    on, until the runs' own timing takes over. +13520 (probably the
+    command buffer's wrap count) is the same until the race loads and
+    then follows each run's command positions. The dumped frames look
+    right, all harnesses match, there are no error lines, and the boot
+    callback is still made. The kick's summary is the same in both (no
+    packets unhandled, 0 scratch write-backs, 0 callbacks).
 
 B4. **Files and saves** (22 functions; the game's `CreateFile`
     `sub_82295508` is the only caller of `NtCreateFile`): the game's file
