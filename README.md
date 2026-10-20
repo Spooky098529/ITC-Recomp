@@ -96,8 +96,7 @@ cmake --build out/build/linux-amd64-release
 
 This builds `itc_recomp/out/build/linux-amd64-release/itc` and
 `rexglue-sdk/out/linux-amd64/librexruntime.so`. Put both in the game folder
-with `itc_recomp/itc.toml` (or `itc_recomp/run.sh`, which passes the same
-settings as options).
+with `itc_recomp/itc.toml`.
 
 The Windows version is cross-compiled on Linux (clang and Microsoft's
 libraries fetched with xwin); see [docs/windows.md](docs/windows.md).

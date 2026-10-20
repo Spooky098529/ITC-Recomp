@@ -74,12 +74,20 @@ XDG_DATA_DIRS=/usr/local/share:/usr/share LD_LIBRARY_PATH=$B:rexglue-sdk/out/lin
 find /dev/shm -maxdepth 1 -user "$USER" -name 'xenia_memory_*' -delete
 ```
 
-- Test runs use what `run.sh` passes: always `--native_audio=true`
-  (without it the SDK's Audio Worker spins on a core and frame rates come
-  out lower than players get) and the mirrors updated once a frame
+- Test runs use the command above, which matches what players get
+  (`itc.toml`'s settings and the defaults; the flags it spells out are on
+  by default now): always `--native_audio=true` (without it the SDK's
+  Audio Worker spins on a core and frame rates come out lower than players
+  get) and the mirrors updated once a frame
   (`--native_renderer_mirror_by_tick=true
   --native_renderer_mirror_to_both=true`; `=false` on the first for the
   old per-draw mirror). `profile_render_thread.sh` does the same.
+- What the old `run-debug.sh` added, for logs to read (frame rate, where
+  each frame's time goes, each busy thread's CPU use):
+  `--log_level=info --log_fps=true --log_frame_times=true
+  --log_thread_cpu=true`. The run scripts (`run.sh`, `run-debug.sh`,
+  `run.bat`, `run-debug.bat`) were removed on 2026-10-20; older docs
+  mention them as what runs used then.
 
 - If the build fails with "file ... has been modified since the precompiled
   header ... was built" (clang was updated), delete the stale headers:
@@ -99,7 +107,7 @@ find /dev/shm -maxdepth 1 -user "$USER" -name 'xenia_memory_*' -delete
   needs lld (`ld.lld`). Measured 2026-10-14, two alternating uncapped attract
   races each: 236 and 237 fps mean without, 246 and 239 with; the user kept
   it. `-DITC_LTO=OFF` turns it off.
-- That's what `run.sh` runs: our own renderer, no GPU plugin. For the
+- That's what players run: our own renderer, no GPU plugin. For the
   emulated GPU (to compare), replace the two `--native_renderer` flags
   with `--native_renderer=false --gpu_plugin=xenos`; the plugin is built
   but no longer shipped.
@@ -138,13 +146,12 @@ cp itc_recomp/itc.toml $D/
 (cd $D && python3 -I -m zipfile -c ../$name.zip itc librexruntime.so itc.toml)
 ```
 
-Release and test zips ship `itc.toml` (the player settings, with comments)
-instead of the scripts, which stay in the repo for our test runs (their
-options win over the file). Since 2026-10-20 the native renderer, its
+Release and test zips ship `itc.toml` (the player settings, with comments;
+command-line options win over it). Since 2026-10-20 the native renderer, its
 exclusive mode and the once-a-frame mirrors are on by default, and without
 `--game_data_root` the game's files are looked for next to the executable
 (`ItcApp::OnConfigurePaths`; the SDK reads that flag before `itc.toml`
-loads), so a bare `./itc` plays like `run.sh`. The emulated GPU now needs
+loads), so a bare `./itc` plays as released. The emulated GPU now needs
 `--native_renderer=false --gpu_plugin=xenos`.
 
 ## Status (`main`, 2026-10-19, v0.4.6)
@@ -156,9 +163,10 @@ cars' bodies), other cars' lighting passing street lamps, tunnels, the race
 start countdown, the HUD, the marker above opponents, the light trails, the
 texture animations (flashing lights, signs, the off-ramp chevron), the
 minimap triangle's flashing, the car's reflections, buildings' lighting,
-play time and the glow (bloom; `src/interpolation/glow.cpp`, v0.3.9) are all done. `run.sh` turns
-interpolation on (marked experimental) with logging off; `run-debug.sh` is
-the same with logs; `./run.sh --no-interpolation` gives the original 30 fps.
+play time and the glow (bloom; `src/interpolation/glow.cpp`, v0.3.9) are all done. Interpolation is
+on by default (marked experimental in `itc.toml`, which also turns logging
+off); `interpolate_draw_state = false` and `max_fps = 30` there give the
+original 30 fps.
 Our renderer always draws the glow (`--glow` only affects the emulated
 GPU); `--motion_blur=false` leaves out the motion blur (on by default;
 defined in `src/native/renderer.cpp` since SDK patch 0002 was removed). Known issues are at the end of
@@ -223,7 +231,7 @@ only logic frames blended it and the blur's length jumped once a tick.
 Now noted under the logic pass's address and blended on every frame
 (`--motion_blur_by_tick`, on); the user judged it fixed at 4K. The motion
 blur is also optional now: `--motion_blur=false` (on by default, in
-`run.sh`'s help), defined in `src/native/renderer.cpp`; SDK patch 0002
+`itc.toml`), defined in `src/native/renderer.cpp`; SDK patch 0002
 (the emulated GPU's toggle) is removed. The cameras refused far from the
 origin were ruled out: a temporary in `sub_82598768`, never drawn
 (`--log_blend_state` now names each refused camera's source). See
@@ -244,7 +252,7 @@ race levels off at ~155 MB of textures. `--log_gpu_memory` logs what the
 renderer holds. See "Textures are never freed" in `docs/native-renderer.md`.
 
 Xbox 360 gamma (merged from `xbox-gamma`, 2026-10-16; released in v0.4.3):
-`--xbox_gamma=off|hdtv|power`, off by default (`run.sh` passes `off` and
+`--xbox_gamma=off|hdtv|power`, off by default (`itc.toml` sets `off` and
 lists the choices). The display gamma tables the game writes at boot,
 copied into `src/native/xbox_gamma_table.h` (not read from the SDK), are
 applied to the frame by a compute pass; `hdtv` looked pretty close to the
@@ -252,7 +260,7 @@ applied to the frame by a compute pass; `hdtv` looked pretty close to the
 
 Windows (merged from `windows`, 2026-10-16; released in v0.4.1, experimental):
 cross-compiled on Linux with xwin, ThinLTO (`ITC_WIN_LTO`), `run.bat`
-with `run.sh`'s defaults, the Visual C++ runtime DLLs in the zip, and a
+with `run.sh`'s defaults (both removed 2026-10-20 for `itc.toml`), the Visual C++ runtime DLLs in the zip, and a
 CI job beside Linux's. Tested only under Wine: ~26% slower than Linux
 there before ThinLTO, which then gave +3.1%. See `docs/windows.md`.
 
@@ -274,7 +282,7 @@ the register shadow read only where the library's dirty masks say
 ("Performance: the render thread" in `docs/native-renderer.md`: "Done on
 `blend-math`", "Register reads", "Against v0.3.7"); then (`mirrors-fix`)
 the guest memory mirrors given memcpy's writes once a frame instead of
-checked draw by draw (opt-in, on in `run.sh`; "Hypothesis to test: the
+checked draw by draw (opt-in then, on by default since 2026-10-20; "Hypothesis to test: the
 mirrors updated once a tick"). All released in v0.3.8: ~430 fps uncapped
 in an attract race with `run.sh`'s flags (2026-10-15). Translated shaders and pipelines are kept on disk (`cache/` next to
 the executable), and textures are reloaded when the game's memcpy writes
@@ -283,7 +291,7 @@ merged from `perf-debug` for Steam Deck hitches. Its known issues (boot movie, g
 remaining packet writers, speed) are milestone 7 in
 `docs/native-renderer.md`.
 
-Sound goes through our own audio output (`--native_audio`, on in `run.sh`,
+Sound goes through our own audio output (`--native_audio`, on by default,
 since v0.3.2): our thread runs the game's mixer, replacing the
 SDK's Audio Worker, whose polling took ~80% of a core. The SDK's XMA
 decoder is kept. See `docs/native-audio.md`.
@@ -320,7 +328,7 @@ Not done yet:
   `docs/native-renderer.md`. Since `mirrors-fix` (merged): the
   mirrors are updated at frame starts instead of checked draw by draw
   (`--native_renderer_mirror_by_tick` and `--native_renderer_mirror_to_both`,
-  off by default, on in `run.sh`): -14.7% render thread cycles a frame,
+  on by default since 2026-10-20): -14.7% render thread cycles a frame,
   checked in attract races and a race the user drove ("Hypothesis to test:
   the mirrors updated once a tick" and what follows it). Then (2026-10-16)
   `Buffers_OnCommand`, `ReplayStats_OnCommand` and `GetRenderer` stopped
