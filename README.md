@@ -19,6 +19,8 @@ Built with AI assistance (Claude Code).
 
 See [`rexglue-removal-project`](https://github.com/Spooky098529/ITC-Recomp/tree/rexglue-removal-project).
 
+The above branch contains the most up to date functions reference, and is where work on mapping out all of the game's code will go from now on.
+
 ## Requirements
 
 - Linux, or Windows 10 or 11 (experimental, see below), on a 64-bit x86
