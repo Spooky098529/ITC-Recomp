@@ -74,7 +74,8 @@ XDG_DATA_DIRS=/usr/local/share:/usr/share LD_LIBRARY_PATH=$B:rexglue-sdk/out/lin
 find /dev/shm -maxdepth 1 -user "$USER" -name 'xenia_memory_*' -delete
 ```
 
-- Test runs use the command above, which matches what players get
+- Test runs use the command above (the docs' "standard flags"), which
+  matches what players get
   (`itc.toml`'s settings and the defaults; the flags it spells out are on
   by default now): always `--native_audio=true` (without it the SDK's
   Audio Worker spins on a core and frame rates come out lower than players
@@ -82,12 +83,9 @@ find /dev/shm -maxdepth 1 -user "$USER" -name 'xenia_memory_*' -delete
   (`--native_renderer_mirror_by_tick=true
   --native_renderer_mirror_to_both=true`; `=false` on the first for the
   old per-draw mirror). `profile_render_thread.sh` does the same.
-- What the old `run-debug.sh` added, for logs to read (frame rate, where
-  each frame's time goes, each busy thread's CPU use):
-  `--log_level=info --log_fps=true --log_frame_times=true
-  --log_thread_cpu=true`. The run scripts (`run.sh`, `run-debug.sh`,
-  `run.bat`, `run-debug.bat`) were removed on 2026-10-20; older docs
-  mention them as what runs used then.
+- For logs to read (frame rate, where each frame's time goes, each busy
+  thread's CPU use), add `--log_level=info --log_fps=true
+  --log_frame_times=true --log_thread_cpu=true`.
 
 - If the build fails with "file ... has been modified since the precompiled
   header ... was built" (clang was updated), delete the stale headers:
@@ -259,8 +257,8 @@ applied to the frame by a compute pass; `hdtv` looked pretty close to the
 360 to the user. See "Gamma" in `docs/native-renderer.md`'s known issues.
 
 Windows (merged from `windows`, 2026-10-16; released in v0.4.1, experimental):
-cross-compiled on Linux with xwin, ThinLTO (`ITC_WIN_LTO`), `run.bat`
-with `run.sh`'s defaults (both removed 2026-10-20 for `itc.toml`), the Visual C++ runtime DLLs in the zip, and a
+cross-compiled on Linux with xwin, ThinLTO (`ITC_WIN_LTO`), `itc.toml`
+for settings, the Visual C++ runtime DLLs in the zip, and a
 CI job beside Linux's. Tested only under Wine: ~26% slower than Linux
 there before ThinLTO, which then gave +3.1%. See `docs/windows.md`.
 
@@ -282,9 +280,9 @@ the register shadow read only where the library's dirty masks say
 ("Performance: the render thread" in `docs/native-renderer.md`: "Done on
 `blend-math`", "Register reads", "Against v0.3.7"); then (`mirrors-fix`)
 the guest memory mirrors given memcpy's writes once a frame instead of
-checked draw by draw (opt-in then, on by default since 2026-10-20; "Hypothesis to test: the
+checked draw by draw (on by default; "Hypothesis to test: the
 mirrors updated once a tick"). All released in v0.3.8: ~430 fps uncapped
-in an attract race with `run.sh`'s flags (2026-10-15). Translated shaders and pipelines are kept on disk (`cache/` next to
+in an attract race with the standard flags (2026-10-15). Translated shaders and pipelines are kept on disk (`cache/` next to
 the executable), and textures are reloaded when the game's memcpy writes
 them instead of being hashed (`docs/texture-handling-optimization.md`);
 merged from `perf-debug` for Steam Deck hitches. Its known issues (boot movie, gamma, textures, window resizing,
@@ -328,7 +326,7 @@ Not done yet:
   `docs/native-renderer.md`. Since `mirrors-fix` (merged): the
   mirrors are updated at frame starts instead of checked draw by draw
   (`--native_renderer_mirror_by_tick` and `--native_renderer_mirror_to_both`,
-  on by default since 2026-10-20): -14.7% render thread cycles a frame,
+  on by default): -14.7% render thread cycles a frame,
   checked in attract races and a race the user drove ("Hypothesis to test:
   the mirrors updated once a tick" and what follows it). Then (2026-10-16)
   `Buffers_OnCommand`, `ReplayStats_OnCommand` and `GetRenderer` stopped

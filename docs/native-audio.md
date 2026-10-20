@@ -188,8 +188,8 @@ Not known yet:
   fills in the race, 4 frames queued; the only fills were in the last
   window of one run, when `timeout` ended the game.
 - **The user listened** (2026-10-14, boot to a race, ~110 s logged): it
-  sounds fine; 0 silence fills. `run.sh` passes `--native_audio=true`
-  (also the flag's default), so release zips use it.
+  sounds fine; 0 silence fills. `--native_audio` is on by default, so
+  release zips use it.
 - **Still to do**: a stereo device as well as the 6-channel one here (a
   HyperX headset that SDL reports as 6 channels, through PipeWire).
 

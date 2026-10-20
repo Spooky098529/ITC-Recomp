@@ -48,7 +48,7 @@ speed).
   every frame; tracking which ranges changed is for later. (Later: only
   ranges memcpy wrote since, see "Buffers"; since v0.3.8, with
   `--native_renderer_mirror_by_tick` and `--native_renderer_mirror_to_both`,
-  on in `run.sh`, the mirrors take memcpy's writes at frame starts and
+  on by default, the mirrors take memcpy's writes at frame starts and
   draws don't copy at all, see "Hypothesis to test: the mirrors updated
   once a tick".)
 - **Development mode first**: with `--native_renderer`, the replay hooks
@@ -67,7 +67,7 @@ speed).
 | 3 | **Textures**: untile and upload (mostly BC1-BC3), samplers from the fetch constants. | The main view looks right without effects. | Done (2026-10-13): signs, gauges, fences, buildings and road textured correctly (screenshot checked); what comes from resolves is still missing. |
 | 4 | **The other passes**: each pass renders into a Vulkan image of its resolve's size and format; resolves become copies. | Shadows, reflections and the mirror work. | Done (2026-10-14): every pass draws, inline vertex draws included; clears and resolves work; the user saw the car's shadow, the mirror and the reflections right in our window (cockpit and third person), and the resolves match the emulated GPU's (`--readback_resolve=full`), except its blocky bloom. Menus not checked. |
 | 5 | **The final frame and the menus** (still in development mode): post-processing, HUD, the frame's end, then every menu screen. | Races and menus look as in the game's window, side by side. | Done (marked 2026-10-19): the final frame with the HUD shows (checked by the user in a race); menus' tiled 3D views fixed; the renderer has drawn races and menus on its own since exclusive mode (milestone 6) and shipped as the only renderer. Not done: a screen-by-screen comparison of every menu against the emulated GPU. |
-| 6 | **Exclusive mode**: the emulated GPU gets no work and then isn't loaded at all; the graphics library is kept for what our renderer needs from it (see "Plan for milestone 6"); then measure. | The GPU plugin isn't loaded; frame rate measured against the emulated GPU. | Done (2026-10-14): the plugin isn't loaded (`run.sh` runs exclusive mode); measured: 135 fps mean uncapped against the emulated GPU's 155, then ~235 after the speed work (step 5; holds the 144 cap in an attract race). The library's remaining packet writers moved to milestone 7 (the user's call); the frame's end (step 6) measured at ~0.2% of the render thread and left as it is. |
+| 6 | **Exclusive mode**: the emulated GPU gets no work and then isn't loaded at all; the graphics library is kept for what our renderer needs from it (see "Plan for milestone 6"); then measure. | The GPU plugin isn't loaded; frame rate measured against the emulated GPU. | Done (2026-10-14): the plugin isn't loaded (exclusive mode is on by default); measured: 135 fps mean uncapped against the emulated GPU's 155, then ~235 after the speed work (step 5; holds the 144 cap in an attract race). The library's remaining packet writers moved to milestone 7 (the user's call); the frame's end (step 6) measured at ~0.2% of the render thread and left as it is. |
 | 7 | **Known issues cleanup**: what's under Known issues below (the boot movie, an in-game movie locking up the game, the bloom's ghosting (fixed 2026-10-15), motion blur at the tick's length, gamma (done: `--xbox_gamma`, off by default), textures replaced in memory (fixed 2026-10-15), textures never freed (fixed 2026-10-19), the library's remaining packet writers, further speed work on our renderer, the freezes while driving to re-examine). | The known issues are fixed or accepted. | In progress (2026-10-19): done are the bloom's ghosting, gamma, textures replaced in memory, textures never freed, and the speed work's big known costs (~135 to ~486 fps uncapped); the in-game movie lock-up and the freeze while driving no longer happen (not seen in extensive testing since, the user's call); open are the boot movie, motion blur at the tick's length, the remaining packet writers. The missing window's error was dropped (not worth it, the user's call). |
 
 ## Progress on milestone 2
@@ -524,7 +524,7 @@ step 1's logs are there to find them before anything is stubbed.
   game has no mouse controls (`--mnk_mouse` is off); gamepads come from
   SDL events whatever the window. No SDK patch. Checked by the user:
   keyboard, gamepad, one window. (2026-10-19: keyboard input dropped,
-  `--mnk_mode` no longer passed by `run.sh`/`run.bat`; see A0 in
+  `--mnk_mode` no longer passed; see A0 in
   `docs/rexglue-removal.md`. The forwarding stays for focus and close.)
 - **Interrupts are made at the library's level, not the GPU's.** Running
   the command stream's INTERRUPT callbacks inside the kick hung loading
@@ -569,8 +569,8 @@ step 1's logs are there to find them before anything is stubbed.
   and the MMIO range at `0x7FC80000`, the earlier candidates, weren't
   needed to explain it.)
 
-- **No GPU plugin** (step 3, 2026-10-14): `run.sh` (and so `run-debug.sh`)
-  runs `--native_renderer=true --native_renderer_exclusive=true` with no
+- **No GPU plugin** (step 3, 2026-10-14): `--native_renderer` and
+  `--native_renderer_exclusive` are on by default, with no
   `--gpu_plugin`, and the zips (CI's and the local ones) leave out
   `librexgpu-xenos.so`; the game doesn't link it, it was only loaded by
   `--gpu_plugin`. Nothing had to stand in for the plugin: no vblank
@@ -824,7 +824,7 @@ memory).
   real change, but nothing in the game was found that changes vertex or
   index data after loading it. With that, the data could live in VRAM
   (see "What the mirror copies").
-- **Since v0.3.8** (2026-10-15, opt-in, on in `run.sh`): with
+- **Since v0.3.8** (2026-10-15, on by default): with
   `--native_renderer_mirror_by_tick` and `--native_renderer_mirror_to_both`
   the mirrors are given memcpy's writes at each frame's start instead, and
   draws skip the index range, the vertex sizes and `Mirror`: -14.7% of the
@@ -944,7 +944,7 @@ memory).
   logic pass's list starts replaying, memcpy's writes applied at frame
   starts to the other; draws do no mirror work. With
   `--native_renderer_mirror_to_both` the writes go into the mirror draws
-  read as well (both on in `run.sh` since v0.3.8; the first alone leaves new
+  read as well (both on by default; the first alone leaves new
   data out for the rest of a tick). Fixed at start.
 - `--native_renderer_log_physical_writes`: each memcpy into the physical
   views by thread, pass (logic or render-only) and caller, checked against
@@ -1044,8 +1044,8 @@ memory).
   pipeline cache.
 - `frame_costs.h`: what a frame spent on texture loads, shader
   translations and pipeline creation, for the long frame log.
-- `log_enabled.h`: whether info logging is on. With it off (`run.sh`'s
-  `--log_level=off`), the 5 s stats, the frame cost timing and the
+- `log_enabled.h`: whether info logging is on. With it off (`--log_level=off`,
+  as released), the 5 s stats, the frame cost timing and the
   dimension mismatch descriptions do no work.
 - Testing: build, run the game in the background with
   `--native_renderer=true --skip_intro --attract_after_s=1`. With no input,
@@ -1124,7 +1124,7 @@ To be fixed (or accepted) in milestone 7.
 - **Motion blur reads the 30 Hz tick.** The game's velocity-based motion
   blur (pixel shader `7EB16456AAD56CBA`) gets its velocities from the
   tick, so at interpolated frame rates each frame smears a whole tick of
-  motion, more than intended. `run.sh` turned it off with the emulated GPU
+  motion, more than intended. It was turned off with the emulated GPU
   (`--motion_blur=false`); ours draws it too unless `--motion_blur=false`
   (added 2026-10-19: leaves its one draw out). Scaling the velocities to
   the frame's share of a tick would fix it.
@@ -1210,8 +1210,8 @@ To be fixed (or accepted) in milestone 7.
   exclusive mode. Checked with `hdtv` in two attract races with a dump a
   second: the same 19 moments 10-24% darker on average, blacks and whites
   unchanged; the user found it works. The user compared `hdtv` against
-  the 360 (2026-10-16): pretty close, but kept off by default (`run.sh`
-  passes `--xbox_gamma=off` and lists the choices in its notes).
+  the 360 (2026-10-16): pretty close, but kept off by default (`itc.toml`
+  sets `xbox_gamma = "off"` and lists the choices).
 
 - **Textures replaced in memory showed their old contents for a while**
   (fixed 2026-10-15). The game rewrites textures in place as it streams
@@ -1408,7 +1408,7 @@ To be fixed (or accepted) in milestone 7.
   its own failed-draw reason. Each growth is logged ("block N added",
   "pool N added"). Checked with 2 MB blocks and 256-set pools (up to 14
   blocks a frame): no failed draws, the frame dumped looked right. A
-  driven race on v0.3.0 (`run-debug.sh`) then logged "constants ring full"
+  driven race on v0.3.0 (logging on) then logged "constants ring full"
   in its busiest 5 s (3,122 draws a frame on average), and nothing else
   failing, so the constants ring is the one that runs out; the HUD didn't
   visibly drop out that time. A driven race on the fix (2,867 draws a
@@ -1583,10 +1583,10 @@ planned once a tick and cameras blended once a frame, the byte swap by
 hand, and register reads of only what the library marked dirty; together
 ~12% fewer render thread cycles a draw than v0.3.7 (~7,660 to ~6,760, by
 profile; see "Against v0.3.7"). Then the mirrors updated once a frame
-(`mirrors-fix`, opt-in, on in `run.sh`): -14.7% render thread cycles a
+(`mirrors-fix`, on by default): -14.7% render thread cycles a
 frame ("Hypothesis to test: the mirrors updated once a tick" and what
 follows). All of it released in v0.3.8 (uncapped attract race with
-`run.sh`'s flags ~430 fps). Since v0.3.9 (2026-10-16, on `main`):
+the standard flags ~430 fps). Since v0.3.9 (2026-10-16, on `main`):
 `Buffers_OnCommand` and `ReplayStats_OnCommand` check their flag before
 setting up their logging's stack frame (~-2% of the render thread's cycles
 a frame), and `GetRenderer` no longer sets up `Init`'s stack frame on every
@@ -1606,7 +1606,7 @@ read from the shader objects instead of hashing the microcode every draw:
 
 ### The Deck's log (2026-10-15)
 
-`itc_045.log` from the Deck (`run-debug.sh`, a race the user drove, build
+`itc_045.log` from the Deck (logging on, a race the user drove, build
 of `47484c8`; the log isn't in the repo):
 
 - **The render thread** (`XThreadA1FFD6C0`, entry `82091EF8`,
@@ -1633,7 +1633,7 @@ Measure on the PC before and after any change. For changes under a few
 percent (most of them now), profile the render thread instead of counting
 frames (`itc_recomp/tools/profile_render_thread.sh`, see "Measuring small
 changes" and "Against v0.3.7"). For larger ones, an uncapped attract race
-(`--max_fps=0`, ~430 fps mean with `run.sh`'s flags since v0.3.8;
+(`--max_fps=0`, ~430 fps mean with the standard flags since v0.3.8;
 `timeout 20`, mean over
 seconds 3-18 of the race, as in `CLAUDE.md`), alternating old and new
 builds (keep a copy of the old binary outside the build directory; a copy
@@ -1650,8 +1650,8 @@ the user's Deck: local builds need a newer glibc than SteamOS has, so
 push the branch and run CI on it (`gh workflow run build-linux.yml --ref
 perf-debug`, then `gh run download <id> -D itc_recomp/out/dist/<name>`;
 the release preset is `-O3` with ThinLTO and `-march=x86-64-v2`). The
-user unzips it on the Deck (`chmod +x itc run.sh run-debug.sh`) and
-drives a race with `run-debug.sh`.
+user unzips it on the Deck (`chmod +x itc`) and drives a race with
+logging on.
 
 ### Ideas for lightening the render load
 
@@ -1824,7 +1824,7 @@ Known issues):
 On `8ee1120` (v0.3.7 plus docs), uncapped attract race, ~318 fps mean
 over the race's seconds 3-18; the render thread at ~98% of a core, the
 main thread ~65%. Flat profile (`perf record -e cycles:u -t <tid>`, 12 s
-from 14 s after launch, `--log_level=off` as `run.sh` runs; a run with
+from 14 s after launch, `--log_level=off` as released; a run with
 info logging gave the same picture plus ~1% of its interface maps):
 `itc` 77%, libc 12%, the Vulkan driver 9.4%, libstdc++ 0.9%. Nothing
 dominates any more:
@@ -2197,7 +2197,7 @@ Also: memcpy's write tracking (`RecordWrite`: the `std::map` of segments,
 its `operator[]` and tree rebalancing) ~1%. The script runs with info
 logging (it counts frames from the `fps` lines), so its profiles include
 `collect_interfaces`' `std::map` (`interpolators_by_shader`, 1.0%), which
-`run.sh` (`--log_level=off`) doesn't pay; the same in every build, so
+a released build (`--log_level=off`) doesn't pay; the same in every build, so
 comparisons hold.
 
 So the mirror is now the largest of our own parts after `Draw`, ~1.2
@@ -2304,8 +2304,8 @@ cycles a frame (~3% of the render thread).
 
 ### Hypothesis to test: the mirrors updated once a tick (the user's, 2026-10-15)
 
-**Outcome:** done and merged (`mirrors-fix`, released in v0.3.8, opt-in
-and on in `run.sh`); the handover below is kept as written, with the
+**Outcome:** done and merged (`mirrors-fix`, released in v0.3.8, on by
+default); the handover below is kept as written, with the
 results after it ("Test results", "The experiment", "Draws' mirror work
 removed", "A race the user drove").
 
@@ -2765,7 +2765,7 @@ compares keys with `std::equal`), other libc spots nearby ~-50, XXH3 (the
 set key's hash) 25 to 2.5.
 
 **Against `main` in fps** (2026-10-16): uncapped attract races with
-`run.sh`'s flags, alternating, mean over the race's seconds 3-18 (as in
+the standard flags, alternating, mean over the race's seconds 3-18 (as in
 `CLAUDE.md`): `main`'s code (`7774a95`) 439.4, 434.9, 423.5 (432.6);
 this branch (`9a83010`) 445.4, 450.8, 438.1 (444.8): +2.8%, each run above
 the one before it. Less than the ~7% the profiles above add up to: those
@@ -2788,7 +2788,7 @@ only ~3%: on this PC the render thread isn't the only limit (it waits on
 the main thread and the GPU too). On the Deck, where it was flat out,
 the gain should be nearer the cycles' 7%; not measured.
 
-The user drove with `run.sh` (build of `9a83010`, 2026-10-16): looks
+The user drove a race (build of `9a83010`, 2026-10-16): looks
 fine.
 
 **Left to try**, unmeasured estimates:
@@ -2825,7 +2825,7 @@ the by-library count has):
 | Other renderer | ~2.2% | `ApplyBuffer` 0.7, `PlaceConstants` 0.5, `DrawPackets_IndexedDraw` 0.4 |
 
 `interpolators_by_shader`'s `std::map` (1.2%) is the script's info
-logging (`collect_interfaces`), as before; `run.sh` doesn't pay it.
+logging (`collect_interfaces`), as before; a released build doesn't pay it.
 
 So with texture binding down to ~4%, the guest side (over a third) is the
 largest part by far; of our own code, shader lookup (~6%: the microcode
@@ -2868,7 +2868,7 @@ stale when met before this session with microcode hashing differently):
   drawn 0 times; ~40-50 thousand vertex shader patches per 5 s (~20 a
   frame), so a generation bumped by every patch would empty a cache
   constantly. The patched-for id in the key makes one unneeded.
-- The user's run with `run.sh`'s flags, capped at 144 (`itc_818.log`,
+- The user's run with the standard flags, capped at 144 (`itc_818.log`,
   ~4 minutes): menus, a race (20:53:15-20:54:30), menus, a second race
   (20:54:45-20:56:20; ~85 new keys at its start, new scenery or a new
   track). Up to 3,670 draws a frame in the second; the same keys as the
@@ -2920,7 +2920,7 @@ the render thread is no longer the only limit: the main thread is about
 as busy.
 
 **Against v0.4.1 in pictures** (2026-10-16): the v0.4.1 release zip and
-this branch (`0436f4f`), attract races of 20 s with `run.sh`'s flags and
+this branch (`0436f4f`), attract races of 20 s with the standard flags and
 `--native_renderer_dump_every=1`, twice each: 19 frames a run, the same
 moments (camera, traffic) in both, nothing drawn differently. The
 replay's color filters (none, black and white, sepia) are chosen at
@@ -2930,7 +2930,7 @@ build). The user looked at the montages and passed it for merging.
 
 **Against v0.4.1 in fps** (2026-10-16, after merging): the v0.4.1
 release zip against a local build of `main`'s code (`31e1474`),
-uncapped attract races with `run.sh`'s flags, alternating, mean over the
+uncapped attract races with the standard flags, alternating, mean over the
 race's seconds 3-17 (the logs end a second early): v0.4.1 427.3, 426.4,
 426.8 (426.8); `main` 449.7, 452.3, 457.1 (453.0): **+6.1%**, every run
 above every v0.4.1 run. Since v0.4.1: texture-binding and shader-lookup.
@@ -2992,7 +2992,7 @@ below every run off. Against `2b33ade` (11.31): **-14.4%**.
 Frames counted in the 12 s barely moved (~5,500 to ~5,650): the render
 thread (~87%) is nearly as busy, so both threads now matter.
 
-Fps against `main` (`2b33ade`), uncapped attract races with `run.sh`'s
+Fps against `main` (`2b33ade`), uncapped attract races with the standard
 flags, alternating, mean over the race's seconds 3-17: `main` 446.4,
 438.5, 449.1 (444.7); `allocate-slots` 470.2, 455.1, 456.1 (460.5):
 **+3.6%**, every run above every `main` run. Smaller than the main
@@ -3285,8 +3285,8 @@ the default, the same sizes as before, the 144 cap held, no failed draws
 (`itc_787.log`).
 
 **Done: fullscreen and black bars** (2026-10-16). Our window follows the
-SDK's `--fullscreen` (default true, as the SDK's own window; `run.sh` and
-the test command in `CLAUDE.md` pass `--fullscreen=false`, and a bare
+SDK's `--fullscreen` (default true, as the SDK's own window; `itc.toml` and
+the test command in `CLAUDE.md` set it to false, and a bare
 `--fullscreen` or `--no-fullscreen` works): borderless at the desktop's
 resolution. In fullscreen `--width`/`--height` set only the drawing
 resolution; without them the scale fits the screen.

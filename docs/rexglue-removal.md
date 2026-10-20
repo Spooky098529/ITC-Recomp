@@ -93,7 +93,7 @@ Measured 2026-10-19 by grepping `itc_recomp/src` and `generated/`.
 | System services | `Xam` UI, user, profile, sessions, voice, notifications, `XMsg*`, `XamLoader*`, `NetDll_*` (17), `Xex*` (78 game functions) | SDK `src/kernel/xam/` | B |
 | Pure helpers | `Rtl*` strings, time, fills, `sprintf`, `vswprintf`, `KeQuery*`, `XGet*`, `DbgPrint` (55 game functions) | SDK `src/kernel/` | B |
 | Core | Guest memory (4 GB mapping plus the physical view at +4 GB, `src/native/state.h`; `/dev/shm/xenia_memory_*`), allocators (`NtAllocateVirtualMemory`, `Mm*`, `XamAlloc`: 31 game functions), threads and sync (`ExCreateThread`, `Ke*`, `Rtl*CriticalSection`, events, waits, TLS, the handle table: 291 game functions), the PCR, the XEX image load (`Runtime::LoadXexImage`), `rex/ppc.h` and the other headers `generated/default/itc_pch.h` includes, the function table `itc_register.cpp` fills | SDK `src/system/`, `src/kernel/`, `include/rex/` | end |
-| Build, packaging | `generated/rexglue.cmake`, `patches/rexglue-sdk/`, `librexruntime.so`/`rexruntime.dll`, third-party libraries through the SDK (SDL3, fmt, spdlog, FFmpeg, glslang, xxHash, imgui, cli11, tomlplusplus) | CMake, CI, `run.sh`, `run.bat` | A, then end |
+| Build, packaging | `generated/rexglue.cmake`, `patches/rexglue-sdk/`, `librexruntime.so`/`rexruntime.dll`, third-party libraries through the SDK (SDL3, fmt, spdlog, FFmpeg, glslang, xxHash, imgui, cli11, tomlplusplus) | CMake, CI | A, then end |
 
 ## The boundary
 
@@ -139,7 +139,7 @@ Independent of each other; each is releasable alone, except A0, which
 comes before everything else.
 
 A0. Done (2026-10-19, `remove-rexglue`): `--mnk_mode=true` removed from
-    `run.sh`, `run.bat`, `tools/profile_render_thread.sh` and the run lines
+    `tools/profile_render_thread.sh` and the run lines
     in CLAUDE.md and `docs/windows.md`. The SDK's flag defaults to off, which
     only turns its keyboard driver off (`rexglue-sdk/src/input/mnk/`);
     gamepads go through its SDL driver as before. `app_window.cpp`'s
@@ -147,7 +147,6 @@ A0. Done (2026-10-19, `remove-rexglue`): `--mnk_mode=true` removed from
     its comments and log line changed).
     **Drop keyboard input** (the user's call, 2026-10-19): no keyboard in
     native code until the game is fully native (after B7). Remove
-    `--mnk_mode=true` from `run.sh` and `run.bat` (`REX_MNK_MODE`), and
     the keyboard from `app_window.cpp`'s forwarding and its comments in
     `app_window.h`; say in the release notes that keyboard play is gone
     for now (gamepad only). From then on, input in this plan means
@@ -306,8 +305,7 @@ E3. **The image load**: the recompiled code reads strings, constants,
 
 E4. **`PPCContext`, `rex/ppc.h`, the function table, `generated/`,
     and the SDK**: delete the submodule, `patches/rexglue-sdk/`,
-    `generated/rexglue.cmake`, `librexruntime` from packaging, `run.sh`,
-    `run.bat`, both CI workflows and CLAUDE.md (the build line's
+    `generated/rexglue.cmake`, `librexruntime` from packaging, both CI workflows and CLAUDE.md (the build line's
     `LD_LIBRARY_PATH`, packaging, the note on the submodule showing
     modified). The `rexglue codegen` target goes with it.
 

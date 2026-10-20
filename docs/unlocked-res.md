@@ -12,8 +12,8 @@ end of `native-renderer.md`; this file is the summary and what's next.
 - `--width`/`--height`: the window's size in real pixels (one alone keeps
   16:9; neither gives 1280x720). The window is high-DPI
   (`SDL_WINDOW_HIGH_PIXEL_DENSITY`), so desktop scaling doesn't shrink it.
-- `--fullscreen` (the SDK's flag, default true; `run.sh` and the test
-  command in `CLAUDE.md` pass `--fullscreen=false`): borderless at the
+- `--fullscreen` (the SDK's flag, default true; `itc.toml` and the test
+  command in `CLAUDE.md` set it to false): borderless at the
   desktop's resolution. With `--width`/`--height` the game draws at that
   resolution and the frame is scaled to the screen.
 - Screens and windows that aren't 16:9 get black bars (`FitOffsets` in
