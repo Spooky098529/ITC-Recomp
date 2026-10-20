@@ -53,7 +53,8 @@ without their kernel calls, `src/hooks/start_up.cpp` and
 `src/user/user.h`, XUserSetContextEx dropped) step 3 (XMP
 dropped, `src/hooks/xmp.cpp`) and step 4 (the network start-up, the
 system link socket not made, `src/hooks/network.cpp`); step 5 (voice) is
-mapped with no code (its listener and profile reads go with steps 6 and 7). Plan steps are done on their
+mapped with no code; step 6 (notifications: the listener wrapper makes
+none, the app's reader builds the users once, `src/hooks/notify.cpp`). Plan steps are done on their
 own branches and merged into `rexglue-removal-project` (no force pushes:
 GitHub refuses them on that branch).
 `docs/tick-replay.md` is a lead (not started): translating draws once a

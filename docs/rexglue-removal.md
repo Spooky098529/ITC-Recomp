@@ -1326,6 +1326,48 @@ B5. **System services** (82 functions; first counted as 78): sign-in, profile, U
     talkers with `XamVoiceCreate`/`XamVoiceClose`, +40/+44 remote, +48
     the remote talkers, +72/+76); +64 and +68 are unknown.
 
+    **Step 6, notifications: done (2026-10-21, `system-services`).** The
+    user's approach: plug in the data the game uses, not a 360-style queue
+    (no masks, versions or start-up set). Of the readers the listener
+    wrapper (`sub_822952B8`) served, only the app's
+    (`sub_82099828`) ever acted on a notification: the start-up sign-in
+    changed (sent twice, to the first listener with the system bit),
+    which built the user table (`sub_82099600`). The others never got one
+    (`sub_820A4610`'s storage devices changed, `sub_82149080`'s Live
+    connection changed, Network::Update's `0x11`), or, for the sign-in
+    helper `sub_8214F290`, only the dialogs' system UI on/off and the
+    sign-in UI's sign-in changed, which re-polled the same users. So
+    (`src/hooks/notify.cpp`):
+
+    - The listener wrapper makes no listener: it returns a fixed nonzero
+      value (the readers test the handle for 0; the storage devices'
+      update runs only with one). It isn't an SDK handle, so the readers
+      left recompiled find no queue in `XNotifyGetNext` and get nothing.
+      Dropped.
+    - The app's reader builds the user table and sets +244 once, on its
+      first call with a listener (the SDK's came on the third and fourth
+      frames), and does nothing after (the sign-in UI's rebuild gave the
+      same table). Overridden.
+
+    Left as they were: the four other readers (still calling
+    `XNotifyGetNext`, answered empty; they go native with their
+    subsystems: B4 for the storage devices, B7 for the network manager's)
+    and voice's own listener (made inside Voice::Init). With the game's
+    listeners no longer in the SDK's list, the SDK's start-up set now goes
+    to voice's listener (mask 5, the system bit): its poll sets and
+    clears its +1316 flag within the same call, with no talker to act on.
+    The sign-in helper no longer sees the dialogs' system UI on/off (its
+    "system UI showing" flag stays 0) or the sign-in UI's sign-in changed
+    (no re-poll, the users the same). Imports: none cleared
+    (`XamNotifyCreateListener` and `XNotifyGetNext` are still called by
+    voice and the readers left).
+
+    Checked: a harness case (`notify`: the app's reader against the
+    recompiled one reading an SDK listener, with a sign-in changed queued
+    against our first call, and nothing against a later one; the app
+    object and r3 the same, but the handle slot, which differs by design)
+    and an attract race with every harness (no errors).
+
 B6. **Pure helpers** (55 functions): string, time and formatting
     helpers made native, or their callers made native. Cheap; can be
     done alongside anything else.
