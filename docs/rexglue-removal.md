@@ -828,10 +828,44 @@ B3. **Graphics boundary** (17 functions calling `Vd*`): ring buffer
     (one run's `GetLocalTime` case differed by a second, run as the
     second ticked over; the next run matched).
 
-    Left in B3 (2026-10-20): `XGetVideoMode`'s two callers (from B6); the
-    GPU registers at `0x7FC80000` (show with logs that nothing reads them,
-    or make their readers native); the interrupt callback `sub_8229DEA0`
-    still recompiled underneath (its override only logs).
+    `XGetVideoMode`'s two callers made native (2026-10-20,
+    `src/hooks/video_mode.cpp`, level 1; from B6). Both run once at boot.
+    `sub_82482B18` (from `sub_82483130`) read only `is_widescreen` (+12),
+    to pick 16/9 or 4/3 (the game's constants at `8204D300`, `8204D2FC`)
+    over the back buffer's aspect; ours takes `display::kWidescreen` (1 at
+    1280x720) and stores the same +132/+136/+140 (1280, 720, 1.0), then
+    makes the same index buffer (indices 0-5), vertex buffer and vertex
+    declaration and calls the object's vtable +96. The display set-up
+    `sub_8258D568` (from `Renderer::Init`, r6 = 2) had the answer written
+    into its object (the video output, `Renderer + 64`, +152..+199) and
+    never read it back; nothing else in the video output's or the
+    renderer's functions reads those bytes either. Shown by logs, not
+    only by search: a temporary switch overwrote them with 0xCD after the
+    set-up, and attract races (the same log, harnesses and frame) and a
+    session the user played (front end, race, pause menu, movie, loading
+    screens: fine, no error lines) didn't change. Ours does the rest the
+    same (the parameters, the two physical blocks, the device, the two
+    front buffers, the viewport, the states, the vblank callback, the safe
+    area) and leaves the 48 bytes zeroed. Checked against the recompiled
+    ones in the same build (a temporary switch, removed): attract races
+    with the objects logged word by word (the video output's +16..+311,
+    the device's states and +15144, the other object's fields, its index
+    data, r3) the same but for the answer's bytes; the dumped frames, the
+    harnesses, no error lines, the boot callback made. The user judged a
+    further session unneeded (both run once at boot, before anything an
+    attract race skips). No recompiled code calls `XGetVideoMode` now.
+
+    Met on the way, for the interrupt callback below: the set-up gives the
+    device its vblank callback (`sub_8229DA20` stores `sub_8258D4D8` at
+    +15144), which counts vblanks (`8296BD2C`, `8296BD30`) and signals an
+    event (`8296BD34`); only `sub_8229DEA0` calls it, on vblank
+    interrupts, which we don't make. The movie code's `sub_824E1750` also
+    reads +15144.
+
+    Left in B3 (2026-10-20): the GPU registers at `0x7FC80000` (show with
+    logs that nothing reads them, or make their readers native); the
+    interrupt callback `sub_8229DEA0` still recompiled underneath (its
+    override only logs), and the vblank callback above.
 
 B4. **Files and saves** (22 functions; the game's `CreateFile`
     `sub_82295508` is the only caller of `NtCreateFile`): the game's file
@@ -912,10 +946,10 @@ B6. **Pure helpers** (55 functions): string, time and formatting
       with the game's converters) and `vswprintf` (its one caller,
       swprintf, has one call site whose format has no conversions, so
       ours copies it; no printf).
-    - `XGetVideoMode`: not done, moved to B3. Its two callers are large
-      graphics setup functions (`sub_8258D568`, the graphics library's
-      display setup; `sub_82482B18`), and the SDK's answer comes from
-      its `video_mode_*` settings.
+    - `XGetVideoMode`: moved to B3 (its two callers are graphics set-up:
+      `sub_8258D568`, the graphics library's display set-up, and
+      `sub_82482B18`), and done there (2026-10-20): both callers native,
+      the answer ours (`src/display/display.h`).
 
     So 10 imports have no recompiled callers left; their SDK code can go
     when the SDK's import table is ours. Checked by the user (2026-10-20):
