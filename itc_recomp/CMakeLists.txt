@@ -78,7 +78,6 @@ set(ITC_SOURCES
     src/hooks/graphics_drops.cpp
     src/hooks/graphics_device.cpp
     src/hooks/video_mode.cpp
-    src/hooks/gpu_register_check.cpp
     src/display/gamma.cpp
     src/harnesses/harness.cpp
     src/harnesses/clock.cpp

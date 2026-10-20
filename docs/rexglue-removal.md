@@ -862,10 +862,40 @@ B3. **Graphics boundary** (17 functions calling `Vd*`): ring buffer
     interrupts, which we don't make. The movie code's `sub_824E1750` also
     reads +15144.
 
-    Left in B3 (2026-10-20): the GPU registers at `0x7FC80000` (show with
-    logs that nothing reads them, or make their readers native); the
-    interrupt callback `sub_8229DEA0` still recompiled underneath (its
-    override only logs), and the vblank callback above.
+    The GPU registers at `0x7FC80000` (2026-10-20): nothing answers them
+    now. Only the SDK's graphics system registered that range's handler
+    (`rexglue-sdk/src/graphics/graphics_system.cpp`), and it exists only
+    with a GPU plugin; without a handler the recompiled code's
+    `REX_MM_LOAD_U32` returns an uninitialized value and its stores are
+    dropped. (The SDK's vblank thread lived there too: there are no
+    vblanks at all now.) So every function touching them was looked for
+    and counted. In `generated/`, the `REX_MM_*` accesses are in the kick
+    `sub_8229E3F0` and Swap `sub_822A08A0` (native, without them),
+    `sub_822A0688` and the engines' callback `sub_822ACB48` (never called),
+    the interrupt callback `sub_8229DEA0` (interrupt status `0x6544`),
+    `sub_8229DFF8` (a store through a pointer; its only caller is the
+    deferred kick, whose native version doesn't call it), and
+    `sub_8245C638`, `sub_8245D138`, `sub_8245D208`, `sub_8245D288`,
+    `sub_8245D350`, `sub_8245D4D0`: those are the XMA decoder's registers
+    at `0x7FEA18xx` (audio), which the SDK's XMA decoder, kept, still
+    answers. One more reads them with a plain load, which the macro
+    search misses: `sub_822AC590` (register r3), with `sub_822AC5A0` (its
+    write); both are reached only through pointers in `sub_822AC918`,
+    from the "GPU hung" handler `sub_822ACAA8`. Nothing else builds
+    `0x7FC80000` or the register-index form (`+0x1FF20000`). A temporary
+    counter on all of them (removed): none called in a 30 s attract race
+    or in a session the user played (front end, a race, the pause menu,
+    loading screens: fine, no error lines, nothing unhandled by the
+    kick), `sub_8229DEA0` included. So nothing reads or writes the GPU
+    registers, and no code changes were needed; the rows say never
+    called.
+
+    Left in B3 (2026-10-20): the interrupt callback `sub_8229DEA0`, whose
+    override only logs and which nothing calls now (the counter above:
+    our kick's `Interrupt()` calls the callback block's functions itself),
+    and the vblank callback above: what reads the vblank count (device
+    +15148) and the vblank callback's counts and event, and whether
+    anything waits on them.
 
 B4. **Files and saves** (22 functions; the game's `CreateFile`
     `sub_82295508` is the only caller of `NtCreateFile`): the game's file

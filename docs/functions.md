@@ -133,7 +133,11 @@ with no row); run it after changing either, on any branch.
 | `sub_825B9C20` | | | Opens a path (`NtOpenFile`), queries its volume (`NtQueryVolumeInformationFile`) and closes it: probably GetDiskFreeSpace. Not read in detail. Files (B4). |
 | `sub_825B9F20` | | | Opens a path, `NtSetInformationFile`, closes it: probably SetFileAttributes. Not read in detail. Files (B4). |
 | `sub_822B58F0` | | | Mounting: names built with `sprintf`, `ObCreateSymbolicLink`, `CreateFile`, and calls to `sub_825B9F20` among others. Only from `sub_822B5C58` (Dropped): no callers left. Not read in detail. Files (B4). |
-| `sub_8245D350` | | | Polled by the audio library's hardware wait (`sub_8245D288`, r3 = the object): nonzero once the hardware answers. Not read. |
+| `sub_8245D350` | | | Polled by the audio library's hardware wait (`sub_8245D288`, r3 = the object): nonzero once the hardware answers; reads the XMA decoder's registers (`7FEA1818` and a 16-bit one; the SDK's XMA decoder answers them). Not read in detail. |
+| `sub_8245C638` | | | Reads the XMA decoder's register `7FEA1800` (audio, not the GPU; the SDK's XMA decoder answers it). Audio library (B2). Not read. |
+| `sub_8245D138` | | | Writes an XMA decoder register (`7FEA18xx`, the address from a pointer). Audio library (B2). Not read. |
+| `sub_8245D208` | | | Writes an XMA decoder register (`7FEA18xx`, the address from a pointer). Audio library (B2). Not read. |
+| `sub_8245D4D0` | | | Writes an XMA decoder register (`7FEA18xx`, the address from a pointer). Audio library (B2). Not read. |
 | `sub_8245CE98` | | | The audio library's per-context reset after a hardware timeout (r3 = the object, r4 = the context index). Not read. |
 | `sub_82106540` | | | Called first in the audio library's hardware reset (r3 = the object). Not read. |
 | `sub_82295500` | `Sleep` | | r3 = milliseconds (from `sub_8245D288`'s `Sleep(1000)`; not read). |
@@ -191,6 +195,7 @@ with no row); run it after changing either, on any branch.
 | `sub_825A7410` | `memcpy` | Wrapped | The library's memcpy (r3 destination, r4 source, r5 size): copies into the physical views recorded for the native renderer's guest memory mirrors (`src/native/buffers.cpp`). |
 | `sub_8229E3F0` | `Device::Kick` | Overridden | `src/native/gpu_link.cpp`. r3 device, r4 (size in words, address) pairs, r5 their count. The kicked buffers are applied directly (only their effects outside the GPU) instead of written to the ring; the original is no longer called. `--native_renderer_log_gpu` logs. |
 | `sub_8229E848` | `Device::DeferredKick` | Overridden | Same file. Queued kicks while GPU interrupts were outstanding; every kick completes at once now, so it kicks straight away; the original is no longer called. |
+| `sub_8229DFF8` | | | Links a block into a list in the command buffer: r3 the list (+4, +8 its last), r4 the block, r5 and r6 stored in it; stores the block's address through the old last's pointer (the MMIO store macro, but not shown to be a register) and calls `sub_822AC470` twice. Only from the deferred kick `sub_8229E848`, whose native version doesn't call it: never called (attract race and play). Not read in detail. |
 | `sub_8229DEA0` | `Device::OnInterrupt` | Wrapped | The library's interrupt callback (r3 source: 0 vblank, 1 the command stream's INTERRUPT); logged with `--native_renderer_log_gpu`. |
 | `sub_822B6BF8`, `sub_822B6A78`, `sub_822B6780` | | Wrapped | The tiling worker's callbacks and job; logged with `--native_renderer_log_gpu`. |
 | `sub_8229EF48` | | Wrapped | Ends the command segment when the buffer is full; counted for `--native_renderer_check_draw_writes` (`src/native/draw_packets.cpp`). |
@@ -218,7 +223,7 @@ with no row); run it after changing either, on any branch.
 | `sub_822B3A78` | | Dropped | The scaler's filters (`VdQueryVideoMode`, `sub_822B3798` twice). Not read in detail. Once at boot, from `sub_822B3FE0`. No longer called: their only callers (`sub_822B2610`, `sub_822B3FE0`) are dropped. |
 | `sub_822B3FE0` | `Device::SetUpScaler` | Dropped | Same file: does nothing (Swap ignores the return). The 360's output scaler: `sub_822B2470`, `sub_822B3A78`, `RtlFillMemoryUlong`, then the scaler's command buffer (`VdInitializeScalerCommandBuffer`, NOPs from the SDK) and display register packets written into the command buffer, which our renderer doesn't read. Once at boot, from Swap. |
 | `sub_822B4F10` | | | Writes a file with a 2048-byte header (display information, gamma ramp; `sub_82295D50`, `sub_82294E20`), deletes a symbolic link. Probably a debug capture. From `sub_822B58F0`, `sub_822B5C58`, `sub_822ACFB8` and `sub_822B58C0`. Never called in an attract race. Not read in detail. Not needed to draw: never called (attract race and play). |
-| `sub_822A0688` | | | Reads GPU registers at `7FC8xxxx`. No callers in code. Never called in an attract race. Not read. Not needed to draw: never called (attract race and play). |
+| `sub_822A0688` | | | Reads GPU registers at `7FC8xxxx`. No callers in code. Not read. Never called (attract races and play, 2026-10-20, a counter). |
 | `sub_822AD500` | `Device::Release` | | r3 device. Waits, frees, `sub_822ACFB8`, `sub_822B58C0`, clears the interrupt callback, `sub_8229F280(device, 0)`, unregisters the terminate notification, `VdShutdownEngines`. From `sub_8229D978`. Never called in an attract race. Not needed to draw: never called (attract race and play). |
 | `sub_8229DB38` | | | Probably Direct3D's CreateDevice: r3 0, r4 1, r5 0, r6 0, r7 the presentation parameters, r8 where the device goes; calls `Device::Init`; returns a negative value on failure. From the display set-up `sub_8258D568` (`8258D6C8`), once at boot. Not read in detail. |
 | `sub_82296550` | | | Probably XPhysicalAlloc: r3 bytes, r4 lowest and r5 highest address, r6 alignment, r7 protection; calls `MmAllocatePhysicalMemoryEx` and `sub_82296FD0`. From the display set-up `sub_8258D568` (64 KB and 1 MB). Not read in detail. |
@@ -274,7 +279,10 @@ with no row); run it after changing either, on any branch.
 | `sub_822A0E50` | | | Movies (per Swap's callers): `sub_822A0718`, `sub_822A3450`, then Swap with +13428 and +13284. Never seen calling Swap. Not read in detail. |
 | `sub_8209ACB8` | | | Calls `sub_822A0718`, `sub_8258D4A8`, then Swap (its result as the front buffer, r5 0). No direct callers. Not read in detail. |
 | `sub_8229E100` | | | The next command buffer segment, for `sub_8229EC00` (r4 2, r5 the size, r6 32); sets +10810 bit 3 among others. Not read in detail. |
-| `sub_822ACAA8` | | | The library's "GPU hung" handler: after a wait times out, sets +10809 bit 1 and the progress to position − 2; reads +20024. Never in exclusive mode. Not read in detail. |
+| `sub_822ACAA8` | | | The library's "GPU hung" handler: after a wait times out, sets +10809 bit 1 and the progress to position − 2; reads +20024; calls `sub_822AC918`, which reads and writes GPU registers. Never called (attract race and play, 2026-10-20): our kick completes every wait. Not read in detail. |
+| `sub_822AC918` | | | From the "GPU hung" handler `sub_822ACAA8`: reads and writes GPU registers (1488, 3878, 1403, ...) through `sub_822AC590` and `sub_822AC5A0` (or a function given in r5); probably a dump of the GPU's state for a debugger. Never called (attract race and play). Not read in detail. |
+| `sub_822AC590` | | | Reads GPU register r3 (`7FC80000` + 4·r3) with a plain load, so not through any MMIO handler. Only through a pointer in `sub_822AC918`. Never called (attract race and play). |
+| `sub_822AC5A0` | | | Writes GPU register r3 = r4 (`7FC80000` + 4·r3). Only through a pointer in `sub_822AC918`. Never called (attract race and play). |
 | `sub_8229B930`, `sub_8229B9C8`, `sub_8229BFE8` | | | GPU performance counters, from `sub_822B20D8` while +20104 is 1 or 2 (never without a debugger); `sub_8229B9C8` and `sub_8229BFE8` reserve words with `sub_8229F148`. Not read. |
 | `sub_8229E9D0` | | | From `sub_822A0718` (r4 the write position, r6 `822A0688`, r7 from +13240 and +11596); writes packets. Not read. |
 | `sub_825BED08` | | | Graphics library; calls `sub_822A3B90`, sets +10811 bit 6. Not read. |
