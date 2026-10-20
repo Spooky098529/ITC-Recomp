@@ -8,7 +8,7 @@
 REXCVAR_DEFINE_STRING(run_harnesses, "", "ITC",
                       "Run harnesses comparing native functions with the recompiled ones, once at "
                       "the first input update: \"all\" or a comma-separated list "
-                      "(object_attributes, time, clock, strings, last_error)");
+                      "(object_attributes, time, clock, strings, last_error, gamma)");
 
 namespace harness {
 
@@ -88,6 +88,7 @@ void RunRequested(PPCContext& ctx, uint8_t* base) {
       {"clock", Clock},
       {"strings", Strings},
       {"last_error", LastError},
+      {"gamma", Gamma},
   };
   auto wanted = [&](const char* name) {
     if (requested == "all") {
@@ -102,7 +103,7 @@ void RunRequested(PPCContext& ctx, uint8_t* base) {
     }
     return false;
   };
-  Context h{ctx, base, ctx.r1.u32 - 1024, {}};
+  Context h{ctx, base, ctx.r1.u32 - kScratchBytes - 512, {}};
   for (const Entry& e : kHarnesses) {
     if (wanted(e.name)) {
       REXLOG_INFO("harness: running {}", e.name);

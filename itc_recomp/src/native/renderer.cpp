@@ -36,13 +36,6 @@ REXCVAR_DEFINE_BOOL(log_gpu_memory, false, "ITC",
                     "Log every 5 s the GPU memory the native renderer holds, by what it's for, "
                     "and its counts of views, samplers, descriptor pools and pipelines (to find "
                     "what grows from race to race)");
-REXCVAR_DEFINE_BOOL(native_renderer, true, "ITC",
-                    "Draw the game's render commands with our own Vulkan renderer, in its own "
-                    "window (see docs/native-renderer.md; =false with --gpu_plugin=xenos for "
-                    "the emulated GPU)");
-REXCVAR_DEFINE_BOOL(native_renderer_exclusive, true, "ITC",
-                    "With native_renderer: hand the emulated GPU no work, drawing only in our "
-                    "window (milestone 6; see docs/native-renderer.md)");
 REXCVAR_DEFINE_BOOL(native_renderer_validation, false, "ITC",
                     "Enable the Vulkan validation layer for the native renderer, if installed");
 REXCVAR_DEFINE_INT32(native_renderer_show_resolve, -1, "ITC",
@@ -1228,19 +1221,8 @@ Renderer* GetRenderer() {
 
 }  // namespace
 
-bool Renderer_Enabled() {
-  return REXCVAR_GET(native_renderer);
-}
-
-bool Renderer_Exclusive() {
-  return REXCVAR_GET(native_renderer) && REXCVAR_GET(native_renderer_exclusive);
-}
-
 void Renderer_OnCommand(uint8_t* base, uint32_t id, uint32_t payload, uint32_t arg1,
                         uint32_t arg2) {
-  if (!Renderer_Enabled()) {
-    return;
-  }
   g_base = base;
   Buffers_OnCommand(base, id, payload, arg1);
   if (Renderer* renderer = GetRenderer()) {
@@ -1250,7 +1232,7 @@ void Renderer_OnCommand(uint8_t* base, uint32_t id, uint32_t payload, uint32_t a
 
 void Renderer_AfterCommand(uint8_t* base, uint32_t id, uint32_t payload, uint32_t arg1,
                            uint32_t arg2) {
-  if (!Renderer_Enabled() || !(IsDraw(id) || id == 25 || id == 26 || id == 32 || id == 33)) {
+  if (!(IsDraw(id) || id == 25 || id == 26 || id == 32 || id == 33)) {
     return;
   }
   if (Renderer* renderer = GetRenderer()) {
@@ -1260,9 +1242,6 @@ void Renderer_AfterCommand(uint8_t* base, uint32_t id, uint32_t payload, uint32_
 
 void Renderer_InlineDraw(uint8_t* base, uint32_t type, uint32_t count, uint32_t stride,
                          uint32_t data) {
-  if (!Renderer_Enabled()) {
-    return;
-  }
   if (Renderer* renderer = GetRenderer()) {
     renderer->InlineDraw(base, type, count, stride, data);
   }
@@ -1271,9 +1250,6 @@ void Renderer_InlineDraw(uint8_t* base, uint32_t type, uint32_t count, uint32_t 
 void Renderer_TiledResolve(uint8_t* base, uint32_t device, uint32_t flags, uint32_t rect,
                            uint32_t destination, uint32_t point, uint32_t clear_color,
                            float clear_z, uint32_t tile, uint32_t tiles) {
-  if (!Renderer_Enabled()) {
-    return;
-  }
   if (Renderer* renderer = GetRenderer()) {
     renderer->TiledResolve(base, device, flags, rect, destination, point, clear_color, clear_z,
                            tile, tiles);
@@ -1281,9 +1257,6 @@ void Renderer_TiledResolve(uint8_t* base, uint32_t device, uint32_t flags, uint3
 }
 
 void Renderer_FrontBufferResolve(uint8_t* base, uint32_t device, uint32_t front_buffer) {
-  if (!Renderer_Enabled()) {
-    return;
-  }
   g_base = base;
   if (Renderer* renderer = GetRenderer()) {
     renderer->FrontBufferResolve(base, device, front_buffer);
@@ -1330,7 +1303,7 @@ void Renderer_TakeListStats(uint64_t& missing, uint64_t& most) {
 }
 
 void Renderer_EndFrame() {
-  if (!Renderer_Enabled() || !g_base) {
+  if (!g_base) {
     return;
   }
   if (Renderer* renderer = GetRenderer()) {

@@ -12,6 +12,9 @@ For each table row, every sub_XXXXXXXX in its first column is checked:
   error    Overridden or Wrapped, but no override exists
   error    no status, but an override exists
   check    Wrapped, but the override never calls __imp__sub_X
+  check    Dropped, but its file calls __imp__sub_X (a fallback flag
+           while the drop is checked; remove it once checked)
+  (Dropped with no override is fine: native callers leave the call out.)
   note     Overridden, and its file calls __imp__sub_X (a fallback flag or
            a check against the original is fine; calling it for the work
            would make it Wrapped)
@@ -100,6 +103,9 @@ def main():
                 errors += 1
             elif status == "Wrapped" and not override[1]:
                 print(f"check  {where}: {override[0]} never calls __imp__{sub}")
+                checks += 1
+            elif status == "Dropped" and override and override[1]:
+                print(f"check  {where}: {override[0]} calls __imp__{sub}")
                 checks += 1
             elif status == "Overridden" and override[1]:
                 print(f"note   {where}: {override[0]} calls __imp__{sub}")

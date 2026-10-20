@@ -21,7 +21,7 @@
 
 namespace harness {
 
-constexpr uint32_t kScratchBytes = 512;
+constexpr uint32_t kScratchBytes = 4096;
 
 // A xorshift generator: the same cases on every run.
 class Random {
@@ -96,5 +96,6 @@ void Time(Context& h);
 void Clock(Context& h);
 void Strings(Context& h);
 void LastError(Context& h);
+void Gamma(Context& h);
 
 }  // namespace harness

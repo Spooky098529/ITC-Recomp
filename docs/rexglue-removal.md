@@ -141,7 +141,7 @@ Measured 2026-10-19 by grepping `itc_recomp/src` and `generated/`.
 |---|---|---|---|
 | Logging, flags, hashes | `REXLOG_*` (~280 uses), `REXCVAR_*` (~370), `rex/hash.h` (xxHash) | almost every file in `src/` | A |
 | App shell | `rex::ReXApp` (`src/itc_app.h`), `REX_DEFINE_APP` (`src/main.cpp`), `WindowedApp`, imgui (include path only), command line, log files, `PathConfig`, the SDK's hidden window (`src/native/app_window.cpp`) | `src/itc_app.h`, `src/main.cpp` | A |
-| Renderer leftovers | The Xenos to SPIR-V shader translator built from SDK sources (`itc_xenos_shaders` in `itc_recomp/CMakeLists.txt`), `rex::graphics::RegisterFile` (`src/native/state.h`, `passes.cpp`), `registers.h`, `xenos.h`, `util/draw.h`, `ui/vulkan/api.h`; SDL3 and Vulkan headers from `rexglue-sdk/thirdparty/`; the xenos plugin still built (`GPU_PLUGINS xenos`) for comparisons | `src/native/` | A |
+| Renderer leftovers | The Xenos to SPIR-V shader translator built from SDK sources (`itc_xenos_shaders` in `itc_recomp/CMakeLists.txt`), `rex::graphics::RegisterFile` (`src/native/state.h`, `passes.cpp`), `registers.h`, `xenos.h`, `util/draw.h`, `ui/vulkan/api.h`; SDL3 and Vulkan headers from `rexglue-sdk/thirdparty/`; the xenos plugin, no longer built for us or loaded since B3 (the SDK's own tree still builds it) | `src/native/` | A |
 | Graphics boundary | `Vd*` (25 imports; 17 game functions). In exclusive mode the GPU's job is already ours (`src/native/gpu_link.cpp`) | SDK `src/kernel/` | B |
 | Audio | Output: `AudioDriver`, `REX_AUDIO_BACKEND`, `conversion.h`, `downmix.h` (A). The game side: `XAudio*`, `XMA*` and the SDK's XMA decoder, which emulates the XMA hardware's contexts on FFmpeg (B; 6 game functions). Our mixer (`src/audio/native_audio.cpp`) still runs on an `XHostThread` and allocates from the guest heap | `src/audio/` | A and B |
 | Input | Reading SDL gamepads (A; the `--mnk_mode` keyboard is dropped first, A0); `XamInput*` (B; 3 game functions) | SDK `src/input/` | A and B |
@@ -235,9 +235,10 @@ A3. **Renderer leftovers**: bring the shader translator into the repo
     work, partly derived from Xenia), keep its notices on copied files,
     ask the user if the terms are unclear. Our own register array in
     place of `RegisterFile`; the formats from `xenos.h`/`registers.h`,
-    `draw_util` and the Vulkan function list the same way. Ask the user
-    whether the xenos plugin keeps being built for comparisons (CLAUDE.md
-    uses it) or goes behind an option.
+    `draw_util` and the Vulkan function list the same way. The xenos
+    plugin isn't kept for comparisons (the user's call, 2026-10-20; see
+    B3): our build no longer uses it since B3 (the SDK still builds it
+    in its own tree until the SDK goes).
 
 A4. **App shell**: our own `main`: SDL init, our window as the only one
     (no hidden SDK window, no event forwarding in `app_window.cpp`), our
@@ -420,6 +421,527 @@ B3. **Graphics boundary** (17 functions calling `Vd*`): ring buffer
     `0x6544`, `0x6110`): show with logs that nothing reads it, or make
     its readers native. Then the GPU plugin and the SDK's graphics go.
 
+    No comparison with the emulated GPU (the user's call, 2026-10-20):
+    our renderer is checked against the 360 itself (the user's play,
+    videos), and the emulated GPU hasn't been used to compare for some
+    time. So B3's native functions replace the recompiled ones with no
+    fallback to the plugin (as B1 did for input), and the plugin's build
+    (`GPU_PLUGINS xenos`) and `--native_renderer=false` go with B3. `main`
+    still has them. Worked on in branch `graphics-boundary`.
+
+    The functions (read 2026-10-20 in `generated/`; the `Vd*` answers are
+    the SDK's, `rexglue-sdk/src/kernel/xboxkrnl/xboxkrnl_video.cpp`). All
+    are the game's graphics library (its Direct3D); r3 is the device
+    unless said otherwise:
+
+    - **Device start**: `sub_822AD298` (device init, called by
+      `sub_8229DB38`, itself reached from the display set-up
+      `sub_8258D568`) initializes two critical sections, calls
+      `sub_822AD190`, reads a console setting (`ExGetXConfigSetting(3,
+      10)` into +15164, B5), sets up the ring with `sub_8229F280`, the
+      display mode with `sub_822ACE00`, retrains EDRAM (`sub_822B2388`)
+      and checks `VdIsHSIOTrainingSucceeded` (1). `sub_822AD190` calls
+      `VdInitializeEngines` (twice, with a `VdShutdownEngines` between;
+      the second time with the PFP and ME microcode at `82016148` and
+      `820165C8`), registers the title terminate notification at
+      `82639098` and the interrupt callback `sub_8229DEA0`
+      (`VdSetGraphicsInterruptCallback`). `sub_8229F280` (also called with
+      no parameters by the device's release, to free) waits for the GPU,
+      frees the old buffers, allocates the primary ring (default 32 KB),
+      the command buffer (default 2 MB), the progress block (96 bytes,
+      device +10768) and the callback block (32 bytes, +10772), calls
+      `VdInitializeRingBuffer` and `VdEnableRingBufferRPtrWriteBack`
+      (progress block +60; `docs/native-renderer.md` put it in
+      `sub_822AD190`, wrongly), fills the ring fields (+13496..+13536),
+      writes ME_INIT through `sub_8229DD70` and the scratch registers'
+      set-up (SCRATCH_UMSK, SCRATCH_ADDR = the callback block), and kicks
+      (`sub_8229F0E0`). Its import named `KiApcNormalRoutineNop`, called
+      with the ME_INIT packet and 19, is probably
+      `VdVerifyMEInitCommand` under a wrong name. Without the plugin the
+      SDK ignores all three `Vd*` set-up calls, `VdInitializeEngines`
+      returns 1 and never calls its callback `sub_822ACB48` (which writes
+      GPU registers `7FC83214` and `7FC83408`).
+    - **Device release**: `sub_822AD500` (called by `sub_8229D978`):
+      waits, frees, calls `sub_822ACFB8` and `sub_822B58C0` (both reach
+      `sub_822B4F10`), clears the interrupt callback, frees the ring
+      (`sub_8229F280` with no parameters) and shuts the engines down.
+      `sub_822ACB68` (unregister and `VdShutdownEngines`) has no callers
+      in code: probably the terminate notification's routine, its
+      address only in the image's data.
+    - **Every frame**: Swap `sub_822A08A0` (called by `Renderer::Present`'s
+      `sub_8258DC58`, the movie code's `sub_822A0E50`, the tiling worker
+      `sub_822B69A8`; `sub_8209ACB8`, which calls it, has no direct callers) reserves 64
+      words, calls `VdGetSystemCommandBuffer` and `VdSwap` (which writes a
+      fetch constant and an XE_SWAP packet there; our kick ignores both),
+      updates the display mode (`sub_822AD0B0`) and scaler
+      (`sub_822B3FE0`) when they change, retrains EDRAM (`sub_822B2388`,
+      `VdRetrainEDRAM` returns 0) and calls `sub_822B20D8` (which reaches
+      the clock gating `sub_8229B848`: `VdEnableDisableClockGating`, and
+      two REG_RMW packets). It writes the GPU register `7FC86110` only
+      with device +10809 bit 1 set (the library's "GPU hung" path).
+      `VdPersistDisplay` and `MmFreePhysicalMemory` only with +10809 bit
+      4.
+    - **Display mode and scaler**: `sub_822ACE00` (from device init)
+      reads `VdQueryVideoMode` into +19988..+20000 and creates the front
+      buffer and other surfaces; `sub_822AD0B0` sets `VdSetDisplayMode`
+      (flags from the format and 720x480/576) and reads
+      `VdGetCurrentDisplayInformation` into the same fields;
+      `sub_822B2470` works out the scaler's rectangle and output height
+      (`VdQueryVideoFlags`); `sub_822B2610` passes the front buffer and
+      display sizes to `VdCallGraphicsNotificationRoutines` (returns 0);
+      `sub_822B3A78` (`VdQueryVideoMode`, filter set-up through
+      `sub_822B3798`) and `sub_822B3FE0` build the scaler's command
+      buffer (`VdInitializeScalerCommandBuffer`, which the SDK fills with
+      NOPs, and `RtlFillMemoryUlong`, B6's blocked import). The SDK's
+      answers come from its `video_mode_*` settings.
+    - **Gamma**: `sub_822B0910` (a 256-entry ramp) and `sub_822B0AB0`
+      (a 128-entry piecewise-linear one) build a 1024-entry 10-bit curve
+      from `VdGetCurrentDisplayGamma` (the SDK: always 2, BT.709) and run
+      the ramp through it: the tables `--xbox_gamma` copied
+      (`src/native/xbox_gamma_table.h`).
+    - **`sub_822B4F10`**: writes a file with a 2048-byte header (display
+      information and the gamma ramp in it; `sub_82295D50`, handles
+      closed with `sub_82294E20`) and deletes a symbolic link
+      (`ObDeleteSymbolicLink`). Called by the mounting `sub_822B58F0`,
+      `sub_822B5C58` (from Swap), `sub_822ACFB8` and `sub_822B58C0`.
+      Probably a debug capture; not read in detail. With its file calls
+      it may belong to B4.
+
+    Not needed already: no vblank interrupts and no GPU registers at
+    `0x7FC80000` have been supplied since the plugin went (milestone 6),
+    and boot, menus and races work. So B3 is mostly removing calls that do
+    nothing today, not doing the GPU's work.
+
+    Plan: (1) a temporary opt-in counter on these functions (which run,
+    how often, from where, what each `Vd*` answers), an attract race and
+    a session the user plays; (2) native as plain C++ behind adapters,
+    smallest first: the display mode, flags, information and gamma (our
+    own answers, the SDK's values; harness cases for the ramps); device
+    start and release (the library's device fields kept, the `Vd*` calls
+    dropped); the scaler (clearing `RtlFillMemoryUlong`); Swap, EDRAM
+    retraining and clock gating; `XGetVideoMode`'s two callers (from B6).
+
+    Counted (2026-10-20, `graphics-boundary`): a temporary wrapper on each
+    (`src/hooks/graphics_boundary_log.cpp`, `--log_graphics_boundary`;
+    removed when the natives replace them). An attract race (30 s): once
+    at boot, device init, engines, ring set-up, display mode, set display
+    mode (from the first Swap), the 256-entry gamma ramp, the scaler
+    (rectangle twice, filters, buffer) and the notification, all at
+    1280x720; Swap and EDRAM retraining once a frame (4,198 each, from
+    `Renderer::Present`'s `8258DCA4`), Swap's device flags +10809 `04`
+    (no "GPU hung" bit, so no `7FC86110` write). Never: clock gating, the
+    piecewise-linear ramp, device release, the terminate routine,
+    `sub_822B4F10`, `sub_822A0688` (reads `7FC8xxxx`) and the engines'
+    callback. A session the user played (2026-10-20, 88 s: the front end,
+    a race, the pause menu, closing the window) gave the same: every
+    function counted once at boot or once a frame (6,530 Swaps, all from
+    `8258DCA4`), the same seven never called. Closing the window
+    hard-exits ("Title terminated; hard-exiting process"), so device
+    release and the terminate routine don't run at quit either.
+
+    The gamma ramps (done 2026-10-20, `graphics-boundary`): `sub_822B0910`
+    and `sub_822B0AB0` are plain C++ (`src/display/gamma.cpp`) behind
+    adapters (`src/hooks/gamma.cpp`), with the display's gamma ours
+    (`src/display/display.h`: type 2, BT.709, power 2.2222223, the SDK's
+    answer). Their helpers, the sRGB and BT.709 curves (`sub_822B07B0`,
+    `sub_822B0860`), are plain C++ too and no longer called; `pow` is
+    `std::pow`. The constants were logged from the image and written as
+    hex floats (one, 1/1.055, doesn't round-trip as a decimal literal);
+    the recompiler's fused multiply-subtract (`fma` in double, then
+    rounded to float) is kept. The harness `gamma` (`--run_harnesses`)
+    compares the two ramps (random, identity and climbing pairs, both
+    directions, in place and not), the two curves (all 1,024 curve inputs,
+    random values, the knees) and `pow` rounded to float (the curves'
+    exponents and random ones): all the same. Only type 2 reaches the
+    whole functions (the import can't be stood in for); the helpers'
+    cases cover types 1 and 3. The harnesses' scratch area grew to 4 KB
+    for the ramps. No game code calls `VdGetCurrentDisplayGamma` any more.
+
+    Kept, though not needed to draw today (the user's call, 2026-10-20):
+    `--xbox_gamma` applies fixed tables captured from the game
+    (`src/native/xbox_gamma_table.h`), not the ramps' output, which only
+    reaches the display's gamma registers. Keeping the native ramps leaves
+    room for `--xbox_gamma` to follow the game's own ramp later. So the
+    set display mode `sub_822AD0B0`, which calls them, isn't dropped
+    either.
+
+    The rule for the rest (the user's, 2026-10-20): we're working toward
+    native graphics code, and the Vulkan renderer is it. What the renderer
+    needs from a function is kept (made native without its `Vd*` calls);
+    what it doesn't need is dropped (status Dropped in
+    `docs/functions.md`, with the reason in its row).
+
+    Dropped (2026-10-20, `src/hooks/graphics_drops.cpp`, no fallback
+    flag): the engines' set-up `sub_822AD190` (returns 1; only `Vd*`
+    calls the SDK ignores and the terminate notification), EDRAM
+    retraining `sub_822B2388` (once a frame; only a lock, with the SDK's
+    `VdRetrainEDRAM` returning 0), and the display scaler's buffer
+    `sub_822B3FE0` and notification `sub_822B2610` (packets for display
+    registers our renderer doesn't read). That leaves `sub_822B2470` and
+    `sub_822B3A78` with no callers. Checked by an attract race (the same
+    device fields at boot and Swap, no errors, the dumped frame drawn
+    right) and the user watching it. No game code calls
+    `VdInitializeEngines`, `VdRetrainEDRAM`, `VdRetrainEDRAMWorker`,
+    `VdInitializeScalerCommandBuffer`, `VdCallGraphicsNotificationRoutines`
+    or `RtlFillMemoryUlong` (B6's blocked import) any more.
+
+    Left (2026-10-20): the functions the renderer needs, still calling
+    `Vd*`: device init (`VdIsHSIOTrainingSucceeded`), the ring set-up
+    (`VdInitializeRingBuffer`, `VdEnableRingBufferRPtrWriteBack`,
+    `VdSetSystemCommandBufferGpuIdentifierAddress`), the display mode
+    (`VdQueryVideoMode`), the set display mode (`VdSetDisplayMode`,
+    `VdGetCurrentDisplayInformation`) and Swap (`VdSwap`,
+    `VdGetSystemCommandBuffer`, `VdPersistDisplay`). Each gets a native
+    version keeping only what the renderer uses. All of them are native
+    now (Swap last, below). The functions that still call `Vd*` in
+    `generated/` are the never-called ones that follow,
+    `Device::InitEngines` and the two no longer called, so none has been
+    seen to run. The counter (`--log_graphics_boundary`) was removed once
+    the user's session (below) had been read. The never-called functions
+    (clock gating, device release, the terminate routine, `sub_822B4F10`, `sub_822A0688`, the
+    engines' callback) keep a blank status; `sub_822B2470` and
+    `sub_822B3A78`, no longer called since their callers were dropped, are
+    Dropped. None has an override (the counter's wrappers went), and they
+    still name `Vd*` imports in `generated/` until it goes.
+
+    Made native (2026-10-20, `src/hooks/graphics_device.cpp`; level 1:
+    the library's own steps stay guest calls, the `Vd*` calls are gone):
+    - `Device::SetUpDisplay` (`sub_822ACE00`): the display mode is ours
+      (`src/display/display.h`, 1280x720) instead of `VdQueryVideoMode`.
+      The game passes +60 set, so no front buffer is made here; the
+      render target and depth surface are.
+    - `Device::Init` (`sub_822AD298`): without `VdIsHSIOTrainingSucceeded`
+      (the "training failed" flag at `829537BC` stays 0), the engines'
+      set-up (so `sub_822AD190` has no callers and its drop went) and the
+      EDRAM retraining (dropped), and without handing two fields to the
+      kernel's debug monitor data (`820007F0` points to 0: no debugger).
+      Kept: storing the device in `VdGlobalDevice` (`820007B0`, other
+      game code may read it), the console setting read (B5) and the
+      critical sections (the core). The counter's rate comes from
+      `src/helpers/clock.h`.
+    - `Device::SetUpRing` (`sub_8229F280`): without its five kernel calls
+      and the ME_INIT packet in the primary ring, which nothing reads. The
+      game passes its own ring and command buffer (nothing is allocated
+      for them). The scratch registers' set-up stays: our kick needs it
+      for the boot callback.
+    - `Device::SetDisplayMode` (`sub_822AD0B0`): the gamma ramp set as
+      before; the display fields from our display mode instead of
+      `VdGetCurrentDisplayInformation`; `VdSetDisplayMode` gone.
+
+    Checked by the counter's log of the device's fields (display, surfaces,
+    flags, ring, command buffer, progress block, fences) after each step
+    and at the first Swaps, against the recompiled versions: the same, but
+    the ring's write position (0, no ME_INIT). For the ring set-up the
+    original ran in the same build behind a temporary switch. Frames dumped
+    in attract races look right (frames always differ between runs, by
+    timing), the boot callback is still made, and all harnesses match.
+
+    Swap, step by step (2026-10-20, `graphics-boundary`; `sub_822A08A0`
+    read in `generated/`, then counted: the Swap wrapper in
+    `src/hooks/graphics_boundary_log.cpp` counts, at entry, the state each
+    branch tests, by caller, and logs the fields before and after at its
+    first calls and powers of two). Attract races (30 s, 5,120 Swaps): all
+    from `Renderer::Present`'s `8258DCA4`, r5 0, device +20440 bit 0
+    clear. In the order Swap runs them:
+
+    1. **Copies the front buffer's 52-byte header to +13444. Needed.**
+       `sub_822A0718` (from `VideoOutput::WaitForVblank` before every
+       Swap; it sets +10809 bit 5, which Swap clears) reads its address
+       word (+13476): only once it's non-zero (from the second frame) does
+       it write its packets, among them scratch register 1 = 1, which our
+       kick writes back to callback block +4. The tiling worker
+       `sub_822B69A8` would show the copy again (Swap with +13444) when
+       +10810 bit 2 is set, but no code sets that bit.
+    2. **GPU timestamps** (`sub_822B1F68` before and after, +20076 += 2)
+       when +20080 is set: an EVENT_WRITE_SHD with initiator bit 31 (the
+       GPU's swap counter) into progress block +64..+92. Never: +20080 is
+       set only by `sub_822B1CB0`, the library's debugger command handler,
+       which `sub_822B1E70` hands to the debug monitor only when
+       `820007B4`/`820007F0` point somewhere (they don't). Not needed.
+    3. **Ends the segment when `829537C0` is set.** Never: no code writes
+       it (0 in every run). Not needed.
+    4. **`sub_822B5C58(device, front buffer)`: the capture.** Tail-calls
+       the mounting `sub_822B58F0` or `sub_822B5208` when the byte at
+       `82953E1C` is set, `sub_822B4F10` when device +20424 bit 3 is;
+       otherwise returns. Neither is written by code (0 in every run).
+       Not needed (skipped behind a temporary switch: the same device
+       fields, frames right).
+    5. **`VdGetSystemCommandBuffer` and `VdSwap`**, unless +19980 (an
+       object only the capture's state machine `sub_822B1788` makes; 0 in
+       every run) is set. The SDK zeroes the 148-byte buffer, so +20120 is
+       stored as 0 and +20432 never written; `VdSwap` fills the 64 words
+       reserved (`sub_8229F148`) with a fetch constant (register `0x4800`,
+       above the 0x2000 our kick keeps), XE_SWAP (ignored) and NOPs.
+       +20120's only reader is the debugger's statistics query
+       `sub_822B1088`, +20432 has none. Not needed, nor the reservation.
+    6. **`Device::SetDisplayMode`** when +10809 bit 4 is set: once, at
+       the first Swap (`Device::SetUpDisplay` sets the bit). Kept (native
+       already, for the gamma ramps).
+    7. **The parameters (r5)**: copied to +13284 and `sub_822B42D0` called
+       when they differ from it. `Renderer::Present`, the tiling worker and
+       `sub_8209ACB8` pass 0; the movies' `sub_822A0E50` passes +13284
+       itself. Never runs.
+    8. **The scaler.** With the zeroed buffer (its +8 is 0) the
+       "nothing from the kernel" branch: when +10810 bit 5 is set (once,
+       the first Swap), clears +13312 (56 bytes), clears the bit and calls
+       `Device::SetUpScaler` (Dropped), then writes 10 words (register
+       `0x1838` = 0, a WAIT_REG_MEM on `0x1973`, `0x1852` = 1: display
+       registers). When +10811 bit 7 is set, `sub_822A05A8` writes the
+       display's gamma packets (REG_RMW on `0x1841`, `0x1930`, a ramp
+       through `sub_822B0D18` or `sub_822B0C38`); no code sets that bit
+       (`EndTiling` clears bit 6), never seen. The packets are display
+       registers our renderer doesn't read. Not needed, but clearing the
+       flags and +13312 (library state).
+    9. **The front buffer register.** The game flips between two front
+       buffers (`FF7F7000`, `FF45F000`), so every Swap finds +20004 changed
+       and writes register `0x1844` (the address) into the command buffer;
+       our kick only keeps it in its register table, which nothing reads
+       for `0x1844`. The GPU register `7FC86110` is written as well only
+       with +10809 bit 1 ("GPU hung", set by `sub_822ACAA8` after a timed
+       out wait, or by the segment end when the "training failed" flag
+       `829537BC` is set; neither in exclusive mode). +20004 has no other
+       reader in the library. Not needed.
+    10. **Display persistence** with +10809 bit 4 (the first Swap): a
+        REG_RMW on `0x1E4E`, `VdPersistDisplay` (the SDK allocates 64
+        bytes) and `MmFreePhysicalMemory` (frees them), then the bit
+        cleared. Not needed, but clearing the bit.
+    11. **Ends the segment** (`sub_8229EF48`: the kick our renderer reads).
+        Needed.
+    12. `RetrainEdram`: Dropped already.
+    13. **`sub_8229EC00(device, +13512 >> 2)`: the next segment and the
+        frame throttle.** Takes the next segment of the command buffer
+        (`sub_8229E100`, or through the object at +13160), sets the write
+        position and its limits (+40, +44, +48 = +44 − 160) and the
+        segment's fields (+13528, +13516, +13532), then waits
+        (`sub_8229E908`) for progress block +0 to reach the fence of the
+        last Swap (+13540; with +20440 bit 0, the one before, +13544) and
+        zeroes it. In exclusive mode the fence is always passed (never
+        ahead in the runs). Needed: the next frame's commands go into that
+        segment.
+    14. **Clears +10809 bit 5 and records the fences**: +13540 = the
+        command position before the kick, +13544 = the old +13540 (0 with
+        +20440 bit 0 clear, as `sub_8229EC00` has just zeroed it). Only
+        Swap and `sub_8229EC00` read them. Needed (the throttle's fences).
+    15. **`sub_822B20D8`: frame statistics.** The frame counter (+20024 +=
+        1), the time since the last Swap from the timebase (+20028, with
+        +20032/+20036), +20048/+20056 moved to +20064/+20068 and zeroed,
+        the debugger's requests (+15168 bits through `820007F0`), the GPU
+        performance counters (+20104 = 1 or 2, set only by `sub_822B0F70`,
+        itself only from the debugger's query `sub_822B1088`; clock gating
+        on that path), and `sub_822B1788` (the capture's state machine at
+        `82953D10`, 0 in every run; otherwise it hands the frame count to
+        the debugger through `820007B4`). Readers of what it leaves: the
+        debugger's query and the "GPU hung" handler. Not needed (skipped
+        behind the temporary switch: only +20024 and +20028 differ, 0
+        instead of counting; frames right).
+    16. **`sub_822A3B90(device, 0)`**: the binning packets (opcodes
+        `0x60`-`0x63` from +12448/+12452), `sub_8229B7D8` (WAIT_UNTIL and
+        register `0xF01` from +10788, with the bits it already holds), the
+        screen scissor `sub_822A0F80` (from +10308/+10312; per tile when
+        tiling), then **all ones in the dirty masks at device +0..+39**.
+        The renderer takes those masks at each draw (`MarkDeviceDirty` in
+        `src/native/state.h`), so the next frame's first draw copies every
+        register block. Needed (a library step without `Vd*` calls, also
+        called by `Device::Init`, `sub_825BED08` and `EndTiling`
+        `sub_825BF200`).
+
+    Seen every frame, then: 1, 4, 5, 9, 11, 13-16; once: 6, 8, 10. Never:
+    2, 3, 7, the gamma half of 8, the "GPU hung" write. What the
+    renderer needs: 1, 11, 13, 14, 16, and 6 (kept for the gamma ramps).
+
+    Proposed native Swap (level 1, in `src/hooks/graphics_device.cpp`):
+    copy the 52 bytes; `Device::SetDisplayMode` when +10809 bit 4 is set,
+    clearing it; when +10810 bit 5 is set, clear +13312 and the bit; clear
+    +10811 bit 7; then the guest calls `sub_8229EF48`, `sub_8229EC00`
+    (+13512 >> 2), clear +10809 bit 5, the fences, and `sub_822A3B90(0)`.
+    Left out: the timestamps, `829537C0`'s segment end, the capture, the
+    `Vd*` calls and their reservation (+20120, +20432), the parameters'
+    compare, the scaler, gamma and front buffer packets (+20004), the
+    `7FC86110` write, the display persistence, `RetrainEdram` and the
+    frame statistics. Swap is the only caller of `sub_822B5C58`,
+    `sub_822B20D8`, `sub_822B1F68` and `sub_822A05A8`, which become
+    Dropped (and `sub_822B1788`, `sub_822B5208`, `sub_822B58F0`, called
+    only from those, are no longer called). Checked as the other device
+    functions were: the counter's fields at the first Swaps and powers of
+    two the same as the recompiled Swap's, but for those left out
+    (+20004, +20024, +20028, and the write position, 256 bytes less a
+    frame), attract races with frame dumps, all harnesses, and a session
+    the user plays (front end, a race, the pause menu, a movie, loading
+    screens).
+
+    Swap made native (2026-10-20, `src/hooks/graphics_device.cpp`, level 1
+    as proposed). Swap's listing, read again against the proposal, matched
+    it. Its r3 comes back as `sub_822A3B90` leaves it (the last guest call,
+    as in the original): `Renderer::Present` and `sub_8209ACB8` ignore it,
+    and the movies' `sub_822A0E50` returns it to its own callers. The
+    52-byte copy stays a call to the game's memcpy (wrapped for the
+    memory mirrors). For the check, the counter's Swap logging moved into
+    functions the native Swap called; the counter went after the user's
+    session. No game code calls `VdGetSystemCommandBuffer`, `VdSwap` or
+    `VdPersistDisplay` any more (`MmFreePhysicalMemory` still has two
+    other callers, `sub_822965C8` and `sub_822B4680`).
+
+    Checked against the recompiled Swap in the same build (a temporary
+    switch, removed), 30 s attract races with `--log_graphics_boundary`:
+    at the first Swaps and powers of two, the same flags (+10808..+10811),
+    display, surfaces, ring and command buffer fields, fences (+13544
+    always 0, +13540 the position before the kick, progress +0 two behind:
+    the fence always passed), dirty masks (all ones) and branch counts
+    (5,120 Swaps, all from `8258DCA4`; display mode and scaler once, front
+    buffer every frame, the rest never). What differs: +20004 (0, no
+    longer set), +20024 and +20028 (0, no frame statistics), and the
+    segments: the original reserved `VdSwap`'s 64 words before
+    `Device::SetDisplayMode` wrote the gamma ramp's packets, so at the
+    first Swap the ramp no longer fit in the segment (3,760 bytes left)
+    and one more segment was ended. The native one ends one fewer there:
+    command positions 2 lower and segments 4,160 bytes earlier from then
+    on, until the runs' own timing takes over. +13520 (probably the
+    command buffer's wrap count) is the same until the race loads and
+    then follows each run's command positions. The dumped frames look
+    right, all harnesses match, there are no error lines, and the boot
+    callback is still made. The kick's summary is the same in both (no
+    packets unhandled, 0 scratch write-backs, 0 callbacks).
+
+    A session the user played on the native Swap (2026-10-20; front end,
+    a race, the pause menu, a movie, loading screens): the game looked
+    fine. 9,330 Swaps, all from `Renderer::Present`'s `8258DCA4` with r5
+    0; the display mode and scaler branches once, the front buffer every
+    Swap, the others never (the same as attract races; the movies'
+    `sub_822A0E50` and `sub_8209ACB8` never called Swap). No error lines,
+    no packets unhandled. Unlike the attract races, some of the kick's
+    10 s summaries count scratch write-backs (240-604, with 125 and 147
+    callbacks in two of them; 0 in the race's), so scratch register 1's
+    write-back from `sub_822A0718` happens in some phases only. Not looked
+    into yet.
+
+    The emulated GPU left out of our build (2026-10-20,
+    `graphics-boundary`): the game no longer builds against the plugin or
+    copies it next to the executable (`rexglue_setup_target(itc)` without
+    `GPU_PLUGINS xenos`; the SDK still builds it in its own tree, which
+    goes with the core). `--native_renderer` and
+    `--native_renderer_exclusive` are gone, with the paths they guarded:
+    the kick (`sub_8229E3F0`) and the deferred kick (`sub_8229E848`) no
+    longer fall back to the recompiled ones that handed the GPU its work,
+    the SDK's window is always hidden, and the renderer's hooks always
+    run. The scripts and the standard command lose the two flags. Checked
+    by an attract race: no error lines, the boot callback made, nothing
+    unhandled by the kick, the dumped frame right, all harnesses the same
+    (one run's `GetLocalTime` case differed by a second, run as the
+    second ticked over; the next run matched).
+
+    `XGetVideoMode`'s two callers made native (2026-10-20,
+    `src/hooks/video_mode.cpp`, level 1; from B6). Both run once at boot.
+    `sub_82482B18` (from `sub_82483130`) read only `is_widescreen` (+12),
+    to pick 16/9 or 4/3 (the game's constants at `8204D300`, `8204D2FC`)
+    over the back buffer's aspect; ours takes `display::kWidescreen` (1 at
+    1280x720) and stores the same +132/+136/+140 (1280, 720, 1.0), then
+    makes the same index buffer (indices 0-5), vertex buffer and vertex
+    declaration and calls the object's vtable +96. The display set-up
+    `sub_8258D568` (from `Renderer::Init`, r6 = 2) had the answer written
+    into its object (the video output, `Renderer + 64`, +152..+199) and
+    never read it back; nothing else in the video output's or the
+    renderer's functions reads those bytes either. Shown by logs, not
+    only by search: a temporary switch overwrote them with 0xCD after the
+    set-up, and attract races (the same log, harnesses and frame) and a
+    session the user played (front end, race, pause menu, movie, loading
+    screens: fine, no error lines) didn't change. Ours does the rest the
+    same (the parameters, the two physical blocks, the device, the two
+    front buffers, the viewport, the states, the vblank callback, the safe
+    area) and leaves the 48 bytes zeroed. Checked against the recompiled
+    ones in the same build (a temporary switch, removed): attract races
+    with the objects logged word by word (the video output's +16..+311,
+    the device's states and +15144, the other object's fields, its index
+    data, r3) the same but for the answer's bytes; the dumped frames, the
+    harnesses, no error lines, the boot callback made. The user judged a
+    further session unneeded (both run once at boot, before anything an
+    attract race skips). No recompiled code calls `XGetVideoMode` now.
+
+    Met on the way, for the interrupt callback below: the set-up gives the
+    device its vblank callback (`sub_8229DA20` stores `sub_8258D4D8` at
+    +15144), which counts vblanks (`8296BD2C`, `8296BD30`) and signals an
+    event (`8296BD34`); only `sub_8229DEA0` calls it, on vblank
+    interrupts, which we don't make. The movie code's `sub_824E1750` also
+    reads +15144.
+
+    The GPU registers at `0x7FC80000` (2026-10-20): nothing answers them
+    now. Only the SDK's graphics system registered that range's handler
+    (`rexglue-sdk/src/graphics/graphics_system.cpp`), and it exists only
+    with a GPU plugin; without a handler the recompiled code's
+    `REX_MM_LOAD_U32` returns an uninitialized value and its stores are
+    dropped. (The SDK's vblank thread lived there too: there are no
+    vblanks at all now.) So every function touching them was looked for
+    and counted. In `generated/`, the `REX_MM_*` accesses are in the kick
+    `sub_8229E3F0` and Swap `sub_822A08A0` (native, without them),
+    `sub_822A0688` and the engines' callback `sub_822ACB48` (never called),
+    the interrupt callback `sub_8229DEA0` (interrupt status `0x6544`),
+    `sub_8229DFF8` (a store through a pointer; its only caller is the
+    deferred kick, whose native version doesn't call it), and
+    `sub_8245C638`, `sub_8245D138`, `sub_8245D208`, `sub_8245D288`,
+    `sub_8245D350`, `sub_8245D4D0`: those are the XMA decoder's registers
+    at `0x7FEA18xx` (audio), which the SDK's XMA decoder, kept, still
+    answers. One more reads them with a plain load, which the macro
+    search misses: `sub_822AC590` (register r3), with `sub_822AC5A0` (its
+    write); both are reached only through pointers in `sub_822AC918`,
+    from the "GPU hung" handler `sub_822ACAA8`. Nothing else builds
+    `0x7FC80000` or the register-index form (`+0x1FF20000`). A temporary
+    counter on all of them (removed): none called in a 30 s attract race
+    or in a session the user played (front end, a race, the pause menu,
+    loading screens: fine, no error lines, nothing unhandled by the
+    kick), `sub_8229DEA0` included. So nothing reads or writes the GPU
+    registers, and no code changes were needed; the rows say never
+    called.
+
+    The interrupt callback and vblank (2026-10-20): `sub_8229DEA0` is no
+    longer called, and its override (which only logged, then called it)
+    is removed. Nothing registers it: only the engines' set-up
+    `sub_822AD190` did (`VdSetGraphicsInterruptCallback`), and native
+    `Device::Init` leaves that out; our kick's `Interrupt()` calls the
+    callback block's functions itself; and the SDK's vblank thread went
+    with the GPU plugin, so there are no vblanks at all. The register
+    item's counter showed it: never called in an attract race or the
+    user's session. What vblanks fed is unused too: the device's vblank
+    count (+15148) is read only by `sub_8229DEA0` and `sub_822A0688`
+    (never called); the display set-up's vblank callback `sub_8258D4D8`
+    (device +15144) is called only by `sub_8229DEA0`; its counts
+    (`8296BD2C`, `8296BD30`) and event (`8296BD34`) were read and waited
+    on only by the original `VideoOutput::WaitForVblank` (`sub_8258DAA8`),
+    which our override replaced (it makes the device call before the
+    wait, not the wait); the event is otherwise only made at boot
+    (`sub_825DA470`) and closed at exit (`sub_825DB2C0`). Four movie
+    decoder functions read +15148 of their object too (`sub_825169A0`,
+    `sub_82533010`, `sub_8253DEB0`, `sub_8256D470`, comparing it with -1):
+    a temporary counter (removed) showed the boot movie's `sub_825169A0`
+    on its own object (`40B0AB40`, +15148 = -1), not the device
+    (`40021B00`); the other three are its variants, reached the same way.
+    Likewise the movie player's +15144 and +15156 (`sub_824E1750` and
+    others) are its own object's, not the device's: the lead in
+    `native-renderer.md` that the movie code sets a vblank callback on the
+    device was wrong (corrected there).
+
+    One consequence, noted and not changed (the user's call):
+    `sub_822A0718` writes scratch register 1 = 1 every frame, which our
+    kick writes back to callback block +4; on the 360 the vblank
+    countdown in `sub_8229DEA0` (+15156) cleared it, and that never runs
+    now. It fits the scratch write-backs seen outside races in the user's
+    sessions (452-604 an interval) and their absence in races.
+
+    B3 done (2026-10-20, merged from `graphics-boundary`): no code that
+    runs calls a `Vd*` import or `XGetVideoMode` any more. Each recompiled
+    caller is overridden natively without it (device start, the ring,
+    Swap, the display mode, the display set-up, the gamma ramps), Dropped
+    (engines, EDRAM retraining, the scaler, notifications), or never
+    called (clock gating, `Device::Release`, the debug capture), and our
+    code calls none. The GPU plugin isn't built or loaded, nothing reads
+    the GPU registers, and nothing needs vblanks. The SDK's graphics code
+    (`rexglue-sdk/src/graphics/`, the `Vd*` exports) is still compiled
+    into `librexruntime`, unused; like all SDK code it's deleted with the
+    SDK (E4), not before.
+
+    For later (the user's call, 2026-10-20): return to the scratch
+    register 1 lead above. Nothing seen so far says it needs looking
+    into now (the game behaves in the user's sessions, with nothing
+    unhandled by the kick).
+
 B4. **Files and saves** (22 functions; the game's `CreateFile`
     `sub_82295508` is the only caller of `NtCreateFile`): the game's file
     functions on host files under `--game_data_root` (log the paths with
@@ -499,10 +1021,10 @@ B6. **Pure helpers** (55 functions): string, time and formatting
       with the game's converters) and `vswprintf` (its one caller,
       swprintf, has one call site whose format has no conversions, so
       ours copies it; no printf).
-    - `XGetVideoMode`: not done, moved to B3. Its two callers are large
-      graphics setup functions (`sub_8258D568`, the graphics library's
-      display setup; `sub_82482B18`), and the SDK's answer comes from
-      its `video_mode_*` settings.
+    - `XGetVideoMode`: moved to B3 (its two callers are graphics set-up:
+      `sub_8258D568`, the graphics library's display set-up, and
+      `sub_82482B18`), and done there (2026-10-20): both callers native,
+      the answer ours (`src/display/display.h`).
 
     So 10 imports have no recompiled callers left; their SDK code can go
     when the SDK's import table is ours. Checked by the user (2026-10-20):
@@ -567,9 +1089,9 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
     the two copies must agree. This is most of the
     work: full decompilations of games this size usually take years. Keep
     the statuses in `docs/functions.md` up to date (Wrapped, Overridden,
-    Native, defined at its top) so progress can be measured: Native plus
-    Overridden is how much of the game is ours, Native alone how much no
-    longer needs `ctx`. Keyboard input comes back
+    Native, Dropped, defined at its top) so progress can be measured:
+    Native, Dropped and Overridden are how much of the game is ours,
+    Native and Dropped how much no longer needs `ctx`. Keyboard input comes back
     once the game is native (A0).
 
 ## The end state: removing the core
@@ -600,7 +1122,9 @@ E4. **`PPCContext`, `rex/ppc.h`, the function table, `generated/`,
     and the SDK**: delete the submodule, `patches/rexglue-sdk/`,
     `generated/rexglue.cmake`, `librexruntime` from packaging, both CI workflows and CLAUDE.md (the build line's
     `LD_LIBRARY_PATH`, packaging, the note on the submodule showing
-    modified). The `rexglue codegen` target goes with it.
+    modified). The `rexglue codegen` target goes with it. The SDK's
+    graphics (`src/graphics/`, the `Vd*` and `XGetVideoMode` exports),
+    unused since B3, go with it.
 
 ## Risks
 

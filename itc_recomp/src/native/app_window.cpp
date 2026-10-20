@@ -31,7 +31,7 @@ class SdkWindowListener : public rex::ui::WindowListener {
 }  // namespace
 
 void AppWindow_SetSdkWindow(rex::ui::Window* window) {
-  if (!window || !Renderer_Exclusive()) {
+  if (!window) {
     return;
   }
   g_sdk_window = static_cast<rex::ui::WindowSDL*>(window);

@@ -678,7 +678,7 @@ extern "C" REX_FUNC(sub_825A7410) {
     g_logged.push_back(write);
   }
   // Recorded after the copy, so a range read meanwhile is read again.
-  if (size && destination >= 0xA0000000u && Renderer_Enabled()) {
+  if (size && destination >= 0xA0000000u) {
     uint32_t physical = GpuPhysicalAddress(destination);
     std::lock_guard lock(g_pending_mutex);
     g_pending.push_back({physical, physical + size, caller});

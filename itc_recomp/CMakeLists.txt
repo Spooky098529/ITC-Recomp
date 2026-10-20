@@ -74,9 +74,15 @@ set(ITC_SOURCES
     src/hooks/clock.cpp
     src/hooks/strings.cpp
     src/hooks/last_error.cpp
+    src/hooks/gamma.cpp
+    src/hooks/graphics_drops.cpp
+    src/hooks/graphics_device.cpp
+    src/hooks/video_mode.cpp
+    src/display/gamma.cpp
     src/harnesses/harness.cpp
     src/harnesses/clock.cpp
     src/harnesses/last_error.cpp
+    src/harnesses/gamma.cpp
     src/harnesses/object_attributes.cpp
     src/harnesses/strings.cpp
     src/harnesses/time.cpp
@@ -126,7 +132,7 @@ else()
     add_executable(itc ${ITC_SOURCES})
 endif()
 
-rexglue_setup_target(itc GPU_PLUGINS xenos)
+rexglue_setup_target(itc)
 
 target_include_directories(itc PRIVATE src)
 

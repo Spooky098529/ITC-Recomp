@@ -32,7 +32,15 @@ recompiled. B6 (pure helpers) is done for now (merged from
 `pure-helpers`, 2026-10-20): the game's time, clock rate, string and
 SetLastError functions are plain C++ in `src/helpers/` behind adapters
 in `src/hooks/`, and 10 kernel imports have no recompiled callers left;
-what's left of B6 waits on B3, B4 and B5. Plan steps are done on their
+what's left of B6 waits on B4 and B5. B3 (the graphics boundary) is
+done (merged from `graphics-boundary`, 2026-10-20): the emulated GPU
+isn't built or loaded (`--native_renderer` and
+`--native_renderer_exclusive` are gone), the game's device, Swap, display
+and gamma functions that called `Vd*` imports are native in
+`src/hooks/graphics_device.cpp`, `video_mode.cpp`, `gamma.cpp` and
+`graphics_drops.cpp`, nothing reads the GPU registers, and nothing needs
+vblanks (the interrupt callback is never called); the SDK's unused
+graphics code goes with the SDK. Plan steps are done on their
 own branches and merged into `rexglue-removal-project` (no force pushes:
 GitHub refuses them on that branch).
 `docs/tick-replay.md` is a lead (not started): translating draws once a
@@ -88,7 +96,7 @@ From the repo root:
 cmake --build itc_recomp/out/build/linux-amd64-release -j$(nproc)
 G="$PWD/itc/Import Tuner Challenge (USA)"; B=itc_recomp/out/build/linux-amd64-release
 XDG_DATA_DIRS=/usr/local/share:/usr/share LD_LIBRARY_PATH=$B:rexglue-sdk/out/linux-amd64 \
-  $B/itc --native_renderer=true --native_renderer_exclusive=true --native_audio=true \
+  $B/itc --native_audio=true \
   --native_renderer_mirror_by_tick=true --native_renderer_mirror_to_both=true \
   --game_data_root="$G" --max_fps=144 --fullscreen=false \
   --log_fps=true --interpolate_draw_state=true <diagnostic flags>
@@ -126,10 +134,7 @@ find /dev/shm -maxdepth 1 -user "$USER" -name 'xenia_memory_*' -delete
   needs lld (`ld.lld`). Measured 2026-10-14, two alternating uncapped attract
   races each: 236 and 237 fps mean without, 246 and 239 with; the user kept
   it. `-DITC_LTO=OFF` turns it off.
-- That's what players run: our own renderer, no GPU plugin. For the
-  emulated GPU (to compare), replace the two `--native_renderer` flags
-  with `--native_renderer=false --gpu_plugin=xenos`; the plugin is built
-  but no longer shipped.
+- That's what players run: our own renderer, no GPU plugin.
 
 - Launch from the repo root; other directories fail (exit 127).
 - `--skip_intro --attract_after_s=1` starts an attract race (AI cars) about
@@ -173,12 +178,12 @@ cp itc_recomp/itc.toml $D/
 ```
 
 Release and test zips ship `itc.toml` (the player settings, with comments;
-command-line options win over it). Since 2026-10-20 the native renderer, its
-exclusive mode and the once-a-frame mirrors are on by default, and without
+command-line options win over it). Since 2026-10-20 the once-a-frame mirrors
+are on by default (and the native renderer always draws: its switches,
+`--native_renderer` and `--native_renderer_exclusive`, went in B3), and without
 `--game_data_root` the game's files are looked for next to the executable
 (`ItcApp::OnConfigurePaths`; the SDK reads that flag before `itc.toml`
-loads), so a bare `./itc` plays as released. The emulated GPU now needs
-`--native_renderer=false --gpu_plugin=xenos`.
+loads), so a bare `./itc` plays as released.
 
 ## Status (`main`, 2026-10-20, v0.4.7.1)
 
