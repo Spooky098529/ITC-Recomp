@@ -89,7 +89,22 @@ std::string DeviceFields(uint8_t* base, uint32_t device) {
                      guest::LoadU8(base, device + 10808), guest::LoadU8(base, device + 10809),
                      guest::LoadU8(base, device + 10810), guest::LoadU8(base, device + 10811),
                      guest::LoadU32(base, device + 13428), guest::LoadU32(base, device + 13432),
-                     guest::LoadU32(base, device + 13424), guest::LoadU32(base, device + 13252));
+                     guest::LoadU32(base, device + 13424), guest::LoadU32(base, device + 13252)) +
+         fmt::format("; ring {:08X} mask {} write {} alloc {:08X} {:08X}; commands {:08X} last {:08X} "
+                     "words {} segment {} [13516] {} [13520] {} [13524] {:08X} [13528] {:08X}; "
+                     "blocks {:08X} {:08X}, progress +0 {:08X} +4 {:08X} +60 {:08X}; position {}",
+                     guest::LoadU32(base, device + 13496), guest::LoadU32(base, device + 13500),
+                     guest::LoadU32(base, device + 10820), guest::LoadU32(base, device + 13436),
+                     guest::LoadU32(base, device + 13440), guest::LoadU32(base, device + 13504),
+                     guest::LoadU32(base, device + 13508), guest::LoadU32(base, device + 13536),
+                     guest::LoadU32(base, device + 13512), guest::LoadU32(base, device + 13516),
+                     guest::LoadU32(base, device + 13520), guest::LoadU32(base, device + 13524),
+                     guest::LoadU32(base, device + 13528), guest::LoadU32(base, device + 10768),
+                     guest::LoadU32(base, device + 10772),
+                     guest::LoadU32(base, guest::LoadU32(base, device + 10768)),
+                     guest::LoadU32(base, guest::LoadU32(base, device + 10768) + 4),
+                     guest::LoadU32(base, guest::LoadU32(base, device + 10768) + 60),
+                     guest::LoadU32(base, device + 10780));
 }
 
 }  // namespace
@@ -108,7 +123,6 @@ std::string DeviceFields(uint8_t* base, uint32_t device) {
   }
 
 COUNTED(8229B848, kClockGating, DeviceFields(base, r3))
-COUNTED(8229F280, kRingSetup, DeviceFields(base, r3))
 COUNTED(822A08A0, kSwap, DeviceFields(base, r3))
 COUNTED(822ACB68, kTerminate, std::string())
 COUNTED(822AD0B0, kSetDisplayMode, DeviceFields(base, r3))

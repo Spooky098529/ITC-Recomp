@@ -260,3 +260,176 @@ extern "C" REX_FUNC(sub_822AD298) {
   });
   ctx.r3.u64 = made ? 1 : 0;
 }
+
+namespace {
+
+// A physical address as the library works it out from a virtual one (the
+// 0xE... range is offset by 0x1000).
+uint32_t PhysicalAddress(uint32_t address) {
+  return (address & 0x1FFFFFFF) + ((((address >> 20) & 0xFFF) + 512) & 0x1000);
+}
+
+void Free(PPCContext& ctx, uint8_t* base, uint32_t block, uint32_t return_address) {
+  ctx.r3.u64 = block;
+  ctx.r4.u64 = 0xB1800000;
+  ctx.lr = return_address;
+  sub_82297790(ctx, base);
+}
+
+uint32_t Allocate(PPCContext& ctx, uint8_t* base, uint32_t bytes, uint32_t flags,
+                  uint32_t return_address) {
+  ctx.r3.u64 = bytes;
+  ctx.r4.u64 = flags;
+  ctx.lr = return_address;
+  sub_822976F8(ctx, base);
+  return ctx.r3.u32;
+}
+
+constexpr uint32_t kDeviceCommandWrite = 40;      // where the next packet goes, minus 4
+constexpr uint32_t kDeviceSegmentEnd = 44;
+constexpr uint32_t kDeviceSegmentLimit = 48;      // past it, the segment is ended
+constexpr uint32_t kDeviceProgressBlock = 10768;  // the fences our kick writes
+constexpr uint32_t kDeviceCallbackBlock = 10772;  // the inserted callbacks'
+constexpr uint32_t kDeviceCommandPosition = 10780;
+constexpr uint32_t kDeviceRingWrite = 10820;
+constexpr uint32_t kDeviceRingAllocated = 13436;
+constexpr uint32_t kDeviceCommandAllocated = 13440;
+constexpr uint32_t kDeviceRing = 13496;
+constexpr uint32_t kDeviceRingMask = 13500;
+constexpr uint32_t kDeviceCommandBuffer = 13504;
+constexpr uint32_t kDeviceCommandLast = 13508;
+constexpr uint32_t kDeviceSegmentBytes = 13512;
+constexpr uint32_t kDeviceCommandWords = 13536;
+constexpr uint32_t kOutOfMemory = 0x8007000E;
+
+}  // namespace
+
+// Device::SetUpRing (from Device::Init; with no parameters, from
+// Device::Release, only frees): r3 device, r4 parameters (+4 the ring's
+// size, +8 a ring, +12 the command buffer's size, +16 a command buffer, +20
+// its segments; 0 for the defaults: 32 KB, 2 MB, 32). Allocates the primary
+// ring, the command buffer, the progress block (the fences our kick writes,
+// which every wait reads) and the callback block (the inserted callbacks'),
+// sets the device's fields for them, and writes the scratch registers' set-up
+// into the command buffer (our kick needs it for the callbacks). Returns 0,
+// or 0x8007000E. Left out: the kernel's ring calls (VdInitializeRingBuffer,
+// VdEnableRingBufferRPtrWriteBack, VdSetSystemCommandBufferGpuIdentifierAddress,
+// and VdVerifyMEInitCommand, imported under the wrong name
+// KiApcNormalRoutineNop) and the ME_INIT packet written into the primary
+// ring, which nothing reads: our kick hands the GPU no ring.
+extern "C" REX_FUNC(sub_8229F280) {
+  REX_FUNC_PROLOGUE();
+  const uint32_t device = ctx.r3.u32, parameters = ctx.r4.u32;
+  auto field = [&](uint32_t offset) { return guest::LoadU32(base, device + offset); };
+  auto set = [&](uint32_t offset, uint32_t value) { guest::StoreU32(base, device + offset, value); };
+  uint32_t result = 0;
+  InFrame(ctx, base, 320, 0x8229F2A4, [&](uint32_t) {
+    if (field(kDeviceCommandPosition)) {
+      ctx.r3.u64 = device;
+      ctx.lr = 0x8229F2A4;
+      sub_8229F1B0(ctx, base);  // waits for the GPU
+    }
+    if (const uint32_t buffer = field(kDeviceCommandBuffer)) {
+      ctx.r3.u64 = PhysicalAddress(buffer) - 0x40000000;
+      ctx.r4.u64 = PhysicalAddress(field(kDeviceCommandLast)) - 0x40000000;
+      ctx.lr = 0x8229F2F4;
+      sub_822AC470(ctx, base);
+    }
+    Free(ctx, base, field(kDeviceRingAllocated), 0x8229F304);
+    Free(ctx, base, field(kDeviceCommandAllocated), 0x8229F310);
+    set(kDeviceRingAllocated, 0);
+    set(kDeviceCommandAllocated, 0);
+    set(kDeviceCommandWrite, 0);
+    set(kDeviceSegmentEnd, 0);
+    Free(ctx, base, field(kDeviceCallbackBlock), 0x8229F338);
+    Free(ctx, base, field(kDeviceProgressBlock), 0x8229F344);
+    if (!parameters) {
+      return;
+    }
+    auto parameter = [&](uint32_t offset) {
+      return guest::LoadU32(base, parameters + offset);
+    };
+    const uint32_t ring_bytes = parameter(4) ? parameter(4) : 0x8000;
+    const uint32_t command_bytes = parameter(12) ? parameter(12) : 0x200000;
+    const uint32_t segments = parameter(20) ? parameter(20) : 32;
+    const uint32_t segment_bytes = command_bytes / segments;
+    uint32_t ring = parameter(8);
+    if (!ring) {
+      ring = Allocate(ctx, base, ring_bytes, 0xB5800000, 0x8229F3AC);
+      set(kDeviceRingAllocated, ring);
+    }
+    uint32_t buffer = parameter(16);
+    if (!buffer) {
+      buffer = Allocate(ctx, base, command_bytes,
+                        command_bytes < 0x80000 ? 0xB7800000 : 0x87800000, 0x8229F3D8);
+      set(kDeviceCommandAllocated, buffer);
+    }
+    result = kOutOfMemory;
+    if (!ring || !buffer) {
+      return;
+    }
+    const uint32_t progress = Allocate(ctx, base, 96, 0xA5800000, 0x8229F3FC);
+    set(kDeviceProgressBlock, progress);
+    if (!progress) {
+      return;
+    }
+    const uint32_t callbacks = Allocate(ctx, base, 32, 0x95800000, 0x8229F414);
+    set(kDeviceCallbackBlock, callbacks);
+    if (!callbacks) {
+      return;
+    }
+    for (uint32_t i = 0; i < 96; i += 4) {
+      guest::StoreU32(base, progress + i, 0);
+    }
+    for (uint32_t i = 0; i < 32; i += 4) {
+      guest::StoreU32(base, callbacks + i, 0);
+    }
+    const uint32_t segment_end = buffer + (segment_bytes & ~3u);
+    const uint32_t last = buffer + (command_bytes & ~3u) - 4;
+    guest::StoreU32(base, last, 0x0BADF00D);
+    set(kDeviceCommandWords, command_bytes >> 2);
+    set(kDeviceRing, ring);
+    set(kDeviceCommandBuffer, buffer);
+    set(13524, buffer);
+    set(kDeviceCommandLast, last);
+    set(13528, buffer);
+    set(kDeviceSegmentBytes, segment_bytes);
+    set(kDeviceRingMask, (ring_bytes >> 2) - 1);
+    guest::StoreU32(base, progress + 60, 0);  // the ring's read pointer
+    set(kDeviceRingWrite, 0);
+    set(kDeviceCommandWrite, buffer - 4);
+    set(kDeviceSegmentEnd, segment_end);
+    set(kDeviceSegmentLimit, segment_end - 160);
+    set(13516, 0);
+    if (!field(kDeviceCommandPosition)) {
+      set(kDeviceCommandPosition, 3);
+    }
+    guest::StoreU32(base, progress, field(kDeviceCommandPosition) - 2);
+    guest::StoreU32(base, progress + 4, (field(13520) & 3) | field(kDeviceCommandWrite));
+    // The scratch registers' set-up and three other register writes, into the
+    // command buffer.
+    uint32_t write = field(kDeviceCommandWrite);
+    if (write > field(kDeviceSegmentLimit)) {
+      ctx.r3.u64 = device;
+      ctx.lr = 0x8229F5E8;
+      sub_8229EF48(ctx, base);  // ends the segment, returns where to write
+      write = ctx.r3.u32;
+    }
+    const uint32_t words[] = {
+        0x00000D02, 0x00010800,                                      // register 0xD02
+        0x00030A02, 0xC0100000, 0x07F00000, 0xC0000000, 0x00100000,  // 0xA02..0xA05
+        0x000001DD, PhysicalAddress(callbacks),                      // SCRATCH_ADDR
+        0x000001DC, 0x00020033,                                      // SCRATCH_UMSK
+    };
+    for (uint32_t word : words) {
+      write += 4;
+      guest::StoreU32(base, write, word);
+    }
+    set(kDeviceCommandWrite, write);
+    ctx.r3.u64 = device;
+    ctx.lr = 0x8229F668;
+    sub_8229F0E0(ctx, base);  // WAIT_UNTIL and register 0xD04
+    result = 0;
+  });
+  ctx.r3.u64 = result;
+}
