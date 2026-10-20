@@ -80,7 +80,7 @@ Clock::time_point g_last_log = Clock::now();
 thread_local uint32_t t_segment_ends = 0;  // sub_8229EF48 calls
 
 bool Checking() {
-  return Renderer_Exclusive() && REXCVAR_GET(native_renderer_check_draw_writes);
+  return REXCVAR_GET(native_renderer_check_draw_writes);
 }
 
 uint8_t* DevicePointer(uint8_t* base, uint32_t device) {
@@ -192,7 +192,7 @@ void native::DrawPackets_IndexedDraw(PPCContext& ctx, uint8_t* base) {
     }
     return;
   }
-  if (!Renderer_Exclusive() || REXCVAR_GET(native_renderer_library_packets) || predicated) {
+  if (REXCVAR_GET(native_renderer_library_packets) || predicated) {
     __imp__sub_825BE708(ctx, base);
     return;
   }

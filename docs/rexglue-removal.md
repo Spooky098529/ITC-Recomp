@@ -813,6 +813,27 @@ B3. **Graphics boundary** (17 functions calling `Vd*`): ring buffer
     write-back from `sub_822A0718` happens in some phases only. Not looked
     into yet.
 
+    The emulated GPU left out of our build (2026-10-20,
+    `graphics-boundary`): the game no longer builds against the plugin or
+    copies it next to the executable (`rexglue_setup_target(itc)` without
+    `GPU_PLUGINS xenos`; the SDK still builds it in its own tree, which
+    goes with the core). `--native_renderer` and
+    `--native_renderer_exclusive` are gone, with the paths they guarded:
+    the kick (`sub_8229E3F0`) and the deferred kick (`sub_8229E848`) no
+    longer fall back to the recompiled ones that handed the GPU its work,
+    the SDK's window is always hidden, and the renderer's hooks always
+    run. The scripts and the standard command lose the two flags. Checked
+    by an attract race: no error lines, the boot callback made, nothing
+    unhandled by the kick, the dumped frame right, all harnesses the same
+    (one run's `GetLocalTime` case differed by a second, run as the
+    second ticked over; the next run matched).
+
+    Left in B3 (2026-10-20): `XGetVideoMode`'s two callers (from B6); the
+    GPU registers at `0x7FC80000` (show with logs that nothing reads them,
+    or make their readers native); the kick and the interrupt callback
+    `sub_8229DEA0` still recompiled underneath (the callback's override
+    only logs).
+
 B4. **Files and saves** (22 functions; the game's `CreateFile`
     `sub_82295508` is the only caller of `NtCreateFile`): the game's file
     functions on host files under `--game_data_root` (log the paths with

@@ -88,7 +88,7 @@ From the repo root:
 cmake --build itc_recomp/out/build/linux-amd64-release -j$(nproc)
 G="$PWD/itc/Import Tuner Challenge (USA)"; B=itc_recomp/out/build/linux-amd64-release
 XDG_DATA_DIRS=/usr/local/share:/usr/share LD_LIBRARY_PATH=$B:rexglue-sdk/out/linux-amd64 \
-  $B/itc --native_renderer=true --native_renderer_exclusive=true --native_audio=true \
+  $B/itc --native_audio=true \
   --native_renderer_mirror_by_tick=true --native_renderer_mirror_to_both=true \
   --game_data_root="$G" --max_fps=144 --fullscreen=false \
   --log_fps=true --interpolate_draw_state=true <diagnostic flags>
@@ -170,8 +170,9 @@ cp itc_recomp/itc.toml $D/
 ```
 
 Release and test zips ship `itc.toml` (the player settings, with comments;
-command-line options win over it). Since 2026-10-20 the native renderer, its
-exclusive mode and the once-a-frame mirrors are on by default, and without
+command-line options win over it). Since 2026-10-20 the once-a-frame mirrors
+are on by default (and the native renderer always draws: its switches,
+`--native_renderer` and `--native_renderer_exclusive`, went in B3), and without
 `--game_data_root` the game's files are looked for next to the executable
 (`ItcApp::OnConfigurePaths`; the SDK reads that flag before `itc.toml`
 loads), so a bare `./itc` plays as released.

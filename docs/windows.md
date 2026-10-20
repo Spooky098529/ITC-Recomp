@@ -135,7 +135,7 @@ export WINEPREFIX=$PWD/itc_recomp/out/wineprefix WINEDLLOVERRIDES="mscoree,mshtm
   XDG_DATA_DIRS=/usr/local/share:/usr/share
 B=itc_recomp/out/build/win-amd64-cross-release
 G='Z:\home\sam\repos\recomptest\itc\Import Tuner Challenge (USA)'
-timeout 90 wine $B/itc.exe --native_renderer=true --native_renderer_exclusive=true \
+timeout 90 wine $B/itc.exe \
   --native_audio=true --game_data_root="$G" --max_fps=144 \
   --log_fps=true --interpolate_draw_state=true --skip_intro --attract_after_s=1
 ```

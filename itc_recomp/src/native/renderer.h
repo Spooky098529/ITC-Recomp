@@ -10,8 +10,6 @@
 
 namespace native {
 
-bool Renderer_Enabled();
-
 // Main thread, as a pass's command list is handed to the render thread
 // (before Renderer::WaitForFrame): whether a logic pass recorded it. Render
 // thread, as a frame's replay starts: takes the next list's. Then whether
@@ -22,10 +20,6 @@ bool Renderer_ReplayingLogicList();
 // Since the last call: frames replayed with no list handed over, and the
 // most lists waiting at a frame's start.
 void Renderer_TakeListStats(uint64_t& missing, uint64_t& most);
-
-// Exclusive mode (milestone 6): the emulated GPU gets no work; see
-// gpu_link.cpp.
-bool Renderer_Exclusive();
 
 // Render thread, before a command handler runs (see the table in
 // docs/gpu-functions.md): r3 = payload, r4 = arg1, r5 = arg2.

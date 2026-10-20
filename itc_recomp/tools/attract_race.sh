@@ -15,7 +15,7 @@ set -u
 SECONDS_TO_RUN=${1:?usage: attract_race.sh <seconds> [extra flags]}; shift
 B=itc_recomp/out/build/linux-amd64-release; G="$PWD/itc/Import Tuner Challenge (USA)"
 XDG_DATA_DIRS=/usr/local/share:/usr/share LD_LIBRARY_PATH=$B:rexglue-sdk/out/linux-amd64 \
-  timeout "$SECONDS_TO_RUN" "$B/itc" --native_renderer=true --native_renderer_exclusive=true \
+  timeout "$SECONDS_TO_RUN" "$B/itc" \
   --native_audio=true --native_renderer_mirror_by_tick=true --native_renderer_mirror_to_both=true \
   --game_data_root="$G" --max_fps=144 --fullscreen=false --log_fps=true \
   --interpolate_draw_state=true --log_level=info --skip_intro --attract_after_s=1 "$@" \

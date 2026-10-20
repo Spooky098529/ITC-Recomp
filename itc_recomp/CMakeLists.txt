@@ -131,7 +131,7 @@ else()
     add_executable(itc ${ITC_SOURCES})
 endif()
 
-rexglue_setup_target(itc GPU_PLUGINS xenos)
+rexglue_setup_target(itc)
 
 target_include_directories(itc PRIVATE src)
 

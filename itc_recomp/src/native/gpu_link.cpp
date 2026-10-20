@@ -1,7 +1,6 @@
 // Where the graphics library meets the GPU (see "Plan for milestone 6" in
-// docs/native-renderer.md): the kick that hands the emulated GPU its work,
-// the block the GPU writes its progress into, and the library's interrupt
-// callback.
+// docs/native-renderer.md): the kick, the progress block its fences go
+// into, and the library's interrupt callback.
 //
 // --native_renderer_log_gpu logs, every 5 s, the packets in the kicked
 // buffers that have effects outside the GPU (memory writes, interrupts,
@@ -9,10 +8,10 @@
 // progress block's values, and the interrupts the callback got. Milestone 6
 // step 1: what exclusive mode has to do in the GPU's place.
 //
-// In exclusive mode (--native_renderer_exclusive) the kick never reaches
-// the emulated GPU: its buffers are walked here and only their effects
+// No GPU gets the kick: its buffers are walked here and only their effects
 // outside the GPU are made (see "Exclusive mode" in
 // docs/native-renderer.md), so the library sees everything done at once.
+// Our renderer draws from the command list replay instead.
 
 #include "guest.h"
 #include "renderer.h"
@@ -526,7 +525,7 @@ extern "C" REX_FUNC(sub_8229E3F0) {
       LogStats(base, device);
     }
   }
-  if (Renderer_Exclusive()) {
+  {
     uint32_t device = ctx.r3.u32, pairs = ctx.r4.u32, count = ctx.r5.u32;
     g_effects.kicks++;
     if (uint32_t cpu = guest::LoadU8(base, ctx.r13.u32 + 268);
@@ -549,9 +548,7 @@ extern "C" REX_FUNC(sub_8229E3F0) {
       last_log = now;
       LogEffects();
     }
-    return;
   }
-  __imp__sub_8229E3F0(ctx, base);
 }
 
 // The library's interrupt callback (registered with
@@ -643,10 +640,6 @@ extern "C" REX_FUNC(sub_822B6780) {
 // the count below 0, hanging loading screens.)
 extern "C" REX_FUNC(sub_8229E848) {
   REX_FUNC_PROLOGUE();
-  if (!native::Renderer_Exclusive()) {
-    __imp__sub_8229E848(ctx, base);
-    return;
-  }
   uint32_t device = ctx.r3.u32, result = ctx.r4.u32;
   PPCContext saved = ctx;
   {
