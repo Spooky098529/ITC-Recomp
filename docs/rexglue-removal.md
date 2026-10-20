@@ -282,6 +282,15 @@ A5. **Input reading**: SDL gamepads (rumble too) as a native module with
     attract race: the pad found and opened at boot, button presses seen
     with `--log_gamepads`, clean shutdown. Rumble is untested until B1.
 
+    Done (2026-10-19, with B1): since B1 the game's input comes only from
+    this module (the SDK's input system isn't created), and the user
+    checked every button, both sticks and triggers, rumble and unplugs
+    while playing. What still ties it to the SDK is covered elsewhere: it
+    is started from `ItcApp` and pumps SDL's events through the SDK's UI
+    thread queue, as the SDK owns the event loop until A4 (it watches
+    events whoever pumps them, so it keeps working then), and it uses the
+    SDK's logging and flags like the rest of `src/` (A2).
+
 A6. **Audio output**: SDL audio straight from our mixer's output, our own
     conversion and downmix (`conversion.h`, `downmix.h` are small), in
     place of `AudioDriver`. Its game side is B2. Read
@@ -322,8 +331,7 @@ B1. **Input** (3 functions calling `XamInput*`): native, reading A5.
     controller was a certification rule), and the race pauses. Checked by
     the user: four unplugs, in a menu and in a race; each seen by the game
     within ~30 ms (`xinput: user 0 disconnected`), the pad back in slot 0
-    on replugging, and the race resumed fine. Not tried yet: starting with
-    no pad connected.
+    on replugging, and the race resumed fine.
 
     Then (2026-10-19) the `ctx` edge moved up one level: the pad read
     `sub_82591C18` is plain C++ (`src/input/physical_pad.cpp`, the
