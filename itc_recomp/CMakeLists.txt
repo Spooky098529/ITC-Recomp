@@ -72,9 +72,11 @@ set(ITC_SOURCES
     src/hooks/object_attributes.cpp
     src/hooks/time.cpp
     src/hooks/clock.cpp
+    src/hooks/strings.cpp
     src/helpers/debug_output.cpp
     src/helpers/object_attributes.cpp
     src/helpers/time.cpp
+    src/helpers/strings.cpp
     src/input/gamepads.cpp
     src/input/input_processor.cpp
     src/input/logical_pad.cpp
