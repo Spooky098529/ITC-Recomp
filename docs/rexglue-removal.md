@@ -387,6 +387,37 @@ B6. **Pure helpers** (55 functions): string, time and formatting
     helpers made native, or their callers made native. Cheap; can be
     done alongside anything else.
 
+    What counts (2026-10-20, the boundary pipeline filtered to these
+    imports; calling functions each): strings (`RtlInitAnsiString` 7,
+    `RtlInitUnicodeString`, `RtlUnicodeToMultiByteN`,
+    `RtlMultiByteToUnicodeN`, `RtlUnicodeStringToAnsiString`,
+    `RtlFreeAnsiString`, `sprintf` 3, `vswprintf`), fills and compares
+    (`RtlFillMemoryUlong`, `RtlCompareMemoryUlong` 3), time math
+    (`RtlTimeToTimeFields` 3, `RtlTimeFieldsToTime` 2), error codes
+    (`RtlNtStatusToDosError` 5), `DbgPrint` 4, fixed answers
+    (`KeGetCurrentProcessType` 7, `XGetVideoMode` 2, `XGetAVPack`,
+    `XGetLanguage`: log what the SDK answers first) and the clock
+    (`KeQuerySystemTime` 2, `KeQueryPerformanceFrequency` 2: frame
+    pacing depends on it). Not pure, though listed with them:
+    `RtlRaiseException`, `RtlUnwind` and `RtlCaptureContext` work on the
+    recompiled code's PowerPC state, so they go with the core. The
+    natives live in `src/helpers/` (plain C++), their adapters in
+    `src/hooks/`. Worked on in branch `pure-helpers`.
+
+    `RtlInitAnsiString` (2026-10-20, `pure-helpers`): of its 7 callers,
+    the 2 pure ones are native (Overridden: their callers are still
+    recompiled): `OutputDebugStringA` (`sub_82296270`, empty: the retail
+    game drops the text) and the named objects' attributes
+    (`sub_822970A8`, checked by a temporary self-test against the
+    recompiled version, all equal; its callers, named event and timer
+    creation, are threads and sync, the core). The other 5 are file
+    functions (`CreateFile` `sub_82295508`, `sub_825B9FD8` with
+    `NtQueryFullAttributesFile`, `sub_825B9C20` with
+    `NtQueryVolumeInformationFile`, `sub_825B9F20` with
+    `NtSetInformationFile`, the mounting in `sub_822B58F0` with
+    `ObCreateSymbolicLink`), where the string is one line next to the
+    `Nt*` calls: they go with B4, and the import with them.
+
 B7. **The game logic inside**: everything else, subsystem by subsystem,
     in whatever order the user wants (frame interpolation's hooks,
     vehicles, UI, menus, physics, ...). Each subsystem moves its data to
