@@ -77,6 +77,7 @@ set(ITC_SOURCES
     src/hooks/graphics_boundary_log.cpp
     src/hooks/gamma.cpp
     src/hooks/graphics_drops.cpp
+    src/hooks/graphics_device.cpp
     src/display/gamma.cpp
     src/harnesses/harness.cpp
     src/harnesses/clock.cpp

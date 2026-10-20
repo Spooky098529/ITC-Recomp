@@ -78,13 +78,18 @@ void Log(Index i, uint32_t lr, uint32_t r3, uint32_t r4, uint32_t r5, uint32_t r
               g_counters[i].name, g_counters[i].calls.load(), lr, r3, r4, r5, result, extra);
 }
 
-// The device's display fields (+19988..+20000) and flags (+10808..+10811).
+// The device's display fields (+19988..+20000), flags (+10808..+10811), the
+// surfaces Device::SetUpDisplay stores (+13428, +13432, +13424) and the
+// front buffer's format (+13252).
 std::string DeviceFields(uint8_t* base, uint32_t device) {
-  return fmt::format("; display {}x{} {} format {}; flags {:02X} {:02X} {:02X} {:02X}",
+  return fmt::format("; display {}x{} {} format {}; flags {:02X} {:02X} {:02X} {:02X}; "
+                     "surfaces {:08X} {:08X} {:08X}, format {:08X}",
                      guest::LoadU32(base, device + 19988), guest::LoadU32(base, device + 19992),
                      guest::LoadU32(base, device + 19996), guest::LoadU32(base, device + 20000),
                      guest::LoadU8(base, device + 10808), guest::LoadU8(base, device + 10809),
-                     guest::LoadU8(base, device + 10810), guest::LoadU8(base, device + 10811));
+                     guest::LoadU8(base, device + 10810), guest::LoadU8(base, device + 10811),
+                     guest::LoadU32(base, device + 13428), guest::LoadU32(base, device + 13432),
+                     guest::LoadU32(base, device + 13424), guest::LoadU32(base, device + 13252));
 }
 
 }  // namespace
@@ -106,7 +111,6 @@ COUNTED(8229B848, kClockGating, DeviceFields(base, r3))
 COUNTED(8229F280, kRingSetup, DeviceFields(base, r3))
 COUNTED(822A08A0, kSwap, DeviceFields(base, r3))
 COUNTED(822ACB68, kTerminate, std::string())
-COUNTED(822ACE00, kDisplayMode, DeviceFields(base, r3))
 COUNTED(822AD0B0, kSetDisplayMode, DeviceFields(base, r3))
 COUNTED(822AD298, kDeviceInit, DeviceFields(base, r3))
 COUNTED(822AD500, kDeviceRelease, std::string())
