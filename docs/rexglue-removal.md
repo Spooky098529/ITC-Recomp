@@ -556,6 +556,14 @@ B3. **Graphics boundary** (17 functions calling `Vd*`): ring buffer
     cases cover types 1 and 3. The harnesses' scratch area grew to 4 KB
     for the ramps. No game code calls `VdGetCurrentDisplayGamma` any more.
 
+    Kept, though not needed to draw today (the user's call, 2026-10-20):
+    `--xbox_gamma` applies fixed tables captured from the game
+    (`src/native/xbox_gamma_table.h`), not the ramps' output, which only
+    reaches the display's gamma registers. Keeping the native ramps leaves
+    room for `--xbox_gamma` to follow the game's own ramp later. So the
+    set display mode `sub_822AD0B0`, which calls them, isn't dropped
+    either.
+
 B4. **Files and saves** (22 functions; the game's `CreateFile`
     `sub_82295508` is the only caller of `NtCreateFile`): the game's file
     functions on host files under `--game_data_root` (log the paths with
