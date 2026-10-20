@@ -531,8 +531,12 @@ B3. **Graphics boundary** (17 functions calling `Vd*`): ring buffer
     (no "GPU hung" bit, so no `7FC86110` write). Never: clock gating, the
     piecewise-linear ramp, device release, the terminate routine,
     `sub_822B4F10`, `sub_822A0688` (reads `7FC8xxxx`) and the engines'
-    callback. A session the user plays (front end, race, pause, quit) is
-    still to come.
+    callback. A session the user played (2026-10-20, 88 s: the front end,
+    a race, the pause menu, closing the window) gave the same: every
+    function counted once at boot or once a frame (6,530 Swaps, all from
+    `8258DCA4`), the same seven never called. Closing the window
+    hard-exits ("Title terminated; hard-exiting process"), so device
+    release and the terminate routine don't run at quit either.
 
 B4. **Files and saves** (22 functions; the game's `CreateFile`
     `sub_82295508` is the only caller of `NtCreateFile`): the game's file
