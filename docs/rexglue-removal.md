@@ -1259,6 +1259,44 @@ B5. **System services** (82 functions; first counted as 78): sign-in, profile, U
     `XamGetSystemVersion` (WSAStartup, step 4, and XUserCheckPrivilege,
     never called) or `XMsgInProcessCall` (the XLiveBase wrappers).
 
+    **Step 4, the network start-up: done (2026-10-21, `system-services`).**
+    All once at boot, from the network manager's set-up `sub_8214E190`
+    (`src/hooks/network.cpp`):
+
+    - WSAStartup `sub_82459B68` (through `sub_82575B08` and
+      `sub_82459C10`, from `sub_82148868`): returns 0, Dropped. Its
+      WSADATA is in `sub_82575B08`'s frame and never read; the SDK's
+      system version (0) never took the `XexGetProcedureAddress` path.
+    - The system link socket `sub_82148958`: not made, Dropped; its handle
+      (`826C6AA0`) is INVALID_SOCKET (-1). The SDK made a socket (UDP,
+      protocol 254) whose bind to port 1000 and FIONBIO failed on Linux
+      (probably the privileged port; on Windows the bind probably
+      succeeded, leaving a live socket). The handle's only readers are the
+      system link code's sendto, select and recvfrom (`sub_8214AB48`,
+      `sub_8214AA70`, `sub_8214D7A0`), never run in play; if system link
+      is opened they get the SDK's "not a socket". The one answer that
+      differs from the SDK's (socket: -1 instead of a handle) was the
+      user's call (2026-10-21): an exact one would need a stand-in for
+      the SDK's socket.
+    - XNetGetTitleXnAddr `sub_82459D50` (looped until nonzero): the SDK's
+      XNADDR as fixed bytes (127.0.0.1, no online address or port, `CC`
+      for the Ethernet address, no online id) and 4. Overridden.
+    - XNetXnAddrToMachineId `sub_82459D40`: 1, nothing written (so the
+      machine id `sub_8214F6E8` gets stays 0, cleared by `sub_82148868`).
+      Dropped.
+
+    Checked: harness cases (`network`: WSAStartup's answer, the XNADDR on
+    a buffer filled with 0xCD and its answer, the machine id's answer and
+    its output left alone), all the same, and an attract race (no
+    errors). Imports with no recompiled callers left: `NetDll_WSAStartup`,
+    `NetDll_XNetGetTitleXnAddr`, `NetDll_XNetXnAddrToMachineId`,
+    `XexGetModuleHandle` and `XexGetProcedureAddress` (WSAStartup was
+    their only caller); `XamGetSystemVersion` is left only in
+    XUserCheckPrivilege (`sub_82295030`, never called). Not cleared: `NetDll_socket`, `NetDll_bind`
+    and `NetDll_ioctlsocket` (also in `sub_82148A80`, another socket
+    set-up never run in play) and the other socket imports (the system
+    link code).
+
 B6. **Pure helpers** (55 functions): string, time and formatting
     helpers made native, or their callers made native. Cheap; can be
     done alongside anything else.
