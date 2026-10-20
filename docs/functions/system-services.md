@@ -69,7 +69,13 @@ run it after changing either, on any branch.
 | `sub_8214E268` | `Network::Update` | | Every frame, from `sub_82107910` (Draw). The sign-in manager (`sub_8214F290`), the users' XUIDs and names, the profile read on sign-in changes (`sub_82149178`), the XNet address (`sub_82459D50`, `sub_82459D40`), Live connection changes (`sub_82149080`), notification `0x11` (never sent), and a state machine (13 states) with system link receives (`sub_8214D7A0`). Not read in detail. B5. |
 | `sub_8214F1C0` | | | Called first by `sub_8214E190` with (0, 4, 0, 1, the manager). Not read. |
 | `sub_8214F290` | `SignIn::Update` | | Every frame, from `sub_8214E268`. Counts the signed-in users (`826C7954`..`826C795C`), the first one (`82618B84`), the sign-in UI (`sub_822952C0`), a "sign in" message box (`sub_822952E8`, text by `swprintf`, its only caller: the "VS MODE" format at `0x82009218`) whose button 1 launches the dashboard (`sub_822967E0`), and XN_SYS_UI (`9`) from its listener (`826C794C`). The message box never ran. Not read in detail. B5. |
+| `sub_8214F690` | | | Releases the voice engine (table +4) when the network manager's +0 isn't 0, then `sub_82294E20`. From `sub_825DB040`. The only engine user that checks for null. Not read in detail. |
 | `sub_8214F6E8` | | | Called by `sub_8214E190` with the network manager (`826C74A0`) and the machine id (0 in play). Not read. |
+| `sub_8214F790` | | | Through the voice engine: +48 (the remote talkers), then +44 (unregister a remote talker). From `sub_8214B330` (system link). Not read in detail. |
+| `sub_8214FA78` | | | Every frame, from `Network::Update`: the voice engine's +72 (`GetDataReadyFlags`, 0 with no talker); when the local user's bit is set, +76 (`GetLocalChatData`) into the manager's buffer (+36, count at +436); returns 1 when 70 bytes are waiting or 200 ms passed (`sub_822956F0`), else 0. Not read in detail. |
+| `sub_8214FDF8` | | | Through the voice engine: +48 (the remote talkers), XMsg `FC 5800E` (`sub_82576EE0`), `sub_8214FD68`, +80. From `sub_8214AC68` (system link). Not read in detail. |
+| `sub_8226BCB8` | | | UI code (350 instructions) that reads the network manager (probably the voice engine's +52, headset present). Not read in detail. |
+| `sub_8226EEC8` | | | UI code (361 instructions) like `sub_8226BCB8`, from seven callers. Not read in detail. |
 | `sub_82294E58` | `XUserWriteAchievements` | | XMsg `FB B0008` (count, list; overlapped r5). Never called. |
 | `sub_82294ED8` | `XUserSetContextEx` | Dropped | XMsg `FB B0006` (user, context, value; overlapped r6): with an overlapped it answers 997, else GetLastError (`sub_82296EC0`) turned into 0 or 1627. The SDK answered 0 and cleared the last error. Only `sub_82294F70` calls it, so it isn't called since that was dropped (B5 step 2; no override). |
 | `sub_82294F70` | `XUserSetContextEx` | Dropped | XUserSetContextEx without an overlapped: `sub_82294ED8` with r6 0. Every SetContextEx call: `sub_82293504` (context `8001`, probably presence), `sub_822934B8`, `sub_822917B8`, `sub_82148FD8`, `sub_82148B60` (not read). Dropped (B5 step 2, `src/hooks/user.cpp`): returns 0 and clears the last error, as the SDK's answer did; harness `user`: the answer and the last error the same. |
@@ -139,8 +145,34 @@ run it after changing either, on any branch.
 | `sub_82576F30` | | | XMsg `FC 58035`. Never called. |
 | `sub_82576FE8` | | | XMsg `FC 58035`. Never called. |
 | `sub_82577560` | | | Copies two words (from `8265D404`, `8265D408`) into `82957680` (`sub_825A7410`); probably XNet start-up parameters. Called by `sub_82575B08`. Not read in detail. |
-| `sub_8257AF30` | `Voice::Poll` | | The voice thread (`sub_8257B5D8`), every 10 ms: reads its notifications, then the voice update (`sub_8257DFA8` and others). Not read in detail. B5. |
-| `sub_8257B7A8` | `Voice::Init` | | Once at boot from `sub_82578BF8`: the voice code's state, its profile reads (`sub_8257E568`, 4 times), its listener and critical section. Not read in detail. B5. |
+| `sub_82578BF8` | | | Probably XHVCreateEngine: the three parameters into a block, `Voice::Init` (`sub_8257B7A8`); on failure releases what it stored (table +4). Once at boot. The engine can't be failed: it's used without null checks (B5). |
+| `sub_8257A498` | | | The voice engine's +0: adds to the reference count (+4), returns it (probably AddRef). |
+| `sub_8257A4C0` | | | The voice engine's +8: tries or takes the critical section (probably Lock). Not read in detail. |
+| `sub_8257A548` | | | The voice engine's +12 (`sub_8257DEB8`; probably StartLocalProcessingModes). Not read. |
+| `sub_8257A5B8` | | | The voice engine's +16 (`sub_8257DF30`; probably StopLocalProcessingModes). Not read. |
+| `sub_8257A628` | | | The voice engine's +28: stores r4 at +1324, returns 0 (probably SetMaxDecodePackets). |
+| `sub_8257A650` | | | The voice engine's +32: registers a local talker (`sub_8257E4B0`, `XamVoiceCreate`). Never called in play. Not read in detail. |
+| `sub_8257A708` | | | The voice engine's +36: unregisters a local talker (`sub_8257DDA0`, `XamVoiceClose`). Not read in detail. |
+| `sub_8257A790` | | | The voice engine's +52: the local talker's +192 (`sub_8257D6D0`), 0 without a talker (probably IsHeadsetPresent). |
+| `sub_8257A7E8` | | | The voice engine's +56: the local talker's +4 then +144, 0 without one (probably IsLocalTalking). |
+| `sub_8257A818` | | | The voice engine's +72: returns +1268 (`GetDataReadyFlags`; 0 with no talker). Every frame from `sub_8214FA78`. |
+| `sub_8257A820` | | | The voice engine's +76: a local talker's chat data (`sub_8257E2B0`), E_INVALIDARG without a talker (`GetLocalChatData`). Not read in detail. |
+| `sub_8257AED8` | | | The voice engine's +4: drops a reference (`sub_8257AD68` frees it at 0; probably Release). Also Voice::Init's clean-up. Not read in detail. |
+| `sub_8257AF30` | `Voice::Poll` | | The voice thread (`sub_8257B5D8`), every 10 ms, in the engine's critical section (+1272): reads one notification from its listener (+1312; sign-in changed `0xA`, `0xE`, `0x04000002`, `0x04000003` set +1316), sets up an audio voice once (`sub_8245A050`, `sub_8245A168`, flag +1092), `sub_8257A8F8`, submits the four local talkers' data (`sub_8257DFA8`, none in play), updates the remote talkers (`sub_8257EED0`). Its listener read waits on step 6 (notifications). Not read in detail. B5. |
+| `sub_8257B0A8` | | | The voice engine's +20 (`sub_8257EF80`; probably StartRemoteProcessingModes). Not read. |
+| `sub_8257B118` | | | The voice engine's +24 (`sub_8257EFF8`; probably StopRemoteProcessingModes). Not read. |
+| `sub_8257B188` | | | The voice engine's +40: registers a remote talker (`sub_8257F070`). Not read in detail. |
+| `sub_8257B290` | | | The voice engine's +44: unregisters a remote talker (`sub_8257F110`). Not read in detail. |
+| `sub_8257B2F0` | | | The voice engine's +48: the remote talkers' XUIDs (r5) and count (r4), skipping empty ones (probably GetRemoteTalkers). |
+| `sub_8257B3B0` | | | The voice engine's +60 (`sub_8257F210`; probably IsRemoteTalking). Not read. |
+| `sub_8257B408` | | | The voice engine's +64 (`sub_8257E9B8`). Not read. |
+| `sub_8257B470` | | | The voice engine's +68 (`sub_8257EAC0`). Not read. |
+| `sub_8257B4F8` | | | The voice engine's +80 (`sub_8257F1E8`; probably SetPlaybackPriority). Not read. |
+| `sub_8257B568` | | | The voice engine's +84 (`sub_8257F198`; probably SubmitIncomingChatData). Not read. |
+| `sub_8257B5D8` | | | The voice thread's entry (made by `Voice::Init`): runs `Voice::Poll` every 10 ms. Not read in detail. |
+| `sub_8257B688` | | | Fills the voice engine's table at `829576D0` once (22 entries, `sub_8257A498`..`sub_8257B568`). |
+| `sub_8257B7A8` | `Voice::Init` | | Once at boot from `sub_82578BF8`: fills the engine's table (`sub_8257B688`, at `829576D0`), allocates the engine (2,240 bytes: +0 the table, +4 a reference count of 1, +8 a copy of the 48-byte parameters), `sub_82579F88`, a profile read per local talker (`sub_8257E568`, 4, into +1096), `sub_8257F388` per remote talker (none), an event (+1304), a listener (mask 5, +1312), a critical section (+1272), the voice thread (`sub_8257B5D8`, +1264) and waits for it to start; stores the engine through r4 (0 on failure, after `sub_8257AED8`). Its listener waits on step 6, its profile reads on step 7. Not read in detail. B5. |
+| `sub_8257D6D0` | | | A local talker's +192 (for the engine's +52). |
 | `sub_8257D798` | | | The voice code's user check (headset, sign-in, profile, privileges, friends). Never called. |
 | `sub_8257DDA0` | | | Voice close. Never called. |
 | `sub_8257DFA8` | | | Voice submit. Never called. |

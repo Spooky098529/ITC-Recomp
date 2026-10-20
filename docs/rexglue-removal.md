@@ -1300,6 +1300,32 @@ B5. **System services** (82 functions; first counted as 78): sign-in, profile, U
     set-up never run in play) and the other socket imports (the system
     link code).
 
+    **Step 5, voice: mapped, no code (2026-10-21, `system-services`).**
+    In play the voice code reaches three system services, all inline in
+    game code and all with callers elsewhere: Voice::Init's listener
+    (`XamNotifyCreateListener`, mask 5) and the voice thread's
+    `XNotifyGetNext` (every 10 ms) go with step 6, its four profile reads
+    (`sub_8257E568`, `XamUserReadProfileSettings`) with step 7. Every
+    `XamVoice*` call, the friends and privilege checks are in functions
+    never called (no talker is ever registered): rows only. Dropping
+    Voice::Init or the thread would mean building the engine without
+    them, close to the stand-in ruled out, for nothing visible; voice goes
+    with the network manager in B7 (the user agreed, 2026-10-21: the
+    fastest route through these Xbox-only parts).
+
+    The engine (rows in `docs/functions/system-services.md`): made by
+    `sub_82578BF8` (probably XHVCreateEngine) through Voice::Init, 2,240
+    bytes, +0 a 22-entry table at `829576D0` (filled by `sub_8257B688`),
+    +4 a reference count, +8 the 48-byte parameters. The game calls +72
+    (`GetDataReadyFlags`, the engine's +1268, 0 with no talker) and +76
+    (`GetLocalChatData`, only when a flag is set) every frame from
+    `sub_8214FA78`; +48, +44 and +80 from system link code; +52 (probably
+    headset present) from UI code (`sub_8226EEC8`, `sub_8226BCB8`); +4 to
+    release (`sub_8214F690`, the only null check). The table's order
+    matches the XDK's IXHVEngine where the code shows it (+32/+36 local
+    talkers with `XamVoiceCreate`/`XamVoiceClose`, +40/+44 remote, +48
+    the remote talkers, +72/+76); +64 and +68 are unknown.
+
 B6. **Pure helpers** (55 functions): string, time and formatting
     helpers made native, or their callers made native. Cheap; can be
     done alongside anything else.
