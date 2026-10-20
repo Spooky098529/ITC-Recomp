@@ -1191,7 +1191,9 @@ B5. **System services** (82 functions; first counted as 78): sign-in, profile, U
     boot; `time`: the read against the recompiled one, "uses daylight"
     given and not, on a buffer filled with 0xCD), all the same, and an
     attract race (`attract_race.sh 30 --run_harnesses=all`: no errors, 25 s
-    raced). Imports with no recompiled callers left: `XGetAVPack`,
+    raced), then a session the user played (`itc_247.log`, 2026-10-21: the
+    boot movie, the front end, a race at ~150 fps, quit): "looks fine", no
+    errors in the log, closed cleanly. Imports with no recompiled callers left: `XGetAVPack`,
     `XGetLanguage`, `XexCheckExecutablePrivilege`, `HalReturnToFirmware`,
     `RtlImageXexHeaderField` and `ExGetXConfigSetting`. Not cleared:
     `RtlNtStatusToDosError`, still called by `sub_822953E8` (reached only
