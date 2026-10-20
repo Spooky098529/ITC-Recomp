@@ -1174,7 +1174,8 @@ B5. **System services** (82 functions; first counted as 78): sign-in, profile, U
       `src/helpers/console_settings.h`) instead of
       `ExGetXConfigSetting(3, 10)`; the size it wrote at frame + 80 had no
       reader.
-    - The time zone read `sub_8229B440`: Native. The SDK's answers (zero for
+    - The time zone read `sub_8229B440`: plain C++ (Overridden only
+      because of the harness's adapter, below). The SDK's answers (zero for
       settings 1-7, retail flags `0x40` for 12, so "uses daylight" 1) are
       `helpers::kConsoleTimeZone` and `helpers::UsesDaylight`;
       `time_hooks::ReadTimeZoneSettings` (`src/hooks/time.cpp`) writes the
