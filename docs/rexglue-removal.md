@@ -595,8 +595,8 @@ B3. **Graphics boundary** (17 functions calling `Vd*`): ring buffer
     now (Swap last, below). The functions that still call `Vd*` in
     `generated/` are the never-called ones that follow,
     `Device::InitEngines` and the two no longer called, so none has been
-    seen to run. The counter (`--log_graphics_boundary`) stays until the
-    user's session (below) has been read. The never-called functions
+    seen to run. The counter (`--log_graphics_boundary`) was removed once
+    the user's session (below) had been read. The never-called functions
     (clock gating, device release, the terminate routine, `sub_822B4F10`, `sub_822A0688`, the
     engines' callback) keep a blank status; `sub_822B2470` and
     `sub_822B3A78`, no longer called since their callers were dropped, are
@@ -774,9 +774,9 @@ B3. **Graphics boundary** (17 functions calling `Vd*`): ring buffer
     as in the original): `Renderer::Present` and `sub_8209ACB8` ignore it,
     and the movies' `sub_822A0E50` returns it to its own callers. The
     52-byte copy stays a call to the game's memcpy (wrapped for the
-    memory mirrors). The counter's Swap logging moved into
-    `graphics_boundary::SwapEntered`/`SwapLeft`, which the native Swap
-    calls. No game code calls `VdGetSystemCommandBuffer`, `VdSwap` or
+    memory mirrors). For the check, the counter's Swap logging moved into
+    functions the native Swap called; the counter went after the user's
+    session. No game code calls `VdGetSystemCommandBuffer`, `VdSwap` or
     `VdPersistDisplay` any more (`MmFreePhysicalMemory` still has two
     other callers, `sub_822965C8` and `sub_822B4680`).
 

@@ -5,7 +5,6 @@
 
 #include "guest.h"
 #include "guest_call.h"
-#include "graphics_boundary_log.h"
 
 #include <bit>
 
@@ -503,8 +502,6 @@ constexpr uint32_t kDeviceFenceBefore = 13544;      // the one before
 extern "C" REX_FUNC(sub_822A08A0) {
   REX_FUNC_PROLOGUE();
   const uint32_t device = ctx.r3.u32, front_buffer = ctx.r4.u32;
-  const graphics_boundary::SwapEntry entry =
-      graphics_boundary::SwapEntered(base, uint32_t(ctx.lr), device, front_buffer, ctx.r5.u32);
   auto field = [&](uint32_t offset) { return guest::LoadU32(base, device + offset); };
   auto set = [&](uint32_t offset, uint32_t value) { guest::StoreU32(base, device + offset, value); };
   auto clear_bits = [&](uint32_t offset, uint8_t bits) {
@@ -549,5 +546,4 @@ extern "C" REX_FUNC(sub_822A08A0) {
     ctx.lr = 0x822A0E48;
     sub_822A3B90(ctx, base);  // every register block dirty
   });
-  graphics_boundary::SwapLeft(base, entry, ctx.r3.u32);
 }

@@ -74,7 +74,6 @@ set(ITC_SOURCES
     src/hooks/clock.cpp
     src/hooks/strings.cpp
     src/hooks/last_error.cpp
-    src/hooks/graphics_boundary_log.cpp
     src/hooks/gamma.cpp
     src/hooks/graphics_drops.cpp
     src/hooks/graphics_device.cpp
