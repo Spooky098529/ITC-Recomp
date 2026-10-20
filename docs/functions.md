@@ -22,11 +22,20 @@ Status:
 - **Wrapped**: an override that does something of its own (skipping
   render-only passes, logging, timing) and still calls the original
   (`__imp__sub_XXXXXXXX`) for the work.
+- **Dropped**: an override in `itc_recomp/src/` that replaces the
+  function with nothing (or a fixed return value), because its work isn't
+  needed on PC (hardware set-up, kernel calls the SDK already stubbed).
+  Logs, a harness or the renderer's frame dumps have shown that nothing
+  reads what it did. The original is no longer called, except behind a
+  fallback flag while the drop is being checked. A function nothing calls
+  needs no override: its status stays blank and its row says it's never
+  called.
 - **Patched**: the generated code was edited in place (search for
   `PATCH:`).
 
 A function usually moves from recompiled or Wrapped to Overridden to
-Native as the `ctx` edge moves up through its callers.
+Native as the `ctx` edge moves up through its callers, or straight to
+Dropped when its work isn't needed.
 `itc_recomp/tools/check_function_statuses.py` checks this column against
 `src/` (an override marked Native, a status with no override, an override
 with no row); run it after changing either, on any branch.

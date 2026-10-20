@@ -703,9 +703,9 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
     the two copies must agree. This is most of the
     work: full decompilations of games this size usually take years. Keep
     the statuses in `docs/functions.md` up to date (Wrapped, Overridden,
-    Native, defined at its top) so progress can be measured: Native plus
-    Overridden is how much of the game is ours, Native alone how much no
-    longer needs `ctx`. Keyboard input comes back
+    Native, Dropped, defined at its top) so progress can be measured:
+    Native, Dropped and Overridden are how much of the game is ours,
+    Native and Dropped how much no longer needs `ctx`. Keyboard input comes back
     once the game is native (A0).
 
 ## The end state: removing the core
