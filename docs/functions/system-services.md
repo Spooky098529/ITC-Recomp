@@ -137,7 +137,8 @@ run it after changing either, on any branch.
 | `sub_8257E4B0` | | | `XamVoiceCreate`. Never called. |
 | `sub_8257E568` | | | The voice code's profile read (4 calls at boot). Not read in detail. B5. |
 | `sub_825816D8` | | | `XamVoiceSubmitPacket`. Never called. |
-| `sub_82589360` | | | XMsg `FA 7001A` (XMP: set the playback controller). Twice: at the boot movie's start (`sub_825894C8`) and end (`sub_825895A0`); 0. B5. |
-| `sub_82589408` | | | XMsg `FA 7001B` (XMP: get the playback controller). Once, from `sub_825894C8`: 0. B5. |
-| `sub_825894C8` | | | Takes the playback from the player's music (`XamGetSystemVersion`, a critical section, `sub_82589408`, `sub_82589360`). Once, from `Boot::StartMovie`. Not read in detail. |
-| `sub_825895A0` | | | Hands the playback back (`sub_82589360`). Once, from `Boot::EndMovie`. Not read in detail. |
+| `sub_82589360` | | Dropped | XMsg `FA 7001A` (XMP: set the playback controller) through `XMsgStartIORequestEx` with a 12-byte block, then `sub_82295700(0)`; 0, or the error's code. Twice: at the boot movie's start (`sub_825894C8`) and end (`sub_825895A0`); 0. No longer called since those were dropped (B5 step 3; no override). |
+| `sub_82589408` | | Dropped | XMsg `FA 7001B` (XMP: get the playback controller) through `XMsgInProcessCall`: r3 client, r4 controller (out), r5 locked (out); the SDK wrote 0 to both. Once, from `sub_825894C8`: 0. No longer called since that was dropped (B5 step 3; no override). |
+| `sub_825894C8` | | Dropped | Takes the playback from the player's music: below system version `8A100` (the SDK's is 0), in a critical section (`8265D9F4`), reads the controller (`sub_82589408`), keeps whether the player's music had it (`8295777C`), sets it (`sub_82589360`) and marks it taken (`82957778`); 1627 if already taken. Once, from `Boot::StartMovie`, which ignores the answer. Dropped (B5 step 3, `src/hooks/xmp.cpp`): returns 0 and clears the last error, as the SDK's answers left it; harness `xmp`: the same. |
+| `sub_825895A0` | | Dropped | Hands the playback back: the same check and critical section; if taken, sets the controller back (`sub_82589360`, 0 or 4 by `8295777C`) and clears both globals; 1627 if not taken. Once, from `Boot::EndMovie`, which returns its answer. Dropped (B5 step 3, `src/hooks/xmp.cpp`): returns 0 and clears the last error; harness `xmp`: the same. |
+| `sub_825DA140` | | | Uses the XMP code's critical section (`8265D9F4`); probably sets it up. Not read. |
