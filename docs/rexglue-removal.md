@@ -564,6 +564,39 @@ B3. **Graphics boundary** (17 functions calling `Vd*`): ring buffer
     set display mode `sub_822AD0B0`, which calls them, isn't dropped
     either.
 
+    The rule for the rest (the user's, 2026-10-20): we're working toward
+    native graphics code, and the Vulkan renderer is it. What the renderer
+    needs from a function is kept (made native without its `Vd*` calls);
+    what it doesn't need is dropped (status Dropped in
+    `docs/functions.md`, with the reason in its row).
+
+    Dropped (2026-10-20, `src/hooks/graphics_drops.cpp`, no fallback
+    flag): the engines' set-up `sub_822AD190` (returns 1; only `Vd*`
+    calls the SDK ignores and the terminate notification), EDRAM
+    retraining `sub_822B2388` (once a frame; only a lock, with the SDK's
+    `VdRetrainEDRAM` returning 0), and the display scaler's buffer
+    `sub_822B3FE0` and notification `sub_822B2610` (packets for display
+    registers our renderer doesn't read). That leaves `sub_822B2470` and
+    `sub_822B3A78` with no callers. Checked by an attract race (the same
+    device fields at boot and Swap, no errors, the dumped frame drawn
+    right) and the user watching it. No game code calls
+    `VdInitializeEngines`, `VdRetrainEDRAM`, `VdRetrainEDRAMWorker`,
+    `VdInitializeScalerCommandBuffer`, `VdCallGraphicsNotificationRoutines`
+    or `RtlFillMemoryUlong` (B6's blocked import) any more.
+
+    Left (2026-10-20): the functions the renderer needs, still calling
+    `Vd*`: device init (`VdIsHSIOTrainingSucceeded`), the ring set-up
+    (`VdInitializeRingBuffer`, `VdEnableRingBufferRPtrWriteBack`,
+    `VdSetSystemCommandBufferGpuIdentifierAddress`), the display mode
+    (`VdQueryVideoMode`), the set display mode (`VdSetDisplayMode`,
+    `VdGetCurrentDisplayInformation`) and Swap (`VdSwap`,
+    `VdGetSystemCommandBuffer`, `VdPersistDisplay`; four calls in it not
+    yet identified). Each gets a native version keeping only what the
+    renderer uses. The never-called functions (clock gating, device
+    release, the terminate routine, `sub_822B4F10`, `sub_822A0688`, the
+    engines' callback, and now `sub_822B2470` and `sub_822B3A78`) still
+    name `Vd*` imports in `generated/`.
+
 B4. **Files and saves** (22 functions; the game's `CreateFile`
     `sub_82295508` is the only caller of `NtCreateFile`): the game's file
     functions on host files under `--game_data_root` (log the paths with
