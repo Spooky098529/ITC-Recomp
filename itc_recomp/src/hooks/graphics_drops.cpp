@@ -6,9 +6,8 @@
 #include "guest.h"
 
 // RetrainEdram, once a frame from Swap (native Device::Init no longer calls
-// it): with
-// the SDK's VdRetrainEDRAM returning 0 it only took and released a lock.
-// Its callers ignore the return.
+// it): with the SDK's VdRetrainEDRAM returning 0 it only took and released
+// a lock. Swap ignores the return.
 extern "C" REX_FUNC(sub_822B2388) {
   REX_FUNC_PROLOGUE();
   ctx.r3.u64 = 1;
