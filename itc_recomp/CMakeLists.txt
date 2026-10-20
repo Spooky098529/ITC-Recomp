@@ -68,6 +68,10 @@ set(ITC_SOURCES
     src/hooks/cockpit_dials.cpp
     src/hooks/input.cpp
     src/hooks/input_update.cpp
+    src/hooks/debug_output.cpp
+    src/hooks/object_attributes.cpp
+    src/helpers/debug_output.cpp
+    src/helpers/object_attributes.cpp
     src/input/gamepads.cpp
     src/input/input_processor.cpp
     src/input/logical_pad.cpp
