@@ -75,9 +75,12 @@ set(ITC_SOURCES
     src/hooks/strings.cpp
     src/hooks/last_error.cpp
     src/hooks/graphics_boundary_log.cpp
+    src/hooks/gamma.cpp
+    src/display/gamma.cpp
     src/harnesses/harness.cpp
     src/harnesses/clock.cpp
     src/harnesses/last_error.cpp
+    src/harnesses/gamma.cpp
     src/harnesses/object_attributes.cpp
     src/harnesses/strings.cpp
     src/harnesses/time.cpp
