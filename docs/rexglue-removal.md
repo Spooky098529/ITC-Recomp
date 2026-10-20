@@ -1226,7 +1226,9 @@ B5. **System services** (82 functions; first counted as 78): sign-in, profile, U
     Checked: harness cases (`user`: the name for users 0-5 and sizes 0-20
     on a buffer filled with 0xCD, the sign-in state, the XUID with and
     without an out, 200 title ids, and SetContextEx's answer with the last
-    error slot), all the same, and an attract race (no errors). Imports
+    error slot), all the same, an attract race (no errors), and a session
+    the user played (`itc_249.log`, 2026-10-21: the boot, the front end,
+    their career save loaded, no race; no errors, closed cleanly). Imports
     with no recompiled callers left: `XamUserGetName`, `XamUserGetXUID`
     and `XamGetExecutionId`. Not cleared: `XamUserGetSigninState` (also in
     XUserCheckPrivilege, never called, and the voice code `sub_8257D798`,
