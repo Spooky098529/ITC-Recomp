@@ -890,12 +890,43 @@ B3. **Graphics boundary** (17 functions calling `Vd*`): ring buffer
     registers, and no code changes were needed; the rows say never
     called.
 
-    Left in B3 (2026-10-20): the interrupt callback `sub_8229DEA0`, whose
-    override only logs and which nothing calls now (the counter above:
-    our kick's `Interrupt()` calls the callback block's functions itself),
-    and the vblank callback above: what reads the vblank count (device
-    +15148) and the vblank callback's counts and event, and whether
-    anything waits on them.
+    The interrupt callback and vblank (2026-10-20): `sub_8229DEA0` is no
+    longer called, and its override (which only logged, then called it)
+    is removed. Nothing registers it: only the engines' set-up
+    `sub_822AD190` did (`VdSetGraphicsInterruptCallback`), and native
+    `Device::Init` leaves that out; our kick's `Interrupt()` calls the
+    callback block's functions itself; and the SDK's vblank thread went
+    with the GPU plugin, so there are no vblanks at all. The register
+    item's counter showed it: never called in an attract race or the
+    user's session. What vblanks fed is unused too: the device's vblank
+    count (+15148) is read only by `sub_8229DEA0` and `sub_822A0688`
+    (never called); the display set-up's vblank callback `sub_8258D4D8`
+    (device +15144) is called only by `sub_8229DEA0`; its counts
+    (`8296BD2C`, `8296BD30`) and event (`8296BD34`) were read and waited
+    on only by the original `VideoOutput::WaitForVblank` (`sub_8258DAA8`),
+    which our override replaced (it makes the device call before the
+    wait, not the wait); the event is otherwise only made at boot
+    (`sub_825DA470`) and closed at exit (`sub_825DB2C0`). Four movie
+    decoder functions read +15148 of their object too (`sub_825169A0`,
+    `sub_82533010`, `sub_8253DEB0`, `sub_8256D470`, comparing it with -1):
+    a temporary counter (removed) showed the boot movie's `sub_825169A0`
+    on its own object (`40B0AB40`, +15148 = -1), not the device
+    (`40021B00`); the other three are its variants, reached the same way.
+    Likewise the movie player's +15144 and +15156 (`sub_824E1750` and
+    others) are its own object's, not the device's: the lead in
+    `native-renderer.md` that the movie code sets a vblank callback on the
+    device was wrong (corrected there).
+
+    One consequence, noted and not changed (the user's call):
+    `sub_822A0718` writes scratch register 1 = 1 every frame, which our
+    kick writes back to callback block +4; on the 360 the vblank
+    countdown in `sub_8229DEA0` (+15156) cleared it, and that never runs
+    now. It fits the scratch write-backs seen outside races in the user's
+    sessions (452-604 an interval) and their absence in races.
+
+    Left in B3 (2026-10-20): the scratch register 1 lead above, if the
+    user wants it looked into; then B3's last step, the SDK's graphics
+    (already not loaded: no GPU plugin) going with the core.
 
 B4. **Files and saves** (22 functions; the game's `CreateFile`
     `sub_82295508` is the only caller of `NtCreateFile`): the game's file

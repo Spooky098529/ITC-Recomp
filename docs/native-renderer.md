@@ -457,7 +457,10 @@ step 1's logs are there to find them before anything is stubbed.
   - Vblank interrupts (source 0, 60 a second) come from the SDK's vsync
     thread, not the command stream: `sub_8229DEA0` counts them (+15148),
     counts down +15156 (zeroing callback block +4 at 0) and calls a
-    callback at +15144 (set by `sub_824F0030`, in the movie code).
+    callback at +15144 (the display set-up's `sub_8258D4D8`, given by
+    `sub_8229DA20`; corrected 2026-10-20: the movie code's +15144 is its
+    own object's, see B3 in `docs/rexglue-removal.md`). Since B3 there
+    are no vblanks and `sub_8229DEA0` is never called.
   - No MEM_WRITE, REG_TO_MEM, queries (EVENT_WRITE_ZPD, VIZ_QUERY) or
     screen extents in a race. Device +10868 (the full wait's flag) stayed
     0: it counts deferred kicks (`sub_8229E848`). `sub_822ACAA8` is the
@@ -1157,9 +1160,10 @@ To be fixed (or accepted) in milestone 7.
   Not investigated yet (milestone 7, the user's call). Plan: launch the
   game, have the user trigger the movie, and if it hangs take every
   thread's stack with gdb to see what it waits on. One lead to check, not
-  a finding: the movie code sets a callback the library calls on vblank
-  interrupts (`sub_824F0030`, device +15144; see "What the GPU does outside
-  itself"), and with no GPU plugin there are no vblank interrupts. The game
+  a finding: with no GPU plugin there are no vblank interrupts. (An
+  earlier lead here, that the movie code sets a vblank callback on the
+  device, was wrong: its +15144 is its own object's; see B3 in
+  `docs/rexglue-removal.md`.) The game
   ships 12 movies in `DATA/TXR/MOVIE` (`OPENING`, `STAGE1-3_OPENING`,
   `SHIBUYA_OPEN`, `SHINJUKU_OPEN`, endings, staff rolls).
 - **The boot movie (`UBI_LOGO.wmv`) isn't drawn** in our window (seen by
