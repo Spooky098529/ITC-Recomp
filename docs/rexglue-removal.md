@@ -520,6 +520,20 @@ B3. **Graphics boundary** (17 functions calling `Vd*`): ring buffer
     dropped); the scaler (clearing `RtlFillMemoryUlong`); Swap, EDRAM
     retraining and clock gating; `XGetVideoMode`'s two callers (from B6).
 
+    Counted (2026-10-20, `graphics-boundary`): a temporary wrapper on each
+    (`src/hooks/graphics_boundary_log.cpp`, `--log_graphics_boundary`;
+    removed when the natives replace them). An attract race (30 s): once
+    at boot, device init, engines, ring set-up, display mode, set display
+    mode (from the first Swap), the 256-entry gamma ramp, the scaler
+    (rectangle twice, filters, buffer) and the notification, all at
+    1280x720; Swap and EDRAM retraining once a frame (4,198 each, from
+    `Renderer::Present`'s `8258DCA4`), Swap's device flags +10809 `04`
+    (no "GPU hung" bit, so no `7FC86110` write). Never: clock gating, the
+    piecewise-linear ramp, device release, the terminate routine,
+    `sub_822B4F10`, `sub_822A0688` (reads `7FC8xxxx`) and the engines'
+    callback. A session the user plays (front end, race, pause, quit) is
+    still to come.
+
 B4. **Files and saves** (22 functions; the game's `CreateFile`
     `sub_82295508` is the only caller of `NtCreateFile`): the game's file
     functions on host files under `--game_data_root` (log the paths with
