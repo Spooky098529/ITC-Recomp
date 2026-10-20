@@ -112,7 +112,6 @@ COUNTED(8229F280, kRingSetup, DeviceFields(base, r3))
 COUNTED(822A08A0, kSwap, DeviceFields(base, r3))
 COUNTED(822ACB68, kTerminate, std::string())
 COUNTED(822AD0B0, kSetDisplayMode, DeviceFields(base, r3))
-COUNTED(822AD298, kDeviceInit, DeviceFields(base, r3))
 COUNTED(822AD500, kDeviceRelease, std::string())
 COUNTED(822B2470, kScalerRect,
         fmt::format("; display {}x{}", guest::LoadU32(base, r3 + 19988),
