@@ -830,9 +830,8 @@ B3. **Graphics boundary** (17 functions calling `Vd*`): ring buffer
 
     Left in B3 (2026-10-20): `XGetVideoMode`'s two callers (from B6); the
     GPU registers at `0x7FC80000` (show with logs that nothing reads them,
-    or make their readers native); the kick and the interrupt callback
-    `sub_8229DEA0` still recompiled underneath (the callback's override
-    only logs).
+    or make their readers native); the interrupt callback `sub_8229DEA0`
+    still recompiled underneath (its override only logs).
 
 B4. **Files and saves** (22 functions; the game's `CreateFile`
     `sub_82295508` is the only caller of `NtCreateFile`): the game's file
