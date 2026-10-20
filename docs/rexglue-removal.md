@@ -631,6 +631,139 @@ B3. **Graphics boundary** (17 functions calling `Vd*`): ring buffer
     in attract races look right (frames always differ between runs, by
     timing), the boot callback is still made, and all harnesses match.
 
+    Swap, step by step (2026-10-20, `graphics-boundary`; `sub_822A08A0`
+    read in `generated/`, then counted: the Swap wrapper in
+    `src/hooks/graphics_boundary_log.cpp` counts, at entry, the state each
+    branch tests, by caller, and logs the fields before and after at its
+    first calls and powers of two). Attract races (30 s, 5,120 Swaps): all
+    from `Renderer::Present`'s `8258DCA4`, r5 0, device +20440 bit 0
+    clear. In the order Swap runs them:
+
+    1. **Copies the front buffer's 52-byte header to +13444. Needed.**
+       `sub_822A0718` (from `VideoOutput::WaitForVblank` before every
+       Swap; it sets +10809 bit 5, which Swap clears) reads its address
+       word (+13476): only once it's non-zero (from the second frame) does
+       it write its packets, among them scratch register 1 = 1, which our
+       kick writes back to callback block +4. The tiling worker
+       `sub_822B69A8` would show the copy again (Swap with +13444) when
+       +10810 bit 2 is set, but no code sets that bit.
+    2. **GPU timestamps** (`sub_822B1F68` before and after, +20076 += 2)
+       when +20080 is set: an EVENT_WRITE_SHD with initiator bit 31 (the
+       GPU's swap counter) into progress block +64..+92. Never: +20080 is
+       set only by `sub_822B1CB0`, the library's debugger command handler,
+       which `sub_822B1E70` hands to the debug monitor only when
+       `820007B4`/`820007F0` point somewhere (they don't). Not needed.
+    3. **Ends the segment when `829537C0` is set.** Never: no code writes
+       it (0 in every run). Not needed.
+    4. **`sub_822B5C58(device, front buffer)`: the capture.** Tail-calls
+       the mounting `sub_822B58F0` or `sub_822B5208` when the byte at
+       `82953E1C` is set, `sub_822B4F10` when device +20424 bit 3 is;
+       otherwise returns. Neither is written by code (0 in every run).
+       Not needed (skipped behind a temporary switch: the same device
+       fields, frames right).
+    5. **`VdGetSystemCommandBuffer` and `VdSwap`**, unless +19980 (an
+       object only the capture's state machine `sub_822B1788` makes; 0 in
+       every run) is set. The SDK zeroes the 148-byte buffer, so +20120 is
+       stored as 0 and +20432 never written; `VdSwap` fills the 64 words
+       reserved (`sub_8229F148`) with a fetch constant (register `0x4800`,
+       above the 0x2000 our kick keeps), XE_SWAP (ignored) and NOPs.
+       +20120's only reader is the debugger's statistics query
+       `sub_822B1088`, +20432 has none. Not needed, nor the reservation.
+    6. **`Device::SetDisplayMode`** when +10809 bit 4 is set: once, at
+       the first Swap (`Device::SetUpDisplay` sets the bit). Kept (native
+       already, for the gamma ramps).
+    7. **The parameters (r5)**: copied to +13284 and `sub_822B42D0` called
+       when they differ from it. `Renderer::Present`, the tiling worker and
+       `sub_8209ACB8` pass 0; the movies' `sub_822A0E50` passes +13284
+       itself. Never runs.
+    8. **The scaler.** With the zeroed buffer (its +8 is 0) the
+       "nothing from the kernel" branch: when +10810 bit 5 is set (once,
+       the first Swap), clears +13312 (56 bytes), clears the bit and calls
+       `Device::SetUpScaler` (Dropped), then writes 10 words (register
+       `0x1838` = 0, a WAIT_REG_MEM on `0x1973`, `0x1852` = 1: display
+       registers). When +10811 bit 7 is set, `sub_822A05A8` writes the
+       display's gamma packets (REG_RMW on `0x1841`, `0x1930`, a ramp
+       through `sub_822B0D18` or `sub_822B0C38`); no code sets that bit
+       (`EndTiling` clears bit 6), never seen. The packets are display
+       registers our renderer doesn't read. Not needed, but clearing the
+       flags and +13312 (library state).
+    9. **The front buffer register.** The game flips between two front
+       buffers (`FF7F7000`, `FF45F000`), so every Swap finds +20004 changed
+       and writes register `0x1844` (the address) into the command buffer;
+       our kick only keeps it in its register table, which nothing reads
+       for `0x1844`. The GPU register `7FC86110` is written as well only
+       with +10809 bit 1 ("GPU hung", set by `sub_822ACAA8` after a timed
+       out wait, or by the segment end when the "training failed" flag
+       `829537BC` is set; neither in exclusive mode). +20004 has no other
+       reader in the library. Not needed.
+    10. **Display persistence** with +10809 bit 4 (the first Swap): a
+        REG_RMW on `0x1E4E`, `VdPersistDisplay` (the SDK allocates 64
+        bytes) and `MmFreePhysicalMemory` (frees them), then the bit
+        cleared. Not needed, but clearing the bit.
+    11. **Ends the segment** (`sub_8229EF48`: the kick our renderer reads).
+        Needed.
+    12. `RetrainEdram`: Dropped already.
+    13. **`sub_8229EC00(device, +13512 >> 2)`: the next segment and the
+        frame throttle.** Takes the next segment of the command buffer
+        (`sub_8229E100`, or through the object at +13160), sets the write
+        position and its limits (+40, +44, +48 = +44 − 160) and the
+        segment's fields (+13528, +13516, +13532), then waits
+        (`sub_8229E908`) for progress block +0 to reach the fence of the
+        last Swap (+13540; with +20440 bit 0, the one before, +13544) and
+        zeroes it. In exclusive mode the fence is always passed (never
+        ahead in the runs). Needed: the next frame's commands go into that
+        segment.
+    14. **Clears +10809 bit 5 and records the fences**: +13540 = the
+        command position before the kick, +13544 = the old +13540 (0 with
+        +20440 bit 0 clear, as `sub_8229EC00` has just zeroed it). Only
+        Swap and `sub_8229EC00` read them. Needed (the throttle's fences).
+    15. **`sub_822B20D8`: frame statistics.** The frame counter (+20024 +=
+        1), the time since the last Swap from the timebase (+20028, with
+        +20032/+20036), +20048/+20056 moved to +20064/+20068 and zeroed,
+        the debugger's requests (+15168 bits through `820007F0`), the GPU
+        performance counters (+20104 = 1 or 2, set only by `sub_822B0F70`,
+        itself only from the debugger's query `sub_822B1088`; clock gating
+        on that path), and `sub_822B1788` (the capture's state machine at
+        `82953D10`, 0 in every run; otherwise it hands the frame count to
+        the debugger through `820007B4`). Readers of what it leaves: the
+        debugger's query and the "GPU hung" handler. Not needed (skipped
+        behind the temporary switch: only +20024 and +20028 differ, 0
+        instead of counting; frames right).
+    16. **`sub_822A3B90(device, 0)`**: the binning packets (opcodes
+        `0x60`-`0x63` from +12448/+12452), `sub_8229B7D8` (WAIT_UNTIL and
+        register `0xF01` from +10788, with the bits it already holds), the
+        screen scissor `sub_822A0F80` (from +10308/+10312; per tile when
+        tiling), then **all ones in the dirty masks at device +0..+39**.
+        The renderer takes those masks at each draw (`MarkDeviceDirty` in
+        `src/native/state.h`), so the next frame's first draw copies every
+        register block. Needed (a library step without `Vd*` calls, also
+        called by `Device::Init`, `sub_825BED08` and `EndTiling`
+        `sub_825BF200`).
+
+    Seen every frame, then: 1, 4, 5, 9, 11, 13-16; once: 6, 8, 10. Never:
+    2, 3, 7, the gamma half of 8, the "GPU hung" write. What the
+    renderer needs: 1, 11, 13, 14, 16, and 6 (kept for the gamma ramps).
+
+    Proposed native Swap (level 1, in `src/hooks/graphics_device.cpp`):
+    copy the 52 bytes; `Device::SetDisplayMode` when +10809 bit 4 is set,
+    clearing it; when +10810 bit 5 is set, clear +13312 and the bit; clear
+    +10811 bit 7; then the guest calls `sub_8229EF48`, `sub_8229EC00`
+    (+13512 >> 2), clear +10809 bit 5, the fences, and `sub_822A3B90(0)`.
+    Left out: the timestamps, `829537C0`'s segment end, the capture, the
+    `Vd*` calls and their reservation (+20120, +20432), the parameters'
+    compare, the scaler, gamma and front buffer packets (+20004), the
+    `7FC86110` write, the display persistence, `RetrainEdram` and the
+    frame statistics. Swap is the only caller of `sub_822B5C58`,
+    `sub_822B20D8`, `sub_822B1F68` and `sub_822A05A8`, which become
+    Dropped (and `sub_822B1788`, `sub_822B5208`, `sub_822B58F0`, called
+    only from those, are no longer called). Checked as the other device
+    functions were: the counter's fields at the first Swaps and powers of
+    two the same as the recompiled Swap's, but for those left out
+    (+20004, +20024, +20028, and the write position, 256 bytes less a
+    frame), attract races with frame dumps, all harnesses, and a session
+    the user plays (front end, a race, the pause menu, a movie, loading
+    screens).
+
 B4. **Files and saves** (22 functions; the game's `CreateFile`
     `sub_82295508` is the only caller of `NtCreateFile`): the game's file
     functions on host files under `--game_data_root` (log the paths with

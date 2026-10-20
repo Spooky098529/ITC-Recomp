@@ -281,23 +281,3 @@ extern "C" REX_FUNC(sub_822A08A0) {
     SwapSummary();
   }
 }
-
-// TEMPORARY (B3, Swap): skip Swap's capture check and frame statistics to
-// show nothing the renderer uses reads what they leave.
-REXCVAR_DEFINE_BOOL(swap_skip_capture_and_stats, false, "ITC",
-                    "Skip sub_822B5C58 and sub_822B20D8 in Swap (temporary, for "
-                    "rexglue-removal B3)");
-
-extern "C" REX_FUNC(sub_822B5C58) {
-  REX_FUNC_PROLOGUE();
-  if (!REXCVAR_GET(swap_skip_capture_and_stats)) {
-    __imp__sub_822B5C58(ctx, base);
-  }
-}
-
-extern "C" REX_FUNC(sub_822B20D8) {
-  REX_FUNC_PROLOGUE();
-  if (!REXCVAR_GET(swap_skip_capture_and_stats)) {
-    __imp__sub_822B20D8(ctx, base);
-  }
-}
