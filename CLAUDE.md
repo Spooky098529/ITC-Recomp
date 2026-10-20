@@ -28,7 +28,10 @@ removed last. In progress on the long-lived branch
 (graphics and the like). A0, A5 and B1 are done: game input no longer
 goes through the SDK, and the input path from SDL to the processors is
 our own C++ (`src/input/`); the action mappers above it are read but
-recompiled.
+recompiled. B6 (pure helpers) is mostly done on branch `pure-helpers`
+(not yet merged into the project branch): the game's time, clock rate
+and string functions are plain C++ in `src/helpers/` behind adapters in
+`src/hooks/`, and 10 kernel imports have no recompiled callers left.
 `docs/tick-replay.md` is a lead (not started): translating draws once a
 tick and replaying our own list on in-between frames.
 `docs/pause-menu-fix.md` is the pause menu's too-fast input repeat: fixed
@@ -59,6 +62,20 @@ date as you learn things.
 - Find problems with logs, not guesses: add logging, have the user run the
   game, read the log, then fix what it shows. Guessing at causes cost many
   runs on the marker above opponents (see "World-space sprites").
+- Keep track of what you learn about the game's functions, without being
+  asked: every function you read in `generated/`, override, or learn
+  something about (what it does, its arguments, what it calls, who calls
+  it, how often), including those only met along the way (callees,
+  callers, helpers). When a piece of work is done, or before ending a
+  session, show the user the rows you'd add or change in
+  `docs/functions.md`, in that file's table format (`| Address | Name |
+  Status | Notes |`, four cells, each row exactly as it would be written;
+  for a changed row, say what changed), and ask whether to add them;
+  write them only after the user has reviewed and agreed. In
+  the rows, say how much is known: "Not read" or "Not read in detail"
+  for what's inferred from calls, "probably" for guesses. Set the Status
+  column by the definitions at the top of the file and run
+  `itc_recomp/tools/check_function_statuses.py` after changing it.
 
 ## Build and run
 

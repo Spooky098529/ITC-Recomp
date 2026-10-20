@@ -1,7 +1,7 @@
 # Removing ReXGlue: toward a native port
 
 The plan (written 2026-10-19 on branch `remove-rexglue`, restructured the
-same day; A0, A5 and B1 done) for taking the game off the ReXGlue SDK
+same day; A0, A5 and B1 done, B6 mostly done on `pure-helpers`) for taking the game off the ReXGlue SDK
 (`rexglue-sdk/`) piece by piece, with releases along the way. The goal
 is a native PC port, not a smaller emulator: in the end no `PPCContext`,
 no guest memory layout, no Xbox kernel calls, no `default.xex`.
@@ -386,6 +386,121 @@ B5. **System services** (78 functions): sign-in, profile, UI dialogs,
 B6. **Pure helpers** (55 functions): string, time and formatting
     helpers made native, or their callers made native. Cheap; can be
     done alongside anything else.
+
+    What counts (2026-10-20, the boundary pipeline filtered to these
+    imports; calling functions each): strings (`RtlInitAnsiString` 7,
+    `RtlInitUnicodeString`, `RtlUnicodeToMultiByteN`,
+    `RtlMultiByteToUnicodeN`, `RtlUnicodeStringToAnsiString`,
+    `RtlFreeAnsiString`, `sprintf` 3, `vswprintf`), fills and compares
+    (`RtlFillMemoryUlong`, `RtlCompareMemoryUlong` 3), time math
+    (`RtlTimeToTimeFields` 3, `RtlTimeFieldsToTime` 2), error codes
+    (`RtlNtStatusToDosError` 5), `DbgPrint` 4, fixed answers
+    (`KeGetCurrentProcessType` 7, `XGetVideoMode` 2, `XGetAVPack`,
+    `XGetLanguage`: log what the SDK answers first) and the clock
+    (`KeQuerySystemTime` 2, `KeQueryPerformanceFrequency` 2: frame
+    pacing depends on it). Not pure, though listed with them:
+    `RtlRaiseException`, `RtlUnwind` and `RtlCaptureContext` work on the
+    recompiled code's PowerPC state, so they go with the core. The
+    natives live in `src/helpers/` (plain C++), their adapters in
+    `src/hooks/`. Worked on in branch `pure-helpers`.
+
+    `RtlInitAnsiString` (2026-10-20, `pure-helpers`): of its 7 callers,
+    the 2 pure ones are native (Overridden: their callers are still
+    recompiled): `OutputDebugStringA` (`sub_82296270`, empty: the retail
+    game drops the text) and the named objects' attributes
+    (`sub_822970A8`, checked by a temporary self-test against the
+    recompiled version, all equal; its callers, named event and timer
+    creation, are threads and sync, the core). The other 5 are file
+    functions (`CreateFile` `sub_82295508`, `sub_825B9FD8` with
+    `NtQueryFullAttributesFile`, `sub_825B9C20` with
+    `NtQueryVolumeInformationFile`, `sub_825B9F20` with
+    `NtSetInformationFile`, the mounting in `sub_822B58F0` with
+    `ObCreateSymbolicLink`), where the string is one line next to the
+    `Nt*` calls: they go with B4, and the import with them.
+
+    Which imports B6 alone clears (2026-10-20: no caller also calls an
+    import of another area), done as groups on `pure-helpers`, each
+    checked by an attract race and a temporary harness (not committed;
+    kept in `git stash`) running the recompiled and native versions on
+    the same inputs:
+
+    - Time (done): `KeQuerySystemTime`, `RtlTimeToTimeFields`,
+      `RtlTimeFieldsToTime`, through GetLocalTime, the time zone state,
+      its cutover dates and the two FILETIME conversions
+      (`src/helpers/time.cpp`). Thousands of random cases the same, but
+      for times outside 1678-2261, where the SDK's conversions overflow
+      `system_clock`'s nanoseconds (ours are right). The zone itself
+      still comes from `sub_8229B440` (`ExGetXConfigSetting`, B5) as a
+      guest call.
+    - The counter's rate (done): `KeQueryPerformanceFrequency`, through
+      QueryPerformanceFrequency and the audio library's hardware wait
+      `sub_8245D288` (`src/helpers/clock.h`: 50 MHz, which must match
+      the SDK's timebase that recompiled `mftb` reads until the core
+      goes).
+    - Strings (done): `RtlInitUnicodeString`,
+      `RtlUnicodeStringToAnsiString`, `RtlFreeAnsiString` (only in
+      OutputDebugStringW, now empty), `RtlMultiByteToUnicodeN`,
+      `RtlUnicodeToMultiByteN` (MultiByteToWideChar,
+      WideCharToMultiByte; the SDK's Latin-1 behavior kept; UTF-8 stays
+      with the game's converters) and `vswprintf` (its one caller,
+      swprintf, has one call site whose format has no conversions, so
+      ours copies it; no printf).
+    - `XGetVideoMode`: not done, moved to B3. Its two callers are large
+      graphics setup functions (`sub_8258D568`, the graphics library's
+      display setup; `sub_82482B18`), and the SDK's answer comes from
+      its `video_mode_*` settings.
+
+    So 10 imports have no recompiled callers left; their SDK code can go
+    when the SDK's import table is ours. Checked by the user (2026-10-20):
+    a 2.5-minute session (menus, a race, quit) with no errors seen; the
+    log had no errors, the native audio played steadily with no silence
+    fills (so the audio library's hardware wait, now ours, never held it
+    up), and the game closed cleanly. Adapters calling guest code use
+    `src/hooks/guest_call.h` (a frame like the recompiled function's).
+
+    Left in B6 (2026-10-20): each import below still has a caller in
+    another area, so making B6's callers native clears none of them
+    yet; it's work saved for when those areas are done.
+
+    | Import | Callers B6 can do now | Callers waiting |
+    |---|---|---|
+    | `RtlNtStatusToDosError` | `sub_822953E8`; `sub_82296E88` (SetLastError from an NTSTATUS, which our time adapters call as guest code: native, it removes those guest calls) | `sub_8229B440`, the console's time zone read (B5) |
+    | `DbgPrint` | `sub_822AC530`, `sub_82486BC0`, `sub_8248FBE0` | `sub_822954C8`, also calling `XamLoaderTerminateTitle` (B5) |
+    | `sprintf` | `sub_822AC638`, `sub_822B1AC8` | the drive mounting `sub_822B58F0` (B4) |
+    | `RtlCompareMemoryUlong` | `sub_82298548`, `sub_82298A88` | `sub_8229A930`, the game's heap (core) |
+    | `KeGetCurrentProcessType` | `sub_8245A828`, `sub_825776A8` | five heap and memory functions (core) |
+    | `RtlInitAnsiString` | none (its 2 pure callers are done) | the file functions `sub_825B9C20`, `sub_825B9F20`, `sub_825B9FD8`, `sub_822B58F0` (B4); `sub_82295508`, CreateFile, is only wrapped for logging |
+
+    Blocked entirely: `RtlFillMemoryUlong` (its caller also sets up the
+    scaler command buffer, B3), `XGetAVPack` and `XGetLanguage` (one
+    function also reading the console's settings and the executable's
+    privileges, B5), `XGetVideoMode` (B3, above), and `RtlRaiseException`,
+    `RtlUnwind`, `RtlCaptureContext` (the core). Re-run the boundary
+    pipeline before starting any of these: the callers may have changed.
+
+    **State of B6 (2026-10-20):** every import B6 alone can clear is
+    cleared (10; `XGetVideoMode` went to B3). What's left doesn't clear
+    any import:
+
+    1. The "now" callers in the table above (11 functions): work saved
+       for B3, B4, B5 and the core, with nothing removed from the SDK
+       until those are done.
+    2. Done (2026-10-20, `pure-helpers`): SetLastError (`sub_82296E70`,
+       its jump `sub_82296FD0`, and `sub_82296E88`) in
+       `src/hooks/last_error.cpp`, called directly by our time and string
+       adapters, which make no SetLastError guest calls any more.
+       `sub_82296E88`'s NTSTATUS mapping is the SDK's
+       (`xeRtlNtStatusToDosError`, called as C++) until `sub_8229B440`
+       (B5), the import's last other caller, is native: then the table
+       has to be ours. GetTimeZoneBias (`sub_82297678`) is plain C++ and
+       its recompiled version is no longer called: the first function of
+       this work to reach Native. GetLocalTime's only guest call left is
+       the console settings read (B5). Checked by the harness (all the
+       same) and an attract race.
+
+    Suggested next (not decided): with 2 done, B6 counts as done for now;
+    merge `pure-helpers` into `rexglue-removal-project` and pick the next
+    item (A2, or A6 with B2, would remove visible SDK use).
 
 B7. **The game logic inside**: everything else, subsystem by subsystem,
     in whatever order the user wants (frame interpolation's hooks,
