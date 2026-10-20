@@ -554,8 +554,11 @@ extern "C" REX_FUNC(sub_8229E3F0) {
 // The library's interrupt callback (registered with
 // VdSetGraphicsInterruptCallback): r3 source (0 vblank, 1 the command
 // stream's INTERRUPT packet), r4 the device.
+void GpuRegisterCheck_Interrupt(uint32_t source, uint32_t lr);  // TEMPORARY (B3)
+
 extern "C" REX_FUNC(sub_8229DEA0) {
   REX_FUNC_PROLOGUE();
+  GpuRegisterCheck_Interrupt(ctx.r3.u32, ctx.lr);  // TEMPORARY (B3)
   if (REXCVAR_GET(native_renderer_log_gpu)) {
     uint32_t source = ctx.r3.u32;
     native::g_interrupts[source ? 1 : 0]++;
