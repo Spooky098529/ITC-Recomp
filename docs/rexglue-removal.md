@@ -418,6 +418,48 @@ B6. **Pure helpers** (55 functions): string, time and formatting
     `ObCreateSymbolicLink`), where the string is one line next to the
     `Nt*` calls: they go with B4, and the import with them.
 
+    Which imports B6 alone clears (2026-10-20: no caller also calls an
+    import of another area), done as groups on `pure-helpers`, each
+    checked by an attract race and a temporary harness (not committed;
+    kept in `git stash`) running the recompiled and native versions on
+    the same inputs:
+
+    - Time (done): `KeQuerySystemTime`, `RtlTimeToTimeFields`,
+      `RtlTimeFieldsToTime`, through GetLocalTime, the time zone state,
+      its cutover dates and the two FILETIME conversions
+      (`src/helpers/time.cpp`). Thousands of random cases the same, but
+      for times outside 1678-2261, where the SDK's conversions overflow
+      `system_clock`'s nanoseconds (ours are right). The zone itself
+      still comes from `sub_8229B440` (`ExGetXConfigSetting`, B5) as a
+      guest call.
+    - The counter's rate (done): `KeQueryPerformanceFrequency`, through
+      QueryPerformanceFrequency and the audio library's hardware wait
+      `sub_8245D288` (`src/helpers/clock.h`: 50 MHz, which must match
+      the SDK's timebase that recompiled `mftb` reads until the core
+      goes).
+    - Strings (done): `RtlInitUnicodeString`,
+      `RtlUnicodeStringToAnsiString`, `RtlFreeAnsiString` (only in
+      OutputDebugStringW, now empty), `RtlMultiByteToUnicodeN`,
+      `RtlUnicodeToMultiByteN` (MultiByteToWideChar,
+      WideCharToMultiByte; the SDK's Latin-1 behavior kept; UTF-8 stays
+      with the game's converters) and `vswprintf` (its one caller,
+      swprintf, has one call site whose format has no conversions, so
+      ours copies it; no printf).
+    - `XGetVideoMode`: not done, moved to B3. Its two callers are large
+      graphics setup functions (`sub_8258D568`, the graphics library's
+      display setup; `sub_82482B18`), and the SDK's answer comes from
+      its `video_mode_*` settings.
+
+    So 10 imports have no recompiled callers left; their SDK code can go
+    when the SDK's import table is ours. Adapters calling guest code use
+    `src/hooks/guest_call.h` (a frame like the recompiled function's).
+
+    Left in B6, each with callers in other areas: `RtlNtStatusToDosError`
+    (4 of 5 callers pure), `DbgPrint` (3 of 4), `sprintf` (2 of 3),
+    `RtlCompareMemoryUlong` (2 of 3), `KeGetCurrentProcessType` (2 of 7);
+    `RtlFillMemoryUlong`, `XGetAVPack`, `XGetLanguage` and
+    `RtlInitAnsiString`'s file callers wait for B3, B5 and B4.
+
 B7. **The game logic inside**: everything else, subsystem by subsystem,
     in whatever order the user wants (frame interpolation's hooks,
     vehicles, UI, menus, physics, ...). Each subsystem moves its data to
