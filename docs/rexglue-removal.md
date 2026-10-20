@@ -141,7 +141,7 @@ Measured 2026-10-19 by grepping `itc_recomp/src` and `generated/`.
 |---|---|---|---|
 | Logging, flags, hashes | `REXLOG_*` (~280 uses), `REXCVAR_*` (~370), `rex/hash.h` (xxHash) | almost every file in `src/` | A |
 | App shell | `rex::ReXApp` (`src/itc_app.h`), `REX_DEFINE_APP` (`src/main.cpp`), `WindowedApp`, imgui (include path only), command line, log files, `PathConfig`, the SDK's hidden window (`src/native/app_window.cpp`) | `src/itc_app.h`, `src/main.cpp` | A |
-| Renderer leftovers | The Xenos to SPIR-V shader translator built from SDK sources (`itc_xenos_shaders` in `itc_recomp/CMakeLists.txt`), `rex::graphics::RegisterFile` (`src/native/state.h`, `passes.cpp`), `registers.h`, `xenos.h`, `util/draw.h`, `ui/vulkan/api.h`; SDL3 and Vulkan headers from `rexglue-sdk/thirdparty/`; the xenos plugin still built (`GPU_PLUGINS xenos`) for comparisons | `src/native/` | A |
+| Renderer leftovers | The Xenos to SPIR-V shader translator built from SDK sources (`itc_xenos_shaders` in `itc_recomp/CMakeLists.txt`), `rex::graphics::RegisterFile` (`src/native/state.h`, `passes.cpp`), `registers.h`, `xenos.h`, `util/draw.h`, `ui/vulkan/api.h`; SDL3 and Vulkan headers from `rexglue-sdk/thirdparty/`; the xenos plugin still built (`GPU_PLUGINS xenos`), no longer used (goes with B3) | `src/native/` | A |
 | Graphics boundary | `Vd*` (25 imports; 17 game functions). In exclusive mode the GPU's job is already ours (`src/native/gpu_link.cpp`) | SDK `src/kernel/` | B |
 | Audio | Output: `AudioDriver`, `REX_AUDIO_BACKEND`, `conversion.h`, `downmix.h` (A). The game side: `XAudio*`, `XMA*` and the SDK's XMA decoder, which emulates the XMA hardware's contexts on FFmpeg (B; 6 game functions). Our mixer (`src/audio/native_audio.cpp`) still runs on an `XHostThread` and allocates from the guest heap | `src/audio/` | A and B |
 | Input | Reading SDL gamepads (A; the `--mnk_mode` keyboard is dropped first, A0); `XamInput*` (B; 3 game functions) | SDK `src/input/` | A and B |
@@ -235,9 +235,9 @@ A3. **Renderer leftovers**: bring the shader translator into the repo
     work, partly derived from Xenia), keep its notices on copied files,
     ask the user if the terms are unclear. Our own register array in
     place of `RegisterFile`; the formats from `xenos.h`/`registers.h`,
-    `draw_util` and the Vulkan function list the same way. Ask the user
-    whether the xenos plugin keeps being built for comparisons (CLAUDE.md
-    uses it) or goes behind an option.
+    `draw_util` and the Vulkan function list the same way. The xenos
+    plugin isn't kept for comparisons (the user's call, 2026-10-20; see
+    B3): its build goes with B3.
 
 A4. **App shell**: our own `main`: SDL init, our window as the only one
     (no hidden SDK window, no event forwarding in `app_window.cpp`), our
@@ -419,6 +419,106 @@ B3. **Graphics boundary** (17 functions calling `Vd*`): ring buffer
     the MMIO range at `0x7FC80000` (`CP_RB_WPTR 0x714`, interrupt status
     `0x6544`, `0x6110`): show with logs that nothing reads it, or make
     its readers native. Then the GPU plugin and the SDK's graphics go.
+
+    No comparison with the emulated GPU (the user's call, 2026-10-20):
+    our renderer is checked against the 360 itself (the user's play,
+    videos), and the emulated GPU hasn't been used to compare for some
+    time. So B3's native functions replace the recompiled ones with no
+    fallback to the plugin (as B1 did for input), and the plugin's build
+    (`GPU_PLUGINS xenos`) and `--native_renderer=false` go with B3. `main`
+    still has them. Worked on in branch `graphics-boundary`.
+
+    The functions (read 2026-10-20 in `generated/`; the `Vd*` answers are
+    the SDK's, `rexglue-sdk/src/kernel/xboxkrnl/xboxkrnl_video.cpp`). All
+    are the game's graphics library (its Direct3D); r3 is the device
+    unless said otherwise:
+
+    - **Device start**: `sub_822AD298` (device init, called by
+      `sub_8229DB38`, itself reached from the display set-up
+      `sub_8258D568`) initializes two critical sections, calls
+      `sub_822AD190`, reads a console setting (`ExGetXConfigSetting(3,
+      10)` into +15164, B5), sets up the ring with `sub_8229F280`, the
+      display mode with `sub_822ACE00`, retrains EDRAM (`sub_822B2388`)
+      and checks `VdIsHSIOTrainingSucceeded` (1). `sub_822AD190` calls
+      `VdInitializeEngines` (twice, with a `VdShutdownEngines` between;
+      the second time with the PFP and ME microcode at `82016148` and
+      `820165C8`), registers the title terminate notification at
+      `82639098` and the interrupt callback `sub_8229DEA0`
+      (`VdSetGraphicsInterruptCallback`). `sub_8229F280` (also called with
+      no parameters by the device's release, to free) waits for the GPU,
+      frees the old buffers, allocates the primary ring (default 32 KB),
+      the command buffer (default 2 MB), the progress block (96 bytes,
+      device +10768) and the callback block (32 bytes, +10772), calls
+      `VdInitializeRingBuffer` and `VdEnableRingBufferRPtrWriteBack`
+      (progress block +60; `docs/native-renderer.md` put it in
+      `sub_822AD190`, wrongly), fills the ring fields (+13496..+13536),
+      writes ME_INIT through `sub_8229DD70` and the scratch registers'
+      set-up (SCRATCH_UMSK, SCRATCH_ADDR = the callback block), and kicks
+      (`sub_8229F0E0`). Its import named `KiApcNormalRoutineNop`, called
+      with the ME_INIT packet and 19, is probably
+      `VdVerifyMEInitCommand` under a wrong name. Without the plugin the
+      SDK ignores all three `Vd*` set-up calls, `VdInitializeEngines`
+      returns 1 and never calls its callback `sub_822ACB48` (which writes
+      GPU registers `7FC83214` and `7FC83408`).
+    - **Device release**: `sub_822AD500` (called by `sub_8229D978`):
+      waits, frees, calls `sub_822ACFB8` and `sub_822B58C0` (both reach
+      `sub_822B4F10`), clears the interrupt callback, frees the ring
+      (`sub_8229F280` with no parameters) and shuts the engines down.
+      `sub_822ACB68` (unregister and `VdShutdownEngines`) has no callers
+      in code: probably the terminate notification's routine, its
+      address only in the image's data.
+    - **Every frame**: Swap `sub_822A08A0` (called by `Renderer::Present`'s
+      `sub_8258DC58`, the movie code's `sub_822A0E50`, the tiling worker
+      `sub_822B69A8`; `sub_8209ACB8`, which calls it, has no direct callers) reserves 64
+      words, calls `VdGetSystemCommandBuffer` and `VdSwap` (which writes a
+      fetch constant and an XE_SWAP packet there; our kick ignores both),
+      updates the display mode (`sub_822AD0B0`) and scaler
+      (`sub_822B3FE0`) when they change, retrains EDRAM (`sub_822B2388`,
+      `VdRetrainEDRAM` returns 0) and calls `sub_822B20D8` (which reaches
+      the clock gating `sub_8229B848`: `VdEnableDisableClockGating`, and
+      two REG_RMW packets). It writes the GPU register `7FC86110` only
+      with device +10809 bit 1 set (the library's "GPU hung" path).
+      `VdPersistDisplay` and `MmFreePhysicalMemory` only with +10809 bit
+      4.
+    - **Display mode and scaler**: `sub_822ACE00` (from device init)
+      reads `VdQueryVideoMode` into +19988..+20000 and creates the front
+      buffer and other surfaces; `sub_822AD0B0` sets `VdSetDisplayMode`
+      (flags from the format and 720x480/576) and reads
+      `VdGetCurrentDisplayInformation` into the same fields;
+      `sub_822B2470` works out the scaler's rectangle and output height
+      (`VdQueryVideoFlags`); `sub_822B2610` passes the front buffer and
+      display sizes to `VdCallGraphicsNotificationRoutines` (returns 0);
+      `sub_822B3A78` (`VdQueryVideoMode`, filter set-up through
+      `sub_822B3798`) and `sub_822B3FE0` build the scaler's command
+      buffer (`VdInitializeScalerCommandBuffer`, which the SDK fills with
+      NOPs, and `RtlFillMemoryUlong`, B6's blocked import). The SDK's
+      answers come from its `video_mode_*` settings.
+    - **Gamma**: `sub_822B0910` (a 256-entry ramp) and `sub_822B0AB0`
+      (a 128-entry piecewise-linear one) build a 1024-entry 10-bit curve
+      from `VdGetCurrentDisplayGamma` (the SDK: always 2, BT.709) and run
+      the ramp through it: the tables `--xbox_gamma` copied
+      (`src/native/xbox_gamma_table.h`).
+    - **`sub_822B4F10`**: writes a file with a 2048-byte header (display
+      information and the gamma ramp in it; `sub_82295D50`, handles
+      closed with `sub_82294E20`) and deletes a symbolic link
+      (`ObDeleteSymbolicLink`). Called by the mounting `sub_822B58F0`,
+      `sub_822B5C58` (from Swap), `sub_822ACFB8` and `sub_822B58C0`.
+      Probably a debug capture; not read in detail. With its file calls
+      it may belong to B4.
+
+    Not needed already: no vblank interrupts and no GPU registers at
+    `0x7FC80000` have been supplied since the plugin went (milestone 6),
+    and boot, menus and races work. So B3 is mostly removing calls that do
+    nothing today, not doing the GPU's work.
+
+    Plan: (1) a temporary opt-in counter on these functions (which run,
+    how often, from where, what each `Vd*` answers), an attract race and
+    a session the user plays; (2) native as plain C++ behind adapters,
+    smallest first: the display mode, flags, information and gamma (our
+    own answers, the SDK's values; harness cases for the ramps); device
+    start and release (the library's device fields kept, the `Vd*` calls
+    dropped); the scaler (clearing `RtlFillMemoryUlong`); Swap, EDRAM
+    retraining and clock gating; `XGetVideoMode`'s two callers (from B6).
 
 B4. **Files and saves** (22 functions; the game's `CreateFile`
     `sub_82295508` is the only caller of `NtCreateFile`): the game's file

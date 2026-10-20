@@ -126,10 +126,7 @@ find /dev/shm -maxdepth 1 -user "$USER" -name 'xenia_memory_*' -delete
   needs lld (`ld.lld`). Measured 2026-10-14, two alternating uncapped attract
   races each: 236 and 237 fps mean without, 246 and 239 with; the user kept
   it. `-DITC_LTO=OFF` turns it off.
-- That's what players run: our own renderer, no GPU plugin. For the
-  emulated GPU (to compare), replace the two `--native_renderer` flags
-  with `--native_renderer=false --gpu_plugin=xenos`; the plugin is built
-  but no longer shipped.
+- That's what players run: our own renderer, no GPU plugin.
 
 - Launch from the repo root; other directories fail (exit 127).
 - `--skip_intro --attract_after_s=1` starts an attract race (AI cars) about
@@ -177,8 +174,7 @@ command-line options win over it). Since 2026-10-20 the native renderer, its
 exclusive mode and the once-a-frame mirrors are on by default, and without
 `--game_data_root` the game's files are looked for next to the executable
 (`ItcApp::OnConfigurePaths`; the SDK reads that flag before `itc.toml`
-loads), so a bare `./itc` plays as released. The emulated GPU now needs
-`--native_renderer=false --gpu_plugin=xenos`.
+loads), so a bare `./itc` plays as released.
 
 ## Status (`main`, 2026-10-20, v0.4.7.1)
 

@@ -437,7 +437,8 @@ step 1's logs are there to find them before anything is stubbed.
     progress block +0, and the command buffer address the GPU reached
     (`BFxxxxxx`, a virtual alias) to +4. The block is at `FFC93000`
     (physical `1FC94000`); +60 is the ring's read pointer write-back
-    (`VdEnableRingBufferRPtrWriteBack`, in `sub_822AD190`).
+    (`VdEnableRingBufferRPtrWriteBack`, in `sub_8229F280`; first put in
+    `sub_822AD190`, wrongly: see B3 in `docs/rexglue-removal.md`).
   - Every other kick is 11 words: COHER_STATUS/SIZE/BASE (`0A31`, `0A2F`,
     `0A30`) for the command buffer range `1FB90000` (1 MB) and a
     WAIT_REG_MEM on COHER_STATUS_HOST: making the GPU see the CPU's
