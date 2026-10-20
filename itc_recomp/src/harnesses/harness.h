@@ -98,5 +98,6 @@ void Strings(Context& h);
 void LastError(Context& h);
 void Gamma(Context& h);
 void StartUp(Context& h);
+void User(Context& h);
 
 }  // namespace harness
