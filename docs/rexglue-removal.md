@@ -158,11 +158,18 @@ pipeline (re-run it as things change; it prints `<function> <import>`):
 
 ```sh
 cd itc_recomp/generated/default
-awk '/DEFINE_REX_FUNC\(sub_/ {match($0,/sub_[0-9A-F]+/); f=substr($0,RSTART,RLENGTH)}
+awk '/DEFINE_REX_FUNC\(/ {match($0,/DEFINE_REX_FUNC\([A-Za-z_][A-Za-z0-9_]*/); f=substr($0,RSTART+16,RLENGTH-16)}
      /__imp__[A-Za-z]/ && !/__imp__sub_/ && !/DEFINE_REX_FUNC/ {
        match($0,/__imp__[A-Za-z][A-Za-z0-9_]+/); print f, substr($0,RSTART+7,RLENGTH-7)}' \
   itc_recomp.*.cpp | sort -u
 ```
+
+Corrected 2026-10-20 (B5): it first matched only `sub_` names, so the
+imports of a function with another name were credited to the `sub_`
+function before it in the file. The only such caller is `xstart` (the C
+runtime's entry point, `0x82296C80`): its `DbgPrint` and
+`XamLoaderTerminateTitle` were listed under `sub_822954C8`, a small wait
+wrapper. The totals didn't change.
 
 2026-10-19: 916 pairs, 449 distinct functions. By area (functions):
 threads and sync 291, system services 78, pure helpers 55, memory 31,
@@ -1041,7 +1048,7 @@ B6. **Pure helpers** (55 functions): string, time and formatting
     | Import | Callers B6 can do now | Callers waiting |
     |---|---|---|
     | `RtlNtStatusToDosError` | `sub_822953E8`; `sub_82296E88` (SetLastError from an NTSTATUS, which our time adapters call as guest code: native, it removes those guest calls) | `sub_8229B440`, the console's time zone read (B5) |
-    | `DbgPrint` | `sub_822AC530`, `sub_82486BC0`, `sub_8248FBE0` | `sub_822954C8`, also calling `XamLoaderTerminateTitle` (B5) |
+    | `DbgPrint` | `sub_822AC530`, `sub_82486BC0`, `sub_8248FBE0` | `xstart`, the C runtime's entry point, also calling `XamLoaderTerminateTitle` (B5; first listed as `sub_822954C8`, the pipeline's mistake, corrected under "The boundary") |
     | `sprintf` | `sub_822AC638`, `sub_822B1AC8` | the drive mounting `sub_822B58F0` (B4) |
     | `RtlCompareMemoryUlong` | `sub_82298548`, `sub_82298A88` | `sub_8229A930`, the game's heap (core) |
     | `KeGetCurrentProcessType` | `sub_8245A828`, `sub_825776A8` | five heap and memory functions (core) |
