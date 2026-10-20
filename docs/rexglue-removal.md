@@ -1242,6 +1242,23 @@ B5. **System services** (82 functions; first counted as 78): sign-in, profile, U
     `helpers::SystemTimeNow`. Not from B5 (GetLocalTime has been native
     since B6); not looked into.
 
+    **Step 3, XMP: done (2026-10-21, `system-services`).** Dropped at the
+    highest point: Boot::StartMovie's `sub_825894C8` (takes the playback
+    from the player's music: XMP's get and set controller,
+    `sub_82589408` and `sub_82589360`) and Boot::EndMovie's `sub_825895A0`
+    (hands it back) return 0 and clear the last error
+    (`src/hooks/xmp.cpp`), as the SDK's answers left them (its set went
+    through `XMsgStartIORequestEx`, which cleared the last error).
+    StartMovie ignores the answer, EndMovie returns it; their state
+    (`82957778`, `8295777C`) has no other reader, and XMP's notification
+    reached no listener. The two wrappers are no longer called (Dropped).
+    No notes kept for a music player of our own (the user's call).
+    Checked: a harness case (`xmp`: take then hand back, each answer and
+    the last error, the same; the recompiled pair leaves its state at 0)
+    and an attract race (no errors). Clears `XMsgStartIORequestEx`; not
+    `XamGetSystemVersion` (WSAStartup, step 4, and XUserCheckPrivilege,
+    never called) or `XMsgInProcessCall` (the XLiveBase wrappers).
+
 B6. **Pure helpers** (55 functions): string, time and formatting
     helpers made native, or their callers made native. Cheap; can be
     done alongside anything else.

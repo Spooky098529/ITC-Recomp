@@ -50,7 +50,8 @@ graphics code goes with the SDK. B5 (system services) is in progress on
 checks, Device::Init's video flags and the console's time zone read
 without their kernel calls, `src/hooks/start_up.cpp` and
 `src/helpers/console_settings.h`), and step 2 (the user wrappers from
-`src/user/user.h`, XUserSetContextEx dropped). Plan steps are done on their
+`src/user/user.h`, XUserSetContextEx dropped) and step 3 (XMP
+dropped, `src/hooks/xmp.cpp`). Plan steps are done on their
 own branches and merged into `rexglue-removal-project` (no force pushes:
 GitHub refuses them on that branch).
 `docs/tick-replay.md` is a lead (not started): translating draws once a
