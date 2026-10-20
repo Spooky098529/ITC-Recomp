@@ -19,6 +19,8 @@ Status:
   recompiled code shares the data). The game reaches it without `ctx`,
   from native or overridden callers, and the recompiled original is no
   longer called (except behind a fallback flag or to check against it).
+  No `REX_FUNC` override of it exists, not even an adapter kept only for
+  a harness (that's Overridden until the adapter goes).
   The end state for every function.
 - **Overridden**: an `extern "C" REX_FUNC(sub_XXXXXXXX)` override in
   `itc_recomp/src/` (or a macro defining one) does the work instead of
