@@ -924,9 +924,13 @@ B3. **Graphics boundary** (17 functions calling `Vd*`): ring buffer
     now. It fits the scratch write-backs seen outside races in the user's
     sessions (452-604 an interval) and their absence in races.
 
-    Left in B3 (2026-10-20): the scratch register 1 lead above, if the
-    user wants it looked into; then B3's last step, the SDK's graphics
-    (already not loaded: no GPU plugin) going with the core.
+    Left in B3 (2026-10-20): B3's last step, the SDK's graphics (already
+    not loaded: no GPU plugin) going with the core.
+
+    For later (the user's call, 2026-10-20): return to the scratch
+    register 1 lead above. Nothing seen so far says it needs looking
+    into now (the game behaves in the user's sessions, with nothing
+    unhandled by the kick).
 
 B4. **Files and saves** (22 functions; the game's `CreateFile`
     `sub_82295508` is the only caller of `NtCreateFile`): the game's file
