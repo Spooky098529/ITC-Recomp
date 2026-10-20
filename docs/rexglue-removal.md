@@ -1102,7 +1102,28 @@ B5. **System services** (82 functions; first counted as 78): sign-in, profile, U
       today.
     - XMP: dropped (0; its notifications reach no listener).
     - Voice: its set-up and 10 ms poll; nothing seen that it gives the
-      game (no headset). To read before dropping.
+      game (no headset). Can't be dropped by failing the engine's
+      creation (`sub_82578BF8`, probably XHVCreateEngine): the engine
+      pointer (`826C74A0`, the network manager's +0) is used without a
+      null check, every frame by `sub_8214FA78` (vtable +72, from
+      `sub_8214E268`) and by `sub_8214F790` (+48), `sub_8214FDF8`,
+      `sub_8226EEC8` and `sub_8226BCB8` (+52); only the release
+      `sub_8214F690` checks. A native stand-in engine was ruled out (the
+      user's rule below), so voice goes with the network manager.
+
+    The user's rule (2026-10-20): Xbox-only features the PC port won't
+    use (voice chat, system link, Xbox Live, XMP, presence) are mapped
+    out (read and written up in `docs/functions.md`) but not brought into
+    C++: no stand-ins imitating their interfaces. They're skipped at the
+    highest game-level point that's safe (Dropped, with the reason), and
+    what the game does need from them (one signed-in local user, the
+    profile's answers) becomes plain C++ with fixed answers. For voice,
+    system link and Live that point is probably the network manager
+    (`826C74A0`): its set-up `sub_8214E190` (the voice engine, the system
+    link socket, XNet, listeners) and its per-frame update `sub_8214E268`.
+    That update also runs the sign-in manager `sub_8214F290` and the
+    profile read, so what the rest of the game reads from them must be
+    found (and kept) first.
     - Notifications: the startup set and the dialogs' must reach the
       same listeners. Five of their readers are game code calling
       `XNotifyGetNext` inline, so those functions have to be made native
