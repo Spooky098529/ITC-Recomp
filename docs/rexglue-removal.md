@@ -38,6 +38,15 @@ goes in `src/` as overrides), American English.
     leftovers, third-party libraries). Can start now, in any order.
   - **Track B**, the native port from the boundary inward, subsystem by
     subsystem; each one deletes its SDK piece when done.
+- **Map Xbox-only features, don't port them** (the user's rule,
+  2026-10-20, from B5). Features the PC port won't use (voice chat,
+  system link, Xbox Live, XMP, presence, and the like) are still read and
+  written up in `docs/functions.md`, but they aren't brought into C++:
+  no stand-ins or shims imitating their Xbox interfaces. They're skipped
+  at the highest point in the game's own code where that's safe (status
+  Dropped, with the reason), or left out when that caller is made native.
+  What the game does need from them (one signed-in local user, the
+  profile's answers) becomes plain C++ with fixed answers.
 - **The core stays the SDK's, untouched, until the end**: guest memory,
   the threads that run recompiled code, the image load, `PPCContext`,
   the function table, the sync objects shared with recompiled code. These
