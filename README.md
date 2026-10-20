@@ -12,7 +12,7 @@ Built with AI assistance (Claude Code).
   with Vulkan, this avoids relying on the xenia GPU backend of rexglue and should run faster
   
 - **Frame interpolation in races.** Game logic still runs at its original
-  30 Hz, and frames are blended between ticks, so races play smoothly at an uncapped FPS (`--max_fps=0`), or with a cap specified on the command line with (`--max_fps=n`). `./run.sh --no-interpolation` gives the original
+  30 Hz, and frames are blended between ticks, so races play smoothly at an uncapped FPS (`--max_fps=0`), or with a cap set in `itc.toml` (`max_fps`). `interpolate_draw_state = false` and `max_fps = 30` there give the original
   30 fps game. Be aware that the internal game logic is still expecting a consistent 30hz update rate, if your machine cannot keep up, the game will run in slow motion.
   
 ## In progress: removing ReXGlue
@@ -42,25 +42,32 @@ The above branch contains the most up to date functions reference, and is where 
    [Releases](https://github.com/Spooky098529/ITC-Recomp/releases)
    (`linux-amd64` or `win-amd64`) and extract its files into that folder,
    next to `default.xex`.
-3. Run `./run.sh` on Linux, or `run.bat` on Windows.
+3. Run `./itc` on Linux, or `itc.exe` on Windows.
 
-## Running it
+## Settings
 
-| Command | What it does |
+Settings are in `itc.toml`, next to `itc`; each is explained in the file.
+Edit it and start the game again.
+
+| Setting | What it does |
 |---|---|
-| `./run.sh` | Frame interpolation on, up to 144 fps in races, no logging. |
-| `./run.sh --max_fps=N` | A different frame cap; `--max_fps=0` is unlimited. |
-| `./run.sh --no-interpolation` | The original 30 fps game. |
-| `./run.sh --width=1920 --height=1080` | A bigger window, drawn at that resolution instead of the game's 1280x720. |
-| `./run.sh --fullscreen` | Fills the screen, drawn at the screen's resolution. With `--width`/`--height`, drawn at that resolution and scaled to the screen. |
-| `./run.sh --skip_intro` | Skips the Ubisoft logo movie and speeds through the Genki logo and the title screen's intro. Now and then the game hangs at startup with this; if it does, close it and start it again. |
-| `./run-debug.sh` | The same as `run.sh`, with logging on (written to `logs/`). |
+| `interpolate_draw_state` | Frame interpolation in races (`true` by default). |
+| `max_fps` | The frame cap (144 by default); `0` is unlimited. |
+| `width`, `height` | A bigger window, drawn at that resolution instead of the game's 1280x720. |
+| `fullscreen` | Fills the screen, drawn at the screen's resolution. With `width`/`height`, drawn at that resolution and scaled to the screen. |
+| `motion_blur` | The game's blur of the picture at speed (`true` by default). |
+| `xbox_gamma` | `"off"`, or the Xbox 360's gamma for an HDTV (`"hdtv"`) or a set gamma power (`"power"`). |
+| `log_level` | `"off"`, or `"info"` to write logs to `logs/`. |
 
-Options can be combined, e.g. `./run.sh --skip_intro --max_fps=0`. On
-Windows, use `run.bat` and `run-debug.bat` the same way.
+For the original 30 fps game, set `interpolate_draw_state = false` and
+`max_fps = 30`. By default the game runs in a 1280x720 window at its own
+resolution, as on the console. Screens and windows that aren't 16:9 get
+black bars.
 
-By default the game runs in a 1280x720 window at its own resolution, as on
-the console. Screens and windows that aren't 16:9 get black bars.
+Options given on the command line win over the file, e.g.
+`./itc --max_fps=0`. `./itc --skip_intro` skips the Ubisoft logo movie and
+speeds through the Genki logo and the title screen's intro; now and then the
+game hangs at startup with it; if it does, close it and start it again.
 
 ## Known limitations
 
@@ -72,7 +79,7 @@ the console. Screens and windows that aren't 16:9 get black bars.
 - Some 2d elements flicker when races are paused when unlocking the framerate, like logos above cars or smoke trails
 ## Reporting problems
 
-Play with `./run-debug.sh` (`run-debug.bat` on Windows), then open an
+Set `log_level = "info"` in `itc.toml`, play, then open an
 [issue](https://github.com/Spooky098529/ITC-Recomp/issues) describing what
 you saw, and attach the newest file from the `logs` folder.
 
@@ -89,7 +96,8 @@ cmake --build out/build/linux-amd64-release
 
 This builds `itc_recomp/out/build/linux-amd64-release/itc` and
 `rexglue-sdk/out/linux-amd64/librexruntime.so`. Put both in the game folder
-with `itc_recomp/run.sh` and `itc_recomp/run-debug.sh`.
+with `itc_recomp/itc.toml` (or `itc_recomp/run.sh`, which passes the same
+settings as options).
 
 The Windows version is cross-compiled on Linux (clang and Microsoft's
 libraries fetched with xwin); see [docs/windows.md](docs/windows.md).

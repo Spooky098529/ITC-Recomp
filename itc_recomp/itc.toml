@@ -1,9 +1,9 @@
 # Import Tuner Challenge (recompiled): settings.
 #
-# Put itc, its libraries and this file in the game folder next to
-# default.xex, then run itc. Edit the values below and start the game again
-# for them to take effect. Options given on the command line (for example
-# ./itc --fullscreen=true) win over this file.
+# Put itc (itc.exe on Windows), its libraries and this file in the game
+# folder next to default.xex, then run itc. Edit the values below and start
+# the game again for them to take effect. Options given on the command line
+# (for example ./itc --fullscreen=true) win over this file.
 
 # Frame interpolation (experimental): game logic stays at 30 Hz and races
 # are drawn up to max_fps, each frame blended between the last two ticks.
@@ -44,6 +44,6 @@ motion_blur = true
 #            shadows
 xbox_gamma = "off"
 
-# Logging: "off", or "info" to write logs (in logs/ next to itc) for
-# reporting problems.
+# Logging: "off", or "info" to write logs (in the logs folder next to itc)
+# for reporting problems.
 log_level = "off"

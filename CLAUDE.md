@@ -101,7 +101,8 @@ find /dev/shm -maxdepth 1 -user "$USER" -name 'xenia_memory_*' -delete
   it. `-DITC_LTO=OFF` turns it off.
 - That's what `run.sh` runs: our own renderer, no GPU plugin. For the
   emulated GPU (to compare), replace the two `--native_renderer` flags
-  with `--gpu_plugin=xenos`; the plugin is built but no longer shipped.
+  with `--native_renderer=false --gpu_plugin=xenos`; the plugin is built
+  but no longer shipped.
 
 - Launch from the repo root; other directories fail (exit 127).
 - `--skip_intro --attract_after_s=1` starts an attract race (AI cars) about
@@ -133,10 +134,18 @@ Package them into `itc_recomp/out/dist` with Python's zipfile:
 name=itc-<label>-linux-amd64; D=itc_recomp/out/dist/$name
 rm -rf $D $D.zip; mkdir -p $D
 cp itc_recomp/out/build/linux-amd64-release/itc rexglue-sdk/out/linux-amd64/librexruntime.so $D/
-install -m 755 itc_recomp/run.sh $D/run.sh
-install -m 755 itc_recomp/run-debug.sh $D/run-debug.sh
-(cd $D && python3 -I -m zipfile -c ../$name.zip itc librexruntime.so run.sh run-debug.sh)
+cp itc_recomp/itc.toml $D/
+(cd $D && python3 -I -m zipfile -c ../$name.zip itc librexruntime.so itc.toml)
 ```
+
+Release and test zips ship `itc.toml` (the player settings, with comments)
+instead of the scripts, which stay in the repo for our test runs (their
+options win over the file). Since 2026-10-20 the native renderer, its
+exclusive mode and the once-a-frame mirrors are on by default, and without
+`--game_data_root` the game's files are looked for next to the executable
+(`ItcApp::OnConfigurePaths`; the SDK reads that flag before `itc.toml`
+loads), so a bare `./itc` plays like `run.sh`. The emulated GPU now needs
+`--native_renderer=false --gpu_plugin=xenos`.
 
 ## Status (`main`, 2026-10-19, v0.4.6)
 
