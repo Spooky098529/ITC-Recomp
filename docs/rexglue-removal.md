@@ -458,11 +458,25 @@ B6. **Pure helpers** (55 functions): string, time and formatting
     up), and the game closed cleanly. Adapters calling guest code use
     `src/hooks/guest_call.h` (a frame like the recompiled function's).
 
-    Left in B6, each with callers in other areas: `RtlNtStatusToDosError`
-    (4 of 5 callers pure), `DbgPrint` (3 of 4), `sprintf` (2 of 3),
-    `RtlCompareMemoryUlong` (2 of 3), `KeGetCurrentProcessType` (2 of 7);
-    `RtlFillMemoryUlong`, `XGetAVPack`, `XGetLanguage` and
-    `RtlInitAnsiString`'s file callers wait for B3, B5 and B4.
+    Left in B6 (2026-10-20): each import below still has a caller in
+    another area, so making B6's callers native clears none of them
+    yet; it's work saved for when those areas are done.
+
+    | Import | Callers B6 can do now | Callers waiting |
+    |---|---|---|
+    | `RtlNtStatusToDosError` | `sub_822953E8`; `sub_82296E88` (SetLastError from an NTSTATUS, which our time adapters call as guest code: native, it removes those guest calls) | `sub_8229B440`, the console's time zone read (B5) |
+    | `DbgPrint` | `sub_822AC530`, `sub_82486BC0`, `sub_8248FBE0` | `sub_822954C8`, also calling `XamLoaderTerminateTitle` (B5) |
+    | `sprintf` | `sub_822AC638`, `sub_822B1AC8` | the drive mounting `sub_822B58F0` (B4) |
+    | `RtlCompareMemoryUlong` | `sub_82298548`, `sub_82298A88` | `sub_8229A930`, the game's heap (core) |
+    | `KeGetCurrentProcessType` | `sub_8245A828`, `sub_825776A8` | five heap and memory functions (core) |
+    | `RtlInitAnsiString` | none (its 2 pure callers are done) | the file functions `sub_825B9C20`, `sub_825B9F20`, `sub_825B9FD8`, `sub_822B58F0` (B4); `sub_82295508`, CreateFile, is only wrapped for logging |
+
+    Blocked entirely: `RtlFillMemoryUlong` (its caller also sets up the
+    scaler command buffer, B3), `XGetAVPack` and `XGetLanguage` (one
+    function also reading the console's settings and the executable's
+    privileges, B5), `XGetVideoMode` (B3, above), and `RtlRaiseException`,
+    `RtlUnwind`, `RtlCaptureContext` (the core). Re-run the boundary
+    pipeline before starting any of these: the callers may have changed.
 
 B7. **The game logic inside**: everything else, subsystem by subsystem,
     in whatever order the user wants (frame interpolation's hooks,
