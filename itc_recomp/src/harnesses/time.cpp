@@ -8,7 +8,6 @@
 #include "harness.h"
 
 #include "helpers/time.h"
-#include "hooks/system_services_log.h"  // TEMPORARY (B5)
 
 #include <rex/logging.h>
 
@@ -75,9 +74,7 @@ void StoreDate(uint8_t* base, uint32_t address, const uint16_t f[8]) {
 extern "C" REX_FUNC(sub_8229B440) {
   REX_FUNC_PROLOGUE();
   if (!g_fake_zone.active) {
-    const uint32_t lr = uint32_t(ctx.lr), zone = ctx.r3.u32, uses_daylight = ctx.r4.u32;
     __imp__sub_8229B440(ctx, base);
-    system_services_log::TimeZoneRead(base, lr, zone, uses_daylight, ctx.r3.u32);  // TEMPORARY (B5)
     return;
   }
   harness::Write(base, ctx.r3.u32, g_fake_zone.bytes, 172);
