@@ -4,7 +4,7 @@
 // delivers to every registered handler. Message 0 is Update (all physics and
 // fixed-step logic run in its handlers) and message 1 is Draw (the draw step
 // that records the scene). See "Separating drawing from the game tick" in
-// docs/functions.md.
+// docs/functions/functions.md.
 //
 // On a render-only pass, Update messages are consumed without being
 // delivered, so the pass draws the scene without advancing the game.

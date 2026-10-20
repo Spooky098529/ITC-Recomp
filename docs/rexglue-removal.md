@@ -41,7 +41,7 @@ goes in `src/` as overrides), American English.
 - **Map Xbox-only features, don't port them** (the user's rule,
   2026-10-20, from B5). Features the PC port won't use (voice chat,
   system link, Xbox Live, XMP, presence, and the like) are still read and
-  written up in `docs/functions.md`, but they aren't brought into C++:
+  written up in `docs/functions/`, but they aren't brought into C++:
   no stand-ins or shims imitating their Xbox interfaces. They're skipped
   at the highest point in the game's own code where that's safe (status
   Dropped, with the reason), or left out when that caller is made native.
@@ -79,7 +79,8 @@ Existing practice (CLAUDE.md, "generated/ is the recompiled code"):
 function (`grep -rn sub_XXXXXXXX itc_recomp/src` first). For each:
 
 - Read the function in `generated/` and what's known in
-  `docs/functions.md`; write it down there as it's understood.
+  `docs/functions/` (the subsystem's file); write it down there as it's
+  understood.
 - **Plain C++ behind thin adapters** (the user's precedent, 2026-10-19,
   first done for B1): the logic is a plain C++ function with normal
   arguments and host structs, no `ctx` and no guest memory, in its
@@ -126,7 +127,7 @@ itc_recomp/tools/attract_race.sh 25 --run_harnesses=all
 - Inputs that come from elsewhere are fed by a stand-in override that
   answers with made-up data while a harness asks and calls the
   recompiled function otherwise (the time harness's console time zone
-  read, `sub_8229B440`, Wrapped in `functions.md`). When that function
+  read, `sub_8229B440`, Wrapped in `functions/system-services.md`). When that function
   is made native, the stand-in moves into its native version.
 - Where ours deliberately differs, the cases go in a group of their own
   named "(expected to differ)" (the time conversions outside 1678-2261,
@@ -319,7 +320,7 @@ Smallest and most self-contained first. Each item: make the game's
 callers (and close neighbors) native at level 1, delete or stop building
 the SDK piece nothing calls any more, release. Start every item by
 listing its functions (the pipeline above), reading them in
-`generated/` and writing them up in `docs/functions.md`.
+`generated/` and writing them up in `docs/functions/`.
 
 B1. **Input** (3 functions calling `XamInput*`): native, reading A5.
     Then the SDK's input system goes. The user checks gamepad, rumble, the pause menu's repeat (`docs/pause-menu-fix.md`; the action
@@ -585,7 +586,7 @@ B3. **Graphics boundary** (17 functions calling `Vd*`): ring buffer
     native graphics code, and the Vulkan renderer is it. What the renderer
     needs from a function is kept (made native without its `Vd*` calls);
     what it doesn't need is dropped (status Dropped in
-    `docs/functions.md`, with the reason in its row).
+    `docs/functions/functions.md`, with the reason in its row).
 
     Dropped (2026-10-20, `src/hooks/graphics_drops.cpp`, no fallback
     flag): the engines' set-up `sub_822AD190` (returns 1; only `Vd*`
@@ -1122,7 +1123,7 @@ B5. **System services** (82 functions; first counted as 78): sign-in, profile, U
 
     The user's rule (2026-10-20): Xbox-only features the PC port won't
     use (voice chat, system link, Xbox Live, XMP, presence) are mapped
-    out (read and written up in `docs/functions.md`) but not brought into
+    out (read and written up in `docs/functions/`) but not brought into
     C++: no stand-ins imitating their interfaces. They're skipped at the
     highest game-level point that's safe (Dropped, with the reason), and
     what the game does need from them (one signed-in local user, the
@@ -1280,7 +1281,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
     recompiled code still reads a table, it stays in the image too, and
     the two copies must agree. This is most of the
     work: full decompilations of games this size usually take years. Keep
-    the statuses in `docs/functions.md` up to date (Wrapped, Overridden,
+    the statuses in `docs/functions/` up to date (Wrapped, Overridden,
     Native, Dropped, defined at its top) so progress can be measured:
     Native, Dropped and Overridden are how much of the game is ours,
     Native and Dropped how much no longer needs `ctx`. Keyboard input comes back

@@ -5,9 +5,11 @@ ReXGlue (`rexglue-sdk/`, a submodule patched from `patches/rexglue-sdk/`).
 `git status` showing `rexglue-sdk` as modified (`m`) is expected: those are
 our patches applied in the submodule, not something to look into
 (patch 0003, Windows SDL as a DLL, only changes Windows builds).
-`docs/functions.md` is the reference: what's known about the game's code,
-how frame interpolation works, every diagnostic option, and what didn't
-work. `docs/gpu-functions.md` covers how the game drives the GPU (the
+`docs/functions/` is the reference: what's known about the game's code
+(the functions' table, split by subsystem into one file per area since
+2026-10-20: `functions.md` holds the rows not yet moved and the prose,
+`system-services.md` B5's), how frame interpolation works, every
+diagnostic option, and what didn't work. `docs/gpu-functions.md` covers how the game drives the GPU (the
 render command replay and the graphics library), and
 `docs/native-renderer.md` is the plan and progress of the native renderer
 that replaced the emulated GPU, and (its last section) the investigation
@@ -79,8 +81,9 @@ date as you learn things.
   it, how often), including those only met along the way (callees,
   callers, helpers). When a piece of work is done, or before ending a
   session, show the user the rows you'd add or change in
-  `docs/functions.md`, in that file's table format (`| Address | Name |
-  Status | Notes |`, four cells, each row exactly as it would be written;
+  `docs/functions/` (the subsystem's file; `functions.md` when none
+  fits yet), in the table format (`| Address | Name | Status | Notes |`,
+  four cells, sorted by address, each row exactly as it would be written;
   for a changed row, say what changed), and ask whether to add them;
   write them only after the user has reviewed and agreed. In
   the rows, say how much is known: "Not read" or "Not read in detail"
@@ -201,7 +204,7 @@ original 30 fps.
 Our renderer always draws the glow (`--glow` only affects the emulated
 GPU); `--motion_blur=false` leaves out the motion blur (on by default;
 defined in `src/native/renderer.cpp` since SDK patch 0002 was removed). Known issues are at the end of
-`docs/functions.md`.
+`docs/functions/functions.md`.
 
 Other resolutions (v0.4.0, merged from `unlocked-resolution`):
 `--width`/`--height` and `--fullscreen`, off by default (a 1280x720 window
@@ -227,7 +230,7 @@ the rival intro cutscene's logo flickered above 30 fps, drawn during its
 Update handler (`82159948`, `sub_821594B8`) on logic passes only. A native
 override runs the cutscene on logic passes and only the logo's draw
 (`sub_82211A28`) on render-only passes (`--redraw_rival_logo`, on by
-default). See "The rival logo at the race start" in `docs/functions.md`.
+default). See "The rival logo at the race start" in `docs/functions/functions.md`.
 
 Cockpit dials (merged from `cockpit-dial-interpolation`, 2026-10-19,
 released in v0.4.5): the dial updates (`sub_820E42E8`, `sub_820E45A8`) are native
@@ -240,7 +243,7 @@ blended). Before, blending the needles' matrices cut across the dials, and
 the turbo gauge fell to its rest angle between ticks. TODO: blend the
 angles, or run the game logic at a higher tick rate. See
 `docs/cockpit-dial-interpolation.md`; the functions are in
-`docs/functions.md`.
+`docs/functions/functions.md`.
 
 Headlight beam far from the origin (merged from `headlight-flicker`,
 2026-10-19): far out (x ≈ -8,000 m), the beam lagged the car or flickered,
@@ -251,7 +254,7 @@ Camera numbers and the cut check no longer use it
 address while a projection drifts (`--sticky_camera_ids`); both on.
 `--double_precision_blending` is kept off (nothing visible). The cockpit
 judder far out is the game's own (Known issues). See "The headlight beam
-far from the origin" in `docs/functions.md`.
+far from the origin" in `docs/functions/functions.md`.
 
 Motion blur (merged from `beam-stepping`, 2026-10-19): the headlight beam
 on the road sometimes looked like it updated at 30 Hz. It was the motion

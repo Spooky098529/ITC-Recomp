@@ -5,7 +5,7 @@
 // The title screen's update (sub_822221A0) counts idle ticks in +36 of the
 // object at [0x82814E34] and, at 600 (20 s at 30 Hz), sets the object's
 // state (+4) to 5, which loads an attract-mode race. See "The title screen"
-// in docs/functions.md.
+// in docs/functions/functions.md.
 
 #include "title_screen.h"
 

@@ -103,8 +103,9 @@ libraries fetched with xwin); see [docs/windows.md](docs/windows.md).
 
 ## Documentation (This is written by LLMs primarily for LLMs)
 
-- [docs/functions.md](docs/functions.md): what's known about the game's
-  code, how frame interpolation works, and the diagnostic options.
+- [docs/functions/](docs/functions/functions.md): what's known about the game's
+  code (the functions' table, split by subsystem), how frame interpolation
+  works, and the diagnostic options.
 - [docs/gpu-functions.md](docs/gpu-functions.md): how the game drives the
   GPU.
 - [docs/native-renderer.md](docs/native-renderer.md): the native renderer's

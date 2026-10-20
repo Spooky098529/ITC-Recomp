@@ -37,9 +37,21 @@ Status:
 A function usually moves from recompiled or Wrapped to Overridden to
 Native as the `ctx` edge moves up through its callers, or straight to
 Dropped when its work isn't needed.
-`itc_recomp/tools/check_function_statuses.py` checks this column against
-`src/` (an override marked Native, a status with no override, an override
-with no row); run it after changing either, on any branch.
+`itc_recomp/tools/check_function_statuses.py` checks this column, in
+every file of the tables, against `src/` (an override marked Native, a
+status with no override, an override with no row, a row in two files);
+run it after changing either, on any branch.
+
+The table is being split by subsystem into `docs/functions/`, one file
+per area, each with the same columns, sorted by address, and these
+status definitions copied at its top (change them in every file).
+Rows not yet moved stay in the table below. So far:
+
+- [`system-services.md`](system-services.md):
+  sign-in, profile, dialogs, sessions and achievements, Xbox Live,
+  the player's music (XMP), network and system link, voice chat,
+  notifications, the loader and start-up, console settings (B5 in
+  `docs/rexglue-removal.md`).
 
 | Address | Name | Status | Notes |
 |---|---|---|---|
@@ -113,7 +125,6 @@ with no row); run it after changing either, on any branch.
 | `sub_822968B8` | `GetLocalTime` | Overridden | r3 = SYSTEMTIME (out): the time now (`KeQuerySystemTime`) less the bias (`sub_82297678`), as fields. Ours: `src/hooks/time.cpp`, the clock and math in `src/helpers/time.cpp` (the host's UTC time as FILETIME); works out the bias itself; its only guest call left is the console settings read (`sub_8229B440`, B5). Called once at boot, from `0x82247978`. |
 | `sub_82297678` | `GetTimeZoneBias` | Native | r3 = 64-bit bias (out, 100 ns units): the zone's bias plus its standard or daylight bias by `sub_82297DC8`'s state (0 for an error). Native: `helpers::TimeZoneBias` (`src/helpers/time.cpp`), called by GetLocalTime's adapter through `time_hooks::GetTimeZoneBias`; the recompiled one is no longer called (its only caller was GetLocalTime). 6 zones the same, including one whose biases overflow 32 bits. |
 | `sub_82297DC8` | `GetTimeZoneInformation` | Overridden | r3 = TIME_ZONE_INFORMATION (172 bytes: bias +0, standard name +4, standard date +68, standard bias +84, daylight name +88, daylight date +152, daylight bias +168). Reads the zone from the console's settings (`sub_8229B440`, a guest call: `ExGetXConfigSetting`, B5), clears the daylight fields when it says there's no daylight saving, then returns 1 (standard time) or 2 (daylight time) by the two cutovers (`sub_8229B1E8`), 0 without dates, -1 when the settings can't be read (the last error set by `last_error::Set`). The SDK's zone has no dates, so the game gets 0. Ours: `helpers::TimeZoneState`; the same bytes and answer as the recompiled one on ten made-up zones (northern, southern, absolute dates, invalid ones; a temporary harness standing in for `sub_8229B440`). |
-| `sub_8229B440` | `ReadTimeZoneSettings` | Wrapped | r3 = TIME_ZONE_INFORMATION (out), r4 = "uses daylight saving" (out); returns 0 or a DOS error. Reads the console's time zone settings (`ExGetXConfigSetting` category 3, settings 1, 2, 3, 4 and more; `RtlNtStatusToDosError` on failure). System services (B5). Wrapped by the time harness (`src/harnesses/time.cpp`), which answers with a made-up zone while it runs (`--run_harnesses`) and calls the recompiled one otherwise. In play (B5's survey, 2026-10-20): 4 calls, from the front end; the SDK answers an all-zero zone with "uses daylight" 1. |
 | `sub_8229B1E8` | `GetCutoverTime` | Overridden | r3 = a time zone date (SYSTEMTIME; year 0 = a rule: `wDay` the week, 5 the last, `wDayOfWeek` the weekday), r4 = the cutover (out, FILETIME), r5 = now, r6 = from this year (low byte); returns 1 when found. An absolute date's time is stored even when it's past (0 returned). Ours: `helpers::CutoverTime`; 4,000 random cases the same as the recompiled one. |
 | `sub_8229B680` | `SystemTimeToFileTime` | Overridden | r3 = SYSTEMTIME, r4 = FILETIME (out); returns 1, or 0 for an invalid date (`sub_82296E88` sets STATUS_INVALID_PARAMETER). Ours: `helpers::SystemTimeToFileTime`; the same as the recompiled one on 2,000 random dates in 1678-2261. Outside those years the SDK's `RtlTimeFieldsToTime` overflows `system_clock`'s nanoseconds and gives wrong times; ours gives the right ones. |
 | `sub_8229B720` | `FileTimeToSystemTime` | Overridden | r3 = FILETIME, r4 = SYSTEMTIME (out); returns 1. Ours: `helpers::FileTimeToSystemTime`; the same on 2,000 random times in 1678-2261 (outside, the SDK's `RtlTimeToTimeFields` overflows, as above). |
@@ -145,7 +156,6 @@ with no row); run it after changing either, on any branch.
 | `sub_8245CE98` | | | The audio library's per-context reset after a hardware timeout (r3 = the object, r4 = the context index). Not read. |
 | `sub_82106540` | | | Called first in the audio library's hardware reset (r3 = the object). Not read. |
 | `sub_82295500` | `Sleep` | | r3 = milliseconds (from `sub_8245D288`'s `Sleep(1000)`; not read). |
-| `sub_8214F290` | `SignIn::Update` | | Every frame, from `sub_8214E268`. Counts the signed-in users (`826C7954`..`826C795C`), the first one (`82688B84`), the sign-in UI (`sub_822952C0`), a "sign in" message box (`sub_822952E8`, text by `swprintf`, its only caller: the "VS MODE" format at `0x82009218`) whose button 1 launches the dashboard (`sub_822967E0`), and XN_SYS_UI (`9`) from its listener (`826C794C`). The message box never ran. Not read in detail. B5. |
 | `sub_82482B18` | | Overridden | `src/hooks/video_mode.cpp`, without `XGetVideoMode` (it read only `is_widescreen`; ours is `display::kWidescreen`). Once at boot, from `sub_82483130` (`82483174`), r3 = an object (+56 the device). Stores the back buffer's size (`sub_8229B7B0`) as floats at +132/+136 and the display's aspect (16/9 or 4/3, the game's constants at `8204D300`/`8204D2FC`) over the back buffer's at +140 (1.0), makes a 12-byte index buffer (`sub_822A6968`, to +60, filled with 0-5 through `sub_822A6A18`/`sub_822A6A78`), a 120-byte vertex buffer (`sub_822A6830`, to +64) and a vertex declaration (`sub_822A8980` with `8264D550`, to +68), then returns the object's vtable +96 call (0), or `0x8007000E` if one couldn't be made. What the object is isn't known. |
 | `sub_82483130` | | | Calls `sub_8229D7E0`, then `sub_82482B18` at boot. Not read. |
 | `sub_8229B7B0` | | | Copies four words of the device's presentation parameters (+13188 width, +13192 height, +13236, +13196) to r5. r3 device, r4 unused (0). From `sub_82482B18`. |
@@ -320,91 +330,6 @@ with no row); run it after changing either, on any branch.
 | `sub_8259FA00`, `sub_8211CD90`, `sub_8259DAC0`, `sub_8211B4D0`, `sub_8211B080` | | Wrapped | The UI movie update's callees besides its tracks (and `sub_82119B80` above), watched for writes for `--log_pause_movie` (`WATCH_MOVIE_CALL`). |
 | `sub_8258E5E0`, `sub_8258ED78`, `sub_8259D1A8`, `sub_82094B10`, `sub_821184E8`, `sub_82118FB0`, `sub_82118C18` | | Wrapped | Named in `--find_menu_selection`'s log (`ITC_MENU_SCAN_WRAP`): `Scene::Update`'s two screen calls and others. |
 | `sub_8209F8A0`, `sub_8209F900`, `sub_820C5DE8`, `sub_820F6068`, `sub_82130978`, `sub_8209F7A8`, `sub_820A0958`, `sub_820AA1A8`, `sub_820AB560`, `sub_820C4EB8`, `sub_820C4FB8`, `sub_820DAA38`, `sub_820DAAC8`, `sub_820DAB10`, `sub_820FFD88`, `sub_82593FC0`, `sub_82597118`, `sub_82597518`, `sub_82597610`, `sub_82598768`, `sub_820C5C88`, `sub_820D4048`, `sub_820D72D8`, `sub_820D92A0`, `sub_820D9B68`, `sub_820D9C50`, `sub_820D9EA0`, `sub_820DAB58`, `sub_820DBFF8`, `sub_820DC498`, `sub_820DCBC0`, `sub_820DDA60`, `sub_820DDE58`, `sub_820E2E68`, `sub_820E2EE8`, `sub_820E4140`, `sub_820E53F0`, `sub_820E5A68`, `sub_820E6A40`, `sub_820E7328`, `sub_820E8908`, `sub_820ECE28` (and `sub_820DAC68` above) | | Wrapped | The race draw step's parts and the per-car update's callees, wrapped only to name which one advances per-frame state (`--find_per_frame_state`) and to skip one (`--debug_hide`) (`ITC_FRAME_STATE_WRAP`, `src/debug/frame_state_diff.cpp`). |
-| `xstart` | `xstart` | | The C runtime's entry point (`0x82296C80`). The heap check (`sub_82297CE0`), `sub_82297B38(1)`, the PAL-50 check (`sub_82296AB0`: `XamLoaderTerminateTitle` if 1), the C runtime's set-up, the command line (`+14264`), `main` (`sub_82090108`), the exit (`sub_825AA388`), then `DbgPrint` and `XamLoaderTerminateTitle`. Not read in detail. B5 (and B6's `DbgPrint`). |
-| `sub_822954C8` | | | A wait wrapper: `sub_82296F48` (r4 as a byte), returns 192 when that does, else 0. Not read in detail. The boundary pipeline credited `xstart`'s imports to it until 2026-10-20. |
-| `sub_82297CE0` | `CheckHeap` | | Called once by `xstart`: `sub_82297C08`; if that fails, calls the debug monitor's routine (`820007F0`, none without a debugger) and `HalReturnToFirmware(1)`. Answers 1 in play (no firmware return). B5. |
-| `sub_82297C08` | `CreateHeap` | | Reads the image's heap size (`RtlImageXexHeaderField(header, 0x20401)`, default 1 MB; returns 1 if it's 0) and creates the heap once (`sub_822997B0(2, 0, size, 4096, ...)`, kept at `826A549C`); returns 1 when it exists. Once at boot (1). |
-| `sub_82296AB0` | `CheckPal50` | | The XDK's PAL-50 check, once from `xstart`: privilege 10 (`XexCheckExecutablePrivilege`, probably "PAL-50 incompatible"), then unless the AV pack (`XGetAVPack`) is 3, 4, 6 or 8, the AV region (`ExGetXConfigSetting(2, 2)`, `& 0xFF00 == 0x300`) and video flags (`(3, 10)`), and on a 50 Hz console a message box (`sub_82296950`) in the console's language (`XGetLanguage`, strings by `sub_82296A08`); returns 1 if shown. Returns 0 in play (the SDK's AV pack is 6). B5. |
-| `sub_82296950` | | | The PAL-50 message box (`XamShowMessageBoxUIEx` with an event, waits through `sub_82295C98`). Never called. |
-| `sub_82099828` | `App::PollSignIn` | | Reached through a vtable from `sub_82099A98`, every frame. Reads one notification from the listener at +240: sign-in changed (`0xA`) sets +244 and rebuilds the users (`sub_82099600`); Live connection changed (`0x02000002`, never sent) sets +248 and keeps its parameter at +252. B5. |
-| `sub_82099600` | `App::ReadUsers` | | For users 0-3: the sign-in state (`sub_82295028`) at +8 + 40n, and when signed in the name (`sub_82295020`, 16 bytes) and XUID (`sub_82295268`); a list of signed-in users (+200, count +216) and of Live ones (state 2, +168, count +220). In play: user 0 state 1, "User", `B13EBABEBABEBABE`. |
-| `sub_820A4610` | `SaveDevices::Update` | | Reached through a vtable from `sub_82099A98`, every frame: each slot's state machine (+44, 1,000 bytes each, +956/+988), and on storage devices changed (`0xB`, which the SDK never sends) re-checks each slot's pending operation (`sub_820A45C0`). Not read in detail. B5 (its `XNotifyGetNext`). |
-| `sub_820A45C0` | | | A save slot's pending operation (+36): `sub_82295C10` (probably XGetOverlappedResult), cleared when done; returns it. Not read in detail. |
-| `sub_820998B8` | | | Creates the app's listener (`sub_822952B8`, mask 3: the first with the system bit, so it gets the SDK's start-up notifications). Not read in detail. |
-| `sub_822952B8` | `XNotifyCreateListener` | | `XamNotifyCreateListener(r3 mask, 0)`. 5 calls at boot: masks 3 (`sub_820998B8`), 1 (`sub_820A6160`), 3 (`sub_8214F1C0`), 2 (`sub_82148868`) and 2 more; returns the handle. B5. |
-| `sub_8214E268` | `Network::Update` | | Every frame, from `sub_82107910` (Draw). The sign-in manager (`sub_8214F290`), the users' XUIDs and names, the profile read on sign-in changes (`sub_82149178`), the XNet address (`sub_82459D50`, `sub_82459D40`), Live connection changes (`sub_82149080`), notification `0x11` (never sent), and a state machine (13 states) with system link receives (`sub_8214D7A0`). Not read in detail. B5. |
-| `sub_82149080` | | | From `sub_8214E268`: reads Live connection changed (`0x02000002`, never sent) into `826C72F8` (+`826C72FC` = 1), or asks an object (`826C7300`) for the state; returns 1 once. B5. |
-| `sub_82149178` | | | Reads the profile (`sub_82576E78`, 26 settings) twice: the size, then the settings. From `sub_8214E268` on sign-in changes. Not read in detail. |
-| `sub_82295020` | `XUserGetName` | | `XamUserGetName` (user, buffer, size). In play: "User" (5 calls). B5. |
-| `sub_82295028` | `XUserGetSigninState` | | `XamUserGetSigninState` (user). In play: 1 for user 0, 0 for 1-3 (20 calls). B5. |
-| `sub_82295268` | `XUserGetXUID` | | `XamUserGetXUID(user, 7, out)`; errors in facility 7 come back as their code, others as 1627. In play: `B13EBABEBABEBABE` (5 calls). B5. |
-| `sub_82295030` | `XUserCheckPrivilege` | | On systems before `20096B00` answers "not logged on" (1245, result 0) when the user (or any, for 255) is signed in locally; else `XamUserCheckPrivilege`. Never called. |
-| `sub_82296EE0` | | | 0 when r3 is 0 or its high half is this title's (`XamGetExecutionId`, title id +12), else 1627. Before the profile read and stats enumerators (10 calls, 0). B5. |
-| `sub_82294E58` | `XUserWriteAchievements` | | XMsg `FB B0008` (count, list; overlapped r5). Never called. |
-| `sub_82294ED8` | `XUserSetContextEx` | | XMsg `FB B0006` (user, context, value; overlapped r6); `sub_82294F70` passes none. From `sub_82293504` (9 calls: context `8001`, probably presence, values 0 and 1), answers 0. B5. |
-| `sub_82294F78` | `XUserSetPropertyEx` | | XMsg `FB B0007`; `sub_82295018` passes no overlapped. Never called. |
-| `sub_822950C0` | | | XMsg `FB B0021`. Never called. |
-| `sub_822951A8` | | | `XamUserCreateStatsEnumerator` (r4 1) after `sub_82296EE0`. Never called. |
-| `sub_82295208` | | | `XamUserCreateStatsEnumerator`, another kind. Never called. |
-| `sub_822952C0` | `XShowSigninUI` | | `XamShowSigninUI` (panes, flags). Once in play, from `sub_8227C210` (0; the SDK sends sign-in changed and XN_SYS_UI off). B5. |
-| `sub_822952C8` | `XShowFriendsUI` | | Never called. |
-| `sub_822952D0` | `XShowGamerCardUI` | | `XamShowGamerCardUIForXUID`. Never called. |
-| `sub_822952D8` | `XShowPlayerReviewUI` | | Never called. |
-| `sub_822952E0` | `XShowDeviceSelectorUI` | | `XamShowDeviceSelectorUI`, from `sub_820A4960` (user 0, content type 1, flags `200`): 997, device 1 through the overlapped. Twice in play, around saves. Belongs with B4. |
-| `sub_822952E8` | `XShowMessageBoxUI` | | `XamShowMessageBoxUI`, the overlapped from the caller's stack. Never called. |
-| `sub_82295310` | | | `XamShowDirtyDiscErrorUI`, then `sub_822967E0(0, 0)`. Never called. |
-| `sub_82295D30` | `XEnumerate` | | `XamEnumerate(handle, 0, buffer, size, items, overlapped)`, from `sub_820A49D0` on the content enumerator: 997 (3 calls, around saves). Belongs with B4. |
-| `sub_822967E0` | `XLaunchNewImage` | | `XamLoaderLaunchTitle`, with flags for the two names at `820228D8`/`820228EC` (probably the dashboard's). Never called. |
-| `sub_82459B68` | `WSAStartup` | | `NetDll_WSAStartup` (through `XexGetProcedureAddress` on older systems). Once at boot from `sub_82575B08`: 0. B5. |
-| `sub_82459C20` | `socket` | | `NetDll_socket`. Once at boot from `sub_82148958` (UDP): a handle. B5. |
-| `sub_82459C60` | `bind` | | `NetDll_bind`. Once at boot from `sub_82148958`: -1 (no system link). B5. |
-| `sub_82459C48` | `ioctlsocket` | | `NetDll_ioctlsocket` (`FIONBIO`). Once at boot from `sub_82148958`: -1. B5. |
-| `sub_82459C38` | `closesocket` | | Never called. |
-| `sub_82459C78` | `connect` | | Never called. |
-| `sub_82459C90` | `listen` | | Never called. |
-| `sub_82459CA0` | `accept` | | Never called. |
-| `sub_82459CB8` | `select` | | Never called. |
-| `sub_82459CD8` | `recvfrom` | | Never called. |
-| `sub_82459CF8` | `sendto` | | Never called. |
-| `sub_82459D18` | `WSAGetLastError` | | Never called. |
-| `sub_82459D20` | `__WSAFDIsSet` | | Never called. |
-| `sub_82459D28` | `XNetXnAddrToInAddr` | | Never called. |
-| `sub_82459D40` | `XNetXnAddrToMachineId` | | Once at boot from `sub_8214E190`: 1. B5. |
-| `sub_82459D50` | `XNetGetTitleXnAddr` | | Once at boot from `sub_8214E190`: 4. B5. |
-| `sub_82148958` | | | Makes the system link's UDP socket (socket, bind, non-blocking); both fail on the SDK. Once at boot. Not read in detail. |
-| `sub_82575C90` | | | XMsg `FC 58004` (the logon id). Never called. |
-| `sub_82575E50` | `XSessionCreate` | | `XamSessionCreateHandle`, XMsg `FB B0010`. Never called. |
-| `sub_82575FE0` | `XSessionModify` | | XMsg `FB B0018`. Never called. |
-| `sub_82576080` | `XSessionDelete` | | XMsg `FB B0011`. Never called. |
-| `sub_82576130` | | | XMsg `FB B0012` (probably join local). Never called. |
-| `sub_825761D8` | | | XMsg `FB B0012` (probably join remote). Never called. |
-| `sub_82576280` | | | XMsg `FB B0013` (probably leave local). Never called. |
-| `sub_82576328` | | | XMsg `FB B0013` (probably leave remote). Never called. |
-| `sub_825763D0` | | | XMsg `FB B001A`. Never called. |
-| `sub_825764A8` | `XSessionStart` | | XMsg `FB B0014`. Never called. |
-| `sub_82576540` | `XSessionEnd` | | XMsg `FB B0015`. Never called. |
-| `sub_825765F0` | `XSessionSearchEx` | | XMsg `FB B001C`. Never called. |
-| `sub_825766E0` | | | XMsg `FB B0025`. Never called. |
-| `sub_825767D0` | | | XMsg `FC 58023`. Never called. |
-| `sub_82576900` | | | An XLiveBase request with allocated buffers. Never called. |
-| `sub_82576BE0` | | | An XLiveBase request with allocated buffers. Never called. |
-| `sub_82576E78` | `XUserReadProfileSettings` | | r3 title, r4 user, r5 count, r6 ids, r7 size (in, out), r8 results, r9 overlapped; `XamUserReadProfileSettings` after `sub_82296EE0`. From `sub_82149178`: 26 settings, 4,192 bytes; the SDK's defaults, the title-specific ones unset (10 calls). B5. |
-| `sub_82576EE0` | | | XMsg `FC 5800E`. Never called. |
-| `sub_82576F30` | | | XMsg `FC 58035`. Never called. |
-| `sub_82576FE8` | | | XMsg `FC 58035`. Never called. |
-| `sub_8257B7A8` | `Voice::Init` | | Once at boot from `sub_82578BF8`: the voice code's state, its profile reads (`sub_8257E568`, 4 times), its listener and critical section. Not read in detail. B5. |
-| `sub_8257AF30` | `Voice::Poll` | | The voice thread (`sub_8257B5D8`), every 10 ms: reads its notifications, then the voice update (`sub_8257DFA8` and others). Not read in detail. B5. |
-| `sub_8257E568` | | | The voice code's profile read (4 calls at boot). Not read in detail. B5. |
-| `sub_8257D798` | | | The voice code's user check (headset, sign-in, profile, privileges, friends). Never called. |
-| `sub_8257DDA0` | | | Voice close. Never called. |
-| `sub_8257DFA8` | | | Voice submit. Never called. |
-| `sub_8257E3B8` | | | Voice close. Never called. |
-| `sub_8257E4B0` | | | `XamVoiceCreate`. Never called. |
-| `sub_825816D8` | | | `XamVoiceSubmitPacket`. Never called. |
-| `sub_82589360` | | | XMsg `FA 7001A` (XMP: set the playback controller). Twice: at the boot movie's start (`sub_825894C8`) and end (`sub_825895A0`); 0. B5. |
-| `sub_82589408` | | | XMsg `FA 7001B` (XMP: get the playback controller). Once, from `sub_825894C8`: 0. B5. |
-| `sub_825894C8` | | | Takes the playback from the player's music (`XamGetSystemVersion`, a critical section, `sub_82589408`, `sub_82589360`). Once, from `Boot::StartMovie`. Not read in detail. |
-| `sub_825895A0` | | | Hands the playback back (`sub_82589360`). Once, from `Boot::EndMovie`. Not read in detail. |
 
 ## Frame structure
 
