@@ -1366,7 +1366,10 @@ B5. **System services** (82 functions; first counted as 78): sign-in, profile, U
     recompiled one reading an SDK listener, with a sign-in changed queued
     against our first call, and nothing against a later one; the app
     object and r3 the same, but the handle slot, which differs by design)
-    and an attract race with every harness (no errors).
+    and an attract race with every harness (no errors), then a session
+    the user played (`itc_255.log`, 2026-10-21: the boot, the front end,
+    their save loaded through the device selector, a race, quit): no
+    errors, closed cleanly.
 
 B6. **Pure helpers** (55 functions): string, time and formatting
     helpers made native, or their callers made native. Cheap; can be
