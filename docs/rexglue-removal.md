@@ -141,7 +141,7 @@ Measured 2026-10-19 by grepping `itc_recomp/src` and `generated/`.
 |---|---|---|---|
 | Logging, flags, hashes | `REXLOG_*` (~280 uses), `REXCVAR_*` (~370), `rex/hash.h` (xxHash) | almost every file in `src/` | A |
 | App shell | `rex::ReXApp` (`src/itc_app.h`), `REX_DEFINE_APP` (`src/main.cpp`), `WindowedApp`, imgui (include path only), command line, log files, `PathConfig`, the SDK's hidden window (`src/native/app_window.cpp`) | `src/itc_app.h`, `src/main.cpp` | A |
-| Renderer leftovers | The Xenos to SPIR-V shader translator built from SDK sources (`itc_xenos_shaders` in `itc_recomp/CMakeLists.txt`), `rex::graphics::RegisterFile` (`src/native/state.h`, `passes.cpp`), `registers.h`, `xenos.h`, `util/draw.h`, `ui/vulkan/api.h`; SDL3 and Vulkan headers from `rexglue-sdk/thirdparty/`; the xenos plugin still built (`GPU_PLUGINS xenos`), no longer used (goes with B3) | `src/native/` | A |
+| Renderer leftovers | The Xenos to SPIR-V shader translator built from SDK sources (`itc_xenos_shaders` in `itc_recomp/CMakeLists.txt`), `rex::graphics::RegisterFile` (`src/native/state.h`, `passes.cpp`), `registers.h`, `xenos.h`, `util/draw.h`, `ui/vulkan/api.h`; SDL3 and Vulkan headers from `rexglue-sdk/thirdparty/`; the xenos plugin, no longer built for us or loaded since B3 (the SDK's own tree still builds it) | `src/native/` | A |
 | Graphics boundary | `Vd*` (25 imports; 17 game functions). In exclusive mode the GPU's job is already ours (`src/native/gpu_link.cpp`) | SDK `src/kernel/` | B |
 | Audio | Output: `AudioDriver`, `REX_AUDIO_BACKEND`, `conversion.h`, `downmix.h` (A). The game side: `XAudio*`, `XMA*` and the SDK's XMA decoder, which emulates the XMA hardware's contexts on FFmpeg (B; 6 game functions). Our mixer (`src/audio/native_audio.cpp`) still runs on an `XHostThread` and allocates from the guest heap | `src/audio/` | A and B |
 | Input | Reading SDL gamepads (A; the `--mnk_mode` keyboard is dropped first, A0); `XamInput*` (B; 3 game functions) | SDK `src/input/` | A and B |
@@ -237,7 +237,8 @@ A3. **Renderer leftovers**: bring the shader translator into the repo
     place of `RegisterFile`; the formats from `xenos.h`/`registers.h`,
     `draw_util` and the Vulkan function list the same way. The xenos
     plugin isn't kept for comparisons (the user's call, 2026-10-20; see
-    B3): its build goes with B3.
+    B3): our build no longer uses it since B3 (the SDK still builds it
+    in its own tree until the SDK goes).
 
 A4. **App shell**: our own `main`: SDL init, our window as the only one
     (no hidden SDK window, no event forwarding in `app_window.cpp`), our
@@ -924,8 +925,17 @@ B3. **Graphics boundary** (17 functions calling `Vd*`): ring buffer
     now. It fits the scratch write-backs seen outside races in the user's
     sessions (452-604 an interval) and their absence in races.
 
-    Left in B3 (2026-10-20): B3's last step, the SDK's graphics (already
-    not loaded: no GPU plugin) going with the core.
+    B3 done (2026-10-20, merged from `graphics-boundary`): no code that
+    runs calls a `Vd*` import or `XGetVideoMode` any more. Each recompiled
+    caller is overridden natively without it (device start, the ring,
+    Swap, the display mode, the display set-up, the gamma ramps), Dropped
+    (engines, EDRAM retraining, the scaler, notifications), or never
+    called (clock gating, `Device::Release`, the debug capture), and our
+    code calls none. The GPU plugin isn't built or loaded, nothing reads
+    the GPU registers, and nothing needs vblanks. The SDK's graphics code
+    (`rexglue-sdk/src/graphics/`, the `Vd*` exports) is still compiled
+    into `librexruntime`, unused; like all SDK code it's deleted with the
+    SDK (E4), not before.
 
     For later (the user's call, 2026-10-20): return to the scratch
     register 1 lead above. Nothing seen so far says it needs looking
@@ -1112,7 +1122,9 @@ E4. **`PPCContext`, `rex/ppc.h`, the function table, `generated/`,
     and the SDK**: delete the submodule, `patches/rexglue-sdk/`,
     `generated/rexglue.cmake`, `librexruntime` from packaging, both CI workflows and CLAUDE.md (the build line's
     `LD_LIBRARY_PATH`, packaging, the note on the submodule showing
-    modified). The `rexglue codegen` target goes with it.
+    modified). The `rexglue codegen` target goes with it. The SDK's
+    graphics (`src/graphics/`, the `Vd*` and `XGetVideoMode` exports),
+    unused since B3, go with it.
 
 ## Risks
 

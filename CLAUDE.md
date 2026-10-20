@@ -32,7 +32,15 @@ recompiled. B6 (pure helpers) is done for now (merged from
 `pure-helpers`, 2026-10-20): the game's time, clock rate, string and
 SetLastError functions are plain C++ in `src/helpers/` behind adapters
 in `src/hooks/`, and 10 kernel imports have no recompiled callers left;
-what's left of B6 waits on B3, B4 and B5. Plan steps are done on their
+what's left of B6 waits on B4 and B5. B3 (the graphics boundary) is
+done (merged from `graphics-boundary`, 2026-10-20): the emulated GPU
+isn't built or loaded (`--native_renderer` and
+`--native_renderer_exclusive` are gone), the game's device, Swap, display
+and gamma functions that called `Vd*` imports are native in
+`src/hooks/graphics_device.cpp`, `video_mode.cpp`, `gamma.cpp` and
+`graphics_drops.cpp`, nothing reads the GPU registers, and nothing needs
+vblanks (the interrupt callback is never called); the SDK's unused
+graphics code goes with the SDK. Plan steps are done on their
 own branches and merged into `rexglue-removal-project` (no force pushes:
 GitHub refuses them on that branch).
 `docs/tick-replay.md` is a lead (not started): translating draws once a
