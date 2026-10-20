@@ -1254,8 +1254,8 @@ B5. **System services** (82 functions; first counted as 78): sign-in, profile, U
     reached no listener. The two wrappers are no longer called (Dropped).
     No notes kept for a music player of our own (the user's call).
     Checked: a harness case (`xmp`: take then hand back, each answer and
-    the last error, the same; the recompiled pair leaves its state at 0)
-    and an attract race (no errors). Clears `XMsgStartIORequestEx`; not
+    the last error, the same; the recompiled pair leaves its state at 0),
+    an attract race (no errors), and the session below step 4's. Clears `XMsgStartIORequestEx`; not
     `XamGetSystemVersion` (WSAStartup, step 4, and XUserCheckPrivilege,
     never called) or `XMsgInProcessCall` (the XLiveBase wrappers).
 
@@ -1287,8 +1287,11 @@ B5. **System services** (82 functions; first counted as 78): sign-in, profile, U
 
     Checked: harness cases (`network`: WSAStartup's answer, the XNADDR on
     a buffer filled with 0xCD and its answer, the machine id's answer and
-    its output left alone), all the same, and an attract race (no
-    errors). Imports with no recompiled callers left: `NetDll_WSAStartup`,
+    its output left alone), all the same, an attract race (no errors),
+    and a session the user played for steps 3 and 4 (`itc_252.log`,
+    2026-10-21: the boot movie, the front end, a race at ~150 fps, back to
+    the menus, quit): "looked fine", no errors, closed cleanly. Imports
+    with no recompiled callers left: `NetDll_WSAStartup`,
     `NetDll_XNetGetTitleXnAddr`, `NetDll_XNetXnAddrToMachineId`,
     `XexGetModuleHandle` and `XexGetProcedureAddress` (WSAStartup was
     their only caller); `XamGetSystemVersion` is left only in
