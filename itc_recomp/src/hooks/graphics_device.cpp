@@ -10,6 +10,7 @@
 
 #include "display/display.h"
 #include "helpers/clock.h"
+#include "helpers/console_settings.h"
 
 using guest_call::InFrame;
 
@@ -165,14 +166,15 @@ extern "C" REX_FUNC(sub_822ACE00) {
 // parameters. Returns 1, or 0 if a step failed. Left out: Device::InitEngines
 // and RetrainEdram (dropped), VdIsHSIOTrainingSucceeded (it never fails), and
 // handing two of the device's fields to the kernel's debug monitor data
-// (KeDebugMonitorData: none without a debugger). Kept: the rest, as calls to
-// the library's own functions, the console setting read
-// (ExGetXConfigSetting, B5) and the critical sections (the core).
+// (KeDebugMonitorData: none without a debugger). The console's video flags
+// (ExGetXConfigSetting(3, 10)) are the SDK's answer, fixed (B5). Kept: the
+// rest, as calls to the library's own functions, and the critical sections
+// (the core).
 extern "C" REX_FUNC(sub_822AD298) {
   REX_FUNC_PROLOGUE();
   const uint32_t device = ctx.r3.u32, parameters = ctx.r4.u32;
   bool made = false;
-  InFrame(ctx, base, 128, 0x822AD2B8, [&](uint32_t frame) {
+  InFrame(ctx, base, 128, 0x822AD2B8, [&](uint32_t) {
     ctx.r3.u64 = device;
     ctx.lr = 0x822AD2B8;
     sub_822AD228(ctx, base);  // the device's fields and a physical block
@@ -187,17 +189,7 @@ extern "C" REX_FUNC(sub_822AD298) {
     __imp__RtlInitializeCriticalSection(ctx, base);
     guest::StoreU8(base, device + kDeviceFlags2, guest::LoadU8(base, device + kDeviceFlags2) | 8);
     guest::StoreU32(base, guest::LoadU32(base, kVdGlobalDeviceImport), device);
-    guest::StoreU16(base, frame + 80, 0);
-    ctx.r3.u64 = 3;
-    ctx.r4.u64 = 10;
-    ctx.r5.u64 = device + 15164;
-    ctx.r6.u64 = 4;
-    ctx.r7.u64 = frame + 80;
-    ctx.lr = 0x822AD324;
-    __imp__ExGetXConfigSetting(ctx, base);
-    if (ctx.r3.s32 < 0) {
-      return;
-    }
+    guest::StoreU32(base, device + 15164, helpers::kVideoFlags);
     ctx.r3.u64 = device;
     ctx.r4.u64 = parameters + 72;
     ctx.lr = 0x822AD338;
