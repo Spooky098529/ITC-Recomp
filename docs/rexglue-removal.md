@@ -801,6 +801,18 @@ B3. **Graphics boundary** (17 functions calling `Vd*`): ring buffer
     callback is still made. The kick's summary is the same in both (no
     packets unhandled, 0 scratch write-backs, 0 callbacks).
 
+    A session the user played on the native Swap (2026-10-20; front end,
+    a race, the pause menu, a movie, loading screens): the game looked
+    fine. 9,330 Swaps, all from `Renderer::Present`'s `8258DCA4` with r5
+    0; the display mode and scaler branches once, the front buffer every
+    Swap, the others never (the same as attract races; the movies'
+    `sub_822A0E50` and `sub_8209ACB8` never called Swap). No error lines,
+    no packets unhandled. Unlike the attract races, some of the kick's
+    10 s summaries count scratch write-backs (240-604, with 125 and 147
+    callbacks in two of them; 0 in the race's), so scratch register 1's
+    write-back from `sub_822A0718` happens in some phases only. Not looked
+    into yet.
+
 B4. **Files and saves** (22 functions; the game's `CreateFile`
     `sub_82295508` is the only caller of `NtCreateFile`): the game's file
     functions on host files under `--game_data_root` (log the paths with
