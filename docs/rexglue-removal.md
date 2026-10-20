@@ -1193,13 +1193,52 @@ B5. **System services** (82 functions; first counted as 78): sign-in, profile, U
     attract race (`attract_race.sh 30 --run_harnesses=all`: no errors, 25 s
     raced), then a session the user played (`itc_247.log`, 2026-10-21: the
     boot movie, the front end, a race at ~150 fps, quit): "looks fine", no
-    errors in the log, closed cleanly. Imports with no recompiled callers left: `XGetAVPack`,
-    `XGetLanguage`, `XexCheckExecutablePrivilege`, `HalReturnToFirmware`,
+    errors in the log, closed cleanly. Imports with no recompiled
+    callers left: `XGetAVPack`, `XGetLanguage`, `XexCheckExecutablePrivilege`, `HalReturnToFirmware`,
     `RtlImageXexHeaderField` and `ExGetXConfigSetting`. Not cleared:
     `RtlNtStatusToDosError`, still called by `sub_822953E8` (reached only
     through the function table: maps an error status and calls a routine,
     probably a file I/O completion routine, B4); our `sub_82296E88` keeps
     the SDK's mapping as C++ until then (the user's call: the table waits).
+
+    **Step 2, the user wrappers: done (2026-10-21, `system-services`).**
+    The player as plain C++ in `src/user/user.h` (one local user in slot 0,
+    signed in, the SDK's name "User" and XUID `B13EBABEBABEBABE`, the
+    SDK's result codes, this title's id `555307EE` from the image's
+    execution info), with adapters in `src/hooks/user.cpp` (Overridden):
+
+    - XUserGetName `sub_82295020`: users 4 and up `0x80070057`, 1-3
+      `0x80070525`, nothing written; user 0 gets 0 and "User" in at most
+      `min(size, 16) - 1` characters and a terminator (nothing for size 0).
+    - XUserGetSigninState `sub_82295028`: 1 for user 0, else 0.
+    - XUserGetXUID `sub_82295268`: user 0 the XUID and 0; users 1-3 an
+      XUID of 0 and 1317; 4 and up 0 and 87; a null out 87, nothing written.
+    - The title id check `sub_82296EE0`: 0 for 0 or this title's high half
+      (`5553`), else 1627.
+    - XUserSetContextEx (presence, Xbox-only): every call goes through
+      `sub_82294F70` (no overlapped), whose override returns 0 and clears
+      the thread's last error, as the SDK's answer did (it set the last
+      error to 0, which the wrapper read back with GetLastError,
+      `sub_82296EC0`). Dropped; `sub_82294ED8` is no longer called
+      (Dropped, no override). Its callers (`sub_82293504` and the others)
+      stay recompiled.
+
+    Checked: harness cases (`user`: the name for users 0-5 and sizes 0-20
+    on a buffer filled with 0xCD, the sign-in state, the XUID with and
+    without an out, 200 title ids, and SetContextEx's answer with the last
+    error slot), all the same, and an attract race (no errors). Imports
+    with no recompiled callers left: `XamUserGetName`, `XamUserGetXUID`
+    and `XamGetExecutionId`. Not cleared: `XamUserGetSigninState` (also in
+    XUserCheckPrivilege, never called, and the voice code `sub_8257D798`,
+    step 5) and `XMsgStartIORequest` (the other XGI and XLiveBase
+    wrappers).
+
+    Seen along the way: the time harness's GetLocalTime case ("to the
+    second") can differ by one second when a second ticks over between
+    the two reads; once the recompiled one (read first) gave :53 and ours
+    :52, so the SDK's clock is probably a little ahead of the host's
+    `helpers::SystemTimeNow`. Not from B5 (GetLocalTime has been native
+    since B6); not looked into.
 
 B6. **Pure helpers** (55 functions): string, time and formatting
     helpers made native, or their callers made native. Cheap; can be
