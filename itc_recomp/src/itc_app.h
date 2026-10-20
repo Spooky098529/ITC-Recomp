@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include <rex/filesystem.h>
 #include <rex/rex_app.h>
 
 #include "audio/native_audio.h"
@@ -38,6 +39,15 @@ class ItcApp : public rex::ReXApp {
   // --log_thread_cpu (src/debug/thread_cpu.cpp).
   void OnPostSetup() override { debug::ThreadCpu_Start(); }
   void OnShutdown() override { debug::ThreadCpu_Stop(); }
+
+  // Without --game_data_root, the game's files are next to the executable
+  // (where run.sh points it). The SDK reads that flag before itc.toml is
+  // loaded, so the config file can't set it.
+  void OnConfigurePaths(rex::PathConfig& paths) override {
+    if (paths.game_data_root.empty()) {
+      paths.game_data_root = rex::filesystem::GetExecutableFolder();
+    }
+  }
 
   // Override virtual hooks for customization:
   // void OnPostInitLogging() override {}
