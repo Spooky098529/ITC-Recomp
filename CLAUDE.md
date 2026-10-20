@@ -28,10 +28,13 @@ removed last. In progress on the long-lived branch
 (graphics and the like). A0, A5 and B1 are done: game input no longer
 goes through the SDK, and the input path from SDL to the processors is
 our own C++ (`src/input/`); the action mappers above it are read but
-recompiled. B6 (pure helpers) is mostly done on branch `pure-helpers`
-(not yet merged into the project branch): the game's time, clock rate
-and string functions are plain C++ in `src/helpers/` behind adapters in
-`src/hooks/`, and 10 kernel imports have no recompiled callers left.
+recompiled. B6 (pure helpers) is done for now (merged from
+`pure-helpers`, 2026-10-20): the game's time, clock rate, string and
+SetLastError functions are plain C++ in `src/helpers/` behind adapters
+in `src/hooks/`, and 10 kernel imports have no recompiled callers left;
+what's left of B6 waits on B3, B4 and B5. Plan steps are done on their
+own branches and merged into `rexglue-removal-project` (no force pushes:
+GitHub refuses them on that branch).
 `docs/tick-replay.md` is a lead (not started): translating draws once a
 tick and replaying our own list on in-between frames.
 `docs/pause-menu-fix.md` is the pause menu's too-fast input repeat: fixed

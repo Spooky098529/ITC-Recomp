@@ -1,7 +1,7 @@
 # Removing ReXGlue: toward a native port
 
 The plan (written 2026-10-19 on branch `remove-rexglue`, restructured the
-same day; A0, A5 and B1 done, B6 mostly done on `pure-helpers`) for taking the game off the ReXGlue SDK
+same day; A0, A5 and B1 done, B6 done for now) for taking the game off the ReXGlue SDK
 (`rexglue-sdk/`) piece by piece, with releases along the way. The goal
 is a native PC port, not a smaller emulator: in the end no `PPCContext`,
 no guest memory layout, no Xbox kernel calls, no `default.xex`.
@@ -498,9 +498,9 @@ B6. **Pure helpers** (55 functions): string, time and formatting
        the console settings read (B5). Checked by the harness (all the
        same) and an attract race.
 
-    Suggested next (not decided): with 2 done, B6 counts as done for now;
-    merge `pure-helpers` into `rexglue-removal-project` and pick the next
-    item (A2, or A6 with B2, would remove visible SDK use).
+    B6 is done for now: `pure-helpers` was merged into
+    `rexglue-removal-project` (2026-10-20). Next item not decided (A2,
+    or A6 with B2, would remove visible SDK use).
 
 B7. **The game logic inside**: everything else, subsystem by subsystem,
     in whatever order the user wants (frame interpolation's hooks,
