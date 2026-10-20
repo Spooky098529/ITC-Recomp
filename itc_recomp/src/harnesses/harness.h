@@ -101,5 +101,6 @@ void StartUp(Context& h);
 void User(Context& h);
 void Xmp(Context& h);
 void Network(Context& h);
+void Notify(Context& h);
 
 }  // namespace harness

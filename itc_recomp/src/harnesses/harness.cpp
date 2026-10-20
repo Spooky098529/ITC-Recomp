@@ -8,7 +8,7 @@
 REXCVAR_DEFINE_STRING(run_harnesses, "", "ITC",
                       "Run harnesses comparing native functions with the recompiled ones, once at "
                       "the first input update: \"all\" or a comma-separated list "
-                      "(object_attributes, time, clock, strings, last_error, gamma, start_up, user, xmp, network)");
+                      "(object_attributes, time, clock, strings, last_error, gamma, start_up, user, xmp, network, notify)");
 
 namespace harness {
 
@@ -93,6 +93,7 @@ void RunRequested(PPCContext& ctx, uint8_t* base) {
       {"user", User},
       {"xmp", Xmp},
       {"network", Network},
+      {"notify", Notify},
   };
   auto wanted = [&](const char* name) {
     if (requested == "all") {
