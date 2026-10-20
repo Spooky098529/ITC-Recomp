@@ -4,22 +4,11 @@
 #include "guest.h"
 #include "guest_call.h"
 
-#include <rex/cvar.h>
-
 #include <algorithm>
 
 #include "display/display.h"
 
 using guest_call::InFrame;
-
-// TEMPORARY (B3): run the recompiled callers instead, to compare.
-REXCVAR_DEFINE_BOOL(video_mode_original, false, "ITC",
-                    "TEMPORARY: run the recompiled sub_8258D568 and sub_82482B18 instead of "
-                    "the native ones");
-
-void VideoModeCheck_AfterDisplaySetup(uint8_t* base, uint32_t object, uint32_t lr, uint32_t r6,
-                                      uint32_t result);
-void VideoModeCheck_AfterAspect(uint8_t* base, uint32_t object, uint32_t lr, uint32_t result);
 
 namespace {
 
@@ -67,12 +56,7 @@ constexpr float kAspect16x9 = 16.0f / 9.0f;
 // zeroed as the original did before asking.
 extern "C" REX_FUNC(sub_8258D568) {
   REX_FUNC_PROLOGUE();
-  const uint32_t object = ctx.r3.u32, interval = ctx.r6.u32, lr = ctx.lr;
-  if (REXCVAR_GET(video_mode_original)) {
-    __imp__sub_8258D568(ctx, base);
-    VideoModeCheck_AfterDisplaySetup(base, object, lr, interval, ctx.r3.u32);
-    return;
-  }
+  const uint32_t object = ctx.r3.u32, interval = ctx.r6.u32;
   auto set = [&](uint32_t offset, uint32_t value) { guest::StoreU32(base, object + offset, value); };
   auto field = [&](uint32_t offset) { return guest::LoadU32(base, object + offset); };
   for (uint32_t i = 0; i < 48; i += 4) {
@@ -187,7 +171,6 @@ extern "C" REX_FUNC(sub_8258D568) {
     result = field(kVideoDevice);
   });
   ctx.r3.u64 = result;
-  VideoModeCheck_AfterDisplaySetup(base, object, lr, interval, ctx.r3.u32);
 }
 
 // From sub_82483130 at boot: r3 = the object (+56 the device). Stores the
@@ -199,12 +182,7 @@ extern "C" REX_FUNC(sub_8258D568) {
 // is_widescreen.
 extern "C" REX_FUNC(sub_82482B18) {
   REX_FUNC_PROLOGUE();
-  const uint32_t object = ctx.r3.u32, lr = ctx.lr;
-  if (REXCVAR_GET(video_mode_original)) {
-    __imp__sub_82482B18(ctx, base);
-    VideoModeCheck_AfterAspect(base, object, lr, ctx.r3.u32);
-    return;
-  }
+  const uint32_t object = ctx.r3.u32;
   const uint32_t device = guest::LoadU32(base, object + 56);
   const float width = float(guest::LoadU32(base, device + kDeviceParameters));
   const float height = float(guest::LoadU32(base, device + kDeviceParameters + 4));
@@ -261,5 +239,4 @@ extern "C" REX_FUNC(sub_82482B18) {
     result = ctx.r3.u32;
   });
   ctx.r3.u64 = result;
-  VideoModeCheck_AfterAspect(base, object, lr, ctx.r3.u32);
 }
