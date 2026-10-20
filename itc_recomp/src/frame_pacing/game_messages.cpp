@@ -4,6 +4,7 @@
 #include "debug/idle_timer_scan.h"
 #include "debug/menu_selection_scan.h"
 #include "guest.h"
+#include "harnesses/harness.h"
 #include "hooks/input_update.h"
 #include "interpolation/blend_state.h"
 #include "native/textures.h"
@@ -653,6 +654,7 @@ bool g_input_manager_logged = false;  // this race
 
 extern "C" REX_FUNC(sub_820990F0) {
   REX_FUNC_PROLOGUE();
+  harness::RunRequested(ctx, base);  // --run_harnesses, once
   if (frame_pacing::GameMessages_IsRenderOnlyPass()) {
     return;
   }
