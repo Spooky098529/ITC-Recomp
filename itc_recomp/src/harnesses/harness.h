@@ -100,5 +100,6 @@ void Gamma(Context& h);
 void StartUp(Context& h);
 void User(Context& h);
 void Xmp(Context& h);
+void Network(Context& h);
 
 }  // namespace harness

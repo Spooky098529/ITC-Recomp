@@ -81,6 +81,7 @@ set(ITC_SOURCES
     src/hooks/start_up.cpp
     src/hooks/user.cpp
     src/hooks/xmp.cpp
+    src/hooks/network.cpp
     src/display/gamma.cpp
     src/harnesses/harness.cpp
     src/harnesses/clock.cpp
@@ -92,6 +93,7 @@ set(ITC_SOURCES
     src/harnesses/start_up.cpp
     src/harnesses/user.cpp
     src/harnesses/xmp.cpp
+    src/harnesses/network.cpp
     src/helpers/debug_output.cpp
     src/helpers/object_attributes.cpp
     src/helpers/time.cpp
