@@ -959,12 +959,165 @@ B4. **Files and saves** (22 functions; the game's `CreateFile`
     byte; test with a save from the last release before and after. Then
     the SDK's VFS goes.
 
-B5. **System services** (78 functions): sign-in, profile, UI dialogs,
+B5. **System services** (82 functions; first counted as 78): sign-in, profile, UI dialogs,
     sessions, voice, network, notifications, the loader. Most should go
     from the game's side entirely (offline, signed in, no voice). Log
     which are called in a full play session first (an opt-in counter
     around the callers), and what the SDK answers today; the game must
     get the same answers.
+
+    Worked on in branch `system-services`. Surveyed 2026-10-20 (no
+    native code yet).
+
+    **The functions.** The boundary pipeline filtered to `Xam*` (but
+    input, content and `XamAlloc`/`XamFree`), `XMsg*`, `XNotify*`,
+    `NetDll_*`, `Xex*`, `ExGetXConfigSetting`, `XGetLanguage`,
+    `XGetAVPack`, `HalReturnToFirmware` and `RtlImageXexHeaderField`
+    gives 82 functions, plus `xstart` (`DbgPrint`,
+    `XamLoaderTerminateTitle`). Two have overrides already: the time zone
+    read `sub_8229B440` (the time harness's stand-in) and Device::Init
+    `sub_822AD298` (B3), which is also the only code in `src/` calling one
+    of these imports directly (`ExGetXConfigSetting(3, 10)`). Most are the
+    XDK's thin wrappers (1-60 instructions); the big ones are game code
+    calling an import inline: the sign-in manager `sub_8214F290` (227
+    instructions), the network manager's update `sub_8214E268` (232), the
+    save devices' update `sub_820A4610` (124) and the voice code (up to
+    224). By service (XMsg ids: app `FA` XMP, `FB` XGI, `FC` XLiveBase):
+
+    - Notifications: listeners (`sub_822952B8`, `sub_8257B7A8`) and
+      their readers `sub_82099828` (the app's: sign-in changed rebuilds
+      the user table, `sub_82099600`; Live connection changed sets +248),
+      `sub_820A4610` (storage devices changed), `sub_82149080` (Live
+      connection changed), `sub_8214E268` (`0x11`), `sub_8214F290`
+      (XN_SYS_UI), `sub_8257AF30` (voice).
+    - Sign-in and user: XUserGetName `sub_82295020`, GetSigninState
+      `sub_82295028`, GetXUID `sub_82295268`, CheckPrivilege
+      `sub_82295030`, the title id check `sub_82296EE0`
+      (`XamGetExecutionId`).
+    - Profile: XUserReadProfileSettings `sub_82576E78` (from
+      `sub_82149178`, the network manager), and the voice code's reads
+      (`sub_8257E568`, `sub_8257D798`).
+    - UI: the sign-in, friends, gamercard, player review, device
+      selector, message box and dirty disc dialogs (`sub_822952C0`..
+      `sub_82295310`), and the PAL-50 message box `sub_82296950`.
+    - XGI (sessions, achievements, stats, contexts): SetContextEx
+      `sub_82294ED8` (`B0006`), SetPropertyEx `sub_82294F78` (`B0007`),
+      WriteAchievements `sub_82294E58` (`B0008`), `sub_822950C0`
+      (`B0021`), the sessions `sub_82575E50`..`sub_825766E0` (`B0010`..
+      `B0025`), the stats enumerators `sub_822951A8`, `sub_82295208`,
+      and XEnumerate `sub_82295D30`.
+    - XLiveBase: `sub_82575C90` (`58004`, the logon id), `sub_825767D0`
+      (`58023`), `sub_82576900`, `sub_82576BE0`, `sub_82576EE0`
+      (`5800E`), `sub_82576F30`, `sub_82576FE8` (`58035`).
+    - XMP (the player's own music): `sub_82589360` (`7001A`, set the
+      playback controller), `sub_82589408` (`7001B`, get it), from
+      `sub_825894C8` (`Boot::StartMovie`) and `sub_825895A0`
+      (`Boot::EndMovie`).
+    - Network: WSAStartup `sub_82459B68`, 13 socket wrappers
+      `sub_82459C20`..`sub_82459D20`, XNet `sub_82459D28`,
+      `sub_82459D40`, `sub_82459D50` (system link: `sub_82148958` makes
+      the socket, `sub_8214D7A0` receives).
+    - Voice: `sub_8257B7A8` (set-up), `sub_8257AF30` (its thread's
+      poll), `sub_8257D798`, `sub_8257DDA0`, `sub_8257DFA8`,
+      `sub_8257E3B8`, `sub_8257E4B0`, `sub_8257E568`, `sub_825816D8`.
+    - Loader and start-up: `xstart`, the heap check `sub_82297CE0` and
+      `sub_82297C08` (`RtlImageXexHeaderField` for the heap size,
+      `HalReturnToFirmware` if the heap can't be made), the PAL-50 check
+      `sub_82296AB0` (`XexCheckExecutablePrivilege(10)`, `XGetAVPack`,
+      `ExGetXConfigSetting`, `XGetLanguage`), XLaunchNewImage
+      `sub_822967E0`.
+    - Console settings: the time zone read `sub_8229B440`, Device::Init.
+
+    **What runs** (a temporary counter, `--log_system_services`,
+    `src/hooks/system_services_log.cpp`; removed after the survey). No
+    attract race this time (the user's call): one session the user played
+    (`itc_243.log`, 2.5 minutes: the boot movie, the front end, loading a
+    save, a race, saving, closing the window). 33 of the 82 ran:
+
+    - Every frame (~11,800 calls, from Draw through `sub_82107910` and
+      the app's `sub_82099A98`): `sub_82099828`, `sub_820A4610`,
+      `sub_8214E268` with `sub_8214F290` and `sub_82149080`. The voice
+      thread's `sub_8257AF30` every 10 ms (14,990).
+    - Once at boot: the heap check (returns 1, so no
+      `HalReturnToFirmware`), the PAL-50 check (returns 0: the SDK's AV
+      pack is 6, so no settings are read), five listeners (masks 3, 1, 3,
+      2 and the voice code's), Device::Init's config read (`00040000`),
+      WSAStartup (0), a UDP socket whose `bind` and `ioctlsocket` fail
+      (-1: no system link), XNetGetTitleXnAddr (4) and
+      XNetXnAddrToMachineId (1), the voice set-up with four profile reads,
+      and the XMP controller (set at the boot movie's start and end).
+    - Each front-end visit: XUserSetContextEx (9 calls, context `8001`,
+      probably presence, values 0 and 1), the user table (user 0 signed
+      in locally, state 1; users 1-3 state 0; name "User", XUID
+      `B13EBABEBABEBABE`), the profile read (10 calls), the time zone
+      read (4: an all-zero zone, "uses daylight" 1), and around the saves
+      the device selector (twice) and XEnumerate (three times), both
+      997 (pending), and the sign-in UI once.
+    - Never: achievements, SetPropertyEx, `B0021`, the stats
+      enumerators, every session and XLiveBase message, connect, listen,
+      accept, select, send and receive, the friends, gamercard, player
+      review, message box and dirty disc dialogs, the PAL-50 message box,
+      XLaunchNewImage, XUserCheckPrivilege, the voice traffic (create,
+      close, submit) and its user check.
+
+    **Notifications.** The game drains its queues, and the SDK writes id
+    0 when one is empty, so they can't be logged one by one; but the SDK
+    sends a fixed set. The first listener whose mask has bit 0 (the
+    app's, `sub_820998B8`, mask 3) gets XN_SYS_UI on and off, sign-in
+    changed twice, input devices changed twice and input configuration
+    changed twice at start-up. After that only the dialogs send any: the
+    device selector XN_SYS_UI on and off (with a 100 ms sleep), the
+    sign-in UI sign-in changed and XN_SYS_UI off, to every listener with
+    the system bit. Each listener takes only its mask's areas (id >> 25),
+    so the XMP's notifications (area 5) reach none, and nothing sends Live
+    connection changed (`0x02000002`), storage devices changed (`0xB`) or
+    `0x11`: those branches never run.
+
+    **Player data.** The profile read asks for 26 settings, first for the
+    size (4,192 bytes, `ERROR_INSUFFICIENT_BUFFER`), then the settings
+    (997, completed at once): the SDK's built-in defaults (from 1, the
+    profile), the gamercard picture key "gamercard_picture_key", and the
+    three title-specific settings (`63E83FFF`..`63E83FFD`) unset (from
+    0). The SDK would keep those as files in the game's user content
+    folder, but only `XamUserWriteProfileSettings` writes them and the
+    game doesn't import it. So no player data is in the profile: a fixed
+    answer keeps everything. Career saves are `XamContent` (B4); the
+    device selector (device 1) and XEnumerate on the content enumerator
+    belong with them.
+
+    **What can go and what needs an answer:**
+
+    - Fixed answers, once at boot: the heap check (1), the PAL-50 check
+      (0; clears `XGetAVPack`, `XGetLanguage`,
+      `XexCheckExecutablePrivilege`, and `ExGetXConfigSetting` once the
+      others are done), Device::Init's config value (`00040000`), the
+      time zone read (the SDK's all-zero zone; the last caller of
+      `RtlNtStatusToDosError` but B6's, so its mapping table has to be
+      ours then), `HalReturnToFirmware` and `RtlImageXexHeaderField`.
+    - Fixed answers, the user: one local user, signed in, name, XUID;
+      XUserSetContextEx dropped (returns 0, nothing reads it back).
+    - The profile read: the same 26 settings as the SDK answers.
+    - Network: WSAStartup 0, the system link socket made but `bind` and
+      `ioctlsocket` -1, the XNet answers; system link stays off, as
+      today.
+    - XMP: dropped (0; its notifications reach no listener).
+    - Voice: its set-up and 10 ms poll; nothing seen that it gives the
+      game (no headset). To read before dropping.
+    - Notifications: the startup set and the dialogs' must reach the
+      same listeners. Five of their readers are game code calling
+      `XNotifyGetNext` inline, so those functions have to be made native
+      whole (or the queue ours behind an adapter for the import's
+      callers); the biggest work in B5.
+    - Never called: rows only ("never called"), no code.
+    - To B4: the device selector and XEnumerate.
+
+    Proposed order (smallest and safest first, player data last): (1)
+    the boot-time fixed answers (heap check, PAL-50 check, Device::Init's
+    value, the time zone read); (2) the user wrappers (name, sign-in
+    state, XUID, title id check, SetContextEx); (3) XMP; (4) the network
+    start-up; (5) voice, after reading what it does with its answers; (6)
+    the notification readers with their queue (the sign-in watcher first,
+    then the network manager and sign-in manager); (7) the profile read.
 
 B6. **Pure helpers** (55 functions): string, time and formatting
     helpers made native, or their callers made native. Cheap; can be
