@@ -97,5 +97,6 @@ void Clock(Context& h);
 void Strings(Context& h);
 void LastError(Context& h);
 void Gamma(Context& h);
+void StartUp(Context& h);
 
 }  // namespace harness

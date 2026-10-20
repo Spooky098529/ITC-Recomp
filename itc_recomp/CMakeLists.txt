@@ -78,6 +78,7 @@ set(ITC_SOURCES
     src/hooks/graphics_drops.cpp
     src/hooks/graphics_device.cpp
     src/hooks/video_mode.cpp
+    src/hooks/start_up.cpp
     src/display/gamma.cpp
     src/harnesses/harness.cpp
     src/harnesses/clock.cpp
@@ -86,6 +87,7 @@ set(ITC_SOURCES
     src/harnesses/object_attributes.cpp
     src/harnesses/strings.cpp
     src/harnesses/time.cpp
+    src/harnesses/start_up.cpp
     src/helpers/debug_output.cpp
     src/helpers/object_attributes.cpp
     src/helpers/time.cpp
