@@ -1,14 +1,17 @@
 // The game's time functions natively: adapters in front of src/helpers/time.cpp.
-// One thing is still a guest call: the time zone read from the console's
-// settings (sub_8229B440, ExGetXConfigSetting: B5 in docs/rexglue-removal.md).
-// GetLocalTime works out the bias (the game's sub_82297678, no longer
-// called) itself.
+// The time zone comes from the console's settings as the SDK answered them
+// (src/helpers/console_settings.h; the game's sub_8229B440, B5 in
+// docs/rexglue-removal.md). GetLocalTime works out the bias (the game's
+// sub_82297678, no longer called) itself.
 
 #include "guest.h"
 #include "guest_call.h"
 #include "last_error.h"
 
+#include "helpers/console_settings.h"
 #include "helpers/time.h"
+
+#include <cstring>
 
 namespace {
 
@@ -72,30 +75,78 @@ void SetInvalidParameter(PPCContext& ctx, uint8_t* base) {
   last_error::SetFromStatus(base, ctx.r13.u32, kStatusInvalidParameter);
 }
 
+// A made-up zone the time harness answers with (time_hooks::SetFakeZone).
+struct FakeZone {
+  bool active = false;
+  bool uses_daylight = false;
+  uint8_t bytes[172] = {};
+} g_fake_zone;
+
+// The console's time zone into TIME_ZONE_INFORMATION as sub_8229B440 writes
+// it: the bias, each name's first four characters (a byte each, widened) and
+// a terminator after them (the rest of the name left alone), each date
+// cleared and its month, day of week, day and hour set, and the biases.
+void StoreConsoleZone(uint8_t* base, uint32_t address, const helpers::ConsoleTimeZone& zone) {
+  auto name = [&](uint32_t at, const uint8_t (&characters)[4]) {
+    for (uint32_t i = 0; i < 4; i++) {
+      guest::StoreU16(base, at + 2 * i, characters[i]);
+    }
+    guest::StoreU16(base, at + 8, 0);
+  };
+  auto date = [&](uint32_t at, const uint8_t (&fields)[4]) {
+    for (uint32_t i = 0; i < 16; i += 4) {
+      guest::StoreU32(base, at + i, 0);
+    }
+    guest::StoreU16(base, at + 2, fields[0]);  // month
+    guest::StoreU16(base, at + 6, fields[1]);  // day
+    guest::StoreU16(base, at + 4, fields[2]);  // day of week
+    guest::StoreU16(base, at + 8, fields[3]);  // hour
+  };
+  guest::StoreU32(base, address + 0, uint32_t(zone.bias));
+  name(address + 4, zone.standard_name);
+  name(address + 88, zone.daylight_name);
+  date(address + 68, zone.standard_date);
+  date(address + 152, zone.daylight_date);
+  guest::StoreU32(base, address + 84, uint32_t(zone.standard_bias));
+  guest::StoreU32(base, address + 168, uint32_t(zone.daylight_bias));
+}
+
 }  // namespace
 
 namespace time_hooks {
 
-// GetTimeZoneInformation's work (sub_82297DC8) on the zone at `address`:
-// returns its state (0, 1 or 2), or -1 when the console's settings can't be
-// read (the last error set).
-uint32_t GetTimeZoneInformation(PPCContext& ctx, uint8_t* base, uint32_t address) {
-  uint32_t error = 0, uses_daylight = 0;
-  InFrame(ctx, base, 144, 0x82297DEC, [&](uint32_t frame) {
-    ctx.r3.u64 = address;
-    ctx.r4.u64 = frame + 80;
-    sub_8229B440(ctx, base);
-    error = ctx.r3.u32;
-    uses_daylight = guest::LoadU32(base, frame + 80);
-  });
-  if (error) {
-    last_error::Set(base, ctx.r13.u32, error);
-    return 0xFFFFFFFF;
+void SetFakeZone(const uint8_t (&bytes)[172], bool uses_daylight) {
+  std::memcpy(g_fake_zone.bytes, bytes, sizeof(bytes));
+  g_fake_zone.uses_daylight = uses_daylight;
+  g_fake_zone.active = true;
+}
+
+void ClearFakeZone() {
+  g_fake_zone.active = false;
+}
+
+// The console's time zone read (sub_8229B440) into the TIME_ZONE_INFORMATION
+// at `address`; returns whether it uses daylight saving. It never fails (the
+// original's error, from ExGetXConfigSetting, can't happen).
+bool ReadTimeZoneSettings(uint8_t* base, uint32_t address) {
+  if (g_fake_zone.active) {
+    for (uint32_t i = 0; i < 172; i++) {
+      guest::StoreU8(base, address + i, g_fake_zone.bytes[i]);
+    }
+    return g_fake_zone.uses_daylight;
   }
+  StoreConsoleZone(base, address, helpers::kConsoleTimeZone);
+  return helpers::UsesDaylight(helpers::kRetailFlags);
+}
+
+// GetTimeZoneInformation's work (sub_82297DC8) on the zone at `address`:
+// returns its state (0, 1 or 2).
+uint32_t GetTimeZoneInformation(PPCContext& ctx, uint8_t* base, uint32_t address) {
+  const bool uses_daylight = ReadTimeZoneSettings(base, address);
   helpers::TimeZoneInformation zone = LoadZone(base, address);
   bool invalid_parameter = false;
   const uint32_t state =
-      helpers::TimeZoneState(zone, uses_daylight != 0, helpers::SystemTimeNow(), &invalid_parameter);
+      helpers::TimeZoneState(zone, uses_daylight, helpers::SystemTimeNow(), &invalid_parameter);
   if (!uses_daylight) {
     StoreZone(base, address, zone);
   }
@@ -128,11 +179,24 @@ extern "C" REX_FUNC(sub_822968B8) {
 }
 
 // GetTimeZoneInformation: r3 = the TIME_ZONE_INFORMATION; returns its state
-// (0, 1 or 2), or -1 when the console's settings can't be read.
+// (0, 1 or 2).
 extern "C" REX_FUNC(sub_82297DC8) {
   REX_FUNC_PROLOGUE();
   const uint32_t state = time_hooks::GetTimeZoneInformation(ctx, base, ctx.r3.u32);
   ctx.r3.s64 = int32_t(state);
+}
+
+// The console's time zone read: r3 = the TIME_ZONE_INFORMATION (out), r4 =
+// "uses daylight saving" (out, or 0); returns 0. Only the recompiled time
+// functions the time harness runs still call it; ours call
+// ReadTimeZoneSettings.
+extern "C" REX_FUNC(sub_8229B440) {
+  REX_FUNC_PROLOGUE();
+  const bool uses_daylight = time_hooks::ReadTimeZoneSettings(base, ctx.r3.u32);
+  if (ctx.r4.u32) {
+    guest::StoreU32(base, ctx.r4.u32, uses_daylight ? 1 : 0);
+  }
+  ctx.r3.u64 = 0;
 }
 
 // The next cutover of a time zone date: r3 = the date, r4 = the cutover (out),
