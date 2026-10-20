@@ -80,6 +80,7 @@ set(ITC_SOURCES
     src/hooks/video_mode.cpp
     src/hooks/start_up.cpp
     src/hooks/user.cpp
+    src/hooks/xmp.cpp
     src/display/gamma.cpp
     src/harnesses/harness.cpp
     src/harnesses/clock.cpp
@@ -90,6 +91,7 @@ set(ITC_SOURCES
     src/harnesses/time.cpp
     src/harnesses/start_up.cpp
     src/harnesses/user.cpp
+    src/harnesses/xmp.cpp
     src/helpers/debug_output.cpp
     src/helpers/object_attributes.cpp
     src/helpers/time.cpp

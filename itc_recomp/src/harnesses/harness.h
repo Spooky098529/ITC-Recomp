@@ -99,5 +99,6 @@ void LastError(Context& h);
 void Gamma(Context& h);
 void StartUp(Context& h);
 void User(Context& h);
+void Xmp(Context& h);
 
 }  // namespace harness
