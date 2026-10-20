@@ -485,14 +485,20 @@ B6. **Pure helpers** (55 functions): string, time and formatting
     1. The "now" callers in the table above (11 functions): work saved
        for B3, B4, B5 and the core, with nothing removed from the SDK
        until those are done.
-    2. Moving the `ctx` edge up from the functions made native here:
-       SetLastError (`sub_82296E70`, its jump `sub_82296FD0`, and
-       `sub_82296E88`, one of the 11) and GetTimeZoneBias
-       (`sub_82297678`, no imports). Native, they remove the guest calls
-       our time and string adapters still make, and those functions'
-       callers could then reach them without `ctx`.
+    2. Done (2026-10-20, `pure-helpers`): SetLastError (`sub_82296E70`,
+       its jump `sub_82296FD0`, and `sub_82296E88`) in
+       `src/hooks/last_error.cpp`, called directly by our time and string
+       adapters, which make no SetLastError guest calls any more.
+       `sub_82296E88`'s NTSTATUS mapping is the SDK's
+       (`xeRtlNtStatusToDosError`, called as C++) until `sub_8229B440`
+       (B5), the import's last other caller, is native: then the table
+       has to be ours. GetTimeZoneBias (`sub_82297678`) is plain C++ and
+       its recompiled version is no longer called: the first function of
+       this work to reach Native. GetLocalTime's only guest call left is
+       the console settings read (B5). Checked by the harness (all the
+       same) and an attract race.
 
-    Suggested next (not decided): 2, then B6 counts as done for now;
+    Suggested next (not decided): with 2 done, B6 counts as done for now;
     merge `pure-helpers` into `rexglue-removal-project` and pick the next
     item (A2, or A6 with B2, would remove visible SDK use).
 
