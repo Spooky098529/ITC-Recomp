@@ -181,8 +181,8 @@ with no row); run it after changing either, on any branch.
 | `sub_82465870` | `AudioRenderDriver::Submit` | Overridden | Same file. r4 = the mixed buffer (`sub_8245F718` gives its descriptor; samples at +8), handed to our audio output. |
 | `sub_824658C8` | `AudioRenderDriver::Destroy` | Wrapped | Same file. Unregisters our handle first, so the original doesn't pass it to `XAudioUnregisterRenderDriverClient`. |
 | `sub_825A7410` | `memcpy` | Wrapped | The library's memcpy (r3 destination, r4 source, r5 size): copies into the physical views recorded for the native renderer's guest memory mirrors (`src/native/buffers.cpp`). |
-| `sub_8229E3F0` | `Device::Kick` | Overridden | `src/native/gpu_link.cpp`. r3 device, r4 (size in words, address) pairs, r5 their count. In exclusive mode the kicked buffers are applied directly instead of written to the ring; the original otherwise. `--native_renderer_log_gpu` logs. |
-| `sub_8229E848` | `Device::DeferredKick` | Overridden | Same file. Queued kicks while GPU interrupts were outstanding; in exclusive mode every kick completes at once, so it kicks straight away. |
+| `sub_8229E3F0` | `Device::Kick` | Overridden | `src/native/gpu_link.cpp`. r3 device, r4 (size in words, address) pairs, r5 their count. The kicked buffers are applied directly (only their effects outside the GPU) instead of written to the ring; the original is no longer called. `--native_renderer_log_gpu` logs. |
+| `sub_8229E848` | `Device::DeferredKick` | Overridden | Same file. Queued kicks while GPU interrupts were outstanding; every kick completes at once now, so it kicks straight away; the original is no longer called. |
 | `sub_8229DEA0` | `Device::OnInterrupt` | Wrapped | The library's interrupt callback (r3 source: 0 vblank, 1 the command stream's INTERRUPT); logged with `--native_renderer_log_gpu`. |
 | `sub_822B6BF8`, `sub_822B6A78`, `sub_822B6780` | | Wrapped | The tiling worker's callbacks and job; logged with `--native_renderer_log_gpu`. |
 | `sub_8229EF48` | | Wrapped | Ends the command segment when the buffer is full; counted for `--native_renderer_check_draw_writes` (`src/native/draw_packets.cpp`). |
