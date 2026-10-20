@@ -538,6 +538,24 @@ B3. **Graphics boundary** (17 functions calling `Vd*`): ring buffer
     hard-exits ("Title terminated; hard-exiting process"), so device
     release and the terminate routine don't run at quit either.
 
+    The gamma ramps (done 2026-10-20, `graphics-boundary`): `sub_822B0910`
+    and `sub_822B0AB0` are plain C++ (`src/display/gamma.cpp`) behind
+    adapters (`src/hooks/gamma.cpp`), with the display's gamma ours
+    (`src/display/display.h`: type 2, BT.709, power 2.2222223, the SDK's
+    answer). Their helpers, the sRGB and BT.709 curves (`sub_822B07B0`,
+    `sub_822B0860`), are plain C++ too and no longer called; `pow` is
+    `std::pow`. The constants were logged from the image and written as
+    hex floats (one, 1/1.055, doesn't round-trip as a decimal literal);
+    the recompiler's fused multiply-subtract (`fma` in double, then
+    rounded to float) is kept. The harness `gamma` (`--run_harnesses`)
+    compares the two ramps (random, identity and climbing pairs, both
+    directions, in place and not), the two curves (all 1,024 curve inputs,
+    random values, the knees) and `pow` rounded to float (the curves'
+    exponents and random ones): all the same. Only type 2 reaches the
+    whole functions (the import can't be stood in for); the helpers'
+    cases cover types 1 and 3. The harnesses' scratch area grew to 4 KB
+    for the ramps. No game code calls `VdGetCurrentDisplayGamma` any more.
+
 B4. **Files and saves** (22 functions; the game's `CreateFile`
     `sub_82295508` is the only caller of `NtCreateFile`): the game's file
     functions on host files under `--game_data_root` (log the paths with
