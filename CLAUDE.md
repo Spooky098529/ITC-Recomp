@@ -67,9 +67,11 @@ date as you learn things.
   something about (what it does, its arguments, what it calls, who calls
   it, how often), including those only met along the way (callees,
   callers, helpers). When a piece of work is done, or before ending a
-  session, show the user a summary of the rows you'd add or change in
-  `docs/functions.md` (address, name, status, notes), and ask whether to
-  add them; write them only after the user has reviewed and agreed. In
+  session, show the user the rows you'd add or change in
+  `docs/functions.md`, in that file's table format (`| Address | Name |
+  Status | Notes |`, four cells, each row exactly as it would be written;
+  for a changed row, say what changed), and ask whether to add them;
+  write them only after the user has reviewed and agreed. In
   the rows, say how much is known: "Not read" or "Not read in detail"
   for what's inferred from calls, "probably" for guesses. Set the Status
   column by the definitions at the top of the file and run
