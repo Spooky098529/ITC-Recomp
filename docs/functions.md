@@ -29,8 +29,7 @@ Status:
   says which caller). Logs, a harness or the renderer's frame dumps have
   shown that nothing reads what it did. The original is no longer called,
   except behind a fallback flag while the drop is being checked. A
-  function the game never calls in the first place isn't Dropped: its
-  status stays blank and its row says it's never called.
+  function the game never calls in the first place is automatically considered dropped, as we do not need it.
 - **Patched**: the generated code was edited in place (search for
   `PATCH:`).
 
