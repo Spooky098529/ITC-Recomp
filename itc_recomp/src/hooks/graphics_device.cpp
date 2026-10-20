@@ -7,8 +7,6 @@
 #include "guest_call.h"
 #include "graphics_boundary_log.h"
 
-#include <rex/cvar.h>
-
 #include <bit>
 
 #include "display/display.h"
@@ -473,10 +471,6 @@ extern "C" REX_FUNC(sub_822AD0B0) {
   guest::StoreU32(base, device + kDeviceDisplayFormat, 0);
 }
 
-REXCVAR_DEFINE_BOOL(recompiled_swap, false, "ITC",
-                    "Run the recompiled Swap instead of the native one (temporary, for checking "
-                    "rexglue-removal B3)");
-
 namespace {
 
 constexpr uint32_t kDeviceFlags3 = 10811;
@@ -511,11 +505,6 @@ extern "C" REX_FUNC(sub_822A08A0) {
   const uint32_t device = ctx.r3.u32, front_buffer = ctx.r4.u32;
   const graphics_boundary::SwapEntry entry =
       graphics_boundary::SwapEntered(base, uint32_t(ctx.lr), device, front_buffer, ctx.r5.u32);
-  if (REXCVAR_GET(recompiled_swap)) {
-    __imp__sub_822A08A0(ctx, base);
-    graphics_boundary::SwapLeft(base, entry, ctx.r3.u32);
-    return;
-  }
   auto field = [&](uint32_t offset) { return guest::LoadU32(base, device + offset); };
   auto set = [&](uint32_t offset, uint32_t value) { guest::StoreU32(base, device + offset, value); };
   auto clear_bits = [&](uint32_t offset, uint8_t bits) {
