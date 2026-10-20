@@ -597,6 +597,38 @@ B3. **Graphics boundary** (17 functions calling `Vd*`): ring buffer
     engines' callback, and now `sub_822B2470` and `sub_822B3A78`) still
     name `Vd*` imports in `generated/`.
 
+    Made native (2026-10-20, `src/hooks/graphics_device.cpp`; level 1:
+    the library's own steps stay guest calls, the `Vd*` calls are gone):
+    - `Device::SetUpDisplay` (`sub_822ACE00`): the display mode is ours
+      (`src/display/display.h`, 1280x720) instead of `VdQueryVideoMode`.
+      The game passes +60 set, so no front buffer is made here; the
+      render target and depth surface are.
+    - `Device::Init` (`sub_822AD298`): without `VdIsHSIOTrainingSucceeded`
+      (the "training failed" flag at `829537BC` stays 0), the engines'
+      set-up (so `sub_822AD190` has no callers and its drop went) and the
+      EDRAM retraining (dropped), and without handing two fields to the
+      kernel's debug monitor data (`820007F0` points to 0: no debugger).
+      Kept: storing the device in `VdGlobalDevice` (`820007B0`, other
+      game code may read it), the console setting read (B5) and the
+      critical sections (the core). The counter's rate comes from
+      `src/helpers/clock.h`.
+    - `Device::SetUpRing` (`sub_8229F280`): without its five kernel calls
+      and the ME_INIT packet in the primary ring, which nothing reads. The
+      game passes its own ring and command buffer (nothing is allocated
+      for them). The scratch registers' set-up stays: our kick needs it
+      for the boot callback.
+    - `Device::SetDisplayMode` (`sub_822AD0B0`): the gamma ramp set as
+      before; the display fields from our display mode instead of
+      `VdGetCurrentDisplayInformation`; `VdSetDisplayMode` gone.
+
+    Checked by the counter's log of the device's fields (display, surfaces,
+    flags, ring, command buffer, progress block, fences) after each step
+    and at the first Swaps, against the recompiled versions: the same, but
+    the ring's write position (0, no ME_INIT). For the ring set-up the
+    original ran in the same build behind a temporary switch. Frames dumped
+    in attract races look right (frames always differ between runs, by
+    timing), the boot callback is still made, and all harnesses match.
+
 B4. **Files and saves** (22 functions; the game's `CreateFile`
     `sub_82295508` is the only caller of `NtCreateFile`): the game's file
     functions on host files under `--game_data_root` (log the paths with
