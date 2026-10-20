@@ -74,6 +74,12 @@ set(ITC_SOURCES
     src/hooks/clock.cpp
     src/hooks/strings.cpp
     src/hooks/last_error.cpp
+    src/harnesses/harness.cpp
+    src/harnesses/clock.cpp
+    src/harnesses/last_error.cpp
+    src/harnesses/object_attributes.cpp
+    src/harnesses/strings.cpp
+    src/harnesses/time.cpp
     src/helpers/debug_output.cpp
     src/helpers/object_attributes.cpp
     src/helpers/time.cpp
