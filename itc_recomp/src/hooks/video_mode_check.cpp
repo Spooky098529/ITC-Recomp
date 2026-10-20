@@ -55,17 +55,15 @@ extern "C" REX_FUNC(sub_8258D568) {
   }
 }
 
-// Reads only is_widescreen (+12) of the answer: r3 = its object.
-extern "C" REX_FUNC(sub_82482B18) {
-  REX_FUNC_PROLOGUE();
-  const uint32_t object = ctx.r3.u32, lr = ctx.lr;
-  __imp__sub_82482B18(ctx, base);
-  if (ShouldLog(aspect_calls)) {
-    REXLOG_INFO("video mode check: sub_82482B18 #{} from {:08X}, object {:08X}, r3 {:08X}, "
-                "+132 {} +136 {} +140 {}, +56 {:08X}, [8204D2FC] {} [8204D300] {}",
-                aspect_calls.load(), lr, object, ctx.r3.u32, guest::LoadFloat(base, object + 132),
-                guest::LoadFloat(base, object + 136), guest::LoadFloat(base, object + 140),
-                guest::LoadU32(base, object + 56), guest::LoadFloat(base, 0x8204D2FC),
-                guest::LoadFloat(base, 0x8204D300));
+// After sub_82482B18 (src/hooks/video_mode.cpp), native or recompiled.
+void VideoModeCheck_AfterAspect(uint8_t* base, uint32_t object, uint32_t lr, uint32_t result) {
+  if (!ShouldLog(aspect_calls)) {
+    return;
   }
+  const uint32_t indices = guest::LoadU32(base, object + 60);
+  REXLOG_INFO("video mode check: sub_82482B18 #{} from {:08X}, object {:08X}, r3 {:08X}, "
+              "+132..+140 {}, +56..+68 {}, index buffer {}, its data {}",
+              aspect_calls.load(), lr, object, result, Words(base, object + 132, 3),
+              Words(base, object + 56, 4), indices ? Words(base, indices, 8) : "none",
+              indices ? Words(base, guest::LoadU32(base, indices + 24), 3) : "none");
 }

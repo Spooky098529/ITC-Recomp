@@ -77,6 +77,7 @@ set(ITC_SOURCES
     src/hooks/gamma.cpp
     src/hooks/graphics_drops.cpp
     src/hooks/graphics_device.cpp
+    src/hooks/video_mode.cpp
     src/hooks/video_mode_check.cpp
     src/display/gamma.cpp
     src/harnesses/harness.cpp

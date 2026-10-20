@@ -15,6 +15,10 @@ namespace display {
 constexpr uint32_t kWidth = 1280;
 constexpr uint32_t kHeight = 720;
 
+// Whether the display is widescreen (XGetVideoMode's is_widescreen, as the
+// SDK worked it out from the size).
+constexpr bool kWidescreen = kWidth * 3 >= kHeight * 4;
+
 // The display's gamma (VdGetCurrentDisplayGamma): its type (1 sRGB, 2
 // BT.709, 3 a power; anything else is taken as BT.709 by the game's ramp
 // functions) and, for type 3, the power.
