@@ -152,7 +152,7 @@ exclusive mode and the once-a-frame mirrors are on by default, and without
 loads), so a bare `./itc` plays as released. The emulated GPU now needs
 `--native_renderer=false --gpu_plugin=xenos`.
 
-## Status (`main`, 2026-10-19, v0.4.6)
+## Status (`main`, 2026-10-20, v0.4.7.1)
 
 Frame interpolation for races is working: logic runs at 30 Hz and frames are
 blended between ticks. The world, cameras, wheels (other cars' too, paired
@@ -294,7 +294,11 @@ since v0.3.2): our thread runs the game's mixer, replacing the
 SDK's Audio Worker, whose polling took ~80% of a core. The SDK's XMA
 decoder is kept. See `docs/native-audio.md`.
 
-Releases are made by pushing a `v*` tag: CI builds the zip and publishes a
+Releases are made by pushing a `v*` tag, which must be `vX.Y`, `vX.Y.Z`
+or `vX.Y.Z.W` (the SDK's `cmake/rex_version.cmake` parses it: anything
+else, like `v0.4.7b`, fails to configure, and so does every later
+untagged build while it's the nearest tag; a release without
+improvements gets a fourth number, like `v0.4.7.1`): CI builds the zip and publishes a
 GitHub release with generated notes, which are then replaced with notes
 written for players: title "vX.Y.Z: <summary>", and just a couple of
 bullet points naming the changes (not the long layout of v0.3.5 and
