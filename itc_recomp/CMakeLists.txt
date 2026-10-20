@@ -71,6 +71,7 @@ set(ITC_SOURCES
     src/hooks/debug_output.cpp
     src/hooks/object_attributes.cpp
     src/hooks/time.cpp
+    src/hooks/clock.cpp
     src/helpers/debug_output.cpp
     src/helpers/object_attributes.cpp
     src/helpers/time.cpp

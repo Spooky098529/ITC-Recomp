@@ -6,10 +6,13 @@
 // recompiled: it calls no kernel import.
 
 #include "guest.h"
+#include "guest_call.h"
 
 #include "helpers/time.h"
 
 namespace {
+
+using guest_call::InFrame;
 
 constexpr uint32_t kStatusInvalidParameter = 0xC000000D;
 
@@ -36,21 +39,6 @@ void StoreSystemTime(uint8_t* base, uint32_t address, const helpers::SystemTime&
   for (uint32_t i = 0; i < 8; i++) {
     guest::StoreU16(base, address + 2 * i, fields[i]);
   }
-}
-
-// Calls guest code from inside a frame of `frame_bytes` made below the stack
-// pointer, as the recompiled function's own; `return_address` is the
-// recompiled call's.
-template <typename Call>
-void InFrame(PPCContext& ctx, uint8_t* base, uint32_t frame_bytes, uint32_t return_address,
-             Call call) {
-  const uint64_t stack = ctx.r1.u64;
-  const uint32_t frame = ctx.r1.u32 - frame_bytes;
-  guest::StoreU32(base, frame, ctx.r1.u32);  // the back chain
-  ctx.r1.u64 = frame;
-  ctx.lr = return_address;
-  call(frame);
-  ctx.r1.u64 = stack;
 }
 
 // The game's SetLastError from an NTSTATUS (sub_82296E88).
