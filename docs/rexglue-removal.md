@@ -594,9 +594,9 @@ B3. **Graphics boundary** (17 functions calling `Vd*`): ring buffer
     yet identified). Each gets a native version keeping only what the
     renderer uses. The never-called functions (clock gating, device
     release, the terminate routine, `sub_822B4F10`, `sub_822A0688`, the
-    engines' callback, and now `sub_822B2470` and `sub_822B3A78`) are
-    Dropped too (the user's change to the definition, 2026-10-20: a
-    function the game never calls is dropped), with no override; they
+    engines' callback) keep a blank status; `sub_822B2470` and
+    `sub_822B3A78`, no longer called since their callers were dropped, are
+    Dropped. None has an override (the counter's wrappers went), and they
     still name `Vd*` imports in `generated/` until it goes.
 
     Made native (2026-10-20, `src/hooks/graphics_device.cpp`; level 1:
