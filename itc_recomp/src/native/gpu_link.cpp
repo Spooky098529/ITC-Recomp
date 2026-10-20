@@ -1,11 +1,13 @@
 // Where the graphics library meets the GPU (see "Plan for milestone 6" in
-// docs/native-renderer.md): the kick, the progress block its fences go
-// into, and the library's interrupt callback.
+// docs/native-renderer.md): the kick and the progress block its fences go
+// into. The library's interrupt callback (sub_8229DEA0) is no longer
+// called: nothing registers it, and the kick's interrupts call the callback
+// block's functions themselves (see B3 in docs/rexglue-removal.md).
 //
 // --native_renderer_log_gpu logs, every 5 s, the packets in the kicked
 // buffers that have effects outside the GPU (memory writes, interrupts,
 // waits, swaps; and register writes outside the context registers), the
-// progress block's values, and the interrupts the callback got. Milestone 6
+// progress block's values. Milestone 6
 // step 1: what exclusive mode has to do in the GPU's place.
 //
 // No GPU gets the kick: its buffers are walked here and only their effects
@@ -107,8 +109,6 @@ struct Stats {
 } g_stats;
 std::mutex g_mutex;
 Clock::time_point g_last_log = Clock::now();
-std::atomic<uint64_t> g_interrupts[2] = {};
-std::atomic<uint32_t> g_last_interrupt_cpu{0};
 // A detailed trace of the kicks: the first ones, a while every 10 s, and
 // those with rare packets (up to a limit).
 uint32_t g_trace_kicks = 60;
@@ -227,10 +227,7 @@ void LogStats(uint8_t* base, uint32_t device) {
     registers += fmt::format(" {:04X}={} (last {:08X})", reg, count, s.register_values[reg]);
   }
   REXLOG_INFO("native renderer: gpu: register writes below 0x2000:{}", registers);
-  REXLOG_INFO("native renderer: gpu: interrupts: {} vblank, {} from the command stream (last "
-              "cpu {}); {}",
-              g_interrupts[0].exchange(0), g_interrupts[1].exchange(0),
-              g_last_interrupt_cpu.load(), ProgressBlock(base, device));
+  REXLOG_INFO("native renderer: gpu: {}", ProgressBlock(base, device));
   s = Stats{};
 }
 
@@ -549,27 +546,6 @@ extern "C" REX_FUNC(sub_8229E3F0) {
       LogEffects();
     }
   }
-}
-
-// The library's interrupt callback (registered with
-// VdSetGraphicsInterruptCallback): r3 source (0 vblank, 1 the command
-// stream's INTERRUPT packet), r4 the device.
-extern "C" REX_FUNC(sub_8229DEA0) {
-  REX_FUNC_PROLOGUE();
-  if (REXCVAR_GET(native_renderer_log_gpu)) {
-    uint32_t source = ctx.r3.u32;
-    native::g_interrupts[source ? 1 : 0]++;
-    if (source == 1) {
-      uint32_t cpu = guest::LoadU8(base, ctx.r13.u32 + 268);
-      native::g_last_interrupt_cpu = cpu;
-      uint32_t block = guest::LoadU32(base, ctx.r4.u32 + native::kDeviceCallbackBlock);
-      REXLOG_INFO("native renderer: gpu: interrupt from the command stream on cpu {}: callback "
-                  "block {:08X}: +0 {:08X}, calls {:08X}({:08X})",
-                  cpu, block, guest::LoadU32(base, block), guest::LoadU32(base, block + 16),
-                  guest::LoadU32(base, block + 20));
-    }
-  }
-  __imp__sub_8229DEA0(ctx, base);
 }
 
 // Tiling's worker (milestone 6, finding why loading screens hang in
