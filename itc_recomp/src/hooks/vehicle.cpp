@@ -2,7 +2,7 @@
 //
 // Each function here has the same name as a generated sub_XXXXXXXX. The
 // generated definitions are weak, so these take their place at link time.
-// See docs/functions/functions.md for what is known about each address.
+// See docs/functions/ and docs/known-data.md for what is known about each address.
 
 #include "debug/state_capture.h"
 #include "guest.h"

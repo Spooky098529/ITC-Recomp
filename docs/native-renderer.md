@@ -3,7 +3,8 @@
 A renderer that draws the game's render commands with Vulkan directly,
 replacing the emulated GPU (`librexgpu-xenos.so`) and moving the project
 away from the ReXGlue SDK. Why: the emulated GPU limits the frame rate
-(see "Performance" in `functions.md`), and the game's command list is a
+(see "Historical: what limited the frame rate under the emulated GPU" at
+the end), and the game's command list is a
 narrow boundary to draw from (see `gpu-functions.md`, which holds what's
 known about it; this file is the plan and its progress, and its last
 section, "Performance: the render thread", the work on the renderer's
@@ -1054,7 +1055,7 @@ memory).
 - Testing: build, run the game in the background with
   `--native_renderer=true --skip_intro --attract_after_s=1`. With no input,
   an attract race starts about 1 s after launch (where `fps` goes above 30 in the
-  log; see "The title screen" in `functions.md`), so a run can be fully
+  log; see `title-screen.md`), so a run can be fully
   automatic: launch under `timeout`, delete the `/dev/shm/xenia_memory_*`
   files afterwards, and read the `native renderer:` lines in the log and
   any dump. Never screenshot the user's desktop: look at frames with the
@@ -1073,7 +1074,7 @@ To be fixed (or accepted) in milestone 7.
   ghosted with frame interpolation (seen by the user, 2026-10-14). Fixed
   on `glow-interpolation-fix` (merged): the user drove a race uncapped
   and saw no ghosting. The bloom is the glow chain whose combine is
-  pixel shader `9750599DF5ED3B39` (see `--glow` in `functions.md`). What
+  pixel shader `9750599DF5ED3B39` (see `--glow` in `frame-interpolation.md`). What
   the logs show (2026-10-15, attract races):
   - **The glow keeps a history, written back at tick rate.** In the
     256x144 target, two draws shrink the HDR copy, then the cross-fade
@@ -1622,7 +1623,7 @@ of `47484c8`; the log isn't in the repo):
   time per draw (1,875-3,050 draws a frame, 13.4-23.7 ms a frame).
 - **Late ticks**: the 30 Hz game ticks are often released over 8 ms late
   (the "late" count in the fps lines; see "frame pacer" in
-  `functions.md`), 10-28 a second. Ticks per second stay at 30 with no
+  `frame-interpolation.md`), 10-28 a second. Ticks per second stay at 30 with no
   grid restarts, so this is uneven motion (judder), not slow motion.
 - **Not textures, shaders or pipelines**: no frame over 40 ms in the race
   (the "long frame" lines are all at loads), texture loading at most
@@ -2316,7 +2317,7 @@ removed", "A race the user drove").
 
 For a new session to test. Read "Buffers" and the "Guest memory is
 mirrored" decision above first, and "Render command recording" and
-"Interpolation" in `functions.md`.
+"Interpolation" in `frame-interpolation.md`.
 
 **Where things stand.** Branch `mirrors-fix` (not merged; whether to
 start from it or merge it first is the user's call; ask before creating
@@ -2356,7 +2357,7 @@ draw. Then the mirrors work as front and back buffers alternating by tick:
 the GPU draws from a mirror that doesn't change while it's in use, and the
 other takes the writes. Draws do no mirror work at all.
 
-**What's known that bears on it** (`functions.md`):
+**What's known that bears on it** (`frame-interpolation.md`):
 - Every frame is a main loop pass. Logic passes (a 30 Hz tick due) run
   Update and Draw; render-only passes (in races) skip Update, and Draw
   records a new command list from the same game state. The command list is
@@ -3016,7 +3017,7 @@ Re-checked on `main` at `c18f74b` first: in an uncapped attract race
 
 `sub_820F4128` (14.4-14.9% of the main thread, ~1,480 thousand cycles a
 frame) collects the lights nearest a point, nearest first (what it does is
-in `functions.md`). The check below also counted, over a whole attract
+in `functions/functions.md`). The check below also counted, over a whole attract
 race: ~3 calls a frame (93% on render-only passes), each testing **~6,240
 lights** for ~1-7 that pass; and ~63 groups a call scanned again (an
 entry's count above 1 makes it scan the same group again), ~1,465 of
@@ -3333,3 +3334,50 @@ The default size (scale 1) keeps the console's 1024x576 upscaled. At
 1920x1080 (`itc_793.log`): 3D view 1920x1080, its 1024x576 copies
 1920x1080, `1ECB9000` 1920x1080 (menus) and 2400x1350 (race); the dumped
 frame (cockpit view, with the mirror and HUD) right.
+
+## Historical: what limited the frame rate under the emulated GPU
+
+**Historical: the emulated GPU (2026-10-13).** This is what limited the
+frame rate before the native renderer and native audio. Neither the
+emulated GPU nor the Audio Worker runs any more by default, so none of it
+describes the game as it runs now. For the current limit (the
+render thread's own work), see "Performance: the render thread" in
+`native-renderer.md`.
+
+Measured 2026-10-13 in a race (9800X3D, RX 7900), with `--log_frame_times`
+and `perf record -e cycles:u -g` over the whole run, cut to the race by
+the samples in our blending code.
+
+- **The render thread is the limit**: in busy areas it takes 7.5-7.8 ms a
+  frame (129-134 fps) while the main thread's pass takes ~3.3 ms and then
+  waits. Its CPU time is within 0.1 ms of its wall time, so it never
+  sleeps.
+- **About half of the render thread's time is a busy-wait on the emulated
+  GPU.** `sub_8229D8A0` (46% of its samples) and `sub_825B9A60` (7%, it
+  only reads a tick count from the processor block, r13+256 → +332) are
+  the game's graphics library waiting on the GPU. `sub_8229D8A0` spins a
+  few `db16cyc`, reads the tick count, and gives up after 5000 ticks
+  (`sub_822ACAA8`). It's called in loops from four functions; the one in
+  `sub_8229E908` waits for space in the ring buffer (see "Waits on the
+  GPU" in `gpu-functions.md`). `perf` can't see callers, since the
+  recompiled code has no frame pointers.
+- **The emulated GPU's thread ("GPU Commands") is busy, not idle**: ~70% of
+  a core in user code during the race, nearly all of it command processing
+  rather than its idle spin. Its biggest costs are per-register work
+  (`VulkanCommandProcessor::WriteRegister` 7.5%,
+  `CommandProcessor::WriteRegister` 7.3%, `RegisterFile::GetRegisterInfo`
+  4%, `ExecutePacketType0` 3.7%), `pthread_mutex_lock` 3.9%, binding
+  updates, and ~3% looking up cvars by name (`cvar::HasNonDefaultValue`,
+  a string-keyed hash table, in the draw path). The Vulkan driver itself is
+  ~12% of it.
+- Our blending is ~4-10% of the render thread (`BlendState_ReplayConstants`
+  and the upload wrapper).
+- The "Audio Worker" thread spins at ~80% of a core
+  (`pthread_mutex_trylock`) the whole time: the SDK's polling wait, not
+  audio work. Measured since: it didn't cost frame rate on this PC, and
+  our own audio output replaced it (see `native-audio.md`).
+
+So the frame rate in busy areas is set by how fast the emulated GPU
+processes the game's commands; the render thread mostly waits for it.
+
+(Moved here from `docs/functions/functions.md`, where it was "Performance", on 2026-10-20.)

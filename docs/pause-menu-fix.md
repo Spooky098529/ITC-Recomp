@@ -858,8 +858,8 @@ What's known and what isn't yet, for whoever picks this up:
 
 ### When done
 
-Update the `Input::Update` row and "Menus run at 30 fps" in
-`docs/functions/functions.md` (the pause menu then runs at the full frame rate with
+Update the `Input::Update` row in `docs/functions/functions.md` and
+"Menus run at 30 fps" in `docs/known-issues.md` (the pause menu then runs at the full frame rate with
 the right repeat; the front end's menus still run at 30 fps), this
 document's status, and CLAUDE.md's line for this document.
 
@@ -966,7 +966,7 @@ ticks: next, 144 fps with `--interpolate_draw_state=false`.
 keyframe interpolation (it finds the keys around the animation's time and
 applies t = (time - k0) / (k1 - k0), clamped): it sets values from the
 time, so replays can't step it. The game never measures time (see
-"Fixed time step" in `docs/functions/functions.md`), so the arrow isn't scaled by
+"Fixed time step" in `docs/frame-interpolation.md`), so the arrow isn't scaled by
 frame time; something steps once a pass. With interpolation off at 144
 fps the user still saw the arrow wrong, so it isn't the blending either.
 

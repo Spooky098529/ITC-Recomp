@@ -5,11 +5,14 @@ ReXGlue (`rexglue-sdk/`, a submodule patched from `patches/rexglue-sdk/`).
 `git status` showing `rexglue-sdk` as modified (`m`) is expected: those are
 our patches applied in the submodule, not something to look into
 (patch 0003, Windows SDL as a DLL, only changes Windows builds).
-`docs/functions/` is the reference: what's known about the game's code
-(the functions' table, split by subsystem into one file per area since
-2026-10-20: `functions.md` holds the rows not yet moved and the prose,
-`system-services.md` B5's), how frame interpolation works, every
-diagnostic option, and what didn't work. `docs/gpu-functions.md` covers how the game drives the GPU (the
+`docs/functions/` is the reference for the game's functions: their
+table, split by subsystem into one file per area since 2026-10-20
+(`functions.md` holds the rows not yet moved, `system-services.md` B5's).
+`docs/known-data.md` lists the globals and object fields worked out.
+`docs/frame-interpolation.md` is how frame interpolation works (the
+frame's structure, the passes, what's blended), every diagnostic option,
+and what didn't work; `docs/title-screen.md` the boot and the attract
+race; `docs/known-issues.md` the known issues. `docs/gpu-functions.md` covers how the game drives the GPU (the
 render command replay and the graphics library), and
 `docs/native-renderer.md` is the plan and progress of the native renderer
 that replaced the emulated GPU, and (its last section) the investigation
@@ -203,8 +206,8 @@ off); `interpolate_draw_state = false` and `max_fps = 30` there give the
 original 30 fps.
 Our renderer always draws the glow (`--glow` only affects the emulated
 GPU); `--motion_blur=false` leaves out the motion blur (on by default;
-defined in `src/native/renderer.cpp` since SDK patch 0002 was removed). Known issues are at the end of
-`docs/functions/functions.md`.
+defined in `src/native/renderer.cpp` since SDK patch 0002 was removed). Known issues are in
+`docs/known-issues.md`.
 
 Other resolutions (v0.4.0, merged from `unlocked-resolution`):
 `--width`/`--height` and `--fullscreen`, off by default (a 1280x720 window
@@ -230,7 +233,7 @@ the rival intro cutscene's logo flickered above 30 fps, drawn during its
 Update handler (`82159948`, `sub_821594B8`) on logic passes only. A native
 override runs the cutscene on logic passes and only the logo's draw
 (`sub_82211A28`) on render-only passes (`--redraw_rival_logo`, on by
-default). See "The rival logo at the race start" in `docs/functions/functions.md`.
+default). See "The rival logo at the race start" in `docs/frame-interpolation.md`.
 
 Cockpit dials (merged from `cockpit-dial-interpolation`, 2026-10-19,
 released in v0.4.5): the dial updates (`sub_820E42E8`, `sub_820E45A8`) are native
@@ -254,7 +257,7 @@ Camera numbers and the cut check no longer use it
 address while a projection drifts (`--sticky_camera_ids`); both on.
 `--double_precision_blending` is kept off (nothing visible). The cockpit
 judder far out is the game's own (Known issues). See "The headlight beam
-far from the origin" in `docs/functions/functions.md`.
+far from the origin" in `docs/frame-interpolation.md`.
 
 Motion blur (merged from `beam-stepping`, 2026-10-19): the headlight beam
 on the road sometimes looked like it updated at 30 Hz. It was the motion
