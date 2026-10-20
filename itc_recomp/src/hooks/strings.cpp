@@ -1,10 +1,11 @@
 // The game's character set conversions natively: adapters in front of
 // src/helpers/strings.cpp. UTF-8 stays with the game's own converters
-// (sub_82297340, sub_82297540, guest calls), and errors are set through its
-// SetLastError (sub_82296FD0).
+// (sub_82297340, sub_82297540, guest calls); errors are set with
+// last_error::Set.
 
 #include "guest.h"
 #include "guest_call.h"
+#include "last_error.h"
 
 #include "helpers/strings.h"
 
@@ -18,14 +19,6 @@ namespace {
 
 constexpr uint32_t kCodePageUtf8 = 65001;
 constexpr uint32_t kErrorInsufficientBuffer = 122;
-
-void SetLastError(PPCContext& ctx, uint8_t* base, uint32_t frame_bytes, uint32_t error,
-                  uint32_t return_address) {
-  InFrame(ctx, base, frame_bytes, return_address, [&](uint32_t) {
-    ctx.r3.u64 = error;
-    sub_82296FD0(ctx, base);
-  });
-}
 
 }  // namespace
 
@@ -62,7 +55,7 @@ extern "C" REX_FUNC(sub_82296648) {
       ctx.r3.s64 = length;
       return;
     case helpers::Conversion::kTooSmall:
-      SetLastError(ctx, base, 96, kErrorInsufficientBuffer, 0x82296708);
+      last_error::Set(base, ctx.r13.u32, kErrorInsufficientBuffer);
       ctx.r3.u64 = 0;
       return;
     case helpers::Conversion::kConvert:
@@ -117,7 +110,7 @@ extern "C" REX_FUNC(sub_82296720) {
       ctx.r3.s64 = length;
       return;
     case helpers::Conversion::kTooSmall:
-      SetLastError(ctx, base, 128, kErrorInsufficientBuffer, 0x822967D4);
+      last_error::Set(base, ctx.r13.u32, kErrorInsufficientBuffer);
       ctx.r3.u64 = 0;
       return;
     case helpers::Conversion::kConvert:

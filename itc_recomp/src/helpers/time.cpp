@@ -11,6 +11,12 @@ using Ticks = std::chrono::duration<int64_t, std::ratio<1, 10000000>>;  // 100 n
 // FILETIME's epoch (1601-01-01) to the Unix epoch.
 constexpr int64_t kUnixEpoch = 116444736000000000;
 
+// Minutes to 100 ns units, the minutes' product cut to 32 bits as the
+// game's (mulli then extsw).
+int64_t MinutesToTicks(int32_t minutes) {
+  return int64_t(int32_t(uint32_t(minutes) * 60u)) * 10000000;
+}
+
 TimeFields ToFields(const SystemTime& s) {
   return {s.year, s.month, s.day, s.hour, s.minute, s.second, s.milliseconds, s.day_of_week};
 }
@@ -166,17 +172,28 @@ uint32_t TimeZoneState(TimeZoneInformation& zone, bool uses_daylight, uint64_t n
   }
   // The cutovers are local times: daylight time starts in standard time,
   // standard time in daylight time.
-  // Minutes to 100 ns units, the minutes' product cut to 32 bits as the
-  // game's (mulli then extsw).
-  auto ticks = [](int32_t minutes) { return int64_t(int32_t(uint32_t(minutes) * 60u)) * 10000000; };
-  int64_t bias = ticks(zone.bias);
-  int64_t daylight_starts = ticks(zone.standard_bias) + bias + int64_t(daylight_cutover);
-  int64_t standard_starts = ticks(zone.daylight_bias) + bias + int64_t(standard_cutover);
+  int64_t bias = MinutesToTicks(zone.bias);
+  int64_t daylight_starts = MinutesToTicks(zone.standard_bias) + bias + int64_t(daylight_cutover);
+  int64_t standard_starts = MinutesToTicks(zone.daylight_bias) + bias + int64_t(standard_cutover);
   int64_t t = int64_t(now);
   if (daylight_starts < standard_starts) {
     return (t < daylight_starts || t >= standard_starts) ? 1 : 2;
   }
   return (t < standard_starts || t >= daylight_starts) ? 2 : 1;
+}
+
+int64_t TimeZoneBias(const TimeZoneInformation& zone, uint32_t state) {
+  int32_t minutes;
+  if (state == 0) {
+    minutes = zone.bias;
+  } else if (state == 1) {
+    minutes = int32_t(uint32_t(zone.bias) + uint32_t(zone.standard_bias));
+  } else if (state == 2) {
+    minutes = int32_t(uint32_t(zone.bias) + uint32_t(zone.daylight_bias));
+  } else {
+    minutes = 0;
+  }
+  return MinutesToTicks(minutes);
 }
 
 }  // namespace helpers

@@ -1,12 +1,12 @@
 // The game's time functions natively: adapters in front of src/helpers/time.cpp.
-// Two things are still guest calls: the time zone read from the console's
-// settings (sub_8229B440, ExGetXConfigSetting: B5 in docs/rexglue-removal.md)
-// and the game's SetLastError helpers (sub_82296E88, sub_82296FD0). The
-// bias (sub_82297678, between GetLocalTime and the time zone state) stays
-// recompiled: it calls no kernel import.
+// One thing is still a guest call: the time zone read from the console's
+// settings (sub_8229B440, ExGetXConfigSetting: B5 in docs/rexglue-removal.md).
+// GetLocalTime works out the bias (the game's sub_82297678, no longer
+// called) itself.
 
 #include "guest.h"
 #include "guest_call.h"
+#include "last_error.h"
 
 #include "helpers/time.h"
 
@@ -41,15 +41,6 @@ void StoreSystemTime(uint8_t* base, uint32_t address, const helpers::SystemTime&
   }
 }
 
-// The game's SetLastError from an NTSTATUS (sub_82296E88).
-void SetLastErrorFromStatus(PPCContext& ctx, uint8_t* base, uint32_t status,
-                            uint32_t return_address) {
-  InFrame(ctx, base, 128, return_address, [&](uint32_t) {
-    ctx.r3.u64 = status;
-    sub_82296E88(ctx, base);
-  });
-}
-
 // TIME_ZONE_INFORMATION (172 bytes): bias +0, standard name +4, standard
 // date +68, standard bias +84, daylight name +88, daylight date +152,
 // daylight bias +168.
@@ -77,27 +68,18 @@ void StoreZone(uint8_t* base, uint32_t address, const helpers::TimeZoneInformati
   guest::StoreU32(base, address + 168, uint32_t(zone.daylight_bias));
 }
 
-}  // namespace
-
-// GetLocalTime: r3 = the SYSTEMTIME.
-extern "C" REX_FUNC(sub_822968B8) {
-  REX_FUNC_PROLOGUE();
-  const uint32_t out = ctx.r3.u32;
-  const uint64_t now = helpers::SystemTimeNow();
-  uint64_t bias = 0;
-  InFrame(ctx, base, 144, 0x822968DC, [&](uint32_t frame) {
-    ctx.r3.u64 = frame + 88;
-    sub_82297678(ctx, base);
-    bias = LoadU64(base, frame + 88);
-  });
-  StoreSystemTime(base, out, helpers::FileTimeToSystemTime(now - bias));
+void SetInvalidParameter(PPCContext& ctx, uint8_t* base) {
+  last_error::SetFromStatus(base, ctx.r13.u32, kStatusInvalidParameter);
 }
 
-// GetTimeZoneInformation: r3 = the TIME_ZONE_INFORMATION; returns its state
-// (0, 1 or 2), or -1 when the console's settings can't be read.
-extern "C" REX_FUNC(sub_82297DC8) {
-  REX_FUNC_PROLOGUE();
-  const uint32_t address = ctx.r3.u32;
+}  // namespace
+
+namespace time_hooks {
+
+// GetTimeZoneInformation's work (sub_82297DC8) on the zone at `address`:
+// returns its state (0, 1 or 2), or -1 when the console's settings can't be
+// read (the last error set).
+uint32_t GetTimeZoneInformation(PPCContext& ctx, uint8_t* base, uint32_t address) {
   uint32_t error = 0, uses_daylight = 0;
   InFrame(ctx, base, 144, 0x82297DEC, [&](uint32_t frame) {
     ctx.r3.u64 = address;
@@ -105,15 +87,10 @@ extern "C" REX_FUNC(sub_82297DC8) {
     sub_8229B440(ctx, base);
     error = ctx.r3.u32;
     uses_daylight = guest::LoadU32(base, frame + 80);
-    if (error) {
-      ctx.r3.u64 = error;
-      ctx.lr = 0x82297DF8;
-      sub_82296FD0(ctx, base);
-    }
   });
   if (error) {
-    ctx.r3.s64 = -1;
-    return;
+    last_error::Set(base, ctx.r13.u32, error);
+    return 0xFFFFFFFF;
   }
   helpers::TimeZoneInformation zone = LoadZone(base, address);
   bool invalid_parameter = false;
@@ -123,9 +100,39 @@ extern "C" REX_FUNC(sub_82297DC8) {
     StoreZone(base, address, zone);
   }
   if (invalid_parameter) {
-    SetLastErrorFromStatus(ctx, base, kStatusInvalidParameter, 0x8229B6F0);
+    SetInvalidParameter(ctx, base);
   }
-  ctx.r3.u64 = state;
+  return state;
+}
+
+// The time zone's bias now (the game's sub_82297678), in 100 ns units; the
+// zone read into a guest buffer in a frame like the game's.
+int64_t GetTimeZoneBias(PPCContext& ctx, uint8_t* base) {
+  int64_t bias = 0;
+  InFrame(ctx, base, 272, 0x822968DC, [&](uint32_t frame) {
+    const uint32_t state = GetTimeZoneInformation(ctx, base, frame + 80);
+    bias = helpers::TimeZoneBias(LoadZone(base, frame + 80), state);
+  });
+  return bias;
+}
+
+}  // namespace time_hooks
+
+// GetLocalTime: r3 = the SYSTEMTIME.
+extern "C" REX_FUNC(sub_822968B8) {
+  REX_FUNC_PROLOGUE();
+  const uint32_t out = ctx.r3.u32;
+  const uint64_t now = helpers::SystemTimeNow();
+  const int64_t bias = time_hooks::GetTimeZoneBias(ctx, base);
+  StoreSystemTime(base, out, helpers::FileTimeToSystemTime(now - uint64_t(bias)));
+}
+
+// GetTimeZoneInformation: r3 = the TIME_ZONE_INFORMATION; returns its state
+// (0, 1 or 2), or -1 when the console's settings can't be read.
+extern "C" REX_FUNC(sub_82297DC8) {
+  REX_FUNC_PROLOGUE();
+  const uint32_t state = time_hooks::GetTimeZoneInformation(ctx, base, ctx.r3.u32);
+  ctx.r3.s64 = int32_t(state);
 }
 
 // The next cutover of a time zone date: r3 = the date, r4 = the cutover (out),
@@ -143,7 +150,7 @@ extern "C" REX_FUNC(sub_8229B1E8) {
     StoreU64(base, out, cutover);
   }
   if (invalid_parameter) {
-    SetLastErrorFromStatus(ctx, base, kStatusInvalidParameter, 0x8229B6F0);
+    SetInvalidParameter(ctx, base);
   }
   ctx.r3.u64 = found ? 1 : 0;
 }
@@ -154,7 +161,7 @@ extern "C" REX_FUNC(sub_8229B680) {
   REX_FUNC_PROLOGUE();
   uint64_t time;
   if (!helpers::SystemTimeToFileTime(LoadSystemTime(base, ctx.r3.u32), &time)) {
-    SetLastErrorFromStatus(ctx, base, kStatusInvalidParameter, 0x8229B6F0);
+    SetInvalidParameter(ctx, base);
     ctx.r3.u64 = 0;
     return;
   }

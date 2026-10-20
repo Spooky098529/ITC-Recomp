@@ -64,4 +64,10 @@ bool CutoverTime(const SystemTime& rule, uint64_t now, bool from_this_year, uint
 uint32_t TimeZoneState(TimeZoneInformation& zone, bool uses_daylight, uint64_t now,
                        bool* invalid_parameter);
 
+// The time zone's bias (GetTimeZoneBias, sub_82297678) for a zone in a
+// TimeZoneState: the zone's bias plus its standard bias (state 1) or
+// daylight bias (2), nothing else for 0, and no bias at all for an error
+// (-1); in 100 ns units, to subtract from UTC.
+int64_t TimeZoneBias(const TimeZoneInformation& zone, uint32_t state);
+
 }  // namespace helpers
