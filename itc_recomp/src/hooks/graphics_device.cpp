@@ -10,6 +10,7 @@
 
 #include "display/display.h"
 #include "helpers/clock.h"
+#include "hooks/system_services_log.h"  // TEMPORARY (B5)
 
 using guest_call::InFrame;
 
@@ -195,6 +196,7 @@ extern "C" REX_FUNC(sub_822AD298) {
     ctx.r7.u64 = frame + 80;
     ctx.lr = 0x822AD324;
     __imp__ExGetXConfigSetting(ctx, base);
+    system_services_log::ConfigSetting(base, 3, 10, device + 15164, 4, ctx.r3.u32);  // TEMPORARY (B5)
     if (ctx.r3.s32 < 0) {
       return;
     }
