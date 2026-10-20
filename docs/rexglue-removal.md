@@ -1,7 +1,7 @@
 # Removing ReXGlue: toward a native port
 
 The plan (written 2026-10-19 on branch `remove-rexglue`, restructured the
-same day; A0, A5 and B1 done) for taking the game off the ReXGlue SDK
+same day; A0, A5 and B1 done, B6 mostly done on `pure-helpers`) for taking the game off the ReXGlue SDK
 (`rexglue-sdk/`) piece by piece, with releases along the way. The goal
 is a native PC port, not a smaller emulator: in the end no `PPCContext`,
 no guest memory layout, no Xbox kernel calls, no `default.xex`.
@@ -451,7 +451,11 @@ B6. **Pure helpers** (55 functions): string, time and formatting
       its `video_mode_*` settings.
 
     So 10 imports have no recompiled callers left; their SDK code can go
-    when the SDK's import table is ours. Adapters calling guest code use
+    when the SDK's import table is ours. Checked by the user (2026-10-20):
+    a 2.5-minute session (menus, a race, quit) with no errors seen; the
+    log had no errors, the native audio played steadily with no silence
+    fills (so the audio library's hardware wait, now ours, never held it
+    up), and the game closed cleanly. Adapters calling guest code use
     `src/hooks/guest_call.h` (a frame like the recompiled function's).
 
     Left in B6, each with callers in other areas: `RtlNtStatusToDosError`
