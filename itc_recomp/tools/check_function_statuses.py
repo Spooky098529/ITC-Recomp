@@ -9,11 +9,12 @@ For each table row, every sub_XXXXXXXX in its first column is checked:
   error    Native, but an override (extern "C" REX_FUNC(sub_X), or a macro
            defining one) exists:
            it should be Overridden or Wrapped
-  error    Overridden, Wrapped or Dropped, but no override exists
+  error    Overridden or Wrapped, but no override exists
   error    no status, but an override exists
   check    Wrapped, but the override never calls __imp__sub_X
   check    Dropped, but its file calls __imp__sub_X (a fallback flag
            while the drop is checked; remove it once checked)
+  (Dropped with no override is fine: native callers leave the call out.)
   note     Overridden, and its file calls __imp__sub_X (a fallback flag or
            a check against the original is fine; calling it for the work
            would make it Wrapped)
@@ -94,7 +95,7 @@ def main():
             if status == "Native" and override:
                 print(f"error  {where}: an override exists in {override[0]}")
                 errors += 1
-            elif status in ("Overridden", "Wrapped", "Dropped") and not override:
+            elif status in ("Overridden", "Wrapped") and not override:
                 print(f"error  {where}: no override in src/")
                 errors += 1
             elif not status and override:
@@ -103,7 +104,7 @@ def main():
             elif status == "Wrapped" and not override[1]:
                 print(f"check  {where}: {override[0]} never calls __imp__{sub}")
                 checks += 1
-            elif status == "Dropped" and override[1]:
+            elif status == "Dropped" and override and override[1]:
                 print(f"check  {where}: {override[0]} calls __imp__{sub}")
                 checks += 1
             elif status == "Overridden" and override[1]:
