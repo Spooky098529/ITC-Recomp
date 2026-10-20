@@ -478,6 +478,24 @@ B6. **Pure helpers** (55 functions): string, time and formatting
     `RtlUnwind`, `RtlCaptureContext` (the core). Re-run the boundary
     pipeline before starting any of these: the callers may have changed.
 
+    **State of B6 (2026-10-20):** every import B6 alone can clear is
+    cleared (10; `XGetVideoMode` went to B3). What's left doesn't clear
+    any import:
+
+    1. The "now" callers in the table above (11 functions): work saved
+       for B3, B4, B5 and the core, with nothing removed from the SDK
+       until those are done.
+    2. Moving the `ctx` edge up from the functions made native here:
+       SetLastError (`sub_82296E70`, its jump `sub_82296FD0`, and
+       `sub_82296E88`, one of the 11) and GetTimeZoneBias
+       (`sub_82297678`, no imports). Native, they remove the guest calls
+       our time and string adapters still make, and those functions'
+       callers could then reach them without `ctx`.
+
+    Suggested next (not decided): 2, then B6 counts as done for now;
+    merge `pure-helpers` into `rexglue-removal-project` and pick the next
+    item (A2, or A6 with B2, would remove visible SDK use).
+
 B7. **The game logic inside**: everything else, subsystem by subsystem,
     in whatever order the user wants (frame interpolation's hooks,
     vehicles, UI, menus, physics, ...). Each subsystem moves its data to
