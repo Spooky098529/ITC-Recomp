@@ -45,7 +45,11 @@ and gamma functions that called `Vd*` imports are native in
 `src/hooks/graphics_device.cpp`, `video_mode.cpp`, `gamma.cpp` and
 `graphics_drops.cpp`, nothing reads the GPU registers, and nothing needs
 vblanks (the interrupt callback is never called); the SDK's unused
-graphics code goes with the SDK. Plan steps are done on their
+graphics code goes with the SDK. B5 (system services) is in progress on
+`system-services`: step 1 is done (2026-10-21; the PAL-50 and heap
+checks, Device::Init's video flags and the console's time zone read
+without their kernel calls, `src/hooks/start_up.cpp` and
+`src/helpers/console_settings.h`). Plan steps are done on their
 own branches and merged into `rexglue-removal-project` (no force pushes:
 GitHub refuses them on that branch).
 `docs/tick-replay.md` is a lead (not started): translating draws once a

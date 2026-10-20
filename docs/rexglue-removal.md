@@ -1150,6 +1150,54 @@ B5. **System services** (82 functions; first counted as 78): sign-in, profile, U
     the notification readers with their queue (the sign-in watcher first,
     then the network manager and sign-in manager); (7) the profile read.
 
+    **Step 1, the boot-time fixed answers: done (2026-10-21,
+    `system-services`).** All four run once at boot; no fallback flags (the
+    user's call, as for B3 and B6: the harness and runs check them).
+
+    - The PAL-50 check `sub_82296AB0` (`src/hooks/start_up.cpp`): returns
+      0, Dropped. The executable's system flags (header `0x30000`) are
+      `0x600`, so privilege 10 is set and the check reaches the AV pack,
+      which the SDK answers 6: it passes before any setting is read.
+    - The heap check `sub_82297CE0` and `sub_82297C08`
+      (`src/hooks/start_up.cpp`): the heap is still made by the game's
+      `sub_822997B0(2, 0, 1 MB, 4096, 0, attributes)` (the attributes a
+      48-byte block, its size then zeros), a guest call in a frame like the
+      original's, kept at `8297149C` (`lis -32105` + 5276; the survey
+      first wrote `826A549C`, which made the first try skip the heap and
+      crash at boot). The size is fixed: `default.xex` has no default heap
+      size field (`0x20401`; its optional headers listed from the file), so
+      the SDK's `RtlImageXexHeaderField` answered 0 and the game took its
+      1 MB default. If the heap can't be made, ours logs an error and exits
+      (the SDK's `HalReturnToFirmware` exited too).
+    - Device::Init (`src/hooks/graphics_device.cpp`): the video flags
+      stored at device + 15164 are `helpers::kVideoFlags` (`00040000`,
+      `src/helpers/console_settings.h`) instead of
+      `ExGetXConfigSetting(3, 10)`; the size it wrote at frame + 80 had no
+      reader.
+    - The time zone read `sub_8229B440`: Native. The SDK's answers (zero for
+      settings 1-7, retail flags `0x40` for 12, so "uses daylight" 1) are
+      `helpers::kConsoleTimeZone` and `helpers::UsesDaylight`;
+      `time_hooks::ReadTimeZoneSettings` (`src/hooks/time.cpp`) writes the
+      same bytes as the original (only the first four characters of each
+      name and a terminator: the rest is left alone), and
+      GetTimeZoneInformation calls it directly, so the time adapters make
+      no guest call for it and its -1 path (the read can't fail) is gone.
+      The time harness's made-up zone moved into it
+      (`time_hooks::SetFakeZone`); the `sub_8229B440` adapter stays only
+      for the recompiled time functions the harness runs.
+
+    Checked: harness cases (`start_up`: the PAL-50 and heap checks after
+    boot; `time`: the read against the recompiled one, "uses daylight"
+    given and not, on a buffer filled with 0xCD), all the same, and an
+    attract race (`attract_race.sh 30 --run_harnesses=all`: no errors, 25 s
+    raced). Imports with no recompiled callers left: `XGetAVPack`,
+    `XGetLanguage`, `XexCheckExecutablePrivilege`, `HalReturnToFirmware`,
+    `RtlImageXexHeaderField` and `ExGetXConfigSetting`. Not cleared:
+    `RtlNtStatusToDosError`, still called by `sub_822953E8` (reached only
+    through the function table: maps an error status and calls a routine,
+    probably a file I/O completion routine, B4); our `sub_82296E88` keeps
+    the SDK's mapping as C++ until then (the user's call: the table waits).
+
 B6. **Pure helpers** (55 functions): string, time and formatting
     helpers made native, or their callers made native. Cheap; can be
     done alongside anything else.
@@ -1198,7 +1246,7 @@ B6. **Pure helpers** (55 functions): string, time and formatting
       for times outside 1678-2261, where the SDK's conversions overflow
       `system_clock`'s nanoseconds (ours are right). The zone itself
       still comes from `sub_8229B440` (`ExGetXConfigSetting`, B5) as a
-      guest call.
+      guest call (native since B5 step 1, 2026-10-21: no guest call).
     - The counter's rate (done): `KeQueryPerformanceFrequency`, through
       QueryPerformanceFrequency and the audio library's hardware wait
       `sub_8245D288` (`src/helpers/clock.h`: 50 MHz, which must match
@@ -1231,17 +1279,17 @@ B6. **Pure helpers** (55 functions): string, time and formatting
 
     | Import | Callers B6 can do now | Callers waiting |
     |---|---|---|
-    | `RtlNtStatusToDosError` | `sub_822953E8`; `sub_82296E88` (SetLastError from an NTSTATUS, which our time adapters call as guest code: native, it removes those guest calls) | `sub_8229B440`, the console's time zone read (B5) |
+    | `RtlNtStatusToDosError` | `sub_822953E8` (probably a file I/O completion routine, so maybe B4's); `sub_82296E88` done (the SDK's mapping as C++) | none since 2026-10-21: the time zone read `sub_8229B440` is native (B5 step 1) |
     | `DbgPrint` | `sub_822AC530`, `sub_82486BC0`, `sub_8248FBE0` | `xstart`, the C runtime's entry point, also calling `XamLoaderTerminateTitle` (B5; first listed as `sub_822954C8`, the pipeline's mistake, corrected under "The boundary") |
     | `sprintf` | `sub_822AC638`, `sub_822B1AC8` | the drive mounting `sub_822B58F0` (B4) |
     | `RtlCompareMemoryUlong` | `sub_82298548`, `sub_82298A88` | `sub_8229A930`, the game's heap (core) |
     | `KeGetCurrentProcessType` | `sub_8245A828`, `sub_825776A8` | five heap and memory functions (core) |
     | `RtlInitAnsiString` | none (its 2 pure callers are done) | the file functions `sub_825B9C20`, `sub_825B9F20`, `sub_825B9FD8`, `sub_822B58F0` (B4); `sub_82295508`, CreateFile, is only wrapped for logging |
 
-    Blocked entirely: `XGetAVPack` and `XGetLanguage` (one
-    function also reading the console's settings and the executable's
-    privileges, B5), and `RtlRaiseException`,
-    `RtlUnwind`, `RtlCaptureContext` (the core). Re-run the boundary
+    Blocked entirely: `RtlRaiseException`,
+    `RtlUnwind`, `RtlCaptureContext` (the core). `XGetAVPack` and
+    `XGetLanguage`, first listed here, were cleared by B5 step 1
+    (2026-10-21: their one caller, the PAL-50 check, is Dropped). Re-run the boundary
     pipeline before starting any of these: the callers may have changed.
     Cleared by B3 (2026-10-20): `XGetVideoMode` (both callers native) and
     `RtlFillMemoryUlong` (its only caller, the scaler set-up
@@ -1261,7 +1309,9 @@ B6. **Pure helpers** (55 functions): string, time and formatting
        `sub_82296E88`'s NTSTATUS mapping is the SDK's
        (`xeRtlNtStatusToDosError`, called as C++) until `sub_8229B440`
        (B5), the import's last other caller, is native: then the table
-       has to be ours. GetTimeZoneBias (`sub_82297678`) is plain C++ and
+       has to be ours. (Corrected 2026-10-21: `sub_8229B440` is native,
+       but `sub_822953E8` still calls the import, so the table waits for
+       it.) GetTimeZoneBias (`sub_82297678`) is plain C++ and
        its recompiled version is no longer called: the first function of
        this work to reach Native. GetLocalTime's only guest call left is
        the console settings read (B5). Checked by the harness (all the
