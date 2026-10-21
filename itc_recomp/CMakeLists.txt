@@ -84,6 +84,7 @@ set(ITC_SOURCES
     src/hooks/network.cpp
     src/hooks/notify.cpp
     src/hooks/profile.cpp
+    src/hooks/files_and_saves_log.cpp
     src/display/gamma.cpp
     src/harnesses/harness.cpp
     src/harnesses/clock.cpp
