@@ -314,7 +314,7 @@ old performance notes to the end of `../native-renderer.md`.
 | `sub_8229B930`, `sub_8229B9C8`, `sub_8229BFE8` | | | GPU performance counters, from `sub_822B20D8` while +20104 is 1 or 2 (never without a debugger); `sub_8229B9C8` and `sub_8229BFE8` reserve words with `sub_8229F148`. Not read. |
 | `sub_8229E9D0` | | | From `sub_822A0718` (r4 the write position, r6 `822A0688`, r7 from +13240 and +11596); writes packets. Not read. |
 | `sub_825BED08` | | | Graphics library; calls `sub_822A3B90`, sets +10811 bit 6. Not read. |
-| `sub_825BE708` | `DrawIndexedVertices` | Overridden | Exclusive mode, without its packets (`src/native/draw_packets.cpp`). |
+| `sub_825BE708` | `DrawIndexedVertices` | Overridden | Exclusive mode, without its packets (`src/native/draw_packets.cpp`). Predicated draws (the device's tiling flags, bit 2) and `--native_renderer_library_packets` still run the original there, so it runs in play (coverage, 2026-10-21). |
 | `sub_822A6738`, `sub_822A67B0` | `Resource::AddRef`, `Resource::Release` | Overridden | `src/native/refcount.cpp`: reference counts without the library's global lock, skipped for the vertex shader already bound; the original with `--refcount_global_lock`. |
 | `sub_822A8808` | `Device::SetVertexShader` | Wrapped | Same file: marks a rebind of the bound shader, so `AddRef` and `Release` skip it. |
 | `sub_822AE340` | | Wrapped | `src/native/replay_hooks.cpp`: keeps the patched copy of a vertex shader's microcode (made when the GPU may still use the original) for the native renderer. |
