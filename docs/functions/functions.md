@@ -45,7 +45,7 @@ status with no override, an override with no row, a row in two files);
 run it after changing either, on any branch.
 
 The table is being split by subsystem into `docs/functions/`, one file
-per area, each with the same columns, sorted by address, and these
+per area, each with the same columns, one function a row, and these
 status definitions copied at its top (change them in every file).
 Rows not yet moved stay in the table below. So far:
 

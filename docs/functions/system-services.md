@@ -7,9 +7,8 @@ Xbox Live (XLiveBase), the player's own music (XMP), network and system
 link, voice chat, notifications, the loader and start-up, and the
 console's settings. Worked on as B5 in `docs/rexglue-removal.md`, which
 has the survey (what runs, what the SDK answers). Xbox-only features are
-mapped here but not ported ("The approach" there). Rows are sorted by
-address. The rest of the game's functions, and the prose sections, are
-in [`functions.md`](functions.md).
+mapped here but not ported ("The approach" there). The rest of the
+game's functions, and the prose sections, are in [`functions.md`](functions.md).
 
 Status:
 
