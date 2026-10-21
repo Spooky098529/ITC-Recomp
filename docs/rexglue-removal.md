@@ -33,15 +33,16 @@ goes in `src/` as overrides), American English.
   measures the core, so B7 needs its own measure: per-subsystem counts of
   the statuses in `docs/functions/`.
 - **Track A**: A0, A2, A5 and A6 done (A2's flag parser waits for A4);
-  A1 started (xxHash); A3 and A4 not started. What `src/` still takes
+  A1 started (xxHash); A4 not started; A3 left for later (2026-10-21: the
+  translator is already static, and freeing it from the DLL only pays off
+  at the end). What `src/` still takes
   from the SDK is in the table below.
 - **Next, in order (proposed 2026-10-21, the user agreed to start with
   A2; A2 done the same day, merged from `own-logging`):** A2 (logging, flags, hashes: our own headers forwarding to the
   SDK's, then `src/` switched over area by area, then our own logger and
   hashing; the flag parser waits for A4), A4 (the app shell: our own
   `main`, loop, window and flag parser; it unblocks A1's SDL and finishes
-  A2's flags), A3 alongside (the shader translator and our own register
-  array), A1 after A4. B7 starts with its measure and a first subsystem:
+  A2's flags), A1 after A4; A3 left for the end. B7 starts with its measure and a first subsystem:
   the leftovers above (the movie player, Voice::Init skipped as high as
   is safe), or the main thread's performance leads
   (`sub_821298C0`, `sub_8209C6E0`, in `docs/native-renderer.md`).
@@ -189,7 +190,7 @@ first and what's left).
 |---|---|---|---|
 | Logging, flags, hashes | `REXLOG_*` (~280 uses; 327 on 2026-10-21), `REXCVAR_*` (~370; 408), `rex/hash.h` (xxHash); about 87 includes of `rex/logging.h`, `rex/cvar.h` and `rex/hash.h` | almost every file in `src/` | A |
 | App shell | `rex::ReXApp` (`src/itc_app.h`), `REX_DEFINE_APP` (`src/main.cpp`), `WindowedApp`, imgui (include path only), command line, log files, `PathConfig`, the SDK's hidden window (`src/native/app_window.cpp`) | `src/itc_app.h`, `src/main.cpp` | A |
-| Renderer leftovers | The Xenos to SPIR-V shader translator built from SDK sources (`itc_xenos_shaders` in `itc_recomp/CMakeLists.txt`), `rex::graphics::RegisterFile` (`src/native/state.h`, `passes.cpp`), `registers.h`, `xenos.h`, `util/draw.h`, `ui/vulkan/api.h`; SDL3 and Vulkan headers from `rexglue-sdk/thirdparty/`; the xenos plugin, no longer built for us or loaded since B3 (the SDK's own tree still builds it) | `src/native/` | A |
+| Renderer leftovers | The Xenos to SPIR-V shader translator built from SDK sources (`itc_xenos_shaders` in `itc_recomp/CMakeLists.txt`), `rex::graphics::RegisterFile` (`src/native/state.h`, `passes.cpp`), `registers.h`, `xenos.h`, `util/draw.h`, `ui/vulkan/api.h`; the register file, formats, `draw_util` and Vulkan list are used from the SDK's headers on purpose (no copies; the register array goes with guest memory); SDL3 and Vulkan headers from `rexglue-sdk/thirdparty/`; the xenos plugin, no longer built for us or loaded since B3 (the SDK's own tree still builds it) | `src/native/` | A3 (later), end |
 | Graphics boundary | Was `Vd*` (25 imports; 17 game functions). Done (B3): native or Dropped, the emulated GPU not built or loaded | — | B |
 | Audio | Output: done (A6, `src/audio/output_mix.h`); left: the `AudioSystem` base class (the runtime's audio slot, A4) and the `audio_mute`, `audio_maxqframes` flags (A2). The game side (was `XAudio*`, `XMA*` and the SDK's XMA decoder): done (B2, our own FFmpeg). Our mixer (`src/audio/native_audio.cpp`) still runs on an `XHostThread` and allocates from the guest heap (the core) | `src/audio/` | A, then end |
 | Input | Done (A5, B1): `src/input/`; it pumps SDL through the SDK's UI thread queue until A4 | — | A4 |
@@ -350,18 +351,38 @@ A2. Done (2026-10-21, `own-logging`; the flag parser waits for A4).
     (A4); the 158 `fmt::format` calls in `src/` can move to `std::format`
     with A1's fmt.
 
-A3. **Renderer leftovers**: bring the shader translator into the repo
-    (`src/native/xenos/`; the files `itc_xenos_shaders` builds, listed in
-    `CMakeLists.txt`, and the headers they need). The game's shaders are
-    Xenos microcode in its data, so a native port still translates them;
-    this isn't emulation. Read `rexglue-sdk/LICENSE` first (Tom Clay's
-    work, partly derived from Xenia), keep its notices on copied files,
-    ask the user if the terms are unclear. Our own register array in
-    place of `RegisterFile`; the formats from `xenos.h`/`registers.h`,
-    `draw_util` and the Vulkan function list the same way. The xenos
-    plugin isn't kept for comparisons (the user's call, 2026-10-20; see
-    B3): our build no longer uses it since B3 (the SDK still builds it
-    in its own tree until the SDK goes).
+A3. Left for later (the user's call, 2026-10-21). **Renderer leftovers**:
+    the SDK's Xenos to SPIR-V shader translator as a static dependency, so
+    it needs no `librexruntime`. The game's shaders are Xenos microcode in
+    its data, so a native port still translates them; this isn't
+    emulation. It is already static: `itc_xenos_shaders` in
+    `itc_recomp/CMakeLists.txt` builds the SDK's sources into `itc`. What
+    ties it to the DLL is ~30 symbols it calls there (surveyed
+    2026-10-21): `StringBuffer` (`src/core/string_buffer.cpp`),
+    `copy_and_swap_32_*` (`memory.cpp`), `bit_scan_forward` and `lzcnt`
+    (`math_gcc.cpp`/`math_msvc.cpp`), `FloatToD3D11Fixed16p8`
+    (`src/ui/graphics_util.cpp`), `FormatInfo::Get` and
+    `texture_util::GetTiled*` (`src/graphics/pipeline/texture/`),
+    `Float20e4To32` and the render target format names
+    (`src/graphics/xenos.cpp`), `filesystem::OpenFile` (shader dumps), and
+    the logging and flag registries (`logging.cpp`, `cvar.cpp`: asserts and
+    log lines, `dump_shaders`, `draw.cpp`'s two half-pixel-offset flags).
+    The helpers can be added to the library's file list from
+    `rexglue-sdk/`; logging and flags need small stand-ins over
+    `src/base/` (a second registry would clash with the DLL's). Since
+    `itc` needs the DLL for the core until the end, this only pays off
+    then, so it waits for "The end state".
+
+    Not planned (the user's call, 2026-10-21): our own register array in
+    place of `RegisterFile`, our own copies of the formats in
+    `xenos.h`/`registers.h`, of `draw_util`, or of the Vulkan function
+    list. `src/native/` includes the SDK's headers for them. The register
+    array exists because we read the game's GPU register shadow from guest
+    memory, which lasts until the core goes; copying SDK pieces we only
+    use would be rebuilding the SDK. The xenos plugin isn't kept for
+    comparisons (the user's call, 2026-10-20; see B3): our build no longer
+    uses it since B3 (the SDK still builds it in its own tree until the
+    SDK goes).
 
 A4. **App shell**: our own `main`: SDL init, our window as the only one
     (no hidden SDK window, no event forwarding in `app_window.cpp`), our
