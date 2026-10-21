@@ -984,7 +984,94 @@ B4. **Files and saves** (22 functions; the game's `CreateFile`
     handle is native (waits on async reads, `NtClose`). Saves
     (`XamContent*`): read and write where the SDK puts them, byte for
     byte; test with a save from the last release before and after. Then
-    the SDK's VFS goes.
+    the SDK's VFS goes. (Superseded for saves by the user's call below:
+    our own `saves` folder, no migration.)
+
+    Worked on in branch `files-and-saves`. Surveyed 2026-10-21. The
+    functions are in `docs/functions/files-and-saves.md`, the save slot's
+    fields in `docs/known-data.md`.
+
+    **The functions.** The boundary pipeline filtered to the file and
+    save imports gives 23 functions (22, and the debug capture's
+    `sub_822B4F10`, B3's). Nearly all are the XDK's Win32-style wrappers:
+    CreateFile `sub_82295508` (the only `NtCreateFile` caller), ReadFile,
+    ReadFileEx (with its APC `sub_822953E8`), WriteFile, SetFilePointer,
+    GetFileSize and GetFileSizeEx, SetEndOfFile, GetFileTime,
+    FlushFileBuffers, GetFileAttributes, GetDiskFreeSpaceEx and DeleteFile,
+    and the XContent wrappers (create, delete, close, thumbnail, creator,
+    enumerator, device data), the device selector and XEnumerate. Above
+    them: the game's file layer (`File::OpenRead` `sub_8258C688`,
+    `File::Read`, `File::Seek`, `File::OpenWrite`, `File::Write`; the
+    handle at +4, the position at +8), the C runtime's low-level I/O
+    (`_read`, `_write`, `_lseek`, `_commit`), the archive streaming
+    (`sub_8209E210` opens, `sub_8209DD00` reads with ReadFileEx), the
+    movie player (`MoviePlayer::OpenFile` `sub_82487C48`, reads in
+    `sub_82488598`), and the save slots (`SaveSlot::*`, `sub_820A45C0` to
+    `sub_820A5E68`: a 1,000-byte slot, each step started through an
+    overlapped and polled with XGetOverlappedResult `sub_82295C98`). Two
+    old guesses were wrong: `sub_82295C10` is XContentGetDeviceData (not
+    XGetOverlappedResult), `sub_825B9F20` is DeleteFile (not
+    SetFileAttributes).
+
+    **What runs** (a temporary counter, `--log_files_and_saves`,
+    `src/hooks/files_and_saves_log.cpp`, with `--log_file_opens`; removed
+    after the survey). A 30 s attract race and a session the user played
+    (load the save, save, load a race; 2026-10-21):
+
+    - Files opened, the whole session: 15. The two archives
+      (`game:\DATA\BUILD\TXR\BUILD.DAT` and `BUILD_CRS.DAT`, opened once
+      by `sub_8209E210` and streamed with ReadFileEx: 1,134 reads, each
+      done at once under the SDK, the APC called straight after with the
+      routine `sub_8209D808`), their TOCs, the audio banks
+      (`txr_xact.xgs`, `SB_SYSTEM_SE.XWB`/`.XSB`, `CAR_SE.XWB` three
+      times), the boot movie (`UBI_LOGO.wmv`, twice), `DEBUG\DEBFONT.XPR`,
+      and the save (`TXR360:\TXR_DATA_1`, once read, once written). The
+      file layer reads each whole (open, GetFileSize, one ReadFile).
+    - The graphics library asks GetFileAttributes for
+      `ShaderDumpxe:\CompareBackEnds` (fails, -1) through `sub_822B8868`,
+      14 times: a debug check, can be answered "not there".
+    - Never called in play: GetDiskFreeSpaceEx, SetEndOfFile, DeleteFile,
+      the debug capture's mounting (`sub_822B58F0`, `sub_822B4760`),
+      GetFileTime and its caller, `_read`, `_write`, `_lseek`, `_commit`,
+      FlushFileBuffers, XContentDelete, XContentSetThumbnail,
+      XContentGetCreator, `File::OpenWrite`, `File::Write`.
+    - The save, at boot: the device selector (997, then device 1 through
+      the overlapped), XContentGetDeviceData (type 1, 20 GB, 3 GB free),
+      the enumerator (`0x7850` bytes: 100 items of 308) and XEnumerate
+      (997; one save found: "GAME DATA   2026/10/20 23:28",
+      `SystemData.bin`), XContentCreate with open existing on root
+      `TXR360` and XContentClose (the check that it opens), then
+      `SaveSlot::Create` (mode 0: open existing), `SaveSlot::ReadFile`
+      (`TXR360:\TXR_DATA_1`, 129,400 bytes) and XContentClose. The
+      front end (`sub_8228FC50`) works out the save's size
+      (XContentCalculateSize of 129,400: 188,416) and looks for
+      `SystemData.bin` among the enumerated saves.
+    - The save, saving: the selector, enumerate and open check again,
+      then `SaveSlot::Create` (mode 1, create always, display name
+      "GAME DATA   " and the date), `SaveSlot::WriteFile` (the same path
+      and size; WriteFile done at once) and XContentClose. No thumbnail
+      set. Loading a race enumerated the saves once more.
+    - The SDK keeps it as
+      `<user folder>/B13EBABEBABEBABE/555307EE/00000001/SystemData.bin/TXR_DATA_1`
+      (`~/.local/share/itc/...` on Linux) with a header file for the
+      display name.
+
+    **The user's calls (2026-10-21):** the save goes in a `saves` folder
+    next to the executable, laid out our own way (the SDK's isn't a
+    guide), and old saves in the SDK's folder aren't migrated or read.
+
+    **Proposed for the saves** (plug in the data): cut at the save slot
+    steps. The device selector, device data and space check answered at
+    once (one device, room enough, no UI); the enumeration one item
+    ("GAME DATA   " and the file's date, `SystemData.bin`) when
+    `saves/TXR_DATA_1` exists, else none; open, create, close and the
+    thumbnail done with nothing to do; the read and write steps plain
+    host file I/O on `saves/TXR_DATA_1` (written to a temporary file and
+    renamed over the old one), each step's overlapped marked done so the
+    game's polls pass. The XContent wrappers and XGetOverlappedResult are
+    then never called. Then the game data files (`game:\` under
+    `--game_data_root`, through the file layer and the archive
+    streaming), the debug checks, and what's never called.
 
 B5. **System services** (82 functions; first counted as 78): sign-in, profile, UI dialogs,
     sessions, voice, network, notifications, the loader. Most should go
