@@ -10,8 +10,8 @@
 
 #include "gamepads.h"
 
-#include <rex/cvar.h>
-#include <rex/logging.h>
+#include "base/flags.h"
+#include "base/log.h"
 
 #include <SDL3/SDL.h>
 
@@ -20,8 +20,8 @@
 #include <mutex>
 #include <vector>
 
-REXCVAR_DEFINE_BOOL(log_gamepads, false, "ITC",
-                    "Log our gamepad reading's button changes (src/input/gamepads.cpp)");
+ITC_FLAG_BOOL(log_gamepads, false, "ITC",
+              "Log our gamepad reading's button changes (src/input/gamepads.cpp)");
 
 namespace input {
 namespace {
@@ -104,7 +104,7 @@ void OpenPending() {
   for (SDL_JoystickID id : to_open) {
     SDL_Gamepad* pad = SDL_OpenGamepad(id);
     if (!pad) {
-      REXLOG_WARN("gamepads: couldn't open SDL gamepad {}: {}", id, SDL_GetError());
+      ITC_LOG_WARN("gamepads: couldn't open SDL gamepad {}: {}", id, SDL_GetError());
       continue;
     }
     int slot;
@@ -121,8 +121,8 @@ void OpenPending() {
       continue;
     }
     const char* name = SDL_GetGamepadName(pad);
-    REXLOG_INFO("gamepads: \"{}\" in slot {} (SDL gamepad {}, vendor 0x{:04X}, product 0x{:04X})",
-                name ? name : "", slot, id, SDL_GetGamepadVendor(pad), SDL_GetGamepadProduct(pad));
+    ITC_LOG_INFO("gamepads: \"{}\" in slot {} (SDL gamepad {}, vendor 0x{:04X}, product 0x{:04X})",
+                 name ? name : "", slot, id, SDL_GetGamepadVendor(pad), SDL_GetGamepadProduct(pad));
   }
 }
 
@@ -167,7 +167,7 @@ bool OnEvent(void*, SDL_Event* event) {
           buttons = event->gbutton.down ? buttons | bit : buttons & ~bit;
           g_slots[slot].state.changes++;
           logged_buttons = buttons;
-          log_buttons = REXCVAR_GET(log_gamepads);
+          log_buttons = ITC_FLAG(log_gamepads);
         }
         break;
       default:
@@ -175,10 +175,10 @@ bool OnEvent(void*, SDL_Event* event) {
     }
   }
   if (event->type == SDL_EVENT_GAMEPAD_REMOVED && slot >= 0) {
-    REXLOG_INFO("gamepads: slot {} unplugged (SDL gamepad {})", slot, event->gdevice.which);
+    ITC_LOG_INFO("gamepads: slot {} unplugged (SDL gamepad {})", slot, event->gdevice.which);
   }
   if (log_buttons) {
-    REXLOG_INFO("gamepads: slot {} buttons {:08X}", slot, logged_buttons);
+    ITC_LOG_INFO("gamepads: slot {} buttons {:08X}", slot, logged_buttons);
   }
   if (queue_open) {
     QueueOpen();
@@ -199,7 +199,7 @@ void QueuePump() {
 
 void Gamepads_Start(UiThreadQueue queue) {
   if (!SDL_InitSubSystem(SDL_INIT_GAMEPAD)) {
-    REXLOG_ERROR("gamepads: SDL's gamepad subsystem failed to start: {}", SDL_GetError());
+    ITC_LOG_ERROR("gamepads: SDL's gamepad subsystem failed to start: {}", SDL_GetError());
     return;
   }
   g_queue = std::move(queue);
@@ -219,7 +219,7 @@ void Gamepads_Start(UiThreadQueue queue) {
     }
   }
   SDL_free(ids);
-  REXLOG_INFO("gamepads: started, {} connected", count);
+  ITC_LOG_INFO("gamepads: started, {} connected", count);
   QueueOpen();
 }
 
