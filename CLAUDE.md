@@ -66,9 +66,8 @@ sounds are decoded by our own upstream FFmpeg (the submodule
 read by position (`src/audio/xma_stream.h`, `src/hooks/xma.cpp`); the
 SDK's XMA decoder isn't set up, and the output's conversion is ours (A6,
 `src/audio/output_mix.h`); see `docs/native-audio.md`.
-B8 (not started) takes the boundary's last non-core imports (B5's and
-B6's leftovers: wrappers to mark "never called", the other notification
-readers, small one-offs), so only the core's stay live.
+What's left of B5 and B6 (rows to mark "never called", the other
+notification readers, small one-offs) is under "Left to do" in each.
 B4 (files and saves) is done (merged from `files-and-saves`, 2026-10-21):
 the saves (`src/saves/`), the data files (`src/game_data/`, the
 file class and the archive streaming), the movies' reads

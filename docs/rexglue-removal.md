@@ -1981,6 +1981,24 @@ B5. **System services** (82 functions; first counted as 78): sign-in, profile, U
     XEnumerate (B4), `xstart`'s `DbgPrint` and `XamLoaderTerminateTitle`
     (the core).
 
+    **Left to do (2026-10-21, after B2):** of the 72 imports still with a
+    live caller after B2, about a dozen are B5's and B6's; the rest are
+    the core's. For B5:
+
+    - Rows to settle: wrappers whose callers B5 already made native or
+      skipped still count as live because their rows don't say "never
+      called": the socket wrappers (`sub_82459C20`, `sub_82459C48`,
+      `sub_82459C60`), XamShowSigninUI's (`sub_822952C0`), the profile
+      read's (`sub_8257E568`) and the listener's (`sub_8257B7A8`). A
+      temporary counter over boot, menus and a race the user plays, then
+      the rows marked (or the wrappers Dropped).
+    - The other notification readers still calling `XNotifyGetNext`
+      (`sub_820A4610`, `sub_82149080`, `sub_8214E268`, `sub_8214F290`;
+      listed above for B7): read each and answer what the game needs
+      ("no notification"). The fifth, `Voice::Poll` (`sub_8257AF30`), is
+      voice chat: mapped, not ported, skipped at the game level.
+    - `xstart`'s `XamLoaderTerminateTitle` (the quit path): a native exit.
+
 B6. **Pure helpers** (55 functions): string, time and formatting
     helpers made native, or their callers made native. Cheap; can be
     done alongside anything else.
@@ -2111,36 +2129,17 @@ B6. **Pure helpers** (55 functions): string, time and formatting
     `rexglue-removal-project` (2026-10-20). Next item not decided (A2,
     or A6 with B2, would remove visible SDK use).
 
-B8. **The boundary's last non-core imports** (agreed with the user,
-    2026-10-21, after B2; done before B7, numbered after it). After B2,
-    72 imports still have a live caller: ~60 are the core's (threads
-    and sync, 49; the heap and physical memory, ~8: E1 and E2, after
-    B7), and about a dozen are B5's and B6's leftovers. This item takes
-    those, so only the core's imports stay live:
-
-    1. **Bookkeeping**: wrappers whose callers B5 already made native or
-       skipped (the system link socket set-up, the profile read, sign-in,
-       the notification listener) still count as live because their rows
-       don't say "never called". A temporary counter on them over boot,
-       menus and a race the user plays, then the rows marked (or the
-       wrappers Dropped).
-    2. **The other notification readers**: the four game readers that
-       still poll `XNotifyGetNext` besides the app's (B5 step 6), first
-       listed under B5's leftovers for B7. Read each, and answer what
-       the game needs ("no notification"), per "plug in the data".
-    3. **Small one-offs**: the quit path (`xstart`'s
-       `XamLoaderTerminateTitle`: a native exit), `DbgPrint` (dropped),
-       `sprintf` (its callers, the drive mounting, probably never run),
-       the memory statistics query (`MmQueryStatistics`, probably fixed
-       data) and the `XamAlloc`/`XamFree` caller (`sub_82575D78`). The
-       heap helpers counted under B6 (`RtlCompareMemoryUlong`,
-       `KeGetCurrentProcessType`) and `RtlInitializeCriticalSection` stay
-       with the core.
-
-    `itc_recomp/tools/boundary_status.py` gives the counts only; the live
-    callers of each import come from the same data (its `boundary()` and
-    the status check's rows, read the way its `main()` decides "live").
-    Not started.
+    **Left to do (2026-10-21, after B2):** `DbgPrint` (`sub_822AC530`,
+    `sub_82486BC0`, `sub_8248FBE0`, `xstart`: dropped), `sprintf`
+    (`sub_822AC638`, `sub_822B1AC8`, the drive mounting's: probably never
+    run, then marked), and two counted under memory that may be fixed
+    data rather than the core's: `MmQueryStatistics` (`sub_82294DA0`) and
+    `XamAlloc`/`XamFree` (`sub_82575D78`). The heap helpers
+    (`RtlCompareMemoryUlong`, `KeGetCurrentProcessType`) and
+    `RtlInitializeCriticalSection` stay with the core. Check with the same
+    counter run as B5's rows. `boundary_status.py` gives counts only; the
+    live callers of each import come from its `boundary()` and the status
+    check's rows, read the way its `main()` decides "live".
 
 B7. **The game logic inside**: everything else, subsystem by subsystem,
     in whatever order the user wants (frame interpolation's hooks,
