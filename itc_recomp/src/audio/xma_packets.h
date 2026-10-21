@@ -8,11 +8,13 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 
 namespace audio::xma {
 
 constexpr size_t kPacketSize = 2048;
 constexpr uint32_t kSamplesPerFrame = 512;
+constexpr uint32_t kSamplesPerSubframe = 128;
 
 struct PacketHeader {
   uint32_t frame_count;      // frames starting in this packet (top 6 bits)
@@ -25,5 +27,16 @@ PacketHeader ReadPacketHeader(const uint8_t* packet);
 
 // Frames in a single-stream buffer of whole packets.
 uint32_t CountFrames(const uint8_t* data, size_t size);
+
+// The bit offset (from the data's start) of the frame holding `sample`
+// (frame sample / 512) of `stream`, as sub_8246A5F8 works it out: the
+// stream's packets from packet `stream`, skipping other streams' packets,
+// then that packet's frames by their 15-bit lengths. 0 past the end.
+uint32_t BitOffsetOfSample(const uint8_t* data, uint32_t size, uint32_t stream, uint32_t sample);
+
+// The other way: the index of the stream's frame starting at `bit`, if one
+// does.
+std::optional<uint32_t> FrameAtBitOffset(const uint8_t* data, uint32_t size, uint32_t stream,
+                                         uint32_t bit);
 
 }  // namespace audio::xma
