@@ -87,6 +87,7 @@ set(ITC_SOURCES
     src/hooks/saves.cpp
     src/saves/saves.cpp
     src/hooks/file_class.cpp
+    src/hooks/archive_streaming.cpp
     src/game_data/game_data.cpp
     src/hooks/files_and_saves_log.cpp
     src/display/gamma.cpp
