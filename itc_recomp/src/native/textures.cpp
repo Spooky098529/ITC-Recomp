@@ -18,24 +18,24 @@
 #include <unordered_map>
 #include <vector>
 #include <rex/graphics/xenos.h>
-#include <rex/cvar.h>
-#include <rex/hash.h>
-#include <rex/logging.h>
+#include "base/flags.h"
+#include "base/hash.h"
+#include "base/log.h"
 
 #include <emmintrin.h>
 #if defined(__SSSE3__)
 #include <tmmintrin.h>
 #endif
 
-REXCVAR_DEFINE_BOOL(native_renderer_log_texture_writes, false, "ITC",
-                    "Log which code writes textures' memory: on first load and when a texture "
-                    "is found changed, what the library's memcpy wrote there (a debugging aid; "
-                    "with --native_renderer_verify_textures every change is found)");
+ITC_FLAG_BOOL(native_renderer_log_texture_writes, false, "ITC",
+              "Log which code writes textures' memory: on first load and when a texture "
+              "is found changed, what the library's memcpy wrote there (a debugging aid; "
+              "with --native_renderer_verify_textures every change is found)");
 
-REXCVAR_DECLARE(bool, log_gpu_memory);
-REXCVAR_DEFINE_BOOL(native_renderer_cache_texture_bindings, true, "ITC",
-                    "Answer texture views and samplers from a table of earlier answers by the "
-                    "fetch constant's words, instead of looking the texture up every binding");
+ITC_FLAG_DECLARE(bool, log_gpu_memory);
+ITC_FLAG_BOOL(native_renderer_cache_texture_bindings, true, "ITC",
+              "Answer texture views and samplers from a table of earlier answers by the "
+              "fetch constant's words, instead of looking the texture up every binding");
 
 namespace native {
 
@@ -675,10 +675,10 @@ void TextureCache::State::LogFirstLoad(const Texture& t) {
   }
   if (bytes < size && write_lines) {
     write_lines--;
-    REXLOG_INFO("native renderer: texture writes: {:08X} ({}x{}, {} bytes) first loaded with "
-                "{} bytes written by memcpy{}",
-                address, t.layout.width, t.layout.height, size, bytes,
-                bytes ? fmt::format(" (first from {:08X})", first_caller) : std::string());
+    ITC_LOG_INFO("native renderer: texture writes: {:08X} ({}x{}, {} bytes) first loaded with "
+                 "{} bytes written by memcpy{}",
+                 address, t.layout.width, t.layout.height, size, bytes,
+                 bytes ? fmt::format(" (first from {:08X})", first_caller) : std::string());
   }
 }
 
@@ -704,8 +704,8 @@ void TextureCache::State::LogUnrecordedChange(uint8_t* base, const Texture& t) {
       }
     }
     write_lines--;
-    REXLOG_INFO("native renderer: texture writes: {:08X}: {} bytes changed, offsets {}-{}",
-                address, changed, first, last);
+    ITC_LOG_INFO("native renderer: texture writes: {:08X}: {} bytes changed, offsets {}-{}",
+                 address, changed, first, last);
   }
   was.assign(now, now + range_size);
 }
@@ -717,14 +717,14 @@ void TextureCache::State::LogWriteSummary() {
   }
   writes_logged = now;
   WriteStats& w = writes;
-  REXLOG_INFO("native renderer: texture writes: {} first loads ({:.1f} MB): {} written wholly by "
-              "memcpy, {} partly, {} not at all ({:.1f} MB); by first writer:{}",
-              w.first, w.first_bytes / 1048576.0, w.covered, w.partly, w.uncovered,
-              w.uncovered_bytes / 1048576.0, WriteCallers(w.first_callers));
+  ITC_LOG_INFO("native renderer: texture writes: {} first loads ({:.1f} MB): {} written wholly by "
+               "memcpy, {} partly, {} not at all ({:.1f} MB); by first writer:{}",
+               w.first, w.first_bytes / 1048576.0, w.covered, w.partly, w.uncovered,
+               w.uncovered_bytes / 1048576.0, WriteCallers(w.first_callers));
   for (auto& [address, entry] : w.unrecorded_by) {
-    REXLOG_INFO("native renderer: texture writes: {:08X} ({}) changed {} times without a "
-                "recorded write",
-                address, entry.second, entry.first);
+    ITC_LOG_INFO("native renderer: texture writes: {:08X} ({}) changed {} times without a "
+                 "recorded write",
+                 address, entry.second, entry.first);
   }
   w = WriteStats{};
 }
@@ -749,8 +749,8 @@ bool TextureCache::State::CreateTexture(Texture& t) {
   info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
   if (VkResult result = vk::vkCreateImage(device, &info, nullptr, &t.image);
       result != VK_SUCCESS) {
-    REXLOG_ERROR("native renderer: texture {}x{} format {}: vkCreateImage: {}", l.width, l.height,
-                 int(t.format.format), int(result));
+    ITC_LOG_ERROR("native renderer: texture {}x{} format {}: vkCreateImage: {}", l.width, l.height,
+                  int(t.format.format), int(result));
     t.image = VK_NULL_HANDLE;
     return false;
   }
@@ -763,7 +763,7 @@ bool TextureCache::State::CreateTexture(Texture& t) {
   if (alloc.memoryTypeIndex == UINT32_MAX ||
       vk::vkAllocateMemory(device, &alloc, nullptr, &t.memory) != VK_SUCCESS ||
       vk::vkBindImageMemory(device, t.image, t.memory, 0) != VK_SUCCESS) {
-    REXLOG_ERROR("native renderer: no memory for a {}x{} texture", l.width, l.height);
+    ITC_LOG_ERROR("native renderer: no memory for a {}x{} texture", l.width, l.height);
     vk::vkDestroyImage(device, t.image, nullptr);
     t.image = VK_NULL_HANDLE;
     return false;
@@ -815,7 +815,7 @@ uint64_t TextureCache::State::Hash(uint8_t* base, const Texture& t) const {
   uint64_t hash = 0;
   for (const auto& [address, size] : t.ranges) {
     if (size) {
-      hash = XXH3_64bits_withSeed(PhysicalHostAddress(base, address), size, hash);
+      hash = base::Hash64(PhysicalHostAddress(base, address), size, hash);
     }
   }
   return hash;
@@ -992,13 +992,13 @@ void TextureCache::BeginFrame(uint32_t frame_index) {
   s.staging_used = 0;
   s.recording = false;
   vk::vkResetCommandPool(s.context.device, s.frames[frame_index].pool, 0);
-  cache_bindings_ = REXCVAR_GET(native_renderer_cache_texture_bindings);
-  log_writes_ = REXCVAR_GET(native_renderer_log_texture_writes);
+  cache_bindings_ = ITC_FLAG(native_renderer_cache_texture_bindings);
+  log_writes_ = ITC_FLAG(native_renderer_log_texture_writes);
   if (log_writes_) {
     s.LogWriteSummary();
   }
   s.DestroyRetired();
-  s.log_memory = REXCVAR_GET(log_gpu_memory);
+  s.log_memory = ITC_FLAG(log_gpu_memory);
   if (s.log_memory) {
     s.now_s = uint32_t(std::chrono::duration_cast<std::chrono::seconds>(
                            std::chrono::steady_clock::now() - s.start_time)
@@ -1068,11 +1068,11 @@ void TextureCache::State::LogAges() {
     ages += fmt::format("{}{} {} ({:.1f} MB)", i ? ", " : "", kNames[i], counts[i],
                         bytes[i] / 1048576.0);
   }
-  REXLOG_INFO("native renderer: textures by time since drawn: {}; new {}, {} overlapping "
-              "held textures: {} of them ({} written since loaded, {:.1f} MB); overwritten "
-              "freed {} ({:.1f} MB)",
-              ages, overlaps.created, overlaps.overlapping, overlaps.old, overlaps.old_changed,
-              overlaps.old_bytes / 1048576.0, overlaps.freed, overlaps.freed_bytes / 1048576.0);
+  ITC_LOG_INFO("native renderer: textures by time since drawn: {}; new {}, {} overlapping "
+               "held textures: {} of them ({} written since loaded, {:.1f} MB); overwritten "
+               "freed {} ({:.1f} MB)",
+               ages, overlaps.created, overlaps.overlapping, overlaps.old, overlaps.old_changed,
+               overlaps.old_bytes / 1048576.0, overlaps.freed, overlaps.freed_bytes / 1048576.0);
   overlaps = {};
 }
 
@@ -1090,8 +1090,8 @@ void TextureCache::State::RetireLoaded() {
     Retire(t);
   }
   if (log_memory) {
-    REXLOG_INFO("native renderer: a race ended: {} textures freed ({:.1f} MB)", textures.size(),
-                bytes / 1048576.0);
+    ITC_LOG_INFO("native renderer: a race ended: {} textures freed ({:.1f} MB)", textures.size(),
+                 bytes / 1048576.0);
   }
   textures.clear();
   by_address.clear();
@@ -1151,11 +1151,11 @@ void TextureCache::State::RetireMovedResolveDestinations(const Texture& t) {
     if (old.layout.base_address != t.layout.base_address && old_start < end && start < old_end &&
         now - old.last_resolved >= std::chrono::seconds(2)) {
       if (log_memory) {
-        REXLOG_INFO("native renderer: resolve destination at {:08X} (format {} {}x{}) freed: "
-                    "one made at {:08X} (format {} {}x{}) over its memory",
-                    old.layout.base_address, old.guest_format, old.layout.width,
-                    old.layout.height, t.layout.base_address, t.guest_format, t.layout.width,
-                    t.layout.height);
+        ITC_LOG_INFO("native renderer: resolve destination at {:08X} (format {} {}x{}) freed: "
+                     "one made at {:08X} (format {} {}x{}) over its memory",
+                     old.layout.base_address, old.guest_format, old.layout.width,
+                     old.layout.height, t.layout.base_address, t.guest_format, t.layout.width,
+                     t.layout.height);
       }
       moved.push_back(key);
     }
@@ -1353,13 +1353,13 @@ VkImageView TextureCache::LookUpView(uint8_t* base, const uint32_t fetch_words[6
     }
     if (t.format.block_width == 1) {
       // Uncompressed: few, and the likeliest to be decoded wrong.
-      REXLOG_INFO("native renderer: texture at {:08X}: format {} {}x{}x{} levels {}-{}, endian "
-                  "{}, tiled {}, pitch {}, signs {:02X}, swizzle {:03o}, exp adjust {}",
-                  t.layout.base_address ? t.layout.base_address : t.layout.mip_address,
-                  uint32_t(fetch.format), t.layout.width, t.layout.height, t.layout.layers,
-                  t.layout.min_level, t.layout.max_level, uint32_t(t.endian), t.layout.tiled,
-                  t.layout.pitch_texels, (fetch.dword_0 >> 2) & 0xFF, uint32_t(fetch.swizzle),
-                  int32_t(fetch.exp_adjust));
+      ITC_LOG_INFO("native renderer: texture at {:08X}: format {} {}x{}x{} levels {}-{}, endian "
+                   "{}, tiled {}, pitch {}, signs {:02X}, swizzle {:03o}, exp adjust {}",
+                   t.layout.base_address ? t.layout.base_address : t.layout.mip_address,
+                   uint32_t(fetch.format), t.layout.width, t.layout.height, t.layout.layers,
+                   t.layout.min_level, t.layout.max_level, uint32_t(t.endian), t.layout.tiled,
+                   t.layout.pitch_texels, (fetch.dword_0 >> 2) & 0xFF, uint32_t(fetch.swizzle),
+                   int32_t(fetch.exp_adjust));
     }
     if (s.log_memory) {
       s.NoteOverlaps(t);
@@ -1483,10 +1483,10 @@ bool TextureCache::GetResolveDestination(const uint32_t fetch_words[6], float sc
                                  it->second.layout.height != height)) {
     // Another texture at the same address: start over (the old image is
     // destroyed once the frames in flight that may use it are done).
-    REXLOG_WARN("native renderer: resolve destination at {:08X} changed from format {} {}x{} "
-                "to format {} {}x{}",
-                page << 12, it->second.guest_format, it->second.layout.width,
-                it->second.layout.height, uint32_t(fetch.format), width, height);
+    ITC_LOG_WARN("native renderer: resolve destination at {:08X} changed from format {} {}x{} "
+                 "to format {} {}x{}",
+                 page << 12, it->second.guest_format, it->second.layout.width,
+                 it->second.layout.height, uint32_t(fetch.format), width, height);
     s.RetireResolveDestination(key);
     it = s.resolved.end();
   }
@@ -1511,10 +1511,10 @@ bool TextureCache::GetResolveDestination(const uint32_t fetch_words[6], float sc
     if (!s.CreateTexture(t)) {
       return false;
     }
-    REXLOG_INFO("native renderer: resolve destination at {:08X}: format {} {}x{} (host format {}, "
-                "{}x{}, scale {})",
-                page << 12, t.guest_format, width, height, int(t.format.format), t.host_width,
-                t.host_height, scale);
+    ITC_LOG_INFO("native renderer: resolve destination at {:08X}: format {} {}x{} (host format {}, "
+                 "{}x{}, scale {})",
+                 page << 12, t.guest_format, width, height, int(t.format.format), t.host_width,
+                 t.host_height, scale);
     size_t held = s.resolved.size();
     s.RetireMovedResolveDestinations(t);
     if (s.resolved.size() != held) {

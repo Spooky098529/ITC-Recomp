@@ -21,8 +21,8 @@
 #include "renderer.h"
 #include "state.h"
 
-#include <rex/cvar.h>
-#include <rex/logging.h>
+#include "base/flags.h"
+#include "base/log.h"
 
 #include <array>
 #include <chrono>
@@ -32,13 +32,13 @@
 #include <string>
 #include <vector>
 
-REXCVAR_DEFINE_BOOL(native_renderer_check_draw_writes, false, "ITC",
-                    "Log the device fields the graphics library's draw and its packet-writing "
-                    "helpers change besides the command buffer (a debugging aid for the native "
-                    "renderer's exclusive mode; keeps the library's draw)");
-REXCVAR_DEFINE_BOOL(native_renderer_library_packets, false, "ITC",
-                    "In exclusive mode, let the graphics library write its GPU packets for "
-                    "indexed draws as before (nothing reads them)");
+ITC_FLAG_BOOL(native_renderer_check_draw_writes, false, "ITC",
+              "Log the device fields the graphics library's draw and its packet-writing "
+              "helpers change besides the command buffer (a debugging aid for the native "
+              "renderer's exclusive mode; keeps the library's draw)");
+ITC_FLAG_BOOL(native_renderer_library_packets, false, "ITC",
+              "In exclusive mode, let the graphics library write its GPU packets for "
+              "indexed draws as before (nothing reads them)");
 
 namespace native {
 namespace {
@@ -80,7 +80,7 @@ Clock::time_point g_last_log = Clock::now();
 thread_local uint32_t t_segment_ends = 0;  // sub_8229EF48 calls
 
 bool Checking() {
-  return REXCVAR_GET(native_renderer_check_draw_writes);
+  return ITC_FLAG(native_renderer_check_draw_writes);
 }
 
 uint8_t* DevicePointer(uint8_t* base, uint32_t device) {
@@ -113,18 +113,18 @@ void Checked(Helper helper, uint8_t* base, uint32_t device, Call call) {
 
 void LogCheck() {
   CheckStats& c = g_check;
-  REXLOG_INFO("native renderer: draw writes: {} indexed draws ({} predicated, {} with a shader "
-              "load)",
-              c.draws, c.predicated, c.shader_loads);
+  ITC_LOG_INFO("native renderer: draw writes: {} indexed draws ({} predicated, {} with a shader "
+               "load)",
+               c.draws, c.predicated, c.shader_loads);
   for (int i = 0; i < kHelpers; i++) {
     HelperStats& s = c.helpers[i];
     std::string changed;
     for (auto& [offset, count] : s.changed) {
       changed += fmt::format(" +{}={}", offset, count);
     }
-    REXLOG_INFO("native renderer: draw writes: {}: {} calls ({} ending a segment, not "
-                "compared); device fields changed:{}",
-                kHelperNames[i], s.calls, s.segment_ends, changed.empty() ? " none" : changed);
+    ITC_LOG_INFO("native renderer: draw writes: {}: {} calls ({} ending a segment, not "
+                 "compared); device fields changed:{}",
+                 kHelperNames[i], s.calls, s.segment_ends, changed.empty() ? " none" : changed);
   }
   c = {};
 }
@@ -192,7 +192,7 @@ void native::DrawPackets_IndexedDraw(PPCContext& ctx, uint8_t* base) {
     }
     return;
   }
-  if (REXCVAR_GET(native_renderer_library_packets) || predicated) {
+  if (ITC_FLAG(native_renderer_library_packets) || predicated) {
     __imp__sub_825BE708(ctx, base);
     return;
   }

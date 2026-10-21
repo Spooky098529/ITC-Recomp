@@ -2,37 +2,37 @@
 
 #include "helpers/executable.h"
 
-#include <rex/cvar.h>
-#include <rex/logging.h>
+#include "base/flags.h"
+#include "base/log.h"
 
 #ifdef _WIN32
 #include <cstring>
 #include <string>
 #endif
 
-REXCVAR_DEFINE_BOOL(native_renderer_disk_cache, true, "ITC",
-                    "Keep translated shaders and compiled pipelines in cache/ next to the "
-                    "executable between sessions");
+ITC_FLAG_BOOL(native_renderer_disk_cache, true, "ITC",
+              "Keep translated shaders and compiled pipelines in cache/ next to the "
+              "executable between sessions");
 
 namespace native {
 
 std::filesystem::path DiskCacheDirectory() {
-  if (!REXCVAR_GET(native_renderer_disk_cache)) {
+  if (!ITC_FLAG(native_renderer_disk_cache)) {
     return {};
   }
   static const std::filesystem::path directory = [] {
     std::error_code error;
     std::filesystem::path folder = helpers::ExecutableFolder(error);
     if (error) {
-      REXLOG_WARN("native renderer: no disk cache: can't find the executable ({})",
-                  error.message());
+      ITC_LOG_WARN("native renderer: no disk cache: can't find the executable ({})",
+                   error.message());
       return std::filesystem::path();
     }
     std::filesystem::path path = folder / "cache";
     std::filesystem::create_directories(path, error);
     if (error) {
-      REXLOG_WARN("native renderer: no disk cache: can't make {} ({})", path.string(),
-                  error.message());
+      ITC_LOG_WARN("native renderer: no disk cache: can't make {} ({})", path.string(),
+                   error.message());
       return std::filesystem::path();
     }
     return path;
