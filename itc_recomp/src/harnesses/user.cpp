@@ -1,6 +1,7 @@
 // The user wrappers (src/hooks/user.cpp) against the recompiled ones, which
 // ask the SDK: the name, sign-in state and XUID for users 0-5, the title id
-// check, and XUserSetContextEx's answer and the last error it leaves.
+// check, XUserSetContextEx's answer and the last error it leaves, and
+// XShowSigninUI's answer.
 
 #include "harness.h"
 
@@ -84,6 +85,23 @@ void User(Context& h) {
            fmt::format("user {} context {:X} value {}", index, context, value));
     }
     guest::StoreU32(base, slot, saved);
+    results.Report();
+  }
+  {
+    // The recompiled one's SDK call also broadcasts sign-in changed and
+    // system UI off, which reach only voice's listener.
+    Results results("XShowSigninUI (sub_822952C0)");
+    for (uint32_t panes : {1u, 2u, 4u}) {
+      for (uint32_t flags : {0u, 1u, 2u}) {
+        Both(h, results, [] {},
+             [&](PPCContext& t) {
+               t.r3.u64 = panes;
+               t.r4.u64 = flags;
+             },
+             __imp__sub_822952C0, sub_822952C0, h.data, 0,
+             fmt::format("panes {} flags {}", panes, flags));
+      }
+    }
     results.Report();
   }
 }

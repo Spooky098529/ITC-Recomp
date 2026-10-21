@@ -1,5 +1,6 @@
 // The game's XDK user wrappers, without their kernel calls: adapters in front
-// of src/user/user.h. And XUserSetContextEx (presence, Xbox-only) dropped.
+// of src/user/user.h. And XUserSetContextEx (presence, Xbox-only) and the
+// sign-in dialog dropped.
 // See B5 in docs/rexglue-removal.md.
 
 #include "guest.h"
@@ -44,6 +45,14 @@ extern "C" REX_FUNC(sub_82295268) {
 extern "C" REX_FUNC(sub_82296EE0) {
   REX_FUNC_PROLOGUE();
   ctx.r3.u64 = user::CheckTitleId(ctx.r3.u32);
+}
+
+// XShowSigninUI: r3 = panes, r4 = flags. No dialog: one local user is always
+// signed in. The SDK answered 0 (its sign-in changed and system UI off reach
+// none of the game's readers since step 6).
+extern "C" REX_FUNC(sub_822952C0) {
+  REX_FUNC_PROLOGUE();
+  ctx.r3.u64 = 0;
 }
 
 // XUserSetContextEx without an overlapped (every call; sub_82294ED8 with one
