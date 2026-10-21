@@ -12,7 +12,8 @@
 // CreateFile and the movie player's open already have overrides
 // (create_file.cpp): run with --log_file_opens for their paths. The save slot
 // steps made native (hooks/saves.cpp), XContentClose and the file class made
-// native (hooks/file_class.cpp) are no longer wrapped.
+// native (hooks/file_class.cpp) and Archive::Init (hooks/archive_streaming.cpp)
+// are no longer wrapped.
 
 #include "guest.h"
 
@@ -230,7 +231,6 @@ struct Function {
 // Names are from docs/functions/files-and-saves.md ("probably" there).
 #define FILES_AND_SAVES(X)                                                  \
   X(8209AC78, "file layer error report?", None)                             \
-  X(8209E210, "data file open", None)                                       \
   X(820A55A8, "XContentGetCreator caller", None)                            \
   X(820A5BE8, "SaveSlot::SaveStep", Slot)                                   \
   X(820A5E68, "SaveSlot::LoadStep", Slot)                                   \
