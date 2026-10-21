@@ -23,6 +23,8 @@ import os
 import re
 import sys
 
+sys.dont_write_bytecode = True  # no __pycache__ from importing the status check
+
 ROOT = os.path.abspath(sys.argv[1] if len(sys.argv) > 1 else
                        os.path.join(os.path.dirname(__file__), "..", ".."))
 GENERATED = os.path.join(ROOT, "itc_recomp", "generated", "default")
