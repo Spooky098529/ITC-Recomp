@@ -218,7 +218,26 @@ std::string Slot(uint8_t* base, const In& in, uint32_t) {
                      WideString(base, slot + 504), String(base, slot + 760, 42));
 }
 
+// The movie player's file data source (r3): after the call, its position
+// +88, end flag +48, start +56 and size +64, block size +104 and count +108,
+// flags +120, handle +44; and r6's bytes read for the reads.
+std::string Stream(uint8_t* base, const In& in, uint32_t) {
+  uint32_t s = in.r[0];
+  return fmt::format("; position {} end {} start {} size {} block {} x {} flags {:X} handle {:08X}",
+                     LoadU64(base, s + 88), guest::LoadU32(base, s + 48), LoadU64(base, s + 56),
+                     LoadU64(base, s + 64), guest::LoadU32(base, s + 104),
+                     guest::LoadU32(base, s + 108), guest::LoadU32(base, s + 120),
+                     guest::LoadU32(base, s + 44));
+}
 
+std::string StreamRead(uint8_t* base, const In& in, uint32_t result) {
+  return Out32(base, "read", in.r[3]) + Stream(base, in, result);
+}
+
+// GetOverlappedResult (handle, overlapped, bytes, wait).
+std::string WaitResult(uint8_t* base, const In& in, uint32_t) {
+  return Out32(base, "bytes", in.r[2]) + Overlapped(base, in.r[1]);
+}
 
 struct Function {
   uint32_t address;
@@ -247,6 +266,7 @@ struct Function {
   X(82295D30, "XEnumerate", Enumerate)                                      \
   X(82295D48, "wcscpy?", None)                                              \
   X(82295D50, "WriteFile", ReadWrite)                                       \
+  X(82295F20, "GetOverlappedResult", WaitResult)                            \
   X(82295FC8, "ReadFile", ReadWrite)                                        \
   X(822965E0, "GetFileSize", FileSize)                                      \
   X(822972E0, "GetFileSizeEx", FileSizeEx)                                  \
@@ -256,9 +276,17 @@ struct Function {
   X(822BC588, "GetFileAttributes caller 2", None)                           \
   X(822E1838, "whole file load", None)                                      \
   X(8235E878, "GetFileTime caller", None)                                   \
-  X(824881D0, "movie player read?", None)                                   \
-  X(82488598, "movie player read? 2", None)                                 \
-  X(82488A10, "movie player read? 3", None)                                 \
+  X(82487D58, "movie source open (wide path)", Stream)                      \
+  X(82487DD8, "movie source open (handle)", Stream)                         \
+  X(82487E68, "movie source open (parameters)", Stream)                     \
+  X(82487F68, "movie source blocks", Stream)                                \
+  X(824880D8, "movie source close", None)                                   \
+  X(824881D0, "movie source prime", Stream)                                 \
+  X(824883C8, "movie source cancel", Stream)                                \
+  X(82488508, "movie source skip", Stream)                                  \
+  X(82488548, "movie source seek", Stream)                                  \
+  X(82488598, "movie source read", StreamRead)                              \
+  X(82488A10, "movie source read (loop)", StreamRead)                       \
   X(8258C608, "File::OpenWrite", PathArg)                                   \
   X(8258C898, "File::Write", None)                                          \
   X(82593B10, "open and size", None)                                        \

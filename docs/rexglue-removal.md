@@ -1234,6 +1234,93 @@ B4. **Files and saves** (22 functions; the game's `CreateFile`
     `Write`, GetDiskFreeSpaceEx, SetEndOfFile, DeleteFile, GetFileTime,
     FlushFileBuffers), to be marked so the boundary counts them.
 
+    **The debug check: surveyed (2026-10-21).** `sub_822B8868` wraps the
+    shader build `sub_822B8230` (14 calls at boot, main thread, all from
+    `sub_822B8D28`). On its first call only (the byte `82953E29`, set
+    after) it asks GetFileAttributes for `ShaderDumpxe:\CompareBackEnds`;
+    had the file been there, it would set `82953E28`, print a debug line,
+    and build each shader a second way to compare the two. Nothing else
+    reads or writes either byte. So GetFileAttributes runs once (the
+    earlier "14 calls" were `sub_822B8868`'s), and with the file absent
+    the function is `sub_822B8230` with the same arguments.
+    `sub_822BC588`, the other GetFileAttributes caller, is the HLSL
+    compiler's `#include` (a folder check on the path, then a file
+    object), from the grammar's actions `sub_822BC8A8`: never called in
+    play (the game compiles no HLSL source).
+
+    Proposed: `sub_822B8868` overridden as a call to `sub_822B8230` with
+    the registers as they came (the compare mode off, no file check);
+    GetFileAttributes then has no caller in play (Dropped, no override).
+    No harness (the override is the original's own path with the flag
+    off; running both would build every shader twice); checked by play
+    (the boot, and no "VFS: ... [no device]" line).
+
+    **The movies: surveyed (2026-10-21).** The player's file code is the
+    XDK media library's file data source (vtable `8204DD50`; +0 the
+    destructor `sub_82488FD8`, +48 Close `sub_824880D8`, +52 Skip
+    `sub_82488508`, +56 Seek `sub_82488548`, +60 Read `sub_82488598`,
+    +108 OpenFile `sub_82487C48`, +112 Reset `sub_82487BF8`, +116 the
+    blocks' set-up `sub_82487F68`, +120 Prime `sub_824881D0`, +124
+    Cancel `sub_824883C8`, +128 the looping Read `sub_82488A10`). Its
+    fields: +44 the handle, +48 the end flag, +56 the start, +64 the
+    size, +72/+80 the blocks' window, +88 the position, +104 the block
+    size, +108 the block count, +112 the current block's index, +116 the
+    blocks to keep ahead, +120 flags (1 opened by name, 4 the handle was
+    the caller's: not closed, 8 loop), +124 the blocks' memory, +128 the
+    current block, +132 the block list. OpenFile: CreateFile and
+    GetFileSizeEx, then the set-up (8 blocks of 128 KB, each a buffer
+    and an overlapped with an event), which primes them: an overlapped
+    ReadFile each from the position rounded down to 2 KB. Read (r4 the
+    destination, r5 the size, r6 the bytes read): from +88, clamped to
+    the end (+56 + +64; +48 = 1 when short or at the end), copied out of
+    the blocks, each waited for with GetOverlappedResult, and each block
+    passed refilled with the next read; a position outside the window
+    cancels (CancelIo `sub_825BA0E8`, the waits) and primes again.
+    Close: Cancel, CloseHandle (unless flag 4), the blocks freed, Reset.
+
+    What runs (the temporary counter with the source's fields, a plain
+    boot and a session the user played, 2026-10-21): each movie opens
+    two sources on its file (one per stream), on the thread that starts
+    the movie (`sub_820AE64C`'s), through `sub_82487E68` (by name, flags
+    1); each is read on its own decoder thread, 64 KB a Read (from
+    `824864A4` and `82485204`), with a Seek and a Skip before each; once
+    a Read came from the render thread's interrupt callback (the window
+    missed: Cancel and Prime). Every ReadFile finished at once under the
+    SDK (overlapped status 0), so no wait ever waited. `UBI_LOGO.wmv`
+    (8,094,414 bytes, ~9 s): 359 Reads, 208 ReadFiles, 639
+    GetOverlappedResults. `STAGE1_OPENING.wmv` (69,372,600 bytes, skipped
+    by the user after 60 s at 56 MB): ~1,790 Reads, ~910 ReadFiles. Both
+    sources closed by the destructor on the main thread. Never called:
+    the looping Read, the open by handle (`sub_82487DD8`) and by wide
+    path (`sub_82487D58`).
+
+    Proposed (where the decoder asks for its data: the source's Read),
+    plain C++ behind adapters in a new `src/hooks/movie_files.cpp`:
+
+    1. OpenFile native: the path through the game data module, our
+       handle at +44 and the host file's size at +64, then the set-up
+       (+116) called as now; a missing file answered as the SDK's
+       failure was (the error through +32).
+    2. The set-up native without blocks: +48, +104 and +116 set as now,
+       no buffers, overlappeds or events, no Prime (+108 and +124 stay 0).
+    3. Read and the looping Read native: `ReadAt` at +88 straight into
+       guest memory (`guest::ForEachHostPart`), clamped at the end, +88
+       moved on, r6's bytes, +48 as the original sets it; 0 in r3. The
+       two decoder threads read their own handles (the module locks per
+       file).
+    4. Cancel (nothing in flight: its fields cleared) and Close (our
+       handle closed; a caller's handle, flag 4, never in play, left to
+       the recompiled CloseHandle) native.
+    5. Checks: a harness for Read against the recompiled source (opened
+       through the SDK on the same movie, with the same Seek, Skip and
+       Read sequence the decoder makes, reads across a block and at the
+       end) comparing bytes, +88, +48 and r6; a plain boot with the
+       logo's picture and sound; the user's play with `STAGE1_OPENING`.
+
+    Afterwards ReadFile, GetFileSizeEx, GetOverlappedResult, CancelIo,
+    CreateFile and Prime have no callers in play (Dropped), and the
+    SDK's VFS serves nothing the game asks for.
+
 B5. **System services** (82 functions; first counted as 78): sign-in, profile, UI dialogs,
     sessions, voice, network, notifications, the loader. Most should go
     from the game's side entirely (offline, signed in, no voice). Log
