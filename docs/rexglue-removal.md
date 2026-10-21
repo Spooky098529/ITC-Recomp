@@ -1,7 +1,7 @@
 # Removing ReXGlue: toward a native port
 
 The plan (written 2026-10-19 on branch `remove-rexglue`, restructured the
-same day; A0, A5, B1 and B3 done, B6 done for now) for taking the game off the ReXGlue SDK
+same day; A0, A5, A6 and B1-B6 done, see "Where things stand") for taking the game off the ReXGlue SDK
 (`rexglue-sdk/`) piece by piece, with releases along the way. The goal
 is a native PC port, not a smaller emulator: in the end no `PPCContext`,
 no guest memory layout, no Xbox kernel calls, no `default.xex`.
@@ -20,6 +20,30 @@ turns out wrong, say so instead of deleting it. CLAUDE.md's rules hold
 throughout: logs before guesses, commit often and push the work branch,
 ask before touching `main` or tags, never edit `generated/` (native code
 goes in `src/` as overrides), American English.
+
+## Where things stand (2026-10-21, after B5's and B6's leftovers)
+
+- **Track B's boundary is done** (B1-B6). Of the 295 boundary functions
+  still live, all but three belong to the core (threads and sync 264,
+  memory 18, the heap's helpers counted under pure helpers 22; "The
+  boundary over time"). The three: Voice::Init and its talker set-up
+  (`XamNotifyCreateListener`, `XamUserReadProfileSettings`), `xstart`
+  (never reached in play) and the movie player's stream set-up
+  (`DbgPrint`); all go with B7. From here `boundary_status.py` mostly
+  measures the core, so B7 needs its own measure: per-subsystem counts of
+  the statuses in `docs/functions/`.
+- **Track A**: A0, A5 and A6 done; A1-A4 not started. What `src/` still
+  takes from the SDK is in the table below.
+- **Next, in order (proposed 2026-10-21, the user agreed to start with
+  A2):** A2 (logging, flags, hashes: our own headers forwarding to the
+  SDK's, then `src/` switched over area by area, then our own logger and
+  hashing; the flag parser waits for A4), A4 (the app shell: our own
+  `main`, loop, window and flag parser; it unblocks A1's SDL and finishes
+  A2's flags), A3 alongside (the shader translator and our own register
+  array), A1 after A4. B7 starts with its measure and a first subsystem:
+  the leftovers above (the movie player, Voice::Init skipped as high as
+  is safe), or the main thread's performance leads
+  (`sub_821298C0`, `sub_8209C6E0`, in `docs/native-renderer.md`).
 
 ## The approach (agreed with the user, 2026-10-19)
 
@@ -156,19 +180,21 @@ itc_recomp/tools/attract_race.sh 25 --run_harnesses=all
 
 ## What the game uses from the SDK
 
-Measured 2026-10-19 by grepping `itc_recomp/src` and `generated/`.
+Measured 2026-10-19 by grepping `itc_recomp/src` and `generated/`;
+updated 2026-10-21, after B1-B6 (the Track B rows say what was there
+first and what's left).
 
 | Area | What we use from the SDK | Where | Track |
 |---|---|---|---|
-| Logging, flags, hashes | `REXLOG_*` (~280 uses), `REXCVAR_*` (~370), `rex/hash.h` (xxHash) | almost every file in `src/` | A |
+| Logging, flags, hashes | `REXLOG_*` (~280 uses; 327 on 2026-10-21), `REXCVAR_*` (~370; 408), `rex/hash.h` (xxHash); about 87 includes of `rex/logging.h`, `rex/cvar.h` and `rex/hash.h` | almost every file in `src/` | A |
 | App shell | `rex::ReXApp` (`src/itc_app.h`), `REX_DEFINE_APP` (`src/main.cpp`), `WindowedApp`, imgui (include path only), command line, log files, `PathConfig`, the SDK's hidden window (`src/native/app_window.cpp`) | `src/itc_app.h`, `src/main.cpp` | A |
 | Renderer leftovers | The Xenos to SPIR-V shader translator built from SDK sources (`itc_xenos_shaders` in `itc_recomp/CMakeLists.txt`), `rex::graphics::RegisterFile` (`src/native/state.h`, `passes.cpp`), `registers.h`, `xenos.h`, `util/draw.h`, `ui/vulkan/api.h`; SDL3 and Vulkan headers from `rexglue-sdk/thirdparty/`; the xenos plugin, no longer built for us or loaded since B3 (the SDK's own tree still builds it) | `src/native/` | A |
-| Graphics boundary | `Vd*` (25 imports; 17 game functions). In exclusive mode the GPU's job is already ours (`src/native/gpu_link.cpp`) | SDK `src/kernel/` | B |
-| Audio | Output: `AudioDriver`, `REX_AUDIO_BACKEND`, `conversion.h`, `downmix.h` (A). The game side: `XAudio*`, `XMA*` and the SDK's XMA decoder, which emulates the XMA hardware's contexts on FFmpeg (B; 6 game functions). Our mixer (`src/audio/native_audio.cpp`) still runs on an `XHostThread` and allocates from the guest heap | `src/audio/` | A and B |
-| Input | Reading SDL gamepads (A; the `--mnk_mode` keyboard is dropped first, A0); `XamInput*` (B; 3 game functions) | SDK `src/input/` | A and B |
-| Files, saves | `Nt*File` and friends, `Ob*SymbolicLink`, `XamContent*` through the SDK's VFS and `--game_data_root` (22 game functions; 12 for the file calls) | SDK `src/filesystem/`, `src/kernel/` | B |
-| System services | `Xam` UI, user, profile, sessions, voice, notifications, `XMsg*`, `XamLoader*`, `NetDll_*` (17), `Xex*` (78 game functions) | SDK `src/kernel/xam/` | B |
-| Pure helpers | `Rtl*` strings, time, fills, `sprintf`, `vswprintf`, `KeQuery*`, `XGet*`, `DbgPrint` (55 game functions) | SDK `src/kernel/` | B |
+| Graphics boundary | Was `Vd*` (25 imports; 17 game functions). Done (B3): native or Dropped, the emulated GPU not built or loaded | — | B |
+| Audio | Output: done (A6, `src/audio/output_mix.h`); left: the `AudioSystem` base class (the runtime's audio slot, A4) and the `audio_mute`, `audio_maxqframes` flags (A2). The game side (was `XAudio*`, `XMA*` and the SDK's XMA decoder): done (B2, our own FFmpeg). Our mixer (`src/audio/native_audio.cpp`) still runs on an `XHostThread` and allocates from the guest heap (the core) | `src/audio/` | A, then end |
+| Input | Done (A5, B1): `src/input/`; it pumps SDL through the SDK's UI thread queue until A4 | — | A4 |
+| Files, saves | Was `Nt*File` and friends, `Ob*SymbolicLink`, `XamContent*` through the SDK's VFS (22 game functions). Done (B4): nothing the game opens goes through the VFS; the SDK still reads `default.xex` through it at start-up (E3) | — | end |
+| System services | Was `Xam` UI, user, profile, sessions, voice, notifications, `XMsg*`, `XamLoader*`, `NetDll_*` (78 game functions). Done (B5); left: Voice::Init and its talker set-up (B7), `xstart`'s `XamLoaderTerminateTitle` (never reached) | — | B7 |
+| Pure helpers | Was `Rtl*` strings, time, fills, `sprintf`, `vswprintf`, `KeQuery*`, `XGet*`, `DbgPrint` (55 game functions). Done (B6); left: the heap's helpers (the core) and `DbgPrint` in `xstart` and the movie player (B7) | — | B7, end |
 | Core | Guest memory (4 GB mapping plus the physical view at +4 GB, `src/native/state.h`; `/dev/shm/xenia_memory_*`), allocators (`NtAllocateVirtualMemory`, `Mm*`, `XamAlloc`: 31 game functions), threads and sync (`ExCreateThread`, `Ke*`, `Rtl*CriticalSection`, events, waits, TLS, the handle table: 291 game functions), the PCR, the XEX image load (`Runtime::LoadXexImage`), `rex/ppc.h` and the other headers `generated/default/itc_pch.h` includes, the function table `itc_register.cpp` fills | SDK `src/system/`, `src/kernel/`, `include/rex/` | end |
 | Build, packaging | `generated/rexglue.cmake`, `patches/rexglue-sdk/`, `librexruntime.so`/`rexruntime.dll`, third-party libraries through the SDK (SDL3, fmt, spdlog, FFmpeg, glslang, xxHash, imgui, cli11, tomlplusplus) | CMake, CI | A, then end |
 
@@ -2215,7 +2241,8 @@ B6. **Pure helpers** (55 functions): string, time and formatting
 
     B6 is done for now: `pure-helpers` was merged into
     `rexglue-removal-project` (2026-10-20). Next item not decided (A2,
-    or A6 with B2, would remove visible SDK use).
+    or A6 with B2, would remove visible SDK use). (2026-10-21: B2 and A6
+    were done next; what follows is under "Where things stand".)
 
     **Left to do (2026-10-21, after B2):** `DbgPrint` (`sub_822AC530`,
     `sub_82486BC0`, `sub_8248FBE0`, `xstart`: dropped), `sprintf`
