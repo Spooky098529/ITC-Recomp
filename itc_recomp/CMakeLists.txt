@@ -95,6 +95,7 @@ set(ITC_SOURCES
     src/hooks/archive_streaming.cpp
     src/hooks/memory_status.cpp
     src/hooks/voice.cpp
+    src/hooks/network_log.cpp
     src/game_data/game_data.cpp
     src/display/gamma.cpp
     src/harnesses/harness.cpp
