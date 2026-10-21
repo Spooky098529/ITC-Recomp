@@ -7,7 +7,8 @@ our patches applied in the submodule, not something to look into
 (patch 0003, Windows SDL as a DLL, only changes Windows builds).
 `docs/functions/` is the reference for the game's functions: their
 table, split by subsystem into one file per area since 2026-10-20
-(`functions.md` holds the rows not yet moved, `system-services.md` B5's).
+(`functions.md` holds the rows not yet moved, `system-services.md` B5's,
+`files-and-saves.md` B4's).
 `docs/known-data.md` lists the globals and object fields worked out.
 `docs/frame-interpolation.md` is how frame interpolation works (the
 frame's structure, the passes, what's blended), every diagnostic option,
