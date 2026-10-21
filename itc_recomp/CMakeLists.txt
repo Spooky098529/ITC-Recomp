@@ -72,6 +72,7 @@ set(ITC_SOURCES
     src/hooks/object_attributes.cpp
     src/hooks/time.cpp
     src/hooks/clock.cpp
+    src/hooks/xma_log.cpp
     src/hooks/strings.cpp
     src/hooks/last_error.cpp
     src/hooks/gamma.cpp
