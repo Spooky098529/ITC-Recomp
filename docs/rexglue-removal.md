@@ -2030,9 +2030,8 @@ B5. **System services** (82 functions; first counted as 78): sign-in, profile, U
     - SaveDevices::Update `sub_820A4610`: the game's save-slot state
       machines, needed; ours is the same without the read (Overridden,
       `src/hooks/notify.cpp`).
-    - Not done (batch 2, the user's call: stub them): Network::Update
-      `sub_8214E268` and SignIn::Update `sub_8214F290`, the last
-      `XNotifyGetNext` callers.
+    - Network::Update `sub_8214E268` and SignIn::Update `sub_8214F290`,
+      the last `XNotifyGetNext` callers: stubbed in batch 2 (below).
     - `xstart`: `main` never returns in play (closing the window ends the
       title's threads and exits), so its exit, `DbgPrint` and
       `XamLoaderTerminateTitle` never run. Left as it is for now.
@@ -2049,6 +2048,44 @@ B5. **System services** (82 functions; first counted as 78): sign-in, profile, U
     and SignIn::Update, batch 2), `XamNotifyCreateListener` and
     `XamUserReadProfileSettings` (Voice::Init and its talker set-up, B7),
     `XamLoaderTerminateTitle` (`xstart`).
+
+    **Batch 2, Network::Update stubbed (2026-10-21, `b5-b6-leftovers`;
+    the user's call: stub it).** A temporary logger
+    (`--log_network_update`, removed after) diffed the network manager's
+    globals (`826C6000`..`826C7FFF`, `82618B7C`..`82618B87`) around each
+    call in a session the user played, loading their save (`itc_304.log`;
+    the sign-in and profile paths need the user, not an attract race).
+    What the game gets from Network::Update and the sign-in helper it runs:
+    on the first call one signed-in local user (the sign-in counts and
+    masks, the first user, the user table's name and XUID) and a profile
+    read; the profile read again whenever the front end's controller
+    assignments (`sub_8209F5E0`, `sub_8209F6B8`) set `826C7938`, then the
+    gamercard region copied from its results; nothing else (every later
+    10 s summary: 0 words changed). The rest is Xbox-only and never did
+    anything: Live users' voice registration, XNet, the Live connection
+    and `0x11` notifications, voice chat data, the sign-in dialog and the
+    "VS MODE" message box (the user bounds are fixed at 0-4 at boot), and
+    system link code, unreachable (the game has no System Link mode, the
+    user, 2026-10-21).
+
+    Ours (`src/hooks/network.cpp`, Overridden): the first call writes user
+    0 from `src/user/user.h`; the first call and each request run the
+    game's own profile read (`sub_82149178`, its buffers, answered by our
+    XUserReadProfileSettings), and the next call copies the region; nothing
+    else. SignIn::Update and the Live connection reader are no longer
+    called (Dropped; the reader's override from batch 1 removed). No
+    harness: the recompiled one frees and reallocates the profile buffers,
+    so both can't run on the same state; instead its writes were diffed
+    the same way, word for word the same as the recompiled one's, the
+    profile buffers' layout included, in an attract race (`itc_305.log`)
+    and a session the user played (`itc_306.log`: the menus, their save, a
+    race; "looks good", no errors). Clears `XNotifyGetNext`.
+
+    **State of B5 (2026-10-21, after the leftovers):** of B5's imports,
+    only `XamNotifyCreateListener` and `XamUserReadProfileSettings`
+    (Voice::Init and its talker set-up, B7 with the network manager's
+    code) and `xstart`'s `XamLoaderTerminateTitle` (never reached: `main`
+    doesn't return in play) still have a live caller.
 
 B6. **Pure helpers** (55 functions): string, time and formatting
     helpers made native, or their callers made native. Cheap; can be
@@ -2384,3 +2421,24 @@ Cleared: the three socket imports, `XamShowSigninUI`, `sprintf`,
 Network::Update and SignIn::Update (`XNotifyGetNext`, batch 2), Voice::Init
 and its talker set-up (B7), `xstart` and the movie player's stream set-up
 (`DbgPrint`). 287 overrides in `src/`.
+
+**2026-10-21, B5 and B6 leftovers, batch 2: Network::Update stubbed
+(branch `b5-b6-leftovers`):** 449 functions (916 pairs): overridden 58,
+Native 3, Dropped 23, never called 70, live 295. Imports: 186 called, 63
+with a live caller.
+
+| Area | Overridden | Native | Dropped | Never called | Live |
+|---|---|---|---|---|---|
+| input (B1) | 0 | 3 | 0 | 0 | 0 |
+| audio (B2) | 6 | 0 | 0 | 0 | 0 |
+| graphics (B3) | 12 | 0 | 3 | 4 | 0 |
+| files and saves (B4) | 2 | 0 | 13 | 8 | 0 |
+| memory (core) | 6 | 0 | 0 | 4 | 18 |
+| system services (B5) | 20 | 0 | 6 | 51 | 3 |
+| pure helpers (B6) | 18 | 0 | 2 | 7 | 22 |
+| threads, sync and the rest (core) | 7 | 0 | 4 | 19 | 264 |
+
+Cleared: `XNotifyGetNext`. Live outside the core: Voice::Init and its
+talker set-up (`XamNotifyCreateListener`, `XamUserReadProfileSettings`,
+B7), `xstart` (`XamLoaderTerminateTitle`, `DbgPrint`) and the movie
+player's stream set-up (`DbgPrint`). 287 overrides in `src/`.

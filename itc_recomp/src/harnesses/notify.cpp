@@ -4,10 +4,7 @@
 // after. Compared: the app object (its users, lists and flags; not the
 // listener handle at +240, an SDK one or ours) and r3.
 //
-// Also the Live connection reader (ours answers 0) on the game's own app,
-// with its globals at 826C72F8-826C7307 set each way (the value 0, as in
-// play: the recompiled one copies the app's +252 there) and put back; and
-// SaveDevices::Update (ours without its notification read) on made-up save
+// Also SaveDevices::Update (ours without its notification read) on made-up save
 // devices whose methods are recompiled getters and constants, against the
 // recompiled one reading a listener handle the SDK doesn't know (no
 // notification, as in play).
@@ -33,38 +30,6 @@ constexpr uint32_t kReturns1 = 0x824457CC;
 constexpr uint32_t kReturns10 = 0x820A7178;
 constexpr uint32_t kReturns11 = 0x820A7B70;
 constexpr uint32_t kReturnsMinus1 = 0x824F65C0;
-
-void LiveReader(Context& h) {
-  uint8_t* base = h.base;
-  constexpr uint32_t kState = 0x826C72F8;  // +0 value, +4 changed, +8 the app, +12 reported
-  if (!guest::LoadU32(base, kState + 8)) {
-    REXLOG_INFO("harness: notify: the network manager isn't set up; Live reader skipped");
-    return;
-  }
-  const std::vector<uint8_t> saved = Read(base, kState, 16);
-  Results results("Live connection reader (sub_82149080)");
-  for (uint32_t changed : {0u, 1u}) {
-    for (uint32_t reported : {0u, 1u}) {
-      std::vector<uint8_t> result[2];
-      for (int v = 0; v < 2; v++) {
-        Write(base, kState, saved.data(), 16);
-        guest::StoreU32(base, kState, 0);  // as in play
-        guest::StoreU32(base, kState + 4, changed);
-        guest::StoreU32(base, kState + 12, reported);
-        PPCContext t = CallContext(h);
-        (v == 0 ? __imp__sub_82149080 : sub_82149080)(t, base);
-        result[v] = Read(base, kState, 16);
-        for (int i = 0; i < 4; i++) {
-          result[v].push_back(uint8_t(t.r3.u32 >> (24 - 8 * i)));
-        }
-      }
-      results.Check(result[0], result[1],
-                    fmt::format("changed {} reported {}", changed, reported));
-    }
-  }
-  Write(base, kState, saved.data(), 16);
-  results.Report();
-}
 
 void SaveDevicesUpdate(Context& h) {
   uint8_t* base = h.base;
@@ -156,7 +121,6 @@ void Notify(Context& h) {
   }
   notify_hooks::SetUsersBuilt(true);
   results.Report();
-  LiveReader(h);
   SaveDevicesUpdate(h);
 }
 

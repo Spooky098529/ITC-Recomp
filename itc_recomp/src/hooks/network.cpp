@@ -69,9 +69,9 @@ extern "C" REX_FUNC(sub_82459D40) {
 // game reads from them in play is one signed-in local user (written once)
 // and the profile read again when the front end asks. Left out, Xbox-only:
 // the Live users' voice registration, XNet, the Live connection and 0x11
-// notifications, voice chat, the system link state machine (system link
-// doesn't work), and the sign-in dialog and "VS MODE" message box (the
-// bounds are 0-4 users, so one never triggers them).
+// notifications, voice chat, the system link state machine (unreachable: the
+// game has no such mode), and the sign-in dialog and "VS MODE" message box
+// (the bounds are 0-4 users, so one user never triggers them).
 namespace {
 
 constexpr uint32_t kProfileOverlapped = 0x826C6080;  // 997 while a read is pending
@@ -171,12 +171,8 @@ uint32_t ProfileUser(uint8_t* base) {
 
 }  // namespace
 
-extern "C" void NetworkLog_Before(uint8_t* base);
-extern "C" void NetworkLog_After(uint8_t* base);
-
 extern "C" REX_FUNC(sub_8214E268) {
   REX_FUNC_PROLOGUE();
-  NetworkLog_Before(base);
   if (guest::LoadU32(base, kProfileOverlapped) != 997) {
     if (guest::LoadU32(base, kProfileWasRead)) {
       CopyRegion(base);
@@ -195,5 +191,4 @@ extern "C" REX_FUNC(sub_8214E268) {
       guest::StoreU32(base, kProfileWasRead, 1);
     }
   }
-  NetworkLog_After(base);
 }

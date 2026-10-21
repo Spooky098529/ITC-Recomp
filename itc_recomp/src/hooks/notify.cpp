@@ -4,9 +4,9 @@
 // at start-up, which built the user table. The others (the storage devices,
 // Live connection, Network::Update's 0x11 and, around the dialogs, the
 // sign-in helper's system UI and sign-in changes, which re-polled the same
-// users) get none, as an empty queue. Of those, the Live connection reader
-// answers its fixed result and the storage devices' update runs without its
-// read. See B5 in docs/rexglue-removal.md.
+// users) get none, as an empty queue. Of those, the storage devices' update
+// runs without its read (the others went with Network::Update's stub,
+// src/hooks/network.cpp). See B5 in docs/rexglue-removal.md.
 
 #include "guest.h"
 #include "guest_call.h"
@@ -74,16 +74,6 @@ uint32_t Method(uint8_t* base, uint32_t object, uint32_t offset) {
 }
 
 }  // namespace
-
-// The Live connection reader (from Network::Update, every frame): with no
-// notification it asked the app for its Live connection state, which copies
-// the app's +252 into 826C72F8 and answers its +248; both are 0 (set by the
-// app's set-up and written only by App::PollSignIn on a Live connection
-// change, which never comes). So it answers 0 and leaves 826C72F8 at 0.
-extern "C" REX_FUNC(sub_82149080) {
-  REX_FUNC_PROLOGUE();
-  ctx.r3.u64 = 0;
-}
 
 // SaveDevices::Update (every frame, through a vtable): r3 = the save devices.
 // The game's slot state machines, without the storage devices changed
