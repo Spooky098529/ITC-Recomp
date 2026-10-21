@@ -3,8 +3,8 @@
 #include "frame_pacing/game_messages.h"
 #include "guest.h"
 
-#include <rex/cvar.h>
-#include <rex/logging.h>
+#include "base/flags.h"
+#include "base/log.h"
 
 #include <chrono>
 #include <cmath>
@@ -19,29 +19,29 @@
 #include <string>
 #include <vector>
 
-REXCVAR_DEFINE_BOOL(find_per_frame_state, false, "ITC",
-                    "Find game state that advances on render-only passes, and the code that "
-                    "advances it");
+ITC_FLAG_BOOL(find_per_frame_state, false, "ITC",
+              "Find game state that advances on render-only passes, and the code that "
+              "advances it");
 REXCVAR_DEFINE_INT32(find_per_frame_state_interval_ms, 2000, "ITC",
                      "How often --find_per_frame_state samples a render-only pass (0 = every "
                      "one; slow)");
-REXCVAR_DEFINE_STRING(debug_hide, "", "ITC",
-                      "Testing: wrapped draw functions (hex, comma-separated) never to run, "
-                      "to see what they draw");
-REXCVAR_DEFINE_STRING(watch_addresses, "", "ITC",
-                      "With --find_per_frame_state, guest addresses (hex, comma-separated) to "
-                      "watch from the start, logging every change with the code making it");
-REXCVAR_DEFINE_BOOL(find_any_steps, false, "ITC",
-                    "With --find_per_frame_state, look for any steady step (a float changing "
-                    "by less than 1, or an integer by up to 4, by the same amount in two "
-                    "samples) instead of timer steps only");
-REXCVAR_DEFINE_BOOL(watch_lights, false, "ITC",
-                    "With --find_per_frame_state, watch the light billboards' lights (the "
-                    "first 2 of each list drawn by sub_8209CC38, up to 64 lists), logging every change");
-REXCVAR_DEFINE_BOOL(find_countdowns, false, "ITC",
-                    "With --find_per_frame_state, look for values counting down (a float in "
-                    "0..10 going down, or a small integer going down by one) instead of any "
-                    "timer step");
+ITC_FLAG_STRING(debug_hide, "", "ITC",
+                "Testing: wrapped draw functions (hex, comma-separated) never to run, "
+                "to see what they draw");
+ITC_FLAG_STRING(watch_addresses, "", "ITC",
+                "With --find_per_frame_state, guest addresses (hex, comma-separated) to "
+                "watch from the start, logging every change with the code making it");
+ITC_FLAG_BOOL(find_any_steps, false, "ITC",
+              "With --find_per_frame_state, look for any steady step (a float changing "
+              "by less than 1, or an integer by up to 4, by the same amount in two "
+              "samples) instead of timer steps only");
+ITC_FLAG_BOOL(watch_lights, false, "ITC",
+              "With --find_per_frame_state, watch the light billboards' lights (the "
+              "first 2 of each list drawn by sub_8209CC38, up to 64 lists), logging every change");
+ITC_FLAG_BOOL(find_countdowns, false, "ITC",
+              "With --find_per_frame_state, look for values counting down (a float in "
+              "0..10 going down, or a small integer going down by one) instead of any "
+              "timer step");
 
 namespace debug {
 
@@ -132,7 +132,7 @@ const char* AnyStep(uint32_t before, uint32_t after, double& step) {
 // Whether a word stepped like a frame timer: a float by +-1/30 or +-1/60 s,
 // or a small integer by +-1.
 const char* TimerStep(uint32_t before, uint32_t after) {
-  if (REXCVAR_GET(find_countdowns)) {
+  if (ITC_FLAG(find_countdowns)) {
     return CountdownStep(before, after);
   }
   float a = AsFloat(before), b = AsFloat(after);
@@ -152,7 +152,7 @@ const char* TimerStep(uint32_t before, uint32_t after) {
 class FrameStateDiff {
  public:
   void OnPassStart(uint8_t* base, bool render_only) {
-    if (!REXCVAR_GET(find_per_frame_state)) {
+    if (!ITC_FLAG(find_per_frame_state)) {
       return;
     }
     if (snapshot_taken_) {
@@ -163,7 +163,7 @@ class FrameStateDiff {
     before_.clear();
     auto now = std::chrono::steady_clock::now();
     if (render_only && now - last_snapshot_ >= std::chrono::milliseconds(
-                           REXCVAR_GET(find_per_frame_state_interval_ms))) {
+                           ITC_FLAG(find_per_frame_state_interval_ms))) {
       last_snapshot_ = now;
       ranges_ = ReadableGuestRanges(base);
       snapshot_.clear();
@@ -176,7 +176,7 @@ class FrameStateDiff {
   }
 
   void Before(uint8_t* base) {
-    if (!REXCVAR_GET(find_per_frame_state) || !render_only_) {
+    if (!ITC_FLAG(find_per_frame_state) || !render_only_) {
       return;
     }
     AddForcedWatches();
@@ -191,7 +191,7 @@ class FrameStateDiff {
   }
 
   void After(uint8_t* base, const char* kind, uint32_t id) {
-    if (!REXCVAR_GET(find_per_frame_state) || !render_only_ || before_.empty()) {
+    if (!ITC_FLAG(find_per_frame_state) || !render_only_ || before_.empty()) {
       return;
     }
     std::vector<uint32_t> values = std::move(before_.back());
@@ -202,9 +202,9 @@ class FrameStateDiff {
         changes_[{std::string(kind), id, watched_[i]}]++;
         if (forced_.count(watched_[i]) && logged_values_ < kMaxLoggedValues) {
           logged_values_++;
-          REXLOG_INFO("per-frame state: pass {} {} {:08X} wrote {:08X}: {} -> {}",
-                      frame_pacing::GameMessages_PassNumber(), kind, id, watched_[i], values[i],
-                      now);
+          ITC_LOG_INFO("per-frame state: pass {} {} {:08X} wrote {:08X}: {} -> {}",
+                       frame_pacing::GameMessages_PassNumber(), kind, id, watched_[i], values[i],
+                       now);
         }
       }
     }
@@ -229,7 +229,7 @@ class FrameStateDiff {
         uint32_t before = __builtin_bswap32(*reinterpret_cast<const uint32_t*>(then + i));
         uint32_t after = guest::LoadU32(base, address);
         const char* step;
-        if (REXCVAR_GET(find_any_steps)) {
+        if (ITC_FLAG(find_any_steps)) {
           // Only steps equal to the word's step in an earlier sample: a
           // steady rate, not a buffer being rewritten.
           double change = 0;
@@ -260,8 +260,8 @@ class FrameStateDiff {
       }
       offset += r.size;
     }
-    REXLOG_INFO("per-frame state: {} words stepped like timers over a render-only pass:{}", found,
-                sample);
+    ITC_LOG_INFO("per-frame state: {} words stepped like timers over a render-only pass:{}", found,
+                 sample);
     // Watch words that stepped in more than one sampled pass: steady
     // per-frame counters, not one-off changes (a load finishing).
     for (uint32_t address : stepped_now) {
@@ -289,8 +289,8 @@ class FrameStateDiff {
     last_log_ = now;
     logged_values_ = 0;
     for (const auto& [key, n] : changes_) {
-      REXLOG_INFO("per-frame state: {} {:08X} changed {:08X} ({} times)", std::get<0>(key),
-                  std::get<1>(key), std::get<2>(key), n);
+      ITC_LOG_INFO("per-frame state: {} {:08X} changed {:08X} ({} times)", std::get<0>(key),
+                   std::get<1>(key), std::get<2>(key), n);
     }
     changes_.clear();
   }
@@ -302,7 +302,7 @@ class FrameStateDiff {
     forced_added_ = true;
     if (!forced_parsed_) {
       forced_parsed_ = true;
-      std::string list = REXCVAR_GET(watch_addresses);
+      std::string list = ITC_FLAG(watch_addresses);
       size_t start = 0;
       while (start < list.size()) {
         size_t end = list.find(',', start);
@@ -369,7 +369,7 @@ void FrameStateDiff_Before(uint8_t* base) {
 }
 
 bool IsHidden(uint32_t function) {
-  std::string list = REXCVAR_GET(debug_hide);
+  std::string list = ITC_FLAG(debug_hide);
   size_t start = 0;
   while (start < list.size()) {
     size_t end = list.find(',', start);
@@ -437,14 +437,14 @@ extern "C" REX_FUNC(sub_8209CC38) {
   if (debug::IsHidden(0x8209CC38)) {
     return;
   }
-  if (REXCVAR_GET(watch_lights) && REXCVAR_GET(find_per_frame_state)) {
+  if (ITC_FLAG(watch_lights) && ITC_FLAG(find_per_frame_state)) {
     static std::set<uint32_t> seen;
     uint32_t list = ctx.r4.u32;
     uint32_t lights = guest::LoadU32(base, list + 36);
     uint32_t count = guest::LoadU32(base, list + 32);
     if (seen.insert(lights).second && seen.size() <= 64) {
-      REXLOG_INFO("per-frame state: watching light list {:08X}: {} lights at {:08X}, type {}",
-                  list, count, lights, guest::LoadU32(base, list));
+      ITC_LOG_INFO("per-frame state: watching light list {:08X}: {} lights at {:08X}, type {}",
+                   list, count, lights, guest::LoadU32(base, list));
       for (uint32_t i = 0; i < std::min<uint32_t>(count, 2) * 48; i += 4) {
         debug::FrameStateDiff_Watch(lights + i);
       }

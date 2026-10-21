@@ -5,8 +5,8 @@
 #include "frame_pacing/game_messages.h"
 #include "guest.h"
 
-#include <rex/cvar.h>
-#include <rex/logging.h>
+#include "base/flags.h"
+#include "base/log.h"
 
 #include <algorithm>
 #include <chrono>
@@ -15,12 +15,12 @@
 #include <string>
 #include <vector>
 
-REXCVAR_DEFINE_BOOL(find_menu_selection, false, "ITC",
-                    "While paused, find words that change on render-only passes only while a "
-                    "direction is held, and log the code changing them by pass type");
-REXCVAR_DEFINE_STRING(menu_watch, "", "ITC",
-                      "Guest words (hex, comma-separated) to watch like --find_menu_selection's "
-                      "candidates, without its scan");
+ITC_FLAG_BOOL(find_menu_selection, false, "ITC",
+              "While paused, find words that change on render-only passes only while a "
+              "direction is held, and log the code changing them by pass type");
+ITC_FLAG_STRING(menu_watch, "", "ITC",
+                "Guest words (hex, comma-separated) to watch like --find_menu_selection's "
+                "candidates, without its scan");
 
 namespace debug {
 
@@ -43,7 +43,7 @@ class MenuSelectionScan {
     before_.clear();
     if (!watch_parsed_) {
       watch_parsed_ = true;
-      std::string list = REXCVAR_GET(menu_watch);
+      std::string list = ITC_FLAG(menu_watch);
       for (size_t start = 0; start < list.size();) {
         size_t end = list.find(',', start);
         std::string item = list.substr(start, end == std::string::npos ? end : end - start);
@@ -53,7 +53,7 @@ class MenuSelectionScan {
         start = end == std::string::npos ? list.size() : end + 1;
       }
     }
-    if (!REXCVAR_GET(find_menu_selection)) {
+    if (!ITC_FLAG(find_menu_selection)) {
       return;
     }
     if (sampling_) {
@@ -102,10 +102,10 @@ class MenuSelectionScan {
       uint32_t now = guest::LoadU32(base, candidates_[i]);
       if (now != values[i] && change_lines_ < kMaxChangeLines) {
         change_lines_++;
-        REXLOG_INFO("menu selection: pass {} {} {} {:08X} changed {:08X}: {} -> {}",
-                    frame_pacing::GameMessages_PassNumber(),
-                    render_only_ ? "render-only" : "logic", kind, id, candidates_[i], values[i],
-                    now);
+        ITC_LOG_INFO("menu selection: pass {} {} {} {:08X} changed {:08X}: {} -> {}",
+                     frame_pacing::GameMessages_PassNumber(),
+                     render_only_ ? "render-only" : "logic", kind, id, candidates_[i], values[i],
+                     now);
       }
     }
   }
@@ -168,7 +168,7 @@ class MenuSelectionScan {
       const Hits& hits = hits_[address];
       list += fmt::format(" {:08X}x{}({}->{})", address, n, hits.before, hits.after);
     }
-    REXLOG_INFO(
+    ITC_LOG_INFO(
         "menu selection: sample ({}): {} words changed; {} held and {} idle samples; "
         "{} candidates:{}",
         held_ ? "held" : "idle", changed, held_samples_, idle_samples_, ranked.size(), list);

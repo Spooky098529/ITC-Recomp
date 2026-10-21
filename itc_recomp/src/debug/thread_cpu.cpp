@@ -1,18 +1,18 @@
 #include "thread_cpu.h"
 
-#include <rex/cvar.h>
-#include <rex/logging.h>
+#include "base/flags.h"
+#include "base/log.h"
 
-REXCVAR_DEFINE_BOOL(log_thread_cpu, false, "ITC",
-                    "Log each busy thread's CPU use by name every 2 s (Linux only)");
+ITC_FLAG_BOOL(log_thread_cpu, false, "ITC",
+              "Log each busy thread's CPU use by name every 2 s (Linux only)");
 
 #ifdef _WIN32
 
 namespace debug {
 
 void ThreadCpu_Start() {
-  if (REXCVAR_GET(log_thread_cpu)) {
-    REXLOG_WARN("thread cpu: --log_thread_cpu isn't supported on Windows");
+  if (ITC_FLAG(log_thread_cpu)) {
+    ITC_LOG_WARN("thread cpu: --log_thread_cpu isn't supported on Windows");
   }
 }
 
@@ -221,7 +221,7 @@ class ThreadCpu {
   void Run() {
     const double ticks_per_s = double(sysconf(_SC_CLK_TCK));
     const long cpus = sysconf(_SC_NPROCESSORS_ONLN);
-    REXLOG_INFO("thread cpu: sampling every {} s, {} CPUs", kInterval.count(), cpus);
+    ITC_LOG_INFO("thread cpu: sampling every {} s, {} CPUs", kInterval.count(), cpus);
     auto previous = SampleThreads();
     uint64_t machine_busy = 0, machine_total = 0;
     bool have_machine = SampleMachine(machine_busy, machine_total);
@@ -289,11 +289,11 @@ class ThreadCpu {
           kernel_heavy.emplace_back(r.tid, r.s->name + guest);
         }
       }
-      REXLOG_INFO("thread cpu: process {:.0f}% of a core, {} threads{}{}", 100 * process,
-                  current.size(), machine, line);
+      ITC_LOG_INFO("thread cpu: process {:.0f}% of a core, {} threads{}{}", 100 * process,
+                   current.size(), machine, line);
       // Sampled after the totals are logged (0.1 s a thread).
       for (const auto& [tid, name] : kernel_heavy) {
-        REXLOG_INFO("thread cpu: {} ({}) system calls: {}", name, tid, SampleSyscalls(tid, 25));
+        ITC_LOG_INFO("thread cpu: {} ({}) system calls: {}", name, tid, SampleSyscalls(tid, 25));
       }
       previous = std::move(current);
     }
@@ -312,7 +312,7 @@ ThreadCpu* g_thread_cpu = nullptr;
 namespace debug {
 
 void ThreadCpu_Start() {
-  if (!REXCVAR_GET(log_thread_cpu) || g_thread_cpu) {
+  if (!ITC_FLAG(log_thread_cpu) || g_thread_cpu) {
     return;
   }
   g_thread_cpu = new ThreadCpu();

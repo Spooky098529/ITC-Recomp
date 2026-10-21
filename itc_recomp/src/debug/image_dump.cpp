@@ -5,13 +5,13 @@
 #include <cstdlib>
 #include <string>
 #include <vector>
-#include <rex/logging.h>
-#include <rex/cvar.h>
+#include "base/log.h"
+#include "base/flags.h"
 
-REXCVAR_DEFINE_STRING(dump_image, "", "ITC",
-                      "Write the loaded executable image (0x82000000-0x82980000, "
-                      "big-endian as in guest memory) to this file at the first frame, "
-                      "then exit");
+ITC_FLAG_STRING(dump_image, "", "ITC",
+                "Write the loaded executable image (0x82000000-0x82980000, "
+                "big-endian as in guest memory) to this file at the first frame, "
+                "then exit");
 
 namespace {
 
@@ -23,7 +23,7 @@ constexpr uint32_t kImageEnd = 0x82980000;
 }  // namespace
 
 void debug::ImageDump_OnPass(uint8_t* base) {
-  std::string path = REXCVAR_GET(dump_image);
+  std::string path = ITC_FLAG(dump_image);
   if (path.empty()) {
     return;
   }
@@ -33,9 +33,9 @@ void debug::ImageDump_OnPass(uint8_t* base) {
   }
   FILE* f = std::fopen(path.c_str(), "wb");
   if (!f || std::fwrite(image.data(), 1, image.size(), f) != image.size()) {
-    REXLOG_ERROR("dump_image: can't write {}", path);
+    ITC_LOG_ERROR("dump_image: can't write {}", path);
   } else {
-    REXLOG_INFO("dump_image: wrote {} bytes from {:08X} to {}", image.size(), kImageStart, path);
+    ITC_LOG_INFO("dump_image: wrote {} bytes from {:08X} to {}", image.size(), kImageStart, path);
   }
   if (f) {
     std::fclose(f);

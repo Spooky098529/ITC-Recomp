@@ -20,18 +20,18 @@
 #include "frame_pacing/game_messages.h"
 #include "guest.h"
 
-#include <rex/cvar.h>
-#include <rex/logging.h>
+#include "base/flags.h"
+#include "base/log.h"
 
 #include <chrono>
 #include <map>
 #include <mutex>
 #include <tuple>
 
-REXCVAR_DEFINE_BOOL(log_pause_menu, false, "ITC",
-                    "Log menu list updates (sub_8220C1E0) and the action mapper's updates "
-                    "(sub_8210C370) while a direction fires, by pass type; count the mappers' "
-                    "updates and reads by caller once a second");
+ITC_FLAG_BOOL(log_pause_menu, false, "ITC",
+              "Log menu list updates (sub_8220C1E0) and the action mapper's updates "
+              "(sub_8210C370) while a direction fires, by pass type; count the mappers' "
+              "updates and reads by caller once a second");
 
 namespace {
 
@@ -101,7 +101,7 @@ void FlushReads() {
   reads_since = now;
   for (const auto& [key, count] : reads) {
     const auto& [slot, action, caller, render_only, paused] = key;
-    REXLOG_INFO(
+    ITC_LOG_INFO(
         "pause menu reads: tick {} {} {} slot {} ({}) action {} from {:08X}: calls {} "
         "non-zero {}",
         Ticks(), paused ? "paused" : "running", render_only ? "render-only" : "logic", slot,
@@ -135,7 +135,7 @@ void NoteRead(int slot, uint32_t mapper, uint32_t action, uint32_t caller, bool 
     FlushReads();
   }
   if (render_only && nonzero && TakeReadLine()) {
-    REXLOG_INFO(
+    ITC_LOG_INFO(
         "pause menu read on render-only pass: tick {} pass {} slot {} ({}) mapper {:08X} "
         "action {} from {:08X} = {}",
         Ticks(), frame_pacing::GameMessages_PassNumber(), slot, SlotFunction(slot), mapper,
@@ -150,7 +150,7 @@ void NoteRead(int slot, uint32_t mapper, uint32_t action, uint32_t caller, bool 
 #define PAUSE_MENU_READ_SLOT(address, slot, result)                        \
   extern "C" REX_FUNC(sub_##address) {                                     \
     REX_FUNC_PROLOGUE();                                                   \
-    if (!REXCVAR_GET(log_pause_menu)) {                                    \
+    if (!ITC_FLAG(log_pause_menu)) {                                    \
       __imp__sub_##address(ctx, base);                                     \
       return;                                                              \
     }                                                                      \
@@ -173,7 +173,7 @@ PAUSE_MENU_READ_SLOT(8210BA28, 14, double(ctx.r3.u32 & 0xFFFF))
 #undef PAUSE_MENU_READ_SLOT
 
 void debug::PauseMenuLog_NoteMapperUpdate(uint32_t caller) {
-  if (REXCVAR_GET(log_pause_menu)) {
+  if (ITC_FLAG(log_pause_menu)) {
     NoteRead(0, 0, 0, caller, false, 0);
   }
 }
@@ -181,7 +181,7 @@ void debug::PauseMenuLog_NoteMapperUpdate(uint32_t caller) {
 // The menu list update.
 extern "C" REX_FUNC(sub_8220C1E0) {
   REX_FUNC_PROLOGUE();
-  if (!REXCVAR_GET(log_pause_menu)) {
+  if (!ITC_FLAG(log_pause_menu)) {
     __imp__sub_8220C1E0(ctx, base);
     return;
   }
@@ -196,7 +196,7 @@ extern "C" REX_FUNC(sub_8220C1E0) {
   uint32_t after = guest::LoadU32(base, menu + 16);
   bool pause_menu = menu == guest::LoadU32(base, 0x826D84DC);
   if ((after != before || (fired & kDirectionBits) || (held & kDirectionBits)) && TakeLine()) {
-    REXLOG_INFO(
+    ITC_LOG_INFO(
         "pause menu: tick {} pass {} {} list {:08X}{} from {:08X}: selection {} -> {} "
         "(scroll {} -> {}), mapper {:08X} held {:08X} fired {:08X}",
         Ticks(), frame_pacing::GameMessages_PassNumber(), PassType(), menu,
@@ -208,7 +208,7 @@ extern "C" REX_FUNC(sub_8220C1E0) {
 // The action mapper's input update.
 extern "C" REX_FUNC(sub_8210C370) {
   REX_FUNC_PROLOGUE();
-  if (!REXCVAR_GET(log_pause_menu)) {
+  if (!ITC_FLAG(log_pause_menu)) {
     __imp__sub_8210C370(ctx, base);
     return;
   }
@@ -219,7 +219,7 @@ extern "C" REX_FUNC(sub_8210C370) {
   uint32_t held = guest::LoadU32(base, mapper + 448);
   uint32_t fired = guest::LoadU32(base, mapper + 464);
   if (((held | fired | fired_before) & kDirectionBits) && TakeLine()) {
-    REXLOG_INFO(
+    ITC_LOG_INFO(
         "pause menu: tick {} pass {} {} mapper {:08X} update from {:08X}: held {:08X} "
         "pressed {:08X} fired {:08X} -> {:08X}",
         Ticks(), frame_pacing::GameMessages_PassNumber(), PassType(), mapper, caller, held,
