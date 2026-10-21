@@ -11,7 +11,7 @@
 
 #include "harness.h"
 
-#include <rex/logging.h>
+#include "base/log.h"
 #include <rex/system/kernel_state.h>
 #include <rex/system/xnotifylistener.h>
 
@@ -94,7 +94,7 @@ void Notify(Context& h) {
   auto sdk_listener =
       REX_KERNEL_OBJECTS()->LookupObject<rex::system::XNotifyListener>(listener);
   if (!sdk_listener) {
-    REXLOG_INFO("harness: notify: no SDK listener made");
+    ITC_LOG_INFO("harness: notify: no SDK listener made");
     return;
   }
   Results results("App::PollSignIn (sub_82099828)");

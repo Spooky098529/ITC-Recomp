@@ -5,7 +5,7 @@
 
 #include "harness.h"
 
-#include <rex/logging.h>
+#include "base/log.h"
 
 namespace harness {
 
@@ -33,8 +33,8 @@ void Xmp(Context& h) {
   results.Check(result[0], result[1], "take, then hand back");
   guest::StoreU32(base, slot, saved);
   results.Report();
-  REXLOG_INFO("harness: XMP state after the recompiled pair: {:08X} {:08X} (0 0 expected)",
-              guest::LoadU32(base, taken), guest::LoadU32(base, was_playing));
+  ITC_LOG_INFO("harness: XMP state after the recompiled pair: {:08X} {:08X} (0 0 expected)",
+               guest::LoadU32(base, taken), guest::LoadU32(base, was_playing));
 }
 
 }  // namespace harness

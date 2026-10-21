@@ -10,7 +10,7 @@
 
 #include "helpers/time.h"
 
-#include <rex/logging.h>
+#include "base/log.h"
 
 namespace time_hooks {
 int64_t GetTimeZoneBias(PPCContext& ctx, uint8_t* base);
