@@ -529,12 +529,34 @@ B2. **Audio** (6 functions calling `XAudio*`/`XMA*`, plus what's around
     4. The SDK's audio system goes (`ItcAudioSystem` no longer starts
        its XMA decoder), and A6 (our own conversion and downmix).
 
-    Still to read before step 2: what `sub_8246B480` does when the
-    input buffer is consumed (valid bits, `sub_8245CA30`, and
-    `sub_8245CF60`, which reads the error status), what `sub_8246B1C8`
-    (the voice's flush or stop, with `sub_8245D070`, which reads the input
-    read offset) does with the offset, and the loop's subframe skip and
-    end against the 512-sample frames.
+    Read since (2026-10-21), and what step 2 needs from it:
+
+    - The voice's queue of buffers is at voice +20 (address +8, size
+      +12, loop count +16, state +116: 0 new, 3 handed over, 4 done).
+      `sub_8246B480` hands a new buffer over (`sub_8245C958`) and, with a
+      loop count, sets the loop data (`sub_8245CF98`): bit offsets the
+      buffer carries (+40, +44), or with voice +266 = 2 worked out from
+      sample positions by `sub_8246A5F8`. A buffer is done (the
+      buffer-end callback, voice +16's vtable +92) once its address is
+      no longer a valid input buffer (`sub_8245CA30`), or the error
+      status (`sub_8245CF60`) has bit 8. So our stream clears its valid
+      bit when decoding passes the data's end after its loops.
+    - `sub_8246A5F8` is the game's own frame walk, sample to bit offset:
+      2 KB packets, each header with the frame count (top 6 bits), the
+      first frame's bit offset (15 bits, + 32 for the header) and the
+      packets of other streams to skip (low 8 bits); each frame starts
+      with its length (15 bits) and decodes to 512 samples a channel.
+      `sub_8246A698` gives the last frame's offset (the data's end). Our
+      loop handling is this walk the other way; subframes are 128
+      samples, so the loop's skip and end counts place the loop points
+      within a frame. Check the exact meaning of the skip and end
+      against the SDK's decoder (`rexglue-sdk/src/audio/xma_context.cpp`)
+      while writing it.
+    - Never called in the user's session: `sub_8246BB98`'s second loop
+      (from buffer +32 to the end, once, with `sub_8245CE10` moving the
+      output by 128 samples), `sub_8246B1C8` and `sub_8245D070` (the input
+      read offset). Step 2 can leave them out (logging if one is ever
+      reached).
 
 B3. **Graphics boundary** (17 functions calling `Vd*`): ring buffer
     setup, the interrupt callback and vblank, swap, display mode and gamma
