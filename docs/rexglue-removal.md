@@ -1100,7 +1100,7 @@ B4. **Files and saves** (22 functions; the game's `CreateFile`
     changed, at 6086-6092). The temporary counter no longer wraps the
     steps made native.
 
-    **Step 2, the game's data files: surveyed (2026-10-21), not started.**
+    **Step 2, the game's data files: surveyed (2026-10-21); done (below).**
     The user's direction: native file loading code at the level where the
     game asks for its data, not a reimplementation of the Xbox's file
     calls (that would emulate the 360); after it, the next level up is
@@ -1189,6 +1189,50 @@ B4. **Files and saves** (22 functions; the game's `CreateFile`
     Afterwards ReadFileEx and its APC, ReadFile, GetFileSize(Ex),
     SetFilePointer and CreateFile have no callers in play but the movie
     player's; the SDK's VFS serves only the movies and the boot.
+
+    **Step 2: done (2026-10-21, `files-and-saves`).** As proposed, in
+    four commits:
+
+    1. `src/game_data/game_data.{h,cpp}`: files under the data root
+       (ItcApp's: `--game_data_root` or the executable's folder, set in
+       `OnConfigurePaths`) from the game's relative paths, `game:\`
+       dropped, names matched whatever their case on Linux (exact first,
+       then each folder's entries, cached); our own handles
+       (`47440000` up), reads at a position or an offset, straight into
+       guest memory (`guest::ForEachHostPart`, split at `0xE0000000`).
+    2. The file class (`src/hooks/file_class.cpp`): open, read, seek and
+       close on the module; other devices (none in play) go to the
+       recompiled class. Harness `file_class`: the game's own use (open,
+       read, seek to 0, read, close) the same as the recompiled one on
+       three files; seeks elsewhere expected to differ: ours reads at the
+       position set (checked against the files), a read through the SDK
+       after its SetFilePointer doesn't (not followed: the game only
+       seeks to 0; the user's call to check this by play).
+    3. The loader thread (`src/hooks/archive_streaming.cpp`): archive
+       bytes copied straight into the request's buffer, the request-done
+       lock signaled after the read as the APC did; the queue, loose
+       reads, `Ucl::Unpack` and callbacks called as before. Attract race:
+       the same requests, every unpack the right size, latency the same
+       (median 11.7 ms against 12.2, 90th percentile 240 against 241).
+    4. `Archive::Init`: the TOCs read straight into their buffers, the
+       archives opened by the module (their paths read from the image);
+       a word the recompiled Init copies unset from its frame copied from
+       the same guest stack slot.
+
+    No fallback flags (as for B3, B5, B6 and step 1). The user's play
+    (2026-10-21): boot, menus and sound right, and a 3-minute drive far
+    along the track with no missing scenery: 2,287 requests, 1 GB
+    unpacked, none wrong; the only files the SDK opened were the movies
+    (`UBI_LOGO.wmv`, `STAGE1_OPENING.wmv`). The streaming trace in the
+    temporary counter is removed; the counter itself stays until B4 is
+    done.
+
+    Left in B4: the movie player's reads (with the movie decoder), the
+    debug checks (the graphics library's `ShaderDumpxe:` GetFileAttributes,
+    the debug capture's file functions, never called), and the functions
+    never called in play (the C runtime's I/O, `File::OpenWrite` and
+    `Write`, GetDiskFreeSpaceEx, SetEndOfFile, DeleteFile, GetFileTime,
+    FlushFileBuffers), to be marked so the boundary counts them.
 
 B5. **System services** (82 functions; first counted as 78): sign-in, profile, UI dialogs,
     sessions, voice, network, notifications, the loader. Most should go
@@ -1854,3 +1898,11 @@ caller. Files and saves (B4): overridden 2, Dropped 7, never called 1,
 live 13 (the game's data files, the debug checks, the C runtime's I/O
 and what's never called but not yet marked). The other areas unchanged.
 245 overrides in `src/`.
+
+**2026-10-21, B4 step 2, the game's data files (branch
+`files-and-saves`; B4 in progress):** 449 functions (916 pairs):
+overridden 49, Native 3, Dropped 15, never called 54, live 328. Imports:
+186 called, 88 with a live caller. Files and saves (B4): overridden 2,
+Dropped 8, never called 1, live 12 (the movie player's file calls, the
+debug checks and what's never called in play but not yet marked). The
+other areas unchanged. 251 overrides in `src/`.
