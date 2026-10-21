@@ -1906,3 +1906,14 @@ overridden 49, Native 3, Dropped 15, never called 54, live 328. Imports:
 Dropped 8, never called 1, live 12 (the movie player's file calls, the
 debug checks and what's never called in play but not yet marked). The
 other areas unchanged. 251 overrides in `src/`.
+
+**2026-10-21, B4: the functions never called in play marked (branch
+`files-and-saves`; B4 in progress):** 449 functions (916 pairs):
+overridden 49, Native 3, Dropped 17, never called 61, live 319. Imports:
+186 called, 81 with a live caller. Files and saves (B4): overridden 2,
+Dropped 10 (WriteFile and SetFilePointer added: their callers in play are
+native), never called 8 (the debug capture's file functions,
+GetDiskFreeSpaceEx, SetEndOfFile, DeleteFile, GetFileTime,
+FlushFileBuffers, XContentGetCreator: none called in nine sessions), live
+3 (ReadFile and GetFileSizeEx, the movie player's; GetFileAttributes, the
+graphics library's debug check). The other areas unchanged.
