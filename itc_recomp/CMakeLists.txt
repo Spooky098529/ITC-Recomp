@@ -158,27 +158,11 @@ set(ITC_SOURCES
     src/interpolation/glow.cpp
 )
 
-if(WIN32)
-    add_executable(itc WIN32 ${ITC_SOURCES})
-else()
-    add_executable(itc ${ITC_SOURCES})
-endif()
-
-rexglue_setup_target(itc)
-
-target_include_directories(itc PRIVATE src)
-
-# Our own copies of header-only libraries (A1 in docs/rexglue-removal.md),
-# included with their folder (<xxHash/xxhash.h>) so the SDK's copies on the
-# include path can't stand in for them.
-target_include_directories(itc PRIVATE thirdparty)
-
 # Our XMA decoding (src/audio/xma_*: B2 in docs/rexglue-removal.md) on our
 # own FFmpeg, in a library of its own so only our FFmpeg's headers reach it.
 add_library(itc_xma STATIC src/audio/xma_packets.cpp src/audio/xma_stream.cpp)
 target_include_directories(itc_xma PUBLIC src)
 target_link_libraries(itc_xma PRIVATE itc_avcodec)
-target_link_libraries(itc PRIVATE itc_xma)
 
 # The SDK's Xenos shader translator (to SPIR-V), built into our binary for
 # the native renderer (docs/native-renderer.md: reused for now, to be
@@ -208,19 +192,57 @@ target_compile_options(itc_xenos_shaders PRIVATE -Wno-unused-variable)
 target_link_libraries(itc_xenos_shaders PUBLIC
     rexruntime xxHash::xxhash Vulkan::Headers glslang::SPIRV glslang
     MachineIndependent GenericCodeGen OSDependent OGLCompiler)
-target_link_libraries(itc PRIVATE itc_xenos_shaders)
 
-# The native renderer (src/native/) uses SDL, which lives in librexruntime,
-# and loads Vulkan at runtime: it needs only the headers. Both are the SDK's
-# third-party copies.
-target_include_directories(itc PRIVATE
-    ${REXSDK_DIR}/thirdparty/sdl3/include
-    ${REXSDK_DIR}/thirdparty/vulkan-headers/include)
+# The game's executable, from our sources and the recompiled code.
+function(itc_add_executable name)
+    if(WIN32)
+        add_executable(${name} WIN32 ${ARGN})
+    else()
+        add_executable(${name} ${ARGN})
+    endif()
 
-# rex::runtime doesn't propagate imgui's include path, which rex_app.cpp and
-# the app header need. Headers only: the symbols already live in librexruntime.
-target_include_directories(itc PRIVATE
-    $<TARGET_PROPERTY:imgui::imgui,INTERFACE_INCLUDE_DIRECTORIES>)
+    rexglue_setup_target(${name})
+
+    target_include_directories(${name} PRIVATE src)
+
+    # Our own copies of header-only libraries (A1 in docs/rexglue-removal.md),
+    # included with their folder (<xxHash/xxhash.h>) so the SDK's copies on the
+    # include path can't stand in for them.
+    target_include_directories(${name} PRIVATE thirdparty)
+
+    target_link_libraries(${name} PRIVATE itc_xma itc_xenos_shaders)
+
+    # The native renderer (src/native/) uses SDL, which lives in librexruntime,
+    # and loads Vulkan at runtime: it needs only the headers. Both are the SDK's
+    # third-party copies.
+    target_include_directories(${name} PRIVATE
+        ${REXSDK_DIR}/thirdparty/sdl3/include
+        ${REXSDK_DIR}/thirdparty/vulkan-headers/include)
+
+    # rex::runtime doesn't propagate imgui's include path, which rex_app.cpp and
+    # the app header need. Headers only: the symbols already live in librexruntime.
+    target_include_directories(${name} PRIVATE
+        $<TARGET_PROPERTY:imgui::imgui,INTERFACE_INCLUDE_DIRECTORIES>)
+endfunction()
+
+itc_add_executable(itc ${ITC_SOURCES})
+
+# The coverage build: which recompiled functions run in play ("Functions
+# seen in play" in docs/rexglue-removal.md). A second executable beside itc,
+# not built by default ('cmake --build ... --target itc_coverage'), whose
+# copy of the recompiled code marks each function the first time it runs;
+# src/debug/coverage.cpp writes the marks out. Its own target rather than a
+# build directory of its own, as the SDK writes its libraries to one place
+# (rexglue-sdk/out/<platform>) whatever the build directory. Linux only.
+option(ITC_COVERAGE "Add the itc_coverage target" OFF)
+if(ITC_COVERAGE)
+    itc_add_executable(itc_coverage ${ITC_SOURCES} src/debug/coverage.cpp)
+    set_target_properties(itc_coverage itc_coverage_recomp PROPERTIES EXCLUDE_FROM_ALL ON)
+    # Without LTO: ThinLTO's import leaves the coverage tables' private
+    # globals (__sancov_gen_*) undefined at the link.
+    target_compile_options(itc_coverage_recomp PRIVATE
+        -fsanitize-coverage=func,inline-bool-flag,pc-table -fno-lto)
+endif()
 
 # Decodes one XMA wave from a game bank with our FFmpeg (B2 in
 # docs/rexglue-removal.md; how to run it is at the top of the file). Not

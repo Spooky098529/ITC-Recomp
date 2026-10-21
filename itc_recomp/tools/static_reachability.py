@@ -17,6 +17,10 @@ Vtables point at every method of every class, used or not, so this only
 finds what nothing can reach; what's reachable but never run takes a
 coverage build. Overridden functions keep their generated body's edges,
 which overcounts a little where the override no longer calls them.
+It also misses addresses built across registers (lis r9,hi, later
+addi r28,r28,lo): 23 functions a 20-second attract race ran were
+"unreachable" here (2026-10-21). The coverage build is the measure; this
+is a quick look without running the game.
 """
 
 import os
