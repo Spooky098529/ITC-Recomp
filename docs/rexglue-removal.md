@@ -1073,6 +1073,33 @@ B4. **Files and saves** (22 functions; the game's `CreateFile`
     `--game_data_root`, through the file layer and the archive
     streaming), the debug checks, and what's never called.
 
+    **Step 1, the saves: done (2026-10-21, `files-and-saves`).** The save
+    is plain C++ in `src/saves/saves.{h,cpp}` (`std::filesystem` and
+    streams, the same on Linux and Windows): files in `saves/` next to
+    the executable (found by `helpers::ExecutableFolder`, which
+    `native/disk_cache.cpp` now uses too), written to a temporary file
+    and renamed over the old one. `src/hooks/saves.cpp` has the adapters
+    over the 12 save slot steps that called imports (CheckDevice,
+    Show/WaitDeviceSelector, Enumerate and its wait `sub_820A4A88`,
+    OpenItem and its wait, Create, ReadFile, WriteFile, SetThumbnail,
+    Delete): each finishes at once and marks its overlapped done, so the
+    recompiled waits pass on their next poll without a kernel call; the
+    read and write steps make no file or event handles (+496 = -1, +492
+    = 0), so the close step's wait has none to close. One device (1),
+    the SDK's free bytes (3 GB), one save (`SystemData.bin` holding
+    `TXR_DATA_1`, its display name "GAME DATA   " and the file's date in
+    UTC). XContentClose, called inline by the save and load steps, is
+    Dropped (its overlapped done, 997). XShowDeviceSelectorUI, the
+    XContent wrappers and XEnumerate have no callers left (Dropped).
+    No fallback flag (as for B3, B5 and B6). Checked: the harness
+    (`saves`: CheckDevice, WaitDeviceSelector and the enumeration's
+    wait, 13 cases, 0 differ; the other steps would make the SDK create
+    or close content in its own folder), an attract race, and the user's
+    play: a fresh start with no save, a save (129,400 bytes written), a
+    restart that loaded the progress, and a save over it (4 bytes
+    changed, at 6086-6092). The temporary counter no longer wraps the
+    steps made native.
+
 B5. **System services** (82 functions; first counted as 78): sign-in, profile, UI dialogs,
     sessions, voice, network, notifications, the loader. Most should go
     from the game's side entirely (offline, signed in, no voice). Log
@@ -1730,3 +1757,10 @@ readers, voice and the system link code, with B7; the device selector
 and XEnumerate, with B4) and B6's callers waiting on those areas.
 Overall, 232 overrides in `src/` of 16,552 recompiled functions.
 
+**2026-10-21, B4 step 1, the saves (branch `files-and-saves`; B4 in
+progress):** 449 functions (916 pairs): overridden 49, Native 3, Dropped
+13, never called 54, live 330. Imports: 186 called, 89 with a live
+caller. Files and saves (B4): overridden 2, Dropped 7, never called 1,
+live 13 (the game's data files, the debug checks, the C runtime's I/O
+and what's never called but not yet marked). The other areas unchanged.
+245 overrides in `src/`.
