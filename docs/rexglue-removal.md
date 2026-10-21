@@ -47,6 +47,17 @@ goes in `src/` as overrides), American English.
   Dropped, with the reason), or left out when that caller is made native.
   What the game does need from them (one signed-in local user, the
   profile's answers) becomes plain C++ with fixed answers.
+- **Plug in the data the game uses, don't mimic the 360** (the user's
+  rule, 2026-10-21, from B5). When replacing a system service, first
+  read what the game's callers actually do with its answer (often one
+  field, or one effect), and plug that in directly: hardcoded values, or
+  the one action it led to. Don't rebuild the 360 mechanism behind it.
+  In B5, notifications became "the app's reader builds the user table
+  once" (no queue, listener masks or start-up set), and the profile
+  read became a fixed table of the 26 settings the game asks for (no
+  profile code). Harness cases still check what the game reads against
+  the recompiled function. And read the game function before sizing a
+  job: notifications looked big until the readers were read.
 - **The core stays the SDK's, untouched, until the end**: guest memory,
   the threads that run recompiled code, the image load, `PPCContext`,
   the function table, the sync objects shared with recompiled code. These
