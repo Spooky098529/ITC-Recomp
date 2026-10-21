@@ -91,6 +91,10 @@ date as you learn things.
 - SBX-Recomp (the Japanese release's recomp, in a folder named `SBX-Recomp`
   beside this repo's folder) is a reference, but read it only when the user
   says so. How to reference it: `docs/referencing-sbx-recomp.md`.
+- The repo is public: never commit absolute local paths (anything under
+  `/home/`) in files or commit messages; use paths relative to the repo root.
+  `.githooks/` refuses them; enable it once per clone with
+  `git config core.hooksPath .githooks`.
 - Commit often. Never revert or `git checkout` uncommitted work without
   committing it first.
 - Don't create branches (local or pushed) without asking the user first;

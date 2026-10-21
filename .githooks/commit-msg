@@ -1,0 +1,11 @@
+#!/bin/sh
+# Refuses a commit message holding an absolute path from someone's machine
+# (/home/...): the repo is public. See pre-commit.
+
+pattern='/home/[A-Za-z0-9._-]+'
+found=$(grep -v '^#' "$1" | grep -E "$pattern")
+if [ -n "$found" ]; then
+  echo "commit-msg: absolute local paths in the message (the repo is public):" >&2
+  echo "$found" | head -5 >&2
+  exit 1
+fi
