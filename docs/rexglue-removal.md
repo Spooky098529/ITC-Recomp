@@ -1390,8 +1390,10 @@ B5. **System services** (82 functions; first counted as 78): sign-in, profile, U
 
     Checked: harness cases (`profile`: the size query, the settings with
     and without an overlapped, another user, a short buffer; the buffer,
-    the size, the overlapped and r3 the same as the recompiled one's) and
-    an attract race (no errors). Not cleared: `XamUserReadProfileSettings`
+    the size, the overlapped and r3 the same as the recompiled one's), an
+    attract race (no errors), and a session the user played
+    (`itc_258.log`, 2026-10-21: the front end, a race at ~150 fps, quit):
+    no errors, closed cleanly. Not cleared: `XamUserReadProfileSettings`
     (voice's own reads, `sub_8257E568`, and the never-called
     `sub_8257D798`).
 
