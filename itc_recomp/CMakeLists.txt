@@ -86,6 +86,8 @@ set(ITC_SOURCES
     src/hooks/profile.cpp
     src/hooks/saves.cpp
     src/saves/saves.cpp
+    src/hooks/file_class.cpp
+    src/game_data/game_data.cpp
     src/hooks/files_and_saves_log.cpp
     src/display/gamma.cpp
     src/harnesses/harness.cpp
@@ -102,6 +104,7 @@ set(ITC_SOURCES
     src/harnesses/notify.cpp
     src/harnesses/profile.cpp
     src/harnesses/saves.cpp
+    src/harnesses/file_class.cpp
     src/helpers/debug_output.cpp
     src/helpers/object_attributes.cpp
     src/helpers/time.cpp

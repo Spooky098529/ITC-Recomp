@@ -9,6 +9,7 @@
 
 #include "audio/native_audio.h"
 #include "debug/thread_cpu.h"
+#include "game_data/game_data.h"
 #include "input/gamepads.h"
 #include "native/app_window.h"
 
@@ -60,6 +61,7 @@ class ItcApp : public rex::ReXApp {
     if (paths.game_data_root.empty()) {
       paths.game_data_root = rex::filesystem::GetExecutableFolder();
     }
+    game_data::SetRoot(paths.game_data_root);
   }
 
   // Override virtual hooks for customization:

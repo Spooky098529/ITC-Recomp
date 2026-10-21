@@ -104,5 +104,6 @@ void Network(Context& h);
 void Notify(Context& h);
 void Profile(Context& h);
 void Saves(Context& h);
+void FileClass(Context& h);
 
 }  // namespace harness

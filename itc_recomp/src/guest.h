@@ -141,6 +141,22 @@ inline void SwapStoreU32s(uint8_t* out, const uint8_t* in, uint32_t count) {
   }
 }
 
+// The host memory for `bytes` bytes of guest memory at `address`, as one or
+// two contiguous parts (split at 0xE0000000, where the host offset changes, as
+// in CopyU32s): calls part(host, offset into the range, part's bytes). For
+// bulk copies such as file reads (no byte swap).
+template <typename Part>
+inline void ForEachHostPart(uint8_t* base, uint32_t address, uint32_t bytes, Part part) {
+  constexpr uint32_t kOffsetChange = 0xE0000000u;
+  if (bytes && address < kOffsetChange && uint64_t(address) + bytes > kOffsetChange) {
+    uint32_t below = kOffsetChange - address;
+    part(REX_RAW_ADDR(address), 0u, below);
+    part(REX_RAW_ADDR(kOffsetChange), below, bytes - below);
+    return;
+  }
+  part(REX_RAW_ADDR(address), 0u, bytes);
+}
+
 // Stores count words (floats or integers, in host byte order) to guest
 // memory at address, as StoreU32 would one by one, in one vectorized loop.
 // Split at 0xE0000000 as CopyU32s.

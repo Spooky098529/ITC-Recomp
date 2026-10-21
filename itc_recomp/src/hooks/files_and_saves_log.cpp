@@ -11,7 +11,8 @@
 // memory where that's known), and every 10 s the counts of those called.
 // CreateFile and the movie player's open already have overrides
 // (create_file.cpp): run with --log_file_opens for their paths. The save slot
-// steps made native (hooks/saves.cpp) and XContentClose are no longer wrapped.
+// steps made native (hooks/saves.cpp), XContentClose and the file class made
+// native (hooks/file_class.cpp) are no longer wrapped.
 
 #include "guest.h"
 
@@ -260,9 +261,6 @@ struct Function {
   X(82488598, "movie player read? 2", None)                                 \
   X(82488A10, "movie player read? 3", None)                                 \
   X(8258C608, "File::OpenWrite", PathArg)                                   \
-  X(8258C688, "File::OpenRead", None)                                       \
-  X(8258C768, "File::Seek", None)                                           \
-  X(8258C820, "File::Read", None)                                           \
   X(8258C898, "File::Write", None)                                          \
   X(82593B10, "open and size", None)                                        \
   X(825B0F48, "_write", None)                                               \

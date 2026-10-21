@@ -1159,10 +1159,14 @@ B4. **Files and saves** (22 functions; the game's `CreateFile`
 
     Proposed (each part plain C++ behind thin adapters):
 
-    1. A game data module (`src/game_data/`): finds a `game:\` path's
-       file under the game data folder whatever its case (the game asks
-       for `CAR_SE.XWB`, the file is `car_se.xwb`), and reads byte ranges
-       of the two archives (kept open) and of loose files.
+    1. A game data module (`src/game_data/`): reads files and byte
+       ranges under the data root (the executable's folder, or
+       `--game_data_root`, the flag that already exists) from the game's
+       relative paths (`DATA\AUDIO\CAR_SE.XWB`; a `game:\` prefix in the
+       game's strings is dropped: no mount points or devices, the user's
+       call), matching names whatever their case on Linux (the game asks
+       for `CAR_SE.XWB`, the file is `car_se.xwb`); the two archives kept
+       open.
     2. The file class native: open (the size from the host file), read
        at the position, seek, close, with handles of our own (a range the
        SDK's `F8000000` ones can't reach); `File::Close` hands any other
