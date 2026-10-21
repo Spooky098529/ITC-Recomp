@@ -24,6 +24,7 @@
 #include <chrono>
 #include <mutex>
 #include <string>
+#include <unordered_map>
 
 REXCVAR_DEFINE_BOOL(log_files_and_saves, false, "ITC",
                     "Log calls to the game's functions that call file and save kernel imports "
@@ -228,7 +229,6 @@ struct Function {
 // Names are from docs/functions/files-and-saves.md ("probably" there).
 #define FILES_AND_SAVES(X)                                                  \
   X(8209AC78, "file layer error report?", None)                             \
-  X(8209DD00, "async read (ReadFileEx)", None)                              \
   X(8209E210, "data file open", None)                                       \
   X(820A55A8, "XContentGetCreator caller", None)                            \
   X(820A5BE8, "SaveSlot::SaveStep", Slot)                                   \
@@ -285,6 +285,25 @@ Function g_functions[] = {FILES_AND_SAVES(ENTRY)};
 enum Index { FILES_AND_SAVES(INDEX) };
 #undef INDEX
 
+// The archive streaming's requests (B4 step 2's survey), every call: the
+// load request (sub_8209DE48), its cancel (sub_8209DB20), the state it's given
+// (sub_8209D490), the archive reads (sub_8209DD00), loose files
+// (sub_8209DFA8), the decompression (sub_82294610) and the finish with its
+// callback (sub_8209D688), with the latency since the request.
+struct Streaming {
+  std::mutex mutex;
+  std::unordered_map<uint32_t, std::chrono::steady_clock::time_point> submitted;  // by serial
+  uint64_t requests = 0, cancels = 0, finishes = 0, reads = 0, read_bytes = 0, loose = 0;
+  uint64_t decompressions = 0, decompressed_bytes = 0;
+  double decompress_ms = 0, loose_ms = 0;
+};
+Streaming g_streaming;
+
+double MsSince(std::chrono::steady_clock::time_point start) {
+  return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start)
+      .count();
+}
+
 std::mutex g_summary_mutex;
 std::chrono::steady_clock::time_point g_last_summary = std::chrono::steady_clock::now();
 
@@ -304,6 +323,14 @@ void Summary() {
     }
   }
   REXLOG_INFO("files and saves: counts:{}", counts);
+  std::lock_guard lock(g_streaming.mutex);
+  REXLOG_INFO("files and saves: streaming totals: {} requests, {} cancelled, {} finished, {} "
+              "pending; {} archive reads ({} bytes); {} decompressions ({} bytes, {:.1f} ms); {} "
+              "loose files ({:.1f} ms)",
+              g_streaming.requests, g_streaming.cancels, g_streaming.finishes,
+              g_streaming.submitted.size(), g_streaming.reads, g_streaming.read_bytes,
+              g_streaming.decompressions, g_streaming.decompressed_bytes,
+              g_streaming.decompress_ms, g_streaming.loose, g_streaming.loose_ms);
 }
 
 // Counts the call; true when it's one to log (the first 3 and powers of 2).
@@ -349,3 +376,166 @@ void Log(Index i, uint8_t* base, const In& in, uint32_t result) {
 
 FILES_AND_SAVES(WRAPPER)
 #undef WRAPPER
+
+namespace {
+
+bool Streaming() {
+  if (!REXCVAR_GET(log_files_and_saves)) {
+    return false;
+  }
+  Summary();
+  return true;
+}
+
+// The request (sub_8209DC18's slot): +8 serial, +12 flags, +16 id, +20 the
+// in-memory pointer, +24 the byte offset, +32 size, +40 destination, +44
+// context, +48 callback, +52 state, +56/+60 the read, +72/+76/+88 the
+// decompression, +84 the request chained to it.
+std::string Request(uint8_t* base, uint32_t r) {
+  auto u = [&](uint32_t o) { return guest::LoadU32(base, r + o); };
+  return fmt::format("serial {} flags {:04X} id {} state {} offset {:08X} size {} dest {:08X} "
+                     "callback {:08X} context {:08X} data {:08X} in-memory {:08X} chained {:08X}",
+                     int32_t(u(8)), u(12), u(16), u(52), u(24), u(32), u(40), u(48), u(44), u(76),
+                     u(20), u(84));
+}
+
+}  // namespace
+
+// The load request: r3 = asset id (from 23011: BUILD_CRS), r4 = destination,
+// r5 = callback, r6 = its context, r7, r8 = a size; returns the serial.
+extern "C" REX_FUNC(sub_8209DE48) {
+  REX_FUNC_PROLOGUE();
+  if (!Streaming()) {
+    __imp__sub_8209DE48(ctx, base);
+    return;
+  }
+  const In in = Capture(ctx);
+  const uint32_t id = in.r[0];
+  const bool crs = id >= 23011;
+  const uint32_t toc = guest::LoadU32(base, crs ? 0x826A5128 : 0x826A5120);
+  const uint32_t entry = toc + ((crs ? id - 23011 : id) + 1) * 16;
+  __imp__sub_8209DE48(ctx, base);
+  const uint32_t serial = ctx.r3.u32;
+  {
+    std::lock_guard lock(g_streaming.mutex);
+    g_streaming.requests++;
+    g_streaming.submitted[serial] = std::chrono::steady_clock::now();
+  }
+  REXLOG_INFO("files and saves: request {} from {:08X}: id {}{} toc {:08X} {:08X} {:08X} {:08X}; "
+              "dest {:08X} callback {:08X} context {:08X} r7 {:08X} r8 {:08X}",
+              int32_t(serial), in.lr, id, crs ? " (crs)" : "", guest::LoadU32(base, entry),
+              guest::LoadU32(base, entry + 4), guest::LoadU32(base, entry + 8),
+              guest::LoadU32(base, entry + 12), in.r[1], in.r[2], in.r[3], in.r[4], in.r[5]);
+}
+
+// The cancel: r3 = serial; 1 when it was still waiting.
+extern "C" REX_FUNC(sub_8209DB20) {
+  REX_FUNC_PROLOGUE();
+  if (!Streaming()) {
+    __imp__sub_8209DB20(ctx, base);
+    return;
+  }
+  const In in = Capture(ctx);
+  __imp__sub_8209DB20(ctx, base);
+  if (ctx.r3.u32) {
+    std::lock_guard lock(g_streaming.mutex);
+    g_streaming.cancels++;
+    g_streaming.submitted.erase(in.r[0]);
+  }
+  REXLOG_INFO("files and saves: cancel {} from {:08X} -> {}", int32_t(in.r[0]), in.lr, ctx.r3.u32);
+}
+
+// The state a request is given (r3 = request).
+extern "C" REX_FUNC(sub_8209D490) {
+  REX_FUNC_PROLOGUE();
+  if (!Streaming() || !ctx.r3.u32) {
+    __imp__sub_8209D490(ctx, base);
+    return;
+  }
+  const uint32_t r = ctx.r3.u32;
+  __imp__sub_8209D490(ctx, base);
+  REXLOG_INFO("files and saves: start: {}", Request(base, r));
+}
+
+// An archive read (r3 = request): +56 the offset, +60 sectors (2,048 bytes),
+// +76 the staging buffer, +16 < 0 picks BUILD.DAT.
+extern "C" REX_FUNC(sub_8209DD00) {
+  REX_FUNC_PROLOGUE();
+  if (!Streaming()) {
+    __imp__sub_8209DD00(ctx, base);
+    return;
+  }
+  const uint32_t r = ctx.r3.u32;
+  const uint32_t bytes = guest::LoadU32(base, r + 60) << 11;
+  {
+    std::lock_guard lock(g_streaming.mutex);
+    g_streaming.reads++;
+    g_streaming.read_bytes += bytes;
+  }
+  REXLOG_INFO("files and saves: read: offset {:08X} bytes {} to {:08X}; {}",
+              guest::LoadU32(base, r + 56), bytes, guest::LoadU32(base, r + 76),
+              Request(base, r));
+  __imp__sub_8209DD00(ctx, base);
+}
+
+// A loose file request (r3 = request), on the streaming thread.
+extern "C" REX_FUNC(sub_8209DFA8) {
+  REX_FUNC_PROLOGUE();
+  if (!Streaming()) {
+    __imp__sub_8209DFA8(ctx, base);
+    return;
+  }
+  const uint32_t r = ctx.r3.u32;
+  REXLOG_INFO("files and saves: loose file: {}", Request(base, r));
+  auto start = std::chrono::steady_clock::now();
+  __imp__sub_8209DFA8(ctx, base);
+  double ms = MsSince(start);
+  std::lock_guard lock(g_streaming.mutex);
+  g_streaming.loose++;
+  g_streaming.loose_ms += ms;
+}
+
+// The decompression: r3 = destination, r4 = source, r5 = the expected size;
+// 1 when it adds up.
+extern "C" REX_FUNC(sub_82294610) {
+  REX_FUNC_PROLOGUE();
+  if (!Streaming()) {
+    __imp__sub_82294610(ctx, base);
+    return;
+  }
+  const In in = Capture(ctx);
+  auto start = std::chrono::steady_clock::now();
+  __imp__sub_82294610(ctx, base);
+  double ms = MsSince(start);
+  {
+    std::lock_guard lock(g_streaming.mutex);
+    g_streaming.decompressions++;
+    g_streaming.decompressed_bytes += in.r[2];
+    g_streaming.decompress_ms += ms;
+  }
+  REXLOG_INFO("files and saves: decompress {:08X} -> {:08X}, {} bytes: {} ({:.2f} ms)", in.r[1],
+              in.r[0], in.r[2], ctx.r3.u32, ms);
+}
+
+// The finish (r3 = request): the callback (flag 0x2000) and the free (0x2).
+extern "C" REX_FUNC(sub_8209D688) {
+  REX_FUNC_PROLOGUE();
+  if (!Streaming()) {
+    __imp__sub_8209D688(ctx, base);
+    return;
+  }
+  const uint32_t r = ctx.r3.u32;
+  const uint32_t serial = guest::LoadU32(base, r + 8);
+  std::string request = Request(base, r);
+  double latency = -1;
+  {
+    std::lock_guard lock(g_streaming.mutex);
+    g_streaming.finishes++;
+    if (auto it = g_streaming.submitted.find(serial); it != g_streaming.submitted.end()) {
+      latency = MsSince(it->second);
+      g_streaming.submitted.erase(it);
+    }
+  }
+  REXLOG_INFO("files and saves: finish after {:.1f} ms: {}", latency, request);
+  __imp__sub_8209D688(ctx, base);
+}
