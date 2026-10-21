@@ -1806,8 +1806,8 @@ class DrawState {
     if (ITC_FLAG(log_replayed_constants)) {
       auto print = [&](const char* name, uint32_t offset) {
         Matrix4 m = LoadMatrix(base_, CameraPass(0) + offset);
-        ITC_LOG_INFO("pass 0 {}: {:.4g} {:.4g} {:.4g} {:.4g} | {:.4g} {:.4g} {:.4g} {:.4g} | {:.4g} "
-                     "{:.4g} {:.4g} {:.4g} | {:.4g} {:.4g} {:.4g} {:.4g}",
+        ITC_LOG_INFO("pass 0 {}: {:.4g} {:.4g} {:.4g} {:.4g} | {:.4g} {:.4g} {:.4g} {:.4g} | "
+                     "{:.4g} {:.4g} {:.4g} {:.4g} | {:.4g} {:.4g} {:.4g} {:.4g}",
                      name, m[0], m[1], m[2], m[3], m[4], m[5], m[6], m[7], m[8], m[9], m[10],
                      m[11], m[12], m[13], m[14], m[15]);
       };
@@ -3529,8 +3529,8 @@ class SteppingConstantsLog {
       bool sometimes_present = entry.present * 10 > frames_ && entry.present * 10 < frames_ * 9;
       if ((sometimes_blended || sometimes_present) && mixed < 60) {
         mixed++;
-        ITC_LOG_INFO("mixed constants: {} c{} x{} #{} by {:08X}: in {} of {} frames, blended in {}, "
-                     "{} changes/s unblended, e.g. {}",
+        ITC_LOG_INFO("mixed constants: {} c{} x{} #{} by {:08X}: in {} of {} frames, blended in "
+                     "{}, {} changes/s unblended, e.g. {}",
                      key.stage ? "pixel" : "vertex", key.start, key.count, key.occurrence,
                      key.owner, entry.present, frames_, entry.substituted, entry.changes / seconds,
                      entry.sample);
@@ -3648,7 +3648,8 @@ class OverlayUploadsLog {
                  "{} c{} x{} {}: {}{}",
                  frame_, GetReplayCameras().tick(), GetReplayCameras().amount(), index_++,
                  slot->render_only ? "render-only" : "logic", slot->pass,
-                 stage == 0 ? "vs" : "ps", start, count, substituted ? "substituted" : "as recorded",
+                 stage == 0 ? "vs" : "ps", start, count,
+                 substituted ? "substituted" : "as recorded",
                  values, was);
   }
 

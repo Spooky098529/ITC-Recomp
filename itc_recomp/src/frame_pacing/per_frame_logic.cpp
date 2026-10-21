@@ -618,8 +618,8 @@ void PerFrameLogic_RecordWorldSprites(uint8_t* base, uint32_t list,
                      b[4], b[5], b[6]);
       }
       auto f = [&](uint32_t o) { return guest::LoadFloat(base, list + o); };
-      ITC_LOG_INFO("world sprites: list {:08X} matrix {:.4g} {:.4g} {:.4g} | {:.4g} {:.4g} {:.4g} | "
-                   "{:.4g} {:.4g} {:.4g} | {:.5g} {:.5g} {:.5g}",
+      ITC_LOG_INFO("world sprites: list {:08X} matrix {:.4g} {:.4g} {:.4g} | {:.4g} {:.4g} {:.4g} "
+                   "| {:.4g} {:.4g} {:.4g} | {:.5g} {:.5g} {:.5g}",
                    list, f(0), f(4), f(8), f(16), f(20), f(24), f(32), f(36), f(40), f(48), f(52),
                    f(56));
     }
