@@ -54,6 +54,11 @@ Rows not yet moved stay in the table below. So far:
   the player's music (XMP), network and system link, voice chat,
   notifications, the loader and start-up, console settings (B5 in
   `docs/rexglue-removal.md`).
+- [`files-and-saves.md`](files-and-saves.md): the file calls, the
+  game's file layer and archives, the C runtime's I/O, the save slots
+  (B4).
+- [`audio.md`](audio.md): the audio library's render driver client, its
+  XMA layer and the voice category volume (B2).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
@@ -137,7 +142,6 @@ old performance notes to the end of `../native-renderer.md`.
 | `sub_8229B680` | `SystemTimeToFileTime` | Overridden | r3 = SYSTEMTIME, r4 = FILETIME (out); returns 1, or 0 for an invalid date (`sub_82296E88` sets STATUS_INVALID_PARAMETER). Ours: `helpers::SystemTimeToFileTime`; the same as the recompiled one on 2,000 random dates in 1678-2261. Outside those years the SDK's `RtlTimeFieldsToTime` overflows `system_clock`'s nanoseconds and gives wrong times; ours gives the right ones. |
 | `sub_8229B720` | `FileTimeToSystemTime` | Overridden | r3 = FILETIME, r4 = SYSTEMTIME (out); returns 1. Ours: `helpers::FileTimeToSystemTime`; the same on 2,000 random times in 1678-2261 (outside, the SDK's `RtlTimeToTimeFields` overflows, as above). |
 | `sub_825B9A70` | `QueryPerformanceFrequency` | Overridden | r3 = 64-bit rate (out); returns 1. Ours stores 50,000,000 (`src/helpers/clock.h`), the rate the SDK's runtime gives the timebase recompiled `mftb` reads. |
-| `sub_8245D288` | | Overridden | The audio library's wait for its hardware (r3 = the object): polls `sub_8245D350` until it answers (returns 0); after an eighth of a second (the performance counter's rate >> 3 timebase ticks) resets it: `sub_82106540`, Sleep(1000) (`sub_82295500`), 0 then `0x03000000` written to the XMA registers at `0x7FEA1804`, `sub_8245CE98` for each of the object's [+0] contexts; returns 1. ~200 calls a second in a race, from `0x8246C51C`. Ours (`src/hooks/clock.cpp`) keeps the steps as guest calls, the rate from `src/helpers/clock.h`. Audio library (B2). |
 | `sub_82296648` | `MultiByteToWideChar` | Overridden | r3 = code page, r5 = source, r6 = its length (-1: terminated, terminator counted), r7 = destination, r8 = its room in characters (0 to measure); returns the characters, 0 with error 122 (`sub_82296FD0`) when the room is short. UTF-8 (65001) goes to the game's converter `sub_82297340` (a guest call); other code pages widen each byte (the SDK's `RtlMultiByteToUnicodeN`). Ours: `src/hooks/strings.cpp`, `src/helpers/strings.cpp`; 3,000 random cases the same. Called once at boot, from `0x8214E44C`. |
 | `sub_82296720` | `WideCharToMultiByte` | Overridden | The same layout as `MultiByteToWideChar`, room in bytes, r10 = "default used" (out, 0); characters above 255 become '?' (the SDK's `RtlUnicodeToMultiByteN`), UTF-8 through `sub_82297540`. Ours as above; 3,000 random cases the same. |
 | `sub_82296870` | `swprintf` | Overridden | r3 = buffer, r4 = format, then the arguments (to `vswprintf`). One call site (`sub_8214F290`, returning to `0x8214F338`), with a Japanese "VS MODE" format at `0x82009218` that has no conversions; ours copies the format (`%%` made `%`) and logs an error at any other conversion. The same as the recompiled one on that format and 199 made-up ones. |
@@ -155,13 +159,6 @@ old performance notes to the end of `../native-renderer.md`.
 | `sub_825A71D0` | `memset` | | r3 = destination, r4 = value, r5 = bytes (from its calls). The time zone read clears each date with it (16 bytes). |
 | `sub_82295E78` | `CreateEvent` | | r4 = manual reset, r5 = initial state, r6 = name (0 for none): `NtCreateEvent`, with `sub_822970A8`'s object attributes only for a name. None named in a boot and attract race. Threads and sync (core). |
 | `sub_825BA2B0` | `CreateTimer` | | `NtCreateTimer`, named the same way. Threads and sync (core). |
-| `sub_8245D350` | | | Polled by the audio library's hardware wait (`sub_8245D288`, r3 = the object): nonzero once the hardware answers; reads the XMA decoder's registers (`7FEA1818` and a 16-bit one; the SDK's XMA decoder answers them). Not read in detail. |
-| `sub_8245C638` | | | Reads the XMA decoder's register `7FEA1800` (audio, not the GPU; the SDK's XMA decoder answers it). Audio library (B2). Not read. |
-| `sub_8245D138` | | | Writes an XMA decoder register (`7FEA18xx`, the address from a pointer). Audio library (B2). Not read. |
-| `sub_8245D208` | | | Writes an XMA decoder register (`7FEA18xx`, the address from a pointer). Audio library (B2). Not read. |
-| `sub_8245D4D0` | | | Writes an XMA decoder register (`7FEA18xx`, the address from a pointer). Audio library (B2). Not read. |
-| `sub_8245CE98` | | | The audio library's per-context reset after a hardware timeout (r3 = the object, r4 = the context index). Not read. |
-| `sub_82106540` | | | Called first in the audio library's hardware reset (r3 = the object). Not read. |
 | `sub_82295500` | `Sleep` | | r3 = milliseconds (from `sub_8245D288`'s `Sleep(1000)`; not read). |
 | `sub_82482B18` | | Overridden | `src/hooks/video_mode.cpp`, without `XGetVideoMode` (it read only `is_widescreen`; ours is `display::kWidescreen`). Once at boot, from `sub_82483130` (`82483174`), r3 = an object (+56 the device). Stores the back buffer's size (`sub_8229B7B0`) as floats at +132/+136 and the display's aspect (16/9 or 4/3, the game's constants at `8204D300`/`8204D2FC`) over the back buffer's at +140 (1.0), makes a 12-byte index buffer (`sub_822A6968`, to +60, filled with 0-5 through `sub_822A6A18`/`sub_822A6A78`), a 120-byte vertex buffer (`sub_822A6830`, to +64) and a vertex declaration (`sub_822A8980` with `8264D550`, to +68), then returns the object's vtable +96 call (0), or `0x8007000E` if one couldn't be made. What the object is isn't known. |
 | `sub_82483130` | | | Calls `sub_8229D7E0`, then `sub_82482B18` at boot. Not read. |
@@ -209,9 +206,6 @@ old performance notes to the end of `../native-renderer.md`.
 | `sub_821379D8` | `Glow::Record` | Wrapped | The glow (bloom) recorder in races: strength and history weight blended between ticks, history written every frame (`--blend_glow`, `--glow_history_every_frame`; `src/interpolation/glow.cpp`). |
 | `sub_8209C6E0` | `Billboards::BuildVertices` | Wrapped | r3 = billboard set (+0 the camera pass it faces), r4 = command list, r5 = the sprites: each light's quad turned to face that camera; the camera blended once a frame (`--cache_billboard_cameras`). |
 | `sub_820AE958` | | Wrapped | The render thread's command that starts the boot movie; `--skip_intro` waits for it to return (ending the movie earlier stalled the boot; "The title screen" in `../title-screen.md`). |
-| `sub_824657E0` | `AudioRenderDriver::Register` | Overridden | `src/audio/native_audio.cpp` (`--native_audio`; `docs/native-audio.md`). r3 = the driver object (callback argument +12, handle +16), r4 = the mixer callback (0 only unregisters): registered with our audio output instead of the kernel's. |
-| `sub_82465870` | `AudioRenderDriver::Submit` | Overridden | Same file. r4 = the mixed buffer (`sub_8245F718` gives its descriptor; samples at +8), handed to our audio output. |
-| `sub_824658C8` | `AudioRenderDriver::Destroy` | Wrapped | Same file. Unregisters our handle first, so the original doesn't pass it to `XAudioUnregisterRenderDriverClient`. |
 | `sub_825A7410` | `memcpy` | Wrapped | The library's memcpy (r3 destination, r4 source, r5 size): copies into the physical views recorded for the native renderer's guest memory mirrors (`src/native/buffers.cpp`). |
 | `sub_8229E3F0` | `Device::Kick` | Overridden | `src/native/gpu_link.cpp`. r3 device, r4 (size in words, address) pairs, r5 their count. The kicked buffers are applied directly (only their effects outside the GPU) instead of written to the ring; the original is no longer called. `--native_renderer_log_gpu` logs. |
 | `sub_8229E848` | `Device::DeferredKick` | Overridden | Same file. Queued kicks while GPU interrupts were outstanding; every kick completes at once now, so it kicks straight away; the original is no longer called. |
