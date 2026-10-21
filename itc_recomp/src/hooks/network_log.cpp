@@ -5,7 +5,8 @@
 // block a real override).
 //
 // --log_network_update snapshots the network manager's globals (826C6000-
-// 826C7FFF) and 82618B7C-82618B87 around each call, and logs each word that
+// 826C7FFF) and 82618B7C-82618B87 around each call (since the stub, called
+// from it, to compare with what the recompiled one wrote), and logs each word that
 // changed: "in" during the call, "outside" between calls (other code). The
 // first 1,000 changes in full, then every 10 s the words changed since the last
 // summary (count and value). Also the first calls (and every power of two) of
@@ -120,26 +121,31 @@ Callee g_callees[] = {CALLEES(ENTRY)};
 enum Index { CALLEES(INDEX) };
 #undef INDEX
 
+Snapshot g_before;
+
 }  // namespace
 
-extern "C" REX_FUNC(sub_8214E268) {
-  REX_FUNC_PROLOGUE();
+// Called by the Network::Update stub (src/hooks/network.cpp) around its work.
+extern "C" void NetworkLog_Before(uint8_t* base) {
   if (!REXCVAR_GET(log_network_update)) {
-    __imp__sub_8214E268(ctx, base);
     return;
   }
-  Snapshot before;
-  Take(base, before);
+  Take(base, g_before);
   if (g_have_after) {
-    Compare(g_after, before, "outside");
+    Compare(g_after, g_before, "outside");
   }
   g_calls++;
   g_inside = true;
-  __imp__sub_8214E268(ctx, base);
+}
+
+extern "C" void NetworkLog_After(uint8_t* base) {
+  if (!REXCVAR_GET(log_network_update)) {
+    return;
+  }
   g_inside = false;
   Take(base, g_after);
   g_have_after = true;
-  Compare(before, g_after, "in");
+  Compare(g_before, g_after, "in");
   Summary();
 }
 
