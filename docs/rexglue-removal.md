@@ -987,7 +987,8 @@ B4. **Files and saves** (22 functions; the game's `CreateFile`
     the SDK's VFS goes. (Superseded for saves by the user's call below:
     our own `saves` folder, no migration.)
 
-    Worked on in branch `files-and-saves`. Surveyed 2026-10-21. The
+    Worked on in branch `files-and-saves`, merged into
+    `rexglue-removal-project` 2026-10-21. Surveyed 2026-10-21. The
     functions are in `docs/functions/files-and-saves.md`, the save slot's
     fields in `docs/known-data.md`.
 
@@ -1005,8 +1006,8 @@ B4. **Files and saves** (22 functions; the game's `CreateFile`
     handle at +4, the position at +8), the C runtime's low-level I/O
     (`_read`, `_write`, `_lseek`, `_commit`), the archive streaming
     (`sub_8209E210` opens, `sub_8209DD00` reads with ReadFileEx), the
-    movie player (`MoviePlayer::OpenFile` `sub_82487C48`, reads in
-    `sub_82488598`), and the save slots (`SaveSlot::*`, `sub_820A45C0` to
+    movie player (`MovieSource::OpenFile` `sub_82487C48`, first named
+    `MoviePlayer::OpenFile`, reads in `sub_82488598`), and the save slots (`SaveSlot::*`, `sub_820A45C0` to
     `sub_820A5E68`: a 1,000-byte slot, each step started through an
     overlapped and polled with XGetOverlappedResult `sub_82295C98`). Two
     old guesses were wrong: `sub_82295C10` is XContentGetDeviceData (not
@@ -1154,7 +1155,7 @@ B4. **Files and saves** (22 functions; the game's `CreateFile`
       vtable) and the loose requests. `File::OpenWrite` and `File::Write`
       are never called.
     - The movies (`UBI_LOGO.wmv`, `OPENING.wmv`) have their own reads in
-      the movie player (`MoviePlayer::OpenFile`, `sub_82488598`): left
+      the movie player (`MovieSource::OpenFile`, `sub_82488598`): left
       for when the movie decoder is looked at.
 
     Proposed (each part plain C++ behind thin adapters):
@@ -1337,10 +1338,15 @@ B4. **Files and saves** (22 functions; the game's `CreateFile`
     CreateFile keeps its logging wrapper (`--log_file_opens`), which
     would show any open left. The temporary counter is removed.
 
-    **B4: done (2026-10-21).** No live boundary function is left in files
+    **B4: done (2026-10-21; merged from `files-and-saves`).** No live
+    boundary function is left in files
     and saves: the saves, the game's data files, the movies and the debug
     check are native or dropped, and the rest is never called in play.
-    Nothing the game asks for goes through the SDK's VFS any more.
+    Nothing the game asks for goes through the SDK's VFS any more; the
+    SDK itself still reads `default.xex` through it at start-up
+    (`Runtime::LoadXexImage`), which goes with the image load (E3). The
+    kernel's file imports stay linked, never called in play, until the
+    SDK goes (E4).
 
 B5. **System services** (82 functions; first counted as 78): sign-in, profile, UI dialogs,
     sessions, voice, network, notifications, the loader. Most should go
@@ -1876,6 +1882,13 @@ B6. **Pure helpers** (55 functions): string, time and formatting
     | `RtlCompareMemoryUlong` | `sub_82298548`, `sub_82298A88` | `sub_8229A930`, the game's heap (core) |
     | `KeGetCurrentProcessType` | `sub_8245A828`, `sub_825776A8` | five heap and memory functions (core) |
     | `RtlInitAnsiString` | none (its 2 pure callers are done) | the file functions `sub_825B9C20`, `sub_825B9F20`, `sub_825B9FD8`, `sub_822B58F0` (B4); `sub_82295508`, CreateFile, is only wrapped for logging |
+
+    Since B4 (2026-10-21) the table's B4 callers no longer run in play:
+    `sub_825B9FD8` and `sub_822953E8` are Dropped, `sub_825B9C20`,
+    `sub_825B9F20` and `sub_822B58F0` are never called. So
+    `RtlNtStatusToDosError`, `sprintf` and `RtlInitAnsiString` have no
+    caller in play outside B6; they stay imported until those callers are
+    gone with the SDK.
 
     Blocked entirely: `RtlRaiseException`,
     `RtlUnwind`, `RtlCaptureContext` (the core). `XGetAVPack` and

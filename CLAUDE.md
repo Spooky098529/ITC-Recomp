@@ -38,7 +38,8 @@ recompiled. B6 (pure helpers) is done for now (merged from
 `pure-helpers`, 2026-10-20): the game's time, clock rate, string and
 SetLastError functions are plain C++ in `src/helpers/` behind adapters
 in `src/hooks/`, and 10 kernel imports have no recompiled callers left;
-what's left of B6 waits on B4 and B5. B3 (the graphics boundary) is
+what's left of B6 waits on its callers' areas ("Left in B6" in the plan:
+since B4, only the core's and `xstart`'s still run). B3 (the graphics boundary) is
 done (merged from `graphics-boundary`, 2026-10-20): the emulated GPU
 isn't built or loaded (`--native_renderer` and
 `--native_renderer_exclusive` are gone), the game's device, Swap, display
@@ -46,8 +47,8 @@ and gamma functions that called `Vd*` imports are native in
 `src/hooks/graphics_device.cpp`, `video_mode.cpp`, `gamma.cpp` and
 `graphics_drops.cpp`, nothing reads the GPU registers, and nothing needs
 vblanks (the interrupt callback is never called); the SDK's unused
-graphics code goes with the SDK. B5 (system services) is in progress on
-`system-services`: step 1 is done (2026-10-21; the PAL-50 and heap
+graphics code goes with the SDK. B5 (system services) is done (merged
+from `system-services`, 2026-10-21): step 1 (2026-10-21; the PAL-50 and heap
 checks, Device::Init's video flags and the console's time zone read
 without their kernel calls, `src/hooks/start_up.cpp` and
 `src/helpers/console_settings.h`), and step 2 (the user wrappers from
@@ -58,11 +59,12 @@ mapped with no code; step 6 (notifications: the listener wrapper makes
 none, the app's reader builds the users once, `src/hooks/notify.cpp`);
 step 7 (the profile read as hardcoded data, `src/user/profile.cpp`). B5's
 steps are done; what's left of its imports goes with B4, B7 and the core.
-B4 (files and saves) is done on `files-and-saves` (2026-10-21, not yet
-merged): the saves (`src/saves/`), the data files (`src/game_data/`, the
+B4 (files and saves) is done (merged from `files-and-saves`, 2026-10-21):
+the saves (`src/saves/`), the data files (`src/game_data/`, the
 file class and the archive streaming), the movies' reads
 (`src/hooks/movie_files.cpp`) and the shader build's debug check are
-native or dropped; nothing the game opens goes through the SDK's VFS.
+native or dropped; nothing the game opens goes through the SDK's VFS (the
+SDK still reads `default.xex` through it at start-up: E3 in the plan).
 After each plan item, run `itc_recomp/tools/boundary_status.py` and record
 its output in "The boundary over time" at the end of
 `docs/rexglue-removal.md`. Plan steps are done on their
