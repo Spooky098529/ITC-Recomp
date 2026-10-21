@@ -32,10 +32,11 @@ goes in `src/` as overrides), American English.
   (`DbgPrint`); all go with B7. From here `boundary_status.py` mostly
   measures the core, so B7 needs its own measure: per-subsystem counts of
   the statuses in `docs/functions/`.
-- **Track A**: A0, A5 and A6 done; A1-A4 not started. What `src/` still
-  takes from the SDK is in the table below.
+- **Track A**: A0, A2, A5 and A6 done (A2's flag parser waits for A4);
+  A1 started (xxHash); A3 and A4 not started. What `src/` still takes
+  from the SDK is in the table below.
 - **Next, in order (proposed 2026-10-21, the user agreed to start with
-  A2):** A2 (logging, flags, hashes: our own headers forwarding to the
+  A2; A2 done the same day, merged from `own-logging`):** A2 (logging, flags, hashes: our own headers forwarding to the
   SDK's, then `src/` switched over area by area, then our own logger and
   hashing; the flag parser waits for A4), A4 (the app shell: our own
   `main`, loop, window and flag parser; it unblocks A1's SDL and finishes
@@ -270,8 +271,8 @@ A0. Done (2026-10-19, `remove-rexglue`): `--mnk_mode=true` removed from
     for now (gamepad only). From then on, input in this plan means
     gamepads only, and nothing needs the SDK window's listener for keys.
 
-A1. **Third-party libraries from our own copies** (submodules or
-    FetchContent, pinned versions) instead of `rexglue-sdk/thirdparty/`:
+A1. Started (2026-10-21, xxHash, below). **Third-party libraries from
+    our own copies** (submodules or FetchContent, pinned versions) instead of `rexglue-sdk/thirdparty/`:
     SDL3, Vulkan headers, fmt, spdlog, xxHash, glslang. While
     `librexruntime` exists it links its own; only one SDL may be loaded
     (see patch 0003 and `docs/windows.md`), so SDL probably stays the
@@ -281,7 +282,8 @@ A1. **Third-party libraries from our own copies** (submodules or
     `itc_recomp/thirdparty/xxHash` (v0.8.3), header-only, on the include
     path as `itc_recomp/thirdparty/` (included with its folder).
 
-A2. **Logging, flags, hashes**: our own headers (`src/base/log.h`,
+A2. Done (2026-10-21, `own-logging`; the flag parser waits for A4).
+    **Logging, flags, hashes**: our own headers (`src/base/log.h`,
     `cvar.h`, `hash.h`, names to taste) with our own macro names, first
     forwarding to the SDK's, and every file in `src/` switched over
     (mechanical; one commit per area). Then our own implementations for
@@ -2530,3 +2532,9 @@ Cleared: `XNotifyGetNext`. Live outside the core: Voice::Init and its
 talker set-up (`XamNotifyCreateListener`, `XamUserReadProfileSettings`,
 B7), `xstart` (`XamLoaderTerminateTitle`, `DbgPrint`) and the movie
 player's stream set-up (`DbgPrint`). 287 overrides in `src/`.
+
+**2026-10-21, A2: our own logging, flags and hashes (branch
+`own-logging`):** unchanged, as A2 is host-side: 449 functions (916
+pairs): overridden 58, Native 3, Dropped 23, never called 70, live 295.
+Imports: 186 called, 63 with a live caller. The areas' counts are as
+after B5's and B6's leftovers, batch 2.
