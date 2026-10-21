@@ -120,11 +120,18 @@ asks for a measure of its progress (per-subsystem counts of the statuses in
   override, not Native or Dropped). Functions that never run don't need
   porting; when B7 replaces a subsystem from the top, the ones below it that
   never ran go with it, unread.
-- **The measure** (to do: a report script beside `boundary_status.py`,
-  reading `docs/functions/` with `check_function_statuses.py`'s code, writing
-  nothing): seen in play, by status (Overridden, Wrapped, Native, Dropped,
-  none) and by subsystem file; seen in play without a row (what's still
-  unknown); and, as a check, rows marked live whose function never ran.
+- **The measure:** `itc_recomp/tools/b7_status.py` (reports only; it reads
+  `docs/functions/` with `check_function_statuses.py`'s code). A function
+  is in play when it was seen in play or is ours (an override's recompiled
+  body no longer runs, so coverage can't see it), and counts once: **ours**
+  (overridden, Native or Dropped), **wrapped** (Wrapped: ours in front, the
+  recompiled body does the work), **known** (a row, still recompiled) or
+  **unknown** (no row yet). Wrapped, known and unknown are the work left.
+  It counts them by table (the subsystem files, and "(no row)"), and lists
+  as checks the rows that say their function no longer runs (Native,
+  Dropped, an override that never calls `__imp__`, "never called") whose
+  function ran. Run it after each B7 item and record its totals in "The
+  boundary over time".
 - **Choosing what to do next:** a subsystem's size in functions that
   actually run is a better guide to its cost than its size in `generated/`.
 - **Removing the core** (E1-E4) needs no recompiled code left that runs.
@@ -143,8 +150,26 @@ checked over several sessions.
 | 2026-10-21 | a 20-second attract race (`--skip_intro`) | 4,975 of 16,552 (30%) | The test run; not written to the list |
 | 2026-10-21 | the user's first session (~5.5 minutes, closed cleanly) | 6,656 of 16,552 (40.2%; 39.8% of the generated lines) | The list's first entries. 208 of them were "unreachable" to the static pass. The user judged it most of what's needed: the game's loop is simple and reuses its systems (boot and a 20-second attract race already ran 4,975) |
 
-Joined by hand with `docs/functions/` after the first session (the report
-script is still to do): 219 of the 548 rows are functions seen in play (165
-with no status, 52 Wrapped, 1 Patched, 1 Overridden; overridden functions
-whose override doesn't call `__imp__` don't count as run), and 6,437
-functions seen in play have no row yet.
+`b7_status.py` after the first session (2026-10-21). It counts the 16,315
+`sub_` functions (the register save and restore helpers and `xstart` left
+out), of which 6,591 were seen in play:
+
+```
+in play (seen, or ours): 6752
+  ours 162, work left 6590 (wrapped 151, known 174, unknown 6265)
+rows: 673; for functions not seen in play: 186
+
+table                         ours   wrapped     known   unknown   in play
+audio.md                        29         0         9         0        38
+files-and-saves.md              44         0        29         0        73
+functions.md                    61       151       118         0       330
+system-services.md              28         0        18         0        46
+(no row)                         0         0         0      6265      6265
+```
+
+So B7 is ~6,600 functions, ~6,300 of them not yet looked at. ("rows" counts
+functions named in rows: some rows name several, 673 functions in 548
+rows.) One check: `DrawIndexedVertices` (`sub_825BE708`, Overridden) ran,
+as its override hands predicated draws and `--native_renderer_library_packets`
+to the original from `src/native/draw_packets.cpp` (a file the status
+check doesn't read for it).
