@@ -976,8 +976,8 @@ B5. **System services** (82 functions; first counted as 78): sign-in, profile, U
     around the callers), and what the SDK answers today; the game must
     get the same answers.
 
-    Worked on in branch `system-services`. Surveyed 2026-10-20 (no
-    native code yet).
+    Worked on in branch `system-services`. Surveyed 2026-10-20; steps
+    1-7 done 2026-10-21 (below the survey, after the proposed order).
 
     **The functions.** The boundary pipeline filtered to `Xam*` (but
     input, content and `XamAlloc`/`XamFree`), `XMsg*`, `XNotify*`,
@@ -1240,7 +1240,8 @@ B5. **System services** (82 functions; first counted as 78): sign-in, profile, U
     the two reads; once the recompiled one (read first) gave :53 and ours
     :52, so the SDK's clock is probably a little ahead of the host's
     `helpers::SystemTimeNow`. Not from B5 (GetLocalTime has been native
-    since B6); not looked into.
+    since B6); not looked into. Since 2026-10-21 the case allows a second
+    apart (the user's call), named "within a second".
 
     **Step 3, XMP: done (2026-10-21, `system-services`).** Dropped at the
     highest point: Boot::StartMovie's `sub_825894C8` (takes the playback

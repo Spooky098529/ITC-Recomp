@@ -210,17 +210,30 @@ void Time(Context& h) {
     results.Report();
   }
 
-  // GetLocalTime: the two read the clock apart, so the milliseconds aren't
-  // compared.
+  // GetLocalTime: the two read the clock apart (and the SDK's clock can be a
+  // little ahead of the host's), so the milliseconds aren't compared and the
+  // times may be up to a second apart (a second can tick over between them).
   {
-    Results results("GetLocalTime (sub_822968B8), to the second");
+    Results results("GetLocalTime (sub_822968B8), within a second");
     std::vector<uint8_t> result[2];
+    uint64_t time[2] = {};
     for (int v = 0; v < 2; v++) {
       Fill(base, data, kScratchBytes);
       PPCContext t = CallContext(h);
       t.r3.u64 = data;
       (v == 0 ? __imp__sub_822968B8 : sub_822968B8)(t, base);
       result[v] = Read(base, data, 14);
+      helpers::SystemTime s;
+      uint16_t* fields = &s.year;
+      for (uint32_t i = 0; i < 8; i++) {
+        fields[i] = guest::LoadU16(base, data + 2 * i);
+      }
+      s.milliseconds = 0;
+      helpers::SystemTimeToFileTime(s, &time[v]);
+    }
+    const uint64_t apart = time[0] > time[1] ? time[0] - time[1] : time[1] - time[0];
+    if (apart <= 10000000) {  // 1 s in 100 ns units
+      result[1] = result[0];
     }
     results.Check(result[0], result[1], "now");
     results.Report();
