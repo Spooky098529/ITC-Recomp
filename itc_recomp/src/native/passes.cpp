@@ -1,6 +1,6 @@
 #include "passes.h"
 #include "frame_costs.h"
-#include "log_enabled.h"
+#include "base/log.h"
 #include "disk_cache.h"
 
 #include "generated_gamma_comp.h"
@@ -1997,7 +1997,7 @@ VkDescriptorSet Passes::State::BuildTextureSet(uint8_t* base, const TranslatedSh
       mismatched_seen = total;
     }
     // Which shaders sample a texture of another dimension than declared.
-    if (mismatched && mismatch_lines.size() < 20 && InfoLogEnabled()) {
+    if (mismatched && mismatch_lines.size() < 20 && base::InfoLogEnabled()) {
       std::string key = fmt::format(
           "{} shader {:016X} fetch constant {} declares view type {}; texture {:08X} format {} "
           "dimension {} {}x{}",

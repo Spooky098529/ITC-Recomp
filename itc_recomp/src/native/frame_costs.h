@@ -8,7 +8,7 @@
 #include <chrono>
 #include <cstdint>
 
-#include "log_enabled.h"
+#include "base/log.h"
 
 namespace native {
 
@@ -30,7 +30,7 @@ inline FrameCosts g_frame_costs;
 // logging is on (nothing else reads it).
 class ScopedCost {
  public:
-  explicit ScopedCost(int64_t& ns) : ns_(ns), timed_(InfoLogEnabled()) {
+  explicit ScopedCost(int64_t& ns) : ns_(ns), timed_(base::InfoLogEnabled()) {
     if (timed_) {
       start_ = std::chrono::steady_clock::now();
     }

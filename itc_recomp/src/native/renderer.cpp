@@ -1,6 +1,6 @@
 #include "renderer.h"
 #include "frame_costs.h"
-#include "log_enabled.h"
+#include "base/log.h"
 
 #include "buffers.h"
 #include "gpu_memory.h"
@@ -975,7 +975,7 @@ void Renderer::LogStats() {
   if (now - last_log_ < std::chrono::seconds(5)) {
     return;
   }
-  if (!InfoLogEnabled()) {
+  if (!base::InfoLogEnabled()) {
     // Nothing would be printed: leave the counters to run on.
     last_log_ = now;
     return;
