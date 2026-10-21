@@ -331,6 +331,14 @@ A6. **Audio output**: SDL audio straight from our mixer's output, our own
     place of `AudioDriver`. Its game side is B2. Read
     `docs/native-audio.md` first.
 
+    Done (2026-10-21, `native-xma`, with B2's step 4): the conversion and
+    stereo fold are ours (`src/audio/output_mix.h`), with the numbers the
+    SDK's defaults gave (nothing ever changed them: center and back at
+    -3 dB into both sides, LFE dropped, scale 1 / (1 + 0.707); 5.1
+    passed through). What's left of the SDK in the output is its
+    `AudioSystem` base class (the runtime's audio slot: A4) and its
+    `audio_mute` and `audio_maxqframes` flags (A2).
+
 ## Track B: the native port from the boundary inward
 
 Smallest and most self-contained first. Each item: make the game's
@@ -579,6 +587,50 @@ B2. **Audio** (6 functions calling `XAudio*`/`XMA*`, plus what's around
       output by 128 samples), `sub_8246B1C8` and `sub_8245D070` (the input
       read offset). Step 2 can leave them out (logging if one is ever
       reached).
+
+    **Done (2026-10-21, `native-xma`).** The XMA work went another way
+    than step 2 above, for the rule "don't rebuild what the SDK does"
+    (the user stopped the ring version: blocks, valid bits, subframes and
+    decoding at unlock were the SDK's XMA emulation again):
+
+    - Step 2: each sound is decoded with our FFmpeg into one flat buffer
+      of big-endian 16-bit samples in guest memory (system heap; up to
+      ~12 MB for a music track), from the game's data where it lies
+      (`src/audio/xma_stream.h`): a second's worth when it starts, then
+      kept a second ahead at each unlock (a whole track at once took
+      ~60 ms, more than the ~42 ms of output queued). The helpers answer
+      the voice from a position (`src/hooks/xma.cpp`): ready, where,
+      taken; "ready" capped at the voice's own ring size, so the voice
+      never sees a count it couldn't on the 360. Loops: the loop's bit
+      offsets turned into sample positions by the frame walk
+      (`FrameAtBitOffset`), the position jumps back at the loop end.
+      Lock, wait and the error status answer at once. The game's frame
+      walk (`sub_8246A5F8`) is ported (`BitOffsetOfSample`); harness
+      `xma`: 512 cases on made-up packets, 0 differ. No fallback flag (the
+      user's call): the harness covers the walk, the release build is the
+      listening comparison.
+    - Checked: attract races (five minutes; the user listened as well):
+      0 silence fills (but the window `timeout` ends in, and once 1 at a
+      race load that didn't come back in two more runs); the loop points
+      equal to the banks' loop regions less the decoder's 64
+      (`bgm_tmp_04`: 458,496 to 1,305,216 in the bank, 458,432 to
+      1,305,152 ours; `bgm_tmp_06` likewise); each sound ends at its
+      decoded length (`SB_SYSTEM_SE`'s 18,368 samples as
+      `itc_xma_check`). Not yet seen: the loop jump itself (no attract
+      race lasts to a track's loop end; `--log_xma` logs `loop:` when it
+      happens).
+    - Step 3: the mixer's category volume pass (`sub_8245B808`,
+      `src/hooks/audio_volume.cpp`) without its two imports: the change
+      mask 0, as the SDK answered every time, so no volume is asked for.
+    - Step 4: the SDK's XMA decoder isn't set up (no "XMA Decoder" thread,
+      no register mapping at `7FEA0000`); the hardware wait
+      (`sub_8245D288`) answers at once (`hooks/xma.cpp`; its register
+      writes are gone from `hooks/clock.cpp`). A6 with it (above).
+    - `--log_xma` logs each sound's start, loop data, loop jumps and end.
+
+    Left: the SDK's audio pieces in our output (A6 above: `AudioSystem`,
+    two flags), and the guest memory the decoded samples live in (level 1:
+    the voice's update is recompiled; with B7 they move to host memory).
 
 B3. **Graphics boundary** (17 functions calling `Vd*`): ring buffer
     setup, the interrupt callback and vblank, swap, display mode and gamma
@@ -2193,3 +2245,24 @@ Files and saves: ReadFile, GetFileSizeEx and GetFileAttributes Dropped
 (their callers in play native or overridden without them), none live.
 Some functions also call imports of other areas (the pure helpers' and
 the core's counts move with them). 256 overrides in `src/`.
+
+**2026-10-21, after B2 (branch `native-xma`; A0, A5, A6, B1, B2, B3, B4,
+B5 and B6 done):** 449 functions (916 pairs): overridden 54, Native 3,
+Dropped 20, never called 62, live 310. Imports: 186 called, 72 with a
+live caller.
+
+| Area | Overridden | Native | Dropped | Never called | Live |
+|---|---|---|---|---|---|
+| input (B1) | 0 | 3 | 0 | 0 | 0 |
+| audio (B2) | 6 | 0 | 0 | 0 | 0 |
+| graphics (B3) | 12 | 0 | 3 | 4 | 0 |
+| files and saves (B4) | 2 | 0 | 13 | 8 | 0 |
+| memory (core) | 5 | 0 | 0 | 3 | 20 |
+| system services (B5) | 17 | 0 | 3 | 48 | 12 |
+| pure helpers (B6) | 18 | 0 | 2 | 3 | 26 |
+| threads, sync and the rest (core) | 7 | 0 | 3 | 19 | 265 |
+
+Audio: none live. The XMA helpers calling `MmGetPhysicalAddress`
+(`sub_8245C650`, `sub_8245C958`, `sub_8245D138`) are ours, so memory and
+the core's counts moved with them. 282 overrides in `src/`. Outside the
+core, what's live is B5's and B6's leftovers waiting on B7 and the core.

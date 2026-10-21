@@ -201,10 +201,27 @@ Not known yet:
 - **Still to do**: a stereo device as well as the 6-channel one here (a
   HyperX headset that SDL reports as 6 channels, through PipeWire).
 
+## XMA decoded by our own code (B2, 2026-10-21)
+
+Since B2 (`rexglue-removal.md`, B2, branch `native-xma`), XMA sounds (the
+music and the menus' sounds) no longer go through the SDK's XMA decoder:
+each is decoded with our own upstream FFmpeg (`xma2`) into a flat buffer
+the game's XMA source voice reads by position (`src/audio/xma_stream.h`,
+`src/hooks/xma.cpp`). The SDK's decoder isn't set up (no "XMA Decoder"
+thread, no XMA registers), and the output's conversion and stereo fold
+are ours (`src/audio/output_mix.h`). The decoding runs on our "ITC Audio"
+thread, inside the game's mixer callback. The functions are in
+`functions/audio.md`.
+
 ## Tools
 
 - `--native_audio=false`: the SDK's audio system and render driver, for
   comparison.
+- `--log_xma`: each XMA sound's start (data, size, channels, rate,
+  samples, buffer), loop data (bits and the sample positions they give),
+  loop jumps, end and reset.
+- `itc_xma_check` (`itc_recomp/tests/xma_check.cpp`, built on request)
+  decodes one wave of a bank with our FFmpeg and writes a WAV.
 - With logging on, our audio logs its endpoint, each client registered,
   and every 10 s each client's frames played, silence fills (frames the
   mixer didn't have ready in time) and frames queued.

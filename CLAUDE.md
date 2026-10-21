@@ -59,6 +59,13 @@ mapped with no code; step 6 (notifications: the listener wrapper makes
 none, the app's reader builds the users once, `src/hooks/notify.cpp`);
 step 7 (the profile read as hardcoded data, `src/user/profile.cpp`). B5's
 steps are done; what's left of its imports goes with B4, B7 and the core.
+B2 (audio) is done on `native-xma` (2026-10-21, not merged yet): XMA
+sounds are decoded by our own upstream FFmpeg (the submodule
+`itc_recomp/thirdparty/FFmpeg`, built with only the `xma2` decoder by
+`itc_recomp/cmake/ffmpeg.cmake`) into a flat buffer the game's XMA voices
+read by position (`src/audio/xma_stream.h`, `src/hooks/xma.cpp`); the
+SDK's XMA decoder isn't set up, and the output's conversion is ours (A6,
+`src/audio/output_mix.h`); see `docs/native-audio.md`.
 B4 (files and saves) is done (merged from `files-and-saves`, 2026-10-21):
 the saves (`src/saves/`), the data files (`src/game_data/`, the
 file class and the archive streaming), the movies' reads
