@@ -121,7 +121,7 @@ std::optional<std::string> WrittenAt(const std::string& name) {
     return std::nullopt;
   }
   using namespace std::chrono;
-  auto utc = time_point_cast<minutes>(file_clock::to_sys(written));
+  auto utc = time_point_cast<minutes>(clock_cast<system_clock>(written));
   auto day = floor<days>(utc);
   year_month_day date(day);
   hh_mm_ss time(utc - day);

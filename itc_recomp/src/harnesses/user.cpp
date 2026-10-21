@@ -5,7 +5,7 @@
 
 #include "harness.h"
 
-#include <rex/logging.h>
+#include "base/log.h"
 
 namespace harness {
 

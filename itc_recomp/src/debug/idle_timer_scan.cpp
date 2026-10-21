@@ -12,8 +12,8 @@
 
 #include "guest.h"
 
-#include <rex/cvar.h>
-#include <rex/logging.h>
+#include "base/flags.h"
+#include "base/log.h"
 
 #include <cmath>
 #include <cstring>
@@ -23,11 +23,11 @@
 #include <unordered_map>
 #include <vector>
 
-REXCVAR_DEFINE_BOOL(find_idle_timer, false, "ITC",
-                    "Log guest words that step steadily like a timer in menus (to find the "
-                    "title screen's idle timer)");
+ITC_FLAG_BOOL(find_idle_timer, false, "ITC",
+              "Log guest words that step steadily like a timer in menus (to find the "
+              "title screen's idle timer)");
 
-REXCVAR_DECLARE(bool, log_boot_modes);
+ITC_FLAG_DECLARE(bool, log_boot_modes);
 
 namespace debug {
 
@@ -81,7 +81,7 @@ class IdleTimerScan {
     }
     if (in_race_) {
       in_race_ = false;
-      REXLOG_INFO("idle timer: race over, scanning again");
+      ITC_LOG_INFO("idle timer: race over, scanning again");
       snapshot_.clear();
       streaks_.clear();
     }
@@ -145,7 +145,7 @@ class IdleTimerScan {
         watched_.push_back(address);
       }
     }
-    REXLOG_INFO("idle timer: pass {} {} steady timers:{}", passes_, logged, sample);
+    ITC_LOG_INFO("idle timer: pass {} {} steady timers:{}", passes_, logged, sample);
   }
 
  public:
@@ -167,8 +167,8 @@ class IdleTimerScan {
     for (size_t i = 0; i < values.size() && i < watched_.size(); i++) {
       uint32_t now = guest::LoadU32(base, watched_[i]);
       if (now != values[i] && logged_.insert({watched_[i], id}).second) {
-        REXLOG_INFO("idle timer: {} {:08X} changed {:08X}: {} -> {}", kind, id, watched_[i],
-                    values[i], now);
+        ITC_LOG_INFO("idle timer: {} {:08X} changed {:08X}: {} -> {}", kind, id, watched_[i],
+                     values[i], now);
       }
     }
   }
@@ -184,7 +184,7 @@ class IdleTimerScan {
                             s.value, AsFloat(s.value), now, AsFloat(now));
       }
     }
-    REXLOG_INFO("idle timer: race started; steady timers before it:{}", list);
+    ITC_LOG_INFO("idle timer: race started; steady timers before it:{}", list);
   }
 
   bool in_race_ = false;
@@ -206,7 +206,7 @@ IdleTimerScan& Get() {
 
 void IdleTimerScan_OnPassStart(uint8_t* base, bool render_only, bool in_race) {
   g_logic_pass = false;
-  if (!REXCVAR_GET(find_idle_timer) || render_only) {
+  if (!ITC_FLAG(find_idle_timer) || render_only) {
     return;
   }
   g_logic_pass = !render_only;
@@ -214,20 +214,20 @@ void IdleTimerScan_OnPassStart(uint8_t* base, bool render_only, bool in_race) {
 }
 
 void IdleTimerScan_Before(uint8_t* base) {
-  if (REXCVAR_GET(find_idle_timer) && g_logic_pass) {
+  if (ITC_FLAG(find_idle_timer) && g_logic_pass) {
     Get().Before(base);
   }
 }
 
 void IdleTimerScan_After(uint8_t* base, const char* kind, uint32_t id) {
-  if (REXCVAR_GET(log_boot_modes)) {
+  if (ITC_FLAG(log_boot_modes)) {
     // Each handler the first time it runs, to see what runs when in the boot.
     static std::set<std::pair<std::string, uint32_t>> seen;
     if (seen.insert({kind, id}).second) {
-      REXLOG_INFO("boot modes: first {} {:08X}", kind, id);
+      ITC_LOG_INFO("boot modes: first {} {:08X}", kind, id);
     }
   }
-  if (REXCVAR_GET(find_idle_timer) && g_logic_pass) {
+  if (ITC_FLAG(find_idle_timer) && g_logic_pass) {
     Get().After(base, kind, id);
   }
 }

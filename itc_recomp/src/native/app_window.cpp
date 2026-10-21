@@ -1,7 +1,7 @@
 #include "app_window.h"
 #include "renderer.h"
 
-#include <rex/logging.h>
+#include "base/log.h"
 #include <rex/ui/window_listener.h>
 #include <rex/ui/window_sdl.h>
 #include <rex/ui/windowed_app_context_sdl.h>
@@ -42,10 +42,10 @@ void AppWindow_SetSdkWindow(rex::ui::Window* window) {
   SDL_Window** windows = SDL_GetWindows(&count);
   if (count == 1) {
     SDL_HideWindow(windows[0]);
-    REXLOG_INFO("native renderer: the SDK's window is hidden (exclusive mode)");
+    ITC_LOG_INFO("native renderer: the SDK's window is hidden (exclusive mode)");
   } else {
-    REXLOG_WARN("native renderer: {} SDL windows at startup, expected 1; the SDK's window stays",
-                count);
+    ITC_LOG_WARN("native renderer: {} SDL windows at startup, expected 1; the SDK's window stays",
+                 count);
   }
   SDL_free(windows);
 }
@@ -58,7 +58,7 @@ void AppWindow_AdoptOurWindow(SDL_Window* window) {
   g_our_window_id = SDL_GetWindowID(window);
   static_cast<rex::ui::SDLWindowedAppContext&>(g_sdk_window->app_context())
       .RegisterWindow(g_our_window_id, g_sdk_window);
-  REXLOG_INFO("native renderer: our window's events go to the SDK's window (focus, close)");
+  ITC_LOG_INFO("native renderer: our window's events go to the SDK's window (focus, close)");
 }
 
 }  // namespace native

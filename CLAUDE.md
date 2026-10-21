@@ -85,6 +85,15 @@ file class and the archive streaming), the movies' reads
 (`src/hooks/movie_files.cpp`) and the shader build's debug check are
 native or dropped; nothing the game opens goes through the SDK's VFS (the
 SDK still reads `default.xex` through it at start-up: E3 in the plan).
+A2 (logging, flags, hashes) is done (merged from `own-logging`,
+2026-10-21): `src/` logs, defines flags and hashes through our own
+`src/base/` (`ITC_LOG_*`, `ITC_FLAG_*` and `ITC_FLAG(name)`,
+`base::Hash64`; never the SDK's `REXLOG_*`, `REXCVAR_*` or `rex/hash.h` in
+new code). The logger is ours (`src/base/log.cpp`, `std::format` and
+stdio, no rotation) and takes over the log file the SDK opens, forwarding
+the SDK's own lines into it (`src/base/log_sdk.cpp`, until A4); hashes
+use our own xxHash (`itc_recomp/thirdparty/xxHash`, A1's first library).
+The flags are still parsed by the SDK until A4.
 After each plan item, run `itc_recomp/tools/boundary_status.py` and record
 its output in "The boundary over time" at the end of
 `docs/rexglue-removal.md`. Plan steps are done on their
@@ -210,8 +219,8 @@ find /dev/shm -maxdepth 1 -user "$USER" -name 'xenia_memory_*' -delete
 - Run the game in the background. The user plays: they start a race, drive
   near an opponent and quit, then say what they saw.
 - Logs go to `itc_recomp/out/build/linux-amd64-release/logs/itc_<n>.log`,
-  newest first by `ls -t`. A big log rotates into `itc_<n>.1.log`, so check
-  both. The race starts where `fps` jumps above 30.
+  newest first by `ls -t` (one file a run, no rotation since A2's logger;
+  older logs may have an `itc_<n>.1.log`). The race starts where `fps` jumps above 30.
 - `generated/` is the recompiled code. Find a function with
   `grep -n "DEFINE_REX_FUNC(sub_XXXXXXXX)" itc_recomp/generated/default/*.cpp`,
   or a call site with `grep -ln "lr = 0xXXXXXXXX;"`. Override a function by

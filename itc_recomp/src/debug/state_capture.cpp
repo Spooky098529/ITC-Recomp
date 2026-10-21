@@ -1,7 +1,7 @@
 #include "state_capture.h"
 
-#include <rex/cvar.h>
-#include <rex/logging.h>
+#include "base/flags.h"
+#include "base/log.h"
 
 #include "guest.h"
 
@@ -17,8 +17,8 @@
 #include <string>
 #include <vector>
 
-REXCVAR_DEFINE_STRING(capture_dir, "", "ITC",
-                      "Folder to record game state into each tick; empty disables");
+ITC_FLAG_STRING(capture_dir, "", "ITC",
+                "Folder to record game state into each tick; empty disables");
 
 namespace debug {
 namespace {
@@ -73,7 +73,7 @@ class StateCapture {
     if (vehicles_.size() < kMaxVehicles &&
         std::find(vehicles_.begin(), vehicles_.end(), vehicle) == vehicles_.end()) {
       vehicles_.push_back(vehicle);
-      REXLOG_INFO("capture: vehicle {:08x}", vehicle);
+      ITC_LOG_INFO("capture: vehicle {:08x}", vehicle);
     }
   }
 
@@ -128,7 +128,7 @@ class StateCapture {
     if (out_.is_open()) {
       return true;
     }
-    const std::string& dir = REXCVAR_GET(capture_dir);
+    const std::string& dir = ITC_FLAG(capture_dir);
     if (dir.empty()) {
       failed_ = true;
       return false;
@@ -137,11 +137,11 @@ class StateCapture {
     auto path = std::filesystem::path(dir) / "capture.bin";
     out_.open(path, std::ios::binary | std::ios::trunc);
     if (!out_) {
-      REXLOG_ERROR("capture: can't open {}", path.string());
+      ITC_LOG_ERROR("capture: can't open {}", path.string());
       failed_ = true;
       return false;
     }
-    REXLOG_INFO("capture: writing {}", path.string());
+    ITC_LOG_INFO("capture: writing {}", path.string());
     start_ = std::chrono::steady_clock::now();
     return true;
   }
@@ -208,7 +208,7 @@ class StateCapture {
     auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
                   std::chrono::steady_clock::now() - started)
                   .count();
-    REXLOG_INFO("capture: tick {} found {} referrers in {} ms", tick_, referrers_.size(), ms);
+    ITC_LOG_INFO("capture: tick {} found {} referrers in {} ms", tick_, referrers_.size(), ms);
   }
 
   static bool IsRotation(const float* rows) {
@@ -307,8 +307,8 @@ class StateCapture {
     auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
                   std::chrono::steady_clock::now() - started)
                   .count();
-    REXLOG_INFO("capture: tick {} found {} nearby matrices and {} points in {} ms", tick_,
-                nearby_matrices_.size(), nearby_points_.size(), ms);
+    ITC_LOG_INFO("capture: tick {} found {} nearby matrices and {} points in {} ms", tick_,
+                 nearby_matrices_.size(), nearby_points_.size(), ms);
   }
 
   void Write32(uint32_t value) {
@@ -330,7 +330,7 @@ class StateCapture {
     }
     // Which pointer each referrer window belongs to, for the reader.
     if (burst_ticks_left_ + 1 == kBurstTicks) {
-      std::ofstream index(std::filesystem::path(REXCVAR_GET(capture_dir)) / "referrers.txt",
+      std::ofstream index(std::filesystem::path(ITC_FLAG(capture_dir)) / "referrers.txt",
                           std::ios::app);
       for (const Referrer& referrer : referrers_) {
         char line[64];
@@ -363,14 +363,14 @@ StateCapture& GetStateCapture() {
 }  // namespace
 
 void StateCapture_OnVehicleSeen(uint32_t vehicle) {
-  if (REXCVAR_GET(capture_dir).empty()) {
+  if (ITC_FLAG(capture_dir).empty()) {
     return;
   }
   GetStateCapture().OnVehicleSeen(vehicle);
 }
 
 void StateCapture_OnTickDone(uint8_t* base) {
-  if (REXCVAR_GET(capture_dir).empty()) {
+  if (ITC_FLAG(capture_dir).empty()) {
     return;
   }
   GetStateCapture().OnTickDone(base);

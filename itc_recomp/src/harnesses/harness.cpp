@@ -1,14 +1,14 @@
 #include "harness.h"
 
-#include <rex/cvar.h>
-#include <rex/logging.h>
+#include "base/flags.h"
+#include "base/log.h"
 
 #include <sstream>
 
-REXCVAR_DEFINE_STRING(run_harnesses, "", "ITC",
-                      "Run harnesses comparing native functions with the recompiled ones, once at "
-                      "the first input update: \"all\" or a comma-separated list "
-                      "(object_attributes, time, clock, strings, last_error, gamma, start_up, user, xmp, network, notify, profile, saves, file_class, movie_files, xma)");
+ITC_FLAG_STRING(run_harnesses, "", "ITC",
+                "Run harnesses comparing native functions with the recompiled ones, once at "
+                "the first input update: \"all\" or a comma-separated list "
+                "(object_attributes, time, clock, strings, last_error, gamma, start_up, user, xmp, network, notify, profile, saves, file_class, movie_files, xma)");
 
 namespace harness {
 
@@ -23,13 +23,13 @@ void Results::Check(const std::vector<uint8_t>& recompiled, const std::vector<ui
                     const std::string& what) {
   cases_++;
   if (recompiled != native && ++differ_ <= 10) {
-    REXLOG_INFO("harness: {} DIFFERS on {}: recompiled {} native {}", name_, what, Hex(recompiled),
-                Hex(native));
+    ITC_LOG_INFO("harness: {} DIFFERS on {}: recompiled {} native {}", name_, what, Hex(recompiled),
+                 Hex(native));
   }
 }
 
 void Results::Report() const {
-  REXLOG_INFO("harness: {}: {} cases, {} differ", name_, cases_, differ_);
+  ITC_LOG_INFO("harness: {}: {} cases, {} differ", name_, cases_, differ_);
 }
 
 void Fill(uint8_t* base, uint32_t address, uint32_t bytes, uint8_t value) {
@@ -73,7 +73,7 @@ PPCContext CallContext(const Context& h) {
 
 void RunRequested(PPCContext& ctx, uint8_t* base) {
   static bool run = false;
-  const std::string& requested = REXCVAR_GET(run_harnesses);
+  const std::string& requested = ITC_FLAG(run_harnesses);
   if (run || requested.empty()) {
     return;
   }
@@ -116,11 +116,11 @@ void RunRequested(PPCContext& ctx, uint8_t* base) {
   Context h{ctx, base, ctx.r1.u32 - kScratchBytes - 512, {}};
   for (const Entry& e : kHarnesses) {
     if (wanted(e.name)) {
-      REXLOG_INFO("harness: running {}", e.name);
+      ITC_LOG_INFO("harness: running {}", e.name);
       e.run(h);
     }
   }
-  REXLOG_INFO("harness: done");
+  ITC_LOG_INFO("harness: done");
 }
 
 }  // namespace harness

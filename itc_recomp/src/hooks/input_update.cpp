@@ -22,7 +22,7 @@
 #include "input/logical_pad.h"
 #include "input/physical_pad.h"
 
-#include <rex/logging.h>
+#include "base/log.h"
 
 namespace input_hooks {
 namespace {
@@ -220,7 +220,7 @@ void InputUpdate_Run(PPCContext& ctx, uint8_t* base) {
     uint32_t node = guest::LoadU32(base, head + 4);
     if (node == head) {
       // An empty list with a count; the game traps here (twi 31).
-      REXLOG_ERROR("Input::Update: listener slot {} has a count but no node", j);
+      ITC_LOG_ERROR("Input::Update: listener slot {} has a count but no node", j);
       continue;
     }
     UpdateWithPad(ctx, base, guest::LoadU32(base, node + 8),

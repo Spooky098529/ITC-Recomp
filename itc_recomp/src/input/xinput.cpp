@@ -6,7 +6,7 @@
 
 #include "gamepads.h"
 
-#include <rex/logging.h>
+#include "base/log.h"
 
 #include <SDL3/SDL.h>
 
@@ -77,13 +77,13 @@ uint32_t XInput_GetState(uint32_t user, XInputState* state) {
   if (user >= kGamepadSlots || !Gamepads_Read(int(user), &pad)) {
     if (user < kGamepadSlots && g_packets[user].number) {
       g_packets[user] = {};
-      REXLOG_INFO("xinput: user {} disconnected", user);
+      ITC_LOG_INFO("xinput: user {} disconnected", user);
     }
     return kXInputDeviceNotConnected;
   }
   Packets& packets = g_packets[user];
   if (!packets.number) {
-    REXLOG_INFO("xinput: user {} connected", user);
+    ITC_LOG_INFO("xinput: user {} connected", user);
   }
   if (pad.changes != packets.changes) {
     packets.changes = pad.changes;

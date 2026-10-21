@@ -32,10 +32,11 @@ goes in `src/` as overrides), American English.
   (`DbgPrint`); all go with B7. From here `boundary_status.py` mostly
   measures the core, so B7 needs its own measure: per-subsystem counts of
   the statuses in `docs/functions/`.
-- **Track A**: A0, A5 and A6 done; A1-A4 not started. What `src/` still
-  takes from the SDK is in the table below.
+- **Track A**: A0, A2, A5 and A6 done (A2's flag parser waits for A4);
+  A1 started (xxHash); A3 and A4 not started. What `src/` still takes
+  from the SDK is in the table below.
 - **Next, in order (proposed 2026-10-21, the user agreed to start with
-  A2):** A2 (logging, flags, hashes: our own headers forwarding to the
+  A2; A2 done the same day, merged from `own-logging`):** A2 (logging, flags, hashes: our own headers forwarding to the
   SDK's, then `src/` switched over area by area, then our own logger and
   hashing; the flag parser waits for A4), A4 (the app shell: our own
   `main`, loop, window and flag parser; it unblocks A1's SDL and finishes
@@ -270,22 +271,84 @@ A0. Done (2026-10-19, `remove-rexglue`): `--mnk_mode=true` removed from
     for now (gamepad only). From then on, input in this plan means
     gamepads only, and nothing needs the SDK window's listener for keys.
 
-A1. **Third-party libraries from our own copies** (submodules or
-    FetchContent, pinned versions) instead of `rexglue-sdk/thirdparty/`:
+A1. Started (2026-10-21, xxHash, below). **Third-party libraries from
+    our own copies** (submodules or FetchContent, pinned versions) instead of `rexglue-sdk/thirdparty/`:
     SDL3, Vulkan headers, fmt, spdlog, xxHash, glslang. While
     `librexruntime` exists it links its own; only one SDL may be loaded
     (see patch 0003 and `docs/windows.md`), so SDL probably stays the
     SDK's until A4.
 
-A2. **Logging, flags, hashes**: our own headers (`src/base/log.h`,
+    xxHash done (2026-10-21, `own-logging`, with A2): the submodule
+    `itc_recomp/thirdparty/xxHash` (v0.8.3), header-only, on the include
+    path as `itc_recomp/thirdparty/` (included with its folder).
+
+A2. Done (2026-10-21, `own-logging`; the flag parser waits for A4).
+    **Logging, flags, hashes**: our own headers (`src/base/log.h`,
     `cvar.h`, `hash.h`, names to taste) with our own macro names, first
     forwarding to the SDK's, and every file in `src/` switched over
     (mechanical; one commit per area). Then our own implementations for
     logging and hashing. Our own flag parser has to wait for A4: until
     then the SDK's flags (`--game_data_root`,
     `--fullscreen`, ...) are parsed from the same command line by the SDK.
-    Log file names and rotation must stay (`logs/itc_<n>.log`,
-    `itc_<n>.1.log`): CLAUDE.md and tools rely on them.
+    Log file names must stay (`logs/itc_<n>.log`): CLAUDE.md and tools
+    rely on them. (Rotation into `itc_<n>.1.log` was dropped with our own
+    logger.)
+
+    Steps 1 and 2 done (2026-10-21, `own-logging`): `src/base/log.h`
+    (`ITC_LOG_DEBUG`, `_INFO`, `_WARN`, `_ERROR`, and
+    `base::InfoLogEnabled`, moved from `native/log_enabled.h`),
+    `src/base/flags.h` (`ITC_FLAG_BOOL`, `_INT32`, `_STRING`,
+    `ITC_FLAG_DECLARE`, and `ITC_FLAG(name)` for a value) and
+    `src/base/hash.h` (`base::Hash64`, XXH3-64 inlined, with or without a
+    seed), all forwarding to the SDK's. Every file in `src/` switched over,
+    one commit per directory; nothing outside `src/base/` uses the SDK's
+    log, flag or hash macros or includes `rex/logging.h`, `rex/cvar.h` or
+    `rex/hash.h`. Flag names and spellings are unchanged (the SDK's
+    integer flags are `INT32`; there's no plain `INT`). Files that used a
+    macro now include its header: `native/shaders.cpp` had the SDK's
+    flags only through `rex/hash.h`. Checked: an attract race with every
+    harness (no errors, 16 s raced, all the same but the groups expected
+    to differ). Step 3 next: our own logger and hashing.
+
+    Hashing done (2026-10-21, `own-logging`): `base/hash.h` includes our
+    own xxHash (A1: the submodule `itc_recomp/thirdparty/xxHash`, v0.8.3,
+    the commit the SDK pins), as `<xxHash/xxhash.h>` from
+    `itc_recomp/thirdparty/` so the SDK's copy on the include path can't
+    stand in for it. Ninja's dependencies show our four hashing files
+    (`passes.cpp`, `shaders.cpp`, `textures.cpp`, `replay_stats.cpp`) on
+    ours; the SDK's copy is only in SDK sources (`itc_xenos_shaders`'s
+    `draw.cpp` among them, until A3). Same hashes: an attract race loaded
+    every shader from the disk cache (keyed by the microcode's hash), none
+    translated. Left of A2: our own logger, and the flag parser (A4).
+
+    Our own logger done (2026-10-21, `own-logging`; the user's call: plain
+    stdio, not a copy of the SDK's spdlog set-up). `src/base/log.cpp`:
+    lines formatted with `std::format` (our format specs need no changes),
+    written as one `fwrite` under a mutex and flushed (as the SDK's file
+    sink flushed at info), in the SDK's layout with `[itc]` as our
+    category: `[2026-10-21 23:03:57.966] [info] [itc] [t13876] ...`. The
+    macros check the level before evaluating their arguments, as the SDK's
+    did; `base::InfoLogEnabled` is an atomic load (it was a call into the
+    runtime). Lines from before the file opens are kept and written then.
+    No rotation (proposed; a size cap is easy to add if wanted): one file
+    a run, where the SDK rotated at 5 MB into `itc_<n>.1.log`. With `log_level = "off"` (as released)
+    nothing is written; the SDK still creates the empty file, as before.
+
+    The SDK's side until A4 (`src/base/log_sdk.cpp`, from
+    `ItcApp::OnPostInitLogging`, no SDK patch): the SDK still names and
+    creates the file (`itc_<n>.log`, one more than the highest there).
+    Ours finds its rotating file sink on the `core` logger, takes its file
+    name, sets it to off and removes it from every logger, opens the same
+    path, and adds a sink forwarding the SDK's own lines (`[core]`,
+    `[sys]`, ...; already filtered by `--log_level`) into ours. Setting it
+    off matters: a category the SDK registers later (on first use; `sys`
+    for the guest memory's line) is built with the SDK's file sink again,
+    and wrote its lines twice before. At A4 our `main` names the file and
+    sets up the SDK's logging without one. Checked: attract races with
+    every harness (no errors, no duplicate lines, 17 s raced), and one
+    with `--log_level=off` (empty file). Left of A2: the flag parser
+    (A4); the 158 `fmt::format` calls in `src/` can move to `std::format`
+    with A1's fmt.
 
 A3. **Renderer leftovers**: bring the shader translator into the repo
     (`src/native/xenos/`; the files `itc_xenos_shaders` builds, listed in
@@ -2469,3 +2532,9 @@ Cleared: `XNotifyGetNext`. Live outside the core: Voice::Init and its
 talker set-up (`XamNotifyCreateListener`, `XamUserReadProfileSettings`,
 B7), `xstart` (`XamLoaderTerminateTitle`, `DbgPrint`) and the movie
 player's stream set-up (`DbgPrint`). 287 overrides in `src/`.
+
+**2026-10-21, A2: our own logging, flags and hashes (branch
+`own-logging`):** unchanged, as A2 is host-side: 449 functions (916
+pairs): overridden 58, Native 3, Dropped 23, never called 70, live 295.
+Imports: 186 called, 63 with a live caller. The areas' counts are as
+after B5's and B6's leftovers, batch 2.

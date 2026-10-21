@@ -12,9 +12,9 @@
 #include "debug/pause_movie_log.h"
 #include "interpolation/blend_state.h"
 
-#include <rex/cvar.h>
+#include "base/flags.h"
 
-#include <rex/logging.h>
+#include "base/log.h"
 
 #include <algorithm>
 #include <array>
@@ -30,35 +30,35 @@
 #include <unordered_set>
 #include <vector>
 
-REXCVAR_DECLARE(bool, interpolate_draw_state);
-REXCVAR_DECLARE(bool, log_pause_movie);
-REXCVAR_DEFINE_BOOL(per_tick_blink_timers, true, "ITC",
-                    "Advance the car blink timers once per tick on render-only passes");
-REXCVAR_DEFINE_BOOL(per_tick_ui_movies, true, "ITC",
-                    "Advance UI movies once per tick on render-only passes");
-REXCVAR_DEFINE_BOOL(per_tick_ui_movie_tracks, true, "ITC",
-                    "On render-only passes, don't apply UI movies' animation tracks that add "
-                    "to a value the update doesn't put back (they moved ~5x as far: the pause "
-                    "sub-menus' arrow)");
-REXCVAR_DEFINE_BOOL(per_tick_changed_ui_movies, true, "ITC",
-                    "On render-only passes, draw UI movies changed since the logic pass "
-                    "without advancing them (the pause sub-menus' arrow)");
-REXCVAR_DEFINE_BOOL(per_tick_texture_animations, true, "ITC",
-                    "Advance texture animations (flashing lights) once per tick on "
-                    "render-only passes");
-REXCVAR_DEFINE_BOOL(per_tick_minimap_blink, true, "ITC",
-                    "Advance the minimap's blink clock once per tick on render-only passes");
-REXCVAR_DEFINE_BOOL(per_tick_play_time, true, "ITC",
-                    "Count play time once per tick on render-only passes");
-REXCVAR_DEFINE_BOOL(log_replays, false, "ITC",
-                    "Log how replays from the logic pass's state went, every 2 s");
+ITC_FLAG_DECLARE(bool, interpolate_draw_state);
+ITC_FLAG_DECLARE(bool, log_pause_movie);
+ITC_FLAG_BOOL(per_tick_blink_timers, true, "ITC",
+              "Advance the car blink timers once per tick on render-only passes");
+ITC_FLAG_BOOL(per_tick_ui_movies, true, "ITC",
+              "Advance UI movies once per tick on render-only passes");
+ITC_FLAG_BOOL(per_tick_ui_movie_tracks, true, "ITC",
+              "On render-only passes, don't apply UI movies' animation tracks that add "
+              "to a value the update doesn't put back (they moved ~5x as far: the pause "
+              "sub-menus' arrow)");
+ITC_FLAG_BOOL(per_tick_changed_ui_movies, true, "ITC",
+              "On render-only passes, draw UI movies changed since the logic pass "
+              "without advancing them (the pause sub-menus' arrow)");
+ITC_FLAG_BOOL(per_tick_texture_animations, true, "ITC",
+              "Advance texture animations (flashing lights) once per tick on "
+              "render-only passes");
+ITC_FLAG_BOOL(per_tick_minimap_blink, true, "ITC",
+              "Advance the minimap's blink clock once per tick on render-only passes");
+ITC_FLAG_BOOL(per_tick_play_time, true, "ITC",
+              "Count play time once per tick on render-only passes");
+ITC_FLAG_BOOL(log_replays, false, "ITC",
+              "Log how replays from the logic pass's state went, every 2 s");
 
 // Blink timers (r3 = timer set, from the car's draw, sub_820DDE58): adds one
 // to each of four frame counters (+8, +16, +24, +32, 64-bit) and resets each
 // past its duration. Drives the flashing sprites above cars.
 extern "C" REX_FUNC(sub_820DC958) {
   REX_FUNC_PROLOGUE();
-  if (frame_pacing::GameMessages_IsRenderOnlyPass() && REXCVAR_GET(per_tick_blink_timers)) {
+  if (frame_pacing::GameMessages_IsRenderOnlyPass() && ITC_FLAG(per_tick_blink_timers)) {
     return;
   }
   __imp__sub_820DC958(ctx, base);
@@ -71,7 +71,7 @@ extern "C" REX_FUNC(sub_820DC958) {
 extern "C" REX_FUNC(sub_820F11A8) {
   REX_FUNC_PROLOGUE();
   if (frame_pacing::GameMessages_IsRenderOnlyPass() &&
-      REXCVAR_GET(per_tick_texture_animations)) {
+      ITC_FLAG(per_tick_texture_animations)) {
     return;
   }
   __imp__sub_820F11A8(ctx, base);
@@ -86,7 +86,7 @@ extern "C" REX_FUNC(sub_820F11A8) {
 extern "C" REX_FUNC(sub_820F5740) {
   REX_FUNC_PROLOGUE();
   constexpr uint32_t kBlinkFrames = 0x826C5AA4, kBlinkPhase = 0x826C5AA8;
-  if (!frame_pacing::GameMessages_IsRenderOnlyPass() || !REXCVAR_GET(per_tick_minimap_blink)) {
+  if (!frame_pacing::GameMessages_IsRenderOnlyPass() || !ITC_FLAG(per_tick_minimap_blink)) {
     __imp__sub_820F5740(ctx, base);
     return;
   }
@@ -104,7 +104,7 @@ extern "C" REX_FUNC(sub_820F5740) {
 extern "C" REX_FUNC(sub_82107910) {
   REX_FUNC_PROLOGUE();
   constexpr uint32_t kPlayTimeFrames = 0x826C5B90;
-  if (frame_pacing::GameMessages_IsRenderOnlyPass() && REXCVAR_GET(per_tick_play_time)) {
+  if (frame_pacing::GameMessages_IsRenderOnlyPass() && ITC_FLAG(per_tick_play_time)) {
     guest::StoreU32(base, kPlayTimeFrames, guest::LoadU32(base, kPlayTimeFrames) - 1);
   }
   __imp__sub_82107910(ctx, base);
@@ -175,7 +175,7 @@ class ReplayFromLogicPass {
   // call just runs, advancing on every pass).
   template <typename Call>
   void CallFromCurrentState(uint8_t* state, Call&& call) {
-    if (!REXCVAR_GET(per_tick_changed_ui_movies)) {
+    if (!ITC_FLAG(per_tick_changed_ui_movies)) {
       call();
       return;
     }
@@ -185,7 +185,7 @@ class ReplayFromLogicPass {
   }
 
   void Count(const char* outcome, int offset) {
-    if (!REXCVAR_GET(log_replays)) {
+    if (!ITC_FLAG(log_replays)) {
       return;
     }
     counts_[{outcome, offset}]++;
@@ -195,8 +195,8 @@ class ReplayFromLogicPass {
     }
     last_log_ = now;
     for (const auto& [key, n] : counts_) {
-      REXLOG_INFO("replay {}: {} {} (first differing byte +{:X})", name_, key.first, n,
-                  key.second);
+      ITC_LOG_INFO("replay {}: {} {} (first differing byte +{:X})", name_, key.first, n,
+                   key.second);
     }
     counts_.clear();
   }
@@ -231,7 +231,7 @@ ReplayFromLogicPass g_ui_movies("UI movies", 0xA000);
 
 namespace {
 void UpdateUiMovie(PPCContext& ctx, uint8_t* base) {
-  if (ctx.r4.u32 != 0 || !REXCVAR_GET(per_tick_ui_movies)) {
+  if (ctx.r4.u32 != 0 || !ITC_FLAG(per_tick_ui_movies)) {
     __imp__sub_8211D2F8(ctx, base);
     return;
   }
@@ -295,7 +295,7 @@ void NotePutBackTargets(uint8_t* base, uint32_t movie, const std::vector<AddedTa
     bool put_back = guest::LoadU32(base, it->target) == it->before;
     bool changed = put_back ? g_put_back_targets.insert(it->target).second
                             : g_put_back_targets.erase(it->target) != 0;
-    if (changed && REXCVAR_GET(log_pause_movie)) {
+    if (changed && ITC_FLAG(log_pause_movie)) {
       debug::PauseMovieLog_PutBack(movie, it->property, it->target, put_back);
     }
   }
@@ -314,7 +314,7 @@ extern "C" REX_FUNC(sub_825A0548) {
   bool adds = property < kTrackPropertyCount && guest::LoadU8(base, descriptor + 8) == 0;
   uint32_t type = property < kTrackPropertyCount ? guest::LoadU32(base, descriptor + 4) : 3;
   bool noted = adds && g_added != nullptr;
-  bool log = REXCVAR_GET(log_pause_movie) && debug::PauseMovieLog_TracksWanted();
+  bool log = ITC_FLAG(log_pause_movie) && debug::PauseMovieLog_TracksWanted();
   if (type >= 3 || (!noted && !log)) {
     __imp__sub_825A0548(ctx, base);
     return;
@@ -330,7 +330,7 @@ extern "C" REX_FUNC(sub_825A0548) {
     }
   }
   if (skip) {
-    if (REXCVAR_GET(log_pause_movie)) {
+    if (ITC_FLAG(log_pause_movie)) {
       debug::PauseMovieLog_Skipped(g_ui_movie, property, target);
     }
   } else {
@@ -347,7 +347,7 @@ extern "C" REX_FUNC(sub_8211D2F8) {
   uint32_t movie = ctx.r3.u32, r4 = ctx.r4.u32, caller = uint32_t(ctx.lr);
   uint32_t movie_before = g_ui_movie;
   std::vector<AddedTarget>* added_before = g_added;
-  bool tracks = REXCVAR_GET(per_tick_ui_movie_tracks);
+  bool tracks = ITC_FLAG(per_tick_ui_movie_tracks);
   if (tracks) {
     if (g_update_depth == g_added_by_depth.size()) {
       g_added_by_depth.emplace_back();
@@ -355,7 +355,7 @@ extern "C" REX_FUNC(sub_8211D2F8) {
     g_added = &g_added_by_depth[g_update_depth++];
     g_added->clear();
   }
-  bool log = REXCVAR_GET(log_pause_movie);
+  bool log = ITC_FLAG(log_pause_movie);
   if (log) {
     g_ui_movie = movie;
     debug::PauseMovieLog_Before(base, movie, r4, caller);
@@ -523,15 +523,15 @@ uint64_t g_sprite_pass = ~0ull;
 std::unordered_map<uint32_t, int> g_sprite_occurrences;
 }  // namespace
 
-REXCVAR_DEFINE_BOOL(blend_world_sprites, true, "ITC",
-                    "Blend world-space sprites (light trails) between ticks");
+ITC_FLAG_BOOL(blend_world_sprites, true, "ITC",
+              "Blend world-space sprites (light trails) between ticks");
 
-REXCVAR_DEFINE_BOOL(log_world_sprites, false, "ITC",
-                    "Log the world-space sprite lists as recorded, every 2 s");
+ITC_FLAG_BOOL(log_world_sprites, false, "ITC",
+              "Log the world-space sprite lists as recorded, every 2 s");
 
 void PerFrameLogic_RecordWorldSprites(uint8_t* base, uint32_t list,
                                       const std::function<void()>& record) {
-  if (REXCVAR_GET(log_world_sprites)) {
+  if (ITC_FLAG(log_world_sprites)) {
     static std::chrono::steady_clock::time_point last{};
     static int lines = 0;
     auto now = std::chrono::steady_clock::now();
@@ -545,18 +545,18 @@ void PerFrameLogic_RecordWorldSprites(uint8_t* base, uint32_t list,
       auto f = [&](uint32_t a) { return guest::LoadFloat(base, a); };
       auto it = g_sprite_lists.find({list, g_sprite_occurrences[list]});
       SpriteList s = it != g_sprite_lists.end() ? it->second : SpriteList{};
-      REXLOG_INFO("world sprites: list {:08X} pass {} {} in race {} amount {:.2f} count {} "
-                  "matrix row3 ({:.5g} {:.5g} {:.5g}) corner0 ({:.5g} {:.5g} {:.5g}) "
-                  "corner1 ({:.5g} {:.5g} {:.5g}) kept {}/{}",
-                  list, frame_pacing::GameMessages_PassNumber(),
-                  frame_pacing::GameMessages_IsRenderOnlyPass() ? "render-only" : "logic",
-                  frame_pacing::GameMessages_InRace(),
-                  frame_pacing::GetFramePacer().TickProgress(), n, f(list + 48), f(list + 52),
-                  f(list + 56), f(list + 80), f(list + 84), f(list + 88), f(list + 96),
-                  f(list + 100), f(list + 104), s.before.size() / 16, s.now.size() / 16);
+      ITC_LOG_INFO("world sprites: list {:08X} pass {} {} in race {} amount {:.2f} count {} "
+                   "matrix row3 ({:.5g} {:.5g} {:.5g}) corner0 ({:.5g} {:.5g} {:.5g}) "
+                   "corner1 ({:.5g} {:.5g} {:.5g}) kept {}/{}",
+                   list, frame_pacing::GameMessages_PassNumber(),
+                   frame_pacing::GameMessages_IsRenderOnlyPass() ? "render-only" : "logic",
+                   frame_pacing::GameMessages_InRace(),
+                   frame_pacing::GetFramePacer().TickProgress(), n, f(list + 48), f(list + 52),
+                   f(list + 56), f(list + 80), f(list + 84), f(list + 88), f(list + 96),
+                   f(list + 100), f(list + 104), s.before.size() / 16, s.now.size() / 16);
     }
   }
-  if (!REXCVAR_GET(interpolate_draw_state) || !REXCVAR_GET(blend_world_sprites) ||
+  if (!ITC_FLAG(interpolate_draw_state) || !ITC_FLAG(blend_world_sprites) ||
       !frame_pacing::GameMessages_InRace()) {
     record();
     return;
@@ -604,7 +604,7 @@ void PerFrameLogic_RecordWorldSprites(uint8_t* base, uint32_t list,
       guest::StoreFloat(base, corner(i, k), a[k] + (b[k] - a[k]) * amount);
     }
   }
-  if (REXCVAR_GET(log_world_sprites) && !saved.empty()) {
+  if (ITC_FLAG(log_world_sprites) && !saved.empty()) {
     static std::chrono::steady_clock::time_point last{};
     auto now = std::chrono::steady_clock::now();
     if (now - last >= std::chrono::milliseconds(500)) {
@@ -612,16 +612,16 @@ void PerFrameLogic_RecordWorldSprites(uint8_t* base, uint32_t list,
       for (uint32_t i = 0; i < paired; i++) {
         const float* a = &sprites.before[i * 16];
         const float* b = &sprites.now[i * 16];
-        REXLOG_INFO("world sprites: list {:08X} sprite {}/{} amount {:.2f} before ({:.5g} {:.5g} "
-                    "{:.5g}) ({:.5g} {:.5g} {:.5g}) now ({:.5g} {:.5g} {:.5g}) ({:.5g} {:.5g} {:.5g})",
-                    list, i, count, amount, a[0], a[1], a[2], a[4], a[5], a[6], b[0], b[1], b[2],
-                    b[4], b[5], b[6]);
+        ITC_LOG_INFO("world sprites: list {:08X} sprite {}/{} amount {:.2f} before ({:.5g} {:.5g} "
+                     "{:.5g}) ({:.5g} {:.5g} {:.5g}) now ({:.5g} {:.5g} {:.5g}) ({:.5g} {:.5g} {:.5g})",
+                     list, i, count, amount, a[0], a[1], a[2], a[4], a[5], a[6], b[0], b[1], b[2],
+                     b[4], b[5], b[6]);
       }
       auto f = [&](uint32_t o) { return guest::LoadFloat(base, list + o); };
-      REXLOG_INFO("world sprites: list {:08X} matrix {:.4g} {:.4g} {:.4g} | {:.4g} {:.4g} {:.4g} | "
-                  "{:.4g} {:.4g} {:.4g} | {:.5g} {:.5g} {:.5g}",
-                  list, f(0), f(4), f(8), f(16), f(20), f(24), f(32), f(36), f(40), f(48), f(52),
-                  f(56));
+      ITC_LOG_INFO("world sprites: list {:08X} matrix {:.4g} {:.4g} {:.4g} | {:.4g} {:.4g} {:.4g} "
+                   "| {:.4g} {:.4g} {:.4g} | {:.5g} {:.5g} {:.5g}",
+                   list, f(0), f(4), f(8), f(16), f(20), f(24), f(32), f(36), f(40), f(48), f(52),
+                   f(56));
     }
   }
   record();
@@ -643,12 +643,12 @@ extern "C" REX_FUNC(sub_82128750) {
 // Diagnostics (--log_camera_pass_records): which camera passes are recorded
 // (sub_820A3978: r3 = camera pass) on logic and on render-only passes, and
 // from where, every 2 s, in races.
-REXCVAR_DEFINE_BOOL(log_camera_pass_records, false, "ITC",
-                    "Log which camera passes are recorded on logic and render-only passes");
+ITC_FLAG_BOOL(log_camera_pass_records, false, "ITC",
+              "Log which camera passes are recorded on logic and render-only passes");
 
 extern "C" REX_FUNC(sub_820A3978) {
   REX_FUNC_PROLOGUE();
-  if (REXCVAR_GET(log_camera_pass_records) && frame_pacing::GameMessages_InRace()) {
+  if (ITC_FLAG(log_camera_pass_records) && frame_pacing::GameMessages_InRace()) {
     static std::map<std::tuple<uint32_t, uint32_t, uint32_t>, std::pair<int, int>> counts;
     static auto last = std::chrono::steady_clock::now();
     static uint64_t logic_start = 0, render_start = 0;
@@ -663,10 +663,10 @@ extern "C" REX_FUNC(sub_820A3978) {
       frame_pacing::GameMessages_PassCounts(logic, render);
       for (const auto& [key, n] : counts) {
         auto [pass, handler, message] = key;
-        REXLOG_INFO("camera pass record: pass {:08X} (type {}) in handler {:08X} message {}: {} "
-                    "on {} logic, {} on {} render-only passes",
-                    pass, guest::LoadU32(base, pass + 584), handler, int32_t(message), n.first,
-                    logic - logic_start, n.second, render - render_start);
+        ITC_LOG_INFO("camera pass record: pass {:08X} (type {}) in handler {:08X} message {}: {} "
+                     "on {} logic, {} on {} render-only passes",
+                     pass, guest::LoadU32(base, pass + 584), handler, int32_t(message), n.first,
+                     logic - logic_start, n.second, render - render_start);
       }
       counts.clear();
       logic_start = logic;
@@ -682,8 +682,8 @@ extern "C" REX_FUNC(sub_820A3978) {
 // corners (x, y, z, pad) at +80 become the vertices. The corners are
 // blended between their last two ticks while it records, matched by sprite
 // and order in the pass, then put back.
-REXCVAR_DEFINE_BOOL(log_single_sprites, false, "ITC",
-                    "Log each single world-space sprite recorded, 40 lines every 2 s");
+ITC_FLAG_BOOL(log_single_sprites, false, "ITC",
+              "Log each single world-space sprite recorded, 40 lines every 2 s");
 
 namespace {
 struct SingleSpriteKey {
@@ -727,13 +727,13 @@ extern "C" REX_FUNC(sub_821281A8) {
     state.ticks++;
   }
   float amount = frame_pacing::GetFramePacer().TickProgress();
-  bool blend = REXCVAR_GET(interpolate_draw_state) && REXCVAR_GET(blend_world_sprites) &&
+  bool blend = ITC_FLAG(interpolate_draw_state) && ITC_FLAG(blend_world_sprites) &&
                frame_pacing::GameMessages_InRace() && state.ticks >= 2 && corners == state.now;
   for (uint32_t k = 0; blend && k < 16; k++) {
     blend = std::isfinite(state.before[k]) &&
             std::abs(state.now[k] - state.before[k]) <= kMaxSpriteStep;
   }
-  if (REXCVAR_GET(log_single_sprites)) {
+  if (ITC_FLAG(log_single_sprites)) {
     static std::chrono::steady_clock::time_point last{};
     static int lines = 0;
     auto now = std::chrono::steady_clock::now();
@@ -745,13 +745,13 @@ extern "C" REX_FUNC(sub_821281A8) {
       uint32_t handler, message;
       frame_pacing::GameMessages_CurrentHandler(handler, message);
       auto f = [&](uint32_t o) { return guest::LoadFloat(base, sprite + o); };
-      REXLOG_INFO("single sprite: pass {} {} amount {:.2f} sprite {:08X} from {:08X} #{} handler "
-                  "{:08X} message {} camera {:08X} matrix row3 ({:.5g} {:.5g} {:.5g}) corner0 "
-                  "({:.5g} {:.5g} {:.5g}) before ({:.5g} {:.5g} {:.5g}) blend {}",
-                  pass, render_only ? "render-only" : "logic", amount, sprite, caller,
-                  key.occurrence, handler, int32_t(message), ctx.r4.u32, f(48), f(52), f(56),
-                  corners[0], corners[1], corners[2], state.before[0], state.before[1],
-                  state.before[2], blend);
+      ITC_LOG_INFO("single sprite: pass {} {} amount {:.2f} sprite {:08X} from {:08X} #{} handler "
+                   "{:08X} message {} camera {:08X} matrix row3 ({:.5g} {:.5g} {:.5g}) corner0 "
+                   "({:.5g} {:.5g} {:.5g}) before ({:.5g} {:.5g} {:.5g}) blend {}",
+                   pass, render_only ? "render-only" : "logic", amount, sprite, caller,
+                   key.occurrence, handler, int32_t(message), ctx.r4.u32, f(48), f(52), f(56),
+                   corners[0], corners[1], corners[2], state.before[0], state.before[1],
+                   state.before[2], blend);
     }
   }
   if (!blend) {

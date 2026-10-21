@@ -1,6 +1,6 @@
 #include "renderer.h"
 #include "frame_costs.h"
-#include "log_enabled.h"
+#include "base/log.h"
 
 #include "buffers.h"
 #include "gpu_memory.h"
@@ -29,121 +29,121 @@
 #include <memory>
 #include <string>
 #include <vector>
-#include <rex/logging.h>
-#include <rex/cvar.h>
+#include "base/log.h"
+#include "base/flags.h"
 
-REXCVAR_DEFINE_BOOL(log_gpu_memory, false, "ITC",
-                    "Log every 5 s the GPU memory the native renderer holds, by what it's for, "
-                    "and its counts of views, samplers, descriptor pools and pipelines (to find "
-                    "what grows from race to race)");
-REXCVAR_DEFINE_BOOL(native_renderer_validation, false, "ITC",
-                    "Enable the Vulkan validation layer for the native renderer, if installed");
-REXCVAR_DEFINE_INT32(native_renderer_show_resolve, -1, "ITC",
-                     "Show the frame's nth resolve destination in the native renderer's window "
-                     "instead of the main view (a debugging aid; -1 for the main view)");
+ITC_FLAG_BOOL(log_gpu_memory, false, "ITC",
+              "Log every 5 s the GPU memory the native renderer holds, by what it's for, "
+              "and its counts of views, samplers, descriptor pools and pipelines (to find "
+              "what grows from race to race)");
+ITC_FLAG_BOOL(native_renderer_validation, false, "ITC",
+              "Enable the Vulkan validation layer for the native renderer, if installed");
+ITC_FLAG_INT32(native_renderer_show_resolve, -1, "ITC",
+               "Show the frame's nth resolve destination in the native renderer's window "
+               "instead of the main view (a debugging aid; -1 for the main view)");
 
-REXCVAR_DEFINE_BOOL(native_renderer_serialize, false, "ITC",
-                    "Wait for the GPU to finish each frame before recording the next (a "
-                    "debugging aid: rules out frames in flight sharing data)");
-REXCVAR_DEFINE_BOOL(native_renderer_check_mirror, false, "ITC",
-                    "Log the vertex and index ranges whose contents change between frames "
-                    "(a debugging aid)");
-REXCVAR_DEFINE_BOOL(native_renderer_skip_repeated_state, true, "ITC",
-                    "Don't record a draw's viewport, scissor, depth bias, blend constants, "
-                    "pipeline or index buffer again when the command buffer already holds them");
-REXCVAR_DEFINE_BOOL(native_renderer_reuse_constants, true, "ITC",
-                    "Point a draw at the constants the last draw wrote, block by block, when "
-                    "they're the same, instead of writing them again");
-REXCVAR_DEFINE_BOOL(native_renderer_log_constant_changes, false, "ITC",
-                    "Log why draws' constants aren't reused: what differs in the fetch block, "
-                    "and which blocks' offsets differ when the descriptor sets repeat");
-REXCVAR_DEFINE_BOOL(native_renderer_log_register_reads, false, "ITC",
-                    "Log how often the device's register shadow is read a frame, how many words "
-                    "are copied (those marked dirty) and what changed since the last read");
-REXCVAR_DEFINE_BOOL(native_renderer_cache_index_ranges, true, "ITC",
-                    "Keep each draw's lowest and highest index until memcpy writes its index "
-                    "range, instead of scanning the indices every draw");
-REXCVAR_DEFINE_BOOL(native_renderer_log_index_ranges, false, "ITC",
-                    "Log how often draws' index ranges are scanned again unchanged since memcpy "
-                    "last wrote them, and how the guest memory mirror's checks go");
-REXCVAR_DEFINE_BOOL(native_renderer_log_texture_bindings, false, "ITC",
-                    "Log how often draws' texture bindings repeat the last ones (fetch constants, "
-                    "views, samplers, descriptor sets) and what would empty a cache of them");
-REXCVAR_DEFINE_BOOL(native_renderer_cache_shader_lookups, true, "ITC",
-                    "Keep draws' shader lookups by what they read from the shader objects "
-                    "instead of hashing the shaders' microcode every draw");
-REXCVAR_DEFINE_BOOL(native_renderer_log_shader_lookups, false, "ITC",
-                    "Log how often draws' shader lookups repeat the last ones and whether a key "
-                    "of the shader objects' fields would ever give a shader whose microcode "
-                    "changed");
-REXCVAR_DEFINE_BOOL(native_renderer_reuse_texture_sets, true, "ITC",
-                    "Give a draw the last draw's texture descriptor set when its shader and the "
-                    "fetch constants it reads are unchanged, and no texture changed");
-REXCVAR_DEFINE_BOOL(native_renderer_copy_all, false, "ITC",
-                    "Copy every vertex and index range into the mirror every frame, not only "
-                    "those the library's memcpy wrote since (a debugging aid)");
-REXCVAR_DEFINE_BOOL(native_renderer_mirror_by_tick, true, "ITC",
-                    "Draws read a guest memory mirror updated only as a logic pass's list starts "
-                    "replaying, the two mirrors alternating (=false for the old per-draw "
-                    "mirror; see 'Hypothesis to test: the mirrors updated once a tick' in "
-                    "docs/native-renderer.md)");
-REXCVAR_DEFINE_BOOL(native_renderer_mirror_to_both, true, "ITC",
-                    "With --native_renderer_mirror_by_tick: memcpy's writes go into both mirrors "
-                    "at each frame's start, the one draws read included");
-REXCVAR_DEFINE_BOOL(native_renderer_verify_mirror, false, "ITC",
-                    "Compare each vertex and index range not copied into the mirror with guest "
-                    "memory every frame, logging those that differ (a debugging aid; slow, ~20 "
-                    "fps in a race). With --native_renderer_mirror_by_tick: each drawn range "
-                    "looked up in the writes the mirror hasn't had instead (fast)");
-REXCVAR_DEFINE_BOOL(native_renderer_watch_draws, false, "ITC",
-                    "Log what changes in the main view's draws' inputs between frames: with the "
-                    "camera still, only flickering draws should (a debugging aid)");
-REXCVAR_DEFINE_BOOL(native_renderer_hide_cubes, false, "ITC",
-                    "Give cube maps the white placeholder (a debugging aid)");
-REXCVAR_DEFINE_STRING(native_renderer_cycle, "", "ITC",
-                      "Directory: when a file named 'now' appears in it, leave out the main "
-                      "view's draws of each pixel shader in turn for 3 s, saving a frame of each "
-                      "(a debugging aid that keeps frames recorded at their usual speed)");
-REXCVAR_DEFINE_BOOL(native_renderer_check_late_writes, false, "ITC",
-                    "Log vertex and index ranges written after we copied them, by the end of "
-                    "the frame (a debugging aid)");
-REXCVAR_DEFINE_BOOL(native_renderer_check_clobbers, false, "ITC",
-                    "Log copies into the mirror that change bytes an earlier draw's copy put "
-                    "there in the same frame (a debugging aid)");
-REXCVAR_DEFINE_STRING(native_renderer_watch_pixel_shader, "", "ITC",
-                      "With native_renderer_watch_draws: only the draws of this pixel shader "
-                      "(hash in hex)");
-REXCVAR_DEFINE_BOOL(motion_blur, true, "ITC",
-                    "Draw the game's velocity-based motion blur (pixel shader "
-                    "7EB16456AAD56CBA); false leaves the frame unblurred");
-REXCVAR_DEFINE_STRING(native_renderer_skip_pixel_shader, "", "ITC",
-                      "Leave out the draws of this pixel shader (hash in hex; a debugging aid)");
-REXCVAR_DEFINE_BOOL(native_renderer_log_glow, false, "ITC",
-                    "Log the glow history's cross-fades and write-backs once a second, by logic "
-                    "and render-only frames (a debugging aid)");
-REXCVAR_DEFINE_BOOL(native_renderer_base_level_only, false, "ITC",
-                    "Sample only each texture's first level (a debugging aid)");
-REXCVAR_DEFINE_BOOL(native_renderer_verify_textures, false, "ITC",
-                    "Hash every texture used each frame, logging and reloading those whose "
-                    "memory changed with no memcpy write recorded (a debugging aid)");
-REXCVAR_DEFINE_BOOL(native_renderer_no_index_clamp, false, "ITC",
-                    "Don't clamp indices to VGT_MIN/MAX_VTX_INDX (a debugging aid)");
-REXCVAR_DEFINE_INT32(native_renderer_dump_every, 0, "ITC",
-                     "With native_renderer_dump: dump only the frame itself (shown image, draw "
-                     "IDs, draws.txt) every this many seconds of a race (a debugging aid)");
-REXCVAR_DEFINE_STRING(native_renderer_dump, "", "ITC",
-                      "Directory to dump frames into, as PFM files, with draws.txt describing "
-                      "each draw: once 10 s into a race, and again whenever a file named 'now' "
-                      "appears in it (a debugging aid; see docs/native-renderer.md)");
-REXCVAR_DEFINE_INT32(width, 0, "ITC",
-                     "Window width in pixels (in fullscreen, the drawing width); 0: 1280, or "
-                     "from height at 16:9");
-REXCVAR_DEFINE_INT32(height, 0, "ITC",
-                     "Window height in pixels (in fullscreen, the drawing height); 0: 720, or "
-                     "from width at 16:9");
+ITC_FLAG_BOOL(native_renderer_serialize, false, "ITC",
+              "Wait for the GPU to finish each frame before recording the next (a "
+              "debugging aid: rules out frames in flight sharing data)");
+ITC_FLAG_BOOL(native_renderer_check_mirror, false, "ITC",
+              "Log the vertex and index ranges whose contents change between frames "
+              "(a debugging aid)");
+ITC_FLAG_BOOL(native_renderer_skip_repeated_state, true, "ITC",
+              "Don't record a draw's viewport, scissor, depth bias, blend constants, "
+              "pipeline or index buffer again when the command buffer already holds them");
+ITC_FLAG_BOOL(native_renderer_reuse_constants, true, "ITC",
+              "Point a draw at the constants the last draw wrote, block by block, when "
+              "they're the same, instead of writing them again");
+ITC_FLAG_BOOL(native_renderer_log_constant_changes, false, "ITC",
+              "Log why draws' constants aren't reused: what differs in the fetch block, "
+              "and which blocks' offsets differ when the descriptor sets repeat");
+ITC_FLAG_BOOL(native_renderer_log_register_reads, false, "ITC",
+              "Log how often the device's register shadow is read a frame, how many words "
+              "are copied (those marked dirty) and what changed since the last read");
+ITC_FLAG_BOOL(native_renderer_cache_index_ranges, true, "ITC",
+              "Keep each draw's lowest and highest index until memcpy writes its index "
+              "range, instead of scanning the indices every draw");
+ITC_FLAG_BOOL(native_renderer_log_index_ranges, false, "ITC",
+              "Log how often draws' index ranges are scanned again unchanged since memcpy "
+              "last wrote them, and how the guest memory mirror's checks go");
+ITC_FLAG_BOOL(native_renderer_log_texture_bindings, false, "ITC",
+              "Log how often draws' texture bindings repeat the last ones (fetch constants, "
+              "views, samplers, descriptor sets) and what would empty a cache of them");
+ITC_FLAG_BOOL(native_renderer_cache_shader_lookups, true, "ITC",
+              "Keep draws' shader lookups by what they read from the shader objects "
+              "instead of hashing the shaders' microcode every draw");
+ITC_FLAG_BOOL(native_renderer_log_shader_lookups, false, "ITC",
+              "Log how often draws' shader lookups repeat the last ones and whether a key "
+              "of the shader objects' fields would ever give a shader whose microcode "
+              "changed");
+ITC_FLAG_BOOL(native_renderer_reuse_texture_sets, true, "ITC",
+              "Give a draw the last draw's texture descriptor set when its shader and the "
+              "fetch constants it reads are unchanged, and no texture changed");
+ITC_FLAG_BOOL(native_renderer_copy_all, false, "ITC",
+              "Copy every vertex and index range into the mirror every frame, not only "
+              "those the library's memcpy wrote since (a debugging aid)");
+ITC_FLAG_BOOL(native_renderer_mirror_by_tick, true, "ITC",
+              "Draws read a guest memory mirror updated only as a logic pass's list starts "
+              "replaying, the two mirrors alternating (=false for the old per-draw "
+              "mirror; see 'Hypothesis to test: the mirrors updated once a tick' in "
+              "docs/native-renderer.md)");
+ITC_FLAG_BOOL(native_renderer_mirror_to_both, true, "ITC",
+              "With --native_renderer_mirror_by_tick: memcpy's writes go into both mirrors "
+              "at each frame's start, the one draws read included");
+ITC_FLAG_BOOL(native_renderer_verify_mirror, false, "ITC",
+              "Compare each vertex and index range not copied into the mirror with guest "
+              "memory every frame, logging those that differ (a debugging aid; slow, ~20 "
+              "fps in a race). With --native_renderer_mirror_by_tick: each drawn range "
+              "looked up in the writes the mirror hasn't had instead (fast)");
+ITC_FLAG_BOOL(native_renderer_watch_draws, false, "ITC",
+              "Log what changes in the main view's draws' inputs between frames: with the "
+              "camera still, only flickering draws should (a debugging aid)");
+ITC_FLAG_BOOL(native_renderer_hide_cubes, false, "ITC",
+              "Give cube maps the white placeholder (a debugging aid)");
+ITC_FLAG_STRING(native_renderer_cycle, "", "ITC",
+                "Directory: when a file named 'now' appears in it, leave out the main "
+                "view's draws of each pixel shader in turn for 3 s, saving a frame of each "
+                "(a debugging aid that keeps frames recorded at their usual speed)");
+ITC_FLAG_BOOL(native_renderer_check_late_writes, false, "ITC",
+              "Log vertex and index ranges written after we copied them, by the end of "
+              "the frame (a debugging aid)");
+ITC_FLAG_BOOL(native_renderer_check_clobbers, false, "ITC",
+              "Log copies into the mirror that change bytes an earlier draw's copy put "
+              "there in the same frame (a debugging aid)");
+ITC_FLAG_STRING(native_renderer_watch_pixel_shader, "", "ITC",
+                "With native_renderer_watch_draws: only the draws of this pixel shader "
+                "(hash in hex)");
+ITC_FLAG_BOOL(motion_blur, true, "ITC",
+              "Draw the game's velocity-based motion blur (pixel shader "
+              "7EB16456AAD56CBA); false leaves the frame unblurred");
+ITC_FLAG_STRING(native_renderer_skip_pixel_shader, "", "ITC",
+                "Leave out the draws of this pixel shader (hash in hex; a debugging aid)");
+ITC_FLAG_BOOL(native_renderer_log_glow, false, "ITC",
+              "Log the glow history's cross-fades and write-backs once a second, by logic "
+              "and render-only frames (a debugging aid)");
+ITC_FLAG_BOOL(native_renderer_base_level_only, false, "ITC",
+              "Sample only each texture's first level (a debugging aid)");
+ITC_FLAG_BOOL(native_renderer_verify_textures, false, "ITC",
+              "Hash every texture used each frame, logging and reloading those whose "
+              "memory changed with no memcpy write recorded (a debugging aid)");
+ITC_FLAG_BOOL(native_renderer_no_index_clamp, false, "ITC",
+              "Don't clamp indices to VGT_MIN/MAX_VTX_INDX (a debugging aid)");
+ITC_FLAG_INT32(native_renderer_dump_every, 0, "ITC",
+               "With native_renderer_dump: dump only the frame itself (shown image, draw "
+               "IDs, draws.txt) every this many seconds of a race (a debugging aid)");
+ITC_FLAG_STRING(native_renderer_dump, "", "ITC",
+                "Directory to dump frames into, as PFM files, with draws.txt describing "
+                "each draw: once 10 s into a race, and again whenever a file named 'now' "
+                "appears in it (a debugging aid; see docs/native-renderer.md)");
+ITC_FLAG_INT32(width, 0, "ITC",
+               "Window width in pixels (in fullscreen, the drawing width); 0: 1280, or "
+               "from height at 16:9");
+ITC_FLAG_INT32(height, 0, "ITC",
+               "Window height in pixels (in fullscreen, the drawing height); 0: 720, or "
+               "from width at 16:9");
 // The SDK's (it also makes the SDK's own window, hidden in exclusive mode,
 // fullscreen); ours follows it.
-REXCVAR_DECLARE(bool, fullscreen);
+ITC_FLAG_DECLARE(bool, fullscreen);
 
 namespace native {
 namespace {
@@ -155,7 +155,7 @@ constexpr uint32_t kDefaultWidth = 1280, kDefaultHeight = 720;
 
 // The window's size from --width and --height (one alone keeps 16:9).
 VkExtent2D WindowSize() {
-  int32_t width = REXCVAR_GET(width), height = REXCVAR_GET(height);
+  int32_t width = ITC_FLAG(width), height = ITC_FLAG(height);
   if (width <= 0 && height <= 0) {
     return {kDefaultWidth, kDefaultHeight};
   }
@@ -173,8 +173,8 @@ VkExtent2D WindowSize() {
 // otherwise the largest that fits the window's pixels (`pixels`, the
 // swapchain's size).
 float ResolutionScale(VkExtent2D pixels) {
-  bool sized = REXCVAR_GET(width) > 0 || REXCVAR_GET(height) > 0;
-  VkExtent2D size = (REXCVAR_GET(fullscreen) && sized) || !pixels.width || !pixels.height
+  bool sized = ITC_FLAG(width) > 0 || ITC_FLAG(height) > 0;
+  VkExtent2D size = (ITC_FLAG(fullscreen) && sized) || !pixels.width || !pixels.height
                         ? WindowSize()
                         : pixels;
   return std::min(float(size.width) / kDefaultWidth, float(size.height) / kDefaultHeight);
@@ -239,7 +239,7 @@ void SDLCALL CreateWindowOnMainThread(void* data) {
   // screen at 145%).
   SDL_WindowFlags flags = SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE |
                           SDL_WINDOW_HIGH_PIXEL_DENSITY |
-                          (REXCVAR_GET(fullscreen) ? SDL_WINDOW_FULLSCREEN : 0);
+                          (ITC_FLAG(fullscreen) ? SDL_WINDOW_FULLSCREEN : 0);
   setup->window =
       SDL_CreateWindow("ITC native renderer", int(size.width), int(size.height), flags);
   if (!setup->window) {
@@ -253,7 +253,7 @@ void SDLCALL CreateWindowOnMainThread(void* data) {
   // The window's size is given in pixels: in the desktop's (scaled) units,
   // it's that over the pixel density.
   if (float density = SDL_GetWindowPixelDensity(setup->window);
-      density > 0.0f && density != 1.0f && !REXCVAR_GET(fullscreen)) {
+      density > 0.0f && density != 1.0f && !ITC_FLAG(fullscreen)) {
     SDL_SetWindowSize(setup->window, int(std::lround(size.width / density)),
                       int(std::lround(size.height / density)));
     SDL_SyncWindow(setup->window);
@@ -285,7 +285,7 @@ void SDLCALL CreateWindowOnMainThread(void* data) {
   }
   VkResult result = vk::vkCreateInstance(&info, nullptr, &setup->instance);
   if (result == VK_ERROR_LAYER_NOT_PRESENT) {
-    REXLOG_WARN("native renderer: validation layer not installed, continuing without it");
+    ITC_LOG_WARN("native renderer: validation layer not installed, continuing without it");
     info.enabledLayerCount = 0;
     result = vk::vkCreateInstance(&info, nullptr, &setup->instance);
   }
@@ -397,32 +397,32 @@ class Renderer {
 bool Renderer::CreateWindowAndInstance() {
   static Uint32 wakeup_event = SDL_RegisterEvents(1);
   auto setup = std::make_shared<WindowSetup>();
-  setup->validation = REXCVAR_GET(native_renderer_validation);
+  setup->validation = ITC_FLAG(native_renderer_validation);
   auto future = setup->done.get_future();
   // Queued for the main thread, which runs it as it pumps events; an event
   // of our own wakes it (the SDK's loop ignores event types it doesn't know).
   if (!SDL_RunOnMainThread(CreateWindowOnMainThread, new std::shared_ptr<WindowSetup>(setup),
                            false)) {
-    REXLOG_ERROR("native renderer: SDL_RunOnMainThread: {}", SDL_GetError());
+    ITC_LOG_ERROR("native renderer: SDL_RunOnMainThread: {}", SDL_GetError());
     return false;
   }
   SDL_Event wake{};
   wake.type = wakeup_event;
   SDL_PushEvent(&wake);
   if (future.wait_for(std::chrono::seconds(10)) != std::future_status::ready) {
-    REXLOG_ERROR("native renderer: the main thread didn't create the window");
+    ITC_LOG_ERROR("native renderer: the main thread didn't create the window");
     return false;
   }
   if (!setup->error.empty()) {
-    REXLOG_ERROR("native renderer: {}", setup->error);
+    ITC_LOG_ERROR("native renderer: {}", setup->error);
     return false;
   }
   window_ = setup->window;
   display_ = setup->display;
-  REXLOG_INFO("native renderer: window {}x{}{}, screen {}x{}, pixel density {}",
-              WindowSize().width, WindowSize().height,
-              REXCVAR_GET(fullscreen) ? " (fullscreen)" : "", display_.width, display_.height,
-              setup->density);
+  ITC_LOG_INFO("native renderer: window {}x{}{}, screen {}x{}, pixel density {}",
+               WindowSize().width, WindowSize().height,
+               ITC_FLAG(fullscreen) ? " (fullscreen)" : "", display_.width, display_.height,
+               setup->density);
   instance_ = setup->instance;
   surface_ = setup->surface;
   return true;
@@ -458,16 +458,16 @@ bool Renderer::CreateDevice() {
     }
   }
   if (!physical_device_) {
-    REXLOG_ERROR("native renderer: no GPU can draw to the window");
+    ITC_LOG_ERROR("native renderer: no GPU can draw to the window");
     return false;
   }
   VkPhysicalDeviceProperties properties;
   vk::vkGetPhysicalDeviceProperties(physical_device_, &properties);
-  REXLOG_INFO("native renderer: using {}", properties.deviceName);
+  ITC_LOG_INFO("native renderer: using {}", properties.deviceName);
 
   // Dynamic rendering is core in Vulkan 1.3.
   if (properties.apiVersion < VK_API_VERSION_1_3) {
-    REXLOG_ERROR("native renderer: needs Vulkan 1.3");
+    ITC_LOG_ERROR("native renderer: needs Vulkan 1.3");
     return false;
   }
 
@@ -479,7 +479,7 @@ bool Renderer::CreateDevice() {
   supported.pNext = &supported13;
   vk::vkGetPhysicalDeviceFeatures2(physical_device_, &supported);
   if (!supported13.dynamicRendering) {
-    REXLOG_ERROR("native renderer: needs dynamic rendering");
+    ITC_LOG_ERROR("native renderer: needs dynamic rendering");
     return false;
   }
   VkPhysicalDeviceVulkan13Features enabled13{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES};
@@ -511,7 +511,7 @@ bool Renderer::CreateDevice() {
   info.ppEnabledExtensionNames = extensions;
   if (VkResult result = vk::vkCreateDevice(physical_device_, &info, nullptr, &device_);
       result != VK_SUCCESS) {
-    REXLOG_ERROR("native renderer: vkCreateDevice: {}", int(result));
+    ITC_LOG_ERROR("native renderer: vkCreateDevice: {}", int(result));
     return false;
   }
   if (!vk::LoadDevice(device_)) {
@@ -618,7 +618,7 @@ bool Renderer::CreateSwapchain() {
   VkSwapchainKHR swapchain;
   if (VkResult result = vk::vkCreateSwapchainKHR(device_, &info, nullptr, &swapchain);
       result != VK_SUCCESS) {
-    REXLOG_ERROR("native renderer: vkCreateSwapchainKHR: {}", int(result));
+    ITC_LOG_ERROR("native renderer: vkCreateSwapchainKHR: {}", int(result));
     return false;
   }
   DestroySwapchain();
@@ -634,8 +634,8 @@ bool Renderer::CreateSwapchain() {
     vk::vkCreateSemaphore(device_, &semaphore_info, nullptr, &semaphore);
   }
   swapchain_stale_ = false;
-  REXLOG_INFO("native renderer: swapchain {}x{}, {} images, present mode {}", extent.width,
-              extent.height, count, int(mode));
+  ITC_LOG_INFO("native renderer: swapchain {}x{}, {} images, present mode {}", extent.width,
+               extent.height, count, int(mode));
   return true;
 }
 
@@ -658,8 +658,8 @@ bool Renderer::Init(uint8_t* base) {
       !passes_.Init(context_, base, kFramesInFlight, ResolutionScale(swapchain_extent_))) {
     return false;
   }
-  passes_.set_mirror_by_tick(REXCVAR_GET(native_renderer_mirror_by_tick));
-  passes_.set_mirror_to_both(REXCVAR_GET(native_renderer_mirror_to_both));
+  passes_.set_mirror_by_tick(ITC_FLAG(native_renderer_mirror_by_tick));
+  passes_.set_mirror_to_both(ITC_FLAG(native_renderer_mirror_to_both));
   return true;
 }
 
@@ -674,7 +674,7 @@ VkCommandBuffer Renderer::BeginFrame() {
   Frame& frame = frames_[frame_index_];
   if (!recording_) {
     vk::vkWaitForFences(device_, 1, &frame.done, VK_TRUE, UINT64_MAX);
-    if (REXCVAR_GET(native_renderer_serialize)) {
+    if (ITC_FLAG(native_renderer_serialize)) {
       vk::vkQueueWaitIdle(queue_);
     }
     vk::vkResetCommandBuffer(frame.commands, 0);
@@ -683,12 +683,12 @@ VkCommandBuffer Renderer::BeginFrame() {
     vk::vkBeginCommandBuffer(frame.commands, &begin);
     passes_.BeginFrame(frame_index_);
     // A dump starts 10 s into a race, or when asked for.
-    const std::string& dump_root = REXCVAR_GET(native_renderer_dump);
+    const std::string& dump_root = ITC_FLAG(native_renderer_dump);
     if (!dump_root.empty() && !dumping_) {
       std::error_code error;
       bool asked = std::filesystem::remove(dump_root + "/now", error);
       // With dump_every: a frame every that many seconds of a race.
-      int32_t every = REXCVAR_GET(native_renderer_dump_every);
+      int32_t every = ITC_FLAG(native_renderer_dump_every);
       bool in_race = passes_.frame_resolve_count() >= 20;
       bool periodic = every > 0 && in_race && Clock::now() - last_dump_ >= std::chrono::seconds(every);
       if (asked || periodic ||
@@ -699,11 +699,11 @@ VkCommandBuffer Renderer::BeginFrame() {
         dump_steps_.clear();
         dump_directory_ = fmt::format("{}/{}", dump_root, dumps_++);
         std::filesystem::create_directories(dump_directory_, error);
-        REXLOG_INFO("native renderer: dumping into {}", dump_directory_);
+        ITC_LOG_INFO("native renderer: dumping into {}", dump_directory_);
       }
     }
     // The cycle: started on request, a step every 3 s.
-    const std::string& cycle_root = REXCVAR_GET(native_renderer_cycle);
+    const std::string& cycle_root = ITC_FLAG(native_renderer_cycle);
     if (!cycle_root.empty()) {
       std::error_code error;
       if (cycle_steps_.empty() && std::filesystem::remove(cycle_root + "/now", error)) {
@@ -718,43 +718,43 @@ VkCommandBuffer Renderer::BeginFrame() {
         cycle_captured_ = false;
         cycle_directory_ = fmt::format("{}/{}", cycle_root, cycles_++);
         std::filesystem::create_directories(cycle_directory_, error);
-        REXLOG_INFO("native renderer: cycling {} steps into {}", cycle_steps_.size(),
-                    cycle_directory_);
+        ITC_LOG_INFO("native renderer: cycling {} steps into {}", cycle_steps_.size(),
+                     cycle_directory_);
       }
       if (!cycle_steps_.empty()) {
         passes_.set_skip_pixel_shader(cycle_steps_[cycle_step_].skip);
       }
     }
-    if (const std::string& skip = REXCVAR_GET(native_renderer_skip_pixel_shader); !skip.empty()) {
+    if (const std::string& skip = ITC_FLAG(native_renderer_skip_pixel_shader); !skip.empty()) {
       passes_.set_skip_pixel_shader(std::strtoull(skip.c_str(), nullptr, 16));
     }
-    passes_.set_skip_motion_blur(!REXCVAR_GET(motion_blur));
+    passes_.set_skip_motion_blur(!ITC_FLAG(motion_blur));
     // Its first frame describes each draw (cheaply: the effect being looked
     // for went away while frames were recorded slowly).
     passes_.set_record_draws(dumping_ && dump_step_ == 0);
-    passes_.set_check_mirror_frames(REXCVAR_GET(native_renderer_check_mirror));
-    passes_.set_copy_all(REXCVAR_GET(native_renderer_copy_all));
-    passes_.set_skip_repeated_state(REXCVAR_GET(native_renderer_skip_repeated_state));
-    passes_.set_reuse_constants(REXCVAR_GET(native_renderer_reuse_constants));
-    passes_.set_log_constant_changes(REXCVAR_GET(native_renderer_log_constant_changes));
-    passes_.set_log_register_reads(REXCVAR_GET(native_renderer_log_register_reads));
-    passes_.set_log_index_ranges(REXCVAR_GET(native_renderer_log_index_ranges));
-    passes_.set_log_texture_bindings(REXCVAR_GET(native_renderer_log_texture_bindings));
-    passes_.set_log_shader_lookups(REXCVAR_GET(native_renderer_log_shader_lookups));
-    passes_.set_cache_shader_lookups(REXCVAR_GET(native_renderer_cache_shader_lookups));
-    passes_.set_reuse_texture_sets(REXCVAR_GET(native_renderer_reuse_texture_sets));
-    passes_.set_log_glow(REXCVAR_GET(native_renderer_log_glow));
-    passes_.set_cache_index_ranges(REXCVAR_GET(native_renderer_cache_index_ranges));
-    passes_.set_verify_mirror(REXCVAR_GET(native_renderer_verify_mirror));
-    passes_.set_check_late_writes(REXCVAR_GET(native_renderer_check_late_writes));
-    passes_.set_check_clobbers(REXCVAR_GET(native_renderer_check_clobbers));
+    passes_.set_check_mirror_frames(ITC_FLAG(native_renderer_check_mirror));
+    passes_.set_copy_all(ITC_FLAG(native_renderer_copy_all));
+    passes_.set_skip_repeated_state(ITC_FLAG(native_renderer_skip_repeated_state));
+    passes_.set_reuse_constants(ITC_FLAG(native_renderer_reuse_constants));
+    passes_.set_log_constant_changes(ITC_FLAG(native_renderer_log_constant_changes));
+    passes_.set_log_register_reads(ITC_FLAG(native_renderer_log_register_reads));
+    passes_.set_log_index_ranges(ITC_FLAG(native_renderer_log_index_ranges));
+    passes_.set_log_texture_bindings(ITC_FLAG(native_renderer_log_texture_bindings));
+    passes_.set_log_shader_lookups(ITC_FLAG(native_renderer_log_shader_lookups));
+    passes_.set_cache_shader_lookups(ITC_FLAG(native_renderer_cache_shader_lookups));
+    passes_.set_reuse_texture_sets(ITC_FLAG(native_renderer_reuse_texture_sets));
+    passes_.set_log_glow(ITC_FLAG(native_renderer_log_glow));
+    passes_.set_cache_index_ranges(ITC_FLAG(native_renderer_cache_index_ranges));
+    passes_.set_verify_mirror(ITC_FLAG(native_renderer_verify_mirror));
+    passes_.set_check_late_writes(ITC_FLAG(native_renderer_check_late_writes));
+    passes_.set_check_clobbers(ITC_FLAG(native_renderer_check_clobbers));
     passes_.set_watch_draws(
-        REXCVAR_GET(native_renderer_watch_draws),
-        std::strtoull(REXCVAR_GET(native_renderer_watch_pixel_shader).c_str(), nullptr, 16));
-    passes_.set_hide_cubes(REXCVAR_GET(native_renderer_hide_cubes));
-    passes_.set_no_index_clamp(REXCVAR_GET(native_renderer_no_index_clamp));
-    passes_.set_base_level_only(REXCVAR_GET(native_renderer_base_level_only));
-    passes_.set_verify_textures(REXCVAR_GET(native_renderer_verify_textures));
+        ITC_FLAG(native_renderer_watch_draws),
+        std::strtoull(ITC_FLAG(native_renderer_watch_pixel_shader).c_str(), nullptr, 16));
+    passes_.set_hide_cubes(ITC_FLAG(native_renderer_hide_cubes));
+    passes_.set_no_index_clamp(ITC_FLAG(native_renderer_no_index_clamp));
+    passes_.set_base_level_only(ITC_FLAG(native_renderer_base_level_only));
+    passes_.set_verify_textures(ITC_FLAG(native_renderer_verify_textures));
     recording_ = true;
   }
   return frame.commands;
@@ -799,14 +799,14 @@ void Renderer::EndFrame() {
   bool cycle_capture = !cycle_steps_.empty() && !cycle_captured_ &&
                        Clock::now() - cycle_step_start_ >= std::chrono::seconds(2);
   VkExtent2D source =
-      dump ? passes_.EndFrame(commands, REXCVAR_GET(native_renderer_show_resolve), true,
+      dump ? passes_.EndFrame(commands, ITC_FLAG(native_renderer_show_resolve), true,
                               dump_step_ ? dump_steps_[dump_step_ - 1].name : "shown",
-                              dump_step_ == 0 && REXCVAR_GET(native_renderer_dump_every) <= 0)
+                              dump_step_ == 0 && ITC_FLAG(native_renderer_dump_every) <= 0)
       : cycle_capture
-          ? passes_.EndFrame(commands, REXCVAR_GET(native_renderer_show_resolve), true,
+          ? passes_.EndFrame(commands, ITC_FLAG(native_renderer_show_resolve), true,
                              fmt::format("{:02}_{}", cycle_step_, cycle_steps_[cycle_step_].name),
                              false)
-          : passes_.EndFrame(commands, REXCVAR_GET(native_renderer_show_resolve), false);
+          : passes_.EndFrame(commands, ITC_FLAG(native_renderer_show_resolve), false);
   Frame& frame = frames_[frame_index_];
 
   // Copy what's shown onto a swapchain image, if one can be had now.
@@ -824,7 +824,7 @@ void Renderer::EndFrame() {
     } else if (result == VK_ERROR_OUT_OF_DATE_KHR) {
       swapchain_stale_ = true;
     } else if (result != VK_TIMEOUT && result != VK_NOT_READY) {
-      REXLOG_ERROR("native renderer: vkAcquireNextImageKHR: {}", int(result));
+      ITC_LOG_ERROR("native renderer: vkAcquireNextImageKHR: {}", int(result));
     }
   }
   if (acquired) {
@@ -890,7 +890,7 @@ void Renderer::EndFrame() {
   command_buffers[submit.commandBufferCount++] = commands;
   submit.pCommandBuffers = command_buffers;
   if (VkResult result = vk::vkQueueSubmit(queue_, 1, &submit, frame.done); result != VK_SUCCESS) {
-    REXLOG_ERROR("native renderer: vkQueueSubmit: {}", int(result));
+    ITC_LOG_ERROR("native renderer: vkQueueSubmit: {}", int(result));
   }
   if (acquired) {
     VkPresentInfoKHR present{VK_STRUCTURE_TYPE_PRESENT_INFO_KHR};
@@ -910,7 +910,7 @@ void Renderer::EndFrame() {
     if (auto ms = std::chrono::duration<double, std::milli>(now - last_present_).count();
         ms >= 40 && frames_presented_ > 1) {
       const FrameCosts& c = g_frame_costs;
-      REXLOG_INFO(
+      ITC_LOG_INFO(
           "native renderer: long frame: {:.0f} ms since the last present ({} draws): "
           "{} textures loaded ({:.1f} MB) in {:.1f} ms (hashing {:.1f} ms), {} shaders "
           "translated in {:.1f} ms, {} pipelines made in {:.1f} ms",
@@ -939,13 +939,13 @@ void Renderer::EndFrame() {
     if (cycle_step_ >= cycle_steps_.size()) {
       cycle_steps_.clear();
       passes_.set_skip_pixel_shader(0);
-      REXLOG_INFO("native renderer: cycle done");
+      ITC_LOG_INFO("native renderer: cycle done");
     }
   }
   if (dump) {
     vk::vkQueueWaitIdle(queue_);
     passes_.WriteDump(dump_directory_);
-    if (dump_step_ == 0 && REXCVAR_GET(native_renderer_dump_every) <= 0) {
+    if (dump_step_ == 0 && ITC_FLAG(native_renderer_dump_every) <= 0) {
       // Each pixel shader the main view was drawn with, left out; then all
       // textures from memory, and all resolve destinations, hidden.
       using Hide = TextureCache::Hide;
@@ -975,7 +975,7 @@ void Renderer::LogStats() {
   if (now - last_log_ < std::chrono::seconds(5)) {
     return;
   }
-  if (!InfoLogEnabled()) {
+  if (!base::InfoLogEnabled()) {
     // Nothing would be printed: leave the counters to run on.
     last_log_ = now;
     return;
@@ -983,16 +983,16 @@ void Renderer::LogStats() {
   double seconds = std::chrono::duration<double>(now - last_log_).count();
   uint64_t frames = std::max<uint64_t>(frames_presented_ + frames_skipped_, 1);
   Passes::Stats view = passes_.TakeStats();
-  REXLOG_INFO("native renderer: {:.0f} frames/s presented, {} skipped; per frame {:.0f} "
-              "commands, {:.0f} draws; {:.0f} drawn, {:.0f} unsupported, {:.0f} failed; {:.1f} "
-              "MB copied a frame ({:.1f} MB unchanged, not copied); {} pipelines; shaders "
-              "translated {}, failed {}, from the disk cache {}",
-              frames_presented_ / seconds, frames_skipped_, double(commands_) / frames,
-              double(draws_) / frames, double(view.drawn) / frames,
-              double(view.unsupported) / frames, double(view.failed) / frames,
-              view.mirrored_bytes / 1048576.0 / frames,
-              view.mirror_skipped_bytes / 1048576.0 / frames, view.pipelines,
-              view.shaders_translated, view.shaders_failed, view.shaders_from_disk);
+  ITC_LOG_INFO("native renderer: {:.0f} frames/s presented, {} skipped; per frame {:.0f} "
+               "commands, {:.0f} draws; {:.0f} drawn, {:.0f} unsupported, {:.0f} failed; {:.1f} "
+               "MB copied a frame ({:.1f} MB unchanged, not copied); {} pipelines; shaders "
+               "translated {}, failed {}, from the disk cache {}",
+               frames_presented_ / seconds, frames_skipped_, double(commands_) / frames,
+               double(draws_) / frames, double(view.drawn) / frames,
+               double(view.unsupported) / frames, double(view.failed) / frames,
+               view.mirrored_bytes / 1048576.0 / frames,
+               view.mirror_skipped_bytes / 1048576.0 / frames, view.pipelines,
+               view.shaders_translated, view.shaders_failed, view.shaders_from_disk);
   if (view.failed) {
     static constexpr const char* kFailedDrawReasons[] = {
         "no target", "no vertex shader", "shader translation", "no index buffer",
@@ -1005,191 +1005,191 @@ void Renderer::LogStats() {
                                double(view.failed_by[i]) / frames);
       }
     }
-    REXLOG_INFO("native renderer: failed draws a frame by reason:{}", reasons);
+    ITC_LOG_INFO("native renderer: failed draws a frame by reason:{}", reasons);
   }
-  if (REXCVAR_GET(log_gpu_memory)) {
-    REXLOG_INFO("native renderer: GPU memory: {}", gpu_memory::Describe());
+  if (ITC_FLAG(log_gpu_memory)) {
+    ITC_LOG_INFO("native renderer: GPU memory: {}", gpu_memory::Describe());
   }
   if (std::string by_tick = passes_.TakeMirrorByTick(); !by_tick.empty()) {
     uint64_t missing, most;
     Renderer_TakeListStats(missing, most);
-    REXLOG_INFO("native renderer: mirror by tick: {}; lists replayed without a hand-over {}, "
-                "most waiting {}",
-                by_tick, missing, most);
+    ITC_LOG_INFO("native renderer: mirror by tick: {}; lists replayed without a hand-over {}, "
+                 "most waiting {}",
+                 by_tick, missing, most);
   }
-  if (REXCVAR_GET(native_renderer_verify_mirror)) {
-    REXLOG_INFO("native renderer: mirror check: of {} ranges not copied and checked, {} "
-                "differed from guest memory ({:.1f} MB){}",
-                view.mirror_checked, view.mirror_stale, view.mirror_stale_bytes / 1048576.0,
-                view.mirror_stale ? fmt::format(", e.g. {} {:08X} ({} bytes)",
+  if (ITC_FLAG(native_renderer_verify_mirror)) {
+    ITC_LOG_INFO("native renderer: mirror check: of {} ranges not copied and checked, {} "
+                 "differed from guest memory ({:.1f} MB){}",
+                 view.mirror_checked, view.mirror_stale, view.mirror_stale_bytes / 1048576.0,
+                 view.mirror_stale ? fmt::format(", e.g. {} {:08X} ({} bytes)",
                                                 view.mirror_stale_sample_index ? "index" : "vertex",
                                                 view.mirror_stale_sample_address,
                                                 view.mirror_stale_sample_size)
                                   : std::string());
   }
-  REXLOG_INFO("native renderer: {} targets; per frame {:.1f} clears ({:.1f} with rects), {:.1f} "
-              "resolves, {:.1f} skipped; {:.1f} draws with targets 1-3 bound, {:.1f} with "
-              "mismatched sample counts, {:.1f} with a depth bias, {:.1f} with an equal depth "
-              "test; {} resolves with unknown flags (e.g. {:08X}); {} tilings, {} tiled resolves",
-              view.targets, double(view.clears) / frames, double(view.clear_rects) / frames,
-              double(view.resolves) / frames, double(view.resolves_skipped) / frames,
-              double(view.extra_targets) / frames, double(view.mismatched_samples) / frames,
-              double(view.depth_biased) / frames, double(view.depth_equal) / frames,
-              view.resolve_unknown_flags, view.resolve_flags_sample, view.tilings,
-              view.tiled_resolves);
+  ITC_LOG_INFO("native renderer: {} targets; per frame {:.1f} clears ({:.1f} with rects), {:.1f} "
+               "resolves, {:.1f} skipped; {:.1f} draws with targets 1-3 bound, {:.1f} with "
+               "mismatched sample counts, {:.1f} with a depth bias, {:.1f} with an equal depth "
+               "test; {} resolves with unknown flags (e.g. {:08X}); {} tilings, {} tiled resolves",
+               view.targets, double(view.clears) / frames, double(view.clear_rects) / frames,
+               double(view.resolves) / frames, double(view.resolves_skipped) / frames,
+               double(view.extra_targets) / frames, double(view.mismatched_samples) / frames,
+               double(view.depth_biased) / frames, double(view.depth_equal) / frames,
+               view.resolve_unknown_flags, view.resolve_flags_sample, view.tilings,
+               view.tiled_resolves);
   frames_presented_ = frames_skipped_ = commands_ = draws_ = 0;
   const TextureCache::Stats& t = view.textures;
-  REXLOG_INFO("native renderer: textures: {} ({} samplers); {} loaded, {} reloaded, {:.1f} MB "
-              "(loading and hashing {:.1f} ms, at most {:.1f} ms a frame); "
-              "{} deferred (staging full), {} unsupported (e.g. format {} dimension {}), {} "
-              "of another dimension than declared; {:.0f} lookups a frame got a resolve "
-              "destination ({:.0f} of another size or format)",
-              t.textures, t.samplers, t.loaded, t.reloaded, t.loaded_bytes / 1048576.0,
-              texture_ns_ / 1e6, texture_ns_max_ / 1e6,
-              t.deferred, t.unsupported,
-              t.unsupported_sample == UINT32_MAX ? -1 : int(t.unsupported_sample >> 8),
-              t.unsupported_sample == UINT32_MAX ? -1 : int(t.unsupported_sample & 0xFF),
-              t.mismatched, double(t.resolved_hits) / frames,
-              double(t.resolved_mismatched) / frames);
+  ITC_LOG_INFO("native renderer: textures: {} ({} samplers); {} loaded, {} reloaded, {:.1f} MB "
+               "(loading and hashing {:.1f} ms, at most {:.1f} ms a frame); "
+               "{} deferred (staging full), {} unsupported (e.g. format {} dimension {}), {} "
+               "of another dimension than declared; {:.0f} lookups a frame got a resolve "
+               "destination ({:.0f} of another size or format)",
+               t.textures, t.samplers, t.loaded, t.reloaded, t.loaded_bytes / 1048576.0,
+               texture_ns_ / 1e6, texture_ns_max_ / 1e6,
+               t.deferred, t.unsupported,
+               t.unsupported_sample == UINT32_MAX ? -1 : int(t.unsupported_sample >> 8),
+               t.unsupported_sample == UINT32_MAX ? -1 : int(t.unsupported_sample & 0xFF),
+               t.mismatched, double(t.resolved_hits) / frames,
+               double(t.resolved_mismatched) / frames);
   texture_ns_ = texture_ns_max_ = 0;
-  REXLOG_INFO("native renderer: textures: {} memcpy writes, {} textures marked written ({:.1f} "
-              "ms marking)",
-              t.writes, t.marked, mark_ns_ / 1e6);
+  ITC_LOG_INFO("native renderer: textures: {} memcpy writes, {} textures marked written ({:.1f} "
+               "ms marking)",
+               t.writes, t.marked, mark_ns_ / 1e6);
   mark_ns_ = 0;
   if (t.unrecorded) {
-    REXLOG_INFO("native renderer: {} textures changed in memory with no write recorded, e.g. "
-                "{:08X}, {} frames after it was first loaded",
-                t.unrecorded, t.unrecorded_sample, t.unrecorded_frames);
+    ITC_LOG_INFO("native renderer: {} textures changed in memory with no write recorded, e.g. "
+                 "{:08X}, {} frames after it was first loaded",
+                 t.unrecorded, t.unrecorded_sample, t.unrecorded_frames);
   }
   if (t.mismatched_sample != UINT32_MAX) {
-    REXLOG_INFO("native renderer: e.g. a texture of format {}, dimension {}, {}x{} where the "
-                "shader declares view type {}",
-                (t.mismatched_sample >> 8) & 0xFF, t.mismatched_sample & 0xFF, t.mismatched_width,
-                t.mismatched_height, t.mismatched_sample >> 16);
+    ITC_LOG_INFO("native renderer: e.g. a texture of format {}, dimension {}, {}x{} where the "
+                 "shader declares view type {}",
+                 (t.mismatched_sample >> 8) & 0xFF, t.mismatched_sample & 0xFF, t.mismatched_width,
+                 t.mismatched_height, t.mismatched_sample >> 16);
   }
-  REXLOG_INFO("native renderer: {:.1f} draws a frame with PsParamGen;{}",
-              double(view.param_gen_draws) / frames, passes_.TakeInterfaces());
+  ITC_LOG_INFO("native renderer: {:.1f} draws a frame with PsParamGen;{}",
+               double(view.param_gen_draws) / frames, passes_.TakeInterfaces());
   if (view.clamped_draws) {
     const auto& c = view.clamped_sample;
-    REXLOG_INFO("native renderer: {:.1f} draws a frame have indices outside VGT_MIN/MAX_VTX_INDX, "
-                "e.g. {}-{} against {}-{}",
-                double(view.clamped_draws) / frames, c[0], c[1], c[2], c[3]);
+    ITC_LOG_INFO("native renderer: {:.1f} draws a frame have indices outside VGT_MIN/MAX_VTX_INDX, "
+                 "e.g. {}-{} against {}-{}",
+                 double(view.clamped_draws) / frames, c[0], c[1], c[2], c[3]);
   }
   if (view.inline_draws) {
     const auto& t = view.inline_by_type;
-    REXLOG_INFO("native renderer: {:.1f} inline vertex draws a frame (triangle lists {:.1f}, "
-                "strips {:.1f}, rectangle lists {:.1f}, quad lists {:.1f})",
-                double(view.inline_draws) / frames, double(t[4]) / frames, double(t[6]) / frames,
-                double(t[8]) / frames, double(t[13]) / frames);
+    ITC_LOG_INFO("native renderer: {:.1f} inline vertex draws a frame (triangle lists {:.1f}, "
+                 "strips {:.1f}, rectangle lists {:.1f}, quad lists {:.1f})",
+                 double(view.inline_draws) / frames, double(t[4]) / frames, double(t[6]) / frames,
+                 double(t[8]) / frames, double(t[13]) / frames);
   }
   if (view.state_compared) {
     const auto& r = view.state_repeated;
     auto share = [&](uint64_t n) { return 100.0 * double(n) / double(view.state_compared); };
-    REXLOG_INFO("native renderer: of {:.1f} draws a frame following another draw, repeating its "
-                "viewport {:.0f}%, scissor {:.0f}%, depth bias {:.0f}%, blend constants {:.0f}%, "
-                "pipeline {:.0f}%, descriptor sets {:.0f}% (with offsets {:.0f}%), index buffer "
-                "binding {:.0f}% (buffer and type {:.0f}%)",
-                double(view.state_compared) / frames, share(r[0]), share(r[1]), share(r[2]),
-                share(r[3]), share(r[4]), share(r[5]), share(r[8]), share(r[6]), share(r[7]));
+    ITC_LOG_INFO("native renderer: of {:.1f} draws a frame following another draw, repeating its "
+                 "viewport {:.0f}%, scissor {:.0f}%, depth bias {:.0f}%, blend constants {:.0f}%, "
+                 "pipeline {:.0f}%, descriptor sets {:.0f}% (with offsets {:.0f}%), index buffer "
+                 "binding {:.0f}% (buffer and type {:.0f}%)",
+                 double(view.state_compared) / frames, share(r[0]), share(r[1]), share(r[2]),
+                 share(r[3]), share(r[4]), share(r[5]), share(r[8]), share(r[6]), share(r[7]));
     const auto& o = view.offset_differs;
     if (view.offsets_differ) {
-      REXLOG_INFO("native renderer: descriptor sets repeated with other offsets for {:.0f}% of "
-                  "draws: system {:.0f}%, vertex floats {:.0f}%, pixel floats {:.0f}%, "
-                  "bool/loop {:.0f}%, fetch {:.0f}% (fetch alone {:.0f}%)",
-                  share(view.offsets_differ), share(o[0]), share(o[1]), share(o[2]),
-                  share(o[3]), share(o[4]), share(view.only_fetch_offset_differs));
+      ITC_LOG_INFO("native renderer: descriptor sets repeated with other offsets for {:.0f}% of "
+                   "draws: system {:.0f}%, vertex floats {:.0f}%, pixel floats {:.0f}%, "
+                   "bool/loop {:.0f}%, fetch {:.0f}% (fetch alone {:.0f}%)",
+                   share(view.offsets_differ), share(o[0]), share(o[1]), share(o[2]),
+                   share(o[3]), share(o[4]), share(view.only_fetch_offset_differs));
     }
   }
   if (const RegisterReadStats& r = view.register_reads; r.calls) {
     auto share = [&](uint64_t n) { return 100.0 * double(n) / double(r.calls); };
     const auto& b = r.blocks_changed;
-    REXLOG_INFO("native renderer: register reads: {:.1f} a frame, of {:.0f} words a frame {:.0f} "
-                "copied (dirty), {:.1f} changed; {:.0f}% changed anything; changed by block: "
-                "2000 {:.0f}%, 2100 {:.0f}%, 2180 {:.0f}%, 2200 {:.0f}%, 2280 {:.0f}%, 2300 "
-                "{:.0f}%, 2380 {:.0f}%, fetch {:.0f}%, bool {:.0f}%, loop {:.0f}%",
-                double(r.calls) / frames, double(r.words) / frames,
-                double(r.words_copied) / frames, double(r.words_changed) / frames,
-                share(r.calls_changed), share(b[0]), share(b[1]), share(b[2]), share(b[3]),
-                share(b[4]), share(b[5]), share(b[6]), share(b[7]), share(b[8]), share(b[9]));
+    ITC_LOG_INFO("native renderer: register reads: {:.1f} a frame, of {:.0f} words a frame {:.0f} "
+                 "copied (dirty), {:.1f} changed; {:.0f}% changed anything; changed by block: "
+                 "2000 {:.0f}%, 2100 {:.0f}%, 2180 {:.0f}%, 2200 {:.0f}%, 2280 {:.0f}%, 2300 "
+                 "{:.0f}%, 2380 {:.0f}%, fetch {:.0f}%, bool {:.0f}%, loop {:.0f}%",
+                 double(r.calls) / frames, double(r.words) / frames,
+                 double(r.words_copied) / frames, double(r.words_changed) / frames,
+                 share(r.calls_changed), share(b[0]), share(b[1]), share(b[2]), share(b[3]),
+                 share(b[4]), share(b[5]), share(b[6]), share(b[7]), share(b[8]), share(b[9]));
   }
   if (view.constants_draws) {
     const auto& r = view.constants_reused;
     auto share = [&](uint64_t n) { return 100.0 * double(n) / double(view.constants_draws); };
-    REXLOG_INFO("native renderer: of {:.1f} draws a frame given constants, reusing the last "
-                "written system {:.0f}%, vertex floats {:.0f}%, pixel floats {:.0f}%, bool/loop "
-                "{:.0f}%, fetch {:.0f}%; {:.0f} KB written a frame",
-                double(view.constants_draws) / frames, share(r[0]), share(r[1]), share(r[2]),
-                share(r[3]), share(r[4]), double(view.constant_bytes) / frames / 1024);
+    ITC_LOG_INFO("native renderer: of {:.1f} draws a frame given constants, reusing the last "
+                 "written system {:.0f}%, vertex floats {:.0f}%, pixel floats {:.0f}%, bool/loop "
+                 "{:.0f}%, fetch {:.0f}%; {:.0f} KB written a frame",
+                 double(view.constants_draws) / frames, share(r[0]), share(r[1]), share(r[2]),
+                 share(r[3]), share(r[4]), double(view.constant_bytes) / frames / 1024);
     if (view.fetch_changed) {
-      REXLOG_INFO("native renderer: fetch block differed from the last written for {:.0f}% of "
-                  "draws: in a texture fetch constant read {:.0f}%, a vertex fetch constant "
-                  "read {:.0f}% (address only {:.0f}%), only in unread ones {:.0f}%",
-                  share(view.fetch_changed), share(view.fetch_changed_texture),
-                  share(view.fetch_changed_vertex), share(view.fetch_changed_vertex_address),
-                  share(view.fetch_changed_unread));
+      ITC_LOG_INFO("native renderer: fetch block differed from the last written for {:.0f}% of "
+                   "draws: in a texture fetch constant read {:.0f}%, a vertex fetch constant "
+                   "read {:.0f}% (address only {:.0f}%), only in unread ones {:.0f}%",
+                   share(view.fetch_changed), share(view.fetch_changed_texture),
+                   share(view.fetch_changed_vertex), share(view.fetch_changed_vertex_address),
+                   share(view.fetch_changed_unread));
     }
   }
   if (view.vertex_shader_copies) {
-    REXLOG_INFO("native renderer: {:.1f} draws a frame got their vertex shader from the library's "
-                "patched copy in the command buffer",
-                double(view.vertex_shader_copies) / frames);
+    ITC_LOG_INFO("native renderer: {:.1f} draws a frame got their vertex shader from the library's "
+                 "patched copy in the command buffer",
+                 double(view.vertex_shader_copies) / frames);
   }
   if (view.declaration_mismatches) {
-    REXLOG_INFO("native renderer: {:.1f} draws a frame had a vertex shader patched for another "
-                "vertex declaration than the bound one ({:.1f} patched in their library call), "
-                "e.g. {} (bound {})",
-                double(view.declaration_mismatches) / frames,
-                double(view.declaration_mismatches_patched) / frames, view.declaration_sample[0],
-                view.declaration_sample[1]);
+    ITC_LOG_INFO("native renderer: {:.1f} draws a frame had a vertex shader patched for another "
+                 "vertex declaration than the bound one ({:.1f} patched in their library call), "
+                 "e.g. {} (bound {})",
+                 double(view.declaration_mismatches) / frames,
+                 double(view.declaration_mismatches_patched) / frames, view.declaration_sample[0],
+                 view.declaration_sample[1]);
   }
   for (const std::string& line : passes_.TakeDeclarationLines()) {
-    REXLOG_INFO("native renderer: declaration mismatch: {}", line);
+    ITC_LOG_INFO("native renderer: declaration mismatch: {}", line);
   }
   if (view.base_vertex_differs) {
-    REXLOG_INFO("native renderer: {:.1f} draws a frame have a base vertex in their item other "
-                "than VGT_INDX_OFFSET, e.g. {} and {}",
-                double(view.base_vertex_differs) / frames, int32_t(view.base_vertex_sample[0]),
-                int32_t(view.base_vertex_sample[1]));
+    ITC_LOG_INFO("native renderer: {:.1f} draws a frame have a base vertex in their item other "
+                 "than VGT_INDX_OFFSET, e.g. {} and {}",
+                 double(view.base_vertex_differs) / frames, int32_t(view.base_vertex_sample[0]),
+                 int32_t(view.base_vertex_sample[1]));
   }
   if (view.vertex_overruns) {
     const auto& v = view.vertex_overrun_sample;
-    REXLOG_INFO("native renderer: {:.1f} draws a frame read vertices past their fetch "
-                "constant's size, e.g. {:08X}: {} bytes, {} needed (vertex {}, stride {} words)",
-                double(view.vertex_overruns) / frames, v[0], v[1], v[2], v[3], v[4]);
+    ITC_LOG_INFO("native renderer: {:.1f} draws a frame read vertices past their fetch "
+                 "constant's size, e.g. {:08X}: {} bytes, {} needed (vertex {}, stride {} words)",
+                 double(view.vertex_overruns) / frames, v[0], v[1], v[2], v[3], v[4]);
   }
-  if (REXCVAR_GET(native_renderer_watch_draws)) {
+  if (ITC_FLAG(native_renderer_watch_draws)) {
     uint64_t changes, watched;
     std::vector<std::string> lines = passes_.TakeWatchLines(changes, watched);
-    REXLOG_INFO("native renderer: {} of {} main view draws changed inputs since the previous "
-                "frame", changes, watched);
+    ITC_LOG_INFO("native renderer: {} of {} main view draws changed inputs since the previous "
+                 "frame", changes, watched);
     for (const std::string& line : lines) {
-      REXLOG_INFO("native renderer: changed: {}", line);
+      ITC_LOG_INFO("native renderer: changed: {}", line);
     }
   }
-  if (REXCVAR_GET(native_renderer_check_clobbers)) {
-    REXLOG_INFO("native renderer: {}", passes_.TakeClobbers());
+  if (ITC_FLAG(native_renderer_check_clobbers)) {
+    ITC_LOG_INFO("native renderer: {}", passes_.TakeClobbers());
   }
-  if (REXCVAR_GET(native_renderer_check_late_writes)) {
-    REXLOG_INFO("native renderer: {}", passes_.TakeLateWrites());
+  if (ITC_FLAG(native_renderer_check_late_writes)) {
+    ITC_LOG_INFO("native renderer: {}", passes_.TakeLateWrites());
   }
-  if (REXCVAR_GET(native_renderer_check_mirror)) {
-    REXLOG_INFO("native renderer: between frames, {}", passes_.TakeMirrorChanges());
+  if (ITC_FLAG(native_renderer_check_mirror)) {
+    ITC_LOG_INFO("native renderer: between frames, {}", passes_.TakeMirrorChanges());
   }
-  if (REXCVAR_GET(native_renderer_log_index_ranges)) {
-    REXLOG_INFO("native renderer: {}", passes_.TakeIndexRanges());
+  if (ITC_FLAG(native_renderer_log_index_ranges)) {
+    ITC_LOG_INFO("native renderer: {}", passes_.TakeIndexRanges());
   }
-  if (REXCVAR_GET(native_renderer_log_texture_bindings)) {
-    REXLOG_INFO("native renderer: {}", passes_.TakeTextureBindings());
+  if (ITC_FLAG(native_renderer_log_texture_bindings)) {
+    ITC_LOG_INFO("native renderer: {}", passes_.TakeTextureBindings());
   }
-  if (REXCVAR_GET(native_renderer_log_shader_lookups)) {
-    REXLOG_INFO("native renderer: {}", passes_.TakeShaderLookups());
+  if (ITC_FLAG(native_renderer_log_shader_lookups)) {
+    ITC_LOG_INFO("native renderer: {}", passes_.TakeShaderLookups());
   }
   if (view.invisible) {
     const auto& v = view.invisible_sample;
-    REXLOG_INFO("native renderer: {:.0f} draws a frame skipped as invisible, e.g. "
-                "viewport {},{} {}x{}, scissor {},{} {}x{}",
-                double(view.invisible) / frames, v[0] & 0x7FFFFFFF, v[1], v[2], v[3], v[4], v[5],
-                v[6], v[7]);
+    ITC_LOG_INFO("native renderer: {:.0f} draws a frame skipped as invisible, e.g. "
+                 "viewport {},{} {}x{}, scissor {},{} {}x{}",
+                 double(view.invisible) / frames, v[0] & 0x7FFFFFFF, v[1], v[2], v[3], v[4], v[5],
+                 v[6], v[7]);
   }
   last_log_ = now;
 }
@@ -1206,7 +1206,7 @@ uint8_t* g_base = nullptr;
 [[gnu::noinline]] void StartRenderer() {
   g_renderer = new Renderer();
   if (!g_base || !g_renderer->Init(g_base)) {
-    REXLOG_ERROR("native renderer: couldn't start; continuing without it");
+    ITC_LOG_ERROR("native renderer: couldn't start; continuing without it");
     g_failed = true;
     g_renderer = nullptr;  // leaked: may hold objects already made
   }

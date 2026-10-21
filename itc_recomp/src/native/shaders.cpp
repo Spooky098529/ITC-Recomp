@@ -9,8 +9,9 @@
 #include <unordered_map>
 #include <rex/graphics/pipeline/shader/spirv.h>
 #include <rex/graphics/pipeline/shader/spirv_translator.h>
-#include <rex/hash.h>
-#include <rex/logging.h>
+#include "base/flags.h"
+#include "base/hash.h"
+#include "base/log.h"
 #include <rex/string/buffer.h>
 
 // The translator reads this GPU setting, which the emulated GPU's plugin
@@ -21,9 +22,9 @@ std::string& FLAGS_dump_shaders_storage_() {
   return dump_shaders;
 }
 
-REXCVAR_DEFINE_STRING(native_renderer_log_shader_ucode, "", "ITC",
-                      "Log the microcode disassembly of this shader (hash in hex) when first "
-                      "used (a debugging aid)");
+ITC_FLAG_STRING(native_renderer_log_shader_ucode, "", "ITC",
+                "Log the microcode disassembly of this shader (hash in hex) when first "
+                "used (a debugging aid)");
 
 namespace native {
 
@@ -258,7 +259,7 @@ struct ShaderCache::State {
     if (std::fwrite(head, sizeof(head), 1, disk) != 1 ||
         std::fwrite(record.bytes.data(), record.bytes.size(), 1, disk) != 1 ||
         std::fflush(disk) != 0) {
-      REXLOG_WARN("native renderer: shader disk cache: write failed; not writing more");
+      ITC_LOG_WARN("native renderer: shader disk cache: write failed; not writing more");
       std::fclose(disk);
       disk = nullptr;
     }
@@ -291,19 +292,19 @@ struct ShaderCache::State {
         }
         return n;
       };
-      REXLOG_INFO("native renderer: analyzed {} shader {:016X}: memexport eM {:02X}, {} stream "
-                  "constants; fetches: {} unnormalized, {} getWeights, {} with offsets",
-                  stage == ShaderStage::kVertex ? "vertex" : "pixel", hash,
-                  shader->memexport_eM_written(), shader->memexport_stream_constants().size(),
-                  count("UnnormalizedTextureCoords=true"), count("getWeights"),
-                  count("OffsetX=") + count("OffsetY="));
+      ITC_LOG_INFO("native renderer: analyzed {} shader {:016X}: memexport eM {:02X}, {} stream "
+                   "constants; fetches: {} unnormalized, {} getWeights, {} with offsets",
+                   stage == ShaderStage::kVertex ? "vertex" : "pixel", hash,
+                   shader->memexport_eM_written(), shader->memexport_stream_constants().size(),
+                   count("UnnormalizedTextureCoords=true"), count("getWeights"),
+                   count("OffsetX=") + count("OffsetY="));
     }
     return shader.get();
   }
 };
 
 uint64_t MicrocodeHash(const uint8_t* ucode, uint32_t size_bytes) {
-  return XXH3_64bits(ucode, size_bytes);
+  return base::Hash64(ucode, size_bytes);
 }
 
 void ShaderCache::OpenDiskCache(const std::filesystem::path& file) {
@@ -373,11 +374,11 @@ void ShaderCache::OpenDiskCache(const std::filesystem::path& file) {
     s.disk = error ? nullptr : OpenFile(file, "ab");
   }
   if (!s.disk) {
-    REXLOG_WARN("native renderer: shader disk cache: can't write {}", file.string());
+    ITC_LOG_WARN("native renderer: shader disk cache: can't write {}", file.string());
   }
-  REXLOG_INFO("native renderer: shader disk cache {}: {} translations and {} interfaces loaded{}",
-              file.string(), translations, interfaces,
-              keep == 0 && !data.empty() ? " (old or other device's file replaced)" : "");
+  ITC_LOG_INFO("native renderer: shader disk cache {}: {} translations and {} interfaces loaded{}",
+               file.string(), translations, interfaces,
+               keep == 0 && !data.empty() ? " (old or other device's file replaced)" : "");
 }
 
 ShaderCache::ShaderCache(const ShaderFeatures& features)
@@ -434,12 +435,12 @@ TranslatedShader* ShaderCache::Get(ShaderStage stage, const uint8_t* ucode, uint
   if (auto it = state_->translations.find(key); it != state_->translations.end()) {
     return it->second->spirv.empty() ? nullptr : it->second.get();
   }
-  if (const std::string& logged = REXCVAR_GET(native_renderer_log_shader_ucode);
+  if (const std::string& logged = ITC_FLAG(native_renderer_log_shader_ucode);
       !logged.empty() && std::strtoull(logged.c_str(), nullptr, 16) == hash &&
       !state_->ucode_logged) {
     state_->ucode_logged = true;
-    REXLOG_INFO("native renderer: shader {:016X}'s microcode:\n{}", hash,
-                state_->Analyzed(stage, ucode, size_bytes, hash)->ucode_disassembly());
+    ITC_LOG_INFO("native renderer: shader {:016X}'s microcode:\n{}", hash,
+                 state_->Analyzed(stage, ucode, size_bytes, hash)->ucode_disassembly());
   }
   // From an earlier session (disk_cache.h).
   if (auto it = state_->stored.find(key); it != state_->stored.end()) {
@@ -455,13 +456,13 @@ TranslatedShader* ShaderCache::Get(ShaderStage stage, const uint8_t* ucode, uint
       result = std::move(shader);
       return result.get();
     }
-    REXLOG_WARN("native renderer: shader disk cache: bad record for {:016X}; translating", hash);
+    ITC_LOG_WARN("native renderer: shader disk cache: bad record for {:016X}; translating", hash);
   }
   ScopedCost cost(g_frame_costs.shader_ns);
   g_frame_costs.shaders++;
   const char* stage_name = stage == ShaderStage::kVertex ? "vertex" : "pixel";
-  REXLOG_DEBUG("native renderer: translating {} shader {:016X}, {} bytes, num_reg {}",
-               stage_name, hash, size_bytes, num_reg);
+  ITC_LOG_DEBUG("native renderer: translating {} shader {:016X}, {} bytes, num_reg {}",
+                stage_name, hash, size_bytes, num_reg);
   auto& result = state_->translations[key];
   result = std::make_unique<TranslatedShader>();
   result->stage = stage;
@@ -493,14 +494,14 @@ TranslatedShader* ShaderCache::Get(ShaderStage stage, const uint8_t* ucode, uint
       shader->GetOrCreateTranslation(modification.value);
   if (!translation->is_translated() && !state_->translator.TranslateAnalyzedShader(*translation)) {
     failed_++;
-    REXLOG_ERROR("native renderer: couldn't translate {} shader {:016X}",
-                 stage == ShaderStage::kVertex ? "vertex" : "pixel", hash);
+    ITC_LOG_ERROR("native renderer: couldn't translate {} shader {:016X}",
+                  stage == ShaderStage::kVertex ? "vertex" : "pixel", hash);
     return nullptr;
   }
   if (!translation->is_valid()) {
     failed_++;
-    REXLOG_ERROR("native renderer: {} shader {:016X} is invalid",
-                 stage == ShaderStage::kVertex ? "vertex" : "pixel", hash);
+    ITC_LOG_ERROR("native renderer: {} shader {:016X} is invalid",
+                  stage == ShaderStage::kVertex ? "vertex" : "pixel", hash);
     return nullptr;
   }
   const std::vector<uint8_t>& binary = translation->translated_binary();
@@ -538,7 +539,7 @@ TranslatedShader* ShaderCache::Get(ShaderStage stage, const uint8_t* ucode, uint
   WriteTranslationKey(record, key);
   WriteTranslation(record, *result);
   state_->Append(kDiskTranslation, record);
-  REXLOG_DEBUG("native renderer: translated {} shader {:016X}: {} SPIR-V words", stage_name, hash,
+  ITC_LOG_DEBUG("native renderer: translated {} shader {:016X}: {} SPIR-V words", stage_name, hash,
               result->spirv.size());
   return result.get();
 }

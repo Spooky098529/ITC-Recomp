@@ -23,8 +23,8 @@
 #include "frame_pacing/game_messages.h"
 #include "guest.h"
 
-#include <rex/cvar.h>
-#include <rex/logging.h>
+#include "base/flags.h"
+#include "base/log.h"
 
 #include <algorithm>
 #include <array>
@@ -37,10 +37,10 @@
 #include <unordered_map>
 #include <vector>
 
-REXCVAR_DEFINE_BOOL(log_pause_movie, false, "ITC",
-                    "While paused, log the words the pause menu's movie update changes (and "
-                    "what changes them between updates), and the sub-menus' calls setting its "
-                    "nodes, by pass type");
+ITC_FLAG_BOOL(log_pause_movie, false, "ITC",
+              "While paused, log the words the pause menu's movie update changes (and "
+              "what changes them between updates), and the sub-menus' calls setting its "
+              "nodes, by pass type");
 
 namespace debug {
 
@@ -82,7 +82,7 @@ bool TakeLine(int& lines, std::chrono::steady_clock::time_point& last, int max) 
 class PauseMovieLog {
  public:
   void Before(uint8_t* base, uint32_t movie, uint32_t r4, bool draw_only) {
-    active_ = REXCVAR_GET(log_pause_movie) && frame_pacing::GameMessages_Paused();
+    active_ = ITC_FLAG(log_pause_movie) && frame_pacing::GameMessages_Paused();
     if (!active_) {
       last_after_.clear();
       return;
@@ -153,8 +153,8 @@ class PauseMovieLog {
     ranges_.swap(merged);
     objects_.clear();
     if (!Readable(movie, kMovieBytes)) {
-      REXLOG_INFO("pause movie: tick {} movie {:08X} isn't readable ({} ranges)", Ticks(), movie,
-                  ranges_.size());
+      ITC_LOG_INFO("pause movie: tick {} movie {:08X} isn't readable ({} ranges)", Ticks(), movie,
+                   ranges_.size());
       return;
     }
     objects_.push_back({movie, kMovieBytes, 0});
@@ -187,8 +187,8 @@ class PauseMovieLog {
     for (const Object& o : objects_) {
       bytes += o.size;
     }
-    REXLOG_INFO("pause movie: tick {} movie {:08X}: watching {} objects, {} bytes", Ticks(),
-                movie, objects_.size(), bytes);
+    ITC_LOG_INFO("pause movie: tick {} movie {:08X}: watching {} objects, {} bytes", Ticks(),
+                 movie, objects_.size(), bytes);
   }
 
   void Snapshot(uint8_t* base, std::vector<uint8_t>& out) const {
@@ -226,7 +226,7 @@ class PauseMovieLog {
           bool quiet = busy_last_second_.count(address) == 0;
           if (busy.changes++ < kBusyChanges && quiet &&
               TakeLine(lines_, lines_since_, kMaxLines)) {
-            REXLOG_INFO(
+            ITC_LOG_INFO(
                 "pause movie change: movie {:08X} tick {} pass {} {} r4 {}{} {} {:08X} (object "
                 "{:08X} +{:X}, parent {:08X}): {:08X} -> {:08X} ({:g} -> {:g})",
                 movie_, Ticks(), frame_pacing::GameMessages_PassNumber(), PassType(), r4_,
@@ -250,7 +250,7 @@ class PauseMovieLog {
       }
       busy_last_second_[address] = true;
       if (lines++ < 40) {
-        REXLOG_INFO(
+        ITC_LOG_INFO(
             "pause movie busy: movie {:08X} {:08X}: {} changes (in update {} logic, {} render-only; "
             "between {}), {:08X} -> {:08X}",
             movie_, address, busy.changes, busy.logic, busy.render_only, busy.between, busy.first,
@@ -258,7 +258,7 @@ class PauseMovieLog {
       }
     }
     if (lines > 40) {
-      REXLOG_INFO("pause movie busy: {} more", lines - 40);
+      ITC_LOG_INFO("pause movie busy: {} more", lines - 40);
     }
     busy_.clear();
   }
@@ -295,10 +295,10 @@ void CountUpdate(uint32_t movie, uint32_t r4, uint32_t caller, bool draw_only) {
   g_updates_since = now;
   for (const auto& [key, n] : g_updates) {
     const auto& [m, mode, from, was_paused, render_only, made_draw_only] = key;
-    REXLOG_INFO("pause movie updates: tick {} movie {:08X} r4 {} from {:08X} {} {}{}: {}",
-                Ticks(), m, mode, from, was_paused ? "paused" : "running",
-                render_only ? "render-only" : "logic", made_draw_only ? " made draw-only" : "",
-                n);
+    ITC_LOG_INFO("pause movie updates: tick {} movie {:08X} r4 {} from {:08X} {} {}{}: {}",
+                 Ticks(), m, mode, from, was_paused ? "paused" : "running",
+                 render_only ? "render-only" : "logic", made_draw_only ? " made draw-only" : "",
+                 n);
   }
   g_updates.clear();
 }
@@ -321,22 +321,22 @@ void LogMovingTargets(uint8_t* base, uint32_t movie, const char* when) {
   for (uint32_t target : g_moving_targets) {
     line += fmt::format(" {:08X}={:g}", target, guest::LoadFloat(base, target));
   }
-  REXLOG_INFO("pause movie targets: tick {} pass {} {} movie {:08X} {}:{}", Ticks(),
-              frame_pacing::GameMessages_PassNumber(), PassType(), movie, when, line);
+  ITC_LOG_INFO("pause movie targets: tick {} pass {} {} movie {:08X} {}:{}", Ticks(),
+               frame_pacing::GameMessages_PassNumber(), PassType(), movie, when, line);
 }
 
 int g_call_lines = 0;
 std::chrono::steady_clock::time_point g_call_lines_since{};
 
 void LogCall(const char* name, PPCContext& ctx) {
-  if (REXCVAR_GET(log_pause_movie) && frame_pacing::GameMessages_Paused()) {
+  if (ITC_FLAG(log_pause_movie) && frame_pacing::GameMessages_Paused()) {
     g_trace_until_pass = frame_pacing::GameMessages_PassNumber() + kTracePasses;
   }
-  if (!REXCVAR_GET(log_pause_movie) || !frame_pacing::GameMessages_Paused() ||
+  if (!ITC_FLAG(log_pause_movie) || !frame_pacing::GameMessages_Paused() ||
       !TakeLine(g_call_lines, g_call_lines_since, kMaxCallLines)) {
     return;
   }
-  REXLOG_INFO(
+  ITC_LOG_INFO(
       "pause movie call: tick {} pass {} {} {} from {:08X}: r3 {:08X} r4 {:08X} r5 {:08X} "
       "r6 {:08X}",
       Ticks(), frame_pacing::GameMessages_PassNumber(), PassType(), name, uint32_t(ctx.lr),
@@ -347,7 +347,7 @@ void LogCall(const char* name, PPCContext& ctx) {
 
 void PauseMovieLog_Before(uint8_t* base, uint32_t movie, uint32_t r4, uint32_t caller) {
   constexpr bool draw_only = false;
-  if (!REXCVAR_GET(log_pause_movie)) {
+  if (!ITC_FLAG(log_pause_movie)) {
     return;
   }
   CountUpdate(movie, r4, caller, draw_only);
@@ -357,7 +357,7 @@ void PauseMovieLog_Before(uint8_t* base, uint32_t movie, uint32_t r4, uint32_t c
 
 void PauseMovieLog_After(uint8_t* base, uint32_t movie, uint32_t caller, const char* outcome,
                          int occurrence) {
-  if (!REXCVAR_GET(log_pause_movie)) {
+  if (!ITC_FLAG(log_pause_movie)) {
     return;
   }
   g_logs[movie].After(base);
@@ -367,7 +367,7 @@ void PauseMovieLog_After(uint8_t* base, uint32_t movie, uint32_t caller, const c
   uint64_t pass = frame_pacing::GameMessages_PassNumber();
   if (frame_pacing::GameMessages_Paused() && pass <= g_trace_until_pass &&
       TakeLine(g_call_lines, g_call_lines_since, kMaxCallLines)) {
-    REXLOG_INFO(
+    ITC_LOG_INFO(
         "pause movie update: tick {} pass {} {} movie {:08X} from {:08X} occurrence {} {}: "
         "clocks +9154 {:g} +96E0 {:g} +9708 {:g}",
         Ticks(), pass, PassType(), movie, caller, occurrence, outcome,
@@ -377,7 +377,7 @@ void PauseMovieLog_After(uint8_t* base, uint32_t movie, uint32_t caller, const c
 }
 
 bool PauseMovieLog_TracksWanted() {
-  return REXCVAR_GET(log_pause_movie) && frame_pacing::GameMessages_Paused() &&
+  return ITC_FLAG(log_pause_movie) && frame_pacing::GameMessages_Paused() &&
          frame_pacing::GameMessages_PassNumber() <= g_trace_until_pass;
 }
 
@@ -395,7 +395,7 @@ void PauseMovieLog_Track(uint32_t movie, uint32_t node, uint32_t property, uint3
   }
   // Type 0 is a float, 1 and 2 integers (sub_825A0548).
   float before_f = std::bit_cast<float>(before), after_f = std::bit_cast<float>(after);
-  REXLOG_INFO(
+  ITC_LOG_INFO(
       "pause movie track: tick {} pass {} {} movie {:08X} {} property {} type {} node {:08X} "
       "target {:08X} (+{:X}) {} -> {} ({:+}){}",
       Ticks(), frame_pacing::GameMessages_PassNumber(), PassType(), movie,
@@ -410,20 +410,20 @@ int g_put_back_lines = 0;
 std::chrono::steady_clock::time_point g_put_back_lines_since{};
 
 void PauseMovieLog_PutBack(uint32_t movie, uint32_t property, uint32_t target, bool put_back) {
-  if (!REXCVAR_GET(log_pause_movie) ||
+  if (!ITC_FLAG(log_pause_movie) ||
       !TakeLine(g_put_back_lines, g_put_back_lines_since, kMaxCallLines)) {
     return;
   }
-  REXLOG_INFO("pause movie track target: tick {} movie {:08X} property {} target {:08X} {}",
-              Ticks(), movie, property, target,
-              put_back ? "put back by the update" : "not put back by the update");
+  ITC_LOG_INFO("pause movie track target: tick {} movie {:08X} property {} target {:08X} {}",
+               Ticks(), movie, property, target,
+               put_back ? "put back by the update" : "not put back by the update");
 }
 
 std::map<std::tuple<uint32_t, uint32_t, uint32_t>, int> g_skipped;
 std::chrono::steady_clock::time_point g_skipped_since{};
 
 void PauseMovieLog_Skipped(uint32_t movie, uint32_t property, uint32_t target) {
-  if (!REXCVAR_GET(log_pause_movie)) {
+  if (!ITC_FLAG(log_pause_movie)) {
     return;
   }
   g_skipped[{movie, property, target}]++;
@@ -434,8 +434,8 @@ void PauseMovieLog_Skipped(uint32_t movie, uint32_t property, uint32_t target) {
   g_skipped_since = now;
   for (const auto& [key, n] : g_skipped) {
     const auto& [m, p, t] = key;
-    REXLOG_INFO("pause movie skipped tracks: tick {} movie {:08X} property {} target {:08X}: {}",
-                Ticks(), m, p, t, n);
+    ITC_LOG_INFO("pause movie skipped tracks: tick {} movie {:08X} property {} target {:08X}: {}",
+                 Ticks(), m, p, t, n);
   }
   g_skipped.clear();
 }
@@ -458,7 +458,7 @@ void WatchMovingTargets(const char* name, PPCContext& ctx, uint8_t* base, Call&&
   for (size_t i = 0; i < g_moving_targets.size(); i++) {
     uint32_t after = guest::LoadU32(base, g_moving_targets[i]);
     if (after != before[i] && TakeLine(g_track_lines, g_track_lines_since, kMaxTrackLines)) {
-      REXLOG_INFO(
+      ITC_LOG_INFO(
           "pause movie target written: tick {} pass {} {} {} from {:08X} r3 {:08X} r4 {:08X}: "
           "{:08X} {:g} -> {:g}",
           Ticks(), frame_pacing::GameMessages_PassNumber(), PassType(), name, lr, r3, r4,
@@ -474,7 +474,7 @@ void WatchMovingTargets(const char* name, PPCContext& ctx, uint8_t* base, Call&&
 #define WATCH_MOVIE_CALL(address)                                                       \
   extern "C" REX_FUNC(sub_##address) {                                                  \
     REX_FUNC_PROLOGUE();                                                                \
-    if (!REXCVAR_GET(log_pause_movie)) {                                                \
+    if (!ITC_FLAG(log_pause_movie)) {                                                \
       __imp__sub_##address(ctx, base);                                                  \
       return;                                                                           \
     }                                                                                   \
@@ -495,7 +495,7 @@ WATCH_MOVIE_CALL(8211B080)
 // sub_8220BA68 (r3 = the screen state [0x826D84D8]) switches sub-screens.
 extern "C" REX_FUNC(sub_8211C7E8) {
   REX_FUNC_PROLOGUE();
-  if (!REXCVAR_GET(log_pause_movie)) {
+  if (!ITC_FLAG(log_pause_movie)) {
     __imp__sub_8211C7E8(ctx, base);
     return;
   }
@@ -505,7 +505,7 @@ extern "C" REX_FUNC(sub_8211C7E8) {
 
 extern "C" REX_FUNC(sub_821BE5A8) {
   REX_FUNC_PROLOGUE();
-  if (!REXCVAR_GET(log_pause_movie)) {
+  if (!ITC_FLAG(log_pause_movie)) {
     __imp__sub_821BE5A8(ctx, base);
     return;
   }
@@ -515,7 +515,7 @@ extern "C" REX_FUNC(sub_821BE5A8) {
 
 extern "C" REX_FUNC(sub_8220D040) {
   REX_FUNC_PROLOGUE();
-  if (!REXCVAR_GET(log_pause_movie)) {
+  if (!ITC_FLAG(log_pause_movie)) {
     __imp__sub_8220D040(ctx, base);
     return;
   }
@@ -530,7 +530,7 @@ extern "C" REX_FUNC(sub_8220D040) {
 // then updates the movie once (from 8220DF24).
 extern "C" REX_FUNC(sub_8211DAC8) {
   REX_FUNC_PROLOGUE();
-  if (!REXCVAR_GET(log_pause_movie)) {
+  if (!ITC_FLAG(log_pause_movie)) {
     __imp__sub_8211DAC8(ctx, base);
     return;
   }
@@ -540,7 +540,7 @@ extern "C" REX_FUNC(sub_8211DAC8) {
 
 extern "C" REX_FUNC(sub_8211D978) {
   REX_FUNC_PROLOGUE();
-  if (!REXCVAR_GET(log_pause_movie)) {
+  if (!ITC_FLAG(log_pause_movie)) {
     __imp__sub_8211D978(ctx, base);
     return;
   }
@@ -550,7 +550,7 @@ extern "C" REX_FUNC(sub_8211D978) {
 
 extern "C" REX_FUNC(sub_8211DE38) {
   REX_FUNC_PROLOGUE();
-  if (!REXCVAR_GET(log_pause_movie)) {
+  if (!ITC_FLAG(log_pause_movie)) {
     __imp__sub_8211DE38(ctx, base);
     return;
   }
@@ -560,7 +560,7 @@ extern "C" REX_FUNC(sub_8211DE38) {
 
 extern "C" REX_FUNC(sub_8211DDD8) {
   REX_FUNC_PROLOGUE();
-  if (!REXCVAR_GET(log_pause_movie)) {
+  if (!ITC_FLAG(log_pause_movie)) {
     __imp__sub_8211DDD8(ctx, base);
     return;
   }
@@ -570,7 +570,7 @@ extern "C" REX_FUNC(sub_8211DDD8) {
 
 extern "C" REX_FUNC(sub_8211DF20) {
   REX_FUNC_PROLOGUE();
-  if (!REXCVAR_GET(log_pause_movie)) {
+  if (!ITC_FLAG(log_pause_movie)) {
     __imp__sub_8211DF20(ctx, base);
     return;
   }
@@ -580,7 +580,7 @@ extern "C" REX_FUNC(sub_8211DF20) {
 
 extern "C" REX_FUNC(sub_8220BA68) {
   REX_FUNC_PROLOGUE();
-  if (!REXCVAR_GET(log_pause_movie)) {
+  if (!ITC_FLAG(log_pause_movie)) {
     __imp__sub_8220BA68(ctx, base);
     return;
   }

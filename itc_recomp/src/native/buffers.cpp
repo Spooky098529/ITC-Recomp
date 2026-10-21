@@ -33,8 +33,8 @@
 #include "renderer.h"
 #include "state.h"
 
-#include <rex/cvar.h>
-#include <rex/logging.h>
+#include "base/flags.h"
+#include "base/log.h"
 
 #include <algorithm>
 #include <array>
@@ -48,14 +48,14 @@
 #include <string>
 #include <unordered_map>
 
-REXCVAR_DEFINE_BOOL(native_renderer_log_buffers, false, "ITC",
-                    "Log the vertex and index buffer objects draws bind, and where their data "
-                    "comes from (a debugging aid for the native renderer)");
-REXCVAR_DECLARE(bool, native_renderer_log_texture_writes);
-REXCVAR_DEFINE_BOOL(native_renderer_log_physical_writes, false, "ITC",
-                    "Log memcpy's writes into the physical views by thread, pass and caller, and "
-                    "whether they land in vertex or index data drawn around them (a debugging aid "
-                    "for the native renderer)");
+ITC_FLAG_BOOL(native_renderer_log_buffers, false, "ITC",
+              "Log the vertex and index buffer objects draws bind, and where their data "
+              "comes from (a debugging aid for the native renderer)");
+ITC_FLAG_DECLARE(bool, native_renderer_log_texture_writes);
+ITC_FLAG_BOOL(native_renderer_log_physical_writes, false, "ITC",
+              "Log memcpy's writes into the physical views by thread, pass and caller, and "
+              "whether they land in vertex or index data drawn around them (a debugging aid "
+              "for the native renderer)");
 
 namespace native {
 namespace {
@@ -218,10 +218,10 @@ void Seen(uint8_t* base, uint32_t object, bool index, uint32_t stream, uint32_t 
     }
     if (g_lines) {
       g_lines--;
-      REXLOG_INFO("native renderer: buffers: {:.2f} s new {} buffer {:08X}: +0 {:08X} data "
-                  "{:08X} size {}{}",
-                  seconds, index ? "index" : "vertex", object, now.type, now.address, now.size,
-                  index ? std::string()
+      ITC_LOG_INFO("native renderer: buffers: {:.2f} s new {} buffer {:08X}: +0 {:08X} data "
+                   "{:08X} size {}{}",
+                   seconds, index ? "index" : "vertex", object, now.type, now.address, now.size,
+                   index ? std::string()
                         : fmt::format(" (stream {}, offset {}, stride {})", stream, offset,
                                       stride));
     }
@@ -233,10 +233,10 @@ void Seen(uint8_t* base, uint32_t object, bool index, uint32_t stream, uint32_t 
     g_changed++;
     if (g_lines) {
       g_lines--;
-      REXLOG_INFO("native renderer: buffers: {:.2f} s {} buffer {:08X} changed: +0 {:08X} -> "
-                  "{:08X}, data {:08X} -> {:08X}, size {} -> {} (after {} binds)",
-                  seconds, index ? "index" : "vertex", object, was.type, now.type, was.address,
-                  now.address, was.size, now.size, was.binds);
+      ITC_LOG_INFO("native renderer: buffers: {:.2f} s {} buffer {:08X} changed: +0 {:08X} -> "
+                   "{:08X}, data {:08X} -> {:08X}, size {} -> {} (after {} binds)",
+                   seconds, index ? "index" : "vertex", object, was.type, now.type, was.address,
+                   now.address, was.size, now.size, was.binds);
     }
     was = BufferObject{now.type, now.address, now.size, index, was.binds};
   }
@@ -263,19 +263,19 @@ void LogSummary() {
   for (auto& [object, buffer] : g_objects) {
     index += buffer.index;
   }
-  REXLOG_INFO("native renderer: buffers: {} objects known ({} index), {} new and {} headers "
-              "changed in 5 s, {} binds; memcpy into headers {} times, into the physical views "
-              "{} times ({:.1f} MB)",
-              g_objects.size(), index, g_new, g_changed, g_binds, header_copies, physical_copies,
-              physical_copy_bytes / 1048576.0);
+  ITC_LOG_INFO("native renderer: buffers: {} objects known ({} index), {} new and {} headers "
+               "changed in 5 s, {} binds; memcpy into headers {} times, into the physical views "
+               "{} times ({:.1f} MB)",
+               g_objects.size(), index, g_new, g_changed, g_binds, header_copies, physical_copies,
+               physical_copy_bytes / 1048576.0);
   RangeStats& r = g_range_stats;
-  REXLOG_INFO("native renderer: buffers: mirrored ranges first seen: {} ({:.1f} MB): {} written "
-              "wholly by memcpy, {} partly, {} not at all ({:.1f} MB); by first writer:{}",
-              r.first, r.first_bytes / 1048576.0, r.covered, r.partly, r.uncovered,
-              r.uncovered_bytes / 1048576.0, Callers(r.first_callers));
-  REXLOG_INFO("native renderer: buffers: mirrored ranges written again by memcpy after first "
-              "use: {} ({:.1f} MB); by writer:{}",
-              r.rewritten, r.rewritten_bytes / 1048576.0, Callers(r.rewrite_callers));
+  ITC_LOG_INFO("native renderer: buffers: mirrored ranges first seen: {} ({:.1f} MB): {} written "
+               "wholly by memcpy, {} partly, {} not at all ({:.1f} MB); by first writer:{}",
+               r.first, r.first_bytes / 1048576.0, r.covered, r.partly, r.uncovered,
+               r.uncovered_bytes / 1048576.0, Callers(r.first_callers));
+  ITC_LOG_INFO("native renderer: buffers: mirrored ranges written again by memcpy after first "
+               "use: {} ({:.1f} MB); by writer:{}",
+               r.rewritten, r.rewritten_bytes / 1048576.0, Callers(r.rewrite_callers));
   g_new = g_changed = g_binds = 0;
   r = RangeStats{};
 }
@@ -361,24 +361,24 @@ void LogWriteSummary() {
     total.replaying_changed += w.replaying_changed;
     total.textures += w.textures;
   }
-  REXLOG_INFO("native renderer: physical writes: 5 s: logic passes {} ({:.2f} MB, {} same "
-              "contents, {} into drawn ranges, {} changing them); render-only passes {} ({:.2f} "
-              "MB, {} same, {} into drawn ranges, {} changing them); while the list reading them "
-              "was replayed {} ({} changing them); into textures {}; too old to check {}",
-              total.writes[0], total.bytes[0] / 1048576.0, total.same[0], total.drawn[0],
-              total.drawn_changed[0], total.writes[1], total.bytes[1] / 1048576.0, total.same[1],
-              total.drawn[1], total.drawn_changed[1], total.replaying, total.replaying_changed,
-              total.textures, g_unchecked);
+  ITC_LOG_INFO("native renderer: physical writes: 5 s: logic passes {} ({:.2f} MB, {} same "
+               "contents, {} into drawn ranges, {} changing them); render-only passes {} ({:.2f} "
+               "MB, {} same, {} into drawn ranges, {} changing them); while the list reading them "
+               "was replayed {} ({} changing them); into textures {}; too old to check {}",
+               total.writes[0], total.bytes[0] / 1048576.0, total.same[0], total.drawn[0],
+               total.drawn_changed[0], total.writes[1], total.bytes[1] / 1048576.0, total.same[1],
+               total.drawn[1], total.drawn_changed[1], total.replaying, total.replaying_changed,
+               total.textures, g_unchecked);
   for (auto& [key, w] : g_write_stats) {
-    REXLOG_INFO("native renderer: physical writes: from {:08X} on {}: logic {} ({} bytes, {} "
-                "same, {} drawn, {} changing drawn), render-only {} ({} bytes, {} same, {} "
-                "drawn, {} changing drawn); vertex {} index {} (drawn in the next frame {}); while "
-                "replayed {} ({} "
-                "changing); textures {}; passes {}-{}",
-                key.first, ThreadName(key.second), w.writes[0], w.bytes[0], w.same[0], w.drawn[0],
-                w.drawn_changed[0], w.writes[1], w.bytes[1], w.same[1], w.drawn[1],
-                w.drawn_changed[1], w.vertex, w.index, w.drawn_after, w.replaying, w.replaying_changed,
-                w.textures, w.first_pass, w.last_pass);
+    ITC_LOG_INFO("native renderer: physical writes: from {:08X} on {}: logic {} ({} bytes, {} "
+                 "same, {} drawn, {} changing drawn), render-only {} ({} bytes, {} same, {} "
+                 "drawn, {} changing drawn); vertex {} index {} (drawn in the next frame {}); "
+                 "while replayed {} ({} "
+                 "changing); textures {}; passes {}-{}",
+                 key.first, ThreadName(key.second), w.writes[0], w.bytes[0], w.same[0], w.drawn[0],
+                 w.drawn_changed[0], w.writes[1], w.bytes[1], w.same[1], w.drawn[1],
+                 w.drawn_changed[1], w.vertex, w.index, w.drawn_after, w.replaying, w.replaying_changed,
+                 w.textures, w.first_pass, w.last_pass);
   }
   g_write_stats.clear();
   g_unchecked = 0;
@@ -446,15 +446,15 @@ void CheckLoggedWrites(const std::function<bool(uint32_t, uint32_t)>& is_texture
     // pass, or under the replay reading it.
     if (!w.same && ((kinds && w.render_only) || into_replayed) && g_write_lines) {
       g_write_lines--;
-      REXLOG_INFO("native renderer: physical writes: {:08X}-{:08X} ({} bytes) from {:08X} on {}, "
-                  "pass {} ({}), frame {}{}: changes drawn {}{}{}; drawn in frames{}{}{}{}",
-                  w.start, w.end, w.end - w.start, w.caller, ThreadName(w.thread), w.pass,
-                  w.render_only ? "render-only" : "logic", w.frame,
-                  w.replaying ? " while recorded" : "",
-                  kinds == 3 ? "vertex and index data" : kinds == 2 ? "index data" : "vertex data",
-                  into_replayed ? ", read by the list being replayed" : "",
-                  texture ? ", and a texture" : "", frames & 1 ? " -2" : "",
-                  frames & 2 ? " -1" : "", frames & 4 ? " 0" : "", frames & 8 ? " +1" : "");
+      ITC_LOG_INFO("native renderer: physical writes: {:08X}-{:08X} ({} bytes) from {:08X} on {}, "
+                   "pass {} ({}), frame {}{}: changes drawn {}{}{}; drawn in frames{}{}{}{}",
+                   w.start, w.end, w.end - w.start, w.caller, ThreadName(w.thread), w.pass,
+                   w.render_only ? "render-only" : "logic", w.frame,
+                   w.replaying ? " while recorded" : "",
+                   kinds == 3 ? "vertex and index data" : kinds == 2 ? "index data" : "vertex data",
+                   into_replayed ? ", read by the list being replayed" : "",
+                   texture ? ", and a texture" : "", frames & 1 ? " -2" : "",
+                   frames & 2 ? " -1" : "", frames & 4 ? " 0" : "", frames & 8 ? " +1" : "");
     }
   }
   g_logged_taken.resize(kept);
@@ -462,7 +462,7 @@ void CheckLoggedWrites(const std::function<bool(uint32_t, uint32_t)>& is_texture
 }  // namespace
 
 bool Buffers_Logging() {
-  return REXCVAR_GET(native_renderer_log_buffers);
+  return ITC_FLAG(native_renderer_log_buffers);
 }
 
 // Kept out of line: inlined, its stack frame (Seen's and the summary's) was
@@ -494,7 +494,7 @@ void Buffers_OnCommand(uint8_t* base, uint32_t id, uint32_t payload, uint32_t co
 }
 
 bool Buffers_LogPhysicalWrites() {
-  return REXCVAR_GET(native_renderer_log_physical_writes);
+  return ITC_FLAG(native_renderer_log_physical_writes);
 }
 
 void Buffers_OnFrameStart(const std::function<bool(uint32_t, uint32_t)>& is_texture) {
@@ -555,7 +555,7 @@ void Buffers_TakeNewWrites(std::vector<std::pair<uint32_t, uint32_t>>& out) {
 
 void Buffers_KeepSegments(bool keep) {
   // The texture cache's write log asks of them too.
-  g_keep_segments = keep || REXCVAR_GET(native_renderer_log_texture_writes);
+  g_keep_segments = keep || ITC_FLAG(native_renderer_log_texture_writes);
 }
 
 void Buffers_CollectMirrorWrites() {
@@ -601,9 +601,9 @@ void Buffers_OnMirror(uint32_t physical, uint32_t size, bool index) {
     }
     if (coverage.bytes < size && g_range_lines) {
       g_range_lines--;
-      REXLOG_INFO("native renderer: buffers: {} range {:08X} ({} bytes) first used with {} "
-                  "bytes written by memcpy",
-                  index ? "index" : "vertex", physical, size, coverage.bytes);
+      ITC_LOG_INFO("native renderer: buffers: {} range {:08X} ({} bytes) first used with {} "
+                   "bytes written by memcpy",
+                   index ? "index" : "vertex", physical, size, coverage.bytes);
     }
     return;
   }
@@ -614,9 +614,9 @@ void Buffers_OnMirror(uint32_t physical, uint32_t size, bool index) {
     r.rewrite_callers[coverage.newest_caller]++;
     if (g_range_lines) {
       g_range_lines--;
-      REXLOG_INFO("native renderer: buffers: {} range {:08X} ({} bytes) written again by "
-                  "memcpy from {:08X}",
-                  index ? "index" : "vertex", physical, size, coverage.newest_caller);
+      ITC_LOG_INFO("native renderer: buffers: {} range {:08X} ({} bytes) written again by "
+                   "memcpy from {:08X}",
+                   index ? "index" : "vertex", physical, size, coverage.newest_caller);
     }
   }
 }
@@ -650,9 +650,9 @@ extern "C" REX_FUNC(sub_825A7410) {
       }
     }
     if (header_object) {
-      REXLOG_INFO("native renderer: buffers: memcpy {:08X} <- {:08X}, {} bytes, from {:08X}: "
-                  "into the header of buffer {:08X}",
-                  destination, source, size, caller, header_object);
+      ITC_LOG_INFO("native renderer: buffers: memcpy {:08X} <- {:08X}, {} bytes, from {:08X}: "
+                   "into the header of buffer {:08X}",
+                   destination, source, size, caller, header_object);
     }
   }
   bool log_write = size && destination >= 0xA0000000u && Buffers_LogPhysicalWrites();

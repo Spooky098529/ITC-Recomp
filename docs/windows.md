@@ -76,6 +76,15 @@ branch, merged into `main` 2026-10-16.
   (`--find_per_frame_state` and friends, the state capture), which read
   `/proc/self/maps`, and `--log_frame_times`' thread CPU time (reads 0).
 - **Settings come from `itc.toml`** next to `itc.exe`, as on Linux.
+- **The MSVC runtime's `<chrono>`** has no `file_clock::to_sys`: a
+  save's time (`src/saves/saves.cpp`) goes through
+  `clock_cast<system_clock>`, which both have (the Windows build failed
+  from B4 until 2026-10-21, on `rexglue-removal-project` only).
+- **The log** (A2, `src/base/log.cpp`): thread ids from
+  `GetCurrentThreadId`, local time from `localtime_s`; the take-over of
+  the SDK's log file finds its sink across the DLL boundary
+  (`dynamic_pointer_cast`). Checked under Wine 2026-10-21: one log with
+  ours and the SDK's lines, no duplicates.
 - **The Visual C++ runtime ships in the zip** (`MSVCP140.dll`,
   `MSVCP140_ATOMIC_WAIT.dll`, `VCRUNTIME140.dll`, `VCRUNTIME140_1.dll`:
   what the three binaries import; Windows 10 and 11 have the Universal
@@ -134,7 +143,7 @@ aren't needed:
 export WINEPREFIX=$PWD/itc_recomp/out/wineprefix WINEDLLOVERRIDES="mscoree,mshtml=" \
   XDG_DATA_DIRS=/usr/local/share:/usr/share
 B=itc_recomp/out/build/win-amd64-cross-release
-G='Z:\home\sam\repos\recomptest\itc\Import Tuner Challenge (USA)'
+G="Z:$(pwd | tr / '\\')\\itc\\Import Tuner Challenge (USA)"
 timeout 90 wine $B/itc.exe \
   --native_audio=true --game_data_root="$G" --max_fps=144 \
   --log_fps=true --interpolate_draw_state=true --skip_intro --attract_after_s=1

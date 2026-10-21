@@ -17,8 +17,8 @@
 #include "audio/xma_packets.h"
 #include "audio/xma_stream.h"
 
-#include <rex/cvar.h>
-#include <rex/logging.h>
+#include "base/flags.h"
+#include "base/log.h"
 #include <rex/system/kernel_state.h>
 #include <rex/system/xmemory.h>
 
@@ -27,8 +27,8 @@
 #include <unordered_map>
 #include <vector>
 
-REXCVAR_DEFINE_BOOL(log_xma, false, "ITC",
-                    "Log each XMA sound's start, loop and end (B2's native XMA layer)");
+ITC_FLAG_BOOL(log_xma, false, "ITC",
+              "Log each XMA sound's start, loop and end (B2's native XMA layer)");
 
 namespace {
 
@@ -88,20 +88,20 @@ bool Start(uint8_t* base, StreamState& s, uint32_t data, uint32_t size) {
   const uint32_t bytes = std::max(samples, 1u) * s.channels * 2;
   s.buffer = Memory()->SystemHeapAlloc(bytes);
   if (!s.buffer) {
-    REXLOG_ERROR("xma: no system heap for {} bytes ({} samples)", bytes, samples);
+    ITC_LOG_ERROR("xma: no system heap for {} bytes ({} samples)", bytes, samples);
     return false;
   }
   if (!s.stream.Begin(host, size, s.channels, s.sample_rate, base + s.buffer)) {
-    REXLOG_ERROR("xma: couldn't start the decoder ({} channels, {} Hz)", s.channels,
-                 s.sample_rate);
+    ITC_LOG_ERROR("xma: couldn't start the decoder ({} channels, {} Hz)", s.channels,
+                  s.sample_rate);
     FreeBuffer(s);
     return false;
   }
   s.input = data;
   s.stream.DecodeAhead(s.sample_rate * kDecodeAheadSeconds);
-  if (REXCVAR_GET(log_xma)) {
-    REXLOG_INFO("xma: start: data {:08X}, {} bytes, {} channels, {} Hz, {} samples, buffer {:08X}",
-                data, size, s.channels, s.sample_rate, samples, s.buffer);
+  if (ITC_FLAG(log_xma)) {
+    ITC_LOG_INFO("xma: start: data {:08X}, {} bytes, {} channels, {} Hz, {} samples, buffer {:08X}",
+                 data, size, s.channels, s.sample_rate, samples, s.buffer);
   }
   return true;
 }
@@ -114,8 +114,8 @@ bool Valid(const StreamState& s) {
 // Moves to a second sound once the first has played out.
 void Advance(uint8_t* base, StreamState& s) {
   if (s.input && !s.stream.playing()) {
-    if (REXCVAR_GET(log_xma)) {
-      REXLOG_INFO("xma: end: data {:08X} after {} samples", s.input, s.consumed);
+    if (ITC_FLAG(log_xma)) {
+      ITC_LOG_INFO("xma: end: data {:08X} after {} samples", s.input, s.consumed);
     }
     FreeBuffer(s);
     if (s.pending) {
@@ -133,13 +133,13 @@ void OnStream(PPCContext& ctx, uint32_t none, F f) {
   auto object = Find(ctx.r3.u32);
   const uint32_t index = ctx.r4.u32;
   if (!object) {
-    REXLOG_ERROR("xma: unknown object {:08X} (from {:08X})", ctx.r3.u32, uint32_t(ctx.lr));
+    ITC_LOG_ERROR("xma: unknown object {:08X} (from {:08X})", ctx.r3.u32, uint32_t(ctx.lr));
     ctx.r3.u64 = none;
     return;
   }
   std::lock_guard lock(object->mutex);
   if (index >= object->streams.size()) {
-    REXLOG_ERROR("xma: no stream {} in {:08X}", index, ctx.r3.u32);
+    ITC_LOG_ERROR("xma: no stream {} in {:08X}", index, ctx.r3.u32);
     ctx.r3.u64 = none;
     return;
   }
@@ -238,7 +238,7 @@ extern "C" REX_FUNC(sub_8245C958) {
     if (s.pending) {
       return kBothInUse;
     }
-    REXLOG_WARN("xma: a second sound ({:08X}) given while {:08X} plays", data, s.input);
+    ITC_LOG_WARN("xma: a second sound ({:08X}) given while {:08X} plays", data, s.input);
     s.pending = data;
     s.pending_size = size;
     return 0;
@@ -298,9 +298,9 @@ extern "C" REX_FUNC(sub_8245CBB0) {
     const uint32_t loop_end = s.stream.loop_end();
     const uint32_t before = s.stream.position();
     const uint32_t taken = s.stream.Consume(std::min(count, s.ring_samples));
-    if (REXCVAR_GET(log_xma) && s.stream.position() < before + taken && loop_end) {
-      REXLOG_INFO("xma: loop: data {:08X} at {} back to {}", s.input, before + taken,
-                  s.stream.position());
+    if (ITC_FLAG(log_xma) && s.stream.position() < before + taken && loop_end) {
+      ITC_LOG_INFO("xma: loop: data {:08X} at {} back to {}", s.input, before + taken,
+                   s.stream.position());
     }
     s.consumed += taken;
     return taken;
@@ -317,8 +317,8 @@ extern "C" REX_FUNC(sub_8245D050) {
 extern "C" REX_FUNC(sub_8245CE98) {
   REX_FUNC_PROLOGUE();
   OnStream(ctx, 0, [&](StreamState& s) -> uint32_t {
-    if (REXCVAR_GET(log_xma) && s.input) {
-      REXLOG_INFO("xma: reset: data {:08X} after {} samples", s.input, s.consumed);
+    if (ITC_FLAG(log_xma) && s.input) {
+      ITC_LOG_INFO("xma: reset: data {:08X} after {} samples", s.input, s.consumed);
     }
     Reset(s);
     return 0;
@@ -344,11 +344,11 @@ extern "C" REX_FUNC(sub_8245CF98) {
   const uint32_t count = guest::LoadU8(base, loop + 10);
   OnStream(ctx, 0, [&](StreamState& s) -> uint32_t {
     s.stream.SetLoop(start_bit, end_bit, skip, end_subframe, count);
-    if (REXCVAR_GET(log_xma)) {
-      REXLOG_INFO("xma: loop data: data {:08X}: bits {} to {}, skip {}, end subframe {}, "
-                  "count {}: samples {} to {}",
-                  s.input, start_bit, end_bit, skip, end_subframe, count, s.stream.loop_start(),
-                  s.stream.loop_end());
+    if (ITC_FLAG(log_xma)) {
+      ITC_LOG_INFO("xma: loop data: data {:08X}: bits {} to {}, skip {}, end subframe {}, "
+                   "count {}: samples {} to {}",
+                   s.input, start_bit, end_bit, skip, end_subframe, count, s.stream.loop_start(),
+                   s.stream.loop_end());
     }
     return 0;
   });
@@ -404,19 +404,19 @@ extern "C" REX_FUNC(sub_8245C638) {
 // Never called in play (docs/functions/audio.md): logged if one ever is.
 extern "C" REX_FUNC(sub_8245CE10) {
   REX_FUNC_PROLOGUE();
-  REXLOG_ERROR("xma: sub_8245CE10 called (from {:08X}), not handled", uint32_t(ctx.lr));
+  ITC_LOG_ERROR("xma: sub_8245CE10 called (from {:08X}), not handled", uint32_t(ctx.lr));
   ctx.r3.u64 = 1;
 }
 
 extern "C" REX_FUNC(sub_8245D010) {
   REX_FUNC_PROLOGUE();
-  REXLOG_ERROR("xma: sub_8245D010 called (from {:08X}), not handled", uint32_t(ctx.lr));
+  ITC_LOG_ERROR("xma: sub_8245D010 called (from {:08X}), not handled", uint32_t(ctx.lr));
   ctx.r3.u64 = 0;
 }
 
 extern "C" REX_FUNC(sub_8245D070) {
   REX_FUNC_PROLOGUE();
-  REXLOG_ERROR("xma: sub_8245D070 called (from {:08X}), not handled", uint32_t(ctx.lr));
+  ITC_LOG_ERROR("xma: sub_8245D070 called (from {:08X}), not handled", uint32_t(ctx.lr));
   for (uint32_t i = 0; i < 3; i++) {
     guest::StoreU32(base, ctx.r5.u32 + 4 * i, 0);
   }

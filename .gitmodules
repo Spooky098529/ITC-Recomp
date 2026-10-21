@@ -5,3 +5,7 @@
 	path = itc_recomp/thirdparty/FFmpeg
 	url = https://github.com/FFmpeg/FFmpeg.git
 	shallow = true
+[submodule "itc_recomp/thirdparty/xxHash"]
+	path = itc_recomp/thirdparty/xxHash
+	url = https://github.com/Cyan4973/xxHash.git
+	shallow = true

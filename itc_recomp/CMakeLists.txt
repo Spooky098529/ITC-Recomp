@@ -61,6 +61,8 @@ include(cmake/ffmpeg.cmake)
 # Sources
 set(ITC_SOURCES
     src/main.cpp
+    src/base/log.cpp
+    src/base/log_sdk.cpp
     src/audio/native_audio.cpp
     src/audio/output_mix.cpp
     src/hooks/vehicle.cpp
@@ -165,6 +167,11 @@ endif()
 rexglue_setup_target(itc)
 
 target_include_directories(itc PRIVATE src)
+
+# Our own copies of header-only libraries (A1 in docs/rexglue-removal.md),
+# included with their folder (<xxHash/xxhash.h>) so the SDK's copies on the
+# include path can't stand in for them.
+target_include_directories(itc PRIVATE thirdparty)
 
 # Our XMA decoding (src/audio/xma_*: B2 in docs/rexglue-removal.md) on our
 # own FFmpeg, in a library of its own so only our FFmpeg's headers reach it.

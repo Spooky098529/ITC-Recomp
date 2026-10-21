@@ -12,7 +12,7 @@
 
 #include "game_data/game_data.h"
 
-#include <rex/logging.h>
+#include "base/log.h"
 
 #include <string>
 
@@ -51,8 +51,8 @@ extern "C" REX_FUNC(sub_8258C688) {
   const std::string path = GuestString(base, ctx.r4.u32);
   auto relative = game_data::RelativePath(path);
   if (!relative) {
-    REXLOG_WARN("file class: \"{}\" isn't game data: opened by the recompiled File::OpenRead",
-                path);
+    ITC_LOG_WARN("file class: \"{}\" isn't game data: opened by the recompiled File::OpenRead",
+                 path);
     __imp__sub_8258C688(ctx, base);
     return;
   }
@@ -63,7 +63,7 @@ extern "C" REX_FUNC(sub_8258C688) {
   }
   auto handle = game_data::Open(*relative);
   if (!handle) {
-    REXLOG_WARN("file class: no file \"{}\"", path);
+    ITC_LOG_WARN("file class: no file \"{}\"", path);
     guest::StoreU32(base, file + 4, kClosed);
     ReportError(ctx, base, 0x8258C700);
     ctx.r3.u64 = 0;

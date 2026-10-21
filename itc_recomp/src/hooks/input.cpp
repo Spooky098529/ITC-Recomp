@@ -14,15 +14,15 @@
 #include "frame_pacing/game_messages.h"
 #include "guest.h"
 
-#include <rex/cvar.h>
+#include "base/flags.h"
 
-REXCVAR_DEFINE_BOOL(input_mappers_by_tick, true, "ITC",
-                    "Update the action mappers (sub_8210B018) on logic passes only, so menu "
-                    "input repeats at the game's rate at any frame rate");
+ITC_FLAG_BOOL(input_mappers_by_tick, true, "ITC",
+              "Update the action mappers (sub_8210B018) on logic passes only, so menu "
+              "input repeats at the game's rate at any frame rate");
 
 extern "C" REX_FUNC(sub_8210B018) {
   REX_FUNC_PROLOGUE();
-  if (REXCVAR_GET(input_mappers_by_tick) && frame_pacing::GameMessages_IsRenderOnlyPass()) {
+  if (ITC_FLAG(input_mappers_by_tick) && frame_pacing::GameMessages_IsRenderOnlyPass()) {
     return;
   }
   debug::PauseMenuLog_NoteMapperUpdate(uint32_t(ctx.lr));

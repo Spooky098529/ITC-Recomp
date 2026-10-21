@@ -5,7 +5,7 @@
 
 #include "harness.h"
 
-#include <rex/logging.h>
+#include "base/log.h"
 
 namespace harness {
 
@@ -16,7 +16,7 @@ void LastError(Context& h) {
   const uint32_t slot = guest::LoadU32(base, pcr + 256) + 352;
   const uint32_t saved = guest::LoadU32(base, slot);
   if (guest::LoadU32(base, pcr + 336)) {
-    REXLOG_INFO("harness: PCR+336 is set, so SetLastError stores nothing here");
+    ITC_LOG_INFO("harness: PCR+336 is set, so SetLastError stores nothing here");
   }
   Results set("SetLastError (sub_82296E70, sub_82296FD0)");
   Results from_status("SetLastErrorFromStatus (sub_82296E88)");

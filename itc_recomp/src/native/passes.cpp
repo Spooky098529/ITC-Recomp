@@ -1,6 +1,6 @@
 #include "passes.h"
 #include "frame_costs.h"
-#include "log_enabled.h"
+#include "base/log.h"
 #include "disk_cache.h"
 
 #include "generated_gamma_comp.h"
@@ -34,17 +34,17 @@
 #include <rex/graphics/registers.h>
 #include <rex/graphics/util/draw.h>
 #include <rex/graphics/xenos.h>
-#include <rex/cvar.h>
-#include <rex/hash.h>
-#include <rex/logging.h>
+#include "base/flags.h"
+#include "base/hash.h"
+#include "base/log.h"
 
-REXCVAR_DECLARE(std::string, log_level);
+ITC_FLAG_DECLARE(std::string, log_level);
 
-REXCVAR_DEFINE_STRING(xbox_gamma, "off", "ITC",
-                      "Show the frame through the display gamma table the game sets for a kind "
-                      "of display, as the Xbox 360's video output does (native renderer): off "
-                      "(a PC monitor, sRGB: no change), hdtv (darker mid-tones and shadows), "
-                      "power (lighter shadows)");
+ITC_FLAG_STRING(xbox_gamma, "off", "ITC",
+                "Show the frame through the display gamma table the game sets for a kind "
+                "of display, as the Xbox 360's video output does (native renderer): off "
+                "(a PC monitor, sRGB: no change), hdtv (darker mid-tones and shadows), "
+                "power (lighter shadows)");
 
 namespace native {
 
@@ -317,7 +317,9 @@ struct PipelineKey {
 // Hashed and compared as a whole (no padding to hold stray bytes).
 static_assert(sizeof(PipelineKey) == 3 * sizeof(void*) + 18 * sizeof(uint32_t));
 struct PipelineKeyHash {
-  size_t operator()(const PipelineKey& key) const { return size_t(XXH3_64bits(&key, sizeof(key))); }
+  size_t operator()(const PipelineKey& key) const {
+    return size_t(base::Hash64(&key, sizeof(key)));
+  }
 };
 struct HandlePairHash {
   size_t operator()(const std::pair<VkDescriptorSetLayout, VkDescriptorSetLayout>& key) const {
@@ -338,7 +340,7 @@ class FrameSetCache {
     if (entries_.size() * 2 >= table_.size()) {
       Grow();
     }
-    uint64_t hash = XXH3_64bits(words, count * sizeof(uint64_t));
+    uint64_t hash = base::Hash64(words, count * sizeof(uint64_t));
     size_t mask = table_.size() - 1;
     for (size_t i = size_t(hash) & mask;; i = (i + 1) & mask) {
       int32_t index = table_[i];
@@ -1282,8 +1284,8 @@ bool Passes::State::CreateGuestMemoryMirror() {
       return false;
     }
   }
-  REXLOG_INFO("native renderer: {} guest memory mirrors of {} MB", mirrors.size(),
-              kPhysicalMemorySize >> 20);
+  ITC_LOG_INFO("native renderer: {} guest memory mirrors of {} MB", mirrors.size(),
+               kPhysicalMemorySize >> 20);
   return true;
 }
 
@@ -1304,12 +1306,12 @@ bool Passes::State::CreateGuestMemoryMirror(GuestMirror& mirror) {
       FindMemoryType(memory_properties, requirements.memoryTypeBits,
                      VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
   if (alloc.memoryTypeIndex == UINT32_MAX) {
-    REXLOG_ERROR("native renderer: no host-visible memory for the guest memory mirror");
+    ITC_LOG_ERROR("native renderer: no host-visible memory for the guest memory mirror");
     return false;
   }
   if (VkResult result = vk::vkAllocateMemory(device, &alloc, nullptr, &mirror.memory);
       result != VK_SUCCESS) {
-    REXLOG_ERROR("native renderer: allocating the guest memory mirror failed: {}", int(result));
+    ITC_LOG_ERROR("native renderer: allocating the guest memory mirror failed: {}", int(result));
     return false;
   }
   gpu_memory::Allocated(gpu_memory::Kind::kMirror, alloc.allocationSize);
@@ -1348,7 +1350,7 @@ void Passes::State::Mirror(uint8_t* base, uint32_t address, uint32_t size, bool 
   }
   uint64_t key = (uint64_t(address) << 32) | size;
   if (check_mirror) {
-    uint64_t hash = XXH3_64bits(PhysicalHostAddress(base, address), size);
+    uint64_t hash = base::Hash64(PhysicalHostAddress(base, address), size);
     auto [it, added] = mirrored_hashes.try_emplace(key, hash);
     if (!added && it->second != hash) {
       it->second = hash;
@@ -1377,14 +1379,14 @@ void Passes::State::Mirror(uint8_t* base, uint32_t address, uint32_t size, bool 
   }
   if (check_late_writes) {
     // Hashed again at the end of the frame.
-    copied_ranges.push_back({address, size, XXH3_64bits(PhysicalHostAddress(base, address), size),
+    copied_ranges.push_back({address, size, base::Hash64(PhysicalHostAddress(base, address), size),
                              index, current_vertex_shader});
   }
   if (check_clobbers) {
     CheckClobbers(base, address, size, index);
   }
   if (check_mirror_frames) {
-    uint64_t hash = XXH3_64bits(PhysicalHostAddress(base, address), size);
+    uint64_t hash = base::Hash64(PhysicalHostAddress(base, address), size);
     auto [it, added] = range_history.try_emplace(key, RangeHistory{hash, 0, index});
     if (added) {
       mirror_new_bytes += size;
@@ -1421,10 +1423,10 @@ void Passes::State::Mirror(uint8_t* base, uint32_t address, uint32_t size, bool 
       stats.mirror_stale_bytes += size;
       if (by_tick.stale_lines) {
         by_tick.stale_lines--;
-        REXLOG_INFO("native renderer: mirror by tick: frame {}, {} list: {} range {:08X} ({} "
-                    "bytes) misses a write to {:08X}-{:08X}",
-                    by_tick.frames, render_only ? "a render-only pass's" : "a logic pass's",
-                    index ? "index" : "vertex", address, size, it->first, it->second);
+        ITC_LOG_INFO("native renderer: mirror by tick: frame {}, {} list: {} range {:08X} ({} "
+                     "bytes) misses a write to {:08X}-{:08X}",
+                     by_tick.frames, render_only ? "a render-only pass's" : "a logic pass's",
+                     index ? "index" : "vertex", address, size, it->first, it->second);
       }
       break;
     }
@@ -1997,7 +1999,7 @@ VkDescriptorSet Passes::State::BuildTextureSet(uint8_t* base, const TranslatedSh
       mismatched_seen = total;
     }
     // Which shaders sample a texture of another dimension than declared.
-    if (mismatched && mismatch_lines.size() < 20 && InfoLogEnabled()) {
+    if (mismatched && mismatch_lines.size() < 20 && base::InfoLogEnabled()) {
       std::string key = fmt::format(
           "{} shader {:016X} fetch constant {} declares view type {}; texture {:08X} format {} "
           "dimension {} {}x{}",
@@ -2005,7 +2007,7 @@ VkDescriptorSet Passes::State::BuildTextureSet(uint8_t* base, const TranslatedSh
           texture.fetch_constant, int(texture.view_type), fetch[1] & 0xFFFFF000u, fetch[1] & 0x3F,
           (fetch[5] >> 9) & 3, (fetch[2] & 0x1FFF) + 1, ((fetch[2] >> 13) & 0x1FFF) + 1);
       if (mismatch_lines.insert(key).second) {
-        REXLOG_INFO("native renderer: dimension mismatch: {} (frame {})", key, frames);
+        ITC_LOG_INFO("native renderer: dimension mismatch: {} (frame {})", key, frames);
       }
     }
     if (!view && mismatched) {
@@ -2068,8 +2070,8 @@ VkDescriptorSet Passes::State::BuildTextureSet(uint8_t* base, const TranslatedSh
         ring.texture_pool--;
         return VK_NULL_HANDLE;
       }
-      REXLOG_INFO("native renderer: frame {} texture sets: pool {} added ({} sets each)",
-                  frame, ring.texture_pools.size(), kTextureSetsPerPool);
+      ITC_LOG_INFO("native renderer: frame {} texture sets: pool {} added ({} sets each)",
+                   frame, ring.texture_pools.size(), kTextureSetsPerPool);
     }
     alloc.descriptorPool = ring.texture_pools[ring.texture_pool];
     if (vk::vkAllocateDescriptorSets(context.device, &alloc, set) != VK_SUCCESS) {
@@ -2108,7 +2110,7 @@ void Passes::State::CountBinding(bool view, uint32_t slot, const uint32_t* fetch
   std::memcpy(last.words, words, sizeof(words));
   last.generation = generation;
   last.valid = true;
-  uint64_t hash = XXH3_64bits(words, sizeof(words));
+  uint64_t hash = base::Hash64(words, sizeof(words));
   if (view) {
     c.views++;
     c.view_same_slot += same;
@@ -2135,7 +2137,7 @@ void Passes::State::CountShaderLookup(const ShaderKey keys[2], const uint64_t ha
   c.copies += keys[0].copy;
   uint64_t key_hashes[2];
   for (int stage = 0; stage < 2; stage++) {
-    key_hashes[stage] = XXH3_64bits(&keys[stage], sizeof(ShaderKey));
+    key_hashes[stage] = base::Hash64(&keys[stage], sizeof(ShaderKey));
     c.same[stage] += last.valid && last.key[stage] == key_hashes[stage];
     auto [it, added] =
         shaders_seen[stage].try_emplace(key_hashes[stage], ShaderSeen{hashes[stage], 0});
@@ -2159,7 +2161,7 @@ void Passes::State::CountShaderLookup(const ShaderKey keys[2], const uint64_t ha
   uint64_t lookup[4] = {key_hashes[0], key_hashes[1],
                         uint64_t(program_control) << 32 | context_misc,
                         uint64_t(point) | uint64_t(rectangle_list) << 1};
-  uint64_t lookup_hash = XXH3_64bits(lookup, sizeof(lookup));
+  uint64_t lookup_hash = base::Hash64(lookup, sizeof(lookup));
   c.lookup_same += last.valid && last.lookup == lookup_hash;
   c.lookup_seen += !lookups_seen.insert(lookup_hash).second;
   last = {{key_hashes[0], key_hashes[1]}, lookup_hash, true};
@@ -2327,7 +2329,7 @@ VkPipeline Passes::State::GetPipeline(const PipelineKey& key) {
   if (VkResult result = vk::vkCreateGraphicsPipelines(context.device, pipeline_cache, 1, &info,
                                                       nullptr, &it->second);
       result != VK_SUCCESS) {
-    REXLOG_ERROR("native renderer: vkCreateGraphicsPipelines: {}", int(result));
+    ITC_LOG_ERROR("native renderer: vkCreateGraphicsPipelines: {}", int(result));
     it->second = VK_NULL_HANDLE;
   } else {
     stats.pipelines++;
@@ -2361,8 +2363,8 @@ bool Passes::State::ReserveDrawConstants() {
     if (!CreateConstantBlock(ring)) {
       return false;
     }
-    REXLOG_INFO("native renderer: frame {} constants: block {} added ({} MB each)", frame,
-                ring.blocks.size(), kConstantBlockSize >> 20);
+    ITC_LOG_INFO("native renderer: frame {} constants: block {} added ({} MB each)", frame,
+                 ring.blocks.size(), kConstantBlockSize >> 20);
   }
   ring.block++;
   ring_offset = 0;
@@ -2481,8 +2483,8 @@ Target* Passes::State::GetTarget(VkCommandBuffer commands, uint8_t* base, uint32
                                    : VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
   if (!CreateImage(t.image, VK_IMAGE_TYPE_2D, VK_IMAGE_VIEW_TYPE_2D, format,
                    {t.extent.width, t.extent.height, 1}, 1, usage, t.aspects(), 0, t.samples)) {
-    REXLOG_ERROR("native renderer: couldn't create a {}x{} target", t.extent.width,
-                 t.extent.height);
+    ITC_LOG_ERROR("native renderer: couldn't create a {}x{} target", t.extent.width,
+                  t.extent.height);
     t.image = {};
     return nullptr;
   }
@@ -2495,11 +2497,11 @@ Target* Passes::State::GetTarget(VkCommandBuffer commands, uint8_t* base, uint32
     view.subresourceRange = {VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1};
     vk::vkCreateImageView(context.device, &view, nullptr, &t.sample_view);
   }
-  REXLOG_INFO("native renderer: {} target: EDRAM base {}, pitch {}, MSAA {}, format {}; {}x{}{} "
-              "({}x{} drawn)",
-              depth ? "depth" : "color", surface.edram_base, surface.pitch, surface.msaa,
-              surface.format, t.guest_extent.width, t.guest_extent.height,
-              tiling ? " (tiled)" : "", t.extent.width, t.extent.height);
+  ITC_LOG_INFO("native renderer: {} target: EDRAM base {}, pitch {}, MSAA {}, format {}; {}x{}{} "
+               "({}x{} drawn)",
+               depth ? "depth" : "color", surface.edram_base, surface.pitch, surface.msaa,
+               surface.format, t.guest_extent.width, t.guest_extent.height,
+               tiling ? " (tiled)" : "", t.extent.width, t.extent.height);
   stats.targets++;
   VkClearValue initial{};
   initial.depthStencil = {1.0f, 0};
@@ -2669,9 +2671,9 @@ bool Passes::State::CreateGammaResources() {
     gamma_pipeline = VK_NULL_HANDLE;
     return false;
   }
-  REXLOG_INFO("native renderer: --xbox_gamma={}: the Xbox 360's gamma table for that display is "
-              "applied to the frame",
-              REXCVAR_GET(xbox_gamma));
+  ITC_LOG_INFO("native renderer: --xbox_gamma={}: the Xbox 360's gamma table for that display is "
+               "applied to the frame",
+               ITC_FLAG(xbox_gamma));
   return true;
 }
 
@@ -2755,8 +2757,8 @@ VkPipeline Passes::State::GetResolvePipeline(VkFormat format, bool multisample) 
   info.layout = resolve_layout;
   if (vk::vkCreateGraphicsPipelines(context.device, pipeline_cache, 1, &info, nullptr,
                                     &it->second) != VK_SUCCESS) {
-    REXLOG_ERROR("native renderer: couldn't create a resolve pipeline for format {}",
-                 int(format));
+    ITC_LOG_ERROR("native renderer: couldn't create a resolve pipeline for format {}",
+                  int(format));
     it->second = VK_NULL_HANDLE;
   }
   return it->second;
@@ -2794,11 +2796,11 @@ bool Passes::State::ResolveInto(VkCommandBuffer commands, uint8_t* base, Target&
   int32_t height = std::min(bottom - top, int32_t(dest.height) - y);
   uint64_t log_key = uint64_t(reinterpret_cast<uintptr_t>(&source)) * 31 + (fetch[1] >> 12);
   if (logged_resolves.insert(log_key).second) {
-    REXLOG_INFO("native renderer: resolve from {} target (EDRAM base {}, pitch {}, MSAA {}, "
-                "format {}) rect {},{}-{},{} to {:08X} at {},{}, flags {:08X}",
-                source.depth ? "depth" : "color", source.surface.edram_base,
-                source.surface.pitch, source.surface.msaa, source.surface.format, left, top, right,
-                bottom, fetch[1] & 0xFFFFF000u, x, y, flags);
+    ITC_LOG_INFO("native renderer: resolve from {} target (EDRAM base {}, pitch {}, MSAA {}, "
+                 "format {}) rect {},{}-{},{} to {:08X} at {},{}, flags {:08X}",
+                 source.depth ? "depth" : "color", source.surface.edram_base,
+                 source.surface.pitch, source.surface.msaa, source.surface.format, left, top, right,
+                 bottom, fetch[1] & 0xFFFFF000u, x, y, flags);
   }
   if (width <= 0 || height <= 0 || x < 0 || y < 0) {
     return false;
@@ -2920,24 +2922,24 @@ bool Passes::Init(const DeviceContext& context, uint8_t* base, uint32_t frames_i
   s.shown_extent = s.Scaled(VkExtent2D{kShownWidth, kShownHeight});
   s.main_view_extent = State::ScaledBy(VkExtent2D{kMainViewWidth, kMainViewHeight},
                                        s.main_view_scale);
-  REXLOG_INFO("native renderer: resolution scale {}: frame {}x{}, 3D view {}x{} (scale {})",
-              s.scale, s.shown_extent.width, s.shown_extent.height, s.main_view_extent.width,
-              s.main_view_extent.height, s.main_view_scale);
+  ITC_LOG_INFO("native renderer: resolution scale {}: frame {}x{}, 3D view {}x{} (scale {})",
+               s.scale, s.shown_extent.width, s.shown_extent.height, s.main_view_extent.width,
+               s.main_view_extent.height, s.main_view_scale);
   s.guest_base = base;
   s.frames_in_flight = frames_in_flight;
-  const std::string& log_level = REXCVAR_GET(log_level);
+  const std::string& log_level = ITC_FLAG(log_level);
   s.collect_interfaces = log_level == "trace" || log_level == "debug" || log_level == "info";
   vk::vkGetPhysicalDeviceMemoryProperties(context.physical_device, &s.memory_properties);
   if (!s.CreateGuestMemoryMirror()) {
     return false;
   }
-  const std::string& gamma = REXCVAR_GET(xbox_gamma);
+  const std::string& gamma = ITC_FLAG(xbox_gamma);
   if (gamma == "hdtv") {
     s.gamma_values = kXboxGammaHdtv;
   } else if (gamma == "power") {
     s.gamma_values = kXboxGammaPower;
   } else if (gamma != "off") {
-    REXLOG_WARN("native renderer: --xbox_gamma={}: not off, hdtv or power; off", gamma);
+    ITC_LOG_WARN("native renderer: --xbox_gamma={}: not off, hdtv or power; off", gamma);
   }
   if (!s.CreateImage(s.shown, VK_IMAGE_TYPE_2D, VK_IMAGE_VIEW_TYPE_2D, kShownFormat,
                      {s.shown_extent.width, s.shown_extent.height, 1}, 1,
@@ -2946,7 +2948,7 @@ bool Passes::Init(const DeviceContext& context, uint8_t* base, uint32_t frames_i
                      VK_IMAGE_ASPECT_COLOR_BIT) ||
       (s.gamma_values && !s.CreateGammaResources()) || !s.CreateRings() || !s.CreateDescriptors() || !s.CreateDummyTextures() ||
       !s.CreateResolveResources() || !s.textures.Init(context, frames_in_flight)) {
-    REXLOG_ERROR("native renderer: couldn't create the passes' resources");
+    ITC_LOG_ERROR("native renderer: couldn't create the passes' resources");
     return false;
   }
   ShaderFeatures features;
@@ -2995,9 +2997,9 @@ void Passes::State::OpenPipelineCache() {
   }
   pipeline_cache_saved = std::chrono::steady_clock::now();
   if (!pipeline_cache_file.empty()) {
-    REXLOG_INFO("native renderer: pipeline disk cache {}: {}", pipeline_cache_file.string(),
-                matches        ? fmt::format("{} KB loaded", data.size() / 1024)
-                : data.empty() ? std::string("new")
+    ITC_LOG_INFO("native renderer: pipeline disk cache {}: {}", pipeline_cache_file.string(),
+                 matches        ? fmt::format("{} KB loaded", data.size() / 1024)
+                 : data.empty() ? std::string("new")
                                : std::string("another device's or driver's; starting over"));
   }
 }
@@ -3033,8 +3035,8 @@ void Passes::State::MaybeSavePipelineCache() {
     std::filesystem::rename(temporary, pipeline_cache_file, error);
   }
   if (!written || error) {
-    REXLOG_WARN("native renderer: pipeline disk cache: couldn't write {}",
-                pipeline_cache_file.string());
+    ITC_LOG_WARN("native renderer: pipeline disk cache: couldn't write {}",
+                 pipeline_cache_file.string());
   }
 }
 
@@ -3117,11 +3119,11 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
         s.logged_extra_targets = true;
         Surface extra = ReadSurface(base, object);
         Surface first = color_object ? ReadSurface(base, color_object) : Surface{};
-        REXLOG_INFO("native renderer: render target {} bound ({:08X}: EDRAM base {}, pitch {}, "
-                    "MSAA {}, format {}) with target 0 {:08X} (EDRAM base {}, pitch {}, MSAA {}, "
-                    "format {})",
-                    i, object, extra.edram_base, extra.pitch, extra.msaa, extra.format,
-                    color_object, first.edram_base, first.pitch, first.msaa, first.format);
+        ITC_LOG_INFO("native renderer: render target {} bound ({:08X}: EDRAM base {}, pitch {}, "
+                     "MSAA {}, format {}) with target 0 {:08X} (EDRAM base {}, pitch {}, MSAA {}, "
+                     "format {})",
+                     i, object, extra.edram_base, extra.pitch, extra.msaa, extra.format,
+                     color_object, first.edram_base, first.pitch, first.msaa, first.format);
       }
       s.stats.extra_targets++;
       break;
@@ -3210,7 +3212,7 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
       s.declaration_lines.push_back(fmt::format(
           "vs object {:08X} patched for {} ({:016X}), bound declaration {:08X} id {}; this "
           "draw patched {}; last patch: object {:08X} declaration {:08X} id {}",
-          vertex_object, patched_for, XXH3_64bits(vertex_ucode, vertex_size), declaration,
+          vertex_object, patched_for, base::Hash64(vertex_ucode, vertex_size), declaration,
           declaration_id, patched, g_last_patch[0], g_last_patch[1], g_last_patch[2]));
     }
     if (!s.stats.declaration_sample[0] && !s.stats.declaration_sample[1]) {
@@ -4304,8 +4306,8 @@ void Passes::BeginTiling(VkCommandBuffer commands, uint8_t* base, uint32_t paylo
   float clear;
   std::memcpy(&clear, &clear_bits, 4);
   if (s.logged_tilings.insert(uint64_t(rects) << 32 | count).second) {
-    REXLOG_INFO("native renderer: begin tiling: flags {:X}, {} tiles:{}; clear color and Z {}",
-                flags, count, tiles, clear);
+    ITC_LOG_INFO("native renderer: begin tiling: flags {:X}, {} tiles:{}; clear color and Z {}",
+                 flags, count, tiles, clear);
   }
   s.EndRendering(commands);
   s.tiling = true;
@@ -4346,11 +4348,11 @@ void Passes::TiledResolve(VkCommandBuffer commands, uint8_t* base, uint32_t devi
     std::memcpy(&color[c], &bits, 4);
   }
   if (s.logged_tiled_resolves.insert(uint64_t(destination) << 8 | tile).second) {
-    REXLOG_INFO("native renderer: tiled resolve {} of {}: flags {:08X}, rect {},{}-{},{}, to "
-                "{:08X} at {},{}",
-                tile + 1, tiles, flags, rect_address ? rect[0] : -1, rect_address ? rect[1] : -1,
-                rect_address ? rect[2] : -1, rect_address ? rect[3] : -1, destination,
-                point_address ? point[0] : -1, point_address ? point[1] : -1);
+    ITC_LOG_INFO("native renderer: tiled resolve {} of {}: flags {:08X}, rect {},{}-{},{}, to "
+                 "{:08X} at {},{}",
+                 tile + 1, tiles, flags, rect_address ? rect[0] : -1, rect_address ? rect[1] : -1,
+                 rect_address ? rect[2] : -1, rect_address ? rect[3] : -1, destination,
+                 point_address ? point[0] : -1, point_address ? point[1] : -1);
   }
   // The library clears the target after each tile but the last for the
   // next tile; the whole surface is drawn at once here, so only the last
@@ -4378,12 +4380,12 @@ void Passes::FrontBufferResolve(VkCommandBuffer commands, uint8_t* base, uint32_
     s.logged_front = true;
     Surface surface = object ? ReadSurface(base, object) : Surface{};
     uint32_t format = front_buffer ? guest::LoadU32(base, front_buffer + 28 + 4) & 0x3F : 0;
-    REXLOG_INFO("native renderer: front buffer resolve: device {:08X} (ours {:08X}), render "
-                "target 0 {:08X} (pitch {}, MSAA {}, format {}, EDRAM base {}), into {:08X}: "
-                "{}x{} format {}",
-                device, guest::LoadU32(base, kDevicePointer), object, surface.pitch, surface.msaa,
-                surface.format, surface.edram_base, front_buffer, s.front_extent.width,
-                s.front_extent.height, format);
+    ITC_LOG_INFO("native renderer: front buffer resolve: device {:08X} (ours {:08X}), render "
+                 "target 0 {:08X} (pitch {}, MSAA {}, format {}, EDRAM base {}), into {:08X}: "
+                 "{}x{} format {}",
+                 device, guest::LoadU32(base, kDevicePointer), object, surface.pitch, surface.msaa,
+                 surface.format, surface.edram_base, front_buffer, s.front_extent.width,
+                 s.front_extent.height, format);
   }
 }
 
@@ -4418,19 +4420,19 @@ void Passes::State::LogGlow() {
   auto now = std::chrono::steady_clock::now();
   if (now - glow_last_log >= std::chrono::seconds(1)) {
     glow_last_log = now;
-    REXLOG_INFO("native renderer: glow: logic frames {} (cross-fades {}, history resolves {}, "
-                "reading the history {}), render-only frames {} ({}, {}, {}); last read "
-                "{:08X}, last history {:08X}; 256x144 resolves of a logic frame: {}, of a "
-                "render-only frame: {}; frames: {}",
-                glow_counts[1].frames, glow_counts[1].cross_fades,
-                glow_counts[1].history_resolves, glow_counts[1].reads_history,
-                glow_counts[0].frames, glow_counts[0].cross_fades,
-                glow_counts[0].history_resolves, glow_counts[0].reads_history,
-                glow_frame.cross_fade_texture, glow_frame.history_address, glow_addresses[1],
-                glow_addresses[0], glow_pattern);
-    REXLOG_INFO("native renderer: glow cross-fade constants: logic frame: {}render-only "
-                "frame: {}",
-                glow_constants[1], glow_constants[0]);
+    ITC_LOG_INFO("native renderer: glow: logic frames {} (cross-fades {}, history resolves {}, "
+                 "reading the history {}), render-only frames {} ({}, {}, {}); last read "
+                 "{:08X}, last history {:08X}; 256x144 resolves of a logic frame: {}, of a "
+                 "render-only frame: {}; frames: {}",
+                 glow_counts[1].frames, glow_counts[1].cross_fades,
+                 glow_counts[1].history_resolves, glow_counts[1].reads_history,
+                 glow_counts[0].frames, glow_counts[0].cross_fades,
+                 glow_counts[0].history_resolves, glow_counts[0].reads_history,
+                 glow_frame.cross_fade_texture, glow_frame.history_address, glow_addresses[1],
+                 glow_addresses[0], glow_pattern);
+    ITC_LOG_INFO("native renderer: glow cross-fade constants: logic frame: {}render-only "
+                 "frame: {}",
+                 glow_constants[1], glow_constants[0]);
     glow_counts = {};
     glow_addresses = {};
     glow_pattern.clear();
@@ -4600,8 +4602,8 @@ void Passes::set_mirror_to_both(bool to_both) {
 void Passes::set_mirror_by_tick(bool by_tick) {
   State& s = *state_;
   if (by_tick && s.mirrors.size() != 2) {
-    REXLOG_WARN("native renderer: mirror by tick needs two mirrors, not {}: off",
-                s.mirrors.size());
+    ITC_LOG_WARN("native renderer: mirror by tick needs two mirrors, not {}: off",
+                 s.mirrors.size());
     return;
   }
   s.mirror_by_tick = by_tick;
@@ -4900,7 +4902,7 @@ VkExtent2D Passes::EndFrame(VkCommandBuffer commands, int32_t show_resolve, bool
     uint8_t* base = s.last_base;
     for (const State::CopiedRange& r : s.copied_ranges) {
       s.late_checked++;
-      if (XXH3_64bits(PhysicalHostAddress(base, r.address), r.size) != r.hash) {
+      if (base::Hash64(PhysicalHostAddress(base, r.address), r.size) != r.hash) {
         s.late_written++;
         s.late_by_shader[r.vertex_shader]++;
         if (s.late_sample.empty()) {
@@ -4921,7 +4923,7 @@ VkExtent2D Passes::EndFrame(VkCommandBuffer commands, int32_t show_resolve, bool
       list += fmt::format("{}{}: {:08X} format {} {}x{} flags {:X}", i ? "; " : "", i, r.address,
                           r.format, r.extent.width, r.extent.height, r.flags);
     }
-    REXLOG_INFO("native renderer: this frame's resolves: {}", list);
+    ITC_LOG_INFO("native renderer: this frame's resolves: {}", list);
   }
   VkImage shown = s.shown.image;
   Transition(commands, shown, VK_IMAGE_ASPECT_COLOR_BIT, s.shown_layout,
@@ -5182,7 +5184,7 @@ void Passes::WriteDump(const std::string& directory) {
     std::string path = directory + "/" + d.name + ".pfm";
     FILE* file = std::fopen(path.c_str(), "wb");
     if (!file) {
-      REXLOG_ERROR("native renderer: couldn't write {}", path);
+      ITC_LOG_ERROR("native renderer: couldn't write {}", path);
       continue;
     }
     // PFM: rows bottom to top, little-endian floats.
@@ -5198,7 +5200,7 @@ void Passes::WriteDump(const std::string& directory) {
     }
     std::fclose(file);
   }
-  REXLOG_INFO("native renderer: dumped {} images into {}", s.dumped.size(), directory);
+  ITC_LOG_INFO("native renderer: dumped {} images into {}", s.dumped.size(), directory);
   if (!s.recorded_draws.empty()) {
     if (FILE* file = std::fopen((directory + "/draws.txt").c_str(), "w")) {
       for (size_t n = 0; n < s.recorded_draws.size(); n++) {
