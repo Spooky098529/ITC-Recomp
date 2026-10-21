@@ -11,15 +11,16 @@ It started from this project and follows its layout, but the Japanese build was
 compiled differently, so the same functions sit at other addresses. Its own
 `docs/porting-from-itc.md` describes how the two line up.
 
-It lives beside this repo, at `/home/sam/repos/SBX-Recomp`. CLAUDE.md's rule is
-to search only inside this repo; the user made the exception and pointed to it
-(2026-10-21, during B4 step 2's survey of the archive streaming), naming its
-function-mapping TSV. Its modding work (the mod loader, addon ids, cut cars) is
+It lives in a folder named `SBX-Recomp` beside this repo's folder (`../SBX-Recomp`
+from the repo root; paths below are written that way). CLAUDE.md's rule is to
+search only inside this repo; **read SBX-Recomp only when the user says so**
+(their rule, 2026-10-21). They pointed to it the first time during B4 step 2's
+survey of the archive streaming, naming its function-mapping TSV. Its modding work (the mod loader, addon ids, cut cars) is
 to be ignored: no mod support here yet (the user's call). Use it only for
 function identities and data layouts.
 
 Read at SBX-Recomp commit `1fd0d3d` (2026-10-20, "More Research Notes"). It
-changes over time: check `git -C /home/sam/repos/SBX-Recomp log -1` before
+changes over time: check `git -C ../SBX-Recomp log -1` before
 relying on line numbers or rows below.
 
 ## The two files used
@@ -51,7 +52,7 @@ with the match's method and score:
 ```python
 # python3 -I map_sbx_rows.py <first line> <last line> (of their docs/functions.md)
 import csv, re, sys
-SBX = "/home/sam/repos/SBX-Recomp/docs/"
+SBX = "../SBX-Recomp/docs/"  # run from this repo's root
 ours = {}
 for r in csv.DictReader(open(SBX + "itc_to_sbx_functions.tsv"), delimiter="\t"):
     ours.setdefault(r["dst"], []).append(f'{r["src"]} ({r["method"]} {r["score"]})')
@@ -104,7 +105,7 @@ for the loader thread"; these came from reading `generated/` and the logs
 
 ## Checking it again
 
-1. `git -C /home/sam/repos/SBX-Recomp log -1`: if it moved past `1fd0d3d`,
+1. `git -C ../SBX-Recomp log -1`: if it moved past `1fd0d3d`,
    their rows may have changed; rerun the script on the archive section (find
    it again with the grep above).
 2. For each row in the table, look the address up in the TSV (`src` column)

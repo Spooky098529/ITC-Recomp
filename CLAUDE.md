@@ -88,6 +88,9 @@ date as you learn things.
 ## Rules from the user
 
 - Only search inside this repo. Ask for the location of anything outside it.
+- SBX-Recomp (the Japanese release's recomp, in a folder named `SBX-Recomp`
+  beside this repo's folder) is a reference, but read it only when the user
+  says so. How to reference it: `docs/referencing-sbx-recomp.md`.
 - Commit often. Never revert or `git checkout` uncommitted work without
   committing it first.
 - Don't create branches (local or pushed) without asking the user first;
