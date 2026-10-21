@@ -101,6 +101,9 @@ its output in "The boundary over time" at the end of
 `docs/rexglue-removal.md`. Plan steps are done on their
 own branches and merged into `rexglue-removal-project` (no force pushes:
 GitHub refuses them on that branch).
+`docs/coverage.md` is which recompiled functions actually run (the
+`itc_coverage` build, `itc_recomp/coverage/seen_in_play.txt`) and how that
+measures B7; functions that never run get no rows.
 `docs/tick-replay.md` is a lead (not started): translating draws once a
 tick and replaying our own list on in-between frames.
 `docs/pause-menu-fix.md` is the pause menu's too-fast input repeat: fixed
@@ -146,7 +149,7 @@ date as you learn things.
   session, show the user the rows you'd add or change in
   `docs/functions/` (the subsystem's file; `functions.md` when none
   fits yet), in the table format (`| Address | Name | Status | Notes |`,
-  four cells, sorted by address, each row exactly as it would be written;
+  four cells, one function a row, each row exactly as it would be written;
   for a changed row, say what changed), and ask whether to add them;
   write them only after the user has reviewed and agreed. In
   the rows, say how much is known: "Not read" or "Not read in detail"

@@ -8,9 +8,8 @@ kick and poll them through the XMA decoder's registers at `7FEA18xx`,
 and the source voice code that uses them) and the voice category volume
 (`XAudioGetVoiceCategoryVolume`). Worked on as B2 in
 `docs/rexglue-removal.md`; how the game's sound works and the native
-audio output are in `../native-audio.md`. Rows are sorted by address.
-The rest of the game's functions, and the prose sections, are in
-[`functions.md`](functions.md).
+audio output are in `../native-audio.md`. The rest of the game's
+functions, and the prose sections, are in [`functions.md`](functions.md).
 
 Status:
 

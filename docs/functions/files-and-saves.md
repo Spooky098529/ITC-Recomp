@@ -7,9 +7,8 @@ game's own file layer and the C runtime's low-level I/O above them, the
 save slots (the device selector, content create, enumerate, open,
 delete and close, the thumbnail), and the graphics library's debug
 capture, which mounts a drive of its own. Worked on as B4 in
-`docs/rexglue-removal.md`. Rows are sorted by address. The rest of the
-game's functions, and the prose sections, are in
-[`functions.md`](functions.md).
+`docs/rexglue-removal.md`. The rest of the game's functions, and the
+prose sections, are in [`functions.md`](functions.md).
 
 Status:
 
