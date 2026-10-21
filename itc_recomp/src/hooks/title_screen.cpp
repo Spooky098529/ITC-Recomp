@@ -11,18 +11,18 @@
 
 #include "guest.h"
 
-#include <rex/cvar.h>
-#include <rex/logging.h>
+#include "base/flags.h"
+#include "base/log.h"
 
 #include <atomic>
 #include <string>
 
-REXCVAR_DEFINE_BOOL(log_boot_modes, false, "ITC",
-                    "Log the front end's state objects as they change, and each tick and "
-                    "message handler the first time it runs");
-REXCVAR_DEFINE_BOOL(skip_intro, false, "ITC",
-                    "Testing: skip the Ubisoft logo movie, and run the Genki logo and the "
-                    "title screen's intro without the 30 Hz tick wait (until the first race)");
+ITC_FLAG_BOOL(log_boot_modes, false, "ITC",
+              "Log the front end's state objects as they change, and each tick and "
+              "message handler the first time it runs");
+ITC_FLAG_BOOL(skip_intro, false, "ITC",
+              "Testing: skip the Ubisoft logo movie, and run the Genki logo and the "
+              "title screen's intro without the 30 Hz tick wait (until the first race)");
 REXCVAR_DEFINE_INT32(attract_after_s, 0, "ITC",
                      "Testing: seconds the title screen waits before the attract race "
                      "(0 = the game's 20)");
@@ -48,7 +48,7 @@ bool TitleScreen_SkipTickWait(bool in_race) {
   if (in_race) {
     g_first_race_started = true;
   }
-  return REXCVAR_GET(skip_intro) && !g_first_race_started;
+  return ITC_FLAG(skip_intro) && !g_first_race_started;
 }
 
 }  // namespace hooks
@@ -56,7 +56,7 @@ bool TitleScreen_SkipTickWait(bool in_race) {
 // TitleScreen_Update.
 extern "C" REX_FUNC(sub_822221A0) {
   REX_FUNC_PROLOGUE();
-  int32_t after = REXCVAR_GET(attract_after_s) * kTicksPerSecond;
+  int32_t after = ITC_FLAG(attract_after_s) * kTicksPerSecond;
   uint32_t title = guest::LoadU32(base, kTitleScreenPointer);
   int32_t before = title ? int32_t(guest::LoadU32(base, title + kIdleTicksOffset)) : 0;
   __imp__sub_822221A0(ctx, base);
@@ -75,7 +75,7 @@ extern "C" REX_FUNC(sub_822221A0) {
 // end's state objects at [0x82814E2C] and [0x82814E34] as they change.
 extern "C" REX_FUNC(sub_820988C8) {
   REX_FUNC_PROLOGUE();
-  if (REXCVAR_GET(log_boot_modes)) {
+  if (ITC_FLAG(log_boot_modes)) {
     static std::string last;
     std::string now;
     for (uint32_t pointer : {0x82814E2Cu, 0x82814E30u, kTitleScreenPointer}) {
@@ -86,7 +86,7 @@ extern "C" REX_FUNC(sub_820988C8) {
       }
     }
     if (now != last) {
-      REXLOG_INFO("boot modes:{}", now);
+      ITC_LOG_INFO("boot modes:{}", now);
       last = now;
     }
   }
@@ -100,11 +100,11 @@ extern "C" REX_FUNC(sub_820988C8) {
 // the render thread has started it.
 extern "C" REX_FUNC(sub_82107C58) {
   REX_FUNC_PROLOGUE();
-  if (REXCVAR_GET(log_boot_modes)) {
-    REXLOG_INFO("boot modes: movie wait, this {:08X} +9608 {}", ctx.r3.u32,
-                guest::LoadU32(base, ctx.r3.u32 + 9608));
+  if (ITC_FLAG(log_boot_modes)) {
+    ITC_LOG_INFO("boot modes: movie wait, this {:08X} +9608 {}", ctx.r3.u32,
+                 guest::LoadU32(base, ctx.r3.u32 + 9608));
   }
-  g_in_movie_wait = REXCVAR_GET(skip_intro);
+  g_in_movie_wait = ITC_FLAG(skip_intro);
   __imp__sub_82107C58(ctx, base);
   g_in_movie_wait = false;
 }

@@ -9,7 +9,7 @@
 
 #include "helpers/strings.h"
 
-#include <rex/logging.h>
+#include "base/log.h"
 
 #include <vector>
 
@@ -150,8 +150,8 @@ extern "C" REX_FUNC(sub_82296870) {
   }
   std::u16string text;
   if (!helpers::FormatWithoutArguments(format, &text)) {
-    REXLOG_ERROR("swprintf: format at {:08X} (from {:08X}) has conversions; not written",
-                 format_address, uint32_t(ctx.lr));
+    ITC_LOG_ERROR("swprintf: format at {:08X} (from {:08X}) has conversions; not written",
+                  format_address, uint32_t(ctx.lr));
   }
   for (size_t i = 0; i < text.size(); i++) {
     guest::StoreU16(base, buffer + 2 * uint32_t(i), uint16_t(text[i]));

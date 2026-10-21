@@ -13,7 +13,7 @@
 
 #include "saves/saves.h"
 
-#include <rex/logging.h>
+#include "base/log.h"
 
 #include <string>
 
@@ -123,7 +123,7 @@ std::string SlotFileName(uint8_t* base, uint32_t slot) {
   std::string path = GuestString(base, slot + 802, 128);
   auto name = saves::FileName(path);
   if (!name) {
-    REXLOG_WARN("saves: not a save file: \"{}\"", path);
+    ITC_LOG_WARN("saves: not a save file: \"{}\"", path);
     return {};
   }
   return *name;
@@ -315,7 +315,7 @@ extern "C" REX_FUNC(sub_820A4D68) {
     bytes[i] = guest::LoadU8(base, data + i);
   }
   if (name.empty() || !saves::Write(name, bytes.data(), size)) {
-    REXLOG_WARN("saves: can't write the save \"{}\" ({} bytes)", name, size);
+    ITC_LOG_WARN("saves: can't write the save \"{}\" ({} bytes)", name, size);
     guest::StoreU32(base, slot + 492, 0);
     guest::StoreU32(base, slot + 496, 0xFFFFFFFF);
     ctx.r3.u64 = uint64_t(-3);
@@ -339,7 +339,7 @@ extern "C" REX_FUNC(sub_820A4EF8) {
   std::string name = SlotFileName(base, slot);
   auto bytes = name.empty() ? std::nullopt : saves::Read(name, size);
   if (!bytes) {
-    REXLOG_WARN("saves: can't read the save \"{}\"", name);
+    ITC_LOG_WARN("saves: can't read the save \"{}\"", name);
     guest::StoreU32(base, slot + 492, 0);
     guest::StoreU32(base, slot + 496, 0xFFFFFFFF);
     ctx.r3.u64 = uint64_t(-3);

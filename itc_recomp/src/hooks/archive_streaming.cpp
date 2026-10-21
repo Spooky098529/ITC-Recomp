@@ -14,7 +14,7 @@
 
 #include "game_data/game_data.h"
 
-#include <rex/logging.h>
+#include "base/log.h"
 
 #include <optional>
 #include <string>
@@ -43,7 +43,7 @@ constexpr uint32_t kArchiveHandles[2] = {0x82600A9C, 0x82600AA0};
 std::optional<uint32_t> Archive(uint8_t* base, bool crs) {
   uint32_t handle = guest::LoadU32(base, kArchiveHandles[crs]);
   if (!game_data::IsHandle(handle)) {
-    REXLOG_ERROR("archive streaming: {} isn't open", crs ? "BUILD_CRS.DAT" : "BUILD.DAT");
+    ITC_LOG_ERROR("archive streaming: {} isn't open", crs ? "BUILD_CRS.DAT" : "BUILD.DAT");
     return std::nullopt;
   }
   return handle;
@@ -73,7 +73,7 @@ bool ReadRequest(uint8_t* base, uint32_t request) {
     total += read.value_or(0);
   });
   if (!ok) {
-    REXLOG_ERROR("archive streaming: can't read id {} ({} bytes at {:08X})", id, bytes, offset);
+    ITC_LOG_ERROR("archive streaming: can't read id {} ({} bytes at {:08X})", id, bytes, offset);
     return false;
   }
   // A read past the end gives fewer bytes, as ReadFileEx did.
@@ -100,7 +100,7 @@ std::optional<uint32_t> OpenImagePath(uint8_t* base, uint32_t path) {
   auto relative = game_data::RelativePath(name);
   auto handle = relative ? game_data::Open(*relative) : std::nullopt;
   if (!handle) {
-    REXLOG_ERROR("archive streaming: can't open \"{}\"", name);
+    ITC_LOG_ERROR("archive streaming: can't open \"{}\"", name);
   }
   return handle;
 }

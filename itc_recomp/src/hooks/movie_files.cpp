@@ -15,12 +15,12 @@
 
 #include "game_data/game_data.h"
 
-#include <rex/cvar.h>
-#include <rex/logging.h>
+#include "base/flags.h"
+#include "base/log.h"
 
 #include <string>
 
-REXCVAR_DECLARE(bool, log_file_opens);
+ITC_FLAG_DECLARE(bool, log_file_opens);
 
 namespace {
 
@@ -99,7 +99,7 @@ void Read(PPCContext& ctx, uint8_t* base) {
     guest::StoreU32(base, source + 48, 1);
   }
   if (failed) {
-    REXLOG_WARN("movie source {:08X}: read of {} bytes at {} failed", source, want, position);
+    ITC_LOG_WARN("movie source {:08X}: read of {} bytes at {} failed", source, want, position);
     ctx.r3.u64 = kReadFault;
   }
 }
@@ -115,12 +115,12 @@ extern "C" REX_FUNC(sub_82487C48) {
   REX_FUNC_PROLOGUE();
   const uint32_t source = ctx.r3.u32;
   const std::string path = GuestString(base, ctx.r4.u32);
-  if (REXCVAR_GET(log_file_opens)) {
-    REXLOG_INFO("movie open: source {:08X} \"{}\" from {:08X}", source, path, ctx.lr);
+  if (ITC_FLAG(log_file_opens)) {
+    ITC_LOG_INFO("movie open: source {:08X} \"{}\" from {:08X}", source, path, ctx.lr);
   }
   auto relative = game_data::RelativePath(path);
   if (!relative) {
-    REXLOG_WARN("movie source: \"{}\" isn't game data: opened by the recompiled OpenFile", path);
+    ITC_LOG_WARN("movie source: \"{}\" isn't game data: opened by the recompiled OpenFile", path);
     __imp__sub_82487C48(ctx, base);
     return;
   }
@@ -132,7 +132,7 @@ extern "C" REX_FUNC(sub_82487C48) {
   }
   auto handle = game_data::Open(*relative);
   if (!handle) {
-    REXLOG_WARN("movie source: no file \"{}\"", path);
+    ITC_LOG_WARN("movie source: no file \"{}\"", path);
     guest::StoreU32(base, source + 44, kClosed);
     ctx.r3.u64 = kFileNotFound;
     return;

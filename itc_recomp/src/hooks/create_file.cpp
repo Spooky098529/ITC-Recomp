@@ -7,12 +7,12 @@
 
 #include "guest.h"
 
-#include <rex/cvar.h>
-#include <rex/logging.h>
+#include "base/flags.h"
+#include "base/log.h"
 
 #include <string>
 
-REXCVAR_DEFINE_BOOL(log_file_opens, false, "ITC", "Log every file the game opens");
+ITC_FLAG_BOOL(log_file_opens, false, "ITC", "Log every file the game opens");
 
 // CreateFile: r3 = path; returns the handle, or -1.
 extern "C" REX_FUNC(sub_82295508) {
@@ -25,8 +25,8 @@ extern "C" REX_FUNC(sub_82295508) {
     }
     path += c;
   }
-  if (REXCVAR_GET(log_file_opens)) {
-    REXLOG_INFO("file open: {} (from {:08X})", path, ctx.lr);
+  if (ITC_FLAG(log_file_opens)) {
+    ITC_LOG_INFO("file open: {} (from {:08X})", path, ctx.lr);
   }
   __imp__sub_82295508(ctx, base);
 }

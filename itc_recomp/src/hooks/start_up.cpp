@@ -5,7 +5,7 @@
 #include "guest.h"
 #include "guest_call.h"
 
-#include <rex/logging.h>
+#include "base/log.h"
 
 #include <cstdlib>
 
@@ -66,7 +66,7 @@ extern "C" REX_FUNC(sub_82297C08) {
 extern "C" REX_FUNC(sub_82297CE0) {
   REX_FUNC_PROLOGUE();
   if (!MakeHeap(ctx, base)) {
-    REXLOG_ERROR("The game's heap couldn't be made");
+    ITC_LOG_ERROR("The game's heap couldn't be made");
     std::exit(EXIT_FAILURE);
   }
   ctx.r3.u64 = 1;
