@@ -517,6 +517,28 @@ B2. **Audio** (6 functions calling `XAudio*`/`XMA*`, plus what's around
        hardware's behavior). Both can be loaded at once:
        `librexruntime.so` links its FFmpeg statically and exports none
        of its symbols. Linux and the Windows cross-compile both build it.
+
+       Done (2026-10-21, `native-xma`): the submodule
+       `itc_recomp/thirdparty/FFmpeg` at `n9.0.2` (shallow), built by
+       `itc_recomp/cmake/ffmpeg.cmake` as `itc_avutil` and `itc_avcodec`
+       (static, hidden symbols; ~150 files, plain C, threads on: pthreads
+       or Windows threads) from the files configure made, kept in
+       `itc_recomp/thirdparty/ffmpeg-config/<platform>/` (local paths
+       scrubbed) by `itc_recomp/tools/ffmpeg_config.sh`; run it again
+       after moving the submodule. Not linked into `itc` yet.
+       `itc_xma_check` (`itc_recomp/tests/xma_check.cpp`, not built by
+       default) decodes a bank's wave and writes a WAV. On `bgm_tmp_01`
+       and four `SB_SYSTEM_SE` sounds, Linux and Windows (Wine) alike:
+       every packet decoded, and the packet headers' frames × 512
+       (`src/audio/xma_packets.h`) equal to the bank's duration
+       (3,024,896 for the music). The decoder's output runs exactly 5,184
+       samples behind the frames × 512 timeline the whole way: 64 dropped
+       at the start (`skip_samples`) and 10 frames held inside, given out
+       at the flush. So decoded sample n is timeline sample n + 64, and
+       loop points worked out on the game's timeline (`sub_8246A5F8`'s)
+       carry over with that shift. The end loses 807 samples more (the
+       last frame's trim in the data); the music's loop end (3,024,000)
+       comes before it.
     2. **The XMA layer native**: the helpers above (set-up and release,
        input and output buffers, samples ready, read, reset, lock, wait,
        unlock) become adapters over a plain C++ stream (input buffers,
