@@ -459,6 +459,73 @@ B2. **Audio** (6 functions calling `XAudio*`/`XMA*`, plus what's around
     `sub_8245D350`, `sub_8245D4D0`), so the level to replace is the
     library's XMA layer, not just the two imports.
 
+    **Survey (2026-10-21, branch `native-xma`)**, from `generated/` and
+    a temporary counter (`--log_xma`, `src/hooks/xma_log.cpp`) in an
+    attract race and a session the user played (boot, menus, a race;
+    `itc_281.log`):
+
+    - The source voices that play XMA (an XAudio "source voice" is one
+      sound playing, not voice chat) each hold an XMA object at voice
+      +184: +0 the stream count, +4 flags, +8 an array of 96-byte
+      entries, one a stream. An entry is a copy of the stream's XMA
+      context (64 bytes, the layout of the SDK's `XMA_CONTEXT_DATA`),
+      then +64 the hardware context, +68 the output buffer, +72 the work
+      buffer, +76 samples consumed, +80 the context id, +82 the position
+      within the current 256-byte block, +84 and +88 the two input
+      buffers' addresses. Flags: 0x10000 lock asked, 0x20000 the copies
+      are current, 0x40000 contexts made.
+    - Every update (`sub_8246C320`, from the mixer callback, ~118 a
+      second a voice) does lock (`sub_8245D208`: writes the Lock
+      registers `7FEA1A40`), wait (`sub_8245D288` polling `sub_8245D350`:
+      `CurrentContextIndex` `7FEA1818` isn't one of its contexts, then
+      copies each hardware context into its entry), then works on the
+      copies (`sub_8246BB98`, `sub_8246B480` and the helpers: samples
+      ready, read them, give input buffers), then unlock (`sub_8245D4D0`:
+      the copies written back and the Kick registers `7FEA1940`).
+      Between unlock and the next lock, the hardware decodes. The voice
+      reaches the XMA object only through these helpers (every load of
+      +184 goes to one as r3); it reads the decoded samples straight from
+      the output buffer, at the address the helpers give.
+    - What plays: one stereo 44.1 kHz voice a music track, long-lived,
+      streaming (its first input buffer given at set-up, `sub_8245C958`,
+      later ones by `sub_8245CF98`, 0.45-1.4 MB each), and a mono voice
+      a menu sound, its context made when the sound starts and released
+      when it ends, the whole sound given at set-up. 23 contexts made in
+      the user's session, never more than a few at once. One stream an
+      object every time. The context's loop count was 0 every time (no
+      hardware loops seen).
+
+    **Plan (agreed with the user, 2026-10-21):** we aren't emulating an
+    Xbox; we take the game's audio and play it through SDL. So:
+
+    1. **Our own FFmpeg from upstream**, pinned to a release in the
+       repo and built with only the `xma2` decoder (A1's FFmpeg part,
+       done here). Not the SDK's: it pins Xenia's fork
+       (`wmarti/FFmpeg`), whose build has only `mp3`, `wmapro`, `wmav2`
+       and `xmaframes`, the fork's frame-at-a-time decoder made for
+       emulating the hardware (bit read offsets, mid-packet starts and
+       loops). Upstream's `xma2` decodes whole 2 KB packets, which is
+       what we feed. Both can be loaded at once:
+       `librexruntime.so` links its FFmpeg statically and exports none
+       of its symbols. Linux and the Windows cross-compile both build it.
+    2. **The XMA layer native**: the helpers above (set-up and release,
+       input and output buffers, samples ready, read, reset, lock, wait,
+       unlock) become adapters over a plain C++ stream (input buffers,
+       an FFmpeg decoder, the output ring in guest memory where the voice
+       reads it). Decoding happens at unlock, on the mixer thread, filling
+       the output ring's free blocks; lock and wait have nothing to wait
+       for. No contexts, no registers, no `XMACreateContext`.
+    3. `sub_8245B808`'s category volume: the fixed answers (1.0, no
+       change) without the imports.
+    4. The SDK's audio system goes (`ItcAudioSystem` no longer starts
+       its XMA decoder), and A6 (our own conversion and downmix).
+
+    Still to read before step 2: how `sub_8246B480` hands over input
+    buffers and clears them when consumed (valid bits, `sub_8245CA30`,
+    `sub_8245CF60`), what `sub_8246B1C8` (the voice's flush or stop, with
+    `sub_8245D070`, which reads the input read offset) does with the
+    offset, and whether music loops by giving its buffers again.
+
 B3. **Graphics boundary** (17 functions calling `Vd*`): ring buffer
     setup, the interrupt callback and vblank, swap, display mode and gamma
     queries. `src/native/gpu_link.cpp` already does the GPU's side; move

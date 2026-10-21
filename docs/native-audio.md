@@ -124,7 +124,10 @@ Not known yet:
   `docs/rexglue-removal.md`):** XMA is decoded by our own code calling
   FFmpeg, in place of the SDK's XMA decoder and its emulated hardware
   (contexts, the registers at `7FEA0000`), so the SDK's audio system can
-  go. The PCM bank conversion isn't the plan.
+  go. The PCM bank conversion isn't the plan. Upstream FFmpeg's `xma2`
+  decoder, our own build, fed whole packets: we aren't emulating the XMA
+  hardware (the survey and plan are under B2 in
+  `docs/rexglue-removal.md`).
 - **No SDK patch**: override the game's functions in `itc_recomp/src/`,
   as the native renderer does.
 
