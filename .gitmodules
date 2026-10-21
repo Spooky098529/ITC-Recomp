@@ -1,3 +1,7 @@
 [submodule "rexglue-sdk"]
 	path = rexglue-sdk
 	url = https://github.com/rexglue/rexglue-sdk.git
+[submodule "itc_recomp/thirdparty/FFmpeg"]
+	path = itc_recomp/thirdparty/FFmpeg
+	url = https://github.com/FFmpeg/FFmpeg.git
+	shallow = true

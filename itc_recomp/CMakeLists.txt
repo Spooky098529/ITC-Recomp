@@ -56,6 +56,7 @@ if(WIN32 AND ITC_WIN_LTO)
 endif()
 
 include(generated/rexglue.cmake)
+include(cmake/ffmpeg.cmake)
 
 # Sources
 set(ITC_SOURCES
@@ -201,3 +202,10 @@ target_include_directories(itc PRIVATE
 # the app header need. Headers only: the symbols already live in librexruntime.
 target_include_directories(itc PRIVATE
     $<TARGET_PROPERTY:imgui::imgui,INTERFACE_INCLUDE_DIRECTORIES>)
+
+# Decodes one XMA wave from a game bank with our FFmpeg (B2 in
+# docs/rexglue-removal.md; how to run it is at the top of the file). Not
+# built by default.
+add_executable(itc_xma_check EXCLUDE_FROM_ALL tests/xma_check.cpp src/audio/xma_packets.cpp)
+target_include_directories(itc_xma_check PRIVATE src)
+target_link_libraries(itc_xma_check PRIVATE itc_avcodec)
