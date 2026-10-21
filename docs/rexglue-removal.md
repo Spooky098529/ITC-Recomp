@@ -1999,6 +1999,57 @@ B5. **System services** (82 functions; first counted as 78): sign-in, profile, U
       voice chat: mapped, not ported, skipped at the game level.
     - `xstart`'s `XamLoaderTerminateTitle` (the quit path): a native exit.
 
+    **The leftovers, batch 1 (2026-10-21, branch `b5-b6-leftovers`).** A
+    temporary counter (`--log_leftovers`, `src/hooks/leftovers_log.cpp`,
+    removed after) over every function above and B6's below, plus `main`
+    and `exit`: two attract races (`itc_294.log`, `itc_299.log`) and two
+    sessions the user played (`itc_295.log`, `itc_300.log`). What it
+    showed, and what was done (the user's rule, 2026-10-21: where the game
+    needs something, feed it the data and do nothing more):
+
+    - Never called: the socket wrappers (their callers are Dropped or
+      never called). Rows marked.
+    - XamShowSigninUI's wrapper ran in B5's survey (from `sub_8227C210`)
+      but not here: Dropped, returns 0 (the SDK's answer; its sign-in
+      changed and XN_SYS_UI off reach only voice's listener since step 6).
+    - The profile read `sub_8257E568` isn't one: it's voice's local talker
+      set-up (4 at boot from Voice::Init, an allocated talker, codec
+      buffers, the profile read somewhere inside), and Voice::Init itself
+      makes the listener inline. Both stay recompiled with the network
+      manager (B7).
+    - Voice::Poll: skipped at its thread. The voice library's worker
+      `sub_8257B5D8` (made by Voice::Init when its parameters' +8 is 0)
+      only ran Poll every 10 ms, and Poll's work went nowhere (its flag
+      +1316 read only by never-called code, an audio voice nothing else
+      uses, no talkers). Ours sets the "started" event Voice::Init waits
+      on and returns (`src/hooks/voice.cpp`); Poll is no longer called.
+    - The Live connection reader `sub_82149080`: with no notification it
+      asked the app (`sub_82099580`) for its state, copying the app's +252
+      into `826C72F8` and answering its +248, both 0 since the app's
+      set-up (only App::PollSignIn wrote them). Dropped: returns 0.
+    - SaveDevices::Update `sub_820A4610`: the game's save-slot state
+      machines, needed; ours is the same without the read (Overridden,
+      `src/hooks/notify.cpp`).
+    - Not done (batch 2, the user's call: stub them): Network::Update
+      `sub_8214E268` and SignIn::Update `sub_8214F290`, the last
+      `XNotifyGetNext` callers.
+    - `xstart`: `main` never returns in play (closing the window ends the
+      title's threads and exits), so its exit, `DbgPrint` and
+      `XamLoaderTerminateTitle` never run. Left as it is for now.
+
+    Checked: harness cases (`notify`: the Live reader on the game's app
+    with its globals set each way, 4 the same; SaveDevices::Update on
+    made-up devices whose methods are recompiled getters and constants,
+    60 the same; `user`: XShowSigninUI, 9 the same), an attract race with
+    every harness (no errors, 25 s raced) and a session the user played
+    (`itc_300.log`: no errors, closed cleanly). Imports with no live
+    caller left: `NetDll_socket`, `NetDll_bind`, `NetDll_ioctlsocket`,
+    `XamShowSigninUI` (and, from B6's, `sprintf`, `MmQueryStatistics`,
+    `XamAlloc`, `XamFree`). Left for B5: `XNotifyGetNext` (Network::Update
+    and SignIn::Update, batch 2), `XamNotifyCreateListener` and
+    `XamUserReadProfileSettings` (Voice::Init and its talker set-up, B7),
+    `XamLoaderTerminateTitle` (`xstart`).
+
 B6. **Pure helpers** (55 functions): string, time and formatting
     helpers made native, or their callers made native. Cheap; can be
     done alongside anything else.
@@ -2140,6 +2191,22 @@ B6. **Pure helpers** (55 functions): string, time and formatting
     counter run as B5's rows. `boundary_status.py` gives counts only; the
     live callers of each import come from its `boundary()` and the status
     check's rows, read the way its `main()` decides "live".
+
+    **Batch 1 (2026-10-21, `b5-b6-leftovers`; the counter under B5's
+    batch 1):** never called in two attract races and two sessions:
+    `sub_822AC530` (the graphics library's debug print), `sub_8248FBE0` (a
+    method that isn't implemented: `DbgPrint` and E_NOTIMPL), the sprintf
+    callers `sub_822AC638` (only from the never-called "GPU hung" dump)
+    and `sub_822B1AC8` (through a pointer), and `sub_82575D78`
+    (`XamAlloc`/`XamFree`, only from two never-called XLiveBase requests):
+    rows marked. GlobalMemoryStatus `sub_82294DA0` (`MmQueryStatistics`)
+    runs (25 calls a session) but its three callers never read the buffer:
+    Dropped, writes nothing (`src/hooks/memory_status.cpp`). `sprintf`,
+    `MmQueryStatistics`, `XamAlloc` and `XamFree` have no live caller left.
+    `DbgPrint` is left in `xstart` (never reached, under B5) and the movie
+    player's stream set-up `sub_82486BC0` (twice a session, its print only
+    on a third stream that never comes; it goes with the movie player in
+    B7).
 
 B7. **The game logic inside**: everything else, subsystem by subsystem,
     in whatever order the user wants (frame interpolation's hooks,
@@ -2296,3 +2363,24 @@ Audio: none live. The XMA helpers calling `MmGetPhysicalAddress`
 (`sub_8245C650`, `sub_8245C958`, `sub_8245D138`) are ours, so memory and
 the core's counts moved with them. 282 overrides in `src/`. Outside the
 core, what's live is B5's and B6's leftovers waiting on B7 and the core.
+
+**2026-10-21, B5 and B6 leftovers, batch 1 (branch `b5-b6-leftovers`):**
+449 functions (916 pairs): overridden 58, Native 3, Dropped 21, never
+called 70, live 297. Imports: 186 called, 64 with a live caller.
+
+| Area | Overridden | Native | Dropped | Never called | Live |
+|---|---|---|---|---|---|
+| input (B1) | 0 | 3 | 0 | 0 | 0 |
+| audio (B2) | 6 | 0 | 0 | 0 | 0 |
+| graphics (B3) | 12 | 0 | 3 | 4 | 0 |
+| files and saves (B4) | 2 | 0 | 13 | 8 | 0 |
+| memory (core) | 6 | 0 | 0 | 4 | 18 |
+| system services (B5) | 20 | 0 | 4 | 51 | 5 |
+| pure helpers (B6) | 18 | 0 | 2 | 7 | 22 |
+| threads, sync and the rest (core) | 7 | 0 | 4 | 19 | 264 |
+
+Cleared: the three socket imports, `XamShowSigninUI`, `sprintf`,
+`MmQueryStatistics`, `XamAlloc` and `XamFree`. Live outside the core:
+Network::Update and SignIn::Update (`XNotifyGetNext`, batch 2), Voice::Init
+and its talker set-up (B7), `xstart` and the movie player's stream set-up
+(`DbgPrint`). 287 overrides in `src/`.

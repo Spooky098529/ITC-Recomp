@@ -93,7 +93,6 @@ set(ITC_SOURCES
     src/hooks/file_class.cpp
     src/hooks/movie_files.cpp
     src/hooks/archive_streaming.cpp
-    src/hooks/leftovers_log.cpp
     src/hooks/memory_status.cpp
     src/hooks/voice.cpp
     src/game_data/game_data.cpp
