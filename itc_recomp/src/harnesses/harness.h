@@ -103,5 +103,6 @@ void Xmp(Context& h);
 void Network(Context& h);
 void Notify(Context& h);
 void Profile(Context& h);
+void Saves(Context& h);
 
 }  // namespace harness

@@ -10,7 +10,8 @@
 // two (caller, r3-r10 in, r3 out, and what the function answers through
 // memory where that's known), and every 10 s the counts of those called.
 // CreateFile and the movie player's open already have overrides
-// (create_file.cpp): run with --log_file_opens for their paths.
+// (create_file.cpp): run with --log_file_opens for their paths. The save slot
+// steps made native (hooks/saves.cpp) and XContentClose are no longer wrapped.
 
 #include "guest.h"
 
@@ -169,10 +170,6 @@ std::string ContentDelete(uint8_t* base, const In& in, uint32_t) {
   return ContentData(base, in.r[1]) + Overlapped(base, in.r[2]);
 }
 
-// XContentClose (root name, overlapped).
-std::string ContentClose(uint8_t* base, const In& in, uint32_t) {
-  return "; root " + String(base, in.r[0], 64) + Overlapped(base, in.r[1]);
-}
 
 // XContentSetThumbnail (user, data, image, size, overlapped).
 std::string Thumbnail(uint8_t* base, const In& in, uint32_t) {
@@ -219,18 +216,7 @@ std::string Slot(uint8_t* base, const In& in, uint32_t) {
                      WideString(base, slot + 504), String(base, slot + 760, 42));
 }
 
-// SaveSlot::Create (owner, slot, mode): the XCONTENT_DATA it built and the root.
-std::string SlotCreate(uint8_t* base, const In& in, uint32_t) {
-  return "; root " + String(base, in.r[0] + 16, 64) + ContentData(base, in.r[1] + 164) +
-         Out64(base, "free", in.r[1] + 40);
-}
 
-// SaveSlot::WriteFile and ReadFile (owner, slot): the path and the data's size.
-std::string SlotFile(uint8_t* base, const In& in, uint32_t) {
-  uint32_t slot = in.r[1];
-  return fmt::format("; path {} size {} handle {:08X}", String(base, slot + 802),
-                     guest::LoadU32(base, slot + 936), guest::LoadU32(base, slot + 496));
-}
 
 struct Function {
   uint32_t address;
@@ -244,17 +230,6 @@ struct Function {
   X(8209AC78, "file layer error report?", None)                             \
   X(8209DD00, "async read (ReadFileEx)", None)                              \
   X(8209E210, "data file open", None)                                       \
-  X(820A45C0, "SaveSlot::CheckDevice", Slot)                                \
-  X(820A48B8, "SaveSlot::WaitDeviceSelector", Slot)                         \
-  X(820A4960, "SaveSlot::ShowDeviceSelector", Slot)                         \
-  X(820A49D0, "SaveSlot::Enumerate", Slot)                                  \
-  X(820A4B18, "SaveSlot::OpenItem", Slot)                                   \
-  X(820A4B98, "SaveSlot::WaitOpenItem", Slot)                               \
-  X(820A4C58, "SaveSlot::Create", SlotCreate)                               \
-  X(820A4D68, "SaveSlot::WriteFile", SlotFile)                              \
-  X(820A4EF8, "SaveSlot::ReadFile", SlotFile)                               \
-  X(820A5110, "SaveSlot::SetThumbnail", Slot)                               \
-  X(820A51E0, "SaveSlot::Delete", Slot)                                     \
   X(820A55A8, "XContentGetCreator caller", None)                            \
   X(820A5BE8, "SaveSlot::SaveStep", Slot)                                   \
   X(820A5E68, "SaveSlot::LoadStep", Slot)                                   \
@@ -263,7 +238,6 @@ struct Function {
   X(82295450, "ReadFileEx", ReadEx)                                         \
   X(82295BC8, "XContentCreate", ContentCreate)                              \
   X(82295BE8, "XContentDelete", ContentDelete)                              \
-  X(82295BF0, "XContentClose", ContentClose)                                \
   X(82295BF8, "XContentSetThumbnail", Thumbnail)                            \
   X(82295C00, "XContentGetCreator", Creator)                                \
   X(82295C08, "XContentCreateEnumerator", CreateEnumerator)                 \

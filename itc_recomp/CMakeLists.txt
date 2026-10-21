@@ -84,6 +84,8 @@ set(ITC_SOURCES
     src/hooks/network.cpp
     src/hooks/notify.cpp
     src/hooks/profile.cpp
+    src/hooks/saves.cpp
+    src/saves/saves.cpp
     src/hooks/files_and_saves_log.cpp
     src/display/gamma.cpp
     src/harnesses/harness.cpp
@@ -99,10 +101,12 @@ set(ITC_SOURCES
     src/harnesses/network.cpp
     src/harnesses/notify.cpp
     src/harnesses/profile.cpp
+    src/harnesses/saves.cpp
     src/helpers/debug_output.cpp
     src/helpers/object_attributes.cpp
     src/helpers/time.cpp
     src/helpers/strings.cpp
+    src/helpers/executable.cpp
     src/user/profile.cpp
     src/input/gamepads.cpp
     src/input/input_processor.cpp
