@@ -56,11 +56,13 @@ if(WIN32 AND ITC_WIN_LTO)
 endif()
 
 include(generated/rexglue.cmake)
+include(cmake/ffmpeg.cmake)
 
 # Sources
 set(ITC_SOURCES
     src/main.cpp
     src/audio/native_audio.cpp
+    src/audio/output_mix.cpp
     src/hooks/vehicle.cpp
     src/hooks/title_screen.cpp
     src/hooks/create_file.cpp
@@ -72,6 +74,8 @@ set(ITC_SOURCES
     src/hooks/object_attributes.cpp
     src/hooks/time.cpp
     src/hooks/clock.cpp
+    src/hooks/xma.cpp
+    src/hooks/audio_volume.cpp
     src/hooks/strings.cpp
     src/hooks/last_error.cpp
     src/hooks/gamma.cpp
@@ -107,6 +111,7 @@ set(ITC_SOURCES
     src/harnesses/saves.cpp
     src/harnesses/file_class.cpp
     src/harnesses/movie_files.cpp
+    src/harnesses/xma.cpp
     src/helpers/debug_output.cpp
     src/helpers/object_attributes.cpp
     src/helpers/time.cpp
@@ -159,6 +164,13 @@ rexglue_setup_target(itc)
 
 target_include_directories(itc PRIVATE src)
 
+# Our XMA decoding (src/audio/xma_*: B2 in docs/rexglue-removal.md) on our
+# own FFmpeg, in a library of its own so only our FFmpeg's headers reach it.
+add_library(itc_xma STATIC src/audio/xma_packets.cpp src/audio/xma_stream.cpp)
+target_include_directories(itc_xma PUBLIC src)
+target_link_libraries(itc_xma PRIVATE itc_avcodec)
+target_link_libraries(itc PRIVATE itc_xma)
+
 # The SDK's Xenos shader translator (to SPIR-V), built into our binary for
 # the native renderer (docs/native-renderer.md: reused for now, to be
 # replaced). The plugin has its own copy with hidden symbols.
@@ -200,3 +212,9 @@ target_include_directories(itc PRIVATE
 # the app header need. Headers only: the symbols already live in librexruntime.
 target_include_directories(itc PRIVATE
     $<TARGET_PROPERTY:imgui::imgui,INTERFACE_INCLUDE_DIRECTORIES>)
+
+# Decodes one XMA wave from a game bank with our FFmpeg (B2 in
+# docs/rexglue-removal.md; how to run it is at the top of the file). Not
+# built by default.
+add_executable(itc_xma_check EXCLUDE_FROM_ALL tests/xma_check.cpp)
+target_link_libraries(itc_xma_check PRIVATE itc_xma itc_avcodec)

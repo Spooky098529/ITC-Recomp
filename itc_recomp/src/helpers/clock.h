@@ -12,10 +12,4 @@ namespace helpers {
 
 constexpr uint64_t kPerformanceFrequency = 50000000;
 
-// How many counter ticks a wait for the audio hardware (sub_8245D288) gives
-// up after: an eighth of a second.
-constexpr uint64_t AudioHardwareTimeout() {
-  return kPerformanceFrequency >> 3;
-}
-
 }  // namespace helpers

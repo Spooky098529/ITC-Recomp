@@ -331,6 +331,14 @@ A6. **Audio output**: SDL audio straight from our mixer's output, our own
     place of `AudioDriver`. Its game side is B2. Read
     `docs/native-audio.md` first.
 
+    Done (2026-10-21, `native-xma`, with B2's step 4): the conversion and
+    stereo fold are ours (`src/audio/output_mix.h`), with the numbers the
+    SDK's defaults gave (nothing ever changed them: center and back at
+    -3 dB into both sides, LFE dropped, scale 1 / (1 + 0.707); 5.1
+    passed through). What's left of the SDK in the output is its
+    `AudioSystem` base class (the runtime's audio slot: A4) and its
+    `audio_mute` and `audio_maxqframes` flags (A2).
+
 ## Track B: the native port from the boundary inward
 
 Smallest and most self-contained first. Each item: make the game's
@@ -458,6 +466,171 @@ B2. **Audio** (6 functions calling `XAudio*`/`XMA*`, plus what's around
     (`sub_8245C638`, `sub_8245D138`, `sub_8245D208`, `sub_8245D288`,
     `sub_8245D350`, `sub_8245D4D0`), so the level to replace is the
     library's XMA layer, not just the two imports.
+
+    **Survey (2026-10-21, branch `native-xma`)**, from `generated/` and
+    a temporary counter (`--log_xma`, `src/hooks/xma_log.cpp`) in an
+    attract race and a session the user played (boot, menus, a race;
+    `itc_281.log`):
+
+    - The source voices that play XMA (an XAudio "source voice" is one
+      sound playing, not voice chat) each hold an XMA object at voice
+      +184: +0 the stream count, +4 flags, +8 an array of 96-byte
+      entries, one a stream. An entry is a copy of the stream's XMA
+      context (64 bytes, the layout of the SDK's `XMA_CONTEXT_DATA`),
+      then +64 the hardware context, +68 the output buffer, +72 the work
+      buffer, +76 samples consumed, +80 the context id, +82 the position
+      within the current 256-byte block, +84 and +88 the two input
+      buffers' addresses. Flags: 0x10000 lock asked, 0x20000 the copies
+      are current, 0x40000 contexts made.
+    - Every update (`sub_8246C320`, from the mixer callback, ~118 a
+      second a voice) does lock (`sub_8245D208`: writes the Lock
+      registers `7FEA1A40`), wait (`sub_8245D288` polling `sub_8245D350`:
+      `CurrentContextIndex` `7FEA1818` isn't one of its contexts, then
+      copies each hardware context into its entry), then works on the
+      copies (`sub_8246BB98`, `sub_8246B480` and the helpers: samples
+      ready, read them, give input buffers), then unlock (`sub_8245D4D0`:
+      the copies written back and the Kick registers `7FEA1940`).
+      Between unlock and the next lock, the hardware decodes. The voice
+      reaches the XMA object only through these helpers (every load of
+      +184 goes to one as r3); it reads the decoded samples straight from
+      the output buffer, at the address the helpers give.
+    - What plays: one stereo 44.1 kHz voice a music track and a mono
+      voice a menu sound, each with its context made when it starts and
+      released when it ends. A sound's whole data is one input buffer,
+      given once at set-up (`sub_8245C958`; 0.45-1.4 MB for music). 23
+      contexts made in the user's session, never more than a few at
+      once, one stream an object every time.
+    - Music loops in the hardware: `sub_8245CF98` sets the loop data
+      (`XMASetLoopData`: loop count 255, forever; loop start and end as
+      bit offsets into the input buffer, e.g. `1FECB7` and `5D5993`;
+      the subframes to skip at the start and play at the end), called
+      once a music voice (4 times in the session). First written here as
+      "no hardware loops" and "later input buffers by `sub_8245CF98`",
+      both wrong: the loop count was read before that call.
+
+    **Plan (agreed with the user, 2026-10-21):** we aren't emulating an
+    Xbox; we take the game's audio and play it through SDL. So:
+
+    1. **Our own FFmpeg from upstream**, pinned to a release in the
+       repo and built with only the `xma2` decoder (A1's FFmpeg part,
+       done here). Not the SDK's: it pins Xenia's fork
+       (`wmarti/FFmpeg`), whose build has only `mp3`, `wmapro`, `wmav2`
+       and `xmaframes`, the fork's frame-at-a-time decoder made for
+       emulating the hardware (bit read offsets, mid-packet starts and
+       loops). Upstream's `xma2` decodes whole 2 KB packets, which is
+       what we feed. Loops: every XMA frame decodes to 512 samples a
+       channel and starts with its length (15 bits), so our code walks
+       the frame headers to turn the loop's bit offsets into sample
+       positions and loops the decoded samples there (parsing, not the
+       hardware's behavior). Both can be loaded at once:
+       `librexruntime.so` links its FFmpeg statically and exports none
+       of its symbols. Linux and the Windows cross-compile both build it.
+
+       Done (2026-10-21, `native-xma`): the submodule
+       `itc_recomp/thirdparty/FFmpeg` at `n9.0.2` (shallow), built by
+       `itc_recomp/cmake/ffmpeg.cmake` as `itc_avutil` and `itc_avcodec`
+       (static, hidden symbols; ~150 files, plain C, threads on: pthreads
+       or Windows threads) from the files configure made, kept in
+       `itc_recomp/thirdparty/ffmpeg-config/<platform>/` (local paths
+       scrubbed) by `itc_recomp/tools/ffmpeg_config.sh`; run it again
+       after moving the submodule. Not linked into `itc` yet.
+       `itc_xma_check` (`itc_recomp/tests/xma_check.cpp`, not built by
+       default) decodes a bank's wave and writes a WAV. On `bgm_tmp_01`
+       and four `SB_SYSTEM_SE` sounds, Linux and Windows (Wine) alike:
+       every packet decoded, and the packet headers' frames × 512
+       (`src/audio/xma_packets.h`) equal to the bank's duration
+       (3,024,896 for the music). The decoder's output runs exactly 5,184
+       samples behind the frames × 512 timeline the whole way: 64 dropped
+       at the start (`skip_samples`) and 10 frames held inside, given out
+       at the flush. So decoded sample n is timeline sample n + 64, and
+       loop points worked out on the game's timeline (`sub_8246A5F8`'s)
+       carry over with that shift. The end loses 807 samples more (the
+       last frame's trim in the data); the music's loop end (3,024,000)
+       comes before it.
+    2. **The XMA layer native**: the helpers above (set-up and release,
+       input and output buffers, samples ready, read, reset, lock, wait,
+       unlock) become adapters over a plain C++ stream (input buffers,
+       an FFmpeg decoder, the output ring in guest memory where the voice
+       reads it). Decoding happens at unlock, on the mixer thread, filling
+       the output ring's free blocks; lock and wait have nothing to wait
+       for. No contexts, no registers, no `XMACreateContext`.
+    3. `sub_8245B808`'s category volume: the fixed answers (1.0, no
+       change) without the imports.
+    4. The SDK's audio system goes (`ItcAudioSystem` no longer starts
+       its XMA decoder), and A6 (our own conversion and downmix).
+
+    Read since (2026-10-21), and what step 2 needs from it:
+
+    - The voice's queue of buffers is at voice +20 (address +8, size
+      +12, loop count +16, state +116: 0 new, 3 handed over, 4 done).
+      `sub_8246B480` hands a new buffer over (`sub_8245C958`) and, with a
+      loop count, sets the loop data (`sub_8245CF98`): bit offsets the
+      buffer carries (+40, +44), or with voice +266 = 2 worked out from
+      sample positions by `sub_8246A5F8`. A buffer is done (the
+      buffer-end callback, voice +16's vtable +92) once its address is
+      no longer a valid input buffer (`sub_8245CA30`), or the error
+      status (`sub_8245CF60`) has bit 8. So our stream clears its valid
+      bit when decoding passes the data's end after its loops.
+    - `sub_8246A5F8` is the game's own frame walk, sample to bit offset:
+      2 KB packets, each header with the frame count (top 6 bits), the
+      first frame's bit offset (15 bits, + 32 for the header) and the
+      packets of other streams to skip (low 8 bits); each frame starts
+      with its length (15 bits) and decodes to 512 samples a channel.
+      `sub_8246A698` gives the last frame's offset (the data's end). Our
+      loop handling is this walk the other way; subframes are 128
+      samples, so the loop's skip and end counts place the loop points
+      within a frame. Check the exact meaning of the skip and end
+      against the SDK's decoder (`rexglue-sdk/src/audio/xma_context.cpp`)
+      while writing it.
+    - Never called in the user's session: `sub_8246BB98`'s second loop
+      (from buffer +32 to the end, once, with `sub_8245CE10` moving the
+      output by 128 samples), `sub_8246B1C8` and `sub_8245D070` (the input
+      read offset). Step 2 can leave them out (logging if one is ever
+      reached).
+
+    **Done (2026-10-21, `native-xma`).** The XMA work went another way
+    than step 2 above, for the rule "don't rebuild what the SDK does"
+    (the user stopped the ring version: blocks, valid bits, subframes and
+    decoding at unlock were the SDK's XMA emulation again):
+
+    - Step 2: each sound is decoded with our FFmpeg into one flat buffer
+      of big-endian 16-bit samples in guest memory (system heap; up to
+      ~12 MB for a music track), from the game's data where it lies
+      (`src/audio/xma_stream.h`): a second's worth when it starts, then
+      kept a second ahead at each unlock (a whole track at once took
+      ~60 ms, more than the ~42 ms of output queued). The helpers answer
+      the voice from a position (`src/hooks/xma.cpp`): ready, where,
+      taken; "ready" capped at the voice's own ring size, so the voice
+      never sees a count it couldn't on the 360. Loops: the loop's bit
+      offsets turned into sample positions by the frame walk
+      (`FrameAtBitOffset`), the position jumps back at the loop end.
+      Lock, wait and the error status answer at once. The game's frame
+      walk (`sub_8246A5F8`) is ported (`BitOffsetOfSample`); harness
+      `xma`: 512 cases on made-up packets, 0 differ. No fallback flag (the
+      user's call): the harness covers the walk, the release build is the
+      listening comparison.
+    - Checked: attract races (five minutes; the user listened as well):
+      0 silence fills (but the window `timeout` ends in, and once 1 at a
+      race load that didn't come back in two more runs); the loop points
+      equal to the banks' loop regions less the decoder's 64
+      (`bgm_tmp_04`: 458,496 to 1,305,216 in the bank, 458,432 to
+      1,305,152 ours; `bgm_tmp_06` likewise); each sound ends at its
+      decoded length (`SB_SYSTEM_SE`'s 18,368 samples as
+      `itc_xma_check`). Not yet seen: the loop jump itself (no attract
+      race lasts to a track's loop end; `--log_xma` logs `loop:` when it
+      happens).
+    - Step 3: the mixer's category volume pass (`sub_8245B808`,
+      `src/hooks/audio_volume.cpp`) without its two imports: the change
+      mask 0, as the SDK answered every time, so no volume is asked for.
+    - Step 4: the SDK's XMA decoder isn't set up (no "XMA Decoder" thread,
+      no register mapping at `7FEA0000`); the hardware wait
+      (`sub_8245D288`) answers at once (`hooks/xma.cpp`; its register
+      writes are gone from `hooks/clock.cpp`). A6 with it (above).
+    - `--log_xma` logs each sound's start, loop data, loop jumps and end.
+
+    Left: the SDK's audio pieces in our output (A6 above: `AudioSystem`,
+    two flags), and the guest memory the decoded samples live in (level 1:
+    the voice's update is recompiled; with B7 they move to host memory).
 
 B3. **Graphics boundary** (17 functions calling `Vd*`): ring buffer
     setup, the interrupt callback and vblank, swap, display mode and gamma
@@ -1938,6 +2111,37 @@ B6. **Pure helpers** (55 functions): string, time and formatting
     `rexglue-removal-project` (2026-10-20). Next item not decided (A2,
     or A6 with B2, would remove visible SDK use).
 
+B8. **The boundary's last non-core imports** (agreed with the user,
+    2026-10-21, after B2; done before B7, numbered after it). After B2,
+    72 imports still have a live caller: ~60 are the core's (threads
+    and sync, 49; the heap and physical memory, ~8: E1 and E2, after
+    B7), and about a dozen are B5's and B6's leftovers. This item takes
+    those, so only the core's imports stay live:
+
+    1. **Bookkeeping**: wrappers whose callers B5 already made native or
+       skipped (the system link socket set-up, the profile read, sign-in,
+       the notification listener) still count as live because their rows
+       don't say "never called". A temporary counter on them over boot,
+       menus and a race the user plays, then the rows marked (or the
+       wrappers Dropped).
+    2. **The other notification readers**: the four game readers that
+       still poll `XNotifyGetNext` besides the app's (B5 step 6), first
+       listed under B5's leftovers for B7. Read each, and answer what
+       the game needs ("no notification"), per "plug in the data".
+    3. **Small one-offs**: the quit path (`xstart`'s
+       `XamLoaderTerminateTitle`: a native exit), `DbgPrint` (dropped),
+       `sprintf` (its callers, the drive mounting, probably never run),
+       the memory statistics query (`MmQueryStatistics`, probably fixed
+       data) and the `XamAlloc`/`XamFree` caller (`sub_82575D78`). The
+       heap helpers counted under B6 (`RtlCompareMemoryUlong`,
+       `KeGetCurrentProcessType`) and `RtlInitializeCriticalSection` stay
+       with the core.
+
+    `itc_recomp/tools/boundary_status.py` gives the counts only; the live
+    callers of each import come from the same data (its `boundary()` and
+    the status check's rows, read the way its `main()` decides "live").
+    Not started.
+
 B7. **The game logic inside**: everything else, subsystem by subsystem,
     in whatever order the user wants (frame interpolation's hooks,
     vehicles, UI, menus, physics, ...). Each subsystem moves its data to
@@ -2072,3 +2276,24 @@ Files and saves: ReadFile, GetFileSizeEx and GetFileAttributes Dropped
 (their callers in play native or overridden without them), none live.
 Some functions also call imports of other areas (the pure helpers' and
 the core's counts move with them). 256 overrides in `src/`.
+
+**2026-10-21, after B2 (branch `native-xma`; A0, A5, A6, B1, B2, B3, B4,
+B5 and B6 done):** 449 functions (916 pairs): overridden 54, Native 3,
+Dropped 20, never called 62, live 310. Imports: 186 called, 72 with a
+live caller.
+
+| Area | Overridden | Native | Dropped | Never called | Live |
+|---|---|---|---|---|---|
+| input (B1) | 0 | 3 | 0 | 0 | 0 |
+| audio (B2) | 6 | 0 | 0 | 0 | 0 |
+| graphics (B3) | 12 | 0 | 3 | 4 | 0 |
+| files and saves (B4) | 2 | 0 | 13 | 8 | 0 |
+| memory (core) | 5 | 0 | 0 | 3 | 20 |
+| system services (B5) | 17 | 0 | 3 | 48 | 12 |
+| pure helpers (B6) | 18 | 0 | 2 | 3 | 26 |
+| threads, sync and the rest (core) | 7 | 0 | 3 | 19 | 265 |
+
+Audio: none live. The XMA helpers calling `MmGetPhysicalAddress`
+(`sub_8245C650`, `sub_8245C958`, `sub_8245D138`) are ours, so memory and
+the core's counts moved with them. 282 overrides in `src/`. Outside the
+core, what's live is B5's and B6's leftovers waiting on B7 and the core.

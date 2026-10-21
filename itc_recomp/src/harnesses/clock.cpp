@@ -1,7 +1,5 @@
 // The performance counter's rate (src/hooks/clock.cpp) against the
-// recompiled QueryPerformanceFrequency. The audio library's hardware wait
-// (sub_8245D288) isn't compared here: it polls the hardware, so an attract
-// race is its check.
+// recompiled QueryPerformanceFrequency.
 
 #include "harness.h"
 
