@@ -33,10 +33,17 @@ goes in `src/` as overrides), American English.
   measures the core, so B7 needs its own measure: per-subsystem counts of
   the statuses in `docs/functions/`.
 - **Track A**: A0, A2, A5 and A6 done (A2's flag parser waits for A4);
-  A1 started (xxHash); A3 and A4 not started. What `src/` still takes
-  from the SDK is in the table below.
-- **Next, in order (proposed 2026-10-21, the user agreed to start with
-  A2; A2 done the same day, merged from `own-logging`):** A2 (logging, flags, hashes: our own headers forwarding to the
+  A1 started (xxHash); A3 not started; A4 deferred until the code has no
+  guest dependency (the user's call, 2026-10-21; see A4). What `src/`
+  still takes from the SDK is in the table below.
+- **Next (2026-10-21, after A4 was deferred):** B7, starting with its
+  measure (per-subsystem counts of the statuses in `docs/functions/`) and
+  a first subsystem: the leftovers above, or the main thread's
+  performance leads. A3 alongside. A1's SDL and A2's flag parser wait for
+  A4, at the end.
+- **The order proposed before (2026-10-21, the user agreed to start with
+  A2; A2 done the same day, merged from `own-logging`; A4 since
+  deferred):** A2 (logging, flags, hashes: our own headers forwarding to the
   SDK's, then `src/` switched over area by area, then our own logger and
   hashing; the flag parser waits for A4), A4 (the app shell: our own
   `main`, loop, window and flag parser; it unblocks A1's SDL and finishes
@@ -371,6 +378,80 @@ A4. **App shell**: our own `main`: SDL init, our window as the only one
     SDK's runtime (memory, kernel, image load) through its API: that's the
     core and stays. Find the minimal setup in
     `rexglue-sdk/src/ui/rex_app.cpp` and `src/system/runtime.cpp`.
+
+    **Deferred until the code has no guest dependency** (the user's call,
+    2026-10-21, after the survey below). Nothing in Track B or A3 needs it:
+    the SDK's flag parser, its hidden window and the log file takeover
+    (`src/base/log_sdk.cpp`) all work. Done now, our `main` would still start
+    the SDK's `Runtime` (memory, kernel, image load) through its API, and
+    that start-up is replaced anyway when the core goes; done last, it's
+    written once. A1's SDL and A2's flag parser wait with it.
+
+    The survey (2026-10-21), for when it's picked up again. From process
+    start to the first frame, all on the process's main thread (the SDK's
+    "UI thread"), as `windowed_app_main_sdl.cpp` and `rex_app.cpp` (both
+    compiled into our executable by `rexglue_configure_target`) run it:
+    1. `rex::cvar::Init(argc, argv)`: CLI11 parses the command line against
+       the SDK's flag registry (ours are in it too, through
+       `ITC_FLAG_*`); unknown `--name=value` kept for late registrations.
+       `ApplyEnvironment()` (`REX_<NAME>` variables; nothing of ours uses
+       them), `InitLoggingEarly()` (a stdout sink).
+    2. `SDLWindowedAppContext::Initialize`: `SDL_InitSubSystem(VIDEO)`
+       (honors `--video_driver`), two registered event types (wake-up,
+       paint), an event watch; `CoInitializeEx` on Windows.
+    3. `ReXApp::OnInitialize`:
+       - `SetupEnvironment`: paths from `--game_data_root` (our
+         `OnConfigurePaths`: the executable's folder when empty),
+         `--user_data_root` (default the platform's user folder + `itc`),
+         `--cache_root` (default `<user>/cache`; only the emulated GPU's
+         shader storage used it; our `cache/` is `native/disk_cache.cpp`'s),
+         update and metadata roots. Only then is `itc.toml` (next to the
+         executable) loaded, which is why it can't set `game_data_root`.
+         Logging: `BuildLogConfig(--log_level, [log.levels] in the toml)`,
+         `InitLogging` makes `logs/itc_NNN.log` in the executable's folder
+         (`{:03d}`, one more than the highest there; `--log_file` overrides);
+         our `OnPostInitLogging` takes the file over.
+       - `SetupPresentation`: the `RuntimeConfig` (audio: the SDK's SDL
+         audio, ours through `native_audio::Configure`; input: nulled by
+         us; `kernel_init = rex::kernel::InitializeKernel`; no GPU plugin);
+         a 1280x720 SDK window (we hide it) titled
+         `itc [rexglue-v<version>-<config>]`, its listeners, imgui, the
+         overlays and their keybinds; our `Gamepads_Start`, which queues
+         its work through `CallInUIThreadDeferred`.
+       - `ConstructRuntime`: `Runtime(paths)`, `set_app_context` (used only
+         by Xam's dialogs, none live since B5; nothing reads
+         `display_window`), `Runtime::Setup(PPCImageConfig, config)`
+         (memory, exports, dispatcher, VFS, KernelState, kernel modules,
+         audio, the function table), `LoadXexImage("game:\\default.xex")`;
+         no CRT heap (`REXCRT_HEAP 0`); `OnPostSetup` (thread CPU logging).
+    4. The loop (`SDL_WaitEvent`); its first queued function launches the
+       module: `PrepareModuleLaunch()`, `Resume()` on the guest's main
+       thread, and a `std::thread` that waits for it and quits the loop
+       (it never returns in play).
+
+    Elsewhere: our renderer makes its window on the main thread
+    (`SDL_RunOnMainThread` and a pushed wake event) and registers it in the
+    SDK's event table (`native/app_window.cpp`); gamepads are watched on
+    whichever thread pumps, opened and pumped on the main thread. Close:
+    our window's close request (or `SDL_EVENT_QUIT`, so SIGINT and
+    `timeout`'s SIGTERM too) reaches `ReXApp::OnClosing`:
+    `kernel_state()->TerminateTitle()`, flush, `std::_Exit(0)`.
+    `OnShutdown` and `OnDestroy` only run if the guest's main returns, so
+    never in play. Unused by us: imgui, the overlays and keybinds,
+    achievements, the SDK window itself.
+
+    The plan proposed then (not agreed, revisit with the core's removal):
+    our own flag registry and parser (`itc.toml` then the command line;
+    names the SDK registers forwarded with `rex::cvar::SetFlagByName`;
+    `fullscreen`, `log_level`, `audio_mute`, `audio_maxqframes` and
+    `video_driver` ours); a `--log_flags` flag landed first on the old
+    shell so flag values can be compared before and after; our `main`
+    naming the log file as the SDK did and calling `rex::InitLogging` with
+    no file; `SDL_main.h` for Windows' entry point; the gamepads' queue on
+    `SDL_RunOnMainThread`; the two SDK app sources taken off our target's
+    source list in our `CMakeLists.txt`. Open questions then: drop the
+    `REX_*` environment variables, no log file at all with
+    `--log_level=off`, `itc.toml` able to set `game_data_root`.
 
 A5. **Input reading**: SDL gamepads (rumble too) as a native module with
     no Xbox types. No keyboard (A0). Its game side is B1; do the two
@@ -2374,6 +2455,10 @@ E3. **The image load**: the recompiled code reads strings, constants,
     compiled into the exe (B7). Once no recompiled code reads the image,
     the load and `default.xex` are no longer needed; the player's `DATA/`
     still is.
+
+A4 (the app shell, deferred 2026-10-21) comes here, once nothing needs
+the guest: our own `main`, loop, window and flag parser, written once
+against what's left instead of around the SDK's `Runtime` start-up.
 
 E4. **`PPCContext`, `rex/ppc.h`, the function table, `generated/`,
     and the SDK**: delete the submodule, `patches/rexglue-sdk/`,

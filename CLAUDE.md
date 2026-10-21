@@ -93,7 +93,9 @@ new code). The logger is ours (`src/base/log.cpp`, `std::format` and
 stdio, no rotation) and takes over the log file the SDK opens, forwarding
 the SDK's own lines into it (`src/base/log_sdk.cpp`, until A4); hashes
 use our own xxHash (`itc_recomp/thirdparty/xxHash`, A1's first library).
-The flags are still parsed by the SDK until A4.
+The flags are still parsed by the SDK until A4, which is deferred until
+the code has no guest dependency (the user's call, 2026-10-21; the survey
+is under A4 in the plan). Next: B7.
 After each plan item, run `itc_recomp/tools/boundary_status.py` and record
 its output in "The boundary over time" at the end of
 `docs/rexglue-removal.md`. Plan steps are done on their
