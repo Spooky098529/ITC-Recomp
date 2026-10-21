@@ -58,6 +58,11 @@ mapped with no code; step 6 (notifications: the listener wrapper makes
 none, the app's reader builds the users once, `src/hooks/notify.cpp`);
 step 7 (the profile read as hardcoded data, `src/user/profile.cpp`). B5's
 steps are done; what's left of its imports goes with B4, B7 and the core.
+B4 (files and saves) is done on `files-and-saves` (2026-10-21, not yet
+merged): the saves (`src/saves/`), the data files (`src/game_data/`, the
+file class and the archive streaming), the movies' reads
+(`src/hooks/movie_files.cpp`) and the shader build's debug check are
+native or dropped; nothing the game opens goes through the SDK's VFS.
 After each plan item, run `itc_recomp/tools/boundary_status.py` and record
 its output in "The boundary over time" at the end of
 `docs/rexglue-removal.md`. Plan steps are done on their

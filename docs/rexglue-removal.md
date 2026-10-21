@@ -1321,6 +1321,27 @@ B4. **Files and saves** (22 functions; the game's `CreateFile`
     CreateFile and Prime have no callers in play (Dropped), and the
     SDK's VFS serves nothing the game asks for.
 
+    **The debug check and the movies: done (2026-10-21,
+    `files-and-saves`).** As proposed. `sub_822B8868` calls the shader
+    build alone (`src/hooks/graphics_drops.cpp`). The movie source's
+    OpenFile, set-up, Read, looping Read and Close are native for our
+    handles (`src/hooks/movie_files.cpp`); a handle that isn't ours goes
+    to the recompiled methods, so Cancel and Prime are left only to them
+    (Dropped). Harness `movie_files` (the recompiled source opened through
+    the SDK on `UBI_LOGO.wmv`, the decoder's Seek, Skip and Read: 17
+    cases, 0 differ). The user's play: the logo, then a race through
+    `STAGE1_OPENING.wmv`, both seen; the log shows no file opened through
+    the SDK and no error lines. GetOverlappedResult still runs once at
+    boot, from the save load's wait (`sub_820A4FF8`) on an overlapped our
+    save code marked done: no wait, and it calls no import itself.
+    CreateFile keeps its logging wrapper (`--log_file_opens`), which
+    would show any open left. The temporary counter is removed.
+
+    **B4: done (2026-10-21).** No live boundary function is left in files
+    and saves: the saves, the game's data files, the movies and the debug
+    check are native or dropped, and the rest is never called in play.
+    Nothing the game asks for goes through the SDK's VFS any more.
+
 B5. **System services** (82 functions; first counted as 78): sign-in, profile, UI dialogs,
     sessions, voice, network, notifications, the loader. Most should go
     from the game's side entirely (offline, signed in, no voice). Log
@@ -2004,3 +2025,24 @@ GetDiskFreeSpaceEx, SetEndOfFile, DeleteFile, GetFileTime,
 FlushFileBuffers, XContentGetCreator: none called in nine sessions), live
 3 (ReadFile and GetFileSizeEx, the movie player's; GetFileAttributes, the
 graphics library's debug check). The other areas unchanged.
+
+**2026-10-21, after B4 (branch `files-and-saves`; A0, A5, B1, B3, B4, B5
+and B6 done):** 449 functions (916 pairs): overridden 49, Native 3,
+Dropped 20, never called 61, live 316. Imports: 186 called, 77 with a
+live caller.
+
+| Area | Overridden | Native | Dropped | Never called | Live |
+|---|---|---|---|---|---|
+| input (B1) | 0 | 3 | 0 | 0 | 0 |
+| audio (B2) | 3 | 0 | 0 | 0 | 3 |
+| graphics (B3) | 12 | 0 | 3 | 4 | 0 |
+| files and saves (B4) | 2 | 0 | 13 | 8 | 0 |
+| memory (core) | 2 | 0 | 0 | 3 | 23 |
+| system services (B5) | 17 | 0 | 3 | 48 | 12 |
+| pure helpers (B6) | 18 | 0 | 2 | 3 | 26 |
+| threads, sync and the rest (core) | 6 | 0 | 3 | 18 | 267 |
+
+Files and saves: ReadFile, GetFileSizeEx and GetFileAttributes Dropped
+(their callers in play native or overridden without them), none live.
+Some functions also call imports of other areas (the pure helpers' and
+the core's counts move with them). 256 overrides in `src/`.
