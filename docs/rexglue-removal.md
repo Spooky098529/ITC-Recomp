@@ -287,6 +287,22 @@ A2. **Logging, flags, hashes**: our own headers (`src/base/log.h`,
     Log file names and rotation must stay (`logs/itc_<n>.log`,
     `itc_<n>.1.log`): CLAUDE.md and tools rely on them.
 
+    Steps 1 and 2 done (2026-10-21, `own-logging`): `src/base/log.h`
+    (`ITC_LOG_DEBUG`, `_INFO`, `_WARN`, `_ERROR`, and
+    `base::InfoLogEnabled`, moved from `native/log_enabled.h`),
+    `src/base/flags.h` (`ITC_FLAG_BOOL`, `_INT32`, `_STRING`,
+    `ITC_FLAG_DECLARE`, and `ITC_FLAG(name)` for a value) and
+    `src/base/hash.h` (`base::Hash64`, XXH3-64 inlined, with or without a
+    seed), all forwarding to the SDK's. Every file in `src/` switched over,
+    one commit per directory; nothing outside `src/base/` uses the SDK's
+    log, flag or hash macros or includes `rex/logging.h`, `rex/cvar.h` or
+    `rex/hash.h`. Flag names and spellings are unchanged (the SDK's
+    integer flags are `INT32`; there's no plain `INT`). Files that used a
+    macro now include its header: `native/shaders.cpp` had the SDK's
+    flags only through `rex/hash.h`. Checked: an attract race with every
+    harness (no errors, 16 s raced, all the same but the groups expected
+    to differ). Step 3 next: our own logger and hashing.
+
 A3. **Renderer leftovers**: bring the shader translator into the repo
     (`src/native/xenos/`; the files `itc_xenos_shaders` builds, listed in
     `CMakeLists.txt`, and the headers they need). The game's shaders are
