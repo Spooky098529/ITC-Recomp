@@ -97,5 +97,11 @@ void Clock(Context& h);
 void Strings(Context& h);
 void LastError(Context& h);
 void Gamma(Context& h);
+void StartUp(Context& h);
+void User(Context& h);
+void Xmp(Context& h);
+void Network(Context& h);
+void Notify(Context& h);
+void Profile(Context& h);
 
 }  // namespace harness

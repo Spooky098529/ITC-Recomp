@@ -1,6 +1,6 @@
 // Interpolated drawing, in the usual engine way: game logic ticks at 30 Hz,
 // and each frame is drawn from a blend of the last two ticks. See
-// "Interpolation" in docs/functions.md.
+// "Interpolation" in docs/frame-interpolation.md.
 //
 // Almost everything drawn in 3D gets its transform from the game's matrix
 // multiply (sub_8209BD50): world * a camera's view-projection, written into a

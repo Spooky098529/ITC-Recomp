@@ -1,5 +1,5 @@
 // The graphics library's functions whose work isn't needed on PC, dropped
-// (status Dropped in docs/functions.md): they only made kernel video calls
+// (status Dropped in docs/functions/functions.md): they only made kernel video calls
 // (Vd*) the SDK stubs, or wrote packets for the 360's display hardware,
 // which our renderer doesn't read. See B3 in docs/rexglue-removal.md.
 

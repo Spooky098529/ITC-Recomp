@@ -1,9 +1,10 @@
 // The time functions (src/hooks/time.cpp) against the recompiled ones:
 // FileTimeToSystemTime, SystemTimeToFileTime, the cutover dates, the time
-// zone state and bias on made-up zones, and GetLocalTime.
+// zone state and bias on made-up zones, GetLocalTime, and the console's time
+// zone read.
 //
-// Made-up zones come from the override of the console's time zone read
-// below, which answers with g_fake_zone while a harness sets it.
+// Made-up zones are answered by the time zone read (time_hooks::SetFakeZone),
+// which both the native and recompiled versions call.
 
 #include "harness.h"
 
@@ -13,15 +14,11 @@
 
 namespace time_hooks {
 int64_t GetTimeZoneBias(PPCContext& ctx, uint8_t* base);
+void SetFakeZone(const uint8_t (&bytes)[172], bool uses_daylight);
+void ClearFakeZone();
 }
 
 namespace {
-
-struct FakeZone {
-  bool active = false;
-  uint32_t uses_daylight = 0;
-  uint8_t bytes[172] = {};
-} g_fake_zone;
 
 // A zone in TIME_ZONE_INFORMATION's layout (see src/hooks/time.cpp).
 struct Zone {
@@ -35,7 +32,7 @@ struct Zone {
 };
 
 void SetFakeZone(const Zone& z) {
-  uint8_t* b = g_fake_zone.bytes;
+  uint8_t b[172];
   for (int i = 0; i < 172; i++) {
     b[i] = uint8_t(0x40 + i);  // the names: a pattern
   }
@@ -56,8 +53,7 @@ void SetFakeZone(const Zone& z) {
   be32(84, uint32_t(z.standard_bias));
   date(152, z.daylight_date);
   be32(168, uint32_t(z.daylight_bias));
-  g_fake_zone.uses_daylight = z.uses_daylight;
-  g_fake_zone.active = true;
+  time_hooks::SetFakeZone(b, z.uses_daylight != 0);
 }
 
 void StoreDate(uint8_t* base, uint32_t address, const uint16_t f[8]) {
@@ -67,20 +63,6 @@ void StoreDate(uint8_t* base, uint32_t address, const uint16_t f[8]) {
 }
 
 }  // namespace
-
-// The console's time zone read (r3 = the zone, r4 = "uses daylight saving";
-// returns 0 or a DOS error): the recompiled one, or the harness's made-up
-// zone while one is set.
-extern "C" REX_FUNC(sub_8229B440) {
-  REX_FUNC_PROLOGUE();
-  if (!g_fake_zone.active) {
-    __imp__sub_8229B440(ctx, base);
-    return;
-  }
-  harness::Write(base, ctx.r3.u32, g_fake_zone.bytes, 172);
-  guest::StoreU32(base, ctx.r4.u32, g_fake_zone.uses_daylight);
-  ctx.r3.u64 = 0;
-}
 
 namespace harness {
 
@@ -202,7 +184,7 @@ void Time(Context& h) {
       SetFakeZone(z);
       Both(h, results, [] {}, [&](PPCContext& t) { t.r3.u64 = data; }, __imp__sub_82297DC8,
            sub_82297DC8, data, 172, z.name);
-      g_fake_zone.active = false;
+      time_hooks::ClearFakeZone();
     }
     results.Report();
   }
@@ -222,25 +204,55 @@ void Time(Context& h) {
       for (int i = 0; i < 8; i++) {
         result[1].push_back(uint8_t(ours >> (56 - 8 * i)));
       }
-      g_fake_zone.active = false;
+      time_hooks::ClearFakeZone();
       results.Check(result[0], result[1], z.name);
     }
     results.Report();
   }
 
-  // GetLocalTime: the two read the clock apart, so the milliseconds aren't
-  // compared.
+  // GetLocalTime: the two read the clock apart (and the SDK's clock can be a
+  // little ahead of the host's), so the milliseconds aren't compared and the
+  // times may be up to a second apart (a second can tick over between them).
   {
-    Results results("GetLocalTime (sub_822968B8), to the second");
+    Results results("GetLocalTime (sub_822968B8), within a second");
     std::vector<uint8_t> result[2];
+    uint64_t time[2] = {};
     for (int v = 0; v < 2; v++) {
       Fill(base, data, kScratchBytes);
       PPCContext t = CallContext(h);
       t.r3.u64 = data;
       (v == 0 ? __imp__sub_822968B8 : sub_822968B8)(t, base);
       result[v] = Read(base, data, 14);
+      helpers::SystemTime s;
+      uint16_t* fields = &s.year;
+      for (uint32_t i = 0; i < 8; i++) {
+        fields[i] = guest::LoadU16(base, data + 2 * i);
+      }
+      s.milliseconds = 0;
+      helpers::SystemTimeToFileTime(s, &time[v]);
+    }
+    const uint64_t apart = time[0] > time[1] ? time[0] - time[1] : time[1] - time[0];
+    if (apart <= 10000000) {  // 1 s in 100 ns units
+      result[1] = result[0];
     }
     results.Check(result[0], result[1], "now");
+    results.Report();
+  }
+
+  // The console's time zone read, the SDK's answers: the zone (names left
+  // partly alone, so the 0xCD around them is compared too) and "uses
+  // daylight saving", given or not.
+  {
+    Results results("ReadTimeZoneSettings (sub_8229B440)");
+    for (int given = 0; given < 2; given++) {
+      Both(h, results, [] {},
+           [&](PPCContext& t) {
+             t.r3.u64 = data;
+             t.r4.u64 = given ? data + 172 : 0;
+           },
+           __imp__sub_8229B440, sub_8229B440, data, 176,
+           given ? "uses daylight given" : "uses daylight not given");
+    }
     results.Report();
   }
 }

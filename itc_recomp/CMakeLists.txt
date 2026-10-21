@@ -78,6 +78,12 @@ set(ITC_SOURCES
     src/hooks/graphics_drops.cpp
     src/hooks/graphics_device.cpp
     src/hooks/video_mode.cpp
+    src/hooks/start_up.cpp
+    src/hooks/user.cpp
+    src/hooks/xmp.cpp
+    src/hooks/network.cpp
+    src/hooks/notify.cpp
+    src/hooks/profile.cpp
     src/display/gamma.cpp
     src/harnesses/harness.cpp
     src/harnesses/clock.cpp
@@ -86,10 +92,17 @@ set(ITC_SOURCES
     src/harnesses/object_attributes.cpp
     src/harnesses/strings.cpp
     src/harnesses/time.cpp
+    src/harnesses/start_up.cpp
+    src/harnesses/user.cpp
+    src/harnesses/xmp.cpp
+    src/harnesses/network.cpp
+    src/harnesses/notify.cpp
+    src/harnesses/profile.cpp
     src/helpers/debug_output.cpp
     src/helpers/object_attributes.cpp
     src/helpers/time.cpp
     src/helpers/strings.cpp
+    src/user/profile.cpp
     src/input/gamepads.cpp
     src/input/input_processor.cpp
     src/input/logical_pad.cpp

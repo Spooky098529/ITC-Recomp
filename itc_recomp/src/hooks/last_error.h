@@ -14,9 +14,9 @@ namespace last_error {
 void Set(uint8_t* base, uint32_t pcr, uint32_t error);
 
 // SetLastError from an NTSTATUS (sub_82296E88); returns the DOS error. The
-// mapping is the SDK's (xeRtlNtStatusToDosError) until the console's
-// settings read (sub_8229B440, B5), its other caller, is native: then it
-// needs a table of our own.
+// mapping is the SDK's (xeRtlNtStatusToDosError) until the import's last
+// recompiled caller, sub_822953E8 (probably a file I/O completion routine,
+// B4), is native: then it needs a table of our own.
 uint32_t SetFromStatus(uint8_t* base, uint32_t pcr, uint32_t status);
 
 }  // namespace last_error

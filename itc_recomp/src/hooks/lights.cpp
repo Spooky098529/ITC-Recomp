@@ -1,5 +1,5 @@
 // Lights::FindNearest (sub_820F4128) done natively: the lights nearest a
-// point, nearest first. See docs/functions.md for what it does, and "The main
+// point, nearest first. See docs/functions/functions.md for what it does, and "The main
 // thread" in docs/native-renderer.md for why (13% of the main thread).
 //
 // The translated original spends most of its time per light tested on

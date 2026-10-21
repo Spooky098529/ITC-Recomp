@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""Checks the Status column of docs/functions.md against the code in
-itc_recomp/src, so the statuses stay true on every branch (definitions at
-the top of docs/functions.md). Reports only; changes nothing.
+"""Checks the Status column of the function tables (every file in
+docs/functions/) against the code in itc_recomp/src, so the statuses stay
+true on every branch (definitions at the top of each file).
+Reports only; changes nothing.
 
 usage: check_function_statuses.py [repo root]   (default: this repo)
 
@@ -18,6 +19,9 @@ For each table row, every sub_XXXXXXXX in its first column is checked:
   note     Overridden, and its file calls __imp__sub_X (a fallback flag or
            a check against the original is fine; calling it for the work
            would make it Wrapped)
+  error    the same sub_X in rows of two files (a row moved to another
+           file but left behind too); rows naming several
+           functions may repeat one within a file
 Then lists overrides in src/ that no row's first column names.
 Exits 1 if there are errors.
 """
@@ -28,7 +32,7 @@ import sys
 
 ROOT = os.path.abspath(sys.argv[1] if len(sys.argv) > 1 else
                        os.path.join(os.path.dirname(__file__), "..", ".."))
-DOC = os.path.join(ROOT, "docs", "functions.md")
+DOCS = os.path.join(ROOT, "docs", "functions")
 SRC = os.path.join(ROOT, "itc_recomp", "src")
 
 OVERRIDE = re.compile(r'extern\s+"C"\s+REX_FUNC\((sub_[0-9A-F]{8})\)')
@@ -71,27 +75,39 @@ def overrides():
     return found
 
 
+def tables():
+    """The files in docs/functions/, functions.md first."""
+    names = sorted(n for n in os.listdir(DOCS) if n.endswith(".md"))
+    return sorted(names, key=lambda n: n != "functions.md")
+
+
 def rows():
-    """(line number, [subs in the first column], status)."""
-    with open(DOC) as f:
-        for number, line in enumerate(f, 1):
-            if not line.startswith("| `sub_"):
-                continue
-            cells = [c.strip() for c in line.strip().strip("|").split("|")]
-            if len(cells) < 3:
-                continue
-            yield number, SUB.findall(cells[0]), cells[2]
+    """(place, [subs in the first column], status); place is file:line."""
+    for table in tables():
+        with open(os.path.join(DOCS, table)) as f:
+            for number, line in enumerate(f, 1):
+                if not line.startswith("| `sub_"):
+                    continue
+                cells = [c.strip() for c in line.strip().strip("|").split("|")]
+                if len(cells) < 3:
+                    continue
+                yield f"{table}:{number}", SUB.findall(cells[0]), cells[2]
 
 
 def main():
     found = overrides()
-    named = set()
+    named = {}  # sub_X -> where its first row is
     errors = checks = notes = 0
-    for number, subs, status in rows():
+    for place, subs, status in rows():
         for sub in subs:
-            named.add(sub)
+            table = place.split(":")[0]
+            first = named.setdefault(sub, place)
+            if first.split(":")[0] != table:
+                print(f"error  {place} {sub}: also has a row at {first}")
+                errors += 1
+                continue
             override = found.get(sub)
-            where = f"functions.md:{number} {sub} ({status or 'no status'})"
+            where = f"{place} {sub} ({status or 'no status'})"
             if status == "Native" and override:
                 print(f"error  {where}: an override exists in {override[0]}")
                 errors += 1
@@ -110,7 +126,7 @@ def main():
             elif status == "Overridden" and override[1]:
                 print(f"note   {where}: {override[0]} calls __imp__{sub}")
                 notes += 1
-    unnamed = sorted(set(found) - named)
+    unnamed = sorted(set(found) - set(named))
     for sub in unnamed:
         print(f"no row {sub}: overridden in {found[sub][0]}")
     print(f"{errors} errors, {checks} to check, {notes} notes, {len(unnamed)} overrides "

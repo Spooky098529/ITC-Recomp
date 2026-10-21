@@ -38,6 +38,15 @@ goes in `src/` as overrides), American English.
     leftovers, third-party libraries). Can start now, in any order.
   - **Track B**, the native port from the boundary inward, subsystem by
     subsystem; each one deletes its SDK piece when done.
+- **Map Xbox-only features, don't port them** (the user's rule,
+  2026-10-20, from B5). Features the PC port won't use (voice chat,
+  system link, Xbox Live, XMP, presence, and the like) are still read and
+  written up in `docs/functions/`, but they aren't brought into C++:
+  no stand-ins or shims imitating their Xbox interfaces. They're skipped
+  at the highest point in the game's own code where that's safe (status
+  Dropped, with the reason), or left out when that caller is made native.
+  What the game does need from them (one signed-in local user, the
+  profile's answers) becomes plain C++ with fixed answers.
 - **The core stays the SDK's, untouched, until the end**: guest memory,
   the threads that run recompiled code, the image load, `PPCContext`,
   the function table, the sync objects shared with recompiled code. These
@@ -70,7 +79,8 @@ Existing practice (CLAUDE.md, "generated/ is the recompiled code"):
 function (`grep -rn sub_XXXXXXXX itc_recomp/src` first). For each:
 
 - Read the function in `generated/` and what's known in
-  `docs/functions.md`; write it down there as it's understood.
+  `docs/functions/` (the subsystem's file); write it down there as it's
+  understood.
 - **Plain C++ behind thin adapters** (the user's precedent, 2026-10-19,
   first done for B1): the logic is a plain C++ function with normal
   arguments and host structs, no `ctx` and no guest memory, in its
@@ -117,7 +127,7 @@ itc_recomp/tools/attract_race.sh 25 --run_harnesses=all
 - Inputs that come from elsewhere are fed by a stand-in override that
   answers with made-up data while a harness asks and calls the
   recompiled function otherwise (the time harness's console time zone
-  read, `sub_8229B440`, Wrapped in `functions.md`). When that function
+  read, `sub_8229B440`, Wrapped in `functions/system-services.md`). When that function
   is made native, the stand-in moves into its native version.
 - Where ours deliberately differs, the cases go in a group of their own
   named "(expected to differ)" (the time conversions outside 1678-2261,
@@ -158,17 +168,30 @@ pipeline (re-run it as things change; it prints `<function> <import>`):
 
 ```sh
 cd itc_recomp/generated/default
-awk '/DEFINE_REX_FUNC\(sub_/ {match($0,/sub_[0-9A-F]+/); f=substr($0,RSTART,RLENGTH)}
+awk '/DEFINE_REX_FUNC\(/ {match($0,/DEFINE_REX_FUNC\([A-Za-z_][A-Za-z0-9_]*/); f=substr($0,RSTART+16,RLENGTH-16)}
      /__imp__[A-Za-z]/ && !/__imp__sub_/ && !/DEFINE_REX_FUNC/ {
        match($0,/__imp__[A-Za-z][A-Za-z0-9_]+/); print f, substr($0,RSTART+7,RLENGTH-7)}' \
   itc_recomp.*.cpp | sort -u
 ```
+
+Corrected 2026-10-20 (B5): it first matched only `sub_` names, so the
+imports of a function with another name were credited to the `sub_`
+function before it in the file. The only such caller is `xstart` (the C
+runtime's entry point, `0x82296C80`): its `DbgPrint` and
+`XamLoaderTerminateTitle` were listed under `sub_822954C8`, a small wait
+wrapper. The totals didn't change.
 
 2026-10-19: 916 pairs, 449 distinct functions. By area (functions):
 threads and sync 291, system services 78, pure helpers 55, memory 31,
 files and saves 22, graphics 17, audio 6, input 3. Overrides in `src/`
 already replace some callers; check each against `grep -rn` before
 counting it as open.
+
+Where each boundary function stands (overridden, Native, Dropped,
+never called, or still live), by plan item:
+`itc_recomp/tools/boundary_status.py` (it runs this pipeline and reads
+`docs/functions/` with the status check's code). Record its output in
+"The boundary over time" at the end of this doc after each plan item.
 
 These are the direct callers only. Making one native often means making
 its close callers native too (a wrapper and the few functions using its
@@ -303,7 +326,7 @@ Smallest and most self-contained first. Each item: make the game's
 callers (and close neighbors) native at level 1, delete or stop building
 the SDK piece nothing calls any more, release. Start every item by
 listing its functions (the pipeline above), reading them in
-`generated/` and writing them up in `docs/functions.md`.
+`generated/` and writing them up in `docs/functions/`.
 
 B1. **Input** (3 functions calling `XamInput*`): native, reading A5.
     Then the SDK's input system goes. The user checks gamepad, rumble, the pause menu's repeat (`docs/pause-menu-fix.md`; the action
@@ -569,7 +592,7 @@ B3. **Graphics boundary** (17 functions calling `Vd*`): ring buffer
     native graphics code, and the Vulkan renderer is it. What the renderer
     needs from a function is kept (made native without its `Vd*` calls);
     what it doesn't need is dropped (status Dropped in
-    `docs/functions.md`, with the reason in its row).
+    `docs/functions/functions.md`, with the reason in its row).
 
     Dropped (2026-10-20, `src/hooks/graphics_drops.cpp`, no fallback
     flag): the engines' set-up `sub_822AD190` (returns 1; only `Vd*`
@@ -952,12 +975,452 @@ B4. **Files and saves** (22 functions; the game's `CreateFile`
     byte; test with a save from the last release before and after. Then
     the SDK's VFS goes.
 
-B5. **System services** (78 functions): sign-in, profile, UI dialogs,
+B5. **System services** (82 functions; first counted as 78): sign-in, profile, UI dialogs,
     sessions, voice, network, notifications, the loader. Most should go
     from the game's side entirely (offline, signed in, no voice). Log
     which are called in a full play session first (an opt-in counter
     around the callers), and what the SDK answers today; the game must
     get the same answers.
+
+    Worked on in branch `system-services`. Surveyed 2026-10-20; steps
+    1-7 done 2026-10-21 (below the survey, after the proposed order).
+
+    **The functions.** The boundary pipeline filtered to `Xam*` (but
+    input, content and `XamAlloc`/`XamFree`), `XMsg*`, `XNotify*`,
+    `NetDll_*`, `Xex*`, `ExGetXConfigSetting`, `XGetLanguage`,
+    `XGetAVPack`, `HalReturnToFirmware` and `RtlImageXexHeaderField`
+    gives 82 functions, plus `xstart` (`DbgPrint`,
+    `XamLoaderTerminateTitle`). Two have overrides already: the time zone
+    read `sub_8229B440` (the time harness's stand-in) and Device::Init
+    `sub_822AD298` (B3), which is also the only code in `src/` calling one
+    of these imports directly (`ExGetXConfigSetting(3, 10)`). Most are the
+    XDK's thin wrappers (1-60 instructions); the big ones are game code
+    calling an import inline: the sign-in manager `sub_8214F290` (227
+    instructions), the network manager's update `sub_8214E268` (232), the
+    save devices' update `sub_820A4610` (124) and the voice code (up to
+    224). By service (XMsg ids: app `FA` XMP, `FB` XGI, `FC` XLiveBase):
+
+    - Notifications: listeners (`sub_822952B8`, `sub_8257B7A8`) and
+      their readers `sub_82099828` (the app's: sign-in changed rebuilds
+      the user table, `sub_82099600`; Live connection changed sets +248),
+      `sub_820A4610` (storage devices changed), `sub_82149080` (Live
+      connection changed), `sub_8214E268` (`0x11`), `sub_8214F290`
+      (XN_SYS_UI), `sub_8257AF30` (voice).
+    - Sign-in and user: XUserGetName `sub_82295020`, GetSigninState
+      `sub_82295028`, GetXUID `sub_82295268`, CheckPrivilege
+      `sub_82295030`, the title id check `sub_82296EE0`
+      (`XamGetExecutionId`).
+    - Profile: XUserReadProfileSettings `sub_82576E78` (from
+      `sub_82149178`, the network manager), and the voice code's reads
+      (`sub_8257E568`, `sub_8257D798`).
+    - UI: the sign-in, friends, gamercard, player review, device
+      selector, message box and dirty disc dialogs (`sub_822952C0`..
+      `sub_82295310`), and the PAL-50 message box `sub_82296950`.
+    - XGI (sessions, achievements, stats, contexts): SetContextEx
+      `sub_82294ED8` (`B0006`), SetPropertyEx `sub_82294F78` (`B0007`),
+      WriteAchievements `sub_82294E58` (`B0008`), `sub_822950C0`
+      (`B0021`), the sessions `sub_82575E50`..`sub_825766E0` (`B0010`..
+      `B0025`), the stats enumerators `sub_822951A8`, `sub_82295208`,
+      and XEnumerate `sub_82295D30`.
+    - XLiveBase: `sub_82575C90` (`58004`, the logon id), `sub_825767D0`
+      (`58023`), `sub_82576900`, `sub_82576BE0`, `sub_82576EE0`
+      (`5800E`), `sub_82576F30`, `sub_82576FE8` (`58035`).
+    - XMP (the player's own music): `sub_82589360` (`7001A`, set the
+      playback controller), `sub_82589408` (`7001B`, get it), from
+      `sub_825894C8` (`Boot::StartMovie`) and `sub_825895A0`
+      (`Boot::EndMovie`).
+    - Network: WSAStartup `sub_82459B68`, 13 socket wrappers
+      `sub_82459C20`..`sub_82459D20`, XNet `sub_82459D28`,
+      `sub_82459D40`, `sub_82459D50` (system link: `sub_82148958` makes
+      the socket, `sub_8214D7A0` receives).
+    - Voice: `sub_8257B7A8` (set-up), `sub_8257AF30` (its thread's
+      poll), `sub_8257D798`, `sub_8257DDA0`, `sub_8257DFA8`,
+      `sub_8257E3B8`, `sub_8257E4B0`, `sub_8257E568`, `sub_825816D8`.
+    - Loader and start-up: `xstart`, the heap check `sub_82297CE0` and
+      `sub_82297C08` (`RtlImageXexHeaderField` for the heap size,
+      `HalReturnToFirmware` if the heap can't be made), the PAL-50 check
+      `sub_82296AB0` (`XexCheckExecutablePrivilege(10)`, `XGetAVPack`,
+      `ExGetXConfigSetting`, `XGetLanguage`), XLaunchNewImage
+      `sub_822967E0`.
+    - Console settings: the time zone read `sub_8229B440`, Device::Init.
+
+    **What runs** (a temporary counter, `--log_system_services`,
+    `src/hooks/system_services_log.cpp`; removed after the survey). No
+    attract race this time (the user's call): one session the user played
+    (`itc_243.log`, 2.5 minutes: the boot movie, the front end, loading a
+    save, a race, saving, closing the window). 33 of the 82 ran:
+
+    - Every frame (~11,800 calls, from Draw through `sub_82107910` and
+      the app's `sub_82099A98`): `sub_82099828`, `sub_820A4610`,
+      `sub_8214E268` with `sub_8214F290` and `sub_82149080`. The voice
+      thread's `sub_8257AF30` every 10 ms (14,990).
+    - Once at boot: the heap check (returns 1, so no
+      `HalReturnToFirmware`), the PAL-50 check (returns 0: the SDK's AV
+      pack is 6, so no settings are read), five listeners (masks 3, 1, 3,
+      2 and the voice code's), Device::Init's config read (`00040000`),
+      WSAStartup (0), a UDP socket whose `bind` and `ioctlsocket` fail
+      (-1: no system link), XNetGetTitleXnAddr (4) and
+      XNetXnAddrToMachineId (1), the voice set-up with four profile reads,
+      and the XMP controller (set at the boot movie's start and end).
+    - Each front-end visit: XUserSetContextEx (9 calls, context `8001`,
+      probably presence, values 0 and 1), the user table (user 0 signed
+      in locally, state 1; users 1-3 state 0; name "User", XUID
+      `B13EBABEBABEBABE`), the profile read (10 calls), the time zone
+      read (4: an all-zero zone, "uses daylight" 1), and around the saves
+      the device selector (twice) and XEnumerate (three times), both
+      997 (pending), and the sign-in UI once.
+    - Never: achievements, SetPropertyEx, `B0021`, the stats
+      enumerators, every session and XLiveBase message, connect, listen,
+      accept, select, send and receive, the friends, gamercard, player
+      review, message box and dirty disc dialogs, the PAL-50 message box,
+      XLaunchNewImage, XUserCheckPrivilege, the voice traffic (create,
+      close, submit) and its user check.
+
+    **Notifications.** The game drains its queues, and the SDK writes id
+    0 when one is empty, so they can't be logged one by one; but the SDK
+    sends a fixed set. The first listener whose mask has bit 0 (the
+    app's, `sub_820998B8`, mask 3) gets XN_SYS_UI on and off, sign-in
+    changed twice, input devices changed twice and input configuration
+    changed twice at start-up. After that only the dialogs send any: the
+    device selector XN_SYS_UI on and off (with a 100 ms sleep), the
+    sign-in UI sign-in changed and XN_SYS_UI off, to every listener with
+    the system bit. Each listener takes only its mask's areas (id >> 25),
+    so the XMP's notifications (area 5) reach none, and nothing sends Live
+    connection changed (`0x02000002`), storage devices changed (`0xB`) or
+    `0x11`: those branches never run.
+
+    **Player data.** The profile read asks for 26 settings, first for the
+    size (4,192 bytes, `ERROR_INSUFFICIENT_BUFFER`), then the settings
+    (997, completed at once): the SDK's built-in defaults (from 1, the
+    profile), the gamercard picture key "gamercard_picture_key", and the
+    three title-specific settings (`63E83FFF`..`63E83FFD`) unset (from
+    0). The SDK would keep those as files in the game's user content
+    folder, but only `XamUserWriteProfileSettings` writes them and the
+    game doesn't import it. So no player data is in the profile: a fixed
+    answer keeps everything. Career saves are `XamContent` (B4); the
+    device selector (device 1) and XEnumerate on the content enumerator
+    belong with them.
+
+    **What can go and what needs an answer:**
+
+    - Fixed answers, once at boot: the heap check (1), the PAL-50 check
+      (0; clears `XGetAVPack`, `XGetLanguage`,
+      `XexCheckExecutablePrivilege`, and `ExGetXConfigSetting` once the
+      others are done), Device::Init's config value (`00040000`), the
+      time zone read (the SDK's all-zero zone; the last caller of
+      `RtlNtStatusToDosError` but B6's, so its mapping table has to be
+      ours then), `HalReturnToFirmware` and `RtlImageXexHeaderField`.
+    - Fixed answers, the user: one local user, signed in, name, XUID;
+      XUserSetContextEx dropped (returns 0, nothing reads it back).
+    - The profile read: the same 26 settings as the SDK answers.
+    - Network: WSAStartup 0, the system link socket made but `bind` and
+      `ioctlsocket` -1, the XNet answers; system link stays off, as
+      today.
+    - XMP: dropped (0; its notifications reach no listener).
+    - Voice: its set-up and 10 ms poll; nothing seen that it gives the
+      game (no headset). Can't be dropped by failing the engine's
+      creation (`sub_82578BF8`, probably XHVCreateEngine): the engine
+      pointer (`826C74A0`, the network manager's +0) is used without a
+      null check, every frame by `sub_8214FA78` (vtable +72, from
+      `sub_8214E268`) and by `sub_8214F790` (+48), `sub_8214FDF8`,
+      `sub_8226EEC8` and `sub_8226BCB8` (+52); only the release
+      `sub_8214F690` checks. A native stand-in engine was ruled out (the
+      user's rule below), so voice goes with the network manager.
+
+    The user's rule (2026-10-20): Xbox-only features the PC port won't
+    use (voice chat, system link, Xbox Live, XMP, presence) are mapped
+    out (read and written up in `docs/functions/`) but not brought into
+    C++: no stand-ins imitating their interfaces. They're skipped at the
+    highest game-level point that's safe (Dropped, with the reason), and
+    what the game does need from them (one signed-in local user, the
+    profile's answers) becomes plain C++ with fixed answers. For voice,
+    system link and Live that point is probably the network manager
+    (`826C74A0`): its set-up `sub_8214E190` (the voice engine, the system
+    link socket, XNet, listeners) and its per-frame update `sub_8214E268`.
+    That update also runs the sign-in manager `sub_8214F290` and the
+    profile read, so what the rest of the game reads from them must be
+    found (and kept) first.
+    - Notifications: the startup set and the dialogs' must reach the
+      same listeners. Five of their readers are game code calling
+      `XNotifyGetNext` inline, so those functions have to be made native
+      whole (or the queue ours behind an adapter for the import's
+      callers); the biggest work in B5.
+    - Never called: rows only ("never called"), no code.
+    - To B4: the device selector and XEnumerate.
+
+    Proposed order (smallest and safest first, player data last): (1)
+    the boot-time fixed answers (heap check, PAL-50 check, Device::Init's
+    value, the time zone read); (2) the user wrappers (name, sign-in
+    state, XUID, title id check, SetContextEx); (3) XMP; (4) the network
+    start-up; (5) voice, after reading what it does with its answers; (6)
+    the notification readers with their queue (the sign-in watcher first,
+    then the network manager and sign-in manager); (7) the profile read.
+
+    **Step 1, the boot-time fixed answers: done (2026-10-21,
+    `system-services`).** All four run once at boot; no fallback flags (the
+    user's call, as for B3 and B6: the harness and runs check them).
+
+    - The PAL-50 check `sub_82296AB0` (`src/hooks/start_up.cpp`): returns
+      0, Dropped. The executable's system flags (header `0x30000`) are
+      `0x600`, so privilege 10 is set and the check reaches the AV pack,
+      which the SDK answers 6: it passes before any setting is read.
+    - The heap check `sub_82297CE0` and `sub_82297C08`
+      (`src/hooks/start_up.cpp`): the heap is still made by the game's
+      `sub_822997B0(2, 0, 1 MB, 4096, 0, attributes)` (the attributes a
+      48-byte block, its size then zeros), a guest call in a frame like the
+      original's, kept at `8297149C` (`lis -32105` + 5276; the survey
+      first wrote `826A549C`, which made the first try skip the heap and
+      crash at boot). The size is fixed: `default.xex` has no default heap
+      size field (`0x20401`; its optional headers listed from the file), so
+      the SDK's `RtlImageXexHeaderField` answered 0 and the game took its
+      1 MB default. If the heap can't be made, ours logs an error and exits
+      (the SDK's `HalReturnToFirmware` exited too).
+    - Device::Init (`src/hooks/graphics_device.cpp`): the video flags
+      stored at device + 15164 are `helpers::kVideoFlags` (`00040000`,
+      `src/helpers/console_settings.h`) instead of
+      `ExGetXConfigSetting(3, 10)`; the size it wrote at frame + 80 had no
+      reader.
+    - The time zone read `sub_8229B440`: plain C++ (Overridden only
+      because of the harness's adapter, below). The SDK's answers (zero for
+      settings 1-7, retail flags `0x40` for 12, so "uses daylight" 1) are
+      `helpers::kConsoleTimeZone` and `helpers::UsesDaylight`;
+      `time_hooks::ReadTimeZoneSettings` (`src/hooks/time.cpp`) writes the
+      same bytes as the original (only the first four characters of each
+      name and a terminator: the rest is left alone), and
+      GetTimeZoneInformation calls it directly, so the time adapters make
+      no guest call for it and its -1 path (the read can't fail) is gone.
+      The time harness's made-up zone moved into it
+      (`time_hooks::SetFakeZone`); the `sub_8229B440` adapter stays only
+      for the recompiled time functions the harness runs.
+
+    Checked: harness cases (`start_up`: the PAL-50 and heap checks after
+    boot; `time`: the read against the recompiled one, "uses daylight"
+    given and not, on a buffer filled with 0xCD), all the same, and an
+    attract race (`attract_race.sh 30 --run_harnesses=all`: no errors, 25 s
+    raced), then a session the user played (`itc_247.log`, 2026-10-21: the
+    boot movie, the front end, a race at ~150 fps, quit): "looks fine", no
+    errors in the log, closed cleanly. Imports with no recompiled
+    callers left: `XGetAVPack`, `XGetLanguage`, `XexCheckExecutablePrivilege`, `HalReturnToFirmware`,
+    `RtlImageXexHeaderField` and `ExGetXConfigSetting`. Not cleared:
+    `RtlNtStatusToDosError`, still called by `sub_822953E8` (reached only
+    through the function table: maps an error status and calls a routine,
+    probably a file I/O completion routine, B4); our `sub_82296E88` keeps
+    the SDK's mapping as C++ until then (the user's call: the table waits).
+
+    **Step 2, the user wrappers: done (2026-10-21, `system-services`).**
+    The player as plain C++ in `src/user/user.h` (one local user in slot 0,
+    signed in, the SDK's name "User" and XUID `B13EBABEBABEBABE`, the
+    SDK's result codes, this title's id `555307EE` from the image's
+    execution info), with adapters in `src/hooks/user.cpp` (Overridden):
+
+    - XUserGetName `sub_82295020`: users 4 and up `0x80070057`, 1-3
+      `0x80070525`, nothing written; user 0 gets 0 and "User" in at most
+      `min(size, 16) - 1` characters and a terminator (nothing for size 0).
+    - XUserGetSigninState `sub_82295028`: 1 for user 0, else 0.
+    - XUserGetXUID `sub_82295268`: user 0 the XUID and 0; users 1-3 an
+      XUID of 0 and 1317; 4 and up 0 and 87; a null out 87, nothing written.
+    - The title id check `sub_82296EE0`: 0 for 0 or this title's high half
+      (`5553`), else 1627.
+    - XUserSetContextEx (presence, Xbox-only): every call goes through
+      `sub_82294F70` (no overlapped), whose override returns 0 and clears
+      the thread's last error, as the SDK's answer did (it set the last
+      error to 0, which the wrapper read back with GetLastError,
+      `sub_82296EC0`). Dropped; `sub_82294ED8` is no longer called
+      (Dropped, no override). Its callers (`sub_82293504` and the others)
+      stay recompiled.
+
+    Checked: harness cases (`user`: the name for users 0-5 and sizes 0-20
+    on a buffer filled with 0xCD, the sign-in state, the XUID with and
+    without an out, 200 title ids, and SetContextEx's answer with the last
+    error slot), all the same, an attract race (no errors), and a session
+    the user played (`itc_249.log`, 2026-10-21: the boot, the front end,
+    their career save loaded, no race; no errors, closed cleanly). Imports
+    with no recompiled callers left: `XamUserGetName`, `XamUserGetXUID`
+    and `XamGetExecutionId`. Not cleared: `XamUserGetSigninState` (also in
+    XUserCheckPrivilege, never called, and the voice code `sub_8257D798`,
+    step 5) and `XMsgStartIORequest` (the other XGI and XLiveBase
+    wrappers).
+
+    Seen along the way: the time harness's GetLocalTime case ("to the
+    second") can differ by one second when a second ticks over between
+    the two reads; once the recompiled one (read first) gave :53 and ours
+    :52, so the SDK's clock is probably a little ahead of the host's
+    `helpers::SystemTimeNow`. Not from B5 (GetLocalTime has been native
+    since B6); not looked into. Since 2026-10-21 the case allows a second
+    apart (the user's call), named "within a second".
+
+    **Step 3, XMP: done (2026-10-21, `system-services`).** Dropped at the
+    highest point: Boot::StartMovie's `sub_825894C8` (takes the playback
+    from the player's music: XMP's get and set controller,
+    `sub_82589408` and `sub_82589360`) and Boot::EndMovie's `sub_825895A0`
+    (hands it back) return 0 and clear the last error
+    (`src/hooks/xmp.cpp`), as the SDK's answers left them (its set went
+    through `XMsgStartIORequestEx`, which cleared the last error).
+    StartMovie ignores the answer, EndMovie returns it; their state
+    (`82957778`, `8295777C`) has no other reader, and XMP's notification
+    reached no listener. The two wrappers are no longer called (Dropped).
+    No notes kept for a music player of our own (the user's call).
+    Checked: a harness case (`xmp`: take then hand back, each answer and
+    the last error, the same; the recompiled pair leaves its state at 0),
+    an attract race (no errors), and the session below step 4's. Clears `XMsgStartIORequestEx`; not
+    `XamGetSystemVersion` (WSAStartup, step 4, and XUserCheckPrivilege,
+    never called) or `XMsgInProcessCall` (the XLiveBase wrappers).
+
+    **Step 4, the network start-up: done (2026-10-21, `system-services`).**
+    All once at boot, from the network manager's set-up `sub_8214E190`
+    (`src/hooks/network.cpp`):
+
+    - WSAStartup `sub_82459B68` (through `sub_82575B08` and
+      `sub_82459C10`, from `sub_82148868`): returns 0, Dropped. Its
+      WSADATA is in `sub_82575B08`'s frame and never read; the SDK's
+      system version (0) never took the `XexGetProcedureAddress` path.
+    - The system link socket `sub_82148958`: not made, Dropped; its handle
+      (`826C6AA0`) is INVALID_SOCKET (-1). The SDK made a socket (UDP,
+      protocol 254) whose bind to port 1000 and FIONBIO failed on Linux
+      (probably the privileged port; on Windows the bind probably
+      succeeded, leaving a live socket). The handle's only readers are the
+      system link code's sendto, select and recvfrom (`sub_8214AB48`,
+      `sub_8214AA70`, `sub_8214D7A0`), never run in play; if system link
+      is opened they get the SDK's "not a socket". The one answer that
+      differs from the SDK's (socket: -1 instead of a handle) was the
+      user's call (2026-10-21): an exact one would need a stand-in for
+      the SDK's socket.
+    - XNetGetTitleXnAddr `sub_82459D50` (looped until nonzero): the SDK's
+      XNADDR as fixed bytes (127.0.0.1, no online address or port, `CC`
+      for the Ethernet address, no online id) and 4. Overridden.
+    - XNetXnAddrToMachineId `sub_82459D40`: 1, nothing written (so the
+      machine id `sub_8214F6E8` gets stays 0, cleared by `sub_82148868`).
+      Dropped.
+
+    Checked: harness cases (`network`: WSAStartup's answer, the XNADDR on
+    a buffer filled with 0xCD and its answer, the machine id's answer and
+    its output left alone), all the same, an attract race (no errors),
+    and a session the user played for steps 3 and 4 (`itc_252.log`,
+    2026-10-21: the boot movie, the front end, a race at ~150 fps, back to
+    the menus, quit): "looked fine", no errors, closed cleanly. Imports
+    with no recompiled callers left: `NetDll_WSAStartup`,
+    `NetDll_XNetGetTitleXnAddr`, `NetDll_XNetXnAddrToMachineId`,
+    `XexGetModuleHandle` and `XexGetProcedureAddress` (WSAStartup was
+    their only caller); `XamGetSystemVersion` is left only in
+    XUserCheckPrivilege (`sub_82295030`, never called). Not cleared: `NetDll_socket`, `NetDll_bind`
+    and `NetDll_ioctlsocket` (also in `sub_82148A80`, another socket
+    set-up never run in play) and the other socket imports (the system
+    link code).
+
+    **Step 5, voice: mapped, no code (2026-10-21, `system-services`).**
+    In play the voice code reaches three system services, all inline in
+    game code and all with callers elsewhere: Voice::Init's listener
+    (`XamNotifyCreateListener`, mask 5) and the voice thread's
+    `XNotifyGetNext` (every 10 ms) go with step 6, its four profile reads
+    (`sub_8257E568`, `XamUserReadProfileSettings`) with step 7. Every
+    `XamVoice*` call, the friends and privilege checks are in functions
+    never called (no talker is ever registered): rows only. Dropping
+    Voice::Init or the thread would mean building the engine without
+    them, close to the stand-in ruled out, for nothing visible; voice goes
+    with the network manager in B7 (the user agreed, 2026-10-21: the
+    fastest route through these Xbox-only parts).
+
+    The engine (rows in `docs/functions/system-services.md`): made by
+    `sub_82578BF8` (probably XHVCreateEngine) through Voice::Init, 2,240
+    bytes, +0 a 22-entry table at `829576D0` (filled by `sub_8257B688`),
+    +4 a reference count, +8 the 48-byte parameters. The game calls +72
+    (`GetDataReadyFlags`, the engine's +1268, 0 with no talker) and +76
+    (`GetLocalChatData`, only when a flag is set) every frame from
+    `sub_8214FA78`; +48, +44 and +80 from system link code; +52 (probably
+    headset present) from UI code (`sub_8226EEC8`, `sub_8226BCB8`); +4 to
+    release (`sub_8214F690`, the only null check). The table's order
+    matches the XDK's IXHVEngine where the code shows it (+32/+36 local
+    talkers with `XamVoiceCreate`/`XamVoiceClose`, +40/+44 remote, +48
+    the remote talkers, +72/+76); +64 and +68 are unknown.
+
+    **Step 6, notifications: done (2026-10-21, `system-services`).** The
+    user's approach: plug in the data the game uses, not a 360-style queue
+    (no masks, versions or start-up set). Of the readers the listener
+    wrapper (`sub_822952B8`) served, only the app's
+    (`sub_82099828`) ever acted on a notification: the start-up sign-in
+    changed (sent twice, to the first listener with the system bit),
+    which built the user table (`sub_82099600`). The others never got one
+    (`sub_820A4610`'s storage devices changed, `sub_82149080`'s Live
+    connection changed, Network::Update's `0x11`), or, for the sign-in
+    helper `sub_8214F290`, only the dialogs' system UI on/off and the
+    sign-in UI's sign-in changed, which re-polled the same users. So
+    (`src/hooks/notify.cpp`):
+
+    - The listener wrapper makes no listener: it returns a fixed nonzero
+      value (the readers test the handle for 0; the storage devices'
+      update runs only with one). It isn't an SDK handle, so the readers
+      left recompiled find no queue in `XNotifyGetNext` and get nothing.
+      Dropped.
+    - The app's reader builds the user table and sets +244 once, on its
+      first call with a listener (the SDK's came on the third and fourth
+      frames), and does nothing after (the sign-in UI's rebuild gave the
+      same table). Overridden.
+
+    Left as they were: the four other readers (still calling
+    `XNotifyGetNext`, answered empty; they go native with their
+    subsystems: B4 for the storage devices, B7 for the network manager's)
+    and voice's own listener (made inside Voice::Init). With the game's
+    listeners no longer in the SDK's list, the SDK's start-up set now goes
+    to voice's listener (mask 5, the system bit): its poll sets and
+    clears its +1316 flag within the same call, with no talker to act on.
+    The sign-in helper no longer sees the dialogs' system UI on/off (its
+    "system UI showing" flag stays 0) or the sign-in UI's sign-in changed
+    (no re-poll, the users the same). Imports: none cleared
+    (`XamNotifyCreateListener` and `XNotifyGetNext` are still called by
+    voice and the readers left).
+
+    Checked: a harness case (`notify`: the app's reader against the
+    recompiled one reading an SDK listener, with a sign-in changed queued
+    against our first call, and nothing against a later one; the app
+    object and r3 the same, but the handle slot, which differs by design)
+    and an attract race with every harness (no errors), then a session
+    the user played (`itc_255.log`, 2026-10-21: the boot, the front end,
+    their save loaded through the device selector, a race, quit): no
+    errors, closed cleanly.
+
+    **Step 7, the profile read: done (2026-10-21, `system-services`).**
+    Hardcoded data (the user's call: no profile code). The network
+    manager's `sub_82149178` reads the profile twice through
+    XUserReadProfileSettings (`sub_82576E78`): the size (4,192 bytes,
+    ERROR_INSUFFICIENT_BUFFER), then its 26 settings (the list at
+    `82008EA0`) into an allocated buffer with an overlapped at `826C6080`,
+    which Network::Update waits on (997) before it runs; it then reads
+    setting 3's value (the gamercard region, 0). Ours
+    (`src/user/profile.cpp`, adapter `src/hooks/profile.cpp`): the 26
+    settings in the game's order with the SDK's values (the gamercard and
+    options at their defaults, the picture key "gamercard_picture_key",
+    the three title-specific ones unset), written at the buffer's address
+    (the header and the picture key point into it), and the overlapped
+    completed as the SDK did (result, length, extended error; the game's
+    has no event or completion routine, and nothing reads the thread
+    handle the SDK put in its context). Overridden.
+
+    Checked: harness cases (`profile`: the size query, the settings with
+    and without an overlapped, another user, a short buffer; the buffer,
+    the size, the overlapped and r3 the same as the recompiled one's), an
+    attract race (no errors), and a session the user played
+    (`itc_258.log`, 2026-10-21: the front end, a race at ~150 fps, quit):
+    no errors, closed cleanly. Not cleared: `XamUserReadProfileSettings`
+    (voice's own reads, `sub_8257E568`, and the never-called
+    `sub_8257D798`).
+
+    **State of B5 (2026-10-21):** steps 1-7 done. Imports with no
+    recompiled callers left: `XGetAVPack`, `XGetLanguage`,
+    `XexCheckExecutablePrivilege`, `HalReturnToFirmware`,
+    `RtlImageXexHeaderField`, `ExGetXConfigSetting`, `XamUserGetName`,
+    `XamUserGetXUID`, `XamGetExecutionId`, `XMsgStartIORequestEx`,
+    `NetDll_WSAStartup`, `NetDll_XNetGetTitleXnAddr`,
+    `NetDll_XNetXnAddrToMachineId`, `XexGetModuleHandle`,
+    `XexGetProcedureAddress` (15; 17 counted before, wrongly: the steps'
+    lists add up to 15). Left, with where they go: the notifications'
+    imports, the profile read's and the voice imports (voice and the
+    network manager's code, B7), the socket imports (system link code,
+    B7), `XamUserGetSigninState` (XUserCheckPrivilege, never called, and
+    voice), `XMsgStartIORequest` and `XMsgInProcessCall` (the XGI and
+    XLiveBase wrappers, never called but SetContextEx's, B7),
+    `XamGetSystemVersion` (XUserCheckPrivilege), the device selector and
+    XEnumerate (B4), `xstart`'s `DbgPrint` and `XamLoaderTerminateTitle`
+    (the core).
 
 B6. **Pure helpers** (55 functions): string, time and formatting
     helpers made native, or their callers made native. Cheap; can be
@@ -1007,7 +1470,7 @@ B6. **Pure helpers** (55 functions): string, time and formatting
       for times outside 1678-2261, where the SDK's conversions overflow
       `system_clock`'s nanoseconds (ours are right). The zone itself
       still comes from `sub_8229B440` (`ExGetXConfigSetting`, B5) as a
-      guest call.
+      guest call (native since B5 step 1, 2026-10-21: no guest call).
     - The counter's rate (done): `KeQueryPerformanceFrequency`, through
       QueryPerformanceFrequency and the audio library's hardware wait
       `sub_8245D288` (`src/helpers/clock.h`: 50 MHz, which must match
@@ -1040,17 +1503,17 @@ B6. **Pure helpers** (55 functions): string, time and formatting
 
     | Import | Callers B6 can do now | Callers waiting |
     |---|---|---|
-    | `RtlNtStatusToDosError` | `sub_822953E8`; `sub_82296E88` (SetLastError from an NTSTATUS, which our time adapters call as guest code: native, it removes those guest calls) | `sub_8229B440`, the console's time zone read (B5) |
-    | `DbgPrint` | `sub_822AC530`, `sub_82486BC0`, `sub_8248FBE0` | `sub_822954C8`, also calling `XamLoaderTerminateTitle` (B5) |
+    | `RtlNtStatusToDosError` | `sub_822953E8` (probably a file I/O completion routine, so maybe B4's); `sub_82296E88` done (the SDK's mapping as C++) | none since 2026-10-21: the time zone read `sub_8229B440` is native (B5 step 1) |
+    | `DbgPrint` | `sub_822AC530`, `sub_82486BC0`, `sub_8248FBE0` | `xstart`, the C runtime's entry point, also calling `XamLoaderTerminateTitle` (B5; first listed as `sub_822954C8`, the pipeline's mistake, corrected under "The boundary") |
     | `sprintf` | `sub_822AC638`, `sub_822B1AC8` | the drive mounting `sub_822B58F0` (B4) |
     | `RtlCompareMemoryUlong` | `sub_82298548`, `sub_82298A88` | `sub_8229A930`, the game's heap (core) |
     | `KeGetCurrentProcessType` | `sub_8245A828`, `sub_825776A8` | five heap and memory functions (core) |
     | `RtlInitAnsiString` | none (its 2 pure callers are done) | the file functions `sub_825B9C20`, `sub_825B9F20`, `sub_825B9FD8`, `sub_822B58F0` (B4); `sub_82295508`, CreateFile, is only wrapped for logging |
 
-    Blocked entirely: `XGetAVPack` and `XGetLanguage` (one
-    function also reading the console's settings and the executable's
-    privileges, B5), and `RtlRaiseException`,
-    `RtlUnwind`, `RtlCaptureContext` (the core). Re-run the boundary
+    Blocked entirely: `RtlRaiseException`,
+    `RtlUnwind`, `RtlCaptureContext` (the core). `XGetAVPack` and
+    `XGetLanguage`, first listed here, were cleared by B5 step 1
+    (2026-10-21: their one caller, the PAL-50 check, is Dropped). Re-run the boundary
     pipeline before starting any of these: the callers may have changed.
     Cleared by B3 (2026-10-20): `XGetVideoMode` (both callers native) and
     `RtlFillMemoryUlong` (its only caller, the scaler set-up
@@ -1070,7 +1533,9 @@ B6. **Pure helpers** (55 functions): string, time and formatting
        `sub_82296E88`'s NTSTATUS mapping is the SDK's
        (`xeRtlNtStatusToDosError`, called as C++) until `sub_8229B440`
        (B5), the import's last other caller, is native: then the table
-       has to be ours. GetTimeZoneBias (`sub_82297678`) is plain C++ and
+       has to be ours. (Corrected 2026-10-21: `sub_8229B440` is native,
+       but `sub_822953E8` still calls the import, so the table waits for
+       it.) GetTimeZoneBias (`sub_82297678`) is plain C++ and
        its recompiled version is no longer called: the first function of
        this work to reach Native. GetLocalTime's only guest call left is
        the console settings read (B5). Checked by the harness (all the
@@ -1090,7 +1555,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
     recompiled code still reads a table, it stays in the image too, and
     the two copies must agree. This is most of the
     work: full decompilations of games this size usually take years. Keep
-    the statuses in `docs/functions.md` up to date (Wrapped, Overridden,
+    the statuses in `docs/functions/` up to date (Wrapped, Overridden,
     Native, Dropped, defined at its top) so progress can be measured:
     Native, Dropped and Overridden are how much of the game is ours,
     Native and Dropped how much no longer needs `ctx`. Keyboard input comes back
@@ -1137,3 +1602,33 @@ E4. **`PPCContext`, `rex/ppc.h`, the function table, `generated/`,
   before it's removed.
 - Scale (B7): most of the work is the game logic, not the boundary.
   Track A and B1-B6 are worth doing on their own even if B7 goes slowly.
+
+## The boundary over time
+
+`itc_recomp/tools/boundary_status.py` after each plan item (functions
+calling a kernel import directly; a function calling imports of several
+areas counts in each area). "Live" is what's still called by recompiled
+code.
+
+**2026-10-21, after B5 (branch `system-services`; A0, A5, B1, B3, B5 and
+B6 done):** 449 functions (916 function-import pairs): overridden 48,
+Native 3, Dropped 6, never called 54, live 338. Imports: 186 called, 97
+with a live caller.
+
+| Area | Overridden | Native | Dropped | Never called | Live |
+|---|---|---|---|---|---|
+| input (B1) | 0 | 3 | 0 | 0 | 0 |
+| audio (B2) | 3 | 0 | 0 | 0 | 3 |
+| graphics (B3) | 12 | 0 | 3 | 4 | 0 |
+| files and saves (B4) | 1 | 0 | 0 | 1 | 21 |
+| memory (core) | 2 | 0 | 0 | 3 | 23 |
+| system services (B5) | 17 | 0 | 3 | 48 | 12 |
+| pure helpers (B6) | 18 | 0 | 0 | 0 | 31 |
+| threads, sync and the rest (core) | 6 | 0 | 1 | 16 | 271 |
+
+What's live: the core (threads, sync, memory: E1, E2, after B7), B4's
+file and save functions, B2's audio, B5's leftovers (the notification
+readers, voice and the system link code, with B7; the device selector
+and XEnumerate, with B4) and B6's callers waiting on those areas.
+Overall, 232 overrides in `src/` of 16,552 recompiled functions.
+

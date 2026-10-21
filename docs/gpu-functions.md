@@ -4,16 +4,17 @@ What's known about how the game drives the GPU: the render command replay,
 the graphics library (the Xbox 360's Direct3D, linked into the game) and
 its waits on the GPU. This is the groundwork for a native renderer that
 replaces the emulated GPU (`librexgpu-xenos.so`). Game-side recording,
-interpolation and everything else are in `functions.md`.
+interpolation are in `frame-interpolation.md`, the functions' table in
+`functions/`.
 
-Addresses and names follow `functions.md`: names are our own, and
+Addresses and names follow `functions/`: names are our own, and
 "likely" marks an identification from argument shapes that hasn't been
 checked at runtime.
 
 ## The path from the game to the GPU
 
 1. The main thread records render commands into the command list (see
-   "Render command recording" in `functions.md`).
+   "Render command recording" in `frame-interpolation.md`).
 2. The render thread replays them: `sub_8258EE98` walks the item chains,
    and `sub_8258E698` dispatches each command through the table at
    `0x8265EDE0`.
@@ -342,7 +343,8 @@ ticks (`sub_822ACAA8`). It's called in loops from:
 | `sub_8229DCC0` (at `0x8229DD1C`) | 2 | Unknown. |
 | `sub_822B64A0` (at `0x822B64E8`) | 1 | Unknown. |
 
-In the race profile (see "Performance" in `functions.md`), `sub_8229D8A0`
+In the race profile (see "Historical: what limited the frame rate under the emulated GPU" in
+`native-renderer.md`), `sub_8229D8A0`
 was 46% of the render thread and `sub_8229E908` 2%: the render thread
 spends about half its time waiting for the emulated GPU to make room in
 the ring buffer. A native renderer has no ring buffer, so these waits go.

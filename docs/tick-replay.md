@@ -8,7 +8,7 @@ the first step is the diagnostic below.
 ## What happens now on an in-between frame
 
 With interpolation, a race frame that isn't a tick is a **render-only
-pass** (`functions.md`, "Interpolation", "Passes"): the main loop runs
+pass** (`frame-interpolation.md`, "Interpolation", "Passes"): the main loop runs
 with Update skipped, so it draws the same game state again. At ~450 fps
 uncapped that's ~15 frames a tick, 14 of them render-only. On each:
 
@@ -25,7 +25,7 @@ uncapped that's ~15 frames a tick, 14 of them render-only. On each:
    shaders, texture sets, pipeline, constants.
 3. **Interpolation substitutes blended values** as the replay uploads
    them (`BlendState_ReplayConstants`: cameras, world matrices, lighting;
-   `functions.md`, "Interpolation").
+   `frame-interpolation.md`, "Interpolation").
 
 Only step 3 makes anything new. Steps 1 and 2 rebuild what the tick's
 first frame already built; the per-draw caches so far (repeated state,
@@ -64,14 +64,14 @@ From what's documented; each needs checking:
 
 - **Do render-only recordings match the tick's?** The render-only
   recording numbers its products separately, and interpolation pairs
-  them with the logic recording's by order and position (`functions.md`,
+  them with the logic recording's by order and position (`frame-interpolation.md`,
   "Interpolation"; wheels are "paired by position"). So the two lists
   may not be the same draws in the same order.
 - **Per-frame data.** Inline vertex draws get fresh data every frame (the
   mirrors give them half their region per frame slot); loader bursts
   landed on render-only frames (`native-renderer.md`, "Hypothesis to
   test: the mirrors updated once a tick"); and the "Per-frame logic"
-  exceptions in `functions.md` (blink timers, texture animations, the
+  exceptions in `frame-interpolation.md` (blink timers, texture animations, the
   minimap's flashing, play time) run per pass, some of them put back
   around render-only passes.
 - **Interpolation is tied to the replay.** It blends values as the game
@@ -79,7 +79,7 @@ From what's documented; each needs checking:
   into the kept list instead: a rewrite of how it feeds the renderer.
 - **Skipping the game's Draw on render-only passes** was avoided before:
   re-running or skipping parts of the main loop broke things (skipping
-  `Scene::Update` froze race loading; `functions.md`, "Passes"). The
+  `Scene::Update` froze race loading; `frame-interpolation.md`, "Passes"). The
   render thread's half (replaying our own list instead of the game's)
   can be tried without touching the main thread's.
 - **What our draws read that isn't the game's state:** the frame's

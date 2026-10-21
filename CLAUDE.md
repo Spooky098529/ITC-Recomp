@@ -5,9 +5,14 @@ ReXGlue (`rexglue-sdk/`, a submodule patched from `patches/rexglue-sdk/`).
 `git status` showing `rexglue-sdk` as modified (`m`) is expected: those are
 our patches applied in the submodule, not something to look into
 (patch 0003, Windows SDL as a DLL, only changes Windows builds).
-`docs/functions.md` is the reference: what's known about the game's code,
-how frame interpolation works, every diagnostic option, and what didn't
-work. `docs/gpu-functions.md` covers how the game drives the GPU (the
+`docs/functions/` is the reference for the game's functions: their
+table, split by subsystem into one file per area since 2026-10-20
+(`functions.md` holds the rows not yet moved, `system-services.md` B5's).
+`docs/known-data.md` lists the globals and object fields worked out.
+`docs/frame-interpolation.md` is how frame interpolation works (the
+frame's structure, the passes, what's blended), every diagnostic option,
+and what didn't work; `docs/title-screen.md` the boot and the attract
+race; `docs/known-issues.md` the known issues. `docs/gpu-functions.md` covers how the game drives the GPU (the
 render command replay and the graphics library), and
 `docs/native-renderer.md` is the plan and progress of the native renderer
 that replaced the emulated GPU, and (its last section) the investigation
@@ -40,7 +45,21 @@ and gamma functions that called `Vd*` imports are native in
 `src/hooks/graphics_device.cpp`, `video_mode.cpp`, `gamma.cpp` and
 `graphics_drops.cpp`, nothing reads the GPU registers, and nothing needs
 vblanks (the interrupt callback is never called); the SDK's unused
-graphics code goes with the SDK. Plan steps are done on their
+graphics code goes with the SDK. B5 (system services) is in progress on
+`system-services`: step 1 is done (2026-10-21; the PAL-50 and heap
+checks, Device::Init's video flags and the console's time zone read
+without their kernel calls, `src/hooks/start_up.cpp` and
+`src/helpers/console_settings.h`), and step 2 (the user wrappers from
+`src/user/user.h`, XUserSetContextEx dropped) step 3 (XMP
+dropped, `src/hooks/xmp.cpp`) and step 4 (the network start-up, the
+system link socket not made, `src/hooks/network.cpp`); step 5 (voice) is
+mapped with no code; step 6 (notifications: the listener wrapper makes
+none, the app's reader builds the users once, `src/hooks/notify.cpp`);
+step 7 (the profile read as hardcoded data, `src/user/profile.cpp`). B5's
+steps are done; what's left of its imports goes with B4, B7 and the core.
+After each plan item, run `itc_recomp/tools/boundary_status.py` and record
+its output in "The boundary over time" at the end of
+`docs/rexglue-removal.md`. Plan steps are done on their
 own branches and merged into `rexglue-removal-project` (no force pushes:
 GitHub refuses them on that branch).
 `docs/tick-replay.md` is a lead (not started): translating draws once a
@@ -79,8 +98,9 @@ date as you learn things.
   it, how often), including those only met along the way (callees,
   callers, helpers). When a piece of work is done, or before ending a
   session, show the user the rows you'd add or change in
-  `docs/functions.md`, in that file's table format (`| Address | Name |
-  Status | Notes |`, four cells, each row exactly as it would be written;
+  `docs/functions/` (the subsystem's file; `functions.md` when none
+  fits yet), in the table format (`| Address | Name | Status | Notes |`,
+  four cells, sorted by address, each row exactly as it would be written;
   for a changed row, say what changed), and ask whether to add them;
   write them only after the user has reviewed and agreed. In
   the rows, say how much is known: "Not read" or "Not read in detail"
@@ -200,8 +220,8 @@ off); `interpolate_draw_state = false` and `max_fps = 30` there give the
 original 30 fps.
 Our renderer always draws the glow (`--glow` only affects the emulated
 GPU); `--motion_blur=false` leaves out the motion blur (on by default;
-defined in `src/native/renderer.cpp` since SDK patch 0002 was removed). Known issues are at the end of
-`docs/functions.md`.
+defined in `src/native/renderer.cpp` since SDK patch 0002 was removed). Known issues are in
+`docs/known-issues.md`.
 
 Other resolutions (v0.4.0, merged from `unlocked-resolution`):
 `--width`/`--height` and `--fullscreen`, off by default (a 1280x720 window
@@ -227,7 +247,7 @@ the rival intro cutscene's logo flickered above 30 fps, drawn during its
 Update handler (`82159948`, `sub_821594B8`) on logic passes only. A native
 override runs the cutscene on logic passes and only the logo's draw
 (`sub_82211A28`) on render-only passes (`--redraw_rival_logo`, on by
-default). See "The rival logo at the race start" in `docs/functions.md`.
+default). See "The rival logo at the race start" in `docs/frame-interpolation.md`.
 
 Cockpit dials (merged from `cockpit-dial-interpolation`, 2026-10-19,
 released in v0.4.5): the dial updates (`sub_820E42E8`, `sub_820E45A8`) are native
@@ -240,7 +260,7 @@ blended). Before, blending the needles' matrices cut across the dials, and
 the turbo gauge fell to its rest angle between ticks. TODO: blend the
 angles, or run the game logic at a higher tick rate. See
 `docs/cockpit-dial-interpolation.md`; the functions are in
-`docs/functions.md`.
+`docs/functions/functions.md`.
 
 Headlight beam far from the origin (merged from `headlight-flicker`,
 2026-10-19): far out (x ≈ -8,000 m), the beam lagged the car or flickered,
@@ -251,7 +271,7 @@ Camera numbers and the cut check no longer use it
 address while a projection drifts (`--sticky_camera_ids`); both on.
 `--double_precision_blending` is kept off (nothing visible). The cockpit
 judder far out is the game's own (Known issues). See "The headlight beam
-far from the origin" in `docs/functions.md`.
+far from the origin" in `docs/frame-interpolation.md`.
 
 Motion blur (merged from `beam-stepping`, 2026-10-19): the headlight beam
 on the road sometimes looked like it updated at 30 Hz. It was the motion
