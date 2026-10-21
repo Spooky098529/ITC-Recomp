@@ -187,6 +187,12 @@ files and saves 22, graphics 17, audio 6, input 3. Overrides in `src/`
 already replace some callers; check each against `grep -rn` before
 counting it as open.
 
+Where each boundary function stands (overridden, Native, Dropped,
+never called, or still live), by plan item:
+`itc_recomp/tools/boundary_status.py` (it runs this pipeline and reads
+`docs/functions/` with the status check's code). Record its output in
+"The boundary over time" at the end of this doc after each plan item.
+
 These are the direct callers only. Making one native often means making
 its close callers native too (a wrapper and the few functions using its
 handles), which is fine: the unit of work is a subsystem, not a function.
@@ -1596,3 +1602,33 @@ E4. **`PPCContext`, `rex/ppc.h`, the function table, `generated/`,
   before it's removed.
 - Scale (B7): most of the work is the game logic, not the boundary.
   Track A and B1-B6 are worth doing on their own even if B7 goes slowly.
+
+## The boundary over time
+
+`itc_recomp/tools/boundary_status.py` after each plan item (functions
+calling a kernel import directly; a function calling imports of several
+areas counts in each area). "Live" is what's still called by recompiled
+code.
+
+**2026-10-21, after B5 (branch `system-services`; A0, A5, B1, B3, B5 and
+B6 done):** 449 functions (916 function-import pairs): overridden 48,
+Native 3, Dropped 6, never called 54, live 338. Imports: 186 called, 97
+with a live caller.
+
+| Area | Overridden | Native | Dropped | Never called | Live |
+|---|---|---|---|---|---|
+| input (B1) | 0 | 3 | 0 | 0 | 0 |
+| audio (B2) | 3 | 0 | 0 | 0 | 3 |
+| graphics (B3) | 12 | 0 | 3 | 4 | 0 |
+| files and saves (B4) | 1 | 0 | 0 | 1 | 21 |
+| memory (core) | 2 | 0 | 0 | 3 | 23 |
+| system services (B5) | 17 | 0 | 3 | 48 | 12 |
+| pure helpers (B6) | 18 | 0 | 0 | 0 | 31 |
+| threads, sync and the rest (core) | 6 | 0 | 1 | 16 | 271 |
+
+What's live: the core (threads, sync, memory: E1, E2, after B7), B4's
+file and save functions, B2's audio, B5's leftovers (the notification
+readers, voice and the system link code, with B7; the device selector
+and XEnumerate, with B4) and B6's callers waiting on those areas.
+Overall, 232 overrides in `src/` of 16,552 recompiled functions.
+
