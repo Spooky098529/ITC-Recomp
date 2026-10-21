@@ -6,21 +6,21 @@
 // took ~80% of a core. Here the game's driver object calls ours instead:
 // one guest thread runs each client's mixer whenever SDL has played a
 // frame, waiting on a condition variable in between. The frames are
-// converted for SDL as the SDK's driver does (same downmix and settings).
-// The SDK's XMA decoder is kept.
+// converted for SDL with the SDK driver's numbers (audio/output_mix.h). XMA
+// sounds are decoded by our own code (hooks/xma.cpp), so the SDK's XMA
+// decoder isn't set up.
 //
 // --native_audio=false brings back the SDK's driver, for comparison.
 
 #include "audio/native_audio.h"
 
+#include "audio/output_mix.h"
+
 #include "guest.h"
 
 #include <rex/audio/audio_driver.h>
 #include <rex/audio/audio_system.h>
-#include <rex/audio/conversion.h>
-#include <rex/audio/downmix.h>
 #include <rex/audio/flags.h>
-#include <rex/audio/xma/decoder.h>
 #include <rex/cvar.h>
 #include <rex/logging.h>
 #include <rex/system/function_dispatcher.h>
@@ -106,12 +106,9 @@ class ItcAudioSystem : public rex::audio::AudioSystem {
     return std::make_unique<ItcAudioSystem>(function_dispatcher);
   }
 
-  // Only the XMA decoder; the base class would also start the Audio Worker.
+  // Only our thread: the base class would start the Audio Worker and the XMA
+  // decoder (its thread and the XMA registers), which nothing uses since B2.
   X_STATUS Setup(rex::system::KernelState* kernel_state) override {
-    X_STATUS result = xma_decoder_->Setup(kernel_state);
-    if (result) {
-      return result;
-    }
     running_ = true;
     thread_ = rex::system::object_ref<rex::system::XHostThread>(new rex::system::XHostThread(
         kernel_state, 128 * 1024, 0, [this]() {
@@ -128,9 +125,6 @@ class ItcAudioSystem : public rex::audio::AudioSystem {
   void Shutdown() override {
     if (!running_) {
       return;
-    }
-    if (xma_decoder_) {
-      xma_decoder_->Shutdown();
     }
     {
       std::lock_guard<std::mutex> lock(mutex_);
@@ -338,9 +332,6 @@ class ItcAudioSystem : public rex::audio::AudioSystem {
       return;
     }
     size_t index = reinterpret_cast<size_t>(userdata);
-    const rex::audio::StereoFold fold = rex::audio::GetStereoFold();
-    const rex::audio::SurroundMix mix = rex::audio::GetSurroundMix();
-    const float gain = rex::audio::GetOutputGain();
     std::array<float, kFrameSamples> data;
     bool played = false;
     {
@@ -357,11 +348,9 @@ class ItcAudioSystem : public rex::audio::AudioSystem {
           if (REXCVAR_GET(audio_mute)) {
             std::memset(data.data(), 0, len);
           } else if (client.device_channels == 6) {
-            rex::audio::conversion::sequential_6_BE_to_interleaved_6_LE(
-                data.data(), frame->data(), kChannelSamples, mix, gain);
+            audio::ToInterleaved51(frame->data(), kChannelSamples, data.data());
           } else {
-            rex::audio::conversion::sequential_6_BE_to_interleaved_2_LE(
-                data.data(), frame->data(), kChannelSamples, fold, gain);
+            audio::ToInterleavedStereo(frame->data(), kChannelSamples, data.data());
           }
           client.unused.push_back(std::move(frame));
           client.credits++;

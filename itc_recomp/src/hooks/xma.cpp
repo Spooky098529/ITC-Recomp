@@ -376,6 +376,14 @@ extern "C" REX_FUNC(sub_8245D350) {
   ctx.r3.u64 = 1;
 }
 
+// The hardware wait (r3 the object; polled sub_8245D350, and after an eighth
+// of a second reset the XMA hardware through its registers): nothing to wait
+// for, 0 (answered at once).
+extern "C" REX_FUNC(sub_8245D288) {
+  REX_FUNC_PROLOGUE();
+  ctx.r3.u64 = 0;
+}
+
 extern "C" REX_FUNC(sub_8245D4D0) {
   REX_FUNC_PROLOGUE();
   if (auto object = Find(ctx.r3.u32)) {

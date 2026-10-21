@@ -62,6 +62,7 @@ include(cmake/ffmpeg.cmake)
 set(ITC_SOURCES
     src/main.cpp
     src/audio/native_audio.cpp
+    src/audio/output_mix.cpp
     src/hooks/vehicle.cpp
     src/hooks/title_screen.cpp
     src/hooks/create_file.cpp
