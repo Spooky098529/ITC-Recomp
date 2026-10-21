@@ -8,6 +8,7 @@
 #include <rex/rex_app.h>
 
 #include "audio/native_audio.h"
+#include "base/log_sdk.h"
 #include "debug/thread_cpu.h"
 #include "game_data/game_data.h"
 #include "input/gamepads.h"
@@ -64,8 +65,10 @@ class ItcApp : public rex::ReXApp {
     game_data::SetRoot(paths.game_data_root);
   }
 
+  // Our log takes over the file the SDK just opened (src/base/log_sdk.cpp).
+  void OnPostInitLogging() override { base::TakeOverSdkLogFile(); }
+
   // Override virtual hooks for customization:
-  // void OnPostInitLogging() override {}
   // void OnLoadXexImage(std::string& xex_image) override {}
   // void OnPostLoadXexImage() override {}
   // void OnCreateDialogs(rex::ui::ImGuiDrawer* drawer) override {}

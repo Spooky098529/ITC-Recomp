@@ -288,8 +288,9 @@ A2. **Logging, flags, hashes**: our own headers (`src/base/log.h`,
     logging and hashing. Our own flag parser has to wait for A4: until
     then the SDK's flags (`--game_data_root`,
     `--fullscreen`, ...) are parsed from the same command line by the SDK.
-    Log file names and rotation must stay (`logs/itc_<n>.log`,
-    `itc_<n>.1.log`): CLAUDE.md and tools rely on them.
+    Log file names must stay (`logs/itc_<n>.log`): CLAUDE.md and tools
+    rely on them. (Rotation into `itc_<n>.1.log` was dropped with our own
+    logger.)
 
     Steps 1 and 2 done (2026-10-21, `own-logging`): `src/base/log.h`
     (`ITC_LOG_DEBUG`, `_INFO`, `_WARN`, `_ERROR`, and
@@ -317,6 +318,35 @@ A2. **Logging, flags, hashes**: our own headers (`src/base/log.h`,
     `draw.cpp` among them, until A3). Same hashes: an attract race loaded
     every shader from the disk cache (keyed by the microcode's hash), none
     translated. Left of A2: our own logger, and the flag parser (A4).
+
+    Our own logger done (2026-10-21, `own-logging`; the user's call: plain
+    stdio, not a copy of the SDK's spdlog set-up). `src/base/log.cpp`:
+    lines formatted with `std::format` (our format specs need no changes),
+    written as one `fwrite` under a mutex and flushed (as the SDK's file
+    sink flushed at info), in the SDK's layout with `[itc]` as our
+    category: `[2026-10-21 23:03:57.966] [info] [itc] [t13876] ...`. The
+    macros check the level before evaluating their arguments, as the SDK's
+    did; `base::InfoLogEnabled` is an atomic load (it was a call into the
+    runtime). Lines from before the file opens are kept and written then.
+    No rotation (proposed; a size cap is easy to add if wanted): one file
+    a run, where the SDK rotated at 5 MB into `itc_<n>.1.log`. With `log_level = "off"` (as released)
+    nothing is written; the SDK still creates the empty file, as before.
+
+    The SDK's side until A4 (`src/base/log_sdk.cpp`, from
+    `ItcApp::OnPostInitLogging`, no SDK patch): the SDK still names and
+    creates the file (`itc_<n>.log`, one more than the highest there).
+    Ours finds its rotating file sink on the `core` logger, takes its file
+    name, sets it to off and removes it from every logger, opens the same
+    path, and adds a sink forwarding the SDK's own lines (`[core]`,
+    `[sys]`, ...; already filtered by `--log_level`) into ours. Setting it
+    off matters: a category the SDK registers later (on first use; `sys`
+    for the guest memory's line) is built with the SDK's file sink again,
+    and wrote its lines twice before. At A4 our `main` names the file and
+    sets up the SDK's logging without one. Checked: attract races with
+    every harness (no errors, no duplicate lines, 17 s raced), and one
+    with `--log_level=off` (empty file). Left of A2: the flag parser
+    (A4); the 158 `fmt::format` calls in `src/` can move to `std::format`
+    with A1's fmt.
 
 A3. **Renderer leftovers**: bring the shader translator into the repo
     (`src/native/xenos/`; the files `itc_xenos_shaders` builds, listed in
