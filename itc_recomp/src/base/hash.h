@@ -1,5 +1,6 @@
-// Hashing for our code: XXH3-64, inlined. xxHash comes from the SDK's
-// thirdparty/ until we have our own copy (A1 in docs/rexglue-removal.md).
+// Hashing for our code: XXH3-64, inlined, from our own xxHash
+// (itc_recomp/thirdparty/xxHash, v0.8.3 as the SDK's; A1 and A2 in
+// docs/rexglue-removal.md).
 
 #pragma once
 
@@ -12,7 +13,7 @@
 #ifndef XXH_INLINE_ALL
 #define XXH_INLINE_ALL
 #endif
-#include <xxhash.h>
+#include <xxHash/xxhash.h>
 
 namespace base {
 

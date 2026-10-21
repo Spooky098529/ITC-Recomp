@@ -277,6 +277,10 @@ A1. **Third-party libraries from our own copies** (submodules or
     (see patch 0003 and `docs/windows.md`), so SDL probably stays the
     SDK's until A4.
 
+    xxHash done (2026-10-21, `own-logging`, with A2): the submodule
+    `itc_recomp/thirdparty/xxHash` (v0.8.3), header-only, on the include
+    path as `itc_recomp/thirdparty/` (included with its folder).
+
 A2. **Logging, flags, hashes**: our own headers (`src/base/log.h`,
     `cvar.h`, `hash.h`, names to taste) with our own macro names, first
     forwarding to the SDK's, and every file in `src/` switched over
@@ -302,6 +306,17 @@ A2. **Logging, flags, hashes**: our own headers (`src/base/log.h`,
     flags only through `rex/hash.h`. Checked: an attract race with every
     harness (no errors, 16 s raced, all the same but the groups expected
     to differ). Step 3 next: our own logger and hashing.
+
+    Hashing done (2026-10-21, `own-logging`): `base/hash.h` includes our
+    own xxHash (A1: the submodule `itc_recomp/thirdparty/xxHash`, v0.8.3,
+    the commit the SDK pins), as `<xxHash/xxhash.h>` from
+    `itc_recomp/thirdparty/` so the SDK's copy on the include path can't
+    stand in for it. Ninja's dependencies show our four hashing files
+    (`passes.cpp`, `shaders.cpp`, `textures.cpp`, `replay_stats.cpp`) on
+    ours; the SDK's copy is only in SDK sources (`itc_xenos_shaders`'s
+    `draw.cpp` among them, until A3). Same hashes: an attract race loaded
+    every shader from the disk cache (keyed by the microcode's hash), none
+    translated. Left of A2: our own logger, and the flag parser (A4).
 
 A3. **Renderer leftovers**: bring the shader translator into the repo
     (`src/native/xenos/`; the files `itc_xenos_shaders` builds, listed in
