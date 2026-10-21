@@ -31,12 +31,12 @@
 #include <mutex>
 #include <chrono>
 #include <ctime>
-#include <rex/logging.h>
-#include <rex/cvar.h>
+#include "base/log.h"
+#include "base/flags.h"
 
-REXCVAR_DEFINE_BOOL(log_frame_times, false, "ITC",
-                    "Log where frame time goes (main thread work, waits, render thread "
-                    "drawing and presenting, blending), every 2 s");
+ITC_FLAG_BOOL(log_frame_times, false, "ITC",
+              "Log where frame time goes (main thread work, waits, render thread "
+              "drawing and presenting, blending), every 2 s");
 
 namespace {
 
@@ -89,8 +89,8 @@ class FrameTimes {
                           s.count ? s.total / s.count : 0.0, s.worst, s.count);
       stats_[i] = {};
     }
-    REXLOG_INFO("frame times (ms):{} | per frame: blending {:.2f}, constant uploads {:.2f}", line,
-                blend_ns / 1e6 / frames, upload_ns / 1e6 / frames);
+    ITC_LOG_INFO("frame times (ms):{} | per frame: blending {:.2f}, constant uploads {:.2f}", line,
+                 blend_ns / 1e6 / frames, upload_ns / 1e6 / frames);
   }
 
   Clock::time_point pass_start;
@@ -153,7 +153,7 @@ void Event_Signal(PPCContext& ctx, uint8_t* base, uint32_t event) {
 }
 
 void Renderer_DrawFrame(PPCContext& ctx, uint8_t* base, uint32_t renderer) {
-  bool timing = REXCVAR_GET(log_frame_times);
+  bool timing = ITC_FLAG(log_frame_times);
   auto start = FrameTimes::Clock::now();
   auto cpu_start = timing ? ThreadCpuTime() : FrameTimes::Clock::duration{};
   interpolation::BlendState_OnReplayFrameStart();
@@ -185,7 +185,7 @@ void Renderer_ThreadLoop(PPCContext& ctx, uint8_t* base, uint32_t renderer) {
 // Main thread, once per main-loop pass: the game's own wait for the frame in
 // flight (and its deferred work), then pacing for the coming pass.
 void Renderer_WaitForFrame(PPCContext& ctx, uint8_t* base, uint32_t renderer) {
-  bool timing = REXCVAR_GET(log_frame_times);
+  bool timing = ITC_FLAG(log_frame_times);
   FrameTimes& times = GetFrameTimes();
   auto wait_start = FrameTimes::Clock::now();
   if (timing && times.pass_started) {
@@ -268,7 +268,7 @@ extern "C" REX_FUNC(sub_820920D8) {
 // (--log_frame_times).
 extern "C" REX_FUNC(sub_82091A60) {
   REX_FUNC_PROLOGUE();
-  if (!REXCVAR_GET(log_frame_times)) {
+  if (!ITC_FLAG(log_frame_times)) {
     __imp__sub_82091A60(ctx, base);
     return;
   }
