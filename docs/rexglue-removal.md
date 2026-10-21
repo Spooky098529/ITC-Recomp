@@ -2432,6 +2432,13 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
     Native and Dropped how much no longer needs `ctx`. Keyboard input comes back
     once the game is native (A0).
 
+    What B7 has to deal with is the functions that run, not all 16,552:
+    `docs/coverage.md` (started 2026-10-21, branch `coverage`) records them
+    with a coverage build (`itc_coverage`) in
+    `itc_recomp/coverage/seen_in_play.txt`; a 20-second attract race ran
+    4,975 (30%). Its report, joined with `docs/functions/`, is to be B7's
+    measure.
+
 ## The end state: removing the core
 
 Only when no recompiled function is left (or none that touches what's
