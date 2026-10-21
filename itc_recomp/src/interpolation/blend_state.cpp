@@ -31,8 +31,8 @@
 #include "guest.h"
 #include "transform.h"
 
-#include <rex/cvar.h>
-#include <rex/logging.h>
+#include "base/flags.h"
+#include "base/log.h"
 
 #include <algorithm>
 #include <array>
@@ -53,112 +53,112 @@
 
 #include <x86intrin.h>  // SameMatrix
 
-REXCVAR_DEFINE_BOOL(interpolate_draw_state, true, "ITC",
-                    "Smooth motion between 30 Hz ticks in races by blending cameras and "
-                    "object transforms");
-REXCVAR_DEFINE_BOOL(blend_while_drawing, false, "ITC",
-                    "Also blend cameras and objects while render-only passes draw (changes "
-                    "what the game culls, so pairings with the logic pass can slip)");
-REXCVAR_DEFINE_BOOL(blend_pixel_constants, true, "ITC",
-                    "Blend per-object pixel shader constants (lighting) between ticks");
-REXCVAR_DEFINE_BOOL(log_stepping_constants, false, "ITC",
-                    "Log constant uploads that change at the tick rate rather than every "
-                    "frame (left at 30 Hz), with the code that recorded them; needs "
-                    "--log_slot_callers");
-REXCVAR_DEFINE_BOOL(log_overlay_products, false, "ITC",
-                    "Log the race overlays' camera products as replayed, 12 frames every 3 s");
-REXCVAR_DEFINE_BOOL(log_overlay_uploads, false, "ITC",
-                    "Log every shader constant upload the race overlays recorded, as replayed, "
-                    "12 frames every 3 s");
-REXCVAR_DECLARE(bool, log_frame_times);
-REXCVAR_DEFINE_BOOL(strict_pixel_pairing, true, "ITC",
-                    "Leave per-object pixel constants unblended after a draw that isn't a known "
-                    "camera product, instead of pairing them by the product before it");
-REXCVAR_DEFINE_BOOL(blend_object_extras, true, "ITC",
-                    "Blend the per-object uploads' world matrix (c4-c7) and camera position "
-                    "(c8) along with c0-c3 (the paint's reflections)");
-REXCVAR_DEFINE_BOOL(log_object_extras, false, "ITC",
-                    "Log how often c4-c8 of substituted per-object uploads change, with "
-                    "examples, every 2 s");
-REXCVAR_DEFINE_STRING(debug_zero_owners, "", "ITC",
-                      "Testing: vertex or pixel constant uploads recorded by these callers (hex, "
-                      "comma-separated; needs --log_slot_callers) are replayed as zeros, so "
-                      "their draws vanish");
-REXCVAR_DEFINE_BOOL(log_upload_owners, false, "ITC",
-                    "Log the callers recording vertex constant uploads, with uploads per "
-                    "frame, every 5 s (needs --log_slot_callers)");
-REXCVAR_DEFINE_BOOL(motion_blur_by_tick, true, "ITC",
-                    "Blend the motion blur's previous view-projection (c100 x4) on render-only "
-                    "frames too: the game copies the same matrix all tick, from the view's "
-                    "+8080 on the logic pass and +8144 after, so it's noted under the logic "
-                    "pass's address (otherwise only logic frames blend it: a 30 Hz pulse)");
-REXCVAR_DEFINE_BOOL(log_motion_blur_velocity, false, "ITC",
-                    "Log, every 5 s for ~40 passes, the motion blur's previous view-projection "
-                    "(c100 x4, copied at 8213653C from the view's +8080 or +8144): which one, "
-                    "how far the camera moved between the two, and how the replay changed it");
-REXCVAR_DEFINE_BOOL(log_blend_state, false, "ITC",
-                    "Log how many cameras and objects were blended, once a second");
-REXCVAR_DEFINE_BOOL(log_replayed_constants, false, "ITC",
-                    "Log the vertex constant matrices the render thread replays, once a second");
-REXCVAR_DEFINE_BOOL(pixel_blend_from_latest, true, "ITC",
-                    "Blend per-object lighting from the last value recorded in the previous "
-                    "tick to this frame's (false: only frames recording the tick's first value "
-                    "are blended)");
-REXCVAR_DEFINE_BOOL(blend_only_light_slots, false, "ITC",
-                    "Blend only the per-object lighting's light positions and directions (the "
-                    "headlights) and leave the rest as recorded (default: blend all of it)");
-REXCVAR_DEFINE_BOOL(blend_lighting_camera, true, "ITC",
-                    "Blend the per-object lighting's camera (c0-c3 view, c4 position) as a whole "
-                    "(false: by component, with c1.x, c3.xyz and c4.x as switches)");
-REXCVAR_DEFINE_BOOL(switch_light_slots, true, "ITC",
-                    "A per-object light slot whose light changed between ticks takes the tick's "
-                    "light and the rest of the lighting blends (false: the whole upload is left "
-                    "as recorded)");
-REXCVAR_DEFINE_BOOL(pair_by_object, true, "ITC",
-                    "Pair the per-object recorder's products between ticks by the part being "
-                    "drawn (its caller's r31), not only by order, so culling or reordering "
-                    "doesn't pair a wheel with another wheel or car");
-REXCVAR_DEFINE_BOOL(log_moving_products, false, "ITC",
-                    "Log moving objects drawn out of step: render-only mismatches, products not "
-                    "blended or unpaired, pairings that move unlike their neighbors, and jumps "
-                    "between frames");
-REXCVAR_DEFINE_BOOL(log_cockpit_judder, false, "ITC",
-                    "Log where the camera is in the frame of each part within 3 m of it (the "
-                    "cockpit) frame by frame, and its jerk (second difference): a part shaking "
-                    "against the view, every 2 s");
-REXCVAR_DEFINE_BOOL(log_pixel_outcomes, false, "ITC",
-                    "Log what happened to the per-object lighting uploads (blended, unpaired, "
-                    "rejected...), for moving and still objects, every 2 s");
-REXCVAR_DEFINE_BOOL(log_camera_copies, false, "ITC",
-                    "Log copies of cameras (the headlight projector's among them) left unpaired "
-                    "between ticks, what the previous tick held under the same camera address, "
-                    "and how many camera numbers exist, every 2 s");
-REXCVAR_DEFINE_BOOL(sticky_camera_ids, true, "ITC",
-                    "A camera address keeps the camera number it used while its projection stays "
-                    "within the tolerance of the last one there, so a projection that drifts "
-                    "(the headlight projector's) keeps its number instead of taking new ones and "
-                    "flipping between two, which left it unpaired, drawn at the tick");
-REXCVAR_DEFINE_BOOL(double_precision_blending, false, "ITC",
-                    "Blend an object's and its camera's positions in double precision and "
-                    "multiply with only their difference, so float rounding far from the map's "
-                    "origin (~1 mm at 10 km) doesn't make the cockpit judder against the view");
-REXCVAR_DEFINE_BOOL(camera_ids_ignore_depth_offset, true, "ITC",
-                    "Number cameras by aspect ratio and depth scale only: the depth offset, read "
-                    "back from the view-projection, drifts with the camera's distance from the "
-                    "map's origin (the headlight projector's by 1% over 7 km), which gave it new "
-                    "numbers far out (the beam lagging the car), and failed the cut check "
-                    "(the beam drawn a tick ahead); the cut check compares the rest");
-REXCVAR_DEFINE_BOOL(cache_camera_ids, true, "ITC",
-                    "Remember the camera number of recently seen view-projections by their "
-                    "bytes, so a repeated one skips splitting it and the table lookup (same "
-                    "numbers)");
-REXCVAR_DEFINE_BOOL(publish_by_tick, true, "ITC",
-                    "Work out what the render thread needs of each of the tick's products once "
-                    "a tick, shared by its frames, instead of looking it up and copying it "
-                    "every frame (same products)");
-REXCVAR_DEFINE_BOOL(cache_billboard_cameras, true, "ITC",
-                    "Blend the cameras the light billboards face once a frame, instead of on "
-                    "every billboard set (same values)");
+ITC_FLAG_BOOL(interpolate_draw_state, true, "ITC",
+              "Smooth motion between 30 Hz ticks in races by blending cameras and "
+              "object transforms");
+ITC_FLAG_BOOL(blend_while_drawing, false, "ITC",
+              "Also blend cameras and objects while render-only passes draw (changes "
+              "what the game culls, so pairings with the logic pass can slip)");
+ITC_FLAG_BOOL(blend_pixel_constants, true, "ITC",
+              "Blend per-object pixel shader constants (lighting) between ticks");
+ITC_FLAG_BOOL(log_stepping_constants, false, "ITC",
+              "Log constant uploads that change at the tick rate rather than every "
+              "frame (left at 30 Hz), with the code that recorded them; needs "
+              "--log_slot_callers");
+ITC_FLAG_BOOL(log_overlay_products, false, "ITC",
+              "Log the race overlays' camera products as replayed, 12 frames every 3 s");
+ITC_FLAG_BOOL(log_overlay_uploads, false, "ITC",
+              "Log every shader constant upload the race overlays recorded, as replayed, "
+              "12 frames every 3 s");
+ITC_FLAG_DECLARE(bool, log_frame_times);
+ITC_FLAG_BOOL(strict_pixel_pairing, true, "ITC",
+              "Leave per-object pixel constants unblended after a draw that isn't a known "
+              "camera product, instead of pairing them by the product before it");
+ITC_FLAG_BOOL(blend_object_extras, true, "ITC",
+              "Blend the per-object uploads' world matrix (c4-c7) and camera position "
+              "(c8) along with c0-c3 (the paint's reflections)");
+ITC_FLAG_BOOL(log_object_extras, false, "ITC",
+              "Log how often c4-c8 of substituted per-object uploads change, with "
+              "examples, every 2 s");
+ITC_FLAG_STRING(debug_zero_owners, "", "ITC",
+                "Testing: vertex or pixel constant uploads recorded by these callers (hex, "
+                "comma-separated; needs --log_slot_callers) are replayed as zeros, so "
+                "their draws vanish");
+ITC_FLAG_BOOL(log_upload_owners, false, "ITC",
+              "Log the callers recording vertex constant uploads, with uploads per "
+              "frame, every 5 s (needs --log_slot_callers)");
+ITC_FLAG_BOOL(motion_blur_by_tick, true, "ITC",
+              "Blend the motion blur's previous view-projection (c100 x4) on render-only "
+              "frames too: the game copies the same matrix all tick, from the view's "
+              "+8080 on the logic pass and +8144 after, so it's noted under the logic "
+              "pass's address (otherwise only logic frames blend it: a 30 Hz pulse)");
+ITC_FLAG_BOOL(log_motion_blur_velocity, false, "ITC",
+              "Log, every 5 s for ~40 passes, the motion blur's previous view-projection "
+              "(c100 x4, copied at 8213653C from the view's +8080 or +8144): which one, "
+              "how far the camera moved between the two, and how the replay changed it");
+ITC_FLAG_BOOL(log_blend_state, false, "ITC",
+              "Log how many cameras and objects were blended, once a second");
+ITC_FLAG_BOOL(log_replayed_constants, false, "ITC",
+              "Log the vertex constant matrices the render thread replays, once a second");
+ITC_FLAG_BOOL(pixel_blend_from_latest, true, "ITC",
+              "Blend per-object lighting from the last value recorded in the previous "
+              "tick to this frame's (false: only frames recording the tick's first value "
+              "are blended)");
+ITC_FLAG_BOOL(blend_only_light_slots, false, "ITC",
+              "Blend only the per-object lighting's light positions and directions (the "
+              "headlights) and leave the rest as recorded (default: blend all of it)");
+ITC_FLAG_BOOL(blend_lighting_camera, true, "ITC",
+              "Blend the per-object lighting's camera (c0-c3 view, c4 position) as a whole "
+              "(false: by component, with c1.x, c3.xyz and c4.x as switches)");
+ITC_FLAG_BOOL(switch_light_slots, true, "ITC",
+              "A per-object light slot whose light changed between ticks takes the tick's "
+              "light and the rest of the lighting blends (false: the whole upload is left "
+              "as recorded)");
+ITC_FLAG_BOOL(pair_by_object, true, "ITC",
+              "Pair the per-object recorder's products between ticks by the part being "
+              "drawn (its caller's r31), not only by order, so culling or reordering "
+              "doesn't pair a wheel with another wheel or car");
+ITC_FLAG_BOOL(log_moving_products, false, "ITC",
+              "Log moving objects drawn out of step: render-only mismatches, products not "
+              "blended or unpaired, pairings that move unlike their neighbors, and jumps "
+              "between frames");
+ITC_FLAG_BOOL(log_cockpit_judder, false, "ITC",
+              "Log where the camera is in the frame of each part within 3 m of it (the "
+              "cockpit) frame by frame, and its jerk (second difference): a part shaking "
+              "against the view, every 2 s");
+ITC_FLAG_BOOL(log_pixel_outcomes, false, "ITC",
+              "Log what happened to the per-object lighting uploads (blended, unpaired, "
+              "rejected...), for moving and still objects, every 2 s");
+ITC_FLAG_BOOL(log_camera_copies, false, "ITC",
+              "Log copies of cameras (the headlight projector's among them) left unpaired "
+              "between ticks, what the previous tick held under the same camera address, "
+              "and how many camera numbers exist, every 2 s");
+ITC_FLAG_BOOL(sticky_camera_ids, true, "ITC",
+              "A camera address keeps the camera number it used while its projection stays "
+              "within the tolerance of the last one there, so a projection that drifts "
+              "(the headlight projector's) keeps its number instead of taking new ones and "
+              "flipping between two, which left it unpaired, drawn at the tick");
+ITC_FLAG_BOOL(double_precision_blending, false, "ITC",
+              "Blend an object's and its camera's positions in double precision and "
+              "multiply with only their difference, so float rounding far from the map's "
+              "origin (~1 mm at 10 km) doesn't make the cockpit judder against the view");
+ITC_FLAG_BOOL(camera_ids_ignore_depth_offset, true, "ITC",
+              "Number cameras by aspect ratio and depth scale only: the depth offset, read "
+              "back from the view-projection, drifts with the camera's distance from the "
+              "map's origin (the headlight projector's by 1% over 7 km), which gave it new "
+              "numbers far out (the beam lagging the car), and failed the cut check "
+              "(the beam drawn a tick ahead); the cut check compares the rest");
+ITC_FLAG_BOOL(cache_camera_ids, true, "ITC",
+              "Remember the camera number of recently seen view-projections by their "
+              "bytes, so a repeated one skips splitting it and the table lookup (same "
+              "numbers)");
+ITC_FLAG_BOOL(publish_by_tick, true, "ITC",
+              "Work out what the render thread needs of each of the tick's products once "
+              "a tick, shared by its frames, instead of looking it up and copying it "
+              "every frame (same products)");
+ITC_FLAG_BOOL(cache_billboard_cameras, true, "ITC",
+              "Blend the cameras the light billboards face once a frame, instead of on "
+              "every billboard set (same values)");
 
 namespace interpolation {
 namespace {
@@ -533,7 +533,7 @@ struct ProductSource {
 bool IsSameCamera(const PerspectiveCamera& a, const PerspectiveCamera& b,
                   const ProductSource& source) {
   bool same = IsSameCameraCheck(a, b);
-  if (!same && REXCVAR_GET(log_blend_state)) {
+  if (!same && ITC_FLAG(log_blend_state)) {
     std::lock_guard lock(g_camera_rejects_mutex);
     if (g_camera_rejects.size() < 1500) {
       g_camera_rejects += fmt::format(
@@ -561,7 +561,7 @@ bool IsSameCameraCheck(const PerspectiveCamera& a, const PerspectiveCamera& b) {
          // Read back from the view-projection, the depth offset drifts with
          // the camera's distance from the origin (square projectors' 0.0991
          // <-> 0.1002 a tick at x ~ -8,500), which refused them as cuts.
-         (REXCVAR_GET(camera_ids_ignore_depth_offset) ||
+         (ITC_FLAG(camera_ids_ignore_depth_offset) ||
           close(a.depth_offset, b.depth_offset, 0.01f));
 }
 
@@ -706,7 +706,7 @@ Matrix4 BlendProduct(const ReplayedProduct& product, const TickPlans* plans,
     parts->world_now = parts->world = product.tick->now.world;
     parts->product = &product;
   }
-  if (product.tick->now.live && REXCVAR_GET(log_blend_state)) [[unlikely]] {
+  if (product.tick->now.live && ITC_FLAG(log_blend_state)) [[unlikely]] {
     stats.live++;
     if (product.tick->plan < 0) {
       stats.live_unpaired++;
@@ -753,7 +753,7 @@ Matrix4 BlendProduct(const ReplayedProduct& product, const TickPlans* plans,
       parts->position_exact = position;
       parts->eye_exact = blended.eye_exact;
     }
-    if (REXCVAR_GET(double_precision_blending) && IsAffineRowLayout(world)) {
+    if (ITC_FLAG(double_precision_blending) && IsAffineRowLayout(world)) {
       // world * view_projection = (world moved by -eye) * the camera at the
       // origin; the difference is small, so float holds it to well under a
       // millimeter.
@@ -789,7 +789,7 @@ class CameraIds {
   uint64_t Of(const Matrix4& view_projection, Signature* signature = nullptr) {
     Signature unused;
     Signature& out = signature ? *signature : unused;
-    if (!REXCVAR_GET(cache_camera_ids)) {
+    if (!ITC_FLAG(cache_camera_ids)) {
       return Compute(view_projection, out);
     }
     return Cached(view_projection, out);
@@ -856,7 +856,7 @@ class CameraIds {
     // headlight projector's 0.1000 near the start, 0.0990 8 km out). The
     // aspect ratio and depth scale come from the rotation part alone.
     Signature signature =
-        REXCVAR_GET(camera_ids_ignore_depth_offset)
+        ITC_FLAG(camera_ids_ignore_depth_offset)
             ? Signature{camera->x_scale / camera->y_scale, camera->depth_scale / camera->w_scale, 0}
             : Signature{camera->x_scale / camera->y_scale, camera->depth_offset,
                         camera->depth_scale / camera->depth_offset};
@@ -881,7 +881,7 @@ class CameraIds {
     }
     uint64_t id = ++count_;
     buckets_[Key(bucket)].push_back({signature, id});
-    if (REXCVAR_GET(log_camera_copies)) [[unlikely]] {
+    if (ITC_FLAG(log_camera_copies)) [[unlikely]] {
       LogNewId(id, signature, *camera);
     }
     return id;
@@ -921,13 +921,13 @@ class CameraIds {
       }
     }
     const Vec3& eye = camera.camera.position;
-    REXLOG_INFO("camera ids: new {}: signature {:.7g} {:.7g} {:.7g} (x {:.7g} y {:.7g} w {:.7g} "
-                "depth scale {:.7g} offset {:.7g}), eye {:.1f} {:.1f} {:.1f}; nearest {} at "
-                "{:.4f}: {:.7g} {:.7g} {:.7g}",
-                id, signature[0], signature[1], signature[2], camera.x_scale, camera.y_scale,
-                camera.w_scale, camera.depth_scale, camera.depth_offset, eye[0], eye[1], eye[2],
-                nearest, nearest_difference, nearest_signature[0], nearest_signature[1],
-                nearest_signature[2]);
+    ITC_LOG_INFO("camera ids: new {}: signature {:.7g} {:.7g} {:.7g} (x {:.7g} y {:.7g} w {:.7g} "
+                 "depth scale {:.7g} offset {:.7g}), eye {:.1f} {:.1f} {:.1f}; nearest {} at "
+                 "{:.4f}: {:.7g} {:.7g} {:.7g}",
+                 id, signature[0], signature[1], signature[2], camera.x_scale, camera.y_scale,
+                 camera.w_scale, camera.depth_scale, camera.depth_offset, eye[0], eye[1], eye[2],
+                 nearest, nearest_difference, nearest_signature[0], nearest_signature[1],
+                 nearest_signature[2]);
   }
   std::chrono::steady_clock::time_point new_id_log_start_;
   int new_id_lines_ = 0;
@@ -1094,7 +1094,7 @@ class DrawState {
     if (handler_ != kRaceOverlaysHandler) {
       CameraIds::Signature projection;
       signature = camera_ids_.Of(inputs.view_projection, &projection);
-      if (signature != 0 && REXCVAR_GET(sticky_camera_ids)) {
+      if (signature != 0 && ITC_FLAG(sticky_camera_ids)) {
         signature = StickyCameraId(camera, signature, projection);
       }
     }
@@ -1102,7 +1102,7 @@ class DrawState {
     // pointer to the part it draws in r31. Numbering products by order alone
     // paired a wheel with another wheel, or another car, whenever a part was
     // culled or the cars were drawn in another order.
-    uint64_t object = REXCVAR_GET(pair_by_object) && inputs.context[0] != 0
+    uint64_t object = ITC_FLAG(pair_by_object) && inputs.context[0] != 0
                           ? (uint64_t(inputs.context[0]) << 32) | inputs.context[8]
                           : 0;
     ProductKey key{camera, world, signature, handler_, object,
@@ -1111,7 +1111,7 @@ class DrawState {
       object_keys_.keyed++;
       object_keys_.shared += key.occurrence > 0;
     }
-    if (REXCVAR_GET(log_overlay_products) && handler_ == kRaceOverlaysHandler &&
+    if (ITC_FLAG(log_overlay_products) && handler_ == kRaceOverlaysHandler &&
         overlay_keys_logged_ < 24) [[unlikely]] {
       LogOverlayKey(out, world, key, render_only);
     }
@@ -1134,7 +1134,7 @@ class DrawState {
         return;
       }
     }
-    if (noting_live_ && render_only && REXCVAR_GET(log_blend_state)) [[unlikely]] {
+    if (noting_live_ && render_only && ITC_FLAG(log_blend_state)) [[unlikely]] {
       counts_.live_noted++;
     }
     int32_t tick_product = -1;
@@ -1171,10 +1171,10 @@ class DrawState {
       if (!overlay && (!tick || !SameMatrix(tick->world, inputs.world) ||
                        !SameMatrix(tick->view_projection, inputs.view_projection))) {
         counts_.mismatched_products++;
-        if (noting_live_ && REXCVAR_GET(log_blend_state)) [[unlikely]] {
+        if (noting_live_ && ITC_FLAG(log_blend_state)) [[unlikely]] {
           counts_.live_left++;
         }
-        if (REXCVAR_GET(log_moving_products)) {
+        if (ITC_FLAG(log_moving_products)) {
           LogMismatch(key, tick, inputs);
         }
         return;
@@ -1200,7 +1200,7 @@ class DrawState {
   uint32_t handler() const { return handler_; }
   std::thread::id main_thread() const { return main_thread_; }
   // The amount this pass's frame blends its ticks by (as published).
-  float amount() const { return REXCVAR_GET(interpolate_draw_state) ? amount_ : 1.0f; }
+  float amount() const { return ITC_FLAG(interpolate_draw_state) ? amount_ : 1.0f; }
 
   void BeforeDraw(uint8_t* base, bool logic_pass) {
     drawing_ = true;
@@ -1213,7 +1213,7 @@ class DrawState {
     amount_ = frame_pacing::GetFramePacer().TickProgress();
     recorded_.clear();
     // A logic pass draws the tick as it is (its uploads are blended at replay).
-    enabled_ = REXCVAR_GET(interpolate_draw_state) && REXCVAR_GET(blend_while_drawing) &&
+    enabled_ = ITC_FLAG(interpolate_draw_state) && ITC_FLAG(blend_while_drawing) &&
                !logic_pass;
     if (!enabled_) {
       return;
@@ -1254,10 +1254,10 @@ class DrawState {
       current_order_ = std::move(collecting_order_);
       collecting_order_.clear();
       MatchTick();
-      if (REXCVAR_GET(log_camera_copies)) [[unlikely]] {
+      if (ITC_FLAG(log_camera_copies)) [[unlikely]] {
         LogCameraCopies();
       }
-      by_tick_ = REXCVAR_GET(publish_by_tick);
+      by_tick_ = ITC_FLAG(publish_by_tick);
       PlanTick();
       overlay_keys_ = std::move(overlay_keys_this_tick_);
       overlay_keys_this_tick_.clear();
@@ -1271,13 +1271,13 @@ class DrawState {
     Restore(base, saved_vec3_);
     counts_.draws++;
     LogCounts();
-    if (REXCVAR_GET(log_moving_products) && logic_pass_) {
+    if (ITC_FLAG(log_moving_products) && logic_pass_) {
       object_keys_.ticks++;
       auto now = std::chrono::steady_clock::now();
       if (now - object_keys_.last_log >= std::chrono::seconds(2)) {
-        REXLOG_INFO("moving: per tick, {:.1f} products keyed by object, {:.1f} sharing one",
-                    double(object_keys_.keyed) / std::max(object_keys_.ticks, 1),
-                    double(object_keys_.shared) / std::max(object_keys_.ticks, 1));
+        ITC_LOG_INFO("moving: per tick, {:.1f} products keyed by object, {:.1f} sharing one",
+                     double(object_keys_.keyed) / std::max(object_keys_.ticks, 1),
+                     double(object_keys_.shared) / std::max(object_keys_.ticks, 1));
         object_keys_ = {};
         object_keys_.last_log = now;
       }
@@ -1389,19 +1389,19 @@ class DrawState {
         }
       }
       const Matrix4& m = inputs.view_projection;
-      REXLOG_INFO("camera copies: tick {} unpaired: camera {:08X} handler {:08X} id {} occurrence "
-                  "{}; m00 {:.5f} m11 {:.5f} m22 {:.6f} m32 {:.6f} m23 {:.4f}; before:{}",
-                  ticks_, key.camera, key.handler, key.signature, key.occurrence, m[0], m[5],
-                  m[10], m[14], m[11], before.empty() ? std::string(" none") : before);
+      ITC_LOG_INFO("camera copies: tick {} unpaired: camera {:08X} handler {:08X} id {} occurrence "
+                   "{}; m00 {:.5f} m11 {:.5f} m22 {:.6f} m32 {:.6f} m23 {:.4f}; before:{}",
+                   ticks_, key.camera, key.handler, key.signature, key.occurrence, m[0], m[5],
+                   m[10], m[14], m[11], before.empty() ? std::string(" none") : before);
     }
     auto now = std::chrono::steady_clock::now();
     if (now - camera_copies_.last_log >= std::chrono::seconds(2)) {
-      REXLOG_INFO("camera copies: last 2 s, {} ticks, {:.1f} copies a tick, {} unpaired; {} "
-                  "camera numbers, {} products kept their address's number, {} numbers pushed "
-                  "out of an address's slots",
-                  camera_copies_.ticks, double(camera_copies_.copies) / camera_copies_.ticks,
-                  camera_copies_.unpaired, camera_ids_.count(), camera_copies_.kept,
-                  camera_copies_.evicted);
+      ITC_LOG_INFO("camera copies: last 2 s, {} ticks, {:.1f} copies a tick, {} unpaired; {} "
+                   "camera numbers, {} products kept their address's number, {} numbers pushed "
+                   "out of an address's slots",
+                   camera_copies_.ticks, double(camera_copies_.copies) / camera_copies_.ticks,
+                   camera_copies_.unpaired, camera_ids_.count(), camera_copies_.kept,
+                   camera_copies_.evicted);
       camera_copies_ = {};
       camera_copies_.last_log = now;
     }
@@ -1456,10 +1456,10 @@ class DrawState {
     // Only while Draw runs, where amount_ is this frame's: billboards built
     // during Update (the marker above opponents, by the race overlays) are
     // left facing the tick's camera, the same on every pass.
-    if (!REXCVAR_GET(interpolate_draw_state) || !drawing_) {
+    if (!ITC_FLAG(interpolate_draw_state) || !drawing_) {
       return;
     }
-    if (REXCVAR_GET(cache_billboard_cameras)) {
+    if (ITC_FLAG(cache_billboard_cameras)) {
       // The same for every set drawn in the frame: blended on the first.
       if (!billboard_cameras_ready_) {
         BlendBillboardCameras();
@@ -1551,7 +1551,7 @@ class DrawState {
   // Render thread diagnostics; counted only when logged, as the increment
   // is a locked instruction (costly on the render thread).
   void CountReplayedProduct() {
-    if (REXCVAR_GET(log_blend_state)) {
+    if (ITC_FLAG(log_blend_state)) {
       counts_.replayed_products.fetch_add(1, std::memory_order_relaxed);
     }
   }
@@ -1644,7 +1644,7 @@ class DrawState {
 
   void PublishReplayFrame() {
     std::shared_ptr<ReplayFrame> frame = by_tick_ ? SpareFrame() : std::make_shared<ReplayFrame>();
-    frame->amount = REXCVAR_GET(interpolate_draw_state) ? amount_ : 1.0f;
+    frame->amount = ITC_FLAG(interpolate_draw_state) ? amount_ : 1.0f;
     frame->tick = ticks_;
     frame->plans = plans_;
     frame->products.Reserve(tick_outputs_.size() + pass_outputs_.size());
@@ -1782,7 +1782,7 @@ class DrawState {
   }
 
   void LogCounts() {
-    if (!REXCVAR_GET(log_blend_state)) {
+    if (!ITC_FLAG(log_blend_state)) {
       return;
     }
     auto now = std::chrono::steady_clock::now();
@@ -1790,7 +1790,7 @@ class DrawState {
       return;
     }
     int draws = std::max(counts_.draws, 1);
-    REXLOG_INFO(
+    ITC_LOG_INFO(
         "blend state: {} draws; per draw {} look-ats, {} cameras, {} objects ({} unmatched, {} "
         "not transforms), {} replayed camera products; {} camera cuts, {} object cuts; {} "
         "products published per draw, {} mismatched, {} copies",
@@ -1800,16 +1800,16 @@ class DrawState {
         counts_.camera_cuts, counts_.object_cuts, counts_.products_published / draws,
         counts_.mismatched_products / draws, counts_.copies / draws);
     if (counts_.live_noted) {
-      REXLOG_INFO("blend state: {} live poses on render-only passes, {} left as drawn",
-                  counts_.live_noted, counts_.live_left);
+      ITC_LOG_INFO("blend state: {} live poses on render-only passes, {} left as drawn",
+                   counts_.live_noted, counts_.live_left);
     }
-    if (REXCVAR_GET(log_replayed_constants)) {
+    if (ITC_FLAG(log_replayed_constants)) {
       auto print = [&](const char* name, uint32_t offset) {
         Matrix4 m = LoadMatrix(base_, CameraPass(0) + offset);
-        REXLOG_INFO("pass 0 {}: {:.4g} {:.4g} {:.4g} {:.4g} | {:.4g} {:.4g} {:.4g} {:.4g} | {:.4g} "
-                    "{:.4g} {:.4g} {:.4g} | {:.4g} {:.4g} {:.4g} {:.4g}",
-                    name, m[0], m[1], m[2], m[3], m[4], m[5], m[6], m[7], m[8], m[9], m[10],
-                    m[11], m[12], m[13], m[14], m[15]);
+        ITC_LOG_INFO("pass 0 {}: {:.4g} {:.4g} {:.4g} {:.4g} | {:.4g} {:.4g} {:.4g} {:.4g} | {:.4g} "
+                     "{:.4g} {:.4g} {:.4g} | {:.4g} {:.4g} {:.4g} {:.4g}",
+                     name, m[0], m[1], m[2], m[3], m[4], m[5], m[6], m[7], m[8], m[9], m[10],
+                     m[11], m[12], m[13], m[14], m[15]);
       };
       print("view", kViewOffset);
       print("projection", kProjectionOffset);
@@ -2091,11 +2091,11 @@ class DrawState {
       return;
     }
     overlay_keys_logged_++;
-    REXLOG_INFO("overlay key ({}{}): out {:08X} camera {:08X} world {:08X} id {} occurrence {} "
-                "(tick {}) in current tick {} previous {}",
-                render_only ? "render-only" : "logic", world == 0 ? ", copy" : "", out,
-                key.camera, key.world, key.signature, key.occurrence, ticks_,
-                current_tick_.count(key), previous_tick_.count(key));
+    ITC_LOG_INFO("overlay key ({}{}): out {:08X} camera {:08X} world {:08X} id {} occurrence {} "
+                 "(tick {}) in current tick {} previous {}",
+                 render_only ? "render-only" : "logic", world == 0 ? ", copy" : "", out,
+                 key.camera, key.world, key.signature, key.occurrence, ticks_,
+                 current_tick_.count(key), previous_tick_.count(key));
   }
 
   // Diagnostics (--log_moving_products): a render-only pass's multiply whose
@@ -2108,7 +2108,7 @@ class DrawState {
     total++;
     auto t = std::chrono::steady_clock::now();
     if (t - last >= std::chrono::seconds(2)) {
-      REXLOG_INFO("moving: {} render-only mismatches in the last 2 s", total);
+      ITC_LOG_INFO("moving: {} render-only mismatches in the last 2 s", total);
       last = t;
       lines = 0;
       total = 0;
@@ -2118,19 +2118,19 @@ class DrawState {
     }
     const Matrix4& w = now.world;
     if (!tick) {
-      REXLOG_INFO("moving: render-only mismatch, key not in the tick: tick {} camera {:08X} world "
-                  "{:08X} id {} handler {:08X} occurrence {}, world at {:.3f} {:.3f} {:.3f}",
-                  ticks_, key.camera, key.world, key.signature, key.handler, key.occurrence,
-                  w[12], w[13], w[14]);
+      ITC_LOG_INFO("moving: render-only mismatch, key not in the tick: tick {} camera {:08X} world "
+                   "{:08X} id {} handler {:08X} occurrence {}, world at {:.3f} {:.3f} {:.3f}",
+                   ticks_, key.camera, key.world, key.signature, key.handler, key.occurrence,
+                   w[12], w[13], w[14]);
       return;
     }
     const Matrix4& tw = tick->world;
-    REXLOG_INFO("moving: render-only mismatch: tick {} camera {:08X} world {:08X} id {} handler "
-                "{:08X} occurrence {}, world at {:.3f} {:.3f} {:.3f}, logic pass's {:.3f} {:.3f} "
-                "{:.3f}; camera {}",
-                ticks_, key.camera, key.world, key.signature, key.handler, key.occurrence, w[12],
-                w[13], w[14], tw[12], tw[13], tw[14],
-                tick->view_projection == now.view_projection ? "same" : "differs");
+    ITC_LOG_INFO("moving: render-only mismatch: tick {} camera {:08X} world {:08X} id {} handler "
+                 "{:08X} occurrence {}, world at {:.3f} {:.3f} {:.3f}, logic pass's {:.3f} {:.3f} "
+                 "{:.3f}; camera {}",
+                 ticks_, key.camera, key.world, key.signature, key.handler, key.occurrence, w[12],
+                 w[13], w[14], tw[12], tw[13], tw[14],
+                 tick->view_projection == now.view_projection ? "same" : "differs");
   }
   CameraIds camera_ids_;
   struct {
@@ -2236,9 +2236,9 @@ class MovingProductsLog {
     auto now = std::chrono::steady_clock::now();
     if (now - last_log_ >= std::chrono::seconds(2)) {
       if (frames_ > 0) {
-        REXLOG_INFO("moving: last 2 s, {} frames, {:.1f} moving products a frame; {} not "
-                    "blended, {} unpaired near moving, {} unlike their neighbors, {} jumps",
-                    frames_, double(moving_) / frames_, not_blended_, unpaired_, unlike_, jumps_);
+        ITC_LOG_INFO("moving: last 2 s, {} frames, {:.1f} moving products a frame; {} not "
+                     "blended, {} unpaired near moving, {} unlike their neighbors, {} jumps",
+                     frames_, double(moving_) / frames_, not_blended_, unpaired_, unlike_, jumps_);
       }
       last_log_ = now;
       lines_ = 0;
@@ -2315,14 +2315,14 @@ class MovingProductsLog {
       if (r.outcome == Outcome::kWorldNotBlended && r.Moved() > 0.01f) {
         not_blended_++;
         if (Line()) {
-          REXLOG_INFO("moving: not blended, tick {} amount {:.2f}: {}", tick_, amount_,
-                      Describe(r));
+          ITC_LOG_INFO("moving: not blended, tick {} amount {:.2f}: {}", tick_, amount_,
+                       Describe(r));
         }
       } else if (r.outcome == Outcome::kUnpaired && near_moving(r.now)) {
         unpaired_++;
         if (Line()) {
-          REXLOG_INFO("moving: unpaired near moving, tick {} amount {:.2f}: {}", tick_, amount_,
-                      Describe(r));
+          ITC_LOG_INFO("moving: unpaired near moving, tick {} amount {:.2f}: {}", tick_, amount_,
+                       Describe(r));
         }
       }
       // Drawn somewhere its own motion doesn't explain since the last frame.
@@ -2334,11 +2334,11 @@ class MovingProductsLog {
         if (moved > 2 * expected + 0.2f) {
           jumps_++;
           if (Line()) {
-            REXLOG_INFO("moving: jump of {:.3f} (expected {:.3f}), tick {} amount {:.2f}, last "
-                        "frame tick {} amount {:.2f} at {:.3f} {:.3f} {:.3f}: {}",
-                        moved, expected, tick_, amount_, last->second.tick, last->second.amount,
-                        last->second.position[0], last->second.position[1],
-                        last->second.position[2], Describe(r));
+            ITC_LOG_INFO("moving: jump of {:.3f} (expected {:.3f}), tick {} amount {:.2f}, last "
+                         "frame tick {} amount {:.2f} at {:.3f} {:.3f} {:.3f}: {}",
+                         moved, expected, tick_, amount_, last->second.tick, last->second.amount,
+                         last->second.position[0], last->second.position[1],
+                         last->second.position[2], Describe(r));
           }
         }
       }
@@ -2362,8 +2362,8 @@ class MovingProductsLog {
       if (neighbors >= 2 && agreeing == 0) {
         unlike_++;
         if (Line()) {
-          REXLOG_INFO("moving: unlike its {} neighbors, tick {} amount {:.2f}: {}", neighbors,
-                      tick_, amount_, Describe(*r));
+          ITC_LOG_INFO("moving: unlike its {} neighbors, tick {} amount {:.2f}: {}", neighbors,
+                       tick_, amount_, Describe(*r));
         }
       }
     }
@@ -2420,12 +2420,12 @@ class CockpitJudderLog {
           tick_max_jerk_ = std::max(tick_max_jerk_, jerk);
           if (jerk > 0.002f && tick_lines_ < 6) {
             tick_lines_++;
-            REXLOG_INFO("cockpit judder: tick {}: id {:016X} the tick's own eye in part {:.4f} "
-                        "{:.4f} {:.4f} (ticks before {:.4f} {:.4f} {:.4f}, {:.4f} {:.4f} {:.4f}), "
-                        "jerk {:.4f} m",
-                        tick_, identity, ticks.now[0], ticks.now[1], ticks.now[2],
-                        ticks.last[0], ticks.last[1], ticks.last[2], ticks.before[0],
-                        ticks.before[1], ticks.before[2], jerk);
+            ITC_LOG_INFO("cockpit judder: tick {}: id {:016X} the tick's own eye in part {:.4f} "
+                         "{:.4f} {:.4f} (ticks before {:.4f} {:.4f} {:.4f}, {:.4f} {:.4f} {:.4f}), "
+                         "jerk {:.4f} m",
+                         tick_, identity, ticks.now[0], ticks.now[1], ticks.now[2],
+                         ticks.last[0], ticks.last[1], ticks.last[2], ticks.before[0],
+                         ticks.before[1], ticks.before[2], jerk);
           }
         }
       }
@@ -2451,20 +2451,20 @@ class CockpitJudderLog {
     max_jerk_ = std::max(max_jerk_, jerk);
     if (jerk > 0.002f && lines_ < 12) {
       lines_++;
-      REXLOG_INFO("cockpit judder: tick {} amount {:.3f}: id {:016X} jerk {:.4f} m, eye in part "
-                  "{:.4f} {:.4f} {:.4f} (last {:.4f} {:.4f} {:.4f}, before {:.4f} {:.4f} "
-                  "{:.4f}); camera {} (last {}), world {} (last {}); part at {:.1f} {:.1f} "
-                  "{:.1f}",
-                  tick_, amount_, identity, jerk, local[0], local[1], local[2],
-                  last->second.local[0], last->second.local[1], last->second.local[2],
-                  before->second.local[0], before->second.local[1], before->second.local[2],
-                  sample.camera_rejected ? "rejected" : sample.camera_blended ? "blended" : "not",
-                  last->second.camera_rejected  ? "rejected"
-                  : last->second.camera_blended ? "blended"
+      ITC_LOG_INFO("cockpit judder: tick {} amount {:.3f}: id {:016X} jerk {:.4f} m, eye in part "
+                   "{:.4f} {:.4f} {:.4f} (last {:.4f} {:.4f} {:.4f}, before {:.4f} {:.4f} "
+                   "{:.4f}); camera {} (last {}), world {} (last {}); part at {:.1f} {:.1f} "
+                   "{:.1f}",
+                   tick_, amount_, identity, jerk, local[0], local[1], local[2],
+                   last->second.local[0], last->second.local[1], last->second.local[2],
+                   before->second.local[0], before->second.local[1], before->second.local[2],
+                   sample.camera_rejected ? "rejected" : sample.camera_blended ? "blended" : "not",
+                   last->second.camera_rejected  ? "rejected"
+                   : last->second.camera_blended ? "blended"
                                                 : "not",
-                  sample.world_blended ? "blended" : "not",
-                  last->second.world_blended ? "blended" : "not", world[12], world[13],
-                  world[14]);
+                   sample.world_blended ? "blended" : "not",
+                   last->second.world_blended ? "blended" : "not", world[12], world[13],
+                   world[14]);
     }
   }
 
@@ -2488,12 +2488,12 @@ class CockpitJudderLog {
     frames_++;
     auto now = std::chrono::steady_clock::now();
     if (now - last_log_ >= std::chrono::seconds(2)) {
-      REXLOG_INFO("cockpit judder: last 2 s, {} frames, {:.1f} parts within 3 m a frame ({} "
-                  "camera not blended, {} rejected, {} world not blended); jerk mean {:.5f} max "
-                  "{:.5f} m as drawn; the ticks' own: mean {:.5f} max {:.5f} m",
-                  frames_, double(parts_) / std::max(frames_, 1), camera_unblended_,
-                  camera_rejected_, world_unblended_, jerk_sum_ / std::max(jerk_count_, 1),
-                  max_jerk_, tick_jerk_sum_ / std::max(tick_jerk_count_, 1), tick_max_jerk_);
+      ITC_LOG_INFO("cockpit judder: last 2 s, {} frames, {:.1f} parts within 3 m a frame ({} "
+                   "camera not blended, {} rejected, {} world not blended); jerk mean {:.5f} max "
+                   "{:.5f} m as drawn; the ticks' own: mean {:.5f} max {:.5f} m",
+                   frames_, double(parts_) / std::max(frames_, 1), camera_unblended_,
+                   camera_rejected_, world_unblended_, jerk_sum_ / std::max(jerk_count_, 1),
+                   max_jerk_, tick_jerk_sum_ / std::max(tick_jerk_count_, 1), tick_max_jerk_);
       last_log_ = now;
       frames_ = parts_ = camera_unblended_ = camera_rejected_ = world_unblended_ = jerk_count_ =
           lines_ = tick_jerk_count_ = tick_lines_ = 0;
@@ -2539,8 +2539,8 @@ class ReplayCameras {
     LogStats();
     if (overlay_frames_left_ > 0) {
       overlay_frames_left_--;
-      if (REXCVAR_GET(log_overlay_products)) {
-        REXLOG_INFO("overlay: --- frame ---");
+      if (ITC_FLAG(log_overlay_products)) {
+        ITC_LOG_INFO("overlay: --- frame ---");
       }
     }
     last_identity_ = 0;
@@ -2552,10 +2552,10 @@ class ReplayCameras {
       }
       frame_ = g_replay_frame;
     }
-    if (REXCVAR_GET(log_moving_products) && frame_) {
+    if (ITC_FLAG(log_moving_products) && frame_) {
       GetMovingProductsLog().OnFrameStart(frame_->tick, frame_->amount);
     }
-    if (REXCVAR_GET(log_cockpit_judder) && frame_) [[unlikely]] {
+    if (ITC_FLAG(log_cockpit_judder) && frame_) [[unlikely]] {
       GetCockpitJudderLog().OnFrameStart(frame_->tick, frame_->amount);
     }
   }
@@ -2574,11 +2574,11 @@ class ReplayCameras {
       return;
     }
     const Matrix4& w = product.written;
-    REXLOG_INFO("overlay: tick {} amount {:.2f} payload {:08X} paired {} written row3 ({:.4g} {:.4g} "
-                "{:.4g} {:.4g}) now ({:.4g} {:.4g} {:.4g} {:.4g}) result ({:.4g} {:.4g} {:.4g} {:.4g})",
-                frame_->tick, frame_->amount, payload, product.tick->before.has_value(), w[12], w[13],
-                w[14], w[15], product.tick->now.world[12], product.tick->now.world[13], product.tick->now.world[14],
-                product.tick->now.world[15], result[12], result[13], result[14], result[15]);
+    ITC_LOG_INFO("overlay: tick {} amount {:.2f} payload {:08X} paired {} written row3 ({:.4g} {:.4g} "
+                 "{:.4g} {:.4g}) now ({:.4g} {:.4g} {:.4g} {:.4g}) result ({:.4g} {:.4g} {:.4g} {:.4g})",
+                 frame_->tick, frame_->amount, payload, product.tick->before.has_value(), w[12], w[13],
+                 w[14], w[15], product.tick->now.world[12], product.tick->now.world[13], product.tick->now.world[14],
+                 product.tick->now.world[15], result[12], result[13], result[14], result[15]);
   }
   int overlay_frames_left_ = 0;
   std::chrono::steady_clock::time_point overlay_last_{};
@@ -2596,9 +2596,9 @@ class ReplayCameras {
     if (miss_lines_++ >= 30) {
       return;
     }
-    REXLOG_INFO("overlay miss: tick {} amount {:.2f} payload {:08X} {}: row3 ({:.5g} {:.5g} "
-                "{:.5g} {:.5g})",
-                tick(), amount(), payload, Status(payload, m), m[12], m[13], m[14], m[15]);
+    ITC_LOG_INFO("overlay miss: tick {} amount {:.2f} payload {:08X} {}: row3 ({:.5g} {:.5g} "
+                 "{:.5g} {:.5g})",
+                 tick(), amount(), payload, Status(payload, m), m[12], m[13], m[14], m[15]);
   }
   std::unordered_set<uint32_t> overlay_payloads_;
   std::chrono::steady_clock::time_point miss_last_{};
@@ -2627,7 +2627,7 @@ class ReplayCameras {
 
   // Render thread, for each vertex constant upload of 4+ registers.
   void CountUpload(uint8_t* base, uint32_t payload, bool substituted) {
-    if (!REXCVAR_GET(log_blend_state)) {
+    if (!ITC_FLAG(log_blend_state)) {
       return;
     }
     stats_.uploads++;
@@ -2656,7 +2656,7 @@ class ReplayCameras {
       // isn't): the pixel constants after it belong to it, not to the last
       // product, so they mustn't be paired by that product's identity (that
       // blended one piece of world geometry's lighting with another's).
-      if (REXCVAR_GET(strict_pixel_pairing)) {
+      if (ITC_FLAG(strict_pixel_pairing)) {
         last_identity_ = 0;
       }
       return std::nullopt;
@@ -2669,7 +2669,7 @@ class ReplayCameras {
     Matrix4 result =
         BlendProduct(*product, frame_->plans.get(), frame_->amount, stats_.blend, camera_blends_,
                      &last_parts_);
-    if (REXCVAR_GET(log_moving_products)) {
+    if (ITC_FLAG(log_moving_products)) {
       using Outcome = MovingProductsLog::Outcome;
       Outcome outcome = stats_.blend.unpaired != before.unpaired       ? Outcome::kUnpaired
                         : stats_.blend.spinning != before.spinning     ? Outcome::kSpinning
@@ -2678,10 +2678,10 @@ class ReplayCameras {
                             : Outcome::kBlended;
       GetMovingProductsLog().OnProduct(payload, *product, last_parts_.world, outcome);
     }
-    if (REXCVAR_GET(log_cockpit_judder)) [[unlikely]] {
+    if (ITC_FLAG(log_cockpit_judder)) [[unlikely]] {
       LogCockpitJudder(*product, before);
     }
-    if (REXCVAR_GET(log_overlay_products) && product->tick->handler == kRaceOverlaysHandler) {
+    if (ITC_FLAG(log_overlay_products) && product->tick->handler == kRaceOverlaysHandler) {
       LogOverlay(payload, *product, result);
     }
     return result;
@@ -2695,7 +2695,7 @@ class ReplayCameras {
     std::array<double, 3> offset;
     if (last_parts_.eye) {
       for (int k = 0; k < 3; k++) {
-        offset[k] = REXCVAR_GET(double_precision_blending)
+        offset[k] = ITC_FLAG(double_precision_blending)
                         ? last_parts_.eye_exact[k] - last_parts_.position_exact[k]
                         : double((*last_parts_.eye)[k]) - double(world[12 + k]);
       }
@@ -2723,7 +2723,7 @@ class ReplayCameras {
   }
 
   void LogStats() {
-    if (!REXCVAR_GET(log_blend_state)) {
+    if (!ITC_FLAG(log_blend_state)) {
       return;
     }
     stats_.frames++;
@@ -2735,11 +2735,11 @@ class ReplayCameras {
     {
       std::lock_guard lock(g_camera_rejects_mutex);
       if (!g_camera_rejects.empty()) {
-        REXLOG_INFO("replay: cameras not blended:{}", g_camera_rejects);
+        ITC_LOG_INFO("replay: cameras not blended:{}", g_camera_rejects);
         g_camera_rejects.clear();
       }
     }
-    REXLOG_INFO(
+    ITC_LOG_INFO(
         "replay: {} frames; per frame {} uploads, {} blended ({} spinning, {} world, {} camera not "
         "blended), "
         "{} unpaired, not replaced: {} unchanged since last frame, {} changed",
@@ -2748,9 +2748,9 @@ class ReplayCameras {
         stats_.blend.unpaired / f, stats_.not_substituted_same / f,
         stats_.not_substituted_changed / f);
     if (stats_.blend.live) {
-      REXLOG_INFO("replay: {} live poses: {} unpaired, {} camera rejected, {} no camera",
-                  stats_.blend.live, stats_.blend.live_unpaired,
-                  stats_.blend.live_camera_rejected, stats_.blend.live_no_camera);
+      ITC_LOG_INFO("replay: {} live poses: {} unpaired, {} camera rejected, {} no camera",
+                   stats_.blend.live, stats_.blend.live_unpaired,
+                   stats_.blend.live_camera_rejected, stats_.blend.live_no_camera);
     }
     stats_ = {};
     last_log_ = now;
@@ -2781,16 +2781,16 @@ ReplayCameras& GetReplayCameras() {
 class ReplayedConstantsLog {
  public:
   void OnFrameStart() {
-    if (!REXCVAR_GET(log_replayed_constants)) {
+    if (!ITC_FLAG(log_replayed_constants)) {
       return;
     }
     auto now = std::chrono::steady_clock::now();
     if (logging_) {
       logging_ = false;
-      REXLOG_INFO("replayed constants: frame with {} uploads, {} changed since the last frame",
-                  frame_.size(), changed_);
+      ITC_LOG_INFO("replayed constants: frame with {} uploads, {} changed since the last frame",
+                   frame_.size(), changed_);
       for (const auto& line : lines_) {
-        REXLOG_INFO("replayed constants: {}", line);
+        ITC_LOG_INFO("replayed constants: {}", line);
       }
     }
     if (now - last_log_ >= std::chrono::seconds(1) && frames_since_tick_ == 2) {
@@ -2808,7 +2808,7 @@ class ReplayedConstantsLog {
   void OnTick() { frames_since_tick_ = 0; }
 
   void OnUpload(uint8_t* base, uint32_t payload, uint32_t packed, bool substituted) {
-    if (!REXCVAR_GET(log_replayed_constants)) {
+    if (!ITC_FLAG(log_replayed_constants)) {
       return;
     }
     uint32_t stage = packed >> 24, start = (packed >> 8) & 0xFF, count = packed & 0xFF;
@@ -2912,7 +2912,7 @@ class PixelConstantBlender {
     // lights there, and the tick's own on the frames after. Blending from
     // the last value recorded in the previous tick to this frame's gives the
     // previous tick's lights at the tick (amount about 0) and a blend after.
-    bool from_latest = REXCVAR_GET(pixel_blend_from_latest);
+    bool from_latest = ITC_FLAG(pixel_blend_from_latest);
     bool first = entry.current_tick != tick_;  // the tick's own value
     // The upload, loaded straight into the entry when it becomes its current
     // value (the entry's node stays put until OnFrameStart).
@@ -2922,7 +2922,7 @@ class PixelConstantBlender {
     entry.current_tick = tick_;
     recorded_ = &now;
     last_key_ = {object, key.occurrence};
-    keep_blended_ = REXCVAR_GET(log_pixel_outcomes);
+    keep_blended_ = ITC_FLAG(log_pixel_outcomes);
     if (keep_blended_) {
       last_blended_ = now;
     }
@@ -2981,7 +2981,7 @@ class PixelConstantBlender {
     // kSlotLightMove; cars' headlights move at most about 3 m a tick.
     constexpr float kSlotLightMove = 4.0f;  // meters
     std::array<bool, 8> slot_switched{};
-    if (count == 63 && REXCVAR_GET(switch_light_slots)) {
+    if (count == 63 && ITC_FLAG(switch_light_slots)) {
       for (uint32_t k = 0; k < 8; k++) {
         uint32_t p = (8 + k) * 4;
         Vec3 before{previous[p], previous[p + 1], previous[p + 2]};
@@ -3011,7 +3011,7 @@ class PixelConstantBlender {
     // Judged by component, a view matrix entry that moved more than the
     // tolerance kept the tick's value while the rest blended, so the car was
     // lit against an inconsistent camera for a tick (a flash).
-    bool camera = count == 63 && REXCVAR_GET(blend_lighting_camera);
+    bool camera = count == 63 && ITC_FLAG(blend_lighting_camera);
     bool camera_cut = false;
     if (camera) {
       Vec3 eye_before{previous[16], previous[17], previous[18]};
@@ -3027,7 +3027,7 @@ class PixelConstantBlender {
     // the cars, and the rest is left as recorded. Added while opponents' cars
     // flashed passing under lamps, before the cause (slots taking the next
     // lamp, see slot_switched) was found; blending all of it is fine since.
-    bool only_lights = count == 63 && REXCVAR_GET(blend_only_light_slots);
+    bool only_lights = count == 63 && ITC_FLAG(blend_only_light_slots);
     auto blends = [&](uint32_t i) {
       uint32_t r = i / 4;
       return !only_lights || (r >= 8 && r < 16) || (r >= 24 && r < 32);
@@ -3060,7 +3060,7 @@ class PixelConstantBlender {
       }
       if (jumped(i)) {
         if (!is_switch(i)) {
-          if (REXCVAR_GET(log_blend_state)) {
+          if (ITC_FLAG(log_blend_state)) {
             LogRejection(start * 4 + i, a, b);
           }
           switch_jumps_ = switch_jumps;
@@ -3184,8 +3184,8 @@ void PixelConstantBlender::LogRejection(uint32_t i, float a, float b) {
   for (const auto& [index, n] : rejections) {
     line += fmt::format(" c{}.{}:{}", index / 4, "xyzw"[index % 4], n);
   }
-  REXLOG_INFO("pixel constants rejected (register.component:count):{}; e.g. c{}.{} {} -> {}", line,
-              i / 4, "xyzw"[i % 4], a, b);
+  ITC_LOG_INFO("pixel constants rejected (register.component:count):{}; e.g. c{}.{} {} -> {}", line,
+               i / 4, "xyzw"[i % 4], a, b);
   rejections.clear();
 }
 
@@ -3247,10 +3247,10 @@ class PixelOutcomesLog {
           before = fmt::format("{:.3f} {:.3f} {:.3f} (lr {:08X} r31 {:08X})", v[12], v[13], v[14],
                                d[0], d[8]);
         }
-        REXLOG_INFO("pixel outcomes: rejected c{}.{} {:.4g}->{:.4g}, object {:016X}: now {:.3f} "
-                    "{:.3f} {:.3f} (lr {:08X} r31 {:08X}), before {}",
-                    start + blender.rejected() / 4, "xyzw"[blender.rejected() % 4], a, b,
-                    product->tick->identity, w[12], w[13], w[14], c[0], c[8], before);
+        ITC_LOG_INFO("pixel outcomes: rejected c{}.{} {:.4g}->{:.4g}, object {:016X}: now {:.3f} "
+                     "{:.3f} {:.3f} (lr {:08X} r31 {:08X}), before {}",
+                     start + blender.rejected() / 4, "xyzw"[blender.rejected() % 4], a, b,
+                     product->tick->identity, w[12], w[13], w[14], c[0], c[8], before);
       }
     }
   }
@@ -3272,27 +3272,27 @@ class PixelOutcomesLog {
     }
     for (const auto& [key, line] : lines) {
       auto jumps = switch_jumps_.find(key);
-      REXLOG_INFO("pixel outcomes per frame, {} objects, c{}:{}; blended with switches jumping {:.1f}",
-                  key.first, key.second, line,
-                  jumps == switch_jumps_.end() ? 0.0 : double(jumps->second) / frames_);
+      ITC_LOG_INFO("pixel outcomes per frame, {} objects, c{}:{}; blended with switches jumping {:.1f}",
+                   key.first, key.second, line,
+                   jumps == switch_jumps_.end() ? 0.0 : double(jumps->second) / frames_);
     }
     if (!rejected_.empty()) {
       std::string line;
       for (const auto& [i, n] : rejected_) {
         line += fmt::format(" +{}.{}:{}", i / 4, "xyzw"[i % 4], n);
       }
-      REXLOG_INFO("pixel outcomes: moving objects rejected by (register from start.component:count):{}; e.g.{}",
-                  line, rejected_examples_);
+      ITC_LOG_INFO("pixel outcomes: moving objects rejected by (register from start.component:count):{}; e.g.{}",
+                   line, rejected_examples_);
     }
     if (!differing_.empty()) {
       std::string line;
       for (const auto& [i, n] : differing_) {
         line += fmt::format(" +{}.{}:{}", i / 4, "xyzw"[i % 4], n);
       }
-      REXLOG_INFO("pixel outcomes: moving objects not as recorded, differing (register from "
-                  "start.component:count):{}", line);
+      ITC_LOG_INFO("pixel outcomes: moving objects not as recorded, differing (register from "
+                   "start.component:count):{}", line);
       for (const std::string& example : not_as_recorded_examples_) {
-        REXLOG_INFO("pixel outcomes: not as recorded, e.g. {}", example);
+        ITC_LOG_INFO("pixel outcomes: not as recorded, e.g. {}", example);
       }
     }
     for (const auto* changes : {&frame_jumps_, &frame_flips_}) {
@@ -3303,9 +3303,9 @@ class PixelOutcomesLog {
       for (const auto& [i, n] : *changes) {
         line += fmt::format(" c{}.{}:{}", i / 4, "xyzw"[i % 4], n);
       }
-      REXLOG_INFO("pixel outcomes: moving objects' lighting, frame-to-frame {} (register from "
-                  "start.component:count):{}",
-                  changes == &frame_jumps_ ? "jumps" : "flips", line);
+      ITC_LOG_INFO("pixel outcomes: moving objects' lighting, frame-to-frame {} (register from "
+                   "start.component:count):{}",
+                   changes == &frame_jumps_ ? "jumps" : "flips", line);
     }
     frame_jumps_.clear();
     frame_flips_.clear();
@@ -3363,20 +3363,20 @@ class PixelOutcomesLog {
                                v[33], v[34], v[36], v[37], v[38], v[188], v[189], v[190], v[191],
                                v[192], v[193], v[194], v[195]);
           };
-          REXLOG_INFO("pixel follow: object {:016X} c{} jumped at c{}.{}; two frames ago "
-                      "uploaded {}",
-                      object, start, start + r, "xyzw"[i % 4],
-                      has_older ? line(h.older) : std::string("-"));
-          REXLOG_INFO("pixel follow: last frame (tick {} amount {:.2f}) uploaded {}", h.tick,
-                      h.amount, line(h.previous));
+          ITC_LOG_INFO("pixel follow: object {:016X} c{} jumped at c{}.{}; two frames ago "
+                       "uploaded {}",
+                       object, start, start + r, "xyzw"[i % 4],
+                       has_older ? line(h.older) : std::string("-"));
+          ITC_LOG_INFO("pixel follow: last frame (tick {} amount {:.2f}) uploaded {}", h.tick,
+                       h.amount, line(h.previous));
         }
         if (change_lines_++ < 16) {
-          REXLOG_INFO("pixel outcomes: frame {} c{}.{} ({}), object {:016X}: {} -> {:.4g} -> "
-                      "{:.4g}, tick {} amount {:.2f} (last frame tick {} amount {:.2f}), {}",
-                      flip ? "flip" : "jump", start + r, "xyzw"[i % 4],
-                      slot ? "light slot" : "other", object,
-                      has_older ? fmt::format("{:.4g}", o) : std::string("-"), a, b, tick, amount,
-                      h.tick, h.amount, kOutcomeNames[int(blender.outcome())]);
+          ITC_LOG_INFO("pixel outcomes: frame {} c{}.{} ({}), object {:016X}: {} -> {:.4g} -> "
+                       "{:.4g}, tick {} amount {:.2f} (last frame tick {} amount {:.2f}), {}",
+                       flip ? "flip" : "jump", start + r, "xyzw"[i % 4],
+                       slot ? "light slot" : "other", object,
+                       has_older ? fmt::format("{:.4g}", o) : std::string("-"), a, b, tick, amount,
+                       h.tick, h.amount, kOutcomeNames[int(blender.outcome())]);
         }
       }
     }
@@ -3393,9 +3393,9 @@ class PixelOutcomesLog {
                            v[34], v[36], v[37], v[38], v[188], v[189], v[190], v[191], v[192],
                            v[193], v[194], v[195]);
       };
-      REXLOG_INFO("pixel follow: tick {} amount {:.2f} {}: recorded {}", tick, amount,
-                  kOutcomeNames[int(blender.outcome())], line(rec));
-      REXLOG_INFO("pixel follow:                       uploaded {}", line(now));
+      ITC_LOG_INFO("pixel follow: tick {} amount {:.2f} {}: recorded {}", tick, amount,
+                   kOutcomeNames[int(blender.outcome())], line(rec));
+      ITC_LOG_INFO("pixel follow:                       uploaded {}", line(now));
     }
     h.older = std::move(h.previous);
     h.older_frame = h.frame;
@@ -3437,8 +3437,8 @@ class PixelOutcomesLog {
         trace_key_ = blender.last_key();
         trace_tick_ = tick;
         trace_ticks_left_ = 4;
-        REXLOG_INFO("pixel trace: following object {:016X} occurrence {}", trace_key_.first,
-                    trace_key_.second);
+        ITC_LOG_INFO("pixel trace: following object {:016X} occurrence {}", trace_key_.first,
+                     trace_key_.second);
       } else {
         return;
       }
@@ -3466,12 +3466,12 @@ class PixelOutcomesLog {
                  ? fmt::format("{:.3f} {:.3f} {:.3f}", v[r * 4], v[r * 4 + 1], v[r * 4 + 2])
                  : std::string("-");
     };
-    REXLOG_INFO("pixel trace: tick {} amount {:.2f} {} | world now {:.3f} {:.3f} {:.3f} blend "
-                "{:.3f} {:.3f} {:.3f} | c8 {} | c9 {} | c11 {} | c24 {} | c25 {} | c27 {} | "
-                "uploaded c9 {} | c25 {}",
-                tick, amount, kNames[int(blender.outcome())], world_now[0], world_now[1],
-                world_now[2], world[0], world[1], world[2], reg(8), reg(9), reg(11), reg(24),
-                reg(25), reg(27), uploaded(9), uploaded(25));
+    ITC_LOG_INFO("pixel trace: tick {} amount {:.2f} {} | world now {:.3f} {:.3f} {:.3f} blend "
+                 "{:.3f} {:.3f} {:.3f} | c8 {} | c9 {} | c11 {} | c24 {} | c25 {} | c27 {} | "
+                 "uploaded c9 {} | c25 {}",
+                 tick, amount, kNames[int(blender.outcome())], world_now[0], world_now[1],
+                 world_now[2], world[0], world[1], world[2], reg(8), reg(9), reg(11), reg(24),
+                 reg(25), reg(27), uploaded(9), uploaded(25));
   }
 
   std::chrono::steady_clock::time_point last_trace_{};
@@ -3498,7 +3498,7 @@ PixelOutcomesLog& GetPixelOutcomesLog() {
 class SteppingConstantsLog {
  public:
   void OnFrameStart() {
-    if (!REXCVAR_GET(log_stepping_constants)) {
+    if (!ITC_FLAG(log_stepping_constants)) {
       return;
     }
     frames_++;
@@ -3514,9 +3514,9 @@ class SteppingConstantsLog {
       float rate = entry.changes / seconds;
       if (entry.frames * 2 > frames_ && rate > 15 && rate < 45 && logged < 60) {
         logged++;
-        REXLOG_INFO("stepping constants: {} c{} x{} #{} by {:08X}: {:.0f} changes/s, e.g. {}",
-                    key.stage ? "pixel" : "vertex", key.start, key.count, key.occurrence,
-                    key.owner, rate, entry.sample);
+        ITC_LOG_INFO("stepping constants: {} c{} x{} #{} by {:08X}: {:.0f} changes/s, e.g. {}",
+                     key.stage ? "pixel" : "vertex", key.start, key.count, key.occurrence,
+                     key.owner, rate, entry.sample);
       }
     }
     // Uploads blended on some frames and not others, or recorded on only
@@ -3529,21 +3529,21 @@ class SteppingConstantsLog {
       bool sometimes_present = entry.present * 10 > frames_ && entry.present * 10 < frames_ * 9;
       if ((sometimes_blended || sometimes_present) && mixed < 60) {
         mixed++;
-        REXLOG_INFO("mixed constants: {} c{} x{} #{} by {:08X}: in {} of {} frames, blended in {}, "
-                    "{} changes/s unblended, e.g. {}",
-                    key.stage ? "pixel" : "vertex", key.start, key.count, key.occurrence,
-                    key.owner, entry.present, frames_, entry.substituted, entry.changes / seconds,
-                    entry.sample);
+        ITC_LOG_INFO("mixed constants: {} c{} x{} #{} by {:08X}: in {} of {} frames, blended in {}, "
+                     "{} changes/s unblended, e.g. {}",
+                     key.stage ? "pixel" : "vertex", key.start, key.count, key.occurrence,
+                     key.owner, entry.present, frames_, entry.substituted, entry.changes / seconds,
+                     entry.sample);
       }
     }
-    REXLOG_INFO("stepping constants: {} logged of {} upload groups, {} frames", logged,
-                entries_.size(), frames_);
+    ITC_LOG_INFO("stepping constants: {} logged of {} upload groups, {} frames", logged,
+                 entries_.size(), frames_);
     entries_.clear();
     frames_ = 0;
   }
 
   void OnUpload(uint8_t* base, uint32_t payload, uint32_t packed, bool substituted) {
-    if (!REXCVAR_GET(log_stepping_constants)) {
+    if (!ITC_FLAG(log_stepping_constants)) {
       return;
     }
     Key key{packed >> 24, (packed >> 8) & 0xFF, packed & 0xFF, SlotOwner(payload - 16), 0};
@@ -3604,7 +3604,7 @@ SteppingConstantsLog& GetSteppingConstantsLog() {
 class OverlayUploadsLog {
  public:
   void OnFrameStart() {
-    if (!REXCVAR_GET(log_overlay_uploads)) {
+    if (!ITC_FLAG(log_overlay_uploads)) {
       return;
     }
     frame_++;
@@ -3623,7 +3623,7 @@ class OverlayUploadsLog {
 
   void OnUpload(uint8_t* base, uint32_t payload, uint32_t packed, bool substituted,
                 const std::optional<Matrix4>& original) {
-    if (!REXCVAR_GET(log_overlay_uploads) || frames_left_ == 0) {
+    if (!ITC_FLAG(log_overlay_uploads) || frames_left_ == 0) {
       return;
     }
     std::optional<OverlaySlot> slot = OverlaySlotOf(payload - 16);
@@ -3644,12 +3644,12 @@ class OverlayUploadsLog {
       was = fmt::format(" (was row3 {:.5g} {:.5g} {:.5g} {:.5g})", (*original)[12],
                         (*original)[13], (*original)[14], (*original)[15]);
     }
-    REXLOG_INFO("overlay upload: frame {} tick {} amount {:.2f} #{} recorded on {} pass {} "
-                "{} c{} x{} {}: {}{}",
-                frame_, GetReplayCameras().tick(), GetReplayCameras().amount(), index_++,
-                slot->render_only ? "render-only" : "logic", slot->pass,
-                stage == 0 ? "vs" : "ps", start, count, substituted ? "substituted" : "as recorded",
-                values, was);
+    ITC_LOG_INFO("overlay upload: frame {} tick {} amount {:.2f} #{} recorded on {} pass {} "
+                 "{} c{} x{} {}: {}{}",
+                 frame_, GetReplayCameras().tick(), GetReplayCameras().amount(), index_++,
+                 slot->render_only ? "render-only" : "logic", slot->pass,
+                 stage == 0 ? "vs" : "ps", start, count, substituted ? "substituted" : "as recorded",
+                 values, was);
   }
 
  private:
@@ -3669,7 +3669,7 @@ OverlayUploadsLog& GetOverlayUploadsLog() {
 void BlendState_LogOverlayAllocations(uint8_t* base) {
   static auto last = std::chrono::steady_clock::now();
   auto now = std::chrono::steady_clock::now();
-  if (!REXCVAR_GET(log_overlay_uploads) || frame_pacing::GameMessages_IsRenderOnlyPass()) {
+  if (!ITC_FLAG(log_overlay_uploads) || frame_pacing::GameMessages_IsRenderOnlyPass()) {
     return;
   }
   if (now - last >= std::chrono::seconds(3)) {
@@ -3685,7 +3685,7 @@ void BlendState_LogOverlayAllocations(uint8_t* base) {
                      ? fmt::format("{:.5g}", f)
                      : fmt::format("{:08X}", w);
       }
-      REXLOG_INFO("overlay alloc: {:08X} x{} by {:08X}:{}", a.address, a.count, a.caller, words);
+      ITC_LOG_INFO("overlay alloc: {:08X} x{} by {:08X}:{}", a.address, a.count, a.caller, words);
     }
   }
   g_overlay_allocations.clear();
@@ -3729,17 +3729,17 @@ class ObjectExtrasLog {
     }
     float seconds = std::chrono::duration<float>(now - last_log_).count();
     last_log_ = now;
-    REXLOG_INFO("object extras: {} frames, {} substituted x9 uploads; c4-c7 changed in {} "
-                "({:.1f}/s per upload address), c8 changed in {}",
-                frames_, uploads_, world_changes_,
-                world_changes_ / std::max<float>(seconds * std::max<size_t>(last_.size(), 1), 1),
-                c8_changes_);
+    ITC_LOG_INFO("object extras: {} frames, {} substituted x9 uploads; c4-c7 changed in {} "
+                 "({:.1f}/s per upload address), c8 changed in {}",
+                 frames_, uploads_, world_changes_,
+                 world_changes_ / std::max<float>(seconds * std::max<size_t>(last_.size(), 1), 1),
+                 c8_changes_);
     for (const std::string& example : examples_) {
-      REXLOG_INFO("object extras: {}", example);
+      ITC_LOG_INFO("object extras: {}", example);
     }
-    REXLOG_INFO("object extras: replaced c4-c7 in {}, c8 in {}; camera blended but c8 not its "
-                "position in {} (e.g. {:.3g} m away)",
-                world_replaced_, eye_replaced_, eye_missed_, eye_miss_example_);
+    ITC_LOG_INFO("object extras: replaced c4-c7 in {}, c8 in {}; camera blended but c8 not its "
+                 "position in {} (e.g. {:.3g} m away)",
+                 world_replaced_, eye_replaced_, eye_missed_, eye_miss_example_);
     frames_ = uploads_ = world_changes_ = c8_changes_ = 0;
     world_replaced_ = eye_replaced_ = eye_missed_ = 0;
     examples_.clear();
@@ -3807,7 +3807,7 @@ void BlendState_AfterRecordObject(uint8_t* base) {
 }
 
 void BlendState_OnReplayFrameStart() {
-  if (REXCVAR_GET(log_object_extras)) {
+  if (ITC_FLAG(log_object_extras)) {
     GetObjectExtrasLog().OnFrameStart();
   }
   GetReplayedConstantsLog().OnFrameStart();
@@ -3815,7 +3815,7 @@ void BlendState_OnReplayFrameStart() {
   GetReplayCameras().OnFrameStart();
   GetOverlayUploadsLog().OnFrameStart();
   GetPixelConstantBlender().OnFrameStart(GetReplayCameras().tick());
-  if (REXCVAR_GET(log_pixel_outcomes)) {
+  if (ITC_FLAG(log_pixel_outcomes)) {
     GetPixelOutcomesLog().OnFrameStart();
   }
 }
@@ -3888,9 +3888,9 @@ class MotionBlurLog {
   bool Sampling(Sample& sample) {
     auto now = std::chrono::steady_clock::now();
     if (sample.count >= kEntries) {
-      REXLOG_INFO("motion blur: {}:{}", &sample == &copies_ ? "c100 copies (main thread)"
+      ITC_LOG_INFO("motion blur: {}:{}", &sample == &copies_ ? "c100 copies (main thread)"
                                                            : "c100 uploads (render thread)",
-                  sample.lines);
+                   sample.lines);
       sample = {now, -1, {}};
     }
     if (sample.count < 0) {
@@ -3931,7 +3931,7 @@ uint32_t BlendState_MotionBlurNotedSource(uint8_t* base, uint32_t view, uint32_t
     Matrix4 value;
   };
   static std::unordered_map<uint32_t, Copied> logic_copies;  // by view
-  if (!REXCVAR_GET(interpolate_draw_state) || !REXCVAR_GET(motion_blur_by_tick) ||
+  if (!ITC_FLAG(interpolate_draw_state) || !ITC_FLAG(motion_blur_by_tick) ||
       std::this_thread::get_id() != GetDrawState().main_thread()) {
     return src;
   }
@@ -3948,7 +3948,7 @@ void BlendState_ReplayConstants(uint8_t* base, uint32_t payload, uint32_t packed
                                 const std::function<void()>& upload) {
   uint32_t stage = packed >> 24, count = packed & 0xFF;
   std::optional<Matrix4> original;
-  if (REXCVAR_GET(interpolate_draw_state) && stage == 0 && count >= 4) {
+  if (ITC_FLAG(interpolate_draw_state) && stage == 0 && count >= 4) {
     Matrix4 m = LoadMatrix(base, payload);
     if (std::optional<Matrix4> substitute = GetReplayCameras().Substitute(payload, m)) {
       original = m;
@@ -3961,7 +3961,7 @@ void BlendState_ReplayConstants(uint8_t* base, uint32_t payload, uint32_t packed
   // reflections use: give them the same blend as c0-c3, when they hold
   // what the product was made from.
   std::array<float, 20> original_extras;
-  bool extras = original && count >= 9 && REXCVAR_GET(blend_object_extras);
+  bool extras = original && count >= 9 && ITC_FLAG(blend_object_extras);
   if (extras) {
     const ProductBlendParts& parts = GetReplayCameras().last_parts();
     for (uint32_t i = 0; i < 20; i++) {
@@ -3981,17 +3981,17 @@ void BlendState_ReplayConstants(uint8_t* base, uint32_t payload, uint32_t packed
         }
       }
     }
-    if (REXCVAR_GET(log_object_extras)) {
+    if (ITC_FLAG(log_object_extras)) {
       GetObjectExtrasLog().OnReplaced(world, eye_distance);
     }
   }
   bool pixel_blended = false;
-  if (REXCVAR_GET(interpolate_draw_state) && REXCVAR_GET(blend_pixel_constants) && stage == 1 &&
+  if (ITC_FLAG(interpolate_draw_state) && ITC_FLAG(blend_pixel_constants) && stage == 1 &&
       ((packed >> 16) & 0xFF) == 1) {
     pixel_blended =
         GetPixelConstantBlender().Apply(base, payload, packed, GetReplayCameras().amount(),
                                         GetReplayCameras().last_identity());
-    if (REXCVAR_GET(log_pixel_outcomes)) {
+    if (ITC_FLAG(log_pixel_outcomes)) {
       const ProductBlendParts& parts = GetReplayCameras().last_parts();
       GetPixelOutcomesLog().OnUpload(
           (packed >> 8) & 0xFF, GetReplayCameras().last_identity() != 0,
@@ -4002,22 +4002,22 @@ void BlendState_ReplayConstants(uint8_t* base, uint32_t payload, uint32_t packed
   }
   GetSteppingConstantsLog().OnUpload(base, payload, packed,
                                      original.has_value() || pixel_blended);
-  if (REXCVAR_GET(log_motion_blur_velocity) && stage == 0 && ((packed >> 8) & 0xFF) == 100 &&
+  if (ITC_FLAG(log_motion_blur_velocity) && stage == 0 && ((packed >> 8) & 0xFF) == 100 &&
       count == 4) [[unlikely]] {
     GetMotionBlurLog().OnUpload(LoadMatrix(base, payload), original, GetReplayCameras().tick(),
                                 GetReplayCameras().amount());
   }
-  if (REXCVAR_GET(log_object_extras) && stage == 0 && count == 9 && original) {
+  if (ITC_FLAG(log_object_extras) && stage == 0 && count == 9 && original) {
     GetObjectExtrasLog().OnUpload(base, payload);
   }
   if (stage == 0 && count >= 4) {
     GetReplayCameras().CountUpload(base, payload, original.has_value());
-    if (!original && REXCVAR_GET(log_overlay_products)) {
+    if (!original && ITC_FLAG(log_overlay_products)) {
       GetReplayCameras().LogOverlayMiss(payload, LoadMatrix(base, payload));
     }
     // Diagnostics (--log_replayed_constants): main-camera matrices uploaded
     // to c0, with their status.
-    if (REXCVAR_GET(log_replayed_constants)) {
+    if (ITC_FLAG(log_replayed_constants)) {
       uint32_t start = (packed >> 8) & 0xFF;
       Matrix4 m = original ? *original : LoadMatrix(base, payload);
       static auto last = std::chrono::steady_clock::now();
@@ -4030,17 +4030,17 @@ void BlendState_ReplayConstants(uint8_t* base, uint32_t payload, uint32_t packed
       std::string status = GetReplayCameras().Status(payload, m);
       if (start == 0 && status != "substituted" && logged < 400) {
         logged++;
-        REXLOG_INFO("c0 upload t={} from {:08X} (slot by {:08X}, header by {:08X}) x{} {}: {:.4g} {:.4g} {:.4g} {:.4g} ... {:.4g} {:.4g} {:.4g} {:.4g}",
-                    std::chrono::duration_cast<std::chrono::microseconds>(now.time_since_epoch()).count() % 100000000,
-                    payload, SlotOwner(payload), SlotOwner(payload - 16), count, status, m[0], m[1], m[2], m[3],
-                    m[12], m[13], m[14], m[15]);
+        ITC_LOG_INFO("c0 upload t={} from {:08X} (slot by {:08X}, header by {:08X}) x{} {}: {:.4g} {:.4g} {:.4g} {:.4g} ... {:.4g} {:.4g} {:.4g} {:.4g}",
+                     std::chrono::duration_cast<std::chrono::microseconds>(now.time_since_epoch()).count() % 100000000,
+                     payload, SlotOwner(payload), SlotOwner(payload - 16), count, status, m[0], m[1], m[2], m[3],
+                     m[12], m[13], m[14], m[15]);
       }
     }
   }
   GetReplayedConstantsLog().OnUpload(base, payload, packed, original.has_value());
   std::vector<uint32_t> zeroed;
   if (stage == 0) {
-    if (REXCVAR_GET(log_upload_owners)) {
+    if (ITC_FLAG(log_upload_owners)) {
       uint32_t owner = SlotOwner(payload - 16);
       static std::map<uint32_t, int> owners;
       static int frames = 0;
@@ -4058,14 +4058,14 @@ void BlendState_ReplayConstants(uint8_t* base, uint32_t payload, uint32_t packed
         for (const auto& [who, n] : owners) {
           line += fmt::format(" {:08X}:{}", who, n / std::max(frames, 1));
         }
-        REXLOG_INFO("upload owners (caller:uploads per tick):{}", line);
+        ITC_LOG_INFO("upload owners (caller:uploads per tick):{}", line);
         owners.clear();
         frames = 0;
       }
     }
   }
   // Vertex or pixel constants, by the code that allocated the header.
-  if (const std::string& list = REXCVAR_GET(debug_zero_owners); !list.empty()) {
+  if (const std::string& list = ITC_FLAG(debug_zero_owners); !list.empty()) {
     uint32_t owner = SlotOwner(payload - 16);
     if (owner != 0 && list.find(fmt::format("{:08X}", owner)) != std::string::npos) {
       for (uint32_t i = 0; i < count * 4; i++) {
@@ -4107,14 +4107,14 @@ extern "C" REX_FUNC(sub_8209BD50) {
 
 // Diagnostics (--log_slot_callers): who allocates command list slots for
 // shader constants (4 or 9 registers) on the main thread, once a second.
-REXCVAR_DEFINE_BOOL(log_recording_by_pass, false, "ITC",
-                    "Log, for each code allocating command slots, its allocations per logic "
-                    "pass and per render-only pass (in races), every 2 s");
-REXCVAR_DEFINE_BOOL(native_allocate_slots, true, "ITC",
-                    "Allocate command list slots natively instead of through the translated "
-                    "CommandList::AllocateSlots (same results, without its guest stack frame)");
-REXCVAR_DEFINE_BOOL(log_slot_callers, false, "ITC",
-                    "Log which code allocates command list slots for constants, once a second");
+ITC_FLAG_BOOL(log_recording_by_pass, false, "ITC",
+              "Log, for each code allocating command slots, its allocations per logic "
+              "pass and per render-only pass (in races), every 2 s");
+ITC_FLAG_BOOL(native_allocate_slots, true, "ITC",
+              "Allocate command list slots natively instead of through the translated "
+              "CommandList::AllocateSlots (same results, without its guest stack frame)");
+ITC_FLAG_BOOL(log_slot_callers, false, "ITC",
+              "Log which code allocates command list slots for constants, once a second");
 
 namespace {
 std::mutex g_slot_callers_mutex;
@@ -4129,7 +4129,7 @@ namespace {
 // no stack frame (they made it reserve ~700 bytes and save six registers).
 [[gnu::noinline]] void AllocateSlots_Diagnostics(PPCContext& ctx, uint32_t count,
                                                  uint32_t caller) {
-  if (REXCVAR_GET(log_overlay_uploads) && ctx.r3.u32 != 0 &&
+  if (ITC_FLAG(log_overlay_uploads) && ctx.r3.u32 != 0 &&
       std::this_thread::get_id() == interpolation::GetDrawState().main_thread()) {
     uint32_t handler = interpolation::GetDrawState().handler() & ~1u;
     std::optional<interpolation::OverlaySlot> slot;
@@ -4149,7 +4149,7 @@ namespace {
       interpolation::g_overlay_slots[ctx.r3.u32 + 16 * i] = slot;
     }
   }
-  if (REXCVAR_GET(log_slot_callers) && ctx.r3.u32 != 0) {
+  if (ITC_FLAG(log_slot_callers) && ctx.r3.u32 != 0) {
     std::lock_guard lock(interpolation::g_slot_owners_mutex);
     if (interpolation::g_slot_owners.size() > 200000) {
       interpolation::g_slot_owners.clear();
@@ -4158,7 +4158,7 @@ namespace {
       interpolation::g_slot_owners[ctx.r3.u32 + 16 * i] = caller;
     }
   }
-  if (REXCVAR_GET(log_recording_by_pass) && frame_pacing::GameMessages_InRace()) {
+  if (ITC_FLAG(log_recording_by_pass) && frame_pacing::GameMessages_InRace()) {
     static std::map<uint32_t, std::pair<uint64_t, uint64_t>> by_caller;  // logic, render-only
     static uint64_t logic_start = 0, render_start = 0;
     static auto last = std::chrono::steady_clock::now();
@@ -4174,18 +4174,18 @@ namespace {
       for (const auto& [who, n] : by_caller) {
         double per_logic = n.first / logic_passes, per_render = n.second / render_passes;
         if (per_logic > per_render + 0.5) {
-          REXLOG_INFO("recording by pass: {:08X}: {:.1f} per logic pass, {:.1f} per render-only pass",
-                      who, per_logic, per_render);
+          ITC_LOG_INFO("recording by pass: {:08X}: {:.1f} per logic pass, {:.1f} per render-only pass",
+                       who, per_logic, per_render);
         }
       }
-      REXLOG_INFO("recording by pass: {} logic, {} render-only passes", logic - logic_start,
-                  render - render_start);
+      ITC_LOG_INFO("recording by pass: {} logic, {} render-only passes", logic - logic_start,
+                   render - render_start);
       by_caller.clear();
       logic_start = logic;
       render_start = render;
     }
   }
-  if (!REXCVAR_GET(log_slot_callers) || (count != 4 && count != 9)) {
+  if (!ITC_FLAG(log_slot_callers) || (count != 4 && count != 9)) {
     return;
   }
   std::lock_guard lock(g_slot_callers_mutex);
@@ -4193,8 +4193,8 @@ namespace {
   auto now = std::chrono::steady_clock::now();
   if (now - g_slot_callers_logged >= std::chrono::seconds(1)) {
     for (const auto& [key, n] : g_slot_callers) {
-      REXLOG_INFO("slot callers: {:08X} x{} {} pass: {} calls", std::get<0>(key), std::get<1>(key),
-                  std::get<2>(key) ? "render-only" : "logic", n);
+      ITC_LOG_INFO("slot callers: {:08X} x{} {} pass: {} calls", std::get<0>(key), std::get<1>(key),
+                   std::get<2>(key) ? "render-only" : "logic", n);
     }
     g_slot_callers.clear();
     g_slot_callers_logged = now;
@@ -4213,7 +4213,7 @@ extern "C" REX_FUNC(sub_8258CAA0) {
   uint32_t list = ctx.r3.u32;
   uint32_t used = guest::LoadU32(base, list + 12) + count;
   uint32_t limit = guest::LoadU32(base, list + 8);
-  if (REXCVAR_GET(native_allocate_slots) && used < limit) {
+  if (ITC_FLAG(native_allocate_slots) && used < limit) {
     uint32_t first = guest::LoadU32(base, list + 44);
     uint32_t next = first + (count << 4);
     guest::StoreU32(base, list + 12, used);
@@ -4227,8 +4227,8 @@ extern "C" REX_FUNC(sub_8258CAA0) {
   } else {
     __imp__sub_8258CAA0(ctx, base);
   }
-  if (REXCVAR_GET(log_overlay_uploads) || REXCVAR_GET(log_slot_callers) ||
-      REXCVAR_GET(log_recording_by_pass)) [[unlikely]] {
+  if (ITC_FLAG(log_overlay_uploads) || ITC_FLAG(log_slot_callers) ||
+      ITC_FLAG(log_recording_by_pass)) [[unlikely]] {
     AllocateSlots_Diagnostics(ctx, count, uint32_t(ctx.lr));
   }
 }
@@ -4241,7 +4241,7 @@ extern "C" REX_FUNC(sub_820A0AC0) {
   uint32_t noted_src = src;
   if (caller == 0x8213653C) [[unlikely]] {
     // The motion blur's previous view-projection (c100 x4); r29 is the view.
-    if (REXCVAR_GET(log_motion_blur_velocity)) {
+    if (ITC_FLAG(log_motion_blur_velocity)) {
       interpolation::BlendState_LogMotionBlurCopy(base, ctx.r29.u32, src);
     }
     noted_src = interpolation::BlendState_MotionBlurNotedSource(base, ctx.r29.u32, src);
@@ -4279,7 +4279,7 @@ extern "C" REX_FUNC(sub_8258FD48) {
   uint32_t payload = ctx.r3.u32, packed = ctx.r5.u32;
   debug::ReplayStats_OnCommand(base, 7, payload, ctx.r4.u32, packed);
   native::Renderer_OnCommand(base, 7, payload, ctx.r4.u32, packed);
-  if (!REXCVAR_GET(log_frame_times)) {
+  if (!ITC_FLAG(log_frame_times)) {
     interpolation::BlendState_ReplayConstants(base, payload, packed,
                                               [&] { __imp__sub_8258FD48(ctx, base); });
     return;
