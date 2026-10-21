@@ -74,6 +74,7 @@ set(ITC_SOURCES
     src/hooks/time.cpp
     src/hooks/clock.cpp
     src/hooks/xma.cpp
+    src/hooks/audio_volume.cpp
     src/hooks/strings.cpp
     src/hooks/last_error.cpp
     src/hooks/gamma.cpp
