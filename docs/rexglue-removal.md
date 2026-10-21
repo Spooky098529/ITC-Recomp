@@ -486,14 +486,19 @@ B2. **Audio** (6 functions calling `XAudio*`/`XMA*`, plus what's around
       reaches the XMA object only through these helpers (every load of
       +184 goes to one as r3); it reads the decoded samples straight from
       the output buffer, at the address the helpers give.
-    - What plays: one stereo 44.1 kHz voice a music track, long-lived,
-      streaming (its first input buffer given at set-up, `sub_8245C958`,
-      later ones by `sub_8245CF98`, 0.45-1.4 MB each), and a mono voice
-      a menu sound, its context made when the sound starts and released
-      when it ends, the whole sound given at set-up. 23 contexts made in
-      the user's session, never more than a few at once. One stream an
-      object every time. The context's loop count was 0 every time (no
-      hardware loops seen).
+    - What plays: one stereo 44.1 kHz voice a music track and a mono
+      voice a menu sound, each with its context made when it starts and
+      released when it ends. A sound's whole data is one input buffer,
+      given once at set-up (`sub_8245C958`; 0.45-1.4 MB for music). 23
+      contexts made in the user's session, never more than a few at
+      once, one stream an object every time.
+    - Music loops in the hardware: `sub_8245CF98` sets the loop data
+      (`XMASetLoopData`: loop count 255, forever; loop start and end as
+      bit offsets into the input buffer, e.g. `1FECB7` and `5D5993`;
+      the subframes to skip at the start and play at the end), called
+      once a music voice (4 times in the session). First written here as
+      "no hardware loops" and "later input buffers by `sub_8245CF98`",
+      both wrong: the loop count was read before that call.
 
     **Plan (agreed with the user, 2026-10-21):** we aren't emulating an
     Xbox; we take the game's audio and play it through SDL. So:
@@ -505,7 +510,11 @@ B2. **Audio** (6 functions calling `XAudio*`/`XMA*`, plus what's around
        and `xmaframes`, the fork's frame-at-a-time decoder made for
        emulating the hardware (bit read offsets, mid-packet starts and
        loops). Upstream's `xma2` decodes whole 2 KB packets, which is
-       what we feed. Both can be loaded at once:
+       what we feed. Loops: every XMA frame decodes to 512 samples a
+       channel and starts with its length (15 bits), so our code walks
+       the frame headers to turn the loop's bit offsets into sample
+       positions and loops the decoded samples there (parsing, not the
+       hardware's behavior). Both can be loaded at once:
        `librexruntime.so` links its FFmpeg statically and exports none
        of its symbols. Linux and the Windows cross-compile both build it.
     2. **The XMA layer native**: the helpers above (set-up and release,
@@ -520,11 +529,12 @@ B2. **Audio** (6 functions calling `XAudio*`/`XMA*`, plus what's around
     4. The SDK's audio system goes (`ItcAudioSystem` no longer starts
        its XMA decoder), and A6 (our own conversion and downmix).
 
-    Still to read before step 2: how `sub_8246B480` hands over input
-    buffers and clears them when consumed (valid bits, `sub_8245CA30`,
-    `sub_8245CF60`), what `sub_8246B1C8` (the voice's flush or stop, with
-    `sub_8245D070`, which reads the input read offset) does with the
-    offset, and whether music loops by giving its buffers again.
+    Still to read before step 2: what `sub_8246B480` does when the
+    input buffer is consumed (valid bits, `sub_8245CA30`, and
+    `sub_8245CF60`, which reads the error status), what `sub_8246B1C8`
+    (the voice's flush or stop, with `sub_8245D070`, which reads the input
+    read offset) does with the offset, and the loop's subframe skip and
+    end against the 512-sample frames.
 
 B3. **Graphics boundary** (17 functions calling `Vd*`): ring buffer
     setup, the interrupt callback and vblank, swap, display mode and gamma
