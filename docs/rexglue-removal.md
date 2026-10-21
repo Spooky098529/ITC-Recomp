@@ -446,6 +446,19 @@ B2. **Audio** (6 functions calling `XAudio*`/`XMA*`, plus what's around
     SDK thread until the core goes (it runs recompiled code). The user
     listens through menus, a race, the rival intro.
 
+    Next (chosen 2026-10-21: the last boundary subsystem outside the
+    core; A2 waits, as its churn over `src/` would make every merge from
+    `main` conflict). XMA goes through our own code calling FFmpeg (the
+    user's call, 2026-10-21), replacing the user's 2026-10-14 call to keep
+    the SDK's decoder (`docs/native-audio.md`, "Decisions"). Live at the
+    start: `sub_8245D138` (`XMACreateContext`), `sub_8245C8D0`
+    (`XMAReleaseContext`) and `sub_8245B808`
+    (`XAudioGetVoiceCategoryVolume` and `...ChangeMask`); the game's
+    audio library also reads and writes the XMA registers itself
+    (`sub_8245C638`, `sub_8245D138`, `sub_8245D208`, `sub_8245D288`,
+    `sub_8245D350`, `sub_8245D4D0`), so the level to replace is the
+    library's XMA layer, not just the two imports.
+
 B3. **Graphics boundary** (17 functions calling `Vd*`): ring buffer
     setup, the interrupt callback and vblank, swap, display mode and gamma
     queries. `src/native/gpu_link.cpp` already does the GPU's side; move

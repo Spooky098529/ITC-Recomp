@@ -120,6 +120,11 @@ Not known yet:
   wrapper `sub_82295508`, so that XACT plays music and menu sounds through
   its PCM path and no XMA context is made. Its open question was whether
   this XACT streams PCM from banks laid out for XMA.)
+  **Changed (the user's call, 2026-10-21, for B2 in
+  `docs/rexglue-removal.md`):** XMA is decoded by our own code calling
+  FFmpeg, in place of the SDK's XMA decoder and its emulated hardware
+  (contexts, the registers at `7FEA0000`), so the SDK's audio system can
+  go. The PCM bank conversion isn't the plan.
 - **No SDK patch**: override the game's functions in `itc_recomp/src/`,
   as the native renderer does.
 
