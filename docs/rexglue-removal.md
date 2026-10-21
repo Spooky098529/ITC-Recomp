@@ -1371,6 +1371,48 @@ B5. **System services** (82 functions; first counted as 78): sign-in, profile, U
     their save loaded through the device selector, a race, quit): no
     errors, closed cleanly.
 
+    **Step 7, the profile read: done (2026-10-21, `system-services`).**
+    Hardcoded data (the user's call: no profile code). The network
+    manager's `sub_82149178` reads the profile twice through
+    XUserReadProfileSettings (`sub_82576E78`): the size (4,192 bytes,
+    ERROR_INSUFFICIENT_BUFFER), then its 26 settings (the list at
+    `82008EA0`) into an allocated buffer with an overlapped at `826C6080`,
+    which Network::Update waits on (997) before it runs; it then reads
+    setting 3's value (the gamercard region, 0). Ours
+    (`src/user/profile.cpp`, adapter `src/hooks/profile.cpp`): the 26
+    settings in the game's order with the SDK's values (the gamercard and
+    options at their defaults, the picture key "gamercard_picture_key",
+    the three title-specific ones unset), written at the buffer's address
+    (the header and the picture key point into it), and the overlapped
+    completed as the SDK did (result, length, extended error; the game's
+    has no event or completion routine, and nothing reads the thread
+    handle the SDK put in its context). Overridden.
+
+    Checked: harness cases (`profile`: the size query, the settings with
+    and without an overlapped, another user, a short buffer; the buffer,
+    the size, the overlapped and r3 the same as the recompiled one's) and
+    an attract race (no errors). Not cleared: `XamUserReadProfileSettings`
+    (voice's own reads, `sub_8257E568`, and the never-called
+    `sub_8257D798`).
+
+    **State of B5 (2026-10-21):** steps 1-7 done. Imports with no
+    recompiled callers left: `XGetAVPack`, `XGetLanguage`,
+    `XexCheckExecutablePrivilege`, `HalReturnToFirmware`,
+    `RtlImageXexHeaderField`, `ExGetXConfigSetting`, `XamUserGetName`,
+    `XamUserGetXUID`, `XamGetExecutionId`, `XMsgStartIORequestEx`,
+    `NetDll_WSAStartup`, `NetDll_XNetGetTitleXnAddr`,
+    `NetDll_XNetXnAddrToMachineId`, `XexGetModuleHandle`,
+    `XexGetProcedureAddress` (15; 17 counted before, wrongly: the steps'
+    lists add up to 15). Left, with where they go: the notifications'
+    imports, the profile read's and the voice imports (voice and the
+    network manager's code, B7), the socket imports (system link code,
+    B7), `XamUserGetSigninState` (XUserCheckPrivilege, never called, and
+    voice), `XMsgStartIORequest` and `XMsgInProcessCall` (the XGI and
+    XLiveBase wrappers, never called but SetContextEx's, B7),
+    `XamGetSystemVersion` (XUserCheckPrivilege), the device selector and
+    XEnumerate (B4), `xstart`'s `DbgPrint` and `XamLoaderTerminateTitle`
+    (the core).
+
 B6. **Pure helpers** (55 functions): string, time and formatting
     helpers made native, or their callers made native. Cheap; can be
     done alongside anything else.

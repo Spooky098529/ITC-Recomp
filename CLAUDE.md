@@ -54,7 +54,9 @@ without their kernel calls, `src/hooks/start_up.cpp` and
 dropped, `src/hooks/xmp.cpp`) and step 4 (the network start-up, the
 system link socket not made, `src/hooks/network.cpp`); step 5 (voice) is
 mapped with no code; step 6 (notifications: the listener wrapper makes
-none, the app's reader builds the users once, `src/hooks/notify.cpp`). Plan steps are done on their
+none, the app's reader builds the users once, `src/hooks/notify.cpp`);
+step 7 (the profile read as hardcoded data, `src/user/profile.cpp`). B5's
+steps are done; what's left of its imports goes with B4, B7 and the core. Plan steps are done on their
 own branches and merged into `rexglue-removal-project` (no force pushes:
 GitHub refuses them on that branch).
 `docs/tick-replay.md` is a lead (not started): translating draws once a

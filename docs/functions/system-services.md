@@ -61,7 +61,7 @@ run it after changing either, on any branch.
 | `sub_82148958` | | Dropped | Makes the system link's socket: `socket(2, 2, 254)` (UDP, protocol 254) kept at `826C6AA0`, bound to port 1000, then FIONBIO; on Linux the SDK's bind and ioctlsocket failed (-1). Once at boot, from `sub_8214E190`. Dropped (B5 step 4, `src/hooks/network.cpp`): stores INVALID_SOCKET (-1), so system link stays off (the user's call: the SDK gave a handle). |
 | `sub_82148A80` | | | Another socket set-up like `sub_82148958` (socket, bind, ioctlsocket). Never called in play. |
 | `sub_82149080` | | | From `sub_8214E268`: reads Live connection changed (`0x02000002`, never sent) into `826C72F8` (+`826C72FC` = 1), or asks an object (`826C7300`) for the state; returns 1 once. B5. |
-| `sub_82149178` | | | Reads the profile (`sub_82576E78`, 26 settings) twice: the size, then the settings. From `sub_8214E268` on sign-in changes. Not read in detail. |
+| `sub_82149178` | | | Reads the profile for user r3: clears the overlapped at `826C6080` (Network::Update skips while it's 997), frees the last results (`826C6AD0`) and the 26 per-setting buffers, asks the size (`sub_82576E78`), allocates and clears the results, allocates the per-setting buffers (256 for the first 23, 1,000 for the title-specific ones), then reads the 26 settings (`82008EA0`) with the overlapped. From `sub_8214E268` on sign-in changes. Network::Update then reads setting 3's value (the gamercard region). |
 | `sub_8214AA70` | | | A system link send: `sendto` (`sub_82459CF8`) on the socket at `826C6AA0`. Never called in play. Not read in detail. |
 | `sub_8214AB48` | | | Another system link send (`sendto`, then `WSAGetLastError` on failure). Never called in play. Not read in detail. |
 | `sub_8214D7A0` | | | The system link receives, from `Network::Update`'s state machine: `accept`, `select`, `__WSAFDIsSet` and `recvfrom` on the socket at `826C6AA0`, then the message handlers. Its socket calls never ran in play. Not read in detail. |
@@ -140,7 +140,7 @@ run it after changing either, on any branch.
 | `sub_825767D0` | | | XMsg `FC 58023`. Never called. |
 | `sub_82576900` | | | An XLiveBase request with allocated buffers. Never called. |
 | `sub_82576BE0` | | | An XLiveBase request with allocated buffers. Never called. |
-| `sub_82576E78` | `XUserReadProfileSettings` | | r3 title, r4 user, r5 count, r6 ids, r7 size (in, out), r8 results, r9 overlapped; `XamUserReadProfileSettings` after `sub_82296EE0`. From `sub_82149178`: 26 settings, 4,192 bytes; the SDK's defaults, the title-specific ones unset (10 calls). B5. |
+| `sub_82576E78` | `XUserReadProfileSettings` | Overridden | r3 title, r4 user, r5 count, r6 ids, r7 size (in, out), r8 results, r9 overlapped; `XamUserReadProfileSettings` after `sub_82296EE0`. From `sub_82149178`: 26 settings, 4,192 bytes; the SDK's defaults, the title-specific ones unset (10 calls). Ours (B5 step 7, `src/hooks/profile.cpp`, the data in `src/user/profile.cpp`): the size query answered 4,192 (ERROR_INSUFFICIENT_BUFFER), the 26 settings as hardcoded data at the buffer's address, the overlapped completed as the SDK did; harness `profile`: the same on five cases. |
 | `sub_82576EE0` | | | XMsg `FC 5800E`. Never called. |
 | `sub_82576F30` | | | XMsg `FC 58035`. Never called. |
 | `sub_82576FE8` | | | XMsg `FC 58035`. Never called. |
