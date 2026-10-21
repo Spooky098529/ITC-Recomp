@@ -2111,6 +2111,37 @@ B6. **Pure helpers** (55 functions): string, time and formatting
     `rexglue-removal-project` (2026-10-20). Next item not decided (A2,
     or A6 with B2, would remove visible SDK use).
 
+B8. **The boundary's last non-core imports** (agreed with the user,
+    2026-10-21, after B2; done before B7, numbered after it). After B2,
+    72 imports still have a live caller: ~60 are the core's (threads
+    and sync, 49; the heap and physical memory, ~8: E1 and E2, after
+    B7), and about a dozen are B5's and B6's leftovers. This item takes
+    those, so only the core's imports stay live:
+
+    1. **Bookkeeping**: wrappers whose callers B5 already made native or
+       skipped (the system link socket set-up, the profile read, sign-in,
+       the notification listener) still count as live because their rows
+       don't say "never called". A temporary counter on them over boot,
+       menus and a race the user plays, then the rows marked (or the
+       wrappers Dropped).
+    2. **The other notification readers**: the four game readers that
+       still poll `XNotifyGetNext` besides the app's (B5 step 6), first
+       listed under B5's leftovers for B7. Read each, and answer what
+       the game needs ("no notification"), per "plug in the data".
+    3. **Small one-offs**: the quit path (`xstart`'s
+       `XamLoaderTerminateTitle`: a native exit), `DbgPrint` (dropped),
+       `sprintf` (its callers, the drive mounting, probably never run),
+       the memory statistics query (`MmQueryStatistics`, probably fixed
+       data) and the `XamAlloc`/`XamFree` caller (`sub_82575D78`). The
+       heap helpers counted under B6 (`RtlCompareMemoryUlong`,
+       `KeGetCurrentProcessType`) and `RtlInitializeCriticalSection` stay
+       with the core.
+
+    `itc_recomp/tools/boundary_status.py` gives the counts only; the live
+    callers of each import come from the same data (its `boundary()` and
+    the status check's rows, read the way its `main()` decides "live").
+    Not started.
+
 B7. **The game logic inside**: everything else, subsystem by subsystem,
     in whatever order the user wants (frame interpolation's hooks,
     vehicles, UI, menus, physics, ...). Each subsystem moves its data to
