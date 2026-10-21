@@ -1100,6 +1100,92 @@ B4. **Files and saves** (22 functions; the game's `CreateFile`
     changed, at 6086-6092). The temporary counter no longer wraps the
     steps made native.
 
+    **Step 2, the game's data files: surveyed (2026-10-21), not started.**
+    The user's direction: native file loading code at the level where the
+    game asks for its data, not a reimplementation of the Xbox's file
+    calls (that would emulate the 360); after it, the next level up is
+    the functions that read the data (the load callbacks and parsers).
+    Names and layouts confirmed with SBX-Recomp's `docs/functions.md`
+    (the Japanese build's recomp, beside this repo; its
+    `docs/itc_to_sbx_functions.tsv` maps the addresses).
+
+    Where the game asks for files (a trace in the temporary counter, a
+    40 s attract race, 2026-10-21):
+
+    - `Archive::Load` (`sub_8209DE48`, about 35 callers, all on the main
+      thread): r3 an asset id (from 23011 in `BUILD_CRS`), r4 the
+      destination, r5 a callback, r6 its context. It reads the id's TOC
+      entry (start sector, stored size, decompressed size), checks
+      `Archive::FindLooseFile` (`sub_8209D8D8`: a path for ids served by
+      loose files, such as the audio banks), and queues a 40-byte request
+      (`sub_8209DC18`); `sub_8209DB20` cancels one still waiting. 476
+      requests: 395 at load (120 MB unpacked in a second), then about 10
+      every few seconds during the race (3-10 MB a second, from
+      `sub_820D08D8`, `sub_820F2454`, `sub_820DB674`/`DB69C`,
+      `sub_820D0840`): loads have to stay asynchronous (a synchronous load
+      would stall the main thread 10-30 ms a burst). Latency today: median
+      12 ms, 90th percentile 241 ms.
+    - The loader thread (`sub_8209E118`) does the rest: `sub_8209D490`
+      gives each request a state and a target (+56 the byte offset, +60
+      sectors, +68/+72 the stored and unpacked sizes, +76 a fresh buffer,
+      the caller's, or half of the 10 MB staging ring for a compressed
+      entry, its destination then at +88). State 5 (365 + 96 + 12 seen):
+      an asynchronous ReadFileEx from `BUILD.DAT` or `BUILD_CRS.DAT`
+      (`sub_8209DD00`), then an alertable wait until the APC's routine
+      (`sub_8209D808`) releases the loop's lock (`826A(-21912)`); state 7
+      (3: the audio banks `SB_SYSTEM_SE.xwb`/`.xsb`, `car_se.xwb`): the
+      loose file read through the file class (`sub_8209DFA8`), which
+      releases the lock itself; states 1-2: no read, the loop releases
+      it. While a read is in flight the previous compressed entry is
+      unpacked (`Ucl::Unpack` `sub_82294610`, blocks by `sub_822947F8`,
+      about 3 ms a MB); `sub_8209D688` then calls the callback (flag
+      0x2000) on the loader thread.
+    - `Archive::Init` (`sub_8209E210`, once at boot) allocates the TOC
+      and staging buffers, reads `BUILD.TOC` and `BUILD_CRS.TOC` whole
+      through the file class, and opens the two `.DAT`s with CreateFile
+      (handles at `82600A9C`, `82600AA0`).
+    - The game's file class (`File::OpenRead` `sub_8258C688`, `File::Read`
+      `sub_8258C820`, `File::Seek` `sub_8258C768`, `File::Close`
+      `sub_8258C718`; the object: +4 the handle, -1 closed, +8 the
+      position, +12 the size, which `sub_822B80D8` returns): the only
+      whole-file loads in play go through it: the TOCs, `DEBFONT.XPR`
+      (`sub_82090CC0`), `TXR_XACT.xgs` (opened by `sub_82118638`, read by
+      the audio engine's start-up `sub_8259D1F0` through the object's
+      vtable) and the loose requests. `File::OpenWrite` and `File::Write`
+      are never called.
+    - The movies (`UBI_LOGO.wmv`, `OPENING.wmv`) have their own reads in
+      the movie player (`MoviePlayer::OpenFile`, `sub_82488598`): left
+      for when the movie decoder is looked at.
+
+    Proposed (each part plain C++ behind thin adapters):
+
+    1. A game data module (`src/game_data/`): finds a `game:\` path's
+       file under the game data folder whatever its case (the game asks
+       for `CAR_SE.XWB`, the file is `car_se.xwb`), and reads byte ranges
+       of the two archives (kept open) and of loose files.
+    2. The file class native: open (the size from the host file), read
+       at the position, seek, close, with handles of our own (a range the
+       SDK's `F8000000` ones can't reach); `File::Close` hands any other
+       handle to the recompiled CloseHandle.
+    3. The loader thread's loop native (level 1: it calls the game's
+       request queue, `Ucl::Unpack` and the finish with its callbacks, as
+       now): state 5's bytes copied from the archive into +76 directly,
+       then the lock released as the APC's routine did, with no wait;
+       state 7 read directly too. No ReadFileEx, APC or alertable wait.
+    4. `Archive::Init` native (level 1): the TOCs read straight into
+       their buffers, the archives opened by the game data module, no
+       CreateFile; the allocations, locks and the thread's start called
+       as now. `Archive::Shutdown` (`sub_8209D3B0`) closes nothing of the
+       SDK's then.
+    5. Checks: harnesses for the file class against the recompiled one
+       on real files (bytes, positions, sizes, r3) and for the archive
+       reads (the same bytes as a ReadFileEx of the same request); an
+       attract race with the trace (requests, latency); the user's play.
+
+    Afterwards ReadFileEx and its APC, ReadFile, GetFileSize(Ex),
+    SetFilePointer and CreateFile have no callers in play but the movie
+    player's; the SDK's VFS serves only the movies and the boot.
+
 B5. **System services** (82 functions; first counted as 78): sign-in, profile, UI dialogs,
     sessions, voice, network, notifications, the loader. Most should go
     from the game's side entirely (offline, signed in, no voice). Log
