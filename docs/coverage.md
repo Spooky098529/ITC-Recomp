@@ -141,3 +141,10 @@ checked over several sessions.
 | Date | Sessions | Seen in play | Notes |
 |---|---|---|---|
 | 2026-10-21 | a 20-second attract race (`--skip_intro`) | 4,975 of 16,552 (30%) | The test run; not written to the list |
+| 2026-10-21 | the user's first session (~5.5 minutes, closed cleanly) | 6,656 of 16,552 (40.2%; 39.8% of the generated lines) | The list's first entries. 208 of them were "unreachable" to the static pass |
+
+Joined by hand with `docs/functions/` after the first session (the report
+script is still to do): 219 of the 548 rows are functions seen in play (165
+with no status, 52 Wrapped, 1 Patched, 1 Overridden; overridden functions
+whose override doesn't call `__imp__` don't count as run), and 6,437
+functions seen in play have no row yet.
