@@ -66,8 +66,8 @@ sounds are decoded by our own upstream FFmpeg (the submodule
 read by position (`src/audio/xma_stream.h`, `src/hooks/xma.cpp`); the
 SDK's XMA decoder isn't set up, and the output's conversion is ours (A6,
 `src/audio/output_mix.h`); see `docs/native-audio.md`.
-B5's and B6's leftovers are done (branch `b5-b6-leftovers`, 2026-10-21,
-not yet merged; under "Left to do" in each): the functions never called in
+B5's and B6's leftovers are done (merged from `b5-b6-leftovers`,
+2026-10-21; under "Left to do" in each): the functions never called in
 play marked, GlobalMemoryStatus and XShowSigninUI dropped, voice skipped at
 its thread (`src/hooks/voice.cpp`: Voice::Poll no longer runs; Voice::Init
 still makes the engine, used without null checks), SaveDevices::Update
