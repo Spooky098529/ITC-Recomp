@@ -36,12 +36,9 @@ struct Function {
   X(82459C20, "socket")                                  \
   X(82459C48, "ioctlsocket")                             \
   X(82459C60, "bind")                                    \
-  X(822952C0, "XShowSigninUI")                           \
   X(8257B7A8, "Voice::Init")                             \
   X(8257E568, "voice profile read")                      \
   X(8257AF30, "Voice::Poll")                             \
-  X(820A4610, "SaveDevices::Update")                     \
-  X(82149080, "Live connection reader")                  \
   X(8214E268, "Network::Update")                         \
   X(8214F290, "SignIn::Update")                          \
   X(822AC530, "graphics debug print")                    \
@@ -49,7 +46,6 @@ struct Function {
   X(8248FBE0, "not implemented method")                  \
   X(822AC638, "sprintf caller 822AC638")                 \
   X(822B1AC8, "sprintf caller 822B1AC8")                 \
-  X(82294DA0, "GlobalMemoryStatus")                      \
   X(82575D78, "XamAlloc/XamFree caller")                 \
   X(82090108, "main")
 
