@@ -90,7 +90,6 @@ set(ITC_SOURCES
     src/hooks/movie_files.cpp
     src/hooks/archive_streaming.cpp
     src/game_data/game_data.cpp
-    src/hooks/files_and_saves_log.cpp
     src/display/gamma.cpp
     src/harnesses/harness.cpp
     src/harnesses/clock.cpp
