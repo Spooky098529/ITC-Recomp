@@ -23,9 +23,9 @@ ITC_FLAG_BOOL(log_boot_modes, false, "ITC",
 ITC_FLAG_BOOL(skip_intro, false, "ITC",
               "Testing: skip the Ubisoft logo movie, and run the Genki logo and the "
               "title screen's intro without the 30 Hz tick wait (until the first race)");
-REXCVAR_DEFINE_INT32(attract_after_s, 0, "ITC",
-                     "Testing: seconds the title screen waits before the attract race "
-                     "(0 = the game's 20)");
+ITC_FLAG_INT32(attract_after_s, 0, "ITC",
+               "Testing: seconds the title screen waits before the attract race "
+               "(0 = the game's 20)");
 
 namespace {
 

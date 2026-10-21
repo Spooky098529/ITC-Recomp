@@ -38,9 +38,9 @@ ITC_FLAG_BOOL(log_gpu_memory, false, "ITC",
               "what grows from race to race)");
 ITC_FLAG_BOOL(native_renderer_validation, false, "ITC",
               "Enable the Vulkan validation layer for the native renderer, if installed");
-REXCVAR_DEFINE_INT32(native_renderer_show_resolve, -1, "ITC",
-                     "Show the frame's nth resolve destination in the native renderer's window "
-                     "instead of the main view (a debugging aid; -1 for the main view)");
+ITC_FLAG_INT32(native_renderer_show_resolve, -1, "ITC",
+               "Show the frame's nth resolve destination in the native renderer's window "
+               "instead of the main view (a debugging aid; -1 for the main view)");
 
 ITC_FLAG_BOOL(native_renderer_serialize, false, "ITC",
               "Wait for the GPU to finish each frame before recording the next (a "
@@ -128,19 +128,19 @@ ITC_FLAG_BOOL(native_renderer_verify_textures, false, "ITC",
               "memory changed with no memcpy write recorded (a debugging aid)");
 ITC_FLAG_BOOL(native_renderer_no_index_clamp, false, "ITC",
               "Don't clamp indices to VGT_MIN/MAX_VTX_INDX (a debugging aid)");
-REXCVAR_DEFINE_INT32(native_renderer_dump_every, 0, "ITC",
-                     "With native_renderer_dump: dump only the frame itself (shown image, draw "
-                     "IDs, draws.txt) every this many seconds of a race (a debugging aid)");
+ITC_FLAG_INT32(native_renderer_dump_every, 0, "ITC",
+               "With native_renderer_dump: dump only the frame itself (shown image, draw "
+               "IDs, draws.txt) every this many seconds of a race (a debugging aid)");
 ITC_FLAG_STRING(native_renderer_dump, "", "ITC",
                 "Directory to dump frames into, as PFM files, with draws.txt describing "
                 "each draw: once 10 s into a race, and again whenever a file named 'now' "
                 "appears in it (a debugging aid; see docs/native-renderer.md)");
-REXCVAR_DEFINE_INT32(width, 0, "ITC",
-                     "Window width in pixels (in fullscreen, the drawing width); 0: 1280, or "
-                     "from height at 16:9");
-REXCVAR_DEFINE_INT32(height, 0, "ITC",
-                     "Window height in pixels (in fullscreen, the drawing height); 0: 720, or "
-                     "from width at 16:9");
+ITC_FLAG_INT32(width, 0, "ITC",
+               "Window width in pixels (in fullscreen, the drawing width); 0: 1280, or "
+               "from height at 16:9");
+ITC_FLAG_INT32(height, 0, "ITC",
+               "Window height in pixels (in fullscreen, the drawing height); 0: 720, or "
+               "from width at 16:9");
 // The SDK's (it also makes the SDK's own window, hidden in exclusive mode,
 // fullscreen); ours follows it.
 ITC_FLAG_DECLARE(bool, fullscreen);

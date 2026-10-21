@@ -22,9 +22,9 @@
 ITC_FLAG_BOOL(find_per_frame_state, false, "ITC",
               "Find game state that advances on render-only passes, and the code that "
               "advances it");
-REXCVAR_DEFINE_INT32(find_per_frame_state_interval_ms, 2000, "ITC",
-                     "How often --find_per_frame_state samples a render-only pass (0 = every "
-                     "one; slow)");
+ITC_FLAG_INT32(find_per_frame_state_interval_ms, 2000, "ITC",
+               "How often --find_per_frame_state samples a render-only pass (0 = every "
+               "one; slow)");
 ITC_FLAG_STRING(debug_hide, "", "ITC",
                 "Testing: wrapped draw functions (hex, comma-separated) never to run, "
                 "to see what they draw");

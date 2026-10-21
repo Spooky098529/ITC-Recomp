@@ -12,7 +12,7 @@
 #include <windows.h>
 #endif
 
-REXCVAR_DEFINE_INT32(max_fps, 0, "ITC", "Frame rate cap; 0 means unlimited");
+ITC_FLAG_INT32(max_fps, 0, "ITC", "Frame rate cap; 0 means unlimited");
 ITC_FLAG_BOOL(log_fps, false, "ITC", "Log frames and game ticks per second");
 
 namespace frame_pacing {

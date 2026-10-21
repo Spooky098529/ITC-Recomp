@@ -9,8 +9,8 @@
 
 #define ITC_FLAG_BOOL(name, default_val, category, desc) \
   REXCVAR_DEFINE_BOOL(name, default_val, category, desc)
-#define ITC_FLAG_INT(name, default_val, category, desc) \
-  REXCVAR_DEFINE_INT(name, default_val, category, desc)
+#define ITC_FLAG_INT32(name, default_val, category, desc) \
+  REXCVAR_DEFINE_INT32(name, default_val, category, desc)
 #define ITC_FLAG_STRING(name, default_val, category, desc) \
   REXCVAR_DEFINE_STRING(name, default_val, category, desc)
 #define ITC_FLAG_DECLARE(type, name) REXCVAR_DECLARE(type, name)
