@@ -87,6 +87,7 @@ set(ITC_SOURCES
     src/hooks/saves.cpp
     src/saves/saves.cpp
     src/hooks/file_class.cpp
+    src/hooks/movie_files.cpp
     src/hooks/archive_streaming.cpp
     src/game_data/game_data.cpp
     src/hooks/files_and_saves_log.cpp
@@ -106,6 +107,7 @@ set(ITC_SOURCES
     src/harnesses/profile.cpp
     src/harnesses/saves.cpp
     src/harnesses/file_class.cpp
+    src/harnesses/movie_files.cpp
     src/helpers/debug_output.cpp
     src/helpers/object_attributes.cpp
     src/helpers/time.cpp

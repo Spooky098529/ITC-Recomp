@@ -26,3 +26,14 @@ extern "C" REX_FUNC(sub_822B2610) {
   REX_FUNC_PROLOGUE();
   ctx.r3.u64 = 0;
 }
+
+// The shader build's wrapper (14 calls at boot, from sub_822B8D28): on its
+// first call it asked GetFileAttributes for "ShaderDumpxe:\CompareBackEnds"
+// and, had the file been there, set 82953E28 to build each shader a second
+// way and compare. The file never is, and nothing else reads either byte, so
+// this is the build (sub_822B8230) with the arguments as they came. B4 in
+// docs/rexglue-removal.md.
+extern "C" REX_FUNC(sub_822B8868) {
+  REX_FUNC_PROLOGUE();
+  sub_822B8230(ctx, base);
+}

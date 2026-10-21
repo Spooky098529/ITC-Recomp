@@ -105,5 +105,6 @@ void Notify(Context& h);
 void Profile(Context& h);
 void Saves(Context& h);
 void FileClass(Context& h);
+void MovieFiles(Context& h);
 
 }  // namespace harness

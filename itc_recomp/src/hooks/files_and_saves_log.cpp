@@ -272,21 +272,16 @@ struct Function {
   X(822972E0, "GetFileSizeEx", FileSizeEx)                                  \
   X(822B4760, "debug capture free space check", None)                       \
   X(822B58F0, "debug capture mounting", None)                               \
-  X(822B8868, "GetFileAttributes caller", None)                             \
   X(822BC588, "GetFileAttributes caller 2", None)                           \
   X(822E1838, "whole file load", None)                                      \
   X(8235E878, "GetFileTime caller", None)                                   \
   X(82487D58, "movie source open (wide path)", Stream)                      \
   X(82487DD8, "movie source open (handle)", Stream)                         \
   X(82487E68, "movie source open (parameters)", Stream)                     \
-  X(82487F68, "movie source blocks", Stream)                                \
-  X(824880D8, "movie source close", None)                                   \
   X(824881D0, "movie source prime", Stream)                                 \
   X(824883C8, "movie source cancel", Stream)                                \
   X(82488508, "movie source skip", Stream)                                  \
   X(82488548, "movie source seek", Stream)                                  \
-  X(82488598, "movie source read", StreamRead)                              \
-  X(82488A10, "movie source read (loop)", StreamRead)                       \
   X(8258C608, "File::OpenWrite", PathArg)                                   \
   X(8258C898, "File::Write", None)                                          \
   X(82593B10, "open and size", None)                                        \
