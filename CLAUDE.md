@@ -56,7 +56,10 @@ system link socket not made, `src/hooks/network.cpp`); step 5 (voice) is
 mapped with no code; step 6 (notifications: the listener wrapper makes
 none, the app's reader builds the users once, `src/hooks/notify.cpp`);
 step 7 (the profile read as hardcoded data, `src/user/profile.cpp`). B5's
-steps are done; what's left of its imports goes with B4, B7 and the core. Plan steps are done on their
+steps are done; what's left of its imports goes with B4, B7 and the core.
+After each plan item, run `itc_recomp/tools/boundary_status.py` and record
+its output in "The boundary over time" at the end of
+`docs/rexglue-removal.md`. Plan steps are done on their
 own branches and merged into `rexglue-removal-project` (no force pushes:
 GitHub refuses them on that branch).
 `docs/tick-replay.md` is a lead (not started): translating draws once a
