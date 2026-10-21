@@ -2630,3 +2630,12 @@ player's stream set-up (`DbgPrint`). 287 overrides in `src/`.
 pairs): overridden 58, Native 3, Dropped 23, never called 70, live 295.
 Imports: 186 called, 63 with a live caller. The areas' counts are as
 after B5's and B6's leftovers, batch 2.
+
+**2026-10-22, coverage: B7's measure (branch `coverage`):** the boundary
+unchanged: 449 functions (916 pairs): overridden 58, Native 3, Dropped
+23, never called 70, live 295. Imports: 186 called, 63 with a live
+caller. B7's first count (`itc_recomp/tools/b7_status.py`, after the
+user's first coverage session; `docs/coverage.md`): of 16,315 `sub_`
+functions, 6,591 seen in play, 6,752 in play (seen, or ours): ours 162,
+work left 6,590 (Wrapped 151, with a row 174, no row yet 6,265). From
+here, record `b7_status.py`'s totals beside the boundary's.
