@@ -14,8 +14,9 @@ there), and this file's history.
 - Subsystem 2 of 3: the collision world's narrow phase and shapes
   (`sub_820BB868`, `sub_820BBE30`, ...; from `leads.md`: runs every
   physics step, many ready groups, blocks `car-physics.md`), mapped in
-  `collision.md` (dd758b3; 64 rows; checked: 43 ready groups). Step:
-  migration 1 (agent running).
+  `collision.md` (dd758b3; 64 rows; checked: 43 ready groups). Migration 1
+  done (f5b59e8..e634cfd, 53 of 64 ours). Step: its validation (agent
+  running); then migration 2 for what's left.
 
 ## Done
 
@@ -31,6 +32,15 @@ there), and this file's history.
   query and table entries, `car-physics.md`'s intro; 1 lead added (the
   track's collision queries). Guesses to confirm: the floats at
   `0x82002B90`..`0x82002B98` and the impulse scale at `0x82600E84`.
+  Migration 1's 53 rows (35 Overridden, 18 Native) and the intro (the
+  box's vtable slots, read at run time). For review: the native code
+  reads the constants at `0x82002B90` and `0x820021E8` from guest memory,
+  leaves out the box's type calls (slot 4 is `li r3,2`) and runs the
+  original for any shape that isn't a box or when the impact table's
+  box-box entry isn't `sub_820BF038`; the box copies' memcpys are native
+  only where `c_runtime::Memcpy` records nothing. Map corrections:
+  LowerCorner's ties and NaNs (k^2), NextCheckTime's radii (the +20
+  shape), Shape::Shape zeroes +108's w.
 
 - `heap.md`: 15 rows read in full and rewritten (no status changed), the
   intro's paragraph on native versions; migration 1's 15 rows (12
@@ -45,6 +55,17 @@ there), and this file's history.
 
 ## Expected to differ
 
+- `collision.md` (migration 1): every function has a "NaNs and
+  infinities anywhere (expected to differ)" group (two NaNs meeting;
+  sign or payload only); nonzero: FaceDirection 2, BoxShape::Translate
+  2, BoxShape::Place 10, UpdateMotion 21, CollisionShape::Place 85,
+  CollisionShape::Translate 33, RelativePlacement 17, RelativeCenter 1,
+  BlockCorners 1, BoxBox::Separated 96, SeparatedAfterMove 17,
+  Query::Separated 96, Query::SeparatedAfterMove 17, BoxBox::FindImpact
+  1, Query::FindImpact 1 (of 200). UpdateMotion, CollisionShape::Place
+  and CollisionShape::Translate also have "one NaN meeting its own
+  negation" groups (1, 0, 1 differ: a sign in row +96).
+
 ## To check in a drive
 
 ## Totals
@@ -55,3 +76,5 @@ there), and this file's history.
   known 321, unknown 5566).
 - After mapping the collision narrow phase: ours 729, work left 6024
   (wrapped 137, known 385, unknown 5502).
+- After the collision's migration 1: ours 782, work left 5971 (wrapped
+  137, known 332, unknown 5502).
