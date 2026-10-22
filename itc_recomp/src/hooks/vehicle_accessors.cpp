@@ -76,7 +76,8 @@ ITC_FLAG_BOOL(native_vehicle_accessors, true, "ITC",
 using namespace vehicle_accessors;
 
 ITC_ACCESSOR_WORD(820C0468, VehicleGet(base, ctx.r3.u32))
-ITC_ACCESSOR_WORD(820C0170, VehicleWheelContact(ctx.r3.u32, ctx.r4.u32))
+// Vehicle::WheelContact (sub_820C0170) has no adapter: its callers in play,
+// OverlayView::WheelContact and WheelSurfaceMarks, are native.
 ITC_ACCESSOR_WORD(820B67D8, RigidBodyPosition(ctx.r3.u32))
 ITC_ACCESSOR_WORD(820B6930, RigidBodyMatrix(ctx.r3.u32))
 ITC_ACCESSOR_WORD(820B8CC0, ContactObject(base, ctx.r3.u32))
@@ -115,8 +116,9 @@ ITC_ACCESSOR_VOID(820B6968, RigidBodyAddForceAt(base, ctx.r3.u32, ctx.r4.u32, ct
 ITC_ACCESSOR_VOID(820B69D8, RigidBodyAddTorqueAt(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
                   ctx.r3.u64 = ctx.r3.u32 + 128)
 
-// The wheels' slip: r3 = the vehicle, r4 = a wheel, f1 = a threshold.
-ITC_ACCESSOR_FLOAT(820C0180, VehicleWheelSlip(base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64))
+// The wheels' slip: r3 = the vehicle, f1 = a threshold. Vehicle::WheelSlip
+// (sub_820C0180) has no adapter: its callers in play, MaxWheelSlip and
+// OverlayView::WheelSlip, are native.
 ITC_ACCESSOR_FLOAT(820C0290, VehicleMaxWheelSlip(base, ctx.r3.u32, ctx.f1.f64))
 
 // The vehicle (r3).
