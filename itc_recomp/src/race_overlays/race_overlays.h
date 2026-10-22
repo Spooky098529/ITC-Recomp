@@ -448,6 +448,10 @@ void RaceOverlaysClear(uint8_t* base, uint32_t list);
 // overlay 0's texture table (SetTextures104 with [list[0] + 104]). Returns
 // what the original leaves in r3 (entry 24).
 uint32_t ShareTextures(uint8_t* base, uint32_t list);
+// RaceOverlays::SlotOf (sub_8215E048): an overlay's index (0-24) to its
+// view slot: the index itself (the jump table's cases, sub_8215E078 the
+// first), 0 for anything above 24.
+uint32_t SlotOf(uint32_t index);
 
 }  // namespace race_overlays
 

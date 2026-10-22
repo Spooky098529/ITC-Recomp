@@ -17,7 +17,7 @@ ITC_FLAG_BOOL(native_race_overlays, true, "ITC",
               "sub_8212E660; Sparks::Emit, sub_8212D818; CarOverlays::EmitSmoke, sub_82123240, "
               "with Smoke::Emit; the set-up's constructors, clears and bindings, sub_82126498 to "
               "sub_8215E000; the resets, sub_8211E9F0 to sub_8212D6E0; Smoke::InRegion, "
-              "sub_8212A868; Sparks::Update, sub_8212DDC8; Smoke::Update, sub_8212AA78; ParticlesB::Update, sub_8212B748; ParticlesC::Update, sub_8212C2F0; the children's constructors, "
+              "sub_8212A868; Sparks::Update, sub_8212DDC8; Smoke::Update, sub_8212AA78; ParticlesB::Update, sub_8212B748; ParticlesC::Update, sub_8212C2F0; RaceOverlays::SlotOf, sub_8215E048; the children's constructors, "
               "sub_8211F060 to sub_8212E9A0, and Smoke and ParticlesB::Reset, sub_8212A9E0 and "
               "sub_8212BA98) natively "
               "instead of through the translated code (same results; checked by "
@@ -429,3 +429,7 @@ extern "C" REX_FUNC(sub_8212C2F0) {
   }
   ctx.r3.u64 = r3;
 }
+
+// RaceOverlays::SlotOf: r3 = an index; returns the slot (its jump table's
+// first case, sub_8215E078, is done by the plain C++).
+ITC_OVERLAY_WORD(8215E048, SlotOf(ctx.r3.u32))

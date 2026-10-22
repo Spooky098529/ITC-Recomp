@@ -254,6 +254,8 @@ void NativeParticlesCUpdate(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = r3;
 }
 
+ITC_NATIVE_WORD(NativeSlotOf, ro::SlotOf(ctx.r3.u32))
+
 void NativeRandomRange(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   uint32_t drawn = 0;
@@ -2337,6 +2339,27 @@ void ParticlesCUpdateCases(Context& h, uint32_t block) {
   guest::StoreU32(h.base, kSeed, live);
   results.Report();
 }
+
+// RaceOverlays::SlotOf: indices 0 to 40, the edges of the 32-bit range and
+// random words (with random upper halves of r3, which the original's
+// cmplwi doesn't read).
+void SlotOfCases(Context& h) {
+  Random& r = h.random;
+  std::vector<uint32_t> indices = {0x7FFFFFFF, 0x80000000, 0xFFFFFFFF, 0xFFFFFFE8};
+  for (uint32_t i = 0; i <= 40; i++) {
+    indices.push_back(i);
+  }
+  for (int i = 0; i < 40; i++) {
+    indices.push_back(uint32_t(r.Next()));
+  }
+  Results results("RaceOverlays::SlotOf (sub_8215E048)");
+  for (uint32_t index : indices) {
+    const uint64_t upper = r.Next() << 32;
+    Compare(h, results, {}, [] {}, [&](PPCContext& t) { t.r3.u64 = upper | index; },
+            __imp__sub_8215E048, NativeSlotOf, fmt::format("index {:X}", index));
+  }
+  results.Report();
+}
 }  // namespace
 
 void RaceOverlays(Context& h) {
@@ -2367,6 +2390,7 @@ void RaceOverlays(Context& h) {
   SmokeUpdateCases(h, block);
   ParticlesBUpdateCases(h, block);
   ParticlesCUpdateCases(h, block);
+  SlotOfCases(h);
   memory->SystemHeapFree(block);
 }
 

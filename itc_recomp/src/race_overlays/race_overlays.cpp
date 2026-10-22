@@ -2532,3 +2532,12 @@ bool ParticlesCUpdate(uint8_t* base, uint32_t effect, uint32_t* r3) {
 }
 
 }  // namespace race_overlays
+
+namespace race_overlays {
+
+uint32_t SlotOf(uint32_t index) {
+  ITC_NATIVE_RUNNING("sub_8215E048 RaceOverlays::SlotOf");
+  return index <= 24 ? index : 0;
+}
+
+}  // namespace race_overlays
