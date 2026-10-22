@@ -114,5 +114,6 @@ void CRuntime(Context& h);
 void Math(Context& h);
 void UiMovies(Context& h);
 void UiMoviesGame(Context& h);
+void RaceOverlays(Context& h);
 
 }  // namespace harness

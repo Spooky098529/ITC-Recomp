@@ -1,0 +1,298 @@
+// The race overlays' update side (src/hooks/race_overlays.cpp) against the
+// recompiled functions. Overlays, views and vehicles are live guest objects:
+// the cases build their own in a block taken from the system heap for the
+// run (a trail alone is 64 KB, more than the scratch area), so nothing the
+// game holds is written, except the race data pointer (0x826C5B2C) some
+// cases point at the block and put back.
+
+#include "harness.h"
+
+#include "base/flags.h"
+#include "base/log.h"
+#include "race_overlays/race_overlays.h"
+
+#include <rex/system/kernel_state.h>
+#include <rex/system/xmemory.h>
+
+#include <fmt/format.h>
+
+#include <iterator>
+#include <string>
+#include <utility>
+#include <vector>
+
+ITC_FLAG_DECLARE(bool, native_race_overlays);
+
+namespace harness {
+
+namespace {
+
+namespace ro = race_overlays;
+
+constexpr uint32_t kRaceData = 0x826C5B2C;
+
+// The register steps: the cases run the plain C++ through these (not the
+// adapters, so they keep working once an adapter goes), against the
+// recompiled versions.
+#define ITC_NATIVE_WORD(name, expr)                    \
+  void name(PPCContext& ctx, uint8_t* base) {          \
+    ctx.r3.u64 = uint32_t(expr);                       \
+  }
+#define ITC_NATIVE_FLOAT(name, expr)                   \
+  void name(PPCContext& ctx, uint8_t* base) {          \
+    ctx.fpscr.disableFlushMode();                      \
+    ctx.f1.f64 = double(expr);                         \
+  }
+
+ITC_NATIVE_WORD(NativeView, ro::View(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_WORD(NativeViewportEntry, ro::ViewportEntry(ctx.r4.u32))
+ITC_NATIVE_FLOAT(NativeWheelSpin, ro::WheelSpin(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_FLOAT(NativeWheelValue512, ro::WheelValue512(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_FLOAT(NativeAxleValue3764, ro::AxleValue3764(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_FLOAT(NativeAxleValue3384, ro::AxleValue3384(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_WORD(NativeWheelOnGround, ro::WheelOnGround(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_WORD(NativeVehicleByte2504, ro::VehicleByte2504(base, ctx.r3.u32))
+ITC_NATIVE_WORD(NativeVehicleWord2252, ro::VehicleWord2252(base, ctx.r3.u32))
+ITC_NATIVE_WORD(NativeVehicleWord340, ro::VehicleWord340(base, ctx.r3.u32))
+ITC_NATIVE_FLOAT(NativeVehicleFloat6256, ro::VehicleFloat6256(base, ctx.r3.u32))
+ITC_NATIVE_FLOAT(NativeVehicleFloat6252, ro::VehicleFloat6252(base, ctx.r3.u32))
+ITC_NATIVE_WORD(NativeRaceMode, ro::RaceMode(base))
+ITC_NATIVE_WORD(NativeRacerFlags, ro::RacerFlags(base, ctx.r3.u32))
+
+void NativeRacerId(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.s64 = ro::RacerId(base, ctx.r3.u32);
+}
+
+// Runs the recompiled version with --native_race_overlays off, so the
+// functions it calls that are ours run the originals too.
+void RunRecompiled(GuestFunction recompiled, PPCContext& t, uint8_t* base) {
+  const bool native = ITC_FLAG(native_race_overlays);
+  ITC_FLAG(native_race_overlays) = false;
+  recompiled(t, base);
+  ITC_FLAG(native_race_overlays) = native;
+}
+
+// The odd float words mixed into fields: NaNs of both kinds and signs,
+// infinities, denormals, signed zeros.
+constexpr uint32_t kOddFloats[] = {0x7FC00000, 0x7F800001, 0xFFC00001, 0xFF800001, 0x7F800000,
+                                   0xFF800000, 0x00000001, 0x807FFFFF, 0x00000000, 0x80000000,
+                                   0x7F7FFFFF, 0x3F800000};
+
+uint32_t RandomWord(Random& r) {
+  return r.Below(4) == 0 ? kOddFloats[r.Below(std::size(kOddFloats))] : uint32_t(r.Next());
+}
+
+// Random words (odd floats among them) over `bytes` at `at`.
+void FillRandom(uint8_t* base, Random& r, uint32_t at, uint32_t bytes) {
+  for (uint32_t i = 0; i < bytes; i += 4) {
+    guest::StoreU32(base, at + i, RandomWord(r));
+  }
+}
+
+using Regions = std::vector<std::pair<uint32_t, uint32_t>>;
+
+// One case through both versions: `setup()` writes the inputs (the same
+// each time), `args(t)` sets the registers, the function runs; the regions'
+// bytes, r3 and f1 are compared.
+template <typename Setup, typename Args>
+void Compare(Context& h, Results& results, const Regions& regions, Setup setup, Args args,
+             GuestFunction recompiled, GuestFunction native, const std::string& what) {
+  std::vector<uint8_t> result[2];
+  for (int v = 0; v < 2; v++) {
+    setup();
+    PPCContext t = CallContext(h);
+    args(t);
+    if (v == 0) {
+      RunRecompiled(recompiled, t, h.base);
+    } else {
+      native(t, h.base);
+    }
+    for (const auto& [at, bytes] : regions) {
+      const std::vector<uint8_t> part = Read(h.base, at, bytes);
+      result[v].insert(result[v].end(), part.begin(), part.end());
+    }
+    for (int i = 0; i < 4; i++) {
+      result[v].push_back(uint8_t(t.r3.u32 >> (24 - 8 * i)));
+    }
+    for (int i = 0; i < 8; i++) {
+      result[v].push_back(uint8_t(t.f1.u64 >> (56 - 8 * i)));
+    }
+  }
+  results.Check(result[0], result[1], what);
+}
+
+// The block's layout for the accessors' cases.
+constexpr uint32_t kOverlays = 0x0;      // 100 bytes of view slots
+constexpr uint32_t kView = 0x100;        // 16 bytes
+constexpr uint32_t kVehicle = 0x1000;    // 0x2000 bytes
+constexpr uint32_t kRecords = 0x4000;    // 48 + 93 x 3,936 bytes
+constexpr uint32_t kBlockBytes = 0x70000;
+
+void AccessorCases(Context& h, uint32_t block) {
+  Random& r = h.random;
+  const uint32_t race_data = guest::LoadU32(h.base, kRaceData);
+
+  // The view slots, the view and its vehicle: random words, the view's
+  // vehicle the block's.
+  auto vehicle_setup = [&](uint64_t seed) {
+    return [&h, block, seed] {
+      Random fill;
+      for (uint64_t i = 0; i < seed % 7; i++) {
+        fill.Next();
+      }
+      FillRandom(h.base, fill, block + kOverlays, 0x100);
+      FillRandom(h.base, fill, block + kVehicle, 0x2000);
+      guest::StoreU32(h.base, block + kView + 4, block + kVehicle);
+    };
+  };
+
+  {
+    Results results("CarOverlays::View (sub_82126550)");
+    for (uint32_t slot = 0; slot < 27; slot++) {
+      for (uint64_t seed = 0; seed < 3; seed++) {
+        Compare(h, results, {}, vehicle_setup(seed),
+                [&](PPCContext& t) {
+                  t.r3.u64 = block + kOverlays;
+                  t.r4.u64 = slot;
+                },
+                __imp__sub_82126550, NativeView, fmt::format("slot {} seed {}", slot, seed));
+      }
+    }
+    results.Report();
+  }
+
+  {
+    Results results("CarOverlays::ViewportEntry (sub_821264A8)");
+    std::vector<uint32_t> indices = {0, 1, 2, 3, 4, 0x7FFFFFFF, 0x80000000, 0xFFFFFFFF};
+    for (int i = 0; i < 40; i++) {
+      indices.push_back(uint32_t(r.Next()));
+    }
+    for (uint32_t index : indices) {
+      Compare(h, results, {}, [] {},
+              [&](PPCContext& t) {
+                t.r3.u64 = r.Next();
+                t.r4.u64 = index;
+              },
+              __imp__sub_821264A8, NativeViewportEntry, fmt::format("index {:X}", index));
+    }
+    results.Report();
+  }
+
+  // The wheel accessors: wheels 0 to 5 (4 and 5 past the four the game
+  // has), over different vehicles.
+  {
+    struct Function {
+      const char* name;
+      GuestFunction recompiled, native;
+    };
+    const Function wheels[] = {
+        {"OverlayView::WheelSpin (sub_821268F0)", __imp__sub_821268F0, NativeWheelSpin},
+        {"sub_82126908", __imp__sub_82126908, NativeWheelValue512},
+        {"sub_82126920", __imp__sub_82126920, NativeAxleValue3764},
+        {"sub_82126958", __imp__sub_82126958, NativeAxleValue3384},
+        {"OverlayView::WheelOnGround (sub_82126998)", __imp__sub_82126998, NativeWheelOnGround},
+    };
+    for (const Function& f : wheels) {
+      Results results(f.name);
+      for (uint32_t wheel = 0; wheel < 6; wheel++) {
+        for (uint64_t seed = 0; seed < 7; seed++) {
+          Compare(h, results, {}, vehicle_setup(seed),
+                  [&](PPCContext& t) {
+                    t.r3.u64 = block + kView;
+                    t.r4.u64 = wheel;
+                  },
+                  f.recompiled, f.native, fmt::format("wheel {} seed {}", wheel, seed));
+        }
+      }
+      results.Report();
+    }
+  }
+
+  // The vehicle's fields, and the race mode.
+  {
+    struct Function {
+      const char* name;
+      GuestFunction recompiled, native;
+    };
+    const Function fields[] = {
+        {"sub_82126A80", __imp__sub_82126A80, NativeVehicleByte2504},
+        {"sub_82126AA0", __imp__sub_82126AA0, NativeVehicleWord2252},
+        {"sub_82126AB0", __imp__sub_82126AB0, NativeVehicleWord340},
+        {"sub_82126AC0", __imp__sub_82126AC0, NativeVehicleFloat6256},
+        {"sub_82126AD0", __imp__sub_82126AD0, NativeVehicleFloat6252},
+        {"sub_82126D18", __imp__sub_82126D18, NativeRaceMode},
+    };
+    for (const Function& f : fields) {
+      Results results(f.name);
+      for (uint64_t seed = 0; seed < 7; seed++) {
+        Compare(h, results, {},
+                [&, seed] {
+                  vehicle_setup(seed)();
+                  // The race mode's word, at the block's vehicle.
+                  guest::StoreU32(h.base, kRaceData, block + kVehicle + 0x10 - 0xA3AF4);
+                },
+                [&](PPCContext& t) { t.r3.u64 = block + kView; }, f.recompiled, f.native,
+                fmt::format("seed {}", seed));
+      }
+      guest::StoreU32(h.base, kRaceData, race_data);
+      results.Report();
+    }
+  }
+
+  // The racer: the vehicle's +5712 one of the 93 records, between two, past
+  // the last, or a random word; the records' flags and ids random.
+  {
+    Results flags("OverlayView::RacerFlags (sub_82127178)");
+    Results ids("OverlayView::RacerId (sub_82126AE0)");
+    const uint32_t records = block + kRecords;
+    for (int i = 0; i < 300; i++) {
+      const uint32_t k = r.Below(95);
+      const uint32_t kind = r.Below(5);
+      uint32_t racer = records + 48 + 3936 * k;
+      if (kind == 3) {
+        racer += 4 * (1 + r.Below(900));
+      } else if (kind == 4) {
+        racer = records + 48 + 3936 * r.Below(93) + 3936 - 4;
+      }
+      const uint64_t seed = r.Next();
+      auto setup = [&, racer, seed] {
+        Random fill;
+        for (uint64_t n = 0; n < seed % 13; n++) {
+          fill.Next();
+        }
+        FillRandom(h.base, fill, block + kVehicle, 0x2000);
+        guest::StoreU32(h.base, block + kView + 4, block + kVehicle);
+        guest::StoreU32(h.base, block + kVehicle + 5712, racer);
+        for (uint32_t n = 0; n < 95; n++) {
+          guest::StoreU32(h.base, records + 3936 * n + 3960, RandomWord(fill));
+          guest::StoreU32(h.base, records + 48 + 3936 * n + 3888, RandomWord(fill));
+        }
+        guest::StoreU32(h.base, kRaceData, records);
+      };
+      auto args = [&](PPCContext& t) { t.r3.u64 = block + kView; };
+      const std::string what = fmt::format("record {} kind {}", k, kind);
+      Compare(h, ids, {}, setup, args, __imp__sub_82126AE0, NativeRacerId, what);
+      if (kind != 3) {  // inside a record: its flags word is the one set
+        Compare(h, flags, {}, setup, args, __imp__sub_82127178, NativeRacerFlags, what);
+      }
+    }
+    guest::StoreU32(h.base, kRaceData, race_data);
+    flags.Report();
+    ids.Report();
+  }
+}
+
+}  // namespace
+
+void RaceOverlays(Context& h) {
+  auto* memory = rex::system::kernel_state()->memory();
+  const uint32_t block = memory->SystemHeapAlloc(kBlockBytes);
+  if (!block) {
+    ITC_LOG_ERROR("harness: race_overlays: no block from the system heap");
+    return;
+  }
+  AccessorCases(h, block);
+  memory->SystemHeapFree(block);
+}
+
+}  // namespace harness
