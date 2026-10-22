@@ -374,6 +374,27 @@ enum Args {
   kQueryVector,   // r3 = the query (set up), r4 = the vector
 };
 
+// The pair's response and solving, with the adapters' fallbacks.
+void NativeRespond(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  if (!co::CollisionPairRespondNative(base, ctx.r3.u32, ctx.r4.u32)) {
+    __imp__sub_820BB868(ctx, base);
+    return;
+  }
+  uint32_t r3 = 0;
+  co::CollisionPairRespond(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32 - 240, &r3);
+  ctx.r3.u64 = r3;
+}
+void NativeSolve(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  uint32_t result = 0;
+  if (!co::CollisionPairSolve(base, ctx.r3.u32, ctx.r1.u32 - 1632, &result)) {
+    __imp__sub_820BBE30(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = result;
+}
+
 void Append32(std::vector<uint8_t>& out, uint32_t word) {
   for (int i = 0; i < 4; i++) {
     out.push_back(uint8_t(word >> (24 - 8 * i)));
@@ -527,6 +548,196 @@ void LifetimeCases(Context& h, uint32_t region) {
       results.Report();
     }
   }
+}
+
+// The pair's cases: two collision objects, each with a rigid body and a
+// shape record of real boxes (built and placed by the native constructors
+// and BoxShape::Place, the same on both sides: inputs, not under test), B
+// near A and moving into it, so the query finds impacts and push-outs and
+// the response pushes, pushes back and records contacts; the collision
+// world's pointer (0x826C2D88) set to a fake world whose contact pool is in
+// the region, and put back after. Compared: the region and r3.
+constexpr uint32_t kWorldPointer = 0x826C2D88;
+// In the region: the pair (+0x000), a contact (+0x040), the fake world
+// (+0x080) and its pool (+0x0C0, four 80-byte contacts), objects A
+// (+0x200) and B (+0x340), bodies A (+0x480) and B (+0x6A0), A's template,
+// previous and current boxes (+0x8C0, +0xAC0, +0xCC0) and B's (+0xEC0,
+// +0x10C0, +0x12C0), the matrices for placing them (+0x14C0, 64 bytes
+// each: A's previous and current, B's) and the box's corners (+0x15C0).
+constexpr uint32_t kPairP = 0x000, kContactP = 0x040, kWorldP = 0x080, kPoolP = 0x0C0,
+                   kObjectP[2] = {0x200, 0x340}, kBodyP[2] = {0x480, 0x6A0},
+                   kTemplateP[2] = {0x8C0, 0xEC0}, kPreviousP[2] = {0xAC0, 0x10C0},
+                   kCurrentP[2] = {0xCC0, 0x12C0}, kMatricesP = 0x14C0, kCornersP = 0x15C0;
+
+void PairCases(Context& h, uint32_t region) {
+  const uint32_t saved_world = guest::LoadU32(h.base, kWorldPointer);
+  enum Kind { kRespond, kSolve };
+  const struct {
+    const char* name;
+    GuestFunction recompiled, native;
+    Kind kind;
+  } functions[] = {
+      {"CollisionPair::Respond (sub_820BB868)", Original<__imp__sub_820BB868>, NativeRespond,
+       kRespond},
+      {"CollisionPair::Solve (sub_820BBE30)", Original<__imp__sub_820BBE30>, NativeSolve,
+       kSolve},
+  };
+  enum Group { kNumbers, kNaNs };
+  const char* const kGroupNames[] = {"", ", one NaN anywhere (expected to differ)"};
+  for (const auto& f : functions) {
+    for (Group group : {kNumbers, kNaNs}) {
+      Results results(std::string(f.name) + kGroupNames[group]);
+      // A fixed body (byte +0 = 1) where the impulse applies: the response
+      // runs the original, whose RigidBody::ContactImpulseWith reads its
+      // stack's leftovers for that body's term (car-physics.md), and the
+      // leftovers differ (native callees save no registers on the guest
+      // stack). The game's cars aren't fixed.
+      Results fixed(std::string(f.name) +
+                    (group == kNumbers ? "" : ", one NaN anywhere") +
+                    ", a fixed body meeting the impulse (expected to differ)");
+      for (uint64_t seed = 0; seed < 200; seed++) {
+        Random pick = Seeded(seed * 29 + 11 * uint64_t(group) + 4);
+        std::vector<uint8_t> result[2];
+        bool fixed_impulse = false;
+        for (int v = 0; v < 2; v++) {
+          Random words = Seeded(seed * 31 + 13 * uint64_t(group) + 6);
+          Random r = Seeded(seed * 37 + 17 * uint64_t(group) + 8);
+          for (uint32_t i = 0; i < kRegionBytes; i += 4) {
+            guest::StoreU32(h.base, region + i, NumberWord(words));
+          }
+          auto real = [&](int lo, int hi) {
+            return float(lo) + float(r.Below(uint32_t((hi - lo) * 1000) + 1)) / 1000.0f;
+          };
+          auto set_vector = [&](uint32_t at, float x, float y, float z, float w) {
+            guest::StoreFloat(h.base, at + 0, x);
+            guest::StoreFloat(h.base, at + 4, y);
+            guest::StoreFloat(h.base, at + 8, z);
+            guest::StoreFloat(h.base, at + 12, w);
+          };
+          // The boxes: a car's size around its origin.
+          const uint32_t corners = region + kCornersP;
+          set_vector(corners, -real(1, 2), -real(0, 1), -real(2, 3), 0.0f);
+          set_vector(corners + 16, real(1, 2), real(1, 2), real(2, 3), 0.0f);
+          // A at the origin moving a little; B beside it (x 1 to 4) moving
+          // toward it; both turned about y.
+          const float bx = real(1, 4) * (r.Below(2) == 0 ? 1.0f : -1.0f);
+          const float place[4][4] = {
+              {0.0f, 0.0f, 0.0f, real(-1, 1) * 0.3f},
+              {real(-1, 1) * 0.3f, 0.0f, real(-1, 1) * 0.3f, real(-1, 1) * 0.3f},
+              {bx, real(-1, 1) * 0.2f, real(-2, 2), real(-1, 1) * 0.3f},
+              {bx * real(0, 1), real(-1, 1) * 0.2f, real(-2, 2), real(-1, 1) * 0.3f},
+          };
+          for (int m = 0; m < 4; m++) {
+            const uint32_t matrix = region + kMatricesP + 64 * uint32_t(m);
+            const float c = std::cos(place[m][3]), sn = std::sin(place[m][3]);
+            set_vector(matrix + 0, c, 0.0f, -sn, 0.0f);
+            set_vector(matrix + 16, 0.0f, 1.0f, 0.0f, 0.0f);
+            set_vector(matrix + 32, sn, 0.0f, c, 0.0f);
+            set_vector(matrix + 48, place[m][0], place[m][1], place[m][2], 1.0f);
+          }
+          PPCContext t = CallContext(h);
+          t.fpscr.disableFlushModeUnconditional();
+          const uint32_t frame = t.r1.u32 - 2048;
+          for (int o = 0; o < 2; o++) {
+            const uint32_t object = region + kObjectP[o], body = region + kBodyP[o];
+            const uint32_t record = object + 32;
+            co::BoxConstruct(h.base, region + kTemplateP[o], corners, corners + 16, frame);
+            co::BoxConstruct(h.base, region + kPreviousP[o], corners, corners + 16, frame);
+            co::BoxConstruct(h.base, region + kCurrentP[o], corners, corners + 16, frame);
+            const uint32_t matrices = region + kMatricesP + 128 * uint32_t(o);
+            co::BoxPlace(h.base, region + kPreviousP[o], matrices, region + kTemplateP[o],
+                         frame);
+            co::BoxPlace(h.base, region + kCurrentP[o], matrices + 64, region + kTemplateP[o],
+                         frame);
+            guest::StoreU32(h.base, record + 0, region + kTemplateP[o]);
+            guest::StoreU32(h.base, record + 4, region + kPreviousP[o]);
+            guest::StoreU32(h.base, record + 8, region + kCurrentP[o]);
+            co::CollisionShapeUpdateMotion(h.base, record, frame);
+            co::CollisionShapeUpdateBounds(h.base, record);
+            guest::StoreU32(h.base, object + 16, body);
+            guest::StoreU32(h.base, object + 20, region + kTemplateP[o]);
+            // The masks: all meeting most of the time, else a few bits.
+            const bool all = r.Below(4) != 0;
+            for (uint32_t at : {244u, 256u, 260u}) {
+              guest::StoreU32(h.base, object + at, all ? 1 : r.Below(4));
+            }
+            guest::StoreU32(h.base, object + 240, 0);
+            // The weights +208: (1, 1, 1) most of the time.
+            if (r.Below(4) != 0) {
+              set_vector(object + 208, 1.0f, 1.0f, 1.0f, 0.0f);
+            }
+            // The body: not fixed (fixed one time in eight), a car's mass
+            // and its inverse.
+            guest::StoreU8(h.base, body, r.Below(8) == 0 ? 1 : 0);
+            const float mass = real(800, 1600);
+            guest::StoreFloat(h.base, body + 4, mass);
+            guest::StoreFloat(h.base, body + 8, 1.0f / mass);
+          }
+          guest::StoreU32(h.base, region + kPairP + 16, region + kObjectP[0]);
+          guest::StoreU32(h.base, region + kPairP + 20, region + kObjectP[1]);
+          const uint32_t cache = r.Below(2) == 0 ? 0 : r.Below(64) << (8 * r.Below(2));
+          guest::StoreU32(h.base, region + kPairP + 24, cache);
+          // The contact for Respond: a point between them, a unit normal
+          // and push direction along x, a depth.
+          const float sign = bx > 0 ? -1.0f : 1.0f;
+          set_vector(region + kContactP, bx * 0.5f, real(0, 1), real(-1, 1), 1.0f);
+          set_vector(region + kContactP + 16, sign, 0.0f, 0.0f, 0.0f);
+          set_vector(region + kContactP + 32, sign, 0.0f, 0.0f, 0.0f);
+          guest::StoreFloat(h.base, region + kContactP + 48, real(-1, 1) * 0.2f);
+          // The fake world: room for 0 to 4 contacts, 0 to 2 used.
+          const uint32_t world = region + kWorldP;
+          guest::StoreU32(h.base, world + 44, r.Below(5));
+          guest::StoreU32(h.base, world + 52, r.Below(3));
+          guest::StoreU32(h.base, world + 48, region + kPoolP);
+          guest::StoreU32(h.base, kWorldPointer, world);
+          // One NaN in a float (never a pointer): the contact, a body
+          // (past its fixed byte's word) or a box (past its vtable).
+          if (group == kNaNs) {
+            uint32_t at = 0;
+            switch (r.Below(3)) {
+              case 0:
+                at = kContactP + 4 * r.Below(16);
+                break;
+              case 1:
+                at = kBodyP[r.Below(2)] + 4 + 4 * r.Below(127);
+                break;
+              default: {
+                const uint32_t boxes[] = {kTemplateP[0], kPreviousP[0], kCurrentP[0],
+                                          kTemplateP[1], kPreviousP[1], kCurrentP[1]};
+                at = boxes[r.Below(6)] + 16 + 4 * r.Below(120);
+                break;
+              }
+            }
+            guest::StoreU32(h.base, region + at,
+                            0x7FC00000u | (uint32_t(r.Next()) & 0x80000001u));
+          }
+          {
+            const uint32_t oa = region + kObjectP[0], ob = region + kObjectP[1];
+            const bool meet =
+                (guest::LoadU32(h.base, oa + 256) & guest::LoadU32(h.base, ob + 244)) != 0 ||
+                (guest::LoadU32(h.base, ob + 256) & guest::LoadU32(h.base, oa + 244)) != 0;
+            fixed_impulse = meet && (guest::LoadU8(h.base, region + kBodyP[0]) == 1 ||
+                                     guest::LoadU8(h.base, region + kBodyP[1]) == 1);
+          }
+          if (f.kind == kRespond) {
+            t.r3.u64 = region + kObjectP[0];
+            t.r4.u64 = region + kObjectP[1];
+            t.r5.u64 = region + kContactP;
+          } else {
+            t.r3.u64 = region + kPairP;
+          }
+          (v == 0 ? f.recompiled : f.native)(t, h.base);
+          result[v] = Read(h.base, region, kRegionBytes);
+          Append32(result[v], t.r3.u32);
+        }
+        (fixed_impulse ? fixed : results)
+            .Check(result[0], result[1], fmt::format("seed {}", seed));
+      }
+      results.Report();
+      fixed.Report();
+    }
+  }
+  guest::StoreU32(h.base, kWorldPointer, saved_world);
 }
 
 }  // namespace
@@ -963,6 +1174,7 @@ void Collision(Context& h) {
   }
   Write(h.base, kFaceDirection, saved_direction.data(), 16);
   LifetimeCases(h, region);
+  PairCases(h, region);
 }
 
 }  // namespace harness

@@ -25,7 +25,8 @@ ITC_FLAG_BOOL(native_collision, true, "ITC",
               "sub_820BB300, sub_820BD280, sub_820BD578, sub_820BD508, sub_820BD6E0; the pair's "
               "next check time, sub_820BBB20; the impacts, sub_820BE490, sub_820BEBF0, "
               "sub_820BECA0, sub_820BF038, sub_820BCE80; the push-outs, sub_820BF080, "
-              "sub_820BF320, sub_820BE150, sub_820BFB28, sub_820BCDD0; the query and its contact, sub_820BD1C8, sub_820BC848, sub_820BC908, sub_820BC858) natively "
+              "sub_820BF320, sub_820BE150, sub_820BFB28, sub_820BCDD0; the pair's solving and "
+              "response, sub_820BBE30, sub_820BB868; the query and its contact, sub_820BD1C8, sub_820BC848, sub_820BC908, sub_820BC858) natively "
               "instead of through the translated code (the same words, bit for bit; checked by "
               "--run_harnesses=collision). Those reached only from native callers have no "
               "adapters, and the flag switches their callers: sub_820BA3B0, sub_820BB020, "
@@ -33,7 +34,7 @@ ITC_FLAG_BOOL(native_collision, true, "ITC",
               "sub_820BA408, sub_820BA5D8, sub_820BD0C8, sub_820BC978, sub_820BCCE8, "
               "sub_820BB300, sub_820BD280, sub_820BD578, sub_820BE490, sub_820BECA0, "
               "sub_820BC858, sub_820BACD0, sub_820BF080, sub_820BF320, sub_820BE150, sub_820BACB8, "
-              "sub_820B9FC8, sub_820B9FE0, sub_820BC908, sub_820BEBF0");
+              "sub_820B9FC8, sub_820B9FE0, sub_820BC908, sub_820BEBF0, sub_820BB868");
 
 // Defines an adapter: `body` uses `ctx` and `base`.
 #define ITC_COLLISION(address, body)   \
@@ -212,6 +213,12 @@ extern "C" REX_FUNC(sub_820BFB28) {
 // r4 = the direction.
 ITC_COLLISION_TEST(820BCDD0, QueryFindPushOut(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 112,
                                               &result))
+
+// --- The pair ---
+
+// CollisionPair::Respond (sub_820BB868) has no adapter: its caller in
+// play, CollisionPair::Solve, is native.
+ITC_COLLISION_TEST(820BBE30, CollisionPairSolve(base, ctx.r3.u32, ctx.r1.u32 - 1632, &result))
 
 // --- The query and its contact ---
 

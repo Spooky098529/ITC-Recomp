@@ -284,6 +284,32 @@ bool BoxBoxFindPushOut(uint8_t* base, uint32_t query, uint32_t frame, uint32_t* 
 bool QueryFindPushOut(uint8_t* base, uint32_t query, uint32_t direction, uint32_t frame,
                       uint32_t* result);
 
+// --- The pair (src/collision/pairs.cpp): +16 and +20 the collision
+// objects A and B, +24 the separation cache. ---
+
+// Whether CollisionPair::Respond can answer a contact between objects A
+// and B natively: both records' current copies boxes
+// (CollisionObject::Translate), and neither body fixed (byte +0 = 1) when
+// the impulse applies (RigidBody::ContactImpulseWith runs the original
+// for a fixed body).
+bool CollisionPairRespondNative(uint8_t* base, uint32_t a, uint32_t b);
+// CollisionPair::Respond (sub_820BB868): the contact (+0 the point, +16
+// the normal, +32 the push direction, +48 the depth) answered: the objects
+// pushed apart by their mass shares (CollisionObject::Translate) when
+// their +260 meets the other's +244, the impulse's force on each
+// (RigidBody::ContactImpulseWith, CollisionObject::AccumulateForce) when
+// their +256 does, and a contact added to each. Only where
+// CollisionPairRespondNative. `r3`: what the original leaves there.
+// `frame`: the original's 240 bytes.
+void CollisionPairRespond(uint8_t* base, uint32_t a, uint32_t b, uint32_t contact,
+                          uint32_t frame, uint32_t* r3);
+// CollisionPair::Solve (sub_820BBE30): the query on the stack (`frame` +
+// 128): 0 when a face separates the boxes, else up to 10 impacts and up to
+// 3 push-outs, each answered (Respond); 1 when any was. False, with nothing
+// done, where a record's template or copies aren't boxes or Respond can't
+// be native. `frame`: the original's 1,632 bytes.
+bool CollisionPairSolve(uint8_t* base, uint32_t pair, uint32_t frame, uint32_t* result);
+
 // --- The query (on CollisionPair::Solve's stack) and its contact (+32) ---
 
 // Query::Query (sub_820BD1C8): the w of +32, +48, +64, +96 and of the 8
