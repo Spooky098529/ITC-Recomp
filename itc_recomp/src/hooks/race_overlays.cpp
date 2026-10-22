@@ -21,7 +21,8 @@ ITC_FLAG_BOOL(native_race_overlays, true, "ITC",
               "sub_8211F060 to sub_8212E9A0, and Smoke and ParticlesB::Reset, sub_8212A9E0 and "
               "sub_8212BA98; the view's body and wheels through the vehicle accessors, sub_821268B0 to "
               "sub_82126FF0; CarOverlays::IsBehindCamera, sub_82124630; the racers' "
-              "save flags and stages, sub_82126B50 to sub_82126CB0) natively "
+              "save flags and stages, sub_82126B50 to sub_82126CB0; CarOverlays::UpdateTrails, "
+              "sub_82124EE0) natively "
               "instead of through the translated code (same results; checked by "
               "--run_harnesses=race_overlays)");
 
@@ -480,3 +481,19 @@ ITC_OVERLAY_WORD(82126BB0, SaveFlag199FA(base, ctx.r4.u32))
 // adapters: their only caller in play, SaveFlag199F8Or199FC, is native.
 ITC_OVERLAY_WORD(82126CB0, SaveFlag199F8Or199FC(base, ctx.r4.u32))
 ITC_OVERLAY_WORD(82126B50, RacerInCurrentStage(base, ctx.r4.u32))
+
+// CarOverlays::UpdateTrails: r3 = the car overlays. Its point goes in the
+// original's own stack slot (r1 - 336 + 112, below the stack pointer).
+// Where the native version declines (a trail's capacity 0 or -1), the
+// original runs.
+extern "C" REX_FUNC(sub_82124EE0) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_race_overlays)) {
+    __imp__sub_82124EE0(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  if (!UpdateTrails(base, ctx.r3.u32, ctx.r1.u32 - 336 + 112)) {
+    __imp__sub_82124EE0(ctx, base);
+  }
+}

@@ -394,6 +394,14 @@ ITC_NATIVE_WORD(NativeSaveFlag199F8, ro::SaveFlag199F8(base, ctx.r4.u32))
 ITC_NATIVE_WORD(NativeSaveFlag199FC, ro::SaveFlag199FC(base, ctx.r4.u32))
 ITC_NATIVE_WORD(NativeSaveFlag199F8Or199FC, ro::SaveFlag199F8Or199FC(base, ctx.r4.u32))
 ITC_NATIVE_WORD(NativeRacerInCurrentStage, ro::RacerInCurrentStage(base, ctx.r4.u32))
+// As the adapter: the point in the original's stack slot, and the original
+// where the native version declines.
+void NativeUpdateTrails(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  if (!ro::UpdateTrails(base, ctx.r3.u32, ctx.r1.u32 - 336 + 112)) {
+    __imp__sub_82124EE0(ctx, base);
+  }
+}
 void NativeIsBehindCamera(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = ro::IsBehindCamera(base, ctx.r3.u32, ctx.r4.u32);
@@ -455,7 +463,7 @@ using Regions = std::vector<std::pair<uint32_t, uint32_t>>;
 template <typename Setup, typename Args>
 void Compare(Context& h, Results& results, const Regions& regions, Setup setup, Args args,
              GuestFunction recompiled, GuestFunction native, const std::string& what,
-             bool compare_r3 = true) {
+             bool compare_r3 = true, bool compare_f1 = true) {
   std::vector<uint8_t> result[2];
   for (int v = 0; v < 2; v++) {
     setup();
@@ -473,7 +481,7 @@ void Compare(Context& h, Results& results, const Regions& regions, Setup setup, 
     for (int i = 0; compare_r3 && i < 4; i++) {
       result[v].push_back(uint8_t(t.r3.u32 >> (24 - 8 * i)));
     }
-    for (int i = 0; i < 8; i++) {
+    for (int i = 0; compare_f1 && i < 8; i++) {
       result[v].push_back(uint8_t(t.f1.u64 >> (56 - 8 * i)));
     }
   }
@@ -2724,6 +2732,83 @@ void SaveFlagCases(Context& h, uint32_t block) {
     results.Report();
   }
 }
+
+// CarOverlays::UpdateTrails: the car overlays (0x400 bytes) with its view
+// (ViewBodySetup's) in a random slot, the parameter table, and four trails
+// with small capacities (their points within 0x600 bytes, the last position
+// at +64,144), 0 or -1 now and then (the native version declines there).
+// The vehicle's surfaces small, the thresholds and counters around the
+// table's. r3 and f1 aren't compared (callers read neither; the original
+// leaves the last callee's). NaN inputs (random words) apart, as
+// Trail::AddPoint's.
+void UpdateTrailsCases(Context& h, uint32_t block) {
+  Random& r = h.random;
+  const uint32_t overlays = block + 0x66000, table = block + 0x69000, trails = block + 0x40000,
+                 trail_table = block + 0x6A000;
+  Results results("CarOverlays::UpdateTrails (sub_82124EE0)");
+  Results nan_results("CarOverlays::UpdateTrails, NaN inputs (expected to differ)");
+  Regions regions = {{overlays, 0x400}, {table, 0x100}};
+  for (uint32_t i = 0; i < 4; i++) {
+    regions.push_back({trails + 0x600 * i, 0x600});
+    regions.push_back({trails + 0x600 * i + 64000, 160});
+  }
+  for (uint64_t seed = 0; seed < 300; seed++) {
+    const bool odd = seed % 5 == 4;
+    const uint32_t slot = r.Below(25);
+    const uint64_t fill_seed = r.Next();
+    Compare(h, odd ? nan_results : results, regions,
+            [&h, block, overlays, table, trails, trail_table, slot, seed, odd, fill_seed] {
+              ViewBodySetup(h, block, seed, odd)();
+              Random fill;
+              for (uint64_t n = 0; n < fill_seed % 101; n++) {
+                fill.Next();
+              }
+              const uint32_t vehicle = block + kBodyVehicle;
+              for (uint32_t wheel = 0; wheel < 4; wheel++) {
+                const uint32_t kind = fill.Below(4);
+                guest::StoreU16(h.base, vehicle + 5328 + 96 * wheel + 80,
+                                kind == 0 ? uint16_t(fill.Next()) : uint16_t(fill.Below(10)));
+              }
+              FillRandom(h.base, fill, overlays, 0x400);
+              guest::StoreU32(h.base, overlays + 128, slot);
+              guest::StoreU32(h.base, overlays + 4 * (slot + 1), block + kBodyView);
+              guest::StoreU32(h.base, overlays + 144, table);
+              guest::StoreU32(h.base, overlays + 784, fill.Below(4));
+              FillRandom(h.base, fill, table, 0x100);
+              guest::StoreFloat(h.base, table + 152, float(fill.Below(40)) / 4.0f);
+              const uint32_t least = fill.Below(4);
+              const uint32_t most = fill.Below(6) == 0 ? uint32_t(fill.Next()) : least + fill.Below(8);
+              guest::StoreU32(h.base, table + 156, least);
+              guest::StoreU32(h.base, table + 160, most);
+              FillRandom(h.base, fill, trail_table, 16);
+              for (uint32_t wheel = 0; wheel < 4; wheel++) {
+                const uint32_t trail = trails + 0x600 * wheel;
+                guest::StoreU32(h.base, overlays + 148 + 4 * wheel, trail);
+                const uint32_t kind = fill.Below(8);
+                guest::StoreU32(h.base, overlays + 432 + 12 * wheel,
+                                kind == 0 ? uint32_t(fill.Next()) : fill.Below(2 * most + 3));
+                guest::StoreU32(h.base, overlays + 440 + 12 * wheel,
+                                kind == 1 ? uint32_t(fill.Next()) : fill.Below(2));
+                const uint32_t capacity = fill.Below(40) == 0 ? (fill.Below(2) ? 0 : 0xFFFFFFFF)
+                                                              : 1 + fill.Below(8);
+                const uint32_t points = capacity == 0 || capacity == 0xFFFFFFFF ? 1 : capacity;
+                FillRandom(h.base, fill, trail, 0x600);
+                FillRandom(h.base, fill, trail + 64000, 160);
+                guest::StoreU32(h.base, trail + 104, capacity);
+                guest::StoreU32(h.base, trail + 112, trail_table);
+                guest::StoreU32(h.base, trail + 64132, fill.Below(points));
+                guest::StoreU32(h.base, trail + 64136, fill.Below(points + 1));
+                for (uint32_t k = 0; k < 4; k++) {
+                  guest::StoreU32(h.base, trail + 64144 + 4 * k, NumberOrWord(fill, odd));
+                }
+              }
+            },
+            [&](PPCContext& t) { t.r3.u64 = overlays; }, Original<__imp__sub_82124EE0>,
+            NativeUpdateTrails, fmt::format("seed {} slot {}", seed, slot), false, false);
+  }
+  results.Report();
+  nan_results.Report();
+}
 }  // namespace
 
 void RaceOverlays(Context& h) {
@@ -2758,6 +2843,7 @@ void RaceOverlays(Context& h) {
   ViewBodyCases(h, block);
   IsBehindCameraCases(h, block);
   SaveFlagCases(h, block);
+  UpdateTrailsCases(h, block);
   memory->SystemHeapFree(block);
 }
 

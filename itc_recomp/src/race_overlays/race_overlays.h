@@ -669,4 +669,23 @@ uint32_t SaveFlag199F8Or199FC(uint8_t* base, uint32_t id);
 // 0x59620, Racers::IndexOf(race data + 48, id), the current stage).
 uint32_t RacerInCurrentStage(uint8_t* base, uint32_t id);
 
+// CarOverlays::UpdateTrails (sub_82124EE0): nothing when DebugSwitchOff
+// isn't 0; else for each wheel 0-3 and its trail (+148 + 4i), with the
+// parameter table at +144 and the view in slot +128: the wheel's counter
+// (+432 + 12i) set to 0 when the wheel is off the ground, on a surface that
+// leaves no marks, or doesn't slip (WheelSlip with the table's +152 is
+// 0.0); else a point is due when the table's +156 <= the counter <= its
+// +160 (unsigned), and the counter goes up, capped at twice +160. The
+// point, at `scratch` (16 bytes of guest memory: the adapter passes the
+// original's own stack slot), is the wheel's contact position plus the
+// vector at 0x826C5D40 (fadds; w 1.0), plus the vector at 0x82616F40 (vaddfp,
+// flush-to-zero on). A due point goes to Trail::AddPoint (direction (0, 1,
+// 0, 0), the speed in km/h, width AxleValue3384 times the float at
+// 0x820021E8, state 2 when the wheel's +440 + 12i was set else 1, value 1,
+// or 0 in view modes 1 and 2 (+784) until a point is due on wheel 2 or 3);
+// +440 + 12i = whether one was added; then Trail::SetLastPosition (the
+// point). False, with nothing done, when a trail's capacity is 0 or -1
+// (Trail::AddPoint would decline); the original runs there.
+bool UpdateTrails(uint8_t* base, uint32_t overlays, uint32_t scratch);
+
 }  // namespace race_overlays

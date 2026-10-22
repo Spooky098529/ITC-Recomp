@@ -2686,4 +2686,83 @@ uint32_t RacerInCurrentStage(uint8_t* base, uint32_t id) {
   return va::StagesHasRacer(base, race + 0x59620, uint32_t(index), 0xFFFFFFFFu);
 }
 
+bool UpdateTrails(uint8_t* base, uint32_t overlays, uint32_t scratch) {
+  ITC_NATIVE_RUNNING("sub_82124EE0 CarOverlays::UpdateTrails");
+  constexpr uint32_t kContactOffset = 0x826C5D40;
+  constexpr uint32_t kTrailLift = 0x82616F40;
+  constexpr uint32_t kTrailWidthScale = 0x820021E8;
+  for (uint32_t wheel = 0; wheel < 4; wheel++) {
+    const int32_t capacity =
+        int32_t(guest::LoadU32(base, guest::LoadU32(base, overlays + 148 + 4 * wheel) + 104));
+    if (capacity == 0 || capacity == -1) {
+      return false;
+    }
+  }
+  const uint32_t table = guest::LoadU32(base, overlays + 144);
+  const uint32_t view = View(base, overlays, guest::LoadU32(base, overlays + 128));
+  if (va::DebugSwitchOff() != 0) {
+    return true;
+  }
+  const uint32_t zero = guest::LoadU32(base, kZero);
+  const uint32_t one = guest::LoadU32(base, kOne);
+  const double zero_value = std::bit_cast<float>(zero);
+  // The direction passed to Trail::AddPoint, (0, 1, 0, 0). The original
+  // puts it back to the same when its length is 0.0, which it never is.
+  const uint32_t direction[4] = {zero, one, zero, zero};
+  const int32_t mode = int32_t(guest::LoadU32(base, overlays + 784));
+  uint32_t value = (mode == 1 || mode == 2) ? 0 : 1;
+  const double width_scale = guest::LoadFloat(base, kTrailWidthScale);
+  for (uint32_t wheel = 0; wheel < 4; wheel++) {
+    const uint32_t trail = guest::LoadU32(base, overlays + 148 + 4 * wheel);
+    const uint32_t counter = overlays + 432 + 12 * wheel;
+    uint32_t due = 0;
+    const float axle = AxleValue3384(base, view, wheel);
+    if (WheelOnGround(base, view, wheel) != 0 && WheelSurfaceMarks(base, view, wheel) != 0 &&
+        double(WheelSlip(base, view, wheel, guest::LoadFloat(base, table + 152))) != zero_value) {
+      uint32_t count = guest::LoadU32(base, counter);
+      if (!(guest::LoadU32(base, table + 156) > count) &&
+          !(count > guest::LoadU32(base, table + 160))) {
+        due = 1;
+      }
+      const uint32_t most = guest::LoadU32(base, table + 160) << 1;
+      count = count + 1;
+      guest::StoreU32(base, counter, count > most ? most : count);
+    } else {
+      guest::StoreU32(base, counter, 0);
+    }
+
+    // The point: the contact position plus the offset, then the lift.
+    const uint32_t contact = WheelContact(base, view, wheel);
+    auto sum = [&](uint32_t k) {
+      return std::bit_cast<uint32_t>(float(double(guest::LoadFloat(base, contact + 4 * k)) +
+                                           double(guest::LoadFloat(base, kContactOffset + 4 * k))));
+    };
+    const simde__m128 at = VectorOf(sum(0), sum(1), sum(2), one);
+    const uint32_t csr = Fpscr::getcsr();
+    Fpscr::setcsr(csr | uint32_t(Fpscr::FlushMask));
+    const simde__m128 point = simde_mm_add_ps(at, LoadVector(base, kTrailLift));
+    Fpscr::setcsr(csr);
+    for (int k = 0; k < 4; k++) {
+      guest::StoreU32(base, scratch + 4 * k, WordOf(point, k));
+    }
+
+    if (due != 0) {
+      const uint32_t state = guest::LoadU32(base, counter + 8) != 0 ? 2 : 1;
+      if (wheel >= 2) {
+        value = 1;
+      }
+      const double speed = SpeedKmh(base, view);
+      const double width = float(double(axle) * width_scale);
+      uint32_t added = 0;
+      TrailAddPoint(base, trail, scratch, speed, width, direction, state, value, &added);
+      if (added == 0) {
+        due = 0;
+      }
+    }
+    guest::StoreU32(base, counter + 8, due);
+    TrailSetLastPosition(base, trail, scratch);
+  }
+  return true;
+}
+
 }  // namespace race_overlays
