@@ -22,6 +22,7 @@
 #include "debug/pause_movie_log.h"
 #include "frame_pacing/game_messages.h"
 #include "guest.h"
+#include "hooks/ui_movies.h"
 
 #include "base/flags.h"
 #include "base/log.h"
@@ -483,10 +484,21 @@ void WatchMovingTargets(const char* name, PPCContext& ctx, uint8_t* base, Call&&
 WATCH_MOVIE_CALL(82119B80)
 WATCH_MOVIE_CALL(8259FA00)
 WATCH_MOVIE_CALL(8211CD90)
-WATCH_MOVIE_CALL(8259DAC0)
 WATCH_MOVIE_CALL(8211B4D0)
 WATCH_MOVIE_CALL(8211B080)
 #undef WATCH_MOVIE_CALL
+
+// sub_8259DAC0, watched as the others; its work (natively with
+// --native_ui_movies) is in src/hooks/ui_movies.cpp.
+extern "C" REX_FUNC(sub_8259DAC0) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(log_pause_movie)) {
+    ui_movies_hooks::ResetAfterMovie(ctx, base);
+    return;
+  }
+  debug::WatchMovingTargets("8259DAC0", ctx, base,
+                            [&] { ui_movies_hooks::ResetAfterMovie(ctx, base); });
+}
 
 // The sub-menus' calls on the movie's nodes, logged for --log_pause_movie.
 // sub_8211C7E8 (r3 = movie, r4 = node, r5 = 8, r6 = value, from sub_8220D040)

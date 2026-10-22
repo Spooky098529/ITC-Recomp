@@ -345,12 +345,14 @@ void RecorderCases(Context& h) {
   struct Recorder {
     const char* name;
     GuestFunction recompiled, native;
-    int kind;  // 0 textured quad, 1 untextured, 2 the resets
+    int kind;  // 0 textured quad, 1 untextured, 2 the resets, 3 either by +84, 4 the resets by r4
   };
   const Recorder recorders[] = {
       {"RecordQuad, textured (sub_8259DAD0)", __imp__sub_8259DAD0, sub_8259DAD0, 0},
       {"RecordQuad, untextured (sub_8259E098)", __imp__sub_8259E098, sub_8259E098, 1},
       {"the clip and state resets (sub_8259D7B0)", __imp__sub_8259D7B0, sub_8259D7B0, 2},
+      {"RecordQuad and the resets when clipped (sub_8259EBE8)", __imp__sub_8259EBE8, sub_8259EBE8, 3},
+      {"the resets after a movie (sub_8259DAC0)", __imp__sub_8259DAC0, sub_8259DAC0, 4},
   };
   constexpr uint32_t kList = 0, kRendererObject = 64, kVtable = 128, kQuad = 256,
                      kPositions = 512, kColors = 640, kUvs = 768, kSlots = 1024;
@@ -368,13 +370,19 @@ void RecorderCases(Context& h) {
       const uint32_t key = r.Below(2) ? 678 : uint32_t(r.Next());
       const int state = i < 520 ? 0 : 1 + (i % 3);  // 1 already open, 2 nested, 3 just room
       const uint32_t used = r.Below(2) ? 0 : r.Below(100000);
+      const uint32_t texture = f.kind == 3 && r.Below(2) ? 0 : uint32_t(r.Next()) | 1;
+      const bool textured = f.kind == 0 || (f.kind == 3 && texture != 0);
       // The slots it needs, for "just room".
       uint32_t needed = 8;
-      if (f.kind != 2) {
+      if (f.kind != 2 && f.kind != 4) {
         const uint32_t blend[] = {5, 5, 5, 6, 4};
-        needed = (f.kind == 0 ? 5 : 3) + (mode < 5 ? blend[mode] : 0) + 6 +
+        needed = (textured ? 5 : 3) + (mode < 5 ? blend[mode] : 0) + 6 +
                  ((vertices * 24 + 15) >> 4) + 3;
+        if (f.kind == 3 && clipped != 0) {
+          needed += 8;
+        }
       }
+      const uint32_t unread = uint32_t(r.Next());
       std::vector<uint32_t> words(4 * 3 * 8 + 64);
       for (uint32_t& w : words) {
         w = r.Below(3) ? RandomFloat(r, -2000, 2000) : uint32_t(r.Next());
@@ -396,7 +404,7 @@ void RecorderCases(Context& h) {
         const uint32_t quad = h.data + kQuad;
         guest::StoreU32(h.base, quad + 68, mode);
         guest::StoreU32(h.base, quad + 80, vertices);
-        guest::StoreU32(h.base, quad + 84, words[0]);
+        guest::StoreU32(h.base, quad + 84, texture);
         guest::StoreU32(h.base, quad + 88, h.data + kPositions);
         guest::StoreU32(h.base, quad + 92, h.data + kColors);
         guest::StoreU32(h.base, quad + 96, h.data + kUvs);
@@ -414,6 +422,9 @@ void RecorderCases(Context& h) {
         PPCContext t = CallContext(h);
         if (f.kind == 2) {
           t.r3.u64 = key;
+        } else if (f.kind == 4) {
+          t.r3.u64 = unread;
+          t.r4.u64 = key;
         } else {
           t.r3.u64 = quad;
           t.r4.u64 = key;

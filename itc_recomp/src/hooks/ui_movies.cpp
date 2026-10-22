@@ -9,6 +9,7 @@
 #include "base/flags.h"
 #include "base/log.h"
 #include "hooks/guest_call.h"
+#include "hooks/ui_movies.h"
 #include "ui_movies/ui_movies.h"
 
 ITC_FLAG_BOOL(native_ui_movies, true, "ITC",
@@ -20,7 +21,8 @@ ITC_FLAG_BOOL(native_ui_movies, true, "ITC",
               "the draw context reset sub_8259D930; the keys sub_8259FA20, sub_8259FB30 and "
               "sub_8259FC18; the recorders sub_8259DAD0, sub_8259E098 and sub_8259D7B0; the "
               "file fix-ups sub_825A0CF8 with sub_825A0C60, and UiMovie::FixUpFile "
-              "sub_825A0EF0 with sub_825A0E40, sub_825A0ED8, sub_8259D688 and sub_825A6570) "
+              "sub_825A0EF0 with sub_825A0E40, sub_825A0ED8, sub_8259D688 and sub_825A6570; "
+              "sub_8259EBE8 and sub_8259DAC0, which call the recorders) "
               "natively instead of through the translated code (same results; checked by "
               "--run_harnesses=ui_movies)");
 
@@ -302,3 +304,52 @@ extern "C" REX_FUNC(sub_825A0EF0) {
   }
   ctx.r3.u64 = ui_movies::FixUpFile(base, ctx.r3.u32);
 }
+
+// sub_8259EBE8: r3 = a quad or primitive, r4 = its key, f1 = a depth (passed
+// on to sub_8259D7B0, which doesn't read it): recorded untextured or
+// textured by its +84, then, when clipped (+100), the resets with key r4 + 1.
+// The recorders (ours, above) are called from a frame like the original's
+// (112 bytes) with its return addresses.
+extern "C" REX_FUNC(sub_8259EBE8) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_ui_movies)) {
+    __imp__sub_8259EBE8(ctx, base);
+    return;
+  }
+  const uint32_t quad = ctx.r3.u32, key = ctx.r4.u32;
+  const double depth = ctx.f1.f64;
+  const uint64_t lr = ctx.lr;
+  const bool textured = guest::LoadU32(base, quad + 84) != 0;
+  guest_call::InFrame(ctx, base, 112, textured ? 0x8259EC24 : 0x8259EC1C, [&](uint32_t) {
+    ctx.r3.u64 = quad;
+    ctx.r4.u64 = key;
+    ctx.f1.f64 = depth;
+    if (textured) {
+      sub_8259DAD0(ctx, base);
+    } else {
+      sub_8259E098(ctx, base);
+    }
+  });
+  if (guest::LoadU32(base, quad + 100) != 0) {
+    guest_call::InFrame(ctx, base, 112, 0x8259EC3C, [&](uint32_t) {
+      ctx.r3.u64 = uint64_t(key) + 1;
+      ctx.fpscr.disableFlushMode();
+      ctx.f1.f64 = depth;
+      sub_8259D7B0(ctx, base);
+    });
+  }
+  ctx.lr = lr;
+}
+
+namespace ui_movies_hooks {
+void ResetAfterMovie(PPCContext& ctx, uint8_t* base) {
+  if (!ITC_FLAG(native_ui_movies)) {
+    __imp__sub_8259DAC0(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = ctx.r4.u64;
+  ctx.fpscr.disableFlushMode();
+  ctx.f1.f64 = double(std::bit_cast<float>(guest::LoadU32(base, kClipResetDepth)));
+  sub_8259D7B0(ctx, base);
+}
+}  // namespace ui_movies_hooks
