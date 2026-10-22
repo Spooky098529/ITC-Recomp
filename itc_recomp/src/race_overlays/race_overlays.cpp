@@ -2107,3 +2107,138 @@ void ParticlesBReset(uint8_t* base, uint32_t particles) {
 }
 
 }  // namespace race_overlays
+
+namespace race_overlays {
+
+namespace {
+
+constexpr uint32_t kSmokeOldest = 32528;  // the oldest emitter (Smoke::Emit adds at +32,532)
+constexpr uint32_t kSmokeRegionOn = 32624;
+
+// The index after `index` modulo `capacity` (divw, then the remainder, as
+// the originals do it).
+int32_t NextIndex(int32_t index, int32_t capacity) {
+  const int32_t next = int32_t(uint32_t(index) + 1);
+  return int32_t(uint32_t(next) - uint32_t(next / capacity) * uint32_t(capacity));
+}
+
+// Whether an update loop over 'capacity' entries of `bytes` from `first`,
+// starting at `head`, stays below 4 GB, and the original can't trap (a
+// capacity of 0 or -1, a head below 0 or INT_MAX).
+bool EntriesInRange(uint32_t first, uint32_t bytes, int32_t capacity, int32_t head) {
+  if (capacity == 0 || capacity == -1 || head < 0 || head == INT32_MAX) {
+    return false;
+  }
+  const uint64_t last_index =
+      std::max<uint64_t>(uint64_t(head), uint64_t(std::abs(int64_t(capacity))));
+  return uint64_t(first) + uint64_t(bytes) * (last_index + 1) <= (uint64_t(1) << 32);
+}
+
+// int to float as the originals do it (stored as a doubleword, fcfid, frsp).
+float FloatOf(int64_t value) {
+  return float(double(value));
+}
+
+}  // namespace
+
+bool SmokeUpdate(uint8_t* base, uint32_t smoke, uint32_t* r3) {
+  ITC_NATIVE_RUNNING("sub_8212AA78 Smoke::Update");
+  const uint32_t table = guest::LoadU32(base, smoke + 112);
+  int32_t count = int32_t(guest::LoadU32(base, smoke + kSmokeCount));
+  if (count == 0) {
+    return true;
+  }
+  int32_t index = int32_t(guest::LoadU32(base, smoke + kSmokeOldest));
+  if (!EntriesInRange(smoke + 128, kSmokeBytes,
+                      int32_t(guest::LoadU32(base, smoke + 104)), index)) {
+    return false;
+  }
+  auto emitter_at = [&](int32_t i) { return smoke + 128 + kSmokeBytes * uint32_t(i); };
+  uint32_t emitter = emitter_at(index);
+  // The oldest emitter, when its life is out, is reset and dropped (the
+  // head and count read again after the reset).
+  if (!(int32_t(guest::LoadU32(base, emitter + 108)) > 0)) {
+    SmokeEmitterReset(base, emitter);
+    const int32_t head = int32_t(guest::LoadU32(base, smoke + kSmokeOldest));
+    const int32_t capacity = int32_t(guest::LoadU32(base, smoke + 104));
+    count = int32_t(guest::LoadU32(base, smoke + kSmokeCount) - 1);
+    guest::StoreU32(base, smoke + kSmokeCount, uint32_t(count));
+    index = NextIndex(head, capacity);
+    guest::StoreU32(base, smoke + kSmokeOldest, uint32_t(index));
+    if (count != 0) {
+      emitter = emitter_at(index);
+    }
+  }
+  if (!(count > 0)) {
+    return true;
+  }
+  const double zero = guest::LoadFloat(base, kZero);
+  const double one = guest::LoadFloat(base, kOne);
+  const uint32_t zero_word = guest::LoadU32(base, kZero);
+  for (; count > 0; count--) {
+    const int32_t life_left = int32_t(guest::LoadU32(base, emitter + 108) - 1);
+    guest::StoreU32(base, emitter + 108, uint32_t(life_left));
+    if (life_left < 0) {
+      guest::StoreU32(base, emitter + 108, 0);
+    }
+    const uint32_t life = guest::LoadU32(base, emitter + 108);
+    if (guest::LoadU32(base, table + 0) - life > 1) {
+      guest::StoreU32(base, emitter + 96, 1);
+    }
+    // The size: +124 plus +116 x +124 x (the table's life - life) / the
+    // table's life.
+    const uint32_t most = guest::LoadU32(base, table + 0);
+    const double size_from = guest::LoadFloat(base, emitter + 124);
+    const double growth = guest::LoadFloat(base, emitter + 116);
+    double size = float(growth * size_from);
+    size = float(size * double(FloatOf(int64_t(uint32_t(most - life)))));
+    size = float(size / double(FloatOf(int64_t(most))));
+    guest::StoreFloat(base, emitter + 100, float(size + size_from));
+    // The fade: +120 times life / the table's +12 while life is below it.
+    const uint32_t fade_ticks = guest::LoadU32(base, table + 12);
+    const uint32_t most_fade_word = guest::LoadU32(base, emitter + 120);
+    const double most_fade = std::bit_cast<float>(most_fade_word);
+    if (fade_ticks > life) {
+      double fade = float(one / double(FloatOf(int64_t(fade_ticks))));
+      fade = float(fade * double(FloatOf(int64_t(int32_t(life)))));
+      guest::StoreFloat(base, emitter + 104, float(fade * most_fade));
+    } else {
+      guest::StoreU32(base, emitter + 104, most_fade_word);
+    }
+    if (double(guest::LoadFloat(base, emitter + 104)) < zero) {
+      guest::StoreU32(base, emitter + 104, zero_word);
+    }
+    if (most_fade < double(guest::LoadFloat(base, emitter + 104))) {
+      guest::StoreU32(base, emitter + 104, most_fade_word);
+    }
+    guest::StoreU32(base, emitter + 92,
+                    uint32_t(Fctiwz(double(guest::LoadFloat(base, emitter + 104)))));
+    // The particles drift by their velocity (+16) and show (+36 = 1),
+    // unless the region is on and they're inside it.
+    for (int32_t i = 0; i < int32_t(guest::LoadU32(base, emitter + 128)); i++) {
+      const uint32_t particle = emitter + 240 + 48 * uint32_t(i);
+      // Where both are NaNs, the translated code (addss, seen in the
+      // disassembly) keeps the position's for x and the velocity's for y
+      // and z.
+      for (uint32_t k = 0; k < 3; k++) {
+        const uint32_t velocity = guest::LoadU32(base, particle + 16 + 4 * k);
+        const uint32_t position = guest::LoadU32(base, particle + 4 * k);
+        guest::StoreU32(base, particle + 4 * k,
+                        k == 0 ? KeepFirstNaN(position, velocity, true)
+                               : KeepFirstNaN(velocity, position, true));
+      }
+      guest::StoreU32(base, particle + 40, 1);
+      if (guest::LoadU32(base, smoke + kSmokeRegionOn) == 1) {
+        *r3 = SmokeInRegion(base, smoke, particle);
+        if (*r3 != 0) {
+          guest::StoreU32(base, particle + 40, 0);
+        }
+      }
+    }
+    index = NextIndex(index, int32_t(guest::LoadU32(base, smoke + 104)));
+    emitter = emitter_at(index);
+  }
+  return true;
+}
+
+}  // namespace race_overlays

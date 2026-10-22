@@ -227,6 +227,16 @@ void NativeSparksUpdate(PPCContext& ctx, uint8_t* base) {
   }
 }
 
+void NativeSmokeUpdate(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  uint32_t r3 = ctx.r3.u32;
+  if (!ro::SmokeUpdate(base, ctx.r3.u32, &r3)) {
+    __imp__sub_8212AA78(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = r3;
+}
+
 void NativeRandomRange(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   uint32_t drawn = 0;
@@ -2048,6 +2058,93 @@ void SparksUpdateCases(Context& h, uint32_t block) {
   }
   results.Report();
 }
+
+// Smoke::Update: emitters of random words with small lives (0 to 50, some
+// negative or huge) and particle counts (0 to 12), a table (+112) with a
+// life (+0) of 40 to 50 or random and a +12 of 0 to 30 or random;
+// capacities 1 to 45, heads inside and past them (below 45), counts up to
+// past the capacity; the region on, off or random, with the region's
+// points and the particles small numbers in half the cases (so particles
+// fall inside and outside it); and the cases where the native version
+// declines (a capacity of 0 or -1). Heads below 0, where it declines too,
+// aren't tried: the original then resets emitters below the smoke, over its
+// capacity and table pointer, and runs on through random memory.
+void SmokeUpdateCases(Context& h, uint32_t block) {
+  Random& r = h.random;
+  const uint32_t smoke = block + 0x1000;
+  const uint32_t table = block + 0x100;
+  // The smoke and five emitters past it: with a capacity of 0 (the
+  // original runs, its divisions giving 0) the index runs on past the 45.
+  constexpr uint32_t kBytes = 32640 + 5 * 720;
+  Results results("Smoke::Update (sub_8212AA78)");
+  for (int i = 0; i < 300; i++) {
+    const uint64_t seed = r.Next();
+    int32_t capacity = int32_t(1 + r.Below(45));
+    int32_t head = int32_t(r.Below(uint32_t(capacity)));
+    int32_t count = int32_t(r.Below(uint32_t(capacity) + 3));
+    if (i % 25 == 1) {
+      head = std::min(capacity + int32_t(r.Below(5)), 44);  // past the capacity
+    } else if (i % 25 == 2) {
+      capacity = 0;
+      count = int32_t(r.Below(3));  // the index runs on by one an emitter
+    } else if (i % 25 == 3) {
+      capacity = -1;
+    } else if (i % 25 == 5) {
+      count = -int32_t(r.Below(3));
+    }
+    const bool small = i % 2 == 0;
+    const uint32_t region = r.Below(4) == 0 ? uint32_t(r.Next()) : r.Below(2);
+    Compare(h, results, {{smoke, kBytes}, {table, 16}},
+            [&, seed, capacity, head, count, small, region] {
+              Random fill;
+              for (uint64_t n = 0; n < seed % 61; n++) {
+                fill.Next();
+              }
+              auto small_float = [&] {
+                return std::bit_cast<uint32_t>(float(int32_t(fill.Below(21)) - 10) * 0.5f);
+              };
+              FillRandom(h.base, fill, smoke, kBytes);
+              FillRandom(h.base, fill, table, 16);
+              if (fill.Below(4) != 0) {
+                guest::StoreU32(h.base, table, 40 + fill.Below(11));
+              }
+              const uint32_t ticks = fill.Below(4) == 0 ? uint32_t(fill.Next()) : fill.Below(31);
+              guest::StoreU32(h.base, table + 12, ticks);
+              guest::StoreU32(h.base, smoke + 104, uint32_t(capacity));
+              guest::StoreU32(h.base, smoke + 112, table);
+              guest::StoreU32(h.base, smoke + 32528, uint32_t(head));
+              guest::StoreU32(h.base, smoke + 32536, uint32_t(count));
+              guest::StoreU32(h.base, smoke + 32624, region);
+              for (uint32_t n = 0; n < 50; n++) {
+                const uint32_t emitter = smoke + 128 + 720 * n;
+                const uint32_t kind = fill.Below(10);
+                const uint32_t life = kind == 0   ? uint32_t(fill.Next())
+                                      : kind == 1 ? uint32_t(-int32_t(fill.Below(3)))
+                                                  : fill.Below(51);
+                guest::StoreU32(h.base, emitter + 108, life);
+                guest::StoreU32(h.base, emitter + 128, fill.Below(13));
+                if (small) {
+                  for (uint32_t p = 0; p < 10; p++) {
+                    for (uint32_t k = 0; k < 6; k++) {
+                      guest::StoreU32(h.base, emitter + 240 + 48 * p + (k < 3 ? 4 * k : 4 + 4 * k),
+                                      small_float());
+                    }
+                  }
+                }
+              }
+              if (small) {
+                for (uint32_t k = 0; k < 3; k++) {
+                  guest::StoreU32(h.base, smoke + 32592 + 4 * k, small_float());
+                  guest::StoreU32(h.base, smoke + 32608 + 4 * k, small_float());
+                }
+              }
+            },
+            [&](PPCContext& t) { t.r3.u64 = smoke; }, __imp__sub_8212AA78, NativeSmokeUpdate,
+            fmt::format("case {} capacity {} head {} count {} region {:X}", i, capacity, head,
+                        count, region));
+  }
+  results.Report();
+}
 }  // namespace
 
 void RaceOverlays(Context& h) {
@@ -2075,6 +2172,7 @@ void RaceOverlays(Context& h) {
   ResetCases(h, block);
   SmokeInRegionCases(h, block);
   SparksUpdateCases(h, block);
+  SmokeUpdateCases(h, block);
   memory->SystemHeapFree(block);
 }
 

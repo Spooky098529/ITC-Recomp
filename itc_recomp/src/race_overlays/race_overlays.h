@@ -523,6 +523,22 @@ uint32_t SmokeInRegion(uint8_t* base, uint32_t smoke, uint32_t point);
 // entries past the end of guest memory); the original runs there.
 bool SparksUpdate(uint8_t* base, uint32_t sparks);
 
+// Smoke::Update (sub_8212AA78): the oldest emitter (the head, +32,528; 720
+// bytes from +128), when its life (+108) is out, reset (SmokeEmitterReset)
+// and dropped (the head moves on modulo the capacity +104 and the count
+// +32,536 goes down, both read again after the reset). Then for each of the
+// count emitters from the head: its life counts down to 0; +96 = 1 once the
+// table's (+112) +0 less life is above 1 (unsigned); +100 = +124 + +116 x
+// +124 x (table +0 - life) / table +0; +104 = +120 times 1/the table's +12
+// times life while life is below +12 (unsigned), clamped to 0.0 and +120;
+// +92 = that as an integer; its +128 particles (48 bytes from +240) move by
+// their velocity (+16) and get +40 = 1, or 0 when the region is on (+32,624
+// = 1) and Smoke::InRegion says they're inside it. `r3` is left as the
+// original leaves it (the last InRegion result, when it ran). False, with
+// nothing done, when the original could trap or reach outside its emitters
+// (EntriesInRange's cases); the original runs there.
+bool SmokeUpdate(uint8_t* base, uint32_t smoke, uint32_t* r3);
+
 }  // namespace race_overlays
 
 namespace race_overlays {
