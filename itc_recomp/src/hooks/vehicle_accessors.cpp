@@ -5,6 +5,7 @@
 #include "guest.h"
 
 #include "base/flags.h"
+#include "debug/frame_state_diff.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
 ITC_FLAG_BOOL(native_vehicle_accessors, true, "ITC",
@@ -17,7 +18,10 @@ ITC_FLAG_BOOL(native_vehicle_accessors, true, "ITC",
               "to sub_820B69D8; the wheels' slip, sub_820C0180 and sub_820C0290; the vehicle's "
               "other accessors, sub_820C0140 to sub_820C0590; the collision object's and the "
               "collision world's, sub_820B7BF0 to sub_820B8D10; the +344 object's, "
-              "sub_820B9658 to sub_820B99C8) natively instead of through the translated code (same "
+              "sub_820B9658 to sub_820B99C8; the race data's setters, stages and racer records, "
+              "sub_820FF918 to sub_820FFF10; the scene's pools and List::Init and At, "
+              "sub_820C42C8 to sub_820C5D70, sub_82593FB0 and sub_82593FC0; the switch "
+              "sub_825C8390) natively instead of through the translated code (same "
               "results; checked by --run_harnesses=vehicle_accessors)");
 
 // Defines an adapter returning a word in r3: `address` the function's
@@ -163,6 +167,83 @@ ITC_ACCESSOR_VOID(820B99B8, ObjectSetHalf112(base, ctx.r3.u32, ctx.r4.u32))
 ITC_ACCESSOR_WORD(820B99C0, ObjectHalf114(base, ctx.r3.u32))
 // Object::SetHalf114 (sub_820B99C8) has no adapter: its only caller is
 // sub_820C0450, native.
+
+// The race data, its stages (r3 the stage list) and racer records.
+ITC_ACCESSOR_VOID(820FF918, RaceDataSetWord59618(base, ctx.r3.u32))
+ITC_ACCESSOR_VOID(820FF938, RaceDataSetWord5961C(base, ctx.r3.u32))
+ITC_ACCESSOR_VOID(820FF968, RaceDataSetWord32(base, ctx.r3.u32))
+ITC_ACCESSOR_WORD(820FFA30, StagesHasNext(base, ctx.r3.u32))
+ITC_ACCESSOR_VOID(820FFA50, StagesSetType(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+ITC_ACCESSOR_VOID(820FFAB0, StagesSetWord808(base, ctx.r3.u32, ctx.r4.u32))
+ITC_ACCESSOR_WORD(820FFBE8, StagesType(base, ctx.r3.u32, ctx.r4.u32))
+ITC_ACCESSOR_WORD(820FFC08, StagesWord4(base, ctx.r3.u32, ctx.r4.u32))
+ITC_ACCESSOR_WORD(820FFC30, StagesIsType2Or3(base, ctx.r3.u32, ctx.r4.u32))
+ITC_ACCESSOR_WORD(820FFC68, StagesWord808(base, ctx.r3.u32))
+ITC_ACCESSOR_WORD(820FFC70, StagesWord76(base, ctx.r3.u32, ctx.r4.u32))
+ITC_ACCESSOR_WORD(820FFC98, StagesRacer(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+ITC_ACCESSOR_WORD(820FFCC8, StagesWord48(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+ITC_ACCESSOR_VOID(820FFD48, StagesCopy24(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+ITC_ACCESSOR_VOID(820FFDD8, EntriesAdd(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+// RacerRecords::Add: r3 comes back as where the record went (memcpy's
+// result). Where the native version declines, the original runs.
+extern "C" REX_FUNC(sub_820FFE08) {
+  REX_FUNC_PROLOGUE();
+  uint32_t added = 0;
+  if (!ITC_FLAG(native_vehicle_accessors) ||
+      !RacerRecordsAdd(base, ctx.r3.u32, ctx.r4.u32, &added)) {
+    __imp__sub_820FFE08(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = added;
+}
+ITC_ACCESSOR_WORD(820FFE58, RacerRecordsAt(base, ctx.r3.u32, ctx.r4.u32))
+ITC_ACCESSOR_VOID(820FFE98, PairCopy(base, ctx.r3.u32, ctx.r4.u32))
+ITC_ACCESSOR_VOID(820FFEB0, PairsLast(base, ctx.r3.u32, ctx.r4.u32))
+ITC_ACCESSOR_VOID(820FFF10, PairsAt(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+ITC_ACCESSOR_WORD(825C8390, DebugSwitchOn())
+
+// Stages::Copy and List::At: their adapters keep what the frame state
+// diff's wrapper did (src/debug/frame_state_diff.cpp: --find_per_frame_state
+// names which draw step part advances per-frame state, --debug_hide skips
+// one). Stages::Copy: r3 = out, r4 = the stage list, r5 = a stage; where
+// the native version declines (a copy memcpy's override must see), the
+// original runs.
+extern "C" REX_FUNC(sub_820FFD88) {
+  REX_FUNC_PROLOGUE();
+  if (debug::IsHidden(0x820FFD88)) {
+    return;
+  }
+  debug::FrameStateDiff_Before(base);
+  if (!ITC_FLAG(native_vehicle_accessors) ||
+      !StagesCopy(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32)) {
+    __imp__sub_820FFD88(ctx, base);
+  }
+  debug::FrameStateDiff_After(base, "draw step part", 0x820FFD88);
+}
+
+// List::At: r3 = the list, r4 = n.
+extern "C" REX_FUNC(sub_82593FC0) {
+  REX_FUNC_PROLOGUE();
+  if (debug::IsHidden(0x82593FC0)) {
+    return;
+  }
+  debug::FrameStateDiff_Before(base);
+  if (!ITC_FLAG(native_vehicle_accessors)) {
+    __imp__sub_82593FC0(ctx, base);
+  } else {
+    ctx.r3.u64 = ListAt(base, ctx.r3.u32, ctx.r4.u32);
+  }
+  debug::FrameStateDiff_After(base, "draw step part", 0x82593FC0);
+}
+
+// The scene's pools: r3 = the scene (or the list, or an object).
+ITC_ACCESSOR_VOID(82593FB0, ListInit(base, ctx.r3.u32))
+ITC_ACCESSOR_SIGNED(820C42C8, ScenePoolsClaimA(base, ctx.r3.u32, ctx.r4.u32))
+ITC_ACCESSOR_SIGNED(820C5AB0, ScenePoolsClaimB(base, ctx.r3.u32, ctx.r4.u32))
+ITC_ACCESSOR_WORD(820C4420, ScenePoolsGetA(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+ITC_ACCESSOR_WORD(820C5C20, ScenePoolsGetB(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+ITC_ACCESSOR_WORD(820C5D70, ScenePoolsFindModel(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+ITC_ACCESSOR_WORD(820C4550, ObjectRecord1888(ctx.r3.u32))
 
 // --- The vector library (src/vehicle_accessors/vectors.cpp) ---
 

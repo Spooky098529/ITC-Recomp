@@ -186,6 +186,52 @@ ITC_NATIVE_SET(NativeObjectSetHalf112, va::ObjectSetHalf112(base, ctx.r3.u32, ct
 ITC_NATIVE_WORD(NativeObjectHalf114, va::ObjectHalf114(base, ctx.r3.u32))
 ITC_NATIVE_SET(NativeObjectSetHalf114, va::ObjectSetHalf114(base, ctx.r3.u32, ctx.r4.u32))
 
+ITC_NATIVE_SET(NativeRaceDataSetWord59618, va::RaceDataSetWord59618(base, ctx.r3.u32))
+ITC_NATIVE_SET(NativeRaceDataSetWord5961C, va::RaceDataSetWord5961C(base, ctx.r3.u32))
+ITC_NATIVE_SET(NativeRaceDataSetWord32, va::RaceDataSetWord32(base, ctx.r3.u32))
+ITC_NATIVE_WORD(NativeStagesHasNext, va::StagesHasNext(base, ctx.r3.u32))
+ITC_NATIVE_SET(NativeStagesSetType, va::StagesSetType(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+ITC_NATIVE_SET(NativeStagesSetWord808, va::StagesSetWord808(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_WORD(NativeStagesWord808, va::StagesWord808(base, ctx.r3.u32))
+ITC_NATIVE_WORD(NativeStagesType, va::StagesType(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_WORD(NativeStagesWord4, va::StagesWord4(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_WORD(NativeStagesIsType2Or3, va::StagesIsType2Or3(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_WORD(NativeStagesWord76, va::StagesWord76(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_WORD(NativeStagesRacer, va::StagesRacer(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+ITC_NATIVE_WORD(NativeStagesWord48, va::StagesWord48(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+ITC_NATIVE_SET(NativeStagesCopy24, va::StagesCopy24(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+// Where the native version declines, the original runs (as the adapter).
+void NativeStagesCopy(PPCContext& ctx, uint8_t* base) {
+  if (!va::StagesCopy(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32)) {
+    __imp__sub_820FFD88(ctx, base);
+  }
+}
+ITC_NATIVE_SET(NativeEntriesAdd, va::EntriesAdd(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+void NativeRacerRecordsAdd(PPCContext& ctx, uint8_t* base) {
+  uint32_t added = 0;
+  if (!va::RacerRecordsAdd(base, ctx.r3.u32, ctx.r4.u32, &added)) {
+    __imp__sub_820FFE08(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = added;
+}
+ITC_NATIVE_WORD(NativeRacerRecordsAt, va::RacerRecordsAt(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_SET(NativePairCopy, va::PairCopy(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_SET(NativePairsLast, va::PairsLast(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_SET(NativePairsAt, va::PairsAt(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+ITC_NATIVE_WORD(NativeDebugSwitchOn, va::DebugSwitchOn())
+ITC_NATIVE_SET(NativeListInit, va::ListInit(base, ctx.r3.u32))
+ITC_NATIVE_WORD(NativeListAt, va::ListAt(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_SIGNED(NativeScenePoolsClaimA, va::ScenePoolsClaimA(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_SIGNED(NativeScenePoolsClaimB, va::ScenePoolsClaimB(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_WORD(NativeScenePoolsGetA,
+                va::ScenePoolsGetA(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+ITC_NATIVE_WORD(NativeScenePoolsGetB,
+                va::ScenePoolsGetB(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+ITC_NATIVE_WORD(NativeScenePoolsFindModel,
+                va::ScenePoolsFindModel(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+ITC_NATIVE_WORD(NativeObjectRecord1888, va::ObjectRecord1888(ctx.r3.u32))
+
 namespace vl = vector_library;
 
 #define ITC_NATIVE_VOID(name, call)           \
@@ -320,6 +366,7 @@ std::vector<uint32_t> Words(Random& r, int random_count) {
 }
 
 constexpr uint32_t kBlockBytes = 0x60000;  // 93 racer records fit (366,048 bytes)
+constexpr uint32_t kRecordBytesHarness = 3936;
 
 // The getters that only add to their argument: random arguments, upper
 // halves included.
@@ -333,6 +380,8 @@ void AddressCases(Context& h) {
       {"RigidBody::Matrix (sub_820B6930)", __imp__sub_820B6930, NativeRigidBodyMatrix},
       {"Contact::Position (sub_820B8D00)", __imp__sub_820B8D00, NativeContactPosition},
       {"DebugSwitchOff (sub_825C8388)", __imp__sub_825C8388, NativeDebugSwitchOff},
+      {"DebugSwitchOn (sub_825C8390)", __imp__sub_825C8390, NativeDebugSwitchOn},
+      {"Object::Record1888 (sub_820C4550)", __imp__sub_820C4550, NativeObjectRecord1888},
       {"Vehicle::Identity (sub_820C0168)", __imp__sub_820C0168, NativeVehicleIdentity},
       {"RigidBody::Field80 (sub_820B6880)", __imp__sub_820B6880, NativeRigidBodyField80},
       {"RigidBody::Velocity (sub_820B6888)", __imp__sub_820B6888, NativeRigidBodyVelocity},
@@ -1080,6 +1129,322 @@ void OtherObjectCases(Context& h, uint32_t block) {
   }
 }
 
+// The race data's cases: the race data pointer (0x826C5B2C) pointed at a
+// block of its own for the setters (put back after), and a stage list (10
+// stages of 80 bytes, the count +800, the current +804) and racer records
+// (a few of 3,936 bytes, the count at +0x49FE0) in the block.
+constexpr uint32_t kRaceDataPointer = 0x826C5B2C;
+constexpr uint32_t kStages = 0x10000;
+
+void RaceDataMoreCases(Context& h, uint32_t block, uint32_t records_block) {
+  Random& r = h.random;
+  const uint32_t saved = guest::LoadU32(h.base, kRaceDataPointer);
+  // The setters: r3 = a value (0 among them), into the block taken as the
+  // race data (0x5A000 bytes, room for +0x5961C).
+  {
+    const struct {
+      const char* name;
+      GuestFunction recompiled, native;
+    } setters[] = {
+        {"RaceData::SetWord59618 (sub_820FF918)", __imp__sub_820FF918,
+         NativeRaceDataSetWord59618},
+        {"RaceData::SetWord5961C (sub_820FF938)", __imp__sub_820FF938,
+         NativeRaceDataSetWord5961C},
+        {"RaceData::SetWord32 (sub_820FF968)", __imp__sub_820FF968, NativeRaceDataSetWord32},
+    };
+    for (const auto& f : setters) {
+      Results results(f.name);
+      for (uint32_t value : Words(r, 10)) {
+        Compare(h, results, {{records_block + 0x59610, 0x10}, {records_block, 0x40}},
+                [&] {
+                  guest::StoreU32(h.base, kRaceDataPointer, records_block);
+                  Fill(h.base, records_block, 0x40);
+                  Fill(h.base, records_block + 0x59610, 0x10);
+                },
+                [&](PPCContext& t) { t.r3.u64 = value; }, f.recompiled, f.native,
+                fmt::format("value {:X}", value));
+      }
+      results.Report();
+    }
+    guest::StoreU32(h.base, kRaceDataPointer, saved);
+  }
+
+  // The stage list: types 0-5 and words, the count 0-9, the current 0-9.
+  auto stages = [&h, block](uint64_t seed) {
+    return [&h, block, seed] {
+      Random fill = Seeded(seed * 17 + 9);
+      FillRandom(h.base, fill, block + kStages, 812);
+      for (uint32_t s = 0; s < 10; s++) {
+        guest::StoreU32(h.base, block + kStages + 80 * s, fill.Below(6));
+      }
+      guest::StoreU32(h.base, block + kStages + 800, fill.Below(10));
+      guest::StoreU32(h.base, block + kStages + 804, fill.Below(10));
+    };
+  };
+  const struct {
+    const char* name;
+    GuestFunction recompiled, native;
+    bool slot, out;
+  } stage_functions[] = {
+      {"Stages::HasNext (sub_820FFA30)", __imp__sub_820FFA30, NativeStagesHasNext},
+      {"Stages::SetType (sub_820FFA50)", __imp__sub_820FFA50, NativeStagesSetType},
+      {"Stages::SetWord808 (sub_820FFAB0)", __imp__sub_820FFAB0, NativeStagesSetWord808},
+      {"Stages::Word808 (sub_820FFC68)", __imp__sub_820FFC68, NativeStagesWord808},
+      {"Stages::Type (sub_820FFBE8)", __imp__sub_820FFBE8, NativeStagesType},
+      {"Stages::Word4 (sub_820FFC08)", __imp__sub_820FFC08, NativeStagesWord4},
+      {"Stages::IsType2Or3 (sub_820FFC30)", __imp__sub_820FFC30, NativeStagesIsType2Or3},
+      {"Stages::Word76 (sub_820FFC70)", __imp__sub_820FFC70, NativeStagesWord76},
+      {"Stages::Racer (sub_820FFC98)", __imp__sub_820FFC98, NativeStagesRacer, true},
+      {"Stages::Word48 (sub_820FFCC8)", __imp__sub_820FFCC8, NativeStagesWord48, true},
+      {"Stages::Copy24 (sub_820FFD48)", __imp__sub_820FFD48, NativeStagesCopy24, false, true},
+      {"Stages::Copy (sub_820FFD88)", __imp__sub_820FFD88, NativeStagesCopy, false, true},
+  };
+  for (const auto& f : stage_functions) {
+    Results results(f.name);
+    for (uint64_t seed = 0; seed < 8; seed++) {
+      for (uint32_t stage : {0xFFFFFFFFu, 0u, 3u, 9u}) {
+        for (uint32_t value : {2u, 4u, 0xFFFFFFFFu, 3u}) {
+          Compare(h, results, {{block + kStages, 0x400}}, stages(seed),
+                  [&](PPCContext& t) {
+                    if (f.out) {
+                      t.r3.u64 = block + kStages + 0x340 + 4 * (seed % 3);
+                      t.r4.u64 = block + kStages;
+                      t.r5.u64 = stage;
+                    } else {
+                      t.r3.u64 = block + kStages;
+                      t.r4.u64 = f.slot ? value & 3 : value;
+                      t.r5.u64 = stage;
+                      if (!f.slot) {
+                        // r4 the stage for the getters, the type for SetType.
+                        if (std::string(f.name).find("SetType") == std::string::npos &&
+                            std::string(f.name).find("SetWord") == std::string::npos) {
+                          t.r4.u64 = stage;
+                        }
+                      }
+                    }
+                  },
+                  f.recompiled, f.native,
+                  fmt::format("seed {} stage {} value {}", seed, int32_t(stage), int32_t(value)));
+        }
+      }
+    }
+    results.Report();
+  }
+
+  // Lists of 972-byte entries: the count 0-3.
+  {
+    Results results("Entries::Add (sub_820FFDD8)");
+    for (uint64_t seed = 0; seed < 20; seed++) {
+      Compare(h, results, {{block + kStages, 0x1000}},
+              [&h, block, seed] {
+                Random fill = Seeded(seed);
+                FillRandom(h.base, fill, block + kStages, 0x1000);
+                guest::StoreU32(h.base, block + kStages, fill.Below(4));
+              },
+              [&](PPCContext& t) {
+                Random pick = Seeded(seed + 100);
+                t.r3.u64 = block + kStages;
+                t.r4.u64 = uint32_t(pick.Next());
+                t.r5.u64 = uint32_t(pick.Next());
+              },
+              __imp__sub_820FFDD8, NativeEntriesAdd, fmt::format("seed {}", seed));
+    }
+    results.Report();
+  }
+
+  // Racer records: the count 0-3 (or -1, or 0) in the records block, a
+  // record to add from the block.
+  {
+    auto records = [&h, records_block, block](uint64_t seed) {
+      return [&h, records_block, block, seed] {
+        Random fill = Seeded(seed * 3);
+        FillRandom(h.base, fill, records_block, 4 * kRecordBytesHarness);
+        FillRandom(h.base, fill, block + kStages, kRecordBytesHarness);
+        const uint32_t counts[] = {0, 1, 2, 3, 0xFFFFFFFF};
+        guest::StoreU32(h.base, records_block + 0x49FE0, counts[seed % 5]);
+      };
+    };
+    Results add("RacerRecords::Add (sub_820FFE08)");
+    Results at("RacerRecords::At (sub_820FFE58)");
+    for (uint64_t seed = 0; seed < 10; seed++) {
+      if (seed % 5 != 4) {
+        Compare(h, add,
+                {{records_block, 4 * kRecordBytesHarness}, {records_block + 0x49FE0, 4}},
+                records(seed),
+                [&](PPCContext& t) {
+                  t.r3.u64 = records_block;
+                  t.r4.u64 = block + kStages;
+                },
+                __imp__sub_820FFE08, NativeRacerRecordsAdd, fmt::format("seed {}", seed));
+      }
+      for (uint32_t n : {0xFFFFFFFFu, 0u, 1u, 76u, 0x80000000u}) {
+        Compare(h, at, {}, records(seed),
+                [&](PPCContext& t) {
+                  t.r3.u64 = records_block;
+                  t.r4.u64 = n;
+                },
+                __imp__sub_820FFE58, NativeRacerRecordsAt,
+                fmt::format("seed {} n {}", seed, int32_t(n)));
+      }
+    }
+    add.Report();
+    at.Report();
+  }
+
+  // Pairs of halfwords: five pairs, some 0xFFFF firsts.
+  {
+    auto pairs = [&h, block](uint64_t seed) {
+      return [&h, block, seed] {
+        Random fill = Seeded(seed * 7);
+        FillRandom(h.base, fill, block + kStages, 64);
+        for (uint32_t i = 0; i < 5; i++) {
+          if (fill.Below(3) == 0) {
+            guest::StoreU16(h.base, block + kStages + 8 + 4 * i, 0xFFFF);
+          }
+        }
+      };
+    };
+    const struct {
+      const char* name;
+      GuestFunction recompiled, native;
+    } functions[] = {
+        {"Pair::Copy (sub_820FFE98)", __imp__sub_820FFE98, NativePairCopy},
+        {"Pairs::Last (sub_820FFEB0)", __imp__sub_820FFEB0, NativePairsLast},
+        {"Pairs::At (sub_820FFF10)", __imp__sub_820FFF10, NativePairsAt},
+    };
+    for (const auto& f : functions) {
+      Results results(f.name);
+      for (uint64_t seed = 0; seed < 30; seed++) {
+        for (uint32_t i : {0u, 2u, 4u, 5u, 0xFFFFFFFFu, 0x7FFFFFFFu}) {
+          if (int32_t(i) < 0 && f.native == NativePairsAt) {
+            continue;  // pair -1 would be read before the block
+          }
+          Compare(h, results, {{block + kStages, 64}}, pairs(seed),
+                  [&](PPCContext& t) {
+                    t.r3.u64 = block + kStages + 32 + 4 * (seed % 3);
+                    t.r4.u64 = block + kStages + 8;
+                    t.r5.u64 = i;
+                  },
+                  f.recompiled, f.native, fmt::format("seed {} i {}", seed, int32_t(i)));
+        }
+      }
+      results.Report();
+    }
+  }
+}
+
+// The scene's pools: a scene in the block with lists of 0-5 objects (+16
+// 0, 3 or another, +32 a kind 0-2) for pools 0-2 of the first set (+56 +
+// 12 x pool) and the second (+4944 + 12 x pool), and pool 7 of the second
+// (+5028); objects 48 bytes apart from +0x2000, each list's nodes linked by
+// +8.
+constexpr uint32_t kScene = 0x20000;
+
+void ScenePoolCases(Context& h, uint32_t block) {
+  const uint32_t scene = block + kScene;
+  auto setup = [&h, scene](uint64_t seed) {
+    return [&h, scene, seed] {
+      Random fill = Seeded(seed * 19 + 4);
+      FillRandom(h.base, fill, scene, 0x1400);
+      uint32_t next_object = scene + 0x2000;
+      auto make_list = [&](uint32_t list) {
+        const uint32_t count = fill.Below(6);
+        uint32_t first = 0, previous = 0;
+        for (uint32_t i = 0; i < count; i++) {
+          const uint32_t object = next_object;
+          next_object += 48;
+          FillRandom(h.base, fill, object, 48);
+          const uint32_t states[] = {0, 3, 3, 1};
+          guest::StoreU32(h.base, object + 16, states[fill.Below(4)]);
+          guest::StoreU32(h.base, object + 32, fill.Below(3));
+          guest::StoreU32(h.base, object + 8, 0);
+          if (previous) {
+            guest::StoreU32(h.base, previous + 8, object);
+          } else {
+            first = object;
+          }
+          previous = object;
+        }
+        guest::StoreU32(h.base, list, first);
+        // The count as given, or off by one (the claims trust it).
+        guest::StoreU32(h.base, list + 8, count == 0 ? 0 : count - fill.Below(2));
+      };
+      for (uint32_t pool = 0; pool < 3; pool++) {
+        make_list(scene + 56 + 12 * pool);
+        make_list(scene + 4944 + 12 * pool);
+      }
+      make_list(scene + 5028);
+    };
+  };
+  const struct {
+    const char* name;
+    GuestFunction recompiled, native;
+    int kind;  // 0 list, 1 claim, 2 get, 3 find
+    uint32_t list_offset;
+  } functions[] = {
+      {"List::Init (sub_82593FB0)", __imp__sub_82593FB0, NativeListInit, 0, 56},
+      {"List::At (sub_82593FC0)", __imp__sub_82593FC0, NativeListAt, 0, 4944},
+      {"ScenePools::ClaimA (sub_820C42C8)", __imp__sub_820C42C8, NativeScenePoolsClaimA, 1, 0},
+      {"ScenePools::ClaimB (sub_820C5AB0)", __imp__sub_820C5AB0, NativeScenePoolsClaimB, 1, 0},
+      {"ScenePools::GetA (sub_820C4420)", __imp__sub_820C4420, NativeScenePoolsGetA, 2, 0},
+      {"ScenePools::GetB (sub_820C5C20)", __imp__sub_820C5C20, NativeScenePoolsGetB, 2, 0},
+      {"ScenePools::FindModel (sub_820C5D70)", __imp__sub_820C5D70, NativeScenePoolsFindModel,
+       3, 0},
+  };
+  for (const auto& f : functions) {
+    Results results(f.name);
+    for (uint64_t seed = 0; seed < 30; seed++) {
+      for (uint32_t pool = 0; pool < 3; pool++) {
+        for (uint32_t index : {0u, 1u, 2u, 4u, 7u, 0xFFFFFFFFu}) {
+          if (f.kind == 2 || f.kind == 0) {
+            // GetA and GetB read the object's +16 even for an empty list
+            // (address 16): only lists with objects.
+            const uint32_t list =
+                f.kind == 0 ? scene + f.list_offset + 12 * pool
+                : f.native == NativeScenePoolsGetA ? scene + 56 + 12 * pool
+                                                   : scene + 4944 + 12 * pool;
+            setup(seed)();
+            if (f.kind == 2 && guest::LoadU32(h.base, list) == 0) {
+              continue;
+            }
+          }
+          if (f.kind == 1 || f.kind == 3) {
+            if (index > 2 && index != 0xFFFFFFFFu) {
+              continue;
+            }
+          }
+          Compare(h, results, {{scene, 0x1400}, {scene + 0x2000, 48 * 40}}, setup(seed),
+                  [&](PPCContext& t) {
+                    switch (f.kind) {
+                      case 0:
+                        t.r3.u64 = scene + f.list_offset + 12 * pool;
+                        t.r4.u64 = index;
+                        break;
+                      case 1:
+                        t.r3.u64 = scene;
+                        t.r4.u64 = pool;
+                        break;
+                      case 2:
+                        t.r3.u64 = scene;
+                        t.r4.u64 = pool;
+                        t.r5.u64 = index;
+                        break;
+                      case 3:
+                        t.r3.u64 = scene;
+                        t.r4.u64 = pool;
+                        t.r5.u64 = index;
+                        break;
+                    }
+                  },
+                  f.recompiled, f.native,
+                  fmt::format("seed {} pool {} index {}", seed, pool, int32_t(index)));
+        }
+      }
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void VehicleAccessors(Context& h) {
@@ -1097,6 +1462,16 @@ void VehicleAccessors(Context& h) {
   RigidBodyCases(h, block);
   WheelSlipCases(h, block);
   OtherObjectCases(h, block);
+  ScenePoolCases(h, block);
+  // The racer records and the race data's setters need a block of their
+  // own (the race data reaches +0x5961C).
+  const uint32_t records = memory->SystemHeapAlloc(0x5A000);
+  if (records) {
+    RaceDataMoreCases(h, block, records);
+    memory->SystemHeapFree(records);
+  } else {
+    ITC_LOG_ERROR("harness: vehicle_accessors: no second block from the system heap");
+  }
   memory->SystemHeapFree(block);
 }
 

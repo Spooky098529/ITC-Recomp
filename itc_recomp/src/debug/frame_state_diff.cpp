@@ -422,12 +422,12 @@ ITC_FRAME_STATE_WRAP(820C4FB8)
 ITC_FRAME_STATE_WRAP(820DAA38)
 ITC_FRAME_STATE_WRAP(820DAAC8)
 ITC_FRAME_STATE_WRAP(820DAB10)
-ITC_FRAME_STATE_WRAP(820FFD88)
-ITC_FRAME_STATE_WRAP(82593FC0)
 ITC_FRAME_STATE_WRAP(82597118)
 ITC_FRAME_STATE_WRAP(82597518)
 ITC_FRAME_STATE_WRAP(82597610)
 ITC_FRAME_STATE_WRAP(82598768)
+// Stages::Copy (sub_820FFD88) and List::At (sub_82593FC0) were wrapped here
+// too; their native adapters (src/hooks/vehicle_accessors.cpp) do the same.
 // The light billboards' batch (calls sub_8209C1A0 and sub_8209C6E0); r4 is
 // the light list: count at +32, 48-byte lights at +36 (position at +0, size
 // at +32 and +36; a light with neither size above 0 is skipped).

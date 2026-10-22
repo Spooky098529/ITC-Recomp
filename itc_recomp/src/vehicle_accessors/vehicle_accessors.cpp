@@ -3,6 +3,7 @@
 #include "guest.h"
 
 #include "base/log.h"
+#include "c_runtime/strings.h"
 #include "vehicle_accessors/vectors.h"
 
 #include <bit>
@@ -27,6 +28,23 @@ constexpr uint32_t kQuaternionScale = 0x820021E8;
 constexpr uint32_t kCollisionGlobal78 = 0x826C2D78;
 constexpr uint32_t kCollisionGlobal7C = 0x826C2D7C;
 constexpr uint32_t kCollisionWorld = 0x826C2D88;  // the collision world's pointer
+constexpr uint32_t kRaceData = 0x826C5B2C;        // the race data's pointer
+constexpr uint32_t kRecordBytes = 3936;
+constexpr uint32_t kRecordCount = 0x49FE0;        // the racer records' count
+
+// The library's memcpy natively, where that's what it would do and its
+// override has nothing to record (see Stages::Copy).
+bool CopyLikeMemcpy(uint8_t* base, uint32_t destination, uint32_t source, uint32_t size) {
+  return destination < 0xA0000000u && c_runtime::Memcpy(base, destination, source, size);
+}
+
+// The stage `stage` (-1 for the current, +804) of the stage list.
+uint32_t Stage(uint8_t* base, uint32_t stages, uint32_t stage) {
+  if (int32_t(stage) == -1) {
+    stage = guest::LoadU32(base, stages + 804);
+  }
+  return stages + 80 * stage;
+}
 
 namespace vl = vector_library;
 
@@ -609,6 +627,260 @@ uint32_t ContactNext(uint8_t* base, uint32_t contact, uint32_t mask) {
     }
   }
   return 0;
+}
+
+void RaceDataSetWord59618(uint8_t* base, uint32_t value) {
+  ITC_NATIVE_RUNNING("sub_820FF918 RaceData::SetWord59618");
+  if (value != 0) {
+    guest::StoreU32(base, guest::LoadU32(base, kRaceData) + 0x59618, value);
+  }
+}
+
+void RaceDataSetWord5961C(uint8_t* base, uint32_t value) {
+  ITC_NATIVE_RUNNING("sub_820FF938 RaceData::SetWord5961C");
+  if (value != 0) {
+    guest::StoreU32(base, guest::LoadU32(base, kRaceData) + 0x5961C, value);
+  }
+}
+
+void RaceDataSetWord32(uint8_t* base, uint32_t value) {
+  ITC_NATIVE_RUNNING("sub_820FF968 RaceData::SetWord32");
+  guest::StoreU32(base, guest::LoadU32(base, kRaceData) + 32, value);
+}
+
+uint32_t StagesHasNext(uint8_t* base, uint32_t stages) {
+  ITC_NATIVE_RUNNING("sub_820FFA30 Stages::HasNext");
+  const int32_t last = int32_t(guest::LoadU32(base, stages + 800) - 1);
+  return int32_t(guest::LoadU32(base, stages + 804)) < last ? 1 : 0;
+}
+
+void StagesSetType(uint8_t* base, uint32_t stages, uint32_t type, uint32_t stage) {
+  ITC_NATIVE_RUNNING("sub_820FFA50 Stages::SetType");
+  if (int32_t(type) == 4) {
+    return;
+  }
+  if (int32_t(stage) == -1) {
+    guest::StoreU32(base, stages + 80 * guest::LoadU32(base, stages + 800), type);
+    guest::StoreU32(base, stages + 800, guest::LoadU32(base, stages + 800) + 1);
+    return;
+  }
+  guest::StoreU32(base, stages + 80 * stage, type);
+}
+
+void StagesSetWord808(uint8_t* base, uint32_t stages, uint32_t value) {
+  ITC_NATIVE_RUNNING("sub_820FFAB0 Stages::SetWord808");
+  guest::StoreU32(base, stages + 808, value);
+}
+
+uint32_t StagesWord808(uint8_t* base, uint32_t stages) {
+  ITC_NATIVE_RUNNING("sub_820FFC68 Stages::Word808");
+  return guest::LoadU32(base, stages + 808);
+}
+
+uint32_t StagesType(uint8_t* base, uint32_t stages, uint32_t stage) {
+  ITC_NATIVE_RUNNING("sub_820FFBE8 Stages::Type");
+  return guest::LoadU32(base, Stage(base, stages, stage));
+}
+
+uint32_t StagesWord4(uint8_t* base, uint32_t stages, uint32_t stage) {
+  ITC_NATIVE_RUNNING("sub_820FFC08 Stages::Word4");
+  return guest::LoadU32(base, Stage(base, stages, stage) + 4);
+}
+
+uint32_t StagesIsType2Or3(uint8_t* base, uint32_t stages, uint32_t stage) {
+  ITC_NATIVE_RUNNING("sub_820FFC30 Stages::IsType2Or3");
+  const int32_t type = int32_t(guest::LoadU32(base, Stage(base, stages, stage)));
+  return type == 2 || type == 3 ? 1 : 0;
+}
+
+uint32_t StagesWord76(uint8_t* base, uint32_t stages, uint32_t stage) {
+  ITC_NATIVE_RUNNING("sub_820FFC70 Stages::Word76");
+  return guest::LoadU32(base, Stage(base, stages, stage) + 76);
+}
+
+uint32_t StagesRacer(uint8_t* base, uint32_t stages, uint32_t slot, uint32_t stage) {
+  ITC_NATIVE_RUNNING("sub_820FFC98 Stages::Racer");
+  return guest::LoadU32(base, Stage(base, stages, stage) + 8 * slot + 44);
+}
+
+uint32_t StagesWord48(uint8_t* base, uint32_t stages, uint32_t slot, uint32_t stage) {
+  ITC_NATIVE_RUNNING("sub_820FFCC8 Stages::Word48");
+  return guest::LoadU32(base, Stage(base, stages, stage) + 8 * slot + 48);
+}
+
+void StagesCopy24(uint8_t* base, uint32_t out, uint32_t stages, uint32_t stage) {
+  ITC_NATIVE_RUNNING("sub_820FFD48 Stages::Copy24");
+  const uint32_t from = Stage(base, stages, stage) + 24;
+  uint32_t words[4];
+  for (uint32_t i = 0; i < 4; i++) {
+    words[i] = guest::LoadU32(base, from + 4 * i);
+  }
+  for (uint32_t i = 0; i < 4; i++) {
+    guest::StoreU32(base, out + 4 * i, words[i]);
+  }
+}
+
+bool StagesCopy(uint8_t* base, uint32_t out, uint32_t stages, uint32_t stage) {
+  ITC_NATIVE_RUNNING("sub_820FFD88 Stages::Copy");
+  return CopyLikeMemcpy(base, out, Stage(base, stages, stage), 80);
+}
+
+void EntriesAdd(uint8_t* base, uint32_t list, uint32_t a, uint32_t b) {
+  ITC_NATIVE_RUNNING("sub_820FFDD8 Entries::Add");
+  guest::StoreU32(base, list + 972 * guest::LoadU32(base, list) + 4, a);
+  guest::StoreU32(base, list + 972 * guest::LoadU32(base, list) + 8, b);
+  guest::StoreU32(base, list, guest::LoadU32(base, list) + 1);
+}
+
+bool RacerRecordsAdd(uint8_t* base, uint32_t records, uint32_t record, uint32_t* added) {
+  ITC_NATIVE_RUNNING("sub_820FFE08 RacerRecords::Add");
+  const uint32_t count = records + kRecordCount;
+  const uint32_t to = records + kRecordBytes * guest::LoadU32(base, count);
+  if (!CopyLikeMemcpy(base, to, record, kRecordBytes)) {
+    return false;
+  }
+  guest::StoreU32(base, count, guest::LoadU32(base, count) + 1);
+  *added = to;
+  return true;
+}
+
+uint32_t RacerRecordsAt(uint8_t* base, uint32_t records, uint32_t n) {
+  ITC_NATIVE_RUNNING("sub_820FFE58 RacerRecords::At");
+  if (int32_t(n) != -1) {
+    return records + kRecordBytes * n;
+  }
+  const int32_t count = int32_t(guest::LoadU32(base, records + kRecordCount));
+  if (count <= 0) {
+    return 0;
+  }
+  return records + kRecordBytes * uint32_t(count) - kRecordBytes;
+}
+
+namespace {
+
+void CopyPair(uint8_t* base, uint32_t out, uint32_t pair) {
+  const uint16_t first = guest::LoadU16(base, pair);
+  const uint16_t second = guest::LoadU16(base, pair + 2);
+  guest::StoreU16(base, out, first);
+  guest::StoreU16(base, out + 2, second);
+}
+
+}  // namespace
+
+void PairCopy(uint8_t* base, uint32_t out, uint32_t pair) {
+  ITC_NATIVE_RUNNING("sub_820FFE98 Pair::Copy");
+  CopyPair(base, out, pair);
+}
+
+void PairsLast(uint8_t* base, uint32_t out, uint32_t pairs) {
+  ITC_NATIVE_RUNNING("sub_820FFEB0 Pairs::Last");
+  for (uint32_t i = 0; i < 5; i++) {
+    if (guest::LoadU16(base, pairs + 4 * i) == 0xFFFF) {
+      CopyPair(base, out, pairs + 4 * i - 4);
+      return;
+    }
+  }
+  CopyPair(base, out, pairs + 16);
+}
+
+void PairsAt(uint8_t* base, uint32_t out, uint32_t pairs, uint32_t i) {
+  ITC_NATIVE_RUNNING("sub_820FFF10 Pairs::At");
+  if (int32_t(i) < 5) {
+    CopyPair(base, out, pairs + 4 * i);
+    return;
+  }
+  guest::StoreU32(base, out, 0xFFFFFFFFu);
+}
+
+void ListInit(uint8_t* base, uint32_t list) {
+  ITC_NATIVE_RUNNING("sub_82593FB0 List::Init");
+  guest::StoreU32(base, list + 0, 0);
+  guest::StoreU32(base, list + 8, 0);
+}
+
+uint32_t ListAt(uint8_t* base, uint32_t list, uint32_t n) {
+  ITC_NATIVE_RUNNING("sub_82593FC0 List::At");
+  const uint32_t first = guest::LoadU32(base, list);
+  uint32_t i = 0;
+  for (uint32_t node = first; node != 0; node = guest::LoadU32(base, node + 8)) {
+    if (int32_t(i) == int32_t(n)) {
+      return node;
+    }
+    i++;
+  }
+  return first;
+}
+
+namespace {
+
+// ClaimA's and ClaimB's steps on the pool's list (its count at +8).
+int32_t Claim(uint8_t* base, uint32_t list) {
+  const int32_t count = int32_t(guest::LoadU32(base, list + 8));
+  for (int32_t i = 0; i < count; i++) {
+    const uint32_t object = ListAt(base, list, uint32_t(i));
+    if (guest::LoadU32(base, object + 16) == 0) {
+      guest::StoreU32(base, object + 16, 3);
+      return i;
+    }
+  }
+  return -1;
+}
+
+uint32_t GetInUse(uint8_t* base, uint32_t list, uint32_t index) {
+  if (int32_t(guest::LoadU32(base, ListAt(base, list, index) + 16)) != 3) {
+    return 0;
+  }
+  return ListAt(base, list, index);
+}
+
+}  // namespace
+
+int32_t ScenePoolsClaimA(uint8_t* base, uint32_t scene, uint32_t pool) {
+  ITC_NATIVE_RUNNING("sub_820C42C8 ScenePools::ClaimA");
+  return Claim(base, scene + 12 * pool + 56);
+}
+
+int32_t ScenePoolsClaimB(uint8_t* base, uint32_t scene, uint32_t pool) {
+  ITC_NATIVE_RUNNING("sub_820C5AB0 ScenePools::ClaimB");
+  return Claim(base, scene + 12 * (pool + 412));
+}
+
+uint32_t ScenePoolsGetA(uint8_t* base, uint32_t scene, uint32_t pool, uint32_t index) {
+  ITC_NATIVE_RUNNING("sub_820C4420 ScenePools::GetA");
+  return GetInUse(base, scene + 12 * pool + 56, index);
+}
+
+uint32_t ScenePoolsGetB(uint8_t* base, uint32_t scene, uint32_t pool, uint32_t index) {
+  ITC_NATIVE_RUNNING("sub_820C5C20 ScenePools::GetB");
+  return GetInUse(base, scene + 12 * (pool + 412), index);
+}
+
+uint32_t ScenePoolsFindModel(uint8_t* base, uint32_t scene, uint32_t kind, uint32_t n) {
+  ITC_NATIVE_RUNNING("sub_820C5D70 ScenePools::FindModel");
+  const int32_t count = int32_t(guest::LoadU32(base, scene + 5036));
+  int32_t found = 0;
+  for (int32_t i = 0; i < count; i++) {
+    const uint32_t object = ListAt(base, scene + 5028, uint32_t(i));
+    if (int32_t(guest::LoadU32(base, object + 16)) != 3 ||
+        guest::LoadU32(base, object + 32) != kind) {
+      continue;
+    }
+    if (found == int32_t(n)) {
+      return object;
+    }
+    found++;
+  }
+  return 0;
+}
+
+uint32_t ObjectRecord1888(uint32_t object) {
+  ITC_NATIVE_RUNNING("sub_820C4550 Object::Record1888");
+  return object != 0 ? object + 1888 : 0;
+}
+
+uint32_t DebugSwitchOn() {
+  ITC_NATIVE_RUNNING("sub_825C8390 DebugSwitchOn");
+  return 1;
 }
 
 }  // namespace vehicle_accessors

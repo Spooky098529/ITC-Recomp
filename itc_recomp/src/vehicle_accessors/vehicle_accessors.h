@@ -187,6 +187,79 @@ int32_t RacersIndexOf(uint8_t* base, uint32_t records, uint32_t id);
 // current, +804, for -1) four slots (+44 + 8i, until a -1) is `racer`.
 uint32_t StagesHasRacer(uint8_t* base, uint32_t stages, uint32_t racer, uint32_t stage);
 
+// sub_820FF918 and sub_820FF938: a nonzero value to the race data's
+// ([0x826C5B2C]) +0x59618 or +0x5961C; sub_820FF968: the value to its +32.
+void RaceDataSetWord59618(uint8_t* base, uint32_t value);
+void RaceDataSetWord5961C(uint8_t* base, uint32_t value);
+void RaceDataSetWord32(uint8_t* base, uint32_t value);
+// Stages::HasNext (sub_820FFA30): 1 when the current stage (+804) is
+// before the last (+800 the count, less 1; signed).
+uint32_t StagesHasNext(uint8_t* base, uint32_t stages);
+// Stages::SetType (sub_820FFA50): nothing for type 4; with stage -1 a stage
+// is added (its +0 = type, the count +800 up), else that stage's +0 = type.
+void StagesSetType(uint8_t* base, uint32_t stages, uint32_t type, uint32_t stage);
+// sub_820FFAB0: +808 = value; sub_820FFC68: +808.
+void StagesSetWord808(uint8_t* base, uint32_t stages, uint32_t value);
+uint32_t StagesWord808(uint8_t* base, uint32_t stages);
+// Stages::Type (sub_820FFBE8), sub_820FFC08 and sub_820FFC70: the stage's
+// (80 bytes; -1 for the current, +804) words +0, +4 and +76; sub_820FFC30:
+// 1 when its type is 2 or 3.
+uint32_t StagesType(uint8_t* base, uint32_t stages, uint32_t stage);
+uint32_t StagesWord4(uint8_t* base, uint32_t stages, uint32_t stage);
+uint32_t StagesIsType2Or3(uint8_t* base, uint32_t stages, uint32_t stage);
+uint32_t StagesWord76(uint8_t* base, uint32_t stages, uint32_t stage);
+// Stages::Racer (sub_820FFC98) and sub_820FFCC8: the stage's words +44 and
+// +48 + 8 x slot.
+uint32_t StagesRacer(uint8_t* base, uint32_t stages, uint32_t slot, uint32_t stage);
+uint32_t StagesWord48(uint8_t* base, uint32_t stages, uint32_t slot, uint32_t stage);
+// sub_820FFD48: out = the stage's 16 bytes at +24.
+void StagesCopy24(uint8_t* base, uint32_t out, uint32_t stages, uint32_t stage);
+// Stages::Copy (sub_820FFD88): out = the stage's 80 bytes (memcpy). False,
+// with nothing copied, where the library's memcpy must run (its copy
+// shares memory, or the destination is in the physical views, which the
+// renderer's mirrors track through memcpy's override).
+bool StagesCopy(uint8_t* base, uint32_t out, uint32_t stages, uint32_t stage);
+// sub_820FFDD8: adds an entry to a list of 972-byte entries (the count at
+// +0): its +4 = a, +8 = b.
+void EntriesAdd(uint8_t* base, uint32_t list, uint32_t a, uint32_t b);
+// RacerRecords::Add (sub_820FFE08): the 3,936-byte record copied to the end
+// of the array (the count at +0x49FE0) and counted; returns where it went.
+// False as Stages::Copy.
+bool RacerRecordsAdd(uint8_t* base, uint32_t records, uint32_t record, uint32_t* added);
+// RacerRecords::At (sub_820FFE58): record n, or the last for -1 (0 when
+// there are none).
+uint32_t RacerRecordsAt(uint8_t* base, uint32_t records, uint32_t n);
+// sub_820FFE98: out = the two halfwords at `pair`.
+void PairCopy(uint8_t* base, uint32_t out, uint32_t pair);
+// sub_820FFEB0: out = the pair before the first of five whose first
+// halfword is 0xFFFF, or the fifth.
+void PairsLast(uint8_t* base, uint32_t out, uint32_t pairs);
+// sub_820FFF10: out = pair i for i below 5 (signed), else (-1, -1).
+void PairsAt(uint8_t* base, uint32_t out, uint32_t pairs, uint32_t i);
+
+// --- The scene's pools ---
+
+// List::Init (sub_82593FB0): +0 (the first node) and +8 (the count) = 0.
+void ListInit(uint8_t* base, uint32_t list);
+// List::At (sub_82593FC0): node n (from +0, linked by each node's +8); 0
+// for an empty list, and the first node when n is past the end.
+uint32_t ListAt(uint8_t* base, uint32_t list, uint32_t n);
+// ScenePools::ClaimA (sub_820C42C8) and ClaimB (sub_820C5AB0): the first
+// free object (+16 = 0) of the scene's pool (scene + 56 + 12 x pool, or
+// + 4944 for the second set; the count at +8) marked in use (+16 = 3), its
+// index returned; -1 when none.
+int32_t ScenePoolsClaimA(uint8_t* base, uint32_t scene, uint32_t pool);
+int32_t ScenePoolsClaimB(uint8_t* base, uint32_t scene, uint32_t pool);
+// ScenePools::GetA (sub_820C4420) and GetB (sub_820C5C20): the object when
+// in use (+16 = 3), else 0.
+uint32_t ScenePoolsGetA(uint8_t* base, uint32_t scene, uint32_t pool, uint32_t index);
+uint32_t ScenePoolsGetB(uint8_t* base, uint32_t scene, uint32_t pool, uint32_t index);
+// ScenePools::FindModel (sub_820C5D70): the n-th in-use object of the second
+// set's pool 7 (scene + 5028) whose +32 is `kind`, or 0.
+uint32_t ScenePoolsFindModel(uint8_t* base, uint32_t scene, uint32_t kind, uint32_t n);
+// sub_820C4550: object + 1888, or 0 for none.
+uint32_t ObjectRecord1888(uint32_t object);
+
 // --- Save data and switches ---
 
 // SaveData::Of (sub_82105620): [0x826C5B58 + 4 x player] (no bounds check).
@@ -194,5 +267,7 @@ uint32_t SaveDataOf(uint8_t* base, uint32_t player);
 
 // sub_825C8388: 0 (probably a debug switch compiled to a constant).
 uint32_t DebugSwitchOff();
+// sub_825C8390: 1 (probably a switch like sub_825C8388).
+uint32_t DebugSwitchOn();
 
 }  // namespace vehicle_accessors
