@@ -27,8 +27,10 @@ record: `b7-loop-2026-10-22-0111.md` (and this file's history).
   Native) in 59b94fb..61e4084: SpeedKmh, the set-up's constructors and
   bindings, the resets, Smoke::InRegion, Sparks::Update, the children's
   constructors. Left: Smoke, ParticlesB and ParticlesC::Update,
-  RaceOverlays::SlotOf, `sub_8215E150`. Step 8: validation agent running.
-- Session: pass 10 of 20, subsystem 1 of 5. In all: subsystem 1 of 5.
+  RaceOverlays::SlotOf, `sub_8215E150`. Validated (itc_563.log): 33 of
+  33 (`sub_820C0128`'s print added, f29a13d).
+- Step 6: the race overlays' fifth migration agent running.
+- Session: pass 11 of 20, subsystem 1 of 5. In all: subsystem 1 of 5.
 - Known at the start: `b7_status.py` checks `c-runtime.md:221`
   `sub_825A9934` (`__chkstk`) "Dropped, but it ran" (from the first run:
   its override does nothing, so it still shows as seen).
@@ -86,7 +88,8 @@ the validation agent's attract race; the user drives (with
   AnimationList::Get.
 - Race overlays (itc_524.log): `sub_82129598` Trail::AddPoint (probably
   the skid marks); (itc_540.log) `sub_8212D818` Sparks::Emit (no
-  scraping in attract races).
+  scraping in attract races); (itc_563.log) `sub_82123A00`
+  Sprite::ResetStyle2, `sub_8212A868` Smoke::InRegion.
 
 ## Totals
 
