@@ -12,7 +12,8 @@
 ITC_FLAG_BOOL(native_car_physics, true, "ITC",
               "Run the car physics (docs/functions/car-physics.md: the rigid body, sub_820B6A38 "
               "to sub_820B7928; the vehicle's physics step's helpers, updates and controls, "
-              "sub_820AFAE8 to sub_820B6430) natively instead of through the translated "
+              "sub_820AFAE8 to sub_820B6430; the vehicle's state from its body and its "
+              "copies, sub_820B13C8, sub_820B0A50, sub_820B0CC0) natively instead of through the translated "
               "code (the same words, bit for bit; checked by --run_harnesses=car_physics)");
 
 // Defines an adapter: `body` uses `ctx` and `base`. Flush-to-zero off for
@@ -215,3 +216,13 @@ ITC_CAR_PHYSICS(820B2808, ctx.r3.u64 = VehicleUpdateAtRest(base, ctx.r3.u32, ctx
 ITC_CAR_PHYSICS(820B2A48, ctx.r3.u64 = VehicleUpdateAero(base, ctx.r3.u32, ctx.r1.u32 - 240))
 ITC_CAR_PHYSICS(820B1B00,
                 ctx.r3.u64 = VehicleUpdateWheelAxes(base, ctx.r3.u32, ctx.r1.u32 - 256))
+
+// --- The vehicle's state from its body, its copies ---
+
+// f1 comes back as 0.5 (the midpoints' scale), r3 as +2016.
+ITC_CAR_PHYSICS(820B13C8,
+                ctx.f1.f64 = VehicleSyncFromBody(base, ctx.r3.u32, ctx.r1.u32 - 368);
+                ctx.r3.u64 = ctx.r3.u32 + 2016)
+// r3 = out, r4 = the record; r3 comes back as out.
+ITC_CAR_PHYSICS(820B0A50, WheelCopy(base, ctx.r3.u32, ctx.r4.u32))
+ITC_CAR_PHYSICS(820B0CC0, WheelRecord2Copy(base, ctx.r3.u32, ctx.r4.u32))

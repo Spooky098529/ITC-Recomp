@@ -186,6 +186,13 @@ ITC_NATIVE_STEP(NativeUpdateAero,
 ITC_NATIVE_STEP(NativeUpdateWheelAxes,
                 ctx.r3.u64 = cp::VehicleUpdateWheelAxes(base, ctx.r3.u32, ctx.r1.u32 - 256))
 
+// The vehicle's state from its body, its copies.
+ITC_NATIVE_STEP(NativeSyncFromBody,
+                ctx.f1.f64 = cp::VehicleSyncFromBody(base, ctx.r3.u32, ctx.r1.u32 - 368);
+                ctx.r3.u64 = ctx.r3.u32 + 2016)
+ITC_NATIVE_STEP(NativeWheelCopy, cp::WheelCopy(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_STEP(NativeWheelRecord2Copy, cp::WheelRecord2Copy(base, ctx.r3.u32, ctx.r4.u32))
+
 // Runs the recompiled version with the native flags off, so the functions
 // it calls that are ours run the originals too.
 template <GuestFunction recompiled>
@@ -457,8 +464,10 @@ constexpr uint32_t kVehicleAreaBytes = 0x2E00;
 
 // What r4 holds: a wheel (0-3), an axle's first wheel (0 or 2), a byte
 // (any word), or the tire coefficients (four floats in the surface
-// records' area).
-enum R4Kind { kWheelR4, kAxleR4, kByteR4, kCoefficientsR4 };
+// records' area). The copies: r3 = a wheel's record and r4 another's (the
+// next wheel's, by the case's wheel), or r3 = the rear's wheel record 2
+// (+2016) and r4 the front's (+1888).
+enum R4Kind { kWheelR4, kAxleR4, kByteR4, kCoefficientsR4, kWheelCopyR4, kRecord2CopyR4 };
 
 // Fills the area for one case: float words (by the group's generator),
 // then the pointers and the bytes the functions branch on.
@@ -638,6 +647,14 @@ void CarPhysicsVehicle(Context& h) {
        false},
       {"Vehicle::UpdateWheelAxes (sub_820B1B00)", Original<__imp__sub_820B1B00>,
        NativeUpdateWheelAxes, false, kWheelR4, false, true, true},
+      // A NaN in the body's position: translated by -p and then by p, the
+      // two meet in the matrix +3312.
+      {"Vehicle::SyncFromBody (sub_820B13C8)", Original<__imp__sub_820B13C8>,
+       NativeSyncFromBody, true, kWheelR4, false, true, true},
+      {"Wheel::Copy (sub_820B0A50)", Original<__imp__sub_820B0A50>, NativeWheelCopy, false,
+       kWheelCopyR4},
+      {"WheelRecord2::Copy (sub_820B0CC0)", Original<__imp__sub_820B0CC0>,
+       NativeWheelRecord2Copy, false, kRecord2CopyR4},
   };
   enum Group { kNumbers, kOneNaN, kNaNs };
   const char* const kGroupNames[] = {"", ", one NaN",
@@ -657,8 +674,16 @@ void CarPhysicsVehicle(Context& h) {
         if (f.unit_f1 && pick.Below(4) != 0) {
           f1 = double(float(pick.Below(1100)) / 1000.0f);
         }
-        uint32_t r4 = wheel;
+        uint32_t r3 = area + kVehicle, r4 = wheel;
         switch (f.r4) {
+          case kWheelCopyR4:
+            r3 = area + kVehicle + 416 + 368 * ((wheel + 1) & 3);
+            r4 = area + kVehicle + 416 + 368 * wheel;
+            break;
+          case kRecord2CopyR4:
+            r3 = area + kVehicle + 2016;
+            r4 = area + kVehicle + 1888;
+            break;
           case kWheelR4:
             break;
           case kAxleR4:
@@ -689,7 +714,7 @@ void CarPhysicsVehicle(Context& h) {
           }
           PPCContext t = CallContext(h);
           t.fpscr.disableFlushModeUnconditional();
-          t.r3.u64 = area + kVehicle;
+          t.r3.u64 = r3;
           t.r4.u64 = r4;
           t.f1.f64 = f1;
           (v == 0 ? f.recompiled : f.native)(t, h.base);

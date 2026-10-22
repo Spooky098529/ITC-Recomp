@@ -300,4 +300,26 @@ uint32_t VehicleUpdateAero(uint8_t* base, uint32_t vehicle, uint32_t frame);
 // original leaves in r3 (wheel 3's +48).
 uint32_t VehicleUpdateWheelAxes(uint8_t* base, uint32_t vehicle, uint32_t frame);
 
+// --- The vehicle's state from its body, its copies and set-up
+// (src/car_physics/vehicle_state.cpp) ---
+
+// Vehicle::SyncFromBody (sub_820B13C8): the body matrix's rows 0-2 (w 0.0)
+// into +0, +16, +32, its +160 into +48, its angular velocity into +64, the
+// matrix into +208 (Matrix::CopyRows); per wheel the mount point (the car
+// data's +896 + 96 w, its +16 also into wheel +24) through +208 into wheel
+// +80 with the travel wheel +0 added to y, and without into wheel +64;
+// +3312 = +3248 about the body's position (MultiplyTranslation twice and
+// Matrix::Multiply, noted for interpolation as the original's call), the
+// body's word +12 = its address; the axles' midpoints +1888, +2016 and
+// tracks +1992, +2120. `frame`: the original's 368 bytes
+// (MultiplyTranslation's below it). Returns what the original leaves in f1
+// (0.5, the scale of the midpoints).
+double VehicleSyncFromBody(uint8_t* base, uint32_t vehicle, uint32_t frame);
+// Wheel::Copy (sub_820B0A50): the wheel record's +0 to +359 field by field
+// (not +100 to +108, +40 to +47 or +360 on).
+void WheelCopy(uint8_t* base, uint32_t out, uint32_t wheel);
+// sub_820B0CC0 (the name ours: WheelRecord2::Copy): six vectors, then the
+// words +96 to +116 of a 120-byte record (wheel record 2).
+void WheelRecord2Copy(uint8_t* base, uint32_t out, uint32_t record);
+
 }  // namespace car_physics
