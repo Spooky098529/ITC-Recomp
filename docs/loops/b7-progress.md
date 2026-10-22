@@ -12,14 +12,21 @@ there), and this file's history.
   branch), from 91f40be; summary `b7-loop-2026-10-22-2211.md`.
 - Subsystem 1 of 3: the C runtime heap (`sub_825A6940`, `sub_825A71C0`,
   `sub_825A70E8`; the top of `leads.md`), mapped in the existing
-  `heap.md` (1f48eaf; checked). Step: migration 1 (agent running).
+  `heap.md` (1f48eaf; checked). Migration 1 done
+  (510aae9..34d8c7b, all 15 ours). Step: validation (agent running).
 
 ## Done
 
 ## Rows to review
 
 - `heap.md`: 15 rows read in full and rewritten (no status changed), the
-  intro's paragraph on native versions; `known-data.md`'s heap globals;
+  intro's paragraph on native versions; migration 1's 15 rows (12
+  Overridden, 3 Native; XMemAlloc's attribute bits corrected by the
+  harness: protection `(attr >> 28) & 3`, default alignment field 12). For
+  review: the adapters run the plain C++ only while `--native_heap` is
+  active (`hooks::NativeHeapActive()`), and the error paths (errno, the
+  new handler, `bad_alloc`, `_invalid_parameter`) run `__imp__` from the
+  start; `known-data.md`'s heap globals;
   1 lead added (`sub_8235AAC0`), operator new taken from the
   VirtualAlloc lead.
 
@@ -31,3 +38,5 @@ there), and this file's history.
 
 - Start: ours 714, work left 6039 (wrapped 137, known 336, unknown 5566).
 - After mapping the heap: the same (rows rewritten in place).
+- After the heap's migration 1: ours 729, work left 6024 (wrapped 137,
+  known 321, unknown 5566).
