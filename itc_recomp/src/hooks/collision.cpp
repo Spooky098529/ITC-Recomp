@@ -20,7 +20,8 @@ ITC_FLAG_BOOL(native_collision, true, "ITC",
               "sub_820BAE38, sub_820BAC00, sub_820BAE78, sub_820BB758, sub_820BACD0; the box-box separation "
               "tests, sub_820BA408, sub_820BA5D8, sub_820BD0C8, sub_820BC978, sub_820BCCE8, "
               "sub_820BB300, sub_820BD280, sub_820BD578, sub_820BD508, sub_820BD6E0; the pair's "
-              "next check time, sub_820BBB20; the query and its contact, sub_820BD1C8, sub_820BC848, sub_820BC908, sub_820BC858) natively "
+              "next check time, sub_820BBB20; the impacts, sub_820BE490, sub_820BEBF0, "
+              "sub_820BECA0, sub_820BF038, sub_820BCE80; the query and its contact, sub_820BD1C8, sub_820BC848, sub_820BC908, sub_820BC858) natively "
               "instead of through the translated code (the same words, bit for bit; checked by "
               "--run_harnesses=collision)");
 
@@ -196,6 +197,43 @@ ITC_COLLISION_TEST(820BD6E0, QuerySeparatedAfterMove(base, ctx.r3.u32, ctx.r1.u3
 ITC_COLLISION(820BBB20, uint32_t r3 = 0;
               ctx.f1.f64 = CollisionPairNextCheckTime(base, ctx.r3.u32, ctx.r1.u32 - 160, &r3);
               ctx.r3.u64 = r3)
+
+// --- The impacts ---
+
+// r3 comes back as the query + 64.
+ITC_COLLISION(820BE490, ctx.r3.u64 = BoxBoxSwapForImpact(base, ctx.r3.u32))
+ITC_COLLISION(820BEBF0, ctx.r3.u64 = BoxBoxSwapForPushOut(base, ctx.r3.u32))
+// Shapes that aren't boxes: the original.
+extern "C" REX_FUNC(sub_820BECA0) {
+  REX_FUNC_PROLOGUE();
+  uint32_t r3 = 0;
+  if (!ITC_FLAG(native_collision)) {
+    __imp__sub_820BECA0(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  if (!BoxBoxCornerImpacts(base, ctx.r3.u32, &r3)) {
+    __imp__sub_820BECA0(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = r3;
+}
+// Reached through the table 0x82600EB4 (box-box); r3 comes back as the
+// query + 64.
+extern "C" REX_FUNC(sub_820BF038) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_collision)) {
+    __imp__sub_820BF038(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  if (!BoxBoxFindImpact(base, ctx.r3.u32)) {
+    __imp__sub_820BF038(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = ctx.r3.u32 + 64;
+}
+ITC_COLLISION_TEST(820BCE80, QueryFindImpact(base, ctx.r3.u32, &result))
 
 // --- The query and its contact ---
 

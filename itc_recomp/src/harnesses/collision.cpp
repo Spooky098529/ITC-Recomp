@@ -145,6 +145,27 @@ ITC_NATIVE_STEP(NativeNextCheckTime, uint32_t r3 = 0;
                 ctx.f1.f64 = co::CollisionPairNextCheckTime(base, ctx.r3.u32, ctx.r1.u32 - 160,
                                                             &r3);
                 ctx.r3.u64 = r3)
+ITC_NATIVE_STEP(NativeSwapForImpact, ctx.r3.u64 = co::BoxBoxSwapForImpact(base, ctx.r3.u32))
+ITC_NATIVE_STEP(NativeSwapForPushOut, ctx.r3.u64 = co::BoxBoxSwapForPushOut(base, ctx.r3.u32))
+void NativeCornerImpacts(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  uint32_t r3 = 0;
+  if (!co::BoxBoxCornerImpacts(base, ctx.r3.u32, &r3)) {
+    __imp__sub_820BECA0(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = r3;
+}
+void NativeFindImpact(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  if (!co::BoxBoxFindImpact(base, ctx.r3.u32)) {
+    __imp__sub_820BF038(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = ctx.r3.u32 + 64;
+}
+ITC_NATIVE_TEST_STEP(NativeQueryFindImpact, 820BCE80,
+                     co::QueryFindImpact(base, ctx.r3.u32, &result))
 ITC_NATIVE_STEP(NativeWordAt8, ctx.r3.u64 = co::WordAt8(base, ctx.r3.u32))
 ITC_NATIVE_STEP(NativeCurrentCenter,
                 ctx.r3.u64 = co::CollisionShapeCurrentCenter(base, ctx.r3.u32))
@@ -372,6 +393,16 @@ void Collision(Context& h) {
        NativeQuerySeparatedAfterMove, kQuerySetUp, 1, false},
       {"CollisionPair::NextCheckTime (sub_820BBB20)", Original<__imp__sub_820BBB20>,
        NativeNextCheckTime, kPairR3, 1, true},
+      {"BoxBox::SwapForImpact (sub_820BE490)", Original<__imp__sub_820BE490>,
+       NativeSwapForImpact, kQuerySetUp, 1, false},
+      {"BoxBox::SwapForPushOut (sub_820BEBF0)", Original<__imp__sub_820BEBF0>,
+       NativeSwapForPushOut, kQuerySetUp, 1, false},
+      {"BoxBox::CornerImpacts (sub_820BECA0)", Original<__imp__sub_820BECA0>,
+       NativeCornerImpacts, kQuerySetUp, 1, false},
+      {"BoxBox::FindImpact (sub_820BF038)", Original<__imp__sub_820BF038>, NativeFindImpact,
+       kQuerySetUp, 1, false},
+      {"Query::FindImpact (sub_820BCE80)", Original<__imp__sub_820BCE80>, NativeQueryFindImpact,
+       kQuerySetUp, 1, false},
       {"sub_822BE2C8 (the word +8)", Original<__imp__sub_822BE2C8>, NativeWordAt8, kRecordR3, 1,
        false},
       {"CollisionShape::CurrentCenter (sub_820BAB20)", Original<__imp__sub_820BAB20>,
@@ -428,6 +459,7 @@ void Collision(Context& h) {
         // bodies fixed (byte +0 set) one time in four each.
         const bool objects_clear = pick.Below(4) != 0;
         const bool fixed_a = pick.Below(4) == 0, fixed_b = pick.Below(4) == 0;
+        const bool realistic = pick.Below(2) == 0;
         // The one NaN: in the region, or (one case in ten) in f1.
         const uint32_t nan_word = kNaNWords[pick.Below(std::size(kNaNWords))];
         const uint32_t nan_at = pick.Below(kRegionBytes / 4 + kRegionBytes / 40);
@@ -457,6 +489,25 @@ void Collision(Context& h) {
               guest::StoreU32(h.base, region + kQuery + 8 + 4 * k, region + kBlock + 336 * k);
             }
             guest::StoreU32(h.base, region + kCache, cache);
+            // Blocks as the game's look some of the time: the corners'
+            // outcodes 6 bits, their coordinates within 2.0, the impact
+            // time 2.0 (so corners cross the unit box's faces).
+            if (realistic) {
+              Random r = Seeded(seed * 17 + 3 * uint64_t(group) + 5);
+              for (uint32_t k = 0; k < 4; k++) {
+                const uint32_t block = region + kBlock + 336 * k;
+                for (uint32_t corner = 0; corner < 8; corner++) {
+                  const uint32_t at = block + 80 + 32 * corner;
+                  for (uint32_t axis = 0; axis < 12; axis += 4) {
+                    guest::StoreFloat(h.base, at + axis,
+                                      float(int32_t(r.Below(4001)) - 2000) / 1000.0f);
+                  }
+                  guest::StoreU32(h.base, at + 16, r.Below(64));
+                }
+                guest::StoreU32(h.base, block + 64, r.Below(64));
+              }
+              guest::StoreU32(h.base, region + kQuery + 84, 0x40000000);
+            }
           }
           if (f.args == kPairR3) {
             const uint32_t objects[] = {kObjectA, kObjectB}, bodies[] = {kBodyA, kBodyB},

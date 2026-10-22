@@ -193,6 +193,31 @@ bool QuerySeparatedAfterMove(uint8_t* base, uint32_t query, uint32_t frame, uint
 // there. `frame`: the original's 160 bytes.
 double CollisionPairNextCheckTime(uint8_t* base, uint32_t pair, uint32_t frame, uint32_t* r3);
 
+// --- The impacts (src/collision/impacts.cpp): the query's +32 its contact
+// (+84 the impact time, +80 the depth), +96 the push direction. ---
+
+// BoxBox::SwapForImpact (sub_820BE490): the contact flipped, A and B
+// swapped (+0, +4) and the blocks +8 with +16, +12 with +20.
+// BoxBox::SwapForPushOut (sub_820BEBF0): the direction +96 x -1.0, the
+// contact flipped, A and B swapped and the blocks +12 with +20. Both return
+// what the original leaves in r3 (the query + 64).
+uint32_t BoxBoxSwapForImpact(uint8_t* base, uint32_t query);
+uint32_t BoxBoxSwapForPushOut(uint8_t* base, uint32_t query);
+// BoxBox::CornerImpacts (sub_820BECA0): A's corners crossing a face of B's
+// unit box between the placements, the earliest under the time so far (+84)
+// set as the contact. False, with nothing done, where a record's template or
+// current copy isn't a box. `r3`: what the original leaves there.
+bool BoxBoxCornerImpacts(uint8_t* base, uint32_t query, uint32_t* r3);
+// BoxBox::FindImpact (sub_820BF038): CornerImpacts both ways round (swapped
+// and back). False as CornerImpacts.
+bool BoxBoxFindImpact(uint8_t* base, uint32_t query);
+// Query::FindImpact (sub_820BCE80): +80 = 0.0, +84 = +88 = 2.0, the impact
+// test for the shapes' types (box-box: BoxBox::FindImpact), then 1 when
+// the time +84 is under [0x82002B90]. False, with nothing done, where the
+// shapes aren't boxes or the table's box-box entry isn't
+// BoxBox::FindImpact.
+bool QueryFindImpact(uint8_t* base, uint32_t query, uint32_t* result);
+
 // --- The query (on CollisionPair::Solve's stack) and its contact (+32) ---
 
 // Query::Query (sub_820BD1C8): the w of +32, +48, +64, +96 and of the 8
