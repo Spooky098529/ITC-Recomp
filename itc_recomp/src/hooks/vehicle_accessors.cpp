@@ -147,7 +147,8 @@ ITC_ACCESSOR_VOID(820B7D58, CollisionObjectClearBits260(base, ctx.r3.u32, ctx.r4
 ITC_ACCESSOR_VOID(820B7D68, CollisionObjectSetSize(base, ctx.r3.u32, ctx.r4.u32);
                   ctx.r3.u64 = ctx.r3.u32 + 208)
 ITC_ACCESSOR_VOID(820B7D70, CollisionObjectSetFloat224(base, ctx.r3.u32, ctx.f1.f64))
-ITC_ACCESSOR_VOID(820B7D78, CollisionRecordCopy(base, ctx.r3.u32, ctx.r4.u32))
+// CollisionRecord::Copy (sub_820B7D78) has no adapter: its caller in play,
+// CollisionRecords::Merge (src/car_physics/), is native.
 ITC_ACCESSOR_VOID(820B8768, CollisionSetGlobal78(base, ctx.r3.u32))
 ITC_ACCESSOR_VOID(820B8778, CollisionSetGlobal7C(base, ctx.r3.u32))
 ITC_ACCESSOR_VOID(820B8788, CollisionWorldSetCallback(base, ctx.r3.u32))
@@ -303,7 +304,8 @@ ITC_VECTOR_VOID(822942A0, Vec3Sum(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
 ITC_VECTOR_VOID(822942E0, Vec3Difference(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
 ITC_VECTOR_VOID(82294320, Vec3AddTo(base, ctx.r3.u32, ctx.r4.u32))
 ITC_VECTOR_VOID(82294340, Vec4ScaleBy(base, ctx.r3.u32, ctx.f1.f64))
-ITC_VECTOR_FLOAT(82294348, Vec4DivideBy(base, ctx.r3.u32, ctx.f1.f64))
+// Vec4::DivideBy (sub_82294348) has no adapter: its caller in play,
+// CollisionRecords::Merge (src/car_physics/), is native.
 ITC_VECTOR_VOID(82294360, Vec3SubCopy(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
 ITC_VECTOR_VOID(822943C8, Vec3AddCopy(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
 ITC_VECTOR_VOID(82294430, Vec4Scaled(base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64))

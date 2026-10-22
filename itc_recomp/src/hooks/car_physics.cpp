@@ -310,10 +310,9 @@ extern "C" REX_FUNC(sub_820B6430) {
 // --- The collision world ---
 
 // r3 = the flags; f1 = the value.
-ITC_CAR_PHYSICS(820BC1F8, ctx.f1.f64 = CollisionSurfaceA(base, ctx.r3.u32))
-ITC_CAR_PHYSICS(820BC240, ctx.f1.f64 = CollisionSurfaceB(base, ctx.r3.u32))
-ITC_CAR_PHYSICS(820BC288, ctx.f1.f64 = CollisionSurfaceC(base, ctx.r3.u32))
-ITC_CAR_PHYSICS(820BC2D0, ctx.f1.f64 = CollisionSurfaceD(base, ctx.r3.u32))
+// The getters CollisionSurface::A to D (sub_820BC1F8, sub_820BC240,
+// sub_820BC288, sub_820BC2D0) have no adapters: their callers in play, the
+// wrappers below, are native.
 ITC_CAR_PHYSICS(820BC540, ctx.f1.f64 = CollisionSurfaceOfA(base, ctx.r3.u32))
 ITC_CAR_PHYSICS(820BC548, ctx.f1.f64 = CollisionSurfaceOfB(base, ctx.r3.u32))
 ITC_CAR_PHYSICS(820BC530, ctx.f1.f64 = CollisionSurfaceOfC(base, ctx.r3.u32))
@@ -323,11 +322,12 @@ ITC_CAR_PHYSICS(820BC318, CollisionSurfaceSetA(base, ctx.r4.u32, ctx.f1.f64))
 ITC_CAR_PHYSICS(820BC360, CollisionSurfaceSetB(base, ctx.r4.u32, ctx.f1.f64))
 ITC_CAR_PHYSICS(820BC3A8, CollisionSurfaceSetC(base, ctx.r4.u32, ctx.f1.f64))
 ITC_CAR_PHYSICS(820BC3F0, CollisionSurfaceSetD(base, ctx.r4.u32, ctx.f1.f64))
-ITC_CAR_PHYSICS(820BC438, CollisionSurfacesReset(base))
+// CollisionSurfaces::Reset (sub_820BC438) has no adapter: its caller in
+// play, ResetSurfaces, is native.
 // r3 comes back as 0x826C2E30.
 ITC_CAR_PHYSICS(820BC550, CollisionWorldResetSurfaces(base); ctx.r3.u64 = 0x826C2E30)
-// r3 = the shape (left as it is).
-ITC_CAR_PHYSICS(820BAA78, CollisionShapeInit(base, ctx.r3.u32))
+// CollisionShape::Init (sub_820BAA78) has no adapter: its caller in play,
+// the collision object's constructor, is native.
 // r3 = the object (left as it is).
 ITC_CAR_PHYSICS(820B7AE8, CollisionObjectConstruct(base, ctx.r3.u32))
 // r4 = the point, r5 = the force; r3 comes back as +176.
