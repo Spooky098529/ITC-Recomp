@@ -12,7 +12,7 @@ record: `b7-loop-2026-10-22-0111.md` (and this file's history).
   contact and scene-model accessors, with `sub_825C8388`'s lead folded
   in: both block the race overlays' updates). Step: mapping (agent
   running).
-- Session 2: pass 1 of 20, subsystem 1 of 5. In all: subsystem 2 of 5.
+- Session 2: pass 1 of 20, subsystem 1 of 3. In all: subsystem 2 of 5.
 - Known: `b7_status.py` checks `sub_825A9934` (`__chkstk`) "Dropped, but
   it ran", and every function made Native or Merged this run "..., but
   it ran" (`seen_in_play.txt` predates them; a new coverage session
