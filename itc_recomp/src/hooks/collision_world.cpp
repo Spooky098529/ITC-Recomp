@@ -28,7 +28,8 @@ ITC_FLAG_BOOL(native_collision_world, true, "ITC",
               "--run_harnesses=collision_world). Those reached only from native callers have no "
               "adapters, and the flag switches their callers: sub_820F6898, sub_820F72F8, "
               "sub_820F7468, sub_820F7590, sub_820F7818, sub_820F6E18, sub_820F6A38, sub_820F6BE8, "
-              "sub_820F71B0, sub_820F7EE8, sub_820F7E30, sub_820F7D70, sub_820F6C88, sub_820FC110");
+              "sub_820F71B0, sub_820F7EE8, sub_820F7E30, sub_820F7D70, sub_820F6C88, sub_820FC110, "
+              "sub_820FE8F8");
 
 // Defines an adapter: `body` uses `ctx` and `base`.
 #define ITC_COLLISION_WORLD(address, body)   \
@@ -95,9 +96,8 @@ ITC_COLLISION_WORLD(820F6A08, ctx.r3.u64 = TrackMeshSliceKind(base, ctx.r3.u32, 
 ITC_COLLISION_WORLD(820F7AA0, ctx.r3.u64 = TrackMeshGroundHeight(base, ctx.r3.u32, ctx.r4.u32,
                                                                  ctx.r5.u32, ctx.r6.u32,
                                                                  ctx.r7.u32, ctx.r1.u32 - 240))
-// r3 = the result, r4 = the point, r5 = the track position (r6 not read).
-ITC_COLLISION_WORLD(820FE8F8, ctx.r3.u64 = TrackCollisionGround(base, ctx.r3.u32, ctx.r4.u32,
-                                                                ctx.r5.u32, ctx.r1.u32 - 144))
+// TrackCollision::Ground (sub_820FE8F8) has no adapter: its callers in
+// play, GroundCallback and GroundHits, are native.
 // The collision world's +8 (CollisionWorld::Callback).
 ITC_COLLISION_WORLD(820FEAB0,
                     ctx.r3.u64 = TrackCollisionGroundCallback(base, ctx.r3.u32, ctx.r4.u32,
