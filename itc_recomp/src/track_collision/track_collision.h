@@ -111,6 +111,18 @@ uint32_t TrackMeshGroundHeight(uint8_t* base, uint32_t mesh, uint32_t point, uin
 // for the point. Returns 1. `frame`: the original's 144 bytes.
 uint32_t TrackCollisionGround(uint8_t* base, uint32_t result, uint32_t point, uint32_t position,
                               uint32_t frame);
+// TrackCollision::GroundHits (sub_820FEBD0, the world's second query):
+// for a box, of its four lower corners (in the order 0, 2, 1, 3) the one
+// lowest against its track position's last height (the box's cache word
+// of its place); when below it, the ground under it (Ground), and when
+// below that, one hit record: +0 the corner, +16 and +32 the ground's
+// normal, +48 [0x8200222C] minus the ground's depth, +56 the surface kind,
+// +60 = 0; `count` 1 when the world has room for hits (its +60 above 0),
+// else 0. +48 = 0.0 first. False, with nothing done, for a shape that
+// isn't a box (the point lists and other shapes never ran in play).
+// `frame`: the original's 384 bytes.
+bool TrackCollisionGroundHits(uint8_t* base, uint32_t hits, uint32_t box, uint32_t frame,
+                              uint32_t* count);
 // TrackCollision::GroundCallback (sub_820FEAB0): Ground, then +48 &=
 // 0x80FFFFFF. Returns 1. `frame`: the original's 96 bytes.
 uint32_t TrackCollisionGroundCallback(uint8_t* base, uint32_t result, uint32_t point,

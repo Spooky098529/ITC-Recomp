@@ -19,7 +19,8 @@ ITC_FLAG_BOOL(native_collision_world, true, "ITC",
               "routes the game's VirtualAlloc to the allocation layer), sub_820F69B0; the "
               "mesh's lookups, sub_820F6A08; the ground, sub_820F7AA0 with sub_820F72F8, "
               "sub_820F7468, sub_820F7590, sub_820F7818, sub_820F6E18, and "
-              "TrackCollision::Ground sub_820FE8F8 and GroundCallback sub_820FEAB0) natively "
+              "TrackCollision::Ground sub_820FE8F8, GroundCallback sub_820FEAB0 and GroundHits "
+              "sub_820FEBD0, for boxes) natively "
               "instead of through the translated code (the same words, bit for bit; checked by "
               "--run_harnesses=collision_world). Those reached only from native callers have no "
               "adapters, and the flag switches their callers: sub_820F6898, sub_820F72F8, "
@@ -97,3 +98,18 @@ ITC_COLLISION_WORLD(820FE8F8, ctx.r3.u64 = TrackCollisionGround(base, ctx.r3.u32
 ITC_COLLISION_WORLD(820FEAB0,
                     ctx.r3.u64 = TrackCollisionGroundCallback(base, ctx.r3.u32, ctx.r4.u32,
                                                               ctx.r5.u32, ctx.r1.u32 - 96))
+// The collision world's second query: r3 = the hit records, r4 = the shape
+// (r5 not read). A shape that isn't a box: the original.
+extern "C" REX_FUNC(sub_820FEBD0) {
+  REX_FUNC_PROLOGUE();
+  uint32_t count = 0;
+  if (ITC_FLAG(native_collision_world)) {
+    ctx.fpscr.disableFlushMode();
+  }
+  if (!ITC_FLAG(native_collision_world) ||
+      !TrackCollisionGroundHits(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 384, &count)) {
+    __imp__sub_820FEBD0(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = count;
+}

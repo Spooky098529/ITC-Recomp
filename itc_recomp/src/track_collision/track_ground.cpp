@@ -7,7 +7,9 @@
 #include "car_physics/float_ops.h"
 
 #include "base/log.h"
+#include "collision/collision.h"
 #include "vehicle_accessors/vectors.h"
+#include "vehicle_accessors/vehicle_accessors.h"
 
 #include <rex/platform/fpscr.h>
 #include <simde/x86/sse4.1.h>
@@ -16,6 +18,8 @@ namespace track_collision {
 
 using namespace car_physics::ops;
 namespace vl = vector_library;
+namespace co = collision;
+namespace va = vehicle_accessors;
 
 namespace {
 
@@ -30,6 +34,7 @@ constexpr uint32_t kCatchDistance = 0x82002A0C;     // the ground within this of
 constexpr uint32_t kColorScale = 0x82006820;
 constexpr uint32_t kColorNumerator = 0x82001BE0;
 constexpr uint32_t kUp = 0x82640000u - 32128;  // 0x82638280: the up vector
+constexpr uint32_t kEpsilon = 0x8200222C;       // collision.md's small epsilon
 
 uint32_t S16(uint8_t* base, uint32_t address) {
   return uint32_t(int32_t(int16_t(guest::LoadU16(base, address))));
@@ -592,6 +597,66 @@ uint32_t TrackCollisionGroundCallback(uint8_t* base, uint32_t result, uint32_t p
   TrackCollisionGround(base, result, point, position, frame - 144);
   guest::StoreU32(base, result + 48, guest::LoadU32(base, result + 48) & 0x80FFFFFF);
   return 1;
+}
+
+bool TrackCollisionGroundHits(uint8_t* base, uint32_t hits, uint32_t box, uint32_t frame,
+                              uint32_t* count) {
+  if (!co::IsBox(base, box)) {
+    return false;
+  }
+  ITC_NATIVE_RUNNING("sub_820FEBD0 TrackCollision::GroundHits");
+  const uint32_t f = frame;
+  const int32_t room = int32_t(va::CollisionWorldWord60(base));
+  *count = 0;
+  const double zero = Lfs(base, kZero);
+  Stfs(base, hits + 48, zero);
+  // The lower corners in the order 0, 2, 1, 3; the lowest against its
+  // track position's last height (the cache word of its place in that
+  // order).
+  guest::StoreU32(base, f + 80, 0);
+  guest::StoreU32(base, f + 84, 2);
+  guest::StoreU32(base, f + 88, 1);
+  guest::StoreU32(base, f + 92, 3);
+  uint32_t lowest = 0;
+  double below;
+  {
+    const uint32_t corner = co::BoxLowerCorner(base, box, 0);
+    const uint32_t position = co::BoxCacheWord(base, box, 0);
+    below = Fsubs(Lfs(base, corner + 4), Lfs(base, position + 20));
+  }
+  for (uint32_t k = 1; k < 4; k++) {
+    const uint32_t corner = co::BoxLowerCorner(base, box, guest::LoadU32(base, f + 80 + 4 * k));
+    const uint32_t position = co::BoxCacheWord(base, box, k);
+    const double d = Fsubs(Lfs(base, corner + 4), Lfs(base, position + 20));
+    if (below > d) {
+      below = d;
+      lowest = k;
+    }
+  }
+  Stfs(base, f + 252, zero);
+  Stfs(base, f + 268, zero);
+  const uint32_t corner =
+      co::BoxLowerCorner(base, box, guest::LoadU32(base, lowest * 4 + f + 80));
+  co::BoxCacheWord(base, box, lowest);
+  if (!(below < zero)) {
+    return true;
+  }
+  const uint32_t position = co::BoxCacheWord(base, box, lowest);
+  TrackCollisionGround(base, f + 224, corner, position, f - 144);
+  const double depth = Fneg(Lfs(base, f + 224));
+  if (!(depth > zero)) {
+    return true;
+  }
+  guest::StoreU32(base, hits + 60, 0);
+  vl::Vec4Copy(base, hits + 16, f + 240);
+  vl::Vec4Copy(base, hits + 32, f + 256);
+  Stfs(base, hits + 48, Fsubs(Lfs(base, kEpsilon), Lfs(base, f + 224)));
+  vl::Vec4Copy(base, hits + 0, corner);
+  guest::StoreU32(base, hits + 56, guest::LoadU32(base, f + 272));
+  if (room > 0) {
+    *count = 1;
+  }
+  return true;
 }
 
 }  // namespace track_collision

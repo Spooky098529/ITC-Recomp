@@ -13,6 +13,7 @@
 #include "base/log.h"
 #include "hooks/heap.h"
 #include "memory/heap.h"
+#include "collision/collision.h"
 #include "track_collision/track_collision.h"
 
 #include <fmt/format.h>
@@ -95,6 +96,15 @@ ITC_NATIVE_STEP(NativeGroundHeight,
                                                        ctx.r6.u32, ctx.r7.u32, ctx.r1.u32 - 240))
 ITC_NATIVE_STEP(NativeGround, ctx.r3.u64 = tc::TrackCollisionGround(base, ctx.r3.u32, ctx.r4.u32,
                                                                     ctx.r5.u32, ctx.r1.u32 - 144))
+void NativeGroundHits(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  uint32_t count = 0;
+  if (!tc::TrackCollisionGroundHits(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 384, &count)) {
+    __imp__sub_820FEBD0(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = count;
+}
 ITC_NATIVE_STEP(NativeGroundCallback,
                 ctx.r3.u64 = tc::TrackCollisionGroundCallback(base, ctx.r3.u32, ctx.r4.u32,
                                                               ctx.r5.u32, ctx.r1.u32 - 96))
@@ -426,7 +436,13 @@ constexpr uint32_t kMeshP = 0x0, kFileP = 0x40, kTableP = 0x60, kPositionP = 0x2
                    kPointP = 0x280, kResultP = 0x300, kColorP = 0x340, kNormalP = 0x360,
                    kOutsP = 0x3A0, kSectionP = 0x1000, kSectionBytes = 0x4000;
 constexpr uint32_t kVerticesO = 0x100, kColorsO = 0x400, kSlicesO = 0x600, kTrianglesO = 0x800;
-constexpr uint32_t kGroundCompared = kSectionP + 2 * kSectionBytes;
+// For GroundHits: a box (its template, the matrix placing it), its four
+// track positions (96 bytes each), a fake collision world (its +60 the
+// room for hits) and the hit record.
+constexpr uint32_t kBoxP = kSectionP + 2 * kSectionBytes, kTemplateP = kBoxP + 0x200,
+                   kMatrixP = kBoxP + 0x400, kPositionsP = kBoxP + 0x500,
+                   kWorldP = kBoxP + 0x700, kHitsP = kBoxP + 0x800;
+constexpr uint32_t kGroundCompared = kBoxP + 0x900;
 
 uint32_t SectionAt(uint32_t area, uint32_t k) {
   return area + kSectionP + kSectionBytes * k;
@@ -526,6 +542,7 @@ void GroundCases(Context& h, uint32_t area) {
     kColor,         // r3 = out, r4 = the point, r5 = a triangle, r6, r7 = its section's arrays
     kGroundHeight,  // r3 = the mesh, r4 = the point, r5 = the position, r6, r7 = outs or 0
     kGround,        // r3 = the result, r4 = the point, r5 = the position or 0
+    kHits,          // r3 = the hit record, r4 = the box
   };
   const struct {
     const char* name;
@@ -548,9 +565,12 @@ void GroundCases(Context& h, uint32_t area) {
        kGround},
       {"TrackCollision::GroundCallback (sub_820FEAB0)", Original<__imp__sub_820FEAB0>,
        NativeGroundCallback, kGround},
+      {"TrackCollision::GroundHits (sub_820FEBD0)", Original<__imp__sub_820FEBD0>,
+       NativeGroundHits, kHits},
   };
   uint8_t saved_mesh[12];
   std::memcpy(saved_mesh, h.base + tc::kMesh, sizeof(saved_mesh));
+  const uint32_t saved_world = guest::LoadU32(h.base, kWorldPointer);
   const float catch_distance = guest::LoadFloat(h.base, 0x82002A0C);
   ITC_LOG_INFO("harness: collision_world: the ground's catch distance {}, its offset {}, the "
                "slice offsets {} {} {} {}",
@@ -695,6 +715,59 @@ void GroundCases(Context& h, uint32_t area) {
               t.r6.u64 = r.Below(4) == 0 ? 0 : area + kColorP;
               t.r7.u64 = r.Below(4) == 0 ? 0 : out;
               break;
+            case kHits: {
+              out_unaligned = false;
+              std::memcpy(h.base + tc::kMesh, h.base + area + kMeshP, 12);
+              guest::StoreU32(h.base, kWorldPointer, area + kWorldP);
+              guest::StoreU32(h.base, area + kWorldP + 60, r.Below(4) == 0 ? 0 : 32);
+              // A car-sized box at the point, turned about y, tilted a
+              // little one time in two.
+              const uint32_t corners = area + kOutsP;
+              const float sx = 0.5f + float(r.Below(1000)) / 1000.0f;
+              const float sy = 0.3f + float(r.Below(500)) / 1000.0f;
+              const float sz = 1.0f + float(r.Below(1500)) / 1000.0f;
+              const float lo[4] = {-sx, -sy, -sz, 0.0f}, hi[4] = {sx, sy, sz, 0.0f};
+              for (uint32_t i = 0; i < 4; i++) {
+                guest::StoreFloat(h.base, corners + 4 * i, lo[i]);
+                guest::StoreFloat(h.base, corners + 16 + 4 * i, hi[i]);
+              }
+              const uint32_t frame = t.r1.u32 - 2048;
+              collision::BoxConstruct(h.base, area + kTemplateP, corners, corners + 16, frame);
+              const float yaw = float(r.Below(6283)) / 1000.0f;
+              const float tilt = r.Below(2) == 0 ? 0.0f : float(int32_t(r.Below(400)) - 200) / 1000.0f;
+              const float c = std::cos(yaw), sn = std::sin(yaw), ct = std::cos(tilt),
+                          st = std::sin(tilt);
+              const float m[16] = {c, 0.0f, -sn, 0.0f, sn * st, ct, c * st, 0.0f,
+                                   sn * ct, -st, c * ct, 0.0f, px, py, pz, 1.0f};
+              for (uint32_t i = 0; i < 16; i++) {
+                guest::StoreFloat(h.base, area + kMatrixP + 4 * i, m[i]);
+              }
+              collision::BoxConstruct(h.base, area + kBoxP, corners, corners + 16, frame);
+              collision::BoxPlace(h.base, area + kBoxP, area + kMatrixP, area + kTemplateP, frame);
+              // The positions: the point's cell or near it, their last
+              // height near the point's (their x and z the corner's one
+              // time in four).
+              for (uint32_t i = 0; i < 4; i++) {
+                const uint32_t p = area + kPositionsP + 96 * i;
+                for (uint32_t w = 0; w < 96; w += 4) {
+                  guest::StoreU32(h.base, p + w, guest::LoadU32(h.base, position + w));
+                }
+                if (r.Below(3) == 0) {
+                  guest::StoreU16(h.base, p + 2, uint16_t(std::clamp(
+                      true_slice + int32_t(r.Below(3)) - 1, 0, int32_t(kSlices) - 1)));
+                }
+                guest::StoreFloat(h.base, p + 20, py + float(int32_t(r.Below(2001)) - 1000) / 1000.0f);
+                if (r.Below(4) == 0) {
+                  const uint32_t corner = collision::BoxLowerCorner(h.base, area + kBoxP, i);
+                  guest::StoreU32(h.base, p + 16, guest::LoadU32(h.base, corner + 0));
+                  guest::StoreU32(h.base, p + 24, guest::LoadU32(h.base, corner + 8));
+                }
+                collision::BoxSetCacheWord(h.base, area + kBoxP, i, p);
+              }
+              t.r3.u64 = area + kHitsP;
+              t.r4.u64 = area + kBoxP;
+              break;
+            }
             case kGround:
               out_unaligned = false;
               std::memcpy(h.base + tc::kMesh, h.base + area + kMeshP, 12);
@@ -713,8 +786,9 @@ void GroundCases(Context& h, uint32_t area) {
             Append32(result[v], uint32_t(bits >> 32));
             Append32(result[v], uint32_t(bits));
           }
-          if (f.kind == kGround) {
+          if (f.kind == kGround || f.kind == kHits) {
             std::memcpy(h.base + tc::kMesh, saved_mesh, sizeof(saved_mesh));
+            guest::StoreU32(h.base, kWorldPointer, saved_world);
           }
         }
         if (!result[0].empty() || !result[1].empty()) {
