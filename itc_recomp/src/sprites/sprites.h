@@ -7,6 +7,7 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 
 namespace sprites {
 
@@ -36,5 +37,16 @@ bool Equal4(const float a[4], const float b[4]);
 // cross product's y (as the game computes it, -(a.x b.z - a.z b.x), flushing
 // denormals to zero) is above `zero` (the game's 0.0), else -1.
 int32_t TurnSide(const float a[4], const float b[4], float zero);
+
+// ScreenRect::Record (sub_82128E70)'s recording, before its submit: a chunk
+// opened on the command list `list` (the global at 0x826C5D60), its render
+// states (by the rectangle's +116, alpha blending), its texture (+112), a quad
+// of four white vertices at the rectangle's pixels (+80 x, +84 y, +88 width,
+// +92 height, integers; +96-+108 the texture coordinates u0, v0, u1, v1) and
+// command 15, the chunk closed. Returns the chunk's first slot, which the
+// caller then submits to the render queue; nothing is done (nullopt) where
+// the original's command list calls would print a message (another chunk
+// open, the list full), which the caller leaves to the original.
+std::optional<uint32_t> RecordScreenRect(uint8_t* base, uint32_t list, uint32_t rect);
 
 }  // namespace sprites

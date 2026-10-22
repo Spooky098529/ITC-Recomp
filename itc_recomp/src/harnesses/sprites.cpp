@@ -4,6 +4,7 @@
 #include "harness.h"
 
 #include "base/log.h"
+#include "command_list/command_list.h"
 
 #include <algorithm>
 #include <bit>
@@ -171,6 +172,93 @@ void Sprites(Context& h) {
            fmt::format("{:08X} {:08X} {:08X} {:08X} to {:08X} {:08X} {:08X} {:08X}", a[0], a[1],
                        a[2], a[3], b[0], b[1], b[2], b[3]));
     }
+    results.Report();
+  }
+
+  // ScreenRect::Record: a made-up command list, render queue and rectangle
+  // in the scratch area, the game's globals for the queue and the list (and
+  // the open chunk count) pointed at them during the cases and put back
+  // after. The queue's vtable slot 4 is BillboardMaterial::SetLights
+  // (sub_8209F5C8), which stores what it's given (r4, the chunk; r5, the
+  // layer) at the queue's +32 and +36. Cases: alpha blending on and off,
+  // random and odd rectangles (wrapping sums, NaNs of both kinds, denormals,
+  // infinities), the chunk already open, another chunk open (the original
+  // runs), and a list with just room. Compared: the whole scratch area, the
+  // open count and r3.
+  {
+    Results results("ScreenRect::Record (sub_82128E70)");
+    constexpr uint32_t kRenderQueue = 0x826C5D5C;
+    constexpr uint32_t kOverlayList = 0x826C5D60;
+    constexpr uint32_t kList = 0, kQueue = 64, kVtable = 128, kRect = 256, kSlots = 512;
+    const uint32_t saved_queue = guest::LoadU32(h.base, kRenderQueue);
+    const uint32_t saved_list = guest::LoadU32(h.base, kOverlayList);
+    const uint32_t saved_open = guest::LoadU32(h.base, command_list::kOpenChunks);
+    const uint32_t odd[] = {0x7FC00000, 0x7F800001, 0xFF800000, 0x7F800000, 0x00000001,
+                            0x80000000, 0x007FFFFF, 0x3F800000};
+    Random& r = h.random;
+    for (int i = 0; i < 400; i++) {
+      uint32_t rect[10];  // +80 to +116
+      for (int k = 0; k < 4; k++) {
+        rect[k] = r.Below(3) ? r.Below(1280) : uint32_t(r.Next());
+      }
+      for (int k = 4; k < 8; k++) {
+        const float f = float(r.Below(1u << 16)) / float(1u << 16);
+        rect[k] = r.Below(8) == 0 ? odd[r.Below(8)] : std::bit_cast<uint32_t>(f);
+      }
+      rect[8] = uint32_t(r.Next());                               // the texture
+      rect[9] = r.Below(2) ? 0 : (r.Below(2) ? 1 : uint32_t(r.Next()));  // blending
+      const int kind = i < 360 ? 0 : 1 + (i % 4);  // 1: already open, 2: nested, 3-4: just room
+      const uint32_t used = r.Below(2) ? 0 : r.Below(100000);
+      const uint32_t layer = r.Below(2) ? 604 : uint32_t(r.Next());
+      const uint32_t pass = uint32_t(r.Next());  // r4, not read
+      std::vector<uint8_t> result[2];
+      for (int v = 0; v < 2; v++) {
+        Fill(h.base, h.data, kScratchBytes);
+        const uint32_t list = h.data + kList;
+        guest::StoreU32(h.base, list + 8, kind >= 3 ? used + 25 : used + 1000);
+        guest::StoreU32(h.base, list + 12, used);
+        guest::StoreU32(h.base, list + 32, h.data + kSlots);
+        guest::StoreU8(h.base, list + 52, kind == 1 ? 1 : 0);
+        if (kind == 1) {
+          guest::StoreU32(h.base, list + 44, h.data + kSlots + 16);
+        }
+        guest::StoreU32(h.base, command_list::kOpenChunks, kind == 2 ? 1 : 0);
+        guest::StoreU32(h.base, h.data + kQueue, h.data + kVtable);
+        guest::StoreU32(h.base, h.data + kVtable + 16, 0x8209F5C8);
+        for (int k = 0; k < 10; k++) {
+          guest::StoreU32(h.base, h.data + kRect + 80 + 4 * k, rect[k]);
+        }
+        guest::StoreU32(h.base, h.data + kRect + 64, 0);
+        guest::StoreU32(h.base, kRenderQueue, h.data + kQueue);
+        guest::StoreU32(h.base, kOverlayList, list);
+        PPCContext t = CallContext(h);
+        t.r3.u64 = h.data + kRect;
+        t.r4.u64 = pass;
+        t.r5.u64 = layer;
+        (v == 0 ? __imp__sub_82128E70 : sub_82128E70)(t, h.base);
+        result[v] = Read(h.base, h.data, kScratchBytes);
+        for (uint32_t word : {guest::LoadU32(h.base, command_list::kOpenChunks), t.r3.u32}) {
+          for (int b = 0; b < 4; b++) {
+            result[v].push_back(uint8_t(word >> (24 - 8 * b)));
+          }
+        }
+      }
+      size_t at = 0;
+      while (at < result[0].size() && result[0][at] == result[1][at]) {
+        at++;
+      }
+      const size_t from = at < result[0].size() ? at : 0;
+      const size_t to = std::min(result[0].size(), from + 32);
+      results.Check({result[0].begin() + from, result[0].begin() + to},
+                    {result[1].begin() + from, result[1].begin() + to},
+                    fmt::format("case {}: kind {} rect {:08X} {:08X} {:08X} {:08X} uv {:08X} {:08X} "
+                                "{:08X} {:08X} blend {:X}, from byte {}",
+                                i, kind, rect[0], rect[1], rect[2], rect[3], rect[4], rect[5],
+                                rect[6], rect[7], rect[9], from));
+    }
+    guest::StoreU32(h.base, kRenderQueue, saved_queue);
+    guest::StoreU32(h.base, kOverlayList, saved_list);
+    guest::StoreU32(h.base, command_list::kOpenChunks, saved_open);
     results.Report();
   }
 }

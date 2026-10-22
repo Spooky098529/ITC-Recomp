@@ -6,13 +6,34 @@
 #include <bit>
 
 #include "base/flags.h"
+#include "hooks/guest_call.h"
 #include "sprites/sprites.h"
 
 ITC_FLAG_BOOL(native_sprites, true, "ITC",
               "Run the race overlays' sprite helpers (the sprite lists' reset, "
               "sub_821298C0 and sub_8211EB60; the layer for a camera pass, sub_82126630; "
-              "Vec4::Equal, sub_82123300; Trail::TurnSide, sub_82129940) natively instead of through the "
-              "translated code (same results; checked by --run_harnesses=sprites)");
+              "Vec4::Equal, sub_82123300; Trail::TurnSide, sub_82129940; ScreenRect::Record, "
+              "sub_82128E70) natively instead of through the translated code (same results; "
+              "checked by --run_harnesses=sprites)");
+
+// AllocateSlots's diagnostics (blend_state.cpp) note each slot's caller: with
+// any of them on, the recorders run the originals.
+ITC_FLAG_DECLARE(bool, log_overlay_uploads);
+ITC_FLAG_DECLARE(bool, log_slot_callers);
+ITC_FLAG_DECLARE(bool, log_recording_by_pass);
+
+namespace {
+bool SlotDiagnostics() {
+  return ITC_FLAG(log_overlay_uploads) || ITC_FLAG(log_slot_callers) ||
+         ITC_FLAG(log_recording_by_pass);
+}
+
+// The render queue (its vtable's slot 4 takes a recorded chunk) and the
+// command list the overlays record into.
+constexpr uint32_t kRenderQueue = 0x826C5D5C;
+constexpr uint32_t kOverlayList = 0x826C5D60;
+constexpr uint32_t kZero = 0x82000A34;  // the float 0.0, the chunk's depth
+}  // namespace
 
 // SpriteList::Reset: r3 = a sprite list (500 sprites).
 extern "C" REX_FUNC(sub_821298C0) {
@@ -83,4 +104,35 @@ extern "C" REX_FUNC(sub_82129940) {
   unpack(ctx.r3.u64, ctx.r4.u64, a);
   unpack(ctx.r5.u64, ctx.r6.u64, b);
   ctx.r3.s64 = sprites::TurnSide(a, b, guest::LoadFloat(base, 0x82000A34));
+}
+
+// ScreenRect::Record: r3 = a screen rectangle, r5 = the render queue layer
+// (r4, the camera pass, isn't read). Records it natively, then submits the
+// chunk through the render queue's vtable (slot 4: r3 = the queue, r4 = the
+// chunk, r5 = the layer, f1 = 0.0) from a frame like the original's (272
+// bytes), with its return address.
+extern "C" REX_FUNC(sub_82128E70) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_sprites) || SlotDiagnostics()) {
+    __imp__sub_82128E70(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  const uint32_t layer = ctx.r5.u32;
+  const std::optional<uint32_t> chunk =
+      sprites::RecordScreenRect(base, guest::LoadU32(base, kOverlayList), ctx.r3.u32);
+  if (!chunk) {
+    __imp__sub_82128E70(ctx, base);
+    return;
+  }
+  const uint64_t lr = ctx.lr;
+  guest_call::InFrame(ctx, base, 272, 0x82129278, [&](uint32_t) {
+    const uint32_t queue = guest::LoadU32(base, kRenderQueue);
+    ctx.r3.u64 = queue;
+    ctx.r4.u64 = *chunk;
+    ctx.r5.u64 = layer;
+    ctx.f1.f64 = double(guest::LoadFloat(base, kZero));
+    REX_CALL_INDIRECT_FUNC(guest::LoadU32(base, guest::LoadU32(base, queue) + 16));
+  });
+  ctx.lr = lr;
 }
