@@ -244,6 +244,16 @@ void NativeParticlesBUpdate(PPCContext& ctx, uint8_t* base) {
   }
 }
 
+void NativeParticlesCUpdate(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  uint32_t r3 = ctx.r3.u32;
+  if (!ro::ParticlesCUpdate(base, ctx.r3.u32, &r3)) {
+    __imp__sub_8212C2F0(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = r3;
+}
+
 void NativeRandomRange(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   uint32_t drawn = 0;
@@ -2238,6 +2248,95 @@ void ParticlesBUpdateCases(Context& h, uint32_t block) {
   }
   results.Report();
 }
+
+// ParticlesC::Update: entries of random words with small lives (0 to 50,
+// some negative or huge), a table (+108) with a +8 small or random, a +4
+// small or random and a +12 of 0 to 30 or random; the entries' positions
+// (+48) and the effect's +2,672 small numbers (some the same, so lengths of
+// 0.0) or random, its +2,704 small or random; capacities 1 to 20 (the
+// entries before the effect's own fields), oldest and newest inside and past
+// them, counts up to past the capacity and negative; the game's rand seed
+// set for each case and put back after; and the case where the native
+// version declines (a capacity of 0, with a count of 0 so the original
+// doesn't run on).
+void ParticlesCUpdateCases(Context& h, uint32_t block) {
+  Random& r = h.random;
+  constexpr uint32_t kSeed = 0x82638188;
+  const uint32_t live = guest::LoadU32(h.base, kSeed);
+  const uint32_t effect = block + 0x1000;
+  const uint32_t table = block + 0x100;
+  constexpr uint32_t kBytes = 2720;
+  Results results("ParticlesC::Update (sub_8212C2F0)");
+  for (int i = 0; i < 300; i++) {
+    const uint64_t seed = r.Next();
+    uint32_t capacity = 1 + r.Below(20);
+    uint32_t oldest = r.Below(capacity);
+    uint32_t newest = r.Below(capacity);
+    int32_t count = int32_t(r.Below(capacity + 3));
+    if (i % 25 == 1) {
+      oldest = std::min(capacity + r.Below(5), 19u);  // past the capacity
+      newest = std::min(capacity + r.Below(5), 19u);
+    } else if (i % 25 == 2) {
+      capacity = 0;
+      count = 0;
+    } else if (i % 25 == 3) {
+      count = -int32_t(r.Below(3));
+    }
+    const bool small = i % 2 == 0;
+    const uint32_t rand_seed = uint32_t(r.Next());
+    Compare(h, results, {{effect, kBytes}, {table, 16}, {kSeed, 4}},
+            [&, seed, capacity, oldest, newest, count, small, rand_seed] {
+              Random fill;
+              for (uint64_t n = 0; n < seed % 61; n++) {
+                fill.Next();
+              }
+              auto small_float = [&] {
+                return std::bit_cast<uint32_t>(float(int32_t(fill.Below(21)) - 10) * 0.5f);
+              };
+              FillRandom(h.base, fill, effect, kBytes);
+              FillRandom(h.base, fill, table, 16);
+              if (small) {
+                guest::StoreU32(h.base, table + 4, small_float());
+                guest::StoreU32(h.base, table + 8,
+                                std::bit_cast<uint32_t>(float(fill.Below(256))));
+                guest::StoreU32(h.base, effect + 2704, small_float());
+              }
+              const uint32_t ticks = fill.Below(4) == 0 ? uint32_t(fill.Next()) : fill.Below(31);
+              guest::StoreU32(h.base, table + 12, ticks);
+              guest::StoreU32(h.base, effect + 108, table);
+              for (uint32_t n = 0; n < 20; n++) {
+                const uint32_t entry = effect + 112 + 128 * n;
+                const uint32_t kind = fill.Below(10);
+                const uint32_t life = kind == 0   ? uint32_t(fill.Next())
+                                      : kind == 1 ? uint32_t(-int32_t(fill.Below(3)))
+                                                  : fill.Below(51);
+                guest::StoreU32(h.base, entry + 108, life);
+                if (small) {
+                  for (uint32_t k = 0; k < 3; k++) {
+                    guest::StoreU32(h.base, entry + 48 + 4 * k,
+                                    fill.Below(6) == 0 ? 0 : small_float());
+                  }
+                }
+              }
+              if (small) {
+                for (uint32_t k = 0; k < 3; k++) {
+                  guest::StoreU32(h.base, effect + 2672 + 4 * k, small_float());
+                }
+              }
+              guest::StoreU32(h.base, effect + 2688, oldest);
+              guest::StoreU32(h.base, effect + 2692, newest);
+              guest::StoreU32(h.base, effect + 2696, uint32_t(count));
+              guest::StoreU32(h.base, effect + 2700, capacity);
+              guest::StoreU32(h.base, kSeed, rand_seed);
+            },
+            [&](PPCContext& t) { t.r3.u64 = effect; }, __imp__sub_8212C2F0,
+            NativeParticlesCUpdate,
+            fmt::format("case {} capacity {} oldest {} newest {} count {}", i, capacity, oldest,
+                        newest, count));
+  }
+  guest::StoreU32(h.base, kSeed, live);
+  results.Report();
+}
 }  // namespace
 
 void RaceOverlays(Context& h) {
@@ -2267,6 +2366,7 @@ void RaceOverlays(Context& h) {
   SparksUpdateCases(h, block);
   SmokeUpdateCases(h, block);
   ParticlesBUpdateCases(h, block);
+  ParticlesCUpdateCases(h, block);
   memory->SystemHeapFree(block);
 }
 

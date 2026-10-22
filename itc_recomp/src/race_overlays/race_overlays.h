@@ -554,6 +554,24 @@ bool SmokeUpdate(uint8_t* base, uint32_t smoke, uint32_t* r3);
 // there.
 bool ParticlesBUpdate(uint8_t* base, uint32_t effect);
 
+// ParticlesC::Update (sub_8212C2F0): for each of the count (+2,696)
+// entries from the oldest (+2,688; 128 bytes from +112, the index moving on
+// modulo the capacity +2,700, unsigned): life (+108) counts down to 0; at 0,
+// +96 = 0 and the oldest moves on and the count goes down (in memory; the
+// loop runs the count it started with); +104 = the table's (+108) +8 times
+// life / the table's +12 while life is below it (unsigned), clamped to 0.0
+// and the table's +8, times the effect's +2,704 x the float at 0x82002BF0
+// (at most 1.0), plus rand() % 3; +92 = that as an integer. Then the newest
+// entry (the one before +2,692) takes the effect's position (+2,672, at its
+// +48), and for count - 1 entries from there back, the entry before each is
+// pulled to within +2,704 x the float at 0x8200874C x the table's +4 of it
+// (its +48 = the next one's +48 less their difference times that over its
+// length, w 1.0; left alone at a length of 0.0). `r3` is left as the
+// original leaves it (the last rand() result, when it ran). False, with
+// nothing done, for a capacity of 0 (the original's divisions trap); the
+// original runs there.
+bool ParticlesCUpdate(uint8_t* base, uint32_t effect, uint32_t* r3);
+
 }  // namespace race_overlays
 
 namespace race_overlays {

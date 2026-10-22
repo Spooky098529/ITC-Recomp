@@ -17,7 +17,7 @@ ITC_FLAG_BOOL(native_race_overlays, true, "ITC",
               "sub_8212E660; Sparks::Emit, sub_8212D818; CarOverlays::EmitSmoke, sub_82123240, "
               "with Smoke::Emit; the set-up's constructors, clears and bindings, sub_82126498 to "
               "sub_8215E000; the resets, sub_8211E9F0 to sub_8212D6E0; Smoke::InRegion, "
-              "sub_8212A868; Sparks::Update, sub_8212DDC8; Smoke::Update, sub_8212AA78; ParticlesB::Update, sub_8212B748; the children's constructors, "
+              "sub_8212A868; Sparks::Update, sub_8212DDC8; Smoke::Update, sub_8212AA78; ParticlesB::Update, sub_8212B748; ParticlesC::Update, sub_8212C2F0; the children's constructors, "
               "sub_8211F060 to sub_8212E9A0, and Smoke and ParticlesB::Reset, sub_8212A9E0 and "
               "sub_8212BA98) natively "
               "instead of through the translated code (same results; checked by "
@@ -409,4 +409,23 @@ extern "C" REX_FUNC(sub_8212B748) {
   if (!ParticlesBUpdate(base, ctx.r3.u32)) {
     __imp__sub_8212B748(ctx, base);
   }
+}
+
+// ParticlesC::Update (its vtable's slot 4, so the adapter stays while the
+// update loop calling it is recompiled): r3 = the effect, left as the
+// original leaves it. rand is called as plain C++. Where the native version
+// declines (a capacity of 0, where the original traps), the original runs.
+extern "C" REX_FUNC(sub_8212C2F0) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_race_overlays)) {
+    __imp__sub_8212C2F0(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  uint32_t r3 = ctx.r3.u32;
+  if (!ParticlesCUpdate(base, ctx.r3.u32, &r3)) {
+    __imp__sub_8212C2F0(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = r3;
 }
