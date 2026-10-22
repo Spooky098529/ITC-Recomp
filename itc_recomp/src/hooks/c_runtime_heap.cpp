@@ -1,6 +1,8 @@
 // Adapters in front of the C runtime's heap over the native allocation layer
-// (src/memory/c_runtime_heap.h; docs/functions/heap.md). Each falls back to
-// the game's own function with --native_c_runtime_heap off, with
+// (src/memory/c_runtime_heap.h; docs/functions/heap.md). _calloc_impl,
+// LocalAlloc and LocalFree have none: only calloc, XMemAlloc and XMemFree
+// call them, and those call the plain C++. Each adapter falls back
+// to the game's own function with --native_c_runtime_heap off, with
 // --native_heap off (the game's own heap; the plain C++ calls the layer
 // directly), and for the error paths the plain C++ leaves to it.
 
@@ -18,7 +20,9 @@ ITC_FLAG_BOOL(native_c_runtime_heap, true, "ITC",
               "sub_82297F90), XMemAlloc and XMemFree (sub_822976F8, sub_82297790), operator new "
               "and new[] (sub_825A6880, sub_825A6940), operator delete and delete[] "
               "(sub_825A70E8, sub_825A71C0); their error paths stay the game's (checked by "
-              "--run_harnesses=c_runtime_heap)");
+              "--run_harnesses=c_runtime_heap). Those reached only from native callers have "
+              "no adapters, and the flag switches their callers: _calloc_impl, LocalAlloc and "
+              "LocalFree");
 
 namespace {
 
@@ -58,19 +62,6 @@ extern "C" REX_FUNC(sub_825A9B58) {
   }
 }
 
-// _calloc_impl: r3 = count, r4 = size, r5 = where errno goes; returns the
-// block.
-extern "C" REX_FUNC(sub_825AC248) {
-  REX_FUNC_PROLOGUE();
-  if (Native()) {
-    if (auto block = memory::crt::CallocImpl(ctx.r3.u32, ctx.r4.u32)) {
-      ctx.r3.u64 = *block;
-      return;
-    }
-  }
-  __imp__sub_825AC248(ctx, base);
-}
-
 // calloc: r3 = count, r4 = size; returns the block.
 extern "C" REX_FUNC(sub_825AC320) {
   REX_FUNC_PROLOGUE();
@@ -105,26 +96,6 @@ extern "C" REX_FUNC(sub_825AED30) {
     }
   }
   __imp__sub_825AED30(ctx, base);
-}
-
-// LocalAlloc: r3 = flags, r4 = size; returns the block.
-extern "C" REX_FUNC(sub_82297F48) {
-  REX_FUNC_PROLOGUE();
-  if (!Native()) {
-    __imp__sub_82297F48(ctx, base);
-    return;
-  }
-  ctx.r3.u64 = memory::crt::LocalAlloc(ctx.r3.u32, ctx.r4.u32);
-}
-
-// LocalFree: r3 = block; returns 0 when freed, else the block.
-extern "C" REX_FUNC(sub_82297F90) {
-  REX_FUNC_PROLOGUE();
-  if (!Native()) {
-    __imp__sub_82297F90(ctx, base);
-    return;
-  }
-  ctx.r3.u64 = memory::crt::LocalFree(ctx.r3.u32);
 }
 
 // XMemAlloc: r3 = size, r4 = attributes; returns the block.
