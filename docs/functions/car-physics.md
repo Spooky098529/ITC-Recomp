@@ -52,6 +52,26 @@ loads an unset stack slot it doesn't use on the one-axle paths;
 `sub_820B4CF0` writes into the car data; surface group D's getter falls
 back to group B's default.
 
+Native so far (B7 loop, 2026-10-22, `--native_car_physics`, on by
+default): the rigid body (`src/car_physics/rigid_body.cpp`) and the
+physics step's helpers and the controls' setters
+(`src/car_physics/vehicle_step.cpp`), adapters in
+`src/hooks/car_physics.cpp`, harness `car_physics`. What it took: the
+originals' temporaries are written in their own stack frames at the same
+offsets (`frame`, the original's r1 after its `stwu`; callees' frames below
+it), so what's left on the stack is the same; the PowerPC branches kept as
+they are (`bge` and `ble` are "not less" and "not greater": NaNs take
+them); an `lfs` then `stfs` of one word is a bit copy where they're next to
+each other in the translated code, but goes through the double (a
+signaling NaN made quiet) where a branch joins them (`sub_820AFD30`); the
+vector library's dot product kept inside its flush-to-zero window (ThinLTO
+had moved it out; see `sub_82294170` in `vehicle-accessors.md`). The
+harness runs the vehicle's functions on a vehicle, its car data, surface
+records and body 64 KB down the guest stack (as the sprites' harness), its
+numbers below 10^6 so no NaN is made from infinities; where NaNs meet, the
+cases are in "(expected to differ)" groups. Frames dumped 10 s into an
+attract race show the AI cars in the same places with the flag on and off.
+
 Status:
 
 - **Native**: plain C++ in `itc_recomp/src/` that doesn't use the
