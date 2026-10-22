@@ -103,6 +103,7 @@ set(ITC_SOURCES
     src/sprites/billboards.cpp
     src/hooks/command_list.cpp
     src/command_list/command_list.cpp
+    src/hooks/c_runtime.cpp
     src/game_data/game_data.cpp
     src/display/gamma.cpp
     src/harnesses/harness.cpp
@@ -125,6 +126,7 @@ set(ITC_SOURCES
     src/harnesses/sprites.cpp
     src/harnesses/billboards.cpp
     src/harnesses/command_list.cpp
+    src/harnesses/c_runtime.cpp
     src/helpers/debug_output.cpp
     src/helpers/object_attributes.cpp
     src/helpers/time.cpp

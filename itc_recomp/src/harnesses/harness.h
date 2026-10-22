@@ -110,5 +110,6 @@ void Xma(Context& h);
 void Sprites(Context& h);
 void Billboards(Context& h);
 void CommandList(Context& h);
+void CRuntime(Context& h);
 
 }  // namespace harness
