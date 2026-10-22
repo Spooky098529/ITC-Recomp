@@ -38,7 +38,9 @@ ITC_FLAG_BOOL(native_c_runtime, true, "ITC",
               "sub_825A6E48), _init_pointers' setters (sub_825AD140, sub_825AEE18, sub_825AFCB8, "
               "sub_825B3560, sub_825B3548), __initmbctable and setSBCS (sub_825B6958, sub_825B68C8) "
               "(checked by "
-              "--run_harnesses=c_runtime)");
+              "--run_harnesses=c_runtime). Those reached only from native callers have no "
+              "adapters, and the flag switches their callers: strcpy_s, __ascii_strnicmp, "
+              "strtoxl, ___dtold, _ld12tod, _atof_l, _fltin2, __strgtold12_l and __mtold12");
 
 ITC_FLAG_BOOL(native_memcpy, true, "ITC",
               "Copy natively in the C runtime's memcpy (sub_825A7410), inside its override in "
@@ -136,20 +138,6 @@ extern "C" REX_FUNC(sub_825A7F50) {
   c_runtime::Strncpy(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
 }
 
-// strcpy_s: r3 = destination, r4 = its size, r5 = source; returns 0. Its
-// error paths (_errno and _invalid_parameter, never seen in play) and an
-// overlapping copy upward stay on the recompiled path. (The original also
-// saves the link register and r31 below the stack pointer: not done here.)
-extern "C" REX_FUNC(sub_825A9DD8) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_c_runtime) ||
-      !c_runtime::StrcpyS(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32)) {
-    __imp__sub_825A9DD8(ctx, base);
-    return;
-  }
-  ctx.r3.u64 = 0;
-}
-
 // strncmp: r3, r4 = strings, r5 = count.
 extern "C" REX_FUNC(sub_825AACD0) {
   REX_FUNC_PROLOGUE();
@@ -178,16 +166,6 @@ extern "C" REX_FUNC(sub_825AC710) {
   if (!ITC_FLAG(native_c_runtime) || ctx.r3.u32 == 0 || ctx.r4.u32 == 0 ||
       ctx.r5.u32 > 0x7FFFFFFFu) {
     __imp__sub_825AC710(ctx, base);
-    return;
-  }
-  ctx.r3.s64 = c_runtime::AsciiStrnicmp(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
-}
-
-// __ascii_strnicmp: r3, r4 = strings, r5 = count.
-extern "C" REX_FUNC(sub_825AC6B0) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_c_runtime)) {
-    __imp__sub_825AC6B0(ctx, base);
     return;
   }
   ctx.r3.s64 = c_runtime::AsciiStrnicmp(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
@@ -330,10 +308,10 @@ extern "C" REX_FUNC(sub_825B6898) {
   ctx.r3.u64 = c_runtime::IsLeadByte(base, ctx.r3.u32);
 }
 
-// strtoxl: r3 = locale (unused: the original reads the current one), r4 =
-// string, r5 = end pointer out, r6 = base, r7 = flags. Its _errno paths and
-// a multibyte locale stay on the recompiled path. (The original also saves
-// r23-r31 below the stack pointer: not done here.)
+// strtoxl's work for strtoul (strtoxl itself has no adapter: strtoul, its
+// only caller in play, is native): the string, the end pointer out, the
+// base and the flags. Its _errno paths and a multibyte locale stay on the
+// recompiled path.
 namespace {
 
 bool StrToXl(uint8_t* base, uint32_t string, uint32_t end_out, int32_t radix, uint32_t flags,
@@ -350,17 +328,6 @@ bool StrToXl(uint8_t* base, uint32_t string, uint32_t end_out, int32_t radix, ui
 
 }  // namespace
 
-extern "C" REX_FUNC(sub_825A82C8) {
-  REX_FUNC_PROLOGUE();
-  uint64_t result = 0;
-  if (!ITC_FLAG(native_c_runtime) ||
-      !StrToXl(base, ctx.r4.u32, ctx.r5.u32, ctx.r6.s32, ctx.r7.u32, &result)) {
-    __imp__sub_825A82C8(ctx, base);
-    return;
-  }
-  ctx.r3.u64 = result;
-}
-
 // strtoul: r3 = string, r4 = end pointer out, r5 = base; strtoxl unsigned.
 extern "C" REX_FUNC(sub_825A85E0) {
   REX_FUNC_PROLOGUE();
@@ -373,114 +340,8 @@ extern "C" REX_FUNC(sub_825A85E0) {
   ctx.r3.u64 = result;
 }
 
-// ___dtold: r3 = the 12-byte long double out, r4 = the double's address.
-// The original reads the double first, so the order of the stores doesn't
-// matter; it leaves +10 as it is.
-extern "C" REX_FUNC(sub_825B6378) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_c_runtime)) {
-    __imp__sub_825B6378(ctx, base);
-    return;
-  }
-  const uint64_t bits = (uint64_t(guest::LoadU32(base, ctx.r4.u32)) << 32) |
-                        guest::LoadU32(base, ctx.r4.u32 + 4);
-  const c_runtime::LongDouble12 value = c_runtime::DoubleToLd12(bits);
-  const uint32_t out = ctx.r3.u32;
-  guest::StoreU16(base, out, value.sign_exponent);
-  guest::StoreU32(base, out + 2, value.mantissa_high);
-  guest::StoreU32(base, out + 6, value.mantissa_low);
-}
-
-// _ld12tod: r3 = the 12-byte long double, r4 = the double out; returns the
-// status. Everything is read before the double is stored (its low word
-// first, as the original).
-extern "C" REX_FUNC(sub_825B69B8) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_c_runtime)) {
-    __imp__sub_825B69B8(ctx, base);
-    return;
-  }
-  const uint32_t in = ctx.r3.u32;
-  const c_runtime::LongDouble12 value = {guest::LoadU16(base, in), guest::LoadU32(base, in + 2),
-                                         guest::LoadU32(base, in + 6)};
-  int32_t status;
-  const uint64_t bits = c_runtime::Ld12ToDouble(value, guest::LoadU16(base, in + 10), &status);
-  guest::StoreU32(base, ctx.r4.u32 + 4, uint32_t(bits));
-  guest::StoreU32(base, ctx.r4.u32, uint32_t(bits >> 32));
-  ctx.r3.s64 = status;
-}
-
-// __mtold12: r3 = the digits, r4 = their count, r5 = the 12-byte long double
-// out. The digits are read first (the original reads them as it writes the
-// result: no caller overlaps the two). A mantissa of 0, where the original
-// never ends, and a count above 4,096 (never: at most 24) run the original.
-extern "C" REX_FUNC(sub_825B7F10) {
-  REX_FUNC_PROLOGUE();
-  const uint32_t count = ctx.r4.u32;
-  c_runtime::LongDouble12Full value;
-  uint8_t digits[4096];
-  bool native = ITC_FLAG(native_c_runtime) && count <= sizeof(digits);
-  if (native) {
-    for (uint32_t i = 0; i < count; i++) {
-      digits[i] = guest::LoadU8(base, ctx.r3.u32 + i);
-    }
-    native = c_runtime::Mtold12(digits, count, &value);
-  }
-  if (!native) {
-    __imp__sub_825B7F10(ctx, base);
-    return;
-  }
-  const uint32_t out = ctx.r5.u32;
-  guest::StoreU16(base, out, value.value.sign_exponent);
-  guest::StoreU32(base, out + 2, value.value.mantissa_high);
-  guest::StoreU32(base, out + 6, value.value.mantissa_low);
-  guest::StoreU16(base, out + 10, value.extra);
-}
-
-// __strgtold12_l: r3 = the 12-byte long double out, r4 = the end pointer
-// out, r5 = the string, r6 = mult12, r7 = scale, r8 = decpt, r9 =
-// implicit_E, r10 = the locale (only tested for null: EINVAL through
-// _errno, never seen in play, runs the original); returns the flags. The
-// end is stored first, then the number from +10 down, as the original.
-extern "C" REX_FUNC(sub_825B36B8) {
-  REX_FUNC_PROLOGUE();
-  c_runtime::Strgtold12Result result;
-  if (!ITC_FLAG(native_c_runtime) || ctx.r10.u32 == 0 ||
-      !c_runtime::Strgtold12(base, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32, ctx.r8.u32, ctx.r9.u32,
-                             &result)) {
-    __imp__sub_825B36B8(ctx, base);
-    return;
-  }
-  guest::StoreU32(base, ctx.r4.u32, result.end);
-  const uint32_t out = ctx.r3.u32;
-  guest::StoreU16(base, out + 10, result.value.extra);
-  guest::StoreU32(base, out + 6, result.value.value.mantissa_low);
-  guest::StoreU32(base, out + 2, result.value.value.mantissa_high);
-  guest::StoreU16(base, out, result.value.value.sign_exponent);
-  ctx.r3.u64 = result.flags;
-}
-
-// _fltin2: r3 = the result (+0 flags, +4 characters used, +16 the double),
-// r4 = the string, r5 = its length (unused), r8 = the locale (passed on
-// to __strgtold12_l, which tests it for null: the original runs then);
-// returns r3.
-extern "C" REX_FUNC(sub_825AFDC8) {
-  REX_FUNC_PROLOGUE();
-  c_runtime::FltinResult result;
-  if (!ITC_FLAG(native_c_runtime) || ctx.r8.u32 == 0 ||
-      !c_runtime::Fltin2(base, ctx.r4.u32, &result)) {
-    __imp__sub_825AFDC8(ctx, base);
-    return;
-  }
-  const uint32_t out = ctx.r3.u32;
-  guest::StoreU32(base, out, result.flags);
-  guest::StoreU32(base, out + 16, uint32_t(result.bits >> 32));
-  guest::StoreU32(base, out + 20, uint32_t(result.bits));
-  guest::StoreU32(base, out + 4, result.used);
-}
-
-// _atof_l and atof: r3 = the string (r4, _atof_l's locale, is unused: the
-// current one is read); returns the double in f1. A null string and a
+// atof: r3 = the string; returns the double in f1 (_atof_l's work: _atof_l
+// has no adapter, as atof is its only caller in play). A null string and a
 // multibyte locale's space test run the original. Its callers read only f1
 // after it (the original leaves r3 pointing into its finished frame).
 namespace {
@@ -496,13 +357,6 @@ bool Atof(PPCContext& ctx, uint8_t* base) {
 }
 
 }  // namespace
-
-extern "C" REX_FUNC(sub_825AB0C0) {
-  REX_FUNC_PROLOGUE();
-  if (!Atof(ctx, base)) {
-    __imp__sub_825AB0C0(ctx, base);
-  }
-}
 
 extern "C" REX_FUNC(sub_825AB1C0) {
   REX_FUNC_PROLOGUE();
@@ -577,6 +431,10 @@ extern "C" REX_FUNC(sub_825B6458) {
   ctx.r3.u64 = ctx.r4.u64;
 }
 
+namespace {
+void CftofL(PPCContext& ctx, uint8_t* base);
+}  // namespace
+
 // _cfltcvt_l: r3 = the double's address, r4 = the buffer, r5 = its size, r6
 // = the format character, r7 = the precision, r8 = caps, r9 = the locale.
 // The original's dispatch, with its register moves: 'e' and 'E' to
@@ -599,7 +457,7 @@ extern "C" REX_FUNC(sub_825AEB20) {
     sub_825AE1A8(ctx, base);
   } else if (format == 'f') {
     ctx.r7.u64 = ctx.r8.u64;
-    sub_825AE8E0(ctx, base);
+    CftofL(ctx, base);
   } else if (format == 'a' || format == 'A') {
     sub_825AE2C0(ctx, base);
   } else {
@@ -615,14 +473,23 @@ extern "C" REX_FUNC(sub_825AEB20) {
 // leaves r4 to r12 changed; its callers (_cfltcvt_l's and sub_825AEB70's
 // tail calls, so _output_l) read none of them. (Its frame, with _fltout2's
 // result and digits, is below the caller's stack pointer: not written.)
-extern "C" REX_FUNC(sub_825AE8E0) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_c_runtime) ||
-      !c_runtime::Cftof(base, REX_LOAD_U64(ctx.r3.u32), ctx.r4.u32, ctx.r5.u32, ctx.r6.s32)) {
+namespace {
+void CftofL(PPCContext& ctx, uint8_t* base) {
+  if (!c_runtime::Cftof(base, REX_LOAD_U64(ctx.r3.u32), ctx.r4.u32, ctx.r5.u32, ctx.r6.s32)) {
     __imp__sub_825AE8E0(ctx, base);
     return;
   }
   ctx.r3.u64 = 0;
+}
+}  // namespace
+
+extern "C" REX_FUNC(sub_825AE8E0) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_c_runtime)) {
+    __imp__sub_825AE8E0(ctx, base);
+    return;
+  }
+  CftofL(ctx, base);
 }
 
 // _fptostr: r3 = the buffer, r4 = its size, r5 = the digits wanted, r6 =

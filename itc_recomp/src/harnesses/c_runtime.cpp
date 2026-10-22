@@ -5,6 +5,8 @@
 
 #include "base/log.h"
 #include "c_runtime/format.h"
+#include "c_runtime/parse.h"
+#include "c_runtime/strings.h"
 
 #include <algorithm>
 #include <array>
@@ -151,6 +153,133 @@ void GlobalsCase(Context& h, Results& results,
 }
 
 const uint32_t kLengths[] = {0, 1, 2, 3, 4, 5, 7, 8, 15, 16, 17, 31, 64, 200, 450};
+
+// The register steps of the functions whose adapters went once their
+// callers were native (docs/loops/b7-loop.md, "Removing an adapter"): the
+// cases run the plain C++ through these, against the recompiled versions;
+// where the plain C++ refuses (the error paths the adapters left to the
+// original), the original runs, as the adapters did.
+
+// strcpy_s: r3 = destination, r4 = its size, r5 = source; returns 0.
+void NativeStrcpyS(PPCContext& ctx, uint8_t* base) {
+  if (!c_runtime::StrcpyS(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32)) {
+    __imp__sub_825A9DD8(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = 0;
+}
+
+// __ascii_strnicmp: r3, r4 = strings, r5 = count.
+void NativeAsciiStrnicmp(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.s64 = c_runtime::AsciiStrnicmp(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+}
+
+// strtoxl: r4 = string, r5 = end pointer out, r6 = base, r7 = flags.
+void NativeStrToXl(PPCContext& ctx, uint8_t* base) {
+  uint32_t end = 0;
+  uint64_t result = 0;
+  if (!c_runtime::StrToXl(base, ctx.r4.u32, ctx.r6.s32, ctx.r7.u32, ctx.r5.u32 != 0, &end,
+                          &result)) {
+    __imp__sub_825A82C8(ctx, base);
+    return;
+  }
+  if (ctx.r5.u32 != 0) {
+    guest::StoreU32(base, ctx.r5.u32, end);
+  }
+  ctx.r3.u64 = result;
+}
+
+// ___dtold: r3 = the 12-byte long double out, r4 = the double's address.
+void NativeDtold(PPCContext& ctx, uint8_t* base) {
+  const uint64_t bits = (uint64_t(guest::LoadU32(base, ctx.r4.u32)) << 32) |
+                        guest::LoadU32(base, ctx.r4.u32 + 4);
+  const c_runtime::LongDouble12 value = c_runtime::DoubleToLd12(bits);
+  const uint32_t out = ctx.r3.u32;
+  guest::StoreU16(base, out, value.sign_exponent);
+  guest::StoreU32(base, out + 2, value.mantissa_high);
+  guest::StoreU32(base, out + 6, value.mantissa_low);
+}
+
+// _ld12tod: r3 = the 12-byte long double, r4 = the double out; returns the
+// status.
+void NativeLd12tod(PPCContext& ctx, uint8_t* base) {
+  const uint32_t in = ctx.r3.u32;
+  const c_runtime::LongDouble12 value = {guest::LoadU16(base, in), guest::LoadU32(base, in + 2),
+                                         guest::LoadU32(base, in + 6)};
+  int32_t status;
+  const uint64_t bits = c_runtime::Ld12ToDouble(value, guest::LoadU16(base, in + 10), &status);
+  guest::StoreU32(base, ctx.r4.u32 + 4, uint32_t(bits));
+  guest::StoreU32(base, ctx.r4.u32, uint32_t(bits >> 32));
+  ctx.r3.s64 = status;
+}
+
+// __mtold12: r3 = the digits, r4 = their count, r5 = the 12-byte long
+// double out.
+void NativeMtold12(PPCContext& ctx, uint8_t* base) {
+  const uint32_t count = ctx.r4.u32;
+  c_runtime::LongDouble12Full value;
+  uint8_t digits[4096];
+  bool native = count <= sizeof(digits);
+  if (native) {
+    for (uint32_t i = 0; i < count; i++) {
+      digits[i] = guest::LoadU8(base, ctx.r3.u32 + i);
+    }
+    native = c_runtime::Mtold12(digits, count, &value);
+  }
+  if (!native) {
+    __imp__sub_825B7F10(ctx, base);
+    return;
+  }
+  const uint32_t out = ctx.r5.u32;
+  guest::StoreU16(base, out, value.value.sign_exponent);
+  guest::StoreU32(base, out + 2, value.value.mantissa_high);
+  guest::StoreU32(base, out + 6, value.value.mantissa_low);
+  guest::StoreU16(base, out + 10, value.extra);
+}
+
+// __strgtold12_l: r3 = the 12-byte long double out, r4 = the end pointer
+// out, r5 = the string, r6 to r9 = mult12, scale, decpt, implicit_E, r10 =
+// the locale; returns the flags.
+void NativeStrgtold12(PPCContext& ctx, uint8_t* base) {
+  c_runtime::Strgtold12Result result;
+  if (ctx.r10.u32 == 0 || !c_runtime::Strgtold12(base, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32,
+                                                 ctx.r8.u32, ctx.r9.u32, &result)) {
+    __imp__sub_825B36B8(ctx, base);
+    return;
+  }
+  guest::StoreU32(base, ctx.r4.u32, result.end);
+  const uint32_t out = ctx.r3.u32;
+  guest::StoreU16(base, out + 10, result.value.extra);
+  guest::StoreU32(base, out + 6, result.value.value.mantissa_low);
+  guest::StoreU32(base, out + 2, result.value.value.mantissa_high);
+  guest::StoreU16(base, out, result.value.value.sign_exponent);
+  ctx.r3.u64 = result.flags;
+}
+
+// _fltin2: r3 = the result, r4 = the string, r8 = the locale; returns r3.
+void NativeFltin2(PPCContext& ctx, uint8_t* base) {
+  c_runtime::FltinResult result;
+  if (ctx.r8.u32 == 0 || !c_runtime::Fltin2(base, ctx.r4.u32, &result)) {
+    __imp__sub_825AFDC8(ctx, base);
+    return;
+  }
+  const uint32_t out = ctx.r3.u32;
+  guest::StoreU32(base, out, result.flags);
+  guest::StoreU32(base, out + 16, uint32_t(result.bits >> 32));
+  guest::StoreU32(base, out + 20, uint32_t(result.bits));
+  guest::StoreU32(base, out + 4, result.used);
+}
+
+// _atof_l: r3 = the string; the double in f1.
+void NativeAtofL(PPCContext& ctx, uint8_t* base) {
+  uint64_t bits;
+  if (!c_runtime::AtofL(base, ctx.r3.u32, &bits)) {
+    __imp__sub_825AB0C0(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  ctx.f1.u64 = bits;
+}
 
 }  // namespace
 
@@ -362,7 +491,7 @@ void CRuntime(Context& h) {
                            t.r4.u64 = count;
                            t.r5.u64 = at;
                          },
-                         __imp__sub_825A9DD8, sub_825A9DD8, what);
+                         __imp__sub_825A9DD8, NativeStrcpyS, what);
             }
           }
         }
@@ -422,7 +551,7 @@ void CRuntime(Context& h) {
               };
               const std::string with = what + fmt::format(" count {:X}", count);
               StringCase(h, ncmp, setup, args, __imp__sub_825AACD0, sub_825AACD0, with);
-              StringCase(h, ascii, setup, args, __imp__sub_825AC6B0, sub_825AC6B0, with);
+              StringCase(h, ascii, setup, args, __imp__sub_825AC6B0, NativeAsciiStrnicmp, with);
               if (count <= 0x7FFFFFFF) {  // above, EINVAL through _errno
                 StringCase(h, nicmp, setup, args, __imp__sub_825AC710, sub_825AC710, with);
               }
@@ -659,7 +788,7 @@ void CRuntime(Context& h) {
                          t.r6.s64 = text.radix;
                          t.r7.u64 = 0;
                        },
-                       __imp__sub_825A82C8, sub_825A82C8, what);
+                       __imp__sub_825A82C8, NativeStrToXl, what);
           }
         }
       }
@@ -696,7 +825,7 @@ void CRuntime(Context& h) {
                      t.r3.u64 = h.data + offset;
                      t.r4.u64 = h.data + 512;
                    },
-                   __imp__sub_825B6378, sub_825B6378,
+                   __imp__sub_825B6378, NativeDtold,
                    fmt::format("{:016X} out +{}", bits, offset));
       }
     }
@@ -777,7 +906,7 @@ void CRuntime(Context& h) {
                    t.r3.u64 = h.data + 512;
                    t.r4.u64 = h.data + 64;
                  },
-                 __imp__sub_825B69B8, sub_825B69B8,
+                 __imp__sub_825B69B8, NativeLd12tod,
                  fmt::format("{:04X} {:08X} {:08X} {:04X}", v.sign_exponent, v.high, v.low,
                              v.extra));
     }
@@ -1160,7 +1289,7 @@ void CRuntime(Context& h) {
         t.r3.u64 = from;
         t.r4.u64 = count;
         t.r5.u64 = out;
-        (v == 0 ? __imp__sub_825B7F10 : sub_825B7F10)(t, h.base);
+        (v == 0 ? __imp__sub_825B7F10 : NativeMtold12)(t, h.base);
         result[v] = Read(h.base, h.data, kScratchBytes);
       }
       results.Check(result[0], result[1], fmt::format("{} digits", count));
@@ -1243,7 +1372,7 @@ void CRuntime(Context& h) {
                      t.r9.u64 = kArgs[v][3];
                      t.r10.u64 = 0x8266BC28;
                    },
-                   __imp__sub_825B36B8, sub_825B36B8, fmt::format("\"{}\" args {}", numbers[i], v));
+                   __imp__sub_825B36B8, NativeStrgtold12, fmt::format("\"{}\" args {}", numbers[i], v));
       }
     }
     results.Report();
@@ -1261,7 +1390,7 @@ void CRuntime(Context& h) {
                    t.r7.u64 = 0;
                    t.r8.u64 = 0x8266BC28;
                  },
-                 __imp__sub_825AFDC8, sub_825AFDC8, fmt::format("\"{}\"", numbers[i]));
+                 __imp__sub_825AFDC8, NativeFltin2, fmt::format("\"{}\"", numbers[i]));
     }
     results.Report();
   }
@@ -1280,7 +1409,7 @@ void CRuntime(Context& h) {
         t.r4.u64 = locale;
         t.f1.u64 = 0x7FF4000000000001ull;
         if (which == 0) {
-          (v == 0 ? __imp__sub_825AB0C0 : sub_825AB0C0)(t, h.base);
+          (v == 0 ? __imp__sub_825AB0C0 : NativeAtofL)(t, h.base);
         } else {
           (v == 0 ? __imp__sub_825AB1C0 : sub_825AB1C0)(t, h.base);
         }
