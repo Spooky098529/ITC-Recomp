@@ -59,8 +59,8 @@ goes in `src/` as overrides), American English.
   subsystems mapped and made native as far as they were ready (ours 162
   -> 335); its second run (branch `b7-loop-22-10-26`) removed
   31 adapters and made the race overlays native as far as they were
-  ready (ours 422); its third run (the same branch, stopped for the
-  user's review) made the vehicle accessors, the matrix math and the
+  ready (ours 422); its third run (the same branch; both merged
+  2026-10-22, their rows not yet reviewed by the user) made the vehicle accessors, the matrix math and the
   car physics native as far as they were ready (ours 705). See "B7's loop runs" under B7, and
   `docs/loops/b7-progress.md`. What most of the rest waits on is the
   user's call on allocating guest memory from native code (the heap and

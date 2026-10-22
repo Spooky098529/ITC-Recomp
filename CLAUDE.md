@@ -105,13 +105,14 @@ reviewed by the user) made five subsystems native as far as they were ready
 default); see "B7's loop runs" in the plan and
 `docs/loops/b7-progress.md`. Most of what's left in them waits on the
 user's call on allocating guest memory from native code. Its second run
-(on `b7-loop-22-10-26`, in progress; its first session merged into
-`rexglue-removal-project` 2026-10-22, after a drive saw the functions
-attract races hadn't; summary
+(on `b7-loop-22-10-26`, merged into `rexglue-removal-project`
+2026-10-22, after a drive saw the functions attract races hadn't; summary
 `docs/loops/b7-loop-2026-10-22-1047.md`) removed 31 adapters and made the
 race overlays native as far as they were ready
 (`docs/functions/race-overlays.md`, `--native_race_overlays`). Its third
-run (the same branch, 2026-10-22, stopped for the user's review; summary
+run (the same branch, 2026-10-22, merged the same day after a drive saw
+62 of the 66 functions attract races hadn't, its rows not yet reviewed
+by the user; summary
 `docs/loops/b7-loop-2026-10-22-1439.md`) made the vehicle accessors, the
 matrix math and the car physics native as far as they were ready
 (`vehicle-accessors.md`, `matrix-math.md`, `car-physics.md`;
