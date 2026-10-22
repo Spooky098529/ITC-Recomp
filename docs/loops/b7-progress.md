@@ -16,10 +16,9 @@ there), and this file's history.
   physics step, many ready groups, blocks `car-physics.md`), mapped in
   `collision.md` (dd758b3; 64 rows; checked: 43 ready groups). Migration 1
   done (f5b59e8..e634cfd, 53 of 64 ours). Validated (53 of 53 harness
-  lines; replay ok). Step: migration 2 (agent running): what's left,
-  with `sub_820B7B60` CollisionObject::Translate (`car-physics.md`) and
-  the two rigid body accessors' lead (`sub_820988C0`, `sub_82379328`),
-  which block it.
+  lines; replay ok). Migration 2 done (df767d1..b83c56a: all 64 ours, with
+  CollisionObject::Translate, Vehicle::ApplyForces and the rigid body
+  accessors). Step: its validation (agent running).
 
 ## Done
 
@@ -44,6 +43,16 @@ there), and this file's history.
   only where `c_runtime::Memcpy` records nothing. Map corrections:
   LowerCorner's ties and NaNs (k^2), NextCheckTime's radii (the +20
   shape), Shape::Shape zeroes +108's w.
+  Migration 2's rows: 23 in `collision.md` (all 64 ours: 35 Native, 29
+  Overridden), `car-physics.md`'s `sub_820B7B60` CollisionObject::Translate
+  and `sub_820B2CC0` Vehicle::ApplyForces, `vehicle-accessors.md`'s new
+  `sub_820988C0` RigidBody::Force (keeps its adapter: reached
+  indirectly in play) and `sub_82379328` RigidBody::Torque. For review:
+  the lifetime functions use `memory::crt` only while `--native_heap` is
+  on, checking error paths first with a new `memory::IsHeapBlock`;
+  PushOutCorners does the work of `sub_820BE0D8` and `sub_820BC8A8`
+  (never ran in play, no rows); Respond's and Solve's "a fixed body
+  meeting the impulse" groups (below).
 
 - `heap.md`: 15 rows read in full and rewritten (no status changed), the
   intro's paragraph on native versions; migration 1's 15 rows (12
@@ -68,6 +77,16 @@ there), and this file's history.
   1, Query::FindImpact 1 (of 200). UpdateMotion, CollisionShape::Place
   and CollisionShape::Translate also have "one NaN meeting its own
   negation" groups (1, 0, 1 differ: a sign in row +96).
+- `collision.md` (migration 2): "NaNs and infinities anywhere":
+  Vehicle::ApplyForces 23 of 100, CollisionObject::Translate 32 of 200,
+  CollisionShape::SetUp 7 of 100; Translate "one NaN meeting its own
+  negation" 1 of 1. CollisionPair::Respond "a fixed body meeting the
+  impulse" 10 of 44, "one NaN anywhere" 4 of 158, both 6 of 42; Solve
+  "one NaN anywhere, a fixed body meeting the impulse" 2 of 42. For
+  review: the fixed-body groups differ because the original
+  RigidBody::ContactImpulseWith reads its stack's leftovers for a fixed
+  body, and native callees leave different leftovers (the game's cars
+  aren't fixed; whether anything fixed meets a car in play isn't known).
 
 ## To check in a drive
 
@@ -92,3 +111,5 @@ the validation agent's attract race or pad replay; the user drives (with
   (wrapped 137, known 385, unknown 5502).
 - After the collision's migration 1: ours 782, work left 5971 (wrapped
   137, known 332, unknown 5502).
+- After the collision's migration 2: ours 797, work left 5956 (wrapped
+  137, known 319, unknown 5500).
