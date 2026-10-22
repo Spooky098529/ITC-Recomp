@@ -66,6 +66,11 @@ Rows not yet moved stay in the table below. So far:
   list the recorders write render commands into: its set-up and flip,
   opening and closing chunks, allocating slots, vertices, bytes and
   resolves (B7).
+- [`c-runtime.md`](c-runtime.md): the C runtime and math library as seen
+  in play: math functions and their floating-point helpers, string,
+  memory and character helpers, number parsing and formatting, and the
+  pure parts of its start-up (B7; the heap and what calls kernel imports
+  aren't in it).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
@@ -161,8 +166,6 @@ old performance notes to the end of `../native-renderer.md`.
 | `sub_82296E88` | `SetLastErrorFromStatus` | Overridden | r3 = an NTSTATUS: `SetLastError(RtlNtStatusToDosError(r3))` (the same check of `[r13+336]`), returning the DOS error. Called after failed kernel calls (27 files). Ours: `last_error::SetFromStatus`, the mapping from the SDK's `xeRtlNtStatusToDosError` (C++, no guest call) until the import's last recompiled caller, `sub_822953E8`, is native and the table is ours. 1,000 statuses across the mapping's branches the same as the recompiled one. |
 | `sub_82297340` | | | UTF-8 to UTF-16, for `MultiByteToWideChar`'s code page 65001: r3 = source, r4 = its length, r5 = destination, r6 = its room. Not read. |
 | `sub_82297540` | | | UTF-16 to UTF-8, for `WideCharToMultiByte`'s code page 65001; arguments as `sub_82297340`. Not read. |
-| `sub_825A9958` | `wcslen` | | r3 = UTF-16 string; returns its length. From `WideCharToMultiByte`'s use (ours counts natively, the same in 3,000 cases). |
-| `sub_825A71D0` | `memset` | | r3 = destination, r4 = value, r5 = bytes (from its calls). The time zone read clears each date with it (16 bytes). |
 | `sub_82295E78` | `CreateEvent` | | r4 = manual reset, r5 = initial state, r6 = name (0 for none): `NtCreateEvent`, with `sub_822970A8`'s object attributes only for a name. None named in a boot and attract race. Threads and sync (core). |
 | `sub_825BA2B0` | `CreateTimer` | | `NtCreateTimer`, named the same way. Threads and sync (core). |
 | `sub_82295500` | `Sleep` | | r3 = milliseconds (from `sub_8245D288`'s `Sleep(1000)`; not read). |
@@ -211,7 +214,6 @@ old performance notes to the end of `../native-renderer.md`.
 | `sub_82211A28` | | Wrapped | Draws the rival's logo; noted during the cutscene for the render-only redraw. |
 | `sub_821379D8` | `Glow::Record` | Wrapped | The glow (bloom) recorder in races: strength and history weight blended between ticks, history written every frame (`--blend_glow`, `--glow_history_every_frame`; `src/interpolation/glow.cpp`). |
 | `sub_820AE958` | | Wrapped | The render thread's command that starts the boot movie; `--skip_intro` waits for it to return (ending the movie earlier stalled the boot; "The title screen" in `../title-screen.md`). |
-| `sub_825A7410` | `memcpy` | Wrapped | The library's memcpy (r3 destination, r4 source, r5 size): copies into the physical views recorded for the native renderer's guest memory mirrors (`src/native/buffers.cpp`). |
 | `sub_8229E3F0` | `Device::Kick` | Overridden | `src/native/gpu_link.cpp`. r3 device, r4 (size in words, address) pairs, r5 their count. The kicked buffers are applied directly (only their effects outside the GPU) instead of written to the ring; the original is no longer called. `--native_renderer_log_gpu` logs. |
 | `sub_8229E848` | `Device::DeferredKick` | Overridden | Same file. Queued kicks while GPU interrupts were outstanding; every kick completes at once now, so it kicks straight away; the original is no longer called. |
 | `sub_8229DFF8` | | | Links a block into a list in the command buffer: r3 the list (+4, +8 its last), r4 the block, r5 and r6 stored in it; stores the block's address through the old last's pointer (the MMIO store macro, but not shown to be a register) and calls `sub_822AC470` twice. Only from the deferred kick `sub_8229E848`, whose native version doesn't call it: never called (attract race and play). Not read in detail. |
@@ -238,7 +240,6 @@ old performance notes to the end of `../native-renderer.md`.
 | `sub_822B0AB0` | `ComputeGammaRampPwl` | Overridden | Same files. The same curve for a 128-entry piecewise-linear ramp (three channels of (base, delta) pairs): base `curve[base >> 6] << 6`, delta `(curve[min(base>>6 + delta>>6, 1023)] − curve[base >> 6]) << 6`, wrapped to 16 bits. Never called in play. Not needed to draw today (`--xbox_gamma` uses fixed tables captured from the game), but kept native so it can follow the game's ramp later. |
 | `sub_822B07B0` | `SrgbCurve` | Native | `display::Srgb` (`src/display/gamma.cpp`). f1 x, r4 to linear; returns f1 (float). To linear: x > 0.04045 → ((x + 0.055) × (1/1.055))^2.4, else x / 12.92; from linear: x > 0.0031308 → 1.055 × x^(1/2.4) − 0.055 (fused), else x × 12.92. Called only by the two gamma ramps, now native. |
 | `sub_822B0860` | `Bt709Curve` | Native | `display::Bt709`, same file. To linear: x ≥ 0.0812 → ((x + 0.099) × (1/1.099))^(1/0.45), else x / 4.5; from linear: x ≥ 0.018 → 1.099 × x^0.45 − 0.099 (fused), else x × 4.5. Called only by the two gamma ramps, now native. |
-| `sub_825A8ED0` | `pow` | | The C runtime's pow (f1, f2; returns f1); a zero exponent and a zero base handled first. 36 callers. The gamma curves use `std::pow` instead: the same once rounded to float (the `gamma` harness). Not read in detail. |
 | `sub_822A3A20` | | | Calls `ComputeGammaRamp` (r5 = 0); from `Device::SetDisplayMode`. Not read. |
 | `sub_822A3AA8` | | | Calls `ComputeGammaRampPwl`; from `Device::SetDisplayMode` for formats 7 and 54. Not read. |
 | `sub_822B0E08` | | | Fill a ramp (r3, r4 = 0) before `Device::SetDisplayMode` runs it through the gamma functions; also called by `sub_822A05A8`. Probably the default (identity) ramps. Not read. |

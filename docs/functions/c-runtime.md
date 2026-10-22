@@ -1,0 +1,198 @@
+# Known functions: C runtime
+
+The game's statically linked C runtime and math library (Microsoft's, for
+the Xbox 360), as seen in play: the math functions, the floating-point
+helpers they share, the string, memory and character helpers, the
+number parsing and formatting (`sprintf` and its float conversion), and
+the small pure pieces of its start-up. It sits at about `825A6880` to
+`825B9A60` in `default.xex`; below it (`8259C000` to `825A6800`) is the
+UI movie library (`UiMovie::` in [`functions.md`](functions.md), a lead
+in `../loops/leads.md`), above it the kernel import thunks and threads.
+Mapped by the B7 loop (`../loops/b7-loop.md`) from the stack probe
+(`sub_825A9934`) and `acos` (`sub_825A8170`), which block the sprite
+overlays in [`sprites.md`](sprites.md). The C runtime's globals are in
+`../known-data.md`.
+
+Not here: the heap (`sub_825A6880`, `sub_825A6940`, `sub_825A70E8`,
+`sub_825A71C0`, and under them `sub_825A9A90` and `sub_825A9B58`, the
+allocation and free over HeapAlloc and HeapFree, `sub_825AC320` calloc,
+`sub_825AEBC8` and `sub_825AED30`; a lead waiting on the user), and what
+calls kernel imports, which goes with the core: the locks
+(`sub_825AA1A8` and `sub_825AA1B0` over `sub_825B3430` and `sub_825B32D0`,
+critical sections), `atexit` (`sub_825A7068`, 124 static set-ups
+register their clean-up with it, with `sub_825A6F60`, `sub_825A7044`,
+`sub_825A6F00`; it locks and grows its table on the heap), the per-thread
+data (`sub_825AA580` `_getptd`, `sub_825AA4C0`, `sub_825AA400`,
+`sub_825AA708`, `sub_825AA670`, `sub_825B3650`: TLS), the lock and stream
+tables' set-up (`sub_825B31D8`, `sub_825B35A0`, `sub_825AD4D0`,
+`sub_825B4668`), and `_controlfp` (`sub_825AB400`,
+KeEnableFpuExceptions). Shared with other files: `sub_82106540` (an
+empty function, in [`audio.md`](audio.md)), called by `_init_pointers`.
+The game's own wrappers that jump here (`sub_82295D48` to `wcscpy`) stay
+in their files.
+
+Matching the translated code: native math must give the same doubles,
+bit for bit, as the translated PowerPC code, NaNs and denormals
+included. What that takes, from the generated code:
+
+- `fmadd`, `fmsub`, `fnmsub` and `fnmadd` are translated as `std::fma`
+  (one rounding): native code calls `std::fma` at the same steps, and
+  builds with no other contraction (`-ffp-contract=off`, no fast math),
+  as a separate multiply and add round twice.
+- The polynomials' coefficients are tables of doubles (and some floats)
+  in guest memory (`../known-data.md`): native code uses the same values
+  (read once from the guest, or copied as hex constants), in the same
+  order of operations.
+- `fsqrt` and `fdiv` are correctly rounded on both sides (`sqrt`, `/`).
+  `fsel` is `a >= 0.0 ? b : c` (a NaN picks c); `fcmpu` comparisons with a
+  NaN are all false.
+- `fctid` (`sin`, `cos`, `pow`'s integer test) rounds by the host's
+  rounding mode (`cvtsd2si`), `fctidz` truncates; a NaN gives
+  `0x8000000000000000`, and too large saturates.
+- The translated scalar code turns the host's flush-to-zero off before
+  floating-point work (`ctx.fpscr.disableFlushMode()`); vector code turns
+  it on. Native code called from translated code must run with it off
+  too, or denormals differ.
+- `mffs` and `mtfsf` read and write only the rounding mode
+  (`FPSCRRegister::loadFromHost`, `storeFromGuest` in the SDK's
+  `rex/ppc/context.h`): `_ctrlfp` (`sub_825B0B80`) sees no exception bits,
+  so the error paths that test them (`_except1` and the like) never ran.
+- `sub_825A9DB0` converts a 64-bit integer to a double by truncating, not
+  rounding.
+
+The error paths (`_errno` `sub_825A81E0` and `_invalid_parameter`
+`sub_825AFCC8`, called with EINVAL 22 or ERANGE 34; the math functions'
+`_except1`, `sub_825B0968` and the like) never ran in play: native code
+for a function keeps them on the recompiled path behind its flag, or
+ports them, and the row says which.
+
+Status:
+
+- **Native**: plain C++ in `itc_recomp/src/` that doesn't use the
+  PowerPC context (`ctx`): normal arguments and host structs (it may
+  still read and write guest memory through `src/guest.h` while
+  recompiled code shares the data). The game reaches it without `ctx`,
+  from native or overridden callers, and the recompiled original is no
+  longer called (except behind a fallback flag or to check against it).
+  No `REX_FUNC` override of it exists, not even an adapter kept only for
+  a harness (that's Overridden until the adapter goes).
+  The end state for every function.
+- **Overridden**: an `extern "C" REX_FUNC(sub_XXXXXXXX)` override in
+  `itc_recomp/src/` (or a macro defining one) does the work instead of
+  the original: a thin adapter in front of native code, or a body that
+  still uses `ctx` (calling guest code, reading registers). It may call
+  the original when its flag is off, or to check itself against it.
+- **Wrapped**: an override that does something of its own (skipping
+  render-only passes, logging, timing) and still calls the original
+  (`__imp__sub_XXXXXXXX`) for the work.
+- **Dropped**: its work isn't needed on PC (hardware set-up, kernel calls
+  the SDK already stubbed), so it no longer runs: an override in
+  `itc_recomp/src/` replaces it with nothing (or a fixed return value), or
+  its callers, made native, leave the call out (no override then; the row
+  says which caller). Logs, a harness or the renderer's frame dumps have
+  shown that nothing reads what it did. The original is no longer called,
+  except behind a fallback flag while the drop is being checked. A
+  function the game never calls in the first place isn't Dropped: its
+  status stays blank and its row says it's never called.
+- **Patched**: the generated code was edited in place (search for
+  `PATCH:`).
+
+A function usually moves from recompiled or Wrapped to Overridden to
+Native as the `ctx` edge moves up through its callers, or straight to
+Dropped when its work isn't needed.
+`itc_recomp/tools/check_function_statuses.py` checks this column, in
+every file of the tables, against `src/` (an override marked Native, a
+status with no override, an override with no row, a row in two files);
+run it after changing either, on any branch.
+
+| Address | Name | Status | Notes |
+|---|---|---|---|
+| `sub_825A9934` | `__chkstk` (the stack probe) | | r12 = minus the frame size (bytes), from functions with frames of 4 KB and more, before they move r1: reads one word every 4,096 bytes below r1, down to the new frame (none for under 4 KB). Reads only (touching the guard pages on the 360); writes nothing, returns nothing. Leaf. 9 callers seen in play: `sub_820F5740`, `sub_82114268`, the sprite overlays `sub_82129A08`, `sub_8212ACF0`, `sub_8212BB20`, `sub_8212C6D0`, `sub_8212DFB8` (`sprites.md`), `sub_822C3960`, `sub_8246AEE0`. Native callers can leave the call out (the guest stack is ordinary memory: the reads have no effect), which makes it Dropped for them. |
+| `sub_825A8170` | `acos` | | f1 = x; returns acos(x) in f1 (double): sets r4 = 1 and branches to `sub_825A7FB0`. From `sub_821266C8` (`Vector::AngleBetween`, `sprites.md`) and `sub_82136FA8`. |
+| `sub_825A7FB0` | `__asin_acos` (probably) | | The kernel `acos` shares (f1 = x, r4 = 0 for asin, 1 for acos; only `acos` calls it in play): for \|x\| above the float at `0x8266B47C` (probably 0.5), s = -sqrt((1 - \|x\|) × it) scaled by the float at +8; else s = \|x\| and x² (with r4 = 0, x = 0 returns x). Then a rational polynomial in x² (coefficients at `0x8266B470` +48 to +120, doubles: two Horner chains with `fmadd`), p × s / q + s, plus or minus the table's constants (+16 and +32, by r4 and the branch: probably 0, π/2 and π), the sign picked with `fsel` on x (a NaN x takes the negative side). Leaf. Bit for bit: `std::fma` at each `fmadd`, `sqrt`, one division. |
+| `sub_825A80A8` | `asin` | | f1 = x; returns asin(x): the same steps as `sub_825A7FB0` with r4 = 0 built in (the same table at `0x8266B470`). Leaf. From `sub_820C05C8`. |
+| `sub_825A8688` | `atan` | | f1 = x; returns atan(x). \|x\| above the float at `0x8266B660` +176 (probably 1.0): beyond the double at +48, returns the double at +8 (probably π/2) with x's sign; else 1/\|x\| (r10 = 2). Above the double at +24 (probably 2 - √3), reduced by (a·t - 1)/(a + t) with `fmsub` (r10 + 1). A rational polynomial (+56 to +112, `fmadd` chains), negated for r10 > 1, plus the constant at +128 + 8·r10; the sign from x by `fsel`; x = ±0 returns x. Leaf. 8 callers seen (`sub_820AA378`, `sub_820AAE90`, `sub_820B09C8`, `sub_820B18B8`, `sub_82136FA8`, `sub_82150350`, `sub_824B3AA8`, `sub_82593568`). |
+| `sub_825A8770` | `atan2` | | f1 = y, f2 = x; returns atan2(y, x), the same table as `atan` (`0x8266B660`). x = 0: y = 0 gives 0, or the double at +16 (probably π) with y's sign when x is -0; y ≠ 0 the double at +8 with y's sign. Else the smaller magnitude over the larger, `atan`'s reduction and polynomial, then the quadrant by `fsel` on x (π minus the result for x < 0) and y's sign bit. Leaf. 8 callers seen (`sub_820B1B00`, `sub_820B3F80`, `sub_820B4420`, `sub_820F5740`, `sub_82138D78`, `sub_821467F0`, `sub_8217CAB8`, `sub_82481390`). |
+| `sub_825A88A0` | `sin` | | f1 = x; returns sin(x). k = \|x\| × the double at `0x8266B718` +8 (probably 1/π) rounded by `fctid` (the host's rounding mode, nearest in play); r = \|x\| - k·C1 - k·C2 (`fnmsub`, +40 and +48: π in two parts); an odd polynomial in r (+56 to +112 and the 1.0 at `0x82002250`, `fmadd`), negated when k is odd, times x's sign (`fsel`: the floats at +28 and +32). \|x\| beyond the double at +16 returns the double at `0x8266BC38` (probably the default NaN); x = ±0 returns x. Leaf. 24 callers seen (cameras, the car, the HUD, the sprite overlays' `sub_8212A350` and `sub_8212B4A8`...). |
+| `sub_825A8978` | `cos` | | f1 = x; returns cos(x): `sin`'s table and steps on \|x\| + π/2 (the double at `0x8266B718` +0), k rounded by `fctid` then less 0.5 (the float at +36). \|x\| beyond +16 returns the double at `0x8266BC38`; \|x\| equal to the float at +24 (probably 0) returns the float at +28 (1.0). Leaf. 29 callers seen. |
+| `sub_825A8A50` | `tan` | | f1 = x; returns tan(x). Sets the rounding mode to nearest through `_ctrlfp` (`sub_825B0B80`, r3 = 0xF8, r4 = 0xC007FEFF) and restores it at the end. Infinity or NaN: `_fpclass`-like `sub_825AFEF8` (never ran), the `_except1` paths. \|x\| above the double at `0x820723B8` +16 goes to the `_except1` path with the NaN at `0x8266BC38` (never ran). Else k = rint(x × 2/π) (`sub_825B0B30`), r = x - k·C1 - k·C2 (`fnmsub`, `0x8266B790`), for small \|r\| (below +8) p = r and q = the double at +48 (a denormal r goes through `sub_825AFEC0`, never ran); else a rational polynomial (`fmadd`, `fmsub`, `fnmsub` with constants at `0x82072410` to `0x82072428`), then p/q, or -q/p for odd k. 15 callers seen. The exception bits it tests are always clear in the translation (only the rounding mode is kept), so it returns through the restore. |
+| `sub_825B0B30` | `rint` (probably `_frnd`) | | f1 = x; returns x rounded to an integer in the current rounding mode: unchanged when x equals the double at `0x82073670` (probably 0) or \|x\| ≥ the double at `0x82073678` (probably 2^52); else (x + 2^52) - 2^52, or (x - 2^52) + 2^52 for negative x. Leaf. From `tan`. Bit for bit: two plain additions, no `std::nearbyint` unless it matches in every mode. |
+| `sub_825B0B80` | `_ctrlfp` | | r3 = new bits, r4 = mask: FPSCR = (new ^ 0xF8) & mask \| FPSCR & ~mask (`mffs`, `mtfsf`); returns the old FPSCR word ^ 0xF8. In the translation only the rounding mode is read and written (`loadFromHost`, `storeFromGuest`): the host's MXCSR rounding bits. Leaf. From `tan`, `ldexp`, `_controlfp` (`sub_825AB400`) and `sub_825AB568`. Native code would set the host rounding mode itself (`fesetround`) or, since every caller in play sets nearest and restores it, keep the nearest the thread already runs in; needs the callers native first. |
+| `sub_825AB568` | `_clearfp` (probably) | | `_ctrlfp(0, 0xFFF80700)` (clears the FPSCR's exception bits: only the rounding mode exists in the translation), then returns `sub_825AB380` of the old word. From `sub_822E0840` and `sub_82340778`, which also call `_controlfp` (`sub_825AB400`, KeEnableFpuExceptions: with the core). |
+| `sub_825AB380` | `_abstract_sw` (probably) | | r3 = an FPSCR word (^ 0xF8): returns the C runtime's portable control or status word: rounding mode (0-3 to 0, 768, 512, 256), bits 0x08, 0x20, 0x40, 0x10 and 0x80 to 1, 2, 4, 8 and 16, ORed with 0x80000. Leaf. From `_controlfp` and `sub_825AB568`. |
+| `sub_825A8CA0` | `floor` | | f1 = x; returns floor(x): t = trunc(x) (`fctidz`, `fcfid`), t - 1.0 when x - t < 0 (`fsel`); \|x\| ≥ the double at `0x82072430` (probably 2^52) or a NaN returns x. Leaf. From `sub_82132778` and `sub_823DE130`. |
+| `sub_825AA0B8` | `ceil` | | f1 = x; returns ceil(x): as `floor` with t + 1.0 when t - x < 0. Leaf. From `sub_824B3510`. |
+| `sub_825A8CE0` | `pow`'s integer test (probably `_d_inttype`) | | f1 = y: returns 2 for an even integer, 1 for an odd one, 0 otherwise (a denormal or non-integer); y and y × 0.5 (the double at `0x820022B8`) tested by `fctid`, `fcfid` and `fcmpu`. Leaf. From `pow`. |
+| `sub_825A8ED0` | `pow` | | The C runtime's pow (f1, f2; returns f1); a zero exponent and a zero base handled first. 36 callers. The gamma curves use `std::pow` instead: the same once rounded to float (the `gamma` harness). Not read in detail. Calls (seen in play): `sub_825A8CE0` (the integer test), `log` (`sub_825A9C00`), `copysign` (`sub_825AB1C8`), `_set_exp`, `_get_exp` and `_decomp` (`sub_825AFE80`, `sub_825AFEA8`, `sub_825AFF80`); `sub_825A8D50` (probably its `exp` step) never ran in play, so the paths seen probably end before it (not checked). 13 callers seen in play (`sub_820B81C8`, `sub_820C05C8`, `sub_8210D718`, `sub_82134060`, the audio library's `sub_824675B8`, `sub_82467A18`, `sub_82468848`, `sub_8246AC40`, `sub_8246D0C8`, `sub_824B3628`, `sub_824B72C8`, `sub_824B7390`, `sub_825DA750`). |
+| `sub_825A9C00` | `log` | | f1 = x; returns ln(x). x = 1.0 returns 0.0; infinity or NaN (exponent 2047): x returned when above the double at `0x82072610` (probably the largest double: +infinity), else -NaN; x ≤ 0: -NaN (from `0x8266BC38`), or -infinity (`0x8266BC30`) for 0. Else a denormal scaled first (× `0x82072600`), the mantissa split into [0.5, 1) by its exponent bits, f = (m - 0.5 - 0.5)/(...) with the table at `0x82072588`, a rational polynomial (`fmadd`, `fmsub`, `fnmsub`) plus the exponent × ln 2 in two parts (`0x820725E8`, `0x82072590`). Leaf. From `pow`, `log10`, `sub_823DE658` and `sub_824AFD48`. |
+| `sub_825A9D80` | `log10` | | f1 = x: `log(x)` × the double at `0x820725A0` (probably 1/ln 10). From `sub_82469418`. |
+| `sub_825AAD20` | `ldexp` | | f1 = x, r4 = n; returns x × 2^n. Sets nearest rounding through `_ctrlfp` and restores it. Infinity or NaN and 0 returned as they are (the NaN's `_except` path, `sub_825B08E8`, never ran); else the exponent from `_decomp` (`sub_825AFF80`) plus n: within range set with `_set_exp` (`sub_825AFE80`); overflow (above 1024) or underflow (below -1021) go through `_except` (`sub_825B0A40`, never ran) with infinity (`copysign`, `0x8266BC30`), 0 or the value rescaled by 1536. From `sub_822AF550`. |
+| `sub_825AB1C8` | `copysign` (probably `_copysign`) | | f1 = magnitude, f2 = sign: f1's bits with f2's sign bit (through the stack, bit operations; the double at `0x82002258` is loaded and overwritten). Leaf. From `pow`, `ldexp` and `sub_823DE130`. |
+| `sub_825AB268` | `_fpclass` | | f1 = x; returns its class: infinity or NaN through `sub_825AFEF8` (never ran; its 1 → 512 +infinity, 2 → 4 -infinity, 3 → 2 quiet NaN, else 1 signaling NaN), denormals 128 or 16, zeros 64 or 32, normals 256 or 8 (positive, negative). From `sub_823C0E60`, `sub_8240ED30` and `sub_82414008`. |
+| `sub_825AFE80` | `_set_exp` | | f1 = x, r4 = exponent: returns x with its biased exponent set to r4 + 1022 (sign and mantissa kept). Leaf. From `pow` and `ldexp`. |
+| `sub_825AFEA8` | `_get_exp` | | f1 = x: returns its biased exponent - 1022 (sign extended). Leaf. From `pow`. |
+| `sub_825AFF80` | `_decomp` | | f1 = x, r4 = int out: returns the mantissa in [0.5, 1) with x's sign and stores the exponent (0 for x = 0; a denormal normalized bit by bit, -1021 and down). Leaf. From `pow` and `ldexp`. |
+| `sub_825A9DB0` | `__ultod` (probably) | | r3 = 64-bit integer: returns it as a double built from its bits (`cntlzd`, the leading bit dropped, the exponent 1086 - zeros), truncating the low bits rather than rounding; 0 gives 0.0. Leaf. From `sub_8246E208`, `sub_8246E4C8`, `sub_8248BE48` and `sub_824A35A8`. Bit for bit: not `double(uint64_t)`, which rounds. |
+| `sub_825AC870` | `abs` | | r3 = int: returns its absolute value (INT_MIN stays). Leaf. 6 callers seen (`sub_824F8478`, `sub_824F87A8`, `sub_824FD850`, `sub_825614D0`, `sub_82561700`, `sub_82562B10`). |
+| `sub_825A9BB8` | `rand` | | Returns (seed × 214013 + 2531011) >> 16 & 0x7FFF, the seed in the calling thread's C runtime data (+20 of `_getptd`, `sub_825AA580`: TLS, with the core). From `sub_8212F148` and `sub_82175DB0`. Blocked by `_getptd`; native code would need that seed (the guest's per-thread data, or its own per thread: then not the same sequence where the game also seeds it with `srand`, not seen). |
+| `sub_825A71D0` | `memset` | | r3 = destination, r4 = value, r5 = bytes (from its calls). The time zone read clears each date with it (16 bytes). 192 callers seen in play. Cache hints only (`dcbtst`), no `dcbz`. Not read in detail. |
+| `sub_825A7410` | `memcpy` | Wrapped | The library's memcpy (r3 destination, r4 source, r5 size): copies into the physical views recorded for the native renderer's guest memory mirrors (`src/native/buffers.cpp`). 318 callers seen in play; `memmove` (`sub_825AA840`) and `memcpy_s` (`sub_825A7270`) call it. Cache hints only (`dcbt`, `dcbtst`). Native callers would copy and do the wrapper's mirror work (`src/native/buffers.cpp`) themselves. |
+| `sub_825AA840` | `memmove` | | r3 = destination, r4 = source, r5 = bytes: nothing when they're equal; destination below the source tail-calls `memcpy` (`sub_825A7410`, so the mirrors' wrapper sees it); else copies backward (bytes to align the destination, words, the source read bytewise when unaligned, then bytes). From `sub_822997B0`, `sub_8229A930`, `sub_8233DFD8`, `sub_824850A0`, `sub_82486350`, `sub_825AE708`, `sub_825B61E8`. |
+| `sub_825A7830` | `memcpy` (a second, simple one) | | r3 = destination, r4 = source, r5 = bytes: copies forward, bytes until the destination is word aligned, then words (an unaligned source read bytewise), then the rest; r3 stays the destination. Leaf. Not wrapped like `sub_825A7410`, so its copies don't reach the mirrors' bookkeeping. From `sub_821891C8`, `sub_82295890` and `sub_8254DCD8`. |
+| `sub_825A7270` | `memcpy_s` | | r3 = destination, r4 = its size, r5 = source, r6 = count: 0 when count is 0; copies with `memcpy` when the source isn't null and count ≤ size, returns 0; else clears the destination (`memset`) and returns EINVAL (22, a null destination or source) or ERANGE (34) through `_errno` and `_invalid_parameter` (never ran). From `sub_82091328`, `sub_82091458`, `sub_82091720`, `sub_82091808` and `sub_820A6F60`. |
+| `sub_825A9958` | `wcslen` | | r3 = UTF-16 string; returns its length. From `WideCharToMultiByte`'s use (ours counts natively, the same in 3,000 cases). Leaf. Callers seen in play: `sub_82108210` and `sub_82109AA8`. |
+| `sub_825A7F30` | `wcscpy` | | r3 = destination, r4 = source (UTF-16): copies through the terminator; returns r3. Leaf. From `sub_8209EEC8`, `sub_8209F040`, `sub_8210A680` and `sub_82295D48` (the save slot's name, `files-and-saves.md`). |
+| `sub_825A7EF8` | `wcscat` | | r3 = destination, r4 = source (UTF-16): copies the source over the destination's terminator; returns r3. Leaf. From `sub_8210A5E8`, `sub_8210A680`, `sub_8210A990` and `sub_8210ABC0`. |
+| `sub_825A7EB0` | `wcscmp` | | r3, r4 = UTF-16 strings: -1, 0 or 1 by the first differing unit (unsigned). Leaf. From `sub_8209EEC8`. |
+| `sub_825A7F50` | `strncpy` | | r3 = destination, r4 = source, r5 = count: copies up to count bytes, stopping after the terminator, and pads the rest of count with zeros; returns r3. Leaf. From `sub_820AEC10`. |
+| `sub_825A9DD8` | `strcpy_s` | | r3 = destination, r4 = its size, r5 = source: copies with the terminator; returns 0, or EINVAL (22: null destination, size 0, null source) or ERANGE (34: too long, the destination cleared) through `_errno` and `_invalid_parameter` (never ran). Leaf otherwise. From the float formatting's `_fltout2` (`sub_825B6458`) and `$I10_OUTPUT` (`sub_825B8B48`). |
+| `sub_825AACD0` | `strncmp` | | r3, r4 = strings, r5 = count: the difference of the first differing bytes (unsigned) within count, stopping at a terminator; 0 for count ≤ 0. Leaf. From `sub_822B7D50` and `sub_822B7E00`. |
+| `sub_825AA100` | `_stricmp` | | r3, r4 = strings: compares with A-Z folded to lower case (ASCII only, no locale); returns the difference of the first differing bytes. Leaf. From `sub_82336B18`, `sub_82338F30`, `sub_82339200`, `sub_823D1DB8`, `sub_823DE658` and `sub_8240EEC0`. |
+| `sub_825AC710` | `_strnicmp` | | r3, r4 = strings, r5 = count: EINVAL and INT_MAX for a null string or a count above INT_MAX (never ran), else `sub_825AC6B0`. From `sub_823D1DB8` and `sub_8240EEC0`. |
+| `sub_825AC6B0` | `_strnicmp`'s compare (probably `__ascii_strnicmp`) | | r3, r4 = strings, r5 = count: compares up to count bytes with A-Z folded (ASCII), stopping at the first's terminator; returns the difference. Leaf. From `_strnicmp`. |
+| `sub_825A98A8` | `strstr` | | r3 = string, r4 = what to find: returns the first match's address, r3 for an empty r4, or 0. Leaf. From `sub_820F0070`. |
+| `sub_825A8600` | `toupper` (probably `__ascii_toupper`) | | r3 = character: a-z to A-Z, others as they are (no locale). Leaf. From `sub_820CE800`. |
+| `sub_825A8618` | `tolower` (probably `__ascii_tolower`) | | r3 = character: A-Z to a-z, others as they are. Leaf. From `sub_822C3960`, `sub_822C3E30`, `sub_822C3EA8`, `sub_82338F30` and `sub_82339200`. |
+| `sub_825AB020` | `isalpha` | | r3 = character: its entry in the C locale's character type table (the halfword pointer at `0x8266BB48` + 200) & 0x103 (upper, lower, alpha). Leaf. From `sub_822C3BC0` and `sub_822C5580`. |
+| `sub_825AB040` | `isdigit` | | r3 = character: the same table's entry & 4. Leaf. From `sub_822C3960` and `sub_822C4C88`. |
+| `sub_825AB0A0` | `isalnum` | | r3 = character: the same table's entry & 0x107. Leaf. From `sub_822C3BC0`. |
+| `sub_825B6898` | `isleadbyte` (probably `_isleadbyte_l`) | | r3 = character: the current locale's type table (`[0x8266BC28]` + 200) entry for its low byte & 0x8000 (a multibyte lead byte; none in the C locale). Leaf. From `_output_l` and `_woutput_l`. |
+| `sub_825B7EC8` | `mbtowc` (the C locale's, probably `_mbtowc_l`'s single-byte path) | | r3 = wide char out (or 0), r4 = the bytes, r5 = their count: 0 for none or an empty string (storing 0), else stores the byte zero-extended and returns 1. Leaf. From `_woutput_l`. |
+| `sub_825A85E0` | `strtoul` | | r3 = string, r4 = end pointer out, r5 = base: `sub_825A82C8` with the global locale (`0x8266BC28`) and unsigned (r7 = 1). From `sub_82391930`, `sub_823D1DB8` and `sub_8240EEC0`. |
+| `sub_825A82C8` | `strtoxl` | | r3 = locale, r4 = string, r5 = end pointer out, r6 = base (0 or 2-36), r7 = flags (1 unsigned): skips spaces (the locale's type table, or `sub_825AFD98` for multibyte locales: never ran), a sign, a 0x prefix or base guess; digits accumulated with overflow checks; stores the end. Errors through `_errno` (never ran). From `strtoul`. Not read in detail past the prefix. |
+| `sub_825AB1C0` | `atof` | | r3 = string: `sub_825AB0C0` with no locale (r4 = 0). From `sub_822C3960` (a text parser that also uses `isdigit` and `tolower`). |
+| `sub_825AB0C0` | `_atof_l` | | r3 = string: EINVAL and 0.0 for null (never ran); skips spaces by the type table, measures the rest (`strlen` inline) and parses it with `sub_825AFDC8` (global locale `0x8266BC28`); returns the double at the result's +16. From `atof`. |
+| `sub_825AFDC8` | `_fltin2` (probably) | | r3 = result (+0 flags: 512 nothing parsed, 128 overflow, 256 underflow; +4 characters used; +16 the double), r4 = string, r5 = its length, r8 = locale: `__strgtold12_l` (`sub_825B36B8`) into a 12-byte long double, then `_ld12tod` (`sub_825B69B8`). From `_atof_l`. |
+| `sub_825B36B8` | `__strgtold12_l` | | Parses a decimal number (spaces, sign, digits, the locale's decimal point, exponent) into the C runtime's 12-byte long double (r3 out), r4 the end out; returns flags. A state machine, ~800 lines; calls `__mtold12` (`sub_825B7F10`) and `memcpy`. From `_fltin2`. Not read in detail. |
+| `sub_825B7F10` | `__mtold12` | | r3 = mantissa digits (0-9 bytes), r4 = their count, r5 = the 12-byte result: the digits multiplied in (×10 by shifts and adds of the three words, `memcpy` for the copy), then normalized with exponent 16462. From `__strgtold12_l`. Not read in detail. |
+| `sub_825B69B8` | `_ld12tod` | | r3 = 12-byte long double, r4 = double out: rounds it to a double (the format table at `0x8266C514`), returns 0, 1 (overflow) or 2 (underflow). ~600 lines of integer code. From `_fltin2`. Not read in detail. |
+| `sub_825A93D0` | `sprintf` | | r3 = buffer, r4 = format, the rest variadic (r5-r10 spilled to the caller's area): a string stream of INT_MAX bytes on the stack (flags 66), `_output_l` (`sub_825AF130`) with no locale, then the terminator (through `sub_825AEE28`, `_flsbuf`, never ran when the stream is full); returns the count. EINVAL and -1 for a null buffer or format (never ran). From `sub_820D47A8`, `sub_820D4F80`, `sub_820D6108`, `sub_820D67E8`, `sub_820D7D38`, `sub_820D8430`, `sub_820D8A08`, `sub_82118638` and `sub_82593CA0`. The variadic arguments are read from guest memory (the `va_list` points into the guest stack), so native code needs its own formatter over guest arguments, or callers made native first. |
+| `sub_825AB010` | `_vsnprintf` | | r3 = buffer, r4 = count, r5 = format, r6 = `va_list`: `_vsnprintf_l` (`sub_825AAF18`) with no locale. From `sub_822B8048`, `sub_82364A58` and `_output_l` (formatting a float with its precision into a 512-byte stack buffer). |
+| `sub_825AAF18` | `_vsnprintf_l` | | r3 = buffer, r4 = count (capped at INT_MAX), r5 = format, r6 = locale, r7 = `va_list`: a string stream over the buffer, `_output_l`, the terminator when it fits (`_flsbuf` otherwise: never ran); returns the count (-1 when it didn't fit). From `_vsnprintf`. |
+| `sub_825AF130` | `_output_l` | | The printf engine: r3 = stream, r4 = format, r5 = locale, r6 = `va_list`. ~1,060 lines: flags, width, precision, `%c %s %d %u %x %p %e %f %g %a %ls`...; floats through the conversion table at `0x8266BA5C` (indirect: `_cfltcvt_l` `sub_825AEB20` and others), its buffer `malloc`ed (`sub_825A9A90`, freed with `sub_825A9B58`) only for a precision above 163, so a static blocker on the heap; `_vsnprintf` for the float precision path, `isleadbyte`, `__iob_func` (`sub_825AD4C0`), `write_char`, `write_multi_char`. From `sprintf` and `_vsnprintf_l`. Not read in detail. |
+| `sub_825AF000` | `write_char` | | r3 = character, r4 = stream, r5 = count (int*): a string stream with no buffer (flag 0x40, +8 = 0) only counts; else stores the byte and moves the pointer (+0) while room is left (+4), or `_flsbuf` (`sub_825AEE28`, never ran); count = -1 on failure. Leaf in play. From `_output_l` and `write_multi_char`. |
+| `sub_825AF098` | `write_multi_char` | | r3 = string, r4 = length, r5 = stream, r6 = count: `write_char` for each, stopping at a failure (writing '?' for an EILSEQ, never ran); the no-buffer stream adds the length. From `_output_l`. |
+| `sub_825AD4C0` | `__iob_func` | | Returns `0x8266B7D0`, the C runtime's stream table (32 bytes a stream; stdin, stdout and stderr first). Leaf. From `_output_l`, `_woutput_l` and `_putwc_nolock` (comparing the stream with stdout and stderr). |
+| `sub_825A9A80` | `vswprintf` (probably, the C version without a count) | | r3 = buffer, r4 = format, r5 = `va_list`: `_vswprintf_l` (`sub_825A9980`) with no locale. From `sub_8210A490`. |
+| `sub_825A9980` | `_vswprintf_l` | | r3 = buffer (UTF-16), r4 = format, r5 = locale, r6 = `va_list`: a string stream of INT_MAX bytes, `_woutput_l` (`sub_825B13D0`), then a two-byte terminator; returns the count. EINVAL and -1 for null (never ran). From `vswprintf`. |
+| `sub_825B13D0` | `_woutput_l` | | The wide printf engine (UTF-16 format and output), ~1,040 lines, like `_output_l`; writes through `sub_825B1368`; `mbtowc` (`sub_825B7EC8`, probably for narrow `%hc`/`%hs` arguments), `isleadbyte`, `__iob_func`; `malloc` and `free` statically (as `_output_l`). From `_vswprintf_l`. Not read in detail. |
+| `sub_825B1368` | `write_char` (wide) | | r3 = UTF-16 unit, r4 = stream, r5 = count: like `write_char`, through `_putwc_nolock` (`sub_825B7A80`); count = -1 when it returns 0xFFFF. From `_woutput_l`. |
+| `sub_825B7A80` | `_putwc_nolock` (probably) | | r3 = UTF-16 unit, r4 = stream: for a string stream stores the two bytes; a file stream would convert through the console's code page (`_fileno`, `sub_825B0E88`, and the stream info table at `0x82978220`: never ran). From `sub_825B1368`. Not read in detail. |
+| `sub_825AEB20` | `_cfltcvt_l` | | r3 = the double's address, r4 = buffer, r5 = its size, r6 = format character, r7 = precision, r8 = caps, r9 = locale: 'e'/'E' to `sub_825AE1A8`, 'f' to `_cftof_l` (`sub_825AE8E0`), 'a'/'A' to `sub_825AE2C0`, others ('g') to `sub_825AE9D0`; only the 'f' path ran in play. No direct caller: from `_output_l` through the table at `0x8266BA5C` (+24), set by `sub_825A6DB0`. |
+| `sub_825AE8E0` | `_cftof_l` | | %f: the double's digits by `_fltout2` (`sub_825B6458`, 22 digits), the precision checked (EINVAL, never ran), then `_cftof2_l` (`sub_825AE708`). From `_cfltcvt_l`. Not read in detail. |
+| `sub_825AE708` | `_cftof2_l` (probably) | | Writes the %f text from `_fltout2`'s result: the sign, leading zeros (`memmove` to make room), the locale's decimal point, the digits. From `_cftof_l`. Not read in detail. |
+| `sub_825B61E8` | `_fptostr` | | r3 = buffer, r4 = size, r5 = digits wanted, r6 = `_fltout2`'s result: copies its digits, rounds at the precision (carrying into a leading '1' with `memmove`). From `_cftof_l`. Not read in detail. |
+| `sub_825B6458` | `_fltout2` | | r3 = the double (64-bit), r4 = result (+0 sign, +4 decimal exponent, +8 flag, +12 the digits' buffer), r5 = buffer, r6 = its size: `___dtold` (`sub_825B6378`), `$I10_OUTPUT` (`sub_825B8B48`, 17 digits), the digits copied with `strcpy_s` (`sub_825A9DD8`; its failure path, `sub_825AFD10`, never ran). From `_cftof_l`. |
+| `sub_825B6378` | `___dtold` | | r3 = 12-byte long double out (sign and 15-bit exponent at +0, 64-bit mantissa at +2), r4 = the double: biased exponent + 15360, the implied bit set, a denormal normalized by shifts; infinity and NaN to exponent 32767; zero keeps the sign. Leaf. From `_fltout2`. |
+| `sub_825B8B48` | `$I10_OUTPUT` | | r3-r4 = the 80-bit long double (sign/exponent, mantissa), r5 = digits wanted, r6 = flags, r7 = result (+0 exponent, +2 sign '-' or ' ', +3 count, +4 the digits): the long double's decimal digits by extended multiplication with powers-of-ten tables, rounded; `strcpy_s` for "1#INF", "1#QNAN" and the like. ~1,000 lines of integer code. From `_fltout2`. Not read in detail. |
+| `sub_825A6DB0` | `_cfltcvt_init` (probably) | | Fills the float conversion table at `0x8266BA5C` with ten function pointers (`0x825AEB70`, `0x825ADF20`, `0x825ADF10`, `0x825ADF18`, `0x825ADE90`, `0x825AEB70`, `0x825AEB20` (`_cfltcvt_l`), `0x825ADEB0`, `0x825ADDD8`, `0x825ADD38`). Leaf. Through `sub_825A6E48` once at start-up. |
+| `sub_825A6E48` | | | Branches to `sub_825A6DB0`. No direct caller: probably a C runtime initializer from the start-up's table, run once. |
+| `sub_825AA398` | `_init_pointers` (probably) | | Start-up: stores 0 through `sub_825AD140`, `sub_825B3560`, `sub_825AFCB8`, `sub_825AEE18` (the encoded handler pointers at `0x82971170`, `0x8297132C`, `0x82978320`, `0x82971178`), calls `sub_82106540` (empty; `audio.md`) with 0, `sub_825B3548`, and stores `0x825AA378` at `0x8266B7B0`. From `sub_825AA708` (`_mtinit`, TLS: with the core), once. |
+| `sub_825AD140` | | | r3 → `0x82971170` (a C runtime handler pointer). Leaf. From `_init_pointers`. |
+| `sub_825AEE18` | | | r3 → `0x82971178` (a C runtime handler pointer). Leaf. From `_init_pointers`. |
+| `sub_825AFCB8` | | | r3 → `0x82978320` (probably the invalid parameter handler). Leaf. From `_init_pointers`. |
+| `sub_825B3560` | | | r3 → `0x8297132C` (probably the critical section initializer's pointer, read by `sub_825B35A0`). Leaf. From `_init_pointers`. |
+| `sub_825B3548` | | | Stores `0x825B3498` at `0x82971328`. Leaf. From `_init_pointers`. |
+| `sub_825B6958` | `__initmbctable` (probably) | | Start-up, once (the flag at `0x82978338`): sets `0x8297136C` to -3 and `0x8297135C` to 0, and fills the multibyte info at `[0x8266C450]` with `sub_825B68C8`. No direct caller (an initializer). |
+| `sub_825B68C8` | `setSBCS` (probably) | | r3 = multibyte info: clears its 257-byte table (+28) and +4 to +27, then copies the C locale's 257 + 256 bytes from `0x8266C028` (+28 and +285). Leaf. From `sub_825B6958`. |
+| `sub_825AC4B0` | `setjmp` | | r3 = jmp_buf: if the hook at `0x8297832C` is set, jumps to it; else saves f14-f31, r13-r31, r1, the link register and CR in the buffer (+0 to +312) and returns 0. Leaf. From `sub_823653B0`. Can't be made native on its own: a `longjmp` back into translated code would need the guest's registers; it goes with its caller. |

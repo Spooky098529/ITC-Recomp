@@ -15,10 +15,11 @@ thread's two largest recompiled functions, `sub_821298C0` and
 calls the overlay recorders here through their vtables; the overlays'
 update side (the rest of `82121000`-`8212EF00`) isn't mapped yet (a lead
 in `../loops/leads.md`). Shared callees in other files: `sub_8209BD50`
-(`Matrix::Multiply`), `sub_825A7410` (`memcpy`), `sub_8258CAA0`
-(`CommandList::AllocateSlots`), and the texture animations'
-`sub_82146A38`, `sub_82146B80` and `sub_82597118`, all in
-[`functions.md`](functions.md). The rest of the game's functions are in
+(`Matrix::Multiply`) and the texture animations' `sub_82146A38`,
+`sub_82146B80` and `sub_82597118`, in [`functions.md`](functions.md);
+`sub_825A7410` (`memcpy`), the stack probe `sub_825A9934` and `acos`
+(`sub_825A8170`), in [`c-runtime.md`](c-runtime.md); `sub_8258CAA0`
+(`CommandList::AllocateSlots`), in [`command-list.md`](command-list.md). The rest of the game's functions are in
 [`functions.md`](functions.md).
 
 Status:
