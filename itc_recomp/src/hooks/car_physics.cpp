@@ -212,3 +212,6 @@ ITC_CAR_PHYSICS(820B24A8, VehicleUpdateTurbo(base, ctx.r3.u32))
 ITC_CAR_PHYSICS(820B3F80,
                 ctx.r3.u64 = VehicleUpdateTireForces(base, ctx.r3.u32, ctx.r1.u32 - 272))
 ITC_CAR_PHYSICS(820B2808, ctx.r3.u64 = VehicleUpdateAtRest(base, ctx.r3.u32, ctx.r1.u32 - 192))
+ITC_CAR_PHYSICS(820B2A48, ctx.r3.u64 = VehicleUpdateAero(base, ctx.r3.u32, ctx.r1.u32 - 240))
+ITC_CAR_PHYSICS(820B1B00,
+                ctx.r3.u64 = VehicleUpdateWheelAxes(base, ctx.r3.u32, ctx.r1.u32 - 256))

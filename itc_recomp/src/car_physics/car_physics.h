@@ -286,5 +286,18 @@ uint32_t VehicleUpdateTireForces(uint8_t* base, uint32_t vehicle, uint32_t frame
 // `frame`: the original's 192 bytes (its callees' below). Returns what the
 // original leaves in r3.
 uint32_t VehicleUpdateAtRest(uint8_t* base, uint32_t vehicle, uint32_t frame);
+// Vehicle::UpdateAero (sub_820B2A48): the drag into the body's force
+// accumulator +2608, the downforce into the wheels' (moving forward), and
+// the engine's shake (+2340, +2344) into the front wheels'. `frame`: the
+// original's 240 bytes (EngineTorque's below it). Returns what the
+// original leaves in r3.
+uint32_t VehicleUpdateAero(uint8_t* base, uint32_t vehicle, uint32_t frame);
+// Vehicle::UpdateWheelAxes (sub_820B1B00): per wheel the toe +36 and the
+// axes +144 and +128 (the vehicle's +112 and +128 turned by toe and
+// steering; those two also into +2080 and +2064), +324 = +320, the contact's
+// velocity +336 and its speeds +320, +328, the camber +32 and the wheel's
+// quaternion +48. `frame`: the original's 256 bytes. Returns what the
+// original leaves in r3 (wheel 3's +48).
+uint32_t VehicleUpdateWheelAxes(uint8_t* base, uint32_t vehicle, uint32_t frame);
 
 }  // namespace car_physics

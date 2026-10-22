@@ -1018,4 +1018,195 @@ uint32_t VehicleUpdateAtRest(uint8_t* base, uint32_t vehicle, uint32_t frame) {
   return body + 96;
 }
 
+uint32_t VehicleUpdateAero(uint8_t* base, uint32_t vehicle, uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_820B2A48 Vehicle::UpdateAero");
+  const uint32_t f = frame;
+  const uint32_t data = CarData(base, vehicle);
+  const double zero = Lfs(base, kZero);
+  // The drag, against the motion along +112 (forward) and +128 (side).
+  const double forward = Lfs(base, vehicle + 384);
+  const double forward2 = Fmuls(forward, forward);
+  const double k = Fmuls(Lfs(base, data + 1808), Lfs(base, vehicle + 2404));
+  const double scale = Lfs(base, 0x82002A14);
+  const double minus_one = Lfs(base, 0x82001BE0);
+  double drag = Fmuls(Fmuls(Lfs(base, data + 1800), forward2), k);
+  drag = Fmuls(drag, scale);
+  if (forward > zero) {
+    drag = Fmuls(drag, minus_one);
+  }
+  const double side = Lfs(base, vehicle + 392);
+  double side_drag = Fmuls(Fmuls(Fmuls(side, side), Lfs(base, data + 1804)), k);
+  side_drag = Fmuls(side_drag, scale);
+  if (side > zero) {
+    side_drag = Fmuls(side_drag, minus_one);
+  }
+  vl::Vec4Scaled(base, f + 112, vehicle + 128, side_drag);
+  vl::Vec4Scaled(base, f + 176, vehicle + 112, drag);
+  vl::Vec3Sum(base, f + 160, f + 176, f + 112);
+  vl::Vec3AddTo(base, vehicle + 2608, f + 160);
+  uint32_t r3 = vehicle + 2608;
+  if (Lfs(base, vehicle + 384) > zero) {
+    // The downforce: -(+96) x v^2 x 0.5, x car data +1812 into the front
+    // wheels' accumulators, +1816 into the rear's.
+    const double down_y = Fneg(Lfs(base, vehicle + 100));
+    Stfs(base, f + 108, zero);
+    Stfs(base, f + 100, down_y);
+    const double half_v2 = Fmuls(forward2, Lfs(base, 0x82001BE4));
+    Stfs(base, f + 96, Fneg(Lfs(base, vehicle + 96)));
+    Stfs(base, f + 104, Fneg(Lfs(base, vehicle + 104)));
+    vl::Vec4Scaled(base, f + 112, f + 96, half_v2);
+    vl::Vec4Scaled(base, f + 128, f + 112, Lfs(base, CarData(base, vehicle) + 1812));
+    vl::Vec4Scaled(base, f + 144, f + 112, Lfs(base, CarData(base, vehicle) + 1816));
+    vl::Vec3AddTo(base, vehicle + 2560, f + 128);
+    vl::Vec3AddTo(base, vehicle + 2544, f + 128);
+    vl::Vec3AddTo(base, vehicle + 2592, f + 144);
+    vl::Vec3AddTo(base, vehicle + 2576, f + 144);
+    r3 = vehicle + 2576;
+  }
+  // The engine's shake.
+  const double rpm = Lfs(base, vehicle + 2228);
+  const uint32_t engine_data = CarData(base, vehicle);
+  Stfs(base, f + 92, zero);
+  const double torque = VehicleEngineTorque(base, vehicle, rpm, f);
+  r3 = vehicle;
+  const double peak = Lfs(base, engine_data + 1552);
+  const double per = Fdivs(torque, Lfs(base, engine_data + 1424));
+  const double c = Lfs(base, 0x820021F4);
+  const double one = Lfs(base, kOne);
+  double amount = Fmadds(Fsubs(one, peak), c, Lfs(base, 0x82001FBC));
+  const double phase = Fmadds(rpm, c, Lfs(base, vehicle + 2340));
+  Stfs(base, vehicle + 2340, phase);
+  amount = Fmuls(amount, per);
+  amount = Fmuls(amount, Lfs(base, 0x82002A28));
+  if (phase < one) {
+    return r3;
+  }
+  const int32_t count = int32_t(guest::LoadU32(base, vehicle + 2344));
+  Stfs(base, f + 80, zero);
+  Stfs(base, f + 88, zero);
+  Stfs(base, f + 92, one);
+  const int32_t step = count % 4;
+  if (step == 0 || step == 2) {
+    const double push = step == 0 ? Fmuls(amount, Lfs(base, 0x82002A24)) : Fmuls(amount, c);
+    Stfs(base, f + 84, push);
+    vl::Vec3AddTo(base, vehicle + 2544, f + 80);
+    vl::Vec3AddTo(base, vehicle + 2560, f + 80);
+    r3 = vehicle + 2560;
+  }
+  const int32_t next = int32_t(guest::LoadU32(base, vehicle + 2344));
+  Stfs(base, vehicle + 2340, zero);
+  guest::StoreU32(base, vehicle + 2344, next <= 4 ? uint32_t(next + 1) : 0);
+  return r3;
+}
+
+namespace {
+
+// UpdateWheelAxes' axes for one wheel: with s, c = SinCos(angle) at
+// `frame` + 80 and + 84, +144 = +112 c - +128 s and +128 = +112 s + +128 c
+// (the vehicle's axes; the temporaries at `frame` + 96 to + 143, in the
+// original's order, wheel 0's first sum at + 128 and the others' at + 96).
+void TurnedAxes(uint8_t* base, uint32_t vehicle, uint32_t wheel, double angle, uint32_t frame,
+                bool wheel0) {
+  const uint32_t f = frame;
+  mm::SinCos(base, angle, f + 80, f + 84);
+  const double s = Lfs(base, f + 80);
+  const double c = Lfs(base, f + 84);
+  if (wheel0) {
+    vl::Vec4Scaled(base, f + 96, vehicle + 128, Fneg(s));
+    vl::Vec4Scaled(base, f + 112, vehicle + 112, c);
+    vl::Vec3Sum(base, f + 128, f + 112, f + 96);
+    vl::Vec4Copy(base, wheel + 144, f + 128);
+  } else {
+    vl::Vec4Scaled(base, f + 128, vehicle + 128, Fneg(s));
+    vl::Vec4Scaled(base, f + 112, vehicle + 112, c);
+    vl::Vec3Sum(base, f + 96, f + 112, f + 128);
+    vl::Vec4Copy(base, wheel + 144, f + 96);
+  }
+  vl::Vec4Scaled(base, f + 128, vehicle + 128, c);
+  vl::Vec4Scaled(base, f + 112, vehicle + 112, s);
+  vl::Vec3Sum(base, f + 96, f + 112, f + 128);
+  vl::Vec4Copy(base, wheel + 128, f + 96);
+}
+
+}  // namespace
+
+uint32_t VehicleUpdateWheelAxes(uint8_t* base, uint32_t vehicle, uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_820B1B00 Vehicle::UpdateWheelAxes");
+  const uint32_t f = frame;
+  const uint32_t w0 = Wheel(vehicle, 0), w1 = Wheel(vehicle, 1);
+  const uint32_t w2 = Wheel(vehicle, 2), w3 = Wheel(vehicle, 3);
+  const double k_f8 = Lfs(base, 0x820029F8);
+  const double k_fc = Lfs(base, 0x820029FC);
+  const double cfbc = Lfs(base, 0x82001FBC);
+  // The front: the toe from the travel's angle (atan2 of +0 against the
+  // lateral offset +24), car data +548, the steering +308 and +312.
+  {
+    const uint32_t data = CarData(base, vehicle);
+    const double steer1 = Lfs(base, vehicle + 312);
+    const double steer0 = Lfs(base, vehicle + 308);
+    const double toe = Lfs(base, data + 548);
+    const double a0 = double(float(c_runtime::Atan2(Lfs(base, w0 + 0), Lfs(base, w0 + 24))));
+    const double a1 = double(float(c_runtime::Atan2(Lfs(base, w1 + 0), Fneg(Lfs(base, w1 + 24)))));
+    double t0 = Fmadds(Lfs(base, w0 + 288), k_fc, Fmuls(a0, k_f8));
+    t0 = Fadds(t0, toe);
+    Stfs(base, w0 + 36, t0);
+    const double angle0 = Fadds(t0, steer0);
+    double t1 = Fmadds(Lfs(base, w1 + 288), k_fc, Fmuls(a1, cfbc));
+    t1 = Fsubs(t1, toe);
+    Stfs(base, w1 + 36, t1);
+    TurnedAxes(base, vehicle, w0, angle0, f, true);
+    TurnedAxes(base, vehicle, w1, Fadds(Lfs(base, w1 + 36), steer1), f, false);
+  }
+  // The rear: no steering (+304 x 0.0), and the vehicle's axes into +2080
+  // and +2064.
+  {
+    const double rear_steer = Fmuls(Lfs(base, vehicle + 304), Lfs(base, kZero));
+    vl::Vec4Copy(base, vehicle + 2080, vehicle + 112);
+    vl::Vec4Copy(base, vehicle + 2064, vehicle + 128);
+    const uint32_t data = CarData(base, vehicle);
+    const double toe = Lfs(base, data + 820);
+    const double a2 = double(float(c_runtime::Atan2(Lfs(base, w2 + 0), Lfs(base, w2 + 24))));
+    const double a3 = double(float(c_runtime::Atan2(Lfs(base, w3 + 0), Fneg(Lfs(base, w3 + 24)))));
+    const double k_f4 = Lfs(base, 0x820029F4);
+    const double m2 = Fmuls(Lfs(base, w2 + 288), k_f4);
+    const double m3 = Fmuls(Lfs(base, w3 + 288), k_f4);
+    double t2 = Fmsubs(a2, cfbc, m2);
+    t2 = Fadds(t2, toe);
+    Stfs(base, w2 + 36, t2);
+    const double angle2 = Fadds(t2, rear_steer);
+    double t3 = Fmsubs(a3, k_f8, m3);
+    t3 = Fsubs(t3, toe);
+    Stfs(base, w3 + 36, t3);
+    TurnedAxes(base, vehicle, w2, angle2, f, false);
+    TurnedAxes(base, vehicle, w3, Fadds(rear_steer, Lfs(base, w3 + 36)), f, false);
+  }
+  // Per wheel: the contact's velocity and speeds, the camber and the
+  // wheel's quaternion (about the x axis at 0x82638270).
+  for (uint32_t w = 0; w < 4; w++) {
+    const uint32_t wheel = Wheel(vehicle, w);
+    CopyWord(base, wheel + 320, wheel + 324);
+    const uint32_t data = guest::LoadU32(base, vehicle + 2160 + 4 * w);
+    va::RigidBodyPointVelocity(base, f + 128, guest::LoadU32(base, vehicle + 336), wheel + 160);
+    vl::Vec4Copy(base, wheel + 336, f + 128);
+    Stfs(base, wheel + 320, double(vl::Vec3DotOf(base, wheel + 336, wheel + 144)));
+    Stfs(base, wheel + 328, double(vl::Vec3DotOf(base, wheel + 336, wheel + 128)));
+    double turn;
+    if (w == 0 || w == 2) {
+      const double a = double(float(c_runtime::Atan2(Lfs(base, wheel + 0), Lfs(base, wheel + 24))));
+      Stfs(base, wheel + 32, Fnmsubs(a, Lfs(base, data + 48), Lfs(base, data + 204)));
+      const double b = double(float(c_runtime::Atan2(Lfs(base, wheel + 0), Lfs(base, wheel + 24))));
+      turn = Fnmsubs(b, Lfs(base, data + 48), Lfs(base, data + 208));
+    } else {
+      const double a =
+          double(float(c_runtime::Atan2(Lfs(base, wheel + 0), Fneg(Lfs(base, wheel + 24)))));
+      Stfs(base, wheel + 32, Fmsubs(a, Lfs(base, data + 48), Lfs(base, data + 204)));
+      const double b =
+          double(float(c_runtime::Atan2(Lfs(base, wheel + 0), Fneg(Lfs(base, wheel + 24)))));
+      turn = Fmsubs(b, Lfs(base, data + 48), Lfs(base, data + 208));
+    }
+    mm::QuaternionFromAxisAngle(base, wheel + 48, 0x82638270, turn, f - 32);
+  }
+  return w3 + 48;
+}
+
 }  // namespace car_physics

@@ -181,6 +181,10 @@ ITC_NATIVE_STEP(NativeUpdateTireForces,
                 ctx.r3.u64 = cp::VehicleUpdateTireForces(base, ctx.r3.u32, ctx.r1.u32 - 272))
 ITC_NATIVE_STEP(NativeUpdateAtRest,
                 ctx.r3.u64 = cp::VehicleUpdateAtRest(base, ctx.r3.u32, ctx.r1.u32 - 192))
+ITC_NATIVE_STEP(NativeUpdateAero,
+                ctx.r3.u64 = cp::VehicleUpdateAero(base, ctx.r3.u32, ctx.r1.u32 - 240))
+ITC_NATIVE_STEP(NativeUpdateWheelAxes,
+                ctx.r3.u64 = cp::VehicleUpdateWheelAxes(base, ctx.r3.u32, ctx.r1.u32 - 256))
 
 // Runs the recompiled version with the native flags off, so the functions
 // it calls that are ours run the originals too.
@@ -491,6 +495,11 @@ void FillVehicle(uint8_t* base, uint32_t area, Random& r, Word word) {
     guest::StoreU32(base, contact + 68, c == 0 && r.Below(2) == 0 ? contact + 128 : 0);
   }
   guest::StoreU8(base, v + 2384, uint8_t(r.Below(4) == 0));
+  // The engine's shake: its phase near 1.0, its counter 0 to 5.
+  if (r.Below(2) == 0) {
+    guest::StoreU32(base, v + 2340, std::bit_cast<uint32_t>(float(r.Below(1200)) / 1000.0f));
+  }
+  guest::StoreU32(base, v + 2344, r.Below(3) == 0 ? uint32_t(r.Next()) : r.Below(6));
   guest::StoreU8(base, v + 2664, uint8_t(r.Below(3) != 0));
   guest::StoreU8(base, v + 2386, uint8_t(r.Below(3) != 0));
   guest::StoreU32(base, v + 3156, r.Below(1000));
@@ -554,6 +563,9 @@ void CarPhysicsVehicle(Context& h) {
     // r3 compared (UpdateSteering's is what tan's _ctrlfp leaves, which the
     // game doesn't read: the physics step sets r3 again).
     bool compare_r3 = true;
+    // One NaN put in can meet its own negation (a "... meeting its own
+    // negation (expected to differ)" group, as RigidBody::ContactImpulse's).
+    bool negation = false;
   } functions[] = {
       {"Vehicle::BeginStep (sub_820AFAE8)", Original<__imp__sub_820AFAE8>, NativeBeginStep,
        true},
@@ -622,6 +634,10 @@ void CarPhysicsVehicle(Context& h) {
        NativeUpdateTireForces, false},
       {"Vehicle::UpdateAtRest (sub_820B2808)", Original<__imp__sub_820B2808>, NativeUpdateAtRest,
        false},
+      {"Vehicle::UpdateAero (sub_820B2A48)", Original<__imp__sub_820B2A48>, NativeUpdateAero,
+       false},
+      {"Vehicle::UpdateWheelAxes (sub_820B1B00)", Original<__imp__sub_820B1B00>,
+       NativeUpdateWheelAxes, false, kWheelR4, false, true, true},
   };
   enum Group { kNumbers, kOneNaN, kNaNs };
   const char* const kGroupNames[] = {"", ", one NaN",
@@ -630,6 +646,8 @@ void CarPhysicsVehicle(Context& h) {
   for (const auto& f : functions) {
     for (Group group : {kNumbers, kOneNaN, kNaNs}) {
       Results results(std::string(f.name) + kGroupNames[group]);
+      Results negated(std::string(f.name) +
+                      ", one NaN meeting its own negation (expected to differ)");
       for (uint64_t seed = 0; seed < 100; seed++) {
         Random pick = Seeded(seed * 17 + 3 * uint64_t(group) + 2);
         auto word = [group](Random& r) { return group == kNaNs ? FloatWord(r) : NumberWord(r); };
@@ -683,11 +701,27 @@ void CarPhysicsVehicle(Context& h) {
             result[v].push_back(uint8_t(t.f1.u64 >> (56 - 8 * i)));
           }
         }
-        results.Check(result[0], result[1],
+        // One NaN that spreads into two values, one of them negated, which
+        // then meet: the results differ only in NaNs' signs (UpdateWheelAxes:
+        // a NaN angle's sine, negated, and cosine summed).
+        bool only_signs = f.negation && group == kOneNaN && result[0] != result[1] &&
+                          result[0].size() == result[1].size();
+        for (size_t i = 0; only_signs && i + 4 <= result[0].size(); i += 4) {
+          uint32_t a = 0, b = 0;
+          for (int k = 0; k < 4; k++) {
+            a = (a << 8) | result[0][i + k];
+            b = (b << 8) | result[1][i + k];
+          }
+          only_signs = a == b || ((a ^ b) == 0x80000000 && std::isnan(std::bit_cast<float>(a)));
+        }
+        (only_signs ? negated : results).Check(result[0], result[1],
                       fmt::format("seed {} r4 {:08X} f1 {:016X}", seed, r4,
                                   std::bit_cast<uint64_t>(f1)));
       }
       results.Report();
+      if (f.negation && group == kOneNaN) {
+        negated.Report();
+      }
     }
   }
 }
