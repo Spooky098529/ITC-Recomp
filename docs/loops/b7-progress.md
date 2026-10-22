@@ -17,7 +17,9 @@ rows to review and drive list are there), and this file's history.
   (the race overlays' effect updates, ff29ee9..ff7cd37) validated (33
   of 33 harness lines).
 - Subsystem 3 of 3: the car physics (with the collision world's pairs'
-  lead folded in). Step: mapping (agent running). Queued: the no-mapping
+  lead folded in). Mapped in d7e9c3f (`car-physics.md`, 129 rows,
+  64 ready groups; checked, four rows spot-checked against `generated/`).
+  Step: migration 1 (agent running). Queued: the no-mapping
   lead UiMovie::ApplyTransform.
 - Known: `b7_status.py` checks `sub_825A9934` (`__chkstk`) "Dropped, but
   it ran", and every function made Native or Merged since the coverage
@@ -56,6 +58,8 @@ rows to review and drive list are there), and this file's history.
 
 ## Rows to review
 
+- `car-physics.md` (new, 129 rows), `known-data.md`'s new rows, 5 leads
+  added (the collision narrow phase and shapes, and others).
 - `race-overlays.md`: the matrix-math lead's rows (UpdateLightSprites,
   UpdateParticlesB, UpdateParticlesC, UpdateSmoke, Smoke::SetFrame,
   ModelMatrix, ParticlesB::Emit's f1 corrected to +6256) and 23 adapters
@@ -158,5 +162,7 @@ the validation agent's attract race; the user drives (with
   (wrapped 137, known 302, unknown 5723).
 - After the race overlays' effect updates: ours 597, work left 6156
   (wrapped 137, known 296, unknown 5723).
+- After mapping the car physics: ours 597, work left 6156 (wrapped 137,
+  known 425, unknown 5594).
 
 ## Stopped
