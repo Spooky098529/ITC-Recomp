@@ -91,4 +91,13 @@ bool StrToXl(uint8_t* base, uint32_t string, int32_t radix, uint32_t flags, bool
 // range that crosses from one view into another; the original runs there.
 bool Memcpy(uint8_t* base, uint32_t destination, uint32_t source, uint32_t size);
 
+// memmove (sub_825AA840)'s backward copy, for a destination above the source
+// (as signed words: the original's cmpw; within one view that's the address
+// order): the host's memmove where both ranges are in one view, the host's
+// memcpy where they don't share memory. False, with nothing copied, where a
+// range crosses into another view or the two share memory through different
+// views; the original runs there. (A destination below the source is the
+// original's tail call to memcpy, sub_825A7410.)
+bool MemmoveDown(uint8_t* base, uint32_t destination, uint32_t source, uint32_t size);
+
 }  // namespace c_runtime

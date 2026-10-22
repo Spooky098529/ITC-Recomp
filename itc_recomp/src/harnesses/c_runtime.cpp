@@ -937,6 +937,83 @@ void CRuntime(Context& h) {
     results.Report();
   }
 
+  // memmove (sub_825AA840): equal, a destination below the source (memcpy's
+  // override) and above it, apart and overlapping by 1 to 17 bytes, at every
+  // alignment of both ends for small sizes, and across a page end; the
+  // scratch area and r3 compared.
+  {
+    Results results("memmove (sub_825AA840)");
+    auto move_case = [&](uint32_t to, uint32_t from, uint32_t size) {
+      const auto bytes = RandomBytes(h, size + 16);
+      StringCase(h, results, [&] { Write(h.base, from - 8, bytes.data(), size + 16); },
+                 [&](PPCContext& t) {
+                   t.r3.u64 = to;
+                   t.r4.u64 = from;
+                   t.r5.u64 = size;
+                 },
+                 __imp__sub_825AA840, sub_825AA840,
+                 fmt::format("to +{} from +{} size {}", to - h.data, from - h.data, size));
+    };
+    for (uint32_t size : {0u, 1u, 2u, 3u, 4u, 5u, 7u, 8u, 9u, 13u, 16u, 31u, 64u, 100u, 257u}) {
+      for (uint32_t a = 0; a < 4; a++) {
+        for (uint32_t b = 0; b < 4; b++) {
+          move_case(h.data + 2048 + a, h.data + 64 + b, size);
+          move_case(h.data + 64 + a, h.data + 2048 + b, size);
+        }
+      }
+      move_case(h.data + 1024, h.data + 1024, size);
+      for (uint32_t k = 1; k <= 17; k++) {
+        move_case(h.data + 1024 + k, h.data + 1024, size);
+        move_case(h.data + 1024, h.data + 1024 + k, size);
+      }
+    }
+    for (uint32_t size : {700u, 1500u}) {
+      for (uint32_t k : {1u, 4u, 9u, 300u}) {
+        move_case(h.data + 512 + k, h.data + 512, size);
+        move_case(h.data + 512, h.data + 512 + k, size);
+      }
+    }
+    for (uint32_t size : {5u, 64u, 200u}) {
+      move_case(h.data + places.page_end - 3, h.data + 64 + 1, size);
+      move_case(h.data + places.page_end - 3, h.data + places.page_end - 9, size);
+    }
+    results.Report();
+  }
+
+  // memcpy_s (sub_825A7270): counts of 0, below, at and (for count 0 only)
+  // above the size, at several alignments; the error paths (_errno) left
+  // out. The scratch area and r3 compared.
+  {
+    Results results("memcpy_s (sub_825A7270)");
+    for (uint32_t count : {0u, 1u, 3u, 4u, 8u, 17u, 64u, 200u, 1000u}) {
+      for (uint32_t extra : {0u, 1u, 50u}) {
+        for (uint32_t a = 0; a < 4; a++) {
+          const uint32_t to = h.data + 2048 + a, from = h.data + 64 + 3 - a;
+          const uint32_t size = count + extra;
+          const auto bytes = RandomBytes(h, count + 16);
+          StringCase(h, results, [&] { Write(h.base, from - 8, bytes.data(), count + 16); },
+                     [&](PPCContext& t) {
+                       t.r3.u64 = to;
+                       t.r4.u64 = size;
+                       t.r5.u64 = from;
+                       t.r6.u64 = count;
+                     },
+                     __imp__sub_825A7270, sub_825A7270,
+                     fmt::format("to +{} size {} from +{} count {}", to - h.data, size,
+                                 from - h.data, count));
+        }
+      }
+    }
+    // A count of 0 returns 0 before anything is checked, even with no buffers.
+    StringCase(h, results, [] {}, [&](PPCContext& t) {
+      t.r3.u64 = 0;
+      t.r4.u64 = 0;
+      t.r5.u64 = 0;
+      t.r6.u64 = 0;
+    }, __imp__sub_825A7270, sub_825A7270, "all 0");
+    results.Report();
+  }
+
   // __iob_func: r3 from random registers.
   {
     Results results("__iob_func (sub_825AD4C0)");

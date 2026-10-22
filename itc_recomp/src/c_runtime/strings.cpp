@@ -325,8 +325,9 @@ constexpr View kViews[] = {
 };
 
 // Where `size` bytes at `address` start in the memory behind the views;
-// false when they cross into the next view (or past 4 GB).
-bool Behind(uint32_t address, uint32_t size, uint64_t* start) {
+// false when they cross into the next view (or past 4 GB). `view` is the
+// view's index, when asked for.
+bool Behind(uint32_t address, uint32_t size, uint64_t* start, size_t* view = nullptr) {
   size_t i = std::size(kViews) - 1;
   while (address < kViews[i].start) {
     i--;
@@ -336,6 +337,9 @@ bool Behind(uint32_t address, uint32_t size, uint64_t* start) {
     return false;
   }
   *start = kViews[i].target + (address - kViews[i].start);
+  if (view) {
+    *view = i;
+  }
   return true;
 }
 
@@ -351,6 +355,28 @@ bool Memcpy(uint8_t* base, uint32_t destination, uint32_t source, uint32_t size)
   }
   if (to < from + size && from < to + size) {
     return false;  // overlapping: the original's loop order decides
+  }
+  std::memcpy(REX_RAW_ADDR(destination), REX_RAW_ADDR(source), size);
+  return true;
+}
+
+bool MemmoveDown(uint8_t* base, uint32_t destination, uint32_t source, uint32_t size) {
+  if (size == 0) {
+    return true;
+  }
+  uint64_t to, from;
+  size_t to_view, from_view;
+  if (!Behind(destination, size, &to, &to_view) || !Behind(source, size, &from, &from_view)) {
+    return false;
+  }
+  if (to < from + size && from < to + size) {
+    if (to_view != from_view) {
+      return false;  // the same memory through two views: the original decides
+    }
+    // One view: the guest's order is the host's, and the original's backward
+    // copy gives what memmove does.
+    std::memmove(REX_RAW_ADDR(destination), REX_RAW_ADDR(source), size);
+    return true;
   }
   std::memcpy(REX_RAW_ADDR(destination), REX_RAW_ADDR(source), size);
   return true;

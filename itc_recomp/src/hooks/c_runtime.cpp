@@ -12,6 +12,7 @@
 
 #include <cstring>
 
+
 ITC_FLAG_BOOL(native_c_runtime, true, "ITC",
               "Run the C runtime's helpers natively instead of through the translated code: "
               "the stack probe (__chkstk, sub_825A9934) is skipped, as its reads of the guest "
@@ -19,7 +20,8 @@ ITC_FLAG_BOOL(native_c_runtime, true, "ITC",
               "(sub_825A9958, sub_825A7F30, sub_825A7EF8, sub_825A7EB0); mbtowc's single-byte "
               "path (sub_825B7EC8); strncpy, strcpy_s, strncmp, _stricmp, _strnicmp and its compare, "
               "strstr (sub_825A7F50, sub_825A9DD8, sub_825AACD0, sub_825AA100, sub_825AC710, "
-              "sub_825AC6B0, sub_825A98A8); the second memcpy (sub_825A7830); toupper, tolower, "
+              "sub_825AC6B0, sub_825A98A8); the second memcpy (sub_825A7830); memmove and memcpy_s "
+              "(sub_825AA840, sub_825A7270); toupper, tolower, "
               "isalpha, isdigit, isalnum and isleadbyte (sub_825A8600, sub_825A8618, sub_825AB020, "
               "sub_825AB040, sub_825AB0A0, sub_825B6898); strtoul and strtoxl (sub_825A85E0, "
               "sub_825A82C8); ___dtold and _ld12tod (sub_825B6378, sub_825B69B8); write_char "
@@ -204,6 +206,61 @@ extern "C" REX_FUNC(sub_825A7830) {
     return;
   }
   c_runtime::CopyForward(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+}
+
+// memmove: r3 = destination, r4 = source, r5 = count; returns r3 (left as it
+// is). Equal (as signed words, the original's cmpw) does nothing; a
+// destination below the source is the original's tail call to memcpy (its
+// override, which the mirrors' bookkeeping sees); above it, the backward
+// copy natively where c_runtime::MemmoveDown can tell it gives the same
+// bytes, else the original. The original also leaves r0, r4, r5, r7 to r10,
+// ctr and cr0 changed; no caller reads them before setting them.
+extern "C" REX_FUNC(sub_825AA840) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_c_runtime)) {
+    __imp__sub_825AA840(ctx, base);
+    return;
+  }
+  if (ctx.r3.s32 == ctx.r4.s32) {
+    return;
+  }
+  if (ctx.r3.s32 < ctx.r4.s32) {
+    sub_825A7410(ctx, base);
+    return;
+  }
+  if (!c_runtime::MemmoveDown(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32)) {
+    __imp__sub_825AA840(ctx, base);
+  }
+}
+
+// memcpy_s: r3 = destination, r4 = its size, r5 = source, r6 = count;
+// returns 0. A count of 0 does nothing; otherwise the copy is memcpy's (its
+// override, called from where the original calls it, so the mirrors'
+// bookkeeping sees the same caller). A null destination or source or a
+// count above the size (memset, then EINVAL or ERANGE through _errno and
+// _invalid_parameter, never seen in play) stays on the recompiled path. Its
+// callers read no register but r3 after it.
+extern "C" REX_FUNC(sub_825A7270) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_c_runtime)) {
+    __imp__sub_825A7270(ctx, base);
+    return;
+  }
+  if (ctx.r6.u32 == 0) {
+    ctx.r3.u64 = 0;
+    return;
+  }
+  if (ctx.r3.u32 == 0 || ctx.r5.u32 == 0 || ctx.r4.u32 < ctx.r6.u32) {
+    __imp__sub_825A7270(ctx, base);
+    return;
+  }
+  const uint64_t lr = ctx.lr;
+  ctx.r4.u64 = ctx.r5.u64;
+  ctx.r5.u64 = ctx.r6.u64;
+  ctx.lr = 0x825A72F0;
+  sub_825A7410(ctx, base);
+  ctx.lr = lr;
+  ctx.r3.u64 = 0;
 }
 
 // toupper and tolower: r3 = character; the step added to the whole
