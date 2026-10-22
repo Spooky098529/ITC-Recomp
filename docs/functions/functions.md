@@ -105,12 +105,17 @@ Rows not yet moved stay in the table below. So far:
   (ground, suspension, steering, tires, engine, gearbox, drivetrain,
   brakes, aerodynamics), the rigid body's integration, and the
   collision world's objects, pairs, update and surface settings (B7;
-  the narrow phase and shapes aren't in it).
+  the narrow phase and shapes are in `collision.md`).
 - [`heap.md`](heap.md): memory allocation: the C runtime's allocators,
   LocalAlloc and XMemAlloc, the process heap, VirtualAlloc and physical
   memory, routed to the native allocation layer (B7's first step,
   `../native-memory.md`); the C runtime's heap above it read in full by
   the B7 loop (2026-10-22).
+- [`collision.md`](collision.md): the collision world's narrow phase and
+  shapes: the shape record each collision object carries, the box shape
+  (placed, moved, its corners, faces and edges), a pair's next check
+  time, its separation, impact and push-out tests and its response (B7;
+  the world, its objects and pairs are in `car-physics.md`).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what

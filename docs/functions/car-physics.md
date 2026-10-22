@@ -17,8 +17,8 @@ change) and the contacts, and its update (`CollisionWorld::Update`,
 queries and responds with forces using the surface settings
 (`820BC1F8`-`820BC550`: four values per surface kind, by flag bits
 0x01000000, 0x02000000 and 0x04000000). The pairs' own narrow phase and
-the collision shapes (`820B99D0`-`820BBE30`, `820BC848` on) aren't in
-this file (`docs/loops/leads.md`).
+the collision shapes (`820B99D0`-`820BBE30`, `820BC848` on) are in
+`collision.md`.
 
 Shared with other files, which keep their rows: the accessors on the
 vehicle, its wheels, rigid body, collision object, contacts and the
