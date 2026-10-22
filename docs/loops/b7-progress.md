@@ -20,8 +20,10 @@ record: `b7-loop-2026-10-22-0111.md` (and this file's history).
 - Second migration agent: 5 functions Overridden and 1 Merged
   (`sub_8211F3B4`) in 8d7ad32, 092a792; the first 9 prints named; 27
   ready groups left. Validated (itc_524.log): 14 of 14 harness lines.
-- Step 6: the race overlays' third migration agent running.
-- Session: pass 7 of 20, subsystem 1 of 5. In all: subsystem 1 of 5.
+- Third migration agent: 10 functions (5 Overridden, 5 Native with no
+  adapter) in 55092ef..6bc388e; left in the file: `sub_821268C0`, and
+  callees with no rows. Step 8: validation agent running.
+- Session: pass 8 of 20, subsystem 1 of 5. In all: subsystem 1 of 5.
 - Known at the start: `b7_status.py` checks `c-runtime.md:221`
   `sub_825A9934` (`__chkstk`) "Dropped, but it ran" (from the first run:
   its override does nothing, so it still shows as seen).
@@ -52,6 +54,11 @@ record: `b7-loop-2026-10-22-0111.md` (and this file's history).
   with NaN or infinite inputs (5 of 126 differ, only NaNs' sign and
   payload, by the agent's reading of the translated code's compiled
   Newton step); its 474 finite cases are the same.
+  The third migration's 10 rows (4 new). For review: NaN-only harness
+  results depend on which operand the compiler kept in the translated
+  vector adds: Smoke::Emit keeps the first operand's NaN (as the Xenon
+  does), the sparks a plain `addps` matching how this build compiled
+  theirs; a rebuild could bring back NaN-only differences there.
 
 ## To check in a drive
 
