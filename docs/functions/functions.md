@@ -71,6 +71,11 @@ Rows not yet moved stay in the table below. So far:
   memory and character helpers, number parsing and formatting, and the
   pure parts of its start-up (B7; the heap and what calls kernel imports
   aren't in it).
+- [`ui-movies.md`](ui-movies.md): the UI movie library (the HUD's, the
+  menus' and the pause screens' 2D movies): loading and fixing up movie
+  files, applying animations' tracks to nodes, and drawing the node tree
+  as quads, with the game's movie update and rest pose (B7; the rest of
+  the game's `UiMovie::` side is a lead).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
@@ -184,13 +189,6 @@ old performance notes to the end of `../native-renderer.md`.
 | `sub_820C9170` | | | Asks `sub_820F4128` for up to 10 lights near a point (r1+112) in a cone (cosine-like value from `sub_825A8978` of a setting at `[r27+11844]+5500` times a constant) of the light set at `[0x826C551C]`. Probably feeds the 8 per-object light slots of the pixel constants (see "Per-object pixel constants" in `../frame-interpolation.md`; not checked). Called from `0x820E1DF0`, `0x820E6B00` and `0x820DC3B8`. |
 | `sub_82294730` | | | r3 a light set, r4 an index: returns r3 plus the r4-th of the little-endian offsets at r3+4 (the count at +0 bounds r4); with r5's low byte set, 0 for an entry whose first word is 0. `sub_820F4128` passes r5 = 0. |
 | `sub_8218E420` | | Patched | Post-race check; the comparison against 60 was changed to 1 to fix the black screen after quest races. |
-| `sub_8211D2F8` | `UiMovie::Update` | Wrapped | r3 = movie, r4 = 0 advance a frame and draw, 1 draw only; reached through `sub_8211E1B8` from 634 call sites (the HUD, the race start countdown, the pause menus). Replayed on render-only passes, and its adding tracks handled per tick (see "Per-frame logic" in `../frame-interpolation.md`; `docs/pause-menu-fix.md`, "The sub-menus' arrow"). |
-| `sub_825A08E0` | `UiMovie::ApplyAnimation` | | Run by each movie update for every playing animation: finds the keys around the animation's time and applies each track with t = (time - k0) / (k1 - k0), clamped, through `sub_825A0548`. Sets values from the time, so it doesn't step by itself. |
-| `sub_825A0548` | `UiMovie::ApplyTrack` | Wrapped | r3 = node, r4 = track (word +0 its property id), f1 = t, r5/r6 = the keys. Writes one word, at node + the descriptor's offset (plus `sub_8259D600` when indirect): sets it (descriptor byte +8 non-zero) or adds to it (0); nothing for types 3 and up. Adds the update doesn't put back are skipped on render-only passes (`--per_tick_ui_movie_tracks`). |
-| `sub_8259FE68` | `UiMovie::TrackProperty` | | r3 = property id; returns its 12-byte descriptor in the table at `0x82970C28` (64 entries, filled on first use, byte `0x82970C20` set): +0 node offset, +4 type (0 float, 1 and 2 integer), byte +8 set/add, byte +9 indirect. |
-| `sub_8259D600` | | | r3, r4: returns 16 * (r3 + 2 * (r4 + 4)); the indirect tracks' extra offset (r3 = [node + 112], r4 = [track + 12]). |
-| `sub_8259D658` | `UiMovie::Child` | | r3 = node, r4 = index: returns that child (the count is at node + 112). |
-| `sub_82119B80` | `UiMovie::RestorePose` | Wrapped | r3 = movie, r4 = live tree, r5 = rest tree: for each child of six tagged types (GRP recursed into; PIC, PRM, SCE, TFM, TXT) copies the rest node's fields (+12..+80, and per type +100..+136) over the live one. Called at the end of each movie update (from `8211D7CC`), so tracks' adds start from the rest pose every update. Wrapped only for `--log_pause_movie` (`WATCH_MOVIE_CALL`). |
 | `sub_820DAC68` | `Car::DrawUpdate` | Wrapped | Draw's per-car update (r3 = car - 4288; it passes r3 + 4288 on as the car), on every pass: first takes `[0x82000A30]` (1.0) off car + 704 (the boost; the tick sets it again), then poses and draws the car, the cockpit dials among it (`sub_820E51D0`, `sub_820E45A8`). The player's car in cockpit view runs it twice a pass; only the first poses the dials. Wrapped only for `--find_per_frame_state` (`ITC_FRAME_STATE_WRAP`). |
 | `sub_8215C780` | `Car::TickUpdate` | | The tick's car record update (logic passes; r31 = the car record, r26 = the vehicle): copies the car's world matrix into car + 16 and stores the gauge values at car + 696 (`sub_820C0128`, the speed in km/h), + 700 (`sub_820C0140`, the revs), + 704 (`[r26 + 2944]`, the boost) and + 712 (`[r26 + 6260]`). |
 | `sub_820E51D0` | | | Calls `sub_820E42E8` when `[dash + 20]` is set, then `sub_820E39F8` when `[dash + 2180]` is. |
@@ -415,11 +413,9 @@ old performance notes to the end of `../native-renderer.md`.
 | `sub_8210BFA8` | | Wrapped | The action mappers' read slots (vtable `0x82007F78`; r3 the mapper, r4 the action id 151-180); logged for `--log_pause_menu` (`PAUSE_MENU_READ_SLOT`). |
 | `sub_8210C010` | | Wrapped | The action mappers' read slots (vtable `0x82007F78`; r3 the mapper, r4 the action id 151-180); logged for `--log_pause_menu` (`PAUSE_MENU_READ_SLOT`). |
 | `sub_8210BA28` | | Wrapped | The action mappers' read slots (vtable `0x82007F78`; r3 the mapper, r4 the action id 151-180); logged for `--log_pause_menu` (`PAUSE_MENU_READ_SLOT`). |
-| `sub_8259FA00` | | Wrapped | The UI movie update's callees besides its tracks (and `sub_82119B80` above), watched for writes for `--log_pause_movie` (`WATCH_MOVIE_CALL`). |
-| `sub_8211CD90` | | Wrapped | The UI movie update's callees besides its tracks (and `sub_82119B80` above), watched for writes for `--log_pause_movie` (`WATCH_MOVIE_CALL`). |
-| `sub_8259DAC0` | | Wrapped | The UI movie update's callees besides its tracks (and `sub_82119B80` above), watched for writes for `--log_pause_movie` (`WATCH_MOVIE_CALL`). |
-| `sub_8211B4D0` | | Wrapped | The UI movie update's callees besides its tracks (and `sub_82119B80` above), watched for writes for `--log_pause_movie` (`WATCH_MOVIE_CALL`). |
-| `sub_8211B080` | | Wrapped | The UI movie update's callees besides its tracks (and `sub_82119B80` above), watched for writes for `--log_pause_movie` (`WATCH_MOVIE_CALL`). |
+| `sub_8211CD90` | | Wrapped | The UI movie update's callees besides its tracks (and `sub_82119B80`, in [`ui-movies.md`](ui-movies.md)), watched for writes for `--log_pause_movie` (`WATCH_MOVIE_CALL`). |
+| `sub_8211B4D0` | | Wrapped | The UI movie update's callees besides its tracks (and `sub_82119B80`, in [`ui-movies.md`](ui-movies.md)), watched for writes for `--log_pause_movie` (`WATCH_MOVIE_CALL`). |
+| `sub_8211B080` | | Wrapped | The UI movie update's callees besides its tracks (and `sub_82119B80`, in [`ui-movies.md`](ui-movies.md)), watched for writes for `--log_pause_movie` (`WATCH_MOVIE_CALL`). |
 | `sub_8258E5E0` | | Wrapped | Named in `--find_menu_selection`'s log (`ITC_MENU_SCAN_WRAP`): `Scene::Update`'s two screen calls and others. |
 | `sub_8258ED78` | | Wrapped | Named in `--find_menu_selection`'s log (`ITC_MENU_SCAN_WRAP`): `Scene::Update`'s two screen calls and others. |
 | `sub_8259D1A8` | | Wrapped | Named in `--find_menu_selection`'s log (`ITC_MENU_SCAN_WRAP`): `Scene::Update`'s two screen calls and others. |
