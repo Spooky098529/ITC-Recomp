@@ -57,9 +57,11 @@ goes in `src/` as overrides), American English.
   `/loop` session handing each subsystem to a mapping agent, then
   migration agents) did its first run on the branch `b7-loop-test` (merged 2026-10-22): five
   subsystems mapped and made native as far as they were ready (ours 162
-  -> 335); its second run (branch `b7-loop-22-10-26`, in progress) removed
+  -> 335); its second run (branch `b7-loop-22-10-26`) removed
   31 adapters and made the race overlays native as far as they were
-  ready (ours 422). See "B7's loop runs" under B7, and
+  ready (ours 422); its third run (the same branch, stopped for the
+  user's review) made the vehicle accessors, the matrix math and the
+  car physics native as far as they were ready (ours 705). See "B7's loop runs" under B7, and
   `docs/loops/b7-progress.md`. What most of the rest waits on is the
   user's call on allocating guest memory from native code (the heap and
   the VirtualAlloc wrappers, in `docs/loops/leads.md`).
@@ -2468,6 +2470,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
     | 2026-10-22 | The race overlays' update side | `race-overlays.md` | 88 of 158 | `--native_race_overlays` |
     | 2026-10-22 | The vehicle, rigid body, collision and race data accessors, and the vector library | `vehicle-accessors.md` | 127 of 132 | `--native_vehicle_accessors`, `--native_vector_library` |
     | 2026-10-22 | The matrix, vector and quaternion math (`Matrix::` and the vector library's 4x4 half) | `matrix-math.md` | 28 of 28 | `--native_matrix_math` |
+    | 2026-10-22 | The car physics and the collision world | `car-physics.md` | 106 of 130 | `--native_car_physics` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -2502,6 +2505,18 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
     meet, the compiler's operand order picks which comes out); the
     cases with numbers alone or one NaN match. It unblocked four race
     overlays groups and UiMovie::ApplyTransform (leads).
+
+    The car physics (2026-10-22, the same run): 106 of 130 ours in four
+    migrations: the rigid body, the physics step's updates (suspension,
+    steering, tires, engine, turbo, gearbox, drivetrain, brakes, aero),
+    the collision world's objects, pairs and surfaces, the car data and
+    the vehicle's constructor; the AI cars of an attract race in the same
+    places with the flag on and off. Its harness found the vector
+    library's dot products leaving their flush-to-zero window under
+    ThinLTO (fixed, ee810a9). Left: the physics step's root (ProbeGround,
+    through a function pointer), the collision object's destructor (a
+    vtable call), the collision update and narrow phase (a lead), and
+    the set-up functions that allocate (the heap).
 
     The second run (from 2026-10-22, branch `b7-loop-22-10-26`; its first
     session stopped after one subsystem): the first run's removable
@@ -2744,3 +2759,10 @@ Dropped 23, never called 70, live 295. Imports: 186 called, 63 with a
 live caller. B7 (`b7_status.py`): 6,753 in play, ours 591, work left
 6,162 (Wrapped 137, with a row 302, no row yet 5,723); 641 overrides in
 `src/`.
+
+**2026-10-22, B7's third loop run, done (branch `b7-loop-22-10-26`: the
+car physics):** the boundary unchanged: 449 functions (916 pairs):
+overridden 58, Native 3, Dropped 23, never called 70, live 295. Imports:
+186 called, 63 with a live caller. B7 (`b7_status.py`): 6,753 in play,
+ours 705, work left 6,048 (Wrapped 137, with a row 318, no row yet
+5,593); 694 overrides in `src/`.

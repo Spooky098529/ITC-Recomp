@@ -16,32 +16,22 @@ rows to review and drive list are there), and this file's history.
 - Subsystem 2 of 3 (the matrix math) finished; then the no-mapping lead
   (the race overlays' effect updates, ff29ee9..ff7cd37) validated (33
   of 33 harness lines).
-- Subsystem 3 of 3: the car physics (with the collision world's pairs'
-  lead folded in). Mapped in d7e9c3f (`car-physics.md`, 129 rows,
-  64 ready groups; checked, four rows spot-checked against `generated/`).
-  Migration 1 done (ee810a9..a86606e: the rigid body, the physics
-  step's helpers, the controls; 41 rows ours, 6 adapters removed;
-  `--native_car_physics`; race 22 s, 0 errors; AI cars in the same
-  places with the flag on and off). Validated (43 of 43 harness lines).
-  Migration 2 done (6b84e44..9018b3b: 15 of the physics step's
-  updates, 4 adapters removed; race 21 s, 0 errors; AI cars in the same
-  places). Validated (19 of 19 harness lines, all ran
-  in play). Migration 3 done (611173d..c86ed03: SyncFromBody,
-  reset, gearing, steering, suspension, drivetrain, gearbox, the
-  collision world's objects, contacts and surfaces; 17 adapters removed;
-  91 of 130 ours; race 21 s, 0 errors; AI cars in the same places).
-  Validated (40 of 40 harness lines). Migration 4 done
-  (cf19bfc..556069f: the collision world's pairs, reset and removals,
-  the car data, Vehicle::Vehicle, AddGroups and RemoveGroups; nothing
-  ready left; race 21 s, 0 errors; AI cars in the same places). Step:
-  validation 4 (agent running). Queued: the no-mapping
-  lead UiMovie::ApplyTransform.
+- Subsystem 3 of 3 (the car physics) finished: the run is done
+  (stopped for the user's review, below).
 - Known: `b7_status.py` checks `sub_825A9934` (`__chkstk`) "Dropped, but
   it ran", and every function made Native or Merged since the coverage
   session "..., but it ran" (`seen_in_play.txt` predates them; a new
   coverage session clears them).
 
 ## Done
+
+- The car physics (`car-physics.md`, mapped in d7e9c3f; 130 rows): 106
+  ours (75 Overridden, 31 Native) in four migrations (ee810a9..a86606e,
+  6b84e44..9018b3b, 611173d..c86ed03, cf19bfc..556069f), each validated;
+  `--native_car_physics`; with `vehicle-accessors.md`'s AddGroups and
+  RemoveGroups. Left: the physics step's root (ProbeGround's function
+  pointer), ~CollisionObject (a vtable call), the collision update and
+  narrow phase, the set-up functions (the heap).
 
 - No-mapping lead: the race overlays' groups the matrix math made ready
   (`race-overlays.md`): UpdateLightSprites, UpdateParticlesB and C,
@@ -210,6 +200,8 @@ the validation agent's attract race; the user drives (with
   `sub_820BC530`, `sub_820BC538`, `sub_820BC540`, `sub_820BC548`,
   `sub_820B7D78` CollisionRecord::Copy, `sub_82294348` Vec4::DivideBy
   (probably collisions only).
+- Car physics, migration 4 (validation's race): `sub_820B85E8`
+  CollisionWorld::Reset.
 
 ## Totals
 
@@ -240,3 +232,7 @@ the validation agent's attract race; the user drives (with
   137, known 318, unknown 5593).
 
 ## Stopped
+
+2026-10-22, after the car physics: the run's limit (3 subsystems) is
+reached. Not a failure: every validation passed. The user reviews the
+rows, the expected differences and the drive list above, then merges.
