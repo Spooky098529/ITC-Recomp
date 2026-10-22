@@ -91,6 +91,23 @@ harness compares it). Read the `lis`/offset pairs' sums carefully: the
 floats at `0x820029F4` to `0x820029FC` are next to `0x82002A34` to
 `0x82002A3C`, and mixing them up was the one mistake the harness caught.
 
+The third migration (B7 loop, 2026-10-22) made the rest of the physics
+step's updates native but its root (`src/car_physics/vehicle_state.cpp`:
+`SyncFromBody`, the suspension, the drivetrain and its differential, the
+gearbox, the reset, gearing and steering, the wheel copies) and the
+collision world's objects, contacts and surface settings
+(`src/car_physics/collision_world.cpp`), the same flag and harness (the
+collision world's cases in guest stack below the vehicle's, with the
+surface settings and the world's pointer put back after). What it took,
+beyond the first two's: which registers a callee leaves alone matters
+where the original keeps values in volatile ones across a call
+(`UpdateDrivetrain`, `SetUpGearing`: read from the callees' code); a
+function whose temporaries are below r1 without a frame of its own
+(`UpdateDrivenAxle`) has them written there; the gearbox's control flow
+(549 lines) is written label for label with its registers as locals. A
+deliberately broken line in the gearbox and in `CollisionRecords::Merge`
+made their harness cases differ (their deep paths are reached).
+
 Status:
 
 - **Native**: plain C++ in `itc_recomp/src/` that doesn't use the
