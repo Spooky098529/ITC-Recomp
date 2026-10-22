@@ -166,6 +166,19 @@ void NativeTrailAddPoint(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = result;
 }
 
+// Where the native version declines, the original runs (as the adapter).
+void NativeParticlesBEmit(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  uint32_t result = 0;
+  double sine = ctx.f1.f64;
+  if (!ro::ParticlesBEmit(base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64, &result, &sine)) {
+    __imp__sub_8212B4A8(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = result;
+  ctx.f1.f64 = sine;
+}
+
 // Runs the recompiled version with --native_race_overlays off, so the
 // functions it calls that are ours run the originals too.
 void RunRecompiled(GuestFunction recompiled, PPCContext& t, uint8_t* base) {
@@ -916,6 +929,84 @@ void TrailAddPointCases(Context& h, uint32_t block) {
   nan_results.Report();
 }
 
+// ParticlesB::Emit: capacities of the game's 15, small ones, 0 and -1 (the
+// original runs there); counts around them (and negative); the head
+// anywhere in the 15 entries; random seeds; tables with game-like and odd
+// floats (inside the block, or overlapping the effect); positions elsewhere
+// or overlapping the entries; game-like, odd and random size factors.
+void ParticlesBCases(Context& h, uint32_t block) {
+  Random& r = h.random;
+  constexpr uint32_t kSeed = 0x82638188;
+  const uint32_t live = guest::LoadU32(h.base, kSeed);
+  const uint32_t effect = block + 0x100;
+  const uint32_t table = block + 0x40;
+  const uint32_t source = block + 0x10200;
+  Results results("ParticlesB::Emit (sub_8212B4A8)");
+  for (int i = 0; i < 600; i++) {
+    int32_t capacity;
+    switch (r.Below(5)) {
+      case 0:
+        capacity = r.Below(2) ? 0 : -1;
+        break;
+      case 1:
+        capacity = int32_t(1 + r.Below(6));
+        break;
+      default:
+        capacity = 15;
+        break;
+    }
+    const int32_t count = r.Below(5) == 0 ? -int32_t(r.Below(5)) : int32_t(r.Below(18));
+    const uint32_t head = r.Below(capacity > 0 ? uint32_t(capacity) : 15);
+    const uint32_t at = r.Below(10) == 0 ? effect + 4 * r.Below(680) : table;
+    const uint32_t position =
+        r.Below(8) == 0 ? effect + 128 + 4 * r.Below(660) : source + 4 * r.Below(4);
+    double factor;
+    switch (r.Below(4)) {
+      case 0:
+        factor = double(std::bit_cast<float>(RandomWord(r)));
+        break;
+      case 1:
+        factor = std::bit_cast<double>(r.Next());
+        break;
+      default:
+        factor = double(float(r.Below(4000)) / 100.0f);
+        break;
+    }
+    const uint32_t seed = uint32_t(r.Next());
+    const uint64_t fill_seed = r.Next();
+    const bool game_table = r.Below(2);
+    Compare(h, results, {{block, 0x100}, {effect, 2816}, {source, 64}, {kSeed, 4}},
+            [&, fill_seed] {
+              Random fill;
+              for (uint64_t n = 0; n < fill_seed % 19; n++) {
+                fill.Next();
+              }
+              FillRandom(h.base, fill, block, 0x100 + 2816);
+              FillRandom(h.base, fill, source, 64);
+              if (game_table) {  // life, size, size factor
+                guest::StoreU32(h.base, table, fill.Below(100));
+                guest::StoreFloat(h.base, table + 4, float(fill.Below(1000)) / 100.0f);
+                guest::StoreFloat(h.base, table + 8, float(fill.Below(256)) / 16.0f);
+              }
+              guest::StoreU32(h.base, effect + 104, uint32_t(capacity));
+              guest::StoreU32(h.base, effect + 112, at);
+              guest::StoreU32(h.base, effect + 2772, head);
+              guest::StoreU32(h.base, effect + 2776, uint32_t(count));
+              guest::StoreU32(h.base, kSeed, seed);
+            },
+            [&](PPCContext& t) {
+              t.r3.u64 = effect;
+              t.r4.u64 = position;
+              t.f1.f64 = factor;
+            },
+            __imp__sub_8212B4A8, NativeParticlesBEmit,
+            fmt::format("case {} capacity {} count {} head {} factor {:016X}", i, capacity, count,
+                        head, std::bit_cast<uint64_t>(factor)));
+  }
+  results.Report();
+  guest::StoreU32(h.base, kSeed, live);
+}
+
 }  // namespace
 
 void RaceOverlays(Context& h) {
@@ -933,6 +1024,7 @@ void RaceOverlays(Context& h) {
   ModelSpriteCases(h, block);
   ParticlesCCases(h, block);
   TrailAddPointCases(h, block);
+  ParticlesBCases(h, block);
   memory->SystemHeapFree(block);
 }
 

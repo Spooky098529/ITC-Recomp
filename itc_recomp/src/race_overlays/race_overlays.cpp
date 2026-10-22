@@ -3,6 +3,7 @@
 #include "guest.h"
 
 #include "base/log.h"
+#include "c_runtime/math.h"
 
 #include <rex/platform/fpscr.h>
 #include <simde/x86/sse4.1.h>
@@ -748,6 +749,112 @@ bool TrailAddPoint(uint8_t* base, uint32_t trail, uint32_t position, double spee
       (size_now && !(next == INT32_MIN && size_now == -1)) ? next / size_now : 0;
   guest::StoreU32(base, trail + kTrailTail, uint32_t(next) - uint32_t(quotient) * uint32_t(size_now));
   guest::StoreU32(base, trail + kTrailCount, added);
+  *result = 1;
+  return true;
+}
+
+}  // namespace race_overlays
+
+namespace race_overlays {
+
+namespace {
+
+constexpr uint32_t kParticlesBSizeScale = 0x82008540;
+constexpr uint32_t kParticlesBAngleLow = 0x820029C4;
+constexpr uint32_t kParticlesBAngleHigh = 0x82002240;
+constexpr uint32_t kParticlesBDistanceLow = 0x82006908;
+constexpr uint32_t kParticlesBDistanceHigh = 0x82002208;
+constexpr uint32_t kParticlesBSpread = 0x82001BE4;
+
+}  // namespace
+
+bool ParticlesBEmit(uint8_t* base, uint32_t effect, uint32_t position, double a,
+                    uint32_t* result, double* sine) {
+  ITC_NATIVE_RUNNING("sub_8212B4A8 ParticlesB::Emit");
+  const int32_t capacity = int32_t(guest::LoadU32(base, effect + 104));
+  if (capacity == 0 || capacity == -1) {
+    return false;
+  }
+  const int32_t count = int32_t(guest::LoadU32(base, effect + 2776));
+  const uint32_t table = guest::LoadU32(base, effect + 112);
+  if (!(capacity > count)) {
+    *result = 0;
+    return true;
+  }
+  const uint32_t entry = effect + 128 + guest::LoadU32(base, effect + 2772) * 176;
+  const uint32_t at = entry + 48;
+  const uint32_t moved = effect + 2800;
+  const double scaled =
+      float(a * double(guest::LoadFloat(base, kParticlesBSizeScale)));
+  const uint32_t one = guest::LoadU32(base, kOne);
+  guest::StoreU32(base, entry + 96, 1);
+  guest::StoreU32(base, entry + 108, guest::LoadU32(base, table + 0));
+  CopyFloat(base, table + 4, entry + 100);
+  CopyVector(base, position, at);
+  CopyVector(base, effect + 2784, entry + 64);
+  const float size = float(scaled * double(guest::LoadFloat(base, table + 8)));
+  guest::StoreFloat(base, entry + 112, size);
+  guest::StoreFloat(base, entry + 104, size);
+  guest::StoreU32(base, entry + 80, 200);
+  guest::StoreU32(base, entry + 84, 200);
+  const double distance_high = guest::LoadFloat(base, kParticlesBDistanceHigh);
+  guest::StoreU32(base, entry + 88, 200);
+  const double distance_low = guest::LoadFloat(base, kParticlesBDistanceLow);
+  guest::StoreU32(base, entry + 92, uint32_t(Fctiwz(double(size))));
+  const float dx = Difference(guest::LoadFloat(base, at + 0), guest::LoadFloat(base, entry + 64));
+  const float dy = Difference(guest::LoadFloat(base, at + 4), guest::LoadFloat(base, entry + 68));
+  const float dz = Difference(guest::LoadFloat(base, at + 8), guest::LoadFloat(base, entry + 72));
+  guest::StoreFloat(base, moved + 0, dx);
+  guest::StoreFloat(base, moved + 4, dy);
+  guest::StoreFloat(base, moved + 8, dz);
+  guest::StoreU32(base, moved + 12, one);
+  guest::StoreU32(base, entry + 116, 1);
+  const double angle_low = guest::LoadFloat(base, kParticlesBAngleLow);
+  const double angle_high = guest::LoadFloat(base, kParticlesBAngleHigh);
+  const double spread = guest::LoadFloat(base, kParticlesBSpread);
+  const uint32_t csr = Fpscr::getcsr();
+  const uint32_t flushing = csr | uint32_t(Fpscr::FlushMask);
+
+  uint32_t particle = entry + 128;
+  for (int32_t i = 0; i < int32_t(guest::LoadU32(base, entry + 116)); i++, particle += 48) {
+    const double angle = RandomRange(base, angle_low, angle_high);
+    const double distance = RandomRange(base, distance_low, distance_high);
+    double x = float(double(float(c_runtime::Cos(angle))) * distance);
+    x = float(x * spread);
+    *sine = c_runtime::Sin(angle);
+    const double sine_single = float(*sine);
+    guest::StoreFloat(base, particle + 0, float(x + double(guest::LoadFloat(base, at + 0))));
+    CopyFloat(base, at + 4, particle + 4);
+    const double z = guest::LoadFloat(base, at + 8);
+    double offset = float(sine_single * distance);
+    offset = float(offset * spread);
+    guest::StoreFloat(base, particle + 8, float(z + offset));
+    // The particle's vector less the effect's +2,800 (vsubfp, both loaded
+    // as lvx does).
+    const simde__m128 less = LoadVector(base, moved);
+    const simde__m128 from = LoadVector(base, particle);
+    Fpscr::setcsr(flushing);
+    const simde__m128 difference = simde_mm_sub_ps(from, less);
+    Fpscr::setcsr(csr);
+    const uint32_t to = particle & ~0xFu;
+    for (int k = 0; k < 4; k++) {
+      guest::StoreU32(base, to + 4 * k, WordOf(difference, k));
+    }
+    CopyVector(base, moved, particle + 16);
+    const int32_t first = int32_t(Rand(base));
+    guest::StoreU32(base, particle + 32, uint32_t(first - (first / 3) * 3));
+    const int32_t second = int32_t(Rand(base));
+    guest::StoreU32(base, particle + 36, uint32_t(second - (second / 4) * 4));
+  }
+
+  // The head moves on (divw, then the remainder) and the count goes up.
+  const int32_t next = int32_t(guest::LoadU32(base, effect + 2772) + 1);
+  const int32_t size_now = int32_t(guest::LoadU32(base, effect + 104));
+  const uint32_t added = guest::LoadU32(base, effect + 2776) + 1;
+  const int32_t quotient =
+      (size_now && !(next == INT32_MIN && size_now == -1)) ? next / size_now : 0;
+  guest::StoreU32(base, effect + 2772, uint32_t(next) - uint32_t(quotient) * uint32_t(size_now));
+  guest::StoreU32(base, effect + 2776, added);
   *result = 1;
   return true;
 }

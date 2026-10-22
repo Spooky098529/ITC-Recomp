@@ -11,7 +11,7 @@ ITC_FLAG_BOOL(native_race_overlays, true, "ITC",
               "accessors, sub_82126550 to sub_82127178; the child overlays' setters, "
               "sub_8211E9C8 to sub_8212DF90; the game's rand, sub_82293568, and RandomRange, "
               "sub_8211F118; Marker::Set and Update, sub_8212CCE0 and sub_8212CBE0; Trail::Update and "
-              "AddPoint, sub_821292E8 and sub_82129598; ParticlesC::Emit, sub_8212C1C0; the "
+              "AddPoint, sub_821292E8 and sub_82129598; ParticlesB and ParticlesC::Emit, sub_8212B4A8 and sub_8212C1C0; the "
               "car-model sprites' kind and table entry, sub_82123188 and sub_8211F300) natively "
               "instead of through the translated code (same results; checked by "
               "--run_harnesses=race_overlays)");
@@ -191,4 +191,24 @@ extern "C" REX_FUNC(sub_82129598) {
     return;
   }
   ctx.r3.u64 = result;
+}
+
+// ParticlesB::Emit: r3 = the effect, r4 = a position, f1 = a size factor
+// (f2 and f3 aren't read); returns 1, or 0 when full. Where the native
+// version declines (a capacity of 0 or -1), the original runs.
+extern "C" REX_FUNC(sub_8212B4A8) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_race_overlays)) {
+    __imp__sub_8212B4A8(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  uint32_t result = 0;
+  double sine = ctx.f1.f64;
+  if (!ParticlesBEmit(base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64, &result, &sine)) {
+    __imp__sub_8212B4A8(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = result;
+  ctx.f1.f64 = sine;
 }

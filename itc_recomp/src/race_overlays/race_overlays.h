@@ -226,3 +226,28 @@ bool TrailAddPoint(uint8_t* base, uint32_t trail, uint32_t position, double spee
                    uint32_t* result);
 
 }  // namespace race_overlays
+
+namespace race_overlays {
+
+// ParticlesB::Emit (sub_8212B4A8): when the count (+2,776) is below the
+// capacity (+104, signed), a new 176-byte entry at the head (+2,772; the
+// entries from +128): +48 the position, +64 the effect's position (+2,784),
+// their difference with w the game's 1.0 to the effect's +2,800, +108 life
+// and +100 size from the table (+112's +0, +4), +104 and +112 the table's
+// +8 times `a` times the float at 0x82008540, +92 that as an integer, +80
+// to +88 = 200, +96 and +116 = 1; then each of its +116 particles (48
+// bytes from +128): placed around the position at a random angle (cos and
+// sin of RandomRange(0x820029C4, 0x82002240)) and distance
+// (RandomRange(0x82006908, 0x82002208)) times the float at 0x82001BE4,
+// less the effect's +2,800 (a vector subtraction, flush-to-zero on), +16
+// the effect's +2,800, +32 rand() % 3, +36 rand() % 4. The head moves on
+// (modulo the capacity) and the count goes up. `*result` gets 1, or 0 when
+// full. `*sine` gets the last particle's sine, unrounded (the original
+// leaves it in f1; untouched when no particle is made). (The original's f2
+// and f3 aren't read.) False, with nothing done,
+// for a capacity of 0 or -1 (where the original's division can trap); the
+// original runs there.
+bool ParticlesBEmit(uint8_t* base, uint32_t effect, uint32_t position, double a,
+                    uint32_t* result, double* sine);
+
+}  // namespace race_overlays
