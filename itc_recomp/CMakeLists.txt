@@ -104,6 +104,8 @@ set(ITC_SOURCES
     src/hooks/command_list.cpp
     src/command_list/command_list.cpp
     src/hooks/c_runtime.cpp
+    src/hooks/math.cpp
+    src/c_runtime/math.cpp
     src/game_data/game_data.cpp
     src/display/gamma.cpp
     src/harnesses/harness.cpp
@@ -127,6 +129,7 @@ set(ITC_SOURCES
     src/harnesses/billboards.cpp
     src/harnesses/command_list.cpp
     src/harnesses/c_runtime.cpp
+    src/harnesses/math.cpp
     src/helpers/debug_output.cpp
     src/helpers/object_attributes.cpp
     src/helpers/time.cpp
@@ -168,6 +171,16 @@ set(ITC_SOURCES
     src/interpolation/blend_state.cpp
     src/interpolation/glow.cpp
 )
+
+# The C runtime's math (src/c_runtime/math.cpp) must give the translated
+# code's doubles bit for bit, NaNs' signs included: std::fma only where the
+# PowerPC code fuses (no other contraction), and no rewrites that move a
+# negation into an addition (LLVM's default model treats a NaN's sign as
+# free; seen with -O3 on asin of a negative NaN). See
+# docs/functions/c-runtime.md.
+set_source_files_properties(src/c_runtime/math.cpp PROPERTIES
+    COMPILE_OPTIONS "-ffp-model=strict;-ffp-contract=off"
+    SKIP_PRECOMPILE_HEADERS ON)
 
 # Our XMA decoding (src/audio/xma_*: B2 in docs/rexglue-removal.md) on our
 # own FFmpeg, in a library of its own so only our FFmpeg's headers reach it.
