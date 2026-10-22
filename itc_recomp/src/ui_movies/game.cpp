@@ -331,11 +331,13 @@ Moved Move(uint8_t* base, uint32_t movie, bool to_looping, Match match) {
 
 Moved MoveAnimation(uint8_t* base, uint32_t movie, uint32_t sub_scene, uint32_t index,
                     bool to_looping) {
+  ITC_NATIVE_RUNNING("sub_8211DBE0 UiMovie::MoveAnimation");
   return Move(base, movie, to_looping,
               [&](const Slot& slot) { return slot[1] == sub_scene && slot[0] == index; });
 }
 
 Moved MoveNamedAnimation(uint8_t* base, uint32_t movie, uint32_t index, bool to_looping) {
+  ITC_NATIVE_RUNNING("sub_8211DCE8 UiMovie::MoveNamedAnimation");
   return Move(base, movie, to_looping, [&](const Slot& slot) { return slot[2] == index; });
 }
 
