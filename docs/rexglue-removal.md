@@ -2445,6 +2445,14 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
     Native and Dropped how much no longer needs `ctx`. Keyboard input comes back
     once the game is native (A0).
 
+    **B7's first step, native memory** (`docs/native-memory.md`, designed
+    with the user 2026-10-22, on branch `native-heap`): one allocation
+    layer of our own (`src/memory/`) that every allocation goes through,
+    recompiled and native alike: the process heap, VirtualAlloc and
+    physical memory, routed at nine functions behind `--native_heap`.
+    Native code allocates guest memory through it without `ctx`, and the
+    port's end swaps its backing in one place.
+
     What B7 has to deal with is the functions that run, not all 16,552:
     `docs/coverage.md` (started 2026-10-21, branch `coverage`) records them
     with a coverage build (`itc_coverage`) in
