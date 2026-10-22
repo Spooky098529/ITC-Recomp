@@ -23,6 +23,7 @@
 // (amount 0) and the frames after it move towards the current one.
 
 #include "blend_state.h"
+#include "command_list/command_list.h"
 #include "debug/replay_stats.h"
 #include "native/renderer.h"
 
@@ -4214,15 +4215,16 @@ extern "C" REX_FUNC(sub_8258CAA0) {
   // (see "AllocateSlots" in docs/native-renderer.md). Done here without the
   // frame, leaving the registers it changes as it would; a full list goes to
   // the original (it prints a message and returns 0).
+  // The allocation is plain C++ (src/command_list/command_list.h), which
+  // the other allocators call directly.
   uint32_t list = ctx.r3.u32;
-  uint32_t used = guest::LoadU32(base, list + 12) + count;
-  uint32_t limit = guest::LoadU32(base, list + 8);
-  if (ITC_FLAG(native_allocate_slots) && used < limit) {
-    uint32_t first = guest::LoadU32(base, list + 44);
-    uint32_t next = first + (count << 4);
-    guest::StoreU32(base, list + 12, used);
-    guest::StoreU32(base, list + 44, next);
-    ctx.cr6.compare<uint32_t>(used, limit, ctx.xer);
+  uint32_t first = 0;
+  if (ITC_FLAG(native_allocate_slots)) {
+    first = command_list::AllocateSlots(base, list, count);
+  }
+  if (first != 0) {
+    ctx.cr6.compare<uint32_t>(guest::LoadU32(base, list + 12), guest::LoadU32(base, list + 8),
+                              ctx.xer);
     ctx.r12.u64 = ctx.lr;
     ctx.r11.u64 = list;
     ctx.r10.u64 = uint64_t(count << 4) + first;
