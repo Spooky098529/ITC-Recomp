@@ -238,4 +238,7 @@ menus, a race).
    own functions (`itc_750.log`, `itc_751.log`).
 5. The functions' rows (shown to the user first), the "the user decides"
    notes in `loops/leads.md` and `loops/b7-loop.md` removed, CLAUDE.md's
-   B7 sentence, and an entry in "The boundary over time".
+   B7 sentence, and an entry in "The boundary over time". Done,
+   2026-10-22: `functions/heap.md` (30 rows, 9 Overridden), and the
+   boundary's entry (overridden 58 -> 67, live 295 -> 286, `KeBugCheckEx`
+   no longer has a live caller; B7's ours 705 -> 714).
