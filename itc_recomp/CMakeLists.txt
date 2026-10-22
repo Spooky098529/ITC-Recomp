@@ -96,6 +96,7 @@ set(ITC_SOURCES
     src/hooks/movie_files.cpp
     src/hooks/archive_streaming.cpp
     src/hooks/memory_status.cpp
+    src/hooks/heap_counter.cpp
     src/hooks/voice.cpp
     src/hooks/sprites.cpp
     src/sprites/sprites.cpp
