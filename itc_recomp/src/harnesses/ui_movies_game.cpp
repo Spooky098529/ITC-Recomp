@@ -904,6 +904,60 @@ void TextCases(Context& h, const Block& block) {
   }
 }
 
+// The moves between a movie's two lists (UiMovie::MoveAnimation and the
+// rest): random lists (0 to 32 used: moving into a full one follows the
+// original's -1 links) with small keys, so some slots match, and a random
+// last started slot for LoopLast.
+void MoveCases(Context& h, const Block& block) {
+  struct Move {
+    const char* name;
+    GuestFunction recompiled, native;
+  };
+  const Move moves[] = {
+      {"UiMovie::MoveAnimation (sub_8211DBE0)", __imp__sub_8211DBE0, sub_8211DBE0},
+      {"UiMovie::MoveNamedAnimation (sub_8211DCE8)", __imp__sub_8211DCE8, sub_8211DCE8},
+      {"UiMovie::Loop (sub_8211DDD8)", __imp__sub_8211DDD8, sub_8211DDD8},
+      {"UiMovie::LoopNamed (sub_8211DDE0)", __imp__sub_8211DDE0, sub_8211DDE0},
+      {"UiMovie::LoopLast (sub_8211DDE8)", __imp__sub_8211DDE8, sub_8211DDE8},
+  };
+  const uint32_t movie = block.at;
+  for (const Move& f : moves) {
+    Results results(f.name);
+    for (int i = 0; i < 400; i++) {
+      const ListSpec queue(h.random, i == 0 ? 0 : h.random.Below(33));
+      const ListSpec looping(h.random, i == 1 ? 0 : h.random.Below(33));
+      const uint32_t r4 = h.random.Below(5) == 0 ? 0xFFFFFFFFu : h.random.Below(6);
+      const uint32_t r5 = h.random.Below(4);
+      const uint32_t r6 = h.random.Below(3) == 0 ? uint32_t(h.random.Next()) : h.random.Below(2);
+      uint32_t last[10];
+      for (uint32_t& w : last) {
+        w = RandomWord(h.random);
+      }
+      last[0] = h.random.Below(4);
+      last[1] = h.random.Below(3) == 0 ? 0xFFFFFFFFu : h.random.Below(3);
+      last[2] = h.random.Below(2) == 0 ? 0xFFFFFFFFu : h.random.Below(6);
+      Compare(h, results, movie + 0x9000, 0xA000 - 0x9000,
+              [&] {
+                queue.Write(h.base, movie + 0x90B4);
+                looping.Write(h.base, movie + 0x9640);
+                for (uint32_t k = 0; k < 10; k++) {
+                  guest::StoreU32(h.base, movie + 0x9FD8 + 4 * k, last[k]);
+                }
+              },
+              [&](PPCContext& t) {
+                t.r3.u64 = movie;
+                t.r4.u64 = r4;
+                t.r5.u64 = r5;
+                t.r6.u64 = r6;
+              },
+              f.recompiled, f.native,
+              fmt::format("case {}: {} and {} used, r4 {:X} r5 {} r6 {:X}", i, queue.used,
+                          looping.used, r4, r5, r6));
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void UiMoviesGame(Context& h) {
@@ -926,6 +980,7 @@ void UiMoviesGame(Context& h) {
   ScreenStartCases(h, block);
   LayersCases(h, block);
   TextCases(h, block);
+  MoveCases(h, block);
   memory->SystemHeapFree(block.at);
 }
 

@@ -281,6 +281,69 @@ uint32_t NamedAnimationTime(uint8_t* base, uint32_t movie, uint32_t index) {
                   [&](uint32_t slot) { return guest::LoadU32(base, slot + 8) == index; });
 }
 
+Slot LoadSlot(uint8_t* base, uint32_t address) {
+  Slot slot;
+  for (uint32_t k = 0; k < slot.size(); k++) {
+    slot[k] = guest::LoadU32(base, address + 4 * k);
+  }
+  return slot;
+}
+
+void StoreSlot(uint8_t* base, uint32_t address, const Slot& slot) {
+  for (uint32_t k = 0; k < slot.size(); k++) {
+    guest::StoreU32(base, address + 4 * k, slot[k]);
+  }
+}
+
+uint32_t Append(uint8_t* base, uint32_t list, const Slot& slot) {
+  const uint32_t position = uint32_t(int32_t(int16_t(guest::LoadU16(base, list + 136))));
+  LinkFree(base, list, int16_t(uint16_t(position)));
+  const uint32_t to = SlotOf(base, list, LinkAt(base, list, position));
+  StoreSlot(base, to, slot);
+  return to;
+}
+
+namespace {
+// The original's loop: each slot copied out by position (AnimationList::Get)
+// and tested; the first match removed and appended to the other list.
+template <typename Match>
+Moved Move(uint8_t* base, uint32_t movie, bool to_looping, Match match) {
+  const uint32_t from = movie + (to_looping ? kMovieQueue : kMovieLooping);
+  const uint32_t to = movie + (to_looping ? kMovieLooping : kMovieQueue);
+  const uint32_t count = uint32_t(int32_t(int16_t(guest::LoadU16(base, from + 136))));
+  Moved moved;
+  for (uint32_t i = 0; i < count; i++) {
+    moved.looked = true;
+    const Slot slot = LoadSlot(base, SlotOf(base, from, LinkAt(base, from, i)));
+    if (match(slot)) {
+      RemoveAt(base, from, i);
+      moved.slot = Append(base, to, slot);
+      return moved;
+    }
+  }
+  return moved;
+}
+}  // namespace
+
+Moved MoveAnimation(uint8_t* base, uint32_t movie, uint32_t sub_scene, uint32_t index,
+                    bool to_looping) {
+  return Move(base, movie, to_looping,
+              [&](const Slot& slot) { return slot[1] == sub_scene && slot[0] == index; });
+}
+
+Moved MoveNamedAnimation(uint8_t* base, uint32_t movie, uint32_t index, bool to_looping) {
+  return Move(base, movie, to_looping, [&](const Slot& slot) { return slot[2] == index; });
+}
+
+Moved LoopLast(uint8_t* base, uint32_t movie) {
+  const uint32_t named = guest::LoadU32(base, movie + kMovieLastStarted + 8);
+  if (named != 0xFFFFFFFFu) {
+    return MoveNamedAnimation(base, movie, named, true);
+  }
+  return MoveAnimation(base, movie, guest::LoadU32(base, movie + kMovieLastStarted + 4),
+                       guest::LoadU32(base, movie + kMovieLastStarted), true);
+}
+
 namespace {
 constexpr uint32_t kTextMapNone = 0x826C5CD8;
 constexpr uint32_t kPairsNone = 0x826C5CDC;

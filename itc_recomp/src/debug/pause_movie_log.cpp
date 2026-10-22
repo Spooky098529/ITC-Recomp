@@ -602,10 +602,12 @@ extern "C" REX_FUNC(sub_8211DE38) {
   __imp__sub_8211DE38(ctx, base);
 }
 
+// Its work (natively with --native_ui_movies_game) is in
+// src/hooks/ui_movies_game.cpp; logged, the original runs.
 extern "C" REX_FUNC(sub_8211DDD8) {
   REX_FUNC_PROLOGUE();
   if (!ITC_FLAG(log_pause_movie)) {
-    __imp__sub_8211DDD8(ctx, base);
+    ui_movies_game_hooks::Loop(ctx, base);
     return;
   }
   debug::LogCall("8211DDD8", ctx);

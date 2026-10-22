@@ -15,4 +15,10 @@ namespace ui_movies_game_hooks {
 void Insert(PPCContext& ctx, uint8_t* base);
 void RemoveAt(PPCContext& ctx, uint8_t* base);
 
+// UiMovie::Loop (sub_8211DDD8; r3 = movie, r4 = a sub-scene's index or -1,
+// r5 = an animation's index): natively with --native_ui_movies_game and
+// without --log_pause_movie, else the original. Its override
+// (src/debug/pause_movie_log.cpp) logs it for --log_pause_movie.
+void Loop(PPCContext& ctx, uint8_t* base);
+
 }  // namespace ui_movies_game_hooks

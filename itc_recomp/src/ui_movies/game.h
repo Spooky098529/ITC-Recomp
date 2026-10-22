@@ -11,7 +11,9 @@
 
 #include "guest.h"
 
+#include <array>
 #include <cstdint>
+#include <optional>
 
 namespace ui_movies {
 
@@ -117,6 +119,35 @@ void RemoveAt(uint8_t* base, uint32_t list, uint32_t position);
 // 0x82001BE0.
 uint32_t AnimationTime(uint8_t* base, uint32_t movie, uint32_t sub_scene, uint32_t index);
 uint32_t NamedAnimationTime(uint8_t* base, uint32_t movie, uint32_t index);
+
+// A list's 40-byte slot as its ten words, and the slot of the last
+// animation started (+0x9FD8: +0 index, +4 sub-scene, +8 named index).
+using Slot = std::array<uint32_t, 10>;
+constexpr uint32_t kMovieLastStarted = 0x9FD8;
+Slot LoadSlot(uint8_t* base, uint32_t address);
+void StoreSlot(uint8_t* base, uint32_t address, const Slot& slot);
+// AnimationList::Insert (sub_8211B4D0) at the end of the list (its count,
+// 16-bit, sign-extended, as the original's callers pass it), from a slot
+// that can't share the list's memory. Returns the slot written.
+uint32_t Append(uint8_t* base, uint32_t list, const Slot& slot);
+
+// sub_8211DBE0 (UiMovie::MoveAnimation) and sub_8211DCE8
+// (UiMovie::MoveNamedAnimation): the first slot naming the animation (its
+// +4 `sub_scene` and +0 `index`, or by name its +8 `index`) in the queue
+// (`to_looping`) or the looping list, copied out, removed (RemoveAt) and
+// appended to the other list. Returns the slot appended to, or nothing when
+// no slot matched; `looked` says whether the list had slots (the original's
+// r3 differs: a copy in its frame then, the movie otherwise).
+struct Moved {
+  std::optional<uint32_t> slot;
+  bool looked = false;
+};
+Moved MoveAnimation(uint8_t* base, uint32_t movie, uint32_t sub_scene, uint32_t index,
+                    bool to_looping);
+Moved MoveNamedAnimation(uint8_t* base, uint32_t movie, uint32_t index, bool to_looping);
+// sub_8211DDE8 (UiMovie::LoopLast): the last started animation moved to the
+// looping list, by name when its +8 isn't -1.
+Moved LoopLast(uint8_t* base, uint32_t movie);
 
 // The maps of {key, value} word pairs. A movie's texts (+0x9BCC): 128 pairs
 // in place, the count at +1024. The movie table (0x826C5CCC) and the like:

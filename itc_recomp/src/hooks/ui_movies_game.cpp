@@ -32,7 +32,11 @@ ITC_FLAG_BOOL(native_ui_movies_game, true, "ITC",
               "layers sub_8211BD10 (its buckets in its frame on the guest stack, as the "
               "original's; the original runs for trees that would overflow them); the texts' "
               "accessors UiMovie::TextString sub_8211B720, sub_8211B770, sub_8211B7B8, "
-              "sub_8211B9B8 and sub_8211B940, and UiMovies::IsLoaded sub_8211BE98 "
+              "sub_8211B9B8 and sub_8211B940, and UiMovies::IsLoaded sub_8211BE98; the moves "
+              "between the animation lists UiMovie::MoveAnimation sub_8211DBE0, "
+              "UiMovie::MoveNamedAnimation sub_8211DCE8, UiMovie::Loop sub_8211DDD8, "
+              "UiMovie::LoopNamed sub_8211DDE0 and UiMovie::LoopLast sub_8211DDE8 (these "
+              "without --log_pause_movie) "
               "(same results; checked by --run_harnesses=ui_movies_game)");
 
 ITC_FLAG_DECLARE(bool, native_ui_movies);
@@ -371,6 +375,69 @@ extern "C" REX_FUNC(sub_8211B940) {
   ctx.r3.u64 = movie + ui_movies::kMovieTexts;
 }
 
+namespace {
+// The moves between the animation lists and the starts call
+// AnimationList::Insert and RemoveAt (watched for --log_pause_movie):
+// natively only where nothing watches them.
+bool NativeUnwatched() {
+  return ITC_FLAG(native_ui_movies_game) && !ITC_FLAG(log_pause_movie);
+}
+
+// The r3 the moves leave: the slot appended to; with no match, the copy in
+// their 176-byte frame (+80) when the list had slots, else the movie.
+uint64_t MovedR3(const ui_movies::Moved& moved, uint32_t r1, uint32_t movie) {
+  if (moved.slot) {
+    return *moved.slot;
+  }
+  return moved.looked ? r1 - 176 + 80 : movie;
+}
+}  // namespace
+
+#define NATIVE_UNWATCHED_OR_ORIGINAL(address) \
+  if (!NativeUnwatched()) {                   \
+    __imp__sub_##address(ctx, base);          \
+    return;                                   \
+  }
+
+// UiMovie::MoveAnimation: r3 = movie, r4 = a sub-scene's index or -1, r5 =
+// an animation's index, r6 = 1 to the looping list, 0 to the queue.
+extern "C" REX_FUNC(sub_8211DBE0) {
+  REX_FUNC_PROLOGUE();
+  NATIVE_UNWATCHED_OR_ORIGINAL(8211DBE0);
+  const uint32_t movie = ctx.r3.u32;
+  ctx.r3.u64 = MovedR3(
+      ui_movies::MoveAnimation(base, movie, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32 != 0),
+      ctx.r1.u32, movie);
+}
+
+// UiMovie::MoveNamedAnimation: r3 = movie, r4 = a named animation's index,
+// r5 the direction.
+extern "C" REX_FUNC(sub_8211DCE8) {
+  REX_FUNC_PROLOGUE();
+  NATIVE_UNWATCHED_OR_ORIGINAL(8211DCE8);
+  const uint32_t movie = ctx.r3.u32;
+  ctx.r3.u64 = MovedR3(ui_movies::MoveNamedAnimation(base, movie, ctx.r4.u32, ctx.r5.u32 != 0),
+                       ctx.r1.u32, movie);
+}
+
+// UiMovie::LoopNamed: sub_8211DCE8 with r5 = 1.
+extern "C" REX_FUNC(sub_8211DDE0) {
+  REX_FUNC_PROLOGUE();
+  NATIVE_UNWATCHED_OR_ORIGINAL(8211DDE0);
+  const uint32_t movie = ctx.r3.u32;
+  ctx.r3.u64 = MovedR3(ui_movies::MoveNamedAnimation(base, movie, ctx.r4.u32, true), ctx.r1.u32,
+                       movie);
+}
+
+// UiMovie::LoopLast: r3 = movie (its tail calls make their frames where
+// its caller's ends).
+extern "C" REX_FUNC(sub_8211DDE8) {
+  REX_FUNC_PROLOGUE();
+  NATIVE_UNWATCHED_OR_ORIGINAL(8211DDE8);
+  const uint32_t movie = ctx.r3.u32;
+  ctx.r3.u64 = MovedR3(ui_movies::LoopLast(base, movie), ctx.r1.u32, movie);
+}
+
 namespace ui_movies_game_hooks {
 void Insert(PPCContext& ctx, uint8_t* base) {
   NATIVE_OR_ORIGINAL(8211B4D0);
@@ -384,5 +451,12 @@ void Insert(PPCContext& ctx, uint8_t* base) {
 void RemoveAt(PPCContext& ctx, uint8_t* base) {
   NATIVE_OR_ORIGINAL(8211B080);
   ui_movies::RemoveAt(base, ctx.r3.u32, ctx.r4.u32);
+}
+
+void Loop(PPCContext& ctx, uint8_t* base) {
+  NATIVE_UNWATCHED_OR_ORIGINAL(8211DDD8);
+  const uint32_t movie = ctx.r3.u32;
+  ctx.r3.u64 = MovedR3(ui_movies::MoveAnimation(base, movie, ctx.r4.u32, ctx.r5.u32, true),
+                       ctx.r1.u32, movie);
 }
 }  // namespace ui_movies_game_hooks
