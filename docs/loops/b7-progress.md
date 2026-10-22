@@ -30,6 +30,9 @@ record: `b7-loop-2026-10-22-0111.md` (and this file's history).
   RaceOverlays::SlotOf, `sub_8215E150`. Validated (itc_563.log): 33 of
   33 (`sub_820C0128`'s print added, f29a13d).
 - Step 6: the race overlays' fifth migration agent running.
+- The user (2026-10-22): end this session's loop once the race overlays
+  are done (recorded, step 9), for the context's size; the next session
+  (after `/clear`) takes the next lead.
 - Session: pass 11 of 20, subsystem 1 of 5. In all: subsystem 1 of 5.
 - Known at the start: `b7_status.py` checks `c-runtime.md:221`
   `sub_825A9934` (`__chkstk`) "Dropped, but it ran" (from the first run:
