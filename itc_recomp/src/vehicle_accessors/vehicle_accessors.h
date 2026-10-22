@@ -23,6 +23,30 @@ uint32_t VehicleGet(uint8_t* base, uint32_t index);
 // vehicle + 5,328 + 96 x wheel.
 uint32_t VehicleWheelContact(uint32_t vehicle, uint32_t wheel);
 
+// sub_820C0140: the vehicle's float +2224.
+float VehicleFloat2224(uint8_t* base, uint32_t vehicle);
+// Vehicle::Speed (sub_820C0148): the float at +48 (m/s).
+float VehicleSpeed(uint8_t* base, uint32_t vehicle);
+// Vehicle::GetDistancePerFrame (sub_820C0150): +48 times the float at
+// 0x820029EC (1/30).
+float VehicleDistancePerFrame(uint8_t* base, uint32_t vehicle);
+// Vehicle::Identity (sub_820C0168): vehicle + 5,232.
+uint32_t VehicleIdentity(uint32_t vehicle);
+// sub_820C0450: when the vehicle's +344 object is set, its halfword +114 =
+// value (Object344SetHalf114); returns the object (0 when none).
+uint32_t VehicleSetObjectHalf114(uint8_t* base, uint32_t vehicle, uint32_t value);
+// Quaternion::ToMatrix3 (sub_820C0490): the rotation matrix's three rows
+// (+0-+8, +16-+24, +32-+40; the rows' w left), scaled by the float at
+// 0x820021E8 over the quaternion's squared length (vmsum4fp128: dpps with
+// flush-to-zero on, on the 16 bytes at the quaternion rounded down to 16).
+void QuaternionToMatrix3(uint8_t* base, uint32_t out, uint32_t quaternion);
+// Quaternion::ToMatrix (sub_820C0550): ToMatrix3, then the fourth row =
+// (0, 0, 0, 1).
+void QuaternionToMatrix(uint8_t* base, uint32_t out, uint32_t quaternion);
+// sub_820C0590: out +0 = speed x 3.6 (the float at 0x820029E0), out +4 and
+// +6 = the vehicle's halfwords +5236 and +5238.
+void VehicleSpeedRecord(uint8_t* base, uint32_t out, uint32_t vehicle);
+
 // --- The rigid body (the vehicle's +336) ---
 
 // RigidBody::Position (sub_820B67D8): body + 208.
@@ -79,6 +103,64 @@ float VehicleWheelSlip(uint8_t* base, uint32_t vehicle, uint32_t wheel, double t
 // (from 0.0; a NaN, once met, is kept).
 float VehicleMaxWheelSlip(uint8_t* base, uint32_t vehicle, double threshold);
 
+// --- The collision object (the vehicle's +340) and the collision world ---
+
+// CollisionObject::Link (sub_820B7BF0): the object first in the list at
+// `head` (+228 next, +232 previous).
+void CollisionObjectLink(uint8_t* base, uint32_t object, uint32_t head);
+// CollisionObject::Unlink (sub_820B7C18): the object out of the list.
+void CollisionObjectUnlink(uint8_t* base, uint32_t object, uint32_t head);
+// CollisionObject::FirstContact (sub_820B7C90): the first contact in its
+// list (+240, linked by +68) whose flags (+4) have a bit of `mask`, or 0.
+uint32_t CollisionObjectFirstContact(uint8_t* base, uint32_t object, uint32_t mask);
+// sub_820B7CB8 and sub_820B7CC0: the word +264, and its setter.
+uint32_t CollisionObjectWord264(uint8_t* base, uint32_t object);
+void CollisionObjectSetWord264(uint8_t* base, uint32_t object, uint32_t value);
+// sub_820B7D18: clears `bits` in +252; sub_820B7D28 and sub_820B7D38 set
+// and clear them in +256; sub_820B7D48 and sub_820B7D58 in +260.
+void CollisionObjectClearBits252(uint8_t* base, uint32_t object, uint32_t bits);
+void CollisionObjectSetBits256(uint8_t* base, uint32_t object, uint32_t bits);
+void CollisionObjectClearBits256(uint8_t* base, uint32_t object, uint32_t bits);
+void CollisionObjectSetBits260(uint8_t* base, uint32_t object, uint32_t bits);
+void CollisionObjectClearBits260(uint8_t* base, uint32_t object, uint32_t bits);
+// sub_820B7D68: +208 = the vector (Vec4::Copy).
+void CollisionObjectSetSize(uint8_t* base, uint32_t object, uint32_t vector);
+// sub_820B7D70: +224 = value (rounded to single).
+void CollisionObjectSetFloat224(uint8_t* base, uint32_t object, double value);
+// sub_820B7D78: copies a 68-byte record (three vectors, then +48 to +64).
+void CollisionRecordCopy(uint8_t* base, uint32_t out, uint32_t record);
+// sub_820B8768 and sub_820B8778: the value to 0x826C2D78 and 0x826C2D7C.
+void CollisionSetGlobal78(uint8_t* base, uint32_t value);
+void CollisionSetGlobal7C(uint8_t* base, uint32_t value);
+// CollisionWorld::SetCallback (sub_820B8788): the world's (+[0x826C2D88])
+// +8 = value.
+void CollisionWorldSetCallback(uint8_t* base, uint32_t value);
+// CollisionWorld::NewContact (sub_820B8A48): the next of the world's
+// 80-byte records (+48 the array, +52 used, +44 the capacity), counted, or
+// 0 when full.
+uint32_t CollisionWorldNewContact(uint8_t* base);
+// sub_820B8C90, sub_820B8CA0 and sub_820B8CB0: the world's words +60, +64
+// and +68.
+uint32_t CollisionWorldWord60(uint8_t* base);
+uint32_t CollisionWorldWord64(uint8_t* base);
+uint32_t CollisionWorldWord68(uint8_t* base);
+
+// --- The vehicle's +344 object ---
+
+// sub_820B9658, sub_820B9660, sub_820B9670 and sub_820B9678: +20, +16, +28
+// and +24 = value (rounded to single); sub_820B9668: the float at +28.
+void Object344SetFloat20(uint8_t* base, uint32_t object, double value);
+void Object344SetFloat16(uint8_t* base, uint32_t object, double value);
+float Object344Float28(uint8_t* base, uint32_t object);
+void Object344SetFloat28(uint8_t* base, uint32_t object, double value);
+void Object344SetFloat24(uint8_t* base, uint32_t object, double value);
+// sub_820B99B0 and sub_820B99C0: the halfwords +112 and +114;
+// sub_820B99B8 and sub_820B99C8 their setters (the value's low 16 bits).
+uint32_t ObjectHalf112(uint8_t* base, uint32_t object);
+void ObjectSetHalf112(uint8_t* base, uint32_t object, uint32_t value);
+uint32_t ObjectHalf114(uint8_t* base, uint32_t object);
+void ObjectSetHalf114(uint8_t* base, uint32_t object, uint32_t value);
+
 // --- Contacts (the collision world's 80-byte records) ---
 
 // Contact::Object (sub_820B8CC0): the contact's word +0 when the top byte
@@ -88,6 +170,12 @@ uint32_t ContactObject(uint8_t* base, uint32_t contact);
 uint32_t ContactPosition(uint32_t contact);
 // Contact::Strength (sub_820B8D08): the float at +64.
 float ContactStrength(uint8_t* base, uint32_t contact);
+// sub_820B8CE0: the contact's word +0 when the top byte of its flags is
+// nonzero, else 0 (Contact::Object's other case).
+uint32_t ContactOtherObject(uint8_t* base, uint32_t contact);
+// Contact::Next (sub_820B8D10): the next contact (+68 on) whose flags have
+// a bit of `mask`, or 0.
+uint32_t ContactNext(uint8_t* base, uint32_t contact, uint32_t mask);
 
 // --- The race data's racer records and stages ---
 

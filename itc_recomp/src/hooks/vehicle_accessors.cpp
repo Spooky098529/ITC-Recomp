@@ -14,7 +14,10 @@ ITC_FLAG_BOOL(native_vehicle_accessors, true, "ITC",
               "position and strength, sub_820B8CC0 to sub_820B8D08; Racers::IndexOf and "
               "Stages::HasRacer, sub_820FF9F8 and sub_820FFCF8; SaveData::Of, sub_82105620; "
               "the switch sub_825C8388; the rigid body's accessors and setters, sub_820B6638 "
-              "to sub_820B69D8; the wheels' slip, sub_820C0180 and sub_820C0290) natively instead of through the translated code (same "
+              "to sub_820B69D8; the wheels' slip, sub_820C0180 and sub_820C0290; the vehicle's "
+              "other accessors, sub_820C0140 to sub_820C0590; the collision object's and the "
+              "collision world's, sub_820B7BF0 to sub_820B8D10; the +344 object's, "
+              "sub_820B9658 to sub_820B99C8) natively instead of through the translated code (same "
               "results; checked by --run_harnesses=vehicle_accessors)");
 
 // Defines an adapter returning a word in r3: `address` the function's
@@ -111,6 +114,53 @@ ITC_ACCESSOR_VOID(820B69D8, RigidBodyAddTorqueAt(base, ctx.r3.u32, ctx.r4.u32, c
 // The wheels' slip: r3 = the vehicle, r4 = a wheel, f1 = a threshold.
 ITC_ACCESSOR_FLOAT(820C0180, VehicleWheelSlip(base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64))
 ITC_ACCESSOR_FLOAT(820C0290, VehicleMaxWheelSlip(base, ctx.r3.u32, ctx.f1.f64))
+
+// The vehicle (r3).
+ITC_ACCESSOR_FLOAT(820C0140, VehicleFloat2224(base, ctx.r3.u32))
+ITC_ACCESSOR_FLOAT(820C0148, VehicleSpeed(base, ctx.r3.u32))
+ITC_ACCESSOR_FLOAT(820C0150, VehicleDistancePerFrame(base, ctx.r3.u32))
+ITC_ACCESSOR_WORD(820C0168, VehicleIdentity(ctx.r3.u32))
+ITC_ACCESSOR_WORD(820C0450, VehicleSetObjectHalf114(base, ctx.r3.u32, ctx.r4.u32))
+ITC_ACCESSOR_VOID(820C0490, QuaternionToMatrix3(base, ctx.r3.u32, ctx.r4.u32))
+ITC_ACCESSOR_VOID(820C0550, QuaternionToMatrix(base, ctx.r3.u32, ctx.r4.u32))
+ITC_ACCESSOR_VOID(820C0590, VehicleSpeedRecord(base, ctx.r3.u32, ctx.r4.u32))
+
+// The collision object (r3) and the collision world.
+ITC_ACCESSOR_VOID(820B7BF0, CollisionObjectLink(base, ctx.r3.u32, ctx.r4.u32))
+ITC_ACCESSOR_VOID(820B7C18, CollisionObjectUnlink(base, ctx.r3.u32, ctx.r4.u32))
+ITC_ACCESSOR_WORD(820B7C90, CollisionObjectFirstContact(base, ctx.r3.u32, ctx.r4.u32))
+ITC_ACCESSOR_WORD(820B7CB8, CollisionObjectWord264(base, ctx.r3.u32))
+ITC_ACCESSOR_VOID(820B7CC0, CollisionObjectSetWord264(base, ctx.r3.u32, ctx.r4.u32))
+ITC_ACCESSOR_VOID(820B7D18, CollisionObjectClearBits252(base, ctx.r3.u32, ctx.r4.u32))
+ITC_ACCESSOR_VOID(820B7D28, CollisionObjectSetBits256(base, ctx.r3.u32, ctx.r4.u32))
+ITC_ACCESSOR_VOID(820B7D38, CollisionObjectClearBits256(base, ctx.r3.u32, ctx.r4.u32))
+ITC_ACCESSOR_VOID(820B7D48, CollisionObjectSetBits260(base, ctx.r3.u32, ctx.r4.u32))
+ITC_ACCESSOR_VOID(820B7D58, CollisionObjectClearBits260(base, ctx.r3.u32, ctx.r4.u32))
+// r3 comes back as object + 208 (the copy's destination).
+ITC_ACCESSOR_VOID(820B7D68, CollisionObjectSetSize(base, ctx.r3.u32, ctx.r4.u32);
+                  ctx.r3.u64 = ctx.r3.u32 + 208)
+ITC_ACCESSOR_VOID(820B7D70, CollisionObjectSetFloat224(base, ctx.r3.u32, ctx.f1.f64))
+ITC_ACCESSOR_VOID(820B7D78, CollisionRecordCopy(base, ctx.r3.u32, ctx.r4.u32))
+ITC_ACCESSOR_VOID(820B8768, CollisionSetGlobal78(base, ctx.r3.u32))
+ITC_ACCESSOR_VOID(820B8778, CollisionSetGlobal7C(base, ctx.r3.u32))
+ITC_ACCESSOR_VOID(820B8788, CollisionWorldSetCallback(base, ctx.r3.u32))
+ITC_ACCESSOR_WORD(820B8A48, CollisionWorldNewContact(base))
+ITC_ACCESSOR_WORD(820B8C90, CollisionWorldWord60(base))
+ITC_ACCESSOR_WORD(820B8CA0, CollisionWorldWord64(base))
+ITC_ACCESSOR_WORD(820B8CB0, CollisionWorldWord68(base))
+ITC_ACCESSOR_WORD(820B8CE0, ContactOtherObject(base, ctx.r3.u32))
+ITC_ACCESSOR_WORD(820B8D10, ContactNext(base, ctx.r3.u32, ctx.r4.u32))
+
+// The vehicle's +344 object (r3).
+ITC_ACCESSOR_VOID(820B9658, Object344SetFloat20(base, ctx.r3.u32, ctx.f1.f64))
+ITC_ACCESSOR_VOID(820B9660, Object344SetFloat16(base, ctx.r3.u32, ctx.f1.f64))
+ITC_ACCESSOR_FLOAT(820B9668, Object344Float28(base, ctx.r3.u32))
+ITC_ACCESSOR_VOID(820B9670, Object344SetFloat28(base, ctx.r3.u32, ctx.f1.f64))
+ITC_ACCESSOR_VOID(820B9678, Object344SetFloat24(base, ctx.r3.u32, ctx.f1.f64))
+ITC_ACCESSOR_WORD(820B99B0, ObjectHalf112(base, ctx.r3.u32))
+ITC_ACCESSOR_VOID(820B99B8, ObjectSetHalf112(base, ctx.r3.u32, ctx.r4.u32))
+ITC_ACCESSOR_WORD(820B99C0, ObjectHalf114(base, ctx.r3.u32))
+ITC_ACCESSOR_VOID(820B99C8, ObjectSetHalf114(base, ctx.r3.u32, ctx.r4.u32))
 
 // --- The vector library (src/vehicle_accessors/vectors.cpp) ---
 

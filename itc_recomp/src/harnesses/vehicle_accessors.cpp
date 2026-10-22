@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <bit>
 #include <cmath>
+#include <functional>
 #include <iterator>
 #include <string>
 #include <utility>
@@ -123,6 +124,67 @@ ITC_NATIVE_FLOAT(NativeVehicleWheelSlip,
                  va::VehicleWheelSlip(base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64))
 ITC_NATIVE_FLOAT(NativeVehicleMaxWheelSlip,
                  va::VehicleMaxWheelSlip(base, ctx.r3.u32, ctx.f1.f64))
+
+ITC_NATIVE_FLOAT(NativeVehicleFloat2224, va::VehicleFloat2224(base, ctx.r3.u32))
+ITC_NATIVE_FLOAT(NativeVehicleSpeed, va::VehicleSpeed(base, ctx.r3.u32))
+ITC_NATIVE_FLOAT(NativeVehicleDistancePerFrame, va::VehicleDistancePerFrame(base, ctx.r3.u32))
+ITC_NATIVE_WORD(NativeVehicleIdentity, va::VehicleIdentity(ctx.r3.u32))
+ITC_NATIVE_WORD(NativeVehicleSetObjectHalf114,
+                va::VehicleSetObjectHalf114(base, ctx.r3.u32, ctx.r4.u32))
+
+#define ITC_NATIVE_SET(name, call)            \
+  void name(PPCContext& ctx, uint8_t* base) { \
+    ctx.fpscr.disableFlushMode();             \
+    call;                                     \
+  }
+
+ITC_NATIVE_SET(NativeQuaternionToMatrix3, va::QuaternionToMatrix3(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_SET(NativeQuaternionToMatrix, va::QuaternionToMatrix(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_SET(NativeVehicleSpeedRecord, va::VehicleSpeedRecord(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_SET(NativeCollisionObjectLink, va::CollisionObjectLink(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_SET(NativeCollisionObjectUnlink,
+               va::CollisionObjectUnlink(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_WORD(NativeCollisionObjectFirstContact,
+                va::CollisionObjectFirstContact(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_WORD(NativeCollisionObjectWord264, va::CollisionObjectWord264(base, ctx.r3.u32))
+ITC_NATIVE_SET(NativeCollisionObjectSetWord264,
+               va::CollisionObjectSetWord264(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_SET(NativeCollisionObjectClearBits252,
+               va::CollisionObjectClearBits252(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_SET(NativeCollisionObjectSetBits256,
+               va::CollisionObjectSetBits256(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_SET(NativeCollisionObjectClearBits256,
+               va::CollisionObjectClearBits256(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_SET(NativeCollisionObjectSetBits260,
+               va::CollisionObjectSetBits260(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_SET(NativeCollisionObjectClearBits260,
+               va::CollisionObjectClearBits260(base, ctx.r3.u32, ctx.r4.u32))
+void NativeCollisionObjectSetSize(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  va::CollisionObjectSetSize(base, ctx.r3.u32, ctx.r4.u32);
+  ctx.r3.u64 = ctx.r3.u32 + 208;
+}
+ITC_NATIVE_SET(NativeCollisionObjectSetFloat224,
+               va::CollisionObjectSetFloat224(base, ctx.r3.u32, ctx.f1.f64))
+ITC_NATIVE_SET(NativeCollisionRecordCopy, va::CollisionRecordCopy(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_SET(NativeCollisionSetGlobal78, va::CollisionSetGlobal78(base, ctx.r3.u32))
+ITC_NATIVE_SET(NativeCollisionSetGlobal7C, va::CollisionSetGlobal7C(base, ctx.r3.u32))
+ITC_NATIVE_SET(NativeCollisionWorldSetCallback, va::CollisionWorldSetCallback(base, ctx.r3.u32))
+ITC_NATIVE_WORD(NativeCollisionWorldNewContact, va::CollisionWorldNewContact(base))
+ITC_NATIVE_WORD(NativeCollisionWorldWord60, va::CollisionWorldWord60(base))
+ITC_NATIVE_WORD(NativeCollisionWorldWord64, va::CollisionWorldWord64(base))
+ITC_NATIVE_WORD(NativeCollisionWorldWord68, va::CollisionWorldWord68(base))
+ITC_NATIVE_WORD(NativeContactOtherObject, va::ContactOtherObject(base, ctx.r3.u32))
+ITC_NATIVE_WORD(NativeContactNext, va::ContactNext(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_SET(NativeObject344SetFloat20, va::Object344SetFloat20(base, ctx.r3.u32, ctx.f1.f64))
+ITC_NATIVE_SET(NativeObject344SetFloat16, va::Object344SetFloat16(base, ctx.r3.u32, ctx.f1.f64))
+ITC_NATIVE_FLOAT(NativeObject344Float28, va::Object344Float28(base, ctx.r3.u32))
+ITC_NATIVE_SET(NativeObject344SetFloat28, va::Object344SetFloat28(base, ctx.r3.u32, ctx.f1.f64))
+ITC_NATIVE_SET(NativeObject344SetFloat24, va::Object344SetFloat24(base, ctx.r3.u32, ctx.f1.f64))
+ITC_NATIVE_WORD(NativeObjectHalf112, va::ObjectHalf112(base, ctx.r3.u32))
+ITC_NATIVE_SET(NativeObjectSetHalf112, va::ObjectSetHalf112(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_WORD(NativeObjectHalf114, va::ObjectHalf114(base, ctx.r3.u32))
+ITC_NATIVE_SET(NativeObjectSetHalf114, va::ObjectSetHalf114(base, ctx.r3.u32, ctx.r4.u32))
 
 namespace vl = vector_library;
 
@@ -271,6 +333,7 @@ void AddressCases(Context& h) {
       {"RigidBody::Matrix (sub_820B6930)", __imp__sub_820B6930, NativeRigidBodyMatrix},
       {"Contact::Position (sub_820B8D00)", __imp__sub_820B8D00, NativeContactPosition},
       {"DebugSwitchOff (sub_825C8388)", __imp__sub_825C8388, NativeDebugSwitchOff},
+      {"Vehicle::Identity (sub_820C0168)", __imp__sub_820C0168, NativeVehicleIdentity},
       {"RigidBody::Field80 (sub_820B6880)", __imp__sub_820B6880, NativeRigidBodyField80},
       {"RigidBody::Velocity (sub_820B6888)", __imp__sub_820B6888, NativeRigidBodyVelocity},
       {"RigidBody::Field144 (sub_820B6890)", __imp__sub_820B6890, NativeRigidBodyField144},
@@ -821,6 +884,202 @@ void WheelSlipCases(Context& h, uint32_t block) {
   }
 }
 
+// The other objects' cases: a region of the block (0x1800 bytes) filled
+// anew for each case, the object at its start; `prepare(fill, region)`
+// then sets fields (pointers, lists), `args(t, pick, region)` the
+// registers from a generator seeded the same for both versions. The
+// region, the collision globals (0x826C2D78, 0x826C2D7C) and r3 and f1 are
+// compared; the globals and the collision world's pointer are put back.
+constexpr uint32_t kRegion = 0x8000, kRegionBytes = 0x1800;
+constexpr uint32_t kCollisionGlobals = 0x826C2D78, kCollisionWorld = 0x826C2D88;
+
+struct ObjectFunction {
+  const char* name;
+  GuestFunction recompiled, native;
+  std::function<void(Random&, uint32_t)> prepare;
+  std::function<void(PPCContext&, Random&, uint32_t)> args;
+  bool compare_f1 = true;
+  // Whether it does arithmetic on two float inputs (NaN cases a group of
+  // their own, expected to differ).
+  bool arithmetic = false;
+};
+
+void ObjectCases(Context& h, uint32_t block, const ObjectFunction& f, int count) {
+  const uint32_t region = block + kRegion;
+  const uint32_t saved_globals[2] = {guest::LoadU32(h.base, kCollisionGlobals),
+                                     guest::LoadU32(h.base, kCollisionGlobals + 4)};
+  const uint32_t saved_world = guest::LoadU32(h.base, kCollisionWorld);
+  Results results(f.name);
+  Results nan_results(std::string(f.name) + ", NaN inputs (expected to differ)");
+  for (int seed = 0; seed < count; seed++) {
+    const bool nans = seed % 4 == 3;
+    Compare(
+        h, nans && f.arithmetic ? nan_results : results,
+        {{region, kRegionBytes}, {kCollisionGlobals, 8}},
+        [&] {
+          Random fill = Seeded(uint64_t(seed) * 11 + 5);
+          for (uint32_t i = 0; i < kRegionBytes; i += 4) {
+            guest::StoreU32(h.base, region + i, nans ? FloatWord(fill) : NumberWord(fill));
+          }
+          guest::StoreU32(h.base, kCollisionGlobals, saved_globals[0]);
+          guest::StoreU32(h.base, kCollisionGlobals + 4, saved_globals[1]);
+          guest::StoreU32(h.base, kCollisionWorld, saved_world);
+          if (f.prepare) {
+            f.prepare(fill, region);
+          }
+        },
+        [&](PPCContext& t) {
+          Random pick = Seeded(uint64_t(seed) * 13 + 7);
+          t.r3.u64 = region;
+          t.r4.u64 = uint32_t(pick.Next());
+          t.f1.f64 = double(std::bit_cast<float>(nans ? FloatWord(pick) : NumberWord(pick)));
+          if (f.args) {
+            f.args(t, pick, region);
+          }
+        },
+        f.recompiled, f.native, fmt::format("seed {}", seed), f.compare_f1);
+  }
+  guest::StoreU32(h.base, kCollisionGlobals, saved_globals[0]);
+  guest::StoreU32(h.base, kCollisionGlobals + 4, saved_globals[1]);
+  guest::StoreU32(h.base, kCollisionWorld, saved_world);
+  results.Report();
+  if (f.arithmetic) {
+    nan_results.Report();
+  }
+}
+
+void OtherObjectCases(Context& h, uint32_t block) {
+  // Puts the collision world in the region (+0x400), with a small capacity
+  // and count.
+  auto world = [&h](Random& fill, uint32_t region) {
+    guest::StoreU32(h.base, kCollisionWorld, region + 0x400);
+    guest::StoreU32(h.base, region + 0x400 + 44, fill.Below(5));
+    guest::StoreU32(h.base, region + 0x400 + 52, fill.Below(6));
+  };
+  // A chain of contacts (80 bytes each from +0x800, linked by +68, ending
+  // in 0 after up to six), its first at the object's +240 and the start
+  // contact's +68.
+  auto contacts = [&h](Random& fill, uint32_t region) {
+    const uint32_t count = fill.Below(7);
+    uint32_t next = 0;
+    for (uint32_t i = count; i-- > 0;) {
+      const uint32_t contact = region + 0x800 + 80 * i;
+      guest::StoreU32(h.base, contact + 68, next);
+      guest::StoreU32(h.base, contact + 4, uint32_t(fill.Next()) & (fill.Below(2) ? 0xFF : ~0u));
+      next = contact;
+    }
+    guest::StoreU32(h.base, region + 240, next);
+    guest::StoreU32(h.base, region + 68, next);
+  };
+  // A list for Link and Unlink: the head at +0x10, the object (the region)
+  // and two others (+0x400, +0x600) linked in some way (+228 next, +232
+  // previous).
+  auto list = [&h](Random& fill, uint32_t region) {
+    const uint32_t others[] = {0, region + 0x400, region + 0x600};
+    guest::StoreU32(h.base, region + 0x10, fill.Below(3) == 0 ? 0 : others[1 + fill.Below(2)]);
+    guest::StoreU32(h.base, region + 232, others[fill.Below(2)]);
+    guest::StoreU32(h.base, region + 228, others[2 * fill.Below(2)]);
+    for (uint32_t other : {others[1], others[2]}) {
+      guest::StoreU32(h.base, other + 228, others[fill.Below(3)]);
+      guest::StoreU32(h.base, other + 232, others[fill.Below(3)]);
+    }
+  };
+  auto head = [](PPCContext& t, Random&, uint32_t region) { t.r4.u64 = region + 0x10; };
+  // A vector or record elsewhere in the region, or overlapping the object.
+  auto source = [](PPCContext& t, Random& pick, uint32_t region) {
+    const uint32_t at[] = {0x200, 0x204, 0x210, 0xD0, 0x0, 0x8};
+    t.r4.u64 = region + at[pick.Below(6)];
+  };
+  auto out_and_source = [](PPCContext& t, Random& pick, uint32_t region) {
+    const uint32_t at[] = {0x200, 0x204, 0x210, 0x100, 0x0, 0x8};
+    t.r3.u64 = region + 0x100;
+    t.r4.u64 = region + at[pick.Below(6)];
+  };
+  auto mask = [](PPCContext& t, Random& pick, uint32_t) {
+    t.r4.u64 = pick.Below(2) ? uint32_t(1) << pick.Below(32) : uint32_t(pick.Next());
+  };
+  const ObjectFunction functions[] = {
+      {"Vehicle::Float2224 (sub_820C0140)", __imp__sub_820C0140, NativeVehicleFloat2224},
+      {"Vehicle::Speed (sub_820C0148)", __imp__sub_820C0148, NativeVehicleSpeed},
+      {"Vehicle::GetDistancePerFrame (sub_820C0150)", __imp__sub_820C0150,
+       NativeVehicleDistancePerFrame},
+      {"Vehicle::SetObjectHalf114 (sub_820C0450)", __imp__sub_820C0450,
+       NativeVehicleSetObjectHalf114,
+       [&h](Random& fill, uint32_t region) {
+         guest::StoreU32(h.base, region + 344, fill.Below(3) == 0 ? 0 : region + 0x400);
+       }},
+      {"Quaternion::ToMatrix3 (sub_820C0490)", __imp__sub_820C0490, NativeQuaternionToMatrix3,
+       nullptr, out_and_source, true, true},
+      {"Quaternion::ToMatrix (sub_820C0550)", __imp__sub_820C0550, NativeQuaternionToMatrix,
+       nullptr, out_and_source, true, true},
+      {"Vehicle::SpeedRecord (sub_820C0590)", __imp__sub_820C0590, NativeVehicleSpeedRecord,
+       nullptr,
+       [](PPCContext& t, Random& pick, uint32_t region) {
+         t.r3.u64 = region + 0x100 + 4 * pick.Below(4);
+         t.r4.u64 = region;
+       }},
+      {"CollisionObject::Link (sub_820B7BF0)", __imp__sub_820B7BF0, NativeCollisionObjectLink,
+       list, head},
+      {"CollisionObject::Unlink (sub_820B7C18)", __imp__sub_820B7C18,
+       NativeCollisionObjectUnlink, list, head},
+      {"CollisionObject::FirstContact (sub_820B7C90)", __imp__sub_820B7C90,
+       NativeCollisionObjectFirstContact, contacts, mask},
+      {"CollisionObject::Word264 (sub_820B7CB8)", __imp__sub_820B7CB8,
+       NativeCollisionObjectWord264},
+      {"CollisionObject::SetWord264 (sub_820B7CC0)", __imp__sub_820B7CC0,
+       NativeCollisionObjectSetWord264},
+      {"CollisionObject::ClearBits252 (sub_820B7D18)", __imp__sub_820B7D18,
+       NativeCollisionObjectClearBits252},
+      {"CollisionObject::SetBits256 (sub_820B7D28)", __imp__sub_820B7D28,
+       NativeCollisionObjectSetBits256},
+      {"CollisionObject::ClearBits256 (sub_820B7D38)", __imp__sub_820B7D38,
+       NativeCollisionObjectClearBits256},
+      {"CollisionObject::SetBits260 (sub_820B7D48)", __imp__sub_820B7D48,
+       NativeCollisionObjectSetBits260},
+      {"CollisionObject::ClearBits260 (sub_820B7D58)", __imp__sub_820B7D58,
+       NativeCollisionObjectClearBits260},
+      {"CollisionObject::SetSize (sub_820B7D68)", __imp__sub_820B7D68,
+       NativeCollisionObjectSetSize, nullptr, source},
+      {"CollisionObject::SetFloat224 (sub_820B7D70)", __imp__sub_820B7D70,
+       NativeCollisionObjectSetFloat224},
+      {"CollisionRecord::Copy (sub_820B7D78)", __imp__sub_820B7D78, NativeCollisionRecordCopy,
+       nullptr, out_and_source},
+      {"Collision::SetGlobal78 (sub_820B8768)", __imp__sub_820B8768,
+       NativeCollisionSetGlobal78},
+      {"Collision::SetGlobal7C (sub_820B8778)", __imp__sub_820B8778,
+       NativeCollisionSetGlobal7C},
+      {"CollisionWorld::SetCallback (sub_820B8788)", __imp__sub_820B8788,
+       NativeCollisionWorldSetCallback, world},
+      {"CollisionWorld::NewContact (sub_820B8A48)", __imp__sub_820B8A48,
+       NativeCollisionWorldNewContact, world},
+      {"CollisionWorld::Word60 (sub_820B8C90)", __imp__sub_820B8C90, NativeCollisionWorldWord60,
+       world},
+      {"CollisionWorld::Word64 (sub_820B8CA0)", __imp__sub_820B8CA0, NativeCollisionWorldWord64,
+       world},
+      {"CollisionWorld::Word68 (sub_820B8CB0)", __imp__sub_820B8CB0, NativeCollisionWorldWord68,
+       world},
+      {"Contact::OtherObject (sub_820B8CE0)", __imp__sub_820B8CE0, NativeContactOtherObject,
+       [&h](Random& fill, uint32_t region) {
+         if (fill.Below(2)) {
+           guest::StoreU32(h.base, region + 4, uint32_t(fill.Next()) & 0x00FFFFFF);
+         }
+       }},
+      {"Contact::Next (sub_820B8D10)", __imp__sub_820B8D10, NativeContactNext, contacts, mask},
+      {"Object344::SetFloat20 (sub_820B9658)", __imp__sub_820B9658, NativeObject344SetFloat20},
+      {"Object344::SetFloat16 (sub_820B9660)", __imp__sub_820B9660, NativeObject344SetFloat16},
+      {"Object344::Float28 (sub_820B9668)", __imp__sub_820B9668, NativeObject344Float28},
+      {"Object344::SetFloat28 (sub_820B9670)", __imp__sub_820B9670, NativeObject344SetFloat28},
+      {"Object344::SetFloat24 (sub_820B9678)", __imp__sub_820B9678, NativeObject344SetFloat24},
+      {"Object::Half112 (sub_820B99B0)", __imp__sub_820B99B0, NativeObjectHalf112},
+      {"Object::SetHalf112 (sub_820B99B8)", __imp__sub_820B99B8, NativeObjectSetHalf112},
+      {"Object::Half114 (sub_820B99C0)", __imp__sub_820B99C0, NativeObjectHalf114},
+      {"Object::SetHalf114 (sub_820B99C8)", __imp__sub_820B99C8, NativeObjectSetHalf114},
+  };
+  for (const ObjectFunction& f : functions) {
+    ObjectCases(h, block, f, 60);
+  }
+}
+
 }  // namespace
 
 void VehicleAccessors(Context& h) {
@@ -837,6 +1096,7 @@ void VehicleAccessors(Context& h) {
   VectorCases(h, block);
   RigidBodyCases(h, block);
   WheelSlipCases(h, block);
+  OtherObjectCases(h, block);
   memory->SystemHeapFree(block);
 }
 

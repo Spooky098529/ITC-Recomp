@@ -8,6 +8,9 @@
 #include <bit>
 #include <cmath>
 
+#include <rex/platform/fpscr.h>
+#include <simde/x86/sse4.1.h>
+
 namespace vehicle_accessors {
 
 namespace {
@@ -18,6 +21,12 @@ constexpr uint32_t kVehicleBytes = 6272;
 constexpr uint32_t kOne = 0x82000A30;        // the game's float 1.0
 constexpr uint32_t kZero = 0x82000A34;       // the game's float 0.0
 constexpr uint32_t kSlipScale = 0x82002BD8;
+constexpr uint32_t kKmhScale = 0x820029E0;       // 3.6
+constexpr uint32_t kFrameSeconds = 0x820029EC;   // 1/30
+constexpr uint32_t kQuaternionScale = 0x820021E8;
+constexpr uint32_t kCollisionGlobal78 = 0x826C2D78;
+constexpr uint32_t kCollisionGlobal7C = 0x826C2D7C;
+constexpr uint32_t kCollisionWorld = 0x826C2D88;  // the collision world's pointer
 
 namespace vl = vector_library;
 
@@ -291,6 +300,315 @@ float VehicleMaxWheelSlip(uint8_t* base, uint32_t vehicle, double threshold) {
     }
   }
   return most;
+}
+
+float VehicleFloat2224(uint8_t* base, uint32_t vehicle) {
+  ITC_NATIVE_RUNNING("sub_820C0140 Vehicle::Float2224");
+  return guest::LoadFloat(base, vehicle + 2224);
+}
+
+float VehicleSpeed(uint8_t* base, uint32_t vehicle) {
+  ITC_NATIVE_RUNNING("sub_820C0148 Vehicle::Speed");
+  return guest::LoadFloat(base, vehicle + 48);
+}
+
+float VehicleDistancePerFrame(uint8_t* base, uint32_t vehicle) {
+  ITC_NATIVE_RUNNING("sub_820C0150 Vehicle::GetDistancePerFrame");
+  return float(Lfs(base, vehicle + 48) * Lfs(base, kFrameSeconds));
+}
+
+uint32_t VehicleIdentity(uint32_t vehicle) {
+  ITC_NATIVE_RUNNING("sub_820C0168 Vehicle::Identity");
+  return vehicle + 5232;
+}
+
+uint32_t VehicleSetObjectHalf114(uint8_t* base, uint32_t vehicle, uint32_t value) {
+  ITC_NATIVE_RUNNING("sub_820C0450 Vehicle::SetObjectHalf114");
+  const uint32_t object = guest::LoadU32(base, vehicle + 344);
+  if (object != 0) {
+    ObjectSetHalf114(base, object, value & 0xFFFF);
+  }
+  return object;
+}
+
+void QuaternionToMatrix3(uint8_t* base, uint32_t out, uint32_t quaternion) {
+  ITC_NATIVE_RUNNING("sub_820C0490 Quaternion::ToMatrix3");
+  using Fpscr = rex::platform::FPSCRPlatform;
+  // The squared length: vmsum4fp128 on the 16 bytes at the quaternion
+  // rounded down to 16 (lvx128), with flush-to-zero on.
+  const uint32_t aligned = quaternion & ~0xFu;
+  const simde__m128 q = simde_mm_castsi128_ps(simde_mm_set_epi32(
+      int32_t(guest::LoadU32(base, aligned + 0)), int32_t(guest::LoadU32(base, aligned + 4)),
+      int32_t(guest::LoadU32(base, aligned + 8)), int32_t(guest::LoadU32(base, aligned + 12))));
+  const uint32_t csr = Fpscr::getcsr();
+  Fpscr::setcsr(csr | uint32_t(Fpscr::FlushMask));
+  const simde__m128 squared = simde_mm_dp_ps(q, q, 0xFF);
+  Fpscr::setcsr(csr);
+  const double y = Lfs(base, quaternion + 4);
+  const double z = Lfs(base, quaternion + 8);
+  const double x = Lfs(base, quaternion + 0);
+  const double w = Lfs(base, quaternion + 12);
+  auto muls = [](double a, double b) { return double(float(a * b)); };
+  auto adds = [](double a, double b) { return double(float(a + b)); };
+  auto subs = [](double a, double b) { return double(float(a - b)); };
+  const double s =
+      double(float(Lfs(base, kQuaternionScale) / double(simde_mm_cvtss_f32(squared))));
+  const double ys = muls(y, s);
+  const double zs = muls(z, s);
+  const double xs = muls(x, s);
+  const double yy = muls(y, ys);
+  const double zz = muls(z, zs);
+  const double xx = muls(x, xs);
+  const double wy = muls(w, ys);
+  const double wx = muls(w, xs);
+  const double xy = muls(x, ys);
+  const double wz = muls(w, zs);
+  const double xz = muls(x, zs);
+  const double yz = muls(y, zs);
+  const double zz_yy = adds(zz, yy);
+  const double zz_xx = adds(zz, xx);
+  const double yy_xx = adds(yy, xx);
+  guest::StoreFloat(base, out + 4, float(adds(xy, wz)));
+  guest::StoreFloat(base, out + 8, float(subs(xz, wy)));
+  guest::StoreFloat(base, out + 32, float(adds(xz, wy)));
+  const double one = Lfs(base, kOne);
+  guest::StoreFloat(base, out + 16, float(subs(xy, wz)));
+  const double yz_wx = adds(yz, wx);
+  guest::StoreFloat(base, out + 0, float(subs(one, zz_yy)));
+  const double row1 = subs(one, zz_xx);
+  guest::StoreFloat(base, out + 24, float(yz_wx));
+  const double yz_less_wx = subs(yz, wx);
+  guest::StoreFloat(base, out + 20, float(row1));
+  const double row2 = subs(one, yy_xx);
+  guest::StoreFloat(base, out + 36, float(yz_less_wx));
+  guest::StoreFloat(base, out + 40, float(row2));
+}
+
+void QuaternionToMatrix(uint8_t* base, uint32_t out, uint32_t quaternion) {
+  ITC_NATIVE_RUNNING("sub_820C0550 Quaternion::ToMatrix");
+  QuaternionToMatrix3(base, out, quaternion);
+  const uint32_t zero = guest::LoadU32(base, kZero);
+  guest::StoreU32(base, out + 56, zero);
+  guest::StoreU32(base, out + 52, zero);
+  guest::StoreU32(base, out + 48, zero);
+  guest::StoreU32(base, out + 60, guest::LoadU32(base, kOne));
+}
+
+void VehicleSpeedRecord(uint8_t* base, uint32_t out, uint32_t vehicle) {
+  ITC_NATIVE_RUNNING("sub_820C0590 Vehicle::SpeedRecord");
+  guest::StoreFloat(base, out, float(Lfs(base, vehicle + 48) * Lfs(base, kKmhScale)));
+  guest::StoreU16(base, out + 4, guest::LoadU16(base, vehicle + 5236));
+  guest::StoreU16(base, out + 6, guest::LoadU16(base, vehicle + 5238));
+}
+
+void CollisionObjectLink(uint8_t* base, uint32_t object, uint32_t head) {
+  ITC_NATIVE_RUNNING("sub_820B7BF0 CollisionObject::Link");
+  const uint32_t first = guest::LoadU32(base, head);
+  if (first != 0) {
+    guest::StoreU32(base, first + 232, object);
+  }
+  guest::StoreU32(base, object + 232, 0);
+  guest::StoreU32(base, object + 228, guest::LoadU32(base, head));
+  guest::StoreU32(base, head, object);
+}
+
+void CollisionObjectUnlink(uint8_t* base, uint32_t object, uint32_t head) {
+  ITC_NATIVE_RUNNING("sub_820B7C18 CollisionObject::Unlink");
+  const uint32_t previous = guest::LoadU32(base, object + 232);
+  if (previous != 0) {
+    guest::StoreU32(base, previous + 228, guest::LoadU32(base, object + 228));
+  } else {
+    guest::StoreU32(base, head, guest::LoadU32(base, object + 228));
+  }
+  const uint32_t next = guest::LoadU32(base, object + 228);
+  if (next != 0) {
+    guest::StoreU32(base, next + 232, guest::LoadU32(base, object + 232));
+  }
+}
+
+uint32_t CollisionObjectFirstContact(uint8_t* base, uint32_t object, uint32_t mask) {
+  ITC_NATIVE_RUNNING("sub_820B7C90 CollisionObject::FirstContact");
+  for (uint32_t contact = guest::LoadU32(base, object + 240); contact != 0;
+       contact = guest::LoadU32(base, contact + 68)) {
+    if (guest::LoadU32(base, contact + 4) & mask) {
+      return contact;
+    }
+  }
+  return 0;
+}
+
+uint32_t CollisionObjectWord264(uint8_t* base, uint32_t object) {
+  ITC_NATIVE_RUNNING("sub_820B7CB8 CollisionObject::Word264");
+  return guest::LoadU32(base, object + 264);
+}
+
+void CollisionObjectSetWord264(uint8_t* base, uint32_t object, uint32_t value) {
+  ITC_NATIVE_RUNNING("sub_820B7CC0 CollisionObject::SetWord264");
+  guest::StoreU32(base, object + 264, value);
+}
+
+namespace {
+
+void SetBits(uint8_t* base, uint32_t at, uint32_t bits) {
+  guest::StoreU32(base, at, bits | guest::LoadU32(base, at));
+}
+
+void ClearBits(uint8_t* base, uint32_t at, uint32_t bits) {
+  guest::StoreU32(base, at, guest::LoadU32(base, at) & ~bits);
+}
+
+}  // namespace
+
+void CollisionObjectClearBits252(uint8_t* base, uint32_t object, uint32_t bits) {
+  ITC_NATIVE_RUNNING("sub_820B7D18 CollisionObject::ClearBits252");
+  ClearBits(base, object + 252, bits);
+}
+
+void CollisionObjectSetBits256(uint8_t* base, uint32_t object, uint32_t bits) {
+  ITC_NATIVE_RUNNING("sub_820B7D28 CollisionObject::SetBits256");
+  SetBits(base, object + 256, bits);
+}
+
+void CollisionObjectClearBits256(uint8_t* base, uint32_t object, uint32_t bits) {
+  ITC_NATIVE_RUNNING("sub_820B7D38 CollisionObject::ClearBits256");
+  ClearBits(base, object + 256, bits);
+}
+
+void CollisionObjectSetBits260(uint8_t* base, uint32_t object, uint32_t bits) {
+  ITC_NATIVE_RUNNING("sub_820B7D48 CollisionObject::SetBits260");
+  SetBits(base, object + 260, bits);
+}
+
+void CollisionObjectClearBits260(uint8_t* base, uint32_t object, uint32_t bits) {
+  ITC_NATIVE_RUNNING("sub_820B7D58 CollisionObject::ClearBits260");
+  ClearBits(base, object + 260, bits);
+}
+
+void CollisionObjectSetSize(uint8_t* base, uint32_t object, uint32_t vector) {
+  ITC_NATIVE_RUNNING("sub_820B7D68 CollisionObject::SetSize");
+  vl::Vec4Copy(base, object + 208, vector);
+}
+
+void CollisionObjectSetFloat224(uint8_t* base, uint32_t object, double value) {
+  ITC_NATIVE_RUNNING("sub_820B7D70 CollisionObject::SetFloat224");
+  guest::StoreFloat(base, object + 224, float(value));
+}
+
+void CollisionRecordCopy(uint8_t* base, uint32_t out, uint32_t record) {
+  ITC_NATIVE_RUNNING("sub_820B7D78 CollisionRecord::Copy");
+  vl::Vec4Copy(base, out, record);
+  vl::Vec4Copy(base, out + 16, record + 16);
+  vl::Vec4Copy(base, out + 32, record + 32);
+  // lfs and stfs, lwz and stw: the words' bits, in order.
+  for (uint32_t at = 48; at <= 64; at += 4) {
+    guest::StoreU32(base, out + at, guest::LoadU32(base, record + at));
+  }
+}
+
+void CollisionSetGlobal78(uint8_t* base, uint32_t value) {
+  ITC_NATIVE_RUNNING("sub_820B8768 Collision::SetGlobal78");
+  guest::StoreU32(base, kCollisionGlobal78, value);
+}
+
+void CollisionSetGlobal7C(uint8_t* base, uint32_t value) {
+  ITC_NATIVE_RUNNING("sub_820B8778 Collision::SetGlobal7C");
+  guest::StoreU32(base, kCollisionGlobal7C, value);
+}
+
+void CollisionWorldSetCallback(uint8_t* base, uint32_t value) {
+  ITC_NATIVE_RUNNING("sub_820B8788 CollisionWorld::SetCallback");
+  guest::StoreU32(base, guest::LoadU32(base, kCollisionWorld) + 8, value);
+}
+
+uint32_t CollisionWorldNewContact(uint8_t* base) {
+  ITC_NATIVE_RUNNING("sub_820B8A48 CollisionWorld::NewContact");
+  const uint32_t world = guest::LoadU32(base, kCollisionWorld);
+  if (!(guest::LoadU32(base, world + 52) < guest::LoadU32(base, world + 44))) {
+    return 0;
+  }
+  const uint32_t used = guest::LoadU32(base, world + 52);
+  const uint32_t contact = used * 80 + guest::LoadU32(base, world + 48);
+  guest::StoreU32(base, world + 52, used + 1);
+  return contact;
+}
+
+uint32_t CollisionWorldWord60(uint8_t* base) {
+  ITC_NATIVE_RUNNING("sub_820B8C90 CollisionWorld::Word60");
+  return guest::LoadU32(base, guest::LoadU32(base, kCollisionWorld) + 60);
+}
+
+uint32_t CollisionWorldWord64(uint8_t* base) {
+  ITC_NATIVE_RUNNING("sub_820B8CA0 CollisionWorld::Word64");
+  return guest::LoadU32(base, guest::LoadU32(base, kCollisionWorld) + 64);
+}
+
+uint32_t CollisionWorldWord68(uint8_t* base) {
+  ITC_NATIVE_RUNNING("sub_820B8CB0 CollisionWorld::Word68");
+  return guest::LoadU32(base, guest::LoadU32(base, kCollisionWorld) + 68);
+}
+
+void Object344SetFloat20(uint8_t* base, uint32_t object, double value) {
+  ITC_NATIVE_RUNNING("sub_820B9658 Object344::SetFloat20");
+  guest::StoreFloat(base, object + 20, float(value));
+}
+
+void Object344SetFloat16(uint8_t* base, uint32_t object, double value) {
+  ITC_NATIVE_RUNNING("sub_820B9660 Object344::SetFloat16");
+  guest::StoreFloat(base, object + 16, float(value));
+}
+
+float Object344Float28(uint8_t* base, uint32_t object) {
+  ITC_NATIVE_RUNNING("sub_820B9668 Object344::Float28");
+  return guest::LoadFloat(base, object + 28);
+}
+
+void Object344SetFloat28(uint8_t* base, uint32_t object, double value) {
+  ITC_NATIVE_RUNNING("sub_820B9670 Object344::SetFloat28");
+  guest::StoreFloat(base, object + 28, float(value));
+}
+
+void Object344SetFloat24(uint8_t* base, uint32_t object, double value) {
+  ITC_NATIVE_RUNNING("sub_820B9678 Object344::SetFloat24");
+  guest::StoreFloat(base, object + 24, float(value));
+}
+
+uint32_t ObjectHalf112(uint8_t* base, uint32_t object) {
+  ITC_NATIVE_RUNNING("sub_820B99B0 Object::Half112");
+  return guest::LoadU16(base, object + 112);
+}
+
+void ObjectSetHalf112(uint8_t* base, uint32_t object, uint32_t value) {
+  ITC_NATIVE_RUNNING("sub_820B99B8 Object::SetHalf112");
+  guest::StoreU16(base, object + 112, uint16_t(value));
+}
+
+uint32_t ObjectHalf114(uint8_t* base, uint32_t object) {
+  ITC_NATIVE_RUNNING("sub_820B99C0 Object::Half114");
+  return guest::LoadU16(base, object + 114);
+}
+
+void ObjectSetHalf114(uint8_t* base, uint32_t object, uint32_t value) {
+  ITC_NATIVE_RUNNING("sub_820B99C8 Object::SetHalf114");
+  guest::StoreU16(base, object + 114, uint16_t(value));
+}
+
+uint32_t ContactOtherObject(uint8_t* base, uint32_t contact) {
+  ITC_NATIVE_RUNNING("sub_820B8CE0 Contact::OtherObject");
+  if (guest::LoadU32(base, contact + 4) & 0xFF000000u) {
+    return guest::LoadU32(base, contact);
+  }
+  return 0;
+}
+
+uint32_t ContactNext(uint8_t* base, uint32_t contact, uint32_t mask) {
+  ITC_NATIVE_RUNNING("sub_820B8D10 Contact::Next");
+  for (contact = guest::LoadU32(base, contact + 68); contact != 0;
+       contact = guest::LoadU32(base, contact + 68)) {
+    if (guest::LoadU32(base, contact + 4) & mask) {
+      return contact;
+    }
+  }
+  return 0;
 }
 
 }  // namespace vehicle_accessors
