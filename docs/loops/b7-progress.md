@@ -8,8 +8,12 @@ commits, the function files and the subsystems' docs.
 - Subsystem: the UI movie library (`8259C000`-`825A6800`; `sub_825A08E0`,
   `sub_825A0EF0`, `sub_825A0CF8`, `sub_825A1218`, `sub_825A1C88`,
   `sub_825A1D68`, `sub_8259C9B0`, from `leads.md`).
-- Step: mapping (agent running).
-- Session: pass 13 of 20, subsystem 4 of 5. In all: subsystem 4 of 5.
+  Mapped as `functions/ui-movies.md` (27ec389): 45 rows (the library is
+  only `8259D5C8`-`825A0FC4` and `825A6508`-`825A6600`; the rest of the
+  range went to `leads.md` as 3 other subsystems), 24 ready groups.
+  TrackProperty and its callers wait on the heap (via `atexit`).
+- Step: migration (first agent running).
+- Session: pass 14 of 20, subsystem 4 of 5. In all: subsystem 4 of 5.
 
 ## Done
 
@@ -96,6 +100,8 @@ commits, the function files and the subsystems' docs.
   (wrapped 149, known 198, unknown 6149).
 - After the C runtime: ours 261, work left 6492 (wrapped 149, known 194,
   unknown 6149).
+- After mapping the UI movies: ours 261, work left 6492 (wrapped 149,
+  known 230, unknown 6113).
 
 ## Stopped
 
