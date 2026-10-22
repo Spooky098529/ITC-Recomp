@@ -8,15 +8,12 @@ record: `b7-loop-2026-10-22-0111.md` (and this file's history).
 
 - Run started 2026-10-22 10:47 on `b7-loop-22-10-26` (made by the user,
   from 600ed23); summary `b7-loop-2026-10-22-1047.md`.
-- Subsystem: the race overlays (`race-overlays.md`, mapped in 6baeabf:
-  154 rows, 79 ready groups by `b7_groups.py`; the creation side waits
-  on the guest heap); step 6, migration agent running.
-- Queued (the validation check, added to the loop 2026-10-22): a
-  validation agent for the race overlays' migration when it reports,
-  then one for the adapters lead's 31 functions (adding their prints:
-  their harnesses were moved off the adapters, the case the check is
-  for). Their `not in game:` lists go under "To check in a drive".
-- Session: pass 3 of 20, subsystem 1 of 5. In all: subsystem 1 of 5.
+- Subsystem: the race overlays (`race-overlays.md`, mapped in 6baeabf).
+  First migration agent: 34 functions Overridden in 5 groups
+  (76ddc05..3fc85b8), `--native_race_overlays`; 32 ready groups left.
+  Step 8: validation agent running, for these 34 and the adapters
+  lead's 31 (their prints added).
+- Session: pass 4 of 20, subsystem 1 of 5. In all: subsystem 1 of 5.
 - Known at the start: `b7_status.py` checks `c-runtime.md:221`
   `sub_825A9934` (`__chkstk`) "Dropped, but it ran" (from the first run:
   its override does nothing, so it still shows as seen).
@@ -38,7 +35,10 @@ record: `b7-loop-2026-10-22-0111.md` (and this file's history).
 - `c-runtime.md`, `ui-movies.md`, `ui-movies-game.md`, `sprites.md`: the
   adapters lead's rows (Overridden -> Native, and notes on the 4 kept).
 - `race-overlays.md` (new, 154 rows; `sub_8215DEA0` moved from
-  `functions.md`), `sprites.md`'s intro, `known-data.md`'s new rows.
+  `functions.md`), `sprites.md`'s intro, `known-data.md`'s new rows;
+  the first migration's 34 rows (Overridden). For review: RacerId's
+  adapter (`sub_82126AE0`) sign-extends r3 where the original
+  zero-extends a found id (only the upper 32 bits; callers compare 32).
 
 ## To check in a drive
 
