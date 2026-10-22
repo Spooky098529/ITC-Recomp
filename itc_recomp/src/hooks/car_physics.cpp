@@ -19,8 +19,9 @@ ITC_FLAG_BOOL(native_car_physics, true, "ITC",
               "sub_820B5588, sub_820B0198; the drivetrain, sub_820B4778, sub_820B31D0; the gearbox, "
               "sub_820B6430, sub_820B4CF0; the collision world's objects, contacts and "
               "surfaces, sub_820B7AE8 to sub_820B7ED0, sub_820BAA78, sub_820BC1F8 to "
-              "sub_820BC550) natively instead of through the translated "
-              "code (the same words, bit for bit; checked by --run_harnesses=car_physics)");
+              "sub_820BC550; its pairs and reset, sub_820B94B0, sub_820B8A88, sub_820B85E8 with "
+              "sub_820B8C20, sub_820BC068, sub_820BBC40, sub_820BBD30) natively instead of "
+              "through the translated code (the same words, bit for bit; checked by --run_harnesses=car_physics)");
 
 // Defines an adapter: `body` uses `ctx` and `base`. Flush-to-zero off for
 // the work; VECTOR leaves it on after (the original's last step is the
@@ -341,3 +342,25 @@ ITC_CAR_PHYSICS(820B7C50, ctx.r3.u64 = CollisionObjectAddContact(base, ctx.r3.u3
 ITC_CAR_PHYSICS(820B7ED0, ctx.r3.u64 = CollisionRecordsMerge(base, ctx.r3.u32, ctx.r4.u32,
                                                              ctx.r5.u32, ctx.r6.u32,
                                                              ctx.r1.u32 - 304))
+// CollisionWorld::HasPair, LinkPair, UnlinkPair and MovePair (sub_820B8C20,
+// sub_820BC068, sub_820BBC40, sub_820BBD30) have no adapters: their only
+// callers, AddPairs and RemovePair, are native.
+// r3 = the object, r4 = the groups.
+ITC_CAR_PHYSICS(820B94B0, ctx.r3.u64 = CollisionWorldAddPairs(base, ctx.r3.u32, ctx.r4.u32))
+// r3 = the pair's index. Where the move's memcpy can't be native, the
+// original.
+extern "C" REX_FUNC(sub_820B8A88) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_car_physics)) {
+    __imp__sub_820B8A88(ctx, base);
+    return;
+  }
+  uint32_t r3 = 0;
+  if (!CollisionWorldRemovePair(base, ctx.r3.u32, &r3)) {
+    __imp__sub_820B8A88(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = r3;
+}
+// r3 comes back as 0x826C2E30 (ResetSurfaces').
+ITC_CAR_PHYSICS(820B85E8, ctx.r3.u64 = CollisionWorldReset(base))

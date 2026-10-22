@@ -458,4 +458,36 @@ uint32_t CollisionObjectAddContact(uint8_t* base, uint32_t object);
 uint32_t CollisionRecordsMerge(uint8_t* base, uint32_t out, uint32_t summary, uint32_t hits,
                                uint32_t count, uint32_t frame);
 
+// The world's pairs (32 bytes each, at the world's +36, counted by +40):
+// +16 and +20 the objects A and B, +0/+8 the previous and next in A's list,
+// +4/+12 in B's (each object's list from its head +264), +28 0.0.
+// CollisionWorld::HasPair (sub_820B8C20): whether a pair holds a and b
+// (either order).
+bool CollisionWorldHasPair(uint8_t* base, uint32_t a, uint32_t b);
+// CollisionWorld::LinkPair (sub_820BC068): the pair set up for a and b and
+// put last in both lists. Returns the original's r3 (b when its list was
+// empty, else 0).
+uint32_t CollisionWorldLinkPair(uint8_t* base, uint32_t pair, uint32_t a, uint32_t b);
+// CollisionWorld::AddPairs (sub_820B94B0): a pair for each other active
+// object (the list from the world's +20, by +228) with a bit of `groups` in
+// its +244, unless both have the same nonzero +268 or the pair exists.
+// Returns the original's r3 (the object when nothing was tested).
+uint32_t CollisionWorldAddPairs(uint8_t* base, uint32_t object, uint32_t groups);
+// CollisionWorld::UnlinkPair (sub_820BBC40): the pair out of both lists.
+// Returns the original's r3.
+uint32_t CollisionWorldUnlinkPair(uint8_t* base, uint32_t pair);
+// CollisionWorld::MovePair (sub_820BBD30): the neighbors and heads
+// repointed to `slot`, the 32 bytes copied there (memcpy natively: its
+// caller checks first that the copy can be).
+void CollisionWorldMovePair(uint8_t* base, uint32_t pair, uint32_t slot);
+// CollisionWorld::RemovePair (sub_820B8A88): pair `index` unlinked, the
+// last moved into its slot, the count down. False, with nothing done, where
+// the move's memcpy can't be done natively (the physical views, or ranges
+// that may share memory): the original runs there. `r3`: the original's.
+bool CollisionWorldRemovePair(uint8_t* base, uint32_t index, uint32_t* r3);
+// CollisionWorld::Reset (sub_820B85E8): no active objects, all on the free
+// list (+24, linked by +228 and +232), no pairs or contacts, +56 = 0, +60 =
+// 32; then ResetSurfaces. Returns the original's r3 (0x826C2E30).
+uint32_t CollisionWorldReset(uint8_t* base);
+
 }  // namespace car_physics

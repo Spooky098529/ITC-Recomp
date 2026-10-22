@@ -6,6 +6,7 @@
 #include "car_physics/float_ops.h"
 
 #include "base/log.h"
+#include "c_runtime/strings.h"
 #include "vehicle_accessors/vectors.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
@@ -279,6 +280,218 @@ uint32_t CollisionRecordsMerge(uint8_t* base, uint32_t out, uint32_t summary, ui
   vl::Vec3NormalizeSelf(base, summary + 16);
   NormalizePush(base, summary);
   return kept;
+}
+
+
+// --- The world's pairs and its reset ---
+
+namespace {
+
+constexpr uint32_t kWorldPointer = 0x826C2D88;  // the collision world's pointer
+
+uint32_t World(uint8_t* base) {
+  return guest::LoadU32(base, kWorldPointer);
+}
+
+// The pair's last in an object's list (+0/+8 on the side where the pair's
+// +16 is the object, +4/+12 on the other), from the head +264; 0 for none.
+uint32_t ListTail(uint8_t* base, uint32_t object) {
+  uint32_t pair = va::CollisionObjectWord264(base, object);
+  uint32_t last = 0;
+  while (pair != 0) {
+    last = pair;
+    pair = guest::LoadU32(base, pair + 16) == object ? guest::LoadU32(base, pair + 8)
+                                                     : guest::LoadU32(base, pair + 12);
+  }
+  return last;
+}
+
+// A neighbor's link toward the pair repointed: its next (+8, or +12 on its
+// B side) when `next`, else its previous (+0, or +4), by whether its +16 is
+// `object`.
+void Repoint(uint8_t* base, uint32_t neighbor, uint32_t object, bool next, uint32_t to) {
+  const bool a_side = guest::LoadU32(base, neighbor + 16) == object;
+  guest::StoreU32(base, neighbor + (next ? 8 : 0) + (a_side ? 0 : 4), to);
+}
+
+}  // namespace
+
+bool CollisionWorldHasPair(uint8_t* base, uint32_t a, uint32_t b) {
+  ITC_NATIVE_RUNNING("sub_820B8C20 CollisionWorld::HasPair");
+  const uint32_t world = World(base);
+  const uint32_t count = guest::LoadU32(base, world + 40);
+  if (count == 0) {
+    return false;
+  }
+  uint32_t pair = guest::LoadU32(base, world + 36);
+  for (uint32_t i = 0; i < count; i++, pair += 32) {
+    const uint32_t first = guest::LoadU32(base, pair + 16);
+    if (first == a && guest::LoadU32(base, pair + 20) == b) {
+      return true;
+    }
+    if (first == b && guest::LoadU32(base, pair + 20) == a) {
+      return true;
+    }
+  }
+  return false;
+}
+
+uint32_t CollisionWorldLinkPair(uint8_t* base, uint32_t pair, uint32_t a, uint32_t b) {
+  ITC_NATIVE_RUNNING("sub_820BC068 CollisionWorld::LinkPair");
+  CopyWord(base, kZero, pair + 28);
+  guest::StoreU32(base, pair + 20, b);
+  guest::StoreU32(base, pair + 16, a);
+  guest::StoreU32(base, pair + 8, 0);
+  guest::StoreU32(base, pair + 12, 0);
+  guest::StoreU32(base, pair + 24, 0);
+  const uint32_t tail_a = ListTail(base, a);
+  guest::StoreU32(base, pair + 0, tail_a);
+  if (tail_a == 0) {
+    va::CollisionObjectSetWord264(base, guest::LoadU32(base, pair + 16), pair);
+  } else {
+    Repoint(base, tail_a, guest::LoadU32(base, pair + 16), true, pair);
+  }
+  const uint32_t second = guest::LoadU32(base, pair + 20);
+  const uint32_t tail_b = ListTail(base, second);
+  guest::StoreU32(base, pair + 4, tail_b);
+  if (tail_b == 0) {
+    const uint32_t object = guest::LoadU32(base, pair + 20);
+    va::CollisionObjectSetWord264(base, object, pair);
+    return object;
+  }
+  Repoint(base, tail_b, guest::LoadU32(base, pair + 20), true, pair);
+  return 0;
+}
+
+uint32_t CollisionWorldAddPairs(uint8_t* base, uint32_t object, uint32_t groups) {
+  ITC_NATIVE_RUNNING("sub_820B94B0 CollisionWorld::AddPairs");
+  uint32_t r3 = object;
+  uint32_t world = World(base);
+  for (uint32_t other = guest::LoadU32(base, world + 20); other != 0;
+       other = guest::LoadU32(base, other + 228)) {
+    if (other == object || (guest::LoadU32(base, other + 244) & groups) == 0) {
+      continue;
+    }
+    const uint32_t owner = guest::LoadU32(base, object + 268);
+    if (owner == guest::LoadU32(base, other + 268) && owner != 0) {
+      continue;
+    }
+    r3 = CollisionWorldHasPair(base, object, other) ? 1 : 0;
+    if (r3 != 0) {
+      continue;
+    }
+    const uint32_t pair =
+        (guest::LoadU32(base, world + 40) << 5) + guest::LoadU32(base, world + 36);
+    CopyWord(base, kZero, pair + 28);
+    guest::StoreU32(base, world + 40, guest::LoadU32(base, world + 40) + 1);
+    r3 = CollisionWorldLinkPair(base, pair, object, other);
+    world = World(base);
+  }
+  return r3;
+}
+
+uint32_t CollisionWorldUnlinkPair(uint8_t* base, uint32_t pair) {
+  ITC_NATIVE_RUNNING("sub_820BBC40 CollisionWorld::UnlinkPair");
+  uint32_t r3 = pair;
+  // The neighbors before it (+0 on A's side, +4 on B's) pointed past it.
+  for (uint32_t side = 0; side < 8; side += 4) {
+    const uint32_t previous = guest::LoadU32(base, pair + side);
+    const uint32_t next = guest::LoadU32(base, pair + 8 + side);
+    if (previous == 0) {
+      r3 = guest::LoadU32(base, pair + 16 + side);
+      va::CollisionObjectSetWord264(base, r3, next);
+    } else {
+      Repoint(base, previous, guest::LoadU32(base, pair + 16 + side), true, next);
+    }
+  }
+  // The neighbors after it pointed back past it.
+  for (uint32_t side = 0; side < 8; side += 4) {
+    const uint32_t next = guest::LoadU32(base, pair + 8 + side);
+    const uint32_t previous = guest::LoadU32(base, pair + side);
+    if (next != 0) {
+      Repoint(base, next, guest::LoadU32(base, pair + 16 + side), false, previous);
+    }
+  }
+  return r3;
+}
+
+void CollisionWorldMovePair(uint8_t* base, uint32_t pair, uint32_t slot) {
+  ITC_NATIVE_RUNNING("sub_820BBD30 CollisionWorld::MovePair");
+  for (uint32_t side = 0; side < 8; side += 4) {
+    const uint32_t previous = guest::LoadU32(base, pair + side);
+    if (previous == 0) {
+      va::CollisionObjectSetWord264(base, guest::LoadU32(base, pair + 16 + side), slot);
+    } else {
+      Repoint(base, previous, guest::LoadU32(base, pair + 16 + side), true, slot);
+    }
+  }
+  for (uint32_t side = 0; side < 8; side += 4) {
+    const uint32_t next = guest::LoadU32(base, pair + 8 + side);
+    if (next != 0) {
+      Repoint(base, next, guest::LoadU32(base, pair + 16 + side), false, slot);
+    }
+  }
+  // memcpy (sub_825A7410), 32 bytes; its caller checked first that the
+  // native copy does what the original would (CollisionWorldRemovePair).
+  c_runtime::Memcpy(base, slot, pair, 32);
+}
+
+bool CollisionWorldRemovePair(uint8_t* base, uint32_t index, uint32_t* r3) {
+  ITC_NATIVE_RUNNING("sub_820B8A88 CollisionWorld::RemovePair");
+  uint32_t world = World(base);
+  const uint32_t slot = (index << 5) + guest::LoadU32(base, world + 36);
+  const uint32_t count = guest::LoadU32(base, world + 40);
+  const bool moves = count - 1 > index;
+  const uint32_t last = (count << 5) + guest::LoadU32(base, world + 36) - 32;
+  // The move's memcpy natively only where it's what the library's memcpy
+  // does and its override has nothing to record (outside the physical
+  // views, the two ranges not sharing memory); else the original, with
+  // nothing done. (Unlinking writes only pairs and objects, so the world's
+  // +36 and +40 are the same after it.)
+  if (moves && !(slot < 0xA0000000u && last < 0xA0000000u && c_runtime::InOneView(slot, 32) &&
+                 c_runtime::InOneView(last, 32) && !c_runtime::MayShare(slot, 32, last, 32))) {
+    return false;
+  }
+  *r3 = CollisionWorldUnlinkPair(base, slot);
+  world = World(base);
+  const uint32_t count_after = guest::LoadU32(base, world + 40);
+  if (count_after - 1 > index) {
+    CollisionWorldMovePair(base, (count_after << 5) + guest::LoadU32(base, world + 36) - 32,
+                           slot);
+    *r3 = slot;
+    world = World(base);
+  }
+  guest::StoreU32(base, world + 40, guest::LoadU32(base, world + 40) - 1);
+  return true;
+}
+
+uint32_t CollisionWorldReset(uint8_t* base) {
+  ITC_NATIVE_RUNNING("sub_820B85E8 CollisionWorld::Reset");
+  guest::StoreU32(base, World(base) + 56, 0);
+  guest::StoreU32(base, World(base) + 60, 32);
+  guest::StoreU32(base, World(base) + 20, 0);
+  uint32_t world = World(base);
+  guest::StoreU32(base, world + 24, guest::LoadU32(base, world + 16));
+  world = World(base);
+  // Every object on the free list: +228 the next, +232 the previous.
+  uint32_t count = guest::LoadU32(base, world + 12);
+  for (uint32_t i = 0; i < count; i++) {
+    if (i < count - 1) {
+      const uint32_t object = guest::LoadU32(base, world + 16) + 320 * i;
+      guest::StoreU32(base, object + 228, object + 320);
+    } else {
+      guest::StoreU32(base, count * 320 + guest::LoadU32(base, world + 16) - 92, 0);
+    }
+    const uint32_t object = guest::LoadU32(base, World(base) + 16) + 320 * i;
+    guest::StoreU32(base, object + 232, int32_t(i) > 0 ? object - 320 : 0);
+    world = World(base);
+    count = guest::LoadU32(base, world + 12);
+  }
+  guest::StoreU32(base, world + 28, 0);
+  guest::StoreU32(base, World(base) + 40, 0);
+  guest::StoreU32(base, World(base) + 52, 0);
+  CollisionWorldResetSurfaces(base);
+  return 0x826C2E30;
 }
 
 }  // namespace car_physics

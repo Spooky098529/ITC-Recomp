@@ -247,6 +247,27 @@ ITC_NATIVE_STEP(NativeAddContact, ctx.r3.u64 = cp::CollisionObjectAddContact(bas
 ITC_NATIVE_STEP(NativeRecordsMerge,
                 ctx.r3.u64 = cp::CollisionRecordsMerge(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
                                                        ctx.r6.u32, ctx.r1.u32 - 304))
+// The world's pairs and its reset.
+ITC_NATIVE_STEP(NativeHasPair,
+                ctx.r3.u64 = cp::CollisionWorldHasPair(base, ctx.r3.u32, ctx.r4.u32) ? 1 : 0)
+ITC_NATIVE_STEP(NativeLinkPair, ctx.r3.u64 = cp::CollisionWorldLinkPair(base, ctx.r3.u32,
+                                                                        ctx.r4.u32, ctx.r5.u32))
+ITC_NATIVE_STEP(NativeAddPairs,
+                ctx.r3.u64 = cp::CollisionWorldAddPairs(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_STEP(NativeUnlinkPair, ctx.r3.u64 = cp::CollisionWorldUnlinkPair(base, ctx.r3.u32))
+// r3 comes back as the slot (memcpy's).
+ITC_NATIVE_STEP(NativeMovePair, cp::CollisionWorldMovePair(base, ctx.r3.u32, ctx.r4.u32);
+                ctx.r3.u64 = ctx.r4.u32)
+// Where the move's memcpy can't be native, the original (as the adapter).
+void NativeRemovePair(PPCContext& ctx, uint8_t* base) {
+  uint32_t r3 = 0;
+  if (!cp::CollisionWorldRemovePair(base, ctx.r3.u32, &r3)) {
+    __imp__sub_820B8A88(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = r3;
+}
+ITC_NATIVE_STEP(NativeWorldReset, ctx.r3.u64 = cp::CollisionWorldReset(base))
 // Where tan would fail, the original (as the adapters).
 void NativeSteerRecordCurve(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
@@ -346,6 +367,7 @@ enum Shape {
 
 void CarPhysicsVehicle(Context& h);
 void CarPhysicsCollision(Context& h);
+void CarPhysicsPairs(Context& h);
 
 void CarPhysics(Context& h) {
   // The block 16-byte aligned, as the game's bodies are.
@@ -526,6 +548,7 @@ void CarPhysics(Context& h) {
   }
   CarPhysicsVehicle(h);
   CarPhysicsCollision(h);
+  CarPhysicsPairs(h);
 }
 
 namespace {
@@ -1069,6 +1092,179 @@ void CarPhysicsCollision(Context& h) {
       }
       results.Report();
     }
+  }
+  std::memcpy(h.base + kSurfaceGlobals, saved_surfaces, kSurfaceBytes);
+  guest::StoreU32(h.base, kWorldPointer, saved_world);
+}
+
+
+namespace {
+
+// The collision world's pairs: a fake world in a region of guest stack
+// further down (below the collision cases'), with 2 to 8 objects (some
+// active, in a random order), pairs made by the recompiled AddPairs first
+// (the same in both runs), then the function. The world's pointer and the
+// surface settings are put back after. Compared: the region, the surface
+// settings and r3. Integers only (the one float, +28, is 0.0 copied).
+constexpr uint32_t kPairsArea = 0x18000;
+constexpr uint32_t kPairsAreaBytes = 0x1000;
+// The world at +0, the objects (320 bytes each) at +0x100, the pairs (32
+// bytes each, up to 28) at +0xB00.
+constexpr uint32_t kPairsObjects = 0x100, kPairs = 0xB00;
+
+enum PairsShape {
+  kHasPairArgs,     // r3, r4 = two objects
+  kLinkPairArgs,    // r3 = the next pair, r4, r5 = two objects
+  kAddPairsArgs,    // r3 = an object, r4 = groups
+  kUnlinkPairArgs,  // r3 = a pair
+  kMovePairArgs,    // r3 = the last pair, r4 = a slot unlinked first
+  kRemovePairArgs,  // r3 = a pair's index
+  kResetArgs,       // nothing
+};
+
+}  // namespace
+
+void CarPhysicsPairs(Context& h) {
+  const uint32_t area = (h.data - kPairsArea) & ~0xFu;
+  const struct {
+    const char* name;
+    GuestFunction recompiled, native;
+    PairsShape shape;
+  } functions[] = {
+      {"CollisionWorld::HasPair (sub_820B8C20)", Original<__imp__sub_820B8C20>, NativeHasPair,
+       kHasPairArgs},
+      {"CollisionWorld::LinkPair (sub_820BC068)", Original<__imp__sub_820BC068>, NativeLinkPair,
+       kLinkPairArgs},
+      {"CollisionWorld::AddPairs (sub_820B94B0)", Original<__imp__sub_820B94B0>, NativeAddPairs,
+       kAddPairsArgs},
+      {"CollisionWorld::UnlinkPair (sub_820BBC40)", Original<__imp__sub_820BBC40>,
+       NativeUnlinkPair, kUnlinkPairArgs},
+      {"CollisionWorld::MovePair (sub_820BBD30)", Original<__imp__sub_820BBD30>, NativeMovePair,
+       kMovePairArgs},
+      {"CollisionWorld::RemovePair (sub_820B8A88)", Original<__imp__sub_820B8A88>,
+       NativeRemovePair, kRemovePairArgs},
+      {"CollisionWorld::Reset (sub_820B85E8)", Original<__imp__sub_820B85E8>, NativeWorldReset,
+       kResetArgs},
+  };
+  uint8_t saved_surfaces[kSurfaceBytes];
+  std::memcpy(saved_surfaces, h.base + kSurfaceGlobals, kSurfaceBytes);
+  const uint32_t saved_world = guest::LoadU32(h.base, kWorldPointer);
+  const uint32_t world = area;
+  auto object_at = [area](uint32_t i) { return area + kPairsObjects + 320 * i; };
+  auto pair_count = [&h, world] { return guest::LoadU32(h.base, world + 40); };
+  for (const auto& f : functions) {
+    Results results(f.name);
+    for (uint64_t seed = 0; seed < 200; seed++) {
+      std::vector<uint8_t> result[2];
+      std::string what;
+      for (int v = 0; v < 2; v++) {
+        Random fill = Seeded(seed * 37 + 11);
+        for (uint32_t i = 0; i < kPairsAreaBytes; i += 4) {
+          guest::StoreU32(h.base, area + i, uint32_t(fill.Next()));
+        }
+        for (uint32_t i = 0; i < kSurfaceBytes; i += 4) {
+          guest::StoreU32(h.base, kSurfaceGlobals + i, NumberWord(fill));
+        }
+        const uint32_t objects = 2 + fill.Below(7);
+        guest::StoreU32(h.base, world + 12, objects);
+        guest::StoreU32(h.base, world + 16, object_at(0));
+        guest::StoreU32(h.base, world + 36, area + kPairs);
+        guest::StoreU32(h.base, world + 40, 0);
+        guest::StoreU32(h.base, kWorldPointer, world);
+        // The active list: the objects in a random order, some left out.
+        uint32_t order[8];
+        for (uint32_t i = 0; i < objects; i++) {
+          order[i] = i;
+        }
+        for (uint32_t i = objects - 1; i > 0; i--) {
+          std::swap(order[i], order[fill.Below(i + 1)]);
+        }
+        uint32_t head = 0;
+        for (uint32_t i = 0; i < objects; i++) {
+          const uint32_t object = object_at(order[i]);
+          guest::StoreU32(h.base, object + 244, fill.Below(16));
+          guest::StoreU32(h.base, object + 268, fill.Below(3));
+          guest::StoreU32(h.base, object + 264, 0);
+          if (fill.Below(5) != 0) {
+            guest::StoreU32(h.base, object + 228, head);
+            head = object;
+          }
+        }
+        guest::StoreU32(h.base, world + 20, head);
+        // The pairs made by the recompiled AddPairs.
+        const uint32_t adds = fill.Below(5);
+        for (uint32_t i = 0; i < adds; i++) {
+          PPCContext t = CallContext(h);
+          t.r3.u64 = object_at(fill.Below(objects));
+          t.r4.u64 = fill.Below(16);
+          Original<__imp__sub_820B94B0>(t, h.base);
+        }
+        PPCContext t = CallContext(h);
+        t.fpscr.disableFlushModeUnconditional();
+        const uint32_t a = object_at(fill.Below(objects));
+        const uint32_t b = object_at(fill.Below(objects));
+        const uint32_t count = pair_count();
+        const uint32_t index = count == 0 ? 0 : fill.Below(count);
+        bool skip = false;
+        switch (f.shape) {
+          case kHasPairArgs:
+            t.r3.u64 = a;
+            t.r4.u64 = b;
+            break;
+          case kLinkPairArgs:
+            if (a == b) {
+              skip = true;
+            }
+            t.r3.u64 = area + kPairs + 32 * count;
+            t.r4.u64 = a;
+            t.r5.u64 = b;
+            break;
+          case kAddPairsArgs:
+            t.r3.u64 = a;
+            t.r4.u64 = fill.Below(16);
+            break;
+          case kUnlinkPairArgs:
+            t.r3.u64 = area + kPairs + 32 * index;
+            skip = count == 0;
+            break;
+          case kMovePairArgs: {
+            // Unlinked by the original first, as RemovePair does.
+            skip = count < 2 || index == count - 1;
+            if (!skip) {
+              PPCContext u = CallContext(h);
+              u.r3.u64 = area + kPairs + 32 * index;
+              Original<__imp__sub_820BBC40>(u, h.base);
+            }
+            t.r3.u64 = area + kPairs + 32 * (count - 1);
+            t.r4.u64 = area + kPairs + 32 * index;
+            break;
+          }
+          case kRemovePairArgs:
+            t.r3.u64 = index;
+            skip = count == 0;
+            break;
+          case kResetArgs:
+            break;
+        }
+        what = fmt::format("seed {} objects {} pairs {} a {:08X} b {:08X} index {}", seed,
+                           objects, count, a, b, index);
+        if (skip) {
+          result[v].clear();
+          continue;
+        }
+        (v == 0 ? f.recompiled : f.native)(t, h.base);
+        result[v] = Read(h.base, area, kPairsAreaBytes);
+        const std::vector<uint8_t> surfaces = Read(h.base, kSurfaceGlobals, kSurfaceBytes);
+        result[v].insert(result[v].end(), surfaces.begin(), surfaces.end());
+        for (int i = 0; i < 4; i++) {
+          result[v].push_back(uint8_t(t.r3.u32 >> (24 - 8 * i)));
+        }
+      }
+      if (!result[0].empty() || !result[1].empty()) {
+        results.Check(result[0], result[1], what);
+      }
+    }
+    results.Report();
   }
   std::memcpy(h.base + kSurfaceGlobals, saved_surfaces, kSurfaceBytes);
   guest::StoreU32(h.base, kWorldPointer, saved_world);
