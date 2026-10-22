@@ -296,3 +296,36 @@ uint32_t ModelPointPosition(uint8_t* base, uint32_t out, uint32_t model, int32_t
 uint32_t OverlayViewPointPosition(uint8_t* base, uint32_t out, uint32_t view, int32_t index);
 
 }  // namespace race_overlays
+
+namespace race_overlays {
+
+// --- The sparks ---
+//
+// A sparks emitter: its sparks (144 bytes each) from +128, +104 the
+// capacity, +28,928 a streak counter, +28,932 the head, +28,940 the count,
+// +28,944 the spread, +28,960 the position, +28,976 streaking, +28,992 and
+// +29,008 the last two positions, +29,024 50 random vectors.
+
+// Sparks::UpdateStreak (sub_8212E660): the spread (+28,944) from `speed`
+// times the float at 0x820029E4, clamped to the floats at 0x82001FBC and
+// 0x82002C50; `position` (the vector passed in r4 and r5: words 0-1 and
+// 2-3) to +28,960; `streaking` to +28,976; the counter counts up. When
+// streaking, the last positions move on (the newer to +28,992, `position`
+// to +29,008), the counter goes back to 0, and the 50 vectors get x, y and
+// z from RandomRange(-spread, spread) times the spread factor (1.0, or the
+// float at 0x820035B0 for `mode` 1); else they're (0, 0, 0, 1). Once the
+// counter is above 2, +29,008 is copied to +28,992 (before the reset).
+// Then each of the count's sparks from the head: state 2 adds its +32
+// vector to +64 (vaddfp, flush-to-zero on); state 1 while streaking: 2 when
+// the length of +48 - +64 (as the original's vector code works it out)
+// passes +136, else +64 = `position`; 2 again when rand() % 10 is 0; +112
+// = +64 - +48; state 1 when not streaking: as state 2. The original also
+// stores `position` in its caller's parameter area, which its caller
+// doesn't read. `*drawn` gets the last rand() result and `*value` the last
+// RandomRange value (the original leaves them in r3 and f1; untouched when
+// none is drawn).
+void SparksUpdateStreak(uint8_t* base, uint32_t sparks, double speed,
+                        const uint32_t position[4], uint32_t streaking, uint32_t mode,
+                        uint32_t* drawn, double* value);
+
+}  // namespace race_overlays

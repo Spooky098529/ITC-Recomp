@@ -968,3 +968,149 @@ uint32_t OverlayViewPointPosition(uint8_t* base, uint32_t out, uint32_t view, in
 }
 
 }  // namespace race_overlays
+
+namespace race_overlays {
+
+namespace {
+
+constexpr uint32_t kSparksSpreadScale = 0x820029E4;
+constexpr uint32_t kSparksLeastSpread = 0x82001FBC;
+constexpr uint32_t kSparksMostSpread = 0x82002C50;
+constexpr uint32_t kSparksModeFactor = 0x820035B0;
+constexpr uint32_t kSparksStreak = 28928;
+constexpr uint32_t kSparksHead = 28932;
+constexpr uint32_t kSparksCount = 28940;
+constexpr uint32_t kSparksSpread = 28944;
+constexpr uint32_t kSparksPosition = 28960;
+constexpr uint32_t kSparksStreaking = 28976;
+constexpr uint32_t kSparksBytes = 144;
+
+// The 16 bytes at `to` (rounded down to 16) plus those at `from` (rounded
+// down too), stored back at `to`: lvx, lvx, vaddfp with flush-to-zero on,
+// stvx.
+void AddVectorTo(uint8_t* base, uint32_t to, uint32_t from, uint32_t csr, uint32_t flushing) {
+  const simde__m128 a = LoadVector(base, to);
+  const simde__m128 b = LoadVector(base, from);
+  Fpscr::setcsr(flushing);
+  const simde__m128 sum = simde_mm_add_ps(a, b);
+  Fpscr::setcsr(csr);
+  const uint32_t at = to & ~0xFu;
+  for (int k = 0; k < 4; k++) {
+    guest::StoreU32(base, at + 4 * k, WordOf(sum, k));
+  }
+}
+
+}  // namespace
+
+void SparksUpdateStreak(uint8_t* base, uint32_t sparks, double speed,
+                        const uint32_t position[4], uint32_t streaking, uint32_t mode,
+                        uint32_t* drawn, double* value) {
+  ITC_NATIVE_RUNNING("sub_8212E660 Sparks::UpdateStreak");
+  const uint64_t position_high = (uint64_t(position[0]) << 32) | position[1];
+  const uint64_t position_low = (uint64_t(position[2]) << 32) | position[3];
+  const uint32_t head = guest::LoadU32(base, sparks + kSparksHead);
+  const uint32_t one = guest::LoadU32(base, kOne);
+  double factor = std::bit_cast<float>(one);
+  // fmuls, then clamped (a NaN stays).
+  double spread = float(speed * double(guest::LoadFloat(base, kSparksSpreadScale)));
+  const double least = guest::LoadFloat(base, kSparksLeastSpread);
+  if (spread < least) {
+    spread = least;
+  } else {
+    const double most = guest::LoadFloat(base, kSparksMostSpread);
+    if (spread > most) {
+      spread = most;
+    }
+  }
+  guest::StoreFloat(base, sparks + kSparksSpread, float(spread));
+  for (uint32_t i = 0; i < 4; i++) {
+    guest::StoreU32(base, sparks + kSparksPosition + 4 * i, position[i]);
+  }
+  const uint32_t counter = guest::LoadU32(base, sparks + kSparksStreak);
+  guest::StoreU32(base, sparks + kSparksStreaking, streaking);
+  guest::StoreU32(base, sparks + kSparksStreak, counter + 1);
+  if (streaking != 0) {
+    StoreU64(base, sparks + 28992, LoadU64(base, sparks + 29008));
+    const uint64_t newer = LoadU64(base, sparks + 29016);
+    StoreU64(base, sparks + 29000, newer);
+    StoreU64(base, sparks + 29008, position_high);
+    StoreU64(base, sparks + 29016, position_low);
+  }
+  if (int32_t(guest::LoadU32(base, sparks + kSparksStreak)) > 2) {
+    CopyDoublewords(base, sparks + 29008, sparks + 28992);
+  }
+  if (int32_t(mode) == 1) {
+    factor = guest::LoadFloat(base, kSparksModeFactor);
+  }
+  if (guest::LoadU32(base, sparks + kSparksStreaking) != 0) {
+    guest::StoreU32(base, sparks + kSparksStreak, 0);
+    for (uint32_t at = sparks + 29028, k = 0; k < 50; k++, at += 16) {
+      for (const int32_t offset : {-4, 0, 4}) {
+        const double range = guest::LoadFloat(base, sparks + kSparksSpread);
+        *value = RandomRange(base, -range, range, drawn);
+        guest::StoreFloat(base, at + uint32_t(offset), float(*value * factor));
+      }
+    }
+  } else {
+    const uint32_t zero = guest::LoadU32(base, kZero);
+    for (uint32_t at = sparks + 29032, k = 0; k < 50; k++, at += 16) {
+      guest::StoreU32(base, at - 8, zero);
+      guest::StoreU32(base, at - 4, zero);
+      guest::StoreU32(base, at + 0, zero);
+      guest::StoreU32(base, at + 4, one);
+    }
+  }
+
+  if (int32_t(guest::LoadU32(base, sparks + kSparksCount)) <= 0) {
+    return;
+  }
+  const uint32_t csr = Fpscr::getcsr();
+  const uint32_t flushing = csr | uint32_t(Fpscr::FlushMask);
+  uint32_t spark = sparks + head * kSparksBytes + 128;
+  int32_t i = 0;
+  do {
+    if (int32_t(guest::LoadU32(base, spark + 128)) == 2) {
+      AddVectorTo(base, spark + 64, spark + 32, csr, flushing);
+    }
+    if (int32_t(guest::LoadU32(base, spark + 128)) == 1) {
+      if (guest::LoadU32(base, sparks + kSparksStreaking) != 0) {
+        const float dx = Difference(guest::LoadFloat(base, spark + 48),
+                                    guest::LoadFloat(base, spark + 64));
+        const float dy = Difference(guest::LoadFloat(base, spark + 52),
+                                    guest::LoadFloat(base, spark + 68));
+        const float dz = Difference(guest::LoadFloat(base, spark + 56),
+                                    guest::LoadFloat(base, spark + 72));
+        const float limit = guest::LoadFloat(base, spark + 136);
+        const simde__m128 moved =
+            VectorOf(std::bit_cast<uint32_t>(dx), std::bit_cast<uint32_t>(dy),
+                     std::bit_cast<uint32_t>(dz), one);
+        Fpscr::setcsr(flushing);
+        const simde__m128 length = Length(moved);
+        Fpscr::setcsr(csr);
+        if (double(limit) < double(std::bit_cast<float>(WordOf(length, 0)))) {
+          guest::StoreU32(base, spark + 128, 2);
+        } else {
+          StoreU64(base, spark + 64, position_high);
+          StoreU64(base, spark + 72, position_low);
+        }
+        *drawn = Rand(base);
+        const int32_t r = int32_t(*drawn);
+        if (r - (r / 10) * 10 == 0) {
+          guest::StoreU32(base, spark + 128, 2);
+        }
+        for (uint32_t k = 0; k < 12; k += 4) {
+          guest::StoreFloat(base, spark + 112 + k,
+                            Difference(guest::LoadFloat(base, spark + 64 + k),
+                                       guest::LoadFloat(base, spark + 48 + k)));
+        }
+      } else {
+        AddVectorTo(base, spark + 64, spark + 32, csr, flushing);
+      }
+    }
+    const uint32_t last = guest::LoadU32(base, sparks + 104) * kSparksBytes + sparks - 16;
+    spark = spark == last ? sparks + 128 : spark + kSparksBytes;
+    i++;
+  } while (i < int32_t(guest::LoadU32(base, sparks + kSparksCount)));
+}
+
+}  // namespace race_overlays

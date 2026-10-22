@@ -189,6 +189,18 @@ ITC_NATIVE_WORD(NativeModelPointPosition,
 ITC_NATIVE_WORD(NativeOverlayViewPointPosition,
                 ro::OverlayViewPointPosition(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.s32))
 
+void NativeSparksUpdateStreak(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const uint32_t position[4] = {uint32_t(ctx.r4.u64 >> 32), ctx.r4.u32,
+                                uint32_t(ctx.r5.u64 >> 32), ctx.r5.u32};
+  uint32_t drawn = ctx.r3.u32;
+  double value = ctx.f1.f64;
+  ro::SparksUpdateStreak(base, ctx.r3.u32, ctx.f1.f64, position, ctx.r6.u32, ctx.r8.u32, &drawn,
+                         &value);
+  ctx.r3.u64 = drawn;
+  ctx.f1.f64 = value;
+}
+
 // Runs the recompiled version with --native_race_overlays off, so the
 // functions it calls that are ours run the originals too.
 void RunRecompiled(GuestFunction recompiled, PPCContext& t, uint8_t* base) {
@@ -1173,6 +1185,108 @@ void ModelPointPositionCases(Context& h, uint32_t block) {
   }
 }
 
+// Sparks::UpdateStreak: capacities of 200 (the room the object has), small
+// ones and 0; the head inside them; counts from 0 to past the capacity (and
+// negative); each spark's state 1, 2, 0 or random; random words (odd
+// floats among them) in the sparks, their limits and the position;
+// game-like, odd and random speeds; streaking 0, 1 or random; modes 0, 1, 2
+// or random; random seeds.
+void SparksUpdateStreakCases(Context& h, uint32_t block) {
+  Random& r = h.random;
+  constexpr uint32_t kSeed = 0x82638188;
+  const uint32_t live = guest::LoadU32(h.base, kSeed);
+  const uint32_t sparks = block + 0x100;
+  constexpr uint32_t kBytes = 0x10000;
+  Results results("Sparks::UpdateStreak (sub_8212E660)");
+  for (int i = 0; i < 400; i++) {
+    uint32_t capacity;
+    switch (r.Below(6)) {
+      case 0:
+        capacity = 1 + r.Below(8);
+        break;
+      case 1:
+        capacity = 0;
+        break;
+      default:
+        capacity = 200;
+        break;
+    }
+    const uint32_t room = capacity ? capacity : 50;
+    const uint32_t head = r.Below(room);
+    const int32_t count = r.Below(8) == 0 ? -int32_t(r.Below(3)) : int32_t(r.Below(room + 6));
+    double speed;
+    switch (r.Below(4)) {
+      case 0:
+        speed = double(std::bit_cast<float>(RandomWord(r)));
+        break;
+      case 1:
+        speed = std::bit_cast<double>(r.Next());
+        break;
+      default:
+        speed = double(float(r.Below(20000)) / 100.0f);
+        break;
+    }
+    const uint32_t streaking = r.Below(3) == 2 ? uint32_t(r.Next()) : r.Below(2);
+    const uint32_t mode = r.Below(4) == 3 ? uint32_t(r.Next()) : r.Below(3);
+    const uint64_t r4 = (uint64_t(RandomWord(r)) << 32) | RandomWord(r);
+    const uint64_t r5 = (uint64_t(RandomWord(r)) << 32) | RandomWord(r);
+    const uint32_t seed = uint32_t(r.Next());
+    const uint64_t fill_seed = r.Next();
+    Compare(h, results, {{block, kBytes}, {kSeed, 4}},
+            [&, fill_seed] {
+              Random fill;
+              for (uint64_t n = 0; n < fill_seed % 29; n++) {
+                fill.Next();
+              }
+              FillRandom(h.base, fill, block, kBytes);
+              guest::StoreU32(h.base, sparks + 104, capacity);
+              guest::StoreU32(h.base, sparks + 28928, fill.Below(5));
+              guest::StoreU32(h.base, sparks + 28932, head);
+              guest::StoreU32(h.base, sparks + 28940, uint32_t(count));
+              for (uint32_t k = 0; k < 400; k++) {
+                const uint32_t spark = sparks + 128 + 144 * k;
+                uint32_t state;
+                switch (fill.Below(4)) {
+                  case 0:
+                    state = 1;
+                    break;
+                  case 1:
+                    state = 2;
+                    break;
+                  case 2:
+                    state = 0;
+                    break;
+                  default:
+                    state = uint32_t(fill.Next());
+                    break;
+                }
+                if (spark + 144 > block + kBytes || (spark >= sparks + 28928 && spark < sparks + 29824)) {
+                  continue;
+                }
+                guest::StoreU32(h.base, spark + 128, state);
+                if (fill.Below(2)) {  // a game-like limit
+                  guest::StoreFloat(h.base, spark + 136, float(fill.Below(400)) / 100.0f);
+                }
+              }
+              guest::StoreU32(h.base, kSeed, seed);
+            },
+            [&](PPCContext& t) {
+              t.r3.u64 = sparks;
+              t.r4.u64 = r4;
+              t.r5.u64 = r5;
+              t.r6.u64 = streaking;
+              t.r8.u64 = mode;
+              t.f1.f64 = speed;
+            },
+            __imp__sub_8212E660, NativeSparksUpdateStreak,
+            fmt::format("case {} capacity {} head {} count {} streaking {:X} mode {:X} speed {:016X}",
+                        i, capacity, head, count, streaking, mode,
+                        std::bit_cast<uint64_t>(speed)));
+  }
+  results.Report();
+  guest::StoreU32(h.base, kSeed, live);
+}
+
 }  // namespace
 
 void RaceOverlays(Context& h) {
@@ -1193,6 +1307,7 @@ void RaceOverlays(Context& h) {
   ParticlesBCases(h, block);
   ModelPointCases(h, block);
   ModelPointPositionCases(h, block);
+  SparksUpdateStreakCases(h, block);
   memory->SystemHeapFree(block);
 }
 

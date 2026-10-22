@@ -13,7 +13,8 @@ ITC_FLAG_BOOL(native_race_overlays, true, "ITC",
               "sub_8211F118; Marker::Set and Update, sub_8212CCE0 and sub_8212CBE0; Trail::Update and "
               "AddPoint, sub_821292E8 and sub_82129598; ParticlesB and ParticlesC::Emit, sub_8212B4A8 and sub_8212C1C0; the "
               "car-model sprites' kind and table entry, sub_82123188 and sub_8211F300; the model "
-              "points' checks and positions, sub_82126A78 and sub_82127140) natively "
+              "points' checks and positions, sub_82126A78 and sub_82127140; Sparks::UpdateStreak, "
+              "sub_8212E660) natively "
               "instead of through the translated code (same results; checked by "
               "--run_harnesses=race_overlays)");
 
@@ -223,3 +224,24 @@ ITC_OVERLAY_WORD(82126A78, OverlayViewHasPoint(base, ctx.r3.u32, ctx.r4.s32))
 // returns out (Model::PointPosition and ModelParts::PointPosition, which
 // only it calls in play, are done by its plain C++).
 ITC_OVERLAY_WORD(82127140, OverlayViewPointPosition(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.s32))
+
+// Sparks::UpdateStreak: r3 = the sparks, f1 = speed, r4 and r5 = a position
+// (a vector passed by value), r6 = streaking, r8 = a mode (r7 isn't read);
+// r3 and f1 are left the last rand() and RandomRange results, as the
+// original leaves them.
+extern "C" REX_FUNC(sub_8212E660) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_race_overlays)) {
+    __imp__sub_8212E660(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  const uint32_t position[4] = {uint32_t(ctx.r4.u64 >> 32), ctx.r4.u32,
+                                uint32_t(ctx.r5.u64 >> 32), ctx.r5.u32};
+  uint32_t drawn = ctx.r3.u32;
+  double value = ctx.f1.f64;
+  SparksUpdateStreak(base, ctx.r3.u32, ctx.f1.f64, position, ctx.r6.u32, ctx.r8.u32, &drawn,
+                     &value);
+  ctx.r3.u64 = drawn;
+  ctx.f1.f64 = value;
+}
