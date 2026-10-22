@@ -348,8 +348,8 @@ made native, or whose adapter it removed:
 3. **Replays the recorded pad** for the functions with no `native running
    (game):` line (added by the user, 2026-10-22):
    `itc_recomp/tools/scripted_run.sh <the recording in
-   itc_recomp/pad_recordings/> --log_level=info` (default flags
-   otherwise). Functions with a game line in the replay's log count as
+   itc_recomp/pad_recordings/>` (default flags; the script already passes
+   `--log_level=info`, and a flag given twice is refused). Functions with a game line in the replay's log count as
    ran in play. Only what the replay didn't reach goes to the user's
    drive (below). A replay that breaks (stalls, logs new errors, desyncs,
    ends early) is not a halt: the agent says how it broke and where it

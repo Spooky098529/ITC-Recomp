@@ -15,8 +15,11 @@ there), and this file's history.
   (`sub_820BB868`, `sub_820BBE30`, ...; from `leads.md`: runs every
   physics step, many ready groups, blocks `car-physics.md`), mapped in
   `collision.md` (dd758b3; 64 rows; checked: 43 ready groups). Migration 1
-  done (f5b59e8..e634cfd, 53 of 64 ours). Step: its validation (agent
-  running); then migration 2 for what's left.
+  done (f5b59e8..e634cfd, 53 of 64 ours). Validated (53 of 53 harness
+  lines; replay ok). Step: migration 2 (agent running): what's left,
+  with `sub_820B7B60` CollisionObject::Translate (`car-physics.md`) and
+  the two rigid body accessors' lead (`sub_820988C0`, `sub_82379328`),
+  which block it.
 
 ## Done
 
@@ -67,6 +70,17 @@ there), and this file's history.
   negation" groups (1, 0, 1 differ: a sign in row +96).
 
 ## To check in a drive
+
+Functions made native this run with no `native running (game):` line in
+the validation agent's attract race or pad replay; the user drives (with
+`--log_level=info`) and checks the log for them when the loop ends.
+
+- Collision, migration 1 (the impact path: no box-box contact in the
+  attract race or the replay; replay ok): `sub_820B9FC8`, `sub_820B9FE0`,
+  `sub_820BA3B0`, `sub_820B9F00`, `sub_820BAB30`, `sub_820BACB8`,
+  `sub_820BC908`, `sub_820BC858`, `sub_820BA5D8`, `sub_820BC978`,
+  `sub_820BCCE8`, `sub_820BD578`, `sub_820BD6E0`, `sub_820BE490`,
+  `sub_820BEBF0`, `sub_820BECA0`, `sub_820BF038`, `sub_820BCE80`.
 
 ## Totals
 
