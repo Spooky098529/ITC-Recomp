@@ -57,4 +57,18 @@ double Pow(double x, double y);
 double Floor(double x);
 double Ceil(double x);
 
+// log10 (sub_825A9D80): log(x) times 1/ln 10 (the double at 0x820725A0).
+double Log10(double x);
+
+// __ultod (sub_825A9DB0): an unsigned 64-bit integer to a double, its bits
+// built by hand: the low bits beyond the mantissa dropped (truncated, not
+// rounded as double(uint64_t) would).
+double U64ToDouble(uint64_t value);
+
+// _fpclass (sub_825AB268): the class bits (512 +infinity, 4 -infinity, 2
+// quiet NaN, 1 signaling NaN, 128 and 16 denormals, 64 and 32 zeros, 256 and
+// 8 normals: positive, negative), with its helper sub_825AFEF8 (never seen in
+// play) ported.
+int32_t FpClass(double x);
+
 }  // namespace c_runtime

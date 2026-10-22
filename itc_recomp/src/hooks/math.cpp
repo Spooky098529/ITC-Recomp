@@ -13,7 +13,8 @@ ITC_FLAG_BOOL(native_math, true, "ITC",
               "and sub_825A80A8; sin and cos, sub_825A88A0 and sub_825A8978; atan and atan2, sub_825A8688 and "
               "sub_825A8770; pow, sub_825A8ED0, with log, sub_825A9C00, copysign, sub_825AB1C8, "
               "_set_exp, _get_exp and _decomp, sub_825AFE80, sub_825AFEA8 and sub_825AFF80, and the "
-              "integer test sub_825A8CE0; floor and ceil, sub_825A8CA0 and sub_825AA0B8) natively instead of through the translated code (the same "
+              "integer test sub_825A8CE0; floor and ceil, sub_825A8CA0 and sub_825AA0B8; log10, sub_825A9D80; "
+              "__ultod, sub_825A9DB0; _fpclass, sub_825AB268) natively instead of through the translated code (the same "
               "doubles, bit for bit; checked by --run_harnesses=math)");
 
 // acos: f1 = x.
@@ -195,4 +196,42 @@ extern "C" REX_FUNC(sub_825AA0B8) {
   }
   ctx.fpscr.disableFlushMode();
   ctx.f1.f64 = c_runtime::Ceil(ctx.f1.f64);
+}
+
+// log10: f1 = x.
+extern "C" REX_FUNC(sub_825A9D80) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_math)) {
+    __imp__sub_825A9D80(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  ctx.f1.f64 = c_runtime::Log10(ctx.f1.f64);
+}
+
+// __ultod: r3 = the integer; returns the double in f1. The original builds
+// the bits in r3 and leaves them there (some callers return right after),
+// so r3 gets them here too.
+extern "C" REX_FUNC(sub_825A9DB0) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_math)) {
+    __imp__sub_825A9DB0(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  ctx.f1.f64 = c_runtime::U64ToDouble(ctx.r3.u64);
+  ctx.r3.u64 = ctx.f1.u64;
+}
+
+// _fpclass: f1 = x; returns r3. (The original's negative classes come out
+// with bit 32 of r3 set, by its carry arithmetic; every caller compares
+// only the low word.)
+extern "C" REX_FUNC(sub_825AB268) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_math)) {
+    __imp__sub_825AB268(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = uint32_t(c_runtime::FpClass(ctx.f1.f64));
 }

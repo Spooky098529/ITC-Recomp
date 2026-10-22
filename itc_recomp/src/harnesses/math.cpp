@@ -343,6 +343,42 @@ void Math(Context& h) {
     Unary(h, "floor (sub_825A8CA0)", __imp__sub_825A8CA0, sub_825A8CA0, values);
     Unary(h, "ceil (sub_825AA0B8)", __imp__sub_825AA0B8, sub_825AA0B8, values);
   }
+
+  // log10, __ultod and _fpclass.
+  {
+    std::vector<double> values = SpecialValues();
+    for (double x : {1.0, 10.0, 100.0, 0.1, 0.5, 2.0, 1e-300, 1e300}) {
+      AddAround(values, x);
+    }
+    AddRandom(h, values, 1000.0, 500);
+    Unary(h, "log10 (sub_825A9D80)", __imp__sub_825A9D80, sub_825A9D80, values);
+    Cases(h, "_fpclass (sub_825AB268)", __imp__sub_825AB268, sub_825AB268, values.size(),
+          [&](size_t i, PPCContext& t) { t.f1.f64 = values[i]; },
+          [](PPCContext& t, std::vector<uint8_t>& b) { Append(b, t.r3.u32); },
+          [&](size_t i) { return "x " + Bits(values[i]); });
+
+    // Integers: zero, powers of two and their neighbors, every bit length,
+    // values with more bits than a mantissa (where truncation shows).
+    std::vector<uint64_t> integers = {0, 1, 2, 3, ~0ull, 1ull << 63, (1ull << 63) - 1,
+                                      (1ull << 53) + 1, (1ull << 54) + 3, 0x8000000000000401ull};
+    for (int b = 0; b < 64; b++) {
+      integers.push_back(1ull << b);
+      integers.push_back((1ull << b) + 1);
+      integers.push_back((1ull << b) - 1);
+    }
+    for (int i = 0; i < 2000; i++) {
+      const uint64_t r = h.random.Next();
+      integers.push_back(r);
+      integers.push_back(r >> h.random.Below(64));
+    }
+    Cases(h, "__ultod (sub_825A9DB0)", __imp__sub_825A9DB0, sub_825A9DB0, integers.size(),
+          [&](size_t i, PPCContext& t) { t.r3.u64 = integers[i]; },
+          [](PPCContext& t, std::vector<uint8_t>& b) {
+            Append(b, t.f1.u64);
+            Append(b, t.r3.u64);
+          },
+          [&](size_t i) { return fmt::format("r3 {:016X}", integers[i]); });
+  }
 }
 
 }  // namespace harness

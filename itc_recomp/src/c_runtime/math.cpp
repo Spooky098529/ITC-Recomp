@@ -678,6 +678,44 @@ double Ceil(double x) {
   return Select(Neg(ax), x, r);
 }
 
+double Log10(double x) {
+  return Log(x) * D(0x3FDBCB7B1526E50E);  // 1/ln 10, at 0x820725A0
+}
+
+double U64ToDouble(uint64_t value) {
+  if (value == 0) {
+    return 0.0;
+  }
+  const int zeros = std::countl_zero(value);
+  const uint64_t normalized = value << zeros;  // the leading 1 at bit 63
+  const uint64_t mantissa = (normalized >> 11) & 0x000FFFFFFFFFFFFFull;
+  const uint64_t exponent = (uint64_t(1086 - zeros) << 52) & 0x7FF0000000000000ull;
+  return D(exponent | mantissa);
+}
+
+int32_t FpClass(double x) {
+  const uint64_t bits = Bits(x);
+  const uint32_t high = High16(x);
+  const bool negative = (high & 0x8000) != 0;
+  if ((high & 0x7FF0) == 0x7FF0) {
+    // sub_825AFEF8: 1 +infinity, 2 -infinity, 3 quiet NaN, 4 signaling.
+    if (bits == 0x7FF0000000000000ull) {
+      return 512;
+    }
+    if (bits == 0xFFF0000000000000ull) {
+      return 4;
+    }
+    return (high & 0x7FF8) == 0x7FF8 ? 2 : 1;
+  }
+  if ((high & 0x7FF0) == 0 && (bits & 0x000FFFFFFFFFFFFFull) != 0) {
+    return negative ? 16 : 128;
+  }
+  if (x == 0.0) {
+    return negative ? 32 : 64;
+  }
+  return negative ? 8 : 256;
+}
+
 double Atan(double x) {
   const double ax = Abs(x);
   double a;
