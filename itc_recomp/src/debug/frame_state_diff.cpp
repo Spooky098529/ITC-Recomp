@@ -2,6 +2,7 @@
 
 #include "frame_pacing/game_messages.h"
 #include "guest.h"
+#include "matrix_math/matrix_math.h"
 
 #include "base/flags.h"
 #include "base/log.h"
@@ -18,6 +19,8 @@
 #include <sstream>
 #include <string>
 #include <vector>
+
+ITC_FLAG_DECLARE(bool, native_matrix_math);
 
 ITC_FLAG_BOOL(find_per_frame_state, false, "ITC",
               "Find game state that advances on render-only passes, and the code that "
@@ -393,6 +396,15 @@ void FrameStateDiff_Watch(uint32_t address) {
   Get().Watch(address);
 }
 
+void Vec4Transform(uint8_t* base, uint32_t out, uint32_t m, uint32_t v) {
+  if (IsHidden(0x820AB560)) {
+    return;
+  }
+  FrameStateDiff_Before(base);
+  matrix_math::Vec4Transform(base, out, m, v);
+  FrameStateDiff_After(base, "draw step part", 0x820AB560);
+}
+
 }  // namespace debug
 
 // The race draw step's parts (sub_8215B4F8 calls these), wrapped only to
@@ -416,18 +428,34 @@ ITC_FRAME_STATE_WRAP(82130978)
 ITC_FRAME_STATE_WRAP(8209F7A8)
 ITC_FRAME_STATE_WRAP(820A0958)
 ITC_FRAME_STATE_WRAP(820AA1A8)
-ITC_FRAME_STATE_WRAP(820AB560)
+// Vec4::Transform: r3 = out, r4 = a matrix, r5 = a vector; its work natively
+// (src/matrix_math/matrix_math.cpp, --native_matrix_math; the translated
+// code leaves flush-to-zero on) or translated, inside the same wrap.
+extern "C" REX_FUNC(sub_820AB560) {
+  REX_FUNC_PROLOGUE();
+  if (debug::IsHidden(0x820AB560)) {
+    return;
+  }
+  debug::FrameStateDiff_Before(base);
+  if (ITC_FLAG(native_matrix_math)) {
+    matrix_math::Vec4Transform(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+    ctx.fpscr.enableFlushMode();
+  } else {
+    __imp__sub_820AB560(ctx, base);
+  }
+  debug::FrameStateDiff_After(base, "draw step part", 0x820AB560);
+}
 ITC_FRAME_STATE_WRAP(820C4EB8)
 ITC_FRAME_STATE_WRAP(820C4FB8)
 ITC_FRAME_STATE_WRAP(820DAA38)
 ITC_FRAME_STATE_WRAP(820DAAC8)
 ITC_FRAME_STATE_WRAP(820DAB10)
-ITC_FRAME_STATE_WRAP(820FFD88)
-ITC_FRAME_STATE_WRAP(82593FC0)
 ITC_FRAME_STATE_WRAP(82597118)
 ITC_FRAME_STATE_WRAP(82597518)
 ITC_FRAME_STATE_WRAP(82597610)
 ITC_FRAME_STATE_WRAP(82598768)
+// Stages::Copy (sub_820FFD88) and List::At (sub_82593FC0) were wrapped here
+// too; their native adapters (src/hooks/vehicle_accessors.cpp) do the same.
 // The light billboards' batch (calls sub_8209C1A0 and sub_8209C6E0); r4 is
 // the light list: count at +32, 48-byte lights at +36 (position at +0, size
 // at +32 and +36; a light with neither size above 0 is skipped).

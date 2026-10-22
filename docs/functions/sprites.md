@@ -15,7 +15,7 @@ thread's two largest recompiled functions, `sub_821298C0` and
 `82121000`-`8212EF00`) are in [`race-overlays.md`](race-overlays.md): the
 recordings here are the overlays' vtable slot 7 (r4 the camera pass
 index), called by each car's overlays' recording (`sub_82122958`). Shared callees in other files: `sub_8209BD50`
-(`Matrix::Multiply`) and the texture animations' `sub_82146A38`,
+(`Matrix::Multiply`) in [`matrix-math.md`](matrix-math.md); the texture animations' `sub_82146A38`,
 `sub_82146B80` and `sub_82597118`, in [`functions.md`](functions.md);
 `sub_825A7410` (`memcpy`), the stack probe `sub_825A9934` and `acos`
 (`sub_825A8170`), in [`c-runtime.md`](c-runtime.md); `sub_8258CAA0`

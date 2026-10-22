@@ -4,7 +4,10 @@
 
 #include "base/log.h"
 #include "c_runtime/math.h"
+#include "c_runtime/strings.h"
+#include "debug/frame_state_diff.h"
 #include "hooks/vehicle.h"
+#include "vehicle_accessors/vehicle_accessors.h"
 
 #include <rex/platform/fpscr.h>
 #include <simde/x86/sse4.1.h>
@@ -2538,6 +2541,687 @@ namespace race_overlays {
 uint32_t SlotOf(uint32_t index) {
   ITC_NATIVE_RUNNING("sub_8215E048 RaceOverlays::SlotOf");
   return index <= 24 ? index : 0;
+}
+
+}  // namespace race_overlays
+
+namespace race_overlays {
+
+namespace va = vehicle_accessors;
+
+namespace {
+
+uint32_t Body(uint8_t* base, uint32_t view) {
+  return guest::LoadU32(base, guest::LoadU32(base, view + 4) + 336);
+}
+
+}  // namespace
+
+uint32_t BodyMatrix(uint8_t* base, uint32_t view) {
+  ITC_NATIVE_RUNNING("sub_821268B0 OverlayView::BodyMatrix");
+  return va::RigidBodyMatrix(Body(base, view));
+}
+
+uint32_t WheelContact(uint8_t* base, uint32_t view, uint32_t wheel) {
+  ITC_NATIVE_RUNNING("sub_821268C8 OverlayView::WheelContact");
+  return va::VehicleWheelContact(guest::LoadU32(base, view + 4), wheel) + 16;
+}
+
+uint32_t WheelSurfaceMarks(uint8_t* base, uint32_t view, uint32_t wheel) {
+  ITC_NATIVE_RUNNING("sub_821269B0 OverlayView::WheelSurfaceMarks");
+  const uint32_t record = va::VehicleWheelContact(guest::LoadU32(base, view + 4), wheel);
+  // lha, then cmplwi: a negative surface compares as a large one.
+  const uint32_t surface = uint32_t(int32_t(int16_t(guest::LoadU16(base, record + 80))));
+  if (surface == 0) {
+    return 1;
+  }
+  return (surface <= 2 || surface == 8) ? 0 : 1;
+}
+
+float WheelSlip(uint8_t* base, uint32_t view, uint32_t wheel, double threshold) {
+  ITC_NATIVE_RUNNING("sub_82126A70 OverlayView::WheelSlip");
+  return va::VehicleWheelSlip(base, guest::LoadU32(base, view + 4), wheel, threshold);
+}
+
+uint32_t BodyPosition(uint8_t* base, uint32_t out, uint32_t view) {
+  ITC_NATIVE_RUNNING("sub_82126F80 OverlayView::BodyPosition");
+  const uint32_t from = va::RigidBodyPosition(Body(base, view));
+  uint32_t words[4];
+  for (uint32_t i = 0; i < 4; i++) {
+    words[i] = guest::LoadU32(base, from + 4 * i);
+  }
+  for (uint32_t i = 0; i < 4; i++) {
+    guest::StoreU32(base, out + 4 * i, words[i]);
+  }
+  return out;
+}
+
+uint32_t BodyMatrixCopy(uint8_t* base, uint32_t out, uint32_t view) {
+  ITC_NATIVE_RUNNING("sub_82126FF0 OverlayView::BodyMatrixCopy");
+  const uint32_t one = guest::LoadU32(base, kOne);
+  for (uint32_t row = 0; row < 4; row++) {
+    guest::StoreU32(base, out + 16 * row + 12, one);
+  }
+  // The original reads the matrix after those stores, into its stack, then
+  // writes it out.
+  const uint32_t from = va::RigidBodyMatrix(Body(base, view));
+  uint32_t words[16];
+  for (uint32_t i = 0; i < 16; i++) {
+    words[i] = guest::LoadU32(base, from + 4 * i);
+  }
+  for (uint32_t i = 0; i < 16; i++) {
+    guest::StoreU32(base, out + 4 * i, words[i]);
+  }
+  return out;
+}
+
+uint32_t IsBehindCamera(uint8_t* base, uint32_t overlays, uint32_t point) {
+  ITC_NATIVE_RUNNING("sub_82124630 CarOverlays::IsBehindCamera");
+  const uint32_t pass = guest::LoadU32(base, overlays + 800);
+  const uint32_t view = View(base, overlays, guest::LoadU32(base, overlays + 128));
+  const uint32_t matrix = BodyMatrix(base, view);
+  const uint32_t one = guest::LoadU32(base, kOne);
+  auto bits = [](float f) { return std::bit_cast<uint32_t>(f); };
+  const double px = guest::LoadFloat(base, point + 0);
+  const double py = guest::LoadFloat(base, point + 4);
+  const double pz = guest::LoadFloat(base, point + 8);
+  const simde__m128 from_eye =
+      VectorOf(bits(Difference(px, guest::LoadFloat(base, pass + 400))),
+               bits(Difference(py, guest::LoadFloat(base, pass + 404))),
+               bits(Difference(pz, guest::LoadFloat(base, pass + 408))), one);
+  const simde__m128 from_car =
+      VectorOf(bits(Difference(px, guest::LoadFloat(base, matrix + 48))),
+               bits(Difference(py, guest::LoadFloat(base, matrix + 52))),
+               bits(Difference(pz, guest::LoadFloat(base, matrix + 56))), one);
+  const uint32_t csr = Fpscr::getcsr();
+  Fpscr::setcsr(csr | uint32_t(Fpscr::FlushMask));
+  const simde__m128 dot = simde_mm_dp_ps(from_car, from_eye, 0xEF);
+  Fpscr::setcsr(csr);
+  return double(std::bit_cast<float>(WordOf(dot, 0))) < double(guest::LoadFloat(base, kZero)) ? 0
+                                                                                              : 1;
+}
+
+namespace {
+
+// A save flag: the halfword at player 0's save data + `offset` + 12 x id
+// (lhax, then cntlzw: any nonzero halfword, negative ones too, is 1).
+uint32_t SaveFlag(uint8_t* base, uint32_t id, uint32_t offset) {
+  if (id > 399) {
+    return 0;
+  }
+  const uint32_t save = va::SaveDataOf(base, 0);
+  return guest::LoadU16(base, save + offset + 12 * id) != 0 ? 1 : 0;
+}
+
+}  // namespace
+
+uint32_t SaveFlag199FA(uint8_t* base, uint32_t id) {
+  ITC_NATIVE_RUNNING("sub_82126BB0 SaveFlag199FA");
+  return SaveFlag(base, id, 0x199FA);
+}
+
+uint32_t SaveFlag199F8(uint8_t* base, uint32_t id) {
+  ITC_NATIVE_RUNNING("sub_82126C08 SaveFlag199F8");
+  return SaveFlag(base, id, 0x199F8);
+}
+
+uint32_t SaveFlag199FC(uint8_t* base, uint32_t id) {
+  ITC_NATIVE_RUNNING("sub_82126C58 SaveFlag199FC");
+  return SaveFlag(base, id, 0x199FC);
+}
+
+uint32_t SaveFlag199F8Or199FC(uint8_t* base, uint32_t id) {
+  ITC_NATIVE_RUNNING("sub_82126CB0 SaveFlag199F8Or199FC");
+  if (id > 399) {
+    return 0;
+  }
+  return (SaveFlag199F8(base, id) != 0 || SaveFlag199FC(base, id) != 0) ? 1 : 0;
+}
+
+uint32_t RacerInCurrentStage(uint8_t* base, uint32_t id) {
+  ITC_NATIVE_RUNNING("sub_82126B50 RacerInCurrentStage");
+  if (id > 399) {
+    return 0;
+  }
+  const uint32_t race = guest::LoadU32(base, kRaceData);
+  const int32_t index = va::RacersIndexOf(base, race + 48, id);
+  return va::StagesHasRacer(base, race + 0x59620, uint32_t(index), 0xFFFFFFFFu);
+}
+
+bool UpdateTrails(uint8_t* base, uint32_t overlays, uint32_t scratch) {
+  ITC_NATIVE_RUNNING("sub_82124EE0 CarOverlays::UpdateTrails");
+  constexpr uint32_t kContactOffset = 0x826C5D40;
+  constexpr uint32_t kTrailLift = 0x82616F40;
+  constexpr uint32_t kTrailWidthScale = 0x820021E8;
+  for (uint32_t wheel = 0; wheel < 4; wheel++) {
+    const int32_t capacity =
+        int32_t(guest::LoadU32(base, guest::LoadU32(base, overlays + 148 + 4 * wheel) + 104));
+    if (capacity == 0 || capacity == -1) {
+      return false;
+    }
+  }
+  const uint32_t table = guest::LoadU32(base, overlays + 144);
+  const uint32_t view = View(base, overlays, guest::LoadU32(base, overlays + 128));
+  if (va::DebugSwitchOff() != 0) {
+    return true;
+  }
+  const uint32_t zero = guest::LoadU32(base, kZero);
+  const uint32_t one = guest::LoadU32(base, kOne);
+  const double zero_value = std::bit_cast<float>(zero);
+  // The direction passed to Trail::AddPoint, (0, 1, 0, 0). The original
+  // puts it back to the same when its length is 0.0, which it never is.
+  const uint32_t direction[4] = {zero, one, zero, zero};
+  const int32_t mode = int32_t(guest::LoadU32(base, overlays + 784));
+  uint32_t value = (mode == 1 || mode == 2) ? 0 : 1;
+  const double width_scale = guest::LoadFloat(base, kTrailWidthScale);
+  for (uint32_t wheel = 0; wheel < 4; wheel++) {
+    const uint32_t trail = guest::LoadU32(base, overlays + 148 + 4 * wheel);
+    const uint32_t counter = overlays + 432 + 12 * wheel;
+    uint32_t due = 0;
+    const float axle = AxleValue3384(base, view, wheel);
+    if (WheelOnGround(base, view, wheel) != 0 && WheelSurfaceMarks(base, view, wheel) != 0 &&
+        double(WheelSlip(base, view, wheel, guest::LoadFloat(base, table + 152))) != zero_value) {
+      uint32_t count = guest::LoadU32(base, counter);
+      if (!(guest::LoadU32(base, table + 156) > count) &&
+          !(count > guest::LoadU32(base, table + 160))) {
+        due = 1;
+      }
+      const uint32_t most = guest::LoadU32(base, table + 160) << 1;
+      count = count + 1;
+      guest::StoreU32(base, counter, count > most ? most : count);
+    } else {
+      guest::StoreU32(base, counter, 0);
+    }
+
+    // The point: the contact position plus the offset, then the lift.
+    const uint32_t contact = WheelContact(base, view, wheel);
+    auto sum = [&](uint32_t k) {
+      return std::bit_cast<uint32_t>(float(double(guest::LoadFloat(base, contact + 4 * k)) +
+                                           double(guest::LoadFloat(base, kContactOffset + 4 * k))));
+    };
+    const simde__m128 at = VectorOf(sum(0), sum(1), sum(2), one);
+    const uint32_t csr = Fpscr::getcsr();
+    Fpscr::setcsr(csr | uint32_t(Fpscr::FlushMask));
+    const simde__m128 point = simde_mm_add_ps(at, LoadVector(base, kTrailLift));
+    Fpscr::setcsr(csr);
+    for (int k = 0; k < 4; k++) {
+      guest::StoreU32(base, scratch + 4 * k, WordOf(point, k));
+    }
+
+    if (due != 0) {
+      const uint32_t state = guest::LoadU32(base, counter + 8) != 0 ? 2 : 1;
+      if (wheel >= 2) {
+        value = 1;
+      }
+      const double speed = SpeedKmh(base, view);
+      const double width = float(double(axle) * width_scale);
+      uint32_t added = 0;
+      TrailAddPoint(base, trail, scratch, speed, width, direction, state, value, &added);
+      if (added == 0) {
+        due = 0;
+      }
+    }
+    guest::StoreU32(base, counter + 8, due);
+    TrailSetLastPosition(base, trail, scratch);
+  }
+  return true;
+}
+
+uint32_t NoSaveFlags(uint8_t* base, uint32_t id) {
+  ITC_NATIVE_RUNNING("sub_82127198 OverlayView::NoSaveFlags");
+  if (id > 399 || SaveFlag199FA(base, id) != 0) {
+    return 0;
+  }
+  return SaveFlag199F8Or199FC(base, id) == 0 ? 1 : 0;
+}
+
+uint32_t FlagsKind(uint8_t* base, uint32_t overlays, uint32_t id, int32_t a, int32_t b,
+                   int32_t c, int32_t d) {
+  ITC_NATIVE_RUNNING("sub_82122DB8 CarOverlays::FlagsKind");
+  View(base, overlays, guest::LoadU32(base, overlays + 128));
+  if (NoSaveFlags(base, id) != 0) {
+    return 0;
+  }
+  int32_t ids[4] = {a, b, c, d};
+  const int count = c == -1 ? 2 : d == -1 ? 3 : 4;
+  for (int i = 0; i < count; i++) {
+    if (SaveFlag199FA(base, uint32_t(ids[i])) == 0) {
+      return 1;
+    }
+  }
+  return 2;
+}
+
+uint32_t MarkerKind(uint8_t* base, uint32_t overlays, int32_t id, uint32_t fallback) {
+  ITC_NATIVE_RUNNING("sub_82122EA8 CarOverlays::MarkerKind");
+  int32_t first = 0, last = 0;
+  if (id == 67 || id == 68 || id == 374 || id == 375) {
+    first = id <= 68 ? 67 : 374;
+    return FlagsKind(base, overlays, uint32_t(id), first, first + 1, -1, -1);
+  }
+  if (id >= 107 && id <= 109) {
+    first = 107, last = 109;
+  } else if (id >= 111 && id <= 114) {
+    first = 111, last = 114;
+  } else if (id >= 248 && id <= 250) {
+    first = 248, last = 250;
+  } else if (id >= 304 && id <= 306) {
+    first = 304, last = 306;
+  } else if (id >= 383 && id <= 385) {
+    first = 383, last = 385;
+  } else if (id >= 393 && id <= 395) {
+    first = 393, last = 395;
+  } else {
+    return fallback;
+  }
+  View(base, overlays, guest::LoadU32(base, overlays + 128));
+  if (NoSaveFlags(base, uint32_t(id)) != 0) {
+    return 0;
+  }
+  for (int32_t flag = first; flag <= last; flag++) {
+    if (SaveFlag199FA(base, uint32_t(flag)) == 0) {
+      return 1;
+    }
+  }
+  return 2;
+}
+
+}  // namespace race_overlays
+
+namespace race_overlays {
+
+namespace {
+
+// The model point `index` in world space at frame + 80, as the effects'
+// updates place it: the body matrix copied to frame + 112, the point's
+// position to frame + 96, then copied to frame + 80 (ld and std), its x less
+// `shift` (fsubs) when given, and transformed by the matrix in place
+// (Vec4::Transform, with its override's checks around it).
+void WorldPoint(uint8_t* base, uint32_t view, int32_t index, uint32_t frame,
+                const double* shift) {
+  BodyMatrixCopy(base, frame + 112, view);
+  const uint32_t position = OverlayViewPointPosition(base, frame + 96, view, index);
+  CopyDoublewords(base, position, frame + 80);
+  if (shift) {
+    guest::StoreFloat(base, frame + 80,
+                      Difference(guest::LoadFloat(base, frame + 80), *shift));
+  }
+  debug::Vec4Transform(base, frame + 80, frame + 112, frame + 80);
+}
+
+}  // namespace
+
+float VehicleFloat2508(uint8_t* base, uint32_t view) {
+  ITC_NATIVE_RUNNING("sub_82126A90 OverlayView::VehicleFloat2508");
+  return guest::LoadFloat(base, guest::LoadU32(base, view + 4) + 2508);
+}
+
+void LightSpriteShow(uint8_t* base, uint32_t sprite, uint32_t position) {
+  ITC_NATIVE_RUNNING("sub_8211EAA0 LightSprite::Show");
+  const uint32_t at = sprite + 144;
+  const uint32_t table = guest::LoadU32(base, sprite + 140);
+  CopyVector(base, position, at + 48);
+  guest::StoreU32(base, at + 96, 1);
+  CopyFloat(base, table + 4, at + 100);
+  CopyFloat(base, table + 8, at + 104);
+  const uint32_t life = guest::LoadU32(base, table + 0);
+  guest::StoreU32(base, at + 112, 0);
+  guest::StoreU32(base, at + 108, life);
+  const int32_t r = int32_t(Rand(base));
+  const int32_t alpha = Fctiwz(guest::LoadFloat(base, at + 104));
+  guest::StoreU32(base, at + 116, uint32_t(r - (r / 4) * 4));
+  guest::StoreU32(base, at + 80, 255);
+  guest::StoreU32(base, at + 84, 255);
+  guest::StoreU32(base, at + 88, 255);
+  guest::StoreU32(base, at + 92, uint32_t(alpha));
+}
+
+void UpdateLightSprites(uint8_t* base, uint32_t overlays, uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_821251C0 CarOverlays::UpdateLightSprites");
+  const uint32_t view = View(base, overlays, guest::LoadU32(base, overlays + 128));
+  const uint32_t word = VehicleWord2252(base, view);
+  CopyFloat(base, kOne, frame + 92);
+  if (va::DebugSwitchOff() != 0) {
+    return;
+  }
+  const double shift = guest::LoadFloat(base, kAxleScale);
+  for (int32_t i = 0; i < 4; i++) {
+    const uint32_t sprite = guest::LoadU32(base, overlays + 200 + 4 * uint32_t(i));
+    if (OverlayViewHasPoint(base, view, 4 + i) == 0) {
+      continue;
+    }
+    WorldPoint(base, view, 4 + i, frame, &shift);
+    if (VehicleByte2504(base, view) != 0) {
+      VehicleFloat2508(base, view);  // left in f1, which LightSprite::Show doesn't read
+      LightSpriteShow(base, sprite, frame + 80);
+    }
+    LightSpriteSetPosition(base, sprite, frame + 80);
+  }
+  guest::StoreU32(base, overlays + 720, word);
+}
+
+bool UpdateParticlesB(uint8_t* base, uint32_t overlays, uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_821252D0 CarOverlays::UpdateParticlesB");
+  for (uint32_t i = 0; i < 4; i++) {
+    const int32_t capacity =
+        int32_t(guest::LoadU32(base, guest::LoadU32(base, overlays + 360 + 4 * i) + 104));
+    if (capacity == 0 || capacity == -1) {
+      return false;
+    }
+  }
+  const uint32_t view = View(base, overlays, guest::LoadU32(base, overlays + 128));
+  CopyFloat(base, kOne, frame + 92);
+  if (va::DebugSwitchOff() != 0) {
+    return true;
+  }
+  const double shift = guest::LoadFloat(base, kAxleScale);
+  for (int32_t i = 0; i < 4; i++) {
+    const uint32_t effect = guest::LoadU32(base, overlays + 360 + 4 * uint32_t(i));
+    if (OverlayViewHasPoint(base, view, 4 + i) == 0) {
+      continue;
+    }
+    WorldPoint(base, view, 4 + i, frame, &shift);
+    // The speed and +6252 go in f3 and f2, which ParticlesB::Emit doesn't
+    // read; +6256, the last read, is its f1.
+    SpeedKmh(base, view);
+    VehicleFloat6252(base, view);
+    const double factor = VehicleFloat6256(base, view);
+    uint32_t result = 0;
+    double sine = factor;
+    ParticlesBEmit(base, effect, frame + 80, factor, &result, &sine);
+    ParticlesBSetPosition(base, effect, frame + 80);
+  }
+  return true;
+}
+
+void UpdateParticlesC(uint8_t* base, uint32_t overlays, uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_82125798 CarOverlays::UpdateParticlesC");
+  const uint32_t view = View(base, overlays, guest::LoadU32(base, overlays + 128));
+  CopyFloat(base, kOne, frame + 92);
+  for (int32_t i = 0; i < 4; i++) {
+    const uint32_t effect = guest::LoadU32(base, overlays + 380 + 4 * uint32_t(i));
+    if (OverlayViewHasPoint(base, view, 14 + i) == 0) {
+      continue;
+    }
+    WorldPoint(base, view, 14 + i, frame, nullptr);
+    if (IsBehindCamera(base, overlays, frame + 80) == 0) {
+      ParticlesCEmit(base, effect, frame + 80);
+    }
+    const double speed = SpeedKmh(base, view);
+    ParticlesCSetPosition(base, effect, frame + 80, speed);
+  }
+}
+
+}  // namespace race_overlays
+
+namespace race_overlays {
+
+namespace {
+
+constexpr uint32_t kSmokeEmitters = 128;     // the emitters, 720 bytes each
+constexpr uint32_t kSmokeEmitterBytes = 720;
+constexpr uint32_t kSmokeFrameCopies = 0x10000;  // more emitters than this: the original runs
+
+// Whether Smoke::SetFrame's memcpy of each of the smoke's emitters (+144,
+// 64 bytes from `frame`) is the library's plain copy (CopyLikeMemcpy's
+// cases: below the physical views, not sharing memory with the frame).
+bool SmokeFrameCopiesPlain(uint8_t* base, uint32_t smoke, uint32_t frame) {
+  const uint32_t count = guest::LoadU32(base, smoke + 104);
+  if (count > kSmokeFrameCopies) {
+    return false;
+  }
+  for (uint32_t i = 0; i < count; i++) {
+    const uint32_t to = smoke + kSmokeEmitters + kSmokeEmitterBytes * i + 144;
+    if (to >= 0xA0000000u || c_runtime::MayShare(to, 64, frame, 64)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+// Whether CarOverlays::EmitSmoke would decline for the wheel (its smoke's
+// capacity 0 or -1, or its accumulator the capacity word).
+bool EmitSmokeDeclines(uint8_t* base, uint32_t overlays, uint32_t wheel) {
+  const uint32_t accumulator = overlays + (wheel + 11) * 48;
+  const uint32_t smoke = guest::LoadU32(base, overlays + ((wheel + 41) << 2));
+  const int32_t capacity = int32_t(guest::LoadU32(base, smoke + 104));
+  return capacity == 0 || capacity == -1 ||
+         (accumulator + 4 > smoke + 104 && accumulator < smoke + 108);
+}
+
+// The wheel's contact record's surface (the halfword +80, sign-extended).
+int32_t WheelSurface(uint8_t* base, uint32_t view, uint32_t wheel) {
+  const uint32_t record = va::VehicleWheelContact(guest::LoadU32(base, view + 4), wheel);
+  return int16_t(guest::LoadU16(base, record + 80));
+}
+
+// The rate draw UpdateSmoke makes three times: RandomRange(a x v, v), and
+// `a` itself unless it's below that draw, where a second draw from a x v
+// to v replaces it (the first draw is only compared). `a` is reloaded from
+// the table after the draw, as the original does.
+double SmokeDraw(uint8_t* base, uint32_t at, double v, bool value_first) {
+  const double a = guest::LoadFloat(base, at);
+  const double low = value_first ? double(float(v * a)) : double(float(a * v));
+  const double drawn = RandomRange(base, low, v, nullptr);
+  const double again = guest::LoadFloat(base, at);
+  if (again < drawn) {
+    return RandomRange(base, double(float(again * v)), v, nullptr);
+  }
+  return again;
+}
+
+// The size UpdateSmoke stores at the frame's +192: the translated code keeps
+// it as a double across branches, so a signaling NaN from the table comes
+// back quieted.
+void StoreSmokeSize(uint8_t* base, uint32_t at, double size) {
+  uint32_t word = std::bit_cast<uint32_t>(float(size));
+  if (std::isnan(float(size))) {
+    word |= 0x00400000;
+  }
+  guest::StoreU32(base, at, word);
+}
+
+// x clamped to `most` (NaNs as they are), times `scale`, and 0.0 (the
+// game's) below 0.0.
+double ClampedScaled(double x, double most, double scale, double zero) {
+  const double a = std::fabs(x);
+  const double scaled = float((a > most ? most : a) * scale);
+  if (scaled < zero) {
+    return zero;
+  }
+  return float((a > most ? most : a) * scale);
+}
+
+}  // namespace
+
+bool SmokeSetFrame(uint8_t* base, uint32_t smoke, uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_8212B1B0 Smoke::SetFrame");
+  if (!SmokeFrameCopiesPlain(base, smoke, frame)) {
+    return false;
+  }
+  for (uint32_t i = 0; i < guest::LoadU32(base, smoke + 104); i++) {
+    const uint32_t emitter = smoke + kSmokeEmitters + kSmokeEmitterBytes * i;
+    for (uint32_t k = 0; k < 4; k++) {
+      CopyFloat(base, frame + 64 + 4 * k, emitter + 208 + 4 * k);
+    }
+    c_runtime::Memcpy(base, emitter + 144, frame, 64);
+    CopyFloat(base, frame + 80, emitter + 224);
+  }
+  return true;
+}
+
+uint32_t WheelOnSurface8(uint8_t* base, uint32_t view, uint32_t wheel) {
+  ITC_NATIVE_RUNNING("sub_82126A00 OverlayView::WheelOnSurface8");
+  return WheelSurface(base, view, wheel) == 8 ? 1 : 0;
+}
+
+uint32_t WheelOnSurface1Or2(uint8_t* base, uint32_t view, uint32_t wheel) {
+  ITC_NATIVE_RUNNING("sub_82126A38 OverlayView::WheelOnSurface1Or2");
+  return uint32_t(WheelSurface(base, view, wheel) - 1) <= 1 ? 1 : 0;
+}
+
+bool UpdateSmoke(uint8_t* base, uint32_t overlays, uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_82125B60 CarOverlays::UpdateSmoke");
+  constexpr uint32_t kHalf = 0x82001BE4;
+  constexpr uint32_t kSpinScale = 0x8200805C;
+  constexpr uint32_t kSlipScale = 0x82008060;
+  constexpr uint32_t kSpinMost = 0x82002C38;
+  constexpr uint32_t kSlipMost = 0x820029D0;
+  constexpr uint32_t kContactOffset = 0x826C5D40;
+  for (uint32_t wheel = 0; wheel < 4; wheel++) {
+    const uint32_t smoke = guest::LoadU32(base, overlays + 164 + 4 * wheel);
+    if (EmitSmokeDeclines(base, overlays, wheel) ||
+        !SmokeFrameCopiesPlain(base, smoke, frame + 112)) {
+      return false;
+    }
+  }
+  const uint32_t table = guest::LoadU32(base, overlays + 144);
+  const uint32_t view = View(base, overlays, guest::LoadU32(base, overlays + 128));
+  const uint32_t one = guest::LoadU32(base, kOne);
+  const double scale_off =
+      va::DebugSwitchOff() != 0 ? double(guest::LoadFloat(base, table + 4))
+                                : double(guest::LoadFloat(base, kOne));
+  for (uint32_t at : {124u, 140u, 156u, 172u, 188u}) {
+    guest::StoreU32(base, frame + at, one);
+  }
+  const uint32_t zero_word = guest::LoadU32(base, kZero);
+  const double zero = std::bit_cast<float>(zero_word);
+
+  // The car's two axes: half the front contacts' difference (wheels 2 and
+  // 3) at +80 and the rear's (0 and 1) at +96, w 1.0; then each plus a
+  // contact (3 and 1), vaddfp with flush-to-zero on.
+  const double half = guest::LoadFloat(base, kHalf);
+  auto axis = [&](uint32_t to, uint32_t a_wheel, uint32_t b_wheel) {
+    const uint32_t b = WheelContact(base, view, b_wheel);
+    const uint32_t a = WheelContact(base, view, a_wheel);
+    float d[3];
+    for (uint32_t k = 0; k < 3; k++) {
+      d[k] = Difference(guest::LoadFloat(base, a + 4 * k), guest::LoadFloat(base, b + 4 * k));
+    }
+    guest::StoreU32(base, to + 12, one);
+    for (uint32_t k = 0; k < 3; k++) {
+      guest::StoreFloat(base, to + 4 * k, float(double(d[k]) * half));
+    }
+  };
+  axis(frame + 80, 2, 3);
+  axis(frame + 96, 0, 1);
+  const uint32_t csr = Fpscr::getcsr();
+  const uint32_t flushing = csr | uint32_t(Fpscr::FlushMask);
+  AddVectorTo(base, frame + 80, WheelContact(base, view, 3), csr, flushing);
+  AddVectorTo(base, frame + 96, WheelContact(base, view, 1), csr, flushing);
+  if (va::DebugSwitchOff() != 0) {
+    return true;
+  }
+
+  const int32_t mode = int32_t(guest::LoadU32(base, overlays + 784));
+  const uint32_t value = (mode == 1 || mode == 2) ? 0 : 1;
+  for (uint32_t at : {176u, 180u, 184u}) {
+    guest::StoreU32(base, frame + at, zero_word);
+  }
+  guest::StoreU32(base, frame + 188, one);
+  guest::StoreU32(base, frame + 192, one);
+  const double spin_scale = guest::LoadFloat(base, kSpinScale);
+  const double spin_most = guest::LoadFloat(base, kSpinMost);
+  const double slip_scale = guest::LoadFloat(base, kSlipScale);
+  const double slip_most = guest::LoadFloat(base, kSlipMost);
+  guest::StoreU32(base, frame + 220, one);
+  for (uint32_t row = 0; row < 4; row++) {
+    StoreIdentityRow(base, frame + 112 + 16 * row, row);
+  }
+
+  for (uint32_t wheel = 0; wheel < 4; wheel++) {
+    const uint32_t counter = overlays + 436 + 12 * wheel;
+    const double slip = ClampedScaled(
+        WheelSlip(base, view, wheel, guest::LoadFloat(base, table + 20)), slip_most, slip_scale,
+        zero);
+    double rate = ClampedScaled(WheelSpin(base, view, wheel), spin_most, spin_scale, zero);
+    if (!(slip < rate)) {
+      rate = slip;
+    }
+    const uint32_t smoke = guest::LoadU32(base, overlays + 164 + 4 * wheel);
+    const float axle = AxleValue3764(base, view, wheel);
+    const uint32_t contact = WheelContact(base, view, wheel);
+    for (uint32_t k = 0; k < 3; k++) {
+      guest::StoreFloat(base, frame + 208 + 4 * k,
+                        float(double(guest::LoadFloat(base, contact + 4 * k)) +
+                              double(guest::LoadFloat(base, kContactOffset + 4 * k))));
+    }
+    const uint64_t first = LoadU64(base, frame + 208);
+    const uint64_t second = LoadU64(base, frame + 216);
+    StoreU64(base, frame + 176, first);
+    StoreU64(base, frame + 184, second);
+    const double lift = WheelValue512(base, view, wheel);
+    const double y = guest::LoadFloat(base, frame + 180);
+    guest::StoreFloat(base, frame + 196, axle);
+    guest::StoreFloat(base, frame + 180, float(lift + y));
+    SmokeSetFrame(base, smoke, frame + 112);
+    SmokeSetRegion(base, smoke, frame + 80, frame + 96, guest::LoadU32(base, overlays + 784));
+
+    double last = 0.0;
+    if (WheelOnGround(base, view, wheel) != 0) {
+      double size = zero;
+      if (WheelSurfaceMarks(base, view, wheel) != 0) {
+        const double base_rate = float(double(guest::LoadFloat(base, table + 12)) * slip);
+        size = SmokeDraw(base, table + 16, slip, false);
+        if (slip != zero) {
+          const double speed = SpeedKmh(base, view);
+          const double emit = float(double(guest::LoadFloat(base, table + 8)) + base_rate);
+          EmitSmoke(base, overlays, emit, speed, frame + 112, wheel, value, &last);
+        }
+      } else if (WheelOnSurface8(base, view, wheel) != 0) {
+        const double emit =
+            float(double(float(double(guest::LoadFloat(base, table + 24)) * rate)) * scale_off);
+        size = SmokeDraw(base, table + 44, rate, false);
+        const double speed = SpeedKmh(base, view);
+        EmitSmoke(base, overlays, emit, speed, frame + 112, wheel, value, &last);
+        const int32_t count = int32_t(guest::LoadU32(base, counter));
+        if (count < 25) {
+          guest::StoreU32(base, counter, uint32_t(count + 1));
+        }
+      } else if (WheelOnSurface1Or2(base, view, wheel) != 0) {
+        const double emit =
+            float(double(float(double(guest::LoadFloat(base, table + 68)) * rate)) * scale_off);
+        size = SmokeDraw(base, table + 80, rate, true);
+        const double speed = SpeedKmh(base, view);
+        EmitSmoke(base, overlays, emit, speed, frame + 112, wheel, value, &last);
+      }
+      StoreSmokeSize(base, frame + 192, size);
+    }
+
+    if (int32_t(guest::LoadU32(base, counter)) > 0 &&
+        (WheelSurfaceMarks(base, view, wheel) != 0 || WheelOnGround(base, view, wheel) == 0)) {
+      const double size = SmokeDraw(base, table + 44, rate, false);
+      const double emit =
+          float(double(float(double(guest::LoadFloat(base, table + 28)) * rate)) * scale_off);
+      const double speed = SpeedKmh(base, view);
+      EmitSmoke(base, overlays, emit, speed, frame + 112, wheel, value, &last);
+      const uint32_t count = guest::LoadU32(base, counter);
+      StoreSmokeSize(base, frame + 192, size);
+      // The count less EmitSmoke's r3 (0) and 1, 0 when that's negative.
+      const uint32_t next = count - 1;
+      guest::StoreU32(base, counter, int32_t(next) < 0 ? 0 : next);
+    }
+    SmokeSetVelocity(base, smoke, frame + 176);
+  }
+  return true;
+}
+
+}  // namespace race_overlays
+
+namespace race_overlays {
+
+bool ModelMatrix(uint8_t* base, uint32_t out, uint32_t view) {
+  ITC_NATIVE_RUNNING("sub_821270E8 OverlayView::ModelMatrix");
+  const uint32_t from = guest::LoadU32(base, view + 8) + 4288 + 16;
+  if (out >= 0xA0000000u || c_runtime::MayShare(out, 64, from, 64)) {
+    return false;
+  }
+  const uint32_t one = guest::LoadU32(base, kOne);
+  for (uint32_t row = 0; row < 4; row++) {
+    guest::StoreU32(base, out + 16 * row + 12, one);
+  }
+  c_runtime::Memcpy(base, out, from, 64);
+  return true;
 }
 
 }  // namespace race_overlays

@@ -90,6 +90,22 @@ Rows not yet moved stay in the table below. So far:
   movies (`UiMovie::`): loading and unloading movies and the table of
   them by id, node lookups and setters, the animation queue and the
   looping animations, the movies' texts and the text list's draw (B7).
+- [`vehicle-accessors.md`](vehicle-accessors.md): the small accessors on
+  the vehicles, their wheels, rigid bodies, collision objects and
+  contacts, the scene's object pools, the race data's stages and racer
+  records and the players' save data, with the vector library they use
+  (B7; the physics itself isn't in it).
+- [`matrix-math.md`](matrix-math.md): the matrix, vector and quaternion
+  math: the 4x4 matrix copy, multiply, inverse and turns and a vector
+  transformed by a matrix (`8209B000`-`820AC000`), and the matrix and
+  quaternion half of the physics' vector library (`82293598`-`82293F10`)
+  (B7).
+- [`car-physics.md`](car-physics.md): the cars' physics: the car data
+  derived at load, the vehicle's physics set-up, the physics step
+  (ground, suspension, steering, tires, engine, gearbox, drivetrain,
+  brakes, aerodynamics), the rigid body's integration, and the
+  collision world's objects, pairs, update and surface settings (B7;
+  the narrow phase and shapes aren't in it).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
@@ -140,11 +156,9 @@ old performance notes to the end of `../native-renderer.md`.
 | `sub_8210B018` | `ActionMappers::Update` | Wrapped | Updates every action mapper (`sub_8210C370` each: held, pressed, fired words and the repeat objects). Skipped on render-only passes (`--input_mappers_by_tick`, on by default), so menu input repeats count ticks; see `docs/pause-menu-fix.md`. |
 | `sub_8215B4F8` | `Race::DrawStep` | Wrapped | The race's draw step (Draw message). Its running marks the pass as in a race. |
 | `sub_820A3978` | `CameraPass::Update` | Wrapped | Rebuilds a camera pass's view (+0x10) from its eye, target and up vector (+0x190, +0x1A0, +0x1B0), and its view-projection (+0x90 = view * projection at +0x50). Called several times per Draw for pass 0. Wrapped for `--log_camera_pass_records`. |
-| `sub_8209BD50` | `Matrix::Multiply` | Wrapped | out (r3) = a (r4) * b (r5), 4x4. Interpolation notes every multiply into a camera (see "Interpolation" in `../frame-interpolation.md`). |
 | `sub_825953D0` | `Recorder::RecordObject` | Wrapped | The bulk per-object recorder, ~150 calls per pass in a race: records command 7 with vertex constants 0-8: world (r5) * camera view-projection (r4) in c0-c3, the world matrix in c4-c7 (for some objects a projective matrix instead), and the camera's world position in c8. The camera is often a stack copy, not a camera pass. |
 | `sub_825951E0` | | | Multiplies a world matrix and camera into a stack temporary; not recorded (likely a visibility test). |
 | `sub_8258FD48` | `Command::SetShaderConstants` | Wrapped | Render thread, command 7: r3 = payload, r4 = register count, r5 = stage << 24 \| type << 16 \| start << 8 \| count. Interpolation substitutes blended values here. |
-| `sub_820C0150` | `Vehicle::GetDistancePerFrame` | | Speed (m/s) times a hard-coded 1/30 s. |
 | `sub_8210EDB0` | | | Wind sound; scales with speed. |
 | `sub_82152CD8` | | | Camera shake; scales with speed. |
 | `sub_8213F530` | | | Parent of the speed trail object (switches mode at about 88 km/h). Calls `sub_8213F2E0`, `sub_8213F140` and `sub_8213F4B0`. |
@@ -210,8 +224,6 @@ old performance notes to the end of `../native-renderer.md`.
 | `sub_820E45A8` | `Dash::PoseDials` | Overridden | Same file. r3 = the dash, r4 = the car, r5 = the camera passes. Seven needle slots k = 0-6, each drawn if `[[dash] + 8 + 12k]` and its model (`[dash + 1700]`, `1940`, `2660`, `2900`, `3620`, `3860`, `4100`) are set: stores `[dash + 5296 + 4k]` into the model + 48, angle `sub_820D3688([dash + 5328 + 4k], [[dash] + 12 + 12k], car)`, world `(B * RotZ(angle)) * A * car + 16` with A at dash + 32 + 240k and B 64 bytes on, drawn with `sub_820D06F0` (dash + 2176, 2416, 3136, 3376, 4336, 4576, 4816). In mode 5 (`[dash + 4]`) slot 1 is the turbo gauge: `[dash + 5324]` into the model, angle from car + 704: above 0, `[0x820062E0]` times it, capped at `[0x820062E0]` above 1; below the double at `0x820062D8`, `[0x820062D0]`; else value * `[0x820062CC]` * `[0x820062D0]`. |
 | `sub_820D3688` | `Dial::Angle` | Native | `DialAngle` in `src/hooks/cockpit_dials.cpp`, called by the native `sub_820E45A8` (its only caller; the translated one runs only with `--native_cockpit_dials=false` or for `--check_native_cockpit_dials`). r3 = range, r4 = gauge (0-3: car + 704, 712, 716, 720), r5 = the car; returns f1, no state. `[0x82000A34]` with no range. Else from = range + 0, to = + 4, angles + 8, + 12: below from the first angle, above to the second, between `(v - from) / (to - from) * (a1 - a0)` (without `+ a0`, the game's own), all times `[0x82002948]`. |
 | `sub_820D3740` | `Dial::TachometerAngles` | Native | `TachAngles` in `src/hooks/cockpit_dials.cpp`, called by the native `sub_820E42E8` (its only caller; the translated one runs only with `--native_cockpit_dials=false` or for `--check_native_cockpit_dials`). r3 = table, r4 = the car, r5 = [dash], r6 = &a, r7 = &b; no state. `a` from car + 696: `[0x82000A34]` below it; up to from (table + 0, or + 8 when `[[dash]]` isn't 0) value / from * table[16]; up to to (+ 4 or + 12) linear to table[20]; above, table[20]. `b` from car + 700: table[28] below table[24], linear over table[24..36] then table[32..44], clamped at table[44]. |
-| `sub_820A2D30` | `Matrix::RotateZ` | | r3 = out, r4 = in, r5 = &angle: out = in * RotZ, rows `(c, s, 0, 0)`, `(-s, c, 0, 0)`, sine and cosine from a polynomial. |
-| `sub_820A0AC0` | `Matrix::Copy` | Wrapped | r3 = destination, r4 = source, 4x4. Interpolation follows copies of cameras and products. |
 | `sub_82597610` | `Projector::Build` | Wrapped | r3 = out, r4 = eye, r5 = target, r6 = up (16-byte vectors), f1-f4 = field of view, aspect, near, far: out = look-at (`sub_82597378`) * perspective (`sub_825972A8`) * a fixed bias matrix at `0x8265EED0` (two `sub_8209BD50` multiplies). Called by the render orchestrator `sub_820C5DE8` (return `0x820C6A2C`) for the player's headlight once a view, and by `sub_820F34C8` (return `0x820F3944`) in a loop of up to 5. See "The headlight beam far from the origin" in `../frame-interpolation.md`. |
 | `sub_821363F0` | `View::UploadPreviousViewProjection` | | r3 = the view (kept in r29). Records vertex c100 x4, the motion blur's previous view-projection: a `Matrix::Copy` (return `8213653C`) from view+8080 (this tick's view-projection) when view+48 is set (passes that ran the game logic) and view+44 is 0, otherwise from view+8144 (the previous tick's). The view moves the pair on right after the logic pass, so it's the same matrix all tick. Header slot allocated at `821364D0` (the owner `--debug_zero_owners` and `--log_slot_callers` name). See "Motion blur reads the 30 Hz tick" in `docs/native-renderer.md`. |
 | `sub_82598768` | `TextureProjection::Fit` | Wrapped | Builds the c14 x4 texture projection, fitted to a camera object's view; called three times by `sub_820C5DE8` (returns `820C7174`, `820C7558`, `820C7950`; the third's result copied to c14 at `820C79F8`). Its multiply at `82599644` (stack temporary sp+352 = sp+352 * sp+208) reads back as a camera, w 1 with the eye at the origin, and was the group of cameras refused far from the origin; overwritten at `825996FC`, never drawn. See "The headlight beam far from the origin" in `../frame-interpolation.md`. |
@@ -435,14 +447,11 @@ old performance notes to the end of `../native-renderer.md`.
 | `sub_8209F7A8` | | Wrapped | The race draw step's parts and the per-car update's callees, wrapped only to name which one advances per-frame state (`--find_per_frame_state`) and to skip one (`--debug_hide`) (`ITC_FRAME_STATE_WRAP`, `src/debug/frame_state_diff.cpp`). |
 | `sub_820A0958` | | Wrapped | The race draw step's parts and the per-car update's callees, wrapped only to name which one advances per-frame state (`--find_per_frame_state`) and to skip one (`--debug_hide`) (`ITC_FRAME_STATE_WRAP`, `src/debug/frame_state_diff.cpp`). |
 | `sub_820AA1A8` | | Wrapped | The race draw step's parts and the per-car update's callees, wrapped only to name which one advances per-frame state (`--find_per_frame_state`) and to skip one (`--debug_hide`) (`ITC_FRAME_STATE_WRAP`, `src/debug/frame_state_diff.cpp`). |
-| `sub_820AB560` | | Wrapped | The race draw step's parts and the per-car update's callees, wrapped only to name which one advances per-frame state (`--find_per_frame_state`) and to skip one (`--debug_hide`) (`ITC_FRAME_STATE_WRAP`, `src/debug/frame_state_diff.cpp`). |
 | `sub_820C4EB8` | | Wrapped | The race draw step's parts and the per-car update's callees, wrapped only to name which one advances per-frame state (`--find_per_frame_state`) and to skip one (`--debug_hide`) (`ITC_FRAME_STATE_WRAP`, `src/debug/frame_state_diff.cpp`). |
 | `sub_820C4FB8` | | Wrapped | The race draw step's parts and the per-car update's callees, wrapped only to name which one advances per-frame state (`--find_per_frame_state`) and to skip one (`--debug_hide`) (`ITC_FRAME_STATE_WRAP`, `src/debug/frame_state_diff.cpp`). |
 | `sub_820DAA38` | | Wrapped | The race draw step's parts and the per-car update's callees, wrapped only to name which one advances per-frame state (`--find_per_frame_state`) and to skip one (`--debug_hide`) (`ITC_FRAME_STATE_WRAP`, `src/debug/frame_state_diff.cpp`). |
 | `sub_820DAAC8` | | Wrapped | The race draw step's parts and the per-car update's callees, wrapped only to name which one advances per-frame state (`--find_per_frame_state`) and to skip one (`--debug_hide`) (`ITC_FRAME_STATE_WRAP`, `src/debug/frame_state_diff.cpp`). |
 | `sub_820DAB10` | | Wrapped | The race draw step's parts and the per-car update's callees, wrapped only to name which one advances per-frame state (`--find_per_frame_state`) and to skip one (`--debug_hide`) (`ITC_FRAME_STATE_WRAP`, `src/debug/frame_state_diff.cpp`). |
-| `sub_820FFD88` | | Wrapped | The race draw step's parts and the per-car update's callees, wrapped only to name which one advances per-frame state (`--find_per_frame_state`) and to skip one (`--debug_hide`) (`ITC_FRAME_STATE_WRAP`, `src/debug/frame_state_diff.cpp`). |
-| `sub_82593FC0` | | Wrapped | The race draw step's parts and the per-car update's callees, wrapped only to name which one advances per-frame state (`--find_per_frame_state`) and to skip one (`--debug_hide`) (`ITC_FRAME_STATE_WRAP`, `src/debug/frame_state_diff.cpp`). |
 | `sub_82597118` | | Wrapped | The race draw step's parts and the per-car update's callees, wrapped only to name which one advances per-frame state (`--find_per_frame_state`) and to skip one (`--debug_hide`) (`ITC_FRAME_STATE_WRAP`, `src/debug/frame_state_diff.cpp`). |
 | `sub_82597518` | | Wrapped | The race draw step's parts and the per-car update's callees, wrapped only to name which one advances per-frame state (`--find_per_frame_state`) and to skip one (`--debug_hide`) (`ITC_FRAME_STATE_WRAP`, `src/debug/frame_state_diff.cpp`). |
 | `sub_82597610` | | Wrapped | The race draw step's parts and the per-car update's callees, wrapped only to name which one advances per-frame state (`--find_per_frame_state`) and to skip one (`--debug_hide`) (`ITC_FRAME_STATE_WRAP`, `src/debug/frame_state_diff.cpp`). |

@@ -31,12 +31,12 @@ memory.
   after each change), and listed in the progress file for one review by
   the user before the merge. This relaxes the "show rows and ask first"
   rule for the loop's branch, nowhere else.
-- **Per session:** 5 subsystems or 20 passes, whichever comes first
-  (raised from 3 and 10 by the user, 2026-10-22). Then
-  the loop ends itself; the user runs `/clear` and starts it again
-  (nothing is lost: it picks up from the progress file).
-- **In all:** 5 subsystems a run, then the loop stops for the user's
-  review.
+- **Limit:** 3 subsystems a run, then the loop stops for the user's
+  review. A run is one loop, from its start until it stops (the user's
+  call, 2026-10-22; before, a session ended itself after a few
+  subsystems or passes, and a run went on across sessions). Each loop
+  started is a new run: its first pass starts the progress file afresh
+  and makes its summary.
 
 ## The cycle
 
@@ -82,8 +82,7 @@ memory.
 
 ## The run's summary
 
-Each run (from a start until the stop for the user's review, across
-`/clear`s) gets a short summary file, `docs/loops/b7-loop-<date>-<time>.md`
+Each run (one loop, from its start until it stops) gets a short summary file, `docs/loops/b7-loop-<date>-<time>.md`
 (the run's start, like `b7-loop-2026-10-22-0111.md`), made by the run's
 first pass and named under "Now" in the progress file. Not wordy: a title,
 the branch and the commit the run started from, a table of the subsystems
@@ -289,8 +288,14 @@ callers reach it, and that the fallback flag now switches only them),
 `check_function_statuses.py` run (it refuses Native with an override
 left), and the usual build and `attract_race.sh 25 --run_harnesses=all`.
 
-It stops when nothing ready is left in the subsystem, after about five
-groups (the lead starts another), or at a failure. Report, in its last
+It works in batches (a group, or small related groups together, each
+built, raced and committed before the next), one after another in its
+own context. It stops when nothing ready is left in the subsystem, after
+about five batches (the lead starts another), or at a failure. A massive
+migration (a batch too big for one context, such as a group over the
+1,500-line cap) may be split: the agent hands its parts to subagents one
+at a time, each finishing (committed, or reported failed) before the next
+starts, and reports for all of them. Report, in its last
 message:
 
 ```
@@ -369,7 +374,7 @@ file, when:
 - an agent left work uncommitted, or a commit doesn't build;
 - a report's `stop:` isn't `none`;
 - a map fails its check, or `leads.md` has nothing the loop can take;
-- the session's or the total limit is reached;
+- the run's limit is reached;
 - the tree has changes the loop didn't make, or isn't on the run's branch.
 
 Whatever the reason, before ending, the lead also brings the run's
@@ -381,6 +386,11 @@ step 9 of the cycle): the "B7 in progress" line near the top of
 commits them with the "Stopped" entry. The user reviews and merges.
 
 ## Rules that still hold
+
+Nothing runs in parallel (the user's rule, 2026-10-22): the lead runs
+one agent at a time, and an agent that splits its work (a mapping agent's
+reading, a massive migration) hands it to subagents one at a time, never
+several at once. Agents say in their report if they used subagents.
 
 CLAUDE.md's rules, in short: never edit `generated/`; plain C++ behind
 adapters; the SDK's headers used, not reimplemented; the game's use
@@ -395,11 +405,12 @@ the user's desktop; find problems with logs, not guesses.
 
 `docs/loops/b7-progress.md`, for the current run. Kept short, so a pass
 can read it whole. A run's first pass finds the previous run's file
-stopped: it starts it afresh (the old one is in its run's summary file and
-in git):
+stopped: it starts it afresh, first copying the old one's rows to
+review, expected differences, drive list and totals into that run's
+summary file under "Left for the user" (the rest is in git):
 
-- **Now:** the subsystem, the step, the agent running, this session's
-  pass and subsystem counts.
+- **Now:** the subsystem, the step, the agent running, the run's
+  subsystem count.
 - **Done:** one line a subsystem (file, groups made native, flags,
   commits), newest first.
 - **Rows to review:** the function files added or changed, for the user.

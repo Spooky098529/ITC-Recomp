@@ -25,6 +25,9 @@
 #include <vector>
 
 ITC_FLAG_DECLARE(bool, native_race_overlays);
+ITC_FLAG_DECLARE(bool, native_vehicle_accessors);
+ITC_FLAG_DECLARE(bool, native_vector_library);
+ITC_FLAG_DECLARE(bool, native_matrix_math);
 
 namespace harness {
 
@@ -381,6 +384,81 @@ void NativeEmitSmoke(PPCContext& ctx, uint8_t* base) {
   ctx.f1.f64 = last;
 }
 
+// The view's body and wheels (through the vehicle accessors' plain C++).
+ITC_NATIVE_WORD(NativeBodyMatrix, ro::BodyMatrix(base, ctx.r3.u32))
+ITC_NATIVE_WORD(NativeWheelContact, ro::WheelContact(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_WORD(NativeWheelSurfaceMarks, ro::WheelSurfaceMarks(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_WORD(NativeBodyPosition, ro::BodyPosition(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_WORD(NativeBodyMatrixCopy, ro::BodyMatrixCopy(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_WORD(NativeSaveFlag199FA, ro::SaveFlag199FA(base, ctx.r4.u32))
+ITC_NATIVE_WORD(NativeSaveFlag199F8, ro::SaveFlag199F8(base, ctx.r4.u32))
+ITC_NATIVE_WORD(NativeSaveFlag199FC, ro::SaveFlag199FC(base, ctx.r4.u32))
+ITC_NATIVE_WORD(NativeSaveFlag199F8Or199FC, ro::SaveFlag199F8Or199FC(base, ctx.r4.u32))
+ITC_NATIVE_WORD(NativeRacerInCurrentStage, ro::RacerInCurrentStage(base, ctx.r4.u32))
+ITC_NATIVE_WORD(NativeNoSaveFlags, ro::NoSaveFlags(base, ctx.r4.u32))
+ITC_NATIVE_WORD(NativeFlagsKind, ro::FlagsKind(base, ctx.r3.u32, ctx.r5.u32, ctx.r6.s32,
+                                               ctx.r7.s32, ctx.r8.s32, ctx.r9.s32))
+ITC_NATIVE_WORD(NativeMarkerKind,
+                ro::MarkerKind(base, ctx.r3.u32, ctx.r4.s32, ctx.r5.u32))
+// As the adapter: the point in the original's stack slot, and the original
+// where the native version declines.
+void NativeUpdateTrails(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  if (!ro::UpdateTrails(base, ctx.r3.u32, ctx.r1.u32 - 336 + 112)) {
+    __imp__sub_82124EE0(ctx, base);
+  }
+}
+void NativeIsBehindCamera(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = ro::IsBehindCamera(base, ctx.r3.u32, ctx.r4.u32);
+}
+// As the adapter: r3 comes back as the view's vehicle (not compared: with
+// the accessors off, the original leaves it a stack address).
+void NativeWheelSlip(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const uint32_t view = ctx.r3.u32;
+  ctx.r3.u64 = guest::LoadU32(base, view + 4);
+  ctx.f1.f64 = double(ro::WheelSlip(base, view, ctx.r4.u32, ctx.f1.f64));
+}
+
+// As the adapters: the points in the originals' stack frames, and the
+// original where UpdateParticlesB declines.
+void NativeUpdateLightSprites(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ro::UpdateLightSprites(base, ctx.r3.u32, ctx.r1.u32 - 256);
+}
+void NativeUpdateParticlesB(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  if (!ro::UpdateParticlesB(base, ctx.r3.u32, ctx.r1.u32 - 256)) {
+    __imp__sub_821252D0(ctx, base);
+  }
+}
+void NativeUpdateParticlesC(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ro::UpdateParticlesC(base, ctx.r3.u32, ctx.r1.u32 - 240);
+}
+
+// As the adapter: the frame in the original's stack frame, and the original
+// where UpdateSmoke declines; Smoke::SetFrame's original where it declines.
+void NativeUpdateSmoke(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  if (!ro::UpdateSmoke(base, ctx.r3.u32, ctx.r1.u32 - 400)) {
+    __imp__sub_82125B60(ctx, base);
+  }
+}
+void NativeSmokeSetFrame(PPCContext& ctx, uint8_t* base) {
+  if (!ro::SmokeSetFrame(base, ctx.r3.u32, ctx.r4.u32)) {
+    __imp__sub_8212B1B0(ctx, base);
+  }
+}
+
+void NativeModelMatrix(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  if (!ro::ModelMatrix(base, ctx.r3.u32, ctx.r4.u32)) {
+    __imp__sub_821270E8(ctx, base);
+  }
+}
+
 // Runs the recompiled version with --native_race_overlays off, so the
 // functions it calls that are ours run the originals too.
 void RunRecompiled(GuestFunction recompiled, PPCContext& t, uint8_t* base) {
@@ -388,6 +466,23 @@ void RunRecompiled(GuestFunction recompiled, PPCContext& t, uint8_t* base) {
   ITC_FLAG(native_race_overlays) = false;
   recompiled(t, base);
   ITC_FLAG(native_race_overlays) = native;
+}
+
+// The originals of functions that call the vehicle accessors, run with
+// those (and the vector library and the matrix math) off too, so the whole
+// chain is the recompiled code's.
+template <GuestFunction recompiled>
+void Original(PPCContext& ctx, uint8_t* base) {
+  const bool accessors = ITC_FLAG(native_vehicle_accessors);
+  const bool vectors = ITC_FLAG(native_vector_library);
+  const bool matrices = ITC_FLAG(native_matrix_math);
+  ITC_FLAG(native_vehicle_accessors) = false;
+  ITC_FLAG(native_vector_library) = false;
+  ITC_FLAG(native_matrix_math) = false;
+  recompiled(ctx, base);
+  ITC_FLAG(native_vehicle_accessors) = accessors;
+  ITC_FLAG(native_vector_library) = vectors;
+  ITC_FLAG(native_matrix_math) = matrices;
 }
 
 // The odd float words mixed into fields: NaNs of both kinds and signs,
@@ -414,7 +509,8 @@ using Regions = std::vector<std::pair<uint32_t, uint32_t>>;
 // bytes, r3 and f1 are compared.
 template <typename Setup, typename Args>
 void Compare(Context& h, Results& results, const Regions& regions, Setup setup, Args args,
-             GuestFunction recompiled, GuestFunction native, const std::string& what) {
+             GuestFunction recompiled, GuestFunction native, const std::string& what,
+             bool compare_r3 = true, bool compare_f1 = true) {
   std::vector<uint8_t> result[2];
   for (int v = 0; v < 2; v++) {
     setup();
@@ -429,10 +525,10 @@ void Compare(Context& h, Results& results, const Regions& regions, Setup setup, 
       const std::vector<uint8_t> part = Read(h.base, at, bytes);
       result[v].insert(result[v].end(), part.begin(), part.end());
     }
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; compare_r3 && i < 4; i++) {
       result[v].push_back(uint8_t(t.r3.u32 >> (24 - 8 * i)));
     }
-    for (int i = 0; i < 8; i++) {
+    for (int i = 0; compare_f1 && i < 8; i++) {
       result[v].push_back(uint8_t(t.f1.u64 >> (56 - 8 * i)));
     }
   }
@@ -2360,6 +2456,754 @@ void SlotOfCases(Context& h) {
   }
   results.Report();
 }
+
+// The view's body and wheels: a view, its vehicle, the vehicle's body
+// (+336) and wheels' data (+2160 + 4 x wheel) in the block. The originals
+// run with the vehicle accessors off too (Original).
+constexpr uint32_t kBodyView = 0x60000, kBodyVehicle = 0x61000, kBodyBody = 0x64000,
+                   kBodyWheels = 0x64800, kBodyOut = 0x65000;
+
+// Plain numbers (multiples of 1/16 from -64 to 64), or random words with odd
+// floats among them.
+uint32_t NumberOrWord(Random& r, bool odd) {
+  if (odd) {
+    return RandomWord(r);
+  }
+  return std::bit_cast<uint32_t>(float(int32_t(r.Below(2049)) - 1024) / 16.0f);
+}
+
+// The view, its vehicle, body and wheels' data, from `seed`: numbers, or
+// random words with odd floats among them.
+auto ViewBodySetup(Context& h, uint32_t block, uint64_t seed, bool odd) {
+  return [&h, block, seed, odd] {
+    const uint32_t view = block + kBodyView;
+    const uint32_t vehicle = block + kBodyVehicle;
+    const uint32_t body = block + kBodyBody;
+    Random fill;
+    for (uint64_t n = 0; n < seed % 97; n++) {
+      fill.Next();
+    }
+    for (uint32_t i = 0; i < 0x2000; i += 4) {
+      guest::StoreU32(h.base, vehicle + i, NumberOrWord(fill, odd));
+    }
+    for (uint32_t i = 0; i < 0x500; i += 4) {
+      guest::StoreU32(h.base, body + i, NumberOrWord(fill, odd));
+    }
+    for (uint32_t i = 0; i < 5 * 64; i += 4) {
+      guest::StoreU32(h.base, block + kBodyWheels + i, NumberOrWord(fill, odd));
+    }
+    FillRandom(h.base, fill, block + kBodyOut, 64);
+    guest::StoreU32(h.base, view + 4, vehicle);
+    guest::StoreU32(h.base, vehicle + 336, body);
+    for (uint32_t wheel = 0; wheel < 5; wheel++) {
+      guest::StoreU32(h.base, vehicle + 2160 + 4 * wheel, block + kBodyWheels + 64 * wheel);
+      guest::StoreU8(h.base, vehicle + 433 + 368 * wheel, fill.Below(4) == 0 ? 0 : 1);
+    }
+  };
+}
+
+void ViewBodyCases(Context& h, uint32_t block) {
+  Random& r = h.random;
+  const uint32_t view = block + kBodyView;
+  const uint32_t vehicle = block + kBodyVehicle;
+  const uint32_t body = block + kBodyBody;
+  auto setup = [&h, block](uint64_t seed, bool odd) {
+    return ViewBodySetup(h, block, seed, odd);
+  };
+
+  {
+    Results results("OverlayView::BodyMatrix (sub_821268B0)");
+    for (uint64_t seed = 0; seed < 10; seed++) {
+      Compare(h, results, {}, setup(seed, seed % 2),
+              [&](PPCContext& t) { t.r3.u64 = view; }, Original<__imp__sub_821268B0>,
+              NativeBodyMatrix, fmt::format("seed {}", seed));
+    }
+    results.Report();
+  }
+  {
+    Results results("OverlayView::WheelContact (sub_821268C8)");
+    for (uint32_t wheel = 0; wheel < 6; wheel++) {
+      for (uint64_t seed = 0; seed < 4; seed++) {
+        Compare(h, results, {}, setup(seed, false),
+                [&](PPCContext& t) {
+                  t.r3.u64 = view;
+                  t.r4.u64 = wheel;
+                },
+                Original<__imp__sub_821268C8>, NativeWheelContact,
+                fmt::format("wheel {} seed {}", wheel, seed));
+      }
+    }
+    results.Report();
+  }
+  {
+    // Each surface from -2 to 12, the halfword's edges and random ones.
+    Results results("OverlayView::WheelSurfaceMarks (sub_821269B0)");
+    std::vector<uint16_t> surfaces = {0x7FFF, 0x8000, 0xFFFF, 0x0100, 0x0108};
+    for (int32_t s = -2; s <= 12; s++) {
+      surfaces.push_back(uint16_t(s));
+    }
+    for (int i = 0; i < 20; i++) {
+      surfaces.push_back(uint16_t(r.Next()));
+    }
+    for (uint32_t wheel = 0; wheel < 6; wheel++) {
+      for (uint16_t surface : surfaces) {
+        Compare(h, results, {},
+                [&, wheel, surface] {
+                  setup(wheel, true)();
+                  guest::StoreU16(h.base, vehicle + 5328 + 96 * wheel + 80, surface);
+                },
+                [&](PPCContext& t) {
+                  t.r3.u64 = view;
+                  t.r4.u64 = wheel;
+                },
+                Original<__imp__sub_821269B0>, NativeWheelSurfaceMarks,
+                fmt::format("wheel {} surface {:04X}", wheel, surface));
+      }
+    }
+    results.Report();
+  }
+  {
+    // As Vehicle::WheelSlip's cases: with NaNs among the inputs, its NaNs
+    // differ in sign and payload between builds of the same operations
+    // (vehicle-accessors.md), so those cases are kept apart.
+    Results results("OverlayView::WheelSlip (sub_82126A70)");
+    Results nan_results("OverlayView::WheelSlip (sub_82126A70), NaN inputs (expected to differ)");
+    for (uint64_t seed = 0; seed < 60; seed++) {
+      const bool odd = seed % 4 == 3;
+      for (uint32_t wheel = 0; wheel < 5; wheel++) {
+        const double f1 = seed % 2 ? double(std::bit_cast<float>(NumberOrWord(r, false)))
+                                   : double(float(r.Below(100)) / 100.0f);
+        Compare(h, odd ? nan_results : results, {}, setup(seed, odd),
+                [&](PPCContext& t) {
+                  t.r3.u64 = view;
+                  t.r4.u64 = wheel;
+                  t.f1.f64 = f1;
+                },
+                Original<__imp__sub_82126A70>, NativeWheelSlip,
+                fmt::format("seed {} wheel {} f1 {:016X}", seed, wheel,
+                            std::bit_cast<uint64_t>(f1)),
+                false);
+      }
+    }
+    results.Report();
+    nan_results.Report();
+  }
+  {
+    // Out apart from the body, or over its position or matrix.
+    const struct {
+      const char* name;
+      GuestFunction recompiled, native;
+      uint32_t bytes, field;
+    } copies[] = {
+        {"OverlayView::BodyPosition (sub_82126F80)", Original<__imp__sub_82126F80>,
+         NativeBodyPosition, 16, 208},
+        {"OverlayView::BodyMatrixCopy (sub_82126FF0)", Original<__imp__sub_82126FF0>,
+         NativeBodyMatrixCopy, 64, 288},
+    };
+    for (const auto& f : copies) {
+      Results results(f.name);
+      for (uint64_t seed = 0; seed < 30; seed++) {
+        const uint32_t kind = seed % 5;
+        const uint32_t out = kind == 3   ? body + f.field
+                             : kind == 4 ? body + f.field + 4
+                                         : block + kBodyOut;
+        Compare(h, results, {{block + kBodyOut, 64}, {body, 0x500}}, setup(seed, seed % 2),
+                [&](PPCContext& t) {
+                  t.r3.u64 = out;
+                  t.r4.u64 = view;
+                },
+                f.recompiled, f.native, fmt::format("seed {} out {:X}", seed, out));
+      }
+      results.Report();
+    }
+  }
+}
+
+// CarOverlays::IsBehindCamera: the car overlays, a camera pass and a point
+// in the block, the view (ViewBodyCases' set-up) in a random slot; numbers
+// (some making the dot product 0.0, some tiny, to meet flush-to-zero) or
+// random words.
+void IsBehindCameraCases(Context& h, uint32_t block) {
+  Random& r = h.random;
+  const uint32_t overlays = block + 0x66000, pass = block + 0x67000, point = block + 0x68000;
+  Results results("CarOverlays::IsBehindCamera (sub_82124630)");
+  for (uint64_t seed = 0; seed < 400; seed++) {
+    const uint32_t kind = seed % 5;
+    const uint32_t slot = r.Below(25);
+    uint32_t words[9];
+    for (uint32_t& w : words) {
+      w = kind == 4 ? RandomWord(r) : NumberOrWord(r, false);
+    }
+    if (kind == 1) {  // the point on the eye or on the car
+      for (uint32_t k = 0; k < 3; k++) {
+        words[3 + 3 * r.Below(2) + k] = words[k];
+      }
+    } else if (kind == 2) {  // differences of tiny numbers
+      for (uint32_t& w : words) {
+        w = (w & 0x807FFFFF) | (r.Below(3) << 23);
+      }
+    }
+    Compare(h, results, {{point, 16}},
+            [&h, overlays, pass, point, slot, seed, words, block] {
+              ViewBodySetup(h, block, seed, false)();
+              Random fill;
+              FillRandom(h.base, fill, overlays, 0x400);
+              guest::StoreU32(h.base, overlays + 800, pass);
+              guest::StoreU32(h.base, overlays + 128, slot);
+              guest::StoreU32(h.base, overlays + 4 * (slot + 1), block + kBodyView);
+              for (uint32_t k = 0; k < 3; k++) {
+                guest::StoreU32(h.base, point + 4 * k, words[k]);
+                guest::StoreU32(h.base, pass + 400 + 4 * k, words[3 + k]);
+                guest::StoreU32(h.base, block + kBodyBody + 288 + 48 + 4 * k, words[6 + k]);
+              }
+            },
+            [&](PPCContext& t) {
+              t.r3.u64 = overlays;
+              t.r4.u64 = point;
+            },
+            Original<__imp__sub_82124630>, NativeIsBehindCamera,
+            fmt::format("seed {} kind {} slot {}", seed, kind, slot));
+  }
+  results.Report();
+}
+
+// The racers' save flags and stages. Player 0's save data pointer
+// (0x826C5B58) and the race data's (0x826C5B2C) point into the block for the
+// cases and are put back; ids 0 to 401, the 32-bit edges and random ones.
+// The flags' halfwords: zeros, small numbers, negative ones and random; the
+// game's own save data too (read only).
+void SaveFlagCases(Context& h, uint32_t block) {
+  Random& r = h.random;
+  constexpr uint32_t kSaveData = 0x826C5B58;
+  const uint32_t live_save = guest::LoadU32(h.base, kSaveData);
+  const uint32_t live_race = guest::LoadU32(h.base, kRaceData);
+  // The flags (ids 0-399 from block + 0x10000) and the race data.
+  const uint32_t save = block + 0x10000 - 0x199F8;
+  const uint32_t race = block + 0x4000 - 48;
+  std::vector<uint32_t> ids = {400, 401, 0x7FFFFFFF, 0x80000000, 0xFFFFFFFF};
+  for (uint32_t id = 0; id < 400; id += 1 + r.Below(3)) {
+    ids.push_back(id);
+  }
+  ids.push_back(399);
+  for (int i = 0; i < 20; i++) {
+    ids.push_back(uint32_t(r.Next()));
+  }
+  auto save_setup = [&h, save](uint64_t seed, bool live, uint32_t live_save) {
+    return [&h, save, seed, live, live_save] {
+      if (live) {
+        guest::StoreU32(h.base, kSaveData, live_save);
+        return;
+      }
+      Random fill;
+      for (uint64_t n = 0; n < seed % 31; n++) {
+        fill.Next();
+      }
+      for (uint32_t i = 0; i < 12 * 400 + 8; i += 2) {
+        const uint32_t kind = fill.Below(6);
+        const uint16_t value = kind < 3   ? 0
+                               : kind == 3 ? uint16_t(1 + fill.Below(3))
+                               : kind == 4 ? uint16_t(0x8000 | fill.Below(0x8000))
+                                           : uint16_t(fill.Next());
+        guest::StoreU16(h.base, save + 0x199F8 + i, value);
+      }
+      guest::StoreU32(h.base, kSaveData, save);
+    };
+  };
+  {
+    const struct {
+      const char* name;
+      GuestFunction recompiled, native;
+    } flags[] = {
+        {"SaveFlag199FA (sub_82126BB0)", Original<__imp__sub_82126BB0>, NativeSaveFlag199FA},
+        {"SaveFlag199F8 (sub_82126C08)", Original<__imp__sub_82126C08>, NativeSaveFlag199F8},
+        {"SaveFlag199FC (sub_82126C58)", Original<__imp__sub_82126C58>, NativeSaveFlag199FC},
+        {"SaveFlag199F8Or199FC (sub_82126CB0)", Original<__imp__sub_82126CB0>,
+         NativeSaveFlag199F8Or199FC},
+    };
+    for (const auto& f : flags) {
+      Results results(f.name);
+      for (uint64_t seed = 0; seed < 4; seed++) {
+        for (uint32_t id : ids) {
+          const uint64_t upper = r.Next() << 32;
+          const uint64_t r3 = r.Next();
+          Compare(h, results, {}, save_setup(seed, seed == 3, live_save),
+                  [&](PPCContext& t) {
+                    t.r3.u64 = r3;
+                    t.r4.u64 = upper | id;
+                  },
+                  f.recompiled, f.native,
+                  fmt::format("seed {}{} id {:X}", seed, seed == 3 ? " (live)" : "", id));
+        }
+      }
+      guest::StoreU32(h.base, kSaveData, live_save);
+      results.Report();
+    }
+  }
+  // The marker's kind and its helpers: the car overlays with a view in a
+  // random slot (read, not used); flag ids from the ranges MarkerKind
+  // passes, and random ones for FlagsKind's c and d.
+  {
+    const uint32_t overlays = block + 0x66000;
+    auto kind_setup = [&h, save, overlays, block](uint64_t seed, bool live,
+                                                   uint32_t live_save, uint32_t slot) {
+      return [&h, save, overlays, block, seed, live, live_save, slot] {
+        Random fill;
+        FillRandom(h.base, fill, overlays, 0x200);
+        guest::StoreU32(h.base, overlays + 128, slot);
+        guest::StoreU32(h.base, overlays + 4 * (slot + 1), block + kBodyView);
+        if (live) {
+          guest::StoreU32(h.base, kSaveData, live_save);
+          return;
+        }
+        for (uint64_t n = 0; n < seed % 31; n++) {
+          fill.Next();
+        }
+        // Mostly set, so that whole ranges are.
+        for (uint32_t i = 0; i < 12 * 400 + 8; i += 2) {
+          guest::StoreU16(h.base, save + 0x199F8 + i,
+                          fill.Below(5) == 0 ? 0 : uint16_t(1 + fill.Below(0xFFFF)));
+        }
+        guest::StoreU32(h.base, kSaveData, save);
+      };
+    };
+    std::vector<int32_t> kind_ids;
+    for (int32_t id = 60; id <= 400; id++) {
+      kind_ids.push_back(id);
+    }
+    for (int32_t id : {-1, 0, 1, 0x7FFFFFFF, int32_t(0x80000000)}) {
+      kind_ids.push_back(id);
+    }
+    Results marker("CarOverlays::MarkerKind (sub_82122EA8)");
+    Results no_flags("OverlayView::NoSaveFlags (sub_82127198)");
+    for (uint64_t seed = 0; seed < 4; seed++) {
+      for (int32_t id : kind_ids) {
+        const uint32_t slot = r.Below(25);
+        const uint64_t fallback = r.Next();
+        const uint64_t r3 = r.Next();
+        const auto setup = kind_setup(seed, seed == 3, live_save, slot);
+        const std::string what =
+            fmt::format("seed {}{} id {}", seed, seed == 3 ? " (live)" : "", id);
+        Compare(h, marker, {},
+                setup,
+                [&](PPCContext& t) {
+                  t.r3.u64 = overlays;
+                  t.r4.u64 = uint64_t(int64_t(id));
+                  t.r5.u64 = fallback;
+                },
+                Original<__imp__sub_82122EA8>, NativeMarkerKind, what);
+        Compare(h, no_flags, {}, setup,
+                [&](PPCContext& t) {
+                  t.r3.u64 = r3;
+                  t.r4.u64 = uint32_t(id);
+                },
+                Original<__imp__sub_82127198>, NativeNoSaveFlags, what);
+      }
+    }
+    guest::StoreU32(h.base, kSaveData, live_save);
+    marker.Report();
+    no_flags.Report();
+
+    Results kinds("CarOverlays::FlagsKind (sub_82122DB8)");
+    for (uint64_t seed = 0; seed < 4; seed++) {
+      for (int i = 0; i < 150; i++) {
+        const uint32_t slot = r.Below(25);
+        auto flag_id = [&] {
+          const uint32_t kind = r.Below(8);
+          return kind == 0 ? -1 : kind == 1 ? int32_t(r.Next()) : int32_t(r.Below(402));
+        };
+        const int32_t a = flag_id(), b = flag_id(), c = r.Below(3) == 0 ? -1 : flag_id(),
+                      d = r.Below(2) == 0 ? -1 : flag_id();
+        const uint32_t id = r.Below(8) == 0 ? uint32_t(r.Next()) : r.Below(402);
+        Compare(h, kinds, {}, kind_setup(seed, seed == 3, live_save, slot),
+                [&](PPCContext& t) {
+                  t.r3.u64 = overlays;
+                  t.r5.u64 = id;
+                  t.r6.u64 = uint64_t(int64_t(a));
+                  t.r7.u64 = uint64_t(int64_t(b));
+                  t.r8.u64 = uint64_t(int64_t(c));
+                  t.r9.u64 = uint64_t(int64_t(d));
+                },
+                Original<__imp__sub_82122DB8>, NativeFlagsKind,
+                fmt::format("seed {} id {} a {} b {} c {} d {}", seed, id, a, b, c, d));
+      }
+    }
+    guest::StoreU32(h.base, kSaveData, live_save);
+    kinds.Report();
+  }
+  {
+    // Racer ids in the records' +3912 from a small range (so some match,
+    // some twice), the current stage 0-7, its slots from the same range of
+    // indices or -1.
+    Results results("RacerInCurrentStage (sub_82126B50)");
+    for (uint64_t seed = 0; seed < 6; seed++) {
+      for (uint32_t id : ids) {
+        const uint64_t r3 = r.Next();
+        Compare(h, results, {},
+                [&h, race, seed] {
+                  Random fill;
+                  for (uint64_t n = 0; n < seed % 17; n++) {
+                    fill.Next();
+                  }
+                  for (uint32_t i = 0; i < 93; i++) {
+                    guest::StoreU32(h.base, race + 48 + 3912 + 3936 * i,
+                                    fill.Below(3) == 0 ? uint32_t(fill.Next()) : fill.Below(420));
+                  }
+                  const uint32_t stages = race + 0x59620;
+                  const uint32_t current = fill.Below(8);
+                  guest::StoreU32(h.base, stages + 804, current);
+                  for (uint32_t i = 0; i < 4; i++) {
+                    const uint32_t kind = fill.Below(5);
+                    guest::StoreU32(h.base, stages + 80 * current + 44 + 8 * i,
+                                    kind == 0 ? 0xFFFFFFFF : fill.Below(95));
+                  }
+                  guest::StoreU32(h.base, kRaceData, race);
+                },
+                [&](PPCContext& t) {
+                  t.r3.u64 = r3;
+                  t.r4.u64 = id;
+                },
+                Original<__imp__sub_82126B50>, NativeRacerInCurrentStage,
+                fmt::format("seed {} id {:X}", seed, id));
+      }
+    }
+    guest::StoreU32(h.base, kRaceData, live_race);
+    results.Report();
+  }
+}
+
+// CarOverlays::UpdateTrails: the car overlays (0x400 bytes) with its view
+// (ViewBodySetup's) in a random slot, the parameter table, and four trails
+// with small capacities (their points within 0x600 bytes, the last position
+// at +64,144), 0 or -1 now and then (the native version declines there).
+// The vehicle's surfaces small, the thresholds and counters around the
+// table's. r3 and f1 aren't compared (callers read neither; the original
+// leaves the last callee's). NaN inputs (random words) apart, as
+// Trail::AddPoint's.
+void UpdateTrailsCases(Context& h, uint32_t block) {
+  Random& r = h.random;
+  const uint32_t overlays = block + 0x66000, table = block + 0x69000, trails = block + 0x40000,
+                 trail_table = block + 0x6A000;
+  Results results("CarOverlays::UpdateTrails (sub_82124EE0)");
+  Results nan_results("CarOverlays::UpdateTrails, NaN inputs (expected to differ)");
+  Regions regions = {{overlays, 0x400}, {table, 0x100}};
+  for (uint32_t i = 0; i < 4; i++) {
+    regions.push_back({trails + 0x600 * i, 0x600});
+    regions.push_back({trails + 0x600 * i + 64000, 160});
+  }
+  for (uint64_t seed = 0; seed < 300; seed++) {
+    const bool odd = seed % 5 == 4;
+    const uint32_t slot = r.Below(25);
+    const uint64_t fill_seed = r.Next();
+    Compare(h, odd ? nan_results : results, regions,
+            [&h, block, overlays, table, trails, trail_table, slot, seed, odd, fill_seed] {
+              ViewBodySetup(h, block, seed, odd)();
+              Random fill;
+              for (uint64_t n = 0; n < fill_seed % 101; n++) {
+                fill.Next();
+              }
+              const uint32_t vehicle = block + kBodyVehicle;
+              for (uint32_t wheel = 0; wheel < 4; wheel++) {
+                const uint32_t kind = fill.Below(4);
+                guest::StoreU16(h.base, vehicle + 5328 + 96 * wheel + 80,
+                                kind == 0 ? uint16_t(fill.Next()) : uint16_t(fill.Below(10)));
+              }
+              FillRandom(h.base, fill, overlays, 0x400);
+              guest::StoreU32(h.base, overlays + 128, slot);
+              guest::StoreU32(h.base, overlays + 4 * (slot + 1), block + kBodyView);
+              guest::StoreU32(h.base, overlays + 144, table);
+              guest::StoreU32(h.base, overlays + 784, fill.Below(4));
+              FillRandom(h.base, fill, table, 0x100);
+              guest::StoreFloat(h.base, table + 152, float(fill.Below(40)) / 4.0f);
+              const uint32_t least = fill.Below(4);
+              const uint32_t most = fill.Below(6) == 0 ? uint32_t(fill.Next()) : least + fill.Below(8);
+              guest::StoreU32(h.base, table + 156, least);
+              guest::StoreU32(h.base, table + 160, most);
+              FillRandom(h.base, fill, trail_table, 16);
+              for (uint32_t wheel = 0; wheel < 4; wheel++) {
+                const uint32_t trail = trails + 0x600 * wheel;
+                guest::StoreU32(h.base, overlays + 148 + 4 * wheel, trail);
+                const uint32_t kind = fill.Below(8);
+                guest::StoreU32(h.base, overlays + 432 + 12 * wheel,
+                                kind == 0 ? uint32_t(fill.Next()) : fill.Below(2 * most + 3));
+                guest::StoreU32(h.base, overlays + 440 + 12 * wheel,
+                                kind == 1 ? uint32_t(fill.Next()) : fill.Below(2));
+                const uint32_t capacity = fill.Below(40) == 0 ? (fill.Below(2) ? 0 : 0xFFFFFFFF)
+                                                              : 1 + fill.Below(8);
+                const uint32_t points = capacity == 0 || capacity == 0xFFFFFFFF ? 1 : capacity;
+                FillRandom(h.base, fill, trail, 0x600);
+                FillRandom(h.base, fill, trail + 64000, 160);
+                guest::StoreU32(h.base, trail + 104, capacity);
+                guest::StoreU32(h.base, trail + 112, trail_table);
+                guest::StoreU32(h.base, trail + 64132, fill.Below(points));
+                guest::StoreU32(h.base, trail + 64136, fill.Below(points + 1));
+                for (uint32_t k = 0; k < 4; k++) {
+                  guest::StoreU32(h.base, trail + 64144 + 4 * k, NumberOrWord(fill, odd));
+                }
+              }
+            },
+            [&](PPCContext& t) { t.r3.u64 = overlays; }, Original<__imp__sub_82124EE0>,
+            NativeUpdateTrails, fmt::format("seed {} slot {}", seed, slot), false, false);
+  }
+  results.Report();
+  nan_results.Report();
+}
+
+// The effects' updates: the view of the body cases (its vehicle and body)
+// with the model of the point cases (+8), the car overlays with four light
+// sprites, four of particle effect B and four of C (their tables, capacities
+// as in the game, small, and sometimes 0 or -1, where UpdateParticlesB's
+// original runs), the camera pass (+800, for IsBehindCamera), rand's seed
+// and the original's stack frame, all from `seed`; numbers, or random words
+// with odd floats among them.
+constexpr uint32_t kFxSprites = 0x40000, kFxSpriteTable = 0x40800, kFxEffectsB = 0x41000,
+                   kFxEffectsC = 0x44000, kFxTableB = 0x47000, kFxTableC = 0x47100,
+                   kFxOverlays = 0x66000, kFxPass = 0x67000;
+
+auto EffectsSetup(Context& h, uint32_t block, uint64_t seed, bool odd, uint32_t slot) {
+  return [&h, block, seed, odd, slot] {
+    constexpr uint32_t kSeed = 0x82638188;
+    ViewBodySetup(h, block, seed, odd)();
+    ModelPointSetup(h, block, seed);
+    Random fill;
+    for (uint64_t n = 0; n < seed % 89; n++) {
+      fill.Next();
+    }
+    const uint32_t view = block + kBodyView;
+    const uint32_t vehicle = block + kBodyVehicle;
+    const uint32_t overlays = block + kFxOverlays;
+    const uint32_t pass = block + kFxPass;
+    guest::StoreU32(h.base, view + 8, block + kPointModel);
+    guest::StoreU8(h.base, vehicle + 2504, fill.Below(3) == 0 ? uint8_t(1 + fill.Below(255)) : 0);
+    FillRandom(h.base, fill, overlays, 0x400);
+    guest::StoreU32(h.base, overlays + 128, slot);
+    guest::StoreU32(h.base, overlays + 4 * (slot + 1), view);
+    guest::StoreU32(h.base, overlays + 800, pass);
+    FillRandom(h.base, fill, pass, 0x200);
+    for (uint32_t k = 0; k < 4; k++) {
+      guest::StoreU32(h.base, pass + 400 + 4 * k, NumberOrWord(fill, odd));
+    }
+    // A table: life, then two floats (size and alpha, or random words).
+    auto table = [&](uint32_t at) {
+      FillRandom(h.base, fill, at, 0x40);
+      if (!odd || fill.Below(2)) {
+        guest::StoreU32(h.base, at, fill.Below(100));
+        guest::StoreFloat(h.base, at + 4, float(fill.Below(1000)) / 100.0f);
+        guest::StoreFloat(h.base, at + 8, float(fill.Below(256)));
+      }
+    };
+    table(block + kFxSpriteTable);
+    table(block + kFxTableB);
+    table(block + kFxTableC);
+    FillRandom(h.base, fill, block + kFxSprites, 0x800);
+    FillRandom(h.base, fill, block + kFxEffectsB, 0x3000);
+    FillRandom(h.base, fill, block + kFxEffectsC, 0x2C00);
+    for (uint32_t i = 0; i < 4; i++) {
+      const uint32_t sprite = block + kFxSprites + 0x200 * i;
+      guest::StoreU32(h.base, overlays + 200 + 4 * i, sprite);
+      guest::StoreU32(h.base, sprite + 140, block + kFxSpriteTable);
+      guest::StoreU32(h.base, sprite + 240, fill.Below(2));
+
+      const uint32_t b = block + kFxEffectsB + 0xC00 * i;
+      guest::StoreU32(h.base, overlays + 360 + 4 * i, b);
+      const int32_t b_capacity = fill.Below(40) == 0 ? (fill.Below(2) ? 0 : -1)
+                                 : fill.Below(3) == 0 ? int32_t(1 + fill.Below(6))
+                                                      : 15;
+      guest::StoreU32(h.base, b + 104, uint32_t(b_capacity));
+      guest::StoreU32(h.base, b + 112, block + kFxTableB);
+      guest::StoreU32(h.base, b + 2772, fill.Below(b_capacity > 0 ? uint32_t(b_capacity) : 15));
+      guest::StoreU32(h.base, b + 2776, fill.Below(18));
+
+      const uint32_t c = block + kFxEffectsC + 0xB00 * i;
+      guest::StoreU32(h.base, overlays + 380 + 4 * i, c);
+      const uint32_t c_capacity = fill.Below(10) == 0 ? 0
+                                  : fill.Below(3) == 0 ? 1 + fill.Below(6)
+                                                       : 20;
+      guest::StoreU32(h.base, c + 2700, c_capacity);
+      guest::StoreU32(h.base, c + 108, block + kFxTableC);
+      guest::StoreU32(h.base, c + 2692, fill.Below(c_capacity ? c_capacity : 20));
+      guest::StoreU32(h.base, c + 2696, fill.Below(24));
+    }
+    guest::StoreU32(h.base, kSeed, uint32_t(fill.Next()));
+    FillRandom(h.base, fill, h.data - 1024 - 256, 256);
+  };
+}
+
+void EffectUpdateCases(Context& h, uint32_t block) {
+  constexpr uint32_t kSeed = 0x82638188;
+  Random& r = h.random;
+  const uint32_t live = guest::LoadU32(h.base, kSeed);
+  const uint32_t overlays = block + kFxOverlays;
+  struct Update {
+    const char* name;
+    GuestFunction original;
+    GuestFunction native;
+    uint32_t frame;  // below the stack pointer
+  };
+  const Update updates[] = {
+      {"CarOverlays::UpdateLightSprites (sub_821251C0)", Original<__imp__sub_821251C0>,
+       NativeUpdateLightSprites, 256},
+      {"CarOverlays::UpdateParticlesB (sub_821252D0)", Original<__imp__sub_821252D0>,
+       NativeUpdateParticlesB, 256},
+      {"CarOverlays::UpdateParticlesC (sub_82125798)", Original<__imp__sub_82125798>,
+       NativeUpdateParticlesC, 240},
+  };
+  for (const Update& update : updates) {
+    Results results(update.name);
+    const Regions regions = {{overlays, 0x400},
+                             {block + kFxSprites, 0x800},
+                             {block + kFxEffectsB, 0x3000},
+                             {block + kFxEffectsC, 0x2C00},
+                             {kSeed, 4},
+                             {h.data - 1024 - update.frame + 80, 96}};
+    for (uint64_t seed = 0; seed < 300; seed++) {
+      const bool odd = seed % 5 == 4;
+      const uint32_t slot = r.Below(25);
+      Compare(h, results, regions, EffectsSetup(h, block, seed, odd, slot),
+              [&](PPCContext& t) { t.r3.u64 = overlays; }, update.original, update.native,
+              fmt::format("seed {} slot {}", seed, slot), false, false);
+    }
+    results.Report();
+  }
+  guest::StoreU32(h.base, kSeed, live);
+}
+
+// The tire smoke's update: the view of the body cases, the car overlays
+// with a parameter table, two smokes (each wheel's one of them, small
+// capacities as a rule, sometimes 0, where the original runs), the
+// wheels' counters and accumulators, the contacts' surfaces (0 to 9, so the
+// smoking, 8 and 1-2 surfaces all come up, or random), rand's seed and the
+// original's stack frame, from `seed`.
+constexpr uint32_t kSmokeA = 0x40000, kSmokeB = 0x48000, kSmokeParams = 0x50000,
+                   kSmokeSmokeTable = 0x50100, kSmokeBytes = 32640;
+
+auto UpdateSmokeSetup(Context& h, uint32_t block, uint64_t seed, bool odd, uint32_t slot) {
+  return [&h, block, seed, odd, slot] {
+    constexpr uint32_t kSeed = 0x82638188;
+    ViewBodySetup(h, block, seed, odd)();
+    Random fill;
+    for (uint64_t n = 0; n < seed % 83; n++) {
+      fill.Next();
+    }
+    const uint32_t view = block + kBodyView;
+    const uint32_t vehicle = block + kBodyVehicle;
+    const uint32_t overlays = block + kFxOverlays;
+    for (uint32_t wheel = 0; wheel < 4; wheel++) {
+      guest::StoreU16(h.base, vehicle + 5328 + 96 * wheel + 80,
+                      fill.Below(5) == 0 ? uint16_t(fill.Next()) : uint16_t(fill.Below(10)));
+    }
+    FillRandom(h.base, fill, overlays, 0x400);
+    guest::StoreU32(h.base, overlays + 128, slot);
+    guest::StoreU32(h.base, overlays + 4 * (slot + 1), view);
+    guest::StoreU32(h.base, overlays + 144, block + kSmokeParams);
+    guest::StoreU32(h.base, overlays + 784, fill.Below(4));
+    FillRandom(h.base, fill, block + kSmokeParams, 0x200);
+    if (!odd || fill.Below(2)) {
+      for (uint32_t at = 4; at <= 80; at += 4) {
+        guest::StoreFloat(h.base, block + kSmokeParams + at, float(fill.Below(400)) / 100.0f);
+      }
+      const uint32_t t = block + kSmokeSmokeTable;
+      guest::StoreU32(h.base, t, fill.Below(100));
+      guest::StoreFloat(h.base, t + 4, float(fill.Below(1000)) / 100.0f);
+      guest::StoreFloat(h.base, t + 8, float(fill.Below(256)));
+    }
+    for (uint32_t wheel = 0; wheel < 4; wheel++) {
+      const uint32_t kind = fill.Below(6);
+      guest::StoreU32(h.base, overlays + 436 + 12 * wheel,
+                      kind == 0 ? uint32_t(fill.Next()) : fill.Below(28));
+      guest::StoreFloat(h.base, overlays + 528 + 48 * wheel, float(fill.Below(100)) / 100.0f);
+      guest::StoreU32(h.base, overlays + 164 + 4 * wheel,
+                      block + (fill.Below(2) ? kSmokeA : kSmokeB));
+    }
+    for (uint32_t smoke : {block + kSmokeA, block + kSmokeB}) {
+      FillRandom(h.base, fill, smoke, kSmokeBytes);
+      // Not -1: Smoke::SetFrame's original would copy into 2^32 - 1 emitters.
+      const int32_t capacity = fill.Below(30) == 0 ? 0 : int32_t(1 + fill.Below(8));
+      const uint32_t heads = capacity > 0 ? uint32_t(capacity) : 8;
+      guest::StoreU32(h.base, smoke + 104, uint32_t(capacity));
+      guest::StoreU32(h.base, smoke + 112, block + kSmokeSmokeTable);
+      guest::StoreU32(h.base, smoke + 32528, fill.Below(heads));
+      guest::StoreU32(h.base, smoke + 32532, fill.Below(heads));
+      guest::StoreU32(h.base, smoke + 32536, fill.Below(heads + 2));
+      for (uint32_t k = 0; k < heads; k++) {
+        guest::StoreU32(h.base, smoke + 128 + 720 * k + 108, 40 + fill.Below(6));
+      }
+    }
+    guest::StoreU32(h.base, kSeed, uint32_t(fill.Next()));
+    FillRandom(h.base, fill, h.data - 1024 - 400, 400);
+  };
+}
+
+void UpdateSmokeCases(Context& h, uint32_t block) {
+  constexpr uint32_t kSeed = 0x82638188;
+  Random& r = h.random;
+  const uint32_t live = guest::LoadU32(h.base, kSeed);
+  const uint32_t overlays = block + kFxOverlays;
+  {
+    // Smoke::SetFrame: capacities 0 to 45, the frame apart or over an
+    // emitter's matrix (the original runs there).
+    Results results("Smoke::SetFrame (sub_8212B1B0)");
+    for (uint64_t seed = 0; seed < 200; seed++) {
+      const uint32_t capacity = seed % 10 == 0 ? 45 : r.Below(9);
+      const uint32_t frame = r.Below(8) == 0 ? block + kSmokeA + 128 + 720 * r.Below(3) + 4 * r.Below(60)
+                                             : block + kSmokeParams + 4 * r.Below(16);
+      const uint64_t fill_seed = r.Next();
+      Compare(h, results, {{block + kSmokeA, kSmokeBytes}, {block + kSmokeParams, 0x200}},
+              [&h, block, capacity, fill_seed] {
+                Random fill;
+                for (uint64_t n = 0; n < fill_seed % 31; n++) {
+                  fill.Next();
+                }
+                FillRandom(h.base, fill, block + kSmokeA, kSmokeBytes);
+                FillRandom(h.base, fill, block + kSmokeParams, 0x200);
+                guest::StoreU32(h.base, block + kSmokeA + 104, capacity);
+              },
+              [&](PPCContext& t) {
+                t.r3.u64 = block + kSmokeA;
+                t.r4.u64 = frame;
+              },
+              __imp__sub_8212B1B0, NativeSmokeSetFrame,
+              fmt::format("seed {} capacity {} frame {:X}", seed, capacity, frame), false, false);
+    }
+    results.Report();
+  }
+  Results results("CarOverlays::UpdateSmoke (sub_82125B60)");
+  const Regions regions = {{overlays, 0x400},
+                           {block + kSmokeA, kSmokeBytes},
+                           {block + kSmokeB, kSmokeBytes},
+                           {kSeed, 4},
+                           {h.data - 1024 - 400 + 80, 148}};
+  for (uint64_t seed = 0; seed < 300; seed++) {
+    const bool odd = seed % 5 == 4;
+    const uint32_t slot = r.Below(25);
+    Compare(h, results, regions, UpdateSmokeSetup(h, block, seed, odd, slot),
+            [&](PPCContext& t) { t.r3.u64 = overlays; }, Original<__imp__sub_82125B60>,
+            NativeUpdateSmoke, fmt::format("seed {} slot {}", seed, slot), false, false);
+  }
+  results.Report();
+  guest::StoreU32(h.base, kSeed, live);
+}
+
+// OverlayView::ModelMatrix: the point cases' view and model, `out` apart,
+// overlapping the model's matrix (the original runs there), or unaligned.
+void ModelMatrixCases(Context& h, uint32_t block) {
+  Random& r = h.random;
+  const uint32_t model_matrix = block + kPointModel + 4304;
+  Results results("OverlayView::ModelMatrix (sub_821270E8)");
+  for (uint64_t seed = 0; seed < 120; seed++) {
+    const uint32_t kind = r.Below(4);
+    const uint32_t out = kind == 0   ? model_matrix - 32 + 4 * r.Below(16)
+                         : kind == 1 ? block + kPointOut + 4 * r.Below(8)
+                                     : block + kPointOut;
+    Compare(h, results, {{block + kPointOut, 0x100}, {block + kPointModel, 0x1400}},
+            [&h, block, seed] { ModelPointSetup(h, block, seed); },
+            [&](PPCContext& t) {
+              t.r3.u64 = out;
+              t.r4.u64 = block + kPointView;
+            },
+            __imp__sub_821270E8, NativeModelMatrix, fmt::format("seed {} out {:X}", seed, out));
+  }
+  results.Report();
+}
 }  // namespace
 
 void RaceOverlays(Context& h) {
@@ -2391,6 +3235,13 @@ void RaceOverlays(Context& h) {
   ParticlesBUpdateCases(h, block);
   ParticlesCUpdateCases(h, block);
   SlotOfCases(h);
+  ViewBodyCases(h, block);
+  IsBehindCameraCases(h, block);
+  SaveFlagCases(h, block);
+  UpdateTrailsCases(h, block);
+  EffectUpdateCases(h, block);
+  UpdateSmokeCases(h, block);
+  ModelMatrixCases(h, block);
   memory->SystemHeapFree(block);
 }
 

@@ -110,7 +110,13 @@ user's call on allocating guest memory from native code. Its second run
 attract races hadn't; summary
 `docs/loops/b7-loop-2026-10-22-1047.md`) removed 31 adapters and made the
 race overlays native as far as they were ready
-(`docs/functions/race-overlays.md`, `--native_race_overlays`); native
+(`docs/functions/race-overlays.md`, `--native_race_overlays`). Its third
+run (the same branch, 2026-10-22, stopped for the user's review; summary
+`docs/loops/b7-loop-2026-10-22-1439.md`) made the vehicle accessors, the
+matrix math and the car physics native as far as they were ready
+(`vehicle-accessors.md`, `matrix-math.md`, `car-physics.md`;
+`--native_vehicle_accessors`, `--native_vector_library`,
+`--native_matrix_math`, `--native_car_physics`; ours 422 -> 705); native
 functions log `native running (game|harness)` once
 (`ITC_NATIVE_RUNNING`), and the status Merged is work done inside a
 native caller.

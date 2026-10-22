@@ -618,4 +618,176 @@ void SmokeReset(uint8_t* base, uint32_t smoke);
 // (ParticlesBResetEntry), the count read again each time.
 void ParticlesBReset(uint8_t* base, uint32_t particles);
 
+// --- The view's body and wheels, through the vehicle accessors ---
+//
+// These call the vehicle accessors' plain C++ (src/vehicle_accessors/)
+// directly.
+
+// OverlayView::BodyMatrix (sub_821268B0): RigidBody::Matrix of the
+// vehicle's +336, the body's 64-byte matrix.
+uint32_t BodyMatrix(uint8_t* base, uint32_t view);
+// OverlayView::WheelContact (sub_821268C8): Vehicle::WheelContact + 16 (the
+// contact point, probably).
+uint32_t WheelContact(uint8_t* base, uint32_t view, uint32_t wheel);
+// OverlayView::WheelSurfaceMarks (sub_821269B0): the contact record's
+// halfword +80, sign-extended and compared unsigned: 0 for 1, 2 and 8, else
+// 1.
+uint32_t WheelSurfaceMarks(uint8_t* base, uint32_t view, uint32_t wheel);
+// OverlayView::WheelSlip (sub_82126A70): Vehicle::WheelSlip of the view's
+// vehicle (which the original tail-calls).
+float WheelSlip(uint8_t* base, uint32_t view, uint32_t wheel, double threshold);
+// OverlayView::BodyPosition (sub_82126F80): out = the 16 bytes at
+// RigidBody::Position (bits as they are); returns out.
+uint32_t BodyPosition(uint8_t* base, uint32_t out, uint32_t view);
+// OverlayView::BodyMatrixCopy (sub_82126FF0): 1.0 stored in out's rows' w,
+// then out = the body's 64-byte matrix (which covers them again: the copy
+// is the matrix as it is, bits too); returns out.
+uint32_t BodyMatrixCopy(uint8_t* base, uint32_t out, uint32_t view);
+
+// CarOverlays::IsBehindCamera (sub_82124630): with the camera pass at
+// overlays +800 (its eye at +400) and the body matrix of the view in slot
+// +128: 0 when the dot product (vmsum3fp128, flush-to-zero on) of point -
+// eye and point - the matrix's fourth row (the car's position) is below the
+// game's 0.0, else 1 (NaNs too).
+uint32_t IsBehindCamera(uint8_t* base, uint32_t overlays, uint32_t point);
+
+// --- The racers' save flags and stages (the marker's and car-model sprites'
+// inputs) ---
+//
+// The save flags are halfwords of player 0's save data (SaveData::Of(0)),
+// 12 bytes a racer id: 1 when nonzero, 0 for ids above 399 (unsigned).
+
+// sub_82126BB0: the halfword at +0x199FA.
+uint32_t SaveFlag199FA(uint8_t* base, uint32_t id);
+// sub_82126C08: the halfword at +0x199F8.
+uint32_t SaveFlag199F8(uint8_t* base, uint32_t id);
+// sub_82126C58: the halfword at +0x199FC.
+uint32_t SaveFlag199FC(uint8_t* base, uint32_t id);
+// sub_82126CB0: SaveFlag199F8 or SaveFlag199FC.
+uint32_t SaveFlag199F8Or199FC(uint8_t* base, uint32_t id);
+// sub_82126B50: 0 for ids above 399; else Stages::HasRacer(race data +
+// 0x59620, Racers::IndexOf(race data + 48, id), the current stage).
+uint32_t RacerInCurrentStage(uint8_t* base, uint32_t id);
+
+// CarOverlays::UpdateTrails (sub_82124EE0): nothing when DebugSwitchOff
+// isn't 0; else for each wheel 0-3 and its trail (+148 + 4i), with the
+// parameter table at +144 and the view in slot +128: the wheel's counter
+// (+432 + 12i) set to 0 when the wheel is off the ground, on a surface that
+// leaves no marks, or doesn't slip (WheelSlip with the table's +152 is
+// 0.0); else a point is due when the table's +156 <= the counter <= its
+// +160 (unsigned), and the counter goes up, capped at twice +160. The
+// point, at `scratch` (16 bytes of guest memory: the adapter passes the
+// original's own stack slot), is the wheel's contact position plus the
+// vector at 0x826C5D40 (fadds; w 1.0), plus the vector at 0x82616F40 (vaddfp,
+// flush-to-zero on). A due point goes to Trail::AddPoint (direction (0, 1,
+// 0, 0), the speed in km/h, width AxleValue3384 times the float at
+// 0x820021E8, state 2 when the wheel's +440 + 12i was set else 1, value 1,
+// or 0 in view modes 1 and 2 (+784) until a point is due on wheel 2 or 3);
+// +440 + 12i = whether one was added; then Trail::SetLastPosition (the
+// point). False, with nothing done, when a trail's capacity is 0 or -1
+// (Trail::AddPoint would decline); the original runs there.
+bool UpdateTrails(uint8_t* base, uint32_t overlays, uint32_t scratch);
+
+// OverlayView::NoSaveFlags (sub_82127198): 1 when the id is 399 or below
+// (unsigned) and neither SaveFlag199FA nor SaveFlag199F8Or199FC is set,
+// else 0 (r3, a view, isn't read). Only MarkerKind and FlagsKind call it.
+uint32_t NoSaveFlags(uint8_t* base, uint32_t id);
+// CarOverlays::FlagsKind (sub_82122DB8): with the view in slot +128 (not
+// read further): 0 when NoSaveFlags(id); else 1 unless SaveFlag199FA is
+// set for `a`, `b` (and `c`, `d` up to the first that's -1), 2 when all
+// are. Only MarkerKind calls it (with c and d -1).
+uint32_t FlagsKind(uint8_t* base, uint32_t overlays, uint32_t id, int32_t a, int32_t b,
+                   int32_t c, int32_t d);
+// CarOverlays::MarkerKind (sub_82122EA8): `fallback` for ids (signed)
+// outside 67-68, 107-109, 111-114, 248-250, 304-306, 374-375, 383-385 and
+// 393-395; for 67-68 and 374-375, FlagsKind with the range; for the others
+// 0 when NoSaveFlags(id), else 2 when SaveFlag199FA is set for each id of
+// the range, else 1.
+uint32_t MarkerKind(uint8_t* base, uint32_t overlays, int32_t id, uint32_t fallback);
+
+}  // namespace race_overlays
+
+namespace race_overlays {
+
+// --- The car overlays' effect updates (CarOverlays::UpdateEffects' calls) ---
+//
+// Each places a child overlay at a model point in world space (WorldPoint in
+// the .cpp: the body matrix (BodyMatrixCopy) at `frame` + 112, the point
+// (OverlayView::PointPosition) at `frame` + 96, copied to `frame` + 80 and
+// transformed there by Vec4::Transform's plain C++). `frame` is the
+// original's stack frame (its r1 after the stwu: 16 bytes of guest memory at
+// +80, +96 and 64 at +112, and +92 written first with the game's 1.0); the
+// adapters pass the original's own. The view is the one in slot +128.
+
+// sub_82126A90: the vehicle's float +2508. Only UpdateLightSprites calls it
+// (into f1, which LightSprite::Show doesn't read); never ran in play.
+float VehicleFloat2508(uint8_t* base, uint32_t view);
+// LightSprite::Show (sub_8211EAA0): the sprite at +144 shown at `position`
+// (its +48), +96 = 1, +100 and +104 = the table's (+140) +4 and +8 (bits as
+// they are), +108 = its +0, +112 = 0, +116 = rand() % 4, colors 255 at +80
+// to +88, +92 = +104 as an integer (fctiwz). Never ran in play (the
+// vehicle's +2504 stayed 0).
+void LightSpriteShow(uint8_t* base, uint32_t sprite, uint32_t position);
+// CarOverlays::UpdateLightSprites (sub_821251C0): nothing more when
+// DebugSwitchOff isn't 0; else for model points 4-7 that exist and the
+// light sprites (+200 + 4i): the point with x less the float at 0x82001FBC,
+// in world space; LightSprite::Show there when the vehicle's byte +2504 is
+// set; LightSprite::SetPosition. Then +720 = the vehicle's word +2252 (read
+// first).
+void UpdateLightSprites(uint8_t* base, uint32_t overlays, uint32_t frame);
+// CarOverlays::UpdateParticlesB (sub_821252D0): as UpdateLightSprites
+// (DebugSwitchOff, points 4-7, x less the float at 0x82001FBC) for particle
+// effect B's emitters (+360 + 4i): ParticlesB::Emit with the vehicle's
+// +6256 (the original also reads the speed and +6252, into registers Emit
+// doesn't read), then ParticlesB::SetPosition. False, with nothing done,
+// when an emitter's capacity is 0 or -1 (ParticlesB::Emit would decline);
+// the original runs there.
+bool UpdateParticlesB(uint8_t* base, uint32_t overlays, uint32_t frame);
+// CarOverlays::UpdateParticlesC (sub_82125798): for model points 14-17 that
+// exist and particle effect C's emitters (+380 + 4i): the point in world
+// space (x as it is), ParticlesC::Emit there when
+// CarOverlays::IsBehindCamera returns 0, then ParticlesC::SetPosition with the speed in km/h. No DebugSwitchOff check.
+void UpdateParticlesC(uint8_t* base, uint32_t overlays, uint32_t frame);
+
+
+// Smoke::SetFrame (sub_8212B1B0): for each of the smoke's +104 emitters (720
+// bytes from +128; the count read again each time): +208 to +220 the frame's
+// +64 to +76, +144 the frame's 64 bytes (memcpy, c_runtime::Memcpy), +224
+// its +80 (bits as they are). False, with nothing done, where a copy
+// wouldn't be the library's plain one (into the physical views, or sharing
+// memory with the frame) or there are more than 65,536 emitters; the
+// original runs there. Only UpdateSmoke calls it.
+bool SmokeSetFrame(uint8_t* base, uint32_t smoke, uint32_t frame);
+// sub_82126A00: 1 when the wheel's contact surface (Vehicle::WheelContact's
+// halfword +80, sign-extended) is 8, else 0.
+uint32_t WheelOnSurface8(uint8_t* base, uint32_t view, uint32_t wheel);
+// sub_82126A38: 1 when the surface is 1 or 2, else 0.
+uint32_t WheelOnSurface1Or2(uint8_t* base, uint32_t view, uint32_t wheel);
+// CarOverlays::UpdateSmoke (sub_82125B60): the car's axes (half the
+// difference of wheels 2 and 3's contacts, plus wheel 3's, at `frame` + 80;
+// of 0 and 1, plus 1's, at +96; the additions vaddfp with flush-to-zero on),
+// then, unless DebugSwitchOff, a frame at +112 (an identity matrix, +176 a
+// position, +192 a size, +196 a value) and for each wheel 0-3 and its smoke
+// (+164 + 4i): a rate, the larger of the slip (WheelSlip with the table's
+// +20) and the spin, each clamped and scaled (0x820029D0 and 0x82008060,
+// 0x82002C38 and 0x8200805C); the position the contact plus 0x826C5D40, its
+// y plus WheelValue512; Smoke::SetFrame and SetRegion; on the ground,
+// smoke by the surface (EmitSmoke: marks with the table's +8 + +12 x slip
+// unless the slip is 0.0; surface 8 with +24 x rate, the wheel's counter
+// (+436 + 12i) up to 25; surfaces 1-2 with +68 x rate; the size drawn from
+// the table's +16, +44 or +80); then while the counter is above 0 and the
+// wheel is on a marking surface or off the ground, smoke with +28 x rate
+// and the counter down by 1; finally Smoke::SetVelocity (+176). `frame` is
+// the original's stack frame (its r1 after the stwu, 400 bytes below). False,
+// with nothing done, where EmitSmoke or Smoke::SetFrame would decline for a
+// wheel; the original runs there.
+bool UpdateSmoke(uint8_t* base, uint32_t overlays, uint32_t frame);
+
+// OverlayView::ModelMatrix (sub_821270E8): 1.0 stored in out's rows' w,
+// then out = the 64 bytes at the view's model + 4,304 (memcpy, through
+// c_runtime::Memcpy; it covers them again). False, with nothing done, where
+// the copy wouldn't be the library's plain one (into the physical views, or
+// sharing memory with the model's matrix); the original runs there.
+bool ModelMatrix(uint8_t* base, uint32_t out, uint32_t view);
+
 }  // namespace race_overlays

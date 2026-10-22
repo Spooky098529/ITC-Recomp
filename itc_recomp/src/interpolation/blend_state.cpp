@@ -31,6 +31,7 @@
 #include "frame_pacing/game_messages.h"
 #include "guest.h"
 #include "hooks/guest_call.h"
+#include "matrix_math/matrix_math.h"
 #include "sprites/billboards.h"
 #include "transform.h"
 
@@ -75,6 +76,7 @@ ITC_FLAG_BOOL(log_overlay_uploads, false, "ITC",
               "12 frames every 3 s");
 ITC_FLAG_DECLARE(bool, log_frame_times);
 ITC_FLAG_DECLARE(bool, native_billboards);
+ITC_FLAG_DECLARE(bool, native_matrix_math);
 ITC_FLAG_BOOL(strict_pixel_pairing, true, "ITC",
               "Leave per-object pixel constants unblended after a draw that isn't a known "
               "camera product, instead of pairing them by the product before it");
@@ -3704,6 +3706,11 @@ void BlendState_OnLogicPassStart() {
   GetDrawState().OnLogicPassStart();
 }
 
+void BlendState_OnMultiply(uint8_t* base, uint32_t out, uint32_t a, uint32_t b,
+                           uint32_t caller) {
+  GetDrawState().OnMultiply(base, out, a, b, caller);
+}
+
 void BlendState_SetHandler(uint32_t handler) {
   GetDrawState().SetHandler(handler);
 }
@@ -4101,12 +4108,19 @@ void BlendState_ReplayConstants(uint8_t* base, uint32_t payload, uint32_t packed
 
 }  // namespace interpolation
 
-// Matrix_Multiply: r3 = out, r4 = a, r5 = b; out = a * b (4x4).
+// Matrix_Multiply: r3 = out, r4 = a, r5 = b; out = a * b (4x4). The work
+// natively (src/matrix_math/matrix_math.cpp, --native_matrix_math; the
+// translated code leaves flush-to-zero on) or translated, then noted.
 extern "C" REX_FUNC(sub_8209BD50) {
   REX_FUNC_PROLOGUE();
   uint32_t out = ctx.r3.u32, a = ctx.r4.u32, b = ctx.r5.u32;
   uint32_t caller = uint32_t(ctx.lr);
-  __imp__sub_8209BD50(ctx, base);
+  if (ITC_FLAG(native_matrix_math)) {
+    matrix_math::Multiply(base, out, a, b);
+    ctx.fpscr.enableFlushMode();
+  } else {
+    __imp__sub_8209BD50(ctx, base);
+  }
   interpolation::GetDrawState().OnMultiply(base, out, a, b, caller);
 }
 
@@ -4252,7 +4266,14 @@ extern "C" REX_FUNC(sub_820A0AC0) {
     }
     noted_src = interpolation::BlendState_MotionBlurNotedSource(base, ctx.r29.u32, src);
   }
-  __imp__sub_820A0AC0(ctx, base);
+  // The copy natively (src/matrix_math/matrix_math.cpp, --native_matrix_math)
+  // or translated, then noted.
+  if (ITC_FLAG(native_matrix_math)) {
+    ctx.fpscr.disableFlushMode();
+    matrix_math::Copy(base, dst, src);
+  } else {
+    __imp__sub_820A0AC0(ctx, base);
+  }
   interpolation::GetDrawState().OnCopy(base, dst, noted_src, caller);
 }
 

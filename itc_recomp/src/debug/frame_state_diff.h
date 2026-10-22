@@ -28,4 +28,11 @@ void FrameStateDiff_Watch(uint32_t address);
 // Testing (--debug_hide): whether a wrapped draw function is never to run.
 bool IsHidden(uint32_t function);
 
+// Vec4::Transform's work (matrix_math::Vec4Transform: out = v * m) inside
+// the same checks its override (sub_820AB560) puts around it: nothing when
+// --debug_hide names it, else the work between FrameStateDiff_Before and
+// After. Native callers of Vec4::Transform call this instead of the plain
+// C++ alone.
+void Vec4Transform(uint8_t* base, uint32_t out, uint32_t m, uint32_t v);
+
 }  // namespace debug
