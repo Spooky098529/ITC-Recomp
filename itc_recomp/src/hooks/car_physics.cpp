@@ -246,27 +246,11 @@ extern "C" REX_FUNC(sub_820B0EE8) {
 ITC_CAR_PHYSICS(820B4AA8, VehicleSetUpGearing(base, ctx.r3.u32, ctx.r1.u32 - 176))
 // f1 = the input; f1 comes back as the second sin's.
 ITC_CAR_PHYSICS(820B3D10, ctx.f1.f64 = VehicleSetSteering(base, ctx.r3.u32, ctx.f1.f64))
-// r3 = out, r7 = the record, f1, f2, f3.
-ITC_CAR_PHYSICS(820B0668, SteerRecordFill(base, ctx.r3.u32, ctx.r7.u32, ctx.f1.f64, ctx.f2.f64,
-                                          ctx.f3.f64))
-// f1 = the angle; f1 comes back as the curve. Where tan would fail, the
-// original. r3 isn't kept (tan's _ctrlfp leaves it; its callers set it again).
-extern "C" REX_FUNC(sub_820B3E98) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_car_physics)) {
-    __imp__sub_820B3E98(ctx, base);
-    return;
-  }
-  ctx.fpscr.disableFlushMode();
-  double f1 = 0.0;
-  if (!SteerRecordCurve(base, ctx.r3.u32, ctx.f1.f64, &f1)) {
-    __imp__sub_820B3E98(ctx, base);
-    return;
-  }
-  ctx.f1.f64 = f1;
-}
+// SteerRecord::Fill and SteerRecord::Curve (sub_820B0668, sub_820B3E98) have
+// no adapters: their caller in play, SteerTowards, is native.
 // f1 = the target, f2 = dt, f3, r4 and r5 = the bytes; f1 comes back as the
-// curve. Where tan would fail, the original. r3 isn't kept (as above).
+// curve. Where tan would fail, the original. r3 isn't kept (tan's _ctrlfp
+// leaves it; its caller sets it again).
 extern "C" REX_FUNC(sub_820B5FD8) {
   REX_FUNC_PROLOGUE();
   if (!ITC_FLAG(native_car_physics)) {
