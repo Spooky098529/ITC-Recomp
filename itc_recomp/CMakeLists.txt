@@ -106,6 +106,8 @@ set(ITC_SOURCES
     src/ui_movies/keys.cpp
     src/ui_movies/recording.cpp
     src/ui_movies/files.cpp
+    src/hooks/ui_movies_game.cpp
+    src/ui_movies/game.cpp
     src/hooks/command_list.cpp
     src/command_list/command_list.cpp
     src/hooks/c_runtime.cpp
@@ -140,6 +142,7 @@ set(ITC_SOURCES
     src/harnesses/c_runtime.cpp
     src/harnesses/math.cpp
     src/harnesses/ui_movies.cpp
+    src/harnesses/ui_movies_game.cpp
     src/helpers/debug_output.cpp
     src/helpers/object_attributes.cpp
     src/helpers/time.cpp
