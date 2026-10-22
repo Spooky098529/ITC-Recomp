@@ -98,6 +98,8 @@ set(ITC_SOURCES
     src/hooks/memory_status.cpp
     src/hooks/heap.cpp
     src/memory/heap.cpp
+    src/hooks/c_runtime_heap.cpp
+    src/memory/c_runtime_heap.cpp
     src/hooks/voice.cpp
     src/hooks/sprites.cpp
     src/sprites/sprites.cpp
@@ -157,6 +159,7 @@ set(ITC_SOURCES
     src/harnesses/command_list.cpp
     src/harnesses/c_runtime.cpp
     src/harnesses/heap.cpp
+    src/harnesses/c_runtime_heap.cpp
     src/harnesses/math.cpp
     src/harnesses/ui_movies.cpp
     src/harnesses/ui_movies_game.cpp
