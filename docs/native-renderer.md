@@ -3251,6 +3251,13 @@ the largest left; main thread ~6.1 million cycles a frame):
   stored, as in `Lights::FindNearest`); find its hot instructions by IP
   (see the mapping above) and whether its own stack traffic stalls the
   same way.
+  Made native (B7 loop, `src/sprites/billboards.cpp`,
+  `--native_billboards`, behind the same override and camera blend; same
+  results by harness, ~59,000 calls a second). Its vector steps (the light's
+  distance and whether it's in front) switch MXCSR's flush bits twice a
+  light, as the translated code's do (more often there), so denormals give
+  the same results; not profiled (profiles are no longer part of the
+  migration's checks).
 
 ## Resolution (branch `unlocked-resolution`, 2026-10-16)
 

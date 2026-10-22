@@ -10,7 +10,7 @@
 
 ITC_FLAG_BOOL(native_billboards, true, "ITC",
               "Run the light glows' billboard functions (the material's set-up, "
-              "sub_8209F5A0 and sub_8209F5C8) natively instead of through the "
+              "sub_8209F5A0 and sub_8209F5C8; the vertices, sub_8209C6E0) natively instead of through the "
               "translated code (same results; checked by --run_harnesses=billboards)");
 
 // BillboardMaterial::Init: r3 = the material.
