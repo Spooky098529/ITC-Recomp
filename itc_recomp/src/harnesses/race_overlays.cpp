@@ -179,6 +179,10 @@ void NativeParticlesBEmit(PPCContext& ctx, uint8_t* base) {
   ctx.f1.f64 = sine;
 }
 
+ITC_NATIVE_WORD(NativeModelPartsHasPoint, ro::ModelPartsHasPoint(base, ctx.r3.u32, ctx.r4.s32))
+ITC_NATIVE_WORD(NativeModelHasPoint, ro::ModelHasPoint(base, ctx.r3.u32, ctx.r4.s32))
+ITC_NATIVE_WORD(NativeOverlayViewHasPoint, ro::OverlayViewHasPoint(base, ctx.r3.u32, ctx.r4.s32))
+
 // Runs the recompiled version with --native_race_overlays off, so the
 // functions it calls that are ours run the originals too.
 void RunRecompiled(GuestFunction recompiled, PPCContext& t, uint8_t* base) {
@@ -1007,6 +1011,105 @@ void ParticlesBCases(Context& h, uint32_t block) {
   guest::StoreU32(h.base, kSeed, live);
 }
 
+// The model points' checks: a view, its model, the model's point object and
+// parts in the block, with the model's four words each sometimes 0 and the
+// parts' words often 0; points -3 to 25 and random ones.
+constexpr uint32_t kPointView = 0x100;
+constexpr uint32_t kPointModel = 0x1000;    // 0x1400 bytes
+constexpr uint32_t kPointObject = 0x3000;   // 0x100 bytes
+constexpr uint32_t kPointTable = 0x4000;    // 0x2000 bytes
+constexpr uint32_t kPointParts = 0x8000;    // 0xA000 bytes
+constexpr uint32_t kPointOut = 0x20000;     // 0x100 bytes
+
+// Fills the model's block (the view, the model, its point object, table and
+// parts); each of the model's four words is 0 one time in five.
+void ModelPointSetup(Context& h, uint32_t block, uint64_t seed) {
+  Random fill;
+  for (uint64_t i = 0; i < seed % 23; i++) {
+    fill.Next();
+  }
+  for (uint32_t i = 0; i < 0xA000; i += 4) {
+    guest::StoreU32(h.base, block + kPointParts + i, fill.Below(3) == 0 ? 0 : RandomWord(fill));
+  }
+  FillRandom(h.base, fill, block + kPointModel, 0x1400);
+  FillRandom(h.base, fill, block + kPointObject, 0x100);
+  FillRandom(h.base, fill, block + kPointTable, 0x2000);
+  FillRandom(h.base, fill, block + kPointOut, 0x100);
+  guest::StoreU32(h.base, block + kPointView + 8, block + kPointModel);
+  const uint32_t words[4][2] = {{5048, block + kPointObject},
+                                {5052, uint32_t(fill.Next())},
+                                {5060, block + kPointParts},
+                                {5064, uint32_t(fill.Next())}};
+  for (const auto& [offset, value] : words) {
+    guest::StoreU32(h.base, block + kPointModel + offset, fill.Below(5) == 0 ? 0 : value);
+  }
+  guest::StoreU32(h.base, block + kPointObject + 24, block + kPointTable - 6976 + 0x40);
+}
+
+std::vector<int32_t> PointIndices(Random& r) {
+  std::vector<int32_t> indices;
+  for (int32_t i = -3; i <= 25; i++) {
+    indices.push_back(i);
+  }
+  indices.push_back(INT32_MIN);
+  indices.push_back(INT32_MAX);
+  for (int i = 0; i < 10; i++) {
+    indices.push_back(int32_t(r.Next()));
+  }
+  return indices;
+}
+
+void ModelPointCases(Context& h, uint32_t block) {
+  Random& r = h.random;
+  const std::vector<int32_t> indices = PointIndices(r);
+  const Regions regions = {{block + kPointOut, 0x100}};
+  {
+    Results results("ModelParts::HasPoint (sub_820DF2A0)");
+    for (int32_t index : indices) {
+      for (uint64_t seed = 0; seed < 6; seed++) {
+        Compare(h, results, regions, [&h, block, seed] { ModelPointSetup(h, block, seed); },
+                [&](PPCContext& t) {
+                  t.r3.u64 = block + kPointParts;
+                  t.r4.u64 = uint64_t(int64_t(index));
+                },
+                __imp__sub_820DF2A0, NativeModelPartsHasPoint,
+                fmt::format("point {} seed {}", index, seed));
+      }
+    }
+    results.Report();
+  }
+  {
+    Results results("Model::HasPoint (sub_820D9DB0)");
+    for (int32_t index : indices) {
+      for (uint64_t seed = 0; seed < 12; seed++) {
+        Compare(h, results, regions, [&h, block, seed] { ModelPointSetup(h, block, seed); },
+                [&](PPCContext& t) {
+                  t.r3.u64 = block + kPointModel;
+                  t.r4.u64 = uint64_t(int64_t(index));
+                },
+                __imp__sub_820D9DB0, NativeModelHasPoint,
+                fmt::format("point {} seed {}", index, seed));
+      }
+    }
+    results.Report();
+  }
+  {
+    Results results("OverlayView::HasPoint (sub_82126A78)");
+    for (int32_t index : indices) {
+      for (uint64_t seed = 0; seed < 12; seed++) {
+        Compare(h, results, regions, [&h, block, seed] { ModelPointSetup(h, block, seed); },
+                [&](PPCContext& t) {
+                  t.r3.u64 = block + kPointView;
+                  t.r4.u64 = uint64_t(int64_t(index));
+                },
+                __imp__sub_82126A78, NativeOverlayViewHasPoint,
+                fmt::format("point {} seed {}", index, seed));
+      }
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void RaceOverlays(Context& h) {
@@ -1025,6 +1128,7 @@ void RaceOverlays(Context& h) {
   ParticlesCCases(h, block);
   TrailAddPointCases(h, block);
   ParticlesBCases(h, block);
+  ModelPointCases(h, block);
   memory->SystemHeapFree(block);
 }
 

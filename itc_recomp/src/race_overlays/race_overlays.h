@@ -251,3 +251,28 @@ bool ParticlesBEmit(uint8_t* base, uint32_t effect, uint32_t position, double a,
                     uint32_t* result, double* sine);
 
 }  // namespace race_overlays
+
+namespace race_overlays {
+
+// --- The scene model's points ---
+//
+// A scene model (a view's +8): +5048 an object whose +24 holds the first
+// four points (16 bytes each from +6976), +5052 and +5064 words that must
+// be set, +5060 the model's parts (points 4-21: 4-7 from +34,256, 8-13 from
+// +23,120, 14-21 from +24,640, 240 bytes apart, each with a word that must
+// be set 140 bytes before it).
+
+// ModelParts::HasPoint (sub_820DF2A0): for points 4-21, 1 when the point's
+// word is set, else 0; others return `parts` itself (the original leaves
+// r3 alone).
+uint32_t ModelPartsHasPoint(uint8_t* base, uint32_t parts, int32_t index);
+
+// Model::HasPoint (sub_820D9DB0): 0 unless the model's +5048, +5052, +5060
+// and +5064 are all set; then 1 for points below 4, else
+// ModelPartsHasPoint on +5060.
+uint32_t ModelHasPoint(uint8_t* base, uint32_t model, int32_t index);
+
+// OverlayView::HasPoint (sub_82126A78): ModelHasPoint on the view's model.
+uint32_t OverlayViewHasPoint(uint8_t* base, uint32_t view, int32_t index);
+
+}  // namespace race_overlays

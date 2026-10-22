@@ -860,3 +860,55 @@ bool ParticlesBEmit(uint8_t* base, uint32_t effect, uint32_t position, double a,
 }
 
 }  // namespace race_overlays
+
+namespace race_overlays {
+
+namespace {
+
+constexpr uint32_t kModelPoints = 5048;
+constexpr uint32_t kModelParts = 5060;
+
+// Whether the model's +5048, +5052, +5060 and +5064 are all set (the
+// original's checks, in its order).
+bool ModelReady(uint8_t* base, uint32_t model) {
+  return guest::LoadU32(base, model + kModelPoints) != 0 &&
+         guest::LoadU32(base, model + 5052) != 0 &&
+         guest::LoadU32(base, model + kModelParts) != 0 &&
+         guest::LoadU32(base, model + 5064) != 0;
+}
+
+}  // namespace
+
+uint32_t ModelPartsHasPoint(uint8_t* base, uint32_t parts, int32_t index) {
+  ITC_NATIVE_RUNNING("sub_820DF2A0 ModelParts::HasPoint");
+  if (index < 4 || index > 21) {
+    return parts;
+  }
+  uint32_t offset;
+  if (index <= 7) {
+    offset = 34116;
+  } else if (index <= 13) {
+    offset = 22980;
+  } else {
+    offset = 24500;
+  }
+  return guest::LoadU32(base, parts + 240 * uint32_t(index) + offset) != 0 ? 1 : 0;
+}
+
+uint32_t ModelHasPoint(uint8_t* base, uint32_t model, int32_t index) {
+  ITC_NATIVE_RUNNING("sub_820D9DB0 Model::HasPoint");
+  if (!ModelReady(base, model)) {
+    return 0;
+  }
+  if (index < 4) {
+    return 1;
+  }
+  return ModelPartsHasPoint(base, guest::LoadU32(base, model + kModelParts), index);
+}
+
+uint32_t OverlayViewHasPoint(uint8_t* base, uint32_t view, int32_t index) {
+  ITC_NATIVE_RUNNING("sub_82126A78 OverlayView::HasPoint");
+  return ModelHasPoint(base, guest::LoadU32(base, view + 8), index);
+}
+
+}  // namespace race_overlays
