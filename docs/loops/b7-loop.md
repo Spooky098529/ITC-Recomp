@@ -73,6 +73,22 @@ memory.
      in the same doc.
 9. **Take the next lead**: back to step 1.
 
+## The run's summary
+
+Each run (from a start until the stop for the user's review, across
+`/clear`s) gets a short summary file, `docs/loops/b7-loop-<date>-<time>.md`
+(the run's start, like `b7-loop-2026-10-22-0111.md`), made by the run's
+first pass and named under "Now" in the progress file. Not wordy: a title,
+the branch and the commit the run started from, a table of the subsystems
+finished (function file, how many made native, the flags), a few lines of
+totals (`b7_status.py`'s ours and work left, before and after) and what's
+left for the user, then "Status changes": the output of
+`itc_recomp/tools/status_changes.py <start commit>` (one line per
+function whose Status changed, by function file). The lead brings it up
+to date in the pass that records each finished subsystem (step 8 of the
+cycle), and once more when the loop stops, committed with the progress
+file.
+
 A pass does one step: it reads the state, collects the report of the
 agent that finished, checks it, records it in the progress file, starts
 the next agent, and schedules the next pass. A running agent's finishing
@@ -106,6 +122,8 @@ nothing runs and there's work, about a minute.
   frame, for speed (not part of the loop's checks: see "The migration
   agent").
 - `itc_recomp/tools/boundary_status.py`: the SDK boundary.
+- `itc_recomp/tools/status_changes.py <commit>`: the functions whose
+  Status changed since a commit, for the run's summary.
 - Finding code: `grep -n "DEFINE_REX_FUNC(sub_X)"
   itc_recomp/generated/default/*.cpp`; call sites `grep -ln "lr =
   0xXXXXXXXX;"`; overrides `grep -rn sub_X itc_recomp/src`.
@@ -277,7 +295,8 @@ file, when:
 - the session's or the total limit is reached;
 - the tree has changes the loop didn't make, or isn't on `b7-loop-test`.
 
-Whatever the reason, before ending, the lead also brings the B7 status
+Whatever the reason, before ending, the lead also brings the run's
+summary up to date ("The run's summary") and the B7 status
 lines up to date (the subsystems' rows and totals are already there, from
 step 8 of the cycle): the "B7 in progress" line near the top of
 `docs/rexglue-removal.md` and the B7 sentence in `CLAUDE.md`'s overview
