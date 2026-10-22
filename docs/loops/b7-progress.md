@@ -9,8 +9,11 @@ commits, the function files and the subsystems' docs.
   `sub_825A8170` -> `sub_825A7FB0`, probably `acos`; from `leads.md`), with
   the rest of the C runtime seen in play except the heap (a lead that
   waits on the user).
-- Step: mapping (agent running).
-- Session: pass 6 of 20, subsystem 3 of 5. In all: subsystem 3 of 5.
+  Mapped as `functions/c-runtime.md` (6cbe96a): 89 rows, 54 ready
+  groups; the heap, TLS (`_getptd`) and the kernel-calling pieces left
+  out (the core).
+- Step: migration (first agent running).
+- Session: pass 7 of 20, subsystem 3 of 5. In all: subsystem 3 of 5.
 
 ## Done
 
@@ -37,6 +40,8 @@ commits, the function files and the subsystems' docs.
   Overridden).
 - `docs/functions/command-list.md` (new; `sub_8258CAA0` moved from
   `functions.md`, Wrapped -> Overridden).
+- `docs/functions/c-runtime.md` (new; `memcpy`, `memset`, `wcslen`, `pow`
+  moved from `functions.md`).
 
 ## Totals
 
@@ -52,6 +57,8 @@ commits, the function files and the subsystems' docs.
   150, known 189, unknown 6234).
 - After sprites' second migration: ours 182, work left 6571 (wrapped 150,
   known 187, unknown 6234).
+- After mapping the C runtime: ours 182, work left 6571 (wrapped 150,
+  known 272, unknown 6149).
 
 ## Stopped
 
