@@ -6,6 +6,7 @@
 
 #include "hooks/vehicle.h"
 
+#include "base/log.h"
 #include "debug/state_capture.h"
 #include "guest.h"
 
@@ -19,6 +20,7 @@ constexpr float kMetersPerSecondToKmh = 3.6f;
 }  // namespace
 
 float Vehicle_GetSpeedKmh(uint8_t* base, uint32_t vehicle) {
+  ITC_NATIVE_RUNNING("sub_820C0128 Vehicle::GetSpeedKmh");
   float speed = guest::LoadFloat(base, vehicle + kVehicleSpeedOffset);
   return speed * kMetersPerSecondToKmh;
 }
