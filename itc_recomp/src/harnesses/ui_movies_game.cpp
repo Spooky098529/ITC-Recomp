@@ -413,6 +413,161 @@ void ItemCases(Context& h, const Block& block) {
   }
 }
 
+// An animation list in a valid state: `used` links in the list's chain and
+// the rest in the free chain (in a random order, -1 ending each), each
+// link's slot a permutation of 0 to 31, the slots' words random with the
+// matches the time lookups look for planted at +0, +4 and +8.
+struct ListSpec {
+  uint32_t used;
+  uint16_t order[32];
+  uint16_t slot[32];
+  uint32_t slots[32][10];
+  uint32_t other[4];
+
+  ListSpec(Random& r, uint32_t used_count) : used(used_count) {
+    for (uint16_t k = 0; k < 32; k++) {
+      order[k] = k;
+      slot[k] = k;
+    }
+    for (uint32_t k = 31; k > 0; k--) {
+      std::swap(order[k], order[r.Below(k + 1)]);
+      std::swap(slot[k], slot[r.Below(k + 1)]);
+    }
+    for (auto& words : slots) {
+      for (uint32_t& w : words) {
+        w = RandomWord(r);
+      }
+      // Small indices, so the lookups' keys match some.
+      words[0] = r.Below(4);
+      words[1] = r.Below(3) == 0 ? 0xFFFFFFFFu : r.Below(3);
+      words[2] = r.Below(3) == 0 ? 0xFFFFFFFFu : r.Below(6);
+    }
+    for (uint32_t& w : other) {
+      w = uint32_t(r.Next());
+    }
+  }
+
+  void Write(uint8_t* base, uint32_t list) const {
+    auto chain = [&](uint32_t from, uint32_t to, uint32_t head) {
+      guest::StoreU16(base, list + head, from < to ? order[from] : 0xFFFF);
+      for (uint32_t k = from; k < to; k++) {
+        guest::StoreU16(base, list + 4 * order[k], k + 1 < to ? order[k + 1] : 0xFFFF);
+      }
+    };
+    for (uint32_t k = 0; k < 32; k++) {
+      guest::StoreU16(base, list + 4 * k + 2, slot[k]);
+      for (uint32_t w = 0; w < 10; w++) {
+        guest::StoreU32(base, list + 140 + 40 * k + 4 * w, slots[k][w]);
+      }
+    }
+    chain(0, used, 132);
+    chain(used, 32, 128);
+    guest::StoreU16(base, list + 130, 0xFFFF);
+    guest::StoreU16(base, list + 134, 0xFFFF);
+    guest::StoreU16(base, list + 136, uint16_t(used));
+  }
+};
+
+constexpr uint32_t kListBytes = 140 + 40 * 32;
+
+void AnimationListCases(Context& h, const Block& block) {
+  const uint32_t list = block.at + 64;
+  const uint32_t outside = list + kListBytes + 64;  // a slot to insert, or the copy's destination
+  {
+    Results results("sub_8211A9E8 (the animation lists set up)");
+    for (int i = 0; i < 40; i++) {
+      const uint32_t movie = block.at + 16 * h.random.Below(16);
+      Compare(h, results, block.at, 0xA100, [] {}, [&](PPCContext& t) { t.r3.u64 = movie; },
+              __imp__sub_8211A9E8, sub_8211A9E8, fmt::format("movie +{:X}", movie - block.at));
+    }
+    results.Report();
+  }
+  struct Op {
+    const char* name;
+    GuestFunction recompiled, native;
+  };
+  const Op ops[] = {
+      {"sub_8211B230 (a free link linked in)", __imp__sub_8211B230, sub_8211B230},
+      {"AnimationList::Insert (sub_8211B4D0)", __imp__sub_8211B4D0, sub_8211B4D0},
+      {"AnimationList::RemoveAt (sub_8211B080)", __imp__sub_8211B080, sub_8211B080},
+      {"AnimationList::Get (sub_8211B298)", __imp__sub_8211B298, sub_8211B298},
+  };
+  for (const Op& op : ops) {
+    Results results(op.name);
+    for (int i = 0; i < 400; i++) {
+      const bool links = op.native == sub_8211B230 || op.native == sub_8211B4D0;
+      // Linking needs a free link; removing and getting a used one.
+      const uint32_t used = links ? h.random.Below(32) : 1 + h.random.Below(32);
+      const ListSpec spec(h.random, i == 0 ? (links ? 0 : 32) : used);
+      const uint32_t position = links ? h.random.Below(spec.used + 1) : h.random.Below(spec.used);
+      // The slot copied: apart, or (one case in five) inside the list.
+      const uint32_t other =
+          i % 5 == 4 ? list + 140 + 4 * h.random.Below(320) : outside + 4 * h.random.Below(16);
+      std::vector<uint32_t> words(16);
+      for (uint32_t& w : words) {
+        w = RandomWord(h.random);
+      }
+      Compare(h, results, block.at, 64 + kListBytes + 256,
+              [&] {
+                spec.Write(h.base, list);
+                for (uint32_t k = 0; k < 16; k++) {
+                  guest::StoreU32(h.base, outside + 4 * k, words[k]);
+                }
+              },
+              [&](PPCContext& t) {
+                if (op.native == sub_8211B298) {
+                  t.r3.u64 = other;
+                  t.r4.u64 = list;
+                  t.r5.u64 = position;
+                } else {
+                  t.r3.u64 = list;
+                  t.r4.u64 = op.native == sub_8211B4D0 ? other : position;
+                  t.r5.u64 = position;
+                }
+              },
+              op.recompiled, op.native,
+              fmt::format("case {}: {} used, position {}, other +{:X}", i, spec.used, position,
+                          other - block.at));
+    }
+    results.Report();
+  }
+  // The time lookups: both lists of a movie, keys matching some slots or
+  // none.
+  struct Lookup {
+    const char* name;
+    GuestFunction recompiled, native;
+  };
+  const Lookup lookups[] = {
+      {"UiMovie::AnimationTime (sub_8211BA00)", __imp__sub_8211BA00, sub_8211BA00},
+      {"UiMovie::NamedAnimationTime (sub_8211BB18)", __imp__sub_8211BB18, sub_8211BB18},
+  };
+  const uint32_t movie = block.at;
+  for (const Lookup& f : lookups) {
+    Results results(f.name);
+    for (int i = 0; i < 400; i++) {
+      const ListSpec queue(h.random, h.random.Below(33));
+      const ListSpec looping(h.random, h.random.Below(33));
+      const uint32_t r4 = h.random.Below(5) == 0 ? 0xFFFFFFFFu : h.random.Below(7);
+      const uint32_t r5 = h.random.Below(5);
+      Compare(h, results, movie + 0x90B4, 0x9640 - 0x90B4 + kListBytes,
+              [&] {
+                queue.Write(h.base, movie + 0x90B4);
+                looping.Write(h.base, movie + 0x9640);
+              },
+              [&](PPCContext& t) {
+                t.r3.u64 = movie;
+                t.r4.u64 = r4;
+                t.r5.u64 = r5;
+              },
+              f.recompiled, f.native,
+              fmt::format("case {}: {} and {} used, r4 {:X} r5 {}", i, queue.used, looping.used,
+                          r4, r5),
+              true);
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void UiMoviesGame(Context& h) {
@@ -430,6 +585,7 @@ void UiMoviesGame(Context& h) {
   ClearTextIdsCases(h, block);
   SwapTextureCases(h, block);
   ItemCases(h, block);
+  AnimationListCases(h, block);
   memory->SystemHeapFree(block.at);
 }
 

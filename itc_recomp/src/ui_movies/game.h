@@ -83,4 +83,39 @@ uint32_t ClearTextItem(uint8_t* base, uint32_t item);
 // of the original's stores decides there, and it runs.
 bool CopyTextItem(uint8_t* base, uint32_t to, uint32_t from);
 
+// The animation lists (two a movie: the queue at +0x90B4 and the looping
+// animations at +0x9640): 32 links of 4 bytes (+0 the next link, +2 its
+// slot; 16-bit, -1 ending a chain), the free chain's first at +128, the
+// list's first at +132 (+130 and +134 set to -1, not read here), the count
+// at +136 (16-bit), and 32 slots of 40 bytes from +140 (+0 an animation's
+// index, +4 its sub-scene's or -1, +8 a named animation's index or -1, +20
+// the time). A link's slot never changes; linking moves links between the
+// chains.
+constexpr uint32_t kMovieQueue = 0x90B4;
+constexpr uint32_t kMovieLooping = 0x9640;
+constexpr uint32_t kMovieLoaded = 0x9FD0;
+
+// sub_8211A9E8: a movie's +0..+24 and loaded flag (+0x9FD0) cleared, and
+// both lists set up empty (link k: next k + 1, slot k; the free chain from
+// 0, link 31's next -1).
+void InitAnimationLists(uint8_t* base, uint32_t movie);
+// The link `steps` links after the list's first.
+uint32_t LinkAt(uint8_t* base, uint32_t list, uint32_t steps);
+// A link's slot: list + 140 + 40 [link + 2].
+uint32_t SlotOf(uint8_t* base, uint32_t list, uint32_t link);
+// sub_8211B230: the free chain's first link linked in at `position` (the
+// original's 16-bit r4, sign-extended), the count + 1. No check for a full
+// list.
+void LinkFree(uint8_t* base, uint32_t list, int32_t position);
+// sub_8211B080 (AnimationList::RemoveAt): the link at `position` unlinked
+// onto the free chain, the count - 1.
+void RemoveAt(uint8_t* base, uint32_t list, uint32_t position);
+// sub_8211BA00 (UiMovie::AnimationTime) and sub_8211BB18
+// (UiMovie::NamedAnimationTime): the time (+20, a float's word) of the
+// first slot naming the animation (`index`, `sub_scene` or, by name,
+// `index` at +8), in the looping list, then the queue; else the float at
+// 0x82001BE0.
+uint32_t AnimationTime(uint8_t* base, uint32_t movie, uint32_t sub_scene, uint32_t index);
+uint32_t NamedAnimationTime(uint8_t* base, uint32_t movie, uint32_t index);
+
 }  // namespace ui_movies

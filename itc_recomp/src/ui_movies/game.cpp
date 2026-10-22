@@ -4,6 +4,8 @@
 
 #include "c_runtime/strings.h"
 
+#include <optional>
+
 namespace ui_movies {
 
 namespace {
@@ -165,6 +167,118 @@ bool CopyTextItem(uint8_t* base, uint32_t to, uint32_t from) {
   guest::StoreU32(base, to, guest::LoadU32(base, from));
   CopyWords(base, to, from, 16, 112);
   return true;
+}
+
+void InitAnimationLists(uint8_t* base, uint32_t movie) {
+  for (uint32_t offset = 0; offset <= 24; offset += 4) {
+    guest::StoreU32(base, movie + offset, 0);
+  }
+  guest::StoreU32(base, movie + kMovieLoaded, 0);
+  for (uint32_t list : {movie + kMovieQueue, movie + kMovieLooping}) {
+    for (uint32_t k = 0; k < 32; k++) {
+      guest::StoreU16(base, list + 4 * k + 2, uint16_t(k));
+      guest::StoreU16(base, list + 4 * k, uint16_t(k + 1));
+    }
+    guest::StoreU16(base, list + 124, 0xFFFF);
+    guest::StoreU16(base, list + 128, 0);
+    guest::StoreU16(base, list + 130, 0xFFFF);
+    guest::StoreU16(base, list + 132, 0xFFFF);
+    guest::StoreU16(base, list + 134, 0xFFFF);
+    guest::StoreU16(base, list + 136, 0);
+  }
+}
+
+namespace {
+// A link's address from its 16-bit index (sign-extended, as the original's
+// lha).
+uint32_t Link(uint32_t list, uint16_t index) {
+  return list + 4 * uint32_t(int32_t(int16_t(index)));
+}
+
+// The link before position `position` (the list's first field, +132, for
+// 0): where a link is put in or taken out.
+uint32_t Before(uint8_t* base, uint32_t list, uint32_t position) {
+  return position == 0 ? list + 132 : LinkAt(base, list, position - 1);
+}
+}  // namespace
+
+uint32_t LinkAt(uint8_t* base, uint32_t list, uint32_t steps) {
+  uint32_t link = Link(list, guest::LoadU16(base, list + 132));
+  for (; steps != 0; steps--) {
+    link = Link(list, guest::LoadU16(base, link));
+  }
+  return link;
+}
+
+uint32_t SlotOf(uint8_t* base, uint32_t list, uint32_t link) {
+  return list + 140 + 40 * uint32_t(int32_t(int16_t(guest::LoadU16(base, link + 2))));
+}
+
+void LinkFree(uint8_t* base, uint32_t list, int32_t position) {
+  const uint32_t before = Before(base, list, uint32_t(position));
+  const uint16_t free = guest::LoadU16(base, list + 128);
+  const uint32_t link = Link(list, free);
+  guest::StoreU16(base, list + 128, guest::LoadU16(base, link));
+  guest::StoreU16(base, link, free);
+  guest::StoreU16(base, link, guest::LoadU16(base, before));
+  guest::StoreU16(base, before, free);
+  guest::StoreU16(base, list + 136, uint16_t(guest::LoadU16(base, list + 136) + 1));
+}
+
+void RemoveAt(uint8_t* base, uint32_t list, uint32_t position) {
+  const uint32_t before = Before(base, list, position);
+  const uint16_t index = guest::LoadU16(base, before);
+  const uint32_t link = Link(list, index);
+  const uint16_t next = guest::LoadU16(base, link);
+  guest::StoreU16(base, link, index);
+  guest::StoreU16(base, before, next);
+  const uint16_t freed = guest::LoadU16(base, link);
+  const uint16_t free = guest::LoadU16(base, list + 128);
+  guest::StoreU16(base, list + 128, freed);
+  guest::StoreU16(base, link, free);
+  guest::StoreU16(base, list + 136, uint16_t(guest::LoadU16(base, list + 136) - 1));
+}
+
+namespace {
+constexpr uint32_t kNoTime = 0x82001BE0;
+
+// The first slot of `list` that `match` accepts.
+template <typename Match>
+std::optional<uint32_t> FindSlot(uint8_t* base, uint32_t list, Match match) {
+  const uint32_t count = uint32_t(int32_t(int16_t(guest::LoadU16(base, list + 136))));
+  uint32_t link = Link(list, guest::LoadU16(base, list + 132));
+  for (uint32_t i = 0; i < count; i++) {
+    if (i != 0) {
+      link = Link(list, guest::LoadU16(base, link));
+    }
+    const uint32_t slot = SlotOf(base, list, link);
+    if (match(slot)) {
+      return slot;
+    }
+  }
+  return std::nullopt;
+}
+
+template <typename Match>
+uint32_t FindTime(uint8_t* base, uint32_t movie, Match match) {
+  for (uint32_t list : {movie + kMovieLooping, movie + kMovieQueue}) {
+    if (const std::optional<uint32_t> slot = FindSlot(base, list, match)) {
+      return guest::LoadU32(base, *slot + 20);
+    }
+  }
+  return guest::LoadU32(base, kNoTime);
+}
+}  // namespace
+
+uint32_t AnimationTime(uint8_t* base, uint32_t movie, uint32_t sub_scene, uint32_t index) {
+  return FindTime(base, movie, [&](uint32_t slot) {
+    return guest::LoadU32(base, slot + 4) == sub_scene && guest::LoadU32(base, slot) == index;
+  });
+}
+
+uint32_t NamedAnimationTime(uint8_t* base, uint32_t movie, uint32_t index) {
+  return FindTime(base, movie,
+                  [&](uint32_t slot) { return guest::LoadU32(base, slot + 8) == index; });
 }
 
 }  // namespace ui_movies

@@ -3,7 +3,12 @@
 
 #include "guest.h"
 
+#include <bit>
+
 #include "base/flags.h"
+#include "c_runtime/strings.h"
+#include "hooks/guest_call.h"
+#include "hooks/ui_movies_game.h"
 #include "ui_movies/game.h"
 #include "ui_movies/ui_movies.h"
 
@@ -17,7 +22,11 @@ ITC_FLAG_BOOL(native_ui_movies_game, true, "ITC",
               "the pose resets UiMovie::ResetPose sub_8211ABA8 and UiMovie::ResetNode "
               "sub_8211A1E0 (these two with --native_ui_movies and without --log_pause_movie); "
               "the quads' and text items' set-up Quad::Quad sub_8211A948, TextItem::TextItem "
-              "sub_8211A818, TextItem::~TextItem sub_8211A8C8 and the copy sub_8211AED0 "
+              "sub_8211A818, TextItem::~TextItem sub_8211A8C8 and the copy sub_8211AED0; the "
+              "animation lists' sub_8211A9E8, sub_8211B230, AnimationList::Insert "
+              "sub_8211B4D0, AnimationList::RemoveAt sub_8211B080, AnimationList::Get "
+              "sub_8211B298, UiMovie::AnimationTime sub_8211BA00 and "
+              "UiMovie::NamedAnimationTime sub_8211BB18 "
               "(same results; checked by --run_harnesses=ui_movies_game)");
 
 ITC_FLAG_DECLARE(bool, native_ui_movies);
@@ -181,3 +190,83 @@ extern "C" REX_FUNC(sub_8211AED0) {
     __imp__sub_8211AED0(ctx, base);
   }
 }
+
+// sub_8211A9E8: r3 = movie (left).
+extern "C" REX_FUNC(sub_8211A9E8) {
+  REX_FUNC_PROLOGUE();
+  NATIVE_OR_ORIGINAL(8211A9E8);
+  ui_movies::InitAnimationLists(base, ctx.r3.u32);
+}
+
+// sub_8211B230: r3 = a list (left), r4 = a position (16-bit).
+extern "C" REX_FUNC(sub_8211B230) {
+  REX_FUNC_PROLOGUE();
+  NATIVE_OR_ORIGINAL(8211B230);
+  ui_movies::LinkFree(base, ctx.r3.u32, int16_t(ctx.r4.u16));
+}
+
+namespace {
+// The 40-byte slot copies: the host's where the two can't share memory,
+// else the game's memcpy (sub_825A7410) from a frame like the original's.
+void CopySlot(PPCContext& ctx, uint8_t* base, uint32_t to, uint32_t from, uint32_t frame_bytes,
+              uint32_t return_address) {
+  if (c_runtime::Memcpy(base, to, from, 40)) {
+    return;
+  }
+  const uint64_t lr = ctx.lr;
+  guest_call::InFrame(ctx, base, frame_bytes, return_address, [&](uint32_t) {
+    ctx.r3.u64 = to;
+    ctx.r4.u64 = from;
+    ctx.r5.u64 = 40;
+    sub_825A7410(ctx, base);
+  });
+  ctx.lr = lr;
+}
+}  // namespace
+
+// AnimationList::Get: r3 = a 40-byte destination, r4 = a list, r5 = a
+// position; returns r3.
+extern "C" REX_FUNC(sub_8211B298) {
+  REX_FUNC_PROLOGUE();
+  NATIVE_OR_ORIGINAL(8211B298);
+  const uint32_t to = ctx.r3.u32, list = ctx.r4.u32;
+  const uint32_t from = ui_movies::SlotOf(base, list, ui_movies::LinkAt(base, list, ctx.r5.u32));
+  CopySlot(ctx, base, to, from, 96, 0x8211B2F4);
+  ctx.r3.u64 = to;
+}
+
+// UiMovie::AnimationTime: r3 = movie (left), r4 = a sub-scene's index or -1,
+// r5 = an animation's index; the time in f1.
+extern "C" REX_FUNC(sub_8211BA00) {
+  REX_FUNC_PROLOGUE();
+  NATIVE_OR_ORIGINAL(8211BA00);
+  const uint32_t time = ui_movies::AnimationTime(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+  ctx.fpscr.disableFlushMode();
+  ctx.f1.f64 = double(std::bit_cast<float>(time));
+}
+
+// UiMovie::NamedAnimationTime: r3 = movie (left), r4 = a named animation's
+// index; the time in f1.
+extern "C" REX_FUNC(sub_8211BB18) {
+  REX_FUNC_PROLOGUE();
+  NATIVE_OR_ORIGINAL(8211BB18);
+  const uint32_t time = ui_movies::NamedAnimationTime(base, ctx.r3.u32, ctx.r4.u32);
+  ctx.fpscr.disableFlushMode();
+  ctx.f1.f64 = double(std::bit_cast<float>(time));
+}
+
+namespace ui_movies_game_hooks {
+void Insert(PPCContext& ctx, uint8_t* base) {
+  NATIVE_OR_ORIGINAL(8211B4D0);
+  const uint32_t list = ctx.r3.u32, from = ctx.r4.u32, position = ctx.r5.u32;
+  ui_movies::LinkFree(base, list, int16_t(uint16_t(position)));
+  const uint32_t to = ui_movies::SlotOf(base, list, ui_movies::LinkAt(base, list, position));
+  CopySlot(ctx, base, to, from, 112, 0x8211B538);
+  ctx.r3.u64 = to;
+}
+
+void RemoveAt(PPCContext& ctx, uint8_t* base) {
+  NATIVE_OR_ORIGINAL(8211B080);
+  ui_movies::RemoveAt(base, ctx.r3.u32, ctx.r4.u32);
+}
+}  // namespace ui_movies_game_hooks
