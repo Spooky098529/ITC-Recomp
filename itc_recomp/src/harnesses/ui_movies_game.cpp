@@ -8,6 +8,8 @@
 
 #include "base/flags.h"
 #include "base/log.h"
+#include "c_runtime/strings.h"
+#include "ui_movies/game.h"
 
 #include <rex/system/kernel_state.h>
 #include <rex/system/xmemory.h>
@@ -26,6 +28,33 @@ ITC_FLAG_DECLARE(bool, native_ui_movies_game);
 namespace harness {
 
 namespace {
+
+// The register steps of the functions whose adapters went once their
+// callers were native (docs/loops/b7-loop.md, "Removing an adapter"): the
+// cases run the plain C++ through these, against the recompiled versions.
+
+// sub_8211A660: r4 = a node, r5 = a number (r3 left).
+void NativeSetLayer(PPCContext& ctx, uint8_t* base) {
+  ui_movies::SetLayer(base, ctx.r4.u32, ctx.r5.u32);
+}
+
+// sub_8211B230: r3 = a list (left), r4 = a position (16-bit).
+void NativeLinkFree(PPCContext& ctx, uint8_t* base) {
+  ui_movies::LinkFree(base, ctx.r3.u32, int16_t(ctx.r4.u16));
+}
+
+// AnimationList::Get: r3 = a 40-byte destination, r4 = a list, r5 = a
+// position; returns r3. Where the slot and the destination share memory,
+// the original runs (the removed adapter used the game's memcpy there).
+void NativeGet(PPCContext& ctx, uint8_t* base) {
+  const uint32_t to = ctx.r3.u32, list = ctx.r4.u32;
+  const uint32_t from = ui_movies::SlotOf(base, list, ui_movies::LinkAt(base, list, ctx.r5.u32));
+  if (!c_runtime::Memcpy(base, to, from, 40)) {
+    __imp__sub_8211B298(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = to;
+}
 
 // Runs the recompiled version with --native_ui_movies_game off, so the
 // functions it calls that are ours (its recursions among them) run the
@@ -319,7 +348,7 @@ void LeafSetterCases(Context& h, const Block& block) {
                 t.r4.u64 = node;
                 t.r5.u64 = n;
               },
-              __imp__sub_8211A660, sub_8211A660, fmt::format("n {:X}", n));
+              __imp__sub_8211A660, NativeSetLayer, fmt::format("n {:X}", n));
     }
     results.Report();
   }
@@ -509,15 +538,15 @@ void AnimationListCases(Context& h, const Block& block) {
     GuestFunction recompiled, native;
   };
   const Op ops[] = {
-      {"sub_8211B230 (a free link linked in)", __imp__sub_8211B230, sub_8211B230},
+      {"sub_8211B230 (a free link linked in)", __imp__sub_8211B230, NativeLinkFree},
       {"AnimationList::Insert (sub_8211B4D0)", __imp__sub_8211B4D0, sub_8211B4D0},
       {"AnimationList::RemoveAt (sub_8211B080)", __imp__sub_8211B080, sub_8211B080},
-      {"AnimationList::Get (sub_8211B298)", __imp__sub_8211B298, sub_8211B298},
+      {"AnimationList::Get (sub_8211B298)", __imp__sub_8211B298, NativeGet},
   };
   for (const Op& op : ops) {
     Results results(op.name);
     for (int i = 0; i < 400; i++) {
-      const bool links = op.native == sub_8211B230 || op.native == sub_8211B4D0;
+      const bool links = op.native == NativeLinkFree || op.native == sub_8211B4D0;
       // Linking needs a free link; removing and getting a used one.
       const uint32_t used = links ? h.random.Below(32) : 1 + h.random.Below(32);
       const ListSpec spec(h.random, i == 0 ? (links ? 0 : 32) : used);
@@ -537,7 +566,7 @@ void AnimationListCases(Context& h, const Block& block) {
                 }
               },
               [&](PPCContext& t) {
-                if (op.native == sub_8211B298) {
+                if (op.native == NativeGet) {
                   t.r3.u64 = other;
                   t.r4.u64 = list;
                   t.r5.u64 = position;

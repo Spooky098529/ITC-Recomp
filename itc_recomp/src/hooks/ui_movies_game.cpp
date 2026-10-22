@@ -38,7 +38,9 @@ ITC_FLAG_BOOL(native_ui_movies_game, true, "ITC",
               "UiMovie::LoopNamed sub_8211DDE0 and UiMovie::LoopLast sub_8211DDE8, and the "
               "starts UiMovie::Play sub_8211D978 and UiMovie::PlayNamed sub_8211DAC8 (these "
               "without --log_pause_movie) "
-              "(same results; checked by --run_harnesses=ui_movies_game)");
+              "(same results; checked by --run_harnesses=ui_movies_game). sub_8211A660, "
+              "sub_8211B230 and AnimationList::Get have no adapters: only native callers reach "
+              "them, and the flag switches those");
 
 ITC_FLAG_DECLARE(bool, native_ui_movies);
 ITC_FLAG_DECLARE(bool, log_pause_movie);
@@ -71,13 +73,6 @@ extern "C" REX_FUNC(sub_8211A630) {
   REX_FUNC_PROLOGUE();
   NATIVE_OR_ORIGINAL(8211A630);
   ui_movies::SetColor(base, ctx.r4.u32, ctx.r5.u32);
-}
-
-// sub_8211A660: r4 = a node, r5 = a number (r3 left).
-extern "C" REX_FUNC(sub_8211A660) {
-  REX_FUNC_PROLOGUE();
-  NATIVE_OR_ORIGINAL(8211A660);
-  ui_movies::SetLayer(base, ctx.r4.u32, ctx.r5.u32);
 }
 
 // sub_8211A6C0: r3 = movie (left).
@@ -209,13 +204,6 @@ extern "C" REX_FUNC(sub_8211A9E8) {
   ui_movies::InitAnimationLists(base, ctx.r3.u32);
 }
 
-// sub_8211B230: r3 = a list (left), r4 = a position (16-bit).
-extern "C" REX_FUNC(sub_8211B230) {
-  REX_FUNC_PROLOGUE();
-  NATIVE_OR_ORIGINAL(8211B230);
-  ui_movies::LinkFree(base, ctx.r3.u32, int16_t(ctx.r4.u16));
-}
-
 namespace {
 // The 40-byte slot copies: the host's where the two can't share memory,
 // else the game's memcpy (sub_825A7410) from a frame like the original's.
@@ -234,17 +222,6 @@ void CopySlot(PPCContext& ctx, uint8_t* base, uint32_t to, uint32_t from, uint32
   ctx.lr = lr;
 }
 }  // namespace
-
-// AnimationList::Get: r3 = a 40-byte destination, r4 = a list, r5 = a
-// position; returns r3.
-extern "C" REX_FUNC(sub_8211B298) {
-  REX_FUNC_PROLOGUE();
-  NATIVE_OR_ORIGINAL(8211B298);
-  const uint32_t to = ctx.r3.u32, list = ctx.r4.u32;
-  const uint32_t from = ui_movies::SlotOf(base, list, ui_movies::LinkAt(base, list, ctx.r5.u32));
-  CopySlot(ctx, base, to, from, 96, 0x8211B2F4);
-  ctx.r3.u64 = to;
-}
 
 // UiMovie::AnimationTime: r3 = movie (left), r4 = a sub-scene's index or -1,
 // r5 = an animation's index; the time in f1.
