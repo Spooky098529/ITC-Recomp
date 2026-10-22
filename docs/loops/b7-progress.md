@@ -12,12 +12,17 @@ commits, the function files and the subsystems' docs.
   Mapped as `functions/c-runtime.md` (6cbe96a): 89 rows, 54 ready
   groups; the heap, TLS (`_getptd`) and the kernel-calling pieces left
   out (the core).
-- Step: migration (third agent running: the last small math, the string
-  and character helpers).
-- Session: pass 9 of 20, subsystem 3 of 5. In all: subsystem 3 of 5.
+- Step: migration (fourth agent running: tan, ldexp, `_clearfp`, the
+  float formatting pieces, the start-up setters, memcpy if simple).
+- Session: pass 10 of 20, subsystem 3 of 5. In all: subsystem 3 of 5.
 
 ## Done
 
+- C runtime, third migration: rint, `_ctrlfp`, `_abstract_sw`, abs, the
+  wide and narrow string helpers, the second memcpy, the character helpers,
+  strtoul (36b44e6..7c52ae3), under `--native_math` and
+  `--native_c_runtime`; harnesses at 0 differing, race 20 s, no errors.
+  Not run in attract races: abs, mbtowc, strncpy, strcpy_s, strstr.
 - C runtime, second migration: pow and its six helpers, floor, ceil,
   log10, `__ultod`, `_fpclass` (d98d94f..2138474), under `--native_math`;
   harnesses at 0 differing, race 20 s, no errors.
@@ -72,6 +77,8 @@ commits, the function files and the subsystems' docs.
   (wrapped 150, known 263, unknown 6149).
 - After the C runtime's second migration: ours 203, work left 6550
   (wrapped 150, known 251, unknown 6149).
+- After the C runtime's third migration: ours 228, work left 6525
+  (wrapped 150, known 226, unknown 6149).
 
 ## Stopped
 
