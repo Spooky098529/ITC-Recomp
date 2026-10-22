@@ -83,6 +83,15 @@ recompiled code keeps the word as it is, signaling NaNs too (as the 360's
 lfs and stfs do), so the native code copies the word: the harness feeds
 signaling NaNs often. An attract race calls `sub_8211DAC8` once.
 
+After the second migration, nothing in this file is ready: the
+animations' starts and stops that remain (`sub_8211DE38`, `sub_8211DF20`,
+`sub_8211DFF8`) wait on the library's `UiMovie::ApplyAnimation`
+(`sub_825A08E0`, in `ui-movies.md`, still recompiled), the update and the
+movies' set-up and teardown on the blockers above (the heap, VirtualAlloc,
+`std::string`, the string table and font, the math, the texture set), and
+the text setter `sub_8211CD90` on its formatting group (`sub_82109EF0` and
+the rest, over the size cap).
+
 Outside this file, these block it (leads in `../loops/leads.md`): the C
 runtime heap (`sub_825A6880`, `sub_825A6940`, `sub_825A70E8`,
 `sub_825A71C0`), the game's VirtualAlloc and VirtualFree wrappers
@@ -94,9 +103,8 @@ the matrix and vector math (`sub_820AB560`, `sub_820A0AC0`), and the
 movie's texture set (`sub_82596E68`, `sub_82596F68`, `sub_82597118`,
 `sub_822A5B78`). `sub_82119B38` in this range belongs to the sound side
 (a lead). `sub_8211E808`, which sets up a movie as `sub_82247AA0` and
-`sub_822912A0` do (`sub_8211E1C0`, `sub_8211A9E8`, `sub_8211E798`), has no
-row yet; it does run in play (it's in `seen_in_play.txt`, and an attract
-race calls `sub_8211A9E8` from `0x8211E870`, inside it), so it needs one.
+`sub_822912A0` do (`sub_8211E1C0`, `sub_8211A9E8`, `sub_8211E798`), runs in
+play and has its row (added in the second migration).
 
 Status:
 
@@ -140,6 +148,7 @@ run it after changing either, on any branch.
 | Address | Name | Status | Notes |
 |---|---|---|---|
 | `sub_8211E1B8` | `UiMovie::Run` | | A jump to the update `sub_8211D2F8` (in [`ui-movies.md`](ui-movies.md), shared): r3 = movie, r4 = 0 advance and draw, 1 draw only; returns 1 while an animation plays or is queued, else 0. 628 call sites in `generated/` (122 callers seen in play: the HUD, the menus, the pause screens, the rival logo's `sub_82211A28` from `0x82211A74`). No override: `--log_pause_movie` names its caller from lr. |
+| `sub_8211E808` | `UiMovies::Open` (probably) | | r3 = a movie id, r4 = an asset id: when the movie table (`0x826C5CCC`, `sub_8211B3F0`) already has a movie for the id, returns 0; else allocates one (40,976 bytes, `sub_825A6880`) and builds it (`sub_8211E1C0`; 0 when the allocation fails, passed on anyway), sets up its animation lists (`sub_8211A9E8`), stores the id at +0x9FD4, loads the asset into it (`sub_8211E798`), adds it to the table (`sub_8211C168`, the id and the movie from its frame) and returns 1. 10 call sites (mostly tail calls); callers seen in play: `sub_8219B950`, `sub_8220AA40`, `sub_8225A510`, `sub_8222C300` (two calls), `sub_82221990`, `sub_821A1D10`; `sub_822891F8`, `sub_82242F10` and `sub_82276E40` never ran. An attract race calls `sub_8211A9E8` from `0x8211E870` here. Blocked by the heap (`sub_825A6880`), `sub_8211E1C0`, `sub_8211E798` and `sub_8211C168`. |
 | `sub_8211E1C0` | `UiMovie::UiMovie` | | r3 = a new movie: the textures at +28 (`sub_8211AE18`), the text list at +40 (`sub_8211B018`, count +48 = 0), the draw context at +64 (`sub_8259D930`, in `ui-movies.md`), the 1,024 named animations from +176 (`sub_8211D210` each; count at +0x90B0 = 0), the texts' 128 pairs at +0x9BCC cleared (count +0x9FCC = 0). Returns r3. From `sub_82247AA0`, `sub_822912A0` (and `sub_8211E808`, never in play), which also call `sub_8211A9E8` and `sub_8211E798`. |
 | `sub_8211A9E8` | | Overridden | r3 = a movie: clears +0..+24 and the loaded flag (+0x9FD0), and sets up its two animation lists (at +0x90B4, the queue, and +0x9640, the looping animations): 32 links each (+0 the next, +2 the slot), the free list from 0 (+128), none in use (+132 = -1, +136 the count = 0; +130, +134 = -1). From the same callers as `sub_8211E1C0`. Native under `--native_ui_movies_game` (`ui_movies::InitAnimationLists`). Called in an attract race from `0x8211E870` (`sub_8211E808`) and `0x822912E4`. |
 | `sub_8211E798` | `UiMovie::Load` | | r3 = movie, r4 = an asset id: allocates the asset's size (`sub_820A0678(id)`, `sub_82295398`) and requests it (`Archive::Load`, `sub_8209DE48`, in `files-and-saves.md`) with `sub_8211E500` as the callback and the movie as its context. From the same callers as `sub_8211E1C0`. |
@@ -161,7 +170,7 @@ run it after changing either, on any branch.
 | `sub_8211B0E8` | | | r3 = a vector of 8-byte pairs: capacity 64 (+4), 512 bytes allocated (`sub_825A6940`) and cleared at +0. From the static set-up `sub_825D9678`, for the movie table at `0x826C5CCC` (which then sets its count, +8, to 0 and registers its clean-up with `atexit`). |
 | `sub_8211B3F0` | `UiMovies::Find` | Overridden | r3 = a vector of {key, value} pairs (+0 the data, +8 the count), r4 = the key's address: returns the value's address, or `0x826C5CDC` when not found. Leaf. Mostly on the movie table at `0x826C5CCC` (a movie by id): 1,256 call sites in `generated/`, 213 callers seen in play (every screen, the HUD, the rival logo). The key is read only when the count isn't 0; the data pointer is read again for the result. Native under `--native_ui_movies_game` (`ui_movies::PairsFind`). Called ~4,000 times in an attract race's 20 s (from `0x8211E834`, `0x8220BA0C` and others). |
 | `sub_8211BE98` | `UiMovies::IsLoaded` | Overridden | r3 = a movie id: the movie's loaded flag (+0x9FD0) is set (`sub_8211B3F0` on `0x826C5CCC`; no check that the movie exists: an id not in the table reads the word at `0x826C5CDC` as the movie). Returns 1 or 0. 19 callers seen in play. Native under `--native_ui_movies_game` (`ui_movies::IsLoaded`, through `PairsFindKey`). Called over 1,000 times in an attract race. |
-| `sub_8211C168` | | | r3 = a vector of pairs, r4 = the key's address, r5 = the value's address: sets the value when the key is there, else appends the pair (`sub_8211B458`). From `sub_8211E258` (and `sub_8211E808`, never in play). |
+| `sub_8211C168` | | | r3 = a vector of pairs, r4 = the key's address, r5 = the value's address: sets the value when the key is there, else appends the pair (`sub_8211B458`). From `sub_8211E258` and `sub_8211E808`. |
 | `sub_8211B458` | | | r3 = a vector of 8-byte pairs (+0, +4 the capacity, +8 the count), r4 = a pair: appends it, doubling the capacity first when full (`sub_8211B160`). From `sub_8211C168`. |
 | `sub_8211B160` | | | r3 = a vector of 8-byte pairs, r4 = the new capacity: when it differs, allocates it (`sub_825A6940`, -1 bytes on overflow), cleared, copies the pairs that fit and frees the old array (`sub_825A71C0`). From `sub_8211B458`. |
 | `sub_8211AE18` | | | r3 = a vector of words: capacity 512 (+4), 2 KB allocated (`sub_825A6940`), count 0 (+8). Returns r3. The movie's textures; from `sub_8211E1C0`. |
