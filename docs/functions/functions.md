@@ -75,7 +75,11 @@ Rows not yet moved stay in the table below. So far:
   menus' and the pause screens' 2D movies): loading and fixing up movie
   files, applying animations' tracks to nodes, and drawing the node tree
   as quads, with the game's movie update and rest pose (B7; the rest of
-  the game's `UiMovie::` side is a lead).
+  the game's `UiMovie::` side is in `ui-movies-game.md`).
+- [`ui-movies-game.md`](ui-movies-game.md): the game's side of the UI
+  movies (`UiMovie::`): loading and unloading movies and the table of
+  them by id, node lookups and setters, the animation queue and the
+  looping animations, the movies' texts and the text list's draw (B7).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
@@ -337,14 +341,8 @@ old performance notes to the end of `../native-renderer.md`.
 | `sub_82092968` | | Wrapped | Runs the app's component lists (r4's low word a component; its vtable slot 1); named for `--find_menu_selection`. |
 | `sub_8220C1E0` | `MenuList::Update` | Wrapped | Logged for `--log_pause_menu` (`src/debug/pause_menu_log.cpp`). `sub_8210C370` reads logical pad `j`'s values 0-7 (sticks, triggers) through the pointer at mapper +2880 (= input manager +44 + 196j) and the buttons through the listener object at mapper +2464 (seen by the read watch, 2026-10-19). |
 | `sub_8210C370` | `ActionMapper::Update` | Wrapped | Logged for `--log_pause_menu` (`src/debug/pause_menu_log.cpp`). `sub_8210C370` reads logical pad `j`'s values 0-7 (sticks, triggers) through the pointer at mapper +2880 (= input manager +44 + 196j) and the buttons through the listener object at mapper +2464 (seen by the read watch, 2026-10-19). |
-| `sub_8211C7E8` | | Wrapped | The pause sub-menus' calls on their UI movie (setting animation targets and the children's +80 flags, starting animations, switching sub-screens); logged for `--log_pause_movie` (`src/debug/pause_movie_log.cpp`). |
 | `sub_821BE5A8` | | Wrapped | The pause sub-menus' calls on their UI movie (setting animation targets and the children's +80 flags, starting animations, switching sub-screens); logged for `--log_pause_movie` (`src/debug/pause_movie_log.cpp`). |
 | `sub_8220D040` | | Wrapped | The pause sub-menus' calls on their UI movie (setting animation targets and the children's +80 flags, starting animations, switching sub-screens); logged for `--log_pause_movie` (`src/debug/pause_movie_log.cpp`). |
-| `sub_8211DAC8` | | Wrapped | The pause sub-menus' calls on their UI movie (setting animation targets and the children's +80 flags, starting animations, switching sub-screens); logged for `--log_pause_movie` (`src/debug/pause_movie_log.cpp`). |
-| `sub_8211D978` | | Wrapped | The pause sub-menus' calls on their UI movie (setting animation targets and the children's +80 flags, starting animations, switching sub-screens); logged for `--log_pause_movie` (`src/debug/pause_movie_log.cpp`). |
-| `sub_8211DE38` | | Wrapped | The pause sub-menus' calls on their UI movie (setting animation targets and the children's +80 flags, starting animations, switching sub-screens); logged for `--log_pause_movie` (`src/debug/pause_movie_log.cpp`). |
-| `sub_8211DDD8` | | Wrapped | The pause sub-menus' calls on their UI movie (setting animation targets and the children's +80 flags, starting animations, switching sub-screens); logged for `--log_pause_movie` (`src/debug/pause_movie_log.cpp`). |
-| `sub_8211DF20` | | Wrapped | The pause sub-menus' calls on their UI movie (setting animation targets and the children's +80 flags, starting animations, switching sub-screens); logged for `--log_pause_movie` (`src/debug/pause_movie_log.cpp`). |
 | `sub_8220BA68` | | Wrapped | The pause sub-menus' calls on their UI movie (setting animation targets and the children's +80 flags, starting animations, switching sub-screens); logged for `--log_pause_movie` (`src/debug/pause_movie_log.cpp`). |
 | `sub_8258FBD0` | `Command::*` (1) | Wrapped | The render command handlers, by id (`REPLAY_COUNTED_HANDLER`, `src/native/replay_hooks.cpp`): the native renderer and the stats logger see every command. Command 7 is `sub_8258FD48` above; 0, 36 and 37 aren't wrapped. The commands: "Command list format" in `../frame-interpolation.md` here and `gpu-functions.md`. |
 | `sub_8258FC30` | `Command::*` (2) | Wrapped | The render command handlers, by id (`REPLAY_COUNTED_HANDLER`, `src/native/replay_hooks.cpp`): the native renderer and the stats logger see every command. Command 7 is `sub_8258FD48` above; 0, 36 and 37 aren't wrapped. The commands: "Command list format" in `../frame-interpolation.md` here and `gpu-functions.md`. |
@@ -413,9 +411,6 @@ old performance notes to the end of `../native-renderer.md`.
 | `sub_8210BFA8` | | Wrapped | The action mappers' read slots (vtable `0x82007F78`; r3 the mapper, r4 the action id 151-180); logged for `--log_pause_menu` (`PAUSE_MENU_READ_SLOT`). |
 | `sub_8210C010` | | Wrapped | The action mappers' read slots (vtable `0x82007F78`; r3 the mapper, r4 the action id 151-180); logged for `--log_pause_menu` (`PAUSE_MENU_READ_SLOT`). |
 | `sub_8210BA28` | | Wrapped | The action mappers' read slots (vtable `0x82007F78`; r3 the mapper, r4 the action id 151-180); logged for `--log_pause_menu` (`PAUSE_MENU_READ_SLOT`). |
-| `sub_8211CD90` | | Wrapped | The UI movie update's callees besides its tracks (and `sub_82119B80`, in [`ui-movies.md`](ui-movies.md)), watched for writes for `--log_pause_movie` (`WATCH_MOVIE_CALL`). |
-| `sub_8211B4D0` | | Wrapped | The UI movie update's callees besides its tracks (and `sub_82119B80`, in [`ui-movies.md`](ui-movies.md)), watched for writes for `--log_pause_movie` (`WATCH_MOVIE_CALL`). |
-| `sub_8211B080` | | Wrapped | The UI movie update's callees besides its tracks (and `sub_82119B80`, in [`ui-movies.md`](ui-movies.md)), watched for writes for `--log_pause_movie` (`WATCH_MOVIE_CALL`). |
 | `sub_8258E5E0` | | Wrapped | Named in `--find_menu_selection`'s log (`ITC_MENU_SCAN_WRAP`): `Scene::Update`'s two screen calls and others. |
 | `sub_8258ED78` | | Wrapped | Named in `--find_menu_selection`'s log (`ITC_MENU_SCAN_WRAP`): `Scene::Update`'s two screen calls and others. |
 | `sub_8259D1A8` | | Wrapped | Named in `--find_menu_selection`'s log (`ITC_MENU_SCAN_WRAP`): `Scene::Update`'s two screen calls and others. |
