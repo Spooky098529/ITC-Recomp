@@ -93,6 +93,50 @@ double SinPolynomial(double r, double r2) {
   return p * r;
 }
 
+// atan and atan2's constants, the doubles at 0x8266B660: +8 pi/2, +16 pi,
+// +24 2 - sqrt(3) (the reduction's bound), +40 sqrt(3), +48 the largest
+// argument reduced, +56 to +120 the polynomial, +128 0, pi/6, pi/2 and pi/3
+// (added by range); the floats 0.0 at +168 and 1.0 at +176.
+constexpr uint64_t kAtanTable[23] = {
+    0x3E46A09E667F3BCD, 0x3FF921FB54442D18, 0x400921FB54442D18, 0x3FD126145E9ECD56,
+    0x3FE76CF5D0B09955, 0x3FFBB67AE8584CAA, 0x7FD0000000000000, 0xC02B60A651061CE2,
+    0xC034817FB9E2BCCB, 0xC020FD3F5C8D6A63, 0xBFEACD7AD9B187BD, 0x4044887CBCC495A9,
+    0x40558A12040B6DA5, 0x404DCA0A320DA3D7, 0x402E0C49E14AC710, 0x3FF0000000000000,
+    0x0000000000000000, 0x3FE0C152382D7366, 0x3FF921FB54442D18, 0x3FF0C152382D7366,
+    0x0010000000000000, 0x000000003F000000, 0x3F80000000000000,
+};
+double AtanK(uint32_t offset) {
+  return D(kAtanTable[offset / 8]);
+}
+
+// atan and atan2's shared steps, from t (0 <= t <= 1 or a NaN) and its range
+// so far (0, or 2 for 1/|x|): reduced by (sqrt(3) t - 1)/(sqrt(3) + t)
+// above 2 - sqrt(3), a rational polynomial, negated for ranges above 1, plus
+// the range's constant.
+double AtanReduced(double t, int range) {
+  if (t > AtanK(24)) {
+    range++;
+    const double denominator = AtanK(40) + t;
+    t = std::fma(AtanK(40), t, -1.0) / denominator;  // fmsub
+  }
+  const double z = t * t;
+  double q = AtanK(112) + z;
+  double p = std::fma(AtanK(80), z, AtanK(72));
+  q = std::fma(q, z, AtanK(104));
+  p = std::fma(p, z, AtanK(64));
+  q = std::fma(q, z, AtanK(96));
+  p = std::fma(p, z, AtanK(56));
+  q = std::fma(q, z, AtanK(88));
+  double r = p * z;
+  r = r * t;
+  r = r / q;
+  r = r + t;
+  if (range > 1) {
+    r = Neg(r);
+  }
+  return AtanK(128 + 8 * range) + r;
+}
+
 // asin and acos's constants, the doubles at 0x8266B470 (as read from guest
 // memory). The floats in the first two words are 0.0, 1.0, 2.0 and 0.5.
 constexpr uint64_t kAsinTable[16] = {
@@ -215,6 +259,51 @@ double Cos(double x) {
     return 1.0;
   }
   return result;
+}
+
+double Atan(double x) {
+  const double ax = Abs(x);
+  double a;
+  if (ax > 1.0) {
+    a = ax > AtanK(48) ? AtanK(8) : AtanReduced(1.0 / ax, 2);
+  } else {
+    a = AtanReduced(ax, 0);
+  }
+  const double result = Select(x, a, Neg(a));
+  if (Bits(ax) == 0) {
+    return x;
+  }
+  return result;
+}
+
+double Atan2(double y, double x) {
+  double a;
+  if (x == 0.0) {
+    if (y == 0.0) {
+      // atan2(+-0, +0) is y; atan2(+-0, -0) is +-pi.
+      if ((Bits(x) >> 63) == 0) {
+        return y;
+      }
+      return (Bits(y) >> 63) != 0 ? Neg(AtanK(16)) : AtanK(16);
+    }
+    a = AtanK(8);
+  } else {
+    // The smaller magnitude over the larger: range 2 when |y| is larger.
+    const double ax = Abs(x);
+    const double ay = Abs(y);
+    double t;
+    int range = 0;
+    if (ay > ax) {
+      t = ax / ay;
+      range = 2;
+    } else {
+      t = ay / ax;
+    }
+    a = AtanReduced(t, range);
+  }
+  const double behind = AtanK(16) - a;  // pi - a, for x < 0
+  const double result = Select(x, a, behind);
+  return (Bits(y) >> 63) != 0 ? Neg(result) : result;
 }
 
 }  // namespace c_runtime

@@ -92,6 +92,31 @@ void Unary(Context& h, const char* name, GuestFunction recompiled, GuestFunction
   results.Report();
 }
 
+// atan2 over pairs: f1 = y, f2 = x; f1 and r3 compared.
+void Binary(Context& h, const char* name, GuestFunction recompiled, GuestFunction native,
+            const std::vector<std::pair<double, double>>& pairs) {
+  Results results(name);
+  for (const auto& [y, x] : pairs) {
+    std::vector<uint8_t> result[2];
+    for (int v = 0; v < 2; v++) {
+      PPCContext t = CallContext(h);
+      t.f1.f64 = y;
+      t.f2.f64 = x;
+      (v == 0 ? recompiled : native)(t, h.base);
+      for (int i = 0; i < 8; i++) {
+        result[v].push_back(uint8_t(t.f1.u64 >> (56 - 8 * i)));
+      }
+      for (int i = 0; i < 4; i++) {
+        result[v].push_back(uint8_t(t.r3.u32 >> (24 - 8 * i)));
+      }
+    }
+    results.Check(result[0], result[1],
+                  fmt::format("y {:016X} x {:016X}", std::bit_cast<uint64_t>(y),
+                              std::bit_cast<uint64_t>(x)));
+  }
+  results.Report();
+}
+
 }  // namespace
 
 void Math(Context& h) {
@@ -128,6 +153,42 @@ void Math(Context& h) {
     AddRandom(h, values, 3e8, 300);
     Unary(h, "sin (sub_825A88A0)", __imp__sub_825A88A0, sub_825A88A0, values);
     Unary(h, "cos (sub_825A8978)", __imp__sub_825A8978, sub_825A8978, values);
+  }
+
+  // atan and atan2: 1.0 (where 1/|x| starts), 2 - sqrt(3) (where the
+  // reduction starts), the largest reduced argument, every size; atan2 over
+  // every pair of the special values (the zeros' signs pick the quadrant),
+  // equal and near-equal magnitudes, and random pairs.
+  {
+    std::vector<double> values = SpecialValues();
+    for (double x : {1.0, 0.2679491924311227, 3.7320508075688772, 4.49423283715579e+307, 1e-8,
+                     0.5, 2.0, 1e10}) {
+      AddAround(values, x);
+    }
+    AddRandom(h, values, 1.0, 1000);
+    AddRandom(h, values, 10.0, 1000);
+    AddRandom(h, values, 1e6, 200);
+    Unary(h, "atan (sub_825A8688)", __imp__sub_825A8688, sub_825A8688, values);
+
+    std::vector<std::pair<double, double>> pairs;
+    const std::vector<double> specials = SpecialValues();
+    std::vector<double> edges = specials;
+    for (double x : {1.0, -1.0, 0.5, -3.0, 1e-8}) {
+      edges.push_back(x);
+    }
+    for (double y : edges) {
+      for (double x : edges) {
+        pairs.push_back({y, x});
+      }
+    }
+    std::vector<double> random;
+    AddRandom(h, random, 100.0, 2000);
+    for (size_t i = 0; i + 1 < random.size(); i += 2) {
+      pairs.push_back({random[i], random[i + 1]});
+      pairs.push_back({random[i], random[i]});
+      pairs.push_back({random[i], -std::nextafter(random[i], 0.0)});
+    }
+    Binary(h, "atan2 (sub_825A8770)", __imp__sub_825A8770, sub_825A8770, pairs);
   }
 }
 

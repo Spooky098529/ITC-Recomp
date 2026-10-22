@@ -27,4 +27,8 @@ double Asin(double x);
 double Sin(double x);
 double Cos(double x);
 
+// atan (sub_825A8688) and atan2 (sub_825A8770; y, then x).
+double Atan(double x);
+double Atan2(double y, double x);
+
 }  // namespace c_runtime
