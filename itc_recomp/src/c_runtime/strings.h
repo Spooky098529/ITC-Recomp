@@ -83,4 +83,12 @@ uint32_t IsLeadByte(uint8_t* base, uint32_t c);
 bool StrToXl(uint8_t* base, uint32_t string, int32_t radix, uint32_t flags, bool want_end,
              uint32_t* end, uint64_t* result);
 
+// memcpy (sub_825A7410)'s copy: the bytes copied with the host's memcpy,
+// the same bytes the original's byte, word and doubleword loops leave when
+// the two ranges don't share memory. False, with nothing copied, where they
+// might: ranges that overlap in the memory behind them (the guest views that
+// share memory, the xex's two and the physical ones, counted as one), or a
+// range that crosses from one view into another; the original runs there.
+bool Memcpy(uint8_t* base, uint32_t destination, uint32_t source, uint32_t size);
+
 }  // namespace c_runtime

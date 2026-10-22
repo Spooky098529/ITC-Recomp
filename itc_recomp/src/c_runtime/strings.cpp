@@ -4,6 +4,9 @@
 
 #include "guest.h"
 
+#include <cstring>
+#include <iterator>
+
 namespace c_runtime {
 
 uint32_t Wcslen(uint8_t* base, uint32_t string) {
@@ -302,6 +305,54 @@ bool StrToXl(uint8_t* base, uint32_t string, int32_t radix, uint32_t flags, bool
   }
   *end = next;
   *result = (flags & 2) != 0 ? 0 - uint64_t(value) : uint64_t(value);
+  return true;
+}
+
+namespace {
+
+// The guest's views of host memory and where each starts in the memory behind
+// them (map_info in the SDK's src/system/xmemory.cpp): 0x7F000000 and the
+// views from 0xA0000000 show the physical memory (from 0xE0000000 offset by
+// 4 KB), 0x80000000 and 0x90000000 both the xex.
+struct View {
+  uint32_t start;
+  uint64_t target;
+};
+constexpr View kViews[] = {
+    {0x00000000, 0x000000000}, {0x40000000, 0x040000000}, {0x7F000000, 0x100000000},
+    {0x80000000, 0x080000000}, {0x90000000, 0x080000000}, {0xA0000000, 0x100000000},
+    {0xC0000000, 0x100000000}, {0xE0000000, 0x100001000},
+};
+
+// Where `size` bytes at `address` start in the memory behind the views;
+// false when they cross into the next view (or past 4 GB).
+bool Behind(uint32_t address, uint32_t size, uint64_t* start) {
+  size_t i = std::size(kViews) - 1;
+  while (address < kViews[i].start) {
+    i--;
+  }
+  const uint64_t end = i + 1 < std::size(kViews) ? kViews[i + 1].start : 0x100000000ull;
+  if (uint64_t(address) + size > end) {
+    return false;
+  }
+  *start = kViews[i].target + (address - kViews[i].start);
+  return true;
+}
+
+}  // namespace
+
+bool Memcpy(uint8_t* base, uint32_t destination, uint32_t source, uint32_t size) {
+  if (size == 0) {
+    return true;
+  }
+  uint64_t to, from;
+  if (!Behind(destination, size, &to) || !Behind(source, size, &from)) {
+    return false;
+  }
+  if (to < from + size && from < to + size) {
+    return false;  // overlapping: the original's loop order decides
+  }
+  std::memcpy(REX_RAW_ADDR(destination), REX_RAW_ADDR(source), size);
   return true;
 }
 

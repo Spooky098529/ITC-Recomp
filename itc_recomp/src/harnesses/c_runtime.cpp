@@ -887,6 +887,56 @@ void CRuntime(Context& h) {
     results.Report();
   }
 
+  // memcpy (sub_825A7410, its override with the native copy against the
+  // original): every alignment of both ends (mod 8) for sizes around the
+  // original's paths (bytes, words, doublewords, 128-byte blocks), random
+  // alignments for the sizes between, a source and destination across a
+  // page end, and overlaps either way by 1 to 17 bytes (left to the
+  // original by the native copy); the scratch area and r3 compared.
+  {
+    Results results("memcpy (sub_825A7410)");
+    auto copy_case = [&](uint32_t to, uint32_t from, uint32_t size) {
+      const auto bytes = RandomBytes(h, size + 16);
+      StringCase(h, results, [&] { Write(h.base, from - 8, bytes.data(), size + 16); },
+                 [&](PPCContext& t) {
+                   t.r3.u64 = to;
+                   t.r4.u64 = from;
+                   t.r5.u64 = size;
+                 },
+                 __imp__sub_825A7410, sub_825A7410,
+                 fmt::format("to +{} from +{} size {}", to - h.data, from - h.data, size));
+    };
+    std::vector<uint32_t> sizes;
+    for (uint32_t size = 0; size <= 300; size++) {
+      sizes.push_back(size);
+    }
+    for (uint32_t size : {383u, 384u, 385u, 511u, 512u, 513u, 1000u, 1023u, 1024u, 1025u, 1500u}) {
+      sizes.push_back(size);
+    }
+    for (uint32_t size : sizes) {
+      const bool all = size <= 40 || (size >= 120 && size <= 140) || size >= 256;
+      for (uint32_t a = 0; a < 8; a++) {
+        for (uint32_t b = 0; b < 8; b++) {
+          if (!all && h.random.Below(16) != 0) {
+            continue;
+          }
+          copy_case(h.data + 2048 + a, h.data + 64 + b, size);
+        }
+      }
+    }
+    for (uint32_t size : {5u, 64u, 200u, 700u}) {
+      copy_case(h.data + places.page_end - 3, h.data + 64 + 1, size);
+      copy_case(h.data + 2048 + 4, h.data + places.page_end - 9, size);
+    }
+    for (uint32_t size : {1u, 7u, 8u, 9u, 16u, 64u, 127u, 128u, 129u, 300u}) {
+      for (uint32_t k = 1; k <= 17; k++) {
+        copy_case(h.data + 1024 + k, h.data + 1024, size);
+        copy_case(h.data + 1024, h.data + 1024 + k, size);
+      }
+    }
+    results.Report();
+  }
+
   // __iob_func: r3 from random registers.
   {
     Results results("__iob_func (sub_825AD4C0)");

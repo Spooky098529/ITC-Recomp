@@ -29,6 +29,12 @@ ITC_FLAG_BOOL(native_c_runtime, true, "ITC",
               "(checked by "
               "--run_harnesses=c_runtime)");
 
+ITC_FLAG_BOOL(native_memcpy, true, "ITC",
+              "Copy natively in the C runtime's memcpy (sub_825A7410), inside its override in "
+              "src/native/buffers.cpp that records copies for the renderer's memory mirrors: the "
+              "host's memcpy where the two ranges don't share memory, the translated code "
+              "otherwise (checked by --run_harnesses=c_runtime)");
+
 // __chkstk: r12 = minus the frame about to be made (4 KB or more). Reads one
 // word every 4,096 bytes below r1 down to the new frame, touching the guard
 // pages on the 360; the guest stack here is ordinary memory, so the reads do
