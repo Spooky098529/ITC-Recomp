@@ -19,11 +19,13 @@ memory.
 
 ## Settings (set by the user, 2026-10-22)
 
-- **Branch:** `b7-loop-test`, made from `rexglue-removal-project` by the user
-  (2026-10-22), already there: the first pass doesn't make it. The loop never
+- **Branch:** `b7-loop-22-10-26`, made from `rexglue-removal-project` at
+  the user's request (2026-10-22, after the first run's branch,
+  `b7-loop-test`, was merged), already there: the first pass doesn't make
+  it. The loop never
   makes another branch, never touches `main` or tags, and never merges:
   the user reviews and merges the branch.
-- **Code changes without asking first:** allowed on `b7-loop-test`, for the
+- **Code changes without asking first:** allowed on `b7-loop-22-10-26`, for the
   subsystems the loop takes. This relaxes the "explain before code
   changes" rule for the loop's branch, nowhere else.
 - **Function rows:** written by the agents as they go (the status check
@@ -161,7 +163,7 @@ code, no builds, no game runs):
   `leads.md`.
 - **Runs** `check_function_statuses.py` (no errors) and `b7_status.py`.
 - **Commits** (only its own files, by path; the staged diff checked for
-  `/home/`) and pushes `b7-loop-test`.
+  `/home/`) and pushes `b7-loop-22-10-26`.
 
 Report, in its last message:
 
@@ -224,7 +226,7 @@ functions; run again after each group, as callers become ready):
 6. Records: the rows (Status by the definitions at the top), then
    `check_function_statuses.py`; what was learned in the subsystem's doc.
 7. Commits each group (only its own files, by path; the staged diff
-   checked for `/home/`) and pushes `b7-loop-test`.
+   checked for `/home/`) and pushes `b7-loop-22-10-26`.
 8. Removes the adapters that can go ("Removing an adapter" below): after
    each group, `b7_groups.py --removable` on the subsystem's functions
    (callees become removable as their callers are made native), each
@@ -293,7 +295,7 @@ file, when:
 - a report's `stop:` isn't `none`;
 - a map fails its check, or `leads.md` has nothing the loop can take;
 - the session's or the total limit is reached;
-- the tree has changes the loop didn't make, or isn't on `b7-loop-test`.
+- the tree has changes the loop didn't make, or isn't on `b7-loop-22-10-26`.
 
 Whatever the reason, before ending, the lead also brings the run's
 summary up to date ("The run's summary") and the B7 status
