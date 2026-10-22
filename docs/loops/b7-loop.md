@@ -43,7 +43,10 @@ memory.
    run most often or are closest to being ready
    (`itc_recomp/tools/b7_groups.py <its functions>`), not one that needs
    a decision only the user can make. Its line is deleted from `leads.md`
-   when picked.
+   when picked. A lead marked "no mapping" (cleanup in files
+   already mapped, such as adapters to remove) goes straight to a
+   migration agent (step 6) with the files it names, and doesn't count as
+   a subsystem toward the limits.
 2. **Hand it to a mapping agent** (below).
 3. The mapping agent **writes `docs/functions/<name>.md`** for the
    subsystem's functions.
@@ -86,7 +89,9 @@ nothing runs and there's work, about a minute.
 - `itc_recomp/tools/b7_groups.py [root ...]`: a function's group (it and
   the callees only it calls), whether it's ready (nothing outside it that
   runs is still recompiled), the ready groups under a root and the
-  blockers. Groups are made native from the bottom up, as native code can
+  blockers. `--removable` lists the overridden functions whose adapters
+  may go (see "Removing an adapter"). Groups are made native from the
+  bottom up, as native code can
   only call what's already ours.
 - `itc_recomp/tools/check_function_statuses.py`: the Status column
   against `src/` (run after any row change); a function in rows of two
@@ -202,6 +207,43 @@ functions; run again after each group, as callers become ready):
    `check_function_statuses.py`; what was learned in the subsystem's doc.
 7. Commits each group (only its own files, by path; the staged diff
    checked for `/home/`) and pushes `b7-loop-test`.
+8. Removes the adapters that can go ("Removing an adapter" below): after
+   each group, `b7_groups.py --removable` on the subsystem's functions
+   (callees become removable as their callers are made native), each
+   candidate confirmed, its adapter removed and its row set to Native,
+   committed on its own.
+
+### Removing an adapter
+
+A function stays Overridden while its `REX_FUNC` adapter exists, and the
+adapter is what recompiled code calls. Once no recompiled code reaches it
+in play, the adapter goes and the function is Native (the definitions at
+the top of `functions.md`). Removing one can't break anything: without
+it, `sub_X` is the recompiled original again, so any recompiled path still
+reaching it runs the original, as before; native callers keep calling the
+plain C++ directly, and their fallback flags switch only the callers.
+
+`b7_groups.py --removable [function ...]` lists the candidates: every
+direct caller seen in play is ours. Functions with no direct caller in
+play are reached through a vtable or a function pointer, so their
+adapters stay. For each candidate, before removing its adapter:
+
+- Read each caller's adapter and plain C++: it calls the candidate's
+  plain C++ directly, and the paths it hands back to the original
+  (`__imp__`, edge cases, error paths) aren't the ones that run in play
+  (they'd still be correct, as the original runs, but no longer native).
+- Grep `itc_recomp/src` for the candidate's adapter being called (other
+  adapters or helpers calling `sub_X(ctx, base)`): those calls go to the
+  plain C++ first.
+- The harness calls the plain C++ and `__imp__sub_X` directly, not the
+  adapter.
+- A temporary counter in the adapter shows it isn't called in an attract
+  race with the flags on (outside the harness); removed by editing.
+
+Then the adapter is deleted, the row set to Native (saying which native
+callers reach it, and that the fallback flag now switches only them),
+`check_function_statuses.py` run (it refuses Native with an override
+left), and the usual build and `attract_race.sh 25 --run_harnesses=all`.
 
 It stops when nothing ready is left in the subsystem, after about five
 groups (the lead starts another), or at a failure. Report, in its last
@@ -213,6 +255,7 @@ groups: <root -> commit, one a line>
 harnesses: <each "harness: <function>: N cases, M differ" line, verbatim>
 race: <seconds at 30 ticks/s>, <error lines>
 rows: <functions whose rows changed>
+native: <functions whose adapters were removed (now Native)> | none
 flags: <the --native_ flags added>
 left: <ready groups left> | none; blocked by: <blockers> | none
 uncommitted: none | <what and why>
