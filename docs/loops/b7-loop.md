@@ -65,7 +65,8 @@ memory.
 8. **Hand its work to a validation agent** (below; added by the user,
    2026-10-22) after each migration agent's report has passed the
    lead's checks, the "no mapping" leads' too: it checks from a log that
-   every function the step made native ran as our code.
+   every function the step made native ran as our code in its harness,
+   and which ran in play.
 9. **Record the finished subsystem** in the summary docs, once nothing
    ready is left in it (the lead does this itself, in the pass that
    takes the next lead, and commits it with the progress file):
@@ -298,36 +299,37 @@ stop: none | <reason>
 
 Each native function's plain C++ starts with
 `ITC_NATIVE_RUNNING("sub_X Name");` (`src/base/log.h`), which logs
-`native running: sub_X Name` the first time it runs (once a function, so
-logs stay readable). Prompt the agent with: the migration agent's report
-(its `groups:`, `native:` and `flags:` lines and commits), this section,
-"The tooling" and "Rules that still hold", and the report format. One at
-a time, after the migration agent (it builds and runs the game in this
-tree). For every function the step made native, or whose adapter it
-removed:
+`native running (game): sub_X Name` the first time the game runs it and
+`native running (harness): sub_X Name` the first time a harness does
+(`--run_harnesses` runs inside `base::InHarnessScope`, a thread-local
+flag; once a function and kind, so logs stay readable). Prompt the agent
+with: the migration agent's report (its `groups:`, `native:` and `flags:`
+lines and commits), this section, "The tooling" and "Rules that still
+hold", and the report format. One at a time, after the migration agent
+(it builds and runs the game in this tree). For every function the step
+made native, or whose adapter it removed:
 
 1. **Checks the print** is the first statement of its plain C++ (grep
    `itc_recomp/src` for the address). Missing ones it adds, in one commit,
    pushed (a print only, no other change).
 2. **Runs** the build and `attract_race.sh 25 --run_harnesses=all` with
-   the default flags, and checks the log has a `native running:` line for
-   each function: run in play or by its harness, it ran as our code. A
-   function with no line didn't (a harness calling the adapter, or
-   `__imp__` on both sides, once its adapter is gone), or nothing reached
-   it.
-3. **Runs** `attract_race.sh 25` without harnesses, and lists which of the
-   functions ran in play (for the rows; not a failure when a function
-   only runs in menus or on paths an attract race doesn't take).
+   the default flags, and checks the log has a `native running
+   (harness):` line for each function: its harness ran our code. A
+   function with none didn't (a harness calling the adapter, or `__imp__`
+   on both sides once its adapter is gone), or its harness doesn't reach
+   it. The `(game):` lines list which functions ran in play, for the rows
+   (no line isn't a failure: a function may only run in menus or on paths
+   an attract race doesn't take).
 
-It fixes nothing but missing prints: a function with no line goes in the
-report, and the lead halts. Report, in its last message:
+It fixes nothing but missing prints: a function with no harness line
+goes in the report, and the lead halts. Report, in its last message:
 
 ```
 validate: <name>
 prints added: none | <functions>: <commit>
-ran (with harnesses): <count> of <count>
-missing: none | <functions with no line, and why if known>
-ran in play: <functions seen without harnesses> | none
+harness lines: <count> of <count>
+missing: none | <functions with no harness line, and why if known>
+ran in play: <functions with a game line> | none
 race: <seconds at 30 ticks/s>, <error lines>, harnesses all 0: yes | no
 stop: none | <reason>
 ```

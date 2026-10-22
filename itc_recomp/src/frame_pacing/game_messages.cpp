@@ -654,7 +654,10 @@ bool g_input_manager_logged = false;  // this race
 
 extern "C" REX_FUNC(sub_820990F0) {
   REX_FUNC_PROLOGUE();
-  harness::RunRequested(ctx, base);  // --run_harnesses, once
+  {
+    base::InHarnessScope in_harness;  // ITC_NATIVE_RUNNING's harness lines
+    harness::RunRequested(ctx, base);  // --run_harnesses, once
+  }
   if (frame_pacing::GameMessages_IsRenderOnlyPass()) {
     return;
   }

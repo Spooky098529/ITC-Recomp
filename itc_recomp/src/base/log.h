@@ -57,14 +57,33 @@ void Log(LogLevel level, std::format_string<Args...> format, Args&&... args) {
 #define ITC_LOG_WARN(...) ITC_LOG_AT_(::base::LogLevel::kWarn, __VA_ARGS__)
 #define ITC_LOG_ERROR(...) ITC_LOG_AT_(::base::LogLevel::kError, __VA_ARGS__)
 
+namespace base::log_detail {
+// Set on the thread running --run_harnesses while it runs (they run on the
+// main thread, between its passes), so ITC_NATIVE_RUNNING can tell a
+// harness's call from the game's on any thread.
+inline thread_local bool in_harness = false;
+}  // namespace base::log_detail
+
+namespace base {
+// While alive, ITC_NATIVE_RUNNING on this thread counts as a harness's.
+struct InHarnessScope {
+  InHarnessScope() { log_detail::in_harness = true; }
+  ~InHarnessScope() { log_detail::in_harness = false; }
+};
+}  // namespace base
+
 // At the top of each native function's plain C++ (the B7 loop): logs
-// "native running: <name>" the first time it runs, so a log shows which
-// native functions ran (in play or in a harness). One relaxed load a call
+// "native running (game): <name>" the first time the game runs it and
+// "native running (harness): <name>" the first time a harness does, so a
+// log shows which native functions ran, and how. One relaxed load a call
 // after that.
 #define ITC_NATIVE_RUNNING(name)                                          \
   do {                                                                    \
-    static std::atomic<bool> itc_native_ran_{false};                      \
-    if (!itc_native_ran_.load(std::memory_order_relaxed) &&               \
-        !itc_native_ran_.exchange(true, std::memory_order_relaxed))       \
-      ITC_LOG_INFO("native running: {}", name);                           \
+    static std::atomic<bool> itc_native_ran_[2] = {false, false};         \
+    const bool itc_harness_ = ::base::log_detail::in_harness;             \
+    if (!itc_native_ran_[itc_harness_].load(std::memory_order_relaxed) && \
+        !itc_native_ran_[itc_harness_].exchange(true,                     \
+                                                std::memory_order_relaxed)) \
+      ITC_LOG_INFO("native running ({}): {}",                             \
+                   itc_harness_ ? "harness" : "game", name);              \
   } while (0)
