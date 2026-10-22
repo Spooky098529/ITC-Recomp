@@ -2467,6 +2467,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
     | 2026-10-22 | The game's UI movie side | `ui-movies-game.md` | 42 of 89 | `--native_ui_movies_game` |
     | 2026-10-22 | The race overlays' update side | `race-overlays.md` | 88 of 158 | `--native_race_overlays` |
     | 2026-10-22 | The vehicle, rigid body, collision and race data accessors, and the vector library | `vehicle-accessors.md` | 127 of 132 | `--native_vehicle_accessors`, `--native_vector_library` |
+    | 2026-10-22 | The matrix, vector and quaternion math (`Matrix::` and the vector library's 4x4 half) | `matrix-math.md` | 28 of 28 | `--native_matrix_math` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -2489,6 +2490,18 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
     `sub_820B8798` (a tail call through a function pointer, needs `ctx`)
     and four functions behind blockers outside the file (`sub_820B94B0`,
     `sub_820B8AF8`, `sub_820DA180`, `sub_820CD5D8`).
+
+    The matrix math (2026-10-22, the same run): all 28 functions ours in
+    two migrations, built with `-ffp-model=strict -ffp-contract=off`.
+    `Matrix::Multiply`, `Matrix::Copy` and `Vec4::Transform` were
+    Wrapped for interpolation: their overrides now do the math natively
+    with the same hooks around it, and native callers of Multiply note
+    their multiplies through `interpolation::BlendState_OnMultiply`
+    (frame dumps with the flag on and off match). Every function has a
+    "NaNs anywhere (expected to differ)" harness group (where two NaNs
+    meet, the compiler's operand order picks which comes out); the
+    cases with numbers alone or one NaN match. It unblocked four race
+    overlays groups and UiMovie::ApplyTransform (leads).
 
     The second run (from 2026-10-22, branch `b7-loop-22-10-26`; its first
     session stopped after one subsystem): the first run's removable
@@ -2723,3 +2736,11 @@ overridden 58, Native 3, Dropped 23, never called 70, live 295. Imports:
 186 called, 63 with a live caller. B7 (`b7_status.py`): 6,753 in play,
 ours 549, work left 6,204 (Wrapped 140, with a row 317, no row yet
 5,747); 618 overrides in `src/`.
+
+**2026-10-22, B7's third loop run (branch `b7-loop-22-10-26`: the race
+overlays' functions the accessors made ready, the matrix math):** the
+boundary unchanged: 449 functions (916 pairs): overridden 58, Native 3,
+Dropped 23, never called 70, live 295. Imports: 186 called, 63 with a
+live caller. B7 (`b7_status.py`): 6,753 in play, ours 591, work left
+6,162 (Wrapped 137, with a row 302, no row yet 5,723); 641 overrides in
+`src/`.

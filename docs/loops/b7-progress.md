@@ -13,21 +13,20 @@ rows to review and drive list are there), and this file's history.
 - Subsystem 1 of 3 (the vehicle accessors) finished; then the no-mapping
   lead (the race overlays' newly ready functions, 7c018ef..f986921)
   validated (21 of 21 harness lines).
-- Subsystem 2 of 3: the matrix and vector math (the `Matrix::` lead at
-  `8209B000`-`820AC000`, with the vector library's 4x4 matrix lead
-  folded in). Mapped in 7929f36 (`matrix-math.md`, 28 rows, 15 ready
-  groups; checked). Migration 1 done (18cafd4: all 15 ready groups, 18
-  ours and 3 Merged; `--native_matrix_math`; race 22 s, 0 errors).
-  Validated (18 of 18 harness lines, all
-  18 ran in play). Migration 2 done (6c81f15..9345920:
-  the turns, ObjectInverse, the quaternion functions; 28 of 28 ours;
-  race 22 s, 0 errors). Step: validation 2 (agent running).
+- Subsystem 2 of 3 (the matrix math) finished. Now: the no-mapping
+  lead (the race overlays' groups the matrix math made ready):
+  migration (agent running).
 - Known: `b7_status.py` checks `sub_825A9934` (`__chkstk`) "Dropped, but
   it ran", and every function made Native or Merged since the coverage
   session "..., but it ran" (`seen_in_play.txt` predates them; a new
   coverage session clears them).
 
 ## Done
+
+- The matrix math (`matrix-math.md`, mapped in 7929f36; 28 rows): 28
+  ours (20 Overridden, 5 Native, 3 Merged) in two migrations (18cafd4;
+  6c81f15..9345920), each validated (18 and 8 harness lines, all ran in
+  play); `--native_matrix_math`.
 
 - No-mapping lead: the race overlays' functions made ready by the
   accessors (`race-overlays.md`): 14 rows ours (with FlagsKind and
