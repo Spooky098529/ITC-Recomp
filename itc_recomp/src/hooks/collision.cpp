@@ -17,8 +17,10 @@ ITC_FLAG_BOOL(native_collision, true, "ITC",
               "sub_820BAA50 and sub_822BE2C8; their constructors and placement, sub_820BB020, "
               "sub_820BAB48, sub_820BB688, sub_820B99D0, sub_820BB188, sub_820B9C40; the shape record's accessors, bounds, motion, "
               "placement and translation, sub_820BAB20, sub_820BAB30, sub_820BACB8, sub_820BADF8, "
-              "sub_820BAE38, sub_820BAC00, sub_820BAE78, sub_820BB758, sub_820BACD0; the query and its "
-              "contact, sub_820BD1C8, sub_820BC848, sub_820BC908, sub_820BC858) natively "
+              "sub_820BAE38, sub_820BAC00, sub_820BAE78, sub_820BB758, sub_820BACD0; the box-box separation "
+              "tests, sub_820BA408, sub_820BA5D8, sub_820BD0C8, sub_820BC978, sub_820BCCE8, "
+              "sub_820BB300, sub_820BD280, sub_820BD578, sub_820BD508, sub_820BD6E0; the pair's "
+              "next check time, sub_820BBB20; the query and its contact, sub_820BD1C8, sub_820BC848, sub_820BC908, sub_820BC858) natively "
               "instead of through the translated code (the same words, bit for bit; checked by "
               "--run_harnesses=collision)");
 
@@ -152,6 +154,48 @@ extern "C" REX_FUNC(sub_820BACD0) {
     __imp__sub_820BACD0(ctx, base);
   }
 }
+
+// --- The box-box separation tests and the pair's next check time ---
+
+// r4 = the block, r5 = box B; r3 comes back as B + 384 (B + 48).
+ITC_COLLISION(820BA408, ctx.r3.u64 = BoxRelativePlacement(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+ITC_COLLISION(820BA5D8, ctx.r3.u64 = BoxRelativeCenter(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+ITC_COLLISION(820BD0C8, ctx.r3.u64 = BoxBoxOutcode(base, ctx.r3.u32))
+// r3 comes back as the block + 304.
+ITC_COLLISION(820BC978, BoxBoxBlockCorners(base, ctx.r3.u32, ctx.r1.u32 - 320);
+              ctx.r3.u64 = ctx.r3.u32 + 304)
+// r4 = the offset; r3 comes back as the last corner.
+ITC_COLLISION(820BCCE8, BoxBoxMoveCorners(base, ctx.r3.u32, ctx.r4.u32);
+              ctx.r3.u64 = ctx.r3.u32 + 224)
+ITC_COLLISION(820BB300, ctx.r3.u64 = BoxBoxFaceSeparates(base, ctx.r3.u32, ctx.r4.u32,
+                                                         ctx.r5.u32, ctx.r6.u32))
+// The query's tests: shapes that aren't boxes run the original.
+#define ITC_COLLISION_TEST(address, call)    \
+  extern "C" REX_FUNC(sub_##address) {      \
+    REX_FUNC_PROLOGUE();                    \
+    uint32_t result = 0;                    \
+    if (!ITC_FLAG(native_collision)) {      \
+      __imp__sub_##address(ctx, base);      \
+      return;                               \
+    }                                       \
+    ctx.fpscr.disableFlushMode();           \
+    if (!call) {                            \
+      __imp__sub_##address(ctx, base);      \
+      return;                               \
+    }                                       \
+    ctx.r3.u64 = result;                    \
+  }
+// r4 = the cache (the pair's +24).
+ITC_COLLISION_TEST(820BD280, BoxBoxSeparated(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 160,
+                                             &result))
+ITC_COLLISION_TEST(820BD578, BoxBoxSeparatedAfterMove(base, ctx.r3.u32, ctx.r1.u32 - 240, &result))
+ITC_COLLISION_TEST(820BD508, QuerySeparated(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 112,
+                                            &result))
+ITC_COLLISION_TEST(820BD6E0, QuerySeparatedAfterMove(base, ctx.r3.u32, ctx.r1.u32 - 96, &result))
+// f1 = the time.
+ITC_COLLISION(820BBB20, uint32_t r3 = 0;
+              ctx.f1.f64 = CollisionPairNextCheckTime(base, ctx.r3.u32, ctx.r1.u32 - 160, &r3);
+              ctx.r3.u64 = r3)
 
 // --- The query and its contact ---
 

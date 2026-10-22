@@ -110,6 +110,41 @@ void NativeRecordTranslate(PPCContext& ctx, uint8_t* base) {
     __imp__sub_820BACD0(ctx, base);
   }
 }
+ITC_NATIVE_STEP(NativeRelativePlacement,
+                ctx.r3.u64 = co::BoxRelativePlacement(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+ITC_NATIVE_STEP(NativeRelativeCenter,
+                ctx.r3.u64 = co::BoxRelativeCenter(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+ITC_NATIVE_STEP(NativeOutcode, ctx.r3.u64 = co::BoxBoxOutcode(base, ctx.r3.u32))
+ITC_NATIVE_STEP(NativeBlockCorners, co::BoxBoxBlockCorners(base, ctx.r3.u32, ctx.r1.u32 - 320);
+                ctx.r3.u64 = ctx.r3.u32 + 304)
+ITC_NATIVE_STEP(NativeMoveCorners, co::BoxBoxMoveCorners(base, ctx.r3.u32, ctx.r4.u32);
+                ctx.r3.u64 = ctx.r3.u32 + 224)
+ITC_NATIVE_STEP(NativeFaceSeparates,
+                ctx.r3.u64 = co::BoxBoxFaceSeparates(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                                     ctx.r6.u32))
+// Shapes that aren't boxes: the original (as the adapters).
+#define ITC_NATIVE_TEST_STEP(name, address, call) \
+  void name(PPCContext& ctx, uint8_t* base) {     \
+    ctx.fpscr.disableFlushMode();                 \
+    uint32_t result = 0;                          \
+    if (!call) {                                  \
+      __imp__sub_##address(ctx, base);            \
+      return;                                     \
+    }                                             \
+    ctx.r3.u64 = result;                          \
+  }
+ITC_NATIVE_TEST_STEP(NativeSeparated, 820BD280,
+                     co::BoxBoxSeparated(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 160, &result))
+ITC_NATIVE_TEST_STEP(NativeSeparatedAfterMove, 820BD578,
+                     co::BoxBoxSeparatedAfterMove(base, ctx.r3.u32, ctx.r1.u32 - 240, &result))
+ITC_NATIVE_TEST_STEP(NativeQuerySeparated, 820BD508,
+                     co::QuerySeparated(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 112, &result))
+ITC_NATIVE_TEST_STEP(NativeQuerySeparatedAfterMove, 820BD6E0,
+                     co::QuerySeparatedAfterMove(base, ctx.r3.u32, ctx.r1.u32 - 96, &result))
+ITC_NATIVE_STEP(NativeNextCheckTime, uint32_t r3 = 0;
+                ctx.f1.f64 = co::CollisionPairNextCheckTime(base, ctx.r3.u32, ctx.r1.u32 - 160,
+                                                            &r3);
+                ctx.r3.u64 = r3)
 ITC_NATIVE_STEP(NativeWordAt8, ctx.r3.u64 = co::WordAt8(base, ctx.r3.u32))
 ITC_NATIVE_STEP(NativeCurrentCenter,
                 ctx.r3.u64 = co::CollisionShapeCurrentCenter(base, ctx.r3.u32))
@@ -197,7 +232,7 @@ Random Seeded(uint64_t seed) {
 
 // The region, below the car physics' (0x14000 below the scratch area).
 constexpr uint32_t kRegion = 0x20000;
-constexpr uint32_t kRegionBytes = 0xE00;
+constexpr uint32_t kRegionBytes = 0x1C00;
 // In the region: boxes A (+0x000), B (+0x200) and C (+0xC00); a shape record
 // (+0x400: its template A, previous copy B, current copy C); a vector
 // argument (+0x480); a contact (+0x4C0); a query (+0x500, 1,632 bytes).
@@ -205,6 +240,16 @@ constexpr uint32_t kRegionBytes = 0xE00;
 constexpr uint32_t kBoxA = 0x000, kBoxB = 0x200, kBoxC = 0xC00, kRecord = 0x400,
                    kVector = 0x480, kVector2 = 0x4A0, kContact = 0x4C0, kQuery = 0x500,
                    kMatrix = 0x500;
+// For the query's tests: a second record (+0x1400: its template D +0xE00,
+// previous copy E +0x1000, current copy F +0x1200), the query (+0x500) set
+// up with both records and its four blocks (+0x570 on, as Query::Query
+// sets them), the pair's cache word (+0x1480). For the next check time: a
+// pair (+0x1500: objects +0x1600 and +0x1900, each with its body at +16
+// (+0x1800, +0x1B00), a shape at +20 (A, D) and a record at +32 whose
+// current copy is C or F).
+constexpr uint32_t kBoxD = 0xE00, kBoxE = 0x1000, kBoxF = 0x1200, kRecordB = 0x1400,
+                   kBlock = kQuery + 112, kCache = 0x1480, kPair = 0x1500, kObjectA = 0x1600,
+                   kObjectB = 0x1900, kBodyA = 0x1800, kBodyB = 0x1B00;
 constexpr uint32_t kFaceDirection = 0x826C2DE0;
 
 // The registers each function takes (`i`, an index in range).
@@ -228,6 +273,13 @@ enum Args {
   kPlace,         // r3 = box B, r4 = the matrix, r5 = box A
   kRecordMatrix,  // r3 = the record, r4 = the matrix (its +112 0.0 one case in three)
   kRecordVector,  // r3 = the record, r4 = the vector
+  kRelative,      // r3 = box A, r4 = the query's first block, r5 = box B
+  kBlockR3,       // r3 = the query's first block
+  kMoveCorners,   // r3 = the first block's corners, r4 = the vector
+  kFaces,         // r3 = face i of box A, r4 = face i of box C, r5 = box B, r6 = box E
+  kQueryCache,    // r3 = the query (set up), r4 = the cache word
+  kQuerySetUp,    // r3 = the query (set up)
+  kPairR3,        // r3 = the pair (set up)
 };
 
 }  // namespace
@@ -298,6 +350,28 @@ void Collision(Context& h) {
        kRecordMatrix, 3, false, true},
       {"CollisionShape::Translate (sub_820BACD0)", Original<__imp__sub_820BACD0>,
        NativeRecordTranslate, kRecordVector, 1, false, true},
+      {"BoxShape::RelativePlacement (sub_820BA408)", Original<__imp__sub_820BA408>,
+       NativeRelativePlacement, kRelative, 1, false},
+      {"BoxShape::RelativeCenter (sub_820BA5D8)", Original<__imp__sub_820BA5D8>,
+       NativeRelativeCenter, kRelative, 1, false},
+      {"BoxBox::Outcode (sub_820BD0C8)", Original<__imp__sub_820BD0C8>, NativeOutcode, kBlockR3,
+       1, false},
+      {"BoxBox::BlockCorners (sub_820BC978)", Original<__imp__sub_820BC978>, NativeBlockCorners,
+       kBlockR3, 1, false},
+      {"BoxBox::MoveCorners (sub_820BCCE8)", Original<__imp__sub_820BCCE8>, NativeMoveCorners,
+       kMoveCorners, 1, false},
+      {"BoxBox::FaceSeparates (sub_820BB300)", Original<__imp__sub_820BB300>,
+       NativeFaceSeparates, kFaces, 6, false},
+      {"BoxBox::Separated (sub_820BD280)", Original<__imp__sub_820BD280>, NativeSeparated,
+       kQueryCache, 1, false},
+      {"BoxBox::SeparatedAfterMove (sub_820BD578)", Original<__imp__sub_820BD578>,
+       NativeSeparatedAfterMove, kQuerySetUp, 1, false},
+      {"Query::Separated (sub_820BD508)", Original<__imp__sub_820BD508>, NativeQuerySeparated,
+       kQueryCache, 1, false},
+      {"Query::SeparatedAfterMove (sub_820BD6E0)", Original<__imp__sub_820BD6E0>,
+       NativeQuerySeparatedAfterMove, kQuerySetUp, 1, false},
+      {"CollisionPair::NextCheckTime (sub_820BBB20)", Original<__imp__sub_820BBB20>,
+       NativeNextCheckTime, kPairR3, 1, true},
       {"sub_822BE2C8 (the word +8)", Original<__imp__sub_822BE2C8>, NativeWordAt8, kRecordR3, 1,
        false},
       {"CollisionShape::CurrentCenter (sub_820BAB20)", Original<__imp__sub_820BAB20>,
@@ -344,6 +418,16 @@ void Collision(Context& h) {
         const double f2 = double(std::bit_cast<float>(word(pick)));
         const uint32_t index = pick.Below(f.count);
         const uint32_t cache_word = uint32_t(pick.Next());
+        // The cache: 0, one of A's faces' bits, one of B's, or anything.
+        const uint32_t cache_kind = pick.Below(4);
+        const uint32_t cache = cache_kind == 0   ? 0
+                               : cache_kind == 1 ? (cache_word & 0x3F)
+                               : cache_kind == 2 ? (cache_word & 0x3F00)
+                                                 : cache_word;
+        // The pair's objects: +272 and +276 clear most of the time; the
+        // bodies fixed (byte +0 set) one time in four each.
+        const bool objects_clear = pick.Below(4) != 0;
+        const bool fixed_a = pick.Below(4) == 0, fixed_b = pick.Below(4) == 0;
         // The one NaN: in the region, or (one case in ten) in f1.
         const uint32_t nan_word = kNaNWords[pick.Below(std::size(kNaNWords))];
         const uint32_t nan_at = pick.Below(kRegionBytes / 4 + kRegionBytes / 40);
@@ -360,6 +444,37 @@ void Collision(Context& h) {
             guest::StoreU32(h.base, region + 4 * nan_at, nan_word);
           }
           // The boxes' vtables, and the record's copies.
+          for (uint32_t box : {kBoxD, kBoxE, kBoxF}) {
+            guest::StoreU32(h.base, region + box, co::kBoxVtable);
+          }
+          guest::StoreU32(h.base, region + kRecordB + 0, region + kBoxD);
+          guest::StoreU32(h.base, region + kRecordB + 4, region + kBoxE);
+          guest::StoreU32(h.base, region + kRecordB + 8, region + kBoxF);
+          if (f.args == kQueryCache || f.args == kQuerySetUp) {
+            guest::StoreU32(h.base, region + kQuery + 0, region + kRecord);
+            guest::StoreU32(h.base, region + kQuery + 4, region + kRecordB);
+            for (uint32_t k = 0; k < 4; k++) {
+              guest::StoreU32(h.base, region + kQuery + 8 + 4 * k, region + kBlock + 336 * k);
+            }
+            guest::StoreU32(h.base, region + kCache, cache);
+          }
+          if (f.args == kPairR3) {
+            const uint32_t objects[] = {kObjectA, kObjectB}, bodies[] = {kBodyA, kBodyB},
+                           shapes[] = {kBoxA, kBoxD}, copies[] = {kBoxC, kBoxF};
+            const bool fixed[] = {fixed_a, fixed_b};
+            for (int o = 0; o < 2; o++) {
+              const uint32_t object = region + objects[o];
+              guest::StoreU32(h.base, region + kPair + 16 + 4 * o, object);
+              guest::StoreU32(h.base, object + 16, region + bodies[o]);
+              guest::StoreU32(h.base, object + 20, region + shapes[o]);
+              guest::StoreU32(h.base, object + 32 + 8, region + copies[o]);
+              if (objects_clear) {
+                guest::StoreU32(h.base, object + 272, 0);
+                guest::StoreU32(h.base, object + 276, 0);
+              }
+              guest::StoreU8(h.base, region + bodies[o], fixed[o] ? 1 : 0);
+            }
+          }
           for (uint32_t box : {kBoxA, kBoxB, kBoxC}) {
             guest::StoreU32(h.base, region + box, co::kBoxVtable);
           }
@@ -441,6 +556,34 @@ void Collision(Context& h) {
               if (index == 0) {
                 guest::StoreU32(h.base, region + kRecord + 112, 0);
               }
+              break;
+            case kRelative:
+              t.r3.u64 = region + kBoxA;
+              t.r4.u64 = region + kBlock;
+              t.r5.u64 = region + kBoxB;
+              break;
+            case kBlockR3:
+              t.r3.u64 = region + kBlock;
+              break;
+            case kMoveCorners:
+              t.r3.u64 = region + kBlock + 80;
+              t.r4.u64 = region + kVector;
+              break;
+            case kFaces:
+              t.r3.u64 = region + kBoxA + 304 + 32 * index;
+              t.r4.u64 = region + kBoxC + 304 + 32 * index;
+              t.r5.u64 = region + kBoxB;
+              t.r6.u64 = region + kBoxE;
+              break;
+            case kQueryCache:
+              t.r3.u64 = region + kQuery;
+              t.r4.u64 = region + kCache;
+              break;
+            case kQuerySetUp:
+              t.r3.u64 = region + kQuery;
+              break;
+            case kPairR3:
+              t.r3.u64 = region + kPair;
               break;
             case kRecordVector:
               t.r3.u64 = region + kRecord;

@@ -143,6 +143,56 @@ bool CollisionShapePlace(uint8_t* base, uint32_t record, uint32_t matrix, uint32
 // box. `frame`: the original's 192 bytes.
 bool CollisionShapeTranslate(uint8_t* base, uint32_t record, uint32_t offset, uint32_t frame);
 
+// --- The box-box separation tests (src/collision/box_box.cpp). A block
+// (336 bytes, four of them in the query at +112, +448, +784, +1120, their
+// addresses at the query's +8 to +20) is one box in the other's unit box:
+// +0, +16, +32 its 3x3, +48 its center, +64 its outcode, +80 its 8 corners
+// 32 bytes apart (each corner's outcode at its +16). ---
+
+// BoxShape::RelativePlacement (sub_820BA408): B in A's unit box into the
+// block (its center +48 and its 3x3). BoxShape::RelativeCenter
+// (sub_820BA5D8): the center only. They return what the original leaves in
+// r3 (B + 384, B + 48).
+uint32_t BoxRelativePlacement(uint8_t* base, uint32_t a, uint32_t block, uint32_t b);
+uint32_t BoxRelativeCenter(uint8_t* base, uint32_t a, uint32_t block, uint32_t b);
+// BoxBox::Outcode (sub_820BD0C8): the block's outcode (bits 1, 2 for x
+// beyond +1 or -1 with its reach, 4, 8 for y, 16, 32 for z).
+uint32_t BoxBoxOutcode(uint8_t* base, uint32_t block);
+// BoxBox::BlockCorners (sub_820BC978): the block's 8 corners and their
+// outcodes. `frame`: the original's 320 bytes.
+void BoxBoxBlockCorners(uint8_t* base, uint32_t block, uint32_t frame);
+// BoxBox::MoveCorners (sub_820BCCE8): the 8 corners from `corners` (a
+// block's +80) moved by the offset, their outcodes again.
+void BoxBoxMoveCorners(uint8_t* base, uint32_t corners, uint32_t offset);
+// BoxBox::FaceSeparates (sub_820BB300): 1 when box B lies wholly outside
+// the face at both placements (the faces of A's previous and current
+// copies, B's previous and current copies), else 0.
+uint32_t BoxBoxFaceSeparates(uint8_t* base, uint32_t previous_face, uint32_t current_face,
+                             uint32_t previous_box, uint32_t current_box);
+// BoxBox::Separated (sub_820BD280): the cached face (`cache`, the pair's
+// +24) or a face of either box separating them at both placements: 1, the
+// cache set; else 0, the cache 0 and the blocks' corners. False, with
+// nothing done, where a record's template or a copy isn't a box. `frame`:
+// the original's 160 bytes.
+bool BoxBoxSeparated(uint8_t* base, uint32_t query, uint32_t cache, uint32_t frame,
+                     uint32_t* result);
+// BoxBox::SeparatedAfterMove (sub_820BD578): the current blocks' centers
+// again; 1 when one's outcode shares a bit with the previous one's, else 0
+// with the current blocks' corners moved. False as Separated. `frame`: the
+// original's 240 bytes.
+bool BoxBoxSeparatedAfterMove(uint8_t* base, uint32_t query, uint32_t frame, uint32_t* result);
+// Query::Separated (sub_820BD508) and Query::SeparatedAfterMove
+// (sub_820BD6E0): the box-box tests for two boxes; false (the original
+// runs) for any other shapes. `frame`: the original's 112 and 96 bytes.
+bool QuerySeparated(uint8_t* base, uint32_t query, uint32_t cache, uint32_t frame,
+                    uint32_t* result);
+bool QuerySeparatedAfterMove(uint8_t* base, uint32_t query, uint32_t frame, uint32_t* result);
+// CollisionPair::NextCheckTime (sub_820BBB20): the clock (0x826C2D80) plus
+// the time until the objects' bounding spheres could touch at the bodies'
+// speeds, or plus the step (0x826C2D84). `r3`: what the original leaves
+// there. `frame`: the original's 160 bytes.
+double CollisionPairNextCheckTime(uint8_t* base, uint32_t pair, uint32_t frame, uint32_t* r3);
+
 // --- The query (on CollisionPair::Solve's stack) and its contact (+32) ---
 
 // Query::Query (sub_820BD1C8): the w of +32, +48, +64, +96 and of the 8
