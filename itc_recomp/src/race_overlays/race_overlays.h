@@ -749,4 +749,38 @@ bool UpdateParticlesB(uint8_t* base, uint32_t overlays, uint32_t frame);
 // CarOverlays::IsBehindCamera returns 0, then ParticlesC::SetPosition with the speed in km/h. No DebugSwitchOff check.
 void UpdateParticlesC(uint8_t* base, uint32_t overlays, uint32_t frame);
 
+
+// Smoke::SetFrame (sub_8212B1B0): for each of the smoke's +104 emitters (720
+// bytes from +128; the count read again each time): +208 to +220 the frame's
+// +64 to +76, +144 the frame's 64 bytes (memcpy, c_runtime::Memcpy), +224
+// its +80 (bits as they are). False, with nothing done, where a copy
+// wouldn't be the library's plain one (into the physical views, or sharing
+// memory with the frame) or there are more than 65,536 emitters; the
+// original runs there. Only UpdateSmoke calls it.
+bool SmokeSetFrame(uint8_t* base, uint32_t smoke, uint32_t frame);
+// sub_82126A00: 1 when the wheel's contact surface (Vehicle::WheelContact's
+// halfword +80, sign-extended) is 8, else 0.
+uint32_t WheelOnSurface8(uint8_t* base, uint32_t view, uint32_t wheel);
+// sub_82126A38: 1 when the surface is 1 or 2, else 0.
+uint32_t WheelOnSurface1Or2(uint8_t* base, uint32_t view, uint32_t wheel);
+// CarOverlays::UpdateSmoke (sub_82125B60): the car's axes (half the
+// difference of wheels 2 and 3's contacts, plus wheel 3's, at `frame` + 80;
+// of 0 and 1, plus 1's, at +96; the additions vaddfp with flush-to-zero on),
+// then, unless DebugSwitchOff, a frame at +112 (an identity matrix, +176 a
+// position, +192 a size, +196 a value) and for each wheel 0-3 and its smoke
+// (+164 + 4i): a rate, the larger of the slip (WheelSlip with the table's
+// +20) and the spin, each clamped and scaled (0x820029D0 and 0x82008060,
+// 0x82002C38 and 0x8200805C); the position the contact plus 0x826C5D40, its
+// y plus WheelValue512; Smoke::SetFrame and SetRegion; on the ground,
+// smoke by the surface (EmitSmoke: marks with the table's +8 + +12 x slip
+// unless the slip is 0.0; surface 8 with +24 x rate, the wheel's counter
+// (+436 + 12i) up to 25; surfaces 1-2 with +68 x rate; the size drawn from
+// the table's +16, +44 or +80); then while the counter is above 0 and the
+// wheel is on a marking surface or off the ground, smoke with +28 x rate
+// and the counter down by 1; finally Smoke::SetVelocity (+176). `frame` is
+// the original's stack frame (its r1 after the stwu, 400 bytes below). False,
+// with nothing done, where EmitSmoke or Smoke::SetFrame would decline for a
+// wheel; the original runs there.
+bool UpdateSmoke(uint8_t* base, uint32_t overlays, uint32_t frame);
+
 }  // namespace race_overlays

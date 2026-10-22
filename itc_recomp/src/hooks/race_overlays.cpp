@@ -24,7 +24,7 @@ ITC_FLAG_BOOL(native_race_overlays, true, "ITC",
               "save flags and stages, sub_82126B50 to sub_82126CB0; CarOverlays::UpdateTrails, "
               "sub_82124EE0; CarOverlays::MarkerKind, sub_82122EA8; the effects' updates "
               "UpdateLightSprites, UpdateParticlesB and UpdateParticlesC, sub_821251C0, "
-              "sub_821252D0 and sub_82125798) natively "
+              "sub_821252D0 and sub_82125798; CarOverlays::UpdateSmoke, sub_82125B60) natively "
               "instead of through the translated code (same results; checked by "
               "--run_harnesses=race_overlays)");
 
@@ -482,4 +482,21 @@ extern "C" REX_FUNC(sub_82125798) {
   }
   ctx.fpscr.disableFlushMode();
   UpdateParticlesC(base, ctx.r3.u32, ctx.r1.u32 - 240);
+}
+
+// CarOverlays::UpdateSmoke: r3 = the car overlays; its frame in the
+// original's own stack frame (r1 - 400). Where the native version declines
+// (EmitSmoke or Smoke::SetFrame would), the original runs. Smoke::SetFrame
+// (sub_8212B1B0), sub_82126A00 and sub_82126A38 have no adapters: it's
+// their only caller.
+extern "C" REX_FUNC(sub_82125B60) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_race_overlays)) {
+    __imp__sub_82125B60(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  if (!UpdateSmoke(base, ctx.r3.u32, ctx.r1.u32 - 400)) {
+    __imp__sub_82125B60(ctx, base);
+  }
 }

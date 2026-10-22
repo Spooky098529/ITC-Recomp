@@ -438,6 +438,20 @@ void NativeUpdateParticlesC(PPCContext& ctx, uint8_t* base) {
   ro::UpdateParticlesC(base, ctx.r3.u32, ctx.r1.u32 - 240);
 }
 
+// As the adapter: the frame in the original's stack frame, and the original
+// where UpdateSmoke declines; Smoke::SetFrame's original where it declines.
+void NativeUpdateSmoke(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  if (!ro::UpdateSmoke(base, ctx.r3.u32, ctx.r1.u32 - 400)) {
+    __imp__sub_82125B60(ctx, base);
+  }
+}
+void NativeSmokeSetFrame(PPCContext& ctx, uint8_t* base) {
+  if (!ro::SmokeSetFrame(base, ctx.r3.u32, ctx.r4.u32)) {
+    __imp__sub_8212B1B0(ctx, base);
+  }
+}
+
 // Runs the recompiled version with --native_race_overlays off, so the
 // functions it calls that are ours run the originals too.
 void RunRecompiled(GuestFunction recompiled, PPCContext& t, uint8_t* base) {
@@ -3045,6 +3059,122 @@ void EffectUpdateCases(Context& h, uint32_t block) {
   }
   guest::StoreU32(h.base, kSeed, live);
 }
+
+// The tire smoke's update: the view of the body cases, the car overlays
+// with a parameter table, two smokes (each wheel's one of them, small
+// capacities as a rule, sometimes 0, where the original runs), the
+// wheels' counters and accumulators, the contacts' surfaces (0 to 9, so the
+// smoking, 8 and 1-2 surfaces all come up, or random), rand's seed and the
+// original's stack frame, from `seed`.
+constexpr uint32_t kSmokeA = 0x40000, kSmokeB = 0x48000, kSmokeParams = 0x50000,
+                   kSmokeSmokeTable = 0x50100, kSmokeBytes = 32640;
+
+auto UpdateSmokeSetup(Context& h, uint32_t block, uint64_t seed, bool odd, uint32_t slot) {
+  return [&h, block, seed, odd, slot] {
+    constexpr uint32_t kSeed = 0x82638188;
+    ViewBodySetup(h, block, seed, odd)();
+    Random fill;
+    for (uint64_t n = 0; n < seed % 83; n++) {
+      fill.Next();
+    }
+    const uint32_t view = block + kBodyView;
+    const uint32_t vehicle = block + kBodyVehicle;
+    const uint32_t overlays = block + kFxOverlays;
+    for (uint32_t wheel = 0; wheel < 4; wheel++) {
+      guest::StoreU16(h.base, vehicle + 5328 + 96 * wheel + 80,
+                      fill.Below(5) == 0 ? uint16_t(fill.Next()) : uint16_t(fill.Below(10)));
+    }
+    FillRandom(h.base, fill, overlays, 0x400);
+    guest::StoreU32(h.base, overlays + 128, slot);
+    guest::StoreU32(h.base, overlays + 4 * (slot + 1), view);
+    guest::StoreU32(h.base, overlays + 144, block + kSmokeParams);
+    guest::StoreU32(h.base, overlays + 784, fill.Below(4));
+    FillRandom(h.base, fill, block + kSmokeParams, 0x200);
+    if (!odd || fill.Below(2)) {
+      for (uint32_t at = 4; at <= 80; at += 4) {
+        guest::StoreFloat(h.base, block + kSmokeParams + at, float(fill.Below(400)) / 100.0f);
+      }
+      const uint32_t t = block + kSmokeSmokeTable;
+      guest::StoreU32(h.base, t, fill.Below(100));
+      guest::StoreFloat(h.base, t + 4, float(fill.Below(1000)) / 100.0f);
+      guest::StoreFloat(h.base, t + 8, float(fill.Below(256)));
+    }
+    for (uint32_t wheel = 0; wheel < 4; wheel++) {
+      const uint32_t kind = fill.Below(6);
+      guest::StoreU32(h.base, overlays + 436 + 12 * wheel,
+                      kind == 0 ? uint32_t(fill.Next()) : fill.Below(28));
+      guest::StoreFloat(h.base, overlays + 528 + 48 * wheel, float(fill.Below(100)) / 100.0f);
+      guest::StoreU32(h.base, overlays + 164 + 4 * wheel,
+                      block + (fill.Below(2) ? kSmokeA : kSmokeB));
+    }
+    for (uint32_t smoke : {block + kSmokeA, block + kSmokeB}) {
+      FillRandom(h.base, fill, smoke, kSmokeBytes);
+      // Not -1: Smoke::SetFrame's original would copy into 2^32 - 1 emitters.
+      const int32_t capacity = fill.Below(30) == 0 ? 0 : int32_t(1 + fill.Below(8));
+      const uint32_t heads = capacity > 0 ? uint32_t(capacity) : 8;
+      guest::StoreU32(h.base, smoke + 104, uint32_t(capacity));
+      guest::StoreU32(h.base, smoke + 112, block + kSmokeSmokeTable);
+      guest::StoreU32(h.base, smoke + 32528, fill.Below(heads));
+      guest::StoreU32(h.base, smoke + 32532, fill.Below(heads));
+      guest::StoreU32(h.base, smoke + 32536, fill.Below(heads + 2));
+      for (uint32_t k = 0; k < heads; k++) {
+        guest::StoreU32(h.base, smoke + 128 + 720 * k + 108, 40 + fill.Below(6));
+      }
+    }
+    guest::StoreU32(h.base, kSeed, uint32_t(fill.Next()));
+    FillRandom(h.base, fill, h.data - 1024 - 400, 400);
+  };
+}
+
+void UpdateSmokeCases(Context& h, uint32_t block) {
+  constexpr uint32_t kSeed = 0x82638188;
+  Random& r = h.random;
+  const uint32_t live = guest::LoadU32(h.base, kSeed);
+  const uint32_t overlays = block + kFxOverlays;
+  {
+    // Smoke::SetFrame: capacities 0 to 45, the frame apart or over an
+    // emitter's matrix (the original runs there).
+    Results results("Smoke::SetFrame (sub_8212B1B0)");
+    for (uint64_t seed = 0; seed < 200; seed++) {
+      const uint32_t capacity = seed % 10 == 0 ? 45 : r.Below(9);
+      const uint32_t frame = r.Below(8) == 0 ? block + kSmokeA + 128 + 720 * r.Below(3) + 4 * r.Below(60)
+                                             : block + kSmokeParams + 4 * r.Below(16);
+      const uint64_t fill_seed = r.Next();
+      Compare(h, results, {{block + kSmokeA, kSmokeBytes}, {block + kSmokeParams, 0x200}},
+              [&h, block, capacity, fill_seed] {
+                Random fill;
+                for (uint64_t n = 0; n < fill_seed % 31; n++) {
+                  fill.Next();
+                }
+                FillRandom(h.base, fill, block + kSmokeA, kSmokeBytes);
+                FillRandom(h.base, fill, block + kSmokeParams, 0x200);
+                guest::StoreU32(h.base, block + kSmokeA + 104, capacity);
+              },
+              [&](PPCContext& t) {
+                t.r3.u64 = block + kSmokeA;
+                t.r4.u64 = frame;
+              },
+              __imp__sub_8212B1B0, NativeSmokeSetFrame,
+              fmt::format("seed {} capacity {} frame {:X}", seed, capacity, frame), false, false);
+    }
+    results.Report();
+  }
+  Results results("CarOverlays::UpdateSmoke (sub_82125B60)");
+  const Regions regions = {{overlays, 0x400},
+                           {block + kSmokeA, kSmokeBytes},
+                           {block + kSmokeB, kSmokeBytes},
+                           {kSeed, 4},
+                           {h.data - 1024 - 400 + 80, 148}};
+  for (uint64_t seed = 0; seed < 300; seed++) {
+    const bool odd = seed % 5 == 4;
+    const uint32_t slot = r.Below(25);
+    Compare(h, results, regions, UpdateSmokeSetup(h, block, seed, odd, slot),
+            [&](PPCContext& t) { t.r3.u64 = overlays; }, Original<__imp__sub_82125B60>,
+            NativeUpdateSmoke, fmt::format("seed {} slot {}", seed, slot), false, false);
+  }
+  results.Report();
+  guest::StoreU32(h.base, kSeed, live);
+}
 }  // namespace
 
 void RaceOverlays(Context& h) {
@@ -3081,6 +3211,7 @@ void RaceOverlays(Context& h) {
   SaveFlagCases(h, block);
   UpdateTrailsCases(h, block);
   EffectUpdateCases(h, block);
+  UpdateSmokeCases(h, block);
   memory->SystemHeapFree(block);
 }
 
