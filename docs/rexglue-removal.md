@@ -52,6 +52,15 @@ goes in `src/` as overrides), American English.
   the leftovers above (the movie player, Voice::Init skipped as high as
   is safe), or the main thread's performance leads
   (`sub_821298C0`, `sub_8209C6E0`, in `docs/native-renderer.md`).
+- **B7 in progress (2026-10-22):** its measure is `b7_status.py`
+  (`docs/coverage.md`), and the B7 loop (`docs/loops/b7-loop.md`, a
+  `/loop` session handing each subsystem to a mapping agent, then
+  migration agents) did its first run on the branch `b7-loop-test`: five
+  subsystems mapped and made native as far as they were ready (ours 162
+  -> 335). See "B7's first loop run" under B7, and
+  `docs/loops/b7-progress.md`. What most of the rest waits on is the
+  user's call on allocating guest memory from native code (the heap and
+  the VirtualAlloc wrappers, in `docs/loops/leads.md`).
 
 ## The approach (agreed with the user, 2026-10-19)
 
@@ -2436,8 +2445,34 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
     `docs/coverage.md` (started 2026-10-21, branch `coverage`) records them
     with a coverage build (`itc_coverage`) in
     `itc_recomp/coverage/seen_in_play.txt`; a 20-second attract race ran
-    4,975 (30%). Its report, joined with `docs/functions/`, is to be B7's
-    measure.
+    4,975 (30%). Its report, joined with `docs/functions/`, is B7's
+    measure (`itc_recomp/tools/b7_status.py`).
+
+    **B7's first loop run (2026-10-22, branch `b7-loop-test`):** the B7
+    loop (`docs/loops/b7-loop.md`; progress and what's for the user in
+    `docs/loops/b7-progress.md`) mapped five subsystems into their own
+    function files and made their ready groups native, each behind a
+    `--native_*` flag (on by default, falling back to the recompiled
+    function) with harness cases comparing it with the recompiled one:
+
+    | Subsystem | Function file | Native | Flags |
+    |---|---|---|---|
+    | Camera-facing sprites and light glows | `sprites.md` | 10 of 26 | `--native_sprites`, `--native_billboards` |
+    | The graphics library's command list | `command-list.md` | 10 of 11 | `--native_command_list` |
+    | The C runtime and math library | `c-runtime.md` | 79 of 89 | `--native_math`, `--native_c_runtime`, `--native_memcpy` |
+    | The UI movie library | `ui-movies.md` | 32 of 45 | `--native_ui_movies` |
+    | The game's UI movie side | `ui-movies-game.md` | 42 of 89 | `--native_ui_movies_game` |
+
+    Every harness at 0 differing, attract races at 20-21 s with no errors,
+    and a race the user drove looked right. Ours went from 162 to 335 (work
+    left 6,590 -> 6,418). The C runtime's math (and the UI movies' keys)
+    build with `-ffp-model=strict -ffp-contract=off` to give the
+    translated code's doubles bit for bit, NaN signs included (the intro
+    of `docs/functions/c-runtime.md`). What blocks the rest of these
+    subsystems: the guest heap and the VirtualAlloc wrappers (the user's
+    decision), TLS (`_getptd`), the matrix math (`Matrix::Multiply` and
+    `Matrix::Copy`, Wrapped), std::string, the string table and font, the
+    texture set; each is a lead in `docs/loops/leads.md`.
 
 ## The end state: removing the core
 
@@ -2639,3 +2674,10 @@ user's first coverage session; `docs/coverage.md`): of 16,315 `sub_`
 functions, 6,591 seen in play, 6,752 in play (seen, or ours): ours 162,
 work left 6,590 (Wrapped 151, with a row 174, no row yet 6,265). From
 here, record `b7_status.py`'s totals beside the boundary's.
+
+**2026-10-22, B7's first loop run (branch `b7-loop-test`):** the
+boundary unchanged, as the five subsystems were all inside it: 449
+functions (916 pairs): overridden 58, Native 3, Dropped 23, never called
+70, live 295. Imports: 186 called, 63 with a live caller. B7
+(`b7_status.py`): 6,753 in play, ours 335, work left 6,418 (Wrapped 142,
+with a row 243, no row yet 6,033); 450 overrides in `src/`.

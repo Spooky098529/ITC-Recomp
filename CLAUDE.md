@@ -8,7 +8,8 @@ our patches applied in the submodule, not something to look into
 `docs/functions/` is the reference for the game's functions: their
 table, split by subsystem into one file per area since 2026-10-20
 (`functions.md` holds the rows not yet moved, `system-services.md` B5's,
-`files-and-saves.md` B4's, `audio.md` B2's).
+`files-and-saves.md` B4's, `audio.md` B2's; B7's subsystems in their
+own files, such as `c-runtime.md` and `ui-movies.md`).
 `docs/known-data.md` lists the globals and object fields worked out.
 `docs/frame-interpolation.md` is how frame interpolation works (the
 frame's structure, the passes, what's blended), every diagnostic option,
@@ -95,7 +96,14 @@ the SDK's own lines into it (`src/base/log_sdk.cpp`, until A4); hashes
 use our own xxHash (`itc_recomp/thirdparty/xxHash`, A1's first library).
 The flags are still parsed by the SDK until A4, which is deferred until
 the code has no guest dependency (the user's call, 2026-10-21; the survey
-is under A4 in the plan). Next: B7.
+is under A4 in the plan). B7 (the game logic) is in progress: its
+first loop run (`docs/loops/b7-loop.md`, 2026-10-22, on `b7-loop-test`,
+not merged yet) made five subsystems native as far as they were ready
+(`docs/functions/sprites.md`, `command-list.md`, `c-runtime.md`,
+`ui-movies.md`, `ui-movies-game.md`; each behind `--native_*` flags, on by
+default); see "B7's first loop run" in the plan and
+`docs/loops/b7-progress.md`. Most of what's left in them waits on the
+user's call on allocating guest memory from native code.
 After each plan item, run `itc_recomp/tools/boundary_status.py` and record
 its output in "The boundary over time" at the end of
 `docs/rexglue-removal.md`. Plan steps are done on their
