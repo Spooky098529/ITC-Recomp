@@ -62,6 +62,10 @@ Rows not yet moved stay in the table below. So far:
 - [`sprites.md`](sprites.md): the camera-facing sprites: the race
   overlays' sprite lists (trails, particles), single sprites and screen
   rectangles, and the light glows' billboards (B7).
+- [`command-list.md`](command-list.md): the graphics library's command
+  list the recorders write render commands into: its set-up and flip,
+  opening and closing chunks, allocating slots, vertices, bytes and
+  resolves (B7).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
@@ -116,7 +120,6 @@ old performance notes to the end of `../native-renderer.md`.
 | `sub_825953D0` | `Recorder::RecordObject` | Wrapped | The bulk per-object recorder, ~150 calls per pass in a race: records command 7 with vertex constants 0-8: world (r5) * camera view-projection (r4) in c0-c3, the world matrix in c4-c7 (for some objects a projective matrix instead), and the camera's world position in c8. The camera is often a stack copy, not a camera pass. |
 | `sub_825951E0` | | | Multiplies a world matrix and camera into a stack temporary; not recorded (likely a visibility test). |
 | `sub_8258FD48` | `Command::SetShaderConstants` | Wrapped | Render thread, command 7: r3 = payload, r4 = register count, r5 = stage << 24 \| type << 16 \| start << 8 \| count. Interpolation substitutes blended values here. |
-| `sub_8258CAA0` | `CommandList::AllocateSlots` | Wrapped | r3 = list, r4 = slot count; returns the first 16-byte slot. Wrapped only for diagnostics (`--log_slot_callers`). |
 | `sub_820C0150` | `Vehicle::GetDistancePerFrame` | | Speed (m/s) times a hard-coded 1/30 s. |
 | `sub_8210EDB0` | | | Wind sound; scales with speed. |
 | `sub_82152CD8` | | | Camera shake; scales with speed. |
