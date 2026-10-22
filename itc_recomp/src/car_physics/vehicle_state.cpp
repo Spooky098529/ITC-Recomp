@@ -646,4 +646,143 @@ bool VehicleSteerTowards(uint8_t* base, uint32_t vehicle, double target, double 
   return true;
 }
 
+double VehicleSuspensionSpring(uint8_t* base, uint32_t vehicle, uint32_t w, double change,
+                               uint32_t velocity) {
+  ITC_NATIVE_RUNNING("sub_820B0198 Vehicle::SuspensionSpring");
+  const uint32_t v = vehicle, wheel = Wheel(v, w);
+  const uint32_t r = guest::LoadU32(base, v + 2160 + 4 * w) + 96;  // the suspension
+  const uint32_t partner = Wheel(v, (w & 1) != 0 ? w - 1 : w + 1);
+  const double travel = Lfs(base, wheel + 0);
+  double moved = Fadds(travel, change);
+  const double previous = Lfs(base, wheel + 12);
+  const double roll = Lfs(base, r + 36);
+  const double mass = Lfs(base, r + 0);
+  const double dt = Lfs(base, v + 2352);
+  const double partner_previous = Lfs(base, partner + 12);
+  const double c = Lfs(base, 0x82002980);
+  const double half = Lfs(base, 0x82001BE4);
+  const double zero = Lfs(base, kZero);
+  const double anti_roll = Fmuls(Fmuls(Fsubs(partner_previous, previous), half), roll);
+  const double spring = Lfs(base, r + 12);
+  const double per_spring = Fdivs(mass, spring);
+  const double rebound = Lfs(base, r + 20);
+  const double rest = Fmadds(per_spring, c, travel);
+  const double leaving =
+      Fmuls(Fdivs(Fmsubs(rest, spring, anti_roll), rebound), dt);
+  double damping;
+  if (change > zero) {
+    damping = Fmuls(Lfs(base, r + 16), change);
+  } else {
+    if (leaving > zero && change < Fneg(leaving)) {
+      // The wheel leaves the ground: the travel less that, -R32.
+      Stfs(base, wheel + 0, Fsubs(travel, leaving));
+      return Fneg(Lfs(base, r + 32));
+    }
+    damping = Fmuls(rebound, change);
+  }
+  const uint32_t steps = guest::LoadU32(base, v + 2368);
+  const double start = Lfs(base, velocity);
+  const double step = Lfs(base, v + 2364);
+  double momentum = Fmsubs(start, mass, damping);
+  if (steps != 0) {
+    const double stiffer = Lfs(base, 0x82002568);
+    const double past = Lfs(base, 0x82001070);
+    for (uint32_t i = 0;;) {
+      const double limit = Fmuls(Lfs(base, r + 24), past);
+      const double k = Lfs(base, r + 12);
+      double force;
+      if (moved < limit) {
+        force = Fneg(Fmuls(moved, k));
+      } else {
+        const double over = Fsubs(moved, limit);
+        const double plain = Fmuls(k, moved);
+        force = Fnmsubs(Fmuls(over, k), stiffer, Fneg(plain));
+      }
+      const double speed = Lfs(base, velocity);
+      if (speed > zero) {
+        force = Fnmsubs(Lfs(base, r + 16), speed, force);
+      } else {
+        force = Fnmsubs(speed, Lfs(base, r + 20), force);
+      }
+      momentum = Fmadds(force, step, momentum);
+      const double new_speed = Fmuls(Lfs(base, r + 4), momentum);
+      Stfs(base, velocity, new_speed);
+      i++;
+      moved = Fmadds(new_speed, step, moved);
+      if (!(i < guest::LoadU32(base, v + 2368))) {
+        break;
+      }
+    }
+  }
+  Stfs(base, wheel + 0, moved);
+  const double change_of_speed = Fsubs(Lfs(base, velocity), start);
+  const double per_dt = Fdivs(Lfs(base, 0x82001BE0), Lfs(base, v + 2352));
+  return Fmuls(Fmuls(change_of_speed, per_dt), Lfs(base, r + 0));
+}
+
+double VehicleUpdateWheelSuspension(uint8_t* base, uint32_t vehicle, uint32_t w,
+                                    uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_820B5588 Vehicle::UpdateWheelSuspension");
+  const uint32_t v = vehicle, f = frame, wheel = Wheel(v, w);
+  const double down = Fneg(Lfs(base, wheel + 96));
+  const uint32_t data = guest::LoadU32(base, v + 2160 + 4 * w);
+  guest::StoreU8(base, wheel + 16, 0);
+  va::RigidBodyPointVelocity(base, f + 96, Body(base, v), wheel + 64);
+  const double vertical = double(vl::Vec3DotOf(base, f + 96, v + 160));
+  Stfs(base, f + 80, Fneg(vertical));
+  const double result = VehicleSuspensionSpring(base, v, w, down, f + 80);
+  Stfs(base, wheel + 4, Fneg(Lfs(base, f + 80)));
+  double force = Fadds(Lfs(base, data + 128), result);
+  const double zero = Lfs(base, kZero);
+  if (!(Lfs(base, wheel + 0) > Lfs(base, data + 124))) {
+    CopyWord(base, data + 124, wheel + 0);
+    force = zero;
+    guest::StoreU8(base, wheel + 17, 0);
+  }
+  if (!(force > zero)) {
+    force = zero;
+    guest::StoreU8(base, wheel + 17, 0);
+  } else {
+    guest::StoreU8(base, wheel + 17, 1);
+    guest::StoreU32(base, v + 348, guest::LoadU32(base, v + 348) + 1);
+  }
+  Stfs(base, wheel + 8, force);
+  return result;
+}
+
+uint32_t VehicleUpdateSuspension(uint8_t* base, uint32_t vehicle, uint32_t frame, double* f1) {
+  ITC_NATIVE_RUNNING("sub_820B6328 Vehicle::UpdateSuspension");
+  const uint32_t v = vehicle, f = frame;
+  guest::StoreU32(base, v + 348, 0);
+  for (uint32_t w = 0; w < 4; w++) {
+    guest::StoreU32(base, v + 2176 + 4 * w, w);
+    CopyWord(base, Wheel(v, w) + 0, Wheel(v, w) + 12);
+  }
+  // The order by load (+280), a bubble sort from the back.
+  for (uint32_t pass = 0; pass < 4; pass++) {
+    if (pass >= 3) {
+      continue;
+    }
+    uint32_t at = v + 2184;
+    for (uint32_t n = 3 - pass; n != 0; n--, at -= 4) {
+      const uint32_t a = guest::LoadU32(base, at), b = guest::LoadU32(base, at + 4);
+      if (Lfs(base, v + 368 * a + 696) > Lfs(base, v + 368 * b + 696)) {
+        guest::StoreU32(base, at + 4, a);
+        guest::StoreU32(base, at, b);
+      }
+    }
+  }
+  for (uint32_t i = 0; i < 4; i++) {
+    VehicleUpdateWheelSuspension(base, v, guest::LoadU32(base, v + 2176 + 4 * i), f - 176);
+  }
+  double last = 0.0;
+  for (uint32_t w = 0; w < 4; w++) {
+    last = Lfs(base, Wheel(v, w) + 8);
+    vl::Vec4Scaled(base, f + 80, v + 96, last);
+    vl::Vec3AddTo(base, v + 2544 + 16 * w, f + 80);
+  }
+  *f1 = last;
+  return v + 2592;
+}
+
 }  // namespace car_physics

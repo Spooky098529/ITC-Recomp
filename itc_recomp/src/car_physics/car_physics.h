@@ -356,4 +356,26 @@ bool SteerRecordCurve(uint8_t* base, uint32_t record, double angle, double* resu
 bool VehicleSteerTowards(uint8_t* base, uint32_t vehicle, double target, double dt, double f3,
                          uint32_t left, uint32_t right, double* f1);
 
+// sub_820B0198 (the name ours: Vehicle::SuspensionSpring): wheel w's spring
+// and damper (the suspension at its wheel data +96, the axle partner's
+// anti-roll) over +2368 substeps of +2364 with `change` (f1) and the
+// velocity (a float at `velocity`, updated); wheel +0 = the travel. Returns
+// the force (the change of speed x -1 / dt x the mass), or -R32 when the
+// wheel leaves the ground.
+double VehicleSuspensionSpring(uint8_t* base, uint32_t vehicle, uint32_t w, double change,
+                               uint32_t velocity);
+// Vehicle::UpdateWheelSuspension (sub_820B5588): byte wheel +16 = 0; the
+// vertical speed at the mount (RigidBody::PointVelocity at `frame` + 96,
+// dotted with +160, negated at `frame` + 80: the original's 176 bytes)
+// through SuspensionSpring; wheel +4, +8 (the force) and byte +17 (on the
+// ground, counted in +348). Returns SuspensionSpring's (the original's f1).
+double VehicleUpdateWheelSuspension(uint8_t* base, uint32_t vehicle, uint32_t w,
+                                    uint32_t frame);
+// Vehicle::UpdateSuspension (sub_820B6328): +348 = 0; the wheel order
+// +2176 to +2188 sorted by load (+280); each wheel's +12 = +0, its
+// UpdateWheelSuspension in that order (its frame below `frame`, the
+// original's 144 bytes); each accumulator +2544 + 16 w += up (+96) x wheel
+// +8. Returns the original's r3 (+2592); `f1` gets wheel 3's +8.
+uint32_t VehicleUpdateSuspension(uint8_t* base, uint32_t vehicle, uint32_t frame, double* f1);
+
 }  // namespace car_physics

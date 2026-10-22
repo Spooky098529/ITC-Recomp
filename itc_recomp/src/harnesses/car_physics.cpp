@@ -201,6 +201,18 @@ ITC_NATIVE_STEP(NativeSetSteering,
 ITC_NATIVE_STEP(NativeSteerRecordFill,
                 cp::SteerRecordFill(base, ctx.r3.u32, ctx.r7.u32, ctx.f1.f64, ctx.f2.f64,
                                     ctx.f3.f64))
+void NativeUpdateSuspension(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  double f1 = 0.0;
+  ctx.r3.u64 = cp::VehicleUpdateSuspension(base, ctx.r3.u32, ctx.r1.u32 - 144, &f1);
+  ctx.f1.f64 = f1;
+}
+ITC_NATIVE_STEP(NativeUpdateWheelSuspension,
+                ctx.f1.f64 = cp::VehicleUpdateWheelSuspension(base, ctx.r3.u32, ctx.r4.u32,
+                                                              ctx.r1.u32 - 176))
+ITC_NATIVE_STEP(NativeSuspensionSpring,
+                ctx.f1.f64 = cp::VehicleSuspensionSpring(base, ctx.r3.u32, ctx.r4.u32,
+                                                         ctx.f1.f64, ctx.r6.u32))
 // Where tan would fail, the original (as the adapters).
 void NativeSteerRecordCurve(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
@@ -598,6 +610,9 @@ void FillVehicle(uint8_t* base, uint32_t area, Random& r, Word word) {
   // The gear count (car data +1268), 1 to 7: SetUpGearing loops over it and
   // stores by it.
   guest::StoreU32(base, area + kCarData + 1268, 1 + r.Below(7));
+  // The substeps (+2368), 1 to 10 (0 some of the time): the suspension
+  // loops over them.
+  guest::StoreU32(base, v + 2368, r.Below(8) == 0 ? 0 : 1 + r.Below(10));
 }
 
 }  // namespace
@@ -709,6 +724,13 @@ void CarPhysicsVehicle(Context& h) {
        NativeSteerRecordCurve, true, kSteerRecordR4, false, false},
       {"Vehicle::SteerTowards (sub_820B5FD8)", Original<__imp__sub_820B5FD8>, NativeSteerTowards,
        true, kByteR4, false, false},
+      {"Vehicle::UpdateSuspension (sub_820B6328)", Original<__imp__sub_820B6328>,
+       NativeUpdateSuspension, true},
+      {"Vehicle::UpdateWheelSuspension (sub_820B5588)", Original<__imp__sub_820B5588>,
+       NativeUpdateWheelSuspension, true},
+      // r6 = a velocity in the vehicle (+5000).
+      {"Vehicle::SuspensionSpring (sub_820B0198)", Original<__imp__sub_820B0198>,
+       NativeSuspensionSpring, true},
   };
   enum Group { kNumbers, kOneNaN, kNaNs };
   const char* const kGroupNames[] = {"", ", one NaN",
@@ -780,6 +802,7 @@ void CarPhysicsVehicle(Context& h) {
           t.f3.f64 = double(std::bit_cast<float>(word(more)));
           t.r5.u64 = more.Below(3) == 0 ? uint32_t(more.Next()) : more.Below(2);
           t.r7.u64 = area + kCarData + 336;
+          t.r6.u64 = area + kVehicle + 5000;
           t.f1.f64 = f1;
           (v == 0 ? f.recompiled : f.native)(t, h.base);
           result[v] = Read(h.base, area, kVehicleAreaBytes);

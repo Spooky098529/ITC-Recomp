@@ -15,7 +15,8 @@ ITC_FLAG_BOOL(native_car_physics, true, "ITC",
               "sub_820AFAE8 to sub_820B6430; the vehicle's state from its body and its "
               "copies, sub_820B13C8, sub_820B0A50, sub_820B0CC0; its reset, gearing and "
               "steering, sub_820B0EE8, sub_820B4AA8, sub_820B3D10, sub_820B5FD8 with "
-              "sub_820B0668 and sub_820B3E98) natively instead of through the translated "
+              "sub_820B0668 and sub_820B3E98; the suspension, sub_820B6328, "
+              "sub_820B5588, sub_820B0198) natively instead of through the translated "
               "code (the same words, bit for bit; checked by --run_harnesses=car_physics)");
 
 // Defines an adapter: `body` uses `ctx` and `base`. Flush-to-zero off for
@@ -266,3 +267,24 @@ extern "C" REX_FUNC(sub_820B5FD8) {
   }
   ctx.f1.f64 = f1;
 }
+
+// --- The suspension ---
+
+// r3 comes back as +2592, f1 as wheel 3's +8.
+extern "C" REX_FUNC(sub_820B6328) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_car_physics)) {
+    __imp__sub_820B6328(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  double f1 = 0.0;
+  ctx.r3.u64 = VehicleUpdateSuspension(base, ctx.r3.u32, ctx.r1.u32 - 144, &f1);
+  ctx.f1.f64 = f1;
+}
+// r4 = the wheel; f1 comes back as the spring's.
+ITC_CAR_PHYSICS(820B5588, ctx.f1.f64 = VehicleUpdateWheelSuspension(base, ctx.r3.u32, ctx.r4.u32,
+                                                                    ctx.r1.u32 - 176))
+// r4 = the wheel, f1 = the change, r6 = the velocity; f1 = the force.
+ITC_CAR_PHYSICS(820B0198, ctx.f1.f64 = VehicleSuspensionSpring(base, ctx.r3.u32, ctx.r4.u32,
+                                                               ctx.f1.f64, ctx.r6.u32))
