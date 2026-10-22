@@ -109,3 +109,20 @@ void LightSpriteSetTextures(uint8_t* base, uint32_t sprite, uint32_t table);
 void ModelSpriteSetTextures(uint8_t* base, uint32_t sprite, uint32_t table);
 
 }  // namespace race_overlays
+
+namespace race_overlays {
+
+// --- Random numbers ---
+
+// rand (sub_82293568), the game's own (not the C runtime's per-thread one):
+// the seed at 0x82638188 = seed x 1,103,515,245 + 12,345; returns the new
+// seed's upper halfword's low 15 bits.
+uint32_t Rand(uint8_t* base);
+
+// RandomRange (sub_8211F118): low + (high - low) x rand() x the float at
+// 0x82002BD4, with the original's roundings (the difference and the product
+// to single, then a fused multiply-add rounded to single). `drawn` gets
+// rand()'s result (the original leaves it in r3).
+float RandomRange(uint8_t* base, double low, double high, uint32_t* drawn = nullptr);
+
+}  // namespace race_overlays

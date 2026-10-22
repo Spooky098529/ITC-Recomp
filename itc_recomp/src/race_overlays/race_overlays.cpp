@@ -4,6 +4,8 @@
 
 #include "base/log.h"
 
+#include <cmath>
+
 namespace race_overlays {
 
 namespace {
@@ -223,6 +225,36 @@ void LightSpriteSetTextures(uint8_t* base, uint32_t sprite, uint32_t table) {
 void ModelSpriteSetTextures(uint8_t* base, uint32_t sprite, uint32_t table) {
   ITC_NATIVE_RUNNING("sub_8211F408 ModelSprite::SetTextures");
   StoreEntries(base, sprite + 108, table, 25);
+}
+
+}  // namespace race_overlays
+
+namespace race_overlays {
+
+namespace {
+constexpr uint32_t kSeed = 0x82638188;
+constexpr uint32_t kRandScale = 0x82002BD4;  // probably 1/32,767
+}  // namespace
+
+uint32_t Rand(uint8_t* base) {
+  ITC_NATIVE_RUNNING("sub_82293568 rand");
+  const uint32_t seed =
+      uint32_t(int64_t(int32_t(guest::LoadU32(base, kSeed))) * 1103515245 + 12345);
+  guest::StoreU32(base, kSeed, seed);
+  return (seed >> 16) & 0x7FFF;
+}
+
+float RandomRange(uint8_t* base, double low, double high, uint32_t* drawn) {
+  ITC_NATIVE_RUNNING("sub_8211F118 RandomRange");
+  const uint32_t r = Rand(base);
+  if (drawn) {
+    *drawn = r;
+  }
+  const double range = double(float(high - low));
+  const double scale = double(guest::LoadFloat(base, kRandScale));
+  const double value = double(float(double(int64_t(int32_t(r)))));
+  const double scaled = double(float(range * value));
+  return float(std::fma(scaled, scale, low));
 }
 
 }  // namespace race_overlays

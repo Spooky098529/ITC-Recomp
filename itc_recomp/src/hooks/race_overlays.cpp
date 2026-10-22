@@ -9,7 +9,8 @@
 ITC_FLAG_BOOL(native_race_overlays, true, "ITC",
               "Run the race overlays' update helpers (the car overlays' view and vehicle "
               "accessors, sub_82126550 to sub_82127178; the child overlays' setters, "
-              "sub_8211E9C8 to sub_8212DF90) natively instead of through the "
+              "sub_8211E9C8 to sub_8212DF90; the game's rand, sub_82293568, and RandomRange, "
+              "sub_8211F118) natively instead of through the "
               "translated code (same results; checked by --run_harnesses=race_overlays)");
 
 // Defines an adapter for a function of the view or overlays in r3 that
@@ -99,3 +100,19 @@ ITC_OVERLAY_SET(8212D6D8, SetTextures108(base, ctx.r3.u32, ctx.r4.u32))
 ITC_OVERLAY_SET(8212CC10, MarkerSetTextures(base, ctx.r3.u32, ctx.r4.u32))
 ITC_OVERLAY_SET(8211E9C8, LightSpriteSetTextures(base, ctx.r3.u32, ctx.r4.u32))
 ITC_OVERLAY_SET(8211F408, ModelSpriteSetTextures(base, ctx.r3.u32, ctx.r4.u32))
+
+// rand: returns r3.
+ITC_OVERLAY_WORD(82293568, Rand(base))
+
+// RandomRange: f1 = low, f2 = high; returns f1 (r3 is left rand()'s result).
+extern "C" REX_FUNC(sub_8211F118) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_race_overlays)) {
+    __imp__sub_8211F118(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  uint32_t drawn = 0;
+  ctx.f1.f64 = double(RandomRange(base, ctx.f1.f64, ctx.f2.f64, &drawn));
+  ctx.r3.u64 = drawn;
+}

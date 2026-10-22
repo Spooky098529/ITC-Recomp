@@ -116,6 +116,15 @@ void NativeModelSpriteSetTextures(PPCContext& ctx, uint8_t* base) {
   ro::ModelSpriteSetTextures(base, ctx.r3.u32, ctx.r4.u32);
 }
 
+ITC_NATIVE_WORD(NativeRand, ro::Rand(base))
+
+void NativeRandomRange(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  uint32_t drawn = 0;
+  ctx.f1.f64 = double(ro::RandomRange(base, ctx.f1.f64, ctx.f2.f64, &drawn));
+  ctx.r3.u64 = drawn;
+}
+
 // Runs the recompiled version with --native_race_overlays off, so the
 // functions it calls that are ours run the originals too.
 void RunRecompiled(GuestFunction recompiled, PPCContext& t, uint8_t* base) {
@@ -420,6 +429,54 @@ void SetterCases(Context& h, uint32_t block) {
   }
 }
 
+// rand and RandomRange: random seeds (the live one put back after), and
+// ranges of game-like floats, odd floats and random doubles.
+void RandomCases(Context& h) {
+  Random& r = h.random;
+  constexpr uint32_t kSeed = 0x82638188;
+  const uint32_t live = guest::LoadU32(h.base, kSeed);
+  {
+    Results results("rand (sub_82293568)");
+    std::vector<uint32_t> seeds = {0, 1, 0x7FFFFFFF, 0x80000000, 0xFFFFFFFF, live};
+    for (int i = 0; i < 300; i++) {
+      seeds.push_back(uint32_t(r.Next()));
+    }
+    for (uint32_t seed : seeds) {
+      Compare(h, results, {{kSeed, 4}}, [&] { guest::StoreU32(h.base, kSeed, seed); },
+              [](PPCContext&) {}, __imp__sub_82293568, NativeRand,
+              fmt::format("seed {:08X}", seed));
+    }
+    results.Report();
+  }
+  {
+    Results results("RandomRange (sub_8211F118)");
+    auto value = [&]() -> double {
+      switch (r.Below(3)) {
+        case 0:
+          return double(std::bit_cast<float>(RandomWord(r)));
+        case 1:
+          return std::bit_cast<double>(r.Next());
+        default:
+          return double(float(int32_t(r.Below(2001)) - 1000) / 64.0f);
+      }
+    };
+    for (int i = 0; i < 600; i++) {
+      const uint32_t seed = uint32_t(r.Next());
+      const double low = value(), high = value();
+      Compare(h, results, {{kSeed, 4}}, [&] { guest::StoreU32(h.base, kSeed, seed); },
+              [&](PPCContext& t) {
+                t.f1.f64 = low;
+                t.f2.f64 = high;
+              },
+              __imp__sub_8211F118, NativeRandomRange,
+              fmt::format("seed {:08X} low {:016X} high {:016X}", seed,
+                          std::bit_cast<uint64_t>(low), std::bit_cast<uint64_t>(high)));
+    }
+    results.Report();
+  }
+  guest::StoreU32(h.base, kSeed, live);
+}
+
 }  // namespace
 
 void RaceOverlays(Context& h) {
@@ -431,6 +488,7 @@ void RaceOverlays(Context& h) {
   }
   AccessorCases(h, block);
   SetterCases(h, block);
+  RandomCases(h);
   memory->SystemHeapFree(block);
 }
 
