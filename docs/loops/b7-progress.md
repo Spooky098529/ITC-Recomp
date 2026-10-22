@@ -17,8 +17,10 @@ record: `b7-loop-2026-10-22-0111.md` (and this file's history).
   (AnimationList::Get) have no function of their own (their work is
   inside their native callers): set to the new Merged status (the
   user's, 2026-10-22), not a halt.
-- Step 6: the race overlays' second migration agent running.
-- Session: pass 5 of 20, subsystem 1 of 5. In all: subsystem 1 of 5.
+- Second migration agent: 5 functions Overridden and 1 Merged
+  (`sub_8211F3B4`) in 8d7ad32, 092a792; the first 9 prints named; 27
+  ready groups left. Step 8: validation agent running.
+- Session: pass 6 of 20, subsystem 1 of 5. In all: subsystem 1 of 5.
 - Known at the start: `b7_status.py` checks `c-runtime.md:221`
   `sub_825A9934` (`__chkstk`) "Dropped, but it ran" (from the first run:
   its override does nothing, so it still shows as seen).
@@ -44,6 +46,11 @@ record: `b7-loop-2026-10-22-0111.md` (and this file's history).
   the first migration's 34 rows (Overridden). For review: RacerId's
   adapter (`sub_82126AE0`) sign-extends r3 where the original
   zero-extends a found id (only the upper 32 bits; callers compare 32).
+  The second migration's 6 rows and the 9 names. For review: a new
+  "(expected to differ)" harness group, Trail::AddPoint (`sub_82129598`)
+  with NaN or infinite inputs (5 of 126 differ, only NaNs' sign and
+  payload, by the agent's reading of the translated code's compiled
+  Newton step); its 474 finite cases are the same.
 
 ## To check in a drive
 
