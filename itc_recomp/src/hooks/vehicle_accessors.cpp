@@ -65,3 +65,71 @@ ITC_ACCESSOR_SIGNED(820FF9F8, RacersIndexOf(base, ctx.r3.u32, ctx.r4.u32))
 ITC_ACCESSOR_WORD(820FFCF8, StagesHasRacer(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
 ITC_ACCESSOR_WORD(82105620, SaveDataOf(base, ctx.r3.u32))
 ITC_ACCESSOR_WORD(825C8388, DebugSwitchOff())
+
+// --- The vector library (src/vehicle_accessors/vectors.cpp) ---
+
+#include "vehicle_accessors/vectors.h"
+
+ITC_FLAG_BOOL(native_vector_library, true, "ITC",
+              "Run the game's vector library (docs/functions/vehicle-accessors.md: sqrtf, "
+              "sub_82293590; the matrix helpers, sub_82293818 to sub_822938F0; the 3D vector "
+              "helpers, sub_82294028 to sub_82294608) natively instead of through the "
+              "translated code (same results; checked by --run_harnesses=vehicle_accessors)");
+
+// Defines an adapter for a function returning nothing (r3 left as it was):
+// `call` uses `ctx` and `base`.
+#define ITC_VECTOR_VOID(address, call)         \
+  extern "C" REX_FUNC(sub_##address) {        \
+    REX_FUNC_PROLOGUE();                      \
+    if (!ITC_FLAG(native_vector_library)) {   \
+      __imp__sub_##address(ctx, base);        \
+      return;                                 \
+    }                                         \
+    ctx.fpscr.disableFlushMode();             \
+    call;                                     \
+  }
+
+// The same for a single returned in f1.
+#define ITC_VECTOR_FLOAT(address, expr)        \
+  extern "C" REX_FUNC(sub_##address) {        \
+    REX_FUNC_PROLOGUE();                      \
+    if (!ITC_FLAG(native_vector_library)) {   \
+      __imp__sub_##address(ctx, base);        \
+      return;                                 \
+    }                                         \
+    ctx.fpscr.disableFlushMode();             \
+    ctx.f1.f64 = double(expr);                \
+  }
+
+using namespace vector_library;
+
+ITC_VECTOR_FLOAT(82293590, Sqrtf(ctx.f1.f64))
+// r3 comes back as the matrix's fourth row (the original's copy's
+// destination).
+ITC_VECTOR_VOID(82293818, MatrixSetTranslation(base, ctx.r3.u32, ctx.r4.u32);
+                ctx.r3.u64 = ctx.r3.u32 + 48)
+ITC_VECTOR_VOID(82293880, MatrixRotate(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+ITC_VECTOR_VOID(822938F0, MatrixTransformPoint(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+ITC_VECTOR_VOID(82294028, Vec3Add(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+ITC_VECTOR_VOID(82294068, Vec3Sub(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+ITC_VECTOR_VOID(822940A8, Vec4ScaleTo(base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64))
+ITC_VECTOR_VOID(822940E0, Vec4Copy(base, ctx.r3.u32, ctx.r4.u32))
+ITC_VECTOR_VOID(82294108, Vec3CrossW1(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+ITC_VECTOR_FLOAT(82294170, Vec3Dot(base, ctx.r3.u32, ctx.r4.u32))
+ITC_VECTOR_FLOAT(822941B0, Vec3Normalize(base, ctx.r3.u32, ctx.r4.u32))
+ITC_VECTOR_FLOAT(82294200, Vec3Direction(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+ITC_VECTOR_FLOAT(82294270, Vec3Length(base, ctx.r3.u32))
+ITC_VECTOR_FLOAT(82294298, Vec3NormalizeSelf(base, ctx.r3.u32))
+ITC_VECTOR_VOID(822942A0, Vec3Sum(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+ITC_VECTOR_VOID(822942E0, Vec3Difference(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+ITC_VECTOR_VOID(82294320, Vec3AddTo(base, ctx.r3.u32, ctx.r4.u32))
+ITC_VECTOR_VOID(82294340, Vec4ScaleBy(base, ctx.r3.u32, ctx.f1.f64))
+ITC_VECTOR_FLOAT(82294348, Vec4DivideBy(base, ctx.r3.u32, ctx.f1.f64))
+ITC_VECTOR_VOID(82294360, Vec3SubCopy(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+ITC_VECTOR_VOID(822943C8, Vec3AddCopy(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+ITC_VECTOR_VOID(82294430, Vec4Scaled(base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64))
+ITC_VECTOR_VOID(82294470, Vec4ScaledFrom(base, ctx.r3.u32, ctx.r5.u32, ctx.f1.f64))
+ITC_VECTOR_VOID(822944B0, Vec3ScaledCopy(base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64))
+ITC_VECTOR_VOID(82294518, Vec3Cross(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+ITC_VECTOR_VOID(82294568, Vec3Lerp(base, ctx.r3.u32, ctx.r5.u32, ctx.r6.u32, ctx.f1.f64))
+ITC_VECTOR_FLOAT(82294608, Vec3DotOf(base, ctx.r3.u32, ctx.r4.u32))

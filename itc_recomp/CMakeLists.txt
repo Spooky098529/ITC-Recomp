@@ -112,6 +112,7 @@ set(ITC_SOURCES
     src/race_overlays/race_overlays.cpp
     src/hooks/vehicle_accessors.cpp
     src/vehicle_accessors/vehicle_accessors.cpp
+    src/vehicle_accessors/vectors.cpp
     src/hooks/command_list.cpp
     src/command_list/command_list.cpp
     src/hooks/c_runtime.cpp
