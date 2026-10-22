@@ -113,6 +113,8 @@ set(ITC_SOURCES
     src/hooks/vehicle_accessors.cpp
     src/vehicle_accessors/vehicle_accessors.cpp
     src/vehicle_accessors/vectors.cpp
+    src/hooks/matrix_math.cpp
+    src/matrix_math/matrix_math.cpp
     src/hooks/command_list.cpp
     src/command_list/command_list.cpp
     src/hooks/c_runtime.cpp
@@ -150,6 +152,7 @@ set(ITC_SOURCES
     src/harnesses/ui_movies_game.cpp
     src/harnesses/race_overlays.cpp
     src/harnesses/vehicle_accessors.cpp
+    src/harnesses/matrix_math.cpp
     src/helpers/debug_output.cpp
     src/helpers/object_attributes.cpp
     src/helpers/time.cpp
@@ -198,8 +201,10 @@ set(ITC_SOURCES
 # negation into an addition (LLVM's default model treats a NaN's sign as
 # free; seen with -O3 on asin of a negative NaN). See
 # docs/functions/c-runtime.md. The UI movie keys' interpolation
-# (src/ui_movies/keys.cpp) likewise (docs/functions/ui-movies.md).
-set_source_files_properties(src/c_runtime/math.cpp src/ui_movies/keys.cpp PROPERTIES
+# (src/ui_movies/keys.cpp) likewise (docs/functions/ui-movies.md), and the
+# matrix math (src/matrix_math/matrix_math.cpp, docs/functions/matrix-math.md).
+set_source_files_properties(src/c_runtime/math.cpp src/ui_movies/keys.cpp
+    src/matrix_math/matrix_math.cpp PROPERTIES
     COMPILE_OPTIONS "-ffp-model=strict;-ffp-contract=off"
     SKIP_PRECOMPILE_HEADERS ON)
 

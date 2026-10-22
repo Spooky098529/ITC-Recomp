@@ -116,5 +116,6 @@ void UiMovies(Context& h);
 void UiMoviesGame(Context& h);
 void RaceOverlays(Context& h);
 void VehicleAccessors(Context& h);
+void MatrixMath(Context& h);
 
 }  // namespace harness

@@ -2,6 +2,7 @@
 
 #include "frame_pacing/game_messages.h"
 #include "guest.h"
+#include "matrix_math/matrix_math.h"
 
 #include "base/flags.h"
 #include "base/log.h"
@@ -18,6 +19,8 @@
 #include <sstream>
 #include <string>
 #include <vector>
+
+ITC_FLAG_DECLARE(bool, native_matrix_math);
 
 ITC_FLAG_BOOL(find_per_frame_state, false, "ITC",
               "Find game state that advances on render-only passes, and the code that "
@@ -416,7 +419,23 @@ ITC_FRAME_STATE_WRAP(82130978)
 ITC_FRAME_STATE_WRAP(8209F7A8)
 ITC_FRAME_STATE_WRAP(820A0958)
 ITC_FRAME_STATE_WRAP(820AA1A8)
-ITC_FRAME_STATE_WRAP(820AB560)
+// Vec4::Transform: r3 = out, r4 = a matrix, r5 = a vector; its work natively
+// (src/matrix_math/matrix_math.cpp, --native_matrix_math; the translated
+// code leaves flush-to-zero on) or translated, inside the same wrap.
+extern "C" REX_FUNC(sub_820AB560) {
+  REX_FUNC_PROLOGUE();
+  if (debug::IsHidden(0x820AB560)) {
+    return;
+  }
+  debug::FrameStateDiff_Before(base);
+  if (ITC_FLAG(native_matrix_math)) {
+    matrix_math::Vec4Transform(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+    ctx.fpscr.enableFlushMode();
+  } else {
+    __imp__sub_820AB560(ctx, base);
+  }
+  debug::FrameStateDiff_After(base, "draw step part", 0x820AB560);
+}
 ITC_FRAME_STATE_WRAP(820C4EB8)
 ITC_FRAME_STATE_WRAP(820C4FB8)
 ITC_FRAME_STATE_WRAP(820DAA38)
