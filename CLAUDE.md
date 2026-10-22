@@ -24,8 +24,8 @@ the SDK's audio (the Audio Worker's spin, the game's sounds, the plan).
 `--height`, `--fullscreen`, black bars) and what's left to try.
 `docs/windows.md` is the Windows build: cross-compiled on Linux, tested
 under Wine (the user has no Windows machine).
-`docs/native-memory.md` is B7's first step (built 2026-10-22 on the
-branch `native-heap`): one allocation layer of our own
+`docs/native-memory.md` is B7's first step (built on `native-heap`,
+merged into `rexglue-removal-project` 2026-10-22): one allocation layer of our own
 (`src/memory/heap.h`) under every allocation, recompiled and native alike
 (the process heap, VirtualAlloc and physical memory, routed at nine
 functions by `src/hooks/heap.cpp` behind `--native_heap`, on by default;
