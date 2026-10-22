@@ -18,7 +18,8 @@ rows to review and drive list are there), and this file's history.
   folded in). Mapped in 7929f36 (`matrix-math.md`, 28 rows, 15 ready
   groups; checked). Migration 1 done (18cafd4: all 15 ready groups, 18
   ours and 3 Merged; `--native_matrix_math`; race 22 s, 0 errors).
-  Step: validation (agent running).
+  Validated (18 of 18 harness lines, all
+  18 ran in play). Step: migration 2 (agent running).
 - Known: `b7_status.py` checks `sub_825A9934` (`__chkstk`) "Dropped, but
   it ran", and every function made Native or Merged since the coverage
   session "..., but it ran" (`seen_in_play.txt` predates them; a new
