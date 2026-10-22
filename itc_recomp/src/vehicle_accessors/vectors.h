@@ -77,4 +77,27 @@ void Vec3Lerp(uint8_t* base, uint32_t out, uint32_t a, uint32_t b, double t);
 // Vec3::DotOf (sub_82294608): Dot(a, b).
 float Vec3DotOf(uint8_t* base, uint32_t a, uint32_t b);
 
+// --- Vectors held on the host (the originals' temporaries on their stack) ---
+
+// The four words as floats (copies keep their bits, signaling NaNs too).
+struct Vector {
+  float x, y, z, w;
+};
+
+Vector LoadVector(uint8_t* base, uint32_t address);
+void StoreVector(uint8_t* base, uint32_t address, const Vector& v);
+
+// Vec3::Sub's and Vec3::Add's arithmetic, w 1.0.
+Vector Sub(const Vector& a, const Vector& b);
+Vector Add(const Vector& a, const Vector& b);
+// Vec3::Cross's, w 0.0.
+Vector Cross(const Vector& a, const Vector& b);
+// Vec4::ScaleTo's, all four.
+Vector Scale(const Vector& v, double s);
+// Vec3::Dot's (dpps with flush-to-zero on).
+float Dot(const Vector& a, const Vector& b);
+// Vec3::Add's (or Sub's) steps on guest memory with b held on the host:
+// out = a + b (a - b), a read again after each store, w 1.0.
+void AddValue(uint8_t* base, uint32_t out, uint32_t a, const Vector& b, bool subtract);
+
 }  // namespace vector_library

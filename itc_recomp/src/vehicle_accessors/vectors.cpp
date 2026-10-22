@@ -58,25 +58,31 @@ double Fsqrts(double a) {
 }
 
 // Vec3::Add's and Vec3::Sub's steps (the same loads and stores; `subtract`
-// picks fsubs).
-void AddOrSub(uint8_t* base, uint32_t out, uint32_t a, uint32_t b, bool subtract) {
+// picks fsubs); `b(offset)` loads b's component, at the original's point.
+template <typename LoadB>
+void AddOrSubSteps(uint8_t* base, uint32_t out, uint32_t a, LoadB b, bool subtract) {
   auto op = [subtract](double x, double y) { return subtract ? Fsubs(x, y) : Fadds(x, y); };
   {
-    const double bx = Lfs(base, b + 0);
+    const double bx = b(0);
     const double ax = Lfs(base, a + 0);
     Stfs(base, out + 0, op(ax, bx));
   }
   {
-    const double by = Lfs(base, b + 4);
+    const double by = b(4);
     const double ay = Lfs(base, a + 4);
     Stfs(base, out + 4, op(ay, by));
   }
   const double az = Lfs(base, a + 8);
-  const double bz = Lfs(base, b + 8);
+  const double bz = b(8);
   const uint32_t one = guest::LoadU32(base, kOne);
   const double z = op(az, bz);
   guest::StoreU32(base, out + 12, one);
   Stfs(base, out + 8, z);
+}
+
+void AddOrSub(uint8_t* base, uint32_t out, uint32_t a, uint32_t b, bool subtract) {
+  AddOrSubSteps(base, out, a, [base, b](uint32_t offset) { return Lfs(base, b + offset); },
+                subtract);
 }
 
 // The x, y, z of a - b or a + b with all loads first (the copies through a
@@ -396,6 +402,60 @@ void Vec3Lerp(uint8_t* base, uint32_t out, uint32_t a, uint32_t b, double t) {
 float Vec3DotOf(uint8_t* base, uint32_t a, uint32_t b) {
   ITC_NATIVE_RUNNING("sub_82294608 Vec3::DotOf");
   return Vec3Dot(base, a, b);
+}
+
+Vector LoadVector(uint8_t* base, uint32_t address) {
+  return {std::bit_cast<float>(guest::LoadU32(base, address + 0)),
+          std::bit_cast<float>(guest::LoadU32(base, address + 4)),
+          std::bit_cast<float>(guest::LoadU32(base, address + 8)),
+          std::bit_cast<float>(guest::LoadU32(base, address + 12))};
+}
+
+void StoreVector(uint8_t* base, uint32_t address, const Vector& v) {
+  guest::StoreU32(base, address + 0, std::bit_cast<uint32_t>(v.x));
+  guest::StoreU32(base, address + 4, std::bit_cast<uint32_t>(v.y));
+  guest::StoreU32(base, address + 8, std::bit_cast<uint32_t>(v.z));
+  guest::StoreU32(base, address + 12, std::bit_cast<uint32_t>(v.w));
+}
+
+Vector Sub(const Vector& a, const Vector& b) {
+  return {float(Fsubs(a.x, b.x)), float(Fsubs(a.y, b.y)), float(Fsubs(a.z, b.z)), 1.0f};
+}
+
+Vector Add(const Vector& a, const Vector& b) {
+  return {float(Fadds(a.x, b.x)), float(Fadds(a.y, b.y)), float(Fadds(a.z, b.z)), 1.0f};
+}
+
+Vector Cross(const Vector& a, const Vector& b) {
+  const double t7 = Fmuls(b.y, a.z);
+  const double t6 = Fmuls(a.x, b.z);
+  const double t5 = Fmuls(b.x, a.y);
+  return {float(Fmsubs(b.z, a.y, t7)), float(Fmsubs(b.x, a.z, t6)),
+          float(Fmsubs(a.x, b.y, t5)), 0.0f};
+}
+
+Vector Scale(const Vector& v, double s) {
+  return {float(Fmuls(v.x, s)), float(Fmuls(v.y, s)), float(Fmuls(v.z, s)),
+          float(Fmuls(v.w, s))};
+}
+
+float Dot(const Vector& a, const Vector& b) {
+  auto lanes = [](const Vector& v) {
+    return simde_mm_set_ps(v.x, v.y, v.z, v.w);
+  };
+  const simde__m128 va = lanes(a);
+  const simde__m128 vb = lanes(b);
+  const uint32_t csr = Fpscr::getcsr();
+  Fpscr::setcsr(csr | uint32_t(Fpscr::FlushMask));
+  const simde__m128 dot = simde_mm_dp_ps(va, vb, 0xEF);
+  Fpscr::setcsr(csr);
+  return simde_mm_cvtss_f32(dot);
+}
+
+void AddValue(uint8_t* base, uint32_t out, uint32_t a, const Vector& b, bool subtract) {
+  const float parts[3] = {b.x, b.y, b.z};
+  AddOrSubSteps(base, out, a, [&parts](uint32_t offset) { return double(parts[offset / 4]); },
+                subtract);
 }
 
 }  // namespace vector_library

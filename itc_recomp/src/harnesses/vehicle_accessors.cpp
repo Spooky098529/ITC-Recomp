@@ -66,6 +66,64 @@ ITC_NATIVE_WORD(NativeStagesHasRacer,
 ITC_NATIVE_WORD(NativeSaveDataOf, va::SaveDataOf(base, ctx.r3.u32))
 ITC_NATIVE_WORD(NativeDebugSwitchOff, va::DebugSwitchOff())
 
+// The rigid body's and the wheels' (r3 as the adapters leave it).
+ITC_NATIVE_WORD(NativeRigidBodyIsFixed, va::RigidBodyIsFixed(base, ctx.r3.u32))
+void NativeRigidBodySetGravity(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  va::RigidBodySetGravity(base, ctx.r3.u32, ctx.r4.u32);
+  ctx.r3.u64 = ctx.r3.u32 + 496;
+}
+void NativeRigidBodySetMass(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  va::RigidBodySetMass(base, ctx.r3.u32, ctx.f1.f64);
+  ctx.r3.u64 = ctx.r3.u32 + 496;
+}
+ITC_NATIVE_FLOAT(NativeRigidBodyMass, va::RigidBodyMass(base, ctx.r3.u32))
+void NativeRigidBodySetCenterOfMass(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  va::RigidBodySetCenterOfMass(base, ctx.r3.u32, ctx.r4.u32);
+  ctx.r3.u64 = ctx.r3.u32 + 16;
+}
+ITC_NATIVE_WORD(NativeRigidBodyField80, va::RigidBodyField80(ctx.r3.u32))
+ITC_NATIVE_WORD(NativeRigidBodyVelocity, va::RigidBodyVelocity(ctx.r3.u32))
+ITC_NATIVE_WORD(NativeRigidBodyField144, va::RigidBodyField144(ctx.r3.u32))
+ITC_NATIVE_WORD(NativeRigidBodyField160, va::RigidBodyField160(ctx.r3.u32))
+ITC_NATIVE_WORD(NativeRigidBodyOrientation, va::RigidBodyOrientation(ctx.r3.u32))
+ITC_NATIVE_WORD(NativeRigidBodyAngularVelocity, va::RigidBodyAngularVelocity(ctx.r3.u32))
+ITC_NATIVE_FLOAT(NativeRigidBodyFloat48, va::RigidBodyFloat48(base, ctx.r3.u32))
+void NativeRigidBodyPointVelocity(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  va::RigidBodyPointVelocity(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+}
+void NativeRigidBodySetFloat112(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  va::RigidBodySetFloat112(base, ctx.r3.u32, ctx.f1.f64);
+}
+void NativeRigidBodyAddForce(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  va::RigidBodyAddForce(base, ctx.r3.u32, ctx.r4.u32);
+  ctx.r3.u64 = ctx.r3.u32 + 64;
+}
+void NativeRigidBodyAddTorque(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  va::RigidBodyAddTorque(base, ctx.r3.u32, ctx.r4.u32);
+  ctx.r3.u64 = ctx.r3.u32 + 128;
+}
+void NativeRigidBodyAddForceAt(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  va::RigidBodyAddForceAt(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+  ctx.r3.u64 = ctx.r3.u32 + 64;
+}
+void NativeRigidBodyAddTorqueAt(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  va::RigidBodyAddTorqueAt(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+  ctx.r3.u64 = ctx.r3.u32 + 128;
+}
+ITC_NATIVE_FLOAT(NativeVehicleWheelSlip,
+                 va::VehicleWheelSlip(base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64))
+ITC_NATIVE_FLOAT(NativeVehicleMaxWheelSlip,
+                 va::VehicleMaxWheelSlip(base, ctx.r3.u32, ctx.f1.f64))
+
 namespace vl = vector_library;
 
 #define ITC_NATIVE_VOID(name, call)           \
@@ -159,7 +217,7 @@ using Regions = std::vector<std::pair<uint32_t, uint32_t>>;
 template <typename Setup, typename Args>
 void Compare(Context& h, Results& results, const Regions& regions, Setup setup, Args args,
              GuestFunction recompiled, GuestFunction native, const std::string& what,
-             bool compare_f1 = true) {
+             bool compare_f1 = true, bool compare_r3 = true) {
   std::vector<uint8_t> result[2];
   for (int v = 0; v < 2; v++) {
     setup();
@@ -179,7 +237,7 @@ void Compare(Context& h, Results& results, const Regions& regions, Setup setup, 
       const std::vector<uint8_t> part = Read(h.base, at, bytes);
       result[v].insert(result[v].end(), part.begin(), part.end());
     }
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; compare_r3 && i < 4; i++) {
       result[v].push_back(uint8_t(t.r3.u32 >> (24 - 8 * i)));
     }
     for (int i = 0; compare_f1 && i < 8; i++) {
@@ -213,6 +271,14 @@ void AddressCases(Context& h) {
       {"RigidBody::Matrix (sub_820B6930)", __imp__sub_820B6930, NativeRigidBodyMatrix},
       {"Contact::Position (sub_820B8D00)", __imp__sub_820B8D00, NativeContactPosition},
       {"DebugSwitchOff (sub_825C8388)", __imp__sub_825C8388, NativeDebugSwitchOff},
+      {"RigidBody::Field80 (sub_820B6880)", __imp__sub_820B6880, NativeRigidBodyField80},
+      {"RigidBody::Velocity (sub_820B6888)", __imp__sub_820B6888, NativeRigidBodyVelocity},
+      {"RigidBody::Field144 (sub_820B6890)", __imp__sub_820B6890, NativeRigidBodyField144},
+      {"RigidBody::Field160 (sub_820B6898)", __imp__sub_820B6898, NativeRigidBodyField160},
+      {"RigidBody::Orientation (sub_820B6928)", __imp__sub_820B6928,
+       NativeRigidBodyOrientation},
+      {"RigidBody::AngularVelocity (sub_820B6948)", __imp__sub_820B6948,
+       NativeRigidBodyAngularVelocity},
   };
   for (const auto& f : functions) {
     Results results(f.name);
@@ -567,6 +633,194 @@ void VectorCases(Context& h, uint32_t block) {
   }
 }
 
+// Float words without NaNs (infinities, denormals and signed zeros kept):
+// where no NaN is an input, the NaNs that come out are the default one, the
+// same in both versions.
+uint32_t NumberWord(Random& r) {
+  uint32_t word;
+  do {
+    word = FloatWord(r);
+  } while (std::isnan(std::bit_cast<float>(word)));
+  return word;
+}
+
+// The rigid body's cases: a body (0x200 bytes) and three vectors in the
+// block, filled anew for each case, numbers only in one group and NaNs
+// allowed in another (expected to differ: where two NaNs meet, which comes
+// out follows the compiler's operand order); the vectors also put inside
+// the body (the originals' order of loads and stores makes that matter).
+constexpr uint32_t kBody = 0x1000, kVector = 0x1400, kPoint = 0x1440, kBodyOut = 0x1480;
+
+void RigidBodyCases(Context& h, uint32_t block) {
+  Random& r = h.random;
+  enum Shape { kBodyOnly, kBodyF1, kBodyVector, kBodyVectorPoint, kOutBodyPoint };
+  const struct {
+    const char* name;
+    GuestFunction recompiled, native;
+    Shape shape;
+    bool compare_f1;
+    // Whether it does arithmetic on two inputs (where two NaNs can meet).
+    bool arithmetic = true;
+  } functions[] = {
+      {"RigidBody::IsFixed (sub_820B6638)", __imp__sub_820B6638, NativeRigidBodyIsFixed,
+       kBodyOnly, true, false},
+      // f1 is left the mass there (a scratch register callers don't read).
+      {"RigidBody::SetGravity (sub_820B6640)", __imp__sub_820B6640, NativeRigidBodySetGravity,
+       kBodyVector, false},
+      {"RigidBody::SetMass (sub_820B6698)", __imp__sub_820B6698, NativeRigidBodySetMass, kBodyF1,
+       true},
+      {"RigidBody::Mass (sub_820B6708)", __imp__sub_820B6708, NativeRigidBodyMass, kBodyOnly,
+       true, false},
+      {"RigidBody::SetCenterOfMass (sub_820B67E0)", __imp__sub_820B67E0,
+       NativeRigidBodySetCenterOfMass, kBodyVector, true},
+      {"RigidBody::Float48 (sub_820B68A0)", __imp__sub_820B68A0, NativeRigidBodyFloat48,
+       kBodyOnly, true, false},
+      {"RigidBody::PointVelocity (sub_820B68C0)", __imp__sub_820B68C0,
+       NativeRigidBodyPointVelocity, kOutBodyPoint, true},
+      {"RigidBody::SetFloat112 (sub_820B6950)", __imp__sub_820B6950, NativeRigidBodySetFloat112,
+       kBodyF1, true, false},
+      {"RigidBody::AddForce (sub_820B6958)", __imp__sub_820B6958, NativeRigidBodyAddForce,
+       kBodyVector, true},
+      {"RigidBody::AddTorque (sub_820B6960)", __imp__sub_820B6960, NativeRigidBodyAddTorque,
+       kBodyVector, true},
+      {"RigidBody::AddForceAt (sub_820B6968)", __imp__sub_820B6968, NativeRigidBodyAddForceAt,
+       kBodyVectorPoint, true},
+      {"RigidBody::AddTorqueAt (sub_820B69D8)", __imp__sub_820B69D8, NativeRigidBodyAddTorqueAt,
+       kBodyVectorPoint, true},
+  };
+  // Where the vector, the point and the output go: apart, or inside the
+  // body (on fields the functions read or write).
+  const struct {
+    uint32_t vector, point, out;
+    const char* name;
+  } layouts[] = {
+      {kVector, kPoint, kBodyOut, "apart"},
+      {kBody + 64, kBody + 16, kBody + 32, "inside the body"},
+      {kBody + 128, kBody + 208, kBody + 96, "inside the body, elsewhere"},
+      {kBody + 480, kBody + 192, kBody + 16, "on the gravity and center"},
+  };
+  for (const auto& f : functions) {
+    Results results(f.name);
+    Results nan_results(std::string(f.name) + ", NaN inputs (expected to differ)");
+    for (const auto& layout : layouts) {
+      for (uint64_t seed = 0; seed < 40; seed++) {
+        const bool nans = seed % 4 == 3;
+        const double f1 = double(std::bit_cast<float>(nans ? FloatWord(r) : NumberWord(r)));
+        Compare(
+            h, nans && f.arithmetic ? nan_results : results, {{block + kBody, 0x500}},
+            [&] {
+              Random fill = Seeded(seed * 5 + 1);
+              for (uint32_t i = 0; i < 0x500; i += 4) {
+                guest::StoreU32(h.base, block + kBody + i,
+                                nans ? FloatWord(fill) : NumberWord(fill));
+              }
+              // Fixed or not.
+              guest::StoreU8(h.base, block + kBody, seed % 3 == 0 ? 0 : uint8_t(fill.Next()));
+            },
+            [&](PPCContext& t) {
+              t.f1.f64 = f1;
+              switch (f.shape) {
+                case kBodyOnly:
+                case kBodyF1:
+                  t.r3.u64 = block + kBody;
+                  break;
+                case kBodyVector:
+                  t.r3.u64 = block + kBody;
+                  t.r4.u64 = block + layout.vector;
+                  break;
+                case kBodyVectorPoint:
+                  t.r3.u64 = block + kBody;
+                  t.r4.u64 = block + layout.vector;
+                  t.r5.u64 = block + layout.point;
+                  break;
+                case kOutBodyPoint:
+                  t.r3.u64 = block + layout.out;
+                  t.r4.u64 = block + kBody;
+                  t.r5.u64 = block + layout.point;
+                  break;
+              }
+            },
+            f.recompiled, f.native,
+            fmt::format("{} seed {} f1 {:016X}", layout.name, seed, std::bit_cast<uint64_t>(f1)),
+            f.compare_f1);
+      }
+    }
+    results.Report();
+    if (f.arithmetic) {
+      nan_results.Report();
+    }
+  }
+}
+
+// The wheels' slip: a vehicle, its body (+336) and its wheels' data
+// (+2160 + 4 x wheel) in the block; wheels 0-4, on the ground or not. r3
+// isn't compared: the originals leave it a stack address where the wheel is
+// on the ground (callers read only f1).
+constexpr uint32_t kSlipVehicle = 0x2000, kSlipBody = 0x4000, kSlipWheels = 0x4400;
+
+void WheelSlipCases(Context& h, uint32_t block) {
+  Random& r = h.random;
+  auto setup = [&](uint64_t seed, bool nans) {
+    return [&h, block, seed, nans] {
+      Random fill = Seeded(seed * 3 + 2);
+      for (uint32_t i = 0; i < 0x2600; i += 4) {
+        guest::StoreU32(h.base, block + kSlipVehicle + i,
+                        nans ? FloatWord(fill) : NumberWord(fill));
+      }
+      guest::StoreU32(h.base, block + kSlipVehicle + 336, block + kSlipBody);
+      for (uint32_t wheel = 0; wheel < 5; wheel++) {
+        guest::StoreU32(h.base, block + kSlipVehicle + 2160 + 4 * wheel,
+                        block + kSlipWheels + 64 * wheel);
+        guest::StoreU8(h.base, block + kSlipVehicle + 433 + 368 * wheel,
+                       fill.Below(4) == 0 ? 0 : 1);
+      }
+    };
+  };
+  {
+    Results results("Vehicle::WheelSlip (sub_820C0180)");
+    Results nan_results("Vehicle::WheelSlip (sub_820C0180), NaN inputs (expected to differ)");
+    for (uint64_t seed = 0; seed < 60; seed++) {
+      const bool nans = seed % 4 == 3;
+      for (uint32_t wheel = 0; wheel < 5; wheel++) {
+        // Thresholds from 0 up, some small enough that slips count.
+        const double f1 = seed % 2 ? double(std::bit_cast<float>(NumberWord(r)))
+                                   : double(float(r.Below(100)) / 100.0f);
+        Compare(h, nans ? nan_results : results, {}, setup(seed, nans),
+                [&](PPCContext& t) {
+                  t.r3.u64 = block + kSlipVehicle;
+                  t.r4.u64 = wheel;
+                  t.f1.f64 = f1;
+                },
+                __imp__sub_820C0180, NativeVehicleWheelSlip,
+                fmt::format("seed {} wheel {} f1 {:016X}", seed, wheel,
+                            std::bit_cast<uint64_t>(f1)),
+                true, false);
+      }
+    }
+    results.Report();
+    nan_results.Report();
+  }
+  {
+    Results results("Vehicle::MaxWheelSlip (sub_820C0290)");
+    Results nan_results("Vehicle::MaxWheelSlip (sub_820C0290), NaN inputs (expected to differ)");
+    for (uint64_t seed = 0; seed < 60; seed++) {
+      const bool nans = seed % 4 == 3;
+      const double f1 = seed % 2 ? double(std::bit_cast<float>(NumberWord(r)))
+                                 : double(float(r.Below(100)) / 100.0f);
+      Compare(h, nans ? nan_results : results, {}, setup(seed, nans),
+              [&](PPCContext& t) {
+                t.r3.u64 = block + kSlipVehicle;
+                t.f1.f64 = f1;
+              },
+              __imp__sub_820C0290, NativeVehicleMaxWheelSlip,
+              fmt::format("seed {} f1 {:016X}", seed, std::bit_cast<uint64_t>(f1)), true,
+              false);
+    }
+    results.Report();
+    nan_results.Report();
+  }
+}
+
 }  // namespace
 
 void VehicleAccessors(Context& h) {
@@ -581,6 +835,8 @@ void VehicleAccessors(Context& h) {
   ContactCases(h, block);
   RaceDataCases(h, block);
   VectorCases(h, block);
+  RigidBodyCases(h, block);
+  WheelSlipCases(h, block);
   memory->SystemHeapFree(block);
 }
 

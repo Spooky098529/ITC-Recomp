@@ -13,7 +13,8 @@ ITC_FLAG_BOOL(native_vehicle_accessors, true, "ITC",
               "position and matrix, sub_820B67D8 and sub_820B6930; the contacts' object, "
               "position and strength, sub_820B8CC0 to sub_820B8D08; Racers::IndexOf and "
               "Stages::HasRacer, sub_820FF9F8 and sub_820FFCF8; SaveData::Of, sub_82105620; "
-              "the switch sub_825C8388) natively instead of through the translated code (same "
+              "the switch sub_825C8388; the rigid body's accessors and setters, sub_820B6638 "
+              "to sub_820B69D8; the wheels' slip, sub_820C0180 and sub_820C0290) natively instead of through the translated code (same "
               "results; checked by --run_harnesses=vehicle_accessors)");
 
 // Defines an adapter returning a word in r3: `address` the function's
@@ -52,6 +53,19 @@ ITC_FLAG_BOOL(native_vehicle_accessors, true, "ITC",
     ctx.f1.f64 = double(expr);                   \
   }
 
+// The same for a function returning nothing (`call` uses `ctx` and `base`,
+// and sets r3 where the original leaves it something callers could see).
+#define ITC_ACCESSOR_VOID(address, call)          \
+  extern "C" REX_FUNC(sub_##address) {           \
+    REX_FUNC_PROLOGUE();                         \
+    if (!ITC_FLAG(native_vehicle_accessors)) {   \
+      __imp__sub_##address(ctx, base);           \
+      return;                                    \
+    }                                            \
+    ctx.fpscr.disableFlushMode();                \
+    call;                                        \
+  }
+
 using namespace vehicle_accessors;
 
 ITC_ACCESSOR_WORD(820C0468, VehicleGet(base, ctx.r3.u32))
@@ -65,6 +79,38 @@ ITC_ACCESSOR_SIGNED(820FF9F8, RacersIndexOf(base, ctx.r3.u32, ctx.r4.u32))
 ITC_ACCESSOR_WORD(820FFCF8, StagesHasRacer(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
 ITC_ACCESSOR_WORD(82105620, SaveDataOf(base, ctx.r3.u32))
 ITC_ACCESSOR_WORD(825C8388, DebugSwitchOff())
+
+// The rigid body (r3). The setters leave r3 at their last copy's or
+// addition's destination, as the originals do.
+ITC_ACCESSOR_WORD(820B6638, RigidBodyIsFixed(base, ctx.r3.u32))
+ITC_ACCESSOR_VOID(820B6640, RigidBodySetGravity(base, ctx.r3.u32, ctx.r4.u32);
+                  ctx.r3.u64 = ctx.r3.u32 + 496)
+ITC_ACCESSOR_VOID(820B6698, RigidBodySetMass(base, ctx.r3.u32, ctx.f1.f64);
+                  ctx.r3.u64 = ctx.r3.u32 + 496)
+ITC_ACCESSOR_FLOAT(820B6708, RigidBodyMass(base, ctx.r3.u32))
+ITC_ACCESSOR_VOID(820B67E0, RigidBodySetCenterOfMass(base, ctx.r3.u32, ctx.r4.u32);
+                  ctx.r3.u64 = ctx.r3.u32 + 16)
+ITC_ACCESSOR_WORD(820B6880, RigidBodyField80(ctx.r3.u32))
+ITC_ACCESSOR_WORD(820B6888, RigidBodyVelocity(ctx.r3.u32))
+ITC_ACCESSOR_WORD(820B6890, RigidBodyField144(ctx.r3.u32))
+ITC_ACCESSOR_WORD(820B6898, RigidBodyField160(ctx.r3.u32))
+ITC_ACCESSOR_FLOAT(820B68A0, RigidBodyFloat48(base, ctx.r3.u32))
+ITC_ACCESSOR_VOID(820B68C0, RigidBodyPointVelocity(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+ITC_ACCESSOR_WORD(820B6928, RigidBodyOrientation(ctx.r3.u32))
+ITC_ACCESSOR_WORD(820B6948, RigidBodyAngularVelocity(ctx.r3.u32))
+ITC_ACCESSOR_VOID(820B6950, RigidBodySetFloat112(base, ctx.r3.u32, ctx.f1.f64))
+ITC_ACCESSOR_VOID(820B6958, RigidBodyAddForce(base, ctx.r3.u32, ctx.r4.u32);
+                  ctx.r3.u64 = ctx.r3.u32 + 64)
+ITC_ACCESSOR_VOID(820B6960, RigidBodyAddTorque(base, ctx.r3.u32, ctx.r4.u32);
+                  ctx.r3.u64 = ctx.r3.u32 + 128)
+ITC_ACCESSOR_VOID(820B6968, RigidBodyAddForceAt(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+                  ctx.r3.u64 = ctx.r3.u32 + 64)
+ITC_ACCESSOR_VOID(820B69D8, RigidBodyAddTorqueAt(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+                  ctx.r3.u64 = ctx.r3.u32 + 128)
+
+// The wheels' slip: r3 = the vehicle, r4 = a wheel, f1 = a threshold.
+ITC_ACCESSOR_FLOAT(820C0180, VehicleWheelSlip(base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64))
+ITC_ACCESSOR_FLOAT(820C0290, VehicleMaxWheelSlip(base, ctx.r3.u32, ctx.f1.f64))
 
 // --- The vector library (src/vehicle_accessors/vectors.cpp) ---
 
