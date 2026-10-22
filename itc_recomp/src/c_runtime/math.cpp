@@ -799,6 +799,93 @@ uint32_t AbstractSw(uint32_t word) {
   return result | 0x80000;
 }
 
+namespace {
+
+// tan's constants, the doubles at 0x820723B8: +0 2/pi, +8 the bound below
+// which r is used as it is, +16 the largest argument, +24 to +112 the
+// rational polynomial (+48 is 1.0); pi/2 in two parts at 0x8266B790.
+constexpr uint64_t kTanTable[15] = {
+    0x3FE45F306DC9C883, 0x3E46A09E667F3BCD, 0x41B1C5831ADD62E4, 0xBFC112B5E54D0900,
+    0x3F6C0E82A63BAADF, 0xBEF2BAB72EA2C724, 0x3FF0000000000000, 0xBFDDDEB047FBD9D5,
+    0x3F9A479EA17E2159, 0xBF346F6499094841, 0x3EA0B774F07678E9, 0x3FDDDEB047FBD9D5,
+    0x3FC112B5E54D0900, 0x3F346F6499094841, 0x3EF2BAB72EA2C724,
+};
+double TanK(uint32_t offset) {
+  return D(kTanTable[offset / 8]);
+}
+constexpr double kHalfPiHigh = D(0x3FF921FB54400000);  // 0x8266B790
+constexpr double kHalfPiLow = D(0x3DD0B4611A600000);   // 0x8266B798
+
+}  // namespace
+
+bool Tan(double x, double* result) {
+  if ((High16(x) & 0x7FF0) == 0x7FF0) {
+    return false;  // an infinity or NaN: _except1
+  }
+  if (x == 0.0) {  // 0.0 at 0x82002258
+    *result = x;
+    return true;
+  }
+  if (Abs(x) > TanK(16)) {
+    return false;  // too large: _except1 with the default NaN
+  }
+  const double k = Rint(x * TanK(0));
+  const double ak = Abs(k);
+  const double f0 = -std::fma(kHalfPiHigh, k, -x);  // fnmsub
+  const double r = -std::fma(kHalfPiLow, k, -f0);
+  const int64_t odd = Fctidz(ak) & 1;  // stfiwx's low word
+  const double ar = r < 0.0 ? Neg(r) : r;
+  double p, q;
+  if (ar < TanK(8)) {
+    if ((High16(r) & 0x7FF0) == 0 && (Bits(r) & 0x000FFFFFFFFFFFFFull) != 0) {
+      return false;  // a denormal r: sub_825AFEC0, then _except1
+    }
+    p = r;
+    q = TanK(48);
+  } else {
+    const double z = r * r;
+    double f11 = -std::fma(z, TanK(112), -TanK(32));  // fnmsub
+    const double f12 = std::fma(z, TanK(80), -TanK(104));  // fmsub
+    f11 = std::fma(f11, z, -TanK(96));
+    double f10 = std::fma(f12, z, TanK(64));
+    f11 = std::fma(f11, z, TanK(48));
+    f10 = std::fma(f10, z, -TanK(88));
+    p = f11 * r;
+    q = std::fma(f10, z, TanK(48));
+  }
+  *result = odd != 0 ? q / Neg(p) : p / q;
+  return true;
+}
+
+bool Ldexp(double x, int32_t n, double* result) {
+  if ((High16(x) & 0x7FF0) == 0x7FF0) {
+    if ((Bits(x) & 0x000FFFFFFFFFFFFFull) != 0) {
+      return false;  // a NaN: _except (sub_825B08E8)
+    }
+    *result = x;  // an infinity, as it is
+    return true;
+  }
+  if (x == 0.0) {
+    *result = x;
+    return true;
+  }
+  int32_t e;
+  const double m = Decomp(x, &e);
+  if (n < 0) {
+    if (e < int32_t(uint32_t(INT32_MIN) - uint32_t(n))) {
+      return false;  // underflow beyond an int
+    }
+  } else if (e > int32_t(uint32_t(INT32_MAX) - uint32_t(n))) {
+    return false;  // overflow beyond an int
+  }
+  const int32_t exponent = int32_t(uint32_t(e) + uint32_t(n));
+  if (exponent > 1024 || exponent < -1021) {
+    return false;  // overflow or underflow: _except (sub_825B0A40)
+  }
+  *result = SetExp(m, exponent);
+  return true;
+}
+
 uint64_t AbsRegister(uint64_t r3) {
   return int32_t(uint32_t(r3)) < 0 ? 0 - r3 : r3;
 }

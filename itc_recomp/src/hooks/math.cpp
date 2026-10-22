@@ -15,7 +15,8 @@ ITC_FLAG_BOOL(native_math, true, "ITC",
               "_set_exp, _get_exp and _decomp, sub_825AFE80, sub_825AFEA8 and sub_825AFF80, and the "
               "integer test sub_825A8CE0; floor and ceil, sub_825A8CA0 and sub_825AA0B8; log10, sub_825A9D80; "
               "__ultod, sub_825A9DB0; _fpclass, sub_825AB268; rint, sub_825B0B30; _ctrlfp, sub_825B0B80, "
-              "which sets the rounding mode as the original does; _abstract_sw, sub_825AB380; abs, sub_825AC870) natively instead of through the translated code (the same "
+              "which sets the rounding mode as the original does; _abstract_sw, sub_825AB380; abs, sub_825AC870; "
+              "tan, sub_825A8A50; ldexp, sub_825AAD20; _clearfp, sub_825AB568) natively instead of through the translated code (the same "
               "doubles, bit for bit; checked by --run_harnesses=math)");
 
 // acos: f1 = x.
@@ -257,17 +258,89 @@ extern "C" REX_FUNC(sub_825B0B30) {
 // The original also stores the word at r1 - 8 (below the stack pointer) and
 // leaves it in r5, r6 and f0; no caller reads those (tan, ldexp, _controlfp,
 // sub_825AB568 set them again first), so they aren't written here.
+namespace {
+
+// _ctrlfp's steps on the context (for its adapter and its callers'): returns
+// what it leaves in r3.
+uint64_t CtrlFp(PPCContext& ctx, uint64_t new_bits, uint64_t mask) {
+  const uint32_t old_word = ctx.fpscr.loadFromHost();
+  ctx.fpscr.disableFlushMode();
+  const uint64_t word = c_runtime::CtrlFpWord(old_word, new_bits, mask);
+  ctx.fpscr.storeFromGuest(uint32_t(word));
+  return old_word ^ 0xF8u;
+}
+
+// The mask tan and ldexp pass to _ctrlfp (0xC007FEFF), with 0xF8 for
+// nearest rounding, then the old word ^ 0xF8 to put it back.
+constexpr uint64_t kRoundingMask = 0xFFFFFFFFC007FEFFull;
+
+}  // namespace
+
 extern "C" REX_FUNC(sub_825B0B80) {
   REX_FUNC_PROLOGUE();
   if (!ITC_FLAG(native_math)) {
     __imp__sub_825B0B80(ctx, base);
     return;
   }
-  const uint32_t old_word = ctx.fpscr.loadFromHost();
+  ctx.r3.u64 = CtrlFp(ctx, ctx.r3.u64, ctx.r4.u64);
+}
+
+// tan: f1 = x. As the original: _ctrlfp sets nearest rounding, the work, and
+// _ctrlfp puts the old mode back (the exception bits it then tests are
+// always clear in the translation, so it always returns that way); r3 and
+// r4 as the second _ctrlfp leaves them. Where the original would go to its
+// _except1 paths (never seen in play), the original runs instead, after the
+// mode is put back (the same state as before the call).
+extern "C" REX_FUNC(sub_825A8A50) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_math)) {
+    __imp__sub_825A8A50(ctx, base);
+    return;
+  }
+  const double x = ctx.f1.f64;
+  const uint64_t old = CtrlFp(ctx, 0xF8, kRoundingMask);
+  double result;
+  const bool done = c_runtime::Tan(x, &result);
+  ctx.r3.u64 = CtrlFp(ctx, old, kRoundingMask);
+  if (!done) {
+    __imp__sub_825A8A50(ctx, base);
+    return;
+  }
+  ctx.r4.u64 = kRoundingMask;
+  ctx.f1.f64 = result;
+}
+
+// ldexp: f1 = x, r4 = n. Decided before the two _ctrlfp calls (no rounding
+// in it), which are made as the original's; where the original would go to
+// its _except paths (never seen in play), the original runs instead.
+extern "C" REX_FUNC(sub_825AAD20) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_math)) {
+    __imp__sub_825AAD20(ctx, base);
+    return;
+  }
   ctx.fpscr.disableFlushMode();
-  const uint64_t word = c_runtime::CtrlFpWord(old_word, ctx.r3.u64, ctx.r4.u64);
-  ctx.r3.u64 = old_word ^ 0xF8u;
-  ctx.fpscr.storeFromGuest(uint32_t(word));
+  double result;
+  if (!c_runtime::Ldexp(ctx.f1.f64, ctx.r4.s32, &result)) {
+    __imp__sub_825AAD20(ctx, base);
+    return;
+  }
+  const uint64_t old = CtrlFp(ctx, 0xF8, kRoundingMask);
+  ctx.r3.u64 = CtrlFp(ctx, old, kRoundingMask);
+  ctx.r4.u64 = kRoundingMask;
+  ctx.f1.f64 = result;
+}
+
+// _clearfp: _ctrlfp(0, 0xFFF80700), which keeps the rounding mode (the only
+// part of the FPSCR in the translation), then _abstract_sw of the old word.
+extern "C" REX_FUNC(sub_825AB568) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_math)) {
+    __imp__sub_825AB568(ctx, base);
+    return;
+  }
+  const uint64_t old = CtrlFp(ctx, 0, 0xFFFFFFFFFFF80700ull);
+  ctx.r3.u64 = c_runtime::AbstractSw(uint32_t(old));
 }
 
 // _abstract_sw: r3 = an FPSCR word (^ 0xF8); returns the portable word.

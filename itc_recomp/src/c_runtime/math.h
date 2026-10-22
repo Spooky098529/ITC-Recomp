@@ -88,6 +88,20 @@ uint64_t CtrlFpWord(uint64_t old_word, uint64_t new_bits, uint64_t mask);
 // ORed with 0x80000.
 uint32_t AbstractSw(uint32_t word);
 
+// tan (sub_825A8A50)'s work between its two _ctrlfp calls, in the host's
+// rounding mode (the adapter sets nearest first, as the original does): k =
+// rint(x 2/pi), r = x - k pi/2 in two parts, a rational polynomial, p/q or
+// -q/p for odd k. False, with nothing computed, where the original goes to
+// its _except1 paths (never seen in play): an infinity or NaN, |x| above
+// the largest argument (2.98e8), or a denormal r.
+bool Tan(double x, double* result);
+
+// ldexp (sub_825AAD20): x times 2^n, by _decomp and _set_exp (no rounding:
+// an infinity, a zero and every result in range come out exactly). False
+// where the original goes to its _except paths (never seen in play): a NaN,
+// or an exponent beyond -1021 to 1024 (overflow or underflow).
+bool Ldexp(double x, int32_t n, double* result);
+
 // abs (sub_825AC870) on a whole register, as the PowerPC code does it: the
 // low word's sign decides and all 64 bits are negated (neg), so the low
 // word is |x| (INT_MIN stays) and the high word what neg leaves.

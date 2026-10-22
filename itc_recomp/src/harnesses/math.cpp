@@ -6,6 +6,7 @@
 #include "harness.h"
 
 #include "base/log.h"
+#include "c_runtime/math.h"
 
 #include <xmmintrin.h>
 
@@ -474,6 +475,121 @@ void Math(Context& h) {
           [&](size_t i, PPCContext& t) { t.r3.u64 = ints[i]; },
           [](PPCContext& t, std::vector<uint8_t>& b) { Append(b, t.r3.u64); },
           [&](size_t i) { return fmt::format("r3 {:X}", ints[i]); });
+    _mm_setcsr(saved);
+  }
+
+  // tan, ldexp and _clearfp, which set the rounding mode through _ctrlfp and
+  // put it back: from each of the four modes (MXCSR set before each call and
+  // put back after), f1, r3, the MXCSR after and the context's copy of it
+  // compared. Inputs where the original would go to its _except paths
+  // (never seen in play; the native adapters run the original there) are
+  // left out: they reach the C runtime's exception handling.
+  {
+    const uint32_t saved = _mm_getcsr();
+    auto set_mode = [&](PPCContext& t, uint32_t mode) {
+      _mm_setcsr((saved & ~0x603Fu) | (mode << 13));
+      t.fpscr.csr = _mm_getcsr();
+    };
+    auto out = [&](PPCContext& t, std::vector<uint8_t>& b) {
+      Append(b, t.f1.u64);
+      Append(b, t.r3.u64);
+      Append(b, t.r4.u64);
+      Append(b, _mm_getcsr());
+      Append(b, t.fpscr.csr);
+      _mm_setcsr(saved);
+    };
+
+    // tan: multiples of pi/4 (where k changes, and the poles), the bound
+    // below which r is used as it is, the largest argument (2.98e8), every
+    // size.
+    std::vector<double> candidates = SpecialValues();
+    const double quarter_pi = 0.7853981633974483;
+    for (int i = 1; i <= 16; i++) {
+      AddAround(candidates, quarter_pi * i);
+    }
+    for (double x : {1.0536712127723509e-08, 298156826.0, 2.9815682e8, 1e-8, 1e-6, 0.5, 1.0,
+                     100.0, 1e6, 1e8}) {
+      AddAround(candidates, x);
+    }
+    AddRandom(h, candidates, 2.0, 2000);
+    AddRandom(h, candidates, 1000.0, 500);
+    AddRandom(h, candidates, 3e8, 300);
+    std::vector<double> values;
+    for (double x : candidates) {
+      double result;
+      if (c_runtime::Tan(x, &result)) {
+        values.push_back(x);
+      }
+    }
+    for (uint32_t mode = 0; mode < 4; mode++) {
+      Cases(h, fmt::format("tan, rounding mode {} (sub_825A8A50)", mode).c_str(),
+            __imp__sub_825A8A50, sub_825A8A50, values.size(),
+            [&](size_t i, PPCContext& t) {
+              t.f1.f64 = values[i];
+              set_mode(t, mode);
+            },
+            out, [&](size_t i) { return "x " + Bits(values[i]); });
+    }
+
+    // ldexp: every pair of edge values and exponents (the result's range,
+    // -1021 to 1024, and the int's ends), then random ones.
+    std::vector<double> xs = SpecialValues();
+    for (double x : {1.0, -1.0, 0.5, 3.0, 1e-300, 1e300, 1.5e-310, 0.75}) {
+      xs.push_back(x);
+    }
+    AddRandom(h, xs, 100.0, 100);
+    std::vector<std::pair<double, int64_t>> pairs;
+    const int64_t ns[] = {0, 1, -1, 10, -10, 1000, -1000, 1023, 1024, 1025, -1021, -1022,
+                          -1074, -1075, 2046, -2046, 2147483647, -2147483647 - 1,
+                          0x100000001ll, -0x100000000ll};
+    for (double x : xs) {
+      for (int64_t n : ns) {
+        pairs.push_back({x, n});
+      }
+    }
+    for (int i = 0; i < 2000; i++) {
+      const double x = xs[h.random.Below(uint32_t(xs.size()))];
+      pairs.push_back({x, int64_t(h.random.Below(4200)) - 2100});
+      pairs.push_back({x, int64_t(h.random.Next())});
+    }
+    std::vector<std::pair<double, int64_t>> in_range;
+    for (const auto& [x, n] : pairs) {
+      double result;
+      if (c_runtime::Ldexp(x, int32_t(n), &result)) {
+        in_range.push_back({x, n});
+      }
+    }
+    for (uint32_t mode = 0; mode < 4; mode++) {
+      Cases(h, fmt::format("ldexp, rounding mode {} (sub_825AAD20)", mode).c_str(),
+            __imp__sub_825AAD20, sub_825AAD20, in_range.size(),
+            [&](size_t i, PPCContext& t) {
+              t.f1.f64 = in_range[i].first;
+              t.r4.s64 = in_range[i].second;
+              set_mode(t, mode);
+            },
+            out,
+            [&](size_t i) {
+              return fmt::format("x {} n {}", Bits(in_range[i].first), in_range[i].second);
+            });
+    }
+
+    // _clearfp: random registers in, from each mode.
+    for (uint32_t mode = 0; mode < 4; mode++) {
+      Cases(h, fmt::format("_clearfp, rounding mode {} (sub_825AB568)", mode).c_str(),
+            __imp__sub_825AB568, sub_825AB568, 64,
+            [&](size_t i, PPCContext& t) {
+              t.r3.u64 = i * 0x9E3779B97F4A7C15ull;
+              t.r4.u64 = i;
+              set_mode(t, mode);
+            },
+            [&](PPCContext& t, std::vector<uint8_t>& b) {
+              Append(b, t.r3.u64);
+              Append(b, _mm_getcsr());
+              Append(b, t.fpscr.csr);
+              _mm_setcsr(saved);
+            },
+            [&](size_t i) { return fmt::format("case {}", i); });
+    }
     _mm_setcsr(saved);
   }
 }
