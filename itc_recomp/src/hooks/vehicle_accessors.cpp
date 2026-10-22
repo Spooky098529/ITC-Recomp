@@ -136,8 +136,9 @@ ITC_ACCESSOR_VOID(820C0590, VehicleSpeedRecord(base, ctx.r3.u32, ctx.r4.u32))
 ITC_ACCESSOR_VOID(820B7BF0, CollisionObjectLink(base, ctx.r3.u32, ctx.r4.u32))
 ITC_ACCESSOR_VOID(820B7C18, CollisionObjectUnlink(base, ctx.r3.u32, ctx.r4.u32))
 ITC_ACCESSOR_WORD(820B7C90, CollisionObjectFirstContact(base, ctx.r3.u32, ctx.r4.u32))
-ITC_ACCESSOR_WORD(820B7CB8, CollisionObjectWord264(base, ctx.r3.u32))
-ITC_ACCESSOR_VOID(820B7CC0, CollisionObjectSetWord264(base, ctx.r3.u32, ctx.r4.u32))
+// CollisionObject::Word264 and SetWord264 (sub_820B7CB8, sub_820B7CC0) have
+// no adapters: their callers in play, the collision world's LinkPair,
+// UnlinkPair and MovePair (src/car_physics/), are native.
 ITC_ACCESSOR_VOID(820B7D18, CollisionObjectClearBits252(base, ctx.r3.u32, ctx.r4.u32))
 ITC_ACCESSOR_VOID(820B7D28, CollisionObjectSetBits256(base, ctx.r3.u32, ctx.r4.u32))
 ITC_ACCESSOR_VOID(820B7D38, CollisionObjectClearBits256(base, ctx.r3.u32, ctx.r4.u32))
