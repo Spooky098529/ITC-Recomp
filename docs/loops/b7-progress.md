@@ -8,10 +8,11 @@ record: `b7-loop-2026-10-22-0111.md` (and this file's history).
 
 - Run started 2026-10-22 10:47 on `b7-loop-22-10-26` (made by the user,
   from 600ed23); summary `b7-loop-2026-10-22-1047.md`.
-- Stopped after the race overlays (the user's call, below). Next
-  session: `/clear`, then `/loop follow docs/loops/b7-loop.md`; it takes
-  the next lead from `leads.md`.
-- Session: pass 12 of 20, subsystem 1 of 5. In all: subsystem 1 of 5.
+- Subsystem 2: the vehicle accessors (the leads' vehicle, wheel, body,
+  contact and scene-model accessors, with `sub_825C8388`'s lead folded
+  in: both block the race overlays' updates). Step: mapping (agent
+  running).
+- Session 2: pass 1 of 20, subsystem 1 of 5. In all: subsystem 2 of 5.
 - Known: `b7_status.py` checks `sub_825A9934` (`__chkstk`) "Dropped, but
   it ran", and every function made Native or Merged this run "..., but
   it ran" (`seen_in_play.txt` predates them; a new coverage session
@@ -101,6 +102,5 @@ play.
 
 ## Stopped
 
-2026-10-22, after the race overlays: the user ended this session's loop
-for the context's size. Not a failure; the run goes on in the next
-session (subsystem 2 of 5).
+(Session 1 was ended by the user after the race overlays, 2026-10-22:
+not a failure. Session 2 started the same day.)
