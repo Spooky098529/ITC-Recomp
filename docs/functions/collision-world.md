@@ -1,0 +1,145 @@
+# Known functions: the collision world's owner and the track's collision
+
+The track's side of the collision world: what loads the track's
+collision data and sets the world up for a race, ticks it, resets and
+frees it, and the two queries and the ground probe the world calls
+through function pointers (`0x826C2D78`, `0x826C2D7C` and the world's
++8, set by `CollisionWorld::Setup`). The track's collision mesh at
+`0x826C5B1C` (a file loaded per course, `820F6898`-`820F7D70`) is
+split into sections, each into slices (cells along the road) holding
+triangles (the ground, with a surface kind each) and walls (vertical
+segments between two of the section's vertices). A collision object's
+box is tested against the walls of the cells near its four lower
+corners (`TrackCollision::WallHits`, `sub_820FF1B0`: a corner moving
+through a wall, else a bottom edge crossing it) and its lowest corner
+against the ground (`TrackCollision::GroundHits`, `sub_820FEBD0`); the
+wheels ask for the ground under them (`TrackCollision::GroundCallback`,
+`sub_820FEAB0`, from `Vehicle::ProbeGround`). Both go through track
+positions (a section and slice kept from tick to tick with the last
+point, normal and surface kind, `820F8090`-`820F8600`): 96-byte
+records in the vehicle, its own at +5232 and one per wheel at
++5328 + 96 × wheel, which the vehicle code (`sub_820C1D08`) puts in the
+wheels' word +20 and the box's four words +160.
+The course's route data at `0x826C5B10` (loaded with the mesh) and
+its queries are a lead in `docs/loops/leads.md`.
+
+Shared with other files, which keep their rows: `CollisionWorld::Setup`
+(`sub_820FF250`), `Create`, `SetQueryCapacity`, `Reset`, `Destroy`,
+`Update` and its subtree (`SolvePairs`, `CollideAll`,
+`CollisionObject::Collide`, `Respond`), the surface setters
+(`car-physics.md`); the shape record's `Previous`, `Current`,
+`UpdateBounds`, the box's corners, edges, lower corners and four words
+(`BoxShape::SetCacheWord`, `CacheWord`), `Shape::Radius`
+(`collision.md`); the collision world's accessors (`sub_820B8768`,
+`sub_820B8778`, `CollisionWorld::SetCallback`, `sub_820B8C90`), the
+contacts' (`Contact::Object`, `sub_820B8CE0`, `Contact::Strength`,
+`Contact::Next`), `Vehicle::Get`, the box's halfwords +112 and +114
+(`sub_820B99B0`, `sub_820B99C0`), `Vec4::Copy` and `Vec3::Direction`
+(`vehicle-accessors.md`); VirtualAlloc, VirtualFree, operator new and
+delete (`heap.md`); `Archive::Load` (`files-and-saves.md`). The asset
+size `sub_820A0678` has no row yet (it blocks the loads).
+
+Floats named by address are in `.rdata`: `0x82000A30` is 1.0,
+`0x82000A34` 0.0, `0x82001BE4` 0.5, `0x82001BE0` probably -1.0,
+`0x820021E8` 2.0 (as in `car-physics.md`), `0x8200222C` the small
+epsilon `collision.md` names, `0x82002968` probably 0.25; the others
+(`0x82002A08` a height offset for surface kinds 4 and 20, `0x82002FB0`,
+`0x82002A0C` the ground's catch distance, `0x820029D8`, `0x820029DC`,
+`0x82001BDC`, `0x82001FBC`, `0x82002CB0`, `0x82006908`, `0x8200690C`)
+weren't read from guest memory. `0x82628280` and `0x826282B0` are
+vectors, probably the up axis. The fields of the mesh, the track
+position, the ground result, the wall query and the hit records are in
+`docs/known-data.md`.
+
+Things a native version has to keep (the game's own behavior):
+`TrackPosition::Update` (`sub_820F8470`) puts the point's y back when
+the ground lookup fails; the ground lookup (`sub_820F7AA0`) leaves the
+track position's section and slice as they were (only
+`TrackPosition::FindCell` moves them); `TrackCollision::Ground`
+(`sub_820FE8F8`) reuses the last height when x and z are exactly the
+same, and answers flat ground at y 0 (up, kind 0x04000000) without a
+track position; `TrackCollision::GroundHits` tests only a box's lowest
+corner; the wall query keeps at most 128 tested walls and writes the
+last hit record again once the world's 32 are used.
+
+Status:
+
+- **Native**: plain C++ in `itc_recomp/src/` that doesn't use the
+  PowerPC context (`ctx`): normal arguments and host structs (it may
+  still read and write guest memory through `src/guest.h` while
+  recompiled code shares the data). The game reaches it without `ctx`,
+  from native or overridden callers, and the recompiled original is no
+  longer called (except behind a fallback flag or to check against it).
+  No `REX_FUNC` override of it exists, not even an adapter kept only for
+  a harness (that's Overridden until the adapter goes).
+  The end state for every function.
+- **Overridden**: an `extern "C" REX_FUNC(sub_XXXXXXXX)` override in
+  `itc_recomp/src/` (or a macro defining one) does the work instead of
+  the original: a thin adapter in front of native code, or a body that
+  still uses `ctx` (calling guest code, reading registers). It may call
+  the original when its flag is off, or to check itself against it.
+- **Wrapped**: an override that does something of its own (skipping
+  render-only passes, logging, timing) and still calls the original
+  (`__imp__sub_XXXXXXXX`) for the work.
+- **Dropped**: its work isn't needed on PC (hardware set-up, kernel calls
+  the SDK already stubbed), so it no longer runs: an override in
+  `itc_recomp/src/` replaces it with nothing (or a fixed return value), or
+  its callers, made native, leave the call out (no override then; the row
+  says which caller). Logs, a harness or the renderer's frame dumps have
+  shown that nothing reads what it did. The original is no longer called,
+  except behind a fallback flag while the drop is being checked. A
+  function the game never calls in the first place isn't Dropped: its
+  status stays blank and its row says it's never called.
+- **Merged**: its work is done inside a native caller's plain C++ (a
+  few lines only that caller needs), so it has no function or override of
+  its own in `itc_recomp/src/`. The row names the caller(s) and the
+  harness that covers the work. The original is no longer called, except
+  behind the caller's fallback flag.
+- **Patched**: the generated code was edited in place (search for
+  `PATCH:`).
+
+| Address | Name | Status | Notes |
+|---|---|---|---|
+| `sub_820FF368` | `TrackCollision::Load` | | No arguments; once a race load (only caller `sub_82170550`). A 4-byte object (`sub_825A6880`; +0 = 0, later 4; what it is isn't known) into `0x826C5B28`; `CollisionWorld::Setup` (`sub_820FF250`, `car-physics.md`); the course's index (`sub_8228F090`): 3 when the race data's +4 (`[0x826C5B2C]`) is 8, 9 or 10, else its +32 (0 to 2, probably the course); the mesh (`0x826C5B1C`) and the route (`0x826C5B10`) freed (`sub_820F6940`, `sub_820F8618`) and made ready (`sub_820F68E8`, `sub_820F8600`); then both loaded from the course's two asset ids, `[[0x82602EA4 + 8 × index]]` and `+4` (`TrackMesh::Load` `sub_820F77A0`, `sub_820F9E28`). Allocates guest memory. |
+| `sub_8228F090` | | | r3 × 3 + r4. Leaf. From `sub_820FF368` (the course's index) and `sub_8215B790`. |
+| `sub_820FEFB0` | `TrackCollision::Unload` | | No arguments: `CollisionWorld::Destroy` (`sub_820B86B8`), the mesh and the route freed (`sub_820F6940`, `sub_820F8618`), the object at `[0x826C5B28]` deleted (`sub_825A70E8`; the pointer isn't cleared). Only caller `sub_82171250`. Frees guest memory. |
+| `sub_820FEAF8` | `TrackCollision::ResetWorld` | | No arguments: `CollisionWorld::Reset` (`sub_820B85E8`), then the surface settings as `CollisionWorld::Setup` sets them: C 0.0 for 0x02000000, 0x01000000, 0x04000000; D 0.0, 1.0, 1.0; A 0.0, 0.5, the float at `0x82002968`; B 0.0 for all three (`sub_820BC3A8`, `sub_820BC3F0`, `sub_820BC318`, `sub_820BC360`). Only caller `sub_82170668`. |
+| `sub_820FF050` | `TrackCollision::Tick` | | No arguments; probably once a tick (callers `sub_82165E20`, `sub_821662E0`, `sub_82173A90`, `sub_82174BC0`). Nothing until both the mesh and the route are loaded (their +8 = 2). `CollisionWorld::Update` (`sub_820B92C8`) with the float at `0x8260327C` (probably 1/30), or 0.0 when `sub_820FEFF8` says the cars don't collide with each other (with 0.0 the world doesn't solve its pairs). Then for each racer (`sub_821705F8`), its vehicle (`Vehicle::Get` of `[[0x826D82F4] + 2308 + 4i] + 20`): +6152 = 0, then for each contact on its collision object (`[+340] + 240`, `Contact::Next` with -1): bit 0x1 when the contact has another object (`Contact::Object` `sub_820B8CC0`), else bit 0x2 and +6236 = its strength (`sub_820B8CE0`, `Contact::Strength` `sub_820B8D08`; probably the last hit on the track's walls or ground). +6240 counts the ticks while +348 (the wheels on the ground) is 0; when it isn't, after 10 or more such ticks +6152 gets bit 0x4 and +6232 the count (probably a landing), and +6240 = 0. |
+| `sub_820FEFF8` | `Racers::CarsCollide` | | r3 = the racer records (the race data + 48): 0 when the car count (+0x595E0 from r3, the race data's +0x59610) is 1, or when a record's flags (+3888) have bit 0x8; else 1. Leaf. Only caller `sub_820FF050`. The name ours (probably). |
+| `sub_821705F8` | `Race::RacerCount` | | The word +2364 of `[0x826D82F4]` (probably the race's manager: the racers' pointers at +2308 + 4i, `sub_820FF050`). Leaf. 30 callers seen across the race code (`sub_820C2248`, `sub_8213`..., `sub_8215C780`, `sub_82175F20`). The name ours. |
+| `sub_820FF1B0` | `TrackCollision::WallHits` | | The collision world's first query (`[0x826C2D78]`, no direct callers; from `CollisionObject::Collide` `sub_820B8548`): r3 = the world's hit records, r4 = the object's shape record, r5 (the groups) not read. A wall query on its 1,584-byte frame (+80): +0 the count = 0, +4 = 2.0, +8 the records, +12 the shape record, the w of its vectors set; the first record's +64 = 2.0; `CollisionShape::UpdateBounds` (`sub_820BAC00`) on the shape record; `TrackCollision::QueryWalls` (`sub_820FDF38`) with the mesh `0x826C5B1C`. Returns the hit count. |
+| `sub_820FDF38` | `TrackCollision::QueryWalls` | | r3 = a wall query, r4 = the mesh: +624 = 0 (no walls tested yet); the cells near the box (`WallQuery::GatherCells` `sub_820FC188`), then `WallQuery::TestCell` (`sub_820FDC18`, r6 = 2) on each (+112 + 4i, the count +108). Only caller `sub_820FF1B0`. |
+| `sub_820FC188` | `WallQuery::GatherCells` | | r3 = a wall query, r4 = the mesh: +108 = 0; for each of the current box's lower corners (`CollisionShape::Current` `sub_820BAE38`; half its slot 11, the corner count: 4), its track position (slot 21, `BoxShape::CacheWord`) gives a cell (its words +0: the section and slice), added to the list +112 when not there (`sub_820FC110`); when added, also the slices before and after it in its section (within 0 and the section's count), and the cells the section's six links lead to from that slice or its neighbors. Returns the count +108. Only caller `sub_820FDF38`. |
+| `sub_820FC110` | `WallQuery::AddCell` | | r3 = a wall query, r4 = a cell (two halfwords: section, slice): 0 when already in the list (+112, count +108), else added and 1. No limit is checked (room for 128). Leaf. Only caller `sub_820FC188`. |
+| `sub_820FDC18` | `WallQuery::TestCell` | | r3 = a wall query, r4 = the mesh, r5 = a cell (section, slice), r6 not read. For each of the slice's walls (count at its +4, the first at +6; 8 bytes each from the section's +80: +0 and +2 its two vertices, +4 a kind): a wall with a kind is skipped when `WallQuery::IgnoresWall` (`sub_820FD6D8`) says so for the template box's halfwords +114 and +112 (`sub_820B99C0`, `sub_820B99B0`); one already tested (section and vertices in the list +628, 6 bytes each, count +624, at most 128 kept) is skipped, else added. Then the wall's ends into +16 and +32, its direction (`Vec3::Direction` `sub_82294200`, +16 - +32; a zero-length wall skipped) into +1408 and its negation into +1424, its horizontal normal (+1408 × the vector at `0x826282B0`) into +1440, and +1456, +1460 the ends along it, +1464 the normal's distance; `WallQuery::CornersThroughWall` (`sub_820FC3C8`), and when that found nothing `WallQuery::EdgesAcrossWall` (`sub_820FC900`). Calls `CollisionShape::Previous` and `Current` first (answers unused). Only caller `sub_820FDF38`. |
+| `sub_820FD6D8` | `WallQuery::IgnoresWall` | | r3 = &the wall's kind, r4 = &the box's halfword +112, r5 = &its +114: a switch on the kind (2 to 61, table `0x82006888`; others answer 0): comparisons of the kind with the box's two halfwords (probably which lane or route the car may use), some through `sub_820FC870`; nonzero skips the wall. Not read in detail (528 lines). Only caller `sub_820FDC18`. |
+| `sub_820FC870` | | | r3 = &a word: 1 (skip) when it's 2; else by the race mode (the race data's +0xA3AF4): 1 below 3, for 6 and above 8, and for 5 unless `[[0x826D82E8] + 6100]` is 1 or 3; otherwise (3, 4, 7, 8, and those 5s) 0 when the stage list's +1220 (the race data's +0x59620) has bit 0x20 or 0x40, else 1. Leaf. Only caller `sub_820FD6D8`. Not read in detail. |
+| `sub_820FC3C8` | `WallQuery::CornersThroughWall` | | r3 = a wall query (its wall set by `sub_820FDC18`). For each corner of the box (slot 11, the order from the bytes at `0x82006900` for the first 8), its previous and current place (slot 12 of `CollisionShape::Previous` and `Current`): skipped when it didn't move in x or z, isn't moving into the wall (normal · motion < 0), or ends in front of it; else, when its place pushed back onto the wall lies between the wall's ends: the query's hit (+48 the point, +64 and +80 the normal, +96 and +100 the depth, +104 the walls tested so far) recorded (`WallQuery::AddHit` `sub_820FC2E0`, surface bits 0x01000000). Returns 1 when a corner hit. Only caller `sub_820FDC18`. Not read in detail. |
+| `sub_820FC900` | `WallQuery::EdgesAcrossWall` | | r3 = a wall query. The box's edges (slot 15, probably the edge count; slots 17 and 18 an edge's two corners; edges 1, 3, 9 and 10 skipped, probably the vertical ones), each edge's previous and current place (slot 12 on `CollisionShape::Previous` and `Current`) against the wall's span and height (+1456 to +1464); where the edge's path crosses the wall in x and z (`Segments::Intersect2D` `sub_820FC658`), a push out of it along the wall's normal or its ends (`Vec3::Direction`, the box's faces 0, 2, 3, 5 by a switch) recorded (`WallQuery::AddHit`, 0x01000000). 1,343 lines; not read in detail. Only caller `sub_820FDC18`. |
+| `sub_820FC658` | `Segments::Intersect2D` | | r3 = four point pointers (a, b, c, d), r4 = out: 0 when the segments a-b and c-d don't cross in x and z (their bounds, then the sides), else 1 with out's x and z the crossing (worked out around the four points' mean, `0x82002968`). Leaf. Only caller `sub_820FC900`. |
+| `sub_820FC2E0` | `WallQuery::AddHit` | | r3 = a wall query, r4 = surface bits: the next of the world's hit records (the query's +8; the count +0 grows up to n, `sub_820B8C90`, the world's +60 = 32; past that the last record is written again): +0 = the query's +48 (the point), +16 = +64 (the normal), +32 = +80 (the push direction), +48 = +96 and +52 = +100 times the float at `0x820029DC` (the depth), +56 = r4, +60 = +104 (the wall's number, so `CollisionRecords::Merge` merges a wall's hits), +64 = +4 (2.0). From `sub_820FC3C8`, `sub_820FC900`. |
+| `sub_820FEBD0` | `TrackCollision::GroundHits` | | The collision world's second query (`[0x826C2D7C]`, no direct callers; from `CollisionObject::Collide`): r3 = the hit records, r4 = the shape record's current copy (a box), r5 (the groups) not read. n = `sub_820B8C90` (32); records +48 = 0.0. For a box (slot 4 answering 2): of its four lower corners (`BoxShape::LowerCorner` `sub_820BA368`, in the order 0, 2, 1, 3), the one lowest against its track position's last height (slot 21 `BoxShape::CacheWord` i, the position's +20); when it's below, the ground under it (`TrackCollision::Ground` `sub_820FE8F8`, r6 = 2); when below that, one hit: +0 the corner, +16 the ground's normal, +32 its copy, +48 the depth plus `0x8200222C`, +56 the surface kind (the result's +48), +60 = 0. Returns the count (1 or 0). Another shape type (1: a point list through slots 11, 12, 20, 21, each point probed; others: `sub_820B97C0` and `Shape::Radius`) never ran in play. |
+| `sub_820FEAB0` | `TrackCollision::GroundCallback` | | The collision world's +8 (no direct callers; from `CollisionWorld::Callback` `sub_820B8798`, for `Vehicle::ProbeGround`): r3 = the result, r4 = the wheel's point, r5 = its track position (the wheel's word +20): `TrackCollision::Ground` (`sub_820FE8F8`, r6 = 1), then the result's +48 &= 0x80FFFFFF (the surface bits cleared); returns 1. |
+| `sub_820FE8F8` | `TrackCollision::Ground` | | r3 = a ground result, r4 = a point, r5 = a track position, r6 not read. Without a track position: +52 = 0, +16 and +32 = the vector at `0x82628280` (up, probably), +0 = the point's y, +48 = 0x04000000. Else: the point 0.5 higher; when its x and z equal the position's last (+16, +24), its last height (+20) and kind (halfword +80) are used; else the ground under it (`TrackMesh::GroundHeight` `sub_820F7AA0` on `0x826C5B1C`, the normal into the position's +48) and the position's +16 to +24 = the point with the ground's height. With a kind (0 or above): the position's +80 = it, +52 = the position, +16 = its normal, +32 a copy, +48 = the kind, +0 = the point's y minus the height (plus `0x82002A08` for kinds 4 and 20). With none (-1, -2): +52 = the position, +16 and +32 up, +0 = 0.0, +48 = 0x04000000, the position's +16 to +24 = the point. Returns 1. From `sub_820FEAB0`, `sub_820FEBD0`. |
+| `sub_820F6898` | `TrackMesh::InitScratch` | | r3 = an 8-byte block: +0 = 0, +4 = an 8 KB block (`VirtualAlloc`, `sub_82295398`, `MEM_COMMIT \| MEM_NOZERO`, read and write). What it's for isn't known (nothing read here uses it). Only caller `sub_820F68E8`. Allocates guest memory. |
+| `sub_820F68E8` | `TrackMesh::Prepare` | | r3 = the mesh (`0x826C5B1C`): +8 = 1 (loading), +4 = 0, +0 = an 8-byte block (`VirtualAlloc`) set up by `sub_820F6898`. Only caller `sub_820FF368`. Allocates guest memory. |
+| `sub_820F6940` | `TrackMesh::Free` | | r3 = the mesh: the block +0's 8 KB block and the block freed (`VirtualFree`, `sub_82295330`, `MEM_RELEASE`), +0 = 0; the file +4 freed, +4 = 0. From `sub_820FEFB0`, `sub_820FF368`. Frees guest memory. |
+| `sub_820F77A0` | `TrackMesh::Load` | | r3 = the mesh, r4 = an asset id: its size (`sub_820A0678`), a buffer of it (`VirtualAlloc`) into +4, and `Archive::Load` (`sub_8209DE48`) into it with the callback `0x820F69B0` and the mesh as context. Only caller `sub_820FF368`. Allocates guest memory. |
+| `sub_820F69B0` | `TrackMesh::OnLoaded` | | `Archive::Load`'s callback (no direct callers; passed by `sub_820F77A0`): r6 = the mesh. Its file's offsets made pointers: the file's +4 (the section table) and each of its +0 entries (the sections). Then +8 = 2 (loaded). Leaf. |
+| `sub_820F7AA0` | `TrackMesh::GroundHeight` | | r3 = the mesh, r4 = a point (its y set to the ground's height when found), r5 = a track position (its section and slice to start from), r6 = out (a 16-byte color, (0, 0, 0, 1.0) first, or 0), r7 = out (the normal, (0, 1.0, 0, 1.0) first, or 0). The triangle under the point (`TrackMesh::FindTriangle` `sub_820F7818`; none: -1); its surface kind (byte +9; kinds 9 and up become 0, except 20 which becomes 4); for kinds 4 and 20 another triangle without those kinds is looked for in the same slice and its neighbors (`sub_820F72F8` with r6 = 1, the slice offsets at `0x8200680C`), and when there's none the height is lowered by `0x82002FB0`. The height: a quad's (the triangle's +6 set and flag +10 bit 0) from `TrackMesh::QuadHeight` (`sub_820F7590`), else the triangle's plane (`TrackMesh::TriangleNormal` `sub_820F7468`) at the point's x and z; plus `0x82002A08`. When within `0x82002A0C` of the point's y: the point's y = the height, the color from `sub_820F6E18` (r6), the normal normalized into r7; returns the kind. Else -2. The track position's section and slice aren't updated. From `sub_820FE8F8`, `sub_820F8470`. |
+| `sub_820F7818` | `TrackMesh::FindTriangle` | | r3 = the mesh, r4 = &the section (out), r5 = &the triangle (out), r6 = a point, r7 = a track position: from its section and slice (halfwords +0, +2; -1 gives -1), the triangle containing the point in x and z (`sub_820F72F8`) in the slice, then the slices offset by the 4 words at `0x8200680C`, then the slices the section's six links lead to from this one, then those within 2 of it; returns the slice found (the section and triangle written out), else -1. Only caller `sub_820F7AA0`. |
+| `sub_820F72F8` | `TrackMesh::TriangleInSlice` | | r3 = a section, r4 = a slice, r5 = a point, r6 = 1 to skip triangles of kinds 4 and 20: the first of the slice's triangles (28-byte slice at the section's +72: halfword +0 the count, +2 the first; 12-byte triangles at +76) the point is inside in x and z (each edge's cross product at most `0x820029D8`; a quad, +6 not 0xFFFF, has four edges); returns its index, else -1. Leaf. From `sub_820F7818`, `sub_820F7AA0`. |
+| `sub_820F7468` | `TrackMesh::TriangleNormal` | | r3 = out, r4 = a section, r5 = a triangle, r6, r7, r8 = which three of its vertices (0 to 3): the cross product of two of their edges, w 1.0, normalized (a zero vector stays zero). Leaf. From `sub_820F7590`, `sub_820F7AA0`. |
+| `sub_820F7590` | `TrackMesh::QuadHeight` | | r3 = out, r4 = a section, r5 = a quad, r6 = a point: the quad split by the side the point is on, the two triangles' planes (`sub_820F7468`, vertices 0-1-2 or 0-2-3 and the other pair) at the point's x and z; out = the mean of their normals (normalized); returns the mean height in f1. Only caller `sub_820F7AA0`. Not read in detail. |
+| `sub_820F6E18` | `TrackMesh::ColorAt` | | r3 = out, r4 = a point, r5 = a triangle, r6 = the section's vertices (+64), r7 = its halfwords at +68 (one per vertex, probably RGB565 colors): the three (a quad's nearer three) vertices' colors interpolated at the point into out's x, y, z (probably the ground's lighting for the car). Only caller `sub_820F7AA0` (with r6 set only by `TrackPosition::Update`). Not read in detail. |
+| `sub_820F8578` | `TrackPosition::Init` | | r3 = a track position: its route position (+4) from the point (+16) (`sub_820FA860` on `0x826C5B10`, the route lead), its section and slice from the route entry's word +156 (the route's +12 table, 84-byte entries), +80 and +82 = 0, then `TrackPosition::Update`. Only caller `sub_820C3608` (the vehicle placed). |
+| `sub_820F8470` | `TrackPosition::Update` | | r3 = a track position: its cell kept up to date (`TrackPosition::FindCell` `sub_820F8090`); the point (+16) 0.5 higher and the ground under it (`TrackMesh::GroundHeight`, the color into +32, the normal into +48; the y put back when none is found); +82 = 1 for kinds 4 and 20, plus 2, 4 or 8 for the slice's kind 30, 31 or 32 (`sub_820F6A08`); then the route position (`sub_820FB680` on `0x826C5B10`, the route lead). From `sub_820C1D78` (the vehicle code), `sub_820F8578`. |
+| `sub_820F8090` | `TrackPosition::FindCell` | | r3 = the mesh, r4 = a track position, r5 = its point: the slice containing the point (`TrackMesh::SliceContains` `sub_820F6A38`): the current one, then 1, 2 and 3 slices either side, then the section's linked cells, then the next or previous section (`sub_820F71B0`) when past either end, then a search of the linked sections (`sub_820F6BE8`); the halfwords +0, +2 updated. Returns 0, or -1, -2, -3 when the full searches (`sub_820F7EE8`, `sub_820F7E30`, never ran in play) didn't find it either. Only caller `sub_820F8470`. Not read in detail. |
+| `sub_820F6A38` | `TrackMesh::SliceContains` | | r3 = a slice, r4 = the section's outline (its halfword +2: 8-byte x, z points), r5 = a point: 0 unless the point's y is within `0x82001BDC` of the slice's height (+20); then whether the point is inside the slice's outline (3 or 4 corners, halfwords +12 to +18, +18 0xFFFF for 3). Leaf. From `sub_820F6BE8`, `sub_820F8090`. Not read in detail. |
+| `sub_820F6BE8` | `TrackMesh::FindSlice` | | r3 = a section, r4 = a slice or -1: the first slice of the section containing the point (`sub_820F6A38`), among all (-1) or those within 4 of r4; else -1. From `sub_820F71B0`, `sub_820F8090`. |
+| `sub_820F71B0` | `TrackPosition::CrossSection` | | r3 = a track position, r4 = the mesh, r5 = a point: its slice looked for in its section near the current one, then in the sections linked from it, then at the section's first or last slice; the position's section and slice set (the slice kept within the section). Returns 1 when one was found. Only caller `sub_820F8090`. Not read in detail. |
+| `sub_820F6A08` | `TrackMesh::SliceKind` | | r3 = the mesh, r4 = a track position: its slice's halfword +24. Leaf. Only caller `sub_820F8470`. |
+| `sub_820F8600` | `TrackRoute::Prepare` | | r3 = the route (`0x826C5B10`): +8 = 1 (loading), +0 = 0. Leaf. Only caller `sub_820FF368`. |
+| `sub_820F8618` | `TrackRoute::Free` | | r3 = the route: +8 = 0, its file +0 freed (`VirtualFree`, `MEM_RELEASE`), +0 = 0. From `sub_820FEFB0`, `sub_820FF368`. Frees guest memory. |
+| `sub_820F9E28` | `TrackRoute::Load` | | r3 = the route, r4 = an asset id: as `TrackMesh::Load` into +0, with the callback `0x820F9050`. Returns 0. Only caller `sub_820FF368`. Allocates guest memory. |
+| `sub_820F9050` | `TrackRoute::OnLoaded` | | `Archive::Load`'s callback (no direct callers; passed by `sub_820F9E28`): r6 = the route. Its file's offsets made pointers (the tables at +12 and +16, counts +0 and +4, and the 12 words at +20); for each of the race's route bits (the race data's +24) set, the floats +148 and +152 of the 84-byte entries it lists (by halfwords: entry, index, a value) lowered or raised to it; the route's +4 = the sum of the first halfwords of the +12 entries; +8 = 2 (loaded). Not read in detail. |

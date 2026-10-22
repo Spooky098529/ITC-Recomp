@@ -116,6 +116,12 @@ Rows not yet moved stay in the table below. So far:
   (placed, moved, its corners, faces and edges), a pair's next check
   time, its separation, impact and push-out tests and its response (B7;
   the world, its objects and pairs are in `car-physics.md`).
+- [`collision-world.md`](collision-world.md): the collision world's
+  owner (its load, tick, reset and unload) and the track's collision:
+  the course's mesh and route files loaded, the queries the world calls
+  (walls, ground) and the ground probe the wheels use, the mesh's
+  lookups and the track positions they keep (B7; the course's route
+  queries are a lead).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
