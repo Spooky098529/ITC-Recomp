@@ -60,6 +60,66 @@ void Sprites(Context& h) {
     }
     results.Report();
   }
+
+  // The layer for a camera pass index: the four the game uses, the next
+  // ones, the largest, and random ones.
+  {
+    Results results("Overlay::LayerFor (sub_82126630)");
+    std::vector<uint32_t> indices = {0, 1, 2, 3, 4, 5, 0x7FFFFFFF, 0x80000000, 0xFFFFFFFF};
+    for (int i = 0; i < 50; i++) {
+      indices.push_back(uint32_t(h.random.Next()));
+    }
+    for (uint32_t index : indices) {
+      Both(h, results, [] {},
+           [&](PPCContext& t) {
+             t.r3.u64 = h.data;
+             t.r4.u64 = index;
+           },
+           __imp__sub_82126630, sub_82126630, h.data, 16, fmt::format("index {:X}", index));
+    }
+    results.Report();
+  }
+
+  // Vec4::Equal: equal vectors, one component off (each in turn), -0 against
+  // 0, NaNs, infinities and denormals.
+  {
+    Results results("Vec4::Equal (sub_82123300)");
+    const uint32_t specials[] = {0x00000000, 0x80000000, 0x7FC00000, 0x7F800001, 0x7F800000,
+                                 0xFF800000, 0x00000001, 0x3F800000, 0xBF800000, 0x007FFFFF};
+    Random& r = h.random;
+    for (int i = 0; i < 2000; i++) {
+      uint32_t a[4], b[4];
+      for (int k = 0; k < 4; k++) {
+        a[k] = r.Below(4) == 0 ? specials[r.Below(10)] : uint32_t(r.Next());
+        b[k] = a[k];
+      }
+      int kind = r.Below(4);
+      if (kind == 1) {
+        b[r.Below(4)] ^= 1u << r.Below(32);
+      } else if (kind == 2) {
+        b[r.Below(4)] = specials[r.Below(10)];
+      } else if (kind == 3) {
+        for (int k = 0; k < 4; k++) {
+          b[k] = r.Below(2) ? specials[r.Below(10)] : a[k];
+        }
+      }
+      Both(h, results,
+           [&] {
+             for (int k = 0; k < 4; k++) {
+               guest::StoreU32(h.base, h.data + 4 * k, a[k]);
+               guest::StoreU32(h.base, h.data + 16 + 4 * k, b[k]);
+             }
+           },
+           [&](PPCContext& t) {
+             t.r3.u64 = h.data;
+             t.r4.u64 = h.data + 16;
+           },
+           __imp__sub_82123300, sub_82123300, h.data, 32,
+           fmt::format("{:08X} {:08X} {:08X} {:08X} against {:08X} {:08X} {:08X} {:08X}", a[0], a[1],
+                       a[2], a[3], b[0], b[1], b[2], b[3]));
+    }
+    results.Report();
+  }
 }
 
 }  // namespace harness

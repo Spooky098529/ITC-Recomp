@@ -22,4 +22,13 @@ constexpr uint32_t kSpriteCorners = 4;
 // count will be.
 void ResetSprites(uint8_t* base, uint32_t sprite, uint32_t corners);
 
+// Overlay::LayerFor (sub_82126630): the render queue layer the overlays
+// submit their sprites with for a camera pass index: 2 -> 491, 3 -> 53,
+// anything else 270.
+uint32_t LayerFor(uint32_t pass_index);
+
+// Vec4::Equal (sub_82123300): whether all four components are equal (as
+// floats: -0 equals 0, NaN equals nothing).
+bool Equal4(const float a[4], const float b[4]);
+
 }  // namespace sprites

@@ -42,4 +42,19 @@ void ResetSprites(uint8_t* base, uint32_t sprite, uint32_t corners) {
   }
 }
 
+uint32_t LayerFor(uint32_t pass_index) {
+  switch (pass_index) {
+    case 2:
+      return 491;
+    case 3:
+      return 53;
+    default:
+      return 270;
+  }
+}
+
+bool Equal4(const float a[4], const float b[4]) {
+  return a[0] == b[0] && a[1] == b[1] && a[2] == b[2] && a[3] == b[3];
+}
+
 }  // namespace sprites
