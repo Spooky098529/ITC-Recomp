@@ -65,4 +65,22 @@ uint32_t ResetPose(uint8_t* base, uint32_t movie);
 // with the node as the group). Returns what the second RestorePose returns.
 uint32_t ResetNode(uint8_t* base, uint32_t movie, uint32_t sub_scene, uint32_t child);
 
+// The quads' and text items' set-up (the identity matrix copied in with
+// memcpy in the original, after stores of 1.0 that it overwrites).
+//
+// sub_8211A948 (Quad::Quad): the identity at +0, +64 and +68 (the blend
+// mode) = 0, +72 = 2. Returns the quad.
+uint32_t MakeQuad(uint8_t* base, uint32_t quad);
+// sub_8211A818 (TextItem::TextItem): +0 = 0, the identity at +16, +80..+96
+// = the float at 0x82000A34 (0.0). Returns the item.
+uint32_t MakeTextItem(uint8_t* base, uint32_t item);
+// sub_8211A8C8 (TextItem::~TextItem): +80 = the float at 0x82000A34, +0 =
+// 0, the identity at +16. Returns item + 16 (memcpy's return, left in r3).
+uint32_t ClearTextItem(uint8_t* base, uint32_t item);
+// sub_8211AED0: a text item copied: +0, the matrix at +16 (memcpy), +80,
+// +84..+96 and +100..+112 (+116..+127 aren't). False, with nothing done,
+// where the two items might share memory (c_runtime::MayShare): the order
+// of the original's stores decides there, and it runs.
+bool CopyTextItem(uint8_t* base, uint32_t to, uint32_t from);
+
 }  // namespace ui_movies

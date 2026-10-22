@@ -372,6 +372,47 @@ void SwapTextureCases(Context& h, const Block& block) {
   results.Report();
 }
 
+// The quads' and text items' set-up and the copy: items at random places in
+// 1 KB of random words (odd floats among them); the copy's two items apart,
+// or overlapping (where the original runs).
+void ItemCases(Context& h, const Block& block) {
+  struct Maker {
+    const char* name;
+    GuestFunction recompiled, native;
+  };
+  const Maker makers[] = {
+      {"Quad::Quad (sub_8211A948)", __imp__sub_8211A948, sub_8211A948},
+      {"TextItem::TextItem (sub_8211A818)", __imp__sub_8211A818, sub_8211A818},
+      {"TextItem::~TextItem (sub_8211A8C8)", __imp__sub_8211A8C8, sub_8211A8C8},
+      {"sub_8211AED0 (a text item copied)", __imp__sub_8211AED0, sub_8211AED0},
+  };
+  for (const Maker& f : makers) {
+    Results results(f.name);
+    for (int i = 0; i < 300; i++) {
+      std::vector<uint32_t> words(256);
+      for (uint32_t& w : words) {
+        w = RandomWord(h.random);
+      }
+      const uint32_t to = block.at + 4 * h.random.Below(96);
+      const uint32_t from = i % 4 == 3 ? to + 4 * h.random.Below(40) - 80
+                                       : block.at + 512 + 4 * h.random.Below(96);
+      Compare(h, results, block.at, 1024,
+              [&] {
+                for (uint32_t k = 0; k < 256; k++) {
+                  guest::StoreU32(h.base, block.at + 4 * k, words[k]);
+                }
+              },
+              [&](PPCContext& t) {
+                t.r3.u64 = to;
+                t.r4.u64 = from;
+              },
+              f.recompiled, f.native,
+              fmt::format("case {}: at {:X} from {:X}", i, to - block.at, from - block.at));
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void UiMoviesGame(Context& h) {
@@ -388,6 +429,7 @@ void UiMoviesGame(Context& h) {
   LeafSetterCases(h, block);
   ClearTextIdsCases(h, block);
   SwapTextureCases(h, block);
+  ItemCases(h, block);
   memory->SystemHeapFree(block.at);
 }
 

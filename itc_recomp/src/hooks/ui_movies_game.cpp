@@ -15,7 +15,9 @@ ITC_FLAG_BOOL(native_ui_movies_game, true, "ITC",
               "UiMovie::HideNode sub_8211AC48, UiMovie::SetPictureTexture sub_8211AAA8, "
               "UiMovie::GetPictureTexture sub_8211AB28, UiMovie::SwapTexture sub_8211AB90; "
               "the pose resets UiMovie::ResetPose sub_8211ABA8 and UiMovie::ResetNode "
-              "sub_8211A1E0 (these two with --native_ui_movies and without --log_pause_movie) "
+              "sub_8211A1E0 (these two with --native_ui_movies and without --log_pause_movie); "
+              "the quads' and text items' set-up Quad::Quad sub_8211A948, TextItem::TextItem "
+              "sub_8211A818, TextItem::~TextItem sub_8211A8C8 and the copy sub_8211AED0 "
               "(same results; checked by --run_harnesses=ui_movies_game)");
 
 ITC_FLAG_DECLARE(bool, native_ui_movies);
@@ -149,4 +151,33 @@ extern "C" REX_FUNC(sub_8211A1E0) {
     return;
   }
   ctx.r3.u64 = ui_movies::ResetNode(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+}
+
+// Quad::Quad: r3 = the quad; returns it.
+extern "C" REX_FUNC(sub_8211A948) {
+  REX_FUNC_PROLOGUE();
+  NATIVE_OR_ORIGINAL(8211A948);
+  ctx.r3.u64 = ui_movies::MakeQuad(base, ctx.r3.u32);
+}
+
+// TextItem::TextItem: r3 = the item; returns it.
+extern "C" REX_FUNC(sub_8211A818) {
+  REX_FUNC_PROLOGUE();
+  NATIVE_OR_ORIGINAL(8211A818);
+  ctx.r3.u64 = ui_movies::MakeTextItem(base, ctx.r3.u32);
+}
+
+// TextItem::~TextItem: r3 = the item; r3 left at item + 16.
+extern "C" REX_FUNC(sub_8211A8C8) {
+  REX_FUNC_PROLOGUE();
+  NATIVE_OR_ORIGINAL(8211A8C8);
+  ctx.r3.u64 = ui_movies::ClearTextItem(base, ctx.r3.u32);
+}
+
+// sub_8211AED0: r3 = destination, r4 = a text item; returns r3.
+extern "C" REX_FUNC(sub_8211AED0) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_ui_movies_game) || !ui_movies::CopyTextItem(base, ctx.r3.u32, ctx.r4.u32)) {
+    __imp__sub_8211AED0(ctx, base);
+  }
 }

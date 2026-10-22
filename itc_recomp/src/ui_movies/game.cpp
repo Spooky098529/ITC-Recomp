@@ -2,6 +2,8 @@
 
 #include "ui_movies/ui_movies.h"
 
+#include "c_runtime/strings.h"
+
 namespace ui_movies {
 
 namespace {
@@ -115,6 +117,54 @@ uint32_t ResetNode(uint8_t* base, uint32_t movie, uint32_t sub_scene, uint32_t c
               guest::LoadU32(base, movie + kMovieFile), live, from);
   return RestorePose(base, movie, guest::LoadU32(base, movie + kMovieSaved),
                      guest::LoadU32(base, movie + kMovieFile), saved, from);
+}
+
+namespace {
+constexpr uint32_t kZero = 0x82000A34;  // the float 0.0
+
+void StoreIdentity(uint8_t* base, uint32_t matrix) {
+  constexpr uint32_t kOneBits = 0x3F800000;
+  for (uint32_t row = 0; row < 4; row++) {
+    for (uint32_t column = 0; column < 4; column++) {
+      guest::StoreU32(base, matrix + 16 * row + 4 * column, row == column ? kOneBits : 0);
+    }
+  }
+}
+}  // namespace
+
+uint32_t MakeQuad(uint8_t* base, uint32_t quad) {
+  StoreIdentity(base, quad);
+  guest::StoreU32(base, quad + 64, 0);
+  guest::StoreU32(base, quad + 68, 0);
+  guest::StoreU32(base, quad + 72, 2);
+  return quad;
+}
+
+uint32_t MakeTextItem(uint8_t* base, uint32_t item) {
+  const uint32_t zero = guest::LoadU32(base, kZero);
+  guest::StoreU32(base, item + 80, zero);
+  guest::StoreU32(base, item, 0);
+  for (uint32_t offset = 84; offset <= 96; offset += 4) {
+    guest::StoreU32(base, item + offset, zero);
+  }
+  StoreIdentity(base, item + 16);
+  return item;
+}
+
+uint32_t ClearTextItem(uint8_t* base, uint32_t item) {
+  guest::StoreU32(base, item + 80, guest::LoadU32(base, kZero));
+  guest::StoreU32(base, item, 0);
+  StoreIdentity(base, item + 16);
+  return item + 16;
+}
+
+bool CopyTextItem(uint8_t* base, uint32_t to, uint32_t from) {
+  if (c_runtime::MayShare(to, 116, from, 116)) {
+    return false;
+  }
+  guest::StoreU32(base, to, guest::LoadU32(base, from));
+  CopyWords(base, to, from, 16, 112);
+  return true;
 }
 
 }  // namespace ui_movies
