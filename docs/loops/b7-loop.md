@@ -62,7 +62,13 @@ memory.
    used so far, and reports. A subsystem too big for one agent gets
    another migration agent after the first reports, until nothing ready
    is left in it.
-8. **Record the finished subsystem** in the summary docs, once nothing
+8. **Hand its work to a poison agent** (below; added by the user,
+   2026-10-22) after each migration agent's report has passed the
+   lead's checks, the "no mapping" leads' too: it breaks the step's
+   native functions on purpose in one commit, checks that their
+   harnesses differ, and reverts it. It shows the native code is what
+   the harnesses ran (and that they'd catch drift).
+9. **Record the finished subsystem** in the summary docs, once nothing
    ready is left in it (the lead does this itself, in the pass that
    takes the next lead, and commits it with the progress file):
    - its row in the table under "B7's loop runs" in
@@ -73,7 +79,7 @@ memory.
    - `itc_recomp/tools/boundary_status.py` and `b7_status.py` run, their
      totals added as a dated entry at the end of "The boundary over time"
      in the same doc.
-9. **Take the next lead**: back to step 1.
+10. **Take the next lead**: back to step 1.
 
 ## The run's summary
 
@@ -87,7 +93,7 @@ totals (`b7_status.py`'s ours and work left, before and after) and what's
 left for the user, then "Status changes": the output of
 `itc_recomp/tools/status_changes.py <start commit>` (one line per
 function whose Status changed, by function file). The lead brings it up
-to date in the pass that records each finished subsystem (step 8 of the
+to date in the pass that records each finished subsystem (step 9 of the
 cycle), and once more when the loop stops, committed with the progress
 file.
 
@@ -288,6 +294,55 @@ uncommitted: none | <what and why>
 stop: none | <reason>
 ```
 
+## The poison agent
+
+Prompt it with: the migration agent's report (its `groups:`, `native:`
+and `flags:` lines and commits), this section, "The tooling" and "Rules
+that still hold", and the report format. One at a time, after the
+migration agent (it builds and runs the game in this tree). It checks
+that every function the step made native, or whose adapter it removed,
+runs as our code in its harness:
+
+1. **Poisons**: for each such function, a small change to its plain C++
+   that the harness cases must see (a sign flipped in a calculation, a
+   constant off by one, a field written with the wrong value), on the
+   path its cases take, not an edge branch they may miss. Only the plain
+   C++ under `src/`, never the harness cases, the recompiled side or
+   `generated/`. All in one commit ("poison: ..."), pushed.
+2. **Runs** the build and `attract_race.sh 25 --run_harnesses=all` with
+   the step's `--native_*` flags set to `false`, so the game itself runs
+   the recompiled code and the poison can't crash the race or stall the
+   boot (the harnesses call the plain C++ directly, without the flag).
+   With the flags off, a harness that differs can only have run the
+   poisoned C++.
+3. **Checks**: every poisoned function's harness differs; harnesses of
+   other areas are unchanged (0 differing outside "(expected to
+   differ)"). A poisoned function whose harness stays at 0 differing
+   didn't run as our code there (a harness calling the adapter or
+   `__imp__` on both sides), or its cases miss its main path: either way
+   it's reported. A harness that differs only through a poisoned callee
+   (a native caller calling the callee's plain C++) doesn't count for the
+   caller: such callers are poisoned again alone, in a second poison
+   commit, reverted the same way.
+4. **Reverts** with `git revert` of each poison commit (a new commit,
+   pushed; no force push, no reset), then checks `git diff <the commit
+   before the first poison> HEAD -- itc_recomp/src` is empty, builds,
+   and runs `attract_race.sh 25 --run_harnesses=all` with the default
+   flags: every harness at 0 differing again.
+
+It fixes nothing: a function that fails goes in the report, and the
+lead halts. Report, in its last message:
+
+```
+poison: <name>
+poisoned: <functions, one commit each round: commit>
+differ: <function: its harness line, verbatim, one a line>
+missed: none | <functions whose harness didn't differ, and why if known>
+reverted: <revert commits>; src/ the same as <commit>: yes | no
+race after revert: <seconds at 30 ticks/s>, <error lines>, harnesses all 0: yes | no
+stop: none | <reason>
+```
+
 ## When to halt
 
 The lead ends the loop, and writes why under "Stopped" in the progress
@@ -295,6 +350,8 @@ file, when:
 
 - a harness differs (outside "(expected to differ)"), or a function made
   native has no harness cases;
+- a poison agent reports a function `missed:`, or its revert doesn't
+  bring `src/` back exactly;
 - an attract race failed, stalled twice, logged new errors, or ran under
   ~20 seconds at 30 ticks/s;
 - an agent left work uncommitted, or a commit doesn't build;
@@ -306,7 +363,7 @@ file, when:
 Whatever the reason, before ending, the lead also brings the run's
 summary up to date ("The run's summary") and the B7 status
 lines up to date (the subsystems' rows and totals are already there, from
-step 8 of the cycle): the "B7 in progress" line near the top of
+step 9 of the cycle): the "B7 in progress" line near the top of
 `docs/rexglue-removal.md` and the B7 sentence in `CLAUDE.md`'s overview
 (which subsystems are done, the branch, what the rest waits on), and
 commits them with the "Stopped" entry. The user reviews and merges.
