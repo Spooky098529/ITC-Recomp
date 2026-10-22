@@ -495,6 +495,139 @@ void CRuntime(Context& h) {
     }
     copies.Report();
   }
+
+  // The character helpers: every character from -2 to 300 (EOF and the
+  // halfwords before the table included), registers with high words that
+  // aren't the low word's sign extension (their low words within the table).
+  {
+    std::vector<uint64_t> characters;
+    for (int64_t c = -2; c <= 300; c++) {
+      characters.push_back(uint64_t(c));
+    }
+    for (uint64_t c : {0x0000000100000061ull, 0xFFFFFFFF00000041ull, 0x00000000FFFFFFFFull,
+                       0x7FFFFFFF0000007Aull, 0x8000000000000020ull}) {
+      characters.push_back(c);
+    }
+    struct Function {
+      const char* name;
+      GuestFunction recompiled, native;
+    };
+    const Function functions[] = {
+        {"toupper (sub_825A8600)", __imp__sub_825A8600, sub_825A8600},
+        {"tolower (sub_825A8618)", __imp__sub_825A8618, sub_825A8618},
+        {"isalpha (sub_825AB020)", __imp__sub_825AB020, sub_825AB020},
+        {"isdigit (sub_825AB040)", __imp__sub_825AB040, sub_825AB040},
+        {"isalnum (sub_825AB0A0)", __imp__sub_825AB0A0, sub_825AB0A0},
+        {"isleadbyte (sub_825B6898)", __imp__sub_825B6898, sub_825B6898},
+    };
+    for (const Function& f : functions) {
+      Results results(f.name);
+      for (uint64_t c : characters) {
+        StringCase(h, results, [] {}, [&](PPCContext& t) { t.r3.u64 = c; }, f.recompiled,
+                   f.native, fmt::format("c {:X}", c));
+      }
+      results.Report();
+    }
+  }
+
+  // strtoul and strtoxl: spaces, a sign, a 0x prefix, digits of each base
+  // (both cases) and something after them; bases 0, 2, 8, 10, 16 and 36;
+  // with and without an end pointer; numbers at the edges of the range.
+  // Numbers out of range (ERANGE through _errno, which sets the thread's
+  // errno) aren't run.
+  {
+    Results unsigned_results("strtoul (sub_825A85E0)");
+    Results signed_results("strtoxl, signed (sub_825A82C8)");
+    struct Text {
+      std::string text;
+      int32_t radix;
+      uint64_t value;  // the digits' value, for leaving out what's out of range
+      bool negative;
+    };
+    std::vector<Text> texts = {
+        {"", 10, 0, false},          {"   ", 0, 0, false},       {"-", 10, 0, false},
+        {"+", 0, 0, false},          {"0x", 16, 0, false},       {"0x", 0, 0, false},
+        {"0xg", 16, 0, false},       {"0", 0, 0, false},         {"08", 0, 0, false},
+        {"077", 0, 63, false},       {"z", 36, 35, false},       {"Zz", 36, 1295, false},
+        {"z", 10, 0, false},         {"4294967295", 10, 4294967295, false},
+        {"-4294967295", 10, 4294967295, true}, {"2147483647", 10, 2147483647, false},
+        {"-2147483648", 10, 2147483648, true},  {"0xFFFFFFFF", 0, 4294967295, false},
+        {"\t\n\v\f\r 12", 10, 12, false},  {"1z", 36, 71, false}, {"12a", 10, 12, false},
+        {"\x80" "5", 10, 0, false},
+    };
+    const int32_t radices[] = {0, 2, 8, 10, 16, 36};
+    const char* kDigits = "0123456789abcdefghijklmnopqrstuvwxyz";
+    for (int i = 0; i < 300; i++) {
+      Text t;
+      t.radix = radices[h.random.Below(6)];
+      const uint32_t digit_base = t.radix == 0 ? (i % 3 == 0 ? 16 : i % 3 == 1 ? 8 : 10) : uint32_t(t.radix);
+      for (uint32_t n = h.random.Below(3); n > 0; n--) {
+        t.text += " \t\n"[h.random.Below(3)];
+      }
+      t.negative = h.random.Below(3) == 0;
+      if (t.negative) {
+        t.text += '-';
+      } else if (h.random.Below(3) == 0) {
+        t.text += '+';
+      }
+      if (digit_base == 16 && (t.radix == 0 || h.random.Below(2))) {
+        t.text += h.random.Below(2) ? "0x" : "0X";
+      } else if (t.radix == 0 && digit_base == 8) {
+        t.text += '0';
+      }
+      t.value = 0;
+      const uint32_t count = 1 + h.random.Below(12);
+      for (uint32_t n = 0; n < count; n++) {
+        uint32_t d = h.random.Below(digit_base);
+        if (n == 0 && t.radix == 0 && digit_base == 10 && d == 0) {
+          d = 1;  // a leading 0 would make it octal
+        }
+        char c = kDigits[d];
+        if (c >= 'a' && h.random.Below(2)) {
+          c = char(c - 32);
+        }
+        t.text += c;
+        t.value = std::min<uint64_t>(t.value * digit_base + d, 1ull << 40);
+      }
+      t.text += "@ ?!/:"[h.random.Below(6)];  // never a digit
+      texts.push_back(t);
+    }
+    for (const Text& text : texts) {
+      for (uint32_t offset : {65u, places.page_end - 3}) {
+        for (bool want_end : {true, false}) {
+          const uint32_t at = h.data + offset;
+          const uint32_t end_out = want_end ? h.data + 8 : 0;
+          auto setup = [&] {
+            WriteBytes(h, at, std::vector<uint8_t>(text.text.begin(), text.text.end()));
+          };
+          const std::string what = fmt::format("\"{}\" base {} offset {} end {}", text.text,
+                                                text.radix, offset, want_end);
+          if (text.value <= 0xFFFFFFFFull) {
+            StringCase(h, unsigned_results, setup,
+                       [&](PPCContext& t) {
+                         t.r3.u64 = at;
+                         t.r4.u64 = end_out;
+                         t.r5.s64 = text.radix;
+                       },
+                       __imp__sub_825A85E0, sub_825A85E0, what);
+          }
+          if (text.value <= (text.negative ? 0x80000000ull : 0x7FFFFFFFull)) {
+            StringCase(h, signed_results, setup,
+                       [&](PPCContext& t) {
+                         t.r3.u64 = 0x8266BC28;
+                         t.r4.u64 = at;
+                         t.r5.u64 = end_out;
+                         t.r6.s64 = text.radix;
+                         t.r7.u64 = 0;
+                       },
+                       __imp__sub_825A82C8, sub_825A82C8, what);
+          }
+        }
+      }
+    }
+    unsigned_results.Report();
+    signed_results.Report();
+  }
 }
 
 }  // namespace harness

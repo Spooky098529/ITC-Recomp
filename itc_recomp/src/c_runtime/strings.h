@@ -52,4 +52,35 @@ int64_t Strstr(uint8_t* base, uint32_t string, uint32_t find);
 // the rest: overlapping copies come out as the original's.
 void CopyForward(uint8_t* base, uint32_t destination, uint32_t source, uint32_t count);
 
+// toupper and tolower (sub_825A8600, sub_825A8618; ASCII only, no locale):
+// what to add to the character (-32, 32 or 0). The originals add it to
+// the whole register.
+int32_t ToUpperStep(int32_t c);
+int32_t ToLowerStep(int32_t c);
+
+// The character type tables (docs/known-data.md): halfwords, 1 upper, 2
+// lower, 4 digit, 8 space, 0x100 alpha, 0x8000 a multibyte lead byte. Read
+// from guest memory on every call, as the originals do (the current
+// locale's pointer is the game's to change).
+constexpr uint32_t kCLocale = 0x8266BB48;       // the C locale's data
+constexpr uint32_t kCurrentLocale = 0x8266BC28;  // the current locale's pointer
+// isalpha, isdigit and isalnum (sub_825AB020, sub_825AB040, sub_825AB0A0):
+// the C locale's entry for c (c as an unsigned index: -1 reads the halfword
+// before the table) masked with 0x103, 4 or 0x107.
+uint32_t CTypeC(uint8_t* base, uint32_t c, uint32_t mask);
+// isleadbyte (sub_825B6898): the current locale's entry for c's low byte,
+// & 0x8000.
+uint32_t IsLeadByte(uint8_t* base, uint32_t c);
+
+// strtoxl (sub_825A82C8, through strtoul sub_825A85E0): parses `string` in
+// `radix` (0 or 2-36) with `flags` (1 unsigned): spaces by the current
+// locale's table, a sign, a 0x prefix or the base guessed. False where the
+// original goes through _errno (a null string, a base out of range, a
+// number out of range) or tests spaces for a multibyte locale
+// (sub_825AFD98): those stay on the recompiled path. Else `result` is r3
+// as the original leaves it (negated in 64 bits for a minus sign) and `end`
+// where it stopped (the string itself when no digits were read).
+bool StrToXl(uint8_t* base, uint32_t string, int32_t radix, uint32_t flags, bool want_end,
+             uint32_t* end, uint64_t* result);
+
 }  // namespace c_runtime
