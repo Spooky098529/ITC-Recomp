@@ -6,6 +6,7 @@
 #include "car_physics/float_ops.h"
 
 #include "base/log.h"
+#include "c_runtime/math.h"
 #include "vehicle_accessors/vectors.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
@@ -374,6 +375,273 @@ uint32_t VehicleSuspensionTorques(uint8_t* base, uint32_t vehicle, uint32_t fram
     r3 = body + 128;
   }
   return r3;
+}
+
+double VehicleEngineTorque(uint8_t* base, uint32_t vehicle, double x, uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_820B00C8 Vehicle::EngineTorque");
+  const uint32_t engine = CarData(base, vehicle) + 1268;
+  const double one = Lfs(base, kOne);
+  if (!(x < one)) {
+    return Lfs(base, kZero);
+  }
+  const double floor = Lfs(base, engine + 360);
+  if (!(x > floor)) {
+    x = floor;
+  }
+  // The curve's segment: fctidz, its low word through the stack (stfiwx at
+  // r1 - 16), less 1, as the translated code (64-bit registers).
+  double t = Fmuls(x, Lfs(base, 0x820029CC));
+  int64_t whole;
+  if (std::isnan(t)) {
+    whole = INT64_MIN;
+  } else if (t > double(LLONG_MAX)) {
+    whole = LLONG_MAX;
+  } else {
+    whole = simde_mm_cvttsd_si64(simde_mm_set_sd(t));
+  }
+  guest::StoreU32(base, frame - 16, uint32_t(whole));
+  const uint64_t i = uint64_t(guest::LoadU32(base, frame - 16)) - 1;
+  double torque;
+  if (uint32_t(i) == 32) {
+    torque = Lfs(base, engine + 152);
+  } else {
+    t = Fsubs(t, one);
+    const double zero = Lfs(base, kZero);
+    if (t < zero) {
+      t = zero;
+    }
+    const uint64_t low = i & 0xFFFFFFFFu;
+    const uint32_t upper_at = uint32_t(i + 7) << 2;
+    const uint32_t lower_at = uint32_t(i + 6) << 2;
+    guest::StoreU32(base, frame - 16, uint32_t(low >> 32));
+    guest::StoreU32(base, frame - 12, uint32_t(low));
+    const double upper = Lfs(base, upper_at + engine);
+    const double lower = Lfs(base, lower_at + engine);
+    const double segment = double(float(double(int64_t(low))));
+    const double fraction = Fsubs(t, segment);
+    const double rest = Fsubs(one, fraction);
+    torque = Fmadds(lower, rest, Fmuls(upper, fraction));
+  }
+  const double scale = Fmuls(Lfs(base, vehicle + 2956), Lfs(base, engine + 156));
+  return Fmuls(scale, torque);
+}
+
+double TireMagicFormula(uint8_t* base, uint32_t coefficients, double x) {
+  ITC_NATIVE_RUNNING("sub_820B09C8 Tire::MagicFormula");
+  const uint32_t c = coefficients;
+  double a = c_runtime::Atan(Fmuls(Lfs(base, c + 0), x));
+  const double e = Lfs(base, c + 12);
+  const double b = Lfs(base, c + 0);
+  const double atan_bx = double(float(a));
+  const double one_less_e = Fsubs(Lfs(base, kOne), e);
+  const double e_over_b = Fdivs(e, b);
+  const double term = Fmuls(one_less_e, x);
+  const double inner = Fmadds(e_over_b, atan_bx, term);
+  a = c_runtime::Atan(Fmuls(inner, b));
+  const double atan_inner = double(float(a));
+  const double s = c_runtime::Sin(Fmuls(Lfs(base, c + 4), atan_inner));
+  return Fmuls(Lfs(base, c + 8), double(float(s)));
+}
+
+void VehicleSetGearValues(uint8_t* base, uint32_t vehicle) {
+  ITC_NATIVE_RUNNING("sub_820B3C90 Vehicle::SetGearValues");
+  uint32_t gear = guest::LoadU32(base, vehicle + 2252);
+  if (gear == 0xFFFFFFFFu) {
+    gear = 0;
+  } else if (gear == 0) {
+    gear = 1;
+  }
+  const uint32_t gearbox = CarData(base, vehicle) + 1268;
+  const double clutch = Lfs(base, vehicle + 2328);
+  const double sum = Fadds(Lfs(base, vehicle + 2336), clutch);
+  const double final_drive = Lfs(base, gearbox + 332);
+  const double ratio = Fmuls(Lfs(base, (uint32_t(gear + 74) << 2) + gearbox), final_drive);
+  CopyWord(base, vehicle + 2328, vehicle + 2324);
+  CopyWord(base, kZero, vehicle + 2320);
+  Stfs(base, vehicle + 2312, sum);
+  Stfs(base, vehicle + 2304, Fabs(ratio));
+  const double value = Lfs(base, (uint32_t(gear + 58) << 2) + gearbox);
+  Stfs(base, vehicle + 2308, Fmuls(value, Lfs(base, gearbox + 276)));
+}
+
+double VehicleAxleReactionTorque(uint8_t* base, uint32_t vehicle, uint32_t first) {
+  ITC_NATIVE_RUNNING("sub_820B3130 Vehicle::AxleReactionTorque");
+  const double zero = Lfs(base, kZero);
+  const uint32_t data = guest::LoadU32(base, vehicle + (uint32_t(first + 540) << 2));
+  double sum = zero;
+  if (first >= first + 2) {
+    return sum;
+  }
+  const double minus_one = Lfs(base, 0x82001BE0);
+  const double plus_one = Lfs(base, kOne);
+  for (uint32_t w = first; w < first + 2; w++) {
+    const uint32_t spin_at = vehicle + kWheelBytes * w + 664;
+    const double spin = Lfs(base, spin_at);
+    const double brake = Fabs(Lfs(base, spin_at + 52));
+    double sign;
+    if (spin == zero) {
+      sign = zero;
+    } else if (spin > zero) {
+      sign = minus_one;
+    } else {
+      sign = plus_one;
+    }
+    double torque = Fmsubs(sign, brake, Lfs(base, spin_at + 60));
+    torque = Fmuls(torque, Lfs(base, data + 52));
+    Stfs(base, spin_at + 104, torque);
+    sum = Fadds(torque, sum);
+  }
+  return sum;
+}
+
+void VehicleUpdateFreeAxle(uint8_t* base, uint32_t vehicle, uint32_t first) {
+  ITC_NATIVE_RUNNING("sub_820B3010 Vehicle::UpdateFreeAxle");
+  const uint32_t record = guest::LoadU32(base, vehicle + (uint32_t(first + 536) << 2));
+  const uint32_t data = guest::LoadU32(base, vehicle + (uint32_t(first + 540) << 2));
+  const double radius = Lfs(base, data + 52);
+  const double inertia = Fmuls(Lfs(base, record + 108), Lfs(base, 0x82001BE4));
+  if (first >= first + 2) {
+    return;
+  }
+  const double inverse = Fdivs(Lfs(base, kOne), inertia);
+  const double zero = Lfs(base, kZero);
+  for (uint32_t w = first; w < first + 2; w++) {
+    const uint32_t spin_at = vehicle + kWheelBytes * w + 664;
+    // The tire's torque (+308 x radius) turns the wheel.
+    double drive = Fmuls(Lfs(base, spin_at + 60), radius);
+    const double brake = Fabs(Lfs(base, spin_at + 52));
+    const double time = Lfs(base, vehicle + 2364);
+    const double spin0 = Lfs(base, spin_at);
+    drive = Fneg(drive);
+    drive = Fmuls(drive, inverse);
+    const double spun = Fmadds(drive, time, spin0);
+    Stfs(base, spin_at, spun);
+    // The brake slows it toward 0.0, not past it (the branches as the
+    // original's: ble and bge are "not greater" and "not less").
+    double braking = Fmuls(brake, radius);
+    braking = Fmuls(braking, Lfs(base, vehicle + 2364));
+    braking = Fmuls(braking, inverse);
+    bool stop = false;
+    double moved = spun;
+    if (spun > zero) {
+      if (spun > braking) {
+        moved = Fsubs(spun, braking);
+      } else {
+        stop = true;
+      }
+    } else if (!(spun < zero)) {
+      stop = true;
+    } else if (!(spun < Fneg(braking))) {
+      stop = true;
+    } else {
+      moved = Fadds(spun, braking);
+    }
+    if (stop) {
+      Stfs(base, spin_at, zero);
+    } else {
+      Stfs(base, spin_at, moved);
+    }
+    const double spin = Lfs(base, spin_at);
+    Stfs(base, spin_at + 4, Fmuls(spin, inertia));
+    if (brake > zero) {
+      // +212 = |the brake's change of spin x inertia / radius x +216|.
+      double t = Fsubs(spin, spun);
+      const double time2 = Lfs(base, vehicle + 2364);
+      const double share = Lfs(base, spin_at - 32);
+      t = Fdivs(t, time2);
+      t = Fmuls(t, inertia);
+      t = Fdivs(t, radius);
+      t = Fmuls(t, share);
+      Stfs(base, spin_at - 36, Fabs(t));
+    }
+  }
+}
+
+namespace {
+
+// sub_820B3E08's, sub_820B3E38's and sub_820B3E68's steps: the value
+// clamped to [0.0, 1.0] (a NaN kept) into `field`, and returned in f1.
+double ClampInto(uint8_t* base, uint32_t vehicle, double value, uint32_t field) {
+  const double zero = Lfs(base, kZero);
+  if (value < zero) {
+    value = zero;
+  } else {
+    const double one = Lfs(base, kOne);
+    if (value > one) {
+      value = one;
+    }
+  }
+  Stfs(base, vehicle + field, value);
+  return value;
+}
+
+}  // namespace
+
+double VehicleSetBrake(uint8_t* base, uint32_t vehicle, double value) {
+  ITC_NATIVE_RUNNING("sub_820B3E08 Vehicle::SetBrake");
+  return ClampInto(base, vehicle, value, 292);
+}
+
+double VehicleSetHandbrake(uint8_t* base, uint32_t vehicle, double value) {
+  ITC_NATIVE_RUNNING("sub_820B3E38 Vehicle::SetHandbrake");
+  return ClampInto(base, vehicle, value, 296);
+}
+
+double VehicleSetThrottle(uint8_t* base, uint32_t vehicle, double value) {
+  ITC_NATIVE_RUNNING("sub_820B3E68 Vehicle::SetThrottle");
+  return ClampInto(base, vehicle, value, 284);
+}
+
+namespace {
+
+// sub_820B0478's and sub_820B04C0's steps: `field` ramps up by the car
+// data's `rate` x time while `on`, to 1.0; else 0.0.
+void Ramp(uint8_t* base, uint32_t vehicle, uint32_t on, double time, uint32_t field,
+          uint32_t rate) {
+  if ((on & 0xFF) == 0) {
+    CopyWord(base, kZero, vehicle + field);
+    return;
+  }
+  const uint32_t data = CarData(base, vehicle);
+  const double current = Lfs(base, vehicle + field);
+  const double value = Fmadds(Lfs(base, data + rate), time, current);
+  Stfs(base, vehicle + field, value);
+  if (value > Lfs(base, kOne)) {
+    CopyWord(base, kOne, vehicle + field);
+  }
+}
+
+}  // namespace
+
+void VehicleRampReverseThrottle(uint8_t* base, uint32_t vehicle, uint32_t on, double time) {
+  ITC_NATIVE_RUNNING("sub_820B0478 Vehicle::RampReverseThrottle");
+  Ramp(base, vehicle, on, time, 288, 1264);
+}
+
+void VehicleRampHandbrake(uint8_t* base, uint32_t vehicle, uint32_t on, double time) {
+  ITC_NATIVE_RUNNING("sub_820B04C0 Vehicle::RampHandbrake");
+  Ramp(base, vehicle, on, time, 296, 128);
+}
+
+void VehicleSetValue2388(uint8_t* base, uint32_t vehicle, double value, uint32_t flag) {
+  ITC_NATIVE_RUNNING("sub_820B3C20 Vehicle::SetValue2388");
+  const double zero = Lfs(base, kZero);
+  const double one = Lfs(base, kOne);
+  double clamped;
+  if (!(value < zero)) {
+    clamped = value > one ? one : value;
+  } else {
+    clamped = zero;
+  }
+  Stfs(base, vehicle + 2388, clamped);
+  guest::StoreU8(base, vehicle + 2385, uint8_t(flag));
+  double rest = Fnmsubs(value, Lfs(base, 0x82002A2C), one);
+  if (rest < zero) {
+    rest = zero;
+  } else if (rest > one) {
+    rest = one;
+  }
+  Stfs(base, vehicle + 2396, rest);
 }
 
 }  // namespace car_physics

@@ -11,8 +11,8 @@
 
 ITC_FLAG_BOOL(native_car_physics, true, "ITC",
               "Run the car physics (docs/functions/car-physics.md: the rigid body, sub_820B6A38 "
-              "to sub_820B7928; the vehicle's physics step's helpers, sub_820AFAE8 to "
-              "sub_820B2748) natively instead of through the translated "
+              "to sub_820B7928; the vehicle's physics step's helpers and controls, "
+              "sub_820AFAE8 to sub_820B3E68) natively instead of through the translated "
               "code (the same words, bit for bit; checked by --run_harnesses=car_physics)");
 
 // Defines an adapter: `body` uses `ctx` and `base`. Flush-to-zero off for
@@ -147,3 +147,24 @@ ITC_CAR_PHYSICS(820B0838, VehicleBrakeTorques(base, ctx.r3.u32))
 ITC_CAR_PHYSICS(820B0718, VehicleAntiLock(base, ctx.r3.u32))
 ITC_CAR_PHYSICS(820AFBD8,
                 ctx.r3.u64 = VehicleSuspensionTorques(base, ctx.r3.u32, ctx.r1.u32 - 256))
+// f1 = x; f1 = the torque. The original passes the curve's index through
+// its r1 - 16.
+ITC_CAR_PHYSICS(820B00C8,
+                ctx.f1.f64 = VehicleEngineTorque(base, ctx.r3.u32, ctx.f1.f64, ctx.r1.u32))
+// r4 = the coefficients, f1 = x; f1 = the force.
+ITC_CAR_PHYSICS(820B09C8, ctx.f1.f64 = TireMagicFormula(base, ctx.r4.u32, ctx.f1.f64))
+ITC_CAR_PHYSICS(820B3C90, VehicleSetGearValues(base, ctx.r3.u32))
+// r4 = the axle's first wheel; f1 = the sum.
+ITC_CAR_PHYSICS(820B3130,
+                ctx.f1.f64 = VehicleAxleReactionTorque(base, ctx.r3.u32, ctx.r4.u32))
+ITC_CAR_PHYSICS(820B3010, VehicleUpdateFreeAxle(base, ctx.r3.u32, ctx.r4.u32))
+// f1 = the value; f1 comes back clamped.
+ITC_CAR_PHYSICS(820B3E08, ctx.f1.f64 = VehicleSetBrake(base, ctx.r3.u32, ctx.f1.f64))
+ITC_CAR_PHYSICS(820B3E38, ctx.f1.f64 = VehicleSetHandbrake(base, ctx.r3.u32, ctx.f1.f64))
+ITC_CAR_PHYSICS(820B3E68, ctx.f1.f64 = VehicleSetThrottle(base, ctx.r3.u32, ctx.f1.f64))
+// r4 = the byte, f1 = time.
+ITC_CAR_PHYSICS(820B0478,
+                VehicleRampReverseThrottle(base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64))
+ITC_CAR_PHYSICS(820B04C0, VehicleRampHandbrake(base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64))
+// f1 = the value, r4 = the byte.
+ITC_CAR_PHYSICS(820B3C20, VehicleSetValue2388(base, ctx.r3.u32, ctx.f1.f64, ctx.r4.u32))

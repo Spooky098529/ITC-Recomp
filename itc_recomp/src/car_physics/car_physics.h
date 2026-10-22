@@ -173,4 +173,44 @@ void VehicleAntiLock(uint8_t* base, uint32_t vehicle);
 // 256 bytes.
 uint32_t VehicleSuspensionTorques(uint8_t* base, uint32_t vehicle, uint32_t frame);
 
+// Vehicle::EngineTorque (sub_820B00C8): x = the rpm normalized to 0-1; 0.0
+// at 1.0 or more; else x = max(x, car data +1628), the torque curve (the
+// 33 floats at car data +1292) read between its points at x times the float
+// at 0x820029CC (the last point, car data +1420, at the end), times +2956
+// and car data +1424. `frame`: the original's r1 (it passes the point's
+// index through r1 - 16).
+double VehicleEngineTorque(uint8_t* base, uint32_t vehicle, double x, uint32_t frame);
+// Tire::MagicFormula (sub_820B09C8): D sin(C atan(B x - E (B x - atan(B
+// x)))), the coefficients B, C, D, E at +0 to +12; atan and sin are the C
+// runtime's (src/c_runtime/math.h).
+double TireMagicFormula(uint8_t* base, uint32_t coefficients, double x);
+// Vehicle::SetGearValues (sub_820B3C90): from the gear +2252 (-1 and 0 read
+// as 0 and 1): +2324 = +2328, +2320 = 0.0, +2312 = +2336 + +2328, +2304 =
+// |the gear's ratio x the final drive|, +2308 = the gear's other value x
+// car data +1544.
+void VehicleSetGearValues(uint8_t* base, uint32_t vehicle);
+// Vehicle::AxleReactionTorque (sub_820B3130): for the axle's two wheels
+// (from `first`), +352 = (-sign(spin) |brake +300| - +308) x the radius;
+// returns their sum.
+double VehicleAxleReactionTorque(uint8_t* base, uint32_t vehicle, uint32_t first);
+// Vehicle::UpdateFreeAxle (sub_820B3010): the axle's two wheels' spin
+// turned by the tire's torque, then slowed by the brake toward 0.0 (not
+// past it); +252 = spin x inertia; with a brake, +212 = the brake's part.
+void VehicleUpdateFreeAxle(uint8_t* base, uint32_t vehicle, uint32_t first);
+// sub_820B3E08, sub_820B3E38 and sub_820B3E68 (the names ours:
+// Vehicle::SetBrake, SetHandbrake, SetThrottle): the value clamped to
+// [0.0, 1.0] into +292, +296 or +284; returned (the original's f1).
+double VehicleSetBrake(uint8_t* base, uint32_t vehicle, double value);
+double VehicleSetHandbrake(uint8_t* base, uint32_t vehicle, double value);
+double VehicleSetThrottle(uint8_t* base, uint32_t vehicle, double value);
+// sub_820B0478 and sub_820B04C0 (the names ours, probably:
+// Vehicle::RampReverseThrottle, RampHandbrake): while the byte `on` is
+// set, +288 (+296) += car data +1264 (+128) x time, to 1.0; else 0.0.
+void VehicleRampReverseThrottle(uint8_t* base, uint32_t vehicle, uint32_t on, double time);
+void VehicleRampHandbrake(uint8_t* base, uint32_t vehicle, uint32_t on, double time);
+// sub_820B3C20 (the name ours: Vehicle::SetValue2388): +2388 = the value
+// clamped to [0.0, 1.0], byte +2385 = `flag`, +2396 = 1 - value x the float
+// at 0x82002A2C, clamped.
+void VehicleSetValue2388(uint8_t* base, uint32_t vehicle, double value, uint32_t flag);
+
 }  // namespace car_physics

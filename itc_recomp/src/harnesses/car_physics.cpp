@@ -134,6 +134,27 @@ ITC_NATIVE_STEP(NativeAntiLock, cp::VehicleAntiLock(base, ctx.r3.u32))
 ITC_NATIVE_STEP(NativeSuspensionTorques,
                 ctx.r3.u64 = cp::VehicleSuspensionTorques(base, ctx.r3.u32, ctx.r1.u32 - 256))
 
+ITC_NATIVE_STEP(NativeEngineTorque,
+                ctx.f1.f64 = cp::VehicleEngineTorque(base, ctx.r3.u32, ctx.f1.f64, ctx.r1.u32))
+ITC_NATIVE_STEP(NativeMagicFormula,
+                ctx.f1.f64 = cp::TireMagicFormula(base, ctx.r4.u32, ctx.f1.f64))
+ITC_NATIVE_STEP(NativeSetGearValues, cp::VehicleSetGearValues(base, ctx.r3.u32))
+ITC_NATIVE_STEP(NativeAxleReactionTorque,
+                ctx.f1.f64 = cp::VehicleAxleReactionTorque(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_STEP(NativeUpdateFreeAxle, cp::VehicleUpdateFreeAxle(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_STEP(NativeSetBrake,
+                ctx.f1.f64 = cp::VehicleSetBrake(base, ctx.r3.u32, ctx.f1.f64))
+ITC_NATIVE_STEP(NativeSetHandbrake,
+                ctx.f1.f64 = cp::VehicleSetHandbrake(base, ctx.r3.u32, ctx.f1.f64))
+ITC_NATIVE_STEP(NativeSetThrottle,
+                ctx.f1.f64 = cp::VehicleSetThrottle(base, ctx.r3.u32, ctx.f1.f64))
+ITC_NATIVE_STEP(NativeRampReverseThrottle,
+                cp::VehicleRampReverseThrottle(base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64))
+ITC_NATIVE_STEP(NativeRampHandbrake,
+                cp::VehicleRampHandbrake(base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64))
+ITC_NATIVE_STEP(NativeSetValue2388,
+                cp::VehicleSetValue2388(base, ctx.r3.u32, ctx.f1.f64, ctx.r4.u32))
+
 // Runs the recompiled version with the native flags off, so the functions
 // it calls that are ours run the originals too.
 template <GuestFunction recompiled>
@@ -391,6 +412,11 @@ constexpr uint32_t kVehicleArea = 0x10000;  // below the scratch area
 constexpr uint32_t kVehicle = 0, kCarData = 0x2000, kSurfaces = 0x2800, kBody = 0x2900;
 constexpr uint32_t kVehicleAreaBytes = 0x2C00;
 
+// What r4 holds: a wheel (0-3), an axle's first wheel (0 or 2), a byte
+// (any word), or the tire coefficients (four floats in the surface
+// records' area).
+enum R4Kind { kWheelR4, kAxleR4, kByteR4, kCoefficientsR4 };
+
 // Fills the area for one case: float words (by the group's generator),
 // then the pointers and the bytes the functions branch on.
 template <typename Word>
@@ -419,6 +445,7 @@ void FillVehicle(uint8_t* base, uint32_t area, Random& r, Word word) {
   guest::StoreU8(base, v + 2664, uint8_t(r.Below(3) != 0));
   guest::StoreU8(base, v + 2386, uint8_t(r.Below(3) != 0));
   guest::StoreU32(base, v + 3156, r.Below(1000));
+  guest::StoreU32(base, v + 2252, uint32_t(int32_t(r.Below(8)) - 1));  // the gear, -1 to 6
 }
 
 }  // namespace
@@ -429,20 +456,22 @@ void CarPhysicsVehicle(Context& h) {
     const char* name;
     GuestFunction recompiled, native;
     bool compare_f1;
-    bool wheel_in_r4 = false;
+    R4Kind r4 = kWheelR4;
+    // f1 a value from 0.0 to 1.1 (the engine's normalized rpm).
+    bool unit_f1 = false;
   } functions[] = {
       {"Vehicle::BeginStep (sub_820AFAE8)", Original<__imp__sub_820AFAE8>, NativeBeginStep,
        true},
       {"Vehicle::WheelLoads (sub_820AFD30)", Original<__imp__sub_820AFD30>, NativeWheelLoads,
        false},
       {"Vehicle::SurfaceValue (sub_820B0508)", Original<__imp__sub_820B0508>,
-       NativeSurfaceValue, true, true},
+       NativeSurfaceValue, true},
       {"Vehicle::SurfaceValue20 (sub_820B0560)", Original<__imp__sub_820B0560>,
-       NativeSurfaceValue20, true, true},
+       NativeSurfaceValue20, true},
       {"Vehicle::SurfaceValue12 (sub_820B05B8)", Original<__imp__sub_820B05B8>,
-       NativeSurfaceValue12, true, true},
+       NativeSurfaceValue12, true},
       {"Vehicle::SurfaceValue16 (sub_820B0610)", Original<__imp__sub_820B0610>,
-       NativeSurfaceValue16, true, true},
+       NativeSurfaceValue16, true},
       {"Vehicle::AccumulateTireForces (sub_820B0908)", Original<__imp__sub_820B0908>,
        NativeAccumulateTireForces, false},
       {"Vehicle::RollingResistance (sub_820B2748)", Original<__imp__sub_820B2748>,
@@ -455,6 +484,27 @@ void CarPhysicsVehicle(Context& h) {
        false},
       {"Vehicle::SuspensionTorques (sub_820AFBD8)", Original<__imp__sub_820AFBD8>,
        NativeSuspensionTorques, false},
+      {"Vehicle::EngineTorque (sub_820B00C8)", Original<__imp__sub_820B00C8>,
+       NativeEngineTorque, true, kWheelR4, true},
+      {"Tire::MagicFormula (sub_820B09C8)", Original<__imp__sub_820B09C8>, NativeMagicFormula,
+       true, kCoefficientsR4},
+      {"Vehicle::SetGearValues (sub_820B3C90)", Original<__imp__sub_820B3C90>,
+       NativeSetGearValues, false},
+      {"Vehicle::AxleReactionTorque (sub_820B3130)", Original<__imp__sub_820B3130>,
+       NativeAxleReactionTorque, true, kAxleR4},
+      {"Vehicle::UpdateFreeAxle (sub_820B3010)", Original<__imp__sub_820B3010>,
+       NativeUpdateFreeAxle, false, kAxleR4},
+      {"Vehicle::SetBrake (sub_820B3E08)", Original<__imp__sub_820B3E08>, NativeSetBrake, true},
+      {"Vehicle::SetHandbrake (sub_820B3E38)", Original<__imp__sub_820B3E38>,
+       NativeSetHandbrake, true},
+      {"Vehicle::SetThrottle (sub_820B3E68)", Original<__imp__sub_820B3E68>, NativeSetThrottle,
+       true},
+      {"Vehicle::RampReverseThrottle (sub_820B0478)", Original<__imp__sub_820B0478>,
+       NativeRampReverseThrottle, false, kByteR4},
+      {"Vehicle::RampHandbrake (sub_820B04C0)", Original<__imp__sub_820B04C0>,
+       NativeRampHandbrake, false, kByteR4},
+      {"Vehicle::SetValue2388 (sub_820B3C20)", Original<__imp__sub_820B3C20>,
+       NativeSetValue2388, true, kByteR4},
   };
   enum Group { kNumbers, kOneNaN, kNaNs };
   const char* const kGroupNames[] = {"", ", one NaN",
@@ -466,8 +516,26 @@ void CarPhysicsVehicle(Context& h) {
       for (uint64_t seed = 0; seed < 100; seed++) {
         Random pick = Seeded(seed * 17 + 3 * uint64_t(group) + 2);
         auto word = [group](Random& r) { return group == kNaNs ? FloatWord(r) : NumberWord(r); };
-        const double f1 = double(std::bit_cast<float>(word(pick)));
+        double f1 = double(std::bit_cast<float>(word(pick)));
         const uint32_t wheel = pick.Below(4);
+        const uint32_t byte_word = pick.Below(3) == 0 ? uint32_t(pick.Next()) : pick.Below(2);
+        if (f.unit_f1 && pick.Below(4) != 0) {
+          f1 = double(float(pick.Below(1100)) / 1000.0f);
+        }
+        uint32_t r4 = wheel;
+        switch (f.r4) {
+          case kWheelR4:
+            break;
+          case kAxleR4:
+            r4 = wheel & 2;
+            break;
+          case kByteR4:
+            r4 = byte_word;
+            break;
+          case kCoefficientsR4:
+            r4 = area + kSurfaces + 16 * wheel;
+            break;
+        }
         const uint32_t nan_word = kNaNWords[pick.Below(std::size(kNaNWords))];
         const uint32_t nan_at = pick.Below(kVehicleAreaBytes / 4);
         std::vector<uint8_t> result[2];
@@ -487,7 +555,7 @@ void CarPhysicsVehicle(Context& h) {
           PPCContext t = CallContext(h);
           t.fpscr.disableFlushModeUnconditional();
           t.r3.u64 = area + kVehicle;
-          t.r4.u64 = wheel;
+          t.r4.u64 = r4;
           t.f1.f64 = f1;
           (v == 0 ? f.recompiled : f.native)(t, h.base);
           result[v] = Read(h.base, area, kVehicleAreaBytes);
@@ -499,7 +567,7 @@ void CarPhysicsVehicle(Context& h) {
           }
         }
         results.Check(result[0], result[1],
-                      fmt::format("seed {} wheel {} f1 {:016X}", seed, wheel,
+                      fmt::format("seed {} r4 {:08X} f1 {:016X}", seed, r4,
                                   std::bit_cast<uint64_t>(f1)));
       }
       results.Report();
