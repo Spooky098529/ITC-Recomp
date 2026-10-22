@@ -24,6 +24,11 @@ the SDK's audio (the Audio Worker's spin, the game's sounds, the plan).
 `--height`, `--fullscreen`, black bars) and what's left to try.
 `docs/windows.md` is the Windows build: cross-compiled on Linux, tested
 under Wine (the user has no Windows machine).
+`docs/native-memory.md` is B7's first step (designed, not built yet, on
+the branch `native-heap`): one allocation layer of our own
+(`src/memory/`) under every allocation, recompiled and native alike (the
+process heap, VirtualAlloc and physical memory, routed at nine functions
+behind `--native_heap`), whose backing is swapped at the port's end.
 `docs/old-hardware.md` is the plan (not started) for running below
 Vulkan 1.3, and why not OpenGL.
 `docs/rexglue-removal.md` is the plan for a native port without the
