@@ -1,4 +1,4 @@
-# B7 loop: making the game's functions native, group by group
+# B7 loop: map a subsystem, make it native, take the next lead
 
 Instructions for a `/loop` session working on B7 ("The game logic
 inside" in `docs/rexglue-removal.md`) without the user. Start it, in a
@@ -9,203 +9,218 @@ fresh session (`/clear` first), with:
 ```
 
 with no interval: each pass schedules the next one itself. The session
-running the loop (the **lead**) does no porting itself: it hands groups to
-subagents, reads their reports, and decides what's next or halts. So its
-own context grows by a few reports a pass, and each group starts with a
-fresh agent. What a pass needs to know lives in the repo (this file,
-`docs/loops/b7-progress.md`, the surveys, commits), not in the session's
+running the loop (the **lead**) does no mapping or porting itself: it
+hands each step to one subagent at a time, reads its report, checks it,
+and decides what's next or halts. Its own context grows by a few reports
+a pass, and every step starts with a fresh agent. What a pass needs to
+know lives in the repo (this file, `docs/loops/b7-progress.md`,
+`docs/loops/leads.md`, the function files, commits), not in the session's
 memory.
 
-## Settings (the user sets these before the first pass)
+## Settings (set by the user, 2026-10-22)
 
-The loop doesn't start until the user has replaced every "to confirm"
-below. The suggested values are Claude's, not the user's yet.
+- **Branch:** `b7-loop`, made once from `rexglue-removal-project` by the
+  first pass (the user's approval here counts as asking). The loop never
+  makes another branch, never touches `main` or tags, and never merges:
+  the user reviews and merges the branch.
+- **Code changes without asking first:** allowed on `b7-loop`, for the
+  subsystems the loop takes. This relaxes the "explain before code
+  changes" rule for the loop's branch, nowhere else.
+- **Function rows:** written by the agents as they go (the status check
+  after each change), and listed in the progress file for one review by
+  the user before the merge. This relaxes the "show rows and ask first"
+  rule for the loop's branch, nowhere else.
+- **Per session:** 3 subsystems or 10 passes, whichever comes first. Then
+  the loop ends itself; the user runs `/clear` and starts it again
+  (nothing is lost: it picks up from the progress file).
+- **In all:** 5 subsystems, then the loop stops for the user's review.
 
-- **Roots:** to confirm. Suggested: the main thread's performance leads,
-  `sub_821298C0` (60 lines, ready) and `sub_8209C6E0` (475 lines, ready, one
-  callee never seen in play) ("DrawState::Note and AfterDraw" in
-  `docs/native-renderer.md`), then their callers as they become ready.
-- **Branch:** to confirm. Suggested: `b7-main-thread`, made once from
-  `rexglue-removal-project` (the user's approval here counts as asking).
-  The loop never makes another branch, never touches `main` or tags, and
-  never merges: the user reviews and merges the branch.
-- **Code changes without asking first:** to confirm. Suggested: allowed
-  on the loop's branch, for the groups under the roots only. This relaxes
-  the "explain before code changes" rule for the loop's branch, nowhere
-  else.
-- **Function rows:** to confirm. Suggested: written to `docs/functions/`
-  by the porting agent (the status check after each change) and listed in
-  the progress file for one review by the user before the merge.
-- **Passes per session:** to confirm. Suggested: 5. Then the loop ends
-  itself; the user runs `/clear` and starts it again (nothing is lost: it
-  picks up from the progress file).
-- **Groups in all:** to confirm. Suggested: 10, then the loop stops for
-  the user's review.
+## The cycle
 
-## Groups
+1. **Pick a subsystem.** The first is the top of `docs/loops/leads.md`;
+   after that, the lead picks from `leads.md`: the lead whose functions
+   run most often or are closest to being ready
+   (`itc_recomp/tools/b7_groups.py <its functions>`), not one that needs
+   a decision only the user can make. Its line is deleted from `leads.md`
+   when picked.
+2. **Hand it to a mapping agent** (below).
+3. The mapping agent **writes `docs/functions/<name>.md`** for the
+   subsystem's functions.
+4. It **adds leads**: functions worth investigating that look like other
+   subsystems go to `docs/loops/leads.md`.
+5. **The lead checks the map** ("Checking a map" below). A failed check
+   halts the loop.
+6. **Hand it to a migration agent** (below), which makes the subsystem
+   native group by group.
+7. The migration agent works in the **build, attract race, debug** cycle
+   used so far, and reports. A subsystem too big for one agent gets
+   another migration agent after the first reports, until nothing ready
+   is left in it.
+8. **Take the next lead**: back to step 1.
 
-A group is a small set of functions made native together and checked
-together. Native code is plain C++ without `ctx` ("Plain C++ behind thin
-adapters" in `docs/rexglue-removal.md`), so it can only call code that's
-already ours: functions become native from the bottom of the call graph
-up. For a function F (the group's root), its group is F plus the callees
-only the group calls, seen in play and not yet ours, followed down.
+A pass does one step: it reads the state, collects the report of the
+agent that finished, checks it, records it in the progress file, starts
+the next agent, and schedules the next pass. A running agent's finishing
+wakes the loop, so the fallback wake-up is long (about 30 minutes); when
+nothing runs and there's work, about a minute.
 
-- **Ready:** every callee outside the group that runs in play is ours.
-  The loop takes ready groups only. (A group still calling recompiled code
-  could be made Overridden, but that's the user's call, not the loop's.)
-- **Within the cap:** 1,500 generated lines at most (lines, not functions:
-  sizes run from 10 lines to thousands).
-- **Callees never seen in play:** native code replaces the whole function,
-  so their branches need a decision: port them too, or keep the recompiled
-  path for that branch behind the fallback flag. The survey proposes; the
-  porting agent does it.
-- **Indirect calls** (through a register: vtables, callbacks) aren't in
-  the static graph; the survey reads which targets run (a temporary
-  counter override in an attract race, if reading isn't enough).
-- **Kernel imports** the group calls (mostly the core's locks and memory)
-  stay as they are through the SDK; a group that would need one replaced
-  goes back to the user.
-- **The heap:** the functions holding the most groups back are the guest
-  heap's (`sub_825A7410`, `sub_825A71D0`, `sub_825A7068`'s group; 2026-10-22).
-  Native code that allocates guest memory needs a way to do it without
-  `ctx`; until the user decides how, a group needing it isn't ready.
+## The tooling (what the agents use)
 
-`itc_recomp/tools/b7_groups.py` computes them (reports only):
+- `itc_recomp/coverage/seen_in_play.txt`: the functions seen in play
+  (`docs/coverage.md`). Functions that never ran get no rows.
+- `itc_recomp/tools/b7_status.py`: B7's measure (ours, wrapped, known,
+  unknown), by function file; checks rows that say their function no
+  longer runs.
+- `itc_recomp/tools/b7_groups.py [root ...]`: a function's group (it and
+  the callees only it calls), whether it's ready (nothing outside it that
+  runs is still recompiled), the ready groups under a root and the
+  blockers. Groups are made native from the bottom up, as native code can
+  only call what's already ours.
+- `itc_recomp/tools/check_function_statuses.py`: the Status column
+  against `src/` (run after any row change); a function in rows of two
+  files is an error.
+- `itc_recomp/tools/attract_race.sh <seconds> [flags]`: an attract race
+  with the standard flags: the log, the seconds at 30 ticks/s, error
+  lines, harness results (`--run_harnesses=all`).
+- `src/harnesses/`: native against recompiled on the same inputs
+  ("Checking with a harness" in `docs/rexglue-removal.md`).
+- `--native_renderer_dump=<dir>`: frames from a race.
+- `ITC_THREAD=main itc_recomp/tools/profile_render_thread.sh`: cycles a
+  frame, for speed.
+- `itc_recomp/tools/boundary_status.py`: the SDK boundary.
+- Finding code: `grep -n "DEFINE_REX_FUNC(sub_X)"
+  itc_recomp/generated/default/*.cpp`; call sites `grep -ln "lr =
+  0xXXXXXXXX;"`; overrides `grep -rn sub_X itc_recomp/src`.
 
-- `b7_groups.py <root>...`: each root's group, whether it's ready, the
-  ready groups under it (largest first) and the blockers under it.
-- `b7_groups.py`: the whole game: how many groups are ready, and the
-  blockers holding the most back.
+## The mapping agent
 
-Order: the ready groups under the roots, smallest first; once a group is
-ours, run the script again, as its callers may have become ready (that's
-the way up). When nothing under the roots is ready, stop for the user.
+Prompt it with: the subsystem (its lead line from `leads.md`: the
+functions, why), this file's "The mapping agent", "The tooling" and
+"Rules that still hold", and the report format. It changes docs only (no
+code, no builds, no game runs):
 
-## The pass (the lead)
+- **Finds the subsystem:** from the lead's functions, their callees seen
+  in play (`b7_groups.py <functions>` lists the subtree) and the callers
+  up to where another subsystem begins. At most ~150 functions: beyond
+  that, it maps a part and puts the rest in `leads.md`.
+- **Reads each function** in `generated/`: what it does, its arguments and
+  return value, the guest memory it reads and writes (objects, fields,
+  globals), its callers and callees, how often it runs where known.
+- **Writes `docs/functions/<name>.md`** (a short, lowercase name, words
+  joined by hyphens, like `audio.md`): a title "Known functions:
+  <subsystem>", a paragraph saying what the subsystem is and which docs
+  cover it, the Status definitions copied from the top of `functions.md`
+  word for word, then the table (`| Address | Name | Status | Notes |`,
+  one function a row, in the order that reads best; no sorting required).
+  Only functions seen in play get rows. Notes say how much is known ("Not
+  read", "Not read in detail", "probably" for guesses), as the other files
+  do. Fields and globals worked out go in `docs/known-data.md`.
+- **Moves rows, never copies them:** a function already in `functions.md`
+  moves to the new file with its row (kept as it was, with what's new
+  added). A function already in another subsystem file stays there: the
+  new file names it in its notes as shared.
+- **Lists the file** in `functions.md`'s "So far" list.
+- **Adds leads** to `docs/loops/leads.md` (format there): functions that
+  look like another subsystem, not already in a function file or in
+  `leads.md`.
+- **Runs** `check_function_statuses.py` (no errors) and `b7_status.py`.
+- **Commits** (only its own files, by path; the staged diff checked for
+  `/home/`) and pushes `b7-loop`.
 
-1. **Read the state.** This file, `docs/loops/b7-progress.md`, `git status`
-   and `git log -5`. On the wrong branch, or with uncommitted changes the
-   loop didn't make: stop (the user may be editing).
-2. **Collect reports** from agents that finished since the last pass
-   (their notifications). Apply "When to halt" below to each.
-3. **Plan.** Run `b7_groups.py <roots>` and `b7_status.py`. The queue:
-   groups surveyed (a file in `docs/loops/surveys/`) and not yet ported,
-   then ready groups not yet surveyed.
-4. **Hand out work** (the Agent tool; agents run in the background and
-   notify when done):
-   - **Porting:** if no porting agent is running and a surveyed group is
-     queued, start one for the next surveyed group. One at a time: it
-     edits, builds and runs the game in this tree.
-   - **Surveys:** keep up to three surveyed groups ahead of the porting
-     agent: start a survey agent for each ready group not yet surveyed,
-     up to three running at once. They only read, so they can run beside
-     the porting agent.
-5. **Record.** Update the progress file (below); commit and push it.
-6. **Next pass.** Count the pass; at the session's limit, end the loop
-   (say so in the progress file). Otherwise schedule the next pass: when
-   agents are running, their notifications wake the loop, so a long
-   fallback (about 30 minutes); when nothing runs and there's work, about
-   a minute.
-
-## The survey agent (read-only)
-
-Prompt it with: the group (its root, members, unseen callees, indirect
-calls and imports, from `b7_groups.py`), this file's "Groups" and
-"Rules that still hold", and the report format below. It reads:
-
-- each member in `generated/` (`grep -n "DEFINE_REX_FUNC(sub_X)"
-  itc_recomp/generated/default/*.cpp`), its rows in `docs/functions/`, and
-  the docs they point to;
-- its callers (`grep -ln "lr = 0xXXXXXXXX;"`) and how often it runs, where
-  known.
-
-It writes `docs/loops/surveys/<root>.md`, its only file: what each member
-does (arguments, return value, guest memory read and written), its
-callers, the native shape proposed (the plain C++ function's signature,
-where it goes in `src/`, the adapter, the flag's name), the decision for
-each unseen callee and indirect call, harness cases worth having (branches,
-edge cases, real inputs), and risks (float rounding, big-endian layout,
-order of side effects). It doesn't build, run the game, or change anything
-else. Report, in its last message:
+Report, in its last message:
 
 ```
-survey: <root>
-file: docs/loops/surveys/<root>.md
-ready: yes | no (why)
-size: <functions>, <lines>
+map: <name>
+file: docs/functions/<name>.md
+functions: <rows> (<moved from functions.md>, <new>)
+ready groups: <count>, roots: <the ready groups' roots>
+blocked by: <blockers outside the subsystem> | none
+leads added: <count>
+commit: <hash>
 stop: none | <reason the user must decide>
 ```
 
-## The porting agent (one at a time)
+## Checking a map (the lead)
 
-Prompt it with: the survey file, this file's "Rules that still hold" and
-"When to halt", and the report format below. It:
+Before any migration, the lead checks, and halts on any failure:
 
-1. Checks `grep -rn sub_XXXXXXXX itc_recomp/src` for each member (one
-   override per function).
-2. Makes the group native as the survey proposes ("How a native override
-   is written and checked" in `docs/rexglue-removal.md`): plain C++ in the
-   subsystem's directory, thin `REX_FUNC` adapters, a `--native_<name>`
-   flag falling back to `__imp__sub_XXXXXXXX`, on by default once checked.
-   Never edits `generated/`.
-3. Adds harness cases in the same change ("Checking with a harness"),
-   registered in `harness.cpp` and the flag's help text.
-4. Checks:
-   - `cmake --build itc_recomp/out/build/linux-amd64-release -j$(nproc)`
-   - `itc_recomp/tools/attract_race.sh 25 --run_harnesses=all`: no new
-     error lines, ~20 seconds at 30 ticks/s, every harness at 0 differing
-     (outside "(expected to differ)" groups). A stalled boot is restarted
-     once.
-   - If the group runs in the race, a temporary counter override to show
-     it was called, removed before committing.
-   - For anything drawn, a frame dump (`--native_renderer_dump=<dir>`)
-     against one with the fallback flag.
-   - For the performance leads, `ITC_THREAD=main
-     itc_recomp/tools/profile_render_thread.sh`, two runs each way,
-     alternating.
-5. Records: the rows in `docs/functions/` (one function a row; Status by
-   the definitions at the top of the file), then
-   `itc_recomp/tools/check_function_statuses.py`; what was learned in the
-   subsystem's doc; deletes the survey file (what it knew is now in the
-   rows and docs).
-6. Commits (only its own files, by path; the staged diff checked for
-   `/home/`) and pushes the branch.
+- `check_function_statuses.py`: 0 errors.
+- `b7_status.py`: the new file shows in its table; every function in the
+  file is in play.
+- The report's `stop:` is `none`, and nothing in the file needs a
+  decision only the user can make: the guest heap (native code that
+  allocates guest memory needs a way to do it without `ctx`), a kernel
+  import replaced, behavior changed on purpose, a new dependency.
+- At least one ready group (`b7_groups.py` on the file's functions). With
+  none, the subsystem waits on its blockers: the lead adds them to
+  `leads.md` if they aren't there and takes the next lead instead.
 
-On a failure it doesn't fix by guessing: it adds logging, runs, reads the
-log; if that doesn't settle it, it leaves the work uncommitted, says so,
-and reports. Report, in its last message:
+## The migration agent
+
+Prompt it with: the function file, this file's "The migration agent",
+"The tooling", "Rules that still hold" and "When to halt", and the report
+format. One at a time: it edits, builds and runs the game in this tree.
+Group by group, ready groups first (`b7_groups.py` on the file's
+functions; run again after each group, as callers become ready):
+
+1. Checks `grep -rn sub_X itc_recomp/src` for each member (one override
+   per function).
+2. Makes the group native ("How a native override is written and
+   checked" in `docs/rexglue-removal.md`): plain C++ in the subsystem's
+   directory under `src/`, thin `REX_FUNC` adapters, a `--native_<name>`
+   flag falling back to `__imp__sub_X`, on by default once checked. Never
+   edits `generated/`. A callee that never ran in play: its branch keeps
+   the recompiled path behind the flag, or is ported too, said in the row.
+3. Adds harness cases in the same change, registered in `harness.cpp` and
+   the flag's help text.
+4. Builds (`cmake --build itc_recomp/out/build/linux-amd64-release
+   -j$(nproc)`) and runs `attract_race.sh 25 --run_harnesses=all`: no new
+   error lines, ~20 seconds at 30 ticks/s, every harness at 0 differing
+   (outside "(expected to differ)" groups); a stalled boot restarted once.
+   If the group runs in the race, a temporary counter override shows it
+   was called (removed before committing). For anything drawn, a frame
+   dump against one with the fallback flag. For main-thread code, a
+   profile, two runs each way, alternating.
+5. On a failure: logging, a run, the log read; no fixes by guessing. If
+   that doesn't settle it, it leaves the group uncommitted, says so, and
+   reports.
+6. Records: the rows (Status by the definitions at the top), then
+   `check_function_statuses.py`; what was learned in the subsystem's doc.
+7. Commits each group (only its own files, by path; the staged diff
+   checked for `/home/`) and pushes `b7-loop`.
+
+It stops when nothing ready is left in the subsystem, after about five
+groups (the lead starts another), or at a failure. Report, in its last
+message:
 
 ```
-port: <root>
-commit: <hash> | none
+migrate: <name>
+groups: <root -> commit, one a line>
 harnesses: <each "harness: <function>: N cases, M differ" line, verbatim>
 race: <seconds at 30 ticks/s>, <error lines>
 profile: <before -> after cycles a frame> | not run
-rows: <functions whose rows were added or changed>
-flag: --native_<name>
+rows: <functions whose rows changed>
+flags: <the --native_ flags added>
+left: <ready groups left> | none; blocked by: <blockers> | none
+uncommitted: none | <what and why>
 stop: none | <reason>
 ```
 
 ## When to halt
 
 The lead ends the loop, and writes why under "Stopped" in the progress
-file, when a report shows:
+file, when:
 
-- any harness differing (outside "(expected to differ)"), or a harness
-  missing for a function made native;
-- an attract race that failed, stalled twice, logged new errors, or ran
-  under ~20 seconds at 30 ticks/s;
-- a porting agent that left work uncommitted, or a commit that doesn't
-  build;
-- `stop:` anything but `none` (from either agent);
-- a profile slower than before, beyond the runs' spread.
-
-And also when: nothing under the roots is ready, the groups in all are
-done, a group needs the heap or a kernel import replaced, or the tree has
-changes the loop didn't make. Agents still running when the loop halts
-are left to finish; their work isn't merged or built on until the user
-has looked.
+- a harness differs (outside "(expected to differ)"), or a function made
+  native has no harness cases;
+- an attract race failed, stalled twice, logged new errors, or ran under
+  ~20 seconds at 30 ticks/s;
+- an agent left work uncommitted, or a commit doesn't build;
+- a report's `stop:` isn't `none`;
+- a profile is slower than before, beyond the runs' spread;
+- a map fails its check, or `leads.md` has nothing the loop can take;
+- the session's or the total limit is reached;
+- the tree has changes the loop didn't make, or isn't on `b7-loop`.
 
 ## Rules that still hold
 
@@ -221,13 +236,13 @@ the user's desktop; find problems with logs, not guesses.
 `docs/loops/b7-progress.md`, made by the first pass. Kept short, so a pass
 can read it whole:
 
-- **Now:** the branch, the pass count this session, the agents running
-  (which groups), the queue.
-- **Done:** one line a group (root, functions, flag, commit), newest first.
-- **Rows to review:** the functions whose rows were added or changed, for
-  the user.
-- **Totals:** `b7_status.py`'s totals line after each group.
+- **Now:** the subsystem, the step, the agent running, this session's
+  pass and subsystem counts.
+- **Done:** one line a subsystem (file, groups made native, flags,
+  commits), newest first.
+- **Rows to review:** the function files added or changed, for the user.
+- **Totals:** `b7_status.py`'s totals line after each step.
 - **Stopped:** when and why, if the loop ended itself.
 
-Details go in commits, the function rows and the subsystem's doc, not
+Details go in commits, the function files and the subsystem's doc, not
 here.
