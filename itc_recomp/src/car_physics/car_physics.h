@@ -322,4 +322,38 @@ void WheelCopy(uint8_t* base, uint32_t out, uint32_t wheel);
 // words +96 to +116 of a 120-byte record (wheel record 2).
 void WheelRecord2Copy(uint8_t* base, uint32_t out, uint32_t record);
 
+// Vehicle::Reset (sub_820B0EE8): the vehicle's physics state to its
+// defaults (no allocation; the fields in its row), the wheels' quaternions
+// +48 by Quaternion::FromAxisAngle (its scratch below `frame`), +3248 and
+// +3312 the identity (built at `frame` + 80, the original's 240 bytes).
+// `f1` gets what the original leaves there (the last FromAxisAngle's).
+void VehicleReset(uint8_t* base, uint32_t vehicle, uint32_t frame, double* f1);
+// Vehicle::SetUpGearing (sub_820B4AA8): the driven wheels' radius +2332
+// and the axle's +2336 by the drive type, +2328, Vehicle::SetGearValues,
+// the shift-up speeds +2632 + 4 x gear (Vehicle::EngineTorque, passing
+// `frame`, the original's 176 bytes), +2300, +2296 and +2292 (the torque
+// curve's peak; its index through `frame` + 80).
+void VehicleSetUpGearing(uint8_t* base, uint32_t vehicle, uint32_t frame);
+// Vehicle::SetSteering (sub_820B3D10): byte +276 = 1, +280 = the input
+// clamped to [-1, 1], +3108 from the steering's sine ratio and the front
+// wheels. Returns what the original leaves in f1 (the second sin's).
+double VehicleSetSteering(uint8_t* base, uint32_t vehicle, double steer);
+// sub_820B0668 (the name ours: SteerRecord::Fill): the 36-byte record at
+// `out` (vehicle +2988) from the front axle data `record` and f1, f2, f3.
+void SteerRecordFill(uint8_t* base, uint32_t out, uint32_t record, double f1, double f2,
+                     double f3);
+// sub_820B3E98 (the name ours: SteerRecord::Curve): the curve of the
+// record at +2988 for an angle (tan of it, then a polynomial). False, with
+// nothing done, where tan would take its _except1 path (an infinite or NaN
+// angle, never in play): then the original runs.
+bool SteerRecordCurve(uint8_t* base, uint32_t record, double angle, double* result);
+// Vehicle::SteerTowards (sub_820B5FD8): byte +276 = 1; +280 moved toward
+// the target (-1 or 1 with the bytes `left`, `right`) by a rate from dt and
+// the speed, clamped to [-1, 1]; the record +2988 (SteerRecord::Fill) and
+// +3108 (SteerRecord::Curve of the front wheels' mean slip). False, with
+// nothing done, where the curve's tan would fail: then the original runs.
+// `f1` gets what the original leaves there (the curve).
+bool VehicleSteerTowards(uint8_t* base, uint32_t vehicle, double target, double dt, double f3,
+                         uint32_t left, uint32_t right, double* f1);
+
 }  // namespace car_physics

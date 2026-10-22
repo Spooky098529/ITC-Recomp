@@ -13,7 +13,9 @@ ITC_FLAG_BOOL(native_car_physics, true, "ITC",
               "Run the car physics (docs/functions/car-physics.md: the rigid body, sub_820B6A38 "
               "to sub_820B7928; the vehicle's physics step's helpers, updates and controls, "
               "sub_820AFAE8 to sub_820B6430; the vehicle's state from its body and its "
-              "copies, sub_820B13C8, sub_820B0A50, sub_820B0CC0) natively instead of through the translated "
+              "copies, sub_820B13C8, sub_820B0A50, sub_820B0CC0; its reset, gearing and "
+              "steering, sub_820B0EE8, sub_820B4AA8, sub_820B3D10, sub_820B5FD8 with "
+              "sub_820B0668 and sub_820B3E98) natively instead of through the translated "
               "code (the same words, bit for bit; checked by --run_harnesses=car_physics)");
 
 // Defines an adapter: `body` uses `ctx` and `base`. Flush-to-zero off for
@@ -226,3 +228,57 @@ ITC_CAR_PHYSICS(820B13C8,
 // r3 = out, r4 = the record; r3 comes back as out.
 ITC_CAR_PHYSICS(820B0A50, WheelCopy(base, ctx.r3.u32, ctx.r4.u32))
 ITC_CAR_PHYSICS(820B0CC0, WheelRecord2Copy(base, ctx.r3.u32, ctx.r4.u32))
+
+// f1 comes back as the last Quaternion::FromAxisAngle's, r3 as +3312
+// (memcpy's).
+extern "C" REX_FUNC(sub_820B0EE8) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_car_physics)) {
+    __imp__sub_820B0EE8(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  double f1 = 0.0;
+  VehicleReset(base, ctx.r3.u32, ctx.r1.u32 - 240, &f1);
+  ctx.f1.f64 = f1;
+  ctx.r3.u64 = ctx.r3.u32 + 3312;
+}
+ITC_CAR_PHYSICS(820B4AA8, VehicleSetUpGearing(base, ctx.r3.u32, ctx.r1.u32 - 176))
+// f1 = the input; f1 comes back as the second sin's.
+ITC_CAR_PHYSICS(820B3D10, ctx.f1.f64 = VehicleSetSteering(base, ctx.r3.u32, ctx.f1.f64))
+// r3 = out, r7 = the record, f1, f2, f3.
+ITC_CAR_PHYSICS(820B0668, SteerRecordFill(base, ctx.r3.u32, ctx.r7.u32, ctx.f1.f64, ctx.f2.f64,
+                                          ctx.f3.f64))
+// f1 = the angle; f1 comes back as the curve. Where tan would fail, the
+// original. r3 isn't kept (tan's _ctrlfp leaves it; its callers set it again).
+extern "C" REX_FUNC(sub_820B3E98) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_car_physics)) {
+    __imp__sub_820B3E98(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  double f1 = 0.0;
+  if (!SteerRecordCurve(base, ctx.r3.u32, ctx.f1.f64, &f1)) {
+    __imp__sub_820B3E98(ctx, base);
+    return;
+  }
+  ctx.f1.f64 = f1;
+}
+// f1 = the target, f2 = dt, f3, r4 and r5 = the bytes; f1 comes back as the
+// curve. Where tan would fail, the original. r3 isn't kept (as above).
+extern "C" REX_FUNC(sub_820B5FD8) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_car_physics)) {
+    __imp__sub_820B5FD8(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  double f1 = 0.0;
+  if (!VehicleSteerTowards(base, ctx.r3.u32, ctx.f1.f64, ctx.f2.f64, ctx.f3.f64, ctx.r4.u32,
+                           ctx.r5.u32, &f1)) {
+    __imp__sub_820B5FD8(ctx, base);
+    return;
+  }
+  ctx.f1.f64 = f1;
+}
