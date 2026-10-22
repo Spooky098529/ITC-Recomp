@@ -122,3 +122,107 @@ int32_t RacerId(uint8_t* base, uint32_t view) {
 }
 
 }  // namespace race_overlays
+
+namespace race_overlays {
+
+namespace {
+
+// lfs then stfs of one word: the bits as they are (the translated code's
+// float to double and back folds away, signaling NaNs included).
+void CopyFloat(uint8_t* base, uint32_t from, uint32_t to) {
+  guest::StoreU32(base, to, guest::LoadU32(base, from));
+}
+
+void CopyVector(uint8_t* base, uint32_t from, uint32_t to) {
+  for (uint32_t i = 0; i < 16; i += 4) {
+    CopyFloat(base, from + i, to + i);
+  }
+}
+
+// The addresses of `count` consecutive words from `table`, stored from `to`.
+void StoreEntries(uint8_t* base, uint32_t to, uint32_t table, uint32_t count) {
+  for (uint32_t i = 0; i < count; i++) {
+    guest::StoreU32(base, to + 4 * i, table + 4 * i);
+  }
+}
+
+}  // namespace
+
+void SmokeSetVelocity(uint8_t* base, uint32_t smoke, uint32_t vector) {
+  ITC_NATIVE_RUNNING("sub_8212A840 Smoke::SetVelocity");
+  CopyVector(base, vector, smoke + 32544);
+}
+
+void SmokeSetRegion(uint8_t* base, uint32_t smoke, uint32_t a, uint32_t b, uint32_t mode) {
+  ITC_NATIVE_RUNNING("sub_8212A998 Smoke::SetRegion");
+  CopyVector(base, a, smoke + 32608);
+  CopyVector(base, b, smoke + 32592);
+  guest::StoreU32(base, smoke + 32624, mode);
+}
+
+void ParticlesBSetPosition(uint8_t* base, uint32_t effect, uint32_t position) {
+  ITC_NATIVE_RUNNING("sub_8212BA70 ParticlesB::SetPosition");
+  CopyVector(base, position, effect + 2784);
+}
+
+void ParticlesCSetPosition(uint8_t* base, uint32_t effect, uint32_t position, double speed) {
+  ITC_NATIVE_RUNNING("sub_8212C6A8 ParticlesC::SetPosition");
+  CopyVector(base, position, effect + 2672);
+  guest::StoreFloat(base, effect + 2704, float(speed));
+}
+
+void SparksSetPosition(uint8_t* base, uint32_t sparks, uint32_t position) {
+  ITC_NATIVE_RUNNING("sub_8212DF90 Sparks::SetPosition");
+  CopyVector(base, position, sparks + 28960);
+}
+
+void TrailSetLastPosition(uint8_t* base, uint32_t trail, uint32_t position) {
+  ITC_NATIVE_RUNNING("sub_821299D8 Trail::SetLastPosition");
+  CopyVector(base, position, trail + 64144);
+}
+
+void MarkerSetCameraPosition(uint8_t* base, uint32_t marker, uint32_t position) {
+  ITC_NATIVE_RUNNING("sub_8212CE18 Marker::SetCameraPosition");
+  CopyVector(base, position, marker + 272);
+}
+
+void LightSpriteSetPosition(uint8_t* base, uint32_t sprite, uint32_t position) {
+  ITC_NATIVE_RUNNING("sub_8211EBE0 LightSprite::SetPosition");
+  if (guest::LoadU32(base, sprite + 240) == 0) {
+    return;
+  }
+  CopyVector(base, position, sprite + 192);
+}
+
+void ModelSpritePlaceHidden(uint8_t* base, uint32_t sprite, uint32_t position) {
+  ITC_NATIVE_RUNNING("sub_82121560 ModelSprite::PlaceHidden");
+  CopyVector(base, position, sprite + 272);
+  guest::StoreU32(base, sprite + 336, 0);
+}
+
+void SetTextures104(uint8_t* base, uint32_t overlay, uint32_t value) {
+  ITC_NATIVE_RUNNING("sub_8212C0E0 Overlay::SetTextures104");
+  guest::StoreU32(base, overlay + 104, value);
+}
+
+void SetTextures108(uint8_t* base, uint32_t overlay, uint32_t value) {
+  ITC_NATIVE_RUNNING("sub_8212D6D8 Overlay::SetTextures108");
+  guest::StoreU32(base, overlay + 108, value);
+}
+
+void MarkerSetTextures(uint8_t* base, uint32_t marker, uint32_t table) {
+  ITC_NATIVE_RUNNING("sub_8212CC10 Marker::SetTextures");
+  StoreEntries(base, marker + 104, table, 4);
+}
+
+void LightSpriteSetTextures(uint8_t* base, uint32_t sprite, uint32_t table) {
+  ITC_NATIVE_RUNNING("sub_8211E9C8 LightSprite::SetTextures");
+  StoreEntries(base, sprite + 104, table, 9);
+}
+
+void ModelSpriteSetTextures(uint8_t* base, uint32_t sprite, uint32_t table) {
+  ITC_NATIVE_RUNNING("sub_8211F408 ModelSprite::SetTextures");
+  StoreEntries(base, sprite + 108, table, 25);
+}
+
+}  // namespace race_overlays

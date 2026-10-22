@@ -65,3 +65,47 @@ uint32_t RacerFlags(uint8_t* base, uint32_t view);
 int32_t RacerId(uint8_t* base, uint32_t view);
 
 }  // namespace race_overlays
+
+namespace race_overlays {
+
+// --- The child overlays' setters ---
+//
+// Each copies a 16-byte vector word by word (the original's lfs then stfs:
+// the translated code keeps the bits, signaling NaNs included).
+
+// Smoke::SetVelocity (sub_8212A840): `vector` to the smoke's +32,544.
+void SmokeSetVelocity(uint8_t* base, uint32_t smoke, uint32_t vector);
+// Smoke::SetRegion (sub_8212A998): `a` to +32,608, `b` to +32,592, the view
+// mode to +32,624.
+void SmokeSetRegion(uint8_t* base, uint32_t smoke, uint32_t a, uint32_t b, uint32_t mode);
+// ParticlesB::SetPosition (sub_8212BA70): `position` to +2,784.
+void ParticlesBSetPosition(uint8_t* base, uint32_t effect, uint32_t position);
+// ParticlesC::SetPosition (sub_8212C6A8): `position` to +2,672 and `speed`
+// (rounded to single) to +2,704.
+void ParticlesCSetPosition(uint8_t* base, uint32_t effect, uint32_t position, double speed);
+// Sparks::SetPosition (sub_8212DF90): `position` to +28,960.
+void SparksSetPosition(uint8_t* base, uint32_t sparks, uint32_t position);
+// Trail::SetLastPosition (sub_821299D8): `position` to +64,144.
+void TrailSetLastPosition(uint8_t* base, uint32_t trail, uint32_t position);
+// Marker::SetCameraPosition (sub_8212CE18): `position` to +272.
+void MarkerSetCameraPosition(uint8_t* base, uint32_t marker, uint32_t position);
+// LightSprite::SetPosition (sub_8211EBE0): when shown (+240), `position` to
+// the sprite's position (+192).
+void LightSpriteSetPosition(uint8_t* base, uint32_t sprite, uint32_t position);
+// ModelSprite::PlaceHidden (sub_82121560): `position` to +272, +336 = 0.
+void ModelSpritePlaceHidden(uint8_t* base, uint32_t sprite, uint32_t position);
+
+// Overlay::SetTextures104 (sub_8212C0E0) and SetTextures108 (sub_8212D6D8):
+// `value` to the overlay's +104 or +108.
+void SetTextures104(uint8_t* base, uint32_t overlay, uint32_t value);
+void SetTextures108(uint8_t* base, uint32_t overlay, uint32_t value);
+
+// Marker::SetTextures (sub_8212CC10, 4 at +104), LightSprite::SetTextures
+// (sub_8211E9C8, 9 at +104), ModelSprite::SetTextures (sub_8211F408, 25 at
+// +108): the addresses of consecutive words from `table` (the texture
+// table's entries, not their contents).
+void MarkerSetTextures(uint8_t* base, uint32_t marker, uint32_t table);
+void LightSpriteSetTextures(uint8_t* base, uint32_t sprite, uint32_t table);
+void ModelSpriteSetTextures(uint8_t* base, uint32_t sprite, uint32_t table);
+
+}  // namespace race_overlays

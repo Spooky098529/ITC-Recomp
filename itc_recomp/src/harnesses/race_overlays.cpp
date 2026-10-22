@@ -16,6 +16,7 @@
 
 #include <fmt/format.h>
 
+#include <bit>
 #include <iterator>
 #include <string>
 #include <utility>
@@ -61,6 +62,58 @@ ITC_NATIVE_WORD(NativeRacerFlags, ro::RacerFlags(base, ctx.r3.u32))
 
 void NativeRacerId(PPCContext& ctx, uint8_t* base) {
   ctx.r3.s64 = ro::RacerId(base, ctx.r3.u32);
+}
+
+void NativeSmokeSetVelocity(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ro::SmokeSetVelocity(base, ctx.r3.u32, ctx.r4.u32);
+}
+void NativeSmokeSetRegion(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ro::SmokeSetRegion(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32);
+}
+void NativeParticlesBSetPosition(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ro::ParticlesBSetPosition(base, ctx.r3.u32, ctx.r4.u32);
+}
+void NativeParticlesCSetPosition(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ro::ParticlesCSetPosition(base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64);
+}
+void NativeSparksSetPosition(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ro::SparksSetPosition(base, ctx.r3.u32, ctx.r4.u32);
+}
+void NativeTrailSetLastPosition(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ro::TrailSetLastPosition(base, ctx.r3.u32, ctx.r4.u32);
+}
+void NativeMarkerSetCameraPosition(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ro::MarkerSetCameraPosition(base, ctx.r3.u32, ctx.r4.u32);
+}
+void NativeLightSpriteSetPosition(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ro::LightSpriteSetPosition(base, ctx.r3.u32, ctx.r4.u32);
+}
+void NativeModelSpritePlaceHidden(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ro::ModelSpritePlaceHidden(base, ctx.r3.u32, ctx.r4.u32);
+}
+void NativeSetTextures104(PPCContext& ctx, uint8_t* base) {
+  ro::SetTextures104(base, ctx.r3.u32, ctx.r4.u32);
+}
+void NativeSetTextures108(PPCContext& ctx, uint8_t* base) {
+  ro::SetTextures108(base, ctx.r3.u32, ctx.r4.u32);
+}
+void NativeMarkerSetTextures(PPCContext& ctx, uint8_t* base) {
+  ro::MarkerSetTextures(base, ctx.r3.u32, ctx.r4.u32);
+}
+void NativeLightSpriteSetTextures(PPCContext& ctx, uint8_t* base) {
+  ro::LightSpriteSetTextures(base, ctx.r3.u32, ctx.r4.u32);
+}
+void NativeModelSpriteSetTextures(PPCContext& ctx, uint8_t* base) {
+  ro::ModelSpriteSetTextures(base, ctx.r3.u32, ctx.r4.u32);
 }
 
 // Runs the recompiled version with --native_race_overlays off, so the
@@ -282,6 +335,91 @@ void AccessorCases(Context& h, uint32_t block) {
   }
 }
 
+// The setters: an object of random words (the shown flags among them 0 or
+// not), vectors from elsewhere or overlapping the destination, and random
+// r5, r6 and f1.
+void SetterCases(Context& h, uint32_t block) {
+  Random& r = h.random;
+  struct Function {
+    const char* name;
+    GuestFunction recompiled, native;
+    uint32_t bytes;      // the object's
+    uint32_t to;         // where the vector goes (for overlapping sources)
+    uint32_t flag;       // a word the cases set to 0 or not (0: none)
+  };
+  const Function setters[] = {
+      {"Smoke::SetVelocity (sub_8212A840)", __imp__sub_8212A840, NativeSmokeSetVelocity, 32640,
+       32544, 0},
+      {"Smoke::SetRegion (sub_8212A998)", __imp__sub_8212A998, NativeSmokeSetRegion, 32640, 32608,
+       0},
+      {"ParticlesB::SetPosition (sub_8212BA70)", __imp__sub_8212BA70, NativeParticlesBSetPosition,
+       2816, 2784, 0},
+      {"ParticlesC::SetPosition (sub_8212C6A8)", __imp__sub_8212C6A8, NativeParticlesCSetPosition,
+       2720, 2672, 0},
+      {"Sparks::SetPosition (sub_8212DF90)", __imp__sub_8212DF90, NativeSparksSetPosition, 29824,
+       28960, 0},
+      {"Trail::SetLastPosition (sub_821299D8)", __imp__sub_821299D8, NativeTrailSetLastPosition,
+       64160, 64144, 0},
+      {"Marker::SetCameraPosition (sub_8212CE18)", __imp__sub_8212CE18,
+       NativeMarkerSetCameraPosition, 304, 272, 0},
+      {"LightSprite::SetPosition (sub_8211EBE0)", __imp__sub_8211EBE0,
+       NativeLightSpriteSetPosition, 288, 192, 240},
+      {"ModelSprite::PlaceHidden (sub_82121560)", __imp__sub_82121560,
+       NativeModelSpritePlaceHidden, 576, 272, 0},
+      {"Overlay::SetTextures104 (sub_8212C0E0)", __imp__sub_8212C0E0, NativeSetTextures104, 304,
+       104, 0},
+      {"Overlay::SetTextures108 (sub_8212D6D8)", __imp__sub_8212D6D8, NativeSetTextures108, 304,
+       108, 0},
+      {"Marker::SetTextures (sub_8212CC10)", __imp__sub_8212CC10, NativeMarkerSetTextures, 304, 104,
+       0},
+      {"LightSprite::SetTextures (sub_8211E9C8)", __imp__sub_8211E9C8,
+       NativeLightSpriteSetTextures, 288, 104, 0},
+      {"ModelSprite::SetTextures (sub_8211F408)", __imp__sub_8211F408,
+       NativeModelSpriteSetTextures, 576, 108, 0},
+  };
+  const uint32_t object = block + 0x100;
+  const uint32_t source = block + 0x10200;  // past the largest object
+  for (const Function& f : setters) {
+    Results results(f.name);
+    for (int i = 0; i < 40; i++) {
+      const uint64_t seed = r.Next();
+      const uint32_t kind = r.Below(4);
+      // A vector elsewhere, the second one 16 bytes on; or overlapping the
+      // destination by a few words either way.
+      uint32_t from = source + 4 * r.Below(8);
+      if (kind == 3) {
+        from = object + f.to + 4 * r.Below(7) - 12;
+      }
+      const uint32_t r5 = kind == 2 ? object + f.to - 16 + 4 * r.Below(8) : from + 16;
+      const uint32_t r6 = uint32_t(r.Next());
+      const double f1 = r.Below(4) == 0 ? std::bit_cast<double>(r.Next())
+                                         : double(std::bit_cast<float>(RandomWord(r)));
+      const uint32_t flag = r.Below(2) ? 0 : RandomWord(r);
+      Compare(h, results, {{object, f.bytes}, {source, 64}},
+              [&, seed] {
+                Random fill;
+                for (uint64_t n = 0; n < seed % 17; n++) {
+                  fill.Next();
+                }
+                FillRandom(h.base, fill, object, (f.bytes + 3) & ~3u);
+                FillRandom(h.base, fill, source, 64);
+                if (f.flag) {
+                  guest::StoreU32(h.base, object + f.flag, flag);
+                }
+              },
+              [&](PPCContext& t) {
+                t.r3.u64 = object;
+                t.r4.u64 = from;
+                t.r5.u64 = r5;
+                t.r6.u64 = r6;
+                t.f1.f64 = f1;
+              },
+              f.recompiled, f.native, fmt::format("case {} kind {}", i, kind));
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void RaceOverlays(Context& h) {
@@ -292,6 +430,7 @@ void RaceOverlays(Context& h) {
     return;
   }
   AccessorCases(h, block);
+  SetterCases(h, block);
   memory->SystemHeapFree(block);
 }
 
