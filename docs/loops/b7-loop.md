@@ -30,7 +30,8 @@ memory.
   after each change), and listed in the progress file for one review by
   the user before the merge. This relaxes the "show rows and ask first"
   rule for the loop's branch, nowhere else.
-- **Per session:** 3 subsystems or 10 passes, whichever comes first. Then
+- **Per session:** 5 subsystems or 20 passes, whichever comes first
+  (raised from 3 and 10 by the user, 2026-10-22). Then
   the loop ends itself; the user runs `/clear` and starts it again
   (nothing is lost: it picks up from the progress file).
 - **In all:** 5 subsystems, then the loop stops for the user's review.

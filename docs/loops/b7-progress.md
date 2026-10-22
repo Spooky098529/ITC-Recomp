@@ -12,7 +12,7 @@ commits, the function files and the subsystems' docs.
   groups; `CommandList::Init` waits on the C runtime heap (a lead that
   needs the user's decision on guest allocation).
 - Step: migration (agent running).
-- Session: pass 4 of 10, subsystem 2 of 3. In all: subsystem 2 of 5.
+- Session: pass 4 of 20, subsystem 2 of 5. In all: subsystem 2 of 5.
 
 ## Done
 
