@@ -141,3 +141,7 @@ commits, the function files and the subsystems' docs.
   write only `count`'s corners; the UI movie work wasn't seen on the HUD
   or menus in attract races (a driven race is worth a look); one agent
   ran `git checkout` over uncommitted work (rebuilt, harnesses passed).
+- 2026-10-22, after the stop: the user drove a race on 35d1724 with every
+  new `--native_*` flag on (their defaults): nothing looked broken (HUD,
+  menus, race); the log (~55 s raced at ~150 fps, 30 ticks/s) had no
+  errors.
