@@ -213,7 +213,10 @@ functions; run again after each group, as callers become ready):
    directory under `src/`, thin `REX_FUNC` adapters, a `--native_<name>`
    flag falling back to `__imp__sub_X`, on by default once checked; each
    plain C++ function starts with `ITC_NATIVE_RUNNING("sub_X Name");`
-   ("The validation agent"). Never
+   ("The validation agent"). A function whose work it does inside a
+   native caller (a few lines only that caller needs), with no plain C++
+   function of its own, gets the Merged status in its row (the caller,
+   the harness covering the work) when it's merged. Never
    edits `generated/`. A callee that never ran in play: its branch keeps
    the recompiled path behind the flag, or is ported too, said in the row.
 3. Adds harness cases in the same change, registered in `harness.cpp` and
@@ -326,7 +329,8 @@ made native, or whose adapter it removed:
 
 A function with no plain C++ of its own, because its work is done
 inside a native caller (a few lines only that caller needs), isn't a
-failure: the agent sets its row to Merged (the definitions at the top of
+failure: the migration agent should have marked it Merged; if it
+didn't, the validation agent sets its row to Merged (the definitions at the top of
 the function files: the caller and the harness that covers the work),
 reports it under `merged:` and doesn't look for its print.
 
