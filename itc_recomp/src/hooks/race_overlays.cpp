@@ -19,7 +19,8 @@ ITC_FLAG_BOOL(native_race_overlays, true, "ITC",
               "sub_8215E000; the resets, sub_8211E9F0 to sub_8212D6E0; Smoke::InRegion, "
               "sub_8212A868; Sparks::Update, sub_8212DDC8; Smoke::Update, sub_8212AA78; ParticlesB::Update, sub_8212B748; ParticlesC::Update, sub_8212C2F0; RaceOverlays::SlotOf, sub_8215E048; the children's constructors, "
               "sub_8211F060 to sub_8212E9A0, and Smoke and ParticlesB::Reset, sub_8212A9E0 and "
-              "sub_8212BA98) natively "
+              "sub_8212BA98; the view's body and wheels through the vehicle accessors, sub_821268B0 to "
+              "sub_82126FF0) natively "
               "instead of through the translated code (same results; checked by "
               "--run_harnesses=race_overlays)");
 
@@ -433,3 +434,26 @@ extern "C" REX_FUNC(sub_8212C2F0) {
 // RaceOverlays::SlotOf: r3 = an index; returns the slot (its jump table's
 // first case, sub_8215E078, is done by the plain C++).
 ITC_OVERLAY_WORD(8215E048, SlotOf(ctx.r3.u32))
+
+// The view's (r3) body and wheels, through the vehicle accessors' plain C++.
+ITC_OVERLAY_WORD(821268B0, BodyMatrix(base, ctx.r3.u32))
+ITC_OVERLAY_WORD(821268C8, WheelContact(base, ctx.r3.u32, ctx.r4.u32))
+ITC_OVERLAY_WORD(821269B0, WheelSurfaceMarks(base, ctx.r3.u32, ctx.r4.u32))
+// r3 = out, r4 = the view; returns out.
+ITC_OVERLAY_WORD(82126F80, BodyPosition(base, ctx.r3.u32, ctx.r4.u32))
+ITC_OVERLAY_WORD(82126FF0, BodyMatrixCopy(base, ctx.r3.u32, ctx.r4.u32))
+
+// OverlayView::WheelSlip: r3 = a view, r4 = a wheel, f1 = a threshold. The
+// original loads the vehicle into r3 and tail-calls Vehicle::WheelSlip, so
+// r3 comes back as the vehicle.
+extern "C" REX_FUNC(sub_82126A70) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_race_overlays)) {
+    __imp__sub_82126A70(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  const uint32_t view = ctx.r3.u32;
+  ctx.r3.u64 = guest::LoadU32(base, view + 4);
+  ctx.f1.f64 = double(WheelSlip(base, view, ctx.r4.u32, ctx.f1.f64));
+}

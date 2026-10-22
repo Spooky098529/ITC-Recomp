@@ -5,6 +5,7 @@
 #include "base/log.h"
 #include "c_runtime/math.h"
 #include "hooks/vehicle.h"
+#include "vehicle_accessors/vehicle_accessors.h"
 
 #include <rex/platform/fpscr.h>
 #include <simde/x86/sse4.1.h>
@@ -2538,6 +2539,78 @@ namespace race_overlays {
 uint32_t SlotOf(uint32_t index) {
   ITC_NATIVE_RUNNING("sub_8215E048 RaceOverlays::SlotOf");
   return index <= 24 ? index : 0;
+}
+
+}  // namespace race_overlays
+
+namespace race_overlays {
+
+namespace va = vehicle_accessors;
+
+namespace {
+
+uint32_t Body(uint8_t* base, uint32_t view) {
+  return guest::LoadU32(base, guest::LoadU32(base, view + 4) + 336);
+}
+
+}  // namespace
+
+uint32_t BodyMatrix(uint8_t* base, uint32_t view) {
+  ITC_NATIVE_RUNNING("sub_821268B0 OverlayView::BodyMatrix");
+  return va::RigidBodyMatrix(Body(base, view));
+}
+
+uint32_t WheelContact(uint8_t* base, uint32_t view, uint32_t wheel) {
+  ITC_NATIVE_RUNNING("sub_821268C8 OverlayView::WheelContact");
+  return va::VehicleWheelContact(guest::LoadU32(base, view + 4), wheel) + 16;
+}
+
+uint32_t WheelSurfaceMarks(uint8_t* base, uint32_t view, uint32_t wheel) {
+  ITC_NATIVE_RUNNING("sub_821269B0 OverlayView::WheelSurfaceMarks");
+  const uint32_t record = va::VehicleWheelContact(guest::LoadU32(base, view + 4), wheel);
+  // lha, then cmplwi: a negative surface compares as a large one.
+  const uint32_t surface = uint32_t(int32_t(int16_t(guest::LoadU16(base, record + 80))));
+  if (surface == 0) {
+    return 1;
+  }
+  return (surface <= 2 || surface == 8) ? 0 : 1;
+}
+
+float WheelSlip(uint8_t* base, uint32_t view, uint32_t wheel, double threshold) {
+  ITC_NATIVE_RUNNING("sub_82126A70 OverlayView::WheelSlip");
+  return va::VehicleWheelSlip(base, guest::LoadU32(base, view + 4), wheel, threshold);
+}
+
+uint32_t BodyPosition(uint8_t* base, uint32_t out, uint32_t view) {
+  ITC_NATIVE_RUNNING("sub_82126F80 OverlayView::BodyPosition");
+  const uint32_t from = va::RigidBodyPosition(Body(base, view));
+  uint32_t words[4];
+  for (uint32_t i = 0; i < 4; i++) {
+    words[i] = guest::LoadU32(base, from + 4 * i);
+  }
+  for (uint32_t i = 0; i < 4; i++) {
+    guest::StoreU32(base, out + 4 * i, words[i]);
+  }
+  return out;
+}
+
+uint32_t BodyMatrixCopy(uint8_t* base, uint32_t out, uint32_t view) {
+  ITC_NATIVE_RUNNING("sub_82126FF0 OverlayView::BodyMatrixCopy");
+  const uint32_t one = guest::LoadU32(base, kOne);
+  for (uint32_t row = 0; row < 4; row++) {
+    guest::StoreU32(base, out + 16 * row + 12, one);
+  }
+  // The original reads the matrix after those stores, into its stack, then
+  // writes it out.
+  const uint32_t from = va::RigidBodyMatrix(Body(base, view));
+  uint32_t words[16];
+  for (uint32_t i = 0; i < 16; i++) {
+    words[i] = guest::LoadU32(base, from + 4 * i);
+  }
+  for (uint32_t i = 0; i < 16; i++) {
+    guest::StoreU32(base, out + 4 * i, words[i]);
+  }
+  return out;
 }
 
 }  // namespace race_overlays

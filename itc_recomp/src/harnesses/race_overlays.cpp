@@ -25,6 +25,8 @@
 #include <vector>
 
 ITC_FLAG_DECLARE(bool, native_race_overlays);
+ITC_FLAG_DECLARE(bool, native_vehicle_accessors);
+ITC_FLAG_DECLARE(bool, native_vector_library);
 
 namespace harness {
 
@@ -381,6 +383,21 @@ void NativeEmitSmoke(PPCContext& ctx, uint8_t* base) {
   ctx.f1.f64 = last;
 }
 
+// The view's body and wheels (through the vehicle accessors' plain C++).
+ITC_NATIVE_WORD(NativeBodyMatrix, ro::BodyMatrix(base, ctx.r3.u32))
+ITC_NATIVE_WORD(NativeWheelContact, ro::WheelContact(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_WORD(NativeWheelSurfaceMarks, ro::WheelSurfaceMarks(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_WORD(NativeBodyPosition, ro::BodyPosition(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_WORD(NativeBodyMatrixCopy, ro::BodyMatrixCopy(base, ctx.r3.u32, ctx.r4.u32))
+// As the adapter: r3 comes back as the view's vehicle (not compared: with
+// the accessors off, the original leaves it a stack address).
+void NativeWheelSlip(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const uint32_t view = ctx.r3.u32;
+  ctx.r3.u64 = guest::LoadU32(base, view + 4);
+  ctx.f1.f64 = double(ro::WheelSlip(base, view, ctx.r4.u32, ctx.f1.f64));
+}
+
 // Runs the recompiled version with --native_race_overlays off, so the
 // functions it calls that are ours run the originals too.
 void RunRecompiled(GuestFunction recompiled, PPCContext& t, uint8_t* base) {
@@ -388,6 +405,20 @@ void RunRecompiled(GuestFunction recompiled, PPCContext& t, uint8_t* base) {
   ITC_FLAG(native_race_overlays) = false;
   recompiled(t, base);
   ITC_FLAG(native_race_overlays) = native;
+}
+
+// The originals of functions that call the vehicle accessors, run with
+// those (and the vector library) off too, so the whole chain is the
+// recompiled code's.
+template <GuestFunction recompiled>
+void Original(PPCContext& ctx, uint8_t* base) {
+  const bool accessors = ITC_FLAG(native_vehicle_accessors);
+  const bool vectors = ITC_FLAG(native_vector_library);
+  ITC_FLAG(native_vehicle_accessors) = false;
+  ITC_FLAG(native_vector_library) = false;
+  recompiled(ctx, base);
+  ITC_FLAG(native_vehicle_accessors) = accessors;
+  ITC_FLAG(native_vector_library) = vectors;
 }
 
 // The odd float words mixed into fields: NaNs of both kinds and signs,
@@ -414,7 +445,8 @@ using Regions = std::vector<std::pair<uint32_t, uint32_t>>;
 // bytes, r3 and f1 are compared.
 template <typename Setup, typename Args>
 void Compare(Context& h, Results& results, const Regions& regions, Setup setup, Args args,
-             GuestFunction recompiled, GuestFunction native, const std::string& what) {
+             GuestFunction recompiled, GuestFunction native, const std::string& what,
+             bool compare_r3 = true) {
   std::vector<uint8_t> result[2];
   for (int v = 0; v < 2; v++) {
     setup();
@@ -429,7 +461,7 @@ void Compare(Context& h, Results& results, const Regions& regions, Setup setup, 
       const std::vector<uint8_t> part = Read(h.base, at, bytes);
       result[v].insert(result[v].end(), part.begin(), part.end());
     }
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; compare_r3 && i < 4; i++) {
       result[v].push_back(uint8_t(t.r3.u32 >> (24 - 8 * i)));
     }
     for (int i = 0; i < 8; i++) {
@@ -2360,6 +2392,159 @@ void SlotOfCases(Context& h) {
   }
   results.Report();
 }
+
+// The view's body and wheels: a view, its vehicle, the vehicle's body
+// (+336) and wheels' data (+2160 + 4 x wheel) in the block. The originals
+// run with the vehicle accessors off too (Original).
+constexpr uint32_t kBodyView = 0x60000, kBodyVehicle = 0x61000, kBodyBody = 0x64000,
+                   kBodyWheels = 0x64800, kBodyOut = 0x65000;
+
+// Plain numbers (multiples of 1/16 from -64 to 64), or random words with odd
+// floats among them.
+uint32_t NumberOrWord(Random& r, bool odd) {
+  if (odd) {
+    return RandomWord(r);
+  }
+  return std::bit_cast<uint32_t>(float(int32_t(r.Below(2049)) - 1024) / 16.0f);
+}
+
+void ViewBodyCases(Context& h, uint32_t block) {
+  Random& r = h.random;
+  const uint32_t view = block + kBodyView;
+  const uint32_t vehicle = block + kBodyVehicle;
+  const uint32_t body = block + kBodyBody;
+  auto setup = [&h, view, vehicle, body, block](uint64_t seed, bool odd) {
+    return [&h, view, vehicle, body, block, seed, odd] {
+      Random fill;
+      for (uint64_t n = 0; n < seed % 97; n++) {
+        fill.Next();
+      }
+      for (uint32_t i = 0; i < 0x2000; i += 4) {
+        guest::StoreU32(h.base, vehicle + i, NumberOrWord(fill, odd));
+      }
+      for (uint32_t i = 0; i < 0x500; i += 4) {
+        guest::StoreU32(h.base, body + i, NumberOrWord(fill, odd));
+      }
+      for (uint32_t i = 0; i < 5 * 64; i += 4) {
+        guest::StoreU32(h.base, block + kBodyWheels + i, NumberOrWord(fill, odd));
+      }
+      FillRandom(h.base, fill, block + kBodyOut, 64);
+      guest::StoreU32(h.base, view + 4, vehicle);
+      guest::StoreU32(h.base, vehicle + 336, body);
+      for (uint32_t wheel = 0; wheel < 5; wheel++) {
+        guest::StoreU32(h.base, vehicle + 2160 + 4 * wheel, block + kBodyWheels + 64 * wheel);
+        guest::StoreU8(h.base, vehicle + 433 + 368 * wheel, fill.Below(4) == 0 ? 0 : 1);
+      }
+    };
+  };
+
+  {
+    Results results("OverlayView::BodyMatrix (sub_821268B0)");
+    for (uint64_t seed = 0; seed < 10; seed++) {
+      Compare(h, results, {}, setup(seed, seed % 2),
+              [&](PPCContext& t) { t.r3.u64 = view; }, Original<__imp__sub_821268B0>,
+              NativeBodyMatrix, fmt::format("seed {}", seed));
+    }
+    results.Report();
+  }
+  {
+    Results results("OverlayView::WheelContact (sub_821268C8)");
+    for (uint32_t wheel = 0; wheel < 6; wheel++) {
+      for (uint64_t seed = 0; seed < 4; seed++) {
+        Compare(h, results, {}, setup(seed, false),
+                [&](PPCContext& t) {
+                  t.r3.u64 = view;
+                  t.r4.u64 = wheel;
+                },
+                Original<__imp__sub_821268C8>, NativeWheelContact,
+                fmt::format("wheel {} seed {}", wheel, seed));
+      }
+    }
+    results.Report();
+  }
+  {
+    // Each surface from -2 to 12, the halfword's edges and random ones.
+    Results results("OverlayView::WheelSurfaceMarks (sub_821269B0)");
+    std::vector<uint16_t> surfaces = {0x7FFF, 0x8000, 0xFFFF, 0x0100, 0x0108};
+    for (int32_t s = -2; s <= 12; s++) {
+      surfaces.push_back(uint16_t(s));
+    }
+    for (int i = 0; i < 20; i++) {
+      surfaces.push_back(uint16_t(r.Next()));
+    }
+    for (uint32_t wheel = 0; wheel < 6; wheel++) {
+      for (uint16_t surface : surfaces) {
+        Compare(h, results, {},
+                [&, wheel, surface] {
+                  setup(wheel, true)();
+                  guest::StoreU16(h.base, vehicle + 5328 + 96 * wheel + 80, surface);
+                },
+                [&](PPCContext& t) {
+                  t.r3.u64 = view;
+                  t.r4.u64 = wheel;
+                },
+                Original<__imp__sub_821269B0>, NativeWheelSurfaceMarks,
+                fmt::format("wheel {} surface {:04X}", wheel, surface));
+      }
+    }
+    results.Report();
+  }
+  {
+    // As Vehicle::WheelSlip's cases: with NaNs among the inputs, its NaNs
+    // differ in sign and payload between builds of the same operations
+    // (vehicle-accessors.md), so those cases are kept apart.
+    Results results("OverlayView::WheelSlip (sub_82126A70)");
+    Results nan_results("OverlayView::WheelSlip (sub_82126A70), NaN inputs (expected to differ)");
+    for (uint64_t seed = 0; seed < 60; seed++) {
+      const bool odd = seed % 4 == 3;
+      for (uint32_t wheel = 0; wheel < 5; wheel++) {
+        const double f1 = seed % 2 ? double(std::bit_cast<float>(NumberOrWord(r, false)))
+                                   : double(float(r.Below(100)) / 100.0f);
+        Compare(h, odd ? nan_results : results, {}, setup(seed, odd),
+                [&](PPCContext& t) {
+                  t.r3.u64 = view;
+                  t.r4.u64 = wheel;
+                  t.f1.f64 = f1;
+                },
+                Original<__imp__sub_82126A70>, NativeWheelSlip,
+                fmt::format("seed {} wheel {} f1 {:016X}", seed, wheel,
+                            std::bit_cast<uint64_t>(f1)),
+                false);
+      }
+    }
+    results.Report();
+    nan_results.Report();
+  }
+  {
+    // Out apart from the body, or over its position or matrix.
+    const struct {
+      const char* name;
+      GuestFunction recompiled, native;
+      uint32_t bytes, field;
+    } copies[] = {
+        {"OverlayView::BodyPosition (sub_82126F80)", Original<__imp__sub_82126F80>,
+         NativeBodyPosition, 16, 208},
+        {"OverlayView::BodyMatrixCopy (sub_82126FF0)", Original<__imp__sub_82126FF0>,
+         NativeBodyMatrixCopy, 64, 288},
+    };
+    for (const auto& f : copies) {
+      Results results(f.name);
+      for (uint64_t seed = 0; seed < 30; seed++) {
+        const uint32_t kind = seed % 5;
+        const uint32_t out = kind == 3   ? body + f.field
+                             : kind == 4 ? body + f.field + 4
+                                         : block + kBodyOut;
+        Compare(h, results, {{block + kBodyOut, 64}, {body, 0x500}}, setup(seed, seed % 2),
+                [&](PPCContext& t) {
+                  t.r3.u64 = out;
+                  t.r4.u64 = view;
+                },
+                f.recompiled, f.native, fmt::format("seed {} out {:X}", seed, out));
+      }
+      results.Report();
+    }
+  }
+}
 }  // namespace
 
 void RaceOverlays(Context& h) {
@@ -2391,6 +2576,7 @@ void RaceOverlays(Context& h) {
   ParticlesBUpdateCases(h, block);
   ParticlesCUpdateCases(h, block);
   SlotOfCases(h);
+  ViewBodyCases(h, block);
   memory->SystemHeapFree(block);
 }
 

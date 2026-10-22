@@ -618,4 +618,30 @@ void SmokeReset(uint8_t* base, uint32_t smoke);
 // (ParticlesBResetEntry), the count read again each time.
 void ParticlesBReset(uint8_t* base, uint32_t particles);
 
+// --- The view's body and wheels, through the vehicle accessors ---
+//
+// These call the vehicle accessors' plain C++ (src/vehicle_accessors/)
+// directly.
+
+// OverlayView::BodyMatrix (sub_821268B0): RigidBody::Matrix of the
+// vehicle's +336, the body's 64-byte matrix.
+uint32_t BodyMatrix(uint8_t* base, uint32_t view);
+// OverlayView::WheelContact (sub_821268C8): Vehicle::WheelContact + 16 (the
+// contact point, probably).
+uint32_t WheelContact(uint8_t* base, uint32_t view, uint32_t wheel);
+// OverlayView::WheelSurfaceMarks (sub_821269B0): the contact record's
+// halfword +80, sign-extended and compared unsigned: 0 for 1, 2 and 8, else
+// 1.
+uint32_t WheelSurfaceMarks(uint8_t* base, uint32_t view, uint32_t wheel);
+// OverlayView::WheelSlip (sub_82126A70): Vehicle::WheelSlip of the view's
+// vehicle (which the original tail-calls).
+float WheelSlip(uint8_t* base, uint32_t view, uint32_t wheel, double threshold);
+// OverlayView::BodyPosition (sub_82126F80): out = the 16 bytes at
+// RigidBody::Position (bits as they are); returns out.
+uint32_t BodyPosition(uint8_t* base, uint32_t out, uint32_t view);
+// OverlayView::BodyMatrixCopy (sub_82126FF0): 1.0 stored in out's rows' w,
+// then out = the body's 64-byte matrix (which covers them again: the copy
+// is the matrix as it is, bits too); returns out.
+uint32_t BodyMatrixCopy(uint8_t* base, uint32_t out, uint32_t view);
+
 }  // namespace race_overlays
