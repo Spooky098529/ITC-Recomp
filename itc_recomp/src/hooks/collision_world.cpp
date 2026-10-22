@@ -17,10 +17,13 @@ ITC_FLAG_BOOL(native_collision_world, true, "ITC",
               "mesh's and the route's lifetime, sub_820F68E8 with sub_820F6898, sub_820F6940, "
               "sub_820F8600, sub_820F8618 (those allocating or freeing only while --native_heap "
               "routes the game's VirtualAlloc to the allocation layer), sub_820F69B0; the "
-              "mesh's lookups, sub_820F6A08) natively instead of through the translated code "
-              "(the same words, bit for bit; checked by --run_harnesses=collision_world). "
-              "Those reached only from native callers have no adapters, and the flag switches "
-              "their callers: sub_820F6898");
+              "mesh's lookups, sub_820F6A08; the ground, sub_820F7AA0 with sub_820F72F8, "
+              "sub_820F7468, sub_820F7590, sub_820F7818, sub_820F6E18, and "
+              "TrackCollision::Ground sub_820FE8F8 and GroundCallback sub_820FEAB0) natively "
+              "instead of through the translated code (the same words, bit for bit; checked by "
+              "--run_harnesses=collision_world). Those reached only from native callers have no "
+              "adapters, and the flag switches their callers: sub_820F6898, sub_820F72F8, "
+              "sub_820F7468, sub_820F7590, sub_820F7818, sub_820F6E18");
 
 // Defines an adapter: `body` uses `ctx` and `base`.
 #define ITC_COLLISION_WORLD(address, body)   \
@@ -77,3 +80,20 @@ ITC_COLLISION_WORLD(820F69B0, TrackMeshOnLoaded(base, ctx.r6.u32))
 // --- The mesh's lookups ---
 
 ITC_COLLISION_WORLD(820F6A08, ctx.r3.u64 = TrackMeshSliceKind(base, ctx.r3.u32, ctx.r4.u32))
+
+// --- The ground ---
+
+// TrackMesh::TriangleInSlice, TriangleNormal, QuadHeight, FindTriangle and
+// ColorAt (sub_820F72F8, sub_820F7468, sub_820F7590, sub_820F7818,
+// sub_820F6E18) have no adapters: their callers in play are native.
+// r4 = the point, r5 = the track position, r6 = the color, r7 = the normal.
+ITC_COLLISION_WORLD(820F7AA0, ctx.r3.u64 = TrackMeshGroundHeight(base, ctx.r3.u32, ctx.r4.u32,
+                                                                 ctx.r5.u32, ctx.r6.u32,
+                                                                 ctx.r7.u32, ctx.r1.u32 - 240))
+// r3 = the result, r4 = the point, r5 = the track position (r6 not read).
+ITC_COLLISION_WORLD(820FE8F8, ctx.r3.u64 = TrackCollisionGround(base, ctx.r3.u32, ctx.r4.u32,
+                                                                ctx.r5.u32, ctx.r1.u32 - 144))
+// The collision world's +8 (CollisionWorld::Callback).
+ITC_COLLISION_WORLD(820FEAB0,
+                    ctx.r3.u64 = TrackCollisionGroundCallback(base, ctx.r3.u32, ctx.r4.u32,
+                                                              ctx.r5.u32, ctx.r1.u32 - 96))

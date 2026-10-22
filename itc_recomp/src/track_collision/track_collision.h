@@ -62,6 +62,60 @@ void TrackMeshOnLoaded(uint8_t* base, uint32_t mesh);
 // TrackMesh::SliceKind (sub_820F6A08): the halfword +24 of the track
 // position's slice.
 uint32_t TrackMeshSliceKind(uint8_t* base, uint32_t mesh, uint32_t position);
+// --- The ground (src/track_collision/track_ground.cpp). A section (the
+// mesh file's section table, [[mesh + 4] + 4]): its halfword +0 the slice
+// count, six 6-byte links from +4 (+0 the slice they leave from, +2 the
+// section and +4 the slice they lead to; -1 for none), +64, +68, +72, +76
+// the offsets of its vertices (12 bytes: x, y, z), their colors (a
+// halfword each), its slices (28 bytes: +0 the triangle count, +2 the
+// first) and its triangles (12 bytes: halfwords +0 to +6 the vertices, +6
+// 0xFFFF for a triangle, else a quad; byte +9 the surface kind; halfword
+// +10 flags, bit 0 a quad's own height). A track position: halfwords +0
+// and +2 the section and slice. ---
+
+// TrackMesh::TriangleInSlice (sub_820F72F8): the first triangle of the
+// slice the point is inside in x and z (skipping kinds 4 and 20 when
+// `skip_kinds` is 1), its index; else -1.
+uint32_t TrackMeshTriangleInSlice(uint8_t* base, uint32_t section, uint32_t slice, uint32_t point,
+                                  uint32_t skip_kinds);
+// TrackMesh::TriangleNormal (sub_820F7468): out = the plane's normal of the
+// triangle's vertices a, b, c (which of its four), w 1.0, normalized by the
+// vector unit (the 16 bytes at out rounded down to 16), then w 1.0 again.
+void TrackMeshTriangleNormal(uint8_t* base, uint32_t out, uint32_t section, uint32_t triangle,
+                             uint32_t a, uint32_t b, uint32_t c);
+// TrackMesh::QuadHeight (sub_820F7590): out = the mean of the quad's two
+// halves' normals, normalized; returns the mean of their heights at the
+// point's x and z (f1). `frame`: the original's 208 bytes.
+double TrackMeshQuadHeight(uint8_t* base, uint32_t out, uint32_t section, uint32_t quad,
+                           uint32_t point, uint32_t frame);
+// TrackMesh::FindTriangle (sub_820F7818): the slice of the triangle under
+// the point, near the track position's cell (the section and triangle
+// written to `section_out` and `triangle_out`); else -1 (the halfword's
+// sign as the original leaves it: a slice from a position or a link
+// zero-extended, one from an offset sign-extended).
+uint32_t TrackMeshFindTriangle(uint8_t* base, uint32_t mesh, uint32_t section_out,
+                               uint32_t triangle_out, uint32_t point, uint32_t position);
+// TrackMesh::ColorAt (sub_820F6E18): the three vertices' colors (RGB555
+// halfwords) interpolated at the point into out's x, y, z (a quad's half
+// the point is on).
+void TrackMeshColorAt(uint8_t* base, uint32_t out, uint32_t point, uint32_t triangle,
+                      uint32_t vertices, uint32_t colors);
+// TrackMesh::GroundHeight (sub_820F7AA0): the point's y set to the ground's
+// height under it when within the catch distance; its surface kind, -1
+// (no triangle) or -2 (too far). `color` and `normal` 0 or outputs.
+// `frame`: the original's 240 bytes.
+uint32_t TrackMeshGroundHeight(uint8_t* base, uint32_t mesh, uint32_t point, uint32_t position,
+                               uint32_t color, uint32_t normal, uint32_t frame);
+// TrackCollision::Ground (sub_820FE8F8): the ground result (+0 the depth,
+// +16 and +32 the normal, +48 the surface bits, +52 the track position)
+// for the point. Returns 1. `frame`: the original's 144 bytes.
+uint32_t TrackCollisionGround(uint8_t* base, uint32_t result, uint32_t point, uint32_t position,
+                              uint32_t frame);
+// TrackCollision::GroundCallback (sub_820FEAB0): Ground, then +48 &=
+// 0x80FFFFFF. Returns 1. `frame`: the original's 96 bytes.
+uint32_t TrackCollisionGroundCallback(uint8_t* base, uint32_t result, uint32_t point,
+                                      uint32_t position, uint32_t frame);
+
 // TrackRoute::Prepare (sub_820F8600): +8 = 1, +0 = 0.
 void TrackRoutePrepare(uint8_t* base, uint32_t route);
 // TrackRoute::Free (sub_820F8618): +8 = 0, the file +0 freed, +0 = 0.
