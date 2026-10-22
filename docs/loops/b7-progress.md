@@ -12,7 +12,9 @@ rows to review and drive list are there), and this file's history.
   `b7-loop-2026-10-22-1439.md`.
 - Subsystem 1 of 3 (the vehicle accessors) finished. Now: the
   no-mapping lead (the race overlays' 12 functions made ready by the
-  accessors, not counted): migration (agent running).
+  accessors, not counted): migration done (7c018ef..f986921: 14 rows,
+  8 adapters removed; race 22 s, 0 errors). Step: validation (agent
+  running).
 - Known: `b7_status.py` checks `sub_825A9934` (`__chkstk`) "Dropped, but
   it ran", and every function made Native or Merged since the coverage
   session "..., but it ran" (`seen_in_play.txt` predates them; a new
@@ -29,6 +31,13 @@ rows to review and drive list are there), and this file's history.
 
 ## Rows to review
 
+- `race-overlays.md`: the no-mapping lead's 14 rows (the view's body and
+  wheel accessors, IsBehindCamera, the save flags and stage check,
+  UpdateTrails, MarkerKind; FlagsKind `sub_82122DB8` and NoSaveFlags
+  `sub_82127198` ported with MarkerKind but never ran in play, so no
+  rows) and 6 adapters removed; `vehicle-accessors.md`: `sub_820C0170`,
+  `sub_820C0180` Native. The new harnesses run the originals with the
+  accessors' flags off too (an `Original<>` wrapper).
 - `vehicle-accessors.md`: migration 1's 127 rows (2 now Native, adapters
   removed). For review: the two Wrapped rows (`sub_82593FB0`,
   `sub_820FFD88`) had their frame-state-diff wrappers moved into their
@@ -73,5 +82,7 @@ the validation agent's attract race; the user drives (with
   (wrapped 142, known 442, unknown 5747).
 - After migration 1: ours 549, work left 6204 (wrapped 140, known 317,
   unknown 5747).
+- After the race overlays' newly ready functions: ours 563, work left
+  6190 (wrapped 140, known 303, unknown 5747).
 
 ## Stopped
