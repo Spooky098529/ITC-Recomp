@@ -2479,6 +2479,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
     | 2026-10-22 | The vehicle, rigid body, collision and race data accessors, and the vector library | `vehicle-accessors.md` | 127 of 132 | `--native_vehicle_accessors`, `--native_vector_library` |
     | 2026-10-22 | The matrix, vector and quaternion math (`Matrix::` and the vector library's 4x4 half) | `matrix-math.md` | 28 of 28 | `--native_matrix_math` |
     | 2026-10-22 | The car physics and the collision world | `car-physics.md` | 106 of 130 | `--native_car_physics` |
+| 2026-10-22 | The C runtime heap (operator new and delete, malloc, free, calloc, realloc, `_msize`, XMemAlloc, XMemFree, LocalAlloc, LocalFree, GetProcessHeap; in the existing `heap.md`) | `heap.md` | 24 of 30 | `--native_c_runtime_heap` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -2526,6 +2527,20 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
     through a function pointer), the collision object's destructor (a
     vtable call), the collision update and narrow phase (a lead), and
     the set-up functions that allocate (the heap).
+
+    The C runtime heap (2026-10-22, branch `b7-loop-22-10-26-2`, the
+    fourth run): the 15 C runtime allocators above the native allocation
+    layer made native in one migration, plain C++ in
+    `src/memory/c_runtime_heap.cpp` calling the layer directly. Their
+    adapters run it only while `--native_heap` is on (`hooks::NativeHeapActive()`),
+    so the game's own heap and the layer never mix; the error paths
+    (errno, the new handler, `bad_alloc`, `_invalid_parameter`) run the
+    recompiled function from the start. `_calloc_impl`, LocalAlloc and
+    LocalFree are Native; the rest keep adapters for their recompiled
+    callers (the core's C runtime set-up, the shader code's
+    `sub_8235AAC0`, the game's many callers of new, delete and XMemAlloc).
+    The game's own heap internals (`sub_82297FD8`, `sub_822982B8`) no
+    longer run with `--native_heap` and aren't ported.
 
     The second run (from 2026-10-22, branch `b7-loop-22-10-26`; its first
     session stopped after one subsystem): the first run's removable
@@ -2797,3 +2812,10 @@ Cleared: `KeBugCheckEx` (the heap's own checks, in HeapAlloc, HeapFree,
 HeapReAlloc and HeapSize). B7 (`b7_status.py`): 6,753 in play, ours 714,
 work left 6,039 (Wrapped 137, with a row 336, no row yet 5,566); the new
 `heap.md` has 9 ours of 30 in play. 703 overrides in `src/`.
+
+**2026-10-22, B7's fourth loop run, the C runtime heap (branch
+`b7-loop-22-10-26-2`):** the boundary unchanged: 449 functions (916
+pairs): overridden 67, Native 3, Dropped 23, never called 70, live 286.
+Imports: 186 called, 62 with a live caller. B7 (`b7_status.py`): 6,753
+in play, ours 729, work left 6,024 (Wrapped 137, with a row 321, no row
+yet 5,566); `heap.md` 24 ours of 30. 715 overrides in `src/`.
