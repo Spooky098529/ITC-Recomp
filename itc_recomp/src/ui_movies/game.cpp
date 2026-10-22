@@ -347,4 +347,94 @@ void ResetMovieTable(uint8_t* base, uint32_t renderer, uint32_t list) {
   }
 }
 
+namespace {
+constexpr uint32_t kTagGrp = 0x47525000;  // "GRP\0"
+constexpr uint32_t kLayersFrame = 16800;
+constexpr uint32_t kBuckets = 64, kBucketBytes = 260;
+
+// Calls `visit(child)` for a group's children, last first, as the original
+// walks them (the first index read again each time).
+template <typename Visit>
+void ForChildren(uint8_t* base, uint32_t scene, uint32_t group, Visit visit) {
+  for (int32_t i = int32_t(guest::LoadU32(base, group + 104) + guest::LoadU32(base, group + 100) - 1);
+       i >= int32_t(guest::LoadU32(base, group + 100)); i--) {
+    if (!visit(Child(base, scene, uint32_t(i)))) {
+      return;
+    }
+  }
+}
+
+bool LayersFitAt(uint8_t* base, uint32_t scene, uint32_t group, uint32_t depth) {
+  if (depth > 32) {
+    return false;
+  }
+  const int64_t last =
+      int32_t(guest::LoadU32(base, group + 104) + guest::LoadU32(base, group + 100) - 1);
+  if (last - int64_t(int32_t(guest::LoadU32(base, group + 100))) + 1 > int64_t(kBuckets)) {
+    return false;
+  }
+  bool fits = true;
+  ForChildren(base, scene, group, [&](uint32_t child) {
+    const uint32_t tag = guest::LoadU32(base, child);
+    if (int32_t(guest::LoadU32(base, child + 72)) < 0 ||
+        (tag == kTagGrp && !LayersFitAt(base, scene, child, depth + 1)) ||
+        (tag == kTagSce && !LayersFitAt(base, child, child, depth + 1))) {
+      fits = false;
+    }
+    return fits;
+  });
+  return fits;
+}
+}  // namespace
+
+bool LayersFit(uint8_t* base, uint32_t scene, uint32_t group) {
+  return LayersFitAt(base, scene, group, 0);
+}
+
+uint32_t AssignLayers(uint8_t* base, uint32_t stack, uint32_t movie, uint32_t scene,
+                      uint32_t group, uint32_t layer, bool by_bucket) {
+  const uint32_t frame = stack - kLayersFrame;
+  const uint32_t buckets = frame + 80;
+  for (uint32_t b = 0; b < kBuckets; b++) {
+    guest::StoreU32(base, buckets + kBucketBytes * b + 256, 0);
+  }
+  uint32_t result = movie;
+  ForChildren(base, scene, group, [&](uint32_t child) {
+    result = child;
+    const int32_t offset = int32_t(guest::LoadU32(base, child + 72));
+    const uint32_t bucket = buckets + kBucketBytes * uint32_t(offset < 63 ? offset : 63);
+    const uint32_t count = guest::LoadU32(base, bucket + 256);
+    guest::StoreU32(base, bucket + 256, count + 1);
+    guest::StoreU32(base, bucket + 4 * count, child);
+    return true;
+  });
+  for (uint32_t b = 0; b < kBuckets; b++) {
+    const uint32_t bucket = buckets + kBucketBytes * b;
+    const uint32_t count = guest::LoadU32(base, bucket + 256);
+    for (uint32_t j = 0; j < count; j++) {
+      const uint32_t node = guest::LoadU32(base, bucket + 4 * j);
+      if (by_bucket) {
+        layer = b;
+      }
+      switch (guest::LoadU32(base, node)) {
+        case kTagGrp:
+          result = AssignLayers(base, frame, movie, scene, node, layer, false);
+          break;
+        case kTagSce:
+          result = AssignLayers(base, frame, movie, node, node, layer, false);
+          break;
+        case kTagPic:
+        case kTagPrm:
+        case kTagTxt:
+          SetLayer(base, node, layer);
+          result = movie;
+          break;
+        default:
+          break;
+      }
+    }
+  }
+  return result;
+}
+
 }  // namespace ui_movies

@@ -42,7 +42,12 @@ C++ in `itc_recomp/src/ui_movies/game.cpp`, adapters in
 `--run_harnesses=ui_movies_game` (`src/harnesses/ui_movies_game.cpp`:
 made-up movies in a 64 KB block from the system heap, as movies span more
 than the scratch area). Native code calls the library's native functions
-(`ui_movies::Child`, `ui_movies::RestorePose`) directly; the pose resets
+(`ui_movies::Child`, `ui_movies::RestorePose`) directly. The harness runs
+the recompiled side with the flag off, so what it calls of ours (its
+recursions too) runs the originals. Where an original's result depends on
+memory overlapping or overflowing (the text item and slot copies sharing
+memory, the layers' buckets overflowing), the native code checks first and
+leaves it to the original. The pose resets
 fall back to the originals where `sub_82119B80` wouldn't run natively
 (`--native_ui_movies` off, or `--log_pause_movie` watching it). An attract
 race calls few of these (the movie loads' layers and text ids, the pose
@@ -113,7 +118,7 @@ run it after changing either, on any branch.
 | `sub_8211E318` | | | r3, r4 = named animation entries: copies the string (`sub_82091720`, all of it) and +28, +32. Returns r3. From `sub_8211E378`. |
 | `sub_8211D210` | | | r3 = a named animation entry (36 bytes): an empty `std::string` (`sub_825929E8`, `sub_82593040`, the temporary freed with `sub_82091328`), +28 and +32 = 0. From `sub_8211E1C0`, 1,024 times a movie. |
 | `sub_8211D1B8` | | | r3 = movie + 176: destroys the 1,024 named animations' strings (`sub_82091328(entry, 1, 0)`), last first. From `sub_8211E160`. |
-| `sub_8211BD10` | | | r3 = movie, r4 = the scene, r5 = a group (or the scene), r6 = a layer, r7 = 1 to number by bucket: sorts the group's children ([r5 + 100] on, [r5 + 104] of them, last first) into 64 buckets by their layer offset (+72, at most 63), then by bucket: `GRP` recurses (r7 = 0), `SCE` recurses into it as the scene, `PIC`, `PRM` and `TXT` get their layer from `sub_8211A660` (the bucket's number when r7 is set, else r6). A 16.8 KB stack frame. From `sub_8211E500` (three times a load) and itself. |
+| `sub_8211BD10` | | Overridden | r3 = movie, r4 = the scene, r5 = a group (or the scene), r6 = a layer, r7 = 1 to number by bucket: sorts the group's children ([r5 + 100] on, [r5 + 104] of them, last first) into 64 buckets by their layer offset (+72, at most 63), then by bucket: `GRP` recurses (r7 = 0), `SCE` recurses into it as the scene, `PIC`, `PRM` and `TXT` get their layer from `sub_8211A660` (the bucket's number when r7 is set, else r6). A 16.8 KB stack frame. From `sub_8211E500` (three times a load) and itself. The buckets: 260 bytes each from the frame's +80 (64 node words, the count at +256), counts cleared first; an offset is compared signed (a negative one would index below the buckets, more than 64 children overflow into the next bucket). Native under `--native_ui_movies_game` (`ui_movies::AssignLayers`, recursing natively and calling `ui_movies::SetLayer`, with its buckets in the same frame on the guest stack) where `ui_movies::LayersFit` finds no group of more than 64 children, no negative offset and at most 32 levels; else the original. Returns the r3 the original leaves (the movie after a layer set, a recursion's, else the last child looked up). Called ~30 times an attract race (from `0x8211E62C`, `0x8211E644`: the movie loads). |
 | `sub_8211A660` | | Overridden | r4 = a node, r5 = a number: sets the node's +72 to the game's layer: (n + 62) * 2 up to 147 for n at most 11, (n + 291) * 2 up to 667 for 12 to 43, else 667. Leaf (r3 not read). From `sub_8211BD10`. The 147 cap is never reached ((11 + 62) * 2 = 146). Native under `--native_ui_movies_game` (`ui_movies::SetLayer`, `Layer`). Called ~4,000 times in an attract race's movie loads (from `0x8211BE48`). |
 | `sub_8211A6C0` | | Overridden | r3 = movie: walks the chunks after the live scene ([+16], each +4 the offset to the next) up to `TRM`, setting each `TXT` node's +108 (its text's id) to 0. Leaf. From `sub_8211E500`. The live scene's own chunk isn't tested. Native under `--native_ui_movies_game` (`ui_movies::ClearTextIds`). Called once a movie load in an attract race. |
 | `sub_8211AC90` | | | r3 = movie: frees each text ([+0x9FCC] of them, the values from +0x9BD0): its buffer (`sub_82295330(buffer, 0, 0x8000)`, probably VirtualFree with MEM_RELEASE) and the 28-byte object (`sub_825A70E8`); then the count = 0 (the keys aren't cleared). From `sub_8211E500` and `sub_8211B540`. |

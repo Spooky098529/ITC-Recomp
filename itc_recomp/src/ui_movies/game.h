@@ -142,4 +142,26 @@ uint32_t PairsFind(uint8_t* base, uint32_t vector, uint32_t key_address);
 void ClearScreenFlag(uint8_t* base);
 void ResetMovieTable(uint8_t* base, uint32_t renderer, uint32_t list);
 
+// sub_8211BD10: the layers of a group's nodes, by their layer offsets
+// (+72): its children ([group + 100] on, [group + 104] of them, last first;
+// Child of `scene`) sorted into 64 buckets (an offset above 63 in the last),
+// then bucket by bucket in order: a group recursed into (the same scene), a
+// scene recursed into as the scene and the group, a picture's, primitive's
+// or text's layer set (SetLayer) to `layer`, or with `by_bucket` to its
+// bucket's number. The buckets are kept where the original keeps them, in
+// its 16,800-byte frame below `stack` (the caller's r1): 260 bytes each from
+// +80 (64 nodes, then the count at +256), the recursions' frames below.
+// Returns the r3 the original leaves: the movie after a layer set, a
+// recursion's, else the last child looked up (`movie` when none).
+//
+// LayersFit first: the original's buckets overflow into each other or
+// outside its frame (where its own saved registers are) with more than 64
+// children or a negative offset, and that isn't followed: false, with
+// nothing done, for a tree (read as it is: the layers set are all above 63)
+// with a group of more than 64 children, a negative offset, or deeper than
+// 32 groups; the original runs there.
+bool LayersFit(uint8_t* base, uint32_t scene, uint32_t group);
+uint32_t AssignLayers(uint8_t* base, uint32_t stack, uint32_t movie, uint32_t scene,
+                      uint32_t group, uint32_t layer, bool by_bucket);
+
 }  // namespace ui_movies

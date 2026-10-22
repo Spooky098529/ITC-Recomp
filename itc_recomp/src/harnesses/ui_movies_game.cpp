@@ -6,6 +6,7 @@
 
 #include "harness.h"
 
+#include "base/flags.h"
 #include "base/log.h"
 
 #include <rex/system/kernel_state.h>
@@ -19,9 +20,21 @@
 #include <string>
 #include <vector>
 
+ITC_FLAG_DECLARE(bool, native_ui_movies_game);
+
 namespace harness {
 
 namespace {
+
+// Runs the recompiled version with --native_ui_movies_game off, so the
+// functions it calls that are ours (its recursions among them) run the
+// originals too.
+void RunRecompiled(GuestFunction recompiled, PPCContext& t, uint8_t* base) {
+  const bool native = ITC_FLAG(native_ui_movies_game);
+  ITC_FLAG(native_ui_movies_game) = false;
+  recompiled(t, base);
+  ITC_FLAG(native_ui_movies_game) = native;
+}
 
 constexpr uint32_t kTagGrp = 0x47525000;  // "GRP\0"
 constexpr uint32_t kTagPic = 0x50494300;  // "PIC\0"
@@ -61,7 +74,11 @@ void Compare(Context& h, Results& results, uint32_t area, uint32_t bytes, Setup 
     setup();
     PPCContext t = CallContext(h);
     args(t);
-    (v == 0 ? recompiled : native)(t, h.base);
+    if (v == 0) {
+      RunRecompiled(recompiled, t, h.base);
+    } else {
+      native(t, h.base);
+    }
     result[v] = Read(h.base, area, bytes);
     for (int i = 0; i < 4; i++) {
       result[v].push_back(uint8_t(t.r3.u32 >> (24 - 8 * i)));
@@ -662,7 +679,11 @@ void ScreenStartCases(Context& h, const Block& block) {
       guest::StoreU32(h.base, kRendererGlobals, 0);
       guest::StoreU32(h.base, kRendererGlobals + 4, 0);
       PPCContext t = CallContext(h);
-      (v == 0 ? __imp__sub_8211AD00 : sub_8211AD00)(t, h.base);
+      if (v == 0) {
+        RunRecompiled(__imp__sub_8211AD00, t, h.base);
+      } else {
+        sub_8211AD00(t, h.base);
+      }
       result[v] = Read(h.base, block.at, 1024);
       std::vector<uint8_t> g = Read(h.base, kGlobals, kGlobalBytes);
       std::vector<uint8_t> r = Read(h.base, kRendererGlobals, 8);
@@ -687,12 +708,107 @@ void ScreenStartCases(Context& h, const Block& block) {
   results.Report();
 }
 
+// sub_8211BD10: a made-up scene (96 entries) whose top range (entries 0 to
+// 39, or past them) holds leaves (PIC, PRM, TXT, TFM or a random tag),
+// groups (their ranges in entries 40 to 95, leaves only) and two sub-scenes
+// (entries of leaves); layer offsets mostly 0 to 80, some negative or huge,
+// and top ranges past 64 children (both of which leave it to the original).
+// Its frames (16.8 KB each) go on a stack at the block's top.
+void LayersCases(Context& h, const Block& block) {
+  Results results("sub_8211BD10 (the layers)");
+  constexpr uint32_t kNodes = 96, kNodeBytes = 128;
+  const uint32_t scene = block.at;
+  const uint32_t nodes = block.at + 1024;
+  const uint32_t subs = nodes + kNodes * kNodeBytes;
+  const uint32_t area = subs + 2 * 1024 - block.at;
+  const uint32_t stack = block.at + block.bytes - 512;
+  for (int i = 0; i < 300; i++) {
+    Random& r = h.random;
+    std::vector<uint32_t> tags(kNodes), offsets(kNodes), first(kNodes), count(kNodes);
+    // Nodes 0 to 59 leaves, 60 to 89 groups or leaves, the top's entries
+    // may also name the sub-scenes (as nodes 96 and 97).
+    constexpr uint32_t kLeafTags[] = {kTagPic, kTagPrm, kTagTxt, kTagTfm};
+    for (uint32_t k = 0; k < kNodes; k++) {
+      tags[k] = k >= 60 && r.Below(2) ? kTagGrp
+                                       : (r.Below(8) == 0 ? uint32_t(r.Next()) : kLeafTags[r.Below(4)]);
+      const uint32_t kind = r.Below(40);
+      offsets[k] = kind == 0 ? 0xFFFFFFFFu - r.Below(5)
+                             : (kind == 1 ? uint32_t(r.Next()) & 0x7FFFFFFF : r.Below(81));
+      first[k] = 40 + r.Below(40);
+      count[k] = r.Below(96 - first[k] + 1);
+    }
+    std::vector<uint32_t> entries(kNodes), sub_entries[2];
+    for (uint32_t k = 0; k < kNodes; k++) {
+      // The top region names any node or a sub-scene; the rest only leaves.
+      entries[k] = k < 40 ? (r.Below(10) == 0 ? kNodes + r.Below(2) : r.Below(90)) : r.Below(60);
+    }
+    for (auto& e : sub_entries) {
+      e.resize(16);
+      for (uint32_t& x : e) {
+        x = r.Below(60);
+      }
+    }
+    const uint32_t sub_counts[2] = {r.Below(17), r.Below(17)};
+    const uint32_t sub_offsets[2] = {r.Below(81), r.Below(81)};
+    const bool top_is_group = r.Below(3) == 0;
+    const uint32_t top_first = r.Below(10);
+    const uint32_t top_count = r.Below(10) == 0 ? 60 + r.Below(20) : r.Below(31);
+    const uint32_t layer = r.Below(60), by_bucket = r.Below(2);
+    const uint32_t movie = uint32_t(r.Next());
+    auto node = [&](uint32_t k) {
+      return k < kNodes ? nodes + kNodeBytes * k : subs + 1024 * (k - kNodes);
+    };
+    // A group as the top: one of 90 to 95, which no entry names (so it
+    // isn't its own child).
+    const uint32_t top = top_is_group ? node(90 + r.Below(6)) : scene;
+    Compare(h, results, block.at, area,
+            [&] {
+              guest::StoreU32(h.base, scene, kTagSce);
+              guest::StoreU32(h.base, scene + 108, 0);
+              for (uint32_t k = 0; k < kNodes; k++) {
+                guest::StoreU32(h.base, scene + 128 + 8 * k, node(entries[k]));
+                const uint32_t n = node(k);
+                guest::StoreU32(h.base, n, tags[k]);
+                guest::StoreU32(h.base, n + 72, offsets[k]);
+                guest::StoreU32(h.base, n + 100, first[k]);
+                guest::StoreU32(h.base, n + 104, count[k]);
+              }
+              for (uint32_t m = 0; m < 2; m++) {
+                const uint32_t sub = node(kNodes + m);
+                guest::StoreU32(h.base, sub, kTagSce);
+                guest::StoreU32(h.base, sub + 72, sub_offsets[m]);
+                guest::StoreU32(h.base, sub + 100, 0);
+                guest::StoreU32(h.base, sub + 104, sub_counts[m]);
+                guest::StoreU32(h.base, sub + 108, 0);
+                for (uint32_t k = 0; k < 16; k++) {
+                  guest::StoreU32(h.base, sub + 128 + 8 * k, node(sub_entries[m][k]));
+                }
+              }
+              // The top's range, written last (over a group's own).
+              guest::StoreU32(h.base, top + 100, top_first);
+              guest::StoreU32(h.base, top + 104, top_count);
+            },
+            [&](PPCContext& t) {
+              t.r1.u64 = stack;
+              t.r3.u64 = movie;
+              t.r4.u64 = scene;
+              t.r5.u64 = top;
+              t.r6.u64 = layer;
+              t.r7.u64 = by_bucket;
+            },
+            __imp__sub_8211BD10, sub_8211BD10,
+            fmt::format("case {}: top {:X} range {} {} by bucket {}", i, top - block.at, top_first,
+                        top_count, by_bucket));
+  }
+  results.Report();
+}
+
 }  // namespace
 
 void UiMoviesGame(Context& h) {
   auto* memory = rex::system::kernel_state()->memory();
   Block block;
-  block.bytes = 0x10000;
+  block.bytes = 0x30000;  // the layers' frames at its top
   block.at = memory->SystemHeapAlloc(block.bytes);
   if (!block.at) {
     ITC_LOG_ERROR("harness: ui_movies_game: no block from the system heap");
@@ -707,6 +823,7 @@ void UiMoviesGame(Context& h) {
   AnimationListCases(h, block);
   PairsCases(h, block);
   ScreenStartCases(h, block);
+  LayersCases(h, block);
   memory->SystemHeapFree(block.at);
 }
 

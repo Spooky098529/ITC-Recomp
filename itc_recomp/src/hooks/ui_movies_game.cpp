@@ -28,7 +28,9 @@ ITC_FLAG_BOOL(native_ui_movies_game, true, "ITC",
               "sub_8211B298, UiMovie::AnimationTime sub_8211BA00 and "
               "UiMovie::NamedAnimationTime sub_8211BB18; the pairs' lookups TextMap::Find "
               "sub_8211B310, TextMap::Set sub_8211B370 and UiMovies::Find sub_8211B3F0; the "
-              "screens' movie table reset sub_8211AD00 (its renderer calls still the game's) "
+              "screens' movie table reset sub_8211AD00 (its renderer calls still the game's); the "
+              "layers sub_8211BD10 (its buckets in its frame on the guest stack, as the "
+              "original's; the original runs for trees that would overflow them) "
               "(same results; checked by --run_harnesses=ui_movies_game)");
 
 ITC_FLAG_DECLARE(bool, native_ui_movies);
@@ -310,6 +312,18 @@ extern "C" REX_FUNC(sub_8211AD00) {
   ctx.lr = lr;
   ui_movies::ResetMovieTable(base, renderer, list);
   ctx.r3.u64 = renderer;
+}
+
+// sub_8211BD10: r3 = movie, r4 = the scene, r5 = a group, r6 = a layer, r7
+// = 1 to number by bucket.
+extern "C" REX_FUNC(sub_8211BD10) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_ui_movies_game) || !ui_movies::LayersFit(base, ctx.r4.u32, ctx.r5.u32)) {
+    __imp__sub_8211BD10(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = ui_movies::AssignLayers(base, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                       ctx.r6.u32, ctx.r7.u32 != 0);
 }
 
 namespace ui_movies_game_hooks {
