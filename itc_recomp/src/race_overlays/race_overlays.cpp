@@ -4,6 +4,7 @@
 
 #include "base/log.h"
 #include "c_runtime/math.h"
+#include "debug/frame_state_diff.h"
 #include "hooks/vehicle.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
@@ -2822,6 +2823,132 @@ uint32_t MarkerKind(uint8_t* base, uint32_t overlays, int32_t id, uint32_t fallb
     }
   }
   return 2;
+}
+
+}  // namespace race_overlays
+
+namespace race_overlays {
+
+namespace {
+
+// The model point `index` in world space at frame + 80, as the effects'
+// updates place it: the body matrix copied to frame + 112, the point's
+// position to frame + 96, then copied to frame + 80 (ld and std), its x less
+// `shift` (fsubs) when given, and transformed by the matrix in place
+// (Vec4::Transform, with its override's checks around it).
+void WorldPoint(uint8_t* base, uint32_t view, int32_t index, uint32_t frame,
+                const double* shift) {
+  BodyMatrixCopy(base, frame + 112, view);
+  const uint32_t position = OverlayViewPointPosition(base, frame + 96, view, index);
+  CopyDoublewords(base, position, frame + 80);
+  if (shift) {
+    guest::StoreFloat(base, frame + 80,
+                      Difference(guest::LoadFloat(base, frame + 80), *shift));
+  }
+  debug::Vec4Transform(base, frame + 80, frame + 112, frame + 80);
+}
+
+}  // namespace
+
+float VehicleFloat2508(uint8_t* base, uint32_t view) {
+  ITC_NATIVE_RUNNING("sub_82126A90 OverlayView::VehicleFloat2508");
+  return guest::LoadFloat(base, guest::LoadU32(base, view + 4) + 2508);
+}
+
+void LightSpriteShow(uint8_t* base, uint32_t sprite, uint32_t position) {
+  ITC_NATIVE_RUNNING("sub_8211EAA0 LightSprite::Show");
+  const uint32_t at = sprite + 144;
+  const uint32_t table = guest::LoadU32(base, sprite + 140);
+  CopyVector(base, position, at + 48);
+  guest::StoreU32(base, at + 96, 1);
+  CopyFloat(base, table + 4, at + 100);
+  CopyFloat(base, table + 8, at + 104);
+  const uint32_t life = guest::LoadU32(base, table + 0);
+  guest::StoreU32(base, at + 112, 0);
+  guest::StoreU32(base, at + 108, life);
+  const int32_t r = int32_t(Rand(base));
+  const int32_t alpha = Fctiwz(guest::LoadFloat(base, at + 104));
+  guest::StoreU32(base, at + 116, uint32_t(r - (r / 4) * 4));
+  guest::StoreU32(base, at + 80, 255);
+  guest::StoreU32(base, at + 84, 255);
+  guest::StoreU32(base, at + 88, 255);
+  guest::StoreU32(base, at + 92, uint32_t(alpha));
+}
+
+void UpdateLightSprites(uint8_t* base, uint32_t overlays, uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_821251C0 CarOverlays::UpdateLightSprites");
+  const uint32_t view = View(base, overlays, guest::LoadU32(base, overlays + 128));
+  const uint32_t word = VehicleWord2252(base, view);
+  CopyFloat(base, kOne, frame + 92);
+  if (va::DebugSwitchOff() != 0) {
+    return;
+  }
+  const double shift = guest::LoadFloat(base, kAxleScale);
+  for (int32_t i = 0; i < 4; i++) {
+    const uint32_t sprite = guest::LoadU32(base, overlays + 200 + 4 * uint32_t(i));
+    if (OverlayViewHasPoint(base, view, 4 + i) == 0) {
+      continue;
+    }
+    WorldPoint(base, view, 4 + i, frame, &shift);
+    if (VehicleByte2504(base, view) != 0) {
+      VehicleFloat2508(base, view);  // left in f1, which LightSprite::Show doesn't read
+      LightSpriteShow(base, sprite, frame + 80);
+    }
+    LightSpriteSetPosition(base, sprite, frame + 80);
+  }
+  guest::StoreU32(base, overlays + 720, word);
+}
+
+bool UpdateParticlesB(uint8_t* base, uint32_t overlays, uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_821252D0 CarOverlays::UpdateParticlesB");
+  for (uint32_t i = 0; i < 4; i++) {
+    const int32_t capacity =
+        int32_t(guest::LoadU32(base, guest::LoadU32(base, overlays + 360 + 4 * i) + 104));
+    if (capacity == 0 || capacity == -1) {
+      return false;
+    }
+  }
+  const uint32_t view = View(base, overlays, guest::LoadU32(base, overlays + 128));
+  CopyFloat(base, kOne, frame + 92);
+  if (va::DebugSwitchOff() != 0) {
+    return true;
+  }
+  const double shift = guest::LoadFloat(base, kAxleScale);
+  for (int32_t i = 0; i < 4; i++) {
+    const uint32_t effect = guest::LoadU32(base, overlays + 360 + 4 * uint32_t(i));
+    if (OverlayViewHasPoint(base, view, 4 + i) == 0) {
+      continue;
+    }
+    WorldPoint(base, view, 4 + i, frame, &shift);
+    // The speed and +6252 go in f3 and f2, which ParticlesB::Emit doesn't
+    // read; +6256, the last read, is its f1.
+    SpeedKmh(base, view);
+    VehicleFloat6252(base, view);
+    const double factor = VehicleFloat6256(base, view);
+    uint32_t result = 0;
+    double sine = factor;
+    ParticlesBEmit(base, effect, frame + 80, factor, &result, &sine);
+    ParticlesBSetPosition(base, effect, frame + 80);
+  }
+  return true;
+}
+
+void UpdateParticlesC(uint8_t* base, uint32_t overlays, uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_82125798 CarOverlays::UpdateParticlesC");
+  const uint32_t view = View(base, overlays, guest::LoadU32(base, overlays + 128));
+  CopyFloat(base, kOne, frame + 92);
+  for (int32_t i = 0; i < 4; i++) {
+    const uint32_t effect = guest::LoadU32(base, overlays + 380 + 4 * uint32_t(i));
+    if (OverlayViewHasPoint(base, view, 14 + i) == 0) {
+      continue;
+    }
+    WorldPoint(base, view, 14 + i, frame, nullptr);
+    if (IsBehindCamera(base, overlays, frame + 80) == 0) {
+      ParticlesCEmit(base, effect, frame + 80);
+    }
+    const double speed = SpeedKmh(base, view);
+    ParticlesCSetPosition(base, effect, frame + 80, speed);
+  }
 }
 
 }  // namespace race_overlays

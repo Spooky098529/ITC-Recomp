@@ -22,7 +22,9 @@ ITC_FLAG_BOOL(native_race_overlays, true, "ITC",
               "sub_8212BA98; the view's body and wheels through the vehicle accessors, sub_821268B0 to "
               "sub_82126FF0; CarOverlays::IsBehindCamera, sub_82124630; the racers' "
               "save flags and stages, sub_82126B50 to sub_82126CB0; CarOverlays::UpdateTrails, "
-              "sub_82124EE0; CarOverlays::MarkerKind, sub_82122EA8) natively "
+              "sub_82124EE0; CarOverlays::MarkerKind, sub_82122EA8; the effects' updates "
+              "UpdateLightSprites, UpdateParticlesB and UpdateParticlesC, sub_821251C0, "
+              "sub_821252D0 and sub_82125798) natively "
               "instead of through the translated code (same results; checked by "
               "--run_harnesses=race_overlays)");
 
@@ -486,3 +488,41 @@ extern "C" REX_FUNC(sub_82124EE0) {
 // fallback; returns the kind (FlagsKind and NoSaveFlags, which only it
 // calls, are done by its plain C++).
 ITC_OVERLAY_WORD(82122EA8, MarkerKind(base, ctx.r3.u32, ctx.r4.s32, ctx.r5.u32))
+
+// The effects' updates: r3 = the car overlays. Their points go in the
+// originals' own stack frames (r1 - 256, or - 240 for UpdateParticlesC,
+// below the stack pointer). LightSprite::Show (sub_8211EAA0) and
+// sub_82126A90 have no adapters: UpdateLightSprites is their only caller.
+extern "C" REX_FUNC(sub_821251C0) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_race_overlays)) {
+    __imp__sub_821251C0(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  UpdateLightSprites(base, ctx.r3.u32, ctx.r1.u32 - 256);
+}
+
+// Where the native version declines (an emitter's capacity 0 or -1), the
+// original runs.
+extern "C" REX_FUNC(sub_821252D0) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_race_overlays)) {
+    __imp__sub_821252D0(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  if (!UpdateParticlesB(base, ctx.r3.u32, ctx.r1.u32 - 256)) {
+    __imp__sub_821252D0(ctx, base);
+  }
+}
+
+extern "C" REX_FUNC(sub_82125798) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_race_overlays)) {
+    __imp__sub_82125798(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  UpdateParticlesC(base, ctx.r3.u32, ctx.r1.u32 - 240);
+}

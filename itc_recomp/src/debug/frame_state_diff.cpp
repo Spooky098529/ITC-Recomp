@@ -396,6 +396,15 @@ void FrameStateDiff_Watch(uint32_t address) {
   Get().Watch(address);
 }
 
+void Vec4Transform(uint8_t* base, uint32_t out, uint32_t m, uint32_t v) {
+  if (IsHidden(0x820AB560)) {
+    return;
+  }
+  FrameStateDiff_Before(base);
+  matrix_math::Vec4Transform(base, out, m, v);
+  FrameStateDiff_After(base, "draw step part", 0x820AB560);
+}
+
 }  // namespace debug
 
 // The race draw step's parts (sub_8215B4F8 calls these), wrapped only to

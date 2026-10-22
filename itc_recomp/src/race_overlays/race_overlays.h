@@ -706,3 +706,47 @@ uint32_t FlagsKind(uint8_t* base, uint32_t overlays, uint32_t id, int32_t a, int
 uint32_t MarkerKind(uint8_t* base, uint32_t overlays, int32_t id, uint32_t fallback);
 
 }  // namespace race_overlays
+
+namespace race_overlays {
+
+// --- The car overlays' effect updates (CarOverlays::UpdateEffects' calls) ---
+//
+// Each places a child overlay at a model point in world space (WorldPoint in
+// the .cpp: the body matrix (BodyMatrixCopy) at `frame` + 112, the point
+// (OverlayView::PointPosition) at `frame` + 96, copied to `frame` + 80 and
+// transformed there by Vec4::Transform's plain C++). `frame` is the
+// original's stack frame (its r1 after the stwu: 16 bytes of guest memory at
+// +80, +96 and 64 at +112, and +92 written first with the game's 1.0); the
+// adapters pass the original's own. The view is the one in slot +128.
+
+// sub_82126A90: the vehicle's float +2508. Only UpdateLightSprites calls it
+// (into f1, which LightSprite::Show doesn't read); never ran in play.
+float VehicleFloat2508(uint8_t* base, uint32_t view);
+// LightSprite::Show (sub_8211EAA0): the sprite at +144 shown at `position`
+// (its +48), +96 = 1, +100 and +104 = the table's (+140) +4 and +8 (bits as
+// they are), +108 = its +0, +112 = 0, +116 = rand() % 4, colors 255 at +80
+// to +88, +92 = +104 as an integer (fctiwz). Never ran in play (the
+// vehicle's +2504 stayed 0).
+void LightSpriteShow(uint8_t* base, uint32_t sprite, uint32_t position);
+// CarOverlays::UpdateLightSprites (sub_821251C0): nothing more when
+// DebugSwitchOff isn't 0; else for model points 4-7 that exist and the
+// light sprites (+200 + 4i): the point with x less the float at 0x82001FBC,
+// in world space; LightSprite::Show there when the vehicle's byte +2504 is
+// set; LightSprite::SetPosition. Then +720 = the vehicle's word +2252 (read
+// first).
+void UpdateLightSprites(uint8_t* base, uint32_t overlays, uint32_t frame);
+// CarOverlays::UpdateParticlesB (sub_821252D0): as UpdateLightSprites
+// (DebugSwitchOff, points 4-7, x less the float at 0x82001FBC) for particle
+// effect B's emitters (+360 + 4i): ParticlesB::Emit with the vehicle's
+// +6256 (the original also reads the speed and +6252, into registers Emit
+// doesn't read), then ParticlesB::SetPosition. False, with nothing done,
+// when an emitter's capacity is 0 or -1 (ParticlesB::Emit would decline);
+// the original runs there.
+bool UpdateParticlesB(uint8_t* base, uint32_t overlays, uint32_t frame);
+// CarOverlays::UpdateParticlesC (sub_82125798): for model points 14-17 that
+// exist and particle effect C's emitters (+380 + 4i): the point in world
+// space (x as it is), ParticlesC::Emit there when
+// CarOverlays::IsBehindCamera returns 0, then ParticlesC::SetPosition with the speed in km/h. No DebugSwitchOff check.
+void UpdateParticlesC(uint8_t* base, uint32_t overlays, uint32_t frame);
+
+}  // namespace race_overlays

@@ -27,6 +27,7 @@
 ITC_FLAG_DECLARE(bool, native_race_overlays);
 ITC_FLAG_DECLARE(bool, native_vehicle_accessors);
 ITC_FLAG_DECLARE(bool, native_vector_library);
+ITC_FLAG_DECLARE(bool, native_matrix_math);
 
 namespace harness {
 
@@ -420,6 +421,23 @@ void NativeWheelSlip(PPCContext& ctx, uint8_t* base) {
   ctx.f1.f64 = double(ro::WheelSlip(base, view, ctx.r4.u32, ctx.f1.f64));
 }
 
+// As the adapters: the points in the originals' stack frames, and the
+// original where UpdateParticlesB declines.
+void NativeUpdateLightSprites(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ro::UpdateLightSprites(base, ctx.r3.u32, ctx.r1.u32 - 256);
+}
+void NativeUpdateParticlesB(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  if (!ro::UpdateParticlesB(base, ctx.r3.u32, ctx.r1.u32 - 256)) {
+    __imp__sub_821252D0(ctx, base);
+  }
+}
+void NativeUpdateParticlesC(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ro::UpdateParticlesC(base, ctx.r3.u32, ctx.r1.u32 - 240);
+}
+
 // Runs the recompiled version with --native_race_overlays off, so the
 // functions it calls that are ours run the originals too.
 void RunRecompiled(GuestFunction recompiled, PPCContext& t, uint8_t* base) {
@@ -430,17 +448,20 @@ void RunRecompiled(GuestFunction recompiled, PPCContext& t, uint8_t* base) {
 }
 
 // The originals of functions that call the vehicle accessors, run with
-// those (and the vector library) off too, so the whole chain is the
-// recompiled code's.
+// those (and the vector library and the matrix math) off too, so the whole
+// chain is the recompiled code's.
 template <GuestFunction recompiled>
 void Original(PPCContext& ctx, uint8_t* base) {
   const bool accessors = ITC_FLAG(native_vehicle_accessors);
   const bool vectors = ITC_FLAG(native_vector_library);
+  const bool matrices = ITC_FLAG(native_matrix_math);
   ITC_FLAG(native_vehicle_accessors) = false;
   ITC_FLAG(native_vector_library) = false;
+  ITC_FLAG(native_matrix_math) = false;
   recompiled(ctx, base);
   ITC_FLAG(native_vehicle_accessors) = accessors;
   ITC_FLAG(native_vector_library) = vectors;
+  ITC_FLAG(native_matrix_math) = matrices;
 }
 
 // The odd float words mixed into fields: NaNs of both kinds and signs,
@@ -2905,6 +2926,125 @@ void UpdateTrailsCases(Context& h, uint32_t block) {
   results.Report();
   nan_results.Report();
 }
+
+// The effects' updates: the view of the body cases (its vehicle and body)
+// with the model of the point cases (+8), the car overlays with four light
+// sprites, four of particle effect B and four of C (their tables, capacities
+// as in the game, small, and sometimes 0 or -1, where UpdateParticlesB's
+// original runs), the camera pass (+800, for IsBehindCamera), rand's seed
+// and the original's stack frame, all from `seed`; numbers, or random words
+// with odd floats among them.
+constexpr uint32_t kFxSprites = 0x40000, kFxSpriteTable = 0x40800, kFxEffectsB = 0x41000,
+                   kFxEffectsC = 0x44000, kFxTableB = 0x47000, kFxTableC = 0x47100,
+                   kFxOverlays = 0x66000, kFxPass = 0x67000;
+
+auto EffectsSetup(Context& h, uint32_t block, uint64_t seed, bool odd, uint32_t slot) {
+  return [&h, block, seed, odd, slot] {
+    constexpr uint32_t kSeed = 0x82638188;
+    ViewBodySetup(h, block, seed, odd)();
+    ModelPointSetup(h, block, seed);
+    Random fill;
+    for (uint64_t n = 0; n < seed % 89; n++) {
+      fill.Next();
+    }
+    const uint32_t view = block + kBodyView;
+    const uint32_t vehicle = block + kBodyVehicle;
+    const uint32_t overlays = block + kFxOverlays;
+    const uint32_t pass = block + kFxPass;
+    guest::StoreU32(h.base, view + 8, block + kPointModel);
+    guest::StoreU8(h.base, vehicle + 2504, fill.Below(3) == 0 ? uint8_t(1 + fill.Below(255)) : 0);
+    FillRandom(h.base, fill, overlays, 0x400);
+    guest::StoreU32(h.base, overlays + 128, slot);
+    guest::StoreU32(h.base, overlays + 4 * (slot + 1), view);
+    guest::StoreU32(h.base, overlays + 800, pass);
+    FillRandom(h.base, fill, pass, 0x200);
+    for (uint32_t k = 0; k < 4; k++) {
+      guest::StoreU32(h.base, pass + 400 + 4 * k, NumberOrWord(fill, odd));
+    }
+    // A table: life, then two floats (size and alpha, or random words).
+    auto table = [&](uint32_t at) {
+      FillRandom(h.base, fill, at, 0x40);
+      if (!odd || fill.Below(2)) {
+        guest::StoreU32(h.base, at, fill.Below(100));
+        guest::StoreFloat(h.base, at + 4, float(fill.Below(1000)) / 100.0f);
+        guest::StoreFloat(h.base, at + 8, float(fill.Below(256)));
+      }
+    };
+    table(block + kFxSpriteTable);
+    table(block + kFxTableB);
+    table(block + kFxTableC);
+    FillRandom(h.base, fill, block + kFxSprites, 0x800);
+    FillRandom(h.base, fill, block + kFxEffectsB, 0x3000);
+    FillRandom(h.base, fill, block + kFxEffectsC, 0x2C00);
+    for (uint32_t i = 0; i < 4; i++) {
+      const uint32_t sprite = block + kFxSprites + 0x200 * i;
+      guest::StoreU32(h.base, overlays + 200 + 4 * i, sprite);
+      guest::StoreU32(h.base, sprite + 140, block + kFxSpriteTable);
+      guest::StoreU32(h.base, sprite + 240, fill.Below(2));
+
+      const uint32_t b = block + kFxEffectsB + 0xC00 * i;
+      guest::StoreU32(h.base, overlays + 360 + 4 * i, b);
+      const int32_t b_capacity = fill.Below(40) == 0 ? (fill.Below(2) ? 0 : -1)
+                                 : fill.Below(3) == 0 ? int32_t(1 + fill.Below(6))
+                                                      : 15;
+      guest::StoreU32(h.base, b + 104, uint32_t(b_capacity));
+      guest::StoreU32(h.base, b + 112, block + kFxTableB);
+      guest::StoreU32(h.base, b + 2772, fill.Below(b_capacity > 0 ? uint32_t(b_capacity) : 15));
+      guest::StoreU32(h.base, b + 2776, fill.Below(18));
+
+      const uint32_t c = block + kFxEffectsC + 0xB00 * i;
+      guest::StoreU32(h.base, overlays + 380 + 4 * i, c);
+      const uint32_t c_capacity = fill.Below(10) == 0 ? 0
+                                  : fill.Below(3) == 0 ? 1 + fill.Below(6)
+                                                       : 20;
+      guest::StoreU32(h.base, c + 2700, c_capacity);
+      guest::StoreU32(h.base, c + 108, block + kFxTableC);
+      guest::StoreU32(h.base, c + 2692, fill.Below(c_capacity ? c_capacity : 20));
+      guest::StoreU32(h.base, c + 2696, fill.Below(24));
+    }
+    guest::StoreU32(h.base, kSeed, uint32_t(fill.Next()));
+    FillRandom(h.base, fill, h.data - 1024 - 256, 256);
+  };
+}
+
+void EffectUpdateCases(Context& h, uint32_t block) {
+  constexpr uint32_t kSeed = 0x82638188;
+  Random& r = h.random;
+  const uint32_t live = guest::LoadU32(h.base, kSeed);
+  const uint32_t overlays = block + kFxOverlays;
+  struct Update {
+    const char* name;
+    GuestFunction original;
+    GuestFunction native;
+    uint32_t frame;  // below the stack pointer
+  };
+  const Update updates[] = {
+      {"CarOverlays::UpdateLightSprites (sub_821251C0)", Original<__imp__sub_821251C0>,
+       NativeUpdateLightSprites, 256},
+      {"CarOverlays::UpdateParticlesB (sub_821252D0)", Original<__imp__sub_821252D0>,
+       NativeUpdateParticlesB, 256},
+      {"CarOverlays::UpdateParticlesC (sub_82125798)", Original<__imp__sub_82125798>,
+       NativeUpdateParticlesC, 240},
+  };
+  for (const Update& update : updates) {
+    Results results(update.name);
+    const Regions regions = {{overlays, 0x400},
+                             {block + kFxSprites, 0x800},
+                             {block + kFxEffectsB, 0x3000},
+                             {block + kFxEffectsC, 0x2C00},
+                             {kSeed, 4},
+                             {h.data - 1024 - update.frame + 80, 96}};
+    for (uint64_t seed = 0; seed < 300; seed++) {
+      const bool odd = seed % 5 == 4;
+      const uint32_t slot = r.Below(25);
+      Compare(h, results, regions, EffectsSetup(h, block, seed, odd, slot),
+              [&](PPCContext& t) { t.r3.u64 = overlays; }, update.original, update.native,
+              fmt::format("seed {} slot {}", seed, slot), false, false);
+    }
+    results.Report();
+  }
+  guest::StoreU32(h.base, kSeed, live);
+}
 }  // namespace
 
 void RaceOverlays(Context& h) {
@@ -2940,6 +3080,7 @@ void RaceOverlays(Context& h) {
   IsBehindCameraCases(h, block);
   SaveFlagCases(h, block);
   UpdateTrailsCases(h, block);
+  EffectUpdateCases(h, block);
   memory->SystemHeapFree(block);
 }
 
