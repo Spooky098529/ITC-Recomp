@@ -19,8 +19,9 @@ record: `b7-loop-2026-10-22-0111.md` (and this file's history).
   user's, 2026-10-22), not a halt.
 - Second migration agent: 5 functions Overridden and 1 Merged
   (`sub_8211F3B4`) in 8d7ad32, 092a792; the first 9 prints named; 27
-  ready groups left. Step 8: validation agent running.
-- Session: pass 6 of 20, subsystem 1 of 5. In all: subsystem 1 of 5.
+  ready groups left. Validated (itc_524.log): 14 of 14 harness lines.
+- Step 6: the race overlays' third migration agent running.
+- Session: pass 7 of 20, subsystem 1 of 5. In all: subsystem 1 of 5.
 - Known at the start: `b7_status.py` checks `c-runtime.md:221`
   `sub_825A9934` (`__chkstk`) "Dropped, but it ran" (from the first run:
   its override does nothing, so it still shows as seen).
@@ -63,6 +64,8 @@ the validation agent's attract race; the user drives (with
   `sub_825AE8E0` _cftof_l, `sub_825AE708` _cftof2_l, `sub_825B61E8`
   _fptostr, `sub_825B7A80` _putwc_nolock, `sub_8211B298`
   AnimationList::Get.
+- Race overlays (itc_524.log): `sub_82129598` Trail::AddPoint (probably
+  the skid marks).
 
 ## Totals
 
