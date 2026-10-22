@@ -31,7 +31,7 @@ ITC_FLAG_BOOL(native_collision, true, "ITC",
               "sub_820BAB48, sub_820BB688, sub_820B99D0, sub_820BAB20, sub_820BAE78, "
               "sub_820BA408, sub_820BA5D8, sub_820BD0C8, sub_820BC978, sub_820BCCE8, "
               "sub_820BB300, sub_820BD280, sub_820BD578, sub_820BE490, sub_820BECA0, "
-              "sub_820BC858");
+              "sub_820BC858, sub_820BACD0");
 
 // Defines an adapter: `body` uses `ctx` and `base`.
 #define ITC_COLLISION(address, body)   \
@@ -129,18 +129,8 @@ extern "C" REX_FUNC(sub_820BB758) {
     __imp__sub_820BB758(ctx, base);
   }
 }
-// r4 = the offset. A current copy that isn't a box: the original.
-extern "C" REX_FUNC(sub_820BACD0) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_collision)) {
-    __imp__sub_820BACD0(ctx, base);
-    return;
-  }
-  ctx.fpscr.disableFlushMode();
-  if (!CollisionShapeTranslate(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 192)) {
-    __imp__sub_820BACD0(ctx, base);
-  }
-}
+// CollisionShape::Translate (sub_820BACD0) has no adapter: its caller in
+// play, CollisionObject::Translate, is native.
 
 // --- The box-box separation tests and the pair's next check time ---
 
