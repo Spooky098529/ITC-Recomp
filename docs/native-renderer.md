@@ -3236,7 +3236,14 @@ the largest left; main thread ~6.1 million cycles a frame):
   `functions/sprites.md`): `SpriteList::Reset`, which clears a race
   overlay's 500-sprite list on the stack and stores w = 1.0 in all 2,000
   corners (~32 KB a call), though only the first `count` sprites are
-  recorded.
+  recorded. Made native (B7 loop, `src/sprites/sprites.cpp`,
+  `--native_sprites`, the same stores): main thread profile, two
+  alternating runs each, 6.059 and 5.987 million cycles a frame with the
+  flag off (`__imp__sub_821298C0` ~1,135 thousand) against 5.048 and 5.050
+  with it on (`sprites::ResetSprites` ~140 thousand). About 17,000 calls a
+  second in an attract race (~120 a frame at ~140 fps). Storing only the
+  corners the count uses would cut more, but is a behavior change for the
+  user to decide.
 - `__imp__sub_8209C6E0` (the light billboards' vertex generation), ~12%
   (~730 thousand cycles a frame) after the change above. It fell ~30% when
   the camera we write into the pass went from 4-byte to 16-byte stores,

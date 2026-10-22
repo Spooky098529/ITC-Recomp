@@ -107,5 +107,6 @@ void Saves(Context& h);
 void FileClass(Context& h);
 void MovieFiles(Context& h);
 void Xma(Context& h);
+void Sprites(Context& h);
 
 }  // namespace harness

@@ -97,6 +97,8 @@ set(ITC_SOURCES
     src/hooks/archive_streaming.cpp
     src/hooks/memory_status.cpp
     src/hooks/voice.cpp
+    src/hooks/sprites.cpp
+    src/sprites/sprites.cpp
     src/game_data/game_data.cpp
     src/display/gamma.cpp
     src/harnesses/harness.cpp
@@ -116,6 +118,7 @@ set(ITC_SOURCES
     src/harnesses/file_class.cpp
     src/harnesses/movie_files.cpp
     src/harnesses/xma.cpp
+    src/harnesses/sprites.cpp
     src/helpers/debug_output.cpp
     src/helpers/object_attributes.cpp
     src/helpers/time.cpp
