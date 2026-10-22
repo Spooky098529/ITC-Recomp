@@ -324,14 +324,21 @@ made native, or whose adapter it removed:
    an attract race doesn't take): those functions are listed for the
    user's drive (below).
 
-It fixes nothing but missing prints: a function with no harness line
-goes in the report, and the lead halts. Report, in its last message:
+A function with no plain C++ of its own, because its work is done
+inside a native caller (a few lines only that caller needs), isn't a
+failure: the agent sets its row to Merged (the definitions at the top of
+the function files: the caller and the harness that covers the work),
+reports it under `merged:` and doesn't look for its print.
+
+It fixes nothing but missing prints and Merged rows: a function with no
+harness line, and not merged, goes in the report, and the lead halts. Report, in its last message:
 
 ```
 validate: <name>
 prints added: none | <functions>: <commit>
 harness lines: <count> of <count>
 missing: none | <functions with no harness line, and why if known>
+merged: none | <functions set to Merged: their callers>
 ran in play: <functions with a game line> | none
 not in game: <functions with no game line> | none
 race: <seconds at 30 ticks/s>, <error lines>, harnesses all 0: yes | no

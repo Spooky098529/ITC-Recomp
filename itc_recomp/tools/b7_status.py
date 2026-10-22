@@ -8,7 +8,7 @@ itc_recomp/src. Reports only; changes nothing.
 usage: b7_status.py [repo root]   (default: this repo)
 
 Each function in play is counted once, in the first state that fits:
-  ours        an override in src/, or status Native or Dropped (an
+  ours        an override in src/, or status Native, Merged or Dropped (an
               override's recompiled body no longer runs, so a function that
               is ours may be missing from the list: in play is the list
               plus what's ours)
@@ -19,7 +19,7 @@ Each function in play is counted once, in the first state that fits:
 counts in the file its row is in; functions without a row count under
 "(no row)".
 Then the checks (listed, as there should be few): rows that say the
-function no longer runs (Native, Dropped, an override whose original
+function no longer runs (Native, Merged, Dropped, an override whose original
 nothing in src/ calls (outside the harnesses; macros and helpers in other
 files included), or "never called") whose function ran in play.
 """
@@ -70,7 +70,7 @@ def main():
 
     def ours(sub):
         return (sub in overrides and status.get(sub) != "Wrapped") or \
-            status.get(sub) in ("Native", "Dropped")
+            status.get(sub) in ("Native", "Merged", "Dropped")
 
     def state(sub):
         if status.get(sub) == "Wrapped":  # an override, but not ours yet
@@ -102,7 +102,7 @@ def main():
     checks = []
     for s in sorted(seen & set(table)):
         st = status.get(s, "")
-        if st in ("Native", "Dropped"):
+        if st in ("Native", "Merged", "Dropped"):
             checks.append((s, f"{st}, but it ran"))
         elif s in overrides and not overrides[s][1] and st != "Wrapped":
             # Calls built by macros and from helpers in other files count

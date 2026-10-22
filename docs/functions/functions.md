@@ -33,6 +33,11 @@ Status:
   except behind a fallback flag while the drop is being checked. A
   function the game never calls in the first place isn't Dropped: its
   status stays blank and its row says it's never called.
+- **Merged**: its work is done inside a native caller's plain C++ (a
+  few lines only that caller needs), so it has no function or override of
+  its own in `itc_recomp/src/`. The row names the caller(s) and the
+  harness that covers the work. The original is no longer called, except
+  behind the caller's fallback flag.
 - **Patched**: the generated code was edited in place (search for
   `PATCH:`).
 

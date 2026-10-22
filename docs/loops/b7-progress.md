@@ -14,10 +14,10 @@ record: `b7-loop-2026-10-22-0111.md` (and this file's history).
   Validated (itc_512.log): 34 of 34 harness lines, all ran in play.
 - Adapters lead validated: prints added (b88246d), 29 of 31 harness
   lines; `sub_825B6458` (_fltout2) and `sub_8211B298`
-  (AnimationList::Get) have none, as they have no plain C++ function of
-  their own (their harnesses and native callers call the steps, which
-  print). Halt rule: waiting on the user (fix: a plain function each,
-  with the print).
+  (AnimationList::Get) have no function of their own (their work is
+  inside their native callers): set to the new Merged status (the
+  user's, 2026-10-22), not a halt.
+- Next: the race overlays' second migration agent (32 ready groups).
 - Session: pass 4 of 20, subsystem 1 of 5. In all: subsystem 1 of 5.
 - Known at the start: `b7_status.py` checks `c-runtime.md:221`
   `sub_825A9934` (`__chkstk`) "Dropped, but it ran" (from the first run:

@@ -104,7 +104,7 @@ def main():
     def state(function):
         if function in overrides:
             return "overridden"
-        if status.get(function) == "Native":
+        if status.get(function) in ("Native", "Merged"):
             return "native"
         if status.get(function) == "Dropped":
             return "dropped"
