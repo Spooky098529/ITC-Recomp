@@ -36,7 +36,7 @@ memory.
   by the user, 2026-10-22). Then
   the loop ends itself; the user runs `/clear` and starts it again
   (nothing is lost: it picks up from the progress file).
-- **In all:** 5 subsystems a run, then the loop stops for the user's
+- **In all:** 3 subsystems a run (5 until the user lowered it, 2026-10-22), then the loop stops for the user's
   review.
 
 ## The cycle
