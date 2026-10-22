@@ -34,7 +34,9 @@ ITC_FLAG_BOOL(native_collision, true, "ITC",
               "sub_820BA408, sub_820BA5D8, sub_820BD0C8, sub_820BC978, sub_820BCCE8, "
               "sub_820BB300, sub_820BD280, sub_820BD578, sub_820BE490, sub_820BECA0, "
               "sub_820BC858, sub_820BACD0, sub_820BF080, sub_820BF320, sub_820BE150, sub_820BACB8, "
-              "sub_820B9FC8, sub_820B9FE0, sub_820BC908, sub_820BEBF0, sub_820BB868");
+              "sub_820B9FC8, sub_820B9FE0, sub_820BC908, sub_820BEBF0, sub_820BB868, sub_820BAB30, "
+              "sub_820BD1C8, sub_820BC848, sub_820BD508, sub_820BD6E0, sub_820BCE80, "
+              "sub_820BCDD0");
 
 // Defines an adapter: `body` uses `ctx` and `base`.
 #define ITC_COLLISION(address, body)   \
@@ -112,9 +114,9 @@ extern "C" REX_FUNC(sub_820B9C40) {
 
 // --- The shape record ---
 
-// CollisionShape::CurrentCenter (sub_820BAB20) and UpdateMotion
-// (sub_820BAE78) have no adapters: their callers in play are native.
-ITC_COLLISION(820BAB30, ctx.r3.u64 = CollisionShapePreviousCenter(base, ctx.r3.u32))
+// CollisionShape::CurrentCenter, PreviousCenter and UpdateMotion
+// (sub_820BAB20, sub_820BAB30, sub_820BAE78) have no adapters: their
+// callers in play are native.
 // CollisionShape::Type (sub_820BACB8) has no adapter: its callers in play,
 // the query's tests, are native.
 ITC_COLLISION_RECORD(820BADF8, CollisionShapePrevious(base, ctx.r3.u32, &value))
@@ -159,10 +161,8 @@ extern "C" REX_FUNC(sub_820BB758) {
     }                                       \
     ctx.r3.u64 = result;                    \
   }
-// r4 = the cache (the pair's +24).
-ITC_COLLISION_TEST(820BD508, QuerySeparated(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 112,
-                                            &result))
-ITC_COLLISION_TEST(820BD6E0, QuerySeparatedAfterMove(base, ctx.r3.u32, ctx.r1.u32 - 96, &result))
+// Query::Separated and SeparatedAfterMove (sub_820BD508, sub_820BD6E0)
+// have no adapters: their caller in play, CollisionPair::Solve, is native.
 // f1 = the time.
 ITC_COLLISION(820BBB20, uint32_t r3 = 0;
               ctx.f1.f64 = CollisionPairNextCheckTime(base, ctx.r3.u32, ctx.r1.u32 - 160, &r3);
@@ -188,7 +188,8 @@ extern "C" REX_FUNC(sub_820BF038) {
   }
   ctx.r3.u64 = ctx.r3.u32 + 64;
 }
-ITC_COLLISION_TEST(820BCE80, QueryFindImpact(base, ctx.r3.u32, &result))
+// Query::FindImpact (sub_820BCE80) has no adapter: its caller in play,
+// CollisionPair::Solve, is native.
 
 // --- The push-outs ---
 
@@ -210,9 +211,8 @@ extern "C" REX_FUNC(sub_820BFB28) {
   }
   ctx.r3.u64 = r3;
 }
-// r4 = the direction.
-ITC_COLLISION_TEST(820BCDD0, QueryFindPushOut(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 112,
-                                              &result))
+// Query::FindPushOut (sub_820BCDD0) has no adapter: its caller in play,
+// CollisionPair::Solve, is native.
 
 // --- The pair ---
 
@@ -222,9 +222,8 @@ ITC_COLLISION_TEST(820BBE30, CollisionPairSolve(base, ctx.r3.u32, ctx.r1.u32 - 1
 
 // --- The query and its contact ---
 
-ITC_COLLISION(820BD1C8, QueryConstruct(base, ctx.r3.u32))
-ITC_COLLISION(820BC848, QuerySetShapes(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
-// Contact::Set and Contact::Flip (sub_820BC908, sub_820BC858) have no
+// Query::Query, Query::SetShapes, Contact::Set and Contact::Flip
+// (sub_820BD1C8, sub_820BC848, sub_820BC908, sub_820BC858) have no
 // adapters: their callers in play are native.
 
 // --- The shapes' lifetime: only while the game's heap is the allocation
