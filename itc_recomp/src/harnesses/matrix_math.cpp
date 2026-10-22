@@ -89,6 +89,12 @@ ITC_NATIVE_SCALAR(NativeLengthSquared,
                   ctx.f1.f64 = double(mm::QuaternionLengthSquared(base, ctx.r3.u32)))
 ITC_NATIVE_SCALAR(NativeProjectPoint,
                   mm::ProjectPoint(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+// r3 comes back as out + 48 (Vec4::Copy's destination).
+ITC_NATIVE_SCALAR(NativeFromQuaternionAndRow,
+                  mm::FromQuaternionAndRow(base, ctx.r3.u32, ctx.r4.u32);
+                  ctx.r3.u64 = ctx.r3.u32 + 48)
+ITC_NATIVE_SCALAR(NativeQuaternionXAxis,
+                  mm::QuaternionXAxis(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 96))
 ITC_NATIVE_SCALAR(NativeQuaternionFromMatrix,
                   mm::QuaternionFromMatrix(base, ctx.r3.u32, ctx.r4.u32))
 ITC_NATIVE_SCALAR(NativeQuaternionMultiply,
@@ -203,6 +209,9 @@ void MatrixMath(Context& h) {
       {"Matrix::ProjectPoint (sub_82293600)", __imp__sub_82293600, NativeProjectPoint, false},
       {"Quaternion::FromMatrix (sub_82293AD8)", __imp__sub_82293AD8, NativeQuaternionFromMatrix,
        false},
+      {"Matrix::FromQuaternionAndRow (sub_822937D8)", __imp__sub_822937D8,
+       NativeFromQuaternionAndRow, false},
+      {"Quaternion::XAxis (sub_82293DF0)", __imp__sub_82293DF0, NativeQuaternionXAxis, false},
       {"Quaternion::Multiply (sub_82293D78)", __imp__sub_82293D78, NativeQuaternionMultiply,
        false},
       {"Quaternion::NormalizeSelf (sub_82293F10)", __imp__sub_82293F10,

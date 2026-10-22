@@ -551,6 +551,25 @@ void FromQuaternion(uint8_t* base, uint32_t out, uint32_t q) {
   Stfs(base, out + 40, m22);
 }
 
+void FromQuaternionAndRow(uint8_t* base, uint32_t out, uint32_t q) {
+  ITC_NATIVE_RUNNING("sub_822937D8 Matrix::FromQuaternionAndRow");
+  FromQuaternion(base, out, q);
+  vector_library::Vec4Copy(base, out + 48, 0x826382D0);
+}
+
+void QuaternionXAxis(uint8_t* base, uint32_t out, uint32_t q, uint32_t scratch) {
+  ITC_NATIVE_RUNNING("sub_82293DF0 Quaternion::XAxis");
+  const double one = Lfs(base, kOne);
+  Stfs(base, out + 0, one);
+  const double zero = Lfs(base, kZero);
+  Stfs(base, out + 4, zero);
+  Stfs(base, out + 8, zero);
+  Stfs(base, out + 12, one);
+  SetIdentity(base, scratch);
+  FromQuaternionAndRow(base, scratch, q);
+  ProjectPoint(base, out, scratch, out);
+}
+
 float QuaternionLengthSquared(uint8_t* base, uint32_t q) {
   ITC_NATIVE_RUNNING("sub_82293CB0 Quaternion::LengthSquared");
   const double y = Lfs(base, q + 4);

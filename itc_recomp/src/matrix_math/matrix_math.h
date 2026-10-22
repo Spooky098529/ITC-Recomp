@@ -73,6 +73,13 @@ void SetIdentity(uint8_t* base, uint32_t out);
 // Matrix::FromQuaternion (sub_822936F0): the upper 3x3 of the quaternion's
 // turn; the fourth row and column left as they were.
 void FromQuaternion(uint8_t* base, uint32_t out, uint32_t q);
+// Matrix::FromQuaternionAndRow (sub_822937D8): FromQuaternion, then the
+// fourth row copied from 0x826382D0 (Vec4::Copy); the fourth column left.
+void FromQuaternionAndRow(uint8_t* base, uint32_t out, uint32_t q);
+// Quaternion::XAxis (sub_82293DF0): out = (1, 0, 0, 1) projected by the
+// quaternion's turn (a matrix built at `scratch`, 64 bytes of guest memory:
+// the original's stack, r1 - 96): the x axis turned.
+void QuaternionXAxis(uint8_t* base, uint32_t out, uint32_t q, uint32_t scratch);
 // Quaternion::LengthSquared (sub_82293CB0): x² + y² + z² + w².
 float QuaternionLengthSquared(uint8_t* base, uint32_t q);
 // Matrix::ProjectPoint (sub_82293600): (p, 1) * m divided by its w, out w
