@@ -76,7 +76,8 @@ extern "C" REX_FUNC(sub_821268C0) {
 ITC_OVERLAY_FLOAT(821268F0, WheelSpin(base, ctx.r3.u32, ctx.r4.u32))
 ITC_OVERLAY_FLOAT(82126908, WheelValue512(base, ctx.r3.u32, ctx.r4.u32))
 ITC_OVERLAY_FLOAT(82126920, AxleValue3764(base, ctx.r3.u32, ctx.r4.u32))
-ITC_OVERLAY_FLOAT(82126958, AxleValue3384(base, ctx.r3.u32, ctx.r4.u32))
+// AxleValue3384 (sub_82126958) has no adapter: its only caller in play,
+// CarOverlays::UpdateTrails, is native.
 ITC_OVERLAY_WORD(82126998, WheelOnGround(base, ctx.r3.u32, ctx.r4.u32))
 // The view's (r3) vehicle's fields.
 ITC_OVERLAY_WORD(82126A80, VehicleByte2504(base, ctx.r3.u32))
@@ -118,7 +119,8 @@ ITC_OVERLAY_SET(8212BA70, ParticlesBSetPosition(base, ctx.r3.u32, ctx.r4.u32))
 // f1 = speed.
 ITC_OVERLAY_SET(8212C6A8, ParticlesCSetPosition(base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64))
 ITC_OVERLAY_SET(8212DF90, SparksSetPosition(base, ctx.r3.u32, ctx.r4.u32))
-ITC_OVERLAY_SET(821299D8, TrailSetLastPosition(base, ctx.r3.u32, ctx.r4.u32))
+// Trail::SetLastPosition (sub_821299D8) has no adapter: its only caller in
+// play, CarOverlays::UpdateTrails, is native.
 ITC_OVERLAY_SET(8212CE18, MarkerSetCameraPosition(base, ctx.r3.u32, ctx.r4.u32))
 ITC_OVERLAY_SET(8211EBE0, LightSpriteSetPosition(base, ctx.r3.u32, ctx.r4.u32))
 ITC_OVERLAY_SET(82121560, ModelSpritePlaceHidden(base, ctx.r3.u32, ctx.r4.u32))
@@ -195,27 +197,9 @@ extern "C" REX_FUNC(sub_8212C1C0) {
   ctx.r3.u64 = ParticlesCEmit(base, ctx.r3.u32, ctx.r4.u32);
 }
 
-// Trail::AddPoint: r3 = the trail, r4 = position, r5 and r6 = a vector,
-// f1 = speed, f2 = width, r7 = a state, r10 = a value; returns 1 for a
-// point added. Where the native version declines (a capacity of 0 or -1),
-// the original runs.
-extern "C" REX_FUNC(sub_82129598) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_race_overlays)) {
-    __imp__sub_82129598(ctx, base);
-    return;
-  }
-  ctx.fpscr.disableFlushMode();
-  const uint32_t direction[4] = {uint32_t(ctx.r5.u64 >> 32), ctx.r5.u32,
-                                 uint32_t(ctx.r6.u64 >> 32), ctx.r6.u32};
-  uint32_t result = 0;
-  if (!TrailAddPoint(base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64, ctx.f2.f64, direction,
-                     ctx.r7.u32, ctx.r10.u32, &result)) {
-    __imp__sub_82129598(ctx, base);
-    return;
-  }
-  ctx.r3.u64 = result;
-}
+// Trail::AddPoint (sub_82129598) has no adapter: its only caller in play,
+// CarOverlays::UpdateTrails, is native (and declines first where AddPoint
+// would).
 
 // ParticlesB::Emit: r3 = the effect, r4 = a position, f1 = a size factor
 // (f2 and f3 aren't read); returns 1, or 0 when full. Where the native
