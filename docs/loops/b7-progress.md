@@ -11,8 +11,13 @@ record: `b7-loop-2026-10-22-0111.md` (and this file's history).
 - Subsystem: the race overlays (`race-overlays.md`, mapped in 6baeabf).
   First migration agent: 34 functions Overridden in 5 groups
   (76ddc05..3fc85b8), `--native_race_overlays`; 32 ready groups left.
-  Step 8: validation agent running, for these 34 and the adapters
-  lead's 31 (their prints added).
+  Validated (itc_512.log): 34 of 34 harness lines, all ran in play.
+- Adapters lead validated: prints added (b88246d), 29 of 31 harness
+  lines; `sub_825B6458` (_fltout2) and `sub_8211B298`
+  (AnimationList::Get) have none, as they have no plain C++ function of
+  their own (their harnesses and native callers call the steps, which
+  print). Halt rule: waiting on the user (fix: a plain function each,
+  with the print).
 - Session: pass 4 of 20, subsystem 1 of 5. In all: subsystem 1 of 5.
 - Known at the start: `b7_status.py` checks `c-runtime.md:221`
   `sub_825A9934` (`__chkstk`) "Dropped, but it ran" (from the first run:
@@ -46,7 +51,11 @@ Functions made native this run with no `native running (game):` line in
 the validation agent's attract race; the user drives (with
 `--log_level=info`) and checks the log for them when the loop ends.
 
-(none yet)
+- Adapters lead (itc_512.log): `sub_825A9DD8` strcpy_s, `sub_825B6378`
+  ___dtold, `sub_825B8B48` $I10_OUTPUT, `sub_825B6458` _fltout2,
+  `sub_825AE8E0` _cftof_l, `sub_825AE708` _cftof2_l, `sub_825B61E8`
+  _fptostr, `sub_825B7A80` _putwc_nolock, `sub_8211B298`
+  AnimationList::Get.
 
 ## Totals
 
