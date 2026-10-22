@@ -752,6 +752,124 @@ void FixUpFileCases(Context& h) {
   results.Report();
 }
 
+// UiMovie::RestorePose: two scenes (live and rest) in an area of guest stack
+// below the scratch area (as the sprites harness's lists: the call's own
+// stack stays above it), their children random nodes: GRP (with a range of
+// leaves at indices 8 to 11), PIC, PRM (textures and vertices), SCE (a
+// sub-scene of leaves), TFM, TXT or other tags; everything else random
+// words with odd floats mixed in. Both scenes' entries from base index
+// [+108]; the range walked from the live scene's +100 and +104, or a
+// group's. Compared: the whole area and r3.
+void RestorePoseCases(Context& h) {
+  Results results("UiMovie::RestorePose (sub_82119B80)");
+  constexpr uint32_t kAreaBelow = 0x10000, kAreaBytes = 0x2000;
+  const uint32_t area = (h.data - kAreaBelow) & ~0xFu;
+  const uint32_t live_scene = area, rest_scene = area + 256, live_sub = area + 512,
+                 rest_sub = area + 768;
+  auto live_node = [&](uint32_t k) { return area + 1024 + 320 * k; };
+  auto rest_node = [&](uint32_t k) { return area + 4352 + 320 * k; };
+  constexpr uint32_t kLeafTags[] = {0x50494300, 0x50524D00, 0x54464D00, 0x54585400, 0x12345678};
+  Random& r = h.random;
+  for (int i = 0; i < 500; i++) {
+    std::vector<uint32_t> words(kAreaBytes / 4);
+    for (uint32_t& w : words) {
+      w = r.Below(4) == 0 ? kOddFloats[r.Below(std::size(kOddFloats))] : uint32_t(r.Next());
+    }
+    // The children: top-level indices 0..7 (the range within them), group
+    // leaves 8..11, the sub-scene's 0..3. Nodes 0-9 (live and rest).
+    const uint32_t first = r.Below(3), count = r.Below(7);
+    const uint32_t base_live = r.Below(3), base_rest = r.Below(3);
+    std::vector<std::pair<uint32_t, uint32_t>> scene_entries(12), sub_entries(4);
+    std::vector<uint32_t> node_tags(10);
+    std::vector<uint32_t> node_vertices(10), node_textures_live(10), node_textures_rest(10);
+    for (uint32_t k = 0; k < 10; k++) {
+      node_tags[k] = kLeafTags[r.Below(5)];
+      node_vertices[k] = r.Below(5);
+      node_textures_live[k] = r.Below(3);
+      node_textures_rest[k] = r.Below(3);
+    }
+    // Nodes 8 and 9 may be a group and a sub-scene.
+    node_tags[8] = r.Below(2) ? 0x47525000 : kLeafTags[r.Below(5)];
+    node_tags[9] = r.Below(2) ? 0x53434500 : kLeafTags[r.Below(5)];
+    for (uint32_t k = 0; k < 12; k++) {
+      const uint32_t node = k < 8 ? r.Below(10) : r.Below(8);
+      scene_entries[k] = {live_node(node), rest_node(node)};
+    }
+    for (uint32_t k = 0; k < 4; k++) {
+      const uint32_t node = r.Below(8);
+      sub_entries[k] = {live_node(node), rest_node(node)};
+    }
+    const uint32_t group_count = r.Below(5), sub_count = r.Below(5);
+    const bool use_group = r.Below(4) == 0;
+    const bool no_rest_group = r.Below(4) == 0;  // r7 0: the live scene's range
+    const uint32_t movie = uint32_t(r.Next());
+    std::vector<uint8_t> result[2];
+    for (int v = 0; v < 2; v++) {
+      for (uint32_t k = 0; k < words.size(); k++) {
+        guest::StoreU32(h.base, area + 4 * k, words[k]);
+      }
+      auto scene = [&](uint32_t at, uint32_t entry_base, uint32_t range_first, uint32_t range_count,
+                       const std::vector<std::pair<uint32_t, uint32_t>>& entries, bool live) {
+        guest::StoreU32(h.base, at + 100, range_first);
+        guest::StoreU32(h.base, at + 104, range_count);
+        guest::StoreU32(h.base, at + 108, entry_base);
+        for (uint32_t k = 0; k < entries.size(); k++) {
+          guest::StoreU32(h.base, at + 128 + 8 * (entry_base + k),
+                          live ? entries[k].first : entries[k].second);
+        }
+      };
+      scene(live_scene, base_live, first, count, scene_entries, true);
+      scene(rest_scene, base_rest, first, count, scene_entries, false);
+      scene(live_sub, 0, 0, sub_count, sub_entries, true);
+      scene(rest_sub, 0, 0, sub_count, sub_entries, false);
+      guest::StoreU32(h.base, live_sub, 0x53434500);
+      for (uint32_t k = 0; k < 10; k++) {
+        guest::StoreU32(h.base, live_node(k), node_tags[k]);
+        guest::StoreU32(h.base, live_node(k) + 112, node_textures_live[k]);
+        guest::StoreU32(h.base, rest_node(k) + 112, node_textures_rest[k]);
+        guest::StoreU32(h.base, rest_node(k) + 116, node_vertices[k]);
+      }
+      // The group's leaves (8 to 11 + its base); the sub-scene node points
+      // the walk into the sub-scenes.
+      guest::StoreU32(h.base, live_node(8) + 100, 8);
+      guest::StoreU32(h.base, live_node(8) + 104, group_count);
+      if (node_tags[9] == 0x53434500) {
+        // A scene node: its children are the sub-scene's (the live node is
+        // the sub-scene itself).
+        for (uint32_t k = 0; k < 12; k++) {
+          for (int side = 0; side < 2; side++) {
+            const uint32_t entry = (side == 0 ? live_scene + 128 + 8 * (base_live + k)
+                                              : rest_scene + 128 + 8 * (base_rest + k));
+            if (guest::LoadU32(h.base, entry) == (side == 0 ? live_node(9) : rest_node(9))) {
+              guest::StoreU32(h.base, entry, side == 0 ? live_sub : rest_sub);
+            }
+          }
+        }
+      }
+      PPCContext t = CallContext(h);
+      t.r3.u64 = movie;
+      t.r4.u64 = live_scene;
+      t.r5.u64 = rest_scene;
+      t.r6.u64 = use_group ? live_node(8) : 0;
+      t.r7.u64 = use_group && !no_rest_group ? rest_node(8) : 0;
+      (v == 0 ? __imp__sub_82119B80 : sub_82119B80)(t, h.base);
+      result[v] = Read(h.base, area, kAreaBytes);
+      AppendWord(result[v], t.r3.u32);
+    }
+    size_t at = 0;
+    while (at < result[0].size() && result[0][at] == result[1][at]) {
+      at++;
+    }
+    const size_t from = at < result[0].size() ? at : 0;
+    const size_t to = std::min(result[0].size(), from + 32);
+    results.Check({result[0].begin() + from, result[0].begin() + to},
+                  {result[1].begin() + from, result[1].begin() + to},
+                  fmt::format("case {}: range {} {} group {} ({}) sub {}, from byte {}", i, first,
+                              count, node_tags[8] == 0x47525000, use_group, sub_count, from));
+  }
+  results.Report();
+}
+
 }  // namespace
 
 void UiMovies(Context& h) {
@@ -782,6 +900,7 @@ void UiMovies(Context& h) {
   FixUpAnimationCases(h);
   FixUpSceneCases(h);
   FixUpFileCases(h);
+  RestorePoseCases(h);
 }
 
 }  // namespace harness

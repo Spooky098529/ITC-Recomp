@@ -22,7 +22,8 @@ ITC_FLAG_BOOL(native_ui_movies, true, "ITC",
               "sub_8259FC18; the recorders sub_8259DAD0, sub_8259E098 and sub_8259D7B0; the "
               "file fix-ups sub_825A0CF8 with sub_825A0C60, and UiMovie::FixUpFile "
               "sub_825A0EF0 with sub_825A0E40, sub_825A0ED8, sub_8259D688 and sub_825A6570; "
-              "sub_8259EBE8 and sub_8259DAC0, which call the recorders) "
+              "sub_8259EBE8 and sub_8259DAC0, which call the recorders; UiMovie::RestorePose "
+              "sub_82119B80) "
               "natively instead of through the translated code (same results; checked by "
               "--run_harnesses=ui_movies)");
 
@@ -351,5 +352,14 @@ void ResetAfterMovie(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   ctx.f1.f64 = double(std::bit_cast<float>(guest::LoadU32(base, kClipResetDepth)));
   sub_8259D7B0(ctx, base);
+}
+
+void RestorePose(PPCContext& ctx, uint8_t* base) {
+  if (!ITC_FLAG(native_ui_movies)) {
+    __imp__sub_82119B80(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = ui_movies::RestorePose(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
+                                      ctx.r7.u32);
 }
 }  // namespace ui_movies_hooks

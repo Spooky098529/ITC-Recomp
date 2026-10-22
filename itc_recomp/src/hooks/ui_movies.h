@@ -13,4 +13,11 @@ namespace ui_movies_hooks {
 // src/debug/pause_movie_log.cpp) wraps this for --log_pause_movie.
 void ResetAfterMovie(PPCContext& ctx, uint8_t* base);
 
+// UiMovie::RestorePose (sub_82119B80; r3 = the movie, r4 and r5 = the live
+// and rest scenes, r6 and r7 = a live and rest group or 0): natively or,
+// with --native_ui_movies off, the original. Its override
+// (src/debug/pause_movie_log.cpp) runs the original, watched, for
+// --log_pause_movie.
+void RestorePose(PPCContext& ctx, uint8_t* base);
+
 }  // namespace ui_movies_hooks

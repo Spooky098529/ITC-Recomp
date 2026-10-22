@@ -481,12 +481,23 @@ void WatchMovingTargets(const char* name, PPCContext& ctx, uint8_t* base, Call&&
     }                                                                                   \
     debug::WatchMovingTargets(#address, ctx, base, [&] { __imp__sub_##address(ctx, base); }); \
   }
-WATCH_MOVIE_CALL(82119B80)
 WATCH_MOVIE_CALL(8259FA00)
 WATCH_MOVIE_CALL(8211CD90)
 WATCH_MOVIE_CALL(8211B4D0)
 WATCH_MOVIE_CALL(8211B080)
 #undef WATCH_MOVIE_CALL
+
+// UiMovie::RestorePose (sub_82119B80), natively with --native_ui_movies
+// (src/hooks/ui_movies.cpp); with --log_pause_movie the original runs,
+// watched as the others (its recursive calls come back here, each watched).
+extern "C" REX_FUNC(sub_82119B80) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(log_pause_movie)) {
+    ui_movies_hooks::RestorePose(ctx, base);
+    return;
+  }
+  debug::WatchMovingTargets("82119B80", ctx, base, [&] { __imp__sub_82119B80(ctx, base); });
+}
 
 // sub_8259DAC0, watched as the others; its work (natively with
 // --native_ui_movies) is in src/hooks/ui_movies.cpp.

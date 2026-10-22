@@ -101,6 +101,23 @@ void SetRenderer(uint8_t* base, uint32_t renderer, uint32_t list);
 // 0x82000A30 (1.0), +96..+108 = 0.
 void ResetDrawContext(uint8_t* base, uint32_t context);
 
+// UiMovie::RestorePose (sub_82119B80; ui_movies.cpp): puts a movie's live
+// tree back to its rest pose. `live` and `rest` are the two scenes; the
+// children walked are `group`'s range (+100 the first, +104 the count),
+// last first, or the live scene's when `group` or `rest_group` is 0 (as the
+// original tests r6 and r7). For each pair of children (Child at the same
+// index in each scene) whose live one is tagged GRP, PIC, PRM, SCE, TFM or
+// TXT: +12..+80 copied from the rest one, then by tag: a group recursed
+// into (same scenes, its range), a scene recursed into as the scenes, a
+// picture's +100..+136, a text's +100, +104, +116..+136, a primitive's
+// +100..+108 and its first [rest + 116] vertices (+0..+28 each). Returns
+// the r3 the original leaves (its callers may pass it on): the last child
+// pair's (rest child + 28, the rest primitive's last vertex, a recursion's
+// result, or the rest child when its tag isn't one of those), or `movie`
+// when nothing is walked.
+uint32_t RestorePose(uint8_t* base, uint32_t movie, uint32_t live, uint32_t rest, uint32_t group,
+                     uint32_t rest_group);
+
 // Loading (files.cpp): the movie file (`X2D`, version `005`) and the `XMD`
 // file (version `001`) are fixed up in place once loaded.
 //
