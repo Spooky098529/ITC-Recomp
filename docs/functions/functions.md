@@ -62,6 +62,11 @@ Rows not yet moved stay in the table below. So far:
 - [`sprites.md`](sprites.md): the camera-facing sprites: the race
   overlays' sprite lists (trails, particles), single sprites and screen
   rectangles, and the light glows' billboards (B7).
+- [`race-overlays.md`](race-overlays.md): the race overlays' manager
+  and update side: the overlays per car, their views of the vehicles,
+  and the trails, smoke, sparks, particles, light sprites and the marker
+  above opponents fed from the cars' wheels and bodies (B7; their
+  recordings are in `sprites.md`).
 - [`command-list.md`](command-list.md): the graphics library's command
   list the recorders write render commands into: its set-up and flip,
   opening and closing chunks, allocating slots, vertices, bytes and
@@ -211,7 +216,6 @@ old performance notes to the end of `../native-renderer.md`.
 | `sub_820D04E8` | `Model::Draw` | | Draws a model (r31 = r3): a visibility test (`sub_825951E0`), then the per-object recorder `sub_825953D0` (return address `0x820D0564`, which pairs products by r31). Culls with the camera it's given, so a world matrix away from the tick's can be culled. |
 | `sub_82099A98` | `TickHandler::Invoke` | Wrapped | r3 = the app, r4 = the handler (target at +8). Skips some tick handlers on render-only passes (`SkipTickHandlerOnRenderOnlyPass`, `src/frame_pacing/game_messages.cpp`); the diagnostics' before and after hooks (`--log_tick_handlers`, `--find_per_frame_state` and others). |
 | `sub_820DC958` | `BlinkTimers::Advance` | Wrapped | Skipped on render-only passes (`--per_tick_blink_timers`; "Per-frame logic" in `../frame-interpolation.md`). |
-| `sub_8215DEA0` | `RaceOverlays::Run` | Overridden | The race overlays (25 objects at r3; the marker above opponents): their update (vtable slot 4) on logic passes only, their recording (slot 5) every pass with the logic pass's cameras put back, in the original's stack frame so their products pair. See "World-space sprites" in `../frame-interpolation.md`. |
 | `sub_821594B8` | | Wrapped | The rival intro cutscene's Update handler: runs on logic passes; on render-only passes only its logo's draw (`sub_82211A28`) is repeated (`--redraw_rival_logo`; "The rival logo at the race start" in `../frame-interpolation.md`). |
 | `sub_82211A28` | | Wrapped | Draws the rival's logo; noted during the cutscene for the render-only redraw. |
 | `sub_821379D8` | `Glow::Record` | Wrapped | The glow (bloom) recorder in races: strength and history weight blended between ticks, history written every frame (`--blend_glow`, `--glow_history_every_frame`; `src/interpolation/glow.cpp`). |

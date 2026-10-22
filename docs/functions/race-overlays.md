@@ -1,0 +1,243 @@
+# Known functions: race overlays
+
+The race overlays: the effects drawn around each car in a race (the
+trails behind its wheels, tire smoke, sparks, two other particle
+effects, light glows, and the marker above opponents), about `82121000`
+to `8212EE00` in `default.xex`, with their manager around `8215DE80` to
+`8215E6C0` and the single-sprite classes at `8211E8A8` to `8211F430`.
+The race scene's owner keeps a list of 25 overlay pointers at owner +
+9608 (`RaceOverlays::`); one entry a car (up to 7, made by
+`sub_8215E208`) is a `CarOverlays` object (848 bytes, vtable
+`0x82008524`), which owns 38 child overlays of seven classes (4 trails,
+4 smoke emitters, 4 light sprites, 8 spark emitters, 4 of particle
+effect B, the marker, 4 of particle effect C, 9 car-model sprites). Each
+`CarOverlays` holds up to 25 views (16-byte objects: a vehicle, its
+scene model and a viewport), set up by `sub_8215E2E0` per car and per
+player. Every tick the manager (`sub_8215DEA0`, overridden: updates on
+logic passes only) calls each `CarOverlays`' update (vtable slot 4,
+`sub_82126220`), which reads its car's wheels, body and model points and
+feeds the children (emitting particles, adding trail points, placing
+sprites), then calls each child's own update (slot 4: ageing and fading
+its particles); then each `CarOverlays`' recording (slot 5,
+`sub_82122958`) calls each child's recording (slot 7, with the camera
+pass index), which fills sprite lists and records them. The recordings
+and the sprite recorders are in [`sprites.md`](sprites.md) (shared:
+`sub_82129A08`, `sub_8212ACF0`, `sub_8212BB20`, `sub_8212C6D0`,
+`sub_8212DFB8`, `sub_8212CE40`, `sub_8211EC18`, `sub_82123300`,
+`sub_82126630`, `sub_821266C8`); how the overlays are drawn every frame and blended is
+"Race overlays" and "World-space sprites" in
+`../frame-interpolation.md`. Layouts are in `../known-data.md` ("car
+overlays" and the rows after it). Mapped by the B7 loop
+(`../loops/b7-loop.md`), 2026-10-22, from the generated code only (no
+runs): call counts aren't known; vtable slots are inferred from the
+constructors' vtable addresses and the callers' offsets (the vtables
+themselves, in `.rdata`, weren't read). Shared callees in other files:
+`sub_820AB560` (Wrapped), `sub_82597118`
+and `Vehicle::GetSpeedKmh` (`sub_820C0128`, Overridden) in
+[`functions.md`](functions.md); `sub_825A7410` (`memcpy`),
+`sin`, `cos`, `acos` and the stack probe `sub_825A9934` in
+[`c-runtime.md`](c-runtime.md); `Archive::Load` (`sub_8209DE48`) in
+[`files-and-saves.md`](files-and-saves.md); `sub_82596E68` and `sub_82596F68` (a texture set made and
+loaded), `sub_82108860` (a texture set released), `sub_82295398` and `sub_82295330` (probably
+VirtualAlloc and VirtualFree), `sub_825A6880` (probably operator new) and
+`sub_825A70E8` (probably operator delete) are leads in
+`../loops/leads.md`. The overlays allocate guest memory (their objects,
+views and texture tables through `sub_82295398`, the texture set through
+`sub_825A6880`): making the creation side native waits on the user's
+call on the guest heap; the update side doesn't allocate.
+
+Status:
+
+- **Native**: plain C++ in `itc_recomp/src/` that doesn't use the
+  PowerPC context (`ctx`): normal arguments and host structs (it may
+  still read and write guest memory through `src/guest.h` while
+  recompiled code shares the data). The game reaches it without `ctx`,
+  from native or overridden callers, and the recompiled original is no
+  longer called (except behind a fallback flag or to check against it).
+  No `REX_FUNC` override of it exists, not even an adapter kept only for
+  a harness (that's Overridden until the adapter goes).
+  The end state for every function.
+- **Overridden**: an `extern "C" REX_FUNC(sub_XXXXXXXX)` override in
+  `itc_recomp/src/` (or a macro defining one) does the work instead of
+  the original: a thin adapter in front of native code, or a body that
+  still uses `ctx` (calling guest code, reading registers). It may call
+  the original when its flag is off, or to check itself against it.
+- **Wrapped**: an override that does something of its own (skipping
+  render-only passes, logging, timing) and still calls the original
+  (`__imp__sub_XXXXXXXX`) for the work.
+- **Dropped**: its work isn't needed on PC (hardware set-up, kernel calls
+  the SDK already stubbed), so it no longer runs: an override in
+  `itc_recomp/src/` replaces it with nothing (or a fixed return value), or
+  its callers, made native, leave the call out (no override then; the row
+  says which caller). Logs, a harness or the renderer's frame dumps have
+  shown that nothing reads what it did. The original is no longer called,
+  except behind a fallback flag while the drop is being checked. A
+  function the game never calls in the first place isn't Dropped: its
+  status stays blank and its row says it's never called.
+- **Patched**: the generated code was edited in place (search for
+  `PATCH:`).
+
+A function usually moves from recompiled or Wrapped to Overridden to
+Native as the `ctx` edge moves up through its callers, or straight to
+Dropped when its work isn't needed.
+`itc_recomp/tools/check_function_statuses.py` checks this column, in
+every file of the tables, against `src/` (an override marked Native, a
+status with no override, an override with no row, a row in two files);
+run it after changing either, on any branch.
+
+| Address | Name | Status | Notes |
+|---|---|---|---|
+| `sub_8215DEA0` | `RaceOverlays::Run` | Overridden | The race overlays (25 objects at r3; the marker above opponents): their update (vtable slot 4) on logic passes only, their recording (slot 5) every pass with the logic pass's cameras put back, in the original's stack frame so their products pair. See "World-space sprites" in `../frame-interpolation.md`. The 25 objects are the owner's list at +9608 (r3 = owner + 9608 from the thunk `sub_8215E150`); in races the non-null ones are `CarOverlays` (one a car), whose slot 4 is `sub_82126220` and slot 5 probably `sub_82122958`. |
+| `sub_8215E150` | `RaceOverlays::OnUpdate` | | Message handler thunk: r3 += 9608, tail-calls `sub_8215DEA0`. The Update handler `game_messages.cpp` delivers on render-only passes too (`--redraw_race_overlays`). No direct callers (registered as a handler, probably by `sub_8215E6C8`). |
+| `sub_8215E158` | | | Message handler thunk: r3 += 9608, tail-calls `sub_8215DF20` (the recordings only). Which message isn't known. No direct callers. |
+| `sub_8215E680` | | | Message handler thunk: r3 += 9608, tail-calls `sub_8215E208` (the overlays made). No direct callers; probably the race's load or start. |
+| `sub_8215E688` | | | Message handler: r3 + 9608 to `sub_8215E160` then `sub_8215DF80` (views freed, overlays deleted). No direct callers; probably the race's end. |
+| `sub_8215E6C0` | | | Message handler thunk: r3 += 9608, tail-calls `sub_8215E2E0` (views bound, overlays initialized). No direct callers. |
+| `sub_8215DE80` | `RaceOverlays::Clear` | | r3 = the list: its 25 pointers set to 0. Leaf. From `sub_821073B8` (probably the owner's constructor; not read). |
+| `sub_8215DF20` | `RaceOverlays::RecordAll` | | r3 = the list: each non-null overlay's vtable slot 5 (+20) called, r3 the overlay. From `sub_8215E158`. |
+| `sub_8215DF80` | `RaceOverlays::DeleteAll` | | r3 = the list: each non-null overlay's slot 0 (its destructor, r4 = 0: not freed by it), then `sub_82295330(overlay, 0, 0x8000)` (probably VirtualFree, MEM_RELEASE) and the pointer cleared. From `sub_8215E1D0`, `sub_8215E208`, `sub_8215E688`. |
+| `sub_8215E000` | `RaceOverlays::ShareTextures` | | r3 = the list: entries 1-24, when set, get overlay 0's texture table (`sub_8212C0E0(entry, [list[0] + 104])`: +104 = it). Only overlay 0 loads the textures (`sub_82125888`). From `sub_8215E2E0`. |
+| `sub_8215E048` | `RaceOverlays::SlotOf` | | r3 = an overlay's index (0-24): a view slot index, 1 to 24 by a byte jump table in `.rdata` (not read; probably the index itself), 0 for anything above 24 or what the table sends to the default. Leaf. From `sub_8215E160` and `sub_8215E2E0`. |
+| `sub_8215E078` | | | `li r3,1; blr`: the first case of `sub_8215E048`'s jump table, seen as its own function. |
+| `sub_8215E160` | `RaceOverlays::FreeViews` | | r3 = the list: for each non-null overlay and each index 0-24, the view at `SlotOf(index)` (`sub_82126550`), when set, freed (`sub_82126570`). From `sub_8215E1D0`, `sub_8215E208`, `sub_8215E2E0`, `sub_8215E688`. |
+| `sub_8215E1D0` | `RaceOverlays::Destroy` | | r3 = the list: `sub_8215E160`, then `sub_8215DF80`. From `sub_82107518` (probably the owner's destructor; not read). |
+| `sub_8215E208` | `RaceOverlays::Create` | | r3 = the list: frees and deletes what's there (`sub_8215E160`, `sub_8215DF80`), clears the 25 pointers, then makes overlay 0 and, for the race's car count (`[[0x826C5B2C] + 0x59610]`, capped at 7) minus 1, overlays 1 to 6: each 848 bytes from `sub_82295398(0, 848, 0x801000, 4)` (probably VirtualAlloc, MEM_COMMIT with 0x800000, PAGE_READWRITE) and constructed by `sub_82123350`. Then starts overlay 0's texture load from archive file 71 (`sub_82125888`). Allocates guest memory. From `sub_8215E680`. |
+| `sub_8215E2E0` | `RaceOverlays::Bind` | | r3 = the list: frees the views (`sub_8215E160`), shares overlay 0's textures (`sub_8215E000`), then builds view descriptions (vehicle `sub_820C0468(i)`, its scene model from `sub_820C5D70([0x826C2E44], 2, n)` or 0, a viewport from `[0x826C2CE8]`: +0, or +4 for player 2 when `[[0x826C2CE8] + 8]` is set, probably split screen) and gives them to the overlays (`sub_82126660` makes a view in a slot, `sub_82126890` fills it): overlay 0's slot 0 is car 0; with more cars, overlays 0 and 1 also see each other (slots 0 and 1); overlay i (2-24) gets its car in `SlotOf(i)` and the players' cars in slots 0 and 1. Then each overlay's slot 6 (+24, init: `sub_821256B8` for `CarOverlays`) with a 28-byte set-up on its stack: +0 the viewport entry (0, 2 or 3), +4 a second index (2 or 3), +12 the view slot, +16 to +24 three words of `[0x826C5B2C]` (+4, +28, +32); overlay 0 last. Allocates guest memory (through `sub_82126660`). From `sub_8215E6C0`. |
+| `sub_82123350` | `CarOverlays::CarOverlays` | | r3 = the new 848-byte object: the base constructor (`sub_82126498`), vtable `0x82008524`, +144 = 0, the 25 view slots cleared (`sub_82126530`), +748 to +780 a color (1.0, then 0.0 in +768 to +776 and 1.0 in +780), +788 = 6, +104, +108, +112, +720 = 0; then sets the sprite recorders' render queue and command list from the render manager `[0x826BABA0]` (vtable slot 8, then that object's slots 2 and 1; `sub_82128190`). Returns r3. From `sub_8215E208`. |
+| `sub_821261C0` | `CarOverlays::~CarOverlays` | | Slot 0 (no direct callers): vtable back to `0x82008524`, the children deleted (`sub_82125970`), the base vtable (`sub_82126498`), and `sub_825A70E8(this)` (probably operator delete) when r4 bit 0 is set. |
+| `sub_82125970` | `CarOverlays::DeleteChildren` | | r3 = the car overlays: each of the 38 children (+148 to +176, +200 to +212, +360 to +372, +328 to +356, +396 to +428, +376, +380 to +392) destroyed (its slot 0, r4 = 0), freed (`sub_82295330(child, 0, 0x8000)`) and cleared; then the textures released (`sub_821258F8`). Doesn't check for null children. From `sub_821261C0`. |
+| `sub_821258F8` | `CarOverlays::ReleaseTextures` | | r3 = the car overlays: when the texture set (+108) is set, frees the texture table (+104, `sub_82295330(table, 0, 0x8000)`) and releases the set (`sub_82108860(this + 108)`); +104, +108, +112 cleared. From `sub_82125970`. |
+| `sub_82125888` | `CarOverlays::LoadTextures` | | r3 = the car overlays, r4 = an archive file id (71): a buffer of the file's size (`sub_820A0678(id)`, from `sub_82295398(0, size, 4096, 4)`), then `Archive::Load(id, buffer, 0x82125610, this, 0, 0)` with `sub_82125610` as its callback. From `sub_8215E208` (overlay 0 only). Allocates guest memory. |
+| `sub_82125610` | `CarOverlays::OnTexturesLoaded` | | `Archive::Load`'s callback (no direct callers; its address is passed by `sub_82125888`): r4 = the loaded file, r6 = the car overlays. Makes a texture set (24 bytes from `sub_825A6880`, `sub_82596E68`) at +108 and loads it from the file (`sub_82596F68`), allocates a 168-byte table at +104 (`sub_82295398`) and fills it with the set's 42 textures (`sub_82597118(set, i)`), frees the file's buffer (`sub_82295330`) and sets +112 = 1. Allocates guest memory. |
+| `sub_821256B8` | `CarOverlays::Init` | | Slot 6 (no direct callers; from `sub_8215E2E0` through the vtable): r4 = the 28-byte set-up. +144 = the effects' parameter table `0x82616F50`, +128 = set-up +12 (the view slot), +132 to +140 = +16 to +24, +116 = +0 (viewport entry), +120 = +4; binds the viewport into +796 (`sub_821264C0`), makes the children (`sub_82123450`), resets them (slot 3, `sub_82123880`), then +832 = the view's vehicle, +836 = -1, +820, +824, +828 = 0, and when the view has no model (+8) looks for it (`sub_821253F0`). |
+| `sub_82123450` | `CarOverlays::CreateChildren` | | r3 = the car overlays, r4 = the set-up. Makes the 38 children, each from `sub_82295398(0, size, 0x801000, 4)`, constructed, initialized through its slot 6 (r4 = a 12-byte {set-up +0, +4, a parameter table} on the stack, r5 = its capacity) and given textures from the texture table (+104): 4 trails at +148 (64,160 bytes, `sub_8212A140`, 500 points, `[+104] + 36` through `sub_8212D6D8`, table `0x82616E64`), 4 smoke emitters at +164 (32,640, `sub_8212B2E8`, 45 emitters, +40, `0x82616E78`), 4 light sprites at +200 (288, `sub_8211F060`, 1, nine textures from +104 by `sub_8211E9C8`, `0x82616E88`), 8 spark emitters at +328 (29,824, `sub_8212E9A0`, 200, +44, `0x82616E98`), 4 of particle effect B at +360 (2,816, `sub_8212BFE8`, 15, +40, `0x82616EA8`), 9 car-model sprites at +396 (576, `sub_82122880`, 1, 25 textures from +48 by `sub_8211F408`, `0x82616EE8`), the marker at +376 (304, `sub_8212D620`, 1, four textures from +148 by `sub_8212CC10`, `0x82616EC8`), 4 of particle effect C at +380 (2,720, `sub_8212CAF8`, 20, +164 by `sub_8212C0E0`, `0x82616ED8`); +180 to +196 and two runs of 14 words (+216, +272) cleared. Allocates guest memory. From `sub_821256B8`. |
+| `sub_82123880` | `CarOverlays::Reset` | | Slot 3 (no direct callers; from `sub_821256B8`): every child's slot 3 (its reset), the four 12-byte wheel counters at +432 and the 60 words at +480 cleared, +788 = 6, +768 to +776 = 0.0, +780 = 1.0. |
+| `sub_82126220` | `CarOverlays::Update` | | Slot 4 (no direct callers; from `sub_8215DEA0`'s update loop, once a tick, logic passes only): r3 = the car overlays. Its view (`sub_82126550(this, [+128])`) and viewport (`sub_821264A8(this, [+116])`, then `[0x826C2CE8]`'s entry). When the view lost its vehicle but +832 is set, clears +832 and resets (slot 3). With a vehicle and a model: compares the vehicle's body matrix (`sub_82126FF0`) with the model's (`sub_821270E8`) byte by byte; when they differ, or the racer (`sub_82126AE0`) isn't +836, or the vehicle isn't +832, looks for the model again (`sub_821253F0`) and stores the vehicle in +832; stores the racer in +836 and the viewport's +1860 in +784 (a view mode: 1 and 2 turn some effects off). With +136 = 0 or 3, the effects' update (`sub_82126158`). Then every child's slot 4 (its own update). |
+| `sub_82126158` | `CarOverlays::UpdateEffects` | | r3 = the car overlays: `sub_82124EE0` (trails), `sub_82125B60` (smoke), `sub_821251C0` (light sprites), `sub_821252D0` (particle effect B), `sub_82124728` (sparks), `sub_82123E48` (car-model sprites), `sub_82123A80` (the marker), `sub_82125798` (particle effect C). From `sub_82126220`. |
+| `sub_82122958` | `CarOverlays::Record` | | Probably slot 5 (no direct callers; takes only r3, and calls the children's recordings): each child's slot 7 (+28, the recordings in `sprites.md`), r4 = the camera pass: 0, and also 3 when +784 is 1 or 2; 1 and 2 instead when `[[0x826C2CE8] + 8]` is set (probably split screen). Only when the view (`sub_82126550(this, [+128])`) has a vehicle and a model. Not read in detail past the first children. |
+| `sub_821253F0` | `CarOverlays::FindModel` | | r3 = the car overlays: lists the scene's objects of types 2, 1 and 3 (`sub_820C5D70([0x826C2E44], type, n)` until it returns 0; up to 50 on its stack), and stores in the view's +8 the first whose matrix (+4304, 64 bytes) equals the vehicle's body matrix (`sub_82126FF0`), or the first of type 2 when none does; then resets (slot 3). From `sub_821256B8` and `sub_82126220`. |
+| `sub_82124EE0` | `CarOverlays::UpdateTrails` | | r3 = the car overlays: for each wheel (0-3) and its trail (+148 + 4i): a point is added (`sub_82129598`, r4 = the wheel's contact position (`sub_821268C8`) + the offset at `0x826C5D40`, f1 = speed (`sub_821268C0`), f2 = a front or rear value (`sub_82126958`) times a constant, r7 = 1 or 2 by the wheel's last state, r10 = 0 in view modes 1 and 2) when the wheel is on the ground (`sub_82126998`), its surface allows it (`sub_821269B0`) and it slips (`sub_82126A70`, threshold from the parameter table +152), counted in the wheel's counter at +432 + 12i against the table's +156 and +160; then the trail's last position is set (`sub_821299D8`). Probably the skid marks (the "light trails" of `../frame-interpolation.md` are this overlay's recording, `sub_82129A08`: by these inputs, marks from slipping wheels). Returns early when `sub_825C8388` returns nonzero (it returns 0). From `sub_82126158`. |
+| `sub_82125B60` | `CarOverlays::UpdateSmoke` | | r3 = the car overlays: the car's axes from the wheels' contact positions (front minus rear, left minus right, halved), then for each wheel (0-3) and its smoke emitter (+164 + 4i): the slip (`sub_82126A70`) and a wheel value (`sub_821268F0`) clamped and scaled by the parameter table (+144), the emitter's frame set (`sub_8212B1B0`, `sub_8212A998` with the view mode), and, on the ground and on a smoking surface (`sub_82126998`, `sub_821269B0`), smoke emitted (`sub_82123240`) at a rate drawn by `sub_8211F118`; off it, `sub_82126A00` and `sub_82126A38` (never run in play) choose other rates; the wheel's counter (+436 + 12i) counts down; finally the emitter's velocity (`sub_8212A840`). Probably the tire smoke. From `sub_82126158`. Not read in detail. |
+| `sub_82123240` | `CarOverlays::EmitSmoke` | | r3 = the car overlays, f1 = a rate, f2 = speed, r5 = position, r6 = the wheel, r8 a flag: adds f1 to the wheel's accumulator (float at +528 + 48 × wheel); when it reaches 1.0, emits its whole part (`sub_8212A350` on the smoke emitter +164 + 4 × wheel; r7 = 1 for wheels 4 and above) and keeps the rest. Returns 0. From `sub_82125B60`. |
+| `sub_821251C0` | `CarOverlays::UpdateLightSprites` | | r3 = the car overlays: +720 = the vehicle's +2252 (`sub_82126AA0`); for model points 4-7 that exist (`sub_82126A78`) and their light sprites (+200 + 4i): the point (`sub_82127140`) moved by a constant on x, transformed by the body matrix (`sub_820AB560`), and the sprite placed there (`sub_8211EBE0`); when the vehicle's byte +2504 is set (`sub_82126A80`), shown first (`sub_8211EAA0`, never run in play). Probably the lights' glows (which lights isn't known). From `sub_82126158`. |
+| `sub_821252D0` | `CarOverlays::UpdateParticlesB` | | r3 = the car overlays: for model points 4-7 that exist and particle effect B's emitters (+360 + 4i): the point in world space as in `sub_821251C0`, then `sub_8212B4A8` (emit; f1 = the vehicle's +6252, f2 = +6256, f3 = speed) and `sub_8212BA70` (position). What it draws isn't known. From `sub_82126158`. |
+| `sub_82124728` | `CarOverlays::UpdateSparks` | | r3 = the car overlays: the car's eight box corners (model points 0-7 through `sub_82126ED0`, transformed by the body matrix), then for each spark emitter (+328 + 4i, i = 0-7): a contact object (the vehicle's +340 object's +240, its +68 for i ≥ 4), its position (`sub_820B8D00`, `sub_822940E0`) tested against the car's sides by i's quadrant, its strength (`sub_820B8D08`) against thresholds and its flag (`sub_820B8CC0`); up to 10 sparks emitted (`sub_8212D818`) and more by strength; then `sub_8212E660` and the emitter's position (`sub_8212DF90`). +812 = 1 during it (0 again in view modes 1 and 2). Probably the sparks from scraping walls and cars. From `sub_82126158`. Not read in detail. |
+| `sub_82123E48` | `CarOverlays::UpdateModelSprites` | | r3 = the car overlays: nine positions around the car (from model points 0, 2, 3, 6 and 7 with a constant offset, transformed by the body matrix), then for each car-model sprite (+396 + 4i): a kind from the racer (`sub_82123188`), zeroed by the racer's flags (`sub_82127178`, `sub_82126B50`, +820, +828, the view slot); `sub_8211F300(sprite, kind, i)`: nonzero shows the sprite (`sub_82121760`, never run in play), 0 places it hidden (`sub_82121560`). In play every sprite stays hidden. From `sub_82126158`. |
+| `sub_82123188` | `CarOverlays::ModelSpriteKind` | | r3 = the car overlays, r4 = a racer id: 6 for 382, 392-394, 397; 4 for 391; 1 for 357, 395, 396, 399; 5 for 398; else 0. Calls `sub_82126550(this, [+128])` first and ignores it. From `sub_82123E48`. |
+| `sub_82123A80` | `CarOverlays::UpdateMarker` | | r3 = the car overlays: the marker (+376) placed above the car (the vehicle's position `sub_82126F80` plus model points 2 minus 0, plus a height constant), its distance from camera pass 0's eye (`0x826BAC00` + 0x190, only in view mode 0), and a kind (0-3) from the racer (`sub_82122EA8`, the save's flags `sub_82126BB0` and `sub_82126CB0`, the racer's flags `sub_82127178`, the race mode `sub_82126D18`, +820, +824, +828); +816 = 1 when the marker shows; then `sub_8212CE18` (view 0's position) and `sub_8212CCE0`. The marker above opponents. From `sub_82126158`. |
+| `sub_82122EA8` | `CarOverlays::MarkerKind` | | r3 = the car overlays, r4 = a racer id, r5 = a default: by ranges of ids (67-68, 106-109, 111-114, 304-306 and others), 0, 1 or 2 by the save's flags (`sub_82126BB0` on 107-109, 111-112, ...), or the result of `sub_82122DB8` or `sub_82127198` (never run in play). Probably the marker's color by the opponent's kind (rival, story racer). From `sub_82123A80`. Not read in detail. |
+| `sub_82125798` | `CarOverlays::UpdateParticlesC` | | r3 = the car overlays: for model points 14-17 that exist and particle effect C's emitters (+380 + 4i): the point in world space, emitted (`sub_8212C1C0`, f1 = 0.0) when in front of the camera (`sub_82124630` returns 0), then its position and speed (`sub_8212C6A8`). Probably the exhausts (not checked). From `sub_82126158`. |
+| `sub_82124630` | `CarOverlays::IsBehindCamera` | | r3 = the car overlays, r4 = a point: 1 when the point, relative to the camera pass at +800 (its eye at +0x190), is behind it (a dot product with the view's direction, not read in detail), else 0. From `sub_82125798`. |
+| `sub_82126498` | `Overlay::Overlay` | | r3 = an overlay: vtable `0x820085D8` (the base class). Leaf. From every child's constructor and destructor (the destructors call it to put the base vtable back) and `CarOverlays`'. |
+| `sub_82126530` | `CarOverlays::ClearViews` | | r3 = the car overlays: the 25 view slots (+4 to +100) set to 0. Leaf. From `sub_82123350`. |
+| `sub_82126550` | `CarOverlays::View` | | r3 = the car overlays, r4 = a slot: `[r3 + 4 + 4 × r4]`, 0 for 25. Leaf. From most functions here and `sub_8215E160`, `sub_8215E2E0`. |
+| `sub_82126570` | `CarOverlays::FreeView` | | r3 = the car overlays, r4 = a slot (25 = all, not checked for null): the view's slot 0, `sub_82295330(view, 0, 0x8000)` and the slot cleared. From `sub_8215E160`. |
+| `sub_82126660` | `CarOverlays::NewView` | | r3 = the car overlays, r4 = a slot: a 16-byte view from `sub_82295398(0, 16, 0x801000, 4)` stored in the slot and constructed (`sub_82126870`). Allocates guest memory. From `sub_8215E2E0`. |
+| `sub_82126860` | `ViewDesc::Clear` | | r3 = a view description on `sub_8215E2E0`'s stack: +0 and +4 = 0. Leaf. |
+| `sub_82126870` | `OverlayView::OverlayView` | | r3 = a view: vtable `0x82010B5C`, +4 and +8 = 0. Leaf. From `sub_82126660`. |
+| `sub_82126890` | `OverlayView::Set` | | r3 = a view, r4 = a description: +4, +8, +12 = its three words (the vehicle, its scene model, the viewport). Leaf. From `sub_8215E2E0`. |
+| `sub_821264A8` | `CarOverlays::ViewportEntry` | | r4 = an index: `0x82008558 + 12 × r4` (12-byte entries: a viewport index, a record index, a camera pass index; r3 isn't read). Leaf. From `sub_82124728`, `sub_82126220`. |
+| `sub_821264C0` | `CarOverlays::BindViewport` | | r4 = out (the car overlays +796), r5 = viewport entry, r6 = a second index: out+0 = `[[0x826C2CE8] + 4 × entry.0] + 80 × entry.1`, out+4 = the camera pass `0x826BAC00 + 592 × entry.2`, out+8 and +12 = the two words at `0x820085A0 + 8 × r6`. Leaf. From `sub_821256B8`. |
+| `sub_82128190` | `Overlays::SetRenderTargets` | | r3 = the render queue, r4 = the command list: stored at `0x826C5D5C` and `0x826C5D60`, where the sprite recorders (`sprites.md`) read them. Leaf. From `sub_82123350`. |
+| `sub_821268B0` | `OverlayView::BodyMatrix` | | r3 = a view: `[vehicle + 336] + 288` (`sub_820B6930`), the body's matrix. From `sub_82124630`. |
+| `sub_821268C0` | `OverlayView::SpeedKmh` | | r3 = a view: tail-calls `Vehicle::GetSpeedKmh(vehicle)`. From the effect updates. |
+| `sub_821268C8` | `OverlayView::WheelContact` | | r3 = a view, r4 = a wheel: `sub_820C0170(vehicle, wheel) + 16` (the vehicle's +5328 + 96 × wheel record's +16, probably the contact point). From `sub_82124EE0`, `sub_82125B60`. |
+| `sub_821268F0` | `OverlayView::WheelSpin` | | r3 = a view, r4 = a wheel: the float at vehicle + 664 + 368 × wheel (the wheel record at +416's +248, also read by `sub_820C0180`; probably its spin or slip). Leaf. From `sub_82125B60`. |
+| `sub_82126908` | | | r3 = a view, r4 = a wheel: the float at vehicle + 512 + 368 × wheel (the wheel record's +96). Leaf. From `sub_82125B60`. |
+| `sub_82126920` | | | r3 = a view, r4 = a wheel: the vehicle's float +3764 for wheels 0-1, +4036 for 2-3, else 0.0. Leaf. From `sub_82125B60`. |
+| `sub_82126958` | | | r3 = a view, r4 = a wheel: the vehicle's float +3384 for wheels 0-1, +3388 for 2-3, else 0.0, times the float at `0x82001FBC`. Leaf. From `sub_82124EE0`. |
+| `sub_82126998` | `OverlayView::WheelOnGround` | | r3 = a view, r4 = a wheel: the byte at vehicle + 433 + 368 × wheel (the wheel record's +17; `sub_820C0180` returns 0 when it's 0). Leaf. From `sub_82124EE0`, `sub_82125B60`. |
+| `sub_821269B0` | `OverlayView::WheelSurfaceMarks` | | r3 = a view, r4 = a wheel: the contact record's halfword +80 (`sub_820C0170`): 1 for 0 or above 2 except 8, 0 for 1, 2 and 8 (probably surfaces that leave no marks or smoke). From `sub_82124EE0`, `sub_82125B60`. |
+| `sub_82126A70` | `OverlayView::WheelSlip` | | r3 = a view, r4 = a wheel, f1 = a threshold: tail-calls `sub_820C0180(vehicle, wheel)` (0.0 off the ground, else a slip speed, 0.0 under f1 times a constant). From `sub_82124EE0`, `sub_82125B60`. |
+| `sub_82126A78` | `OverlayView::HasPoint` | | r3 = a view, r4 = a point index: tail-calls `sub_820D9DB0(model, index)` (the view's +8). From `sub_821251C0`, `sub_821252D0`, `sub_82125798`. |
+| `sub_82126A80` | | | r3 = a view: the vehicle's byte +2504. Leaf. From `sub_821251C0`. |
+| `sub_82126AA0` | | | r3 = a view: the vehicle's word +2252. Leaf. From `sub_821251C0`. |
+| `sub_82126AB0` | | | r3 = a view: the vehicle's +340 pointer (its +240 holds the contact objects `sub_82124728` reads). Leaf. From `sub_82124728`. |
+| `sub_82126AC0` | | | r3 = a view: the vehicle's float +6256. Leaf. From `sub_821252D0`. |
+| `sub_82126AD0` | | | r3 = a view: the vehicle's float +6252. Leaf. From `sub_821252D0`. |
+| `sub_82126AE0` | `OverlayView::RacerId` | | r3 = a view: finds which of the 93 racer records (3,936 bytes from `[0x826C5B2C] + 48`) is the vehicle's +5712 and returns its word +3912, or -1. Leaf. From `sub_82126220`. |
+| `sub_82126B50` | | | r3 = a view (not read), r4 = a racer id: 0 above 399, else `sub_820FFCF8([0x826C5B2C] + 0x59620, sub_820FF9F8([0x826C5B2C] + 48), -1)` (neither read). From `sub_82123A80`, `sub_82123E48`. |
+| `sub_82126BB0` | | | r4 = an id: 0 above 399, else whether the halfword at `sub_82105620(0) + 0x199FA + 12 × id` is nonzero (`sub_82105620(i)` = `[0x826C5B58 + 4i]`, probably player i's save data). From `sub_82122EA8`, `sub_82123A80`. |
+| `sub_82126C08` | | | As `sub_82126BB0` with the halfword at +0x199F8. From `sub_82126CB0`. |
+| `sub_82126C58` | | | As `sub_82126BB0` with the halfword at +0x199FC. From `sub_82126CB0`. |
+| `sub_82126CB0` | | | r4 = an id: `sub_82126C08` or `sub_82126C58`, 0 above 399. From `sub_82123A80`. |
+| `sub_82126D18` | | | The word at `[0x826C5B2C] + 0xA3AF4` (probably the race mode; 8 changes the marker). Leaf. From `sub_82123A80`. |
+| `sub_82126ED0` | `OverlayView::ModelPoint` | | r3 = out, r4 = a view, r5 = a point index: through the vehicle's +344 object's vtable slot 12 (+48), the point's x, y, z with w = 1.0; all 0.0 (w too) without the object. From `sub_82123A80`, `sub_82123E48`, `sub_82124728`. |
+| `sub_82126F80` | `OverlayView::BodyPosition` | | r3 = out, r4 = a view: the 16 bytes at `[vehicle + 336] + 208` (`sub_820B67D8`, probably the body's position). From `sub_82123A80`, `sub_82124728`. |
+| `sub_82126FF0` | `OverlayView::BodyMatrixCopy` | | r3 = out, r4 = a view: the 64-byte matrix at `[vehicle + 336] + 288` copied with each row's w set to 1.0. From seven functions here. |
+| `sub_821270E8` | `OverlayView::ModelMatrix` | | r3 = out, r4 = a view: the model's matrix at +4304 copied (`memcpy`, 64 bytes) with each row's w = 1.0 written first (and overwritten by the copy). From `sub_82126220`. |
+| `sub_82127140` | `OverlayView::PointPosition` | | r3 = out, r4 = a view, r5 = a point index: `sub_820DA988(out, model, index)`. From `sub_821251C0`, `sub_821252D0`, `sub_82125798`. |
+| `sub_82127178` | `OverlayView::RacerFlags` | | r3 = a view: `[[vehicle + 5712] + 3888]`, the racer record's flags (bits 1, 2, 8 and 11 read by the marker). Leaf. From `sub_82123A80`, `sub_82123E48`. |
+| `sub_8211F118` | `RandomRange` | | f1 = low, f2 = high: low + (high - low) × `rand()` (`sub_82293568`) × the float at `0x82002BD4` (probably 1/32,767). From the emitters and `sub_82125B60`. |
+| `sub_82293568` | `rand` | | The game's own: seed at `0x82638188` = seed × 1,103,515,245 + 12,345; returns its upper halfword's low 15 bits. Leaf. ~20 callers in and out of the overlays (the C runtime's `rand`, with its seed per thread, is another; see `../known-data.md`). |
+| `sub_8212A140` | `Trail::Trail` | | r3 = the 64,160-byte trail: base constructor, vtable `0x820086C0`, 1.0 in the w of each of the 500 points' vectors (+128, 128 bytes apart) and at +64,156. From `sub_82123450`. |
+| `sub_8212A1C0` | `Trail::~Trail` | | Slot 0: vtable `0x820086C0`, the base's, `sub_825A70E8` when r4 bit 0. No direct callers. |
+| `sub_821292C8` | `Trail::Init` | | Probably slot 6 of the trail and the sparks (no direct callers): +104 = r5 (the capacity), +112 = the set-up's +8 (the parameter table), then tail-calls slot 3 (the reset). |
+| `sub_82129498` | `Trail::Reset` | | Slot 3 (no direct callers): the head (+64,128), tail and count (+64,132, +64,136) cleared, the last position (+64,144) to (0, 0, 0, 1), and each of the +104 points cleared (+120 after, +48 = 0, +60 = 0, +112 = 1 ...). |
+| `sub_821292E8` | `Trail::Update` | | Slot 4 (no direct callers; once a tick): drops the oldest point when its age (+60) is 0, ages every point (+60 down to 0; +48 = 1 once more than 1 tick from the table's lifetime), and fades its width (+56) from +124 over the table's +12 ticks, clamped to 0 and +124, written as an integer to +44 (the alpha). |
+| `sub_82129598` | `Trail::AddPoint` | | r3 = the trail, r4 = position, f1 = speed, f2 = width, r7 = a state (2 becomes 1 for the first point), r10: when there's room and r7 is nonzero and the point moved from the last position (+64,144): a 128-byte point at the head: position, the previous position (+16), direction (+64 = position minus previous), width (+52), +112 = r7, +124 and +56 = the table's +8 plus speed times a constant (capped), +48 = r10, +60 = the table's +0 (age), colors 255, +44 the alpha, and the ribbon's edge points (+80, +96) across the direction; the head and count advance. Returns 1, or 0. Point layout in `../known-data.md` ("trail overlay"). From `sub_82124EE0`. |
+| `sub_821299D8` | `Trail::SetLastPosition` | | r3 = the trail, r4 = a position: the 16 bytes at +64,144. Leaf. From `sub_82124EE0`. |
+| `sub_8212B2E8` | `Smoke::Smoke` | | r3 = the 32,640-byte smoke emitter set: base constructor, +116 = 0, vtable `0x820086F4`, the 45 emitters at +128 (720 bytes each) constructed (`sub_8212B230`), w = 1.0 at +32,556 to +32,620. From `sub_82123450`. |
+| `sub_8212B230` | `SmokeEmitter::SmokeEmitter` | | r3 = a 720-byte emitter: 1.0 in the w of its vectors and of ten 48-byte particles from +240. Leaf. From `sub_8212B2E8`. |
+| `sub_8212B358` | `Smoke::~Smoke` (deleting) | | Slot 0 (no direct callers): `sub_8212B288`, then `sub_825A70E8` when r4 bit 0. |
+| `sub_8212B288` | `Smoke::~Smoke` | | r3 = the smoke: vtable `0x820086F4`, each emitter's ten particles destroyed backwards (`sub_820900C0(emitter + 240, 48, 10, 0x82106540)`, probably the C runtime's array destructor helper), the base vtable. From `sub_8212B358`. |
+| `sub_8212B3A8` | `Smoke::Init` | | Probably slot 6 of the smoke and of particle effect B (no direct callers; both read +112 as their table): +104 = r5, +116 = the set-up's +0, +112 = its +4 (the parameter table), then tail-calls slot 3. |
+| `sub_8212A9E0` | `Smoke::Reset` | | Slot 3 (no direct callers): indices and count (+32,528 to +32,536) cleared, three vectors (+32,544, +32,560, +32,576) to (0, 0, 0, 1), each emitter reset (`sub_8212A218`). |
+| `sub_8212A218` | `SmokeEmitter::Reset` | | r4 = an emitter: its vectors cleared (w = 1.0), +92 = 1, +128 = 10 particles, +112 and +224 the float at `0x82002A90`, and its ten 48-byte particles from +240 cleared. Leaf. From `sub_8212A9E0`, `sub_8212AA78`. |
+| `sub_8212AA78` | `Smoke::Update` | | Slot 4 (no direct callers; once a tick): drops the oldest emitter when its life (+108) runs out (`sub_8212A218`), then ages each live emitter, fades it by the table (+112) and moves its particles; `sub_8212A868` tests them against the region. Not read in detail. |
+| `sub_8212A350` | `Smoke::Emit` | | r3 = the smoke, f1 = size, f2 = speed, r5 = the frame (from `sub_8212B1B0`'s source), r7 = a flag, r8: when there's room, a new emitter at the head: life from the table (+0, +8), size and growth drawn (`sub_8211F118`), position from r5 +64, velocity (+32,544), 2-10 particles (by speed) placed on a disc by random angles (`sin`, `cos`, `rand`), texture frames by `rand() % 3` and `% 4`; the head and count advance. Returns 1, or 0 when full. From `sub_82123240`. Not read in detail. |
+| `sub_8212A840` | `Smoke::SetVelocity` | | r3 = the smoke, r4 = a vector: the 16 bytes at +32,544 (the new emitters' velocity). Leaf. From `sub_82125B60`. |
+| `sub_8212A868` | `Smoke::InRegion` | | r3 = the smoke, r4 = a point: 1 when the point lies between the region's two points (+32,592 and +32,608) by two dot products, else 0. Leaf. From `sub_8212AA78`. |
+| `sub_8212A998` | `Smoke::SetRegion` | | r3 = the smoke, r4, r5 = two points, r6 = the view mode: +32,608 = r4, +32,592 = r5, +32,624 = r6 (2 caps the particles' size in the recording). Leaf. From `sub_82125B60`. |
+| `sub_8212B1B0` | `Smoke::SetFrame` | | r3 = the smoke, r4 = a frame (a 64-byte matrix, a vector at +64, a float at +80): copied into each emitter's +144 (`memcpy`), +208 and +224. From `sub_82125B60`. |
+| `sub_8212BFE8` | `ParticlesB::ParticlesB` | | r3 = the 2,816-byte effect: base constructor, vtable `0x82008720`, the 15 entries at +128 (176 bytes) with w = 1.0 and each one's 48-byte particle constructed (`sub_820911A8(entry + 128, 48, 1, 0x8212B3D0)`, probably the array constructor helper), w = 1.0 at +2,796, +2,812. From `sub_82123450`. |
+| `sub_8212B3D0` | `Particle::Particle` | | r3 = a 48-byte particle: 1.0 at +12 and +28. Leaf. Passed to `sub_820911A8` by `sub_8212BFE8` (no direct callers). |
+| `sub_8212C070` | `ParticlesB::~ParticlesB` (deleting) | | Slot 0 (no direct callers): `sub_8212BF88`, then `sub_825A70E8` when r4 bit 0. |
+| `sub_8212BF88` | `ParticlesB::~ParticlesB` | | Vtable `0x82008720`, each entry's particle destroyed (`sub_820900C0`, 48, 1, `0x82106540`), the base vtable. From `sub_8212C070`. |
+| `sub_8212BA98` | `ParticlesB::Reset` | | Slot 3 (no direct callers): indices and count (+2,768 to +2,776) cleared, two vectors (+2,784, +2,800) to (0, 0, 0, 1), each entry reset (`sub_8212B3E8`). |
+| `sub_8212B3E8` | `ParticlesB::ResetEntry` | | r4 = a 176-byte entry: vectors cleared (w = 1.0), +92 = 1, +116 = 1, +96, +108, +160, +164 = 0. Leaf. From `sub_8212B748`, `sub_8212BA98`. |
+| `sub_8212B748` | `ParticlesB::Update` | | Slot 4 (no direct callers; once a tick): drops the oldest entry when its life (+108) runs out, ages each entry and grows it (+100 by the table's +4) and fades it (+104 from +112 over the table's +12 ticks, as an integer alpha at +92), and moves its particles. Not read in detail. |
+| `sub_8212B4A8` | `ParticlesB::Emit` | | r3 = the effect, r4 = a position, f1 to f3 (the vehicle's +6252, +6256, speed): when there's room, a new entry at the head (life and size from the table, particles placed with `sin`, `cos`, `rand`, `sub_8211F118`). Returns 1, or 0 when full. From `sub_821252D0`. Not read in detail. |
+| `sub_8212BA70` | `ParticlesB::SetPosition` | | r3 = the effect, r4 = a position: +2,784. Leaf. From `sub_821252D0`. |
+| `sub_8212CAF8` | `ParticlesC::ParticlesC` | | r3 = the 2,720-byte effect: base constructor, vtable `0x82008750`, w = 1.0 in the 20 entries at +112 (128 bytes each) and at +2,684. From `sub_82123450`. |
+| `sub_8212CB70` | `ParticlesC::~ParticlesC` | | Slot 0 (no direct callers): vtable, the base's, `sub_825A70E8` when r4 bit 0. |
+| `sub_8212C0C0` | `ParticlesC::Init` | | Probably slot 6 (no direct callers): +2,700 = r5 (the capacity), +108 = the set-up's +8 (the table), then tail-calls slot 3. |
+| `sub_8212C0E8` | `ParticlesC::Reset` | | Slot 3 (no direct callers): +2,704 = 0.0, indices and count (+2,688 to +2,696) cleared, the position (+2,672) to (0, 0, 0, 1), each entry cleared (+148 = 1). |
+| `sub_8212C2F0` | `ParticlesC::Update` | | Slot 4 (no direct callers; once a tick): drops entries whose life (+108 of each, at +112 + 128 × i) runs out, ages and fades the rest by the table (+108), with `rand`. Not read in detail. |
+| `sub_8212C1C0` | `ParticlesC::Emit` | | r3 = the effect, r4 = a position, f1: when there's room, a new 128-byte entry at the head: its offset from the effect's position (+2,672), life, size and alpha from the table (+108), colors 255. Returns 1, or 0 when full. From `sub_82125798`. Not read in detail. |
+| `sub_8212C6A8` | `ParticlesC::SetPosition` | | r3 = the effect, r4 = a position, f1 = speed: +2,672 and +2,704. Leaf. From `sub_82125798`. |
+| `sub_8212C0E0` | `Overlay::SetTextures104` | | r3 = an overlay, r4: +104 = r4 (particle effect C's texture slot; also the car overlays' texture table, from `sub_8215E000`). Leaf. From `sub_82123450`, `sub_8215E000`. |
+| `sub_8212D6D8` | `Overlay::SetTextures108` | | r3 = an overlay, r4: +108 = r4 (the texture holder of the trails, smoke, sparks and particle effect B). Leaf. From `sub_82123450`. |
+| `sub_8212D620` | `Marker::Marker` | | r3 = the 304-byte marker: base constructor, vtable `0x82008784`, w = 1.0 at +140 to +204 and +284. From `sub_82123450`. |
+| `sub_8212D680` | `Marker::~Marker` | | Slot 0 (no direct callers): vtable, the base's, `sub_825A70E8` when r4 bit 0. |
+| `sub_8212CBC8` | `Marker::Init` | | Probably slot 6 (no direct callers): +120 = the set-up's +8 (the table), then tail-calls slot 3. |
+| `sub_8212CC38` | `Marker::Reset` | | Slot 3 (no direct callers): the camera position (+272) to (0, 0, 0, 1), +288 = 1, the sprite at +128 cleared (+220 = 1, +224 = 0, +236 = 0, +240 = 0). |
+| `sub_8212CBE0` | `Marker::Update` | | Slot 4 (no direct callers; once a tick): when shown (+224), +236 counts up (back to 0 when it would turn negative). Leaf. |
+| `sub_8212CC10` | `Marker::SetTextures` | | r3 = the marker, r4 = four textures: +104 to +116. Leaf. From `sub_82123450`. |
+| `sub_8212CCE0` | `Marker::Set` | | r3 = the marker, r4 = position, f1 = distance (0 for the world quad), r6 = view mode, r7 = kind: the sprite's position (+176), +256 = mode, +288 = 1 when f1 is 0.0 (the camera-facing quad of `sub_8212CE40`) else 0 (the screen rectangle), the size (+228) from the table's +4 or from the distance (clamped), the texture index (+240) by the kind (0-3); when not shown yet, shown (+224 = 1) with alpha, life and colors from the table. Returns 1. Leaf. From `sub_82123A80`. |
+| `sub_8212CE18` | `Marker::SetCameraPosition` | | r3 = the marker, r4 = a position: +272. Leaf. From `sub_82123A80`. |
+| `sub_8212E9A0` | `Sparks::Sparks` | | r3 = the 29,824-byte spark emitter: base constructor, vtable `0x820087BC`, w = 1.0 in the 200 entries at +128 (144 bytes) and in 50 vectors from +29,032. From `sub_82123450`. |
+| `sub_8212EA40` | `Sparks::~Sparks` | | Slot 0 (no direct callers): vtable, the base's, `sub_825A70E8` when r4 bit 0. |
+| `sub_8212D6E0` | `Sparks::Reset` | | Probably slot 3 (no direct callers): counters (+28,928 to +28,940, +28,976) cleared, its vectors to (0, 0, 0, 1), the 50 vectors at +29,024 and each entry cleared. |
+| `sub_8212DDC8` | `Sparks::Update` | | Slot 4 (no direct callers; once a tick): drops entries whose life (+108) runs out and ages the rest by the table (+112). Not read in detail. |
+| `sub_8212D818` | `Sparks::Emit` | | r3 = the sparks, r4 = a position, f2 = strength: when there's room, a new 144-byte entry at the head (life, size and direction from the table +0 to +8, `sub_8211F118`, `sin`, `cos`, `rand`). Returns 1, or 0 when full. From `sub_82124728`. Not read in detail. |
+| `sub_8212E660` | `Sparks::UpdateStreak` | | r3 = the sparks, f1 = speed, r6 and r8 flags, a position on the stack: +28,944 = speed times a constant (clamped), +28,960 = the position, +28,976 = r6, +28,928 counts up; with `rand` and `sub_8211F118` adds to the 50 vectors at +29,024 (probably a scrape's streak). From `sub_82124728`. Not read in detail. |
+| `sub_8212DF90` | `Sparks::SetPosition` | | r3 = the sparks, r4 = a position: +28,960. Leaf. From `sub_82124728`. |
+| `sub_8211F060` | `LightSprite::LightSprite` | | r3 = the 288-byte sprite overlay: base constructor, vtable `0x82008444`, w = 1.0 at +156 to +220 and +284. From `sub_82123450`. |
+| `sub_8211F0C0` | `LightSprite::~LightSprite` | | Slot 0 (no direct callers): vtable, the base's, `sub_825A70E8` when r4 bit 0. |
+| `sub_8211E8A8` | `LightSprite::Init` | | Probably slot 6 (no direct callers): +140 = the set-up's +8 (the table), then tail-calls slot 3. |
+| `sub_8211E9F0` | `LightSprite::Reset` | | Slot 3 (no direct callers): +272 to (0, 0, 0, 1), the sprite at +144 cleared (+240 = 0, +256 = 0, +260 = 4). Leaf. |
+| `sub_8211E8C0` | `LightSprite::Update` | | Slot 4 (no direct callers; once a tick): when shown (+240), resets (slot 3) once its life (+252) is 0, else counts it down, +256 = the table's +0 minus life, and fades +248 by the table's +8 and +12, as an integer alpha at +236. |
+| `sub_8211E9C8` | `LightSprite::SetTextures` | | r3 = the sprite overlay, r4 = nine textures: +104 to +136. Leaf. From `sub_82123450`. |
+| `sub_8211EBE0` | `LightSprite::SetPosition` | | r3 = the sprite overlay, r4 = a position: when shown (+240), the sprite's position (+192). Leaf. From `sub_821251C0`. |
+| `sub_82122880` | `ModelSprite::ModelSprite` | | r3 = the 576-byte overlay: base constructor, vtable `0x820084E8`, w = 1.0 at +236 to +300, +380, +396 and ten vectors from +428. From `sub_82123450`. |
+| `sub_82122900` | `ModelSprite::~ModelSprite` | | Slot 0 (no direct callers): vtable, the base's, `sub_825A70E8` when r4 bit 0. |
+| `sub_8211F178` | `ModelSprite::Init` | | Probably slot 6 (no direct callers): +104 = r5 as a float, +208 = the set-up's +8 (the table), then slot 3. |
+| `sub_8211F430` | `ModelSprite::Reset` | | Slot 3 (no direct callers): the sprite at +224 cleared (+336 = 0, +340 = 9, +344 = 4, +348 = 12, +352 = 0), +368 and +384 to (0, 0, 0, 1), +404 and +408 = -1, ten vectors from +416. Leaf. |
+| `sub_82121CC0` | `ModelSprite::Update` | | Probably slot 4 (no direct callers): by the state +336 (1-8, a jump table), one of `sub_8211F6F8`, `sub_8211F530`, `sub_8211F1C8`, `sub_8211F278`, `sub_8211F8C0`, `sub_8211FF20`, none of which run in play: +336 stays 0 (set by `sub_82121560`). |
+| `sub_821225D8` | `ModelSprite::Record` | | Probably slot 7 (no direct callers): r4 = the camera pass index (+400 = it); returns when the sprite (+224) is behind the pass's camera, else draws through `sub_82120008`, `sub_82120868`, `sub_82120BB8`, `sub_82121280` or `sub_82121D78` (none run in play). Not read in detail. |
+| `sub_8211F408` | `ModelSprite::SetTextures` | | r3 = the overlay, r4 = 25 textures: +108 to +204. Leaf. From `sub_82123450`. |
+| `sub_8211F300` | `ModelSprite::Entry` | | r4 = a kind (1-8 by a jump table: five tables at `0x82616CE8` to `0x82616D78`; other kinds `0x826C5CF0`), r5 = an index (0-8, a jump table): that word of the table, 0 for indices above 8. Leaf. In play it returns 0 (`sub_82121760` never runs). From `sub_82123E48`. |
+| `sub_8211F3B4` | | | `lwz r3,0(r11); blr`: the first case of `sub_8211F300`'s second jump table, seen as its own function. |
+| `sub_82121560` | `ModelSprite::PlaceHidden` | | r3 = the overlay, r4 = a position: the sprite's position (+272) and +336 = 0. Leaf. From `sub_82123E48`. |
+| `sub_82123A00` | `Sprite::ResetStyle2` | | r3 = a single sprite (`sprites.md`'s layout): w = 1.0 in its matrix rows and in two corners from +92, +64 and +68 = 0, +72 = 2. Leaf. From `sub_8217C708` only (not an overlay; not read). |

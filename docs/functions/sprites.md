@@ -11,10 +11,10 @@ thread's two largest recompiled functions, `sub_821298C0` and
 `../native-renderer.md`). How their drawing is blended between ticks is
 "World-space sprites" and the "Light billboards' facing" item in
 `../frame-interpolation.md`. The race overlays' manager
-(`sub_8215DEA0`, `RaceOverlays::Run`, in [`functions.md`](functions.md))
-calls the overlay recorders here through their vtables; the overlays'
-update side (the rest of `82121000`-`8212EF00`) isn't mapped yet (a lead
-in `../loops/leads.md`). Shared callees in other files: `sub_8209BD50`
+(`sub_8215DEA0`, `RaceOverlays::Run`) and their update side (the rest of
+`82121000`-`8212EF00`) are in [`race-overlays.md`](race-overlays.md): the
+recordings here are the overlays' vtable slot 7 (r4 the camera pass
+index), called by each car's overlays' recording (`sub_82122958`). Shared callees in other files: `sub_8209BD50`
 (`Matrix::Multiply`) and the texture animations' `sub_82146A38`,
 `sub_82146B80` and `sub_82597118`, in [`functions.md`](functions.md);
 `sub_825A7410` (`memcpy`), the stack probe `sub_825A9934` and `acos`
