@@ -71,4 +71,26 @@ double U64ToDouble(uint64_t value);
 // play) ported.
 int32_t FpClass(double x);
 
+// rint (sub_825B0B30): x rounded to an integer in the host's rounding mode,
+// as (x + 2^52) - 2^52 (or (x - 2^52) + 2^52 for a negative x); zeros,
+// NaNs and |x| from 2^52 returned as they are.
+double Rint(double x);
+
+// _ctrlfp (sub_825B0B80)'s FPSCR word: the new bits (given ^ 0xF8) under
+// the mask, the old word's elsewhere. (Its adapter reads and writes the
+// guest's FPSCR, only its rounding mode in the translation; the return
+// value is the old word ^ 0xF8.)
+uint64_t CtrlFpWord(uint64_t old_word, uint64_t new_bits, uint64_t mask);
+
+// _abstract_sw (sub_825AB380): an FPSCR word (^ 0xF8) as the C runtime's
+// portable control and status word: the rounding mode (0, 768, 512, 256)
+// and the exception bits (0x08, 0x20, 0x40, 0x10, 0x80 to 1, 2, 4, 8, 16),
+// ORed with 0x80000.
+uint32_t AbstractSw(uint32_t word);
+
+// abs (sub_825AC870) on a whole register, as the PowerPC code does it: the
+// low word's sign decides and all 64 bits are negated (neg), so the low
+// word is |x| (INT_MIN stays) and the high word what neg leaves.
+uint64_t AbsRegister(uint64_t r3);
+
 }  // namespace c_runtime

@@ -14,7 +14,8 @@ ITC_FLAG_BOOL(native_math, true, "ITC",
               "sub_825A8770; pow, sub_825A8ED0, with log, sub_825A9C00, copysign, sub_825AB1C8, "
               "_set_exp, _get_exp and _decomp, sub_825AFE80, sub_825AFEA8 and sub_825AFF80, and the "
               "integer test sub_825A8CE0; floor and ceil, sub_825A8CA0 and sub_825AA0B8; log10, sub_825A9D80; "
-              "__ultod, sub_825A9DB0; _fpclass, sub_825AB268) natively instead of through the translated code (the same "
+              "__ultod, sub_825A9DB0; _fpclass, sub_825AB268; rint, sub_825B0B30; _ctrlfp, sub_825B0B80, "
+              "which sets the rounding mode as the original does; _abstract_sw, sub_825AB380; abs, sub_825AC870) natively instead of through the translated code (the same "
               "doubles, bit for bit; checked by --run_harnesses=math)");
 
 // acos: f1 = x.
@@ -234,4 +235,57 @@ extern "C" REX_FUNC(sub_825AB268) {
   }
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = uint32_t(c_runtime::FpClass(ctx.f1.f64));
+}
+
+// rint: f1 = x, rounded in the host's rounding mode (tan's caller sets it
+// to nearest). The original leaves f4, f5, f6, r12 and cr0 changed; tan, its
+// only caller in play, doesn't read them.
+extern "C" REX_FUNC(sub_825B0B30) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_math)) {
+    __imp__sub_825B0B30(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  ctx.f1.f64 = c_runtime::Rint(ctx.f1.f64);
+}
+
+// _ctrlfp: r3 = new bits, r4 = mask; returns the old FPSCR word ^ 0xF8.
+// mffs and mtfsf as the translated code does them (only the rounding mode
+// exists: the host's MXCSR rounding bits), in the same order: the word read
+// from the host, flush-to-zero turned off, the new word's rounding mode set.
+// The original also stores the word at r1 - 8 (below the stack pointer) and
+// leaves it in r5, r6 and f0; no caller reads those (tan, ldexp, _controlfp,
+// sub_825AB568 set them again first), so they aren't written here.
+extern "C" REX_FUNC(sub_825B0B80) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_math)) {
+    __imp__sub_825B0B80(ctx, base);
+    return;
+  }
+  const uint32_t old_word = ctx.fpscr.loadFromHost();
+  ctx.fpscr.disableFlushMode();
+  const uint64_t word = c_runtime::CtrlFpWord(old_word, ctx.r3.u64, ctx.r4.u64);
+  ctx.r3.u64 = old_word ^ 0xF8u;
+  ctx.fpscr.storeFromGuest(uint32_t(word));
+}
+
+// _abstract_sw: r3 = an FPSCR word (^ 0xF8); returns the portable word.
+extern "C" REX_FUNC(sub_825AB380) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_math)) {
+    __imp__sub_825AB380(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = c_runtime::AbstractSw(ctx.r3.u32);
+}
+
+// abs: r3 = int; the whole register as the original's neg leaves it.
+extern "C" REX_FUNC(sub_825AC870) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_math)) {
+    __imp__sub_825AC870(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = c_runtime::AbsRegister(ctx.r3.u64);
 }

@@ -761,4 +761,46 @@ double Atan2(double y, double x) {
   return (Bits(y) >> 63) != 0 ? Neg(result) : result;
 }
 
+double Rint(double x) {
+  constexpr double kTwo52 = D(0x4330000000000000);  // 2^52, at 0x82073678
+  if (x == 0.0 || !(Abs(x) < kTwo52)) {  // 0.0 at 0x82073670; NaNs fail <
+    return x;
+  }
+  if (x < 0.0) {
+    const double t = x - kTwo52;
+    return t + kTwo52;
+  }
+  const double t = x + kTwo52;
+  return t - kTwo52;
+}
+
+uint64_t CtrlFpWord(uint64_t old_word, uint64_t new_bits, uint64_t mask) {
+  return ((new_bits ^ 0xF8) & mask) | (old_word & ~mask);
+}
+
+uint32_t AbstractSw(uint32_t word) {
+  static constexpr uint32_t kRounding[4] = {0, 768, 512, 256};
+  uint32_t result = kRounding[word & 3];
+  if (word & 0x08) {
+    result |= 1;
+  }
+  if (word & 0x20) {
+    result |= 2;
+  }
+  if (word & 0x40) {
+    result |= 4;
+  }
+  if (word & 0x10) {
+    result |= 8;
+  }
+  if (word & 0x80) {
+    result |= 16;
+  }
+  return result | 0x80000;
+}
+
+uint64_t AbsRegister(uint64_t r3) {
+  return int32_t(uint32_t(r3)) < 0 ? 0 - r3 : r3;
+}
+
 }  // namespace c_runtime

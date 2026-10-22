@@ -7,6 +7,8 @@
 
 #include "base/log.h"
 
+#include <xmmintrin.h>
+
 #include <bit>
 #include <cmath>
 #include <functional>
@@ -378,6 +380,101 @@ void Math(Context& h) {
             Append(b, t.r3.u64);
           },
           [&](size_t i) { return fmt::format("r3 {:016X}", integers[i]); });
+  }
+
+  // rint, in each of the four rounding modes (MXCSR set before each call
+  // and put back after): zeros, halves (where the modes differ), 2^52 and
+  // its neighbors, every size. _ctrlfp: new bits and masks (tan's and
+  // _clearfp's among them) from each rounding mode; r3, the MXCSR after
+  // (rounding, flush-to-zero, flags) and the context's copy of it compared.
+  // _abstract_sw over every word up to 0xFFF and random registers; abs over
+  // sign-extended and zero-extended negatives, INT_MIN and random registers.
+  {
+    const uint32_t saved = _mm_getcsr();
+    auto set_mode = [&](PPCContext& t, uint32_t mode) {
+      _mm_setcsr((saved & ~0x603Fu) | (mode << 13));
+      t.fpscr.csr = _mm_getcsr();
+    };
+    std::vector<double> values = SpecialValues();
+    for (double x : {0.5, 1.0, 1.5, 2.5, 3.5, 0.49999999999999994, 4503599627370496.0,
+                     2251799813685248.5, 9007199254740992.0, 1e-300, 1e300}) {
+      AddAround(values, x);
+    }
+    for (int i = -40; i <= 40; i++) {
+      AddAround(values, i * 0.25);
+    }
+    AddRandom(h, values, 10.0, 500);
+    AddRandom(h, values, 1e16, 300);
+    for (uint32_t mode = 0; mode < 4; mode++) {
+      Cases(h, fmt::format("rint, rounding mode {} (sub_825B0B30)", mode).c_str(),
+            __imp__sub_825B0B30, sub_825B0B30, values.size(),
+            [&](size_t i, PPCContext& t) {
+              t.f1.f64 = values[i];
+              set_mode(t, mode);
+            },
+            [&](PPCContext& t, std::vector<uint8_t>& b) {
+              Append(b, t.f1.u64);
+              _mm_setcsr(saved);
+            },
+            [&](size_t i) { return "x " + Bits(values[i]); });
+    }
+
+    std::vector<std::pair<uint64_t, uint64_t>> words;
+    const uint64_t masks[] = {0xC007FEFF, 0xFFF80700, 0, 0xFFFFFFFF, 3, 0xF8, ~0ull};
+    for (uint64_t mask : masks) {
+      for (uint64_t bits : {0ull, 1ull, 2ull, 3ull, 0xF8ull, 0xFFull, 0xFFFFFFFFull, ~0ull}) {
+        words.push_back({bits, mask});
+      }
+    }
+    for (int i = 0; i < 100; i++) {
+      words.push_back({h.random.Next(), h.random.Next()});
+      words.push_back({h.random.Next() & 0xFF, masks[i % 7]});
+    }
+    for (uint32_t mode = 0; mode < 4; mode++) {
+      Cases(h, fmt::format("_ctrlfp, rounding mode {} (sub_825B0B80)", mode).c_str(),
+            __imp__sub_825B0B80, sub_825B0B80, words.size(),
+            [&](size_t i, PPCContext& t) {
+              t.r3.u64 = words[i].first;
+              t.r4.u64 = words[i].second;
+              set_mode(t, mode);
+            },
+            [&](PPCContext& t, std::vector<uint8_t>& b) {
+              Append(b, t.r3.u64);
+              Append(b, _mm_getcsr());
+              Append(b, t.fpscr.csr);
+              _mm_setcsr(saved);
+            },
+            [&](size_t i) {
+              return fmt::format("r3 {:X} r4 {:X}", words[i].first, words[i].second);
+            });
+    }
+
+    std::vector<uint64_t> registers;
+    for (uint64_t w = 0; w <= 0xFFF; w++) {
+      registers.push_back(w);
+    }
+    for (int i = 0; i < 200; i++) {
+      registers.push_back(h.random.Next());
+    }
+    Cases(h, "_abstract_sw (sub_825AB380)", __imp__sub_825AB380, sub_825AB380, registers.size(),
+          [&](size_t i, PPCContext& t) { t.r3.u64 = registers[i]; },
+          [](PPCContext& t, std::vector<uint8_t>& b) { Append(b, t.r3.u64); },
+          [&](size_t i) { return fmt::format("r3 {:X}", registers[i]); });
+
+    std::vector<uint64_t> ints = {0, 1, 2, ~0ull, 0xFFFFFFFFull, 0x80000000ull,
+                                  0xFFFFFFFF80000000ull, 0x7FFFFFFFull, 0xFFFFFFFF80000001ull,
+                                  0x123456789ABCDEF0ull, 0x00000001FFFFFFFEull};
+    for (int i = 0; i < 300; i++) {
+      const uint64_t r = h.random.Next();
+      ints.push_back(r);
+      ints.push_back(uint64_t(int64_t(int32_t(uint32_t(r)))));
+      ints.push_back(uint32_t(r));
+    }
+    Cases(h, "abs (sub_825AC870)", __imp__sub_825AC870, sub_825AC870, ints.size(),
+          [&](size_t i, PPCContext& t) { t.r3.u64 = ints[i]; },
+          [](PPCContext& t, std::vector<uint8_t>& b) { Append(b, t.r3.u64); },
+          [&](size_t i) { return fmt::format("r3 {:X}", ints[i]); });
+    _mm_setcsr(saved);
   }
 }
 
