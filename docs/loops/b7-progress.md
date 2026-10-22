@@ -15,7 +15,7 @@ record: `b7-loop-2026-10-22-0111.md` (and this file's history).
   validation agent for the race overlays' migration when it reports,
   then one for the adapters lead's 31 functions (adding their prints:
   their harnesses were moved off the adapters, the case the check is
-  for).
+  for). Their `not in game:` lists go under "To check in a drive".
 - Session: pass 3 of 20, subsystem 1 of 5. In all: subsystem 1 of 5.
 - Known at the start: `b7_status.py` checks `c-runtime.md:221`
   `sub_825A9934` (`__chkstk`) "Dropped, but it ran" (from the first run:
@@ -39,6 +39,14 @@ record: `b7-loop-2026-10-22-0111.md` (and this file's history).
   adapters lead's rows (Overridden -> Native, and notes on the 4 kept).
 - `race-overlays.md` (new, 154 rows; `sub_8215DEA0` moved from
   `functions.md`), `sprites.md`'s intro, `known-data.md`'s new rows.
+
+## To check in a drive
+
+Functions made native this run with no `native running (game):` line in
+the validation agent's attract race; the user drives (with
+`--log_level=info`) and checks the log for them when the loop ends.
+
+(none yet)
 
 ## Totals
 

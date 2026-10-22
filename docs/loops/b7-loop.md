@@ -317,9 +317,10 @@ made native, or whose adapter it removed:
    (harness):` line for each function: its harness ran our code. A
    function with none didn't (a harness calling the adapter, or `__imp__`
    on both sides once its adapter is gone), or its harness doesn't reach
-   it. The `(game):` lines list which functions ran in play, for the rows
-   (no line isn't a failure: a function may only run in menus or on paths
-   an attract race doesn't take).
+   it. The `(game):` lines list which functions ran in play. No game line
+   isn't a failure (a function may only run in menus, saves or on paths
+   an attract race doesn't take): those functions are listed for the
+   user's drive (below).
 
 It fixes nothing but missing prints: a function with no harness line
 goes in the report, and the lead halts. Report, in its last message:
@@ -330,9 +331,15 @@ prints added: none | <functions>: <commit>
 harness lines: <count> of <count>
 missing: none | <functions with no harness line, and why if known>
 ran in play: <functions with a game line> | none
+not in game: <functions with no game line> | none
 race: <seconds at 30 ticks/s>, <error lines>, harnesses all 0: yes | no
 stop: none | <reason>
 ```
+
+The lead copies `not in game:` into "To check in a drive" in the progress
+file. When the loop ends, the user drives a race (menus, a save) with
+`--log_level=info` and checks the log's `native running (game):` lines for
+those functions: the validation step done by playing.
 
 ## When to halt
 
