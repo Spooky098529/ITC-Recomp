@@ -19,7 +19,9 @@ rows to review and drive list are there), and this file's history.
   groups; checked). Migration 1 done (18cafd4: all 15 ready groups, 18
   ours and 3 Merged; `--native_matrix_math`; race 22 s, 0 errors).
   Validated (18 of 18 harness lines, all
-  18 ran in play). Step: migration 2 (agent running).
+  18 ran in play). Migration 2 done (6c81f15..9345920:
+  the turns, ObjectInverse, the quaternion functions; 28 of 28 ours;
+  race 22 s, 0 errors). Step: validation 2 (agent running).
 - Known: `b7_status.py` checks `sub_825A9934` (`__chkstk`) "Dropped, but
   it ran", and every function made Native or Merged since the coverage
   session "..., but it ran" (`seen_in_play.txt` predates them; a new
@@ -52,6 +54,12 @@ rows to review and drive list are there), and this file's history.
   `src/debug/frame_state_diff.cpp`) now do the work natively, with the
   same hooks around it; frame dumps with the flag on and off look the
   same.
+  Migration 2's 8 rows. For review: the turns' "one NaN" harness group
+  keeps the angle within 1024 (a huge finite angle overflows the game's
+  sine and cosine polynomials to NaNs of both signs, which then meet in
+  Multiply); the "NaNs anywhere" group keeps every angle. The native
+  turns note their multiply for interpolation through a new
+  `interpolation::BlendState_OnMultiply` (as the Multiply wrapper does).
 - `race-overlays.md`: the no-mapping lead's 14 rows (the view's body and
   wheel accessors, IsBehindCamera, the save flags and stage check,
   UpdateTrails, MarkerKind; FlagsKind `sub_82122DB8` and NoSaveFlags
@@ -75,6 +83,8 @@ rows to review and drive list are there), and this file's history.
   Matrix::Inverse 10, MultiplyUnaligned 1, MultiplyTo 1,
   MultiplyReversed 1, ProjectPoint 3, Quaternion::FromMatrix 2,
   Quaternion::Multiply 1 (of 210 each).
+  Migration 2: Matrix::RotateX 14, RotateY 20, RotateZ 19 (of 210; NaN
+  or overflowing angles, the same reason through Multiply).
 
 - `vehicle-accessors.md` (migration 1): every vector, rigid-body and
   quaternion function has a "two or more NaN inputs" / "NaN inputs"
@@ -122,5 +132,7 @@ the validation agent's attract race; the user drives (with
   known 327, unknown 5723).
 - After the matrix math's migration 1: ours 584, work left 6169
   (wrapped 137, known 309, unknown 5723).
+- After the matrix math's migration 2: ours 591, work left 6162
+  (wrapped 137, known 302, unknown 5723).
 
 ## Stopped
