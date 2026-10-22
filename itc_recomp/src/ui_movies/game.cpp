@@ -296,39 +296,80 @@ std::optional<uint32_t> FindKey(uint8_t* base, uint32_t pairs, uint32_t count, u
 }
 }  // namespace
 
-uint32_t TextMapFind(uint8_t* base, uint32_t map, uint32_t key_address) {
+uint32_t TextMapFindKey(uint8_t* base, uint32_t map, uint32_t key) {
   const uint32_t count = guest::LoadU32(base, map + 1024);
   if (count == 0) {
     return kTextMapNone;
   }
-  const std::optional<uint32_t> i = FindKey(base, map, count, guest::LoadU32(base, key_address));
+  const std::optional<uint32_t> i = FindKey(base, map, count, key);
   return i ? map + 8 * *i + 4 : kTextMapNone;
 }
 
-void TextMapSet(uint8_t* base, uint32_t map, uint32_t key_address, uint32_t value_address) {
+uint32_t TextMapFind(uint8_t* base, uint32_t map, uint32_t key_address) {
+  return TextMapFindKey(base, map, guest::LoadU32(base, key_address));
+}
+
+void TextMapSetKey(uint8_t* base, uint32_t map, uint32_t key, uint32_t value) {
   const uint32_t count = guest::LoadU32(base, map + 1024);
   if (count != 0) {
-    if (const std::optional<uint32_t> i =
-            FindKey(base, map, count, guest::LoadU32(base, key_address))) {
-      guest::StoreU32(base, map + 8 * *i + 4, guest::LoadU32(base, value_address));
+    if (const std::optional<uint32_t> i = FindKey(base, map, count, key)) {
+      guest::StoreU32(base, map + 8 * *i + 4, value);
       return;
     }
   }
-  const uint32_t key = guest::LoadU32(base, key_address);
-  const uint32_t value = guest::LoadU32(base, value_address);
   guest::StoreU32(base, map + 1024, count + 1);
   guest::StoreU32(base, map + 8 * count, key);
   guest::StoreU32(base, map + 8 * count + 4, value);
 }
 
-uint32_t PairsFind(uint8_t* base, uint32_t vector, uint32_t key_address) {
+void TextMapSet(uint8_t* base, uint32_t map, uint32_t key_address, uint32_t value_address) {
+  // Both read before any store, as the original's paths do (the found one
+  // reads the value just before its only store).
+  TextMapSetKey(base, map, guest::LoadU32(base, key_address),
+                guest::LoadU32(base, value_address));
+}
+
+uint32_t PairsFindKey(uint8_t* base, uint32_t vector, uint32_t key) {
   const uint32_t count = guest::LoadU32(base, vector + 8);
   if (count == 0) {
     return kPairsNone;
   }
-  const std::optional<uint32_t> i = FindKey(base, guest::LoadU32(base, vector), count,
-                                            guest::LoadU32(base, key_address));
+  const std::optional<uint32_t> i = FindKey(base, guest::LoadU32(base, vector), count, key);
   return i ? guest::LoadU32(base, vector) + 8 * *i + 4 : kPairsNone;
+}
+
+uint32_t PairsFind(uint8_t* base, uint32_t vector, uint32_t key_address) {
+  return PairsFindKey(base, vector, guest::LoadU32(base, key_address));
+}
+
+uint32_t IsLoaded(uint8_t* base, uint32_t id) {
+  const uint32_t movie = guest::LoadU32(base, PairsFindKey(base, kMovieTable, id));
+  return guest::LoadU32(base, movie + kMovieLoaded) != 0 ? 1 : 0;
+}
+
+namespace {
+constexpr uint32_t kEmptyString = 0x82008434;
+
+// A text's record ([the value TextMapFindKey gives]; 0 for none).
+uint32_t TextRecord(uint8_t* base, uint32_t movie, uint32_t id) {
+  return guest::LoadU32(base, TextMapFindKey(base, movie + kMovieTexts, id));
+}
+}  // namespace
+
+uint32_t TextString(uint8_t* base, uint32_t movie, uint32_t id) {
+  const uint32_t text = TextRecord(base, movie, id);
+  return text == 0 ? kEmptyString : guest::LoadU32(base, text);
+}
+
+uint32_t TextField(uint8_t* base, uint32_t movie, uint32_t id, uint32_t offset) {
+  const uint32_t text = TextRecord(base, movie, id);
+  return text == 0 ? 0 : guest::LoadU32(base, text + offset);
+}
+
+void AdvanceTextScroll(uint8_t* base, uint32_t movie, uint32_t id) {
+  const uint32_t text = TextRecord(base, movie, id);
+  guest::StoreU32(base, text + 8, guest::LoadU32(base, text + 8) + 1);
+  TextMapSetKey(base, movie + kMovieTexts, id, text);
 }
 
 void ClearScreenFlag(uint8_t* base) {

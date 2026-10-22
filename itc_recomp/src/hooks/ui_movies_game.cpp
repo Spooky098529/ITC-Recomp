@@ -30,7 +30,9 @@ ITC_FLAG_BOOL(native_ui_movies_game, true, "ITC",
               "sub_8211B310, TextMap::Set sub_8211B370 and UiMovies::Find sub_8211B3F0; the "
               "screens' movie table reset sub_8211AD00 (its renderer calls still the game's); the "
               "layers sub_8211BD10 (its buckets in its frame on the guest stack, as the "
-              "original's; the original runs for trees that would overflow them) "
+              "original's; the original runs for trees that would overflow them); the texts' "
+              "accessors UiMovie::TextString sub_8211B720, sub_8211B770, sub_8211B7B8, "
+              "sub_8211B9B8 and sub_8211B940, and UiMovies::IsLoaded sub_8211BE98 "
               "(same results; checked by --run_harnesses=ui_movies_game)");
 
 ITC_FLAG_DECLARE(bool, native_ui_movies);
@@ -324,6 +326,49 @@ extern "C" REX_FUNC(sub_8211BD10) {
   }
   ctx.r3.u64 = ui_movies::AssignLayers(base, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
                                        ctx.r6.u32, ctx.r7.u32 != 0);
+}
+
+// UiMovies::IsLoaded: r3 = a movie id; 1 or 0.
+extern "C" REX_FUNC(sub_8211BE98) {
+  REX_FUNC_PROLOGUE();
+  NATIVE_OR_ORIGINAL(8211BE98);
+  ctx.r3.u64 = ui_movies::IsLoaded(base, ctx.r3.u32);
+}
+
+// UiMovie::TextString: r3 = movie, r4 = a text id; the text's buffer.
+extern "C" REX_FUNC(sub_8211B720) {
+  REX_FUNC_PROLOGUE();
+  NATIVE_OR_ORIGINAL(8211B720);
+  ctx.r3.u64 = ui_movies::TextString(base, ctx.r3.u32, ctx.r4.u32);
+}
+
+// The text's +20, +24 and +4: r3 = movie, r4 = a text id.
+extern "C" REX_FUNC(sub_8211B770) {
+  REX_FUNC_PROLOGUE();
+  NATIVE_OR_ORIGINAL(8211B770);
+  ctx.r3.u64 = ui_movies::TextField(base, ctx.r3.u32, ctx.r4.u32, 20);
+}
+
+extern "C" REX_FUNC(sub_8211B7B8) {
+  REX_FUNC_PROLOGUE();
+  NATIVE_OR_ORIGINAL(8211B7B8);
+  ctx.r3.u64 = ui_movies::TextField(base, ctx.r3.u32, ctx.r4.u32, 24);
+}
+
+extern "C" REX_FUNC(sub_8211B9B8) {
+  REX_FUNC_PROLOGUE();
+  NATIVE_OR_ORIGINAL(8211B9B8);
+  ctx.r3.u64 = ui_movies::TextField(base, ctx.r3.u32, ctx.r4.u32, 4);
+}
+
+// sub_8211B940: r3 = movie, r4 = a text id; r3 left at the movie's texts
+// (TextMap::Set's).
+extern "C" REX_FUNC(sub_8211B940) {
+  REX_FUNC_PROLOGUE();
+  NATIVE_OR_ORIGINAL(8211B940);
+  const uint32_t movie = ctx.r3.u32;
+  ui_movies::AdvanceTextScroll(base, movie, ctx.r4.u32);
+  ctx.r3.u64 = movie + ui_movies::kMovieTexts;
 }
 
 namespace ui_movies_game_hooks {

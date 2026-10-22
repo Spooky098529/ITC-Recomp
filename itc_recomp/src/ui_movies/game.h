@@ -133,6 +133,32 @@ void TextMapSet(uint8_t* base, uint32_t map, uint32_t key_address, uint32_t valu
 // sub_8211B3F0 (UiMovies::Find): the value's address for the key at
 // `key_address`, or 0x826C5CDC when it's not there.
 uint32_t PairsFind(uint8_t* base, uint32_t vector, uint32_t key_address);
+// The same three with the key (and value) as words.
+uint32_t TextMapFindKey(uint8_t* base, uint32_t map, uint32_t key);
+void TextMapSetKey(uint8_t* base, uint32_t map, uint32_t key, uint32_t value);
+uint32_t PairsFindKey(uint8_t* base, uint32_t vector, uint32_t key);
+
+// sub_8211BE98 (UiMovies::IsLoaded): 1 when the movie with id `id` in the
+// movie table has its loaded flag (+0x9FD0) set, else 0. No check that the
+// movie exists: an id not in the table reads the word at 0x826C5CDC as the
+// movie, as the original does.
+uint32_t IsLoaded(uint8_t* base, uint32_t id);
+
+// A movie's texts by id (the map at +0x9BCC): records of +0 the UTF-16
+// buffer, +4 scrolling, +8 the scroll counter, +20 the characters shown,
+// +24 passed to the formatting. An id not in the map reads the word at
+// 0x826C5CD8 as the record, as the originals do.
+constexpr uint32_t kMovieTexts = 0x9BCC;
+// sub_8211B720 (UiMovie::TextString): the text's buffer, or the empty string
+// at 0x82008434 when the record is 0.
+uint32_t TextString(uint8_t* base, uint32_t movie, uint32_t id);
+// sub_8211B9B8 (+4), sub_8211B770 (+20), sub_8211B7B8 (+24): the record's
+// word at `offset`, or 0 when the record is 0.
+uint32_t TextField(uint8_t* base, uint32_t movie, uint32_t id, uint32_t offset);
+// sub_8211B940: the record's +8 plus one, then the record stored again for
+// the id (TextMapSetKey: appended when the id wasn't there). No check for a
+// record of 0 (the original's neither).
+void AdvanceTextScroll(uint8_t* base, uint32_t movie, uint32_t id);
 
 // sub_8211AD00's work after its renderer calls: the UI movie library's
 // renderer and command list set (SetRenderer), every entry of the movie

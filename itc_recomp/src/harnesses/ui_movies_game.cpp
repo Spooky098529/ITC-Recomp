@@ -16,6 +16,7 @@
 
 #include <algorithm>
 #include <bit>
+#include <functional>
 #include <iterator>
 #include <string>
 #include <vector>
@@ -62,12 +63,13 @@ struct Block {
 
 // One case through both versions: the block's first `bytes` filled with
 // 0xCD, `setup()` writes the inputs, `args(t)` sets the registers, the
-// function runs; the bytes, r3 and (with `f1`) f1 are compared, from the
-// first difference on (32 bytes of it logged).
+// function runs, then `after()` (putting back live globals the setup
+// changed); the bytes, r3 and (with `f1`) f1 are compared, from the first
+// difference on (32 bytes of it logged).
 template <typename Setup, typename Args>
 void Compare(Context& h, Results& results, uint32_t area, uint32_t bytes, Setup setup, Args args,
              GuestFunction recompiled, GuestFunction native, const std::string& what,
-             bool f1 = false) {
+             bool f1 = false, const std::function<void()>& after = {}) {
   std::vector<uint8_t> result[2];
   for (int v = 0; v < 2; v++) {
     Fill(h.base, area, bytes);
@@ -80,6 +82,9 @@ void Compare(Context& h, Results& results, uint32_t area, uint32_t bytes, Setup 
       native(t, h.base);
     }
     result[v] = Read(h.base, area, bytes);
+    if (after) {
+      after();
+    }
     for (int i = 0; i < 4; i++) {
       result[v].push_back(uint8_t(t.r3.u32 >> (24 - 8 * i)));
     }
@@ -803,6 +808,102 @@ void LayersCases(Context& h, const Block& block) {
   results.Report();
 }
 
+// The texts' accessors and UiMovies::IsLoaded: a movie's text map (counts 0
+// to 128, small keys so lookups match some) with records in the block, and
+// the movie table (0x826C5CCC) pointed at made-up movies. An id not found
+// reads the words at 0x826C5CD8 (a text record) and 0x826C5CDC (a movie),
+// pointed into the block too; the table's header and those words are put
+// back after each run.
+void TextCases(Context& h, const Block& block) {
+  constexpr uint32_t kGlobals = 0x826C5CCC, kGlobalBytes = 0x14;  // the table's header, the two
+  const std::vector<uint8_t> globals = Read(h.base, kGlobals, kGlobalBytes);
+  const auto put_back = [&] { Write(h.base, kGlobals, globals.data(), kGlobalBytes); };
+  const uint32_t movie = block.at;
+  const uint32_t map = movie + 0x9BCC;
+  const uint32_t records = block.at + 0xA000;  // 8 records of 32 bytes
+  struct Accessor {
+    const char* name;
+    GuestFunction recompiled, native;
+    bool writes;  // a record of 0 is written through
+  };
+  const Accessor accessors[] = {
+      {"UiMovie::TextString (sub_8211B720)", __imp__sub_8211B720, sub_8211B720, false},
+      {"sub_8211B770 (a text's +20)", __imp__sub_8211B770, sub_8211B770, false},
+      {"sub_8211B7B8 (a text's +24)", __imp__sub_8211B7B8, sub_8211B7B8, false},
+      {"sub_8211B9B8 (a text's +4)", __imp__sub_8211B9B8, sub_8211B9B8, false},
+      {"sub_8211B940 (a text's scroll counter)", __imp__sub_8211B940, sub_8211B940, true},
+  };
+  for (const Accessor& f : accessors) {
+    Results results(f.name);
+    for (int i = 0; i < 400; i++) {
+      const uint32_t count = i < 2 ? uint32_t(i) : h.random.Below(129);
+      std::vector<uint32_t> pairs(2 * 128);
+      for (uint32_t k = 0; k < 128; k++) {
+        pairs[2 * k] = h.random.Below(8) == 0 ? uint32_t(h.random.Next()) : h.random.Below(160);
+        pairs[2 * k + 1] = !f.writes && h.random.Below(5) == 0 ? 0 : records + 32 * h.random.Below(8);
+      }
+      std::vector<uint32_t> words(64);
+      for (uint32_t& w : words) {
+        w = RandomWord(h.random);
+      }
+      const uint32_t none = !f.writes && h.random.Below(3) == 0 ? 0 : records + 32 * h.random.Below(8);
+      const uint32_t id = h.random.Below(6) == 0 ? 0xFFFFFFFFu : h.random.Below(160);
+      Compare(h, results, block.at + 0x9B00, 0x600,
+              [&] {
+                for (uint32_t k = 0; k < pairs.size(); k++) {
+                  guest::StoreU32(h.base, map + 4 * k, pairs[k]);
+                }
+                guest::StoreU32(h.base, map + 1024, count);
+                for (uint32_t k = 0; k < words.size(); k++) {
+                  guest::StoreU32(h.base, records + 4 * k, words[k]);
+                }
+                guest::StoreU32(h.base, 0x826C5CD8, none);
+              },
+              [&](PPCContext& t) {
+                t.r3.u64 = movie;
+                t.r4.u64 = id;
+              },
+              f.recompiled, f.native, fmt::format("case {}: count {} id {:X}", i, count, id), false,
+              put_back);
+    }
+    results.Report();
+  }
+  {
+    Results results("UiMovies::IsLoaded (sub_8211BE98)");
+    const uint32_t pairs = block.at + 0xA200;
+    for (int i = 0; i < 300; i++) {
+      const uint32_t count = i < 2 ? uint32_t(i) : h.random.Below(17);
+      std::vector<uint32_t> words(2 * 16);
+      for (uint32_t k = 0; k < 16; k++) {
+        words[2 * k] = h.random.Below(24);
+        words[2 * k + 1] = block.at + 16 * h.random.Below(8);
+      }
+      uint32_t flags[8];
+      for (uint32_t& w : flags) {
+        w = h.random.Below(2) == 0 ? 0 : RandomWord(h.random);
+      }
+      const uint32_t none = block.at + 16 * h.random.Below(8);
+      const uint32_t id = h.random.Below(24);
+      Compare(h, results, block.at + 0x9F00, 0x400,
+              [&] {
+                for (uint32_t k = 0; k < words.size(); k++) {
+                  guest::StoreU32(h.base, pairs + 4 * k, words[k]);
+                }
+                for (uint32_t k = 0; k < 8; k++) {
+                  guest::StoreU32(h.base, block.at + 16 * k + 0x9FD0, flags[k]);
+                }
+                guest::StoreU32(h.base, 0x826C5CCC, pairs);
+                guest::StoreU32(h.base, 0x826C5CD0, 16);
+                guest::StoreU32(h.base, 0x826C5CD4, count);
+                guest::StoreU32(h.base, 0x826C5CDC, none);
+              },
+              [&](PPCContext& t) { t.r3.u64 = id; }, __imp__sub_8211BE98, sub_8211BE98,
+              fmt::format("case {}: count {} id {}", i, count, id), false, put_back);
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void UiMoviesGame(Context& h) {
@@ -824,6 +925,7 @@ void UiMoviesGame(Context& h) {
   PairsCases(h, block);
   ScreenStartCases(h, block);
   LayersCases(h, block);
+  TextCases(h, block);
   memory->SystemHeapFree(block.at);
 }
 
