@@ -224,7 +224,9 @@ functions; run again after each group, as callers become ready):
    (outside "(expected to differ)" groups); a stalled boot restarted once.
    If the group runs in the race, a temporary counter override shows it
    was called (removed before committing). For anything drawn, a frame
-   dump against one with the fallback flag. No profile: native code may
+   dump against one with the fallback flag (attract races put a random
+   sepia or grayscale filter over the screen: compare what's drawn, not
+   the tint). No profile: native code may
    be slower than the recompiled code for now and is optimized later
    (the user's call, 2026-10-22).
 5. On a failure: logging, a run, the log read; no fixes by guessing. If
