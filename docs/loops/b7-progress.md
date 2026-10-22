@@ -15,8 +15,9 @@ there), and this file's history.
 - Subsystem 3 of 3: the collision world's owner and the track's
   collision queries (two leads joined: `sub_820FF050`, `sub_820FF368`,
   ..., and `sub_820FDF38`, `sub_820FDC18`, ...; the collision update
-  every tick, above `collision.md` and `car-physics.md`). Step: mapping
-  (agent running).
+  every tick, above `collision.md` and `car-physics.md`), mapped in
+  `collision-world.md` (a28943d; 43 rows; checked: 14 ready groups).
+  Step: migration 1 (agent running).
 
 ## Done
 
@@ -34,6 +35,13 @@ there), and this file's history.
   internals aren't ported).
 
 ## Rows to review
+
+- `collision-world.md` (new, 43 rows), `known-data.md`'s mesh, route,
+  course table and track position rows; corrections: `car-physics.md`'s
+  CollisionObject::Collide (the first query's arguments: r3 the
+  records, r4 the shape record), `collision.md`'s box words +160 (the
+  lower corners' track positions), `sub_820C0168` probably the car's own
+  track position; 5 leads added.
 
 - `collision.md` (new, 64 rows), `known-data.md`'s shape, box, pair
   query and table entries, `car-physics.md`'s intro; 1 lead added (the
@@ -116,3 +124,5 @@ the validation agent's attract race or pad replay; the user drives (with
   137, known 332, unknown 5502).
 - After the collision's migration 2: ours 797, work left 5956 (wrapped
   137, known 319, unknown 5500).
+- After mapping the collision world: ours 797, work left 5956 (wrapped
+  137, known 362, unknown 5457).
