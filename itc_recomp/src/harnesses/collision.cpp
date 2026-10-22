@@ -212,6 +212,28 @@ void NativeFindImpact(PPCContext& ctx, uint8_t* base) {
 }
 ITC_NATIVE_TEST_STEP(NativeQueryFindImpact, 820BCE80,
                      co::QueryFindImpact(base, ctx.r3.u32, &result))
+ITC_NATIVE_STEP(NativeEdgesCrossing,
+                ctx.r3.u64 = co::BoxBoxEdgesCrossing(base, ctx.r3.u32, ctx.r4.u32))
+// The query's push-outs: shapes that aren't boxes run the original.
+#define ITC_NATIVE_PUSH_OUT_STEP(name, address, call) \
+  void name(PPCContext& ctx, uint8_t* base) {         \
+    ctx.fpscr.disableFlushMode();                     \
+    uint32_t r3 = 0;                                  \
+    if (!call) {                                      \
+      __imp__sub_##address(ctx, base);                \
+      return;                                         \
+    }                                                 \
+    ctx.r3.u64 = r3;                                  \
+  }
+ITC_NATIVE_PUSH_OUT_STEP(NativePushOutEdges, 820BF320,
+                         co::BoxBoxPushOutEdges(base, ctx.r3.u32, ctx.r1.u32 - 544, &r3))
+ITC_NATIVE_PUSH_OUT_STEP(NativePushOutCorners, 820BE150,
+                         co::BoxBoxPushOutCorners(base, ctx.r3.u32, ctx.r1.u32 - 304, &r3))
+ITC_NATIVE_PUSH_OUT_STEP(NativeFindPushOut, 820BFB28,
+                         co::BoxBoxFindPushOut(base, ctx.r3.u32, ctx.r1.u32 - 96, &r3))
+ITC_NATIVE_TEST_STEP(NativeQueryFindPushOut, 820BCDD0,
+                     co::QueryFindPushOut(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 112,
+                                          &result))
 ITC_NATIVE_STEP(NativeWordAt8, ctx.r3.u64 = co::WordAt8(base, ctx.r3.u32))
 ITC_NATIVE_STEP(NativeCurrentCenter,
                 ctx.r3.u64 = co::CollisionShapeCurrentCenter(base, ctx.r3.u32))
@@ -348,6 +370,8 @@ enum Args {
   kQuerySetUp,    // r3 = the query (set up)
   kPairR3,        // r3 = the pair (set up)
   kObjectVector,  // r3 = object A (its body and a record of A, B, C), r4 = the vector
+  kEdges,         // r3 = the vector (48 bytes out), r4 = the query's first block
+  kQueryVector,   // r3 = the query (set up), r4 = the vector
 };
 
 void Append32(std::vector<uint8_t>& out, uint32_t word) {
@@ -518,6 +542,11 @@ void Collision(Context& h) {
     // The motion's row: minus the current center transformed, plus the
     // center (Vec3::Sum): one NaN there meets its own negation.
     bool motion_row = false;
+    // The push-outs: the blocks' corners' outcodes worked out from their
+    // coordinates (corners inside the other box, edges crossing it), the
+    // blocks' own outcodes 0 three times in four and the depth (+80) 0.0
+    // one time in two.
+    bool push_out = false;
   } functions[] = {
       {"BoxShape::CornerCount (sub_820B9EC8)", Original<__imp__sub_820B9EC8>, NativeCornerCount,
        kNone, 1, false},
@@ -607,6 +636,16 @@ void Collision(Context& h) {
        kQuerySetUp, 1, false},
       {"Query::FindImpact (sub_820BCE80)", Original<__imp__sub_820BCE80>, NativeQueryFindImpact,
        kQuerySetUp, 1, false},
+      {"BoxBox::EdgesCrossing (sub_820BF080)", Original<__imp__sub_820BF080>,
+       NativeEdgesCrossing, kEdges, 1, false, false, true},
+      {"BoxBox::PushOutEdges (sub_820BF320)", Original<__imp__sub_820BF320>,
+       NativePushOutEdges, kQuerySetUp, 1, false, false, true},
+      {"BoxBox::PushOutCorners (sub_820BE150)", Original<__imp__sub_820BE150>,
+       NativePushOutCorners, kQuerySetUp, 1, false, false, true},
+      {"BoxBox::FindPushOut (sub_820BFB28)", Original<__imp__sub_820BFB28>, NativeFindPushOut,
+       kQuerySetUp, 1, false, false, true},
+      {"Query::FindPushOut (sub_820BCDD0)", Original<__imp__sub_820BCDD0>,
+       NativeQueryFindPushOut, kQueryVector, 1, false, false, true},
       {"sub_822BE2C8 (the word +8)", Original<__imp__sub_822BE2C8>, NativeWordAt8, kRecordR3, 1,
        false},
       {"CollisionShape::CurrentCenter (sub_820BAB20)", Original<__imp__sub_820BAB20>,
@@ -686,7 +725,8 @@ void Collision(Context& h) {
           guest::StoreU32(h.base, region + kRecordB + 0, region + kBoxD);
           guest::StoreU32(h.base, region + kRecordB + 4, region + kBoxE);
           guest::StoreU32(h.base, region + kRecordB + 8, region + kBoxF);
-          if (f.args == kQueryCache || f.args == kQuerySetUp) {
+          if (f.args == kQueryCache || f.args == kQuerySetUp || f.args == kEdges ||
+              f.args == kQueryVector) {
             guest::StoreU32(h.base, region + kQuery + 0, region + kRecord);
             guest::StoreU32(h.base, region + kQuery + 4, region + kRecordB);
             for (uint32_t k = 0; k < 4; k++) {
@@ -706,11 +746,25 @@ void Collision(Context& h) {
                     guest::StoreFloat(h.base, at + axis,
                                       float(int32_t(r.Below(4001)) - 2000) / 1000.0f);
                   }
-                  guest::StoreU32(h.base, at + 16, r.Below(64));
+                  uint32_t outcode = r.Below(64);
+                  if (f.push_out) {
+                    outcode = 0;
+                    for (uint32_t axis = 0; axis < 3; axis++) {
+                      const float c = guest::LoadFloat(h.base, at + 4 * axis);
+                      outcode |= (c > 1.0f ? 1u : 0u) << (2 * axis);
+                      outcode |= (c < -1.0f ? 2u : 0u) << (2 * axis);
+                    }
+                  }
+                  guest::StoreU32(h.base, at + 16, outcode);
                 }
-                guest::StoreU32(h.base, block + 64, r.Below(64));
+                const uint32_t block_outcode = r.Below(64);
+                guest::StoreU32(h.base, block + 64,
+                                f.push_out && (block_outcode & 3) != 0 ? 0 : block_outcode);
               }
               guest::StoreU32(h.base, region + kQuery + 84, 0x40000000);
+              if (f.push_out && r.Below(2) == 0) {
+                guest::StoreU32(h.base, region + kQuery + 80, 0);
+              }
             }
           }
           if (f.args == kPairR3) {
@@ -849,6 +903,14 @@ void Collision(Context& h) {
               break;
             case kRecordVector:
               t.r3.u64 = region + kRecord;
+              t.r4.u64 = region + kVector;
+              break;
+            case kEdges:
+              t.r3.u64 = region + kVector;
+              t.r4.u64 = region + kBlock;
+              break;
+            case kQueryVector:
+              t.r3.u64 = region + kQuery;
               t.r4.u64 = region + kVector;
               break;
             case kObjectVector:

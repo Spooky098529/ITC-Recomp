@@ -250,6 +250,40 @@ bool BoxBoxFindImpact(uint8_t* base, uint32_t query);
 // BoxBox::FindImpact.
 bool QueryFindImpact(uint8_t* base, uint32_t query, uint32_t* result);
 
+// --- The push-outs (src/collision/impacts.cpp): along the query's
+// direction (+96), the contact with the largest depth (+80) found. Each
+// false, with nothing done, where a record's template or current copy isn't
+// a box. `r3`: what the original leaves there. ---
+
+// BoxBox::EdgesCrossing (sub_820BF080): for each of the 12 edges of the
+// block's box, its word of `out` 1 when its ends' outcodes share no bit,
+// aren't both 0 and differ, and it passes through a face of the unit box;
+// else 0. Returns 1 when any did.
+uint32_t BoxBoxEdgesCrossing(uint8_t* base, uint32_t out, uint32_t block);
+// BoxBox::PushOutEdges (sub_820BF320): A's edges crossing B's unit box
+// against B's crossing A's: the normal of each pair (their cross product,
+// turned away from B's edge's outward direction), the shallowest depth
+// along the direction under [0x82002B94] and above +80 made the contact (B's
+// edge's middle). `frame`: the original's 544 bytes.
+bool BoxBoxPushOutEdges(uint8_t* base, uint32_t query, uint32_t frame, uint32_t* r3);
+// BoxBox::PushOutCorners (sub_820BE150): A's corners inside B (outcode 0
+// in block +20): the farthest way out along the direction in B's unit box
+// (sub_820BE0D8's work per axis), its length in world units above +80 made
+// the contact (A's corner, B's face's normal: sub_820BC8A8's work). Both
+// callees never ran in play. `frame`: the original's 304 bytes.
+bool BoxBoxPushOutCorners(uint8_t* base, uint32_t query, uint32_t frame, uint32_t* r3);
+// BoxBox::FindPushOut (sub_820BFB28): unless a current block's outcode is
+// set, PushOutCorners both ways round (swapped and back), then with no
+// depth found PushOutEdges. `frame`: the original's 96 bytes.
+bool BoxBoxFindPushOut(uint8_t* base, uint32_t query, uint32_t frame, uint32_t* r3);
+// Query::FindPushOut (sub_820BCDD0): +96 = the direction, +80 = 0.0, +84 =
+// +88 = 2.0, the push-out test for the shapes' types (box-box:
+// BoxBox::FindPushOut), then 1 when the depth +80 is above 0.0. False,
+// with nothing done, where the shapes aren't boxes or the table's box-box
+// entry isn't BoxBox::FindPushOut. `frame`: the original's 112 bytes.
+bool QueryFindPushOut(uint8_t* base, uint32_t query, uint32_t direction, uint32_t frame,
+                      uint32_t* result);
+
 // --- The query (on CollisionPair::Solve's stack) and its contact (+32) ---
 
 // Query::Query (sub_820BD1C8): the w of +32, +48, +64, +96 and of the 8
