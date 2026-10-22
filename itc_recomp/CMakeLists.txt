@@ -137,6 +137,7 @@ set(ITC_SOURCES
     src/track_collision/track_world.cpp
     src/track_collision/track_mesh.cpp
     src/track_collision/track_ground.cpp
+    src/track_collision/track_cell.cpp
     src/hooks/command_list.cpp
     src/command_list/command_list.cpp
     src/hooks/c_runtime.cpp
@@ -241,7 +242,7 @@ set_source_files_properties(src/c_runtime/math.cpp src/ui_movies/keys.cpp
     src/collision/boxes.cpp src/collision/shape_record.cpp
     src/collision/box_box.cpp src/collision/impacts.cpp src/collision/pairs.cpp
     src/track_collision/track_world.cpp src/track_collision/track_mesh.cpp
-    src/track_collision/track_ground.cpp PROPERTIES
+    src/track_collision/track_ground.cpp src/track_collision/track_cell.cpp PROPERTIES
     COMPILE_OPTIONS "-ffp-model=strict;-ffp-contract=off"
     SKIP_PRECOMPILE_HEADERS ON)
 

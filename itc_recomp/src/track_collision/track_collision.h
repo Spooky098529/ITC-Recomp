@@ -128,6 +128,53 @@ bool TrackCollisionGroundHits(uint8_t* base, uint32_t hits, uint32_t box, uint32
 uint32_t TrackCollisionGroundCallback(uint8_t* base, uint32_t result, uint32_t point,
                                       uint32_t position, uint32_t frame);
 
+// --- The track position's cell (src/track_collision/track_cell.cpp): a
+// slice's outline (halfwords +12 to +18 its corners in the section's
+// outline, 8-byte x, z points at the section's halfword +2; +18 0xFFFF for
+// three), its height +20; a section's bounds (+40 to +60). ---
+
+// TrackMesh::SliceContains (sub_820F6A38): 1 when the point's y is within
+// [0x82001BDC] of the slice's height, the point near the outline's center
+// and inside it in x and z; else 0.
+uint32_t TrackMeshSliceContains(uint8_t* base, uint32_t slice, uint32_t outline, uint32_t point);
+// TrackMesh::FindSlice (sub_820F6BE8): the first slice of the section
+// containing the point, among all (`slice` -1) or those within 4 of
+// `slice`; else -1.
+uint32_t TrackMeshFindSlice(uint8_t* base, uint32_t section, uint32_t slice, uint32_t point);
+// TrackPosition::CrossSection (sub_820F71B0): the position's slice looked
+// for near it in its section, then in the sections its links lead to, then
+// from the section's last or first slice; the position's section and
+// slice set (the slice 0 when out of range). Returns 1 when one was found.
+uint32_t TrackPositionCrossSection(uint8_t* base, uint32_t position, uint32_t mesh,
+                                   uint32_t point);
+// TrackPosition::FindCell (sub_820F8090): the position's cell moved to the
+// slice containing the point (FindCell's row in collision-world.md);
+// returns 0, or -1, -2, -3 when the full searches didn't find it either.
+// The full searches (sub_820F7EE8, sub_820F7E30, with sub_820F7D70 and
+// sub_820F6C88; never seen in play) are ported with it. `frame`: the
+// original's 240 bytes.
+uint32_t TrackPositionFindCell(uint8_t* base, uint32_t mesh, uint32_t position, uint32_t point,
+                               uint32_t frame);
+// sub_820F7D70 (the name ours: TrackMesh::SectionOutcode): bits 1, 2 for
+// the point's x below or above the section's bounds (+48, +56, with the
+// margin [0x82001FD8]), 4, 8 for y (+44 - +40, +40 + +44), 16, 32 for z
+// (+52, +60); 0 inside.
+uint32_t TrackMeshSectionOutcode(uint8_t* base, uint32_t mesh, uint32_t point, uint32_t section);
+// sub_820F6C88 (TrackMesh::NearestSlice): the section's slice containing
+// the point (*best = 0.0), else the one whose center is nearest within
+// [0x8200681C] and nearer than *best (*best its squared distance); -1.
+uint32_t TrackMeshNearestSlice(uint8_t* base, uint32_t section, uint32_t point, uint32_t best);
+// sub_820F7EE8 (TrackPosition::SearchLinked): the sections the position's
+// section links to, then every other section, whose bounds hold the point:
+// the first slice containing it. The halfwords at 0x826C5B04 list the
+// linked sections tried (-1 after the last). Returns 1 when found.
+uint32_t TrackPositionSearchLinked(uint8_t* base, uint32_t position, uint32_t point, uint32_t mesh);
+// sub_820F7E30 (TrackPosition::SearchAll): every section whose bounds hold
+// the point: its nearest slice (NearestSlice), until one contains it.
+// Returns 1 when any was found. `frame`: the original's 160 bytes.
+uint32_t TrackPositionSearchAll(uint8_t* base, uint32_t position, uint32_t point, uint32_t mesh,
+                                uint32_t frame);
+
 // TrackRoute::Prepare (sub_820F8600): +8 = 1, +0 = 0.
 void TrackRoutePrepare(uint8_t* base, uint32_t route);
 // TrackRoute::Free (sub_820F8618): +8 = 0, the file +0 freed, +0 = 0.

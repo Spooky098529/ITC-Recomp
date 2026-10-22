@@ -20,11 +20,14 @@ ITC_FLAG_BOOL(native_collision_world, true, "ITC",
               "mesh's lookups, sub_820F6A08; the ground, sub_820F7AA0 with sub_820F72F8, "
               "sub_820F7468, sub_820F7590, sub_820F7818, sub_820F6E18, and "
               "TrackCollision::Ground sub_820FE8F8, GroundCallback sub_820FEAB0 and GroundHits "
-              "sub_820FEBD0, for boxes) natively "
+              "sub_820FEBD0, for boxes; the track position's cell, sub_820F8090 with sub_820F6A38, "
+              "sub_820F6BE8, sub_820F71B0, sub_820F7EE8, sub_820F7E30, sub_820F7D70, "
+              "sub_820F6C88) natively "
               "instead of through the translated code (the same words, bit for bit; checked by "
               "--run_harnesses=collision_world). Those reached only from native callers have no "
               "adapters, and the flag switches their callers: sub_820F6898, sub_820F72F8, "
-              "sub_820F7468, sub_820F7590, sub_820F7818, sub_820F6E18");
+              "sub_820F7468, sub_820F7590, sub_820F7818, sub_820F6E18, sub_820F6A38, sub_820F6BE8, "
+              "sub_820F71B0, sub_820F7EE8, sub_820F7E30, sub_820F7D70, sub_820F6C88");
 
 // Defines an adapter: `body` uses `ctx` and `base`.
 #define ITC_COLLISION_WORLD(address, body)   \
@@ -113,3 +116,13 @@ extern "C" REX_FUNC(sub_820FEBD0) {
   }
   ctx.r3.u64 = count;
 }
+
+// --- The track position's cell ---
+
+// TrackMesh::SliceContains, FindSlice and TrackPosition::CrossSection
+// (sub_820F6A38, sub_820F6BE8, sub_820F71B0), and the full searches
+// (sub_820F7EE8, sub_820F7E30, sub_820F7D70, sub_820F6C88, never seen in
+// play) have no adapters: their callers are native.
+// r3 = the mesh, r4 = the track position, r5 = its point.
+ITC_COLLISION_WORLD(820F8090, ctx.r3.u64 = TrackPositionFindCell(base, ctx.r3.u32, ctx.r4.u32,
+                                                                 ctx.r5.u32, ctx.r1.u32 - 240))

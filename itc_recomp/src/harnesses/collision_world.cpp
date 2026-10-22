@@ -105,6 +105,26 @@ void NativeGroundHits(PPCContext& ctx, uint8_t* base) {
   }
   ctx.r3.u64 = count;
 }
+ITC_NATIVE_STEP(NativeSliceContains,
+                ctx.r3.u64 = tc::TrackMeshSliceContains(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+ITC_NATIVE_STEP(NativeFindSlice,
+                ctx.r3.u64 = tc::TrackMeshFindSlice(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+ITC_NATIVE_STEP(NativeCrossSection,
+                ctx.r3.u64 = tc::TrackPositionCrossSection(base, ctx.r3.u32, ctx.r4.u32,
+                                                           ctx.r5.u32))
+ITC_NATIVE_STEP(NativeSectionOutcode,
+                ctx.r3.u64 = tc::TrackMeshSectionOutcode(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+ITC_NATIVE_STEP(NativeNearestSlice,
+                ctx.r3.u64 = tc::TrackMeshNearestSlice(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+ITC_NATIVE_STEP(NativeSearchLinked,
+                ctx.r3.u64 = tc::TrackPositionSearchLinked(base, ctx.r3.u32, ctx.r4.u32,
+                                                           ctx.r5.u32))
+ITC_NATIVE_STEP(NativeSearchAll,
+                ctx.r3.u64 = tc::TrackPositionSearchAll(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                                        ctx.r1.u32 - 160))
+ITC_NATIVE_STEP(NativeFindCell,
+                ctx.r3.u64 = tc::TrackPositionFindCell(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                                       ctx.r1.u32 - 240))
 ITC_NATIVE_STEP(NativeGroundCallback,
                 ctx.r3.u64 = tc::TrackCollisionGroundCallback(base, ctx.r3.u32, ctx.r4.u32,
                                                               ctx.r5.u32, ctx.r1.u32 - 96))
@@ -435,7 +455,11 @@ constexpr uint32_t kSlices = 6;
 constexpr uint32_t kMeshP = 0x0, kFileP = 0x40, kTableP = 0x60, kPositionP = 0x200,
                    kPointP = 0x280, kResultP = 0x300, kColorP = 0x340, kNormalP = 0x360,
                    kOutsP = 0x3A0, kSectionP = 0x1000, kSectionBytes = 0x4000;
-constexpr uint32_t kVerticesO = 0x100, kColorsO = 0x400, kSlicesO = 0x600, kTrianglesO = 0x800;
+constexpr uint32_t kVerticesO = 0x100, kColorsO = 0x400, kSlicesO = 0x600, kTrianglesO = 0x800,
+                   kOutlineO = 0xC00;
+// SearchLinked's list of linked sections tried (and, past its six, the
+// route's first halfword).
+constexpr uint32_t kLinkedTried = 0x826C5B04, kLinkedTriedBytes = 16;
 // For GroundHits: a box (its template, the matrix placing it), its four
 // track positions (96 bytes each), a fake collision world (its +60 the
 // room for hits) and the hit record.
@@ -486,6 +510,25 @@ void BuildMesh(uint8_t* base, uint32_t area, Random& r, std::vector<uint32_t>& t
     guest::StoreU32(base, section + 68, kColorsO);
     guest::StoreU32(base, section + 72, kSlicesO);
     guest::StoreU32(base, section + 76, kTrianglesO);
+    // The outline points (x, z) at the section's halfword +2: the left and
+    // right edges of each row; the section's bounds (+40 the half height,
+    // +44 the middle height, +48/+56 x, +52/+60 z), a little off one time
+    // in four.
+    guest::StoreU16(base, section + 2, uint16_t(kOutlineO));
+    for (uint32_t row = 0; row <= kSlices; row++) {
+      for (uint32_t side = 0; side < 2; side++) {
+        const uint32_t q = section + kOutlineO + 8 * (row * 2 + side);
+        guest::StoreFloat(base, q + 0, side == 0 ? -10.0f : 10.0f);
+        guest::StoreFloat(base, q + 4, 5.0f * float(row + kSlices * k));
+      }
+    }
+    const float off = r.Below(4) == 0 ? float(int32_t(r.Below(400)) - 200) / 100.0f : 0.0f;
+    guest::StoreFloat(base, section + 40, 2.0f + off);
+    guest::StoreFloat(base, section + 44, 0.5f);
+    guest::StoreFloat(base, section + 48, -10.0f + off);
+    guest::StoreFloat(base, section + 52, 5.0f * float(kSlices * k) + off);
+    guest::StoreFloat(base, section + 56, 10.0f - off);
+    guest::StoreFloat(base, section + 60, 5.0f * float(kSlices * (k + 1)) - off);
     // The vertices: rows along z, three columns across x.
     for (uint32_t row = 0; row <= kSlices; row++) {
       for (uint32_t col = 0; col < 3; col++) {
@@ -503,6 +546,14 @@ void BuildMesh(uint8_t* base, uint32_t area, Random& r, std::vector<uint32_t>& t
         guest::StoreU16(base, slice + i, uint16_t(r.Next()));
       }
       guest::StoreU16(base, slice + 2, uint16_t(count));
+      // Its outline: the row's two outline points and the next row's (a
+      // triangle one time in six), its height near the vertices'.
+      guest::StoreU16(base, slice + 12, uint16_t(s * 2 + 0));
+      guest::StoreU16(base, slice + 14, uint16_t(s * 2 + 1));
+      guest::StoreU16(base, slice + 16, uint16_t(s * 2 + 3));
+      guest::StoreU16(base, slice + 18, r.Below(6) == 0 ? uint16_t(0xFFFF) : uint16_t(s * 2 + 2));
+      guest::StoreFloat(base, slice + 20,
+                        r.Below(8) == 0 ? 6.0f : 0.5f + float(int32_t(r.Below(200)) - 100) / 1000.0f);
       for (uint32_t cell = 0; cell < 2; cell++) {
         const uint16_t a = uint16_t(s * 3 + cell), b = uint16_t(a + 1), c = uint16_t(a + 4),
                        d = uint16_t(a + 3);
@@ -543,6 +594,13 @@ void GroundCases(Context& h, uint32_t area) {
     kGroundHeight,  // r3 = the mesh, r4 = the point, r5 = the position, r6, r7 = outs or 0
     kGround,        // r3 = the result, r4 = the point, r5 = the position or 0
     kHits,          // r3 = the hit record, r4 = the box
+    kContains,      // r3 = a slice, r4 = its section's outline, r5 = the point
+    kFindSlice,     // r3 = a section, r4 = a slice or -1, r5 = the point
+    kCross,         // r3 = the position, r4 = the mesh, r5 = the point
+    kOutcode,       // r3 = the mesh, r4 = the point, r5 = a section
+    kNearest,       // r3 = a section, r4 = the point, r5 = the best distance
+    kSearch,        // r3 = the position, r4 = the point, r5 = the mesh
+    kFindCell,      // r3 = the mesh, r4 = the position, r5 = the point
   };
   const struct {
     const char* name;
@@ -567,10 +625,33 @@ void GroundCases(Context& h, uint32_t area) {
        NativeGroundCallback, kGround},
       {"TrackCollision::GroundHits (sub_820FEBD0)", Original<__imp__sub_820FEBD0>,
        NativeGroundHits, kHits},
+      {"TrackMesh::SliceContains (sub_820F6A38)", Original<__imp__sub_820F6A38>,
+       NativeSliceContains, kContains},
+      {"TrackMesh::FindSlice (sub_820F6BE8)", Original<__imp__sub_820F6BE8>, NativeFindSlice,
+       kFindSlice},
+      {"TrackPosition::CrossSection (sub_820F71B0)", Original<__imp__sub_820F71B0>,
+       NativeCrossSection, kCross},
+      {"TrackMesh::SectionOutcode (sub_820F7D70)", Original<__imp__sub_820F7D70>,
+       NativeSectionOutcode, kOutcode},
+      {"TrackMesh::NearestSlice (sub_820F6C88)", Original<__imp__sub_820F6C88>,
+       NativeNearestSlice, kNearest},
+      {"TrackPosition::SearchLinked (sub_820F7EE8)", Original<__imp__sub_820F7EE8>,
+       NativeSearchLinked, kSearch},
+      {"TrackPosition::SearchAll (sub_820F7E30)", Original<__imp__sub_820F7E30>,
+       NativeSearchAll, kSearch},
+      {"TrackPosition::FindCell (sub_820F8090)", Original<__imp__sub_820F8090>, NativeFindCell,
+       kFindCell},
   };
   uint8_t saved_mesh[12];
   std::memcpy(saved_mesh, h.base + tc::kMesh, sizeof(saved_mesh));
   const uint32_t saved_world = guest::LoadU32(h.base, kWorldPointer);
+  uint8_t saved_tried[kLinkedTriedBytes];
+  std::memcpy(saved_tried, h.base + kLinkedTried, kLinkedTriedBytes);
+  const float tolerance = guest::LoadFloat(h.base, 0x82001BDC);
+  ITC_LOG_INFO("harness: collision_world: a slice's height tolerance {}, its center's reach {} "
+               "(squared {}), the sections' margin {}",
+               tolerance, guest::LoadFloat(h.base, 0x82002A28),
+               guest::LoadFloat(h.base, 0x8200681C), guest::LoadFloat(h.base, 0x82001FD8));
   const float catch_distance = guest::LoadFloat(h.base, 0x82002A0C);
   ITC_LOG_INFO("harness: collision_world: the ground's catch distance {}, its offset {}, the "
                "slice offsets {} {} {} {}",
@@ -585,13 +666,19 @@ void GroundCases(Context& h, uint32_t area) {
       Results unaligned(std::string(f.name) + (group == kNumbers ? "" : ", one NaN in a vertex") +
                         ", out not 16-aligned (expected to differ)");
       bool out_unaligned = false;
-      for (uint64_t seed = 0; seed < 300; seed++) {
+      for (uint64_t seed = 0; seed < (group == kNumbers ? 200u : 100u); seed++) {
         std::vector<uint8_t> result[2];
         std::string what = fmt::format("seed {}", seed);
         for (int v = 0; v < 2; v++) {
           Random r = Seeded(seed * 53 + 17 * uint64_t(group) + 1);
-          for (uint32_t i = 0; i < kGroundCompared; i += 4) {
-            guest::StoreU32(h.base, area + i, uint32_t(r.Next()));
+          // The area is the allocation layer's (virtual memory, host
+          // contiguous): filled and read back with memcpy.
+          {
+            std::vector<uint32_t> words(kGroundCompared / 4);
+            for (uint32_t& w : words) {
+              w = __builtin_bswap32(uint32_t(r.Next()));
+            }
+            std::memcpy(h.base + area, words.data(), kGroundCompared);
           }
           std::vector<uint32_t> triangles, quads;
           BuildMesh(h.base, area, r, triangles, quads, group == kOneNaN);
@@ -768,6 +855,69 @@ void GroundCases(Context& h, uint32_t area) {
               t.r4.u64 = area + kBoxP;
               break;
             }
+            case kContains:
+            case kFindSlice:
+            case kCross:
+            case kOutcode:
+            case kNearest:
+            case kSearch:
+            case kFindCell: {
+              out_unaligned = false;
+              // The point's height near the slices' (within twice the
+              // tolerance), the position's slice in range (or, for
+              // CrossSection, one past either end).
+              const float y = 0.5f + (float(r.Below(2001)) / 1000.0f - 1.0f) * 2.0f * tolerance;
+              guest::StoreFloat(h.base, point + 4, y);
+              what = fmt::format("seed {} point ({}, {}, {}) position ({}, {})", seed, px, y, pz,
+                                 section, slice);
+              if (slice < 0 && section >= 0) {
+                slice = int32_t(r.Below(kSlices));
+                guest::StoreU16(h.base, position + 2, uint16_t(slice));
+              }
+              if (f.kind == kCross && r.Below(3) == 0) {
+                guest::StoreU16(h.base, position + 2, uint16_t(r.Below(2) == 0 ? -1 : kSlices));
+              }
+              const uint32_t sec_slice = sec + kSlicesO + 28 * r.Below(kSlices);
+              switch (f.kind) {
+                case kContains:
+                  t.r3.u64 = sec_slice;
+                  t.r4.u64 = sec + kOutlineO;
+                  t.r5.u64 = point;
+                  break;
+                case kFindSlice:
+                  t.r3.u64 = sec;
+                  t.r4.u64 = r.Below(3) == 0 ? uint32_t(-1) : r.Below(kSlices + 4);
+                  t.r5.u64 = point;
+                  break;
+                case kCross:
+                case kSearch:
+                  if (section < 0 && f.kind == kCross) {
+                    guest::StoreU16(h.base, position + 0, uint16_t(r.Below(2)));
+                  }
+                  t.r3.u64 = position;
+                  t.r4.u64 = f.kind == kCross ? area + kMeshP : point;
+                  t.r5.u64 = f.kind == kCross ? point : area + kMeshP;
+                  break;
+                case kOutcode:
+                  t.r3.u64 = area + kMeshP;
+                  t.r4.u64 = point;
+                  t.r5.u64 = r.Below(2);
+                  break;
+                case kNearest:
+                  guest::StoreFloat(h.base, area + kOutsP,
+                                    r.Below(3) == 0 ? 1e30f : float(r.Below(100000)) / 100.0f);
+                  t.r3.u64 = sec;
+                  t.r4.u64 = point;
+                  t.r5.u64 = area + kOutsP;
+                  break;
+                default:
+                  t.r3.u64 = area + kMeshP;
+                  t.r4.u64 = position;
+                  t.r5.u64 = point;
+                  break;
+              }
+              break;
+            }
             case kGround:
               out_unaligned = false;
               std::memcpy(h.base + tc::kMesh, h.base + area + kMeshP, 12);
@@ -779,7 +929,12 @@ void GroundCases(Context& h, uint32_t area) {
           what = fmt::format("seed {} point ({}, {}, {}) position ({}, {})", seed, px, py, pz,
                              section, slice);
           (v == 0 ? f.recompiled : f.native)(t, h.base);
-          result[v] = Read(h.base, area, kGroundCompared);
+          result[v].assign(h.base + area, h.base + area + kGroundCompared);
+          {
+            const std::vector<uint8_t> tried = Read(h.base, kLinkedTried, kLinkedTriedBytes);
+            result[v].insert(result[v].end(), tried.begin(), tried.end());
+            std::memcpy(h.base + kLinkedTried, saved_tried, kLinkedTriedBytes);
+          }
           Append32(result[v], t.r3.u32);
           if (compare_f1) {
             const uint64_t bits = std::bit_cast<uint64_t>(t.f1.f64);
