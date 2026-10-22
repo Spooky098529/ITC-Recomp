@@ -94,10 +94,14 @@ bool ShapeCopyConstruct(uint8_t* base, uint32_t shape, uint32_t from) {
   return true;
 }
 
+bool BoxCopyFits(uint32_t box, uint32_t from) {
+  return CopyFits(box + 64, from + 64, 48) && CopyFits(box + 176, from + 176, 128) &&
+         CopyFits(box + 304, from + 304, 192);
+}
+
 bool BoxCopyConstruct(uint8_t* base, uint32_t box, uint32_t from) {
   ITC_NATIVE_RUNNING("sub_820BB688 BoxShape::BoxShape(const&)");
-  if (!CopyFits(box + 64, from + 64, 48) || !CopyFits(box + 176, from + 176, 128) ||
-      !CopyFits(box + 304, from + 304, 192)) {
+  if (!BoxCopyFits(box, from)) {
     return false;
   }
   ShapeCopyConstruct(base, box, from);

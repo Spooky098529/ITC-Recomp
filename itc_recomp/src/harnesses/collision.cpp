@@ -94,6 +94,22 @@ void NativeBoxPlace(PPCContext& ctx, uint8_t* base) {
   }
   ctx.r3.u64 = ctx.r3.u32 + 96;
 }
+ITC_NATIVE_STEP(NativeUpdateBounds, co::CollisionShapeUpdateBounds(base, ctx.r3.u32))
+ITC_NATIVE_STEP(NativeUpdateMotion,
+                co::CollisionShapeUpdateMotion(base, ctx.r3.u32, ctx.r1.u32 - 240);
+                ctx.r3.u64 = ctx.r3.u32 + 96)
+void NativeRecordPlace(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  if (!co::CollisionShapePlace(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 608)) {
+    __imp__sub_820BB758(ctx, base);
+  }
+}
+void NativeRecordTranslate(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  if (!co::CollisionShapeTranslate(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 192)) {
+    __imp__sub_820BACD0(ctx, base);
+  }
+}
 ITC_NATIVE_STEP(NativeWordAt8, ctx.r3.u64 = co::WordAt8(base, ctx.r3.u32))
 ITC_NATIVE_STEP(NativeCurrentCenter,
                 ctx.r3.u64 = co::CollisionShapeCurrentCenter(base, ctx.r3.u32))
@@ -210,6 +226,8 @@ enum Args {
   kCorners,       // r3 = box A, r4 = the vector, r5 = the second vector
   kCopy,          // r3 = box B, r4 = box A
   kPlace,         // r3 = box B, r4 = the matrix, r5 = box A
+  kRecordMatrix,  // r3 = the record, r4 = the matrix (its +112 0.0 one case in three)
+  kRecordVector,  // r3 = the record, r4 = the vector
 };
 
 }  // namespace
@@ -222,6 +240,9 @@ void Collision(Context& h) {
     Args args;
     uint32_t count;  // the index's range
     bool compare_f1;
+    // The motion's row: minus the current center transformed, plus the
+    // center (Vec3::Sum): one NaN there meets its own negation.
+    bool motion_row = false;
   } functions[] = {
       {"BoxShape::CornerCount (sub_820B9EC8)", Original<__imp__sub_820B9EC8>, NativeCornerCount,
        kNone, 1, false},
@@ -269,6 +290,14 @@ void Collision(Context& h) {
        kCorners, 1, false},
       {"BoxShape::Place (sub_820B9C40)", Original<__imp__sub_820B9C40>, NativeBoxPlace, kPlace,
        1, false},
+      {"CollisionShape::UpdateBounds (sub_820BAC00)", Original<__imp__sub_820BAC00>,
+       NativeUpdateBounds, kRecordR3, 1, false},
+      {"CollisionShape::UpdateMotion (sub_820BAE78)", Original<__imp__sub_820BAE78>,
+       NativeUpdateMotion, kRecordR3, 1, false, true},
+      {"CollisionShape::Place (sub_820BB758)", Original<__imp__sub_820BB758>, NativeRecordPlace,
+       kRecordMatrix, 3, false, true},
+      {"CollisionShape::Translate (sub_820BACD0)", Original<__imp__sub_820BACD0>,
+       NativeRecordTranslate, kRecordVector, 1, false, true},
       {"sub_822BE2C8 (the word +8)", Original<__imp__sub_822BE2C8>, NativeWordAt8, kRecordR3, 1,
        false},
       {"CollisionShape::CurrentCenter (sub_820BAB20)", Original<__imp__sub_820BAB20>,
@@ -298,6 +327,14 @@ void Collision(Context& h) {
   for (const auto& f : functions) {
     for (Group group : {kNumbers, kOneNaN, kNaNs}) {
       Results results(std::string(f.name) + kGroupNames[group]);
+      // Where one NaN put in reaches the motion's row through the current
+      // center and its negation, the two meet in Vec3::Sum: which comes
+      // out depends on the operand order the compiler gave it, in the
+      // translated vector library as in ours (its harness's "two or more
+      // NaN inputs" groups). Those cases: the differing words all in the
+      // row (+96 to +108), NaNs in both runs with only their signs apart.
+      Results negated(std::string(f.name) +
+                      ", one NaN meeting its own negation (expected to differ)");
       for (uint64_t seed = 0; seed < 200; seed++) {
         Random pick = Seeded(seed * 11 + 5 * uint64_t(group) + 1);
         auto word = [group](Random& r) {
@@ -398,6 +435,17 @@ void Collision(Context& h) {
               t.r4.u64 = region + kMatrix;
               t.r5.u64 = region + kBoxA;
               break;
+            case kRecordMatrix:
+              t.r3.u64 = region + kRecord;
+              t.r4.u64 = region + kMatrix;
+              if (index == 0) {
+                guest::StoreU32(h.base, region + kRecord + 112, 0);
+              }
+              break;
+            case kRecordVector:
+              t.r3.u64 = region + kRecord;
+              t.r4.u64 = region + kVector;
+              break;
           }
           t.f1.f64 = group == kOneNaN && nan_at >= kRegionBytes / 4
                          ? double(std::bit_cast<float>(nan_word))
@@ -414,11 +462,31 @@ void Collision(Context& h) {
             result[v].push_back(uint8_t(t.f1.u64 >> (56 - 8 * i)));
           }
         }
-        results.Check(result[0], result[1],
-                      fmt::format("seed {} index {} f1 {:016X}", seed, index,
-                                  std::bit_cast<uint64_t>(f1)));
+        auto word_at = [&](int v, size_t at) {
+          uint32_t w = 0;
+          for (int i = 0; i < 4; i++) {
+            w = (w << 8) | result[v][at + i];
+          }
+          return w;
+        };
+        bool meets_negation = f.motion_row && group == kOneNaN && result[0] != result[1];
+        for (size_t at = 0; meets_negation && at + 4 <= result[0].size(); at += 4) {
+          const uint32_t a = word_at(0, at), b = word_at(1, at);
+          if (a == b) {
+            continue;
+          }
+          meets_negation = at >= kRecord + 96 && at < kRecord + 112 &&
+                           std::isnan(std::bit_cast<float>(a)) && (a ^ b) == 0x80000000u;
+        }
+        (meets_negation ? negated : results)
+            .Check(result[0], result[1],
+                   fmt::format("seed {} index {} f1 {:016X}", seed, index,
+                               std::bit_cast<uint64_t>(f1)));
       }
       results.Report();
+      if (f.motion_row && group == kOneNaN) {
+        negated.Report();
+      }
     }
   }
   Write(h.base, kFaceDirection, saved_direction.data(), 16);

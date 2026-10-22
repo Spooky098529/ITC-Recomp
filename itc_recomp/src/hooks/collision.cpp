@@ -15,8 +15,9 @@ ITC_FLAG_BOOL(native_collision, true, "ITC",
               "Run the collision world's narrow phase and its shapes "
               "(docs/functions/collision.md: the box's methods and accessors, sub_820B9EC8 to "
               "sub_820BAA50 and sub_822BE2C8; their constructors and placement, sub_820BB020, "
-              "sub_820BAB48, sub_820BB688, sub_820B99D0, sub_820BB188, sub_820B9C40; the shape record's accessors, sub_820BAB20, "
-              "sub_820BAB30, sub_820BACB8, sub_820BADF8, sub_820BAE38; the query and its "
+              "sub_820BAB48, sub_820BB688, sub_820B99D0, sub_820BB188, sub_820B9C40; the shape record's accessors, bounds, motion, "
+              "placement and translation, sub_820BAB20, sub_820BAB30, sub_820BACB8, sub_820BADF8, "
+              "sub_820BAE38, sub_820BAC00, sub_820BAE78, sub_820BB758, sub_820BACD0; the query and its "
               "contact, sub_820BD1C8, sub_820BC848, sub_820BC908, sub_820BC858) natively "
               "instead of through the translated code (the same words, bit for bit; checked by "
               "--run_harnesses=collision)");
@@ -122,6 +123,35 @@ ITC_COLLISION(820BAB30, ctx.r3.u64 = CollisionShapePreviousCenter(base, ctx.r3.u
 ITC_COLLISION_RECORD(820BACB8, CollisionShapeType(base, ctx.r3.u32, &value))
 ITC_COLLISION_RECORD(820BADF8, CollisionShapePrevious(base, ctx.r3.u32, &value))
 ITC_COLLISION_RECORD(820BAE38, CollisionShapeCurrent(base, ctx.r3.u32, &value))
+
+ITC_COLLISION(820BAC00, CollisionShapeUpdateBounds(base, ctx.r3.u32))
+// r3 comes back as the record + 96.
+ITC_COLLISION(820BAE78, CollisionShapeUpdateMotion(base, ctx.r3.u32, ctx.r1.u32 - 240);
+              ctx.r3.u64 = ctx.r3.u32 + 96)
+// r4 = the matrix. Copies or a template that aren't boxes: the original.
+extern "C" REX_FUNC(sub_820BB758) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_collision)) {
+    __imp__sub_820BB758(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  if (!CollisionShapePlace(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 608)) {
+    __imp__sub_820BB758(ctx, base);
+  }
+}
+// r4 = the offset. A current copy that isn't a box: the original.
+extern "C" REX_FUNC(sub_820BACD0) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_collision)) {
+    __imp__sub_820BACD0(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  if (!CollisionShapeTranslate(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 192)) {
+    __imp__sub_820BACD0(ctx, base);
+  }
+}
 
 // --- The query and its contact ---
 

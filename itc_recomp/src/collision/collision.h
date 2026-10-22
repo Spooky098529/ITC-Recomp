@@ -88,6 +88,8 @@ void ShapeConstruct(uint8_t* base, uint32_t shape, uint32_t frame);
 // ranges that may share memory, or in the physical views).
 bool ShapeCopyConstruct(uint8_t* base, uint32_t shape, uint32_t from);
 bool BoxCopyConstruct(uint8_t* base, uint32_t box, uint32_t from);
+// Whether BoxCopyConstruct copies `from` into `box` natively.
+bool BoxCopyFits(uint32_t box, uint32_t from);
 // BoxShape::SetCorners (sub_820B99D0): the center, radius, half extents and
 // their inverses, the 8 corners, the 6 faces, the cache words zeroed and
 // the identity axes from the two corners. `frame`: the original's 224
@@ -119,6 +121,27 @@ uint32_t CollisionShapePreviousCenter(uint8_t* base, uint32_t record);
 bool CollisionShapeType(uint8_t* base, uint32_t record, uint32_t* type);
 bool CollisionShapePrevious(uint8_t* base, uint32_t record, uint32_t* copy);
 bool CollisionShapeCurrent(uint8_t* base, uint32_t record, uint32_t* copy);
+
+// CollisionShape::UpdateBounds (sub_820BAC00): +16..+24 = per axis the
+// smaller of the two copies' centers minus the template's radius, +32..+40
+// the larger plus it (`blt`: ties and NaNs take the current copy's).
+void CollisionShapeUpdateBounds(uint8_t* base, uint32_t record);
+// CollisionShape::UpdateMotion (sub_820BAE78): the motion from the previous
+// copy to the current one into the matrix +48 (the axes' dot products, and
+// the row +96). `frame`: the original's 240 bytes.
+void CollisionShapeUpdateMotion(uint8_t* base, uint32_t record, uint32_t frame);
+// CollisionShape::Place (sub_820BB758): the copies swapped, the new current
+// one placed by the matrix (from the template, or from a copy of it on the
+// stack with its bottom lowered by +112), its cache words from the
+// previous one, then UpdateMotion and UpdateBounds. False, with nothing
+// done, where a copy or the template isn't a box or the stack copy's
+// memcpys can't be native. `frame`: the original's 608 bytes.
+bool CollisionShapePlace(uint8_t* base, uint32_t record, uint32_t matrix, uint32_t frame);
+// CollisionShape::Translate (sub_820BACD0): the current copy moved by the
+// offset (BoxShape::Translate), the motion's row +96 worked out again, then
+// UpdateBounds. False, with nothing done, where the current copy isn't a
+// box. `frame`: the original's 192 bytes.
+bool CollisionShapeTranslate(uint8_t* base, uint32_t record, uint32_t offset, uint32_t frame);
 
 // --- The query (on CollisionPair::Solve's stack) and its contact (+32) ---
 
