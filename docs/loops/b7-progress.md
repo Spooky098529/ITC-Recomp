@@ -5,14 +5,21 @@ commits, the function files and the subsystems' docs.
 
 ## Now
 
-- Subsystem: sprites again (`functions/sprites.md`): the command list made
-  `sub_82128E70` (under `sub_82129280`) ready.
-- Step: migration (second agent running).
-- Session: pass 5 of 20, subsystem 2 of 5 (sprites isn't counted again).
-  In all: subsystem 2 of 5.
+- Subsystem: the C runtime helpers (`sub_825A9934`, the stack probe;
+  `sub_825A8170` -> `sub_825A7FB0`, probably `acos`; from `leads.md`), with
+  the rest of the C runtime seen in play except the heap (a lead that
+  waits on the user).
+- Step: mapping (agent running).
+- Session: pass 6 of 20, subsystem 3 of 5. In all: subsystem 3 of 5.
 
 ## Done
 
+- Sprites, second migration: `sub_82128E70`, `sub_82129280` native under
+  `--native_sprites` (0ce9dcc, 23bd994); harnesses at 0 differing, race
+  20 s, no errors. Not run in attract races (probably the marker above
+  opponents in its screen-placed mode): checked by harness only. Left:
+  blocked by Matrix::Multiply (Wrapped), memcpy, the stack probe, acos,
+  the texture animations.
 - Command list (`functions/command-list.md`, map e0908c6): 9 functions
   native in fa317f9, `--native_command_list`; every harness at 0
   differing, race 21 s, no errors. Left: `CommandList::Init`, waiting on
@@ -43,6 +50,8 @@ commits, the function files and the subsystems' docs.
   known 198, unknown 6234).
 - After the command list's migration: ours 180, work left 6573 (wrapped
   150, known 189, unknown 6234).
+- After sprites' second migration: ours 182, work left 6571 (wrapped 150,
+  known 187, unknown 6234).
 
 ## Stopped
 
