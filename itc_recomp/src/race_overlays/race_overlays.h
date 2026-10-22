@@ -170,3 +170,59 @@ namespace race_overlays {
 bool TrailUpdate(uint8_t* base, uint32_t trail);
 
 }  // namespace race_overlays
+
+namespace race_overlays {
+
+// --- The car-model sprites' kinds and textures ---
+
+// CarOverlays::ModelSpriteKind (sub_82123188): the car-model sprites' kind
+// for a racer id: 6 for 382, 392-394 and 397; 4 for 391; 1 for 357, 395,
+// 396 and 399; 5 for 398; else 0. (The original first reads the view in
+// the overlays' slot, sub_82126550, and ignores it: a load, left out.)
+uint32_t ModelSpriteKind(int32_t racer);
+
+// ModelSprite::Entry (sub_8211F300): word `index` (0-8; 0 above 8) of the
+// kind's table: kind 1 0x82616CC4, 2 0x82616CE8, 3-5 0x82616D0C, 6
+// 0x82616D30, 7 0x82616D54, 8 0x82616D78, others 0x826C5CF0. Covers its
+// jump table's first case, sub_8211F3B4 (word 0), and kind 1's
+// sub_8211F334 (never run in play).
+uint32_t ModelSpriteEntry(uint8_t* base, uint32_t kind, uint32_t index);
+
+}  // namespace race_overlays
+
+namespace race_overlays {
+
+// --- The emitters ---
+
+// ParticlesC::Emit (sub_8212C1C0): when the count (+2,696) is below the
+// capacity (+2,700, unsigned), a new 128-byte entry at the head (+2,692; the
+// entries from +112): +48 the position, +64 the effect's position (+2,672),
+// +32 their difference with w the game's 1.0, +108 life, +100 size and +104
+// alpha from the table (+108's +0, +4, +8), +92 the alpha as an integer,
+// +96 = 1, +112 = 0, colors 255, 0, 0 at +80; the head moves on (modulo the
+// capacity) and the count goes up. Returns 1, or 0 when full. (The
+// original's f1 isn't read.)
+uint32_t ParticlesCEmit(uint8_t* base, uint32_t effect, uint32_t position);
+
+// Trail::AddPoint (sub_82129598): when the count (+64,136) is below the
+// capacity (+104, signed), `state` isn't 0 and `position` is away from the
+// last position (+64,144: the length of their difference, worked out as the
+// original's vector code does, isn't 0.0), a 128-byte point at the tail
+// (+64,132; the points from +128): +0 the position, +16 the last position,
+// +64 their difference; +52 the width; +112 the state (2 becomes 1 for a
+// trail's first point); +124 and +56 the table's +8 plus speed times the
+// float at 0x82001FBC, capped by the float at 0x82000C44; +44 that as an
+// integer; +48 `value`; +60 the table's life (+0); +120 = 0; colors 255;
+// +96 and +80 the position plus and minus `direction` crossed with the
+// difference, scaled to the width over its length and by the float at
+// 0x82001BE4. The tail moves on (modulo the capacity) and the count goes
+// up. `direction` is the vector passed in r5 and r6 (words 0-1 and 2-3; the
+// original also stores them in its caller's parameter area, which no caller
+// reads). `*result` gets 1 for a point added, else 0. False, with nothing
+// done, for a capacity of 0 or -1 (where the original's division can trap);
+// the original runs there.
+bool TrailAddPoint(uint8_t* base, uint32_t trail, uint32_t position, double speed, double width,
+                   const uint32_t direction[4], uint32_t state, uint32_t value,
+                   uint32_t* result);
+
+}  // namespace race_overlays

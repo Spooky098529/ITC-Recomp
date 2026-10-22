@@ -10,8 +10,11 @@ ITC_FLAG_BOOL(native_race_overlays, true, "ITC",
               "Run the race overlays' update helpers (the car overlays' view and vehicle "
               "accessors, sub_82126550 to sub_82127178; the child overlays' setters, "
               "sub_8211E9C8 to sub_8212DF90; the game's rand, sub_82293568, and RandomRange, "
-              "sub_8211F118; Marker::Set and Update, sub_8212CCE0 and sub_8212CBE0) natively instead of through the "
-              "translated code (same results; checked by --run_harnesses=race_overlays)");
+              "sub_8211F118; Marker::Set and Update, sub_8212CCE0 and sub_8212CBE0; Trail::Update and "
+              "AddPoint, sub_821292E8 and sub_82129598; ParticlesC::Emit, sub_8212C1C0; the "
+              "car-model sprites' kind and table entry, sub_82123188 and sub_8211F300) natively "
+              "instead of through the translated code (same results; checked by "
+              "--run_harnesses=race_overlays)");
 
 // Defines an adapter for a function of the view or overlays in r3 that
 // returns a word in r3: `address` the function's (sub_<address>), `expr` the
@@ -147,4 +150,45 @@ extern "C" REX_FUNC(sub_821292E8) {
   if (!TrailUpdate(base, ctx.r3.u32)) {
     __imp__sub_821292E8(ctx, base);
   }
+}
+
+// CarOverlays::ModelSpriteKind: r3 = the car overlays (not needed), r4 = a
+// racer id; returns the kind.
+ITC_OVERLAY_WORD(82123188, ModelSpriteKind(ctx.r4.s32))
+// ModelSprite::Entry: r4 = a kind, r5 = an index (r3 isn't read); returns
+// the table's word.
+ITC_OVERLAY_WORD(8211F300, ModelSpriteEntry(base, ctx.r4.u32, ctx.r5.u32))
+
+// ParticlesC::Emit: r3 = the effect, r4 = a position (f1 isn't read);
+// returns 1, or 0 when full.
+extern "C" REX_FUNC(sub_8212C1C0) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_race_overlays)) {
+    __imp__sub_8212C1C0(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = ParticlesCEmit(base, ctx.r3.u32, ctx.r4.u32);
+}
+
+// Trail::AddPoint: r3 = the trail, r4 = position, r5 and r6 = a vector,
+// f1 = speed, f2 = width, r7 = a state, r10 = a value; returns 1 for a
+// point added. Where the native version declines (a capacity of 0 or -1),
+// the original runs.
+extern "C" REX_FUNC(sub_82129598) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_race_overlays)) {
+    __imp__sub_82129598(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  const uint32_t direction[4] = {uint32_t(ctx.r5.u64 >> 32), ctx.r5.u32,
+                                 uint32_t(ctx.r6.u64 >> 32), ctx.r6.u32};
+  uint32_t result = 0;
+  if (!TrailAddPoint(base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64, ctx.f2.f64, direction,
+                     ctx.r7.u32, ctx.r10.u32, &result)) {
+    __imp__sub_82129598(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = result;
 }

@@ -141,6 +141,31 @@ void NativeTrailUpdate(PPCContext& ctx, uint8_t* base) {
   }
 }
 
+void NativeModelSpriteKind(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ro::ModelSpriteKind(ctx.r4.s32);
+}
+void NativeModelSpriteEntry(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ro::ModelSpriteEntry(base, ctx.r4.u32, ctx.r5.u32);
+}
+void NativeParticlesCEmit(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = ro::ParticlesCEmit(base, ctx.r3.u32, ctx.r4.u32);
+}
+
+// Where the native version declines, the original runs (as the adapter).
+void NativeTrailAddPoint(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const uint32_t direction[4] = {uint32_t(ctx.r5.u64 >> 32), ctx.r5.u32,
+                                 uint32_t(ctx.r6.u64 >> 32), ctx.r6.u32};
+  uint32_t result = 0;
+  if (!ro::TrailAddPoint(base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64, ctx.f2.f64, direction,
+                         ctx.r7.u32, ctx.r10.u32, &result)) {
+    __imp__sub_82129598(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = result;
+}
+
 // Runs the recompiled version with --native_race_overlays off, so the
 // functions it calls that are ours run the originals too.
 void RunRecompiled(GuestFunction recompiled, PPCContext& t, uint8_t* base) {
@@ -265,9 +290,9 @@ void AccessorCases(Context& h, uint32_t block) {
     };
     const Function wheels[] = {
         {"OverlayView::WheelSpin (sub_821268F0)", __imp__sub_821268F0, NativeWheelSpin},
-        {"sub_82126908", __imp__sub_82126908, NativeWheelValue512},
-        {"sub_82126920", __imp__sub_82126920, NativeAxleValue3764},
-        {"sub_82126958", __imp__sub_82126958, NativeAxleValue3384},
+        {"OverlayView::WheelValue512 (sub_82126908)", __imp__sub_82126908, NativeWheelValue512},
+        {"OverlayView::AxleValue3764 (sub_82126920)", __imp__sub_82126920, NativeAxleValue3764},
+        {"OverlayView::AxleValue3384 (sub_82126958)", __imp__sub_82126958, NativeAxleValue3384},
         {"OverlayView::WheelOnGround (sub_82126998)", __imp__sub_82126998, NativeWheelOnGround},
     };
     for (const Function& f : wheels) {
@@ -293,12 +318,12 @@ void AccessorCases(Context& h, uint32_t block) {
       GuestFunction recompiled, native;
     };
     const Function fields[] = {
-        {"sub_82126A80", __imp__sub_82126A80, NativeVehicleByte2504},
-        {"sub_82126AA0", __imp__sub_82126AA0, NativeVehicleWord2252},
-        {"sub_82126AB0", __imp__sub_82126AB0, NativeVehicleWord340},
-        {"sub_82126AC0", __imp__sub_82126AC0, NativeVehicleFloat6256},
-        {"sub_82126AD0", __imp__sub_82126AD0, NativeVehicleFloat6252},
-        {"sub_82126D18", __imp__sub_82126D18, NativeRaceMode},
+        {"OverlayView::VehicleByte2504 (sub_82126A80)", __imp__sub_82126A80, NativeVehicleByte2504},
+        {"OverlayView::VehicleWord2252 (sub_82126AA0)", __imp__sub_82126AA0, NativeVehicleWord2252},
+        {"OverlayView::VehicleWord340 (sub_82126AB0)", __imp__sub_82126AB0, NativeVehicleWord340},
+        {"OverlayView::VehicleFloat6256 (sub_82126AC0)", __imp__sub_82126AC0, NativeVehicleFloat6256},
+        {"OverlayView::VehicleFloat6252 (sub_82126AD0)", __imp__sub_82126AD0, NativeVehicleFloat6252},
+        {"RaceOverlays::RaceMode (sub_82126D18)", __imp__sub_82126D18, NativeRaceMode},
     };
     for (const Function& f : fields) {
       Results results(f.name);
@@ -649,6 +674,248 @@ void TrailCases(Context& h, uint32_t block) {
   results.Report();
 }
 
+// The car-model sprites' kind (racer ids around the ones it names, and
+// random) and table entry (kinds and indices around the jump tables' ranges,
+// and random).
+void ModelSpriteCases(Context& h, uint32_t block) {
+  Random& r = h.random;
+  {
+    Results results("CarOverlays::ModelSpriteKind (sub_82123188)");
+    std::vector<uint32_t> ids = {0xFFFFFFFF, 0xFFFFFFFE, 0, 0x7FFFFFFF, 0x80000000};
+    for (uint32_t id = 350; id < 410; id++) {
+      ids.push_back(id);
+    }
+    for (int i = 0; i < 40; i++) {
+      ids.push_back(uint32_t(r.Next()));
+    }
+    for (uint32_t id : ids) {
+      Compare(h, results, {}, [] {},
+              [&](PPCContext& t) {
+                t.r3.u64 = block;
+                t.r4.u64 = int64_t(int32_t(id));
+              },
+              __imp__sub_82123188, NativeModelSpriteKind, fmt::format("id {}", int32_t(id)));
+    }
+    results.Report();
+  }
+  {
+    Results results("ModelSprite::Entry (sub_8211F300)");
+    std::vector<uint32_t> values = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 0xFFFFFFFF, 0x80000000};
+    for (int i = 0; i < 4; i++) {
+      values.push_back(uint32_t(r.Next()));
+    }
+    for (uint32_t kind : values) {
+      for (uint32_t index : values) {
+        Compare(h, results, {}, [] {},
+                [&](PPCContext& t) {
+                  t.r3.u64 = r.Next();
+                  t.r4.u64 = kind;
+                  t.r5.u64 = index;
+                },
+                __imp__sub_8211F300, NativeModelSpriteEntry,
+                fmt::format("kind {:X} index {:X}", kind, index));
+      }
+    }
+    results.Report();
+  }
+}
+
+// ParticlesC::Emit: capacities of the game's 20, small, 0 and huge; counts
+// around them; the head anywhere in the 20 entries; tables with game-like
+// and odd floats (inside the block, or overlapping the effect); positions
+// elsewhere or overlapping the entries.
+void ParticlesCCases(Context& h, uint32_t block) {
+  Random& r = h.random;
+  const uint32_t effect = block + 0x100;
+  const uint32_t table = block + 0x40;
+  const uint32_t source = block + 0x10200;
+  Results results("ParticlesC::Emit (sub_8212C1C0)");
+  for (int i = 0; i < 600; i++) {
+    uint32_t capacity;
+    switch (r.Below(5)) {
+      case 0:
+        capacity = 0;
+        break;
+      case 1:
+        capacity = r.Below(2) ? 0xFFFFFFFF : uint32_t(r.Next());
+        break;
+      case 2:
+        capacity = 1 + r.Below(6);
+        break;
+      default:
+        capacity = 20;
+        break;
+    }
+    const uint32_t count = r.Below(4) == 0 ? uint32_t(r.Next()) : r.Below(24);
+    const uint32_t head = r.Below(capacity && capacity < 21 ? capacity : 21);
+    const uint32_t at = r.Below(10) == 0 ? effect + 4 * r.Below(600) : table;
+    const uint32_t position = r.Below(8) == 0 ? effect + 112 + 4 * r.Below(640) : source + 4 * r.Below(4);
+    const uint64_t seed = r.Next();
+    const bool game_table = r.Below(2);
+    Compare(h, results, {{block, 0x100}, {effect, 2816}, {source, 64}},
+            [&, seed] {
+              Random fill;
+              for (uint64_t n = 0; n < seed % 19; n++) {
+                fill.Next();
+              }
+              FillRandom(h.base, fill, block, 0x100 + 2816);
+              FillRandom(h.base, fill, source, 64);
+              if (game_table) {  // life, size, alpha
+                guest::StoreU32(h.base, table, fill.Below(100));
+                guest::StoreFloat(h.base, table + 4, float(fill.Below(1000)) / 100.0f);
+                guest::StoreFloat(h.base, table + 8, float(fill.Below(256)));
+              }
+              guest::StoreU32(h.base, effect + 108, at);
+              guest::StoreU32(h.base, effect + 2692, head);
+              guest::StoreU32(h.base, effect + 2696, count);
+              guest::StoreU32(h.base, effect + 2700, capacity);
+            },
+            [&](PPCContext& t) {
+              t.r3.u64 = effect;
+              t.r4.u64 = position;
+              t.f1.f64 = 0.0;
+            },
+            __imp__sub_8212C1C0, NativeParticlesCEmit,
+            fmt::format("case {} capacity {:X} count {:X} head {}", i, capacity, count, head));
+  }
+  results.Report();
+}
+
+// Trail::AddPoint: capacities of the game's 500, small ones, 0 and -1 (the
+// original runs there); counts around them (and negative); the tail anywhere;
+// the state 0, 1, 2 or random; positions at, near (down to denormal steps,
+// which flush to zero in the vector length) and away from the last one;
+// game-like, odd and random floats for the direction, speed and width; the
+// trail aligned or not (the original's lvx rounds the address down).
+void TrailAddPointCases(Context& h, uint32_t block) {
+  Random& r = h.random;
+  const uint32_t table = block + 0x40;
+  const uint32_t source = block + 0x10200;
+  // With a NaN or an infinity among the inputs, the NaNs that come out of
+  // the side's vector arithmetic can differ in sign and payload: which
+  // operand's NaN an SSE instruction passes on depends on the operand order
+  // the compiler picked, and it rewrote the original's Newton step (its
+  // negated product plus the estimate became the estimate minus the
+  // product, seen in its disassembly), so those bits are the compiler's,
+  // not the game's.
+  Results results("Trail::AddPoint (sub_82129598)");
+  Results nan_results("Trail::AddPoint, NaN or infinite inputs (expected to differ)");
+  auto not_finite = [](uint32_t word) { return (word & 0x7F800000) == 0x7F800000; };
+  auto game_float = [&](float range) -> float {
+    return (float(r.Below(20001)) / 10000.0f - 1.0f) * range;
+  };
+  for (int i = 0; i < 600; i++) {
+    const uint32_t trail = block + (r.Below(6) == 0 ? 0x104 + 4 * r.Below(3) : 0x100);
+    int32_t capacity;
+    switch (r.Below(6)) {
+      case 0:
+        capacity = int32_t(1 + r.Below(8));
+        break;
+      case 1:
+        capacity = r.Below(2) ? 0 : -1;
+        break;
+      default:
+        capacity = 500;
+        break;
+    }
+    const uint32_t points = capacity > 0 ? uint32_t(capacity) : 4;
+    const uint32_t tail = r.Below(points);
+    int32_t count;
+    switch (r.Below(5)) {
+      case 0:
+        count = 0;
+        break;
+      case 1:
+        count = -int32_t(r.Below(5));
+        break;
+      default:
+        count = int32_t(r.Below(points + 2));
+        break;
+    }
+    // The position and the last one.
+    float position[4], last[4];
+    const uint32_t step = r.Below(5);
+    for (int k = 0; k < 4; k++) {
+      position[k] = game_float(2000.0f);
+      switch (step) {
+        case 0:
+          last[k] = position[k];
+          break;
+        case 1:  // tiny values: squared, they flush to zero
+          position[k] = std::bit_cast<float>(r.Below(0x01000000));
+          last[k] = std::bit_cast<float>(r.Below(0x01000000));
+          break;
+        case 2:
+          last[k] = std::bit_cast<float>(RandomWord(r));
+          break;
+        default:
+          last[k] = position[k] + game_float(2.0f);
+          break;
+      }
+    }
+    const bool odd_direction = r.Below(4) == 0;
+    uint32_t direction[4];
+    for (uint32_t& word : direction) {
+      word = odd_direction ? RandomWord(r) : std::bit_cast<uint32_t>(game_float(1.0f));
+    }
+    const double speed = r.Below(5) == 0 ? double(std::bit_cast<float>(RandomWord(r)))
+                                          : double(float(r.Below(300)));
+    const double width = r.Below(5) == 0 ? double(std::bit_cast<float>(RandomWord(r)))
+                                          : double(game_float(0.5f));
+    uint32_t state = r.Below(4);
+    if (state == 3) {
+      state = uint32_t(r.Next());
+    }
+    const uint32_t value = uint32_t(r.Next());
+    const uint64_t seed = r.Next();
+    const bool game_table = r.Below(4) != 0;
+    bool odd = not_finite(std::bit_cast<uint32_t>(float(speed))) ||
+               not_finite(std::bit_cast<uint32_t>(float(width)));
+    for (int k = 0; k < 4; k++) {
+      odd = odd || not_finite(direction[k]) || not_finite(std::bit_cast<uint32_t>(last[k]));
+    }
+    Compare(h, odd ? nan_results : results,
+            {{block, 0x100}, {block + 0x100, 64160 + 12}, {source, 64}},
+            [&, seed] {
+              Random fill;
+              for (uint64_t n = 0; n < seed % 23; n++) {
+                fill.Next();
+              }
+              FillRandom(h.base, fill, block, 0x100);
+              const uint32_t point = trail + 128 * (tail + 1);
+              FillRandom(h.base, fill, point & ~0xFu, 160);
+              FillRandom(h.base, fill, trail + 64000, 160);
+              guest::StoreU32(h.base, trail + 104, uint32_t(capacity));
+              guest::StoreU32(h.base, trail + 112, table);
+              guest::StoreU32(h.base, trail + 64132, tail);
+              guest::StoreU32(h.base, trail + 64136, uint32_t(count));
+              for (int k = 0; k < 4; k++) {
+                guest::StoreFloat(h.base, source + 4 * k, position[k]);
+                guest::StoreFloat(h.base, trail + 64144 + 4 * k, last[k]);
+              }
+              if (game_table) {  // life, width
+                guest::StoreU32(h.base, table + 0, fill.Below(400));
+                guest::StoreFloat(h.base, table + 8, float(fill.Below(100)) / 100.0f);
+              }
+            },
+            [&](PPCContext& t) {
+              t.r3.u64 = trail;
+              t.r4.u64 = source;
+              t.r5.u64 = (uint64_t(direction[0]) << 32) | direction[1];
+              t.r6.u64 = (uint64_t(direction[2]) << 32) | direction[3];
+              t.r7.u64 = state;
+              t.r10.u64 = value;
+              t.f1.f64 = speed;
+              t.f2.f64 = width;
+            },
+            __imp__sub_82129598, NativeTrailAddPoint,
+            fmt::format("case {} capacity {} count {} tail {} step {} state {:X}", i, capacity,
+                        count, tail, step, state));
+  }
+  results.Report();
+  nan_results.Report();
+}
+
 }  // namespace
 
 void RaceOverlays(Context& h) {
@@ -663,6 +930,9 @@ void RaceOverlays(Context& h) {
   RandomCases(h);
   MarkerCases(h, block);
   TrailCases(h, block);
+  ModelSpriteCases(h, block);
+  ParticlesCCases(h, block);
+  TrailAddPointCases(h, block);
   memory->SystemHeapFree(block);
 }
 

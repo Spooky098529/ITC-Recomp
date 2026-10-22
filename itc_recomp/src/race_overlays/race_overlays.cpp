@@ -4,8 +4,10 @@
 
 #include "base/log.h"
 
-#include <simde/x86/sse2.h>
+#include <rex/platform/fpscr.h>
+#include <simde/x86/sse4.1.h>
 
+#include <bit>
 #include <climits>
 #include <cmath>
 
@@ -44,12 +46,12 @@ float WheelSpin(uint8_t* base, uint32_t view, uint32_t wheel) {
 }
 
 float WheelValue512(uint8_t* base, uint32_t view, uint32_t wheel) {
-  ITC_NATIVE_RUNNING("sub_82126908");
+  ITC_NATIVE_RUNNING("sub_82126908 OverlayView::WheelValue512");
   return guest::LoadFloat(base, Vehicle(base, view) + kWheelBytes * wheel + 512);
 }
 
 float AxleValue3764(uint8_t* base, uint32_t view, uint32_t wheel) {
-  ITC_NATIVE_RUNNING("sub_82126920");
+  ITC_NATIVE_RUNNING("sub_82126920 OverlayView::AxleValue3764");
   if (wheel < 2) {
     return guest::LoadFloat(base, Vehicle(base, view) + 3764);
   }
@@ -60,7 +62,7 @@ float AxleValue3764(uint8_t* base, uint32_t view, uint32_t wheel) {
 }
 
 float AxleValue3384(uint8_t* base, uint32_t view, uint32_t wheel) {
-  ITC_NATIVE_RUNNING("sub_82126958");
+  ITC_NATIVE_RUNNING("sub_82126958 OverlayView::AxleValue3384");
   float value;
   if (wheel < 2) {
     value = guest::LoadFloat(base, Vehicle(base, view) + 3384);
@@ -79,32 +81,32 @@ uint32_t WheelOnGround(uint8_t* base, uint32_t view, uint32_t wheel) {
 }
 
 uint32_t VehicleByte2504(uint8_t* base, uint32_t view) {
-  ITC_NATIVE_RUNNING("sub_82126A80");
+  ITC_NATIVE_RUNNING("sub_82126A80 OverlayView::VehicleByte2504");
   return guest::LoadU8(base, Vehicle(base, view) + 2504);
 }
 
 uint32_t VehicleWord2252(uint8_t* base, uint32_t view) {
-  ITC_NATIVE_RUNNING("sub_82126AA0");
+  ITC_NATIVE_RUNNING("sub_82126AA0 OverlayView::VehicleWord2252");
   return guest::LoadU32(base, Vehicle(base, view) + 2252);
 }
 
 uint32_t VehicleWord340(uint8_t* base, uint32_t view) {
-  ITC_NATIVE_RUNNING("sub_82126AB0");
+  ITC_NATIVE_RUNNING("sub_82126AB0 OverlayView::VehicleWord340");
   return guest::LoadU32(base, Vehicle(base, view) + 340);
 }
 
 float VehicleFloat6256(uint8_t* base, uint32_t view) {
-  ITC_NATIVE_RUNNING("sub_82126AC0");
+  ITC_NATIVE_RUNNING("sub_82126AC0 OverlayView::VehicleFloat6256");
   return guest::LoadFloat(base, Vehicle(base, view) + 6256);
 }
 
 float VehicleFloat6252(uint8_t* base, uint32_t view) {
-  ITC_NATIVE_RUNNING("sub_82126AD0");
+  ITC_NATIVE_RUNNING("sub_82126AD0 OverlayView::VehicleFloat6252");
   return guest::LoadFloat(base, Vehicle(base, view) + 6252);
 }
 
 uint32_t RaceMode(uint8_t* base) {
-  ITC_NATIVE_RUNNING("sub_82126D18");
+  ITC_NATIVE_RUNNING("sub_82126D18 RaceOverlays::RaceMode");
   return guest::LoadU32(base, guest::LoadU32(base, kRaceData) + 0xA3AF4);
 }
 
@@ -437,6 +439,317 @@ bool TrailUpdate(uint8_t* base, uint32_t trail) {
       return true;
     }
   }
+}
+
+}  // namespace race_overlays
+
+namespace race_overlays {
+
+uint32_t ModelSpriteKind(int32_t racer) {
+  ITC_NATIVE_RUNNING("sub_82123188 CarOverlays::ModelSpriteKind");
+  switch (racer) {
+    case 382:
+    case 392:
+    case 393:
+    case 394:
+    case 397:
+      return 6;
+    case 391:
+      return 4;
+    case 357:
+    case 395:
+    case 396:
+    case 399:
+      return 1;
+    case 398:
+      return 5;
+    default:
+      return 0;
+  }
+}
+
+uint32_t ModelSpriteEntry(uint8_t* base, uint32_t kind, uint32_t index) {
+  ITC_NATIVE_RUNNING("sub_8211F300 ModelSprite::Entry");
+  uint32_t table;
+  switch (kind) {
+    case 1:
+      table = 0x82616CC4;
+      break;
+    case 2:
+      table = 0x82616CE8;
+      break;
+    case 3:
+    case 4:
+    case 5:
+      table = 0x82616D0C;
+      break;
+    case 6:
+      table = 0x82616D30;
+      break;
+    case 7:
+      table = 0x82616D54;
+      break;
+    case 8:
+      table = 0x82616D78;
+      break;
+    default:
+      table = 0x826C5CF0;
+      break;
+  }
+  if (index > 8) {
+    return 0;
+  }
+  return guest::LoadU32(base, table + 4 * index);
+}
+
+}  // namespace race_overlays
+
+namespace race_overlays {
+
+namespace {
+
+uint64_t LoadU64(uint8_t* base, uint32_t address) {
+  return REX_LOAD_U64(address);
+}
+
+void StoreU64(uint8_t* base, uint32_t address, uint64_t value) {
+  REX_STORE_U64(address, value);
+}
+
+// fsubs on two singles from guest memory: the difference of the two as
+// doubles, rounded to single.
+float Difference(double a, double b) {
+  return float(a - b);
+}
+
+}  // namespace
+
+uint32_t ParticlesCEmit(uint8_t* base, uint32_t effect, uint32_t position) {
+  ITC_NATIVE_RUNNING("sub_8212C1C0 ParticlesC::Emit");
+  const uint32_t capacity = guest::LoadU32(base, effect + 2700);
+  const uint32_t count = guest::LoadU32(base, effect + 2696);
+  const uint32_t table = guest::LoadU32(base, effect + 108);
+  if (!(capacity > count)) {
+    return 0;
+  }
+  const uint32_t one = guest::LoadU32(base, kOne);
+  const uint32_t entry = effect + 112 + (guest::LoadU32(base, effect + 2692) << 7);
+  // The doublewords copied as the original's ld and std, in its order.
+  StoreU64(base, entry + 48, LoadU64(base, position + 0));
+  StoreU64(base, entry + 56, LoadU64(base, position + 8));
+  StoreU64(base, entry + 64, LoadU64(base, effect + 2672));
+  StoreU64(base, entry + 72, LoadU64(base, effect + 2680));
+  const float dx = Difference(guest::LoadFloat(base, position + 0),
+                              guest::LoadFloat(base, effect + 2672));
+  const float dy = Difference(guest::LoadFloat(base, position + 4),
+                              guest::LoadFloat(base, effect + 2676));
+  const float dz = Difference(guest::LoadFloat(base, position + 8),
+                              guest::LoadFloat(base, effect + 2680));
+  guest::StoreFloat(base, entry + 32, dx);
+  guest::StoreFloat(base, entry + 36, dy);
+  guest::StoreFloat(base, entry + 40, dz);
+  guest::StoreU32(base, entry + 44, one);
+  guest::StoreU32(base, entry + 108, guest::LoadU32(base, table + 0));
+  CopyFloat(base, table + 4, entry + 100);
+  const uint32_t alpha = guest::LoadU32(base, table + 8);
+  guest::StoreU32(base, entry + 112, 0);
+  guest::StoreU32(base, entry + 104, alpha);
+  const int32_t alpha_int = Fctiwz(double(std::bit_cast<float>(alpha)));
+  guest::StoreU32(base, entry + 96, 1);
+  guest::StoreU32(base, entry + 84, 0);
+  guest::StoreU32(base, entry + 88, 0);
+  guest::StoreU32(base, entry + 80, 255);
+  guest::StoreU32(base, entry + 92, uint32_t(alpha_int));
+  // The head moves on (divwu, then the remainder) and the count goes up.
+  const uint32_t next = guest::LoadU32(base, effect + 2692) + 1;
+  const uint32_t size = guest::LoadU32(base, effect + 2700);
+  const uint32_t added = guest::LoadU32(base, effect + 2696) + 1;
+  const uint32_t quotient = size ? next / size : 0;
+  guest::StoreU32(base, effect + 2696, added);
+  guest::StoreU32(base, effect + 2692, next - quotient * size);
+  return 1;
+}
+
+}  // namespace race_overlays
+
+namespace race_overlays {
+
+namespace {
+
+using Fpscr = rex::platform::FPSCRPlatform;
+
+constexpr uint32_t kTrailTail = 64132;
+constexpr uint32_t kTrailLast = 64144;
+constexpr uint32_t kTrailSpeedScale = 0x82001FBC;
+constexpr uint32_t kTrailMostWidth = 0x82000C44;
+constexpr uint32_t kTrailSideScale = 0x82001BE4;
+
+// A guest vector as the translated code holds it (word 0 in the top lane),
+// from four words.
+simde__m128 VectorOf(uint32_t w0, uint32_t w1, uint32_t w2, uint32_t w3) {
+  return simde_mm_castsi128_ps(
+      simde_mm_set_epi32(int32_t(w0), int32_t(w1), int32_t(w2), int32_t(w3)));
+}
+
+// lvx: the 16 bytes at `address` rounded down to 16, as the translated code
+// loads them.
+simde__m128 LoadVector(uint8_t* base, uint32_t address) {
+  const uint32_t at = address & ~0xFu;
+  return VectorOf(guest::LoadU32(base, at), guest::LoadU32(base, at + 4),
+                  guest::LoadU32(base, at + 8), guest::LoadU32(base, at + 12));
+}
+
+// Word `i` (0-3) of a vector held as above, as its bits.
+uint32_t WordOf(simde__m128 v, int i) {
+  alignas(16) uint32_t lanes[4];
+  simde_mm_store_si128(reinterpret_cast<simde__m128i*>(lanes), simde_mm_castps_si128(v));
+  return lanes[3 - i];
+}
+
+// The original's vector length, with flush-to-zero on (the caller's job):
+// the squared length of x, y and z (vmsum3fp128, dpps with mask 0xEF), its
+// reciprocal square root as 1/sqrt and one Newton step (vrsqrtefp,
+// vnmsubfp, vmaddfp), times the squared length; the squared length itself
+// where it's 0.
+simde__m128 Length(simde__m128 v) {
+  const simde__m128 half = simde_mm_set1_ps(0.5f);
+  const simde__m128 sign = simde_mm_castsi128_ps(simde_mm_set1_epi32(int(0x80000000)));
+  const simde__m128 squared = simde_mm_dp_ps(v, v, 0xEF);
+  const simde__m128 estimate = simde_mm_div_ps(simde_mm_set1_ps(1), simde_mm_sqrt_ps(squared));
+  const simde__m128 half_squared = simde_mm_mul_ps(squared, half);
+  const simde__m128 zero = simde_mm_cmpeq_ps(squared, simde_mm_setzero_ps());
+  const simde__m128 estimate_squared = simde_mm_mul_ps(estimate, estimate);
+  const simde__m128 step = simde_mm_xor_ps(
+      simde_mm_sub_ps(simde_mm_mul_ps(half_squared, estimate_squared), half), sign);
+  const simde__m128 inverse =
+      simde_mm_add_ps(simde_mm_mul_ps(estimate, step), estimate);
+  const simde__m128 length = simde_mm_mul_ps(squared, inverse);
+  return simde_mm_or_ps(simde_mm_andnot_ps(zero, length), simde_mm_and_ps(zero, squared));
+}
+
+}  // namespace
+
+bool TrailAddPoint(uint8_t* base, uint32_t trail, uint32_t position, double speed, double width,
+                   const uint32_t direction[4], uint32_t state, uint32_t value,
+                   uint32_t* result) {
+  ITC_NATIVE_RUNNING("sub_82129598 Trail::AddPoint");
+  const int32_t capacity = int32_t(guest::LoadU32(base, trail + 104));
+  if (capacity == 0 || capacity == -1) {
+    return false;
+  }
+  *result = 0;
+  const uint32_t table = guest::LoadU32(base, trail + 112);
+  const int32_t count = int32_t(guest::LoadU32(base, trail + kTrailCount));
+  if (!(capacity > count) || state == 0) {
+    return true;
+  }
+  const uint32_t last = trail + kTrailLast;
+  const uint32_t x = guest::LoadU32(base, position + 0);
+  const uint32_t one = guest::LoadU32(base, kOne);
+  const uint32_t zero = guest::LoadU32(base, kZero);
+  const uint32_t csr = Fpscr::getcsr();
+  const uint32_t flushing = csr | uint32_t(Fpscr::FlushMask);
+
+  // Away from the last position: the length of the difference isn't 0.0.
+  {
+    const float dx = Difference(std::bit_cast<float>(x), guest::LoadFloat(base, last + 0));
+    const float dy = Difference(guest::LoadFloat(base, position + 4),
+                                guest::LoadFloat(base, last + 4));
+    const float dz = Difference(guest::LoadFloat(base, position + 8),
+                                guest::LoadFloat(base, last + 8));
+    const simde__m128 moved = VectorOf(std::bit_cast<uint32_t>(dx), std::bit_cast<uint32_t>(dy),
+                                       std::bit_cast<uint32_t>(dz), one);
+    Fpscr::setcsr(flushing);
+    const simde__m128 length = Length(moved);
+    Fpscr::setcsr(csr);
+    if (double(std::bit_cast<float>(WordOf(length, 0))) == double(std::bit_cast<float>(zero))) {
+      return true;
+    }
+  }
+  if (count == 0 && state == 2) {
+    state = 1;
+  }
+
+  const uint32_t point = trail + ((guest::LoadU32(base, trail + kTrailTail) + 1) << 7);
+  const float speed_scale = guest::LoadFloat(base, kTrailSpeedScale);
+  guest::StoreU32(base, point + 0, x);
+  CopyFloat(base, position + 4, point + 4);
+  CopyFloat(base, position + 8, point + 8);
+  CopyFloat(base, position + 12, point + 12);
+  CopyVector(base, last, point + 16);
+  for (uint32_t i = 0; i < 12; i += 4) {
+    const float d = Difference(guest::LoadFloat(base, position + i),
+                               guest::LoadFloat(base, last + i));
+    guest::StoreFloat(base, point + 64 + i, d);
+  }
+  guest::StoreFloat(base, point + 52, float(width));
+  guest::StoreU32(base, point + 112, state);
+  // fmadds: speed times the scale plus the table's +8, capped.
+  double size = double(float(
+      std::fma(speed, double(speed_scale), double(guest::LoadFloat(base, table + 8)))));
+  const double most = guest::LoadFloat(base, kTrailMostWidth);
+  if (size > most) {
+    size = most;
+  }
+  guest::StoreFloat(base, point + 124, float(size));
+  guest::StoreFloat(base, point + 56, float(size));
+  const uint32_t life = guest::LoadU32(base, table + 0);
+  guest::StoreU32(base, point + 48, value);
+  const int32_t size_int = Fctiwz(size);
+  guest::StoreU32(base, point + 60, life);
+  guest::StoreU32(base, point + 120, 0);
+  const simde__m128 along = VectorOf(direction[0], direction[1], direction[2], direction[3]);
+  guest::StoreU32(base, point + 32, 255);
+  guest::StoreU32(base, point + 36, 255);
+  guest::StoreU32(base, point + 40, 255);
+  guest::StoreU32(base, point + 44, uint32_t(size_int));
+
+  // The side: `direction` crossed with the difference (vperm-made shuffles,
+  // vmulfp128, vnmsubfp), scaled to the width over its length.
+  const simde__m128 difference = LoadVector(base, point + 64);
+  const float stored_width = guest::LoadFloat(base, point + 52);
+  const float px = guest::LoadFloat(base, point + 0);
+  const simde__m128 sign = simde_mm_castsi128_ps(simde_mm_set1_epi32(int(0x80000000)));
+  Fpscr::setcsr(flushing);
+  simde__m128 side = simde_mm_mul_ps(
+      simde_mm_castsi128_ps(simde_mm_shuffle_epi32(simde_mm_castps_si128(difference), 0x9C)),
+      simde_mm_castsi128_ps(simde_mm_shuffle_epi32(simde_mm_castps_si128(along), 0x78)));
+  side = simde_mm_xor_ps(
+      simde_mm_sub_ps(
+          simde_mm_mul_ps(
+              simde_mm_castsi128_ps(
+                  simde_mm_shuffle_epi32(simde_mm_castps_si128(difference), 0x78)),
+              simde_mm_castsi128_ps(simde_mm_shuffle_epi32(simde_mm_castps_si128(along), 0x9C))),
+          side),
+      sign);
+  const simde__m128 side_length = Length(side);
+  Fpscr::setcsr(csr);
+  const float scale = float(double(stored_width) / double(std::bit_cast<float>(WordOf(side_length, 0))));
+  const uint32_t s = std::bit_cast<uint32_t>(scale);
+  Fpscr::setcsr(flushing);
+  const simde__m128 scaled = simde_mm_mul_ps(side, VectorOf(s, s, s, zero));
+  Fpscr::setcsr(csr);
+  const double factor = guest::LoadFloat(base, kTrailSideScale);
+  const double sx = float(double(std::bit_cast<float>(WordOf(scaled, 0))) * factor);
+  const double sy = float(double(std::bit_cast<float>(WordOf(scaled, 1))) * factor);
+  const double sz = float(double(std::bit_cast<float>(WordOf(scaled, 2))) * factor);
+  guest::StoreFloat(base, point + 96, float(double(px) + sx));
+  guest::StoreFloat(base, point + 100, float(sy + double(guest::LoadFloat(base, point + 4))));
+  guest::StoreFloat(base, point + 104, float(sz + double(guest::LoadFloat(base, point + 8))));
+  guest::StoreFloat(base, point + 80, float(double(guest::LoadFloat(base, point + 0)) - sx));
+  guest::StoreFloat(base, point + 84, float(double(guest::LoadFloat(base, point + 4)) - sy));
+  guest::StoreFloat(base, point + 88, float(double(guest::LoadFloat(base, point + 8)) - sz));
+
+  // The tail moves on (divw, then the remainder) and the count goes up.
+  const int32_t next = int32_t(guest::LoadU32(base, trail + kTrailTail) + 1);
+  const int32_t size_now = int32_t(guest::LoadU32(base, trail + 104));
+  const uint32_t added = guest::LoadU32(base, trail + kTrailCount) + 1;
+  const int32_t quotient =
+      (size_now && !(next == INT32_MIN && size_now == -1)) ? next / size_now : 0;
+  guest::StoreU32(base, trail + kTrailTail, uint32_t(next) - uint32_t(quotient) * uint32_t(size_now));
+  guest::StoreU32(base, trail + kTrailCount, added);
+  *result = 1;
+  return true;
 }
 
 }  // namespace race_overlays
