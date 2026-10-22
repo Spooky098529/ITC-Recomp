@@ -450,3 +450,52 @@ void RaceOverlaysClear(uint8_t* base, uint32_t list);
 uint32_t ShareTextures(uint8_t* base, uint32_t list);
 
 }  // namespace race_overlays
+
+namespace race_overlays {
+
+// --- Resets ---
+//
+// The children's slot 3 (reached through their vtables) and the entries
+// and sprites they clear. "0.0" and "1.0" are the game's words at
+// 0x82000A34 and 0x82000A30, copied with their bits (the original's
+// lfs/stfs); a "unit vector" is (0.0, 0.0, 0.0, 1.0). The identity rows the
+// original stores with stvx go to the 16-byte-aligned address below, as
+// stvx does.
+
+// LightSprite::Reset (sub_8211E9F0): +272 a unit vector, the sprite at +144
+// cleared.
+void LightSpriteReset(uint8_t* base, uint32_t sprite);
+// ModelSprite::Reset (sub_8211F430): the sprite at +224 cleared, +368 and
+// +384 unit vectors, +404 and +408 -1, ten unit vectors from +416.
+void ModelSpriteReset(uint8_t* base, uint32_t sprite);
+// Sprite::ResetStyle2 (sub_82123A00): the identity matrix at +0 (stvx),
+// +64 and +68 0, +72 2, 1.0 at +92 and +108.
+void SpriteResetStyle2(uint8_t* base, uint32_t sprite);
+// Trail::Reset (sub_82129498): head, tail and count (+64,128 to +64,136) 0,
+// the last position (+64,144) a unit vector, then each of the +104 points
+// (128 bytes from +128) cleared, the count read again each time.
+void TrailReset(uint8_t* base, uint32_t trail);
+// SmokeEmitter::Reset (sub_8212A218): the emitter's vectors cleared, the
+// identity matrix at +144 (stvx), +92 1, +128 10, +112 and +224 the float
+// at 0x82002A90, its ten 48-byte particles from +240 cleared.
+void SmokeEmitterReset(uint8_t* base, uint32_t emitter);
+// SmokeEmitter::SmokeEmitter (sub_8212B230): 1.0 in the w of its vectors
+// and of its ten particles from +240.
+void SmokeEmitterConstruct(uint8_t* base, uint32_t emitter);
+// ParticlesB::ResetEntry (sub_8212B3E8): a 176-byte entry's vectors unit
+// vectors, +92 and +116 1, the rest 0.
+void ParticlesBResetEntry(uint8_t* base, uint32_t entry);
+// ParticlesC::Reset (sub_8212C0E8): +2,704 0.0, +2,688 to +2,696 0, the
+// position (+2,672) a unit vector, then each of the +2,700 entries (128
+// bytes from +112) cleared, the count read again each time.
+void ParticlesCReset(uint8_t* base, uint32_t particles);
+// Marker::Reset (sub_8212CC38): the camera position (+272) a unit vector,
+// +288 1, the sprite at +128 cleared.
+void MarkerReset(uint8_t* base, uint32_t marker);
+// Sparks::Reset (sub_8212D6E0): the counters (+28,928 to +28,940, +28,976)
+// 0, its vectors unit vectors, the 50 vectors at +29,024, then each of the
+// +104 entries (144 bytes from +128) cleared, the count read again each
+// time.
+void SparksReset(uint8_t* base, uint32_t sparks);
+
+}  // namespace race_overlays

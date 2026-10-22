@@ -12,6 +12,7 @@
 #include <bit>
 #include <climits>
 #include <cmath>
+#include <initializer_list>
 
 namespace race_overlays {
 
@@ -1682,6 +1683,191 @@ uint32_t ShareTextures(uint8_t* base, uint32_t list) {
     }
   }
   return entry;
+}
+
+}  // namespace race_overlays
+
+namespace race_overlays {
+
+namespace {
+
+constexpr uint32_t kSmokeEmitterSize = 0x82002A90;
+constexpr uint32_t kFloatOne = 0x3F800000;  // the identity rows' 1.0 (vupkd3d128's)
+
+// The stores of a reset, in the original's order: 'z' the game's 0.0 word,
+// 'o' its 1.0 word, '0' and '1' the integers, 'v' a unit vector (four
+// stores from the offset).
+struct ResetStore {
+  int32_t offset;
+  char kind;
+};
+
+void ApplyStores(uint8_t* base, uint32_t at, std::initializer_list<ResetStore> stores) {
+  const uint32_t zero = guest::LoadU32(base, kZero);
+  const uint32_t one = guest::LoadU32(base, kOne);
+  for (const ResetStore& s : stores) {
+    const uint32_t to = at + uint32_t(s.offset);
+    switch (s.kind) {
+      case 'z':
+        guest::StoreU32(base, to, zero);
+        break;
+      case 'o':
+        guest::StoreU32(base, to, one);
+        break;
+      case '0':
+        guest::StoreU32(base, to, 0);
+        break;
+      case '1':
+        guest::StoreU32(base, to, 1);
+        break;
+      case 'v':
+        guest::StoreU32(base, to, zero);
+        guest::StoreU32(base, to + 4, zero);
+        guest::StoreU32(base, to + 8, zero);
+        guest::StoreU32(base, to + 12, one);
+        break;
+    }
+  }
+}
+
+// One identity row as stvx stores it: at `to` rounded down to 16 bytes,
+// 1.0 in word `column`, 0.0 elsewhere.
+void StoreIdentityRow(uint8_t* base, uint32_t to, uint32_t column) {
+  const uint32_t at = to & ~0xFu;
+  for (uint32_t i = 0; i < 4; i++) {
+    guest::StoreU32(base, at + 4 * i, i == column ? kFloatOne : 0);
+  }
+}
+
+// A sprite's state as LightSprite::Reset, ModelSprite::Reset and
+// Marker::Reset clear it (the first part, the same in the three).
+void ClearSpriteVectors(uint8_t* base, uint32_t sprite) {
+  ApplyStores(base, sprite, {{48, 'v'}, {64, 'v'}, {32, 'v'}, {80, '0'}, {84, '0'}, {88, '0'},
+                             {92, '1'}, {0, 'v'}, {16, 'v'}});
+}
+
+}  // namespace
+
+void LightSpriteReset(uint8_t* base, uint32_t sprite) {
+  ITC_NATIVE_RUNNING("sub_8211E9F0 LightSprite::Reset");
+  ApplyStores(base, sprite, {{272, 'v'}});
+  const uint32_t inner = sprite + 144;
+  ClearSpriteVectors(base, inner);
+  ApplyStores(base, inner, {{96, '0'}, {100, 'z'}, {108, '0'}, {104, 'z'}});
+  guest::StoreU32(base, inner + 116, 4);
+  guest::StoreU32(base, inner + 112, 0);
+}
+
+void ModelSpriteReset(uint8_t* base, uint32_t sprite) {
+  ITC_NATIVE_RUNNING("sub_8211F430 ModelSprite::Reset");
+  const uint32_t inner = sprite + 224;
+  ClearSpriteVectors(base, inner);
+  ApplyStores(base, inner, {{96, '0'}, {108, '0'}, {100, 'z'}, {128, '0'}, {104, 'z'}});
+  guest::StoreU32(base, inner + 112, 9);
+  guest::StoreU32(base, inner + 120, 9);
+  guest::StoreU32(base, inner + 116, 4);
+  guest::StoreU32(base, inner + 124, 12);
+  ApplyStores(base, sprite, {{368, 'v'}, {384, 'v'}});
+  guest::StoreU32(base, sprite + 404, 0xFFFFFFFF);
+  guest::StoreU32(base, sprite + 408, 0xFFFFFFFF);
+  for (uint32_t i = 0; i < 10; i++) {
+    ApplyStores(base, sprite + 416 + 16 * i, {{0, 'v'}});
+  }
+}
+
+void SpriteResetStyle2(uint8_t* base, uint32_t sprite) {
+  ITC_NATIVE_RUNNING("sub_82123A00 Sprite::ResetStyle2");
+  ApplyStores(base, sprite, {{12, 'o'}, {28, 'o'}, {44, 'o'}, {60, 'o'}, {64, '0'}, {68, '0'}});
+  guest::StoreU32(base, sprite + 72, 2);
+  for (uint32_t row = 0; row < 4; row++) {
+    StoreIdentityRow(base, sprite + 16 * row, row);
+  }
+  ApplyStores(base, sprite, {{92, 'o'}, {108, 'o'}});
+}
+
+void TrailReset(uint8_t* base, uint32_t trail) {
+  ITC_NATIVE_RUNNING("sub_82129498 Trail::Reset");
+  ApplyStores(base, trail, {{64128, '0'}, {64132, '0'}, {64136, '0'}, {64144, 'v'}});
+  for (uint32_t i = 0; i < guest::LoadU32(base, trail + 104); i++) {
+    ApplyStores(base, trail + 128 + 128 * i,
+                {{0, 'v'}, {16, 'v'}, {64, 'v'}, {96, 'v'}, {80, 'v'}, {32, '0'}, {36, '0'},
+                 {40, '0'}, {44, '1'}, {52, 'z'}, {56, 'z'}, {112, '0'}, {124, 'z'}, {60, '0'},
+                 {116, '0'}, {48, '0'}, {120, '0'}});
+  }
+}
+
+void SmokeEmitterReset(uint8_t* base, uint32_t emitter) {
+  ITC_NATIVE_RUNNING("sub_8212A218 SmokeEmitter::Reset");
+  ApplyStores(base, emitter, {{48, 'v'}, {64, 'v'}, {32, 'v'}, {208, 'v'}});
+  // The original's order: rows 1, 0, 3, 2.
+  StoreIdentityRow(base, emitter + 160, 1);
+  StoreIdentityRow(base, emitter + 144, 0);
+  StoreIdentityRow(base, emitter + 192, 3);
+  StoreIdentityRow(base, emitter + 176, 2);
+  ApplyStores(base, emitter,
+              {{0, 'v'}, {16, 'v'}, {80, '0'}, {84, '0'}, {88, '0'}, {92, '1'}, {104, 'z'},
+               {120, 'z'}, {108, '0'}, {124, 'z'}, {96, '0'}, {100, 'z'}});
+  guest::StoreU32(base, emitter + 128, 10);
+  ApplyStores(base, emitter, {{116, 'z'}});
+  const uint32_t size = guest::LoadU32(base, kSmokeEmitterSize);
+  guest::StoreU32(base, emitter + 112, size);
+  guest::StoreU32(base, emitter + 224, size);
+  ApplyStores(base, emitter, {{228, 'z'}});
+  for (uint32_t i = 0; i < 10; i++) {
+    ApplyStores(base, emitter + 240 + 48 * i, {{0, 'v'}, {16, 'v'}, {32, '0'}, {36, '0'}, {40, '0'}});
+  }
+}
+
+void SmokeEmitterConstruct(uint8_t* base, uint32_t emitter) {
+  ITC_NATIVE_RUNNING("sub_8212B230 SmokeEmitter::SmokeEmitter");
+  ApplyStores(base, emitter, {{12, 'o'}, {28, 'o'}, {44, 'o'}, {60, 'o'}, {76, 'o'}, {156, 'o'},
+                              {172, 'o'}, {188, 'o'}, {204, 'o'}, {220, 'o'}});
+  for (uint32_t i = 0; i < 10; i++) {
+    ApplyStores(base, emitter + 240 + 48 * i, {{12, 'o'}, {28, 'o'}});
+  }
+}
+
+void ParticlesBResetEntry(uint8_t* base, uint32_t entry) {
+  ITC_NATIVE_RUNNING("sub_8212B3E8 ParticlesB::ResetEntry");
+  ApplyStores(base, entry,
+              {{48, 'v'}, {64, 'v'}, {32, 'v'}, {0, 'v'}, {16, 'v'}, {80, '0'}, {84, '0'},
+               {88, '0'}, {92, '1'}, {104, 'z'}, {100, 'z'}, {108, '0'}, {112, 'z'}, {96, '0'},
+               {116, '1'}, {128, 'v'}, {144, 'v'}, {160, '0'}, {164, '0'}});
+}
+
+void ParticlesCReset(uint8_t* base, uint32_t particles) {
+  ITC_NATIVE_RUNNING("sub_8212C0E8 ParticlesC::Reset");
+  ApplyStores(base, particles, {{2704, 'z'}, {2688, '0'}, {2692, '0'}, {2696, '0'}, {2672, 'v'}});
+  for (uint32_t i = 0; i < guest::LoadU32(base, particles + 2700); i++) {
+    ApplyStores(base, particles + 112 + 128 * i,
+                {{48, 'v'}, {64, 'v'}, {32, 'v'}, {0, 'v'}, {16, 'v'}, {80, '0'}, {84, '0'},
+                 {88, '0'}, {92, '1'}, {100, 'z'}, {104, 'z'}, {108, '0'}, {96, '0'},
+                 {112, '0'}});
+  }
+}
+
+void MarkerReset(uint8_t* base, uint32_t marker) {
+  ITC_NATIVE_RUNNING("sub_8212CC38 Marker::Reset");
+  ApplyStores(base, marker, {{272, 'v'}, {288, '1'}});
+  const uint32_t inner = marker + 128;
+  ClearSpriteVectors(base, inner);
+  ApplyStores(base, inner, {{96, '0'}, {100, 'z'}, {108, '0'}, {104, 'z'}, {112, '0'}});
+}
+
+void SparksReset(uint8_t* base, uint32_t sparks) {
+  ITC_NATIVE_RUNNING("sub_8212D6E0 Sparks::Reset");
+  ApplyStores(base, sparks,
+              {{28932, '0'}, {28936, '0'}, {28940, '0'}, {28928, '0'}, {28960, 'v'},
+               {28992, 'v'}, {29008, 'v'}, {28976, '0'}});
+  for (uint32_t i = 0; i < 50; i++) {
+    ApplyStores(base, sparks + 29024 + 16 * i, {{0, 'v'}});
+  }
+  for (uint32_t i = 0; i < guest::LoadU32(base, sparks + 104); i++) {
+    ApplyStores(base, sparks + 128 + 144 * i,
+                {{48, 'v'}, {64, 'v'}, {32, 'v'}, {0, 'v'}, {16, 'v'}, {112, 'v'}, {80, '0'},
+                 {84, '0'}, {88, '0'}, {92, '1'}, {100, 'z'}, {104, 'z'}, {108, '0'}, {136, 'z'},
+                 {128, '0'}, {96, '0'}, {132, '0'}});
+  }
 }
 
 }  // namespace race_overlays

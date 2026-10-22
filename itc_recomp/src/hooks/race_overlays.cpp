@@ -16,7 +16,7 @@ ITC_FLAG_BOOL(native_race_overlays, true, "ITC",
               "points' checks and positions, sub_82126A78 and sub_82127140; Sparks::UpdateStreak, "
               "sub_8212E660; Sparks::Emit, sub_8212D818; CarOverlays::EmitSmoke, sub_82123240, "
               "with Smoke::Emit; the set-up's constructors, clears and bindings, sub_82126498 to "
-              "sub_8215E000) natively "
+              "sub_8215E000; the resets, sub_8211E9F0 to sub_8212D6E0) natively "
               "instead of through the translated code (same results; checked by "
               "--run_harnesses=race_overlays)");
 
@@ -329,3 +329,18 @@ ITC_OVERLAY_SET(82128190, SetRenderTargets(base, ctx.r3.u32, ctx.r4.u32))
 // the original leaves it. SetTextures104, which it calls, is done by its
 // plain C++.
 ITC_OVERLAY_WORD(8215E000, ShareTextures(base, ctx.r3.u32))
+
+// The resets (most are slot 3, reached through the vtables): r3 = the
+// object.
+ITC_OVERLAY_SET(8211E9F0, LightSpriteReset(base, ctx.r3.u32))
+ITC_OVERLAY_SET(8211F430, ModelSpriteReset(base, ctx.r3.u32))
+ITC_OVERLAY_SET(82123A00, SpriteResetStyle2(base, ctx.r3.u32))
+ITC_OVERLAY_SET(82129498, TrailReset(base, ctx.r3.u32))
+ITC_OVERLAY_SET(8212B230, SmokeEmitterConstruct(base, ctx.r3.u32))
+ITC_OVERLAY_SET(8212C0E8, ParticlesCReset(base, ctx.r3.u32))
+ITC_OVERLAY_SET(8212CC38, MarkerReset(base, ctx.r3.u32))
+ITC_OVERLAY_SET(8212D6E0, SparksReset(base, ctx.r3.u32))
+// SmokeEmitter::Reset and ParticlesB::ResetEntry: r4 = the emitter or entry
+// (r3, the owner, isn't read).
+ITC_OVERLAY_SET(8212A218, SmokeEmitterReset(base, ctx.r4.u32))
+ITC_OVERLAY_SET(8212B3E8, ParticlesBResetEntry(base, ctx.r4.u32))

@@ -158,6 +158,37 @@ void NativeSetRenderTargets(PPCContext& ctx, uint8_t* base) {
 }
 ITC_NATIVE_WORD(NativeShareTextures, ro::ShareTextures(base, ctx.r3.u32))
 
+void NativeLightSpriteReset(PPCContext& ctx, uint8_t* base) {
+  ro::LightSpriteReset(base, ctx.r3.u32);
+}
+void NativeModelSpriteReset(PPCContext& ctx, uint8_t* base) {
+  ro::ModelSpriteReset(base, ctx.r3.u32);
+}
+void NativeSpriteResetStyle2(PPCContext& ctx, uint8_t* base) {
+  ro::SpriteResetStyle2(base, ctx.r3.u32);
+}
+void NativeTrailReset(PPCContext& ctx, uint8_t* base) {
+  ro::TrailReset(base, ctx.r3.u32);
+}
+void NativeSmokeEmitterReset(PPCContext& ctx, uint8_t* base) {
+  ro::SmokeEmitterReset(base, ctx.r4.u32);
+}
+void NativeSmokeEmitterConstruct(PPCContext& ctx, uint8_t* base) {
+  ro::SmokeEmitterConstruct(base, ctx.r3.u32);
+}
+void NativeParticlesBResetEntry(PPCContext& ctx, uint8_t* base) {
+  ro::ParticlesBResetEntry(base, ctx.r4.u32);
+}
+void NativeParticlesCReset(PPCContext& ctx, uint8_t* base) {
+  ro::ParticlesCReset(base, ctx.r3.u32);
+}
+void NativeMarkerReset(PPCContext& ctx, uint8_t* base) {
+  ro::MarkerReset(base, ctx.r3.u32);
+}
+void NativeSparksReset(PPCContext& ctx, uint8_t* base) {
+  ro::SparksReset(base, ctx.r3.u32);
+}
+
 void NativeRandomRange(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   uint32_t drawn = 0;
@@ -1794,6 +1825,78 @@ void SetUpCases(Context& h, uint32_t block) {
     results.Report();
   }
 }
+
+// The resets: objects of random words (odd floats among them), at 16-byte
+// alignment and 4, 8 and 12 past it (stvx rounds down), the counts the
+// loops read from 0 to past the game's capacities where that stays inside
+// the object; compared over the object and 32 bytes around it.
+void ResetCases(Context& h, uint32_t block) {
+  Random& r = h.random;
+  struct Function {
+    const char* name;
+    GuestFunction recompiled, native;
+    uint32_t bytes;      // compared
+    bool in_r4;          // the object in r4 (r3 an owner, not read)
+    uint32_t count;      // the count word the loop reads (0: none)
+    uint32_t max_count;  // counts tried up to this
+  };
+  const Function resets[] = {
+      {"LightSprite::Reset (sub_8211E9F0)", __imp__sub_8211E9F0, NativeLightSpriteReset, 288,
+       false, 0, 0},
+      {"ModelSprite::Reset (sub_8211F430)", __imp__sub_8211F430, NativeModelSpriteReset, 576,
+       false, 0, 0},
+      {"Sprite::ResetStyle2 (sub_82123A00)", __imp__sub_82123A00, NativeSpriteResetStyle2, 128,
+       false, 0, 0},
+      {"Trail::Reset (sub_82129498)", __imp__sub_82129498, NativeTrailReset, 66816, false, 104,
+       520},
+      {"SmokeEmitter::Reset (sub_8212A218)", __imp__sub_8212A218, NativeSmokeEmitterReset, 720,
+       true, 0, 0},
+      {"SmokeEmitter::SmokeEmitter (sub_8212B230)", __imp__sub_8212B230,
+       NativeSmokeEmitterConstruct, 720, false, 0, 0},
+      {"ParticlesB::ResetEntry (sub_8212B3E8)", __imp__sub_8212B3E8, NativeParticlesBResetEntry,
+       176, true, 0, 0},
+      // Entry 20 would overwrite the count (+2,700) with 1.0: both versions
+      // would run on, so 20 at most.
+      {"ParticlesC::Reset (sub_8212C0E8)", __imp__sub_8212C0E8, NativeParticlesCReset, 2720,
+       false, 2700, 20},
+      {"Marker::Reset (sub_8212CC38)", __imp__sub_8212CC38, NativeMarkerReset, 304, false, 0, 0},
+      {"Sparks::Reset (sub_8212D6E0)", __imp__sub_8212D6E0, NativeSparksReset, 29824, false, 104,
+       200},
+  };
+  for (const Function& f : resets) {
+    Results results(f.name);
+    for (int i = 0; i < 24; i++) {
+      const uint32_t object = block + 0x100 + 4 * uint32_t(i % 4);
+      const uint64_t seed = r.Next();
+      uint32_t count = 0;
+      if (f.count) {
+        count = i < 4 ? uint32_t(i) : i == 4 ? f.max_count : r.Below(f.max_count + 1);
+      }
+      const uint64_t r3 = r.Next();
+      Compare(h, results, {{object - 32, f.bytes + 64}},
+              [&, seed, count] {
+                Random fill;
+                for (uint64_t n = 0; n < seed % 61; n++) {
+                  fill.Next();
+                }
+                FillRandom(h.base, fill, object - 32, f.bytes + 64);
+                if (f.count) {
+                  guest::StoreU32(h.base, object + f.count, count);
+                }
+              },
+              [&](PPCContext& t) {
+                if (f.in_r4) {
+                  t.r3.u64 = r3;
+                  t.r4.u64 = object;
+                } else {
+                  t.r3.u64 = object;
+                }
+              },
+              f.recompiled, f.native, fmt::format("case {} count {}", i, count));
+    }
+    results.Report();
+  }
+}
 }  // namespace
 
 void RaceOverlays(Context& h) {
@@ -1818,6 +1921,7 @@ void RaceOverlays(Context& h) {
   SparksEmitCases(h, block);
   SmokeCases(h, block);
   SetUpCases(h, block);
+  ResetCases(h, block);
   memory->SystemHeapFree(block);
 }
 
