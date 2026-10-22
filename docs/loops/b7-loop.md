@@ -19,11 +19,11 @@ memory.
 
 ## Settings (set by the user, 2026-10-22)
 
-- **Branch:** `b7-loop`, made once from `rexglue-removal-project` by the
-  first pass (the user's approval here counts as asking). The loop never
+- **Branch:** `b7-loop-test`, made from `rexglue-removal-project` by the user
+  (2026-10-22), already there: the first pass doesn't make it. The loop never
   makes another branch, never touches `main` or tags, and never merges:
   the user reviews and merges the branch.
-- **Code changes without asking first:** allowed on `b7-loop`, for the
+- **Code changes without asking first:** allowed on `b7-loop-test`, for the
   subsystems the loop takes. This relaxes the "explain before code
   changes" rule for the loop's branch, nowhere else.
 - **Function rows:** written by the agents as they go (the status check
@@ -125,7 +125,7 @@ code, no builds, no game runs):
   `leads.md`.
 - **Runs** `check_function_statuses.py` (no errors) and `b7_status.py`.
 - **Commits** (only its own files, by path; the staged diff checked for
-  `/home/`) and pushes `b7-loop`.
+  `/home/`) and pushes `b7-loop-test`.
 
 Report, in its last message:
 
@@ -187,7 +187,7 @@ functions; run again after each group, as callers become ready):
 6. Records: the rows (Status by the definitions at the top), then
    `check_function_statuses.py`; what was learned in the subsystem's doc.
 7. Commits each group (only its own files, by path; the staged diff
-   checked for `/home/`) and pushes `b7-loop`.
+   checked for `/home/`) and pushes `b7-loop-test`.
 
 It stops when nothing ready is left in the subsystem, after about five
 groups (the lead starts another), or at a failure. Report, in its last
@@ -220,7 +220,7 @@ file, when:
 - a profile is slower than before, beyond the runs' spread;
 - a map fails its check, or `leads.md` has nothing the loop can take;
 - the session's or the total limit is reached;
-- the tree has changes the loop didn't make, or isn't on `b7-loop`.
+- the tree has changes the loop didn't make, or isn't on `b7-loop-test`.
 
 ## Rules that still hold
 
