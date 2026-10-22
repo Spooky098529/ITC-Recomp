@@ -436,7 +436,8 @@ extern "C" REX_FUNC(sub_8212C2F0) {
 ITC_OVERLAY_WORD(8215E048, SlotOf(ctx.r3.u32))
 
 // The view's (r3) body and wheels, through the vehicle accessors' plain C++.
-ITC_OVERLAY_WORD(821268B0, BodyMatrix(base, ctx.r3.u32))
+// OverlayView::BodyMatrix (sub_821268B0) has no adapter: its only caller in
+// play, CarOverlays::IsBehindCamera, is native.
 ITC_OVERLAY_WORD(821268C8, WheelContact(base, ctx.r3.u32, ctx.r4.u32))
 ITC_OVERLAY_WORD(821269B0, WheelSurfaceMarks(base, ctx.r3.u32, ctx.r4.u32))
 // r3 = out, r4 = the view; returns out.
