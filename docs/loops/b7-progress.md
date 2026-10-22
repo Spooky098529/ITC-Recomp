@@ -6,9 +6,16 @@ record: `b7-loop-2026-10-22-0111.md` (and this file's history).
 
 ## Now
 
-- New run, not started. Branch: `b7-loop-22-10-26` (made by the user).
-  First lead: the "no mapping" adapters lead at the top of `leads.md`.
-- Session: pass 0 of 20, subsystem 0 of 5. In all: subsystem 0 of 5.
+- Run started 2026-10-22 10:47 on `b7-loop-22-10-26` (made by the user,
+  from 600ed23); summary `b7-loop-2026-10-22-1047.md`.
+- Lead: "no mapping", the removable adapters in the first run's files
+  (`sprites.md`, `command-list.md`, `c-runtime.md`, `ui-movies.md`,
+  `ui-movies-game.md`); step 6, migration agent running. Doesn't count
+  as a subsystem.
+- Session: pass 1 of 20, subsystem 0 of 5. In all: subsystem 0 of 5.
+- Known at the start: `b7_status.py` checks `c-runtime.md:221`
+  `sub_825A9934` (`__chkstk`) "Dropped, but it ran" (from the first run:
+  its override does nothing, so it still shows as seen).
 
 ## Done
 

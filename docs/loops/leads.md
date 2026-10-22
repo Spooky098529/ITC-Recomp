@@ -6,13 +6,6 @@ the top and deletes a lead's line when it picks it; mapping agents add
 new ones at the end, after checking the function isn't already in a file
 in `docs/functions/` or listed here.
 
-- No mapping: the adapters that may go in the files the loop's first run
-  made native (`sprites.md`, `command-list.md`, `c-runtime.md`,
-  `ui-movies.md`, `ui-movies-game.md`): `b7_groups.py --removable` listed
-  35 candidates after the run (pow's helpers, the atof chain below atof,
-  `__ascii_strnicmp`, the UI movies' file fix-ups and recorders' callees,
-  ...). A migration agent confirms and removes them ("Removing an adapter"
-  in `b7-loop.md`). Found by the user and Claude, 2026-10-22.
 - `sub_82126220`, `sub_82126158`, `sub_82123450`, `sub_82123A80`, `sub_82123E48`, `sub_82124728`: the race overlays' update side, the rest of `82121000`-`8212EF00` (~120 functions seen in play: creating the overlays, their vtable slot 4 updates, small accessors such as `sub_82126550` and `sub_82126498`), whose recordings are in `functions/sprites.md`; with `sub_8215DEA0` (`RaceOverlays::Run`, in `functions.md`). Found by the B7 loop's mapping agent (sprites), 2026-10-22.
 - `sub_825A6940`, `sub_825A71C0` (and `sub_825A70E8`): the C runtime heap, probably `malloc` (or operator new) and `free` (and operator delete), seen in play; `CommandList::Init` (`sub_8258CD28`, `functions/command-list.md`) and `sub_82090CC0` call them. Made native, they allocate guest memory without `ctx`: the user decides how first. Found by the B7 loop's mapping agent (command list), 2026-10-22.
 - `sub_8259C9B0`, `sub_8259CB48`, `sub_8259CBE8`, `sub_8259CCA0`, `sub_8259CD50`, `sub_8259D478`: the game's sound cues and 3D emitters, probably over XACT (`8259C9B0`-`8259D5A8`, ~25 functions seen in play: an emitter's set-up, a cue played through a sound bank's vtable and stopped, positions and velocities copied), called from the game side at `82117000`-`82119800` (`sub_82119500`, `sub_821197E0`, `sub_821178C8`, vtable thunks around `82117E08`); with the engine's start-up `sub_8259D1F0` (in `functions/files-and-saves.md`) and `sub_8259D1A8` (Wrapped, in `functions.md`). Taken for the UI movie library by the C runtime's lead; not part of it. Found by the B7 loop's mapping agent (UI movies), 2026-10-22.
