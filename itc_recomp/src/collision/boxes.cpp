@@ -8,6 +8,8 @@
 #include "base/log.h"
 #include "c_runtime/strings.h"
 #include "guest.h"
+#include "memory/c_runtime_heap.h"
+#include "memory/heap.h"
 #include "vehicle_accessors/vectors.h"
 
 namespace collision {
@@ -265,6 +267,43 @@ bool BoxPlace(uint8_t* base, uint32_t box, uint32_t matrix, uint32_t source, uin
   vl::Vec4Copy(base, box + 80, frame + 144);
   RowInto(base, frame + 160, matrix + 32, kZero);
   vl::Vec4Copy(base, box + 96, frame + 160);
+  return true;
+}
+
+bool Deletable(uint32_t block) {
+  return block == 0 || memory::IsHeapBlock(block);
+}
+
+bool ShapeDeletingDestructor(uint8_t* base, uint32_t shape, uint32_t flags) {
+  ITC_NATIVE_RUNNING("sub_820BB140 Shape::DeletingDestructor");
+  // operator delete's error path (a block the layer didn't give) is the
+  // original's: checked before anything is written.
+  if ((flags & 1) != 0 && !Deletable(shape)) {
+    return false;
+  }
+  guest::StoreU32(base, shape + 0, kShapeVtable);
+  if ((flags & 1) != 0) {
+    memory::crt::OperatorDelete(shape);
+  }
+  return true;
+}
+
+bool BoxClone(uint8_t* base, uint32_t box, uint32_t memory, uint32_t frame, uint32_t* copy) {
+  ITC_NATIVE_RUNNING("sub_820BB218 BoxShape::Clone");
+  uint32_t out = memory;
+  if (out == 0) {
+    // operator new's paths that aren't malloc's (the new handler,
+    // std::bad_alloc) are the original's.
+    const auto block = memory::crt::OperatorNew(base, 496);
+    if (!block) {
+      return false;
+    }
+    out = *block;
+  }
+  if (out != 0) {
+    BoxConstruct(base, out, box + 288, box + 176, frame - 112);
+  }
+  *copy = out;
   return true;
 }
 

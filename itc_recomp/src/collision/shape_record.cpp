@@ -7,6 +7,8 @@
 
 #include "base/log.h"
 #include "guest.h"
+#include "matrix_math/matrix_math.h"
+#include "memory/c_runtime_heap.h"
 #include "vehicle_accessors/vectors.h"
 
 namespace collision {
@@ -124,6 +126,76 @@ bool CollisionShapeTranslate(uint8_t* base, uint32_t record, uint32_t offset, ui
   }
   BoxTranslate(base, guest::LoadU32(base, record + 8), offset);
   MotionRow(base, record, frame);
+  CollisionShapeUpdateBounds(base, record);
+  return true;
+}
+
+namespace {
+
+// Whether the record's placed copies (+4, +8) can be deleted natively
+// through their slot 0: each 0, or a box (slot 0 Shape::DeletingDestructor)
+// the layer gave, the two not the same block.
+bool CopiesDeletable(uint8_t* base, uint32_t record) {
+  const uint32_t previous = guest::LoadU32(base, record + 4);
+  const uint32_t current = guest::LoadU32(base, record + 8);
+  for (uint32_t copy : {previous, current}) {
+    if (copy != 0 && (!IsBox(base, copy) || !Deletable(copy))) {
+      return false;
+    }
+  }
+  return previous == 0 || previous != current;
+}
+
+// The copies deleted through slot 0 (r4 = 1) and zeroed, as the destructor
+// and SetUp do.
+void DeleteCopies(uint8_t* base, uint32_t record) {
+  for (uint32_t at : {4u, 8u}) {
+    const uint32_t copy = guest::LoadU32(base, record + at);
+    if (copy != 0) {
+      ShapeDeletingDestructor(base, copy, 1);
+      guest::StoreU32(base, record + at, 0);
+    }
+  }
+}
+
+}  // namespace
+
+bool CollisionShapeDestroy(uint8_t* base, uint32_t record, uint32_t* r3) {
+  ITC_NATIVE_RUNNING("sub_820BAAA0 CollisionShape::~CollisionShape");
+  if (!CopiesDeletable(base, record)) {
+    return false;
+  }
+  // r3: the last copy loaded (+8), or what its slot 0 returned (the same).
+  *r3 = guest::LoadU32(base, record + 8);
+  DeleteCopies(base, record);
+  return true;
+}
+
+bool CollisionShapeSetUp(uint8_t* base, uint32_t record, uint32_t shape, uint32_t matrix,
+                         uint32_t memory, uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_820BB580 CollisionShape::SetUp");
+  // The template's slots 5 (BoxShape::Clone) and 9 (BoxShape::Place) are
+  // made natively only for a box; the copies' deletion and the clones'
+  // allocation are checked before anything is written (malloc gives 0 with
+  // no process heap, and the clones would take operator new's error path).
+  if (!IsBox(base, shape) || !CopiesDeletable(base, record) ||
+      (memory == 0 && memory::crt::GetProcessHeap(base) == 0)) {
+    return false;
+  }
+  const uint32_t f = frame;
+  DeleteCopies(base, record);
+  uint32_t copy = 0;
+  BoxClone(base, shape, memory, f - 96, &copy);
+  guest::StoreU32(base, record + 4, copy);
+  BoxClone(base, shape, memory, f - 96, &copy);
+  guest::StoreU32(base, record + 8, copy);
+  // Each placed by the matrix through its slot 9: a clone is a box (or 0,
+  // which the original would call through too: not with a process heap).
+  BoxPlace(base, guest::LoadU32(base, record + 4), matrix, shape, f - 288);
+  BoxPlace(base, guest::LoadU32(base, record + 8), matrix, shape, f - 288);
+  guest::StoreU32(base, record + 0, shape);
+  matrix_math::SetIdentity(base, record + 48);
+  CopyWord(base, kZero, record + 112);
   CollisionShapeUpdateBounds(base, record);
   return true;
 }

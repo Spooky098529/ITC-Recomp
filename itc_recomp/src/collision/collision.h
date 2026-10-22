@@ -107,9 +107,41 @@ void BoxConstruct(uint8_t* base, uint32_t box, uint32_t min_corner, uint32_t max
 // isn't a box. `frame`: the original's 288 bytes.
 bool BoxPlace(uint8_t* base, uint32_t box, uint32_t matrix, uint32_t source, uint32_t frame);
 
+// --- The shapes' lifetime: operator new and delete through the C runtime's
+// heap over the allocation layer (src/memory/c_runtime_heap.h), so the
+// adapters call these only while --native_heap routes the game's heap to
+// the layer (hooks::NativeHeapActive). ---
+
+// Whether operator delete frees `block` natively: 0, or a block the layer
+// gave (else free's error path, the original's).
+bool Deletable(uint32_t block);
+// Shape::DeletingDestructor (sub_820BB140, slot 0 of the box too): the
+// vtable 0x82002AA8, and with bit 0 of `flags` the shape freed (operator
+// delete). Returns the shape in the original's r3. False, with nothing
+// done, where the shape isn't Deletable.
+bool ShapeDeletingDestructor(uint8_t* base, uint32_t shape, uint32_t flags);
+// BoxShape::Clone (sub_820BB218, slot 5): a box from `box`'s corners (+288,
+// +176) built in `memory`, or in 496 bytes from operator new when 0;
+// `copy` = it (0 when the allocation gave 0). False, with nothing done,
+// where operator new would take its error path. `frame`: the original's 96
+// bytes.
+bool BoxClone(uint8_t* base, uint32_t box, uint32_t memory, uint32_t frame, uint32_t* copy);
+
 // --- The shape record (a collision object's +32: +0 the template shape,
 // +4 the previous placed copy, +8 the current one) ---
 
+// CollisionShape::~CollisionShape (sub_820BAAA0): the placed copies +4 and
+// +8 deleted through slot 0 (r4 = 1) and zeroed. `r3`: what the original
+// leaves there (the old +8). CollisionShape::SetUp (sub_820BB580): the
+// copies deleted likewise, two clones of the template (slot 5, `memory`
+// passed on) into +4 and +8, each placed by the matrix (slot 9), +0 = the
+// template, the matrix +48 the identity, +112 = 0.0, then UpdateBounds.
+// Both false, with nothing done, where a copy isn't a box the layer gave
+// (or the two are one block), the template isn't a box, or the clones'
+// allocation would fail. `frame`: SetUp's 128 bytes.
+bool CollisionShapeDestroy(uint8_t* base, uint32_t record, uint32_t* r3);
+bool CollisionShapeSetUp(uint8_t* base, uint32_t record, uint32_t shape, uint32_t matrix,
+                         uint32_t memory, uint32_t frame);
 // CollisionShape::CurrentCenter (sub_820BAB20) and PreviousCenter
 // (sub_820BAB30): [+8] + 48 and [+4] + 48.
 uint32_t CollisionShapeCurrentCenter(uint8_t* base, uint32_t record);

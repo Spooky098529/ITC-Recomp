@@ -18,11 +18,15 @@
 #include "harness.h"
 
 #include "base/flags.h"
+#include "base/log.h"
 #include "car_physics/car_physics.h"
 #include "collision/collision.h"
+#include "hooks/heap.h"
+#include "memory/heap.h"
 
 #include <fmt/format.h>
 
+#include <algorithm>
 #include <bit>
 #include <cmath>
 #include <iterator>
@@ -120,6 +124,37 @@ void NativeObjectTranslate(PPCContext& ctx, uint8_t* base) {
     return;
   }
   ctx.r3.u64 = ctx.r3.u32 + 304;
+}
+// The shapes' lifetime (operator new and delete natively), with the
+// adapters' fallbacks.
+void NativeDeletingDestructor(PPCContext& ctx, uint8_t* base) {
+  if (!co::ShapeDeletingDestructor(base, ctx.r3.u32, ctx.r4.u32)) {
+    __imp__sub_820BB140(ctx, base);
+  }
+}
+void NativeClone(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  uint32_t copy = 0;
+  if (!co::BoxClone(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 96, &copy)) {
+    __imp__sub_820BB218(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = copy;
+}
+void NativeDestroy(PPCContext& ctx, uint8_t* base) {
+  uint32_t r3 = 0;
+  if (!co::CollisionShapeDestroy(base, ctx.r3.u32, &r3)) {
+    __imp__sub_820BAAA0(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = r3;
+}
+void NativeSetUp(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  if (!co::CollisionShapeSetUp(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
+                               ctx.r1.u32 - 128)) {
+    __imp__sub_820BB580(ctx, base);
+  }
 }
 ITC_NATIVE_STEP(NativeRelativePlacement,
                 ctx.r3.u64 = co::BoxRelativePlacement(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
@@ -314,6 +349,161 @@ enum Args {
   kPairR3,        // r3 = the pair (set up)
   kObjectVector,  // r3 = object A (its body and a record of A, B, C), r4 = the vector
 };
+
+void Append32(std::vector<uint8_t>& out, uint32_t word) {
+  for (int i = 0; i < 4; i++) {
+    out.push_back(uint8_t(word >> (24 - 8 * i)));
+  }
+}
+
+// The shapes' lifetime: blocks from the allocation layer (the same sizes on
+// both sides, at different addresses), so each case compares the region
+// with the blocks' addresses in it replaced by their number, the blocks'
+// contents while allocated, which were freed, and r3 likewise. The blocks
+// left are freed after each side. Only with --native_heap (the adapters'
+// condition): the recompiled side's operator new and delete then use the
+// layer too.
+void LifetimeCases(Context& h, uint32_t region) {
+  if (!hooks::NativeHeapActive()) {
+    ITC_LOG_INFO("harness: collision: the shapes' lifetime skipped (--native_heap off)");
+    return;
+  }
+  enum Kind { kDeleting, kClone, kDestroy, kSetUp };
+  const struct {
+    const char* name;
+    GuestFunction recompiled, native;
+    Kind kind;
+  } functions[] = {
+      {"Shape::DeletingDestructor (sub_820BB140)", Original<__imp__sub_820BB140>,
+       NativeDeletingDestructor, kDeleting},
+      {"BoxShape::Clone (sub_820BB218)", Original<__imp__sub_820BB218>, NativeClone, kClone},
+      {"CollisionShape::~CollisionShape (sub_820BAAA0)", Original<__imp__sub_820BAAA0>,
+       NativeDestroy, kDestroy},
+      {"CollisionShape::SetUp (sub_820BB580)", Original<__imp__sub_820BB580>, NativeSetUp,
+       kSetUp},
+  };
+  enum Group { kNumbers, kNaNs };
+  const char* const kGroupNames[] = {"", ", NaNs and infinities anywhere (expected to differ)"};
+  for (const auto& f : functions) {
+    for (Group group : {kNumbers, kNaNs}) {
+      Results results(std::string(f.name) + kGroupNames[group]);
+      for (uint64_t seed = 0; seed < 100; seed++) {
+        Random pick = Seeded(seed * 19 + 7 * uint64_t(group) + 2);
+        auto word = [group](Random& r) {
+          return group == kNaNs ? FloatWord(r) : NumberWord(r);
+        };
+        const uint32_t flags = uint32_t(pick.Next());
+        // Copies: 0 one time in four each; clones into given memory (box
+        // B) one time in four.
+        const bool no_previous = pick.Below(4) == 0, no_current = pick.Below(4) == 0;
+        const bool given_memory = pick.Below(4) == 0;
+        std::vector<uint8_t> result[2];
+        for (int v = 0; v < 2; v++) {
+          Random words = Seeded(seed * 23 + 5 * uint64_t(group) + 9);
+          for (uint32_t i = 0; i < kRegionBytes; i += 4) {
+            guest::StoreU32(h.base, region + i, word(words));
+          }
+          for (uint32_t box : {kBoxA, kBoxB, kBoxC}) {
+            guest::StoreU32(h.base, region + box, co::kBoxVtable);
+          }
+          // The blocks given: one for the destructor, two copies for the
+          // record (filled as boxes).
+          std::vector<uint32_t> blocks;
+          auto new_box = [&](bool box_vtable) {
+            const uint32_t b = memory::Alloc(496, 0);
+            for (uint32_t i = 0; i < 496; i += 4) {
+              guest::StoreU32(h.base, b + i, word(words));
+            }
+            if (box_vtable) {
+              guest::StoreU32(h.base, b, co::kBoxVtable);
+            }
+            blocks.push_back(b);
+            return b;
+          };
+          PPCContext t = CallContext(h);
+          t.fpscr.disableFlushModeUnconditional();
+          switch (f.kind) {
+            case kDeleting:
+              t.r3.u64 = new_box(pick.Below(2) == 0);
+              t.r4.u64 = flags;
+              break;
+            case kClone:
+              t.r3.u64 = region + kBoxA;
+              t.r4.u64 = given_memory ? region + kBoxB : 0;
+              break;
+            case kDestroy:
+            case kSetUp:
+              guest::StoreU32(h.base, region + kRecord + 4, no_previous ? 0 : new_box(true));
+              guest::StoreU32(h.base, region + kRecord + 8, no_current ? 0 : new_box(true));
+              t.r3.u64 = region + kRecord;
+              t.r4.u64 = region + kBoxA;
+              t.r5.u64 = region + kMatrix;
+              t.r6.u64 = given_memory ? region + kBoxB : 0;
+              break;
+          }
+          (v == 0 ? f.recompiled : f.native)(t, h.base);
+          // The blocks the function allocated: the record's copies and r3
+          // where the layer gave them and they aren't the ones given.
+          std::vector<uint32_t> made;
+          auto is_new = [&](uint32_t b) {
+            return std::find(blocks.begin(), blocks.end(), b) == blocks.end() &&
+                   memory::IsHeapBlock(b);
+          };
+          for (uint32_t b : {guest::LoadU32(h.base, region + kRecord + 4),
+                             guest::LoadU32(h.base, region + kRecord + 8), t.r3.u32}) {
+            if ((f.kind == kSetUp || b == t.r3.u32) && is_new(b) &&
+                std::find(made.begin(), made.end(), b) == made.end()) {
+              made.push_back(b);
+            }
+          }
+          auto name = [&](uint32_t w) {
+            for (size_t i = 0; i < blocks.size(); i++) {
+              if (w == blocks[i]) {
+                return uint32_t(0xB10C0000u + i);
+              }
+            }
+            for (size_t i = 0; i < made.size(); i++) {
+              if (w == made[i]) {
+                return uint32_t(0x0E550000u + i);
+              }
+            }
+            return w;
+          };
+          std::vector<uint8_t>& out = result[v];
+          for (uint32_t i = 0; i < kRegionBytes; i += 4) {
+            Append32(out, name(guest::LoadU32(h.base, region + i)));
+          }
+          Append32(out, name(t.r3.u32));
+          for (uint32_t b : blocks) {
+            const bool freed = !memory::IsHeapBlock(b);
+            out.push_back(freed ? 1 : 0);
+            // The first word (the destructor's vtable) is read freed or not.
+            const uint32_t bytes = freed ? 4 : 496;
+            for (uint32_t i = 0; i < bytes; i += 4) {
+              Append32(out, name(guest::LoadU32(h.base, b + i)));
+            }
+          }
+          for (uint32_t b : made) {
+            Append32(out, memory::Size(b));
+            for (uint32_t i = 0; i < 496; i += 4) {
+              Append32(out, name(guest::LoadU32(h.base, b + i)));
+            }
+          }
+          for (uint32_t b : blocks) {
+            if (memory::IsHeapBlock(b)) {
+              memory::Free(b);
+            }
+          }
+          for (uint32_t b : made) {
+            memory::Free(b);
+          }
+        }
+        results.Check(result[0], result[1], fmt::format("seed {} flags {:08X}", seed, flags));
+      }
+      results.Report();
+    }
+  }
+}
 
 }  // namespace
 
@@ -710,6 +900,7 @@ void Collision(Context& h) {
     }
   }
   Write(h.base, kFaceDirection, saved_direction.data(), 16);
+  LifetimeCases(h, region);
 }
 
 }  // namespace harness

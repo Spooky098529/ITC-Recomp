@@ -10,6 +10,7 @@
 #include "base/flags.h"
 #include "base/log.h"
 #include "collision/collision.h"
+#include "hooks/heap.h"
 
 ITC_FLAG_BOOL(native_collision, true, "ITC",
               "Run the collision world's narrow phase and its shapes "
@@ -17,7 +18,9 @@ ITC_FLAG_BOOL(native_collision, true, "ITC",
               "sub_820BAA50 and sub_822BE2C8; their constructors and placement, sub_820BB020, "
               "sub_820BAB48, sub_820BB688, sub_820B99D0, sub_820BB188, sub_820B9C40; the shape record's accessors, bounds, motion, "
               "placement and translation, sub_820BAB20, sub_820BAB30, sub_820BACB8, sub_820BADF8, "
-              "sub_820BAE38, sub_820BAC00, sub_820BAE78, sub_820BB758, sub_820BACD0; the box-box separation "
+              "sub_820BAE38, sub_820BAC00, sub_820BAE78, sub_820BB758, sub_820BACD0; the shapes' "
+              "lifetime, sub_820BB140, sub_820BB218, sub_820BAAA0, sub_820BB580 (only while "
+              "--native_heap routes the game's heap to the allocation layer); the box-box separation "
               "tests, sub_820BA408, sub_820BA5D8, sub_820BD0C8, sub_820BC978, sub_820BCCE8, "
               "sub_820BB300, sub_820BD280, sub_820BD578, sub_820BD508, sub_820BD6E0; the pair's "
               "next check time, sub_820BBB20; the impacts, sub_820BE490, sub_820BEBF0, "
@@ -205,3 +208,61 @@ ITC_COLLISION(820BC908,
               ctx.r3.u64 = ctx.r3.u32 + 32)
 // Contact::Flip (sub_820BC858) has no adapter: its callers in play are
 // native.
+
+// --- The shapes' lifetime: only while the game's heap is the allocation
+// layer's (operator new and delete called natively). ---
+
+namespace {
+
+bool NativeLifetime() {
+  return ITC_FLAG(native_collision) && hooks::NativeHeapActive();
+}
+
+}  // namespace
+
+// Slot 0: r4 = the flags; r3 comes back as the shape.
+extern "C" REX_FUNC(sub_820BB140) {
+  REX_FUNC_PROLOGUE();
+  if (!NativeLifetime() || !ShapeDeletingDestructor(base, ctx.r3.u32, ctx.r4.u32)) {
+    __imp__sub_820BB140(ctx, base);
+  }
+}
+// Slot 5: r4 = memory or 0; r3 comes back as the copy (or 0).
+extern "C" REX_FUNC(sub_820BB218) {
+  REX_FUNC_PROLOGUE();
+  uint32_t copy = 0;
+  if (!NativeLifetime()) {
+    __imp__sub_820BB218(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  if (!BoxClone(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 96, &copy)) {
+    __imp__sub_820BB218(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = copy;
+}
+// r3 comes back as the old current copy (+8).
+extern "C" REX_FUNC(sub_820BAAA0) {
+  REX_FUNC_PROLOGUE();
+  uint32_t r3 = 0;
+  if (!NativeLifetime() || !CollisionShapeDestroy(base, ctx.r3.u32, &r3)) {
+    __imp__sub_820BAAA0(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = r3;
+}
+// r4 = the template, r5 = the matrix, r6 = memory for the clones or 0; r3
+// comes back as the record.
+extern "C" REX_FUNC(sub_820BB580) {
+  REX_FUNC_PROLOGUE();
+  if (!NativeLifetime()) {
+    __imp__sub_820BB580(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  if (!CollisionShapeSetUp(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
+                           ctx.r1.u32 - 128)) {
+    __imp__sub_820BB580(ctx, base);
+  }
+}
