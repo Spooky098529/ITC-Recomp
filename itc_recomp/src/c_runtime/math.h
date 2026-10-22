@@ -22,4 +22,9 @@ double Acos(double x);
 // asin (sub_825A80A8): its own copy of the kernel's asin steps.
 double Asin(double x);
 
+// sin (sub_825A88A0) and cos (sub_825A8978): fctid rounds by the host's
+// rounding mode (nearest in play), as the translated code's does.
+double Sin(double x);
+double Cos(double x);
+
 }  // namespace c_runtime

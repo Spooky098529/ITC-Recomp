@@ -111,6 +111,24 @@ void Math(Context& h) {
           values, [](PPCContext& t) { t.r4.u64 = 0; });
     Unary(h, "asin (sub_825A80A8)", __imp__sub_825A80A8, sub_825A80A8, values);
   }
+
+  // sin and cos: multiples of pi/2 (where k changes and r is near 0), the
+  // largest argument (2.2e8) and beyond, and angles of every size.
+  {
+    std::vector<double> values = SpecialValues();
+    const double half_pi = 1.5707963267948966;
+    for (int i = 1; i <= 12; i++) {
+      AddAround(values, half_pi * i);
+    }
+    for (double x : {220000000.0, 1e9, 1e-8, 1e-300, 0.5, 1.0, 100.0, 1e6, 1e15, 1e19}) {
+      AddAround(values, x);
+    }
+    AddRandom(h, values, 8.0, 2000);
+    AddRandom(h, values, 1000.0, 500);
+    AddRandom(h, values, 3e8, 300);
+    Unary(h, "sin (sub_825A88A0)", __imp__sub_825A88A0, sub_825A88A0, values);
+    Unary(h, "cos (sub_825A8978)", __imp__sub_825A8978, sub_825A8978, values);
+  }
 }
 
 }  // namespace harness

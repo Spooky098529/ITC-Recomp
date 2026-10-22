@@ -10,7 +10,7 @@
 
 ITC_FLAG_BOOL(native_math, true, "ITC",
               "Run the C runtime's math functions (acos and asin, sub_825A8170, sub_825A7FB0 "
-              "and sub_825A80A8) natively instead of through the translated code (the same "
+              "and sub_825A80A8; sin and cos, sub_825A88A0 and sub_825A8978) natively instead of through the translated code (the same "
               "doubles, bit for bit; checked by --run_harnesses=math)");
 
 // acos: f1 = x.
@@ -44,4 +44,26 @@ extern "C" REX_FUNC(sub_825A80A8) {
   }
   ctx.fpscr.disableFlushMode();
   ctx.f1.f64 = c_runtime::Asin(ctx.f1.f64);
+}
+
+// sin: f1 = x.
+extern "C" REX_FUNC(sub_825A88A0) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_math)) {
+    __imp__sub_825A88A0(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  ctx.f1.f64 = c_runtime::Sin(ctx.f1.f64);
+}
+
+// cos: f1 = x.
+extern "C" REX_FUNC(sub_825A8978) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_math)) {
+    __imp__sub_825A8978(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  ctx.f1.f64 = c_runtime::Cos(ctx.f1.f64);
 }
