@@ -11,6 +11,10 @@ record: `b7-loop-2026-10-22-0111.md` (and this file's history).
 - Subsystem: the race overlays (`race-overlays.md`, mapped in 6baeabf:
   154 rows, 79 ready groups by `b7_groups.py`; the creation side waits
   on the guest heap); step 6, migration agent running.
+- Queued (the poison check, added to the loop 2026-10-22, c7c729c): a
+  poison agent for the race overlays' migration when it reports, then
+  one for the adapters lead's 31 functions (their harnesses were moved
+  off the adapters, the case the check is for).
 - Session: pass 3 of 20, subsystem 1 of 5. In all: subsystem 1 of 5.
 - Known at the start: `b7_status.py` checks `c-runtime.md:221`
   `sub_825A9934` (`__chkstk`) "Dropped, but it ran" (from the first run:
