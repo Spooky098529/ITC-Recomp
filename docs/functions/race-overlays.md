@@ -110,7 +110,20 @@ signaling NaN quieted. `sub_8215E150` (the Update handler's thunk) was left
 for `RaceOverlays::Run`: alone it would only be an adapter passing r3 + 9,608
 to that function's `ctx` override, and its harness would have to run that
 override (camera passes saved, the blend handler set) outside the game's
-update.
+update. The sixth pass (2026-10-22), once the vehicle accessors were native
+(`vehicle-accessors.md`), added the view's body and wheel accessors,
+`CarOverlays::IsBehindCamera`, the racers' save flags and stage check,
+`CarOverlays::UpdateTrails` and `CarOverlays::MarkerKind` (with its two
+helpers, never run in play), calling the accessors' plain C++ directly;
+their harness cases run the originals with `--native_vehicle_accessors` and
+`--native_vector_library` off too, so the whole chain is the translated
+code's. Learned there: native code that hands a guest address to a callee
+(`UpdateTrails`' point for `Trail::AddPoint`) uses the original's own stack
+slot below the adapter's r1; `UpdateTrails` declines before doing anything
+when a trail's capacity would make `AddPoint` decline; `MarkerKind`'s ranged
+ids all go through `sub_82127198` first, which never ran, so in play every
+marker got the caller's default kind; the save flags and `UpdateTrails`'
+points weren't reached in 25-second attract races.
 
 Status:
 
