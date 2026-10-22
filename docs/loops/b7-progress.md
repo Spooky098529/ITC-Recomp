@@ -203,6 +203,12 @@ the validation agent's attract race; the user drives (with
 - Car physics, migration 4 (validation's race): `sub_820B85E8`
   CollisionWorld::Reset.
 
+Checked in a drive (2026-10-22, `itc_733.log`, 0 error lines): 62 of
+66 seen. Not seen: `sub_82126A00` WheelOnSurface8 and `sub_82126A38`
+WheelOnSurface1Or2 (probably ground the drive didn't touch), and
+`sub_82122DB8` FlagsKind and `sub_82127198` NoSaveFlags (never seen in
+the coverage session either).
+
 ## Totals
 
 - Start: ours 422, work left 6331 (wrapped 142, known 313, unknown 5876).
