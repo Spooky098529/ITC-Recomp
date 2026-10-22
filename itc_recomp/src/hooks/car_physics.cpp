@@ -282,9 +282,5 @@ extern "C" REX_FUNC(sub_820B6328) {
   ctx.r3.u64 = VehicleUpdateSuspension(base, ctx.r3.u32, ctx.r1.u32 - 144, &f1);
   ctx.f1.f64 = f1;
 }
-// r4 = the wheel; f1 comes back as the spring's.
-ITC_CAR_PHYSICS(820B5588, ctx.f1.f64 = VehicleUpdateWheelSuspension(base, ctx.r3.u32, ctx.r4.u32,
-                                                                    ctx.r1.u32 - 176))
-// r4 = the wheel, f1 = the change, r6 = the velocity; f1 = the force.
-ITC_CAR_PHYSICS(820B0198, ctx.f1.f64 = VehicleSuspensionSpring(base, ctx.r3.u32, ctx.r4.u32,
-                                                               ctx.f1.f64, ctx.r6.u32))
+// Vehicle::UpdateWheelSuspension and SuspensionSpring (sub_820B5588,
+// sub_820B0198) have no adapters: their callers in play are native.
