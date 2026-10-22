@@ -16,7 +16,9 @@ rows to review and drive list are there), and this file's history.
 - Subsystem 2 of 3: the matrix and vector math (the `Matrix::` lead at
   `8209B000`-`820AC000`, with the vector library's 4x4 matrix lead
   folded in). Mapped in 7929f36 (`matrix-math.md`, 28 rows, 15 ready
-  groups; checked). Step: migration 1 (agent running).
+  groups; checked). Migration 1 done (18cafd4: all 15 ready groups, 18
+  ours and 3 Merged; `--native_matrix_math`; race 22 s, 0 errors).
+  Step: validation (agent running).
 - Known: `b7_status.py` checks `sub_825A9934` (`__chkstk`) "Dropped, but
   it ran", and every function made Native or Merged since the coverage
   session "..., but it ran" (`seen_in_play.txt` predates them; a new
@@ -42,7 +44,13 @@ rows to review and drive list are there), and this file's history.
 ## Rows to review
 
 - `matrix-math.md` (new, 28 rows; 4 moved from `functions.md`), 1 lead
-  added.
+  added. Migration 1's 21 rows (15 Overridden, 3 of them were Wrapped;
+  3 Native with no adapter ever; 3 Merged). For review: the three
+  Wrapped functions' overrides (Multiply and Copy in
+  `src/interpolation/blend_state.cpp`, Vec4::Transform in
+  `src/debug/frame_state_diff.cpp`) now do the work natively, with the
+  same hooks around it; frame dumps with the flag on and off look the
+  same.
 - `race-overlays.md`: the no-mapping lead's 14 rows (the view's body and
   wheel accessors, IsBehindCamera, the save flags and stage check,
   UpdateTrails, MarkerKind; FlagsKind `sub_82122DB8` and NoSaveFlags
@@ -58,6 +66,14 @@ rows to review and drive list are there), and this file's history.
   `known-data.md`'s new rows, 5 leads added.
 
 ## Expected to differ
+
+- `matrix-math.md` (migration 1): every function has a "NaNs anywhere
+  (expected to differ)" group; eight differ, only in a NaN's sign or
+  payload (the operand order the compiler chose where two NaNs meet;
+  every case with numbers alone or one NaN matches): Matrix::Multiply 5,
+  Matrix::Inverse 10, MultiplyUnaligned 1, MultiplyTo 1,
+  MultiplyReversed 1, ProjectPoint 3, Quaternion::FromMatrix 2,
+  Quaternion::Multiply 1 (of 210 each).
 
 - `vehicle-accessors.md` (migration 1): every vector, rigid-body and
   quaternion function has a "two or more NaN inputs" / "NaN inputs"
@@ -103,5 +119,7 @@ the validation agent's attract race; the user drives (with
   6190 (wrapped 140, known 303, unknown 5747).
 - After mapping the matrix math: ours 563, work left 6190 (wrapped 140,
   known 327, unknown 5723).
+- After the matrix math's migration 1: ours 584, work left 6169
+  (wrapped 137, known 309, unknown 5723).
 
 ## Stopped
