@@ -125,6 +125,21 @@ ITC_NATIVE_STEP(NativeSearchAll,
 ITC_NATIVE_STEP(NativeFindCell,
                 ctx.r3.u64 = tc::TrackPositionFindCell(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
                                                        ctx.r1.u32 - 240))
+void NativeGatherCells(PPCContext& ctx, uint8_t* base) {
+  uint32_t count = 0;
+  if (!tc::WallQueryGatherCells(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 192, &count)) {
+    __imp__sub_820FC188(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = count;
+}
+// No frame of its own: the cell goes to the caller's r1 + 28.
+ITC_NATIVE_STEP(NativeAddCell,
+                ctx.r3.u64 = tc::WallQueryAddCell(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32))
+ITC_NATIVE_STEP(NativeAddHit, ctx.r3.u64 = tc::WallQueryAddHit(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_STEP(NativeIntersect2D,
+                ctx.r3.u64 = tc::SegmentsIntersect2D(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_STEP(NativeRouteOnLoaded, tc::TrackRouteOnLoaded(base, ctx.r6.u32); ctx.r3.u64 = 12)
 ITC_NATIVE_STEP(NativeGroundCallback,
                 ctx.r3.u64 = tc::TrackCollisionGroundCallback(base, ctx.r3.u32, ctx.r4.u32,
                                                               ctx.r5.u32, ctx.r1.u32 - 96))
@@ -444,7 +459,9 @@ void LifetimeCases(Context& h, uint32_t area) {
 // beyond; track positions on the point's cell, near it, elsewhere, -1.
 // Compared: the area, r3 and (QuadHeight) f1. Two groups expected to
 // differ, where the vector unit's normalize meets a NaN or an infinity: a
-// NaN in a vertex, and an out not 16-aligned (the normalize then takes the
+// NaN in a vertex (for the functions whose results go through a normal:
+// TriangleNormal, QuadHeight, GroundHeight, Ground, GroundCallback,
+// GroundHits; the others' NaN groups must match), and an out not 16-aligned (the normalize then takes the
 // 16 bytes around it, random words among them). The translated code leaves
 // such a NaN's sign as the compiler ordered its operations (in this build
 // it keeps the NaN's sign where the source negates it: -(x - 0.5) built as
@@ -466,7 +483,11 @@ constexpr uint32_t kLinkedTried = 0x826C5B04, kLinkedTriedBytes = 16;
 constexpr uint32_t kBoxP = kSectionP + 2 * kSectionBytes, kTemplateP = kBoxP + 0x200,
                    kMatrixP = kBoxP + 0x400, kPositionsP = kBoxP + 0x500,
                    kWorldP = kBoxP + 0x700, kHitsP = kBoxP + 0x800;
-constexpr uint32_t kGroundCompared = kBoxP + 0x900;
+// For the wall query's cells: a query (its +12 a shape record whose
+// template and current copy are the box above, +108 the cell count, +112
+// the cells) and the record.
+constexpr uint32_t kQueryP = kBoxP + 0x900, kRecordP = kBoxP + 0xBC0;
+constexpr uint32_t kGroundCompared = kBoxP + 0xC00;
 
 uint32_t SectionAt(uint32_t area, uint32_t k) {
   return area + kSectionP + kSectionBytes * k;
@@ -601,6 +622,8 @@ void GroundCases(Context& h, uint32_t area) {
     kNearest,       // r3 = a section, r4 = the point, r5 = the best distance
     kSearch,        // r3 = the position, r4 = the point, r5 = the mesh
     kFindCell,      // r3 = the mesh, r4 = the position, r5 = the point
+    kGather,        // r3 = the query (its box as for GroundHits), r4 = the mesh
+    kAddCell,       // r3 = the query (some cells listed), r4 = a cell
   };
   const struct {
     const char* name;
@@ -641,6 +664,10 @@ void GroundCases(Context& h, uint32_t area) {
        NativeSearchAll, kSearch},
       {"TrackPosition::FindCell (sub_820F8090)", Original<__imp__sub_820F8090>, NativeFindCell,
        kFindCell},
+      {"WallQuery::GatherCells (sub_820FC188)", Original<__imp__sub_820FC188>, NativeGatherCells,
+       kGather},
+      {"WallQuery::AddCell (sub_820FC110)", Original<__imp__sub_820FC110>, NativeAddCell,
+       kAddCell},
   };
   uint8_t saved_mesh[12];
   std::memcpy(saved_mesh, h.base + tc::kMesh, sizeof(saved_mesh));
@@ -659,10 +686,14 @@ void GroundCases(Context& h, uint32_t area) {
                int32_t(guest::LoadU32(h.base, 0x8200680C)), int32_t(guest::LoadU32(h.base, 0x82006810)),
                int32_t(guest::LoadU32(h.base, 0x82006814)), int32_t(guest::LoadU32(h.base, 0x82006818)));
   enum Group { kNumbers, kOneNaN };
-  const char* const kGroupNames[] = {"", ", one NaN in a vertex (expected to differ)"};
   for (const auto& f : functions) {
+    // A NaN reaches the vector unit's normalize only through the normals.
+    const bool normalizes = f.kind == kNormal || f.kind == kQuad || f.kind == kGroundHeight ||
+                            f.kind == kGround || f.kind == kHits;
+    const std::string nan_group = std::string(", one NaN in a vertex") +
+                                  (normalizes ? " (expected to differ)" : "");
     for (Group group : {kNumbers, kOneNaN}) {
-      Results results(std::string(f.name) + kGroupNames[group]);
+      Results results(f.name + (group == kNumbers ? std::string() : nan_group));
       Results unaligned(std::string(f.name) + (group == kNumbers ? "" : ", one NaN in a vertex") +
                         ", out not 16-aligned (expected to differ)");
       bool out_unaligned = false;
@@ -802,6 +833,8 @@ void GroundCases(Context& h, uint32_t area) {
               t.r6.u64 = r.Below(4) == 0 ? 0 : area + kColorP;
               t.r7.u64 = r.Below(4) == 0 ? 0 : out;
               break;
+            case kGather:
+            case kAddCell:
             case kHits: {
               out_unaligned = false;
               std::memcpy(h.base + tc::kMesh, h.base + area + kMeshP, 12);
@@ -853,6 +886,30 @@ void GroundCases(Context& h, uint32_t area) {
               }
               t.r3.u64 = area + kHitsP;
               t.r4.u64 = area + kBoxP;
+              if (f.kind == kGather) {
+                // The record: the template and both copies the box.
+                guest::StoreU32(h.base, area + kRecordP + 0, area + kBoxP);
+                guest::StoreU32(h.base, area + kRecordP + 4, area + kBoxP);
+                guest::StoreU32(h.base, area + kRecordP + 8, area + kBoxP);
+                guest::StoreU32(h.base, area + kQueryP + 12, area + kRecordP);
+                // The positions' cells within the mesh.
+                for (uint32_t i = 0; i < 4; i++) {
+                  const uint32_t p = area + kPositionsP + 96 * i;
+                  guest::StoreU16(h.base, p + 0, uint16_t(r.Below(2)));
+                  guest::StoreU16(h.base, p + 2, uint16_t(r.Below(kSlices)));
+                }
+                t.r3.u64 = area + kQueryP;
+                t.r4.u64 = area + kMeshP;
+              } else if (f.kind == kAddCell) {
+                const uint32_t listed = r.Below(6);
+                guest::StoreU32(h.base, area + kQueryP + 108, listed);
+                for (uint32_t i = 0; i < listed; i++) {
+                  guest::StoreU16(h.base, area + kQueryP + 112 + 4 * i, uint16_t(r.Below(2)));
+                  guest::StoreU16(h.base, area + kQueryP + 114 + 4 * i, uint16_t(r.Below(4)));
+                }
+                t.r3.u64 = area + kQueryP;
+                t.r4.u64 = (r.Below(2) << 16) | r.Below(4);
+              }
               break;
             }
             case kContains:
@@ -959,12 +1016,165 @@ void GroundCases(Context& h, uint32_t area) {
   std::memcpy(h.base + tc::kMesh, saved_mesh, sizeof(saved_mesh));
 }
 
+// --- The wall query's hit records, the segments' crossing and the route's
+// loading: the area filled anew for each case, globals they read (the
+// collision world's pointer, the race data's pointer 0x826C5B2C) set for
+// each case and put back after. ---
+
+void WallCases(Context& h, uint32_t area) {
+  enum WallKind {
+    kAddHit,     // r3 = a query (+0 its count, +8 the records), r4 = surface bits
+    kIntersect,  // r3 = four point pointers, r4 = out
+    kRoute,      // r6 = the route, its file built at +0x100
+  };
+  const struct {
+    const char* name;
+    GuestFunction recompiled, native;
+    WallKind kind;
+  } functions[] = {
+      {"WallQuery::AddHit (sub_820FC2E0)", Original<__imp__sub_820FC2E0>, NativeAddHit, kAddHit},
+      {"Segments::Intersect2D (sub_820FC658)", Original<__imp__sub_820FC658>, NativeIntersect2D,
+       kIntersect},
+      {"TrackRoute::OnLoaded (sub_820F9050)", Original<__imp__sub_820F9050>, NativeRouteOnLoaded,
+       kRoute},
+  };
+  constexpr uint32_t kRaceDataPointer = 0x826C5B2C;
+  constexpr uint32_t kWallCompared = 0x2000;
+  const uint32_t saved_world = guest::LoadU32(h.base, kWorldPointer);
+  const uint32_t saved_race = guest::LoadU32(h.base, kRaceDataPointer);
+  enum Group { kNumbers, kOneNaN };
+  const char* const kGroupNames[] = {"", ", one NaN"};
+  for (const auto& f : functions) {
+    for (Group group : {kNumbers, kOneNaN}) {
+      if (group == kOneNaN && f.kind == kAddHit) {
+        continue;  // copies and products only
+      }
+      Results results(std::string(f.name) + kGroupNames[group]);
+      for (uint64_t seed = 0; seed < 200; seed++) {
+        std::vector<uint8_t> result[2];
+        for (int v = 0; v < 2; v++) {
+          Random r = Seeded(seed * 59 + 23 * uint64_t(group) + 5);
+          {
+            std::vector<uint32_t> words(kWallCompared / 4);
+            for (uint32_t& w : words) {
+              w = __builtin_bswap32(uint32_t(r.Next()));
+            }
+            std::memcpy(h.base + area, words.data(), kWallCompared);
+          }
+          auto coordinate = [&r]() { return float(int32_t(r.Below(2001)) - 1000) / 200.0f; };
+          PPCContext t = CallContext(h);
+          t.fpscr.disableFlushModeUnconditional();
+          switch (f.kind) {
+            case kAddHit:
+              guest::StoreU32(h.base, kWorldPointer, area + 0x1000);
+              guest::StoreU32(h.base, area + 0x1000 + 60, r.Below(5));
+              guest::StoreU32(h.base, area + 0, r.Below(6));
+              guest::StoreU32(h.base, area + 8, area + 0x200);
+              for (uint32_t i = 48; i < 104; i += 4) {
+                guest::StoreFloat(h.base, area + i, coordinate());
+              }
+              t.r3.u64 = area;
+              t.r4.u64 = r.Below(2) == 0 ? 0x01000000 : uint32_t(r.Next());
+              break;
+            case kIntersect: {
+              // Four points (x, z), a point shared or the segments
+              // parallel one time in eight each.
+              for (uint32_t i = 0; i < 4; i++) {
+                const uint32_t p = area + 0x100 + 16 * i;
+                guest::StoreFloat(h.base, p + 0, coordinate());
+                guest::StoreFloat(h.base, p + 8, coordinate());
+                guest::StoreU32(h.base, area + 4 * i, p);
+              }
+              switch (r.Below(8)) {
+                case 0:
+                  guest::StoreU32(h.base, area + 4 * (2 + r.Below(2)),
+                                  guest::LoadU32(h.base, area + 4 * r.Below(2)));
+                  break;
+                case 1: {
+                  const float dx = coordinate(), dz = coordinate();
+                  const uint32_t a = area + 0x100, c = area + 0x120;
+                  guest::StoreFloat(h.base, a + 16, guest::LoadFloat(h.base, a + 0) + dx);
+                  guest::StoreFloat(h.base, a + 24, guest::LoadFloat(h.base, a + 8) + dz);
+                  guest::StoreFloat(h.base, c + 16, guest::LoadFloat(h.base, c + 0) + 2.0f * dx);
+                  guest::StoreFloat(h.base, c + 24, guest::LoadFloat(h.base, c + 8) + 2.0f * dz);
+                  break;
+                }
+                default:
+                  break;
+              }
+              if (group == kOneNaN) {
+                guest::StoreU32(h.base, area + 0x100 + 16 * r.Below(4) + 8 * r.Below(2),
+                                0x7FC00000u | (uint32_t(r.Next()) & 0x80000001u));
+              }
+              t.r3.u64 = area;
+              t.r4.u64 = area + 0x180;
+              break;
+            }
+            case kRoute: {
+              const uint32_t file = area + 0x100;
+              const uint32_t n0 = 1 + r.Below(4), n1 = r.Below(4);
+              guest::StoreU32(h.base, area + 0, file);
+              guest::StoreU32(h.base, file + 0, n0);
+              guest::StoreU32(h.base, file + 4, n1);
+              guest::StoreU32(h.base, file + 12, 0x40);
+              guest::StoreU32(h.base, file + 16, 0x60);
+              guest::StoreU32(h.base, file + 20, 0x80);
+              for (uint32_t i = 0; i < n0; i++) {
+                guest::StoreU32(h.base, file + 0x40 + 4 * i, 0x200 + 0x200 * i);
+                for (uint32_t k = 0; k < 3; k++) {
+                  const uint32_t e = file + 0x200 + 0x200 * i + 84 * k;
+                  guest::StoreFloat(h.base, e + 148, coordinate());
+                  guest::StoreFloat(h.base, e + 152, coordinate());
+                }
+              }
+              for (uint32_t i = 0; i < n1; i++) {
+                guest::StoreU32(h.base, file + 0x60 + 4 * i, 4 * r.Below(0x100));
+              }
+              for (uint32_t k = 0; k < 12; k++) {
+                const uint32_t list = 0xC00 + 0x40 * k;
+                guest::StoreU32(h.base, file + 0x80 + 4 * k, list);
+                const uint32_t items = r.Below(4);
+                guest::StoreU16(h.base, file + list + 0, uint16_t(items));
+                guest::StoreU16(h.base, file + list + 2, uint16_t(r.Below(2)));
+                for (uint32_t i = 0; i < items; i++) {
+                  const uint32_t item = file + list + 4 + 8 * i;
+                  guest::StoreU16(h.base, item + 0,
+                                  uint16_t(r.Below(8) == 0 ? -1 : int32_t(r.Below(n0))));
+                  guest::StoreU16(h.base, item + 2,
+                                  uint16_t(r.Below(8) == 0 ? -1 : int32_t(r.Below(3))));
+                  guest::StoreFloat(h.base, item + 4, coordinate());
+                }
+              }
+              if (group == kOneNaN) {
+                guest::StoreU32(h.base, file + 0xC08 + 0x40 * r.Below(12) + 8 * r.Below(3),
+                                0x7FC00000u | (uint32_t(r.Next()) & 0x80000001u));
+              }
+              guest::StoreU32(h.base, kRaceDataPointer, area + 0x1800);
+              guest::StoreU32(h.base, area + 0x1800 + 24, uint32_t(r.Next()));
+              t.r6.u64 = area;
+              break;
+            }
+          }
+          (v == 0 ? f.recompiled : f.native)(t, h.base);
+          result[v].assign(h.base + area, h.base + area + kWallCompared);
+          Append32(result[v], t.r3.u32);
+          guest::StoreU32(h.base, kWorldPointer, saved_world);
+          guest::StoreU32(h.base, kRaceDataPointer, saved_race);
+        }
+        results.Check(result[0], result[1], fmt::format("seed {}", seed));
+      }
+      results.Report();
+    }
+  }
+}
+
 }  // namespace
 
 void CollisionWorld(Context& h) {
   const uint32_t area = memory::Alloc(kAreaBytes, 0);
   SmallCases(h, area);
   LifetimeCases(h, area);
+  WallCases(h, area);
   GroundCases(h, area);
   memory::Free(area);
 }

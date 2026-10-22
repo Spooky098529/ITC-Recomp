@@ -175,6 +175,38 @@ uint32_t TrackPositionSearchLinked(uint8_t* base, uint32_t position, uint32_t po
 uint32_t TrackPositionSearchAll(uint8_t* base, uint32_t position, uint32_t point, uint32_t mesh,
                                 uint32_t frame);
 
+// --- The wall query's parts (src/track_collision/track_walls.cpp). A wall
+// query (TrackCollision::WallHits' frame + 80): +0 the hit count, +4 2.0,
+// +8 the world's hit records, +12 the shape record, +48 to +104 the hit
+// being made, +108 the cell count and +112 the cells (two halfwords each:
+// section, slice). ---
+
+// WallQuery::AddCell (sub_820FC110): 0 when the cell is in the list, else
+// added (no limit) and 1. The cell is stored at `frame` + 28 (the caller's
+// frame, as the original does).
+uint32_t WallQueryAddCell(uint8_t* base, uint32_t query, uint32_t cell, uint32_t frame);
+// WallQuery::GatherCells (sub_820FC188): the cells of the current box's
+// four lower corners' track positions, and with each one added, the
+// slices before and after it and the cells the section's links lead to
+// from those. False, with nothing done, where the shape record's template
+// or its current copy isn't a box. `frame`: the original's 192 bytes.
+bool WallQueryGatherCells(uint8_t* base, uint32_t query, uint32_t mesh, uint32_t frame,
+                          uint32_t* count);
+// WallQuery::AddHit (sub_820FC2E0): the next of the world's hit records
+// (the last one again when the world's +60 are used) set from the query's
+// hit, +56 = the surface bits. Returns the original's r3 (the world's +60).
+uint32_t WallQueryAddHit(uint8_t* base, uint32_t query, uint32_t surface);
+// Segments::Intersect2D (sub_820FC658): 0 when the segments a-b and c-d
+// (`points`: four pointers) don't cross in x and z, else 1 with out's x and
+// z the crossing.
+uint32_t SegmentsIntersect2D(uint8_t* base, uint32_t points, uint32_t out);
+
+// TrackRoute::OnLoaded (sub_820F9050, Archive::Load's callback): the
+// route file's offsets made pointers, the race's route bits applied to its
+// entries' +148 and +152, +4 the sum of the +12 entries' first halfwords,
+// +8 = 2.
+void TrackRouteOnLoaded(uint8_t* base, uint32_t route);
+
 // TrackRoute::Prepare (sub_820F8600): +8 = 1, +0 = 0.
 void TrackRoutePrepare(uint8_t* base, uint32_t route);
 // TrackRoute::Free (sub_820F8618): +8 = 0, the file +0 freed, +0 = 0.
