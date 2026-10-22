@@ -129,6 +129,9 @@ GitHub refuses them on that branch).
 `docs/coverage.md` is which recompiled functions actually run (the
 `itc_coverage` build, `itc_recomp/coverage/seen_in_play.txt`) and how that
 measures B7; functions that never run get no rows.
+`docs/pad-replay.md` is recording the user's pad and replaying it into the
+game through a virtual pad (`pad_record.py`, `scripted_run.sh`), for test
+runs past the title screen.
 `docs/tick-replay.md` is a lead (not started): translating draws once a
 tick and replaying our own list on in-between frames.
 `docs/pause-menu-fix.md` is the pause menu's too-fast input repeat: fixed

@@ -121,6 +121,10 @@ nothing runs and there's work, about a minute.
 - `itc_recomp/tools/attract_race.sh <seconds> [flags]`: an attract race
   with the standard flags: the log, the seconds at 30 ticks/s, error
   lines, harness results (`--run_harnesses=all`).
+- `itc_recomp/tools/scripted_run.sh <recording> [flags]`: a recorded pad
+  (`itc_recomp/pad_recordings/`) replayed into the game, for functions
+  attract races don't reach (the menus, a driven race); the same report
+  (`docs/pad-replay.md`).
 - `src/harnesses/`: native against recompiled on the same inputs
   ("Checking with a harness" in `docs/rexglue-removal.md`).
 - `--native_renderer_dump=<dir>`: frames from a race.
