@@ -13,8 +13,9 @@ there), and this file's history.
 - Subsystem 1 of 3 (the C runtime heap) finished.
 - Subsystem 2 of 3: the collision world's narrow phase and shapes
   (`sub_820BB868`, `sub_820BBE30`, ...; from `leads.md`: runs every
-  physics step, many ready groups, blocks `car-physics.md`). Step:
-  mapping (agent running).
+  physics step, many ready groups, blocks `car-physics.md`), mapped in
+  `collision.md` (dd758b3; 64 rows; checked: 43 ready groups). Step:
+  migration 1 (agent running).
 
 ## Done
 
@@ -25,6 +26,11 @@ there), and this file's history.
   internals aren't ported).
 
 ## Rows to review
+
+- `collision.md` (new, 64 rows), `known-data.md`'s shape, box, pair
+  query and table entries, `car-physics.md`'s intro; 1 lead added (the
+  track's collision queries). Guesses to confirm: the floats at
+  `0x82002B90`..`0x82002B98` and the impulse scale at `0x82600E84`.
 
 - `heap.md`: 15 rows read in full and rewritten (no status changed), the
   intro's paragraph on native versions; migration 1's 15 rows (12
@@ -47,3 +53,5 @@ there), and this file's history.
 - After mapping the heap: the same (rows rewritten in place).
 - After the heap's migration 1: ours 729, work left 6024 (wrapped 137,
   known 321, unknown 5566).
+- After mapping the collision narrow phase: ours 729, work left 6024
+  (wrapped 137, known 385, unknown 5502).
