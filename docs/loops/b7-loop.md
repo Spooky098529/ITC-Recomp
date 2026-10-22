@@ -32,10 +32,11 @@ memory.
   the user before the merge. This relaxes the "show rows and ask first"
   rule for the loop's branch, nowhere else.
 - **Limit:** 3 subsystems a run, then the loop stops for the user's
-  review. No limit a session (the user's call, 2026-10-22; before, a
-  session ended itself after a few subsystems or passes). If the user
-  ends a session early, `/clear` and starting the loop again picks up
-  from the progress file.
+  review. A run is one loop, from its start until it stops (the user's
+  call, 2026-10-22; before, a session ended itself after a few
+  subsystems or passes, and a run went on across sessions). Each loop
+  started is a new run: its first pass starts the progress file afresh
+  and makes its summary.
 
 ## The cycle
 
@@ -81,8 +82,7 @@ memory.
 
 ## The run's summary
 
-Each run (from a start until the stop for the user's review, across
-`/clear`s) gets a short summary file, `docs/loops/b7-loop-<date>-<time>.md`
+Each run (one loop, from its start until it stops) gets a short summary file, `docs/loops/b7-loop-<date>-<time>.md`
 (the run's start, like `b7-loop-2026-10-22-0111.md`), made by the run's
 first pass and named under "Now" in the progress file. Not wordy: a title,
 the branch and the commit the run started from, a table of the subsystems
@@ -394,8 +394,9 @@ the user's desktop; find problems with logs, not guesses.
 
 `docs/loops/b7-progress.md`, for the current run. Kept short, so a pass
 can read it whole. A run's first pass finds the previous run's file
-stopped: it starts it afresh (the old one is in its run's summary file and
-in git):
+stopped: it starts it afresh, first copying the old one's rows to
+review, expected differences, drive list and totals into that run's
+summary file under "Left for the user" (the rest is in git):
 
 - **Now:** the subsystem, the step, the agent running, the run's
   subsystem count.
