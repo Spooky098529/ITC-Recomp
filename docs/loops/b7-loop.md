@@ -256,7 +256,13 @@ adapters stay. For each candidate, before removing its adapter:
   adapters or helpers calling `sub_X(ctx, base)`): those calls go to the
   plain C++ first.
 - The harness calls the plain C++ and `__imp__sub_X` directly, not the
-  adapter.
+  adapter. Harnesses written with the adapter call it (once it's gone,
+  `sub_X` is the original, and the cases would compare it with itself):
+  its register steps move into the harness file as a `Native<Name>`
+  function without the flag (the first run's 31 removals did this).
+- Its work is plain C++: an adapter whose work makes guest calls through
+  `ctx` (the recorders handing chunks to the renderer through its vtable)
+  stays, and its row says why.
 - A temporary counter in the adapter shows it isn't called in an attract
   race with the flags on (outside the harness); removed by editing.
 
