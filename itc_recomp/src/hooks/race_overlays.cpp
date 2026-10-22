@@ -339,7 +339,6 @@ ITC_OVERLAY_SET(8211E9F0, LightSpriteReset(base, ctx.r3.u32))
 ITC_OVERLAY_SET(8211F430, ModelSpriteReset(base, ctx.r3.u32))
 ITC_OVERLAY_SET(82123A00, SpriteResetStyle2(base, ctx.r3.u32))
 ITC_OVERLAY_SET(82129498, TrailReset(base, ctx.r3.u32))
-ITC_OVERLAY_SET(8212B230, SmokeEmitterConstruct(base, ctx.r3.u32))
 ITC_OVERLAY_SET(8212C0E8, ParticlesCReset(base, ctx.r3.u32))
 ITC_OVERLAY_SET(8212CC38, MarkerReset(base, ctx.r3.u32))
 ITC_OVERLAY_SET(8212D6E0, SparksReset(base, ctx.r3.u32))
@@ -369,8 +368,8 @@ extern "C" REX_FUNC(sub_8212DDC8) {
 ITC_OVERLAY_SET(8211F060, LightSpriteConstruct(base, ctx.r3.u32))
 ITC_OVERLAY_SET(82122880, ModelSpriteConstruct(base, ctx.r3.u32))
 ITC_OVERLAY_SET(8212A140, TrailConstruct(base, ctx.r3.u32))
-// Smoke::Smoke: SmokeEmitter::SmokeEmitter, which it calls, is done by its
-// plain C++.
+// Smoke::Smoke: SmokeEmitter::SmokeEmitter, which only it calls, is done by
+// its plain C++ (that one has no adapter).
 ITC_OVERLAY_SET(8212B2E8, SmokeConstruct(base, ctx.r3.u32))
 ITC_OVERLAY_SET(8212CAF8, ParticlesCConstruct(base, ctx.r3.u32))
 ITC_OVERLAY_SET(8212D620, MarkerConstruct(base, ctx.r3.u32))
