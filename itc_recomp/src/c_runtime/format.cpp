@@ -169,4 +169,76 @@ int32_t WriteChar(uint8_t* base, uint32_t character, uint32_t stream, uint32_t c
   return 1;
 }
 
+namespace {
+
+// Whether [a, a + a_bytes) and [b, b + b_bytes) share a guest address.
+bool Overlap(uint32_t a, uint32_t a_bytes, uint32_t b, uint32_t b_bytes) {
+  return uint64_t(a) < uint64_t(b) + b_bytes && uint64_t(b) < uint64_t(a) + a_bytes;
+}
+
+// A string stream with no buffer: write_char and its wide one only count.
+bool CountsOnly(uint8_t* base, uint32_t stream) {
+  return (guest::LoadU32(base, stream + 12) & 0x40) != 0 && guest::LoadU32(base, stream + 8) == 0;
+}
+
+}  // namespace
+
+bool WriteMultiChar(uint8_t* base, uint32_t string, int32_t length, uint32_t stream,
+                    uint32_t count, int32_t* last) {
+  *last = -1;
+  if (CountsOnly(base, stream)) {
+    guest::StoreU32(base, count, guest::LoadU32(base, count) + uint32_t(length));
+    return true;
+  }
+  if (length <= 0) {
+    return true;
+  }
+  const uint32_t room = guest::LoadU32(base, stream + 4);
+  const uint32_t pointer = guest::LoadU32(base, stream);
+  const uint32_t counted = guest::LoadU32(base, count);
+  if (Overlap(pointer, uint32_t(length), stream, 16) ||
+      Overlap(pointer, uint32_t(length), count, 4) || Overlap(count, 4, stream, 16)) {
+    return false;
+  }
+  for (uint32_t k = 0; k < uint32_t(length); k++) {
+    if (int32_t(room - 1 - k) < 0 || counted + k + 1 == 0xFFFFFFFFu) {
+      return false;
+    }
+  }
+  for (uint32_t k = 0; k < uint32_t(length); k++) {
+    *last = guest::LoadU8(base, string + k);
+    WriteChar(base, uint32_t(*last), stream, count);
+  }
+  return true;
+}
+
+bool PutwcString(uint8_t* base, uint16_t unit, uint32_t stream) {
+  if (stream == kStreams + 32 || stream == kStreams + 64) {
+    return false;  // stdout and stderr: the console
+  }
+  if ((guest::LoadU32(base, stream + 12) & 0x40) == 0) {
+    return false;  // a file stream
+  }
+  const uint32_t room = guest::LoadU32(base, stream + 4) - 2;
+  if (int32_t(room) < 0) {
+    return false;  // _flswbuf
+  }
+  guest::StoreU32(base, stream + 4, room);
+  guest::StoreU16(base, guest::LoadU32(base, stream), unit);
+  guest::StoreU32(base, stream, guest::LoadU32(base, stream) + 2);
+  return true;
+}
+
+bool WriteWideChar(uint8_t* base, uint16_t unit, uint32_t stream, uint32_t count) {
+  if (CountsOnly(base, stream)) {
+    guest::StoreU32(base, count, guest::LoadU32(base, count) + 1);
+    return true;
+  }
+  if (!PutwcString(base, unit, stream)) {
+    return false;
+  }
+  guest::StoreU32(base, count, unit == 0xFFFF ? 0xFFFFFFFFu : guest::LoadU32(base, count) + 1);
+  return true;
+}
+
 }  // namespace c_runtime

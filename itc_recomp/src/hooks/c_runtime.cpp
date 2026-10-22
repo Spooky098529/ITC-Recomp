@@ -15,6 +15,7 @@
 
 
 
+
 ITC_FLAG_BOOL(native_c_runtime, true, "ITC",
               "Run the C runtime's helpers natively instead of through the translated code: "
               "the stack probe (__chkstk, sub_825A9934) is skipped, as its reads of the guest "
@@ -29,7 +30,8 @@ ITC_FLAG_BOOL(native_c_runtime, true, "ITC",
               "sub_825A82C8); ___dtold and _ld12tod (sub_825B6378, sub_825B69B8); atof, _atof_l, "
               "_fltin2, __strgtold12_l and __mtold12 (sub_825AB1C0, sub_825AB0C0, sub_825AFDC8, "
               "sub_825B36B8, sub_825B7F10); write_char "
-              "(sub_825AF000); __iob_func (sub_825AD4C0); the start-up's _cfltcvt_init (sub_825A6DB0, "
+              "(sub_825AF000), write_multi_char (sub_825AF098), the wide write_char and _putwc_nolock "
+              "(sub_825B1368, sub_825B7A80); __iob_func (sub_825AD4C0); the start-up's _cfltcvt_init (sub_825A6DB0, "
               "sub_825A6E48), _init_pointers' setters (sub_825AD140, sub_825AEE18, sub_825AFCB8, "
               "sub_825B3560, sub_825B3548), __initmbctable and setSBCS (sub_825B6958, sub_825B68C8) "
               "(checked by "
@@ -522,6 +524,46 @@ extern "C" REX_FUNC(sub_825AF000) {
   }
   if (done == 1) {
     ctx.r3.u64 = ctx.r3.u32 & 0xFF;
+  }
+}
+
+// write_multi_char: r3 = the string, r4 = its length, r5 = the stream, r6 =
+// the count. Where the original might reach _flsbuf or _errno (never seen in
+// play), or the buffer lands on the stream or the count, the original runs.
+// r3 is left as the original leaves it (the last character written, when
+// any); its callers read no register it changes.
+extern "C" REX_FUNC(sub_825AF098) {
+  REX_FUNC_PROLOGUE();
+  int32_t last;
+  if (!ITC_FLAG(native_c_runtime) ||
+      !c_runtime::WriteMultiChar(base, ctx.r3.u32, ctx.r4.s32, ctx.r5.u32, ctx.r6.u32, &last)) {
+    __imp__sub_825AF098(ctx, base);
+    return;
+  }
+  if (last >= 0) {
+    ctx.r3.u64 = uint32_t(last);
+  }
+}
+
+// _putwc_nolock: r3 = the UTF-16 unit, r4 = the stream; returns r3 as it
+// came. Only string streams natively: the console (stdout, stderr), file
+// streams and no room left (_flswbuf; none seen in play) run the original.
+// (The original also stores the unit in its caller's frame, at r1 + 22: no
+// caller reads it.)
+extern "C" REX_FUNC(sub_825B7A80) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_c_runtime) || !c_runtime::PutwcString(base, ctx.r3.u16, ctx.r4.u32)) {
+    __imp__sub_825B7A80(ctx, base);
+  }
+}
+
+// The wide write_char: r3 = the UTF-16 unit, r4 = the stream, r5 = the
+// count; r3 left as it came (as the original's _putwc_nolock returns it).
+extern "C" REX_FUNC(sub_825B1368) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_c_runtime) ||
+      !c_runtime::WriteWideChar(base, ctx.r3.u16, ctx.r4.u32, ctx.r5.u32)) {
+    __imp__sub_825B1368(ctx, base);
   }
 }
 

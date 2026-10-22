@@ -830,6 +830,123 @@ void CRuntime(Context& h) {
     results.Report();
   }
 
+  // write_multi_char (sub_825AF098): a stream (string or file flags, with
+  // and without a buffer) with room for every character (no room calls
+  // _flsbuf: left out), lengths from -3 to 40, the buffer apart, unaligned,
+  // over the count (the original runs then) or over the string ahead of
+  // what's read; counts near -1 (the _errno path, also the original's); the
+  // scratch area and r3 compared.
+  {
+    Results results("write_multi_char (sub_825AF098)");
+    const uint32_t stream = h.data + 256;
+    const uint32_t count = h.data + 300;
+    const uint32_t buffer = h.data + 1024;
+    const uint32_t string = h.data + 2048;
+    const uint32_t flags[] = {0x40, 0x49, 0};
+    const uint32_t bases[] = {0, buffer};
+    const uint32_t rooms[] = {1, 5, 30, 40, 100, 0x7FFFFFFF, 0x80000000};
+    const int32_t lengths[] = {-3, 0, 1, 2, 7, 30, 40};
+    const uint32_t pointers[] = {buffer, buffer + 3, count - 2, string + 5};
+    const uint32_t counts[] = {0, 5, 0xFFFFFFF0, 0x7FFFFFFF};
+    for (uint32_t flag : flags) {
+      for (uint32_t base_word : bases) {
+        const bool counts_only = (flag & 0x40) != 0 && base_word == 0;
+        for (uint32_t room : rooms) {
+          for (int32_t length : lengths) {
+            bool fits = true;
+            for (int32_t k = 0; k < length; k++) {
+              fits = fits && int32_t(room - 1 - uint32_t(k)) >= 0;
+            }
+            if (!counts_only && !fits) {
+              continue;
+            }
+            for (uint32_t pointer : pointers) {
+              for (uint32_t c : counts) {
+                const auto bytes = RandomBytes(h, 48);
+                StringCase(h, results,
+                           [&] {
+                             WriteBytes(h, string, bytes);
+                             guest::StoreU32(h.base, stream, pointer);
+                             guest::StoreU32(h.base, stream + 4, room);
+                             guest::StoreU32(h.base, stream + 8, base_word);
+                             guest::StoreU32(h.base, stream + 12, flag);
+                             guest::StoreU32(h.base, count, c);
+                           },
+                           [&](PPCContext& t) {
+                             t.r3.u64 = string;
+                             t.r4.u64 = uint64_t(int64_t(length));
+                             t.r5.u64 = stream;
+                             t.r6.u64 = count;
+                           },
+                           __imp__sub_825AF098, sub_825AF098,
+                           fmt::format("flags {:X} base {:X} room {:X} length {} pointer +{} "
+                                       "count {:X}",
+                                       flag, base_word, room, length, pointer - h.data, c));
+              }
+            }
+          }
+        }
+      }
+    }
+    results.Report();
+  }
+
+  // _putwc_nolock (sub_825B7A80) and the wide write_char (sub_825B1368):
+  // string streams (flag 0x40; file streams and the console go through
+  // _fileno and the console's output, left out) with room for two bytes or
+  // more (no room calls _flswbuf: left out; with no buffer the wide
+  // write_char only counts), the pointer apart, unaligned or on the
+  // stream's own words or the count, units as whole registers (0xFFFF
+  // included), counts; the scratch area and r3 compared.
+  for (int wide_char = 0; wide_char < 2; wide_char++) {
+    Results results(wide_char ? "the wide write_char (sub_825B1368)"
+                              : "_putwc_nolock (sub_825B7A80)");
+    const uint32_t stream = h.data + 256;
+    const uint32_t count = h.data + 300;
+    const uint32_t buffer = h.data + 1024;
+    const uint32_t flags[] = {0x40, 0x49, 0xFFFFFFFF};
+    const uint32_t bases[] = {0, buffer};
+    const uint32_t rooms[] = {0, 1, 2, 3, 100, 0x7FFFFFFF, 0x80000000, 0x80000001};
+    const uint32_t pointers[] = {buffer, buffer + 1, stream, stream + 2, stream + 4, count};
+    const uint32_t counts[] = {0, 7, 0xFFFFFFFE};
+    for (uint32_t flag : flags) {
+      for (uint32_t base_word : bases) {
+        const bool counts_only = wide_char && base_word == 0;
+        for (uint32_t room : rooms) {
+          if (!counts_only && int32_t(room - 2) < 0) {
+            continue;
+          }
+          for (uint32_t pointer : pointers) {
+            for (uint32_t c : counts) {
+              for (int u = 0; u < 3; u++) {
+                const uint64_t unit = u == 0 ? 0xFFFF : u == 1 ? 0x12345678FFFFull : h.random.Next();
+                StringCase(h, results,
+                           [&] {
+                             guest::StoreU32(h.base, stream, pointer);
+                             guest::StoreU32(h.base, stream + 4, room);
+                             guest::StoreU32(h.base, stream + 8, base_word);
+                             guest::StoreU32(h.base, stream + 12, flag);
+                             guest::StoreU32(h.base, count, c);
+                           },
+                           [&](PPCContext& t) {
+                             t.r3.u64 = unit;
+                             t.r4.u64 = stream;
+                             t.r5.u64 = count;
+                           },
+                           wide_char ? __imp__sub_825B1368 : __imp__sub_825B7A80,
+                           wide_char ? sub_825B1368 : sub_825B7A80,
+                           fmt::format("flags {:X} base {:X} room {:X} pointer +{} count {:X} "
+                                       "unit {:X}",
+                                       flag, base_word, room, pointer - h.data, c, unit));
+              }
+            }
+          }
+        }
+      }
+    }
+    results.Report();
+  }
+
   // The start-up's pieces, on the live globals (saved and put back around
   // each call): the float conversion table filled (from 0xCD, through
   // sub_825A6E48 too; r3 not compared: _cfltcvt_init leaves 0x825B0000 there,
