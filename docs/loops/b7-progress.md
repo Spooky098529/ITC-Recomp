@@ -11,11 +11,17 @@ there), and this file's history.
 - Run started 2026-10-22 22:11 on `b7-loop-22-10-26-2` (the user's
   branch), from 91f40be; summary `b7-loop-2026-10-22-2211.md`.
 - Subsystem 1 of 3: the C runtime heap (`sub_825A6940`, `sub_825A71C0`,
-  `sub_825A70E8`; the top of `leads.md`). Step: mapping (agent running).
+  `sub_825A70E8`; the top of `leads.md`), mapped in the existing
+  `heap.md` (1f48eaf; checked). Step: migration 1 (agent running).
 
 ## Done
 
 ## Rows to review
+
+- `heap.md`: 15 rows read in full and rewritten (no status changed), the
+  intro's paragraph on native versions; `known-data.md`'s heap globals;
+  1 lead added (`sub_8235AAC0`), operator new taken from the
+  VirtualAlloc lead.
 
 ## Expected to differ
 
@@ -24,3 +30,4 @@ there), and this file's history.
 ## Totals
 
 - Start: ours 714, work left 6039 (wrapped 137, known 336, unknown 5566).
+- After mapping the heap: the same (rows rewritten in place).
