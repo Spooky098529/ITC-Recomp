@@ -1,7 +1,10 @@
 // The game's statically linked C runtime (docs/functions/c-runtime.md): the
-// stack probe dropped and memset natively.
+// stack probe dropped, memset natively, and adapters in front of the string
+// and character helpers in src/c_runtime/strings.cpp.
 
 #include "guest.h"
+
+#include "c_runtime/strings.h"
 
 #include "base/flags.h"
 
@@ -10,7 +13,9 @@
 ITC_FLAG_BOOL(native_c_runtime, true, "ITC",
               "Run the C runtime's helpers natively instead of through the translated code: "
               "the stack probe (__chkstk, sub_825A9934) is skipped, as its reads of the guest "
-              "stack have no effect; memset (sub_825A71D0) (checked by "
+              "stack have no effect; memset (sub_825A71D0); wcslen, wcscpy, wcscat and wcscmp "
+              "(sub_825A9958, sub_825A7F30, sub_825A7EF8, sub_825A7EB0); mbtowc's single-byte "
+              "path (sub_825B7EC8) (checked by "
               "--run_harnesses=c_runtime)");
 
 // __chkstk: r12 = minus the frame about to be made (4 KB or more). Reads one
@@ -40,4 +45,55 @@ extern "C" REX_FUNC(sub_825A71D0) {
                          [&](uint8_t* host, uint32_t, uint32_t bytes) {
                            std::memset(host, value, bytes);
                          });
+}
+
+// wcslen: r3 = UTF-16 string; returns its length.
+extern "C" REX_FUNC(sub_825A9958) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_c_runtime)) {
+    __imp__sub_825A9958(ctx, base);
+    return;
+  }
+  ctx.r3.s64 = c_runtime::Wcslen(base, ctx.r3.u32);
+}
+
+// wcscpy: r3 = destination, r4 = source; returns r3 (left as it is).
+extern "C" REX_FUNC(sub_825A7F30) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_c_runtime)) {
+    __imp__sub_825A7F30(ctx, base);
+    return;
+  }
+  c_runtime::Wcscpy(base, ctx.r3.u32, ctx.r4.u32);
+}
+
+// wcscat: r3 = destination, r4 = source; returns r3 (left as it is).
+extern "C" REX_FUNC(sub_825A7EF8) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_c_runtime)) {
+    __imp__sub_825A7EF8(ctx, base);
+    return;
+  }
+  c_runtime::Wcscat(base, ctx.r3.u32, ctx.r4.u32);
+}
+
+// wcscmp: r3, r4 = UTF-16 strings; returns -1, 0 or 1.
+extern "C" REX_FUNC(sub_825A7EB0) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_c_runtime)) {
+    __imp__sub_825A7EB0(ctx, base);
+    return;
+  }
+  ctx.r3.s64 = c_runtime::Wcscmp(base, ctx.r3.u32, ctx.r4.u32);
+}
+
+// mbtowc (the C locale's single-byte path): r3 = wide character out (or 0),
+// r4 = the bytes, r5 = their count; returns 0 or 1.
+extern "C" REX_FUNC(sub_825B7EC8) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_c_runtime)) {
+    __imp__sub_825B7EC8(ctx, base);
+    return;
+  }
+  ctx.r3.s64 = c_runtime::Mbtowc(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
 }
