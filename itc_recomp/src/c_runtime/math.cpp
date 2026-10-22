@@ -652,6 +652,32 @@ double Pow(double x, double y) {
   return SetExp(result, exponent) * sign;
 }
 
+namespace {
+constexpr double kRoundBound = D(0x43ABC16D674EC800);  // 1e18, at 0x82072430
+}  // namespace
+
+double Floor(double x) {
+  const double t = double(Fctidz(x));
+  const double ax = Abs(x);
+  const double below = t - 1.0;
+  const double fraction = x - t;
+  const double room = kRoundBound - ax;
+  double r = Select(fraction, t, below);
+  r = Select(room, r, x);
+  return Select(Neg(ax), x, r);  // +-0 returned as it is
+}
+
+double Ceil(double x) {
+  const double t = double(Fctidz(x));
+  const double ax = Abs(x);
+  const double above = t + 1.0;
+  const double fraction = t - x;
+  const double room = kRoundBound - ax;
+  double r = Select(fraction, t, above);
+  r = Select(room, r, x);
+  return Select(Neg(ax), x, r);
+}
+
 double Atan(double x) {
   const double ax = Abs(x);
   double a;

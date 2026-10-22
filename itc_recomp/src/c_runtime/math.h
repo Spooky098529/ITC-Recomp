@@ -51,4 +51,10 @@ int32_t IntType(double y);
 double Log(double x);
 double Pow(double x, double y);
 
+// floor (sub_825A8CA0) and ceil (sub_825AA0B8): by truncation (fctidz);
+// |x| from 1e18 (the bound at 0x82072430, not 2^52) and NaNs returned as
+// they are.
+double Floor(double x);
+double Ceil(double x);
+
 }  // namespace c_runtime

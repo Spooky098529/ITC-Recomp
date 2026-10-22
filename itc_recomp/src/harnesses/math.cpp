@@ -326,6 +326,23 @@ void Math(Context& h) {
           [](PPCContext& t, std::vector<uint8_t>& b) { Append(b, t.f1.u64); },
           [&](size_t i) { return "x " + Bits(pairs[i].first) + " y " + Bits(pairs[i].second); });
   }
+
+  // floor and ceil: integers and their neighbors, halves, 2^52, 2^63 and
+  // the 1e18 bound, every size.
+  {
+    std::vector<double> values = SpecialValues();
+    for (double x : {0.5, 1.0, 1.5, 2.0, 2.5, 1e-8, 0.9999999999999999, 4503599627370496.0,
+                     9007199254740992.0, 1e18, 9.2233720368547758e18, 1e19, 1e300}) {
+      AddAround(values, x);
+    }
+    for (int i = -50; i <= 50; i++) {
+      AddAround(values, i * 0.25);
+    }
+    AddRandom(h, values, 10.0, 1000);
+    AddRandom(h, values, 1e20, 300);
+    Unary(h, "floor (sub_825A8CA0)", __imp__sub_825A8CA0, sub_825A8CA0, values);
+    Unary(h, "ceil (sub_825AA0B8)", __imp__sub_825AA0B8, sub_825AA0B8, values);
+  }
 }
 
 }  // namespace harness

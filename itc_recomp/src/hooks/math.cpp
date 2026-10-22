@@ -13,7 +13,7 @@ ITC_FLAG_BOOL(native_math, true, "ITC",
               "and sub_825A80A8; sin and cos, sub_825A88A0 and sub_825A8978; atan and atan2, sub_825A8688 and "
               "sub_825A8770; pow, sub_825A8ED0, with log, sub_825A9C00, copysign, sub_825AB1C8, "
               "_set_exp, _get_exp and _decomp, sub_825AFE80, sub_825AFEA8 and sub_825AFF80, and the "
-              "integer test sub_825A8CE0) natively instead of through the translated code (the same "
+              "integer test sub_825A8CE0; floor and ceil, sub_825A8CA0 and sub_825AA0B8) natively instead of through the translated code (the same "
               "doubles, bit for bit; checked by --run_harnesses=math)");
 
 // acos: f1 = x.
@@ -173,4 +173,26 @@ extern "C" REX_FUNC(sub_825A8ED0) {
   }
   ctx.fpscr.disableFlushMode();
   ctx.f1.f64 = c_runtime::Pow(ctx.f1.f64, ctx.f2.f64);
+}
+
+// floor: f1 = x.
+extern "C" REX_FUNC(sub_825A8CA0) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_math)) {
+    __imp__sub_825A8CA0(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  ctx.f1.f64 = c_runtime::Floor(ctx.f1.f64);
+}
+
+// ceil: f1 = x.
+extern "C" REX_FUNC(sub_825AA0B8) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_math)) {
+    __imp__sub_825AA0B8(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  ctx.f1.f64 = c_runtime::Ceil(ctx.f1.f64);
 }
