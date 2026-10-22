@@ -17,7 +17,9 @@ ITC_FLAG_BOOL(native_race_overlays, true, "ITC",
               "sub_8212E660; Sparks::Emit, sub_8212D818; CarOverlays::EmitSmoke, sub_82123240, "
               "with Smoke::Emit; the set-up's constructors, clears and bindings, sub_82126498 to "
               "sub_8215E000; the resets, sub_8211E9F0 to sub_8212D6E0; Smoke::InRegion, "
-              "sub_8212A868; Sparks::Update, sub_8212DDC8) natively "
+              "sub_8212A868; Sparks::Update, sub_8212DDC8; the children's constructors, "
+              "sub_8211F060 to sub_8212E9A0, and Smoke and ParticlesB::Reset, sub_8212A9E0 and "
+              "sub_8212BA98) natively "
               "instead of through the translated code (same results; checked by "
               "--run_harnesses=race_overlays)");
 
@@ -362,3 +364,18 @@ extern "C" REX_FUNC(sub_8212DDC8) {
     __imp__sub_8212DDC8(ctx, base);
   }
 }
+
+// The children's constructors: r3 = the object, returned in r3.
+ITC_OVERLAY_SET(8211F060, LightSpriteConstruct(base, ctx.r3.u32))
+ITC_OVERLAY_SET(82122880, ModelSpriteConstruct(base, ctx.r3.u32))
+ITC_OVERLAY_SET(8212A140, TrailConstruct(base, ctx.r3.u32))
+// Smoke::Smoke: SmokeEmitter::SmokeEmitter, which it calls, is done by its
+// plain C++.
+ITC_OVERLAY_SET(8212B2E8, SmokeConstruct(base, ctx.r3.u32))
+ITC_OVERLAY_SET(8212CAF8, ParticlesCConstruct(base, ctx.r3.u32))
+ITC_OVERLAY_SET(8212D620, MarkerConstruct(base, ctx.r3.u32))
+ITC_OVERLAY_SET(8212E9A0, SparksConstruct(base, ctx.r3.u32))
+// Smoke::Reset and ParticlesB::Reset (slot 3): r3 = the object; the entry
+// resets they call are done by their plain C++.
+ITC_OVERLAY_SET(8212A9E0, SmokeReset(base, ctx.r3.u32))
+ITC_OVERLAY_SET(8212BA98, ParticlesBReset(base, ctx.r3.u32))

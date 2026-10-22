@@ -524,3 +524,45 @@ uint32_t SmokeInRegion(uint8_t* base, uint32_t smoke, uint32_t point);
 bool SparksUpdate(uint8_t* base, uint32_t sparks);
 
 }  // namespace race_overlays
+
+namespace race_overlays {
+
+// --- The children's constructors, and the resets made of their entries' ---
+//
+// The constructors run Overlay::Overlay, store their vtable and put the
+// game's 1.0 (its word) in the w of their vectors; they return the object.
+
+// LightSprite::LightSprite (sub_8211F060): vtable 0x82008444; 1.0 at +156
+// to +220 (every 16 bytes) and +284.
+void LightSpriteConstruct(uint8_t* base, uint32_t sprite);
+// ModelSprite::ModelSprite (sub_82122880): vtable 0x820084E8; 1.0 at +236
+// to +300, +380, +396 and +428 to +572.
+void ModelSpriteConstruct(uint8_t* base, uint32_t sprite);
+// Trail::Trail (sub_8212A140): vtable 0x820086C0; 1.0 at +12, +28, +76, +92
+// and +108 of each of the 500 points (128 bytes from +128) and at +64,156.
+void TrailConstruct(uint8_t* base, uint32_t trail);
+// Smoke::Smoke (sub_8212B2E8): +116 0, vtable 0x820086F4, the 45 emitters
+// from +128 constructed (SmokeEmitterConstruct), 1.0 at +32,556 to +32,620.
+void SmokeConstruct(uint8_t* base, uint32_t smoke);
+// ParticlesC::ParticlesC (sub_8212CAF8): vtable 0x82008750; 1.0 at +12 to
+// +76 (every 16 bytes) of each of the 20 entries (128 bytes from +112) and
+// at +2,684.
+void ParticlesCConstruct(uint8_t* base, uint32_t particles);
+// Marker::Marker (sub_8212D620): vtable 0x82008784; 1.0 at +140 to +204 and
+// +284.
+void MarkerConstruct(uint8_t* base, uint32_t marker);
+// Sparks::Sparks (sub_8212E9A0): vtable 0x820087BC; 1.0 at +12 to +76 and
+// +124 of each of the 200 entries (144 bytes from +128), at +28,972,
+// +29,004, +29,020 and +29,036 to +29,820.
+void SparksConstruct(uint8_t* base, uint32_t sparks);
+
+// Smoke::Reset (sub_8212A9E0): +32,528 to +32,536 0, +32,544, +32,560 and
+// +32,576 unit vectors, then each of the +104 emitters (720 bytes from
+// +128) reset (SmokeEmitterReset), the count read again each time.
+void SmokeReset(uint8_t* base, uint32_t smoke);
+// ParticlesB::Reset (sub_8212BA98): +2,768 to +2,776 0, +2,784 and +2,800
+// unit vectors, then each of the +104 entries (176 bytes from +128) reset
+// (ParticlesBResetEntry), the count read again each time.
+void ParticlesBReset(uint8_t* base, uint32_t particles);
+
+}  // namespace race_overlays

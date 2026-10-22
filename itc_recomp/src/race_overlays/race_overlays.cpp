@@ -2011,3 +2011,99 @@ bool SparksUpdate(uint8_t* base, uint32_t sparks) {
 }
 
 }  // namespace race_overlays
+
+namespace race_overlays {
+
+namespace {
+
+// Overlay::Overlay, then the class's vtable.
+void ConstructOverlay(uint8_t* base, uint32_t overlay, uint32_t vtable) {
+  OverlayConstruct(base, overlay);
+  guest::StoreU32(base, overlay, vtable);
+}
+
+}  // namespace
+
+void LightSpriteConstruct(uint8_t* base, uint32_t sprite) {
+  ITC_NATIVE_RUNNING("sub_8211F060 LightSprite::LightSprite");
+  ConstructOverlay(base, sprite, 0x82008444);
+  ApplyStores(base, sprite, {{156, 'o'}, {172, 'o'}, {188, 'o'}, {204, 'o'}, {220, 'o'}, {284, 'o'}});
+}
+
+void ModelSpriteConstruct(uint8_t* base, uint32_t sprite) {
+  ITC_NATIVE_RUNNING("sub_82122880 ModelSprite::ModelSprite");
+  ConstructOverlay(base, sprite, 0x820084E8);
+  ApplyStores(base, sprite,
+              {{236, 'o'}, {252, 'o'}, {268, 'o'}, {284, 'o'}, {300, 'o'}, {380, 'o'}, {396, 'o'}});
+  for (uint32_t i = 0; i < 10; i++) {
+    ApplyStores(base, sprite + 428 + 16 * i, {{0, 'o'}});
+  }
+}
+
+void TrailConstruct(uint8_t* base, uint32_t trail) {
+  ITC_NATIVE_RUNNING("sub_8212A140 Trail::Trail");
+  ConstructOverlay(base, trail, 0x820086C0);
+  for (uint32_t i = 0; i < 500; i++) {
+    ApplyStores(base, trail + 128 + 128 * i, {{12, 'o'}, {28, 'o'}, {76, 'o'}, {92, 'o'}, {108, 'o'}});
+  }
+  ApplyStores(base, trail, {{64156, 'o'}});
+}
+
+void SmokeConstruct(uint8_t* base, uint32_t smoke) {
+  ITC_NATIVE_RUNNING("sub_8212B2E8 Smoke::Smoke");
+  OverlayConstruct(base, smoke);
+  guest::StoreU32(base, smoke + 116, 0);
+  guest::StoreU32(base, smoke, 0x820086F4);
+  for (uint32_t i = 0; i < 45; i++) {
+    SmokeEmitterConstruct(base, smoke + 128 + 720 * i);
+  }
+  ApplyStores(base, smoke, {{32556, 'o'}, {32572, 'o'}, {32588, 'o'}, {32604, 'o'}, {32620, 'o'}});
+}
+
+void ParticlesCConstruct(uint8_t* base, uint32_t particles) {
+  ITC_NATIVE_RUNNING("sub_8212CAF8 ParticlesC::ParticlesC");
+  ConstructOverlay(base, particles, 0x82008750);
+  for (uint32_t i = 0; i < 20; i++) {
+    ApplyStores(base, particles + 112 + 128 * i,
+                {{12, 'o'}, {28, 'o'}, {44, 'o'}, {60, 'o'}, {76, 'o'}});
+  }
+  ApplyStores(base, particles, {{2684, 'o'}});
+}
+
+void MarkerConstruct(uint8_t* base, uint32_t marker) {
+  ITC_NATIVE_RUNNING("sub_8212D620 Marker::Marker");
+  ConstructOverlay(base, marker, 0x82008784);
+  ApplyStores(base, marker, {{140, 'o'}, {156, 'o'}, {172, 'o'}, {188, 'o'}, {204, 'o'}, {284, 'o'}});
+}
+
+void SparksConstruct(uint8_t* base, uint32_t sparks) {
+  ITC_NATIVE_RUNNING("sub_8212E9A0 Sparks::Sparks");
+  ConstructOverlay(base, sparks, 0x820087BC);
+  for (uint32_t i = 0; i < 200; i++) {
+    ApplyStores(base, sparks + 128 + 144 * i,
+                {{12, 'o'}, {28, 'o'}, {44, 'o'}, {60, 'o'}, {76, 'o'}, {124, 'o'}});
+  }
+  ApplyStores(base, sparks, {{28972, 'o'}, {29004, 'o'}, {29020, 'o'}});
+  for (uint32_t i = 0; i < 50; i++) {
+    ApplyStores(base, sparks + 29036 + 16 * i, {{0, 'o'}});
+  }
+}
+
+void SmokeReset(uint8_t* base, uint32_t smoke) {
+  ITC_NATIVE_RUNNING("sub_8212A9E0 Smoke::Reset");
+  ApplyStores(base, smoke, {{32528, '0'}, {32532, '0'}, {32536, '0'}, {32544, 'v'}, {32576, 'v'},
+                            {32560, 'v'}});
+  for (uint32_t i = 0; i < guest::LoadU32(base, smoke + 104); i++) {
+    SmokeEmitterReset(base, smoke + 128 + 720 * i);
+  }
+}
+
+void ParticlesBReset(uint8_t* base, uint32_t particles) {
+  ITC_NATIVE_RUNNING("sub_8212BA98 ParticlesB::Reset");
+  ApplyStores(base, particles, {{2768, '0'}, {2772, '0'}, {2776, '0'}, {2784, 'v'}, {2800, 'v'}});
+  for (uint32_t i = 0; i < guest::LoadU32(base, particles + 104); i++) {
+    ParticlesBResetEntry(base, particles + 128 + 176 * i);
+  }
+}
+
+}  // namespace race_overlays

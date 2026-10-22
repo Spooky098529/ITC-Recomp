@@ -190,6 +190,33 @@ void NativeSparksReset(PPCContext& ctx, uint8_t* base) {
   ro::SparksReset(base, ctx.r3.u32);
 }
 
+void NativeLightSpriteConstruct(PPCContext& ctx, uint8_t* base) {
+  ro::LightSpriteConstruct(base, ctx.r3.u32);
+}
+void NativeModelSpriteConstruct(PPCContext& ctx, uint8_t* base) {
+  ro::ModelSpriteConstruct(base, ctx.r3.u32);
+}
+void NativeTrailConstruct(PPCContext& ctx, uint8_t* base) {
+  ro::TrailConstruct(base, ctx.r3.u32);
+}
+void NativeSmokeConstruct(PPCContext& ctx, uint8_t* base) {
+  ro::SmokeConstruct(base, ctx.r3.u32);
+}
+void NativeParticlesCConstruct(PPCContext& ctx, uint8_t* base) {
+  ro::ParticlesCConstruct(base, ctx.r3.u32);
+}
+void NativeMarkerConstruct(PPCContext& ctx, uint8_t* base) {
+  ro::MarkerConstruct(base, ctx.r3.u32);
+}
+void NativeSparksConstruct(PPCContext& ctx, uint8_t* base) {
+  ro::SparksConstruct(base, ctx.r3.u32);
+}
+void NativeSmokeReset(PPCContext& ctx, uint8_t* base) {
+  ro::SmokeReset(base, ctx.r3.u32);
+}
+void NativeParticlesBReset(PPCContext& ctx, uint8_t* base) {
+  ro::ParticlesBReset(base, ctx.r3.u32);
+}
 ITC_NATIVE_WORD(NativeSmokeInRegion, ro::SmokeInRegion(base, ctx.r3.u32, ctx.r4.u32))
 
 // Where the native version declines, the original runs (as the adapter).
@@ -1873,6 +1900,26 @@ void ResetCases(Context& h, uint32_t block) {
       {"Marker::Reset (sub_8212CC38)", __imp__sub_8212CC38, NativeMarkerReset, 304, false, 0, 0},
       {"Sparks::Reset (sub_8212D6E0)", __imp__sub_8212D6E0, NativeSparksReset, 29824, false, 104,
        200},
+      {"LightSprite::LightSprite (sub_8211F060)", __imp__sub_8211F060, NativeLightSpriteConstruct,
+       288, false, 0, 0},
+      {"ModelSprite::ModelSprite (sub_82122880)", __imp__sub_82122880, NativeModelSpriteConstruct,
+       576, false, 0, 0},
+      {"Trail::Trail (sub_8212A140)", __imp__sub_8212A140, NativeTrailConstruct, 64160, false, 0,
+       0},
+      {"Smoke::Smoke (sub_8212B2E8)", __imp__sub_8212B2E8, NativeSmokeConstruct, 32640, false, 0,
+       0},
+      {"ParticlesC::ParticlesC (sub_8212CAF8)", __imp__sub_8212CAF8, NativeParticlesCConstruct,
+       2720, false, 0, 0},
+      {"Marker::Marker (sub_8212D620)", __imp__sub_8212D620, NativeMarkerConstruct, 304, false, 0,
+       0},
+      {"Sparks::Sparks (sub_8212E9A0)", __imp__sub_8212E9A0, NativeSparksConstruct, 29824, false,
+       0, 0},
+      // The smoke holds 45 emitters; ParticlesB's entries run into its
+      // header from the 16th on (both versions alike), 20 at most.
+      {"Smoke::Reset (sub_8212A9E0)", __imp__sub_8212A9E0, NativeSmokeReset, 32640, false, 104,
+       45},
+      {"ParticlesB::Reset (sub_8212BA98)", __imp__sub_8212BA98, NativeParticlesBReset, 3648, false,
+       104, 20},
   };
   for (const Function& f : resets) {
     Results results(f.name);
