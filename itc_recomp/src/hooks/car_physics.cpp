@@ -351,21 +351,8 @@ ITC_CAR_PHYSICS(820B7ED0, ctx.r3.u64 = CollisionRecordsMerge(base, ctx.r3.u32, c
 // callers, AddPairs and RemovePair, are native.
 // r3 = the object, r4 = the groups.
 ITC_CAR_PHYSICS(820B94B0, ctx.r3.u64 = CollisionWorldAddPairs(base, ctx.r3.u32, ctx.r4.u32))
-// r3 = the pair's index. Where the move's memcpy can't be native, the
-// original.
-extern "C" REX_FUNC(sub_820B8A88) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_car_physics)) {
-    __imp__sub_820B8A88(ctx, base);
-    return;
-  }
-  uint32_t r3 = 0;
-  if (!CollisionWorldRemovePair(base, ctx.r3.u32, &r3)) {
-    __imp__sub_820B8A88(ctx, base);
-    return;
-  }
-  ctx.r3.u64 = r3;
-}
+// CollisionWorld::RemovePair (sub_820B8A88) has no adapter: its callers in
+// play, RemovePairsOf and RemovePairsByGroups, are native.
 // r3 comes back as 0x826C2E30 (ResetSurfaces').
 ITC_CAR_PHYSICS(820B85E8, ctx.r3.u64 = CollisionWorldReset(base))
 // CollisionWorld::RemovePairsOf and RemovePairsByGroups (sub_820B8BA8,
