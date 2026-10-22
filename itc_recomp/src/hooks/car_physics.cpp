@@ -11,8 +11,8 @@
 
 ITC_FLAG_BOOL(native_car_physics, true, "ITC",
               "Run the car physics (docs/functions/car-physics.md: the rigid body, sub_820B6A38 "
-              "to sub_820B7928; the vehicle's physics step's helpers and controls, "
-              "sub_820AFAE8 to sub_820B3E68) natively instead of through the translated "
+              "to sub_820B7928; the vehicle's physics step's helpers, updates and controls, "
+              "sub_820AFAE8 to sub_820B6430) natively instead of through the translated "
               "code (the same words, bit for bit; checked by --run_harnesses=car_physics)");
 
 // Defines an adapter: `body` uses `ctx` and `base`. Flush-to-zero off for
@@ -168,3 +168,16 @@ ITC_CAR_PHYSICS(820B0478,
 ITC_CAR_PHYSICS(820B04C0, VehicleRampHandbrake(base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64))
 // f1 = the value, r4 = the byte.
 ITC_CAR_PHYSICS(820B3C20, VehicleSetValue2388(base, ctx.r3.u32, ctx.f1.f64, ctx.r4.u32))
+
+// --- The physics step's updates ---
+
+// r3 = out, r4 = the matrix; r3 comes back as out.
+ITC_CAR_PHYSICS(820AFB78, MatrixCopyRows(base, ctx.r3.u32, ctx.r4.u32))
+// r3 = out, r4 = the matrix, r5 = the vector; Matrix::Multiply leaves
+// flush-to-zero on.
+ITC_CAR_PHYSICS_VECTOR(820B0D68, MatrixMultiplyTranslation(base, ctx.r3.u32, ctx.r4.u32,
+                                                           ctx.r5.u32, ctx.r1.u32 - 192))
+// r3 = the vehicle, left as it is (the physics step relies on it).
+ITC_CAR_PHYSICS(820B1790, VehicleTractionControl(base, ctx.r3.u32, ctx.r1.u32))
+ITC_CAR_PHYSICS(820B1FB8, VehicleUpdateTireGrip(base, ctx.r3.u32))
+ITC_CAR_PHYSICS(820B22D8, VehicleUpdateEngineTorque(base, ctx.r3.u32, ctx.r1.u32 - 96))

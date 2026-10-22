@@ -118,6 +118,7 @@ set(ITC_SOURCES
     src/hooks/car_physics.cpp
     src/car_physics/rigid_body.cpp
     src/car_physics/vehicle_step.cpp
+    src/car_physics/vehicle_update.cpp
     src/hooks/command_list.cpp
     src/command_list/command_list.cpp
     src/hooks/c_runtime.cpp
@@ -210,7 +211,7 @@ set(ITC_SOURCES
 # and the car physics (src/car_physics/, docs/functions/car-physics.md).
 set_source_files_properties(src/c_runtime/math.cpp src/ui_movies/keys.cpp
     src/matrix_math/matrix_math.cpp src/car_physics/rigid_body.cpp
-    src/car_physics/vehicle_step.cpp PROPERTIES
+    src/car_physics/vehicle_step.cpp src/car_physics/vehicle_update.cpp PROPERTIES
     COMPILE_OPTIONS "-ffp-model=strict;-ffp-contract=off"
     SKIP_PRECOMPILE_HEADERS ON)
 

@@ -213,4 +213,32 @@ void VehicleRampHandbrake(uint8_t* base, uint32_t vehicle, uint32_t on, double t
 // at 0x82002A2C, clamped.
 void VehicleSetValue2388(uint8_t* base, uint32_t vehicle, double value, uint32_t flag);
 
+// --- The physics step's updates (src/car_physics/vehicle_update.cpp) ---
+
+// Matrix::CopyRows (sub_820AFB78): the four rows of `in` into `out`
+// (Vec4::Copy each).
+void MatrixCopyRows(uint8_t* base, uint32_t out, uint32_t in);
+// Matrix::MultiplyTranslation (sub_820B0D68): out = m x the translation by
+// the vector's x, y, z (Matrix::Multiply, noted for interpolation as the
+// original's call). The translation is built at `frame` + 80 (the vector
+// and 1.0) and + 112 (its four rows): the original's frame, 192 bytes.
+void MatrixMultiplyTranslation(uint8_t* base, uint32_t out, uint32_t m, uint32_t vector,
+                               uint32_t frame);
+// Vehicle::TractionControl (sub_820B1790): byte +2400 = 0; the driven
+// pair's mean slip and spin raise the counter +2392 (to 30 past the float
+// at 0x82000D44) or lower it (not below 0); the throttle +284 x= clamp(1 -
+// counter / 30); byte +2400 = 1 when that changed it. `frame`: the
+// original's r1 (it converts the counter through r1 - 16).
+void VehicleTractionControl(uint8_t* base, uint32_t vehicle, uint32_t frame);
+// Vehicle::UpdateTireGrip (sub_820B1FB8): per wheel, the grip +236 and the
+// force limit +316 from the load (Tire::MagicFormula with the coefficients
+// at 0x82600D20), the camber's loss and the surface (SurfaceValue12); 0.0
+// off the ground.
+void VehicleUpdateTireGrip(uint8_t* base, uint32_t vehicle);
+// Vehicle::UpdateEngineTorque (sub_820B22D8): the throttle used (+2516,
+// after the rev limiter and the clutch), the engine's torque (EngineTorque)
+// with nitrous and engine braking into +2240 and +2236. `frame`: the
+// original's r1 after its stwu (96 bytes; EngineTorque's below it).
+void VehicleUpdateEngineTorque(uint8_t* base, uint32_t vehicle, uint32_t frame);
+
 }  // namespace car_physics

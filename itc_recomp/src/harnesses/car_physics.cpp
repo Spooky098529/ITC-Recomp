@@ -155,6 +155,16 @@ ITC_NATIVE_STEP(NativeRampHandbrake,
 ITC_NATIVE_STEP(NativeSetValue2388,
                 cp::VehicleSetValue2388(base, ctx.r3.u32, ctx.f1.f64, ctx.r4.u32))
 
+// The physics step's updates.
+ITC_NATIVE_STEP(NativeCopyRows, cp::MatrixCopyRows(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_STEP_VECTOR(NativeMultiplyTranslation,
+                       cp::MatrixMultiplyTranslation(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                                     ctx.r1.u32 - 192))
+ITC_NATIVE_STEP(NativeTractionControl, cp::VehicleTractionControl(base, ctx.r3.u32, ctx.r1.u32))
+ITC_NATIVE_STEP(NativeUpdateTireGrip, cp::VehicleUpdateTireGrip(base, ctx.r3.u32))
+ITC_NATIVE_STEP(NativeUpdateEngineTorque,
+                cp::VehicleUpdateEngineTorque(base, ctx.r3.u32, ctx.r1.u32 - 96))
+
 // Runs the recompiled version with the native flags off, so the functions
 // it calls that are ours run the originals too.
 template <GuestFunction recompiled>
@@ -226,6 +236,7 @@ enum Shape {
   kImpulse,       // r3 = the body, r4 = the point, r5 = the normal
   kFriction,      // r3 = out, r4 = the body, r5 = the point, r6 = the normal, f1, f2
   kImpulseWith,   // r3 = body a, r4 = the point, r5 = the normal, r6 = body b
+  kMatrix,        // r3 = out (+0x380), r4 = a matrix (+0), r5 = a vector
 };
 
 }  // namespace
@@ -280,6 +291,10 @@ void CarPhysics(Context& h) {
        NativeFrictionImpulse, false, kFriction},
       {"RigidBody::ContactImpulseWith (sub_820B72C8)", Original<__imp__sub_820B72C8>,
        NativeContactImpulseWith, true, kImpulseWith, true},
+      {"Matrix::CopyRows (sub_820AFB78)", Original<__imp__sub_820AFB78>, NativeCopyRows, false,
+       kMatrix},
+      {"Matrix::MultiplyTranslation (sub_820B0D68)", Original<__imp__sub_820B0D68>,
+       NativeMultiplyTranslation, false, kMatrix},
   };
   enum Group { kNumbers, kOneNaN, kNaNs };
   const char* const kGroupNames[] = {"", ", one NaN", ", NaNs and infinities anywhere (expected to differ)"};
@@ -352,6 +367,11 @@ void CarPhysics(Context& h) {
               t.r4.u64 = block;
               t.r5.u64 = block + kArgument;
               t.r6.u64 = block + kNormal;
+              break;
+            case kMatrix:
+              t.r3.u64 = block + kOut;
+              t.r4.u64 = block;
+              t.r5.u64 = block + kArgument;
               break;
             case kImpulseWith:
               t.r3.u64 = block;
@@ -446,6 +466,29 @@ void FillVehicle(uint8_t* base, uint32_t area, Random& r, Word word) {
   guest::StoreU8(base, v + 2386, uint8_t(r.Below(3) != 0));
   guest::StoreU32(base, v + 3156, r.Below(1000));
   guest::StoreU32(base, v + 2252, uint32_t(int32_t(r.Below(8)) - 1));  // the gear, -1 to 6
+  // The physics step's updates: the traction control's counter, the next
+  // gear, nitrous, the handbrake and the clutch, some of the time as the
+  // game has them.
+  if (r.Below(2) == 0) {
+    guest::StoreU32(base, v + 2392, r.Below(40));
+  }
+  guest::StoreU32(base, v + 2256, uint32_t(int32_t(r.Below(8)) - 1));
+  guest::StoreU8(base, v + 2424, uint8_t(r.Below(2)));
+  if (r.Below(2) == 0) {
+    // The rpm, normalized (the engine's torque curve).
+    guest::StoreU32(base, v + 2228, std::bit_cast<uint32_t>(float(r.Below(1100)) / 1000.0f));
+  }
+  if (r.Below(2) == 0) {
+    guest::StoreU32(base, v + 296, 0);
+  }
+  switch (r.Below(3)) {
+    case 0:
+      guest::StoreU32(base, v + 2264, 0x3F800000);
+      break;
+    case 1:
+      guest::StoreU32(base, v + 2264, 0);
+      break;
+  }
 }
 
 }  // namespace
@@ -505,6 +548,12 @@ void CarPhysicsVehicle(Context& h) {
        NativeRampHandbrake, false, kByteR4},
       {"Vehicle::SetValue2388 (sub_820B3C20)", Original<__imp__sub_820B3C20>,
        NativeSetValue2388, true, kByteR4},
+      {"Vehicle::TractionControl (sub_820B1790)", Original<__imp__sub_820B1790>,
+       NativeTractionControl, false},
+      {"Vehicle::UpdateTireGrip (sub_820B1FB8)", Original<__imp__sub_820B1FB8>,
+       NativeUpdateTireGrip, false},
+      {"Vehicle::UpdateEngineTorque (sub_820B22D8)", Original<__imp__sub_820B22D8>,
+       NativeUpdateEngineTorque, false},
   };
   enum Group { kNumbers, kOneNaN, kNaNs };
   const char* const kGroupNames[] = {"", ", one NaN",
