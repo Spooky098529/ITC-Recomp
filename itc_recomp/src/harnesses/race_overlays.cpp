@@ -201,6 +201,21 @@ void NativeSparksUpdateStreak(PPCContext& ctx, uint8_t* base) {
   ctx.f1.f64 = value;
 }
 
+// Where the native version declines, the original runs (as the adapter).
+void NativeSparksEmit(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const uint32_t vector[4] = {uint32_t(ctx.r6.u64 >> 32), ctx.r6.u32,
+                              uint32_t(ctx.r7.u64 >> 32), ctx.r7.u32};
+  uint32_t result = 0;
+  double last = ctx.f1.f64;
+  if (!ro::SparksEmit(base, ctx.r3.u32, ctx.r4.u32, ctx.f2.f64, vector, &result, &last)) {
+    __imp__sub_8212D818(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = result;
+  ctx.f1.f64 = last;
+}
+
 // Runs the recompiled version with --native_race_overlays off, so the
 // functions it calls that are ours run the originals too.
 void RunRecompiled(GuestFunction recompiled, PPCContext& t, uint8_t* base) {
@@ -1287,6 +1302,106 @@ void SparksUpdateStreakCases(Context& h, uint32_t block) {
   guest::StoreU32(h.base, kSeed, live);
 }
 
+// Sparks::Emit: capacities of 200, small ones, 0 and -1 (the original runs
+// there); counts around them (and negative); the head inside them; random
+// seeds; tables with game-like and odd floats (inside the block, or
+// overlapping the sparks); positions elsewhere or overlapping the new
+// spark; the sparks' position and the vector with random words (odd floats
+// among them) and game-like values; positive, zero, negative, odd and
+// random strengths.
+void SparksEmitCases(Context& h, uint32_t block) {
+  Random& r = h.random;
+  constexpr uint32_t kSeed = 0x82638188;
+  const uint32_t live = guest::LoadU32(h.base, kSeed);
+  const uint32_t sparks = block + 0x100;
+  const uint32_t table = block + 0x40;
+  const uint32_t source = block + 0x10000;
+  constexpr uint32_t kBytes = 0x10100;
+  Results results("Sparks::Emit (sub_8212D818)");
+  for (int i = 0; i < 1500; i++) {
+    int32_t capacity;
+    switch (r.Below(6)) {
+      case 0:
+        capacity = r.Below(2) ? 0 : -1;
+        break;
+      case 1:
+        capacity = int32_t(1 + r.Below(6));
+        break;
+      default:
+        capacity = 200;
+        break;
+    }
+    const int32_t count = r.Below(6) == 0 ? -int32_t(r.Below(5))
+                                          : int32_t(r.Below(capacity > 0 ? capacity + 3 : 5));
+    const uint32_t head = r.Below(capacity > 0 ? uint32_t(capacity) : 200);
+    const uint32_t spark = sparks + 128 + 144 * head;
+    const uint32_t at = r.Below(10) == 0 ? spark + 4 * r.Below(36) : table;
+    const uint32_t position = r.Below(8) == 0 ? spark + 4 * r.Below(32) : source + 4 * r.Below(4);
+    double strength;
+    switch (r.Below(5)) {
+      case 0:
+        strength = double(std::bit_cast<float>(RandomWord(r)));
+        break;
+      case 1:
+        strength = std::bit_cast<double>(r.Next());
+        break;
+      case 2:
+        strength = r.Below(2) ? 0.0 : -double(r.Below(100));
+        break;
+      default:
+        strength = double(float(r.Below(4000)) / 100.0f);
+        break;
+    }
+    const bool game_like = r.Below(2);
+    uint32_t vector[4];
+    for (uint32_t& word : vector) {
+      word = game_like ? std::bit_cast<uint32_t>(float(int32_t(r.Below(2000)) - 1000) / 10.0f)
+                       : RandomWord(r);
+    }
+    const uint32_t seed = uint32_t(r.Next());
+    const uint64_t fill_seed = r.Next();
+    const bool game_table = r.Below(2);
+    Compare(h, results, {{block, kBytes}, {kSeed, 4}},
+            [&, fill_seed] {
+              Random fill;
+              for (uint64_t n = 0; n < fill_seed % 31; n++) {
+                fill.Next();
+              }
+              FillRandom(h.base, fill, block, kBytes);
+              if (game_table) {  // life, size, alpha
+                guest::StoreU32(h.base, table, fill.Below(100));
+                guest::StoreFloat(h.base, table + 4, float(fill.Below(1000)) / 100.0f);
+                guest::StoreFloat(h.base, table + 8, float(fill.Below(256)));
+              }
+              if (game_like) {  // the sparks' position and the source near the vector
+                for (uint32_t k = 0; k < 16; k += 4) {
+                  const float near =
+                      std::bit_cast<float>(vector[k / 4]) + float(int32_t(fill.Below(200)) - 100) / 10.0f;
+                  guest::StoreFloat(h.base, sparks + 28960 + k, near);
+                  guest::StoreFloat(h.base, source + k, near);
+                }
+              }
+              guest::StoreU32(h.base, sparks + 104, uint32_t(capacity));
+              guest::StoreU32(h.base, sparks + 112, at);
+              guest::StoreU32(h.base, sparks + 28936, head);
+              guest::StoreU32(h.base, sparks + 28940, uint32_t(count));
+              guest::StoreU32(h.base, kSeed, seed);
+            },
+            [&](PPCContext& t) {
+              t.r3.u64 = sparks;
+              t.r4.u64 = position;
+              t.r6.u64 = (uint64_t(vector[0]) << 32) | vector[1];
+              t.r7.u64 = (uint64_t(vector[2]) << 32) | vector[3];
+              t.f2.f64 = strength;
+            },
+            __imp__sub_8212D818, NativeSparksEmit,
+            fmt::format("case {} capacity {} count {} head {} strength {:016X}", i, capacity,
+                        count, head, std::bit_cast<uint64_t>(strength)));
+  }
+  results.Report();
+  guest::StoreU32(h.base, kSeed, live);
+}
+
 }  // namespace
 
 void RaceOverlays(Context& h) {
@@ -1308,6 +1423,7 @@ void RaceOverlays(Context& h) {
   ModelPointCases(h, block);
   ModelPointPositionCases(h, block);
   SparksUpdateStreakCases(h, block);
+  SparksEmitCases(h, block);
   memory->SystemHeapFree(block);
 }
 

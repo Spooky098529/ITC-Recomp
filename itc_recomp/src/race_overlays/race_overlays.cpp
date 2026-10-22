@@ -1114,3 +1114,228 @@ void SparksUpdateStreak(uint8_t* base, uint32_t sparks, double speed,
 }
 
 }  // namespace race_overlays
+
+namespace race_overlays {
+
+namespace {
+
+constexpr uint32_t kSparksEmitHead = 28936;
+constexpr uint32_t kSparksSizeScale = 0x82001BE4;
+constexpr uint32_t kSparksLimitHigh = 0x820021E4;
+constexpr uint32_t kSparksLimitLow = 0x820021E8;
+constexpr uint32_t kSparksStep = 0x82002674;
+constexpr uint32_t kSparksAngleLow = 0x820029C4;
+constexpr uint32_t kSparksAngleHigh = 0x82002240;
+constexpr uint32_t kSparksSpreadLow = 0x82006908;
+constexpr uint32_t kSparksSpreadHigh = 0x82002208;
+constexpr uint32_t kSparksSpeedOut = 0x82002204;
+constexpr uint32_t kSparksSpeedIn = 0x820087B8;
+constexpr uint32_t kSparksRiseState0 = 0x820087B0;
+constexpr uint32_t kSparksRiseState2 = 0x820087B4;
+
+// fctiwz of a float word, as the original's lfs, fctiwz, stfiwx.
+uint32_t FloatToInt(uint8_t* base, uint32_t address) {
+  return uint32_t(Fctiwz(double(guest::LoadFloat(base, address))));
+}
+
+}  // namespace
+
+bool SparksEmit(uint8_t* base, uint32_t sparks, uint32_t position, double strength,
+                const uint32_t vector[4], uint32_t* result, double* last) {
+  ITC_NATIVE_RUNNING("sub_8212D818 Sparks::Emit");
+  const int32_t capacity = int32_t(guest::LoadU32(base, sparks + 104));
+  if (capacity == 0 || capacity == -1) {
+    return false;
+  }
+  const int32_t count = int32_t(guest::LoadU32(base, sparks + kSparksCount));
+  const uint32_t table = guest::LoadU32(base, sparks + 112);
+  if (!(capacity > count)) {
+    *result = 0;
+    return true;
+  }
+  const uint32_t spark =
+      sparks + guest::LoadU32(base, sparks + kSparksEmitHead) * kSparksBytes + 128;
+  const double vx = std::bit_cast<float>(vector[0]);
+  const double vy = std::bit_cast<float>(vector[1]);
+  const double vz = std::bit_cast<float>(vector[2]);
+
+  // Size, life and the limit.
+  const double scale = guest::LoadFloat(base, kSparksSizeScale);
+  {
+    const double high = guest::LoadFloat(base, table + 4);
+    *last = RandomRange(base, float(high * scale), high);
+    guest::StoreFloat(base, spark + 100, float(*last));
+  }
+  CopyFloat(base, table + 8, spark + 104);
+  const double limit_high = guest::LoadFloat(base, kSparksLimitHigh);
+  const double limit_low = guest::LoadFloat(base, kSparksLimitLow);
+  const uint32_t life = guest::LoadU32(base, table + 0);
+  guest::StoreU32(base, spark + 96, 1);
+  guest::StoreU32(base, spark + 132, 0);
+  guest::StoreU32(base, spark + 108, life);
+  *last = RandomRange(base, limit_low, limit_high);
+  guest::StoreFloat(base, spark + 136, float(*last));
+
+  // The state.
+  {
+    const int32_t drawn = int32_t(Rand(base));
+    const int32_t state = drawn - (drawn / 5) * 5;
+    guest::StoreU32(base, spark + 128, uint32_t(state));
+    if (state > 1) {
+      guest::StoreU32(base, spark + 128, 1);
+    }
+  }
+  const double zero = guest::LoadFloat(base, kZero);
+  if (strength > zero) {
+    guest::StoreU32(base, spark + 128, 2);
+  }
+
+  // The colors.
+  {
+    const int32_t drawn = int32_t(Rand(base));
+    const uint32_t pick = uint32_t(drawn - (drawn / 5) * 5);
+    if (pick == 1 || pick == 3) {
+      const uint32_t alpha = FloatToInt(base, spark + 104);
+      guest::StoreU32(base, spark + 84, 200);
+      guest::StoreU32(base, spark + 80, 255);
+      guest::StoreU32(base, spark + 88, 200);
+      guest::StoreU32(base, spark + 92, alpha);
+    } else if (pick < 5) {
+      const uint32_t color = pick == 0 ? 200 : 255;
+      guest::StoreU32(base, spark + 92, FloatToInt(base, spark + 104));
+      guest::StoreU32(base, spark + 88, color);
+      guest::StoreU32(base, spark + 84, color);
+      guest::StoreU32(base, spark + 80, color);
+    }
+  }
+
+  // The position.
+  const uint32_t at = spark + 48;
+  if (guest::LoadU32(base, spark + 128) != 0) {
+    for (uint32_t i = 0; i < 16; i += 4) {
+      CopyFloat(base, position + i, spark + 64 + i);
+    }
+    for (uint32_t i = 0; i < 16; i += 4) {
+      CopyFloat(base, position + i, at + i);
+    }
+    if (strength > zero) {
+      const uint32_t one = guest::LoadU32(base, kOne);
+      // Toward the sparks' position less the vector, by a random step.
+      const double step_high = limit_low;
+      double radius = RandomRange(base, std::bit_cast<float>(one), step_high);
+      *last = radius;
+      const float dx = Difference(guest::LoadFloat(base, sparks + kSparksPosition + 0), vx);
+      const float dy = Difference(guest::LoadFloat(base, sparks + kSparksPosition + 4), vy);
+      const float dz = Difference(guest::LoadFloat(base, sparks + kSparksPosition + 8), vz);
+      const simde__m128 toward =
+          VectorOf(std::bit_cast<uint32_t>(dx), std::bit_cast<uint32_t>(dy),
+                   std::bit_cast<uint32_t>(dz), one);
+      const uint32_t csr = Fpscr::getcsr();
+      const uint32_t flushing = csr | uint32_t(Fpscr::FlushMask);
+      Fpscr::setcsr(flushing);
+      const simde__m128 length = Length(toward);
+      Fpscr::setcsr(csr);
+      const double length_x = std::bit_cast<float>(WordOf(length, 0));
+      if (!(length_x == zero)) {
+        const simde__m128 from = LoadVector(base, at);
+        const float s = float(double(guest::LoadFloat(base, kSparksStep)) / length_x);
+        const uint32_t sw = std::bit_cast<uint32_t>(s);
+        const simde__m128 factor = VectorOf(sw, sw, sw, guest::LoadU32(base, kZero));
+        Fpscr::setcsr(flushing);
+        const simde__m128 moved = simde_mm_add_ps(from, simde_mm_mul_ps(toward, factor));
+        Fpscr::setcsr(csr);
+        const uint32_t to = at & ~0xFu;
+        for (int k = 0; k < 4; k++) {
+          guest::StoreU32(base, to + 4 * k, WordOf(moved, k));
+        }
+      }
+      // And by a random angle and radius.
+      const double angle = RandomRange(base, guest::LoadFloat(base, kSparksAngleLow),
+                                       guest::LoadFloat(base, kSparksAngleHigh));
+      radius = RandomRange(base, -radius, radius);
+      const double x = float(double(float(double(float(c_runtime::Cos(angle))) * radius)) * scale);
+      const double y = float(double(float(double(float(c_runtime::Cos(angle))) * radius)) * scale);
+      *last = c_runtime::Sin(angle);
+      const double sine = float(*last);
+      guest::StoreFloat(base, at + 0, float(x + double(guest::LoadFloat(base, at + 0))));
+      guest::StoreFloat(base, at + 4, float(double(guest::LoadFloat(base, at + 4)) + y));
+      const double z = float(double(float(sine * radius)) * scale);
+      guest::StoreFloat(base, at + 8, float(double(guest::LoadFloat(base, at + 8)) + z));
+    }
+  } else {
+    // Spread by random amounts.
+    const double low = zero;
+    const double high_x = Difference(guest::LoadFloat(base, sparks + kSparksPosition + 0), vx);
+    const double high_z = Difference(guest::LoadFloat(base, sparks + kSparksPosition + 8), vz);
+    const double ox = RandomRange(base, low, high_x);
+    const double oy = RandomRange(base, guest::LoadFloat(base, kSparksSpreadLow),
+                                  guest::LoadFloat(base, kSparksSpreadHigh));
+    const double oz = RandomRange(base, low, high_z);
+    *last = oz;
+    for (uint32_t i = 0; i < 16; i += 4) {
+      CopyFloat(base, position + i, spark + 64 + i);
+    }
+    guest::StoreFloat(base, at + 0, float(double(guest::LoadFloat(base, position + 0)) + ox));
+    guest::StoreFloat(base, at + 4, float(double(guest::LoadFloat(base, position + 4)) + oy));
+    guest::StoreFloat(base, at + 8, float(double(guest::LoadFloat(base, position + 8)) + oz));
+  }
+
+  // The offset from where it started, and the velocity.
+  for (uint32_t i = 0; i < 12; i += 4) {
+    guest::StoreFloat(base, spark + 112 + i,
+                      Difference(guest::LoadFloat(base, at + i),
+                                 guest::LoadFloat(base, spark + 64 + i)));
+  }
+  const double side_x = Difference(vx, guest::LoadFloat(base, position + 0));
+  const double side_z = Difference(vz, guest::LoadFloat(base, position + 8));
+  double rise = guest::LoadFloat(base, kSparksSpeedOut);
+  const double inward = guest::LoadFloat(base, kSparksSpeedIn);
+  const double toward_x = side_x < zero ? inward : rise;
+  const double toward_z = side_z < zero ? inward : rise;
+  const uint32_t state = guest::LoadU32(base, spark + 128);
+  if (state == 1) {
+    const double vz_drawn = RandomRange(base, zero, toward_z);
+    const double vy_drawn = RandomRange(base, inward, rise);
+    const double vx_drawn = RandomRange(base, zero, toward_x);
+    *last = vx_drawn;
+    guest::StoreFloat(base, spark + 32, float(vx_drawn));
+    guest::StoreFloat(base, spark + 36, float(vy_drawn));
+    guest::StoreFloat(base, spark + 40, float(vz_drawn));
+    guest::StoreU32(base, spark + 44, guest::LoadU32(base, kZero));
+    const int32_t drawn = int32_t(Rand(base));
+    if (drawn - (drawn / 20) * 20 == 0) {
+      guest::StoreFloat(base, spark + 32,
+                        float(toward_x + double(guest::LoadFloat(base, spark + 32))));
+      const double y = guest::LoadFloat(base, spark + 36);
+      const double z = guest::LoadFloat(base, spark + 40);
+      guest::StoreFloat(base, spark + 36, float(y + rise));
+      guest::StoreFloat(base, spark + 40, float(z + toward_z));
+    }
+  } else if (state < 3) {
+    if (double(guest::LoadFloat(base, spark + 52)) < double(guest::LoadFloat(base, position + 4))) {
+      rise = guest::LoadFloat(base, state == 0 ? kSparksRiseState0 : kSparksRiseState2);
+    }
+    const double vz_drawn = RandomRange(base, zero, toward_z);
+    const double vy_drawn = RandomRange(base, zero, rise);
+    const double vx_drawn = RandomRange(base, zero, toward_x);
+    *last = vx_drawn;
+    guest::StoreU32(base, spark + 44, guest::LoadU32(base, kZero));
+    guest::StoreFloat(base, spark + 40, float(vz_drawn));
+    guest::StoreFloat(base, spark + 36, float(vy_drawn));
+    guest::StoreFloat(base, spark + 32, float(vx_drawn));
+  }
+
+  // The head moves on (divw, then the remainder) and the count goes up.
+  const int32_t next = int32_t(guest::LoadU32(base, sparks + kSparksEmitHead) + 1);
+  const int32_t size_now = int32_t(guest::LoadU32(base, sparks + 104));
+  const uint32_t added = guest::LoadU32(base, sparks + kSparksCount) + 1;
+  const int32_t quotient =
+      (size_now && !(next == INT32_MIN && size_now == -1)) ? next / size_now : 0;
+  guest::StoreU32(base, sparks + kSparksEmitHead,
+                  uint32_t(next) - uint32_t(quotient) * uint32_t(size_now));
+  guest::StoreU32(base, sparks + kSparksCount, added);
+  *result = 1;
+  return true;
+}
+
+}  // namespace race_overlays

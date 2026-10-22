@@ -14,7 +14,7 @@ ITC_FLAG_BOOL(native_race_overlays, true, "ITC",
               "AddPoint, sub_821292E8 and sub_82129598; ParticlesB and ParticlesC::Emit, sub_8212B4A8 and sub_8212C1C0; the "
               "car-model sprites' kind and table entry, sub_82123188 and sub_8211F300; the model "
               "points' checks and positions, sub_82126A78 and sub_82127140; Sparks::UpdateStreak, "
-              "sub_8212E660) natively "
+              "sub_8212E660; Sparks::Emit, sub_8212D818) natively "
               "instead of through the translated code (same results; checked by "
               "--run_harnesses=race_overlays)");
 
@@ -244,4 +244,27 @@ extern "C" REX_FUNC(sub_8212E660) {
                      &value);
   ctx.r3.u64 = drawn;
   ctx.f1.f64 = value;
+}
+
+// Sparks::Emit: r3 = the sparks, r4 = a position, r6 and r7 = a vector
+// (passed by value), f2 = strength (f1 isn't read); returns 1, or 0 when
+// full, with f1 left as the original leaves it. Where the native version
+// declines (a capacity of 0 or -1), the original runs.
+extern "C" REX_FUNC(sub_8212D818) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_race_overlays)) {
+    __imp__sub_8212D818(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  const uint32_t vector[4] = {uint32_t(ctx.r6.u64 >> 32), ctx.r6.u32,
+                              uint32_t(ctx.r7.u64 >> 32), ctx.r7.u32};
+  uint32_t result = 0;
+  double last = ctx.f1.f64;
+  if (!SparksEmit(base, ctx.r3.u32, ctx.r4.u32, ctx.f2.f64, vector, &result, &last)) {
+    __imp__sub_8212D818(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = result;
+  ctx.f1.f64 = last;
 }

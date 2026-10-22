@@ -329,3 +329,27 @@ void SparksUpdateStreak(uint8_t* base, uint32_t sparks, double speed,
                         uint32_t* drawn, double* value);
 
 }  // namespace race_overlays
+
+namespace race_overlays {
+
+// Sparks::Emit (sub_8212D818): when the count (+28,940) is below the
+// capacity (+104, signed), a new spark (144 bytes) at the head (+28,936):
+// +100 size drawn between the table's +4 (the table at +112) times the
+// float at 0x82001BE4 and +4; +104 the table's +8; +108 life (the table's
+// +0); +96 = 1, +132 = 0; +136 a limit drawn between the floats at
+// 0x820021E8 and 0x820021E4; +128 a state (rand() % 5, 1 above 1; 2 for a
+// positive `strength`); colors by rand() % 5 (200 or 255 with +92 the size
+// as an integer); then its position (+48) and +64 from `position`, moved
+// toward the sparks' position less `vector` (the vector passed in r6 and
+// r7) and by a random angle and radius when `strength` is positive, or
+// spread by random amounts in state 0; +112 = +48 - +64; and its velocity
+// (+32) drawn by the state, toward the side of `vector` against
+// `position`. The head moves on (modulo the capacity) and the count goes
+// up. `*result` gets 1, or 0 when full; `*last` gets the last value the
+// original leaves in f1 (a RandomRange value or a sine; untouched when
+// full). False, with nothing done, for a capacity of 0 or -1 (where the
+// original's division can trap); the original runs there.
+bool SparksEmit(uint8_t* base, uint32_t sparks, uint32_t position, double strength,
+                const uint32_t vector[4], uint32_t* result, double* last);
+
+}  // namespace race_overlays
