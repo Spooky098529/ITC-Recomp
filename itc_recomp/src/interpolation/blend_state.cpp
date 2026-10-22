@@ -3706,6 +3706,11 @@ void BlendState_OnLogicPassStart() {
   GetDrawState().OnLogicPassStart();
 }
 
+void BlendState_OnMultiply(uint8_t* base, uint32_t out, uint32_t a, uint32_t b,
+                           uint32_t caller) {
+  GetDrawState().OnMultiply(base, out, a, b, caller);
+}
+
 void BlendState_SetHandler(uint32_t handler) {
   GetDrawState().SetHandler(handler);
 }

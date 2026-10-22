@@ -54,6 +54,19 @@ ITC_NATIVE_SCALAR(NativeCopy, mm::Copy(base, ctx.r3.u32, ctx.r4.u32))
 ITC_NATIVE_VECTOR(NativeInverse, mm::Inverse(base, ctx.r3.u32, ctx.r4.u32))
 ITC_NATIVE_VECTOR(NativeVec4Transform,
                   mm::Vec4Transform(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+// Scalar work, then Matrix::Multiply's (flush-to-zero left on).
+#define ITC_NATIVE_MIXED(name, call)          \
+  void name(PPCContext& ctx, uint8_t* base) { \
+    ctx.fpscr.disableFlushMode();             \
+    call;                                     \
+    ctx.fpscr.enableFlushMode();              \
+  }
+ITC_NATIVE_MIXED(NativeRotateX,
+                 mm::RotateX(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32 - 80))
+ITC_NATIVE_MIXED(NativeRotateY,
+                 mm::RotateY(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32 - 80))
+ITC_NATIVE_MIXED(NativeRotateZ,
+                 mm::RotateZ(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32 - 80))
 ITC_NATIVE_SCALAR(NativeVec3SwapXZ, mm::Vec3SwapXZ(base, ctx.r3.u32))
 ITC_NATIVE_SCALAR(NativeSetWsToOne, mm::SetWsToOne(base, ctx.r3.u32))
 // Matrix::MultiplyUnaligned and Matrix::MultiplyTo (its tail call, merged
@@ -154,10 +167,15 @@ void MatrixMath(Context& h) {
     const char* name;
     GuestFunction recompiled, native;
     bool compare_f1;
+    bool angle_at_r5 = false;  // the turns: r5 = &angle
   } functions[] = {
       {"Matrix::Multiply (sub_8209BD50)", __imp__sub_8209BD50, NativeMultiply, false},
       {"Matrix::Copy (sub_820A0AC0)", __imp__sub_820A0AC0, NativeCopy, false},
       {"Matrix::Inverse (sub_820A9988)", __imp__sub_820A9988, NativeInverse, false},
+      // r5 = &angle (a word of the block).
+      {"Matrix::RotateX (sub_820A65F0)", __imp__sub_820A65F0, NativeRotateX, false, true},
+      {"Matrix::RotateY (sub_820A67F8)", __imp__sub_820A67F8, NativeRotateY, false, true},
+      {"Matrix::RotateZ (sub_820A2D30)", __imp__sub_820A2D30, NativeRotateZ, false, true},
       {"Vec4::Transform (sub_820AB560)", __imp__sub_820AB560, NativeVec4Transform, false},
       {"Vec3::SwapXZ (sub_820AB688)", __imp__sub_820AB688, NativeVec3SwapXZ, false},
       {"SetWsToOne (sub_8209B038)", __imp__sub_8209B038, NativeSetWsToOne, false},
@@ -222,6 +240,16 @@ void MatrixMath(Context& h) {
             }
             if (group == kOneNaN && nan_at < kBlockBytes / 4) {
               guest::StoreU32(h.base, block + 4 * nan_at, nan_word);
+            }
+            // The turns' polynomials overflow for angles far beyond 2 pi
+            // (an angle of 1e10 gives inf - inf in them): a NaN made there
+            // would meet the one NaN in Matrix::Multiply, so with one NaN
+            // the angle stays within 1024 (the "NaNs anywhere" group has
+            // them all).
+            const uint32_t angle_at = block + layout.b;
+            if (f.angle_at_r5 && group == kOneNaN &&
+                std::fabs(std::bit_cast<float>(guest::LoadU32(h.base, angle_at))) > 1024.0f) {
+              guest::StoreU32(h.base, angle_at, std::bit_cast<uint32_t>(float(seed) - 15.5f));
             }
             PPCContext t = CallContext(h);
             // Flush-to-zero off in the context's copy of the control word

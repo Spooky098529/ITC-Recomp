@@ -4,6 +4,7 @@
 
 #include "base/log.h"
 #include "c_runtime/math.h"
+#include "interpolation/blend_state.h"
 #include "vehicle_accessors/vectors.h"
 
 #include <rex/platform/fpscr.h>
@@ -128,6 +129,109 @@ Words Product(const Words& a, const Words& b) {
     }
   }
   return out;
+}
+
+// Matrix::RotateX, Y and Z (sub_820A65F0, sub_820A67F8, sub_820A2D30): the
+// same code but for which rows of the turn the sine and cosine go in (the
+// vpermwi128 immediates, as x86 shuffles in the translation) and the return
+// address of their call to Matrix::Multiply.
+enum class Axis { kX, kY, kZ };
+
+template <Axis kAxis>
+void Rotate(uint8_t* base, uint32_t out, uint32_t in, uint32_t angle, uint32_t turn) {
+  // The angle into [-pi, pi]: pi with the angle's sign (its bits ORed into
+  // 0x40490FDB, from the stored float), added, times 1 / (2 pi), truncated
+  // (fctiwz: NaN gives INT_MIN, INT_MAX and above INT_MAX), that many 2 pi
+  // taken off (fnmsubs).
+  double x = Lfs(base, angle);
+  const double two_pi = Lfs(base, 0x82001FA8);
+  const uint32_t one = std::bit_cast<uint32_t>(float(Lfs(base, kOne)));
+  const uint32_t stored = std::bit_cast<uint32_t>(float(x));
+  const double pi = double(std::bit_cast<float>((stored & 0x80000000u) | 0x40490FDBu));
+  const double turns = Fmuls(Fadds(pi, x), Lfs(base, 0x82001FA4));
+  int32_t n;
+  if (std::isnan(turns)) {
+    n = INT32_MIN;
+  } else if (turns >= double(INT32_MAX)) {
+    n = INT32_MAX;
+  } else {
+    n = simde_mm_cvttsd_si32(simde_mm_set_sd(turns));
+  }
+  x = Fnmsubs(double(float(double(int64_t(n)))), two_pi, x);
+  const double x2 = Fmuls(x, x);
+  const double x3 = Fmuls(x2, x);
+  // The polynomials: (1, x, x^2, x^3) and its powers dotted with the
+  // coefficients at 0x820009C0-0x82000A1F (vector unit, flush-to-zero on).
+  const simde__m128 c9c0 = VectorAt(base, 0x820009C0);
+  const simde__m128 c9d0 = VectorAt(base, 0x820009D0);
+  const simde__m128 c9e0 = VectorAt(base, 0x820009E0);
+  const simde__m128 c9f0 = VectorAt(base, 0x820009F0);
+  const simde__m128 ca00 = VectorAt(base, 0x82000A00);
+  const simde__m128 ca10 = VectorAt(base, 0x82000A10);
+  simde__m128 v0, v3, v4, v9, v10, v11, v12, v13, d112;
+  {
+    FlushToZero flush;
+    v13 = VectorOf(one, std::bit_cast<uint32_t>(float(x)), std::bit_cast<uint32_t>(float(x2)),
+                   std::bit_cast<uint32_t>(float(x3)));
+    v0 = simde_mm_mul_ps(v13, v13);
+    v4 = F(simde_mm_shuffle_epi32(I(v13), 0x55));
+    v13 = F(simde_mm_shuffle_epi32(I(v13), 0xAA));
+    v12 = simde_mm_mul_ps(v0, v13);
+    d112 = simde_mm_dp_ps(v0, c9f0, 0xFF);
+    v3 = F(simde_mm_shuffle_epi32(I(v0), 0x0));
+    v11 = simde_mm_dp_ps(v12, c9c0, 0xFF);
+    v13 = simde_mm_mul_ps(v3, v4);
+    v0 = simde_mm_mul_ps(v0, v13);
+    v12 = simde_mm_mul_ps(v12, v13);
+    v10 = simde_mm_dp_ps(v0, ca00, 0xFF);
+    const simde__m128 v11b = simde_mm_mul_ps(v0, v13);
+    v9 = simde_mm_dp_ps(v12, c9d0, 0xFF);
+    v0 = simde_mm_mul_ps(v12, v13);
+    v13 = simde_mm_dp_ps(v11b, ca10, 0xFF);
+  }
+  const double f13 = Fadds(double(std::bit_cast<float>(WordOf(v13, 0))),
+                           double(std::bit_cast<float>(WordOf(v10, 0))));
+  simde__m128 d112b;
+  {
+    FlushToZero flush;
+    d112b = simde_mm_dp_ps(v0, c9e0, 0xFF);
+  }
+  auto word0 = [](simde__m128 v) { return double(std::bit_cast<float>(WordOf(v, 0))); };
+  const uint32_t zero = std::bit_cast<uint32_t>(float(Lfs(base, kZero)));
+  const double cosine = Fadds(f13, word0(d112));
+  const double sine = Fadds(Fadds(word0(d112b), word0(v9)), word0(v11));
+  const uint32_t c = std::bit_cast<uint32_t>(float(cosine));
+  const uint32_t s = std::bit_cast<uint32_t>(float(sine));
+  const uint32_t minus_s = std::bit_cast<uint32_t>(float(-sine));
+  // (s, -s, c, 0), then the turn's rows from it and from vupkd3d128's
+  // (3.0, 3.0, 0.0, 1.0) (the 0.0 and 1.0).
+  const simde__m128i sc = I(VectorOf(s, minus_s, c, zero));
+  const simde__m128i k = I(simde_mm_set_ps(3.0f, 3.0f, 0.0f, 1.0f));
+  simde__m128i rows[4];
+  if constexpr (kAxis == Axis::kZ) {
+    rows[0] = simde_mm_shuffle_epi32(sc, 0x70);
+    rows[1] = simde_mm_shuffle_epi32(sc, 0x90);
+    rows[2] = simde_mm_shuffle_epi32(k, 0x51);
+  } else if constexpr (kAxis == Axis::kX) {
+    rows[0] = simde_mm_shuffle_epi32(k, 0x15);
+    rows[1] = simde_mm_shuffle_epi32(sc, 0x1C);
+    rows[2] = simde_mm_shuffle_epi32(sc, 0x24);
+  } else {
+    rows[0] = simde_mm_shuffle_epi32(sc, 0x48);
+    rows[1] = simde_mm_shuffle_epi32(k, 0x45);
+    rows[2] = simde_mm_shuffle_epi32(sc, 0xC4);
+  }
+  rows[3] = simde_mm_shuffle_epi32(k, 0x54);
+  const uint32_t at = turn & ~0xFu;
+  for (uint32_t i = 0; i < 4; i++) {
+    StoreVector(base, at + 16 * i, F(rows[i]));
+  }
+  // out = in * the turn, noted for interpolation as the original's call.
+  Multiply(base, out, in, turn);
+  constexpr uint32_t kReturn = kAxis == Axis::kZ   ? 0x820A2F28
+                               : kAxis == Axis::kX ? 0x820A67E8
+                                                   : 0x820A69F0;
+  interpolation::BlendState_OnMultiply(base, out, in, turn, kReturn);
 }
 
 }  // namespace
@@ -301,6 +405,21 @@ void Inverse(uint8_t* base, uint32_t out, uint32_t in) {
   for (uint32_t i = 0; i < 4; i++) {
     StoreVector(base, at + 16 * i, result[i]);
   }
+}
+
+void RotateX(uint8_t* base, uint32_t out, uint32_t in, uint32_t angle, uint32_t turn) {
+  ITC_NATIVE_RUNNING("sub_820A65F0 Matrix::RotateX");
+  Rotate<Axis::kX>(base, out, in, angle, turn);
+}
+
+void RotateY(uint8_t* base, uint32_t out, uint32_t in, uint32_t angle, uint32_t turn) {
+  ITC_NATIVE_RUNNING("sub_820A67F8 Matrix::RotateY");
+  Rotate<Axis::kY>(base, out, in, angle, turn);
+}
+
+void RotateZ(uint8_t* base, uint32_t out, uint32_t in, uint32_t angle, uint32_t turn) {
+  ITC_NATIVE_RUNNING("sub_820A2D30 Matrix::RotateZ");
+  Rotate<Axis::kZ>(base, out, in, angle, turn);
 }
 
 void Vec4Transform(uint8_t* base, uint32_t out, uint32_t m, uint32_t v) {

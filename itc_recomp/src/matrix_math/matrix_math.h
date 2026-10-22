@@ -34,6 +34,16 @@ void Copy(uint8_t* base, uint32_t dst, uint32_t src);
 // Matrix::Inverse (sub_820A9988): out = the inverse of in (read first, any
 // alignment), out stored aligned.
 void Inverse(uint8_t* base, uint32_t out, uint32_t in);
+// Matrix::RotateX, RotateY and RotateZ (sub_820A65F0, sub_820A67F8,
+// sub_820A2D30): out = in * the turn about that axis by the float at
+// `angle`, its sine and cosine from the game's polynomials (not std::sin).
+// The turn is built at `turn` (64 bytes of guest memory, 16-byte aligned:
+// the original's stack, r1 - 80), then multiplied with Multiply and noted
+// for interpolation (interpolation::BlendState_OnMultiply) with the return
+// address of the original's call.
+void RotateX(uint8_t* base, uint32_t out, uint32_t in, uint32_t angle, uint32_t turn);
+void RotateY(uint8_t* base, uint32_t out, uint32_t in, uint32_t angle, uint32_t turn);
+void RotateZ(uint8_t* base, uint32_t out, uint32_t in, uint32_t angle, uint32_t turn);
 // Vec4::Transform (sub_820AB560): out = v * m, all four components; m read
 // first (any alignment), v and out aligned.
 void Vec4Transform(uint8_t* base, uint32_t out, uint32_t m, uint32_t v);
