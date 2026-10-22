@@ -101,6 +101,37 @@ void SetRenderer(uint8_t* base, uint32_t renderer, uint32_t list);
 // 0x82000A30 (1.0), +96..+108 = 0.
 void ResetDrawContext(uint8_t* base, uint32_t context);
 
+// Loading (files.cpp): the movie file (`X2D`, version `005`) and the `XMD`
+// file (version `001`) are fixed up in place once loaded.
+//
+// sub_825A0C60: whether `file` starts with `XMD\0` `001\0`.
+bool IsXmd(uint8_t* base, uint32_t file);
+// sub_825A0CF8: 1 when the XMD file is 16-byte aligned and IsXmd, else 0.
+// The original then byte-swaps its +8, +12 and entry words unless word +0
+// reads `XMD\0`, which IsXmd has just made sure of: the swap can't run, and
+// isn't ported.
+uint32_t CheckXmd(uint8_t* base, uint32_t file);
+// sub_825A0E40: whether a movie file holds `X2D\0` `005\0` at +8.
+bool IsMovieFile(uint8_t* base, uint32_t file);
+// sub_825A0ED8: a movie file's table entry `index` from its animations'
+// start ([file + 16]): the word at file + 32 + 8 ([file + 16] + index).
+uint32_t FileAnimation(uint8_t* base, uint32_t file, uint32_t index);
+// sub_8259D688: a scene's child entries ([+124] of them, 8 bytes from +128)
+// from offsets to pointers: those in the animation range ([+116], [+120] of
+// them) through the file's table (FileAnimation), the others relative to the
+// scene; recursing into children tagged `SCE`. Returns 1.
+uint32_t FixUpScene(uint8_t* base, uint32_t scene, uint32_t file);
+// sub_825A6570: an animation's entries ([+56], 8 bytes from +64) from
+// offsets to pointers (relative to it), then each sub-animation's +16 ([+52]
+// of them from index [+48]) through the file's table. Returns 1.
+uint32_t FixUpAnimation(uint8_t* base, uint32_t animation, uint32_t file);
+// sub_825A0EF0 (UiMovie::FixUpFile): 0 unless 16-byte aligned and
+// IsMovieFile; else the table's [+24] entries (8 bytes from +32) from
+// offsets to pointers, the scene at file + [+4] fixed up (0 passed on when
+// it isn't tagged `SCE`, as the original does), and each of its [+20]
+// animations; 1.
+uint32_t FixUpFile(uint8_t* base, uint32_t file);
+
 // The keys' interpolation (keys.cpp, built with -ffp-model=strict and
 // -ffp-contract=off: the translated code's doubles, rounded to single at the
 // same steps, std::fma where it has fmadds). k0 and k1 are the two keys

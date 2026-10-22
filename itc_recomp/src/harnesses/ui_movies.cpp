@@ -445,6 +445,302 @@ void RecorderCases(Context& h) {
   guest::StoreU32(h.base, command_list::kOpenChunks, saved_open);
 }
 
+// The headers: sub_825A0C60 (XMD 001 at +0), sub_825A0E40 (X2D 005 at +8)
+// and sub_825A0CF8 (aligned, then XMD's check; the words after it random,
+// so a swap would show): the header exact, a byte off, byte-swapped, and
+// random, at aligned and unaligned addresses.
+void HeaderCases(Context& h) {
+  struct Header {
+    const char* name;
+    GuestFunction recompiled, native;
+    uint32_t at;
+    uint8_t bytes[8];
+  };
+  const Header headers[] = {
+      {"IsXmd (sub_825A0C60)", __imp__sub_825A0C60, sub_825A0C60, 0, {'X', 'M', 'D', 0, '0', '0', '1', 0}},
+      {"CheckXmd (sub_825A0CF8)", __imp__sub_825A0CF8, sub_825A0CF8, 0, {'X', 'M', 'D', 0, '0', '0', '1', 0}},
+      {"IsMovieFile (sub_825A0E40)", __imp__sub_825A0E40, sub_825A0E40, 8, {'X', '2', 'D', 0, '0', '0', '5', 0}},
+  };
+  for (const Header& f : headers) {
+    Results results(f.name);
+    Random& r = h.random;
+    for (int i = 0; i < 400; i++) {
+      uint8_t bytes[8];
+      std::copy(std::begin(f.bytes), std::end(f.bytes), bytes);
+      const int kind = r.Below(4);
+      if (kind == 1) {
+        bytes[r.Below(8)] ^= uint8_t(1 + r.Below(255));
+      } else if (kind == 2) {
+        std::reverse(bytes, bytes + 4);
+        std::reverse(bytes + 4, bytes + 8);
+      } else if (kind == 3) {
+        for (uint8_t& b : bytes) {
+          b = uint8_t(r.Next());
+        }
+      }
+      const uint32_t file = ((h.data + 64) & ~0xFu) + (r.Below(3) == 0 ? r.Below(16) : 0);
+      std::vector<uint32_t> words(64);
+      for (uint32_t& w : words) {
+        w = r.Below(2) ? r.Below(40) : uint32_t(r.Next());
+      }
+      Both(h, results,
+           [&] {
+             for (uint32_t k = 0; k < 64; k++) {
+               guest::StoreU32(h.base, file + 4 * k, words[k]);
+             }
+             Write(h.base, file + f.at, bytes, 8);
+           },
+           [&](PPCContext& t) { t.r3.u64 = file; }, f.recompiled, f.native, h.data, 512,
+           fmt::format("case {}: kind {} at +{:X}", i, kind, file & 0xF));
+    }
+    results.Report();
+  }
+}
+
+// sub_825A6570: an animation (at +256) whose [+56] entries (offsets) point
+// at sub-animation records (from +1024, 32 bytes each, each used once), the
+// [+52] sub-animations from index [+48] among them, each sub-animation's +16
+// an index into the file's table (at +0: [+16] its start, entries from +32).
+// The file table's entries random.
+void FixUpAnimationCases(Context& h) {
+  Results results("FixUpAnimation (sub_825A6570)");
+  Random& r = h.random;
+  for (int i = 0; i < 300; i++) {
+    const uint32_t file = h.data, animation = h.data + 256;
+    const uint32_t start = r.Below(4);
+    const uint32_t entries = r.Below(17);
+    const uint32_t first = entries == 0 ? r.Below(3) : r.Below(entries);
+    const uint32_t subs = entries == 0 ? 0 : r.Below(entries - first + 1);
+    std::vector<uint32_t> table(16), indices(16);
+    for (uint32_t k = 0; k < 16; k++) {
+      table[k] = uint32_t(r.Next());
+      indices[k] = r.Below(16 - start);
+    }
+    Both(h, results,
+         [&] {
+           guest::StoreU32(h.base, file + 16, start);
+           for (uint32_t k = 0; k < 16; k++) {
+             guest::StoreU32(h.base, file + 32 + 8 * k, table[k]);
+             guest::StoreU32(h.base, animation + 64 + 8 * k, 1024 + 32 * k - 256);
+             guest::StoreU32(h.base, h.data + 1024 + 32 * k + 16, indices[k]);
+           }
+           guest::StoreU32(h.base, animation + 48, first);
+           guest::StoreU32(h.base, animation + 52, subs);
+           guest::StoreU32(h.base, animation + 56, entries);
+         },
+         [&](PPCContext& t) {
+           t.r3.u64 = animation;
+           t.r4.u64 = file;
+         },
+         __imp__sub_825A6570, sub_825A6570, h.data, kScratchBytes,
+         fmt::format("case {}: start {} entries {} first {} subs {}", i, start, entries, first, subs));
+  }
+  results.Report();
+}
+
+// A scene in the scratch area for the fix-ups: at `scene`, `children` child
+// entries from +128, [+116] and [+120] the animation range; entries outside
+// it are offsets to plain nodes (from +3584, 16 bytes each, tagged at random
+// but never SCE) or, once, to a sub-scene; entries in it index the file's
+// table (at `file`: [+16] its start, entries from +32, pointing at plain
+// nodes).
+struct SceneSpec {
+  uint32_t first, count, children;
+  std::vector<uint32_t> entries;
+};
+SceneSpec RandomScene(Random& r, uint32_t scene, uint32_t data, uint32_t start,
+                      uint32_t sub_scene, uint32_t table_entries) {
+  SceneSpec spec;
+  spec.children = r.Below(15);
+  spec.first = r.Below(spec.children + 2);
+  spec.count = r.Below(4) == 0 ? uint32_t(r.Next()) : r.Below(spec.children + 1);
+  bool sub_used = false;
+  for (uint32_t k = 0; k < spec.children; k++) {
+    const bool in_range = k >= spec.first && k < spec.first + spec.count;
+    if (in_range) {
+      spec.entries.push_back(r.Below(table_entries - start));
+    } else if (sub_scene != 0 && !sub_used && r.Below(3) == 0) {
+      spec.entries.push_back(sub_scene - scene);
+      sub_used = true;
+    } else {
+      spec.entries.push_back(data + 3584 + 16 * r.Below(30) - scene);
+    }
+  }
+  return spec;
+}
+
+void WriteScene(uint8_t* base, uint32_t scene, const SceneSpec& spec) {
+  guest::StoreU32(base, scene, ui_movies_kSce);
+  guest::StoreU32(base, scene + 116, spec.first);
+  guest::StoreU32(base, scene + 120, spec.count);
+  guest::StoreU32(base, scene + 124, spec.children);
+  for (uint32_t k = 0; k < spec.children; k++) {
+    guest::StoreU32(base, scene + 128 + 8 * k, spec.entries[k]);
+  }
+}
+
+// The plain nodes' tags.
+void WritePlainNodes(Context& h, const std::vector<uint32_t>& tags) {
+  for (uint32_t k = 0; k < 30; k++) {
+    guest::StoreU32(h.base, h.data + 3584 + 16 * k, tags[k]);
+  }
+}
+
+std::vector<uint32_t> RandomTags(Random& r) {
+  constexpr uint32_t kTags[] = {0x47525000, 0x50494300, 0x50524D00, 0x54585400, 0x53434501};
+  std::vector<uint32_t> tags(30);
+  for (uint32_t& tag : tags) {
+    tag = r.Below(3) == 0 ? (uint32_t(r.Next()) | 1) : kTags[r.Below(5)];
+  }
+  return tags;
+}
+
+// sub_8259D688: a scene with a sub-scene (itself with plain children).
+// sub_825A0ED8 alone: indices into the table.
+void FixUpSceneCases(Context& h) {
+  Results results("FixUpScene (sub_8259D688)");
+  Random& r = h.random;
+  for (int i = 0; i < 400; i++) {
+    const uint32_t file = h.data, scene = h.data + 512, sub = h.data + 1536;
+    const uint32_t start = r.Below(4);
+    const SceneSpec top = RandomScene(r, scene, h.data, start, sub, 16);
+    const SceneSpec inner = RandomScene(r, sub, h.data, start, 0, 16);
+    const std::vector<uint32_t> tags = RandomTags(r);
+    std::vector<uint32_t> table(16);
+    for (uint32_t& entry : table) {
+      entry = h.data + 3584 + 16 * r.Below(30);
+    }
+    Both(h, results,
+         [&] {
+           guest::StoreU32(h.base, file + 16, start);
+           for (uint32_t k = 0; k < 16; k++) {
+             guest::StoreU32(h.base, file + 32 + 8 * k, table[k]);
+           }
+           WriteScene(h.base, scene, top);
+           WriteScene(h.base, sub, inner);
+           WritePlainNodes(h, tags);
+         },
+         [&](PPCContext& t) {
+           t.r3.u64 = scene;
+           t.r4.u64 = file;
+         },
+         __imp__sub_8259D688, sub_8259D688, h.data, kScratchBytes,
+         fmt::format("case {}: start {} top {} children ({} from {}) inner {} ({} from {})", i,
+                     start, top.children, top.count, top.first, inner.children, inner.count,
+                     inner.first));
+  }
+  results.Report();
+
+  Results animation_results("FileAnimation (sub_825A0ED8)");
+  for (int i = 0; i < 300; i++) {
+    const uint32_t start = r.Below(2) ? r.Below(200) : uint32_t(r.Next());
+    const uint32_t index = (r.Below(300) - start) & 0xFFFFFFFFu;
+    const uint32_t entry = uint32_t(r.Next());
+    Both(h, animation_results,
+         [&] {
+           guest::StoreU32(h.base, h.data + 16, start);
+           guest::StoreU32(h.base, h.data + 32 + 8 * (start + index), entry);
+         },
+         [&](PPCContext& t) {
+           t.r3.u64 = h.data;
+           t.r4.u64 = index;
+         },
+         __imp__sub_825A0ED8, sub_825A0ED8, h.data, kScratchBytes,
+         fmt::format("start {:X} index {:X}", start, index));
+  }
+  animation_results.Report();
+}
+
+// UiMovie::FixUpFile: a whole movie file (16-byte aligned, the header at
+// +8): its table ([+24] entries of 16, offsets to plain nodes or, from its
+// start [+16], to its [+20] animations), the scene (at +512, with a
+// sub-scene at +1536), the animations (at +2304 and +2560, their entries
+// pointing at sub-animation records from +2816 and +3200). Also refused
+// files: unaligned, a header byte off.
+void FixUpFileCases(Context& h) {
+  Results results("UiMovie::FixUpFile (sub_825A0EF0)");
+  Random& r = h.random;
+  const uint32_t file = (h.data + 15) & ~0xFu;
+  const uint32_t scene = file + 512, sub = file + 1536;
+  const uint32_t animations[2] = {file + 2304, file + 2560};
+  const uint32_t records[2] = {file + 2816, file + 3200};
+  for (int i = 0; i < 400; i++) {
+    const int kind = i < 360 ? 0 : 1 + i % 2;  // 1 unaligned, 2 header off
+    const uint32_t start = r.Below(4);
+    const uint32_t anims = r.Below(3);
+    const uint32_t table_entries = r.Below(4) == 0 ? r.Below(16) : 16;
+    std::vector<uint32_t> table(16);
+    for (uint32_t k = 0; k < 16; k++) {
+      table[k] = (h.data + 3584 + 16 * r.Below(30)) - file;
+    }
+    for (uint32_t j = 0; j < anims; j++) {
+      table[start + j] = animations[j] - file;
+    }
+    SceneSpec top = RandomScene(r, scene, h.data, start, sub, 16);
+    SceneSpec inner = RandomScene(r, sub, h.data, start, 0, 16);
+    const std::vector<uint32_t> tags = RandomTags(r);
+    struct AnimationSpec {
+      uint32_t entries, first, subs;
+      std::vector<uint32_t> indices;
+    } specs[2];
+    for (AnimationSpec& a : specs) {
+      a.entries = r.Below(9);
+      a.first = a.entries == 0 ? 0 : r.Below(a.entries);
+      a.subs = a.entries == 0 ? 0 : r.Below(a.entries - a.first + 1);
+      for (int k = 0; k < 8; k++) {
+        a.indices.push_back(r.Below(16 - start));
+      }
+    }
+    // With fewer table entries than its animations need, the file has none.
+    const bool fits = table_entries >= start + anims;
+    const uint32_t header_byte = r.Below(8);
+    const uint32_t misalign = 4 + 4 * r.Below(3);
+    std::vector<uint8_t> result[2];
+    for (int v = 0; v < 2; v++) {
+      Fill(h.base, h.data, kScratchBytes);
+      const uint8_t header[8] = {'X', '2', 'D', 0, '0', '0', '5', 0};
+      Write(h.base, file + 8, header, 8);
+      if (kind == 2) {
+        guest::StoreU8(h.base, file + 8 + header_byte, 0x5A);
+      }
+      guest::StoreU32(h.base, file + 4, scene - file);
+      guest::StoreU32(h.base, file + 16, start);
+      guest::StoreU32(h.base, file + 20, fits ? anims : 0);
+      guest::StoreU32(h.base, file + 24, table_entries);
+      for (uint32_t k = 0; k < 16; k++) {
+        guest::StoreU32(h.base, file + 32 + 8 * k, table[k]);
+      }
+      // Entries the loop won't fix are already pointers (the scene's
+      // children may index them).
+      for (uint32_t k = table_entries; k < 16; k++) {
+        guest::StoreU32(h.base, file + 32 + 8 * k, table[k] + file);
+      }
+      WriteScene(h.base, scene, top);
+      WriteScene(h.base, sub, inner);
+      WritePlainNodes(h, tags);
+      for (int j = 0; j < 2; j++) {
+        const AnimationSpec& a = specs[j];
+        guest::StoreU32(h.base, animations[j] + 48, a.first);
+        guest::StoreU32(h.base, animations[j] + 52, a.subs);
+        guest::StoreU32(h.base, animations[j] + 56, a.entries);
+        for (uint32_t k = 0; k < 8; k++) {
+          guest::StoreU32(h.base, animations[j] + 64 + 8 * k, records[j] + 32 * k - animations[j]);
+          guest::StoreU32(h.base, records[j] + 32 * k + 16, a.indices[k]);
+        }
+      }
+      PPCContext t = CallContext(h);
+      t.r3.u64 = file + (kind == 1 ? misalign : 0);
+      (v == 0 ? __imp__sub_825A0EF0 : sub_825A0EF0)(t, h.base);
+      result[v] = Read(h.base, h.data, kScratchBytes);
+      AppendWord(result[v], t.r3.u32);
+    }
+    results.Check(result[0], result[1],
+                  fmt::format("case {}: kind {} start {} animations {} table {}", i, kind, start,
+                              anims, table_entries));
+  }
+  results.Report();
+}
+
 }  // namespace
 
 void UiMovies(Context& h) {
@@ -471,6 +767,10 @@ void UiMovies(Context& h) {
   ResetDrawContextCases(h);
   KeyCases(h);
   RecorderCases(h);
+  HeaderCases(h);
+  FixUpAnimationCases(h);
+  FixUpSceneCases(h);
+  FixUpFileCases(h);
 }
 
 }  // namespace harness

@@ -105,6 +105,7 @@ set(ITC_SOURCES
     src/ui_movies/ui_movies.cpp
     src/ui_movies/keys.cpp
     src/ui_movies/recording.cpp
+    src/ui_movies/files.cpp
     src/hooks/command_list.cpp
     src/command_list/command_list.cpp
     src/hooks/c_runtime.cpp
