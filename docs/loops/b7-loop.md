@@ -288,8 +288,14 @@ callers reach it, and that the fallback flag now switches only them),
 `check_function_statuses.py` run (it refuses Native with an override
 left), and the usual build and `attract_race.sh 25 --run_harnesses=all`.
 
-It stops when nothing ready is left in the subsystem, after about five
-groups (the lead starts another), or at a failure. Report, in its last
+It works in batches (a group, or small related groups together, each
+built, raced and committed before the next), one after another in its
+own context. It stops when nothing ready is left in the subsystem, after
+about five batches (the lead starts another), or at a failure. A massive
+migration (a batch too big for one context, such as a group over the
+1,500-line cap) may be split: the agent hands its parts to subagents one
+at a time, each finishing (committed, or reported failed) before the next
+starts, and reports for all of them. Report, in its last
 message:
 
 ```
@@ -380,6 +386,11 @@ step 9 of the cycle): the "B7 in progress" line near the top of
 commits them with the "Stopped" entry. The user reviews and merges.
 
 ## Rules that still hold
+
+Nothing runs in parallel (the user's rule, 2026-10-22): the lead runs
+one agent at a time, and an agent that splits its work (a mapping agent's
+reading, a massive migration) hands it to subagents one at a time, never
+several at once. Agents say in their report if they used subagents.
 
 CLAUDE.md's rules, in short: never edit `generated/`; plain C++ behind
 adapters; the SDK's headers used, not reimplemented; the game's use
