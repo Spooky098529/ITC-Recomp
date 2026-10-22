@@ -17,8 +17,8 @@ record: `b7-loop-2026-10-22-0111.md` (and this file's history).
   (AnimationList::Get) have no function of their own (their work is
   inside their native callers): set to the new Merged status (the
   user's, 2026-10-22), not a halt.
-- Next: the race overlays' second migration agent (32 ready groups).
-- Session: pass 4 of 20, subsystem 1 of 5. In all: subsystem 1 of 5.
+- Step 6: the race overlays' second migration agent running.
+- Session: pass 5 of 20, subsystem 1 of 5. In all: subsystem 1 of 5.
 - Known at the start: `b7_status.py` checks `c-runtime.md:221`
   `sub_825A9934` (`__chkstk`) "Dropped, but it ran" (from the first run:
   its override does nothing, so it still shows as seen).
