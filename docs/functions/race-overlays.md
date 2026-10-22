@@ -32,7 +32,8 @@ overlays" and the rows after it). Mapped by the B7 loop
 runs): call counts aren't known; vtable slots are inferred from the
 constructors' vtable addresses and the callers' offsets (the vtables
 themselves, in `.rdata`, weren't read). Shared callees in other files:
-`sub_820AB560` (Wrapped), `sub_82597118`
+`sub_820AB560` (`Vec4::Transform`, Wrapped) in
+[`matrix-math.md`](matrix-math.md); `sub_82597118`
 and `Vehicle::GetSpeedKmh` (`sub_820C0128`, Overridden) in
 [`functions.md`](functions.md); `sub_825A7410` (`memcpy`),
 `sin`, `cos`, `acos` and the stack probe `sub_825A9934` in
