@@ -164,6 +164,10 @@ ITC_NATIVE_STEP(NativeTractionControl, cp::VehicleTractionControl(base, ctx.r3.u
 ITC_NATIVE_STEP(NativeUpdateTireGrip, cp::VehicleUpdateTireGrip(base, ctx.r3.u32))
 ITC_NATIVE_STEP(NativeUpdateEngineTorque,
                 cp::VehicleUpdateEngineTorque(base, ctx.r3.u32, ctx.r1.u32 - 96))
+ITC_NATIVE_STEP(NativeUpdateBrakeHeat, cp::VehicleUpdateBrakeHeat(base, ctx.r3.u32))
+ITC_NATIVE_STEP(NativeUpdateBackfire, cp::VehicleUpdateBackfire(base, ctx.r3.u32, ctx.r1.u32))
+ITC_NATIVE_STEP(NativeUpdateTireWear,
+                cp::VehicleUpdateTireWear(base, ctx.r3.u32, ctx.r1.u32 - 112))
 
 // Runs the recompiled version with the native flags off, so the functions
 // it calls that are ours run the originals too.
@@ -474,6 +478,17 @@ void FillVehicle(uint8_t* base, uint32_t area, Random& r, Word word) {
   }
   guest::StoreU32(base, v + 2256, uint32_t(int32_t(r.Below(8)) - 1));
   guest::StoreU8(base, v + 2424, uint8_t(r.Below(2)));
+  // The backfire's switch and latch, the shift byte, the tire wear's mode
+  // and switches.
+  guest::StoreU8(base, v + 2512, uint8_t(r.Below(4) != 0));
+  guest::StoreU8(base, v + 3240, uint8_t(r.Below(2)));
+  guest::StoreU8(base, v + 2281, uint8_t(r.Below(2)));
+  if (r.Below(2) == 0) {
+    guest::StoreU32(base, v + 2524, r.Below(4000));
+  }
+  guest::StoreU32(base, v + 2496, r.Below(4));
+  guest::StoreU8(base, v + 2625, uint8_t(r.Below(2)));
+  guest::StoreU8(base, v + 2383, uint8_t(r.Below(2)));
   if (r.Below(2) == 0) {
     // The rpm, normalized (the engine's torque curve).
     guest::StoreU32(base, v + 2228, std::bit_cast<uint32_t>(float(r.Below(1100)) / 1000.0f));
@@ -554,6 +569,12 @@ void CarPhysicsVehicle(Context& h) {
        NativeUpdateTireGrip, false},
       {"Vehicle::UpdateEngineTorque (sub_820B22D8)", Original<__imp__sub_820B22D8>,
        NativeUpdateEngineTorque, false},
+      {"Vehicle::UpdateBrakeHeat (sub_820B35C8)", Original<__imp__sub_820B35C8>,
+       NativeUpdateBrakeHeat, false},
+      {"Vehicle::UpdateBackfire (sub_820B3788)", Original<__imp__sub_820B3788>,
+       NativeUpdateBackfire, false},
+      {"Vehicle::UpdateTireWear (sub_820B39C8)", Original<__imp__sub_820B39C8>,
+       NativeUpdateTireWear, false},
   };
   enum Group { kNumbers, kOneNaN, kNaNs };
   const char* const kGroupNames[] = {"", ", one NaN",

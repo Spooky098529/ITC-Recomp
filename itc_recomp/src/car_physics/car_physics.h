@@ -240,5 +240,19 @@ void VehicleUpdateTireGrip(uint8_t* base, uint32_t vehicle);
 // with nitrous and engine braking into +2240 and +2236. `frame`: the
 // original's r1 after its stwu (96 bytes; EngineTorque's below it).
 void VehicleUpdateEngineTorque(uint8_t* base, uint32_t vehicle, uint32_t frame);
+// Vehicle::UpdateBrakeHeat (sub_820B35C8): each wheel's brake heat +220
+// raised while braking (the heat added kept from the last braking wheel
+// for the next ones, as the original), cooled toward the float at
+// 0x82002568, clamped; the fade +3232 raised above car data +168, then
+// cooled by dt x 0.5, clamped, and copied to +3236.
+void VehicleUpdateBrakeHeat(uint8_t* base, uint32_t vehicle);
+// Vehicle::UpdateBackfire (sub_820B3788): the charge +2500, byte +2504 and
+// the strength +2508 (byte +3240 the shift's latch). `frame`: the
+// original's r1 (it converts integers through r1 - 16 and r1 - 8).
+void VehicleUpdateBackfire(uint8_t* base, uint32_t vehicle, uint32_t frame);
+// Vehicle::UpdateTireWear (sub_820B39C8): the wear +292 by wheel (each
+// wheel's share kept at `frame` + 80, the original's 112-byte frame), then
+// each axle's grip (wheel record 2 +96).
+void VehicleUpdateTireWear(uint8_t* base, uint32_t vehicle, uint32_t frame);
 
 }  // namespace car_physics

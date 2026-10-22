@@ -181,3 +181,6 @@ ITC_CAR_PHYSICS_VECTOR(820B0D68, MatrixMultiplyTranslation(base, ctx.r3.u32, ctx
 ITC_CAR_PHYSICS(820B1790, VehicleTractionControl(base, ctx.r3.u32, ctx.r1.u32))
 ITC_CAR_PHYSICS(820B1FB8, VehicleUpdateTireGrip(base, ctx.r3.u32))
 ITC_CAR_PHYSICS(820B22D8, VehicleUpdateEngineTorque(base, ctx.r3.u32, ctx.r1.u32 - 96))
+ITC_CAR_PHYSICS(820B35C8, VehicleUpdateBrakeHeat(base, ctx.r3.u32))
+ITC_CAR_PHYSICS(820B3788, VehicleUpdateBackfire(base, ctx.r3.u32, ctx.r1.u32))
+ITC_CAR_PHYSICS(820B39C8, VehicleUpdateTireWear(base, ctx.r3.u32, ctx.r1.u32 - 112))
