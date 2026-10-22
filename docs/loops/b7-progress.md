@@ -15,7 +15,9 @@ rows to review and drive list are there), and this file's history.
   validated (21 of 21 harness lines).
 - Subsystem 2 of 3 (the matrix math) finished. Now: the no-mapping
   lead (the race overlays' groups the matrix math made ready):
-  migration (agent running).
+  migration done (ff29ee9..ff7cd37: UpdateLightSprites,
+  UpdateParticlesB and C, UpdateSmoke, ModelMatrix; 23 adapters removed;
+  race 22 s, 0 errors). Step: validation (agent running).
 - Known: `b7_status.py` checks `sub_825A9934` (`__chkstk`) "Dropped, but
   it ran", and every function made Native or Merged since the coverage
   session "..., but it ran" (`seen_in_play.txt` predates them; a new
@@ -45,6 +47,15 @@ rows to review and drive list are there), and this file's history.
 
 ## Rows to review
 
+- `race-overlays.md`: the matrix-math lead's rows (UpdateLightSprites,
+  UpdateParticlesB, UpdateParticlesC, UpdateSmoke, Smoke::SetFrame,
+  ModelMatrix, ParticlesB::Emit's f1 corrected to +6256) and 23 adapters
+  removed (Native). For review: native callers of Vec4::Transform go
+  through a new `debug::Vec4Transform`, which keeps its override's
+  `--debug_hide` and frame-state checks; UpdateSmoke stores its size word
+  quieted when it comes from the table (as the translated code, which
+  keeps it as a double); its harness never uses a smoke capacity of -1
+  (the original would copy into 2^32 - 1 emitters).
 - `matrix-math.md` (new, 28 rows; 4 moved from `functions.md`), 1 lead
   added. Migration 1's 21 rows (15 Overridden, 3 of them were Wrapped;
   3 Native with no adapter ever; 3 Merged). For review: the three
@@ -133,5 +144,7 @@ the validation agent's attract race; the user drives (with
   (wrapped 137, known 309, unknown 5723).
 - After the matrix math's migration 2: ours 591, work left 6162
   (wrapped 137, known 302, unknown 5723).
+- After the race overlays' effect updates: ours 597, work left 6156
+  (wrapped 137, known 296, unknown 5723).
 
 ## Stopped
