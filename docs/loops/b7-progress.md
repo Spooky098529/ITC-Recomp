@@ -10,8 +10,9 @@ rows to review and drive list are there), and this file's history.
 - Run started 2026-10-22 14:39 on `b7-loop-22-10-26` (the user's branch,
   kept from the previous run), from f9216cf; summary
   `b7-loop-2026-10-22-1439.md`.
-- Subsystem 1 of 3 (the vehicle accessors) finished. Next: the
-  no-mapping lead (the race overlays' newly ready functions).
+- Subsystem 1 of 3 (the vehicle accessors) finished. Now: the
+  no-mapping lead (the race overlays' 12 functions made ready by the
+  accessors, not counted): migration (agent running).
 - Known: `b7_status.py` checks `sub_825A9934` (`__chkstk`) "Dropped, but
   it ran", and every function made Native or Merged since the coverage
   session "..., but it ran" (`seen_in_play.txt` predates them; a new
