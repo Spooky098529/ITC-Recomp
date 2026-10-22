@@ -102,8 +102,11 @@ ITC_ACCESSOR_WORD(820B6880, RigidBodyField80(ctx.r3.u32))
 ITC_ACCESSOR_WORD(820B6888, RigidBodyVelocity(ctx.r3.u32))
 ITC_ACCESSOR_WORD(820B6890, RigidBodyField144(ctx.r3.u32))
 ITC_ACCESSOR_WORD(820B6898, RigidBodyField160(ctx.r3.u32))
+// RigidBody::Force (sub_820988C0) keeps its adapter: something reaches it
+// indirectly in play (a temporary log saw it called with its direct
+// caller native). RigidBody::Torque (sub_82379328) has none: its callers in
+// play, Vehicle::ApplyForces and BoxBox::PushOutCorners, are native.
 ITC_ACCESSOR_WORD(820988C0, RigidBodyForce(ctx.r3.u32))
-ITC_ACCESSOR_WORD(82379328, RigidBodyTorque(ctx.r3.u32))
 ITC_ACCESSOR_FLOAT(820B68A0, RigidBodyFloat48(base, ctx.r3.u32))
 ITC_ACCESSOR_VOID(820B68C0, RigidBodyPointVelocity(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
 ITC_ACCESSOR_WORD(820B6928, RigidBodyOrientation(ctx.r3.u32))
