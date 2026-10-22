@@ -213,6 +213,14 @@ ITC_NATIVE_STEP(NativeUpdateWheelSuspension,
 ITC_NATIVE_STEP(NativeSuspensionSpring,
                 ctx.f1.f64 = cp::VehicleSuspensionSpring(base, ctx.r3.u32, ctx.r4.u32,
                                                          ctx.f1.f64, ctx.r6.u32))
+ITC_NATIVE_STEP(NativeUpdateDrivetrain,
+                cp::VehicleUpdateDrivetrain(base, ctx.r3.u32, ctx.r1.u32 - 176))
+ITC_NATIVE_STEP(NativeUpdateDrivenAxle,
+                cp::VehicleUpdateDrivenAxle(base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64,
+                                            ctx.r1.u32))
+ITC_NATIVE_STEP(NativeUpdateGearbox,
+                cp::VehicleUpdateGearbox(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 112))
+ITC_NATIVE_STEP(NativeShiftGears, cp::VehicleShiftGears(base, ctx.r3.u32, ctx.r1.u32 - 96))
 // Where tan would fail, the original (as the adapters).
 void NativeSteerRecordCurve(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
@@ -613,6 +621,16 @@ void FillVehicle(uint8_t* base, uint32_t area, Random& r, Word word) {
   // The substeps (+2368), 1 to 10 (0 some of the time): the suspension
   // loops over them.
   guest::StoreU32(base, v + 2368, r.Below(8) == 0 ? 0 : 1 + r.Below(10));
+  // The gearbox's bytes (the shift's direction +2276, +2277, the requests
+  // +2284 to +2286, +2249) and the pedals at 0.0 some of the time.
+  for (uint32_t at : {2276u, 2277u, 2284u, 2285u, 2286u, 2249u}) {
+    guest::StoreU8(base, v + at, uint8_t(r.Below(3) == 0));
+  }
+  for (uint32_t at : {284u, 288u, 292u}) {
+    if (r.Below(3) == 0) {
+      guest::StoreU32(base, v + at, 0);
+    }
+  }
 }
 
 }  // namespace
@@ -731,6 +749,14 @@ void CarPhysicsVehicle(Context& h) {
       // r6 = a velocity in the vehicle (+5000).
       {"Vehicle::SuspensionSpring (sub_820B0198)", Original<__imp__sub_820B0198>,
        NativeSuspensionSpring, true},
+      {"Vehicle::UpdateDrivetrain (sub_820B4778)", Original<__imp__sub_820B4778>,
+       NativeUpdateDrivetrain, false},
+      {"Vehicle::UpdateDrivenAxle (sub_820B31D0)", Original<__imp__sub_820B31D0>,
+       NativeUpdateDrivenAxle, false, kAxleR4},
+      {"Vehicle::UpdateGearbox (sub_820B4CF0)", Original<__imp__sub_820B4CF0>,
+       NativeUpdateGearbox, false, kByteR4},
+      {"Vehicle::ShiftGears (sub_820B6430)", Original<__imp__sub_820B6430>, NativeShiftGears,
+       false},
   };
   enum Group { kNumbers, kOneNaN, kNaNs };
   const char* const kGroupNames[] = {"", ", one NaN",

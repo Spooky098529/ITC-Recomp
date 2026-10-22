@@ -378,4 +378,34 @@ double VehicleUpdateWheelSuspension(uint8_t* base, uint32_t vehicle, uint32_t w,
 // +8. Returns the original's r3 (+2592); `f1` gets wheel 3's +8.
 uint32_t VehicleUpdateSuspension(uint8_t* base, uint32_t vehicle, uint32_t frame, double* f1);
 
+// Vehicle::UpdateDrivenAxle (sub_820B31D0): a limited-slip differential on
+// the axle from `first` driven by f1: the wheels' accelerations (locked as
+// one under the locking torque), their spins +248, +252 and brake forces
+// +212, the axle's mean spin +2192. Its temporaries below `sp` (the
+// caller's r1: the accelerations at -64, the flags at -48, the wheels at
+// -56), as the original's.
+void VehicleUpdateDrivenAxle(uint8_t* base, uint32_t vehicle, uint32_t first, double drive,
+                             uint32_t sp);
+// Vehicle::UpdateDrivetrain (sub_820B4778): +2200 = +2196; the driven
+// axles' reactions (AxleReactionTorque) and the other's UpdateFreeAxle; the
+// engine's spin solved against them over +2364, UpdateDrivenAxle given the
+// axle term (twice for four-wheel drive); the engine's momentum +2208, rpm
+// +2228, +2220, +2212, +2224. `frame`: the original's 176 bytes (the axles'
+// half inertias at +80, +84 with both driven).
+void VehicleUpdateDrivetrain(uint8_t* base, uint32_t vehicle, uint32_t frame);
+
+// Vehicle::UpdateGearbox (sub_820B4CF0): with one gear (probably a CVT)
+// its ratio +2288 and the gear values; the clutch +2264, the shift timer
+// +2268, and the shifts: by the speed's shift points when the byte `manual`
+// is clear, on the requests +2284 (up) and +2285 (down) either way;
+// reverse, neutral, pulling away. A shift sets the gear +2252, the old
+// +2256, the timer and the car data's rate (+1668 + 4 x old gear, or +400
+// pulling away), then Vehicle::SetGearValues. `frame`: the original's 112
+// bytes (integers converted through its +80).
+void VehicleUpdateGearbox(uint8_t* base, uint32_t vehicle, uint32_t manual, uint32_t frame);
+// sub_820B6430 (the name ours: Vehicle::ShiftGears): UpdateGearbox, manual
+// unless the gear count is 1 or byte +2249 is set (its frame below
+// `frame`, the original's 96 bytes); +2348 = -1.0 in reverse, else 1.0.
+void VehicleShiftGears(uint8_t* base, uint32_t vehicle, uint32_t frame);
+
 }  // namespace car_physics

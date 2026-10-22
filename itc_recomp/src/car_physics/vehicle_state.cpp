@@ -13,6 +13,7 @@
 #include "vehicle_accessors/vectors.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
+#include <bit>
 #include <cstring>
 
 namespace car_physics {
@@ -783,6 +784,719 @@ uint32_t VehicleUpdateSuspension(uint8_t* base, uint32_t vehicle, uint32_t frame
   }
   *f1 = last;
   return v + 2592;
+}
+
+void VehicleUpdateDrivenAxle(uint8_t* base, uint32_t vehicle, uint32_t first, double drive,
+                             uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_820B31D0 Vehicle::UpdateDrivenAxle");
+  const uint32_t v = vehicle;
+  const uint32_t record = guest::LoadU32(base, v + 2144 + 4 * first);
+  const uint32_t data = guest::LoadU32(base, v + 2160 + 4 * first);
+  const uint32_t a = Wheel(v, first), b = Wheel(v, first + 1);
+  const double size = Fabs(drive);
+  const double half = Lfs(base, 0x82001BE4);
+  const double inertia = Fmuls(Lfs(base, record + 108), half);
+  // Its temporaries below the caller's r1 (`sp`): the accelerations at -64
+  // and -60, the locked flags at -48 and -44, the wheels at -56 and -52.
+  const uint32_t accel = sp - 64, locked = sp - 48, wheels = sp - 56;
+  guest::StoreU32(base, locked + 0, 0);
+  guest::StoreU32(base, locked + 4, 0);
+  guest::StoreU32(base, wheels + 0, a);
+  guest::StoreU32(base, wheels + 4, b);
+  const double grip = Lfs(base, data + 52);
+  if (!(size > Lfs(base, 0x8200222C))) {
+    // No drive: braked wheels stop and +2192 decays.
+    const double zero = Lfs(base, kZero);
+    const double decay = Lfs(base, 0x82002968);
+    for (uint32_t i = 0; i < 2; i++) {
+      const uint32_t wheel = guest::LoadU32(base, wheels + 4 * i);
+      if (Lfs(base, wheel + 300) == zero) {
+        continue;
+      }
+      Stfs(base, wheel + 248, zero);
+      Stfs(base, wheel + 252, zero);
+      const double mean = Lfs(base, v + 2192);
+      Stfs(base, v + 2192, mean == zero ? zero : Fmuls(mean, decay));
+    }
+    return;
+  }
+  const double zero = Lfs(base, kZero);
+  const double bias =
+      Lfs(base, v + 284) > zero ? Lfs(base, data + 260) : Lfs(base, data + 264);
+  const double torque = Fmuls(inertia, drive);
+  const double a_slip = Fabs(Lfs(base, a + 332));
+  const double preload = Lfs(base, data + 268);
+  const double b_slip = Fabs(Lfs(base, b + 332));
+  const double lock = Fmadds(Fabs(torque), bias, preload);
+  double a_accel, b_accel;
+  if (a_slip == zero && b_slip == zero) {
+    a_accel = Fmuls(drive, half);
+    b_accel = a_accel;
+  } else {
+    const double a_reaction = Lfs(base, a + 352);
+    const double sum = Fadds(b_slip, a_slip);
+    const double b_reaction = Lfs(base, b + 352);
+    const double t = Fmadds(a_reaction, a_slip, Fmuls(Fmuls(b_slip, inertia), drive));
+    a_accel = Fdivs(Fdivs(Fnmsubs(b_reaction, b_slip, t), inertia), sum);
+    b_accel = Fsubs(drive, a_accel);
+  }
+  const double a_reaction = Lfs(base, a + 352);
+  const double b_reaction = Lfs(base, b + 352);
+  const double a_torque = Fmsubs(a_accel, inertia, a_reaction);
+  const double b_torque = Fmsubs(b_accel, inertia, b_reaction);
+  double larger, smaller;
+  bool a_larger;
+  if (Fabs(a_torque) > Fabs(b_torque)) {
+    larger = Fabs(a_torque);
+    smaller = Fabs(b_torque);
+    a_larger = true;
+  } else {
+    larger = Fabs(b_torque);
+    smaller = Fabs(a_torque);
+    a_larger = false;
+  }
+  if (Fsubs(larger, smaller) < lock) {
+    // Locked: one acceleration for the axle.
+    const double step = Lfs(base, v + 2364);
+    const double a_spin = Lfs(base, a + 248);
+    const double b_spin = Lfs(base, b + 248);
+    guest::StoreU32(base, record + 116, 1);
+    const double twice = Fmuls(step, Lfs(base, 0x820021E8));
+    const double b_value = Fdivs(Fsubs(Fmadds(step, drive, a_spin), b_spin), twice);
+    Stfs(base, accel + 4, b_value);
+    Stfs(base, accel + 0, Fsubs(drive, b_value));
+  } else {
+    const double part = Fmuls(lock, half);
+    double a_total, b_total;
+    // The larger torque's wheel gives up half the lock, the other takes it
+    // (by the larger's sign).
+    if (a_larger ? !(a_torque > zero) : a_torque > zero) {
+      a_total = Fadds(part, a_torque);
+      b_total = Fsubs(b_torque, part);
+    } else {
+      a_total = Fsubs(a_torque, part);
+      b_total = Fadds(part, b_torque);
+    }
+    a_total = Fadds(a_reaction, a_total);
+    b_total = Fadds(b_reaction, b_total);
+    const double per_inertia = Fdivs(Lfs(base, kOne), inertia);
+    Stfs(base, accel + 0, Fmuls(a_total, per_inertia));
+    Stfs(base, accel + 4, Fmuls(b_total, per_inertia));
+  }
+  // Twice over: a wheel whose spin would change sign (or a stopped braked
+  // wheel held by its brake) locks, and its excess goes to the other.
+  for (int pass = 0; pass < 2; pass++) {
+    for (uint32_t i = 0; i < 2; i++) {
+      if (guest::LoadU32(base, locked + 4 * i) == 1) {
+        continue;
+      }
+      const double step = Lfs(base, v + 2364);
+      const uint32_t wheel = guest::LoadU32(base, wheels + 4 * i);
+      const double acceleration = Lfs(base, accel + 4 * i);
+      const double brake = Lfs(base, wheel + 300);
+      const double spin = Lfs(base, wheel + 248);
+      const double held = Fabs(brake);
+      double next = Fmadds(step, acceleration, spin);
+      const double product = Fmuls(next, spin);
+      bool lock_now = product < zero;
+      if (!lock_now && spin == zero) {
+        lock_now = Fdivs(Fmuls(held, grip), inertia) > Fabs(acceleration);
+      }
+      if (lock_now) {
+        guest::StoreU32(base, locked + 4 * i, 1);
+        next = zero;
+      }
+      if (guest::LoadU32(base, locked + 4 * i) == 0) {
+        continue;
+      }
+      const uint32_t j = (i + 1) & 1;
+      const double excess = Fsubs(acceleration, Fdivs(Fsubs(next, spin), step));
+      const double other = Lfs(base, accel + 4 * j);
+      double moved = Fmuls(other, excess) > zero ? Fsubs(other, excess) : Fadds(other, excess);
+      if (!(Fmuls(moved, other) > zero)) {
+        moved = zero;
+      }
+      Stfs(base, accel + 4 * j, moved);
+    }
+  }
+  for (uint32_t i = 0; i < 2; i++) {
+    const uint32_t wheel = guest::LoadU32(base, wheels + 4 * i);
+    const uint32_t is_locked = guest::LoadU32(base, locked + 4 * i);
+    const double held = Fmuls(Fabs(Lfs(base, wheel + 300)), grip);
+    const double old_spin = Lfs(base, wheel + 248);
+    if (is_locked != 0) {
+      Stfs(base, wheel + 248, zero);
+    } else {
+      Stfs(base, wheel + 248, Fmadds(Lfs(base, accel + 4 * i), Lfs(base, v + 2364),
+                                     Lfs(base, wheel + 248)));
+    }
+    Stfs(base, wheel + 252, Fmuls(Lfs(base, wheel + 248), inertia));
+    const double applied = Fabs(Fmuls(Lfs(base, accel + 4 * i), inertia));
+    if (held > zero && !(old_spin == zero)) {
+      const double change = Fdivs(Fsubs(Lfs(base, wheel + 248), old_spin), Lfs(base, v + 2364));
+      const double share = Lfs(base, wheel + 216);
+      Stfs(base, wheel + 212,
+           Fabs(Fmuls(Fdivs(Fmsubs(change, inertia, Fsubs(applied, held)), grip), share)));
+    }
+  }
+  const double mean = Lfs(base, v + 2192);
+  const double spins = Fadds(Lfs(base, b + 248), Lfs(base, a + 248));
+  const double next = mean == zero ? spins : Fmadds(spins, half, mean);
+  Stfs(base, v + 2192, Fmuls(next, half));
+}
+
+void VehicleUpdateDrivetrain(uint8_t* base, uint32_t vehicle, uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_820B4778 Vehicle::UpdateDrivetrain");
+  const uint32_t v = vehicle, f = frame;
+  const uint32_t e = CarData(base, v) + 1268;  // the engine
+  CopyWord(base, v + 2196, v + 2200);
+  const int32_t gear = int32_t(guest::LoadU32(base, v + 2252));
+  double ratio = Lfs(base, v + 2304);
+  const double zero = Lfs(base, kZero);
+  // The clutch squared (0.0 in neutral or with the clutch at 0.0); the
+  // ratio negated in reverse.
+  double clutch = zero;
+  if (gear != 0) {
+    const double c = Lfs(base, v + 2264);
+    if (!(c == zero)) {
+      if (gear == -1) {
+        ratio = Fneg(ratio);
+      }
+      clutch = Fmuls(c, c);
+    }
+  }
+  const uint32_t drive = guest::LoadU32(base, v + 2376);
+  const double half = Lfs(base, 0x82001BE4);
+  // The driven axles' reaction torques (AxleReactionTorque) and, with one,
+  // its half inertia; with both, the halves at the frame's +80 and +84.
+  double front = 0.0, rear = 0.0, reaction = 0.0, inertia = 0.0;
+  bool both = false;
+  if (drive >= 2) {
+    front = VehicleAxleReactionTorque(base, v, 0);
+    rear = VehicleAxleReactionTorque(base, v, 2);
+    both = true;
+    const uint32_t front_record = guest::LoadU32(base, v + 2144);
+    const uint32_t rear_record = guest::LoadU32(base, v + 2152);
+    const double rear_inertia = Lfs(base, rear_record + 108);
+    Stfs(base, f + 80, Fmuls(Lfs(base, front_record + 108), half));
+    Stfs(base, f + 84, Fmuls(rear_inertia, half));
+  } else {
+    uint32_t record;
+    if (drive == 1) {
+      VehicleUpdateFreeAxle(base, v, 0);
+      reaction = VehicleAxleReactionTorque(base, v, 2);
+      record = guest::LoadU32(base, v + 2152);
+    } else {
+      reaction = VehicleAxleReactionTorque(base, v, 0);
+      VehicleUpdateFreeAxle(base, v, 2);
+      record = guest::LoadU32(base, v + 2144);
+    }
+    inertia = Fmuls(Lfs(base, record + 108), half);
+  }
+  const double engine_inertia = Fadds(Lfs(base, e + 292), Lfs(base, e + 280));
+  const double mean = Lfs(base, v + 2192);
+  const double torque = Lfs(base, v + 2240);
+  const double step = Lfs(base, v + 2364);
+  const double two = Lfs(base, 0x820021E8);
+  const double momentum = Lfs(base, v + 2212);
+  const double scaled_mean = Fmuls(mean, two);
+  Stfs(base, v + 2192, zero);
+  const double damping = Lfs(base, 0x820021F8);
+  const double one = Lfs(base, kOne);
+  const double slip = Fsubs(one, clutch);
+  double engine_spin;  // f26
+  if (both) {
+    const double rear_half = Lfs(base, f + 84);
+    const uint32_t rear_record = guest::LoadU32(base, v + 2152);
+    const double twice_mean = Fmuls(scaled_mean, two);
+    const double front_half = Lfs(base, f + 80);
+    const uint32_t front_record = guest::LoadU32(base, v + 2144);
+    const double damped = Fmuls(momentum, damping);
+    const double per_rear = Fdivs(one, rear_half);
+    const double rear_share = Lfs(base, rear_record + 100);
+    const double rear_drive = Fmuls(rear_share, torque);
+    const double front_share = Lfs(base, front_record + 100);
+    const double per_front = Fdivs(one, front_half);
+    const double front_drive = Fmuls(front_share, torque);
+    const double rear_part = Fmuls(per_rear, rear_share);
+    const double rear_term = Fmuls(Fmadds(rear_drive, ratio, rear), per_rear);
+    const double front_reaction = Fmuls(Fmuls(per_front, front), slip);
+    const double front_term = Fmadds(front_drive, ratio, front);
+    const double shares = Fmuls(Fmuls(Fmadds(per_front, front_share, rear_part), engine_inertia),
+                                ratio);
+    const double terms = Fmadds(front_term, per_front, rear_term);
+    const double rhs = Fmsubs(Fmadds(terms, step, twice_mean), ratio, damped);
+    const double lhs = Fmuls(Fmadds(shares, ratio, damping), step);
+    engine_spin = Fdivs(rhs, lhs);
+    const double residual = Fmuls(Fnmsubs(engine_spin, engine_inertia, torque), ratio);
+    const double front_axle = Fmuls(Fmadds(residual, front_share, front), per_front);
+    VehicleUpdateDrivenAxle(base, v, 0, Fmadds(front_axle, clutch, front_reaction), f);
+    const double rear_reaction = Fmuls(Fmuls(per_rear, rear), slip);
+    const double rear_axle = Fmuls(Fmadds(residual, rear_share, rear), per_rear);
+    VehicleUpdateDrivenAxle(base, v, 2, Fmadds(rear_axle, clutch, rear_reaction), f);
+  } else {
+    const double drive_mean = Fmuls(scaled_mean, ratio);
+    const double axle_inertia = Fmuls(inertia, two);
+    const double geared = Fmuls(engine_inertia, ratio);
+    const double t0 = Fdivs(Fmsubs(drive_mean, half, momentum), step);
+    const double per_axle = Fdivs(reaction, axle_inertia);
+    const double denominator = Fmadds(geared, ratio, axle_inertia);
+    double x = Fnmsubs(t0, engine_inertia, torque);
+    x = Fmadds(x, ratio, reaction);
+    x = Fdivs(x, denominator);
+    const double clutched = Fmuls(x, clutch);
+    engine_spin = Fmadds(x, ratio, t0);
+    VehicleUpdateDrivenAxle(base, v, drive == 0 ? 0 : 2, Fmadds(per_axle, slip, clutched), f);
+  }
+  // The engine's momentum +2208 and rpm +2228 (clamped to idle +360 and
+  // the limit +16), +2220, +2212, +2224.
+  const double free_spin = Fmuls(engine_spin, clutch);
+  double spin = Fmadds(Fdivs(torque, engine_inertia), slip, free_spin);
+  spin = Fmadds(spin, Lfs(base, v + 2364), Lfs(base, v + 2212));
+  Stfs(base, v + 2208, Fmuls(spin, engine_inertia));
+  const double per_rpm = Lfs(base, e + 4);
+  const double low = Fmuls(per_rpm, Lfs(base, e + 360));
+  const double scale = Lfs(base, 0x820029A8);
+  const double high = Fmuls(per_rpm, scale);
+  const double low_spin = Fmuls(low, scale);
+  if (spin < low_spin) {
+    spin = low_spin;
+  } else if (high < spin) {
+    spin = high;
+  }
+  double rpm = Fmuls(Fdivs(spin, Lfs(base, e + 4)), Lfs(base, 0x820029A4));
+  Stfs(base, v + 2228, rpm);
+  const double idle = Lfs(base, e + 360), limit = Lfs(base, e + 16);
+  if (rpm < idle) {
+    rpm = idle;
+  } else if (limit < rpm) {
+    rpm = limit;
+  }
+  Stfs(base, v + 2228, rpm);
+  const double engine = Fmuls(Lfs(base, e + 4), rpm);
+  Stfs(base, v + 2220, engine);
+  const double old = Lfs(base, v + 2224);
+  const double next_momentum = Fmuls(engine, scale);
+  const double smoothed = Fmadds(Lfs(base, v + 2220), damping, old);
+  Stfs(base, v + 2212, next_momentum);
+  const uint64_t bits = (uint64_t(guest::LoadU32(base, 0x82002A58)) << 32) |
+                        guest::LoadU32(base, 0x82002A5C);
+  Stfs(base, v + 2224, Fmuls(smoothed, std::bit_cast<double>(bits)));
+}
+
+namespace {
+
+// An integer through the stack as the original converts it (extsw, std at
+// `at`, lfd, fcfid, frsp): the integer's float.
+double StackIntegerFloat(uint8_t* base, uint32_t at, int64_t value) {
+  guest::StoreU32(base, at, uint32_t(uint64_t(value) >> 32));
+  guest::StoreU32(base, at + 4, uint32_t(value));
+  return double(float(double(value)));
+}
+
+}  // namespace
+
+void VehicleUpdateGearbox(uint8_t* base, uint32_t vehicle, uint32_t manual, uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_820B4CF0 Vehicle::UpdateGearbox");
+  // The original's control flow, label for label (its addresses), with its
+  // registers as locals: the branches are many and share values.
+  const uint32_t v = vehicle, f = frame;
+  const uint32_t e = CarData(base, v) + 1268;  // the gearbox (r6)
+  const uint32_t r4 = manual & 0xFF;
+  double f0 = 0.0, f5 = 0.0, f6 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0,
+         f13 = 0.0;
+  int32_t r7 = 0;
+  uint32_t r5 = 0, r8 = 0, r9 = 0, r10 = 0, r11 = 0;
+  guest::StoreU8(base, v + 2281, 0);
+  guest::StoreU8(base, v + 2282, 0);
+  const double f4 = Lfs(base, kOne);
+  const double f7 = Lfs(base, kZero);
+  if (int32_t(guest::LoadU32(base, e)) == 1) {
+    // One gear (probably a CVT): +2288 between e +300 and e +328.
+    if (int32_t(guest::LoadU32(base, v + 2252)) <= 0) {
+      f0 = Lfs(base, e + 300);
+      goto L4EA4;
+    }
+    f13 = Lfs(base, v + 284);
+    if (f13 == f7) {
+      f12 = Lfs(base, v + 2220);
+      f0 = Lfs(base, 0x82002A84);
+      if (f12 < f0) {
+        f0 = Lfs(base, e + 300);
+        f12 = f0;
+        goto L4D84;
+      }
+    }
+    f0 = Lfs(base, e + 300);
+    f13 = Fsubs(f4, f13);
+    f12 = Lfs(base, e + 328);
+    f12 = Fsubs(f12, f0);
+    f12 = Fmadds(f12, f13, f0);
+  L4D84:
+    f10 = Lfs(base, e + 328);
+    if (f12 < f10) {
+      f0 = f10;
+    } else if (!(f0 < f12)) {
+      f0 = f12;
+    }
+    f11 = Lfs(base, v + 2192);
+    f13 = f0;
+    if (f11 > f4) {
+      f9 = Lfs(base, e + 12);
+      f8 = Lfs(base, e + 332);
+      f0 = Fmuls(f9, Lfs(base, 0x82002A80));
+      f9 = Fmuls(f8, f11);
+      f0 = Fdivs(f0, f9);
+      if (!(f0 > f12) && !(f0 < f10)) {
+        if (f12 < f0) {
+          f0 = f12;
+        }
+        f13 = f0;
+      }
+    }
+    f0 = Fmuls(Lfs(base, e + 332), f11);
+    f12 = Lfs(base, e + 360);
+    f11 = Lfs(base, e + 4);
+    f0 = Fabs(f0);
+    f0 = Fdivs(f12, f0);
+    f12 = Fmuls(f0, f11);
+    f0 = Fmuls(f12, Lfs(base, 0x82002A7C));
+    r11 = f0 > f13 ? 1 : 0;
+    f0 = StackIntegerFloat(base, f + 80, int32_t(r11));
+    if (!(f0 == f7)) {
+      f13 = f0;
+    }
+    f0 = Lfs(base, v + 2288);
+    if (f0 > f7) {
+      f12 = Lfs(base, 0x82002A78);
+      f11 = Lfs(base, 0x82002A74);
+    } else {
+      f12 = Lfs(base, 0x82002A74);
+      f11 = Lfs(base, 0x82002A78);
+    }
+    f12 = Fmuls(f0, f12);
+    f0 = Fmuls(f0, f11);
+    if (f13 < f12) {
+      f0 = f12;
+    } else if (!(f0 < f13)) {
+      f0 = f13;
+    }
+  L4EA4:
+    // The gear values, as Vehicle::SetGearValues sets them.
+    f13 = f0;
+    Stfs(base, v + 2288, f0);
+    f11 = Lfs(base, e + 332);
+    f12 = Lfs(base, v + 2336);
+    f0 = Lfs(base, v + 2328);
+    CopyWord(base, v + 2328, v + 2324);
+    Stfs(base, v + 2312, Fadds(f12, f0));
+    Stfs(base, v + 2320, f7);
+    Stfs(base, v + 2304, Fabs(Fmuls(f11, f13)));
+    Stfs(base, v + 2308, Fmuls(Lfs(base, e + 276), Lfs(base, e + 236)));
+  }
+  if (guest::LoadU8(base, v + 2384) != 0) {
+    Stfs(base, v + 2264, f7);
+    guest::StoreU32(base, v + 2252, 0);
+    goto L5560;
+  }
+  f5 = Lfs(base, v + 288);
+  if (!(f5 == f7) && int32_t(guest::LoadU32(base, v + 2252)) == -1 &&
+      Lfs(base, v + 2264) == f4) {
+    goto L5560;
+  }
+  f6 = Lfs(base, v + 292);
+  if (!(f6 == f7) && !(Lfs(base, v + 284) == f7) &&
+      int32_t(guest::LoadU32(base, v + 2252)) == 0) {
+    goto L4F44;
+  }
+  // The shift timer +2268.
+  f0 = Lfs(base, v + 2268);
+  if (f0 > f7) {
+    f0 = Fsubs(f0, Lfs(base, v + 2352));
+    f12 = Lfs(base, v + 2220);
+    Stfs(base, v + 2268, f0);
+    f13 = Lfs(base, 0x82001FD4);
+    if (f12 < f13 && Lfs(base, v + 284) == f7 && f5 == f7 &&
+        guest::LoadU32(base, v + 2256) == 0) {
+      Stfs(base, v + 2268, f7);
+      guest::StoreU8(base, v + 2276, 0);
+      guest::StoreU8(base, v + 2277, 0);
+      guest::StoreU32(base, v + 2252, 0);
+      goto L555C;
+    }
+    if (f0 > f7) {
+      // Still shifting.
+      r10 = guest::LoadU32(base, v + 2256);
+      if (r10 == 0) {
+        Stfs(base, v + 2264, Fnmsubs(Lfs(base, e + 400), f0, f4));
+        goto L5560;
+      }
+      r11 = guest::LoadU32(base, v + 2252);
+      if (int32_t(r10) > int32_t(r11)) {
+        f0 = Fmuls(Lfs(base, e + 12), Lfs(base, 0x82002A6C));
+        if (!(Lfs(base, v + 2212) > f0)) {
+          goto L5560;
+        }
+        goto L503C;
+      }
+      if (!(int32_t(r10) < int32_t(r11))) {
+        goto L4FC4;
+      }
+      f0 = Lfs(base, e + 332);
+      f13 = Lfs(base, v + 2192);
+      f12 = Lfs(base, v + 2212);
+      f11 = Lfs(base, e + 4 * (r11 + 74));
+      f0 = Fmuls(f13, Fabs(Fmuls(f11, f0)));
+      if (!(f12 < f0)) {
+        goto L5560;
+      }
+    L503C:
+      Stfs(base, v + 2268, f7);
+      goto L555C;
+    }
+    Stfs(base, v + 2268, f7);
+    guest::StoreU8(base, v + 2276, 0);
+    Stfs(base, v + 2264, f4);
+    guest::StoreU8(base, v + 2277, 0);
+  }
+L4FC4:
+  // The shift points: up at f9 ([+2632 + 4 gear]), down below f11.
+  r7 = int32_t(guest::LoadU32(base, v + 2252));
+  f9 = f7;
+  f11 = Lfs(base, 0x82002A70);
+  if (r7 > 0) {
+    f9 = Lfs(base, v + 4 * uint32_t(r7 + 658));
+    f13 = Lfs(base, v + 4 * uint32_t(r7 + 657));
+    f11 = Fmuls(f13, Lfs(base, 0x82001070));
+  }
+  // The driven wheels' mean spin (f12) and mean slip (f0, of those whose
+  // +268 isn't the float at 0x82001BE0).
+  r5 = guest::LoadU32(base, v + 2376);
+  r8 = 0;
+  f8 = Lfs(base, 0x82001BE4);
+  if (r5 < 1) {
+    f13 = Fadds(Lfs(base, Wheel(v, 1) + 248), Lfs(base, Wheel(v, 0) + 248));
+    f0 = f7;
+    f10 = Lfs(base, 0x82001BE0);
+    f12 = Fmuls(f13, f8);
+    for (uint32_t w = 0; w < 2; w++) {
+      f13 = Lfs(base, Wheel(v, w) + 268);
+      if (!(f13 == f10)) {
+        f0 = Fadds(f13, f0);
+        r8++;
+      }
+    }
+    if (r8 == 0) {
+      goto L51F8;
+    }
+    f0 = Fdivs(f0, StackIntegerFloat(base, f + 80, int32_t(r8)));
+  } else if (r5 == 1) {
+    f13 = Fadds(Lfs(base, Wheel(v, 3) + 248), Lfs(base, Wheel(v, 2) + 248));
+    f0 = f7;
+    f10 = Lfs(base, 0x82001BE0);
+    f12 = Fmuls(f13, f8);
+    for (uint32_t w = 2; w < 4; w++) {
+      f13 = Lfs(base, Wheel(v, w) + 268);
+      if (!(f13 == f10)) {
+        f0 = Fadds(f13, f0);
+        r8++;
+      }
+    }
+    if (r8 == 0) {
+      goto L51F8;
+    }
+    f0 = Fdivs(f0, StackIntegerFloat(base, f + 80, int32_t(r8)));
+  } else {
+    f12 = Lfs(base, Wheel(v, 2) + 248);
+    f0 = Fadds(Lfs(base, Wheel(v, 3) + 248), f12);
+    f12 = Lfs(base, Wheel(v, 1) + 248);
+    f10 = Lfs(base, Wheel(v, 0) + 248);
+    f13 = f7;
+    f0 = Fadds(f0, f12);
+    f12 = Fadds(f0, f10);
+    f0 = Lfs(base, 0x82002968);
+    f10 = Lfs(base, 0x82001BE0);
+    f12 = Fmuls(f12, f0);
+    for (uint32_t w = 0; w < 4; w++) {
+      f0 = Lfs(base, Wheel(v, w) + 268);
+      if (!(f0 == f10)) {
+        f13 = Fadds(f0, f13);
+        r8++;
+      }
+    }
+    if (r8 == 0) {
+      goto L51F8;
+    }
+    f0 = Fdivs(f13, StackIntegerFloat(base, f + 80, int32_t(r8)));
+  }
+  goto L51FC;
+L51F8:
+  f0 = f4;
+L51FC:
+  // The speed's own shifts (with r4 clear): r9 up, r10 down.
+  r9 = 0;
+  r10 = 0;
+  r8 = 0;
+  if (r7 > 0 && guest::LoadU8(base, v + 2286) == 0) {
+    r10 = r4;
+    r11 = 0;
+    if (r10 == 0 && f12 > f9 && Lfs(base, v + 2264) == f4 && f0 < Lfs(base, 0x82001FBC)) {
+      r11 = 1;
+    }
+    r9 = r11;
+    r11 = 0;
+    if (r10 == 0 && f12 < f11 && Lfs(base, v + 2264) == f4) {
+      r11 = 1;
+    }
+    r10 = r11;
+  }
+  // The clutch: out while braking near idle on a request, else ramped in.
+  f12 = Lfs(base, 0x82002204);
+  if (!(f6 == f7) && r7 > 1 &&
+      !(Lfs(base, v + 2228) > Fmuls(Lfs(base, e + 360), Lfs(base, 0x820021E8))) &&
+      (r4 != 0 || guest::LoadU8(base, v + 2286) != 0)) {
+    Stfs(base, v + 2264, f7);
+  } else {
+    f0 = Fadds(Lfs(base, v + 2264), f12);
+    Stfs(base, v + 2264, f0);
+    if (!(f0 < f4)) {
+      Stfs(base, v + 2264, f4);
+    }
+  }
+  if (r9 != 0 || (guest::LoadU8(base, v + 2284) != 0 && r7 > 0)) {
+    goto L5438;
+  }
+  if (r10 != 0 || (guest::LoadU8(base, v + 2285) != 0 && r7 > 1)) {
+    goto L5430;
+  }
+  if (!(f6 == f7) && !(Lfs(base, v + 284) == f7)) {
+    if (r7 != 0) {
+      goto L5390;
+    }
+    Stfs(base, v + 2264, f7);
+    goto L5460;
+  }
+  if (r7 != 0 || Lfs(base, v + 284) == f7) {
+    goto L5390;
+  }
+  // Pulling away from neutral.
+  Stfs(base, v + 2260, f7);
+  guest::StoreU32(base, v + 2256, 0);
+  guest::StoreU32(base, v + 2252, 1);
+  f13 = Fmuls(Lfs(base, e + 16), f8);
+  r8 = 1;
+  if (Lfs(base, v + 2228) > f13) {
+    guest::StoreU8(base, v + 2277, 1);
+    guest::StoreU8(base, v + 2276, 0);
+  } else {
+    guest::StoreU8(base, v + 2277, 0);
+    guest::StoreU8(base, v + 2276, 1);
+  }
+  goto L5464;
+L5390:
+  // Reverse, neutral.
+  f13 = Lfs(base, v + 384);
+  if ((f13 < f4 || r7 == 0) && !(f5 == f7)) {
+    if (r7 == -1) {
+      goto L5464;
+    }
+    guest::StoreU32(base, v + 2252, uint32_t(-1));
+    goto L5458;
+  }
+  if (Lfs(base, v + 2264) == f4 && r7 != 0) {
+    f0 = Fmuls(Lfs(base, e + 360), Lfs(base, 0x820027A8));
+    if (Lfs(base, v + 2228) < f0 &&
+        (Lfs(base, v + 284) == f7 || (r7 == -1 && f5 == f7))) {
+      guest::StoreU32(base, v + 2252, 0);
+      goto L5458;
+    }
+  }
+  if (!(f13 < f10) || r7 != 1) {
+    goto L5464;
+  }
+  guest::StoreU32(base, v + 2256, 1);
+  guest::StoreU32(base, v + 2252, 0);
+  goto L545C;
+L5430:
+  r10 = uint32_t(r7 - 1);
+  goto L5448;
+L5438:
+  if (!(r7 < int32_t(guest::LoadU32(base, e)))) {
+    goto L5464;
+  }
+  r10 = uint32_t(r7 + 1);
+L5448:
+  guest::StoreU32(base, v + 2252, r10);
+  CopyWord(base, 0x82002208, v + 2272);
+L5458:
+  guest::StoreU32(base, v + 2256, uint32_t(r7));
+L545C:
+  r8 = 1;
+L5460:
+  Stfs(base, v + 2260, f7);
+L5464:
+  if (r8 == 1) {
+    // A shift: the timer and the car data's rate, then the gear values.
+    const uint32_t up = guest::LoadU8(base, v + 2276);
+    if (up != 0 || guest::LoadU8(base, v + 2277) != 0) {
+      if (up != 0 && guest::LoadU32(base, v + 2256) == 0) {
+        f0 = Lfs(base, 0x8200296C);
+      } else {
+        f0 = Lfs(base, e + 364);
+      }
+      Stfs(base, v + 2268, f0);
+      Stfs(base, e + 400, Fdivs(f4, f0));
+    } else {
+      const uint32_t gear = guest::LoadU32(base, v + 2252);
+      Stfs(base, v + 2264, f7);
+      if (gear == 0) {
+        Stfs(base, v + 2268, f7);
+      } else {
+        const uint32_t old = guest::LoadU32(base, v + 2256);
+        f0 = Lfs(base, e + 4 * (old + 91));
+        CopyWord(base, e + 4 * (old + 91), v + 2268);
+        Stfs(base, e + 4 * (old + 100), Fdivs(f4, f0));
+      }
+    }
+    VehicleSetGearValues(base, v);
+    guest::StoreU8(base, v + 2281, 1);
+    guest::StoreU8(base, v + 2282, 1);
+    goto L5560;
+  }
+  if (r5 == 0 || int32_t(guest::LoadU32(base, v + 2252)) <= 0) {
+    goto L5560;
+  }
+  if (Lfs(base, v + 296) > f7 && Lfs(base, v + 284) == f7) {
+    goto L4F44;
+  }
+  f0 = Fadds(Lfs(base, v + 2264), f12);
+  Stfs(base, v + 2264, f0);
+  if (f0 < f4) {
+    goto L5560;
+  }
+L555C:
+  Stfs(base, v + 2264, f4);
+  goto L5560;
+L4F44:
+  Stfs(base, v + 2264, f7);
+L5560:
+  guest::StoreU8(base, v + 2285, 0);
+  guest::StoreU8(base, v + 2284, 0);
+  guest::StoreU8(base, v + 2286, 0);
+}
+
+void VehicleShiftGears(uint8_t* base, uint32_t vehicle, uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_820B6430 Vehicle::ShiftGears");
+  const uint32_t v = vehicle;
+  uint32_t manual = 0;
+  if (int32_t(guest::LoadU32(base, CarData(base, v) + 1268)) != 1 &&
+      guest::LoadU8(base, v + 2249) == 0) {
+    manual = 1;
+  }
+  VehicleUpdateGearbox(base, v, manual, frame - 112);
+  const double sign = int32_t(guest::LoadU32(base, v + 2252)) == -1 ? Lfs(base, 0x82001BE0)
+                                                                     : Lfs(base, kOne);
+  Stfs(base, v + 2348, sign);
 }
 
 }  // namespace car_physics

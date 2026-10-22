@@ -16,7 +16,8 @@ ITC_FLAG_BOOL(native_car_physics, true, "ITC",
               "copies, sub_820B13C8, sub_820B0A50, sub_820B0CC0; its reset, gearing and "
               "steering, sub_820B0EE8, sub_820B4AA8, sub_820B3D10, sub_820B5FD8 with "
               "sub_820B0668 and sub_820B3E98; the suspension, sub_820B6328, "
-              "sub_820B5588, sub_820B0198) natively instead of through the translated "
+              "sub_820B5588, sub_820B0198; the drivetrain, sub_820B4778, sub_820B31D0; the gearbox, "
+              "sub_820B6430, sub_820B4CF0) natively instead of through the translated "
               "code (the same words, bit for bit; checked by --run_harnesses=car_physics)");
 
 // Defines an adapter: `body` uses `ctx` and `base`. Flush-to-zero off for
@@ -284,3 +285,27 @@ extern "C" REX_FUNC(sub_820B6328) {
 }
 // Vehicle::UpdateWheelSuspension and SuspensionSpring (sub_820B5588,
 // sub_820B0198) have no adapters: their callers in play are native.
+
+// --- The drivetrain ---
+
+// r3 left as it is (the physics step relies on it).
+ITC_CAR_PHYSICS(820B4778, VehicleUpdateDrivetrain(base, ctx.r3.u32, ctx.r1.u32 - 176))
+// r4 = the axle's first wheel, f1 = the drive term; its temporaries below
+// r1.
+ITC_CAR_PHYSICS(820B31D0, VehicleUpdateDrivenAxle(base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64,
+                                                  ctx.r1.u32))
+
+// --- The gearbox ---
+
+// r4 = the byte; r3 left as it is (the physics step relies on it).
+ITC_CAR_PHYSICS(820B4CF0, VehicleUpdateGearbox(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 112))
+// r3 left as it is; r4 comes back as UpdateGearbox's byte.
+extern "C" REX_FUNC(sub_820B6430) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_car_physics)) {
+    __imp__sub_820B6430(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  VehicleShiftGears(base, ctx.r3.u32, ctx.r1.u32 - 96);
+}
