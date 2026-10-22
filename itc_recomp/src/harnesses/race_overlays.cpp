@@ -389,6 +389,11 @@ ITC_NATIVE_WORD(NativeWheelContact, ro::WheelContact(base, ctx.r3.u32, ctx.r4.u3
 ITC_NATIVE_WORD(NativeWheelSurfaceMarks, ro::WheelSurfaceMarks(base, ctx.r3.u32, ctx.r4.u32))
 ITC_NATIVE_WORD(NativeBodyPosition, ro::BodyPosition(base, ctx.r3.u32, ctx.r4.u32))
 ITC_NATIVE_WORD(NativeBodyMatrixCopy, ro::BodyMatrixCopy(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_WORD(NativeSaveFlag199FA, ro::SaveFlag199FA(base, ctx.r4.u32))
+ITC_NATIVE_WORD(NativeSaveFlag199F8, ro::SaveFlag199F8(base, ctx.r4.u32))
+ITC_NATIVE_WORD(NativeSaveFlag199FC, ro::SaveFlag199FC(base, ctx.r4.u32))
+ITC_NATIVE_WORD(NativeSaveFlag199F8Or199FC, ro::SaveFlag199F8Or199FC(base, ctx.r4.u32))
+ITC_NATIVE_WORD(NativeRacerInCurrentStage, ro::RacerInCurrentStage(base, ctx.r4.u32))
 void NativeIsBehindCamera(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = ro::IsBehindCamera(base, ctx.r3.u32, ctx.r4.u32);
@@ -2606,6 +2611,119 @@ void IsBehindCameraCases(Context& h, uint32_t block) {
   }
   results.Report();
 }
+
+// The racers' save flags and stages. Player 0's save data pointer
+// (0x826C5B58) and the race data's (0x826C5B2C) point into the block for the
+// cases and are put back; ids 0 to 401, the 32-bit edges and random ones.
+// The flags' halfwords: zeros, small numbers, negative ones and random; the
+// game's own save data too (read only).
+void SaveFlagCases(Context& h, uint32_t block) {
+  Random& r = h.random;
+  constexpr uint32_t kSaveData = 0x826C5B58;
+  const uint32_t live_save = guest::LoadU32(h.base, kSaveData);
+  const uint32_t live_race = guest::LoadU32(h.base, kRaceData);
+  // The flags (ids 0-399 from block + 0x10000) and the race data.
+  const uint32_t save = block + 0x10000 - 0x199F8;
+  const uint32_t race = block + 0x4000 - 48;
+  std::vector<uint32_t> ids = {400, 401, 0x7FFFFFFF, 0x80000000, 0xFFFFFFFF};
+  for (uint32_t id = 0; id < 400; id += 1 + r.Below(3)) {
+    ids.push_back(id);
+  }
+  ids.push_back(399);
+  for (int i = 0; i < 20; i++) {
+    ids.push_back(uint32_t(r.Next()));
+  }
+  auto save_setup = [&h, save](uint64_t seed, bool live, uint32_t live_save) {
+    return [&h, save, seed, live, live_save] {
+      if (live) {
+        guest::StoreU32(h.base, kSaveData, live_save);
+        return;
+      }
+      Random fill;
+      for (uint64_t n = 0; n < seed % 31; n++) {
+        fill.Next();
+      }
+      for (uint32_t i = 0; i < 12 * 400 + 8; i += 2) {
+        const uint32_t kind = fill.Below(6);
+        const uint16_t value = kind < 3   ? 0
+                               : kind == 3 ? uint16_t(1 + fill.Below(3))
+                               : kind == 4 ? uint16_t(0x8000 | fill.Below(0x8000))
+                                           : uint16_t(fill.Next());
+        guest::StoreU16(h.base, save + 0x199F8 + i, value);
+      }
+      guest::StoreU32(h.base, kSaveData, save);
+    };
+  };
+  {
+    const struct {
+      const char* name;
+      GuestFunction recompiled, native;
+    } flags[] = {
+        {"SaveFlag199FA (sub_82126BB0)", Original<__imp__sub_82126BB0>, NativeSaveFlag199FA},
+        {"SaveFlag199F8 (sub_82126C08)", Original<__imp__sub_82126C08>, NativeSaveFlag199F8},
+        {"SaveFlag199FC (sub_82126C58)", Original<__imp__sub_82126C58>, NativeSaveFlag199FC},
+        {"SaveFlag199F8Or199FC (sub_82126CB0)", Original<__imp__sub_82126CB0>,
+         NativeSaveFlag199F8Or199FC},
+    };
+    for (const auto& f : flags) {
+      Results results(f.name);
+      for (uint64_t seed = 0; seed < 4; seed++) {
+        for (uint32_t id : ids) {
+          const uint64_t upper = r.Next() << 32;
+          const uint64_t r3 = r.Next();
+          Compare(h, results, {}, save_setup(seed, seed == 3, live_save),
+                  [&](PPCContext& t) {
+                    t.r3.u64 = r3;
+                    t.r4.u64 = upper | id;
+                  },
+                  f.recompiled, f.native,
+                  fmt::format("seed {}{} id {:X}", seed, seed == 3 ? " (live)" : "", id));
+        }
+      }
+      guest::StoreU32(h.base, kSaveData, live_save);
+      results.Report();
+    }
+  }
+  {
+    // Racer ids in the records' +3912 from a small range (so some match,
+    // some twice), the current stage 0-7, its slots from the same range of
+    // indices or -1.
+    Results results("RacerInCurrentStage (sub_82126B50)");
+    for (uint64_t seed = 0; seed < 6; seed++) {
+      for (uint32_t id : ids) {
+        const uint64_t r3 = r.Next();
+        Compare(h, results, {},
+                [&h, race, seed] {
+                  Random fill;
+                  for (uint64_t n = 0; n < seed % 17; n++) {
+                    fill.Next();
+                  }
+                  for (uint32_t i = 0; i < 93; i++) {
+                    guest::StoreU32(h.base, race + 48 + 3912 + 3936 * i,
+                                    fill.Below(3) == 0 ? uint32_t(fill.Next()) : fill.Below(420));
+                  }
+                  const uint32_t stages = race + 0x59620;
+                  const uint32_t current = fill.Below(8);
+                  guest::StoreU32(h.base, stages + 804, current);
+                  for (uint32_t i = 0; i < 4; i++) {
+                    const uint32_t kind = fill.Below(5);
+                    guest::StoreU32(h.base, stages + 80 * current + 44 + 8 * i,
+                                    kind == 0 ? 0xFFFFFFFF : fill.Below(95));
+                  }
+                  guest::StoreU32(h.base, kRaceData, race);
+                },
+                [&](PPCContext& t) {
+                  t.r3.u64 = r3;
+                  t.r4.u64 = id;
+                },
+                Original<__imp__sub_82126B50>, NativeRacerInCurrentStage,
+                fmt::format("seed {} id {:X}", seed, id));
+      }
+    }
+    guest::StoreU32(h.base, kRaceData, live_race);
+    results.Report();
+  }
+}
 }  // namespace
 
 void RaceOverlays(Context& h) {
@@ -2639,6 +2757,7 @@ void RaceOverlays(Context& h) {
   SlotOfCases(h);
   ViewBodyCases(h, block);
   IsBehindCameraCases(h, block);
+  SaveFlagCases(h, block);
   memory->SystemHeapFree(block);
 }
 

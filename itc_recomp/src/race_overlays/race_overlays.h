@@ -651,4 +651,22 @@ uint32_t BodyMatrixCopy(uint8_t* base, uint32_t out, uint32_t view);
 // game's 0.0, else 1 (NaNs too).
 uint32_t IsBehindCamera(uint8_t* base, uint32_t overlays, uint32_t point);
 
+// --- The racers' save flags and stages (the marker's and car-model sprites'
+// inputs) ---
+//
+// The save flags are halfwords of player 0's save data (SaveData::Of(0)),
+// 12 bytes a racer id: 1 when nonzero, 0 for ids above 399 (unsigned).
+
+// sub_82126BB0: the halfword at +0x199FA.
+uint32_t SaveFlag199FA(uint8_t* base, uint32_t id);
+// sub_82126C08: the halfword at +0x199F8.
+uint32_t SaveFlag199F8(uint8_t* base, uint32_t id);
+// sub_82126C58: the halfword at +0x199FC.
+uint32_t SaveFlag199FC(uint8_t* base, uint32_t id);
+// sub_82126CB0: SaveFlag199F8 or SaveFlag199FC.
+uint32_t SaveFlag199F8Or199FC(uint8_t* base, uint32_t id);
+// sub_82126B50: 0 for ids above 399; else Stages::HasRacer(race data +
+// 0x59620, Racers::IndexOf(race data + 48, id), the current stage).
+uint32_t RacerInCurrentStage(uint8_t* base, uint32_t id);
+
 }  // namespace race_overlays

@@ -2639,4 +2639,51 @@ uint32_t IsBehindCamera(uint8_t* base, uint32_t overlays, uint32_t point) {
                                                                                               : 1;
 }
 
+namespace {
+
+// A save flag: the halfword at player 0's save data + `offset` + 12 x id
+// (lhax, then cntlzw: any nonzero halfword, negative ones too, is 1).
+uint32_t SaveFlag(uint8_t* base, uint32_t id, uint32_t offset) {
+  if (id > 399) {
+    return 0;
+  }
+  const uint32_t save = va::SaveDataOf(base, 0);
+  return guest::LoadU16(base, save + offset + 12 * id) != 0 ? 1 : 0;
+}
+
+}  // namespace
+
+uint32_t SaveFlag199FA(uint8_t* base, uint32_t id) {
+  ITC_NATIVE_RUNNING("sub_82126BB0 SaveFlag199FA");
+  return SaveFlag(base, id, 0x199FA);
+}
+
+uint32_t SaveFlag199F8(uint8_t* base, uint32_t id) {
+  ITC_NATIVE_RUNNING("sub_82126C08 SaveFlag199F8");
+  return SaveFlag(base, id, 0x199F8);
+}
+
+uint32_t SaveFlag199FC(uint8_t* base, uint32_t id) {
+  ITC_NATIVE_RUNNING("sub_82126C58 SaveFlag199FC");
+  return SaveFlag(base, id, 0x199FC);
+}
+
+uint32_t SaveFlag199F8Or199FC(uint8_t* base, uint32_t id) {
+  ITC_NATIVE_RUNNING("sub_82126CB0 SaveFlag199F8Or199FC");
+  if (id > 399) {
+    return 0;
+  }
+  return (SaveFlag199F8(base, id) != 0 || SaveFlag199FC(base, id) != 0) ? 1 : 0;
+}
+
+uint32_t RacerInCurrentStage(uint8_t* base, uint32_t id) {
+  ITC_NATIVE_RUNNING("sub_82126B50 RacerInCurrentStage");
+  if (id > 399) {
+    return 0;
+  }
+  const uint32_t race = guest::LoadU32(base, kRaceData);
+  const int32_t index = va::RacersIndexOf(base, race + 48, id);
+  return va::StagesHasRacer(base, race + 0x59620, uint32_t(index), 0xFFFFFFFFu);
+}
+
 }  // namespace race_overlays

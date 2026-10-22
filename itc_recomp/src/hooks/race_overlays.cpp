@@ -20,7 +20,8 @@ ITC_FLAG_BOOL(native_race_overlays, true, "ITC",
               "sub_8212A868; Sparks::Update, sub_8212DDC8; Smoke::Update, sub_8212AA78; ParticlesB::Update, sub_8212B748; ParticlesC::Update, sub_8212C2F0; RaceOverlays::SlotOf, sub_8215E048; the children's constructors, "
               "sub_8211F060 to sub_8212E9A0, and Smoke and ParticlesB::Reset, sub_8212A9E0 and "
               "sub_8212BA98; the view's body and wheels through the vehicle accessors, sub_821268B0 to "
-              "sub_82126FF0; CarOverlays::IsBehindCamera, sub_82124630) natively "
+              "sub_82126FF0; CarOverlays::IsBehindCamera, sub_82124630; the racers' "
+              "save flags and stages, sub_82126B50 to sub_82126CB0) natively "
               "instead of through the translated code (same results; checked by "
               "--run_harnesses=race_overlays)");
 
@@ -472,3 +473,10 @@ extern "C" REX_FUNC(sub_82124630) {
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = IsBehindCamera(base, ctx.r3.u32, ctx.r4.u32);
 }
+
+// The racers' save flags and stages: r4 = a racer id (r3 isn't read).
+ITC_OVERLAY_WORD(82126BB0, SaveFlag199FA(base, ctx.r4.u32))
+ITC_OVERLAY_WORD(82126C08, SaveFlag199F8(base, ctx.r4.u32))
+ITC_OVERLAY_WORD(82126C58, SaveFlag199FC(base, ctx.r4.u32))
+ITC_OVERLAY_WORD(82126CB0, SaveFlag199F8Or199FC(base, ctx.r4.u32))
+ITC_OVERLAY_WORD(82126B50, RacerInCurrentStage(base, ctx.r4.u32))
