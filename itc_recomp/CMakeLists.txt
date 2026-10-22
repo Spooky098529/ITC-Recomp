@@ -115,6 +115,8 @@ set(ITC_SOURCES
     src/vehicle_accessors/vectors.cpp
     src/hooks/matrix_math.cpp
     src/matrix_math/matrix_math.cpp
+    src/hooks/car_physics.cpp
+    src/car_physics/rigid_body.cpp
     src/hooks/command_list.cpp
     src/command_list/command_list.cpp
     src/hooks/c_runtime.cpp
@@ -153,6 +155,7 @@ set(ITC_SOURCES
     src/harnesses/race_overlays.cpp
     src/harnesses/vehicle_accessors.cpp
     src/harnesses/matrix_math.cpp
+    src/harnesses/car_physics.cpp
     src/helpers/debug_output.cpp
     src/helpers/object_attributes.cpp
     src/helpers/time.cpp
@@ -202,9 +205,10 @@ set(ITC_SOURCES
 # free; seen with -O3 on asin of a negative NaN). See
 # docs/functions/c-runtime.md. The UI movie keys' interpolation
 # (src/ui_movies/keys.cpp) likewise (docs/functions/ui-movies.md), and the
-# matrix math (src/matrix_math/matrix_math.cpp, docs/functions/matrix-math.md).
+# matrix math (src/matrix_math/matrix_math.cpp, docs/functions/matrix-math.md)
+# and the car physics (src/car_physics/, docs/functions/car-physics.md).
 set_source_files_properties(src/c_runtime/math.cpp src/ui_movies/keys.cpp
-    src/matrix_math/matrix_math.cpp PROPERTIES
+    src/matrix_math/matrix_math.cpp src/car_physics/rigid_body.cpp PROPERTIES
     COMPILE_OPTIONS "-ffp-model=strict;-ffp-contract=off"
     SKIP_PRECOMPILE_HEADERS ON)
 
