@@ -221,7 +221,12 @@ skips Merged rows). Never
    edits `generated/`. A callee that never ran in play: its branch keeps
    the recompiled path behind the flag, or is ported too, said in the row.
 3. Adds harness cases in the same change, registered in `harness.cpp` and
-   the flag's help text.
+   the flag's help text. Cases that differ for a reason that isn't the
+   game's (a NaN's bits as the compiler left them in the translated code,
+   say) may go in their own group named "... (expected to differ)", with
+   the reason in a comment beside it and in the function's row, and the
+   group in the report's `expected to differ:` line. Every other case
+   matches.
 4. Builds (`cmake --build itc_recomp/out/build/linux-amd64-release
    -j$(nproc)`) and runs `attract_race.sh 25 --run_harnesses=all`: no new
    error lines, ~20 seconds at 30 ticks/s, every harness at 0 differing
@@ -292,6 +297,7 @@ message:
 migrate: <name>
 groups: <root -> commit, one a line>
 harnesses: <each "harness: <function>: N cases, M differ" line, verbatim>
+expected to differ: none | <function: the group's line, verbatim; the reason>
 race: <seconds at 30 ticks/s>, <error lines>
 rows: <functions whose rows changed>
 native: <functions whose adapters were removed (now Native)> | none
@@ -397,6 +403,8 @@ in git):
 - **Done:** one line a subsystem (file, groups made native, flags,
   commits), newest first.
 - **Rows to review:** the function files added or changed, for the user.
+- **Expected to differ:** the functions given an "(expected to differ)"
+  harness group this run (from the reports), with the reason.
 - **Totals:** `b7_status.py`'s totals line after each step.
 - **Stopped:** when and why, if the loop ended itself.
 

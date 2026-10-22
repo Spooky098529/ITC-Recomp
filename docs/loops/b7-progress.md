@@ -51,16 +51,20 @@ record: `b7-loop-2026-10-22-0111.md` (and this file's history).
   the first migration's 34 rows (Overridden). For review: RacerId's
   adapter (`sub_82126AE0`) sign-extends r3 where the original
   zero-extends a found id (only the upper 32 bits; callers compare 32).
-  The second migration's 6 rows and the 9 names. For review: a new
-  "(expected to differ)" harness group, Trail::AddPoint (`sub_82129598`)
-  with NaN or infinite inputs (5 of 126 differ, only NaNs' sign and
-  payload, by the agent's reading of the translated code's compiled
-  Newton step); its 474 finite cases are the same.
+  The second migration's 6 rows and the 9 names.
   The third migration's 10 rows (4 new). For review: NaN-only harness
   results depend on which operand the compiler kept in the translated
   vector adds: Smoke::Emit keeps the first operand's NaN (as the Xenon
   does), the sparks a plain `addps` matching how this build compiled
   theirs; a rebuild could bring back NaN-only differences there.
+
+## Expected to differ
+
+- `sub_82129598` Trail::AddPoint (`race-overlays.md`, 8d7ad32): "NaN or
+  infinite inputs (expected to differ)", 126 cases, 5 differ: only the
+  NaNs' sign and payload (the translated code's Newton step as the
+  compiler rewrote it); its 474 finite cases are the same. Accepted by
+  the user, 2026-10-22.
 
 ## To check in a drive
 
