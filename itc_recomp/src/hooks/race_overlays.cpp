@@ -342,10 +342,9 @@ ITC_OVERLAY_SET(82129498, TrailReset(base, ctx.r3.u32))
 ITC_OVERLAY_SET(8212C0E8, ParticlesCReset(base, ctx.r3.u32))
 ITC_OVERLAY_SET(8212CC38, MarkerReset(base, ctx.r3.u32))
 ITC_OVERLAY_SET(8212D6E0, SparksReset(base, ctx.r3.u32))
-// ParticlesB::ResetEntry: r4 = the entry (r3, the owner, isn't read).
-// SmokeEmitter::Reset and Smoke::InRegion have no adapters: only Smoke::Reset
-// and Smoke::Update call them, and those call their plain C++.
-ITC_OVERLAY_SET(8212B3E8, ParticlesBResetEntry(base, ctx.r4.u32))
+// SmokeEmitter::Reset, Smoke::InRegion and ParticlesB::ResetEntry have no
+// adapters: only Smoke::Reset, Smoke::Update, ParticlesB::Reset and
+// ParticlesB::Update call them, and those call their plain C++.
 
 // Sparks::Update: r3 = the sparks. Where the native version declines (the
 // original could trap or reach outside its entries), the original runs.
