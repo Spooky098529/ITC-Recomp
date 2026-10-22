@@ -408,4 +408,54 @@ void VehicleUpdateGearbox(uint8_t* base, uint32_t vehicle, uint32_t manual, uint
 // `frame`, the original's 96 bytes); +2348 = -1.0 in reverse, else 1.0.
 void VehicleShiftGears(uint8_t* base, uint32_t vehicle, uint32_t frame);
 
+// --- The collision world (src/car_physics/collision_world.cpp) ---
+
+// The surface settings' getters (sub_820BC1F8, sub_820BC240, sub_820BC288,
+// sub_820BC2D0; the names ours: CollisionSurface::A to D): the group's value
+// for the first of the flags' bits 0x01000000, 0x02000000, 0x04000000, else
+// its default (D's is group B's, the game's). Their tail-calling wrappers
+// (sub_820BC540, sub_820BC548, sub_820BC530, sub_820BC538: OfA to OfD).
+double CollisionSurfaceA(uint8_t* base, uint32_t flags);
+double CollisionSurfaceB(uint8_t* base, uint32_t flags);
+double CollisionSurfaceC(uint8_t* base, uint32_t flags);
+double CollisionSurfaceD(uint8_t* base, uint32_t flags);
+double CollisionSurfaceOfA(uint8_t* base, uint32_t flags);
+double CollisionSurfaceOfB(uint8_t* base, uint32_t flags);
+double CollisionSurfaceOfC(uint8_t* base, uint32_t flags);
+double CollisionSurfaceOfD(uint8_t* base, uint32_t flags);
+// The setters (sub_820BC318, sub_820BC360, sub_820BC3A8, sub_820BC3F0):
+// the default with any of 0x07000000, and each bit's value.
+void CollisionSurfaceSetA(uint8_t* base, uint32_t bits, double value);
+void CollisionSurfaceSetB(uint8_t* base, uint32_t bits, double value);
+void CollisionSurfaceSetC(uint8_t* base, uint32_t bits, double value);
+void CollisionSurfaceSetD(uint8_t* base, uint32_t bits, double value);
+// sub_820BC438 (the name ours: CollisionSurfaces::Reset): groups A and C
+// 0.5, B and D 1.0; CollisionWorld::ResetSurfaces (sub_820BC550) calls it.
+void CollisionSurfacesReset(uint8_t* base);
+void CollisionWorldResetSurfaces(uint8_t* base);
+// sub_820BAA78 (the name ours: CollisionShape::Init): +28 and +44 = 0.0,
+// words +0, +4, +8 = 0.
+void CollisionShapeInit(uint8_t* base, uint32_t shape);
+// CollisionObject::CollisionObject (sub_820B7AE8): the vtable 0x82002A94,
+// the shape at +32 (CollisionShape::Init), the w of +160, +176, +208, +304
+// = 0.0.
+void CollisionObjectConstruct(uint8_t* base, uint32_t object);
+// CollisionObject::AccumulateForce (sub_820B7DF8): +176 += (point - the
+// body's center) x force (through `frame` + 80 to + 127, the original's
+// 160 bytes); +160 per axis the force's when larger in magnitude; +284 = 0,
+// +192 up. Returns the original's r3 (+176).
+uint32_t CollisionObjectAccumulateForce(uint8_t* base, uint32_t object, uint32_t point,
+                                        uint32_t force, uint32_t frame);
+// CollisionObject::AddContact (sub_820B7C50): a new contact
+// (CollisionWorld::NewContact) pushed on +240; returns it, or 0.
+uint32_t CollisionObjectAddContact(uint8_t* base, uint32_t object);
+// sub_820B7ED0 (the name ours: CollisionRecords::Merge): the `count` hit
+// records copied to `out`, those with the same id (+60) merged (averaged,
+// the push +32 normalized with its length in +48; merged ones' ids -1,
+// dropped); the summary the average of those left with surface bits (more
+// than one), else a copy of the first. Returns the count left. `frame`: the
+// original's 304 bytes.
+uint32_t CollisionRecordsMerge(uint8_t* base, uint32_t out, uint32_t summary, uint32_t hits,
+                               uint32_t count, uint32_t frame);
+
 }  // namespace car_physics

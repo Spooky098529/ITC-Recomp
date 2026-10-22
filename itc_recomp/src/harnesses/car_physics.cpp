@@ -23,6 +23,7 @@
 
 #include <bit>
 #include <cmath>
+#include <cstring>
 #include <iterator>
 #include <string>
 
@@ -221,6 +222,31 @@ ITC_NATIVE_STEP(NativeUpdateDrivenAxle,
 ITC_NATIVE_STEP(NativeUpdateGearbox,
                 cp::VehicleUpdateGearbox(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 112))
 ITC_NATIVE_STEP(NativeShiftGears, cp::VehicleShiftGears(base, ctx.r3.u32, ctx.r1.u32 - 96))
+// The collision world.
+ITC_NATIVE_STEP(NativeSurfaceA, ctx.f1.f64 = cp::CollisionSurfaceA(base, ctx.r3.u32))
+ITC_NATIVE_STEP(NativeSurfaceB, ctx.f1.f64 = cp::CollisionSurfaceB(base, ctx.r3.u32))
+ITC_NATIVE_STEP(NativeSurfaceC, ctx.f1.f64 = cp::CollisionSurfaceC(base, ctx.r3.u32))
+ITC_NATIVE_STEP(NativeSurfaceD, ctx.f1.f64 = cp::CollisionSurfaceD(base, ctx.r3.u32))
+ITC_NATIVE_STEP(NativeSurfaceOfA, ctx.f1.f64 = cp::CollisionSurfaceOfA(base, ctx.r3.u32))
+ITC_NATIVE_STEP(NativeSurfaceOfB, ctx.f1.f64 = cp::CollisionSurfaceOfB(base, ctx.r3.u32))
+ITC_NATIVE_STEP(NativeSurfaceOfC, ctx.f1.f64 = cp::CollisionSurfaceOfC(base, ctx.r3.u32))
+ITC_NATIVE_STEP(NativeSurfaceOfD, ctx.f1.f64 = cp::CollisionSurfaceOfD(base, ctx.r3.u32))
+ITC_NATIVE_STEP(NativeSurfaceSetA, cp::CollisionSurfaceSetA(base, ctx.r4.u32, ctx.f1.f64))
+ITC_NATIVE_STEP(NativeSurfaceSetB, cp::CollisionSurfaceSetB(base, ctx.r4.u32, ctx.f1.f64))
+ITC_NATIVE_STEP(NativeSurfaceSetC, cp::CollisionSurfaceSetC(base, ctx.r4.u32, ctx.f1.f64))
+ITC_NATIVE_STEP(NativeSurfaceSetD, cp::CollisionSurfaceSetD(base, ctx.r4.u32, ctx.f1.f64))
+ITC_NATIVE_STEP(NativeSurfacesReset, cp::CollisionSurfacesReset(base))
+ITC_NATIVE_STEP(NativeResetSurfaces, cp::CollisionWorldResetSurfaces(base);
+                ctx.r3.u64 = 0x826C2E30)
+ITC_NATIVE_STEP(NativeShapeInit, cp::CollisionShapeInit(base, ctx.r3.u32))
+ITC_NATIVE_STEP(NativeObjectConstruct, cp::CollisionObjectConstruct(base, ctx.r3.u32))
+ITC_NATIVE_STEP(NativeAccumulateForce,
+                ctx.r3.u64 = cp::CollisionObjectAccumulateForce(base, ctx.r3.u32, ctx.r4.u32,
+                                                                ctx.r5.u32, ctx.r1.u32 - 160))
+ITC_NATIVE_STEP(NativeAddContact, ctx.r3.u64 = cp::CollisionObjectAddContact(base, ctx.r3.u32))
+ITC_NATIVE_STEP(NativeRecordsMerge,
+                ctx.r3.u64 = cp::CollisionRecordsMerge(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                                       ctx.r6.u32, ctx.r1.u32 - 304))
 // Where tan would fail, the original (as the adapters).
 void NativeSteerRecordCurve(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
@@ -319,6 +345,7 @@ enum Shape {
 }  // namespace
 
 void CarPhysicsVehicle(Context& h);
+void CarPhysicsCollision(Context& h);
 
 void CarPhysics(Context& h) {
   // The block 16-byte aligned, as the game's bodies are.
@@ -498,6 +525,7 @@ void CarPhysics(Context& h) {
     }
   }
   CarPhysicsVehicle(h);
+  CarPhysicsCollision(h);
 }
 
 namespace {
@@ -862,6 +890,188 @@ void CarPhysicsVehicle(Context& h) {
       }
     }
   }
+}
+
+namespace {
+
+// The collision world's cases: a region of guest stack further down (below
+// the vehicle's), the surface settings (0x826C2DF0, 64 bytes) and the
+// collision world's pointer (0x826C2D88) set for each case and put back
+// after. Compared: the region, the surface settings, r3 and f1.
+constexpr uint32_t kCollisionArea = 0x14000;
+constexpr uint32_t kCollisionAreaBytes = 0x1000;
+constexpr uint32_t kSurfaceGlobals = 0x826C2DF0, kSurfaceBytes = 64;
+constexpr uint32_t kWorldPointer = 0x826C2D88;
+// In the region: the object (320 bytes) or the records (+0x000), a point
+// (+0x700), a force (+0x740), the body (+0x800), a fake world (+0xA00) and
+// its contacts (+0xB00); the merge's summary (+0x300) and hits (+0x400).
+constexpr uint32_t kPoint = 0x700, kForce = 0x740, kBodyAt = 0x800, kWorld = 0xA00,
+                   kContactsAt = 0xB00, kSummary = 0x300, kHits = 0x400;
+
+enum CollisionShape {
+  kFlagsR3,     // r3 = flags (0x01000000, 0x02000000, 0x04000000 bits)
+  kBitsR4,      // r4 = bits, f1 = a value
+  kNoArgs,      // the surfaces' reset
+  kObjectR3,    // r3 = the object (or shape) at the region
+  kForceArgs,   // r3 = the object, r4 = a point, r5 = a force
+  kContactR3,   // r3 = the object, a fake world
+  kMergeArgs,   // r3 = out, r4 = the summary, r5 = the hits, r6 = a count
+};
+
+}  // namespace
+
+void CarPhysicsCollision(Context& h) {
+  const uint32_t area = (h.data - kCollisionArea) & ~0xFu;
+  const struct {
+    const char* name;
+    GuestFunction recompiled, native;
+    CollisionShape shape;
+    bool compare_f1;
+  } functions[] = {
+      {"CollisionSurface::A (sub_820BC1F8)", Original<__imp__sub_820BC1F8>, NativeSurfaceA,
+       kFlagsR3, true},
+      {"CollisionSurface::B (sub_820BC240)", Original<__imp__sub_820BC240>, NativeSurfaceB,
+       kFlagsR3, true},
+      {"CollisionSurface::C (sub_820BC288)", Original<__imp__sub_820BC288>, NativeSurfaceC,
+       kFlagsR3, true},
+      {"CollisionSurface::D (sub_820BC2D0)", Original<__imp__sub_820BC2D0>, NativeSurfaceD,
+       kFlagsR3, true},
+      {"CollisionSurface::OfA (sub_820BC540)", Original<__imp__sub_820BC540>, NativeSurfaceOfA,
+       kFlagsR3, true},
+      {"CollisionSurface::OfB (sub_820BC548)", Original<__imp__sub_820BC548>, NativeSurfaceOfB,
+       kFlagsR3, true},
+      {"CollisionSurface::OfC (sub_820BC530)", Original<__imp__sub_820BC530>, NativeSurfaceOfC,
+       kFlagsR3, true},
+      {"CollisionSurface::OfD (sub_820BC538)", Original<__imp__sub_820BC538>, NativeSurfaceOfD,
+       kFlagsR3, true},
+      {"CollisionSurface::SetA (sub_820BC318)", Original<__imp__sub_820BC318>,
+       NativeSurfaceSetA, kBitsR4, false},
+      {"CollisionSurface::SetB (sub_820BC360)", Original<__imp__sub_820BC360>,
+       NativeSurfaceSetB, kBitsR4, false},
+      {"CollisionSurface::SetC (sub_820BC3A8)", Original<__imp__sub_820BC3A8>,
+       NativeSurfaceSetC, kBitsR4, false},
+      {"CollisionSurface::SetD (sub_820BC3F0)", Original<__imp__sub_820BC3F0>,
+       NativeSurfaceSetD, kBitsR4, false},
+      {"CollisionSurfaces::Reset (sub_820BC438)", Original<__imp__sub_820BC438>,
+       NativeSurfacesReset, kNoArgs, false},
+      {"CollisionWorld::ResetSurfaces (sub_820BC550)", Original<__imp__sub_820BC550>,
+       NativeResetSurfaces, kNoArgs, false},
+      {"CollisionShape::Init (sub_820BAA78)", Original<__imp__sub_820BAA78>, NativeShapeInit,
+       kObjectR3, false},
+      {"CollisionObject::CollisionObject (sub_820B7AE8)", Original<__imp__sub_820B7AE8>,
+       NativeObjectConstruct, kObjectR3, false},
+      {"CollisionObject::AccumulateForce (sub_820B7DF8)", Original<__imp__sub_820B7DF8>,
+       NativeAccumulateForce, kForceArgs, false},
+      {"CollisionObject::AddContact (sub_820B7C50)", Original<__imp__sub_820B7C50>,
+       NativeAddContact, kContactR3, false},
+      {"CollisionRecords::Merge (sub_820B7ED0)", Original<__imp__sub_820B7ED0>,
+       NativeRecordsMerge, kMergeArgs, false},
+  };
+  uint8_t saved_surfaces[kSurfaceBytes];
+  std::memcpy(saved_surfaces, h.base + kSurfaceGlobals, kSurfaceBytes);
+  const uint32_t saved_world = guest::LoadU32(h.base, kWorldPointer);
+  enum Group { kNumbers, kOneNaN, kNaNs };
+  const char* const kGroupNames[] = {"", ", one NaN",
+                                     ", NaNs and infinities anywhere (expected to differ)"};
+  constexpr uint32_t kNaNWords[] = {0x7FC00000, 0x7F800001, 0xFFC00001, 0xFF800001};
+  constexpr uint32_t kFlagBits[] = {0x01000000, 0x02000000, 0x04000000};
+  for (const auto& f : functions) {
+    for (Group group : {kNumbers, kOneNaN, kNaNs}) {
+      Results results(std::string(f.name) + kGroupNames[group]);
+      for (uint64_t seed = 0; seed < 100; seed++) {
+        Random pick = Seeded(seed * 29 + 3 * uint64_t(group) + 4);
+        auto word = [group](Random& r) { return group == kNaNs ? FloatWord(r) : NumberWord(r); };
+        const double f1 = double(std::bit_cast<float>(word(pick)));
+        uint32_t bits = 0;
+        for (uint32_t bit : kFlagBits) {
+          bits |= pick.Below(2) == 0 ? bit : 0;
+        }
+        bits |= uint32_t(pick.Next()) & 0x00FFFFFF;
+        const uint32_t count = pick.Below(9);
+        const uint32_t nan_word = kNaNWords[pick.Below(std::size(kNaNWords))];
+        const uint32_t nan_at = pick.Below((kCollisionAreaBytes + kSurfaceBytes) / 4);
+        std::vector<uint8_t> result[2];
+        for (int v = 0; v < 2; v++) {
+          Random fill = Seeded(seed * 31 + 7 * uint64_t(group) + 9);
+          for (uint32_t i = 0; i < kCollisionAreaBytes; i += 4) {
+            guest::StoreU32(h.base, area + i, word(fill));
+          }
+          for (uint32_t i = 0; i < kSurfaceBytes; i += 4) {
+            guest::StoreU32(h.base, kSurfaceGlobals + i, word(fill));
+          }
+          // The object's body (+16), contacts' head (+240); the records'
+          // ids (+60, 0 to 3 or -1) and flags (+56); the fake world.
+          guest::StoreU32(h.base, area + 16, area + kBodyAt);
+          guest::StoreU32(h.base, area + 240, fill.Below(3) == 0 ? 0 : area + kContactsAt);
+          for (uint32_t r = 0; r < 8; r++) {
+            const uint32_t hit = area + kHits + 80 * r;
+            guest::StoreU32(h.base, hit + 60,
+                            fill.Below(5) == 0 ? uint32_t(-1) : fill.Below(4));
+            guest::StoreU32(h.base, hit + 56,
+                            fill.Below(3) == 0 ? 0 : kFlagBits[fill.Below(3)]);
+          }
+          guest::StoreU32(h.base, area + kWorld + 44, fill.Below(5));
+          guest::StoreU32(h.base, area + kWorld + 52, fill.Below(6));
+          guest::StoreU32(h.base, area + kWorld + 48, area + kContactsAt);
+          guest::StoreU32(h.base, kWorldPointer, area + kWorld);
+          if (group == kOneNaN) {
+            // Over a float word only (not a pointer, id, count or flags).
+            const uint32_t at = nan_at < kCollisionAreaBytes / 4
+                                    ? area + 4 * nan_at
+                                    : kSurfaceGlobals + 4 * (nan_at - kCollisionAreaBytes / 4);
+            const uint32_t old = guest::LoadU32(h.base, at);
+            if ((old & 0x7F800000) != 0 && std::fabs(std::bit_cast<float>(old)) < 1e6f) {
+              guest::StoreU32(h.base, at, nan_word);
+            }
+          }
+          PPCContext t = CallContext(h);
+          t.fpscr.disableFlushModeUnconditional();
+          t.f1.f64 = f1;
+          switch (f.shape) {
+            case kFlagsR3:
+              t.r3.u64 = bits;
+              break;
+            case kBitsR4:
+              t.r3.u64 = area;
+              t.r4.u64 = bits;
+              break;
+            case kNoArgs:
+            case kObjectR3:
+            case kContactR3:
+              t.r3.u64 = area;
+              break;
+            case kForceArgs:
+              t.r3.u64 = area;
+              t.r4.u64 = area + kPoint;
+              t.r5.u64 = area + kForce;
+              break;
+            case kMergeArgs:
+              t.r3.u64 = area;
+              t.r4.u64 = area + kSummary;
+              t.r5.u64 = area + kHits;
+              t.r6.u64 = count;
+              break;
+          }
+          (v == 0 ? f.recompiled : f.native)(t, h.base);
+          result[v] = Read(h.base, area, kCollisionAreaBytes);
+          const std::vector<uint8_t> surfaces = Read(h.base, kSurfaceGlobals, kSurfaceBytes);
+          result[v].insert(result[v].end(), surfaces.begin(), surfaces.end());
+          for (int i = 0; i < 4; i++) {
+            result[v].push_back(uint8_t(t.r3.u32 >> (24 - 8 * i)));
+          }
+          for (int i = 0; f.compare_f1 && i < 8; i++) {
+            result[v].push_back(uint8_t(t.f1.u64 >> (56 - 8 * i)));
+          }
+        }
+        results.Check(result[0], result[1],
+                      fmt::format("seed {} bits {:08X} f1 {:016X}", seed, bits,
+                                  std::bit_cast<uint64_t>(f1)));
+      }
+      results.Report();
+    }
+  }
+  std::memcpy(h.base + kSurfaceGlobals, saved_surfaces, kSurfaceBytes);
+  guest::StoreU32(h.base, kWorldPointer, saved_world);
 }
 
 }  // namespace harness

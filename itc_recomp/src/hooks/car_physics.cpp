@@ -17,7 +17,9 @@ ITC_FLAG_BOOL(native_car_physics, true, "ITC",
               "steering, sub_820B0EE8, sub_820B4AA8, sub_820B3D10, sub_820B5FD8 with "
               "sub_820B0668 and sub_820B3E98; the suspension, sub_820B6328, "
               "sub_820B5588, sub_820B0198; the drivetrain, sub_820B4778, sub_820B31D0; the gearbox, "
-              "sub_820B6430, sub_820B4CF0) natively instead of through the translated "
+              "sub_820B6430, sub_820B4CF0; the collision world's objects, contacts and "
+              "surfaces, sub_820B7AE8 to sub_820B7ED0, sub_820BAA78, sub_820BC1F8 to "
+              "sub_820BC550) natively instead of through the translated "
               "code (the same words, bit for bit; checked by --run_harnesses=car_physics)");
 
 // Defines an adapter: `body` uses `ctx` and `base`. Flush-to-zero off for
@@ -304,3 +306,38 @@ extern "C" REX_FUNC(sub_820B6430) {
   ctx.fpscr.disableFlushMode();
   VehicleShiftGears(base, ctx.r3.u32, ctx.r1.u32 - 96);
 }
+
+// --- The collision world ---
+
+// r3 = the flags; f1 = the value.
+ITC_CAR_PHYSICS(820BC1F8, ctx.f1.f64 = CollisionSurfaceA(base, ctx.r3.u32))
+ITC_CAR_PHYSICS(820BC240, ctx.f1.f64 = CollisionSurfaceB(base, ctx.r3.u32))
+ITC_CAR_PHYSICS(820BC288, ctx.f1.f64 = CollisionSurfaceC(base, ctx.r3.u32))
+ITC_CAR_PHYSICS(820BC2D0, ctx.f1.f64 = CollisionSurfaceD(base, ctx.r3.u32))
+ITC_CAR_PHYSICS(820BC540, ctx.f1.f64 = CollisionSurfaceOfA(base, ctx.r3.u32))
+ITC_CAR_PHYSICS(820BC548, ctx.f1.f64 = CollisionSurfaceOfB(base, ctx.r3.u32))
+ITC_CAR_PHYSICS(820BC530, ctx.f1.f64 = CollisionSurfaceOfC(base, ctx.r3.u32))
+ITC_CAR_PHYSICS(820BC538, ctx.f1.f64 = CollisionSurfaceOfD(base, ctx.r3.u32))
+// r4 = the bits, f1 = the value.
+ITC_CAR_PHYSICS(820BC318, CollisionSurfaceSetA(base, ctx.r4.u32, ctx.f1.f64))
+ITC_CAR_PHYSICS(820BC360, CollisionSurfaceSetB(base, ctx.r4.u32, ctx.f1.f64))
+ITC_CAR_PHYSICS(820BC3A8, CollisionSurfaceSetC(base, ctx.r4.u32, ctx.f1.f64))
+ITC_CAR_PHYSICS(820BC3F0, CollisionSurfaceSetD(base, ctx.r4.u32, ctx.f1.f64))
+ITC_CAR_PHYSICS(820BC438, CollisionSurfacesReset(base))
+// r3 comes back as 0x826C2E30.
+ITC_CAR_PHYSICS(820BC550, CollisionWorldResetSurfaces(base); ctx.r3.u64 = 0x826C2E30)
+// r3 = the shape (left as it is).
+ITC_CAR_PHYSICS(820BAA78, CollisionShapeInit(base, ctx.r3.u32))
+// r3 = the object (left as it is).
+ITC_CAR_PHYSICS(820B7AE8, CollisionObjectConstruct(base, ctx.r3.u32))
+// r4 = the point, r5 = the force; r3 comes back as +176.
+ITC_CAR_PHYSICS(820B7DF8, ctx.r3.u64 = CollisionObjectAccumulateForce(base, ctx.r3.u32,
+                                                                      ctx.r4.u32, ctx.r5.u32,
+                                                                      ctx.r1.u32 - 160))
+// r3 comes back as the contact, or 0.
+ITC_CAR_PHYSICS(820B7C50, ctx.r3.u64 = CollisionObjectAddContact(base, ctx.r3.u32))
+// r3 = out, r4 = the summary, r5 = the hits, r6 = the count; r3 comes back
+// as the count left.
+ITC_CAR_PHYSICS(820B7ED0, ctx.r3.u64 = CollisionRecordsMerge(base, ctx.r3.u32, ctx.r4.u32,
+                                                             ctx.r5.u32, ctx.r6.u32,
+                                                             ctx.r1.u32 - 304))
