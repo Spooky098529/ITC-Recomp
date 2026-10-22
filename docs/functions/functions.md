@@ -59,6 +59,9 @@ Rows not yet moved stay in the table below. So far:
   (B4).
 - [`audio.md`](audio.md): the audio library's render driver client, its
   XMA layer and the voice category volume (B2).
+- [`sprites.md`](sprites.md): the camera-facing sprites: the race
+  overlays' sprite lists (trails, particles), single sprites and screen
+  rectangles, and the light glows' billboards (B7).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
@@ -124,7 +127,6 @@ old performance notes to the end of `../native-renderer.md`.
 | `sub_82146AC0` | | | Advances one flipbook animation: frame count +0, current frame +4, tick counter +8 (wraps at the length at +12), frame start ticks from +16. |
 | `sub_82146B80` | | | Returns the current frame's entry of animation r4 in set r3 (texture id at +4). |
 | `sub_82146A38` | | | Finds the animation in set r3 whose texture is r4; -1 if none. |
-| `sub_82148658` | | | Draws the light groups: for each group, builds a light list on the stack (count +32, 48-byte lights at +36, from static level data) and picks its texture's current animation frame. Calls `sub_8209CDB0` → `sub_8209CC38`. |
 | `sub_820F5740` | `Minimap::Draw` | Wrapped | From the draw step part `sub_820F6068`; steps the minimap blink clock at `0x826C5AA4`/`0x826C5AA8` after drawing (see "Per-frame logic" in `../frame-interpolation.md`). |
 | `sub_82107910` | | Wrapped | From Draw; adds one to the play time frame counter at `0x826C5B90` (see "Per-frame logic" in `../frame-interpolation.md`). |
 | `sub_821109B8` | | | Turns the play time frame counter into hours, minutes and seconds (30, 1800, 108000 frames). |
@@ -204,10 +206,7 @@ old performance notes to the end of `../native-renderer.md`.
 | `sub_8215DEA0` | `RaceOverlays::Run` | Overridden | The race overlays (25 objects at r3; the marker above opponents): their update (vtable slot 4) on logic passes only, their recording (slot 5) every pass with the logic pass's cameras put back, in the original's stack frame so their products pair. See "World-space sprites" in `../frame-interpolation.md`. |
 | `sub_821594B8` | | Wrapped | The rival intro cutscene's Update handler: runs on logic passes; on render-only passes only its logo's draw (`sub_82211A28`) is repeated (`--redraw_rival_logo`; "The rival logo at the race start" in `../frame-interpolation.md`). |
 | `sub_82211A28` | | Wrapped | Draws the rival's logo; noted during the cutscene for the render-only redraw. |
-| `sub_82128750` | | Wrapped | World-space sprite recorder (r3 = sprite list, r4 = camera; the light trails): corners blended around the original ("World-space sprites" in `../frame-interpolation.md`). |
-| `sub_821281A8` | | Wrapped | A single world-space sprite's recorder: its corners blended between ticks (`--blend_world_sprites`; `--log_single_sprites`). |
 | `sub_821379D8` | `Glow::Record` | Wrapped | The glow (bloom) recorder in races: strength and history weight blended between ticks, history written every frame (`--blend_glow`, `--glow_history_every_frame`; `src/interpolation/glow.cpp`). |
-| `sub_8209C6E0` | `Billboards::BuildVertices` | Wrapped | r3 = billboard set (+0 the camera pass it faces), r4 = command list, r5 = the sprites: each light's quad turned to face that camera; the camera blended once a frame (`--cache_billboard_cameras`). |
 | `sub_820AE958` | | Wrapped | The render thread's command that starts the boot movie; `--skip_intro` waits for it to return (ending the movie earlier stalled the boot; "The title screen" in `../title-screen.md`). |
 | `sub_825A7410` | `memcpy` | Wrapped | The library's memcpy (r3 destination, r4 source, r5 size): copies into the physical views recorded for the native renderer's guest memory mirrors (`src/native/buffers.cpp`). |
 | `sub_8229E3F0` | `Device::Kick` | Overridden | `src/native/gpu_link.cpp`. r3 device, r4 (size in words, address) pairs, r5 their count. The kicked buffers are applied directly (only their effects outside the GPU) instead of written to the ring; the original is no longer called. `--native_renderer_log_gpu` logs. |
@@ -331,7 +330,6 @@ old performance notes to the end of `../native-renderer.md`.
 | `sub_8258F5C0` | | Wrapped | Same file: the single-command items' command 15 (the helper object's draw), marked as command 15 so the native renderer draws its inline vertices. |
 | `sub_8258D998` | `VideoOutput::ResolveFrontBuffer` | Wrapped | Same file: resolves render target 0 into a front buffer at the frame's end; the native renderer shows that target ("The end of a frame" in `gpu-functions.md`). |
 | `sub_822AFA58` | `Device::Resolve` | Wrapped | Same file: resolves made outside command 25 (command 33's, one per tile) passed to the native renderer. |
-| `sub_8209CC38` | | Wrapped | The light billboards' batch (calls `sub_8209C1A0`, `sub_8209C6E0`; r4 the light list); for `--find_per_frame_state` and `--watch_lights`. |
 | `sub_82133960` | | Overridden | A draw step part, rewritten as the original to name each view's draw for `--find_per_frame_state`: for the 15 per-view objects at `0x826C5D80` with an active camera pass and +52 clear, calls vtable slot 0, clears +8056 and +48, flips +8060. |
 | `sub_82096340` | | Wrapped | A tick handler thunk (vtable slot 1 of r3); names its target for `--find_per_frame_state`. |
 | `sub_82092968` | | Wrapped | Runs the app's component lists (r4's low word a component; its vtable slot 1); named for `--find_menu_selection`. |

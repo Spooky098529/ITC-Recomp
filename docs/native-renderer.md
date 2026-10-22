@@ -3232,7 +3232,11 @@ Left of ours: `Note` ~110 thousand cycles a frame (~75 a call),
 the largest left; main thread ~6.1 million cycles a frame):
 
 - `__imp__sub_821298C0`, ~16% of the main thread, the largest; not looked
-  at yet (what it does isn't known).
+  at yet (what it does isn't known). Since mapped (B7 loop, 2026-10-22,
+  `functions/sprites.md`): `SpriteList::Reset`, which clears a race
+  overlay's 500-sprite list on the stack and stores w = 1.0 in all 2,000
+  corners (~32 KB a call), though only the first `count` sprites are
+  recorded.
 - `__imp__sub_8209C6E0` (the light billboards' vertex generation), ~12%
   (~730 thousand cycles a frame) after the change above. It fell ~30% when
   the camera we write into the pass went from 4-byte to 16-byte stores,

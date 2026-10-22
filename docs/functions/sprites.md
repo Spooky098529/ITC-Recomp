@@ -1,0 +1,90 @@
+# Known functions: sprites
+
+The game's camera-facing sprites, drawn through the render queue
+(`0x826C5D5C`, see `../known-data.md`): the sprite lists the race
+overlays fill on their stack and record (up to 500 quads each: a ribbon
+trail and the particle-like overlays), the overlays' single world-space
+sprites and screen rectangles, and the light glows' billboards (the light
+groups). Mapped by the B7 loop (`../loops/b7-loop.md`) from the main
+thread's two largest recompiled functions, `sub_821298C0` and
+`sub_8209C6E0` ("DrawState::Note and AfterDraw" in
+`../native-renderer.md`). How their drawing is blended between ticks is
+"World-space sprites" and the "Light billboards' facing" item in
+`../frame-interpolation.md`. The race overlays' manager
+(`sub_8215DEA0`, `RaceOverlays::Run`, in [`functions.md`](functions.md))
+calls the overlay recorders here through their vtables; the overlays'
+update side (the rest of `82121000`-`8212EF00`) isn't mapped yet (a lead
+in `../loops/leads.md`). Shared callees in other files: `sub_8209BD50`
+(`Matrix::Multiply`), `sub_825A7410` (`memcpy`), `sub_8258CAA0`
+(`CommandList::AllocateSlots`), and the texture animations'
+`sub_82146A38`, `sub_82146B80` and `sub_82597118`, all in
+[`functions.md`](functions.md). The rest of the game's functions are in
+[`functions.md`](functions.md).
+
+Status:
+
+- **Native**: plain C++ in `itc_recomp/src/` that doesn't use the
+  PowerPC context (`ctx`): normal arguments and host structs (it may
+  still read and write guest memory through `src/guest.h` while
+  recompiled code shares the data). The game reaches it without `ctx`,
+  from native or overridden callers, and the recompiled original is no
+  longer called (except behind a fallback flag or to check against it).
+  No `REX_FUNC` override of it exists, not even an adapter kept only for
+  a harness (that's Overridden until the adapter goes).
+  The end state for every function.
+- **Overridden**: an `extern "C" REX_FUNC(sub_XXXXXXXX)` override in
+  `itc_recomp/src/` (or a macro defining one) does the work instead of
+  the original: a thin adapter in front of native code, or a body that
+  still uses `ctx` (calling guest code, reading registers). It may call
+  the original when its flag is off, or to check itself against it.
+- **Wrapped**: an override that does something of its own (skipping
+  render-only passes, logging, timing) and still calls the original
+  (`__imp__sub_XXXXXXXX`) for the work.
+- **Dropped**: its work isn't needed on PC (hardware set-up, kernel calls
+  the SDK already stubbed), so it no longer runs: an override in
+  `itc_recomp/src/` replaces it with nothing (or a fixed return value), or
+  its callers, made native, leave the call out (no override then; the row
+  says which caller). Logs, a harness or the renderer's frame dumps have
+  shown that nothing reads what it did. The original is no longer called,
+  except behind a fallback flag while the drop is being checked. A
+  function the game never calls in the first place isn't Dropped: its
+  status stays blank and its row says it's never called.
+- **Patched**: the generated code was edited in place (search for
+  `PATCH:`).
+
+A function usually moves from recompiled or Wrapped to Overridden to
+Native as the `ctx` edge moves up through its callers, or straight to
+Dropped when its work isn't needed.
+`itc_recomp/tools/check_function_statuses.py` checks this column, in
+every file of the tables, against `src/` (an override marked Native, a
+status with no override, an override with no row, a row in two files);
+run it after changing either, on any branch.
+
+| Address | Name | Status | Notes |
+|---|---|---|---|
+| `sub_821298C0` | `SpriteList::Reset` | | r3 = a sprite list (0x10A00 bytes, on its caller's stack; layout in `../known-data.md`): +0 the identity matrix, +64, +68 and +72 cleared, and w = 1.0 (the float at `0x82000A30`) stored in each of the 2,000 corners (500 sprites × 4, 16 bytes apart from +80), whatever the count will be. No calls. From the five sprite list overlays below (`sub_82129A08`, `sub_8212ACF0`, `sub_8212BB20`, `sub_8212C6D0`, `sub_8212DFB8`), once or twice a recording each (two lists in `sub_82129A08` and `sub_8212DFB8`). The main thread's largest translated function (~16% of its cycles, "DrawState::Note and AfterDraw" in `../native-renderer.md`): ~32 KB of stores a call. The recorder reads only the first `count` sprites, and the overlays write each corner they fill whole (w = 1.0 seen in `sub_82129A08` and `sub_8212ACF0`; not checked corner by corner in the others), so the stores past the count are probably never read. |
+| `sub_821292B0` | `SpriteList::Draw` | | r3 = sprite list, r4 = camera pass, r5 = the render queue layer: if +64 is 0, tail-calls `sub_82128750`. From the five sprite list overlays. |
+| `sub_82128750` | `SpriteList::Record` | Wrapped | World-space sprite recorder (r3 = sprite list, r4 = camera; the light trails): corners blended around the original ("World-space sprites" in `../frame-interpolation.md`). The recompiled one (r4 = camera pass, r5 = the render queue layer): opens a chunk on the command list at [`0x826C5D60`] (`sub_8258C9D0`), records render states by +72 (0-3) and +68 (0-5), c0 x4 = the list's matrix (+0) × the camera pass's view-projection (+0x90, `sub_8209BD50`, `sub_8258CB98`); then for each of the `min(count, 500)` sprites (count at +0x109F0) a quad of four 24-byte vertices (position, the corner's four color words packed to ARGB, texture coordinates chosen by the sprite's words at +64080 and +66080; `sub_8258CB08`) and a command 15; closes the chunk (`sub_8258CA50`) and submits it to the render queue (`[0x826C5D5C]`, vtable slot 4: the chunk, the layer, f1 = -c0's [3][2]). From `sub_821292B0`. |
+| `sub_82129298` | `Sprite::Draw` | | r3 = a single sprite (`sub_8211EB60`'s layout), r4 = camera pass, r5 = layer: if +64 is 0, tail-calls `sub_821281A8`. From `sub_8211EC18` and `sub_8212CE40`. |
+| `sub_821281A8` | `Sprite::Record` | Wrapped | A single world-space sprite's recorder: its corners blended between ticks (`--blend_world_sprites`; `--log_single_sprites`). The recompiled one (r3 = sprite, r4 = camera pass, r5 = layer) records one quad like `sub_82128750` (render states by +72 and +68) and submits it to the render queue the same way. From `sub_82129298`. Not read in detail. |
+| `sub_8211EB60` | `Sprite::Reset` | | r3 = a single sprite: `sub_821298C0` for one sprite (identity matrix at +0, +64, +68, +72 cleared, w = 1.0 in its four corners at +80). From `sub_8211EC18` and `sub_8212CE40`. No calls. |
+| `sub_82129280` | `ScreenRect::Draw` | | r3 = a screen rectangle, r4 = camera pass, r5 = layer: if +64 is 0, tail-calls `sub_82128E70`. From `sub_8212CE40` (layer 604). |
+| `sub_82128E70` | `ScreenRect::Record` | | r3 = a screen rectangle (+80 x, +84 y, +88 width, +92 height, integers; +96-+108 texture coordinates u0, v0, u1, v1; +112 texture; +116 alpha blending on), r5 = layer: a quad of four white vertices (color -1) at those pixels, opened, closed and submitted to the render queue (`0x826C5D5C`) like `sub_82128750`, depth 0.0. From `sub_82129280`. Not read in detail (its render states). |
+| `sub_82126630` | `Overlay::LayerFor` | | r4 = camera pass index: the render queue layer the overlays submit their sprites with: 0 and 1 → 270, 2 → 491, 3 → 53, others 270 (r3, the overlay, isn't read). Leaf. From the sprite overlays here and `sub_8211EC18`, `sub_8212CE40`. |
+| `sub_82123300` | `Vec4::Equal` | | r3, r4 = two 4-float vectors: 1 if all four are equal (`fcmpu`), else 0. Leaf. From `sub_82129940` and the overlays' update `sub_82123A80`. |
+| `sub_82129940` | `Trail::TurnSide` | | r3-r4 and r5-r6 = two 4-float directions passed in registers: 0 if they're equal (`sub_82123300`), else 1 if their cross product's y is above 0.0, -1 otherwise (which way the trail turns about the vertical). From `sub_82129A08`. |
+| `sub_821266C8` | `Vector::AngleBetween` | | r4-r5 and r6-r7 = two vectors in registers: acos(a·b / (|a| |b|)) (`sub_825A8170`) times the float at `0x82002BDC`, probably degrees; 0.0 if either length is 0. From `sub_8212CE40`. |
+| `sub_82129A08` | | | A sprite list overlay's recording (vtable; r3 the overlay, r4 the camera pass index): probably the light trails (a ribbon; or skid marks, not checked). Walks a ring of 128-byte trail points at this+128 (capacity at +104, head index at +0xFA80, count at +0xFA88; does nothing under 2 points): a point and the one before it make a quad when their sequence numbers (+60) are consecutive, the previous one is valid (+112), the point is in front of the camera (its offset from the eye, pass +0x190, against pass +0x1D0) and their directions (+64) don't oppose; the quad's corners from both points' edge points (+80, +96), adjusted at turns (`sub_82129940`), its four colors from the point's +32-+44, its words 4 and the point's +120. Fills two lists on its stack (each `sub_821298C0`; texture from [this+108]+0, +68 = 1) by the turn's side, up to 500 quads each, then draws both (`sub_82126630`, `sub_821292B0`). Marks a point +116 = 1 where the trail breaks. A ~0x21000-byte stack frame (`sub_825A9934` probes it). Reached through `sub_8215DEA0`'s recording (vtable slot 5) in races. |
+| `sub_8212ACF0` | | | A sprite list overlay's recording (vtable; r3 the overlay, r4 the camera pass index), probably a particle effect: up to ~45 emitters of 720 bytes at this+128 (current index at +32528, count at +32536); each visible one (+96) gets billboard axes (+0, +16) facing the camera (pass +0x1D0), sized by +100, +116 and +124 (capped when +32624 is 2), and its particles (count at +128, records from +240) each a quad in one list (`sub_821298C0`, texture [this+108]+0, +68 = 1), skipped behind the camera; then `sub_82126630`, `sub_821292B0`. A ~0x10B30-byte stack frame (`sub_825A9934`). Not read in detail. |
+| `sub_8212BB20` | | | A sprite list overlay's recording like `sub_8212ACF0` (vtable; r3 the overlay, r4 the camera pass index), probably a particle effect: 176-byte entries at this+128 (current index at +2768, count at +2776), one list (+68 = 1). Not read in detail. |
+| `sub_8212C6D0` | | | A sprite list overlay's recording like `sub_8212ACF0` (vtable; r3 the overlay, r4 the camera pass index), probably a particle effect: 128-byte entries at this+112 (current index at +2688, count at +2696), one list (+68 = 2, texture [this+104]+0). Not read in detail. |
+| `sub_8212DFB8` | | | A sprite list overlay's recording like `sub_8212ACF0` (vtable; r3 the overlay, r4 the camera pass index), probably a particle effect: 144-byte entries at this+128 (current index at +28932, count at +28940), two lists (two `sub_821298C0`, two `sub_821292B0`). Not read in detail. |
+| `sub_8212CE40` | | | An overlay's recording (vtable; r3 the overlay, r4 the camera pass index) with one marker at this+128 (+48 position, +80-+92 color, +96 visible, +100 size, +112 texture index into this+104): probably the marker above opponents. When +288 is 1, a camera-facing quad in front of the camera (`sub_8211EB60`, `sub_82126630`, `sub_82129298`); when 0, a screen rectangle placed by the angle between the camera's direction and the marker's (`sub_821266C8`), layer 604 (`sub_82129280`). Not read in detail. |
+| `sub_8211EC18` | | | An overlay's recording like `sub_8212CE40`'s world half (vtable; r3 the overlay, r4 the camera pass index), its sprite at this+144 (+48 position, +80-+92 color, +96 visible, +100 size, +112, +116): a camera-facing quad (`sub_8211EB60`, `sub_82126630`, `sub_82129298`). Which overlay isn't known. Not read in detail. |
+| `sub_82148658` | | | Draws the light groups: for each group, builds a light list on the stack (count +32, 48-byte lights at +36, from static level data) and picks its texture's current animation frame. Calls `sub_8209CDB0` → `sub_8209CC38`. r3 = the billboard set, r4 = the groups (count at +0, 44 bytes of flags and texture id from +16, then the lights), r5 = the texture table, r6 = the animation set: per group `sub_8209F5A0`, alpha mode +0 = 1024 (flag 0x200), else 64 or 32 (flag 0x10), blend +4 = 2 or 4 (flag 0x40), texture +12 from `sub_82146A38`, `sub_82146B80` and `sub_82597118`, lights by `sub_8209F5C8`. From `sub_820F3B70` and `sub_820F6068` (the race draw step). |
+| `sub_8209F5A0` | `BillboardMaterial::Init` | | r3 = a light list's material on the stack: +0 = 1, +4 = 1, +8, +12, +16, +32 and +36 = 0. Leaf. From `sub_82148658`. |
+| `sub_8209F5C8` | `BillboardMaterial::SetLights` | | r3 = the material, r4 = light count, r5 = the lights: +32 = r4, +36 = r5, unless r4 is 0. Leaf. From `sub_82148658`. |
+| `sub_8209CDB0` | `Billboards::Draw` | | r3 = billboard set, r4 = the material and lights: 0 if its light count (+32) is 0, else `sub_8209CC38` and 1. From `sub_82148658`. |
+| `sub_8209CC38` | `Billboards::Record` | Wrapped | The light billboards' batch (calls `sub_8209C1A0`, `sub_8209C6E0`; r4 the light list); for `--find_per_frame_state` and `--watch_lights`. The recompiled one: the command list from the object at [`0x826BABA0`] (vtable slot 8, then its slot 1), a chunk opened (`sub_8258C9D0`), the material's states (`sub_8209C1A0`) and quads (`sub_8209C6E0`), three render states and command 36; the chunk closed (`sub_8258CA50`) and, when any vertices were written, submitted to the render queue (slot 8, its slot 2, then slot 4: the chunk, layer [r3+4], depth 0.0). From `sub_8209CDB0`. |
+| `sub_8209C1A0` | `Billboards::RecordState` | | r3 = billboard set, r4 = command list, r5 = the material: render states by its alpha mode (+0: 16, 32, 64, 256 or 1024) and blend mode (+4: 1, 2, 4, 8 or 16); c0 x4 = two stack matrices × the camera pass's projection (`[r3]` +0x50, two `sub_8209BD50`, `sub_8258CB98`, a `sub_825A7410` copy); the shaders at `0x826A50A0` and `0x826A50A4`; the texture (+12) or none. From `sub_8209CC38`. Not read in detail. |
+| `sub_8209C6E0` | `Billboards::BuildVertices` | Wrapped | r3 = billboard set (+0 the camera pass it faces), r4 = command list, r5 = the sprites: each light's quad turned to face that camera; the camera blended once a frame (`--cache_billboard_cameras`). The recompiled one writes 28-byte vertices for each of the material's lights (+32, 48 bytes each at +36), then a command 19 (DrawPrimitiveUP: type 13 for alpha modes 2-64, else 2; the count; stride 28), adds the count to `0x826A509C` and returns it (0 when nothing is drawn). No calls but `sub_8258CAA0`. ~12% of the main thread (~730 thousand cycles a frame) after `--cache_billboard_cameras`; see "DrawState::Note and AfterDraw" in `../native-renderer.md`. From `sub_8209CC38`. |
