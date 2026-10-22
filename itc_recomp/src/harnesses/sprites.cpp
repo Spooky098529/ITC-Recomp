@@ -185,8 +185,19 @@ void Sprites(Context& h) {
   // infinities), the chunk already open, another chunk open (the original
   // runs), and a list with just room. Compared: the whole scratch area, the
   // open count and r3.
-  {
-    Results results("ScreenRect::Record (sub_82128E70)");
+  // ScreenRect::Draw (sub_82129280) gets the same cases, its +64 set on one
+  // in five (nothing recorded).
+  struct RectFunction {
+    const char* name;
+    GuestFunction recompiled, native;
+    bool draw;
+  };
+  const RectFunction rect_functions[] = {
+      {"ScreenRect::Record (sub_82128E70)", __imp__sub_82128E70, sub_82128E70, false},
+      {"ScreenRect::Draw (sub_82129280)", __imp__sub_82129280, sub_82129280, true},
+  };
+  for (const RectFunction& f : rect_functions) {
+    Results results(f.name);
     constexpr uint32_t kRenderQueue = 0x826C5D5C;
     constexpr uint32_t kOverlayList = 0x826C5D60;
     constexpr uint32_t kList = 0, kQueue = 64, kVtable = 128, kRect = 256, kSlots = 512;
@@ -211,6 +222,8 @@ void Sprites(Context& h) {
       const uint32_t used = r.Below(2) ? 0 : r.Below(100000);
       const uint32_t layer = r.Below(2) ? 604 : uint32_t(r.Next());
       const uint32_t pass = uint32_t(r.Next());  // r4, not read
+      const uint32_t skip =
+          f.draw && r.Below(5) == 0 ? (r.Below(2) ? 1 : uint32_t(r.Next()) | 1) : 0;
       std::vector<uint8_t> result[2];
       for (int v = 0; v < 2; v++) {
         Fill(h.base, h.data, kScratchBytes);
@@ -228,14 +241,14 @@ void Sprites(Context& h) {
         for (int k = 0; k < 10; k++) {
           guest::StoreU32(h.base, h.data + kRect + 80 + 4 * k, rect[k]);
         }
-        guest::StoreU32(h.base, h.data + kRect + 64, 0);
+        guest::StoreU32(h.base, h.data + kRect + 64, skip);
         guest::StoreU32(h.base, kRenderQueue, h.data + kQueue);
         guest::StoreU32(h.base, kOverlayList, list);
         PPCContext t = CallContext(h);
         t.r3.u64 = h.data + kRect;
         t.r4.u64 = pass;
         t.r5.u64 = layer;
-        (v == 0 ? __imp__sub_82128E70 : sub_82128E70)(t, h.base);
+        (v == 0 ? f.recompiled : f.native)(t, h.base);
         result[v] = Read(h.base, h.data, kScratchBytes);
         for (uint32_t word : {guest::LoadU32(h.base, command_list::kOpenChunks), t.r3.u32}) {
           for (int b = 0; b < 4; b++) {
@@ -252,9 +265,9 @@ void Sprites(Context& h) {
       results.Check({result[0].begin() + from, result[0].begin() + to},
                     {result[1].begin() + from, result[1].begin() + to},
                     fmt::format("case {}: kind {} rect {:08X} {:08X} {:08X} {:08X} uv {:08X} {:08X} "
-                                "{:08X} {:08X} blend {:X}, from byte {}",
+                                "{:08X} {:08X} blend {:X} skip {:X}, from byte {}",
                                 i, kind, rect[0], rect[1], rect[2], rect[3], rect[4], rect[5],
-                                rect[6], rect[7], rect[9], from));
+                                rect[6], rect[7], rect[9], skip, from));
     }
     guest::StoreU32(h.base, kRenderQueue, saved_queue);
     guest::StoreU32(h.base, kOverlayList, saved_list);
