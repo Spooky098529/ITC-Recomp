@@ -10,17 +10,26 @@ rows to review and drive list are there), and this file's history.
 - Run started 2026-10-22 14:39 on `b7-loop-22-10-26` (the user's branch,
   kept from the previous run), from f9216cf; summary
   `b7-loop-2026-10-22-1439.md`.
-- Subsystem 1 of 3 (the vehicle accessors) finished. Now: the
-  no-mapping lead (the race overlays' 12 functions made ready by the
-  accessors, not counted): migration done (7c018ef..f986921: 14 rows,
-  8 adapters removed; race 22 s, 0 errors). Step: validation (agent
-  running).
+- Subsystem 1 of 3 (the vehicle accessors) finished; then the no-mapping
+  lead (the race overlays' newly ready functions, 7c018ef..f986921)
+  validated (21 of 21 harness lines).
+- Subsystem 2 of 3: the matrix and vector math (the `Matrix::` lead at
+  `8209B000`-`820AC000`, with the vector library's 4x4 matrix lead
+  folded in). Step: mapping (agent running).
 - Known: `b7_status.py` checks `sub_825A9934` (`__chkstk`) "Dropped, but
   it ran", and every function made Native or Merged since the coverage
   session "..., but it ran" (`seen_in_play.txt` predates them; a new
   coverage session clears them).
 
 ## Done
+
+- No-mapping lead: the race overlays' functions made ready by the
+  accessors (`race-overlays.md`): 14 rows ours (with FlagsKind and
+  NoSaveFlags, no rows), 8 adapters removed (6 there, 2 in
+  `vehicle-accessors.md`); under `--native_race_overlays`.
+  7c018ef..f986921, validated. Still blocked there: `sub_820AB560`
+  (Wrapped, 6 groups) and `sub_82126ED0` (a vtable call, 3 groups);
+  UpdateSmoke (memcpy, unseen callees).
 
 - The vehicle accessors (`vehicle-accessors.md`, mapped in 6846615; 132
   rows): 127 ours (125 Overridden, 2 Native) in one migration
@@ -74,6 +83,11 @@ the validation agent's attract race; the user drives (with
   `sub_820FFF10`, `sub_82294348`, `sub_82294360`, `sub_822943C8`,
   `sub_822944B0`, `sub_82294568` (the racer records and stages probably
   run at a race's start or end, the contacts on collisions).
+- Race overlays' newly ready functions (validation's race):
+  `sub_82126BB0`, `sub_82126CB0`, `sub_82126C08`, `sub_82126C58`,
+  `sub_82126B50` (the save flags and stage check), `sub_82122DB8`,
+  `sub_82127198` (no rows: never seen in play), `sub_82129598`
+  Trail::AddPoint (already on the previous run's list).
 
 ## Totals
 
