@@ -12,11 +12,17 @@ commits, the function files and the subsystems' docs.
   Mapped as `functions/c-runtime.md` (6cbe96a): 89 rows, 54 ready
   groups; the heap, TLS (`_getptd`) and the kernel-calling pieces left
   out (the core).
-- Step: migration (first agent running).
-- Session: pass 7 of 20, subsystem 3 of 5. In all: subsystem 3 of 5.
+- Step: migration (second agent running: `pow` and its helpers, floor,
+  ceil).
+- Session: pass 8 of 20, subsystem 3 of 5. In all: subsystem 3 of 5.
 
 ## Done
 
+- C runtime, first migration: stack probe (Dropped), asin/acos, memset,
+  sin, cos, atan, atan2 (ebf6cf9..14fd610), `--native_c_runtime`,
+  `--native_math`; harnesses at 0 differing, races 20-21 s, no errors.
+  `src/c_runtime/math.cpp` builds with `-ffp-model=strict
+  -ffp-contract=off` (NaN signs bit for bit).
 - Sprites, second migration: `sub_82128E70`, `sub_82129280` native under
   `--native_sprites` (0ce9dcc, 23bd994); harnesses at 0 differing, race
   20 s, no errors. Not run in attract races (probably the marker above
@@ -59,6 +65,8 @@ commits, the function files and the subsystems' docs.
   known 187, unknown 6234).
 - After mapping the C runtime: ours 182, work left 6571 (wrapped 150,
   known 272, unknown 6149).
+- After the C runtime's first migration: ours 191, work left 6562
+  (wrapped 150, known 263, unknown 6149).
 
 ## Stopped
 
