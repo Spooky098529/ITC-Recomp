@@ -5,6 +5,7 @@
 #include "guest.h"
 
 #include "c_runtime/format.h"
+#include "c_runtime/start_up.h"
 #include "c_runtime/strings.h"
 
 #include "base/flags.h"
@@ -22,7 +23,10 @@ ITC_FLAG_BOOL(native_c_runtime, true, "ITC",
               "isalpha, isdigit, isalnum and isleadbyte (sub_825A8600, sub_825A8618, sub_825AB020, "
               "sub_825AB040, sub_825AB0A0, sub_825B6898); strtoul and strtoxl (sub_825A85E0, "
               "sub_825A82C8); ___dtold and _ld12tod (sub_825B6378, sub_825B69B8); write_char "
-              "(sub_825AF000); __iob_func (sub_825AD4C0) (checked by "
+              "(sub_825AF000); __iob_func (sub_825AD4C0); the start-up's _cfltcvt_init (sub_825A6DB0, "
+              "sub_825A6E48), _init_pointers' setters (sub_825AD140, sub_825AEE18, sub_825AFCB8, "
+              "sub_825B3560, sub_825B3548), __initmbctable and setSBCS (sub_825B6958, sub_825B68C8) "
+              "(checked by "
               "--run_harnesses=c_runtime)");
 
 // __chkstk: r12 = minus the frame about to be made (4 KB or more). Reads one
@@ -362,4 +366,95 @@ extern "C" REX_FUNC(sub_825AD4C0) {
     return;
   }
   ctx.r3.s64 = int32_t(c_runtime::kStreams);
+}
+
+// The start-up's pieces (src/c_runtime/start_up.cpp), each run once at boot.
+
+// _cfltcvt_init: the float conversion table. The original leaves r3 to r11
+// changed (lis and addi steps); its only caller, sub_825A6E48, is reached
+// through the pointer at 0x8207239C from sub_822979E0 (_cinit, probably),
+// which sets them again first.
+extern "C" REX_FUNC(sub_825A6DB0) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_c_runtime)) {
+    __imp__sub_825A6DB0(ctx, base);
+    return;
+  }
+  c_runtime::InitFloatConversions(base);
+}
+
+// Branches to _cfltcvt_init.
+extern "C" REX_FUNC(sub_825A6E48) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_c_runtime)) {
+    __imp__sub_825A6E48(ctx, base);
+    return;
+  }
+  c_runtime::InitFloatConversions(base);
+}
+
+// _init_pointers' setters: r3 = the value.
+extern "C" REX_FUNC(sub_825AD140) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_c_runtime)) {
+    __imp__sub_825AD140(ctx, base);
+    return;
+  }
+  c_runtime::SetHandler82971170(base, ctx.r3.u32);
+}
+
+extern "C" REX_FUNC(sub_825AEE18) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_c_runtime)) {
+    __imp__sub_825AEE18(ctx, base);
+    return;
+  }
+  c_runtime::SetHandler82971178(base, ctx.r3.u32);
+}
+
+extern "C" REX_FUNC(sub_825AFCB8) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_c_runtime)) {
+    __imp__sub_825AFCB8(ctx, base);
+    return;
+  }
+  c_runtime::SetInvalidParameterHandler(base, ctx.r3.u32);
+}
+
+extern "C" REX_FUNC(sub_825B3560) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_c_runtime)) {
+    __imp__sub_825B3560(ctx, base);
+    return;
+  }
+  c_runtime::SetCriticalSectionInitializer(base, ctx.r3.u32);
+}
+
+extern "C" REX_FUNC(sub_825B3548) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_c_runtime)) {
+    __imp__sub_825B3548(ctx, base);
+    return;
+  }
+  c_runtime::SetDefaultCriticalSectionInitializer(base);
+}
+
+// __initmbctable: returns 0.
+extern "C" REX_FUNC(sub_825B6958) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_c_runtime)) {
+    __imp__sub_825B6958(ctx, base);
+    return;
+  }
+  ctx.r3.s64 = c_runtime::InitMbcTable(base);
+}
+
+// setSBCS: r3 = the multibyte info (left as it is).
+extern "C" REX_FUNC(sub_825B68C8) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_c_runtime)) {
+    __imp__sub_825B68C8(ctx, base);
+    return;
+  }
+  c_runtime::SetSbcs(base, ctx.r3.u32);
 }

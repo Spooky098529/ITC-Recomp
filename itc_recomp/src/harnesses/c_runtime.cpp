@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <array>
+#include <tuple>
 
 namespace harness {
 
@@ -110,6 +111,40 @@ std::vector<uint8_t> FlipCase(Context& h, std::vector<uint8_t> v) {
     }
   }
   return v;
+}
+
+// Runs one case of a start-up piece through both versions: the guest ranges
+// it writes (live globals) saved, `setup()` run, the function called, the
+// ranges and r3 kept (unless `r3` is false), and the ranges put back; then
+// compared.
+template <typename Setup, typename Args>
+void GlobalsCase(Context& h, Results& results,
+                 const std::vector<std::pair<uint32_t, uint32_t>>& ranges, Setup setup, Args args,
+                 GuestFunction recompiled, GuestFunction native, const std::string& what,
+                 bool r3 = true) {
+  std::vector<uint8_t> result[2];
+  for (int v = 0; v < 2; v++) {
+    std::vector<std::vector<uint8_t>> saved;
+    for (const auto& [address, bytes] : ranges) {
+      saved.push_back(Read(h.base, address, bytes));
+    }
+    Fill(h.base, h.data, kScratchBytes);
+    setup();
+    PPCContext t = CallContext(h);
+    args(t);
+    (v == 0 ? recompiled : native)(t, h.base);
+    for (size_t i = 0; i < ranges.size(); i++) {
+      const auto bytes = Read(h.base, ranges[i].first, ranges[i].second);
+      result[v].insert(result[v].end(), bytes.begin(), bytes.end());
+      Write(h.base, ranges[i].first, saved[i].data(), ranges[i].second);
+    }
+    const auto scratch = Read(h.base, h.data, kScratchBytes);
+    result[v].insert(result[v].end(), scratch.begin(), scratch.end());
+    if (r3) {
+      Append(result[v], t.r3.u64);
+    }
+  }
+  results.Check(result[0], result[1], what);
 }
 
 const uint32_t kLengths[] = {0, 1, 2, 3, 4, 5, 7, 8, 15, 16, 17, 31, 64, 200, 450};
@@ -791,6 +826,63 @@ void CRuntime(Context& h) {
           }
         }
       }
+    }
+    results.Report();
+  }
+
+  // The start-up's pieces, on the live globals (saved and put back around
+  // each call): the float conversion table filled (from 0xCD, through
+  // sub_825A6E48 too; r3 not compared: _cfltcvt_init leaves 0x825B0000 there,
+  // which its caller, _cinit through sub_825A6E48, sets again before reading);
+  // each setter with zero, a pointer and random words;
+  // __initmbctable with its done flag clear (the info, from 0xCD, filled)
+  // and set (nothing done); setSBCS on the scratch area at even and odd
+  // addresses.
+  {
+    Results results("the C runtime's start-up (sub_825A6DB0 and the rest)");
+    const std::vector<std::pair<uint32_t, uint32_t>> table = {{0x8266BA5C, 40}};
+    for (auto [recompiled, native, name] :
+         {std::tuple{__imp__sub_825A6DB0, sub_825A6DB0, "_cfltcvt_init"},
+          std::tuple{__imp__sub_825A6E48, sub_825A6E48, "sub_825A6E48"}}) {
+      GlobalsCase(h, results, table, [&] { Fill(h.base, 0x8266BA5C, 40); },
+                  [](PPCContext&) {}, recompiled, native, name, false);
+    }
+    struct Setter {
+      GuestFunction recompiled, native;
+      uint32_t global;
+      const char* name;
+    };
+    const Setter setters[] = {
+        {__imp__sub_825AD140, sub_825AD140, 0x82971170, "sub_825AD140"},
+        {__imp__sub_825AEE18, sub_825AEE18, 0x82971178, "sub_825AEE18"},
+        {__imp__sub_825AFCB8, sub_825AFCB8, 0x82978320, "sub_825AFCB8"},
+        {__imp__sub_825B3560, sub_825B3560, 0x8297132C, "sub_825B3560"},
+        {__imp__sub_825B3548, sub_825B3548, 0x82971328, "sub_825B3548"},
+    };
+    for (const Setter& setter : setters) {
+      for (uint64_t value : {uint64_t(0), uint64_t(0x825B3498), uint64_t(0xFFFFFFFF), h.random.Next(), h.random.Next()}) {
+        GlobalsCase(h, results, {{setter.global - 8, 24}}, [] {},
+                    [&](PPCContext& t) { t.r3.u64 = value; }, setter.recompiled, setter.native,
+                    fmt::format("{} r3 {:X}", setter.name, value));
+      }
+    }
+    const uint32_t info = guest::LoadU32(h.base, 0x8266C450);
+    const std::vector<std::pair<uint32_t, uint32_t>> mbc = {
+        {0x82978338, 4}, {0x8297135C, 4}, {0x8297136C, 4}, {info, 544}};
+    for (uint32_t done : {0u, 1u}) {
+      GlobalsCase(h, results, mbc,
+                  [&] {
+                    guest::StoreU32(h.base, 0x82978338, done);
+                    guest::StoreU32(h.base, 0x8297135C, 0x12345678);
+                    guest::StoreU32(h.base, 0x8297136C, 0x12345678);
+                    Fill(h.base, info, 544);
+                  },
+                  [](PPCContext& t) { t.r3.u64 = 0x5555; }, __imp__sub_825B6958, sub_825B6958,
+                  fmt::format("__initmbctable done {}", done));
+    }
+    for (uint32_t offset : {64u, 67u, 1024u}) {
+      GlobalsCase(h, results, {}, [] {}, [&](PPCContext& t) { t.r3.u64 = h.data + offset; },
+                  __imp__sub_825B68C8, sub_825B68C8, fmt::format("setSBCS +{}", offset));
     }
     results.Report();
   }

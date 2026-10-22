@@ -108,6 +108,7 @@ set(ITC_SOURCES
     src/c_runtime/math.cpp
     src/c_runtime/strings.cpp
     src/c_runtime/format.cpp
+    src/c_runtime/start_up.cpp
     src/game_data/game_data.cpp
     src/display/gamma.cpp
     src/harnesses/harness.cpp
