@@ -2446,7 +2446,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
     once the game is native (A0).
 
     **B7's first step, native memory** (`docs/native-memory.md`, designed
-    with the user 2026-10-22, on branch `native-heap`): one allocation
+    with the user and built 2026-10-22, on branch `native-heap`): one allocation
     layer of our own (`src/memory/`) that every allocation goes through,
     recompiled and native alike: the process heap, VirtualAlloc and
     physical memory, routed at nine functions behind `--native_heap`.
@@ -2487,7 +2487,8 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
     translated code's doubles bit for bit, NaN signs included (the intro
     of `docs/functions/c-runtime.md`). What blocks the rest of these
     subsystems: the guest heap and the VirtualAlloc wrappers (the user's
-    decision), TLS (`_getptd`), the matrix math (`Matrix::Multiply` and
+    decision then; since native memory, 2026-10-22, native code allocates
+    through the layer), TLS (`_getptd`), the matrix math (`Matrix::Multiply` and
     `Matrix::Copy`, Wrapped), std::string, the string table and font, the
     texture set; each is a lead in `docs/loops/leads.md`.
 

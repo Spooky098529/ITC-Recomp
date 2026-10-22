@@ -5,7 +5,10 @@ game makes, from recompiled code in `generated/` and from our native code
 in `src/`, goes through one layer of our own. The layer's interface is
 what the rest of the code sees; its backing, the part that finds the
 bytes, is what gets swapped for host memory allocation later. Designed
-with the user, 2026-10-22; not built yet.
+with the user and built, 2026-10-22 (branch `native-heap`):
+`itc_recomp/src/memory/heap.h` (the layer), `src/hooks/heap.cpp` (the
+adapters, `--native_heap`, on by default), `src/harnesses/heap.cpp`
+(harness `heap`).
 
 ## Why
 
