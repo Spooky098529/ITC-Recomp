@@ -2765,4 +2765,63 @@ bool UpdateTrails(uint8_t* base, uint32_t overlays, uint32_t scratch) {
   return true;
 }
 
+uint32_t NoSaveFlags(uint8_t* base, uint32_t id) {
+  ITC_NATIVE_RUNNING("sub_82127198 OverlayView::NoSaveFlags");
+  if (id > 399 || SaveFlag199FA(base, id) != 0) {
+    return 0;
+  }
+  return SaveFlag199F8Or199FC(base, id) == 0 ? 1 : 0;
+}
+
+uint32_t FlagsKind(uint8_t* base, uint32_t overlays, uint32_t id, int32_t a, int32_t b,
+                   int32_t c, int32_t d) {
+  ITC_NATIVE_RUNNING("sub_82122DB8 CarOverlays::FlagsKind");
+  View(base, overlays, guest::LoadU32(base, overlays + 128));
+  if (NoSaveFlags(base, id) != 0) {
+    return 0;
+  }
+  int32_t ids[4] = {a, b, c, d};
+  const int count = c == -1 ? 2 : d == -1 ? 3 : 4;
+  for (int i = 0; i < count; i++) {
+    if (SaveFlag199FA(base, uint32_t(ids[i])) == 0) {
+      return 1;
+    }
+  }
+  return 2;
+}
+
+uint32_t MarkerKind(uint8_t* base, uint32_t overlays, int32_t id, uint32_t fallback) {
+  ITC_NATIVE_RUNNING("sub_82122EA8 CarOverlays::MarkerKind");
+  int32_t first = 0, last = 0;
+  if (id == 67 || id == 68 || id == 374 || id == 375) {
+    first = id <= 68 ? 67 : 374;
+    return FlagsKind(base, overlays, uint32_t(id), first, first + 1, -1, -1);
+  }
+  if (id >= 107 && id <= 109) {
+    first = 107, last = 109;
+  } else if (id >= 111 && id <= 114) {
+    first = 111, last = 114;
+  } else if (id >= 248 && id <= 250) {
+    first = 248, last = 250;
+  } else if (id >= 304 && id <= 306) {
+    first = 304, last = 306;
+  } else if (id >= 383 && id <= 385) {
+    first = 383, last = 385;
+  } else if (id >= 393 && id <= 395) {
+    first = 393, last = 395;
+  } else {
+    return fallback;
+  }
+  View(base, overlays, guest::LoadU32(base, overlays + 128));
+  if (NoSaveFlags(base, uint32_t(id)) != 0) {
+    return 0;
+  }
+  for (int32_t flag = first; flag <= last; flag++) {
+    if (SaveFlag199FA(base, uint32_t(flag)) == 0) {
+      return 1;
+    }
+  }
+  return 2;
+}
+
 }  // namespace race_overlays

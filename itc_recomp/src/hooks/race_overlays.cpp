@@ -22,7 +22,7 @@ ITC_FLAG_BOOL(native_race_overlays, true, "ITC",
               "sub_8212BA98; the view's body and wheels through the vehicle accessors, sub_821268B0 to "
               "sub_82126FF0; CarOverlays::IsBehindCamera, sub_82124630; the racers' "
               "save flags and stages, sub_82126B50 to sub_82126CB0; CarOverlays::UpdateTrails, "
-              "sub_82124EE0) natively "
+              "sub_82124EE0; CarOverlays::MarkerKind, sub_82122EA8) natively "
               "instead of through the translated code (same results; checked by "
               "--run_harnesses=race_overlays)");
 
@@ -481,3 +481,8 @@ extern "C" REX_FUNC(sub_82124EE0) {
     __imp__sub_82124EE0(ctx, base);
   }
 }
+
+// CarOverlays::MarkerKind: r3 = the car overlays, r4 = a racer id, r5 = a
+// fallback; returns the kind (FlagsKind and NoSaveFlags, which only it
+// calls, are done by its plain C++).
+ITC_OVERLAY_WORD(82122EA8, MarkerKind(base, ctx.r3.u32, ctx.r4.s32, ctx.r5.u32))

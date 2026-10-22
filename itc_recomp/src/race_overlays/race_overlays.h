@@ -688,4 +688,21 @@ uint32_t RacerInCurrentStage(uint8_t* base, uint32_t id);
 // (Trail::AddPoint would decline); the original runs there.
 bool UpdateTrails(uint8_t* base, uint32_t overlays, uint32_t scratch);
 
+// OverlayView::NoSaveFlags (sub_82127198): 1 when the id is 399 or below
+// (unsigned) and neither SaveFlag199FA nor SaveFlag199F8Or199FC is set,
+// else 0 (r3, a view, isn't read). Only MarkerKind and FlagsKind call it.
+uint32_t NoSaveFlags(uint8_t* base, uint32_t id);
+// CarOverlays::FlagsKind (sub_82122DB8): with the view in slot +128 (not
+// read further): 0 when NoSaveFlags(id); else 1 unless SaveFlag199FA is
+// set for `a`, `b` (and `c`, `d` up to the first that's -1), 2 when all
+// are. Only MarkerKind calls it (with c and d -1).
+uint32_t FlagsKind(uint8_t* base, uint32_t overlays, uint32_t id, int32_t a, int32_t b,
+                   int32_t c, int32_t d);
+// CarOverlays::MarkerKind (sub_82122EA8): `fallback` for ids (signed)
+// outside 67-68, 107-109, 111-114, 248-250, 304-306, 374-375, 383-385 and
+// 393-395; for 67-68 and 374-375, FlagsKind with the range; for the others
+// 0 when NoSaveFlags(id), else 2 when SaveFlag199FA is set for each id of
+// the range, else 1.
+uint32_t MarkerKind(uint8_t* base, uint32_t overlays, int32_t id, uint32_t fallback);
+
 }  // namespace race_overlays

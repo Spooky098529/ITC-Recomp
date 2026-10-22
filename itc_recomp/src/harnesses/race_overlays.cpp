@@ -394,6 +394,11 @@ ITC_NATIVE_WORD(NativeSaveFlag199F8, ro::SaveFlag199F8(base, ctx.r4.u32))
 ITC_NATIVE_WORD(NativeSaveFlag199FC, ro::SaveFlag199FC(base, ctx.r4.u32))
 ITC_NATIVE_WORD(NativeSaveFlag199F8Or199FC, ro::SaveFlag199F8Or199FC(base, ctx.r4.u32))
 ITC_NATIVE_WORD(NativeRacerInCurrentStage, ro::RacerInCurrentStage(base, ctx.r4.u32))
+ITC_NATIVE_WORD(NativeNoSaveFlags, ro::NoSaveFlags(base, ctx.r4.u32))
+ITC_NATIVE_WORD(NativeFlagsKind, ro::FlagsKind(base, ctx.r3.u32, ctx.r5.u32, ctx.r6.s32,
+                                               ctx.r7.s32, ctx.r8.s32, ctx.r9.s32))
+ITC_NATIVE_WORD(NativeMarkerKind,
+                ro::MarkerKind(base, ctx.r3.u32, ctx.r4.s32, ctx.r5.u32))
 // As the adapter: the point in the original's stack slot, and the original
 // where the native version declines.
 void NativeUpdateTrails(PPCContext& ctx, uint8_t* base) {
@@ -2691,6 +2696,97 @@ void SaveFlagCases(Context& h, uint32_t block) {
       guest::StoreU32(h.base, kSaveData, live_save);
       results.Report();
     }
+  }
+  // The marker's kind and its helpers: the car overlays with a view in a
+  // random slot (read, not used); flag ids from the ranges MarkerKind
+  // passes, and random ones for FlagsKind's c and d.
+  {
+    const uint32_t overlays = block + 0x66000;
+    auto kind_setup = [&h, save, overlays, block](uint64_t seed, bool live,
+                                                   uint32_t live_save, uint32_t slot) {
+      return [&h, save, overlays, block, seed, live, live_save, slot] {
+        Random fill;
+        FillRandom(h.base, fill, overlays, 0x200);
+        guest::StoreU32(h.base, overlays + 128, slot);
+        guest::StoreU32(h.base, overlays + 4 * (slot + 1), block + kBodyView);
+        if (live) {
+          guest::StoreU32(h.base, kSaveData, live_save);
+          return;
+        }
+        for (uint64_t n = 0; n < seed % 31; n++) {
+          fill.Next();
+        }
+        // Mostly set, so that whole ranges are.
+        for (uint32_t i = 0; i < 12 * 400 + 8; i += 2) {
+          guest::StoreU16(h.base, save + 0x199F8 + i,
+                          fill.Below(5) == 0 ? 0 : uint16_t(1 + fill.Below(0xFFFF)));
+        }
+        guest::StoreU32(h.base, kSaveData, save);
+      };
+    };
+    std::vector<int32_t> kind_ids;
+    for (int32_t id = 60; id <= 400; id++) {
+      kind_ids.push_back(id);
+    }
+    for (int32_t id : {-1, 0, 1, 0x7FFFFFFF, int32_t(0x80000000)}) {
+      kind_ids.push_back(id);
+    }
+    Results marker("CarOverlays::MarkerKind (sub_82122EA8)");
+    Results no_flags("OverlayView::NoSaveFlags (sub_82127198)");
+    for (uint64_t seed = 0; seed < 4; seed++) {
+      for (int32_t id : kind_ids) {
+        const uint32_t slot = r.Below(25);
+        const uint64_t fallback = r.Next();
+        const uint64_t r3 = r.Next();
+        const auto setup = kind_setup(seed, seed == 3, live_save, slot);
+        const std::string what =
+            fmt::format("seed {}{} id {}", seed, seed == 3 ? " (live)" : "", id);
+        Compare(h, marker, {},
+                setup,
+                [&](PPCContext& t) {
+                  t.r3.u64 = overlays;
+                  t.r4.u64 = uint64_t(int64_t(id));
+                  t.r5.u64 = fallback;
+                },
+                Original<__imp__sub_82122EA8>, NativeMarkerKind, what);
+        Compare(h, no_flags, {}, setup,
+                [&](PPCContext& t) {
+                  t.r3.u64 = r3;
+                  t.r4.u64 = uint32_t(id);
+                },
+                Original<__imp__sub_82127198>, NativeNoSaveFlags, what);
+      }
+    }
+    guest::StoreU32(h.base, kSaveData, live_save);
+    marker.Report();
+    no_flags.Report();
+
+    Results kinds("CarOverlays::FlagsKind (sub_82122DB8)");
+    for (uint64_t seed = 0; seed < 4; seed++) {
+      for (int i = 0; i < 150; i++) {
+        const uint32_t slot = r.Below(25);
+        auto flag_id = [&] {
+          const uint32_t kind = r.Below(8);
+          return kind == 0 ? -1 : kind == 1 ? int32_t(r.Next()) : int32_t(r.Below(402));
+        };
+        const int32_t a = flag_id(), b = flag_id(), c = r.Below(3) == 0 ? -1 : flag_id(),
+                      d = r.Below(2) == 0 ? -1 : flag_id();
+        const uint32_t id = r.Below(8) == 0 ? uint32_t(r.Next()) : r.Below(402);
+        Compare(h, kinds, {}, kind_setup(seed, seed == 3, live_save, slot),
+                [&](PPCContext& t) {
+                  t.r3.u64 = overlays;
+                  t.r5.u64 = id;
+                  t.r6.u64 = uint64_t(int64_t(a));
+                  t.r7.u64 = uint64_t(int64_t(b));
+                  t.r8.u64 = uint64_t(int64_t(c));
+                  t.r9.u64 = uint64_t(int64_t(d));
+                },
+                Original<__imp__sub_82122DB8>, NativeFlagsKind,
+                fmt::format("seed {} id {} a {} b {} c {} d {}", seed, id, a, b, c, d));
+      }
+    }
+    guest::StoreU32(h.base, kSaveData, live_save);
+    kinds.Report();
   }
   {
     // Racer ids in the records' +3912 from a small range (so some match,
