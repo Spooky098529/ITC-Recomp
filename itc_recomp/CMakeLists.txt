@@ -101,6 +101,7 @@ set(ITC_SOURCES
     src/sprites/sprites.cpp
     src/hooks/billboards.cpp
     src/sprites/billboards.cpp
+    src/hooks/ui_movies.cpp
     src/hooks/command_list.cpp
     src/command_list/command_list.cpp
     src/hooks/c_runtime.cpp
@@ -134,6 +135,7 @@ set(ITC_SOURCES
     src/harnesses/command_list.cpp
     src/harnesses/c_runtime.cpp
     src/harnesses/math.cpp
+    src/harnesses/ui_movies.cpp
     src/helpers/debug_output.cpp
     src/helpers/object_attributes.cpp
     src/helpers/time.cpp

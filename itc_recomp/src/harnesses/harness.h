@@ -112,5 +112,6 @@ void Billboards(Context& h);
 void CommandList(Context& h);
 void CRuntime(Context& h);
 void Math(Context& h);
+void UiMovies(Context& h);
 
 }  // namespace harness

@@ -30,6 +30,17 @@ interpolation is single-precision arithmetic with fused multiply-adds
 through the command list's Overridden functions and, indirectly, the
 renderer object at `0x82970C18` (its vtable slot 4).
 
+Made native by the B7 loop (2026-10-22), from the bottom up: plain C++ in
+`itc_recomp/src/ui_movies/`, adapters in `itc_recomp/src/hooks/ui_movies.cpp`
+behind `--native_ui_movies` (on; off runs the recompiled functions), checked
+by `--run_harnesses=ui_movies` on movies built in the harness's scratch
+area. The accessors' arithmetic is 32-bit and wraps as the original's
+does; they leave r3 zero-extended (the original's 64-bit adds can leave
+upper bits that no caller reads). In an attract race with `--skip_intro`
+the accessors run while the front end's and the race's movies load and
+start; the sub-animation accessor (`sub_825A6558`) didn't run outside the
+harness.
+
 Status:
 
 - **Native**: plain C++ in `itc_recomp/src/` that doesn't use the
@@ -79,17 +90,17 @@ run it after changing either, on any branch.
 | `sub_8259FA20` | | | r3, r4 = the two keys, f1 = t: an integer track's value, `(1 - s) * [k0 + 8] + s * [k1 + 8]` truncated, with s an ease curve in t from the first key's +12 and the second's +16 (and the float at `0x820021E4`). No state. Only caller: `sub_825A0548`. |
 | `sub_8259FB30` | | | r3, r4 = the two keys, f1 = t: a float track's value (+8), a cubic between the keys with tangents from `tan` (`sub_825A8A50`, Overridden) of the second key's +12 and +16, scaled by the time between the keys (+4) and the floats at `0x82002A38` and `0x820021E4`. No state. Only caller: `sub_825A0548`. |
 | `sub_8259FC18` | | | The same cubic as `sub_8259FB30` for integer values (+8), truncated. No state. Only caller: `sub_825A0548`. |
-| `sub_8259D600` | | | r3, r4: returns 16 * (r3 + 2 * (r4 + 4)); the indirect tracks' extra offset (r3 = [node + 112], r4 = [track + 12]). That's the offset of a primitive's vertex r4 (as `sub_8259D628`), so indirect tracks key one vertex. |
-| `sub_825A6508` | | | r3 = a node track list, r4 = i: returns r3 + 16 + 16 * i (its 16-byte tracks). From `sub_825A08E0`. |
-| `sub_825A6518` | | | r3 = a key list, r4 = i: returns r3 + 16 + 32 * i (its 32-byte keys; the count at +12). From `sub_825A08E0`. |
-| `sub_825A6528` | | | r3 = an animation, r4 = i: its node track list i, the pointer at r3 + 64 + 8 * ([r3 + 32] + i). From `sub_825A08E0`. |
-| `sub_825A6540` | | | The same for key list i, from index [r3 + 40]. From `sub_825A08E0`. |
-| `sub_825A6558` | | | The same for sub-animation i, from index [r3 + 48]. From `sub_825A08E0`. |
-| `sub_8259D658` | `UiMovie::Child` | | r3 = node, r4 = index: returns that child (the count is at node + 112). The pointer at node + 128 + 8 * ([node + 108] + r4). From the game side (about 60 callers seen in play: the menus, `sub_82119B80`), `sub_8259F848` and `sub_825A08E0`. |
-| `sub_8259D670` | | | r3 = scene, r4 = i: its animation i, the pointer at r3 + 128 + 8 * ([r3 + 116] + i). From `sub_8211D978` and `sub_8211E378` (the game side, starting animations). |
-| `sub_8259D618` | | | r3 = a primitive, r4 = i: returns r3 + 128 + 16 * i (its texture entries). From `sub_8259F348`. |
-| `sub_8259D628` | | | r3 = a primitive, r4 = i: its vertex i, r3 + 128 + 16 * [r3 + 112] + 32 * i (32-byte vertices after [+112] texture entries). From `sub_8259F348`, `sub_82119B80`, `sub_8211BEE8`. |
-| `sub_8259D648` | | | r3 = a picture, r4 = i: returns r3 + 144 + 16 * i (its texture entries). From `sub_8259ED40`, `sub_8211AAA8`, `sub_8211AB28`. |
+| `sub_8259D600` | | Overridden | r3, r4: returns 16 * (r3 + 2 * (r4 + 4)); the indirect tracks' extra offset (r3 = [node + 112], r4 = [track + 12]). That's the offset of a primitive's vertex r4 (as `sub_8259D628`), so indirect tracks key one vertex. Native in `src/ui_movies/ui_movies.h` behind its adapter (`src/hooks/ui_movies.cpp`, `--native_ui_movies`; harness `ui_movies`). |
+| `sub_825A6508` | | Overridden | r3 = a node track list, r4 = i: returns r3 + 16 + 16 * i (its 16-byte tracks). From `sub_825A08E0`. Native in `src/ui_movies/ui_movies.h` behind its adapter (`src/hooks/ui_movies.cpp`, `--native_ui_movies`; harness `ui_movies`). |
+| `sub_825A6518` | | Overridden | r3 = a key list, r4 = i: returns r3 + 16 + 32 * i (its 32-byte keys; the count at +12). From `sub_825A08E0`. Native in `src/ui_movies/ui_movies.h` behind its adapter (`src/hooks/ui_movies.cpp`, `--native_ui_movies`; harness `ui_movies`). |
+| `sub_825A6528` | | Overridden | r3 = an animation, r4 = i: its node track list i, the pointer at r3 + 64 + 8 * ([r3 + 32] + i). From `sub_825A08E0`. Native in `src/ui_movies/ui_movies.h` behind its adapter (`src/hooks/ui_movies.cpp`, `--native_ui_movies`; harness `ui_movies`). |
+| `sub_825A6540` | | Overridden | The same for key list i, from index [r3 + 40]. From `sub_825A08E0`. Native in `src/ui_movies/ui_movies.h` behind its adapter (`src/hooks/ui_movies.cpp`, `--native_ui_movies`; harness `ui_movies`). |
+| `sub_825A6558` | | Overridden | The same for sub-animation i, from index [r3 + 48]. From `sub_825A08E0`. Native in `src/ui_movies/ui_movies.h` behind its adapter (`src/hooks/ui_movies.cpp`, `--native_ui_movies`; harness `ui_movies`). Not called in an attract race outside the harness (no sub-animations played there). |
+| `sub_8259D658` | `UiMovie::Child` | Overridden | r3 = node, r4 = index: returns that child (the count is at node + 112). The pointer at node + 128 + 8 * ([node + 108] + r4). From the game side (about 60 callers seen in play: the menus, `sub_82119B80`), `sub_8259F848` and `sub_825A08E0`. Native in `src/ui_movies/ui_movies.h` behind its adapter (`src/hooks/ui_movies.cpp`, `--native_ui_movies`; harness `ui_movies`). |
+| `sub_8259D670` | | Overridden | r3 = scene, r4 = i: its animation i, the pointer at r3 + 128 + 8 * ([r3 + 116] + i). From `sub_8211D978` and `sub_8211E378` (the game side, starting animations). Native in `src/ui_movies/ui_movies.h` behind its adapter (`src/hooks/ui_movies.cpp`, `--native_ui_movies`; harness `ui_movies`). |
+| `sub_8259D618` | | Overridden | r3 = a primitive, r4 = i: returns r3 + 128 + 16 * i (its texture entries). From `sub_8259F348`. Native in `src/ui_movies/ui_movies.h` behind its adapter (`src/hooks/ui_movies.cpp`, `--native_ui_movies`; harness `ui_movies`). |
+| `sub_8259D628` | | Overridden | r3 = a primitive, r4 = i: its vertex i, r3 + 128 + 16 * [r3 + 112] + 32 * i (32-byte vertices after [+112] texture entries). From `sub_8259F348`, `sub_82119B80`, `sub_8211BEE8`. Native in `src/ui_movies/ui_movies.h` behind its adapter (`src/hooks/ui_movies.cpp`, `--native_ui_movies`; harness `ui_movies`). |
+| `sub_8259D648` | | Overridden | r3 = a picture, r4 = i: returns r3 + 144 + 16 * i (its texture entries). From `sub_8259ED40`, `sub_8211AAA8`, `sub_8211AB28`. Native in `src/ui_movies/ui_movies.h` behind its adapter (`src/hooks/ui_movies.cpp`, `--native_ui_movies`; harness `ui_movies`). |
 | `sub_825A0E40` | | | r3 = a movie file: 1 when +8 holds `X2D\0` and +12 `005\0`, else 0. From `sub_825A0EF0`. |
 | `sub_825A0EF0` | `UiMovie::FixUpFile` | | r3 = a loaded movie file: 0 unless 16-byte aligned and `sub_825A0E40` agrees. Turns the offsets of its table (8-byte entries at +32, [+24] of them) into pointers, fixes up the scene at +[+4] (`sub_8259D688`; 0 is passed on when it isn't tagged `SCE`) and each of its [+20] animations from table index [+16] (`sub_825A6570`); returns 1. No guard against a second call. From `sub_8211E500` (the game side's movie load). |
 | `sub_8259D688` | | | r3 = a scene, r4 = the movie file: for each of the scene's [+124] child entries (8 bytes from +128), turns the offset into a pointer: entries in the animation range ([+116], [+120] of them) through the file's table (`sub_825A0ED8`), the others relative to the scene; recurses into children tagged `SCE`. Returns 1. From `sub_825A0EF0` and itself. |
