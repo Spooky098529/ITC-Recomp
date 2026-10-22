@@ -225,8 +225,8 @@ menus, a race).
    now 16-aligned, see "The backing, for now").
 4. Checks: an attract race with `--run_harnesses=all`, the texture cache
    by log with the flag on and off, the pad replay drive
-   (`pad-replay.md`), then a race the user drives. Done on 2026-10-22 but
-   the user's race: every harness at 0 differing outside "(expected to
+   (`pad-replay.md`), then a race the user drives. Done on 2026-10-22:
+   the user's race seemed fine (`itc_752.log`, no error lines); every harness at 0 differing outside "(expected to
    differ)" groups, the heap's four groups (110 cases) included, no error
    lines (`itc_747.log`); the texture cache the same with `--native_heap`
    on and off over a 40 s attract race (541 textures, 78.0 MB; 44 freed
