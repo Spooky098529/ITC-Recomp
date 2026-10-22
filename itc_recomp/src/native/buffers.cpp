@@ -34,6 +34,7 @@
 #include "state.h"
 
 #include "base/flags.h"
+#include "c_runtime/strings.h"
 #include "base/log.h"
 
 #include <algorithm>
@@ -623,9 +624,14 @@ void Buffers_OnMirror(uint32_t physical, uint32_t size, bool index) {
 
 }  // namespace native
 
+ITC_FLAG_DECLARE(bool, native_memcpy);
+
 // The library's memcpy (r3 destination, r4 source, r5 size): copies into
 // the physical views are recorded once done (see Buffers_NewestWrite); with
 // --native_renderer_log_buffers, copies into a known buffer header logged.
+// The copy itself is native (c_runtime::Memcpy, --native_memcpy) where the
+// ranges don't share memory; r3 stays the destination either way, and the
+// other registers the original changes are read by no caller.
 extern "C" REX_FUNC(sub_825A7410) {
   REX_FUNC_PROLOGUE();
   using namespace native;
@@ -657,7 +663,9 @@ extern "C" REX_FUNC(sub_825A7410) {
   }
   bool log_write = size && destination >= 0xA0000000u && Buffers_LogPhysicalWrites();
   bool same = log_write && !std::memcmp(base + destination, base + source, size);
-  __imp__sub_825A7410(ctx, base);
+  if (!ITC_FLAG(native_memcpy) || !c_runtime::Memcpy(base, destination, source, size)) {
+    __imp__sub_825A7410(ctx, base);
+  }
   if (log_write) {
     LoggedWrite write;
     write.start = GpuPhysicalAddress(destination);

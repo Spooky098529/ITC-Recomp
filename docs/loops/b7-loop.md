@@ -19,18 +19,19 @@ memory.
 
 ## Settings (set by the user, 2026-10-22)
 
-- **Branch:** `b7-loop`, made once from `rexglue-removal-project` by the
-  first pass (the user's approval here counts as asking). The loop never
+- **Branch:** `b7-loop-test`, made from `rexglue-removal-project` by the user
+  (2026-10-22), already there: the first pass doesn't make it. The loop never
   makes another branch, never touches `main` or tags, and never merges:
   the user reviews and merges the branch.
-- **Code changes without asking first:** allowed on `b7-loop`, for the
+- **Code changes without asking first:** allowed on `b7-loop-test`, for the
   subsystems the loop takes. This relaxes the "explain before code
   changes" rule for the loop's branch, nowhere else.
 - **Function rows:** written by the agents as they go (the status check
   after each change), and listed in the progress file for one review by
   the user before the merge. This relaxes the "show rows and ask first"
   rule for the loop's branch, nowhere else.
-- **Per session:** 3 subsystems or 10 passes, whichever comes first. Then
+- **Per session:** 5 subsystems or 20 passes, whichever comes first
+  (raised from 3 and 10 by the user, 2026-10-22). Then
   the loop ends itself; the user runs `/clear` and starts it again
   (nothing is lost: it picks up from the progress file).
 - **In all:** 5 subsystems, then the loop stops for the user's review.
@@ -42,7 +43,10 @@ memory.
    run most often or are closest to being ready
    (`itc_recomp/tools/b7_groups.py <its functions>`), not one that needs
    a decision only the user can make. Its line is deleted from `leads.md`
-   when picked.
+   when picked. A lead marked "no mapping" (cleanup in files
+   already mapped, such as adapters to remove) goes straight to a
+   migration agent (step 6) with the files it names, and doesn't count as
+   a subsystem toward the limits.
 2. **Hand it to a mapping agent** (below).
 3. The mapping agent **writes `docs/functions/<name>.md`** for the
    subsystem's functions.
@@ -56,7 +60,18 @@ memory.
    used so far, and reports. A subsystem too big for one agent gets
    another migration agent after the first reports, until nothing ready
    is left in it.
-8. **Take the next lead**: back to step 1.
+8. **Record the finished subsystem** in the summary docs, once nothing
+   ready is left in it (the lead does this itself, in the pass that
+   takes the next lead, and commits it with the progress file):
+   - its row in the table under "B7's loop runs" in
+     `docs/rexglue-removal.md` (date, subsystem, function file, how many
+     of its functions are native, the flags), and anything the run
+     learned that the plan should say (what blocks the rest, a build
+     setting) in the text under it;
+   - `itc_recomp/tools/boundary_status.py` and `b7_status.py` run, their
+     totals added as a dated entry at the end of "The boundary over time"
+     in the same doc.
+9. **Take the next lead**: back to step 1.
 
 A pass does one step: it reads the state, collects the report of the
 agent that finished, checks it, records it in the progress file, starts
@@ -74,7 +89,9 @@ nothing runs and there's work, about a minute.
 - `itc_recomp/tools/b7_groups.py [root ...]`: a function's group (it and
   the callees only it calls), whether it's ready (nothing outside it that
   runs is still recompiled), the ready groups under a root and the
-  blockers. Groups are made native from the bottom up, as native code can
+  blockers. `--removable` lists the overridden functions whose adapters
+  may go (see "Removing an adapter"). Groups are made native from the
+  bottom up, as native code can
   only call what's already ours.
 - `itc_recomp/tools/check_function_statuses.py`: the Status column
   against `src/` (run after any row change); a function in rows of two
@@ -86,7 +103,8 @@ nothing runs and there's work, about a minute.
   ("Checking with a harness" in `docs/rexglue-removal.md`).
 - `--native_renderer_dump=<dir>`: frames from a race.
 - `ITC_THREAD=main itc_recomp/tools/profile_render_thread.sh`: cycles a
-  frame, for speed.
+  frame, for speed (not part of the loop's checks: see "The migration
+  agent").
 - `itc_recomp/tools/boundary_status.py`: the SDK boundary.
 - Finding code: `grep -n "DEFINE_REX_FUNC(sub_X)"
   itc_recomp/generated/default/*.cpp`; call sites `grep -ln "lr =
@@ -125,7 +143,7 @@ code, no builds, no game runs):
   `leads.md`.
 - **Runs** `check_function_statuses.py` (no errors) and `b7_status.py`.
 - **Commits** (only its own files, by path; the staged diff checked for
-  `/home/`) and pushes `b7-loop`.
+  `/home/`) and pushes `b7-loop-test`.
 
 Report, in its last message:
 
@@ -179,15 +197,53 @@ functions; run again after each group, as callers become ready):
    (outside "(expected to differ)" groups); a stalled boot restarted once.
    If the group runs in the race, a temporary counter override shows it
    was called (removed before committing). For anything drawn, a frame
-   dump against one with the fallback flag. For main-thread code, a
-   profile, two runs each way, alternating.
+   dump against one with the fallback flag. No profile: native code may
+   be slower than the recompiled code for now and is optimized later
+   (the user's call, 2026-10-22).
 5. On a failure: logging, a run, the log read; no fixes by guessing. If
    that doesn't settle it, it leaves the group uncommitted, says so, and
    reports.
 6. Records: the rows (Status by the definitions at the top), then
    `check_function_statuses.py`; what was learned in the subsystem's doc.
 7. Commits each group (only its own files, by path; the staged diff
-   checked for `/home/`) and pushes `b7-loop`.
+   checked for `/home/`) and pushes `b7-loop-test`.
+8. Removes the adapters that can go ("Removing an adapter" below): after
+   each group, `b7_groups.py --removable` on the subsystem's functions
+   (callees become removable as their callers are made native), each
+   candidate confirmed, its adapter removed and its row set to Native,
+   committed on its own.
+
+### Removing an adapter
+
+A function stays Overridden while its `REX_FUNC` adapter exists, and the
+adapter is what recompiled code calls. Once no recompiled code reaches it
+in play, the adapter goes and the function is Native (the definitions at
+the top of `functions.md`). Removing one can't break anything: without
+it, `sub_X` is the recompiled original again, so any recompiled path still
+reaching it runs the original, as before; native callers keep calling the
+plain C++ directly, and their fallback flags switch only the callers.
+
+`b7_groups.py --removable [function ...]` lists the candidates: every
+direct caller seen in play is ours. Functions with no direct caller in
+play are reached through a vtable or a function pointer, so their
+adapters stay. For each candidate, before removing its adapter:
+
+- Read each caller's adapter and plain C++: it calls the candidate's
+  plain C++ directly, and the paths it hands back to the original
+  (`__imp__`, edge cases, error paths) aren't the ones that run in play
+  (they'd still be correct, as the original runs, but no longer native).
+- Grep `itc_recomp/src` for the candidate's adapter being called (other
+  adapters or helpers calling `sub_X(ctx, base)`): those calls go to the
+  plain C++ first.
+- The harness calls the plain C++ and `__imp__sub_X` directly, not the
+  adapter.
+- A temporary counter in the adapter shows it isn't called in an attract
+  race with the flags on (outside the harness); removed by editing.
+
+Then the adapter is deleted, the row set to Native (saying which native
+callers reach it, and that the fallback flag now switches only them),
+`check_function_statuses.py` run (it refuses Native with an override
+left), and the usual build and `attract_race.sh 25 --run_harnesses=all`.
 
 It stops when nothing ready is left in the subsystem, after about five
 groups (the lead starts another), or at a failure. Report, in its last
@@ -198,8 +254,8 @@ migrate: <name>
 groups: <root -> commit, one a line>
 harnesses: <each "harness: <function>: N cases, M differ" line, verbatim>
 race: <seconds at 30 ticks/s>, <error lines>
-profile: <before -> after cycles a frame> | not run
 rows: <functions whose rows changed>
+native: <functions whose adapters were removed (now Native)> | none
 flags: <the --native_ flags added>
 left: <ready groups left> | none; blocked by: <blockers> | none
 uncommitted: none | <what and why>
@@ -217,15 +273,23 @@ file, when:
   ~20 seconds at 30 ticks/s;
 - an agent left work uncommitted, or a commit doesn't build;
 - a report's `stop:` isn't `none`;
-- a profile is slower than before, beyond the runs' spread;
 - a map fails its check, or `leads.md` has nothing the loop can take;
 - the session's or the total limit is reached;
-- the tree has changes the loop didn't make, or isn't on `b7-loop`.
+- the tree has changes the loop didn't make, or isn't on `b7-loop-test`.
+
+Whatever the reason, before ending, the lead also brings the B7 status
+lines up to date (the subsystems' rows and totals are already there, from
+step 8 of the cycle): the "B7 in progress" line near the top of
+`docs/rexglue-removal.md` and the B7 sentence in `CLAUDE.md`'s overview
+(which subsystems are done, the branch, what the rest waits on), and
+commits them with the "Stopped" entry. The user reviews and merges.
 
 ## Rules that still hold
 
 CLAUDE.md's rules, in short: never edit `generated/`; plain C++ behind
-adapters; the SDK's headers used, not reimplemented; no absolute paths in
+adapters; the SDK's headers used, not reimplemented; the game's use
+of the Xbox replaced, never the Xbox or the SDK (plug in data, map Xbox
+features without porting them, upstream libraries, no System Link); no absolute paths in
 the repo; American English; no `-march=native`; commit often and push the
 branch; commit before any revert; stage only your own files; only search
 inside the repo; SBX-Recomp only when the user says so; never screenshot

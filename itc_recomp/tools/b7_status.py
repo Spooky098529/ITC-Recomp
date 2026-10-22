@@ -19,8 +19,9 @@ Each function in play is counted once, in the first state that fits:
 counts in the file its row is in; functions without a row count under
 "(no row)".
 Then the checks (listed, as there should be few): rows that say the
-function no longer runs (Native, Dropped, or an override that never calls
-__imp__, or "never called") whose function ran in play.
+function no longer runs (Native, Dropped, an override whose original
+nothing in src/ calls (outside the harnesses; macros and helpers in other
+files included), or "never called") whose function ran in play.
 """
 
 import collections
@@ -104,10 +105,10 @@ def main():
         if st in ("Native", "Dropped"):
             checks.append((s, f"{st}, but it ran"))
         elif s in overrides and not overrides[s][1] and st != "Wrapped":
-            # Often a call to __imp__ from another file the status check
-            # doesn't read (a fallback path the override hands work to).
-            checks.append((s, f"overridden in {overrides[s][0]}, which never calls "
-                              f"__imp__, but it ran"))
+            # Calls built by macros and from helpers in other files count
+            # (overrides() in check_function_statuses.py).
+            checks.append((s, f"overridden in {overrides[s][0]}, and nothing in src/ "
+                              f"calls __imp__{s}, but it ran"))
         elif s in never:
             checks.append((s, "its row says never called, but it ran"))
     print()

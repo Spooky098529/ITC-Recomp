@@ -59,6 +59,27 @@ Rows not yet moved stay in the table below. So far:
   (B4).
 - [`audio.md`](audio.md): the audio library's render driver client, its
   XMA layer and the voice category volume (B2).
+- [`sprites.md`](sprites.md): the camera-facing sprites: the race
+  overlays' sprite lists (trails, particles), single sprites and screen
+  rectangles, and the light glows' billboards (B7).
+- [`command-list.md`](command-list.md): the graphics library's command
+  list the recorders write render commands into: its set-up and flip,
+  opening and closing chunks, allocating slots, vertices, bytes and
+  resolves (B7).
+- [`c-runtime.md`](c-runtime.md): the C runtime and math library as seen
+  in play: math functions and their floating-point helpers, string,
+  memory and character helpers, number parsing and formatting, and the
+  pure parts of its start-up (B7; the heap and what calls kernel imports
+  aren't in it).
+- [`ui-movies.md`](ui-movies.md): the UI movie library (the HUD's, the
+  menus' and the pause screens' 2D movies): loading and fixing up movie
+  files, applying animations' tracks to nodes, and drawing the node tree
+  as quads, with the game's movie update and rest pose (B7; the rest of
+  the game's `UiMovie::` side is in `ui-movies-game.md`).
+- [`ui-movies-game.md`](ui-movies-game.md): the game's side of the UI
+  movies (`UiMovie::`): loading and unloading movies and the table of
+  them by id, node lookups and setters, the animation queue and the
+  looping animations, the movies' texts and the text list's draw (B7).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
@@ -113,7 +134,6 @@ old performance notes to the end of `../native-renderer.md`.
 | `sub_825953D0` | `Recorder::RecordObject` | Wrapped | The bulk per-object recorder, ~150 calls per pass in a race: records command 7 with vertex constants 0-8: world (r5) * camera view-projection (r4) in c0-c3, the world matrix in c4-c7 (for some objects a projective matrix instead), and the camera's world position in c8. The camera is often a stack copy, not a camera pass. |
 | `sub_825951E0` | | | Multiplies a world matrix and camera into a stack temporary; not recorded (likely a visibility test). |
 | `sub_8258FD48` | `Command::SetShaderConstants` | Wrapped | Render thread, command 7: r3 = payload, r4 = register count, r5 = stage << 24 \| type << 16 \| start << 8 \| count. Interpolation substitutes blended values here. |
-| `sub_8258CAA0` | `CommandList::AllocateSlots` | Wrapped | r3 = list, r4 = slot count; returns the first 16-byte slot. Wrapped only for diagnostics (`--log_slot_callers`). |
 | `sub_820C0150` | `Vehicle::GetDistancePerFrame` | | Speed (m/s) times a hard-coded 1/30 s. |
 | `sub_8210EDB0` | | | Wind sound; scales with speed. |
 | `sub_82152CD8` | | | Camera shake; scales with speed. |
@@ -124,7 +144,6 @@ old performance notes to the end of `../native-renderer.md`.
 | `sub_82146AC0` | | | Advances one flipbook animation: frame count +0, current frame +4, tick counter +8 (wraps at the length at +12), frame start ticks from +16. |
 | `sub_82146B80` | | | Returns the current frame's entry of animation r4 in set r3 (texture id at +4). |
 | `sub_82146A38` | | | Finds the animation in set r3 whose texture is r4; -1 if none. |
-| `sub_82148658` | | | Draws the light groups: for each group, builds a light list on the stack (count +32, 48-byte lights at +36, from static level data) and picks its texture's current animation frame. Calls `sub_8209CDB0` → `sub_8209CC38`. |
 | `sub_820F5740` | `Minimap::Draw` | Wrapped | From the draw step part `sub_820F6068`; steps the minimap blink clock at `0x826C5AA4`/`0x826C5AA8` after drawing (see "Per-frame logic" in `../frame-interpolation.md`). |
 | `sub_82107910` | | Wrapped | From Draw; adds one to the play time frame counter at `0x826C5B90` (see "Per-frame logic" in `../frame-interpolation.md`). |
 | `sub_821109B8` | | | Turns the play time frame counter into hours, minutes and seconds (30, 1800, 108000 frames). |
@@ -156,8 +175,6 @@ old performance notes to the end of `../native-renderer.md`.
 | `sub_82296E88` | `SetLastErrorFromStatus` | Overridden | r3 = an NTSTATUS: `SetLastError(RtlNtStatusToDosError(r3))` (the same check of `[r13+336]`), returning the DOS error. Called after failed kernel calls (27 files). Ours: `last_error::SetFromStatus`, the mapping from the SDK's `xeRtlNtStatusToDosError` (C++, no guest call) until the import's last recompiled caller, `sub_822953E8`, is native and the table is ours. 1,000 statuses across the mapping's branches the same as the recompiled one. |
 | `sub_82297340` | | | UTF-8 to UTF-16, for `MultiByteToWideChar`'s code page 65001: r3 = source, r4 = its length, r5 = destination, r6 = its room. Not read. |
 | `sub_82297540` | | | UTF-16 to UTF-8, for `WideCharToMultiByte`'s code page 65001; arguments as `sub_82297340`. Not read. |
-| `sub_825A9958` | `wcslen` | | r3 = UTF-16 string; returns its length. From `WideCharToMultiByte`'s use (ours counts natively, the same in 3,000 cases). |
-| `sub_825A71D0` | `memset` | | r3 = destination, r4 = value, r5 = bytes (from its calls). The time zone read clears each date with it (16 bytes). |
 | `sub_82295E78` | `CreateEvent` | | r4 = manual reset, r5 = initial state, r6 = name (0 for none): `NtCreateEvent`, with `sub_822970A8`'s object attributes only for a name. None named in a boot and attract race. Threads and sync (core). |
 | `sub_825BA2B0` | `CreateTimer` | | `NtCreateTimer`, named the same way. Threads and sync (core). |
 | `sub_82295500` | `Sleep` | | r3 = milliseconds (from `sub_8245D288`'s `Sleep(1000)`; not read). |
@@ -176,13 +193,6 @@ old performance notes to the end of `../native-renderer.md`.
 | `sub_820C9170` | | | Asks `sub_820F4128` for up to 10 lights near a point (r1+112) in a cone (cosine-like value from `sub_825A8978` of a setting at `[r27+11844]+5500` times a constant) of the light set at `[0x826C551C]`. Probably feeds the 8 per-object light slots of the pixel constants (see "Per-object pixel constants" in `../frame-interpolation.md`; not checked). Called from `0x820E1DF0`, `0x820E6B00` and `0x820DC3B8`. |
 | `sub_82294730` | | | r3 a light set, r4 an index: returns r3 plus the r4-th of the little-endian offsets at r3+4 (the count at +0 bounds r4); with r5's low byte set, 0 for an entry whose first word is 0. `sub_820F4128` passes r5 = 0. |
 | `sub_8218E420` | | Patched | Post-race check; the comparison against 60 was changed to 1 to fix the black screen after quest races. |
-| `sub_8211D2F8` | `UiMovie::Update` | Wrapped | r3 = movie, r4 = 0 advance a frame and draw, 1 draw only; reached through `sub_8211E1B8` from 634 call sites (the HUD, the race start countdown, the pause menus). Replayed on render-only passes, and its adding tracks handled per tick (see "Per-frame logic" in `../frame-interpolation.md`; `docs/pause-menu-fix.md`, "The sub-menus' arrow"). |
-| `sub_825A08E0` | `UiMovie::ApplyAnimation` | | Run by each movie update for every playing animation: finds the keys around the animation's time and applies each track with t = (time - k0) / (k1 - k0), clamped, through `sub_825A0548`. Sets values from the time, so it doesn't step by itself. |
-| `sub_825A0548` | `UiMovie::ApplyTrack` | Wrapped | r3 = node, r4 = track (word +0 its property id), f1 = t, r5/r6 = the keys. Writes one word, at node + the descriptor's offset (plus `sub_8259D600` when indirect): sets it (descriptor byte +8 non-zero) or adds to it (0); nothing for types 3 and up. Adds the update doesn't put back are skipped on render-only passes (`--per_tick_ui_movie_tracks`). |
-| `sub_8259FE68` | `UiMovie::TrackProperty` | | r3 = property id; returns its 12-byte descriptor in the table at `0x82970C28` (64 entries, filled on first use, byte `0x82970C20` set): +0 node offset, +4 type (0 float, 1 and 2 integer), byte +8 set/add, byte +9 indirect. |
-| `sub_8259D600` | | | r3, r4: returns 16 * (r3 + 2 * (r4 + 4)); the indirect tracks' extra offset (r3 = [node + 112], r4 = [track + 12]). |
-| `sub_8259D658` | `UiMovie::Child` | | r3 = node, r4 = index: returns that child (the count is at node + 112). |
-| `sub_82119B80` | `UiMovie::RestorePose` | Wrapped | r3 = movie, r4 = live tree, r5 = rest tree: for each child of six tagged types (GRP recursed into; PIC, PRM, SCE, TFM, TXT) copies the rest node's fields (+12..+80, and per type +100..+136) over the live one. Called at the end of each movie update (from `8211D7CC`), so tracks' adds start from the rest pose every update. Wrapped only for `--log_pause_movie` (`WATCH_MOVIE_CALL`). |
 | `sub_820DAC68` | `Car::DrawUpdate` | Wrapped | Draw's per-car update (r3 = car - 4288; it passes r3 + 4288 on as the car), on every pass: first takes `[0x82000A30]` (1.0) off car + 704 (the boost; the tick sets it again), then poses and draws the car, the cockpit dials among it (`sub_820E51D0`, `sub_820E45A8`). The player's car in cockpit view runs it twice a pass; only the first poses the dials. Wrapped only for `--find_per_frame_state` (`ITC_FRAME_STATE_WRAP`). |
 | `sub_8215C780` | `Car::TickUpdate` | | The tick's car record update (logic passes; r31 = the car record, r26 = the vehicle): copies the car's world matrix into car + 16 and stores the gauge values at car + 696 (`sub_820C0128`, the speed in km/h), + 700 (`sub_820C0140`, the revs), + 704 (`[r26 + 2944]`, the boost) and + 712 (`[r26 + 6260]`). |
 | `sub_820E51D0` | | | Calls `sub_820E42E8` when `[dash + 20]` is set, then `sub_820E39F8` when `[dash + 2180]` is. |
@@ -204,12 +214,8 @@ old performance notes to the end of `../native-renderer.md`.
 | `sub_8215DEA0` | `RaceOverlays::Run` | Overridden | The race overlays (25 objects at r3; the marker above opponents): their update (vtable slot 4) on logic passes only, their recording (slot 5) every pass with the logic pass's cameras put back, in the original's stack frame so their products pair. See "World-space sprites" in `../frame-interpolation.md`. |
 | `sub_821594B8` | | Wrapped | The rival intro cutscene's Update handler: runs on logic passes; on render-only passes only its logo's draw (`sub_82211A28`) is repeated (`--redraw_rival_logo`; "The rival logo at the race start" in `../frame-interpolation.md`). |
 | `sub_82211A28` | | Wrapped | Draws the rival's logo; noted during the cutscene for the render-only redraw. |
-| `sub_82128750` | | Wrapped | World-space sprite recorder (r3 = sprite list, r4 = camera; the light trails): corners blended around the original ("World-space sprites" in `../frame-interpolation.md`). |
-| `sub_821281A8` | | Wrapped | A single world-space sprite's recorder: its corners blended between ticks (`--blend_world_sprites`; `--log_single_sprites`). |
 | `sub_821379D8` | `Glow::Record` | Wrapped | The glow (bloom) recorder in races: strength and history weight blended between ticks, history written every frame (`--blend_glow`, `--glow_history_every_frame`; `src/interpolation/glow.cpp`). |
-| `sub_8209C6E0` | `Billboards::BuildVertices` | Wrapped | r3 = billboard set (+0 the camera pass it faces), r4 = command list, r5 = the sprites: each light's quad turned to face that camera; the camera blended once a frame (`--cache_billboard_cameras`). |
 | `sub_820AE958` | | Wrapped | The render thread's command that starts the boot movie; `--skip_intro` waits for it to return (ending the movie earlier stalled the boot; "The title screen" in `../title-screen.md`). |
-| `sub_825A7410` | `memcpy` | Wrapped | The library's memcpy (r3 destination, r4 source, r5 size): copies into the physical views recorded for the native renderer's guest memory mirrors (`src/native/buffers.cpp`). |
 | `sub_8229E3F0` | `Device::Kick` | Overridden | `src/native/gpu_link.cpp`. r3 device, r4 (size in words, address) pairs, r5 their count. The kicked buffers are applied directly (only their effects outside the GPU) instead of written to the ring; the original is no longer called. `--native_renderer_log_gpu` logs. |
 | `sub_8229E848` | `Device::DeferredKick` | Overridden | Same file. Queued kicks while GPU interrupts were outstanding; every kick completes at once now, so it kicks straight away; the original is no longer called. |
 | `sub_8229DFF8` | | | Links a block into a list in the command buffer: r3 the list (+4, +8 its last), r4 the block, r5 and r6 stored in it; stores the block's address through the old last's pointer (the MMIO store macro, but not shown to be a register) and calls `sub_822AC470` twice. Only from the deferred kick `sub_8229E848`, whose native version doesn't call it: never called (attract race and play). Not read in detail. |
@@ -236,7 +242,6 @@ old performance notes to the end of `../native-renderer.md`.
 | `sub_822B0AB0` | `ComputeGammaRampPwl` | Overridden | Same files. The same curve for a 128-entry piecewise-linear ramp (three channels of (base, delta) pairs): base `curve[base >> 6] << 6`, delta `(curve[min(base>>6 + delta>>6, 1023)] − curve[base >> 6]) << 6`, wrapped to 16 bits. Never called in play. Not needed to draw today (`--xbox_gamma` uses fixed tables captured from the game), but kept native so it can follow the game's ramp later. |
 | `sub_822B07B0` | `SrgbCurve` | Native | `display::Srgb` (`src/display/gamma.cpp`). f1 x, r4 to linear; returns f1 (float). To linear: x > 0.04045 → ((x + 0.055) × (1/1.055))^2.4, else x / 12.92; from linear: x > 0.0031308 → 1.055 × x^(1/2.4) − 0.055 (fused), else x × 12.92. Called only by the two gamma ramps, now native. |
 | `sub_822B0860` | `Bt709Curve` | Native | `display::Bt709`, same file. To linear: x ≥ 0.0812 → ((x + 0.099) × (1/1.099))^(1/0.45), else x / 4.5; from linear: x ≥ 0.018 → 1.099 × x^0.45 − 0.099 (fused), else x × 4.5. Called only by the two gamma ramps, now native. |
-| `sub_825A8ED0` | `pow` | | The C runtime's pow (f1, f2; returns f1); a zero exponent and a zero base handled first. 36 callers. The gamma curves use `std::pow` instead: the same once rounded to float (the `gamma` harness). Not read in detail. |
 | `sub_822A3A20` | | | Calls `ComputeGammaRamp` (r5 = 0); from `Device::SetDisplayMode`. Not read. |
 | `sub_822A3AA8` | | | Calls `ComputeGammaRampPwl`; from `Device::SetDisplayMode` for formats 7 and 54. Not read. |
 | `sub_822B0E08` | | | Fill a ramp (r3, r4 = 0) before `Device::SetDisplayMode` runs it through the gamma functions; also called by `sub_822A05A8`. Probably the default (identity) ramps. Not read. |
@@ -331,20 +336,13 @@ old performance notes to the end of `../native-renderer.md`.
 | `sub_8258F5C0` | | Wrapped | Same file: the single-command items' command 15 (the helper object's draw), marked as command 15 so the native renderer draws its inline vertices. |
 | `sub_8258D998` | `VideoOutput::ResolveFrontBuffer` | Wrapped | Same file: resolves render target 0 into a front buffer at the frame's end; the native renderer shows that target ("The end of a frame" in `gpu-functions.md`). |
 | `sub_822AFA58` | `Device::Resolve` | Wrapped | Same file: resolves made outside command 25 (command 33's, one per tile) passed to the native renderer. |
-| `sub_8209CC38` | | Wrapped | The light billboards' batch (calls `sub_8209C1A0`, `sub_8209C6E0`; r4 the light list); for `--find_per_frame_state` and `--watch_lights`. |
 | `sub_82133960` | | Overridden | A draw step part, rewritten as the original to name each view's draw for `--find_per_frame_state`: for the 15 per-view objects at `0x826C5D80` with an active camera pass and +52 clear, calls vtable slot 0, clears +8056 and +48, flips +8060. |
 | `sub_82096340` | | Wrapped | A tick handler thunk (vtable slot 1 of r3); names its target for `--find_per_frame_state`. |
 | `sub_82092968` | | Wrapped | Runs the app's component lists (r4's low word a component; its vtable slot 1); named for `--find_menu_selection`. |
 | `sub_8220C1E0` | `MenuList::Update` | Wrapped | Logged for `--log_pause_menu` (`src/debug/pause_menu_log.cpp`). `sub_8210C370` reads logical pad `j`'s values 0-7 (sticks, triggers) through the pointer at mapper +2880 (= input manager +44 + 196j) and the buttons through the listener object at mapper +2464 (seen by the read watch, 2026-10-19). |
 | `sub_8210C370` | `ActionMapper::Update` | Wrapped | Logged for `--log_pause_menu` (`src/debug/pause_menu_log.cpp`). `sub_8210C370` reads logical pad `j`'s values 0-7 (sticks, triggers) through the pointer at mapper +2880 (= input manager +44 + 196j) and the buttons through the listener object at mapper +2464 (seen by the read watch, 2026-10-19). |
-| `sub_8211C7E8` | | Wrapped | The pause sub-menus' calls on their UI movie (setting animation targets and the children's +80 flags, starting animations, switching sub-screens); logged for `--log_pause_movie` (`src/debug/pause_movie_log.cpp`). |
 | `sub_821BE5A8` | | Wrapped | The pause sub-menus' calls on their UI movie (setting animation targets and the children's +80 flags, starting animations, switching sub-screens); logged for `--log_pause_movie` (`src/debug/pause_movie_log.cpp`). |
 | `sub_8220D040` | | Wrapped | The pause sub-menus' calls on their UI movie (setting animation targets and the children's +80 flags, starting animations, switching sub-screens); logged for `--log_pause_movie` (`src/debug/pause_movie_log.cpp`). |
-| `sub_8211DAC8` | | Wrapped | The pause sub-menus' calls on their UI movie (setting animation targets and the children's +80 flags, starting animations, switching sub-screens); logged for `--log_pause_movie` (`src/debug/pause_movie_log.cpp`). |
-| `sub_8211D978` | | Wrapped | The pause sub-menus' calls on their UI movie (setting animation targets and the children's +80 flags, starting animations, switching sub-screens); logged for `--log_pause_movie` (`src/debug/pause_movie_log.cpp`). |
-| `sub_8211DE38` | | Wrapped | The pause sub-menus' calls on their UI movie (setting animation targets and the children's +80 flags, starting animations, switching sub-screens); logged for `--log_pause_movie` (`src/debug/pause_movie_log.cpp`). |
-| `sub_8211DDD8` | | Wrapped | The pause sub-menus' calls on their UI movie (setting animation targets and the children's +80 flags, starting animations, switching sub-screens); logged for `--log_pause_movie` (`src/debug/pause_movie_log.cpp`). |
-| `sub_8211DF20` | | Wrapped | The pause sub-menus' calls on their UI movie (setting animation targets and the children's +80 flags, starting animations, switching sub-screens); logged for `--log_pause_movie` (`src/debug/pause_movie_log.cpp`). |
 | `sub_8220BA68` | | Wrapped | The pause sub-menus' calls on their UI movie (setting animation targets and the children's +80 flags, starting animations, switching sub-screens); logged for `--log_pause_movie` (`src/debug/pause_movie_log.cpp`). |
 | `sub_8258FBD0` | `Command::*` (1) | Wrapped | The render command handlers, by id (`REPLAY_COUNTED_HANDLER`, `src/native/replay_hooks.cpp`): the native renderer and the stats logger see every command. Command 7 is `sub_8258FD48` above; 0, 36 and 37 aren't wrapped. The commands: "Command list format" in `../frame-interpolation.md` here and `gpu-functions.md`. |
 | `sub_8258FC30` | `Command::*` (2) | Wrapped | The render command handlers, by id (`REPLAY_COUNTED_HANDLER`, `src/native/replay_hooks.cpp`): the native renderer and the stats logger see every command. Command 7 is `sub_8258FD48` above; 0, 36 and 37 aren't wrapped. The commands: "Command list format" in `../frame-interpolation.md` here and `gpu-functions.md`. |
@@ -413,11 +411,6 @@ old performance notes to the end of `../native-renderer.md`.
 | `sub_8210BFA8` | | Wrapped | The action mappers' read slots (vtable `0x82007F78`; r3 the mapper, r4 the action id 151-180); logged for `--log_pause_menu` (`PAUSE_MENU_READ_SLOT`). |
 | `sub_8210C010` | | Wrapped | The action mappers' read slots (vtable `0x82007F78`; r3 the mapper, r4 the action id 151-180); logged for `--log_pause_menu` (`PAUSE_MENU_READ_SLOT`). |
 | `sub_8210BA28` | | Wrapped | The action mappers' read slots (vtable `0x82007F78`; r3 the mapper, r4 the action id 151-180); logged for `--log_pause_menu` (`PAUSE_MENU_READ_SLOT`). |
-| `sub_8259FA00` | | Wrapped | The UI movie update's callees besides its tracks (and `sub_82119B80` above), watched for writes for `--log_pause_movie` (`WATCH_MOVIE_CALL`). |
-| `sub_8211CD90` | | Wrapped | The UI movie update's callees besides its tracks (and `sub_82119B80` above), watched for writes for `--log_pause_movie` (`WATCH_MOVIE_CALL`). |
-| `sub_8259DAC0` | | Wrapped | The UI movie update's callees besides its tracks (and `sub_82119B80` above), watched for writes for `--log_pause_movie` (`WATCH_MOVIE_CALL`). |
-| `sub_8211B4D0` | | Wrapped | The UI movie update's callees besides its tracks (and `sub_82119B80` above), watched for writes for `--log_pause_movie` (`WATCH_MOVIE_CALL`). |
-| `sub_8211B080` | | Wrapped | The UI movie update's callees besides its tracks (and `sub_82119B80` above), watched for writes for `--log_pause_movie` (`WATCH_MOVIE_CALL`). |
 | `sub_8258E5E0` | | Wrapped | Named in `--find_menu_selection`'s log (`ITC_MENU_SCAN_WRAP`): `Scene::Update`'s two screen calls and others. |
 | `sub_8258ED78` | | Wrapped | Named in `--find_menu_selection`'s log (`ITC_MENU_SCAN_WRAP`): `Scene::Update`'s two screen calls and others. |
 | `sub_8259D1A8` | | Wrapped | Named in `--find_menu_selection`'s log (`ITC_MENU_SCAN_WRAP`): `Scene::Update`'s two screen calls and others. |

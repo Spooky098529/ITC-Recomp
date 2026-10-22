@@ -3232,7 +3232,18 @@ Left of ours: `Note` ~110 thousand cycles a frame (~75 a call),
 the largest left; main thread ~6.1 million cycles a frame):
 
 - `__imp__sub_821298C0`, ~16% of the main thread, the largest; not looked
-  at yet (what it does isn't known).
+  at yet (what it does isn't known). Since mapped (B7 loop, 2026-10-22,
+  `functions/sprites.md`): `SpriteList::Reset`, which clears a race
+  overlay's 500-sprite list on the stack and stores w = 1.0 in all 2,000
+  corners (~32 KB a call), though only the first `count` sprites are
+  recorded. Made native (B7 loop, `src/sprites/sprites.cpp`,
+  `--native_sprites`, the same stores): main thread profile, two
+  alternating runs each, 6.059 and 5.987 million cycles a frame with the
+  flag off (`__imp__sub_821298C0` ~1,135 thousand) against 5.048 and 5.050
+  with it on (`sprites::ResetSprites` ~140 thousand). About 17,000 calls a
+  second in an attract race (~120 a frame at ~140 fps). Storing only the
+  corners the count uses would cut more, but is a behavior change for the
+  user to decide.
 - `__imp__sub_8209C6E0` (the light billboards' vertex generation), ~12%
   (~730 thousand cycles a frame) after the change above. It fell ~30% when
   the camera we write into the pass went from 4-byte to 16-byte stores,
@@ -3240,6 +3251,13 @@ the largest left; main thread ~6.1 million cycles a frame):
   stored, as in `Lights::FindNearest`); find its hot instructions by IP
   (see the mapping above) and whether its own stack traffic stalls the
   same way.
+  Made native (B7 loop, `src/sprites/billboards.cpp`,
+  `--native_billboards`, behind the same override and camera blend; same
+  results by harness, ~59,000 calls a second). Its vector steps (the light's
+  distance and whether it's in front) switch MXCSR's flush bits twice a
+  light, as the translated code's do (more often there), so denormals give
+  the same results; not profiled (profiles are no longer part of the
+  migration's checks).
 
 ## Resolution (branch `unlocked-resolution`, 2026-10-16)
 

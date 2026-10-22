@@ -3,10 +3,19 @@
 next (docs/loops/b7-loop.md, "Groups"). Reports only; changes nothing.
 
 usage: b7_groups.py [--cap <lines>] [root ...]
+       b7_groups.py --removable [function ...]
   root   a function (sub_XXXXXXXX or its address): the groups in its subtree
          (what it calls, followed down, seen in play and not ours). With no
          root, the whole game: the count of ready groups and the blockers.
   --cap  the most generated lines a group should have (default 1500)
+  --removable  which overridden functions' adapters may go (they become
+         Native): every direct caller seen in play is ours. Of the given
+         functions, or of every overridden one. Candidates only: the
+         callers must also reach the plain C++ directly (not through a
+         fallback to the original in play), and nothing may call the
+         function indirectly (a vtable or a function pointer: direct calls
+         are all this graph has); see "Removing an adapter" in
+         docs/loops/b7-loop.md.
 
 Native code is plain C++ without ctx, so it can only call what's already
 ours: functions become native from the bottom of the call graph up. For a
@@ -99,8 +108,63 @@ def load():
     return calls, lines, indirect, imports, seen, ours
 
 
+def removable(names):
+    calls, lines, indirect, imports, seen, ours = load()
+    spec = importlib.util.spec_from_file_location(
+        "statuses", os.path.join(os.path.dirname(__file__), "check_function_statuses.py"))
+    statuses = importlib.util.module_from_spec(spec)
+    saved, sys.argv = sys.argv, [sys.argv[0], ROOT]
+    spec.loader.exec_module(statuses)
+    sys.argv = saved
+    overrides = statuses.overrides()
+    status = {}
+    for _, subs, st in statuses.rows():
+        for sub in subs:
+            status.setdefault(sub, st)
+    callers = collections.defaultdict(set)
+    for f in calls:
+        for c in calls[f]:
+            callers[c].add(f)
+
+    if not names:
+        names = sorted(f for f in overrides if status.get(f) == "Overridden")
+    ready, waiting, indirect_only = [], [], []
+    for f in names:
+        if f not in calls:
+            print(f"{f}: not a recompiled function")
+            continue
+        if f not in overrides or status.get(f) != "Overridden":
+            print(f"{f}: not Overridden (status {status.get(f) or 'blank'}"
+                  f"{', no override' if f not in overrides else ''})")
+            continue
+        live = callers[f] & seen
+        left = sorted(c for c in live if not ours(c))
+        if not live:
+            indirect_only.append(f)
+        elif left:
+            waiting.append((f, left))
+        else:
+            ready.append((f, sorted(live)))
+    print(f"adapters that may go (every direct caller seen in play is ours): {len(ready)}")
+    for f, live in ready:
+        print(f"  {f}: callers in play {', '.join(live)}")
+    print(f"adapters kept: no direct caller seen in play, so reached indirectly "
+          f"(a vtable or a function pointer): {len(indirect_only)}")
+    if indirect_only:
+        print("  " + ", ".join(indirect_only))
+    print(f"adapters still needed (a caller in play is recompiled): {len(waiting)}")
+    for f, left in waiting[:40]:
+        print(f"  {f}: {', '.join(left[:6])}{' ...' if len(left) > 6 else ''}")
+    if len(waiting) > 40:
+        print(f"  ... and {len(waiting) - 40} more")
+
+
 def main():
     args = sys.argv[1:]
+    if "--removable" in args:
+        args.remove("--removable")
+        removable([f"sub_{a.upper().removeprefix('SUB_').removeprefix('0X')}" for a in args])
+        return
     cap = 1500
     if "--cap" in args:
         i = args.index("--cap")

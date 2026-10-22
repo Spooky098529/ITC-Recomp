@@ -1,0 +1,244 @@
+// The game's side of the UI movies (UiMovie::, over the library in
+// ui_movies.h) as plain C++ (B7 in docs/rexglue-removal.md; the functions
+// are in docs/functions/ui-movies-game.md). Movies are guest objects that
+// recompiled code shares, so these work on guest memory. Adapters:
+// src/hooks/ui_movies_game.cpp.
+//
+// The arithmetic is 32-bit, as the original's addresses are: everything
+// wraps at 2^32.
+
+#pragma once
+
+#include "guest.h"
+
+#include <array>
+#include <cstdint>
+#include <optional>
+
+namespace ui_movies {
+
+// A movie's fields: its three scenes (the live one that's animated and
+// drawn, the pose saved between updates, the file's own) and its textures'
+// array.
+constexpr uint32_t kMovieLive = 16;
+constexpr uint32_t kMovieSaved = 20;
+constexpr uint32_t kMovieFile = 24;
+constexpr uint32_t kMovieTextures = 28;
+
+// The node lookups the game's setters share: a child of the scene `scene`,
+// or of its sub-scene `sub_scene` when that isn't -1.
+uint32_t FindChild(uint8_t* base, uint32_t scene, uint32_t sub_scene, uint32_t child);
+
+// sub_8211A578 (UiMovie::FindNode): the live scene's node (FindChild).
+uint32_t FindNode(uint8_t* base, uint32_t movie, uint32_t sub_scene, uint32_t child);
+
+// sub_8211A630: color `color` of the table at 0x82008410 (12 bytes each)
+// copied to the node's +56..+64.
+void SetColor(uint8_t* base, uint32_t node, uint32_t color);
+
+// sub_8211A660: the node's +72 set to the game's layer for number n
+// (Layer).
+uint32_t Layer(uint32_t n);
+void SetLayer(uint8_t* base, uint32_t node, uint32_t n);
+
+// sub_8211A6C0: every `TXT` chunk after the live scene's, up to `TRM`, gets
+// its text id (+108) cleared.
+void ClearTextIds(uint8_t* base, uint32_t movie);
+
+// sub_8211A708 (UiMovie::SetNodeTexture): a primitive's +104 or a
+// picture's +108 set to `texture` (other tags left). Returns the node.
+uint32_t SetNodeTexture(uint8_t* base, uint32_t node, uint32_t texture);
+
+// The texture word a picture's first texture entry names in the movie's
+// array ([movie + 28] + 4 [PictureTexture(picture, [picture + 108])]).
+uint32_t PictureTextureSlot(uint8_t* base, uint32_t movie, uint32_t picture);
+
+// sub_8211AB90 (UiMovie::SwapTexture): texture i of the movie set to
+// `texture`; returns the old one.
+uint32_t SwapTexture(uint8_t* base, uint32_t movie, uint32_t i, uint32_t texture);
+
+// sub_8211ABA8 (UiMovie::ResetPose): the file's pose copied over the live
+// and the saved scenes (RestorePose with no group). Returns what the second
+// RestorePose returns.
+uint32_t ResetPose(uint8_t* base, uint32_t movie);
+
+// sub_8211A1E0 (UiMovie::ResetNode): a node's +12..+80 copied from the
+// file's scene to the live and saved ones, then its subtree (RestorePose
+// with the node as the group). Returns what the second RestorePose returns.
+uint32_t ResetNode(uint8_t* base, uint32_t movie, uint32_t sub_scene, uint32_t child);
+
+// The quads' and text items' set-up (the identity matrix copied in with
+// memcpy in the original, after stores of 1.0 that it overwrites).
+//
+// sub_8211A948 (Quad::Quad): the identity at +0, +64 and +68 (the blend
+// mode) = 0, +72 = 2. Returns the quad.
+uint32_t MakeQuad(uint8_t* base, uint32_t quad);
+// sub_8211A818 (TextItem::TextItem): +0 = 0, the identity at +16, +80..+96
+// = the float at 0x82000A34 (0.0). Returns the item.
+uint32_t MakeTextItem(uint8_t* base, uint32_t item);
+// sub_8211A8C8 (TextItem::~TextItem): +80 = the float at 0x82000A34, +0 =
+// 0, the identity at +16. Returns item + 16 (memcpy's return, left in r3).
+uint32_t ClearTextItem(uint8_t* base, uint32_t item);
+// sub_8211AED0: a text item copied: +0, the matrix at +16 (memcpy), +80,
+// +84..+96 and +100..+112 (+116..+127 aren't). False, with nothing done,
+// where the two items might share memory (c_runtime::MayShare): the order
+// of the original's stores decides there, and it runs.
+bool CopyTextItem(uint8_t* base, uint32_t to, uint32_t from);
+
+// The animation lists (two a movie: the queue at +0x90B4 and the looping
+// animations at +0x9640): 32 links of 4 bytes (+0 the next link, +2 its
+// slot; 16-bit, -1 ending a chain), the free chain's first at +128, the
+// list's first at +132 (+130 and +134 set to -1, not read here), the count
+// at +136 (16-bit), and 32 slots of 40 bytes from +140 (+0 an animation's
+// index, +4 its sub-scene's or -1, +8 a named animation's index or -1, +20
+// the time). A link's slot never changes; linking moves links between the
+// chains.
+constexpr uint32_t kMovieQueue = 0x90B4;
+constexpr uint32_t kMovieLooping = 0x9640;
+constexpr uint32_t kMovieLoaded = 0x9FD0;
+
+// sub_8211A9E8: a movie's +0..+24 and loaded flag (+0x9FD0) cleared, and
+// both lists set up empty (link k: next k + 1, slot k; the free chain from
+// 0, link 31's next -1).
+void InitAnimationLists(uint8_t* base, uint32_t movie);
+// The link `steps` links after the list's first.
+uint32_t LinkAt(uint8_t* base, uint32_t list, uint32_t steps);
+// A link's slot: list + 140 + 40 [link + 2].
+uint32_t SlotOf(uint8_t* base, uint32_t list, uint32_t link);
+// sub_8211B230: the free chain's first link linked in at `position` (the
+// original's 16-bit r4, sign-extended), the count + 1. No check for a full
+// list.
+void LinkFree(uint8_t* base, uint32_t list, int32_t position);
+// sub_8211B080 (AnimationList::RemoveAt): the link at `position` unlinked
+// onto the free chain, the count - 1.
+void RemoveAt(uint8_t* base, uint32_t list, uint32_t position);
+// sub_8211BA00 (UiMovie::AnimationTime) and sub_8211BB18
+// (UiMovie::NamedAnimationTime): the time (+20, a float's word) of the
+// first slot naming the animation (`index`, `sub_scene` or, by name,
+// `index` at +8), in the looping list, then the queue; else the float at
+// 0x82001BE0.
+uint32_t AnimationTime(uint8_t* base, uint32_t movie, uint32_t sub_scene, uint32_t index);
+uint32_t NamedAnimationTime(uint8_t* base, uint32_t movie, uint32_t index);
+
+// A list's 40-byte slot as its ten words, and the slot of the last
+// animation started (+0x9FD8: +0 index, +4 sub-scene, +8 named index).
+using Slot = std::array<uint32_t, 10>;
+constexpr uint32_t kMovieLastStarted = 0x9FD8;
+Slot LoadSlot(uint8_t* base, uint32_t address);
+void StoreSlot(uint8_t* base, uint32_t address, const Slot& slot);
+// AnimationList::Insert (sub_8211B4D0) at the end of the list (its count,
+// 16-bit, sign-extended, as the original's callers pass it), from a slot
+// that can't share the list's memory. Returns the slot written.
+uint32_t Append(uint8_t* base, uint32_t list, const Slot& slot);
+
+// sub_8211DBE0 (UiMovie::MoveAnimation) and sub_8211DCE8
+// (UiMovie::MoveNamedAnimation): the first slot naming the animation (its
+// +4 `sub_scene` and +0 `index`, or by name its +8 `index`) in the queue
+// (`to_looping`) or the looping list, copied out, removed (RemoveAt) and
+// appended to the other list. Returns the slot appended to, or nothing when
+// no slot matched; `looked` says whether the list had slots (the original's
+// r3 differs: a copy in its frame then, the movie otherwise).
+struct Moved {
+  std::optional<uint32_t> slot;
+  bool looked = false;
+};
+Moved MoveAnimation(uint8_t* base, uint32_t movie, uint32_t sub_scene, uint32_t index,
+                    bool to_looping);
+Moved MoveNamedAnimation(uint8_t* base, uint32_t movie, uint32_t index, bool to_looping);
+// sub_8211DDE8 (UiMovie::LoopLast): the last started animation moved to the
+// looping list, by name when its +8 isn't -1.
+Moved LoopLast(uint8_t* base, uint32_t movie);
+
+// sub_8211D978 (UiMovie::Play): animation `index` of the live scene (or of
+// its sub-scene `sub_scene` when that isn't -1; SceneAnimation) started:
+// unless the looping list has a slot with its +4 `sub_scene` and +0
+// `index`, a slot {index, sub_scene, -1, the scene, the animation, the
+// time, chained, reversed, w32, paused} appended to the queue and copied to
+// the last started (+0x9FD8). The time is 0.0 (the float at 0x82000A34),
+// or the animation's length (+12) when `reversed` isn't 0. Returns the r3
+// the original leaves: the animation when the looping list had it, else
+// the last started slot's address.
+uint32_t Play(uint8_t* base, uint32_t movie, uint32_t sub_scene, uint32_t index,
+              uint32_t chained, uint32_t reversed, uint32_t w32, uint32_t paused);
+// sub_8211DAC8 (UiMovie::PlayNamed): the same for named animation `named`
+// (nothing for a negative one; the looping list's +8 tested): the slot {-1,
+// -1, named, then the entry's +28 and +32 (movie + 176 + 36 named), the
+// time from the latter's +12, ...}. Returns the r3 the original leaves: the
+// movie for a negative `named`, the matching slot's position in the
+// looping list, else the last started slot's address.
+uint32_t PlayNamed(uint8_t* base, uint32_t movie, uint32_t named, uint32_t chained,
+                   uint32_t reversed, uint32_t w32, uint32_t paused);
+
+// The maps of {key, value} word pairs. A movie's texts (+0x9BCC): 128 pairs
+// in place, the count at +1024. The movie table (0x826C5CCC) and the like:
+// +0 the pairs, +4 the capacity, +8 the count.
+constexpr uint32_t kMovieTable = 0x826C5CCC;
+//
+// sub_8211B310 (TextMap::Find): the value's address for the key at
+// `key_address`, or 0x826C5CD8 when it's not there.
+uint32_t TextMapFind(uint8_t* base, uint32_t map, uint32_t key_address);
+// sub_8211B370 (TextMap::Set): the value at `value_address` stored for the
+// key at `key_address`, appended when it's not there (the count stored
+// first, then the pair; no check against the 128 pairs).
+void TextMapSet(uint8_t* base, uint32_t map, uint32_t key_address, uint32_t value_address);
+// sub_8211B3F0 (UiMovies::Find): the value's address for the key at
+// `key_address`, or 0x826C5CDC when it's not there.
+uint32_t PairsFind(uint8_t* base, uint32_t vector, uint32_t key_address);
+// The same three with the key (and value) as words.
+uint32_t TextMapFindKey(uint8_t* base, uint32_t map, uint32_t key);
+void TextMapSetKey(uint8_t* base, uint32_t map, uint32_t key, uint32_t value);
+uint32_t PairsFindKey(uint8_t* base, uint32_t vector, uint32_t key);
+
+// sub_8211BE98 (UiMovies::IsLoaded): 1 when the movie with id `id` in the
+// movie table has its loaded flag (+0x9FD0) set, else 0. No check that the
+// movie exists: an id not in the table reads the word at 0x826C5CDC as the
+// movie, as the original does.
+uint32_t IsLoaded(uint8_t* base, uint32_t id);
+
+// A movie's texts by id (the map at +0x9BCC): records of +0 the UTF-16
+// buffer, +4 scrolling, +8 the scroll counter, +20 the characters shown,
+// +24 passed to the formatting. An id not in the map reads the word at
+// 0x826C5CD8 as the record, as the originals do.
+constexpr uint32_t kMovieTexts = 0x9BCC;
+// sub_8211B720 (UiMovie::TextString): the text's buffer, or the empty string
+// at 0x82008434 when the record is 0.
+uint32_t TextString(uint8_t* base, uint32_t movie, uint32_t id);
+// sub_8211B9B8 (+4), sub_8211B770 (+20), sub_8211B7B8 (+24): the record's
+// word at `offset`, or 0 when the record is 0.
+uint32_t TextField(uint8_t* base, uint32_t movie, uint32_t id, uint32_t offset);
+// sub_8211B940: the record's +8 plus one, then the record stored again for
+// the id (TextMapSetKey: appended when the id wasn't there). No check for a
+// record of 0 (the original's neither).
+void AdvanceTextScroll(uint8_t* base, uint32_t movie, uint32_t id);
+
+// sub_8211AD00's work after its renderer calls: the UI movie library's
+// renderer and command list set (SetRenderer), every entry of the movie
+// table marked free (key -1, value 0; nothing freed), and the screen's
+// globals 0x826C5CA4..0x826C5CAC, 0x826C5CC0 and 0x826C5CB4..0x826C5CBC
+// cleared. (0x826C5CB0 is cleared before the calls: ClearScreenFlag.)
+void ClearScreenFlag(uint8_t* base);
+void ResetMovieTable(uint8_t* base, uint32_t renderer, uint32_t list);
+
+// sub_8211BD10: the layers of a group's nodes, by their layer offsets
+// (+72): its children ([group + 100] on, [group + 104] of them, last first;
+// Child of `scene`) sorted into 64 buckets (an offset above 63 in the last),
+// then bucket by bucket in order: a group recursed into (the same scene), a
+// scene recursed into as the scene and the group, a picture's, primitive's
+// or text's layer set (SetLayer) to `layer`, or with `by_bucket` to its
+// bucket's number. The buckets are kept where the original keeps them, in
+// its 16,800-byte frame below `stack` (the caller's r1): 260 bytes each from
+// +80 (64 nodes, then the count at +256), the recursions' frames below.
+// Returns the r3 the original leaves: the movie after a layer set, a
+// recursion's, else the last child looked up (`movie` when none).
+//
+// LayersFit first: the original's buckets overflow into each other or
+// outside its frame (where its own saved registers are) with more than 64
+// children or a negative offset, and that isn't followed: false, with
+// nothing done, for a tree (read as it is: the layers set are all above 63)
+// with a group of more than 64 children, a negative offset, or deeper than
+// 32 groups; the original runs there.
+bool LayersFit(uint8_t* base, uint32_t scene, uint32_t group);
+uint32_t AssignLayers(uint8_t* base, uint32_t stack, uint32_t movie, uint32_t scene,
+                      uint32_t group, uint32_t layer, bool by_bucket);
+
+}  // namespace ui_movies

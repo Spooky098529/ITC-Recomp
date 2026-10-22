@@ -8,7 +8,7 @@
 ITC_FLAG_STRING(run_harnesses, "", "ITC",
                 "Run harnesses comparing native functions with the recompiled ones, once at "
                 "the first input update: \"all\" or a comma-separated list "
-                "(object_attributes, time, clock, strings, last_error, gamma, start_up, user, xmp, network, notify, profile, saves, file_class, movie_files, xma)");
+                "(object_attributes, time, clock, strings, last_error, gamma, start_up, user, xmp, network, notify, profile, saves, file_class, movie_files, xma, sprites, billboards, command_list, c_runtime, math, ui_movies, ui_movies_game)");
 
 namespace harness {
 
@@ -99,6 +99,13 @@ void RunRequested(PPCContext& ctx, uint8_t* base) {
       {"file_class", FileClass},
       {"movie_files", MovieFiles},
       {"xma", Xma},
+      {"sprites", Sprites},
+      {"billboards", Billboards},
+      {"command_list", CommandList},
+      {"c_runtime", CRuntime},
+      {"math", Math},
+      {"ui_movies", UiMovies},
+      {"ui_movies_game", UiMoviesGame},
   };
   auto wanted = [&](const char* name) {
     if (requested == "all") {

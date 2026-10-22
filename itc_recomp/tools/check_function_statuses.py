@@ -12,11 +12,13 @@ For each table row, every sub_XXXXXXXX in its first column is checked:
            it should be Overridden or Wrapped
   error    Overridden or Wrapped, but no override exists
   error    no status, but an override exists
-  check    Wrapped, but the override never calls __imp__sub_X
-  check    Dropped, but its file calls __imp__sub_X (a fallback flag
+  check    Wrapped, but nothing calls __imp__sub_X
+  check    Dropped, but src/ calls __imp__sub_X (a fallback flag
            while the drop is checked; remove it once checked)
   (Dropped with no override is fine: native callers leave the call out.)
-  note     Overridden, and its file calls __imp__sub_X (a fallback flag or
+  ("src/ calls __imp__sub_X": any file outside src/harnesses/, written out
+  or built by a macro; see overrides().)
+  note     Overridden, and src/ calls __imp__sub_X (a fallback flag or
            a check against the original is fine; calling it for the work
            would make it Wrapped)
   error    the same sub_X in rows of two files (a row moved to another
@@ -39,6 +41,7 @@ OVERRIDE = re.compile(r'extern\s+"C"\s+REX_FUNC\((sub_[0-9A-F]{8})\)')
 # Overrides made by macros (ITC_INPUT_READ(8258CF10) and the like) are
 # found too: see overrides().
 SUB = re.compile(r"sub_[0-9A-F]{8}")
+IMP = re.compile(r"__imp__(sub_[0-9A-F]{8})")
 
 
 # A macro that defines overrides: #define NAME(address, ...) with
@@ -56,23 +59,54 @@ def sources():
 
 
 def overrides():
-    """sub_X -> (file, whether it calls __imp__sub_X)."""
+    """sub_X -> (file, whether src/ calls __imp__sub_X).
+
+    The second is true when any source file outside src/harnesses/ calls
+    __imp__sub_X: written out, or through a macro whose body builds the
+    name (__imp__sub_##address, as NATIVE_OR_ORIGINAL in
+    hooks/ui_movies_game.cpp and WATCH_MOVIE_CALL in
+    debug/pause_movie_log.cpp do), from the override's own file or from a
+    helper in another one it hands the work to (ui_movies_game_hooks::Insert
+    for sub_8211B4D0's override in debug/pause_movie_log.cpp). The harnesses'
+    calls to the originals are checks, not fallbacks, and don't count.
+    """
     found = {}
-    macros = {}  # name -> whether its body calls __imp__sub_##
+    macros = {}  # name -> whether its body defines an override
+    imp_macros = {}  # name -> index of the parameter it builds __imp__sub_## from
     files = list(sources())
     for path, text in files:
         for m in OVERRIDE.finditer(text):
-            sub = m.group(1)
-            found[sub] = (path, "__imp__" + sub in text)
+            found[m.group(1)] = path
         for m in DEFINE.finditer(text):
             body = m.group(3)
             if re.search(r"REX_FUNC\(\s*sub_\s*##", body):
-                macros[m.group(1)] = bool(re.search(r"__imp__sub_\s*##", body))
+                macros[m.group(1)] = True
+            params = [p.strip() for p in m.group(2).split(",")]
+            built = re.search(r"__imp__sub_\s*##\s*(\w+)", body)
+            if built and built.group(1) in params:
+                imp_macros[m.group(1)] = params.index(built.group(1))
+
+    def arguments(name, text):
+        """Macro `name`'s uses in `text`, its arguments in group 1."""
+        return re.finditer(r"^\s*" + name + r"\(([^)]*)\)", text, re.M)
+
+    calls = set()
     for path, text in files:
-        for name, calls in macros.items():
-            for m in re.finditer(r"^\s*" + name + r"\(\s*(?:0x)?([0-9A-Fa-f]{8})\b", text, re.M):
-                found["sub_" + m.group(1).upper()] = (path, calls)
-    return found
+        if path.startswith(os.path.join("itc_recomp", "src", "harnesses") + os.sep):
+            continue
+        calls.update(m.group(1) for m in IMP.finditer(text))
+        for name, index in imp_macros.items():
+            for m in arguments(name, text):
+                args = [a.strip() for a in m.group(1).split(",")]
+                if index < len(args) and re.fullmatch(r"(?:0x)?[0-9A-Fa-f]{8}", args[index]):
+                    calls.add("sub_" + args[index][-8:].upper())
+    for path, text in files:
+        for name in macros:
+            for m in arguments(name, text):
+                arg = m.group(1).split(",")[0].strip()
+                if re.fullmatch(r"(?:0x)?[0-9A-Fa-f]{8}", arg):
+                    found["sub_" + arg[-8:].upper()] = path
+    return {sub: (path, sub in calls) for sub, path in found.items()}
 
 
 def tables():
@@ -118,13 +152,14 @@ def main():
                 print(f"error  {where}: an override exists in {override[0]}")
                 errors += 1
             elif status == "Wrapped" and not override[1]:
-                print(f"check  {where}: {override[0]} never calls __imp__{sub}")
+                print(f"check  {where}: nothing in src/ calls __imp__{sub} "
+                      f"(overridden in {override[0]})")
                 checks += 1
             elif status == "Dropped" and override and override[1]:
-                print(f"check  {where}: {override[0]} calls __imp__{sub}")
+                print(f"check  {where}: src/ calls __imp__{sub} (overridden in {override[0]})")
                 checks += 1
             elif status == "Overridden" and override[1]:
-                print(f"note   {where}: {override[0]} calls __imp__{sub}")
+                print(f"note   {where}: src/ calls __imp__{sub} (overridden in {override[0]})")
                 notes += 1
     unnamed = sorted(set(found) - set(named))
     for sub in unnamed:

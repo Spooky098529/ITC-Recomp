@@ -22,6 +22,8 @@
 #include "debug/pause_movie_log.h"
 #include "frame_pacing/game_messages.h"
 #include "guest.h"
+#include "hooks/ui_movies.h"
+#include "hooks/ui_movies_game.h"
 
 #include "base/flags.h"
 #include "base/log.h"
@@ -480,13 +482,55 @@ void WatchMovingTargets(const char* name, PPCContext& ctx, uint8_t* base, Call&&
     }                                                                                   \
     debug::WatchMovingTargets(#address, ctx, base, [&] { __imp__sub_##address(ctx, base); }); \
   }
-WATCH_MOVIE_CALL(82119B80)
 WATCH_MOVIE_CALL(8259FA00)
 WATCH_MOVIE_CALL(8211CD90)
-WATCH_MOVIE_CALL(8259DAC0)
-WATCH_MOVIE_CALL(8211B4D0)
-WATCH_MOVIE_CALL(8211B080)
 #undef WATCH_MOVIE_CALL
+
+// AnimationList::Insert and RemoveAt, watched as the others; their work
+// (natively with --native_ui_movies_game) is in src/hooks/ui_movies_game.cpp.
+extern "C" REX_FUNC(sub_8211B4D0) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(log_pause_movie)) {
+    ui_movies_game_hooks::Insert(ctx, base);
+    return;
+  }
+  debug::WatchMovingTargets("8211B4D0", ctx, base,
+                            [&] { ui_movies_game_hooks::Insert(ctx, base); });
+}
+
+extern "C" REX_FUNC(sub_8211B080) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(log_pause_movie)) {
+    ui_movies_game_hooks::RemoveAt(ctx, base);
+    return;
+  }
+  debug::WatchMovingTargets("8211B080", ctx, base,
+                            [&] { ui_movies_game_hooks::RemoveAt(ctx, base); });
+}
+
+// UiMovie::RestorePose (sub_82119B80), natively with --native_ui_movies
+// (src/hooks/ui_movies.cpp); with --log_pause_movie the original runs,
+// watched as the others (its recursive calls come back here, each watched).
+extern "C" REX_FUNC(sub_82119B80) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(log_pause_movie)) {
+    ui_movies_hooks::RestorePose(ctx, base);
+    return;
+  }
+  debug::WatchMovingTargets("82119B80", ctx, base, [&] { __imp__sub_82119B80(ctx, base); });
+}
+
+// sub_8259DAC0, watched as the others; its work (natively with
+// --native_ui_movies) is in src/hooks/ui_movies.cpp.
+extern "C" REX_FUNC(sub_8259DAC0) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(log_pause_movie)) {
+    ui_movies_hooks::ResetAfterMovie(ctx, base);
+    return;
+  }
+  debug::WatchMovingTargets("8259DAC0", ctx, base,
+                            [&] { ui_movies_hooks::ResetAfterMovie(ctx, base); });
+}
 
 // The sub-menus' calls on the movie's nodes, logged for --log_pause_movie.
 // sub_8211C7E8 (r3 = movie, r4 = node, r5 = 8, r6 = value, from sub_8220D040)
@@ -527,11 +571,13 @@ extern "C" REX_FUNC(sub_8220D040) {
 // is 0) starts the movie's animations: sub_8211DE38 and sub_8211D978 (r3 =
 // movie, r4 = 8, r5 = item + 4: the items'), sub_8211DDD8 and sub_8211DF20
 // (r4 = 8, 20, 19), and sub_8211DAC8 (r4 = 20 after a move down, 19 up),
-// then updates the movie once (from 8220DF24).
+// then updates the movie once (from 8220DF24). The work of sub_8211DAC8 and
+// sub_8211D978 (natively with --native_ui_movies_game) is in
+// src/hooks/ui_movies_game.cpp; logged, the originals run.
 extern "C" REX_FUNC(sub_8211DAC8) {
   REX_FUNC_PROLOGUE();
   if (!ITC_FLAG(log_pause_movie)) {
-    __imp__sub_8211DAC8(ctx, base);
+    ui_movies_game_hooks::PlayNamed(ctx, base);
     return;
   }
   debug::LogCall("8211DAC8 start animation", ctx);
@@ -541,7 +587,7 @@ extern "C" REX_FUNC(sub_8211DAC8) {
 extern "C" REX_FUNC(sub_8211D978) {
   REX_FUNC_PROLOGUE();
   if (!ITC_FLAG(log_pause_movie)) {
-    __imp__sub_8211D978(ctx, base);
+    ui_movies_game_hooks::Play(ctx, base);
     return;
   }
   debug::LogCall("8211D978 start item animation", ctx);
@@ -558,10 +604,12 @@ extern "C" REX_FUNC(sub_8211DE38) {
   __imp__sub_8211DE38(ctx, base);
 }
 
+// Its work (natively with --native_ui_movies_game) is in
+// src/hooks/ui_movies_game.cpp; logged, the original runs.
 extern "C" REX_FUNC(sub_8211DDD8) {
   REX_FUNC_PROLOGUE();
   if (!ITC_FLAG(log_pause_movie)) {
-    __imp__sub_8211DDD8(ctx, base);
+    ui_movies_game_hooks::Loop(ctx, base);
     return;
   }
   debug::LogCall("8211DDD8", ctx);

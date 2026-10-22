@@ -107,5 +107,12 @@ void Saves(Context& h);
 void FileClass(Context& h);
 void MovieFiles(Context& h);
 void Xma(Context& h);
+void Sprites(Context& h);
+void Billboards(Context& h);
+void CommandList(Context& h);
+void CRuntime(Context& h);
+void Math(Context& h);
+void UiMovies(Context& h);
+void UiMoviesGame(Context& h);
 
 }  // namespace harness

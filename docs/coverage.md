@@ -172,4 +172,18 @@ functions named in rows: some rows name several, 673 functions in 548
 rows.) One check: `DrawIndexedVertices` (`sub_825BE708`, Overridden) ran,
 as its override hands predicated draws and `--native_renderer_library_packets`
 to the original from `src/native/draw_packets.cpp` (a file the status
-check doesn't read for it).
+check didn't read for it; since 2026-10-22 it counts a fallback to
+`__imp__sub_X` from any file in `src/` outside `src/harnesses/`, including
+calls built by macros, so this check is gone).
+
+After B7's first loop run (2026-10-22, branch `b7-loop-test`; "B7's first
+loop run" in `docs/rexglue-removal.md`), still counted against the first
+session's list:
+
+```
+in play (seen, or ours): 6753
+  ours 335, work left 6418 (wrapped 142, known 243, unknown 6033)
+```
+
+Its one check left is the stack probe (`sub_825A9934`), Dropped since but
+seen running in that session.

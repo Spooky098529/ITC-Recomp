@@ -97,6 +97,26 @@ set(ITC_SOURCES
     src/hooks/archive_streaming.cpp
     src/hooks/memory_status.cpp
     src/hooks/voice.cpp
+    src/hooks/sprites.cpp
+    src/sprites/sprites.cpp
+    src/hooks/billboards.cpp
+    src/sprites/billboards.cpp
+    src/hooks/ui_movies.cpp
+    src/ui_movies/ui_movies.cpp
+    src/ui_movies/keys.cpp
+    src/ui_movies/recording.cpp
+    src/ui_movies/files.cpp
+    src/hooks/ui_movies_game.cpp
+    src/ui_movies/game.cpp
+    src/hooks/command_list.cpp
+    src/command_list/command_list.cpp
+    src/hooks/c_runtime.cpp
+    src/hooks/math.cpp
+    src/c_runtime/math.cpp
+    src/c_runtime/strings.cpp
+    src/c_runtime/format.cpp
+    src/c_runtime/start_up.cpp
+    src/c_runtime/parse.cpp
     src/game_data/game_data.cpp
     src/display/gamma.cpp
     src/harnesses/harness.cpp
@@ -116,6 +136,13 @@ set(ITC_SOURCES
     src/harnesses/file_class.cpp
     src/harnesses/movie_files.cpp
     src/harnesses/xma.cpp
+    src/harnesses/sprites.cpp
+    src/harnesses/billboards.cpp
+    src/harnesses/command_list.cpp
+    src/harnesses/c_runtime.cpp
+    src/harnesses/math.cpp
+    src/harnesses/ui_movies.cpp
+    src/harnesses/ui_movies_game.cpp
     src/helpers/debug_output.cpp
     src/helpers/object_attributes.cpp
     src/helpers/time.cpp
@@ -157,6 +184,17 @@ set(ITC_SOURCES
     src/interpolation/blend_state.cpp
     src/interpolation/glow.cpp
 )
+
+# The C runtime's math (src/c_runtime/math.cpp) must give the translated
+# code's doubles bit for bit, NaNs' signs included: std::fma only where the
+# PowerPC code fuses (no other contraction), and no rewrites that move a
+# negation into an addition (LLVM's default model treats a NaN's sign as
+# free; seen with -O3 on asin of a negative NaN). See
+# docs/functions/c-runtime.md. The UI movie keys' interpolation
+# (src/ui_movies/keys.cpp) likewise (docs/functions/ui-movies.md).
+set_source_files_properties(src/c_runtime/math.cpp src/ui_movies/keys.cpp PROPERTIES
+    COMPILE_OPTIONS "-ffp-model=strict;-ffp-contract=off"
+    SKIP_PRECOMPILE_HEADERS ON)
 
 # Our XMA decoding (src/audio/xma_*: B2 in docs/rexglue-removal.md) on our
 # own FFmpeg, in a library of its own so only our FFmpeg's headers reach it.

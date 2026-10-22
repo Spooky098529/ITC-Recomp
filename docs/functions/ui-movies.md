@@ -1,0 +1,148 @@
+# Known functions: UI movies
+
+The UI movie library: the 2D movies the HUD, the race start countdown,
+the menus and the pause screens are made of. A movie file (`X2D` version
+`005`) holds a scene (`SCE`) whose nodes are groups (`GRP`), pictures
+(`PIC`), primitives (`PRM`), sub-scenes (`SCE`), texts (`TXT`) and
+transforms (`TFM`), and animations whose tracks key the nodes' fields over
+time. Each movie update applies the playing animations to the nodes,
+walks the tree, and records the pictures and primitives into the command
+list (`command-list.md`) as quads, while texts are queued for the game to
+draw. The library sits at about `8259D5C8` to `825A0FC4` in `default.xex`,
+with its small accessors at `825A6508` to `825A6600` (just below the C
+runtime, `c-runtime.md`); the rest of `8259C000` to `825A6800` belongs to
+other subsystems (the game's sound cues and emitters, the action mappers,
+probably the model animation and the graphics library: leads in
+`../loops/leads.md`). The game's side (`UiMovie::`, about `82119B80` to
+`8211E808`: loading, starting animations, the texts) is in
+[`ui-movies-game.md`](ui-movies-game.md); only its update and rest pose,
+already named, are here.
+Mapped by the B7 loop (`../loops/b7-loop.md`). How UI movies are kept at
+the tick's pace at higher frame rates (the movie replay,
+`--per_tick_ui_movies`, and the adding tracks, `--per_tick_ui_movie_tracks`)
+is in `../frame-interpolation.md` ("Per-frame logic") and
+`../pause-menu-fix.md` ("The sub-menus' arrow"); the movie's, the nodes'
+and the draw context's fields are in `../known-data.md`.
+
+Most of the library is leaves on guest memory with no imports. The keys'
+interpolation is single-precision arithmetic with fused multiply-adds
+(`fmadds`), so native code follows "Matching the translated code" in
+`c-runtime.md` (`std::fma` in float at the same steps). The drawing goes
+through the command list's Overridden functions and, indirectly, the
+renderer object at `0x82970C18` (its vtable slot 4).
+
+Made native by the B7 loop (2026-10-22), from the bottom up: plain C++ in
+`itc_recomp/src/ui_movies/`, adapters in `itc_recomp/src/hooks/ui_movies.cpp`
+behind `--native_ui_movies` (on; off runs the recompiled functions), checked
+by `--run_harnesses=ui_movies` on movies built in the harness's scratch
+area. The accessors' arithmetic is 32-bit and wraps as the original's
+does; they leave r3 zero-extended (the original's 64-bit adds can leave
+upper bits that no caller reads). In an attract race with `--skip_intro`
+the accessors run while the front end's and the race's movies load and
+start; the sub-animation accessor (`sub_825A6558`) didn't run outside the
+harness. The keys' interpolation (`keys.cpp`) is built as the C runtime's
+math is (`-ffp-model=strict`, `-ffp-contract=off`) and calls tan natively;
+the integer cubic (`sub_8259FC18`) didn't run in an attract race. The
+recorders record natively and hand each chunk to the renderer from a frame
+like the original's; the renderer's slot 4 doesn't record into the list.
+The depths they pass on are their own constants (0.0 for the quads,
+`0x82001C00` and `0x82001BFC` for the resets): the f1 their callers pass
+isn't read. Checked against `--native_ui_movies=false` with frame dumps of
+an attract race (its logo overlay; the attract race shows no HUD). The
+loading's fix-ups (`files.cpp`: `sub_825A0EF0` and its helpers, and the
+`XMD` check `sub_825A0CF8`, whose byte swap is proven unreachable and left
+out) run as each movie loads in an attract race. Above the recorders,
+`sub_8259EBE8` and `sub_8259DAC0` still use `ctx` (the recorders hand
+their chunks on through a guest call, so their callers reach them through
+their adapters); `sub_8259DAC0`'s override is in
+`../../itc_recomp/src/debug/pause_movie_log.cpp`, still watched for
+`--log_pause_movie`. `UiMovie::RestorePose` (`sub_82119B80`, game side) is
+native too (`ui_movies.cpp`), with the original kept, watched, under
+`--log_pause_movie`.
+
+Status:
+
+- **Native**: plain C++ in `itc_recomp/src/` that doesn't use the
+  PowerPC context (`ctx`): normal arguments and host structs (it may
+  still read and write guest memory through `src/guest.h` while
+  recompiled code shares the data). The game reaches it without `ctx`,
+  from native or overridden callers, and the recompiled original is no
+  longer called (except behind a fallback flag or to check against it).
+  No `REX_FUNC` override of it exists, not even an adapter kept only for
+  a harness (that's Overridden until the adapter goes).
+  The end state for every function.
+- **Overridden**: an `extern "C" REX_FUNC(sub_XXXXXXXX)` override in
+  `itc_recomp/src/` (or a macro defining one) does the work instead of
+  the original: a thin adapter in front of native code, or a body that
+  still uses `ctx` (calling guest code, reading registers). It may call
+  the original when its flag is off, or to check itself against it.
+- **Wrapped**: an override that does something of its own (skipping
+  render-only passes, logging, timing) and still calls the original
+  (`__imp__sub_XXXXXXXX`) for the work.
+- **Dropped**: its work isn't needed on PC (hardware set-up, kernel calls
+  the SDK already stubbed), so it no longer runs: an override in
+  `itc_recomp/src/` replaces it with nothing (or a fixed return value), or
+  its callers, made native, leave the call out (no override then; the row
+  says which caller). Logs, a harness or the renderer's frame dumps have
+  shown that nothing reads what it did. The original is no longer called,
+  except behind a fallback flag while the drop is being checked. A
+  function the game never calls in the first place isn't Dropped: its
+  status stays blank and its row says it's never called.
+- **Patched**: the generated code was edited in place (search for
+  `PATCH:`).
+
+A function usually moves from recompiled or Wrapped to Overridden to
+Native as the `ctx` edge moves up through its callers, or straight to
+Dropped when its work isn't needed.
+`itc_recomp/tools/check_function_statuses.py` checks this column, in
+every file of the tables, against `src/` (an override marked Native, a
+status with no override, an override with no row, a row in two files);
+run it after changing either, on any branch.
+
+| Address | Name | Status | Notes |
+|---|---|---|---|
+| `sub_8211D2F8` | `UiMovie::Update` | Wrapped | r3 = movie, r4 = 0 advance a frame and draw, 1 draw only; reached through `sub_8211E1B8` from 634 call sites (the HUD, the race start countdown, the pause menus). Replayed on render-only passes, and its adding tracks handled per tick (see "Per-frame logic" in `../frame-interpolation.md`; `docs/pause-menu-fix.md`, "The sub-menus' arrow"). Game side (see [`ui-movies-game.md`](ui-movies-game.md)). Applies each playing animation slot (the animation lists at movie + 0x90B4 and + 0x9640, 40-byte slots from list + 140: +12 the tree, +16 the animation, +20 the time, +28 reversed; see `../known-data.md`) through `sub_825A08E0`, then draws: `sub_8259FA00(movie + 64, [movie + 16], movie + 28, movie + 40, -1)`, `sub_8211CD90` (r5 = 1), and `sub_8259DAC0` with 678 and 148. `sub_8211D280` (from `sub_822141E8`) does the same drawing after the rest pose (`sub_82119B80`) with no animations. |
+| `sub_82119B80` | `UiMovie::RestorePose` | Overridden | r3 = movie, r4 = live tree, r5 = rest tree: for each child of six tagged types (GRP recursed into; PIC, PRM, SCE, TFM, TXT) copies the rest node's fields (+12..+80, and per type +100..+136) over the live one. Called at the end of each movie update (from `8211D7CC`), so tracks' adds start from the rest pose every update. Wrapped only for `--log_pause_movie` (`WATCH_MOVIE_CALL`). Game side (see [`ui-movies-game.md`](ui-movies-game.md)); walks the children with `sub_8259D658` and copies a primitive's vertices through `sub_8259D628`. Its override is now explicit in `src/debug/pause_movie_log.cpp`: with `--log_pause_movie` the original runs, watched as before; otherwise `ui_movies_hooks::RestorePose` (`src/hooks/ui_movies.cpp`) runs `ui_movies::RestorePose` (`src/ui_movies/ui_movies.cpp`, `--native_ui_movies`; harness `ui_movies`), recursing natively. r6, r7 = a live and rest group (the range then from r6's +100, +104) or 0; walks last first; the per-type copies: PIC +100..+136, TXT +100, +104, +116..+136, PRM +100..+108 and its [rest + 116] vertices, TFM none; GRP and SCE recurse. Leaves r3 as the original (its last child pair's, which two callers pass on). Runs every movie update in an attract race. |
+| `sub_825A08E0` | `UiMovie::ApplyAnimation` | | Run by each movie update for every playing animation: finds the keys around the animation's time and applies each track with t = (time - k0) / (k1 - k0), clamped, through `sub_825A0548`. Sets values from the time, so it doesn't step by itself. r3 = the scene node, r4 = the animation, f1 = the time, r6 = loop. For each node track list (`sub_825A6528`, [anim + 36] of them) and each child of the node (`sub_8259D658`, [node + 112]) with the same id (+8), each track (`sub_825A6508`, 16 bytes: +4 its key list, +8 its start time) finds its keys (`sub_825A6540`, `sub_825A6518`: 32-byte keys, +4 the time) around time - start; before the first key or after the last it uses that key, and the animation's length (+12) when there's no second key. Then each sub-animation (`sub_825A6558`, [anim + 52]: +8 a node id, 0 for this node; +16 the animation; +24..+28 the time range mapped onto +32..+36) recursively, at the mapped time, on this node or on the children with that id. Returns 1 while playing (time below the length; with r6, any time above 0), else 0. Callers: `sub_8211D2F8`, `sub_8211DE38`, `sub_8211DF20`, `sub_8211DFF8` (the game side), itself. |
+| `sub_825A0548` | `UiMovie::ApplyTrack` | Wrapped | r3 = node, r4 = track (word +0 its property id), f1 = t, r5/r6 = the keys. Writes one word, at node + the descriptor's offset (plus `sub_8259D600` when indirect): sets it (descriptor byte +8 non-zero) or adds to it (0); nothing for types 3 and up. Adds the update doesn't put back are skipped on render-only passes (`--per_tick_ui_movie_tracks`). The override (`src/frame_pacing/per_frame_logic.cpp`) also logs tracks for `--log_pause_movie`; a native version keeps that skip. The value: floats through `sub_8259FB30`, integers through `sub_8259FA20` or `sub_8259FC18` (by the keys' kind), and two kinds (`sub_8259FAA8`, `sub_8259FD40`) that never ran in play. Only caller: `sub_825A08E0`. |
+| `sub_8259FE68` | `UiMovie::TrackProperty` | | r3 = property id; returns its 12-byte descriptor in the table at `0x82970C28` (64 entries, filled on first use, byte `0x82970C20` set): +0 node offset, +4 type (0 float, 1 and 2 integer), byte +8 set/add, byte +9 indirect. The first call also clears the table and registers its clean-up with `atexit` (`sub_825A7068`, the function at `0x825DB3F0`; guard bit 0 of `0x82970F28`): `atexit` grows its table on the guest heap, so this one waits on the heap (`c-runtime.md`). Only caller: `sub_825A0548`. |
+| `sub_8259FA20` | | Overridden | r3, r4 = the two keys, f1 = t: an integer track's value, `(1 - s) * [k0 + 8] + s * [k1 + 8]` truncated, with s an ease curve in t from the second key's +12 and +16 (both read from r4; and the float at `0x820021E4`). No state. Only caller: `sub_825A0548`. Native in `src/ui_movies/keys.cpp` (built with `-ffp-model=strict`, `-ffp-contract=off`: each single-precision step rounded as the translated code's) behind its adapter (`src/hooks/ui_movies.cpp`, `--native_ui_movies`; harness `ui_movies`). |
+| `sub_8259FB30` | | Overridden | r3, r4 = the two keys, f1 = t: a float track's value (+8), a cubic between the keys with tangents from `tan` (`sub_825A8A50`, Overridden) of the second key's +12 and +16, scaled by the time between the keys (+4) and the floats at `0x82002A38` and `0x820021E4`. No state. Only caller: `sub_825A0548`. Native in `src/ui_movies/keys.cpp` (as `sub_8259FA20`; tan as `c_runtime::Tan`) behind its adapter (`src/hooks/ui_movies.cpp`, `--native_ui_movies`; harness `ui_movies`). Where tan would take its error paths, or the rounding mode isn't nearest, the original runs. r3 and r4 (tan's leftovers) aren't set: the caller reads only f1. |
+| `sub_8259FC18` | | Overridden | The same cubic as `sub_8259FB30` for integer values (+8), truncated. No state. Only caller: `sub_825A0548`. Native in `src/ui_movies/keys.cpp` (as `sub_8259FB30`, the same fallback) behind its adapter (`src/hooks/ui_movies.cpp`, `--native_ui_movies`; harness `ui_movies`). Not called in an attract race (no such tracks there). |
+| `sub_8259D600` | | Overridden | r3, r4: returns 16 * (r3 + 2 * (r4 + 4)); the indirect tracks' extra offset (r3 = [node + 112], r4 = [track + 12]). That's the offset of a primitive's vertex r4 (as `sub_8259D628`), so indirect tracks key one vertex. Native in `src/ui_movies/ui_movies.h` behind its adapter (`src/hooks/ui_movies.cpp`, `--native_ui_movies`; harness `ui_movies`). |
+| `sub_825A6508` | | Overridden | r3 = a node track list, r4 = i: returns r3 + 16 + 16 * i (its 16-byte tracks). From `sub_825A08E0`. Native in `src/ui_movies/ui_movies.h` behind its adapter (`src/hooks/ui_movies.cpp`, `--native_ui_movies`; harness `ui_movies`). |
+| `sub_825A6518` | | Overridden | r3 = a key list, r4 = i: returns r3 + 16 + 32 * i (its 32-byte keys; the count at +12). From `sub_825A08E0`. Native in `src/ui_movies/ui_movies.h` behind its adapter (`src/hooks/ui_movies.cpp`, `--native_ui_movies`; harness `ui_movies`). |
+| `sub_825A6528` | | Overridden | r3 = an animation, r4 = i: its node track list i, the pointer at r3 + 64 + 8 * ([r3 + 32] + i). From `sub_825A08E0`. Native in `src/ui_movies/ui_movies.h` behind its adapter (`src/hooks/ui_movies.cpp`, `--native_ui_movies`; harness `ui_movies`). |
+| `sub_825A6540` | | Overridden | The same for key list i, from index [r3 + 40]. From `sub_825A08E0`. Native in `src/ui_movies/ui_movies.h` behind its adapter (`src/hooks/ui_movies.cpp`, `--native_ui_movies`; harness `ui_movies`). |
+| `sub_825A6558` | | Overridden | The same for sub-animation i, from index [r3 + 48]. From `sub_825A08E0`. Native in `src/ui_movies/ui_movies.h` behind its adapter (`src/hooks/ui_movies.cpp`, `--native_ui_movies`; harness `ui_movies`). Not called in an attract race outside the harness (no sub-animations played there). |
+| `sub_8259D658` | `UiMovie::Child` | Overridden | r3 = node, r4 = index: returns that child (the count is at node + 112). The pointer at node + 128 + 8 * ([node + 108] + r4). From the game side (about 60 callers seen in play: the menus, `sub_82119B80`), `sub_8259F848` and `sub_825A08E0`. Native in `src/ui_movies/ui_movies.h` behind its adapter (`src/hooks/ui_movies.cpp`, `--native_ui_movies`; harness `ui_movies`). |
+| `sub_8259D670` | | Overridden | r3 = scene, r4 = i: its animation i, the pointer at r3 + 128 + 8 * ([r3 + 116] + i). From `sub_8211D978` and `sub_8211E378` (the game side, starting animations). Native in `src/ui_movies/ui_movies.h` behind its adapter (`src/hooks/ui_movies.cpp`, `--native_ui_movies`; harness `ui_movies`). |
+| `sub_8259D618` | | Overridden | r3 = a primitive, r4 = i: returns r3 + 128 + 16 * i (its texture entries). From `sub_8259F348`. Native in `src/ui_movies/ui_movies.h` behind its adapter (`src/hooks/ui_movies.cpp`, `--native_ui_movies`; harness `ui_movies`). |
+| `sub_8259D628` | | Overridden | r3 = a primitive, r4 = i: its vertex i, r3 + 128 + 16 * [r3 + 112] + 32 * i (32-byte vertices after [+112] texture entries). From `sub_8259F348`, `sub_82119B80`, `sub_8211BEE8`. Native in `src/ui_movies/ui_movies.h` behind its adapter (`src/hooks/ui_movies.cpp`, `--native_ui_movies`; harness `ui_movies`). |
+| `sub_8259D648` | | Overridden | r3 = a picture, r4 = i: returns r3 + 144 + 16 * i (its texture entries). From `sub_8259ED40`, `sub_8211AAA8`, `sub_8211AB28`. Native in `src/ui_movies/ui_movies.h` behind its adapter (`src/hooks/ui_movies.cpp`, `--native_ui_movies`; harness `ui_movies`). |
+| `sub_825A0E40` | | Overridden | r3 = a movie file: 1 when +8 holds `X2D\0` and +12 `005\0`, else 0. From `sub_825A0EF0`. Native in `src/ui_movies/files.cpp` behind its adapter (`src/hooks/ui_movies.cpp`, `--native_ui_movies`; harness `ui_movies`). |
+| `sub_825A0EF0` | `UiMovie::FixUpFile` | Overridden | r3 = a loaded movie file: 0 unless 16-byte aligned and `sub_825A0E40` agrees. Turns the offsets of its table (8-byte entries at +32, [+24] of them) into pointers, fixes up the scene at +[+4] (`sub_8259D688`; 0 is passed on when it isn't tagged `SCE`) and each of its [+20] animations from table index [+16] (`sub_825A6570`); returns 1. No guard against a second call. From `sub_8211E500` (the game side's movie load). Native in `src/ui_movies/files.cpp` behind its adapter (`src/hooks/ui_movies.cpp`, `--native_ui_movies`; harness `ui_movies`). Runs as each UI movie loads (from `sub_8211E500`). |
+| `sub_8259D688` | | Overridden | r3 = a scene, r4 = the movie file: for each of the scene's [+124] child entries (8 bytes from +128), turns the offset into a pointer: entries in the animation range ([+116], [+120] of them) through the file's table (`sub_825A0ED8`), the others relative to the scene; recurses into children tagged `SCE`. Returns 1. From `sub_825A0EF0` and itself. Re-reads [+116], [+120] and [+124] each child, as the original. Native in `src/ui_movies/files.cpp` (recursing natively) behind its adapter (`src/hooks/ui_movies.cpp`, `--native_ui_movies`; harness `ui_movies`). |
+| `sub_825A6570` | | Overridden | r3 = an animation, r4 = the movie file: turns its [+56] entries' offsets (8 bytes from +64) into pointers, then resolves each sub-animation's +16 ([+52] of them from index [+48]) through the file's table (`sub_825A0ED8`). Returns 1. From `sub_825A0EF0`. Native in `src/ui_movies/files.cpp` behind its adapter (`src/hooks/ui_movies.cpp`, `--native_ui_movies`; harness `ui_movies`). |
+| `sub_825A0ED8` | | Overridden | r3 = a movie file, r4 = i: the pointer at r3 + 32 + 8 * ([r3 + 16] + i) (its animation i). From `sub_8259D688`, `sub_825A6570`. Native in `src/ui_movies/files.cpp` behind its adapter (`src/hooks/ui_movies.cpp`, `--native_ui_movies`; harness `ui_movies`). |
+| `sub_825A0EB0` | | Overridden | r3 = a movie file: its scene (r3 + [r3 + 4]) when tagged `SCE`, else 0. From `sub_8211E500`. Native in `src/ui_movies/ui_movies.cpp` behind its adapter (`src/hooks/ui_movies.cpp`, `--native_ui_movies`; harness `ui_movies`). |
+| `sub_8259D5C8` | | Overridden | r3 = a chunk list, r4 = a tag: walks the chunks (each +4 the offset to the next, word +0 its tag) until one tagged r4 or `TRM\0` (the end); returns that chunk, or 0 at the end (unless r4 is `TRM`). From `sub_8211E500`. Native in `src/ui_movies/ui_movies.cpp` behind its adapter (`src/hooks/ui_movies.cpp`, `--native_ui_movies`; harness `ui_movies`). |
+| `sub_825A0C60` | | Overridden | r3: 1 when it starts with `XMD\0` `001\0`, else 0. From `sub_825A0CF8`. Native in `src/ui_movies/files.cpp` behind its adapter (`src/hooks/ui_movies.cpp`, `--native_ui_movies`; harness `ui_movies`). |
+| `sub_825A0CF8` | | Overridden | r3 = an `XMD` file (probably the movie's texture or resource set): 0 unless 16-byte aligned and `sub_825A0C60` agrees. Byte-swaps +8, +12 and the words from +16 ([+12] of them, twice that with bit 0 of +8) unless word +0 reads `XMD\0`, which the check just made sure of: as read, the swap never runs. Returns 1. From `sub_8211E500`. Native in `src/ui_movies/files.cpp` behind its adapter (`src/hooks/ui_movies.cpp`, `--native_ui_movies`; harness `ui_movies`). The byte swap is left out: proven unreachable (`sub_825A0C60` returns 1 only when bytes +0..+3 are `X`, `M`, `D`, 0, so the big-endian word +0 then reads `XMD\0` and the swap is skipped); the harness checks the words after the header are left as they were. |
+| `sub_825A0CD0` | | Overridden | r3 = an `XMD` file, r4 = i: its entry i (r3 + [r3 + 16 + 4 * i]) when i is below [+12], else 0. From `sub_8211E500`. Native in `src/ui_movies/ui_movies.cpp` behind its adapter (`src/hooks/ui_movies.cpp`, `--native_ui_movies`; harness `ui_movies`). |
+| `sub_8259D798` | `UiMovie::SetRenderer` | Overridden | Stores r3 and r4 at `0x82970C18` (the renderer object the library hands its chunks to) and `0x82970C1C` (the command list it records into). From `sub_8211AD00` (five screens) and `sub_82291328`. Native in `src/ui_movies/ui_movies.cpp` behind its adapter (`src/hooks/ui_movies.cpp`, `--native_ui_movies`; harness `ui_movies`). |
+| `sub_8259FA00` | `UiMovie::Draw` | Wrapped | The UI movie update's callees besides its tracks (and `sub_82119B80` above), watched for writes for `--log_pause_movie` (`WATCH_MOVIE_CALL`). r3 = the draw context (movie + 64), r4 = the scene, r5 = the textures (movie + 28), r6 = the text list (movie + 40), r7 (-1): stores r5, r6, r7 at context + 96, + 100, + 104 and draws the scene (`sub_8259F848(r3, r4, r4, 0)`). From `sub_8211D2F8` and `sub_8211D280`. |
+| `sub_8259D930` | | Overridden | r3 = a draw context: identity matrix (copied with `memcpy`), no clip rectangle (+64..+76 = 0), color (+80..+92) all 1.0, +96..+108 = 0. From `sub_8211E1C0` (the game side). Returns r3 unchanged. Native in `src/ui_movies/ui_movies.cpp` (the identity written directly, not through `memcpy` from the stack) behind its adapter (`src/hooks/ui_movies.cpp`, `--native_ui_movies`; harness `ui_movies`). |
+| `sub_8259D9F8` | | | r3 = a new draw context, r4 = the parent's: copies the matrix (`Matrix::Copy`, `sub_820A0AC0`), the clip rectangle, the color and +96..+108. From `sub_8259F848`. |
+| `sub_8259F848` | `UiMovie::DrawNode` | | r3 = the draw context, r4 = the scene the children come from, r5 = the node, r6 = the layer. Applies the node's transform (`sub_8259E6C8`), then for its children [r5 + 100] to [r5 + 100] + [r5 + 104] - 1 (`sub_8259D658` on r4), last first: skips those not visible (+80 = 0) or scaled to nothing (\|+28\| or \|+32\| at most the float at `0x82002A44`), copies the context (`sub_8259D9F8`), and by tag: `GRP` recurses (same scene), `SCE` recurses into it as the scene, `PIC` `sub_8259ED40`, `PRM` `sub_8259F348`, `TXT` `sub_8259F770` (other tags, `TFM` among them, draw nothing), each at layer r6 + [child + 72]. From `sub_8259FA00` and itself. |
+| `sub_8259E6C8` | `UiMovie::ApplyTransform` | | r3 = the draw context, r4 = the node. Clip: the node's rectangle (+40..+52, integers), when set, offset by the context's +32 and +36 (as integers; as read, not the matrix's translation row at +48) and kept, or intersected with the context's (`sub_8259D730`, never ran in play). Color: the context's r, g, b (+80..+88) times the node's +56..+64 (integers) times the float at `0x82002200`, alpha (+92) times +68. Matrix (`Matrix::Multiply`, `sub_8209BD50`, local first): translate by the position (+12, +16) plus the pivot (+20, +24, integers), rotate by +36 (degrees, times the float at `0x82002948`; `Matrix::RotateZ`, `sub_820A2D30`), scale by +28, +32 (sets context + 108 when either isn't 1), translate back by the pivot. The translations are skipped when zero, the rotation when within the float at `0x82002A44` of zero. From `sub_8259F848`, `sub_8259ED40`, `sub_8259F348`, `sub_8259F770`. |
+| `sub_8259ED40` | `UiMovie::DrawPicture` | | r3 = the draw context, r5 = the picture, r6 = the layer. Applies its transform, then builds a quad on its ~1 KB stack (the primitive set up by `sub_8211A948`, game side): four corners (0, 0) to (+100, +104) transformed by the context (`sub_820AB560`), each with the context's color times the float at `0x82000C44` as integers, and texture coordinates from the pixel rectangle +116..+128 over the texture's size (+4, +8) when it has a texture (+140: entry [+108] by `sub_8259D648`, an index into the textures at [[context + 96]]), else 0 to 1; +132 and +136 flip them; the context's clip rectangle as 16-bit integers (sorted). Draws it with `sub_8259EBE8` (r4 = [picture + 72], f1 = the layer times the float at `0x82071520`; the recorders under it don't read f1). From `sub_8259F848`. |
+| `sub_8259F348` | `UiMovie::DrawPrimitive` | | The same as `sub_8259ED40` for a primitive: [+116] vertices (`sub_8259D628`, 32 bytes: position +0, +4; color +8..+16, integers; alpha; texture coordinates +24, +28 in pixels over the texture's size), its texture when +112 is set (entry [+104] by `sub_8259D618`), +100 a flag on the colors. Not read in detail. From `sub_8259F848`. |
+| `sub_8259EBE8` | | Overridden | r3 = a quad or primitive (built on the caller's stack), r4 = its key, f1 = its depth (which neither recorder reads): records it untextured (`sub_8259E098`, when +84 is 0) or textured (`sub_8259DAD0`); when clipped (+100), then `sub_8259D7B0(r4 + 1, f1)`. From `sub_8259ED40`, `sub_8259F348`, `sub_8211BEE8`. Its override (`src/hooks/ui_movies.cpp`, `--native_ui_movies`; harness `ui_movies`) uses `ctx`: it calls the recorders' adapters from a 112-byte frame with the original's return addresses (the recorders hand chunks on through a guest call). Both branches run in an attract race. |
+| `sub_8259DAD0` | | Overridden | Records a textured quad or primitive: opens a chunk in the command list at `[0x82970C1C]` (`CommandList::OpenChunk`), state commands (among them 31 when clipped, 3, 56, 60 and 40), the vertices (`CommandList::AllocateVertices`), closes it and hands it to the renderer `[0x82970C18]` (vtable slot 4, r4 the chunk, r5 the key, f1 the float at `0x82000A34`, 0.0: the caller's f1 isn't read). r3 = the quad (+68 the blend mode 0 to 4, 5 and up none; +80 the vertex count; +84 the texture; +88, +92, +96 the positions, colors and texture coordinates, 16 bytes a vertex; +100 clipped; +104..+110 the clip rectangle; +112 the texture stage flag), r4 = the key; vertices 24 bytes (position, a color word made of the color's +12 low byte and bytes +3, +7, +11, texture coordinates). Recorded only on logic passes (its recorders `8259D7DC`-`8259E050`, "`--log_recording_by_pass`" in `../frame-interpolation.md`). From `sub_8259EBE8`. Native in `src/ui_movies/recording.cpp` behind its adapter (`src/hooks/ui_movies.cpp`, `--native_ui_movies`; harness `ui_movies`).; the chunk handed on from a frame like the original's (160 bytes, its return address). The original runs where its command list calls would print (another chunk open, the list full) and with AllocateSlots's diagnostics on. |
+| `sub_8259E098` | | Overridden | The same as `sub_8259DAD0` for an untextured quad or primitive: no texture slots (command 4 and +84), command 6's third word 0 instead of 2, the vertices' texture coordinates (+16, +20) left as they were. From `sub_8259EBE8`. Native in `src/ui_movies/recording.cpp`, as `sub_8259DAD0` behind its adapter (`src/hooks/ui_movies.cpp`, `--native_ui_movies`; harness `ui_movies`). |
+| `sub_8259D7B0` | | Overridden | r3 = a key (f1 isn't read): records two small chunks into `[0x82970C1C]` (the first with command 31 and the rectangle 0, 0, 1280, 720, then 36: probably the clip turned back to the whole screen; the second commands 1 (with 1) and 200, then 36), each handed to the renderer `[0x82970C18]` (vtable slot 4) with r3, at the floats at `0x82001C00` and `0x82001BFC` (the depths it passes on, not the caller's f1). From `sub_8259DAC0`, `sub_8259EBE8`. Native in `src/ui_movies/recording.cpp` behind its adapter (`src/hooks/ui_movies.cpp`, `--native_ui_movies`; harness `ui_movies`).; both chunks checked to fit before the first is recorded (the original runs otherwise), each handed on from a 144-byte frame with the original's return address. The renderer doesn't record into the list, so the second still fits after the first is handed on; checked again, with an error logged and the second skipped if not (never seen). |
+| `sub_8259DAC0` | | Overridden | The UI movie update's callees besides its tracks (and `sub_82119B80` above), watched for writes for `--log_pause_movie` (`WATCH_MOVIE_CALL`). r4 = a key: `sub_8259D7B0(r4)` at the float at `0x82001C00` (r3 not used). The movie update calls it with 678 and 148 after drawing. From `sub_8211D2F8` and `sub_8211D280`. Now an override of its own in `src/debug/pause_movie_log.cpp` (still watched for `--log_pause_movie`) whose work, `ui_movies_hooks::ResetAfterMovie` (`src/hooks/ui_movies.cpp`, `--native_ui_movies`; harness `ui_movies`), sets r3 and f1 and tail-calls `sub_8259D7B0`'s adapter (uses `ctx`). Runs in an attract race. |
+| `sub_8259F770` | `UiMovie::QueueText` | | r3 = the draw context, r5 = the text node, r6 = the layer. Applies its transform; when the context has a text list (+100), builds a 128-byte text item (`sub_8211A818`, game side: +0 the node, +16 the matrix, +80 the depth, +84 the color, +100 the clip rectangle) and appends it (`sub_8259F700`), then destroys the temporary (`sub_8211A8C8`). The game draws the list after (probably `sub_8211CD90`). From `sub_8259F848`. |
+| `sub_8259F700` | | | r3 = a text list (+0 the items, +4 the capacity, +8 the count), r4 = an item: appends a copy (`sub_8259E620`), growing to twice the capacity first when full (`sub_8259EC58`, never ran in play). From `sub_8259F770`. |
+| `sub_8259E620` | | | r3 = destination, r4 = a text item: copies +0, the matrix at +16 (`Matrix::Copy`), +80 and the 16 bytes at +84 and +100. From `sub_8259F700`. |

@@ -43,6 +43,26 @@ but not loaded.
 Most handlers treat arg1 as a count of 16-byte items and call one library
 function per item. The exceptions are marked with their item size.
 
+### The command list recorded into (native since B7)
+
+The list the slots are allocated from (`docs/functions/command-list.md`)
+is plain C++ in `itc_recomp/src/command_list/` since the B7 loop
+(2026-10-22, `--native_command_list`; AllocateSlots's own flag is
+`--native_allocate_slots`), with adapters in
+`src/hooks/command_list.cpp` and harness `command_list`. The adapters
+keep the guest memory and r3 the originals leave (not the volatile
+registers, which no caller reads; AllocateSlots's adapter still sets
+them, as before). Where the original would print its debug message (a
+chunk opened while the open count at `0x8296BD28` isn't 0, a full list)
+the adapter runs the original instead: nothing changed before, the same
+result. In a 25-second attract race (temporary counters, 2026-10-22):
+OpenChunk and CloseChunk over 4 million calls each, AllocateVertices over
+260 thousand, AllocateBytes over a million, AllocateResolve over 65
+thousand; of the allocators' callers, only `sub_8217C370` asks for a
+header slot (AllocateVertices, command 5; return address `0x8217C3F0`), so
+AllocateBytes's header with a slot count as arg1 (command 21's handler
+reads bytes) is never recorded.
+
 ## Command table (`0x8265EDE0`)
 
 | Id | Handler | Item | What it does | Library call |

@@ -23,12 +23,15 @@
 // (amount 0) and the frames after it move towards the current one.
 
 #include "blend_state.h"
+#include "command_list/command_list.h"
 #include "debug/replay_stats.h"
 #include "native/renderer.h"
 
 #include "frame_pacing/frame_pacer.h"
 #include "frame_pacing/game_messages.h"
 #include "guest.h"
+#include "hooks/guest_call.h"
+#include "sprites/billboards.h"
 #include "transform.h"
 
 #include "base/flags.h"
@@ -71,6 +74,7 @@ ITC_FLAG_BOOL(log_overlay_uploads, false, "ITC",
               "Log every shader constant upload the race overlays recorded, as replayed, "
               "12 frames every 3 s");
 ITC_FLAG_DECLARE(bool, log_frame_times);
+ITC_FLAG_DECLARE(bool, native_billboards);
 ITC_FLAG_BOOL(strict_pixel_pairing, true, "ITC",
               "Leave per-object pixel constants unblended after a draw that isn't a known "
               "camera product, instead of pairing them by the product before it");
@@ -4211,15 +4215,16 @@ extern "C" REX_FUNC(sub_8258CAA0) {
   // (see "AllocateSlots" in docs/native-renderer.md). Done here without the
   // frame, leaving the registers it changes as it would; a full list goes to
   // the original (it prints a message and returns 0).
+  // The allocation is plain C++ (src/command_list/command_list.h), which
+  // the other allocators call directly.
   uint32_t list = ctx.r3.u32;
-  uint32_t used = guest::LoadU32(base, list + 12) + count;
-  uint32_t limit = guest::LoadU32(base, list + 8);
-  if (ITC_FLAG(native_allocate_slots) && used < limit) {
-    uint32_t first = guest::LoadU32(base, list + 44);
-    uint32_t next = first + (count << 4);
-    guest::StoreU32(base, list + 12, used);
-    guest::StoreU32(base, list + 44, next);
-    ctx.cr6.compare<uint32_t>(used, limit, ctx.xer);
+  uint32_t first = 0;
+  if (ITC_FLAG(native_allocate_slots)) {
+    first = command_list::AllocateSlots(base, list, count);
+  }
+  if (first != 0) {
+    ctx.cr6.compare<uint32_t>(guest::LoadU32(base, list + 12), guest::LoadU32(base, list + 8),
+                              ctx.xer);
     ctx.r12.u64 = ctx.lr;
     ctx.r11.u64 = list;
     ctx.r10.u64 = uint64_t(count << 4) + first;
@@ -4253,12 +4258,47 @@ extern "C" REX_FUNC(sub_820A0AC0) {
 
 // Billboards_BuildVertices: r3 = billboard set (its +0 is the camera pass it
 // faces), r4 = command list, r5 = the sprites. Writes each light's quad,
-// turned to face that camera.
+// turned to face that camera; returns the vertices counted. Natively
+// (src/sprites/billboards.cpp, --native_billboards) or translated, between
+// the frame's camera blend and its undoing.
+namespace {
+struct BillboardSlots {
+  PPCContext& ctx;
+  uint8_t* base;
+  uint32_t list;
+};
+
+// CommandList::AllocateSlots (ours, with its diagnostics) from a frame made
+// as the original's (304 bytes), with its return address.
+uint32_t AllocateBillboardSlots(void* user, uint32_t count, uint32_t return_address) {
+  auto& s = *static_cast<BillboardSlots*>(user);
+  uint32_t first = 0;
+  guest_call::InFrame(s.ctx, s.base, 304, return_address, [&](uint32_t) {
+    s.ctx.r3.u64 = s.list;
+    s.ctx.r4.u64 = count;
+    sub_8258CAA0(s.ctx, s.base);
+    first = s.ctx.r3.u32;
+  });
+  return first;
+}
+}  // namespace
+
 extern "C" REX_FUNC(sub_8209C6E0) {
   REX_FUNC_PROLOGUE();
   uint32_t pass = guest::LoadU32(base, ctx.r3.u32);
   interpolation::GetDrawState().BeforeBillboards(base, pass);
-  __imp__sub_8209C6E0(ctx, base);
+  if (ITC_FLAG(native_billboards)) {
+    const uint32_t set = ctx.r3.u32, material = ctx.r5.u32;
+    const uint64_t lr = ctx.lr;
+    BillboardSlots user{ctx, base, ctx.r4.u32};
+    ctx.fpscr.disableFlushMode();
+    uint32_t counted =
+        sprites::BuildBillboardVertices(base, set, material, {AllocateBillboardSlots, &user});
+    ctx.lr = lr;
+    ctx.r3.u64 = counted;
+  } else {
+    __imp__sub_8209C6E0(ctx, base);
+  }
   interpolation::GetDrawState().AfterBillboards(base);
 }
 
