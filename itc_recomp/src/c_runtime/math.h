@@ -31,4 +31,24 @@ double Cos(double x);
 double Atan(double x);
 double Atan2(double y, double x);
 
+// The floating-point helpers pow uses, on the double's bits:
+// copysign (sub_825AB1C8): magnitude's bits with sign's sign bit.
+double Copysign(double magnitude, double sign);
+// _set_exp (sub_825AFE80): the biased exponent set to exponent + 1022 (as a
+// 12-bit field: an overflow reaches the sign bit, as the original's).
+double SetExp(double x, int32_t exponent);
+// _get_exp (sub_825AFEA8): the biased exponent less 1022.
+int32_t GetExp(double x);
+// _decomp (sub_825AFF80): the mantissa in [0.5, 1) with x's sign, and the
+// exponent (0 for a zero, which is returned as it is; denormals normalized).
+double Decomp(double x, int32_t* exponent);
+// pow's integer test (sub_825A8CE0): 2 for an even integer, 1 for an odd
+// one, 0 otherwise (denormals included).
+int32_t IntType(double y);
+
+// log (sub_825A9C00) and pow (sub_825A8ED0; x to the y). pow's infinity
+// cases (sub_825A8D50, never seen in play) are ported with it.
+double Log(double x);
+double Pow(double x, double y);
+
 }  // namespace c_runtime

@@ -117,6 +117,36 @@ void Binary(Context& h, const char* name, GuestFunction recompiled, GuestFunctio
   results.Report();
 }
 
+// A general case runner: `args(i, t)` sets case i's registers, `out(t, bytes)`
+// appends what's compared; the scratch area is filled before each call.
+template <typename Args, typename Out, typename What>
+void Cases(Context& h, const char* name, GuestFunction recompiled, GuestFunction native,
+           size_t count, Args args, Out out, What what) {
+  Results results(name);
+  for (size_t i = 0; i < count; i++) {
+    std::vector<uint8_t> result[2];
+    for (int v = 0; v < 2; v++) {
+      Fill(h.base, h.data, 16);
+      PPCContext t = CallContext(h);
+      args(i, t);
+      (v == 0 ? recompiled : native)(t, h.base);
+      out(t, result[v]);
+    }
+    results.Check(result[0], result[1], what(i));
+  }
+  results.Report();
+}
+
+void Append(std::vector<uint8_t>& bytes, uint64_t value) {
+  for (int i = 0; i < 8; i++) {
+    bytes.push_back(uint8_t(value >> (56 - 8 * i)));
+  }
+}
+
+std::string Bits(double x) {
+  return fmt::format("{:016X}", std::bit_cast<uint64_t>(x));
+}
+
 }  // namespace
 
 void Math(Context& h) {
@@ -189,6 +219,112 @@ void Math(Context& h) {
       pairs.push_back({random[i], -std::nextafter(random[i], 0.0)});
     }
     Binary(h, "atan2 (sub_825A8770)", __imp__sub_825A8770, sub_825A8770, pairs);
+  }
+  // pow and what it calls: copysign, _set_exp, _get_exp, _decomp, the
+  // integer test and log, each against its recompiled version. pow's
+  // recompiled version calls these helpers' overrides (the native ones), so
+  // their own cases are their check; f1 only for pow (its recompiled version
+  // leaves the integer test's result in r3).
+  {
+    // Values: the special ones, integers and halves, the edges each
+    // function tests, and random doubles of every size.
+    std::vector<double> values = SpecialValues();
+    for (double x : {1.0, 2.0, 3.0, 0.5, 1.5, 0.7071067811865476, 4503599627370496.0,
+                     9007199254740992.0, 9223372036854775808.0, 1e18, 1e20, 1e300, 1e-300,
+                     127.0, 128.0, 129.0, 2.2, 1.0 / 2.2, 10.0}) {
+      AddAround(values, x);
+    }
+    AddRandom(h, values, 2.0, 400);
+    AddRandom(h, values, 1e6, 200);
+    for (int i = -40; i <= 40; i++) {
+      values.push_back(i * 0.5);
+    }
+
+    Cases(h, "log (sub_825A9C00)", __imp__sub_825A9C00, sub_825A9C00, values.size(),
+          [&](size_t i, PPCContext& t) { t.f1.f64 = values[i]; },
+          [](PPCContext& t, std::vector<uint8_t>& b) { Append(b, t.f1.u64); },
+          [&](size_t i) { return "x " + Bits(values[i]); });
+    Cases(h, "pow's integer test (sub_825A8CE0)", __imp__sub_825A8CE0, sub_825A8CE0,
+          values.size(), [&](size_t i, PPCContext& t) { t.f1.f64 = values[i]; },
+          [](PPCContext& t, std::vector<uint8_t>& b) { Append(b, t.r3.u64); },
+          [&](size_t i) { return "y " + Bits(values[i]); });
+    Cases(h, "_get_exp (sub_825AFEA8)", __imp__sub_825AFEA8, sub_825AFEA8, values.size(),
+          [&](size_t i, PPCContext& t) { t.f1.f64 = values[i]; },
+          [](PPCContext& t, std::vector<uint8_t>& b) { Append(b, t.r3.u64); },
+          [&](size_t i) { return "x " + Bits(values[i]); });
+    Cases(h, "_decomp (sub_825AFF80)", __imp__sub_825AFF80, sub_825AFF80, values.size(),
+          [&](size_t i, PPCContext& t) {
+            t.f1.f64 = values[i];
+            t.r4.u64 = h.data;
+          },
+          [&](PPCContext& t, std::vector<uint8_t>& b) {
+            Append(b, t.f1.u64);
+            const auto out = Read(h.base, h.data, 8);
+            b.insert(b.end(), out.begin(), out.end());
+          },
+          [&](size_t i) { return "x " + Bits(values[i]); });
+
+    // _set_exp: exponents over the whole range and beyond (into the sign).
+    std::vector<std::pair<double, int64_t>> exps;
+    for (double x : values) {
+      for (int64_t e : {-1100, -1074, -1022, -1021, 0, 1, 1024, 1025, 1026, 3000}) {
+        exps.push_back({x, e});
+      }
+    }
+    for (int i = 0; i < 200; i++) {
+      exps.push_back({values[h.random.Below(uint32_t(values.size()))], int64_t(h.random.Next())});
+    }
+    Cases(h, "_set_exp (sub_825AFE80)", __imp__sub_825AFE80, sub_825AFE80, exps.size(),
+          [&](size_t i, PPCContext& t) {
+            t.f1.f64 = exps[i].first;
+            t.r4.s64 = exps[i].second;
+          },
+          [](PPCContext& t, std::vector<uint8_t>& b) { Append(b, t.f1.u64); },
+          [&](size_t i) { return fmt::format("x {} e {}", Bits(exps[i].first), exps[i].second); });
+
+    // copysign and pow over pairs: every pair of the edge values, then
+    // random ones (bases near 1, integer exponents, results near overflow
+    // and underflow).
+    std::vector<double> edges = SpecialValues();
+    for (double x : {1.0, -1.0, 2.0, -2.0, 0.5, -0.5, 3.0, -3.0, 10.0, -10.0, 2.2, 1.0 / 2.2,
+                     0.9999999, 1.0000001, 127.0, 128.0, 129.0, -127.0, 1e20, 1.0000000000000002e20,
+                     -1e20, 1e21, 9223372036854775808.0, 9007199254740991.0, 1e-300, 1e300}) {
+      edges.push_back(x);
+    }
+    std::vector<std::pair<double, double>> pairs;
+    for (double x : edges) {
+      for (double y : edges) {
+        pairs.push_back({x, y});
+      }
+    }
+    auto unit = [&] { return double(h.random.Next() >> 11) / double(1ull << 53); };
+    for (int i = 0; i < 1500; i++) {
+      pairs.push_back({unit() * 10.0, (unit() * 2.0 - 1.0) * 10.0});
+      pairs.push_back({0.9 + unit() * 0.2, (unit() * 2.0 - 1.0) * 100.0});
+      pairs.push_back({(unit() * 2.0 - 1.0) * 100.0, double(int(h.random.Below(260)) - 130)});
+      pairs.push_back({unit() * 4.0, unit() * 3.0});
+    }
+    for (int i = 0; i < 300; i++) {
+      pairs.push_back({1.0 + unit() * 9.0, 300.0 + unit() * 30.0});
+      pairs.push_back({1.0 + unit() * 9.0, -300.0 - unit() * 30.0});
+      pairs.push_back({2.0, 1020.0 + unit() * 8.0});
+      pairs.push_back({2.0, -1080.0 + unit() * 20.0});
+      pairs.push_back({D(h.random.Next()), D(h.random.Next())});
+    }
+    Cases(h, "copysign (sub_825AB1C8)", __imp__sub_825AB1C8, sub_825AB1C8, pairs.size(),
+          [&](size_t i, PPCContext& t) {
+            t.f1.f64 = pairs[i].first;
+            t.f2.f64 = pairs[i].second;
+          },
+          [](PPCContext& t, std::vector<uint8_t>& b) { Append(b, t.f1.u64); },
+          [&](size_t i) { return Bits(pairs[i].first) + " " + Bits(pairs[i].second); });
+    Cases(h, "pow (sub_825A8ED0)", __imp__sub_825A8ED0, sub_825A8ED0, pairs.size(),
+          [&](size_t i, PPCContext& t) {
+            t.f1.f64 = pairs[i].first;
+            t.f2.f64 = pairs[i].second;
+          },
+          [](PPCContext& t, std::vector<uint8_t>& b) { Append(b, t.f1.u64); },
+          [&](size_t i) { return "x " + Bits(pairs[i].first) + " y " + Bits(pairs[i].second); });
   }
 }
 
