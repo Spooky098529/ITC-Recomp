@@ -276,3 +276,23 @@ uint32_t ModelHasPoint(uint8_t* base, uint32_t model, int32_t index);
 uint32_t OverlayViewHasPoint(uint8_t* base, uint32_t view, int32_t index);
 
 }  // namespace race_overlays
+
+namespace race_overlays {
+
+// ModelParts::PointPosition (sub_820E0910): for points 4-21, the point's 16
+// bytes to `out` (two doublewords, as the original's ld and std); nothing
+// for others. Returns `out` (the original leaves r3 alone).
+uint32_t ModelPartsPointPosition(uint8_t* base, uint32_t out, uint32_t parts, int32_t index);
+
+// Model::PointPosition (sub_820DA988): when the model's four words are set
+// (as ModelHasPoint), points below 4 from the table at the +5048 object's
+// +24 plus 6,976 (16 bytes each), others ModelPartsPointPosition on +5060;
+// else the game's 0.0 (0x82000A34) to the four words of `out`. Returns
+// `out`.
+uint32_t ModelPointPosition(uint8_t* base, uint32_t out, uint32_t model, int32_t index);
+
+// OverlayView::PointPosition (sub_82127140): ModelPointPosition on the
+// view's model. Returns `out`.
+uint32_t OverlayViewPointPosition(uint8_t* base, uint32_t out, uint32_t view, int32_t index);
+
+}  // namespace race_overlays

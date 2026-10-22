@@ -13,7 +13,7 @@ ITC_FLAG_BOOL(native_race_overlays, true, "ITC",
               "sub_8211F118; Marker::Set and Update, sub_8212CCE0 and sub_8212CBE0; Trail::Update and "
               "AddPoint, sub_821292E8 and sub_82129598; ParticlesB and ParticlesC::Emit, sub_8212B4A8 and sub_8212C1C0; the "
               "car-model sprites' kind and table entry, sub_82123188 and sub_8211F300; the model "
-              "points' checks, sub_82126A78) natively "
+              "points' checks and positions, sub_82126A78 and sub_82127140) natively "
               "instead of through the translated code (same results; checked by "
               "--run_harnesses=race_overlays)");
 
@@ -218,3 +218,8 @@ extern "C" REX_FUNC(sub_8212B4A8) {
 // (Model::HasPoint and ModelParts::HasPoint, which only it calls in play,
 // are done by its plain C++).
 ITC_OVERLAY_WORD(82126A78, OverlayViewHasPoint(base, ctx.r3.u32, ctx.r4.s32))
+
+// OverlayView::PointPosition: r3 = out, r4 = a view, r5 = a point index;
+// returns out (Model::PointPosition and ModelParts::PointPosition, which
+// only it calls in play, are done by its plain C++).
+ITC_OVERLAY_WORD(82127140, OverlayViewPointPosition(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.s32))

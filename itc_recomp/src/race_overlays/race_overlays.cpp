@@ -912,3 +912,59 @@ uint32_t OverlayViewHasPoint(uint8_t* base, uint32_t view, int32_t index) {
 }
 
 }  // namespace race_overlays
+
+namespace race_overlays {
+
+namespace {
+
+// Two doublewords from `from` to `to`, the first stored before the second
+// is loaded (the original's ld, std, ld, std).
+void CopyDoublewords(uint8_t* base, uint32_t from, uint32_t to) {
+  StoreU64(base, to + 0, LoadU64(base, from + 0));
+  StoreU64(base, to + 8, LoadU64(base, from + 8));
+}
+
+}  // namespace
+
+uint32_t ModelPartsPointPosition(uint8_t* base, uint32_t out, uint32_t parts, int32_t index) {
+  ITC_NATIVE_RUNNING("sub_820E0910 ModelParts::PointPosition");
+  if (index < 4 || index > 21) {
+    return out;
+  }
+  uint32_t offset;
+  if (index <= 7) {
+    offset = 34256;
+  } else if (index <= 13) {
+    offset = 23120;
+  } else {
+    offset = 24640;
+  }
+  CopyDoublewords(base, parts + 240 * uint32_t(index) + offset, out);
+  return out;
+}
+
+uint32_t ModelPointPosition(uint8_t* base, uint32_t out, uint32_t model, int32_t index) {
+  ITC_NATIVE_RUNNING("sub_820DA988 Model::PointPosition");
+  if (!ModelReady(base, model)) {
+    // lfs then four stfs: the word's bits.
+    const uint32_t zero = guest::LoadU32(base, kZero);
+    guest::StoreU32(base, out + 12, zero);
+    guest::StoreU32(base, out + 8, zero);
+    guest::StoreU32(base, out + 4, zero);
+    guest::StoreU32(base, out + 0, zero);
+    return out;
+  }
+  if (index < 4) {
+    const uint32_t points = guest::LoadU32(base, guest::LoadU32(base, model + kModelPoints) + 24);
+    CopyDoublewords(base, points + 6976 + (uint32_t(index) << 4), out);
+    return out;
+  }
+  return ModelPartsPointPosition(base, out, guest::LoadU32(base, model + kModelParts), index);
+}
+
+uint32_t OverlayViewPointPosition(uint8_t* base, uint32_t out, uint32_t view, int32_t index) {
+  ITC_NATIVE_RUNNING("sub_82127140 OverlayView::PointPosition");
+  return ModelPointPosition(base, out, guest::LoadU32(base, view + 8), index);
+}
+
+}  // namespace race_overlays

@@ -182,6 +182,12 @@ void NativeParticlesBEmit(PPCContext& ctx, uint8_t* base) {
 ITC_NATIVE_WORD(NativeModelPartsHasPoint, ro::ModelPartsHasPoint(base, ctx.r3.u32, ctx.r4.s32))
 ITC_NATIVE_WORD(NativeModelHasPoint, ro::ModelHasPoint(base, ctx.r3.u32, ctx.r4.s32))
 ITC_NATIVE_WORD(NativeOverlayViewHasPoint, ro::OverlayViewHasPoint(base, ctx.r3.u32, ctx.r4.s32))
+ITC_NATIVE_WORD(NativeModelPartsPointPosition,
+                ro::ModelPartsPointPosition(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.s32))
+ITC_NATIVE_WORD(NativeModelPointPosition,
+                ro::ModelPointPosition(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.s32))
+ITC_NATIVE_WORD(NativeOverlayViewPointPosition,
+                ro::OverlayViewPointPosition(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.s32))
 
 // Runs the recompiled version with --native_race_overlays off, so the
 // functions it calls that are ours run the originals too.
@@ -1110,6 +1116,63 @@ void ModelPointCases(Context& h, uint32_t block) {
   }
 }
 
+// The model points' positions: as the checks' cases, with `out` in its own
+// area, or overlapping the first points' table or a part's point (points
+// -3 to 25 and the ends of the range: big negative points would read
+// outside the block below 4).
+void ModelPointPositionCases(Context& h, uint32_t block) {
+  Random& r = h.random;
+  std::vector<int32_t> indices;
+  for (int32_t i = -3; i <= 25; i++) {
+    indices.push_back(i);
+  }
+  indices.push_back(INT32_MIN);
+  indices.push_back(INT32_MAX);
+  const Regions regions = {{block + kPointOut, 0x100}, {block + kPointTable, 0x100},
+                           {block + kPointParts + 23120 + 240 * 8, 0x40}};
+  struct Function {
+    const char* name;
+    uint32_t object;
+    uint64_t seeds;
+    GuestFunction recompiled, native;
+  };
+  const Function functions[] = {
+      {"ModelParts::PointPosition (sub_820E0910)", block + kPointParts, 6, __imp__sub_820E0910,
+       NativeModelPartsPointPosition},
+      {"Model::PointPosition (sub_820DA988)", block + kPointModel, 12, __imp__sub_820DA988,
+       NativeModelPointPosition},
+      {"OverlayView::PointPosition (sub_82127140)", block + kPointView, 12, __imp__sub_82127140,
+       NativeOverlayViewPointPosition},
+  };
+  for (const Function& f : functions) {
+    Results results(f.name);
+    for (int32_t index : indices) {
+      for (uint64_t seed = 0; seed < f.seeds; seed++) {
+        uint32_t out = block + kPointOut + 4 * r.Below(8);
+        switch (r.Below(6)) {
+          case 0:
+            out = block + kPointTable + 0x40 + 4 * r.Below(16);
+            break;
+          case 1:
+            out = block + kPointParts + 23120 + 240 * 8 + 4 * r.Below(8);
+            break;
+          default:
+            break;
+        }
+        Compare(h, results, regions, [&h, block, seed] { ModelPointSetup(h, block, seed); },
+                [&](PPCContext& t) {
+                  t.r3.u64 = out;
+                  t.r4.u64 = f.object;
+                  t.r5.u64 = uint64_t(int64_t(index));
+                },
+                f.recompiled, f.native,
+                fmt::format("point {} seed {} out {:X}", index, seed, out - block));
+      }
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void RaceOverlays(Context& h) {
@@ -1129,6 +1192,7 @@ void RaceOverlays(Context& h) {
   TrailAddPointCases(h, block);
   ParticlesBCases(h, block);
   ModelPointCases(h, block);
+  ModelPointPositionCases(h, block);
   memory->SystemHeapFree(block);
 }
 
