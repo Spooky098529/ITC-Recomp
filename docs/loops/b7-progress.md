@@ -15,7 +15,8 @@ rows to review and drive list are there), and this file's history.
   validated (21 of 21 harness lines).
 - Subsystem 2 of 3: the matrix and vector math (the `Matrix::` lead at
   `8209B000`-`820AC000`, with the vector library's 4x4 matrix lead
-  folded in). Step: mapping (agent running).
+  folded in). Mapped in 7929f36 (`matrix-math.md`, 28 rows, 15 ready
+  groups; checked). Step: migration 1 (agent running).
 - Known: `b7_status.py` checks `sub_825A9934` (`__chkstk`) "Dropped, but
   it ran", and every function made Native or Merged since the coverage
   session "..., but it ran" (`seen_in_play.txt` predates them; a new
@@ -40,6 +41,8 @@ rows to review and drive list are there), and this file's history.
 
 ## Rows to review
 
+- `matrix-math.md` (new, 28 rows; 4 moved from `functions.md`), 1 lead
+  added.
 - `race-overlays.md`: the no-mapping lead's 14 rows (the view's body and
   wheel accessors, IsBehindCamera, the save flags and stage check,
   UpdateTrails, MarkerKind; FlagsKind `sub_82122DB8` and NoSaveFlags
@@ -98,5 +101,7 @@ the validation agent's attract race; the user drives (with
   unknown 5747).
 - After the race overlays' newly ready functions: ours 563, work left
   6190 (wrapped 140, known 303, unknown 5747).
+- After mapping the matrix math: ours 563, work left 6190 (wrapped 140,
+  known 327, unknown 5723).
 
 ## Stopped
