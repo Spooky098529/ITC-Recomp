@@ -6,6 +6,7 @@
 #include "base/log.h"
 
 #include <algorithm>
+#include <array>
 
 namespace harness {
 
@@ -627,6 +628,182 @@ void CRuntime(Context& h) {
     }
     unsigned_results.Report();
     signed_results.Report();
+  }
+
+  // ___dtold: zeros, infinities, NaNs, denormals of every length, normals
+  // and random bits, out at an even and an odd address; the scratch area
+  // and r3 compared.
+  {
+    Results results("___dtold (sub_825B6378)");
+    std::vector<uint64_t> doubles = {0, 0x8000000000000000, 0x7FF0000000000000,
+                                     0xFFF0000000000000, 0x7FF8000000000000, 0xFFF8000000000001,
+                                     0x7FF0000000000001, 0x000FFFFFFFFFFFFF, 0x800FFFFFFFFFFFFF,
+                                     0x0010000000000000, 0x7FEFFFFFFFFFFFFF, 0x3FF0000000000000,
+                                     0xBFF8000000000000, 0x0000000080000000, 0x0000000100000000};
+    for (int b = 0; b < 52; b++) {
+      doubles.push_back(1ull << b);
+      doubles.push_back((1ull << b) | 0x8000000000000000ull);
+      doubles.push_back((1ull << b) | 0x00000000FFFFFFFFull);
+    }
+    for (int i = 0; i < 1500; i++) {
+      const uint64_t r = h.random.Next();
+      doubles.push_back(r);
+      doubles.push_back(r & 0x800FFFFFFFFFFFFFull);
+      doubles.push_back(r >> h.random.Below(64));
+    }
+    for (uint64_t bits : doubles) {
+      for (uint32_t offset : {64u, 67u}) {
+        StringCase(h, results, [&] { StoreU64(h.base, h.data + 512, bits); },
+                   [&](PPCContext& t) {
+                     t.r3.u64 = h.data + offset;
+                     t.r4.u64 = h.data + 512;
+                   },
+                   __imp__sub_825B6378, sub_825B6378,
+                   fmt::format("{:016X} out +{}", bits, offset));
+      }
+    }
+    results.Report();
+  }
+
+  // _ld12tod: exponents at and around a double's range (normal, denormal,
+  // zero, overflow) and far outside it, 0 and 32767; mantissas with their
+  // leading bit set or not, rounding ties (the bit after the 53rd set and
+  // nothing after it, or something only in the extra 16 bits), carries out
+  // of all ones, and random bits; both signs. The scratch area (the double
+  // among 0xCD) and r3 compared.
+  {
+    Results results("_ld12tod (sub_825B69B8)");
+    struct Ld12 {
+      uint16_t sign_exponent;
+      uint32_t high, low;
+      uint16_t extra;
+    };
+    std::vector<Ld12> values;
+    std::vector<int32_t> exponents = {0, 1, 2, 32767, 32766, 16383, 16382, 16384};
+    for (int32_t e = -1090; e <= -1010; e++) {
+      exponents.push_back(16383 + e);
+    }
+    for (int32_t e = 1015; e <= 1030; e++) {
+      exponents.push_back(16383 + e);
+    }
+    for (int i = 0; i < 40; i++) {
+      exponents.push_back(int32_t(h.random.Below(32768)));
+    }
+    auto mantissas = [&](std::vector<std::array<uint32_t, 3>>& m) {
+      m = {{0, 0, 0},
+           {0x80000000u, 0, 0},
+           {0xFFFFFFFFu, 0xFFFFFFFFu, 0xFFFF},
+           {0xFFFFFFFFu, 0xFFFFF800u, 0},
+           {0xFFFFFFFFu, 0xFFFFFC00u, 0},
+           {0x80000000u, 0x00000400u, 0},
+           {0x80000000u, 0x00000C00u, 0},
+           {0x80000000u, 0x00000400u, 1},
+           {0x80000000u, 0x00000401u, 0},
+           {0x80000000u, 0x00000800u, 0},
+           {0x40000000u, 0, 0},
+           {0, 1, 0},
+           {0, 0, 1},
+           {0x12345678u, 0x9ABCDEF0u, 0x1234}};
+      for (int i = 0; i < 6; i++) {
+        const uint64_t r = h.random.Next();
+        const uint32_t high = uint32_t(r >> 32) | (i < 4 ? 0x80000000u : 0);
+        m.push_back({high, uint32_t(r), uint32_t(h.random.Below(0x10000))});
+        m.push_back({high, (uint32_t(r) & ~0x7FFu) | 0x400u, 0});
+        m.push_back({high, (uint32_t(r) & ~0x7FFu) | 0x400u, 0x8000});
+      }
+    };
+    std::vector<std::array<uint32_t, 3>> m;
+    mantissas(m);
+    for (int32_t e : exponents) {
+      for (const auto& man : m) {
+        for (uint16_t sign : {uint16_t(0), uint16_t(0x8000)}) {
+          values.push_back({uint16_t(sign | e), man[0], man[1], uint16_t(man[2])});
+        }
+      }
+    }
+    for (int i = 0; i < 3000; i++) {
+      const uint64_t r = h.random.Next();
+      values.push_back({uint16_t(r >> 48), uint32_t(h.random.Next()), uint32_t(r),
+                        uint16_t(r >> 32)});
+    }
+    for (const Ld12& v : values) {
+      StringCase(h, results,
+                 [&] {
+                   const uint32_t in = h.data + 512;
+                   guest::StoreU16(h.base, in, v.sign_exponent);
+                   guest::StoreU32(h.base, in + 2, v.high);
+                   guest::StoreU32(h.base, in + 6, v.low);
+                   guest::StoreU16(h.base, in + 10, v.extra);
+                 },
+                 [&](PPCContext& t) {
+                   t.r3.u64 = h.data + 512;
+                   t.r4.u64 = h.data + 64;
+                 },
+                 __imp__sub_825B69B8, sub_825B69B8,
+                 fmt::format("{:04X} {:08X} {:08X} {:04X}", v.sign_exponent, v.high, v.low,
+                             v.extra));
+    }
+    results.Report();
+  }
+
+  // write_char: string streams with and without flag 0x40 and a buffer,
+  // room from 1 up (no room calls _flsbuf, which the native version leaves
+  // to the original: those cases are left out), characters as whole
+  // registers, the pointer at the stream's own words or at the count; the
+  // scratch area and r3 compared.
+  {
+    Results results("write_char (sub_825AF000)");
+    const uint32_t stream = h.data + 256;
+    const uint32_t count = h.data + 300;
+    const uint32_t buffer = h.data + 1024;
+    const uint32_t flags[] = {0x40, 0x42, 0x49, 0, 2, 0xFFFFFFBF, 0xFFFFFFFF};
+    const uint32_t bases[] = {0, buffer, 1};
+    const uint32_t rooms[] = {0, 1, 2, 100, 0x7FFFFFFF, 0x80000000, 0xFFFFFFFF};
+    const uint32_t pointers[] = {buffer, buffer + 3, stream, stream + 3, stream + 4, count + 3};
+    const uint32_t counts[] = {0, 5, 0xFFFFFFFF, 0x7FFFFFFF};
+    for (uint32_t flag : flags) {
+      for (uint32_t base_word : bases) {
+        for (uint32_t room : rooms) {
+          const bool counts_only = (flag & 0x40) != 0 && base_word == 0;
+          if (!counts_only && int32_t(room - 1) < 0) {
+            continue;
+          }
+          for (uint32_t pointer : pointers) {
+            for (uint32_t c : counts) {
+              const uint64_t character = h.random.Next();
+              StringCase(h, results,
+                         [&] {
+                           guest::StoreU32(h.base, stream, pointer);
+                           guest::StoreU32(h.base, stream + 4, room);
+                           guest::StoreU32(h.base, stream + 8, base_word);
+                           guest::StoreU32(h.base, stream + 12, flag);
+                           guest::StoreU32(h.base, count, c);
+                         },
+                         [&](PPCContext& t) {
+                           t.r3.u64 = character;
+                           t.r4.u64 = stream;
+                           t.r5.u64 = count;
+                         },
+                         __imp__sub_825AF000, sub_825AF000,
+                         fmt::format("flags {:X} base {:X} room {:X} pointer {:X} count {:X}",
+                                     flag, base_word, room, pointer, c));
+            }
+          }
+        }
+      }
+    }
+    results.Report();
+  }
+
+  // __iob_func: r3 from random registers.
+  {
+    Results results("__iob_func (sub_825AD4C0)");
+    for (int i = 0; i < 16; i++) {
+      const uint64_t r3 = h.random.Next();
+      StringCase(h, results, [] {}, [&](PPCContext& t) { t.r3.u64 = r3; }, __imp__sub_825AD4C0,
+                 sub_825AD4C0, fmt::format("r3 {:X}", r3));
+    }
+    results.Report();
   }
 }
 

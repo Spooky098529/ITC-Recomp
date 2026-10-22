@@ -4,6 +4,7 @@
 
 #include "guest.h"
 
+#include "c_runtime/format.h"
 #include "c_runtime/strings.h"
 
 #include "base/flags.h"
@@ -20,7 +21,8 @@ ITC_FLAG_BOOL(native_c_runtime, true, "ITC",
               "sub_825AC6B0, sub_825A98A8); the second memcpy (sub_825A7830); toupper, tolower, "
               "isalpha, isdigit, isalnum and isleadbyte (sub_825A8600, sub_825A8618, sub_825AB020, "
               "sub_825AB040, sub_825AB0A0, sub_825B6898); strtoul and strtoxl (sub_825A85E0, "
-              "sub_825A82C8) (checked by "
+              "sub_825A82C8); ___dtold and _ld12tod (sub_825B6378, sub_825B69B8); write_char "
+              "(sub_825AF000); __iob_func (sub_825AD4C0) (checked by "
               "--run_harnesses=c_runtime)");
 
 // __chkstk: r12 = minus the frame about to be made (4 KB or more). Reads one
@@ -293,4 +295,71 @@ extern "C" REX_FUNC(sub_825A85E0) {
     return;
   }
   ctx.r3.u64 = result;
+}
+
+// ___dtold: r3 = the 12-byte long double out, r4 = the double's address.
+// The original reads the double first, so the order of the stores doesn't
+// matter; it leaves +10 as it is.
+extern "C" REX_FUNC(sub_825B6378) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_c_runtime)) {
+    __imp__sub_825B6378(ctx, base);
+    return;
+  }
+  const uint64_t bits = (uint64_t(guest::LoadU32(base, ctx.r4.u32)) << 32) |
+                        guest::LoadU32(base, ctx.r4.u32 + 4);
+  const c_runtime::LongDouble12 value = c_runtime::DoubleToLd12(bits);
+  const uint32_t out = ctx.r3.u32;
+  guest::StoreU16(base, out, value.sign_exponent);
+  guest::StoreU32(base, out + 2, value.mantissa_high);
+  guest::StoreU32(base, out + 6, value.mantissa_low);
+}
+
+// _ld12tod: r3 = the 12-byte long double, r4 = the double out; returns the
+// status. Everything is read before the double is stored (its low word
+// first, as the original).
+extern "C" REX_FUNC(sub_825B69B8) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_c_runtime)) {
+    __imp__sub_825B69B8(ctx, base);
+    return;
+  }
+  const uint32_t in = ctx.r3.u32;
+  const c_runtime::LongDouble12 value = {guest::LoadU16(base, in), guest::LoadU32(base, in + 2),
+                                         guest::LoadU32(base, in + 6)};
+  int32_t status;
+  const uint64_t bits = c_runtime::Ld12ToDouble(value, guest::LoadU16(base, in + 10), &status);
+  guest::StoreU32(base, ctx.r4.u32 + 4, uint32_t(bits));
+  guest::StoreU32(base, ctx.r4.u32, uint32_t(bits >> 32));
+  ctx.r3.s64 = status;
+}
+
+// write_char: r3 = the character, r4 = the stream, r5 = the count. Where
+// the original would call _flsbuf (no room left; never seen in play), the
+// original runs instead. r3 as the original leaves it: the byte when stored.
+extern "C" REX_FUNC(sub_825AF000) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_c_runtime)) {
+    __imp__sub_825AF000(ctx, base);
+    return;
+  }
+  const int32_t done = c_runtime::WriteChar(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+  if (done < 0) {
+    __imp__sub_825AF000(ctx, base);
+    return;
+  }
+  if (done == 1) {
+    ctx.r3.u64 = ctx.r3.u32 & 0xFF;
+  }
+}
+
+// __iob_func: returns the stream table (sign-extended, as the original's
+// lis and addi leave it).
+extern "C" REX_FUNC(sub_825AD4C0) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_c_runtime)) {
+    __imp__sub_825AD4C0(ctx, base);
+    return;
+  }
+  ctx.r3.s64 = int32_t(c_runtime::kStreams);
 }
