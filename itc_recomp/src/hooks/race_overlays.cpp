@@ -15,7 +15,8 @@ ITC_FLAG_BOOL(native_race_overlays, true, "ITC",
               "car-model sprites' kind and table entry, sub_82123188 and sub_8211F300; the model "
               "points' checks and positions, sub_82126A78 and sub_82127140; Sparks::UpdateStreak, "
               "sub_8212E660; Sparks::Emit, sub_8212D818; CarOverlays::EmitSmoke, sub_82123240, "
-              "with Smoke::Emit) natively "
+              "with Smoke::Emit; the set-up's constructors, clears and bindings, sub_82126498 to "
+              "sub_8215E000) natively "
               "instead of through the translated code (same results; checked by "
               "--run_harnesses=race_overlays)");
 
@@ -306,3 +307,25 @@ extern "C" REX_FUNC(sub_82123240) {
   ctx.r3.u64 = 0;
   ctx.f1.f64 = last;
 }
+
+// The set-up's constructors, clears and bindings (none allocates).
+// Overlay::Overlay, CarOverlays::ClearViews, ViewDesc::Clear,
+// OverlayView::OverlayView, Particle::Particle and RaceOverlays::Clear: r3 =
+// the object.
+ITC_OVERLAY_SET(82126498, OverlayConstruct(base, ctx.r3.u32))
+ITC_OVERLAY_SET(82126530, ClearViews(base, ctx.r3.u32))
+ITC_OVERLAY_SET(82126860, ViewDescClear(base, ctx.r3.u32))
+ITC_OVERLAY_SET(82126870, OverlayViewConstruct(base, ctx.r3.u32))
+ITC_OVERLAY_SET(8212B3D0, ParticleConstruct(base, ctx.r3.u32))
+ITC_OVERLAY_SET(8215DE80, RaceOverlaysClear(base, ctx.r3.u32))
+// OverlayView::Set: r3 = the view, r4 = a description.
+ITC_OVERLAY_SET(82126890, OverlayViewSet(base, ctx.r3.u32, ctx.r4.u32))
+// CarOverlays::BindViewport: r4 = out, r5 = the viewport entry, r6 = a
+// second index (r3 isn't read).
+ITC_OVERLAY_SET(821264C0, BindViewport(base, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32))
+// Overlays::SetRenderTargets: r3 = the render queue, r4 = the command list.
+ITC_OVERLAY_SET(82128190, SetRenderTargets(base, ctx.r3.u32, ctx.r4.u32))
+// RaceOverlays::ShareTextures: r3 = the list; r3 comes back as entry 24, as
+// the original leaves it. SetTextures104, which it calls, is done by its
+// plain C++.
+ITC_OVERLAY_WORD(8215E000, ShareTextures(base, ctx.r3.u32))

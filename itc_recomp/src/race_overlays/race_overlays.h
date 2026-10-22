@@ -400,3 +400,53 @@ bool EmitSmoke(uint8_t* base, uint32_t overlays, double rate, double speed, uint
                uint32_t wheel, uint32_t value, double* last);
 
 }  // namespace race_overlays
+
+namespace race_overlays {
+
+// --- Set-up: constructors, clears and bindings ---
+//
+// Called while a race's overlays are made (their allocations stay
+// recompiled); none of these allocates.
+
+// Overlay::Overlay (sub_82126498): the base class's vtable (0x820085D8) to
+// +0.
+void OverlayConstruct(uint8_t* base, uint32_t overlay);
+
+// CarOverlays::ClearViews (sub_82126530): the 25 view slots (+4 to +100)
+// to 0.
+void ClearViews(uint8_t* base, uint32_t overlays);
+
+// ViewDesc::Clear (sub_82126860): +0 and +4 to 0.
+void ViewDescClear(uint8_t* base, uint32_t desc);
+
+// OverlayView::OverlayView (sub_82126870): the vtable (0x82010B5C) to +0,
+// +4 and +8 to 0.
+void OverlayViewConstruct(uint8_t* base, uint32_t view);
+
+// OverlayView::Set (sub_82126890): the description's three words (the
+// vehicle, its scene model, the viewport) to +4, +8 and +12.
+void OverlayViewSet(uint8_t* base, uint32_t view, uint32_t desc);
+
+// CarOverlays::BindViewport (sub_821264C0): `out` +0 = [[0x826C2CE8] + 4 x
+// entry.0] + 80 x entry.1, +4 = the camera pass 0x826BAC00 + 592 x
+// entry.2, +8 and +12 the two words at 0x820085A0 + 8 x `second` (`entry`
+// the 12-byte entry `index` at 0x82008558).
+void BindViewport(uint8_t* base, uint32_t out, uint32_t index, uint32_t second);
+
+// Overlays::SetRenderTargets (sub_82128190): the render queue and the
+// command list to 0x826C5D5C and 0x826C5D60.
+void SetRenderTargets(uint8_t* base, uint32_t queue, uint32_t list);
+
+// Particle::Particle (sub_8212B3D0): the game's 1.0 (0x82000A30, its bits)
+// to +12 and +28.
+void ParticleConstruct(uint8_t* base, uint32_t particle);
+
+// RaceOverlays::Clear (sub_8215DE80): the list's 25 pointers to 0.
+void RaceOverlaysClear(uint8_t* base, uint32_t list);
+
+// RaceOverlays::ShareTextures (sub_8215E000): entries 1-24 that are set get
+// overlay 0's texture table (SetTextures104 with [list[0] + 104]). Returns
+// what the original leaves in r3 (entry 24).
+uint32_t ShareTextures(uint8_t* base, uint32_t list);
+
+}  // namespace race_overlays

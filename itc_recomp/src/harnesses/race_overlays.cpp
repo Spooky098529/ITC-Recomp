@@ -129,6 +129,35 @@ void NativeModelSpriteSetTextures(PPCContext& ctx, uint8_t* base) {
 
 ITC_NATIVE_WORD(NativeRand, ro::Rand(base))
 
+void NativeOverlayConstruct(PPCContext& ctx, uint8_t* base) {
+  ro::OverlayConstruct(base, ctx.r3.u32);
+}
+void NativeClearViews(PPCContext& ctx, uint8_t* base) {
+  ro::ClearViews(base, ctx.r3.u32);
+}
+void NativeViewDescClear(PPCContext& ctx, uint8_t* base) {
+  ro::ViewDescClear(base, ctx.r3.u32);
+}
+void NativeOverlayViewConstruct(PPCContext& ctx, uint8_t* base) {
+  ro::OverlayViewConstruct(base, ctx.r3.u32);
+}
+void NativeParticleConstruct(PPCContext& ctx, uint8_t* base) {
+  ro::ParticleConstruct(base, ctx.r3.u32);
+}
+void NativeRaceOverlaysClear(PPCContext& ctx, uint8_t* base) {
+  ro::RaceOverlaysClear(base, ctx.r3.u32);
+}
+void NativeOverlayViewSet(PPCContext& ctx, uint8_t* base) {
+  ro::OverlayViewSet(base, ctx.r3.u32, ctx.r4.u32);
+}
+void NativeBindViewport(PPCContext& ctx, uint8_t* base) {
+  ro::BindViewport(base, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32);
+}
+void NativeSetRenderTargets(PPCContext& ctx, uint8_t* base) {
+  ro::SetRenderTargets(base, ctx.r3.u32, ctx.r4.u32);
+}
+ITC_NATIVE_WORD(NativeShareTextures, ro::ShareTextures(base, ctx.r3.u32))
+
 void NativeRandomRange(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   uint32_t drawn = 0;
@@ -1618,6 +1647,153 @@ void SmokeCases(Context& h, uint32_t block) {
   guest::StoreU32(h.base, kSeed, live);
 }
 
+
+// The set-up's constructors, clears and bindings: objects of random words
+// (odd floats among them), compared over the object and around it.
+void SetUpCases(Context& h, uint32_t block) {
+  Random& r = h.random;
+  const uint32_t object = block + 0x100;
+  const Regions around = {{object - 0x10, 0x100}};
+
+  {
+    const struct {
+      const char* name;
+      GuestFunction recompiled, native;
+    } plain[] = {
+        {"Overlay::Overlay (sub_82126498)", __imp__sub_82126498, NativeOverlayConstruct},
+        {"CarOverlays::ClearViews (sub_82126530)", __imp__sub_82126530, NativeClearViews},
+        {"ViewDesc::Clear (sub_82126860)", __imp__sub_82126860, NativeViewDescClear},
+        {"OverlayView::OverlayView (sub_82126870)", __imp__sub_82126870,
+         NativeOverlayViewConstruct},
+        {"Particle::Particle (sub_8212B3D0)", __imp__sub_8212B3D0, NativeParticleConstruct},
+        {"RaceOverlays::Clear (sub_8215DE80)", __imp__sub_8215DE80, NativeRaceOverlaysClear},
+    };
+    for (const auto& f : plain) {
+      Results results(f.name);
+      for (int i = 0; i < 20; i++) {
+        const uint64_t seed = r.Next();
+        Compare(h, results, around,
+                [&, seed] {
+                  Random fill;
+                  for (uint64_t n = 0; n < seed % 61; n++) {
+                    fill.Next();
+                  }
+                  FillRandom(h.base, fill, object - 0x10, 0x100);
+                },
+                [&](PPCContext& t) { t.r3.u64 = object; }, f.recompiled, f.native,
+                fmt::format("case {}", i));
+      }
+      results.Report();
+    }
+  }
+
+  // OverlayView::Set: the description elsewhere, or overlapping the view's
+  // words by -8 to +8 bytes.
+  {
+    Results results("OverlayView::Set (sub_82126890)");
+    for (int i = 0; i < 40; i++) {
+      const uint64_t seed = r.Next();
+      const uint32_t desc = i < 20 ? object + 0x80 : object + 4 + 4 * (i % 5) - 8;
+      Compare(h, results, around,
+              [&, seed] {
+                Random fill;
+                for (uint64_t n = 0; n < seed % 61; n++) {
+                  fill.Next();
+                }
+                FillRandom(h.base, fill, object - 0x10, 0x100);
+              },
+              [&](PPCContext& t) {
+                t.r3.u64 = object;
+                t.r4.u64 = desc;
+              },
+              __imp__sub_82126890, NativeOverlayViewSet, fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+
+  // CarOverlays::BindViewport: the viewport entries 0-5 of the game's table,
+  // second indices 0-8, the owners' table (0x826C2CE8) pointed at random
+  // words in the block and put back.
+  {
+    constexpr uint32_t kViewportOwners = 0x826C2CE8;
+    const uint32_t owners = guest::LoadU32(h.base, kViewportOwners);
+    const uint32_t table = block + 0x1000;
+    Results results("CarOverlays::BindViewport (sub_821264C0)");
+    for (uint32_t index = 0; index < 6; index++) {
+      for (uint32_t second = 0; second < 9; second++) {
+        const uint64_t seed = r.Next();
+        const uint64_t r3 = r.Next();  // not read
+        Compare(h, results, around,
+                [&, seed] {
+                  Random fill;
+                  for (uint64_t n = 0; n < seed % 61; n++) {
+                    fill.Next();
+                  }
+                  FillRandom(h.base, fill, object - 0x10, 0x100);
+                  FillRandom(h.base, fill, table, 0x1000);
+                  guest::StoreU32(h.base, kViewportOwners, table);
+                },
+                [&](PPCContext& t) {
+                  t.r3.u64 = r3;
+                  t.r4.u64 = object;
+                  t.r5.u64 = index;
+                  t.r6.u64 = second;
+                },
+                __imp__sub_821264C0, NativeBindViewport,
+                fmt::format("entry {} second {}", index, second));
+      }
+    }
+    guest::StoreU32(h.base, kViewportOwners, owners);
+    results.Report();
+  }
+
+  // Overlays::SetRenderTargets: random words, the two globals put back.
+  {
+    constexpr uint32_t kTargets = 0x826C5D5C;
+    const uint32_t queue = guest::LoadU32(h.base, kTargets);
+    const uint32_t list = guest::LoadU32(h.base, kTargets + 4);
+    Results results("Overlays::SetRenderTargets (sub_82128190)");
+    for (int i = 0; i < 20; i++) {
+      const uint64_t a = r.Next(), b = r.Next();
+      Compare(h, results, {{kTargets - 8, 24}}, [] {},
+              [&](PPCContext& t) {
+                t.r3.u64 = a;
+                t.r4.u64 = b;
+              },
+              __imp__sub_82128190, NativeSetRenderTargets, fmt::format("case {}", i));
+    }
+    guest::StoreU32(h.base, kTargets, queue);
+    guest::StoreU32(h.base, kTargets + 4, list);
+    results.Report();
+  }
+
+  // RaceOverlays::ShareTextures: a list whose entries are 0 or overlays in
+  // the block (overlay 0 with a random texture table at +104), entry 24 set
+  // or not.
+  {
+    const uint32_t list = block + 0x2000;
+    const uint32_t overlays = block + 0x3000;  // 25 of 0x100 bytes
+    Results results("RaceOverlays::ShareTextures (sub_8215E000)");
+    for (int i = 0; i < 40; i++) {
+      const uint64_t seed = r.Next();
+      Compare(h, results, {{list, 100}, {overlays, 25 * 0x100}},
+              [&, seed, i] {
+                Random fill;
+                for (uint64_t n = 0; n < seed % 61; n++) {
+                  fill.Next();
+                }
+                FillRandom(h.base, fill, overlays, 25 * 0x100);
+                for (uint32_t n = 0; n < 25; n++) {
+                  const bool set = n == 0 || (n == 24 ? i % 2 == 0 : fill.Below(3) != 0);
+                  guest::StoreU32(h.base, list + 4 * n, set ? overlays + 0x100 * n : 0);
+                }
+              },
+              [&](PPCContext& t) { t.r3.u64 = list; }, __imp__sub_8215E000, NativeShareTextures,
+              fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+}
 }  // namespace
 
 void RaceOverlays(Context& h) {
@@ -1641,6 +1817,7 @@ void RaceOverlays(Context& h) {
   SparksUpdateStreakCases(h, block);
   SparksEmitCases(h, block);
   SmokeCases(h, block);
+  SetUpCases(h, block);
   memory->SystemHeapFree(block);
 }
 

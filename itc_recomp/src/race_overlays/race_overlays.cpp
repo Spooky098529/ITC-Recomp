@@ -1594,3 +1594,94 @@ bool EmitSmoke(uint8_t* base, uint32_t overlays, double rate, double speed, uint
 }
 
 }  // namespace race_overlays
+
+namespace race_overlays {
+
+namespace {
+
+constexpr uint32_t kOverlayVtable = 0x820085D8;
+constexpr uint32_t kOverlayViewVtable = 0x82010B5C;
+constexpr uint32_t kViewportOwners = 0x826C2CE8;
+constexpr uint32_t kCameraPasses = 0x826BAC00;
+constexpr uint32_t kRenderTargets = 0x826C5D5C;
+
+}  // namespace
+
+void OverlayConstruct(uint8_t* base, uint32_t overlay) {
+  ITC_NATIVE_RUNNING("sub_82126498 Overlay::Overlay");
+  guest::StoreU32(base, overlay, kOverlayVtable);
+}
+
+void ClearViews(uint8_t* base, uint32_t overlays) {
+  ITC_NATIVE_RUNNING("sub_82126530 CarOverlays::ClearViews");
+  for (uint32_t i = 0; i < 25; i++) {
+    guest::StoreU32(base, overlays + 4 + 4 * i, 0);
+  }
+}
+
+void ViewDescClear(uint8_t* base, uint32_t desc) {
+  ITC_NATIVE_RUNNING("sub_82126860 ViewDesc::Clear");
+  guest::StoreU32(base, desc, 0);
+  guest::StoreU32(base, desc + 4, 0);
+}
+
+void OverlayViewConstruct(uint8_t* base, uint32_t view) {
+  ITC_NATIVE_RUNNING("sub_82126870 OverlayView::OverlayView");
+  guest::StoreU32(base, view, kOverlayViewVtable);
+  guest::StoreU32(base, view + 4, 0);
+  guest::StoreU32(base, view + 8, 0);
+}
+
+void OverlayViewSet(uint8_t* base, uint32_t view, uint32_t desc) {
+  ITC_NATIVE_RUNNING("sub_82126890 OverlayView::Set");
+  // Word by word, in the original's order (the two may overlap).
+  for (uint32_t i = 0; i < 3; i++) {
+    guest::StoreU32(base, view + 4 + 4 * i, guest::LoadU32(base, desc + 4 * i));
+  }
+}
+
+void BindViewport(uint8_t* base, uint32_t out, uint32_t index, uint32_t second) {
+  ITC_NATIVE_RUNNING("sub_821264C0 CarOverlays::BindViewport");
+  const uint32_t entry = kViewportTable + 12 * index;
+  const uint32_t pair = kViewportTable + 72 + 8 * second;
+  const uint32_t owners = guest::LoadU32(base, kViewportOwners);
+  const uint32_t owner = guest::LoadU32(base, owners + 4 * guest::LoadU32(base, entry));
+  guest::StoreU32(base, out, owner + 80 * guest::LoadU32(base, entry + 4));
+  guest::StoreU32(base, out + 4, kCameraPasses + 592 * guest::LoadU32(base, entry + 8));
+  guest::StoreU32(base, out + 8, guest::LoadU32(base, pair));
+  guest::StoreU32(base, out + 12, guest::LoadU32(base, pair + 4));
+}
+
+void SetRenderTargets(uint8_t* base, uint32_t queue, uint32_t list) {
+  ITC_NATIVE_RUNNING("sub_82128190 Overlays::SetRenderTargets");
+  guest::StoreU32(base, kRenderTargets, queue);
+  guest::StoreU32(base, kRenderTargets + 4, list);
+}
+
+void ParticleConstruct(uint8_t* base, uint32_t particle) {
+  ITC_NATIVE_RUNNING("sub_8212B3D0 Particle::Particle");
+  const uint32_t one = guest::LoadU32(base, kOne);
+  guest::StoreU32(base, particle + 12, one);
+  guest::StoreU32(base, particle + 28, one);
+}
+
+void RaceOverlaysClear(uint8_t* base, uint32_t list) {
+  ITC_NATIVE_RUNNING("sub_8215DE80 RaceOverlays::Clear");
+  for (uint32_t i = 0; i < 25; i++) {
+    guest::StoreU32(base, list + 4 * i, 0);
+  }
+}
+
+uint32_t ShareTextures(uint8_t* base, uint32_t list) {
+  ITC_NATIVE_RUNNING("sub_8215E000 RaceOverlays::ShareTextures");
+  uint32_t entry = 0;
+  for (uint32_t i = 1; i < 25; i++) {
+    entry = guest::LoadU32(base, list + 4 * i);
+    if (entry != 0) {
+      SetTextures104(base, entry, guest::LoadU32(base, guest::LoadU32(base, list) + 104));
+    }
+  }
+  return entry;
+}
+
+}  // namespace race_overlays
