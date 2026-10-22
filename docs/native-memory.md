@@ -141,8 +141,8 @@ hand out guest memory until the port's end.
   are freed. Each block's size is kept on the host side, so no headers
   are written into guest memory and recompiled code sees only the bytes
   it asked for. Heap blocks are 16-aligned and take multiples of 16 bytes,
-  as the game's heap's (the harness saw its blocks 16-aligned; the first
-  build's 8-aligned blocks hung a load, 2026-10-22: AltiVec's `lvx` and
+  as the game's heap's (the harness saw its blocks 16-aligned; probably why the first
+  build's 8-aligned blocks hung a load once, 2026-10-22: AltiVec's `lvx` and
   `stvx` drop an address's low four bits, so a vector access to a block 8
   bytes off a boundary lands on the block before it); pages are 4,096-aligned and
   cleared on allocation. HEAP_ZERO_MEMORY (`0x8`) clears the block.
@@ -219,10 +219,20 @@ menus, a race).
 
 1. This write-up.
 2. The counter, for the range's size (done, 2026-10-22: "What the counter saw").
-3. The layer, the adapters and the harness cases, in one change.
+3. The layer, the adapters and the harness cases, in one change (done,
+   2026-10-22; the range is 384 MiB, 4 KiB pages: the user's call. The
+   first build's 8-aligned heap blocks hung a load in the user's run once;
+   now 16-aligned, see "The backing, for now").
 4. Checks: an attract race with `--run_harnesses=all`, the texture cache
    by log with the flag on and off, the pad replay drive
-   (`pad-replay.md`), then a race the user drives.
+   (`pad-replay.md`), then a race the user drives. Done on 2026-10-22 but
+   the user's race: every harness at 0 differing outside "(expected to
+   differ)" groups, the heap's four groups (110 cases) included, no error
+   lines (`itc_747.log`); the texture cache the same with `--native_heap`
+   on and off over a 40 s attract race (541 textures, 78.0 MB; 44 freed
+   when overwritten, 8.3 MB; `itc_748.log`, `itc_749.log`); two pad replay
+   drives into a race and out, no error lines, nothing left to the game's
+   own functions (`itc_750.log`, `itc_751.log`).
 5. The functions' rows (shown to the user first), the "the user decides"
    notes in `loops/leads.md` and `loops/b7-loop.md` removed, CLAUDE.md's
    B7 sentence, and an entry in "The boundary over time".
