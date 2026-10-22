@@ -84,6 +84,11 @@ the validation agent's attract race; the user drives (with
   Sprite::ResetStyle2, `sub_8212A868` Smoke::InRegion (again not seen in
   itc_584.log).
 
+Checked in two drives (2026-10-22, `itc_585.log` and `itc_586.log`): all
+seen except `sub_825A9DD8` strcpy_s, whose copy runs inside the native
+number conversion with no line of its own; its other callers don't run in
+play.
+
 ## Totals
 
 - Start (2026-10-22, after the first run): ours 335, work left 6418
