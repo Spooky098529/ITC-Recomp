@@ -422,6 +422,11 @@ void RotateZ(uint8_t* base, uint32_t out, uint32_t in, uint32_t angle, uint32_t 
   Rotate<Axis::kZ>(base, out, in, angle, turn);
 }
 
+void ObjectInverse(uint8_t* base, uint32_t object) {
+  ITC_NATIVE_RUNNING("sub_820A9BC8 ObjectInverse");
+  Inverse(base, object + 560, object + 208);
+}
+
 void Vec4Transform(uint8_t* base, uint32_t out, uint32_t m, uint32_t v) {
   ITC_NATIVE_RUNNING("sub_820AB560 Vec4::Transform");
   const Words mw = LoadWords(base, m);

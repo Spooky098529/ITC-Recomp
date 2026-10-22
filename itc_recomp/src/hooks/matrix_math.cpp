@@ -12,7 +12,7 @@
 
 ITC_FLAG_BOOL(native_matrix_math, true, "ITC",
               "Run the game's matrix and quaternion math (Matrix::Multiply, Copy and Inverse, "
-              "sub_8209BD50, sub_820A0AC0 and sub_820A9988; Matrix::RotateX, Y and Z, "
+              "sub_8209BD50, sub_820A0AC0 and sub_820A9988; sub_820A9BC8; Matrix::RotateX, Y and Z, "
               "sub_820A65F0, sub_820A67F8 and sub_820A2D30; Vec4::Transform, sub_820AB560; "
               "Vec3::SwapXZ, sub_820AB688; sub_8209B038; the physics' matrices and quaternions, "
               "sub_82293988 to sub_82293F10, sub_822B8F78; SinCos, sub_820B0E10) natively "
@@ -64,6 +64,10 @@ ITC_MATRIX_MIXED(820A67F8, RotateY(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx
 ITC_MATRIX_MIXED(820A2D30, RotateZ(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32 - 80))
 
 ITC_MATRIX_VECTOR(820A9988, Inverse(base, ctx.r3.u32, ctx.r4.u32))
+// Reached through a pointer (no direct callers), so this adapter stays; r3
+// and r4 come back as the tail call's arguments.
+ITC_MATRIX_VECTOR(820A9BC8, ObjectInverse(base, ctx.r3.u32);
+                  ctx.r4.u64 = ctx.r3.u32 + 208; ctx.r3.u64 = ctx.r3.u32 + 560)
 ITC_MATRIX_SCALAR(820AB688, Vec3SwapXZ(base, ctx.r3.u32))
 ITC_MATRIX_SCALAR(8209B038, SetWsToOne(base, ctx.r3.u32))
 // r3 comes back as out (Matrix::MultiplyUnaligned returns it).

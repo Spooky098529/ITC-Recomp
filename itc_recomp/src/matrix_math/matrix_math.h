@@ -44,6 +44,9 @@ void Inverse(uint8_t* base, uint32_t out, uint32_t in);
 void RotateX(uint8_t* base, uint32_t out, uint32_t in, uint32_t angle, uint32_t turn);
 void RotateY(uint8_t* base, uint32_t out, uint32_t in, uint32_t angle, uint32_t turn);
 void RotateZ(uint8_t* base, uint32_t out, uint32_t in, uint32_t angle, uint32_t turn);
+// sub_820A9BC8: an object's +560 = Inverse of its +208 (the name ours;
+// whose object isn't known).
+void ObjectInverse(uint8_t* base, uint32_t object);
 // Vec4::Transform (sub_820AB560): out = v * m, all four components; m read
 // first (any alignment), v and out aligned.
 void Vec4Transform(uint8_t* base, uint32_t out, uint32_t m, uint32_t v);

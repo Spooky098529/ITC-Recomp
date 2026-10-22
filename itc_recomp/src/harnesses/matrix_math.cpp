@@ -67,6 +67,8 @@ ITC_NATIVE_MIXED(NativeRotateY,
                  mm::RotateY(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32 - 80))
 ITC_NATIVE_MIXED(NativeRotateZ,
                  mm::RotateZ(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32 - 80))
+ITC_NATIVE_VECTOR(NativeObjectInverse, mm::ObjectInverse(base, ctx.r3.u32);
+                  ctx.r4.u64 = ctx.r3.u32 + 208; ctx.r3.u64 = ctx.r3.u32 + 560)
 ITC_NATIVE_SCALAR(NativeVec3SwapXZ, mm::Vec3SwapXZ(base, ctx.r3.u32))
 ITC_NATIVE_SCALAR(NativeSetWsToOne, mm::SetWsToOne(base, ctx.r3.u32))
 // Matrix::MultiplyUnaligned and Matrix::MultiplyTo (its tail call, merged
@@ -168,6 +170,7 @@ void MatrixMath(Context& h) {
     GuestFunction recompiled, native;
     bool compare_f1;
     bool angle_at_r5 = false;  // the turns: r5 = &angle
+    bool object_in_r3 = false;  // r3 = an object at the block's start
   } functions[] = {
       {"Matrix::Multiply (sub_8209BD50)", __imp__sub_8209BD50, NativeMultiply, false},
       {"Matrix::Copy (sub_820A0AC0)", __imp__sub_820A0AC0, NativeCopy, false},
@@ -176,6 +179,10 @@ void MatrixMath(Context& h) {
       {"Matrix::RotateX (sub_820A65F0)", __imp__sub_820A65F0, NativeRotateX, false, true},
       {"Matrix::RotateY (sub_820A67F8)", __imp__sub_820A67F8, NativeRotateY, false, true},
       {"Matrix::RotateZ (sub_820A2D30)", __imp__sub_820A2D30, NativeRotateZ, false, true},
+      // r3 = the object, at the block's start or 4 bytes on (its +208 and
+      // +560 inside the block).
+      {"ObjectInverse (sub_820A9BC8)", __imp__sub_820A9BC8, NativeObjectInverse, false, false,
+       true},
       {"Vec4::Transform (sub_820AB560)", __imp__sub_820AB560, NativeVec4Transform, false},
       {"Vec3::SwapXZ (sub_820AB688)", __imp__sub_820AB688, NativeVec3SwapXZ, false},
       {"SetWsToOne (sub_8209B038)", __imp__sub_8209B038, NativeSetWsToOne, false},
@@ -255,7 +262,7 @@ void MatrixMath(Context& h) {
             // Flush-to-zero off in the context's copy of the control word
             // too (as the vehicle accessors' harness).
             t.fpscr.disableFlushModeUnconditional();
-            t.r3.u64 = block + layout.out;
+            t.r3.u64 = block + (f.object_in_r3 ? layout.out & 0xFF : layout.out);
             t.r4.u64 = block + layout.a;
             t.r5.u64 = block + layout.b;
             t.f1.f64 = group == kOneNaN && nan_at >= kBlockBytes / 4
