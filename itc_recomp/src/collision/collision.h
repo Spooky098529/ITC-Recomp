@@ -73,6 +73,38 @@ double BoxTranslate(uint8_t* base, uint32_t box, uint32_t offset);
 // sub_822BE2C8 (an accessor shared between classes): the word +8.
 uint32_t WordAt8(uint8_t* base, uint32_t object);
 
+// --- The box's and the base class's constructors and placement ---
+
+// Shape::Shape (sub_820BB020): the vtable 0x82002AA8; +60 and the w of +76,
+// +92, +108 = 0.0; +48 = the zero vector 0x82953790; +32 = 0.0; +16, +20 =
+// 0.5 (0x82001BE4), +24 = [0x82002968], +28 = [0x82002204]; +64, +80, +96
+// the identity rows (through `frame` + 80 to + 127, the original's 176
+// bytes); halfwords +112, +114 = 0.
+void ShapeConstruct(uint8_t* base, uint32_t shape, uint32_t frame);
+// Shape::Shape(const&) (sub_820BAB48) and BoxShape::BoxShape(const&)
+// (sub_820BB688): the copies (the latter's 128 bytes of corners and 192 of
+// faces, and the former's 48 at +64, by memcpy). False, with nothing done,
+// where those memcpys can't be done natively (src/c_runtime/strings.h:
+// ranges that may share memory, or in the physical views).
+bool ShapeCopyConstruct(uint8_t* base, uint32_t shape, uint32_t from);
+bool BoxCopyConstruct(uint8_t* base, uint32_t box, uint32_t from);
+// BoxShape::SetCorners (sub_820B99D0): the center, radius, half extents and
+// their inverses, the 8 corners, the 6 faces, the cache words zeroed and
+// the identity axes from the two corners. `frame`: the original's 224
+// bytes. Returns what the original leaves in f1 (the last face's distance).
+double BoxSetCorners(uint8_t* base, uint32_t box, uint32_t min_corner, uint32_t max_corner,
+                     uint32_t frame);
+// BoxShape::BoxShape (sub_820BB188): Shape::Shape (its frame below
+// `frame`, the original's 112 bytes), the vtable 0x82002B30, the w of +140,
+// +156, the corners and the faces' normals 0.0, then SetCorners.
+void BoxConstruct(uint8_t* base, uint32_t box, uint32_t min_corner, uint32_t max_corner,
+                  uint32_t frame);
+// BoxShape::Place (sub_820B9C40): the box placed from the template box by
+// the matrix (the center and corners through it, the faces' normals its
+// rows, the axes its rows). False, with nothing done, for a template that
+// isn't a box. `frame`: the original's 288 bytes.
+bool BoxPlace(uint8_t* base, uint32_t box, uint32_t matrix, uint32_t source, uint32_t frame);
+
 // --- The shape record (a collision object's +32: +0 the template shape,
 // +4 the previous placed copy, +8 the current one) ---
 

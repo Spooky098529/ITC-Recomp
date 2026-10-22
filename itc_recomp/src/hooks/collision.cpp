@@ -14,7 +14,8 @@
 ITC_FLAG_BOOL(native_collision, true, "ITC",
               "Run the collision world's narrow phase and its shapes "
               "(docs/functions/collision.md: the box's methods and accessors, sub_820B9EC8 to "
-              "sub_820BAA50 and sub_822BE2C8; the shape record's accessors, sub_820BAB20, "
+              "sub_820BAA50 and sub_822BE2C8; their constructors and placement, sub_820BB020, "
+              "sub_820BAB48, sub_820BB688, sub_820B99D0, sub_820BB188, sub_820B9C40; the shape record's accessors, sub_820BAB20, "
               "sub_820BAB30, sub_820BACB8, sub_820BADF8, sub_820BAE38; the query and its "
               "contact, sub_820BD1C8, sub_820BC848, sub_820BC908, sub_820BC858) natively "
               "instead of through the translated code (the same words, bit for bit; checked by "
@@ -72,6 +73,47 @@ ITC_COLLISION(820B9F00,
 ITC_COLLISION(820BA2F0, ctx.f1.f64 = BoxTranslate(base, ctx.r3.u32, ctx.r4.u32);
               ctx.r3.u64 = ctx.r3.u32 + 48)
 ITC_COLLISION(822BE2C8, ctx.r3.u64 = WordAt8(base, ctx.r3.u32))
+
+// --- The constructors and the placement ---
+
+// r3 comes back as the shape.
+ITC_COLLISION(820BB020, ShapeConstruct(base, ctx.r3.u32, ctx.r1.u32 - 176))
+// r4 = the shape to copy; where the memcpys can't be native, the original.
+extern "C" REX_FUNC(sub_820BAB48) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_collision) || !ShapeCopyConstruct(base, ctx.r3.u32, ctx.r4.u32)) {
+    __imp__sub_820BAB48(ctx, base);
+  }
+}
+extern "C" REX_FUNC(sub_820BB688) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_collision) || !BoxCopyConstruct(base, ctx.r3.u32, ctx.r4.u32)) {
+    __imp__sub_820BB688(ctx, base);
+  }
+}
+// r4 = the min corner, r5 = the max corner; r3 comes back as the box + 96,
+// f1 as the last face's distance.
+ITC_COLLISION(820B99D0,
+              ctx.f1.f64 = BoxSetCorners(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                         ctx.r1.u32 - 224);
+              ctx.r3.u64 = ctx.r3.u32 + 96)
+// r4 = the min corner, r5 = the max corner; r3 comes back as the box.
+ITC_COLLISION(820BB188, BoxConstruct(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32 - 112))
+// Slot 9: r4 = the matrix, r5 = the template; r3 comes back as the box +
+// 96. A template that isn't a box: the original.
+extern "C" REX_FUNC(sub_820B9C40) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_collision)) {
+    __imp__sub_820B9C40(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  if (!BoxPlace(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32 - 288)) {
+    __imp__sub_820B9C40(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = ctx.r3.u32 + 96;
+}
 
 // --- The shape record ---
 

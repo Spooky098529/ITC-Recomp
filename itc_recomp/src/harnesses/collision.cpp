@@ -69,6 +69,31 @@ ITC_NATIVE_STEP(NativeFaceDirection,
                 ctx.r3.u64 = co::BoxFaceDirection(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 208))
 ITC_NATIVE_STEP(NativeBoxTranslate, ctx.f1.f64 = co::BoxTranslate(base, ctx.r3.u32, ctx.r4.u32);
                 ctx.r3.u64 = ctx.r3.u32 + 48)
+ITC_NATIVE_STEP(NativeShapeConstruct, co::ShapeConstruct(base, ctx.r3.u32, ctx.r1.u32 - 176))
+void NativeShapeCopy(PPCContext& ctx, uint8_t* base) {
+  if (!co::ShapeCopyConstruct(base, ctx.r3.u32, ctx.r4.u32)) {
+    __imp__sub_820BAB48(ctx, base);
+  }
+}
+void NativeBoxCopy(PPCContext& ctx, uint8_t* base) {
+  if (!co::BoxCopyConstruct(base, ctx.r3.u32, ctx.r4.u32)) {
+    __imp__sub_820BB688(ctx, base);
+  }
+}
+ITC_NATIVE_STEP(NativeSetCorners,
+                ctx.f1.f64 = co::BoxSetCorners(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                               ctx.r1.u32 - 224);
+                ctx.r3.u64 = ctx.r3.u32 + 96)
+ITC_NATIVE_STEP(NativeBoxConstruct,
+                co::BoxConstruct(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32 - 112))
+void NativeBoxPlace(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  if (!co::BoxPlace(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32 - 288)) {
+    __imp__sub_820B9C40(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = ctx.r3.u32 + 96;
+}
 ITC_NATIVE_STEP(NativeWordAt8, ctx.r3.u64 = co::WordAt8(base, ctx.r3.u32))
 ITC_NATIVE_STEP(NativeCurrentCenter,
                 ctx.r3.u64 = co::CollisionShapeCurrentCenter(base, ctx.r3.u32))
@@ -160,8 +185,10 @@ constexpr uint32_t kRegionBytes = 0xE00;
 // In the region: boxes A (+0x000), B (+0x200) and C (+0xC00); a shape record
 // (+0x400: its template A, previous copy B, current copy C); a vector
 // argument (+0x480); a contact (+0x4C0); a query (+0x500, 1,632 bytes).
+// a second vector (+0x4A0); a matrix (the query's first 64 bytes).
 constexpr uint32_t kBoxA = 0x000, kBoxB = 0x200, kBoxC = 0xC00, kRecord = 0x400,
-                   kVector = 0x480, kContact = 0x4C0, kQuery = 0x500;
+                   kVector = 0x480, kVector2 = 0x4A0, kContact = 0x4C0, kQuery = 0x500,
+                   kMatrix = 0x500;
 constexpr uint32_t kFaceDirection = 0x826C2DE0;
 
 // The registers each function takes (`i`, an index in range).
@@ -180,6 +207,9 @@ enum Args {
   kQueryShapes,   // r3 = the query, r4 = the record, r5 = box A
   kContactSet,    // r3 = the contact, r4 = the vector, r5 = box B + 16, f1, f2
   kContactR3,     // r3 = the contact
+  kCorners,       // r3 = box A, r4 = the vector, r5 = the second vector
+  kCopy,          // r3 = box B, r4 = box A
+  kPlace,         // r3 = box B, r4 = the matrix, r5 = box A
 };
 
 }  // namespace
@@ -227,6 +257,18 @@ void Collision(Context& h) {
        NativeFaceDirection, kBoxIndex, 12, false},
       {"BoxShape::Translate (sub_820BA2F0)", Original<__imp__sub_820BA2F0>, NativeBoxTranslate,
        kBoxVector, 1, true},
+      {"Shape::Shape (sub_820BB020)", Original<__imp__sub_820BB020>, NativeShapeConstruct,
+       kBoxR3, 1, false},
+      {"Shape::Shape(const&) (sub_820BAB48)", Original<__imp__sub_820BAB48>, NativeShapeCopy,
+       kCopy, 1, false},
+      {"BoxShape::BoxShape(const&) (sub_820BB688)", Original<__imp__sub_820BB688>,
+       NativeBoxCopy, kCopy, 1, false},
+      {"BoxShape::SetCorners (sub_820B99D0)", Original<__imp__sub_820B99D0>, NativeSetCorners,
+       kCorners, 1, true},
+      {"BoxShape::BoxShape (sub_820BB188)", Original<__imp__sub_820BB188>, NativeBoxConstruct,
+       kCorners, 1, false},
+      {"BoxShape::Place (sub_820B9C40)", Original<__imp__sub_820B9C40>, NativeBoxPlace, kPlace,
+       1, false},
       {"sub_822BE2C8 (the word +8)", Original<__imp__sub_822BE2C8>, NativeWordAt8, kRecordR3, 1,
        false},
       {"CollisionShape::CurrentCenter (sub_820BAB20)", Original<__imp__sub_820BAB20>,
@@ -341,6 +383,20 @@ void Collision(Context& h) {
               break;
             case kContactR3:
               t.r3.u64 = region + kContact;
+              break;
+            case kCorners:
+              t.r3.u64 = region + kBoxA;
+              t.r4.u64 = region + kVector;
+              t.r5.u64 = region + kVector2;
+              break;
+            case kCopy:
+              t.r3.u64 = region + kBoxB;
+              t.r4.u64 = region + kBoxA;
+              break;
+            case kPlace:
+              t.r3.u64 = region + kBoxB;
+              t.r4.u64 = region + kMatrix;
+              t.r5.u64 = region + kBoxA;
               break;
           }
           t.f1.f64 = group == kOneNaN && nan_at >= kRegionBytes / 4
