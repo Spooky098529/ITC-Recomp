@@ -389,6 +389,10 @@ ITC_NATIVE_WORD(NativeWheelContact, ro::WheelContact(base, ctx.r3.u32, ctx.r4.u3
 ITC_NATIVE_WORD(NativeWheelSurfaceMarks, ro::WheelSurfaceMarks(base, ctx.r3.u32, ctx.r4.u32))
 ITC_NATIVE_WORD(NativeBodyPosition, ro::BodyPosition(base, ctx.r3.u32, ctx.r4.u32))
 ITC_NATIVE_WORD(NativeBodyMatrixCopy, ro::BodyMatrixCopy(base, ctx.r3.u32, ctx.r4.u32))
+void NativeIsBehindCamera(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = ro::IsBehindCamera(base, ctx.r3.u32, ctx.r4.u32);
+}
 // As the adapter: r3 comes back as the view's vehicle (not compared: with
 // the accessors off, the original leaves it a stack address).
 void NativeWheelSlip(PPCContext& ctx, uint8_t* base) {
@@ -2408,34 +2412,43 @@ uint32_t NumberOrWord(Random& r, bool odd) {
   return std::bit_cast<uint32_t>(float(int32_t(r.Below(2049)) - 1024) / 16.0f);
 }
 
+// The view, its vehicle, body and wheels' data, from `seed`: numbers, or
+// random words with odd floats among them.
+auto ViewBodySetup(Context& h, uint32_t block, uint64_t seed, bool odd) {
+  return [&h, block, seed, odd] {
+    const uint32_t view = block + kBodyView;
+    const uint32_t vehicle = block + kBodyVehicle;
+    const uint32_t body = block + kBodyBody;
+    Random fill;
+    for (uint64_t n = 0; n < seed % 97; n++) {
+      fill.Next();
+    }
+    for (uint32_t i = 0; i < 0x2000; i += 4) {
+      guest::StoreU32(h.base, vehicle + i, NumberOrWord(fill, odd));
+    }
+    for (uint32_t i = 0; i < 0x500; i += 4) {
+      guest::StoreU32(h.base, body + i, NumberOrWord(fill, odd));
+    }
+    for (uint32_t i = 0; i < 5 * 64; i += 4) {
+      guest::StoreU32(h.base, block + kBodyWheels + i, NumberOrWord(fill, odd));
+    }
+    FillRandom(h.base, fill, block + kBodyOut, 64);
+    guest::StoreU32(h.base, view + 4, vehicle);
+    guest::StoreU32(h.base, vehicle + 336, body);
+    for (uint32_t wheel = 0; wheel < 5; wheel++) {
+      guest::StoreU32(h.base, vehicle + 2160 + 4 * wheel, block + kBodyWheels + 64 * wheel);
+      guest::StoreU8(h.base, vehicle + 433 + 368 * wheel, fill.Below(4) == 0 ? 0 : 1);
+    }
+  };
+}
+
 void ViewBodyCases(Context& h, uint32_t block) {
   Random& r = h.random;
   const uint32_t view = block + kBodyView;
   const uint32_t vehicle = block + kBodyVehicle;
   const uint32_t body = block + kBodyBody;
-  auto setup = [&h, view, vehicle, body, block](uint64_t seed, bool odd) {
-    return [&h, view, vehicle, body, block, seed, odd] {
-      Random fill;
-      for (uint64_t n = 0; n < seed % 97; n++) {
-        fill.Next();
-      }
-      for (uint32_t i = 0; i < 0x2000; i += 4) {
-        guest::StoreU32(h.base, vehicle + i, NumberOrWord(fill, odd));
-      }
-      for (uint32_t i = 0; i < 0x500; i += 4) {
-        guest::StoreU32(h.base, body + i, NumberOrWord(fill, odd));
-      }
-      for (uint32_t i = 0; i < 5 * 64; i += 4) {
-        guest::StoreU32(h.base, block + kBodyWheels + i, NumberOrWord(fill, odd));
-      }
-      FillRandom(h.base, fill, block + kBodyOut, 64);
-      guest::StoreU32(h.base, view + 4, vehicle);
-      guest::StoreU32(h.base, vehicle + 336, body);
-      for (uint32_t wheel = 0; wheel < 5; wheel++) {
-        guest::StoreU32(h.base, vehicle + 2160 + 4 * wheel, block + kBodyWheels + 64 * wheel);
-        guest::StoreU8(h.base, vehicle + 433 + 368 * wheel, fill.Below(4) == 0 ? 0 : 1);
-      }
-    };
+  auto setup = [&h, block](uint64_t seed, bool odd) {
+    return ViewBodySetup(h, block, seed, odd);
   };
 
   {
@@ -2545,6 +2558,54 @@ void ViewBodyCases(Context& h, uint32_t block) {
     }
   }
 }
+
+// CarOverlays::IsBehindCamera: the car overlays, a camera pass and a point
+// in the block, the view (ViewBodyCases' set-up) in a random slot; numbers
+// (some making the dot product 0.0, some tiny, to meet flush-to-zero) or
+// random words.
+void IsBehindCameraCases(Context& h, uint32_t block) {
+  Random& r = h.random;
+  const uint32_t overlays = block + 0x66000, pass = block + 0x67000, point = block + 0x68000;
+  Results results("CarOverlays::IsBehindCamera (sub_82124630)");
+  for (uint64_t seed = 0; seed < 400; seed++) {
+    const uint32_t kind = seed % 5;
+    const uint32_t slot = r.Below(25);
+    uint32_t words[9];
+    for (uint32_t& w : words) {
+      w = kind == 4 ? RandomWord(r) : NumberOrWord(r, false);
+    }
+    if (kind == 1) {  // the point on the eye or on the car
+      for (uint32_t k = 0; k < 3; k++) {
+        words[3 + 3 * r.Below(2) + k] = words[k];
+      }
+    } else if (kind == 2) {  // differences of tiny numbers
+      for (uint32_t& w : words) {
+        w = (w & 0x807FFFFF) | (r.Below(3) << 23);
+      }
+    }
+    Compare(h, results, {{point, 16}},
+            [&h, overlays, pass, point, slot, seed, words, block] {
+              ViewBodySetup(h, block, seed, false)();
+              Random fill;
+              FillRandom(h.base, fill, overlays, 0x400);
+              guest::StoreU32(h.base, overlays + 800, pass);
+              guest::StoreU32(h.base, overlays + 128, slot);
+              guest::StoreU32(h.base, overlays + 4 * (slot + 1), block + kBodyView);
+              for (uint32_t k = 0; k < 3; k++) {
+                guest::StoreU32(h.base, point + 4 * k, words[k]);
+                guest::StoreU32(h.base, pass + 400 + 4 * k, words[3 + k]);
+                guest::StoreU32(h.base, block + kBodyBody + 288 + 48 + 4 * k, words[6 + k]);
+              }
+            },
+            [&](PPCContext& t) {
+              t.r3.u64 = overlays;
+              t.r4.u64 = point;
+            },
+            Original<__imp__sub_82124630>, NativeIsBehindCamera,
+            fmt::format("seed {} kind {} slot {}", seed, kind, slot));
+  }
+  results.Report();
+}
 }  // namespace
 
 void RaceOverlays(Context& h) {
@@ -2577,6 +2638,7 @@ void RaceOverlays(Context& h) {
   ParticlesCUpdateCases(h, block);
   SlotOfCases(h);
   ViewBodyCases(h, block);
+  IsBehindCameraCases(h, block);
   memory->SystemHeapFree(block);
 }
 

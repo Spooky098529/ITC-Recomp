@@ -20,7 +20,7 @@ ITC_FLAG_BOOL(native_race_overlays, true, "ITC",
               "sub_8212A868; Sparks::Update, sub_8212DDC8; Smoke::Update, sub_8212AA78; ParticlesB::Update, sub_8212B748; ParticlesC::Update, sub_8212C2F0; RaceOverlays::SlotOf, sub_8215E048; the children's constructors, "
               "sub_8211F060 to sub_8212E9A0, and Smoke and ParticlesB::Reset, sub_8212A9E0 and "
               "sub_8212BA98; the view's body and wheels through the vehicle accessors, sub_821268B0 to "
-              "sub_82126FF0) natively "
+              "sub_82126FF0; CarOverlays::IsBehindCamera, sub_82124630) natively "
               "instead of through the translated code (same results; checked by "
               "--run_harnesses=race_overlays)");
 
@@ -456,4 +456,18 @@ extern "C" REX_FUNC(sub_82126A70) {
   const uint32_t view = ctx.r3.u32;
   ctx.r3.u64 = guest::LoadU32(base, view + 4);
   ctx.f1.f64 = double(WheelSlip(base, view, ctx.r4.u32, ctx.f1.f64));
+}
+
+// CarOverlays::IsBehindCamera: r3 = the car overlays, r4 = a point; returns
+// 1 or 0. BodyMatrix and View are called as plain C++.
+extern "C" REX_FUNC(sub_82124630) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_race_overlays)) {
+    __imp__sub_82124630(ctx, base);
+    return;
+  }
+  // The original's scalar code runs with flush-to-zero off, and it leaves it
+  // off.
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = IsBehindCamera(base, ctx.r3.u32, ctx.r4.u32);
 }

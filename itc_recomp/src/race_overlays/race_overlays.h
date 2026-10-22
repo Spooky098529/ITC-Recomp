@@ -644,4 +644,11 @@ uint32_t BodyPosition(uint8_t* base, uint32_t out, uint32_t view);
 // is the matrix as it is, bits too); returns out.
 uint32_t BodyMatrixCopy(uint8_t* base, uint32_t out, uint32_t view);
 
+// CarOverlays::IsBehindCamera (sub_82124630): with the camera pass at
+// overlays +800 (its eye at +400) and the body matrix of the view in slot
+// +128: 0 when the dot product (vmsum3fp128, flush-to-zero on) of point -
+// eye and point - the matrix's fourth row (the car's position) is below the
+// game's 0.0, else 1 (NaNs too).
+uint32_t IsBehindCamera(uint8_t* base, uint32_t overlays, uint32_t point);
+
 }  // namespace race_overlays

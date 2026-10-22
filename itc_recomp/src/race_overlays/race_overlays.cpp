@@ -2613,4 +2613,30 @@ uint32_t BodyMatrixCopy(uint8_t* base, uint32_t out, uint32_t view) {
   return out;
 }
 
+uint32_t IsBehindCamera(uint8_t* base, uint32_t overlays, uint32_t point) {
+  ITC_NATIVE_RUNNING("sub_82124630 CarOverlays::IsBehindCamera");
+  const uint32_t pass = guest::LoadU32(base, overlays + 800);
+  const uint32_t view = View(base, overlays, guest::LoadU32(base, overlays + 128));
+  const uint32_t matrix = BodyMatrix(base, view);
+  const uint32_t one = guest::LoadU32(base, kOne);
+  auto bits = [](float f) { return std::bit_cast<uint32_t>(f); };
+  const double px = guest::LoadFloat(base, point + 0);
+  const double py = guest::LoadFloat(base, point + 4);
+  const double pz = guest::LoadFloat(base, point + 8);
+  const simde__m128 from_eye =
+      VectorOf(bits(Difference(px, guest::LoadFloat(base, pass + 400))),
+               bits(Difference(py, guest::LoadFloat(base, pass + 404))),
+               bits(Difference(pz, guest::LoadFloat(base, pass + 408))), one);
+  const simde__m128 from_car =
+      VectorOf(bits(Difference(px, guest::LoadFloat(base, matrix + 48))),
+               bits(Difference(py, guest::LoadFloat(base, matrix + 52))),
+               bits(Difference(pz, guest::LoadFloat(base, matrix + 56))), one);
+  const uint32_t csr = Fpscr::getcsr();
+  Fpscr::setcsr(csr | uint32_t(Fpscr::FlushMask));
+  const simde__m128 dot = simde_mm_dp_ps(from_car, from_eye, 0xEF);
+  Fpscr::setcsr(csr);
+  return double(std::bit_cast<float>(WordOf(dot, 0))) < double(guest::LoadFloat(base, kZero)) ? 0
+                                                                                              : 1;
+}
+
 }  // namespace race_overlays
