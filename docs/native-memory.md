@@ -169,16 +169,51 @@ backing, or structures moved to host memory one at a time as their last
 recompiled user goes. The layer allows either, and nothing here sets up
 access rules or interim backings.
 
-## Still to find
+## What the counter saw
 
-- The range's size: a temporary counter on the heap's four functions and
-  the VirtualAlloc wrappers, logging the bytes in use at their peak and
-  the flags seen, over an attract race and a drive. Removed afterwards.
+A temporary counter (commit `43b3900`, removed in the next) overrode the
+heap's four functions and VirtualAlloc and VirtualFree, ran the game's own
+function first and kept each live block's size on the host: heap blocks
+rounded to 8 bytes and pages to 4,096, as the layer would hand them out.
+Runs on 2026-10-22: a 60 s attract race (`itc_741.log`) and the pad replay
+drive `race_test.jsonl` (`itc_742.log`, `itc_743.log`: the title, the
+menus, a race).
+
+| | Attract race | Drive |
+|---|---|---|
+| Peak in use | 88.5 MiB | 172.6 MiB (in the front end, ~16 s after boot; the race stayed below it) |
+| Heap at the peak | 17.2 MiB, 5,071 blocks | 17.3 MiB, 1,843 blocks |
+| Pages at the peak | 71.3 MiB, 1,803 blocks | 155.3 MiB, 3,369 blocks |
+| Largest request | heap 8,192,000; pages 13,107,200 | heap 8,192,000; pages 16,854,160 |
+| Pages rounded to 64 KiB | | 366.6 MiB at the peak |
+
+- The process heap's own flags (heap +24) are 0. HeapAlloc's flags are 0
+  (malloc, from `0x825A9AF0`) and 0x8 (calloc, from `0x825AC2D0`);
+  HeapReAlloc's 0 (realloc); HeapFree's 0 (free). No other heap handle
+  was seen.
+- VirtualAlloc's protection is always 4 (PAGE_READWRITE), its address
+  always 0, and every call commits. Its types:
+  - `0x1000` (MEM_COMMIT), most callers (first from `sub_8209E210`).
+  - `0x801000`, MEM_COMMIT with MEM_NOZERO (`0x800000`, the SDK skips the
+    clearing): `sub_8258DFF0` in the graphics library (not read in
+    detail).
+  - `0x20801000`, also with MEM_LARGE_PAGES (`0x20000000`):
+    `sub_824EFE20` (not read in detail; it clears what it gets with
+    memset itself, and allocates a second block the same way). The SDK
+    takes these from the 64 KiB-page heap at `0x40000000`.
+- VirtualFree was only ever `(address, 0, MEM_RELEASE)`.
+- The SDK's `NtAllocateVirtualMemory` rounds every request without an
+  address up to 64 KiB, with 64 KiB alignment, as the Xbox's allocation
+  granularity does. The game's ~3,400 page blocks average ~47 KB, so that
+  rounding more than doubles what pages take (366.6 MiB against 172.6 at
+  the drive's peak).
+- The SDK's 4 KiB virtual heap spans `0x00000000`-`0x3FFFFFFF` (1 GiB),
+  so a range of a few hundred MiB fits in it.
 
 ## Steps
 
 1. This write-up.
-2. The counter, for the range's size.
+2. The counter, for the range's size (done, 2026-10-22: "What the counter saw").
 3. The layer, the adapters and the harness cases, in one change.
 4. Checks: an attract race with `--run_harnesses=all`, the texture cache
    by log with the flag on and off, the pad replay drive
