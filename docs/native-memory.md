@@ -50,6 +50,48 @@ game allocates comes from three entry points, all seen in play
   runs in play through the layer, so a block made and freed through any
   of the paths above is fine.
 
+### HeapReAlloc's and HeapSize's arguments
+
+Read in `generated/` (2026-10-22).
+
+- HeapReAlloc `sub_8229A930` is `(heap r3, flags r4, block r5, size r6)`,
+  returning the block's address in r3. Its only caller is realloc
+  (`sub_825AEBC8`), with the process heap and flags 0 (realloc handles a
+  null block and size 0 itself, calling malloc and free, and fails sizes
+  over -4096). What it does:
+  - The heap's own flags (the word at heap +24) are ORed into `flags`.
+  - A null block returns 0; a size over `0x7FFFFFFF` returns 0; size 0 is
+    taken as 1.
+  - Without HEAP_NO_SERIALIZE (`0x1`) it takes the heap's lock (heap
+    +1408).
+  - A block whose header doesn't have its busy bit (header byte at block
+    -11, bit `0x1`) is returned unchanged.
+  - It shrinks or grows in place when it can (the neighbor's free space,
+    `sub_82298A88`); otherwise, unless HEAP_REALLOC_IN_PLACE_ONLY
+    (`0x10`, which returns 0), it allocates a new block with HeapAlloc
+    (`sub_82299D60`, the flags without `0x8`), copies the smaller of the
+    old and new sizes (memcpy `sub_825AA840`), and frees the old block
+    with HeapFree (`sub_8229A648`).
+  - HEAP_ZERO_MEMORY (`0x8`) clears the part past the old size, in place
+    or moved (memset `sub_825A71D0`).
+  - On failure with HEAP_GENERATE_EXCEPTIONS (`0x4`) it raises
+    `0xC0000017` (STATUS_NO_MEMORY, through RtlRaiseException's import).
+- HeapSize `sub_82298FF8` is `(heap r3, flags r4, block r5)`, returning
+  the block's usable size in r3. `flags` isn't read. Its only caller is
+  `_msize` (`sub_825AED30`), with the process heap and flags 0. It returns
+  -1 when the busy bit is clear; otherwise, for a block from the heap's
+  segments, its size in 16-byte units (the half-word at block -16) times
+  16 less its unused bytes (the byte at block -10); for a large block of
+  its own pages (header bit `0x8`), the committed size (the word at block
+  -24) less the unused bytes (the half-word at block -16) less 48. That
+  is, the size the caller asked for, which is what the layer's `Size`
+  returns from its host-side table.
+- VirtualAlloc `sub_82295398` is `(address r3, size r4, type r5,
+  protection r6)`, calling `NtAllocateVirtualMemory` with zero bits 0 and
+  returning the address, or 0 on failure (after `sub_82296E88`, probably
+  SetLastError from the status). The size rounded by the kernel isn't
+  returned.
+
 ## The layer
 
 `itc_recomp/src/memory/`, plain C++ (no `ctx`):
@@ -132,8 +174,6 @@ access rules or interim backings.
 - The range's size: a temporary counter on the heap's four functions and
   the VirtualAlloc wrappers, logging the bytes in use at their peak and
   the flags seen, over an attract race and a drive. Removed afterwards.
-- The heap's functions' arguments, read in detail (HeapReAlloc's and
-  HeapSize's are inferred from their callers so far).
 
 ## Steps
 
