@@ -121,7 +121,8 @@ ITC_ACCESSOR_FLOAT(820C0148, VehicleSpeed(base, ctx.r3.u32))
 ITC_ACCESSOR_FLOAT(820C0150, VehicleDistancePerFrame(base, ctx.r3.u32))
 ITC_ACCESSOR_WORD(820C0168, VehicleIdentity(ctx.r3.u32))
 ITC_ACCESSOR_WORD(820C0450, VehicleSetObjectHalf114(base, ctx.r3.u32, ctx.r4.u32))
-ITC_ACCESSOR_VOID(820C0490, QuaternionToMatrix3(base, ctx.r3.u32, ctx.r4.u32))
+// Quaternion::ToMatrix3 (sub_820C0490) has no adapter: its only caller is
+// ToMatrix, native.
 ITC_ACCESSOR_VOID(820C0550, QuaternionToMatrix(base, ctx.r3.u32, ctx.r4.u32))
 ITC_ACCESSOR_VOID(820C0590, VehicleSpeedRecord(base, ctx.r3.u32, ctx.r4.u32))
 
@@ -160,7 +161,8 @@ ITC_ACCESSOR_VOID(820B9678, Object344SetFloat24(base, ctx.r3.u32, ctx.f1.f64))
 ITC_ACCESSOR_WORD(820B99B0, ObjectHalf112(base, ctx.r3.u32))
 ITC_ACCESSOR_VOID(820B99B8, ObjectSetHalf112(base, ctx.r3.u32, ctx.r4.u32))
 ITC_ACCESSOR_WORD(820B99C0, ObjectHalf114(base, ctx.r3.u32))
-ITC_ACCESSOR_VOID(820B99C8, ObjectSetHalf114(base, ctx.r3.u32, ctx.r4.u32))
+// Object::SetHalf114 (sub_820B99C8) has no adapter: its only caller is
+// sub_820C0450, native.
 
 // --- The vector library (src/vehicle_accessors/vectors.cpp) ---
 
