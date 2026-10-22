@@ -57,7 +57,9 @@ goes in `src/` as overrides), American English.
   `/loop` session handing each subsystem to a mapping agent, then
   migration agents) did its first run on the branch `b7-loop-test` (merged 2026-10-22): five
   subsystems mapped and made native as far as they were ready (ours 162
-  -> 335). See "B7's loop runs" under B7, and
+  -> 335); its second run (branch `b7-loop-22-10-26`, in progress) removed
+  31 adapters and made the race overlays native as far as they were
+  ready (ours 422). See "B7's loop runs" under B7, and
   `docs/loops/b7-progress.md`. What most of the rest waits on is the
   user's call on allocating guest memory from native code (the heap and
   the VirtualAlloc wrappers, in `docs/loops/leads.md`).
@@ -2463,6 +2465,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
     | 2026-10-22 | The C runtime and math library | `c-runtime.md` | 79 of 89 | `--native_math`, `--native_c_runtime`, `--native_memcpy` |
     | 2026-10-22 | The UI movie library | `ui-movies.md` | 32 of 45 | `--native_ui_movies` |
     | 2026-10-22 | The game's UI movie side | `ui-movies-game.md` | 42 of 89 | `--native_ui_movies_game` |
+    | 2026-10-22 | The race overlays' update side | `race-overlays.md` | 88 of 158 | `--native_race_overlays` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -2474,6 +2477,17 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
     decision), TLS (`_getptd`), the matrix math (`Matrix::Multiply` and
     `Matrix::Copy`, Wrapped), std::string, the string table and font, the
     texture set; each is a lead in `docs/loops/leads.md`.
+
+    The second run (from 2026-10-22, branch `b7-loop-22-10-26`; its first
+    session stopped after one subsystem): the first run's removable
+    adapters went (31), and the race overlays were made native as far as
+    they were ready. Each native function now logs `native running
+    (game|harness)` once (`ITC_NATIVE_RUNNING`, `src/base/log.h`), and a
+    validation agent checks that every function made native has a harness
+    line; work done inside a native caller is the new status Merged. What
+    blocks the rest of the race overlays: guest vtable calls, guest
+    allocation (the creation side), memcpy's mirror recording (the
+    `sub_825A7410` override has no plain C++ entry), and RaceOverlays::Run.
 
 ## The end state: removing the core
 
@@ -2682,3 +2696,11 @@ functions (916 pairs): overridden 58, Native 3, Dropped 23, never called
 70, live 295. Imports: 186 called, 63 with a live caller. B7
 (`b7_status.py`): 6,753 in play, ours 335, work left 6,418 (Wrapped 142,
 with a row 243, no row yet 6,033); 450 overrides in `src/`.
+
+**2026-10-22, B7's second loop run, first session (branch
+`b7-loop-22-10-26`: the adapters removed, the race overlays):** the
+boundary unchanged: 449 functions (916 pairs): overridden 58, Native 3,
+Dropped 23, never called 70, live 295. Imports: 186 called, 63 with a
+live caller. B7 (`b7_status.py`): 6,753 in play, ours 422, work left
+6,331 (Wrapped 142, with a row 313, no row yet 5,876); 495 overrides in
+`src/`.

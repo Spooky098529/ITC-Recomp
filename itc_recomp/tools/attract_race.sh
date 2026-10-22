@@ -25,6 +25,7 @@ find /dev/shm -maxdepth 1 -user "$USER" -name 'xenia_memory_*' -delete
 L=$(ls -t $B/logs/itc_*.log | head -1)
 echo "log: $L"
 echo "exit: $status (124: stopped by the timeout, as expected)"
-echo "seconds at 30 ticks/s: $(grep -c 'ticks/s 30' "$L")"
+# A second can log 31 ticks (the tick clock against the log's seconds).
+echo "seconds at 30 ticks/s: $(grep -cE 'ticks/s 3[01]\b' "$L")"
 echo "error lines: $(grep -ciE '\berror\b' "$L")"
 grep 'harness:' "$L" | grep -v DIFFERS | sed 's/^.*harness: /harness: /'

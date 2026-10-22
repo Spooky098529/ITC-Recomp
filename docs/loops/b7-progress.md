@@ -8,38 +8,24 @@ record: `b7-loop-2026-10-22-0111.md` (and this file's history).
 
 - Run started 2026-10-22 10:47 on `b7-loop-22-10-26` (made by the user,
   from 600ed23); summary `b7-loop-2026-10-22-1047.md`.
-- Subsystem: the race overlays (`race-overlays.md`, mapped in 6baeabf).
-  First migration agent: 34 functions Overridden in 5 groups
-  (76ddc05..3fc85b8), `--native_race_overlays`; 32 ready groups left.
-  Validated (itc_512.log): 34 of 34 harness lines, all ran in play.
-- Adapters lead validated: prints added (b88246d), 29 of 31 harness
-  lines; `sub_825B6458` (_fltout2) and `sub_8211B298`
-  (AnimationList::Get) have no function of their own (their work is
-  inside their native callers): set to the new Merged status (the
-  user's, 2026-10-22), not a halt.
-- Second migration agent: 5 functions Overridden and 1 Merged
-  (`sub_8211F3B4`) in 8d7ad32, 092a792; the first 9 prints named; 27
-  ready groups left. Validated (itc_524.log): 14 of 14 harness lines.
-- Third migration agent: 10 functions (5 Overridden, 5 Native with no
-  adapter) in 55092ef..6bc388e; left in the file: `sub_821268C0`, and
-  callees with no rows. Validated (itc_540.log): 10 of 10.
-- Fourth migration agent: 32 functions (31 Overridden, `sub_8212B230`
-  Native) in 59b94fb..61e4084: SpeedKmh, the set-up's constructors and
-  bindings, the resets, Smoke::InRegion, Sparks::Update, the children's
-  constructors. Left: Smoke, ParticlesB and ParticlesC::Update,
-  RaceOverlays::SlotOf, `sub_8215E150`. Validated (itc_563.log): 33 of
-  33 (`sub_820C0128`'s print added, f29a13d).
-- Step 6: the race overlays' fifth migration agent running.
-- The user (2026-10-22): end this session's loop once the race overlays
-  are done (recorded, step 9), for the context's size; the next session
-  (after `/clear`) takes the next lead.
-- Session: pass 11 of 20, subsystem 1 of 5. In all: subsystem 1 of 5.
-- Known at the start: `b7_status.py` checks `c-runtime.md:221`
-  `sub_825A9934` (`__chkstk`) "Dropped, but it ran" (from the first run:
-  its override does nothing, so it still shows as seen).
+- Stopped after the race overlays (the user's call, below). Next
+  session: `/clear`, then `/loop follow docs/loops/b7-loop.md`; it takes
+  the next lead from `leads.md`.
+- Session: pass 12 of 20, subsystem 1 of 5. In all: subsystem 1 of 5.
+- Known: `b7_status.py` checks `sub_825A9934` (`__chkstk`) "Dropped, but
+  it ran", and every function made Native or Merged this run "..., but
+  it ran" (`seen_in_play.txt` predates them; a new coverage session
+  clears them).
 
 ## Done
 
+- The race overlays (`race-overlays.md`, mapped in 6baeabf; 158 rows):
+  88 ours (77 Overridden, 9 Native, 2 Merged) in five migrations
+  (76ddc05..8af4216), each validated (harness lines for every function);
+  `--native_race_overlays`. Nothing ready and takeable left: the rest
+  waits on guest vtable calls, guest allocation, memcpy's mirror
+  recording (no plain C++ entry), unseen callees, and `sub_8215E150`
+  (with RaceOverlays::Run).
 - Adapters lead (no mapping, not counted): 31 adapters removed, now
   Native (`c-runtime.md` 23, `ui-movies.md` 5, `ui-movies-game.md` 3);
   4 recorders' adapters stay (their work calls the renderer through
@@ -69,6 +55,9 @@ record: `b7-loop-2026-10-22-0111.md` (and this file's history).
   `functions.md`. For review: on the native SpeedKmh path the state
   capture (`--capture_dir`) no longer hears about the vehicle (the
   game's other callers still pass it on).
+  The fifth migration's 8 rows (4 Overridden, `sub_8215E078` Merged, 3
+  Native). `attract_race.sh` now counts seconds logged at 31 ticks/s too
+  (it reported 19 for a 22-second race).
 
 ## Expected to differ
 
@@ -92,7 +81,8 @@ the validation agent's attract race; the user drives (with
 - Race overlays (itc_524.log): `sub_82129598` Trail::AddPoint (probably
   the skid marks); (itc_540.log) `sub_8212D818` Sparks::Emit (no
   scraping in attract races); (itc_563.log) `sub_82123A00`
-  Sprite::ResetStyle2, `sub_8212A868` Smoke::InRegion.
+  Sprite::ResetStyle2, `sub_8212A868` Smoke::InRegion (again not seen in
+  itc_584.log).
 
 ## Totals
 
@@ -101,7 +91,11 @@ the validation agent's attract race; the user drives (with
 - After the adapters lead: unchanged (ours 335, work left 6418).
 - After mapping the race overlays: ours 335, work left 6418 (wrapped
   142, known 396, unknown 5880).
+- After the race overlays: ours 422, work left 6331 (wrapped 142, known
+  313, unknown 5876).
 
 ## Stopped
 
-(not stopped)
+2026-10-22, after the race overlays: the user ended this session's loop
+for the context's size. Not a failure; the run goes on in the next
+session (subsystem 2 of 5).

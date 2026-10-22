@@ -104,7 +104,14 @@ reviewed by the user) made five subsystems native as far as they were ready
 `ui-movies.md`, `ui-movies-game.md`; each behind `--native_*` flags, on by
 default); see "B7's loop runs" in the plan and
 `docs/loops/b7-progress.md`. Most of what's left in them waits on the
-user's call on allocating guest memory from native code.
+user's call on allocating guest memory from native code. Its second run
+(on `b7-loop-22-10-26`, in progress; summary
+`docs/loops/b7-loop-2026-10-22-1047.md`) removed 31 adapters and made the
+race overlays native as far as they were ready
+(`docs/functions/race-overlays.md`, `--native_race_overlays`); native
+functions log `native running (game|harness)` once
+(`ITC_NATIVE_RUNNING`), and the status Merged is work done inside a
+native caller.
 After each plan item, run `itc_recomp/tools/boundary_status.py` and record
 its output in "The boundary over time" at the end of
 `docs/rexglue-removal.md`. Plan steps are done on their
