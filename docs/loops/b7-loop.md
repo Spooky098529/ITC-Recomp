@@ -31,13 +31,11 @@ memory.
   after each change), and listed in the progress file for one review by
   the user before the merge. This relaxes the "show rows and ask first"
   rule for the loop's branch, nowhere else.
-- **Per session:** 3 subsystems or 20 passes, whichever comes first
-  (3 and 10 at first, raised to 5 and 20, then the subsystems back to 3,
-  by the user, 2026-10-22). Then
-  the loop ends itself; the user runs `/clear` and starts it again
-  (nothing is lost: it picks up from the progress file).
-- **In all:** 3 subsystems a run (5 until the user lowered it, 2026-10-22), then the loop stops for the user's
-  review.
+- **Limit:** 3 subsystems a run, then the loop stops for the user's
+  review. No limit a session (the user's call, 2026-10-22; before, a
+  session ended itself after a few subsystems or passes). If the user
+  ends a session early, `/clear` and starting the loop again picks up
+  from the progress file.
 
 ## The cycle
 
@@ -370,7 +368,7 @@ file, when:
 - an agent left work uncommitted, or a commit doesn't build;
 - a report's `stop:` isn't `none`;
 - a map fails its check, or `leads.md` has nothing the loop can take;
-- the session's or the total limit is reached;
+- the run's limit is reached;
 - the tree has changes the loop didn't make, or isn't on the run's branch.
 
 Whatever the reason, before ending, the lead also brings the run's
@@ -399,8 +397,8 @@ can read it whole. A run's first pass finds the previous run's file
 stopped: it starts it afresh (the old one is in its run's summary file and
 in git):
 
-- **Now:** the subsystem, the step, the agent running, this session's
-  pass and subsystem counts.
+- **Now:** the subsystem, the step, the agent running, the run's
+  subsystem count.
 - **Done:** one line a subsystem (file, groups made native, flags,
   commits), newest first.
 - **Rows to review:** the function files added or changed, for the user.
