@@ -8,7 +8,7 @@
 ITC_FLAG_STRING(run_harnesses, "", "ITC",
                 "Run harnesses comparing native functions with the recompiled ones, once at "
                 "the first input update: \"all\" or a comma-separated list "
-                "(object_attributes, time, clock, strings, last_error, gamma, start_up, user, xmp, network, notify, profile, saves, file_class, movie_files, xma, sprites, billboards, command_list, c_runtime, math, ui_movies, ui_movies_game, race_overlays, vehicle_accessors, matrix_math, car_physics, collision, heap, c_runtime_heap)");
+                "(object_attributes, time, clock, strings, last_error, gamma, start_up, user, xmp, network, notify, profile, saves, file_class, movie_files, xma, sprites, billboards, command_list, c_runtime, math, ui_movies, ui_movies_game, race_overlays, vehicle_accessors, matrix_math, car_physics, collision, collision_world, heap, c_runtime_heap)");
 
 namespace harness {
 
@@ -111,6 +111,7 @@ void RunRequested(PPCContext& ctx, uint8_t* base) {
       {"matrix_math", MatrixMath},
       {"car_physics", CarPhysics},
       {"collision", Collision},
+      {"collision_world", CollisionWorld},
       {"heap", Heap},
       {"c_runtime_heap", CRuntimeHeap},
   };

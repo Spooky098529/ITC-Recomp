@@ -43,6 +43,10 @@ uint32_t AllocPages(uint32_t size, uint32_t alignment);
 // VirtualFree (sub_82295330) with MEM_RELEASE: false (logged once) for an
 // address the layer didn't give.
 bool FreePages(uint32_t address);
+// Whether `address` is pages the layer gave (VirtualFree frees it), with
+// nothing logged: for native callers and harnesses checking before they
+// free.
+bool IsPages(uint32_t address);
 // Whether `address` is inside the layer's range (false before the first
 // allocation).
 bool InRange(uint32_t address);

@@ -119,6 +119,7 @@ void VehicleAccessors(Context& h);
 void MatrixMath(Context& h);
 void CarPhysics(Context& h);
 void Collision(Context& h);
+void CollisionWorld(Context& h);
 void Heap(Context& h);
 void CRuntimeHeap(Context& h);
 
