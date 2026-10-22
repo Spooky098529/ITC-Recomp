@@ -72,4 +72,52 @@ void RigidBodySetInertia(uint8_t* base, uint32_t body, uint32_t inertia, uint32_
 // `frame`: 144 bytes.
 uint32_t RigidBodyApplyImpulses(uint8_t* base, uint32_t body, double dt, uint32_t frame);
 
+// RigidBody::Integrate (sub_820B7658): nothing when fixed. The torque +128
+// x dt into the angular momentum +400 (damped by 1 - +384 dt when +384 >
+// 0.0), +128 = zero, UpdateAngularVelocity; with a spin, the orientation
+// turned by it over dt (Quaternion::FromAxisAngle and Multiply,
+// SetOrientation, UpdateOrientation); the gravity +496 into the force +64,
+// that x dt into the momentum +176 (damped by 1 - +164 dt), +64 = zero,
+// UpdateVelocity; the origin of mass +272 += the velocity +32 x dt,
+// UpdateOrigin. Returns what the original leaves in r3 (the body when
+// fixed, else +336). `frame`: 208 bytes.
+uint32_t RigidBodyIntegrate(uint8_t* base, uint32_t body, double dt, uint32_t frame);
+// RigidBody::Reset (sub_820B77D0): the 528 bytes cleared (memset), then the
+// defaults: the speed and spin caps (+48, +112) the float at 0x82002A90, a
+// mass of 1.0, gravity (0, [0x82002A8C], 0), the inertia's diagonal the
+// float at 0x82002A10, the identity orientation (0x826381B0), no velocity,
+// spin or center of mass offset; words +12 and +516 = 0. `frame`: 176
+// bytes.
+void RigidBodyReset(uint8_t* base, uint32_t body, uint32_t frame);
+// RigidBody::RigidBody (sub_820B7928): the w of its vectors = 0.0, then
+// Reset. `frame`: 96 bytes.
+void RigidBodyConstruct(uint8_t* base, uint32_t body, uint32_t frame);
+// RigidBody::EffectiveMassAt (sub_820B6A38): out (3 floats) = for each
+// world axis e, 1 / (e x inverse mass + ((r x e) inverse inertia +368 to
+// +376) x r) . e), r = point - the center of mass +16. Returns the last dot
+// product (the original's f1). `frame`: 272 bytes.
+double RigidBodyEffectiveMassAt(uint8_t* base, uint32_t body, uint32_t out, uint32_t point,
+                                uint32_t frame);
+// RigidBody::ContactImpulse (sub_820B6C78): vn = -(the velocity at the
+// point . the normal); 0.0 when vn < 0.0; else +512 = 1 / (inverse mass +
+// ((I^-1 (r x n)) x r) . n) and vn x that. `r3` (when given) gets what the
+// original leaves there (a temporary of its frame). `frame`: 208 bytes.
+double RigidBodyContactImpulse(uint8_t* base, uint32_t body, uint32_t point, uint32_t normal,
+                               uint32_t frame, uint32_t* r3);
+// RigidBody::FrictionImpulse (sub_820B6D48): out = the sliding direction at
+// the point (the velocity's part across the normal, normalized) x min(f1 x
+// f2, ContactImpulse along it); the zero vector when the velocity is zero
+// or its part across the normal has a squared length at most the float at
+// 0x8200222C. `frame`: 192 bytes.
+void RigidBodyFrictionImpulse(uint8_t* base, uint32_t out, uint32_t body, uint32_t point,
+                              uint32_t normal, double f1, double f2, uint32_t frame);
+// RigidBody::ContactImpulseWith (sub_820B72C8): as ContactImpulse for body
+// a against body b (the relative velocity, both bodies' inverse masses and
+// angular terms; a's +512 set). False, with nothing done, when either body
+// is fixed (byte +0 = 1): the original then reads its own stack's leftovers
+// for that body's term, so it runs. Otherwise the impulse in `f1`, and in
+// `r3` what the original leaves there. `frame`: 272 bytes.
+bool RigidBodyContactImpulseWith(uint8_t* base, uint32_t a, uint32_t point, uint32_t normal,
+                                 uint32_t b, uint32_t frame, double* f1, uint32_t* r3);
+
 }  // namespace car_physics

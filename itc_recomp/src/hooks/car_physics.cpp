@@ -10,8 +10,8 @@
 #include "car_physics/car_physics.h"
 
 ITC_FLAG_BOOL(native_car_physics, true, "ITC",
-              "Run the car physics (docs/functions/car-physics.md: the rigid body's updates and "
-              "setters, sub_820B6710 to sub_820B75B8) natively instead of through the translated "
+              "Run the car physics (docs/functions/car-physics.md: the rigid body, sub_820B6A38 "
+              "to sub_820B7928) natively instead of through the translated "
               "code (the same words, bit for bit; checked by --run_harnesses=car_physics)");
 
 // Defines an adapter: `body` uses `ctx` and `base`. Flush-to-zero off for
@@ -82,3 +82,55 @@ ITC_CAR_PHYSICS_VECTOR(820B7280,
 // UpdateVelocity leaves it.
 ITC_CAR_PHYSICS(820B75B8, ctx.r3.u64 = RigidBodyApplyImpulses(base, ctx.r3.u32, ctx.f1.f64,
                                                               ctx.r1.u32 - 144))
+// f1 = dt; r3 comes back as the body when it's fixed, else +336.
+ITC_CAR_PHYSICS(820B7658, ctx.r3.u64 = RigidBodyIntegrate(base, ctx.r3.u32, ctx.f1.f64,
+                                                          ctx.r1.u32 - 208))
+// r3 comes back as +96 (SetAngularVelocity's).
+ITC_CAR_PHYSICS(820B77D0, RigidBodyReset(base, ctx.r3.u32, ctx.r1.u32 - 176);
+                ctx.r3.u64 = ctx.r3.u32 + 96)
+// r3 comes back as the body.
+ITC_CAR_PHYSICS(820B7928, RigidBodyConstruct(base, ctx.r3.u32, ctx.r1.u32 - 96))
+// r4 = out (3 floats), r5 = the point; f1 = the last dot product, r3 its
+// temporary (the frame's +192).
+ITC_CAR_PHYSICS(820B6A38,
+                ctx.f1.f64 = RigidBodyEffectiveMassAt(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                                      ctx.r1.u32 - 272);
+                ctx.r3.u64 = ctx.r1.u32 - 272 + 192)
+// r4 = the point, r5 = the normal; f1 = the impulse.
+extern "C" REX_FUNC(sub_820B6C78) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_car_physics)) {
+    __imp__sub_820B6C78(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  uint32_t r3 = 0;
+  ctx.f1.f64 = RigidBodyContactImpulse(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                       ctx.r1.u32 - 208, &r3);
+  ctx.r3.u64 = r3;
+}
+// r3 = out, r4 = the body, r5 = the point, r6 = the normal, f1 x f2 = the
+// limit; r3 comes back as out.
+ITC_CAR_PHYSICS(820B6D48, RigidBodyFrictionImpulse(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                                   ctx.r6.u32, ctx.f1.f64, ctx.f2.f64,
+                                                   ctx.r1.u32 - 192))
+// r3 = body a, r4 = the point, r5 = the normal, r6 = body b; f1 = the
+// impulse. With a fixed body (whose term the original reads from its
+// stack's leftovers), the original.
+extern "C" REX_FUNC(sub_820B72C8) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_car_physics)) {
+    __imp__sub_820B72C8(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  double f1 = 0.0;
+  uint32_t r3 = 0;
+  if (!RigidBodyContactImpulseWith(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
+                                   ctx.r1.u32 - 272, &f1, &r3)) {
+    __imp__sub_820B72C8(ctx, base);
+    return;
+  }
+  ctx.f1.f64 = f1;
+  ctx.r3.u64 = r3;
+}

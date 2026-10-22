@@ -5,13 +5,14 @@
 // originals run with the native flags of their callees off (the vector
 // library, the matrix math, the vehicle accessors, the C runtime's math and
 // the car physics), so the whole chain is the recompiled code's. Three
-// groups, as the matrix math's harness: numbers only (infinities, denormals
-// and signed zeros among them), finite numbers with one NaN word put in the
-// block or f1, and NaNs anywhere (expected to differ: where two NaNs meet
-// in one operation, which comes out depends on the order the compiler gave
-// the operands, in the translated code as in ours, and the translated
-// code, built without -ffp-model=strict, may also flip a NaN's sign where
-// LLVM rewrites a subtraction; the game's bodies hold no NaNs).
+// groups, as the matrix math's harness: numbers only (below 10^6 in size,
+// denormals and signed zeros among them, so no infinities and from them no
+// NaNs are made), those numbers with one NaN word put in the block or f1,
+// and anything anywhere, NaNs and infinities too (expected to differ: where
+// two NaNs meet in one operation, which comes out depends on the order the
+// compiler gave the operands, in the translated code as in ours, and the
+// translated code, built without -ffp-model=strict, may also flip a NaN's
+// sign where LLVM rewrites a subtraction; the game's bodies hold no NaNs).
 
 #include "harness.h"
 
@@ -80,6 +81,36 @@ ITC_NATIVE_STEP_VECTOR(NativeSetInertia,
 ITC_NATIVE_STEP(NativeApplyImpulses,
                 ctx.r3.u64 = cp::RigidBodyApplyImpulses(base, ctx.r3.u32, ctx.f1.f64,
                                                         ctx.r1.u32 - 144))
+ITC_NATIVE_STEP(NativeIntegrate,
+                ctx.r3.u64 = cp::RigidBodyIntegrate(base, ctx.r3.u32, ctx.f1.f64,
+                                                    ctx.r1.u32 - 208))
+ITC_NATIVE_STEP(NativeReset, cp::RigidBodyReset(base, ctx.r3.u32, ctx.r1.u32 - 176);
+                ctx.r3.u64 = ctx.r3.u32 + 96)
+ITC_NATIVE_STEP(NativeConstruct, cp::RigidBodyConstruct(base, ctx.r3.u32, ctx.r1.u32 - 96))
+ITC_NATIVE_STEP(NativeEffectiveMassAt,
+                ctx.f1.f64 = cp::RigidBodyEffectiveMassAt(base, ctx.r3.u32, ctx.r4.u32,
+                                                          ctx.r5.u32, ctx.r1.u32 - 272);
+                ctx.r3.u64 = ctx.r1.u32 - 272 + 192)
+ITC_NATIVE_STEP(NativeContactImpulse, uint32_t r3 = 0;
+                ctx.f1.f64 = cp::RigidBodyContactImpulse(base, ctx.r3.u32, ctx.r4.u32,
+                                                         ctx.r5.u32, ctx.r1.u32 - 208, &r3);
+                ctx.r3.u64 = r3)
+ITC_NATIVE_STEP(NativeFrictionImpulse,
+                cp::RigidBodyFrictionImpulse(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
+                                             ctx.f1.f64, ctx.f2.f64, ctx.r1.u32 - 192))
+// With a fixed body, the original (as the adapter).
+void NativeContactImpulseWith(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  double f1 = 0.0;
+  uint32_t r3 = 0;
+  if (!cp::RigidBodyContactImpulseWith(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
+                                       ctx.r1.u32 - 272, &f1, &r3)) {
+    __imp__sub_820B72C8(ctx, base);
+    return;
+  }
+  ctx.f1.f64 = f1;
+  ctx.r3.u64 = r3;
+}
 
 // Runs the recompiled version with the native flags off, so the functions
 // it calls that are ours run the originals too.
@@ -120,21 +151,14 @@ uint32_t FloatWord(Random& r) {
   }
 }
 
+// Numbers below 10^6 in size (denormals and signed zeros among them), so
+// no infinity is made from them, and from infinities NaNs: two NaNs made so
+// would meet (as in the third group).
 uint32_t NumberWord(Random& r) {
   uint32_t word;
   do {
     word = FloatWord(r);
-  } while (std::isnan(std::bit_cast<float>(word)));
-  return word;
-}
-
-// Finite numbers only, so no NaN is made from them (inf - inf, 0 x inf)
-// to meet the one NaN put in.
-uint32_t FiniteWord(Random& r) {
-  uint32_t word;
-  do {
-    word = FloatWord(r);
-  } while (!std::isfinite(std::bit_cast<float>(word)));
+  } while (!(std::fabs(std::bit_cast<float>(word)) < 1e6f));
   return word;
 }
 
@@ -146,9 +170,20 @@ Random Seeded(uint64_t seed) {
   return r;
 }
 
-// The block: the body at +0 (528 bytes), the vector argument at +0x300.
-constexpr uint32_t kBlockBytes = 0x400;
-constexpr uint32_t kArgument = 0x300;
+// The block: the body at +0 (528 bytes), the vector arguments at +0x300
+// (a point or vector) and +0x340 (a normal), an output at +0x380, a second
+// body at +0x400.
+constexpr uint32_t kBlockBytes = 0x700;
+constexpr uint32_t kArgument = 0x300, kNormal = 0x340, kOut = 0x380, kBodyB = 0x400;
+
+// The registers each function takes.
+enum Shape {
+  kBodyR4,        // r3 = the body, r4 = a vector, f1
+  kMassAt,        // r3 = the body, r4 = out, r5 = the point
+  kImpulse,       // r3 = the body, r4 = the point, r5 = the normal
+  kFriction,      // r3 = out, r4 = the body, r5 = the point, r6 = the normal, f1, f2
+  kImpulseWith,   // r3 = body a, r4 = the point, r5 = the normal, r6 = body b
+};
 
 }  // namespace
 
@@ -159,6 +194,11 @@ void CarPhysics(Context& h) {
     const char* name;
     GuestFunction recompiled, native;
     bool compare_f1;
+    Shape shape = kBodyR4;
+    // The impulses: f1 = +512 x vn, vn the negated dot product. One NaN put
+    // in can reach both factors, once negated: where it meets itself so,
+    // which comes out depends on the operand order (expected to differ).
+    bool impulse = false;
   } functions[] = {
       {"RigidBody::UpdateOrigin (sub_820B6E70)", Original<__imp__sub_820B6E70>,
        NativeUpdateOrigin, false},
@@ -182,19 +222,35 @@ void CarPhysics(Context& h) {
        false},
       {"RigidBody::ApplyImpulses (sub_820B75B8)", Original<__imp__sub_820B75B8>,
        NativeApplyImpulses, false},
+      {"RigidBody::Integrate (sub_820B7658)", Original<__imp__sub_820B7658>, NativeIntegrate,
+       false},
+      {"RigidBody::Reset (sub_820B77D0)", Original<__imp__sub_820B77D0>, NativeReset, false},
+      {"RigidBody::RigidBody (sub_820B7928)", Original<__imp__sub_820B7928>, NativeConstruct,
+       false},
+      {"RigidBody::EffectiveMassAt (sub_820B6A38)", Original<__imp__sub_820B6A38>,
+       NativeEffectiveMassAt, true, kMassAt},
+      {"RigidBody::ContactImpulse (sub_820B6C78)", Original<__imp__sub_820B6C78>,
+       NativeContactImpulse, true, kImpulse, true},
+      {"RigidBody::FrictionImpulse (sub_820B6D48)", Original<__imp__sub_820B6D48>,
+       NativeFrictionImpulse, false, kFriction},
+      {"RigidBody::ContactImpulseWith (sub_820B72C8)", Original<__imp__sub_820B72C8>,
+       NativeContactImpulseWith, true, kImpulseWith, true},
   };
   enum Group { kNumbers, kOneNaN, kNaNs };
-  const char* const kGroupNames[] = {"", ", one NaN", ", NaNs anywhere (expected to differ)"};
+  const char* const kGroupNames[] = {"", ", one NaN", ", NaNs and infinities anywhere (expected to differ)"};
   constexpr uint32_t kNaNWords[] = {0x7FC00000, 0x7F800001, 0xFFC00001, 0xFF800001};
   for (const auto& f : functions) {
     for (Group group : {kNumbers, kOneNaN, kNaNs}) {
       Results results(std::string(f.name) + kGroupNames[group]);
+      Results negated(std::string(f.name) +
+                      ", one NaN meeting its own negation (expected to differ)");
       for (uint64_t seed = 0; seed < 200; seed++) {
         Random fill = Seeded(seed * 11 + 5 * uint64_t(group) + 1);
         auto word = [group](Random& r) {
-          return group == kNaNs ? FloatWord(r) : group == kOneNaN ? FiniteWord(r) : NumberWord(r);
+          return group == kNaNs ? FloatWord(r) : NumberWord(r);
         };
         const double f1 = double(std::bit_cast<float>(word(fill)));
+        const double f2 = double(std::bit_cast<float>(word(fill)));
         // The one NaN: in the block, or (one case in ten) in f1.
         const uint32_t nan_word = kNaNWords[fill.Below(std::size(kNaNWords))];
         const uint32_t nan_at = fill.Below(kBlockBytes / 4 + kBlockBytes / 40);
@@ -213,6 +269,7 @@ void CarPhysics(Context& h) {
           }
           if (movable) {
             guest::StoreU32(h.base, block, 0);
+            guest::StoreU32(h.base, block + kBodyB, 0);
           }
           for (uint32_t i = 0; still && i < 16; i += 4) {
             guest::StoreU32(h.base, block + 176 + i, 0);
@@ -230,11 +287,38 @@ void CarPhysics(Context& h) {
           }
           PPCContext t = CallContext(h);
           t.fpscr.disableFlushModeUnconditional();
-          t.r3.u64 = block;
-          t.r4.u64 = block + kArgument;
+          switch (f.shape) {
+            case kBodyR4:
+              t.r3.u64 = block;
+              t.r4.u64 = block + kArgument;
+              break;
+            case kMassAt:
+              t.r3.u64 = block;
+              t.r4.u64 = block + kOut;
+              t.r5.u64 = block + kArgument;
+              break;
+            case kImpulse:
+              t.r3.u64 = block;
+              t.r4.u64 = block + kArgument;
+              t.r5.u64 = block + kNormal;
+              break;
+            case kFriction:
+              t.r3.u64 = block + kOut;
+              t.r4.u64 = block;
+              t.r5.u64 = block + kArgument;
+              t.r6.u64 = block + kNormal;
+              break;
+            case kImpulseWith:
+              t.r3.u64 = block;
+              t.r4.u64 = block + kArgument;
+              t.r5.u64 = block + kNormal;
+              t.r6.u64 = block + kBodyB;
+              break;
+          }
           t.f1.f64 = group == kOneNaN && nan_at >= kBlockBytes / 4
                          ? double(std::bit_cast<float>(nan_word))
                          : f1;
+          t.f2.f64 = f2;
           (v == 0 ? f.recompiled : f.native)(t, h.base);
           result[v] = Read(h.base, block, kBlockBytes);
           for (int i = 0; i < 4; i++) {
@@ -244,10 +328,31 @@ void CarPhysics(Context& h) {
             result[v].push_back(uint8_t(t.f1.u64 >> (56 - 8 * i)));
           }
         }
-        results.Check(result[0], result[1],
+        // The impulse's two factors both NaN (+512 and f1, the
+        // recompiled run's).
+        auto nan_at_word = [&](size_t at) {
+          uint32_t w = 0;
+          for (int i = 0; i < 4; i++) {
+            w = (w << 8) | result[0][at + i];
+          }
+          return std::isnan(std::bit_cast<float>(w));
+        };
+        const bool meets_negation =
+            f.impulse && group == kOneNaN && nan_at_word(512) &&
+            std::isnan(std::bit_cast<double>([&] {
+              uint64_t w = 0;
+              for (int i = 0; i < 8; i++) {
+                w = (w << 8) | result[0][kBlockBytes + 4 + i];
+              }
+              return w;
+            }()));
+        (meets_negation ? negated : results).Check(result[0], result[1],
                       fmt::format("seed {} f1 {:016X}", seed, std::bit_cast<uint64_t>(f1)));
       }
       results.Report();
+      if (f.impulse && group == kOneNaN) {
+        negated.Report();
+      }
     }
   }
 }
