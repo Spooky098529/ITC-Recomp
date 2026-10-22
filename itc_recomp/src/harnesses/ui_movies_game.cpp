@@ -958,6 +958,96 @@ void MoveCases(Context& h, const Block& block) {
   }
 }
 
+// The starts (UiMovie::Play and PlayNamed): a live scene whose children 0
+// to 2 are sub-scenes and whose animations (and theirs) are records with
+// odd times (+12), named animations' entries pointing at them, random lists
+// (the looping one's keys small, so some starts find theirs there).
+void PlayCases(Context& h, const Block& block) {
+  struct Start {
+    const char* name;
+    GuestFunction recompiled, native;
+    bool named;
+  };
+  const Start starts[] = {
+      {"UiMovie::Play (sub_8211D978)", __imp__sub_8211D978, sub_8211D978, false},
+      {"UiMovie::PlayNamed (sub_8211DAC8)", __imp__sub_8211DAC8, sub_8211DAC8, true},
+  };
+  const uint32_t movie = block.at;
+  const uint32_t scene = block.at + 0xA100;
+  const uint32_t sub = block.at + 0xA200;        // three of 0x100 bytes
+  const uint32_t animations = block.at + 0xA500;  // eight of 32 bytes
+  for (const Start& f : starts) {
+    Results results(f.name);
+    for (int i = 0; i < 400; i++) {
+      const ListSpec queue(h.random, h.random.Below(33));
+      const ListSpec looping(h.random, h.random.Below(33));
+      uint32_t times[8], named_words[8], links[3 * 8 + 8];
+      for (uint32_t& w : times) {
+        // Signaling NaNs often: the time's word is copied through a float.
+        w = h.random.Below(6) == 0 ? (h.random.Below(2) ? 0x7F800001u : 0xFFA00001u)
+                                   : RandomWord(h.random);
+      }
+      for (uint32_t& w : named_words) {
+        w = uint32_t(h.random.Next());
+      }
+      for (uint32_t& w : links) {
+        w = animations + 32 * h.random.Below(8);
+      }
+      uint32_t r4 = h.random.Below(5) == 0 ? 0xFFFFFFFFu : h.random.Below(f.named ? 6 : 3);
+      if (f.named && h.random.Below(10) == 0) {
+        r4 = 0x80000000u | uint32_t(h.random.Next());
+      }
+      const uint32_t r5 = h.random.Below(4);
+      uint32_t flags[4];
+      for (uint32_t& w : flags) {
+        w = h.random.Below(2) == 0 ? 0 : uint32_t(h.random.Next());
+      }
+      Compare(h, results, block.at, 0xA600,
+              [&] {
+                queue.Write(h.base, movie + 0x90B4);
+                looping.Write(h.base, movie + 0x9640);
+                guest::StoreU32(h.base, movie + 16, scene);
+                guest::StoreU32(h.base, scene + 108, 0);
+                guest::StoreU32(h.base, scene + 116, 8);
+                for (uint32_t k = 0; k < 3; k++) {
+                  guest::StoreU32(h.base, scene + 128 + 8 * k, sub + 0x100 * k);
+                  guest::StoreU32(h.base, sub + 0x100 * k + 116, 0);
+                  for (uint32_t j = 0; j < 8; j++) {
+                    guest::StoreU32(h.base, sub + 0x100 * k + 128 + 8 * j, links[8 * k + j]);
+                  }
+                }
+                for (uint32_t j = 0; j < 8; j++) {
+                  guest::StoreU32(h.base, scene + 128 + 8 * (8 + j), links[24 + j]);
+                  guest::StoreU32(h.base, animations + 32 * j + 12, times[j]);
+                  guest::StoreU32(h.base, movie + 176 + 36 * j + 28, named_words[j]);
+                  guest::StoreU32(h.base, movie + 176 + 36 * j + 32, animations + 32 * j);
+                }
+              },
+              [&](PPCContext& t) {
+                t.r3.u64 = movie;
+                t.r4.u64 = r4;
+                const uint32_t* args = flags;
+                if (f.named) {
+                  t.r5.u64 = args[0];
+                  t.r6.u64 = args[1];
+                  t.r7.u64 = args[2];
+                  t.r8.u64 = args[3];
+                } else {
+                  t.r5.u64 = r5;
+                  t.r6.u64 = args[0];
+                  t.r7.u64 = args[1];
+                  t.r8.u64 = args[2];
+                  t.r9.u64 = args[3];
+                }
+              },
+              f.recompiled, f.native,
+              fmt::format("case {}: {} and {} used, r4 {:X} r5 {}", i, queue.used, looping.used,
+                          r4, r5));
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void UiMoviesGame(Context& h) {
@@ -981,6 +1071,7 @@ void UiMoviesGame(Context& h) {
   LayersCases(h, block);
   TextCases(h, block);
   MoveCases(h, block);
+  PlayCases(h, block);
   memory->SystemHeapFree(block.at);
 }
 

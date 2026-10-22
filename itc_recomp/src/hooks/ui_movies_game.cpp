@@ -35,7 +35,8 @@ ITC_FLAG_BOOL(native_ui_movies_game, true, "ITC",
               "sub_8211B9B8 and sub_8211B940, and UiMovies::IsLoaded sub_8211BE98; the moves "
               "between the animation lists UiMovie::MoveAnimation sub_8211DBE0, "
               "UiMovie::MoveNamedAnimation sub_8211DCE8, UiMovie::Loop sub_8211DDD8, "
-              "UiMovie::LoopNamed sub_8211DDE0 and UiMovie::LoopLast sub_8211DDE8 (these "
+              "UiMovie::LoopNamed sub_8211DDE0 and UiMovie::LoopLast sub_8211DDE8, and the "
+              "starts UiMovie::Play sub_8211D978 and UiMovie::PlayNamed sub_8211DAC8 (these "
               "without --log_pause_movie) "
               "(same results; checked by --run_harnesses=ui_movies_game)");
 
@@ -451,6 +452,18 @@ void Insert(PPCContext& ctx, uint8_t* base) {
 void RemoveAt(PPCContext& ctx, uint8_t* base) {
   NATIVE_OR_ORIGINAL(8211B080);
   ui_movies::RemoveAt(base, ctx.r3.u32, ctx.r4.u32);
+}
+
+void Play(PPCContext& ctx, uint8_t* base) {
+  NATIVE_UNWATCHED_OR_ORIGINAL(8211D978);
+  ctx.r3.u64 = ui_movies::Play(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32,
+                               ctx.r8.u32, ctx.r9.u32);
+}
+
+void PlayNamed(PPCContext& ctx, uint8_t* base) {
+  NATIVE_UNWATCHED_OR_ORIGINAL(8211DAC8);
+  ctx.r3.u64 = ui_movies::PlayNamed(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
+                                    ctx.r7.u32, ctx.r8.u32);
 }
 
 void Loop(PPCContext& ctx, uint8_t* base) {

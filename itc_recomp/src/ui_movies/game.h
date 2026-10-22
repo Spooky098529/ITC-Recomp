@@ -149,6 +149,26 @@ Moved MoveNamedAnimation(uint8_t* base, uint32_t movie, uint32_t index, bool to_
 // looping list, by name when its +8 isn't -1.
 Moved LoopLast(uint8_t* base, uint32_t movie);
 
+// sub_8211D978 (UiMovie::Play): animation `index` of the live scene (or of
+// its sub-scene `sub_scene` when that isn't -1; SceneAnimation) started:
+// unless the looping list has a slot with its +4 `sub_scene` and +0
+// `index`, a slot {index, sub_scene, -1, the scene, the animation, the
+// time, chained, reversed, w32, paused} appended to the queue and copied to
+// the last started (+0x9FD8). The time is 0.0 (the float at 0x82000A34),
+// or the animation's length (+12) when `reversed` isn't 0. Returns the r3
+// the original leaves: the animation when the looping list had it, else
+// the last started slot's address.
+uint32_t Play(uint8_t* base, uint32_t movie, uint32_t sub_scene, uint32_t index,
+              uint32_t chained, uint32_t reversed, uint32_t w32, uint32_t paused);
+// sub_8211DAC8 (UiMovie::PlayNamed): the same for named animation `named`
+// (nothing for a negative one; the looping list's +8 tested): the slot {-1,
+// -1, named, then the entry's +28 and +32 (movie + 176 + 36 named), the
+// time from the latter's +12, ...}. Returns the r3 the original leaves: the
+// movie for a negative `named`, the matching slot's position in the
+// looping list, else the last started slot's address.
+uint32_t PlayNamed(uint8_t* base, uint32_t movie, uint32_t named, uint32_t chained,
+                   uint32_t reversed, uint32_t w32, uint32_t paused);
+
 // The maps of {key, value} word pairs. A movie's texts (+0x9BCC): 128 pairs
 // in place, the count at +1024. The movie table (0x826C5CCC) and the like:
 // +0 the pairs, +4 the capacity, +8 the count.

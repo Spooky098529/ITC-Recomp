@@ -21,4 +21,11 @@ void RemoveAt(PPCContext& ctx, uint8_t* base);
 // (src/debug/pause_movie_log.cpp) logs it for --log_pause_movie.
 void Loop(PPCContext& ctx, uint8_t* base);
 
+// UiMovie::Play (sub_8211D978; r3 = movie, r4 = a sub-scene's index or -1,
+// r5 = an animation's index, r6..r9 the slot's +24..+36) and
+// UiMovie::PlayNamed (sub_8211DAC8; r4 = a named animation's index, r5..r8
+// the slot's +24..+36), as Loop: their overrides log them.
+void Play(PPCContext& ctx, uint8_t* base);
+void PlayNamed(PPCContext& ctx, uint8_t* base);
+
 }  // namespace ui_movies_game_hooks

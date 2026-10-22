@@ -335,6 +335,68 @@ Moved MoveNamedAnimation(uint8_t* base, uint32_t movie, uint32_t index, bool to_
   return Move(base, movie, to_looping, [&](const Slot& slot) { return slot[2] == index; });
 }
 
+namespace {
+
+// The position of the first slot of `list` that `match` accepts (by its
+// words), walked as FindSlot does.
+template <typename Match>
+std::optional<uint32_t> FindPosition(uint8_t* base, uint32_t list, Match match) {
+  const uint32_t count = uint32_t(int32_t(int16_t(guest::LoadU16(base, list + 136))));
+  for (uint32_t i = 0; i < count; i++) {
+    if (match(SlotOf(base, list, LinkAt(base, list, i)))) {
+      return i;
+    }
+  }
+  return std::nullopt;
+}
+
+// The start shared by Play and PlayNamed: the slot appended to the queue
+// and copied to the last started. Returns the latter's address. The time's
+// word is copied as it is: the original's lfs and stfs leave it so, a
+// signaling NaN too (as the recompiled code does, checked by the harness).
+uint32_t Start(uint8_t* base, uint32_t movie, Slot slot, uint32_t animation) {
+  slot[5] = guest::LoadU32(base, slot[7] != 0 ? animation + 12 : kZero);
+  Append(base, movie + kMovieQueue, slot);
+  StoreSlot(base, movie + kMovieLastStarted, slot);
+  return movie + kMovieLastStarted;
+}
+}  // namespace
+
+uint32_t Play(uint8_t* base, uint32_t movie, uint32_t sub_scene, uint32_t index,
+              uint32_t chained, uint32_t reversed, uint32_t w32, uint32_t paused) {
+  uint32_t scene = guest::LoadU32(base, movie + kMovieLive);
+  if (sub_scene != 0xFFFFFFFFu) {
+    scene = Child(base, scene, sub_scene);
+  }
+  const uint32_t animation = SceneAnimation(base, scene, index);
+  if (FindPosition(base, movie + kMovieLooping, [&](uint32_t slot) {
+        return guest::LoadU32(base, slot + 4) == sub_scene && guest::LoadU32(base, slot) == index;
+      })) {
+    return animation;
+  }
+  return Start(base, movie,
+               {index, sub_scene, 0xFFFFFFFFu, scene, animation, 0, chained, reversed, w32, paused},
+               animation);
+}
+
+uint32_t PlayNamed(uint8_t* base, uint32_t movie, uint32_t named, uint32_t chained,
+                   uint32_t reversed, uint32_t w32, uint32_t paused) {
+  if (int32_t(named) < 0) {
+    return movie;
+  }
+  if (const std::optional<uint32_t> i = FindPosition(base, movie + kMovieLooping, [&](uint32_t slot) {
+        return guest::LoadU32(base, slot + 8) == named;
+      })) {
+    return *i;
+  }
+  const uint32_t entry = movie + 36 * named;
+  const uint32_t animation = guest::LoadU32(base, entry + 208);
+  return Start(base, movie,
+               {0xFFFFFFFFu, 0xFFFFFFFFu, named, guest::LoadU32(base, entry + 204), animation, 0,
+                chained, reversed, w32, paused},
+               animation);
+}
+
 Moved LoopLast(uint8_t* base, uint32_t movie) {
   const uint32_t named = guest::LoadU32(base, movie + kMovieLastStarted + 8);
   if (named != 0xFFFFFFFFu) {

@@ -571,11 +571,13 @@ extern "C" REX_FUNC(sub_8220D040) {
 // is 0) starts the movie's animations: sub_8211DE38 and sub_8211D978 (r3 =
 // movie, r4 = 8, r5 = item + 4: the items'), sub_8211DDD8 and sub_8211DF20
 // (r4 = 8, 20, 19), and sub_8211DAC8 (r4 = 20 after a move down, 19 up),
-// then updates the movie once (from 8220DF24).
+// then updates the movie once (from 8220DF24). The work of sub_8211DAC8 and
+// sub_8211D978 (natively with --native_ui_movies_game) is in
+// src/hooks/ui_movies_game.cpp; logged, the originals run.
 extern "C" REX_FUNC(sub_8211DAC8) {
   REX_FUNC_PROLOGUE();
   if (!ITC_FLAG(log_pause_movie)) {
-    __imp__sub_8211DAC8(ctx, base);
+    ui_movies_game_hooks::PlayNamed(ctx, base);
     return;
   }
   debug::LogCall("8211DAC8 start animation", ctx);
@@ -585,7 +587,7 @@ extern "C" REX_FUNC(sub_8211DAC8) {
 extern "C" REX_FUNC(sub_8211D978) {
   REX_FUNC_PROLOGUE();
   if (!ITC_FLAG(log_pause_movie)) {
-    __imp__sub_8211D978(ctx, base);
+    ui_movies_game_hooks::Play(ctx, base);
     return;
   }
   debug::LogCall("8211D978 start item animation", ctx);
