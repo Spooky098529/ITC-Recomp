@@ -23,7 +23,12 @@ ITC_FLAG_BOOL(native_collision, true, "ITC",
               "next check time, sub_820BBB20; the impacts, sub_820BE490, sub_820BEBF0, "
               "sub_820BECA0, sub_820BF038, sub_820BCE80; the query and its contact, sub_820BD1C8, sub_820BC848, sub_820BC908, sub_820BC858) natively "
               "instead of through the translated code (the same words, bit for bit; checked by "
-              "--run_harnesses=collision)");
+              "--run_harnesses=collision). Those reached only from native callers have no "
+              "adapters, and the flag switches their callers: sub_820BA3B0, sub_820BB020, "
+              "sub_820BAB48, sub_820BB688, sub_820B99D0, sub_820BAB20, sub_820BAE78, "
+              "sub_820BA408, sub_820BA5D8, sub_820BD0C8, sub_820BC978, sub_820BCCE8, "
+              "sub_820BB300, sub_820BD280, sub_820BD578, sub_820BE490, sub_820BECA0, "
+              "sub_820BC858");
 
 // Defines an adapter: `body` uses `ctx` and `base`.
 #define ITC_COLLISION(address, body)   \
@@ -67,10 +72,8 @@ ITC_COLLISION(820BA678, ctx.r3.u64 = BoxCacheWord(base, ctx.r3.u32, ctx.r4.u32))
 ITC_COLLISION(820BAA50, BoxCopyCache(base, ctx.r3.u32, ctx.r4.u32))
 ITC_COLLISION(820BAB40, ctx.f1.f64 = ShapeRadius(base, ctx.r3.u32))
 ITC_COLLISION(820BA368, ctx.r3.u64 = BoxLowerCorner(base, ctx.r3.u32, ctx.r4.u32))
-// r5 = the point; r3 comes back as the face's normal.
-ITC_COLLISION(820BA3B0, uint32_t r3 = 0;
-              ctx.f1.f64 = BoxFaceDistance(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, &r3);
-              ctx.r3.u64 = r3)
+// BoxShape::FaceDistance (sub_820BA3B0) has no adapter: its caller in play
+// is native.
 ITC_COLLISION(820B9F00,
               ctx.r3.u64 = BoxFaceDirection(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 208))
 // r4 = the offset; r3 comes back as the box + 48.
@@ -80,27 +83,9 @@ ITC_COLLISION(822BE2C8, ctx.r3.u64 = WordAt8(base, ctx.r3.u32))
 
 // --- The constructors and the placement ---
 
-// r3 comes back as the shape.
-ITC_COLLISION(820BB020, ShapeConstruct(base, ctx.r3.u32, ctx.r1.u32 - 176))
-// r4 = the shape to copy; where the memcpys can't be native, the original.
-extern "C" REX_FUNC(sub_820BAB48) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_collision) || !ShapeCopyConstruct(base, ctx.r3.u32, ctx.r4.u32)) {
-    __imp__sub_820BAB48(ctx, base);
-  }
-}
-extern "C" REX_FUNC(sub_820BB688) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_collision) || !BoxCopyConstruct(base, ctx.r3.u32, ctx.r4.u32)) {
-    __imp__sub_820BB688(ctx, base);
-  }
-}
-// r4 = the min corner, r5 = the max corner; r3 comes back as the box + 96,
-// f1 as the last face's distance.
-ITC_COLLISION(820B99D0,
-              ctx.f1.f64 = BoxSetCorners(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
-                                         ctx.r1.u32 - 224);
-              ctx.r3.u64 = ctx.r3.u32 + 96)
+// Shape::Shape, its copy, BoxShape's copy and SetCorners (sub_820BB020,
+// sub_820BAB48, sub_820BB688, sub_820B99D0) have no adapters: their callers
+// in play are native.
 // r4 = the min corner, r5 = the max corner; r3 comes back as the box.
 ITC_COLLISION(820BB188, BoxConstruct(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32 - 112))
 // Slot 9: r4 = the matrix, r5 = the template; r3 comes back as the box +
@@ -121,16 +106,14 @@ extern "C" REX_FUNC(sub_820B9C40) {
 
 // --- The shape record ---
 
-ITC_COLLISION(820BAB20, ctx.r3.u64 = CollisionShapeCurrentCenter(base, ctx.r3.u32))
+// CollisionShape::CurrentCenter (sub_820BAB20) and UpdateMotion
+// (sub_820BAE78) have no adapters: their callers in play are native.
 ITC_COLLISION(820BAB30, ctx.r3.u64 = CollisionShapePreviousCenter(base, ctx.r3.u32))
 ITC_COLLISION_RECORD(820BACB8, CollisionShapeType(base, ctx.r3.u32, &value))
 ITC_COLLISION_RECORD(820BADF8, CollisionShapePrevious(base, ctx.r3.u32, &value))
 ITC_COLLISION_RECORD(820BAE38, CollisionShapeCurrent(base, ctx.r3.u32, &value))
 
 ITC_COLLISION(820BAC00, CollisionShapeUpdateBounds(base, ctx.r3.u32))
-// r3 comes back as the record + 96.
-ITC_COLLISION(820BAE78, CollisionShapeUpdateMotion(base, ctx.r3.u32, ctx.r1.u32 - 240);
-              ctx.r3.u64 = ctx.r3.u32 + 96)
 // r4 = the matrix. Copies or a template that aren't boxes: the original.
 extern "C" REX_FUNC(sub_820BB758) {
   REX_FUNC_PROLOGUE();
@@ -158,18 +141,11 @@ extern "C" REX_FUNC(sub_820BACD0) {
 
 // --- The box-box separation tests and the pair's next check time ---
 
-// r4 = the block, r5 = box B; r3 comes back as B + 384 (B + 48).
-ITC_COLLISION(820BA408, ctx.r3.u64 = BoxRelativePlacement(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
-ITC_COLLISION(820BA5D8, ctx.r3.u64 = BoxRelativeCenter(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
-ITC_COLLISION(820BD0C8, ctx.r3.u64 = BoxBoxOutcode(base, ctx.r3.u32))
-// r3 comes back as the block + 304.
-ITC_COLLISION(820BC978, BoxBoxBlockCorners(base, ctx.r3.u32, ctx.r1.u32 - 320);
-              ctx.r3.u64 = ctx.r3.u32 + 304)
-// r4 = the offset; r3 comes back as the last corner.
-ITC_COLLISION(820BCCE8, BoxBoxMoveCorners(base, ctx.r3.u32, ctx.r4.u32);
-              ctx.r3.u64 = ctx.r3.u32 + 224)
-ITC_COLLISION(820BB300, ctx.r3.u64 = BoxBoxFaceSeparates(base, ctx.r3.u32, ctx.r4.u32,
-                                                         ctx.r5.u32, ctx.r6.u32))
+// BoxShape::RelativePlacement and RelativeCenter, BoxBox::Outcode,
+// BlockCorners, MoveCorners, FaceSeparates, Separated and
+// SeparatedAfterMove (sub_820BA408, sub_820BA5D8, sub_820BD0C8,
+// sub_820BC978, sub_820BCCE8, sub_820BB300, sub_820BD280, sub_820BD578)
+// have no adapters: their callers in play are native.
 // The query's tests: shapes that aren't boxes run the original.
 #define ITC_COLLISION_TEST(address, call)    \
   extern "C" REX_FUNC(sub_##address) {      \
@@ -187,9 +163,6 @@ ITC_COLLISION(820BB300, ctx.r3.u64 = BoxBoxFaceSeparates(base, ctx.r3.u32, ctx.r
     ctx.r3.u64 = result;                    \
   }
 // r4 = the cache (the pair's +24).
-ITC_COLLISION_TEST(820BD280, BoxBoxSeparated(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 160,
-                                             &result))
-ITC_COLLISION_TEST(820BD578, BoxBoxSeparatedAfterMove(base, ctx.r3.u32, ctx.r1.u32 - 240, &result))
 ITC_COLLISION_TEST(820BD508, QuerySeparated(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 112,
                                             &result))
 ITC_COLLISION_TEST(820BD6E0, QuerySeparatedAfterMove(base, ctx.r3.u32, ctx.r1.u32 - 96, &result))
@@ -200,24 +173,10 @@ ITC_COLLISION(820BBB20, uint32_t r3 = 0;
 
 // --- The impacts ---
 
+// BoxBox::SwapForImpact and CornerImpacts (sub_820BE490, sub_820BECA0)
+// have no adapters: their caller in play is native.
 // r3 comes back as the query + 64.
-ITC_COLLISION(820BE490, ctx.r3.u64 = BoxBoxSwapForImpact(base, ctx.r3.u32))
 ITC_COLLISION(820BEBF0, ctx.r3.u64 = BoxBoxSwapForPushOut(base, ctx.r3.u32))
-// Shapes that aren't boxes: the original.
-extern "C" REX_FUNC(sub_820BECA0) {
-  REX_FUNC_PROLOGUE();
-  uint32_t r3 = 0;
-  if (!ITC_FLAG(native_collision)) {
-    __imp__sub_820BECA0(ctx, base);
-    return;
-  }
-  ctx.fpscr.disableFlushMode();
-  if (!BoxBoxCornerImpacts(base, ctx.r3.u32, &r3)) {
-    __imp__sub_820BECA0(ctx, base);
-    return;
-  }
-  ctx.r3.u64 = r3;
-}
 // Reached through the table 0x82600EB4 (box-box); r3 comes back as the
 // query + 64.
 extern "C" REX_FUNC(sub_820BF038) {
@@ -244,6 +203,5 @@ ITC_COLLISION(820BC848, QuerySetShapes(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32)
 ITC_COLLISION(820BC908,
               ContactSet(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.f1.f64, ctx.f2.f64);
               ctx.r3.u64 = ctx.r3.u32 + 32)
-// r3 comes back as the contact + 32, f1 as -1.0.
-ITC_COLLISION(820BC858, ctx.f1.f64 = ContactFlip(base, ctx.r3.u32);
-              ctx.r3.u64 = ctx.r3.u32 + 32)
+// Contact::Flip (sub_820BC858) has no adapter: its callers in play are
+// native.
