@@ -2,6 +2,8 @@
 
 #include "c_runtime/strings.h"
 
+#include "base/log.h"
+
 #include "guest.h"
 
 #include <cstring>
@@ -83,6 +85,7 @@ void Strncpy(uint8_t* base, uint32_t destination, uint32_t source, uint32_t coun
 }
 
 bool StrcpyS(uint8_t* base, uint32_t destination, uint32_t size, uint32_t source) {
+  ITC_NATIVE_RUNNING("sub_825A9DD8 strcpy_s");
   if (destination == 0 || size == 0 || source == 0) {
     return false;
   }
@@ -140,6 +143,7 @@ int32_t Stricmp(uint8_t* base, uint32_t a, uint32_t b) {
 }
 
 int32_t AsciiStrnicmp(uint8_t* base, uint32_t a, uint32_t b, uint32_t count) {
+  ITC_NATIVE_RUNNING("sub_825AC6B0 __ascii_strnicmp");
   if (count == 0) {
     return 0;
   }
@@ -211,6 +215,7 @@ uint32_t IsLeadByte(uint8_t* base, uint32_t c) {
 
 bool StrToXl(uint8_t* base, uint32_t string, int32_t radix, uint32_t flags, bool want_end,
              uint32_t* end, uint64_t* result) {
+  ITC_NATIVE_RUNNING("sub_825A82C8 strtoxl");
   if (string == 0 || (radix != 0 && (radix < 2 || radix > 36))) {
     return false;
   }

@@ -4,6 +4,8 @@
 
 #include "c_runtime/parse.h"
 
+#include "base/log.h"
+
 #include "guest.h"
 
 namespace c_runtime {
@@ -211,6 +213,7 @@ void MultTenPow(uint8_t* base, Frame& f, uint32_t x, uint32_t r, uint32_t y, int
 }  // namespace
 
 bool Mtold12(const uint8_t* digits, uint32_t count, LongDouble12Full* out) {
+  ITC_NATIVE_RUNNING("sub_825B7F10 __mtold12");
   u128 v = 0;
   for (uint32_t i = 0; i < count; i++) {
     v = (v * 10 + uint32_t(int32_t(int8_t(digits[i])))) & kMask96;
@@ -238,6 +241,7 @@ bool Mtold12(const uint8_t* digits, uint32_t count, LongDouble12Full* out) {
 
 bool Strgtold12(uint8_t* base, uint32_t string, uint32_t mult12, uint32_t scale, uint32_t decpt,
                 uint32_t implicit_e, Strgtold12Result* result) {
+  ITC_NATIVE_RUNNING("sub_825B36B8 __strgtold12_l");
   uint8_t buffer[25];
   uint32_t length = 0;     // digits kept (r6)
   uint32_t man_sign = 0;   // r18
@@ -527,6 +531,7 @@ bool Strgtold12(uint8_t* base, uint32_t string, uint32_t mult12, uint32_t scale,
 }
 
 bool Fltin2(uint8_t* base, uint32_t string, FltinResult* result) {
+  ITC_NATIVE_RUNNING("sub_825AFDC8 _fltin2");
   Strgtold12Result parsed;
   if (!Strgtold12(base, string, 0, 0, 0, 0, &parsed)) {
     return false;
@@ -552,6 +557,7 @@ bool Fltin2(uint8_t* base, uint32_t string, FltinResult* result) {
 }
 
 bool AtofL(uint8_t* base, uint32_t string, uint64_t* bits) {
+  ITC_NATIVE_RUNNING("sub_825AB0C0 _atof_l");
   if (string == 0) {
     return false;  // EINVAL through _errno
   }
@@ -588,6 +594,7 @@ constexpr uint32_t kSNan = 0x820744A8;  // "1#SNAN"
 
 bool I10Output(uint8_t* base, const LongDouble12& value, int32_t digits, uint32_t flags,
                FloatOut* out) {
+  ITC_NATIVE_RUNNING("sub_825B8B48 $I10_OUTPUT");
   for (bool& w : out->written) {
     w = false;
   }

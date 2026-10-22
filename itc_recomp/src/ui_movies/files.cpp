@@ -3,6 +3,8 @@
 
 #include "ui_movies/ui_movies.h"
 
+#include "base/log.h"
+
 namespace ui_movies {
 
 namespace {
@@ -16,21 +18,27 @@ bool BytesAre(uint8_t* base, uint32_t address, const char (&bytes)[8]) {
 }
 }  // namespace
 
-bool IsXmd(uint8_t* base, uint32_t file) { return BytesAre(base, file, "XMD\0" "001"); }
+bool IsXmd(uint8_t* base, uint32_t file) {
+  ITC_NATIVE_RUNNING("sub_825A0C60 IsXmd");
+  return BytesAre(base, file, "XMD\0" "001");
+}
 
 uint32_t CheckXmd(uint8_t* base, uint32_t file) {
   return (file & 0xF) == 0 && IsXmd(base, file) ? 1 : 0;
 }
 
 bool IsMovieFile(uint8_t* base, uint32_t file) {
+  ITC_NATIVE_RUNNING("sub_825A0E40 IsMovieFile");
   return BytesAre(base, file + 8, "X2D\0" "005");
 }
 
 uint32_t FileAnimation(uint8_t* base, uint32_t file, uint32_t index) {
+  ITC_NATIVE_RUNNING("sub_825A0ED8 FileAnimation");
   return guest::LoadU32(base, file + 8 * (guest::LoadU32(base, file + 16) + index + 4));
 }
 
 uint32_t FixUpScene(uint8_t* base, uint32_t scene, uint32_t file) {
+  ITC_NATIVE_RUNNING("sub_8259D688 FixUpScene");
   uint32_t entry = scene + 128;
   for (uint32_t i = 0; i < guest::LoadU32(base, scene + 124); i++, entry += 8) {
     const uint32_t first = guest::LoadU32(base, scene + 116);
@@ -49,6 +57,7 @@ uint32_t FixUpScene(uint8_t* base, uint32_t scene, uint32_t file) {
 }
 
 uint32_t FixUpAnimation(uint8_t* base, uint32_t animation, uint32_t file) {
+  ITC_NATIVE_RUNNING("sub_825A6570 FixUpAnimation");
   uint32_t entry = animation + 64;
   for (uint32_t i = 0; i < guest::LoadU32(base, animation + 56); i++, entry += 8) {
     guest::StoreU32(base, entry, guest::LoadU32(base, entry) + animation);

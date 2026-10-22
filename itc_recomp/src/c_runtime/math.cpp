@@ -4,6 +4,8 @@
 
 #include "c_runtime/math.h"
 
+#include "base/log.h"
+
 #include <emmintrin.h>
 
 #include <bit>
@@ -172,6 +174,7 @@ double AsinPolynomial(double z, double s) {
 }  // namespace
 
 double AsinAcos(double x, bool acos) {
+  ITC_NATIVE_RUNNING("sub_825A7FB0 asin and acos's kernel");
   const double ax = Abs(x);
   double z, s;
   uint32_t index;
@@ -368,15 +371,18 @@ double Copysign(double magnitude, double sign) {
 }
 
 double SetExp(double x, int32_t exponent) {
+  ITC_NATIVE_RUNNING("sub_825AFE80 _set_exp");
   const uint64_t high = ((uint32_t(exponent + 1022) << 4) & 0xFFF0) | (High16(x) & 0x800F);
   return D((Bits(x) & 0x0000FFFFFFFFFFFFull) | (high << 48));
 }
 
 int32_t GetExp(double x) {
+  ITC_NATIVE_RUNNING("sub_825AFEA8 _get_exp");
   return int32_t((High16(x) >> 4) & 0x7FF) - 1022;
 }
 
 double Decomp(double x, int32_t* exponent) {
+  ITC_NATIVE_RUNNING("sub_825AFF80 _decomp");
   if (x == 0.0) {
     *exponent = 0;
     return x;
@@ -404,6 +410,7 @@ double Decomp(double x, int32_t* exponent) {
 }
 
 int32_t IntType(double y) {
+  ITC_NATIVE_RUNNING("sub_825A8CE0 pow's integer test");
   if ((High16(y) & 0x7FF0) == 0 && (Bits(y) & 0x000FFFFFFFFFFFFFull) != 0) {
     return 0;  // a denormal
   }
@@ -762,6 +769,7 @@ double Atan2(double y, double x) {
 }
 
 double Rint(double x) {
+  ITC_NATIVE_RUNNING("sub_825B0B30 rint");
   constexpr double kTwo52 = D(0x4330000000000000);  // 2^52, at 0x82073678
   if (x == 0.0 || !(Abs(x) < kTwo52)) {  // 0.0 at 0x82073670; NaNs fail <
     return x;

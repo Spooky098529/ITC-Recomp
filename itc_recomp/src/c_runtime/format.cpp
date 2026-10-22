@@ -3,6 +3,8 @@
 
 #include "c_runtime/format.h"
 
+#include "base/log.h"
+
 #include "c_runtime/parse.h"
 #include "c_runtime/strings.h"
 
@@ -14,6 +16,7 @@
 namespace c_runtime {
 
 LongDouble12 DoubleToLd12(uint64_t bits) {
+  ITC_NATIVE_RUNNING("sub_825B6378 ___dtold");
   const uint32_t high = uint32_t(bits >> 32);
   const uint32_t low = uint32_t(bits);
   const uint16_t sign = uint16_t((high >> 16) & 0x8000);
@@ -111,6 +114,7 @@ void ShrMan(uint32_t man[3], int32_t count) {
 }  // namespace
 
 uint64_t Ld12ToDouble(const LongDouble12& value, uint16_t extra, int32_t* status) {
+  ITC_NATIVE_RUNNING("sub_825B69B8 _ld12tod");
   uint32_t man[3] = {value.mantissa_high, value.mantissa_low, uint32_t(extra) << 16};
   const bool negative = (value.sign_exponent & 0x8000) != 0;
   int32_t exponent = int32_t(value.sign_exponent & 0x7FFF) - 16383;
@@ -219,6 +223,7 @@ bool WriteMultiChar(uint8_t* base, uint32_t string, int32_t length, uint32_t str
 }
 
 bool PutwcString(uint8_t* base, uint16_t unit, uint32_t stream) {
+  ITC_NATIVE_RUNNING("sub_825B7A80 _putwc_nolock");
   if (stream == kStreams + 32 || stream == kStreams + 64) {
     return false;  // stdout and stderr: the console
   }
@@ -335,6 +340,7 @@ bool GuestText::Commit() {
 
 int32_t FpToStr(GuestText& text, uint64_t at, uint32_t size, int32_t digits, int32_t* exponent,
                 const std::vector<uint8_t>& mantissa) {
+  ITC_NATIVE_RUNNING("sub_825B61E8 _fptostr");
   const uint32_t whole = digits > 0 ? uint32_t(digits) : 0;
   if (size == 0 || size <= whole + 1) {
     return -1;  // EINVAL, ERANGE: _errno and _invalid_parameter
@@ -373,6 +379,7 @@ int32_t FpToStr(GuestText& text, uint64_t at, uint32_t size, int32_t digits, int
 
 bool Cftof2(GuestText& text, int32_t precision, int32_t sign, int32_t exponent, bool g_format,
             uint8_t point) {
+  ITC_NATIVE_RUNNING("sub_825AE708 _cftof2_l");
   const int32_t before = int32_t(uint32_t(exponent) - 1);
   if (g_format && before == precision) {
     const int64_t at = int64_t(int32_t(uint32_t(sign == kMinus) + uint32_t(before)));
@@ -428,6 +435,7 @@ uint32_t DecimalPointAddress(uint8_t* base, uint32_t* words) {
 }
 
 bool Cftof(uint8_t* base, uint64_t bits, uint32_t buffer, uint32_t size, int32_t precision) {
+  ITC_NATIVE_RUNNING("sub_825AE8E0 _cftof_l");
   // _fltout2: $I10_OUTPUT's digits copied by strcpy_s into 22 bytes.
   FloatOut out;
   if (!I10Output(base, DoubleToLd12(bits), 17, 0, &out)) {

@@ -1,5 +1,7 @@
 #include "ui_movies/game.h"
 
+#include "base/log.h"
+
 #include "ui_movies/ui_movies.h"
 
 #include "c_runtime/strings.h"
@@ -52,6 +54,7 @@ uint32_t Layer(uint32_t n) {
 }
 
 void SetLayer(uint8_t* base, uint32_t node, uint32_t n) {
+  ITC_NATIVE_RUNNING("sub_8211A660 SetLayer");
   guest::StoreU32(base, node + 72, Layer(n));
 }
 
@@ -215,6 +218,7 @@ uint32_t SlotOf(uint8_t* base, uint32_t list, uint32_t link) {
 }
 
 void LinkFree(uint8_t* base, uint32_t list, int32_t position) {
+  ITC_NATIVE_RUNNING("sub_8211B230 LinkFree");
   const uint32_t before = Before(base, list, uint32_t(position));
   const uint16_t free = guest::LoadU16(base, list + 128);
   const uint32_t link = Link(list, free);

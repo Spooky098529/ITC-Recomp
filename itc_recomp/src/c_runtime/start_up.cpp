@@ -3,11 +3,14 @@
 
 #include "c_runtime/start_up.h"
 
+#include "base/log.h"
+
 #include "guest.h"
 
 namespace c_runtime {
 
 void InitFloatConversions(uint8_t* base) {
+  ITC_NATIVE_RUNNING("sub_825A6DB0 _cfltcvt_init");
   static constexpr uint32_t kTable = 0x8266BA5C;
   static constexpr uint32_t kFunctions[10] = {
       0x825AEB70, 0x825ADF20, 0x825ADF10, 0x825ADF18, 0x825ADE90,
@@ -51,6 +54,7 @@ int32_t InitMbcTable(uint8_t* base) {
 }
 
 void SetSbcs(uint8_t* base, uint32_t info) {
+  ITC_NATIVE_RUNNING("sub_825B68C8 setSBCS");
   static constexpr uint32_t kCLocale = 0x8266C028;
   for (uint32_t i = 0; i < 257; i++) {
     guest::StoreU8(base, info + 28 + i, 0);
