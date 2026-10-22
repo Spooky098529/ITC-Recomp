@@ -110,6 +110,8 @@ set(ITC_SOURCES
     src/ui_movies/game.cpp
     src/hooks/race_overlays.cpp
     src/race_overlays/race_overlays.cpp
+    src/hooks/vehicle_accessors.cpp
+    src/vehicle_accessors/vehicle_accessors.cpp
     src/hooks/command_list.cpp
     src/command_list/command_list.cpp
     src/hooks/c_runtime.cpp
@@ -146,6 +148,7 @@ set(ITC_SOURCES
     src/harnesses/ui_movies.cpp
     src/harnesses/ui_movies_game.cpp
     src/harnesses/race_overlays.cpp
+    src/harnesses/vehicle_accessors.cpp
     src/helpers/debug_output.cpp
     src/helpers/object_attributes.cpp
     src/helpers/time.cpp
