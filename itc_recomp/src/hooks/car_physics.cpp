@@ -134,11 +134,11 @@ extern "C" REX_FUNC(sub_820B72C8) {
 // f1 = dt (left as it is).
 ITC_CAR_PHYSICS(820AFAE8, ctx.r3.u64 = VehicleBeginStep(base, ctx.r3.u32, ctx.f1.f64))
 ITC_CAR_PHYSICS(820AFD30, VehicleWheelLoads(base, ctx.r3.u32))
-// r4 = the wheel; f1 = the value.
+// r4 = the wheel; f1 = the value. SurfaceValue12 and SurfaceValue16
+// (sub_820B05B8, sub_820B0610) have no adapters: their callers in play are
+// native.
 ITC_CAR_PHYSICS(820B0508, ctx.f1.f64 = VehicleSurfaceValue(base, ctx.r3.u32, ctx.r4.u32))
 ITC_CAR_PHYSICS(820B0560, ctx.f1.f64 = VehicleSurfaceValue20(base, ctx.r3.u32, ctx.r4.u32))
-ITC_CAR_PHYSICS(820B05B8, ctx.f1.f64 = VehicleSurfaceValue12(base, ctx.r3.u32, ctx.r4.u32))
-ITC_CAR_PHYSICS(820B0610, ctx.f1.f64 = VehicleSurfaceValue16(base, ctx.r3.u32, ctx.r4.u32))
 ITC_CAR_PHYSICS(820B0908,
                 ctx.r3.u64 = VehicleAccumulateTireForces(base, ctx.r3.u32, ctx.r1.u32 - 192))
 ITC_CAR_PHYSICS(820B2748, VehicleRollingResistance(base, ctx.r3.u32))
