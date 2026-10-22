@@ -568,6 +568,125 @@ void AnimationListCases(Context& h, const Block& block) {
   }
 }
 
+// The pairs' lookups and TextMap::Set: maps of random pairs with keys from a
+// small set (so lookups match some), counts from 0 to 128 (Set's append at
+// 128 lands on the count itself) and a few huge ones for the lookups.
+void PairsCases(Context& h, const Block& block) {
+  struct Lookup {
+    const char* name;
+    GuestFunction recompiled, native;
+    bool in_place;  // the pairs at +0 and the count at +1024, else +0 a pointer and +8 the count
+  };
+  const Lookup lookups[] = {
+      {"TextMap::Find (sub_8211B310)", __imp__sub_8211B310, sub_8211B310, true},
+      {"TextMap::Set (sub_8211B370)", __imp__sub_8211B370, sub_8211B370, true},
+      {"UiMovies::Find (sub_8211B3F0)", __imp__sub_8211B3F0, sub_8211B3F0, false},
+  };
+  const uint32_t map = block.at + 64;
+  const uint32_t pairs = block.at + 2048;
+  const uint32_t key_address = block.at + 16, value_address = block.at + 20;
+  for (const Lookup& f : lookups) {
+    Results results(f.name);
+    for (int i = 0; i < 500; i++) {
+      const bool set = f.native == sub_8211B370;
+      uint32_t count = i < 3 ? uint32_t(i) : h.random.Below(129);
+      if (!set && i % 50 == 49) {
+        count = 129 + h.random.Below(64);  // past the 128 pairs: they read on
+      }
+      std::vector<uint32_t> words(2 * 200);
+      for (uint32_t& w : words) {
+        w = h.random.Below(3) == 0 ? uint32_t(h.random.Next()) : h.random.Below(200);
+      }
+      const uint32_t key = h.random.Below(4) == 0 ? 0xFFFFFFFFu : h.random.Below(200);
+      const uint32_t value = uint32_t(h.random.Next());
+      Compare(h, results, block.at, 4096,
+              [&] {
+                const uint32_t at = f.in_place ? map : pairs;
+                for (uint32_t k = 0; k < words.size(); k++) {
+                  guest::StoreU32(h.base, at + 4 * k, words[k]);
+                }
+                if (f.in_place) {
+                  guest::StoreU32(h.base, map + 1024, count);
+                } else {
+                  guest::StoreU32(h.base, map, pairs);
+                  guest::StoreU32(h.base, map + 4, 256);
+                  guest::StoreU32(h.base, map + 8, count);
+                }
+                guest::StoreU32(h.base, key_address, key);
+                guest::StoreU32(h.base, value_address, value);
+              },
+              [&](PPCContext& t) {
+                t.r3.u64 = map;
+                t.r4.u64 = key_address;
+                t.r5.u64 = value_address;
+              },
+              f.recompiled, f.native, fmt::format("case {}: count {} key {:X}", i, count, key));
+    }
+    results.Report();
+  }
+}
+
+// sub_8211AD00 on the live renderer object (its getters through the
+// vtables) with a made-up movie table: the table's header, the screen's
+// globals and the library's renderer globals are kept and put back after
+// each run.
+void ScreenStartCases(Context& h, const Block& block) {
+  Results results("sub_8211AD00 (a screen's movie table reset)");
+  constexpr uint32_t kGlobals = 0x826C5CA0, kGlobalBytes = 0x40;  // to the table's header and past it
+  constexpr uint32_t kRendererGlobals = 0x82970C18;
+  const std::vector<uint8_t> globals = Read(h.base, kGlobals, kGlobalBytes);
+  const std::vector<uint8_t> renderer = Read(h.base, kRendererGlobals, 8);
+  const uint32_t entries = block.at + 256;
+  for (int i = 0; i < 100; i++) {
+    const uint32_t count = i < 2 ? uint32_t(i) : h.random.Below(65);
+    std::vector<uint32_t> words(2 * 64 + 8);
+    for (uint32_t& w : words) {
+      w = uint32_t(h.random.Next());
+    }
+    uint32_t screen[9];
+    for (uint32_t& w : screen) {
+      w = uint32_t(h.random.Next()) | 1;
+    }
+    std::vector<uint8_t> result[2];
+    for (int v = 0; v < 2; v++) {
+      Fill(h.base, block.at, 1024);
+      for (uint32_t k = 0; k < words.size(); k++) {
+        guest::StoreU32(h.base, entries + 4 * k, words[k]);
+      }
+      for (uint32_t k = 0; k < 9; k++) {
+        guest::StoreU32(h.base, kGlobals + 4 + 4 * k, screen[k]);
+      }
+      guest::StoreU32(h.base, 0x826C5CCC, entries);
+      guest::StoreU32(h.base, 0x826C5CD0, 64);
+      guest::StoreU32(h.base, 0x826C5CD4, count);
+      guest::StoreU32(h.base, kRendererGlobals, 0);
+      guest::StoreU32(h.base, kRendererGlobals + 4, 0);
+      PPCContext t = CallContext(h);
+      (v == 0 ? __imp__sub_8211AD00 : sub_8211AD00)(t, h.base);
+      result[v] = Read(h.base, block.at, 1024);
+      std::vector<uint8_t> g = Read(h.base, kGlobals, kGlobalBytes);
+      std::vector<uint8_t> r = Read(h.base, kRendererGlobals, 8);
+      result[v].insert(result[v].end(), g.begin(), g.end());
+      result[v].insert(result[v].end(), r.begin(), r.end());
+      for (int b = 0; b < 4; b++) {
+        result[v].push_back(uint8_t(t.r3.u32 >> (24 - 8 * b)));
+      }
+      Write(h.base, kGlobals, globals.data(), kGlobalBytes);
+      Write(h.base, kRendererGlobals, renderer.data(), 8);
+    }
+    size_t at = 0;
+    while (at < result[0].size() && result[0][at] == result[1][at]) {
+      at++;
+    }
+    const size_t from = at < result[0].size() ? at : 0;
+    const size_t to = std::min(result[0].size(), from + 32);
+    results.Check({result[0].begin() + from, result[0].begin() + to},
+                  {result[1].begin() + from, result[1].begin() + to},
+                  fmt::format("case {}: count {}, from byte {}", i, count, from));
+  }
+  results.Report();
+}
+
 }  // namespace
 
 void UiMoviesGame(Context& h) {
@@ -586,6 +705,8 @@ void UiMoviesGame(Context& h) {
   SwapTextureCases(h, block);
   ItemCases(h, block);
   AnimationListCases(h, block);
+  PairsCases(h, block);
+  ScreenStartCases(h, block);
   memory->SystemHeapFree(block.at);
 }
 

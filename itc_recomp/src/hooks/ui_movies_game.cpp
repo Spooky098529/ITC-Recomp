@@ -26,7 +26,9 @@ ITC_FLAG_BOOL(native_ui_movies_game, true, "ITC",
               "animation lists' sub_8211A9E8, sub_8211B230, AnimationList::Insert "
               "sub_8211B4D0, AnimationList::RemoveAt sub_8211B080, AnimationList::Get "
               "sub_8211B298, UiMovie::AnimationTime sub_8211BA00 and "
-              "UiMovie::NamedAnimationTime sub_8211BB18 "
+              "UiMovie::NamedAnimationTime sub_8211BB18; the pairs' lookups TextMap::Find "
+              "sub_8211B310, TextMap::Set sub_8211B370 and UiMovies::Find sub_8211B3F0; the "
+              "screens' movie table reset sub_8211AD00 (its renderer calls still the game's) "
               "(same results; checked by --run_harnesses=ui_movies_game)");
 
 ITC_FLAG_DECLARE(bool, native_ui_movies);
@@ -253,6 +255,61 @@ extern "C" REX_FUNC(sub_8211BB18) {
   const uint32_t time = ui_movies::NamedAnimationTime(base, ctx.r3.u32, ctx.r4.u32);
   ctx.fpscr.disableFlushMode();
   ctx.f1.f64 = double(std::bit_cast<float>(time));
+}
+
+// TextMap::Find: r3 = a movie's texts, r4 = an id's address.
+extern "C" REX_FUNC(sub_8211B310) {
+  REX_FUNC_PROLOGUE();
+  NATIVE_OR_ORIGINAL(8211B310);
+  ctx.r3.u64 = ui_movies::TextMapFind(base, ctx.r3.u32, ctx.r4.u32);
+}
+
+// TextMap::Set: r3 = the texts (left), r4 = an id's address, r5 = a text's
+// address.
+extern "C" REX_FUNC(sub_8211B370) {
+  REX_FUNC_PROLOGUE();
+  NATIVE_OR_ORIGINAL(8211B370);
+  ui_movies::TextMapSet(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+}
+
+// UiMovies::Find: r3 = a vector of pairs, r4 = the key's address.
+extern "C" REX_FUNC(sub_8211B3F0) {
+  REX_FUNC_PROLOGUE();
+  NATIVE_OR_ORIGINAL(8211B3F0);
+  ctx.r3.u64 = ui_movies::PairsFind(base, ctx.r3.u32, ctx.r4.u32);
+}
+
+// sub_8211AD00: the renderer and command list from the object at
+// [0x826BABA0] through four calls on vtables (slot 8, then slot 1 for the
+// list; slot 8, then slot 2 for the renderer), made as the original's from a
+// frame like its own; the rest natively. Returns the renderer (r3 as the
+// original leaves it).
+extern "C" REX_FUNC(sub_8211AD00) {
+  REX_FUNC_PROLOGUE();
+  NATIVE_OR_ORIGINAL(8211AD00);
+  constexpr uint32_t kScene = 0x826BABA0;
+  ui_movies::ClearScreenFlag(base);
+  const uint64_t lr = ctx.lr;
+  uint32_t list = 0, renderer = 0;
+  // A call through slot `slot` of r3's vtable.
+  auto call = [&](uint32_t slot, uint32_t return_address) {
+    ctx.lr = return_address;
+    REX_CALL_INDIRECT_FUNC(
+        guest::LoadU32(base, guest::LoadU32(base, ctx.r3.u32) + 4 * slot));
+  };
+  guest_call::InFrame(ctx, base, 96, 0x8211AD34, [&](uint32_t) {
+    ctx.r3.u64 = guest::LoadU32(base, kScene);
+    call(8, 0x8211AD34);
+    call(1, 0x8211AD44);
+    list = ctx.r3.u32;
+    ctx.r3.u64 = guest::LoadU32(base, kScene);
+    call(8, 0x8211AD60);
+    call(2, 0x8211AD70);
+    renderer = ctx.r3.u32;
+  });
+  ctx.lr = lr;
+  ui_movies::ResetMovieTable(base, renderer, list);
+  ctx.r3.u64 = renderer;
 }
 
 namespace ui_movies_game_hooks {

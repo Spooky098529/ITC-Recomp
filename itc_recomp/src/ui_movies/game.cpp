@@ -281,4 +281,70 @@ uint32_t NamedAnimationTime(uint8_t* base, uint32_t movie, uint32_t index) {
                   [&](uint32_t slot) { return guest::LoadU32(base, slot + 8) == index; });
 }
 
+namespace {
+constexpr uint32_t kTextMapNone = 0x826C5CD8;
+constexpr uint32_t kPairsNone = 0x826C5CDC;
+
+// The index of the first pair keyed `key` among `count` from `pairs`.
+std::optional<uint32_t> FindKey(uint8_t* base, uint32_t pairs, uint32_t count, uint32_t key) {
+  for (uint32_t i = 0; i < count; i++) {
+    if (guest::LoadU32(base, pairs + 8 * i) == key) {
+      return i;
+    }
+  }
+  return std::nullopt;
+}
+}  // namespace
+
+uint32_t TextMapFind(uint8_t* base, uint32_t map, uint32_t key_address) {
+  const uint32_t count = guest::LoadU32(base, map + 1024);
+  if (count == 0) {
+    return kTextMapNone;
+  }
+  const std::optional<uint32_t> i = FindKey(base, map, count, guest::LoadU32(base, key_address));
+  return i ? map + 8 * *i + 4 : kTextMapNone;
+}
+
+void TextMapSet(uint8_t* base, uint32_t map, uint32_t key_address, uint32_t value_address) {
+  const uint32_t count = guest::LoadU32(base, map + 1024);
+  if (count != 0) {
+    if (const std::optional<uint32_t> i =
+            FindKey(base, map, count, guest::LoadU32(base, key_address))) {
+      guest::StoreU32(base, map + 8 * *i + 4, guest::LoadU32(base, value_address));
+      return;
+    }
+  }
+  const uint32_t key = guest::LoadU32(base, key_address);
+  const uint32_t value = guest::LoadU32(base, value_address);
+  guest::StoreU32(base, map + 1024, count + 1);
+  guest::StoreU32(base, map + 8 * count, key);
+  guest::StoreU32(base, map + 8 * count + 4, value);
+}
+
+uint32_t PairsFind(uint8_t* base, uint32_t vector, uint32_t key_address) {
+  const uint32_t count = guest::LoadU32(base, vector + 8);
+  if (count == 0) {
+    return kPairsNone;
+  }
+  const std::optional<uint32_t> i = FindKey(base, guest::LoadU32(base, vector), count,
+                                            guest::LoadU32(base, key_address));
+  return i ? guest::LoadU32(base, vector) + 8 * *i + 4 : kPairsNone;
+}
+
+void ClearScreenFlag(uint8_t* base) {
+  guest::StoreU32(base, 0x826C5CB0, 0);
+}
+
+void ResetMovieTable(uint8_t* base, uint32_t renderer, uint32_t list) {
+  SetRenderer(base, renderer, list);
+  for (uint32_t i = 0; i < guest::LoadU32(base, kMovieTable + 8); i++) {
+    guest::StoreU32(base, guest::LoadU32(base, kMovieTable) + 8 * i, 0xFFFFFFFFu);
+    guest::StoreU32(base, guest::LoadU32(base, kMovieTable) + 8 * i + 4, 0);
+  }
+  for (uint32_t global : {0x826C5CA4u, 0x826C5CACu, 0x826C5CA8u, 0x826C5CC0u, 0x826C5CB4u,
+                          0x826C5CB8u, 0x826C5CBCu}) {
+    guest::StoreU32(base, global, 0);
+  }
+}
+
 }  // namespace ui_movies

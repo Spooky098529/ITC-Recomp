@@ -118,4 +118,28 @@ void RemoveAt(uint8_t* base, uint32_t list, uint32_t position);
 uint32_t AnimationTime(uint8_t* base, uint32_t movie, uint32_t sub_scene, uint32_t index);
 uint32_t NamedAnimationTime(uint8_t* base, uint32_t movie, uint32_t index);
 
+// The maps of {key, value} word pairs. A movie's texts (+0x9BCC): 128 pairs
+// in place, the count at +1024. The movie table (0x826C5CCC) and the like:
+// +0 the pairs, +4 the capacity, +8 the count.
+constexpr uint32_t kMovieTable = 0x826C5CCC;
+//
+// sub_8211B310 (TextMap::Find): the value's address for the key at
+// `key_address`, or 0x826C5CD8 when it's not there.
+uint32_t TextMapFind(uint8_t* base, uint32_t map, uint32_t key_address);
+// sub_8211B370 (TextMap::Set): the value at `value_address` stored for the
+// key at `key_address`, appended when it's not there (the count stored
+// first, then the pair; no check against the 128 pairs).
+void TextMapSet(uint8_t* base, uint32_t map, uint32_t key_address, uint32_t value_address);
+// sub_8211B3F0 (UiMovies::Find): the value's address for the key at
+// `key_address`, or 0x826C5CDC when it's not there.
+uint32_t PairsFind(uint8_t* base, uint32_t vector, uint32_t key_address);
+
+// sub_8211AD00's work after its renderer calls: the UI movie library's
+// renderer and command list set (SetRenderer), every entry of the movie
+// table marked free (key -1, value 0; nothing freed), and the screen's
+// globals 0x826C5CA4..0x826C5CAC, 0x826C5CC0 and 0x826C5CB4..0x826C5CBC
+// cleared. (0x826C5CB0 is cleared before the calls: ClearScreenFlag.)
+void ClearScreenFlag(uint8_t* base);
+void ResetMovieTable(uint8_t* base, uint32_t renderer, uint32_t list);
+
 }  // namespace ui_movies
