@@ -2775,3 +2775,25 @@ overridden 58, Native 3, Dropped 23, never called 70, live 295. Imports:
 186 called, 63 with a live caller. B7 (`b7_status.py`): 6,753 in play,
 ours 705, work left 6,048 (Wrapped 137, with a row 318, no row yet
 5,593); 694 overrides in `src/`.
+
+**2026-10-22, B7's first step, native memory (branch `native-heap`):**
+the nine allocators routed to the native allocation layer
+(`docs/native-memory.md`): 449 functions (916 pairs): overridden 67,
+Native 3, Dropped 23, never called 70, live 286. Imports: 186 called, 62
+with a live caller.
+
+| Area | Overridden | Native | Dropped | Never called | Live |
+|---|---|---|---|---|---|
+| input (B1) | 0 | 3 | 0 | 0 | 0 |
+| audio (B2) | 6 | 0 | 0 | 0 | 0 |
+| graphics (B3) | 12 | 0 | 3 | 4 | 0 |
+| files and saves (B4) | 2 | 0 | 13 | 8 | 0 |
+| memory (core) | 14 | 0 | 0 | 4 | 10 |
+| system services (B5) | 20 | 0 | 6 | 51 | 3 |
+| pure helpers (B6) | 22 | 0 | 2 | 7 | 18 |
+| threads, sync and the rest (core) | 11 | 0 | 4 | 19 | 260 |
+
+Cleared: `KeBugCheckEx` (the heap's own checks, in HeapAlloc, HeapFree,
+HeapReAlloc and HeapSize). B7 (`b7_status.py`): 6,753 in play, ours 714,
+work left 6,039 (Wrapped 137, with a row 336, no row yet 5,566); the new
+`heap.md` has 9 ours of 30 in play. 703 overrides in `src/`.
