@@ -490,4 +490,26 @@ bool CollisionWorldRemovePair(uint8_t* base, uint32_t index, uint32_t* r3);
 // 32; then ResetSurfaces. Returns the original's r3 (0x826C2E30).
 uint32_t CollisionWorldReset(uint8_t* base);
 
+// --- The car data and the vehicle's constructor (src/car_physics/car_data.cpp) ---
+
+// CarData::SetDefaults (sub_820AECB8): the car data's defaults (its row);
+// `frame`: the original's 192 bytes (two vectors built at +80 and +96, two
+// at +112 and +128). Returns the original's r3 (+1776, its last Vec4::Copy's).
+uint32_t CarDataSetDefaults(uint8_t* base, uint32_t data, uint32_t frame);
+// CarData::CarData (sub_820AEF80): the w of its vectors 0.0, then
+// SetDefaults (its frame below `frame`, the original's 96 bytes).
+void CarDataConstruct(uint8_t* base, uint32_t data, uint32_t frame);
+// sub_820AEE98 (the name ours: CarData::FillAxle): the axle record (+336
+// when the byte `is_front` is set, else +608) from the car file's record at
+// `source`.
+void CarDataFillAxle(uint8_t* base, uint32_t data, uint32_t source, uint32_t is_front);
+// CarData::ConvertUnits (sub_820AF018): the file's units converted. Returns
+// what the original leaves in f1 (+812's new value).
+double CarDataConvertUnits(uint8_t* base, uint32_t data);
+// Vehicle::Vehicle (sub_820B42C8): the w of its vectors 0.0, +3260 to
+// +3372 (every 16) 1.0, +336, +340, +344 = 0, Vehicle::Reset (its frame
+// below `frame`, the original's 112 bytes; `f1` what it leaves), byte
+// +2624 = 0.
+void VehicleConstruct(uint8_t* base, uint32_t vehicle, uint32_t frame, double* f1);
+
 }  // namespace car_physics

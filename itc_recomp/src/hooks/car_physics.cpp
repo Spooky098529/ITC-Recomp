@@ -20,8 +20,10 @@ ITC_FLAG_BOOL(native_car_physics, true, "ITC",
               "sub_820B6430, sub_820B4CF0; the collision world's objects, contacts and "
               "surfaces, sub_820B7AE8 to sub_820B7ED0, sub_820BAA78, sub_820BC1F8 to "
               "sub_820BC550; its pairs and reset, sub_820B94B0, sub_820B8A88, sub_820B85E8 with "
-              "sub_820B8C20, sub_820BC068, sub_820BBC40, sub_820BBD30) natively instead of "
-              "through the translated code (the same words, bit for bit; checked by --run_harnesses=car_physics)");
+              "sub_820B8C20, sub_820BC068, sub_820BBC40, sub_820BBD30; the car data and the "
+              "vehicle's constructor, sub_820AEF80 with sub_820AECB8, sub_820AEE98, "
+              "sub_820AF018, sub_820B42C8) natively instead of through the translated code "
+              "(the same words, bit for bit; checked by --run_harnesses=car_physics)");
 
 // Defines an adapter: `body` uses `ctx` and `base`. Flush-to-zero off for
 // the work; VECTOR leaves it on after (the original's last step is the
@@ -364,3 +366,26 @@ extern "C" REX_FUNC(sub_820B8A88) {
 }
 // r3 comes back as 0x826C2E30 (ResetSurfaces').
 ITC_CAR_PHYSICS(820B85E8, ctx.r3.u64 = CollisionWorldReset(base))
+
+// --- The car data and the vehicle's constructor ---
+
+// CarData::SetDefaults (sub_820AECB8) has no adapter: its caller in play,
+// CarData::CarData, is native.
+// r3 = the car data (left as it is).
+ITC_CAR_PHYSICS(820AEF80, CarDataConstruct(base, ctx.r3.u32, ctx.r1.u32 - 96))
+// r3 = the car data, r4 = the source, r5 = the byte.
+ITC_CAR_PHYSICS(820AEE98, CarDataFillAxle(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+// f1 comes back as +812's new value.
+ITC_CAR_PHYSICS(820AF018, ctx.f1.f64 = CarDataConvertUnits(base, ctx.r3.u32))
+// r3 = the vehicle (left as it is); f1 comes back as Vehicle::Reset's.
+extern "C" REX_FUNC(sub_820B42C8) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_car_physics)) {
+    __imp__sub_820B42C8(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  double f1 = 0.0;
+  VehicleConstruct(base, ctx.r3.u32, ctx.r1.u32 - 112, &f1);
+  ctx.f1.f64 = f1;
+}

@@ -247,6 +247,16 @@ ITC_NATIVE_STEP(NativeAddContact, ctx.r3.u64 = cp::CollisionObjectAddContact(bas
 ITC_NATIVE_STEP(NativeRecordsMerge,
                 ctx.r3.u64 = cp::CollisionRecordsMerge(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
                                                        ctx.r6.u32, ctx.r1.u32 - 304))
+// The car data and the vehicle's constructor.
+ITC_NATIVE_STEP(NativeCarDataSetDefaults,
+                ctx.r3.u64 = cp::CarDataSetDefaults(base, ctx.r3.u32, ctx.r1.u32 - 192))
+ITC_NATIVE_STEP(NativeCarDataConstruct, cp::CarDataConstruct(base, ctx.r3.u32, ctx.r1.u32 - 96))
+ITC_NATIVE_STEP(NativeCarDataFillAxle,
+                cp::CarDataFillAxle(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+ITC_NATIVE_STEP(NativeCarDataConvertUnits,
+                ctx.f1.f64 = cp::CarDataConvertUnits(base, ctx.r3.u32))
+ITC_NATIVE_STEP(NativeVehicleConstruct, double f1 = 0.0;
+                cp::VehicleConstruct(base, ctx.r3.u32, ctx.r1.u32 - 112, &f1); ctx.f1.f64 = f1)
 // The world's pairs and its reset.
 ITC_NATIVE_STEP(NativeHasPair,
                 ctx.r3.u64 = cp::CollisionWorldHasPair(base, ctx.r3.u32, ctx.r4.u32) ? 1 : 0)
@@ -576,7 +586,9 @@ enum R4Kind {
   kCoefficientsR4,
   kWheelCopyR4,
   kRecord2CopyR4,
-  kSteerRecordR4
+  kSteerRecordR4,
+  kCarDataR3,     // r3 = the car data
+  kAxleSourceR4,  // r3 = the car data, r4 = a source record (vehicle +4000), r5 a byte
 };
 
 // Fills the area for one case: float words (by the group's generator),
@@ -808,6 +820,16 @@ void CarPhysicsVehicle(Context& h) {
        NativeUpdateGearbox, false, kByteR4},
       {"Vehicle::ShiftGears (sub_820B6430)", Original<__imp__sub_820B6430>, NativeShiftGears,
        false},
+      {"CarData::SetDefaults (sub_820AECB8)", Original<__imp__sub_820AECB8>,
+       NativeCarDataSetDefaults, false, kCarDataR3},
+      {"CarData::CarData (sub_820AEF80)", Original<__imp__sub_820AEF80>, NativeCarDataConstruct,
+       false, kCarDataR3},
+      {"CarData::FillAxle (sub_820AEE98)", Original<__imp__sub_820AEE98>, NativeCarDataFillAxle,
+       false, kAxleSourceR4},
+      {"CarData::ConvertUnits (sub_820AF018)", Original<__imp__sub_820AF018>,
+       NativeCarDataConvertUnits, true, kCarDataR3},
+      {"Vehicle::Vehicle (sub_820B42C8)", Original<__imp__sub_820B42C8>, NativeVehicleConstruct,
+       true},
   };
   enum Group { kNumbers, kOneNaN, kNaNs };
   const char* const kGroupNames[] = {"", ", one NaN",
@@ -850,6 +872,13 @@ void CarPhysicsVehicle(Context& h) {
             break;
           case kCoefficientsR4:
             r4 = area + kSurfaces + 16 * wheel;
+            break;
+          case kCarDataR3:
+            r3 = area + kCarData;
+            break;
+          case kAxleSourceR4:
+            r3 = area + kCarData;
+            r4 = area + kVehicle + 4000;
             break;
         }
         const uint32_t nan_word = kNaNWords[pick.Below(std::size(kNaNWords))];
