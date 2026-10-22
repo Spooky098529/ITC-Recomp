@@ -55,7 +55,7 @@ goes in `src/` as overrides), American English.
 - **B7 in progress (2026-10-22):** its measure is `b7_status.py`
   (`docs/coverage.md`), and the B7 loop (`docs/loops/b7-loop.md`, a
   `/loop` session handing each subsystem to a mapping agent, then
-  migration agents) did its first run on the branch `b7-loop-test`: five
+  migration agents) did its first run on the branch `b7-loop-test` (merged 2026-10-22): five
   subsystems mapped and made native as far as they were ready (ours 162
   -> 335). See "B7's loop runs" under B7, and
   `docs/loops/b7-progress.md`. What most of the rest waits on is the

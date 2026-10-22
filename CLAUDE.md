@@ -98,7 +98,8 @@ The flags are still parsed by the SDK until A4, which is deferred until
 the code has no guest dependency (the user's call, 2026-10-21; the survey
 is under A4 in the plan). B7 (the game logic) is in progress: its
 first loop run (`docs/loops/b7-loop.md`, 2026-10-22, on `b7-loop-test`,
-not merged yet) made five subsystems native as far as they were ready
+merged into `rexglue-removal-project` the same day, its rows not yet
+reviewed by the user) made five subsystems native as far as they were ready
 (`docs/functions/sprites.md`, `command-list.md`, `c-runtime.md`,
 `ui-movies.md`, `ui-movies-game.md`; each behind `--native_*` flags, on by
 default); see "B7's loop runs" in the plan and
