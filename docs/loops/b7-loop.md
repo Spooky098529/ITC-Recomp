@@ -35,7 +35,8 @@ memory.
   (raised from 3 and 10 by the user, 2026-10-22). Then
   the loop ends itself; the user runs `/clear` and starts it again
   (nothing is lost: it picks up from the progress file).
-- **In all:** 5 subsystems, then the loop stops for the user's review.
+- **In all:** 5 subsystems a run, then the loop stops for the user's
+  review.
 
 ## The cycle
 
@@ -317,8 +318,10 @@ the user's desktop; find problems with logs, not guesses.
 
 ## The progress file
 
-`docs/loops/b7-progress.md`, made by the first pass. Kept short, so a pass
-can read it whole:
+`docs/loops/b7-progress.md`, for the current run. Kept short, so a pass
+can read it whole. A run's first pass finds the previous run's file
+stopped: it starts it afresh (the old one is in its run's summary file and
+in git):
 
 - **Now:** the subsystem, the step, the agent running, this session's
   pass and subsystem counts.
