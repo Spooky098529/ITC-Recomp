@@ -124,7 +124,8 @@ nothing runs and there's work, about a minute.
 - `itc_recomp/tools/scripted_run.sh <recording> [flags]`: a recorded pad
   (`itc_recomp/pad_recordings/`) replayed into the game, for functions
   attract races don't reach (the menus, a driven race); the same report
-  (`docs/pad-replay.md`).
+  (`docs/pad-replay.md`). The validation agent replays it after its
+  attract race ("The validation agent", step 3).
 - `src/harnesses/`: native against recompiled on the same inputs
   ("Checking with a harness" in `docs/rexglue-removal.md`).
 - `--native_renderer_dump=<dir>`: frames from a race.
@@ -343,8 +344,17 @@ made native, or whose adapter it removed:
    on both sides once its adapter is gone), or its harness doesn't reach
    it. The `(game):` lines list which functions ran in play. No game line
    isn't a failure (a function may only run in menus, saves or on paths
-   an attract race doesn't take): those functions are listed for the
-   user's drive (below).
+   an attract race doesn't take): those functions go to the replay.
+3. **Replays the recorded pad** for the functions with no `native running
+   (game):` line (added by the user, 2026-10-22):
+   `itc_recomp/tools/scripted_run.sh <the recording in
+   itc_recomp/pad_recordings/> --log_level=info` (default flags
+   otherwise). Functions with a game line in the replay's log count as
+   ran in play. Only what the replay didn't reach goes to the user's
+   drive (below). A replay that breaks (stalls, logs new errors, desyncs,
+   ends early) is not a halt: the agent says how it broke and where it
+   stopped, and every function still without a game line goes to the
+   drive list. It doesn't restart or debug the replay.
 
 Functions whose rows are Merged (set by the migration agent) have no
 print of their own: the agent skips them.
@@ -357,14 +367,17 @@ validate: <name>
 prints added: none | <functions>: <commit>
 harness lines: <count> of <count>
 missing: none | <functions with no harness line, and why if known>
-ran in play: <functions with a game line> | none
-not in game: <functions with no game line> | none
+ran in play: <functions with a game line in the attract race> | none
+ran in replay: <functions with a game line only in the replay> | none
+replay: ok | broke: <how, where it stopped>
+not in game: <functions seen in neither the attract race nor the replay> | none
 race: <seconds at 30 ticks/s>, <error lines>, harnesses all 0: yes | no
 stop: none | <reason>
 ```
 
 The lead copies `not in game:` into "To check in a drive" in the progress
-file. When the loop ends, the user drives a race (menus, a save) with
+file, and notes the `replay:` line beside it when the replay broke (the
+native code under test may be the cause). When the loop ends, the user drives a race (menus, a save) with
 `--log_level=info` and checks the log's `native running (game):` lines for
 those functions: the validation step done by playing.
 
@@ -375,7 +388,8 @@ file, when:
 
 - a harness differs (outside "(expected to differ)"), or a function made
   native has no harness cases;
-- a validation agent reports a function `missing:`;
+- a validation agent reports a function `missing:` (a broken replay is
+  not a reason to halt: its functions go to the drive list);
 - an attract race failed, stalled twice, logged new errors, or ran under
   ~20 seconds at 30 ticks/s;
 - an agent left work uncommitted, or a commit doesn't build;
