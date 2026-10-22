@@ -24,6 +24,13 @@ the SDK's audio (the Audio Worker's spin, the game's sounds, the plan).
 `--height`, `--fullscreen`, black bars) and what's left to try.
 `docs/windows.md` is the Windows build: cross-compiled on Linux, tested
 under Wine (the user has no Windows machine).
+`docs/native-memory.md` is B7's first step (built 2026-10-22 on the
+branch `native-heap`): one allocation layer of our own
+(`src/memory/heap.h`) under every allocation, recompiled and native alike
+(the process heap, VirtualAlloc and physical memory, routed at nine
+functions by `src/hooks/heap.cpp` behind `--native_heap`, on by default;
+harness `heap`), whose backing is swapped at the port's end. Guest
+allocation is native: native code allocates through it without `ctx`.
 `docs/old-hardware.md` is the plan (not started) for running below
 Vulkan 1.3, and why not OpenGL.
 `docs/rexglue-removal.md` is the plan for a native port without the
@@ -103,8 +110,10 @@ reviewed by the user) made five subsystems native as far as they were ready
 (`docs/functions/sprites.md`, `command-list.md`, `c-runtime.md`,
 `ui-movies.md`, `ui-movies-game.md`; each behind `--native_*` flags, on by
 default); see "B7's loop runs" in the plan and
-`docs/loops/b7-progress.md`. Most of what's left in them waits on the
-user's call on allocating guest memory from native code. Its second run
+`docs/loops/b7-progress.md`. Much of what's left in them waited on
+allocating guest memory from native code, which is native since
+native memory (2026-10-22, `docs/native-memory.md`): native code calls
+`memory::Alloc` and the like. Its second run
 (on `b7-loop-22-10-26`, merged into `rexglue-removal-project`
 2026-10-22, after a drive saw the functions attract races hadn't; summary
 `docs/loops/b7-loop-2026-10-22-1047.md`) removed 31 adapters and made the

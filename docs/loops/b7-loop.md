@@ -194,9 +194,12 @@ Before any migration, the lead checks, and halts on any failure:
 - `b7_status.py`: the new file shows in its table; every function in the
   file is in play.
 - The report's `stop:` is `none`, and nothing in the file needs a
-  decision only the user can make: the guest heap (native code that
-  allocates guest memory needs a way to do it without `ctx`), a kernel
-  import replaced, behavior changed on purpose, a new dependency.
+  decision only the user can make: a kernel import replaced, behavior
+  changed on purpose, a new dependency. Allocating guest memory isn't
+  one (since 2026-10-22): native code calls the allocation layer
+  (`src/memory/heap.h`: `memory::Alloc`, `Free`, `Realloc`, `AllocPages`,
+  `FreePages`, `AllocPhysical`; `docs/native-memory.md`), which every
+  allocation, recompiled and native, goes through.
 - At least one ready group (`b7_groups.py` on the file's functions). With
   none, the subsystem waits on its blockers: the lead adds them to
   `leads.md` if they aren't there and takes the next lead instead.

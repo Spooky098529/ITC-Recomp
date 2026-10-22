@@ -16,7 +16,8 @@ overlays in [`sprites.md`](sprites.md). The C runtime's globals are in
 Not here: the heap (`sub_825A6880`, `sub_825A6940`, `sub_825A70E8`,
 `sub_825A71C0`, and under them `sub_825A9A90` and `sub_825A9B58`, the
 allocation and free over HeapAlloc and HeapFree, `sub_825AC320` calloc,
-`sub_825AEBC8` and `sub_825AED30`; a lead waiting on the user), and what
+`sub_825AEBC8` and `sub_825AED30`; their rows are in `heap.md`, over
+the native allocation layer since 2026-10-22, `docs/native-memory.md`), and what
 calls kernel imports, which goes with the core: the locks
 (`sub_825AA1A8` and `sub_825AA1B0` over `sub_825B3430` and `sub_825B32D0`,
 critical sections), `atexit` (`sub_825A7068`, 124 static set-ups

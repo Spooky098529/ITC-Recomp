@@ -44,8 +44,9 @@ VirtualAlloc and VirtualFree), `sub_825A6880` (probably operator new) and
 `sub_825A70E8` (probably operator delete) are leads in
 `../loops/leads.md`. The overlays allocate guest memory (their objects,
 views and texture tables through `sub_82295398`, the texture set through
-`sub_825A6880`): making the creation side native waits on the user's
-call on the guest heap; the update side doesn't allocate. Made native
+`sub_825A6880`): since 2026-10-22 native code allocates through the
+allocation layer (`src/memory/heap.h`, `docs/native-memory.md`), so the
+creation side no longer waits on that; the update side doesn't allocate. Made native
 from the bottom up by the B7 loop (2026-10-22): plain C++ in
 `itc_recomp/src/race_overlays/`, adapters in `src/hooks/race_overlays.cpp`
 behind `--native_race_overlays`, harness `race_overlays`. Learned there:

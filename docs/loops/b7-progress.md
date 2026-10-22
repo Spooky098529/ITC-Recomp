@@ -39,7 +39,7 @@ rows to review and drive list are there), and this file's history.
   ff29ee9..ff7cd37, validated. Still blocked there: `sub_82126ED0` (a
   guest vtable call: UpdateModelSprites, UpdateSparks, UpdateMarker and
   the update above them) and the create and destroy side (guest
-  allocation).
+  allocation; no longer a block since 2026-10-22: `docs/native-memory.md`).
 
 - The matrix math (`matrix-math.md`, mapped in 7929f36; 28 rows): 28
   ours (20 Overridden, 5 Native, 3 Merged) in two migrations (18cafd4;

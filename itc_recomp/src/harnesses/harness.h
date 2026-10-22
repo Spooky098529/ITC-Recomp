@@ -118,5 +118,6 @@ void RaceOverlays(Context& h);
 void VehicleAccessors(Context& h);
 void MatrixMath(Context& h);
 void CarPhysics(Context& h);
+void Heap(Context& h);
 
 }  // namespace harness
