@@ -12,6 +12,7 @@
 #include "base/flags.h"
 
 #include <cstring>
+#include <vector>
 
 
 
@@ -29,7 +30,9 @@ ITC_FLAG_BOOL(native_c_runtime, true, "ITC",
               "sub_825AB040, sub_825AB0A0, sub_825B6898); strtoul and strtoxl (sub_825A85E0, "
               "sub_825A82C8); ___dtold and _ld12tod (sub_825B6378, sub_825B69B8); atof, _atof_l, "
               "_fltin2, __strgtold12_l and __mtold12 (sub_825AB1C0, sub_825AB0C0, sub_825AFDC8, "
-              "sub_825B36B8, sub_825B7F10); _fltout2 and $I10_OUTPUT (sub_825B6458, sub_825B8B48); write_char "
+              "sub_825B36B8, sub_825B7F10); _fltout2 and $I10_OUTPUT (sub_825B6458, sub_825B8B48); %f's "
+              "_cfltcvt_l, _cftof_l, _cftof2_l and _fptostr (sub_825AEB20, sub_825AE8E0, sub_825AE708, "
+              "sub_825B61E8); write_char "
               "(sub_825AF000), write_multi_char (sub_825AF098), the wide write_char and _putwc_nolock "
               "(sub_825B1368, sub_825B7A80); __iob_func (sub_825AD4C0); the start-up's _cfltcvt_init (sub_825A6DB0, "
               "sub_825A6E48), _init_pointers' setters (sub_825AD140, sub_825AEE18, sub_825AFCB8, "
@@ -572,6 +575,131 @@ extern "C" REX_FUNC(sub_825B6458) {
   }
   guest::StoreU32(base, result + 12, buffer);
   ctx.r3.u64 = ctx.r4.u64;
+}
+
+// _cfltcvt_l: r3 = the double's address, r4 = the buffer, r5 = its size, r6
+// = the format character, r7 = the precision, r8 = caps, r9 = the locale.
+// The original's dispatch, with its register moves: 'e' and 'E' to
+// sub_825AE1A8, 'f' to _cftof_l (its override below), 'a' and 'A' to
+// sub_825AE2C0, the rest ('g', 'G') to sub_825AE9D0; only 'f' was seen in
+// play, the others stay recompiled. Its one caller, _output_l's indirect
+// call through the table at 0x8266BA5C, reads no register after it.
+extern "C" REX_FUNC(sub_825AEB20) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_c_runtime)) {
+    __imp__sub_825AEB20(ctx, base);
+    return;
+  }
+  const int32_t format = ctx.r6.s32;
+  ctx.r11.u64 = ctx.r6.u64;
+  ctx.r6.u64 = ctx.r7.u64;
+  ctx.r7.u64 = ctx.r8.u64;
+  ctx.r8.u64 = ctx.r9.u64;
+  if (format == 'e' || format == 'E') {
+    sub_825AE1A8(ctx, base);
+  } else if (format == 'f') {
+    ctx.r7.u64 = ctx.r8.u64;
+    sub_825AE8E0(ctx, base);
+  } else if (format == 'a' || format == 'A') {
+    sub_825AE2C0(ctx, base);
+  } else {
+    sub_825AE9D0(ctx, base);
+  }
+}
+
+// _cftof_l (%f): r3 = the double's address, r4 = the buffer, r5 = its size,
+// r6 = the precision, r7 = the locale (not used); returns 0.
+// c_runtime::Cftof does _fltout2, _fptostr and _cftof2_l natively; where it
+// can't (the error paths through _errno, never seen in play; a buffer in the
+// physical views or across two views), the original runs. The original
+// leaves r4 to r12 changed; its callers (_cfltcvt_l's and sub_825AEB70's
+// tail calls, so _output_l) read none of them. (Its frame, with _fltout2's
+// result and digits, is below the caller's stack pointer: not written.)
+extern "C" REX_FUNC(sub_825AE8E0) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_c_runtime) ||
+      !c_runtime::Cftof(base, REX_LOAD_U64(ctx.r3.u32), ctx.r4.u32, ctx.r5.u32, ctx.r6.s32)) {
+    __imp__sub_825AE8E0(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = 0;
+}
+
+// _fptostr: r3 = the buffer, r4 = its size, r5 = the digits wanted, r6 =
+// _fltout2's result (+4 the decimal exponent, added to on a carry; +12 the
+// digits); returns 0. Natively over a GuestText; where the original goes
+// through _errno (a null buffer, no room), the buffer is in the physical
+// views, or what's written shares memory with the result or the digits
+// read, the original runs. Its callers read only r3 after it.
+extern "C" REX_FUNC(sub_825B61E8) {
+  REX_FUNC_PROLOGUE();
+  const uint32_t buffer = ctx.r3.u32, size = ctx.r4.u32, result = ctx.r6.u32;
+  const int32_t digits = ctx.r5.s32;
+  bool native = ITC_FLAG(native_c_runtime) && buffer != 0;
+  c_runtime::GuestText text(base, buffer);
+  std::vector<uint8_t> mantissa;
+  uint32_t source = 0, read = 0;
+  int32_t exponent = 0, before = 0;
+  if (native) {
+    source = guest::LoadU32(base, result + 12);
+    const uint32_t whole = digits > 0 ? uint32_t(digits) : 0;
+    // The original reads the digits up to their terminator, at most one
+    // past the digits wanted (none for fewer than 0 wanted).
+    while (digits >= 0 && read <= whole && read < (1u << 20)) {
+      const uint8_t c = guest::LoadU8(base, source + read);
+      read++;
+      if (c == 0) {
+        break;
+      }
+      mantissa.push_back(c);
+    }
+    exponent = before = int32_t(guest::LoadU32(base, result + 4));
+    native = c_runtime::FpToStr(text, 0, size, digits, &exponent, mantissa) == 0 && text.ok();
+  }
+  if (native) {
+    const uint32_t end = uint32_t(text.WrittenEnd());
+    native = !c_runtime::MayShare(result, 16, buffer, end) &&
+             !c_runtime::MayShare(source, read, buffer, end) && text.Commit();
+  }
+  if (!native) {
+    __imp__sub_825B61E8(ctx, base);
+    return;
+  }
+  if (exponent != before) {
+    guest::StoreU32(base, result + 4, uint32_t(exponent));
+  }
+  ctx.r3.u64 = 0;
+}
+
+// _cftof2_l: r3 = the buffer (holding _fptostr's digits), r4 = its size
+// (only checked for 0), r5 = the precision, r6 = _fltout2's result (+0 the
+// sign, +4 the decimal exponent), r7 = %g (its low byte), r8 = the locale
+// (not used: the decimal point is the current locale's); returns 0.
+// Natively over a GuestText; a null buffer or a size of 0 (_errno), a
+// buffer in the physical views, or writes sharing memory with the result
+// or the decimal point run the original. Its callers read only r3.
+extern "C" REX_FUNC(sub_825AE708) {
+  REX_FUNC_PROLOGUE();
+  const uint32_t buffer = ctx.r3.u32, result = ctx.r6.u32;
+  bool native = ITC_FLAG(native_c_runtime) && buffer != 0 && ctx.r4.u32 != 0;
+  c_runtime::GuestText text(base, buffer);
+  if (native) {
+    uint32_t words[3];
+    const uint32_t point = c_runtime::DecimalPointAddress(base, words);
+    native = c_runtime::Cftof2(text, ctx.r5.s32, int32_t(guest::LoadU32(base, result)),
+                               int32_t(guest::LoadU32(base, result + 4)), ctx.r7.s8 != 0,
+                               guest::LoadU8(base, point));
+    const uint32_t end = uint32_t(text.WrittenEnd());
+    native = native && !c_runtime::MayShare(result, 8, buffer, end) &&
+             !c_runtime::MayShare(words[0], 4, buffer, end) &&
+             !c_runtime::MayShare(words[1], 4, buffer, end) &&
+             !c_runtime::MayShare(point, 1, buffer, end) && text.Commit();
+  }
+  if (!native) {
+    __imp__sub_825AE708(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = 0;
 }
 
 // write_char: r3 = the character, r4 = the stream, r5 = the count. Where

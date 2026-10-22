@@ -345,6 +345,19 @@ bool Behind(uint32_t address, uint32_t size, uint64_t* start, size_t* view = nul
 
 }  // namespace
 
+bool InOneView(uint32_t address, uint32_t size) {
+  uint64_t start;
+  return Behind(address, size, &start);
+}
+
+bool MayShare(uint32_t a, uint32_t a_size, uint32_t b, uint32_t b_size) {
+  uint64_t from_a, from_b;
+  if (!Behind(a, a_size, &from_a) || !Behind(b, b_size, &from_b)) {
+    return true;
+  }
+  return from_a < from_b + b_size && from_b < from_a + a_size;
+}
+
 bool Memcpy(uint8_t* base, uint32_t destination, uint32_t source, uint32_t size) {
   if (size == 0) {
     return true;

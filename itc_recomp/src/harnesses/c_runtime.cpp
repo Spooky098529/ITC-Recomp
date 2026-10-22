@@ -1394,6 +1394,175 @@ void CRuntime(Context& h) {
     results.Report();
   }
 
+  // %f (_cfltcvt_l sub_825AEB20, _cftof_l sub_825AE8E0): doubles (the
+  // special values, zeros of both signs, denormals, rounding carries like
+  // 9.995 and 0.95, powers of ten and their neighbors, random values and
+  // bits) with precisions 0 to 6, 17, 30, 100, 163 and 300, the buffer at
+  // three alignments and big enough (the error paths through _errno, never
+  // seen, left out); 'e', 'E', 'g' and 'G' too, through _cfltcvt_l's
+  // dispatch (recompiled, calling the _fptostr and _cftof2_l overrides).
+  // The scratch area and r3 compared.
+  {
+    std::vector<uint64_t> doubles = {0, 0x8000000000000000ull, 0x7FF0000000000000ull,
+                                     0xFFF0000000000000ull, 0x7FF8000000000000ull,
+                                     0xFFF8000000000000ull, 0x7FF0000000000001ull,
+                                     0x7FF4000000000000ull, 0x0000000000000001ull,
+                                     0x800FFFFFFFFFFFFFull, 0x0010000000000000ull,
+                                     0x7FEFFFFFFFFFFFFFull, 0xFFEFFFFFFFFFFFFFull};
+    for (double v : {9.995, -9.995, 0.995, 0.95, 0.5, 1.5, 2.5, -0.5, 0.05, 0.005, 99.95,
+                     999.5, 9.5, 9.9999999, 0.0005, 0.00049, 1e22, 1e-5, 123.456, -2.5,
+                     0.1, 0.3, 1.0, 10.0, 99.999, 9999999.9999, 0.999999999, 1e15 - 0.5,
+                     4503599627370495.5, 1e300, 1e-300}) {
+      doubles.push_back(std::bit_cast<uint64_t>(v));
+    }
+    for (int i = -12; i <= 12; i++) {
+      const uint64_t b = std::bit_cast<uint64_t>(std::pow(10.0, i));
+      doubles.push_back(b - 1);
+      doubles.push_back(b);
+      doubles.push_back(b + 1);
+    }
+    for (int i = 0; i < 160; i++) {
+      const uint64_t bits = h.random.Next();
+      doubles.push_back(i % 4 == 0 ? bits : (bits & 0x800FFFFFFFFFFFFFull) |
+                                                (uint64_t(960 + h.random.Below(120)) << 52));
+    }
+    const int32_t kPrecisions[] = {0, 1, 2, 3, 4, 5, 6, 17, 30, 100, 163, 300};
+    Results f_results("%f: _cfltcvt_l and _cftof_l (sub_825AEB20, sub_825AE8E0)");
+    Results other_results("_cfltcvt_l's 'e' and 'g' (sub_825AEB20, recompiled below it)");
+    size_t n = 0;
+    for (uint64_t d : doubles) {
+      for (size_t k = 0; k < std::size(kPrecisions); k++) {
+        const int32_t precision = kPrecisions[k];
+        const bool other = (n + k) % 7 == 3 && precision <= 30;
+        static const int32_t kOthers[] = {'e', 'E', 'g', 'G'};
+        const int32_t format = other ? kOthers[(n + k) % 4] : 'f';
+        const uint32_t buffer = h.data + 64 + uint32_t((n + k) % 3);
+        const uint32_t size = 2400 + uint32_t(h.random.Below(1000));
+        for (int direct = 0; direct < (format == 'f' ? 2 : 1); direct++) {
+          StringCase(h, other ? other_results : f_results,
+                     [&] {
+                       guest::StoreU32(h.base, h.data + 8, uint32_t(d >> 32));
+                       guest::StoreU32(h.base, h.data + 12, uint32_t(d));
+                       guest::StoreU8(h.base, h.data + kScratchBytes - 1, 0);
+                     },
+                     [&](PPCContext& t) {
+                       t.r3.u64 = h.data + 8;
+                       t.r4.u64 = buffer;
+                       t.r5.u64 = size;
+                       if (direct) {
+                         t.r6.u64 = uint64_t(int64_t(precision));
+                         t.r7.u64 = 0;
+                       } else {
+                         t.r6.u64 = uint64_t(format);
+                         t.r7.u64 = uint64_t(int64_t(precision));
+                         t.r8.u64 = n & 1;
+                         t.r9.u64 = 0;
+                       }
+                     },
+                     direct ? __imp__sub_825AE8E0 : __imp__sub_825AEB20,
+                     direct ? sub_825AE8E0 : sub_825AEB20,
+                     fmt::format("{:016X} %{}.{}{}", d, char(format), precision,
+                                 direct ? " (_cftof_l)" : ""));
+        }
+      }
+      n++;
+    }
+    f_results.Report();
+    other_results.Report();
+  }
+
+  // _fptostr (sub_825B61E8): digit strings (random digits, runs of nines to
+  // carry through, '5' and above at the rounding place, high bytes, shorter
+  // than asked) with -3 to 40 digits wanted and 100 to 300, the result's
+  // exponent random, the buffer at three alignments with room to spare and
+  // at the least room (size = digits + 2). The scratch area and r3 compared.
+  {
+    Results results("_fptostr (sub_825B61E8)");
+    for (int i = 0; i < 900; i++) {
+      const uint32_t length = h.random.Below(i % 5 == 0 ? 60 : 24);
+      std::vector<uint8_t> mantissa(length);
+      for (uint8_t& c : mantissa) {
+        const uint32_t r = h.random.Below(10);
+        c = r < 4 ? '9' : r < 9 ? uint8_t('0' + h.random.Below(10)) : uint8_t(0x80 + h.random.Below(0x7F));
+      }
+      const int32_t digits = i % 10 == 9 ? int32_t(100 + h.random.Below(200))
+                                         : int32_t(h.random.Below(44)) - 3;
+      const uint32_t whole = digits > 0 ? uint32_t(digits) : 0;
+      const uint32_t size = i % 3 == 0 ? whole + 2 : whole + 2 + h.random.Below(400);
+      const uint32_t buffer = h.data + 64 + uint32_t(i % 3);
+      const uint32_t result = h.data + 2048;
+      const uint32_t digits_at = h.data + 2200 + uint32_t(i % 2);
+      const int32_t exponent = int32_t(h.random.Below(80)) - 40;
+      StringCase(h, results,
+                 [&] {
+                   guest::StoreU32(h.base, result, i % 2 ? '-' : ' ');
+                   guest::StoreU32(h.base, result + 4, uint32_t(exponent));
+                   guest::StoreU32(h.base, result + 8, 1);
+                   guest::StoreU32(h.base, result + 12, digits_at);
+                   WriteBytes(h, digits_at, mantissa);
+                 },
+                 [&](PPCContext& t) {
+                   t.r3.u64 = buffer;
+                   t.r4.u64 = size;
+                   t.r5.u64 = uint64_t(int64_t(digits));
+                   t.r6.u64 = result;
+                 },
+                 __imp__sub_825B61E8, sub_825B61E8,
+                 fmt::format("\"{}\" digits {} size {}",
+                             std::string(mantissa.begin(), mantissa.end()), digits, size));
+    }
+    results.Report();
+  }
+
+  // _cftof2_l (sub_825AE708): digit strings as _fptostr leaves them, signs
+  // '-', ' ' and others, exponents from -45 to the string's length,
+  // precisions 0 to 40 and 100 to 300 (and -1), %f and %g (g_format, with
+  // the exponent one above the precision often). The scratch area and r3
+  // compared.
+  {
+    Results results("_cftof2_l (sub_825AE708)");
+    for (int i = 0; i < 900; i++) {
+      const uint32_t length = 1 + h.random.Below(i % 6 == 0 ? 120 : 30);
+      std::vector<uint8_t> text(length);
+      for (uint8_t& c : text) {
+        c = uint8_t('0' + h.random.Below(10));
+      }
+      static const uint32_t kSigns[] = {'-', ' ', '+', 0x2D00};
+      const uint32_t sign = kSigns[i % 4];
+      const int32_t precision = i % 8 == 7 ? int32_t(100 + h.random.Below(200))
+                                : i % 50 == 1 ? -1
+                                              : int32_t(h.random.Below(41));
+      const bool g_format = i % 3 == 1;
+      int32_t exponent = int32_t(h.random.Below(length + 46)) - 45;
+      if (g_format && i % 2 == 0 && precision + 1 <= int32_t(length)) {
+        exponent = precision + 1;
+      }
+      const uint32_t buffer = h.data + 64 + uint32_t(i % 3);
+      const uint32_t result = h.data + 2048;
+      const uint32_t size = 1 + h.random.Below(2000);
+      StringCase(h, results,
+                 [&] {
+                   guest::StoreU32(h.base, result, sign);
+                   guest::StoreU32(h.base, result + 4, uint32_t(exponent));
+                   WriteBytes(h, buffer + (sign == '-' ? 1 : 0), text);
+                   guest::StoreU8(h.base, h.data + kScratchBytes - 1, 0);
+                 },
+                 [&](PPCContext& t) {
+                   t.r3.u64 = buffer;
+                   t.r4.u64 = size;
+                   t.r5.u64 = uint64_t(int64_t(precision));
+                   t.r6.u64 = result;
+                   t.r7.u64 = g_format ? 0x100 | (1 + i % 200) : 0x100;
+                   t.r8.u64 = 0;
+                 },
+                 __imp__sub_825AE708, sub_825AE708,
+                 fmt::format("\"{}\" sign {:X} exponent {} precision {} g {}",
+                             std::string(text.begin(), text.end()), sign, exponent, precision,
+                             g_format));
+    }
+    results.Report();
+  }
+
   // __iob_func: r3 from random registers.
   {
     Results results("__iob_func (sub_825AD4C0)");

@@ -100,4 +100,12 @@ bool Memcpy(uint8_t* base, uint32_t destination, uint32_t source, uint32_t size)
 // original's tail call to memcpy, sub_825A7410.)
 bool MemmoveDown(uint8_t* base, uint32_t destination, uint32_t source, uint32_t size);
 
+// Whether `size` bytes at `address` lie in one guest view (not crossing
+// into the next one).
+bool InOneView(uint32_t address, uint32_t size);
+// Whether two ranges might share memory behind the guest views: true where
+// they do, or where either crosses into another view (then it can't be
+// told).
+bool MayShare(uint32_t a, uint32_t a_size, uint32_t b, uint32_t b_size);
+
 }  // namespace c_runtime

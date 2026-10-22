@@ -3,7 +3,13 @@
 
 #include "c_runtime/format.h"
 
+#include "c_runtime/parse.h"
+#include "c_runtime/strings.h"
+
 #include "guest.h"
+
+#include <algorithm>
+#include <climits>
 
 namespace c_runtime {
 
@@ -239,6 +245,225 @@ bool WriteWideChar(uint8_t* base, uint16_t unit, uint32_t stream, uint32_t count
   }
   guest::StoreU32(base, count, unit == 0xFFFF ? 0xFFFFFFFFu : guest::LoadU32(base, count) + 1);
   return true;
+}
+
+bool GuestText::Reach(uint64_t at) {
+  constexpr uint64_t kLimit = 1u << 20;
+  if (!ok_ || at >= kLimit || address_ + at > 0xFFFFFFFFull) {
+    ok_ = false;
+    return false;
+  }
+  if (at >= bytes_.size()) {
+    const size_t size = std::max<size_t>(at + 1, bytes_.size() * 2);
+    bytes_.resize(size);
+    known_.resize(size);
+    written_.resize(size);
+  }
+  return true;
+}
+
+uint8_t GuestText::Get(uint64_t at) {
+  if (!Reach(at)) {
+    return 0;
+  }
+  if (!known_[at]) {
+    bytes_[at] = guest::LoadU8(base_, uint32_t(address_ + at));
+    known_[at] = 1;
+  }
+  return bytes_[at];
+}
+
+void GuestText::Set(uint64_t at, uint8_t value) {
+  if (!Reach(at)) {
+    return;
+  }
+  bytes_[at] = value;
+  known_[at] = 1;
+  written_[at] = 1;
+  end_ = std::max(end_, at + 1);
+}
+
+uint32_t GuestText::Length(uint64_t at) {
+  uint32_t length = 0;
+  while (ok_ && Get(at + length) != 0) {
+    length++;
+  }
+  return length;
+}
+
+void GuestText::Move(uint64_t to, uint64_t from, uint32_t count) {
+  if (count == 0 || !Reach(std::max(to, from) + count - 1)) {
+    return;
+  }
+  if (to > from) {
+    for (uint64_t i = count; i-- > 0;) {
+      Set(to + i, Get(from + i));
+    }
+  } else if (to < from) {
+    for (uint64_t i = 0; i < count; i++) {
+      Set(to + i, Get(from + i));
+    }
+  }
+}
+
+void GuestText::Fill(uint64_t at, uint8_t value, uint32_t count) {
+  if (count == 0 || !Reach(at + count - 1)) {
+    return;
+  }
+  for (uint64_t i = 0; i < count; i++) {
+    Set(at + i, value);
+  }
+}
+
+bool GuestText::Commit() {
+  if (!ok_) {
+    return false;
+  }
+  if (end_ == 0) {
+    return true;
+  }
+  if (!InOneView(address_, uint32_t(end_)) || address_ + end_ > 0xA0000000ull) {
+    return false;
+  }
+  for (uint64_t i = 0; i < end_; i++) {
+    if (written_[i]) {
+      guest::StoreU8(base_, uint32_t(address_ + i), bytes_[i]);
+    }
+  }
+  return true;
+}
+
+int32_t FpToStr(GuestText& text, uint64_t at, uint32_t size, int32_t digits, int32_t* exponent,
+                const std::vector<uint8_t>& mantissa) {
+  const uint32_t whole = digits > 0 ? uint32_t(digits) : 0;
+  if (size == 0 || size <= whole + 1) {
+    return -1;  // EINVAL, ERANGE: _errno and _invalid_parameter
+  }
+  const auto digit = [&](size_t i) { return i < mantissa.size() ? mantissa[i] : uint8_t(0); };
+  text.Set(at, '0');
+  size_t next = 0;
+  uint64_t p = at + 1;
+  int32_t left = digits;
+  while (left > 0 && text.ok()) {
+    uint8_t c = digit(next);
+    if (c != 0) {
+      next++;
+    } else {
+      c = '0';
+    }
+    text.Set(p++, c);
+    left--;
+  }
+  text.Set(p, 0);
+  if (left >= 0 && int8_t(digit(next)) >= '5') {  // the original's extsb: signed
+    p--;
+    while (text.ok() && text.Get(p) == '9') {
+      text.Set(p, '0');
+      p--;
+    }
+    text.Set(p, uint8_t(text.Get(p) + 1));
+  }
+  if (text.Get(at) == '1') {
+    *exponent = int32_t(uint32_t(*exponent) + 1);
+  } else {
+    text.Move(at, at + 1, text.Length(at + 1) + 1);
+  }
+  return 0;
+}
+
+bool Cftof2(GuestText& text, int32_t precision, int32_t sign, int32_t exponent, bool g_format,
+            uint8_t point) {
+  const int32_t before = int32_t(uint32_t(exponent) - 1);
+  if (g_format && before == precision) {
+    const int64_t at = int64_t(int32_t(uint32_t(sign == kMinus) + uint32_t(before)));
+    if (at < 0) {
+      return false;
+    }
+    text.Set(uint64_t(at), '0');
+    text.Set(uint64_t(at) + 1, 0);
+  }
+  uint64_t p = 0;
+  if (sign == kMinus) {
+    text.Set(0, uint8_t(sign));
+    p = 1;
+  }
+  uint64_t q;
+  if (exponent <= 0) {
+    text.Move(p + 1, p, text.Length(p) + 1);
+    text.Set(p, '0');
+    q = p + 1;
+  } else {
+    q = p + uint64_t(exponent);
+  }
+  if (precision > 0) {
+    text.Move(q + 1, q, text.Length(q) + 1);
+    text.Set(q, point);
+    if (exponent < 0) {
+      if (exponent == INT32_MIN) {
+        return false;
+      }
+      int32_t zeros = -exponent;
+      if (!g_format && precision < zeros) {
+        zeros = precision;
+      }
+      if (zeros != 0) {
+        text.Move(q + 1 + uint64_t(zeros), q + 1, text.Length(q + 1) + 1);
+      }
+      text.Fill(q + 1, '0', uint32_t(zeros));
+    }
+  }
+  return text.ok();
+}
+
+uint32_t DecimalPointAddress(uint8_t* base, uint32_t* words) {
+  constexpr uint32_t kLocaleData = 0x8266C024;
+  const uint32_t first = guest::LoadU32(base, kLocaleData);
+  const uint32_t point = guest::LoadU32(base, first);
+  if (words) {
+    words[0] = kLocaleData;
+    words[1] = first;
+    words[2] = point;
+  }
+  return point;
+}
+
+bool Cftof(uint8_t* base, uint64_t bits, uint32_t buffer, uint32_t size, int32_t precision) {
+  // _fltout2: $I10_OUTPUT's digits copied by strcpy_s into 22 bytes.
+  FloatOut out;
+  if (!I10Output(base, DoubleToLd12(bits), 17, 0, &out)) {
+    return false;
+  }
+  uint32_t length = 0;
+  while (length < 22 && out.bytes[4 + length] != 0) {
+    length++;
+  }
+  if (length >= 22) {
+    return false;
+  }
+  const int32_t sign = int32_t(int8_t(out.bytes[2]));
+  int32_t exponent = int32_t(int16_t(out.bytes[0] << 8 | out.bytes[1]));
+  const std::vector<uint8_t> mantissa(out.bytes + 4, out.bytes + 4 + length);
+  if (buffer == 0 || size == 0) {
+    return false;  // EINVAL
+  }
+  const uint32_t minus = sign == kMinus ? 1 : 0;
+  const uint32_t room = size == 0xFFFFFFFFu ? 0xFFFFFFFFu : size - minus;
+  GuestText text(base, buffer);
+  if (FpToStr(text, minus, room, int32_t(uint32_t(exponent) + uint32_t(precision)), &exponent,
+              mantissa) != 0) {
+    return false;
+  }
+  uint32_t words[3];
+  const uint32_t point = DecimalPointAddress(base, words);
+  if (!Cftof2(text, precision, sign, exponent, false, guest::LoadU8(base, point))) {
+    return false;
+  }
+  const uint32_t end = uint32_t(text.WrittenEnd());
+  if (MayShare(words[0], 4, buffer, end) || MayShare(words[1], 4, buffer, end) ||
+      MayShare(point, 1, buffer, end)) {
+    return false;
+  }
+  return text.Commit();
 }
 
 }  // namespace c_runtime
