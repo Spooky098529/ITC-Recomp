@@ -22,7 +22,7 @@ ITC_FLAG_BOOL(native_car_physics, true, "ITC",
               "sub_820BC550; its pairs and reset, sub_820B94B0, sub_820B8A88, sub_820B85E8 with "
               "sub_820B8C20, sub_820BC068, sub_820BBC40, sub_820BBD30, sub_820B9448 with "
               "sub_820B8BA8, sub_820B8AF8, and the collision objects' groups, sub_820B7CC8, "
-              "sub_820B7CF0, and their translation, sub_820B7B60; the car data and the "
+              "sub_820B7CF0, and their translation, sub_820B7B60; the vehicle's forces applied, sub_820B2CC0; the car data and the "
               "vehicle's constructor, sub_820AEF80 with sub_820AECB8, sub_820AEE98, "
               "sub_820AF018, sub_820B42C8) natively instead of through the translated code "
               "(the same words, bit for bit; checked by --run_harnesses=car_physics)");
@@ -223,6 +223,7 @@ ITC_CAR_PHYSICS(820B3F80,
                 ctx.r3.u64 = VehicleUpdateTireForces(base, ctx.r3.u32, ctx.r1.u32 - 272))
 ITC_CAR_PHYSICS(820B2808, ctx.r3.u64 = VehicleUpdateAtRest(base, ctx.r3.u32, ctx.r1.u32 - 192))
 ITC_CAR_PHYSICS(820B2A48, ctx.r3.u64 = VehicleUpdateAero(base, ctx.r3.u32, ctx.r1.u32 - 240))
+ITC_CAR_PHYSICS(820B2CC0, ctx.r3.u64 = VehicleApplyForces(base, ctx.r3.u32, ctx.r1.u32 - 352))
 ITC_CAR_PHYSICS(820B1B00,
                 ctx.r3.u64 = VehicleUpdateWheelAxes(base, ctx.r3.u32, ctx.r1.u32 - 256))
 

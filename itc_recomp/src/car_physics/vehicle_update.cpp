@@ -22,6 +22,11 @@ namespace va = vehicle_accessors;
 namespace {
 
 constexpr uint32_t kWheelBytes = 368;
+// Vehicle::ApplyForces's tip limits (+16 . up below them: tipped), the up
+// vector and 0.5.
+constexpr uint32_t kTipUpright = 0x82002A34, kTipInAir = 0x82002A30, kTipDown = 0x82002A2C;
+constexpr uint32_t kUp = 0x82638280;
+constexpr uint32_t kHalfConstant = 0x82001BE4;
 
 uint32_t Wheel(uint32_t vehicle, uint32_t w) {
   return vehicle + 416 + kWheelBytes * w;
@@ -1207,6 +1212,121 @@ uint32_t VehicleUpdateWheelAxes(uint8_t* base, uint32_t vehicle, uint32_t frame)
     mm::QuaternionFromAxisAngle(base, wheel + 48, 0x82638270, turn, f - 32);
   }
   return w3 + 48;
+}
+
+uint32_t VehicleApplyForces(uint8_t* base, uint32_t vehicle, uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_820B2CC0 Vehicle::ApplyForces");
+  const uint32_t v = vehicle, f = frame;
+  // The speed squared.
+  const double speed = Lfs(base, v + 48);
+  Stfs(base, v + 2440, Fmuls(speed, speed));
+  // The center of mass: the car data's +96 with wheels down, +112 in the
+  // air, set when byte +3132 changes.
+  const bool down = guest::LoadU32(base, v + 348) != 0;
+  const uint8_t airborne = guest::LoadU8(base, v + 3132);
+  if (down ? airborne != 0 : airborne == 0) {
+    guest::StoreU8(base, v + 3132, down ? 0 : 1);
+    const uint32_t offset = guest::LoadU32(base, v + 272) + (down ? 96 : 112);
+    va::RigidBodySetCenterOfMass(base, guest::LoadU32(base, v + 336), offset);
+  }
+  const uint32_t sum = v + 368;
+  for (uint32_t i = 0; i < 16; i += 4) {
+    CopyWord(base, kZero, f + 80 + i);
+  }
+  vl::Vec4Copy(base, sum, f + 80);
+  // Two dot products the original drops.
+  vl::Vec3DotOf(base, v, v + 112);
+  vl::Vec3DotOf(base, v + 32, v + 128);
+  const double tip_limit_in_air = Lfs(base, kTipInAir);
+  const double tip_limit_down = Lfs(base, kTipDown);
+  const double tip_limit_upright = Lfs(base, kTipUpright);
+  const uint32_t up = v + 16;
+  for (uint32_t w = 0; w < 4; w++) {
+    const uint32_t accumulator = v + 2544 + 16 * w;
+    // The wheel's force in the ground frame, summed, and given to the body
+    // at its contact point (the wheel's +160, 16 bytes copied).
+    mm::InverseRotate(base, f + 112, v + 144, accumulator);
+    vl::Vec3AddTo(base, sum, f + 112);
+    const uint32_t point = Wheel(v, w) + 160;
+    for (uint32_t i = 0; i < 16; i += 4) {
+      guest::StoreU32(base, f + 128 + i, guest::LoadU32(base, point + i));
+    }
+    va::RigidBodyAddForceAt(base, guest::LoadU32(base, v + 336), accumulator, f + 128);
+    // Tipped too far: the angular velocity set to up x +96, or zero.
+    uint32_t spin = 0;
+    if (guest::LoadU32(base, v + 348) != 0) {
+      guest::StoreU8(base, v + 3241, 0);
+      if (!(double(vl::Vec3DotOf(base, up, kUp)) < tip_limit_down)) {
+        continue;
+      }
+      vl::Vec3Cross(base, f + 160, up, v + 96);
+      spin = f + 160;
+    } else if (guest::LoadU8(base, v + 3241) == 0) {
+      if (!(double(vl::Vec3DotOf(base, up, kUp)) < tip_limit_in_air)) {
+        guest::StoreU8(base, v + 3241, 1);
+        continue;
+      }
+      vl::Vec3Cross(base, f + 176, up, v + 96);
+      spin = f + 176;
+    } else {
+      const double tilt = double(vl::Vec3DotOf(base, up, kUp));
+      if (!(tilt < tip_limit_upright)) {
+        continue;
+      }
+      for (uint32_t i = 0; i < 16; i += 4) {
+        guest::StoreU32(base, f + 144 + i, guest::LoadU32(base, kZeroVector + i));
+      }
+      const uint32_t angular = va::RigidBodyAngularVelocity(guest::LoadU32(base, v + 336));
+      vl::Vec3Cross(base, f + 192, angular, up);
+      if (!(tilt > double(vl::Vec3DotOf(base, f + 192, kUp)))) {
+        continue;
+      }
+      spin = f + 144;
+    }
+    RigidBodySetAngularVelocity(base, guest::LoadU32(base, v + 336), spin, f - 160);
+  }
+  // +80, +84 from +2976, +2980 by +376 and the summed force's x.
+  const double a = Fmuls(Lfs(base, v + 2976), Lfs(base, v + 376));
+  const double b = Fmuls(Lfs(base, v + 2980), Lfs(base, sum));
+  Stfs(base, v + 80, a);
+  Stfs(base, v + 84, b);
+  // The body's force before (+2464), then +2608 added; at rest the
+  // horizontal part cancelled.
+  const uint32_t body = guest::LoadU32(base, v + 336);
+  vl::Vec4Copy(base, v + 2464, va::RigidBodyForce(body));
+  va::RigidBodyAddForce(base, guest::LoadU32(base, v + 336), v + 2608);
+  const uint32_t force = va::RigidBodyForce(guest::LoadU32(base, v + 336));
+  for (uint32_t i = 0; i < 16; i += 4) {
+    guest::StoreU32(base, f + 112 + i, guest::LoadU32(base, force + i));
+  }
+  if (guest::LoadU8(base, v + 2928) != 0) {
+    // fneg between an lfs and an stfs: the sign bit flipped.
+    guest::StoreU32(base, f + 96, guest::LoadU32(base, f + 112) ^ 0x80000000u);
+    const uint32_t z = guest::LoadU32(base, f + 120) ^ 0x80000000u;
+    CopyWord(base, kZero, f + 100);
+    guest::StoreU32(base, f + 104, z);
+    CopyWord(base, kZero, f + 108);
+    va::RigidBodyAddForce(base, guest::LoadU32(base, v + 336), f + 96);
+    CopyWord(base, kZero, v + 2464);
+    CopyWord(base, kZero, v + 2472);
+  }
+  vl::Vec4Copy(base, v + 2480, va::RigidBodyTorque(guest::LoadU32(base, v + 336)));
+  const uint32_t r3 = RigidBodyIntegrate(base, guest::LoadU32(base, v + 336),
+                                         Lfs(base, v + 2352), f - 208);
+  // The body's word +516: bit 0 accelerating (throttle +284 above 0.5 in a
+  // forward gear, +288 in reverse), bit 1 wheels on the ground.
+  const int32_t gear = int32_t(guest::LoadU32(base, v + 2252));
+  const double half = Lfs(base, kHalfConstant);
+  const bool accelerating = (gear > 0 && Lfs(base, v + 284) > half) ||
+                            (gear < 0 && Lfs(base, v + 288) > half);
+  uint32_t at = guest::LoadU32(base, v + 336) + 516;
+  uint32_t bits = guest::LoadU32(base, at);
+  guest::StoreU32(base, at, accelerating ? bits | 1 : bits & ~1u);
+  at = guest::LoadU32(base, v + 336) + 516;
+  bits = guest::LoadU32(base, at);
+  guest::StoreU32(base, at,
+                  guest::LoadU32(base, v + 348) != 0 ? bits | 2 : bits & ~2u);
+  return r3;
 }
 
 }  // namespace car_physics

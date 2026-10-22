@@ -292,6 +292,15 @@ uint32_t VehicleUpdateAtRest(uint8_t* base, uint32_t vehicle, uint32_t frame);
 // original's 240 bytes (EngineTorque's below it). Returns what the
 // original leaves in r3.
 uint32_t VehicleUpdateAero(uint8_t* base, uint32_t vehicle, uint32_t frame);
+// Vehicle::ApplyForces (sub_820B2CC0): the speed squared (+2440), the
+// center of mass by byte +3132, the wheels' accumulators (+2544) summed in
+// the ground frame into +368 and given to the body at their contact
+// points, the tip check (byte +3241) setting the angular velocity, +80 and
+// +84, the body's force (+2464 before +2608 is added; at rest the
+// horizontal part cancelled) and torque (+2480), RigidBody::Integrate by
+// +2352, and the body's +516 bits. `frame`: the original's 352 bytes (its
+// callees' below). Returns what the original leaves in r3 (Integrate's).
+uint32_t VehicleApplyForces(uint8_t* base, uint32_t vehicle, uint32_t frame);
 // Vehicle::UpdateWheelAxes (sub_820B1B00): per wheel the toe +36 and the
 // axes +144 and +128 (the vehicle's +112 and +128 turned by toe and
 // steering; those two also into +2080 and +2064), +324 = +320, the contact's
