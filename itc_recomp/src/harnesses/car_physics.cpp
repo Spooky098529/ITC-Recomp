@@ -112,6 +112,28 @@ void NativeContactImpulseWith(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = r3;
 }
 
+// The vehicle's physics step's helpers.
+ITC_NATIVE_STEP(NativeBeginStep,
+                ctx.r3.u64 = cp::VehicleBeginStep(base, ctx.r3.u32, ctx.f1.f64))
+ITC_NATIVE_STEP(NativeWheelLoads, cp::VehicleWheelLoads(base, ctx.r3.u32))
+ITC_NATIVE_STEP(NativeSurfaceValue,
+                ctx.f1.f64 = cp::VehicleSurfaceValue(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_STEP(NativeSurfaceValue20,
+                ctx.f1.f64 = cp::VehicleSurfaceValue20(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_STEP(NativeSurfaceValue12,
+                ctx.f1.f64 = cp::VehicleSurfaceValue12(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_STEP(NativeSurfaceValue16,
+                ctx.f1.f64 = cp::VehicleSurfaceValue16(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_STEP(NativeAccumulateTireForces,
+                ctx.r3.u64 = cp::VehicleAccumulateTireForces(base, ctx.r3.u32,
+                                                             ctx.r1.u32 - 192))
+ITC_NATIVE_STEP(NativeRollingResistance, cp::VehicleRollingResistance(base, ctx.r3.u32))
+ITC_NATIVE_STEP(NativeTurnWheels, cp::VehicleTurnWheels(base, ctx.r3.u32, ctx.r1.u32))
+ITC_NATIVE_STEP(NativeBrakeTorques, cp::VehicleBrakeTorques(base, ctx.r3.u32))
+ITC_NATIVE_STEP(NativeAntiLock, cp::VehicleAntiLock(base, ctx.r3.u32))
+ITC_NATIVE_STEP(NativeSuspensionTorques,
+                ctx.r3.u64 = cp::VehicleSuspensionTorques(base, ctx.r3.u32, ctx.r1.u32 - 256))
+
 // Runs the recompiled version with the native flags off, so the functions
 // it calls that are ours run the originals too.
 template <GuestFunction recompiled>
@@ -186,6 +208,8 @@ enum Shape {
 };
 
 }  // namespace
+
+void CarPhysicsVehicle(Context& h);
 
 void CarPhysics(Context& h) {
   // The block 16-byte aligned, as the game's bodies are.
@@ -353,6 +377,132 @@ void CarPhysics(Context& h) {
       if (f.impulse && group == kOneNaN) {
         negated.Report();
       }
+    }
+  }
+  CarPhysicsVehicle(h);
+}
+
+namespace {
+
+// A vehicle (6,272 bytes) is larger than the scratch area: its cases use
+// guest stack further down (as the sprites' harness), with what it points
+// to: the car data, the surface records and the rigid body.
+constexpr uint32_t kVehicleArea = 0x10000;  // below the scratch area
+constexpr uint32_t kVehicle = 0, kCarData = 0x2000, kSurfaces = 0x2800, kBody = 0x2900;
+constexpr uint32_t kVehicleAreaBytes = 0x2C00;
+
+// Fills the area for one case: float words (by the group's generator),
+// then the pointers and the bytes the functions branch on.
+template <typename Word>
+void FillVehicle(uint8_t* base, uint32_t area, Random& r, Word word) {
+  for (uint32_t i = 0; i < kVehicleAreaBytes; i += 4) {
+    guest::StoreU32(base, area + i, word(r));
+  }
+  const uint32_t v = area + kVehicle;
+  guest::StoreU32(base, v + 272, area + kCarData);
+  guest::StoreU32(base, v + 336, area + kBody);
+  for (uint32_t w = 0; w < 4; w++) {
+    const uint32_t wheel = v + 416 + 368 * w;
+    guest::StoreU32(base, v + 2144 + 4 * w, v + (w < 2 ? 1888 : 2016));
+    guest::StoreU32(base, v + 2160 + 4 * w, area + kCarData + (w < 2 ? 336 : 608));
+    guest::StoreU8(base, wheel + 17, uint8_t(r.Below(4) != 0));
+    guest::StoreU32(base, wheel + 176, r.Below(8));
+    guest::StoreU32(base, wheel + 204, r.Below(100));
+  }
+  for (uint32_t k = 0; k < 8; k++) {
+    for (uint32_t table : {2668u, 2796u}) {
+      guest::StoreU32(base, v + table + 4 * k,
+                      r.Below(4) == 0 ? 0 : area + kSurfaces + 32 * r.Below(8));
+    }
+  }
+  guest::StoreU32(base, v + 348, r.Below(5));
+  guest::StoreU8(base, v + 2664, uint8_t(r.Below(3) != 0));
+  guest::StoreU8(base, v + 2386, uint8_t(r.Below(3) != 0));
+  guest::StoreU32(base, v + 3156, r.Below(1000));
+}
+
+}  // namespace
+
+void CarPhysicsVehicle(Context& h) {
+  const uint32_t area = (h.data - kVehicleArea) & ~0xFu;
+  const struct {
+    const char* name;
+    GuestFunction recompiled, native;
+    bool compare_f1;
+    bool wheel_in_r4 = false;
+  } functions[] = {
+      {"Vehicle::BeginStep (sub_820AFAE8)", Original<__imp__sub_820AFAE8>, NativeBeginStep,
+       true},
+      {"Vehicle::WheelLoads (sub_820AFD30)", Original<__imp__sub_820AFD30>, NativeWheelLoads,
+       false},
+      {"Vehicle::SurfaceValue (sub_820B0508)", Original<__imp__sub_820B0508>,
+       NativeSurfaceValue, true, true},
+      {"Vehicle::SurfaceValue20 (sub_820B0560)", Original<__imp__sub_820B0560>,
+       NativeSurfaceValue20, true, true},
+      {"Vehicle::SurfaceValue12 (sub_820B05B8)", Original<__imp__sub_820B05B8>,
+       NativeSurfaceValue12, true, true},
+      {"Vehicle::SurfaceValue16 (sub_820B0610)", Original<__imp__sub_820B0610>,
+       NativeSurfaceValue16, true, true},
+      {"Vehicle::AccumulateTireForces (sub_820B0908)", Original<__imp__sub_820B0908>,
+       NativeAccumulateTireForces, false},
+      {"Vehicle::RollingResistance (sub_820B2748)", Original<__imp__sub_820B2748>,
+       NativeRollingResistance, false},
+      {"Vehicle::TurnWheels (sub_820AFDA8)", Original<__imp__sub_820AFDA8>, NativeTurnWheels,
+       false},
+      {"Vehicle::BrakeTorques (sub_820B0838)", Original<__imp__sub_820B0838>,
+       NativeBrakeTorques, false},
+      {"Vehicle::AntiLock (sub_820B0718)", Original<__imp__sub_820B0718>, NativeAntiLock,
+       false},
+      {"Vehicle::SuspensionTorques (sub_820AFBD8)", Original<__imp__sub_820AFBD8>,
+       NativeSuspensionTorques, false},
+  };
+  enum Group { kNumbers, kOneNaN, kNaNs };
+  const char* const kGroupNames[] = {"", ", one NaN",
+                                     ", NaNs and infinities anywhere (expected to differ)"};
+  constexpr uint32_t kNaNWords[] = {0x7FC00000, 0x7F800001, 0xFFC00001, 0xFF800001};
+  for (const auto& f : functions) {
+    for (Group group : {kNumbers, kOneNaN, kNaNs}) {
+      Results results(std::string(f.name) + kGroupNames[group]);
+      for (uint64_t seed = 0; seed < 100; seed++) {
+        Random pick = Seeded(seed * 17 + 3 * uint64_t(group) + 2);
+        auto word = [group](Random& r) { return group == kNaNs ? FloatWord(r) : NumberWord(r); };
+        const double f1 = double(std::bit_cast<float>(word(pick)));
+        const uint32_t wheel = pick.Below(4);
+        const uint32_t nan_word = kNaNWords[pick.Below(std::size(kNaNWords))];
+        const uint32_t nan_at = pick.Below(kVehicleAreaBytes / 4);
+        std::vector<uint8_t> result[2];
+        for (int v = 0; v < 2; v++) {
+          Random fill = Seeded(seed * 19 + 7 * uint64_t(group) + 5);
+          FillVehicle(h.base, area, fill, word);
+          if (group == kOneNaN) {
+            // Over a float word only: not a pointer (above 10^6 as a float)
+            // or a small integer (a denormal or zero: the counts, indices
+            // and bytes the functions branch on).
+            const uint32_t at = area + 4 * nan_at;
+            const uint32_t old = guest::LoadU32(h.base, at);
+            if ((old & 0x7F800000) != 0 && std::fabs(std::bit_cast<float>(old)) < 1e6f) {
+              guest::StoreU32(h.base, at, nan_word);
+            }
+          }
+          PPCContext t = CallContext(h);
+          t.fpscr.disableFlushModeUnconditional();
+          t.r3.u64 = area + kVehicle;
+          t.r4.u64 = wheel;
+          t.f1.f64 = f1;
+          (v == 0 ? f.recompiled : f.native)(t, h.base);
+          result[v] = Read(h.base, area, kVehicleAreaBytes);
+          for (int i = 0; i < 4; i++) {
+            result[v].push_back(uint8_t(t.r3.u32 >> (24 - 8 * i)));
+          }
+          for (int i = 0; f.compare_f1 && i < 8; i++) {
+            result[v].push_back(uint8_t(t.f1.u64 >> (56 - 8 * i)));
+          }
+        }
+        results.Check(result[0], result[1],
+                      fmt::format("seed {} wheel {} f1 {:016X}", seed, wheel,
+                                  std::bit_cast<uint64_t>(f1)));
+      }
+      results.Report();
     }
   }
 }

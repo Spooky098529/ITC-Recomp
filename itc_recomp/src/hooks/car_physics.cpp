@@ -11,7 +11,8 @@
 
 ITC_FLAG_BOOL(native_car_physics, true, "ITC",
               "Run the car physics (docs/functions/car-physics.md: the rigid body, sub_820B6A38 "
-              "to sub_820B7928) natively instead of through the translated "
+              "to sub_820B7928; the vehicle's physics step's helpers, sub_820AFAE8 to "
+              "sub_820B2748) natively instead of through the translated "
               "code (the same words, bit for bit; checked by --run_harnesses=car_physics)");
 
 // Defines an adapter: `body` uses `ctx` and `base`. Flush-to-zero off for
@@ -127,3 +128,22 @@ extern "C" REX_FUNC(sub_820B72C8) {
   ctx.f1.f64 = f1;
   ctx.r3.u64 = r3;
 }
+
+// --- The vehicle's physics step: r3 = the vehicle ---
+
+// f1 = dt (left as it is).
+ITC_CAR_PHYSICS(820AFAE8, ctx.r3.u64 = VehicleBeginStep(base, ctx.r3.u32, ctx.f1.f64))
+ITC_CAR_PHYSICS(820AFD30, VehicleWheelLoads(base, ctx.r3.u32))
+// r4 = the wheel; f1 = the value.
+ITC_CAR_PHYSICS(820B0508, ctx.f1.f64 = VehicleSurfaceValue(base, ctx.r3.u32, ctx.r4.u32))
+ITC_CAR_PHYSICS(820B0560, ctx.f1.f64 = VehicleSurfaceValue20(base, ctx.r3.u32, ctx.r4.u32))
+ITC_CAR_PHYSICS(820B05B8, ctx.f1.f64 = VehicleSurfaceValue12(base, ctx.r3.u32, ctx.r4.u32))
+ITC_CAR_PHYSICS(820B0610, ctx.f1.f64 = VehicleSurfaceValue16(base, ctx.r3.u32, ctx.r4.u32))
+ITC_CAR_PHYSICS(820B0908,
+                ctx.r3.u64 = VehicleAccumulateTireForces(base, ctx.r3.u32, ctx.r1.u32 - 192))
+ITC_CAR_PHYSICS(820B2748, VehicleRollingResistance(base, ctx.r3.u32))
+ITC_CAR_PHYSICS(820AFDA8, VehicleTurnWheels(base, ctx.r3.u32, ctx.r1.u32))
+ITC_CAR_PHYSICS(820B0838, VehicleBrakeTorques(base, ctx.r3.u32))
+ITC_CAR_PHYSICS(820B0718, VehicleAntiLock(base, ctx.r3.u32))
+ITC_CAR_PHYSICS(820AFBD8,
+                ctx.r3.u64 = VehicleSuspensionTorques(base, ctx.r3.u32, ctx.r1.u32 - 256))

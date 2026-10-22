@@ -120,4 +120,57 @@ void RigidBodyFrictionImpulse(uint8_t* base, uint32_t out, uint32_t body, uint32
 bool RigidBodyContactImpulseWith(uint8_t* base, uint32_t a, uint32_t point, uint32_t normal,
                                  uint32_t b, uint32_t frame, double* f1, uint32_t* r3);
 
+// --- The vehicle's physics step (src/car_physics/vehicle_step.cpp; the
+// vehicle in r3, its fields in docs/known-data.md) ---
+
+// Vehicle::BeginStep (sub_820AFAE8): +2352 = dt, +2356 = 1 / dt; the five
+// accumulators +2544 + 16i zeroed; +2448, +2452 = 0.0; each wheel record
+// 2's word +116 = 0; the step counter +3156 up. Returns the original's r3
+// (+2608, the last accumulator).
+uint32_t VehicleBeginStep(uint8_t* base, uint32_t vehicle, double dt);
+// sub_820AFD30 (the name ours: Vehicle::WheelLoads): each wheel's load +280
+// = max(+8, 0.0) on the ground, else 0.0 (all 0.0 with no wheel down).
+void VehicleWheelLoads(uint8_t* base, uint32_t vehicle);
+// sub_820B0508, sub_820B0560, sub_820B05B8 and sub_820B0610 (the names
+// ours: Vehicle::SurfaceValue, SurfaceValue20, 12 and 16): wheel w's
+// surface record's float +0, +20, +12 or +16 (0.0, 0.0, 1.0, 1.0 without
+// one); the last three also store it at the wheel's +196, +184 or +188.
+double VehicleSurfaceValue(uint8_t* base, uint32_t vehicle, uint32_t w);
+double VehicleSurfaceValue20(uint8_t* base, uint32_t vehicle, uint32_t w);
+double VehicleSurfaceValue12(uint8_t* base, uint32_t vehicle, uint32_t w);
+double VehicleSurfaceValue16(uint8_t* base, uint32_t vehicle, uint32_t w);
+// sub_820B0908 (the name ours: Vehicle::AccumulateTireForces): k = +2364 /
+// +2352; per wheel +284 += k +308, +288 += k +304, and the accumulator
+// +2544 + 16w += (+128 x +304 + +144 x +308) x k. Returns the original's
+// r3 (+2592). `frame`: 192 bytes.
+uint32_t VehicleAccumulateTireForces(uint8_t* base, uint32_t vehicle, uint32_t frame);
+// Vehicle::RollingResistance (sub_820B2748): each wheel on the ground's
+// spin +248 moves toward 0.0 (not past it) by +2364 / (wheel record 2 +108
+// x 0.5) x |radius x load x the float at 0x82002A18|.
+void VehicleRollingResistance(uint8_t* base, uint32_t vehicle);
+// sub_820AFDA8 (the name ours: Vehicle::TurnWheels): each wheel's angle +28
+// moves by -(spin +248 x dt) (reshaped past 0x820029B4 and 0x820029BC),
+// wrapped to a turn. `frame`: the original's r1 (it stores the turn count
+// below it, at r1 - 32 and r1 - 24, as the translated fctiwz does).
+void VehicleTurnWheels(uint8_t* base, uint32_t vehicle, uint32_t frame);
+// sub_820B0838 (the name ours: Vehicle::BrakeTorques): each wheel's +212,
+// +216, +300 = 0.0; when braking (+292 + +296 nonzero), +300 = the wheel's
+// brake +200 x +2432 x the axle's brake torque (car data), the rear's with
+// the handbrake added and +216 the brake's share.
+void VehicleBrakeTorques(uint8_t* base, uint32_t vehicle);
+// sub_820B0718 (the name ours: Vehicle::AntiLock): byte +2401 = 0; each
+// wheel's brake +200 = +292; with ABS (byte +2386) above the speed
+// 0x82001FD8 km/h and braking, a wheel on the ground whose slip (+264,
+// +268, when +268 < 0.0) is longer than 1 - the axle's grip (+2000, +2128)
+// gets 0.0 and its count +204 up.
+void VehicleAntiLock(uint8_t* base, uint32_t vehicle);
+// sub_820AFBD8 (the name ours: Vehicle::SuspensionTorques): per wheel on
+// the ground, v = +284 scaled by the car data's (+1824 or +1828 rear; front
+// -(+112 . wheel +144) x +1820); the accumulator += +96 x v; the wheel's +8
+// += v; the body gets the torque of (0, +8, 0) less its part along the
+// wheel's +112, at the wheel's +160 (RigidBody::AddTorqueAt). Returns the
+// original's r3 (the body + 128 after a wheel, else the vehicle). `frame`:
+// 256 bytes.
+uint32_t VehicleSuspensionTorques(uint8_t* base, uint32_t vehicle, uint32_t frame);
+
 }  // namespace car_physics
