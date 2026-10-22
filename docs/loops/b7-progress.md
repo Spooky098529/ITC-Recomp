@@ -23,9 +23,12 @@ record: `b7-loop-2026-10-22-0111.md` (and this file's history).
 - Third migration agent: 10 functions (5 Overridden, 5 Native with no
   adapter) in 55092ef..6bc388e; left in the file: `sub_821268C0`, and
   callees with no rows. Validated (itc_540.log): 10 of 10.
-- Step 6: a fourth migration agent for `sub_821268C0` (the file's last
-  ready group).
-- Session: pass 9 of 20, subsystem 1 of 5. In all: subsystem 1 of 5.
+- Fourth migration agent: 32 functions (31 Overridden, `sub_8212B230`
+  Native) in 59b94fb..61e4084: SpeedKmh, the set-up's constructors and
+  bindings, the resets, Smoke::InRegion, Sparks::Update, the children's
+  constructors. Left: Smoke, ParticlesB and ParticlesC::Update,
+  RaceOverlays::SlotOf, `sub_8215E150`. Step 8: validation agent running.
+- Session: pass 10 of 20, subsystem 1 of 5. In all: subsystem 1 of 5.
 - Known at the start: `b7_status.py` checks `c-runtime.md:221`
   `sub_825A9934` (`__chkstk`) "Dropped, but it ran" (from the first run:
   its override does nothing, so it still shows as seen).
@@ -57,6 +60,10 @@ record: `b7-loop-2026-10-22-0111.md` (and this file's history).
   vector adds: Smoke::Emit keeps the first operand's NaN (as the Xenon
   does), the sparks a plain `addps` matching how this build compiled
   theirs; a rebuild could bring back NaN-only differences there.
+  The fourth migration's 32 rows, and `sub_820C0128`'s notes in
+  `functions.md`. For review: on the native SpeedKmh path the state
+  capture (`--capture_dir`) no longer hears about the vehicle (the
+  game's other callers still pass it on).
 
 ## Expected to differ
 
