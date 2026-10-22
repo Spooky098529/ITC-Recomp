@@ -3207,3 +3207,21 @@ bool UpdateSmoke(uint8_t* base, uint32_t overlays, uint32_t frame) {
 }
 
 }  // namespace race_overlays
+
+namespace race_overlays {
+
+bool ModelMatrix(uint8_t* base, uint32_t out, uint32_t view) {
+  ITC_NATIVE_RUNNING("sub_821270E8 OverlayView::ModelMatrix");
+  const uint32_t from = guest::LoadU32(base, view + 8) + 4288 + 16;
+  if (out >= 0xA0000000u || c_runtime::MayShare(out, 64, from, 64)) {
+    return false;
+  }
+  const uint32_t one = guest::LoadU32(base, kOne);
+  for (uint32_t row = 0; row < 4; row++) {
+    guest::StoreU32(base, out + 16 * row + 12, one);
+  }
+  c_runtime::Memcpy(base, out, from, 64);
+  return true;
+}
+
+}  // namespace race_overlays

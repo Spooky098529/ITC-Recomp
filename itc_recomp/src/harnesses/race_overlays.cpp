@@ -452,6 +452,13 @@ void NativeSmokeSetFrame(PPCContext& ctx, uint8_t* base) {
   }
 }
 
+void NativeModelMatrix(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  if (!ro::ModelMatrix(base, ctx.r3.u32, ctx.r4.u32)) {
+    __imp__sub_821270E8(ctx, base);
+  }
+}
+
 // Runs the recompiled version with --native_race_overlays off, so the
 // functions it calls that are ours run the originals too.
 void RunRecompiled(GuestFunction recompiled, PPCContext& t, uint8_t* base) {
@@ -3175,6 +3182,28 @@ void UpdateSmokeCases(Context& h, uint32_t block) {
   results.Report();
   guest::StoreU32(h.base, kSeed, live);
 }
+
+// OverlayView::ModelMatrix: the point cases' view and model, `out` apart,
+// overlapping the model's matrix (the original runs there), or unaligned.
+void ModelMatrixCases(Context& h, uint32_t block) {
+  Random& r = h.random;
+  const uint32_t model_matrix = block + kPointModel + 4304;
+  Results results("OverlayView::ModelMatrix (sub_821270E8)");
+  for (uint64_t seed = 0; seed < 120; seed++) {
+    const uint32_t kind = r.Below(4);
+    const uint32_t out = kind == 0   ? model_matrix - 32 + 4 * r.Below(16)
+                         : kind == 1 ? block + kPointOut + 4 * r.Below(8)
+                                     : block + kPointOut;
+    Compare(h, results, {{block + kPointOut, 0x100}, {block + kPointModel, 0x1400}},
+            [&h, block, seed] { ModelPointSetup(h, block, seed); },
+            [&](PPCContext& t) {
+              t.r3.u64 = out;
+              t.r4.u64 = block + kPointView;
+            },
+            __imp__sub_821270E8, NativeModelMatrix, fmt::format("seed {} out {:X}", seed, out));
+  }
+  results.Report();
+}
 }  // namespace
 
 void RaceOverlays(Context& h) {
@@ -3212,6 +3241,7 @@ void RaceOverlays(Context& h) {
   UpdateTrailsCases(h, block);
   EffectUpdateCases(h, block);
   UpdateSmokeCases(h, block);
+  ModelMatrixCases(h, block);
   memory->SystemHeapFree(block);
 }
 

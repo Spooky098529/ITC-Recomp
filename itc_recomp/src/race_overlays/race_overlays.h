@@ -783,4 +783,11 @@ uint32_t WheelOnSurface1Or2(uint8_t* base, uint32_t view, uint32_t wheel);
 // wheel; the original runs there.
 bool UpdateSmoke(uint8_t* base, uint32_t overlays, uint32_t frame);
 
+// OverlayView::ModelMatrix (sub_821270E8): 1.0 stored in out's rows' w,
+// then out = the 64 bytes at the view's model + 4,304 (memcpy, through
+// c_runtime::Memcpy; it covers them again). False, with nothing done, where
+// the copy wouldn't be the library's plain one (into the physical views, or
+// sharing memory with the model's matrix); the original runs there.
+bool ModelMatrix(uint8_t* base, uint32_t out, uint32_t view);
+
 }  // namespace race_overlays

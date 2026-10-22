@@ -24,7 +24,7 @@ ITC_FLAG_BOOL(native_race_overlays, true, "ITC",
               "save flags and stages, sub_82126B50 to sub_82126CB0; CarOverlays::UpdateTrails, "
               "sub_82124EE0; CarOverlays::MarkerKind, sub_82122EA8; the effects' updates "
               "UpdateLightSprites, UpdateParticlesB and UpdateParticlesC, sub_821251C0, "
-              "sub_821252D0 and sub_82125798; CarOverlays::UpdateSmoke, sub_82125B60) natively "
+              "sub_821252D0 and sub_82125798; CarOverlays::UpdateSmoke, sub_82125B60; OverlayView::ModelMatrix, sub_821270E8) natively "
               "instead of through the translated code (same results; checked by "
               "--run_harnesses=race_overlays)");
 
@@ -441,5 +441,20 @@ extern "C" REX_FUNC(sub_82125B60) {
   ctx.fpscr.disableFlushMode();
   if (!UpdateSmoke(base, ctx.r3.u32, ctx.r1.u32 - 400)) {
     __imp__sub_82125B60(ctx, base);
+  }
+}
+
+// OverlayView::ModelMatrix: r3 = out, r4 = a view; returns out. Where the
+// native version declines (the copy wouldn't be memcpy's plain one), the
+// original runs.
+extern "C" REX_FUNC(sub_821270E8) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_race_overlays)) {
+    __imp__sub_821270E8(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  if (!ModelMatrix(base, ctx.r3.u32, ctx.r4.u32)) {
+    __imp__sub_821270E8(ctx, base);
   }
 }
