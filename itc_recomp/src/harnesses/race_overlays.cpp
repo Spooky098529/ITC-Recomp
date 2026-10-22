@@ -133,6 +133,14 @@ void NativeMarkerUpdate(PPCContext& ctx, uint8_t* base) {
   ro::MarkerUpdate(base, ctx.r3.u32);
 }
 
+// Where the native version declines, the original runs (as the adapter).
+void NativeTrailUpdate(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  if (!ro::TrailUpdate(base, ctx.r3.u32)) {
+    __imp__sub_821292E8(ctx, base);
+  }
+}
+
 // Runs the recompiled version with --native_race_overlays off, so the
 // functions it calls that are ours run the originals too.
 void RunRecompiled(GuestFunction recompiled, PPCContext& t, uint8_t* base) {
@@ -565,6 +573,82 @@ void MarkerCases(Context& h, uint32_t block) {
   }
 }
 
+// Trail::Update: capacities of the game's 500, small and larger ones (and 0
+// and -1, which the original handles), the oldest point anywhere, counts
+// from 0 to past the capacity (and negative), ages around 0, tables with
+// game-like and random words.
+void TrailCases(Context& h, uint32_t block) {
+  Random& r = h.random;
+  const uint32_t trail = block + 0x100;
+  const uint32_t table = block + 0x40;
+  Results results("Trail::Update (sub_821292E8)");
+  for (int i = 0; i < 400; i++) {
+    int32_t capacity;
+    switch (r.Below(6)) {
+      case 0:
+      case 1:
+        capacity = 500;
+        break;
+      case 2:
+        capacity = int32_t(1 + r.Below(8));
+        break;
+      case 3:
+        capacity = int32_t(1 + r.Below(3000));
+        break;
+      default:
+        capacity = int32_t(1 + r.Below(600));
+        break;
+    }
+    if (i == 0) {
+      capacity = 0;
+    } else if (i == 1) {
+      capacity = -1;
+    }
+    const uint32_t points = capacity > 0 ? uint32_t(capacity) : 4;
+    const uint32_t start = r.Below(points);
+    int32_t count;
+    switch (r.Below(5)) {
+      case 0:
+        count = 0;
+        break;
+      case 1:
+        count = -int32_t(r.Below(5));
+        break;
+      default:
+        count = int32_t(r.Below(points + 3));
+        break;
+    }
+    const uint64_t seed = r.Next();
+    const bool game_like = r.Below(4) != 0;
+    const uint32_t bytes = (points + 2) * 128;
+    Compare(h, results, {{block, 0x100}, {trail, bytes}, {trail + 64000, 160}},
+            [&, seed] {
+              Random fill;
+              for (uint64_t n = 0; n < seed % 23; n++) {
+                fill.Next();
+              }
+              FillRandom(h.base, fill, block, 0x100 + bytes);
+              FillRandom(h.base, fill, trail + 64000, 160);
+              guest::StoreU32(h.base, trail + 104, uint32_t(capacity));
+              guest::StoreU32(h.base, trail + 112, table);
+              guest::StoreU32(h.base, trail + 64128, start);
+              guest::StoreU32(h.base, trail + 64136, uint32_t(count));
+              if (game_like) {
+                guest::StoreU32(h.base, table + 0, fill.Below(40));
+                guest::StoreU32(h.base, table + 12, fill.Below(40));
+                for (uint32_t p = 0; p < points; p++) {
+                  const uint32_t at = trail + 128 * (p + 1);
+                  guest::StoreU32(h.base, at + 60, uint32_t(int32_t(fill.Below(40)) - 3));
+                  guest::StoreFloat(h.base, at + 124, float(fill.Below(4000)) / 16.0f);
+                }
+              }
+            },
+            [&](PPCContext& t) { t.r3.u64 = trail; }, __imp__sub_821292E8, NativeTrailUpdate,
+            fmt::format("capacity {} start {} count {}", capacity, start, count));
+  }
+  results.Report();
+}
+
 }  // namespace
 
 void RaceOverlays(Context& h) {
@@ -578,6 +662,7 @@ void RaceOverlays(Context& h) {
   SetterCases(h, block);
   RandomCases(h);
   MarkerCases(h, block);
+  TrailCases(h, block);
   memory->SystemHeapFree(block);
 }
 

@@ -343,3 +343,100 @@ void MarkerUpdate(uint8_t* base, uint32_t marker) {
 }
 
 }  // namespace race_overlays
+
+namespace race_overlays {
+
+namespace {
+
+constexpr uint32_t kTrailStart = 64128;
+constexpr uint32_t kTrailCount = 64136;
+
+uint32_t TrailPoint(uint32_t trail, uint32_t index) {
+  return trail + ((index + 1) << 7);
+}
+
+// The index after `index`, modulo the capacity (divw then the remainder, as
+// the original).
+uint32_t TrailNext(int32_t index, int32_t capacity) {
+  return uint32_t(index - (index / capacity) * capacity);
+}
+
+}  // namespace
+
+bool TrailUpdate(uint8_t* base, uint32_t trail) {
+  ITC_NATIVE_RUNNING("sub_821292E8 Trail::Update");
+  const int32_t capacity = int32_t(guest::LoadU32(base, trail + 104));
+  if (capacity == 0 || capacity == -1) {
+    return false;
+  }
+  const uint32_t table = guest::LoadU32(base, trail + 112);
+  int32_t left = int32_t(guest::LoadU32(base, trail + kTrailCount));
+  if (left == 0) {
+    return true;
+  }
+  uint32_t index = guest::LoadU32(base, trail + kTrailStart);
+  uint32_t point = TrailPoint(trail, index);
+  if (int32_t(guest::LoadU32(base, point + 60)) <= 0) {
+    guest::StoreU32(base, point + 112, 0);
+    guest::StoreU32(base, point + 48, 0);
+    const int32_t start = int32_t(guest::LoadU32(base, trail + kTrailStart) + 1);
+    const uint32_t count = guest::LoadU32(base, trail + kTrailCount) - 1;
+    // The capacity again, as the original reloads it (no point's fields
+    // reach +104, so it's the one checked above).
+    const int32_t size = int32_t(guest::LoadU32(base, trail + 104));
+    guest::StoreU32(base, trail + kTrailCount, count);
+    index = TrailNext(start, size);
+    guest::StoreU32(base, trail + kTrailStart, index);
+    left = int32_t(count);
+    if (left != 0) {
+      point = TrailPoint(trail, index);
+      guest::StoreU32(base, point + 112, 1);
+    }
+  }
+  if (left <= 0) {
+    return true;
+  }
+  const double zero = guest::LoadFloat(base, kZero);
+  const double one = guest::LoadFloat(base, kOne);
+  while (true) {
+    int32_t age = int32_t(guest::LoadU32(base, point + 60) - 1);
+    guest::StoreU32(base, point + 60, uint32_t(age));
+    if (age < 0) {
+      guest::StoreU32(base, point + 60, 0);
+    }
+    const uint32_t now = guest::LoadU32(base, point + 60);
+    if (guest::LoadU32(base, table + 0) - now > 1) {
+      guest::StoreU32(base, point + 48, 1);
+    }
+    const uint32_t fade = guest::LoadU32(base, table + 12);
+    const float full = guest::LoadFloat(base, point + 124);
+    if (fade > now) {
+      const double ticks = double(float(double(int64_t(fade))));
+      const double aged = double(float(double(int64_t(int32_t(now)))));
+      double width = double(float(one / ticks));
+      width = double(float(width * aged));
+      width = double(float(width * double(full)));
+      guest::StoreFloat(base, point + 56, float(width));
+    } else {
+      guest::StoreFloat(base, point + 56, full);
+    }
+    if (double(guest::LoadFloat(base, point + 56)) < zero) {
+      guest::StoreFloat(base, point + 56, float(zero));
+    }
+    if (double(full) < double(guest::LoadFloat(base, point + 56))) {
+      guest::StoreFloat(base, point + 56, full);
+    }
+    guest::StoreU32(base, point + 44,
+                    uint32_t(Fctiwz(double(guest::LoadFloat(base, point + 56)))));
+    left--;
+    const int32_t next = int32_t(index + 1);
+    const int32_t size = int32_t(guest::LoadU32(base, trail + 104));
+    index = TrailNext(next, size);
+    point = TrailPoint(trail, index);
+    if (left <= 0) {
+      return true;
+    }
+  }
+}
+
+}  // namespace race_overlays

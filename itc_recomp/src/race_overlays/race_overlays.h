@@ -150,3 +150,23 @@ uint32_t MarkerSet(uint8_t* base, uint32_t marker, uint32_t position, double dis
 void MarkerUpdate(uint8_t* base, uint32_t marker);
 
 }  // namespace race_overlays
+
+namespace race_overlays {
+
+// --- The trails ---
+//
+// A trail (64,160 bytes): its points (128 bytes each) from +128, +104 the
+// capacity, +112 the parameter table, +64,128 the oldest point's index,
+// +64,136 the count.
+
+// Trail::Update (sub_821292E8, its slot 4; once a tick): drops the oldest
+// point when its age (+60) is 0 or below (clearing its +112 and +48, and
+// setting the next one's +112 to 1), then for each point from the oldest:
+// the age counts down to 0; +48 = 1 once the table's +0 minus the age is
+// above 1; the width (+56) fades from +124 by age over the table's +12
+// ticks (age / the table's +12 x +124), clamped to 0 and +124; +44 the
+// width as an integer. False, with nothing done, for a capacity of 0 or -1
+// (where the original's division would trap); the original runs there.
+bool TrailUpdate(uint8_t* base, uint32_t trail);
+
+}  // namespace race_overlays

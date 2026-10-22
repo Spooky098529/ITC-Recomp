@@ -133,3 +133,18 @@ extern "C" REX_FUNC(sub_8212CCE0) {
 // Marker::Update (its vtable's slot 4, so the adapter stays while the
 // update loop calling it is recompiled): r3 = the marker.
 ITC_OVERLAY_SET(8212CBE0, MarkerUpdate(base, ctx.r3.u32))
+
+// Trail::Update (its vtable's slot 4, so the adapter stays while the update
+// loop calling it is recompiled): r3 = the trail. Where the native version
+// declines (a capacity of 0 or -1), the original runs.
+extern "C" REX_FUNC(sub_821292E8) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_race_overlays)) {
+    __imp__sub_821292E8(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  if (!TrailUpdate(base, ctx.r3.u32)) {
+    __imp__sub_821292E8(ctx, base);
+  }
+}
