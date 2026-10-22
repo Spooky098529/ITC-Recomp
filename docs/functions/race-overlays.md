@@ -76,7 +76,11 @@ operand first, the two sparks functions have theirs swapped), so
 the sparks use a plain `addps`, which matches them as built; a rebuild
 that changes the translated code's choice would show in those harnesses as
 NaN-only differences. `Sparks::Emit` wasn't called in 25-second attract
-races (no scraping).
+races (no scraping). The fourth pass (2026-10-22) added `OverlayView::SpeedKmh`,
+calling `Vehicle::GetSpeedKmh`'s plain C++ (now declared in
+`src/hooks/vehicle.h`). Learned there: a tail call leaves the callee's
+arguments in its registers (the vehicle in r3), which the harness compares,
+so the adapter returns r3 as the original does.
 
 Status:
 
@@ -177,7 +181,7 @@ run it after changing either, on any branch.
 | `sub_821264C0` | `CarOverlays::BindViewport` | | r4 = out (the car overlays +796), r5 = viewport entry, r6 = a second index: out+0 = `[[0x826C2CE8] + 4 × entry.0] + 80 × entry.1`, out+4 = the camera pass `0x826BAC00 + 592 × entry.2`, out+8 and +12 = the two words at `0x820085A0 + 8 × r6`. Leaf. From `sub_821256B8`. |
 | `sub_82128190` | `Overlays::SetRenderTargets` | | r3 = the render queue, r4 = the command list: stored at `0x826C5D5C` and `0x826C5D60`, where the sprite recorders (`sprites.md`) read them. Leaf. From `sub_82123350`. |
 | `sub_821268B0` | `OverlayView::BodyMatrix` | | r3 = a view: `[vehicle + 336] + 288` (`sub_820B6930`), the body's matrix. From `sub_82124630`. |
-| `sub_821268C0` | `OverlayView::SpeedKmh` | | r3 = a view: tail-calls `Vehicle::GetSpeedKmh(vehicle)`. From the effect updates. |
+| `sub_821268C0` | `OverlayView::SpeedKmh` | Overridden | r3 = a view: tail-calls `Vehicle::GetSpeedKmh(vehicle)`, so r3 comes back as the vehicle (the adapter does the same). From the effect updates (`sub_82124728` 4 times, `sub_82124EE0`, `sub_821252D0`, `sub_82125798`, `sub_82125B60` 4 times). Native in `src/race_overlays/race_overlays.cpp` behind `--native_race_overlays` (adapter in `src/hooks/race_overlays.cpp`, harness `race_overlays`), calling `Vehicle_GetSpeedKmh`'s plain C++ (`src/hooks/vehicle.h`) directly, so the state capture (`--capture_dir`) isn't told about the vehicle on this path (other callers still tell it); runs in attract races (~32,000 calls in a 25-second one). |
 | `sub_821268C8` | `OverlayView::WheelContact` | | r3 = a view, r4 = a wheel: `sub_820C0170(vehicle, wheel) + 16` (the vehicle's +5328 + 96 × wheel record's +16, probably the contact point). From `sub_82124EE0`, `sub_82125B60`. |
 | `sub_821268F0` | `OverlayView::WheelSpin` | Overridden | r3 = a view, r4 = a wheel: the float at vehicle + 664 + 368 × wheel (the wheel record at +416's +248, also read by `sub_820C0180`; probably its spin or slip). Leaf. From `sub_82125B60`. Native in `src/race_overlays/race_overlays.cpp` behind `--native_race_overlays` (adapter in `src/hooks/race_overlays.cpp`, harness `race_overlays`); runs in attract races. |
 | `sub_82126908` | `OverlayView::WheelValue512` | Overridden | r3 = a view, r4 = a wheel: the float at vehicle + 512 + 368 × wheel (the wheel record's +96). Leaf. From `sub_82125B60`. Native in `src/race_overlays/race_overlays.cpp` behind `--native_race_overlays` (adapter in `src/hooks/race_overlays.cpp`, harness `race_overlays`); runs in attract races. |

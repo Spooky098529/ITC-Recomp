@@ -4,6 +4,7 @@
 
 #include "base/log.h"
 #include "c_runtime/math.h"
+#include "hooks/vehicle.h"
 
 #include <rex/platform/fpscr.h>
 #include <simde/x86/sse4.1.h>
@@ -39,6 +40,11 @@ uint32_t View(uint8_t* base, uint32_t overlays, uint32_t slot) {
 uint32_t ViewportEntry(uint32_t index) {
   ITC_NATIVE_RUNNING("sub_821264A8 CarOverlays::ViewportEntry");
   return kViewportTable + 12 * index;
+}
+
+float SpeedKmh(uint8_t* base, uint32_t view) {
+  ITC_NATIVE_RUNNING("sub_821268C0 OverlayView::SpeedKmh");
+  return Vehicle_GetSpeedKmh(base, Vehicle(base, view));
 }
 
 float WheelSpin(uint8_t* base, uint32_t view, uint32_t wheel) {

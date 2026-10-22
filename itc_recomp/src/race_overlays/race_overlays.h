@@ -23,6 +23,10 @@ uint32_t View(uint8_t* base, uint32_t overlays, uint32_t slot);
 // entry `index` of the table at 0x82008558.
 uint32_t ViewportEntry(uint32_t index);
 
+// OverlayView::SpeedKmh (sub_821268C0): the view's vehicle's speed in km/h
+// (Vehicle::GetSpeedKmh, sub_820C0128, which the original tail-calls).
+float SpeedKmh(uint8_t* base, uint32_t view);
+
 // OverlayView::WheelSpin (sub_821268F0): the float at vehicle + 664 + 368 x
 // wheel.
 float WheelSpin(uint8_t* base, uint32_t view, uint32_t wheel);

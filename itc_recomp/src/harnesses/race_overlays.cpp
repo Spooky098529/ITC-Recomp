@@ -9,6 +9,7 @@
 
 #include "base/flags.h"
 #include "base/log.h"
+#include "hooks/vehicle.h"
 #include "race_overlays/race_overlays.h"
 
 #include <rex/system/kernel_state.h>
@@ -47,6 +48,7 @@ constexpr uint32_t kRaceData = 0x826C5B2C;
 
 ITC_NATIVE_WORD(NativeView, ro::View(base, ctx.r3.u32, ctx.r4.u32))
 ITC_NATIVE_WORD(NativeViewportEntry, ro::ViewportEntry(ctx.r4.u32))
+ITC_NATIVE_FLOAT(NativeGetSpeedKmh, Vehicle_GetSpeedKmh(base, ctx.r3.u32))
 ITC_NATIVE_FLOAT(NativeWheelSpin, ro::WheelSpin(base, ctx.r3.u32, ctx.r4.u32))
 ITC_NATIVE_FLOAT(NativeWheelValue512, ro::WheelValue512(base, ctx.r3.u32, ctx.r4.u32))
 ITC_NATIVE_FLOAT(NativeAxleValue3764, ro::AxleValue3764(base, ctx.r3.u32, ctx.r4.u32))
@@ -59,6 +61,15 @@ ITC_NATIVE_FLOAT(NativeVehicleFloat6256, ro::VehicleFloat6256(base, ctx.r3.u32))
 ITC_NATIVE_FLOAT(NativeVehicleFloat6252, ro::VehicleFloat6252(base, ctx.r3.u32))
 ITC_NATIVE_WORD(NativeRaceMode, ro::RaceMode(base))
 ITC_NATIVE_WORD(NativeRacerFlags, ro::RacerFlags(base, ctx.r3.u32))
+
+// As the adapter: r3 comes back as the view's vehicle (the original's tail
+// call leaves it there).
+void NativeSpeedKmh(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const uint32_t view = ctx.r3.u32;
+  ctx.r3.u64 = guest::LoadU32(base, view + 4);
+  ctx.f1.f64 = double(ro::SpeedKmh(base, view));
+}
 
 void NativeRacerId(PPCContext& ctx, uint8_t* base) {
   ctx.r3.s64 = ro::RacerId(base, ctx.r3.u32);
@@ -356,6 +367,43 @@ void AccessorCases(Context& h, uint32_t block) {
               __imp__sub_821264A8, NativeViewportEntry, fmt::format("index {:X}", index));
     }
     results.Report();
+  }
+
+  // OverlayView::SpeedKmh, and the Vehicle::GetSpeedKmh it calls: the
+  // recompiled SpeedKmh tail-calls GetSpeedKmh's adapter (always native, no
+  // flag), so GetSpeedKmh is checked against its original on its own.
+  // Random vehicles, then each odd float at +48.
+  {
+    const struct {
+      const char* name;
+      GuestFunction recompiled, native;
+      uint32_t r3;
+    } speeds[] = {
+        {"OverlayView::SpeedKmh (sub_821268C0)", __imp__sub_821268C0, NativeSpeedKmh, block + kView},
+        {"Vehicle::GetSpeedKmh (sub_820C0128)", __imp__sub_820C0128, NativeGetSpeedKmh,
+         block + kVehicle},
+    };
+    for (const auto& f : speeds) {
+      Results results(f.name);
+      for (uint64_t seed = 0; seed < 7; seed++) {
+        Compare(h, results, {}, vehicle_setup(seed), [&](PPCContext& t) { t.r3.u64 = f.r3; },
+                f.recompiled, f.native, fmt::format("seed {}", seed));
+      }
+      std::vector<uint32_t> speeds_at_48(std::begin(kOddFloats), std::end(kOddFloats));
+      for (int i = 0; i < 30; i++) {
+        speeds_at_48.push_back(uint32_t(r.Next()));
+      }
+      for (uint32_t speed : speeds_at_48) {
+        Compare(h, results, {},
+                [&, speed] {
+                  vehicle_setup(0)();
+                  guest::StoreU32(h.base, block + kVehicle + 48, speed);
+                },
+                [&](PPCContext& t) { t.r3.u64 = f.r3; }, f.recompiled, f.native,
+                fmt::format("speed {:08X}", speed));
+      }
+      results.Report();
+    }
   }
 
   // The wheel accessors: wheels 0 to 5 (4 and 5 past the four the game

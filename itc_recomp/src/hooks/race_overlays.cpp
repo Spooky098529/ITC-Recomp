@@ -8,7 +8,7 @@
 
 ITC_FLAG_BOOL(native_race_overlays, true, "ITC",
               "Run the race overlays' update helpers (the car overlays' view and vehicle "
-              "accessors, sub_82126550 to sub_82127178; the child overlays' setters, "
+              "accessors, sub_82126550 to sub_82127178, and OverlayView::SpeedKmh, sub_821268C0; the child overlays' setters, "
               "sub_8211E9C8 to sub_8212DF90; the game's rand, sub_82293568, and RandomRange, "
               "sub_8211F118; Marker::Set and Update, sub_8212CCE0 and sub_8212CBE0; Trail::Update and "
               "AddPoint, sub_821292E8 and sub_82129598; ParticlesB and ParticlesC::Emit, sub_8212B4A8 and sub_8212C1C0; the "
@@ -51,6 +51,20 @@ using namespace race_overlays;
 ITC_OVERLAY_WORD(82126550, View(base, ctx.r3.u32, ctx.r4.u32))
 // CarOverlays::ViewportEntry: r4 = an index (r3 isn't read).
 ITC_OVERLAY_WORD(821264A8, ViewportEntry(ctx.r4.u32))
+// OverlayView::SpeedKmh: r3 = a view. The original loads the vehicle into
+// r3 and tail-calls Vehicle::GetSpeedKmh, so r3 comes back as the vehicle.
+extern "C" REX_FUNC(sub_821268C0) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_race_overlays)) {
+    __imp__sub_821268C0(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  const uint32_t view = ctx.r3.u32;
+  ctx.r3.u64 = guest::LoadU32(base, view + 4);
+  ctx.f1.f64 = double(SpeedKmh(base, view));
+}
+
 // The view's (r3) wheel (r4) values.
 ITC_OVERLAY_FLOAT(821268F0, WheelSpin(base, ctx.r3.u32, ctx.r4.u32))
 ITC_OVERLAY_FLOAT(82126908, WheelValue512(base, ctx.r3.u32, ctx.r4.u32))
