@@ -5,17 +5,18 @@ commits, the function files and the subsystems' docs.
 
 ## Now
 
-- Subsystem: the graphics library's command list (`sub_8258C9D0`,
-  `sub_8258CA50`, `sub_8258CB08`, `sub_8258CB98`, `sub_8258CC30`, from
-  `leads.md`).
-  Mapped as `functions/command-list.md` (e0908c6): 11 rows, 9 ready
-  groups; `CommandList::Init` waits on the C runtime heap (a lead that
-  needs the user's decision on guest allocation).
-- Step: migration (agent running).
-- Session: pass 4 of 20, subsystem 2 of 5. In all: subsystem 2 of 5.
+- Subsystem: sprites again (`functions/sprites.md`): the command list made
+  `sub_82128E70` (under `sub_82129280`) ready.
+- Step: migration (second agent running).
+- Session: pass 5 of 20, subsystem 2 of 5 (sprites isn't counted again).
+  In all: subsystem 2 of 5.
 
 ## Done
 
+- Command list (`functions/command-list.md`, map e0908c6): 9 functions
+  native in fa317f9, `--native_command_list`; every harness at 0
+  differing, race 21 s, no errors. Left: `CommandList::Init`, waiting on
+  the guest heap (the user's decision).
 - Sprites (`functions/sprites.md`, map ad863ff): 8 functions native in 5
   groups (04f6450, 460a8d1, a63ab81, f049c28, e5e7ef7), `--native_sprites`,
   `--native_billboards`; every harness at 0 differing, race 21 s, no
@@ -40,6 +41,8 @@ commits, the function files and the subsystems' docs.
   188, unknown 6244).
 - After mapping the command list: ours 171, work left 6582 (wrapped 150,
   known 198, unknown 6234).
+- After the command list's migration: ours 180, work left 6573 (wrapped
+  150, known 189, unknown 6234).
 
 ## Stopped
 
