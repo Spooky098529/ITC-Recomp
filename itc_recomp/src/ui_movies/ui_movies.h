@@ -12,6 +12,9 @@
 #include "guest.h"
 
 #include <cstdint>
+#include <initializer_list>
+#include <optional>
+#include <vector>
 
 namespace ui_movies {
 
@@ -65,5 +68,82 @@ inline uint32_t Child(uint8_t* base, uint32_t node, uint32_t i) {
 inline uint32_t SceneAnimation(uint8_t* base, uint32_t scene, uint32_t i) {
   return Entry(base, scene, 128, 116, i);
 }
+
+// Tags, as the words read from guest memory.
+constexpr uint32_t kTagTrm = 0x54524D00;  // "TRM\0", a chunk list's end
+constexpr uint32_t kTagSce = 0x53434500;  // "SCE\0", a scene
+
+// The globals UiMovie::SetRenderer fills: the renderer object the library
+// hands its chunks to (its vtable's slot 4), and the command list it records
+// into.
+constexpr uint32_t kRenderer = 0x82970C18;
+constexpr uint32_t kCommandList = 0x82970C1C;
+
+// sub_8259D5C8: from the chunk at `chunk` (not itself tested), walks the
+// chunks (+4 the offset to the next, +0 its tag) to the first tagged `tag`;
+// at the end (`TRM`) returns 0, unless `tag` is `TRM` (then the end).
+uint32_t FindChunk(uint8_t* base, uint32_t chunk, uint32_t tag);
+
+// sub_825A0EB0: a movie file's scene (file + [file + 4]) when tagged `SCE`,
+// else 0.
+uint32_t FileScene(uint8_t* base, uint32_t file);
+
+// sub_825A0CD0: an `XMD` file's entry i (file + [file + 16 + 4 i]) when i is
+// below its count (+12, unsigned), else 0.
+uint32_t XmdEntry(uint8_t* base, uint32_t file, uint32_t i);
+
+// sub_8259D798 (UiMovie::SetRenderer): stores the renderer and the command
+// list in their globals.
+void SetRenderer(uint8_t* base, uint32_t renderer, uint32_t list);
+
+// sub_8259D930: a draw context reset: the identity matrix (+0..+60), no clip
+// rectangle (+64..+76 = 0), the color (+80..+92) all the float at
+// 0x82000A30 (1.0), +96..+108 = 0.
+void ResetDrawContext(uint8_t* base, uint32_t context);
+
+// The keys' interpolation (keys.cpp, built with -ffp-model=strict and
+// -ffp-contract=off: the translated code's doubles, rounded to single at the
+// same steps, std::fma where it has fmadds). k0 and k1 are the two keys
+// (32 bytes: +4 the time, +8 the value, +12 and +16 the second key's
+// tangent angles), t the time between them (0 to 1, from the caller's f1).
+//
+// sub_8259FA20: an integer track's eased value, (1 - s) [k0 + 8] + s
+// [k1 + 8] with s a cubic in t from k1's +12 and +16 and the float at
+// 0x820021E4, truncated (fctiwz).
+uint32_t EaseInteger(uint8_t* base, uint32_t k0, uint32_t k1, double t);
+// sub_8259FB30: a float track's value, a cubic between the keys with
+// tangents tan(k1 + 16) and tan(k1 + 12) scaled by the time between the keys
+// and the floats at 0x82002A38 and 0x820021E4. nullopt, with nothing done,
+// where tan (sub_825A8A50) would go to its error paths or the rounding mode
+// isn't nearest (tan sets nearest and puts the mode back): the original
+// runs there.
+std::optional<double> CubicFloat(uint8_t* base, uint32_t k0, uint32_t k1, double t);
+// sub_8259FC18: the same cubic on integer values, truncated (fctiwz).
+std::optional<uint32_t> CubicInteger(uint8_t* base, uint32_t k0, uint32_t k1, double t);
+
+// The recorders (recording.cpp), on the command list `list` (the global at
+// 0x82970C1C). Each records a chunk and returns its first slot, which the
+// caller hands to the renderer (vtable slot 4); nothing is done (nullopt)
+// where the original's command list calls would print a message (another
+// chunk open, the list full), which the caller leaves to the original.
+//
+// Whether chunks with these allocations (slot counts, in order) fit, one
+// after the other, as the command list's OpenChunk and AllocateSlots check.
+bool ChunksFit(uint8_t* base, uint32_t list, std::initializer_list<std::vector<uint32_t>> chunks);
+// sub_8259DAD0 (textured) and sub_8259E098 (untextured): a quad or
+// primitive built by the caller (+68 the blend mode, +80 the vertex count,
+// +84 the texture, +88, +92 and +96 the positions, colors and texture
+// coordinates, 16 bytes a vertex, +100 clipped, +104..+110 the clip
+// rectangle, +112 the texture stage flag): the clip (command 31 with the
+// rectangle, or 1 and 200), the texture (command 4 and +84), the blend
+// states by mode, the texture stage, 13, 6, the vertices (command 5) and
+// 15, then 36.
+std::optional<uint32_t> RecordQuad(uint8_t* base, uint32_t list, uint32_t quad, bool textured);
+// sub_8259D7B0's two chunks (4 slots each; check them with ChunksFit
+// first): the clip set to the whole screen (command 31, 0, 0, 1280, 720,
+// then 36), and commands 1 and 200, then 36.
+extern const std::vector<uint32_t> kResetChunkSlots;
+uint32_t RecordClipReset(uint8_t* base, uint32_t list);
+uint32_t RecordStateReset(uint8_t* base, uint32_t list);
 
 }  // namespace ui_movies

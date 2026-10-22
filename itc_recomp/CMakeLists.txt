@@ -102,6 +102,9 @@ set(ITC_SOURCES
     src/hooks/billboards.cpp
     src/sprites/billboards.cpp
     src/hooks/ui_movies.cpp
+    src/ui_movies/ui_movies.cpp
+    src/ui_movies/keys.cpp
+    src/ui_movies/recording.cpp
     src/hooks/command_list.cpp
     src/command_list/command_list.cpp
     src/hooks/c_runtime.cpp
@@ -183,8 +186,9 @@ set(ITC_SOURCES
 # PowerPC code fuses (no other contraction), and no rewrites that move a
 # negation into an addition (LLVM's default model treats a NaN's sign as
 # free; seen with -O3 on asin of a negative NaN). See
-# docs/functions/c-runtime.md.
-set_source_files_properties(src/c_runtime/math.cpp PROPERTIES
+# docs/functions/c-runtime.md. The UI movie keys' interpolation
+# (src/ui_movies/keys.cpp) likewise (docs/functions/ui-movies.md).
+set_source_files_properties(src/c_runtime/math.cpp src/ui_movies/keys.cpp PROPERTIES
     COMPILE_OPTIONS "-ffp-model=strict;-ffp-contract=off"
     SKIP_PRECOMPILE_HEADERS ON)
 
