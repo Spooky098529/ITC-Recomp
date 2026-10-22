@@ -449,6 +449,13 @@ uint32_t CollisionObjectAccumulateForce(uint8_t* base, uint32_t object, uint32_t
 // CollisionObject::AddContact (sub_820B7C50): a new contact
 // (CollisionWorld::NewContact) pushed on +240; returns it, or 0.
 uint32_t CollisionObjectAddContact(uint8_t* base, uint32_t object);
+// CollisionObject::Translate (sub_820B7B60): the body's center (+16) moved
+// by the offset (RigidBody::SetCenterOfMassPosition), the shape record
+// (+32) moved (CollisionShape::Translate), +304 += the offset, +284 = 0.
+// False, with nothing done, where the record's current copy isn't a box
+// (CollisionShape::Translate isn't native for it). `frame`: the original's
+// 128 bytes (the callees' frames below it).
+bool CollisionObjectTranslate(uint8_t* base, uint32_t object, uint32_t offset, uint32_t frame);
 // sub_820B7ED0 (the name ours: CollisionRecords::Merge): the `count` hit
 // records copied to `out`, those with the same id (+60) merged (averaged,
 // the push +32 normalized with its length in +48; merged ones' ids -1,

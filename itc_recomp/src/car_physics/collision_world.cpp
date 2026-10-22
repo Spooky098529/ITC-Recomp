@@ -7,6 +7,7 @@
 
 #include "base/log.h"
 #include "c_runtime/strings.h"
+#include "collision/collision.h"
 #include "vehicle_accessors/vectors.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
@@ -201,6 +202,28 @@ uint32_t CollisionObjectAddContact(uint8_t* base, uint32_t object) {
     guest::StoreU32(base, object + 240, contact);
   }
   return contact;
+}
+
+bool CollisionObjectTranslate(uint8_t* base, uint32_t object, uint32_t offset, uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_820B7B60 CollisionObject::Translate");
+  // CollisionShape::Translate runs natively only on a box (its current
+  // copy, the record's +8): else the original from the start.
+  if (!collision::IsBox(base, guest::LoadU32(base, object + 32 + 8))) {
+    return false;
+  }
+  const uint32_t f = frame;
+  const uint32_t body = guest::LoadU32(base, object + 16);
+  // The body's center (+16, its 16 bytes by ld and std) moved by the offset.
+  const uint32_t center = va::ContactPosition(body);
+  for (uint32_t i = 0; i < 16; i += 4) {
+    guest::StoreU32(base, f + 80 + i, guest::LoadU32(base, center + i));
+  }
+  vl::Vec3AddTo(base, f + 80, offset);
+  RigidBodySetCenterOfMassPosition(base, guest::LoadU32(base, object + 16), f + 80, f - 96);
+  collision::CollisionShapeTranslate(base, object + 32, offset, f - 192);
+  vl::Vec3AddTo(base, object + 304, offset);
+  guest::StoreU32(base, object + 284, 0);
+  return true;
 }
 
 uint32_t CollisionRecordsMerge(uint8_t* base, uint32_t out, uint32_t summary, uint32_t hits,

@@ -77,6 +77,10 @@ uint32_t RigidBodyField144(uint32_t body);
 uint32_t RigidBodyField160(uint32_t body);
 uint32_t RigidBodyOrientation(uint32_t body);
 uint32_t RigidBodyAngularVelocity(uint32_t body);
+// RigidBody::Force (sub_820988C0) and RigidBody::Torque (sub_82379328):
+// body + 64 and + 128 (also used on a box: its half extents at +128).
+uint32_t RigidBodyForce(uint32_t body);
+uint32_t RigidBodyTorque(uint32_t body);
 // sub_820B68A0: 0.0 when fixed, else the float at +48.
 float RigidBodyFloat48(uint8_t* base, uint32_t body);
 // RigidBody::PointVelocity (sub_820B68C0): out = +32 + +96 x (point -

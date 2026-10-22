@@ -22,7 +22,7 @@ ITC_FLAG_BOOL(native_car_physics, true, "ITC",
               "sub_820BC550; its pairs and reset, sub_820B94B0, sub_820B8A88, sub_820B85E8 with "
               "sub_820B8C20, sub_820BC068, sub_820BBC40, sub_820BBD30, sub_820B9448 with "
               "sub_820B8BA8, sub_820B8AF8, and the collision objects' groups, sub_820B7CC8, "
-              "sub_820B7CF0; the car data and the "
+              "sub_820B7CF0, and their translation, sub_820B7B60; the car data and the "
               "vehicle's constructor, sub_820AEF80 with sub_820AECB8, sub_820AEE98, "
               "sub_820AF018, sub_820B42C8) natively instead of through the translated code "
               "(the same words, bit for bit; checked by --run_harnesses=car_physics)");
@@ -339,6 +339,21 @@ ITC_CAR_PHYSICS(820B7AE8, CollisionObjectConstruct(base, ctx.r3.u32))
 ITC_CAR_PHYSICS(820B7DF8, ctx.r3.u64 = CollisionObjectAccumulateForce(base, ctx.r3.u32,
                                                                       ctx.r4.u32, ctx.r5.u32,
                                                                       ctx.r1.u32 - 160))
+// r4 = the offset; r3 comes back as +304. A shape record whose current
+// copy isn't a box: the original.
+extern "C" REX_FUNC(sub_820B7B60) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_car_physics)) {
+    __imp__sub_820B7B60(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  if (!CollisionObjectTranslate(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 128)) {
+    __imp__sub_820B7B60(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = ctx.r3.u32 + 304;
+}
 // r3 comes back as the contact, or 0.
 ITC_CAR_PHYSICS(820B7C50, ctx.r3.u64 = CollisionObjectAddContact(base, ctx.r3.u32))
 // r3 = out, r4 = the summary, r5 = the hits, r6 = the count; r3 comes back

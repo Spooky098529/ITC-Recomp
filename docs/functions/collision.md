@@ -40,8 +40,8 @@ library (`vehicle-accessors.md`); the matrix math (`matrix-math.md`);
 `memcpy` (`c-runtime.md`); operator new and delete (`heap.md`). Two
 one-instruction accessors named for the rigid body are used on the box
 too: `sub_820B6890` (r3 + 144, its row in `vehicle-accessors.md`; the
-box's inverse half extents here) and `sub_82379328` (r3 + 128, a lead
-in `docs/loops/leads.md`; the box's half extents here). The track's
+box's inverse half extents here) and `sub_82379328` (r3 + 128, `RigidBody::Torque`, its row in
+`vehicle-accessors.md`; the box's half extents here). The track's
 queries that call the shapes (`820FC188` to `820FF1B0`) are leads too.
 
 Floats named by address are in `.rdata`: `0x82000A30` is 1.0,

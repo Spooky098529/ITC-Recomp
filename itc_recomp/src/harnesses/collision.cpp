@@ -18,6 +18,7 @@
 #include "harness.h"
 
 #include "base/flags.h"
+#include "car_physics/car_physics.h"
 #include "collision/collision.h"
 
 #include <fmt/format.h>
@@ -109,6 +110,16 @@ void NativeRecordTranslate(PPCContext& ctx, uint8_t* base) {
   if (!co::CollisionShapeTranslate(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 192)) {
     __imp__sub_820BACD0(ctx, base);
   }
+}
+// CollisionObject::Translate (src/car_physics/): a record whose current
+// copy isn't a box runs the original (as the adapter).
+void NativeObjectTranslate(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  if (!car_physics::CollisionObjectTranslate(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 128)) {
+    __imp__sub_820B7B60(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = ctx.r3.u32 + 304;
 }
 ITC_NATIVE_STEP(NativeRelativePlacement,
                 ctx.r3.u64 = co::BoxRelativePlacement(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
@@ -301,6 +312,7 @@ enum Args {
   kQueryCache,    // r3 = the query (set up), r4 = the cache word
   kQuerySetUp,    // r3 = the query (set up)
   kPairR3,        // r3 = the pair (set up)
+  kObjectVector,  // r3 = object A (its body and a record of A, B, C), r4 = the vector
 };
 
 }  // namespace
@@ -371,6 +383,8 @@ void Collision(Context& h) {
        kRecordMatrix, 3, false, true},
       {"CollisionShape::Translate (sub_820BACD0)", Original<__imp__sub_820BACD0>,
        NativeRecordTranslate, kRecordVector, 1, false, true},
+      {"CollisionObject::Translate (sub_820B7B60)", Original<__imp__sub_820B7B60>,
+       NativeObjectTranslate, kObjectVector, 1, false, true},
       {"BoxShape::RelativePlacement (sub_820BA408)", Original<__imp__sub_820BA408>,
        NativeRelativePlacement, kRelative, 1, false},
       {"BoxShape::RelativeCenter (sub_820BA5D8)", Original<__imp__sub_820BA5D8>,
@@ -526,6 +540,13 @@ void Collision(Context& h) {
               guest::StoreU8(h.base, region + bodies[o], fixed[o] ? 1 : 0);
             }
           }
+          if (f.args == kObjectVector) {
+            const uint32_t object = region + kObjectA;
+            guest::StoreU32(h.base, object + 16, region + kBodyA);
+            guest::StoreU32(h.base, object + 32 + 0, region + kBoxA);
+            guest::StoreU32(h.base, object + 32 + 4, region + kBoxB);
+            guest::StoreU32(h.base, object + 32 + 8, region + kBoxC);
+          }
           for (uint32_t box : {kBoxA, kBoxB, kBoxC}) {
             guest::StoreU32(h.base, region + box, co::kBoxVtable);
           }
@@ -640,6 +661,10 @@ void Collision(Context& h) {
               t.r3.u64 = region + kRecord;
               t.r4.u64 = region + kVector;
               break;
+            case kObjectVector:
+              t.r3.u64 = region + kObjectA;
+              t.r4.u64 = region + kVector;
+              break;
           }
           t.f1.f64 = group == kOneNaN && nan_at >= kRegionBytes / 4
                          ? double(std::bit_cast<float>(nan_word))
@@ -664,12 +689,13 @@ void Collision(Context& h) {
           return w;
         };
         bool meets_negation = f.motion_row && group == kOneNaN && result[0] != result[1];
+        const uint32_t record = f.args == kObjectVector ? kObjectA + 32 : kRecord;
         for (size_t at = 0; meets_negation && at + 4 <= result[0].size(); at += 4) {
           const uint32_t a = word_at(0, at), b = word_at(1, at);
           if (a == b) {
             continue;
           }
-          meets_negation = at >= kRecord + 96 && at < kRecord + 112 &&
+          meets_negation = at >= record + 96 && at < record + 112 &&
                            std::isnan(std::bit_cast<float>(a)) && (a ^ b) == 0x80000000u;
         }
         (meets_negation ? negated : results)
