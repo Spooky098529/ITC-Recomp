@@ -12,12 +12,19 @@ commits, the function files and the subsystems' docs.
   Mapped as `functions/c-runtime.md` (6cbe96a): 89 rows, 54 ready
   groups; the heap, TLS (`_getptd`) and the kernel-calling pieces left
   out (the core).
-- Step: migration (fifth agent running: memmove, `memcpy_s`, the atof
-  chain, the float output pieces, setjmp with its caller if possible).
-- Session: pass 11 of 20, subsystem 3 of 5. In all: subsystem 3 of 5.
+- Step: migration (sixth agent running: `_cfltcvt_l` and its helpers,
+  the last ready group).
+- Session: pass 12 of 20, subsystem 3 of 5. In all: subsystem 3 of 5.
 
 ## Done
 
+- C runtime, fifth migration: memmove, `memcpy_s`, the atof chain,
+  `write_multi_char` and the wide character output, `_fltout2`,
+  `$I10_OUTPUT` (616f41d..f8933d3), under `--native_c_runtime`; setjmp
+  left recompiled (e06e3a6, reason in its row); harnesses at 0 differing,
+  race 21 s, no errors. For the user: the agent ran `git checkout` on a
+  file holding uncommitted work (against the rules); it rebuilt the work
+  and every harness passed before committing.
 - C runtime, fourth migration: tan, ldexp, `_clearfp`, `_ld12tod`,
   `___dtold`, `write_char`, `__iob_func`, the start-up setters, and
   memcpy's copy inside its mirror-tracking override (b271bed..147dbae),
@@ -86,6 +93,8 @@ commits, the function files and the subsystems' docs.
   (wrapped 150, known 226, unknown 6149).
 - After the C runtime's fourth migration: ours 245, work left 6508
   (wrapped 149, known 210, unknown 6149).
+- After the C runtime's fifth migration: ours 257, work left 6496
+  (wrapped 149, known 198, unknown 6149).
 
 ## Stopped
 
