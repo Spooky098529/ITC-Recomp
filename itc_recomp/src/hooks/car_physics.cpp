@@ -157,11 +157,9 @@ ITC_CAR_PHYSICS(820B00C8,
                 ctx.f1.f64 = VehicleEngineTorque(base, ctx.r3.u32, ctx.f1.f64, ctx.r1.u32))
 // Tire::MagicFormula (sub_820B09C8) has no adapter: its callers in play
 // are native.
-ITC_CAR_PHYSICS(820B3C90, VehicleSetGearValues(base, ctx.r3.u32))
-// r4 = the axle's first wheel; f1 = the sum.
-ITC_CAR_PHYSICS(820B3130,
-                ctx.f1.f64 = VehicleAxleReactionTorque(base, ctx.r3.u32, ctx.r4.u32))
-ITC_CAR_PHYSICS(820B3010, VehicleUpdateFreeAxle(base, ctx.r3.u32, ctx.r4.u32))
+// Vehicle::SetGearValues, AxleReactionTorque and UpdateFreeAxle
+// (sub_820B3C90, sub_820B3130, sub_820B3010) have no adapters: their
+// callers in play are native.
 // f1 = the value; f1 comes back clamped.
 ITC_CAR_PHYSICS(820B3E08, ctx.f1.f64 = VehicleSetBrake(base, ctx.r3.u32, ctx.f1.f64))
 ITC_CAR_PHYSICS(820B3E38, ctx.f1.f64 = VehicleSetHandbrake(base, ctx.r3.u32, ctx.f1.f64))
@@ -290,16 +288,13 @@ extern "C" REX_FUNC(sub_820B6328) {
 
 // r3 left as it is (the physics step relies on it).
 ITC_CAR_PHYSICS(820B4778, VehicleUpdateDrivetrain(base, ctx.r3.u32, ctx.r1.u32 - 176))
-// r4 = the axle's first wheel, f1 = the drive term; its temporaries below
-// r1.
-ITC_CAR_PHYSICS(820B31D0, VehicleUpdateDrivenAxle(base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64,
-                                                  ctx.r1.u32))
+// Vehicle::UpdateDrivenAxle (sub_820B31D0) has no adapter: its caller in
+// play is native.
 
 // --- The gearbox ---
 
-// r4 = the byte; r3 left as it is (the physics step relies on it).
-ITC_CAR_PHYSICS(820B4CF0, VehicleUpdateGearbox(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 112))
-// r3 left as it is; r4 comes back as UpdateGearbox's byte.
+// Vehicle::UpdateGearbox (sub_820B4CF0) has no adapter: its caller in play
+// is native. r3 left as it is (the physics step relies on it).
 extern "C" REX_FUNC(sub_820B6430) {
   REX_FUNC_PROLOGUE();
   if (!ITC_FLAG(native_car_physics)) {
