@@ -6,22 +6,27 @@
 # in the log, and any harness results, as attract_race.sh does. See
 # docs/pad-replay.md.
 #
-#   itc_recomp/tools/scripted_run.sh <recording> <seconds> [extra flags]
+#   itc_recomp/tools/scripted_run.sh <recording> [extra flags]
 #
 # Run from the repo root, after building. The replay starts PAD_DELAY
 # seconds (3 by default) after the boot's first draw ("called from
-# 8248466C"), with --skip_intro, so at the title screen. If the boot stalls
+# 8248466C"), with --skip_intro, so at the title screen, and the game is
+# closed 5 s after the last input (or, if it hangs, 2 minutes after the
+# recording's length from launch). If the boot stalls
 # (no such line in 30 s), the game is restarted once. The user's own pad
 # can stay plugged in: SDL is told to ignore it (REAL_PAD, its USB ids), so
 # the virtual pad is the game's only pad. Extra flags go on the game's
 # command line; a flag given here can't be given again.
 set -u
-RECORDING=${1:?usage: scripted_run.sh <recording> <seconds> [extra flags]}
-SECONDS_TO_RUN=${2:?usage: scripted_run.sh <recording> <seconds> [extra flags]}; shift 2
+RECORDING=${1:?usage: scripted_run.sh <recording> [extra flags]}; shift
 PAD_DELAY=${PAD_DELAY:-3}
 REAL_PAD=${REAL_PAD:-0x2E24/0x072F}
 B=itc_recomp/out/build/linux-amd64-release; G="$PWD/itc/Import Tuner Challenge (USA)"
 TOOLS=$(dirname "$0")
+# A limit in case the game hangs: the recording's length plus 2 minutes.
+SECONDS_TO_RUN=$(python3 -I -c 'import json, sys
+lines = open(sys.argv[1]).read().splitlines()
+print(int(json.loads(lines[-1]).get("t", 0)) + 120)' "$RECORDING")
 
 newest_log() { ls -t $B/logs/itc_*.log 2>/dev/null | head -1; }
 
@@ -59,14 +64,23 @@ if ! start_game "$@"; then
   fi
 fi
 sleep "$PAD_DELAY"
-python3 "$TOOLS/pad_play.py" "$RECORDING" --keep &
+python3 "$TOOLS/pad_play.py" "$RECORDING" --exit-after 5 &
 PAD=$!
-wait $GAME
-status=$?
-kill $PAD 2>/dev/null; wait $PAD 2>/dev/null
+# Whichever ends first: the replay (then the game is closed) or the game.
+while kill -0 $PAD 2>/dev/null && kill -0 $GAME 2>/dev/null; do sleep 0.2; done
+if kill -0 $GAME 2>/dev/null; then
+  kill $GAME; wait $GAME
+  ending="closed 5 s after the last input"
+else
+  wait $GAME
+  status=$?
+  ending="the game ended first, exit $status (124: the hang limit, ${SECONDS_TO_RUN} s)"
+  kill $PAD 2>/dev/null
+fi
+wait $PAD 2>/dev/null
 find /dev/shm -maxdepth 1 -user "$USER" -name 'xenia_memory_*' -delete
 echo "log: $L"
-echo "exit: $status (124: stopped by the timeout, as expected)"
+echo "end: $ending"
 # A second can log 31 ticks (the tick clock against the log's seconds).
 echo "seconds at 30 ticks/s: $(grep -cE 'ticks/s 3[01]\b' "$L")"
 echo "error lines: $(grep -ciE '\berror\b' "$L")"

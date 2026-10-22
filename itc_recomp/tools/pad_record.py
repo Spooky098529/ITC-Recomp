@@ -4,7 +4,7 @@
   itc_recomp/tools/pad_record.py <recording.jsonl> [--pad NAME]
 
 Reads the pad's evdev events (the game still gets them: the pad isn't
-grabbed) until Ctrl+C. Times start at the first input, so starting this
+grabbed) until Ctrl+C (or SIGTERM). Times start at the first input, so starting this
 early doesn't matter. The recording is JSON lines: a header with the pad's
 buttons and axis ranges, then one line per input report (the events between
 two SYN_REPORTs): {"t": seconds, "ev": [[type, code, value], ...]}.
@@ -12,6 +12,7 @@ two SYN_REPORTs): {"t": seconds, "ev": [[type, code, value], ...]}.
 
 import argparse
 import json
+import signal
 import sys
 
 import evdev
@@ -28,6 +29,10 @@ def find_pad(name):
     sys.exit(f"pad_record: no input device named \"{name}\"")
 
 
+def stop(*_):
+    raise KeyboardInterrupt
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("recording")
@@ -35,6 +40,8 @@ def main():
     args = parser.parse_args()
 
     pad = find_pad(args.pad)
+    # SIGTERM stops it too (background jobs ignore SIGINT).
+    signal.signal(signal.SIGTERM, stop)
     caps = pad.capabilities(absinfo=True)
     header = {
         "format": "itc-pad-recording",

@@ -2,13 +2,14 @@
 """Replays a pad_record.py recording through a virtual pad (uinput); see
 docs/pad-replay.md.
 
-  itc_recomp/tools/pad_play.py <recording.jsonl> [--start-delay S] [--keep]
+  itc_recomp/tools/pad_play.py <recording.jsonl> [--start-delay S]
+                               [--keep | --exit-after S]
 
 Makes the virtual pad, waits --start-delay seconds (1 by default: the game
 picks a new pad up on SDL's hot-plug event), then plays the reports at their
-recorded times from then on. With --keep the pad stays until the script is
-stopped (unplugging it mid-game may pause the game); without, it releases
-everything and goes away when the recording ends.
+recorded times from then on. At the end it releases everything and, after
+--exit-after seconds (0 by default), goes away (unplugging it mid-game may
+pause the game); with --keep it stays until the script is stopped.
 
 The virtual pad has an Xbox 360 pad's USB ids (045E:028E), not the real
 pad's, so the game can be told to ignore the real one:
@@ -32,6 +33,7 @@ def main():
     parser.add_argument("recording")
     parser.add_argument("--start-delay", type=float, default=1.0)
     parser.add_argument("--keep", action="store_true")
+    parser.add_argument("--exit-after", type=float, default=0.0)
     args = parser.parse_args()
 
     with open(args.recording) as f:
@@ -70,6 +72,7 @@ def main():
         print(f"pad_play: done after {time.monotonic() - start:.1f} s", flush=True)
         if args.keep:
             signal.pause()
+        time.sleep(args.exit_after)
     finally:
         pad.close()
 
