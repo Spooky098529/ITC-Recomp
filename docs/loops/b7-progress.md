@@ -8,8 +8,11 @@ commits, the function files and the subsystems' docs.
 - Subsystem: the graphics library's command list (`sub_8258C9D0`,
   `sub_8258CA50`, `sub_8258CB08`, `sub_8258CB98`, `sub_8258CC30`, from
   `leads.md`).
-- Step: mapping (agent running).
-- Session: pass 3 of 10, subsystem 2 of 3. In all: subsystem 2 of 5.
+  Mapped as `functions/command-list.md` (e0908c6): 11 rows, 9 ready
+  groups; `CommandList::Init` waits on the C runtime heap (a lead that
+  needs the user's decision on guest allocation).
+- Step: migration (agent running).
+- Session: pass 4 of 10, subsystem 2 of 3. In all: subsystem 2 of 5.
 
 ## Done
 
@@ -24,6 +27,8 @@ commits, the function files and the subsystems' docs.
 
 - `docs/functions/sprites.md` (new; 5 rows moved from `functions.md`; 8 now
   Overridden).
+- `docs/functions/command-list.md` (new; `sub_8258CAA0` moved from
+  `functions.md`, Wrapped -> Overridden).
 
 ## Totals
 
@@ -33,6 +38,8 @@ commits, the function files and the subsystems' docs.
   unknown 6244.
 - After sprites' migration: ours 170, work left 6582 (wrapped 150, known
   188, unknown 6244).
+- After mapping the command list: ours 171, work left 6582 (wrapped 150,
+  known 198, unknown 6234).
 
 ## Stopped
 
