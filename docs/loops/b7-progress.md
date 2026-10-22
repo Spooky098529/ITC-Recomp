@@ -5,18 +5,25 @@ commits, the function files and the subsystems' docs.
 
 ## Now
 
-- Subsystem: the UI movie library (`8259C000`-`825A6800`; `sub_825A08E0`,
-  `sub_825A0EF0`, `sub_825A0CF8`, `sub_825A1218`, `sub_825A1C88`,
-  `sub_825A1D68`, `sub_8259C9B0`, from `leads.md`).
-  Mapped as `functions/ui-movies.md` (27ec389): 45 rows (the library is
-  only `8259D5C8`-`825A0FC4` and `825A6508`-`825A6600`; the rest of the
-  range went to `leads.md` as 3 other subsystems), 24 ready groups.
-  TrackProperty and its callers wait on the heap (via `atexit`).
-- Step: migration (first agent running).
-- Session: pass 14 of 20, subsystem 4 of 5. In all: subsystem 4 of 5.
+- Subsystem: the game's `UiMovie::` side (over the library in
+  `functions/ui-movies.md`; `sub_8211E500`, `sub_8211E1C0`, `sub_8211DE38`,
+  `sub_8211DF20`, `sub_8211DFF8`, `sub_8211D978`, `sub_8211CD90`,
+  `sub_8211A948`, `sub_8211A818`, `sub_8211A8C8`, from `leads.md`).
+- Step: mapping (agent running).
+- Session: pass 15 of 20, subsystem 5 of 5. In all: subsystem 5 of 5 (the
+  last before the user's review).
 
 ## Done
 
+- UI movie library (`functions/ui-movies.md`, map 27ec389): 32 functions
+  native in 5 groups (f1107f8, b75567f, ac94162, 81441f2, 965fa67),
+  `--native_ui_movies`; harnesses at 0 differing, race 21 s, no errors.
+  The byte swap in `sub_825A0CF8` proven unreachable and not ported. The
+  HUD wasn't in the attract race's frames (only the logo overlay), so the
+  HUD itself wasn't compared: worth a look in a race the user drives.
+  `b7_status.py`'s check on `sub_8259DAC0` is the tool not seeing the
+  fallback inside `ResetAfterMovie`. Left: TrackProperty (the heap) and
+  the matrix functions, the game side.
 - C runtime, sixth migration: %f's `_cfltcvt_l`, `_cftof_l`, `_cftof2_l`,
   `_fptostr` (36d633f); harnesses at 0 differing, race 21 s, no errors.
   The C runtime is done: 79 of 89 native (with 2 more counted as ours);
@@ -71,7 +78,8 @@ commits, the function files and the subsystems' docs.
   `functions.md`, Wrapped -> Overridden).
 - `docs/functions/c-runtime.md` (new; `memcpy`, `memset`, `wcslen`, `pow`
   moved from `functions.md`; 79 now Overridden or Dropped).
-- `docs/functions/ui-movies.md` (new; 9 rows moved from `functions.md`).
+- `docs/functions/ui-movies.md` (new; 9 rows moved from `functions.md`; 32
+  now Overridden).
 
 ## Totals
 
@@ -103,6 +111,8 @@ commits, the function files and the subsystems' docs.
   unknown 6149).
 - After mapping the UI movies: ours 261, work left 6492 (wrapped 149,
   known 230, unknown 6113).
+- After the UI movie library: ours 293, work left 6460 (wrapped 147,
+  known 200, unknown 6113).
 
 ## Stopped
 
