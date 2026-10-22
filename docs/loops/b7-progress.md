@@ -5,20 +5,19 @@ commits, the function files and the subsystems' docs.
 
 ## Now
 
-- Subsystem: the game's `UiMovie::` side (over the library in
-  `functions/ui-movies.md`; `sub_8211E500`, `sub_8211E1C0`, `sub_8211DE38`,
-  `sub_8211DF20`, `sub_8211DFF8`, `sub_8211D978`, `sub_8211CD90`,
-  `sub_8211A948`, `sub_8211A818`, `sub_8211A8C8`, from `leads.md`).
-  Mapped as `functions/ui-movies-game.md` (7d30b85): 88 rows, 29 ready
-  groups; the load and text paths wait on the heap and the VirtualAlloc
-  wrappers (leads that need the user's decision).
-- Step: migration (second agent running: the 10 groups made ready by the
-  first, and `b7_status.py` taught the adapters' macro-built fallbacks).
-- Session: pass 17 of 20, subsystem 5 of 5. In all: subsystem 5 of 5 (the
-  last before the user's review).
+- Stopped for the user's review (the total limit, 5 subsystems). Nothing
+  running. Session: 18 passes.
 
 ## Done
 
+- The game's UI movie side, second migration: `b7_status.py` and
+  `check_function_statuses.py` now see fallbacks built by macros or in
+  helpers in other files (a453e6f; checks 28 -> 1, the stack probe's
+  Dropped-but-ran, which predates its drop in the coverage); 13 more
+  functions native (29b0495, cc42a2c, 350d329), `sub_8211E808`'s row
+  (b3a80b5); harnesses at 0 differing, race 21 s, no errors. Left: blocked
+  by `UiMovie::ApplyAnimation` (heap), the heap, VirtualAlloc, std::string,
+  the string table, matrix math, the texture set.
 - The game's UI movie side, first migration: 29 functions native in 5
   groups (3648d6b, b7af1a0, 8681720, 2f6208f, 2432394),
   `--native_ui_movies_game`; harnesses at 0 differing, race 21 s, no
@@ -91,7 +90,7 @@ commits, the function files and the subsystems' docs.
 - `docs/functions/ui-movies.md` (new; 9 rows moved from `functions.md`; 32
   now Overridden).
 - `docs/functions/ui-movies-game.md` (new; 9 rows moved from
-  `functions.md`).
+  `functions.md`; 42 now Overridden).
 
 ## Totals
 
@@ -129,7 +128,16 @@ commits, the function files and the subsystems' docs.
   (wrapped 147, known 279, unknown 6034).
 - After its first migration: ours 322, work left 6431 (wrapped 145,
   known 252, unknown 6034).
+- At the stop: ours 335, work left 6418 (wrapped 142, known 243, unknown
+  6033).
 
 ## Stopped
 
-(not stopped)
+- 2026-10-22: the total limit (5 subsystems: sprites, the command list,
+  the C runtime, the UI movie library, the game's UI movie side) reached.
+  For the user: review the rows (above) and the branch before merging;
+  decide on the leads that wait on you (the guest heap and the
+  VirtualAlloc wrappers, in `leads.md`), and whether SpriteList::Reset may
+  write only `count`'s corners; the UI movie work wasn't seen on the HUD
+  or menus in attract races (a driven race is worth a look); one agent
+  ran `git checkout` over uncommitted work (rebuilt, harnesses passed).
