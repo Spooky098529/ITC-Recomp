@@ -44,7 +44,15 @@ VirtualAlloc and VirtualFree), `sub_825A6880` (probably operator new) and
 `../loops/leads.md`. The overlays allocate guest memory (their objects,
 views and texture tables through `sub_82295398`, the texture set through
 `sub_825A6880`): making the creation side native waits on the user's
-call on the guest heap; the update side doesn't allocate.
+call on the guest heap; the update side doesn't allocate. Made native
+from the bottom up by the B7 loop (2026-10-22): plain C++ in
+`itc_recomp/src/race_overlays/`, adapters in `src/hooks/race_overlays.cpp`
+behind `--native_race_overlays`, harness `race_overlays`. Learned there:
+the translated code's `lfs`/`stfs` pairs keep a float's bits (signaling
+NaNs too: the float-to-double-and-back folds away), so native copies move
+words; the slot 4 updates (`Marker::Update`, `Trail::Update`) are reached
+only through the vtable, so their adapters stay until `CarOverlays::Update`
+is native and calls them some other way.
 
 Status:
 
