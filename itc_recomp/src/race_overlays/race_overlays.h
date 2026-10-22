@@ -126,3 +126,27 @@ uint32_t Rand(uint8_t* base);
 float RandomRange(uint8_t* base, double low, double high, uint32_t* drawn = nullptr);
 
 }  // namespace race_overlays
+
+namespace race_overlays {
+
+// --- The marker above opponents ---
+//
+// Its sprite is at +128: +176 the position, +208 to +216 the colors, +220
+// the alpha as an integer, +224 shown, +228 the size, +232 the alpha, +236 a
+// counter (the table's +0 when shown, counted up by the update), +240 the
+// texture index. The marker's +120 is its parameter table, +256 the view
+// mode, +272 the camera position, +288 1 for the camera-facing quad.
+
+// Marker::Set (sub_8212CCE0): places the marker at `position`; `distance`
+// 0.0 makes it the camera-facing quad (size from the table's +4), else the
+// screen rectangle sized by the distance (clamped); `kind` 0-3 picks the
+// texture (others 0); when not shown yet, shows it with the table's alpha
+// (+8) and life (+0), colors 255. Returns 1.
+uint32_t MarkerSet(uint8_t* base, uint32_t marker, uint32_t position, double distance,
+                   uint32_t mode, uint32_t kind);
+
+// Marker::Update (sub_8212CBE0, its slot 4): when shown, the age counts up
+// (back to 0 when it would turn negative).
+void MarkerUpdate(uint8_t* base, uint32_t marker);
+
+}  // namespace race_overlays

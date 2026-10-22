@@ -125,6 +125,14 @@ void NativeRandomRange(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = drawn;
 }
 
+void NativeMarkerSet(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = ro::MarkerSet(base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64, ctx.r6.u32, ctx.r7.u32);
+}
+void NativeMarkerUpdate(PPCContext& ctx, uint8_t* base) {
+  ro::MarkerUpdate(base, ctx.r3.u32);
+}
+
 // Runs the recompiled version with --native_race_overlays off, so the
 // functions it calls that are ours run the originals too.
 void RunRecompiled(GuestFunction recompiled, PPCContext& t, uint8_t* base) {
@@ -477,6 +485,86 @@ void RandomCases(Context& h) {
   guest::StoreU32(h.base, kSeed, live);
 }
 
+// The marker: random markers (shown or not), parameter tables with game-like
+// and odd floats (inside the block, or overlapping the marker), distances
+// of 0, game-like, odd and random doubles, kinds 0-5 and random.
+void MarkerCases(Context& h, uint32_t block) {
+  Random& r = h.random;
+  const uint32_t marker = block + 0x100;
+  const uint32_t table = block + 0x400;
+  {
+    Results results("Marker::Set (sub_8212CCE0)");
+    for (int i = 0; i < 1500; i++) {
+      const uint64_t seed = r.Next();
+      const uint32_t shown = r.Below(2) ? 0 : RandomWord(r);
+      const uint32_t at = r.Below(10) == 0 ? marker + 4 * r.Below(76) : table;
+      const uint32_t position = r.Below(10) == 0 ? marker + 176 - 8 + 4 * r.Below(5) : table + 64;
+      double distance;
+      switch (r.Below(5)) {
+        case 0:
+          distance = 0.0;
+          break;
+        case 1:
+          distance = double(std::bit_cast<float>(RandomWord(r)));
+          break;
+        case 2:
+          distance = std::bit_cast<double>(r.Next());
+          break;
+        default:
+          distance = double(float(r.Below(400000)) / 1000.0f);
+          break;
+      }
+      const uint32_t kind = r.Below(8) == 0 ? uint32_t(r.Next()) : r.Below(6);
+      const uint32_t mode = uint32_t(r.Next());
+      const bool game_table = r.Below(2);
+      Compare(h, results, {{marker, 304}, {table, 128}},
+              [&, seed] {
+                Random fill;
+                for (uint64_t n = 0; n < seed % 19; n++) {
+                  fill.Next();
+                }
+                FillRandom(h.base, fill, marker, 304);
+                FillRandom(h.base, fill, table, 128);
+                if (game_table) {  // life, size, alpha
+                  guest::StoreFloat(h.base, table, float(fill.Below(100)));
+                  guest::StoreFloat(h.base, table + 4, float(fill.Below(1000)) / 100.0f);
+                  guest::StoreFloat(h.base, table + 8, float(fill.Below(256)));
+                }
+                guest::StoreU32(h.base, marker + 120, at);
+                guest::StoreU32(h.base, marker + 224, shown);
+              },
+              [&](PPCContext& t) {
+                t.r3.u64 = marker;
+                t.r4.u64 = position;
+                t.f1.f64 = distance;
+                t.r6.u64 = mode;
+                t.r7.u64 = kind;
+              },
+              __imp__sub_8212CCE0, NativeMarkerSet,
+              fmt::format("case {} distance {:016X} kind {:X}", i,
+                          std::bit_cast<uint64_t>(distance), kind));
+    }
+    results.Report();
+  }
+  {
+    Results results("Marker::Update (sub_8212CBE0)");
+    const uint32_t counters[] = {0, 1, 0x7FFFFFFE, 0x7FFFFFFF, 0x80000000, 0xFFFFFFFF};
+    for (int i = 0; i < 200; i++) {
+      const uint32_t shown = r.Below(3) == 0 ? 0 : RandomWord(r);
+      const uint32_t counter = r.Below(2) ? counters[r.Below(6)] : uint32_t(r.Next());
+      Compare(h, results, {{marker, 304}},
+              [&] {
+                Fill(h.base, marker, 304, 0xCD);
+                guest::StoreU32(h.base, marker + 224, shown);
+                guest::StoreU32(h.base, marker + 236, counter);
+              },
+              [&](PPCContext& t) { t.r3.u64 = marker; }, __imp__sub_8212CBE0, NativeMarkerUpdate,
+              fmt::format("shown {:X} counter {:X}", shown, counter));
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void RaceOverlays(Context& h) {
@@ -489,6 +577,7 @@ void RaceOverlays(Context& h) {
   AccessorCases(h, block);
   SetterCases(h, block);
   RandomCases(h);
+  MarkerCases(h, block);
   memory->SystemHeapFree(block);
 }
 

@@ -4,6 +4,9 @@
 
 #include "base/log.h"
 
+#include <simde/x86/sse2.h>
+
+#include <climits>
 #include <cmath>
 
 namespace race_overlays {
@@ -255,6 +258,88 @@ float RandomRange(uint8_t* base, double low, double high, uint32_t* drawn) {
   const double value = double(float(double(int64_t(int32_t(r)))));
   const double scaled = double(float(range * value));
   return float(std::fma(scaled, scale, low));
+}
+
+}  // namespace race_overlays
+
+namespace race_overlays {
+
+namespace {
+
+constexpr uint32_t kOne = 0x82000A30;            // the game's float 1.0
+constexpr uint32_t kMarkerSlope = 0x82002FB0;
+constexpr uint32_t kMarkerMaxSize = 0x82002C3C;
+constexpr uint32_t kMarkerMinSize = 0x82002568;
+
+// fctiwz as the translated code does it: NaN gives 0x80000000, values from
+// INT_MAX up INT_MAX, the rest truncated (0x80000000 below INT_MIN).
+int32_t Fctiwz(double value) {
+  if (std::isnan(value)) {
+    return INT32_MIN;
+  }
+  if (value >= double(INT32_MAX)) {
+    return INT32_MAX;
+  }
+  return simde_mm_cvttsd_si32(simde_mm_set_sd(value));
+}
+
+}  // namespace
+
+uint32_t MarkerSet(uint8_t* base, uint32_t marker, uint32_t position, double distance,
+                   uint32_t mode, uint32_t kind) {
+  ITC_NATIVE_RUNNING("sub_8212CCE0 Marker::Set");
+  const uint32_t sprite = marker + 128;
+  const uint32_t table = guest::LoadU32(base, marker + 120);
+  CopyVector(base, position, sprite + 48);
+  const float zero = guest::LoadFloat(base, kZero);
+  guest::StoreU32(base, marker + 256, mode);
+  guest::StoreU32(base, marker + 288, distance == double(zero) ? 1 : 0);
+  if (guest::LoadU32(base, marker + 288) == 1) {
+    CopyFloat(base, table + 4, sprite + 100);
+  } else {
+    const double slope = guest::LoadFloat(base, kMarkerSlope);
+    const double most = guest::LoadFloat(base, kMarkerMaxSize);
+    const double one = guest::LoadFloat(base, kOne);
+    const double least = guest::LoadFloat(base, kMarkerMinSize);
+    // fnmsubs, then fmadds: one - distance x slope, times the most, plus
+    // the least, each rounded to single.
+    double size = double(float(-std::fma(distance, slope, -one)));
+    size = double(float(std::fma(size, most, least)));
+    guest::StoreFloat(base, sprite + 100, float(size));
+    if (size < least) {
+      guest::StoreFloat(base, sprite + 100, zero);
+    }
+    if (double(guest::LoadFloat(base, sprite + 100)) > most) {
+      guest::StoreFloat(base, sprite + 100, float(most));
+    }
+  }
+  guest::StoreU32(base, sprite + 112, kind <= 3 ? kind : 0);
+  if (guest::LoadU32(base, sprite + 96) != 0) {
+    return 1;
+  }
+  guest::StoreU32(base, sprite + 96, 1);
+  const float alpha = guest::LoadFloat(base, table + 8);
+  guest::StoreFloat(base, sprite + 104, alpha);
+  const int32_t alpha_int = Fctiwz(double(alpha));
+  guest::StoreU32(base, sprite + 108, guest::LoadU32(base, table + 0));
+  guest::StoreU32(base, sprite + 80, 255);
+  guest::StoreU32(base, sprite + 84, 255);
+  guest::StoreU32(base, sprite + 88, 255);
+  guest::StoreU32(base, sprite + 92, uint32_t(alpha_int));
+  return 1;
+}
+
+void MarkerUpdate(uint8_t* base, uint32_t marker) {
+  ITC_NATIVE_RUNNING("sub_8212CBE0 Marker::Update");
+  const uint32_t sprite = marker + 128;
+  if (guest::LoadU32(base, sprite + 96) == 0) {
+    return;
+  }
+  const uint32_t age = guest::LoadU32(base, sprite + 108) + 1;
+  guest::StoreU32(base, sprite + 108, age);
+  if (int32_t(age) < 0) {
+    guest::StoreU32(base, sprite + 108, 0);
+  }
 }
 
 }  // namespace race_overlays

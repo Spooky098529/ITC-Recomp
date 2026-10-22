@@ -10,7 +10,7 @@ ITC_FLAG_BOOL(native_race_overlays, true, "ITC",
               "Run the race overlays' update helpers (the car overlays' view and vehicle "
               "accessors, sub_82126550 to sub_82127178; the child overlays' setters, "
               "sub_8211E9C8 to sub_8212DF90; the game's rand, sub_82293568, and RandomRange, "
-              "sub_8211F118) natively instead of through the "
+              "sub_8211F118; Marker::Set and Update, sub_8212CCE0 and sub_8212CBE0) natively instead of through the "
               "translated code (same results; checked by --run_harnesses=race_overlays)");
 
 // Defines an adapter for a function of the view or overlays in r3 that
@@ -116,3 +116,20 @@ extern "C" REX_FUNC(sub_8211F118) {
   ctx.f1.f64 = double(RandomRange(base, ctx.f1.f64, ctx.f2.f64, &drawn));
   ctx.r3.u64 = drawn;
 }
+
+// Marker::Set: r3 = the marker, r4 = position, f1 = distance, r6 = view
+// mode, r7 = kind; returns 1.
+extern "C" REX_FUNC(sub_8212CCE0) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_race_overlays)) {
+    __imp__sub_8212CCE0(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 =
+      MarkerSet(base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64, ctx.r6.u32, ctx.r7.u32);
+}
+
+// Marker::Update (its vtable's slot 4, so the adapter stays while the
+// update loop calling it is recompiled): r3 = the marker.
+ITC_OVERLAY_SET(8212CBE0, MarkerUpdate(base, ctx.r3.u32))
