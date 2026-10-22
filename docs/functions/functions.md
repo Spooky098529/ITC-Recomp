@@ -109,7 +109,8 @@ Rows not yet moved stay in the table below. So far:
 - [`heap.md`](heap.md): memory allocation: the C runtime's allocators,
   LocalAlloc and XMemAlloc, the process heap, VirtualAlloc and physical
   memory, routed to the native allocation layer (B7's first step,
-  `../native-memory.md`).
+  `../native-memory.md`); the C runtime's heap above it read in full by
+  the B7 loop (2026-10-22).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
@@ -199,7 +200,7 @@ old performance notes to the end of `../native-renderer.md`.
 | `sub_82296EC0` | `GetLastError` | | The thread's last error (`[[r13+256]+352]`), or 0 while `[r13+336]` is set. Called by `sub_82294ED8` after its XMsg call. |
 | `sub_82294E20` | `CloseHandle` | | r3 = handle: `NtClose`; 1, or 0 with the last error. Called for files, events and enumerators (the file class's close, the save slot's close wait, the enumeration's wait, `Archive::Shutdown`). |
 | `sub_82294DA0` | `GlobalMemoryStatus` | Dropped | r3 = a MEMORYSTATUS (32 bytes) filled from `MmQueryStatistics`. From `sub_82106548`, `sub_82106618` and `sub_82107910` (25 calls in a session), each with a buffer in its frame that it never reads. Ours (`src/hooks/memory_status.cpp`): writes nothing. |
-| `sub_82295F18` | `GetLastError` | | Jumps to `sub_82296EC0`. Called after failed file calls (GetDiskFreeSpaceEx, XGetOverlappedResult, the C runtime's I/O). |
+| `sub_82295F18` | `GetLastError` | | Jumps to `sub_82296EC0`. Called after failed file calls (GetDiskFreeSpaceEx, XGetOverlappedResult, the C runtime's I/O), and on free's and realloc's failure paths (`heap.md`, never ran). |
 | `sub_82296E88` | `SetLastErrorFromStatus` | Overridden | r3 = an NTSTATUS: `SetLastError(RtlNtStatusToDosError(r3))` (the same check of `[r13+336]`), returning the DOS error. Called after failed kernel calls (27 files). Ours: `last_error::SetFromStatus`, the mapping from the SDK's `xeRtlNtStatusToDosError` (C++, no guest call) until the import's last recompiled caller, `sub_822953E8`, is native and the table is ours. 1,000 statuses across the mapping's branches the same as the recompiled one. |
 | `sub_82297340` | | | UTF-8 to UTF-16, for `MultiByteToWideChar`'s code page 65001: r3 = source, r4 = its length, r5 = destination, r6 = its room. Not read. |
 | `sub_82297540` | | | UTF-16 to UTF-8, for `WideCharToMultiByte`'s code page 65001; arguments as `sub_82297340`. Not read. |
