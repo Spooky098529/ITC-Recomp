@@ -57,7 +57,18 @@ memory.
    used so far, and reports. A subsystem too big for one agent gets
    another migration agent after the first reports, until nothing ready
    is left in it.
-8. **Take the next lead**: back to step 1.
+8. **Record the finished subsystem** in the summary docs, once nothing
+   ready is left in it (the lead does this itself, in the pass that
+   takes the next lead, and commits it with the progress file):
+   - its row in the table under "B7's loop runs" in
+     `docs/rexglue-removal.md` (date, subsystem, function file, how many
+     of its functions are native, the flags), and anything the run
+     learned that the plan should say (what blocks the rest, a build
+     setting) in the text under it;
+   - `itc_recomp/tools/boundary_status.py` and `b7_status.py` run, their
+     totals added as a dated entry at the end of "The boundary over time"
+     in the same doc.
+9. **Take the next lead**: back to step 1.
 
 A pass does one step: it reads the state, collects the report of the
 agent that finished, checks it, records it in the progress file, starts
@@ -222,6 +233,13 @@ file, when:
 - a map fails its check, or `leads.md` has nothing the loop can take;
 - the session's or the total limit is reached;
 - the tree has changes the loop didn't make, or isn't on `b7-loop-test`.
+
+Whatever the reason, before ending, the lead also brings the B7 status
+lines up to date (the subsystems' rows and totals are already there, from
+step 8 of the cycle): the "B7 in progress" line near the top of
+`docs/rexglue-removal.md` and the B7 sentence in `CLAUDE.md`'s overview
+(which subsystems are done, the branch, what the rest waits on), and
+commits them with the "Stopped" entry. The user reviews and merges.
 
 ## Rules that still hold
 

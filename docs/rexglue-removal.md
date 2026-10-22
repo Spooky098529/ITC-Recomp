@@ -57,7 +57,7 @@ goes in `src/` as overrides), American English.
   `/loop` session handing each subsystem to a mapping agent, then
   migration agents) did its first run on the branch `b7-loop-test`: five
   subsystems mapped and made native as far as they were ready (ours 162
-  -> 335). See "B7's first loop run" under B7, and
+  -> 335). See "B7's loop runs" under B7, and
   `docs/loops/b7-progress.md`. What most of the rest waits on is the
   user's call on allocating guest memory from native code (the heap and
   the VirtualAlloc wrappers, in `docs/loops/leads.md`).
@@ -2448,22 +2448,23 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
     4,975 (30%). Its report, joined with `docs/functions/`, is B7's
     measure (`itc_recomp/tools/b7_status.py`).
 
-    **B7's first loop run (2026-10-22, branch `b7-loop-test`):** the B7
-    loop (`docs/loops/b7-loop.md`; progress and what's for the user in
-    `docs/loops/b7-progress.md`) mapped five subsystems into their own
-    function files and made their ready groups native, each behind a
-    `--native_*` flag (on by default, falling back to the recompiled
-    function) with harness cases comparing it with the recompiled one:
+    **B7's loop runs:** the B7 loop (`docs/loops/b7-loop.md`; progress
+    and what's for the user in `docs/loops/b7-progress.md`) maps
+    subsystems into their own function files and makes their ready groups
+    native, each behind a `--native_*` flag (on by default, falling back
+    to the recompiled function) with harness cases comparing it with the
+    recompiled one. The loop adds a row here as each subsystem is
+    finished:
 
-    | Subsystem | Function file | Native | Flags |
-    |---|---|---|---|
-    | Camera-facing sprites and light glows | `sprites.md` | 10 of 26 | `--native_sprites`, `--native_billboards` |
-    | The graphics library's command list | `command-list.md` | 10 of 11 | `--native_command_list` |
-    | The C runtime and math library | `c-runtime.md` | 79 of 89 | `--native_math`, `--native_c_runtime`, `--native_memcpy` |
-    | The UI movie library | `ui-movies.md` | 32 of 45 | `--native_ui_movies` |
-    | The game's UI movie side | `ui-movies-game.md` | 42 of 89 | `--native_ui_movies_game` |
+    | Finished | Subsystem | Function file | Native | Flags |
+    |---|---|---|---|---|
+    | 2026-10-22 | Camera-facing sprites and light glows | `sprites.md` | 10 of 26 | `--native_sprites`, `--native_billboards` |
+    | 2026-10-22 | The graphics library's command list | `command-list.md` | 10 of 11 | `--native_command_list` |
+    | 2026-10-22 | The C runtime and math library | `c-runtime.md` | 79 of 89 | `--native_math`, `--native_c_runtime`, `--native_memcpy` |
+    | 2026-10-22 | The UI movie library | `ui-movies.md` | 32 of 45 | `--native_ui_movies` |
+    | 2026-10-22 | The game's UI movie side | `ui-movies-game.md` | 42 of 89 | `--native_ui_movies_game` |
 
-    Every harness at 0 differing, attract races at 20-21 s with no errors,
+    The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
     left 6,590 -> 6,418). The C runtime's math (and the UI movies' keys)
     build with `-ffp-model=strict -ffp-contract=off` to give the

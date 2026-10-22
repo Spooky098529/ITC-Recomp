@@ -101,7 +101,7 @@ first loop run (`docs/loops/b7-loop.md`, 2026-10-22, on `b7-loop-test`,
 not merged yet) made five subsystems native as far as they were ready
 (`docs/functions/sprites.md`, `command-list.md`, `c-runtime.md`,
 `ui-movies.md`, `ui-movies-game.md`; each behind `--native_*` flags, on by
-default); see "B7's first loop run" in the plan and
+default); see "B7's loop runs" in the plan and
 `docs/loops/b7-progress.md`. Most of what's left in them waits on the
 user's call on allocating guest memory from native code.
 After each plan item, run `itc_recomp/tools/boundary_status.py` and record
