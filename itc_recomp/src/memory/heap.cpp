@@ -120,8 +120,13 @@ void Give(uint32_t start, uint32_t bytes) {
   free_ranges.emplace_hint(next, start, bytes);
 }
 
+// Heap blocks are 16-aligned and take multiples of 16 bytes, as the game's
+// heap's: AltiVec loads and stores (lvx, stvx) on them drop the address's
+// low four bits.
+constexpr uint32_t kHeapAlignment = 16;
+
 uint32_t HeapSpan(uint32_t size) {
-  return std::max((size + 7) & ~7u, 8u);
+  return std::max((size + kHeapAlignment - 1) & ~(kHeapAlignment - 1), kHeapAlignment);
 }
 
 void Clear(uint32_t address, uint32_t bytes) {
@@ -158,7 +163,7 @@ uint32_t Alloc(uint32_t size, uint32_t flags) {
   }
   ReserveRange();
   const uint32_t span = HeapSpan(size);
-  const uint32_t address = Take(span, 8);
+  const uint32_t address = Take(span, kHeapAlignment);
   if (address == 0) {
     OutOfMemory("HeapAlloc", size);
   }
@@ -192,7 +197,6 @@ uint32_t Realloc(uint32_t address, uint32_t size, uint32_t flags) {
   if (address == 0 || size > 0x7FFFFFFF) {
     return 0;
   }
-  size = std::max(size, 1u);
   std::lock_guard lock(mutex);
   if (flags != 0 && flags != kHeapZeroMemory && FirstTime(kReallocFlags, flags)) {
     ITC_LOG_WARN("native heap: HeapReAlloc flags {:#x} not seen before", flags);
@@ -228,7 +232,7 @@ uint32_t Realloc(uint32_t address, uint32_t size, uint32_t flags) {
       block.span = span;
       block.size = size;
     } else {
-      result = Take(span, 8);
+      result = Take(span, kHeapAlignment);
       if (result == 0) {
         OutOfMemory("HeapReAlloc", size);
       }

@@ -15,7 +15,7 @@ namespace memory {
 // HeapAlloc's and HeapReAlloc's flags the layer acts on.
 constexpr uint32_t kHeapZeroMemory = 0x8;
 
-// HeapAlloc (sub_82299D60): an 8-aligned block of `size` bytes (size 0 gives
+// HeapAlloc (sub_82299D60): a 16-aligned block of `size` bytes (size 0 gives
 // a block of size 0), cleared with kHeapZeroMemory; 0 for a size over
 // 0x7FFFFFFF. Out of memory logs and aborts.
 uint32_t Alloc(uint32_t size, uint32_t flags);
@@ -26,7 +26,7 @@ bool Free(uint32_t address);
 // its free neighbor does), else moved with the smaller of the two sizes
 // copied; the part past the old size cleared with kHeapZeroMemory. 0 for
 // address 0, a size over 0x7FFFFFFF, or an address the layer didn't give
-// (logged once). Size 0 is taken as 1, as the game's does.
+// (logged once). A size of 0 keeps a block of size 0, as the game's does.
 uint32_t Realloc(uint32_t address, uint32_t size, uint32_t flags);
 // HeapSize (sub_82298FF8): the size asked for; 0xFFFFFFFF for an address the
 // layer didn't give.

@@ -60,8 +60,9 @@ Read in `generated/` (2026-10-22).
   null block and size 0 itself, calling malloc and free, and fails sizes
   over -4096). What it does:
   - The heap's own flags (the word at heap +24) are ORed into `flags`.
-  - A null block returns 0; a size over `0x7FFFFFFF` returns 0; size 0 is
-    taken as 1.
+  - A null block returns 0; a size over `0x7FFFFFFF` returns 0; size 0
+    reserves room as size 1 but keeps a size of 0 (HeapSize then gives 0;
+    seen by the harness, 2026-10-22).
   - Without HEAP_NO_SERIALIZE (`0x1`) it takes the heap's lock (heap
     +1408).
   - A block whose header doesn't have its busy bit (header byte at block
@@ -139,7 +140,11 @@ hand out guest memory until the port's end.
   sorted list of free ranges, joined with their neighbors when blocks
   are freed. Each block's size is kept on the host side, so no headers
   are written into guest memory and recompiled code sees only the bytes
-  it asked for. Heap blocks are 8-aligned; pages are 4,096-aligned and
+  it asked for. Heap blocks are 16-aligned and take multiples of 16 bytes,
+  as the game's heap's (the harness saw its blocks 16-aligned; the first
+  build's 8-aligned blocks hung a load, 2026-10-22: AltiVec's `lvx` and
+  `stvx` drop an address's low four bits, so a vector access to a block 8
+  bytes off a boundary lands on the block before it); pages are 4,096-aligned and
   cleared on allocation. HEAP_ZERO_MEMORY (`0x8`) clears the block.
 - Physical memory: the SDK's physical heap, as `MmAllocatePhysicalMemoryEx`
   does now, so the addresses stay in the physical views that the

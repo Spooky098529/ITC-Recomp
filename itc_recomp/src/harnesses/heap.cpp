@@ -91,7 +91,7 @@ void HeapCases(Context& h) {
         if (p == 0) {
           return;
         }
-        Append(out, p % 8);
+        Append(out, p % 16);
         Append(out, Call(h, sub_82298FF8, {heap, 0, p}));
         if (flags & 8) {
           Append(out, AllZero(h.base, p, size));
@@ -125,7 +125,7 @@ void ReallocCases(Context& h) {
              if (q != 0) {
                const uint32_t size = Call(h, sub_82298FF8, {heap, 0, q});
                Append(out, size);
-               Append(out, q % 8);
+               Append(out, q % 16);
                Append(out, HasPattern(h.base, q, std::min(from, size)));
                if ((flags & 8) && size > from) {
                  Append(out, AllZero(h.base, q + from, size - from));
