@@ -17,7 +17,9 @@ ITC_FLAG_BOOL(native_math, true, "ITC",
               "__ultod, sub_825A9DB0; _fpclass, sub_825AB268; rint, sub_825B0B30; _ctrlfp, sub_825B0B80, "
               "which sets the rounding mode as the original does; _abstract_sw, sub_825AB380; abs, sub_825AC870; "
               "tan, sub_825A8A50; ldexp, sub_825AAD20; _clearfp, sub_825AB568) natively instead of through the translated code (the same "
-              "doubles, bit for bit; checked by --run_harnesses=math)");
+              "doubles, bit for bit; checked by --run_harnesses=math). The kernel, pow's "
+              "helpers _set_exp, _get_exp, _decomp and the integer test, and rint have no "
+              "adapters: only their native callers reach them, and the flag switches those");
 
 // acos: f1 = x.
 extern "C" REX_FUNC(sub_825A8170) {
@@ -28,17 +30,6 @@ extern "C" REX_FUNC(sub_825A8170) {
   }
   ctx.fpscr.disableFlushMode();
   ctx.f1.f64 = c_runtime::Acos(ctx.f1.f64);
-}
-
-// asin and acos's kernel: f1 = x, r4 = 1 for acos, 0 for asin.
-extern "C" REX_FUNC(sub_825A7FB0) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_math)) {
-    __imp__sub_825A7FB0(ctx, base);
-    return;
-  }
-  ctx.fpscr.disableFlushMode();
-  ctx.f1.f64 = c_runtime::AsinAcos(ctx.f1.f64, ctx.r4.s32 != 0);
 }
 
 // asin: f1 = x.
@@ -107,52 +98,6 @@ extern "C" REX_FUNC(sub_825AB1C8) {
   }
   ctx.fpscr.disableFlushMode();
   ctx.f1.f64 = c_runtime::Copysign(ctx.f1.f64, ctx.f2.f64);
-}
-
-// _set_exp: f1 = x, r4 = the exponent.
-extern "C" REX_FUNC(sub_825AFE80) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_math)) {
-    __imp__sub_825AFE80(ctx, base);
-    return;
-  }
-  ctx.fpscr.disableFlushMode();
-  ctx.f1.f64 = c_runtime::SetExp(ctx.f1.f64, ctx.r4.s32);
-}
-
-// _get_exp: f1 = x; returns r3.
-extern "C" REX_FUNC(sub_825AFEA8) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_math)) {
-    __imp__sub_825AFEA8(ctx, base);
-    return;
-  }
-  ctx.fpscr.disableFlushMode();
-  ctx.r3.s64 = c_runtime::GetExp(ctx.f1.f64);
-}
-
-// _decomp: f1 = x, r4 = where the exponent goes (a 32-bit int).
-extern "C" REX_FUNC(sub_825AFF80) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_math)) {
-    __imp__sub_825AFF80(ctx, base);
-    return;
-  }
-  ctx.fpscr.disableFlushMode();
-  int32_t exponent;
-  ctx.f1.f64 = c_runtime::Decomp(ctx.f1.f64, &exponent);
-  guest::StoreU32(base, ctx.r4.u32, uint32_t(exponent));
-}
-
-// pow's integer test: f1 = y; returns r3.
-extern "C" REX_FUNC(sub_825A8CE0) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_math)) {
-    __imp__sub_825A8CE0(ctx, base);
-    return;
-  }
-  ctx.fpscr.disableFlushMode();
-  ctx.r3.s64 = c_runtime::IntType(ctx.f1.f64);
 }
 
 // log: f1 = x.
@@ -236,19 +181,6 @@ extern "C" REX_FUNC(sub_825AB268) {
   }
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = uint32_t(c_runtime::FpClass(ctx.f1.f64));
-}
-
-// rint: f1 = x, rounded in the host's rounding mode (tan's caller sets it
-// to nearest). The original leaves f4, f5, f6, r12 and cr0 changed; tan, its
-// only caller in play, doesn't read them.
-extern "C" REX_FUNC(sub_825B0B30) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_math)) {
-    __imp__sub_825B0B30(ctx, base);
-    return;
-  }
-  ctx.fpscr.disableFlushMode();
-  ctx.f1.f64 = c_runtime::Rint(ctx.f1.f64);
 }
 
 // _ctrlfp: r3 = new bits, r4 = mask; returns the old FPSCR word ^ 0xF8.

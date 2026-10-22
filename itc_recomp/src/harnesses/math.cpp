@@ -150,6 +150,41 @@ std::string Bits(double x) {
   return fmt::format("{:016X}", std::bit_cast<uint64_t>(x));
 }
 
+// The register steps of the functions whose adapters went once their
+// callers were native (docs/loops/b7-loop.md, "Removing an adapter"): the
+// cases run the plain C++ through these, against the recompiled versions.
+void NativeAsinAcos(PPCContext& ctx, uint8_t*) {
+  ctx.fpscr.disableFlushMode();
+  ctx.f1.f64 = c_runtime::AsinAcos(ctx.f1.f64, ctx.r4.s32 != 0);
+}
+
+void NativeSetExp(PPCContext& ctx, uint8_t*) {
+  ctx.fpscr.disableFlushMode();
+  ctx.f1.f64 = c_runtime::SetExp(ctx.f1.f64, ctx.r4.s32);
+}
+
+void NativeGetExp(PPCContext& ctx, uint8_t*) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.s64 = c_runtime::GetExp(ctx.f1.f64);
+}
+
+void NativeDecomp(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  int32_t exponent;
+  ctx.f1.f64 = c_runtime::Decomp(ctx.f1.f64, &exponent);
+  guest::StoreU32(base, ctx.r4.u32, uint32_t(exponent));
+}
+
+void NativeIntType(PPCContext& ctx, uint8_t*) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.s64 = c_runtime::IntType(ctx.f1.f64);
+}
+
+void NativeRint(PPCContext& ctx, uint8_t*) {
+  ctx.fpscr.disableFlushMode();
+  ctx.f1.f64 = c_runtime::Rint(ctx.f1.f64);
+}
+
 }  // namespace
 
 void Math(Context& h) {
@@ -163,9 +198,9 @@ void Math(Context& h) {
     AddRandom(h, values, 1.0, 2000);
     AddRandom(h, values, 1.5, 200);
     Unary(h, "acos (sub_825A8170)", __imp__sub_825A8170, sub_825A8170, values);
-    Unary(h, "asin and acos's kernel, acos (sub_825A7FB0)", __imp__sub_825A7FB0, sub_825A7FB0,
+    Unary(h, "asin and acos's kernel, acos (sub_825A7FB0)", __imp__sub_825A7FB0, NativeAsinAcos,
           values, [](PPCContext& t) { t.r4.u64 = 1; });
-    Unary(h, "asin and acos's kernel, asin (sub_825A7FB0)", __imp__sub_825A7FB0, sub_825A7FB0,
+    Unary(h, "asin and acos's kernel, asin (sub_825A7FB0)", __imp__sub_825A7FB0, NativeAsinAcos,
           values, [](PPCContext& t) { t.r4.u64 = 0; });
     Unary(h, "asin (sub_825A80A8)", __imp__sub_825A80A8, sub_825A80A8, values);
   }
@@ -225,9 +260,9 @@ void Math(Context& h) {
   }
   // pow and what it calls: copysign, _set_exp, _get_exp, _decomp, the
   // integer test and log, each against its recompiled version. pow's
-  // recompiled version calls these helpers' overrides (the native ones), so
-  // their own cases are their check; f1 only for pow (its recompiled version
-  // leaves the integer test's result in r3).
+  // recompiled version calls the overrides of copysign and log (the native
+  // ones), so their own cases are their check; f1 only for pow (its
+  // recompiled version leaves the integer test's result in r3).
   {
     // Values: the special ones, integers and halves, the edges each
     // function tests, and random doubles of every size.
@@ -247,15 +282,15 @@ void Math(Context& h) {
           [&](size_t i, PPCContext& t) { t.f1.f64 = values[i]; },
           [](PPCContext& t, std::vector<uint8_t>& b) { Append(b, t.f1.u64); },
           [&](size_t i) { return "x " + Bits(values[i]); });
-    Cases(h, "pow's integer test (sub_825A8CE0)", __imp__sub_825A8CE0, sub_825A8CE0,
+    Cases(h, "pow's integer test (sub_825A8CE0)", __imp__sub_825A8CE0, NativeIntType,
           values.size(), [&](size_t i, PPCContext& t) { t.f1.f64 = values[i]; },
           [](PPCContext& t, std::vector<uint8_t>& b) { Append(b, t.r3.u64); },
           [&](size_t i) { return "y " + Bits(values[i]); });
-    Cases(h, "_get_exp (sub_825AFEA8)", __imp__sub_825AFEA8, sub_825AFEA8, values.size(),
+    Cases(h, "_get_exp (sub_825AFEA8)", __imp__sub_825AFEA8, NativeGetExp, values.size(),
           [&](size_t i, PPCContext& t) { t.f1.f64 = values[i]; },
           [](PPCContext& t, std::vector<uint8_t>& b) { Append(b, t.r3.u64); },
           [&](size_t i) { return "x " + Bits(values[i]); });
-    Cases(h, "_decomp (sub_825AFF80)", __imp__sub_825AFF80, sub_825AFF80, values.size(),
+    Cases(h, "_decomp (sub_825AFF80)", __imp__sub_825AFF80, NativeDecomp, values.size(),
           [&](size_t i, PPCContext& t) {
             t.f1.f64 = values[i];
             t.r4.u64 = h.data;
@@ -277,7 +312,7 @@ void Math(Context& h) {
     for (int i = 0; i < 200; i++) {
       exps.push_back({values[h.random.Below(uint32_t(values.size()))], int64_t(h.random.Next())});
     }
-    Cases(h, "_set_exp (sub_825AFE80)", __imp__sub_825AFE80, sub_825AFE80, exps.size(),
+    Cases(h, "_set_exp (sub_825AFE80)", __imp__sub_825AFE80, NativeSetExp, exps.size(),
           [&](size_t i, PPCContext& t) {
             t.f1.f64 = exps[i].first;
             t.r4.s64 = exps[i].second;
@@ -408,7 +443,7 @@ void Math(Context& h) {
     AddRandom(h, values, 1e16, 300);
     for (uint32_t mode = 0; mode < 4; mode++) {
       Cases(h, fmt::format("rint, rounding mode {} (sub_825B0B30)", mode).c_str(),
-            __imp__sub_825B0B30, sub_825B0B30, values.size(),
+            __imp__sub_825B0B30, NativeRint, values.size(),
             [&](size_t i, PPCContext& t) {
               t.f1.f64 = values[i];
               set_mode(t, mode);
