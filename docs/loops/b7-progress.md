@@ -12,12 +12,19 @@ commits, the function files and the subsystems' docs.
   Mapped as `functions/ui-movies-game.md` (7d30b85): 88 rows, 29 ready
   groups; the load and text paths wait on the heap and the VirtualAlloc
   wrappers (leads that need the user's decision).
-- Step: migration (first agent running).
-- Session: pass 16 of 20, subsystem 5 of 5. In all: subsystem 5 of 5 (the
+- Step: migration (second agent running: the 10 groups made ready by the
+  first, and `b7_status.py` taught the adapters' macro-built fallbacks).
+- Session: pass 17 of 20, subsystem 5 of 5. In all: subsystem 5 of 5 (the
   last before the user's review).
 
 ## Done
 
+- The game's UI movie side, first migration: 29 functions native in 5
+  groups (3648d6b, b7af1a0, 8681720, 2f6208f, 2432394),
+  `--native_ui_movies_game`; harnesses at 0 differing, race 21 s, no
+  errors. 11 of them not seen in attract races (harness only); menus and
+  HUD texts couldn't be compared in frame dumps (attract races show only
+  the logo overlay).
 - UI movie library (`functions/ui-movies.md`, map 27ec389): 32 functions
   native in 5 groups (f1107f8, b75567f, ac94162, 81441f2, 965fa67),
   `--native_ui_movies`; harnesses at 0 differing, race 21 s, no errors.
@@ -120,6 +127,8 @@ commits, the function files and the subsystems' docs.
   known 200, unknown 6113).
 - After mapping the game's UI movie side: ours 293, work left 6460
   (wrapped 147, known 279, unknown 6034).
+- After its first migration: ours 322, work left 6431 (wrapped 145,
+  known 252, unknown 6034).
 
 ## Stopped
 
