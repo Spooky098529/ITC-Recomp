@@ -14,7 +14,8 @@ ITC_FLAG_BOOL(native_race_overlays, true, "ITC",
               "AddPoint, sub_821292E8 and sub_82129598; ParticlesB and ParticlesC::Emit, sub_8212B4A8 and sub_8212C1C0; the "
               "car-model sprites' kind and table entry, sub_82123188 and sub_8211F300; the model "
               "points' checks and positions, sub_82126A78 and sub_82127140; Sparks::UpdateStreak, "
-              "sub_8212E660; Sparks::Emit, sub_8212D818) natively "
+              "sub_8212E660; Sparks::Emit, sub_8212D818; CarOverlays::EmitSmoke, sub_82123240, "
+              "with Smoke::Emit) natively "
               "instead of through the translated code (same results; checked by "
               "--run_harnesses=race_overlays)");
 
@@ -266,5 +267,28 @@ extern "C" REX_FUNC(sub_8212D818) {
     return;
   }
   ctx.r3.u64 = result;
+  ctx.f1.f64 = last;
+}
+
+// CarOverlays::EmitSmoke: r3 = the car overlays, f1 = a rate, f2 = speed,
+// r5 = the frame, r6 = the wheel, r8 = a value for the puff (r4 and r7
+// aren't read); returns 0, with f1 left as the original leaves it.
+// Smoke::Emit, which only it calls, is done by its plain C++. Where the
+// native version declines (the smoke's capacity 0 or -1), the original
+// runs.
+extern "C" REX_FUNC(sub_82123240) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_race_overlays)) {
+    __imp__sub_82123240(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  double last = ctx.f1.f64;
+  if (!EmitSmoke(base, ctx.r3.u32, ctx.f1.f64, ctx.f2.f64, ctx.r5.u32, ctx.r6.u32, ctx.r8.u32,
+                 &last)) {
+    __imp__sub_82123240(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = 0;
   ctx.f1.f64 = last;
 }

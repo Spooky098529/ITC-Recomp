@@ -607,6 +607,21 @@ uint32_t WordOf(simde__m128 v, int i) {
   return lanes[3 - i];
 }
 
+// vaddfp a, b with the first operand's NaN kept where both are NaNs (as
+// the Xenon does): the sum, except that lanes where `a` is a NaN get `a`
+// quieted. addps passes on its first operand's NaN, but the compiler may
+// swap the operands of an addition: in this build the translated
+// Smoke::Emit keeps vA first, while the translated Sparks::UpdateStreak and
+// Sparks::Emit have theirs swapped (seen in the disassembly), so the sparks
+// use a plain addps, which matches them as built.
+simde__m128 AddKeepingFirstNaN(simde__m128 a, simde__m128 b) {
+  const simde__m128 sum = simde_mm_add_ps(a, b);
+  const simde__m128 a_nan = simde_mm_cmpunord_ps(a, a);
+  const simde__m128 quieted =
+      simde_mm_or_ps(a, simde_mm_castsi128_ps(simde_mm_set1_epi32(0x00400000)));
+  return simde_mm_blendv_ps(sum, quieted, a_nan);
+}
+
 // The original's vector length, with flush-to-zero on (the caller's job):
 // the squared length of x, y and z (vmsum3fp128, dpps with mask 0xEF), its
 // reciprocal square root as 1/sqrt and one Newton step (vrsqrtefp,
@@ -1335,6 +1350,240 @@ bool SparksEmit(uint8_t* base, uint32_t sparks, uint32_t position, double streng
                   uint32_t(next) - uint32_t(quotient) * uint32_t(size_now));
   guest::StoreU32(base, sparks + kSparksCount, added);
   *result = 1;
+  return true;
+}
+
+}  // namespace race_overlays
+
+namespace race_overlays {
+
+namespace {
+
+constexpr uint32_t kSmokeHead = 32532;
+constexpr uint32_t kSmokeCount = 32536;
+constexpr uint32_t kSmokeVelocity = 32544;
+constexpr uint32_t kSmokeBytes = 720;
+constexpr uint32_t kSmokeGrowthHigh = 0x82002C4C;
+constexpr uint32_t kSmokeFrameScale = 0x820021E8;
+constexpr uint32_t kSmokeRiseHigh = 0x820029D4;
+constexpr uint32_t kSmokeSpeedScale = 0x820029E4;
+constexpr uint32_t kSmokeDriftScale = 0x820086F0;
+constexpr uint32_t kSmokeDriftHigh = 0x82002C48;
+constexpr uint32_t kSmokeRadiusBase = 0x8200222C;
+constexpr uint32_t kSmokeCountScale = 0x820029EC;
+constexpr uint32_t kSmokeRadiusScale = 0x820086EC;
+constexpr uint32_t kSmokeAngleLow = 0x820029C4;
+constexpr uint32_t kSmokeAngleHigh = 0x82002240;
+
+}  // namespace
+
+bool SmokeEmit(uint8_t* base, uint32_t smoke, double size, double speed, uint32_t frame,
+               uint32_t region, uint32_t value, uint32_t* result, double* last) {
+  ITC_NATIVE_RUNNING("sub_8212A350 Smoke::Emit");
+  const int32_t capacity = int32_t(guest::LoadU32(base, smoke + 104));
+  if (capacity == 0 || capacity == -1) {
+    return false;
+  }
+  const int32_t count = int32_t(guest::LoadU32(base, smoke + kSmokeCount));
+  const uint32_t table = guest::LoadU32(base, smoke + 112);
+  if (!(capacity > count)) {
+    *result = 0;
+    return true;
+  }
+  // The puff, and the one before it (the last when this is the first).
+  const int32_t head = int32_t(guest::LoadU32(base, smoke + kSmokeHead));
+  const uint32_t puff = smoke + uint32_t(head) * kSmokeBytes + 128;
+  uint32_t previous;
+  if (puff == smoke + 128) {
+    previous = smoke + uint32_t(capacity) * kSmokeBytes - 592;
+  } else {
+    const int32_t before = head - 1;
+    const int32_t quotient = before == INT32_MIN && capacity == -1 ? 0 : before / capacity;
+    previous = smoke + (uint32_t(before) - uint32_t(quotient) * uint32_t(capacity)) * kSmokeBytes +
+               128;
+  }
+
+  guest::StoreFloat(base, puff + 112, float(size));
+  guest::StoreU32(base, puff + 96, value);
+  {
+    const uint32_t alpha = guest::LoadU32(base, table + 8);
+    guest::StoreU32(base, puff + 104, alpha);
+    guest::StoreU32(base, puff + 120, alpha);
+  }
+  const double zero = guest::LoadFloat(base, kZero);
+  const uint32_t zero_word = guest::LoadU32(base, kZero);
+  const double growth_high = guest::LoadFloat(base, kSmokeGrowthHigh);
+  guest::StoreU32(base, puff + 108, guest::LoadU32(base, table + 0));
+  {
+    const double drawn = RandomRange(base, zero, growth_high);
+    const double frame_value = guest::LoadFloat(base, frame + 84);
+    const double scale = guest::LoadFloat(base, kSmokeFrameScale);
+    const float growth = float(std::fma(frame_value, scale, drawn));
+    guest::StoreFloat(base, puff + 100, growth);
+    guest::StoreFloat(base, puff + 124, growth);
+  }
+  const uint32_t one_word = guest::LoadU32(base, kOne);
+  const double one = std::bit_cast<float>(one_word);
+  {
+    const double drawn = RandomRange(base, one, guest::LoadFloat(base, kSmokeRiseHigh));
+    const double scale = guest::LoadFloat(base, kSmokeSpeedScale);
+    guest::StoreFloat(base, puff + 116, float(std::fma(speed, scale, drawn)));
+  }
+  const uint32_t velocity = puff + 64;
+  for (uint32_t i = 0; i < 16; i += 4) {
+    CopyFloat(base, frame + 64 + i, puff + 48 + i);
+  }
+  for (uint32_t i = 0; i < 16; i += 4) {
+    CopyFloat(base, smoke + kSmokeVelocity + i, velocity + i);
+  }
+  {
+    const uint32_t alpha = FloatToInt(base, puff + 104);
+    guest::StoreU32(base, puff + 80, 255);
+    guest::StoreU32(base, puff + 84, 255);
+    guest::StoreU32(base, puff + 88, 255);
+    guest::StoreU32(base, puff + 92, alpha);
+  }
+
+  // The drift.
+  double span_x, span_y, span_z;
+  if (region != 0) {
+    span_x = Difference(guest::LoadFloat(base, smoke + 32576), guest::LoadFloat(base, smoke + 32560));
+    span_y = Difference(guest::LoadFloat(base, smoke + 32580), guest::LoadFloat(base, smoke + 32564));
+    span_z = Difference(guest::LoadFloat(base, smoke + 32584), guest::LoadFloat(base, smoke + 32568));
+  } else {
+    span_x = Difference(guest::LoadFloat(base, puff + 48), guest::LoadFloat(base, velocity + 0));
+    span_y = Difference(guest::LoadFloat(base, puff + 52), guest::LoadFloat(base, velocity + 4));
+    span_z = Difference(guest::LoadFloat(base, puff + 56), guest::LoadFloat(base, velocity + 8));
+  }
+  const double reach = RandomRange(
+      base, zero, float(speed * double(guest::LoadFloat(base, kSmokeDriftScale))));
+  const double radius = float(reach + double(guest::LoadFloat(base, kSmokeRadiusBase)));
+  const double along = RandomRange(base, zero, guest::LoadFloat(base, kSmokeDriftHigh));
+  const float ax = float(span_x * along);
+  const float ay = float(span_y * along);
+  const float az = float(span_z * along);
+  const double ox = RandomRange(base, -radius, radius);
+  const double oz = RandomRange(base, -radius, radius);
+  const uint32_t csr = Fpscr::getcsr();
+  const uint32_t flushing = csr | uint32_t(Fpscr::FlushMask);
+  const simde__m128 drift_a = VectorOf(std::bit_cast<uint32_t>(ax), std::bit_cast<uint32_t>(ay),
+                                       std::bit_cast<uint32_t>(az), one_word);
+  const simde__m128 drift_b =
+      VectorOf(std::bit_cast<uint32_t>(float(oz)), zero_word, std::bit_cast<uint32_t>(float(ox)),
+               one_word);
+  Fpscr::setcsr(flushing);
+  const simde__m128 drift = AddKeepingFirstNaN(drift_a, drift_b);
+  Fpscr::setcsr(csr);
+  int32_t particles = Fctiwz(double(float(speed * double(guest::LoadFloat(base, kSmokeCountScale)))));
+  if (particles < 2) {
+    particles = 2;
+  } else if (particles > 10) {
+    particles = 10;
+  }
+  guest::StoreU32(base, puff + 128, uint32_t(particles));
+
+  // The particles.
+  const double step_limit = float(speed * double(guest::LoadFloat(base, kSmokeRadiusScale)));
+  const double angle_high = guest::LoadFloat(base, kSmokeAngleHigh);
+  const double angle_low = guest::LoadFloat(base, kSmokeAngleLow);
+  uint32_t particle = puff + 240;
+  for (int32_t k = 0; k < int32_t(guest::LoadU32(base, puff + 128)); k++, particle += 48) {
+    const double limit = step_limit > one ? one : step_limit;
+    const double share = float(double(int64_t(int32_t(guest::LoadU32(base, puff + 128)))));
+    const double dx = Difference(guest::LoadFloat(base, velocity + 0), guest::LoadFloat(base, puff + 48));
+    const double dz = Difference(guest::LoadFloat(base, velocity + 8), guest::LoadFloat(base, puff + 56));
+    const double dy = Difference(guest::LoadFloat(base, velocity + 4), guest::LoadFloat(base, puff + 52));
+    const double part = float(one / share);
+    const double step_x = float(dx * part);
+    const double step_y = float(dy * part);
+    const double step_z = float(dz * part);
+    // The angle and radius only place the particle in the branch whose
+    // stores are overwritten (below), but they're drawn all the same.
+    const double angle = RandomRange(base, angle_low, angle_high);
+    RandomRange(base, -limit, limit);
+    *last = c_runtime::Sin(angle);
+    for (int i = 0; i < 4; i++) {
+      guest::StoreU32(base, particle + 16 + 4 * i, WordOf(drift, i));
+    }
+    {
+      const int32_t drawn = int32_t(Rand(base));
+      guest::StoreU32(base, particle + 32, uint32_t(drawn - (drawn / 3) * 3));
+    }
+    {
+      const int32_t drawn = int32_t(Rand(base));
+      guest::StoreU32(base, particle + 40, 1);
+      guest::StoreU32(base, particle + 36, uint32_t(drawn - (drawn / 4) * 4));
+    }
+    const int32_t apart = int32_t(guest::LoadU32(base, puff + 108) - guest::LoadU32(base, previous + 108));
+    if (apart <= 2) {
+      const double index = float(double(int64_t(k)));
+      guest::StoreFloat(base, particle + 0,
+                        float(double(float(step_x * index)) + double(guest::LoadFloat(base, puff + 48))));
+      const double y = float(step_y * index);
+      guest::StoreFloat(base, particle + 4, float(double(guest::LoadFloat(base, puff + 52)) + y));
+      const double z = float(step_z * index);
+      guest::StoreFloat(base, particle + 8, float(double(guest::LoadFloat(base, puff + 56)) + z));
+    } else {
+      // (The original first stores +48 plus the cosine offset and +56 plus
+      // the sine offset, then overwrites them with these.)
+      for (uint32_t i = 0; i < 16; i += 4) {
+        CopyFloat(base, puff + 48 + i, particle + i);
+      }
+      if (uint32_t(k) >= 5) {
+        guest::StoreU32(base, puff + 128, 5);
+        break;
+      }
+    }
+  }
+
+  // The head moves on (divw, then the remainder) and the count goes up.
+  const int32_t next = int32_t(guest::LoadU32(base, smoke + kSmokeHead) + 1);
+  const int32_t size_now = int32_t(guest::LoadU32(base, smoke + 104));
+  const uint32_t added = guest::LoadU32(base, smoke + kSmokeCount) + 1;
+  const int32_t quotient =
+      (size_now && !(next == INT32_MIN && size_now == -1)) ? next / size_now : 0;
+  guest::StoreU32(base, smoke + kSmokeHead,
+                  uint32_t(next) - uint32_t(quotient) * uint32_t(size_now));
+  guest::StoreU32(base, smoke + kSmokeCount, added);
+  *result = 1;
+  return true;
+}
+
+bool EmitSmoke(uint8_t* base, uint32_t overlays, double rate, double speed, uint32_t frame,
+               uint32_t wheel, uint32_t value, double* last) {
+  ITC_NATIVE_RUNNING("sub_82123240 CarOverlays::EmitSmoke");
+  const uint32_t accumulator = overlays + (wheel + 11) * 48;
+  const uint32_t smoke = guest::LoadU32(base, overlays + ((wheel + 41) << 2));
+  const uint32_t region = wheel >= 4 ? 1 : 0;
+  if (rate == double(guest::LoadFloat(base, kZero))) {
+    return true;
+  }
+  const int32_t capacity = int32_t(guest::LoadU32(base, smoke + 104));
+  if (capacity == 0 || capacity == -1 ||
+      (accumulator + 4 > smoke + 104 && accumulator < smoke + 108)) {
+    return false;
+  }
+  const float sum = float(double(guest::LoadFloat(base, accumulator)) + rate);
+  guest::StoreFloat(base, accumulator, sum);
+  if (double(sum) < double(guest::LoadFloat(base, kOne))) {
+    return true;
+  }
+  // fctidz, stfiwx, then the low word back as an unsigned number (lwz,
+  // std, fcfid).
+  int64_t whole_64;
+  if (std::isnan(double(sum))) {
+    whole_64 = INT64_MIN;
+  } else if (double(sum) > double(INT64_MAX)) {
+    whole_64 = INT64_MAX;
+  } else {
+    whole_64 = simde_mm_cvttsd_si64(simde_mm_set_sd(double(sum)));
+  }
+  const double whole = float(double(int64_t(uint32_t(whole_64))));
+  *last = whole;
+  uint32_t result = 0;
+  SmokeEmit(base, smoke, whole, speed, frame, region, value, &result, last);
+  guest::StoreFloat(base, accumulator,
+                    float(double(guest::LoadFloat(base, accumulator)) - whole));
   return true;
 }
 

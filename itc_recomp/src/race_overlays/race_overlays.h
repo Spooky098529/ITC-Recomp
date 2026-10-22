@@ -353,3 +353,46 @@ bool SparksEmit(uint8_t* base, uint32_t sparks, uint32_t position, double streng
                 const uint32_t vector[4], uint32_t* result, double* last);
 
 }  // namespace race_overlays
+
+namespace race_overlays {
+
+// --- The tire smoke ---
+//
+// A smoke emitter: its puffs (720 bytes each) from +128, +104 the capacity,
+// +112 the parameter table, +32,532 the head, +32,536 the count, +32,544
+// the velocity, +32,560 and +32,576 a region's two points (Smoke::SetRegion).
+
+// Smoke::Emit (sub_8212A350): when the count is below the capacity
+// (signed), a new puff at the head: +112 `size`, +96 `value`, +104 and +120
+// the table's +8, +108 life (the table's +0), +100 and +124 the frame's +84
+// times the float at 0x820021E8 plus a draw up to the float at 0x82002C4C,
+// +116 `speed` times the float at 0x820029E4 plus a draw from 1.0 to the
+// float at 0x820029D4; +48 the frame's +64, +64 the smoke's velocity
+// (+32,544); colors 255, +92 the alpha as an integer; a drift (the region's
+// span when `region` is set, else +48 - +64, times a draw, plus random
+// offsets; vaddfp with flush-to-zero on); +128 the particle count (`speed`
+// times the float at 0x820029EC as an integer, clamped to 2-10); then each
+// particle (48 bytes from +240): placed around +48 at a random angle and
+// radius (or along +64 - +48 by its index while the puff's life is within 2
+// of the previous puff's; from the sixth on, at +48 itself, the count cut to
+// 5), the drift, rand() % 3, rand() % 4 and 1. The head moves on (modulo the
+// capacity) and the count goes up. `*result` gets 1, or 0 when full;
+// `*last` the last sine (the original leaves it in f1; untouched when
+// full). False, with nothing done, for a capacity of 0 or -1 (where the
+// original's division can trap); the original runs there.
+bool SmokeEmit(uint8_t* base, uint32_t smoke, double size, double speed, uint32_t frame,
+               uint32_t region, uint32_t value, uint32_t* result, double* last);
+
+// CarOverlays::EmitSmoke (sub_82123240): adds `rate` (unless it's 0.0) to
+// the wheel's accumulator (the overlays' +528 + 48 x wheel); once that
+// reaches 1.0, emits its whole part on the wheel's smoke (+164 + 4 x wheel;
+// SmokeEmit with `region` 1 for wheels 4 and above) and keeps the rest.
+// Returns 0 (the original's r3). `*last` gets what the original leaves in
+// f1 (untouched when nothing is emitted). False, with nothing done, when the
+// smoke's capacity is 0 or -1 or the accumulator is the smoke's capacity
+// word (where Smoke::Emit would decline after the accumulator changed);
+// the original runs there.
+bool EmitSmoke(uint8_t* base, uint32_t overlays, double rate, double speed, uint32_t frame,
+               uint32_t wheel, uint32_t value, double* last);
+
+}  // namespace race_overlays
