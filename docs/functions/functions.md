@@ -106,6 +106,10 @@ Rows not yet moved stay in the table below. So far:
   brakes, aerodynamics), the rigid body's integration, and the
   collision world's objects, pairs, update and surface settings (B7;
   the narrow phase and shapes aren't in it).
+- [`heap.md`](heap.md): memory allocation: the C runtime's allocators,
+  LocalAlloc and XMemAlloc, the process heap, VirtualAlloc and physical
+  memory, routed to the native allocation layer (B7's first step,
+  `../native-memory.md`).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
@@ -281,14 +285,11 @@ old performance notes to the end of `../native-renderer.md`.
 | `sub_822A0688` | | | Reads GPU registers at `7FC8xxxx`. No callers in code. Not read. Never called (attract races and play, 2026-10-20, a counter). |
 | `sub_822AD500` | `Device::Release` | | r3 device. Waits, frees, `sub_822ACFB8`, `sub_822B58C0`, clears the interrupt callback, `sub_8229F280(device, 0)`, unregisters the terminate notification, `VdShutdownEngines`. From `sub_8229D978`. Never called in an attract race. Not needed to draw: never called (attract race and play). |
 | `sub_8229DB38` | | | Probably Direct3D's CreateDevice: r3 0, r4 1, r5 0, r6 0, r7 the presentation parameters, r8 where the device goes; calls `Device::Init`; returns a negative value on failure. From the display set-up `sub_8258D568` (`8258D6C8`), once at boot. Not read in detail. |
-| `sub_82296550` | | | Probably XPhysicalAlloc: r3 bytes, r4 lowest and r5 highest address, r6 alignment, r7 protection; calls `MmAllocatePhysicalMemoryEx` and `sub_82296FD0`. From the display set-up `sub_8258D568` (64 KB and 1 MB). Not read in detail. |
 | `sub_822A1EE8` | | | r3 device, r4 value: stores it at +11608 and sets dirty bits (+10332, +24). `sub_822A1F20` (+11612) and `sub_822A1F58` (+11616) are the same for the next two; probably render states of render targets 1-3. From the display set-up with 0. Not read in detail. |
 | `sub_822A1F20` | | | Same as `sub_822A1EE8`, for +11612. Not read in detail. |
 | `sub_822A1F58` | | | Same as `sub_822A1EE8`, for +11616. Not read in detail. |
 | `sub_8229DA20` | | | Stores r4 at device +15144: the callback the interrupt handler `sub_8229DEA0` calls on vblanks. From the display set-up with `sub_8258D4D8`. |
 | `sub_8229D978` | | | Calls `Device::Release`. Called by `sub_8229DB38`, `sub_824829A0`, `sub_82491758`, `sub_82491A00`, `sub_8258DBA8`. Probably the device's reference count drop. Not read. |
-| `sub_822976F8` | | | Probably allocates physical memory (r3 size, r4 flags). Not read. |
-| `sub_82297790` | | | Probably frees what `sub_822976F8` allocates. Not read. |
 | `sub_8229F148` | | | Reserves r4 words in the command buffer: ends the segment if +40 + 4·r4 passes the end (+44), then a new segment (`sub_8229EC00`) if still short; returns the write position (+40; the words are written after it), or 0. From Swap (64 words for `VdSwap`), `sub_8229B9C8`, `sub_8229BFE8`, `sub_822AEBF0`, the gamma packets `sub_822B0C38`/`sub_822B0D18`, `RetrainEdram`, `Device::SetUpScaler`, `sub_822B5208`. |
 | `sub_8229DD70` | | | Writes r5 words from r4 into the primary ring at its write position (+10820, wrapping with +13500), after waiting for room (`sub_8229DCC0`); doesn't write CP_RB_WPTR. From `Device::SetUpRing` (ME_INIT, no longer) and `sub_822B6370` (not read). |
 | `sub_8229DCC0` | | | Waits for room in the primary ring, reading its read pointer from progress block +60 (see "Plan for milestone 6" in `docs/native-renderer.md`). Not read in detail. |
