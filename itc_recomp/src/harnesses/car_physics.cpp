@@ -278,6 +278,49 @@ void NativeRemovePair(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = r3;
 }
 ITC_NATIVE_STEP(NativeWorldReset, ctx.r3.u64 = cp::CollisionWorldReset(base))
+// Where a pair's removal can't be native, the original from the start (as
+// the adapters).
+void NativeRemovePairsOf(PPCContext& ctx, uint8_t* base) {
+  uint32_t r3 = 0;
+  if (!cp::CollisionWorldRemovePairsOf(base, ctx.r3.u32, &r3)) {
+    __imp__sub_820B8BA8(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = r3;
+}
+void NativeRemovePairsByGroups(PPCContext& ctx, uint8_t* base) {
+  uint32_t r3 = 0;
+  if (!cp::CollisionWorldRemovePairsByGroups(base, ctx.r3.u32, ctx.r4.u32, &r3)) {
+    __imp__sub_820B8AF8(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = r3;
+}
+void NativeRemoveObject(PPCContext& ctx, uint8_t* base) {
+  const uint32_t object = ctx.r3.u32;
+  uint32_t r3 = 0;
+  if (!cp::CollisionWorldRemoveObject(base, object, &r3)) {
+    ctx.r3.u64 = object;
+    ctx.r1.u64 = ctx.r1.u32 - 112;
+    __imp__sub_820B8BA8(ctx, base);
+    ctx.r1.u64 = ctx.r1.u32 + 112;
+    return;
+  }
+  ctx.r3.u64 = r3;
+}
+ITC_NATIVE_STEP(NativeAddGroups,
+                ctx.r3.u64 = cp::CollisionObjectAddGroups(base, ctx.r3.u32, ctx.r4.u32))
+void NativeRemoveGroups(PPCContext& ctx, uint8_t* base) {
+  const uint32_t object = ctx.r3.u32;
+  uint32_t groups = 0, r3 = 0;
+  if (!cp::CollisionObjectRemoveGroups(base, object, ctx.r4.u32, &groups, &r3)) {
+    ctx.r3.u64 = object;
+    ctx.r4.u64 = groups;
+    __imp__sub_820B8AF8(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = r3;
+}
 // Where tan would fail, the original (as the adapters).
 void NativeSteerRecordCurve(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
@@ -1149,6 +1192,7 @@ enum PairsShape {
   kMovePairArgs,    // r3 = the last pair, r4 = a slot unlinked first
   kRemovePairArgs,  // r3 = a pair's index
   kResetArgs,       // nothing
+  kObjectGroups,    // r3 = an object, r4 = groups (or bits, some in the top byte)
 };
 
 }  // namespace
@@ -1174,6 +1218,16 @@ void CarPhysicsPairs(Context& h) {
        NativeRemovePair, kRemovePairArgs},
       {"CollisionWorld::Reset (sub_820B85E8)", Original<__imp__sub_820B85E8>, NativeWorldReset,
        kResetArgs},
+      {"CollisionWorld::RemovePairsOf (sub_820B8BA8)", Original<__imp__sub_820B8BA8>,
+       NativeRemovePairsOf, kObjectGroups},
+      {"CollisionWorld::RemovePairsByGroups (sub_820B8AF8)", Original<__imp__sub_820B8AF8>,
+       NativeRemovePairsByGroups, kObjectGroups},
+      {"CollisionWorld::RemoveObject (sub_820B9448)", Original<__imp__sub_820B9448>,
+       NativeRemoveObject, kObjectGroups},
+      {"CollisionObject::AddGroups (sub_820B7CC8)", Original<__imp__sub_820B7CC8>,
+       NativeAddGroups, kObjectGroups},
+      {"CollisionObject::RemoveGroups (sub_820B7CF0)", Original<__imp__sub_820B7CF0>,
+       NativeRemoveGroups, kObjectGroups},
   };
   uint8_t saved_surfaces[kSurfaceBytes];
   std::memcpy(saved_surfaces, h.base + kSurfaceGlobals, kSurfaceBytes);
@@ -1208,18 +1262,28 @@ void CarPhysicsPairs(Context& h) {
         for (uint32_t i = objects - 1; i > 0; i--) {
           std::swap(order[i], order[fill.Below(i + 1)]);
         }
-        uint32_t head = 0;
+        // The active list (+20) and the free list (+24), linked by +228
+        // (next) and +232 (previous); the groups the object is in (+244)
+        // and those it collides with (+248), some in the top byte.
+        uint32_t heads[2] = {0, 0};
         for (uint32_t i = 0; i < objects; i++) {
           const uint32_t object = object_at(order[i]);
           guest::StoreU32(h.base, object + 244, fill.Below(16));
+          guest::StoreU32(h.base, object + 248,
+                          fill.Below(16) | (fill.Below(2) == 0 ? 0x01000000 : 0));
           guest::StoreU32(h.base, object + 268, fill.Below(3));
           guest::StoreU32(h.base, object + 264, 0);
-          if (fill.Below(5) != 0) {
-            guest::StoreU32(h.base, object + 228, head);
-            head = object;
+          uint32_t& list = heads[fill.Below(5) == 0 ? 1 : 0];
+          guest::StoreU32(h.base, object + 228, list);
+          guest::StoreU32(h.base, object + 232, 0);
+          if (list != 0) {
+            guest::StoreU32(h.base, list + 232, object);
           }
+          list = object;
         }
-        guest::StoreU32(h.base, world + 20, head);
+        guest::StoreU32(h.base, world + 20, heads[0]);
+        guest::StoreU32(h.base, world + 24, heads[1]);
+        guest::StoreU32(h.base, world + 28, fill.Below(9));
         // The pairs made by the recompiled AddPairs.
         const uint32_t adds = fill.Below(5);
         for (uint32_t i = 0; i < adds; i++) {
@@ -1273,6 +1337,10 @@ void CarPhysicsPairs(Context& h) {
             skip = count == 0;
             break;
           case kResetArgs:
+            break;
+          case kObjectGroups:
+            t.r3.u64 = a;
+            t.r4.u64 = fill.Below(16) | (fill.Below(3) == 0 ? 0x01000000 : 0);
             break;
         }
         what = fmt::format("seed {} objects {} pairs {} a {:08X} b {:08X} index {}", seed,

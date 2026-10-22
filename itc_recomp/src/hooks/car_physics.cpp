@@ -20,7 +20,9 @@ ITC_FLAG_BOOL(native_car_physics, true, "ITC",
               "sub_820B6430, sub_820B4CF0; the collision world's objects, contacts and "
               "surfaces, sub_820B7AE8 to sub_820B7ED0, sub_820BAA78, sub_820BC1F8 to "
               "sub_820BC550; its pairs and reset, sub_820B94B0, sub_820B8A88, sub_820B85E8 with "
-              "sub_820B8C20, sub_820BC068, sub_820BBC40, sub_820BBD30; the car data and the "
+              "sub_820B8C20, sub_820BC068, sub_820BBC40, sub_820BBD30, sub_820B9448 with "
+              "sub_820B8BA8, sub_820B8AF8, and the collision objects' groups, sub_820B7CC8, "
+              "sub_820B7CF0; the car data and the "
               "vehicle's constructor, sub_820AEF80 with sub_820AECB8, sub_820AEE98, "
               "sub_820AF018, sub_820B42C8) natively instead of through the translated code "
               "(the same words, bit for bit; checked by --run_harnesses=car_physics)");
@@ -366,6 +368,48 @@ extern "C" REX_FUNC(sub_820B8A88) {
 }
 // r3 comes back as 0x826C2E30 (ResetSurfaces').
 ITC_CAR_PHYSICS(820B85E8, ctx.r3.u64 = CollisionWorldReset(base))
+// CollisionWorld::RemovePairsOf and RemovePairsByGroups (sub_820B8BA8,
+// sub_820B8AF8) have no adapters: their only callers, RemoveObject and
+// CollisionObject::RemoveGroups, are native. Where a pair's removal can't be
+// native, the rest of the removals by the original (from the start: the
+// same as it would have done).
+// r3 = the object.
+extern "C" REX_FUNC(sub_820B9448) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_car_physics)) {
+    __imp__sub_820B9448(ctx, base);
+    return;
+  }
+  const uint32_t object = ctx.r3.u32;
+  uint32_t r3 = 0;
+  if (!CollisionWorldRemoveObject(base, object, &r3)) {
+    ctx.r3.u64 = object;
+    ctx.r1.u64 = ctx.r1.u32 - 112;
+    __imp__sub_820B8BA8(ctx, base);
+    ctx.r1.u64 = ctx.r1.u32 + 112;
+    return;
+  }
+  ctx.r3.u64 = r3;
+}
+// r3 = the object, r4 = the bits.
+ITC_CAR_PHYSICS(820B7CC8, ctx.r3.u64 = CollisionObjectAddGroups(base, ctx.r3.u32, ctx.r4.u32))
+extern "C" REX_FUNC(sub_820B7CF0) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_car_physics)) {
+    __imp__sub_820B7CF0(ctx, base);
+    return;
+  }
+  const uint32_t object = ctx.r3.u32;
+  uint32_t groups = 0, r3 = 0;
+  if (!CollisionObjectRemoveGroups(base, object, ctx.r4.u32, &groups, &r3)) {
+    // RemovePairsByGroups is the original's tail call (its frame here).
+    ctx.r3.u64 = object;
+    ctx.r4.u64 = groups;
+    __imp__sub_820B8AF8(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = r3;
+}
 
 // --- The car data and the vehicle's constructor ---
 

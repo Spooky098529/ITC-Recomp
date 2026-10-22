@@ -494,4 +494,105 @@ uint32_t CollisionWorldReset(uint8_t* base) {
   return 0x826C2E30;
 }
 
+
+bool CollisionWorldRemovePairsOf(uint8_t* base, uint32_t object, uint32_t* r3) {
+  ITC_NATIVE_RUNNING("sub_820B8BA8 CollisionWorld::RemovePairsOf");
+  *r3 = object;
+  uint32_t world = World(base);
+  if (guest::LoadU32(base, world + 40) == 0) {
+    return true;
+  }
+  // The pair at `pair` is index `i`'s; after a removal the last pair is in
+  // its slot, tested next.
+  uint32_t pair = guest::LoadU32(base, world + 36);
+  for (uint32_t i = 0; i < guest::LoadU32(base, world + 40); i++) {
+    if (guest::LoadU32(base, pair + 16) == object || guest::LoadU32(base, pair + 20) == object) {
+      if (!CollisionWorldRemovePair(base, i, r3)) {
+        return false;
+      }
+      world = World(base);
+      i--;
+    } else {
+      pair += 32;
+    }
+  }
+  return true;
+}
+
+bool CollisionWorldRemovePairsByGroups(uint8_t* base, uint32_t object, uint32_t groups,
+                                       uint32_t* r3) {
+  ITC_NATIVE_RUNNING("sub_820B8AF8 CollisionWorld::RemovePairsByGroups");
+  *r3 = object;
+  uint32_t world = World(base);
+  if (guest::LoadU32(base, world + 40) == 0) {
+    return true;
+  }
+  uint32_t pair = guest::LoadU32(base, world + 36);
+  for (uint32_t i = 0; i < guest::LoadU32(base, world + 40); i++) {
+    const uint32_t a = guest::LoadU32(base, pair + 16);
+    const uint32_t b = guest::LoadU32(base, pair + 20);
+    // The other object out of the groups, unless the object's +244 still
+    // meets its +248 (or, on B's side, its +244 the object's +248).
+    bool remove = false;
+    if (a == object) {
+      remove = (guest::LoadU32(base, b + 244) & groups) != 0 &&
+               (guest::LoadU32(base, a + 244) & guest::LoadU32(base, b + 248)) == 0;
+    } else if (b == object) {
+      remove = (guest::LoadU32(base, a + 244) & groups) != 0 &&
+               (guest::LoadU32(base, a + 248) & guest::LoadU32(base, b + 244)) == 0;
+    }
+    if (remove) {
+      if (!CollisionWorldRemovePair(base, i, r3)) {
+        return false;
+      }
+      world = World(base);
+      i--;
+    } else {
+      pair += 32;
+    }
+  }
+  return true;
+}
+
+bool CollisionWorldRemoveObject(uint8_t* base, uint32_t object, uint32_t* r3) {
+  ITC_NATIVE_RUNNING("sub_820B9448 CollisionWorld::RemoveObject");
+  va::CollisionObjectUnlink(base, object, World(base) + 20);
+  va::CollisionObjectLink(base, object, World(base) + 24);
+  const uint32_t world = World(base);
+  guest::StoreU32(base, world + 28, guest::LoadU32(base, world + 28) - 1);
+  return CollisionWorldRemovePairsOf(base, object, r3);
+}
+
+uint32_t CollisionObjectAddGroups(uint8_t* base, uint32_t object, uint32_t bits) {
+  ITC_NATIVE_RUNNING("sub_820B7CC8 CollisionObject::AddGroups");
+  const uint32_t had = guest::LoadU32(base, object + 248);
+  const uint32_t added = bits & ~had;
+  if (added == 0) {
+    return object;
+  }
+  guest::StoreU32(base, object + 248, had | bits);
+  if ((added & 0x00FFFFFF) == 0) {
+    return object;
+  }
+  return CollisionWorldAddPairs(base, object, added);
+}
+
+bool CollisionObjectRemoveGroups(uint8_t* base, uint32_t object, uint32_t bits,
+                                 uint32_t* removed_groups, uint32_t* r3) {
+  ITC_NATIVE_RUNNING("sub_820B7CF0 CollisionObject::RemoveGroups");
+  *r3 = object;
+  *removed_groups = 0;
+  const uint32_t had = guest::LoadU32(base, object + 248);
+  const uint32_t removed = had & bits;
+  if (removed == 0) {
+    return true;
+  }
+  guest::StoreU32(base, object + 248, had & ~bits);
+  if ((removed & 0x00FFFFFF) == 0) {
+    return true;
+  }
+  *removed_groups = removed;
+  return CollisionWorldRemovePairsByGroups(base, object, removed, r3);
+}
+
 }  // namespace car_physics

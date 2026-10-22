@@ -490,6 +490,32 @@ bool CollisionWorldRemovePair(uint8_t* base, uint32_t index, uint32_t* r3);
 // 32; then ResetSurfaces. Returns the original's r3 (0x826C2E30).
 uint32_t CollisionWorldReset(uint8_t* base);
 
+// CollisionWorld::RemovePairsOf (sub_820B8BA8): every pair with the object
+// removed (RemovePair). CollisionWorld::RemovePairsByGroups (sub_820B8AF8):
+// each pair whose other object's +244 has a bit of `groups` removed, unless
+// the object's +244 still meets the other's +248 (on B's side, the other's
+// +248 the object's +244). False where a RemovePair couldn't be native:
+// the pairs before it are removed, and the original run from the start then
+// does the same as it would have (the pairs before that index keep what it
+// tests, which removals don't change). `r3`: the original's.
+bool CollisionWorldRemovePairsOf(uint8_t* base, uint32_t object, uint32_t* r3);
+bool CollisionWorldRemovePairsByGroups(uint8_t* base, uint32_t object, uint32_t groups,
+                                       uint32_t* r3);
+// CollisionWorld::RemoveObject (sub_820B9448): the object from the active
+// list (+20) to the free list (+24), +28 down, its pairs removed
+// (RemovePairsOf; false as it, with the rest done: the original
+// RemovePairsOf then).
+bool CollisionWorldRemoveObject(uint8_t* base, uint32_t object, uint32_t* r3);
+// CollisionObject::AddGroups (sub_820B7CC8): the bits not in +248 set
+// there, and with any in the low 24 bits, AddPairs with them. Returns the
+// original's r3.
+uint32_t CollisionObjectAddGroups(uint8_t* base, uint32_t object, uint32_t bits);
+// CollisionObject::RemoveGroups (sub_820B7CF0): the bits of `bits` in +248
+// cleared, and with any in the low 24 bits, RemovePairsByGroups with them
+// (`removed_groups`; false as it).
+bool CollisionObjectRemoveGroups(uint8_t* base, uint32_t object, uint32_t bits,
+                                 uint32_t* removed_groups, uint32_t* r3);
+
 // --- The car data and the vehicle's constructor (src/car_physics/car_data.cpp) ---
 
 // CarData::SetDefaults (sub_820AECB8): the car data's defaults (its row);
