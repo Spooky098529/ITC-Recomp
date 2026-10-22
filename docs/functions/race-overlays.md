@@ -80,7 +80,17 @@ races (no scraping). The fourth pass (2026-10-22) added `OverlayView::SpeedKmh`,
 calling `Vehicle::GetSpeedKmh`'s plain C++ (now declared in
 `src/hooks/vehicle.h`). Learned there: a tail call leaves the callee's
 arguments in its registers (the vehicle in r3), which the harness compares,
-so the adapter returns r3 as the original does.
+so the adapter returns r3 as the original does. The same pass then took the set-up's
+constructors, clears and bindings, the children's resets and
+constructors (none allocates; the allocations stay in their recompiled
+callers), `Smoke::InRegion` and `Sparks::Update`. Learned there: stvx
+stores to the 16-byte-aligned address below its operand, so the identity
+rows of `Sprite::ResetStyle2` and `SmokeEmitter::Reset` are stored there;
+a float the translated code keeps as a double across a branch (the first
++104 store of `Sparks::Update`) comes back with a signaling NaN quieted,
+while a plain load and store keeps its bits; and `Sparks::Update`'s
+additions keep the destination's NaN (seen in the disassembly), so the
+native version picks it explicitly.
 
 Status:
 
