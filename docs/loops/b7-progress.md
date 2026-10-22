@@ -25,7 +25,8 @@ rows to review and drive list are there), and this file's history.
   places with the flag on and off). Validated (43 of 43 harness lines).
   Migration 2 done (6b84e44..9018b3b: 15 of the physics step's
   updates, 4 adapters removed; race 21 s, 0 errors; AI cars in the same
-  places). Step: validation 2 (agent running). Queued: the no-mapping
+  places). Validated (19 of 19 harness lines, all ran
+  in play). Step: migration 3 (agent running). Queued: the no-mapping
   lead UiMovie::ApplyTransform.
 - Known: `b7_status.py` checks `sub_825A9934` (`__chkstk`) "Dropped, but
   it ran", and every function made Native or Merged since the coverage
