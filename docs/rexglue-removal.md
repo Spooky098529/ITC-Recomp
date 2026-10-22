@@ -2480,6 +2480,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
     | 2026-10-22 | The matrix, vector and quaternion math (`Matrix::` and the vector library's 4x4 half) | `matrix-math.md` | 28 of 28 | `--native_matrix_math` |
     | 2026-10-22 | The car physics and the collision world | `car-physics.md` | 106 of 130 | `--native_car_physics` |
 | 2026-10-22 | The C runtime heap (operator new and delete, malloc, free, calloc, realloc, `_msize`, XMemAlloc, XMemFree, LocalAlloc, LocalFree, GetProcessHeap; in the existing `heap.md`) | `heap.md` | 24 of 30 | `--native_c_runtime_heap` |
+| 2026-10-23 | The collision world's narrow phase and shapes (with CollisionObject::Translate, Vehicle::ApplyForces and two rigid body accessors) | `collision.md` | 64 of 64 | `--native_collision` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -2541,6 +2542,18 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
     `sub_8235AAC0`, the game's many callers of new, delete and XMemAlloc).
     The game's own heap internals (`sub_82297FD8`, `sub_822982B8`) no
     longer run with `--native_heap` and aren't ported.
+
+    The collision narrow phase (2026-10-23, the same run): all 64 ours
+    in two migrations: the box shape (the only shape seen in play; its
+    vtable read at run time), the shape record's placement and motion,
+    the box-box separation tests, impacts and push-outs, and the pair's
+    solve and response. Any other shape, or an impact table entry that
+    isn't the box-box one, runs the original. Attract races never reach
+    the impacts; the harness builds boxes that touch, and the pad replay
+    (now step 3 of the validation agent) reached them. Respond's and
+    Solve's harnesses keep "a fixed body meeting the impulse" as expected
+    to differ: the original ContactImpulseWith reads its stack's leftovers
+    for a fixed body.
 
     The second run (from 2026-10-22, branch `b7-loop-22-10-26`; its first
     session stopped after one subsystem): the first run's removable
@@ -2819,3 +2832,10 @@ pairs): overridden 67, Native 3, Dropped 23, never called 70, live 286.
 Imports: 186 called, 62 with a live caller. B7 (`b7_status.py`): 6,753
 in play, ours 729, work left 6,024 (Wrapped 137, with a row 321, no row
 yet 5,566); `heap.md` 24 ours of 30. 715 overrides in `src/`.
+
+**2026-10-23, B7's fourth loop run, the collision narrow phase (branch
+`b7-loop-22-10-26-2`):** the boundary unchanged: 449 functions (916
+pairs): overridden 67, Native 3, Dropped 23, never called 70, live 286.
+Imports: 186 called, 62 with a live caller. B7 (`b7_status.py`): 6,753
+in play, ours 797, work left 5,956 (Wrapped 137, with a row 319, no row
+yet 5,500); `collision.md` 64 ours of 64. 747 overrides in `src/`.

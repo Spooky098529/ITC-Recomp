@@ -11,16 +11,21 @@ there), and this file's history.
 - Run started 2026-10-22 22:11 on `b7-loop-22-10-26-2` (the user's
   branch), from 91f40be; summary `b7-loop-2026-10-22-2211.md`.
 - Subsystem 1 of 3 (the C runtime heap) finished.
-- Subsystem 2 of 3: the collision world's narrow phase and shapes
-  (`sub_820BB868`, `sub_820BBE30`, ...; from `leads.md`: runs every
-  physics step, many ready groups, blocks `car-physics.md`), mapped in
-  `collision.md` (dd758b3; 64 rows; checked: 43 ready groups). Migration 1
-  done (f5b59e8..e634cfd, 53 of 64 ours). Validated (53 of 53 harness
-  lines; replay ok). Migration 2 done (df767d1..b83c56a: all 64 ours, with
-  CollisionObject::Translate, Vehicle::ApplyForces and the rigid body
-  accessors). Step: its validation (agent running).
+- Subsystem 2 of 3 (the collision narrow phase) finished.
+- Subsystem 3 of 3: the collision world's owner and the track's
+  collision queries (two leads joined: `sub_820FF050`, `sub_820FF368`,
+  ..., and `sub_820FDF38`, `sub_820FDC18`, ...; the collision update
+  every tick, above `collision.md` and `car-physics.md`). Step: mapping
+  (agent running).
 
 ## Done
+
+- The collision narrow phase (`collision.md`, mapped in dd758b3; 64
+  rows): all 64 ours (29 Overridden, 35 Native) in two migrations
+  (f5b59e8..e634cfd, df767d1..b83c56a), each validated (53 and 27
+  harness lines; replays ok); `--native_collision`; with
+  `car-physics.md`'s CollisionObject::Translate and Vehicle::ApplyForces
+  and `vehicle-accessors.md`'s RigidBody::Force and Torque. Left: none.
 
 - The C runtime heap (`heap.md`, its existing rows read in full in
   1f48eaf): 15 functions ours (12 Overridden, 3 Native) in one migration
@@ -94,12 +99,10 @@ Functions made native this run with no `native running (game):` line in
 the validation agent's attract race or pad replay; the user drives (with
 `--log_level=info`) and checks the log for them when the loop ends.
 
-- Collision, migration 1 (the impact path: no box-box contact in the
-  attract race or the replay; replay ok): `sub_820B9FC8`, `sub_820B9FE0`,
-  `sub_820BA3B0`, `sub_820B9F00`, `sub_820BAB30`, `sub_820BACB8`,
-  `sub_820BC908`, `sub_820BC858`, `sub_820BA5D8`, `sub_820BC978`,
-  `sub_820BCCE8`, `sub_820BD578`, `sub_820BD6E0`, `sub_820BE490`,
-  `sub_820BEBF0`, `sub_820BECA0`, `sub_820BF038`, `sub_820BCE80`.
+- Collision (migration 2's validation, attract race `itc_799` and replay
+  `itc_800`, replay ok): `sub_820BACB8` CollisionShape::Type. Migration
+  1's 18 impact-path functions all ran in that replay (the first replay,
+  `itc_779`, had no deep enough contact).
 
 ## Totals
 
