@@ -99,6 +99,8 @@ set(ITC_SOURCES
     src/hooks/voice.cpp
     src/hooks/sprites.cpp
     src/sprites/sprites.cpp
+    src/hooks/billboards.cpp
+    src/sprites/billboards.cpp
     src/game_data/game_data.cpp
     src/display/gamma.cpp
     src/harnesses/harness.cpp
@@ -119,6 +121,7 @@ set(ITC_SOURCES
     src/harnesses/movie_files.cpp
     src/harnesses/xma.cpp
     src/harnesses/sprites.cpp
+    src/harnesses/billboards.cpp
     src/helpers/debug_output.cpp
     src/helpers/object_attributes.cpp
     src/helpers/time.cpp
