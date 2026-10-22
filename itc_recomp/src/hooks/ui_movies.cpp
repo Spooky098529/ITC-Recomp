@@ -21,7 +21,8 @@ ITC_FLAG_BOOL(native_ui_movies, true, "ITC",
               "the draw context reset sub_8259D930; the keys sub_8259FA20, sub_8259FB30 and "
               "sub_8259FC18; the recorders sub_8259DAD0, sub_8259E098 and sub_8259D7B0; the "
               "file fix-ups sub_825A0CF8 with sub_825A0C60, and UiMovie::FixUpFile "
-              "sub_825A0EF0 with sub_825A0E40, sub_825A0ED8, sub_8259D688 and sub_825A6570; "
+              "sub_825A0EF0 with sub_825A0E40, sub_825A0ED8, sub_8259D688 and sub_825A6570, "
+              "the helpers without adapters (the flag switches their callers); "
               "sub_8259EBE8 and sub_8259DAC0, which call the recorders; UiMovie::RestorePose "
               "sub_82119B80) "
               "natively instead of through the translated code (same results; checked by "
@@ -240,17 +241,9 @@ extern "C" REX_FUNC(sub_8259D7B0) {
          kStateResetDepth);
 }
 
-// The file fix-ups: r3 = the file (and r4 = the movie file for the scene's
-// and the animation's); each returns its result in r3.
-extern "C" REX_FUNC(sub_825A0C60) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_ui_movies)) {
-    __imp__sub_825A0C60(ctx, base);
-    return;
-  }
-  ctx.r3.u64 = ui_movies::IsXmd(base, ctx.r3.u32) ? 1 : 0;
-}
-
+// The file fix-ups: r3 = the file; each returns its result in r3. Their
+// helpers (sub_825A0C60, sub_825A0E40, sub_825A0ED8, sub_8259D688 and
+// sub_825A6570) have no adapters: only these reach them, natively.
 extern "C" REX_FUNC(sub_825A0CF8) {
   REX_FUNC_PROLOGUE();
   if (!ITC_FLAG(native_ui_movies)) {
@@ -258,42 +251,6 @@ extern "C" REX_FUNC(sub_825A0CF8) {
     return;
   }
   ctx.r3.u64 = ui_movies::CheckXmd(base, ctx.r3.u32);
-}
-
-extern "C" REX_FUNC(sub_825A0E40) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_ui_movies)) {
-    __imp__sub_825A0E40(ctx, base);
-    return;
-  }
-  ctx.r3.u64 = ui_movies::IsMovieFile(base, ctx.r3.u32) ? 1 : 0;
-}
-
-extern "C" REX_FUNC(sub_825A0ED8) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_ui_movies)) {
-    __imp__sub_825A0ED8(ctx, base);
-    return;
-  }
-  ctx.r3.u64 = ui_movies::FileAnimation(base, ctx.r3.u32, ctx.r4.u32);
-}
-
-extern "C" REX_FUNC(sub_8259D688) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_ui_movies)) {
-    __imp__sub_8259D688(ctx, base);
-    return;
-  }
-  ctx.r3.u64 = ui_movies::FixUpScene(base, ctx.r3.u32, ctx.r4.u32);
-}
-
-extern "C" REX_FUNC(sub_825A6570) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_ui_movies)) {
-    __imp__sub_825A6570(ctx, base);
-    return;
-  }
-  ctx.r3.u64 = ui_movies::FixUpAnimation(base, ctx.r3.u32, ctx.r4.u32);
 }
 
 // UiMovie::FixUpFile.

@@ -6,6 +6,7 @@
 
 #include "base/log.h"
 #include "command_list/command_list.h"
+#include "ui_movies/ui_movies.h"
 
 #include <algorithm>
 #include <bit>
@@ -16,6 +17,30 @@
 namespace harness {
 
 namespace {
+
+// The register steps of the file fix-ups whose adapters went once their
+// callers (CheckXmd, UiMovie::FixUpFile) were native (docs/loops/b7-loop.md,
+// "Removing an adapter"): the cases run the plain C++ through these, against
+// the recompiled versions.
+void NativeIsXmd(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ui_movies::IsXmd(base, ctx.r3.u32) ? 1 : 0;
+}
+
+void NativeIsMovieFile(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ui_movies::IsMovieFile(base, ctx.r3.u32) ? 1 : 0;
+}
+
+void NativeFileAnimation(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ui_movies::FileAnimation(base, ctx.r3.u32, ctx.r4.u32);
+}
+
+void NativeFixUpScene(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ui_movies::FixUpScene(base, ctx.r3.u32, ctx.r4.u32);
+}
+
+void NativeFixUpAnimation(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ui_movies::FixUpAnimation(base, ctx.r3.u32, ctx.r4.u32);
+}
 
 constexpr uint32_t ui_movies_kTrm = 0x54524D00;       // "TRM\0"
 constexpr uint32_t ui_movies_kSce = 0x53434500;       // "SCE\0"
@@ -468,9 +493,9 @@ void HeaderCases(Context& h) {
     uint8_t bytes[8];
   };
   const Header headers[] = {
-      {"IsXmd (sub_825A0C60)", __imp__sub_825A0C60, sub_825A0C60, 0, {'X', 'M', 'D', 0, '0', '0', '1', 0}},
+      {"IsXmd (sub_825A0C60)", __imp__sub_825A0C60, NativeIsXmd, 0, {'X', 'M', 'D', 0, '0', '0', '1', 0}},
       {"CheckXmd (sub_825A0CF8)", __imp__sub_825A0CF8, sub_825A0CF8, 0, {'X', 'M', 'D', 0, '0', '0', '1', 0}},
-      {"IsMovieFile (sub_825A0E40)", __imp__sub_825A0E40, sub_825A0E40, 8, {'X', '2', 'D', 0, '0', '0', '5', 0}},
+      {"IsMovieFile (sub_825A0E40)", __imp__sub_825A0E40, NativeIsMovieFile, 8, {'X', '2', 'D', 0, '0', '0', '5', 0}},
   };
   for (const Header& f : headers) {
     Results results(f.name);
@@ -543,7 +568,7 @@ void FixUpAnimationCases(Context& h) {
            t.r3.u64 = animation;
            t.r4.u64 = file;
          },
-         __imp__sub_825A6570, sub_825A6570, h.data, kScratchBytes,
+         __imp__sub_825A6570, NativeFixUpAnimation, h.data, kScratchBytes,
          fmt::format("case {}: start {} entries {} first {} subs {}", i, start, entries, first, subs));
   }
   results.Report();
@@ -635,7 +660,7 @@ void FixUpSceneCases(Context& h) {
            t.r3.u64 = scene;
            t.r4.u64 = file;
          },
-         __imp__sub_8259D688, sub_8259D688, h.data, kScratchBytes,
+         __imp__sub_8259D688, NativeFixUpScene, h.data, kScratchBytes,
          fmt::format("case {}: start {} top {} children ({} from {}) inner {} ({} from {})", i,
                      start, top.children, top.count, top.first, inner.children, inner.count,
                      inner.first));
@@ -656,7 +681,7 @@ void FixUpSceneCases(Context& h) {
            t.r3.u64 = h.data;
            t.r4.u64 = index;
          },
-         __imp__sub_825A0ED8, sub_825A0ED8, h.data, kScratchBytes,
+         __imp__sub_825A0ED8, NativeFileAnimation, h.data, kScratchBytes,
          fmt::format("start {:X} index {:X}", start, index));
   }
   animation_results.Report();
