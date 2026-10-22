@@ -13,17 +13,26 @@ rows to review and drive list are there), and this file's history.
 - Subsystem 1 of 3 (the vehicle accessors) finished; then the no-mapping
   lead (the race overlays' newly ready functions, 7c018ef..f986921)
   validated (21 of 21 harness lines).
-- Subsystem 2 of 3 (the matrix math) finished. Now: the no-mapping
-  lead (the race overlays' groups the matrix math made ready):
-  migration done (ff29ee9..ff7cd37: UpdateLightSprites,
-  UpdateParticlesB and C, UpdateSmoke, ModelMatrix; 23 adapters removed;
-  race 22 s, 0 errors). Step: validation (agent running).
+- Subsystem 2 of 3 (the matrix math) finished; then the no-mapping lead
+  (the race overlays' effect updates, ff29ee9..ff7cd37) validated (33
+  of 33 harness lines).
+- Subsystem 3 of 3: the car physics (with the collision world's pairs'
+  lead folded in). Step: mapping (agent running). Queued: the no-mapping
+  lead UiMovie::ApplyTransform.
 - Known: `b7_status.py` checks `sub_825A9934` (`__chkstk`) "Dropped, but
   it ran", and every function made Native or Merged since the coverage
   session "..., but it ran" (`seen_in_play.txt` predates them; a new
   coverage session clears them).
 
 ## Done
+
+- No-mapping lead: the race overlays' groups the matrix math made ready
+  (`race-overlays.md`): UpdateLightSprites, UpdateParticlesB and C,
+  UpdateSmoke (with Smoke::SetFrame), ModelMatrix; 23 adapters removed.
+  ff29ee9..ff7cd37, validated. Still blocked there: `sub_82126ED0` (a
+  guest vtable call: UpdateModelSprites, UpdateSparks, UpdateMarker and
+  the update above them) and the create and destroy side (guest
+  allocation).
 
 - The matrix math (`matrix-math.md`, mapped in 7929f36; 28 rows): 28
   ours (20 Overridden, 5 Native, 3 Merged) in two migrations (18cafd4;
@@ -128,6 +137,9 @@ the validation agent's attract race; the user drives (with
   `sub_82126B50` (the save flags and stage check), `sub_82122DB8`,
   `sub_82127198` (no rows: never seen in play), `sub_82129598`
   Trail::AddPoint (already on the previous run's list).
+- Race overlays' effect updates (validation's race): `sub_82126A00`
+  OverlayView::WheelOnSurface8, `sub_82126A38` WheelOnSurface1Or2 (no
+  rows).
 
 ## Totals
 
