@@ -16,7 +16,8 @@ ITC_FLAG_BOOL(native_race_overlays, true, "ITC",
               "points' checks and positions, sub_82126A78 and sub_82127140; Sparks::UpdateStreak, "
               "sub_8212E660; Sparks::Emit, sub_8212D818; CarOverlays::EmitSmoke, sub_82123240, "
               "with Smoke::Emit; the set-up's constructors, clears and bindings, sub_82126498 to "
-              "sub_8215E000; the resets, sub_8211E9F0 to sub_8212D6E0) natively "
+              "sub_8215E000; the resets, sub_8211E9F0 to sub_8212D6E0; Smoke::InRegion, "
+              "sub_8212A868; Sparks::Update, sub_8212DDC8) natively "
               "instead of through the translated code (same results; checked by "
               "--run_harnesses=race_overlays)");
 
@@ -344,3 +345,20 @@ ITC_OVERLAY_SET(8212D6E0, SparksReset(base, ctx.r3.u32))
 // (r3, the owner, isn't read).
 ITC_OVERLAY_SET(8212A218, SmokeEmitterReset(base, ctx.r4.u32))
 ITC_OVERLAY_SET(8212B3E8, ParticlesBResetEntry(base, ctx.r4.u32))
+
+// Smoke::InRegion: r3 = the smoke, r4 = a point; returns 1 or 0.
+ITC_OVERLAY_WORD(8212A868, SmokeInRegion(base, ctx.r3.u32, ctx.r4.u32))
+
+// Sparks::Update: r3 = the sparks. Where the native version declines (the
+// original could trap or reach outside its entries), the original runs.
+extern "C" REX_FUNC(sub_8212DDC8) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_race_overlays)) {
+    __imp__sub_8212DDC8(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  if (!SparksUpdate(base, ctx.r3.u32)) {
+    __imp__sub_8212DDC8(ctx, base);
+  }
+}

@@ -9,6 +9,7 @@
 #include <rex/platform/fpscr.h>
 #include <simde/x86/sse4.1.h>
 
+#include <algorithm>
 #include <bit>
 #include <climits>
 #include <cmath>
@@ -1868,6 +1869,145 @@ void SparksReset(uint8_t* base, uint32_t sparks) {
                  {84, '0'}, {88, '0'}, {92, '1'}, {100, 'z'}, {104, 'z'}, {108, '0'}, {136, 'z'},
                  {128, '0'}, {96, '0'}, {132, '0'}});
   }
+}
+
+}  // namespace race_overlays
+
+namespace race_overlays {
+
+uint32_t SmokeInRegion(uint8_t* base, uint32_t smoke, uint32_t point) {
+  ITC_NATIVE_RUNNING("sub_8212A868 Smoke::InRegion");
+  const double ax = guest::LoadFloat(base, smoke + 32592);
+  const double ay = guest::LoadFloat(base, smoke + 32596);
+  const double az = guest::LoadFloat(base, smoke + 32600);
+  const double bx = guest::LoadFloat(base, smoke + 32608);
+  const double by = guest::LoadFloat(base, smoke + 32612);
+  const double bz = guest::LoadFloat(base, smoke + 32616);
+  const double px = guest::LoadFloat(base, point + 0);
+  const double py = guest::LoadFloat(base, point + 4);
+  const double pz = guest::LoadFloat(base, point + 8);
+  const uint32_t one = guest::LoadU32(base, kOne);
+  auto bits = [](float f) { return std::bit_cast<uint32_t>(f); };
+  const simde__m128 a_b = VectorOf(bits(Difference(ax, bx)), bits(Difference(ay, by)),
+                                   bits(Difference(az, bz)), one);
+  const simde__m128 p_a = VectorOf(bits(Difference(px, ax)), bits(Difference(py, ay)),
+                                   bits(Difference(pz, az)), one);
+  const simde__m128 b_a = VectorOf(bits(Difference(bx, ax)), bits(Difference(by, ay)),
+                                   bits(Difference(bz, az)), one);
+  const simde__m128 p_b = VectorOf(bits(Difference(px, bx)), bits(Difference(py, by)),
+                                   bits(Difference(pz, bz)), one);
+  const uint32_t csr = Fpscr::getcsr();
+  Fpscr::setcsr(csr | uint32_t(Fpscr::FlushMask));
+  const simde__m128 past_a = simde_mm_dp_ps(p_a, a_b, 0xEF);
+  const simde__m128 past_b = simde_mm_dp_ps(p_b, b_a, 0xEF);
+  Fpscr::setcsr(csr);
+  const double zero = guest::LoadFloat(base, kZero);
+  if (!(double(std::bit_cast<float>(WordOf(past_a, 0))) < zero)) {
+    return 0;
+  }
+  return double(std::bit_cast<float>(WordOf(past_b, 0))) < zero ? 1 : 0;
+}
+
+namespace {
+
+// fadds or fsubs of two singles (`add` or not), rounded to single, with the
+// first operand's NaN (quieted) where both are NaNs.
+uint32_t KeepFirstNaN(uint32_t a, uint32_t b, bool add) {
+  const float x = std::bit_cast<float>(a);
+  const float y = std::bit_cast<float>(b);
+  if (std::isnan(x)) {
+    return a | 0x00400000;
+  }
+  if (std::isnan(y)) {
+    return b | 0x00400000;
+  }
+  return std::bit_cast<uint32_t>(add ? float(double(x) + double(y)) : float(double(x) - double(y)));
+}
+
+}  // namespace
+
+bool SparksUpdate(uint8_t* base, uint32_t sparks) {
+  ITC_NATIVE_RUNNING("sub_8212DDC8 Sparks::Update");
+  constexpr uint32_t kHead = 28932;
+  constexpr uint32_t kCount = 28940;
+  const int32_t count = int32_t(guest::LoadU32(base, sparks + kCount));
+  if (count <= 0) {
+    return true;
+  }
+  const int32_t capacity = int32_t(guest::LoadU32(base, sparks + 104));
+  const int32_t head = int32_t(guest::LoadU32(base, sparks + kHead));
+  if (capacity == 0 || capacity == -1 || head < 0 || head == INT32_MAX) {
+    return false;
+  }
+  // The entries the loop reaches stay below 4 GB (no address wraps onto
+  // the capacity, which the loop reads again).
+  const uint64_t last_index =
+      std::max<uint64_t>(uint64_t(head), uint64_t(std::abs(int64_t(capacity))));
+  if (uint64_t(sparks) + 128 + 144 * (last_index + 1) > (uint64_t(1) << 32)) {
+    return false;
+  }
+  const uint32_t table = guest::LoadU32(base, sparks + 112);
+  const double zero = guest::LoadFloat(base, kZero);
+  const double one = guest::LoadFloat(base, kOne);
+  const uint32_t zero_word = guest::LoadU32(base, kZero);
+  int32_t index = head;
+  for (int32_t left = count; left > 0; left--) {
+    const uint32_t entry = sparks + 128 + 144 * uint32_t(index);
+    const int32_t life = int32_t(guest::LoadU32(base, entry + 108) - 1);
+    guest::StoreU32(base, entry + 108, uint32_t(life));
+    if (life < 0) {
+      guest::StoreU32(base, entry + 108, 0);
+    }
+    if (!(int32_t(guest::LoadU32(base, entry + 108)) > 0)) {
+      guest::StoreU32(base, entry + 96, 0);
+      const int32_t next = int32_t(guest::LoadU32(base, sparks + kHead) + 1);
+      const int32_t modulo = int32_t(guest::LoadU32(base, sparks + 104));
+      const uint32_t remaining = guest::LoadU32(base, sparks + kCount) - 1;
+      guest::StoreU32(base, sparks + kHead, uint32_t(next % modulo));
+      guest::StoreU32(base, sparks + kCount, remaining);
+    }
+    const uint32_t fade_ticks = guest::LoadU32(base, table + 12);
+    uint32_t brightness_word = guest::LoadU32(base, table + 8);
+    const uint32_t now = guest::LoadU32(base, entry + 108);
+    if (fade_ticks > now) {
+      const float ticks = float(double(fade_ticks));
+      const float life_now = float(double(int32_t(now)));
+      const float step = float(one / double(ticks));
+      const float scaled = float(double(step) * double(life_now));
+      brightness_word = std::bit_cast<uint32_t>(
+          float(double(scaled) * double(guest::LoadFloat(base, table + 8))));
+    }
+    // The original keeps this one as a double (it may be the product), so
+    // a signaling NaN from the table comes back quieted.
+    if (std::isnan(std::bit_cast<float>(brightness_word))) {
+      brightness_word |= 0x00400000;
+    }
+    guest::StoreU32(base, entry + 104, brightness_word);
+    if (double(std::bit_cast<float>(brightness_word)) < zero) {
+      guest::StoreU32(base, entry + 104, zero_word);
+    }
+    const uint32_t most = guest::LoadU32(base, table + 8);
+    if (double(std::bit_cast<float>(most)) < double(guest::LoadFloat(base, entry + 104))) {
+      guest::StoreU32(base, entry + 104, most);
+    }
+    guest::StoreU32(base, entry + 92,
+                    uint32_t(Fctiwz(double(guest::LoadFloat(base, entry + 104)))));
+    // Where both operands are NaNs, the translated code (subss and addss
+    // with the position as the destination, seen in the disassembly) keeps
+    // the position's, quieted.
+    for (uint32_t i = 0; i < 3; i++) {
+      guest::StoreU32(base, entry + 112 + 4 * i,
+                      KeepFirstNaN(guest::LoadU32(base, entry + 48 + 4 * i),
+                                   guest::LoadU32(base, entry + 64 + 4 * i), false));
+    }
+    for (uint32_t i = 0; i < 3; i++) {
+      guest::StoreU32(base, entry + 48 + 4 * i,
+                      KeepFirstNaN(guest::LoadU32(base, entry + 48 + 4 * i),
+                                   guest::LoadU32(base, entry + 32 + 4 * i), true));
+    }
+    index = (index + 1) % int32_t(guest::LoadU32(base, sparks + 104));
+  }
+  return true;
 }
 
 }  // namespace race_overlays

@@ -499,3 +499,28 @@ void MarkerReset(uint8_t* base, uint32_t marker);
 void SparksReset(uint8_t* base, uint32_t sparks);
 
 }  // namespace race_overlays
+
+namespace race_overlays {
+
+// --- The children's updates ---
+
+// Smoke::InRegion (sub_8212A868): 1 when (point - a) . (a - b) < 0.0 and
+// (point - b) . (b - a) < 0.0 (the region's points a at +32,592 and b at
+// +32,608; differences by fsubs, dot products of x, y and z by vmsum3fp128
+// with flush-to-zero on), else 0. Writes nothing to guest memory (the
+// original's temporaries are below the stack pointer).
+uint32_t SmokeInRegion(uint8_t* base, uint32_t smoke, uint32_t point);
+
+// Sparks::Update (sub_8212DDC8): for each of the count (+28,940) entries
+// from the head (+28,932; 144 bytes from +128, the index moving on modulo
+// the capacity +104): its life (+108) counts down to 0; at 0, +96 = 0 and
+// the head moves on and the count goes down (in memory; the loop runs the
+// count it started with); +104 = the table's +8, times 1/the table's +12
+// times life while life is below +12 (unsigned), clamped to 0.0 and the
+// table's +8; +92 = that as an integer; +112 = +48 - +64 (x, y, z); +48 +=
+// +32. False, with nothing done, when the original could trap or reach
+// outside its entries (a capacity of 0 or -1, a head below 0 or INT_MAX,
+// entries past the end of guest memory); the original runs there.
+bool SparksUpdate(uint8_t* base, uint32_t sparks);
+
+}  // namespace race_overlays

@@ -17,6 +17,7 @@
 
 #include <fmt/format.h>
 
+#include <algorithm>
 #include <bit>
 #include <iterator>
 #include <string>
@@ -187,6 +188,16 @@ void NativeMarkerReset(PPCContext& ctx, uint8_t* base) {
 }
 void NativeSparksReset(PPCContext& ctx, uint8_t* base) {
   ro::SparksReset(base, ctx.r3.u32);
+}
+
+ITC_NATIVE_WORD(NativeSmokeInRegion, ro::SmokeInRegion(base, ctx.r3.u32, ctx.r4.u32))
+
+// Where the native version declines, the original runs (as the adapter).
+void NativeSparksUpdate(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  if (!ro::SparksUpdate(base, ctx.r3.u32)) {
+    __imp__sub_8212DDC8(ctx, base);
+  }
 }
 
 void NativeRandomRange(PPCContext& ctx, uint8_t* base) {
@@ -1897,6 +1908,99 @@ void ResetCases(Context& h, uint32_t block) {
     results.Report();
   }
 }
+
+// Smoke::InRegion: the region's points and the point random words (odd
+// floats among them), or small numbers so the point falls on either side
+// of each end and between them.
+void SmokeInRegionCases(Context& h, uint32_t block) {
+  Random& r = h.random;
+  const uint32_t smoke = block + 0x1000;
+  const uint32_t point = block + 0x100;
+  Results results("Smoke::InRegion (sub_8212A868)");
+  for (int i = 0; i < 400; i++) {
+    const uint64_t seed = r.Next();
+    const bool small = i % 2 == 0;
+    Compare(h, results, {{point, 16}, {smoke + 32592, 32}},
+            [&, seed, small] {
+              Random fill;
+              for (uint64_t n = 0; n < seed % 61; n++) {
+                fill.Next();
+              }
+              const uint32_t at[] = {smoke + 32592, smoke + 32596, smoke + 32600,
+                                     smoke + 32608, smoke + 32612, smoke + 32616,
+                                     point,         point + 4,     point + 8};
+              for (uint32_t a : at) {
+                const float value = float(int32_t(fill.Below(21)) - 10) * 0.5f;
+                guest::StoreU32(h.base, a,
+                                small ? std::bit_cast<uint32_t>(value) : RandomWord(fill));
+              }
+              guest::StoreU32(h.base, smoke + 32604, RandomWord(fill));
+              guest::StoreU32(h.base, point + 12, RandomWord(fill));
+            },
+            [&](PPCContext& t) {
+              t.r3.u64 = smoke;
+              t.r4.u64 = point;
+            },
+            __imp__sub_8212A868, NativeSmokeInRegion, fmt::format("case {}", i));
+  }
+  results.Report();
+}
+
+// Sparks::Update: entries of random words with small lives (0 to 20, some
+// negative or huge), a table (+112) with a random +8 (odd floats among
+// them) and a +12 of 0 to 30 or random; capacities 1 to 200, heads inside
+// and past them, counts up to past the capacity; and the cases where the
+// native version declines (a capacity of 0 or -1, a head below 0).
+void SparksUpdateCases(Context& h, uint32_t block) {
+  Random& r = h.random;
+  const uint32_t sparks = block + 0x1000;
+  const uint32_t table = block + 0x100;
+  constexpr uint32_t kBytes = 29824;
+  Results results("Sparks::Update (sub_8212DDC8)");
+  for (int i = 0; i < 300; i++) {
+    const uint64_t seed = r.Next();
+    int32_t capacity = int32_t(1 + r.Below(200));
+    int32_t head = int32_t(r.Below(uint32_t(capacity)));
+    int32_t count = int32_t(r.Below(uint32_t(capacity) + 3));
+    if (i % 25 == 1) {
+      head = capacity + int32_t(r.Below(5));  // past the capacity
+      head = std::min(head, 199);
+    } else if (i % 25 == 2) {
+      capacity = 0;
+    } else if (i % 25 == 3) {
+      capacity = -1;
+    } else if (i % 25 == 4) {
+      head = -1 - int32_t(r.Below(3));
+    } else if (i % 25 == 5) {
+      count = -int32_t(r.Below(3));
+    }
+    Compare(h, results, {{sparks, kBytes}, {table, 16}},
+            [&, seed, capacity, head, count] {
+              Random fill;
+              for (uint64_t n = 0; n < seed % 61; n++) {
+                fill.Next();
+              }
+              FillRandom(h.base, fill, sparks, kBytes);
+              FillRandom(h.base, fill, table, 16);
+              const uint32_t ticks = fill.Below(4) == 0 ? uint32_t(fill.Next()) : fill.Below(31);
+              guest::StoreU32(h.base, table + 12, ticks);
+              guest::StoreU32(h.base, sparks + 104, uint32_t(capacity));
+              guest::StoreU32(h.base, sparks + 112, table);
+              guest::StoreU32(h.base, sparks + 28932, uint32_t(head));
+              guest::StoreU32(h.base, sparks + 28940, uint32_t(count));
+              for (uint32_t n = 0; n < 200; n++) {
+                const uint32_t kind = fill.Below(10);
+                const uint32_t life = kind == 0   ? uint32_t(fill.Next())
+                                      : kind == 1 ? uint32_t(-int32_t(fill.Below(3)))
+                                                  : fill.Below(21);
+                guest::StoreU32(h.base, sparks + 128 + 144 * n + 108, life);
+              }
+            },
+            [&](PPCContext& t) { t.r3.u64 = sparks; }, __imp__sub_8212DDC8, NativeSparksUpdate,
+            fmt::format("case {} capacity {} head {} count {}", i, capacity, head, count));
+  }
+  results.Report();
+}
 }  // namespace
 
 void RaceOverlays(Context& h) {
@@ -1922,6 +2026,8 @@ void RaceOverlays(Context& h) {
   SmokeCases(h, block);
   SetUpCases(h, block);
   ResetCases(h, block);
+  SmokeInRegionCases(h, block);
+  SparksUpdateCases(h, block);
   memory->SystemHeapFree(block);
 }
 
