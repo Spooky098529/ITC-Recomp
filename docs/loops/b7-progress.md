@@ -9,8 +9,11 @@ commits, the function files and the subsystems' docs.
   `functions/ui-movies.md`; `sub_8211E500`, `sub_8211E1C0`, `sub_8211DE38`,
   `sub_8211DF20`, `sub_8211DFF8`, `sub_8211D978`, `sub_8211CD90`,
   `sub_8211A948`, `sub_8211A818`, `sub_8211A8C8`, from `leads.md`).
-- Step: mapping (agent running).
-- Session: pass 15 of 20, subsystem 5 of 5. In all: subsystem 5 of 5 (the
+  Mapped as `functions/ui-movies-game.md` (7d30b85): 88 rows, 29 ready
+  groups; the load and text paths wait on the heap and the VirtualAlloc
+  wrappers (leads that need the user's decision).
+- Step: migration (first agent running).
+- Session: pass 16 of 20, subsystem 5 of 5. In all: subsystem 5 of 5 (the
   last before the user's review).
 
 ## Done
@@ -80,6 +83,8 @@ commits, the function files and the subsystems' docs.
   moved from `functions.md`; 79 now Overridden or Dropped).
 - `docs/functions/ui-movies.md` (new; 9 rows moved from `functions.md`; 32
   now Overridden).
+- `docs/functions/ui-movies-game.md` (new; 9 rows moved from
+  `functions.md`).
 
 ## Totals
 
@@ -113,6 +118,8 @@ commits, the function files and the subsystems' docs.
   known 230, unknown 6113).
 - After the UI movie library: ours 293, work left 6460 (wrapped 147,
   known 200, unknown 6113).
+- After mapping the game's UI movie side: ours 293, work left 6460
+  (wrapped 147, known 279, unknown 6034).
 
 ## Stopped
 
