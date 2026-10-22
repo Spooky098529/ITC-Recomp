@@ -78,9 +78,8 @@ ITC_MATRIX_SCALAR(822936E0, SetIdentity(base, ctx.r3.u32); ctx.r3.u64 = ctx.r3.u
 // r3 comes back as the quaternion (Quaternion::LengthSquared's argument).
 ITC_MATRIX_SCALAR(822936F0, FromQuaternion(base, ctx.r3.u32, ctx.r4.u32);
                   ctx.r3.u64 = ctx.r4.u32)
-ITC_MATRIX_SCALAR(82293600, ProjectPoint(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
 // The matrix on the original's stack (its r1 - 176 + 80); r3 comes back as
-// out (Matrix::ProjectPoint's).
+// out (Matrix::ProjectPoint's, called directly: its adapter is gone).
 ITC_MATRIX_SCALAR(82293DF0, QuaternionXAxis(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 96))
 ITC_MATRIX_SCALAR(82293AD8, QuaternionFromMatrix(base, ctx.r3.u32, ctx.r4.u32))
 ITC_MATRIX_SCALAR(82293D78, QuaternionMultiply(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
