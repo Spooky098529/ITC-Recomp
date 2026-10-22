@@ -70,7 +70,8 @@ commits, the function files and the subsystems' docs.
 - `docs/functions/command-list.md` (new; `sub_8258CAA0` moved from
   `functions.md`, Wrapped -> Overridden).
 - `docs/functions/c-runtime.md` (new; `memcpy`, `memset`, `wcslen`, `pow`
-  moved from `functions.md`).
+  moved from `functions.md`; 79 now Overridden or Dropped).
+- `docs/functions/ui-movies.md` (new; 9 rows moved from `functions.md`).
 
 ## Totals
 
