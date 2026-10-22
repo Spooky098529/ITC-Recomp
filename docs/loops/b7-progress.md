@@ -65,7 +65,7 @@ there), and this file's history.
   on, checking error paths first with a new `memory::IsHeapBlock`;
   PushOutCorners does the work of `sub_820BE0D8` and `sub_820BC8A8`
   (never ran in play, no rows); Respond's and Solve's "a fixed body
-  meeting the impulse" groups (below).
+  meeting the impulse" groups (`expected-differences.md`).
 
 - `heap.md`: 15 rows read in full and rewritten (no status changed), the
   intro's paragraph on native versions; migration 1's 15 rows (12
@@ -80,26 +80,7 @@ there), and this file's history.
 
 ## Expected to differ
 
-- `collision.md` (migration 1): every function has a "NaNs and
-  infinities anywhere (expected to differ)" group (two NaNs meeting;
-  sign or payload only); nonzero: FaceDirection 2, BoxShape::Translate
-  2, BoxShape::Place 10, UpdateMotion 21, CollisionShape::Place 85,
-  CollisionShape::Translate 33, RelativePlacement 17, RelativeCenter 1,
-  BlockCorners 1, BoxBox::Separated 96, SeparatedAfterMove 17,
-  Query::Separated 96, Query::SeparatedAfterMove 17, BoxBox::FindImpact
-  1, Query::FindImpact 1 (of 200). UpdateMotion, CollisionShape::Place
-  and CollisionShape::Translate also have "one NaN meeting its own
-  negation" groups (1, 0, 1 differ: a sign in row +96).
-- `collision.md` (migration 2): "NaNs and infinities anywhere":
-  Vehicle::ApplyForces 23 of 100, CollisionObject::Translate 32 of 200,
-  CollisionShape::SetUp 7 of 100; Translate "one NaN meeting its own
-  negation" 1 of 1. CollisionPair::Respond "a fixed body meeting the
-  impulse" 10 of 44, "one NaN anywhere" 4 of 158, both 6 of 42; Solve
-  "one NaN anywhere, a fixed body meeting the impulse" 2 of 42. For
-  review: the fixed-body groups differ because the original
-  RigidBody::ContactImpulseWith reads its stack's leftovers for a fixed
-  body, and native callees leave different leftovers (the game's cars
-  aren't fixed; whether anything fixed meets a car in play isn't known).
+This run's groups: `expected-differences.md` (the "22:11 run" lines).
 
 ## To check in a drive
 

@@ -422,21 +422,34 @@ branch; commit before any revert; stage only your own files; only search
 inside the repo; SBX-Recomp only when the user says so; never screenshot
 the user's desktop; find problems with logs, not guesses.
 
+## Expected differences
+
+`docs/loops/expected-differences.md` (the user's call, 2026-10-23) holds
+every "(expected to differ)" harness group with cases that differ, kept
+across runs: one table per function file (function, group, differing
+cases, reason, review), with the common reasons written once at the top.
+When a migration agent's report has a nonzero `expected to differ:`
+group, the lead adds its lines there (a new reason gets a line under
+"Reasons"), marked "for review (<run> run)", and commits it with the
+progress file; the user's agreement makes it "accepted". The other loop
+docs (the progress file, the run summaries) point to it instead of
+listing groups.
+
 ## The progress file
 
 `docs/loops/b7-progress.md`, for the current run. Kept short, so a pass
 can read it whole. A run's first pass finds the previous run's file
 stopped: it starts it afresh, first copying the old one's rows to
-review, expected differences, drive list and totals into that run's
-summary file under "Left for the user" (the rest is in git):
+review, drive list and totals into that run's summary file under "Left
+for the user" (the rest is in git; expected differences already live in
+`expected-differences.md`):
 
 - **Now:** the subsystem, the step, the agent running, the run's
   subsystem count.
 - **Done:** one line a subsystem (file, groups made native, flags,
   commits), newest first.
 - **Rows to review:** the function files added or changed, for the user.
-- **Expected to differ:** the functions given an "(expected to differ)"
-  harness group this run (from the reports), with the reason.
+- **Expected to differ:** a pointer to `expected-differences.md` only.
 - **Totals:** `b7_status.py`'s totals line after each step.
 - **Stopped:** when and why, if the loop ended itself.
 
