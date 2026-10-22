@@ -26,7 +26,11 @@ rows to review and drive list are there), and this file's history.
   Migration 2 done (6b84e44..9018b3b: 15 of the physics step's
   updates, 4 adapters removed; race 21 s, 0 errors; AI cars in the same
   places). Validated (19 of 19 harness lines, all ran
-  in play). Step: migration 3 (agent running). Queued: the no-mapping
+  in play). Migration 3 done (611173d..c86ed03: SyncFromBody,
+  reset, gearing, steering, suspension, drivetrain, gearbox, the
+  collision world's objects, contacts and surfaces; 17 adapters removed;
+  91 of 130 ours; race 21 s, 0 errors; AI cars in the same places).
+  Step: validation 3 (agent running). Queued: the no-mapping
   lead UiMovie::ApplyTransform.
 - Known: `b7_status.py` checks `sub_825A9934` (`__chkstk`) "Dropped, but
   it ran", and every function made Native or Merged since the coverage
@@ -80,6 +84,9 @@ rows to review and drive list are there), and this file's history.
   there; the step sets r3 again); the adapters run the original for
   UpdateSteering when tan would take its `_except1` path, and for
   UpdateTorqueSplit in mode 2 in a forward gear (neither seen in play).
+  Migration 3's rows (38 in `car-physics.md`, one new: `sub_820BAA78`
+  CollisionShape::Init; `sub_820B4CF0`'s r4 corrected: clear means
+  automatic shifts) and 2 in `vehicle-accessors.md`.
 - `car-physics.md` (new, 129 rows), `known-data.md`'s new rows, 5 leads
   added (the collision narrow phase and shapes, and others).
 - `race-overlays.md`: the matrix-math lead's rows (UpdateLightSprites,
@@ -139,6 +146,9 @@ rows to review and drive list are there), and this file's history.
   Migration 2: UpdateTireGrip 1, UpdateBrakeHeat 1, UpdateTireWear 4,
   UpdateTireForces 38, UpdateAero 8, UpdateWheelAxes 79 (of 100), and
   UpdateWheelAxes "one NaN meeting its own negation" 1 of 1 (a sign).
+  Migration 3: its "anywhere" groups 0 to 12 differ; a new
+  SyncFromBody "one NaN meeting its own negation" group (0 of 0 in the
+  run; 23 sign-only cases in a temporary test).
   Migration 2: Matrix::RotateX 14, RotateY 20, RotateZ 19 (of 210; NaN
   or overflowing angles, the same reason through Multiply).
 
@@ -207,5 +217,7 @@ the validation agent's attract race; the user drives (with
   137, known 384, unknown 5594).
 - After the car physics' migration 2: ours 653, work left 6100 (wrapped
   137, known 369, unknown 5594).
+- After the car physics' migration 3: ours 688, work left 6065 (wrapped
+  137, known 335, unknown 5593).
 
 ## Stopped
