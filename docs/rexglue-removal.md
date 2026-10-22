@@ -2466,6 +2466,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
     | 2026-10-22 | The UI movie library | `ui-movies.md` | 32 of 45 | `--native_ui_movies` |
     | 2026-10-22 | The game's UI movie side | `ui-movies-game.md` | 42 of 89 | `--native_ui_movies_game` |
     | 2026-10-22 | The race overlays' update side | `race-overlays.md` | 88 of 158 | `--native_race_overlays` |
+    | 2026-10-22 | The vehicle, rigid body, collision and race data accessors, and the vector library | `vehicle-accessors.md` | 127 of 132 | `--native_vehicle_accessors`, `--native_vector_library` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -2477,6 +2478,17 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
     decision), TLS (`_getptd`), the matrix math (`Matrix::Multiply` and
     `Matrix::Copy`, Wrapped), std::string, the string table and font, the
     texture set; each is a lead in `docs/loops/leads.md`.
+
+    The vehicle accessors (2026-10-22, branch `b7-loop-22-10-26`, the
+    third run): small getters and setters, nearly all one-function groups,
+    ported in batches by object. The vector library's and the rigid
+    body's harnesses keep NaN inputs in "(expected to differ)" groups:
+    when two NaNs meet, which one comes out depends on the operand order
+    the compiler picked, in the translated code and ours alike (a few
+    cases differ there, only in a NaN's sign or payload). Left:
+    `sub_820B8798` (a tail call through a function pointer, needs `ctx`)
+    and four functions behind blockers outside the file (`sub_820B94B0`,
+    `sub_820B8AF8`, `sub_820DA180`, `sub_820CD5D8`).
 
     The second run (from 2026-10-22, branch `b7-loop-22-10-26`; its first
     session stopped after one subsystem): the first run's removable
@@ -2704,3 +2716,10 @@ Dropped 23, never called 70, live 295. Imports: 186 called, 63 with a
 live caller. B7 (`b7_status.py`): 6,753 in play, ours 422, work left
 6,331 (Wrapped 142, with a row 313, no row yet 5,876); 495 overrides in
 `src/`.
+
+**2026-10-22, B7's third loop run (branch `b7-loop-22-10-26`: the
+vehicle accessors):** the boundary unchanged: 449 functions (916 pairs):
+overridden 58, Native 3, Dropped 23, never called 70, live 295. Imports:
+186 called, 63 with a live caller. B7 (`b7_status.py`): 6,753 in play,
+ours 549, work left 6,204 (Wrapped 140, with a row 317, no row yet
+5,747); 618 overrides in `src/`.

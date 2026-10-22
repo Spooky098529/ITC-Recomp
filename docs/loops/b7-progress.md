@@ -10,19 +10,21 @@ rows to review and drive list are there), and this file's history.
 - Run started 2026-10-22 14:39 on `b7-loop-22-10-26` (the user's branch,
   kept from the previous run), from f9216cf; summary
   `b7-loop-2026-10-22-1439.md`.
-- Subsystem 1 of 3: the vehicle accessors (the leads' vehicle, wheel,
-  body, contact and scene-model accessors, with `sub_825C8388`'s lead
-  folded in: both block the race overlays' updates). Mapped in 6846615
-  (`vehicle-accessors.md`, 132 rows, 96 ready groups; checked). Migration 1
-  done (04d1028..64cfe00: 127 rows ours, `--native_vehicle_accessors`,
-  `--native_vector_library`; race 22 s, 0 errors). Step: validation
-  (agent running).
+- Subsystem 1 of 3 (the vehicle accessors) finished. Next: the
+  no-mapping lead (the race overlays' newly ready functions).
 - Known: `b7_status.py` checks `sub_825A9934` (`__chkstk`) "Dropped, but
   it ran", and every function made Native or Merged since the coverage
   session "..., but it ran" (`seen_in_play.txt` predates them; a new
   coverage session clears them).
 
 ## Done
+
+- The vehicle accessors (`vehicle-accessors.md`, mapped in 6846615; 132
+  rows): 127 ours (125 Overridden, 2 Native) in one migration
+  (04d1028..64cfe00), validated (127 of 127 harness lines);
+  `--native_vehicle_accessors`, `--native_vector_library`. Left:
+  `sub_820B8798` (needs `ctx`) and four behind `sub_820B94B0`,
+  `sub_820B8AF8`, `sub_820DA180`, `sub_820CD5D8`.
 
 ## Rows to review
 
@@ -50,6 +52,18 @@ rows to review and drive list are there), and this file's history.
 Functions made native this run with no `native running (game):` line in
 the validation agent's attract race; the user drives (with
 `--log_level=info`) and checks the log for them when the loop ends.
+
+- Vehicle accessors (validation's race): `sub_820C0150`, `sub_820B6638`,
+  `sub_820B6890`, `sub_820B6960`, `sub_820B7C90`, `sub_820B7D78`,
+  `sub_820B8A48`, `sub_820B8CB0`, `sub_820B8CC0`, `sub_820B8CE0`,
+  `sub_820B8D08`, `sub_820B8D10`, `sub_820B9668`, `sub_820B99B0`,
+  `sub_820B99C0`, `sub_820FF938`, `sub_820FF9F8`, `sub_820FFA30`,
+  `sub_820FFA50`, `sub_820FFAB0`, `sub_820FFC08`, `sub_820FFC68`,
+  `sub_820FFC70`, `sub_820FFC98`, `sub_820FFCC8`, `sub_820FFD48`,
+  `sub_820FFDD8`, `sub_820FFE08`, `sub_820FFE58`, `sub_820FFE98`,
+  `sub_820FFF10`, `sub_82294348`, `sub_82294360`, `sub_822943C8`,
+  `sub_822944B0`, `sub_82294568` (the racer records and stages probably
+  run at a race's start or end, the contacts on collisions).
 
 ## Totals
 
