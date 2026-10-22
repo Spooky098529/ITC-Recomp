@@ -43,17 +43,10 @@ using namespace car_physics;
 
 // --- The rigid body: r3 = the body ---
 
-// r3 comes back as the body matrix's fourth row (the last copy's).
-ITC_CAR_PHYSICS(820B6E70, RigidBodyUpdateOrigin(base, ctx.r3.u32, ctx.r1.u32 - 176);
-                ctx.r3.u64 = ctx.r3.u32 + 336)
-ITC_CAR_PHYSICS(820B70C8, ctx.r3.u64 = RigidBodyUpdateVelocity(base, ctx.r3.u32, ctx.r1.u32 - 160))
-// r3 comes back as +96.
-ITC_CAR_PHYSICS(820B7478,
-                ctx.f1.f64 = RigidBodyUpdateAngularVelocity(base, ctx.r3.u32, ctx.r1.u32 - 144);
-                ctx.r3.u64 = ctx.r3.u32 + 96)
-// r3 comes back as +416 (Matrix::MultiplyReversed's out).
-ITC_CAR_PHYSICS_VECTOR(820B6F38, RigidBodyUpdateOrientation(base, ctx.r3.u32, ctx.r1.u32 - 320);
-                       ctx.r3.u64 = ctx.r3.u32 + 416)
+// RigidBody::UpdateOrigin, UpdateVelocity, UpdateAngularVelocity and
+// UpdateOrientation (sub_820B6E70, sub_820B70C8, sub_820B7478,
+// sub_820B6F38) have no adapters: their callers in play are native.
+
 // r4 = the quaternion; r3 comes back as +336 (UpdateOrigin's).
 ITC_CAR_PHYSICS(820B71E8,
                 RigidBodySetOrientation(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 96);

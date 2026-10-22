@@ -253,7 +253,7 @@ ITC_ACCESSOR_WORD(820C4550, ObjectRecord1888(ctx.r3.u32))
 
 ITC_FLAG_BOOL(native_vector_library, true, "ITC",
               "Run the game's vector library (docs/functions/vehicle-accessors.md: sqrtf, "
-              "sub_82293590; the matrix helpers, sub_82293818 to sub_822938F0; the 3D vector "
+              "sub_82293590; Matrix::TransformPoint, sub_822938F0; the 3D vector "
               "helpers, sub_82294028 to sub_82294608) natively instead of through the "
               "translated code (same results; checked by --run_harnesses=vehicle_accessors)");
 
@@ -285,11 +285,9 @@ ITC_FLAG_BOOL(native_vector_library, true, "ITC",
 using namespace vector_library;
 
 ITC_VECTOR_FLOAT(82293590, Sqrtf(ctx.f1.f64))
-// r3 comes back as the matrix's fourth row (the original's copy's
-// destination).
-ITC_VECTOR_VOID(82293818, MatrixSetTranslation(base, ctx.r3.u32, ctx.r4.u32);
-                ctx.r3.u64 = ctx.r3.u32 + 48)
-ITC_VECTOR_VOID(82293880, MatrixRotate(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+// Matrix::SetTranslation and Matrix::Rotate (sub_82293818, sub_82293880)
+// have no adapters: their callers in play, the rigid body's functions
+// (src/car_physics/, src/vehicle_accessors/), are native.
 ITC_VECTOR_VOID(822938F0, MatrixTransformPoint(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
 ITC_VECTOR_VOID(82294028, Vec3Add(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
 ITC_VECTOR_VOID(82294068, Vec3Sub(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
