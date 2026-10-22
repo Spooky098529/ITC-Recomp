@@ -5,19 +5,18 @@ commits, the function files and the subsystems' docs.
 
 ## Now
 
-- Subsystem: the C runtime helpers (`sub_825A9934`, the stack probe;
-  `sub_825A8170` -> `sub_825A7FB0`, probably `acos`; from `leads.md`), with
-  the rest of the C runtime seen in play except the heap (a lead that
-  waits on the user).
-  Mapped as `functions/c-runtime.md` (6cbe96a): 89 rows, 54 ready
-  groups; the heap, TLS (`_getptd`) and the kernel-calling pieces left
-  out (the core).
-- Step: migration (sixth agent running: `_cfltcvt_l` and its helpers,
-  the last ready group).
-- Session: pass 12 of 20, subsystem 3 of 5. In all: subsystem 3 of 5.
+- Subsystem: the UI movie library (`8259C000`-`825A6800`; `sub_825A08E0`,
+  `sub_825A0EF0`, `sub_825A0CF8`, `sub_825A1218`, `sub_825A1C88`,
+  `sub_825A1D68`, `sub_8259C9B0`, from `leads.md`).
+- Step: mapping (agent running).
+- Session: pass 13 of 20, subsystem 4 of 5. In all: subsystem 4 of 5.
 
 ## Done
 
+- C runtime, sixth migration: %f's `_cfltcvt_l`, `_cftof_l`, `_cftof2_l`,
+  `_fptostr` (36d633f); harnesses at 0 differing, race 21 s, no errors.
+  The C runtime is done: 79 of 89 native (with 2 more counted as ours);
+  the rest waits on the heap, TLS (`_getptd`) and setjmp's caller.
 - C runtime, fifth migration: memmove, `memcpy_s`, the atof chain,
   `write_multi_char` and the wide character output, `_fltout2`,
   `$I10_OUTPUT` (616f41d..f8933d3), under `--native_c_runtime`; setjmp
@@ -95,6 +94,8 @@ commits, the function files and the subsystems' docs.
   (wrapped 149, known 210, unknown 6149).
 - After the C runtime's fifth migration: ours 257, work left 6496
   (wrapped 149, known 198, unknown 6149).
+- After the C runtime: ours 261, work left 6492 (wrapped 149, known 194,
+  unknown 6149).
 
 ## Stopped
 
