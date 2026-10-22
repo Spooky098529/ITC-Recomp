@@ -100,6 +100,12 @@ Rows not yet moved stay in the table below. So far:
   transformed by a matrix (`8209B000`-`820AC000`), and the matrix and
   quaternion half of the physics' vector library (`82293598`-`82293F10`)
   (B7).
+- [`car-physics.md`](car-physics.md): the cars' physics: the car data
+  derived at load, the vehicle's physics set-up, the physics step
+  (ground, suspension, steering, tires, engine, gearbox, drivetrain,
+  brakes, aerodynamics), the rigid body's integration, and the
+  collision world's objects, pairs, update and surface settings (B7;
+  the narrow phase and shapes aren't in it).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
