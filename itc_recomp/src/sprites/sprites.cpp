@@ -2,6 +2,9 @@
 
 #include "guest.h"
 
+#include <rex/platform/fpscr.h>
+#include <simde/x86/sse.h>
+
 #include <bit>
 
 namespace sprites {
@@ -55,6 +58,20 @@ uint32_t LayerFor(uint32_t pass_index) {
 
 bool Equal4(const float a[4], const float b[4]) {
   return a[0] == b[0] && a[1] == b[1] && a[2] == b[2] && a[3] == b[3];
+}
+
+int32_t TurnSide(const float a[4], const float b[4], float zero) {
+  if (Equal4(a, b)) {
+    return 0;
+  }
+  using Fpscr = rex::platform::FPSCRPlatform;
+  const uint32_t csr = Fpscr::getcsr();
+  Fpscr::setcsr(csr | uint32_t(Fpscr::FlushMask));
+  const simde__m128 x_z = simde_mm_mul_ss(simde_mm_set_ss(a[0]), simde_mm_set_ss(b[2]));
+  const simde__m128 z_x = simde_mm_mul_ss(simde_mm_set_ss(a[2]), simde_mm_set_ss(b[0]));
+  const float y = -simde_mm_cvtss_f32(simde_mm_sub_ss(x_z, z_x));
+  Fpscr::setcsr(csr);
+  return y > zero ? 1 : -1;
 }
 
 }  // namespace sprites

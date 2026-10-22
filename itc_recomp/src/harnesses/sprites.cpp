@@ -5,6 +5,9 @@
 
 #include "base/log.h"
 
+#include <algorithm>
+#include <bit>
+
 namespace harness {
 
 namespace {
@@ -116,6 +119,56 @@ void Sprites(Context& h) {
            },
            __imp__sub_82123300, sub_82123300, h.data, 32,
            fmt::format("{:08X} {:08X} {:08X} {:08X} against {:08X} {:08X} {:08X} {:08X}", a[0], a[1],
+                       a[2], a[3], b[0], b[1], b[2], b[3]));
+    }
+    results.Report();
+  }
+
+  // Trail::TurnSide: directions in the horizontal plane (as a trail's), the
+  // same direction, opposite ones, parallel ones (a zero cross product, of
+  // either sign), random words, and tiny components whose products are
+  // denormal.
+  {
+    Results results("Trail::TurnSide (sub_82129940)");
+    Random& r = h.random;
+    auto uniform = [&](float low, float high) {
+      return low + (high - low) * float(r.Below(1u << 24)) / float(1u << 24);
+    };
+    auto bits = [](float f) { return std::bit_cast<uint32_t>(f); };
+    for (int i = 0; i < 3000; i++) {
+      uint32_t a[4], b[4];
+      const int kind = r.Below(6);
+      for (int k = 0; k < 4; k++) {
+        a[k] = bits(uniform(-1, 1));
+        b[k] = bits(uniform(-1, 1));
+      }
+      a[1] = b[1] = bits(0.0f);
+      if (kind == 1) {
+        std::copy(a, a + 4, b);
+      } else if (kind == 2) {  // parallel or opposite
+        const float scale = r.Below(2) ? -uniform(0, 3) : uniform(0, 3);
+        b[0] = bits(std::bit_cast<float>(a[0]) * scale);
+        b[2] = bits(std::bit_cast<float>(a[2]) * scale);
+      } else if (kind == 3) {
+        for (int k = 0; k < 4; k++) {
+          a[k] = uint32_t(r.Next());
+          b[k] = uint32_t(r.Next());
+        }
+      } else if (kind == 4) {  // denormal products
+        a[0] = bits(uniform(-1e-20f, 1e-20f));
+        b[2] = bits(uniform(-1e-20f, 1e-20f));
+      } else if (kind == 5) {
+        a[r.Below(4)] = 0x80000000;  // -0 against 0
+      }
+      Both(h, results, [] {},
+           [&](PPCContext& t) {
+             t.r3.u64 = (uint64_t(a[0]) << 32) | a[1];
+             t.r4.u64 = (uint64_t(a[2]) << 32) | a[3];
+             t.r5.u64 = (uint64_t(b[0]) << 32) | b[1];
+             t.r6.u64 = (uint64_t(b[2]) << 32) | b[3];
+           },
+           __imp__sub_82129940, sub_82129940, h.data, 0,
+           fmt::format("{:08X} {:08X} {:08X} {:08X} to {:08X} {:08X} {:08X} {:08X}", a[0], a[1],
                        a[2], a[3], b[0], b[1], b[2], b[3]));
     }
     results.Report();

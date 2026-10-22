@@ -31,4 +31,10 @@ uint32_t LayerFor(uint32_t pass_index);
 // floats: -0 equals 0, NaN equals nothing).
 bool Equal4(const float a[4], const float b[4]);
 
+// Trail::TurnSide (sub_82129940): which way a trail turns about the vertical
+// from direction a to direction b: 0 if they're equal (Equal4), 1 if their
+// cross product's y (as the game computes it, -(a.x b.z - a.z b.x), flushing
+// denormals to zero) is above `zero` (the game's 0.0), else -1.
+int32_t TurnSide(const float a[4], const float b[4], float zero);
+
 }  // namespace sprites
