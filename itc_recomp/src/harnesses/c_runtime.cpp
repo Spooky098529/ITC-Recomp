@@ -6,11 +6,13 @@
 #include "base/log.h"
 #include "c_runtime/format.h"
 #include "c_runtime/parse.h"
+#include "c_runtime/start_up.h"
 #include "c_runtime/strings.h"
 
 #include <algorithm>
 #include <array>
 #include <bit>
+#include <vector>
 #include <cmath>
 #include <tuple>
 
@@ -279,6 +281,143 @@ void NativeAtofL(PPCContext& ctx, uint8_t* base) {
   }
   ctx.fpscr.disableFlushMode();
   ctx.f1.u64 = bits;
+}
+
+// $I10_OUTPUT: r3 and r4's top 16 bits = the 80-bit long double, r5 = the
+// digits asked for, r6 = flags, r7 = the FOS out; returns 1, or 0.
+void NativeI10Output(PPCContext& ctx, uint8_t* base) {
+  const c_runtime::LongDouble12 value = {uint16_t(ctx.r3.u64 >> 48), uint32_t(ctx.r3.u64 >> 16),
+                                         uint32_t(ctx.r3.u64 << 16) | uint32_t(ctx.r4.u64 >> 48)};
+  c_runtime::FloatOut out;
+  if (!c_runtime::I10Output(base, value, ctx.r5.s32, ctx.r6.u32, &out)) {
+    __imp__sub_825B8B48(ctx, base);
+    return;
+  }
+  for (uint32_t i = 0; i < sizeof(out.bytes); i++) {
+    if (out.written[i]) {
+      guest::StoreU8(base, ctx.r7.u32 + i, out.bytes[i]);
+    }
+  }
+  ctx.r3.u64 = uint32_t(out.result);
+}
+
+// _fltout2: r3 = the double's bits, r4 = the result, r5 = the digits'
+// buffer, r6 = its size; returns r4.
+void NativeFltout2(PPCContext& ctx, uint8_t* base) {
+  c_runtime::FloatOut out;
+  bool native = c_runtime::I10Output(base, c_runtime::DoubleToLd12(ctx.r3.u64), 17, 0, &out);
+  uint32_t length = 0;
+  if (native) {
+    while (length < 22 && out.bytes[4 + length] != 0) {
+      length++;
+    }
+    native = length < 22 && ctx.r5.u32 != 0 && ctx.r6.u32 != 0 && length + 1 <= ctx.r6.u32;
+  }
+  if (!native) {
+    __imp__sub_825B6458(ctx, base);
+    return;
+  }
+  const uint32_t result = ctx.r4.u32, buffer = ctx.r5.u32;
+  guest::StoreU32(base, result + 8, uint32_t(out.result));
+  guest::StoreU32(base, result, uint32_t(int32_t(int8_t(out.bytes[2]))));
+  guest::StoreU32(base, result + 4, uint32_t(int32_t(int16_t(out.bytes[0] << 8 | out.bytes[1]))));
+  for (uint32_t i = 0; i <= length; i++) {
+    guest::StoreU8(base, buffer + i, out.bytes[4 + i]);
+  }
+  guest::StoreU32(base, result + 12, buffer);
+  ctx.r3.u64 = ctx.r4.u64;
+}
+
+// _cftof_l (%f): r3 = the double's address, r4 = the buffer, r5 = its size,
+// r6 = the precision; returns 0.
+void NativeCftofL(PPCContext& ctx, uint8_t* base) {
+  if (!c_runtime::Cftof(base, REX_LOAD_U64(ctx.r3.u32), ctx.r4.u32, ctx.r5.u32, ctx.r6.s32)) {
+    __imp__sub_825AE8E0(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = 0;
+}
+
+// _fptostr: r3 = the buffer, r4 = its size, r5 = the digits wanted, r6 =
+// _fltout2's result; returns 0.
+void NativeFpToStr(PPCContext& ctx, uint8_t* base) {
+  const uint32_t buffer = ctx.r3.u32, size = ctx.r4.u32, result = ctx.r6.u32;
+  const int32_t digits = ctx.r5.s32;
+  bool native = buffer != 0;
+  c_runtime::GuestText text(base, buffer);
+  std::vector<uint8_t> mantissa;
+  uint32_t source = 0, read = 0;
+  int32_t exponent = 0, before = 0;
+  if (native) {
+    source = guest::LoadU32(base, result + 12);
+    const uint32_t whole = digits > 0 ? uint32_t(digits) : 0;
+    while (digits >= 0 && read <= whole && read < (1u << 20)) {
+      const uint8_t c = guest::LoadU8(base, source + read);
+      read++;
+      if (c == 0) {
+        break;
+      }
+      mantissa.push_back(c);
+    }
+    exponent = before = int32_t(guest::LoadU32(base, result + 4));
+    native = c_runtime::FpToStr(text, 0, size, digits, &exponent, mantissa) == 0 && text.ok();
+  }
+  if (native) {
+    const uint32_t end = uint32_t(text.WrittenEnd());
+    native = !c_runtime::MayShare(result, 16, buffer, end) &&
+             !c_runtime::MayShare(source, read, buffer, end) && text.Commit();
+  }
+  if (!native) {
+    __imp__sub_825B61E8(ctx, base);
+    return;
+  }
+  if (exponent != before) {
+    guest::StoreU32(base, result + 4, uint32_t(exponent));
+  }
+  ctx.r3.u64 = 0;
+}
+
+// _cftof2_l: r3 = the buffer, r4 = its size, r5 = the precision, r6 =
+// _fltout2's result, r7 = %g (its low byte); returns 0.
+void NativeCftof2(PPCContext& ctx, uint8_t* base) {
+  const uint32_t buffer = ctx.r3.u32, result = ctx.r6.u32;
+  bool native = buffer != 0 && ctx.r4.u32 != 0;
+  c_runtime::GuestText text(base, buffer);
+  if (native) {
+    uint32_t words[3];
+    const uint32_t point = c_runtime::DecimalPointAddress(base, words);
+    native = c_runtime::Cftof2(text, ctx.r5.s32, int32_t(guest::LoadU32(base, result)),
+                               int32_t(guest::LoadU32(base, result + 4)), ctx.r7.s8 != 0,
+                               guest::LoadU8(base, point));
+    const uint32_t end = uint32_t(text.WrittenEnd());
+    native = native && !c_runtime::MayShare(result, 8, buffer, end) &&
+             !c_runtime::MayShare(words[0], 4, buffer, end) &&
+             !c_runtime::MayShare(words[1], 4, buffer, end) &&
+             !c_runtime::MayShare(point, 1, buffer, end) && text.Commit();
+  }
+  if (!native) {
+    __imp__sub_825AE708(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = 0;
+}
+
+// _putwc_nolock: r3 = the UTF-16 unit, r4 = the stream; string streams
+// natively, the rest the original.
+void NativePutwc(PPCContext& ctx, uint8_t* base) {
+  if (!c_runtime::PutwcString(base, ctx.r3.u16, ctx.r4.u32)) {
+    __imp__sub_825B7A80(ctx, base);
+  }
+}
+
+// _cfltcvt_init: the float conversion table.
+void NativeCfltcvtInit(PPCContext&, uint8_t* base) {
+  c_runtime::InitFloatConversions(base);
+}
+
+// setSBCS: r3 = the multibyte info (left as it is).
+void NativeSetSbcs(PPCContext& ctx, uint8_t* base) {
+  c_runtime::SetSbcs(base, ctx.r3.u32);
 }
 
 }  // namespace
@@ -1066,7 +1205,7 @@ void CRuntime(Context& h) {
                              t.r5.u64 = count;
                            },
                            wide_char ? __imp__sub_825B1368 : __imp__sub_825B7A80,
-                           wide_char ? sub_825B1368 : sub_825B7A80,
+                           wide_char ? sub_825B1368 : NativePutwc,
                            fmt::format("flags {:X} base {:X} room {:X} pointer +{} count {:X} "
                                        "unit {:X}",
                                        flag, base_word, room, pointer - h.data, c, unit));
@@ -1091,7 +1230,7 @@ void CRuntime(Context& h) {
     Results results("the C runtime's start-up (sub_825A6DB0 and the rest)");
     const std::vector<std::pair<uint32_t, uint32_t>> table = {{0x8266BA5C, 40}};
     for (auto [recompiled, native, name] :
-         {std::tuple{__imp__sub_825A6DB0, sub_825A6DB0, "_cfltcvt_init"},
+         {std::tuple{__imp__sub_825A6DB0, NativeCfltcvtInit, "_cfltcvt_init"},
           std::tuple{__imp__sub_825A6E48, sub_825A6E48, "sub_825A6E48"}}) {
       GlobalsCase(h, results, table, [&] { Fill(h.base, 0x8266BA5C, 40); },
                   [](PPCContext&) {}, recompiled, native, name, false);
@@ -1131,7 +1270,7 @@ void CRuntime(Context& h) {
     }
     for (uint32_t offset : {64u, 67u, 1024u}) {
       GlobalsCase(h, results, {}, [] {}, [&](PPCContext& t) { t.r3.u64 = h.data + offset; },
-                  __imp__sub_825B68C8, sub_825B68C8, fmt::format("setSBCS +{}", offset));
+                  __imp__sub_825B68C8, NativeSetSbcs, fmt::format("setSBCS +{}", offset));
     }
     results.Report();
   }
@@ -1470,7 +1609,7 @@ void CRuntime(Context& h) {
                      t.r6.u64 = flags;
                      t.r7.u64 = fos;
                    },
-                   __imp__sub_825B8B48, sub_825B8B48,
+                   __imp__sub_825B8B48, NativeI10Output,
                    fmt::format("{:04X} {:08X} {:08X} digits {} flags {}", sign_exponent, high,
                                low, digits, flags));
       }
@@ -1517,7 +1656,7 @@ void CRuntime(Context& h) {
                    t.r5.u64 = buffer;
                    t.r6.u64 = 22 + n % 40;
                  },
-                 __imp__sub_825B6458, sub_825B6458, fmt::format("{:016X}", d));
+                 __imp__sub_825B6458, NativeFltout2, fmt::format("{:016X}", d));
       n++;
     }
     results.Report();
@@ -1589,7 +1728,7 @@ void CRuntime(Context& h) {
                        }
                      },
                      direct ? __imp__sub_825AE8E0 : __imp__sub_825AEB20,
-                     direct ? sub_825AE8E0 : sub_825AEB20,
+                     direct ? NativeCftofL : sub_825AEB20,
                      fmt::format("{:016X} %{}.{}{}", d, char(format), precision,
                                  direct ? " (_cftof_l)" : ""));
         }
@@ -1636,7 +1775,7 @@ void CRuntime(Context& h) {
                    t.r5.u64 = uint64_t(int64_t(digits));
                    t.r6.u64 = result;
                  },
-                 __imp__sub_825B61E8, sub_825B61E8,
+                 __imp__sub_825B61E8, NativeFpToStr,
                  fmt::format("\"{}\" digits {} size {}",
                              std::string(mantissa.begin(), mantissa.end()), digits, size));
     }
@@ -1684,7 +1823,7 @@ void CRuntime(Context& h) {
                    t.r7.u64 = g_format ? 0x100 | (1 + i % 200) : 0x100;
                    t.r8.u64 = 0;
                  },
-                 __imp__sub_825AE708, sub_825AE708,
+                 __imp__sub_825AE708, NativeCftof2,
                  fmt::format("\"{}\" sign {:X} exponent {} precision {} g {}",
                              std::string(text.begin(), text.end()), sign, exponent, precision,
                              g_format));
