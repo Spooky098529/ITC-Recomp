@@ -235,11 +235,16 @@ void Vec3CrossW1(uint8_t* base, uint32_t out, uint32_t a, uint32_t b) {
 
 float Vec3Dot(uint8_t* base, uint32_t a, uint32_t b) {
   ITC_NATIVE_RUNNING("sub_82294170 Vec3::Dot");
-  const simde__m128 va = VectorAt(base, a);
-  const simde__m128 vb = VectorAt(base, b);
+  simde__m128 va = VectorAt(base, a);
+  simde__m128 vb = VectorAt(base, b);
   const uint32_t csr = Fpscr::getcsr();
   Fpscr::setcsr(csr | uint32_t(Fpscr::FlushMask));
-  const simde__m128 dot = simde_mm_dp_ps(va, vb, 0xEF);
+  // The barriers keep dpps between the two control word writes (the
+  // compiler doesn't know they change it: ThinLTO had moved the dot product
+  // after the second, so tiny vectors' denormal products weren't flushed).
+  PinInMode(va, vb);
+  simde__m128 dot = simde_mm_dp_ps(va, vb, 0xEF);
+  PinInMode(dot);
   Fpscr::setcsr(csr);
   return simde_mm_cvtss_f32(dot);
 }
@@ -443,11 +448,13 @@ float Dot(const Vector& a, const Vector& b) {
   auto lanes = [](const Vector& v) {
     return simde_mm_set_ps(v.x, v.y, v.z, v.w);
   };
-  const simde__m128 va = lanes(a);
-  const simde__m128 vb = lanes(b);
+  simde__m128 va = lanes(a);
+  simde__m128 vb = lanes(b);
   const uint32_t csr = Fpscr::getcsr();
   Fpscr::setcsr(csr | uint32_t(Fpscr::FlushMask));
-  const simde__m128 dot = simde_mm_dp_ps(va, vb, 0xEF);
+  PinInMode(va, vb);
+  simde__m128 dot = simde_mm_dp_ps(va, vb, 0xEF);
+  PinInMode(dot);
   Fpscr::setcsr(csr);
   return simde_mm_cvtss_f32(dot);
 }

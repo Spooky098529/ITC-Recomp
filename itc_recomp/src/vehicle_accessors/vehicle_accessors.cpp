@@ -355,12 +355,14 @@ void QuaternionToMatrix3(uint8_t* base, uint32_t out, uint32_t quaternion) {
   // The squared length: vmsum4fp128 on the 16 bytes at the quaternion
   // rounded down to 16 (lvx128), with flush-to-zero on.
   const uint32_t aligned = quaternion & ~0xFu;
-  const simde__m128 q = simde_mm_castsi128_ps(simde_mm_set_epi32(
+  simde__m128 q = simde_mm_castsi128_ps(simde_mm_set_epi32(
       int32_t(guest::LoadU32(base, aligned + 0)), int32_t(guest::LoadU32(base, aligned + 4)),
       int32_t(guest::LoadU32(base, aligned + 8)), int32_t(guest::LoadU32(base, aligned + 12))));
   const uint32_t csr = Fpscr::getcsr();
   Fpscr::setcsr(csr | uint32_t(Fpscr::FlushMask));
-  const simde__m128 squared = simde_mm_dp_ps(q, q, 0xFF);
+  vector_library::PinInMode(q);
+  simde__m128 squared = simde_mm_dp_ps(q, q, 0xFF);
+  vector_library::PinInMode(squared);
   Fpscr::setcsr(csr);
   const double y = Lfs(base, quaternion + 4);
   const double z = Lfs(base, quaternion + 8);

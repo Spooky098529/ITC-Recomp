@@ -77,6 +77,20 @@ void Vec3Lerp(uint8_t* base, uint32_t out, uint32_t a, uint32_t b, double t);
 // Vec3::DotOf (sub_82294608): Dot(a, b).
 float Vec3DotOf(uint8_t* base, uint32_t a, uint32_t b);
 
+// Compiler barriers for the vector unit's work done with flush-to-zero on:
+// the values pass through an empty asm, so an operation on them can't be
+// moved across the control word writes around it (the compiler doesn't see
+// that those change how it rounds).
+template <typename V>
+inline void PinInMode(V& value) {
+  asm volatile("" : "+x"(value));
+}
+template <typename V, typename... Rest>
+inline void PinInMode(V& value, Rest&... rest) {
+  PinInMode(value);
+  PinInMode(rest...);
+}
+
 // --- Vectors held on the host (the originals' temporaries on their stack) ---
 
 // The four words as floats (copies keep their bits, signaling NaNs too).

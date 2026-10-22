@@ -546,6 +546,12 @@ uint32_t FloatWord(Random& r) {
   }
 }
 
+// Tiny float words (below 2^-60, either sign): their products are
+// denormal, so the vector unit's flush-to-zero shows.
+uint32_t TinyWord(Random& r) {
+  return std::bit_cast<uint32_t>(std::ldexp(float(int32_t(r.Below(1 << 20)) - (1 << 19)), -80));
+}
+
 // A scalar argument for f1 (a single widened, as callers pass).
 double FloatArgument(Random& r) {
   return double(std::bit_cast<float>(FloatWord(r)));
@@ -742,6 +748,66 @@ void VectorCases(Context& h, uint32_t block) {
     }
     results.Report();
     nan_results.Report();
+    // Tiny vectors (and f1): the block filled with tiny words only.
+    Results tiny_results(std::string(f.name) + ", tiny values");
+    for (const auto& layout : layouts) {
+      for (uint64_t seed = 0; seed < 20; seed++) {
+        Random pick = Seeded(seed * 5 + 1);
+        const double f1 = double(std::bit_cast<float>(TinyWord(pick)));
+        Compare(
+            h, tiny_results, {{block, 0x400}},
+            [&] {
+              Random fill = Seeded(seed * 7 + 3);
+              for (uint32_t i = 0; i < 0x400; i += 4) {
+                guest::StoreU32(h.base, block + i, TinyWord(fill));
+              }
+            },
+            [&](PPCContext& t) {
+              const uint32_t out = block + layout.out, a = block + layout.a,
+                             b = block + layout.b, matrix = block + kMatrix;
+              t.f1.f64 = f1;
+              switch (f.shape) {
+                case kR3:
+                  t.r3.u64 = a;
+                  break;
+                case kR3R4:
+                case kR3R4R5:
+                case kR3R4F1:
+                  t.r3.u64 = out;
+                  t.r4.u64 = a;
+                  t.r5.u64 = b;
+                  break;
+                case kR3R5F1:
+                  t.r3.u64 = out;
+                  t.r5.u64 = a;
+                  break;
+                case kR3F1:
+                  t.r3.u64 = out;
+                  break;
+                case kR3R5R6F1:
+                  t.r3.u64 = out;
+                  t.r5.u64 = a;
+                  t.r6.u64 = b;
+                  break;
+                case kF1:
+                  break;
+                case kR3MatR5:
+                  t.r3.u64 = out;
+                  t.r4.u64 = matrix;
+                  t.r5.u64 = a;
+                  break;
+                case kR3R4Mat:
+                  t.r3.u64 = matrix;
+                  t.r4.u64 = a;
+                  break;
+              }
+            },
+            f.recompiled, f.native,
+            fmt::format("{} seed {} f1 {:016X}", layout.name, seed, std::bit_cast<uint64_t>(f1)),
+            f.compare_f1);
+      }
+    }
+    tiny_results.Report();
   }
 }
 
