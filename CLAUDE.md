@@ -125,6 +125,22 @@ date as you learn things.
 - SBX-Recomp (the Japanese release's recomp, in a folder named `SBX-Recomp`
   beside this repo's folder) is a reference, but read it only when the user
   says so. How to reference it: `docs/referencing-sbx-recomp.md`.
+- Native code replaces the game's use of the Xbox, never the Xbox or the
+  SDK behind it (don't port ReXGlue/Xenia into `src/`):
+  - Plug in data, don't mimic: when replacing an Xbox system service, find
+    what the game's callers use from the answer and hardcode that (fixed
+    values, a one-time action), with no 360-style queues, profiles or
+    notification machinery. Check the function before sizing the work.
+  - Map Xbox features, don't port: voice (XHV), system link, Xbox Live,
+    XMP and presence get rows in `docs/functions/`, but no C++ stand-ins
+    imitating their interfaces; skip them at the highest safe game-level
+    point (Status Dropped, with the reason).
+  - Not emulating: play the game's data through host APIs and upstream
+    libraries at the level the data needs (FFmpeg's `xma2` for XMA), not
+    Xenia's forks or code imitating the hardware (contexts, registers).
+  - No System Link mode: the game has none; its code is unreachable, gets
+    no rows and no preserved behavior (mention it at most once where it's
+    left out).
 - The repo is public: never commit absolute local paths (anything under
   `/home/`) in files or commit messages; use paths relative to the repo root.
   `.githooks/` refuses them; enable it once per clone with

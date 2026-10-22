@@ -225,7 +225,9 @@ file, when:
 ## Rules that still hold
 
 CLAUDE.md's rules, in short: never edit `generated/`; plain C++ behind
-adapters; the SDK's headers used, not reimplemented; no absolute paths in
+adapters; the SDK's headers used, not reimplemented; the game's use
+of the Xbox replaced, never the Xbox or the SDK (plug in data, map Xbox
+features without porting them, upstream libraries, no System Link); no absolute paths in
 the repo; American English; no `-march=native`; commit often and push the
 branch; commit before any revert; stage only your own files; only search
 inside the repo; SBX-Recomp only when the user says so; never screenshot
