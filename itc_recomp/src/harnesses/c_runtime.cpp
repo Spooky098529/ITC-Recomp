@@ -4,9 +4,12 @@
 #include "harness.h"
 
 #include "base/log.h"
+#include "c_runtime/format.h"
 
 #include <algorithm>
 #include <array>
+#include <bit>
+#include <cmath>
 #include <tuple>
 
 namespace harness {
@@ -1285,6 +1288,108 @@ void CRuntime(Context& h) {
         Append(result[v], t.f1.u64);
       }
       results.Check(result[0], result[1], fmt::format("\"{}\"", numbers[i]));
+    }
+    results.Report();
+  }
+
+  // $I10_OUTPUT (sub_825B8B48): long doubles (the special values, zeros,
+  // unnormalized and exponent-0 mantissas, every size of exponent, ___dtold's
+  // forms of doubles) with 0 to 25 digits asked for (-1 and 0 too: the
+  // original then reads a byte it never wrote, both runs take it), flags 0
+  // and 1, the FOS at even and odd addresses; the scratch area and r3
+  // compared.
+  {
+    Results results("$I10_OUTPUT (sub_825B8B48)");
+    std::vector<std::tuple<uint16_t, uint32_t, uint32_t>> values = {
+        {0, 0, 0},           {0x8000, 0, 0},           {0x7FFF, 0x80000000, 0},
+        {0xFFFF, 0x80000000, 0}, {0xFFFF, 0xC0000000, 0}, {0xFFFF, 0xC0000000, 1},
+        {0x7FFF, 0xC0000000, 0}, {0x7FFF, 0xC0000001, 5}, {0x7FFF, 0x80000000, 1},
+        {0x7FFF, 0x00000001, 0}, {0xFFFF, 0x3FFFFFFF, 7}, {0x3FFF, 0x80000000, 0},
+        {0x3FFE, 0xFFFFFFFF, 0xFFFFFFFF}, {0x4002, 0xA0000000, 0}, {0x0000, 0x00000001, 0},
+        {0x0001, 0x80000000, 0}, {0x7FFE, 0xFFFFFFFF, 0xFFFFFFFF}, {0x3FFF, 0x00000000, 1}};
+    for (int i = 0; i < 400; i++) {
+      const uint64_t bits = h.random.Next();
+      const c_runtime::LongDouble12 d =
+          c_runtime::DoubleToLd12(i % 4 == 0 ? bits : (bits & 0x800FFFFFFFFFFFFFull) |
+                                                         (uint64_t(1000 + h.random.Below(48)) << 52));
+      values.push_back({d.sign_exponent, d.mantissa_high, d.mantissa_low});
+      values.push_back({uint16_t(h.random.Next()), uint32_t(h.random.Next()) | 0x80000000u,
+                        uint32_t(h.random.Next())});
+    }
+    for (int i = 0; i < 40; i++) {  // powers of ten and their neighbors
+      double v = 1;
+      for (int k = 0; k < i - 20; k++) v *= 10;
+      for (int k = 0; k < 20 - i; k++) v /= 10;
+      const uint64_t b = std::bit_cast<uint64_t>(v);
+      for (uint64_t near : {b - 1, b, b + 1}) {
+        const c_runtime::LongDouble12 d = c_runtime::DoubleToLd12(near);
+        values.push_back({d.sign_exponent, d.mantissa_high, d.mantissa_low});
+      }
+    }
+    size_t n = 0;
+    for (const auto& [sign_exponent, high, low] : values) {
+      const uint64_t r3 = uint64_t(sign_exponent) << 48 | uint64_t(high) << 16 | (low >> 16);
+      const uint64_t r4 = uint64_t(low & 0xFFFF) << 48;
+      for (int32_t digits : {17, int32_t(n % 27) - 1}) {
+        const uint32_t flags = n % 3 == 2 ? 1 : 0;
+        const uint32_t fos = h.data + 2048 + uint32_t(n & 1);
+        StringCase(h, results, [] {},
+                   [&](PPCContext& t) {
+                     t.r3.u64 = r3;
+                     t.r4.u64 = r4;
+                     t.r5.u64 = uint64_t(int64_t(digits));
+                     t.r6.u64 = flags;
+                     t.r7.u64 = fos;
+                   },
+                   __imp__sub_825B8B48, sub_825B8B48,
+                   fmt::format("{:04X} {:08X} {:08X} digits {} flags {}", sign_exponent, high,
+                               low, digits, flags));
+      }
+      n++;
+    }
+    results.Report();
+  }
+
+  // _fltout2 (sub_825B6458): doubles (the special values, zeros, denormals,
+  // powers of ten and their neighbors, random bits and random values), the
+  // buffer big enough (strcpy_s's error path, never seen, left out); the
+  // scratch area and r3 compared.
+  {
+    Results results("_fltout2 (sub_825B6458)");
+    std::vector<uint64_t> doubles = {0, 0x8000000000000000ull, 0x7FF0000000000000ull,
+                                     0xFFF0000000000000ull, 0x7FF8000000000000ull,
+                                     0xFFF8000000000000ull, 0x7FF0000000000001ull,
+                                     0x7FF4000000000000ull, 0x0000000000000001ull,
+                                     0x000FFFFFFFFFFFFFull, 0x0010000000000000ull,
+                                     0x7FEFFFFFFFFFFFFFull, 0x3FF0000000000000ull,
+                                     std::bit_cast<uint64_t>(0.1), std::bit_cast<uint64_t>(123.456),
+                                     std::bit_cast<uint64_t>(-2.5), std::bit_cast<uint64_t>(1e22),
+                                     std::bit_cast<uint64_t>(9.999999999999999e22),
+                                     std::bit_cast<uint64_t>(0.5), std::bit_cast<uint64_t>(1e-5)};
+    for (int i = -30; i <= 30; i++) {
+      const uint64_t b = std::bit_cast<uint64_t>(std::pow(10.0, i));
+      doubles.push_back(b - 1);
+      doubles.push_back(b);
+      doubles.push_back(b + 1);
+    }
+    for (int i = 0; i < 600; i++) {
+      const uint64_t bits = h.random.Next();
+      doubles.push_back(i % 2 == 0 ? bits : (bits & 0x800FFFFFFFFFFFFFull) |
+                                                (uint64_t(1000 + h.random.Below(48)) << 52));
+    }
+    size_t n = 0;
+    for (uint64_t d : doubles) {
+      const uint32_t result = h.data + 2048 + 4 * uint32_t(n & 1);
+      const uint32_t buffer = h.data + 1024 + uint32_t(n % 3);
+      StringCase(h, results, [] {},
+                 [&](PPCContext& t) {
+                   t.r3.u64 = d;
+                   t.r4.u64 = result;
+                   t.r5.u64 = buffer;
+                   t.r6.u64 = 22 + n % 40;
+                 },
+                 __imp__sub_825B6458, sub_825B6458, fmt::format("{:016X}", d));
+      n++;
     }
     results.Report();
   }

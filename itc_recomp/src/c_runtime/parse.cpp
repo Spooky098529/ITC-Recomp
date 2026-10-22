@@ -18,11 +18,13 @@ constexpr uint32_t kDecimalPoint = 0x8266C024;  // a pointer to a pointer to the
 constexpr uint32_t kPow10Positive = 0x8266C4E8;  // 12-byte powers of ten, less 96
 constexpr uint32_t kPow10Negative = 0x8266C648;
 
-// Big-endian bytes standing in for __strgtold12_l's stack frame: offsets
-// are from its r1 (80 the product, 96 the number, 112 a rounded-down table
-// entry; the multiplication's last carry lands at 78).
+// Big-endian bytes standing in for a function's stack frame: offsets are
+// from its r1 (in __strgtold12_l 80 the product, 96 the number, 112 a
+// rounded-down table entry, the multiplication's last carry at 78; in
+// $I10_OUTPUT 88 the number, 104 and 120 the products, 136 a tenth, 152 a
+// table entry or the number's copy).
 struct Frame {
-  uint8_t b[160] = {};
+  uint8_t b[200] = {};
 
   uint16_t U16(uint32_t o) const { return uint16_t(b[o] << 8 | b[o + 1]); }
   uint32_t U32(uint32_t o) const { return uint32_t(U16(o)) << 16 | U16(o + 2); }
@@ -51,10 +53,9 @@ void Shr96(Frame& f, uint32_t o) {
   f.SetU32(o, w0 >> 1);
 }
 
-// __ld12mul, inlined in __strgtold12_l: the number at 96 times `y` (12
-// bytes at 112 in `f`), the product built at 80.
-void Ld12Mul(Frame& f) {
-  constexpr uint32_t x = 96, y = 112, r = 80;
+// __ld12mul, inlined in __strgtold12_l and $I10_OUTPUT: the number at `x`
+// times the one at `y`, the product built at `r`, the result back at `x`.
+void Ld12Mul(Frame& f, uint32_t x, uint32_t r, uint32_t y) {
   f.SetU32(r + 8, 0);
   f.SetU32(r + 4, 0);
   f.SetU32(r, 0);
@@ -96,9 +97,9 @@ void Ld12Mul(Frame& f) {
     }
   }
   // The mantissas' halfwords multiplied into the product, column by column.
-  uint32_t column = 86;
+  uint32_t column = r + 6;
   for (int32_t count = 5, i = 0; count > 0; count--, column -= 2, i++) {
-    uint32_t from_x = 106 - 2 * i, from_y = y + 2;
+    uint32_t from_x = x + 10 - 2 * i, from_y = y + 2;
     for (int32_t n = count; n > 0; n--, from_x -= 2, from_y += 2) {
       const uint32_t product = uint32_t(f.U16(from_x)) * f.U16(from_y);
       const uint32_t old = f.U32(column + 2);
@@ -174,6 +175,37 @@ void Ld12Mul(Frame& f) {
 
 LongDouble12Full FromFrame(const Frame& f, uint32_t o) {
   return {{f.U16(o), f.U32(o + 2), f.U32(o + 6)}, f.U16(o + 10)};
+}
+
+// __multtenpow12, inlined: the number at `x` times 10^`power` (|power| at
+// most 5200 or so), by the tables three bits of the power at a time, each
+// entry copied to `y` (less one in +6 to +9 when +10 is 0x8000 or more),
+// the products built at `r`.
+void MultTenPow(uint8_t* base, Frame& f, uint32_t x, uint32_t r, uint32_t y, int32_t power) {
+  uint32_t table = kPow10Positive;
+  int32_t n = power;
+  if (n < 0) {
+    table = kPow10Negative;
+    n = -n;
+  }
+  while (n != 0) {
+    table += 84;
+    const uint32_t index = uint32_t(n) & 7;
+    n >>= 3;
+    if (index == 0) {
+      continue;
+    }
+    const uint32_t entry = table + index * 12;
+    for (uint32_t i = 0; i < 12; i++) {
+      f.b[y + i] = guest::LoadU8(base, entry + i);
+    }
+    if (f.U16(y + 10) >= 0x8000) {
+      const uint32_t m = (uint32_t(f.U16(y + 6)) << 16 | f.U16(y + 8)) - 1;
+      f.SetU16(y + 8, m);
+      f.SetU16(y + 6, m >> 16);
+    }
+    Ld12Mul(f, x, r, y);
+  }
 }
 
 }  // namespace
@@ -483,33 +515,10 @@ bool Strgtold12(uint8_t* base, uint32_t string, uint32_t mult12, uint32_t scale,
     return true;
   }
   if (total != 0) {
-    uint32_t table = kPow10Positive;
-    int32_t n = int32_t(total);
-    if (n < 0) {
-      table = kPow10Negative;
-      n = -n;
-    }
     if (mult12 == 0) {
       f.SetU16(106, 0);
     }
-    while (n != 0) {
-      table += 84;
-      const uint32_t index = uint32_t(n) & 7;
-      n >>= 3;
-      if (index == 0) {
-        continue;
-      }
-      const uint32_t entry = table + index * 12;
-      for (uint32_t i = 0; i < 12; i++) {
-        f.b[112 + i] = guest::LoadU8(base, entry + i);
-      }
-      if (f.U16(112 + 10) >= 0x8000) {
-        const uint32_t m = (uint32_t(f.U16(118)) << 16 | f.U16(120)) - 1;
-        f.SetU16(120, m);
-        f.SetU16(118, m >> 16);
-      }
-      Ld12Mul(f);
-    }
+    MultTenPow(base, f, 96, 80, 112, int32_t(total));
   }
   result->value = FromFrame(f, 96);
   result->value.value.sign_exponent = uint16_t(result->value.value.sign_exponent | man_sign);
@@ -564,6 +573,164 @@ bool AtofL(uint8_t* base, uint32_t string, uint64_t* bits) {
     return false;
   }
   *bits = parsed.bits;
+  return true;
+}
+
+namespace {
+
+// The strings $I10_OUTPUT copies for the special values (constant data).
+constexpr uint32_t kQNan = 0x82074490;  // "1#QNAN"
+constexpr uint32_t kInf = 0x82074498;   // "1#INF"
+constexpr uint32_t kInd = 0x820744A0;   // "1#IND"
+constexpr uint32_t kSNan = 0x820744A8;  // "1#SNAN"
+
+}  // namespace
+
+bool I10Output(uint8_t* base, const LongDouble12& value, int32_t digits, uint32_t flags,
+               FloatOut* out) {
+  for (bool& w : out->written) {
+    w = false;
+  }
+  auto put = [&](uint32_t offset, uint8_t byte) {
+    out->bytes[offset] = byte;
+    out->written[offset] = true;
+  };
+  auto put16 = [&](uint32_t offset, uint32_t v) {
+    put(offset, uint8_t(v >> 8));
+    put(offset + 1, uint8_t(v));
+  };
+  const uint32_t expn = value.sign_exponent & 0x7FFF;
+  const uint32_t sign = value.sign_exponent & 0x8000;
+  const uint32_t manhi = value.mantissa_high, manlo = value.mantissa_low;
+  const uint8_t sign_char = sign != 0 ? '-' : ' ';
+  put(2, sign_char);
+  auto zero = [&] {  // "0", exponent 0
+    put16(0, 0);
+    put(2, sign == 0x8000 ? '-' : ' ');
+    put(3, 1);
+    put(5, 0);
+    put(4, '0');
+    out->result = 1;
+  };
+  if (expn == 0 && manhi == 0 && manlo == 0) {
+    zero();
+    return true;
+  }
+  if (expn == 0x7FFF) {
+    put16(0, 1);
+    uint32_t text;
+    uint8_t length;
+    if ((manhi != 0x80000000u || manlo != 0) && (manhi & 0x40000000u) == 0) {
+      text = kSNan;
+      length = 6;
+    } else if (sign != 0 && manhi == 0xC0000000u) {
+      text = manlo != 0 ? kQNan : kInd;
+      length = manlo != 0 ? 6 : 5;
+    } else if (manhi == 0x80000000u && manlo == 0) {
+      text = kInf;
+      length = 5;
+    } else {
+      text = kQNan;
+      length = 6;
+    }
+    // strcpy_s into the 22 bytes at +4 (the strings fit).
+    for (uint32_t i = 0;; i++) {
+      const uint8_t c = guest::LoadU8(base, text + i);
+      put(4 + i, c);
+      if (c == 0) {
+        break;
+      }
+      if (i >= 21) {
+        return false;  // too long: strcpy_s's error path
+      }
+    }
+    put(3, length);
+    out->result = 0;
+    return true;
+  }
+
+  Frame f;
+  constexpr uint32_t x = 88;
+  f.SetU16(x, expn);
+  f.SetU32(x + 2, manhi);
+  f.SetU32(x + 6, manlo);
+  f.SetU16(x + 10, 0);
+  // A tenth (0x3FFB CCCC...CC), for the estimate's correction.
+  f.b[136] = 0x3F;
+  f.b[137] = 0xFB;
+  for (uint32_t i = 138; i < 148; i++) {
+    f.b[i] = 0xCC;
+  }
+  const uint32_t estimate = ((manhi >> 24) * 2 + (expn >> 8)) * 77 + expn * 19728 - 0x134312F4u;
+  int32_t ir = int16_t(int32_t(estimate) >> 16);
+  MultTenPow(base, f, x, 104, 152, -ir);
+  if (f.U16(x) >= 0x3FFF) {
+    ir = int16_t(ir + 1);
+    Ld12Mul(f, x, 120, 136);
+  }
+  put16(0, uint32_t(ir));
+  if ((flags & 1) != 0) {
+    digits += ir;
+    if (digits <= 0) {
+      zero();
+      return true;
+    }
+  }
+  if (digits > 21) {
+    digits = 21;
+  }
+  // The mantissa as a fraction below 1: its exponent cleared, the bits put
+  // 8 below the top (shifted right more for a number below a half).
+  const int32_t unbiased = int32_t(f.U16(x)) - 16382;
+  f.SetU16(x, 0);
+  u128 v = (u128(f.U32(x)) << 64 | u128(f.U32(x + 4)) << 32 | f.U32(x + 8));
+  v = (v << 8) & kMask96;
+  if (unbiased < 0) {
+    const uint32_t shift = uint32_t(-unbiased) & 0xFF;
+    for (uint32_t i = 0; i < shift; i++) {
+      v >>= 1;
+    }
+  }
+  if (digits + 1 <= 0) {
+    return false;  // the original reads +3 as a digit then
+  }
+  // One digit more than asked: times ten, the top byte out.
+  uint32_t p = 4;
+  for (int32_t k = digits + 1; k > 0; k--) {
+    v = (v * 10) & kMask96;
+    put(p++, uint8_t((v >> 88) + '0'));
+    v &= (u128(1) << 88) - 1;
+  }
+  // Rounded on the last digit, the digits before it carried into.
+  uint32_t q = p - 2;
+  if (int8_t(out->bytes[p - 1]) >= '5') {
+    while (q >= 4 && out->bytes[q] == '9') {
+      put(q, '0');
+      q--;
+    }
+    if (q < 4) {
+      put16(0, uint32_t(uint16_t(out->bytes[0] << 8 | out->bytes[1]) + 1));
+      q++;
+    }
+    put(q, uint8_t(out->bytes[q] + 1));
+  } else {
+    while (q >= 4 && out->bytes[q] == '0') {
+      q--;
+    }
+    if (q < 4) {
+      put16(0, 0);
+      put(2, sign == 0x8000 ? '-' : ' ');
+      put(5, 0);
+      put(4, '0');
+      put(3, 1);
+      out->result = 1;
+      return true;
+    }
+  }
+  const int8_t length = int8_t(q - 3);
+  put(3, uint8_t(length));
+  put(uint32_t(int32_t(length) + 4), 0);
+  out->result = 1;
   return true;
 }
 

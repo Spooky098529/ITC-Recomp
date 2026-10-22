@@ -29,7 +29,7 @@ ITC_FLAG_BOOL(native_c_runtime, true, "ITC",
               "sub_825AB040, sub_825AB0A0, sub_825B6898); strtoul and strtoxl (sub_825A85E0, "
               "sub_825A82C8); ___dtold and _ld12tod (sub_825B6378, sub_825B69B8); atof, _atof_l, "
               "_fltin2, __strgtold12_l and __mtold12 (sub_825AB1C0, sub_825AB0C0, sub_825AFDC8, "
-              "sub_825B36B8, sub_825B7F10); write_char "
+              "sub_825B36B8, sub_825B7F10); _fltout2 and $I10_OUTPUT (sub_825B6458, sub_825B8B48); write_char "
               "(sub_825AF000), write_multi_char (sub_825AF098), the wide write_char and _putwc_nolock "
               "(sub_825B1368, sub_825B7A80); __iob_func (sub_825AD4C0); the start-up's _cfltcvt_init (sub_825A6DB0, "
               "sub_825A6E48), _init_pointers' setters (sub_825AD140, sub_825AEE18, sub_825AFCB8, "
@@ -506,6 +506,72 @@ extern "C" REX_FUNC(sub_825AB1C0) {
   if (!Atof(ctx, base)) {
     __imp__sub_825AB1C0(ctx, base);
   }
+}
+
+// $I10_OUTPUT: r3 and r4's top 16 bits = the 80-bit long double (sign and
+// exponent, the 64-bit mantissa), r5 = the digits asked for, r6 = flags,
+// r7 = the FOS out; returns 1, or 0 for an infinity or NaN. Where the
+// original would read a byte it never wrote, the original runs. (It also
+// stores its arguments in its caller's frame, at r1 + 16 to + 55: its
+// caller doesn't read them.)
+namespace {
+
+void StoreFloatOut(uint8_t* base, uint32_t address, const c_runtime::FloatOut& out) {
+  for (uint32_t i = 0; i < sizeof(out.bytes); i++) {
+    if (out.written[i]) {
+      guest::StoreU8(base, address + i, out.bytes[i]);
+    }
+  }
+}
+
+}  // namespace
+
+extern "C" REX_FUNC(sub_825B8B48) {
+  REX_FUNC_PROLOGUE();
+  const c_runtime::LongDouble12 value = {uint16_t(ctx.r3.u64 >> 48), uint32_t(ctx.r3.u64 >> 16),
+                                         uint32_t(ctx.r3.u64 << 16) | uint32_t(ctx.r4.u64 >> 48)};
+  c_runtime::FloatOut out;
+  if (!ITC_FLAG(native_c_runtime) ||
+      !c_runtime::I10Output(base, value, ctx.r5.s32, ctx.r6.u32, &out)) {
+    __imp__sub_825B8B48(ctx, base);
+    return;
+  }
+  StoreFloatOut(base, ctx.r7.u32, out);
+  ctx.r3.u64 = uint32_t(out.result);
+}
+
+// _fltout2: r3 = the double (its 64 bits), r4 = the result (+0 the sign
+// character, +4 the decimal exponent, +8 $I10_OUTPUT's result, +12 the
+// buffer), r5 = the digits' buffer, r6 = its size; returns r4. ___dtold
+// and $I10_OUTPUT (17 digits) natively, the digits copied as strcpy_s does;
+// where strcpy_s would fail (a null buffer, no room: sub_825AFD10, never
+// seen in play) or $I10_OUTPUT isn't native, the original runs. (It also
+// stores the double in its caller's frame, at r1 + 16: no caller reads it.)
+extern "C" REX_FUNC(sub_825B6458) {
+  REX_FUNC_PROLOGUE();
+  c_runtime::FloatOut out;
+  bool native = ITC_FLAG(native_c_runtime) &&
+                c_runtime::I10Output(base, c_runtime::DoubleToLd12(ctx.r3.u64), 17, 0, &out);
+  uint32_t length = 0;
+  if (native) {
+    while (length < 22 && out.bytes[4 + length] != 0) {
+      length++;
+    }
+    native = length < 22 && ctx.r5.u32 != 0 && ctx.r6.u32 != 0 && length + 1 <= ctx.r6.u32;
+  }
+  if (!native) {
+    __imp__sub_825B6458(ctx, base);
+    return;
+  }
+  const uint32_t result = ctx.r4.u32, buffer = ctx.r5.u32;
+  guest::StoreU32(base, result + 8, uint32_t(out.result));
+  guest::StoreU32(base, result, uint32_t(int32_t(int8_t(out.bytes[2]))));
+  guest::StoreU32(base, result + 4, uint32_t(int32_t(int16_t(out.bytes[0] << 8 | out.bytes[1]))));
+  for (uint32_t i = 0; i <= length; i++) {
+    guest::StoreU8(base, buffer + i, out.bytes[4 + i]);
+  }
+  guest::StoreU32(base, result + 12, buffer);
+  ctx.r3.u64 = ctx.r4.u64;
 }
 
 // write_char: r3 = the character, r4 = the stream, r5 = the count. Where

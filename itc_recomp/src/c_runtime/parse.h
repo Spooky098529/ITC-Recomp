@@ -1,8 +1,9 @@
-// The C runtime's number parsing under atof (Microsoft's, for the Xbox 360),
-// natively: the decimal string to the 12-byte long double
-// (__strgtold12_l, with __mtold12 and the multiplication by powers of ten
-// it inlines), _fltin2 and _atof_l, step for step as the translated code.
-// See docs/functions/c-runtime.md.
+// The C runtime's 12-byte long double arithmetic (Microsoft's, for the Xbox
+// 360), natively, step for step as the translated code: the parsing under
+// atof (the decimal string to the 12-byte long double: __strgtold12_l,
+// with __mtold12 and the multiplication by powers of ten it inlines,
+// _fltin2 and _atof_l) and the decimal digits under printf's %f
+// ($I10_OUTPUT and _fltout2). See docs/functions/c-runtime.md.
 
 #pragma once
 
@@ -60,5 +61,25 @@ bool Fltin2(uint8_t* base, uint32_t string, FltinResult* result);
 // _errno (a null string) or tests spaces for a multibyte locale
 // (sub_825AFD98, never seen in play).
 bool AtofL(uint8_t* base, uint32_t string, uint64_t* bits);
+
+// $I10_OUTPUT (sub_825B8B48)'s FOS (+0 the decimal exponent, +2 the sign
+// character, +3 the digits' count, +4 the digits and a terminator; 26
+// bytes) as the original leaves it: only the bytes it writes are marked.
+struct FloatOut {
+  uint8_t bytes[26];
+  bool written[26];
+  int32_t result;  // r3: 1 a number, 0 an infinity or NaN
+};
+
+// $I10_OUTPUT: the long double's first `digits` decimal digits (at most 21;
+// with `flags` & 1, that many after the point), rounded on one more: an
+// estimate of the decimal exponent from the binary one, the number scaled
+// by the powers of ten and corrected by a tenth, the digits by
+// multiplications by ten; "1#INF", "1#IND", "1#QNAN" and "1#SNAN" (read
+// from guest memory) for the special values. False where the original
+// would read a byte it didn't write (no digits asked for) or strcpy_s
+// fails (never: the strings fit).
+bool I10Output(uint8_t* base, const LongDouble12& value, int32_t digits, uint32_t flags,
+               FloatOut* out);
 
 }  // namespace c_runtime
