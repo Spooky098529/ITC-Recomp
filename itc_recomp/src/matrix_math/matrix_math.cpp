@@ -717,6 +717,29 @@ void QuaternionMultiply(uint8_t* base, uint32_t out, uint32_t a, uint32_t b) {
   Stfs(base, out + 12, Fnmsubs(az, bz, f5));
 }
 
+double QuaternionFromAxisAngle(uint8_t* base, uint32_t out, uint32_t axis, double angle,
+                               uint32_t scratch) {
+  ITC_NATIVE_RUNNING("sub_82293E68 Quaternion::FromAxisAngle");
+  const double zero = Lfs(base, kZero);
+  if (angle == zero) {
+    Stfs(base, out + 0, zero);
+    Stfs(base, out + 4, zero);
+    Stfs(base, out + 8, zero);
+    Stfs(base, out + 12, Lfs(base, kOne));
+    return angle;
+  }
+  const double cosine = SinCos(base, Fmuls(angle, Lfs(base, kHalf)), scratch, scratch + 4);
+  const double s = Lfs(base, scratch);
+  Stfs(base, out + 0, Fmuls(Lfs(base, axis + 0), s));
+  Stfs(base, out + 4, Fmuls(Lfs(base, axis + 4), s));
+  const double z = Lfs(base, axis + 8);
+  const double c = Lfs(base, scratch + 4);
+  const double zs = Fmuls(z, s);
+  Stfs(base, out + 12, c);
+  Stfs(base, out + 8, zs);
+  return cosine;
+}
+
 void QuaternionNormalizeSelf(uint8_t* base, uint32_t q) {
   ITC_NATIVE_RUNNING("sub_82293F10 Quaternion::NormalizeSelf");
   const double y = Lfs(base, q + 4);

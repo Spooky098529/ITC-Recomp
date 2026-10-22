@@ -89,6 +89,12 @@ void ProjectPoint(uint8_t* base, uint32_t out, uint32_t m, uint32_t p);
 void QuaternionFromMatrix(uint8_t* base, uint32_t out, uint32_t m);
 // Quaternion::Multiply (sub_82293D78): out = a b (Hamilton product).
 void QuaternionMultiply(uint8_t* base, uint32_t out, uint32_t a, uint32_t b);
+// Quaternion::FromAxisAngle (sub_82293E68): (0, 0, 0, 1) when the angle is
+// 0.0; otherwise SinCos(angle × 0.5) (the sine and cosine stored at
+// `scratch` and +4, the original's stack, r1 - 32) and out = (axis × s, c).
+// Returns what the original leaves in f1: the angle, or the cosine's double.
+double QuaternionFromAxisAngle(uint8_t* base, uint32_t out, uint32_t axis, double angle,
+                               uint32_t scratch);
 // Quaternion::NormalizeSelf (sub_82293F10): q / |q|.
 void QuaternionNormalizeSelf(uint8_t* base, uint32_t q);
 // SinCos (sub_820B0E10): sin and cos of the angle stored as floats at

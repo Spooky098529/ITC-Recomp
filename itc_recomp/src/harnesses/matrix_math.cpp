@@ -99,6 +99,9 @@ ITC_NATIVE_SCALAR(NativeQuaternionFromMatrix,
                   mm::QuaternionFromMatrix(base, ctx.r3.u32, ctx.r4.u32))
 ITC_NATIVE_SCALAR(NativeQuaternionMultiply,
                   mm::QuaternionMultiply(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+ITC_NATIVE_SCALAR(NativeQuaternionFromAxisAngle,
+                  ctx.f1.f64 = mm::QuaternionFromAxisAngle(base, ctx.r3.u32, ctx.r4.u32,
+                                                           ctx.f1.f64, ctx.r1.u32 - 32))
 ITC_NATIVE_SCALAR(NativeQuaternionNormalizeSelf, mm::QuaternionNormalizeSelf(base, ctx.r3.u32))
 ITC_NATIVE_SCALAR(NativeSinCos,
                   ctx.f1.f64 = mm::SinCos(base, ctx.f1.f64, ctx.r4.u32, ctx.r5.u32))
@@ -214,6 +217,10 @@ void MatrixMath(Context& h) {
       {"Quaternion::XAxis (sub_82293DF0)", __imp__sub_82293DF0, NativeQuaternionXAxis, false},
       {"Quaternion::Multiply (sub_82293D78)", __imp__sub_82293D78, NativeQuaternionMultiply,
        false},
+      // f1 = the angle (0.0 and -0.0, among the odd floats, take the branch
+      // that skips SinCos).
+      {"Quaternion::FromAxisAngle (sub_82293E68)", __imp__sub_82293E68,
+       NativeQuaternionFromAxisAngle, true},
       {"Quaternion::NormalizeSelf (sub_82293F10)", __imp__sub_82293F10,
        NativeQuaternionNormalizeSelf, false},
       {"SinCos (sub_820B0E10)", __imp__sub_820B0E10, NativeSinCos, true},

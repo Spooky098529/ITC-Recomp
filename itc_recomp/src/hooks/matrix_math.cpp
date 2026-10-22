@@ -83,6 +83,10 @@ ITC_MATRIX_SCALAR(822936F0, FromQuaternion(base, ctx.r3.u32, ctx.r4.u32);
 ITC_MATRIX_SCALAR(82293DF0, QuaternionXAxis(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 96))
 ITC_MATRIX_SCALAR(82293AD8, QuaternionFromMatrix(base, ctx.r3.u32, ctx.r4.u32))
 ITC_MATRIX_SCALAR(82293D78, QuaternionMultiply(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+// f1 = the angle; the sine and cosine on the original's stack (its r1 - 112
+// + 80); f1 comes back as the original leaves it.
+ITC_MATRIX_SCALAR(82293E68, ctx.f1.f64 = QuaternionFromAxisAngle(base, ctx.r3.u32, ctx.r4.u32,
+                                                                 ctx.f1.f64, ctx.r1.u32 - 32))
 ITC_MATRIX_SCALAR(82293F10, QuaternionNormalizeSelf(base, ctx.r3.u32))
 // f1 = the angle, r4 = &sine, r5 = &cosine; f1 comes back as the cosine.
 ITC_MATRIX_SCALAR(820B0E10, ctx.f1.f64 = SinCos(base, ctx.f1.f64, ctx.r4.u32, ctx.r5.u32))
