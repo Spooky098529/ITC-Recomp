@@ -12,12 +12,17 @@ commits, the function files and the subsystems' docs.
   Mapped as `functions/c-runtime.md` (6cbe96a): 89 rows, 54 ready
   groups; the heap, TLS (`_getptd`) and the kernel-calling pieces left
   out (the core).
-- Step: migration (fourth agent running: tan, ldexp, `_clearfp`, the
-  float formatting pieces, the start-up setters, memcpy if simple).
-- Session: pass 10 of 20, subsystem 3 of 5. In all: subsystem 3 of 5.
+- Step: migration (fifth agent running: memmove, `memcpy_s`, the atof
+  chain, the float output pieces, setjmp with its caller if possible).
+- Session: pass 11 of 20, subsystem 3 of 5. In all: subsystem 3 of 5.
 
 ## Done
 
+- C runtime, fourth migration: tan, ldexp, `_clearfp`, `_ld12tod`,
+  `___dtold`, `write_char`, `__iob_func`, the start-up setters, and
+  memcpy's copy inside its mirror-tracking override (b271bed..147dbae),
+  new flag `--native_memcpy`; harnesses at 0 differing, race 20 s (and a
+  4-minute race, ~80 million native copies), no errors.
 - C runtime, third migration: rint, `_ctrlfp`, `_abstract_sw`, abs, the
   wide and narrow string helpers, the second memcpy, the character helpers,
   strtoul (36b44e6..7c52ae3), under `--native_math` and
@@ -79,6 +84,8 @@ commits, the function files and the subsystems' docs.
   (wrapped 150, known 251, unknown 6149).
 - After the C runtime's third migration: ours 228, work left 6525
   (wrapped 150, known 226, unknown 6149).
+- After the C runtime's fourth migration: ours 245, work left 6508
+  (wrapped 149, known 210, unknown 6149).
 
 ## Stopped
 
