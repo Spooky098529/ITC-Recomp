@@ -476,7 +476,7 @@ extern "C" REX_FUNC(sub_82124630) {
 
 // The racers' save flags and stages: r4 = a racer id (r3 isn't read).
 ITC_OVERLAY_WORD(82126BB0, SaveFlag199FA(base, ctx.r4.u32))
-ITC_OVERLAY_WORD(82126C08, SaveFlag199F8(base, ctx.r4.u32))
-ITC_OVERLAY_WORD(82126C58, SaveFlag199FC(base, ctx.r4.u32))
+// SaveFlag199F8 and SaveFlag199FC (sub_82126C08, sub_82126C58) have no
+// adapters: their only caller in play, SaveFlag199F8Or199FC, is native.
 ITC_OVERLAY_WORD(82126CB0, SaveFlag199F8Or199FC(base, ctx.r4.u32))
 ITC_OVERLAY_WORD(82126B50, RacerInCurrentStage(base, ctx.r4.u32))
