@@ -210,3 +210,6 @@ extern "C" REX_FUNC(sub_820B2100) {
   }
 }
 ITC_CAR_PHYSICS(820B24A8, VehicleUpdateTurbo(base, ctx.r3.u32))
+ITC_CAR_PHYSICS(820B3F80,
+                ctx.r3.u64 = VehicleUpdateTireForces(base, ctx.r3.u32, ctx.r1.u32 - 272))
+ITC_CAR_PHYSICS(820B2808, ctx.r3.u64 = VehicleUpdateAtRest(base, ctx.r3.u32, ctx.r1.u32 - 192))

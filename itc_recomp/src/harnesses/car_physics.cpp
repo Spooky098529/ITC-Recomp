@@ -177,6 +177,10 @@ ITC_NATIVE_STEP(NativeUpdateTorqueSplit,
                 if (!cp::VehicleUpdateTorqueSplit(base, ctx.r3.u32))
                     __imp__sub_820B2100(ctx, base))
 ITC_NATIVE_STEP(NativeUpdateTurbo, cp::VehicleUpdateTurbo(base, ctx.r3.u32))
+ITC_NATIVE_STEP(NativeUpdateTireForces,
+                ctx.r3.u64 = cp::VehicleUpdateTireForces(base, ctx.r3.u32, ctx.r1.u32 - 272))
+ITC_NATIVE_STEP(NativeUpdateAtRest,
+                ctx.r3.u64 = cp::VehicleUpdateAtRest(base, ctx.r3.u32, ctx.r1.u32 - 192))
 
 // Runs the recompiled version with the native flags off, so the functions
 // it calls that are ours run the originals too.
@@ -443,7 +447,9 @@ namespace {
 // to: the car data, the surface records and the rigid body.
 constexpr uint32_t kVehicleArea = 0x10000;  // below the scratch area
 constexpr uint32_t kVehicle = 0, kCarData = 0x2000, kSurfaces = 0x2800, kBody = 0x2900;
-constexpr uint32_t kVehicleAreaBytes = 0x2C00;
+// The collision object (vehicle +340) and two contacts in its list.
+constexpr uint32_t kObject = 0x2B80, kContacts = 0x2D00;
+constexpr uint32_t kVehicleAreaBytes = 0x2E00;
 
 // What r4 holds: a wheel (0-3), an axle's first wheel (0 or 2), a byte
 // (any word), or the tire coefficients (four floats in the surface
@@ -475,6 +481,16 @@ void FillVehicle(uint8_t* base, uint32_t area, Random& r, Word word) {
     }
   }
   guest::StoreU32(base, v + 348, r.Below(5));
+  // The collision object and its contacts (flags +4, the next +68).
+  guest::StoreU32(base, v + 340, r.Below(5) == 0 ? 0 : area + kObject);
+  guest::StoreU32(base, area + kObject + 240, r.Below(4) == 0 ? 0 : area + kContacts);
+  for (uint32_t c = 0; c < 2; c++) {
+    const uint32_t contact = area + kContacts + 128 * c;
+    constexpr uint32_t kFlags[] = {0x01000000, 0x02000000, 0x04000000, 0x00000001};
+    guest::StoreU32(base, contact + 4, kFlags[r.Below(4)]);
+    guest::StoreU32(base, contact + 68, c == 0 && r.Below(2) == 0 ? contact + 128 : 0);
+  }
+  guest::StoreU8(base, v + 2384, uint8_t(r.Below(4) == 0));
   guest::StoreU8(base, v + 2664, uint8_t(r.Below(3) != 0));
   guest::StoreU8(base, v + 2386, uint8_t(r.Below(3) != 0));
   guest::StoreU32(base, v + 3156, r.Below(1000));
@@ -601,6 +617,10 @@ void CarPhysicsVehicle(Context& h) {
       {"Vehicle::UpdateTorqueSplit (sub_820B2100)", Original<__imp__sub_820B2100>,
        NativeUpdateTorqueSplit, false},
       {"Vehicle::UpdateTurbo (sub_820B24A8)", Original<__imp__sub_820B24A8>, NativeUpdateTurbo,
+       false},
+      {"Vehicle::UpdateTireForces (sub_820B3F80)", Original<__imp__sub_820B3F80>,
+       NativeUpdateTireForces, false},
+      {"Vehicle::UpdateAtRest (sub_820B2808)", Original<__imp__sub_820B2808>, NativeUpdateAtRest,
        false},
   };
   enum Group { kNumbers, kOneNaN, kNaNs };

@@ -272,5 +272,19 @@ bool VehicleUpdateTorqueSplit(uint8_t* base, uint32_t vehicle);
 // the blow-off valve (+2964, byte +2960) or the wastegate (+2952, byte
 // +2948), and the torque factor +2956 with a turbo (engine byte +336).
 void VehicleUpdateTurbo(uint8_t* base, uint32_t vehicle);
+// Vehicle::UpdateTireForces (sub_820B3F80): the driven axles' +1996 and
+// +2124; per wheel the slip speed +356, the slips +268, +264, +260 and the
+// tire's forces +308 (and +332), +304 (Tire::MagicFormula, kept in a unit
+// circle, less the surface's drag). The temporaries at `frame` + 80 to +
+// 159 (the original's 272-byte frame). Returns what the original leaves in
+// r3 (the vehicle, or `frame` + 112 when the last wheel didn't slip).
+uint32_t VehicleUpdateTireForces(uint8_t* base, uint32_t vehicle, uint32_t frame);
+// Vehicle::UpdateAtRest (sub_820B2808): the at-rest byte +2928, and when
+// set the gear to 0, the wheels' spin and forces zeroed and the body's
+// horizontal velocity and its spin stopped (RigidBody::SetVelocity,
+// SetAngularVelocity, and the angular momentum +400's x, y, z zeroed).
+// `frame`: the original's 192 bytes (its callees' below). Returns what the
+// original leaves in r3.
+uint32_t VehicleUpdateAtRest(uint8_t* base, uint32_t vehicle, uint32_t frame);
 
 }  // namespace car_physics

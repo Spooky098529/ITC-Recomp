@@ -800,4 +800,222 @@ void VehicleUpdateTurbo(uint8_t* base, uint32_t vehicle) {
   }
 }
 
+uint32_t VehicleUpdateTireForces(uint8_t* base, uint32_t vehicle, uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_820B3F80 Vehicle::UpdateTireForces");
+  const uint32_t f = frame;
+  const double one = Lfs(base, kOne);
+  // The driven axles: their base value plus the share of the clutch's
+  // torque.
+  {
+    const double open = Fsubs(one, Lfs(base, vehicle + 2264));
+    const uint32_t mode = guest::LoadU32(base, vehicle + 2376);
+    const uint32_t data = CarData(base, vehicle);
+    const double drive = Fmuls(Fmuls(open, Lfs(base, vehicle + 2320)), Lfs(base, 0x82001BE4));
+    if (mode < 1) {
+      Stfs(base, vehicle + 1996,
+           Fmadds(Lfs(base, vehicle + 1988), drive, Lfs(base, data + 536)));
+      Stfs(base, vehicle + 2124, Lfs(base, data + 808));
+    } else if (mode == 1) {
+      CopyWord(base, data + 536, vehicle + 1996);
+      Stfs(base, vehicle + 2124,
+           Fmadds(Lfs(base, vehicle + 2116), drive, Lfs(base, data + 808)));
+    } else {
+      Stfs(base, vehicle + 1996,
+           Fmadds(Lfs(base, vehicle + 1988), drive, Lfs(base, data + 536)));
+      Stfs(base, vehicle + 2124,
+           Fmadds(Lfs(base, vehicle + 2116), drive, Lfs(base, data + 808)));
+    }
+  }
+  const double minus_one = Lfs(base, 0x82001BE0);
+  const double least = Lfs(base, 0x82002A54);
+  const double zero = Lfs(base, kZero);
+  uint32_t r3 = vehicle;
+  for (uint32_t w = 0; w < 4; w++) {
+    const uint32_t wheel = Wheel(vehicle, w);
+    const uint32_t data = guest::LoadU32(base, vehicle + 2160 + 4 * w);
+    const uint32_t body = guest::LoadU32(base, vehicle + 336);
+    // The rolling speed (+96: x, 0, 0, 0) and the ground's (+80: along
+    // +144, 0, along +128, 0).
+    const double rolling = Fmuls(Lfs(base, wheel + 248), Lfs(base, data + 52));
+    Stfs(base, f + 140, zero);
+    Stfs(base, f + 108, zero);
+    Stfs(base, f + 92, zero);
+    Stfs(base, f + 100, zero);
+    Stfs(base, f + 104, zero);
+    Stfs(base, f + 96, rolling);
+    va::RigidBodyPointVelocity(base, f + 144, body, wheel + 80);
+    vl::Vec4Copy(base, f + 128, f + 144);
+    Stfs(base, f + 80, double(vl::Vec3DotOf(base, f + 128, wheel + 144)));
+    Stfs(base, f + 84, zero);
+    Stfs(base, f + 88, double(vl::Vec3DotOf(base, f + 128, wheel + 128)));
+    const double rolling_length = double(vl::Vec3Length(base, f + 96));
+    const double ground_length = double(vl::Vec3Length(base, f + 80));
+    double speed =
+        double(vl::Vec3Length(base, rolling_length < ground_length ? f + 80 : f + 96));
+    vl::Vec3Difference(base, f + 112, f + 96, f + 80);
+    double slip = double(vl::Vec3Length(base, f + 112));
+    Stfs(base, wheel + 356, slip);
+    if (slip == zero) {
+      Stfs(base, wheel + 304, zero);
+      Stfs(base, wheel + 268, zero);
+      Stfs(base, wheel + 264, zero);
+      Stfs(base, wheel + 332, zero);
+      Stfs(base, wheel + 308, zero);
+      r3 = f + 112;
+      CopyWord(base, wheel + 308, wheel + 332);
+      continue;
+    }
+    const double low = Fdivs(least, Lfs(base, vehicle + 2364));
+    if (low > slip) {
+      slip = low;
+    }
+    if (low > speed) {
+      speed = low;
+    }
+    const double inverse = Fdivs(one, speed);
+    double along = Fmuls(inverse, Lfs(base, f + 112));
+    if (along < minus_one) {
+      along = minus_one;
+    } else if (along > one) {
+      along = one;
+    }
+    double across = Fmuls(inverse, Lfs(base, f + 120));
+    if (across < minus_one) {
+      across = minus_one;
+    } else if (across > one) {
+      across = one;
+    }
+    // The slip angle: the rolling direction's against the ground's.
+    const double rolling_angle = c_runtime::Atan2(Lfs(base, f + 104), Lfs(base, f + 96));
+    const double ground_angle = c_runtime::Atan2(Lfs(base, f + 88), Lfs(base, f + 80));
+    const double ground_along = Lfs(base, f + 80);
+    Stfs(base, wheel + 268, along);
+    Stfs(base, wheel + 260, Fsubs(double(float(rolling_angle)), double(float(ground_angle))));
+    if (ground_along < zero) {
+      Stfs(base, wheel + 268, Fmuls(along, minus_one));
+    }
+    Stfs(base, wheel + 264, across);
+    const double fx = TireMagicFormula(base, 0x82600D00, along);
+    const double per = Fdivs(one, slip);
+    double longitudinal = Fmuls(Fmuls(per, Fabs(Lfs(base, f + 112))), fx);
+    const double fy = TireMagicFormula(base, 0x82600D10, across);
+    double lateral = Fmuls(Fmuls(per, Fabs(Lfs(base, f + 120))), fy);
+    const double length =
+        double(vl::Sqrtf(Fmadds(lateral, lateral, Fmuls(longitudinal, longitudinal))));
+    const double scale = Fdivs(one, length);
+    if (!(scale > one)) {
+      longitudinal = Fmuls(scale, longitudinal);
+      lateral = Fmuls(scale, lateral);
+    }
+    const double load = Fnmsubs(Lfs(base, wheel + 280), zero, one);
+    const double limit = Lfs(base, wheel + 316);
+    double fl = Fmuls(Fmuls(load, limit), longitudinal);
+    double fs = Fmuls(Fmuls(load, limit), lateral);
+    // Less the surface's drag x the ground speed's square.
+    double drag = Fmuls(VehicleSurfaceValue20(base, vehicle, w), Lfs(base, wheel + 316));
+    double g = Lfs(base, f + 80);
+    fl = Fnmsubs(Fmuls(drag, g), g, fl);
+    drag = Fmuls(VehicleSurfaceValue20(base, vehicle, w), Lfs(base, wheel + 316));
+    g = Lfs(base, f + 88);
+    Stfs(base, wheel + 308, fl);
+    fs = Fnmsubs(Fmuls(drag, g), g, fs);
+    Stfs(base, wheel + 304, fs);
+    r3 = vehicle;
+    CopyWord(base, wheel + 308, wheel + 332);
+  }
+  return r3;
+}
+
+uint32_t VehicleUpdateAtRest(uint8_t* base, uint32_t vehicle, uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_820B2808 Vehicle::UpdateAtRest");
+  const uint32_t f = frame;
+  const double zero = Lfs(base, kZero);
+  uint32_t r3 = vehicle;
+  if (guest::LoadU8(base, vehicle + 2384) != 0) {
+    guest::StoreU8(base, vehicle + 2928, 1);
+  } else {
+    const uint32_t object = guest::LoadU32(base, vehicle + 340);
+    r3 = object;
+    if (object == 0) {
+      return 0;
+    }
+    if (!(Lfs(base, vehicle + 48) < Lfs(base, kOne)) || !(Lfs(base, vehicle + 284) == zero) ||
+        !(Lfs(base, vehicle + 288) == zero)) {
+      guest::StoreU8(base, vehicle + 2928, 0);
+    } else {
+      // Resting on a contact: weak enough, and the car's center of mass
+      // above it (along +96).
+      const uint32_t contact = va::CollisionObjectFirstContact(base, object, 0x03000000);
+      r3 = contact;
+      if (contact != 0 && double(va::ContactStrength(base, contact)) < Lfs(base, 0x82002A20)) {
+        const uint32_t m = va::RigidBodyOrientation(guest::LoadU32(base, vehicle + 336));
+        CopyWord(base, m + 48, f + 80);
+        Stfs(base, f + 92, zero);
+        CopyWord(base, m + 56, f + 88);
+        CopyWord(base, m + 52, f + 84);
+        vl::Vec3Difference(base, f + 128, va::ContactPosition(contact), f + 80);
+        Stfs(base, f + 132, zero);
+        const double up = double(vl::Vec3DotOf(base, f + 128, vehicle + 96));
+        r3 = f + 128;
+        guest::StoreU8(base, vehicle + 2928, up < zero ? 0 : 1);
+      }
+    }
+  }
+  // Still, with no input (or in neutral), wheels down.
+  const double speed = Fabs(Lfs(base, vehicle + 48));
+  const bool no_input =
+      Lfs(base, vehicle + 288) == zero && Lfs(base, vehicle + 284) == zero;
+  if ((no_input || guest::LoadU32(base, vehicle + 2252) == 0) &&
+      guest::LoadU32(base, vehicle + 348) != 0 && Fabs(speed) < Lfs(base, 0x82002A1C)) {
+    guest::StoreU8(base, vehicle + 2928, 1);
+  }
+  if (guest::LoadU8(base, vehicle + 2928) == 0) {
+    return r3;
+  }
+  const uint32_t gear = guest::LoadU32(base, vehicle + 2252);
+  guest::StoreU32(base, vehicle + 2252, 0);
+  guest::StoreU32(base, vehicle + 2256, gear);
+  for (uint32_t w = 0; w < 4; w++) {
+    const uint32_t wheel = Wheel(vehicle, w);
+    Stfs(base, wheel + 248, zero);
+    Stfs(base, wheel + 252, zero);
+    Stfs(base, wheel + 308, zero);
+    Stfs(base, wheel + 304, zero);
+  }
+  const uint32_t body = guest::LoadU32(base, vehicle + 336);
+  // The velocity's y kept (its 16 bytes copied, x and z zeroed).
+  {
+    const uint32_t from = va::RigidBodyVelocity(body);
+    for (uint32_t i = 0; i < 16; i += 4) {
+      guest::StoreU32(base, f + 128 + i, guest::LoadU32(base, from + i));
+    }
+    Stfs(base, f + 128, zero);
+    Stfs(base, f + 136, zero);
+    RigidBodySetVelocity(base, body, f + 128, f - 112);
+  }
+  // The angular momentum +400's x, y and z zeroed (sub_820B6940 and
+  // sub_820B6938, never seen in play: +400, and Vec4::Copy into it).
+  {
+    const uint32_t from = body + 400;
+    for (uint32_t i = 0; i < 16; i += 4) {
+      guest::StoreU32(base, f + 96 + i, guest::LoadU32(base, from + i));
+    }
+    Stfs(base, f + 96, zero);
+    Stfs(base, f + 100, zero);
+    Stfs(base, f + 104, zero);
+    vl::Vec4Copy(base, body + 400, f + 96);
+  }
+  {
+    const uint32_t from = va::RigidBodyAngularVelocity(body);
+    for (uint32_t i = 0; i < 16; i += 4) {
+      guest::StoreU32(base, f + 112 + i, guest::LoadU32(base, from + i));
+    }
+    Stfs(base, f + 112, zero);
+    Stfs(base, f + 116, zero);
+    Stfs(base, f + 120, zero);
+    RigidBodySetAngularVelocity(base, body, f + 112, f - 160);
+  }
+  return body + 96;
+}
+
 }  // namespace car_physics
