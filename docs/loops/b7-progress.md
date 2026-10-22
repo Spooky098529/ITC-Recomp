@@ -22,7 +22,8 @@ rows to review and drive list are there), and this file's history.
   Migration 1 done (ee810a9..a86606e: the rigid body, the physics
   step's helpers, the controls; 41 rows ours, 6 adapters removed;
   `--native_car_physics`; race 22 s, 0 errors; AI cars in the same
-  places with the flag on and off). Step: validation 1 (agent running). Queued: the no-mapping
+  places with the flag on and off). Validated (43 of 43 harness lines).
+  Step: migration 2 (agent running). Queued: the no-mapping
   lead UiMovie::ApplyTransform.
 - Known: `b7_status.py` checks `sub_825A9934` (`__chkstk`) "Dropped, but
   it ran", and every function made Native or Merged since the coverage
@@ -165,6 +166,12 @@ the validation agent's attract race; the user drives (with
 - Race overlays' effect updates (validation's race): `sub_82126A00`
   OverlayView::WheelOnSurface8, `sub_82126A38` WheelOnSurface1Or2 (no
   rows).
+- Car physics, migration 1 (validation's race): `sub_820B71B0`
+  RigidBody::SetCenterOfMassPosition, `sub_820B75B8`
+  RigidBody::ApplyImpulses, `sub_820B6C78` RigidBody::ContactImpulse,
+  `sub_820B6D48` RigidBody::FrictionImpulse, `sub_820B72C8`
+  RigidBody::ContactImpulseWith (probably collisions only),
+  `sub_820B04C0` Vehicle::RampHandbrake.
 
 ## Totals
 
