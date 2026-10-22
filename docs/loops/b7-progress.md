@@ -30,8 +30,11 @@ rows to review and drive list are there), and this file's history.
   reset, gearing, steering, suspension, drivetrain, gearbox, the
   collision world's objects, contacts and surfaces; 17 adapters removed;
   91 of 130 ours; race 21 s, 0 errors; AI cars in the same places).
-  Validated (40 of 40 harness lines). Step: migration 4 (agent
-  running). Queued: the no-mapping
+  Validated (40 of 40 harness lines). Migration 4 done
+  (cf19bfc..556069f: the collision world's pairs, reset and removals,
+  the car data, Vehicle::Vehicle, AddGroups and RemoveGroups; nothing
+  ready left; race 21 s, 0 errors; AI cars in the same places). Step:
+  validation 4 (agent running). Queued: the no-mapping
   lead UiMovie::ApplyTransform.
 - Known: `b7_status.py` checks `sub_825A9934` (`__chkstk`) "Dropped, but
   it ran", and every function made Native or Merged since the coverage
@@ -88,6 +91,11 @@ rows to review and drive list are there), and this file's history.
   Migration 3's rows (38 in `car-physics.md`, one new: `sub_820BAA78`
   CollisionShape::Init; `sub_820B4CF0`'s r4 corrected: clear means
   automatic shifts) and 2 in `vehicle-accessors.md`.
+  Migration 4's 15 rows in `car-physics.md` and 4 in
+  `vehicle-accessors.md`. For review: RemovePair copies a moved pair
+  with `c_runtime::Memcpy` only outside the physical views and for
+  ranges that don't overlap; otherwise RemoveObject's and RemoveGroups'
+  adapters run the original removals from the start (the same result).
 - `car-physics.md` (new, 129 rows), `known-data.md`'s new rows, 5 leads
   added (the collision narrow phase and shapes, and others).
 - `race-overlays.md`: the matrix-math lead's rows (UpdateLightSprites,
@@ -228,5 +236,7 @@ the validation agent's attract race; the user drives (with
   137, known 369, unknown 5594).
 - After the car physics' migration 3: ours 688, work left 6065 (wrapped
   137, known 335, unknown 5593).
+- After the car physics' migration 4: ours 705, work left 6048 (wrapped
+  137, known 318, unknown 5593).
 
 ## Stopped
