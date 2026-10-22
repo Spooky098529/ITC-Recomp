@@ -46,6 +46,38 @@ void CRuntime(Context& h) {
     }
     results.Report();
   }
+
+  // memset: every alignment of the destination, counts from none to a few
+  // hundred bytes (the word loop's 16-byte steps and the rest), values with
+  // bits above the low byte; the scratch area around it and r3 compared.
+  {
+    Results results("memset (sub_825A71D0)");
+    std::vector<uint32_t> counts;
+    for (uint32_t c = 0; c <= 40; c++) {
+      counts.push_back(c);
+    }
+    for (uint32_t c : {63u, 64u, 65u, 255u, 256u, 257u, 1000u, 2048u, 3000u}) {
+      counts.push_back(c);
+    }
+    for (int i = 0; i < 40; i++) {
+      counts.push_back(h.random.Below(3500));
+    }
+    const uint64_t values[] = {0, 0xFF, 0x5A, 0x12345678ABull, 0xFFFFFFFFFFFFFF00ull};
+    for (uint32_t count : counts) {
+      for (uint32_t offset = 0; offset < 8; offset++) {
+        const uint64_t value = values[(count + offset) % 5];
+        Both(h, results, [] {},
+             [&](PPCContext& t) {
+               t.r3.u64 = h.data + 64 + offset;
+               t.r4.u64 = value;
+               t.r5.u64 = count;
+             },
+             __imp__sub_825A71D0, sub_825A71D0, h.data, kScratchBytes,
+             fmt::format("count {} offset {} value {:X}", count, offset, value));
+      }
+    }
+    results.Report();
+  }
 }
 
 }  // namespace harness
