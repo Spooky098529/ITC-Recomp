@@ -90,7 +90,27 @@ a float the translated code keeps as a double across a branch (the first
 +104 store of `Sparks::Update`) comes back with a signaling NaN quieted,
 while a plain load and store keeps its bits; and `Sparks::Update`'s
 additions keep the destination's NaN (seen in the disassembly), so the
-native version picks it explicitly.
+native version picks it explicitly. The fifth pass (2026-10-22) added the
+children's updates `Smoke::Update`, `ParticlesB::Update` and
+`ParticlesC::Update` (their adapters stay: slot 4) and
+`RaceOverlays::SlotOf`; the adapters of `SmokeEmitter::Reset`,
+`Smoke::InRegion` and `ParticlesB::ResetEntry` went. Learned there: a `tw`
+trap in the translated code only logs (`ppc_trap` type 0 warns and runs on,
+the division by 0 giving 0), so with a capacity of 0 the originals run their
+index on past the entries (into whatever follows, whose counts then drive
+the inner loops): the harnesses keep the counts small there, and don't try
+heads below 0, where the originals reset entries over the object's own
+capacity and table pointer. Which NaN an addition or product keeps is the
+x86 destination's, which the compiler picks per lane (seen in the
+disassembly): `Smoke::Update`'s particle additions keep the position's for x
+and the velocity's for y and z, `ParticlesB::Update`'s the velocity's for all
+three, `ParticlesC::Update`'s pull product the difference's; products the
+translated code computes in doubles from a loaded single come back with a
+signaling NaN quieted. `sub_8215E150` (the Update handler's thunk) was left
+for `RaceOverlays::Run`: alone it would only be an adapter passing r3 + 9,608
+to that function's `ctx` override, and its harness would have to run that
+override (camera passes saved, the blend handler set) outside the game's
+update.
 
 Status:
 
