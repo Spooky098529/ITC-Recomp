@@ -61,7 +61,9 @@ memory.
 7. The migration agent works in the **build, attract race, debug** cycle
    used so far, and reports. A subsystem too big for one agent gets
    another migration agent after the first reports, until nothing ready
-   is left in it.
+   is left in it. The lead adds the report's nonzero `expected to differ:`
+   groups to `expected-differences.md` ("Expected differences" below),
+   not to the progress file.
 8. **Hand its work to a validation agent** (below; added by the user,
    2026-10-22) after each migration agent's report has passed the
    lead's checks, the "no mapping" leads' too: it checks from a log that
@@ -232,7 +234,8 @@ skips Merged rows). Never
    game's (a NaN's bits as the compiler left them in the translated code,
    say) may go in their own group named "... (expected to differ)", with
    the reason in a comment beside it and in the function's row, and the
-   group in the report's `expected to differ:` line. Every other case
+   group in the report's `expected to differ:` line (the lead records
+   them in `docs/loops/expected-differences.md`). Every other case
    matches.
 4. Builds (`cmake --build itc_recomp/out/build/linux-amd64-release
    -j$(nproc)`) and runs `attract_race.sh 25 --run_harnesses=all`: no new
