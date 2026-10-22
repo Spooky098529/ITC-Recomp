@@ -86,7 +86,8 @@ nothing runs and there's work, about a minute.
   ("Checking with a harness" in `docs/rexglue-removal.md`).
 - `--native_renderer_dump=<dir>`: frames from a race.
 - `ITC_THREAD=main itc_recomp/tools/profile_render_thread.sh`: cycles a
-  frame, for speed.
+  frame, for speed (not part of the loop's checks: see "The migration
+  agent").
 - `itc_recomp/tools/boundary_status.py`: the SDK boundary.
 - Finding code: `grep -n "DEFINE_REX_FUNC(sub_X)"
   itc_recomp/generated/default/*.cpp`; call sites `grep -ln "lr =
@@ -179,8 +180,9 @@ functions; run again after each group, as callers become ready):
    (outside "(expected to differ)" groups); a stalled boot restarted once.
    If the group runs in the race, a temporary counter override shows it
    was called (removed before committing). For anything drawn, a frame
-   dump against one with the fallback flag. For main-thread code, a
-   profile, two runs each way, alternating.
+   dump against one with the fallback flag. No profile: native code may
+   be slower than the recompiled code for now and is optimized later
+   (the user's call, 2026-10-22).
 5. On a failure: logging, a run, the log read; no fixes by guessing. If
    that doesn't settle it, it leaves the group uncommitted, says so, and
    reports.
@@ -198,7 +200,6 @@ migrate: <name>
 groups: <root -> commit, one a line>
 harnesses: <each "harness: <function>: N cases, M differ" line, verbatim>
 race: <seconds at 30 ticks/s>, <error lines>
-profile: <before -> after cycles a frame> | not run
 rows: <functions whose rows changed>
 flags: <the --native_ flags added>
 left: <ready groups left> | none; blocked by: <blockers> | none
@@ -217,7 +218,6 @@ file, when:
   ~20 seconds at 30 ticks/s;
 - an agent left work uncommitted, or a commit doesn't build;
 - a report's `stop:` isn't `none`;
-- a profile is slower than before, beyond the runs' spread;
 - a map fails its check, or `leads.md` has nothing the loop can take;
 - the session's or the total limit is reached;
 - the tree has changes the loop didn't make, or isn't on `b7-loop-test`.
