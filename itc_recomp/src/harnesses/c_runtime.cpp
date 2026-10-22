@@ -5,6 +5,8 @@
 
 #include "base/log.h"
 
+#include <algorithm>
+
 namespace harness {
 
 namespace {
@@ -85,6 +87,28 @@ void WriteBytes(Context& h, uint32_t address, const std::vector<uint8_t>& bytes,
   if (terminate) {
     guest::StoreU8(h.base, address + uint32_t(bytes.size()), 0);
   }
+}
+
+// Bytes from a small alphabet (so strings match and nearly match): letters
+// of both cases, the characters beside A-Z and a-z, high bytes.
+std::vector<uint8_t> AlphabetBytes(Context& h, uint32_t length) {
+  static const uint8_t kAlphabet[] = {'a', 'A', 'b', 'B', 'z', 'Z', '@', '[', '`', '{',
+                                      '0', 0x80, 0xC1, 0xE1, 0xFF};
+  std::vector<uint8_t> v(length);
+  for (uint8_t& b : v) {
+    b = kAlphabet[h.random.Below(sizeof(kAlphabet))];
+  }
+  return v;
+}
+
+// The same string with letters' case flipped at random.
+std::vector<uint8_t> FlipCase(Context& h, std::vector<uint8_t> v) {
+  for (uint8_t& b : v) {
+    if (((b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z')) && h.random.Below(2)) {
+      b ^= 0x20;
+    }
+  }
+  return v;
 }
 
 const uint32_t kLengths[] = {0, 1, 2, 3, 4, 5, 7, 8, 15, 16, 17, 31, 64, 200, 450};
@@ -265,6 +289,211 @@ void CRuntime(Context& h) {
       }
     }
     wides.Report();
+  }
+
+  // strncpy and strcpy_s: every length at each place, counts and sizes
+  // around the length; the destination apart, or overlapping below the
+  // source. (strcpy_s's error paths, which call _errno and
+  // _invalid_parameter, aren't run: both versions take the recompiled path
+  // there.)
+  {
+    Results copies("strncpy (sub_825A7F50)");
+    Results safe("strcpy_s (sub_825A9DD8)");
+    for (uint32_t length : kLengths) {
+      for (uint32_t offset : places.offsets) {
+        const std::vector<uint8_t> bytes = RandomBytes(h, length);
+        const uint32_t at = h.data + offset;
+        const uint32_t destination = h.data + (offset < 1024 ? 2601 : 1);
+        for (uint32_t to : {destination, at - 1, at - 5}) {
+          for (uint32_t count : {0u, 1u, length, length + 1, length + 2, length + 37,
+                                 length > 0 ? length - 1 : 3}) {
+            const std::string what =
+                fmt::format("length {} offset {} to {:X} count {}", length, offset, to - h.data, count);
+            StringCase(h, copies, [&] { WriteBytes(h, at, bytes); },
+                       [&](PPCContext& t) {
+                         t.r3.u64 = to;
+                         t.r4.u64 = at;
+                         t.r5.u64 = count;
+                       },
+                       __imp__sub_825A7F50, sub_825A7F50, what);
+            if (count > length) {
+              StringCase(h, safe, [&] { WriteBytes(h, at, bytes); },
+                         [&](PPCContext& t) {
+                           t.r3.u64 = to;
+                           t.r4.u64 = count;
+                           t.r5.u64 = at;
+                         },
+                         __imp__sub_825A9DD8, sub_825A9DD8, what);
+            }
+          }
+        }
+      }
+    }
+    copies.Report();
+    safe.Report();
+  }
+
+  // The compares: pairs of strings from a small alphabet (equal, the case
+  // flipped, a prefix, a byte changed at random positions), each way round,
+  // counts around where they differ; strncmp, _stricmp, _strnicmp and its
+  // compare.
+  {
+    Results ncmp("strncmp (sub_825AACD0)");
+    Results icmp("_stricmp (sub_825AA100)");
+    Results nicmp("_strnicmp (sub_825AC710)");
+    Results ascii("__ascii_strnicmp (sub_825AC6B0)");
+    for (uint32_t length : kLengths) {
+      for (uint32_t offset : {65u, places.page_end - 3}) {
+        const std::vector<uint8_t> a = AlphabetBytes(h, length);
+        std::vector<std::vector<uint8_t>> others = {a, FlipCase(h, a), FlipCase(h, a)};
+        if (length > 0) {
+          others.push_back(std::vector<uint8_t>(a.begin(), a.end() - 1));
+          for (int k = 0; k < 4; k++) {
+            std::vector<uint8_t> b = FlipCase(h, a);
+            b[h.random.Below(length)] = AlphabetBytes(h, 1)[0];
+            others.push_back(b);
+          }
+        }
+        std::vector<uint8_t> longer = a;
+        longer.push_back('Q');
+        others.push_back(longer);
+        for (size_t o = 0; o < others.size(); o++) {
+          for (int order = 0; order < 2; order++) {
+            const uint32_t first = h.data + offset;
+            const uint32_t second = h.data + (offset < 1024 ? 2600 : 1);
+            auto setup = [&] {
+              WriteBytes(h, first, order == 0 ? a : others[o]);
+              WriteBytes(h, second, order == 0 ? others[o] : a);
+            };
+            const std::string what =
+                fmt::format("length {} offset {} other {} order {}", length, offset, o, order);
+            StringCase(h, icmp, setup,
+                       [&](PPCContext& t) {
+                         t.r3.u64 = first;
+                         t.r4.u64 = second;
+                       },
+                       __imp__sub_825AA100, sub_825AA100, what);
+            for (uint64_t count : {uint64_t(0), uint64_t(1), uint64_t(length), uint64_t(length) + 1,
+                                   uint64_t(length / 2 + 1), uint64_t(0x7FFFFFFF), uint64_t(0xFFFFFFFF),
+                                   uint64_t(0x100000003)}) {
+              auto args = [&](PPCContext& t) {
+                t.r3.u64 = first;
+                t.r4.u64 = second;
+                t.r5.u64 = count;
+              };
+              const std::string with = what + fmt::format(" count {:X}", count);
+              StringCase(h, ncmp, setup, args, __imp__sub_825AACD0, sub_825AACD0, with);
+              StringCase(h, ascii, setup, args, __imp__sub_825AC6B0, sub_825AC6B0, with);
+              if (count <= 0x7FFFFFFF) {  // above, EINVAL through _errno
+                StringCase(h, nicmp, setup, args, __imp__sub_825AC710, sub_825AC710, with);
+              }
+            }
+          }
+        }
+      }
+    }
+    ncmp.Report();
+    icmp.Report();
+    nicmp.Report();
+    ascii.Report();
+  }
+
+  // strstr: needles taken from the string (at its start, middle and end),
+  // changed in their last byte (a partial match), longer than the string,
+  // empty; an empty string.
+  {
+    Results finds("strstr (sub_825A98A8)");
+    for (uint32_t length : kLengths) {
+      for (uint32_t offset : {65u, places.page_end - 3}) {
+        const std::vector<uint8_t> text = AlphabetBytes(h, length);
+        std::vector<std::vector<uint8_t>> needles = {{}, AlphabetBytes(h, 1), AlphabetBytes(h, 2),
+                                                     AlphabetBytes(h, length + 1)};
+        for (int k = 0; k < 6 && length > 0; k++) {
+          const uint32_t from = h.random.Below(length);
+          const uint32_t n = 1 + h.random.Below(std::min(length - from, 40u));
+          std::vector<uint8_t> needle(text.begin() + from, text.begin() + from + n);
+          needles.push_back(needle);
+          needle.back() ^= 0x20;
+          needles.push_back(needle);
+        }
+        if (length > 0) {
+          needles.push_back(text);
+          needles.push_back(std::vector<uint8_t>(text.end() - std::min(length, 5u), text.end()));
+        }
+        for (size_t n = 0; n < needles.size(); n++) {
+          const uint32_t at = h.data + offset;
+          const uint32_t needle_at = h.data + (offset < 1024 ? 2600 : 1);
+          StringCase(h, finds,
+                     [&] {
+                       WriteBytes(h, at, text);
+                       WriteBytes(h, needle_at, needles[n]);
+                     },
+                     [&](PPCContext& t) {
+                       t.r3.u64 = at;
+                       t.r4.u64 = needle_at;
+                     },
+                     __imp__sub_825A98A8, sub_825A98A8,
+                     fmt::format("length {} offset {} needle {}", length, offset, n));
+          // r3 with its high word set (as a sign-extended pointer has).
+          StringCase(h, finds,
+                     [&] {
+                       WriteBytes(h, at, text);
+                       WriteBytes(h, needle_at, needles[n]);
+                     },
+                     [&](PPCContext& t) {
+                       t.r3.u64 = 0xFFFFFFFF00000000ull | at;
+                       t.r4.u64 = needle_at;
+                     },
+                     __imp__sub_825A98A8, sub_825A98A8,
+                     fmt::format("length {} offset {} needle {} high r3", length, offset, n));
+        }
+      }
+    }
+    finds.Report();
+  }
+
+  // The second memcpy: every alignment of destination and source, counts
+  // from none to a few hundred bytes, overlapping either way by a few bytes,
+  // and across a page end.
+  {
+    Results copies("the second memcpy (sub_825A7830)");
+    std::vector<uint32_t> counts;
+    for (uint32_t c = 0; c <= 24; c++) {
+      counts.push_back(c);
+    }
+    for (uint32_t c : {63u, 64u, 65u, 255u, 700u}) {
+      counts.push_back(c);
+    }
+    for (uint32_t count : counts) {
+      for (uint32_t d = 0; d < 4; d++) {
+        for (uint32_t sa = 0; sa < 4; sa++) {
+          for (int32_t shift : {2000, -1, -3, -4, -6, 1, 3, 4, 7}) {
+            const uint32_t source = h.data + 1000 + sa;
+            const uint32_t destination = uint32_t(int32_t(h.data + 1000 + d) + shift);
+            const std::vector<uint8_t> bytes = RandomBytes(h, count + 8);
+            StringCase(h, copies, [&] { WriteBytes(h, source - 4, bytes, false); },
+                       [&](PPCContext& t) {
+                         t.r3.u64 = destination;
+                         t.r4.u64 = source;
+                         t.r5.u64 = count;
+                       },
+                       __imp__sub_825A7830, sub_825A7830,
+                       fmt::format("count {} destination {} source {} shift {}", count, d, sa,
+                                   shift));
+          }
+        }
+      }
+      const uint32_t across = h.data + places.page_end - 2 - (count & 7);
+      const std::vector<uint8_t> bytes = RandomBytes(h, count);
+      StringCase(h, copies, [&] { WriteBytes(h, h.data + 64, bytes, false); },
+                 [&](PPCContext& t) {
+                   t.r3.u64 = across;
+                   t.r4.u64 = h.data + 65;
+                   t.r5.u64 = count;
+                 },
+                 __imp__sub_825A7830, sub_825A7830, fmt::format("count {} across a page end", count));
+    }
+    copies.Report();
   }
 }
 
