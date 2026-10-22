@@ -216,7 +216,8 @@ functions; run again after each group, as callers become ready):
    ("The validation agent"). A function whose work it does inside a
    native caller (a few lines only that caller needs), with no plain C++
    function of its own, gets the Merged status in its row (the caller,
-   the harness covering the work) when it's merged. Never
+   the harness covering the work) when it's merged (the validation agent
+skips Merged rows). Never
    edits `generated/`. A callee that never ran in play: its branch keeps
    the recompiled path behind the flag, or is ported too, said in the row.
 3. Adds harness cases in the same change, registered in `harness.cpp` and
@@ -327,22 +328,17 @@ made native, or whose adapter it removed:
    an attract race doesn't take): those functions are listed for the
    user's drive (below).
 
-A function with no plain C++ of its own, because its work is done
-inside a native caller (a few lines only that caller needs), isn't a
-failure: the migration agent should have marked it Merged; if it
-didn't, the validation agent sets its row to Merged (the definitions at the top of
-the function files: the caller and the harness that covers the work),
-reports it under `merged:` and doesn't look for its print.
+Functions whose rows are Merged (set by the migration agent) have no
+print of their own: the agent skips them.
 
-It fixes nothing but missing prints and Merged rows: a function with no
-harness line, and not merged, goes in the report, and the lead halts. Report, in its last message:
+It fixes nothing but missing prints: a function with no harness line, and
+not Merged, goes in the report, and the lead halts. Report, in its last message:
 
 ```
 validate: <name>
 prints added: none | <functions>: <commit>
 harness lines: <count> of <count>
 missing: none | <functions with no harness line, and why if known>
-merged: none | <functions set to Merged: their callers>
 ran in play: <functions with a game line> | none
 not in game: <functions with no game line> | none
 race: <seconds at 30 ticks/s>, <error lines>, harnesses all 0: yes | no
