@@ -539,6 +539,21 @@ bool SparksUpdate(uint8_t* base, uint32_t sparks);
 // (EntriesInRange's cases); the original runs there.
 bool SmokeUpdate(uint8_t* base, uint32_t smoke, uint32_t* r3);
 
+// ParticlesB::Update (sub_8212B748): the oldest entry (+2,768; 176 bytes
+// from +128), when its life (+108) is out, reset (ParticlesBResetEntry) and
+// dropped (the head moves on modulo the capacity +104 and the count +2,776
+// goes down, both read again after the reset). Then for each of the count
+// entries from the head: life counts down to 0; +100 = the table's (+112)
+// +4 + (table +0 - life) / (2 x table +0); +104 = +112 times life / the
+// table's +12 while life is below it (unsigned), clamped to 0.0 and +112;
+// +92 = that as an integer; each of its +116 particles (48 bytes from +128)
+// gets the velocity (+16) the effect's +2,800 times (the table's +4 x its
+// length + the float at 0x82002A3C, at most the one at 0x82002A34; w 1.0)
+// and moves by it. False, with nothing done, when the original could trap
+// or reach outside its entries (EntriesInRange's cases); the original runs
+// there.
+bool ParticlesBUpdate(uint8_t* base, uint32_t effect);
+
 }  // namespace race_overlays
 
 namespace race_overlays {

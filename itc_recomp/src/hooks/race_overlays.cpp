@@ -17,7 +17,7 @@ ITC_FLAG_BOOL(native_race_overlays, true, "ITC",
               "sub_8212E660; Sparks::Emit, sub_8212D818; CarOverlays::EmitSmoke, sub_82123240, "
               "with Smoke::Emit; the set-up's constructors, clears and bindings, sub_82126498 to "
               "sub_8215E000; the resets, sub_8211E9F0 to sub_8212D6E0; Smoke::InRegion, "
-              "sub_8212A868; Sparks::Update, sub_8212DDC8; Smoke::Update, sub_8212AA78; the children's constructors, "
+              "sub_8212A868; Sparks::Update, sub_8212DDC8; Smoke::Update, sub_8212AA78; ParticlesB::Update, sub_8212B748; the children's constructors, "
               "sub_8211F060 to sub_8212E9A0, and Smoke and ParticlesB::Reset, sub_8212A9E0 and "
               "sub_8212BA98) natively "
               "instead of through the translated code (same results; checked by "
@@ -394,4 +394,20 @@ extern "C" REX_FUNC(sub_8212AA78) {
     return;
   }
   ctx.r3.u64 = r3;
+}
+
+// ParticlesB::Update (its vtable's slot 4, so the adapter stays while the
+// update loop calling it is recompiled): r3 = the effect. ParticlesB's
+// ResetEntry is called as plain C++. Where the native version declines (the
+// original could trap or reach outside its entries), the original runs.
+extern "C" REX_FUNC(sub_8212B748) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_race_overlays)) {
+    __imp__sub_8212B748(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  if (!ParticlesBUpdate(base, ctx.r3.u32)) {
+    __imp__sub_8212B748(ctx, base);
+  }
 }

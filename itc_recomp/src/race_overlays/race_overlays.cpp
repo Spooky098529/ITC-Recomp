@@ -2242,3 +2242,138 @@ bool SmokeUpdate(uint8_t* base, uint32_t smoke, uint32_t* r3) {
 }
 
 }  // namespace race_overlays
+
+namespace race_overlays {
+
+namespace {
+
+constexpr uint32_t kParticlesBOldest = 2768;  // the oldest entry (ParticlesB::Emit adds at +2,772)
+constexpr uint32_t kParticlesBCount = 2776;
+constexpr uint32_t kParticlesBMoved = 2800;
+constexpr uint32_t kParticlesBBytes = 176;
+constexpr uint32_t kParticlesBMostSpeed = 0x82002A34;
+constexpr uint32_t kParticlesBLeastSpeed = 0x82002A3C;
+
+// A single from guest memory times `factor` (fmuls), the single's NaN kept,
+// quieted, where both are NaNs (the translated code's operand order, seen in
+// the disassembly).
+uint32_t ScaledWord(uint8_t* base, uint32_t address, double factor) {
+  const uint32_t word = guest::LoadU32(base, address);
+  const double value = std::bit_cast<float>(word);
+  if (std::isnan(value)) {
+    return word | 0x00400000;
+  }
+  return std::bit_cast<uint32_t>(float(value * factor));
+}
+
+}  // namespace
+
+bool ParticlesBUpdate(uint8_t* base, uint32_t effect) {
+  ITC_NATIVE_RUNNING("sub_8212B748 ParticlesB::Update");
+  const uint32_t table = guest::LoadU32(base, effect + 112);
+  int32_t count = int32_t(guest::LoadU32(base, effect + kParticlesBCount));
+  if (count == 0) {
+    return true;
+  }
+  int32_t index = int32_t(guest::LoadU32(base, effect + kParticlesBOldest));
+  if (!EntriesInRange(effect + 128, kParticlesBBytes,
+                      int32_t(guest::LoadU32(base, effect + 104)), index)) {
+    return false;
+  }
+  auto entry_at = [&](int32_t i) { return effect + 128 + kParticlesBBytes * uint32_t(i); };
+  uint32_t entry = entry_at(index);
+  // The oldest entry, when its life is out, is reset and dropped (the count
+  // and head read again after the reset).
+  if (!(int32_t(guest::LoadU32(base, entry + 108)) > 0)) {
+    ParticlesBResetEntry(base, entry);
+    count = int32_t(guest::LoadU32(base, effect + kParticlesBCount) - 1);
+    const int32_t head = int32_t(guest::LoadU32(base, effect + kParticlesBOldest));
+    const int32_t capacity = int32_t(guest::LoadU32(base, effect + 104));
+    guest::StoreU32(base, effect + kParticlesBCount, uint32_t(count));
+    index = NextIndex(head, capacity);
+    guest::StoreU32(base, effect + kParticlesBOldest, uint32_t(index));
+    if (count != 0) {
+      entry = entry_at(index);
+    }
+  }
+  if (!(count > 0)) {
+    return true;
+  }
+  const double most_speed = guest::LoadFloat(base, kParticlesBMostSpeed);
+  const double least_speed = guest::LoadFloat(base, kParticlesBLeastSpeed);
+  const double zero = guest::LoadFloat(base, kZero);
+  const double one = guest::LoadFloat(base, kOne);
+  const uint32_t zero_word = guest::LoadU32(base, kZero);
+  const uint32_t one_word = std::bit_cast<uint32_t>(float(one));
+  const uint32_t csr = Fpscr::getcsr();
+  const uint32_t flushing = csr | uint32_t(Fpscr::FlushMask);
+  for (; count > 0; count--) {
+    const int32_t life_left = int32_t(guest::LoadU32(base, entry + 108) - 1);
+    guest::StoreU32(base, entry + 108, uint32_t(life_left));
+    if (life_left < 0) {
+      guest::StoreU32(base, entry + 108, 0);
+    }
+    // The size: the table's +4 plus (the table's life - life) / (twice the
+    // table's life).
+    const uint32_t most = guest::LoadU32(base, table + 0);
+    const double size_from = guest::LoadFloat(base, table + 4);
+    const uint32_t life = guest::LoadU32(base, entry + 108);
+    double size = float(double(FloatOf(int64_t(uint32_t(most - life)))) /
+                        double(FloatOf(int64_t(uint32_t(most << 1)))));
+    guest::StoreFloat(base, entry + 100, float(size + size_from));
+    // The fade: +112 times life / the table's +12 while life is below it.
+    const uint32_t fade_ticks = guest::LoadU32(base, table + 12);
+    const uint32_t most_fade_word = guest::LoadU32(base, entry + 112);
+    const double most_fade = std::bit_cast<float>(most_fade_word);
+    if (fade_ticks > life) {
+      double fade = float(one / double(FloatOf(int64_t(fade_ticks))));
+      fade = float(fade * double(FloatOf(int64_t(int32_t(life)))));
+      guest::StoreFloat(base, entry + 104, float(fade * most_fade));
+    } else {
+      guest::StoreU32(base, entry + 104, most_fade_word);
+    }
+    if (double(guest::LoadFloat(base, entry + 104)) < zero) {
+      guest::StoreU32(base, entry + 104, zero_word);
+    }
+    if (most_fade < double(guest::LoadFloat(base, entry + 104))) {
+      guest::StoreU32(base, entry + 104, most_fade_word);
+    }
+    guest::StoreU32(base, entry + 92,
+                    uint32_t(Fctiwz(double(guest::LoadFloat(base, entry + 104)))));
+    // Each particle's velocity (+16) is the effect's +2,800 scaled by the
+    // table's +4 times its length plus a least, at most a most; then it
+    // moves by it.
+    for (int32_t i = 0; i < int32_t(guest::LoadU32(base, entry + 116)); i++) {
+      const uint32_t particle = entry + 128 + 48 * uint32_t(i);
+      const simde__m128 moved = LoadVector(base, effect + kParticlesBMoved);
+      Fpscr::setcsr(flushing);
+      const simde__m128 length = Length(moved);
+      Fpscr::setcsr(csr);
+      const double scale = guest::LoadFloat(base, table + 4);
+      double speed = float(std::fma(scale, double(std::bit_cast<float>(WordOf(length, 0))),
+                                    least_speed));
+      if (speed > most_speed) {
+        speed = most_speed;
+      }
+      const uint32_t vx = ScaledWord(base, effect + kParticlesBMoved + 0, speed);
+      const uint32_t vy = ScaledWord(base, effect + kParticlesBMoved + 4, speed);
+      const uint32_t vz = ScaledWord(base, effect + kParticlesBMoved + 8, speed);
+      guest::StoreU32(base, particle + 16, vx);
+      guest::StoreU32(base, particle + 20, vy);
+      guest::StoreU32(base, particle + 24, vz);
+      guest::StoreU32(base, particle + 28, one_word);
+      // Where both are NaNs, the translated code (addss, seen in the
+      // disassembly) keeps the velocity's.
+      for (uint32_t k = 0; k < 3; k++) {
+        guest::StoreU32(base, particle + 4 * k,
+                        KeepFirstNaN(guest::LoadU32(base, particle + 16 + 4 * k),
+                                     guest::LoadU32(base, particle + 4 * k), true));
+      }
+    }
+    index = NextIndex(index, int32_t(guest::LoadU32(base, effect + 104)));
+    entry = entry_at(index);
+  }
+  return true;
+}
+
+}  // namespace race_overlays
