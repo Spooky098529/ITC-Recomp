@@ -30,7 +30,8 @@ rows to review and drive list are there), and this file's history.
   reset, gearing, steering, suspension, drivetrain, gearbox, the
   collision world's objects, contacts and surfaces; 17 adapters removed;
   91 of 130 ours; race 21 s, 0 errors; AI cars in the same places).
-  Step: validation 3 (agent running). Queued: the no-mapping
+  Validated (40 of 40 harness lines). Step: migration 4 (agent
+  running). Queued: the no-mapping
   lead UiMovie::ApplyTransform.
 - Known: `b7_status.py` checks `sub_825A9934` (`__chkstk`) "Dropped, but
   it ran", and every function made Native or Merged since the coverage
@@ -193,6 +194,14 @@ the validation agent's attract race; the user drives (with
   `sub_820B6D48` RigidBody::FrictionImpulse, `sub_820B72C8`
   RigidBody::ContactImpulseWith (probably collisions only),
   `sub_820B04C0` Vehicle::RampHandbrake.
+- Car physics, migration 3 (validation's race): `sub_820B0A50`
+  Wheel::Copy, `sub_820B0CC0` WheelRecord2::Copy, `sub_820B7DF8`
+  CollisionObject::AccumulateForce, `sub_820B7C50` AddContact,
+  `sub_820B7ED0` CollisionRecords::Merge, the surface getters
+  `sub_820BC1F8`, `sub_820BC240`, `sub_820BC288`, `sub_820BC2D0`,
+  `sub_820BC530`, `sub_820BC538`, `sub_820BC540`, `sub_820BC548`,
+  `sub_820B7D78` CollisionRecord::Copy, `sub_82294348` Vec4::DivideBy
+  (probably collisions only).
 
 ## Totals
 
