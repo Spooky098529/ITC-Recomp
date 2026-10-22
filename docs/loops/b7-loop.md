@@ -62,12 +62,10 @@ memory.
    used so far, and reports. A subsystem too big for one agent gets
    another migration agent after the first reports, until nothing ready
    is left in it.
-8. **Hand its work to a poison agent** (below; added by the user,
+8. **Hand its work to a validation agent** (below; added by the user,
    2026-10-22) after each migration agent's report has passed the
-   lead's checks, the "no mapping" leads' too: it breaks the step's
-   native functions on purpose in one commit, checks that their
-   harnesses differ, and reverts it. It shows the native code is what
-   the harnesses ran (and that they'd catch drift).
+   lead's checks, the "no mapping" leads' too: it checks from a log that
+   every function the step made native ran as our code.
 9. **Record the finished subsystem** in the summary docs, once nothing
    ready is left in it (the lead does this itself, in the pass that
    takes the next lead, and commits it with the progress file):
@@ -212,7 +210,9 @@ functions; run again after each group, as callers become ready):
 2. Makes the group native ("How a native override is written and
    checked" in `docs/rexglue-removal.md`): plain C++ in the subsystem's
    directory under `src/`, thin `REX_FUNC` adapters, a `--native_<name>`
-   flag falling back to `__imp__sub_X`, on by default once checked. Never
+   flag falling back to `__imp__sub_X`, on by default once checked; each
+   plain C++ function starts with `ITC_NATIVE_RUNNING("sub_X Name");`
+   ("The validation agent"). Never
    edits `generated/`. A callee that never ran in play: its branch keeps
    the recompiled path behind the flag, or is ported too, said in the row.
 3. Adds harness cases in the same change, registered in `harness.cpp` and
@@ -294,52 +294,41 @@ uncommitted: none | <what and why>
 stop: none | <reason>
 ```
 
-## The poison agent
+## The validation agent
 
-Prompt it with: the migration agent's report (its `groups:`, `native:`
-and `flags:` lines and commits), this section, "The tooling" and "Rules
-that still hold", and the report format. One at a time, after the
-migration agent (it builds and runs the game in this tree). It checks
-that every function the step made native, or whose adapter it removed,
-runs as our code in its harness:
+Each native function's plain C++ starts with
+`ITC_NATIVE_RUNNING("sub_X Name");` (`src/base/log.h`), which logs
+`native running: sub_X Name` the first time it runs (once a function, so
+logs stay readable). Prompt the agent with: the migration agent's report
+(its `groups:`, `native:` and `flags:` lines and commits), this section,
+"The tooling" and "Rules that still hold", and the report format. One at
+a time, after the migration agent (it builds and runs the game in this
+tree). For every function the step made native, or whose adapter it
+removed:
 
-1. **Poisons**: for each such function, a small change to its plain C++
-   that the harness cases must see (a sign flipped in a calculation, a
-   constant off by one, a field written with the wrong value), on the
-   path its cases take, not an edge branch they may miss. Only the plain
-   C++ under `src/`, never the harness cases, the recompiled side or
-   `generated/`. All in one commit ("poison: ..."), pushed.
+1. **Checks the print** is the first statement of its plain C++ (grep
+   `itc_recomp/src` for the address). Missing ones it adds, in one commit,
+   pushed (a print only, no other change).
 2. **Runs** the build and `attract_race.sh 25 --run_harnesses=all` with
-   the step's `--native_*` flags set to `false`, so the game itself runs
-   the recompiled code and the poison can't crash the race or stall the
-   boot (the harnesses call the plain C++ directly, without the flag).
-   With the flags off, a harness that differs can only have run the
-   poisoned C++.
-3. **Checks**: every poisoned function's harness differs; harnesses of
-   other areas are unchanged (0 differing outside "(expected to
-   differ)"). A poisoned function whose harness stays at 0 differing
-   didn't run as our code there (a harness calling the adapter or
-   `__imp__` on both sides), or its cases miss its main path: either way
-   it's reported. A harness that differs only through a poisoned callee
-   (a native caller calling the callee's plain C++) doesn't count for the
-   caller: such callers are poisoned again alone, in a second poison
-   commit, reverted the same way.
-4. **Reverts** with `git revert` of each poison commit (a new commit,
-   pushed; no force push, no reset), then checks `git diff <the commit
-   before the first poison> HEAD -- itc_recomp/src` is empty, builds,
-   and runs `attract_race.sh 25 --run_harnesses=all` with the default
-   flags: every harness at 0 differing again.
+   the default flags, and checks the log has a `native running:` line for
+   each function: run in play or by its harness, it ran as our code. A
+   function with no line didn't (a harness calling the adapter, or
+   `__imp__` on both sides, once its adapter is gone), or nothing reached
+   it.
+3. **Runs** `attract_race.sh 25` without harnesses, and lists which of the
+   functions ran in play (for the rows; not a failure when a function
+   only runs in menus or on paths an attract race doesn't take).
 
-It fixes nothing: a function that fails goes in the report, and the
-lead halts. Report, in its last message:
+It fixes nothing but missing prints: a function with no line goes in the
+report, and the lead halts. Report, in its last message:
 
 ```
-poison: <name>
-poisoned: <functions, one commit each round: commit>
-differ: <function: its harness line, verbatim, one a line>
-missed: none | <functions whose harness didn't differ, and why if known>
-reverted: <revert commits>; src/ the same as <commit>: yes | no
-race after revert: <seconds at 30 ticks/s>, <error lines>, harnesses all 0: yes | no
+validate: <name>
+prints added: none | <functions>: <commit>
+ran (with harnesses): <count> of <count>
+missing: none | <functions with no line, and why if known>
+ran in play: <functions seen without harnesses> | none
+race: <seconds at 30 ticks/s>, <error lines>, harnesses all 0: yes | no
 stop: none | <reason>
 ```
 
@@ -350,8 +339,7 @@ file, when:
 
 - a harness differs (outside "(expected to differ)"), or a function made
   native has no harness cases;
-- a poison agent reports a function `missed:`, or its revert doesn't
-  bring `src/` back exactly;
+- a validation agent reports a function `missing:`;
 - an attract race failed, stalled twice, logged new errors, or ran under
   ~20 seconds at 30 ticks/s;
 - an agent left work uncommitted, or a commit doesn't build;

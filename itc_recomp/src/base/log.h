@@ -56,3 +56,15 @@ void Log(LogLevel level, std::format_string<Args...> format, Args&&... args) {
 #define ITC_LOG_INFO(...) ITC_LOG_AT_(::base::LogLevel::kInfo, __VA_ARGS__)
 #define ITC_LOG_WARN(...) ITC_LOG_AT_(::base::LogLevel::kWarn, __VA_ARGS__)
 #define ITC_LOG_ERROR(...) ITC_LOG_AT_(::base::LogLevel::kError, __VA_ARGS__)
+
+// At the top of each native function's plain C++ (the B7 loop): logs
+// "native running: <name>" the first time it runs, so a log shows which
+// native functions ran (in play or in a harness). One relaxed load a call
+// after that.
+#define ITC_NATIVE_RUNNING(name)                                          \
+  do {                                                                    \
+    static std::atomic<bool> itc_native_ran_{false};                      \
+    if (!itc_native_ran_.load(std::memory_order_relaxed) &&               \
+        !itc_native_ran_.exchange(true, std::memory_order_relaxed))       \
+      ITC_LOG_INFO("native running: {}", name);                           \
+  } while (0)
