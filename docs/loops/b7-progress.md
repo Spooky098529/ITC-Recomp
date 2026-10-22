@@ -19,7 +19,10 @@ rows to review and drive list are there), and this file's history.
 - Subsystem 3 of 3: the car physics (with the collision world's pairs'
   lead folded in). Mapped in d7e9c3f (`car-physics.md`, 129 rows,
   64 ready groups; checked, four rows spot-checked against `generated/`).
-  Step: migration 1 (agent running). Queued: the no-mapping
+  Migration 1 done (ee810a9..a86606e: the rigid body, the physics
+  step's helpers, the controls; 41 rows ours, 6 adapters removed;
+  `--native_car_physics`; race 22 s, 0 errors; AI cars in the same
+  places with the flag on and off). Step: validation 1 (agent running). Queued: the no-mapping
   lead UiMovie::ApplyTransform.
 - Known: `b7_status.py` checks `sub_825A9934` (`__chkstk`) "Dropped, but
   it ran", and every function made Native or Merged since the coverage
@@ -58,6 +61,16 @@ rows to review and drive list are there), and this file's history.
 
 ## Rows to review
 
+- `car-physics.md`: migration 1's 41 rows (names marked "ours" where the
+  map had none) and the intro (the identity quaternion is at
+  `0x826381B0`, not the map's `0x825F81B0`); `vehicle-accessors.md`:
+  5 rows. For review: the vector library fixed (ee810a9): ThinLTO could
+  move `dpps` out of its flush-to-zero window, found by the car physics'
+  harness ("tiny values" groups added, at 0); ContactImpulse's harness
+  has a "one NaN meeting its own negation (expected to differ)" group
+  (3 cases, 2 differ); the "numbers" groups keep values below 10^6 (no
+  infinities made). ContactImpulseWith runs the original for a fixed
+  body (whose term the original reads from its stack's leftovers).
 - `car-physics.md` (new, 129 rows), `known-data.md`'s new rows, 5 leads
   added (the collision narrow phase and shapes, and others).
 - `race-overlays.md`: the matrix-math lead's rows (UpdateLightSprites,
@@ -106,6 +119,14 @@ rows to review and drive list are there), and this file's history.
   Matrix::Inverse 10, MultiplyUnaligned 1, MultiplyTo 1,
   MultiplyReversed 1, ProjectPoint 3, Quaternion::FromMatrix 2,
   Quaternion::Multiply 1 (of 210 each).
+- `car-physics.md` (migration 1): every function has a "NaNs and
+  infinities anywhere (expected to differ)" group; nonzero:
+  UpdateOrientation 1, SetOrientation 2, SetPosition 2,
+  SetAngularVelocity 2, SetInertia 1, Integrate 3, EffectiveMassAt 7,
+  ContactImpulse 87, FrictionImpulse 1, ContactImpulseWith 1,
+  AccumulateTireForces 8, BrakeTorques 4, SuspensionTorques 3,
+  EngineTorque 1, AxleReactionTorque 4 (of 100 or 200). Same reason as
+  the matrix groups (two NaNs meeting; a NaN's sign or quieting).
   Migration 2: Matrix::RotateX 14, RotateY 20, RotateZ 19 (of 210; NaN
   or overflowing angles, the same reason through Multiply).
 
@@ -164,5 +185,7 @@ the validation agent's attract race; the user drives (with
   (wrapped 137, known 296, unknown 5723).
 - After mapping the car physics: ours 597, work left 6156 (wrapped 137,
   known 425, unknown 5594).
+- After the car physics' migration 1: ours 638, work left 6115 (wrapped
+  137, known 384, unknown 5594).
 
 ## Stopped
