@@ -1014,6 +1014,164 @@ void CRuntime(Context& h) {
     results.Report();
   }
 
+  // The atof chain, bottom up: __mtold12 on digit buffers, then
+  // __strgtold12_l, _fltin2, _atof_l and atof on the same strings (signs,
+  // points, exponents with d, D, e and E, too many digits, the limits of
+  // the exponent and of a double, spaces, junk; random numbers and random
+  // strings from the characters the parser knows), at odd addresses and
+  // across a page end. Each recompiled version calls the native ones below
+  // it, so each step is checked on its own.
+  {
+    Results results("__mtold12 (sub_825B7F10)");
+    for (int i = 0; i < 600; i++) {
+      const uint32_t count = 1 + h.random.Below(i < 500 ? 25 : 28);
+      std::vector<uint8_t> digits(count);
+      for (uint32_t k = 0; k < count; k++) {
+        digits[k] = uint8_t(k == 0 ? 1 + h.random.Below(9) : h.random.Below(i % 7 == 0 ? 11 : 10));
+      }
+      // The scratch area only: the original leaves r3 pointing into its
+      // finished frame, which its one caller doesn't read.
+      const uint32_t from = h.data + 64 + (i & 3), out = h.data + 2048 + (i & 1);
+      std::vector<uint8_t> result[2];
+      for (int v = 0; v < 2; v++) {
+        Fill(h.base, h.data, kScratchBytes);
+        WriteBytes(h, from, digits, false);
+        PPCContext t = CallContext(h);
+        t.r3.u64 = from;
+        t.r4.u64 = count;
+        t.r5.u64 = out;
+        (v == 0 ? __imp__sub_825B7F10 : sub_825B7F10)(t, h.base);
+        result[v] = Read(h.base, h.data, kScratchBytes);
+      }
+      results.Check(result[0], result[1], fmt::format("{} digits", count));
+    }
+    results.Report();
+  }
+  std::vector<std::string> numbers = {
+      "", "0", "1", "-1", "+1", "1.5", "-0.0", ".5", "5.", ".", "-.", "+.e5", "1e5", "1E-5",
+      "1d10", "1D+10", "2e", "2e+", "2e-x", "2e0", "2e-0", "2e00005", "-2E+0010", "3.14159265358979323846264338327950288",
+      "1e308", "1.7976931348623157e308", "1.8e308", "2.2250738585072014e-308", "4.9e-324",
+      "2.4e-324", "2.5e-324", "1e-400", "1e4931", "1e4933", "1e5200", "1e5201", "1e99999",
+      "1e-5200", "1e-5201", "1e-99999", "0.000000000000000000000000000001",
+      "123456789012345678901234567890", "999999999999999999999999999", "99999999999999999999999.5",
+      "1234567890123456789012345e-10", "0.1234567890123456789012345678", "0000000000123",
+      "00.00", "0e5", "000", "0.", "-0", "  \t\n\r 42", "\v42", "\f42", " - 1", "1+2", "1-2",
+      "1.5+3", "1.5-3e", "abc", "-abc", "1.2.3", "1,5", "0x1A", "inf", "nan", "1e0010",
+      "12e3456", "\x80" "1", "1\xB0", "9.9999999999999999999999999", "0.5e1e2", "6e-1d", "8.e",
+      "1e+-5", "1ee5", ".e", "7.25E", "0.1", "0.2", "0.3", "100", "1048576", "33.333",
+      "-273.15", "6.02214076e23", "1.602176634e-19", "4294967296", "9007199254740993",
+      "2.5", "3.5", "0.125", "1.00000000000000011102230246251565404236316680908203125",
+      "1.0000000000000001110223024625156540423631668090820312500001"};
+  {
+    const char kChars[] = "0123456789.+-eEdD x0";
+    for (int i = 0; i < 1500; i++) {
+      std::string text;
+      if (i % 3 == 0) {
+        const uint32_t length = 1 + h.random.Below(30);
+        for (uint32_t k = 0; k < length; k++) {
+          text += kChars[h.random.Below(sizeof(kChars) - 1)];
+        }
+      } else {
+        if (h.random.Below(3) == 0) {
+          text += h.random.Below(2) ? '-' : '+';
+        }
+        const uint32_t whole = h.random.Below(i % 5 == 0 ? 30 : 12);
+        for (uint32_t k = 0; k < whole; k++) {
+          text += char('0' + h.random.Below(10));
+        }
+        if (h.random.Below(2)) {
+          text += '.';
+          const uint32_t part = h.random.Below(i % 7 == 0 ? 30 : 12);
+          for (uint32_t k = 0; k < part; k++) {
+            text += char('0' + h.random.Below(10));
+          }
+        }
+        if (h.random.Below(2)) {
+          text += "eEdD"[h.random.Below(4)];
+          if (h.random.Below(2)) {
+            text += h.random.Below(2) ? '-' : '+';
+          }
+          text += std::to_string(h.random.Below(i % 4 == 0 ? 6000 : 400));
+        }
+      }
+      numbers.push_back(text);
+    }
+  }
+  auto string_place = [&](size_t i) {
+    return i % 5 == 4 ? h.data + places.page_end - 6 : h.data + 64 + uint32_t(i % 4);
+  };
+  auto write_string = [&](uint32_t at, const std::string& text) {
+    WriteBytes(h, at, std::vector<uint8_t>(text.begin(), text.end()));
+  };
+  {
+    Results results("__strgtold12_l (sub_825B36B8)");
+    for (size_t i = 0; i < numbers.size(); i++) {
+      const uint32_t at = string_place(i);
+      for (int v = 0; v < (i < 120 ? 6 : 1); v++) {
+        // mult12, scale, decpt and implicit_E: _fltin2's zeros, then others.
+        static const uint32_t kArgs[6][4] = {{0, 0, 0, 0}, {1, 0, 0, 0}, {0, 5, 0, 0},
+                                             {0, uint32_t(-3), 2, 0}, {0, 0, 0, 1},
+                                             {1, 7, uint32_t(-4), 1}};
+        StringCase(h, results, [&] { write_string(at, numbers[i]); },
+                   [&](PPCContext& t) {
+                     t.r3.u64 = h.data + 2048;
+                     t.r4.u64 = h.data + 2064;
+                     t.r5.u64 = at;
+                     t.r6.u64 = kArgs[v][0];
+                     t.r7.u64 = kArgs[v][1];
+                     t.r8.u64 = kArgs[v][2];
+                     t.r9.u64 = kArgs[v][3];
+                     t.r10.u64 = 0x8266BC28;
+                   },
+                   __imp__sub_825B36B8, sub_825B36B8, fmt::format("\"{}\" args {}", numbers[i], v));
+      }
+    }
+    results.Report();
+  }
+  {
+    Results results("_fltin2 (sub_825AFDC8)");
+    for (size_t i = 0; i < numbers.size(); i++) {
+      const uint32_t at = string_place(i);
+      StringCase(h, results, [&] { write_string(at, numbers[i]); },
+                 [&](PPCContext& t) {
+                   t.r3.u64 = h.data + 2048 + (i & 3) * 4;
+                   t.r4.u64 = at;
+                   t.r5.u64 = uint32_t(numbers[i].size());
+                   t.r6.u64 = 0;
+                   t.r7.u64 = 0;
+                   t.r8.u64 = 0x8266BC28;
+                 },
+                 __imp__sub_825AFDC8, sub_825AFDC8, fmt::format("\"{}\"", numbers[i]));
+    }
+    results.Report();
+  }
+  // _atof_l and atof: f1 and the scratch area compared.
+  for (int which = 0; which < 2; which++) {
+    Results results(which == 0 ? "_atof_l (sub_825AB0C0)" : "atof (sub_825AB1C0)");
+    for (size_t i = 0; i < numbers.size(); i++) {
+      const uint32_t at = string_place(i);
+      const uint64_t locale = h.random.Next();  // unused by both
+      std::vector<uint8_t> result[2];
+      for (int v = 0; v < 2; v++) {
+        Fill(h.base, h.data, kScratchBytes);
+        write_string(at, numbers[i]);
+        PPCContext t = CallContext(h);
+        t.r3.u64 = at;
+        t.r4.u64 = locale;
+        t.f1.u64 = 0x7FF4000000000001ull;
+        if (which == 0) {
+          (v == 0 ? __imp__sub_825AB0C0 : sub_825AB0C0)(t, h.base);
+        } else {
+          (v == 0 ? __imp__sub_825AB1C0 : sub_825AB1C0)(t, h.base);
+        }
+        result[v] = Read(h.base, h.data, kScratchBytes);
+        Append(result[v], t.f1.u64);
+      }
+      results.Check(result[0], result[1], fmt::format("\"{}\"", numbers[i]));
+    }
+    results.Report();
+  }
+
   // __iob_func: r3 from random registers.
   {
     Results results("__iob_func (sub_825AD4C0)");

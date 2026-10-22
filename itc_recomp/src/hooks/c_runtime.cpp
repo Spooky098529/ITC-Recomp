@@ -5,12 +5,14 @@
 #include "guest.h"
 
 #include "c_runtime/format.h"
+#include "c_runtime/parse.h"
 #include "c_runtime/start_up.h"
 #include "c_runtime/strings.h"
 
 #include "base/flags.h"
 
 #include <cstring>
+
 
 
 ITC_FLAG_BOOL(native_c_runtime, true, "ITC",
@@ -24,7 +26,9 @@ ITC_FLAG_BOOL(native_c_runtime, true, "ITC",
               "(sub_825AA840, sub_825A7270); toupper, tolower, "
               "isalpha, isdigit, isalnum and isleadbyte (sub_825A8600, sub_825A8618, sub_825AB020, "
               "sub_825AB040, sub_825AB0A0, sub_825B6898); strtoul and strtoxl (sub_825A85E0, "
-              "sub_825A82C8); ___dtold and _ld12tod (sub_825B6378, sub_825B69B8); write_char "
+              "sub_825A82C8); ___dtold and _ld12tod (sub_825B6378, sub_825B69B8); atof, _atof_l, "
+              "_fltin2, __strgtold12_l and __mtold12 (sub_825AB1C0, sub_825AB0C0, sub_825AFDC8, "
+              "sub_825B36B8, sub_825B7F10); write_char "
               "(sub_825AF000); __iob_func (sub_825AD4C0); the start-up's _cfltcvt_init (sub_825A6DB0, "
               "sub_825A6E48), _init_pointers' setters (sub_825AD140, sub_825AEE18, sub_825AFCB8, "
               "sub_825B3560, sub_825B3548), __initmbctable and setSBCS (sub_825B6958, sub_825B68C8) "
@@ -399,6 +403,107 @@ extern "C" REX_FUNC(sub_825B69B8) {
   guest::StoreU32(base, ctx.r4.u32 + 4, uint32_t(bits));
   guest::StoreU32(base, ctx.r4.u32, uint32_t(bits >> 32));
   ctx.r3.s64 = status;
+}
+
+// __mtold12: r3 = the digits, r4 = their count, r5 = the 12-byte long double
+// out. The digits are read first (the original reads them as it writes the
+// result: no caller overlaps the two). A mantissa of 0, where the original
+// never ends, and a count above 4,096 (never: at most 24) run the original.
+extern "C" REX_FUNC(sub_825B7F10) {
+  REX_FUNC_PROLOGUE();
+  const uint32_t count = ctx.r4.u32;
+  c_runtime::LongDouble12Full value;
+  uint8_t digits[4096];
+  bool native = ITC_FLAG(native_c_runtime) && count <= sizeof(digits);
+  if (native) {
+    for (uint32_t i = 0; i < count; i++) {
+      digits[i] = guest::LoadU8(base, ctx.r3.u32 + i);
+    }
+    native = c_runtime::Mtold12(digits, count, &value);
+  }
+  if (!native) {
+    __imp__sub_825B7F10(ctx, base);
+    return;
+  }
+  const uint32_t out = ctx.r5.u32;
+  guest::StoreU16(base, out, value.value.sign_exponent);
+  guest::StoreU32(base, out + 2, value.value.mantissa_high);
+  guest::StoreU32(base, out + 6, value.value.mantissa_low);
+  guest::StoreU16(base, out + 10, value.extra);
+}
+
+// __strgtold12_l: r3 = the 12-byte long double out, r4 = the end pointer
+// out, r5 = the string, r6 = mult12, r7 = scale, r8 = decpt, r9 =
+// implicit_E, r10 = the locale (only tested for null: EINVAL through
+// _errno, never seen in play, runs the original); returns the flags. The
+// end is stored first, then the number from +10 down, as the original.
+extern "C" REX_FUNC(sub_825B36B8) {
+  REX_FUNC_PROLOGUE();
+  c_runtime::Strgtold12Result result;
+  if (!ITC_FLAG(native_c_runtime) || ctx.r10.u32 == 0 ||
+      !c_runtime::Strgtold12(base, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32, ctx.r8.u32, ctx.r9.u32,
+                             &result)) {
+    __imp__sub_825B36B8(ctx, base);
+    return;
+  }
+  guest::StoreU32(base, ctx.r4.u32, result.end);
+  const uint32_t out = ctx.r3.u32;
+  guest::StoreU16(base, out + 10, result.value.extra);
+  guest::StoreU32(base, out + 6, result.value.value.mantissa_low);
+  guest::StoreU32(base, out + 2, result.value.value.mantissa_high);
+  guest::StoreU16(base, out, result.value.value.sign_exponent);
+  ctx.r3.u64 = result.flags;
+}
+
+// _fltin2: r3 = the result (+0 flags, +4 characters used, +16 the double),
+// r4 = the string, r5 = its length (unused), r8 = the locale (passed on
+// to __strgtold12_l, which tests it for null: the original runs then);
+// returns r3.
+extern "C" REX_FUNC(sub_825AFDC8) {
+  REX_FUNC_PROLOGUE();
+  c_runtime::FltinResult result;
+  if (!ITC_FLAG(native_c_runtime) || ctx.r8.u32 == 0 ||
+      !c_runtime::Fltin2(base, ctx.r4.u32, &result)) {
+    __imp__sub_825AFDC8(ctx, base);
+    return;
+  }
+  const uint32_t out = ctx.r3.u32;
+  guest::StoreU32(base, out, result.flags);
+  guest::StoreU32(base, out + 16, uint32_t(result.bits >> 32));
+  guest::StoreU32(base, out + 20, uint32_t(result.bits));
+  guest::StoreU32(base, out + 4, result.used);
+}
+
+// _atof_l and atof: r3 = the string (r4, _atof_l's locale, is unused: the
+// current one is read); returns the double in f1. A null string and a
+// multibyte locale's space test run the original. Its callers read only f1
+// after it (the original leaves r3 pointing into its finished frame).
+namespace {
+
+bool Atof(PPCContext& ctx, uint8_t* base) {
+  uint64_t bits;
+  if (!ITC_FLAG(native_c_runtime) || !c_runtime::AtofL(base, ctx.r3.u32, &bits)) {
+    return false;
+  }
+  ctx.fpscr.disableFlushMode();
+  ctx.f1.u64 = bits;
+  return true;
+}
+
+}  // namespace
+
+extern "C" REX_FUNC(sub_825AB0C0) {
+  REX_FUNC_PROLOGUE();
+  if (!Atof(ctx, base)) {
+    __imp__sub_825AB0C0(ctx, base);
+  }
+}
+
+extern "C" REX_FUNC(sub_825AB1C0) {
+  REX_FUNC_PROLOGUE();
+  if (!Atof(ctx, base)) {
+    __imp__sub_825AB1C0(ctx, base);
+  }
 }
 
 // write_char: r3 = the character, r4 = the stream, r5 = the count. Where
