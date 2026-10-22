@@ -184,3 +184,29 @@ ITC_CAR_PHYSICS(820B22D8, VehicleUpdateEngineTorque(base, ctx.r3.u32, ctx.r1.u32
 ITC_CAR_PHYSICS(820B35C8, VehicleUpdateBrakeHeat(base, ctx.r3.u32))
 ITC_CAR_PHYSICS(820B3788, VehicleUpdateBackfire(base, ctx.r3.u32, ctx.r1.u32))
 ITC_CAR_PHYSICS(820B39C8, VehicleUpdateTireWear(base, ctx.r3.u32, ctx.r1.u32 - 112))
+// Where tan would take its _except1 path (an infinite or NaN steering), the
+// original. r3 isn't kept: the step sets it again after this call.
+extern "C" REX_FUNC(sub_820B18B8) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_car_physics)) {
+    __imp__sub_820B18B8(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  if (!VehicleUpdateSteering(base, ctx.r3.u32, ctx.r1.u32 - 160)) {
+    __imp__sub_820B18B8(ctx, base);
+  }
+}
+// Mode 2 in a forward gear (sub_820B0340, never in play): the original.
+extern "C" REX_FUNC(sub_820B2100) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_car_physics)) {
+    __imp__sub_820B2100(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  if (!VehicleUpdateTorqueSplit(base, ctx.r3.u32)) {
+    __imp__sub_820B2100(ctx, base);
+  }
+}
+ITC_CAR_PHYSICS(820B24A8, VehicleUpdateTurbo(base, ctx.r3.u32))

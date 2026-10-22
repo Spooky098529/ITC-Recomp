@@ -6,15 +6,18 @@
 #include "car_physics/float_ops.h"
 
 #include "base/log.h"
+#include "c_runtime/math.h"
 #include "interpolation/blend_state.h"
 #include "matrix_math/matrix_math.h"
 #include "vehicle_accessors/vectors.h"
+#include "vehicle_accessors/vehicle_accessors.h"
 
 namespace car_physics {
 
 using namespace ops;
 namespace vl = vector_library;
 namespace mm = matrix_math;
+namespace va = vehicle_accessors;
 
 namespace {
 
@@ -504,6 +507,296 @@ void VehicleUpdateTireWear(uint8_t* base, uint32_t vehicle, uint32_t frame) {
     }
     const double kept = Fnmsubs(Lfs(base, data + 184), loss, one);
     Stfs(base, record + 96, Fmuls(kept, Lfs(base, record + 96)));
+  }
+}
+
+bool VehicleUpdateSteering(uint8_t* base, uint32_t vehicle, uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_820B18B8 Vehicle::UpdateSteering");
+  const uint32_t data = CarData(base, vehicle);
+  const double zero = Lfs(base, kZero);
+  const double full = Lfs(base, data + 324);
+  double over = Fsubs(Fabs(Lfs(base, vehicle + 48)), Lfs(base, 0x820029F0));
+  if (over < zero) {
+    over = zero;
+  }
+  double limit = full;
+  if (guest::LoadU8(base, vehicle + 276) == 1) {
+    const double k = Lfs(base, data + 328);
+    limit = Fmuls(Fdivs(k, Fadds(k, over)), full);
+  }
+  if (limit < zero) {
+    limit = zero;
+  } else if (full < limit) {
+    limit = full;
+  }
+  double right = limit;
+  double left = Fneg(limit);
+  // The yaw rate: the body's row 1 (w 0.0) . its angular velocity.
+  const uint32_t body = guest::LoadU32(base, vehicle + 336);
+  const uint32_t matrix = va::RigidBodyMatrix(body);
+  CopyWord(base, matrix + 16, frame + 80);
+  CopyWord(base, kZero, frame + 92);
+  CopyWord(base, matrix + 24, frame + 88);
+  CopyWord(base, matrix + 20, frame + 84);
+  const double yaw = double(vl::Vec3DotOf(base, frame + 80, va::RigidBodyAngularVelocity(body)));
+  const double counter = Fmsubs(Lfs(base, vehicle + 92), Lfs(base, 0x82600D38),
+                                Fmuls(Lfs(base, 0x82600D34), yaw));
+  if (!(counter < left)) {
+    if (counter > right) {
+      right = counter;
+      if (counter > full) {
+        right = full;
+      }
+    }
+  } else {
+    const double floor = Fneg(full);
+    left = counter;
+    if (counter < floor) {
+      left = floor;
+    }
+  }
+  const double input = Lfs(base, vehicle + 280);
+  bool positive;
+  double steer;
+  if (input < zero) {
+    steer = Fneg(Fmuls(input, right));
+    positive = false;
+  } else {
+    steer = Fmuls(input, left);
+    positive = true;
+  }
+  // The inner wheel's angle (Ackermann): tan as the C runtime's (the
+  // original's _ctrlfp calls around it set and put back nearest rounding,
+  // the mode it runs in), or the original where tan would fail.
+  double inner = steer;
+  if (!(steer == zero)) {
+    double t;
+    if (!c_runtime::Tan(steer, &t)) {
+      return false;
+    }
+    const double wheelbase = Lfs(base, data + 4);
+    const double track = Lfs(base, data + 8);
+    const double span = Fsubs(Fdivs(wheelbase, Fabs(double(float(t)))), track);
+    if (!(span > zero)) {
+      inner = Lfs(base, 0x82001FB4);
+    } else {
+      inner = double(float(c_runtime::Atan(Fdivs(wheelbase, span))));
+    }
+    if (steer < zero) {
+      inner = Fneg(inner);
+    }
+  }
+  CopyWord(base, vehicle + 304, vehicle + 328);
+  Stfs(base, vehicle + 304, steer);
+  if (positive) {
+    Stfs(base, vehicle + 312, steer);
+    Stfs(base, vehicle + 308, inner);
+  } else {
+    Stfs(base, vehicle + 312, inner);
+    Stfs(base, vehicle + 308, steer);
+  }
+  const double stored = Lfs(base, vehicle + 304);
+  Stfs(base, vehicle + 316, left);
+  Stfs(base, vehicle + 320, right);
+  double clamped = Fneg(full);
+  if (!(stored < clamped)) {
+    clamped = full < stored ? full : stored;
+  }
+  const double smoothed = Fadds(Lfs(base, vehicle + 324), clamped);
+  const double v384 = Lfs(base, vehicle + 384);
+  Stfs(base, vehicle + 324, Fmuls(smoothed, Lfs(base, 0x82001BE4)));
+  const double k = Fdivs(v384, Lfs(base, CarData(base, vehicle) + 4));
+  Stfs(base, vehicle + 3116, Fmuls(k, stored));
+  return true;
+}
+
+bool VehicleUpdateTorqueSplit(uint8_t* base, uint32_t vehicle) {
+  ITC_NATIVE_RUNNING("sub_820B2100 Vehicle::UpdateTorqueSplit");
+  const uint32_t data = CarData(base, vehicle);
+  const double one = Lfs(base, kOne);
+  const double front = Lfs(base, data + 180);
+  const double rear = Fsubs(one, front);
+  const double zero = Lfs(base, kZero);
+  const bool split = !(front == zero) && !(rear == zero);
+  const uint32_t mode = guest::LoadU32(base, vehicle + 2376);
+  if (split && mode == 2 && int32_t(guest::LoadU32(base, vehicle + 2252)) > 0) {
+    return false;
+  }
+  CopyWord(base, data + 180, vehicle + 1988);
+  Stfs(base, vehicle + 2116, rear);
+  if (!split) {
+    return true;
+  }
+  const double half = Lfs(base, 0x82001BE4);
+  // The wheels' loads (+280).
+  auto load = [&](uint32_t w) { return Lfs(base, Wheel(vehicle, w) + 280); };
+  if (mode == 2) {
+    // Not in a forward gear (the forward one is the original's).
+    Stfs(base, vehicle + 1988, Lfs(base, data + 180));
+    Stfs(base, vehicle + 2116, Fsubs(one, Lfs(base, data + 180)));
+    return true;
+  }
+  double share;
+  if (mode == 3) {
+    double f = Fadds(load(1), load(0));
+    double r = Fadds(load(3), load(2));
+    if ((f == zero && r == zero) || Fadds(r, f) == zero) {
+      f = one;
+      r = one;
+    }
+    const double total = Fadds(r, f);
+    const double least = Lfs(base, data + 180);
+    share = Fsubs(one, Fdivs(f, total));
+    if (share < least) {
+      share = least;
+    } else if (share > half) {
+      share = half;
+    }
+  } else if (mode - 4 <= 1) {
+    share = Lfs(base, data + 180);
+    if (int32_t(guest::LoadU32(base, vehicle + 2252)) > 0) {
+      const double r = Fadds(load(3), load(2));
+      const double f = Fadds(load(1), load(0));
+      const double rear_half = Fmuls(Fabs(r), half);
+      const double front_half = Fmuls(Fabs(f), half);
+      const double total = Fadds(Fabs(rear_half), Fabs(front_half));
+      if (!(total > zero)) {
+        share = half;
+      } else {
+        share = Fdivs(Fabs(rear_half), total);
+        if (share > half) {
+          share = half;
+        }
+      }
+    }
+  } else {
+    return true;
+  }
+  Stfs(base, vehicle + 1988, share);
+  Stfs(base, vehicle + 2116, Fsubs(one, share));
+  return true;
+}
+
+void VehicleUpdateTurbo(uint8_t* base, uint32_t vehicle) {
+  ITC_NATIVE_RUNNING("sub_820B24A8 Vehicle::UpdateTurbo");
+  const uint32_t engine = CarData(base, vehicle) + 1268;
+  const double one = Lfs(base, kOne);
+  const bool turbo = guest::LoadU8(base, engine + 336) != 0;
+  const double max_boost = turbo ? Lfs(base, engine + 352) : one;
+  const int32_t gear = int32_t(guest::LoadU32(base, vehicle + 2252));
+  const double boost = Lfs(base, vehicle + 2944);
+  const double zero = Lfs(base, kZero);
+  double throttle;
+  double cap;
+  if (gear == -1) {
+    throttle = Lfs(base, vehicle + 288);
+    cap = one;
+  } else {
+    throttle = Lfs(base, vehicle + 284);
+    if (gear == 0) {
+      cap = one;
+    } else {
+      if (gear != 1 && !(Lfs(base, vehicle + 2268) == zero)) {
+        throttle = zero;
+      }
+      cap = max_boost;
+    }
+  }
+  const double rpm = Lfs(base, vehicle + 2228);
+  const double k = Lfs(base, engine + 348);
+  double pressure;
+  if (boost > one) {
+    pressure = Fmuls(Fmuls(k, rpm), rpm);
+  } else {
+    pressure = Fmuls(rpm, k);
+  }
+  pressure = Fmuls(pressure, throttle);
+  const double floor = Lfs(base, 0x82002A14);
+  const double target = throttle == zero ? floor : Fadds(boost, pressure);
+  const double rate = Lfs(base, 0x82002A10);
+  double now = Fmadds(Fsubs(target, boost), Lfs(base, 0x82001FBC), boost);
+  Stfs(base, vehicle + 2944, now);
+  if (now > cap) {
+    now = Fmadds(Fsubs(cap, now), rate, now);
+    Stfs(base, vehicle + 2944, now);
+  }
+  if (!turbo) {
+    return;
+  }
+  guest::StoreU8(base, vehicle + 2960, 0);
+  if (guest::LoadU8(base, engine + 337) != 0) {
+    // The blow-off valve.
+    double held;
+    if (throttle == zero) {
+      held = Fsubs(Lfs(base, vehicle + 2964), Lfs(base, 0x820021E4));
+    } else {
+      held = Fadds(Lfs(base, vehicle + 2964), throttle);
+    }
+    Stfs(base, vehicle + 2964, held);
+    double clamped;
+    if (held < zero) {
+      clamped = zero;
+    } else {
+      clamped = Lfs(base, 0x82002A0C);
+      if (!(held > clamped)) {
+        clamped = held;
+      }
+    }
+    const double current = Lfs(base, vehicle + 2944);
+    Stfs(base, vehicle + 2964, clamped);
+    const double half = Lfs(base, 0x82001BE4);
+    if (Fmuls(max_boost, Lfs(base, 0x82001070)) > current &&
+        Fmuls(Fsubs(max_boost, one), half) < current && throttle == zero &&
+        boost > current &&
+        !(Lfs(base, vehicle + 2220) < Fmuls(Lfs(base, engine + 12), half))) {
+      const double limit = Fmuls(max_boost, half);
+      const double factor = Fmadds(clamped, Lfs(base, 0x82002A08), one);
+      double grown = current;
+      for (int i = 0; i < 2; i++) {
+        grown = Fmuls(factor, grown);
+        if (grown > limit) {
+          guest::StoreU8(base, vehicle + 2960, 1);
+          break;
+        }
+      }
+      if (guest::LoadU8(base, vehicle + 2960) != 0) {
+        double cut = Fmadds(Fmsubs(factor, current, current), rate, current);
+        Stfs(base, vehicle + 2944, cut);
+        if (cut > cap) {
+          cut = Fmadds(Fsubs(cap, cut), rate, cut);
+          Stfs(base, vehicle + 2944, cut);
+        }
+      }
+    }
+  } else {
+    // The wastegate.
+    uint8_t open = 0;
+    bool set = false;
+    if (target < one) {
+      const double above = Fsubs(boost, one);
+      if (above > Fmuls(Fsubs(max_boost, one), Lfs(base, 0x82002A04))) {
+        double v = Fmuls(above, Lfs(base, 0x82001BE4));
+        if (v < zero) {
+          v = zero;
+        } else if (v > one) {
+          v = one;
+        }
+        Stfs(base, vehicle + 2952, v);
+        open = 1;
+        set = true;
+      }
+    }
+    if (!set) {
+      Stfs(base, vehicle + 2952, zero);
+    }
+    guest::StoreU8(base, vehicle + 2948, open);
+  }
+  // The torque factor.
+  double factor = Fdivs(Fsubs(max_boost, Lfs(base, vehicle + 2944)), Fsubs(max_boost, floor));
+  factor = Fnmsubs(factor, Lfs(base, engine + 344), one);
+  Stfs(base, vehicle + 2956, factor);
+  if (factor > one) {
+    Stfs(base, vehicle + 2956, one);
   }
 }
 

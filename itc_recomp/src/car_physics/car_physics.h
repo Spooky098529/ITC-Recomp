@@ -254,5 +254,23 @@ void VehicleUpdateBackfire(uint8_t* base, uint32_t vehicle, uint32_t frame);
 // wheel's share kept at `frame` + 80, the original's 112-byte frame), then
 // each axle's grip (wheel record 2 +96).
 void VehicleUpdateTireWear(uint8_t* base, uint32_t vehicle, uint32_t frame);
+// Vehicle::UpdateSteering (sub_820B18B8): the steering limit (speed
+// sensitive with byte +276 = 1) widened by the counter-steer term from the
+// yaw rate; +328 = the old +304, +304 the steering, the front wheels'
+// angles +308 and +312 (Ackermann, by tan and atan), the limits +316 and
+// +320, +324 smoothed, +3116. The body's row 1 (w 0.0) goes to `frame` + 80
+// (the original's 160-byte frame) for the dot product. False, with only
+// that temporary written, where the original's tan would take its _except1
+// path (an infinite or NaN steering, never in play): then the original runs.
+bool VehicleUpdateSteering(uint8_t* base, uint32_t vehicle, uint32_t frame);
+// Vehicle::UpdateTorqueSplit (sub_820B2100): the axles' torque shares
+// +1988 and +2116 by the four-wheel drive's mode +2376. False, with nothing
+// done, for mode 2 in a forward gear (sub_820B0340, never in play): then
+// the original runs.
+bool VehicleUpdateTorqueSplit(uint8_t* base, uint32_t vehicle);
+// Vehicle::UpdateTurbo (sub_820B24A8): the boost +2944 toward its target,
+// the blow-off valve (+2964, byte +2960) or the wastegate (+2952, byte
+// +2948), and the torque factor +2956 with a turbo (engine byte +336).
+void VehicleUpdateTurbo(uint8_t* base, uint32_t vehicle);
 
 }  // namespace car_physics

@@ -168,6 +168,15 @@ ITC_NATIVE_STEP(NativeUpdateBrakeHeat, cp::VehicleUpdateBrakeHeat(base, ctx.r3.u
 ITC_NATIVE_STEP(NativeUpdateBackfire, cp::VehicleUpdateBackfire(base, ctx.r3.u32, ctx.r1.u32))
 ITC_NATIVE_STEP(NativeUpdateTireWear,
                 cp::VehicleUpdateTireWear(base, ctx.r3.u32, ctx.r1.u32 - 112))
+// Where tan would fail, or mode 2 in a forward gear, the original (as the
+// adapters).
+ITC_NATIVE_STEP(NativeUpdateSteering,
+                if (!cp::VehicleUpdateSteering(base, ctx.r3.u32, ctx.r1.u32 - 160))
+                    __imp__sub_820B18B8(ctx, base))
+ITC_NATIVE_STEP(NativeUpdateTorqueSplit,
+                if (!cp::VehicleUpdateTorqueSplit(base, ctx.r3.u32))
+                    __imp__sub_820B2100(ctx, base))
+ITC_NATIVE_STEP(NativeUpdateTurbo, cp::VehicleUpdateTurbo(base, ctx.r3.u32))
 
 // Runs the recompiled version with the native flags off, so the functions
 // it calls that are ours run the originals too.
@@ -489,6 +498,15 @@ void FillVehicle(uint8_t* base, uint32_t area, Random& r, Word word) {
   guest::StoreU32(base, v + 2496, r.Below(4));
   guest::StoreU8(base, v + 2625, uint8_t(r.Below(2)));
   guest::StoreU8(base, v + 2383, uint8_t(r.Below(2)));
+  // The steering's switch, the drive's mode, the turbo and its valve (car
+  // data +1604, +1605).
+  guest::StoreU8(base, v + 276, uint8_t(r.Below(2)));
+  guest::StoreU32(base, v + 2376, r.Below(7));
+  guest::StoreU8(base, area + kCarData + 1604, uint8_t(r.Below(3) != 0));
+  guest::StoreU8(base, area + kCarData + 1605, uint8_t(r.Below(2)));
+  if (r.Below(2) == 0) {
+    guest::StoreU32(base, v + 2268, 0);
+  }
   if (r.Below(2) == 0) {
     // The rpm, normalized (the engine's torque curve).
     guest::StoreU32(base, v + 2228, std::bit_cast<uint32_t>(float(r.Below(1100)) / 1000.0f));
@@ -517,6 +535,9 @@ void CarPhysicsVehicle(Context& h) {
     R4Kind r4 = kWheelR4;
     // f1 a value from 0.0 to 1.1 (the engine's normalized rpm).
     bool unit_f1 = false;
+    // r3 compared (UpdateSteering's is what tan's _ctrlfp leaves, which the
+    // game doesn't read: the physics step sets r3 again).
+    bool compare_r3 = true;
   } functions[] = {
       {"Vehicle::BeginStep (sub_820AFAE8)", Original<__imp__sub_820AFAE8>, NativeBeginStep,
        true},
@@ -575,6 +596,12 @@ void CarPhysicsVehicle(Context& h) {
        NativeUpdateBackfire, false},
       {"Vehicle::UpdateTireWear (sub_820B39C8)", Original<__imp__sub_820B39C8>,
        NativeUpdateTireWear, false},
+      {"Vehicle::UpdateSteering (sub_820B18B8)", Original<__imp__sub_820B18B8>,
+       NativeUpdateSteering, false, kWheelR4, false, false},
+      {"Vehicle::UpdateTorqueSplit (sub_820B2100)", Original<__imp__sub_820B2100>,
+       NativeUpdateTorqueSplit, false},
+      {"Vehicle::UpdateTurbo (sub_820B24A8)", Original<__imp__sub_820B24A8>, NativeUpdateTurbo,
+       false},
   };
   enum Group { kNumbers, kOneNaN, kNaNs };
   const char* const kGroupNames[] = {"", ", one NaN",
@@ -629,7 +656,7 @@ void CarPhysicsVehicle(Context& h) {
           t.f1.f64 = f1;
           (v == 0 ? f.recompiled : f.native)(t, h.base);
           result[v] = Read(h.base, area, kVehicleAreaBytes);
-          for (int i = 0; i < 4; i++) {
+          for (int i = 0; f.compare_r3 && i < 4; i++) {
             result[v].push_back(uint8_t(t.r3.u32 >> (24 - 8 * i)));
           }
           for (int i = 0; f.compare_f1 && i < 8; i++) {
