@@ -15,12 +15,19 @@ see in a drive, from every run: `to-drive.md`.
 - Subsystem 1 of 3 (the string table and font) finished: the rest
   waits on `DataFile::GetEntry`, the archive, the XPR, the shader
   compiler and the device's state save.
-- Subsystem 2 of 3: `std::string` (`leads.md`'s top lead), mapped in
-  7aeebb5 (16 rows, 3 ready groups); migration 1 done
-  (2028ce7..5fdcfc2: nothing ready left); step: validation (a
-  validation agent running).
+- Subsystem 2 of 3 (`std::string`) finished: the two static set-ups
+  wait on `atexit`.
+- Subsystem 3 of 3: the course's route (picked: ready groups, runs
+  every update, blocks `TrackPosition::Init` and `Update`); step:
+  mapping (a mapping agent running).
 
 ## Done
+
+- `std::string` (`std-string.md`, mapped in 7aeebb5; 16 rows): 14 ours
+  in one migration (2028ce7..5fdcfc2), validated (14 of 14 harness
+  lines, all ran in the attract race; `itc_1064`, `itc_1065`, replay
+  ok; none to drive); `--native_std_string`. Left: the static set-ups
+  (`atexit`).
 
 - The string table and font (`strings-and-font.md`, mapped in 0974397;
   36 rows): 25 ours in one migration (16458d3..29aea2e), validated (27

@@ -2524,6 +2524,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-10-23 | The car specs (the parameter tables' set-up, load callbacks and byte swaps, the getters, `Car::Refresh` and `Tire::InchUp`; no behavior change) | `car-specs.md` | 47 of 48 (`Params::Free` not seen in play) | `--native_car_specs` |
 | 2026-10-23 | The cameras below the camera modes (the library's `Camera` class, the 21 camera passes and their record passes, the two viewports; interpolation's hooks kept) | `cameras.md` | 32 of 42 (two migrations) | `--native_cameras` |
 | 2026-10-23 | The string table and font (the 17 string files, their pages and formatting with the game's `swprintf`, the font's layout and text draw; the C runtime's wide printf with it) | `strings-and-font.md` | 25 of 36 | `--native_strings_and_font` |
+| 2026-10-23 | `std::string` (Dinkumware's `basic_string<char>` over the guest layout: constructors, `_Tidy`, `_Copy`, `_Grow`, assign, append, the allocator; the library's wildcard search, find and replace-all) | `std-string.md` | 14 of 16 | `--native_std_string` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -3052,3 +3053,14 @@ hands back to the recompiled code on paths never seen in play. The rest
 waits on `DataFile::GetEntry` (`Strings::Get`, so `FormatV` and
 `Format`), the archive (`Font::Load`, `Strings::Load`), the XPR, the
 shader compiler and the device's state save and restore (`Font::Font`).
+
+**2026-10-23, B7's eighth loop run, `std::string` (branch
+`b7-loop-23-10-26-4`):** the boundary unchanged: 449 functions (916
+pairs): overridden 67, Native 3, Dropped 23, never called 70, live 286.
+Imports: 186 called, 62 with a live caller. B7 (`b7_status.py`): 6,757
+in play, ours 1,181, work left 5,576 (Wrapped 123, with a row 561, no
+row yet 4,892); `std-string.md` 14 ours of 16. 971 overrides in
+`src/`. The string's member functions are translated over the guest
+layout (the user's call: the game's inlined code reads its fields, so
+host strings can't stand in; thrown away at the port's end); the two
+global strings' static set-ups wait on `atexit`.
