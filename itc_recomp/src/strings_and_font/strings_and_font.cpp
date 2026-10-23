@@ -3,6 +3,7 @@
 #include "strings_and_font/strings_and_font.h"
 
 #include "base/log.h"
+#include "c_runtime/format.h"
 #include "c_runtime/strings.h"
 #include "guest.h"
 #include "memory/heap.h"
@@ -128,6 +129,12 @@ uint32_t TextIsLoaded(uint8_t* base) {
     return 0;
   }
   return FontIsLoaded(base, guest::LoadU32(base, kFont)) != 0 ? 1 : 0;
+}
+
+bool Swprintf(uint8_t* base, uint32_t buffer, uint32_t format, uint32_t args, uint32_t frame,
+              int32_t* count) {
+  ITC_NATIVE_RUNNING("sub_8210A490 swprintf");
+  return c_runtime::Vswprintf(base, buffer, format, args, frame, count);
 }
 
 uint32_t StringsPageCount(uint8_t* base, uint32_t text) {

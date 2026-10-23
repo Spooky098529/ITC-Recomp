@@ -29,7 +29,9 @@ ITC_FLAG_BOOL(native_strings_and_font, true, "ITC",
               "Strings::Init sub_8210A860 (with --native_heap), Strings::OnLoaded sub_8210A850, "
               "Strings::Release sub_8210A538 (with --native_heap), Text::IsLoaded "
               "sub_82211C90 with Strings::IsLoaded sub_8210A768 and Font::IsLoaded "
-              "sub_821081A0, Strings::PageCount sub_8210A5C0, Strings::CopyPage sub_8210A5E8, "
+              "sub_821081A0, swprintf sub_8210A490 (with vswprintf sub_825A9A80, _vswprintf_l "
+              "sub_825A9980 and _woutput_l sub_825B13D0, no adapters of their own; the original "
+              "for %n, %Z, floats but %f and the unit 0xFFFF), Strings::PageCount sub_8210A5C0, Strings::CopyPage sub_8210A5E8, "
               "the font's pixel shader entries sub_825D9590, Font::TextWidth sub_82108B30 "
               "with Font::SetParams sub_82108368, Font::DrawPass sub_82109EF0 (without the "
               "command list's diagnostics; with Font::CountGlyphs sub_82108210, "
@@ -94,6 +96,28 @@ extern "C" REX_FUNC(sub_8210A538) {
 extern "C" REX_FUNC(sub_82211C90) {
   ITC_STRINGS_AND_FONT_FALLBACK(82211C90)
   ctx.r3.u64 = TextIsLoaded(base);
+}
+
+// swprintf: r3 = the buffer, r4 = the format, r5 to r10 and the stack the
+// arguments: stored into the caller's parameter area (r1 + 32 to + 72) as
+// the original does, the va_list from there; _woutput_l's frame where the
+// original's would be (96, 144 and 2,336 bytes down). r3 the count
+// (zero-extended; the original's can carry -1's upper bits).
+extern "C" REX_FUNC(sub_8210A490) {
+  ITC_STRINGS_AND_FONT_FALLBACK(8210A490)
+  const uint64_t registers[6] = {ctx.r5.u64, ctx.r6.u64, ctx.r7.u64,
+                                 ctx.r8.u64, ctx.r9.u64, ctx.r10.u64};
+  for (uint32_t i = 0; i < 6; i++) {
+    guest::StoreU32(base, ctx.r1.u32 + 32 + 8 * i, uint32_t(registers[i] >> 32));
+    guest::StoreU32(base, ctx.r1.u32 + 36 + 8 * i, uint32_t(registers[i]));
+  }
+  int32_t count;
+  if (!Swprintf(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 + 32, ctx.r1.u32 - 96 - 144 - 2336,
+                &count)) {
+    __imp__sub_8210A490(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = uint32_t(count);
 }
 
 // Strings::PageCount: r4 = the text; r3 the count.

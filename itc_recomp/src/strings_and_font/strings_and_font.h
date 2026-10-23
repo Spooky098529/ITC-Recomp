@@ -55,6 +55,16 @@ uint32_t FontIsLoaded(uint8_t* base, uint32_t font);
 // Font::IsLoaded([0x826C5C00]).
 uint32_t TextIsLoaded(uint8_t* base);
 
+// The game's swprintf (sub_8210A490): vswprintf (sub_825A9A80, merged: it
+// only passes no locale on) of `format` with the arguments at `args` (the
+// va_list: the caller's parameter area from r5 on, 8-byte slots) into
+// `buffer`, through c_runtime::Vswprintf in `frame` (where the original's
+// _woutput_l frame would be). False, with nothing written to `buffer`, where
+// the original must run (c_runtime::Vswprintf's cases); else `*count` the
+// characters written.
+bool Swprintf(uint8_t* base, uint32_t buffer, uint32_t format, uint32_t args, uint32_t frame,
+              int32_t* count);
+
 // Strings::PageCount (sub_8210A5C0): the page breaks (0xFFD1) in `text`.
 uint32_t StringsPageCount(uint8_t* base, uint32_t text);
 

@@ -11,6 +11,7 @@
 #include "harness.h"
 
 #include "base/flags.h"
+#include "base/log.h"
 #include "command_list/command_list.h"
 #include "hooks/heap.h"
 #include "memory/heap.h"
@@ -23,6 +24,7 @@
 #include <functional>
 #include <iterator>
 #include <string>
+#include <string_view>
 #include <vector>
 
 ITC_FLAG_DECLARE(bool, native_strings_and_font);
@@ -116,6 +118,21 @@ void NativeBuildVertices(PPCContext& ctx, uint8_t* base) {
     return;
   }
   ctx.r3.u64 = 0;
+}
+
+void NativeSwprintf(PPCContext& ctx, uint8_t* base) {
+  const uint64_t registers[6] = {ctx.r5.u64, ctx.r6.u64, ctx.r7.u64,
+                                 ctx.r8.u64, ctx.r9.u64, ctx.r10.u64};
+  for (uint32_t i = 0; i < 6; i++) {
+    StoreU64(base, ctx.r1.u32 + 32 + 8 * i, registers[i]);
+  }
+  int32_t count;
+  if (!sf::Swprintf(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 + 32, ctx.r1.u32 - 96 - 144 - 2336,
+                    &count)) {
+    __imp__sub_8210A490(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = uint32_t(count);
 }
 
 // Runs the original with the flag off (its callees' adapters fall back) or
@@ -900,6 +917,216 @@ void FontDrawing(Context& h) {
   DrawCases(h, l, area, "sub_8210A758 Text::Draw", sub_8210A758, __imp__sub_8210A758, 300);
 }
 
+// swprintf: formats made of literal characters (some 0xFFxx, a few 0xFFFF:
+// the original runs) and conversions: flags, a width (digits or '*'), a
+// precision (digits or '*'), a size (h, l, ll, w, I64, I32, I) and a type
+// (d i u o x X p c C s S f, e and g (the original), '%' and a letter that
+// isn't a type); the game's own formats; the arguments to match, in r5 to
+// r10 and on the stack: ints (small, edges, random), strings (wide and
+// narrow, or null), doubles (odd and ordinary values). The format at the
+// scratch area's +512, the strings at +0, the output in a 16 KB block (the
+// longest output, six %f of 1e308 with a precision of 163, is ~6 KB);
+// compared: the block, the scratch area, the caller's parameter area and
+// stack arguments, r3.
+struct FormatCase {
+  std::u16string format;
+  std::vector<uint64_t> slots;
+};
+
+void AddInt(Random& r, std::vector<uint64_t>& slots, bool wide64) {
+  uint64_t v;
+  switch (r.Below(5)) {
+    case 0: v = r.Next(); break;
+    case 1: {
+      constexpr uint64_t kEdges[] = {0, 1, 0xFFFFFFFF, 0x80000000, 0x7FFFFFFF, 0xFFFF,
+                                     0x8000, 0xFFFFFFFFFFFFFFFFull, 0x8000000000000000ull};
+      v = kEdges[r.Below(std::size(kEdges))];
+      break;
+    }
+    default: v = uint64_t(int64_t(int32_t(r.Below(200000)) - 100000)); break;
+  }
+  if (!wide64) v = uint64_t(int64_t(int32_t(uint32_t(v))));
+  slots.push_back(v);
+}
+
+uint64_t DoubleBits(Random& r) {
+  constexpr double kValues[] = {0.0, -0.0, 0.5, -3.25, 123.456, 1e10, 1e-5, 99.995, 2.5, 1e300,
+                                -1e-300, 4294967296.5, 0.1, 7.0};
+  switch (r.Below(6)) {
+    case 0: return r.Next();
+    case 1: {
+      constexpr uint64_t kOdd[] = {0x7FF8000000000000ull, 0xFFF0000000000000ull,
+                                   0x7FF0000000000000ull, 0x0000000000000001ull,
+                                   0x7FF4000000000001ull, 0x8000000000000000ull};
+      return kOdd[r.Below(std::size(kOdd))];
+    }
+    case 2: return std::bit_cast<uint64_t>(kValues[r.Below(std::size(kValues))]);
+    default:
+      return std::bit_cast<uint64_t>(double(int32_t(r.Below(2000000)) - 1000000) / 100.0);
+  }
+}
+
+FormatCase MakeFormat(Random& r, uint32_t strings) {
+  FormatCase c;
+  const uint32_t pieces = 1 + r.Below(6);
+  for (uint32_t k = 0; k < pieces; k++) {
+    if (r.Below(3) == 0) {
+      const uint32_t pick = r.Below(30);
+      c.format += pick == 0 ? char16_t(0xFFFF) : pick == 1 ? char16_t(0xFFD3) : pick == 2 ? u'\n'
+                : char16_t('a' + r.Below(26));
+      continue;
+    }
+    c.format += u'%';
+    const char16_t* kFlags = u"-+ #0";
+    for (uint32_t f = 0; f < 5; f++) {
+      if (r.Below(5) == 0) c.format += kFlags[f];
+    }
+    if (r.Below(3) == 0) {
+      if (r.Below(4) == 0) {
+        c.format += u'*';  // a small width (a huge one would write gigabytes)
+        c.slots.push_back(uint64_t(int64_t(int32_t(r.Below(80)) - 40)));
+      } else {
+        for (char ch : std::to_string(r.Below(30))) c.format += char16_t(ch);
+      }
+    }
+    bool big_precision = false;
+    if (r.Below(3) == 0) {
+      c.format += u'.';
+      if (r.Below(4) == 0) {
+        c.format += u'*';
+        c.slots.push_back(uint64_t(int64_t(int32_t(r.Below(60)) - 10)));
+      } else if (r.Below(3) != 0) {
+        const uint32_t n = r.Below(12) == 0 ? 160 + r.Below(40) : r.Below(25);
+        big_precision = n > 100;
+        for (char ch : std::to_string(n)) c.format += char16_t(ch);
+      }
+    }
+    const char16_t* kSizes[] = {u"", u"", u"", u"h", u"l", u"ll", u"w", u"I64", u"I32", u"I"};
+    const std::u16string size = kSizes[r.Below(std::size(kSizes))];
+    c.format += size;
+    // ('k' isn't a type: the last conversion's text again. Not 'F' or
+    // 'N': the table takes them as sizes, and the arguments after would be
+    // read as the wrong kinds.)
+    const char16_t* kTypes = u"diuoxXpcCsSfffdegE%kk";
+    const char16_t type = kTypes[r.Below(21)];
+    c.format += type;
+    const bool wide64 = size == u"ll" || size == u"I64";
+    // A bare "I" before anything but an integer type is written out, and
+    // the type after it with it: no argument (or the next ones would be
+    // read as the wrong kinds).
+    if (size == u"I" && std::u16string_view(u"diouxX").find(type) == std::u16string_view::npos) {
+      continue;
+    }
+    switch (type) {
+      case u'd': case u'i': case u'u': case u'o': case u'x': case u'X': case u'p': case u'c':
+      case u'C':
+        AddInt(r, c.slots, wide64);
+        break;
+      case u's': case u'S':
+        c.slots.push_back(r.Below(6) == 0 ? 0 : strings + 64 * r.Below(8));
+        break;
+      case u'f': case u'e': case u'g': case u'E':
+        c.slots.push_back(big_precision && r.Below(2) ? 0x4000000000000000ull : DoubleBits(r));
+        break;
+      default:
+        break;
+    }
+  }
+  return c;
+}
+
+void SwprintfCase(Context& h, Results& results, const Block& block, const FormatCase& c,
+                  uint32_t format_address, const std::string& what) {
+  const uint32_t strings = h.data, output = block.address;
+  Outputs out[2];
+  for (int v = 0; v < 2; v++) {
+    Fill(h.base, h.data, kScratchBytes);
+    Fill(h.base, block.address, block.bytes);
+    // Eight strings, 64 bytes each: narrow and wide text, ending in zeros.
+    Random text_random;
+    for (uint32_t k = 0; k < 8; k++) {
+      const uint32_t at = strings + 64 * k;
+      for (uint32_t b = 0; b < 56; b++) {
+        guest::StoreU8(h.base, at + b, uint8_t(k % 2 == 0 ? (b % 2 == 0 ? 0 : 'A' + text_random.Below(26))
+                                                         : (b < 20 ? 'a' + text_random.Below(26) : 0)));
+      }
+      for (uint32_t b = 56; b < 64; b++) guest::StoreU8(h.base, at + b, 0);
+    }
+    if (format_address == 0) {
+      for (uint32_t k = 0; k < c.format.size(); k++) {
+        guest::StoreU16(h.base, h.data + 512 + 2 * k, uint16_t(c.format[k]));
+      }
+      guest::StoreU16(h.base, h.data + 512 + 2 * c.format.size(), 0);
+    }
+    PPCContext t = CallContext(h);
+    // The caller's parameter area and stack arguments (r1 + 32 on).
+    Fill(h.base, t.r1.u32 + 24, 200);
+    uint64_t* registers[6] = {&t.r5.u64, &t.r6.u64, &t.r7.u64, &t.r8.u64, &t.r9.u64, &t.r10.u64};
+    for (uint32_t k = 0; k < 6; k++) *registers[k] = k < c.slots.size() ? c.slots[k] : 0x1234567800000000ull + k;
+    for (uint32_t k = 6; k < c.slots.size() && k < 20; k++) {
+      StoreU64(h.base, t.r1.u32 + 32 + 8 * k, c.slots[k]);
+    }
+    t.r3.u64 = output;
+    t.r4.u64 = format_address != 0 ? format_address : h.data + 512;
+    Run(v, __imp__sub_8210A490, NativeSwprintf, t, h.base);
+    out[v].Bytes(Read(h.base, block.address, block.bytes));
+    out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+    out[v].Bytes(Read(h.base, t.r1.u32 + 24, 200));
+    out[v].Word(t.r3.u32);
+  }
+  results.Check(out[0], out[1], what);
+}
+
+std::string Narrow(const std::u16string& s) {
+  std::string n;
+  for (char16_t ch : s) n += ch < 128 && ch >= 32 ? char(ch) : '?';
+  return n;
+}
+
+void SwprintfCases(Context& h) {
+  Results results("sub_8210A490 swprintf");
+  const Block block(16384);
+  // The game's formats (Strings::FormatV's and Strings::FormatGrouped's).
+  struct Game {
+    uint32_t format;
+    bool is_double;
+  };
+  const Game games[] = {{0x82007EC4, false}, {0x82007EB4, false}, {0x82007EA8, false},
+                        {0x82007E9C, false}, {0x82007E94, false}};
+  for (const Game& g : games) {
+    for (int i = 0; i < 40; i++) {
+      FormatCase c;
+      AddInt(h.random, c.slots, false);
+      if (i < 10) c.slots.back() = h.random.Below(12);
+      SwprintfCase(h, results, block, c, g.format, fmt::format("format {:08X} case {}", g.format, i));
+    }
+  }
+  {
+    // "-%s" with a wide string.
+    FormatCase c;
+    c.slots.push_back(h.data + 64);
+    SwprintfCase(h, results, block, c, 0x82007E8C, "format 82007E8C");
+  }
+  const char16_t* kBuilt[] = {u"%05d", u"%.2f", u"%3d", u"%.0f", u"%.1f", u"%010d", u",%03d", u"%d"};
+  for (const char16_t* f : kBuilt) {
+    for (int i = 0; i < 30; i++) {
+      FormatCase c;
+      c.format = f;
+      if (c.format.find(u'f') != std::u16string::npos) {
+        c.slots.push_back(DoubleBits(h.random));
+      } else {
+        AddInt(h.random, c.slots, false);
+      }
+      SwprintfCase(h, results, block, c, 0, fmt::format("{} case {}", Narrow(c.format), i));
+    }
+  }
+  for (int i = 0; i < 3000; i++) {
+    const FormatCase c = MakeFormat(h.random, h.data);
+    SwprintfCase(h, results, block, c, 0, fmt::format("\"{}\" case {}", Narrow(c.format), i));
+  }
+  results.Report();
+}
+
 }  // namespace
 
 void StringsAndFont(Context& h) {
@@ -913,6 +1140,7 @@ void StringsAndFont(Context& h) {
   SetParams(h);
   FontLayout(h);
   FontDrawing(h);
+  SwprintfCases(h);
 }
 
 }  // namespace harness
