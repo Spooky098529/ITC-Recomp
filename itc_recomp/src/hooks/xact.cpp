@@ -33,7 +33,9 @@ ITC_FLAG_BOOL(native_xact, true, "ITC",
               "sub_825CEEA0 and the folded getters sub_82099BA0, sub_820A8958 and sub_82379D50; "
               "XACTSound::GetPitch, sub_825CAC48; the wave banks' listeners, sub_825C8690 and "
               "sub_825C8540; the wave bank lookups, sub_825C0360 and sub_825C7218; the "
-              "variable's destructors, sub_825C2128 and sub_825C3EE0) natively "
+              "variable's destructors, sub_825C2128 and sub_825C3EE0; XACTSound::GetVolume, "
+              "sub_825CB5E8; the cue's variables, sub_825C5960 and sub_825C5E28; the track "
+              "record, sub_825CC9C8, and XACTSound::SetUpRpcs, sub_825CB470, as in play) natively "
               "instead of through the translated code (same results; checked by "
               "--run_harnesses=xact)");
 
@@ -302,3 +304,31 @@ extern "C" REX_FUNC(sub_825C7218) {
 // XACTVariable::~XACTVariable (sub_825C2128) has no adapter: its only
 // caller, the deleting destructor, is native.
 ITC_XACT_HEAP_WORD(825C3EE0, VariableDeletingDestruct(base, ctx.r3.u32, ctx.r4.u32))
+
+// The sound's volume, the cue's variables, the sounds' track records and
+// RPC set-up. XACTCue::GetVariable (sub_825C5960) has no adapter: its only
+// caller, MakeInstanceVariable, is native.
+extern "C" REX_FUNC(sub_825CB5E8) {
+  ITC_XACT_FALLBACK(825CB5E8)
+  const auto result = SoundGetVolume(base, ctx.r3.u32);
+  if (!result) {
+    __imp__sub_825CB5E8(ctx, base);
+    return;
+  }
+  ctx.f1.f64 = result->f1;
+  ctx.r3.u64 = result->r3;
+}
+// MakeInstanceVariable may allocate: the original unless --native_heap
+// routes the game's heap to the native layer.
+extern "C" REX_FUNC(sub_825C5E28) {
+  ITC_XACT_FALLBACK(825C5E28)
+  const auto result =
+      hooks::NativeHeapActive() ? CueMakeInstanceVariable(base, ctx.r3.u32) : std::nullopt;
+  if (!result) {
+    __imp__sub_825C5E28(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = *result;
+}
+ITC_XACT_OPTIONAL(825CC9C8, SoundGetTrackRecord(base, ctx.r3.u32, ctx.r4.u32))
+ITC_XACT_OPTIONAL(825CB470, SoundSetUpRpcs(base, ctx.r3.u32))

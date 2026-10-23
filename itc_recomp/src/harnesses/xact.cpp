@@ -243,6 +243,23 @@ ITC_NATIVE_STEP(NativeVariableDestruct, ctx.r3.u64 = xa::VariableDestruct(base, 
 ITC_NATIVE_STEP(NativeVariableDeletingDestruct,
                 ctx.r3.u64 = xa::VariableDeletingDestruct(base, ctx.r3.u32, ctx.r4.u32))
 
+void NativeSoundGetVolume(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const auto result = xa::SoundGetVolume(base, ctx.r3.u32);
+  if (!result) {
+    ctx.r3.u64 = 0xDEADDEAD;
+    return;
+  }
+  ctx.f1.f64 = result->f1;
+  ctx.r3.u64 = result->r3;
+}
+ITC_NATIVE_OPTIONAL(NativeCueGetVariable,
+                    xa::CueGetVariable(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+ITC_NATIVE_OPTIONAL(NativeCueMakeInstanceVariable, xa::CueMakeInstanceVariable(base, ctx.r3.u32))
+ITC_NATIVE_OPTIONAL(NativeSoundGetTrackRecord,
+                    xa::SoundGetTrackRecord(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_OPTIONAL(NativeSoundSetUpRpcs, xa::SoundSetUpRpcs(base, ctx.r3.u32))
+
 // The odd float words mixed into inputs: NaNs of both kinds and signs,
 // infinities, denormals, signed zeros.
 constexpr uint32_t kOddFloats[] = {0x7FC00000, 0x7F800001, 0xFFC00001, 0xFF800001, 0x7F800000,
@@ -1613,6 +1630,158 @@ void VariableDestructors(Context& h) {
   results.Report();
 }
 
+// The words of `bytes` (guest words from `at`) pointing into the block
+// [block, block + size) replaced by their offsets (marked), so two
+// versions' blocks at different addresses compare.
+void Relocate(std::vector<uint8_t>& bytes, uint32_t block, uint32_t size) {
+  for (size_t i = 0; i + 4 <= bytes.size(); i += 4) {
+    const uint32_t word = uint32_t(bytes[i]) << 24 | uint32_t(bytes[i + 1]) << 16 |
+                          uint32_t(bytes[i + 2]) << 8 | bytes[i + 3];
+    if (block != 0 && word - block < size) {
+      const uint32_t marked = 0xB10C0000u | (word - block);
+      bytes[i] = uint8_t(marked >> 24);
+      bytes[i + 1] = uint8_t(marked >> 16);
+      bytes[i + 2] = uint8_t(marked >> 8);
+      bytes[i + 3] = uint8_t(marked);
+    }
+  }
+}
+
+void SoundsAndCueVariables(Context& h) {
+  Results results("xact sound volumes and cue variables");
+  const uint32_t d = h.data;
+  constexpr uint32_t kSound = 1600, kRecord = 1760, kCue = 1800;
+  // GetVolume: the sound at +1600 (its record at +1760, its cue at +1800),
+  // the engine and settings as for the settings' group.
+  for (int i = 0; i < 200; i++) {
+    const bool engine_has = i % 6 != 5;
+    const uint32_t category = i % 9 == 0 ? 0xFFFF : h.random.Below(16);
+    auto setup = [&] {
+      Settings(h, kSettingsVtable, engine_has);
+      RandomWords(h, d + kSound, 32);
+      guest::StoreU32(h.base, d + kSound + 28, d + kRecord);
+      guest::StoreU32(h.base, d + kSound + 32, d + kEngine);
+      guest::StoreU32(h.base, d + kSound + 48, d + kCue);
+      RandomBytes(h, d + kRecord, 8);
+      guest::StoreU16(h.base, d + kRecord + 1, uint16_t(category));
+      RandomWords(h, d + kCue, 8);
+      if (category == 0xFFFF) {
+        // The arrays read at the category's index stay in the area.
+        guest::StoreU32(h.base, d + 112, d + 512 - 0x3FFFC);
+        guest::StoreU32(h.base, d + 116, 0);
+      }
+    };
+    Case(h, results, setup, [&](PPCContext& t) { t.r3.u64 = d + kSound; }, __imp__sub_825CB5E8,
+         NativeSoundGetVolume, {},
+         fmt::format("XACTSound::GetVolume {} ({:#x}{})", i, category,
+                     engine_has ? "" : ", no settings"),
+         true);
+  }
+  // GetTrackRecord and SetUpRpcs: the record's flags without the paths
+  // that never ran (those decline below).
+  for (int i = 0; i < 100; i++) {
+    const uint8_t flags = uint8_t(h.random.Next()) & ~0x1Eu;
+    const uint32_t index = i % 4 == 0 ? uint32_t(h.random.Next()) : h.random.Below(20);
+    auto setup = [&] {
+      RandomWords(h, d + kSound, 32);
+      guest::StoreU32(h.base, d + kSound + 28, d + kRecord);
+      RandomBytes(h, d + kRecord, 8);
+      guest::StoreU8(h.base, d + kRecord, flags);
+    };
+    Case(h, results, setup, [&](PPCContext& t) { t.r3.u64 = d + kSound; t.r4.u64 = index; },
+         __imp__sub_825CC9C8, NativeSoundGetTrackRecord, {},
+         fmt::format("XACTComplexSound::GetTrackRecord {} (flags {:#x})", i, flags));
+    Case(h, results, setup, [&](PPCContext& t) { t.r3.u64 = d + kSound; },
+         __imp__sub_825CB470, NativeSoundSetUpRpcs, {},
+         fmt::format("XACTSound::SetUpRpcs {} (flags {:#x})", i, flags));
+  }
+  for (uint32_t bit : {2u, 4u, 8u, 16u}) {
+    Fill(h.base, d, kScratchBytes);
+    guest::StoreU32(h.base, d + kSound + 28, d + kRecord);
+    guest::StoreU8(h.base, d + kRecord, uint8_t(bit));
+    CheckDeclines(h, results, NativeSoundGetTrackRecord, d + kSound, 0,
+                  fmt::format("XACTComplexSound::GetTrackRecord, flags {:#x}", bit));
+    if (bit == 2) {
+      CheckDeclines(h, results, NativeSoundSetUpRpcs, d + kSound, 0,
+                    "XACTSound::SetUpRpcs, flags 0x2");
+    }
+  }
+  // GetVariable and MakeInstanceVariable: the cue at +1600 (its engine at
+  // +56, its variable list at +324) with 0 to 2 variables at +2000 and
+  // +2252; the settings' variable records' flags with 0x4 or not. A made
+  // variable (only while the native layer has the heap) is compared by its
+  // bytes, the words pointing into it relocated, then freed.
+  for (int i = 0; i < 160; i++) {
+    const bool make = i % 4 == 3;
+    if ((make || i % 2) && !hooks::NativeHeapActive()) {
+      continue;
+    }
+    const uint32_t existing = h.random.Below(3);
+    const uint32_t index = make ? 0 : i % 5 == 0 ? uint32_t(h.random.Next()) : h.random.Below(6);
+    const bool out_word = i % 3 != 0;
+    const bool engine_has = i % 8 != 7;
+    Outputs out[2];
+    const Random start = h.random;
+    for (int v = 0; v < 2; v++) {
+      h.random = start;
+      Fill(h.base, d, kScratchBytes);
+      Settings(h, kSettingsVtable, engine_has);
+      const uint32_t cue = d + kSound;
+      RandomWords(h, cue, 84);
+      guest::StoreU32(h.base, cue + 56, d + kEngine);
+      const uint32_t list = cue + 324;
+      guest::StoreU32(h.base, list + 4, list);
+      guest::StoreU32(h.base, list + 8, list);
+      for (uint32_t k = 0; k < existing; k++) {
+        const uint32_t variable = d + 2000 + 252 * k;
+        RandomWords(h, variable, 63);
+        guest::StoreU16(h.base, variable + 244, uint16_t(h.random.Below(6)));
+        guest::StoreU32(h.base, variable + 4, list);
+        guest::StoreU32(h.base, variable + 8, guest::LoadU32(h.base, list + 8));
+        guest::StoreU32(h.base, guest::LoadU32(h.base, list + 8) + 4, variable);
+        guest::StoreU32(h.base, list + 8, variable);
+      }
+      // The variable records' flags: 0x4 for about half.
+      const uint32_t records = d + 1024 + 240;
+      for (uint32_t k = 0; k < 16; k++) {
+        const uint8_t flags = guest::LoadU8(h.base, records + 13 * k);
+        guest::StoreU8(h.base, records + 13 * k,
+                       uint8_t(h.random.Below(2) ? flags | 4 : flags & ~4u));
+      }
+      PPCContext t = CallContext(h);
+      t.r3.u64 = cue;
+      t.r4.u64 = index;
+      t.r5.u64 = out_word ? d + 2600 : 0;
+      ITC_FLAG(native_xact) = v == 1;
+      if (make) {
+        (v == 0 ? __imp__sub_825C5E28 : NativeCueMakeInstanceVariable)(t, h.base);
+      } else {
+        (v == 0 ? __imp__sub_825C5960 : NativeCueGetVariable)(t, h.base);
+      }
+      ITC_FLAG(native_xact) = true;
+      out[v].Word(t.r3.u32);
+      // A made variable is the list's tail outside the area.
+      const uint32_t tail = guest::LoadU32(h.base, list + 8);
+      const bool made = tail - d >= kScratchBytes;
+      out[v].Word(made);
+      auto area = Read(h.base, d, kScratchBytes);
+      if (made) {
+        auto block = Read(h.base, tail, 252);
+        Relocate(block, tail, 252);
+        Relocate(area, tail, 252);
+        out[v].Bytes(block);
+        memory::crt::XMemFree(tail, 0x20848026);
+      }
+      out[v].Bytes(area);
+    }
+    results.Check(out[0], out[1],
+                  fmt::format("XACTCue::{} {} (index {:#x}, {} variables{})",
+                              make ? "MakeInstanceVariable" : "GetVariable", i, index, existing,
+                              engine_has ? "" : ", no settings"));
+  }
+  results.Report();
+}
+
 }  // namespace
 
 void Xact(Context& h) {
@@ -1628,6 +1797,7 @@ void Xact(Context& h) {
   GlobalSettings(h);
   WaveEntriesAndLookups(h);
   VariableDestructors(h);
+  SoundsAndCueVariables(h);
 }
 
 }  // namespace harness

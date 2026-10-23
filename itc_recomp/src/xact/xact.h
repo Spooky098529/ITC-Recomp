@@ -347,4 +347,30 @@ std::optional<uint32_t> SoundBankGetWaveBank(uint8_t* base, uint32_t bank, uint3
 uint32_t VariableDestruct(uint8_t* base, uint32_t variable);
 uint32_t VariableDeletingDestruct(uint8_t* base, uint32_t variable, uint32_t flags);
 
+// --- Batch 8: the sound's volume, the cue's variables, the sounds' track
+// records and RPC set-up where nothing is to do ---
+
+// XACTSound::GetVolume (sub_825CB5E8): f1 = the cue's fader gain (cue
+// +48's +28) x +88 x the category's effective volume (sub_825C04D8, the
+// record's +1) x +112 x +8, each product rounded to single; r3 as
+// sub_825C04D8 leaves it. nullopt where that declines.
+std::optional<CategoryVolume> SoundGetVolume(uint8_t* base, uint32_t sound);
+// XACTCue::GetVariable (sub_825C5960): the local variable `index` (list
+// +324), made (XMemAlloc 252 0x20848026, constructed, initialized, linked
+// at the tail) when it's a cue-instance one (record flags 0x4); stored at
+// `out` when not 0. Returns 0, E_OUTOFMEMORY or
+// XACTENGINE_E_INVALIDVARIABLEINDEX; nullopt, with nothing changed, where
+// sub_825C0748 declines. XACTCue::MakeInstanceVariable (sub_825C5E28):
+// GetVariable(cue, 0, none), returning 0. Native layer only (they
+// allocate).
+std::optional<uint32_t> CueGetVariable(uint8_t* base, uint32_t cue, uint32_t index, uint32_t out);
+std::optional<uint32_t> CueMakeInstanceVariable(uint8_t* base, uint32_t cue);
+// XACTComplexSound::GetTrackRecord (sub_825CC9C8): the record (+28) + 10 +
+// 5 x the 16-bit index; nullopt where the record's flags have optional
+// sections (0x2, 0x4, 0x8, 0x10: never in play).
+std::optional<uint32_t> SoundGetTrackRecord(uint8_t* base, uint32_t sound, uint32_t index);
+// XACTSound::SetUpRpcs (sub_825CB470): 0 when the record's flags lack 0x2
+// (as for every sound in play); nullopt otherwise.
+std::optional<uint32_t> SoundSetUpRpcs(uint8_t* base, uint32_t sound);
+
 }  // namespace xact

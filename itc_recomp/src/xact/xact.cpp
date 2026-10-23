@@ -1343,4 +1343,90 @@ uint32_t VariableDeletingDestruct(uint8_t* base, uint32_t variable, uint32_t fla
   return variable;
 }
 
+// --- Batch 8: the sound's volume, the cue's variables, the sounds' track
+// records and RPC set-up where nothing is to do ---
+
+std::optional<CategoryVolume> SoundGetVolume(uint8_t* base, uint32_t sound) {
+  const uint32_t category = guest::LoadU16(base, guest::LoadU32(base, sound + 28) + 1);
+  const auto volume = EngineGetCategoryVolume(base, guest::LoadU32(base, sound + 32), category);
+  if (!volume) {
+    return std::nullopt;
+  }
+  ITC_NATIVE_RUNNING("sub_825CB5E8 XACTSound::GetVolume");
+  const auto at = [&](uint32_t address) { return double(guest::LoadFloat(base, address)); };
+  double f0 = at(guest::LoadU32(base, sound + 48) + 28);  // the cue's fader gain
+  f0 = double(float(f0 * at(sound + 88)));
+  f0 = double(float(f0 * volume->f1));
+  f0 = double(float(f0 * at(sound + 112)));
+  return CategoryVolume{double(float(f0 * at(sound + 8))), volume->r3};
+}
+
+namespace {
+
+constexpr uint32_t kCueVariableAttributes = 0x20848026;  // a cue's local variable
+constexpr uint32_t kInvalidVariableIndex = 0x8AC7000A;   // XACTENGINE_E_INVALIDVARIABLEINDEX
+
+}  // namespace
+
+std::optional<uint32_t> CueGetVariable(uint8_t* base, uint32_t cue, uint32_t index, uint32_t out) {
+  uint32_t variable = CueFindVariable(base, cue, index);
+  std::optional<uint32_t> record;
+  if (variable == 0) {
+    record = EngineGetVariableRecord(base, guest::LoadU32(base, cue + 56), index);
+    if (!record) {
+      return std::nullopt;
+    }
+  }
+  ITC_NATIVE_RUNNING("sub_825C5960 XACTCue::GetVariable");
+  uint32_t result = 0;
+  if (variable == 0) {
+    if (*record == 0 || (guest::LoadU8(base, *record) & 4) == 0) {
+      result = kInvalidVariableIndex;
+    } else {
+      variable = memory::crt::XMemAlloc(base, 252, kCueVariableAttributes);
+      if (variable == 0) {
+        result = kOutOfMemory;
+      } else {
+        VariableConstruct(base, variable);
+        VariableInit(base, variable, guest::LoadU32(base, cue + 56), cue, index, *record, 0);
+        // Linked at the tail of the cue's list (+324, its tail at +332).
+        const uint32_t list = cue + 324;
+        guest::StoreU32(base, variable + 4, list);
+        guest::StoreU32(base, variable + 8, guest::LoadU32(base, list + 8));
+        guest::StoreU32(base, guest::LoadU32(base, list + 8) + 4, variable);
+        guest::StoreU32(base, list + 8, variable);
+      }
+    }
+  }
+  if (out != 0) {
+    guest::StoreU32(base, out, variable);
+  }
+  return result;
+}
+
+std::optional<uint32_t> CueMakeInstanceVariable(uint8_t* base, uint32_t cue) {
+  if (!CueGetVariable(base, cue, 0, 0)) {
+    return std::nullopt;
+  }
+  ITC_NATIVE_RUNNING("sub_825C5E28 XACTCue::MakeInstanceVariable");
+  return 0;
+}
+
+std::optional<uint32_t> SoundGetTrackRecord(uint8_t* base, uint32_t sound, uint32_t index) {
+  const uint32_t record = guest::LoadU32(base, sound + 28);
+  if ((guest::LoadU8(base, record) & 0x1E) != 0) {
+    return std::nullopt;  // the optional sections (never in play)
+  }
+  ITC_NATIVE_RUNNING("sub_825CC9C8 XACTComplexSound::GetTrackRecord");
+  return record + 10 + 5 * (index & 0xFFFF);
+}
+
+std::optional<uint32_t> SoundSetUpRpcs(uint8_t* base, uint32_t sound) {
+  if ((guest::LoadU8(base, guest::LoadU32(base, sound + 28)) & 2) != 0) {
+    return std::nullopt;  // RPCs to set up (never in play)
+  }
+  ITC_NATIVE_RUNNING("sub_825CB470 XACTSound::SetUpRpcs");
+  return 0;
+}
+
 }  // namespace xact
