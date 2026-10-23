@@ -16,7 +16,8 @@ lists are there), and this file's history.
   slots, `825BF5C8`-`825D0000`, with the small shared helpers), rows
   added to `xact.md` (mapped in 284f3a2: 37 rows there, 2 in
   `functions.md`; 33 ready groups); step 8, migration 2 done (4e8a8fc..ebdb01f, 46
-  ours); validation agent running.
+  ours), validated (52 of 52 harness lines; replay ok); step 6,
+  migration 3 running (`sub_8220BC28`, `sub_825C8440`).
   `sub_822956F0` (probably GetTickCount, reading the kernel's
   timestamp bundle) left recompiled: the user's call.
 
