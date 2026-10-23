@@ -156,6 +156,11 @@ Rows not yet moved stay in the table below. So far:
 - [`models.md`](models.md): the graphics library's models (part files,
   node files and skeletons, recording a shape's draws), the XPR2 texture
   bundles and the boot's shader pairs.
+- [`model-animation.md`](model-animation.md): the graphics library's
+  keyframed model animation: a model's track sets for its part file's
+  sections, their tracks, curves and keys, the per-draw sampling step,
+  and the skeleton class under the node file; with the library's
+  primitive drawer beside it (B7).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
