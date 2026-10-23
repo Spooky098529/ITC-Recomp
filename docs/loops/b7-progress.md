@@ -4,8 +4,8 @@ Kept by the loop's lead (`b7-loop.md`). Short: details are in the
 commits, the function files and the subsystems' docs. Earlier runs'
 records: `b7-loop-2026-10-22-0111.md`, `b7-loop-2026-10-22-1047.md`,
 `b7-loop-2026-10-22-1439.md`, `b7-loop-2026-10-22-2211.md`,
-`b7-loop-2026-10-23-0152.md` (their drive lists are there), and this
-file's history.
+`b7-loop-2026-10-23-0152.md`, and this file's history. What's left to
+see in a drive, from every run: `to-drive.md`.
 
 ## Now
 
@@ -40,18 +40,7 @@ This run's groups: `expected-differences.md` (the "11:06 run" lines).
 
 ## To check in a drive
 
-The data tables' `sub_821171B0` Find20, `sub_82117210` Entry20,
-`sub_82117228` Entry40 (in neither the attract race nor the replay; the
-replay was ok), `sub_82116DA8` ItemRecords::Item ran in a second replay after its
-print was added (`itc_924`, 127 s, 0 errors); the other three didn't.
-
-From earlier runs, still with no `native running (game):` line in any
-log (checked 2026-10-23): `sub_82126A00` WheelOnSurface8 and
-`sub_82126A38` WheelOnSurface1Or2 (probably ground no drive touched),
-`sub_82122DB8` FlagsKind and `sub_82127198` NoSaveFlags (never seen in
-the coverage session either); all from `b7-loop-2026-10-22-1439.md`.
-The fourth run's list (`b7-loop-2026-10-22-2211.md`) has since all run
-(the replays `itc_916`, `itc_922`, the drive `itc_895`, `itc_765`). The action mappers' functions all ran.
+`to-drive.md` (this run's section, and what's left from earlier runs).
 
 ## Totals
 
@@ -82,8 +71,7 @@ Settled (the user's call, 2026-10-23): the adapter stays (two recompiled
 callers in play, `sub_820F2D28`, `sub_82114B88`), and calls a one-line
 `data_tables::RecordsItem` with its own print, as does its harness step:
 `native running (harness)` logged, 300 cases 0 differing (`itc_923`, 19
-s, 0 errors). It's still on the drive list (its callers are the save
-data's).
+s, 0 errors); it ran in game in a second replay (`itc_924`).
 Concluded (the user's call, 2026-10-23): the run ends at 2 subsystems,
 not resumed for a third. Next: the user reviews `review.md`, drives a
-race for the drive list above, and merges; a new run starts afresh.
+race for `to-drive.md`, and merges; a new run starts afresh.

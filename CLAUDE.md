@@ -146,7 +146,8 @@ translated (no host library plays its data); the rest waits on XACT's
 critical section, XAudio and its voices, the tracks and waves, and
 GetTickCount (`sub_822956F0`, the user's call). What's for the user's
 review is in `docs/loops/review.md`, harness groups expected to differ
-in `docs/loops/expected-differences.md`; new harness code compares
+in `docs/loops/expected-differences.md`, the functions still to see in a
+drive in `docs/loops/to-drive.md`; new harness code compares
 floats with `harness::Outputs` (two NaNs match). Its sixth run
 (`b7-loop-23-10-26-2`, stopped 2026-10-23 for the user's review, not
 merged; summary `docs/loops/b7-loop-2026-10-23-1106.md`) made the
