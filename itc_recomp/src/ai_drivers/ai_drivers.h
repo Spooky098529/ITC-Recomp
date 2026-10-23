@@ -813,4 +813,19 @@ uint64_t StartGroup(uint8_t* base, uint32_t frame);
 // change), each other one SetState4. Returns the r3 the original leaves.
 uint64_t StartRanked(uint8_t* base, uint32_t frame);
 
+// --- Reading the vehicle ---
+
+// AiDriver::ReadVehicle (sub_821467F0): from the driver's vehicle: the point
+// +80 (its track position's, w 1.0), the speed +100 (km/h), +164 = +168 =
+// 500.0, the yaw rate +104, the heading +96 (atan2 of the body's orientation
+// x and z, 0.0 when both are 0.0), +108 and +112 (its steering limits); with a
+// slice record, +144 (the offset across it) and +148 (its direction less the
+// heading, wrapped), then UpdateHalfWidth, else +144 = 0.0; +156 the offset
+// along the vehicle's own route slice (0.0 without one); UpdateAgainstPlayer
+// (whose r3 it returns) and +480 = -1.
+uint64_t ReadVehicle(uint8_t* base, uint32_t driver, uint32_t slice);
+// AiDriver::ReadVehicleOwnSlice (sub_821469D0): ReadVehicle with the slice
+// record of the vehicle's own route position.
+uint64_t ReadVehicleOwnSlice(uint8_t* base, uint32_t driver);
+
 }  // namespace ai_drivers

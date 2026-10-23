@@ -5,6 +5,7 @@
 #include "c_runtime/math.h"
 #include "c_runtime/strings.h"
 #include "car_physics/float_ops.h"
+#include "hooks/vehicle.h"
 #include "strings_and_font/steps.h"
 #include "track_collision/track_collision.h"
 #include "track_route/track_route.h"
@@ -4910,6 +4911,81 @@ uint64_t StartRanked(uint8_t* base, uint32_t frame) {
     table = Load(base, kDrivers);
   }
   return r3;
+}
+
+// --- Reading the vehicle ---
+
+namespace {
+constexpr uint32_t kYawScale = 0x82008E60;  // -1/60 (probably)
+// The route slice record of a route position (the halfwords at `position`:
+// the section, then the slice): the section's record (the route file's +12
+// table) + 124 + 84 x the slice.
+uint32_t SliceRecordAt(uint8_t* base, uint32_t position) {
+  const uint32_t table = Load(base, Load(base, track_route::kRoute) + 12);
+  const uint32_t section = guest::LoadU16(base, position + 0);
+  const int32_t slice = LoadS16(base, position + 2);
+  return uint32_t(slice) * 84 + Load(base, table + (section << 2)) + 124;
+}
+}  // namespace
+
+uint64_t ReadVehicle(uint8_t* base, uint32_t driver, uint32_t slice) {
+  ITC_NATIVE_RUNNING("sub_821467F0 AiDriver::ReadVehicle");
+  const uint32_t identity = vehicle_accessors::VehicleIdentity(Load(base, driver + 160));
+  const uint32_t body = Load(base, Load(base, driver + 160) + 336);
+  const uint32_t spin = vehicle_accessors::RigidBodyAngularVelocity(body);
+  for (uint32_t i = 0; i < 16; i += 4) {  // two ld/std pairs: the bits
+    CopyWord(base, identity + 16 + i, driver + 80 + i);
+  }
+  Stfs(base, driver + 92, Lfs(base, kOne));
+  Stfs(base, driver + 100, double(Vehicle_GetSpeedKmh(base, Load(base, driver + 160))));
+  const uint32_t vehicle = Load(base, driver + 160);
+  const double yaw = Fmuls(Lfs(base, vehicle + 2356), Lfs(base, spin + 4));
+  StoreConstant(base, driver + 164, kFiveHundred);
+  StoreConstant(base, driver + 168, kFiveHundred);
+  Stfs(base, driver + 104, Fmuls(yaw, Lfs(base, kYawScale)));
+  const uint32_t orientation = vehicle_accessors::RigidBodyOrientation(body);
+  const double x = Lfs(base, orientation + 0);
+  const double zero = Lfs(base, kZero);
+  if (x == zero && Lfs(base, orientation + 8) == zero) {
+    Stfs(base, driver + 96, zero);
+  } else {
+    Stfs(base, driver + 96, double(float(c_runtime::Atan2(x, Lfs(base, orientation + 8)))));
+  }
+  const uint32_t own = Load(base, driver + 160);
+  CopyWord(base, own + 320, driver + 108);
+  Stfs(base, driver + 112, Fneg(Lfs(base, own + 316)));
+  if (slice != 0) {
+    const double dx = Fsubs(Lfs(base, driver + 80), Lfs(base, slice + 0));
+    const double dz = Fsubs(Lfs(base, driver + 88), Lfs(base, slice + 8));
+    const double across = Fmuls(dx, Lfs(base, slice + 36));
+    Stfs(base, driver + 144, Fmadds(dz, Lfs(base, slice + 40), across));
+    const double side = Lfs(base, slice + 36);
+    const double direction =
+        double(float(c_runtime::Atan2(Lfs(base, slice + 40), Fneg(side))));
+    Stfs(base, driver + 148, Fsubs(direction, Lfs(base, driver + 96)));
+    WrapAngle(base, driver + 148);
+    UpdateHalfWidth(base, driver);
+  } else {
+    Stfs(base, driver + 144, zero);
+  }
+  const uint32_t record = SliceRecordAt(base, identity + 4);
+  if (record != 0) {
+    const double dx = Fsubs(Lfs(base, driver + 80), Lfs(base, record + 0));
+    const double dz = Fsubs(Lfs(base, driver + 88), Lfs(base, record + 8));
+    const double along = Fmuls(dx, Lfs(base, record + 44));
+    Stfs(base, driver + 156, Fmadds(dz, Lfs(base, record + 48), along));
+  } else {
+    Stfs(base, driver + 156, zero);
+  }
+  const uint64_t r3 = UpdateAgainstPlayer(base, driver);
+  guest::StoreU32(base, driver + 480, 0xFFFFFFFFu);
+  return r3;
+}
+
+uint64_t ReadVehicleOwnSlice(uint8_t* base, uint32_t driver) {
+  ITC_NATIVE_RUNNING("sub_821469D0 AiDriver::ReadVehicleOwnSlice");
+  const uint32_t identity = vehicle_accessors::VehicleIdentity(Load(base, driver + 160));
+  return ReadVehicle(base, driver, SliceRecordAt(base, identity + 4));
 }
 
 }  // namespace ai_drivers

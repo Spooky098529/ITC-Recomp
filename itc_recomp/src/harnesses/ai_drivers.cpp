@@ -417,6 +417,8 @@ ITC_NATIVE_STEP(NativeReactToOthers,
                 ctx.r3.u64 = ai::ReactToOthers(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 240))
 ITC_NATIVE_STEP(NativeStartGroup, ctx.r3.u64 = ai::StartGroup(base, ctx.r1.u32 - 160))
 ITC_NATIVE_STEP(NativeStartRanked, ctx.r3.u64 = ai::StartRanked(base, ctx.r1.u32 - 224))
+ITC_NATIVE_STEP(NativeReadVehicle, ctx.r3.u64 = ai::ReadVehicle(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_STEP(NativeReadVehicleOwnSlice, ctx.r3.u64 = ai::ReadVehicleOwnSlice(base, ctx.r3.u32))
 
 // Runs the recompiled version with the native flag off.
 template <GuestFunction recompiled>
@@ -625,6 +627,8 @@ enum Kind {
   kReactToOthers,
   kStartGroup,
   kStartRanked,
+  kReadVehicle,
+  kReadVehicleOwnSlice,
 };
 
 }  // namespace
@@ -915,6 +919,10 @@ void AiDrivers(Context& h) {
        kStartGroup, 2000},
       {"AiDrivers::StartRanked (sub_8213A8B0)", Original<__imp__sub_8213A8B0>,
        NativeStartRanked, kStartRanked, 2000},
+      {"AiDriver::ReadVehicle (sub_821467F0)", Original<__imp__sub_821467F0>, NativeReadVehicle,
+       kReadVehicle, 3000},
+      {"AiDriver::ReadVehicleOwnSlice (sub_821469D0)", Original<__imp__sub_821469D0>,
+       NativeReadVehicleOwnSlice, kReadVehicleOwnSlice, 2000},
   };
   const uint32_t area = memory::Alloc(kAreaBytes, 0);
   const uint32_t driver = area + kDriver, vehicle = area + kVehicle, io = area + kIo;
@@ -1438,6 +1446,8 @@ void AiDrivers(Context& h) {
         case kResetFollow:
           break;
         case kAllSettled:
+        case kReadVehicle:
+        case kReadVehicleOwnSlice:
         case kUpdateAgainstPlayer: {
           // The racers: up to 7, flag 0x10 half the time, an index 0 to 6 or -1.
           const uint32_t count = f.kind == kAllSettled && r.Below(8) == 0 ? 0 : 1 + r.Below(7);
@@ -1461,6 +1471,49 @@ void AiDrivers(Context& h) {
             guest::StoreU32(h.base, vehicles + i * kVehicleBytes + 6148, flags[r.Below(5)]);
           }
           drivers = table;
+          if (f.kind == kReadVehicle || f.kind == kReadVehicleOwnSlice) {
+            // Always a vehicle and its body (io + 0x20: its angular velocity
+            // at +96, its orientation at +224), read without checks; the
+            // vehicle's track position (its identity, +5232: the route
+            // position +4, the point +16) on a route (test_route.h), its
+            // speed (+48), +2356, +316 and +320; the orientation's x and z
+            // now and then 0.0 (either sign); the slice record (r4): one of
+            // the route's, now and then any bytes or none.
+            const test_route::Route route =
+                test_route::BuildRoute(h.base, route_area, route_table, r);
+            route_file = route_area + test_route::kFile;
+            guest::StoreU32(h.base, driver + 160, vehicle);
+            const uint32_t body = io + 0x20;
+            guest::StoreU32(h.base, vehicle + 336, body);
+            test_route::RandomPosition(h.base, vehicle + 5232 + 4, route, r);
+            for (uint32_t i = 0; i < 4; i++) {
+              guest::StoreU32(h.base, vehicle + 5232 + 16 + 4 * i, RandomFloat(r, 150.0f));
+            }
+            guest::StoreU32(h.base, vehicle + 48, RandomFloat(r, 80.0f));
+            guest::StoreU32(h.base, vehicle + 2356, RandomFloat(r, 3.0f));
+            guest::StoreU32(h.base, vehicle + 316, RandomFloat(r, 1.0f));
+            guest::StoreU32(h.base, vehicle + 320, RandomFloat(r, 1.0f));
+            guest::StoreU32(h.base, body + 96 + 4, RandomFloat(r, 4.0f));
+            for (uint32_t at : {0u, 8u}) {
+              guest::StoreU32(h.base, body + 224 + at, r.Below(3) == 0
+                                                           ? (r.Below(2) ? 0u : 0x80000000u)
+                                                           : RandomFloat(r, 1.0f));
+            }
+            for (uint32_t at : {120u, 124u}) {
+              guest::StoreU32(h.base, driver + at, RandomFloat(r, 3.0f));
+            }
+            if (f.kind == kReadVehicle) {
+              const uint32_t section = r.Below(route.sections);
+              r4 = r.Below(8) == 0   ? 0
+                   : r.Below(8) == 0 ? io + 0xC0
+                                     : route.Address(section) + 124 +
+                                           84 * r.Below(route.Slices(section));
+            }
+            floats.push_back({kDriver + 96, 3});
+            floats.push_back({kDriver + 112, 2});
+            floats.push_back({kDriver + 144, 2});
+            floats.push_back({kDriver + 156, 1});
+          }
           if (f.kind == kUpdateAgainstPlayer) {
             guest::StoreU32(h.base, driver + 0, r.Below(8));
             guest::StoreU32(h.base, driver + 100, FloatBits(float(r.Below(400)) / 10.0f));

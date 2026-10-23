@@ -147,7 +147,8 @@ ITC_FLAG_BOOL(native_ai_drivers, true, "ITC",
               "sub_82145B08, AiDrivers::UpdateAll sub_82139628 (the drivers' updates, through "
               "their +6148, on the translated code), AiOther::PlanReaction sub_821456F8, "
               "AiDriver::ReactToOthers sub_82145CA8, AiDrivers::StartGroup sub_8213A000, "
-              "AiDrivers::StartRanked sub_8213A8B0) "
+              "AiDrivers::StartRanked sub_8213A8B0, AiDriver::ReadVehicle sub_821467F0, "
+              "AiDriver::ReadVehicleOwnSlice sub_821469D0) "
               "natively instead of "
               "through the translated code (the same words, bit for bit; checked by "
               "--run_harnesses=ai_drivers). Those "
@@ -455,3 +456,10 @@ ITC_AI_DRIVERS(82145CA8, ctx.r3.u64 = ReactToOthers(base, ctx.r3.u32, ctx.r4.u32
 
 ITC_AI_DRIVERS(8213A000, ctx.r3.u64 = StartGroup(base, ctx.r1.u32 - 160))
 ITC_AI_DRIVERS(8213A8B0, ctx.r3.u64 = StartRanked(base, ctx.r1.u32 - 224))
+
+// --- Reading the vehicle (r3 UpdateAgainstPlayer's, as the originals leave
+// it) ---
+
+// r4 = the slice record or 0.
+ITC_AI_DRIVERS(821467F0, ctx.r3.u64 = ReadVehicle(base, ctx.r3.u32, ctx.r4.u32))
+ITC_AI_DRIVERS(821469D0, ctx.r3.u64 = ReadVehicleOwnSlice(base, ctx.r3.u32))
