@@ -100,4 +100,43 @@ uint32_t On40Loaded(uint8_t* base, uint32_t table) {
   return SwapTable<SwapEntry40>(base, table, 40, 4);
 }
 
+uint32_t IsLoading(uint8_t* base) {
+  ITC_NATIVE_RUNNING("sub_82117158 DataTables::IsLoading");
+  return guest::LoadU32(base, guest::LoadU32(base, kTables) + 4) != 0 ? 1 : 0;
+}
+
+uint32_t Item(uint8_t* base, uint32_t id) {
+  ITC_NATIVE_RUNNING("sub_82117178 DataTables::Item");
+  return guest::LoadU32(base, guest::LoadU32(base, kTables) + 16) + 3008 * id;
+}
+
+uint32_t Entry56(uint8_t* base, uint32_t table, uint32_t entry) {
+  ITC_NATIVE_RUNNING("sub_82117190 DataTables::Entry56");
+  return guest::LoadU32(base, guest::LoadU32(base, kTables) + 4 * (table + 5)) + 56 * entry;
+}
+
+int32_t Find20(uint8_t* base, uint32_t key8, uint32_t key0) {
+  ITC_NATIVE_RUNNING("sub_821171B0 DataTables::Find20");
+  uint32_t entry = guest::LoadU32(base, guest::LoadU32(base, kTables) + 52);
+  for (int32_t index = 0;; index++, entry += 20) {
+    const uint32_t first = guest::LoadU32(base, entry);
+    if (first == 0xFFFFFFFFu) {
+      return -1;
+    }
+    if (guest::LoadU32(base, entry + 8) == key8 && first == key0) {
+      return index;
+    }
+  }
+}
+
+uint32_t Entry20(uint8_t* base, uint32_t index) {
+  ITC_NATIVE_RUNNING("sub_82117210 DataTables::Entry20");
+  return guest::LoadU32(base, guest::LoadU32(base, kTables) + 52) + 20 * index;
+}
+
+uint32_t Entry40(uint8_t* base, uint32_t index) {
+  ITC_NATIVE_RUNNING("sub_82117228 DataTables::Entry40");
+  return guest::LoadU32(base, guest::LoadU32(base, kTables) + 56) + 40 * index;
+}
+
 }  // namespace data_tables

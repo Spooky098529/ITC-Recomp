@@ -41,6 +41,13 @@ ITC_NATIVE_STEP(NativeOn20Loaded, ctx.r3.u64 = dt::On20Loaded(base, ctx.r6.u32))
 ITC_NATIVE_STEP(NativeOn40Loaded, ctx.r3.u64 = dt::On40Loaded(base, ctx.r6.u32))
 ITC_NATIVE_STEP(NativeOnItemsLoaded, dt::OnItemsLoaded(base, ctx.r6.u32))
 ITC_NATIVE_STEP(NativeOnLoaded84, dt::OnLoaded84(base))
+ITC_NATIVE_STEP(NativeIsLoading, ctx.r3.u64 = dt::IsLoading(base))
+ITC_NATIVE_STEP(NativeItem, ctx.r3.u64 = dt::Item(base, ctx.r3.u32))
+ITC_NATIVE_STEP(NativeRecordsItem, ctx.r3.u64 = dt::Item(base, ctx.r4.u32))
+ITC_NATIVE_STEP(NativeEntry56, ctx.r3.u64 = dt::Entry56(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_STEP(NativeFind20, ctx.r3.s64 = dt::Find20(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_STEP(NativeEntry20, ctx.r3.u64 = dt::Entry20(base, ctx.r3.u32))
+ITC_NATIVE_STEP(NativeEntry40, ctx.r3.u64 = dt::Entry40(base, ctx.r3.u32))
 
 #undef ITC_NATIVE_STEP
 
@@ -216,12 +223,147 @@ void Callbacks(Context& h) {
   }
 }
 
+// The object's words at +0 to +60 random (its tables' pointers), +4 the
+// loads pending often 0, the global pointed at it.
+void RandomObject(Context& h) {
+  guest::StoreU32(h.base, dt::kTables, h.data);
+  for (uint32_t offset = 0; offset < 64; offset += 4) {
+    guest::StoreU32(h.base, h.data + offset, uint32_t(h.random.Next()));
+  }
+  if (h.random.Below(2) == 0) {
+    guest::StoreU32(h.base, h.data + 4, 0);
+  }
+}
+
+// An index: the game's range, an edge, or any word; its upper half random
+// (the register's, which the originals carry and the game doesn't read).
+uint64_t RandomIndex(Random& r, uint32_t count) {
+  static const uint32_t kEdges[] = {0, 1, 399, 400, 0x7FFFFFFFu, 0x80000000u, 0xFFFFFFFFu};
+  uint32_t low;
+  switch (r.Below(3)) {
+    case 0:
+      low = kEdges[r.Below(uint32_t(std::size(kEdges)))];
+      break;
+    case 1:
+      low = uint32_t(r.Next());
+      break;
+    default:
+      low = r.Below(count);
+      break;
+  }
+  return (r.Below(2) == 0 ? 0 : r.Next() << 32) | low;
+}
+
+void Accessors(Context& h) {
+  {
+    Results results("sub_82117158 DataTables::IsLoading");
+    for (int i = 0; i < 100; i++) {
+      Case(
+          h, results, [&] { RandomObject(h); },
+          [&](PPCContext& t) { t.r3.u64 = h.random.Next(); }, __imp__sub_82117158,
+          NativeIsLoading, fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    Results results("sub_82117178 DataTables::Item");
+    for (int i = 0; i < 300; i++) {
+      Case(
+          h, results, [&] { RandomObject(h); },
+          [&](PPCContext& t) { t.r3.u64 = RandomIndex(h.random, 400); }, __imp__sub_82117178,
+          NativeItem, fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    Results results("sub_82116DA8 ItemRecords::Item");
+    for (int i = 0; i < 300; i++) {
+      Case(
+          h, results, [&] { RandomObject(h); },
+          [&](PPCContext& t) {
+            t.r3.u64 = h.random.Next();
+            t.r4.u64 = RandomIndex(h.random, 400);
+          },
+          __imp__sub_82116DA8, NativeRecordsItem, fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    // Tables -5 to 10 (the object's words), the game's 0 to 7 most often.
+    Results results("sub_82117190 DataTables::Entry56");
+    for (int i = 0; i < 300; i++) {
+      Case(
+          h, results, [&] { RandomObject(h); },
+          [&](PPCContext& t) {
+            const uint32_t table = h.random.Below(3) == 0 ? h.random.Below(16) - 5
+                                                          : h.random.Below(8);
+            t.r3.u64 = (h.random.Below(2) == 0 ? 0 : h.random.Next() << 32) | table;
+            t.r4.u64 = RandomIndex(h.random, 64);
+          },
+          __imp__sub_82117190, NativeEntry56, fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    Results results("sub_82117210 DataTables::Entry20");
+    for (int i = 0; i < 300; i++) {
+      Case(
+          h, results, [&] { RandomObject(h); },
+          [&](PPCContext& t) { t.r3.u64 = RandomIndex(h.random, 64); }, __imp__sub_82117210,
+          NativeEntry20, fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    Results results("sub_82117228 DataTables::Entry40");
+    for (int i = 0; i < 300; i++) {
+      Case(
+          h, results, [&] { RandomObject(h); },
+          [&](PPCContext& t) { t.r3.u64 = RandomIndex(h.random, 64); }, __imp__sub_82117228,
+          NativeEntry40, fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    // A table of 0 to 59 entries at +64 (keys from a few values, so some
+    // repeat), searched for keys in it, near it or anywhere.
+    Results results("sub_821171B0 DataTables::Find20");
+    const uint32_t table = h.data + 64;
+    for (int i = 0; i < 400; i++) {
+      const uint32_t entries = h.random.Below(60);
+      Case(
+          h, results,
+          [&] {
+            RandomObject(h);
+            guest::StoreU32(h.base, h.data + 52, table);
+            for (uint32_t e = 0; e < entries; e++) {
+              const uint32_t entry = table + 20 * e;
+              RandomWords(h, entry, 5);
+              guest::StoreU32(h.base, entry, h.random.Below(6));
+              guest::StoreU32(h.base, entry + 8, h.random.Below(6));
+            }
+            guest::StoreU32(h.base, table + 20 * entries, 0xFFFFFFFFu);
+          },
+          [&](PPCContext& t) {
+            const bool any = h.random.Below(4) == 0;
+            t.r3.u64 = (h.random.Below(2) == 0 ? 0 : h.random.Next() << 32) |
+                       (any ? uint32_t(h.random.Next()) : h.random.Below(7));
+            t.r4.u64 = (h.random.Below(2) == 0 ? 0 : h.random.Next() << 32) |
+                       (any ? uint32_t(h.random.Next()) : h.random.Below(7));
+          },
+          __imp__sub_821171B0, NativeFind20, fmt::format("case {} ({} entries)", i, entries));
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void DataTables(Context& h) {
   Words(h);
   Entries(h);
   Callbacks(h);
+  Accessors(h);
 }
 
 }  // namespace harness

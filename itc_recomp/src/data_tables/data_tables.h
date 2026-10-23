@@ -35,4 +35,20 @@ uint32_t On56Loaded(uint8_t* base, uint32_t table);
 uint32_t On20Loaded(uint8_t* base, uint32_t table);
 uint32_t On40Loaded(uint8_t* base, uint32_t table);
 
+// The accessors, on the tables the global points at (no bounds checks, as
+// the originals'):
+// DataTables::IsLoading (sub_82117158): 1 while loads are pending, else 0.
+uint32_t IsLoading(uint8_t* base);
+// DataTables::Item (sub_82117178): item `id`'s 3,008-byte entry (asset 94).
+uint32_t Item(uint8_t* base, uint32_t id);
+// DataTables::Entry56 (sub_82117190): entry `entry` of 56-byte table `table`.
+uint32_t Entry56(uint8_t* base, uint32_t table, uint32_t entry);
+// DataTables::Find20 (sub_821171B0): the index of the first 20-byte entry
+// (asset 95) whose +8 is `key8` and +0 is `key0`, or -1.
+int32_t Find20(uint8_t* base, uint32_t key8, uint32_t key0);
+// DataTables::Entry20 (sub_82117210) and Entry40 (sub_82117228): an entry
+// of asset 95's and 96's tables.
+uint32_t Entry20(uint8_t* base, uint32_t index);
+uint32_t Entry40(uint8_t* base, uint32_t index);
+
 }  // namespace data_tables
