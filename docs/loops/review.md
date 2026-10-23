@@ -35,6 +35,21 @@ When the user has reviewed a run's section, its heading gets
   waits on XACT (the cue and engine calls through its vtables), the
   file layer and the string helpers; `sub_82092B78` (a std allocator)
   has no row anywhere.
+  `xact.md` (new, 149 rows: the engine with Initialize, DoWork, the
+  bank creation and categories, its global settings and audio callback
+  `sub_825C0248` run by XAudio on its own thread, the sound and wave
+  banks, the cue, sound and fader), `known-data.md`'s XACT objects, the
+  `.xsb` and `.xwb` layouts, volume tables and clock globals; 4 leads
+  (the rest of XACT, about 265 functions; the voice class with XAudio;
+  shared helpers). For review: names follow the XACT3 interfaces where
+  slots and arguments make them clear, else "probably"; the boundary
+  named in the intro (XAudio's voices and callback, the kernel's
+  critical sections and clock, XMemAlloc); a correction to
+  `sound-cues.md` and `known-data.md` (the cue's slot +60 is
+  GetProperties, writing the emitter's +136 block's first 14 bytes, not
+  3D settings). The mapping agent read the vtables from `default.xex`
+  decrypted and decompressed into its scratchpad with Python's
+  `cryptography` and the retail key (nothing of it in the repo).
 
 ## Run 2026-10-22 22:11 (`b7-loop-22-10-26-2`)
 
