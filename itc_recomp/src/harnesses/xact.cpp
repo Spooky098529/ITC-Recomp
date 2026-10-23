@@ -276,6 +276,12 @@ void NativeWaveBankGetWaveDurations(PPCContext& ctx, uint8_t* base) {
   guest::StoreU32(base, ctx.r6.u32, result->loop_length_ms);
   ctx.r3.u64 = 0;
 }
+ITC_NATIVE_STEP(NativeWaveEntryGetPlayOffset,
+                ctx.r3.u64 = xa::WaveEntryGetPlayOffset(base, ctx.r3.u32))
+// The accessor in the original's stack slot (r1 - 80), as the adapter.
+ITC_NATIVE_OPTIONAL(NativeWaveBankGetWaveRegion,
+                    xa::WaveBankGetWaveRegion(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                              ctx.r1.u32 - 80))
 ITC_NATIVE_OPTIONAL(NativeSoundBankReleaseWaveBanks,
                     xa::SoundBankReleaseWaveBanks(base, ctx.r3.u32))
 ITC_NATIVE_OPTIONAL(NativeSoundBankOnWaveBankGone,
@@ -1476,6 +1482,7 @@ void WaveEntriesAndLookups(Context& h) {
       {__imp__sub_82099BA0, NativeWaveEntryGetPlayLength, "GetPlayLength"},
       {__imp__sub_820A8958, NativeWaveEntryGetLoopStart, "GetLoopStart"},
       {__imp__sub_82379D50, NativeWaveEntryGetLoopLength, "GetLoopLength"},
+      {__imp__sub_8220BC28, NativeWaveEntryGetPlayOffset, "GetPlayOffset (sub_8220BC28)"},
   };
   for (int i = 0; i < 100; i++) {
     auto setup = [&] {
@@ -2020,6 +2027,66 @@ void WaveDurationsAndReleases(Context& h) {
   results.Report();
 }
 
+// GetWaveRegion: a wave bank of 4 entries at the area's start (its entry
+// table at +1024, seek segment at +2048: the waves' offsets, then their
+// tables), by format tag, with or without a loop region; the out block at
+// +3584 (its +8 left at the fill). The accessor goes on the harness stack.
+void WaveRegions(Context& h) {
+  Results results("xact wave regions");
+  const uint32_t d = h.data;
+  for (int i = 0; i < 300; i++) {
+    const uint32_t tag = i % 4;
+    const uint32_t index = h.random.Below(4) | (i % 6 == 0 ? 0x43210000u : 0);
+    auto setup = [&] {
+      WaveBank(h, 4);
+      const uint32_t entry = d + 1024 + 24 * (index & 0xFFFF);
+      const uint32_t format = guest::LoadU32(h.base, entry + 4);
+      guest::StoreU32(h.base, entry + 4, (format & ~3u) | tag);
+      switch (i % 5) {
+        case 0:  // no loop region
+          guest::StoreU32(h.base, entry + 16, 0);
+          guest::StoreU32(h.base, entry + 20, 0);
+          break;
+        case 1:  // a loop start only, or a loop length only
+          guest::StoreU32(h.base, entry + 16 + 4 * h.random.Below(2), 0);
+          break;
+        case 2:
+          break;  // random words
+        default:
+          guest::StoreU32(h.base, entry + 16, h.random.Below(1000000));
+          guest::StoreU32(h.base, entry + 20, h.random.Below(1000000));
+          guest::StoreU32(h.base, entry + 12,
+                          h.random.Below(4) * 0x10000 + h.random.Below(99));
+          break;
+      }
+      for (uint32_t k = 0; k < 4; k++) {
+        guest::StoreU32(h.base, d + 2048 + 4 * k, 64 * k);
+      }
+      SeekTable(h, d + 2048 + 16 + 64 * (index & 0xFFFF), i % 7 != 0);
+    };
+    Case(h, results, setup,
+         [&](PPCContext& t) { t.r3.u64 = d; t.r4.u64 = index; t.r5.u64 = d + 3584; },
+         __imp__sub_825C8440, NativeWaveBankGetWaveRegion, {},
+         fmt::format("XACTWaveBank::GetWaveRegion {} (tag {}, index {:#x})", i, tag, index));
+  }
+  // Declines: a vtable (copied at +3800) whose slot +16 isn't GetEntry, or
+  // whose slot +20 isn't GetSeekTable for an XMA wave.
+  for (uint32_t slot : {16u, 20u}) {
+    Fill(h.base, d, kScratchBytes);
+    WaveBank(h, 4);
+    for (uint32_t k = 0; k < 32; k++) {
+      guest::StoreU32(h.base, d + 3800 + 4 * k, guest::LoadU32(h.base, kWaveBankVtable + 4 * k));
+    }
+    guest::StoreU32(h.base, d + 3800 + slot, 0x82000000);
+    guest::StoreU32(h.base, d, d + 3800);
+    const uint32_t format = guest::LoadU32(h.base, d + 1024 + 4);
+    guest::StoreU32(h.base, d + 1024 + 4, (format & ~3u) | 1);
+    CheckDeclines(h, results, NativeWaveBankGetWaveRegion, d, 0,
+                  fmt::format("XACTWaveBank::GetWaveRegion, slot +{}", slot));
+  }
+  results.Report();
+}
+
 }  // namespace
 
 void Xact(Context& h) {
@@ -2038,6 +2105,7 @@ void Xact(Context& h) {
   SoundsAndCueVariables(h);
   SettingsLoads(h);
   WaveDurationsAndReleases(h);
+  WaveRegions(h);
 }
 
 }  // namespace harness

@@ -39,7 +39,9 @@ ITC_FLAG_BOOL(native_xact, true, "ITC",
               "loading the global settings, sub_825C26E0 and sub_825C3B68, and their DSP "
               "preset and RPC set-up where nothing is to do, sub_825C27C0 and sub_825C2910; the "
               "wave durations, sub_825CC380; letting go of wave banks without listeners to "
-              "tell, sub_825C6A20 and sub_825C7798) natively "
+              "tell, sub_825C6A20 and sub_825C7798; the wave region, sub_825C8440, and the "
+              "folded getter it calls, sub_8220BC28 (the menu list's too: the same load)) "
+              "natively "
               "instead of through the translated code (same results; checked by "
               "--run_harnesses=xact)");
 
@@ -366,3 +368,10 @@ extern "C" REX_FUNC(sub_825C6A20) {
   ctx.r3.u64 = *result;
 }
 ITC_XACT_OPTIONAL(825C7798, SoundBankOnWaveBankGone(base, ctx.r3.u32, ctx.r4.u32))
+
+// The wave region; its entry accessor in the original's stack slot (r1 -
+// 80). The folded getter sub_8220BC28 is also the menu list's
+// (docs/functions/functions.md): one load, the same for every caller.
+ITC_XACT_WORD(8220BC28, WaveEntryGetPlayOffset(base, ctx.r3.u32))
+ITC_XACT_OPTIONAL(825C8440, WaveBankGetWaveRegion(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                                  ctx.r1.u32 - 80))

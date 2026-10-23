@@ -421,4 +421,21 @@ std::optional<uint32_t> SoundBankReleaseWaveBanks(uint8_t* base, uint32_t bank);
 // would be asked (self + 224) or the slot isn't sub_825C8540.
 std::optional<uint32_t> SoundBankOnWaveBankGone(uint8_t* base, uint32_t self, uint32_t wave_bank);
 
+// --- Batch 11: the wave region ---
+
+// The folded getter sub_8220BC28 (the menu list's GetPreviousSelection in
+// docs/functions/functions.md; one load, the same for every caller): the
+// word at +20, on an entry accessor the copied entry's play offset.
+uint32_t WaveEntryGetPlayOffset(uint8_t* base, uint32_t entry);
+// XACTWaveBank::GetWaveRegion (sub_825C8440): an entry accessor built at
+// `accessor` (the original's stack slot) for the wave, then `out`: +0 the
+// wave data (+276) + the play offset, +4 the play length, +12 the loop
+// start in bytes, +20 the loop start, +16 and +24 the loop region in bytes
+// and the loop end, or (no loop region) the play length and the duration.
+// Returns r3 (the +16 or +24 word last stored). nullopt, with `out` left
+// as it was, where the bank's slot +16 isn't GetEntry, Set declines, or an
+// XMA wave's slot +20 isn't GetSeekTable.
+std::optional<uint32_t> WaveBankGetWaveRegion(uint8_t* base, uint32_t bank, uint32_t index,
+                                              uint32_t out, uint32_t accessor);
+
 }  // namespace xact

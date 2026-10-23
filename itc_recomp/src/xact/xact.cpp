@@ -1624,4 +1624,44 @@ std::optional<uint32_t> SoundBankOnWaveBankGone(uint8_t* base, uint32_t self,
   return WaveBankRemoveListener(base, wave_bank, self - 8 == 0 ? 0 : self);
 }
 
+// --- Batch 11: the wave region ---
+
+uint32_t WaveEntryGetPlayOffset(uint8_t* base, uint32_t entry) {
+  ITC_NATIVE_RUNNING("sub_8220BC28 MenuList::GetPreviousSelection");
+  return guest::LoadU32(base, entry + 20);
+}
+
+std::optional<uint32_t> WaveBankGetWaveRegion(uint8_t* base, uint32_t bank, uint32_t index,
+                                              uint32_t out, uint32_t accessor) {
+  if (!SlotIs(base, bank, 16, kGetEntry)) {
+    return std::nullopt;
+  }
+  // The accessor as the original builds it on its stack (Set copies the
+  // entry), then read through the accessor functions.
+  WaveEntryConstruct(base, accessor);
+  if (!WaveEntrySet(base, accessor, index, bank) ||
+      ((guest::LoadU32(base, accessor + 16) & 3) == 1 &&
+       !SlotIs(base, bank, 20, kGetSeekTable))) {
+    return std::nullopt;
+  }
+  ITC_NATIVE_RUNNING("sub_825C8440 XACTWaveBank::GetWaveRegion");
+  const uint32_t data = guest::LoadU32(base, bank + 276);
+  guest::StoreU32(base, out + 0, data + WaveEntryGetPlayOffset(base, accessor));
+  guest::StoreU32(base, out + 4, WaveEntryGetPlayLength(base, accessor));
+  guest::StoreU32(base, out + 12, *WaveEntryGetLoopStartBytes(base, accessor, 0));
+  guest::StoreU32(base, out + 20, WaveEntryGetLoopStart(base, accessor));
+  const uint32_t start = WaveEntryGetLoopStart(base, accessor);
+  guest::StoreU32(base, out + 24, WaveEntryGetLoopLength(base, accessor) + start);
+  const uint32_t region = WaveEntryGetLoopRegion(accessor);
+  if (guest::LoadU32(base, region + 0) == 0 && guest::LoadU32(base, region + 4) == 0) {
+    guest::StoreU32(base, out + 16, WaveEntryGetPlayLength(base, accessor));
+    const uint32_t duration = WaveEntryGetDuration(base, accessor);
+    guest::StoreU32(base, out + 24, duration);
+    return duration;
+  }
+  const uint32_t bytes = *WaveEntryGetLoopLengthBytes(base, accessor);
+  guest::StoreU32(base, out + 16, bytes);
+  return bytes;
+}
+
 }  // namespace xact
