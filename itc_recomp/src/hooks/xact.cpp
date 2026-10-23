@@ -29,7 +29,11 @@ ITC_FLAG_BOOL(native_xact, true, "ITC",
               "accessors, sub_825C2200 to sub_825C2618, and their users, sub_825C3548, "
               "sub_825C3F90, sub_825C4000, sub_825C4070, sub_825C0598, sub_825C05B0, "
               "sub_825C0708, sub_825C0748 and sub_825C04D8, while the settings' slots are "
-              "those functions) natively "
+              "those functions; the wave entries' leaves, sub_825CEE10, sub_825CEE28, "
+              "sub_825CEEA0 and the folded getters sub_82099BA0, sub_820A8958 and sub_82379D50; "
+              "XACTSound::GetPitch, sub_825CAC48; the wave banks' listeners, sub_825C8690 and "
+              "sub_825C8540; the wave bank lookups, sub_825C0360 and sub_825C7218; the "
+              "variable's destructors, sub_825C2128 and sub_825C3EE0) natively "
               "instead of through the translated code (same results; checked by "
               "--run_harnesses=xact)");
 
@@ -260,3 +264,38 @@ extern "C" REX_FUNC(sub_825C04D8) {
   ctx.f1.f64 = result->f1;
   ctx.r3.u64 = result->r3;
 }
+
+// The wave entries' leaves (the folded getters' callers in play are
+// XACT's; the same results for the game code folded with them), the
+// sound's pitch, the wave banks' listeners and the sound banks' wave bank
+// lookup.
+ITC_XACT_WORD(825CEE10, WaveEntryHasLoopRegion(base, ctx.r3.u32))
+ITC_XACT_WORD(825CEE28, WaveEntryGetFormatTag(base, ctx.r3.u32))
+ITC_XACT_WORD(825CEEA0, WaveEntryMsToSamples(base, ctx.r3.u32, ctx.r4.u32))
+ITC_XACT_WORD(82099BA0, WaveEntryGetPlayLength(base, ctx.r3.u32))
+ITC_XACT_WORD(820A8958, WaveEntryGetLoopStart(base, ctx.r3.u32))
+ITC_XACT_WORD(82379D50, WaveEntryGetLoopLength(base, ctx.r3.u32))
+extern "C" REX_FUNC(sub_825CAC48) {
+  ITC_XACT_FALLBACK(825CAC48)
+  ctx.f1.f64 = SoundGetPitch(base, ctx.r3.u32);
+}
+ITC_XACT_HEAP_WORD(825C8690, WaveBankAddListener(base, ctx.r3.u32, ctx.r4.u32))
+ITC_XACT_WORD(825C8540, WaveBankRemoveListener(base, ctx.r3.u32, ctx.r4.u32))
+ITC_XACT_OPTIONAL(825C0360, EngineFindWaveBank(base, ctx.r3.u32, ctx.r4.u32))
+// GetWaveBank registers with the wave bank (AddListener, which
+// allocates): the original unless --native_heap routes the game's heap to
+// the native layer.
+extern "C" REX_FUNC(sub_825C7218) {
+  ITC_XACT_FALLBACK(825C7218)
+  const auto result = hooks::NativeHeapActive()
+                          ? SoundBankGetWaveBank(base, ctx.r3.u32, ctx.r4.u32)
+                          : std::nullopt;
+  if (!result) {
+    __imp__sub_825C7218(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = *result;
+}
+// XACTVariable::~XACTVariable (sub_825C2128) has no adapter: its only
+// caller, the deleting destructor, is native.
+ITC_XACT_HEAP_WORD(825C3EE0, VariableDeletingDestruct(base, ctx.r3.u32, ctx.r4.u32))

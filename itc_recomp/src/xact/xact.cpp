@@ -1182,4 +1182,165 @@ std::optional<CategoryVolume> EngineGetCategoryVolume(uint8_t* base, uint32_t en
   return CategoryVolume{volume, r3};
 }
 
+// --- Batch 7: the wave entries' leaves, the wave banks' listeners and the
+// sound banks' wave bank lookup, the variable's destructor ---
+
+uint32_t WaveEntryHasLoopRegion(uint8_t* base, uint32_t entry) {
+  ITC_NATIVE_RUNNING("sub_825CEE10 XACTWaveEntry::HasLoopRegion");
+  return guest::LoadU32(base, entry + 32) != 0 ? 1 : 0;
+}
+
+uint32_t WaveEntryGetFormatTag(uint8_t* base, uint32_t entry) {
+  ITC_NATIVE_RUNNING("sub_825CEE28 XACTWaveEntry::GetFormatTag");
+  const uint32_t tag = guest::LoadU32(base, entry + 16) & 3;
+  return tag < 1 ? 0 : tag == 1 ? 1 : 3;
+}
+
+uint32_t WaveEntryMsToSamples(uint8_t* base, uint32_t entry, uint32_t ms) {
+  ITC_NATIVE_RUNNING("sub_825CEEA0 XACTWaveEntry::MsToSamples");
+  const uint64_t rate = (guest::LoadU32(base, entry + 16) >> 5) & 0x3FFFF;
+  return uint32_t(rate * ms / 1000);
+}
+
+uint32_t WaveEntryGetPlayLength(uint8_t* base, uint32_t entry) {
+  ITC_NATIVE_RUNNING("sub_82099BA0 XACTWaveEntry::GetPlayLength");
+  return guest::LoadU32(base, entry + 24);
+}
+
+uint32_t WaveEntryGetLoopStart(uint8_t* base, uint32_t entry) {
+  ITC_NATIVE_RUNNING("sub_820A8958 XACTWaveEntry::GetLoopStart");
+  return guest::LoadU32(base, entry + 28);
+}
+
+uint32_t WaveEntryGetLoopLength(uint8_t* base, uint32_t entry) {
+  ITC_NATIVE_RUNNING("sub_82379D50 XACTWaveEntry::GetLoopLength");
+  return guest::LoadU32(base, entry + 32);
+}
+
+double SoundGetPitch(uint8_t* base, uint32_t sound) {
+  ITC_NATIVE_RUNNING("sub_825CAC48 XACTSound::GetPitch");
+  return double(float(double(guest::LoadFloat(base, sound + 120)) +
+                      double(guest::LoadFloat(base, sound + 92))));
+}
+
+uint32_t WaveBankAddListener(uint8_t* base, uint32_t self, uint32_t listener) {
+  ITC_NATIVE_RUNNING("sub_825C8690 XACTWaveBank::AddListener");
+  return NodePoolPushBack(base, self + 20, listener);
+}
+
+uint32_t WaveBankRemoveListener(uint8_t* base, uint32_t self, uint32_t listener) {
+  ITC_NATIVE_RUNNING("sub_825C8540 XACTWaveBank::RemoveListener");
+  return RemoveListener(base, self, self + 224, self + 20, listener);
+}
+
+namespace {
+
+constexpr uint32_t kWaveBankGetName = 0x825C85B8;     // the wave bank's slot +24
+constexpr uint32_t kGetWaveBankNames = 0x825C7B70;    // the sound bank's slot +80
+constexpr uint32_t kWaveBankAddListener = 0x825C8690;  // its +4 interface's slot +0
+
+}  // namespace
+
+std::optional<uint32_t> EngineFindWaveBank(uint8_t* base, uint32_t engine, uint32_t name) {
+  const uint32_t end = engine + 56;
+  // Every prepared bank's slot +24 first (the walk changes nothing, but
+  // the decline comes before any work).
+  for (uint32_t node = guest::LoadU32(base, engine + 60); node != end;
+       node = guest::LoadU32(base, node + 4)) {
+    const uint32_t bank = node != 0 ? node - 8 : 0;
+    if (guest::LoadU32(base, bank + 252) != 0 && !SlotIs(base, bank, 24, kWaveBankGetName)) {
+      return std::nullopt;
+    }
+  }
+  ITC_NATIVE_RUNNING("sub_825C0360 XACTEngine::FindWaveBank");
+  for (uint32_t node = guest::LoadU32(base, engine + 60); node != end;
+       node = guest::LoadU32(base, node + 4)) {
+    const uint32_t bank = node != 0 ? node - 8 : 0;
+    if (guest::LoadU32(base, bank + 252) == 0) {
+      continue;
+    }
+    uint32_t a = WaveBankGetName(base, bank), b = name;
+    for (;; a++, b++) {
+      const uint8_t c = guest::LoadU8(base, a);
+      if (c == 0 || c != guest::LoadU8(base, b)) {
+        break;
+      }
+    }
+    if (guest::LoadU8(base, a) == guest::LoadU8(base, b)) {
+      return bank;
+    }
+  }
+  return 0;
+}
+
+std::optional<uint32_t> SoundBankGetWaveBank(uint8_t* base, uint32_t bank, uint32_t index) {
+  const uint32_t i = index & 0xFF;
+  const uint32_t slot = guest::LoadU32(base, bank + 244) + (i << 2);
+  const uint32_t cached = guest::LoadU32(base, slot);
+  std::optional<uint32_t> found;
+  if (cached == 0) {
+    if (!SlotIs(base, bank, 80, kGetWaveBankNames)) {
+      return std::nullopt;
+    }
+    const auto names = SoundBankGetWaveBankNames(base, bank);
+    if (!names) {
+      return std::nullopt;
+    }
+    found = EngineFindWaveBank(base, guest::LoadU32(base, bank + 24), *names + (i << 6));
+    if (!found || (*found != 0 && !SlotIs(base, *found + 4, 0, kWaveBankAddListener))) {
+      return std::nullopt;
+    }
+  }
+  ITC_NATIVE_RUNNING("sub_825C7218 XACTSoundBank::GetWaveBank");
+  if (cached != 0) {
+    return cached;
+  }
+  if (*found != 0) {
+    WaveBankAddListener(base, *found + 4, bank + 8);
+    guest::StoreU32(base, guest::LoadU32(base, bank + 244) + (i << 2), *found);
+  }
+  return *found;
+}
+
+uint32_t VariableDestruct(uint8_t* base, uint32_t variable) {
+  ITC_NATIVE_RUNNING("sub_825C2128 XACTVariable::~XACTVariable");
+  guest::StoreU32(base, variable, kVariableVtable);
+  const uint32_t pool = variable + 24;
+  // Every used node back on the free list, head first.
+  for (uint32_t node = guest::LoadU32(base, pool + 204); node != 0;) {
+    const uint32_t next = guest::LoadU32(base, node + 4);
+    guest::StoreU32(base, node + 4, guest::LoadU32(base, pool));
+    guest::StoreU32(base, pool, node);
+    guest::StoreU32(base, pool + 204, next);
+    node = next;
+  }
+  guest::StoreU32(base, pool + 212, 0);
+  guest::StoreU32(base, pool + 208, 0);
+  const uint32_t r3 = NodePoolFreeChunks(base, pool);
+  guest::StoreU32(base, variable, kListHeadVtable);
+  return r3;
+}
+
+uint32_t VariableDeletingDestruct(uint8_t* base, uint32_t variable, uint32_t flags) {
+  ITC_NATIVE_RUNNING("sub_825C3EE0 XACTVariable::DeletingDestructor");
+  if (flags & 2) {
+    const uint32_t block = variable - 4;
+    const uint32_t count = guest::LoadU32(base, block);
+    uint32_t at = variable + count * 252;
+    for (int32_t i = int32_t(count) - 1; i >= 0; i--) {
+      at -= 252;
+      VariableDestruct(base, at);
+    }
+    if (flags & 1) {
+      memory::crt::XMemFree(block, 0x20840051);
+    }
+    return block;
+  }
+  VariableDestruct(base, variable);
+  if (flags & 1) {
+    memory::crt::XMemFree(variable, 0x20848026);
+  }
+  return variable;
+}
+
 }  // namespace xact

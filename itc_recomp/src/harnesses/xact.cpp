@@ -220,6 +220,29 @@ void NativeEngineGetCategoryVolume(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = result->r3;
 }
 
+ITC_NATIVE_STEP(NativeWaveEntryHasLoopRegion,
+                ctx.r3.u64 = xa::WaveEntryHasLoopRegion(base, ctx.r3.u32))
+ITC_NATIVE_STEP(NativeWaveEntryGetFormatTag, ctx.r3.u64 = xa::WaveEntryGetFormatTag(base, ctx.r3.u32))
+ITC_NATIVE_STEP(NativeWaveEntryMsToSamples,
+                ctx.r3.u64 = xa::WaveEntryMsToSamples(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_STEP(NativeWaveEntryGetPlayLength,
+                ctx.r3.u64 = xa::WaveEntryGetPlayLength(base, ctx.r3.u32))
+ITC_NATIVE_STEP(NativeWaveEntryGetLoopStart, ctx.r3.u64 = xa::WaveEntryGetLoopStart(base, ctx.r3.u32))
+ITC_NATIVE_STEP(NativeWaveEntryGetLoopLength,
+                ctx.r3.u64 = xa::WaveEntryGetLoopLength(base, ctx.r3.u32))
+ITC_NATIVE_STEP(NativeSoundGetPitch, ctx.f1.f64 = xa::SoundGetPitch(base, ctx.r3.u32))
+ITC_NATIVE_STEP(NativeWaveBankAddListener,
+                ctx.r3.u64 = xa::WaveBankAddListener(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_STEP(NativeWaveBankRemoveListener,
+                ctx.r3.u64 = xa::WaveBankRemoveListener(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_OPTIONAL(NativeEngineFindWaveBank,
+                    xa::EngineFindWaveBank(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_OPTIONAL(NativeSoundBankGetWaveBank,
+                    xa::SoundBankGetWaveBank(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_STEP(NativeVariableDestruct, ctx.r3.u64 = xa::VariableDestruct(base, ctx.r3.u32))
+ITC_NATIVE_STEP(NativeVariableDeletingDestruct,
+                ctx.r3.u64 = xa::VariableDeletingDestruct(base, ctx.r3.u32, ctx.r4.u32))
+
 // The odd float words mixed into inputs: NaNs of both kinds and signs,
 // infinities, denormals, signed zeros.
 constexpr uint32_t kOddFloats[] = {0x7FC00000, 0x7F800001, 0xFFC00001, 0xFF800001, 0x7F800000,
@@ -1355,6 +1378,241 @@ void GlobalSettings(Context& h) {
   results.Report();
 }
 
+// Wave bank names for the lookups: the game's (`TXR_XACT.xwb`-style
+// short names) and edge cases (empty, a prefix of another).
+const char* const kWaveBankNames[] = {"", "car", "car_se", "BGM", "Global", "XMA_streams"};
+
+// A string from kWaveBankNames (or random bytes) at `at`, 64 bytes at most.
+void WaveBankName(Context& h, uint32_t at) {
+  if (h.random.Below(4) == 0) {
+    const uint32_t length = h.random.Below(20);
+    for (uint32_t c = 0; c < length; c++) {
+      guest::StoreU8(h.base, at + c, uint8_t(1 + h.random.Below(255)));
+    }
+    guest::StoreU8(h.base, at + length, 0);
+    return;
+  }
+  const char* name = kWaveBankNames[h.random.Below(std::size(kWaveBankNames))];
+  Write(h.base, at, name, uint32_t(std::char_traits<char>::length(name)) + 1);
+}
+
+// Up to three wave banks in an engine's list for FindWaveBank and
+// GetWaveBank: the banks at +0, +320 and +640 (vtable, +4 interface, a
+// pool at +24 with a free node, +252 prepared or not, +284 the data whose
+// +8 is the name at +2048 + 64 k), the engine at +3072 (its list's
+// sentinel at +56, first at +60).
+void WaveBankList(Context& h, uint32_t banks) {
+  const uint32_t d = h.data;
+  const uint32_t engine = d + kEngine;
+  RandomWords(h, engine, 24);
+  uint32_t previous = engine + 56;
+  guest::StoreU32(h.base, engine + 60, engine + 56);
+  for (uint32_t k = 0; k < banks; k++) {
+    const uint32_t bank = d + 320 * k;
+    RandomWords(h, bank, 73);
+    guest::StoreU32(h.base, bank, kWaveBankVtable);
+    guest::StoreU32(h.base, bank + 4, 0x8207601C);
+    RandomPool(h, bank + 24, d + 2400 + 64 * k, h.random.Below(3), 1 + h.random.Below(2));
+    guest::StoreU32(h.base, bank + 252, h.random.Below(4) == 0 ? 0 : 1 + h.random.Below(9));
+    guest::StoreU32(h.base, bank + 284, d + 2048 + 64 * k - 8);
+    WaveBankName(h, d + 2048 + 64 * k);
+    // Linked after the previous node (the sentinel's +4 is the first).
+    guest::StoreU32(h.base, previous == engine + 56 ? engine + 60 : previous + 4, bank + 8);
+    previous = bank + 8;
+  }
+  guest::StoreU32(h.base, previous == engine + 56 ? engine + 60 : previous + 4, engine + 56);
+}
+
+void WaveEntriesAndLookups(Context& h) {
+  Results results("xact wave entries and lookups");
+  const uint32_t d = h.data;
+  constexpr uint32_t kEntry = 3200;
+  struct Leaf {
+    GuestFunction recompiled, native;
+    const char* name;
+  };
+  const Leaf leaves[] = {
+      {__imp__sub_825CEE10, NativeWaveEntryHasLoopRegion, "HasLoopRegion"},
+      {__imp__sub_825CEE28, NativeWaveEntryGetFormatTag, "GetFormatTag"},
+      {__imp__sub_82099BA0, NativeWaveEntryGetPlayLength, "GetPlayLength"},
+      {__imp__sub_820A8958, NativeWaveEntryGetLoopStart, "GetLoopStart"},
+      {__imp__sub_82379D50, NativeWaveEntryGetLoopLength, "GetLoopLength"},
+  };
+  for (int i = 0; i < 100; i++) {
+    auto setup = [&] {
+      RandomWords(h, d + kEntry, 12);
+      if (i % 5 == 0) {
+        guest::StoreU32(h.base, d + kEntry + 32, 0);
+      }
+    };
+    for (const Leaf& leaf : leaves) {
+      Case(h, results, setup, [&](PPCContext& t) { t.r3.u64 = d + kEntry; }, leaf.recompiled,
+           leaf.native, {}, fmt::format("XACTWaveEntry::{} {}", leaf.name, i));
+    }
+    const uint32_t ms = i % 3 == 0 ? uint32_t(h.random.Next()) : h.random.Below(100000);
+    Case(h, results, setup, [&](PPCContext& t) { t.r3.u64 = d + kEntry; t.r4.u64 = ms; },
+         __imp__sub_825CEEA0, NativeWaveEntryMsToSamples, {},
+         fmt::format("XACTWaveEntry::MsToSamples {} ({} ms)", i, ms));
+    Case(h, results, [&] { RandomWords(h, d, 40); },
+         [&](PPCContext& t) { t.r3.u64 = d; t.f1.u64 = 0x123456789ABCDEFull; },
+         __imp__sub_825CAC48, NativeSoundGetPitch, {}, fmt::format("XACTSound::GetPitch {}", i),
+         true);
+  }
+  // The wave banks' listener lists (self = the bank's +4 interface): a free
+  // node always there (no allocation); the listener one in the list or not.
+  for (int i = 0; i < 100; i++) {
+    const uint32_t used = h.random.Below(5);
+    uint32_t listener = 0;
+    auto setup = [&] {
+      RandomWords(h, d, 73);
+      RandomPool(h, d + 24, d + 1024, used, 1 + h.random.Below(3));
+      const uint32_t head = guest::LoadU32(h.base, d + 228);
+      listener = used != 0 && i % 3 != 0 ? guest::LoadU32(h.base, head) : uint32_t(h.random.Next());
+    };
+    auto args = [&](PPCContext& t) { t.r3.u64 = d + 4; t.r4.u64 = listener; };
+    Case(h, results, setup, args, __imp__sub_825C8690, NativeWaveBankAddListener, {},
+         fmt::format("XACTWaveBank::AddListener {}", i));
+    Case(h, results, setup, args, __imp__sub_825C8540, NativeWaveBankRemoveListener, {},
+         fmt::format("XACTWaveBank::RemoveListener {} ({} used)", i, used));
+  }
+  // FindWaveBank over 0 to 3 banks, the name one of theirs or not.
+  for (int i = 0; i < 200; i++) {
+    const uint32_t banks = h.random.Below(4);
+    const uint32_t which = h.random.Below(4);
+    auto setup = [&] {
+      WaveBankList(h, banks);
+      if (which < banks && i % 3 != 0) {
+        const uint32_t name = d + 2048 + 64 * which;
+        Write(h.base, d + 2304, Read(h.base, name, 64).data(), 64);
+      } else {
+        WaveBankName(h, d + 2304);
+      }
+    };
+    Case(h, results, setup, [&](PPCContext& t) { t.r3.u64 = d + kEngine; t.r4.u64 = d + 2304; },
+         __imp__sub_825C0360, NativeEngineFindWaveBank, {},
+         fmt::format("XACTEngine::FindWaveBank {} ({} banks)", i, banks));
+  }
+  // GetWaveBank: a sound bank at +1600 (its file at +1280, the names at
+  // +1344, 64 bytes each; +24 the engine; +244 the cache at +1900), the
+  // index's entry cached or not.
+  for (int i = 0; i < 200; i++) {
+    const uint32_t banks = h.random.Below(4);
+    const uint32_t index = h.random.Below(3) | (i % 4 == 0 ? 0xABCDEF00u : 0);
+    auto setup = [&] {
+      WaveBankList(h, banks);
+      const uint32_t bank = d + 1600;
+      RandomWords(h, bank, 66);
+      guest::StoreU32(h.base, bank, kSoundBankVtable);
+      guest::StoreU32(h.base, bank + 24, d + kEngine);
+      guest::StoreU32(h.base, bank + 244, d + 1900);
+      guest::StoreU32(h.base, bank + 260, d + 1280);
+      RandomBytes(h, d + 1280, 64);
+      guest::StoreU32(h.base, d + 1280 + 50, 64);
+      for (uint32_t k = 0; k < 3; k++) {
+        const uint32_t name = d + 1344 + 64 * k;
+        if (k < banks && h.random.Below(3) != 0) {
+          Write(h.base, name, Read(h.base, d + 2048 + 64 * k, 64).data(), 64);
+        } else {
+          WaveBankName(h, name);
+        }
+        guest::StoreU32(h.base, d + 1900 + 4 * k,
+                        h.random.Below(4) == 0 ? uint32_t(h.random.Next()) : 0);
+      }
+    };
+    Case(h, results, setup, [&](PPCContext& t) { t.r3.u64 = d + 1600; t.r4.u64 = index; },
+         __imp__sub_825C7218, NativeSoundBankGetWaveBank, {},
+         fmt::format("XACTSoundBank::GetWaveBank {} ({} banks, index {:#x})", i, banks, index));
+  }
+  {
+    // A prepared bank whose slot +24 isn't GetName: FindWaveBank declines.
+    Fill(h.base, d, kScratchBytes);
+    WaveBankList(h, 1);
+    guest::StoreU32(h.base, d + 252, 1);
+    guest::StoreU32(h.base, d, d + 3584);
+    guest::StoreU32(h.base, d + 3584 + 24, 0x825C85E8);
+    CheckDeclines(h, results, NativeEngineFindWaveBank, d + kEngine, d + 2048,
+                  "XACTEngine::FindWaveBank, slot +24 not GetName");
+  }
+  results.Report();
+}
+
+// A variable at `variable` with its listener pool's used and free nodes at
+// `nodes` (its chunk list the inline chunk alone, so nothing is freed).
+void VariableWithPool(Context& h, uint32_t variable, uint32_t nodes) {
+  RandomWords(h, variable, 63);
+  RandomPool(h, variable + 24, nodes, h.random.Below(4), h.random.Below(3));
+  guest::StoreU32(h.base, variable + 28, variable + 32);
+  guest::StoreU32(h.base, variable + 32, 0);
+}
+
+void VariableDestructors(Context& h) {
+  Results results("xact variable destructors");
+  const uint32_t d = h.data;
+  // Without freeing (flags 0 and 2): one variable at +0, or a counted array
+  // of 0 to 3 at +1024 (its count at +1020).
+  for (int i = 0; i < 120; i++) {
+    const uint32_t flags = i % 2 == 0 ? 0 : 2;
+    const uint32_t count = h.random.Below(4);
+    auto setup = [&] {
+      if (flags == 0) {
+        VariableWithPool(h, d, d + 2048);
+      } else {
+        guest::StoreU32(h.base, d + 1020, count);
+        for (uint32_t k = 0; k < count; k++) {
+          VariableWithPool(h, d + 1024 + 252 * k, d + 2048 + 128 * k);
+        }
+      }
+    };
+    const uint32_t variable = flags == 0 ? d : d + 1024;
+    Case(h, results, setup, [&](PPCContext& t) { t.r3.u64 = variable; t.r4.u64 = flags; },
+         __imp__sub_825C3EE0, NativeVariableDeletingDestruct, {},
+         fmt::format("XACTVariable::DeletingDestructor {} (flags {}, {} variables)", i, flags,
+                     flags ? count : 1));
+    if (flags == 0) {
+      Case(h, results, setup, [&](PPCContext& t) { t.r3.u64 = d; }, __imp__sub_825C2128,
+           NativeVariableDestruct, {}, fmt::format("XACTVariable::~XACTVariable {}", i));
+    }
+  }
+  // Freeing (flags 1 and 3, only while the native layer has the heap): the
+  // variable or array in a block of the original's attributes, r3 compared
+  // as the offset into it.
+  if (hooks::NativeHeapActive()) {
+    for (int i = 0; i < 20; i++) {
+      const bool array = i % 2;
+      const uint32_t count = 1 + h.random.Below(3);
+      Outputs out[2];
+      const Random start = h.random;
+      for (int v = 0; v < 2; v++) {
+        h.random = start;
+        Fill(h.base, d, kScratchBytes);
+        const uint32_t bytes = array ? 4 + 252 * count : 252;
+        const uint32_t block =
+            memory::crt::XMemAlloc(h.base, bytes, array ? 0x20840051 : 0x20848026);
+        uint32_t variable = block;
+        if (array) {
+          guest::StoreU32(h.base, block, count);
+          variable = block + 4;
+        }
+        for (uint32_t k = 0; k < (array ? count : 1); k++) {
+          VariableWithPool(h, variable + 252 * k, d + 2048 + 128 * k);
+        }
+        PPCContext t = CallContext(h);
+        t.r3.u64 = variable;
+        t.r4.u64 = array ? 3 : 1;
+        ITC_FLAG(native_xact) = v == 1;
+        (v == 0 ? __imp__sub_825C3EE0 : NativeVariableDeletingDestruct)(t, h.base);
+        ITC_FLAG(native_xact) = true;
+        out[v].Word(t.r3.u32 - block);
+        out[v].Bytes(Read(h.base, d, kScratchBytes));
+      }
+      results.Check(out[0], out[1],
+                    fmt::format("XACTVariable::DeletingDestructor freeing {} ({})", i,
+                                array ? "array" : "one"));
+    }
+  }
+  results.Report();
+}
+
 }  // namespace
 
 void Xact(Context& h) {
@@ -1368,6 +1626,8 @@ void Xact(Context& h) {
   LoopRegions(h);
   Loads(h);
   GlobalSettings(h);
+  WaveEntriesAndLookups(h);
+  VariableDestructors(h);
 }
 
 }  // namespace harness

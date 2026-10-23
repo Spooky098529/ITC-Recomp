@@ -305,4 +305,46 @@ struct CategoryVolume {
 std::optional<CategoryVolume> EngineGetCategoryVolume(uint8_t* base, uint32_t engine,
                                                       uint32_t index);
 
+// --- Batch 7: the wave entries' leaves, the wave banks' listeners, the
+// sound banks' wave bank lookup, the variable's destructor ---
+
+// XACTWaveEntry::HasLoopRegion (sub_825CEE10): 1 when the loop length
+// (+32) isn't 0. GetFormatTag (sub_825CEE28): the format's low 2 bits as
+// 0 (PCM), 1 (XMA) or 3. MsToSamples (sub_825CEEA0): the rate (+16 bits
+// 5-22) x `ms` / 1000, 64-bit, truncated to 32. The folded getters
+// GetPlayLength, GetLoopStart, GetLoopLength (sub_82099BA0, sub_820A8958,
+// sub_82379D50): the words at +24, +28 and +32.
+uint32_t WaveEntryHasLoopRegion(uint8_t* base, uint32_t entry);
+uint32_t WaveEntryGetFormatTag(uint8_t* base, uint32_t entry);
+uint32_t WaveEntryMsToSamples(uint8_t* base, uint32_t entry, uint32_t ms);
+uint32_t WaveEntryGetPlayLength(uint8_t* base, uint32_t entry);
+uint32_t WaveEntryGetLoopStart(uint8_t* base, uint32_t entry);
+uint32_t WaveEntryGetLoopLength(uint8_t* base, uint32_t entry);
+// XACTSound::GetPitch (sub_825CAC48): f1 = +120 + +92, rounded to single.
+double SoundGetPitch(uint8_t* base, uint32_t sound);
+// XACTWaveBank::AddListener and RemoveListener (sub_825C8690, sub_825C8540),
+// through the +4 interface (`self`): PushBack on the pool at self + 20, or
+// the node holding `listener` in its used list (self + 224) freed. r3 as
+// the originals leave it. AddListener: native layer only.
+uint32_t WaveBankAddListener(uint8_t* base, uint32_t self, uint32_t listener);
+uint32_t WaveBankRemoveListener(uint8_t* base, uint32_t self, uint32_t listener);
+// XACTEngine::FindWaveBank (sub_825C0360): the first prepared (+252) wave
+// bank in the engine's list (+56/+60, nodes at bank + 8) named `name`, or
+// 0. nullopt where a prepared bank's slot +24 isn't GetName.
+std::optional<uint32_t> EngineFindWaveBank(uint8_t* base, uint32_t engine, uint32_t name);
+// XACTSoundBank::GetWaveBank (sub_825C7218): the cached wave bank (+244)
+// of the byte index, else the engine's of that name (slot +80
+// GetWaveBankNames, 64 bytes a name), registered with (its +4 interface's
+// slot +0, AddListener) and cached; 0 when not loaded. nullopt, with
+// nothing changed, where a slot isn't the native function. Native layer
+// only (AddListener allocates).
+std::optional<uint32_t> SoundBankGetWaveBank(uint8_t* base, uint32_t bank, uint32_t index);
+// XACTVariable::~XACTVariable (sub_825C2128): the listener pool's used
+// nodes freed, its chunks freed (FreeChunks' r3 returned), the base
+// vtable. XACTVariable::DeletingDestructor (sub_825C3EE0): one variable or
+// (flags bit 1) the counted array at variable - 4, destroyed and with bit
+// 0 freed; returns the block. Native layer only (they free).
+uint32_t VariableDestruct(uint8_t* base, uint32_t variable);
+uint32_t VariableDeletingDestruct(uint8_t* base, uint32_t variable, uint32_t flags);
+
 }  // namespace xact
