@@ -67,6 +67,62 @@ ITC_NATIVE_STEP(NativeCueFindVariable,
 ITC_NATIVE_STEP(NativeFaderConstruct, xa::FaderConstruct(base, ctx.r3.u32))
 ITC_NATIVE_STEP(NativeFaderDestruct, xa::FaderDestruct(base, ctx.r3.u32))
 
+// The optional-returning functions: 0xDEADDEAD where the native version
+// declines (the adapter would run the original).
+#define ITC_NATIVE_OPTIONAL(name, expr)                    \
+  void name(PPCContext& ctx, uint8_t* base) {              \
+    const auto result = (expr);                            \
+    ctx.r3.u64 = result ? *result : 0xDEADDEADu;           \
+  }
+ITC_NATIVE_STEP(NativeSoundBankGetHeader, ctx.r3.u64 = xa::SoundBankGetHeader(base, ctx.r3.u32))
+ITC_NATIVE_OPTIONAL(NativeSoundBankGetSimpleCues, xa::SoundBankGetSimpleCues(base, ctx.r3.u32))
+ITC_NATIVE_OPTIONAL(NativeSoundBankGetWaveBankNames,
+                    xa::SoundBankGetWaveBankNames(base, ctx.r3.u32))
+ITC_NATIVE_OPTIONAL(NativeSoundBankGetPointer,
+                    xa::SoundBankGetPointer(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_OPTIONAL(NativeSoundBankGetCueCount, xa::SoundBankGetCueCount(base, ctx.r3.u32))
+ITC_NATIVE_OPTIONAL(NativeSoundBankFirstEvent,
+                    xa::SoundBankFirstEvent(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_OPTIONAL(NativeSoundBankNextEvent,
+                    xa::SoundBankNextEvent(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_OPTIONAL(NativeSoundBankGetCueRecord,
+                    xa::SoundBankGetCueRecord(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_STEP(NativeWaveBankGetEntry,
+                ctx.r3.u64 = xa::WaveBankGetEntry(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_STEP(NativeWaveBankGetSeekTable,
+                ctx.r3.u64 = xa::WaveBankGetSeekTable(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_STEP(NativeWaveBankGetName, ctx.r3.u64 = xa::WaveBankGetName(base, ctx.r3.u32))
+ITC_NATIVE_STEP(NativeWaveBankGetEntryCount,
+                ctx.r3.u64 = xa::WaveBankGetEntryCount(base, ctx.r3.u32))
+void NativeWaveBankGetWaveFormat(PPCContext& ctx, uint8_t* base) {
+  if (!xa::WaveBankGetWaveFormat(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32)) {
+    ctx.r3.u64 = 0xDEADDEAD;
+    return;
+  }
+  ctx.r3.u64 = xa::WaveBankGetEntry(base, ctx.r3.u32, ctx.r4.u32);
+}
+ITC_NATIVE_STEP(NativeWaveEntryConstruct, xa::WaveEntryConstruct(base, ctx.r3.u32))
+void NativeWaveEntrySet(PPCContext& ctx, uint8_t* base) {
+  if (!xa::WaveEntrySet(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32)) {
+    ctx.r3.u64 = 0xDEADDEAD;
+    return;
+  }
+  ctx.r3.u64 = ctx.r3.u32 + 12;
+}
+ITC_NATIVE_STEP(NativeWaveEntryGetLoopRegion, ctx.r3.u64 = xa::WaveEntryGetLoopRegion(ctx.r3.u32))
+ITC_NATIVE_STEP(NativeWaveEntryGetDuration,
+                ctx.r3.u64 = xa::WaveEntryGetDuration(base, ctx.r3.u32))
+void NativeWaveEntrySamplesToMs(PPCContext& ctx, uint8_t* base) {
+  uint32_t ms = 0;
+  ctx.r3.u64 = xa::WaveEntrySamplesToMs(base, ctx.r3.u32, ctx.r4.u32, &ms) ? ms : 0xDEADDEADu;
+}
+// FindXmaBlock leaves r3 (the entry) as it was.
+ITC_NATIVE_STEP(NativeWaveEntryFindXmaBlock,
+                xa::WaveEntryFindXmaBlock(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
+                                          ctx.r7.u32))
+ITC_NATIVE_OPTIONAL(NativeWaveEntrySamplesToBytes,
+                    xa::WaveEntrySamplesToBytes(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+
 // The odd float words mixed into inputs: NaNs of both kinds and signs,
 // infinities, denormals, signed zeros.
 constexpr uint32_t kOddFloats[] = {0x7FC00000, 0x7F800001, 0xFFC00001, 0xFF800001, 0x7F800000,
@@ -439,12 +495,291 @@ void Objects(Context& h) {
   results.Report();
 }
 
+
+constexpr uint32_t kSoundBankVtable = 0x82075A90;
+constexpr uint32_t kWaveBankVtable = 0x82075AE8;
+
+void RandomBytes(Context& h, uint32_t address, uint32_t count) {
+  for (uint32_t i = 0; i < count; i++) {
+    guest::StoreU8(h.base, address + i, uint8_t(h.random.Next()));
+  }
+}
+
+// A sound bank at the area's start (vtable `vtable`, the buffer at +260
+// pointing to +1024), the buffer's bytes random.
+void SoundBank(Context& h, uint32_t vtable) {
+  RandomWords(h, h.data, 80);
+  guest::StoreU32(h.base, h.data, vtable);
+  guest::StoreU32(h.base, h.data + 260, h.data + 1024);
+  RandomBytes(h, h.data + 1024, 1024);
+}
+
+void SoundBanks(Context& h) {
+  Results results("xact sound banks");
+  const uint32_t d = h.data;
+  const uint32_t header = d + 1024;
+  // A vtable in the area whose slot +64 isn't GetHeader: the native
+  // versions decline (0xDEADDEAD); the originals call through it, so these
+  // cases only check the declines.
+  for (int i = 0; i < 4; i++) {
+    for (int f = 0; f < 6; f++) {
+      Outputs out[2];
+      Fill(h.base, d, kScratchBytes);
+      SoundBank(h, d + 3072);
+      RandomWords(h, d + 3072, 32);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = d;
+      t.r4.u64 = d + 512;
+      static constexpr GuestFunction kNative[] = {
+          NativeSoundBankGetSimpleCues, NativeSoundBankGetWaveBankNames,
+          NativeSoundBankGetPointer,    NativeSoundBankGetCueCount,
+          NativeSoundBankFirstEvent,    NativeSoundBankNextEvent};
+      kNative[f](t, h.base);
+      out[0].Word(0xDEADDEAD);
+      out[1].Word(t.r3.u32);
+      results.Check(out[0], out[1], fmt::format("sound bank slot +64 not GetHeader {} {}", i, f));
+    }
+  }
+  for (int i = 0; i < 40; i++) {
+    const bool near = i % 2;
+    auto setup = [&] {
+      SoundBank(h, kSoundBankVtable);
+      if (near) {
+        guest::StoreU32(h.base, header + 26, h.random.Below(512));
+        guest::StoreU32(h.base, header + 50, h.random.Below(512));
+      }
+    };
+    auto args = [&](PPCContext& t) { t.r3.u64 = d; };
+    Case(h, results, setup, args, __imp__sub_825C7AA8, NativeSoundBankGetHeader, {},
+         fmt::format("XACTSoundBank::GetHeader {}", i));
+    Case(h, results, setup, args, __imp__sub_825C7AB0, NativeSoundBankGetSimpleCues, {},
+         fmt::format("XACTSoundBank::GetSimpleCues {}", i));
+    Case(h, results, setup, args, __imp__sub_825C7B70, NativeSoundBankGetWaveBankNames, {},
+         fmt::format("XACTSoundBank::GetWaveBankNames {}", i));
+    Case(h, results, setup, args, __imp__sub_825C6928, NativeSoundBankGetCueCount, {},
+         fmt::format("XACTSoundBank::GetCueCount {}", i));
+    const uint32_t offset = i < 10 ? i * 0x1001 : uint32_t(h.random.Next());
+    Case(h, results, setup, [&](PPCContext& t) { t.r3.u64 = d; t.r4.u64 = offset; },
+         __imp__sub_825C7C90, NativeSoundBankGetPointer, {},
+         fmt::format("XACTSoundBank::GetPointer {}", i));
+  }
+  // The event iterator at +512 over a buffer of random bytes: each event
+  // type (the low 5 bits of the word at the cursor) with small and random
+  // counts, and the index reaching the count or not.
+  for (int i = 0; i < 320; i++) {
+    const uint32_t type = uint32_t(i) % 32;
+    const uint32_t cursor = h.random.Below(400);
+    const uint32_t n = i % 3 == 0 ? h.random.Below(0x10000) : h.random.Below(40);
+    const uint8_t count = uint8_t(h.random.Below(4));
+    const uint8_t index = i % 4 == 0 ? uint8_t(count - 1) : uint8_t(h.random.Next());
+    auto setup = [&] {
+      SoundBank(h, kSoundBankVtable);
+      RandomWords(h, d + 512, 4);
+      guest::StoreU32(h.base, d + 512, h.random.Below(400));
+      guest::StoreU32(h.base, d + 516, cursor);
+      guest::StoreU8(h.base, d + 520, count);
+      guest::StoreU8(h.base, d + 521, index);
+      const uint32_t word = guest::LoadU32(h.base, header + cursor);
+      guest::StoreU32(h.base, header + cursor, (word & ~0x1Fu) | type);
+      // The variable events' counts, 16 bits at +2 past their fixed parts.
+      const uint32_t fixed = type == 3 ? 9 : type == 6 ? 16 : type == 11 ? 41 : 7;
+      guest::StoreU16(h.base, header + cursor + fixed + 2, uint16_t(n));
+    };
+    auto args = [&](PPCContext& t) { t.r3.u64 = d; t.r4.u64 = d + 512; };
+    Case(h, results, setup, args, __imp__sub_825C7F98, NativeSoundBankNextEvent, {},
+         fmt::format("XACTSoundBank::NextEvent {} (type {})", i, type));
+    if (i < 40) {
+      Case(h, results, setup, args, __imp__sub_825C7F30, NativeSoundBankFirstEvent, {},
+           fmt::format("XACTSoundBank::FirstEvent {}", i));
+    }
+  }
+  // GetCueRecord: simple cues only (a complex cue's table, sub_825C7B10,
+  // never ran; the native version leaves it to the original).
+  for (int i = 0; i < 60; i++) {
+    const uint32_t simple = 1 + h.random.Below(i < 30 ? 20 : 0xFFFF);
+    const uint32_t index = h.random.Below(simple) | (i % 3 == 0 ? 0xABCD0000u : 0);
+    auto setup = [&] {
+      SoundBank(h, kSoundBankVtable);
+      guest::StoreU16(h.base, header + 9, uint16_t(simple));
+      guest::StoreU32(h.base, header + 26, h.random.Below(1024));
+    };
+    Case(h, results, setup, [&](PPCContext& t) { t.r3.u64 = d; t.r4.u64 = index; },
+         __imp__sub_825C8230, NativeSoundBankGetCueRecord, {},
+         fmt::format("XACTSoundBank::GetCueRecord {} ({} of {})", i, index & 0xFFFF, simple));
+  }
+  for (int i = 0; i < 4; i++) {
+    Outputs out[2];
+    Fill(h.base, d, kScratchBytes);
+    SoundBank(h, kSoundBankVtable);
+    guest::StoreU16(h.base, header + 9, uint16_t(i));
+    PPCContext t = CallContext(h);
+    t.r3.u64 = d;
+    t.r4.u64 = i + h.random.Below(5);
+    NativeSoundBankGetCueRecord(t, h.base);
+    out[0].Word(0xDEADDEAD);
+    out[1].Word(t.r3.u32);
+    results.Check(out[0], out[1], fmt::format("XACTSoundBank::GetCueRecord complex {}", i));
+  }
+  results.Report();
+}
+
+// A wave bank at the area's start: the entry table (+272) at +1024, the
+// bank data (+284) at +256, the seek segment (+288) at +2048.
+void WaveBank(Context& h, uint32_t entries) {
+  const uint32_t d = h.data;
+  RandomWords(h, d, 80);
+  guest::StoreU32(h.base, d, kWaveBankVtable);
+  guest::StoreU32(h.base, d + 272, d + 1024);
+  guest::StoreU32(h.base, d + 284, d + 512);
+  guest::StoreU32(h.base, d + 288, d + 2048);
+  RandomWords(h, d + 512, 24);
+  guest::StoreU32(h.base, d + 516, entries);
+  RandomBytes(h, d + 1024, 1024);
+  RandomBytes(h, d + 2048, 1024);
+}
+
+// A seek table at `at`: the count (1-12), then cumulative sample counts
+// (increasing, or random for some).
+void SeekTable(Context& h, uint32_t at, bool sorted) {
+  const uint32_t count = 1 + h.random.Below(12);
+  guest::StoreU32(h.base, at, count);
+  uint32_t total = 0;
+  for (uint32_t i = 0; i < count; i++) {
+    total += sorted ? 1 + h.random.Below(200000) : uint32_t(h.random.Next());
+    guest::StoreU32(h.base, at + 4 + 4 * i, sorted ? total : uint32_t(h.random.Next()));
+  }
+}
+
+void WaveBanks(Context& h) {
+  Results results("xact wave banks");
+  const uint32_t d = h.data;
+  for (int i = 0; i < 60; i++) {
+    const uint32_t entries = 1 + h.random.Below(40);
+    const uint32_t index = (i < 30 ? h.random.Below(entries) : uint32_t(h.random.Next() & 0x3F)) |
+                           (i % 4 == 0 ? 0x12340000u : 0);
+    auto setup = [&] {
+      WaveBank(h, entries);
+      for (uint32_t k = 0; k < 64; k++) {
+        const bool none = h.random.Below(3) == 0;
+        guest::StoreU32(h.base, d + 2048 + 4 * k, none ? 0xFFFFFFFFu : h.random.Below(256));
+      }
+    };
+    auto args = [&](PPCContext& t) { t.r3.u64 = d; t.r4.u64 = index; t.r5.u64 = d + 3584 + 1; };
+    Case(h, results, setup, args, __imp__sub_825C8398, NativeWaveBankGetEntry, {},
+         fmt::format("XACTWaveBank::GetEntry {}", i));
+    Case(h, results, setup, args, __imp__sub_825C8580, NativeWaveBankGetSeekTable, {},
+         fmt::format("XACTWaveBank::GetSeekTable {}", i));
+    Case(h, results, setup, args, __imp__sub_825C85B8, NativeWaveBankGetName, {},
+         fmt::format("XACTWaveBank::GetName {}", i));
+    Case(h, results, setup, args, __imp__sub_825C85E8, NativeWaveBankGetEntryCount, {},
+         fmt::format("XACTWaveBank::GetEntryCount {}", i));
+    if (index % 0x10000 < 40) {
+      Case(h, results, setup, args, __imp__sub_825CC320, NativeWaveBankGetWaveFormat, {},
+           fmt::format("XACTWaveBank::GetWaveFormat {}", i));
+    }
+  }
+  // The wave entry accessor at +3200 (+0 valid, +4 index, +8 the bank, +12
+  // the entry's copy), the bank at the area's start.
+  constexpr uint32_t kEntry = 3200;
+  for (int i = 0; i < 60; i++) {
+    const uint32_t index = h.random.Below(40) | (i % 4 == 0 ? 0x55550000u : 0);
+    auto setup = [&] {
+      WaveBank(h, 40);
+      RandomWords(h, d + kEntry, 12);
+    };
+    auto args = [&](PPCContext& t) { t.r3.u64 = d + kEntry; t.r4.u64 = index; t.r5.u64 = d; };
+    Case(h, results, setup, args, __imp__sub_825CED88, NativeWaveEntryConstruct, {},
+         fmt::format("XACTWaveEntry::XACTWaveEntry {}", i));
+    Case(h, results, setup, args, __imp__sub_825CED98, NativeWaveEntrySet, {},
+         fmt::format("XACTWaveEntry::Set {}", i));
+    Case(h, results, setup, args, __imp__sub_825CEDF8, NativeWaveEntryGetLoopRegion, {},
+         fmt::format("XACTWaveEntry::GetLoopRegion {}", i));
+    Case(h, results, setup, args, __imp__sub_825CEE00, NativeWaveEntryGetDuration, {},
+         fmt::format("XACTWaveEntry::GetDuration {}", i));
+  }
+  for (int i = 0; i < 80; i++) {
+    const uint32_t samples = i < 40 ? h.random.Below(10000000) : uint32_t(h.random.Next());
+    auto setup = [&] {
+      RandomWords(h, d + kEntry, 12);
+      if (i % 2) {  // a real rate (44.1 kHz) in bits 5-22
+        const uint32_t format = guest::LoadU32(h.base, d + kEntry + 16);
+        guest::StoreU32(h.base, d + kEntry + 16, (format & ~(0x3FFFFu << 5)) | (44100u << 5));
+      }
+      if ((guest::LoadU32(h.base, d + kEntry + 16) & (0x3FFFFu << 5)) == 0) {
+        guest::StoreU32(h.base, d + kEntry + 16, guest::LoadU32(h.base, d + kEntry + 16) | 0x20);
+      }
+    };
+    Case(h, results, setup, [&](PPCContext& t) { t.r3.u64 = d + kEntry; t.r4.u64 = samples; },
+         __imp__sub_825CEE70, NativeWaveEntrySamplesToMs, {},
+         fmt::format("XACTWaveEntry::SamplesToMs {}", i));
+  }
+  // FindXmaBlock: a seek table at +2048 (count 1-12; some unsorted), the
+  // two outputs at +3584 and +3588, positions around the blocks' bounds.
+  for (int i = 0; i < 200; i++) {
+    const bool sorted = i % 5 != 0;
+    const uint32_t tag = i % 4;
+    auto setup = [&] {
+      RandomWords(h, d + kEntry, 12);
+      const uint32_t format = guest::LoadU32(h.base, d + kEntry + 16);
+      guest::StoreU32(h.base, d + kEntry + 16, (format & ~3u) | tag);
+      SeekTable(h, d + 2048, sorted);
+    };
+    uint32_t position = 0;
+    auto args = [&](PPCContext& t) {
+      // A position near one of the table's values (read after the set-up).
+      const uint32_t count = guest::LoadU32(h.base, d + 2048);
+      const uint32_t near = guest::LoadU32(h.base, d + 2052 + 4 * h.random.Below(count));
+      position = i % 7 == 0 ? uint32_t(h.random.Next()) : near + h.random.Below(400) - 200;
+      t.r3.u64 = d + kEntry;
+      t.r4.u64 = position;
+      t.r5.u64 = d + 2048;
+      t.r6.u64 = d + 3584;
+      t.r7.u64 = d + 3588;
+    };
+    Case(h, results, setup, args, __imp__sub_825CEF50, NativeWaveEntryFindXmaBlock, {},
+         fmt::format("XACTWaveEntry::FindXmaBlock {}", i));
+  }
+  // SamplesToBytes: the entry at +3200 for the bank at the area's start
+  // (its seek segment at +2048: the wave's offset word, then the table
+  // after the entry count's words), by format tag; the out word at +3584
+  // or none.
+  for (int i = 0; i < 200; i++) {
+    const uint32_t tag = i % 4;
+    const bool out = i % 3 != 0;
+    const uint32_t index = h.random.Below(4);
+    auto setup = [&] {
+      WaveBank(h, 4);
+      RandomWords(h, d + kEntry, 12);
+      guest::StoreU32(h.base, d + kEntry + 8, d);
+      guest::StoreU16(h.base, d + kEntry + 4, uint16_t(index));
+      const uint32_t format = guest::LoadU32(h.base, d + kEntry + 16);
+      guest::StoreU32(h.base, d + kEntry + 16, (format & ~3u) | tag);
+      for (uint32_t k = 0; k < 4; k++) {
+        guest::StoreU32(h.base, d + 2048 + 4 * k, 64 * k);
+      }
+      SeekTable(h, d + 2048 + 16 + 64 * index, i % 5 != 0);
+    };
+    Case(
+        h, results, setup,
+        [&](PPCContext& t) {
+          t.r3.u64 = d + kEntry;
+          t.r4.u64 = i % 7 == 0 ? uint32_t(h.random.Next()) : h.random.Below(1200000);
+          t.r5.u64 = out ? d + 3584 : 0;
+        },
+        __imp__sub_825CF080, NativeWaveEntrySamplesToBytes, {},
+        fmt::format("XACTWaveEntry::SamplesToBytes {} (tag {})", i, tag));
+  }
+  results.Report();
+}
+
 }  // namespace
 
 void Xact(Context& h) {
   Hash(h);
   Pools(h);
   Objects(h);
+  SoundBanks(h);
+  WaveBanks(h);
 }
 
 }  // namespace harness

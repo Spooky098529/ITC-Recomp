@@ -14,7 +14,10 @@ ITC_FLAG_BOOL(native_xact, true, "ITC",
               "sub_825C1F30; XACTEngine::AddCue, sub_825C1518; the global settings' "
               "constructors, sub_825C21B0 and sub_825C3508; XACTVariable::Init, sub_825C1DE0; "
               "the cue's DetachSound and FindVariable, sub_825C4FC0 and sub_825C5758; the "
-              "fader's constructor and destructor, sub_825CC0A0 and sub_825CC0D0) natively "
+              "fader's constructor and destructor, sub_825CC0A0 and sub_825CC0D0; the sound "
+              "banks' file readers, sub_825C7AA8 to sub_825C8230 and sub_825C6928, while the bank's "
+              "slot +64 is GetHeader; the wave banks' accessors, sub_825C8398 to sub_825C85E8 and "
+              "sub_825CC320; the wave entry accessors, sub_825CED88 to sub_825CF080) natively "
               "instead of through the translated code (same results; checked by "
               "--run_harnesses=xact)");
 
@@ -56,6 +59,20 @@ ITC_FLAG_BOOL(native_xact, true, "ITC",
     ctx.r3.u64 = uint32_t(expr);                               \
   }
 
+// An adapter returning a word in r3 when `expr` (an optional) has one, else
+// running the original (a vtable slot that isn't the native function, or a
+// path the native version leaves to the original).
+#define ITC_XACT_OPTIONAL(address, expr)  \
+  extern "C" REX_FUNC(sub_##address) {   \
+    ITC_XACT_FALLBACK(address)           \
+    const auto itc_result_ = (expr);     \
+    if (!itc_result_) {                  \
+      __imp__sub_##address(ctx, base);   \
+      return;                            \
+    }                                    \
+    ctx.r3.u64 = *itc_result_;           \
+  }
+
 using namespace xact;
 
 // The name hash: the original where it traps (a table size of 0).
@@ -88,3 +105,52 @@ ITC_XACT_VOID(825C4FC0, CueDetachSound(base, ctx.r3.u32), ctx.r3.u32)
 ITC_XACT_WORD(825C5758, CueFindVariable(base, ctx.r3.u32, ctx.r4.u32))
 ITC_XACT_VOID(825CC0A0, FaderConstruct(base, ctx.r3.u32), ctx.r3.u32)
 ITC_XACT_VOID(825CC0D0, FaderDestruct(base, ctx.r3.u32), ctx.r3.u32)
+
+// The sound banks' file readers. XACTSoundBank::GetSimpleCues
+// (sub_825C7AB0) has no adapter: its only caller, GetCueRecord, is native.
+ITC_XACT_WORD(825C7AA8, SoundBankGetHeader(base, ctx.r3.u32))
+ITC_XACT_OPTIONAL(825C7B70, SoundBankGetWaveBankNames(base, ctx.r3.u32))
+ITC_XACT_OPTIONAL(825C7C90, SoundBankGetPointer(base, ctx.r3.u32, ctx.r4.u32))
+ITC_XACT_OPTIONAL(825C6928, SoundBankGetCueCount(base, ctx.r3.u32))
+ITC_XACT_OPTIONAL(825C7F30, SoundBankFirstEvent(base, ctx.r3.u32, ctx.r4.u32))
+ITC_XACT_OPTIONAL(825C7F98, SoundBankNextEvent(base, ctx.r3.u32, ctx.r4.u32))
+ITC_XACT_OPTIONAL(825C8230, SoundBankGetCueRecord(base, ctx.r3.u32, ctx.r4.u32))
+
+// The wave banks' accessors.
+ITC_XACT_WORD(825C8398, WaveBankGetEntry(base, ctx.r3.u32, ctx.r4.u32))
+ITC_XACT_WORD(825C8580, WaveBankGetSeekTable(base, ctx.r3.u32, ctx.r4.u32))
+ITC_XACT_WORD(825C85B8, WaveBankGetName(base, ctx.r3.u32))
+ITC_XACT_WORD(825C85E8, WaveBankGetEntryCount(base, ctx.r3.u32))
+extern "C" REX_FUNC(sub_825CC320) {
+  ITC_XACT_FALLBACK(825CC320)
+  if (!WaveBankGetWaveFormat(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32)) {
+    __imp__sub_825CC320(ctx, base);
+    return;
+  }
+  // The original leaves the entry's address (GetEntry's r3).
+  ctx.r3.u64 = WaveBankGetEntry(base, ctx.r3.u32, ctx.r4.u32);
+}
+
+// The wave entry accessors. XACTWaveEntry::FindXmaBlock (sub_825CEF50) has
+// no adapter: its only caller, SamplesToBytes, is native.
+ITC_XACT_VOID(825CED88, WaveEntryConstruct(base, ctx.r3.u32), ctx.r3.u32)
+extern "C" REX_FUNC(sub_825CED98) {
+  ITC_XACT_FALLBACK(825CED98)
+  if (!WaveEntrySet(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32)) {
+    __imp__sub_825CED98(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = ctx.r3.u32 + 12;  // memcpy's r3, the destination
+}
+ITC_XACT_WORD(825CEDF8, WaveEntryGetLoopRegion(ctx.r3.u32))
+ITC_XACT_WORD(825CEE00, WaveEntryGetDuration(base, ctx.r3.u32))
+extern "C" REX_FUNC(sub_825CEE70) {
+  ITC_XACT_FALLBACK(825CEE70)
+  uint32_t ms = 0;
+  if (!WaveEntrySamplesToMs(base, ctx.r3.u32, ctx.r4.u32, &ms)) {
+    __imp__sub_825CEE70(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = ms;
+}
+ITC_XACT_OPTIONAL(825CF080, WaveEntrySamplesToBytes(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
