@@ -1,7 +1,12 @@
 // The AI drivers natively: adapters in front of src/ai_drivers/
 // (docs/functions/ai-drivers.md). Each leaves r3 (and f1 where the original
 // leaves a value there) as the original does; those returning nothing leave
-// r3 as it came, as the originals do.
+// r3 as it came, as the originals do. Functions whose recompiled callers have
+// all been made native have no adapters (the flag switches their callers):
+// AiDriver::ClearOtherIndexes (sub_82144ED8) and AiPath::ClearCorners
+// (sub_8213C720), from AiPath::Reset; AiDriver::SpeedOverDistance
+// (sub_821450E0) and AiDriver::CornerFactor (sub_821453A0), from
+// AiDriver::LimitSpeed.
 
 #include "guest.h"
 
@@ -27,7 +32,9 @@ ITC_FLAG_BOOL(native_ai_drivers, true, "ITC",
               "AiOther::UpdateTimer sub_821456A0, AiDriver::ClearOthers sub_821459B0, "
               "AiDriver::PickTarget sub_82145118, AiDriver::PickTargetBehind sub_821451B8, "
               "AiDriver::KeepsGapFrom sub_82145048) natively instead of through the translated "
-              "code (the same words, bit for bit; checked by --run_harnesses=ai_drivers)");
+              "code (the same words, bit for bit; checked by --run_harnesses=ai_drivers). Those "
+              "reached only from native callers have no adapters, and the flag switches their "
+              "callers: sub_82144ED8, sub_8213C720, sub_821450E0, sub_821453A0");
 
 // Defines an adapter: `body` uses `ctx` and `base`.
 #define ITC_AI_DRIVERS(address, body)   \
@@ -49,8 +56,6 @@ ITC_AI_DRIVERS(8213AD48, InitPath(base, ctx.r3.u32))
 ITC_AI_DRIVERS(82139728, ctx.r3.u64 = Of(base, ctx.r3.u32))
 ITC_AI_DRIVERS(820C96E8, ClearCarInput(base, ctx.r3.u32))
 ITC_AI_DRIVERS(82146508, ClearFollow(base, ctx.r3.u32))
-ITC_AI_DRIVERS(82144ED8, ClearOtherIndexes(base, ctx.r3.u32))
-ITC_AI_DRIVERS(8213C720, ClearCorners(base, ctx.r3.u32))
 ITC_AI_DRIVERS(8213C710, ClearCornerKind(base, ctx.r3.u32))
 ITC_AI_DRIVERS(8213F698, ResetSkill(base, ctx.r3.u32))
 
@@ -61,10 +66,6 @@ ITC_AI_DRIVERS(82101760, ctx.r3.u64 = TimeFromTicks(ctx.r3.u32))
 // r4 = &the word.
 ITC_AI_DRIVERS(82138D20, ctx.r3.u64 = SetFlag2(base, ctx.r3.u32, ctx.r4.u32))
 ITC_AI_DRIVERS(821464B8, ctx.r3.u64 = IsFree(base, ctx.r3.u32))
-// r4 = &the distance; f1.
-ITC_AI_DRIVERS(821450E0, ctx.f1.f64 = SpeedOverDistance(base, ctx.r3.u32, ctx.r4.u32))
-// r4 = &the curvature, r5 = &the width; f1.
-ITC_AI_DRIVERS(821453A0, ctx.f1.f64 = CornerFactor(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
 ITC_AI_DRIVERS(82144F50, ctx.r3.u64 = ReadCar(base, ctx.r3.u32))
 ITC_AI_DRIVERS(82145230, UpdateHalfWidth(base, ctx.r3.u32))
 // f1 = the distance ahead, r4 = out.
