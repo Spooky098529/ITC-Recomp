@@ -25,9 +25,12 @@
 // (sub_82139450), from ResetControl; AccumulateSteer (sub_82138F00), from
 // UpdateSteerInput; ClearPlan (sub_82139820), from StartRace, SetState2or3,
 // SetStateFromList, SetState4 and ClearAll; Restart (sub_821395D0), from
-// ResetAll; and AiCorner::Init (sub_8213C698) and JoinCornerPair
-// (sub_8213DD40), from AddCornersAt, JoinCorners (sub_8213BCD0) and
-// JoinCornersShort (sub_8213BF28), from JoinCornerPair.
+// ResetAll; AiCorner::Init (sub_8213C698) and JoinCornerPair (sub_8213DD40),
+// from AddCornersAt; JoinCorners (sub_8213BCD0) and JoinCornersShort
+// (sub_8213BF28), from JoinCornerPair; UpdateState2, 3, 4 and 5
+// (sub_82145F48, sub_821460C8, sub_82146220, sub_82146388), from
+// UpdateState; and PickTarget (sub_82145118), from UpdateState2, 3 and 4 and
+// IsSettled.
 
 #include "guest.h"
 
@@ -91,7 +94,8 @@ ITC_FLAG_BOOL(native_ai_drivers, true, "ITC",
               "sub_82146508, sub_82146588, sub_82146408, sub_8213F698, sub_821393D8, sub_8213D508, "
               "sub_82145450, sub_821467B8, sub_82138D20, sub_82139450, sub_82138F00, sub_8213E658, "
               "sub_82145A48, sub_82139820, sub_821395D0, sub_8213C698, sub_8213DD40, "
-              "sub_8213BCD0, sub_8213BF28");
+              "sub_8213BCD0, sub_8213BF28, sub_82145F48, sub_821460C8, sub_82146220, sub_82146388, "
+              "sub_82145118");
 
 // Defines an adapter: `body` uses `ctx` and `base`.
 #define ITC_AI_DRIVERS(address, body)   \
@@ -149,7 +153,6 @@ ITC_AI_DRIVERS(8213D438, ctx.r3.u64 = ResetPath(base, ctx.r3.u32))
 
 // r4 = &the other's index, r5 = &the limit.
 ITC_AI_DRIVERS(821456A0, UpdateOtherTimer(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
-ITC_AI_DRIVERS(82145118, PickTarget(base, ctx.r3.u32))
 // r4 = &the other's index.
 ITC_AI_DRIVERS(82145048, ctx.r3.u64 = KeepsGapFrom(base, ctx.r3.u32, ctx.r4.u32))
 
@@ -174,9 +177,6 @@ ITC_AI_DRIVERS(82144EF8, UpdateLane(base, ctx.r3.u32, ctx.r1.u32 - 128);
 
 // --- The other racers' records and the states ---
 
-// r4 = &the target speed.
-ITC_AI_DRIVERS(82146220, UpdateState4(base, ctx.r3.u32, ctx.r4.u32))
-ITC_AI_DRIVERS(82146388, ctx.r3.u64 = UpdateState5(base, ctx.r3.u32, ctx.r4.u32))
 // r3 = out, r4 = the record, r5 = &the value.
 ITC_AI_DRIVERS(82145610, MirrorOther(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
 
@@ -331,9 +331,6 @@ extern "C" REX_FUNC(sub_8213E970) {
 
 // --- The states' speeds ---
 
-// r4 = &the target speed.
-ITC_AI_DRIVERS(82145F48, ctx.r3.u64 = UpdateState2(base, ctx.r3.u32, ctx.r4.u32))
-ITC_AI_DRIVERS(821460C8, ctx.r3.u64 = UpdateState3(base, ctx.r3.u32, ctx.r4.u32))
 // r4 = &the target speed. State 6's step (never seen in play): the
 // translated one, tail-called as the original does.
 extern "C" REX_FUNC(sub_82139AC8) {
