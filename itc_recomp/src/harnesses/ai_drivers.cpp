@@ -427,6 +427,62 @@ ITC_NATIVE_STEP(NativeKeepBranch,
                                             ctx.r1.u32 - 128))
 ITC_NATIVE_STEP(NativeLeftEntry, ctx.r3.u64 = ai::LeftEntry(base, ctx.r3.u32, ctx.r4.u32,
                                                             ctx.r5.u32, ctx.r1.u32 - 160))
+// The path's update's calls on the translated code, as the adapters make them.
+struct PathCall {
+  PPCContext* ctx;
+  uint8_t* base;
+};
+uint64_t CallNormalizer(void* user, uint32_t function, uint32_t frame, uint32_t path,
+                        uint32_t entry, uint32_t position, uint32_t lane, uint64_t masks) {
+  auto& call = *static_cast<PathCall*>(user);
+  PPCContext& ctx = *call.ctx;
+  uint8_t* base = call.base;
+  const uint64_t saved = ctx.r1.u64;
+  guest::StoreU32(base, frame, frame + 208);
+  ctx.r1.u64 = frame;
+  ctx.lr = 0x8213EEDC;
+  ctx.r3.u64 = path;
+  ctx.r4.u64 = entry;
+  ctx.r5.u64 = position;
+  ctx.r6.u64 = lane;
+  ctx.r7.u64 = masks;
+  ctx.ctr.u64 = function;
+  REX_CALL_INDIRECT_FUNC(function);
+  ctx.r1.u64 = saved;
+  ctx.fpscr.disableFlushMode();
+  return ctx.r3.u64;
+}
+uint64_t CallJoinStep(void* user, uint32_t step, uint32_t frame, uint32_t path, uint32_t a,
+                      uint32_t b) {
+  auto& call = *static_cast<PathCall*>(user);
+  PPCContext& ctx = *call.ctx;
+  uint8_t* base = call.base;
+  guest::StoreU32(base, frame, frame + 144);
+  ctx.r3.u64 = path;
+  ctx.r4.u64 = a;
+  ctx.r5.u64 = b;
+  RunJoinStep(ctx, base, step, frame - 112, frame);
+  ctx.fpscr.disableFlushMode();
+  return ctx.r3.u64;
+}
+void NativeExtend(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  PathCall call{&ctx, base};
+  const ai::PathCalls calls{&call, CallNormalizer, CallJoinStep};
+  ctx.r3.u64 = ai::Extend(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 208, calls);
+}
+void NativeUpdatePath(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  PathCall call{&ctx, base};
+  const ai::PathCalls calls{&call, CallNormalizer, CallJoinStep};
+  uint64_t r3 = 0;
+  if (ai::UpdatePath(base, ctx.r3.u32, ctx.r1.u32 - 144, calls, &r3)) {
+    ctx.r3.u64 = r3;
+    return;
+  }
+  g_fallbacks++;
+  __imp__sub_8213F530(ctx, base);
+}
 void NativeDropPassed(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   uint64_t r3 = 0;
@@ -651,6 +707,8 @@ enum Kind {
   kKeepBranch,
   kLeftEntry,
   kDropPassed,
+  kExtend,
+  kUpdatePath,
 };
 
 }  // namespace
@@ -953,6 +1011,10 @@ void AiDrivers(Context& h) {
        kLeftEntry, 3000},
       {"AiPath::DropPassed (sub_8213F2E0)", Original<__imp__sub_8213F2E0>, NativeDropPassed,
        kDropPassed, 3000},
+      {"AiPath::Extend (sub_8213ECF8)", Original<__imp__sub_8213ECF8>, NativeExtend, kExtend,
+       2000},
+      {"AiPath::Update (sub_8213F530)", Original<__imp__sub_8213F530>, NativeUpdatePath,
+       kUpdatePath, 2000},
   };
   const uint32_t area = memory::Alloc(kAreaBytes, 0);
   const uint32_t driver = area + kDriver, vehicle = area + kVehicle, io = area + kIo;
@@ -2462,7 +2524,9 @@ void AiDrivers(Context& h) {
         }
         case kKeepBranch:
         case kLeftEntry:
-        case kDropPassed: {
+        case kDropPassed:
+        case kExtend:
+        case kUpdatePath: {
           // A route (test_route.h) and a point (io); the driver's route
           // position (+4) and lane (+8); BranchMasks' inputs (the path's
           // kinds, the driver's +500 object, the vehicle's flags, the race
@@ -2476,8 +2540,22 @@ void AiDrivers(Context& h) {
           // and the section list (+5144, +5146). KeepBranch's positions at io
           // + 0x60 and io + 0x64; LeftEntry's entry one of the ring's.
           const uint32_t path = driver + kPath;
+          // Extend's and Update's: every section 8 slices and every link to
+          // a slice 0, so the ring crosses at most two sections in the ten
+          // entries a call adds: the section list (+5146, its count +5144)
+          // isn't bounded by the original, which runs past its 8 entries into
+          // the corners' count and records (the game drops passed sections
+          // first, DropPassedSections).
+          const bool extend = f.kind == kExtend || f.kind == kUpdatePath;
           const test_route::Route route =
-              test_route::BuildRoute(h.base, route_area, route_table, r);
+              test_route::BuildRoute(h.base, route_area, route_table, r, extend);
+          if (extend) {
+            for (uint32_t section = 0; section < 8; section++) {
+              for (uint32_t i = 0; i < 12; i++) {
+                guest::StoreU16(h.base, route.Address(section) + 30 + 4 * i, 0);
+              }
+            }
+          }
           route_file = route_area + test_route::kFile;
           // A slice length the game has (positive: WithinRoadAt's index, from
           // the driver's +128 over it, stays on the ring).
@@ -2555,7 +2633,8 @@ void AiDrivers(Context& h) {
             guest::StoreU16(h.base, record + 12, uint16_t(int32_t(r.Below(14)) - 3));
             guest::StoreU16(h.base, record + 10, uint16_t(int32_t(r.Below(14)) - 3));
           }
-          guest::StoreU16(h.base, path + 5144, uint16_t(int32_t(r.Below(10)) - 1));
+          guest::StoreU16(h.base, path + 5144, uint16_t(extend ? r.Below(5)
+                                                               : int32_t(r.Below(10)) - 1));
           for (uint32_t i = 0; i < 8; i++) {
             guest::StoreU16(h.base, path + 5146 + 2 * i, uint16_t(r.Below(route.sections)));
           }
@@ -2575,6 +2654,144 @@ void AiDrivers(Context& h) {
             r5 = path + 16 + 64 * r.Below(80);
           } else {
             r4 = io;
+          }
+          if (f.kind == kExtend || f.kind == kUpdatePath) {
+            // The corners (as AddCornersAt's cases): four corners' data in the
+            // vehicle's bytes (0x300 apart; +48 to +54 their slices), the route
+            // file's corner table (+16) at vehicle + 0xD00, each route slice's
+            // corner list (+58 the count, 0 to 3, entries from +60), the path's
+            // corner records (+5164) and count; the look-ahead +5142, the mode
+            // and its normalizer (now and then a recompiled leaf, on the
+            // translated code: ClearOtherIndexes, returning the path); the
+            // driver's vehicle (FindSideSection reads its route position
+            // without a check); fewer entries (none a fifth of the time).
+            for (uint32_t i = 0; i < 4; i++) {
+              const uint32_t data = vehicle + 0x300 * i;
+              guest::StoreU16(h.base, data + 0, uint16_t(r.Below(13)));
+              guest::StoreU16(h.base, data + 2, uint16_t(int32_t(r.Below(8)) - 1));
+              for (uint32_t k = 0; k < 8; k++) {
+                guest::StoreU16(h.base, data + 36 + 2 * k, uint16_t(r.Below(route.sections)));
+              }
+              guest::StoreU32(h.base, data + 4, RandomFloat(r, 2.0f));
+              guest::StoreU32(h.base, data + 12, RandomFloat(r, 20.0f));
+              guest::StoreU32(h.base, data + 28, RandomFloat(r, 200.0f));
+              guest::StoreU16(h.base, data + 48, uint16_t(r.Below(21)));
+              guest::StoreU16(h.base, data + 50, uint16_t(r.Below(31)));
+              guest::StoreU16(h.base, data + 52, uint16_t(r.Below(41)));
+              guest::StoreU16(h.base, data + 54, uint16_t(r.Below(41)));
+            }
+            for (uint32_t i = 0; i < 8; i++) {
+              guest::StoreU32(h.base, vehicle + 0xD00 + 4 * i,
+                              r.Below(6) == 0 ? 0 : vehicle + 0x300 * r.Below(4));
+            }
+            guest::StoreU32(h.base, route_file + 16, vehicle + 0xD00);
+            for (uint32_t section = 0; section < 8; section++) {
+              for (uint32_t k = 0; k < route.Slices(section); k++) {
+                const uint32_t slice = route.Address(section) + 124 + 84 * k;
+                guest::StoreU16(h.base, slice + 58, uint16_t(r.Below(3) ? 0 : r.Below(4)));
+                for (uint32_t i = 0; i < 3; i++) {
+                  guest::StoreU16(h.base, slice + 60 + 4 * i, uint16_t(r.Below(8)));
+                  guest::StoreU16(h.base, slice + 62 + 4 * i, uint16_t(r.Below(41)));
+                }
+              }
+            }
+            guest::StoreU16(h.base, path + 5162, uint16_t(r.Below(5)));
+            for (uint32_t i = 0; i < 9; i++) {
+              const uint32_t record = path + 5164 + 44 * i;
+              const uint32_t data = r.Below(8) == 0 ? 0 : vehicle + 0x300 * r.Below(4);
+              guest::StoreU32(h.base, record + 0, data);
+              guest::StoreU32(h.base, record + 4, data == 0 ? 0 : data + 56);
+              guest::StoreU16(h.base, record + 8, uint16_t(r.Below(10)));
+              guest::StoreU16(h.base, record + 10, uint16_t(int32_t(r.Below(41)) - 10));
+              guest::StoreU16(h.base, record + 12, uint16_t(r.Below(90)));
+              guest::StoreU16(h.base, record + 14, uint16_t(r.Below(51)));
+              guest::StoreU32(h.base, record + 16, FloatBits(r.Below(2) ? 1.0f : -1.0f));
+              for (uint32_t at : {20u, 24u, 28u, 32u}) {
+                guest::StoreU32(h.base, record + at, RandomFloat(r, 4.0f));
+              }
+              guest::StoreU8(h.base, record + 36, uint8_t(r.Below(2)));
+              guest::StoreU8(h.base, record + 37, uint8_t(r.Below(2)));
+              guest::StoreU32(h.base, record + 40, r.Below(4));
+            }
+            guest::StoreU16(h.base, path + 5136,
+                            uint16_t(r.Below(5) == 0 ? 0 : r.Below(16) == 0 ? 75 + r.Below(6)
+                                                                            : 1 + r.Below(12)));
+            guest::StoreU16(h.base, path + 5142, uint16_t(int32_t(r.Below(30)) - 2));
+            const uint32_t mode = r.Below(2);
+            guest::StoreU32(h.base, path + 5520, mode);
+            guest::StoreU32(h.base, path + 5532, r.Below(16) == 0 ? 0x82144ED8u
+                                                 : mode == 1        ? 0x8213B428u
+                                                                    : 0x8213C908u);
+            guest::StoreU32(h.base, driver + 160, vehicle);
+            test_route::RandomPosition(h.base, vehicle + 5232 + 4, route, r);
+            guest::StoreU16(h.base, object + 88, uint16_t(r.Below(5) + 2));
+            guest::StoreU8(h.base, object + 90, uint8_t(r.Below(4)));
+            for (uint32_t at : {116u, 128u, 152u}) {
+              guest::StoreU32(h.base, driver + at, RandomFloat(r, 3.0f));
+            }
+            guest::StoreU32(h.base, path + 5516, RandomFloat(r, 1.0f));
+            for (uint32_t i = 0; i < 9; i++) {
+              floats.push_back({kPath + 5164 + 44 * i + 28, 2});
+            }
+            for (uint32_t k = 0; k < 80; k++) {
+              floats.push_back({kPath + 16 + 64 * k + 28, 6});
+            }
+          }
+          if (f.kind == kUpdatePath) {
+            // The point (the driver's +80), the driver at index 0 of a table
+            // at the block (the others' +80, +88, +116, +144 in the block
+            // past it), its +16 (bit 0 now and then), state, mask, speed and
+            // records of the others (+172), its skill's percentages; the
+            // racers (up to 3, indexes 0 to 2) and their vehicles' flags and
+            // route positions (FollowLeaderBranch).
+            guest::StoreU32(h.base, driver + 80, guest::LoadU32(h.base, io + 0));
+            guest::StoreU32(h.base, driver + 84, guest::LoadU32(h.base, io + 4));
+            guest::StoreU32(h.base, driver + 88, guest::LoadU32(h.base, io + 8));
+            guest::StoreU16(h.base, driver + 8, uint16_t(r.Below(16) == 0 ? 0x8000 + r.Below(8)
+                                                                          : r.Below(4)));
+            drivers = area + kDriver;
+            guest::StoreU32(h.base, driver + 0, 0);
+            guest::StoreU32(h.base, driver + 16, (r.Below(8) == 0 ? 1u : 0u) |
+                                                     (r.Below(2) ? 4u : 0u) | (r.Below(2) ? 2u : 0u));
+            guest::StoreU32(h.base, driver + 32, r.Below(7));
+            guest::StoreU16(h.base, driver + 40, uint16_t(r.Below(8)));
+            guest::StoreU32(h.base, driver + 100, FloatBits(float(r.Below(250))));
+            guest::StoreU32(h.base, driver + 488, RandomFloat(r, 100.0f));
+            for (uint32_t k = 0; k < 7; k++) {
+              const uint32_t record = driver + 172 + 40 * k;
+              guest::StoreU32(h.base, record + 0, FloatBits(float(r.Below(4001)) / 10.0f - 200.0f));
+              guest::StoreU32(h.base, record + 4, FloatBits(float(r.Below(400)) / 100.0f - 2.0f));
+              guest::StoreU32(h.base, record + 16, FloatBits(float(r.Below(250))));
+              guest::StoreU32(h.base, record + 20, FloatBits(float(r.Below(400)) / 40.0f - 1.0f));
+              guest::StoreU16(h.base, record + 24, uint16_t(r.Below(5)));
+              guest::StoreU16(h.base, record + 30, uint16_t(int32_t(r.Below(4)) - 1));
+              guest::StoreU8(h.base, record + 33, uint8_t(r.Below(2)));
+            }
+            guest::StoreU16(h.base, driver + kSkill + 14, uint16_t(r.Below(101)));
+            guest::StoreU16(h.base, driver + kSkill + 16, uint16_t(r.Below(101)));
+            for (uint32_t j = 1; j < 3; j++) {
+              const uint32_t other = area + kDriver + ai::kDriverBytes * j;
+              for (uint32_t at : {80u, 88u, 144u}) {
+                guest::StoreU32(h.base, other + at, RandomFloat(r, 20.0f));
+              }
+              guest::StoreU32(h.base, other + 116, RandomFloat(r, 2.0f));
+            }
+            const uint32_t count = r.Below(4);
+            guest::StoreU32(h.base, area + kRacers + 56, count);
+            for (uint32_t i = 0; i < 8; i++) {
+              const uint32_t racer = area + kRacerRecords + 24 * i;
+              guest::StoreU32(h.base, area + kRacers + 4 * i, racer);
+              guest::StoreU32(h.base, racer + 20, r.Below(8) == 0 ? r.Below(3) : i % 3);
+              guest::StoreU32(h.base, vehicles + kVehicleBytes * i + 6148,
+                              r.Below(4) == 0 ? 0x80u >> r.Below(8) : 0u);
+              test_route::RandomPosition(h.base, vehicles + kVehicleBytes * i + 5232 + 4, route,
+                                         r);
+            }
+            for (uint32_t k = 0; k < 7; k++) {
+              floats.push_back({kDriver + 172 + 40 * k + 12, 1});
+            }
+            floats.push_back({kDriver + 164, 2});
+            floats.push_back({kPath + 5516, 1});
           }
           break;
         }

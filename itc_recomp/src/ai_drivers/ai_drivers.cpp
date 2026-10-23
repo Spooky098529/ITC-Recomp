@@ -5114,11 +5114,15 @@ uint32_t LeftEntry(uint8_t* base, uint32_t path, uint32_t point, uint32_t entry,
   return 0;
 }
 
+bool CornersMovable(uint32_t path) {
+  const uint32_t records = path + 5164;
+  return records < 0xA0000000u && c_runtime::InOneView(records, 9 * 44);
+}
+
 bool DropPassed(uint8_t* base, uint32_t path, uint32_t point, uint32_t frame, uint64_t* r3) {
   // AdvanceCorners' condition for its native copies (it only depends on the
   // path): checked first, so the original runs whole where it fails.
-  const uint32_t records = path + 5164;
-  if (records >= 0xA0000000u || !c_runtime::InOneView(records, 9 * 44)) {
+  if (!CornersMovable(path)) {
     return false;
   }
   ITC_NATIVE_RUNNING("sub_8213F2E0 AiPath::DropPassed");
@@ -5187,6 +5191,241 @@ bool DropPassed(uint8_t* base, uint32_t path, uint32_t point, uint32_t frame, ui
   Stfs(base, entry + 0, Fmadds(Lfs(base, record + 36), offset, Lfs(base, record + 0)));
   CopyWord(base, record + 4, entry + 4);
   Stfs(base, entry + 8, Fmadds(Lfs(base, record + 40), offset, Lfs(base, record + 8)));
+  return true;
+}
+
+// --- The path's update ---
+
+namespace {
+constexpr uint32_t kExtendReach = 0x820027A4;  // 200.0: how far ahead the ring reaches
+constexpr uint32_t kLookAhead = 0x82008D44;    // -20.0
+constexpr uint32_t kTwelve = 0x82002C78;       // 12.0
+}  // namespace
+
+uint64_t Extend(uint8_t* base, uint32_t path, uint32_t point, uint32_t frame,
+                const PathCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_8213ECF8 AiPath::Extend");
+  const uint32_t file = Load(base, track_route::kRoute);
+  const double length = Lfs(base, file + 8);
+  const double slices = Fdivs(Lfs(base, kExtendReach), length);
+  Stfs(base, frame + 92, Fmuls(length, Lfs(base, kHundredth)));
+  Stfs(base, frame + 96, Fmuls(length, Lfs(base, kTenth)));
+  guest::StoreU32(base, frame + 84, uint32_t(strings_and_font::steps::Fctiwz(slices)));
+  int32_t ahead = int32_t(Load(base, frame + 84));
+  if (!(ahead < 80)) {
+    ahead = 80;
+  }
+  const int32_t count = LoadS16(base, path + 5136);
+  int32_t limit = ahead;
+  if (!(count + 10 > ahead)) {
+    limit = count + 10;
+  }
+  guest::StoreU16(base, frame + 80, 0);
+  guest::StoreU32(base, frame + 84, 0);
+  const uint64_t masks = BranchMasks(base, path, frame - 96);
+  uint64_t r3 = masks;
+  const auto ring_at = [&](int32_t at) {
+    return path + 16 + (uint32_t(at - (at / 80) * 80) << 6);
+  };
+  uint32_t previous = 0;
+  if (count > 0) {
+    previous = ring_at(LoadS16(base, path + 5138) + (count - 1));
+    guest::StoreU16(base, frame + 84, guest::LoadU16(base, previous + 16));
+    guest::StoreU16(base, frame + 86, uint16_t(guest::LoadU16(base, previous + 18) + 1));
+    guest::StoreU16(base, frame + 80, uint16_t(Load(base, previous + 20)));
+  } else {
+    r3 = FindSideSection(base, path, frame + 84, point, uint32_t(masks), frame - 208);
+    if (int32_t(Load(base, path + 5520)) == 1) {
+      guest::StoreU16(base, frame + 80, guest::LoadU16(base, Load(base, path + 0) + 8));
+    } else {
+      guest::StoreU16(base, frame + 80, 0xFFFF);
+    }
+  }
+  if (LoadS16(base, path + 5136) < limit) {
+    guest::StoreU16(base, frame + 88, 0xFFFF);
+    guest::StoreU16(base, frame + 90, 0xFFFF);
+    const double one = Lfs(base, kOne);
+    const double zero = Lfs(base, kZero);
+    for (;;) {
+      const uint32_t entry =
+          ring_at(LoadS16(base, path + 5138) + LoadS16(base, path + 5136));
+      const uint32_t shift = entry + 28;
+      const uint32_t none = Load(base, frame + 88);
+      Stfs(base, entry + 0, zero);
+      guest::StoreU32(base, entry + 20, 0xFFFFFFFFu);
+      Stfs(base, entry + 12, one);
+      guest::StoreU32(base, entry + 16, none);
+      Stfs(base, entry + 48, zero);
+      guest::StoreU32(base, entry + 52, 0);
+      Stfs(base, entry + 4, zero);
+      Stfs(base, entry + 8, zero);
+      Stfs(base, entry + 24, zero);
+      Stfs(base, shift, zero);
+      for (uint32_t at = 32; at <= 44; at += 4) {
+        Stfs(base, entry + at, zero);
+      }
+      const uint32_t normalizer = Load(base, path + 5532);
+      if (normalizer == kNormalizeByLane) {
+        r3 = NormalizeByLane(base, entry, frame + 84, frame + 80, uint32_t(masks));
+      } else if (normalizer == kNormalizeByBranch) {
+        r3 = NormalizeByBranch(base, path, entry, frame + 84, frame + 80, uint32_t(masks));
+      } else {
+        r3 = calls.normalize(calls.user, normalizer, frame, path, entry, frame + 84, frame + 80,
+                             masks);
+      }
+      if (int32_t(uint32_t(r3)) != 1) {
+        break;
+      }
+      guest::StoreU16(base, frame + 84, guest::LoadU16(base, entry + 16));
+      guest::StoreU16(base, frame + 86, uint16_t(guest::LoadU16(base, entry + 18) + 1));
+      const auto add_section = [&](uint16_t section) {
+        const uint32_t at = uint32_t(LoadS16(base, path + 5144) + 2573) << 1;
+        guest::StoreU16(base, path + at, section);
+        guest::StoreU16(base, path + 5144, uint16_t(guest::LoadU16(base, path + 5144) + 1));
+        r3 = DropOffRouteCorners(base, path);
+      };
+      if (previous != 0) {
+        uint32_t record = Load(base, entry + 52);
+        if (guest::LoadU16(base, entry + 16) == guest::LoadU16(base, previous + 16)) {
+          Stfs(base, shift, zero);
+        } else {
+          const uint32_t before = Load(base, previous + 52);
+          const double dx = Fsubs(Lfs(base, before + 0), Lfs(base, record + 0));
+          const double dz = Fsubs(Lfs(base, before + 8), Lfs(base, record + 8));
+          Stfs(base, shift, Fmadds(dz, Lfs(base, record + 40), Fmuls(dx, Lfs(base, record + 36))));
+          add_section(guest::LoadU16(base, entry + 16));
+          record = Load(base, entry + 52);
+        }
+        CopyWord(base, record + 24, entry + 32);
+        CopyWord(base, record + 28, entry + 36);
+        CopyWord(base, record + 28, entry + 44);
+        CopyWord(base, entry + 32, entry + 40);
+        NarrowToOther(base, entry, previous, frame + 92, shift);
+        r3 = NarrowBehind(base, path, entry, previous, frame + 92, frame + 96, frame - 128);
+      } else if (guest::LoadU16(base, path + 5136) == 0) {
+        const uint32_t record = Load(base, entry + 52);
+        const uint16_t section = guest::LoadU16(base, entry + 16);
+        CopyWord(base, record + 24, entry + 32);
+        CopyWord(base, record + 28, entry + 36);
+        CopyWord(base, entry + 32, entry + 40);
+        CopyWord(base, entry + 36, entry + 44);
+        const double dx = Fsubs(Lfs(base, point + 0), Lfs(base, record + 0));
+        const double dz = Fsubs(Lfs(base, point + 8), Lfs(base, record + 8));
+        const double offset = Fmadds(dz, Lfs(base, record + 40), Fmuls(dx, Lfs(base, record + 36)));
+        Stfs(base, entry + 24, offset);
+        Stfs(base, entry + 0, Fmadds(Lfs(base, record + 36), offset, Lfs(base, record + 0)));
+        CopyWord(base, record + 4, entry + 4);
+        Stfs(base, entry + 8, Fmadds(Lfs(base, record + 40), offset, Lfs(base, record + 8)));
+        add_section(section);
+      }
+      uint32_t corners_r3 = 0, a = 0, b = 0;
+      const uint32_t corners = frame - 144;
+      const uint32_t step = AddCornersAt(base, path, entry, corners, &corners_r3, &a, &b);
+      if (step >= 2) {
+        r3 = calls.join(calls.user, step, corners, path, a, b);
+        AddCornersAtFinish(base, path);
+      } else {
+        r3 = corners_r3;
+      }
+      previous = entry;
+      const int16_t added = int16_t(guest::LoadU16(base, path + 5136) + 1);
+      guest::StoreU16(base, path + 5136, uint16_t(added));
+      if (!(added < limit)) {
+        break;
+      }
+    }
+  }
+  if (int32_t(Load(base, path + 5520)) != 1) {
+    ApplyCornerLines(base, path, frame - 112);
+    r3 = path;
+  }
+  const uint32_t driver = Load(base, path + 0);
+  if (driver == 0) {
+    return r3;
+  }
+  uint32_t inside = 0;
+  if (LoadS16(base, path + 5162) > 0) {
+    uint32_t record = path + 5164;
+    int32_t i = 0;
+    do {
+      const uint32_t data = Load(base, record + 0);
+      if (data != 0) {
+        const int32_t offset = LoadS16(base, record + 10);
+        const int32_t look = LoadS16(base, path + 5142);
+        if (!(look < LoadS16(base, data + 48) + offset) &&
+            !(look > LoadS16(base, data + 54) + offset)) {
+          inside = 1;
+          break;
+        }
+      }
+      i++;
+      record += 44;
+    } while (i < LoadS16(base, path + 5162));
+  }
+  guest::StoreU32(base, driver + 496, inside);
+  return r3;
+}
+
+bool UpdatePath(uint8_t* base, uint32_t path, uint32_t frame, const PathCalls& calls,
+                uint64_t* r3) {
+  if (!CornersMovable(path)) {  // DropPassed's condition, checked first
+    return false;
+  }
+  ITC_NATIVE_RUNNING("sub_8213F530 AiPath::Update");
+  *r3 = path;
+  guest::StoreU32(base, frame + 80, 0);
+  const uint32_t file = Load(base, track_route::kRoute);
+  const uint32_t driver = Load(base, path + 0);
+  const uint32_t point = driver + 80;
+  if (!(guest::LoadU16(base, driver + 8) < 32768)) {
+    return true;
+  }
+  FollowLeaderBranch(base, path);
+  uint64_t dropped = 0;
+  DropPassed(base, path, point, frame - 160, &dropped);  // can't fail: checked above
+  *r3 = Extend(base, path, point, frame - 208, calls);
+  const int16_t entries = int16_t(guest::LoadU16(base, path + 5136));
+  const int32_t count = entries;
+  const int32_t reach =
+      strings_and_font::steps::Fctiwz(Fdivs(Lfs(base, kLookAhead), Lfs(base, file + 8)));
+  const int16_t look = int16_t(guest::LoadU16(base, path + 5142) - uint16_t(reach) + 1);
+  guest::StoreU16(base, path + 5140, uint16_t(look));
+  if (look > count) {
+    guest::StoreU16(base, path + 5140, uint16_t(entries));
+  }
+  if (!(count > 1)) {
+    return true;
+  }
+  const uint32_t own = Load(base, path + 0);
+  if ((Load(base, own + 16) & 0x1) != 0) {
+    return true;
+  }
+  const double speed = Fadds(Lfs(base, own + 100), Lfs(base, kTwenty));
+  const double per = Fdivs(Lfs(base, Load(base, track_route::kRoute) + 8), speed);
+  int32_t span = int32_t(uint32_t(LoadS16(base, path + 5140)) << 2);
+  guest::StoreU32(base, frame + 80, uint32_t(span));
+  Stfs(base, path + 5516, Fmuls(per, Lfs(base, kTwelve)));
+  if (span > count) {
+    guest::StoreU32(base, frame + 80, uint32_t(count));
+  }
+  SetRanges(base, path, frame + 80, frame - 128);
+  ReactToOthers(base, Load(base, path + 0), frame + 80, frame - 240);
+  const uint32_t mine = Load(base, path + 0);
+  const int32_t first = int32_t(Load(base, mine + 452));
+  int32_t ring = -1;
+  if (!(first < 0)) {
+    ring = LoadS16(base, uint32_t(first) * 40 + mine + 198);
+  }
+  if (!(ring < 0)) {
+    AvoidOthers(base, path, frame - 272);
+  }
+  if (int32_t(Load(base, path + 5520)) == 1) {
+    FollowTargets(base, path, frame - 128);
+  } else {
+    PlanLine(base, path, frame - 96);
+  }
+  RefreshPoints(base, path);
+  *r3 = path;
   return true;
 }
 

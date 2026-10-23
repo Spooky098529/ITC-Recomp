@@ -868,4 +868,50 @@ uint32_t LeftEntry(uint8_t* base, uint32_t path, uint32_t point, uint32_t entry,
 // then).
 bool DropPassed(uint8_t* base, uint32_t path, uint32_t point, uint32_t frame, uint64_t* r3);
 
+// --- The path's update ---
+
+// The calls the path's update can't make natively, made by the caller (the
+// adapter, on the translated code): the path's normalizer (+5532) when it's
+// neither NormalizeByLane nor NormalizeByBranch (from Extend's frame, `frame`,
+// with r3 to r7 as given), and AddCornersAt's translated join step (2 or 3:
+// r3 = the path, r4 = `a`, r5 = `b`, from 112 bytes below AddCornersAt's frame
+// `frame`). Each returns the r3 it leaves.
+struct PathCalls {
+  void* user;
+  uint64_t (*normalize)(void* user, uint32_t function, uint32_t frame, uint32_t path,
+                        uint32_t entry, uint32_t position, uint32_t lane, uint64_t masks);
+  uint64_t (*join)(void* user, uint32_t step, uint32_t frame, uint32_t path, uint32_t a,
+                   uint32_t b);
+};
+// The path's corner records where AdvanceCorners' copies can be native
+// (outside the physical views, in one view).
+bool CornersMovable(uint32_t path);
+// AiPath::Extend (sub_8213ECF8): the ring filled up to 200.0 m ahead (at most
+// 80 entries, at most 10 more a call) from the last entry's next slice (or,
+// with none, FindSideSection from the point), each new entry cleared and
+// filled by the normalizer (+5532) with BranchMasks, until one fails; a new
+// entry's +28 (the shift between the slices' centers in a new section, whose
+// number is added to the section list, then DropOffRouteCorners), its range
+// (+32 to +44) from its slice record, narrowed to the entry before
+// (NarrowToOther, NarrowBehind with the step and limit at frame + 92 and + 96:
+// the slice length x 0.01 and x 0.1); the first entry's offset and point from
+// the point; AddCornersAt for each. Then ApplyCornerLines in mode 0, and the
+// driver's +496 = 1 when the look-ahead +5142 is inside a corner. `frame` the
+// original's, 208 bytes below the caller's stack pointer. Returns the r3 the
+// original leaves.
+uint64_t Extend(uint8_t* base, uint32_t path, uint32_t point, uint32_t frame,
+                const PathCalls& calls);
+// AiPath::Update (sub_8213F530): with the driver's lane (+8) below 32768:
+// FollowLeaderBranch, DropPassed and Extend from the driver's point (+80);
+// the look-ahead count +5140 (+5142 plus 20.0 m in slices, plus one, at most
+// the entries' count); with more than one entry and the driver's +16 bit 0
+// clear: the largest step +5516, SetRanges and ReactToOthers (over +5140 x 4
+// entries at most the count, at frame + 80: `frame` 144 bytes down),
+// AvoidOthers when the driver's first listed racer has a ring index, then
+// FollowTargets (mode 1) or PlanLine, and RefreshPoints. `r3` the r3 the
+// original leaves. False, with nothing done, where DropPassed couldn't be
+// native (the original runs then).
+bool UpdatePath(uint8_t* base, uint32_t path, uint32_t frame, const PathCalls& calls,
+                uint64_t* r3);
+
 }  // namespace ai_drivers

@@ -150,7 +150,10 @@ ITC_FLAG_BOOL(native_ai_drivers, true, "ITC",
               "AiDrivers::StartRanked sub_8213A8B0, AiDriver::ReadVehicle sub_821467F0, "
               "AiDriver::ReadVehicleOwnSlice sub_821469D0, AiPath::BranchMasks sub_8213E500, "
               "AiPath::KeepBranch sub_8213EAB0, AiPath::LeftEntry sub_8213F140, "
-              "AiPath::DropPassed sub_8213F2E0) "
+              "AiPath::DropPassed sub_8213F2E0, AiPath::Extend sub_8213ECF8 (the path's "
+              "normalizer through its +5532 natively when it's NormalizeByLane or "
+              "NormalizeByBranch, and AddCornersAt's join step on the translated code), "
+              "AiPath::Update sub_8213F530) "
               "natively instead of "
               "through the translated code (the same words, bit for bit; checked by "
               "--run_harnesses=ai_drivers). Those "
@@ -493,4 +496,80 @@ extern "C" REX_FUNC(sub_8213F2E0) {
     }
   }
   __imp__sub_8213F2E0(ctx, base);
+}
+
+// --- The path's update ---
+
+namespace {
+struct PathCall {
+  PPCContext* ctx;
+  uint8_t* base;
+};
+// The path's normalizer when it's neither of the native ones (never in the
+// game: AiPath::SetMode sets only those), called from Extend's frame (its
+// back chain written, returning to 0x8213EEDC) as the original calls it.
+uint64_t CallNormalizer(void* user, uint32_t function, uint32_t frame, uint32_t path,
+                        uint32_t entry, uint32_t position, uint32_t lane, uint64_t masks) {
+  auto& call = *static_cast<PathCall*>(user);
+  PPCContext& ctx = *call.ctx;
+  uint8_t* base = call.base;
+  const uint64_t saved = ctx.r1.u64;
+  guest::StoreU32(base, frame, frame + 208);
+  ctx.r1.u64 = frame;
+  ctx.lr = 0x8213EEDC;
+  ctx.r3.u64 = path;
+  ctx.r4.u64 = entry;
+  ctx.r5.u64 = position;
+  ctx.r6.u64 = lane;
+  ctx.r7.u64 = masks;
+  ctx.ctr.u64 = function;
+  REX_CALL_INDIRECT_FUNC(function);
+  ctx.r1.u64 = saved;
+  ctx.fpscr.disableFlushMode();
+  return ctx.r3.u64;
+}
+// AddCornersAt's translated join step (never seen in play), from its frame
+// (`frame`, Extend's 144 bytes below it) as its adapter runs it.
+uint64_t CallJoinStep(void* user, uint32_t step, uint32_t frame, uint32_t path, uint32_t a,
+                      uint32_t b) {
+  auto& call = *static_cast<PathCall*>(user);
+  PPCContext& ctx = *call.ctx;
+  uint8_t* base = call.base;
+  guest::StoreU32(base, frame, frame + 144);
+  ctx.r3.u64 = path;
+  ctx.r4.u64 = a;
+  ctx.r5.u64 = b;
+  RunJoinStep(ctx, base, step, frame - 112, frame);
+  ctx.fpscr.disableFlushMode();
+  return ctx.r3.u64;
+}
+}  // namespace
+
+// r4 = the point; the original's frame 208 bytes down.
+extern "C" REX_FUNC(sub_8213ECF8) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_ai_drivers)) {
+    __imp__sub_8213ECF8(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  PathCall call{&ctx, base};
+  const PathCalls calls{&call, CallNormalizer, CallJoinStep};
+  ctx.r3.u64 = Extend(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 208, calls);
+}
+// The original's frame 144 bytes down; the original where DropPassed
+// couldn't be native.
+extern "C" REX_FUNC(sub_8213F530) {
+  REX_FUNC_PROLOGUE();
+  if (ITC_FLAG(native_ai_drivers)) {
+    ctx.fpscr.disableFlushMode();
+    PathCall call{&ctx, base};
+    const PathCalls calls{&call, CallNormalizer, CallJoinStep};
+    uint64_t r3 = 0;
+    if (UpdatePath(base, ctx.r3.u32, ctx.r1.u32 - 144, calls, &r3)) {
+      ctx.r3.u64 = r3;
+      return;
+    }
+  }
+  __imp__sub_8213F530(ctx, base);
 }
