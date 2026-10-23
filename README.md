@@ -32,7 +32,7 @@ The above branch contains the most up to date functions reference, and is where 
   - Intel Iris Xe (11th-gen Core laptops) or Arc
   - Steam Deck
 
-  Only the Steam Deck and a Radeon RX 7900 XT have been tested so far.
+  Only the Steam Deck and a Radeon RX 7900 XT have been tested so far. If the screen turns white when you launch the game it means your GPU doesn't support the required Vulkan version.
 - Your own copy of the game, extracted from a backup.
 
 ## Install
