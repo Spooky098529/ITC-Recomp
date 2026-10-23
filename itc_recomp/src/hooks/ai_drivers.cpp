@@ -132,7 +132,11 @@ ITC_FLAG_BOOL(native_ai_drivers, true, "ITC",
               "sub_8213B058, AiPath::ContinueLine sub_8213DB08, AiPath::ApproachCorner sub_8213DE30, "
               "AiPath::CornerToEntry sub_8213E018, AiPath::CornerToApex sub_8213E1D0, "
               "AiPath::CornerToExit sub_8213E360, AiPath::PlanCorners sub_8213E7B8, "
-              "AiPath::PlanLine sub_8213F4B0) "
+              "AiPath::PlanLine sub_8213F4B0, AiPath::BranchMasksFor sub_8213D378 (with its kinds 1, 6 "
+              "and 7's step, sub_8213D3D8, never seen in play), AiPath::LeaderBranchKind "
+              "sub_8213D1F0 (its kind 5's step sub_8213D2B8 with it), AiPath::FindSideSection "
+              "sub_8213D550, AiPath::FollowTargets sub_8213D9D8, AiPath::FollowLeaderBranch "
+              "sub_8213EB48 (its kind 5's step sub_8213EC8C with it)) "
               "natively instead of "
               "through the translated code (the same words, bit for bit; checked by "
               "--run_harnesses=ai_drivers). Those "
@@ -398,3 +402,18 @@ ITC_AI_DRIVERS(8213B058, {
 
 // The original's frame 96 bytes down.
 ITC_AI_DRIVERS(8213F4B0, ctx.r3.u64 = PlanLine(base, ctx.r3.u32, ctx.r1.u32 - 96))
+
+// --- The path's branch kinds and lines ---
+
+// r3 = &the kind; the list's address sign-extended, as the original's lis
+// leaves it.
+ITC_AI_DRIVERS(8213D378, ctx.r3.s64 = int32_t(BranchMasksFor(base, ctx.r3.u32)))
+// r4 = &the kind, r5 = &the best.
+ITC_AI_DRIVERS(8213D1F0, ctx.r3.u64 = LeaderBranchKind(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+// r4 = out, r5 = the point, r6 = the masks; the original's frame 208 bytes
+// down.
+ITC_AI_DRIVERS(8213D550, ctx.r3.u64 = FindSideSection(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                                      ctx.r6.u32, ctx.r1.u32 - 208))
+// The original's frame 128 bytes down (r3 kept).
+ITC_AI_DRIVERS(8213D9D8, FollowTargets(base, ctx.r3.u32, ctx.r1.u32 - 128))
+ITC_AI_DRIVERS(8213EB48, ctx.r3.u64 = FollowLeaderBranch(base, ctx.r3.u32))

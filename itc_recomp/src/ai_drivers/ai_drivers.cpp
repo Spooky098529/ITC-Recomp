@@ -4235,4 +4235,237 @@ uint32_t PlanLine(uint8_t* base, uint32_t path, uint32_t frame) {
   return path;
 }
 
+// --- The path's branch kinds and lines ---
+
+namespace {
+constexpr uint32_t kBranchMasks = 0x82008970;
+constexpr uint32_t kLeaderGap = 0x82008D40;  // -50.0
+// The race data's flags ([0x826C5B2C] + 20).
+uint32_t RaceFlags(uint8_t* base) {
+  return Load(base, Load(base, kRaceData) + 20);
+}
+// The flags the branch kinds need: 0x10, 0x4, 0x8 or 0x20.
+bool BranchFlags(uint32_t flags) {
+  return (flags & 0x3C) != 0;
+}
+// The kind for a route section's branch number (1 to 14, by the originals'
+// jump tables) under the race flags; -1 for none.
+int32_t KindForBranch(uint32_t flags, uint32_t number) {
+  switch (number - 1) {
+    case 0:
+    case 4:
+      return 5;
+    case 1:
+    case 5:
+      return 4;
+    case 2:
+    case 7:
+    case 12:
+      return (flags & 0x8) != 0 ? 7 : -1;
+    case 3:
+    case 6:
+    case 13:
+      return (flags & 0x4) != 0 ? 6 : -1;
+    case 10:
+      return (flags & 0x10) != 0 ? 2 : -1;
+    case 11:
+      return (flags & 0x20) != 0 ? 3 : -1;
+    default:
+      return -1;
+  }
+}
+// The branch number (byte +3) of the section of a vehicle identity's route
+// position (+4); false when the section is negative.
+bool BranchNumberAt(uint8_t* base, uint32_t identity, uint32_t* number) {
+  const uint32_t section = guest::LoadU16(base, identity + 4);
+  if (int16_t(section) < 0) {
+    return false;
+  }
+  const uint32_t table = Load(base, Load(base, track_route::kRoute) + 12);
+  *number = guest::LoadU8(base, Load(base, table + (section << 2)) + 3);
+  return true;
+}
+}  // namespace
+
+uint32_t BranchMasksFor(uint8_t* base, uint32_t kind) {
+  ITC_NATIVE_RUNNING("sub_8213D378 AiPath::BranchMasksFor");
+  const uint32_t flags = RaceFlags(base);
+  if (!BranchFlags(flags)) {
+    return kBranchMasks;
+  }
+  switch (Load(base, kind)) {
+    case 1:
+    case 6:
+    case 7:
+      if ((flags & 0xC) != 0) {
+        return kBranchMasks + 16;
+      }
+      [[fallthrough]];
+    case 2:
+    case 8:
+      if ((flags & 0x10) != 0) {
+        return kBranchMasks + 32;
+      }
+      [[fallthrough]];
+    case 3:
+    case 9:
+      if ((flags & 0x20) != 0) {
+        return kBranchMasks + 48;
+      }
+      return kBranchMasks;
+    default:
+      return kBranchMasks;
+  }
+}
+
+uint32_t LeaderBranchKind(uint8_t* base, uint32_t path, uint32_t kind, uint32_t best) {
+  ITC_NATIVE_RUNNING("sub_8213D1F0 AiPath::LeaderBranchKind");
+  const uint32_t flags = RaceFlags(base);
+  if (!BranchFlags(flags)) {
+    return path;
+  }
+  const uint32_t driver = Load(base, path + 0);
+  const uint32_t vehicle = Load(base, driver + 160);
+  if (vehicle == 0) {
+    return 0;
+  }
+  if (int32_t(Load(base, kind)) != -1 && !(Lfs(base, driver + 488) > Lfs(base, best))) {
+    return vehicle;
+  }
+  const uint32_t identity = vehicle_accessors::VehicleIdentity(vehicle);
+  uint32_t number = 0;
+  if (!BranchNumberAt(base, identity, &number)) {
+    return identity;
+  }
+  const int32_t found = KindForBranch(flags, number);
+  if (found < 0) {
+    return identity;
+  }
+  guest::StoreU32(base, kind, uint32_t(found));
+  Stfs(base, best, Lfs(base, driver + 488));
+  return identity;
+}
+
+uint64_t FindSideSection(uint8_t* base, uint32_t path, uint32_t out, uint32_t point,
+                         uint32_t masks, uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_8213D550 AiPath::FindSideSection");
+  const uint32_t identity =
+      vehicle_accessors::VehicleIdentity(Load(base, Load(base, path + 0) + 160));
+  const uint32_t position = frame + 80;
+  track_route::ClampPosition(base, position, Load(base, identity + 4));
+  uint64_t r3 = position;
+  const uint32_t section = guest::LoadU16(base, position + 0);
+  if (int16_t(section) < 0) {
+    return r3;
+  }
+  const uint16_t slice = guest::LoadU16(base, position + 2);
+  if (int16_t(slice) < 0) {
+    return r3;
+  }
+  const uint32_t route = track_route::kRoute;
+  uint32_t taken = Load(base, position);
+  guest::StoreU32(base, frame + 84, taken);
+  uint32_t current =
+      Load(base, Load(base, Load(base, route) + 12) + ((section & 0xFFFF) << 2));
+  uint32_t link = current + 52;
+  for (int i = 0; i < 4; i++, link += 4) {
+    const uint16_t number = guest::LoadU16(base, link);
+    if (int16_t(number) < 0) {
+      continue;
+    }
+    const uint32_t candidate =
+        Load(base, Load(base, Load(base, route) + 12) + (uint32_t(number) << 2));
+    const int32_t prefer =
+        CompareBranches(base, path, current, candidate, frame + 84, link, masks);
+    r3 = uint64_t(int64_t(prefer));
+    if (!(prefer > 0)) {
+      continue;
+    }
+    guest::StoreU16(base, position + 0, number);
+    guest::StoreU16(base, position + 2, slice);
+    r3 = track_route::Normalize(base, route, position, masks);
+    r3 = track_route::OnSlice(base, route, point, position, 0, frame - 128);
+    if (r3 == 0) {
+      continue;
+    }
+    track_route::ClampPosition(base, frame + 88, Load(base, position));
+    r3 = frame + 88;
+    taken = Load(base, frame + 88);
+    current = candidate;
+    guest::StoreU32(base, frame + 84, taken);
+  }
+  guest::StoreU32(base, out, taken);
+  return r3;
+}
+
+void FollowTargets(uint8_t* base, uint32_t path, uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_8213D9D8 AiPath::FollowTargets");
+  uint32_t previous = RingEntry(base, path, 0);
+  int32_t i = 1;
+  guest::StoreU32(base, frame + 80, uint32_t(i));
+  if (!(LoadS16(base, path + 5140) > 1)) {
+    return;
+  }
+  const double zero = Lfs(base, kZero);
+  do {
+    const uint32_t entry = RingEntry(base, path, i);
+    const double target = Lfs(base, previous + 48);
+    const double before = Lfs(base, previous + 24);
+    const double step = Lfs(base, entry + 28);
+    Stfs(base, entry + 24, target);
+    const double from = Fadds(step, before);
+    KeepInRange(base, entry, target);
+    LimitStep(base, path, entry, from, zero);
+    guest::StoreU32(base, frame + 84, 1);
+    ClampOffset(base, path, entry, frame + 80, frame + 84, frame - 96);
+    i = int32_t(uint32_t(i) + 1);
+    previous = entry;
+    guest::StoreU32(base, frame + 80, uint32_t(i));
+  } while (i < LoadS16(base, path + 5140));
+}
+
+uint32_t FollowLeaderBranch(uint8_t* base, uint32_t path) {
+  ITC_NATIVE_RUNNING("sub_8213EB48 AiPath::FollowLeaderBranch");
+  const uint32_t driver = Load(base, path + 0);
+  uint32_t r3 = path;
+  int32_t kind = -1;
+  if ((Load(base, driver + 16) & 0x4) != 0) {
+    const uint32_t object = Load(base, driver + 500);
+    const uint32_t flags = RaceFlags(base);
+    if (BranchFlags(flags) && object != 0) {
+      const int32_t mode = LoadS16(base, object + 88);
+      if ((mode < 4 || mode > 5) && !(Lfs(base, driver + 488) > Lfs(base, kLeaderGap))) {
+        const int32_t count = int32_t(track_collision::RaceRacerCount(base));
+        uint32_t found = 0;
+        for (int32_t i = 0; i < count; i++) {
+          const uint32_t racer = Load(base, Load(base, kRace) + 2308 + 4 * uint32_t(i));
+          const uint32_t index = Load(base, racer + 20);
+          if (int32_t(index) < 0) {
+            continue;
+          }
+          const uint32_t vehicle = vehicle_accessors::VehicleGet(base, index);
+          if (vehicle != 0 && (Load(base, vehicle + 6148) & 0x81) != 0) {
+            found = vehicle;
+            break;
+          }
+        }
+        r3 = 0;
+        if (found != 0) {
+          const uint32_t identity = vehicle_accessors::VehicleIdentity(found);
+          r3 = identity;
+          uint32_t number = 0;
+          if (BranchNumberAt(base, identity, &number)) {
+            kind = KindForBranch(flags, number);
+          }
+        }
+      }
+    }
+  }
+  if (int32_t(Load(base, path + 5528)) != kind) {
+    guest::StoreU32(base, path + 5528, uint32_t(kind));
+    r3 = ResetPath(base, path);
+  }
+  return r3;
+}
+
 }  // namespace ai_drivers

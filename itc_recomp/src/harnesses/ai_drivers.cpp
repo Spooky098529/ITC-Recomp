@@ -374,6 +374,16 @@ ITC_NATIVE_STEP(NativePlanCorners,
                                              ctx.r6.u32, ctx.r1.u32 - 144))
 ITC_NATIVE_STEP(NativePlanLine, ctx.r3.u64 = ai::PlanLine(base, ctx.r3.u32, ctx.r1.u32 - 96))
 
+ITC_NATIVE_STEP(NativeBranchMasksFor,
+                ctx.r3.s64 = int32_t(ai::BranchMasksFor(base, ctx.r3.u32)))
+ITC_NATIVE_STEP(NativeLeaderBranchKind,
+                ctx.r3.u64 = ai::LeaderBranchKind(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+ITC_NATIVE_STEP(NativeFindSideSection,
+                ctx.r3.u64 = ai::FindSideSection(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                                 ctx.r6.u32, ctx.r1.u32 - 208))
+ITC_NATIVE_STEP(NativeFollowTargets, ai::FollowTargets(base, ctx.r3.u32, ctx.r1.u32 - 128))
+ITC_NATIVE_STEP(NativeFollowLeaderBranch, ctx.r3.u64 = ai::FollowLeaderBranch(base, ctx.r3.u32))
+
 // Runs the recompiled version with the native flag off.
 template <GuestFunction recompiled>
 void Original(PPCContext& ctx, uint8_t* base) {
@@ -570,6 +580,11 @@ enum Kind {
   kCornerToExit,
   kPlanCorners,
   kPlanLine,
+  kBranchMasksFor,
+  kLeaderBranchKind,
+  kFindSideSection,
+  kFollowTargets,
+  kFollowLeaderBranch,
 };
 
 }  // namespace
@@ -838,6 +853,16 @@ void AiDrivers(Context& h) {
        kPlanCorners, 2000},
       {"AiPath::PlanLine (sub_8213F4B0)", Original<__imp__sub_8213F4B0>, NativePlanLine,
        kPlanLine, 2000},
+      {"AiPath::BranchMasksFor (sub_8213D378)", Original<__imp__sub_8213D378>,
+       NativeBranchMasksFor, kBranchMasksFor, 500},
+      {"AiPath::LeaderBranchKind (sub_8213D1F0)", Original<__imp__sub_8213D1F0>,
+       NativeLeaderBranchKind, kLeaderBranchKind, 1000},
+      {"AiPath::FindSideSection (sub_8213D550)", Original<__imp__sub_8213D550>,
+       NativeFindSideSection, kFindSideSection, 2000},
+      {"AiPath::FollowTargets (sub_8213D9D8)", Original<__imp__sub_8213D9D8>,
+       NativeFollowTargets, kFollowTargets, 2000},
+      {"AiPath::FollowLeaderBranch (sub_8213EB48)", Original<__imp__sub_8213EB48>,
+       NativeFollowLeaderBranch, kFollowLeaderBranch, 1000},
   };
   const uint32_t area = memory::Alloc(kAreaBytes, 0);
   const uint32_t driver = area + kDriver, vehicle = area + kVehicle, io = area + kIo;
@@ -884,6 +909,9 @@ void AiDrivers(Context& h) {
       guest::StoreU32(h.base, driver + 16, r.Below(2) ? uint32_t(r.Next()) : r.Below(4));
       guest::StoreU32(h.base, driver + 32, r.Below(8) ? r.Below(8) : uint32_t(r.Next()));
       uint32_t drivers = saved_drivers;
+      // The race data: its words +0xA3AF0 and +0xA3AF4 at kRace, or (the
+      // branch kinds' cases) its flags +20 at io + 0xF0.
+      uint32_t race_data = area + kRace - 0xA3AF0;
       uint64_t r3 = driver, r4 = 0, r5 = 0, r6 = 0, r7 = 0, r8 = 0, r9 = 0;
       uint32_t route_file = area + kFile;
       bool table_written = false;
@@ -2008,7 +2036,8 @@ void AiDrivers(Context& h) {
         case kCornerToApex:
         case kCornerToExit:
         case kPlanCorners:
-        case kPlanLine: {
+        case kPlanLine:
+        case kFollowTargets: {
           // The ring (count, start, look-ahead +5140 within the count; each
           // entry's +24, +28, ranges +32 to +36 and +40 to +44 (mostly
           // ordered) and target +48), the step limit +5516, the index (io),
@@ -2088,7 +2117,7 @@ void AiDrivers(Context& h) {
             guest::StoreU32(h.base, io + 8, r.Below(look + 2));
           }
           r3 = path;
-          if (f.kind == kPlanLine) {
+          if (f.kind == kPlanLine || f.kind == kFollowTargets) {
           } else if (f.kind == kPlanCorners) {
             r4 = before;
             r5 = io;
@@ -2107,6 +2136,79 @@ void AiDrivers(Context& h) {
           }
           floats.push_back({kOut + 24, 1});
           what += fmt::format(" count {} look {} index {}", count, look, index);
+          break;
+        }
+        case kBranchMasksFor:
+        case kLeaderBranchKind:
+        case kFindSideSection:
+        case kFollowLeaderBranch: {
+          // The race flags (io + 0xF0: mostly the bits 0x4, 0x8, 0x10, 0x20
+          // in any mix), a route (test_route.h) with the vehicle's position
+          // (its identity +4), the kind (io: 0 to 11, now and then -1 or any)
+          // and best (io + 4); FindSideSection's point (io + 0x10, the
+          // section's bounds' scale) and masks (io + 0x80); FollowLeaderBranch's
+          // driver +16, +488 (around -50.0), its +500 object (io + 0x40,
+          // +88), the racers (up to 8, their vehicles' flags +6148) and +5528.
+          const uint32_t path = driver + kPath;
+          race_data = io + 0xF0 - 20;
+          guest::StoreU32(h.base, io + 0xF0, r.Below(8) == 0 ? uint32_t(r.Next())
+                                                           : (r.Below(64) << 2) | r.Below(4));
+          const test_route::Route route =
+              test_route::BuildRoute(h.base, route_area, route_table, r);
+          route_file = route_area + test_route::kFile;
+          test_route::RandomPosition(h.base, vehicle + 5232 + 4, route, r);
+          guest::StoreU32(h.base, path + 0, driver);
+          guest::StoreU32(h.base, io, r.Below(8) == 0 ? uint32_t(r.Next())
+                                                    : uint32_t(int32_t(r.Below(13)) - 1));
+          guest::StoreU32(h.base, io + 4, RandomFloat(r, 100.0f));
+          guest::StoreU32(h.base, driver + 488, r.Below(2) ? RandomFloat(r, 100.0f)
+                                                           : FloatBits(-50.0f - float(r.Below(3)) + 1.0f));
+          r3 = path;
+          if (f.kind == kBranchMasksFor) {
+            r3 = io;
+          } else if (f.kind == kLeaderBranchKind) {
+            r4 = io;
+            r5 = io + 4;
+            floats.push_back({kIo + 4, 1});
+          } else if (f.kind == kFindSideSection) {
+            // Always a vehicle (the original reads its identity without a
+            // check).
+            guest::StoreU32(h.base, driver + 160, vehicle);
+            for (uint32_t i = 0; i < 3; i++) {
+              guest::StoreU32(h.base, io + 0x10 + 4 * i, RandomFloat(r, 150.0f));
+            }
+            const uint32_t masks = r.Below(4);
+            for (uint32_t i = 0; i < masks; i++) {
+              const uint32_t word = r.Below(3) == 0 ? 0xDFFFFE7Fu : uint32_t(r.Next());
+              guest::StoreU32(h.base, io + 0x80 + 4 * i, word != 0 ? word : 1u);
+            }
+            guest::StoreU32(h.base, io + 0x80 + 4 * masks, 0);
+            const uint32_t object = io + 0x40;
+            guest::StoreU32(h.base, driver + 500, r.Below(6) == 0 ? 0 : object);
+            guest::StoreU16(h.base, object + 88, uint16_t(r.Below(5) + 2));
+            guest::StoreU8(h.base, object + 36, uint8_t(4 + r.Below(6)));
+            guest::StoreU8(h.base, object + 90, uint8_t(r.Below(4)));
+            r4 = io + 8;
+            r5 = io + 0x10;
+            r6 = r.Below(4) == 0 ? 0 : io + 0x80;
+          } else {
+            const uint32_t object = io + 0x40;
+            guest::StoreU32(h.base, driver + 500, r.Below(6) == 0 ? 0 : object);
+            guest::StoreU16(h.base, object + 88, uint16_t(r.Below(8)));
+            guest::StoreU32(h.base, driver + 16, r.Below(4) == 0 ? 0 : 4u | r.Below(16));
+            const uint32_t count = r.Below(9);
+            guest::StoreU32(h.base, area + kRacers + 56, r.Below(16) == 0 ? uint32_t(-1) : count);
+            for (uint32_t i = 0; i < 8; i++) {
+              const uint32_t record = area + kRacerRecords + 24 * i;
+              guest::StoreU32(h.base, area + kRacers + 4 * i, record);
+              guest::StoreU32(h.base, record + 20, r.Below(8) == 0 ? uint32_t(-1) : r.Below(8));
+              guest::StoreU32(h.base, vehicles + kVehicleBytes * i + 6148,
+                              r.Below(4) == 0 ? 0x80u >> r.Below(8) : 0u);
+              test_route::RandomPosition(h.base, vehicles + kVehicleBytes * i + 5232 + 4, route,
+                                         r);
+            }
+            guest::StoreU32(h.base, path + 5528, uint32_t(int32_t(r.Below(9)) - 1));
+          }
           break;
         }
         case kNarrowToOtherEx: {
@@ -2416,7 +2518,7 @@ void AiDrivers(Context& h) {
         }
         guest::StoreU32(h.base, ai::kDrivers, drivers);
         guest::StoreU32(h.base, track_route::kRoute, route_file);
-        guest::StoreU32(h.base, kRaceData, area + kRace - 0xA3AF0);
+        guest::StoreU32(h.base, kRaceData, race_data);
         guest::StoreU32(h.base, kRaceStateGlobal, area + kRaceState - 6100);
         guest::StoreU32(h.base, kRaceGlobal, area + kRacers - 2308);
         guest::StoreU32(h.base, kVehiclesGlobal, vehicles);

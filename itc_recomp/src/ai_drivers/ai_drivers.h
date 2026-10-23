@@ -720,4 +720,39 @@ uint32_t PlanCorners(uint8_t* base, uint32_t path, uint32_t entry, uint32_t inde
 // r3.
 uint32_t PlanLine(uint8_t* base, uint32_t path, uint32_t frame);
 
+// --- The path's branch kinds and lines ---
+
+// AiPath::BranchMasksFor (sub_8213D378): the branch masks list for the kind
+// at `kind` (0 to 9) under the race data's flags ([0x826C5B2C] + 20): the
+// list at 0x82008970 + 16 for kinds 1, 6, 7 with 0x4 or 0x8, else (and for
+// kinds 2, 8) + 32 with 0x10, else (and for kinds 3, 9) + 48 with 0x20,
+// else + 0 (also with none of 0x4, 0x8, 0x10, 0x20 or a kind above 9).
+uint32_t BranchMasksFor(uint8_t* base, uint32_t kind);
+// AiPath::LeaderBranchKind (sub_8213D1F0): with one of the race data's flags
+// 0x4, 0x8, 0x10, 0x20, a driver vehicle, and no kind yet (the word at
+// `kind` -1) or the driver's +488 above the float at `best`: the kind for
+// the branch number of its route section (KindForBranch) into `kind`, +488
+// into `best`. Returns the r3 the original leaves (the path, 0, the vehicle
+// or its identity record).
+uint32_t LeaderBranchKind(uint8_t* base, uint32_t path, uint32_t kind, uint32_t best);
+// AiPath::FindSideSection (sub_8213D550): from the vehicle's route position
+// (clamped, at frame + 80: `frame` 208 bytes below the caller's stack
+// pointer), each of its section's links 6 to 9 that CompareBranches prefers
+// (the current position at frame + 84) tried at the same slice (Normalize,
+// OnSlice with the point) and taken when on it; out = the last position
+// taken. Nothing written with a negative section or slice. Returns the r3
+// the original leaves (64 bits: CompareBranches' -1 sign-extended).
+uint64_t FindSideSection(uint8_t* base, uint32_t path, uint32_t out, uint32_t point,
+                         uint32_t masks, uint32_t frame);
+// AiPath::FollowTargets (sub_8213D9D8): entries 1 to +5140 - 1, each one's
+// offset the entry before's target +48, kept in range, the step from the
+// one before's offset plus its +28 limited to +5516, then ClampOffset (the
+// index and 1 at frame + 80 and + 84, `frame` 128 bytes down).
+void FollowTargets(uint8_t* base, uint32_t path, uint32_t frame);
+// AiPath::FollowLeaderBranch (sub_8213EB48): the kind for the branch of the
+// first racer whose vehicle has the flags 0x81, under the conditions in the
+// row (else -1); when it differs from +5528, +5528 = it and ResetPath.
+// Returns the r3 the original leaves.
+uint32_t FollowLeaderBranch(uint8_t* base, uint32_t path);
+
 }  // namespace ai_drivers
