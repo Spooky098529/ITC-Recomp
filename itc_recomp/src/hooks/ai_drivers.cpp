@@ -36,7 +36,12 @@
 // UpdateTargetSpeed (sub_8213AB98), from UpdateSpeed; AiPath::TargetPoint
 // (sub_8213B4D8), from SteerToTarget; and ThrottleForSpeed (sub_82139168),
 // EaseThrottleForSteer (sub_82139B98), EaseThrottleForSlide (sub_82139BE8)
-// and AiPath::HasKind2Ahead (sub_8213C148), from UpdatePedals.
+// and AiPath::HasKind2Ahead (sub_8213C148), from UpdatePedals; AiDriver::InitPath
+// (sub_8213AD48) and AiSkill::Clear (sub_8213F700), from AiDrivers::Create;
+// AiPathEntry::Widen (sub_8213C3A8) and AiPath::KeepToCornerSide
+// (sub_8213CA18), from SetRanges; AiPath::SharesSections (sub_8213C010), from
+// AddCornersAt and DropOffRouteCorners; and ApplyCornerLine (sub_8213BB58),
+// from ApplyCornerLines.
 
 #include "guest.h"
 
@@ -109,7 +114,8 @@ ITC_FLAG_BOOL(native_ai_drivers, true, "ITC",
               "sub_8213BCD0, sub_8213BF28, sub_82145F48, sub_821460C8, sub_82146220, sub_82146388, "
               "sub_82145118, sub_821390D0, sub_82139B40, sub_8213C710, sub_82139AC8, sub_8213A620, "
               "sub_8213AB98, sub_8213B4D8, sub_82139168, sub_82139B98, sub_82139BE8, "
-              "sub_8213C148");
+              "sub_8213C148, sub_8213AD48, sub_8213F700, sub_8213C3A8, sub_8213CA18, sub_8213C010, "
+              "sub_8213BB58");
 
 // Defines an adapter: `body` uses `ctx` and `base`.
 #define ITC_AI_DRIVERS(address, body)   \
@@ -127,7 +133,6 @@ using namespace ai_drivers;
 
 // --- Set-up and clears (r3 kept) ---
 
-ITC_AI_DRIVERS(8213AD48, InitPath(base, ctx.r3.u32))
 ITC_AI_DRIVERS(82139728, ctx.r3.u64 = Of(base, ctx.r3.u32))
 ITC_AI_DRIVERS(820C96E8, ClearCarInput(base, ctx.r3.u32))
 
@@ -137,10 +142,6 @@ ITC_AI_DRIVERS(82145408, WrapAngle(base, ctx.r3.u32))
 ITC_AI_DRIVERS(82101760, ctx.r3.u64 = TimeFromTicks(ctx.r3.u32))
 ITC_AI_DRIVERS(82144F50, ctx.r3.u64 = ReadCar(base, ctx.r3.u32))
 ITC_AI_DRIVERS(82145230, UpdateHalfWidth(base, ctx.r3.u32))
-
-// --- The skill (r3 kept) ---
-
-ITC_AI_DRIVERS(8213F700, ClearSkill(base, ctx.r3.u32))
 
 // --- The path's corners and points ---
 
@@ -242,10 +243,6 @@ extern "C" REX_FUNC(sub_8213AC70) {
   }
 }
 ITC_AI_DRIVERS(8213BA48, DropPassedSections(base, ctx.r3.u32))
-// r4 = the record.
-ITC_AI_DRIVERS(8213C010, ctx.r3.u64 = SharesSections(base, ctx.r3.u32, ctx.r4.u32))
-// r4 = &the margin, r5 = &the shift.
-ITC_AI_DRIVERS(8213C3A8, Widen(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
 // r4 = the other entry or 0, r5 = &the margin, r6 = &the offset.
 ITC_AI_DRIVERS(8213C420, NarrowToOther(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32))
 // r4 = &the slices; the original where the records' moves can't be made
@@ -362,14 +359,8 @@ extern "C" REX_FUNC(sub_8213B1E0) {
   }
   __imp__sub_8213B1E0(ctx, base);
 }
-// r4 = &the record's index (r3 kept).
-ITC_AI_DRIVERS(8213BB58, ApplyCornerLine(base, ctx.r3.u32, ctx.r4.u32))
 // The original's frame 112 bytes down (r3 kept).
 ITC_AI_DRIVERS(8213CFC8, ApplyCornerLines(base, ctx.r3.u32, ctx.r1.u32 - 112))
-// r4 = the record, r5 = &the count, r6 = &the margin, r7 = &the shift (r3
-// kept).
-ITC_AI_DRIVERS(8213CA18, KeepToCornerSide(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
-                                          ctx.r7.u32))
 // r4 = &the count; the original's frame 128 bytes down.
 ITC_AI_DRIVERS(8213D670, ctx.r3.u64 = SetRanges(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 128))
 ITC_AI_DRIVERS(8213DC08, ctx.r3.u64 = DropOffRouteCorners(base, ctx.r3.u32))
