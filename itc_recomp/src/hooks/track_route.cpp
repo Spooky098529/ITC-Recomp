@@ -16,8 +16,11 @@
 // NormalizePath), NormalizeForward (sub_820F9EA8, from Normalize and
 // NormalizeForwardPath), NormalizeBack (sub_820F9320, from Normalize,
 // NormalizePath, NormalizeLane and NormalizeLaneMasked), StepForwardLane
-// (sub_820F9448, from NormalizeLane) and StepForwardLaneMasked
-// (sub_820F9600, from NormalizeLaneMasked).
+// (sub_820F9448, from NormalizeLane), StepForwardLaneMasked (sub_820F9600,
+// from NormalizeLaneMasked), AlongSlice (sub_820FAE78, from Locate and
+// LocateShoulder), Locate (sub_820FAF88, from OnSlice) and SectionOutcode
+// (sub_820F8EF0, from OnSlice; its other caller, sub_820FB2B0, never ran
+// in play and runs the original).
 
 #include "guest.h"
 
@@ -43,7 +46,7 @@ ITC_FLAG_BOOL(native_track_route, true, "ITC",
               "from native callers have no adapters, and the flag switches their callers: "
               "sub_820F8A58, sub_820AB408, sub_820AB498, sub_820F8720, sub_820F8CE8, "
               "sub_820F8BD0, sub_820F93A0, sub_820F9EA8, sub_820F9F58, sub_820F8B48, sub_820F8C58, "
-              "sub_820F9320, sub_820F9448, sub_820F9600");
+              "sub_820F9320, sub_820F9448, sub_820F9600, sub_820FAE78, sub_820FAF88, sub_820F8EF0");
 
 // Defines an adapter: `body` uses `ctx` and `base`.
 #define ITC_TRACK_ROUTE(address, body)   \
@@ -68,7 +71,6 @@ ITC_TRACK_ROUTE(820F89F0, ctx.r3.s64 = Link(base, ctx.r3.u32, ctx.r4.u32, ctx.r5
 ITC_TRACK_ROUTE(820F8D38, ctx.r3.s64 = SpecialSection(base, ctx.r3.u32, ctx.r4.u32))
 ITC_TRACK_ROUTE(820F8DE8, ctx.r3.u64 = SliceTest(base, ctx.r3.u32, ctx.r4.u32))
 ITC_TRACK_ROUTE(820F8E98, ctx.r3.u64 = IsMainRoad(base, ctx.r3.u32, ctx.r4.u32))
-ITC_TRACK_ROUTE(820F8EF0, ctx.r3.u64 = SectionOutcode(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
 
 // --- Steps between sections ---
 
@@ -89,15 +91,9 @@ ITC_TRACK_ROUTE(820FA350, ctx.r3.u64 = NormalizeLaneMasked(base, ctx.r3.u32, ctx
 // frame (112 bytes down).
 ITC_TRACK_ROUTE(820FA860, ctx.r3.u64 = Point(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
                                              ctx.r1.u32 - 112))
-// r4 = the point, r5 = the position, r6 = its slice's record; the next
-// slice's position in the original's frame (128 bytes down).
-ITC_TRACK_ROUTE(820FAE78, ctx.r3.u64 = AlongSlice(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
-                                                  ctx.r6.u32, ctx.r1.u32 - 128))
 
 // r4 = the point, r5 = the position, r6 = its slice's record; the original's
 // frame (112 bytes down; AlongSlice's below it).
-ITC_TRACK_ROUTE(820FAF88, ctx.r3.u64 = Locate(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
-                                              ctx.r1.u32 - 112))
 ITC_TRACK_ROUTE(820FB030, ctx.r3.u64 = LocateShoulder(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
                                                       ctx.r6.u32, ctx.r1.u32 - 112))
 // r4 = the point, r5 = the position, r6 = the score or 0; the original's
