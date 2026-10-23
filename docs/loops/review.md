@@ -79,6 +79,9 @@ When the user has reviewed a run's section, its heading gets
   in the attract race (the front end, the save data); the five load
   callbacks keep their adapters (reached through Archive::Load's
   function pointer), the seven accessors too (recompiled callers).
+  After the run's validation: `sub_82116DA8`'s adapter calls a new
+  one-line `data_tables::RecordsItem` (over `Item`) with its own print,
+  as its harness step does (the user's call).
 
 ## Run 2026-10-23 01:52 (`b7-loop-23-10-26`)
 

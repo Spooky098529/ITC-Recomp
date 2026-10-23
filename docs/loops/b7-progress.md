@@ -20,7 +20,7 @@ file's history.
 
 - The data tables (`data-tables.md`, mapped in d8f876f; 18 rows): 16
   ours in one migration (db90dc4..4344730), validated 15 of 16 harness
-  lines (`itc_921`; replay `itc_922` ok); `--native_data_tables`. Left:
+  lines (16 of 16 after `RecordsItem`, `itc_923`) (`itc_921`; replay `itc_922` ok); `--native_data_tables`. Left:
   DataTables::Init and Load (the archive).
 
 - The action mappers (`action-mappers.md`, mapped in 422b250; 40 rows):
@@ -42,8 +42,8 @@ This run's groups: `expected-differences.md` (the "11:06 run" lines).
 
 The data tables' `sub_821171B0` Find20, `sub_82117210` Entry20,
 `sub_82117228` Entry40 (in neither the attract race nor the replay; the
-replay was ok), and `sub_82116DA8` ItemRecords::Item (no print, so no
-game line can show). The action mappers' functions all ran.
+replay was ok), and `sub_82116DA8` ItemRecords::Item (its print added after the
+run; not seen in the attract race). The action mappers' functions all ran.
 
 ## Totals
 
@@ -62,7 +62,7 @@ game line can show). The action mappers' functions all ran.
 
 ## Stopped
 
-2026-10-23, at the data tables' validation: `sub_82116DA8`
+2026-10-23, at the data tables' validation (settled after, below): `sub_82116DA8`
 ItemRecords::Item has no harness line (`missing:`). It's a thunk whose
 adapter (`src/hooks/data_tables.cpp`) and harness step both call
 `data_tables::Item` directly, which prints as `sub_82117178`; its 300
@@ -70,3 +70,9 @@ harness cases match. Giving it a print means a plain C++ function of
 its own and a harness change (more than the validation agent may do),
 or the user may call it Merged. Everything else passed. The user
 reviews `review.md` ("Run 2026-10-23 11:06"), drives a race, and merges.
+Settled (the user's call, 2026-10-23): the adapter stays (two recompiled
+callers in play, `sub_820F2D28`, `sub_82114B88`), and calls a one-line
+`data_tables::RecordsItem` with its own print, as does its harness step:
+`native running (harness)` logged, 300 cases 0 differing (`itc_923`, 19
+s, 0 errors). It's still on the drive list (its callers are the save
+data's).

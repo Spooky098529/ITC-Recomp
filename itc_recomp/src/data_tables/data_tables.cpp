@@ -110,6 +110,11 @@ uint32_t Item(uint8_t* base, uint32_t id) {
   return guest::LoadU32(base, guest::LoadU32(base, kTables) + 16) + 3008 * id;
 }
 
+uint32_t RecordsItem(uint8_t* base, uint32_t id) {
+  ITC_NATIVE_RUNNING("sub_82116DA8 ItemRecords::Item");
+  return Item(base, id);
+}
+
 uint32_t Entry56(uint8_t* base, uint32_t table, uint32_t entry) {
   ITC_NATIVE_RUNNING("sub_82117190 DataTables::Entry56");
   return guest::LoadU32(base, guest::LoadU32(base, kTables) + 4 * (table + 5)) + 56 * entry;

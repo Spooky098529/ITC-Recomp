@@ -41,6 +41,8 @@ uint32_t On40Loaded(uint8_t* base, uint32_t table);
 uint32_t IsLoading(uint8_t* base);
 // DataTables::Item (sub_82117178): item `id`'s 3,008-byte entry (asset 94).
 uint32_t Item(uint8_t* base, uint32_t id);
+// ItemRecords::Item (sub_82116DA8, probably): Item(id); r3 (the records) not read.
+uint32_t RecordsItem(uint8_t* base, uint32_t id);
 // DataTables::Entry56 (sub_82117190): entry `entry` of 56-byte table `table`.
 uint32_t Entry56(uint8_t* base, uint32_t table, uint32_t entry);
 // DataTables::Find20 (sub_821171B0): the index of the first 20-byte entry

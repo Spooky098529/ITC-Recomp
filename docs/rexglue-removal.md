@@ -2657,7 +2657,9 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
     Load, blocked by the archive (`sub_8209DE48` Archive::Load,
     `sub_8209D868`, `sub_820A0678`). The run stopped at its validation:
     ItemRecords::Item (`sub_82116DA8`, a thunk) has an adapter calling
-    `data_tables::Item` directly and so no print of its own.
+    `data_tables::Item` directly and so no print of its own; now a
+    one-line `data_tables::RecordsItem` with its own print (the user's
+    call; the adapter stays for its two recompiled callers).
 
     The second run (from 2026-10-22, branch `b7-loop-22-10-26`; its first
     session stopped after one subsystem): the first run's removable

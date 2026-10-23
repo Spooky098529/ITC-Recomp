@@ -65,7 +65,7 @@ extern "C" REX_FUNC(sub_821170C0) {
 ITC_DATA_TABLES_WORD(82117158, IsLoading(base))
 ITC_DATA_TABLES_WORD(82117178, Item(base, ctx.r3.u32))
 // ItemRecords::Item (probably): r3 (the records) not read, r4 the id.
-ITC_DATA_TABLES_WORD(82116DA8, Item(base, ctx.r4.u32))
+ITC_DATA_TABLES_WORD(82116DA8, RecordsItem(base, ctx.r4.u32))
 ITC_DATA_TABLES_WORD(82117190, Entry56(base, ctx.r3.u32, ctx.r4.u32))
 ITC_DATA_TABLES_WORD(82117210, Entry20(base, ctx.r3.u32))
 ITC_DATA_TABLES_WORD(82117228, Entry40(base, ctx.r3.u32))
