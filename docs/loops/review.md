@@ -31,6 +31,26 @@ When the user has reviewed a run's section, its heading gets
   detail" (the corner planning and avoidance math); `AiDrivers::Create`
   zeroes the table after `AiDriver::InitPath` set its floats (the
   game's own, kept).
+  Migration 1's rows (c94d6be..91b8da2; `--native_ai_drivers`; 74 ours,
+  24 Native): notes corrected for `sub_821390D0`, `sub_8213D438`,
+  `sub_82139B40`, `sub_82139820`, `sub_8213C5C8`, `sub_8213C630`,
+  `sub_82146408`, `sub_82139CB0`, `sub_8213ADF8`, `sub_821452A0`,
+  `sub_821454C8`, `sub_8213C010`, `sub_8213C3A8`, `sub_8213C420`,
+  `sub_8213AC70`, `sub_8213D020`. Code in `src/ai_drivers/` (strict
+  float flags), adapters `src/hooks/ai_drivers.cpp`, harness
+  `src/harnesses/ai_drivers.cpp`; the course's route builder moved,
+  unchanged, from the track_route harness into
+  `src/harnesses/test_route.h` (shared). Left on the recompiled code:
+  UpdateSteerInput's kinds 2 and 3 (`sub_8213AB40`, `sub_82139A08`,
+  never seen in play, tail-called); AllSettled and AdvanceCorners hand
+  the call back to the original when memcpy's copy can't be native (a
+  physical-view destination or a range crossing a view's end; none
+  seen in the harness). Kept: stack-passed words written to the
+  originals' frame offsets; r3 left as each original leaves it;
+  single-word float copies keep a signaling NaN's bits; StartRace and
+  LimitThrottle read the vehicle without a null check, as the
+  originals. The AI harness refills its block every fourth case (about
+  4 s to under 1 s).
 
 ## Run 2026-10-23 17:22 (`b7-loop-23-10-26-4`)
 

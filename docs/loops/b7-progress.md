@@ -17,8 +17,9 @@ file's history. What's left to see in a drive, from every run:
   `sub_82295330`) dropped: both already ours (native memory).
 - Subsystem 1 of 3: the AI drivers (`ai-drivers.md`, mapped in
   1eeb084 from the route users' lead; 148 rows, 67 ready groups; the
-  race states' route users went back to `leads.md`). Step: migration 1
-  (agent running).
+  race states' route users went back to `leads.md`). Migration 1
+  (c94d6be..91b8da2): 74 ours, 24 Native, `--native_ai_drivers`; 47
+  ready groups left. Step: validation of migration 1 (agent running).
 
 ## Done
 
@@ -41,3 +42,7 @@ This run's groups: `expected-differences.md` (the "20:22 run" lines).
 - Start: ours 1223, work left 5534 (wrapped 123, known 559, unknown 4852).
 - After mapping the AI drivers: ours 1223, work left 5534 (wrapped 123,
   known 705, unknown 4706).
+- After the AI drivers' migration 1: ours 1297, work left 5460 (wrapped
+  123, known 631, unknown 4706). Race 22 s (`itc_1123`) with
+  `--run_harnesses=all`, 0 errors, every harness 0 differing (no
+  "(expected to differ)" groups added).
