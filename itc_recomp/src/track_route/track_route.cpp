@@ -262,6 +262,65 @@ uint32_t StepForwardLaneWith(uint8_t* base, uint32_t route, uint32_t position,
   return 0;
 }
 
+// StepAlongPath with the slices' count from `slices()`.
+template <typename Slices>
+uint32_t StepAlongPathWith(uint8_t* base, uint32_t route, uint32_t position, Slices slices,
+                           uint32_t path) {
+  ITC_NATIVE_RUNNING("sub_820F8C58 TrackRoute::StepAlongPath");
+  const uint32_t section = Section(base, Load(base, route), LoadU16(base, position));
+  while (LoadU16(base, path) < 0x8000) {
+    for (uint32_t i = 0; i <= 2; i++) {
+      const uint32_t link = section + 28 + 4 * i;
+      const int32_t to = LoadS16(base, link);
+      if (to != -1 && to == LoadS16(base, path)) {
+        return TakeForward(base, position, link, slices);
+      }
+    }
+    path += 2;
+  }
+  return 0;
+}
+
+// Whether the position is on the route: its section within the file's
+// count, its slice within the section's.
+bool OnRoute(uint8_t* base, uint32_t route, uint32_t position) {
+  const uint32_t number = LoadU16(base, position);
+  const int32_t section = int16_t(number);
+  if (section < 0) {
+    return false;
+  }
+  const uint32_t file = Load(base, route);
+  if (!(int32_t(Load(base, file)) > section)) {
+    return false;
+  }
+  const int32_t slice = LoadS16(base, position + 2);
+  if (slice < 0) {
+    return false;
+  }
+  return LoadS16(base, Section(base, file, number)) > slice;
+}
+
+// Normalize and NormalizePath around their forward step: on the route, 1;
+// a section off the route, (0, 0) and 0; else NormalizeBack then `forward()`,
+// 1 when both did; else 0, the position (0, 0) unless it's on the route.
+template <typename Forward>
+uint32_t NormalizeWith(uint8_t* base, uint32_t route, uint32_t position, Forward forward) {
+  if (OnRoute(base, route, position)) {
+    return 1;
+  }
+  const int32_t section = LoadS16(base, position);
+  if (section >= 0 && section < int32_t(Load(base, Load(base, route)))) {
+    if (NormalizeBack(base, route, position) != 0 && forward() != 0) {
+      return 1;
+    }
+    if (OnRoute(base, route, position)) {
+      return 0;
+    }
+  }
+  guest::StoreU32(base, position, 0);
+  return 0;
+}
+
 }  // namespace
 
 // --- Lookups ---
@@ -453,19 +512,7 @@ uint32_t BranchesMatching(uint8_t* base, uint32_t route, uint32_t out, uint32_t 
 
 uint32_t StepAlongPath(uint8_t* base, uint32_t route, uint32_t position, uint32_t count,
                        uint32_t path) {
-  ITC_NATIVE_RUNNING("sub_820F8C58 TrackRoute::StepAlongPath");
-  const uint32_t section = Section(base, Load(base, route), LoadU16(base, position));
-  while (LoadU16(base, path) < 0x8000) {
-    for (uint32_t i = 0; i <= 2; i++) {
-      const uint32_t link = section + 28 + 4 * i;
-      const int32_t to = LoadS16(base, link);
-      if (to != -1 && to == LoadS16(base, path)) {
-        return TakeForward(base, position, link, WordAt(base, count));
-      }
-    }
-    path += 2;
-  }
-  return 0;
+  return StepAlongPathWith(base, route, position, WordAt(base, count), path);
 }
 
 uint32_t StepForwardMasked(uint8_t* base, uint32_t route, uint32_t position, uint32_t count,
@@ -590,6 +637,41 @@ uint32_t NormalizeBack(uint8_t* base, uint32_t route, uint32_t position) {
     }
   }
   return 1;
+}
+
+uint32_t Normalize(uint8_t* base, uint32_t route, uint32_t position, uint32_t masks) {
+  ITC_NATIVE_RUNNING("sub_820F9FE8 TrackRoute::Normalize");
+  return NormalizeWith(base, route, position,
+                       [&] { return NormalizeForward(base, route, position, masks); });
+}
+
+uint32_t NormalizeForwardPath(uint8_t* base, uint32_t route, uint32_t position, uint32_t path,
+                              uint32_t masks) {
+  ITC_NATIVE_RUNNING("sub_820F9F58 TrackRoute::NormalizeForwardPath");
+  if (path != 0) {
+    for (;;) {
+      const uint32_t section = Section(base, Load(base, route), LoadU16(base, position));
+      const int32_t slice = LoadS16(base, position + 2);
+      const int32_t slices = LoadS16(base, section);
+      if (slice < slices) {
+        return 1;
+      }
+      const auto count = [slices] { return uint32_t(slices); };
+      if (StepAlongPathWith(base, route, position, count, path) == 0 &&
+          StepForwardWith(base, route, position, count) == 0) {
+        break;
+      }
+    }
+  }
+  return NormalizeForward(base, route, position, masks);
+}
+
+uint32_t NormalizePath(uint8_t* base, uint32_t route, uint32_t position, uint32_t path,
+                       uint32_t masks) {
+  ITC_NATIVE_RUNNING("sub_820FA0F8 TrackRoute::NormalizePath");
+  return NormalizeWith(base, route, position, [&] {
+    return NormalizeForwardPath(base, route, position, path, masks);
+  });
 }
 
 // --- The linear index ---

@@ -107,6 +107,22 @@ uint32_t StepBack(uint8_t* base, uint32_t route, uint32_t position);
 // section) and 0. 1 once the slice isn't negative.
 uint32_t NormalizeBack(uint8_t* base, uint32_t route, uint32_t position);
 
+// TrackRoute::Normalize (sub_820F9FE8): 1 when the position is on the
+// route (its section and slice within the counts); else, with a section on
+// the route, NormalizeBack then NormalizeForward (with the masks or 0), 1
+// when both did; else 0, the position set to (0, 0) unless it's on the
+// route then.
+uint32_t Normalize(uint8_t* base, uint32_t route, uint32_t position, uint32_t masks);
+// TrackRoute::NormalizeForwardPath (sub_820F9F58): with a path, while past
+// the section's end, StepAlongPath, else StepForward; when neither (or with
+// no path), NormalizeForward with the masks. 1 once in the section.
+uint32_t NormalizeForwardPath(uint8_t* base, uint32_t route, uint32_t position, uint32_t path,
+                              uint32_t masks);
+// TrackRoute::NormalizePath (sub_820FA0F8): Normalize, forward by
+// NormalizeForwardPath.
+uint32_t NormalizePath(uint8_t* base, uint32_t route, uint32_t position, uint32_t path,
+                       uint32_t masks);
+
 // --- The linear index (the global route's file) ---
 
 // TrackRoute::ToIndex (sub_820AB408): the slices before the packed position

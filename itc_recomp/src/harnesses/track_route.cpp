@@ -82,6 +82,14 @@ ITC_NATIVE_STEP(NativeStepForwardLane,
 ITC_NATIVE_STEP(NativeStepForwardLaneMasked,
                 ctx.r3.u64 = tr::StepForwardLaneMasked(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
                                                        ctx.r6.u32, ctx.r7.u32))
+ITC_NATIVE_STEP(NativeNormalize,
+                ctx.r3.u64 = tr::Normalize(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+ITC_NATIVE_STEP(NativeNormalizeForwardPath,
+                ctx.r3.u64 = tr::NormalizeForwardPath(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                                      ctx.r6.u32))
+ITC_NATIVE_STEP(NativeNormalizePath,
+                ctx.r3.u64 = tr::NormalizePath(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                               ctx.r6.u32))
 ITC_NATIVE_STEP(NativeStepBack, ctx.r3.u64 = tr::StepBack(base, ctx.r3.u32, ctx.r4.u32))
 ITC_NATIVE_STEP(NativeNormalizeBack,
                 ctx.r3.u64 = tr::NormalizeBack(base, ctx.r3.u32, ctx.r4.u32))
@@ -261,6 +269,9 @@ enum Kind {
   kNormalizeForward,
   kStepForwardLane,
   kStepForwardLaneMasked,
+  kNormalize,
+  kNormalizeForwardPath,
+  kNormalizePath,
   kStepBack,
   kNormalizeBack,
   kToIndex,
@@ -309,6 +320,12 @@ void TrackRoute(Context& h) {
        NativeStepForwardLane, kStepForwardLane, 2000},
       {"TrackRoute::StepForwardLaneMasked (sub_820F9600)", Original<__imp__sub_820F9600>,
        NativeStepForwardLaneMasked, kStepForwardLaneMasked, 2000},
+      {"TrackRoute::Normalize (sub_820F9FE8)", Original<__imp__sub_820F9FE8>, NativeNormalize,
+       kNormalize, 2000},
+      {"TrackRoute::NormalizeForwardPath (sub_820F9F58)", Original<__imp__sub_820F9F58>,
+       NativeNormalizeForwardPath, kNormalizeForwardPath, 2000},
+      {"TrackRoute::NormalizePath (sub_820FA0F8)", Original<__imp__sub_820FA0F8>,
+       NativeNormalizePath, kNormalizePath, 2000},
       {"TrackRoute::StepBack (sub_820F8A58)", Original<__imp__sub_820F8A58>, NativeStepBack,
        kStepBack, 2000},
       {"TrackRoute::NormalizeBack (sub_820F9320)", Original<__imp__sub_820F9320>,
@@ -454,6 +471,36 @@ void TrackRoute(Context& h) {
           }
           r4 = area + kA;
           r5 = r.Below(3) == 0 ? 0 : area + kMasks;
+          break;
+        }
+        case kNormalize:
+        case kNormalizeForwardPath:
+        case kNormalizePath: {
+          // On the route, before its start, past its end, or a section off
+          // it (beyond the count, or above 0x7FFF).
+          const uint32_t section = guest::LoadU16(h.base, area + kA);
+          switch (r.Below(5)) {
+            case 0:
+              guest::StoreU16(h.base, area + kA + 2, uint16_t(-int32_t(1 + r.Below(24))));
+              break;
+            case 1:
+            case 2:
+              guest::StoreU16(h.base, area + kA + 2,
+                              uint16_t(route.Slices(section) + r.Below(24)));
+              break;
+            case 3:
+              guest::StoreU16(h.base, area + kA,
+                              uint16_t(r.Below(2) ? route.sections + r.Below(8)
+                                                  : 0x8000 | r.Below(0x8000)));
+              break;
+            default:
+              break;
+          }
+          r4 = area + kA;
+          const uint32_t masks = r.Below(3) == 0 ? 0 : area + kMasks;
+          const uint32_t path = r.Below(4) == 0 ? 0 : area + kPath;
+          r5 = f.kind == kNormalize ? masks : path;
+          r6 = masks;
           break;
         }
         case kStepForwardLane:

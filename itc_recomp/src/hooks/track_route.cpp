@@ -24,7 +24,8 @@ ITC_FLAG_BOOL(native_track_route, true, "ITC",
               "sub_820F8EF0, StepForward sub_820F8B48, BranchesMatching sub_820F8BD0, "
               "StepAlongPath sub_820F8C58, NormalizeBack sub_820F9320 with StepBack "
               "sub_820F8A58, StepForwardMasked sub_820F93A0, NormalizeForward sub_820F9EA8, "
-              "StepForwardLane sub_820F9448, StepForwardLaneMasked sub_820F9600, ClampPosition sub_820F8420 with ToIndex sub_820AB408 and FromIndex "
+              "StepForwardLane sub_820F9448, StepForwardLaneMasked sub_820F9600, Normalize "
+              "sub_820F9FE8, NormalizeForwardPath sub_820F9F58, NormalizePath sub_820FA0F8, ClampPosition sub_820F8420 with ToIndex sub_820AB408 and FromIndex "
               "sub_820AB498, Distance sub_820F9278 with LinkDistance sub_820F8720, SlicePoint "
               "sub_820F9768 with its case 0 sub_820F985C (cases 5 to 16, never seen in play, on "
               "the translated code)) natively instead of through the translated code (the same "
@@ -64,6 +65,13 @@ ITC_TRACK_ROUTE(820F8B48, ctx.r3.u64 = StepForward(base, ctx.r3.u32, ctx.r4.u32,
 ITC_TRACK_ROUTE(820F8C58, ctx.r3.u64 = StepAlongPath(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
                                                      ctx.r6.u32))
 ITC_TRACK_ROUTE(820F9320, ctx.r3.u64 = NormalizeBack(base, ctx.r3.u32, ctx.r4.u32))
+// r5 = the masks or 0.
+ITC_TRACK_ROUTE(820F9FE8, ctx.r3.u64 = Normalize(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+// r5 = the path or 0, r6 = the masks or 0.
+ITC_TRACK_ROUTE(820F9F58, ctx.r3.u64 = NormalizeForwardPath(base, ctx.r3.u32, ctx.r4.u32,
+                                                            ctx.r5.u32, ctx.r6.u32))
+ITC_TRACK_ROUTE(820FA0F8, ctx.r3.u64 = NormalizePath(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                                     ctx.r6.u32))
 // r5 = the masks or 0.
 ITC_TRACK_ROUTE(820F9EA8, ctx.r3.u64 = NormalizeForward(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
 // r5 = the lane (a halfword, changed), r6 = the slices' count.
