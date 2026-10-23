@@ -60,10 +60,10 @@ ITC_FLAG_BOOL(native_sound_cues, true, "ITC",
 using namespace sound_cues;
 
 ITC_SOUND_VOID(8259D478, ListenerConstruct(base, ctx.r3.u32), ctx.r3.u32)
-ITC_SOUND_VOID(8259D550, ListenerSetOrientation(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32),
-               ctx.r3.u32)
-ITC_SOUND_VOID(8259D588, ListenerSetPosition(base, ctx.r3.u32, ctx.r4.u32), ctx.r3.u32)
-ITC_SOUND_VOID(8259CC80, SetVector36(base, ctx.r3.u32, ctx.r4.u32), ctx.r3.u32)
+// Listener::SetOrientation, Listener::SetPosition and sub_8259CC80
+// (sub_8259D550, sub_8259D588, sub_8259CC80) have no adapters: their
+// callers in play (the manager's listener setters and Sound::SetPosition)
+// are native.
 ITC_SOUND_VOID(82117E08, ManagerSetListenerPosition(base, ctx.r3.u32, ctx.r4.u32),
                ctx.r3.u32 + 1456)
 ITC_SOUND_VOID(82117E10,
@@ -73,9 +73,9 @@ ITC_SOUND_VOID(82117E18, ManagerSetListenerVelocity(base, ctx.r3.u32, ctx.r4.u32
                ctx.r3.u32 + 1456)
 ITC_SOUND_WORD(82117EA8, ManagerGetEngine(ctx.r3.u32))
 
-ITC_SOUND_VOID(82117760, BankPairRelease(base, ctx.r3.u32), ctx.r3.u32)
-ITC_SOUND_WORD(82117770, BankPairSoundBank(base, ctx.r3.u32))
-ITC_SOUND_WORD(82117670, BankPairIsLoading(base, ctx.r3.u32))
+// BankPair::Release, SoundBank and IsLoading (sub_82117760, sub_82117770,
+// sub_82117670) have no adapters: their callers in play
+// (AudioManager::ReleaseBank, GetSoundBank and IsBankLoading) are native.
 ITC_SOUND_SLOT(82118190, ManagerReleaseBank)
 ITC_SOUND_SLOT(82118200, ManagerIsBankLoading)
 ITC_SOUND_SLOT(821182E0, ManagerIsBankSlotEmpty)
