@@ -157,5 +157,6 @@ void SoundCues(Context& h);
 void Xact(Context& h);
 void ActionMappers(Context& h);
 void DataTables(Context& h);
+void ModelAnimation(Context& h);
 
 }  // namespace harness
