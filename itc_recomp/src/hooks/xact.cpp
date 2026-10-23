@@ -164,7 +164,8 @@ extern "C" REX_FUNC(sub_825CED98) {
   }
   ctx.r3.u64 = ctx.r3.u32 + 12;  // memcpy's r3, the destination
 }
-ITC_XACT_WORD(825CEDF8, WaveEntryGetLoopRegion(ctx.r3.u32))
+// XACTWaveEntry::GetLoopRegion (sub_825CEDF8) has no adapter: its only
+// caller in play, GetWaveRegion, is native.
 ITC_XACT_WORD(825CEE00, WaveEntryGetDuration(base, ctx.r3.u32))
 // XACTWaveEntry::SamplesToMs (sub_825CEE70) has no adapter: its only
 // caller in play, GetWaveDurations, is native.
@@ -211,8 +212,9 @@ extern "C" REX_FUNC(sub_825C67E8) {
   }
   ctx.r3.u64 = cue;
 }
-ITC_XACT_OPTIONAL(825CF210, WaveEntryGetLoopStartBytes(base, ctx.r3.u32, ctx.r4.u32))
-ITC_XACT_OPTIONAL(825CF288, WaveEntryGetLoopLengthBytes(base, ctx.r3.u32))
+// XACTWaveEntry::GetLoopStartBytes and GetLoopLengthBytes (sub_825CF210,
+// sub_825CF288) have no adapters: their only caller in play,
+// GetWaveRegion, is native.
 
 // Loading a sound bank, which allocates: the original unless --native_heap
 // routes the game's heap to the native layer, or where the bank's slot +64
@@ -267,7 +269,8 @@ ITC_XACT_OPTIONAL(825C05B0, EngineRemoveInstance(base, ctx.r3.u32, ctx.r4.u32))
 ITC_XACT_WORD(825CEE10, WaveEntryHasLoopRegion(base, ctx.r3.u32))
 ITC_XACT_WORD(825CEE28, WaveEntryGetFormatTag(base, ctx.r3.u32))
 ITC_XACT_WORD(825CEEA0, WaveEntryMsToSamples(base, ctx.r3.u32, ctx.r4.u32))
-ITC_XACT_WORD(82099BA0, WaveEntryGetPlayLength(base, ctx.r3.u32))
+// XACTWaveEntry::GetPlayLength (sub_82099BA0, folded) has no adapter: its
+// only caller in play, GetWaveRegion, is native.
 ITC_XACT_WORD(820A8958, WaveEntryGetLoopStart(base, ctx.r3.u32))
 ITC_XACT_WORD(82379D50, WaveEntryGetLoopLength(base, ctx.r3.u32))
 extern "C" REX_FUNC(sub_825CAC48) {
