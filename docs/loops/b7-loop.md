@@ -243,8 +243,9 @@ skips Merged rows). Never
    differ)" groups and no explanations of NaN-sign differences (the
    user's call, 2026-10-23). Every other case matches.
 4. Builds (`cmake --build itc_recomp/out/build/linux-amd64-release
-   -j$(nproc)`) and runs `attract_race.sh 25 --run_harnesses=all`: no new
-   error lines, ~20 seconds at 30 ticks/s, every harness at 0 differing
+   -j$(nproc)`) and runs `attract_race.sh 30 --run_harnesses=all` (30 s,
+   not 25: the harnesses run ~5 s before the race starts; the user's
+   call, 2026-10-23): no new error lines, ~20 seconds at 30 ticks/s, every harness at 0 differing
    (outside "(expected to differ)" groups); a stalled boot restarted once.
    If the group runs in the race, a temporary counter override shows it
    was called (removed before committing). For anything drawn, a frame
@@ -345,7 +346,7 @@ adapters stay. For each candidate, before removing its adapter:
 Then the adapter is deleted, the row set to Native (saying which native
 callers reach it, and that the fallback flag now switches only them),
 `check_function_statuses.py` run (it refuses Native with an override
-left), and the usual build and `attract_race.sh 25 --run_harnesses=all`.
+left), and the usual build and `attract_race.sh 30 --run_harnesses=all`.
 
 It works in batches (a group, or small related groups together, each
 built, raced and committed before the next), one after another in its
@@ -390,7 +391,7 @@ made native, or whose adapter it removed:
 1. **Checks the print** is the first statement of its plain C++ (grep
    `itc_recomp/src` for the address). Missing ones it adds, in one commit,
    pushed (a print only, no other change).
-2. **Runs** the build and `attract_race.sh 25 --run_harnesses=all` with
+2. **Runs** the build and `attract_race.sh 30 --run_harnesses=all` with
    the default flags, and checks the log has a `native running
    (harness):` line for each function: its harness ran our code. A
    function with none didn't (a harness calling the adapter, or `__imp__`

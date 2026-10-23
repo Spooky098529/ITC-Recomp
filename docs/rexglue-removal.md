@@ -185,7 +185,7 @@ byte, what each leaves in guest memory and r3. They're off unless
 differences), and the game carries on. So:
 
 ```sh
-itc_recomp/tools/attract_race.sh 25 --run_harnesses=all
+itc_recomp/tools/attract_race.sh 30 --run_harnesses=all
 ```
 
 - `harness.h` has what they share: `Both` (one case through both

@@ -106,8 +106,8 @@ When the user has reviewed a run's section, its heading gets
   `-ffp-model=strict -ffp-contract=off`. Attract races with all
   harnesses now reach 18 s at 30 ticks/s inside `attract_race.sh 25`
   (19 before): the harnesses take ~4.9 s before the race; without them
-  23 s as before (`itc_1084`, checked by the lead). The loop's ~20 s
-  check may want a longer timeout for harness runs (the user's call).
+  23 s as before (`itc_1084`, checked by the lead). Since (the user's
+  call, 2026-10-23), harness runs use `attract_race.sh 30`.
 
 ## Run 2026-10-23 13:44 (`b7-loop-23-10-26-3`)
 
