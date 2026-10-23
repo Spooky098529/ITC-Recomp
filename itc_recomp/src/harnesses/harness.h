@@ -156,5 +156,6 @@ void CRuntimeHeap(Context& h);
 void SoundCues(Context& h);
 void Xact(Context& h);
 void ActionMappers(Context& h);
+void DataTables(Context& h);
 
 }  // namespace harness

@@ -142,6 +142,8 @@ set(ITC_SOURCES
     src/track_collision/track_wall_query.cpp
     src/hooks/action_mappers.cpp
     src/action_mappers/action_mappers.cpp
+    src/hooks/data_tables.cpp
+    src/data_tables/data_tables.cpp
     src/hooks/sound_cues.cpp
     src/sound_cues/sound_cues.cpp
     src/hooks/xact.cpp
@@ -191,6 +193,7 @@ set(ITC_SOURCES
     src/harnesses/collision_world.cpp
     src/harnesses/collision_world_walls.cpp
     src/harnesses/action_mappers.cpp
+    src/harnesses/data_tables.cpp
     src/harnesses/sound_cues.cpp
     src/harnesses/xact.cpp
     src/helpers/debug_output.cpp
