@@ -4,6 +4,7 @@
 
 #include "c_runtime/math.h"
 #include "car_physics/float_ops.h"
+#include "strings_and_font/steps.h"
 #include "track_route/track_route.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
@@ -32,6 +33,12 @@ constexpr uint32_t kRaceWord = 0xA3AF0;     // the race data's word AiSkill::Loa
 constexpr uint32_t kRaceState = 0x826D82E8;  // +6100 read by RaceAllowsSides
 constexpr uint32_t kInputs = 0x826C5B30;     // a word a racer: its input (probably)
 constexpr uint32_t kSectionLists = 0x82008A08;
+constexpr uint32_t kMinusOne = 0x82001BE0;  // -1.0
+constexpr uint32_t kOtherGap = 0x820027A4;  // a reset record's gap
+constexpr uint32_t kTwenty = 0x82002568;    // 20.0
+// The path's normalizers (+5532): by lane (mode 1), by branch (mode 0).
+constexpr uint32_t kNormalizeByLane = 0x8213B428;
+constexpr uint32_t kNormalizeByBranch = 0x8213C908;
 
 uint32_t Load(uint8_t* base, uint32_t address) {
   return guest::LoadU32(base, address);
@@ -662,33 +669,41 @@ void UpdateOtherTimer(uint8_t* base, uint32_t record, uint32_t index, uint32_t l
   guest::StoreU16(base, record + 30, 120);
 }
 
+namespace {
+// An other-racer record reset (ClearOthers' and ResetOthers' stores, in
+// their order).
+void ResetOtherRecord(uint8_t* base, uint32_t record, double gap, double zero, double one,
+                      double minus_one) {
+  Stfs(base, record + 0, gap);
+  guest::StoreU8(base, record + 32, 0);
+  Stfs(base, record + 4, zero);
+  guest::StoreU8(base, record + 33, 0);
+  Stfs(base, record + 8, zero);
+  guest::StoreU16(base, record + 30, 0);
+  Stfs(base, record + 16, zero);
+  guest::StoreU16(base, record + 24, 0);
+  Stfs(base, record + 12, one);
+  guest::StoreU16(base, record + 28, 0);
+  Stfs(base, record + 20, minus_one);
+  guest::StoreU16(base, record + 26, 0xFFFF);
+  guest::StoreU16(base, record + 34, 0);
+  guest::StoreU16(base, record + 36, 0);
+}
+}  // namespace
+
 void ClearOthers(uint8_t* base, uint32_t driver) {
   ITC_NATIVE_RUNNING("sub_821459B0 AiDriver::ClearOthers");
   const double zero = Lfs(base, kZero);
   Stfs(base, driver + 488, zero);
   guest::StoreU16(base, driver + 484, 0);
-  const double f11 = Lfs(base, 0x82001BE0);
+  const double f11 = Lfs(base, kMinusOne);
   const double one = Lfs(base, kOne);
   guest::StoreU16(base, driver + 486, 0);
-  const double gap = Lfs(base, 0x820027A4);
+  const double gap = Lfs(base, kOtherGap);
   guest::StoreU16(base, driver + 492, 0);
   guest::StoreU32(base, driver + 496, 0);
   for (uint32_t i = 0; i < 7; i++) {
-    const uint32_t record = driver + 172 + 40 * i;
-    Stfs(base, record + 0, gap);
-    guest::StoreU8(base, record + 32, 0);
-    Stfs(base, record + 4, zero);
-    guest::StoreU8(base, record + 33, 0);
-    Stfs(base, record + 8, zero);
-    guest::StoreU16(base, record + 30, 0);
-    Stfs(base, record + 16, zero);
-    guest::StoreU16(base, record + 24, 0);
-    Stfs(base, record + 12, one);
-    guest::StoreU16(base, record + 28, 0);
-    Stfs(base, record + 20, f11);
-    guest::StoreU16(base, record + 26, 0xFFFF);
-    guest::StoreU16(base, record + 34, 0);
-    guest::StoreU16(base, record + 36, 0);
+    ResetOtherRecord(base, driver + 172 + 40 * i, gap, zero, one, f11);
     guest::StoreU32(base, driver + 452 + 4 * i, 0xFFFFFFFFu);
   }
 }
@@ -772,6 +787,347 @@ uint32_t KeepsGapFrom(uint8_t* base, uint32_t driver, uint32_t other) {
   }
   const uint32_t theirs = uint32_t(OfIndex(base, index));
   return Load(base, theirs + 32) - 2 > 1 ? 1 : 0;
+}
+
+// --- Set-up, modes and the plan ---
+
+void SetParams(uint8_t* base, uint32_t driver, uint32_t object) {
+  ITC_NATIVE_RUNNING("sub_82138D00 AiDriver::SetParams");
+  guest::StoreU32(base, driver + 500, object);
+  SetSkillSource(base, driver + 6048, object != 0 ? object + 120 : 0);
+}
+
+void SetSkill(uint8_t* base, uint32_t driver, uint32_t word) {
+  ITC_NATIVE_RUNNING("sub_821393D8 AiDriver::SetSkill");
+  LoadSkill(base, driver + 6048);
+  const uint32_t value = Load(base, word);
+  const uint32_t vehicle = Load(base, driver + 160);
+  guest::StoreU32(base, driver + 6084, value);
+  const int32_t skill = LoadS16(base, driver + 6052);
+  Stfs(base, driver + 12, double(float(double(int64_t(skill)))));
+  if (vehicle != 0) {
+    StoreConstant(base, vehicle + 2432, kOne);
+  }
+}
+
+uint32_t ClearPlan(uint8_t* base, uint32_t driver) {
+  ITC_NATIVE_RUNNING("sub_82139820 AiDriver::ClearPlan");
+  const uint32_t plan = driver + 32;
+  const uint32_t path = driver + 512;
+  const double zero = Lfs(base, kZero);
+  const double one = Lfs(base, kOne);
+  guest::StoreU32(base, plan + 10, 0xFFFFFFFFu);
+  guest::StoreU32(base, plan + 0, 0);
+  guest::StoreU32(base, plan + 4, 0);
+  guest::StoreU16(base, plan + 8, 0);
+  Stfs(base, plan + 16, zero);
+  Stfs(base, plan + 20, zero);
+  Stfs(base, plan + 24, zero);
+  Stfs(base, plan + 28, one);
+  Stfs(base, plan + 32, zero);
+  Stfs(base, plan + 36, zero);
+  Stfs(base, plan + 40, zero);
+  Stfs(base, plan + 44, one);
+  if (int32_t(Load(base, path + 5524)) != -1 || int32_t(Load(base, path + 5528)) != -1) {
+    guest::StoreU32(base, path + 5524, 0xFFFFFFFFu);
+    guest::StoreU32(base, path + 5528, 0xFFFFFFFFu);
+    return ResetPath(base, path);
+  }
+  return path;
+}
+
+double LimitSpeedBlend(uint8_t* base, uint32_t driver, uint32_t speed, uint32_t pair,
+                       uint32_t t, uint32_t w, uint32_t slices, uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_82139B40 AiDriver::LimitSpeedBlend");
+  const double target = Lfs(base, t);
+  const double a = Lfs(base, pair);
+  uint32_t curvature = pair;
+  if (!(a < target)) {
+    const double weight = Lfs(base, w);
+    curvature = frame + 80;
+    const double rest = Fsubs(Lfs(base, kOne), weight);
+    Stfs(base, curvature, Fmadds(rest, a, Fmuls(weight, target)));
+  }
+  return LimitSpeed(base, driver, speed, curvature, pair + 4, slices, frame - 128);
+}
+
+uint32_t SetMode(uint8_t* base, uint32_t path, uint32_t mode) {
+  ITC_NATIVE_RUNNING("sub_8213D508 AiPath::SetMode");
+  const uint32_t value = Load(base, mode);
+  if (int32_t(value) == int32_t(Load(base, path + 5520))) {
+    return path;
+  }
+  guest::StoreU32(base, path + 5520, value);
+  const uint32_t again = Load(base, mode);
+  if (again == 0) {
+    guest::StoreU32(base, path + 5532, kNormalizeByBranch);
+  } else if (again == 1) {
+    guest::StoreU32(base, path + 5532, kNormalizeByLane);
+  }
+  return ResetPath(base, path);
+}
+
+uint32_t ResetFor(uint8_t* base, uint32_t path, uint32_t driver) {
+  ITC_NATIVE_RUNNING("sub_8213E658 AiPath::ResetFor");
+  guest::StoreU32(base, path + 0, driver);
+  StoreConstant(base, path + 5516, kZero);
+  guest::StoreU32(base, path + 5532, kNormalizeByLane);
+  guest::StoreU32(base, path + 5524, 0xFFFFFFFFu);
+  guest::StoreU32(base, path + 5520, 1);
+  guest::StoreU32(base, path + 5528, 0xFFFFFFFFu);
+  return ResetPath(base, path);
+}
+
+uint32_t NormalizeByLane(uint8_t* base, uint32_t entry, uint32_t position, uint32_t lane,
+                         uint32_t masks) {
+  ITC_NATIVE_RUNNING("sub_8213B428 AiPath::NormalizeByLane");
+  const uint32_t route = track_route::kRoute;
+  const uint32_t on = masks == 0
+                          ? track_route::NormalizeLane(base, route, position, lane)
+                          : track_route::NormalizeLaneMasked(base, route, position, lane, masks);
+  if (on == 0) {
+    return 0;
+  }
+  const uint32_t file = Load(base, route);
+  const uint32_t section = guest::LoadU16(base, position + 0);
+  const uint32_t table = Load(base, file + 12);
+  const int32_t slice = LoadS16(base, position + 2);
+  const uint32_t record = Load(base, table + section * 4) + uint32_t(slice) * 84 + 124;
+  guest::StoreU32(base, entry + 52, record);
+  guest::StoreU16(base, entry + 16, guest::LoadU16(base, position + 0));
+  guest::StoreU16(base, entry + 18, guest::LoadU16(base, position + 2));
+  guest::StoreU32(base, entry + 20, uint32_t(LoadS16(base, lane)));
+  SetLaneOffset(base, entry);
+  return 1;
+}
+
+void UpdateLane(uint8_t* base, uint32_t driver, uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_82144EF8 AiDriver::UpdateLane");
+  const uint32_t identity = vehicle_accessors::VehicleIdentity(Load(base, driver + 160));
+  const uint32_t lane =
+      track_route::LaneAt(base, track_route::kRoute, identity + 16, identity + 4);
+  track_route::ClampPosition(base, frame + 80, Load(base, identity + 4));
+  const uint32_t clamped = Load(base, frame + 80);
+  guest::StoreU16(base, driver + 8, uint16_t(lane));
+  guest::StoreU32(base, driver + 4, clamped);
+}
+
+// --- The other racers' records and the states ---
+
+uint64_t ResetOthers(uint8_t* base, uint32_t driver) {
+  ITC_NATIVE_RUNNING("sub_82145A48 AiDriver::ResetOthers");
+  ClearOthers(base, driver);
+  const double minus_one = Lfs(base, kMinusOne);
+  const double one = Lfs(base, kOne);
+  const double zero = Lfs(base, kZero);
+  const double gap = Lfs(base, kOtherGap);
+  uint64_t r3 = driver;
+  for (int32_t i = 0; i < 7; i++) {
+    if (i == int32_t(Load(base, driver + 0))) {
+      continue;
+    }
+    r3 = OfIndex(base, uint32_t(i));
+    const uint32_t record = uint32_t(r3) + Load(base, driver + 0) * 40 + 172;
+    ResetOtherRecord(base, record, gap, zero, one, minus_one);
+  }
+  return r3;
+}
+
+void ClearCarState(uint8_t* base, uint32_t driver) {
+  ITC_NATIVE_RUNNING("sub_82146588 AiDriver::ClearCarState");
+  const double zero = Lfs(base, kZero);
+  Stfs(base, driver + 80, zero);
+  Stfs(base, driver + 84, zero);
+  Stfs(base, driver + 88, zero);
+  Stfs(base, driver + 92, Lfs(base, kOne));
+  guest::StoreU32(base, driver + 480, 0);
+  for (uint32_t at = 96; at <= 104; at += 4) {
+    Stfs(base, driver + at, zero);
+  }
+  const double far = Lfs(base, kFiveHundred);
+  for (uint32_t at = 108; at <= 156; at += 4) {
+    Stfs(base, driver + at, zero);
+  }
+  Stfs(base, driver + 164, far);
+  Stfs(base, driver + 168, far);
+  ClearOthers(base, driver);
+}
+
+void UpdateState4(uint8_t* base, uint32_t driver, uint32_t speed) {
+  ITC_NATIVE_RUNNING("sub_82146220 AiDriver::UpdateState4");
+  PickTarget(base, driver);
+  const uint32_t target = Load(base, driver + 480);
+  if (int32_t(target) < 0) {
+    return;
+  }
+  const double gap = Lfs(base, driver + target * 40 + 172);
+  if (gap < Lfs(base, kZero)) {
+    if (gap < Lfs(base, 0x82008D40)) {
+      return;
+    }
+    StoreConstant(base, speed, kTwenty);
+  } else {
+    if (gap > Lfs(base, 0x8200257C)) {
+      return;
+    }
+    StoreConstant(base, speed, kFiveHundred);
+  }
+}
+
+uint64_t UpdateState5(uint8_t* base, uint32_t driver, uint32_t speed) {
+  ITC_NATIVE_RUNNING("sub_82146388 AiDriver::UpdateState5");
+  PickTargetBehind(base, driver);
+  const uint32_t target = Load(base, driver + 480);
+  if (int32_t(target) < 0) {
+    return driver;
+  }
+  if (!(Lfs(base, driver + target * 40 + 172) > Lfs(base, 0x82008E48))) {
+    return driver;
+  }
+  const uint64_t theirs = OfIndex(base, target);
+  const double their_speed = Lfs(base, uint32_t(theirs) + 100);
+  const double current = Lfs(base, speed);
+  const double limit = Fmuls(their_speed, Lfs(base, 0x82002A3C));
+  if (current > limit) {
+    Stfs(base, speed, limit);
+  }
+  return theirs;
+}
+
+uint32_t IsSettled(uint8_t* base, uint32_t driver) {
+  ITC_NATIVE_RUNNING("sub_82146408 AiDriver::IsSettled");
+  if (Load(base, driver + 32) == 0) {
+    return 1;
+  }
+  guest::StoreU32(base, driver + 480, 0xFFFFFFFFu);
+  PickTarget(base, driver);
+  const uint32_t target = Load(base, driver + 480);
+  if (int32_t(target) < 0) {
+    return 1;
+  }
+  const int32_t state = int32_t(Load(base, driver + 32));
+  const uint32_t record = driver + target * 40 + 172;
+  uint32_t above, below;  // the gap's bounds (floats)
+  if (state == 2) {
+    above = kTwenty;
+    below = 0x82008D44;  // -20.0
+  } else if (state == 3) {
+    above = 0x820027A8;
+    below = 0x82008E5C;
+  } else {
+    return 1;
+  }
+  const double gap = Lfs(base, record);
+  if (gap > Lfs(base, above)) {
+    return 0;
+  }
+  return gap < Lfs(base, below) ? 0 : 1;
+}
+
+void MirrorOther(uint8_t* base, uint32_t out, uint32_t record, uint32_t value) {
+  ITC_NATIVE_RUNNING("sub_82145610 AiOther::Mirror");
+  Stfs(base, out + 0, Fneg(Lfs(base, record + 0)));
+  Stfs(base, out + 4, Fneg(Lfs(base, record + 4)));
+  Stfs(base, out + 8, Fneg(Lfs(base, record + 8)));
+  Stfs(base, out + 20, Lfs(base, record + 20));
+  guest::StoreU8(base, out + 32, guest::LoadU8(base, record + 32));
+  guest::StoreU8(base, out + 33, guest::LoadU8(base, record + 33));
+  uint32_t state = guest::LoadU16(base, record + 24);
+  if (int16_t(state) == 1) {
+    state = 3;
+  } else if (int16_t(state) == 3) {
+    state = 1;
+  }
+  guest::StoreU16(base, out + 24, uint16_t(state));
+  UpdateOtherFlags(base, out);
+  Stfs(base, out + 16, Lfs(base, value));
+}
+
+// --- The path's entries and corners ---
+
+void BlockLeft(uint8_t* base, uint32_t entry, uint32_t at, uint32_t width, uint32_t out) {
+  ITC_NATIVE_RUNNING("sub_8213C5C8 AiPathEntry::BlockLeft");
+  Stfs(base, at, Fsubs(Lfs(base, at), Lfs(base, entry + 28)));
+  double edge = Fadds(Lfs(base, out), Lfs(base, entry + 28));
+  Stfs(base, out, edge);
+  edge = Fadds(Lfs(base, width), edge);
+  Stfs(base, out, edge);
+  const double from = Lfs(base, at);
+  if (from < edge) {
+    Stfs(base, out, from);
+  }
+  const double block = Lfs(base, out);
+  if (!(Lfs(base, entry + 40) < block)) {
+    return;
+  }
+  const double most = Lfs(base, entry + 44);
+  Stfs(base, entry + 40, block);
+  if (block > most) {
+    Stfs(base, entry + 40, most);
+  }
+}
+
+void BlockRight(uint8_t* base, uint32_t entry, uint32_t at, uint32_t width, uint32_t out) {
+  ITC_NATIVE_RUNNING("sub_8213C630 AiPathEntry::BlockRight");
+  Stfs(base, at, Fsubs(Lfs(base, at), Lfs(base, entry + 28)));
+  double edge = Fadds(Lfs(base, out), Lfs(base, entry + 28));
+  Stfs(base, out, edge);
+  edge = Fadds(Lfs(base, width), edge);
+  Stfs(base, out, edge);
+  const double from = Lfs(base, at);
+  if (from > edge) {
+    Stfs(base, out, from);
+  }
+  const double block = Lfs(base, out);
+  if (!(Lfs(base, entry + 44) > block)) {
+    return;
+  }
+  const double least = Lfs(base, entry + 40);
+  Stfs(base, entry + 44, block);
+  if (block < least) {
+    Stfs(base, entry + 44, least);
+  }
+}
+
+void InitCorner(uint8_t* base, uint32_t record, uint32_t data, uint32_t corner_entry,
+                uint32_t count) {
+  ITC_NATIVE_RUNNING("sub_8213C698 AiCorner::Init");
+  guest::StoreU32(base, record + 0, data);
+  guest::StoreU32(base, record + 4, data + 56);
+  guest::StoreU16(base, record + 8, guest::LoadU16(base, corner_entry + 0));
+  const uint32_t offset =
+      guest::LoadU16(base, count) - guest::LoadU16(base, corner_entry + 2);
+  guest::StoreU16(base, record + 10, uint16_t(offset));
+  const uint32_t first = guest::LoadU16(base, data + 0);
+  guest::StoreU16(base, record + 14, 0);
+  guest::StoreU16(base, record + 12, uint16_t(first + uint32_t(int32_t(int16_t(offset)))));
+  const bool negative = Lfs(base, data + 4) < Lfs(base, kZero);
+  StoreConstant(base, record + 16, negative ? kMinusOne : kOne);
+  guest::StoreU32(base, record + 40, 0);
+}
+
+uint32_t WithinRoadAt(uint8_t* base, uint32_t path, uint32_t offset) {
+  ITC_NATIVE_RUNNING("sub_8213C1A0 AiPath::WithinRoadAt");
+  const uint32_t driver = Load(base, path + 0);
+  const int32_t count = LoadS16(base, path + 5136);
+  const uint32_t file = Load(base, track_route::kRoute);
+  const double reach = Lfs(base, driver + 128);
+  const double length = Lfs(base, file + 8);
+  const int32_t k =
+      int32_t(uint32_t(strings_and_font::steps::Fctiwz(Fdivs(reach, length))) + 1);
+  if (!(k < count)) {
+    return 0;
+  }
+  const int32_t start = LoadS16(base, path + 5138);
+  const double at = Lfs(base, offset);
+  const uint32_t entry = RingEntry(path, int32_t(uint32_t(start) + uint32_t(k))) + 16;
+  const uint32_t record = Load(base, entry + 52);
+  const double half = Fmuls(Lfs(base, record + 12), Lfs(base, kHalf));
+  if (at > Fadds(Lfs(base, record + 20), half)) {
+    return 0;
+  }
+  const double left = Fsubs(Fneg(half), Lfs(base, record + 16));
+  return at < left ? 0 : 1;
 }
 
 }  // namespace ai_drivers

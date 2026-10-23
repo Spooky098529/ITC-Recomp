@@ -172,4 +172,83 @@ void PickTargetBehind(uint8_t* base, uint32_t driver);
 // to it is positive and its driver is in state 2 or 3; else 1.
 uint32_t KeepsGapFrom(uint8_t* base, uint32_t driver, uint32_t other);
 
+// --- Set-up, modes and the plan ---
+
+// AiDriver::SetParams (sub_82138D00): +500 = the object; the skill set from
+// its +120 (or from nothing: SetSkillSource).
+void SetParams(uint8_t* base, uint32_t driver, uint32_t object);
+// AiDriver::SetSkill (sub_821393D8): LoadSkill, +6084 = the word at `word`,
+// +12 = the skill's halfword +4 as a float, the vehicle's +2432 = 1.0.
+void SetSkill(uint8_t* base, uint32_t driver, uint32_t word);
+// AiDriver::ClearPlan (sub_82139820): the 48 bytes from +32 to their
+// defaults; when the path's +5524 or +5528 isn't -1, both = -1 and
+// ResetPath. Returns the r3 the original leaves (the path, or ResetPath's).
+uint32_t ClearPlan(uint8_t* base, uint32_t driver);
+// AiDriver::LimitSpeedBlend (sub_82139B40): `pair` = (a, b); when a is at
+// least the float at `t`, a blended toward t by the weight at `w` (written
+// at frame + 80, `frame` the original's, 96 bytes below the caller's stack
+// pointer); LimitSpeed with it and b. Returns LimitSpeed's f1.
+double LimitSpeedBlend(uint8_t* base, uint32_t driver, uint32_t speed, uint32_t pair,
+                       uint32_t t, uint32_t w, uint32_t slices, uint32_t frame);
+// AiPath::SetMode (sub_8213D508): with a new mode (the word at `mode`): +5520
+// = it, the normalizer +5532 (NormalizeByLane for 1, NormalizeByBranch for
+// 0), ResetPath. Returns the r3 the original leaves.
+uint32_t SetMode(uint8_t* base, uint32_t path, uint32_t mode);
+// AiPath::ResetFor (sub_8213E658): +0 = the driver, +5516 = 0.0, mode 1 with
+// the lane normalizer, +5524 and +5528 = -1; ResetPath (whose r3 it
+// returns).
+uint32_t ResetFor(uint8_t* base, uint32_t path, uint32_t driver);
+// AiPath::NormalizeByLane (sub_8213B428): the position normalized by lane
+// (NormalizeLane, or NormalizeLaneMasked with masks); when on the route, the
+// entry's slice record (+52), position (+16) and lane (+20) set and
+// SetLaneOffset. 1, else 0.
+uint32_t NormalizeByLane(uint8_t* base, uint32_t entry, uint32_t position, uint32_t lane,
+                         uint32_t masks);
+// AiDriver::UpdateLane (sub_82144EF8): +8 = the lane of the vehicle's track
+// point at its route position, +4 = that position clamped (written at frame
+// + 80: `frame` the original's, 128 bytes below the caller's stack pointer).
+void UpdateLane(uint8_t* base, uint32_t driver, uint32_t frame);
+
+// --- The other racers' records and the states ---
+
+// AiDriver::ResetOthers (sub_82145A48): ClearOthers, then each other
+// driver's record of this one reset the same way. Returns the r3 the
+// original leaves (the last other driver, or the driver).
+uint64_t ResetOthers(uint8_t* base, uint32_t driver);
+// AiDriver::ClearCarState (sub_82146588): +80 to +156 = 0.0 (+92 = 1.0),
+// +164 and +168 = 500.0, +480 = 0; ClearOthers.
+void ClearCarState(uint8_t* base, uint32_t driver);
+// AiDriver::UpdateState4 (sub_82146220): PickTarget; a gap of 0.0 up to
+// 50.0 sets the speed at `speed` to 500.0, one of -50.0 up to 0.0 to 20.0.
+void UpdateState4(uint8_t* base, uint32_t driver, uint32_t speed);
+// AiDriver::UpdateState5 (sub_82146388): PickTargetBehind; above -30.0 (the
+// float at 0x82008E48), the speed at `speed` lowered to that racer's speed x
+// 0.7. Returns the r3 the original leaves.
+uint64_t UpdateState5(uint8_t* base, uint32_t driver, uint32_t speed);
+// AiDriver::IsSettled (sub_82146408): 1 with no state or no target (+480 =
+// -1, PickTarget); in state 2, 0 with the gap above 20.0 or below -20.0; in
+// state 3, above or below the floats at 0x820027A8 and 0x82008E5C; else 1.
+uint32_t IsSettled(uint8_t* base, uint32_t driver);
+// AiOther::Mirror (sub_82145610): out +0 to +8 = the record's negated, +20,
+// +32, +33 copied, states 1 and 3 swapped, UpdateOtherFlags, +16 = the float
+// at `value`.
+void MirrorOther(uint8_t* base, uint32_t out, uint32_t record, uint32_t value);
+
+// --- The path's entries and corners ---
+
+// AiPathEntry::BlockLeft (sub_8213C5C8): `at` -= the entry's +28, `out` =
+// (out + +28) + the width at `width`, at least `at`; the entry's +40 raised
+// to it, at most +44.
+void BlockLeft(uint8_t* base, uint32_t entry, uint32_t at, uint32_t width, uint32_t out);
+// AiPathEntry::BlockRight (sub_8213C630): BlockLeft mirrored (at most `at`;
+// +44 lowered to it, at least +40).
+void BlockRight(uint8_t* base, uint32_t entry, uint32_t at, uint32_t width, uint32_t out);
+// AiCorner::Init (sub_8213C698): the record from a corner's data, the
+// slice's corner entry and the path's entry count.
+void InitCorner(uint8_t* base, uint32_t record, uint32_t data, uint32_t corner_entry,
+                uint32_t count);
+// AiPath::WithinRoadAt (sub_8213C1A0): 1 when the offset at `offset` is
+// within the road at the ring entry the driver's +128 ahead.
+uint32_t WithinRoadAt(uint8_t* base, uint32_t path, uint32_t offset);
+
 }  // namespace ai_drivers

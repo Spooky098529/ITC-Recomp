@@ -17,6 +17,7 @@
 // the recompiled code's.
 
 #include "harness.h"
+#include "test_route.h"
 
 #include "base/flags.h"
 #include "base/hash.h"
@@ -176,8 +177,10 @@ void Original(PPCContext& ctx, uint8_t* base) {
 
 // The block's layout.
 constexpr uint32_t kAreaBytes = 0x3000;
-constexpr uint32_t kFile = 0x40, kSections = 0x100, kSectionStride = 1000;
-constexpr uint32_t kTableEntries = 0x10000;
+using test_route::kFile;
+using test_route::kSections;
+using test_route::kSectionStride;
+using test_route::kTableEntries;
 constexpr uint32_t kIo = 0x2800;
 constexpr uint32_t kA = kIo + 0, kB = kIo + 4, kLinkIndex = kIo + 8, kLane = kIo + 10,
                    kCount = kIo + 12, kMask = kIo + 16, kFloat = kIo + 20, kPath = kIo + 0x40,
@@ -200,100 +203,10 @@ uint32_t RandomFloat(Random& r, float range) {
   }
 }
 
-struct Route {
-  uint32_t sections = 0;  // the file's count
-  uint32_t slices[8] = {};
-  uint32_t address[8] = {};
-  uint32_t Slices(uint32_t section) const { return slices[section % 8]; }
-  uint32_t Address(uint32_t section) const { return address[section % 8]; }
-};
-
-// The table (see the top), filled once.
-void FillTable(uint8_t* base, uint32_t table, uint32_t area) {
-  for (uint32_t i = 0; i < kTableEntries; i++) {
-    guest::StoreU32(base, table + 4 * i, area + kSections + kSectionStride * (i % 8));
-  }
-}
-
-// A random route in the block (see the top).
-// `whole`: every section 8 slices and every link's slice within them
-// (PathDistance's cases: its slice steps end only where they meet).
-Route BuildRoute(uint8_t* base, uint32_t area, uint32_t table, Random& r, bool whole = false) {
-  Route route;
-  route.sections = 1 + r.Below(8);
-  guest::StoreU32(base, area + 0, area + kFile);
-  guest::StoreU32(base, area + kFile + 0, route.sections);
-  guest::StoreU32(base, area + kFile + 4, uint32_t(r.Next()));
-  guest::StoreU32(base, area + kFile + 8,
-                  r.Below(16) == 0 ? RandomFloat(r, 8.0f)
-                                   : std::bit_cast<uint32_t>(0.5f + float(r.Below(80)) / 8.0f));
-  guest::StoreU32(base, area + kFile + 12, table);
-  for (uint32_t s = 0; s < 8; s++) {
-    const uint32_t at = area + kSections + kSectionStride * s;
-    const uint32_t n = whole ? 8 : 1 + r.Below(8);
-    route.slices[s] = n;
-    route.address[s] = at;
-    guest::StoreU16(base, at + 0, uint16_t(n));
-    // The kind: 0 to 5 mostly (the low four bits), high bits random.
-    guest::StoreU8(base, at + 2, uint8_t((r.Below(8) << 4) | (r.Below(4) ? r.Below(6) : r.Below(16))));
-    // The branch number: 7, 8, 13 and 29 often, now and then above 31.
-    const uint32_t branches[] = {7, 8, 13, 29};
-    guest::StoreU8(base, at + 3, uint8_t(r.Below(3) == 0 ? branches[r.Below(4)]
-                                         : r.Below(8) == 0 ? r.Below(256)
-                                                           : r.Below(32)));
-    for (uint32_t i = 0; i < 6; i++) {
-      guest::StoreU32(base, at + 4 + 4 * i, RandomFloat(r, 200.0f));
-    }
-    // The links: -1 a third of the time, else a section (now and then
-    // beyond the count, or above 0x8000) and a slice.
-    for (uint32_t i = 0; i < 12; i++) {
-      const bool none = r.Below(3) == 0;
-      guest::StoreU16(base, at + 28 + 4 * i,
-                      none ? 0xFFFF
-                           : uint16_t(r.Below(4)    ? r.Below(route.sections)
-                                      : r.Below(2) ? r.Below(16)
-                                                   : r.Below(0xFFFF)));
-      guest::StoreU16(base, at + 30 + 4 * i,
-                      uint16_t(whole ? int32_t(r.Below(8)) : int32_t(r.Below(12)) - 2));
-    }
-    for (uint32_t i = 0; i < 48; i++) {
-      guest::StoreU8(base, at + 76 + i, uint8_t(r.Below(4) == 0 ? 0xFF : r.Below(8)));
-    }
-    for (uint32_t k = 0; k < n; k++) {
-      const uint32_t record = at + 124 + 84 * k;
-      for (uint32_t i = 0; i < 84; i += 4) {
-        guest::StoreU32(base, record + i, RandomFloat(r, 100.0f));
-      }
-      guest::StoreU32(base, record + 12,
-                      r.Below(16) == 0 ? RandomFloat(r, 10.0f)
-                                       : std::bit_cast<uint32_t>(1.0f + float(r.Below(40)) / 4.0f));
-      guest::StoreU16(base, record + 32, uint16_t(r.Below(3)));
-      guest::StoreU16(base, record + 34, uint16_t(r.Next()));
-      guest::StoreU8(base, record + 56, uint8_t((r.Below(16) << 4) | (r.Below(4) ? r.Below(5)
-                                                                                 : r.Below(16))));
-      const uint8_t kinds[] = {0, 3, 4};
-      guest::StoreU8(base, record + 57, uint8_t(r.Below(4) ? kinds[r.Below(3)] : r.Below(256)));
-    }
-    for (uint32_t i = 0; i < 24 * n; i += 4) {
-      guest::StoreU32(base, at + 124 + 84 * n + i, RandomFloat(r, 100.0f));
-    }
-  }
-  return route;
-}
-
-// A position: a section of the route (now and then one of the table's
-// others) and a slice in it, now and then a few past either end.
-void RandomPosition(uint8_t* base, uint32_t address, const Route& route, Random& r,
-                    uint32_t sections_up_to = 0) {
-  const uint32_t section = sections_up_to != 0 ? r.Below(sections_up_to)
-                           : r.Below(8) == 0    ? r.Below(kTableEntries)
-                                                : r.Below(route.sections);
-  const int32_t n = int32_t(route.Slices(section));
-  const int32_t slice = r.Below(4) == 0 ? int32_t(r.Below(uint32_t(n) + 6)) - 3
-                                        : int32_t(r.Below(uint32_t(n)));
-  guest::StoreU16(base, address + 0, uint16_t(section));
-  guest::StoreU16(base, address + 2, uint16_t(slice));
-}
+using test_route::BuildRoute;
+using test_route::FillTable;
+using test_route::RandomPosition;
+using test_route::Route;
 
 enum Kind {
   kLanePoint,

@@ -5,16 +5,18 @@
 // +6048), a vehicle at +0x2000, the inputs at +0x4000, an output at
 // +0x4100, a route file at +0x4200 and the vehicle's box shape at +0x4300;
 // then the fields the function reads set to the cases it tells apart. Both
-// versions run on a copy of the same bytes; the block (in 64-byte pieces,
+// versions run on a copy of the same bytes; the block (in 256-byte pieces,
 // the float outputs as floats), r3 and f1 (for the functions returning a
 // float) are compared. The drivers' table ([0x826C6074]) and the course's
 // route ([0x826C5B10]) are set for each case and put back after. The
 // originals run with --native_ai_drivers off.
 
 #include "harness.h"
+#include "test_route.h"
 
 #include "ai_drivers/ai_drivers.h"
 #include "base/flags.h"
+#include "base/hash.h"
 #include "base/log.h"
 #include "memory/heap.h"
 #include "track_route/track_route.h"
@@ -86,6 +88,34 @@ ITC_NATIVE_STEP(NativeClearOthers, ai::ClearOthers(base, ctx.r3.u32))
 ITC_NATIVE_STEP(NativePickTarget, ai::PickTarget(base, ctx.r3.u32))
 ITC_NATIVE_STEP(NativePickTargetBehind, ai::PickTargetBehind(base, ctx.r3.u32))
 ITC_NATIVE_STEP(NativeKeepsGapFrom, ctx.r3.u64 = ai::KeepsGapFrom(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_STEP(NativeSetParams, ai::SetParams(base, ctx.r3.u32, ctx.r4.u32);
+                ctx.r3.u64 += 6048)
+ITC_NATIVE_STEP(NativeSetSkill, ai::SetSkill(base, ctx.r3.u32, ctx.r4.u32); ctx.r3.u64 += 6048)
+ITC_NATIVE_STEP(NativeClearPlan, ctx.r3.u64 = ai::ClearPlan(base, ctx.r3.u32))
+ITC_NATIVE_STEP(NativeLimitSpeedBlend,
+                ctx.f1.f64 = ai::LimitSpeedBlend(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                                 ctx.r6.u32, ctx.r7.u32, ctx.r8.u32,
+                                                 ctx.r1.u32 - 96))
+ITC_NATIVE_STEP(NativeSetMode, ctx.r3.u64 = ai::SetMode(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_STEP(NativeResetFor, ctx.r3.u64 = ai::ResetFor(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_STEP(NativeNormalizeByLane,
+                ctx.r3.u64 = ai::NormalizeByLane(base, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
+                                                 ctx.r7.u32))
+ITC_NATIVE_STEP(NativeUpdateLane, ai::UpdateLane(base, ctx.r3.u32, ctx.r1.u32 - 128);
+                ctx.r3.u64 = ctx.r1.u32 - 128 + 80)
+ITC_NATIVE_STEP(NativeResetOthers, ctx.r3.u64 = ai::ResetOthers(base, ctx.r3.u32))
+ITC_NATIVE_STEP(NativeClearCarState, ai::ClearCarState(base, ctx.r3.u32))
+ITC_NATIVE_STEP(NativeUpdateState4, ai::UpdateState4(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_STEP(NativeUpdateState5, ctx.r3.u64 = ai::UpdateState5(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_STEP(NativeIsSettled, ctx.r3.u64 = ai::IsSettled(base, ctx.r3.u32))
+ITC_NATIVE_STEP(NativeMirrorOther, ai::MirrorOther(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+ITC_NATIVE_STEP(NativeBlockLeft, ai::BlockLeft(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                               ctx.r6.u32))
+ITC_NATIVE_STEP(NativeBlockRight, ai::BlockRight(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                                 ctx.r6.u32))
+ITC_NATIVE_STEP(NativeInitCorner, ai::InitCorner(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                                 ctx.r6.u32))
+ITC_NATIVE_STEP(NativeWithinRoadAt, ctx.r3.u64 = ai::WithinRoadAt(base, ctx.r3.u32, ctx.r4.u32))
 
 // Runs the recompiled version with the native flag off.
 template <GuestFunction recompiled>
@@ -120,6 +150,26 @@ uint32_t RandomFloat(Random& r, float range) {
     default: {
       const float unit = float(r.Below(1u << 24)) / float(1u << 24);
       return std::bit_cast<uint32_t>((unit * 2.0f - 1.0f) * range);
+    }
+  }
+}
+// A word of the block's fill from one random number: a quarter raw bits,
+// else a float as RandomFloat makes them (within 200.0; now and then NaN,
+// an infinity or a zero), cheaper than it.
+uint32_t FillWord(uint64_t x) {
+  if ((x & 3) == 0) {
+    return uint32_t(x >> 32);
+  }
+  switch ((x >> 2) & 31) {
+    case 0:
+      return 0x7FC00001u | (uint32_t(x >> 32) & 0x803FFFFFu);
+    case 1:
+      return (x >> 40) & 1 ? 0x7F800000u : 0xFF800000u;
+    case 2:
+      return (x >> 40) & 1 ? 0u : 0x80000000u;
+    default: {
+      const float unit = float(uint32_t(x >> 40)) / float(1u << 24);
+      return std::bit_cast<uint32_t>((unit * 2.0f - 1.0f) * 200.0f);
     }
   }
 }
@@ -164,6 +214,24 @@ enum Kind {
   kPickTarget,
   kPickTargetBehind,
   kKeepsGapFrom,
+  kSetParams,
+  kSetSkill,
+  kClearPlan,
+  kLimitSpeedBlend,
+  kSetMode,
+  kResetFor,
+  kNormalizeByLane,
+  kUpdateLane,
+  kResetOthers,
+  kClearCarState,
+  kUpdateState4,
+  kUpdateState5,
+  kIsSettled,
+  kMirrorOther,
+  kBlockLeft,
+  kBlockRight,
+  kInitCorner,
+  kWithinRoadAt,
 };
 
 }  // namespace
@@ -246,6 +314,42 @@ void AiDrivers(Context& h) {
        NativePickTargetBehind, kPickTargetBehind, 3000},
       {"AiDriver::KeepsGapFrom (sub_82145048)", Original<__imp__sub_82145048>,
        NativeKeepsGapFrom, kKeepsGapFrom, 3000},
+      {"AiDriver::SetParams (sub_82138D00)", Original<__imp__sub_82138D00>, NativeSetParams,
+       kSetParams, 500},
+      {"AiDriver::SetSkill (sub_821393D8)", Original<__imp__sub_821393D8>, NativeSetSkill,
+       kSetSkill, 1000},
+      {"AiDriver::ClearPlan (sub_82139820)", Original<__imp__sub_82139820>, NativeClearPlan,
+       kClearPlan, 500},
+      {"AiDriver::LimitSpeedBlend (sub_82139B40)", Original<__imp__sub_82139B40>,
+       NativeLimitSpeedBlend, kLimitSpeedBlend, 3000},
+      {"AiPath::SetMode (sub_8213D508)", Original<__imp__sub_8213D508>, NativeSetMode,
+       kSetMode, 500},
+      {"AiPath::ResetFor (sub_8213E658)", Original<__imp__sub_8213E658>, NativeResetFor,
+       kResetFor, 300},
+      {"AiPath::NormalizeByLane (sub_8213B428)", Original<__imp__sub_8213B428>,
+       NativeNormalizeByLane, kNormalizeByLane, 3000},
+      {"AiDriver::UpdateLane (sub_82144EF8)", Original<__imp__sub_82144EF8>, NativeUpdateLane,
+       kUpdateLane, 3000},
+      {"AiDriver::ResetOthers (sub_82145A48)", Original<__imp__sub_82145A48>,
+       NativeResetOthers, kResetOthers, 300},
+      {"AiDriver::ClearCarState (sub_82146588)", Original<__imp__sub_82146588>,
+       NativeClearCarState, kClearCarState, 200},
+      {"AiDriver::UpdateState4 (sub_82146220)", Original<__imp__sub_82146220>,
+       NativeUpdateState4, kUpdateState4, 3000},
+      {"AiDriver::UpdateState5 (sub_82146388)", Original<__imp__sub_82146388>,
+       NativeUpdateState5, kUpdateState5, 3000},
+      {"AiDriver::IsSettled (sub_82146408)", Original<__imp__sub_82146408>, NativeIsSettled,
+       kIsSettled, 3000},
+      {"AiOther::Mirror (sub_82145610)", Original<__imp__sub_82145610>, NativeMirrorOther,
+       kMirrorOther, 2000},
+      {"AiPathEntry::BlockLeft (sub_8213C5C8)", Original<__imp__sub_8213C5C8>, NativeBlockLeft,
+       kBlockLeft, 3000},
+      {"AiPathEntry::BlockRight (sub_8213C630)", Original<__imp__sub_8213C630>,
+       NativeBlockRight, kBlockRight, 3000},
+      {"AiCorner::Init (sub_8213C698)", Original<__imp__sub_8213C698>, NativeInitCorner,
+       kInitCorner, 2000},
+      {"AiPath::WithinRoadAt (sub_8213C1A0)", Original<__imp__sub_8213C1A0>,
+       NativeWithinRoadAt, kWithinRoadAt, 3000},
   };
   const uint32_t area = memory::Alloc(kAreaBytes, 0);
   const uint32_t driver = area + kDriver, vehicle = area + kVehicle, io = area + kIo;
@@ -264,14 +368,22 @@ void AiDrivers(Context& h) {
       guest::StoreU32(h.base, table + i, uint32_t(fill.Next()));
     }
   }
+  // A course's route for the functions reading one (test_route.h).
+  const uint32_t route_area = memory::Alloc(test_route::kRouteBytes, 0);
+  const uint32_t route_table = memory::Alloc(4 * test_route::kTableEntries, 0);
+  test_route::FillTable(h.base, route_table, route_area);
+  // The table's first seven drivers, for ResetOthers (which writes them).
+  constexpr uint32_t kSevenBytes = 7 * ai::kDriverBytes;
   Random r;
   for (const auto& f : functions) {
     Results results(f.name);
     for (int c = 0; c < f.cases; c++) {
-      // Random words, mostly floats.
-      for (uint32_t i = 0; i < kAreaBytes; i += 4) {
-        guest::StoreU32(h.base, area + i,
-                        r.Below(4) ? RandomFloat(r, 200.0f) : uint32_t(r.Next()));
+      // Random words, mostly floats, every fourth case (the others start
+      // from what the last one left, and set their fields again).
+      if (c % 4 == 0) {
+        for (uint32_t i = 0; i < kAreaBytes; i += 4) {
+          guest::StoreU32(h.base, area + i, FillWord(r.Next()));
+        }
       }
       // The driver's vehicle (now and then none) and its box shape.
       guest::StoreU32(h.base, driver + 160, r.Below(8) == 0 ? 0 : vehicle);
@@ -281,7 +393,9 @@ void AiDrivers(Context& h) {
       guest::StoreU32(h.base, driver + 16, r.Below(2) ? uint32_t(r.Next()) : r.Below(4));
       guest::StoreU32(h.base, driver + 32, r.Below(8) ? r.Below(8) : uint32_t(r.Next()));
       uint32_t drivers = saved_drivers;
-      uint64_t r3 = driver, r4 = 0, r5 = 0, r6 = 0, r7 = 0;
+      uint64_t r3 = driver, r4 = 0, r5 = 0, r6 = 0, r7 = 0, r8 = 0;
+      uint32_t route_file = area + kFile;
+      bool table_written = false;
       uint64_t f1 = 0x7FF8DEADBEEF0000ull;
       std::vector<std::pair<uint32_t, uint32_t>> floats;  // (offset, count) in the block
       std::string what = fmt::format("case {}", c);
@@ -507,13 +621,162 @@ void AiDrivers(Context& h) {
           drivers = table;
           r4 = io;
           break;
+        case kSetParams:
+          r4 = r.Below(4) == 0 ? 0 : io;
+          break;
+        case kSetSkill:
+          guest::StoreU32(h.base, driver + kSkill, r.Below(2) ? 0 : io);
+          guest::StoreU32(h.base, area + kRace, r.Below(2) ? 0 : uint32_t(r.Next()));
+          r4 = io + 0x40;
+          break;
+        case kClearPlan:
+          guest::StoreU32(h.base, driver + kPath + 5524, r.Below(2) ? 0xFFFFFFFFu : r.Below(8));
+          guest::StoreU32(h.base, driver + kPath + 5528, r.Below(2) ? 0xFFFFFFFFu : r.Below(8));
+          guest::StoreU32(h.base, driver + kPath, r.Below(4) == 0 ? 0 : driver);
+          break;
+        case kLimitSpeedBlend:
+          guest::StoreU32(h.base, area + kFile + 8, FloatBits(0.5f + float(r.Below(80)) / 8.0f));
+          guest::StoreU32(h.base, io + 4, RandomFloat(r, 60.0f));
+          guest::StoreU32(h.base, io + 8, RandomFloat(r, 10.0f));
+          guest::StoreU32(h.base, io + 12, RandomFloat(r, 60.0f));
+          guest::StoreU32(h.base, io + 16, RandomFloat(r, 1.5f));
+          guest::StoreU32(h.base, io + 20,
+                          r.Below(4) ? uint32_t(int32_t(r.Below(44)) - 3) : uint32_t(r.Next()));
+          guest::StoreU32(h.base, driver + 100, RandomFloat(r, 300.0f));
+          r4 = io;
+          r5 = io + 4;
+          r6 = io + 12;
+          r7 = io + 16;
+          r8 = io + 20;
+          floats.push_back({kDriver + 6088, 1});
+          break;
+        case kSetMode:
+          guest::StoreU32(h.base, io, r.Below(8) ? r.Below(4) : uint32_t(r.Next()));
+          guest::StoreU32(h.base, driver + kPath + 5520, r.Below(4));
+          guest::StoreU32(h.base, driver + kPath, r.Below(4) == 0 ? 0 : driver);
+          r3 = driver + kPath;
+          r4 = io;
+          break;
+        case kResetFor:
+          r3 = driver + kPath;
+          r4 = r.Below(4) == 0 ? 0 : driver;
+          break;
+        case kNormalizeByLane: {
+          const test_route::Route route =
+              test_route::BuildRoute(h.base, route_area, route_table, r);
+          route_file = route_area + test_route::kFile;
+          test_route::RandomPosition(h.base, io, route, r);
+          guest::StoreU16(h.base, io + 8, uint16_t(r.Below(4) ? r.Below(8) : r.Next()));
+          const uint32_t masks = r.Below(3);
+          for (uint32_t i = 0; i < masks; i++) {
+            const uint32_t word = r.Below(3) == 0 ? 0xDFFFFE7Fu : uint32_t(r.Next());
+            guest::StoreU32(h.base, io + 0x20 + 4 * i, word != 0 ? word : 1u);
+          }
+          guest::StoreU32(h.base, io + 0x20 + 4 * masks, 0);
+          r3 = uint32_t(r.Next());
+          r4 = io + 0x100;
+          r5 = io;
+          r6 = io + 8;
+          r7 = r.Below(2) ? 0 : io + 0x20;
+          floats.push_back({kIo + 0x100 + 24, 1});
+          floats.push_back({kIo + 0x100 + 48, 1});
+          break;
+        }
+        case kUpdateLane: {
+          const test_route::Route route =
+              test_route::BuildRoute(h.base, route_area, route_table, r);
+          route_file = route_area + test_route::kFile;
+          guest::StoreU32(h.base, driver + 160, vehicle);
+          test_route::RandomPosition(h.base, vehicle + 5232 + 4, route, r);
+          for (uint32_t i = 0; i < 3; i++) {
+            guest::StoreU32(h.base, vehicle + 5232 + 16 + 4 * i, RandomFloat(r, 250.0f));
+          }
+          break;
+        }
+        case kResetOthers:
+          guest::StoreU32(h.base, driver + 0, r.Below(8));
+          drivers = table;
+          table_written = true;
+          break;
+        case kClearCarState:
+          break;
+        case kUpdateState4:
+        case kUpdateState5:
+        case kIsSettled: {
+          guest::StoreU32(h.base, driver + 0, r.Below(8) ? r.Below(8) : uint32_t(r.Next()));
+          guest::StoreU16(h.base, driver + 40, uint16_t(r.Below(2) ? 0x7F : r.Next()));
+          // A target already picked stays (its record is read): 0 to 6 only.
+          const uint32_t current[] = {0xFFFFFFFFu, 0, 3, 6, 0x80000000u};
+          guest::StoreU32(h.base, driver + 480, current[r.Below(5)]);
+          guest::StoreU32(h.base, driver + 32, r.Below(8) ? r.Below(5) : uint32_t(r.Next()));
+          for (uint32_t i = 0; i < 7; i++) {
+            guest::StoreU32(h.base, driver + 172 + 40 * i, RandomFloat(r, 60.0f));
+            guest::StoreU32(h.base, table + i * ai::kDriverBytes + 100, RandomFloat(r, 200.0f));
+          }
+          guest::StoreU32(h.base, io, RandomFloat(r, 300.0f));
+          drivers = table;
+          r4 = io;
+          if (f.kind != kIsSettled) {
+            floats.push_back({kIo, 1});
+          }
+          break;
+        }
+        case kMirrorOther:
+          guest::StoreU16(h.base, io + 24, uint16_t(r.Below(4) ? r.Below(5) : r.Next()));
+          r3 = io + 0x100;
+          r4 = io;
+          r5 = io + 0x80;
+          floats.push_back({kIo + 0x100, 3});
+          floats.push_back({kIo + 0x100 + 16, 2});
+          break;
+        case kBlockLeft:
+        case kBlockRight:
+          for (uint32_t i = 0; i < 3; i++) {
+            guest::StoreU32(h.base, io + 4 * i, RandomFloat(r, 10.0f));
+          }
+          for (uint32_t at : {28u, 40u, 44u}) {
+            guest::StoreU32(h.base, io + 0x100 + at, RandomFloat(r, 10.0f));
+          }
+          r3 = io + 0x100;
+          r4 = io;
+          r5 = io + 4;
+          r6 = io + 8;
+          floats.push_back({kIo, 3});
+          floats.push_back({kIo + 0x100 + 40, 2});
+          break;
+        case kInitCorner:
+          r3 = io + 0x100;
+          r4 = io + 0x200;
+          r5 = io;
+          r6 = io + 8;
+          break;
+        case kWithinRoadAt:
+          guest::StoreU32(h.base, area + kFile + 8, FloatBits(0.5f + float(r.Below(80)) / 8.0f));
+          guest::StoreU32(h.base, driver + kPath, driver);
+          guest::StoreU32(h.base, driver + 128, FloatBits(float(r.Below(4000)) / 20.0f));
+          guest::StoreU16(h.base, driver + kPath + 5136, uint16_t(int32_t(r.Below(84)) - 1));
+          guest::StoreU16(h.base, driver + kPath + 5138, uint16_t(r.Below(200)));
+          for (uint32_t k = 0; k < 80; k++) {
+            guest::StoreU32(h.base, driver + kPath + 16 + 64 * k + 52, vehicle + 84 * r.Below(60));
+          }
+          guest::StoreU32(h.base, io, RandomFloat(r, 12.0f));
+          r3 = driver + kPath;
+          r4 = io;
+          break;
       }
-      const std::vector<uint8_t> inputs = Read(h.base, area, kAreaBytes);
+      // Guest memory is one host mapping: the blocks copied as they are.
+      const std::vector<uint8_t> inputs(h.base + area, h.base + area + kAreaBytes);
+      const std::vector<uint8_t> seven =
+          table_written ? std::vector<uint8_t>(h.base + table, h.base + table + kSevenBytes)
+                        : std::vector<uint8_t>();
       Outputs out[2];
       for (int v = 0; v < 2; v++) {
-        Write(h.base, area, inputs.data(), kAreaBytes);
+        std::memcpy(h.base + area, inputs.data(), kAreaBytes);
+        if (table_written) {
+          std::memcpy(h.base + table, seven.data(), kSevenBytes);
+        }
         guest::StoreU32(h.base, ai::kDrivers, drivers);
-        guest::StoreU32(h.base, track_route::kRoute, area + kFile);
+        guest::StoreU32(h.base, track_route::kRoute, route_file);
         guest::StoreU32(h.base, kRaceData, area + kRace - 0xA3AF0);
         guest::StoreU32(h.base, kRaceStateGlobal, area + kRaceState - 6100);
         for (uint32_t i = 0; i < 8; i++) {
@@ -526,6 +789,7 @@ void AiDrivers(Context& h) {
         t.r5.u64 = r5;
         t.r6.u64 = r6;
         t.r7.u64 = r7;
+        t.r8.u64 = r8;
         t.f1.u64 = f1;
         (v == 0 ? f.recompiled : f.native)(t, h.base);
         guest::StoreU32(h.base, ai::kDrivers, saved_drivers);
@@ -536,17 +800,23 @@ void AiDrivers(Context& h) {
           guest::StoreU32(h.base, kInputs + 4 * i, saved_inputs[i]);
         }
         // The float outputs as floats, then the block with them zeroed.
-        std::vector<uint8_t> bytes = Read(h.base, area, kAreaBytes);
+        std::vector<uint8_t> bytes(h.base + area, h.base + area + kAreaBytes);
         for (const auto& [offset, count] : floats) {
           out[v].Floats(h.base, area + offset, count);
           std::memset(bytes.data() + offset, 0, 4 * count);
         }
-        for (uint32_t i = 0; i < kAreaBytes; i += 64) {
-          out[v].Bytes(std::vector<uint8_t>(bytes.begin() + i, bytes.begin() + i + 64));
+        for (uint32_t i = 0; i < kAreaBytes; i += 256) {
+          out[v].Bytes(std::vector<uint8_t>(bytes.begin() + i, bytes.begin() + i + 256));
+        }
+        if (table_written) {  // the other drivers' records, by their hash
+          const uint64_t hash = base::Hash64(h.base + table, kSevenBytes);
+          out[v].Word(uint32_t(hash >> 32));
+          out[v].Word(uint32_t(hash));
         }
         out[v].Word(uint32_t(t.r3.u64 >> 32));
         out[v].Word(t.r3.u32);
-        if (f.kind == kSpeedOverDistance || f.kind == kCornerFactor || f.kind == kLimitSpeed) {
+        if (f.kind == kSpeedOverDistance || f.kind == kCornerFactor || f.kind == kLimitSpeed ||
+            f.kind == kLimitSpeedBlend) {
           out[v].Double(t.f1.u64);
         }
       }
@@ -554,6 +824,8 @@ void AiDrivers(Context& h) {
     }
     results.Report();
   }
+  memory::Free(route_table);
+  memory::Free(route_area);
   memory::Free(table);
   memory::Free(area);
 }

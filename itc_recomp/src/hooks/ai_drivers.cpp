@@ -31,7 +31,16 @@ ITC_FLAG_BOOL(native_ai_drivers, true, "ITC",
               "AiPathEntry::SetLaneOffset sub_8213B390, AiOther::UpdateFlags sub_82145450, "
               "AiOther::UpdateTimer sub_821456A0, AiDriver::ClearOthers sub_821459B0, "
               "AiDriver::PickTarget sub_82145118, AiDriver::PickTargetBehind sub_821451B8, "
-              "AiDriver::KeepsGapFrom sub_82145048) natively instead of through the translated "
+              "AiDriver::KeepsGapFrom sub_82145048, AiDriver::SetParams sub_82138D00, "
+              "AiDriver::SetSkill sub_821393D8, AiDriver::ClearPlan sub_82139820, "
+              "AiDriver::LimitSpeedBlend sub_82139B40, AiPath::SetMode sub_8213D508, "
+              "AiPath::ResetFor sub_8213E658, AiPath::NormalizeByLane sub_8213B428, "
+              "AiDriver::UpdateLane sub_82144EF8, AiDriver::ResetOthers sub_82145A48, "
+              "AiDriver::ClearCarState sub_82146588, AiDriver::UpdateState4 sub_82146220, "
+              "AiDriver::UpdateState5 sub_82146388, AiDriver::IsSettled sub_82146408, "
+              "AiOther::Mirror sub_82145610, AiPathEntry::BlockLeft sub_8213C5C8, "
+              "AiPathEntry::BlockRight sub_8213C630, AiCorner::Init sub_8213C698, "
+              "AiPath::WithinRoadAt sub_8213C1A0) natively instead of through the translated "
               "code (the same words, bit for bit; checked by --run_harnesses=ai_drivers). Those "
               "reached only from native callers have no adapters, and the flag switches their "
               "callers: sub_82144ED8, sub_8213C720, sub_821450E0, sub_821453A0");
@@ -111,3 +120,50 @@ ITC_AI_DRIVERS(82145118, PickTarget(base, ctx.r3.u32))
 ITC_AI_DRIVERS(821451B8, PickTargetBehind(base, ctx.r3.u32))
 // r4 = &the other's index.
 ITC_AI_DRIVERS(82145048, ctx.r3.u64 = KeepsGapFrom(base, ctx.r3.u32, ctx.r4.u32))
+
+// --- Set-up, modes and the plan ---
+
+// r4 = the object or 0; r3 left at the skill (+6048), as the original's
+// tail call leaves it.
+ITC_AI_DRIVERS(82138D00, SetParams(base, ctx.r3.u32, ctx.r4.u32); ctx.r3.u64 += 6048)
+// r4 = &the word; r3 left at the skill.
+ITC_AI_DRIVERS(821393D8, SetSkill(base, ctx.r3.u32, ctx.r4.u32); ctx.r3.u64 += 6048)
+ITC_AI_DRIVERS(82139820, ctx.r3.u64 = ClearPlan(base, ctx.r3.u32))
+// r4 = &the speed, r5 = &(a, b), r6 = &t, r7 = &the weight, r8 = &the
+// slices; the original's frame 96 bytes down.
+ITC_AI_DRIVERS(82139B40, ctx.f1.f64 = LimitSpeedBlend(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                                      ctx.r6.u32, ctx.r7.u32, ctx.r8.u32,
+                                                      ctx.r1.u32 - 96))
+// r4 = &the mode.
+ITC_AI_DRIVERS(8213D508, ctx.r3.u64 = SetMode(base, ctx.r3.u32, ctx.r4.u32))
+// r4 = the driver.
+ITC_AI_DRIVERS(8213E658, ctx.r3.u64 = ResetFor(base, ctx.r3.u32, ctx.r4.u32))
+// The path's +5532 in mode 1 (no direct callers): r3 not read, r4 = the
+// entry, r5 = the position, r6 = &the lane, r7 = the masks or 0.
+ITC_AI_DRIVERS(8213B428, ctx.r3.u64 = NormalizeByLane(base, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
+                                                      ctx.r7.u32))
+// The original's frame 128 bytes down; r3 left at its clamped position
+// (ClampPosition's out), as the original leaves it.
+ITC_AI_DRIVERS(82144EF8, UpdateLane(base, ctx.r3.u32, ctx.r1.u32 - 128);
+               ctx.r3.u64 = ctx.r1.u32 - 128 + 80)
+
+// --- The other racers' records and the states ---
+
+ITC_AI_DRIVERS(82145A48, ctx.r3.u64 = ResetOthers(base, ctx.r3.u32))
+ITC_AI_DRIVERS(82146588, ClearCarState(base, ctx.r3.u32))
+// r4 = &the target speed.
+ITC_AI_DRIVERS(82146220, UpdateState4(base, ctx.r3.u32, ctx.r4.u32))
+ITC_AI_DRIVERS(82146388, ctx.r3.u64 = UpdateState5(base, ctx.r3.u32, ctx.r4.u32))
+ITC_AI_DRIVERS(82146408, ctx.r3.u64 = IsSettled(base, ctx.r3.u32))
+// r3 = out, r4 = the record, r5 = &the value.
+ITC_AI_DRIVERS(82145610, MirrorOther(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+
+// --- The path's entries and corners ---
+
+// r4 = &the position across, r5 = &the width, r6 = &out.
+ITC_AI_DRIVERS(8213C5C8, BlockLeft(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32))
+ITC_AI_DRIVERS(8213C630, BlockRight(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32))
+// r4 = the corner's data, r5 = &the slice's corner entry, r6 = &the count.
+ITC_AI_DRIVERS(8213C698, InitCorner(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32))
+// r4 = &the offset.
+ITC_AI_DRIVERS(8213C1A0, ctx.r3.u64 = WithinRoadAt(base, ctx.r3.u32, ctx.r4.u32))
