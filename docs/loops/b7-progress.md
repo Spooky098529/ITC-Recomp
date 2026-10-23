@@ -18,8 +18,9 @@ see in a drive, from every run: `to-drive.md`.
 - Subsystem 2 of 3 (`std::string`) finished: the two static set-ups
   wait on `atexit`.
 - Subsystem 3 of 3: the course's route (picked: ready groups, runs
-  every update, blocks `TrackPosition::Init` and `Update`); step:
-  mapping (a mapping agent running).
+  every update, blocks `TrackPosition::Init` and `Update`), mapped in
+  e211173 (40 rows, 15 ready groups); step: migration 1 (a migration
+  agent running).
 
 ## Done
 
@@ -62,5 +63,7 @@ This run's groups: `expected-differences.md` (the "17:22 run" lines).
   123, known 561, unknown 4892). Race 19 s (`itc_1063`) with
   `--run_harnesses=all`, 0 errors, every harness 0 differing (no
   "(expected to differ)" groups added).
+- After mapping the course's route: ours 1181, work left 5576 (wrapped
+  123, known 601, unknown 4852).
 
 ## Stopped

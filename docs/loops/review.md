@@ -75,6 +75,23 @@ When the user has reviewed a run's section, its heading gets
   makes the original loop forever), and `_Copy`, `_Grow` cases use
   capacities 15 and up (the `_Copy` quirk in the file's intro); new
   helpers in `src/std_string/std_string.cpp`.
+- `track-route.md` (new, 40 rows; 0 moved, 40 new; mapped in e211173:
+  route positions normalized and moved along linked sections, points,
+  lanes and distances, `TrackRoute::Follow`), `known-data.md`
+  (`0x826C5B10`'s full layout, the default branch mask at `0x82008A00`,
+  the track position's +4 and +6 as a route position, the vehicle's
+  +5232 as the car's track position); 1 lead (the race code's users of
+  the route). For review: `collision-world.md`'s `TrackPosition::Init`
+  (`sub_820F8578`) corrected (its point comes from its route position,
+  not the other way round); `cameras.md`'s intro points to
+  `track-route.md` for `sub_820AB408`, `sub_820AB498`;
+  `vehicle-accessors.md`'s `sub_820C0168` `Vehicle::Identity` probably
+  deserves a new name (left); `sub_820F985C` is a jump table's case 0
+  split off by the recompiler; unsure: `TrackRoute::SliceTest`,
+  `SpecialSection` (fixed section numbers, probably one course's),
+  links 6 and 8 as the left and right neighbors, the two point tables
+  as the road's edges, `LinkDistance`, `PathDistance`, `ToMainRoad`'s
+  end not read in detail.
 
 ## Run 2026-10-23 13:44 (`b7-loop-23-10-26-3`)
 
