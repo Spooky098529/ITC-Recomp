@@ -76,3 +76,6 @@ callers in play, `sub_820F2D28`, `sub_82114B88`), and calls a one-line
 `native running (harness)` logged, 300 cases 0 differing (`itc_923`, 19
 s, 0 errors). It's still on the drive list (its callers are the save
 data's).
+Concluded (the user's call, 2026-10-23): the run ends at 2 subsystems,
+not resumed for a third. Next: the user reviews `review.md`, drives a
+race for the drive list above, and merges; a new run starts afresh.
