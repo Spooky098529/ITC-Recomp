@@ -27,7 +27,7 @@ file's history. What's left to see in a drive, from every run:
   ours (119 Native) in five migrations (c94d6be..91b8da2,
   e01cc35..24669a4, 1521ad2..18ea84b, fcec6fd..2ea28d9,
   5a7f90d..2ddd638), each validated (`itc_1124`/`1125`, `1145`/`1146`,
-  `1169`/`1170`, `1185`/`1186`, `1203`/`1204`; replays ok; 13 to
+  `1169`/`1170`, `1185`/`1186`, `1203`/`1204`; replays ok; 14 to
   drive); `--native_ai_drivers`. Left: Destroy and DestroyRings
   (`sub_820900C0`), UpdateStarting, UpdateTrack and NoteFixedSections
   (`sub_821434E8`).
