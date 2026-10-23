@@ -21,7 +21,7 @@ When the user has reviewed a run's section, its heading gets
   sounds, the data tables, a file-layer helper). For review: XACT's
   vtable slots named only "probably <method>"; the intro records the
   user's call that XACT will probably be translated (it replaces "keep
-  the game's XACT" in `native-audio.md`'s decisions, not yet edited
+  the game's XACT" in `native-audio.md`'s decisions, edited there 2026-10-23
   there); the 3D path never ran in play.
   Migration 1's 30 rows (7 Native; the intro's "Native so far"). For
   review: X3DAudioInitialize (`sub_82480710`, a library entry point,
