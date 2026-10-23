@@ -33,7 +33,10 @@
 // IsSettled; LimitByCurve (sub_821390D0), LimitSpeedBlend (sub_82139B40) and
 // AiPath::ClearCornerKind (sub_8213C710), from LimitForCorner; UpdateState
 // (sub_82139AC8) and LimitForCorner (sub_8213A620), from UpdateTargetSpeed;
-// and UpdateTargetSpeed (sub_8213AB98), from UpdateSpeed.
+// UpdateTargetSpeed (sub_8213AB98), from UpdateSpeed; AiPath::TargetPoint
+// (sub_8213B4D8), from SteerToTarget; and ThrottleForSpeed (sub_82139168),
+// EaseThrottleForSteer (sub_82139B98), EaseThrottleForSlide (sub_82139BE8)
+// and AiPath::HasKind2Ahead (sub_8213C148), from UpdatePedals.
 
 #include "guest.h"
 
@@ -102,7 +105,8 @@ ITC_FLAG_BOOL(native_ai_drivers, true, "ITC",
               "sub_82145A48, sub_82139820, sub_821395D0, sub_8213C698, sub_8213DD40, "
               "sub_8213BCD0, sub_8213BF28, sub_82145F48, sub_821460C8, sub_82146220, sub_82146388, "
               "sub_82145118, sub_821390D0, sub_82139B40, sub_8213C710, sub_82139AC8, sub_8213A620, "
-              "sub_8213AB98");
+              "sub_8213AB98, sub_8213B4D8, sub_82139168, sub_82139B98, sub_82139BE8, "
+              "sub_8213C148");
 
 // Defines an adapter: `body` uses `ctx` and `base`.
 #define ITC_AI_DRIVERS(address, body)   \
@@ -130,20 +134,13 @@ ITC_AI_DRIVERS(82145408, WrapAngle(base, ctx.r3.u32))
 ITC_AI_DRIVERS(82101760, ctx.r3.u64 = TimeFromTicks(ctx.r3.u32))
 ITC_AI_DRIVERS(82144F50, ctx.r3.u64 = ReadCar(base, ctx.r3.u32))
 ITC_AI_DRIVERS(82145230, UpdateHalfWidth(base, ctx.r3.u32))
-// f1 = the distance ahead, r4 = out.
-ITC_AI_DRIVERS(8213B4D8, ctx.r3.u64 = TargetPoint(base, ctx.r3.u32, ctx.f1.f64, ctx.r4.u32))
 
 // --- The skill (r3 kept) ---
 
 ITC_AI_DRIVERS(8213F700, ClearSkill(base, ctx.r3.u32))
 
-// --- Speeds and steering (r3 kept) ---
-
-ITC_AI_DRIVERS(82139B98, EaseThrottleForSteer(base, ctx.r3.u32))
-
 // --- The path's corners and points ---
 
-ITC_AI_DRIVERS(8213C148, ctx.r3.u64 = HasKind2Ahead(base, ctx.r3.u32))
 ITC_AI_DRIVERS(8213C0E8, ctx.r3.u64 = IsSlow(base, ctx.r3.u32))
 // r3, r4 = &the bytes; the list's address sign-extended, as the original's.
 ITC_AI_DRIVERS(8213C358, ctx.r3.s64 = int32_t(PreferredSections(base, ctx.r3.u32, ctx.r4.u32)))
@@ -209,9 +206,6 @@ extern "C" REX_FUNC(sub_8213ADF8) {
 
 // --- Pedals and steering (r3 kept) ---
 
-ITC_AI_DRIVERS(82139168, ThrottleForSpeed(base, ctx.r3.u32))
-// r4 = &the flag.
-ITC_AI_DRIVERS(82139BE8, EaseThrottleForSlide(base, ctx.r3.u32, ctx.r4.u32))
 ITC_AI_DRIVERS(82139CB0, LimitThrottle(base, ctx.r3.u32))
 // r4 = the record, r5 = &the mode.
 ITC_AI_DRIVERS(821452A0, AdjustForOther(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
