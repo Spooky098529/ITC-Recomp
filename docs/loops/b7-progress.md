@@ -14,11 +14,19 @@ file's history. What's left to see in a drive, from every run:
   branch), from 97be4fc; summary `b7-loop-2026-10-23-1344.md`.
 - Subsystem 1 of 3 (the model animation) finished: the rest waits on
   the graphics device.
-- Subsystem 2 of 3: the car specs (`car-specs.md`, already mapped from
-  the game data check; the map checked); migration 1 done (d87b553..114aa35;
-  nothing ready left); validation agent running.
+- Subsystem 2 of 3 (the car specs) finished: the rest waits on the
+  archive.
+- Subsystem 3 of 3: the game's cameras above `CameraPass::Update` (the
+  lead whose functions run every frame, nearly all ready); mapping agent
+  running.
 
 ## Done
+
+- The car specs (`car-specs.md`, already mapped; 48 rows): 47 ours in
+  one migration (d87b553..114aa35), validated (47 of 47 harness lines;
+  all ran in the attract race or the replay, `itc_947`, `itc_948` ok);
+  `--native_car_specs`. Left: `Params::Load` (the archive);
+  `Params::Free` not seen in play.
 
 - The model animation (`model-animation.md`, mapped in c425049; 39
   rows): 36 ours in one migration (6f51fc2, 6714e72), validated (37 of

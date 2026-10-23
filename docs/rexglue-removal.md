@@ -2515,6 +2515,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-10-23 | The action mappers (the game's input actions over the pads: set-up, client list, update, read slots; no behavior change) | `action-mappers.md` | 36 of 40 | `--native_action_mappers` |
 | 2026-10-23 | The game's data tables at `[0x826C5CA0]` (their load callbacks, byte swaps and accessors; no behavior change) | `data-tables.md` | 16 of 18 | `--native_data_tables` |
 | 2026-10-23 | The model animation (track sets and their keyframed curves, `Model::Animate`, the skeleton's node values and matrices; with the primitive drawer's constructor) | `model-animation.md` | 36 of 39 (and `models.md`'s `sub_8259C3A8`) | `--native_model_animation` |
+| 2026-10-23 | The car specs (the parameter tables' set-up, load callbacks and byte swaps, the getters, `Car::Refresh` and `Tire::InchUp`; no behavior change) | `car-specs.md` | 47 of 48 (`Params::Free` not seen in play) | `--native_car_specs` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -3009,3 +3010,13 @@ row yet 4,979); `model-animation.md` 36 ours of 39. 916 overrides in
 `src/`. The model animation's sections with tracks in `Setup208` and
 node types 8 and 16 stay on the recompiled code (never in play); the
 primitive drawer's methods wait on the graphics device.
+
+**2026-10-23, B7's seventh loop run, the car specs (branch
+`b7-loop-23-10-26-3`):** the boundary unchanged: 449 functions (916
+pairs): overridden 67, Native 3, Dropped 23, never called 70, live 286.
+Imports: 186 called, 62 with a live caller. B7 (`b7_status.py`): 6,756
+in play, ours 1,107, work left 5,649 (Wrapped 129, with a row 541, no
+row yet 4,979); `car-specs.md` 47 ours of 48. 929 overrides in `src/`.
+`Params::Load` waits on the archive (its twelve `Archive::Load` calls);
+the archive's TOC lookup `sub_8209D868` stays a guest call from the
+adapters.
