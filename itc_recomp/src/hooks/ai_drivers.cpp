@@ -59,7 +59,9 @@
 // CornerToEntry (sub_8213E018), CornerToApex (sub_8213E1D0) and CornerToExit
 // (sub_8213E360), from PlanCorners (sub_8213E7B8), from PlanLine; and
 // ClampOffset (sub_8213CF58), from FollowTargets, ContinueLine,
-// ApproachCorner and the CornerTo steps.
+// ApproachCorner and the CornerTo steps; AiOther::UpdateTimer (sub_821456A0),
+// Mirror (sub_82145610) and Update (sub_821454C8), from
+// AiDriver::CompareWith (sub_82145B08), from AiDrivers::UpdateAll.
 
 #include "guest.h"
 
@@ -159,7 +161,8 @@ ITC_FLAG_BOOL(native_ai_drivers, true, "ITC",
               "sub_821452A0, sub_8213B650, sub_8213CB30, sub_8213CD50, sub_8213D788, sub_8213F958, "
               "sub_8213FB48, sub_8213AC70, sub_8213C0E8, sub_8213AEF0, sub_82138D78, sub_8213ACD0, "
               "sub_8213A428, sub_82139CB0, sub_8213DB08, sub_8213DE30, sub_8213E018, sub_8213E1D0, "
-              "sub_8213E360, sub_8213E7B8, sub_8213CF58");
+              "sub_8213E360, sub_8213E7B8, sub_8213CF58, sub_821456A0, sub_82145610, sub_821454C8, "
+              "sub_82145B08");
 
 // Defines an adapter: `body` uses `ctx` and `base`.
 #define ITC_AI_DRIVERS(address, body)   \
@@ -196,8 +199,6 @@ ITC_AI_DRIVERS(8213D438, ctx.r3.u64 = ResetPath(base, ctx.r3.u32))
 
 // --- The other racers (r3 kept, but KeepsGapFrom's) ---
 
-// r4 = &the other's index, r5 = &the limit.
-ITC_AI_DRIVERS(821456A0, UpdateOtherTimer(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
 // r4 = &the other's index.
 ITC_AI_DRIVERS(82145048, ctx.r3.u64 = KeepsGapFrom(base, ctx.r3.u32, ctx.r4.u32))
 
@@ -217,8 +218,6 @@ ITC_AI_DRIVERS(82144EF8, UpdateLane(base, ctx.r3.u32, ctx.r1.u32 - 128);
 
 // --- The other racers' records and the states ---
 
-// r3 = out, r4 = the record, r5 = &the value.
-ITC_AI_DRIVERS(82145610, MirrorOther(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
 
 // --- The path's entries and corners ---
 
@@ -249,8 +248,6 @@ extern "C" REX_FUNC(sub_8213ADF8) {
 // --- Pedals and steering (r3 kept) ---
 
 ITC_AI_DRIVERS(82146608, ctx.r3.u64 = UpdateAgainstPlayer(base, ctx.r3.u32))
-// r4 = &the new gap, r5 = &the length.
-ITC_AI_DRIVERS(821454C8, UpdateOther(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
 
 // --- Resets, steering input and the path's lists ---
 
@@ -421,8 +418,6 @@ ITC_AI_DRIVERS(8213EB48, ctx.r3.u64 = FollowLeaderBranch(base, ctx.r3.u32))
 
 // --- The drivers' updates and the pairs ---
 
-// r4 = &the other's index; the original's frame 144 bytes down.
-ITC_AI_DRIVERS(82145B08, ctx.r3.u64 = CompareWith(base, ctx.r3.u64, ctx.r4.u32, ctx.r1.u32 - 144))
 
 namespace {
 struct UpdateCall {
