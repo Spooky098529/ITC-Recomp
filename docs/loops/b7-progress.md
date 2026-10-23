@@ -93,3 +93,6 @@ harnesses 18-19 s under `attract_race.sh 25` (accepted: the harnesses'
 `attract_race.sh 30` (the user's call), no errors, replays ok. Next:
 the user reviews `review.md` ("Run 2026-10-23 17:22"), drives a race
 for `to-drive.md`, and merges.
+Concluded (the user's call, 2026-10-23): merged into
+`rexglue-removal-project` before a drive; `to-drive.md`'s functions
+for this run are still to see.
