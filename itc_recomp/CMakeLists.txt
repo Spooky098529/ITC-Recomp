@@ -146,6 +146,8 @@ set(ITC_SOURCES
     src/data_tables/data_tables.cpp
     src/hooks/model_animation.cpp
     src/model_animation/model_animation.cpp
+    src/hooks/car_specs.cpp
+    src/car_specs/car_specs.cpp
     src/hooks/sound_cues.cpp
     src/sound_cues/sound_cues.cpp
     src/hooks/xact.cpp
@@ -197,6 +199,7 @@ set(ITC_SOURCES
     src/harnesses/action_mappers.cpp
     src/harnesses/data_tables.cpp
     src/harnesses/model_animation.cpp
+    src/harnesses/car_specs.cpp
     src/harnesses/sound_cues.cpp
     src/harnesses/xact.cpp
     src/helpers/debug_output.cpp

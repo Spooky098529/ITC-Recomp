@@ -158,5 +158,6 @@ void Xact(Context& h);
 void ActionMappers(Context& h);
 void DataTables(Context& h);
 void ModelAnimation(Context& h);
+void CarSpecs(Context& h);
 
 }  // namespace harness
