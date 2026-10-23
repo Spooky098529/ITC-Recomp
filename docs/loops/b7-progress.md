@@ -4,39 +4,50 @@ Kept by the loop's lead (`b7-loop.md`). Short: details are in the
 commits, the function files and the subsystems' docs. Earlier runs'
 records: `b7-loop-2026-10-22-0111.md`, `b7-loop-2026-10-22-1047.md`,
 `b7-loop-2026-10-22-1439.md`, `b7-loop-2026-10-22-2211.md`,
-`b7-loop-2026-10-23-0152.md`, and this file's history. What's left to
-see in a drive, from every run: `to-drive.md`.
+`b7-loop-2026-10-23-0152.md`, `b7-loop-2026-10-23-1106.md`, and this
+file's history. What's left to see in a drive, from every run:
+`to-drive.md`.
 
 ## Now
 
-- Run started 2026-10-23 11:06 on `b7-loop-23-10-26-2` (the user's
-  branch), from 5b4cecd; summary `b7-loop-2026-10-23-1106.md`.
-- Subsystem 1 of 3 (the action mappers) finished: the rest waits on
-  the input manager's vtable targets and `sub_8258CE60`.
-- Subsystem 2 of 3 (the data tables) finished: the rest waits on the
-  archive. The loop stopped at its validation (below).
+- Run started 2026-10-23 13:44 on `b7-loop-23-10-26-3` (the user's
+  branch), from 97be4fc; summary `b7-loop-2026-10-23-1344.md`.
+- Subsystem 1 of 3 (the model animation) finished: the rest waits on
+  the graphics device.
+- Subsystem 2 of 3 (the car specs) finished: the rest waits on the
+  archive.
+- Subsystem 3 of 3 (the cameras) finished: the rest waits on the
+  graphics device's resource calls and memset/atexit. The loop stopped
+  at the run's limit (below).
 
 ## Done
 
-- The data tables (`data-tables.md`, mapped in d8f876f; 18 rows): 16
-  ours in one migration (db90dc4..4344730), validated 15 of 16 harness
-  lines (16 of 16 after `RecordsItem`, `itc_923`) (`itc_921`; replay `itc_922` ok); `--native_data_tables`. Left:
-  DataTables::Init and Load (the archive).
+- The cameras (`cameras.md`, mapped in 8fb7201; 42 rows): 32 ours in
+  two migrations (81d1c0c..1736a63, 14a4cc8..11837c9), validated (19 of
+  19 and 11 of 11 harness lines; `itc_982`, `itc_983`, `itc_1013`,
+  `itc_1014`, replays ok; 1 to drive); `--native_cameras`. Left: the
+  passes' and viewports' set-ups (the graphics device, memset, atexit).
 
-- The action mappers (`action-mappers.md`, mapped in 422b250; 40 rows):
-  36 ours in one migration (006e5e4..c67265f), validated (35 of 35
-  harness lines, one Merged; all ran in the attract race or the replay,
-  replay ok); `--native_action_mappers`. Left: BindAll and Bind (the
-  input manager's vtable targets), the mapper's constructor and Init
-  (`sub_8258CE60`).
+- The car specs (`car-specs.md`, already mapped; 48 rows): 47 ours in
+  one migration (d87b553..114aa35), validated (47 of 47 harness lines;
+  all ran in the attract race or the replay, `itc_947`, `itc_948` ok);
+  `--native_car_specs`. Left: `Params::Load` (the archive);
+  `Params::Free` not seen in play.
+
+- The model animation (`model-animation.md`, mapped in c425049; 39
+  rows): 36 ours in one migration (6f51fc2, 6714e72), validated (37 of
+  37 harness lines with `models.md`'s `sub_8259C3A8`; 34 ran in the
+  attract race or the replay, `itc_932`, `itc_933` ok; 3 to drive);
+  `--native_model_animation`. Left: the primitive drawer's methods (the
+  graphics device).
 
 ## Rows to review
 
-This run's rows: `review.md` ("Run 2026-10-23 11:06").
+This run's rows: `review.md` ("Run 2026-10-23 13:44").
 
 ## Expected to differ
 
-This run's groups: `expected-differences.md` (the "11:06 run" lines).
+This run's groups: `expected-differences.md` (the "13:44 run" lines).
 
 ## To check in a drive
 
@@ -44,34 +55,29 @@ This run's groups: `expected-differences.md` (the "11:06 run" lines).
 
 ## Totals
 
-- Start: ours 971, work left 5782 (wrapped 137, known 459, unknown 5186).
-- After mapping the action mappers: ours 971, work left 5782 (wrapped
-  137, known 484, unknown 5161).
-- After the action mappers' migration 1: ours 1007, work left 5746
-  (wrapped 129, known 456, unknown 5161). Its races ran 19 s at 30
-  ticks/s with `--run_harnesses=all` (36 new harnesses at boot); 23 s
-  without, with `--native_action_mappers` on and off (`itc_913`,
-  `itc_914`).
-- After mapping the data tables: ours 1007, work left 5746 (wrapped 129,
-  known 474, unknown 5143).
-- After the data tables' migration 1: ours 1023, work left 5730 (wrapped
-  129, known 458, unknown 5143).
+- Start: ours 1023, work left 5730 (wrapped 129, known 586, unknown 5015).
+- After mapping the model animation: ours 1023, work left 5730 (wrapped
+  129, known 622, unknown 4979).
+- After the model animation's migration 1: ours 1060, work left 5696
+  (wrapped 129, known 588, unknown 4979). Race 19 s at 30 ticks/s with
+  `--run_harnesses=all`, 0 errors, every harness 0 differing outside
+  the earlier "(expected to differ)" groups (none added).
+- After the car specs' migration 1: ours 1107, work left 5649 (wrapped
+  129, known 541, unknown 4979). Race 19 s (`itc_946`), the same checks.
+- After mapping the cameras: ours 1107, work left 5649 (wrapped 129,
+  known 577, unknown 4943).
+- After the cameras' migration 1: ours 1127, work left 5629 (wrapped
+  125, known 561, unknown 4943). Race 19 s (`itc_979`), the same checks.
+- After the cameras' migration 2: ours 1139, work left 5617 (wrapped
+  123, known 551, unknown 4943). Race 19 s, the same checks.
 
 ## Stopped
 
-2026-10-23, at the data tables' validation (settled after, below): `sub_82116DA8`
-ItemRecords::Item has no harness line (`missing:`). It's a thunk whose
-adapter (`src/hooks/data_tables.cpp`) and harness step both call
-`data_tables::Item` directly, which prints as `sub_82117178`; its 300
-harness cases match. Giving it a print means a plain C++ function of
-its own and a harness change (more than the validation agent may do),
-or the user may call it Merged. Everything else passed. The user
-reviews `review.md` ("Run 2026-10-23 11:06"), drives a race, and merges.
-Settled (the user's call, 2026-10-23): the adapter stays (two recompiled
-callers in play, `sub_820F2D28`, `sub_82114B88`), and calls a one-line
-`data_tables::RecordsItem` with its own print, as does its harness step:
-`native running (harness)` logged, 300 cases 0 differing (`itc_923`, 19
-s, 0 errors); it ran in game in a second replay (`itc_924`).
-Concluded (the user's call, 2026-10-23): the run ends at 2 subsystems,
-not resumed for a third. Next: the user reviews `review.md`, drives a
-race for `to-drive.md`, and merges; a new run starts afresh.
+2026-10-23, after the cameras: the run's limit (3 subsystems) reached.
+Everything passed: harnesses 0 differing outside the earlier
+"(expected to differ)" groups (none added), attract races 19 s with all
+harnesses, no errors, replays ok. Next: the user reviews `review.md`
+("Run 2026-10-23 13:44"), drives a race for `to-drive.md`, and merges.
+Concluded (the user's call, 2026-10-23): a drive (`itc_1015`, 139 s,
+no errors) looked right to the user; none of `to-drive.md`'s functions
+ran in it. Merged into `rexglue-removal-project`.

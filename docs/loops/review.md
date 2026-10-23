@@ -11,6 +11,124 @@ functions to check in a drive in the progress file.
 When the user has reviewed a run's section, its heading gets
 "(reviewed <date>)"; the section stays for the record.
 
+## Run 2026-10-23 13:44 (`b7-loop-23-10-26-3`)
+
+- `model-animation.md` (new, 36 rows; 0 moved, 36 new; mapped in
+  c425049), `known-data.md` (the model's +304 to +384 spelled out; new
+  rows: the track set, the animation section with its 20-byte keys,
+  the skeleton); 5 leads. For review: `models.md`'s `sub_82599A20`
+  corrected (the per-node float4s' x, y, z set to 0.0, not 1.0) and
+  `sub_8259A9E0`'s row given its r6 instance count (+160) and the
+  per-instance cursors at +128; the primitive drawer (`sub_825A1438`,
+  `sub_825A16B0`, `sub_825A17A0`) and `sub_825A18D8` aren't animation
+  but have rows, as the lead named them; `sub_825A5778` to
+  `sub_825A6460` are probably XAudio's effects (XAPO), not animation (a
+  lead); only some track sets ran in play (the +364 material animation
+  and +384 sets' helpers and `sub_825A20E8` never did); Model::Animate
+  advances times by 1.0 a call from `sub_820F6068`, probably on
+  render-only passes too (not checked).
+  Migration 1's 36 rows (6f51fc2, 6714e72; `--native_model_animation`;
+  16 Native, written without adapters as only native callers reach
+  them; 3 new rows, Native and not seen in play: `sub_825A0FE0`,
+  `sub_825A10A8`, `sub_825A20E8`; `models.md`'s `sub_8259C3A8` Native,
+  named Skeleton::UpdateNodeMatrices; left: the primitive drawer's
+  vtable methods, blocked by the graphics device). For review: the
+  releases, set-ups, frees, destructors and the drawer's constructor
+  run natively only under `--native_heap`, handing the call to the
+  original when free or operator new would refuse it (the collision
+  precedent), and abort if `OperatorNewArray` fails after those checks;
+  `TrackSet::Setup208` is native only for sections with no tracks (all
+  in play) and `sub_8259C3A8` hands node types 8 and 16 to the
+  original, so `sub_825A6608`, `sub_825A1938`, `sub_8259B748` and
+  `sub_8259BE40` stay recompiled (both checks assume the data isn't
+  written during the call); `sub_8259C3A8` notes its multiplies with
+  `BlendState_OnMultiply` under the original's return addresses;
+  `Curve::Sample` corrected (before the second key it interpolates the
+  first two, not clamps); the harnesses never build node types 8 or 16
+  or Setup208 sections with tracks; the new code reuses
+  `car_physics/float_ops.h` and `xact::WaveEntryConstruct`.
+- `car-specs.md` (already mapped from the game data check; the map
+  checked by the lead, not remapped). Migration 1's 46 rows (d87b553,
+  04c3ebd, f1727ea, 80867d4, 114aa35; `--native_car_specs`; 9 adapters
+  removed and 25 Native with no adapter; 12 unnamed rows named, among
+  them `Car::CopySpec` `sub_820C4888`, `Car::CopyAeroParts`
+  `sub_820C4568`, `CountBodyKits` `sub_820CBD20`; left: `Params::Load`,
+  blocked by the archive, and `Params::Free`, not seen in play). For
+  review: the swaps byte-swap integers where the original round-trips
+  through lfs/stfs (folded in `generated/`; the harness checks
+  signaling NaNs and denormals); the archive's TOC lookup `sub_8209D868`
+  (no row anywhere) stays a guest call from the adapters; the four load
+  callbacks keep their adapters (reached through a function pointer);
+  `Car::Refresh` runs the original if a copy wouldn't be the host's
+  memcpy or the car's span overlaps a source (never taken), its aero
+  getters write into the car directly and the 36-byte parts block is a
+  host array; the float adapters turn flush-to-zero off unconditionally
+  (the data tables' precedent); `sub_820CB0C0`'s leftover r3 reproduced;
+  the Refresh, CopySpec, CopyAeroParts and InchUp harnesses use made-up
+  tables (the game's load after the harnesses), and some cases point
+  the parameter global at a test object for the call (the data tables'
+  precedent: the load callbacks run when the main thread lets them);
+  `Params::Init` native only under `--native_heap`.
+- `cameras.md` (new, 42 rows; 6 moved from `functions.md`, still
+  Wrapped with their old text, 36 new; mapped in 8fb7201): the library's
+  `Camera` class, the 21 camera passes at `0x826BAC00` and their render
+  targets, the two 1,872-byte viewports at `[0x826C2CE8]`; 4 leads (the
+  camera modes at `82152028`-`82156CC0`, a second camera class, the
+  graphics device's resource calls, memset and atexit), and
+  `sub_820AB408`, `sub_820AB498` added to the route lead. For review:
+  `known-data.md`'s `0x826C2CE8` row corrected (1,872-byte viewports of
+  twenty 80-byte entries, not 80-byte records) with new rows for
+  `0x826BABC0`-`0x826BABFC`, the viewport and its entry; a reversed
+  depth range from `Camera::BuildProjection` (+384 near, +388 far);
+  "probably" for mode 1's passes 4-9 as a cube map's faces, the entries'
+  +68 as a focal length in pixels; `CameraPass::RecordBegin`,
+  `RecordEnd` and `Viewport::UpdateEntries` not read in detail.
+  Migration 1's 20 rows (81d1c0c..1736a63; `--native_cameras`; 1
+  Merged, `sub_8209F7DC`; `CameraPass::SetZoom`'s adapter removed). For
+  review: interpolation's hooks kept: `CameraPass::Update` builds its
+  view at the original's stack address (r1 + 128, the copy note's key)
+  and notes the copy and multiply under the original's return addresses
+  (0x820A3D18, 0x820A3D90), through a new
+  `interpolation::BlendState_OnCopy` beside `BlendState_OnMultiply`
+  (`--log_blend_state`: the same blend counts with the flag on and off);
+  the `ITC_FRAME_STATE_WRAP` wrappers of RenderTarget, Disable and
+  EnableForView written out with the native work inside, and the
+  `--log_camera_pass_records` wrapper calling `hooks::CameraPassUpdate`
+  (new `src/hooks/cameras.h`); vtable slots go to the plain C++ only
+  when they hold the library's function (always in play); BuildProjection,
+  SetViewportSize and Update run the original when the stack pointer
+  isn't 16-byte aligned; RecordViewport and RecordClear keep guest calls
+  (the scene's getters, the render queue) and run the original with the
+  command list's diagnostics on, and where a chunk wouldn't fit (never in
+  play) call the scene's getters once more than the original;
+  float-register words copied as bits (signaling NaNs kept, as the
+  translation does); `Viewports::Release` native only under
+  `--native_heap`; the harness changes live game globals (the mode, the
+  passes' enabled words, pass 0's near plane, pass 4's field of view,
+  the viewports and scene pointers, the open-chunk count) and puts them
+  back after each run; the SetZoom adapter removal (7b4c8b1) was built
+  and raced only with the next commit; two functions named
+  `RecordClear` (`sub_8209FA38` here, `sub_825A18D8` in
+  `model-animation.md`).
+  Migration 2's 13 rows (14a4cc8..11837c9; still `--native_cameras`;
+  2 Merged, `sub_820A0D38`, `sub_820A1CA8`; the adapters of
+  `Camera::BuildProjection` and `Viewport::UpdateEntries` removed). For
+  review: Camera::Update leaves out the original's dead `tan` and `atan`
+  (results never read; memory and r3 the same, only f1 on return
+  differs, which the caller doesn't read); it keeps interpolation's
+  notes (its view at the original's r1+112, the copies at 0x825936C4
+  and 0x825936D4, the multiply at 0x82593798); the record passes keep
+  their `frame_state_diff` wrapper (`--find_per_frame_state`,
+  `--debug_hide`) and RecordEnd calls RenderTarget through its override
+  with the original's return addresses; with the command list's
+  diagnostics on, or a full list or another chunk open, the original
+  runs and the scene's getters are called once more (never in play);
+  RecordBegin, RecordEnd and RecordViewport keep their adapters (guest
+  calls); the record-pass harness checks only the last submission to
+  its made-up queue; map corrected: `sub_825D9310` (marked never run)
+  is the 21 passes' static constructor, run at boot; +372 is height ×
+  0.5 × tan(fov/2).
+
 ## Run 2026-10-23 11:06 (`b7-loop-23-10-26-2`)
 
 - `action-mappers.md` (new, 40 rows; 15 moved from `functions.md`, 25

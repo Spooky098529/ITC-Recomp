@@ -3711,6 +3711,10 @@ void BlendState_OnMultiply(uint8_t* base, uint32_t out, uint32_t a, uint32_t b,
   GetDrawState().OnMultiply(base, out, a, b, caller);
 }
 
+void BlendState_OnCopy(uint8_t* base, uint32_t dst, uint32_t src, uint32_t caller) {
+  GetDrawState().OnCopy(base, dst, src, caller);
+}
+
 void BlendState_SetHandler(uint32_t handler) {
   GetDrawState().SetHandler(handler);
 }

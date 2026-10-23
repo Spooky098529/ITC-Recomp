@@ -51,8 +51,8 @@ depends on the operand order the compiler chose (LLVM treats `dpps`,
 `mulss` and `addss` as commutable), and the translated code, built without
 `-ffp-model=strict`, may flip a NaN's sign: those cases are the harness's
 "NaNs anywhere (expected to differ)" groups. Left out: the camera code beside the first library (`sub_820A3978`
-`CameraPass::Update` in `functions.md`, the camera objects at
-`820AA2D0`-`820AB558`) and the other functions in that range (files,
+`CameraPass::Update` and the viewports at `820AA2D0`-`820AB558`, now
+in `cameras.md`) and the other functions in that range (files,
 saves, billboards, the graphics library's objects): not math.
 
 Status:

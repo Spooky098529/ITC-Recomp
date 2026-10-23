@@ -156,6 +156,16 @@ Rows not yet moved stay in the table below. So far:
 - [`models.md`](models.md): the graphics library's models (part files,
   node files and skeletons, recording a shape's draws), the XPR2 texture
   bundles and the boot's shader pairs.
+- [`model-animation.md`](model-animation.md): the graphics library's
+  keyframed model animation: a model's track sets for its part file's
+  sections, their tracks, curves and keys, the per-draw sampling step,
+  and the skeleton class under the node file; with the library's
+  primitive drawer beside it (B7).
+- [`cameras.md`](cameras.md): the cameras under the game's camera
+  modes: the graphics library's camera class, the 21 camera passes
+  (their set-up by type, render targets and surfaces, enabling, update
+  and the commands recorded at a pass's start and end) and the two
+  viewports with their 20 camera entries the camera modes write (B7).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
@@ -206,7 +216,6 @@ old performance notes to the end of `../native-renderer.md`.
 | `sub_825BA3F0` | `XInputGetCapabilities` | Native | Wrapper (r3 = user, r4 = flags, r5 = capabilities) for `XamInputGetCapabilities`; no longer called (see above). Ours: fixed capabilities (a wired gamepad, every button but the guide). |
 | `sub_825BA408` | `XInputSetState` | Native | Wrapper (r3 = user, r4 = vibration) for `XamInputSetState`; no longer called (see above). Ours: rumble through SDL, held until the next call. |
 | `sub_8215B4F8` | `Race::DrawStep` | Wrapped | The race's draw step (Draw message). Its running marks the pass as in a race. |
-| `sub_820A3978` | `CameraPass::Update` | Wrapped | Rebuilds a camera pass's view (+0x10) from its eye, target and up vector (+0x190, +0x1A0, +0x1B0), and its view-projection (+0x90 = view * projection at +0x50). Called several times per Draw for pass 0. Wrapped for `--log_camera_pass_records`. |
 | `sub_825953D0` | `Recorder::RecordObject` | Wrapped | The bulk per-object recorder, ~150 calls per pass in a race: records command 7 with vertex constants 0-8: world (r5) * camera view-projection (r4) in c0-c3, the world matrix in c4-c7 (for some objects a projective matrix instead), and the camera's world position in c8. The camera is often a stack copy, not a camera pass. |
 | `sub_825951E0` | | | Multiplies a world matrix and camera into a stack temporary; not recorded (likely a visibility test). |
 | `sub_8258FD48` | `Command::SetShaderConstants` | Wrapped | Render thread, command 7: r3 = payload, r4 = register count, r5 = stage << 24 \| type << 16 \| start << 8 \| count. Interpolation substitutes blended values here. |
@@ -468,14 +477,9 @@ old performance notes to the end of `../native-renderer.md`.
 | `sub_8258E5E0` | | Wrapped | Named in `--find_menu_selection`'s log (`ITC_MENU_SCAN_WRAP`): `Scene::Update`'s two screen calls and others. |
 | `sub_8258ED78` | | Wrapped | Named in `--find_menu_selection`'s log (`ITC_MENU_SCAN_WRAP`): `Scene::Update`'s two screen calls and others. |
 | `sub_82094B10` | | Wrapped | Named in `--find_menu_selection`'s log (`ITC_MENU_SCAN_WRAP`): `Scene::Update`'s two screen calls and others. |
-| `sub_8209F8A0` | | Wrapped | The race draw step's parts and the per-car update's callees, wrapped only to name which one advances per-frame state (`--find_per_frame_state`) and to skip one (`--debug_hide`) (`ITC_FRAME_STATE_WRAP`, `src/debug/frame_state_diff.cpp`). |
-| `sub_8209F900` | | Wrapped | The race draw step's parts and the per-car update's callees, wrapped only to name which one advances per-frame state (`--find_per_frame_state`) and to skip one (`--debug_hide`) (`ITC_FRAME_STATE_WRAP`, `src/debug/frame_state_diff.cpp`). |
 | `sub_820C5DE8` | | Wrapped | The race draw step's parts and the per-car update's callees, wrapped only to name which one advances per-frame state (`--find_per_frame_state`) and to skip one (`--debug_hide`) (`ITC_FRAME_STATE_WRAP`, `src/debug/frame_state_diff.cpp`). |
 | `sub_820F6068` | | Wrapped | The race draw step's parts and the per-car update's callees, wrapped only to name which one advances per-frame state (`--find_per_frame_state`) and to skip one (`--debug_hide`) (`ITC_FRAME_STATE_WRAP`, `src/debug/frame_state_diff.cpp`). |
 | `sub_82130978` | | Wrapped | The race draw step's parts and the per-car update's callees, wrapped only to name which one advances per-frame state (`--find_per_frame_state`) and to skip one (`--debug_hide`) (`ITC_FRAME_STATE_WRAP`, `src/debug/frame_state_diff.cpp`). |
-| `sub_8209F7A8` | | Wrapped | The race draw step's parts and the per-car update's callees, wrapped only to name which one advances per-frame state (`--find_per_frame_state`) and to skip one (`--debug_hide`) (`ITC_FRAME_STATE_WRAP`, `src/debug/frame_state_diff.cpp`). |
-| `sub_820A0958` | | Wrapped | The race draw step's parts and the per-car update's callees, wrapped only to name which one advances per-frame state (`--find_per_frame_state`) and to skip one (`--debug_hide`) (`ITC_FRAME_STATE_WRAP`, `src/debug/frame_state_diff.cpp`). |
-| `sub_820AA1A8` | | Wrapped | The race draw step's parts and the per-car update's callees, wrapped only to name which one advances per-frame state (`--find_per_frame_state`) and to skip one (`--debug_hide`) (`ITC_FRAME_STATE_WRAP`, `src/debug/frame_state_diff.cpp`). |
 | `sub_820C4EB8` | | Wrapped | The race draw step's parts and the per-car update's callees, wrapped only to name which one advances per-frame state (`--find_per_frame_state`) and to skip one (`--debug_hide`) (`ITC_FRAME_STATE_WRAP`, `src/debug/frame_state_diff.cpp`). |
 | `sub_820C4FB8` | | Wrapped | The race draw step's parts and the per-car update's callees, wrapped only to name which one advances per-frame state (`--find_per_frame_state`) and to skip one (`--debug_hide`) (`ITC_FRAME_STATE_WRAP`, `src/debug/frame_state_diff.cpp`). |
 | `sub_820DAA38` | | Wrapped | The race draw step's parts and the per-car update's callees, wrapped only to name which one advances per-frame state (`--find_per_frame_state`) and to skip one (`--debug_hide`) (`ITC_FRAME_STATE_WRAP`, `src/debug/frame_state_diff.cpp`). |
