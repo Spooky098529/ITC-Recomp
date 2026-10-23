@@ -84,8 +84,10 @@ ITC_FLAG_BOOL(native_ai_drivers, true, "ITC",
               "(its equal directions' steps, sub_8213BDF0 and sub_8213BE80, never seen in play, "
               "on the translated code), AiPath::AddCornersAt sub_8213E970, "
               "AiDriver::UpdateState2 sub_82145F48, AiDriver::UpdateState3 sub_821460C8, "
-              "AiDriver::UpdateState sub_82139AC8 (its state 6's step, sub_821462A0, never seen "
-              "in play, on the translated code)) natively instead of "
+              "AiDriver::UpdateState sub_82139AC8 (with its state 6's step, sub_821462A0, never "
+              "seen in play), AiDriver::LimitForCorner sub_8213A620, "
+              "AiDriver::UpdateTargetSpeed sub_8213AB98, AiDriver::UpdateSpeed sub_8213ACD0) "
+              "natively instead of "
               "through the translated code (the same words, bit for bit; checked by "
               "--run_harnesses=ai_drivers). Those "
               "reached only from native callers have no adapters, and the flag switches their "
@@ -331,19 +333,37 @@ extern "C" REX_FUNC(sub_8213E970) {
 
 // --- The states' speeds ---
 
-// r4 = &the target speed. State 6's step (never seen in play): the
-// translated one, tail-called as the original does.
-extern "C" REX_FUNC(sub_82139AC8) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_ai_drivers)) {
-    __imp__sub_82139AC8(ctx, base);
-    return;
+// r4 = &the target speed.
+ITC_AI_DRIVERS(82139AC8, ctx.r3.u64 = UpdateState(base, ctx.r3.u32, ctx.r4.u32))
+
+// --- The target speed (f1 LimitSpeedBlend's, when it ran) ---
+
+// r4 = &the scale, r5 = the corner record; the original's frame 192 bytes
+// down.
+ITC_AI_DRIVERS(8213A620, {
+  double f1 = 0;
+  bool f1_set = false;
+  ctx.r3.u64 = LimitForCorner(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32 - 192, &f1,
+                              &f1_set);
+  if (f1_set) {
+    ctx.f1.f64 = f1;
   }
-  ctx.fpscr.disableFlushMode();
-  uint64_t r3 = 0;
-  if (UpdateState(base, ctx.r3.u32, ctx.r4.u32, &r3) == 1) {
-    sub_821462A0(ctx, base);
-    return;
+})
+// r4 = &the scale; the original's frame 128 bytes down.
+ITC_AI_DRIVERS(8213AB98, {
+  double f1 = 0;
+  bool f1_set = false;
+  ctx.r3.u64 = UpdateTargetSpeed(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 128, &f1, &f1_set);
+  if (f1_set) {
+    ctx.f1.f64 = f1;
   }
-  ctx.r3.u64 = r3;
-}
+})
+// The original's frame 96 bytes down.
+ITC_AI_DRIVERS(8213ACD0, {
+  double f1 = 0;
+  bool f1_set = false;
+  ctx.r3.u64 = UpdateSpeed(base, ctx.r3.u32, ctx.r1.u32 - 96, &f1, &f1_set);
+  if (f1_set) {
+    ctx.f1.f64 = f1;
+  }
+})

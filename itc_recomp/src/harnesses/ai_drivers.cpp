@@ -238,15 +238,29 @@ ITC_NATIVE_STEP(NativeUpdateState2,
                 ctx.r3.u64 = ai::UpdateState2(base, ctx.r3.u32, ctx.r4.u32))
 ITC_NATIVE_STEP(NativeUpdateState3,
                 ctx.r3.u64 = ai::UpdateState3(base, ctx.r3.u32, ctx.r4.u32))
-void NativeUpdateState(PPCContext& ctx, uint8_t* base) {
-  ctx.fpscr.disableFlushMode();
-  uint64_t r3 = 0;
-  if (ai::UpdateState(base, ctx.r3.u32, ctx.r4.u32, &r3) == 1) {
-    sub_821462A0(ctx, base);
-    return;
+ITC_NATIVE_STEP(NativeUpdateState, ctx.r3.u64 = ai::UpdateState(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_STEP(NativeUpdateState6,
+                ctx.r3.u64 = ai::UpdateState6(base, ctx.r3.u32, ctx.r4.u32))
+
+// The target speed's steps: f1 LimitSpeedBlend's when it ran.
+#define ITC_NATIVE_F1_STEP(name, call)        \
+  void name(PPCContext& ctx, uint8_t* base) { \
+    ctx.fpscr.disableFlushMode();             \
+    double f1 = 0;                            \
+    bool f1_set = false;                      \
+    ctx.r3.u64 = call;                        \
+    if (f1_set) {                             \
+      ctx.f1.f64 = f1;                        \
+    }                                         \
   }
-  ctx.r3.u64 = r3;
-}
+ITC_NATIVE_F1_STEP(NativeLimitForCorner,
+                   ai::LimitForCorner(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                      ctx.r1.u32 - 192, &f1, &f1_set))
+ITC_NATIVE_F1_STEP(NativeUpdateTargetSpeed,
+                   ai::UpdateTargetSpeed(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 128, &f1,
+                                         &f1_set))
+ITC_NATIVE_F1_STEP(NativeUpdateSpeed,
+                   ai::UpdateSpeed(base, ctx.r3.u32, ctx.r1.u32 - 96, &f1, &f1_set))
 
 // Runs the recompiled version with the native flag off.
 template <GuestFunction recompiled>
@@ -402,6 +416,10 @@ enum Kind {
   kUpdateState2,
   kUpdateState3,
   kUpdateState,
+  kUpdateState6,
+  kLimitForCorner,
+  kUpdateTargetSpeed,
+  kUpdateSpeed,
 };
 
 }  // namespace
@@ -586,6 +604,14 @@ void AiDrivers(Context& h) {
        NativeUpdateState3, kUpdateState3, 3000},
       {"AiDriver::UpdateState (sub_82139AC8)", Original<__imp__sub_82139AC8>, NativeUpdateState,
        kUpdateState, 3000},
+      {"AiDriver::UpdateState6 (sub_821462A0, never seen in play)", Original<__imp__sub_821462A0>,
+       NativeUpdateState6, kUpdateState6, 3000},
+      {"AiDriver::LimitForCorner (sub_8213A620)", Original<__imp__sub_8213A620>,
+       NativeLimitForCorner, kLimitForCorner, 3000},
+      {"AiDriver::UpdateTargetSpeed (sub_8213AB98)", Original<__imp__sub_8213AB98>,
+       NativeUpdateTargetSpeed, kUpdateTargetSpeed, 3000},
+      {"AiDriver::UpdateSpeed (sub_8213ACD0)", Original<__imp__sub_8213ACD0>, NativeUpdateSpeed,
+       kUpdateSpeed, 3000},
   };
   const uint32_t area = memory::Alloc(kAreaBytes, 0);
   const uint32_t driver = area + kDriver, vehicle = area + kVehicle, io = area + kIo;
@@ -942,6 +968,7 @@ void AiDrivers(Context& h) {
         case kUpdateState2:
         case kUpdateState3:
         case kUpdateState:
+        case kUpdateState6:
         case kUpdateState4:
         case kUpdateState5:
         case kIsSettled: {
@@ -956,7 +983,7 @@ void AiDrivers(Context& h) {
                                                  : uint32_t(r.Next()));
           // States 2 and 3 tell gaps up to 100.0 apart, and beyond.
           const bool far = f.kind == kUpdateState2 || f.kind == kUpdateState3 ||
-                           f.kind == kUpdateState;
+                           f.kind == kUpdateState || f.kind == kUpdateState6;
           for (uint32_t i = 0; i < 7; i++) {
             guest::StoreU32(h.base, driver + 172 + 40 * i, RandomFloat(r, far ? 140.0f : 60.0f));
             guest::StoreU32(h.base, table + i * ai::kDriverBytes + 100, RandomFloat(r, 200.0f));
@@ -967,7 +994,17 @@ void AiDrivers(Context& h) {
           if (f.kind != kIsSettled) {
             floats.push_back({kIo, 1});
           }
-          if (f.kind == kUpdateState) {
+          if (f.kind == kUpdateState6) {
+            // The others' states (6 for the step), lengths and rates.
+            for (uint32_t i = 0; i < 7; i++) {
+              const uint32_t other = table + i * ai::kDriverBytes;
+              guest::StoreU32(h.base, other + 32, r.Below(2) ? 6 : r.Below(8));
+              guest::StoreU32(h.base, other + 124, RandomFloat(r, 5.0f));
+            }
+            guest::StoreU32(h.base, driver + 124, RandomFloat(r, 5.0f));
+            guest::StoreU32(h.base, driver + 136, RandomFloat(r, 3.0f));
+          }
+          if (f.kind == kUpdateState || f.kind == kUpdateState6) {
             guest::StoreU32(h.base, driver + 100, RandomFloat(r, 200.0f));
             guest::StoreU32(h.base, driver + 6088, RandomFloat(r, 200.0f));
             floats.push_back({kDriver + 6088, 1});
@@ -1373,6 +1410,73 @@ void AiDrivers(Context& h) {
           }
           break;
         }
+        case kLimitForCorner:
+        case kUpdateTargetSpeed:
+        case kUpdateSpeed: {
+          // Two corners' data in the vehicle's bytes (0x300 apart: +0 the
+          // table's count, +8 to +28 the speeds, +50 to +54 the entry,
+          // middle and exit, the table from +56) and up to three corner
+          // records (+5676); the path's entries (+5136), start (+5138) and
+          // look-ahead (+5142); the slice length.
+          guest::StoreU32(h.base, driver + 160, vehicle);  // read without a check
+          guest::StoreU32(h.base, area + kFile + 8, FloatBits(0.5f + float(r.Below(80)) / 8.0f));
+          for (uint32_t i = 0; i < 2; i++) {
+            const uint32_t data = vehicle + 0x300 * i;
+            guest::StoreU16(h.base, data + 0, uint16_t(r.Below(13)));
+            for (uint32_t k = 8; k <= 28; k += 4) {
+              guest::StoreU32(h.base, data + k, RandomFloat(r, 200.0f));
+            }
+            for (uint32_t k = 50; k <= 54; k += 2) {
+              guest::StoreU16(h.base, data + k, uint16_t(int32_t(r.Below(46)) - 5));
+            }
+            for (uint32_t k = 0; k < 13; k++) {
+              guest::StoreU32(h.base, data + 56 + 8 * k + 4, RandomFloat(r, 30.0f));
+            }
+          }
+          guest::StoreU16(h.base, driver + 5674, uint16_t(int32_t(r.Below(5)) - 1));
+          for (uint32_t i = 0; i < 3; i++) {
+            const uint32_t record = driver + 5676 + 44 * i;
+            const uint32_t data = vehicle + 0x300 * r.Below(2);
+            guest::StoreU32(h.base, record + 0, data);
+            guest::StoreU32(h.base, record + 4, data + 56);
+            guest::StoreU16(h.base, record + 10, uint16_t(int32_t(r.Below(41)) - 20));
+            guest::StoreU32(h.base, record + 16, FloatBits(r.Below(2) ? 1.0f : -1.0f));
+            floats.push_back({kDriver + 5676 + 44 * i + 20, 1});
+          }
+          guest::StoreU16(h.base, driver + 5648, uint16_t(int32_t(r.Below(84)) - 2));
+          guest::StoreU16(h.base, driver + 5650, uint16_t(r.Below(200)));
+          guest::StoreU16(h.base, driver + 5654, uint16_t(int32_t(r.Below(14)) - 2));
+          guest::StoreU32(h.base, driver + 144, RandomFloat(r, 30.0f));
+          guest::StoreU32(h.base, driver + 100, RandomFloat(r, 300.0f));
+          guest::StoreU32(h.base, driver + 6032, r.Below(3));
+          guest::StoreU16(h.base, driver + 6056, uint16_t(r.Below(4) ? int32_t(r.Below(300)) - 150
+                                                                     : int32_t(r.Next())));
+          guest::StoreU16(h.base, driver + 6058, uint16_t(r.Below(4) ? int32_t(r.Below(300)) - 150
+                                                                     : int32_t(r.Next())));
+          guest::StoreU32(h.base, driver + 6088, RandomFloat(r, 200.0f));
+          // UpdateTargetSpeed's flags and states (the others as UpdateState's
+          // cases).
+          const uint32_t vehicle_flags[] = {0,          0x20000000u, 0x40000000u, 0x04000000u,
+                                            0x08000000u, 0x10000000u, 0x80000000u,
+                                            uint32_t(r.Next())};
+          guest::StoreU32(h.base, vehicle + 6148, vehicle_flags[r.Below(8)]);
+          guest::StoreU32(h.base, driver + 32, r.Below(2) ? 0 : r.Below(8));
+          guest::StoreU16(h.base, driver + 40, uint16_t(r.Below(2) ? 0x7F : r.Next()));
+          const uint32_t current[] = {0xFFFFFFFFu, 0, 3, 6, 0x80000000u};
+          guest::StoreU32(h.base, driver + 480, current[r.Below(5)]);
+          guest::StoreU32(h.base, driver + 0, r.Below(8));
+          for (uint32_t i = 0; i < 7; i++) {
+            guest::StoreU32(h.base, driver + 172 + 40 * i, RandomFloat(r, 140.0f));
+            guest::StoreU32(h.base, table + i * ai::kDriverBytes + 100, RandomFloat(r, 200.0f));
+          }
+          drivers = table;
+          guest::StoreU32(h.base, io, r.Below(16) == 0 ? RandomFloat(r, 3.0f)
+                                                       : FloatBits(0.75f + float(r.Below(50)) / 100.0f));
+          r4 = io;  // the scale (LimitForCorner, UpdateTargetSpeed)
+          r5 = driver + 5676 + 44 * r.Below(3);  // the corner record (LimitForCorner)
+          floats.push_back({kDriver + 6088, 1});
+          break;
+        }
       }
       // Guest memory is one host mapping: the blocks copied as they are.
       const std::vector<uint8_t> inputs(h.base + area, h.base + area + kAreaBytes);
@@ -1430,7 +1534,8 @@ void AiDrivers(Context& h) {
         out[v].Word(uint32_t(t.r3.u64 >> 32));
         out[v].Word(t.r3.u32);
         if (f.kind == kSpeedOverDistance || f.kind == kCornerFactor || f.kind == kLimitSpeed ||
-            f.kind == kLimitSpeedBlend) {
+            f.kind == kLimitSpeedBlend || f.kind == kLimitForCorner ||
+            f.kind == kUpdateTargetSpeed || f.kind == kUpdateSpeed) {
           out[v].Double(t.f1.u64);
         }
       }

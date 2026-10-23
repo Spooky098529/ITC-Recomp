@@ -2256,22 +2256,51 @@ uint64_t UpdateState3(uint8_t* base, uint32_t driver, uint32_t speed) {
   return r3;
 }
 
-uint32_t UpdateState(uint8_t* base, uint32_t driver, uint32_t speed, uint64_t* r3) {
+uint64_t UpdateState6(uint8_t* base, uint32_t driver, uint32_t speed) {
+  ITC_NATIVE_RUNNING("sub_821462A0 AiDriver::UpdateState6");
+  PickTargetBehind(base, driver);
+  const uint32_t target = Load(base, driver + 480);
+  if (int32_t(target) < 0) {
+    return driver;
+  }
+  const uint64_t other = OfIndex(base, target);
+  const uint32_t theirs = uint32_t(other);
+  if (int32_t(Load(base, theirs + 32)) != 6) {
+    return other;
+  }
+  const uint32_t again = Load(base, driver + 480);
+  const double mine = Lfs(base, driver + 124);
+  const double their_length = Lfs(base, theirs + 124);
+  double f12 = Lfs(base, theirs + 100);
+  const double f0 = Lfs(base, 0x820021E8);
+  const double gap = Fneg(Lfs(base, again * 40 + driver + 172));
+  const double closing = Fsubs(Fnmsubs(mine, f0, gap), their_length);
+  if (!(closing < Lfs(base, kZero))) {
+    double scale = Lfs(base, driver + 100);
+    const double factor = Lfs(base, driver + 136);
+    const double hundred = Lfs(base, kHundred);
+    scale = scale > hundred ? Fdivs(hundred, scale) : Lfs(base, kOne);
+    f12 = Fmadds(Fmuls(scale, factor), closing, f12);
+  }
+  const double limit = Fmuls(f12, Lfs(base, 0x82002A3C));
+  if (Lfs(base, speed) > limit) {
+    Stfs(base, speed, limit);
+  }
+  return other;
+}
+
+uint64_t UpdateState(uint8_t* base, uint32_t driver, uint32_t speed) {
   ITC_NATIVE_RUNNING("sub_82139AC8 AiDriver::UpdateState");
-  *r3 = driver;
   switch (int32_t(Load(base, driver + 32))) {
     case 2:
-      *r3 = UpdateState2(base, driver, speed);
-      return 0;
+      return UpdateState2(base, driver, speed);
     case 3:
-      *r3 = UpdateState3(base, driver, speed);
-      return 0;
+      return UpdateState3(base, driver, speed);
     case 4:
       UpdateState4(base, driver, speed);
-      return 0;
+      return driver;
     case 5:
-      *r3 = UpdateState5(base, driver, speed);
-      return 0;
+      return UpdateState5(base, driver, speed);
     case 6: {
       double f0 = Fsubs(Lfs(base, driver + 100), Lfs(base, kTen));
       const double least = Lfs(base, 0x82008948);
@@ -2281,11 +2310,159 @@ uint32_t UpdateState(uint8_t* base, uint32_t driver, uint32_t speed, uint64_t* r
       if (f0 < Lfs(base, driver + 6088)) {
         Stfs(base, driver + 6088, f0);
       }
-      return 1;
+      return UpdateState6(base, driver, speed);
     }
     default:
-      return 0;
+      return driver;
   }
+}
+
+// --- The target speed ---
+
+namespace {
+// The ring entry k (from the path's start +5138, modulo 80) when k is below
+// the entries' count +5136, else 0.
+uint32_t RingEntry(uint8_t* base, uint32_t path, int32_t k) {
+  if (!(LoadS16(base, path + 5136) > k)) {
+    return 0;
+  }
+  const int32_t at = int32_t(uint32_t(LoadS16(base, path + 5138)) + uint32_t(k));
+  return path + uint32_t(at - (at / 80) * 80) * 64 + 16;
+}
+}  // namespace
+
+uint64_t LimitForCorner(uint8_t* base, uint32_t driver, uint32_t scale, uint32_t record,
+                        uint32_t frame, double* f1, bool* f1_set) {
+  ITC_NATIVE_RUNNING("sub_8213A620 AiDriver::LimitForCorner");
+  uint64_t r3 = driver;
+  CopyWord(base, scale, frame + 88);
+  const uint32_t ahead = driver + 5654;  // the look-ahead (the path's +5142)
+  const uint32_t data = Load(base, record + 0);
+  const double zero = Lfs(base, kZero);
+  Stfs(base, frame + 84, zero);
+  const uint32_t speeds = data + 12;
+  const uint32_t target = data + 8;
+  const int32_t offset = LoadS16(base, record + 10);
+  const uint32_t before = uint32_t(1 - offset);
+  const int32_t entries = LoadS16(base, driver + 5648);
+  const int32_t start = int32_t(uint32_t(LoadS16(base, data + 50)) + uint32_t(offset));
+  const int32_t middle_at = LoadS16(base, data + 52);
+  Stfs(base, record + 20, zero);
+  guest::StoreU32(base, frame + 92, before);
+  const int32_t end = int32_t(uint32_t(middle_at) + uint32_t(offset));
+  const uint32_t path = driver + 512;
+  if (start >= 0 && start < entries) {
+    const uint32_t entry = RingEntry(base, path, start);
+    if (entry != 0) {
+      double a, b;
+      if (Lfs(base, record + 16) < zero) {
+        a = Lfs(base, driver + 144);
+        b = Lfs(base, entry + 40);
+      } else {
+        a = Lfs(base, entry + 44);
+        b = Lfs(base, driver + 144);
+      }
+      Stfs(base, record + 20, Fsubs(a, b));
+    }
+  }
+  if (int32_t(Load(base, driver + 6032)) == 1) {
+    guest::StoreU32(base, record + 40, 0);
+  } else {
+    int32_t skill = LoadS16(base, driver + 6056);
+    if (skill < -100) {
+      skill = -100;
+    } else if (skill > 100) {
+      skill = 100;
+    }
+    guest::StoreU16(base, frame + 80, uint16_t(skill));
+    ClearCornerKind(base, record);
+    r3 = record;
+  }
+  if (entries > 1) {
+    LimitByCurve(base, driver, record, frame + 84, frame + 92, RingEntry(base, path, 1));
+    r3 = driver;
+    const int32_t look = LoadS16(base, ahead);
+    const int32_t next = look + 1;
+    if (entries > next) {
+      const uint32_t entry = RingEntry(base, path, next);
+      guest::StoreU32(base, frame + 92, uint32_t(look) + before);
+      LimitByCurve(base, driver, record, frame + 84, frame + 92, entry);
+    }
+  }
+  const auto blend = [&](uint32_t pair, uint32_t slices) {
+    guest::StoreU32(base, frame + 92, slices);
+    *f1 = LimitSpeedBlend(base, driver, frame + 88, pair, target, frame + 84, frame + 92,
+                          frame - 96);
+    *f1_set = true;
+    r3 = driver;
+  };
+  uint32_t last;
+  if (end >= 0) {
+    if (start > 0) {
+      blend(speeds, uint32_t(LoadS16(base, record + 10) - LoadS16(base, ahead)));
+    }
+    if (start < end) {
+      blend(speeds + 8, uint32_t(start - LoadS16(base, ahead)));
+    }
+    last = uint32_t(end - LoadS16(base, ahead));
+  } else {
+    if (int32_t(uint32_t(LoadS16(base, data + 54)) + uint32_t(LoadS16(base, record + 10))) < 0) {
+      return r3;
+    }
+    last = uint32_t(-end);
+  }
+  blend(speeds + 16, last);
+  return r3;
+}
+
+uint64_t UpdateTargetSpeed(uint8_t* base, uint32_t driver, uint32_t scale, uint32_t frame,
+                           double* f1, bool* f1_set) {
+  ITC_NATIVE_RUNNING("sub_8213AB98 AiDriver::UpdateTargetSpeed");
+  uint64_t r3 = driver;
+  const uint32_t flags = Load(base, driver + 16);
+  const uint32_t vehicle = Load(base, driver + 160);
+  uint32_t from;
+  if ((flags & 4) != 0) {
+    from = driver + 12;
+  } else {
+    // The vehicle's flags read whatever the vehicle, as the original does.
+    const uint32_t state = Load(base, vehicle + 6148);
+    if ((state & 0x60000000u) != 0) {
+      from = 0x82008930;  // 70.0
+    } else if ((state & 0x1C000000u) != 0) {
+      from = kZero;
+    } else {
+      from = 0x82008948;  // 73.0
+    }
+  }
+  CopyWord(base, from, driver + 6088);
+  if (Load(base, driver + 32) != 0) {
+    r3 = UpdateState(base, driver, driver + 6088);
+  }
+  if (LoadS16(base, driver + 5674) > 0) {
+    int32_t i = 0;
+    uint32_t record = driver + 5676;
+    do {
+      r3 = LimitForCorner(base, driver, scale, record, frame - 192, f1, f1_set);
+      i++;
+      record += 44;
+    } while (i < LoadS16(base, driver + 5674));
+  }
+  return r3;
+}
+
+uint64_t UpdateSpeed(uint8_t* base, uint32_t driver, uint32_t frame, double* f1, bool* f1_set) {
+  ITC_NATIVE_RUNNING("sub_8213ACD0 AiDriver::UpdateSpeed");
+  int32_t skill = LoadS16(base, driver + 6058);
+  if (skill < -100) {
+    skill = -100;
+  } else if (skill > 100) {
+    skill = 100;
+  }
+  const double f0 = Lfs(base, 0x82002CE8);
+  const double scale = Fmadds(IntToFloat(skill), f0, Lfs(base, kOne));
+  Stfs(base, frame + 80, scale);
+  return UpdateTargetSpeed(base, driver, frame + 80, frame - 128, f1, f1_set);
 }
 
 }  // namespace ai_drivers
