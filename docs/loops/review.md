@@ -83,6 +83,33 @@ When the user has reviewed a run's section, its heading gets
   "probably" for mode 1's passes 4-9 as a cube map's faces, the entries'
   +68 as a focal length in pixels; `CameraPass::RecordBegin`,
   `RecordEnd` and `Viewport::UpdateEntries` not read in detail.
+  Migration 1's 20 rows (81d1c0c..1736a63; `--native_cameras`; 1
+  Merged, `sub_8209F7DC`; `CameraPass::SetZoom`'s adapter removed). For
+  review: interpolation's hooks kept: `CameraPass::Update` builds its
+  view at the original's stack address (r1 + 128, the copy note's key)
+  and notes the copy and multiply under the original's return addresses
+  (0x820A3D18, 0x820A3D90), through a new
+  `interpolation::BlendState_OnCopy` beside `BlendState_OnMultiply`
+  (`--log_blend_state`: the same blend counts with the flag on and off);
+  the `ITC_FRAME_STATE_WRAP` wrappers of RenderTarget, Disable and
+  EnableForView written out with the native work inside, and the
+  `--log_camera_pass_records` wrapper calling `hooks::CameraPassUpdate`
+  (new `src/hooks/cameras.h`); vtable slots go to the plain C++ only
+  when they hold the library's function (always in play); BuildProjection,
+  SetViewportSize and Update run the original when the stack pointer
+  isn't 16-byte aligned; RecordViewport and RecordClear keep guest calls
+  (the scene's getters, the render queue) and run the original with the
+  command list's diagnostics on, and where a chunk wouldn't fit (never in
+  play) call the scene's getters once more than the original;
+  float-register words copied as bits (signaling NaNs kept, as the
+  translation does); `Viewports::Release` native only under
+  `--native_heap`; the harness changes live game globals (the mode, the
+  passes' enabled words, pass 0's near plane, pass 4's field of view,
+  the viewports and scene pointers, the open-chunk count) and puts them
+  back after each run; the SetZoom adapter removal (7b4c8b1) was built
+  and raced only with the next commit; two functions named
+  `RecordClear` (`sub_8209FA38` here, `sub_825A18D8` in
+  `model-animation.md`).
 
 ## Run 2026-10-23 11:06 (`b7-loop-23-10-26-2`)
 
