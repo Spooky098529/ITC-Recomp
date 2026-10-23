@@ -92,6 +92,22 @@ When the user has reviewed a run's section, its heading gets
   links 6 and 8 as the left and right neighbors, the two point tables
   as the road's edges, `LinkDistance`, `PathDistance`, `ToMainRoad`'s
   end not read in detail.
+  Migration 1's rows (9c3cbaa..7785364; `--native_track_route`; 33
+  rows changed, 17 Native, `sub_820F985C` Merged). For review: the map
+  corrected for `sub_820F9448` (every linked section's lanes added up;
+  kinds 1, 3 and 4 only not taken), `sub_820F9600` (taken when it's the
+  only match), `sub_820FB030` (the shoulders start at half the width
+  plus 0.5); kept on the recompiled code: SlicePoint's points 5 to 16
+  (`sub_820F8FA0`), the unseen callers `sub_820F9DD0` and `sub_820FB2B0`;
+  stack temporaries mostly not written (nothing reads them after the
+  return), but Point and AlongSlice still write their position copy at
+  the original's frame + 80; Distance's r3 kept as the original leaves
+  it; new helpers inside `src/track_route/track_route.cpp`, built with
+  `-ffp-model=strict -ffp-contract=off`. Attract races with all
+  harnesses now reach 18 s at 30 ticks/s inside `attract_race.sh 25`
+  (19 before): the harnesses take ~4.9 s before the race; without them
+  23 s as before (`itc_1084`, checked by the lead). The loop's ~20 s
+  check may want a longer timeout for harness runs (the user's call).
 
 ## Run 2026-10-23 13:44 (`b7-loop-23-10-26-3`)
 

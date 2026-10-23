@@ -19,8 +19,10 @@ see in a drive, from every run: `to-drive.md`.
   wait on `atexit`.
 - Subsystem 3 of 3: the course's route (picked: ready groups, runs
   every update, blocks `TrackPosition::Init` and `Update`), mapped in
-  e211173 (40 rows, 15 ready groups); step: migration 1 (a migration
-  agent running).
+  e211173 (40 rows, 15 ready groups); migration 1 done
+  (9c3cbaa..7785364, five batches; ready groups left); step:
+  validation of migration 1 (a validation agent running), then
+  migration 2.
 
 ## Done
 
@@ -65,5 +67,11 @@ This run's groups: `expected-differences.md` (the "17:22 run" lines).
   "(expected to differ)" groups added).
 - After mapping the course's route: ours 1181, work left 5576 (wrapped
   123, known 601, unknown 4852).
+- After the course's route's migration 1: ours 1215, work left 5542
+  (wrapped 123, known 567, unknown 4852).
+  Race 18 s (`itc_1083`) with `--run_harnesses=all`, 0 errors, every
+  harness 0 differing (none added); 18 s is the harnesses' ~4.9 s inside
+  the 25 s timeout: without them 23 s (`itc_1084`), accepted by the
+  lead.
 
 ## Stopped
