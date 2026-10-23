@@ -13,6 +13,19 @@ function goes from this list when a log shows its `native running
 (game):` line (say which log in the commit). A run with nothing left
 here loses its heading.
 
+## Run 2026-10-23 20:22 (`b7-loop-23-10-26-5`)
+
+Not in the attract race or the replay (`itc_1124`, `itc_1125`, ok):
+
+- `sub_82101760` RaceTime::FromTicks (`ai-drivers.md`)
+- `sub_8213ADF8` AiDrivers::AllSettled (`ai-drivers.md`)
+- `sub_8213C358` AiPath::PreferredSections (`ai-drivers.md`)
+- `sub_82145118` AiDriver::PickTarget (`ai-drivers.md`)
+- `sub_821451B8` AiDriver::PickTargetBehind (`ai-drivers.md`)
+- `sub_82146220` AiDriver::UpdateState4 (`ai-drivers.md`)
+- `sub_82146388` AiDriver::UpdateState5 (`ai-drivers.md`)
+- `sub_82146408` AiDriver::IsSettled (`ai-drivers.md`)
+
 ## Run 2026-10-23 17:22 (`b7-loop-23-10-26-4`)
 
 Not in the attract race or the replay (`itc_1043`, `itc_1044`, ok):

@@ -19,7 +19,9 @@ file's history. What's left to see in a drive, from every run:
   1eeb084 from the route users' lead; 148 rows, 67 ready groups; the
   race states' route users went back to `leads.md`). Migration 1
   (c94d6be..91b8da2): 74 ours, 24 Native, `--native_ai_drivers`; 47
-  ready groups left. Step: validation of migration 1 (agent running).
+  ready groups left. Validated (74 of 74 harness lines; `itc_1124`,
+  `itc_1125`, replay ok; 8 to drive). Step: migration 2 (agent
+  running).
 
 ## Done
 
