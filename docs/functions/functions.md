@@ -127,6 +127,12 @@ Rows not yet moved stay in the table below. So far:
   emitter each, stopped and removed, the listener and the categories)
   and its thin wrapper over XACT and X3DAudio, with the libraries'
   entry points it calls (B7; the rest of XACT and X3DAudio is a lead).
+- [`xact.md`](xact.md): XACT, the 360's sound library linked into the
+  game, as far as the game's wrapper reaches it in play: the engine
+  (start-up, DoWork, the audio callback, categories), its global
+  settings and variables, sound banks, wave banks, cues, sounds and
+  faders, and where it meets XAudio and the kernel (B7; the tracks,
+  waves and voices below are a lead).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what

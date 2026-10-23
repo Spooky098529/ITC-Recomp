@@ -29,9 +29,10 @@ see "How the game's audio works" in `../native-audio.md`). Three layers:
   `XACT3CreateEngine`, `sub_825BF5C8`, and everything its vtables reach
   at about `825BF000`-`825D5000`), X3DAudio (`82480710`-`82481A00`)
   and XAudio (`sub_8245A760`, which XACT's start-up also calls). Only
-  the entry points the wrapper calls directly have rows here; the rest
-  of XACT and X3DAudio seen in play (about 250 and 40 functions, mostly
-  reached through vtables) is a lead in `../loops/leads.md`.
+  the entry points the wrapper calls directly have rows here; the XACT
+  methods the wrapper reaches through its vtables, and what they call,
+  are in [`xact.md`](xact.md); the rest of XACT and X3DAudio seen in
+  play is in `../loops/leads.md`.
 
 The game's 3D path (a `Sound` with its 3D byte +8 set, which runs
 X3DAudio's calculation through `sub_8259D160` and hands the result to
@@ -171,8 +172,8 @@ run it after changing either, on any branch.
 | `sub_82117578` | `Sound::IsCue` | Overridden | r4 = a cue index's address: 1 when it equals +20. From `AudioManager::StopCue` and `IsCuePlaying`. Native in `src/sound_cues/sound_cues.cpp` (`SoundIsCue`) behind `--native_sound_cues` (adapter in `src/hooks/sound_cues.cpp`, harness `sound_cues`, its sounds group); runs in attract races. |
 | `sub_82117630` | `Sound::~Sound` | | r3 = the `Sound`: the emitter's cue destroyed (`sub_8259CBE8`) and the emitter deleted (`sub_821175D8`). From `sub_82118490`. |
 | `sub_821175D8` | | | r3 = a slot holding a 300-byte emitter: when not null, its cue destroyed (`sub_8259CBE8`), `operator delete`, and the slot cleared. From `Sound::~Sound`. |
-| `sub_8259C9B0` | `Emitter::Emitter` | Overridden | r3 = the emitter (300 bytes): +0 the cue (null); an X3DAudio emitter at +8 in the 360's layout (no inner radius): +8 the cone (→ +100), front (0, 0, 1) at +12, top (0, 1, 0) at +24, position and velocity 0 at +36 and +48, one channel (+60), radius 0, the azimuths at +68 (→ +132, one 0.0), no curves (+72 to +88), distance and Doppler scalers 1 (+92, +96); the cone at +100 (0, 0, 0, 1, 0, 1, 0, 1: probably no cone). +136 to +300: a block handed to the cue with each prepare (probably the cue's 3D settings: six (index, 1.0) pairs from +164, counts and flags up to +296). Constants `0x82000A34` (probably 0.0) and `0x82000A30` (1.0). From `Sound::Sound`. Not read in detail past +136. Native in `src/sound_cues/sound_cues.cpp` (`EmitterConstruct`) behind `--native_sound_cues` (adapter in `src/hooks/sound_cues.cpp`, harness `sound_cues`, its sounds group); runs in attract races. |
-| `sub_8259CB48` | `Emitter::Prepare` | | r3 = the emitter, r4 = a sound bank holder, r5 = a 16-bit cue index's address: when the holder has a sound bank (+8) and the emitter no cue, the bank's slot +4 (probably Prepare: the index, flags 0, time 0, the cue into +0); on success the cue's slot +60 with the emitter's +136; returns 1, else 0. From `Sound::Sound` and `Sound::Update`. |
+| `sub_8259C9B0` | `Emitter::Emitter` | Overridden | r3 = the emitter (300 bytes): +0 the cue (null); an X3DAudio emitter at +8 in the 360's layout (no inner radius): +8 the cone (→ +100), front (0, 0, 1) at +12, top (0, 1, 0) at +24, position and velocity 0 at +36 and +48, one channel (+60), radius 0, the azimuths at +68 (→ +132, one 0.0), no curves (+72 to +88), distance and Doppler scalers 1 (+92, +96); the cone at +100 (0, 0, 0, 1, 0, 1, 0, 1: probably no cone). +136 to +300: a block handed to the cue with each prepare (its first 14 bytes are written by `XACTCue::GetProperties`, `xact.md`; the rest, six (index, 1.0) pairs from +164, counts and flags up to +296, not read). Constants `0x82000A34` (probably 0.0) and `0x82000A30` (1.0). From `Sound::Sound`. Not read in detail past +136. Native in `src/sound_cues/sound_cues.cpp` (`EmitterConstruct`) behind `--native_sound_cues` (adapter in `src/hooks/sound_cues.cpp`, harness `sound_cues`, its sounds group); runs in attract races. |
+| `sub_8259CB48` | `Emitter::Prepare` | | r3 = the emitter, r4 = a sound bank holder, r5 = a 16-bit cue index's address: when the holder has a sound bank (+8) and the emitter no cue, the bank's slot +4 (probably Prepare: the index, flags 0, time 0, the cue into +0); on success the cue's slot +60 with the emitter's +136 (`XACTCue::GetProperties`, `sub_825C5790` in `xact.md`, which writes the block's first 14 bytes: the sound's properties, not 3D settings); returns 1, else 0. From `Sound::Sound` and `Sound::Update`. |
 | `sub_8259CC38` | `Emitter::Play` | | The cue's (+0) slot +0 (probably Play), when there is a cue. From `Sound::Update`. |
 | `sub_8259CC58` | `Emitter::Stop` | | The cue's slot +4 with 1 (probably Stop, at once), when there is a cue. From `Sound::Stop`. |
 | `sub_8259CCA0` | `Emitter::IsNotStopped` | | The cue's slot +8 (probably GetState) into a word: 0 when bit 0x20 (probably stopped) is set, else 1; 1 with no cue. From `Sound::Update` and `Sound::IsStopped`. |
