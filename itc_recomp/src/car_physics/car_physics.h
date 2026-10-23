@@ -522,6 +522,31 @@ bool CollisionWorldRemovePairsByGroups(uint8_t* base, uint32_t object, uint32_t 
 // (RemovePairsOf; false as it, with the rest done: the original
 // RemovePairsOf then).
 bool CollisionWorldRemoveObject(uint8_t* base, uint32_t object, uint32_t* r3);
+// The collision world's teardown (src/car_physics/collision_world.cpp),
+// switched by --native_collision_world with its only caller,
+// TrackCollision::Unload (src/track_collision/). Operator delete through
+// the C runtime's heap over the allocation layer, so the caller calls these
+// only while --native_heap routes the game's heap to the layer.
+//
+// CollisionObject::~CollisionObject (sub_820B7B40): +0 = the vtable
+// 0x82002A94, +268 = 0, the shape record +32 destroyed
+// (CollisionShape::~CollisionShape).
+void CollisionObjectDestruct(uint8_t* base, uint32_t object);
+// CollisionObject::DeletingDestructor (sub_820B9110, the vtable's slot 0):
+// with bit 0x2 of `flags` an array (its count at r3 - 16, 320 bytes each)
+// destroyed from the last and, with bit 0x1, its block (r3 - 16) freed
+// (operator delete[]); else the one object, freed with operator delete.
+// Returns the original's r3 (the block or the object).
+uint32_t CollisionObjectDeletingDestructor(uint8_t* base, uint32_t object, uint32_t flags);
+// Whether CollisionWorld::Destroy can run natively: a world, its blocks the
+// heap's (or 0), its objects' slot 0 CollisionObject::DeletingDestructor
+// and their shape records' copies deletable.
+bool CollisionWorldDestroyable(uint8_t* base);
+// CollisionWorld::Destroy (sub_820B86B8): the objects (+16) deleted through
+// the first's slot 0 with r4 = 3 (or, with a count of 0, their block freed),
+// the blocks +36 and +48 freed, the world freed, 0x826C2D88 = 0; each
+// pointer zeroed after its block.
+void CollisionWorldDestroy(uint8_t* base);
 // CollisionObject::AddGroups (sub_820B7CC8): the bits not in +248 set
 // there, and with any in the low 24 bits, AddPairs with them. Returns the
 // original's r3.

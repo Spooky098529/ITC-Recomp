@@ -140,6 +140,9 @@ bool BoxClone(uint8_t* base, uint32_t box, uint32_t memory, uint32_t frame, uint
 // (or the two are one block), the template isn't a box, or the clones'
 // allocation would fail. `frame`: SetUp's 128 bytes.
 bool CollisionShapeDestroy(uint8_t* base, uint32_t record, uint32_t* r3);
+// Whether CollisionShapeDestroy runs natively for the record (its copies
+// boxes the layer gave, or 0, and not one block).
+bool CollisionShapeDestroyable(uint8_t* base, uint32_t record);
 bool CollisionShapeSetUp(uint8_t* base, uint32_t record, uint32_t shape, uint32_t matrix,
                          uint32_t memory, uint32_t frame);
 // CollisionShape::CurrentCenter (sub_820BAB20) and PreviousCenter

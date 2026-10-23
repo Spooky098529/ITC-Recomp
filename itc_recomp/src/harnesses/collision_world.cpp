@@ -12,6 +12,7 @@
 #include "base/flags.h"
 #include "base/log.h"
 #include "hooks/heap.h"
+#include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
 #include "collision/collision.h"
 #include "track_collision/track_collision.h"
@@ -139,6 +140,14 @@ ITC_NATIVE_STEP(NativeAddCell,
 ITC_NATIVE_STEP(NativeAddHit, ctx.r3.u64 = tc::WallQueryAddHit(base, ctx.r3.u32, ctx.r4.u32))
 ITC_NATIVE_STEP(NativeIntersect2D,
                 ctx.r3.u64 = tc::SegmentsIntersect2D(base, ctx.r3.u32, ctx.r4.u32))
+int unload_native_cases = 0;
+void NativeUnload(PPCContext& ctx, uint8_t* base) {
+  if (!tc::TrackCollisionUnload(base)) {
+    __imp__sub_820FEFB0(ctx, base);
+    return;
+  }
+  unload_native_cases++;
+}
 ITC_NATIVE_STEP(NativeRouteOnLoaded, tc::TrackRouteOnLoaded(base, ctx.r6.u32); ctx.r3.u64 = 12)
 ITC_NATIVE_STEP(NativeGroundCallback,
                 ctx.r3.u64 = tc::TrackCollisionGroundCallback(base, ctx.r3.u32, ctx.r4.u32,
@@ -447,6 +456,129 @@ void LifetimeCases(Context& h, uint32_t area) {
     }
     results.Report();
   }
+}
+
+// --- TrackCollision::Unload: a collision world (its objects, 0 to 3 of
+// them with their shape records' two box copies, or none; the blocks +36
+// and +48), the mesh's and the route's pages and the object at 0x826C5B28,
+// all from the allocation layer, built anew for each side and installed
+// in the globals (put back after). Compared: the globals with the given
+// blocks' addresses replaced by their number, and which blocks were freed;
+// the blocks left are freed after each side. Only with --native_heap (the
+// adapter's condition). ---
+
+void UnloadCases(Context& h) {
+  if (!hooks::NativeHeapActive()) {
+    ITC_LOG_INFO("harness: collision_world: Unload skipped (--native_heap off)");
+    return;
+  }
+  constexpr uint32_t kGlobals = 0x826C5B10, kGlobalsBytes = 28;  // route, mesh, the object
+  uint8_t saved[kGlobalsBytes];
+  std::memcpy(saved, h.base + kGlobals, kGlobalsBytes);
+  const uint32_t saved_world = guest::LoadU32(h.base, kWorldPointer);
+  Results results("TrackCollision::Unload (sub_820FEFB0)");
+  for (uint64_t seed = 0; seed < 60; seed++) {
+    std::vector<uint8_t> result[2];
+    for (int v = 0; v < 2; v++) {
+      Random r = Seeded(seed * 61 + 19);
+      PPCContext t = CallContext(h);
+      std::vector<uint32_t> heap, pages;
+      auto block = [&](uint32_t size, bool array) {
+        const auto b = array ? memory::crt::OperatorNewArray(h.base, size)
+                             : memory::crt::OperatorNew(h.base, size);
+        heap.push_back(*b);
+        for (uint32_t i = 0; i < size; i += 4) {
+          guest::StoreU32(h.base, *b + i, uint32_t(r.Next()));
+        }
+        return *b;
+      };
+      auto page = [&](uint32_t size) {
+        const uint32_t p = memory::AllocPages(size, 4096);
+        pages.push_back(p);
+        return p;
+      };
+      const uint32_t world = block(0x100, false);
+      if (r.Below(8) == 0) {
+        guest::StoreU32(h.base, world + 16, 0);
+      } else {
+        const uint32_t count = r.Below(4);
+        const uint32_t objects = block(16 + 320 * count, true) + 16;
+        guest::StoreU32(h.base, objects - 16, count);
+        guest::StoreU32(h.base, world + 16, objects);
+        for (uint32_t i = 0; i < count; i++) {
+          const uint32_t object = objects + 320 * i;
+          guest::StoreU32(h.base, object + 0, 0x82002A94);
+          for (uint32_t at : {36u, 40u}) {
+            uint32_t copy = 0;
+            if (r.Below(4) != 0) {
+              copy = block(496, false);
+              const uint32_t corners = h.data;
+              for (uint32_t k = 0; k < 4; k++) {
+                guest::StoreFloat(h.base, corners + 4 * k, k == 3 ? 0.0f : -1.0f);
+                guest::StoreFloat(h.base, corners + 16 + 4 * k, k == 3 ? 0.0f : 1.0f);
+              }
+              collision::BoxConstruct(h.base, copy, corners, corners + 16, t.r1.u32 - 4096);
+            }
+            guest::StoreU32(h.base, object + at, copy);
+          }
+        }
+      }
+      guest::StoreU32(h.base, world + 36, r.Below(4) == 0 ? 0 : block(64, true));
+      guest::StoreU32(h.base, world + 48, r.Below(4) == 0 ? 0 : block(64, true));
+      guest::StoreU32(h.base, kWorldPointer, world);
+      const uint32_t scratch = page(8);
+      guest::StoreU32(h.base, scratch + 0, 0);
+      guest::StoreU32(h.base, scratch + 4, page(8192));
+      guest::StoreU32(h.base, tc::kMesh + 0, scratch);
+      guest::StoreU32(h.base, tc::kMesh + 4, page(0x10000));
+      guest::StoreU32(h.base, tc::kMesh + 8, 2);
+      guest::StoreU32(h.base, tc::kRoute + 0, page(0x10000));
+      guest::StoreU32(h.base, tc::kRoute + 4, uint32_t(r.Next()));
+      guest::StoreU32(h.base, tc::kRoute + 8, 2);
+      guest::StoreU32(h.base, 0x826C5B28, r.Below(4) == 0 ? 0 : block(4, false));
+      (v == 0 ? Original<__imp__sub_820FEFB0> : NativeUnload)(t, h.base);
+      auto name = [&](uint32_t w) {
+        for (size_t i = 0; i < heap.size(); i++) {
+          if (w == heap[i]) {
+            return uint32_t(0xB10C0000u + i);
+          }
+        }
+        for (size_t i = 0; i < pages.size(); i++) {
+          if (w == pages[i]) {
+            return uint32_t(0x9A9E0000u + i);
+          }
+        }
+        return w;
+      };
+      std::vector<uint8_t>& out = result[v];
+      Append32(out, name(guest::LoadU32(h.base, kWorldPointer)));
+      for (uint32_t i = 0; i < kGlobalsBytes; i += 4) {
+        Append32(out, name(guest::LoadU32(h.base, kGlobals + i)));
+      }
+      for (uint32_t b : heap) {
+        const bool left = memory::IsHeapBlock(b);
+        out.push_back(left ? 1 : 0);
+      }
+      for (uint32_t p : pages) {
+        const bool left = memory::IsPages(p);
+        out.push_back(left ? 1 : 0);
+        if (left) {
+          memory::FreePages(p);
+        }
+      }
+      for (uint32_t b : heap) {
+        if (memory::IsHeapBlock(b)) {
+          memory::crt::Free(b);
+        }
+      }
+      guest::StoreU32(h.base, kWorldPointer, saved_world);
+      std::memcpy(h.base + kGlobals, saved, kGlobalsBytes);
+    }
+    results.Check(result[0], result[1], fmt::format("seed {}", seed));
+  }
+  results.Report();
+  ITC_LOG_INFO("harness coverage: TrackCollision::Unload (sub_820FEFB0): {} of 60 cases native",
+               unload_native_cases);
 }
 
 // --- The ground: a mesh built in the area (two sections of kSlices
@@ -1177,6 +1309,7 @@ void CollisionWorld(Context& h) {
   const uint32_t area = memory::Alloc(kAreaBytes, 0);
   SmallCases(h, area);
   LifetimeCases(h, area);
+  UnloadCases(h);
   WallCases(h, area);
   GroundCases(h, area);
   CollisionWorldWalls(h, area);

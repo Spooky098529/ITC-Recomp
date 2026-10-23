@@ -15,8 +15,9 @@ ITC_FLAG_BOOL(native_collision_world, true, "ITC",
               "(docs/functions/collision-world.md: sub_8228F090, Race::RacerCount sub_821705F8, "
               "Racers::CarsCollide sub_820FEFF8, TrackCollision::ResetWorld sub_820FEAF8; the "
               "mesh's and the route's lifetime, sub_820F68E8 with sub_820F6898, sub_820F6940, "
-              "sub_820F8600, sub_820F8618 (those allocating or freeing only while --native_heap "
-              "routes the game's VirtualAlloc to the allocation layer), sub_820F69B0; the "
+              "sub_820F8600, sub_820F8618, TrackCollision::Unload sub_820FEFB0 with the collision "
+              "world's teardown, sub_820B86B8, sub_820B9110, sub_820B7B40 (those allocating or "
+              "freeing only while --native_heap routes the game's VirtualAlloc to the allocation layer), sub_820F69B0; the "
               "mesh's lookups, sub_820F6A08; the ground, sub_820F7AA0 with sub_820F72F8, "
               "sub_820F7468, sub_820F7590, sub_820F7818, sub_820F6E18, and "
               "TrackCollision::Ground sub_820FE8F8, GroundCallback sub_820FEAB0 and GroundHits "
@@ -32,7 +33,8 @@ ITC_FLAG_BOOL(native_collision_world, true, "ITC",
               "sub_820F7468, sub_820F7590, sub_820F7818, sub_820F6E18, sub_820F6A38, sub_820F6BE8, "
               "sub_820F71B0, sub_820F7EE8, sub_820F7E30, sub_820F7D70, sub_820F6C88, sub_820FC110, "
               "sub_820FE8F8, sub_820FC870, sub_820FC2E0, sub_820FC658, sub_820FC188, sub_820FD6D8, "
-              "sub_820FC3C8, sub_820FC900, sub_820FDC18, sub_820FDF38");
+              "sub_820FC3C8, sub_820FC900, sub_820FDC18, sub_820FDF38, "
+              "sub_820B86B8, sub_820B9110, sub_820B7B40");
 
 // Defines an adapter: `body` uses `ctx` and `base`.
 #define ITC_COLLISION_WORLD(address, body)   \
@@ -83,6 +85,12 @@ ITC_COLLISION_WORLD_PAGES(820F8618, uint32_t r3 = 0;
                             __imp__sub_820F8618(ctx, base);
                             return;
                           } ctx.r3.u64 = r3)
+// No arguments; r3 isn't kept (its caller doesn't read it). A block to free
+// that isn't the layer's: the original.
+ITC_COLLISION_WORLD_PAGES(820FEFB0, if (!TrackCollisionUnload(base)) {
+  __imp__sub_820FEFB0(ctx, base);
+  return;
+})
 // Archive::Load's callback: r6 = the mesh.
 ITC_COLLISION_WORLD(820F69B0, TrackMeshOnLoaded(base, ctx.r6.u32))
 

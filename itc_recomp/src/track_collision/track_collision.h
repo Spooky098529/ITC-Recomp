@@ -271,5 +271,15 @@ void TrackRoutePrepare(uint8_t* base, uint32_t route);
 // False, with nothing done, where the file isn't the allocation layer's (0
 // among them). `r3`: what the original leaves there.
 bool TrackRouteFree(uint8_t* base, uint32_t route, uint32_t* r3);
+// Whether TrackMesh::Free and TrackRoute::Free run natively (their blocks
+// the layer's pages, or, for the mesh, 0).
+bool TrackMeshFreeable(uint8_t* base, uint32_t mesh);
+bool TrackRouteFreeable(uint8_t* base, uint32_t route);
+// TrackCollision::Unload (sub_820FEFB0): CollisionWorld::Destroy (the car
+// physics' plain C++), the mesh and the route freed, the object at
+// 0x826C5B28 deleted (the pointer kept). False, with nothing done, where a
+// block to free isn't the allocation layer's (or there's no world). Only
+// while --native_heap routes the game's heap and VirtualAlloc to the layer.
+bool TrackCollisionUnload(uint8_t* base);
 
 }  // namespace track_collision

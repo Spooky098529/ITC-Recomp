@@ -8,6 +8,7 @@
 #include "base/log.h"
 #include "c_runtime/strings.h"
 #include "collision/collision.h"
+#include "memory/c_runtime_heap.h"
 #include "vehicle_accessors/vectors.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
@@ -616,6 +617,93 @@ bool CollisionObjectRemoveGroups(uint8_t* base, uint32_t object, uint32_t bits,
   }
   *removed_groups = removed;
   return CollisionWorldRemovePairsByGroups(base, object, removed, r3);
+}
+
+namespace {
+
+constexpr uint32_t kObjectVtable = 0x82002A94;
+constexpr uint32_t kObjectDeletingDestructor = 0x820B9110;
+constexpr uint32_t kObjectBytes = 320;
+
+}  // namespace
+
+void CollisionObjectDestruct(uint8_t* base, uint32_t object) {
+  ITC_NATIVE_RUNNING("sub_820B7B40 CollisionObject::~CollisionObject");
+  guest::StoreU32(base, object + 0, kObjectVtable);
+  guest::StoreU32(base, object + 268, 0);
+  uint32_t r3 = 0;
+  collision::CollisionShapeDestroy(base, object + 32, &r3);
+}
+
+uint32_t CollisionObjectDeletingDestructor(uint8_t* base, uint32_t object, uint32_t flags) {
+  ITC_NATIVE_RUNNING("sub_820B9110 CollisionObject::DeletingDestructor");
+  if ((flags & 0x2) == 0) {
+    CollisionObjectDestruct(base, object);
+    if ((flags & 0x1) != 0) {
+      memory::crt::OperatorDelete(object);
+    }
+    return object;
+  }
+  const uint32_t block = object - 16;
+  const uint32_t count = guest::LoadU32(base, block);
+  uint32_t at = count * kObjectBytes + object;
+  for (int32_t i = int32_t(count) - 1; i >= 0; i--) {
+    at -= kObjectBytes;
+    CollisionObjectDestruct(base, at);
+  }
+  if ((flags & 0x1) != 0) {
+    memory::crt::OperatorDeleteArray(block);
+  }
+  return block;
+}
+
+bool CollisionWorldDestroyable(uint8_t* base) {
+  const uint32_t world = guest::LoadU32(base, kWorldPointer);
+  if (world == 0) {
+    return false;
+  }
+  const uint32_t objects = guest::LoadU32(base, world + 16);
+  if (objects != 0) {
+    const uint32_t block = objects - 16;
+    if (!collision::Deletable(block)) {
+      return false;
+    }
+    const uint32_t count = guest::LoadU32(base, block);
+    if (count != 0) {
+      const uint32_t vtable = guest::LoadU32(base, objects);
+      if (vtable != kObjectVtable || guest::LoadU32(base, vtable) != kObjectDeletingDestructor) {
+        return false;
+      }
+      for (int32_t i = int32_t(count) - 1; i >= 0; i--) {
+        if (!collision::CollisionShapeDestroyable(base, objects + kObjectBytes * uint32_t(i) + 32)) {
+          return false;
+        }
+      }
+    }
+  }
+  return collision::Deletable(guest::LoadU32(base, world + 36)) &&
+         collision::Deletable(guest::LoadU32(base, world + 48)) && collision::Deletable(world);
+}
+
+void CollisionWorldDestroy(uint8_t* base) {
+  ITC_NATIVE_RUNNING("sub_820B86B8 CollisionWorld::Destroy");
+  const uint32_t objects = guest::LoadU32(base, guest::LoadU32(base, kWorldPointer) + 16);
+  if (objects != 0) {
+    const uint32_t block = objects - 16;
+    if (guest::LoadU32(base, block) != 0) {
+      // The first object's slot 0 (CollisionWorldDestroyable checked it).
+      CollisionObjectDeletingDestructor(base, objects, 3);
+    } else {
+      memory::crt::OperatorDeleteArray(block);
+    }
+  }
+  guest::StoreU32(base, guest::LoadU32(base, kWorldPointer) + 16, 0);
+  memory::crt::OperatorDeleteArray(guest::LoadU32(base, guest::LoadU32(base, kWorldPointer) + 36));
+  guest::StoreU32(base, guest::LoadU32(base, kWorldPointer) + 36, 0);
+  memory::crt::OperatorDeleteArray(guest::LoadU32(base, guest::LoadU32(base, kWorldPointer) + 48));
+  guest::StoreU32(base, guest::LoadU32(base, kWorldPointer) + 48, 0);
+  memory::crt::OperatorDelete(guest::LoadU32(base, kWorldPointer));
+  guest::StoreU32(base, kWorldPointer, 0);
 }
 
 }  // namespace car_physics

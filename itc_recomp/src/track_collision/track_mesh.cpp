@@ -6,7 +6,10 @@
 #include "guest.h"
 
 #include "base/log.h"
+#include "car_physics/car_physics.h"
 #include "car_physics/float_ops.h"
+#include "collision/collision.h"
+#include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
 
 namespace track_collision {
@@ -14,6 +17,8 @@ namespace track_collision {
 using namespace car_physics::ops;
 
 namespace {
+
+constexpr uint32_t kUnloadObject = 0x826C5B28;  // a 4-byte object TrackCollision::Load makes
 
 // VirtualAlloc(0, size, MEM_COMMIT | MEM_NOZERO, PAGE_READWRITE) as the
 // adapter in src/hooks/heap.cpp answers it.
@@ -40,15 +45,20 @@ uint32_t TrackMeshPrepare(uint8_t* base, uint32_t mesh) {
   return TrackMeshInitScratch(base, scratch);
 }
 
-bool TrackMeshFree(uint8_t* base, uint32_t mesh, uint32_t* r3) {
+bool TrackMeshFreeable(uint8_t* base, uint32_t mesh) {
   const uint32_t scratch = guest::LoadU32(base, mesh + 0);
   const uint32_t file = guest::LoadU32(base, mesh + 4);
-  if ((scratch != 0 && (!memory::IsPages(scratch) ||
-                        !memory::IsPages(guest::LoadU32(base, scratch + 4)))) ||
-      (file != 0 && !memory::IsPages(file))) {
+  return !((scratch != 0 && (!memory::IsPages(scratch) ||
+                             !memory::IsPages(guest::LoadU32(base, scratch + 4)))) ||
+           (file != 0 && !memory::IsPages(file)));
+}
+
+bool TrackMeshFree(uint8_t* base, uint32_t mesh, uint32_t* r3) {
+  ITC_NATIVE_RUNNING("sub_820F6940 TrackMesh::Free");
+  if (!TrackMeshFreeable(base, mesh)) {
     return false;
   }
-  ITC_NATIVE_RUNNING("sub_820F6940 TrackMesh::Free");
+  const uint32_t scratch = guest::LoadU32(base, mesh + 0);
   if (scratch != 0) {
     memory::FreePages(guest::LoadU32(base, scratch + 4));
     memory::FreePages(guest::LoadU32(base, mesh + 0));
@@ -97,12 +107,15 @@ void TrackRoutePrepare(uint8_t* base, uint32_t route) {
   guest::StoreU32(base, route + 0, 0);
 }
 
+bool TrackRouteFreeable(uint8_t* base, uint32_t route) {
+  return memory::IsPages(guest::LoadU32(base, route + 0));
+}
+
 bool TrackRouteFree(uint8_t* base, uint32_t route, uint32_t* r3) {
-  const uint32_t file = guest::LoadU32(base, route + 0);
-  if (!memory::IsPages(file)) {
+  ITC_NATIVE_RUNNING("sub_820F8618 TrackRoute::Free");
+  if (!TrackRouteFreeable(base, route)) {
     return false;
   }
-  ITC_NATIVE_RUNNING("sub_820F8618 TrackRoute::Free");
   guest::StoreU32(base, route + 8, 0);
   *r3 = memory::FreePages(guest::LoadU32(base, route + 0)) ? 1 : 0;
   guest::StoreU32(base, route + 0, 0);
@@ -178,6 +191,23 @@ void TrackRouteOnLoaded(uint8_t* base, uint32_t route) {
                         guest::LoadU32(base, route + 4));
   }
   guest::StoreU32(base, route + 8, 2);
+}
+
+bool TrackCollisionUnload(uint8_t* base) {
+  ITC_NATIVE_RUNNING("sub_820FEFB0 TrackCollision::Unload");
+  const uint32_t object = guest::LoadU32(base, kUnloadObject);
+  // Everything it frees checked first (a block that isn't the layer's: the
+  // original, whose frees take their error paths).
+  if (!car_physics::CollisionWorldDestroyable(base) || !TrackMeshFreeable(base, kMesh) ||
+      !TrackRouteFreeable(base, kRoute) || !collision::Deletable(object)) {
+    return false;
+  }
+  car_physics::CollisionWorldDestroy(base);
+  uint32_t r3 = 0;
+  TrackMeshFree(base, kMesh, &r3);
+  TrackRouteFree(base, kRoute, &r3);
+  memory::crt::OperatorDelete(guest::LoadU32(base, kUnloadObject));
+  return true;
 }
 
 }  // namespace track_collision

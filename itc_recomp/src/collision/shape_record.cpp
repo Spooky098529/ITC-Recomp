@@ -160,6 +160,10 @@ void DeleteCopies(uint8_t* base, uint32_t record) {
 
 }  // namespace
 
+bool CollisionShapeDestroyable(uint8_t* base, uint32_t record) {
+  return CopiesDeletable(base, record);
+}
+
 bool CollisionShapeDestroy(uint8_t* base, uint32_t record, uint32_t* r3) {
   ITC_NATIVE_RUNNING("sub_820BAAA0 CollisionShape::~CollisionShape");
   if (!CopiesDeletable(base, record)) {
