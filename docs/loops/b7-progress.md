@@ -12,7 +12,8 @@ file's history. What's left to see in a drive, from every run:
 
 - Run started 2026-10-23 13:44 on `b7-loop-23-10-26-3` (the user's
   branch), from 97be4fc; summary `b7-loop-2026-10-23-1344.md`.
-- Subsystem 1 of 3: the model animation (the top lead), mapping agent
+- Subsystem 1 of 3: the model animation (the top lead): mapped in
+  c425049 (36 rows, 18 ready groups), checked; migration agent 1
   running.
 
 ## Done
@@ -32,5 +33,7 @@ This run's groups: `expected-differences.md` (the "13:44 run" lines).
 ## Totals
 
 - Start: ours 1023, work left 5730 (wrapped 129, known 586, unknown 5015).
+- After mapping the model animation: ours 1023, work left 5730 (wrapped
+  129, known 622, unknown 4979).
 
 ## Stopped

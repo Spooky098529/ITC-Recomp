@@ -13,7 +13,20 @@ When the user has reviewed a run's section, its heading gets
 
 ## Run 2026-10-23 13:44 (`b7-loop-23-10-26-3`)
 
-(Filled in as reports come in.)
+- `model-animation.md` (new, 36 rows; 0 moved, 36 new; mapped in
+  c425049), `known-data.md` (the model's +304 to +384 spelled out; new
+  rows: the track set, the animation section with its 20-byte keys,
+  the skeleton); 5 leads. For review: `models.md`'s `sub_82599A20`
+  corrected (the per-node float4s' x, y, z set to 0.0, not 1.0) and
+  `sub_8259A9E0`'s row given its r6 instance count (+160) and the
+  per-instance cursors at +128; the primitive drawer (`sub_825A1438`,
+  `sub_825A16B0`, `sub_825A17A0`) and `sub_825A18D8` aren't animation
+  but have rows, as the lead named them; `sub_825A5778` to
+  `sub_825A6460` are probably XAudio's effects (XAPO), not animation (a
+  lead); only some track sets ran in play (the +364 material animation
+  and +384 sets' helpers and `sub_825A20E8` never did); Model::Animate
+  advances times by 1.0 a call from `sub_820F6068`, probably on
+  render-only passes too (not checked).
 
 ## Run 2026-10-23 11:06 (`b7-loop-23-10-26-2`)
 
