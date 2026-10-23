@@ -60,6 +60,21 @@ When the user has reviewed a run's section, its heading gets
   substring copy constructor, not "making an empty one"; unsure:
   `String::ReplaceAll`, `String::Find`, `WildcardSearch` (probably; the
   `*` backtracking not read in detail), the global strings' texts.
+  Migration 1's rows (2028ce7..5fdcfc2; `--native_std_string`; 14 of
+  16 ours, 5 Native). For review: paths left to the original, checked
+  before anything changes (never in play): memcpy_s's and free's
+  errors, operator new's new handler, `_Xlen`, `_Xran`, erase on a
+  self-assign, `append` from the string's own text (`sub_820A6E60`),
+  `replace` (`sub_82592E18`) when the wildcard replace matches, copies
+  not below 0xA0000000 in one view (the mirrors' memcpy recording
+  kept); the constructors write the empty start before their assign's
+  checks (the original writes the same bytes again on a fallback);
+  `_Tidy`'s r3 kept as the original leaves it; allocating paths native
+  only with `--native_heap`; the harness's ReplaceAll patterns can't
+  match except the game's (`/` to `\`: a matching-anything pattern
+  makes the original loop forever), and `_Copy`, `_Grow` cases use
+  capacities 15 and up (the `_Copy` quirk in the file's intro); new
+  helpers in `src/std_string/std_string.cpp`.
 
 ## Run 2026-10-23 13:44 (`b7-loop-23-10-26-3`)
 
