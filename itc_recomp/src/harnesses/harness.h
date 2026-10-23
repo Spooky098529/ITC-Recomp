@@ -154,5 +154,6 @@ void CollisionWorld(Context& h);
 void Heap(Context& h);
 void CRuntimeHeap(Context& h);
 void SoundCues(Context& h);
+void Xact(Context& h);
 
 }  // namespace harness

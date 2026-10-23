@@ -142,6 +142,8 @@ set(ITC_SOURCES
     src/track_collision/track_wall_query.cpp
     src/hooks/sound_cues.cpp
     src/sound_cues/sound_cues.cpp
+    src/hooks/xact.cpp
+    src/xact/xact.cpp
     src/hooks/command_list.cpp
     src/command_list/command_list.cpp
     src/hooks/c_runtime.cpp
@@ -187,6 +189,7 @@ set(ITC_SOURCES
     src/harnesses/collision_world.cpp
     src/harnesses/collision_world_walls.cpp
     src/harnesses/sound_cues.cpp
+    src/harnesses/xact.cpp
     src/helpers/debug_output.cpp
     src/helpers/object_attributes.cpp
     src/helpers/time.cpp
