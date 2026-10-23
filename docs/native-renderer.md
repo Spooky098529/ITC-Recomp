@@ -792,7 +792,7 @@ memory).
   elsewhere.
 - **Everything is written by the library's memcpy (`sub_825A7410`)**:
   - Headers: copied in whole blocks (25-315 KB) from a read buffer at
-    `002B0000` by the resource loader `sub_825963F0` (call at
+    `002B0000` by the resource loader `sub_825963F0` (`Mesh::Parse`, `functions/models.md`; call at
     `0x82596448`), a few by `sub_8258B678` (`0x8258B6B4`) from the heap.
     The final data addresses must then be written into the headers by
     plain stores (not seen by the memcpy wrapper).

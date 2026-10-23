@@ -1,0 +1,101 @@
+# Known functions: the car specs
+
+The car parameter tables at `[0x826C2E48]`: assets 72-83 loaded once at boot into one block (`Params::Init`, `Params::Load`): 72 the car specs (72 cars of 8,432 bytes: the physics, the spec sheet, 16 engine stages, 42 tires, the paints, the stock wheel), 73 the aftermarket wheels, 74-82 the aero parts (23 cars), 83 23 records of 10 floats. Their load callbacks byte-swap them (the files are little-endian; 74-82 are swapped as each record is copied out), and the accessors index them. Also here: the car object, a car's copy of its spec as tuned (`Car::Refresh`), which `Vehicle::SetupFromCar` (`car-physics.md`) turns into the vehicle's car data. Not here: `Archive::Load` (`files-and-saves.md`), and the callers of the accessors (many, in the menus and the race code; named in the rows).
+
+The rows were drafted on 2026-10-23 from SBX-Recomp's `docs/game_data.md` (the Japanese release's recomp; `../referencing-sbx-recomp.md`), each fact checked against our `generated/` code: offsets and asset ids are our build's, which differ from SBX-Recomp's in places. "Name from SBX-Recomp" marks the names taken from it; the others are ours. The data layouts are in `../known-data.md`.
+
+Status:
+
+- **Native**: plain C++ in `itc_recomp/src/` that doesn't use the
+  PowerPC context (`ctx`): normal arguments and host structs (it may
+  still read and write guest memory through `src/guest.h` while
+  recompiled code shares the data). The game reaches it without `ctx`,
+  from native or overridden callers, and the recompiled original is no
+  longer called (except behind a fallback flag or to check against it).
+  No `REX_FUNC` override of it exists, not even an adapter kept only for
+  a harness (that's Overridden until the adapter goes).
+  The end state for every function.
+- **Overridden**: an `extern "C" REX_FUNC(sub_XXXXXXXX)` override in
+  `itc_recomp/src/` (or a macro defining one) does the work instead of
+  the original: a thin adapter in front of native code, or a body that
+  still uses `ctx` (calling guest code, reading registers). It may call
+  the original when its flag is off, or to check itself against it.
+- **Wrapped**: an override that does something of its own (skipping
+  render-only passes, logging, timing) and still calls the original
+  (`__imp__sub_XXXXXXXX`) for the work.
+- **Dropped**: its work isn't needed on PC (hardware set-up, kernel calls
+  the SDK already stubbed), so it no longer runs: an override in
+  `itc_recomp/src/` replaces it with nothing (or a fixed return value), or
+  its callers, made native, leave the call out (no override then; the row
+  says which caller). Logs, a harness or the renderer's frame dumps have
+  shown that nothing reads what it did. The original is no longer called,
+  except behind a fallback flag while the drop is being checked. A
+  function the game never calls in the first place isn't Dropped: its
+  status stays blank and its row says it's never called.
+- **Merged**: its work is done inside a native caller's plain C++ (a
+  few lines only that caller needs), so it has no function or override of
+  its own in `itc_recomp/src/`. The row names the caller(s) and the
+  harness that covers the work. The original is no longer called, except
+  behind the caller's fallback flag.
+- **Patched**: the generated code was edited in place (search for
+  `PATCH:`).
+
+A function usually moves from recompiled or Wrapped to Overridden to
+Native as the `ctx` edge moves up through its callers, or straight to
+Dropped when its work isn't needed.
+`itc_recomp/tools/check_function_statuses.py` checks this column, in
+every file of the tables, against `src/` (an override marked Native, a
+status with no override, an override with no row, a row in two files);
+run it after changing either, on any branch.
+
+| Address | Name | Status | Notes |
+|---|---|---|---|
+| `sub_820C9960` | `Params::Init` | | No arguments; once at boot (only caller `sub_82106618`). Makes the 468-byte parameter object (`sub_825A6880`, operator new) into `0x826C2E48`: +56 = +60 = 0, +64 to +460 = -1. Two passes over assets 72-83 (their TOC sizes, `sub_8209D868`: unpacked, or stored when 0) set +12 (72), +8 (73), +16 to +48 (74-82) and +52 (83) to the block +4 plus the sizes so far, counting +0 up to 12; the block (`sub_825A6940`) is made after the first pass. |
+| `sub_820CC2A8` | `Params::Load` | | No arguments; once at boot (only caller `sub_82106618`, after `Params::Init`). Twelve `Archive::Load`s (`sub_8209DE48`, r7 = r8 = 0) of assets 72-83 into the pointers `Params::Init` set, the object as context: 72 with `sub_820CC248`, 73 with `sub_820CC0A8`, 74-82 with `sub_820C9DF0`, 83 with `sub_820CBD90`. |
+| `sub_820CC248` | `Params::OnCarSpecsLoaded` | | `Archive::Load`'s callback (r6 = the object): +56 = the TOC size / 8432, swaps every spec (`sub_820CC1F0`), counts +0 down. |
+| `sub_820CC0A8` | `Params::OnWheelsLoaded` | | `Archive::Load`'s callback: +60 = the size / 48, swaps them (`sub_820CBE10`), then adds 1 to each record's +40 (its model) and writes the first record of each model to +64 + 4 × model; +464 = the last model + 1. Counts +0 down. |
+| `sub_820C9DF0` | `Params::OnLoaded` | | `Archive::Load`'s callback for tables 74-82: counts +0 down (r6). Leaf. |
+| `sub_820CBD90` | `Params::OnTable83Loaded` | | `Archive::Load`'s callback: swaps table 83's 40-byte records (size / 40; `sub_820CB658`), counts +0 down. Table 83: 23 records of 10 floats, one a car as in 74-82, all 1.0 in the data; no reader found. |
+| `sub_820CC1F0` | `Params::SwapCarSpecs` | | `CarSpec::Swap` on each of the +56 specs (stride 8432). Only caller `sub_820CC248`. |
+| `sub_820CC168` | `CarSpec::Swap` | | r3 = a spec: block 1 (`sub_820CA5D0`), block 2 at +640 (`sub_820CBE70`), 16 engine stages at +980 (`sub_820CAAB0`), 21 front and 21 rear tires at +4244 and +6176 (`sub_820CAD78`), the paints at +8108 (`sub_820CB458`), the stock wheel at +8380 (`sub_820CB588`). |
+| `sub_820CA5D0` | `CarSpec::SwapBlock1` | | r3 = a spec. Leaves +0 to +15; +16 to +80 five float4s (`sub_820C9750`), +96 and +160 16 words (`sub_820C9F10`), +224 and +244 5 words (`sub_820CA480`), +264 (`sub_820CA2F8`), +356 3 words (`sub_820CA550`), +368 (`sub_820CA198`), +528 to +636 words. |
+| `sub_820C9750` | | | r3: swaps the floats at +0, +4, +8 and sets +12 to 1.0 (`0x82000A30`). Leaf. |
+| `sub_820C9F10` | | | r3: swaps 16 words (probably a matrix). Leaf. |
+| `sub_820CA480` | | | r3: swaps 5 words. Leaf; also used by `sub_820CB0C0`. |
+| `sub_820CA550` | | | r3: swaps 3 words. Leaf. |
+| `sub_820CA2F8` | | | r3 = block 1 + 264 (92 bytes): `sub_820CA550` at +0 and +16, words +32 to +88. |
+| `sub_820CA198` | | | r3 = block 1 + 368 (160 bytes): words +0 to +12, then four arrays of 9 at +16, +52, +88, +124 (+16 the reverse and forward ratios). Leaf. |
+| `sub_820CBE70` | `CarSpec::SwapBlock2` | | r3 = block 2 (spec + 640): +8 (`sub_820CAFF0`), words +72 to +124, +132 (`sub_820CB0C0`), +300 (`sub_820CB3B0`); the bytes +68 to +71, +128 to +131 and the text at +316 not swapped. |
+| `sub_820CAFF0` | | | r3 = block 2 + 8: swaps +0, +4 to +16 and +56; sets +20 to +52 (9 floats) to `[0x82000A34]` (probably 0.0). Leaf. |
+| `sub_820CB0C0` | | | r3 = block 2 + 132: swaps 168 bytes of words (three 5-word groups by `sub_820CA480`). |
+| `sub_820CB3B0` | | | r3: swaps 4 words. Leaf. |
+| `sub_820CAAB0` | `EngineStage::Swap` | | r3 = a 204-byte stage: words +8 to +196 (+28 to +152 in a loop of 32); +0 to +7 and +200 to +203 not swapped. Leaf. |
+| `sub_820CAD78` | `Tire::Swap` | | r3 = a 92-byte tire: floats +8 to +88. Leaf. |
+| `sub_820CB458` | `Paint::Swap` | | r3 = spec + 8108: 13 20-byte slots from +8 (u16s +0, +4, +8, +12, +16), the second shade at +12 filled in by the type (0: 0, 0, 25; 1: the hue, the saturation × 60 / 100, 204); then +268. Leaf. |
+| `sub_820CB588` | `Wheel::Swap` | | r3 = a 48-byte wheel record: `sub_820CB530` at +8 and +20, words +32 to +44. From `sub_820CC168` (the stock wheel) and `sub_820CBE10` (table 73). |
+| `sub_820CB530` | | | r3: a 12-byte color record: u16s at +0 and +4, the word at +8. Leaf. |
+| `sub_820CBE10` | `Params::SwapWheels` | | `Wheel::Swap` on each of the +60 wheel records. Only caller `sub_820CC0A8`. |
+| `sub_820CB658` | | | r3: swaps 10 words (a table 83 record). Leaf. Only caller `sub_820CBD90`. |
+| `sub_820CB6C8` | `AeroPart::Swap` | | r3: swaps 7 words (a 28-byte aero part record). Leaf. |
+| `sub_820CB7E8` | `AeroPart::Swap36` | | `AeroPart::Swap`, then the words at +28 and +32. |
+| `sub_820CB848` | `AeroParts::Get74` | | r3 = out, r4 = `Params::GetCarParts`' block, r5 = the level: table 74's record level − 1 copied (`memcpy`) and swapped (`sub_820CB6C8`); level 0 gives 0, 0, 0, 0, 1.0, 1.0, 0. Returns r3. Only caller `sub_820C4568`. |
+| `sub_820CB8D0` | `AeroParts::Get75` | | As `sub_820CB848`, table 75. |
+| `sub_820CB958` | `AeroParts::Get76` | | As `sub_820CB848`, table 76. |
+| `sub_820CB9E0` | `AeroParts::Get77` | | As `sub_820CB848`, table 77. |
+| `sub_820CBA68` | `AeroParts::Get78` | | As `sub_820CB848`, table 78. |
+| `sub_820CBAF0` | `AeroParts::Get79` | | As `sub_820CB848`, table 79. |
+| `sub_820CBB78` | `AeroParts::Get80` | | As `sub_820CB848`, table 80. |
+| `sub_820CBC00` | `AeroParts::Get81` | | As `sub_820CB848` with table 81's 36-byte records (`sub_820CB7E8`; level 0 also 0 at +28 and +32). |
+| `sub_820CBC90` | `AeroParts::Get82` | | As `sub_820CBC00`, table 82. 7 callers (`sub_820C4568`, `sub_8215B878`, `sub_8217DBC0`, `sub_821AF0A8`, `sub_821D2A80`, `sub_821DE160`, `sub_821E3AD0`). |
+| `sub_820CBD20` | | | r3 = `Params::GetCarParts`' block: how many of table 82's two records have +0 other than `[0x82000A34]` (probably 0.0; probably the body kits offered). Only caller `sub_821E1B48` (not read). |
+| `sub_820C9E98` | `Params::GetCarSpec` | | r3 = the car id: table 72 + 8432 × id (no check). 26 call sites in 22 functions. Leaf. Name from SBX-Recomp. |
+| `sub_820C9EB0` | `Params::GetWheel` | | r3 = the wheel number: 0 below 1, else table 73's record n − 1. 46 call sites (44 in `sub_8217DD38`, 2 in `Car::Refresh`). Leaf. Name from SBX-Recomp. |
+| `sub_820C9D90` | `Params::Free` | | Frees the block (`sub_825A71C0`) and the object (`sub_825A70E8`), sets `0x826C2E48` to 0. 1 call site (not read). Not seen in play. |
+| `sub_820C9EE0` | `Params::FirstWheelOfModel` | | r3 = a wheel model: 0 below 1, else `[[0x826C2E48] + 64 + 4m]` + 1 (a wheel number). 2 callers (not read). Leaf. |
+| `sub_820C9E00` | `Params::GetCarParts` | | r3 = out (9 pointers), r4 = the car: tables 74-82 + the car × their strides (280, 280, 280, 280, 168, 168, 84, 108, 72). 8 callers; `Car::Refresh` passes car 0 when the spec's block 2 +131 isn't 0. Name from SBX-Recomp. |
+| `sub_820C9928` | `CarSpec::GetTire` | | r3 = a spec, r4 = the type, r5 = the grade, r6 = rear: tire 0 for type 0, else type × 5 + grade − 5; spec + 4244 (front) or + 6176 (rear) + 92 × that. Leaf. Only caller `sub_820C4888` (twice). Name from SBX-Recomp. |
+| `sub_820C9DD8` | `Params::Exists` | | 1 when `[0x826C2E48]` isn't 0. Leaf; 22 call sites. |
+| `sub_820C4998` | `Car::Refresh` | | r3 = a car object: the spec (`Params::GetCarSpec`, +12); `sub_820C4888`; the aero records from `Params::GetCarParts` (the car's id, or 0 when block 2 +131 is set) through `sub_820C4568`; the wheels +3268 and +3316 (48 bytes) from spec +8380 for wheel number 0, else `Params::GetWheel` (+1728, +1736). 71 call sites in 43 files. Name from SBX-Recomp. |
+| `sub_820C4888` | | | r3 = a car object, r4 = its spec: +3876 = +3880 = 0.0; copies block 1 to +2240, block 2 to +1888, the engine stage (spec + 980 + 204 × [+1656]) to +2880, the paints to +3364; the tires (`CarSpec::GetTire`; +1712/+1716 and +1720/+1724) to +3084 and +3176, each inched up (`Tire::InchUp`, by +1732 and +1740); +3876 and +3880 the change in each tire's width (+48). Only caller `sub_820C4998`. |
+| `sub_820C4568` | | | r3 = a car object, r4 = `Params::GetCarParts`' block: the aero part records for the levels +1744, +1748, +1752, +1756 (-1 read as 0), +1760 (from table 78, or 79 when +1764 is set), +1768, +1780, +1784 into +3636, +3664, +3692, +3720, +3748, +3776 (28 bytes) and +3804, +3840 (36) (`sub_820CB848` to `sub_820CBC90`). Only caller `sub_820C4998`. Not read in detail. |
+| `sub_820C46B8` | `Tire::InchUp` | | r3 = a 92-byte tire, r4 = n inches (0: nothing): the rim +80 += n; the width +48 = int(w × (1 + 0.05n) × 1000) / 5 × 5 mm; the aspect +84 keeps the radius +44; the rim width +88 = 3.5 + (width mm − 135) / 20 (− 0.5 under 175 mm), rounded down to a whole inch (int(2x) × 5 / 10); the grip +64 and +68 = +64 × the ratio of 1 + 3.67 √(radius × width) after to before. Leaf. Only caller `sub_820C4888`. Name from SBX-Recomp. |

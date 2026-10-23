@@ -41,7 +41,7 @@ relying on line numbers or rows below.
 Not used: `docs/porting-from-itc.md` beyond its first sections (how the projects
 line up, the images, the matching methods above); its mod docs. Their
 `docs/game_data.md`, which several of their rows cite for the data formats, was
-never committed (not in any branch at `1fd0d3d`).
+never committed at `1fd0d3d`; it is now (see "Their game data notes" below).
 
 ## How the information was taken
 
@@ -121,3 +121,29 @@ the data (their car specs and part tables, BUILD 72-83; shader pairs; containers
 the save's layout). The same rules apply: map through the TSV, prefer exact or
 high matches, confirm against our code before writing it down, say in the row
 where it came from, and ignore the modding parts.
+
+## Their game data notes (2026-10-23)
+
+Their `docs/game_data.md` (at `1fb2737`, 2026-10-22) describes the data
+files' formats and the code that reads them. Read on the user's word, its
+structures were checked against our `generated/` code, a claim at a time,
+and written into `known-data.md` (the car specs and their records, the car
+object, the car model and its decals, containers, XPR2, shader files, the
+model formats) and into `functions/car-specs.md`, `car-models.md` and
+`models.md` (plus rows in `car-physics.md`, `files-and-saves.md`,
+`vehicle-accessors.md`). Its saves, its patch loader and which TOC entry
+holds what were left out (the user's call: the data's structure is what's
+needed, not the TOC's contents).
+
+Their structures hold in our build, but numbers don't always carry over
+(the builds differ): our car, wheel and decal asset ids are one higher, the
+course's and the shared material shaders' ids differ, the car object's
+tuning levels are 4 bytes later (+1648 on), a material block's records
+start at +16 (their record offsets are ours + 8), and globals sit at other
+addresses (theirs `0x826B2B28`, ours `0x826C2E48`). Where their notes and
+our code disagree, our rows say what our code does: node rotations are
+Euler angles, not quaternions; vinyl layers 0-2 share layer 0's region;
+`Tire::InchUp` rounds the rim width to a whole inch; the field they call
+the primitive type is the cull mode (the primitive type is the next word).
+Never copy an offset, id or address from their notes without finding it in
+our code.
