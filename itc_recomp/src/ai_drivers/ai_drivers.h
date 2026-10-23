@@ -276,7 +276,8 @@ void ResetFollow(uint8_t* base, uint32_t driver);
 // one isn't; else 1 with exactly one, or when the lowest speed of the
 // copies (from 70.0) plus 5.0 is above 70.0. False, with nothing done
 // that's seen outside the frame, when a copy can't be made natively
-// (c_runtime::Memcpy: the original runs then).
+// (c_runtime::Memcpy, or a frame in the physical views: the original runs
+// then).
 bool AllSettled(uint8_t* base, uint32_t frame, uint32_t* result);
 
 // --- Pedals and steering ---
@@ -304,5 +305,48 @@ uint64_t UpdateAgainstPlayer(uint8_t* base, uint32_t driver);
 // to meet from the new gap (at `gap`) and the cars' length (at `length`),
 // then +0 = the gap and UpdateOtherFlags.
 void UpdateOther(uint8_t* base, uint32_t record, uint32_t gap, uint32_t length);
+
+// --- Resets, steering input and the path's lists ---
+
+// AiDriver::ResetControl (sub_82139580): +16 bit 0 cleared, SetFlag2 with 1
+// (the word in the original's frame: `frame`, 112 bytes below the caller's
+// stack pointer, +80), ResetToMode1 (its frame 112 bytes below that).
+void ResetControl(uint8_t* base, uint32_t driver, uint32_t frame);
+// AiDriver::Reset (sub_8213AAA8): ResetFollow, ResetFor on the path, the
+// control fields +6088 to +6144 cleared (+6108 = 1.0, byte +6132 = 0), the
+// update pointer +6148 = 0x8213A1B8, ResetOthers (whose r3 it returns).
+uint64_t ResetDriver(uint8_t* base, uint32_t driver);
+// AiDriver::UpdateSteerInput (sub_8213AC70): the first corner record with
+// data (+5676, 44 bytes each, +5674 the count) of kind 1, 2 or 3 picks the
+// step: 1 or none, AccumulateSteer (done here; returns 0); 2 or 3 (never
+// seen in play: sub_8213AB40, sub_82139A08) return the kind with the record
+// in `record`, for the caller to run the translated step with it in r4.
+uint32_t UpdateSteerInput(uint8_t* base, uint32_t driver, uint32_t* record);
+// AiPath::DropPassedSections (sub_8213BA48): the section list (+5144,
+// +5146) up to the driver's route section dropped, or emptied when it isn't
+// listed.
+void DropPassedSections(uint8_t* base, uint32_t path);
+// AiPath::SharesSections (sub_8213C010): 1 when the path's section list
+// and the record's (+2 the count, halfwords from +36) run the same way from
+// the first section they share; else 0.
+uint32_t SharesSections(uint8_t* base, uint32_t path, uint32_t record);
+// AiPathEntry::Widen (sub_8213C3A8): +40 = +32 + margin, +44 = +36 -
+// margin, the shift added to +40 (positive) or +44; crossed, both their
+// average.
+void Widen(uint8_t* base, uint32_t entry, uint32_t margin, uint32_t shift);
+// AiPathEntry::NarrowToOther (sub_8213C420): with another entry and its
+// record, the entry's range (+32/+40, +36/+44) narrowed to the other's
+// widened by the margin, kept within the record's +24 and +28 and moved by
+// the offset.
+void NarrowToOther(uint8_t* base, uint32_t entry, uint32_t other, uint32_t margin,
+                   uint32_t offset);
+// AiPath::AdvanceCorners (sub_8213D020): each corner record's +12 and +10
+// lowered by the slices at `slices`; a record whose +12 isn't positive
+// removed (the later ones moved down, the last cleared) and the count
+// +5162 lowered. `r3` = the r3 the original leaves (the path, or the last
+// move's destination, memcpy's). False, with nothing done, where the moves
+// can't be memcpy's native copies (the records in the physical views or
+// across one's end: the original runs then).
+bool AdvanceCorners(uint8_t* base, uint32_t path, uint32_t slices, uint32_t* r3);
 
 }  // namespace ai_drivers

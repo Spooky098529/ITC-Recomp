@@ -58,8 +58,13 @@ ITC_FLAG_BOOL(native_ai_drivers, true, "ITC",
               "AiDriver::AccumulateSteer sub_82138F00, AiDriver::ThrottleForSpeed sub_82139168, "
               "AiDriver::EaseThrottleForSlide sub_82139BE8, AiDriver::LimitThrottle "
               "sub_82139CB0, AiDriver::AdjustForOther sub_821452A0, "
-              "AiDriver::UpdateAgainstPlayer sub_82146608, AiOther::Update sub_821454C8) "
-              "natively instead of through the translated "
+              "AiDriver::UpdateAgainstPlayer sub_82146608, AiOther::Update sub_821454C8, "
+              "AiDriver::ResetControl sub_82139580, AiDriver::Reset sub_8213AAA8, "
+              "AiDriver::UpdateSteerInput sub_8213AC70 (its kinds 2 and 3, sub_8213AB40 and "
+              "sub_82139A08, never seen in play, on the translated code), "
+              "AiPath::DropPassedSections sub_8213BA48, AiPath::SharesSections sub_8213C010, "
+              "AiPathEntry::Widen sub_8213C3A8, AiPathEntry::NarrowToOther sub_8213C420, "
+              "AiPath::AdvanceCorners sub_8213D020) natively instead of through the translated "
               "code (the same words, bit for bit; checked by --run_harnesses=ai_drivers). Those "
               "reached only from native callers have no adapters, and the flag switches their "
               "callers: sub_82144ED8, sub_8213C720, sub_821450E0, sub_821453A0, sub_82139248, "
@@ -205,3 +210,50 @@ ITC_AI_DRIVERS(821452A0, AdjustForOther(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32
 ITC_AI_DRIVERS(82146608, ctx.r3.u64 = UpdateAgainstPlayer(base, ctx.r3.u32))
 // r4 = &the new gap, r5 = &the length.
 ITC_AI_DRIVERS(821454C8, UpdateOther(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+
+// --- Resets, steering input and the path's lists ---
+
+// The word in the original's frame (112 bytes down); r3 left at the skill
+// (+6048), as ResetToMode1 leaves it.
+ITC_AI_DRIVERS(82139580, ResetControl(base, ctx.r3.u32, ctx.r1.u32 - 112); ctx.r3.u64 += 6048)
+ITC_AI_DRIVERS(8213AAA8, ctx.r3.u64 = ResetDriver(base, ctx.r3.u32))
+// Kinds 2 and 3 (never seen in play): the translated steps, tail-called as
+// the original does, with the record in r4.
+extern "C" REX_FUNC(sub_8213AC70) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_ai_drivers)) {
+    __imp__sub_8213AC70(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  uint32_t record = 0;
+  const uint32_t kind = UpdateSteerInput(base, ctx.r3.u32, &record);
+  if (kind == 2) {
+    ctx.r4.u64 = record;
+    sub_8213AB40(ctx, base);
+  } else if (kind == 3) {
+    ctx.r4.u64 = record;
+    sub_82139A08(ctx, base);
+  }
+}
+ITC_AI_DRIVERS(8213BA48, DropPassedSections(base, ctx.r3.u32))
+// r4 = the record.
+ITC_AI_DRIVERS(8213C010, ctx.r3.u64 = SharesSections(base, ctx.r3.u32, ctx.r4.u32))
+// r4 = &the margin, r5 = &the shift.
+ITC_AI_DRIVERS(8213C3A8, Widen(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+// r4 = the other entry or 0, r5 = &the margin, r6 = &the offset.
+ITC_AI_DRIVERS(8213C420, NarrowToOther(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32))
+// r4 = &the slices; the original where the records' moves can't be made
+// natively.
+extern "C" REX_FUNC(sub_8213D020) {
+  REX_FUNC_PROLOGUE();
+  if (ITC_FLAG(native_ai_drivers)) {
+    ctx.fpscr.disableFlushMode();
+    uint32_t r3 = 0;
+    if (AdvanceCorners(base, ctx.r3.u32, ctx.r4.u32, &r3)) {
+      ctx.r3.u64 = r3;
+      return;
+    }
+  }
+  __imp__sub_8213D020(ctx, base);
+}

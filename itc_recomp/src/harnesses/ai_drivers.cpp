@@ -143,6 +143,37 @@ ITC_NATIVE_STEP(NativeAdjustForOther,
                 ai::AdjustForOther(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
 ITC_NATIVE_STEP(NativeUpdateAgainstPlayer, ctx.r3.u64 = ai::UpdateAgainstPlayer(base, ctx.r3.u32))
 ITC_NATIVE_STEP(NativeUpdateOther, ai::UpdateOther(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+ITC_NATIVE_STEP(NativeResetControl, ai::ResetControl(base, ctx.r3.u32, ctx.r1.u32 - 112);
+                ctx.r3.u64 += 6048)
+ITC_NATIVE_STEP(NativeResetDriver, ctx.r3.u64 = ai::ResetDriver(base, ctx.r3.u32))
+void NativeUpdateSteerInput(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  uint32_t record = 0;
+  const uint32_t kind = ai::UpdateSteerInput(base, ctx.r3.u32, &record);
+  if (kind == 2) {
+    ctx.r4.u64 = record;
+    sub_8213AB40(ctx, base);
+  } else if (kind == 3) {
+    ctx.r4.u64 = record;
+    sub_82139A08(ctx, base);
+  }
+}
+ITC_NATIVE_STEP(NativeDropPassedSections, ai::DropPassedSections(base, ctx.r3.u32))
+ITC_NATIVE_STEP(NativeSharesSections,
+                ctx.r3.u64 = ai::SharesSections(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_STEP(NativeWiden, ai::Widen(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+ITC_NATIVE_STEP(NativeNarrowToOther,
+                ai::NarrowToOther(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32))
+void NativeAdvanceCorners(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  uint32_t r3 = 0;
+  if (ai::AdvanceCorners(base, ctx.r3.u32, ctx.r4.u32, &r3)) {
+    ctx.r3.u64 = r3;
+    return;
+  }
+  g_fallbacks++;
+  __imp__sub_8213D020(ctx, base);
+}
 
 // Runs the recompiled version with the native flag off.
 template <GuestFunction recompiled>
@@ -277,6 +308,14 @@ enum Kind {
   kAdjustForOther,
   kUpdateAgainstPlayer,
   kUpdateOther,
+  kResetControl,
+  kResetDriver,
+  kUpdateSteerInput,
+  kDropPassedSections,
+  kSharesSections,
+  kWiden,
+  kNarrowToOther,
+  kAdvanceCorners,
 };
 
 }  // namespace
@@ -419,6 +458,22 @@ void AiDrivers(Context& h) {
        NativeUpdateAgainstPlayer, kUpdateAgainstPlayer, 3000},
       {"AiOther::Update (sub_821454C8)", Original<__imp__sub_821454C8>, NativeUpdateOther,
        kUpdateOther, 3000},
+      {"AiDriver::ResetControl (sub_82139580)", Original<__imp__sub_82139580>,
+       NativeResetControl, kResetControl, 500},
+      {"AiDriver::Reset (sub_8213AAA8)", Original<__imp__sub_8213AAA8>, NativeResetDriver,
+       kResetDriver, 300},
+      {"AiDriver::UpdateSteerInput (sub_8213AC70)", Original<__imp__sub_8213AC70>,
+       NativeUpdateSteerInput, kUpdateSteerInput, 3000},
+      {"AiPath::DropPassedSections (sub_8213BA48)", Original<__imp__sub_8213BA48>,
+       NativeDropPassedSections, kDropPassedSections, 3000},
+      {"AiPath::SharesSections (sub_8213C010)", Original<__imp__sub_8213C010>,
+       NativeSharesSections, kSharesSections, 3000},
+      {"AiPathEntry::Widen (sub_8213C3A8)", Original<__imp__sub_8213C3A8>, NativeWiden, kWiden,
+       3000},
+      {"AiPathEntry::NarrowToOther (sub_8213C420)", Original<__imp__sub_8213C420>,
+       NativeNarrowToOther, kNarrowToOther, 3000},
+      {"AiPath::AdvanceCorners (sub_8213D020)", Original<__imp__sub_8213D020>,
+       NativeAdvanceCorners, kAdvanceCorners, 3000},
   };
   const uint32_t area = memory::Alloc(kAreaBytes, 0);
   const uint32_t driver = area + kDriver, vehicle = area + kVehicle, io = area + kIo;
@@ -939,6 +994,92 @@ void AiDrivers(Context& h) {
           r5 = io + 0x44;
           floats.push_back({kIo, 3});
           floats.push_back({kIo + 20, 1});
+          break;
+        case kResetControl:
+          guest::StoreU32(h.base, driver + kPath + 5520, r.Below(3));
+          guest::StoreU32(h.base, driver + kPath, r.Below(4) == 0 ? 0 : driver);
+          break;
+        case kResetDriver:
+          guest::StoreU32(h.base, driver + 0, r.Below(8));
+          drivers = table;
+          table_written = true;
+          break;
+        case kUpdateSteerInput: {
+          guest::StoreU16(h.base, driver + 5674, uint16_t(int32_t(r.Below(11)) - 1));
+          // Kinds 2 and 3 only in records without data (skipped): their steps
+          // (never seen in play) read what a real record holds.
+          for (uint32_t i = 0; i < 9; i++) {
+            const uint32_t at = driver + 5676 + 44 * i;
+            const uint32_t kinds[] = {0, 1, 4, 5, 0xFFFFFFFFu};
+            const bool data = r.Below(3) != 0;
+            guest::StoreU32(h.base, at + 0, data ? 1 + r.Below(1000) : 0);
+            guest::StoreU32(h.base, at + 40, data ? kinds[r.Below(5)] : r.Below(4));
+          }
+          guest::StoreU32(h.base, driver + 100, RandomFloat(r, 400.0f));
+          floats.push_back({kDriver + 6136, 1});
+          break;
+        }
+        case kDropPassedSections: {
+          guest::StoreU32(h.base, driver + kPath, driver);
+          guest::StoreU16(h.base, driver + 4, uint16_t(r.Below(6)));
+          guest::StoreU16(h.base, driver + kPath + 5144, uint16_t(int32_t(r.Below(10)) - 1));
+          for (uint32_t i = 0; i < 8; i++) {
+            guest::StoreU16(h.base, driver + kPath + 5146 + 2 * i, uint16_t(r.Below(7)));
+          }
+          r3 = driver + kPath;
+          break;
+        }
+        case kSharesSections:
+          guest::StoreU16(h.base, driver + kPath + 5144, uint16_t(int32_t(r.Below(10)) - 1));
+          for (uint32_t i = 0; i < 8; i++) {
+            guest::StoreU16(h.base, driver + kPath + 5146 + 2 * i, uint16_t(r.Below(7)));
+          }
+          guest::StoreU16(h.base, io + 2, uint16_t(int32_t(r.Below(14)) - 1));
+          for (uint32_t i = 0; i < 12; i++) {
+            guest::StoreU16(h.base, io + 36 + 2 * i, uint16_t(r.Below(7)));
+          }
+          r3 = driver + kPath;
+          r4 = io;
+          break;
+        case kWiden:
+          for (uint32_t at : {32u, 36u}) {
+            guest::StoreU32(h.base, io + 0x100 + at, RandomFloat(r, 10.0f));
+          }
+          guest::StoreU32(h.base, io, RandomFloat(r, 3.0f));
+          guest::StoreU32(h.base, io + 4, RandomFloat(r, 3.0f));
+          r3 = io + 0x100;
+          r4 = io;
+          r5 = io + 4;
+          floats.push_back({kIo + 0x100 + 40, 2});
+          break;
+        case kNarrowToOther:
+          for (uint32_t at : {32u, 36u, 40u, 44u}) {
+            guest::StoreU32(h.base, io + 0x100 + at, RandomFloat(r, 10.0f));
+          }
+          for (uint32_t at : {32u, 36u}) {
+            guest::StoreU32(h.base, io + 0x180 + at, RandomFloat(r, 10.0f));
+          }
+          guest::StoreU32(h.base, io + 0x180 + 52, r.Below(8) == 0 ? 0 : io + 0x200);
+          guest::StoreU32(h.base, io + 0x200 + 24, RandomFloat(r, 10.0f));
+          guest::StoreU32(h.base, io + 0x200 + 28, RandomFloat(r, 10.0f));
+          guest::StoreU32(h.base, io, RandomFloat(r, 3.0f));
+          guest::StoreU32(h.base, io + 4, RandomFloat(r, 3.0f));
+          r3 = io + 0x100;
+          r4 = r.Below(8) == 0 ? 0 : io + 0x180;
+          r5 = io;
+          r6 = io + 4;
+          floats.push_back({kIo + 0x100 + 32, 4});
+          break;
+        case kAdvanceCorners:
+          guest::StoreU16(h.base, driver + kPath + 5162, uint16_t(int32_t(r.Below(10)) - 1));
+          for (uint32_t i = 0; i < 8; i++) {
+            const uint32_t record = driver + kPath + 5164 + 44 * i;
+            guest::StoreU16(h.base, record + 12, uint16_t(int32_t(r.Below(14)) - 3));
+            guest::StoreU16(h.base, record + 10, uint16_t(int32_t(r.Below(14)) - 3));
+          }
+          guest::StoreU16(h.base, io, uint16_t(r.Below(6)));
+          r3 = driver + kPath;
+          r4 = io;
           break;
       }
       // Guest memory is one host mapping: the blocks copied as they are.

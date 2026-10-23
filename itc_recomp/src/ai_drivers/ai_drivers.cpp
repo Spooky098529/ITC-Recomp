@@ -13,6 +13,7 @@
 #include "base/log.h"
 
 #include <cmath>
+#include <cstring>
 
 namespace ai_drivers {
 
@@ -1226,7 +1227,11 @@ bool AllSettled(uint8_t* base, uint32_t frame, uint32_t* result) {
       if (index < 0) {
         continue;
       }
-      if (!c_runtime::Memcpy(base, copy, uint32_t(index) * kDriverBytes + table, kDriverBytes)) {
+      // memcpy (sub_825A7410) copies natively with nothing for its override
+      // to record (a destination outside the physical views, which it
+      // records for the renderer); else the original runs.
+      if (copy >= 0xA0000000u ||
+          !c_runtime::Memcpy(base, copy, uint32_t(index) * kDriverBytes + table, kDriverBytes)) {
         return false;
       }
       settled++;
@@ -1541,6 +1546,258 @@ void UpdateOther(uint8_t* base, uint32_t record, uint32_t gap, uint32_t length) 
   }
   CopyWord(base, gap, record + 0);
   UpdateOtherFlags(base, record);
+}
+
+// --- Resets, steering input and the path's lists ---
+
+void ResetControl(uint8_t* base, uint32_t driver, uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_82139580 AiDriver::ResetControl");
+  guest::StoreU32(base, frame + 80, 1);
+  guest::StoreU32(base, driver + 16, Load(base, driver + 16) & ~1u);
+  SetFlag2(base, driver, frame + 80);
+  ResetToMode1(base, driver, frame - 112);
+}
+
+uint64_t ResetDriver(uint8_t* base, uint32_t driver) {
+  ITC_NATIVE_RUNNING("sub_8213AAA8 AiDriver::Reset");
+  ResetFollow(base, driver);
+  ResetFor(base, driver + 512, driver);
+  const double zero = Lfs(base, kZero);
+  Stfs(base, driver + 6088, zero);
+  Stfs(base, driver + 6096, zero);
+  Stfs(base, driver + 6100, zero);
+  const double one = Lfs(base, kOne);
+  Stfs(base, driver + 6104, zero);
+  Stfs(base, driver + 6108, one);
+  guest::StoreU8(base, driver + 6132, 0);
+  Stfs(base, driver + 6112, zero);
+  guest::StoreU32(base, driver + 6148, 0x8213A1B8);  // AiDriver::UpdateStarting
+  for (uint32_t at : {6116u, 6120u, 6124u, 6128u, 6136u, 6140u, 6144u}) {
+    Stfs(base, driver + at, zero);
+  }
+  return ResetOthers(base, driver);
+}
+
+uint32_t UpdateSteerInput(uint8_t* base, uint32_t driver, uint32_t* record) {
+  ITC_NATIVE_RUNNING("sub_8213AC70 AiDriver::UpdateSteerInput");
+  const int32_t count = LoadS16(base, driver + 5674);
+  for (int32_t i = 0; i < count; i++) {
+    const uint32_t at = driver + 5676 + 44 * uint32_t(i);
+    if (Load(base, at + 0) == 0) {
+      continue;
+    }
+    const int32_t kind = int32_t(Load(base, at + 40));
+    if (kind == 1) {
+      break;
+    }
+    if (kind == 2 || kind == 3) {
+      *record = at;
+      return uint32_t(kind);
+    }
+  }
+  AccumulateSteer(base, driver);
+  return 0;
+}
+
+void DropPassedSections(uint8_t* base, uint32_t path) {
+  ITC_NATIVE_RUNNING("sub_8213BA48 AiPath::DropPassedSections");
+  const int32_t count = LoadS16(base, path + 5144);
+  const uint32_t driver = Load(base, path + 0);
+  if (count <= 0) {
+    return;
+  }
+  const uint32_t list = path + 5146;
+  const int32_t current = LoadS16(base, driver + 4);
+  if (LoadS16(base, list) == current) {
+    return;
+  }
+  int32_t found = -1;
+  for (int32_t i = 1; count > 1 && i < LoadS16(base, path + 5144); i++) {
+    if (LoadS16(base, list + 2 * uint32_t(i)) == current) {
+      found = i;
+      break;
+    }
+  }
+  if (found < 0) {
+    guest::StoreU16(base, path + 5144, 0);
+    for (uint32_t i = 0; i < 8; i++) {
+      guest::StoreU16(base, list + 2 * i, 0xFFFF);
+    }
+    return;
+  }
+  int32_t moved = 0;
+  if (count - found > 0) {
+    int32_t j = 0;
+    do {
+      guest::StoreU16(base, list + 2 * uint32_t(j),
+                      guest::LoadU16(base, list + 2 * uint32_t(j + found)));
+      j++;
+      moved = j;
+    } while (j < LoadS16(base, path + 5144) - found);
+  }
+  for (int32_t i = moved; i < 8; i++) {
+    guest::StoreU16(base, list + 2 * uint32_t(i), 0xFFFF);
+  }
+  guest::StoreU16(base, path + 5144, uint16_t(guest::LoadU16(base, path + 5144) - found));
+}
+
+uint32_t SharesSections(uint8_t* base, uint32_t path, uint32_t record) {
+  ITC_NATIVE_RUNNING("sub_8213C010 AiPath::SharesSections");
+  const int32_t n = LoadS16(base, path + 5144);
+  if (n <= 0) {
+    return 0;
+  }
+  const int32_t m = LoadS16(base, record + 2);
+  const uint32_t list = path + 5146;
+  for (int32_t i = 0; i < n; i++) {
+    if (m <= 0) {
+      continue;
+    }
+    const int32_t section = LoadS16(base, list + 2 * uint32_t(i));
+    for (int32_t j = 0; j < m; j++) {
+      if (section != LoadS16(base, record + 36 + 2 * uint32_t(j))) {
+        continue;
+      }
+      const int32_t least = i > j ? j : i;
+      int32_t a = i - least, b = j - least;
+      if (!(a < n)) {
+        return 1;
+      }
+      while (b < m) {
+        if (guest::LoadU16(base, list + 2 * uint32_t(a)) !=
+            guest::LoadU16(base, record + 36 + 2 * uint32_t(b))) {
+          return 0;
+        }
+        a++;
+        b++;
+        if (!(a < n)) {
+          break;
+        }
+      }
+      return 1;
+    }
+  }
+  return 0;
+}
+
+void Widen(uint8_t* base, uint32_t entry, uint32_t margin, uint32_t shift) {
+  ITC_NATIVE_RUNNING("sub_8213C3A8 AiPathEntry::Widen");
+  Stfs(base, entry + 40, Fadds(Lfs(base, entry + 32), Lfs(base, margin)));
+  const double m = Lfs(base, margin);
+  const double high = Fsubs(Lfs(base, entry + 36), m);
+  Stfs(base, entry + 44, high);
+  const double by = Lfs(base, shift);
+  if (by > Lfs(base, kZero)) {
+    Stfs(base, entry + 40, Fadds(Lfs(base, entry + 40), by));
+  } else {
+    Stfs(base, entry + 44, Fadds(by, high));
+  }
+  const double lo = Lfs(base, entry + 40);
+  const double hi = Lfs(base, entry + 44);
+  if (!(lo > hi)) {
+    return;
+  }
+  const double middle = Fmuls(Fadds(hi, lo), Lfs(base, kHalf));
+  Stfs(base, entry + 44, middle);
+  Stfs(base, entry + 40, middle);
+}
+
+void NarrowToOther(uint8_t* base, uint32_t entry, uint32_t other, uint32_t margin,
+                   uint32_t offset) {
+  ITC_NATIVE_RUNNING("sub_8213C420 AiPathEntry::NarrowToOther");
+  if (other == 0) {
+    return;
+  }
+  const uint32_t record = Load(base, other + 52);
+  if (record == 0) {
+    return;
+  }
+  const double m = Lfs(base, margin);
+  double lo = Fsubs(Lfs(base, other + 32), m);
+  double hi = Fadds(Lfs(base, other + 36), m);
+  const double least = Lfs(base, record + 24);
+  if (lo < least) {
+    lo = least;
+  }
+  const double most = Lfs(base, record + 28);
+  if (hi > most) {
+    hi = most;
+  }
+  const double by = Lfs(base, offset);
+  double a = Fadds(by, lo);
+  double b = Fadds(by, hi);
+  if (a > b) {
+    b = Fmuls(Fadds(b, a), Lfs(base, kHalf));
+    a = b;
+  }
+  if (Lfs(base, entry + 32) < a) {
+    Stfs(base, entry + 32, a);
+    Stfs(base, entry + 40, a);
+  }
+  if (Lfs(base, entry + 36) > b) {
+    Stfs(base, entry + 36, b);
+    Stfs(base, entry + 44, b);
+  }
+}
+
+bool AdvanceCorners(uint8_t* base, uint32_t path, uint32_t slices, uint32_t* r3) {
+  ITC_NATIVE_RUNNING("sub_8213D020 AiPath::AdvanceCorners");
+  // The records' moves are memcpy's (sub_825A7410): natively only with
+  // nothing for its override to record (outside the physical views) and the
+  // records in one view.
+  const uint32_t records = path + 5164;
+  if (records >= 0xA0000000u || !c_runtime::InOneView(records, 9 * 44)) {
+    return false;
+  }
+  *r3 = path;
+  const int32_t last = LoadS16(base, path + 5162) - 1;
+  if (last < 0) {
+    return true;
+  }
+  const double zero = Lfs(base, kZero);
+  const double one = Lfs(base, kOne);
+  for (int32_t k = last; k >= 0; k--) {
+    const uint32_t record = path + 5164 + 44 * uint32_t(k);
+    guest::StoreU16(base, record + 12,
+                    uint16_t(guest::LoadU16(base, record + 12) - guest::LoadU16(base, slices)));
+    const uint32_t step = guest::LoadU16(base, slices);
+    const int32_t left = LoadS16(base, record + 12);
+    guest::StoreU16(base, record + 10, uint16_t(guest::LoadU16(base, record + 10) - step));
+    if (left > 0) {
+      continue;
+    }
+    int32_t j = k;
+    if (k < LoadS16(base, path + 5162) - 1) {
+      uint32_t to = record;
+      do {
+        // Adjacent records don't share memory: c_runtime::Memcpy copies them
+        // (the host's memmove, which copies them the same, otherwise).
+        if (!c_runtime::Memcpy(base, to, to + 44, 44)) {
+          std::memmove(base + to, base + to + 44, 44);
+        }
+        *r3 = to;  // memcpy's r3
+        j++;
+        to += 44;
+      } while (j < LoadS16(base, path + 5162) - 1);
+    }
+    const uint32_t cleared = path + 5164 + 44 * uint32_t(j);
+    Stfs(base, cleared + 16, one);
+    guest::StoreU32(base, cleared + 0, 0);
+    Stfs(base, cleared + 20, zero);
+    guest::StoreU32(base, cleared + 4, 0);
+    Stfs(base, cleared + 28, zero);
+    guest::StoreU16(base, cleared + 8, 0);
+    Stfs(base, cleared + 32, zero);
+    guest::StoreU16(base, cleared + 10, 0);
+    guest::StoreU16(base, cleared + 12, 0);
+    guest::StoreU16(base, cleared + 14, 0);
+    guest::StoreU32(base, cleared + 24, 0);
+    guest::StoreU8(base, cleared + 36, 0);
+    guest::StoreU8(base, cleared + 37, 0);
+    guest::StoreU32(base, cleared + 40, 0);
+    guest::StoreU16(base, path + 5162, uint16_t(guest::LoadU16(base, path + 5162) - 1));
+  }
+  return true;
 }
 
 }  // namespace ai_drivers
