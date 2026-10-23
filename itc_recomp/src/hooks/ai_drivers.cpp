@@ -41,7 +41,10 @@
 // AiPathEntry::Widen (sub_8213C3A8) and AiPath::KeepToCornerSide
 // (sub_8213CA18), from SetRanges; AiPath::SharesSections (sub_8213C010), from
 // AddCornersAt and DropOffRouteCorners; and ApplyCornerLine (sub_8213BB58),
-// from ApplyCornerLines.
+// from ApplyCornerLines; AiPath::PreferredSections (sub_8213C358), from
+// CompareBranches and NormalizeByBranch; SpreadOffset (sub_8213B890), from
+// ClampOffset; and AiPathEntry::NarrowToOtherEx (sub_8213C4C0), from
+// NarrowBehind.
 
 #include "guest.h"
 
@@ -118,7 +121,7 @@ ITC_FLAG_BOOL(native_ai_drivers, true, "ITC",
               "sub_82145118, sub_821390D0, sub_82139B40, sub_8213C710, sub_82139AC8, sub_8213A620, "
               "sub_8213AB98, sub_8213B4D8, sub_82139168, sub_82139B98, sub_82139BE8, "
               "sub_8213C148, sub_8213AD48, sub_8213F700, sub_8213C3A8, sub_8213CA18, sub_8213C010, "
-              "sub_8213BB58");
+              "sub_8213BB58, sub_8213C358, sub_8213B890, sub_8213C4C0");
 
 // Defines an adapter: `body` uses `ctx` and `base`.
 #define ITC_AI_DRIVERS(address, body)   \
@@ -149,8 +152,6 @@ ITC_AI_DRIVERS(82145230, UpdateHalfWidth(base, ctx.r3.u32))
 // --- The path's corners and points ---
 
 ITC_AI_DRIVERS(8213C0E8, ctx.r3.u64 = IsSlow(base, ctx.r3.u32))
-// r3, r4 = &the bytes; the list's address sign-extended, as the original's.
-ITC_AI_DRIVERS(8213C358, ctx.r3.s64 = int32_t(PreferredSections(base, ctx.r3.u32, ctx.r4.u32)))
 ITC_AI_DRIVERS(8213D318, ctx.r3.u64 = RaceAllowsSides(base))
 ITC_AI_DRIVERS(8213B5D8, RefreshPoints(base, ctx.r3.u32))
 // r3 the path's driver word, as the original leaves it.
@@ -370,19 +371,10 @@ ITC_AI_DRIVERS(8213DC08, ctx.r3.u64 = DropOffRouteCorners(base, ctx.r3.u32))
 
 // --- The path's offsets, narrowing and branches ---
 
-// r4 = &the first index, r5 = &the last, r6 = &the amount; the original's
-// frame 128 bytes down (r3 kept).
-ITC_AI_DRIVERS(8213B890, SpreadOffset(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
-                                      ctx.r1.u32 - 128))
 // r4 = the entry, r5 = &the last index, r6 = &the first; the original's
 // frame 96 bytes down (r3 kept).
 ITC_AI_DRIVERS(8213CF58, ClampOffset(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
                                      ctx.r1.u32 - 96))
-// r3 = the entry, r4 = the other or 0, r5 = &the step, r6 = &the offset, r7
-// and r8 = &the margins, r9 = &the limit.
-ITC_AI_DRIVERS(8213C4C0, ctx.r3.u64 = NarrowToOtherEx(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
-                                                      ctx.r6.u32, ctx.r7.u32, ctx.r8.u32,
-                                                      ctx.r9.u32))
 // r4 = the entry after, r5 = the entry, r6 = &the step, r7 = &the limit; the
 // original's frame 128 bytes down.
 ITC_AI_DRIVERS(8213D140, ctx.r3.u64 = NarrowBehind(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
