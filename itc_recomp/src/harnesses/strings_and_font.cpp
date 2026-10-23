@@ -18,6 +18,7 @@
 #include <fmt/format.h>
 
 #include <bit>
+#include <functional>
 #include <iterator>
 #include <string>
 #include <vector>
@@ -67,6 +68,33 @@ void NativeInitShaderEntries(PPCContext& ctx, uint8_t* base) {
 void NativeSetParams(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   sf::FontSetParams(base, ctx.r3.u32, ctx.r4.u32);
+}
+
+void NativeTextWidth(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ctx.f1.f64 = sf::FontTextWidth(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+}
+void NativeLineWidth(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ctx.f1.f64 = sf::FontLineWidth(base, ctx.r3.u32, ctx.r4.u32);
+}
+void NativeLineGlyphs(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = sf::FontLineGlyphs(base, ctx.r4.u32);
+}
+void NativeLineX(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ctx.f1.f64 = sf::FontLineX(base, ctx.r3.u32, ctx.r4.u32);
+}
+void NativeLineY(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ctx.f1.f64 = sf::FontLineY(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.f1.f64);
+}
+void NativeCountGlyphs(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = sf::FontCountGlyphs(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+}
+void NativeOutCode(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = sf::FontOutCode(base, ctx.r3.u32, ctx.r4.u32);
 }
 
 // Runs the original with the flag off (its callees' adapters fall back) or
@@ -411,6 +439,151 @@ void SetParams(Context& h) {
   results.Report();
 }
 
+// A font for the layout's cases: the font in `font` (its +16448 and +16452
+// spacings random floats), its current page (+36) and the four pages (+20)
+// at the scratch area's +2048 (28 bytes each: +0 the glyph table at +2304,
+// its cell width and height 16-bit; +4 the records, the block `records` of
+// 65,536 x 4 bytes, random), and the draw parameters at the scratch area's
+// +2560 (+16 points at them): ints (small, edges or random bits) but the
+// floats +16 to +40, the alignments (+76, +80) 0-3 or random.
+struct Layout {
+  Layout() : font(16592), records(0x40000) {}
+  Block font;
+  Block records;
+};
+
+constexpr uint32_t kPages = 2048, kTable = 2304, kParams = 2560, kTexts = 64;
+
+void SetUpLayout(Context& h, const Layout& l, bool fill_records) {
+  if (fill_records) {
+    for (uint32_t k = 0; k < l.records.bytes; k += 4) {
+      // The advance (x 4) small, the channel 0-3; sometimes any bits.
+      const uint32_t word = h.random.Below(8) == 0
+                                ? uint32_t(h.random.Next())
+                                : (h.random.Below(256) << 16) | (h.random.Below(256) << 2) |
+                                      h.random.Below(4);
+      guest::StoreU32(h.base, l.records.address + k, word);
+    }
+  }
+  for (uint32_t k : {16u, 36u, 56u, 60u, 16448u, 16452u}) {
+    guest::StoreU32(h.base, l.font.address + k, 0xCDCDCDCD);
+  }
+  guest::StoreU32(h.base, l.font.address + 16448, FloatWord(h.random));
+  guest::StoreU32(h.base, l.font.address + 16452, FloatWord(h.random));
+  guest::StoreU32(h.base, l.font.address + 56, FloatWord(h.random));
+  guest::StoreU32(h.base, l.font.address + 60, FloatWord(h.random));
+  for (uint32_t p = 0; p < 4; p++) {
+    const uint32_t page = h.data + kPages + 28 * p;
+    guest::StoreU32(h.base, page + 0, h.data + kTable);
+    guest::StoreU32(h.base, page + 4, l.records.address);
+    guest::StoreU32(h.base, l.font.address + 20 + 4 * p, page);
+  }
+  guest::StoreU32(h.base, l.font.address + 36, h.data + kPages + 28 * h.random.Below(4));
+  guest::StoreU16(h.base, h.data + kTable + 0, uint16_t(h.random.Below(64)));
+  guest::StoreU16(h.base, h.data + kTable + 2,
+                  h.random.Below(8) == 0 ? uint16_t(h.random.Next()) : uint16_t(h.random.Below(64)));
+  const uint32_t params = h.data + kParams;
+  for (uint32_t k = 0; k < 120; k += 4) {
+    uint32_t word = k >= 16 && k <= 40 ? FloatWord(h.random) : IntWord(h.random);
+    if (k == 60 || k == 108) {
+      word = h.random.Below(4);  // the page (any other reads past the font)
+    } else if (k == 76 || k == 80) {
+      word = h.random.Below(12) == 0 ? uint32_t(h.random.Next()) : h.random.Below(4);
+    } else if (k >= 44 && k <= 56 && h.random.Below(3) == 0) {
+      word = 0;
+    }
+    guest::StoreU32(h.base, params + k, word);
+  }
+  guest::StoreU32(h.base, l.font.address + 16, params);
+}
+
+// The font's words the functions store: +16 and +36 exactly, the floats
+// with Float.
+void FontOutputs(Context& h, const Layout& l, Outputs& out) {
+  out.Word(guest::LoadU32(h.base, l.font.address + 16));
+  out.Word(guest::LoadU32(h.base, l.font.address + 36));
+  for (uint32_t k : {56u, 60u, 16448u, 16452u}) {
+    out.Float(guest::LoadU32(h.base, l.font.address + k));
+  }
+}
+
+void LayoutCases(Context& h, const Layout& l, const char* name, GuestFunction recompiled,
+                 GuestFunction native, int count, bool f1_out,
+                 const std::function<void(PPCContext&, uint32_t)>& args) {
+  Results results(name);
+  for (int i = 0; i < count; i++) {
+    const uint32_t length = i % 20 == 0 ? 0 : h.random.Below(40);
+    const Random start = h.random;
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      h.random = start;
+      Fill(h.base, h.data, kScratchBytes);
+      SetUpLayout(h, l, false);
+      const uint32_t text = h.data + kTexts + 2 * h.random.Below(4);
+      WriteText(h, text, length);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = l.font.address;
+      t.f1.u64 = h.random.Next();
+      args(t, text);
+      Run(v, recompiled, native, t, h.base);
+      FontOutputs(h, l, out[v]);
+      out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+      if (f1_out) {
+        out[v].Double(t.f1.u64);
+      } else {
+        out[v].Word(t.r3.u32);
+      }
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", i));
+  }
+  results.Report();
+}
+
+void FontLayout(Context& h) {
+  Layout l;
+  SetUpLayout(h, l, true);
+  LayoutCases(h, l, "sub_82108B30 Font::TextWidth", __imp__sub_82108B30, NativeTextWidth, 1000,
+              true, [&](PPCContext& t, uint32_t text) {
+                t.r4.u64 = h.data + kParams;
+                t.r5.u64 = text;
+              });
+  LayoutCases(h, l, "sub_82108458 Font::LineWidth", __imp__sub_82108458, NativeLineWidth, 1000,
+              true, [&](PPCContext& t, uint32_t text) { t.r4.u64 = text; });
+  LayoutCases(h, l, "sub_82108810 (a justified line's glyphs)", __imp__sub_82108810,
+              NativeLineGlyphs, 300, false, [&](PPCContext& t, uint32_t text) {
+                t.r3.u64 = h.random.Next();
+                t.r4.u64 = text;
+              });
+  LayoutCases(h, l, "sub_82108FE0 Font::LineX", __imp__sub_82108FE0, NativeLineX, 1500, true,
+              [&](PPCContext& t, uint32_t text) { t.r4.u64 = text; });
+  LayoutCases(h, l, "sub_82108568 Font::LineY", __imp__sub_82108568, NativeLineY, 1500, true,
+              [&](PPCContext& t, uint32_t) {
+                const uint32_t lines = h.random.Below(6) == 0 ? uint32_t(h.random.Next())
+                                                              : h.random.Below(6);
+                t.r4.u64 = (uint64_t(h.random.Next()) << 32) | lines;
+                t.r5.u64 = (uint64_t(h.random.Next()) << 32) |
+                           (h.random.Below(6) == 0 ? uint32_t(h.random.Next()) : h.random.Below(6));
+              });
+  LayoutCases(h, l, "sub_82108210 Font::CountGlyphs", __imp__sub_82108210, NativeCountGlyphs,
+              300, false, [&](PPCContext& t, uint32_t text) {
+                t.r4.u64 = h.data + 4 * h.random.Below(8);
+                t.r5.u64 = text;
+              });
+  LayoutCases(h, l, "sub_821082A0 Font::OutCode", __imp__sub_821082A0, NativeOutCode, 1000,
+              false, [&](PPCContext& t, uint32_t) {
+                const uint32_t vertex = h.data + 3072;
+                guest::StoreU32(h.base, vertex + 0,
+                                h.random.Below(2) == 0 ? FloatWord(h.random)
+                                                       : std::bit_cast<uint32_t>(float(
+                                                             int32_t(h.random.Below(2000)) - 400)));
+                guest::StoreU32(h.base, vertex + 4,
+                                h.random.Below(2) == 0 ? FloatWord(h.random)
+                                                       : std::bit_cast<uint32_t>(float(
+                                                             int32_t(h.random.Below(2000)) - 400)));
+                t.r4.u64 = vertex;
+              });
+}
+
 }  // namespace
 
 void StringsAndFont(Context& h) {
@@ -422,6 +595,7 @@ void StringsAndFont(Context& h) {
   CopyPage(h);
   ShaderEntries(h);
   SetParams(h);
+  FontLayout(h);
 }
 
 }  // namespace harness

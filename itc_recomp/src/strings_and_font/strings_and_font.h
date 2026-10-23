@@ -73,4 +73,40 @@ void InitShaderEntries(uint8_t* base);
 // point (+56, +60) and the letter and line spacing (+16448, +16452).
 void FontSetParams(uint8_t* base, uint32_t font, uint32_t params);
 
+// The font's layout (font.cpp). The text drawn is UTF-16; 0xFFD1 a page
+// break, '\n' a new line, 0xFFD6 and 0xFFF6-0xFFFF colors (not drawn). A
+// glyph's advance is its record's +2 >> 2 (the page's +4 records, 4 bytes a
+// code) times the glyph scale (the parameters' +36), truncated to 64 bits
+// and kept to its low 16 (fctidz, then a halfword load), as a float.
+
+// Font::TextWidth (sub_82108B30): Font::SetParams, the page (+36) from the
+// parameters' +60, and the widest line's width less the letter spacing,
+// times the scale (+28): f1.
+double FontTextWidth(uint8_t* base, uint32_t font, uint32_t params, uint32_t text);
+
+// Font::LineWidth (sub_82108458): one line's width (to '\n', a page break or
+// the end); less the letter spacing and times the scale, except justified.
+double FontLineWidth(uint8_t* base, uint32_t font, uint32_t text);
+
+// sub_82108810: the glyphs drawn in a line (16-bit), for justified text.
+uint32_t FontLineGlyphs(uint8_t* base, uint32_t text);
+
+// Font::LineX (sub_82108FE0): a line's start x by the horizontal
+// alignment; justified text sets the letter spacing (+16448).
+double FontLineX(uint8_t* base, uint32_t font, uint32_t text);
+
+// Font::LineY (sub_82108568): line `line` of `lines`' y by the vertical
+// alignment; justified text sets the line spacing (+16452). An alignment
+// above 3 returns `f1` (the register as it came).
+double FontLineY(uint8_t* base, uint32_t font, uint32_t lines, uint32_t line, double f1);
+
+// Font::CountGlyphs (sub_82108210): each drawn character's channel count
+// (the four words at `counts`) up by one; returns the text's wcslen.
+uint32_t FontCountGlyphs(uint8_t* base, uint32_t font, uint32_t counts, uint32_t text);
+
+// Font::OutCode (sub_821082A0): the vertex's (x, y floats at `vertex`) bits
+// against the clip rectangle (the parameters' +44..+56): x 1 left, 2 right,
+// 4 inside; y 8 above, 16 below, 32 inside.
+uint32_t FontOutCode(uint8_t* base, uint32_t font, uint32_t vertex);
+
 }  // namespace strings_and_font

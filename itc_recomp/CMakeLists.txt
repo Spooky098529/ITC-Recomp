@@ -152,6 +152,7 @@ set(ITC_SOURCES
     src/cameras/cameras.cpp
     src/hooks/strings_and_font.cpp
     src/strings_and_font/strings_and_font.cpp
+    src/strings_and_font/font.cpp
     src/hooks/sound_cues.cpp
     src/sound_cues/sound_cues.cpp
     src/hooks/xact.cpp
@@ -279,7 +280,7 @@ set_source_files_properties(src/c_runtime/math.cpp src/ui_movies/keys.cpp
     src/track_collision/track_walls.cpp src/track_collision/track_wall_query.cpp
     src/action_mappers/action_mappers.cpp src/model_animation/model_animation.cpp
     src/car_specs/car_specs.cpp src/cameras/cameras.cpp
-    src/strings_and_font/strings_and_font.cpp PROPERTIES
+    src/strings_and_font/strings_and_font.cpp src/strings_and_font/font.cpp PROPERTIES
     COMPILE_OPTIONS "-ffp-model=strict;-ffp-contract=off"
     SKIP_PRECOMPILE_HEADERS ON)
 

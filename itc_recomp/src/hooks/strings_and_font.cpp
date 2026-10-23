@@ -5,7 +5,9 @@
 // stay. Strings::IsLoaded (sub_8210A768) and Font::IsLoaded (sub_821081A0)
 // have no adapters: only Text::IsLoaded's plain C++ calls them in play (a
 // recompiled caller reaching them runs the original, and the flag switches
-// Text::IsLoaded). The registers the originals leave that a caller could read
+// Text::IsLoaded). Font::LineWidth (sub_82108458) and the justified line's
+// glyph count (sub_82108810) have none either: only Font::LineX's plain C++
+// calls them. The registers the originals leave that a caller could read
 // (r3) are left the same.
 
 #include "guest.h"
@@ -20,7 +22,10 @@ ITC_FLAG_BOOL(native_strings_and_font, true, "ITC",
               "Strings::Release sub_8210A538 (with --native_heap), Text::IsLoaded "
               "sub_82211C90 with Strings::IsLoaded sub_8210A768 and Font::IsLoaded "
               "sub_821081A0, Strings::PageCount sub_8210A5C0, Strings::CopyPage sub_8210A5E8, "
-              "the font's pixel shader entries sub_825D9590 and Font::SetParams sub_82108368) "
+              "the font's pixel shader entries sub_825D9590, Font::SetParams sub_82108368, "
+              "Font::TextWidth sub_82108B30, Font::LineX sub_82108FE0 with Font::LineWidth "
+              "sub_82108458 and sub_82108810, Font::LineY sub_82108568, Font::CountGlyphs "
+              "sub_82108210 and Font::OutCode sub_821082A0) "
               "natively instead of through the translated code (same results; checked by "
               "--run_harnesses=strings_and_font)");
 
@@ -98,4 +103,42 @@ extern "C" REX_FUNC(sub_82108368) {
   ITC_STRINGS_AND_FONT_FALLBACK(82108368)
   ctx.fpscr.disableFlushMode();
   FontSetParams(base, ctx.r3.u32, ctx.r4.u32);
+}
+
+// Font::TextWidth: r3 = the font, r4 = the draw parameters, r5 = the text;
+// f1 the width.
+extern "C" REX_FUNC(sub_82108B30) {
+  ITC_STRINGS_AND_FONT_FALLBACK(82108B30)
+  ctx.fpscr.disableFlushMode();
+  ctx.f1.f64 = FontTextWidth(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+}
+
+// Font::LineX: r3 = the font, r4 = the line; f1 its x. (The original's r3
+// after justified text is the glyph count; no caller reads it.)
+extern "C" REX_FUNC(sub_82108FE0) {
+  ITC_STRINGS_AND_FONT_FALLBACK(82108FE0)
+  ctx.fpscr.disableFlushMode();
+  ctx.f1.f64 = FontLineX(base, ctx.r3.u32, ctx.r4.u32);
+}
+
+// Font::LineY: r3 = the font, r4 = the line count, r5 = the line; f1 its y
+// (as it came for an alignment above 3).
+extern "C" REX_FUNC(sub_82108568) {
+  ITC_STRINGS_AND_FONT_FALLBACK(82108568)
+  ctx.fpscr.disableFlushMode();
+  ctx.f1.f64 = FontLineY(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.f1.f64);
+}
+
+// Font::CountGlyphs: r3 = the font, r4 = the four counts, r5 = the text; r3
+// the text's length.
+extern "C" REX_FUNC(sub_82108210) {
+  ITC_STRINGS_AND_FONT_FALLBACK(82108210)
+  ctx.r3.u64 = FontCountGlyphs(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+}
+
+// Font::OutCode: r3 = the font, r4 = the vertex; r3 the bits.
+extern "C" REX_FUNC(sub_821082A0) {
+  ITC_STRINGS_AND_FONT_FALLBACK(821082A0)
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = FontOutCode(base, ctx.r3.u32, ctx.r4.u32);
 }

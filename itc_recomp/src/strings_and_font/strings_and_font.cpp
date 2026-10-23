@@ -7,46 +7,25 @@
 #include "guest.h"
 #include "memory/heap.h"
 
-#include <simde/x86/sse2.h>
+#include "strings_and_font/steps.h"
 
-#include <bit>
-#include <climits>
 #include <cmath>
 
 namespace strings_and_font {
+
+using namespace steps;
 
 namespace {
 
 constexpr uint32_t kPageBreak = 0xFFD1;
 
-// fctiwz as the translation does it: NaN to INT_MIN, INT_MAX and above to
-// INT_MAX, else truncated (cvttsd: INT_MIN below the range).
-int32_t Fctiwz(double value) {
-  if (std::isnan(value)) {
-    return INT32_MIN;
-  }
-  if (value >= double(INT32_MAX)) {
-    return INT32_MAX;
-  }
-  return simde_mm_cvttsd_si32(simde_mm_set_sd(value));
-}
-
-// An int32 through the stack and fcfid, rounded to single (frsp).
-double IntToSingle(int32_t value) { return double(float(double(int64_t(value)))); }
-
-double LoadDouble(uint8_t* base, uint32_t address) {
-  const uint64_t bits = (uint64_t(guest::LoadU32(base, address)) << 32) |
-                        guest::LoadU32(base, address + 4);
-  return std::bit_cast<double>(bits);
-}
-
 // The start point's coordinate: (int)(position - (scale - 1) * origin), the
 // subtraction fused as the original's fnmsub, back to a float.
 float StartCoordinate(double scale_less_one, int32_t position, int32_t origin) {
-  const double p = IntToSingle(position);
-  const double o = IntToSingle(origin);
+  const double p = ToSingle(position);
+  const double o = ToSingle(origin);
   const double value = -std::fma(scale_less_one, o, -p);
-  return float(IntToSingle(Fctiwz(value)));
+  return float(ToSingle(Fctiwz(value)));
 }
 
 }  // namespace
@@ -218,7 +197,7 @@ void InitShaderEntries(uint8_t* base) {
 void FontSetParams(uint8_t* base, uint32_t font, uint32_t params) {
   ITC_NATIVE_RUNNING("sub_82108368 Font::SetParams");
   guest::StoreU32(base, font + 16, params);
-  const double one = LoadDouble(base, 0x82002250);
+  const double one = Lfd(base, 0x82002250);
   const int32_t x = int32_t(guest::LoadU32(base, params + 0));
   const double scale_x = double(guest::LoadFloat(base, params + 28)) - one;
   const int32_t origin_x = int32_t(guest::LoadU32(base, params + 8));
@@ -228,9 +207,9 @@ void FontSetParams(uint8_t* base, uint32_t font, uint32_t params) {
   const int32_t origin_y = int32_t(guest::LoadU32(base, params + 12));
   guest::StoreFloat(base, font + 60, StartCoordinate(scale_y, y, origin_y));
   guest::StoreFloat(base, font + 16448,
-                    float(IntToSingle(int32_t(guest::LoadU32(base, params + 84)))));
+                    float(ToSingle(int32_t(guest::LoadU32(base, params + 84)))));
   guest::StoreFloat(base, font + 16452,
-                    float(IntToSingle(int32_t(guest::LoadU32(base, params + 88)))));
+                    float(ToSingle(int32_t(guest::LoadU32(base, params + 88)))));
 }
 
 }  // namespace strings_and_font
