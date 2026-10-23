@@ -31,7 +31,7 @@ ITC_FLAG_BOOL(native_collision_world, true, "ITC",
               "adapters, and the flag switches their callers: sub_820F6898, sub_820F72F8, "
               "sub_820F7468, sub_820F7590, sub_820F7818, sub_820F6E18, sub_820F6A38, sub_820F6BE8, "
               "sub_820F71B0, sub_820F7EE8, sub_820F7E30, sub_820F7D70, sub_820F6C88, sub_820FC110, "
-              "sub_820FE8F8, sub_820FC870");
+              "sub_820FE8F8, sub_820FC870, sub_820FC2E0, sub_820FC658");
 
 // Defines an adapter: `body` uses `ctx` and `base`.
 #define ITC_COLLISION_WORLD(address, body)   \
@@ -145,10 +145,9 @@ extern "C" REX_FUNC(sub_820FC188) {
   }
   ctx.r3.u64 = count;
 }
-// r4 = the surface bits.
-ITC_COLLISION_WORLD(820FC2E0, ctx.r3.u64 = WallQueryAddHit(base, ctx.r3.u32, ctx.r4.u32))
-// r3 = the four points, r4 = out.
-ITC_COLLISION_WORLD(820FC658, ctx.r3.u64 = SegmentsIntersect2D(base, ctx.r3.u32, ctx.r4.u32))
+// WallQuery::AddHit and Segments::Intersect2D (sub_820FC2E0, sub_820FC658)
+// have no adapters: their callers, the wall query's CornersThroughWall and
+// EdgesAcrossWall, are native.
 // Archive::Load's callback: r6 = the route; r3 comes back as 12 (the
 // original's count of route bits).
 ITC_COLLISION_WORLD(820F9050, TrackRouteOnLoaded(base, ctx.r6.u32); ctx.r3.u64 = 12)
