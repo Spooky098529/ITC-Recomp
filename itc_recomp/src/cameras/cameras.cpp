@@ -3,6 +3,8 @@
 #include "guest.h"
 
 #include "base/log.h"
+#include "c_runtime/math.h"
+#include "memory/heap.h"
 
 #include <rex/platform/fpscr.h>
 #include <simde/x86/avx.h>
@@ -310,6 +312,71 @@ bool ReleaseSurfaces(uint8_t* base, uint32_t pass,
     }
   }
   return true;
+}
+
+void PassSetZoom(uint8_t* base, uint32_t pass, double zoom) {
+  ITC_NATIVE_RUNNING("sub_820AA378 CameraPass::SetZoom");
+  Stfs(base, pass + 516, zoom);
+  const int32_t height = int32_t(guest::LoadU32(base, pass + 508));
+  const double h = double(float(double(int64_t(height))));
+  const double ratio = Fdivs(Fmuls(h, Lfs(base, kHalf)), zoom);
+  const double angle = double(float(c_runtime::Atan(ratio)));
+  Stfs(base, pass + 368, WrapAngle(base, angle));
+}
+
+bool ReleaseViewports(uint8_t* base) {
+  ITC_NATIVE_RUNNING("sub_820AA430 Viewports::Release");
+  const uint32_t block = guest::LoadU32(base, kViewports);
+  if (!memory::IsPages(block) || !memory::IsPages(guest::LoadU32(base, block + 0)) ||
+      !memory::IsPages(guest::LoadU32(base, block + 4))) {
+    return false;
+  }
+  for (uint32_t i = 0; i < 8; i += 4) {
+    memory::FreePages(guest::LoadU32(base, guest::LoadU32(base, kViewports) + i));
+  }
+  memory::FreePages(guest::LoadU32(base, kViewports));
+  guest::StoreU32(base, kViewports, 0);
+  return true;
+}
+
+void ViewportSetZoom(uint8_t* base, uint32_t viewport, double zoom) {
+  ITC_NATIVE_RUNNING("sub_820AAE90 Viewport::SetZoom");
+  const uint32_t size = guest::LoadU32(base, 0x82001EF0);
+  const double half = Fmuls(double(float(double(int64_t(uint64_t(size))))), Lfs(base, kHalf));
+  const double angle = double(float(c_runtime::Atan(half)));
+  Stfs(base, viewport + 68, zoom);
+  Stfs(base, viewport + 148, zoom);
+  const double fixed = Fmuls(angle, Lfs(base, 0x82002808));
+  for (uint32_t entry = 2; entry <= 7; entry++) {
+    Stfs(base, viewport + 80 * entry + 68, fixed);
+  }
+  for (uint32_t entry = 8; entry <= 17; entry++) {
+    Stfs(base, viewport + 80 * entry + 68, zoom);
+  }
+  const double inverse = Fdivs(Lfs(base, kOne), Lfs(base, viewport + 1856));
+  Stfs(base, viewport + 1508, Fmuls(inverse, Lfs(base, 0x82002800)));
+  Stfs(base, viewport + 1588, zoom);
+}
+
+void ViewportSetRoll(uint8_t* base, uint32_t viewport, double angle) {
+  ITC_NATIVE_RUNNING("sub_820AA2D0 Viewport::SetRoll");
+  const double pi = Lfs(base, 0x82002240);
+  double x = Fadds(angle, pi);
+  const double two_pi = Lfs(base, kTwoPi);
+  while (x > two_pi) {
+    x = Fsubs(x, two_pi);
+  }
+  const double zero = Lfs(base, 0x82000A34);
+  while (x < zero) {
+    x = Fadds(x, two_pi);
+  }
+  x = Fsubs(x, pi);
+  Stfs(base, viewport + 64, x);
+  Stfs(base, viewport + 144, Fneg(x));
+  for (uint32_t entry = 2; entry <= 17; entry++) {
+    Stfs(base, viewport + 80 * entry + 64, x);
+  }
+  Stfs(base, viewport + 1584, x);
 }
 
 }  // namespace cameras

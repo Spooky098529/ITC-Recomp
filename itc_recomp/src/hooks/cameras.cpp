@@ -13,6 +13,7 @@
 #include "base/flags.h"
 #include "cameras/cameras.h"
 #include "hooks/guest_call.h"
+#include "hooks/heap.h"
 
 ITC_FLAG_BOOL(native_cameras, true, "ITC",
               "Run the camera passes and viewports (docs/functions/cameras.md: the library "
@@ -21,7 +22,9 @@ ITC_FLAG_BOOL(native_cameras, true, "ITC",
               "CameraPasses::Mode sub_8209F718, SetMode sub_8209F738, RenderTarget "
               "sub_8209F7A8, EnableForView sub_820AA1A8 and SetNear sub_820AA368, "
               "CameraPass::Enable sub_820A0968, Disable sub_820A0958 and ReleaseSurfaces "
-              "sub_820A0C40) natively instead of "
+              "sub_820A0C40, and SetZoom sub_820AA378; the viewports' Viewports::Release "
+              "sub_820AA430 (with --native_heap), Viewport::SetZoom sub_820AAE90 and SetRoll "
+              "sub_820AA2D0) natively instead of "
               "through the translated code (the same words, bit for bit; checked by "
               "--run_harnesses=cameras)");
 
@@ -132,4 +135,37 @@ extern "C" REX_FUNC(sub_820A0C40) {
   } else if (!released_580) {
     ctx.r3.u64 = 0;
   }
+}
+
+// CameraPass::SetZoom: r3 = the pass, f1 = the zoom.
+extern "C" REX_FUNC(sub_820AA378) {
+  ITC_CAMERAS_FALLBACK(820AA378)
+  ctx.fpscr.disableFlushMode();
+  cameras::PassSetZoom(base, ctx.r3.u32, ctx.f1.f64);
+}
+
+// Viewports::Release: no arguments; r3 = VirtualFree's answer for the block
+// (1). The original unless --native_heap routes VirtualFree to the
+// allocation layer, or where a block isn't the layer's.
+extern "C" REX_FUNC(sub_820AA430) {
+  ITC_CAMERAS_FALLBACK(820AA430)
+  if (!hooks::NativeHeapActive() || !cameras::ReleaseViewports(base)) {
+    __imp__sub_820AA430(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = 1;
+}
+
+// Viewport::SetZoom: r3 = the viewport, f1 = the zoom.
+extern "C" REX_FUNC(sub_820AAE90) {
+  ITC_CAMERAS_FALLBACK(820AAE90)
+  ctx.fpscr.disableFlushMode();
+  cameras::ViewportSetZoom(base, ctx.r3.u32, ctx.f1.f64);
+}
+
+// Viewport::SetRoll: r3 = the viewport, f1 = the angle.
+extern "C" REX_FUNC(sub_820AA2D0) {
+  ITC_CAMERAS_FALLBACK(820AA2D0)
+  ctx.fpscr.disableFlushMode();
+  cameras::ViewportSetRoll(base, ctx.r3.u32, ctx.f1.f64);
 }

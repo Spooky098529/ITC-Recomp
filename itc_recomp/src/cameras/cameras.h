@@ -106,4 +106,35 @@ void SetNear(uint8_t* base, double near);
 bool ReleaseSurfaces(uint8_t* base, uint32_t pass,
                      const std::function<void(uint32_t surface, uint32_t field)>& release);
 
+// CameraPass::SetZoom (sub_820AA378): +516 = `zoom` (f1) as a float; the
+// field of view +368 = atan(height (+508, a signed integer) x 0.5 / zoom),
+// wrapped into [-pi, pi]; atan the C runtime's (src/c_runtime/math.h).
+void PassSetZoom(uint8_t* base, uint32_t pass, double zoom);
+
+// --- The viewports ([kViewports]: a 12-byte block, +0 and +4 two 1,872-byte
+// viewports, +8 whether both are in use) ---
+//
+// A viewport has twenty 80-byte entries from +0 (+16, +32, +48 the eye,
+// target and up, +64 the roll, +68 the zoom, +72 the far plane), +1856 a
+// distance, +1860 its view mode.
+
+// Viewports::Release (sub_820AA430): the two viewports and the block freed
+// (VirtualFree MEM_RELEASE: memory::FreePages), [kViewports] = 0. False,
+// with nothing done, where one isn't the allocation layer's pages (the
+// original frees it).
+bool ReleaseViewports(uint8_t* base);
+
+// Viewport::SetZoom (sub_820AAE90): the entries' zoom (+68): entries 0, 1,
+// 8 to 17 and 19 = `zoom` (f1) as a float; 2 to 7 = atan(the integer at
+// 0x82001EF0 (256) x 0.5) times the float at 0x82002808; 18 = 1 / +1856
+// times the float at 0x82002800.
+void ViewportSetZoom(uint8_t* base, uint32_t viewport, double zoom);
+
+// Viewport::SetRoll (sub_820AA2D0): `angle` (f1) wrapped into [-pi, pi] by
+// adding pi, taking off 2 pi while above 2 pi, adding it while below 0 and
+// taking off pi; stored as the roll (+64) of entries 0, 2 to 17 and 19,
+// negated for entry 1. An infinite angle never leaves the first loop, as
+// in the original (the game's are numbers).
+void ViewportSetRoll(uint8_t* base, uint32_t viewport, double angle);
+
 }  // namespace cameras

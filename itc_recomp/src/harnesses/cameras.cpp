@@ -12,12 +12,16 @@
 
 #include "base/flags.h"
 #include "cameras/cameras.h"
+#include "hooks/heap.h"
+#include "memory/heap.h"
 
 #include <fmt/format.h>
 
 #include <bit>
 #include <functional>
 #include <iterator>
+#include <limits>
+#include <cmath>
 #include <string>
 #include <vector>
 
@@ -101,6 +105,26 @@ void NativeReleaseSurfaces(PPCContext& ctx, uint8_t* base) {
   }
 }
 
+void NativePassSetZoom(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  cm::PassSetZoom(base, ctx.r3.u32, ctx.f1.f64);
+}
+void NativeReleaseViewports(PPCContext& ctx, uint8_t* base) {
+  if (!hooks::NativeHeapActive() || !cm::ReleaseViewports(base)) {
+    __imp__sub_820AA430(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = 1;
+}
+void NativeViewportSetZoom(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  cm::ViewportSetZoom(base, ctx.r3.u32, ctx.f1.f64);
+}
+void NativeViewportSetRoll(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  cm::ViewportSetRoll(base, ctx.r3.u32, ctx.f1.f64);
+}
+
 // Runs the recompiled version with the flag off, so the functions it calls
 // that are ours run the originals too.
 void RunRecompiled(GuestFunction recompiled, PPCContext& t, uint8_t* base) {
@@ -176,7 +200,8 @@ class Globals {
 void Case(Context& h, Results& results, uint32_t object, std::vector<FloatRange> floats,
           const std::function<void()>& setup, const std::function<void(PPCContext&)>& args,
           GuestFunction recompiled, GuestFunction native, const std::string& what,
-          const std::function<void(Outputs&)>& extra = {}, const Globals* globals = nullptr) {
+          const std::function<void(Outputs&)>& extra = {}, const Globals* globals = nullptr,
+          uint32_t compared = kCompared) {
   Outputs out[2];
   // The same random inputs for both.
   const Random inputs = h.random;
@@ -191,7 +216,7 @@ void Case(Context& h, Results& results, uint32_t object, std::vector<FloatRange>
     } else {
       native(t, h.base);
     }
-    for (uint32_t at = h.data; at < h.data + kCompared; at += 4) {
+    for (uint32_t at = h.data; at < h.data + compared; at += 4) {
       bool is_float = false;
       for (const FloatRange& range : floats) {
         is_float |= at >= object + range.from && at < object + range.to;
@@ -488,6 +513,123 @@ void PassStateCases(Context& h) {
   }
 }
 
+// A field in each of a viewport's 20 entries, as float ranges.
+std::vector<FloatRange> EntryFields(uint32_t offset) {
+  std::vector<FloatRange> ranges;
+  for (uint32_t entry = 0; entry < 20; entry++) {
+    ranges.push_back({80 * entry + offset, 80 * entry + offset + 4});
+  }
+  return ranges;
+}
+
+// CameraPass::SetZoom and the viewports' zoom, roll and release.
+void ViewportCases(Context& h) {
+  {
+    Results results("sub_820AA378 CameraPass::SetZoom");
+    for (int i = 0; i < 300; i++) {
+      const uint32_t pass = h.data + 64 + 4 * h.random.Below(4);
+      static constexpr int32_t kHeights[] = {720, 480, 1024, 512, 256, 0, -1, 1};
+      const uint32_t height =
+          h.random.Below(2) ? uint32_t(kHeights[h.random.Below(std::size(kHeights))])
+                            : uint32_t(h.random.Next());
+      const double zoom = h.random.Below(3) ? double(std::bit_cast<float>(FloatWord(h.random)))
+                                            : RandomF1(h.random);
+      Case(
+          h, results, pass, {{368, 372}, {516, 520}},
+          [&] {
+            RandomWords(h, pass, 148);
+            guest::StoreU32(h.base, pass + 508, height);
+          },
+          [&](PPCContext& t) {
+            t.r3.u64 = pass;
+            t.f1.f64 = zoom;
+          },
+          __imp__sub_820AA378, NativePassSetZoom,
+          fmt::format("case {} height {} zoom {}", i, int32_t(height), zoom));
+    }
+    results.Report();
+  }
+  {
+    Results results("sub_820AAE90 Viewport::SetZoom");
+    for (int i = 0; i < 200; i++) {
+      const uint32_t viewport = h.data + 64 + 4 * h.random.Below(4);
+      const double zoom = RandomF1(h.random);
+      const uint32_t distance = h.random.Below(2) ? FloatBits(8000.0f) : FloatWord(h.random);
+      Case(
+          h, results, viewport, EntryFields(68),
+          [&] {
+            RandomWords(h, viewport, 468);
+            guest::StoreU32(h.base, viewport + 1856, distance);
+          },
+          [&](PPCContext& t) {
+            t.r3.u64 = viewport;
+            t.f1.f64 = zoom;
+          },
+          __imp__sub_820AAE90, NativeViewportSetZoom,
+          fmt::format("case {} zoom {} distance {:08X}", i, zoom, distance), {}, nullptr, 2048);
+    }
+    results.Report();
+  }
+  {
+    // Angles from which the original's loops end: numbers within 10,000
+    // and NaNs (an infinite or huge one never leaves the first loop).
+    Results results("sub_820AA2D0 Viewport::SetRoll");
+    static constexpr double kAngles[] = {0.0, -0.0, 3.14159265, -3.14159265, 6.2831853, -6.2831853,
+                                         10000.0, -10000.0, 1e-40, -1e-45, 1.5, 
+                                         std::numeric_limits<double>::quiet_NaN()};
+    for (int i = 0; i < 300; i++) {
+      const uint32_t viewport = h.data + 64 + 4 * h.random.Below(4);
+      double angle;
+      if (h.random.Below(2)) {
+        angle = kAngles[h.random.Below(std::size(kAngles))];
+      } else {
+        const uint32_t word = FloatWord(h.random);
+        const float f = std::bit_cast<float>(word);
+        angle = (std::isnan(f) || std::fabs(f) <= 10000.0f) ? double(f) : double(f) * 0.0;
+      }
+      Case(
+          h, results, viewport, EntryFields(64), [&] { RandomWords(h, viewport, 468); },
+          [&](PPCContext& t) {
+            t.r3.u64 = viewport;
+            t.f1.f64 = angle;
+          },
+          __imp__sub_820AA2D0, NativeViewportSetRoll, fmt::format("case {} angle {}", i, angle), {},
+          nullptr, 2048);
+    }
+    results.Report();
+  }
+  if (hooks::NativeHeapActive()) {
+    // A viewports block and its two viewports from the allocation layer, the
+    // global pointed at them for the case (and put back).
+    const Globals globals(h.base);
+    Results results("sub_820AA430 Viewports::Release");
+    for (int i = 0; i < 20; i++) {
+      uint32_t blocks[3] = {};
+      Case(
+          h, results, h.data, {},
+          [&] {
+            blocks[0] = memory::AllocPages(12, 4096);
+            blocks[1] = memory::AllocPages(1872, 4096);
+            blocks[2] = memory::AllocPages(1872, 4096);
+            guest::StoreU32(h.base, blocks[0] + 0, blocks[1]);
+            guest::StoreU32(h.base, blocks[0] + 4, blocks[2]);
+            guest::StoreU32(h.base, blocks[0] + 8, h.random.Below(2));
+            guest::StoreU32(h.base, cm::kViewports, blocks[0]);
+          },
+          [](PPCContext&) {}, __imp__sub_820AA430, NativeReleaseViewports,
+          fmt::format("case {}", i),
+          [&](Outputs& out) {
+            out.Word(guest::LoadU32(h.base, cm::kViewports));
+            for (uint32_t block : blocks) {
+              out.Word(memory::IsPages(block) ? 1 : 0);
+            }
+          },
+          &globals);
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void Cameras(Context& h) {
@@ -495,6 +637,7 @@ void Cameras(Context& h) {
   BuildProjectionCases(h);
   SetViewportSizeCases(h);
   PassStateCases(h);
+  ViewportCases(h);
 }
 
 }  // namespace harness
