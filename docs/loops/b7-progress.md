@@ -17,8 +17,9 @@ there), and this file's history.
   ..., and `sub_820FDF38`, `sub_820FDC18`, ...; the collision update
   every tick, above `collision.md` and `car-physics.md`), mapped in
   `collision-world.md` (a28943d; 43 rows; checked: 14 ready groups).
-  Migration 1 done (323cd79..ee7d5e1, 29 of 43 ours). Step: its
-  validation (agent running); then migration 2 for what's left.
+  Migration 1 done (323cd79..ee7d5e1, 29 of 43 ours). Validated (29 of
+  29 harness lines, all ran in play or the replay; replay ok). Step:
+  migration 2 (agent running).
 
 ## Done
 

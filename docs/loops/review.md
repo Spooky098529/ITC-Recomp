@@ -26,7 +26,10 @@ When the user has reviewed a run's section, its heading gets
   the game does, kept; four functions ported that never ran in play are
   described in FindCell's row; the "Negated NaN" groups
   (`expected-differences.md`): ours flips a NaN's sign where the
-  translated code doesn't.
+  translated code doesn't. In four functions (`sub_820F6940`,
+  `sub_820F8618`, `sub_820FEBD0`, `sub_820FC188`) the print comes after
+  a guard that falls back to the recompiled code (the validation agent
+  didn't count them as missing).
 
 - `collision.md` (new, 64 rows), `known-data.md`'s shape, box, pair
   query and table entries, `car-physics.md`'s intro; 1 lead added (the
