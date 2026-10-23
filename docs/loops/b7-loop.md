@@ -63,7 +63,8 @@ memory.
    another migration agent after the first reports, until nothing ready
    is left in it. The lead adds the report's nonzero `expected to differ:`
    groups to `expected-differences.md` ("Expected differences" below),
-   not to the progress file.
+   and what's for the user's review to `review.md` ("Rows to review"
+   below), not to the progress file.
 8. **Hand its work to a validation agent** (below; added by the user,
    2026-10-22) after each migration agent's report has passed the
    lead's checks, the "no mapping" leads' too: it checks from a log that
@@ -425,6 +426,18 @@ branch; commit before any revert; stage only your own files; only search
 inside the repo; SBX-Recomp only when the user says so; never screenshot
 the user's desktop; find problems with logs, not guesses.
 
+## Rows to review
+
+`docs/loops/review.md` (the user's call, 2026-10-23) holds what each run
+leaves for the user's review, kept across runs, a section per run, newest
+first: the function files added or changed (rows, intros,
+`known-data.md`), corrections to earlier maps, and the choices a report
+names for review (behavior kept, paths left on the recompiled code, new
+helpers). The lead adds to the current run's section after each map and
+migration report it checks, and commits it with the progress file. The
+user marks a section reviewed. The progress file and run summaries point
+to it instead of listing rows.
+
 ## Expected differences
 
 `docs/loops/expected-differences.md` (the user's call, 2026-10-23) holds
@@ -442,16 +455,17 @@ listing groups.
 
 `docs/loops/b7-progress.md`, for the current run. Kept short, so a pass
 can read it whole. A run's first pass finds the previous run's file
-stopped: it starts it afresh, first copying the old one's rows to
-review, drive list and totals into that run's summary file under "Left
-for the user" (the rest is in git; expected differences already live in
-`expected-differences.md`):
+stopped: it starts it afresh, first copying the old one's drive list
+and totals into that run's summary file under "Left for the user" (the
+rest is in git; rows to review and expected differences already live in
+`review.md` and `expected-differences.md`), and adds a section for the
+new run to `review.md`:
 
 - **Now:** the subsystem, the step, the agent running, the run's
   subsystem count.
 - **Done:** one line a subsystem (file, groups made native, flags,
   commits), newest first.
-- **Rows to review:** the function files added or changed, for the user.
+- **Rows to review:** a pointer to the run's section of `review.md` only.
 - **Expected to differ:** a pointer to `expected-differences.md` only.
 - **Totals:** `b7_status.py`'s totals line after each step.
 - **Stopped:** when and why, if the loop ended itself.
