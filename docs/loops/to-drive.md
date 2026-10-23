@@ -45,6 +45,11 @@ Migration 3's, not in the attract race or the replay (`itc_1169`,
   `sub_8213A200` AiDriver::SteerAtCornerPoint, `sub_82138FA8`
   AiDriver::SteerByRoom, `sub_821392D8` AiDriver::LimitSlide
 
+Migration 5's, not in the attract race or the replay (`itc_1203`,
+`itc_1204`, ok):
+
+- `sub_8213A000` AiDrivers::StartGroup (`ai-drivers.md`)
+
 ## Run 2026-10-23 17:22 (`b7-loop-23-10-26-4`)
 
 Not in the attract race or the replay (`itc_1043`, `itc_1044`, ok):

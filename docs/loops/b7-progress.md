@@ -15,27 +15,22 @@ file's history. What's left to see in a drive, from every run:
   branch), from cf1f2cb; summary `b7-loop-2026-10-23-2022.md`.
 - `leads.md`'s top lead (VirtualAlloc and VirtualFree, `sub_82295398`,
   `sub_82295330`) dropped: both already ours (native memory).
-- Subsystem 1 of 3: the AI drivers (`ai-drivers.md`, mapped in
-  1eeb084 from the route users' lead; 148 rows, 67 ready groups; the
-  race states' route users went back to `leads.md`). Migration 1
-  (c94d6be..91b8da2): 74 ours, 24 Native, `--native_ai_drivers`; 47
-  ready groups left. Validated (74 of 74 harness lines; `itc_1124`,
-  `itc_1125`, replay ok; 8 to drive). Migration 2 (e01cc35..24669a4):
-  92 ours, 46 Native; 29 ready groups left. Validated (32 of 32
-  harness lines; `itc_1145`, `itc_1146`, replay ok; 3 to drive, 3 of
-  migration 1's seen). Migration 3 (1521ad2..18ea84b): 114 ours, 71
-  Native; 16 ready groups left. Validated (44 of 44 harness lines;
-  `itc_1169` 20 s, `itc_1170`, replay ok; 9 to drive, 4 earlier ones
-  seen). Migration 4 (fcec6fd..2ea28d9): 130 ours, 84 Native; 6
-  functions in ready groups left. Validated (21 of 21 harness lines;
-  `itc_1185`, `itc_1186`, replay ok; none to drive). Migration 5
-  (5a7f90d..2ddd638): 143 ours, 119 Native; nothing ready left (the
-  rest waits on `sub_820900C0` and `sub_821434E8`). Step: validation of
-  migration 5 (agent running).
+- Subsystem 1 of 3 (the AI drivers) finished: 143 of 148 ours; the
+  rest waits on `sub_820900C0` and `sub_821434E8`.
+- Subsystem 2 of 3: the AI drivers' callers (the per-racer controllers
+  `8215F5E8`-`821609E0` and the drivers' per-race set-up `sub_82170FF8`,
+  from `leads.md`). Step: mapping (agent running).
 
 ## Done
 
-(None yet.)
+- The AI drivers (`ai-drivers.md`, mapped in 1eeb084; 148 rows): 143
+  ours (119 Native) in five migrations (c94d6be..91b8da2,
+  e01cc35..24669a4, 1521ad2..18ea84b, fcec6fd..2ea28d9,
+  5a7f90d..2ddd638), each validated (`itc_1124`/`1125`, `1145`/`1146`,
+  `1169`/`1170`, `1185`/`1186`, `1203`/`1204`; replays ok; 13 to
+  drive); `--native_ai_drivers`. Left: Destroy and DestroyRings
+  (`sub_820900C0`), UpdateStarting, UpdateTrack and NoteFixedSections
+  (`sub_821434E8`).
 
 ## Rows to review
 
