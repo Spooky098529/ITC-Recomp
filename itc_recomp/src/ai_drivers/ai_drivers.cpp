@@ -3,8 +3,10 @@
 #include "ai_drivers/ai_drivers.h"
 
 #include "c_runtime/math.h"
+#include "c_runtime/strings.h"
 #include "car_physics/float_ops.h"
 #include "strings_and_font/steps.h"
+#include "track_collision/track_collision.h"
 #include "track_route/track_route.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
@@ -36,6 +38,8 @@ constexpr uint32_t kSectionLists = 0x82008A08;
 constexpr uint32_t kMinusOne = 0x82001BE0;  // -1.0
 constexpr uint32_t kOtherGap = 0x820027A4;  // a reset record's gap
 constexpr uint32_t kTwenty = 0x82002568;    // 20.0
+constexpr uint32_t kFifth = 0x82002208;     // 0.2
+constexpr uint32_t kRace = 0x826D82F4;      // the race: +2308 its racers
 // The path's normalizers (+5532): by lane (mode 1), by branch (mode 0).
 constexpr uint32_t kNormalizeByLane = 0x8213B428;
 constexpr uint32_t kNormalizeByBranch = 0x8213C908;
@@ -46,9 +50,10 @@ uint32_t Load(uint8_t* base, uint32_t address) {
 int32_t LoadS16(uint8_t* base, uint32_t address) {
   return int16_t(guest::LoadU16(base, address));
 }
-// An lfs then stfs of a constant.
+// An lfs then stfs of a constant (its bits: CopyWord, as an lfs then stfs
+// of one word keeps them in the translated code).
 void StoreConstant(uint8_t* base, uint32_t address, uint32_t constant) {
-  Stfs(base, address, Lfs(base, constant));
+  CopyWord(base, constant, address);
 }
 double Fsqrts(double a) {
   return double(float(std::sqrt(a)));
@@ -559,7 +564,7 @@ void RefreshPoints(uint8_t* base, uint32_t path) {
     const double offset = Lfs(base, entry + 40);
     const double cx = Lfs(base, record + 0);
     Stfs(base, entry + 16, Fmadds(Lfs(base, record + 36), offset, cx));
-    Stfs(base, entry + 20, Lfs(base, record + 4));
+    CopyWord(base, record + 4, entry + 20);
     const double dz = Lfs(base, record + 40);
     Stfs(base, entry + 24, Fmadds(dz, offset, Lfs(base, record + 8)));
   }
@@ -939,7 +944,7 @@ void ClearCarState(uint8_t* base, uint32_t driver) {
   Stfs(base, driver + 80, zero);
   Stfs(base, driver + 84, zero);
   Stfs(base, driver + 88, zero);
-  Stfs(base, driver + 92, Lfs(base, kOne));
+  CopyWord(base, kOne, driver + 92);
   guest::StoreU32(base, driver + 480, 0);
   for (uint32_t at = 96; at <= 104; at += 4) {
     Stfs(base, driver + at, zero);
@@ -1029,7 +1034,7 @@ void MirrorOther(uint8_t* base, uint32_t out, uint32_t record, uint32_t value) {
   Stfs(base, out + 0, Fneg(Lfs(base, record + 0)));
   Stfs(base, out + 4, Fneg(Lfs(base, record + 4)));
   Stfs(base, out + 8, Fneg(Lfs(base, record + 8)));
-  Stfs(base, out + 20, Lfs(base, record + 20));
+  CopyWord(base, record + 20, out + 20);
   guest::StoreU8(base, out + 32, guest::LoadU8(base, record + 32));
   guest::StoreU8(base, out + 33, guest::LoadU8(base, record + 33));
   uint32_t state = guest::LoadU16(base, record + 24);
@@ -1040,7 +1045,7 @@ void MirrorOther(uint8_t* base, uint32_t out, uint32_t record, uint32_t value) {
   }
   guest::StoreU16(base, out + 24, uint16_t(state));
   UpdateOtherFlags(base, out);
-  Stfs(base, out + 16, Lfs(base, value));
+  CopyWord(base, value, out + 16);
 }
 
 // --- The path's entries and corners ---
@@ -1128,6 +1133,414 @@ uint32_t WithinRoadAt(uint8_t* base, uint32_t path, uint32_t offset) {
   }
   const double left = Fsubs(Fneg(half), Lfs(base, record + 16));
   return at < left ? 0 : 1;
+}
+
+// --- Starts and resets ---
+
+namespace {
+// +16 bits 0 and 2 cleared.
+uint32_t ClearBits0And2(uint32_t flags) {
+  return flags & ~1u & ~4u;
+}
+}  // namespace
+
+void ResetToMode1(uint8_t* base, uint32_t driver, uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_82139450 AiDriver::ResetToMode1");
+  guest::StoreU32(base, frame + 80, 1);
+  SetFlag2(base, driver, frame + 80);
+  const uint32_t flags = Load(base, driver + 16);
+  const uint32_t vehicle = Load(base, driver + 160);
+  guest::StoreU32(base, frame + 84, 1);
+  guest::StoreU32(base, driver + 16, ClearBits0And2(flags));
+  if (vehicle != 0) {
+    SetMode(base, driver + 512, frame + 84);
+  }
+  guest::StoreU32(base, driver + 6084, 0);
+  ResetSkill(base, driver + 6048);
+  const uint32_t again = Load(base, driver + 160);
+  StoreConstant(base, driver + 12, 0x82008948);
+  if (again != 0) {
+    StoreConstant(base, again + 2432, kOne);
+  }
+}
+
+void ResetToMode0(uint8_t* base, uint32_t driver, uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_821394F0 AiDriver::ResetToMode0");
+  guest::StoreU32(base, frame + 80, 0);
+  SetFlag2(base, driver, frame + 80);
+  const uint32_t vehicle = Load(base, driver + 160);
+  guest::StoreU32(base, frame + 88, 0);
+  guest::StoreU32(base, driver + 16, ClearBits0And2(Load(base, driver + 16)));
+  if (vehicle != 0) {
+    SetMode(base, driver + 512, frame + 88);
+  }
+  ResetSkill(base, driver + 6048);
+  guest::StoreU32(base, driver + 6084, 0);
+  const int32_t skill = LoadS16(base, driver + 6052);
+  Stfs(base, driver + 12, double(float(double(int64_t(skill)))));
+}
+
+uint32_t StartRace(uint8_t* base, uint32_t driver, uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_82139DA0 AiDriver::StartRace");
+  const uint32_t flags = Load(base, driver + 16);
+  const uint32_t vehicle = Load(base, driver + 160);
+  guest::StoreU32(base, driver + 16, flags & ~1u);
+  // The vehicle's flags read whatever the vehicle (+6148 of 0 without one),
+  // as the original does.
+  const uint32_t free = (Load(base, vehicle + 6148) & 129) == 0 ? 1 : 0;
+  guest::StoreU32(base, frame + 80, free);
+  SetFlag2(base, driver, frame + 80);
+  const uint32_t set = Load(base, driver + 16) | 4;
+  guest::StoreU32(base, frame + 84, 0);
+  const uint32_t again = Load(base, driver + 160);
+  guest::StoreU32(base, driver + 16, set);
+  if (again != 0) {
+    SetMode(base, driver + 512, frame + 84);
+  }
+  guest::StoreU32(base, frame + 80, 1);
+  SetSkill(base, driver, frame + 80);
+  return ClearPlan(base, driver);
+}
+
+void ResetFollow(uint8_t* base, uint32_t driver) {
+  ITC_NATIVE_RUNNING("sub_821467B8 AiDriver::ResetFollow");
+  ClearFollow(base, driver);
+  ClearCarState(base, driver);
+}
+
+bool AllSettled(uint8_t* base, uint32_t frame, uint32_t* result) {
+  ITC_NATIVE_RUNNING("sub_8213ADF8 AiDrivers::AllSettled");
+  const int32_t count = int32_t(track_collision::RaceRacerCount(base));
+  uint32_t table = Load(base, kDrivers);
+  const double seventy = Lfs(base, 0x82008930);
+  double lowest = seventy;
+  int32_t settled = 0;
+  if (table != 0) {
+    const uint32_t copy = frame + 80;
+    for (int32_t i = 0; i < count; i++) {
+      const uint32_t racer = Load(base, Load(base, kRace) + 2308 + 4 * uint32_t(i));
+      if ((Load(base, racer + 0) & 0x10) == 0) {
+        continue;
+      }
+      const int32_t index = int32_t(Load(base, racer + 20));
+      if (index < 0) {
+        continue;
+      }
+      if (!c_runtime::Memcpy(base, copy, uint32_t(index) * kDriverBytes + table, kDriverBytes)) {
+        return false;
+      }
+      settled++;
+      if (IsSettled(base, copy) == 0) {
+        *result = 0;
+        return true;
+      }
+      const double speed = Lfs(base, copy + 100);
+      if (lowest > speed) {
+        lowest = speed;
+      }
+      table = Load(base, kDrivers);
+    }
+    if (settled == 1) {
+      *result = 1;
+      return true;
+    }
+  }
+  *result = Fadds(lowest, Lfs(base, 0x820021F4)) > Lfs(base, 0x82008930) ? 1 : 0;
+  return true;
+}
+
+// --- Pedals and steering ---
+
+void AccumulateSteer(uint8_t* base, uint32_t driver) {
+  ITC_NATIVE_RUNNING("sub_82138F00 AiDriver::AccumulateSteer");
+  const double angle = Lfs(base, driver + 6116);
+  const double sum = Fadds(Lfs(base, driver + 6112), angle);
+  double steer = Lfs(base, driver + 152);
+  const double crossed = Fmuls(angle, steer);
+  const double total = Fadds(sum, Lfs(base, driver + 6136));
+  const double zero = Lfs(base, kZero);
+  Stfs(base, driver + 6136, total);
+  if (!(crossed < zero)) {
+    return;
+  }
+  steer = Fmuls(steer, Lfs(base, kFifth));
+  if (steer < zero) {
+    steer = Fneg(steer);
+  }
+  const double speed = Lfs(base, driver + 100);
+  if (speed < Lfs(base, kOtherGap)) {
+    steer = Fmuls(Fmuls(speed, Lfs(base, 0x82002A08)), steer);
+  }
+  steer = Fsubs(steer, Lfs(base, kOne));
+  if (!(steer > zero)) {
+    return;
+  }
+  const double most = Lfs(base, 0x820021E4);
+  Stfs(base, driver + 6136,
+       steer < most ? Fmadds(angle, steer, total) : Fmadds(angle, most, total));
+}
+
+void ThrottleForSpeed(uint8_t* base, uint32_t driver) {
+  ITC_NATIVE_RUNNING("sub_82139168 AiDriver::ThrottleForSpeed");
+  const double speed = Lfs(base, driver + 100);
+  if (!(speed > Lfs(base, kTwenty))) {
+    return;
+  }
+  const double over = Fsubs(speed, Lfs(base, driver + 6088));
+  const double ten = Lfs(base, kTen);
+  const double zero = Lfs(base, kZero);
+  if (over > ten) {
+    Stfs(base, driver + 6140, zero);
+    StoreConstant(base, driver + 6144, 0x820029F0);
+  } else if (over > zero) {
+    Stfs(base, driver + 6140, zero);
+    Stfs(base, driver + 6144, zero);
+  } else if (over > Lfs(base, 0x82002824)) {
+    const double eased = Fmuls(Fneg(over), Lfs(base, kFifth));
+    if (eased < Lfs(base, driver + 6140)) {
+      Stfs(base, driver + 6140, eased);
+    }
+    Stfs(base, driver + 6144, zero);
+  }
+  if (Lfs(base, driver + 100) > Lfs(base, driver + 168)) {
+    Stfs(base, driver + 6140, zero);
+  }
+  if ((Load(base, driver + 16) & 4) != 0) {
+    return;
+  }
+  const double angle = Lfs(base, driver + 6116);
+  if (angle > Lfs(base, 0x82001FB4) || angle < Lfs(base, 0x82002A50)) {
+    Stfs(base, driver + 6140, zero);
+  }
+}
+
+void EaseThrottleForSlide(uint8_t* base, uint32_t driver, uint32_t flag) {
+  ITC_NATIVE_RUNNING("sub_82139BE8 AiDriver::EaseThrottleForSlide");
+  const double speed = Lfs(base, driver + 100);
+  if (speed < Lfs(base, kTwenty)) {
+    return;
+  }
+  const uint32_t vehicle = Load(base, driver + 160);
+  uint32_t kind = 3;
+  uint32_t limit = 0x82008954;
+  if (vehicle != 0) {
+    kind = Load(base, vehicle + 3548);
+  }
+  if (kind == 0) {
+    limit = 0x8200894C;
+  } else if (kind == 1) {
+    limit = 0x82008950;
+  }
+  const double f13 = Lfs(base, limit);
+  const double factor = Fmuls(Lfs(base, driver + 140), Lfs(base, driver + 132));
+  const double slide = Fabs(Lfs(base, driver + 6112));
+  double ease = Fmsubs(slide, speed, Fmuls(factor, f13));
+  const double zero = Lfs(base, kZero);
+  if (!(ease > zero)) {
+    return;
+  }
+  ease = Fmuls(ease, Lfs(base, Load(base, flag) != 0 ? kFifth : 0x82002204));
+  if (!(ease > zero)) {
+    return;
+  }
+  const double throttle = Lfs(base, driver + 6140);
+  Stfs(base, driver + 6140, throttle < ease ? zero : Fsubs(throttle, ease));
+}
+
+void LimitThrottle(uint8_t* base, uint32_t driver) {
+  ITC_NATIVE_RUNNING("sub_82139CB0 AiDriver::LimitThrottle");
+  int32_t skill = LoadS16(base, driver + 6054);
+  if (skill < 0) {
+    skill = 0;
+  } else if (skill > 100) {
+    skill = 100;
+  }
+  const double most = Fmuls(double(float(double(int64_t(skill)))), Lfs(base, 0x8200222C));
+  const double zero = Lfs(base, kZero);
+  const double throttle = Lfs(base, driver + 6124);
+  if (throttle < zero) {
+    Stfs(base, driver + 6124, zero);
+  } else if (throttle > most) {
+    Stfs(base, driver + 6124, most);
+  }
+  const uint32_t vehicle = Load(base, driver + 160);
+  const double limit = Lfs(base, vehicle + 4660);
+  const double rpm = Lfs(base, vehicle + 2228);
+  if (rpm < Fmuls(limit, Lfs(base, 0x82002A34))) {
+    return;
+  }
+  if (rpm > Fmuls(limit, Lfs(base, 0x82002B90))) {
+    Stfs(base, driver + 6124, zero);
+    return;
+  }
+  const bool high = rpm > Fmuls(limit, Lfs(base, 0x82008958));
+  const double now = Lfs(base, driver + 6124);
+  if (now < zero) {
+    Stfs(base, driver + 6124, zero);
+    return;
+  }
+  const double cap = Lfs(base, high ? 0x8200296C : kHalf);
+  if (now > cap) {
+    Stfs(base, driver + 6124, cap);
+  }
+}
+
+void AdjustForOther(uint8_t* base, uint32_t driver, uint32_t record, uint32_t mode) {
+  ITC_NATIVE_RUNNING("sub_821452A0 AiDriver::AdjustForOther");
+  const double gap = Lfs(base, record + 0);
+  const double zero = Lfs(base, kZero);
+  if (!(gap < zero)) {
+    return;
+  }
+  const int32_t index = LoadS16(base, record + 26);
+  if (index < 0) {
+    return;
+  }
+  if (guest::LoadU16(base, record + 24) != 1) {
+    return;
+  }
+  if (!(Lfs(base, record + 4) > zero)) {
+    return;
+  }
+  if ((guest::LoadU16(base, record + 28) & 4) != 0) {
+    return;
+  }
+  double distance = Fneg(gap);
+  if (Load(base, mode) != 0 && index > 1) {
+    const double length = Lfs(base, Load(base, track_route::kRoute) + 8);
+    const double slices = double(float(double(int64_t(index - 1))));
+    distance = Fmadds(slices, length, distance);
+  }
+  if (distance < zero) {
+    distance = zero;
+  }
+  double scale = Lfs(base, driver + 100);
+  const double factor = Lfs(base, driver + 136);
+  const double hundred = Lfs(base, kHundred);
+  scale = scale > hundred ? Fdivs(hundred, scale) : Lfs(base, kOne);
+  const double limit = Fmadds(Fmuls(scale, factor), distance, Lfs(base, record + 16));
+  if (limit < Lfs(base, driver + 168)) {
+    Stfs(base, driver + 168, limit);
+  }
+  if (Lfs(base, record + 0) < Lfs(base, 0x82008E48)) {
+    return;
+  }
+  if (limit < Lfs(base, driver + 164)) {
+    Stfs(base, driver + 164, limit);
+  }
+}
+
+uint64_t UpdateAgainstPlayer(uint8_t* base, uint32_t driver) {
+  ITC_NATIVE_RUNNING("sub_82146608 AiDriver::UpdateAgainstPlayer");
+  const int32_t count = int32_t(track_collision::RaceRacerCount(base));
+  uint64_t r3 = uint32_t(count);
+  StoreConstant(base, driver + 488, kZero);
+  guest::StoreU16(base, driver + 484, 0);
+  guest::StoreU16(base, driver + 486, 0);
+  for (int32_t i = 0; i < count; i++) {
+    const uint32_t racer = Load(base, Load(base, kRace) + 2308 + 4 * uint32_t(i));
+    const uint32_t index = Load(base, racer + 20);
+    if (int32_t(index) < 0 || Load(base, driver + 0) == index) {
+      continue;
+    }
+    const uint32_t vehicle = vehicle_accessors::VehicleGet(base, index);
+    r3 = vehicle;
+    if ((Load(base, vehicle + 6148) & 129) == 0) {
+      continue;
+    }
+    const uint32_t record = driver + index * 40 + 172;
+    if (guest::LoadU8(base, record + 32) == 1) {
+      if ((guest::LoadU16(base, record + 34) & 2) != 0) {
+        guest::StoreU16(base, driver + 484, uint16_t(guest::LoadU16(base, driver + 484) + 1));
+      }
+      if ((guest::LoadU16(base, record + 34) & 4) != 0) {
+        guest::StoreU16(base, driver + 486, uint16_t(guest::LoadU16(base, driver + 486) + 1));
+      }
+    }
+    CopyWord(base, record + 0, driver + 488);
+    break;
+  }
+  const double speed = Lfs(base, driver + 100);
+  bool stuck_check = speed < Lfs(base, 0x82008034);
+  if (stuck_check) {
+    r3 = IsFree(base, driver);
+    stuck_check = r3 != 0;
+  }
+  if (!stuck_check) {
+    guest::StoreU16(base, driver + 492, 0);
+    guest::StoreU32(base, driver + 16, Load(base, driver + 16) & ~0x20u);
+    return r3;
+  }
+  const uint32_t flags = Load(base, driver + 16);
+  const uint32_t count492 = guest::LoadU16(base, driver + 492);
+  if ((flags & 0x20) == 0) {
+    const double held = double(float(double(int64_t(int16_t(count492)))));
+    if (!(held < Lfs(base, 0x82008238))) {
+      guest::StoreU32(base, driver + 16, flags | 32);
+      return r3;
+    }
+    const double fifteen = Lfs(base, 0x820029D0);
+    if (!(speed < fifteen)) {
+      return r3;
+    }
+    const uint32_t step = uint32_t(strings_and_font::steps::Fctiwz(Fsubs(speed, fifteen)));
+    guest::StoreU16(base, driver + 492, uint16_t(count492 - (step & 0xFFFF)));
+    return r3;
+  }
+  const uint32_t step = uint32_t(strings_and_font::steps::Fctiwz(speed));
+  const int32_t left = int16_t(uint16_t(count492 - step));
+  guest::StoreU16(base, driver + 492, uint16_t(left));
+  if (left > 0) {
+    return r3;
+  }
+  guest::StoreU16(base, driver + 492, 0);
+  guest::StoreU32(base, driver + 16, flags & ~0x20u);
+  return r3;
+}
+
+void UpdateOther(uint8_t* base, uint32_t record, uint32_t gap, uint32_t length) {
+  ITC_NATIVE_RUNNING("sub_821454C8 AiOther::Update");
+  const double old = Lfs(base, record + 0);
+  if (!(old < Lfs(base, 0x82008E38)) && !(old > Lfs(base, kOtherGap))) {
+    const double change = Fsubs(Lfs(base, gap), old);
+    const double last = Lfs(base, record + 8);
+    Stfs(base, record + 8, change);
+    Stfs(base, record + 4, Fmuls(Fadds(last, change), Lfs(base, kHalf)));
+    const double now = Lfs(base, gap);
+    const double size = Lfs(base, length);
+    const double zero = Lfs(base, kZero);
+    double apart = Fadds(size, now);
+    bool beside = false;
+    if (!(apart < zero)) {
+      apart = Fsubs(now, size);
+      beside = !(apart > zero);
+    }
+    if (beside) {
+      guest::StoreU16(base, record + 24, 2);
+      Stfs(base, record + 20, zero);
+    } else {
+      const double rate = Lfs(base, record + 4);
+      double meet;
+      if (Fmuls(rate, apart) < zero) {
+        const int32_t ticks = strings_and_font::steps::Fctiwz(Fneg(Fdivs(apart, rate)));
+        meet = ticks < 10000
+                   ? Fmuls(double(float(double(int64_t(ticks)))), Lfs(base, 0x82002A3C))
+                   : Lfs(base, kMinusOne);
+      } else {
+        meet = Lfs(base, kMinusOne);
+      }
+      Stfs(base, record + 20, meet);
+      guest::StoreU16(base, record + 24, Lfs(base, gap) > zero ? 3 : 1);
+    }
+  } else {
+    const double zero = Lfs(base, kZero);
+    Stfs(base, record + 4, zero);
+    guest::StoreU16(base, record + 24, 0);
+    Stfs(base, record + 8, zero);
+    StoreConstant(base, record + 20, kMinusOne);
+  }
+  CopyWord(base, gap, record + 0);
+  UpdateOtherFlags(base, record);
 }
 
 }  // namespace ai_drivers

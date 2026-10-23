@@ -116,6 +116,33 @@ ITC_NATIVE_STEP(NativeBlockRight, ai::BlockRight(base, ctx.r3.u32, ctx.r4.u32, c
 ITC_NATIVE_STEP(NativeInitCorner, ai::InitCorner(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
                                                  ctx.r6.u32))
 ITC_NATIVE_STEP(NativeWithinRoadAt, ctx.r3.u64 = ai::WithinRoadAt(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_STEP(NativeResetToMode1, ai::ResetToMode1(base, ctx.r3.u32, ctx.r1.u32 - 112);
+                ctx.r3.u64 += 6048)
+ITC_NATIVE_STEP(NativeResetToMode0, ai::ResetToMode0(base, ctx.r3.u32, ctx.r1.u32 - 128);
+                ctx.r3.u64 += 6048)
+ITC_NATIVE_STEP(NativeStartRace, ctx.r3.u64 = ai::StartRace(base, ctx.r3.u32, ctx.r1.u32 - 112))
+ITC_NATIVE_STEP(NativeResetFollow, ai::ResetFollow(base, ctx.r3.u32))
+// The original where a copy can't be made natively (counted: none expected).
+int g_fallbacks = 0;
+void NativeAllSettled(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  uint32_t result = 0;
+  if (ai::AllSettled(base, ctx.r1.u32 - 6320, &result)) {
+    ctx.r3.u64 = result;
+    return;
+  }
+  g_fallbacks++;
+  __imp__sub_8213ADF8(ctx, base);
+}
+ITC_NATIVE_STEP(NativeAccumulateSteer, ai::AccumulateSteer(base, ctx.r3.u32))
+ITC_NATIVE_STEP(NativeThrottleForSpeed, ai::ThrottleForSpeed(base, ctx.r3.u32))
+ITC_NATIVE_STEP(NativeEaseThrottleForSlide,
+                ai::EaseThrottleForSlide(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_STEP(NativeLimitThrottle, ai::LimitThrottle(base, ctx.r3.u32))
+ITC_NATIVE_STEP(NativeAdjustForOther,
+                ai::AdjustForOther(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+ITC_NATIVE_STEP(NativeUpdateAgainstPlayer, ctx.r3.u64 = ai::UpdateAgainstPlayer(base, ctx.r3.u32))
+ITC_NATIVE_STEP(NativeUpdateOther, ai::UpdateOther(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
 
 // Runs the recompiled version with the native flag off.
 template <GuestFunction recompiled>
@@ -127,7 +154,7 @@ void Original(PPCContext& ctx, uint8_t* base) {
 }
 
 // The block's layout.
-constexpr uint32_t kAreaBytes = 0x4400;
+constexpr uint32_t kAreaBytes = 0x4600;
 constexpr uint32_t kDriver = 0, kPath = 512, kSkill = 6048;
 constexpr uint32_t kVehicle = 0x2000, kIo = 0x4000, kOut = 0x4100, kFile = 0x4200,
                    kShape = 0x4300, kRace = 0x4380, kRaceState = 0x4390, kInputWords = 0x43C0;
@@ -135,6 +162,12 @@ constexpr uint32_t kVehicle = 0x2000, kIo = 0x4000, kOut = 0x4100, kFile = 0x420
 // the race state ([0x826D82E8], its +6100 at kRaceState) and the racers'
 // inputs ([0x826C5B30], eight words pointing at kInputWords).
 constexpr uint32_t kRaceData = 0x826C5B2C, kRaceStateGlobal = 0x826D82E8, kInputs = 0x826C5B30;
+// The race ([0x826D82F4]): its racers' list (+2308) at kRacers, its count
+// (+2364) at kRacers + 56, the racers' records (+0 flags, +20 the index, 24
+// bytes each) at kRacerRecords. The vehicles ([0x826C2E34], 6,272 bytes each)
+// in a block of their own.
+constexpr uint32_t kRacers = 0x4400, kRacerRecords = 0x4480;
+constexpr uint32_t kRaceGlobal = 0x826D82F4, kVehiclesGlobal = 0x826C2E34, kVehicleBytes = 6272;
 // The drivers' table for Of and KeepsGapFrom: 64 drivers.
 constexpr uint32_t kTableDrivers = 64;
 
@@ -232,6 +265,18 @@ enum Kind {
   kBlockRight,
   kInitCorner,
   kWithinRoadAt,
+  kResetToMode1,
+  kResetToMode0,
+  kStartRace,
+  kResetFollow,
+  kAllSettled,
+  kAccumulateSteer,
+  kThrottleForSpeed,
+  kEaseThrottleForSlide,
+  kLimitThrottle,
+  kAdjustForOther,
+  kUpdateAgainstPlayer,
+  kUpdateOther,
 };
 
 }  // namespace
@@ -350,6 +395,30 @@ void AiDrivers(Context& h) {
        kInitCorner, 2000},
       {"AiPath::WithinRoadAt (sub_8213C1A0)", Original<__imp__sub_8213C1A0>,
        NativeWithinRoadAt, kWithinRoadAt, 3000},
+      {"AiDriver::ResetToMode1 (sub_82139450)", Original<__imp__sub_82139450>,
+       NativeResetToMode1, kResetToMode1, 500},
+      {"AiDriver::ResetToMode0 (sub_821394F0)", Original<__imp__sub_821394F0>,
+       NativeResetToMode0, kResetToMode0, 500},
+      {"AiDriver::StartRace (sub_82139DA0)", Original<__imp__sub_82139DA0>, NativeStartRace,
+       kStartRace, 500},
+      {"AiDriver::ResetFollow (sub_821467B8)", Original<__imp__sub_821467B8>,
+       NativeResetFollow, kResetFollow, 200},
+      {"AiDrivers::AllSettled (sub_8213ADF8)", Original<__imp__sub_8213ADF8>, NativeAllSettled,
+       kAllSettled, 1000},
+      {"AiDriver::AccumulateSteer (sub_82138F00)", Original<__imp__sub_82138F00>,
+       NativeAccumulateSteer, kAccumulateSteer, 3000},
+      {"AiDriver::ThrottleForSpeed (sub_82139168)", Original<__imp__sub_82139168>,
+       NativeThrottleForSpeed, kThrottleForSpeed, 3000},
+      {"AiDriver::EaseThrottleForSlide (sub_82139BE8)", Original<__imp__sub_82139BE8>,
+       NativeEaseThrottleForSlide, kEaseThrottleForSlide, 3000},
+      {"AiDriver::LimitThrottle (sub_82139CB0)", Original<__imp__sub_82139CB0>,
+       NativeLimitThrottle, kLimitThrottle, 3000},
+      {"AiDriver::AdjustForOther (sub_821452A0)", Original<__imp__sub_821452A0>,
+       NativeAdjustForOther, kAdjustForOther, 3000},
+      {"AiDriver::UpdateAgainstPlayer (sub_82146608)", Original<__imp__sub_82146608>,
+       NativeUpdateAgainstPlayer, kUpdateAgainstPlayer, 3000},
+      {"AiOther::Update (sub_821454C8)", Original<__imp__sub_821454C8>, NativeUpdateOther,
+       kUpdateOther, 3000},
   };
   const uint32_t area = memory::Alloc(kAreaBytes, 0);
   const uint32_t driver = area + kDriver, vehicle = area + kVehicle, io = area + kIo;
@@ -362,6 +431,9 @@ void AiDrivers(Context& h) {
     saved_inputs[i] = guest::LoadU32(h.base, kInputs + 4 * i);
   }
   const uint32_t table = memory::Alloc(kTableDrivers * ai::kDriverBytes, 0);
+  const uint32_t vehicles = memory::Alloc(8 * kVehicleBytes, 0);
+  const uint32_t saved_race_global = guest::LoadU32(h.base, kRaceGlobal);
+  const uint32_t saved_vehicles = guest::LoadU32(h.base, kVehiclesGlobal);
   {
     Random fill;
     for (uint32_t i = 0; i < kTableDrivers * ai::kDriverBytes; i += 4) {
@@ -763,6 +835,111 @@ void AiDrivers(Context& h) {
           r3 = driver + kPath;
           r4 = io;
           break;
+        case kResetToMode1:
+        case kResetToMode0:
+        case kStartRace:
+          if (f.kind == kStartRace) {
+            guest::StoreU32(h.base, driver + 160, vehicle);  // read without a check
+            guest::StoreU32(h.base, driver + kSkill, r.Below(2) ? 0 : io);
+            guest::StoreU32(h.base, area + kRace, r.Below(2) ? 0 : uint32_t(r.Next()));
+            guest::StoreU32(h.base, driver + kPath + 5524,
+                            r.Below(2) ? 0xFFFFFFFFu : r.Below(8));
+            guest::StoreU32(h.base, driver + kPath + 5528,
+                            r.Below(2) ? 0xFFFFFFFFu : r.Below(8));
+          }
+          guest::StoreU32(h.base, driver + kPath + 5520, r.Below(3));
+          guest::StoreU32(h.base, driver + kPath, r.Below(4) == 0 ? 0 : driver);
+          break;
+        case kResetFollow:
+          break;
+        case kAllSettled:
+        case kUpdateAgainstPlayer: {
+          // The racers: up to 7, flag 0x10 half the time, an index 0 to 6 or -1.
+          const uint32_t count = f.kind == kAllSettled && r.Below(8) == 0 ? 0 : 1 + r.Below(7);
+          guest::StoreU32(h.base, area + kRacers + 56, r.Below(16) == 0 ? 0xFFFFFFFFu : count);
+          for (uint32_t i = 0; i < 7; i++) {
+            const uint32_t racer = area + kRacerRecords + 24 * i;
+            guest::StoreU32(h.base, area + kRacers + 4 * i, racer);
+            guest::StoreU32(h.base, racer + 0, uint32_t(r.Next()) & (r.Below(2) ? ~0x10u : ~0u));
+            guest::StoreU32(h.base, racer + 20, r.Below(8) ? r.Below(7) : 0xFFFFFFFFu);
+          }
+          for (uint32_t i = 0; i < 7; i++) {
+            const uint32_t other = table + i * ai::kDriverBytes;
+            guest::StoreU32(h.base, other + 32, r.Below(5));
+            guest::StoreU32(h.base, other + 0, r.Below(8));
+            guest::StoreU16(h.base, other + 40, uint16_t(r.Below(2) ? 0x7F : r.Next()));
+            guest::StoreU32(h.base, other + 100, RandomFloat(r, 100.0f));
+            for (uint32_t k = 0; k < 7; k++) {
+              guest::StoreU32(h.base, other + 172 + 40 * k, RandomFloat(r, 40.0f));
+            }
+            const uint32_t flags[] = {0, 1, 0x80, 0x81, uint32_t(r.Next())};
+            guest::StoreU32(h.base, vehicles + i * kVehicleBytes + 6148, flags[r.Below(5)]);
+          }
+          drivers = table;
+          if (f.kind == kUpdateAgainstPlayer) {
+            guest::StoreU32(h.base, driver + 0, r.Below(8));
+            guest::StoreU32(h.base, driver + 100, FloatBits(float(r.Below(400)) / 10.0f));
+            guest::StoreU16(h.base, driver + 492,
+                            uint16_t(r.Below(4) ? r.Below(5000) : r.Next()));
+            for (uint32_t k = 0; k < 7; k++) {
+              guest::StoreU8(h.base, driver + 172 + 40 * k + 32, uint8_t(r.Below(3)));
+            }
+          }
+          break;
+        }
+        case kAccumulateSteer:
+          guest::StoreU32(h.base, driver + 100, RandomFloat(r, 400.0f));
+          break;
+        case kThrottleForSpeed:
+          guest::StoreU32(h.base, driver + 100, RandomFloat(r, 120.0f));
+          guest::StoreU32(h.base, driver + 6088, RandomFloat(r, 120.0f));
+          guest::StoreU32(h.base, driver + 6116, RandomFloat(r, 3.0f));
+          guest::StoreU32(h.base, driver + 6140, RandomFloat(r, 1.5f));
+          floats.push_back({kDriver + 6140, 2});
+          break;
+        case kEaseThrottleForSlide:
+          guest::StoreU32(h.base, driver + 100, RandomFloat(r, 120.0f));
+          guest::StoreU32(h.base, driver + 6112, RandomFloat(r, 1.0f));
+          guest::StoreU32(h.base, driver + 6140, RandomFloat(r, 1.5f));
+          guest::StoreU32(h.base, vehicle + 3548, r.Below(4));
+          guest::StoreU32(h.base, io, r.Below(2) ? 0 : uint32_t(r.Next()));
+          r4 = io;
+          floats.push_back({kDriver + 6140, 1});
+          break;
+        case kLimitThrottle: {
+          guest::StoreU32(h.base, driver + 160, vehicle);  // read without a check
+          guest::StoreU16(h.base, driver + 6054, uint16_t(int32_t(r.Below(140)) - 20));
+          guest::StoreU32(h.base, driver + 6124, RandomFloat(r, 1.5f));
+          const float limit = 6000.0f + float(r.Below(3000));
+          guest::StoreU32(h.base, vehicle + 4660, r.Below(16) ? FloatBits(limit) : RandomFloat(r, 9000.0f));
+          guest::StoreU32(h.base, vehicle + 2228,
+                          FloatBits(limit * (0.9f + float(r.Below(150)) / 1000.0f)));
+          floats.push_back({kDriver + 6124, 1});
+          break;
+        }
+        case kAdjustForOther:
+          guest::StoreU32(h.base, area + kFile + 8, FloatBits(0.5f + float(r.Below(80)) / 8.0f));
+          guest::StoreU32(h.base, io + 0x100, RandomFloat(r, 60.0f));
+          guest::StoreU16(h.base, io + 0x100 + 24, uint16_t(r.Below(4) ? 1 : r.Below(5)));
+          guest::StoreU16(h.base, io + 0x100 + 26, uint16_t(int32_t(r.Below(12)) - 2));
+          guest::StoreU16(h.base, io + 0x100 + 28, uint16_t(r.Below(2) ? 0 : r.Next()));
+          guest::StoreU32(h.base, io, r.Below(2) ? 0 : uint32_t(r.Next()));
+          guest::StoreU32(h.base, driver + 100, RandomFloat(r, 300.0f));
+          r4 = io + 0x100;
+          r5 = io;
+          floats.push_back({kDriver + 164, 2});
+          break;
+        case kUpdateOther:
+          guest::StoreU32(h.base, io, RandomFloat(r, 250.0f));
+          guest::StoreU32(h.base, io + 0x40, RandomFloat(r, 250.0f));
+          guest::StoreU32(h.base, io + 0x44, RandomFloat(r, 10.0f));
+          guest::StoreU16(h.base, io + 34, uint16_t(r.Next()));
+          r3 = io;
+          r4 = io + 0x40;
+          r5 = io + 0x44;
+          floats.push_back({kIo, 3});
+          floats.push_back({kIo + 20, 1});
+          break;
       }
       // Guest memory is one host mapping: the blocks copied as they are.
       const std::vector<uint8_t> inputs(h.base + area, h.base + area + kAreaBytes);
@@ -779,6 +956,8 @@ void AiDrivers(Context& h) {
         guest::StoreU32(h.base, track_route::kRoute, route_file);
         guest::StoreU32(h.base, kRaceData, area + kRace - 0xA3AF0);
         guest::StoreU32(h.base, kRaceStateGlobal, area + kRaceState - 6100);
+        guest::StoreU32(h.base, kRaceGlobal, area + kRacers - 2308);
+        guest::StoreU32(h.base, kVehiclesGlobal, vehicles);
         for (uint32_t i = 0; i < 8; i++) {
           guest::StoreU32(h.base, kInputs + 4 * i, area + kInputWords + 4 * i);
         }
@@ -796,6 +975,8 @@ void AiDrivers(Context& h) {
         guest::StoreU32(h.base, track_route::kRoute, saved_route);
         guest::StoreU32(h.base, kRaceData, saved_race);
         guest::StoreU32(h.base, kRaceStateGlobal, saved_state);
+        guest::StoreU32(h.base, kRaceGlobal, saved_race_global);
+        guest::StoreU32(h.base, kVehiclesGlobal, saved_vehicles);
         for (uint32_t i = 0; i < 8; i++) {
           guest::StoreU32(h.base, kInputs + 4 * i, saved_inputs[i]);
         }
@@ -824,6 +1005,10 @@ void AiDrivers(Context& h) {
     }
     results.Report();
   }
+  if (g_fallbacks != 0) {
+    ITC_LOG_INFO("harness: ai_drivers: {} cases handed to the original", g_fallbacks);
+  }
+  memory::Free(vehicles);
   memory::Free(route_table);
   memory::Free(route_area);
   memory::Free(table);

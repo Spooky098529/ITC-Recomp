@@ -251,4 +251,58 @@ void InitCorner(uint8_t* base, uint32_t record, uint32_t data, uint32_t corner_e
 // within the road at the ring entry the driver's +128 ahead.
 uint32_t WithinRoadAt(uint8_t* base, uint32_t path, uint32_t offset);
 
+// --- Starts and resets ---
+
+// AiDriver::ResetToMode1 (sub_82139450): SetFlag2 with 1, +16 bits 0 and 2
+// cleared, the path's mode 1 (with a vehicle), +6084 = 0, ResetSkill, +12 =
+// 73.0, the vehicle's +2432 = 1.0. The words passed by address are written
+// in the original's frame (`frame`, 112 bytes below the caller's stack
+// pointer, at +80 and +84).
+void ResetToMode1(uint8_t* base, uint32_t driver, uint32_t frame);
+// AiDriver::ResetToMode0 (sub_821394F0): SetFlag2 with 0, +16 bits 0 and 2
+// cleared, the path's mode 0 (with a vehicle), ResetSkill, +6084 = 0, +12 =
+// the skill's halfword +4 as a float (`frame` 128 bytes down; +80, +88).
+void ResetToMode0(uint8_t* base, uint32_t driver, uint32_t frame);
+// AiDriver::StartRace (sub_82139DA0): +16 bit 0 cleared, SetFlag2 with 1
+// when the vehicle has none of the flags 0x81, +16 bit 2 set, the path's
+// mode 0 (with a vehicle), SetSkill with 1, ClearPlan (whose r3 it
+// returns). `frame` 112 bytes down (+80, +84).
+uint32_t StartRace(uint8_t* base, uint32_t driver, uint32_t frame);
+// AiDriver::ResetFollow (sub_821467B8): ClearFollow, ClearCarState.
+void ResetFollow(uint8_t* base, uint32_t driver);
+// AiDrivers::AllSettled (sub_8213ADF8): for each racer with flag 0x10, its
+// driver copied into the original's frame (`frame`, 6,320 bytes below the
+// caller's stack pointer, the copy at +80) and IsSettled on the copy; 0 when
+// one isn't; else 1 with exactly one, or when the lowest speed of the
+// copies (from 70.0) plus 5.0 is above 70.0. False, with nothing done
+// that's seen outside the frame, when a copy can't be made natively
+// (c_runtime::Memcpy: the original runs then).
+bool AllSettled(uint8_t* base, uint32_t frame, uint32_t* result);
+
+// --- Pedals and steering ---
+
+// AiDriver::AccumulateSteer (sub_82138F00): +6136 += +6112 + +6116, then
+// the correction by +152 (see the row).
+void AccumulateSteer(uint8_t* base, uint32_t driver);
+// AiDriver::ThrottleForSpeed (sub_82139168): the throttle (+6140) and brake
+// (+6144) from the speed against the target speed (see the row).
+void ThrottleForSpeed(uint8_t* base, uint32_t driver);
+// AiDriver::EaseThrottleForSlide (sub_82139BE8): the throttle eased by the
+// slide angle +6112 (`flag`: a word, 0.2 when set, else 0.05).
+void EaseThrottleForSlide(uint8_t* base, uint32_t driver, uint32_t flag);
+// AiDriver::LimitThrottle (sub_82139CB0): +6124 kept within 0.0 and the
+// skill's +6 x 0.01, then capped by the vehicle's rpm against its limit.
+void LimitThrottle(uint8_t* base, uint32_t driver);
+// AiDriver::AdjustForOther (sub_821452A0): the speed limits +168 and +164
+// lowered for a racer ahead closing in (see the row).
+void AdjustForOther(uint8_t* base, uint32_t driver, uint32_t record, uint32_t mode);
+// AiDriver::UpdateAgainstPlayer (sub_82146608): +484 to +488 from the
+// driver's record of the first other racer with the flags 0x81, then the
+// stuck count (+492, +16 bit 5). Returns the r3 the original leaves.
+uint64_t UpdateAgainstPlayer(uint8_t* base, uint32_t driver);
+// AiOther::Update (sub_821454C8): the record's change, rate, state and time
+// to meet from the new gap (at `gap`) and the cars' length (at `length`),
+// then +0 = the gap and UpdateOtherFlags.
+void UpdateOther(uint8_t* base, uint32_t record, uint32_t gap, uint32_t length);
+
 }  // namespace ai_drivers

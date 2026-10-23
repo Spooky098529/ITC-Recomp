@@ -45,7 +45,14 @@ ITC_FLAG_BOOL(native_ai_drivers, true, "ITC",
               "AiDriver::UpdateState5 sub_82146388, AiDriver::IsSettled sub_82146408, "
               "AiOther::Mirror sub_82145610, AiPathEntry::BlockLeft sub_8213C5C8, "
               "AiPathEntry::BlockRight sub_8213C630, AiCorner::Init sub_8213C698, "
-              "AiPath::WithinRoadAt sub_8213C1A0) natively instead of through the translated "
+              "AiPath::WithinRoadAt sub_8213C1A0, AiDriver::ResetToMode1 sub_82139450, "
+              "AiDriver::ResetToMode0 sub_821394F0, AiDriver::StartRace sub_82139DA0, "
+              "AiDriver::ResetFollow sub_821467B8, AiDrivers::AllSettled sub_8213ADF8, "
+              "AiDriver::AccumulateSteer sub_82138F00, AiDriver::ThrottleForSpeed sub_82139168, "
+              "AiDriver::EaseThrottleForSlide sub_82139BE8, AiDriver::LimitThrottle "
+              "sub_82139CB0, AiDriver::AdjustForOther sub_821452A0, "
+              "AiDriver::UpdateAgainstPlayer sub_82146608, AiOther::Update sub_821454C8) "
+              "natively instead of through the translated "
               "code (the same words, bit for bit; checked by --run_harnesses=ai_drivers). Those "
               "reached only from native callers have no adapters, and the flag switches their "
               "callers: sub_82144ED8, sub_8213C720, sub_821450E0, sub_821453A0, sub_82139248, "
@@ -163,3 +170,39 @@ ITC_AI_DRIVERS(8213C630, BlockRight(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ct
 ITC_AI_DRIVERS(8213C698, InitCorner(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32))
 // r4 = &the offset.
 ITC_AI_DRIVERS(8213C1A0, ctx.r3.u64 = WithinRoadAt(base, ctx.r3.u32, ctx.r4.u32))
+
+// --- Starts and resets ---
+
+// The words passed by address in the originals' frames (112 and 128 bytes
+// down); r3 left at the skill (+6048), as the originals leave it.
+ITC_AI_DRIVERS(82139450, ResetToMode1(base, ctx.r3.u32, ctx.r1.u32 - 112); ctx.r3.u64 += 6048)
+ITC_AI_DRIVERS(821394F0, ResetToMode0(base, ctx.r3.u32, ctx.r1.u32 - 128); ctx.r3.u64 += 6048)
+ITC_AI_DRIVERS(82139DA0, ctx.r3.u64 = StartRace(base, ctx.r3.u32, ctx.r1.u32 - 112))
+ITC_AI_DRIVERS(821467B8, ResetFollow(base, ctx.r3.u32))
+// The copies in the original's frame (6,320 bytes down); the original where
+// one can't be made natively.
+extern "C" REX_FUNC(sub_8213ADF8) {
+  REX_FUNC_PROLOGUE();
+  if (ITC_FLAG(native_ai_drivers)) {
+    ctx.fpscr.disableFlushMode();
+    uint32_t result = 0;
+    if (AllSettled(base, ctx.r1.u32 - 6320, &result)) {
+      ctx.r3.u64 = result;
+      return;
+    }
+  }
+  __imp__sub_8213ADF8(ctx, base);
+}
+
+// --- Pedals and steering (r3 kept) ---
+
+ITC_AI_DRIVERS(82138F00, AccumulateSteer(base, ctx.r3.u32))
+ITC_AI_DRIVERS(82139168, ThrottleForSpeed(base, ctx.r3.u32))
+// r4 = &the flag.
+ITC_AI_DRIVERS(82139BE8, EaseThrottleForSlide(base, ctx.r3.u32, ctx.r4.u32))
+ITC_AI_DRIVERS(82139CB0, LimitThrottle(base, ctx.r3.u32))
+// r4 = the record, r5 = &the mode.
+ITC_AI_DRIVERS(821452A0, AdjustForOther(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+ITC_AI_DRIVERS(82146608, ctx.r3.u64 = UpdateAgainstPlayer(base, ctx.r3.u32))
+// r4 = &the new gap, r5 = &the length.
+ITC_AI_DRIVERS(821454C8, UpdateOther(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
