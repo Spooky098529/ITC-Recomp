@@ -91,6 +91,30 @@ When the user has reviewed a run's section, its heading gets
   Harness limits: FindSideSection and CompareWith always given a
   vehicle (the originals read it without a null check), CompareWith
   and UpdateAll cases use finite floats in the first seven drivers.
+  Migration 5's rows (5a7f90d..2ddd638; 13 more ours, 35 adapters
+  removed: 143 ours, 119 Native). Fallbacks: when AdvanceCorners can't
+  copy natively (corner records in the physical views, never with heap
+  drivers), DropPassed, AiPath::Update, AiDriver::Update, DriveCar and
+  UpdateIdle return false first and the top adapter runs the original
+  whole. For review: `Extend`'s calls it can't make natively (the
+  +5532 normalizer when not NormalizeByLane or NormalizeByBranch,
+  AddCornersAt's join step; neither in play) go through a `PathCalls`
+  struct the top adapter (DriveCar's or UpdateIdle's) hands down, as
+  UpdateAll's +6148 calls; with that, `Extend`'s adapter was removed:
+  does it fit "its work is plain C++"? Kept, the game's: `Extend`
+  appends to the section list with no bound check (past 8 sections it
+  writes into the corner count +5162; harness routes cross at most two
+  a call). Corrections: StartRanked moves vehicles with flags 0x81 to
+  the front, not the back, and sorts only with three or more;
+  BranchMasks uses +5528's kind when +5524 is -1; UpdateIdle's reset
+  bit is 0x2. Harness: DriveCar's cases also compare the vehicle's
+  +2249 and +2424 (an "extras" mechanism); BranchMasks' cases have
+  their own 0xA3B00-byte race-data block. Still recompiled: Destroy
+  and DestroyRings (wait on `sub_820900C0`), UpdateStarting,
+  UpdateTrack and NoteFixedSections (wait on `sub_821434E8`); 22
+  adapters stay for recompiled callers in play, 2 (NormalizeByLane,
+  NormalizeByBranch) for the +5532 pointer, and UpdateAll's for the
+  +6148 targets.
 
 ## Run 2026-10-23 17:22 (`b7-loop-23-10-26-4`)
 

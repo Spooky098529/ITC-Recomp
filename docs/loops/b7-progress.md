@@ -28,8 +28,10 @@ file's history. What's left to see in a drive, from every run:
   `itc_1169` 20 s, `itc_1170`, replay ok; 9 to drive, 4 earlier ones
   seen). Migration 4 (fcec6fd..2ea28d9): 130 ours, 84 Native; 6
   functions in ready groups left. Validated (21 of 21 harness lines;
-  `itc_1185`, `itc_1186`, replay ok; none to drive). Step: migration 5
-  (agent running).
+  `itc_1185`, `itc_1186`, replay ok; none to drive). Migration 5
+  (5a7f90d..2ddd638): 143 ours, 119 Native; nothing ready left (the
+  rest waits on `sub_820900C0` and `sub_821434E8`). Step: validation of
+  migration 5 (agent running).
 
 ## Done
 
@@ -68,3 +70,7 @@ This run's groups: `expected-differences.md` (the "20:22 run" lines).
   123, known 575, unknown 4706). Race 30 s (`itc_1184`, now
   `attract_race.sh 40`, the user's call) with `--run_harnesses=all`, 0
   errors, every harness 0 differing (none added).
+- After the AI drivers' migration 5: ours 1366, work left 5391 (wrapped
+  123, known 562, unknown 4706). Race 30 s (`itc_1202`) with
+  `--run_harnesses=all`, 0 errors, every harness 0 differing (none
+  added).
