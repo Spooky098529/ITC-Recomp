@@ -30,7 +30,10 @@
 // (sub_8213BF28), from JoinCornerPair; UpdateState2, 3, 4 and 5
 // (sub_82145F48, sub_821460C8, sub_82146220, sub_82146388), from
 // UpdateState; and PickTarget (sub_82145118), from UpdateState2, 3 and 4 and
-// IsSettled.
+// IsSettled; LimitByCurve (sub_821390D0), LimitSpeedBlend (sub_82139B40) and
+// AiPath::ClearCornerKind (sub_8213C710), from LimitForCorner; UpdateState
+// (sub_82139AC8) and LimitForCorner (sub_8213A620), from UpdateTargetSpeed;
+// and UpdateTargetSpeed (sub_8213AB98), from UpdateSpeed.
 
 #include "guest.h"
 
@@ -97,7 +100,8 @@ ITC_FLAG_BOOL(native_ai_drivers, true, "ITC",
               "sub_82145450, sub_821467B8, sub_82138D20, sub_82139450, sub_82138F00, sub_8213E658, "
               "sub_82145A48, sub_82139820, sub_821395D0, sub_8213C698, sub_8213DD40, "
               "sub_8213BCD0, sub_8213BF28, sub_82145F48, sub_821460C8, sub_82146220, sub_82146388, "
-              "sub_82145118");
+              "sub_82145118, sub_821390D0, sub_82139B40, sub_8213C710, sub_82139AC8, sub_8213A620, "
+              "sub_8213AB98");
 
 // Defines an adapter: `body` uses `ctx` and `base`.
 #define ITC_AI_DRIVERS(address, body)   \
@@ -118,7 +122,6 @@ using namespace ai_drivers;
 ITC_AI_DRIVERS(8213AD48, InitPath(base, ctx.r3.u32))
 ITC_AI_DRIVERS(82139728, ctx.r3.u64 = Of(base, ctx.r3.u32))
 ITC_AI_DRIVERS(820C96E8, ClearCarInput(base, ctx.r3.u32))
-ITC_AI_DRIVERS(8213C710, ClearCornerKind(base, ctx.r3.u32))
 
 // --- Small reads and steps ---
 
@@ -135,9 +138,6 @@ ITC_AI_DRIVERS(8213F700, ClearSkill(base, ctx.r3.u32))
 
 // --- Speeds and steering (r3 kept) ---
 
-// r4 = the table, r5 = &the fraction, r6 = &the index, r7 = the record or 0.
-ITC_AI_DRIVERS(821390D0, LimitByCurve(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
-                                      ctx.r7.u32))
 ITC_AI_DRIVERS(82139B98, EaseThrottleForSteer(base, ctx.r3.u32))
 
 // --- The path's corners and points ---
@@ -163,11 +163,6 @@ ITC_AI_DRIVERS(82145048, ctx.r3.u64 = KeepsGapFrom(base, ctx.r3.u32, ctx.r4.u32)
 // r4 = the object or 0; r3 left at the skill (+6048), as the original's
 // tail call leaves it.
 ITC_AI_DRIVERS(82138D00, SetParams(base, ctx.r3.u32, ctx.r4.u32); ctx.r3.u64 += 6048)
-// r4 = &the speed, r5 = &(a, b), r6 = &t, r7 = &the weight, r8 = &the
-// slices; the original's frame 96 bytes down.
-ITC_AI_DRIVERS(82139B40, ctx.f1.f64 = LimitSpeedBlend(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
-                                                      ctx.r6.u32, ctx.r7.u32, ctx.r8.u32,
-                                                      ctx.r1.u32 - 96))
 // The path's +5532 in mode 1 (no direct callers): r3 not read, r4 = the
 // entry, r5 = the position, r6 = &the lane, r7 = the masks or 0.
 ITC_AI_DRIVERS(8213B428, ctx.r3.u64 = NormalizeByLane(base, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
@@ -331,33 +326,8 @@ extern "C" REX_FUNC(sub_8213E970) {
   ctx.r3.u64 = r3;
 }
 
-// --- The states' speeds ---
-
-// r4 = &the target speed.
-ITC_AI_DRIVERS(82139AC8, ctx.r3.u64 = UpdateState(base, ctx.r3.u32, ctx.r4.u32))
-
 // --- The target speed (f1 LimitSpeedBlend's, when it ran) ---
 
-// r4 = &the scale, r5 = the corner record; the original's frame 192 bytes
-// down.
-ITC_AI_DRIVERS(8213A620, {
-  double f1 = 0;
-  bool f1_set = false;
-  ctx.r3.u64 = LimitForCorner(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32 - 192, &f1,
-                              &f1_set);
-  if (f1_set) {
-    ctx.f1.f64 = f1;
-  }
-})
-// r4 = &the scale; the original's frame 128 bytes down.
-ITC_AI_DRIVERS(8213AB98, {
-  double f1 = 0;
-  bool f1_set = false;
-  ctx.r3.u64 = UpdateTargetSpeed(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 128, &f1, &f1_set);
-  if (f1_set) {
-    ctx.f1.f64 = f1;
-  }
-})
 // The original's frame 96 bytes down.
 ITC_AI_DRIVERS(8213ACD0, {
   double f1 = 0;
