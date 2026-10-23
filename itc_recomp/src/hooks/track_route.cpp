@@ -13,8 +13,11 @@
 // NormalizeForward), StepForward (sub_820F8B48, from StepForwardMasked,
 // NormalizeForward and NormalizeForwardPath), StepAlongPath (sub_820F8C58,
 // from NormalizeForwardPath), NormalizeForwardPath (sub_820F9F58, from
-// NormalizePath) and NormalizeForward (sub_820F9EA8, from Normalize and
-// NormalizeForwardPath).
+// NormalizePath), NormalizeForward (sub_820F9EA8, from Normalize and
+// NormalizeForwardPath), NormalizeBack (sub_820F9320, from Normalize,
+// NormalizePath, NormalizeLane and NormalizeLaneMasked), StepForwardLane
+// (sub_820F9448, from NormalizeLane) and StepForwardLaneMasked
+// (sub_820F9600, from NormalizeLaneMasked).
 
 #include "guest.h"
 
@@ -38,7 +41,8 @@ ITC_FLAG_BOOL(native_track_route, true, "ITC",
               "words, bit for bit; checked by --run_harnesses=track_route). Those reached only "
               "from native callers have no adapters, and the flag switches their callers: "
               "sub_820F8A58, sub_820AB408, sub_820AB498, sub_820F8720, sub_820F8CE8, "
-              "sub_820F8BD0, sub_820F93A0, sub_820F9EA8, sub_820F9F58, sub_820F8B48, sub_820F8C58");
+              "sub_820F8BD0, sub_820F93A0, sub_820F9EA8, sub_820F9F58, sub_820F8B48, sub_820F8C58, "
+              "sub_820F9320, sub_820F9448, sub_820F9600");
 
 // Defines an adapter: `body` uses `ctx` and `base`.
 #define ITC_TRACK_ROUTE(address, body)   \
@@ -67,19 +71,11 @@ ITC_TRACK_ROUTE(820F8EF0, ctx.r3.u64 = SectionOutcode(base, ctx.r3.u32, ctx.r4.u
 
 // --- Steps between sections ---
 
-ITC_TRACK_ROUTE(820F9320, ctx.r3.u64 = NormalizeBack(base, ctx.r3.u32, ctx.r4.u32))
 // r5 = the masks or 0.
 ITC_TRACK_ROUTE(820F9FE8, ctx.r3.u64 = Normalize(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
 // r5 = the path or 0, r6 = the masks or 0.
 ITC_TRACK_ROUTE(820FA0F8, ctx.r3.u64 = NormalizePath(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
                                                      ctx.r6.u32))
-// r5 = the lane (a halfword, changed), r6 = the slices' count.
-ITC_TRACK_ROUTE(820F9448, ctx.r3.u64 = StepForwardLane(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
-                                                       ctx.r6.u32))
-// r7 = the masks.
-ITC_TRACK_ROUTE(820F9600, ctx.r3.u64 = StepForwardLaneMasked(base, ctx.r3.u32, ctx.r4.u32,
-                                                             ctx.r5.u32, ctx.r6.u32, ctx.r7.u32))
-
 // r5 = the lane (a halfword, changed).
 ITC_TRACK_ROUTE(820FA210, ctx.r3.u64 = NormalizeLane(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
 // r6 = the masks.
