@@ -262,6 +262,14 @@ ITC_NATIVE_F1_STEP(NativeUpdateTargetSpeed,
 ITC_NATIVE_F1_STEP(NativeUpdateSpeed,
                    ai::UpdateSpeed(base, ctx.r3.u32, ctx.r1.u32 - 96, &f1, &f1_set))
 
+void NativeSteerToTarget(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  double f1 = 0;
+  ctx.r3.u64 = ai::SteerToTarget(base, ctx.r3.u32, &f1);
+  ctx.f1.f64 = f1;
+}
+ITC_NATIVE_STEP(NativeUpdatePedals, ai::UpdatePedals(base, ctx.r3.u32, ctx.r1.u32 - 112))
+
 // Runs the recompiled version with the native flag off.
 template <GuestFunction recompiled>
 void Original(PPCContext& ctx, uint8_t* base) {
@@ -420,6 +428,8 @@ enum Kind {
   kLimitForCorner,
   kUpdateTargetSpeed,
   kUpdateSpeed,
+  kSteerToTarget,
+  kUpdatePedals,
 };
 
 }  // namespace
@@ -612,6 +622,10 @@ void AiDrivers(Context& h) {
        NativeUpdateTargetSpeed, kUpdateTargetSpeed, 3000},
       {"AiDriver::UpdateSpeed (sub_8213ACD0)", Original<__imp__sub_8213ACD0>, NativeUpdateSpeed,
        kUpdateSpeed, 3000},
+      {"AiDriver::SteerToTarget (sub_82138D78)", Original<__imp__sub_82138D78>,
+       NativeSteerToTarget, kSteerToTarget, 3000},
+      {"AiDriver::UpdatePedals (sub_8213A428)", Original<__imp__sub_8213A428>,
+       NativeUpdatePedals, kUpdatePedals, 3000},
   };
   const uint32_t area = memory::Alloc(kAreaBytes, 0);
   const uint32_t driver = area + kDriver, vehicle = area + kVehicle, io = area + kIo;
@@ -1477,6 +1491,69 @@ void AiDrivers(Context& h) {
           floats.push_back({kDriver + 6088, 1});
           break;
         }
+        case kSteerToTarget: {
+          // The path's corners (IsSlow), ring (TargetPoint: its count, start
+          // and look-ahead), the slice length, the driver's point, heading and
+          // speed, the vehicle's +92, +384 and +392.
+          guest::StoreU32(h.base, driver + 160, vehicle);  // read without a check
+          const uint32_t path = driver + kPath;
+          guest::StoreU16(h.base, path + 5162, uint16_t(int32_t(r.Below(5)) - 1));
+          for (uint32_t i = 0; i < 8; i++) {
+            const uint32_t record = path + 5164 + 44 * i;
+            guest::StoreU16(h.base, record + 10, uint16_t(int32_t(r.Below(7)) - 4));
+            guest::StoreU32(h.base, record + 40, r.Below(6));
+          }
+          guest::StoreU32(h.base, area + kFile + 8,
+                          r.Below(16) == 0 ? RandomFloat(r, 8.0f)
+                                           : FloatBits(0.5f + float(r.Below(80)) / 8.0f));
+          guest::StoreU16(h.base, path + 5136, uint16_t(int32_t(r.Below(85)) - 2));
+          guest::StoreU16(h.base, path + 5138, uint16_t(r.Below(200)));
+          guest::StoreU32(h.base, driver + 100, RandomFloat(r, 300.0f));
+          guest::StoreU32(h.base, driver + 156, RandomFloat(r, 20.0f));
+          for (uint32_t at : {80u, 88u, 96u}) {
+            guest::StoreU32(h.base, driver + at, RandomFloat(r, 100.0f));
+          }
+          // Now and then the target point at the driver's (no angle).
+          if (r.Below(16) == 0) {
+            for (uint32_t k = 0; k < 80; k++) {
+              const uint32_t entry = path + 16 + 64 * k;
+              guest::StoreU32(h.base, entry + 16, guest::LoadU32(h.base, driver + 80));
+              guest::StoreU32(h.base, entry + 24, guest::LoadU32(h.base, driver + 88));
+            }
+          }
+          for (uint32_t at : {92u, 384u, 392u}) {
+            guest::StoreU32(h.base, vehicle + at, RandomFloat(r, 4.0f));
+          }
+          floats.push_back({kDriver + 152, 1});
+          floats.push_back({kDriver + 6096, 3});
+          floats.push_back({kDriver + 6112, 2});
+          break;
+        }
+        case kUpdatePedals: {
+          // The path's corners (HasKind2Ahead), the speeds (ThrottleForSpeed),
+          // the slide (EaseThrottleForSlide), the requests and pedals.
+          guest::StoreU32(h.base, driver + 160, r.Below(8) == 0 ? 0 : vehicle);
+          const uint32_t path = driver + kPath;
+          guest::StoreU16(h.base, path + 5162, uint16_t(int32_t(r.Below(5)) - 1));
+          for (uint32_t i = 0; i < 8; i++) {
+            const uint32_t record = path + 5164 + 44 * i;
+            guest::StoreU16(h.base, record + 10, uint16_t(int32_t(r.Below(7)) - 4));
+            guest::StoreU32(h.base, record + 40, r.Below(4));
+          }
+          guest::StoreU32(h.base, vehicle + 3548, r.Below(4));
+          guest::StoreU32(h.base, driver + 100, RandomFloat(r, 300.0f));
+          guest::StoreU32(h.base, driver + 6088, RandomFloat(r, 300.0f));
+          guest::StoreU32(h.base, driver + 168, RandomFloat(r, 300.0f));
+          for (uint32_t at : {104u, 152u, 6112u, 6116u, 6120u}) {
+            guest::StoreU32(h.base, driver + at, RandomFloat(r, 1.5f));
+          }
+          for (uint32_t at : {6124u, 6128u, 6140u, 6144u}) {
+            guest::StoreU32(h.base, driver + at, RandomFloat(r, 1.6f));
+          }
+          floats.push_back({kDriver + 6124, 2});
+          floats.push_back({kDriver + 6140, 2});
+          break;
+        }
       }
       // Guest memory is one host mapping: the blocks copied as they are.
       const std::vector<uint8_t> inputs(h.base + area, h.base + area + kAreaBytes);
@@ -1535,7 +1612,7 @@ void AiDrivers(Context& h) {
         out[v].Word(t.r3.u32);
         if (f.kind == kSpeedOverDistance || f.kind == kCornerFactor || f.kind == kLimitSpeed ||
             f.kind == kLimitSpeedBlend || f.kind == kLimitForCorner ||
-            f.kind == kUpdateTargetSpeed || f.kind == kUpdateSpeed) {
+            f.kind == kUpdateTargetSpeed || f.kind == kUpdateSpeed || f.kind == kSteerToTarget) {
           out[v].Double(t.f1.u64);
         }
       }

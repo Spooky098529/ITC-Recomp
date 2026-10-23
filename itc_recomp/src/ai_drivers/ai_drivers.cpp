@@ -2465,4 +2465,139 @@ uint64_t UpdateSpeed(uint8_t* base, uint32_t driver, uint32_t frame, double* f1,
   return UpdateTargetSpeed(base, driver, frame + 80, frame - 128, f1, f1_set);
 }
 
+// --- Steering at the target and the pedals ---
+
+uint32_t SteerToTarget(uint8_t* base, uint32_t driver, double* f1) {
+  ITC_NATIVE_RUNNING("sub_82138D78 AiDriver::SteerToTarget");
+  const uint32_t path = driver + 512;
+  const uint32_t file = Load(base, track_route::kRoute);
+  const uint32_t slow = IsSlow(base, path);
+  const double speed = Lfs(base, driver + 100);
+  double reach = Fmuls(speed, Lfs(base, slow == 0 ? 0x82008944 : 0x82008940));
+  const double least = Lfs(base, 0x82002834);
+  if (reach < least) {
+    reach = least;
+  }
+  double more = Lfs(base, driver + 156);
+  const double zero = Lfs(base, kZero);
+  if (more < zero) {
+    more = zero;
+  }
+  const double ahead = Fadds(reach, more);
+  *f1 = ahead;
+  int32_t slices = strings_and_font::steps::Fctiwz(Fdivs(ahead, Lfs(base, file + 8)));
+  if (slices > 78) {
+    slices = 78;
+  }
+  const uint32_t target = driver + 6096;
+  guest::StoreU16(base, driver + 5654, uint16_t(slices));
+  if (TargetPoint(base, path, ahead, target) == 0) {
+    return 0;
+  }
+  const double dx = Fsubs(Lfs(base, target + 0), Lfs(base, driver + 80));
+  const double dz = Fsubs(Lfs(base, driver + 6104), Lfs(base, driver + 88));
+  const uint32_t angle = driver + 6116;
+  if (dx == zero && dz == zero) {
+    Stfs(base, angle, zero);
+  } else {
+    const double toward = double(float(c_runtime::Atan2(dx, dz)));
+    Stfs(base, angle, Fsubs(toward, Lfs(base, driver + 96)));
+    WrapAngle(base, angle);
+    Stfs(base, angle, Fneg(Lfs(base, angle)));
+  }
+  const uint32_t vehicle = Load(base, driver + 160);
+  const double cos = c_runtime::Cos(Lfs(base, angle));
+  const double sin = c_runtime::Sin(Lfs(base, angle));
+  *f1 = sin;
+  const double s = double(float(sin));
+  const double across = Lfs(base, vehicle + 384);
+  const double c = double(float(cos));
+  const uint32_t now = Load(base, driver + 160);
+  const double along = Lfs(base, vehicle + 392);
+  const double turned = Lfs(base, angle);
+  Stfs(base, driver + 152, Fmadds(along, c, Fmuls(s, across)));
+  Stfs(base, driver + 6112, Fadds(Lfs(base, now + 92), turned));
+  WrapAngle(base, driver + 6112);
+  return 1;
+}
+
+void UpdatePedals(uint8_t* base, uint32_t driver, uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_8213A428 AiDriver::UpdatePedals");
+  const uint32_t kind2 = HasKind2Ahead(base, driver + 512);
+  ThrottleForSpeed(base, driver);
+  const double zero = Lfs(base, kZero);
+  uint32_t flag = 0;
+  if (kind2 == 0) {
+    const double yaw = Fabs(Lfs(base, driver + 104));
+    if (yaw > zero) {
+      const double throttle = Lfs(base, driver + 6140);
+      Stfs(base, driver + 6140, throttle < yaw ? zero : Fsubs(throttle, yaw));
+    }
+    EaseThrottleForSteer(base, driver);
+    flag = 1;
+  }
+  guest::StoreU32(base, frame + 80, flag);
+  EaseThrottleForSlide(base, driver, frame + 80);
+  const double brake = Lfs(base, driver + 6144);
+  if (brake > zero) {
+    Stfs(base, driver + 6140, zero);
+    const double step = Lfs(base, 0x8200296C);
+    Stfs(base, driver + 6144, brake > step ? Fsubs(brake, step) : zero);
+  }
+  double steer = Fmuls(Lfs(base, driver + 152), Lfs(base, 0x82002968));
+  if (steer < zero) {
+    steer = Fneg(steer);
+  }
+  double request = Lfs(base, driver + 6144);
+  const double one = Lfs(base, kOne);
+  bool kept = false;
+  if (steer < request) {
+    if (request < zero) {
+      request = zero;
+    } else {
+      const double most = Fsubs(one, steer);
+      if (request > most) {
+        request = most;
+      }
+    }
+    const double slide = Lfs(base, driver + 6120);
+    Stfs(base, driver + 6144, request);
+    double turn = Fmuls(slide, Lfs(base, 0x820021E8));
+    if (turn < zero) {
+      turn = Fneg(turn);
+    }
+    if (turn < request) {
+      if (request < zero) {
+        request = zero;
+      } else {
+        const double most = Fsubs(one, turn);
+        if (request > most) {
+          request = most;
+        }
+      }
+      Stfs(base, driver + 6144, request);
+      kept = true;
+    }
+  }
+  if (!kept) {
+    Stfs(base, driver + 6144, zero);
+  }
+  const double limit = Lfs(base, kFifth);
+  const auto approach = [&](uint32_t now_at, uint32_t toward_at) {
+    double move = Fsubs(Lfs(base, toward_at), Lfs(base, now_at));
+    if (move > limit) {
+      move = limit;
+    }
+    const double now = Fadds(Lfs(base, now_at), move);
+    Stfs(base, now_at, now);
+    if (now < zero) {
+      Stfs(base, now_at, zero);
+    } else if (now > one) {
+      Stfs(base, now_at, one);
+    }
+  };
+  approach(driver + 6124, driver + 6140);
+  approach(driver + 6128, driver + 6144);
+}
+
 }  // namespace ai_drivers

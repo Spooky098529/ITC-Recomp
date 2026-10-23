@@ -460,4 +460,19 @@ uint64_t UpdateTargetSpeed(uint8_t* base, uint32_t driver, uint32_t scale, uint3
 // (`frame` 96 bytes down), then UpdateTargetSpeed with it.
 uint64_t UpdateSpeed(uint8_t* base, uint32_t driver, uint32_t frame, double* f1, bool* f1_set);
 
+// --- Steering at the target and the pedals ---
+
+// AiDriver::SteerToTarget (sub_82138D78): the look-ahead (the speed x 0.155,
+// or 0.225 when IsSlow, at least 12.5, plus +156 at least 0.0) in slices
+// (at most 78) into +5654, TargetPoint into +6096; with one, the angle to it
+// (+6116), +152 and +6112 (see the row). 1, or 0 without one; `f1` the f1
+// the original leaves.
+uint32_t SteerToTarget(uint8_t* base, uint32_t driver, double* f1);
+// AiDriver::UpdatePedals (sub_8213A428): ThrottleForSpeed, the throttle and
+// brake requests eased (see the row; EaseThrottleForSlide's flag at frame +
+// 80: `frame` the original's, 112 bytes below the caller's stack pointer),
+// then +6124 and +6128 moved toward them by at most 0.2 and kept in 0.0 to
+// 1.0.
+void UpdatePedals(uint8_t* base, uint32_t driver, uint32_t frame);
+
 }  // namespace ai_drivers

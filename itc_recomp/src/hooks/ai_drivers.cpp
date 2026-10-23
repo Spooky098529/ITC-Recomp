@@ -89,7 +89,8 @@ ITC_FLAG_BOOL(native_ai_drivers, true, "ITC",
               "AiDriver::UpdateState2 sub_82145F48, AiDriver::UpdateState3 sub_821460C8, "
               "AiDriver::UpdateState sub_82139AC8 (with its state 6's step, sub_821462A0, never "
               "seen in play), AiDriver::LimitForCorner sub_8213A620, "
-              "AiDriver::UpdateTargetSpeed sub_8213AB98, AiDriver::UpdateSpeed sub_8213ACD0) "
+              "AiDriver::UpdateTargetSpeed sub_8213AB98, AiDriver::UpdateSpeed sub_8213ACD0, "
+              "AiDriver::SteerToTarget sub_82138D78, AiDriver::UpdatePedals sub_8213A428) "
               "natively instead of "
               "through the translated code (the same words, bit for bit; checked by "
               "--run_harnesses=ai_drivers). Those "
@@ -337,3 +338,14 @@ ITC_AI_DRIVERS(8213ACD0, {
     ctx.f1.f64 = f1;
   }
 })
+
+// --- Steering at the target and the pedals ---
+
+// f1 as the original leaves it.
+ITC_AI_DRIVERS(82138D78, {
+  double f1 = 0;
+  ctx.r3.u64 = SteerToTarget(base, ctx.r3.u32, &f1);
+  ctx.f1.f64 = f1;
+})
+// r3 kept; the original's frame 112 bytes down.
+ITC_AI_DRIVERS(8213A428, UpdatePedals(base, ctx.r3.u32, ctx.r1.u32 - 112))
