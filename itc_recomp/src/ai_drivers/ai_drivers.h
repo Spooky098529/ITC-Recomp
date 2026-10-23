@@ -841,4 +841,31 @@ uint64_t ReadVehicleOwnSlice(uint8_t* base, uint32_t driver);
 // data's word +4 the +16 (2, 3), +32 (4) or +48 (5) list, else the +0 list.
 uint64_t BranchMasks(uint8_t* base, uint32_t path, uint32_t frame);
 
+// --- Keeping to the path's entries ---
+
+// AiPath::KeepBranch (sub_8213EAB0): route positions a (the current) and b
+// compared by CompareBranches with BranchMasks: 1 when a is preferred, 0 when
+// b is; with no preference, 1 when the point is on b's slice
+// (TrackRoute::LocateAt not 0), else 0. `frame` the original's, 128 bytes
+// below the caller's stack pointer.
+uint32_t KeepBranch(uint8_t* base, uint32_t path, uint32_t a, uint32_t b, uint32_t point,
+                    uint32_t frame);
+// AiPath::LeftEntry (sub_8213F140): 0 when the ring entry is the driver's
+// route position with its lane (or none); else the point against the entry's
+// slice: past it by more than a slice length 1; before it by more than one,
+// the count +5136 = 0 and 1; across it outside the road's half width, 1
+// unless within its margins, KeepBranch and WithinRoadAt (the offset at frame
+// + 80: `frame` 160 bytes down); then 1 when the point's lane isn't the
+// entry's, else the driver's route position and lane = the entry's, 0.
+uint32_t LeftEntry(uint8_t* base, uint32_t path, uint32_t point, uint32_t entry,
+                   uint32_t frame);
+// AiPath::DropPassed (sub_8213F2E0): the passed entries at the ring's front
+// dropped (LeftEntry; cleared, at most six, the sixth ResetPath, as an empty
+// ring), the corners moved back (AdvanceCorners, the count at frame + 80:
+// `frame` 160 bytes down), DropPassedSections and the first entry's offset and
+// point from the point. `r3` the r3 the original leaves. False, with nothing
+// done, where AdvanceCorners' copies couldn't be native (the original runs
+// then).
+bool DropPassed(uint8_t* base, uint32_t path, uint32_t point, uint32_t frame, uint64_t* r3);
+
 }  // namespace ai_drivers

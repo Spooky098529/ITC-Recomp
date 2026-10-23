@@ -148,7 +148,9 @@ ITC_FLAG_BOOL(native_ai_drivers, true, "ITC",
               "their +6148, on the translated code), AiOther::PlanReaction sub_821456F8, "
               "AiDriver::ReactToOthers sub_82145CA8, AiDrivers::StartGroup sub_8213A000, "
               "AiDrivers::StartRanked sub_8213A8B0, AiDriver::ReadVehicle sub_821467F0, "
-              "AiDriver::ReadVehicleOwnSlice sub_821469D0, AiPath::BranchMasks sub_8213E500) "
+              "AiDriver::ReadVehicleOwnSlice sub_821469D0, AiPath::BranchMasks sub_8213E500, "
+              "AiPath::KeepBranch sub_8213EAB0, AiPath::LeftEntry sub_8213F140, "
+              "AiPath::DropPassed sub_8213F2E0) "
               "natively instead of "
               "through the translated code (the same words, bit for bit; checked by "
               "--run_harnesses=ai_drivers). Those "
@@ -468,3 +470,27 @@ ITC_AI_DRIVERS(821469D0, ctx.r3.u64 = ReadVehicleOwnSlice(base, ctx.r3.u32))
 
 // The original's frame 96 bytes down.
 ITC_AI_DRIVERS(8213E500, ctx.r3.u64 = BranchMasks(base, ctx.r3.u32, ctx.r1.u32 - 96))
+
+// --- Keeping to the path's entries ---
+
+// r4, r5 = &the route positions, r6 = the point; the original's frame 128
+// bytes down.
+ITC_AI_DRIVERS(8213EAB0, ctx.r3.u64 = KeepBranch(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                                 ctx.r6.u32, ctx.r1.u32 - 128))
+// r4 = the point, r5 = the ring entry; the original's frame 160 bytes down.
+ITC_AI_DRIVERS(8213F140, ctx.r3.u64 = LeftEntry(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                                ctx.r1.u32 - 160))
+// r4 = the point; the original's frame 160 bytes down. The original where
+// AdvanceCorners' copies couldn't be native.
+extern "C" REX_FUNC(sub_8213F2E0) {
+  REX_FUNC_PROLOGUE();
+  if (ITC_FLAG(native_ai_drivers)) {
+    ctx.fpscr.disableFlushMode();
+    uint64_t r3 = 0;
+    if (DropPassed(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 160, &r3)) {
+      ctx.r3.u64 = r3;
+      return;
+    }
+  }
+  __imp__sub_8213F2E0(ctx, base);
+}

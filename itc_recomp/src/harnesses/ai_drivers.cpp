@@ -26,6 +26,7 @@
 #include <fmt/format.h>
 
 #include <bit>
+#include <cmath>
 #include <cstring>
 #include <string>
 #include <utility>
@@ -421,6 +422,21 @@ ITC_NATIVE_STEP(NativeReadVehicle, ctx.r3.u64 = ai::ReadVehicle(base, ctx.r3.u32
 ITC_NATIVE_STEP(NativeReadVehicleOwnSlice, ctx.r3.u64 = ai::ReadVehicleOwnSlice(base, ctx.r3.u32))
 ITC_NATIVE_STEP(NativeBranchMasks,
                 ctx.r3.u64 = ai::BranchMasks(base, ctx.r3.u32, ctx.r1.u32 - 96))
+ITC_NATIVE_STEP(NativeKeepBranch,
+                ctx.r3.u64 = ai::KeepBranch(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
+                                            ctx.r1.u32 - 128))
+ITC_NATIVE_STEP(NativeLeftEntry, ctx.r3.u64 = ai::LeftEntry(base, ctx.r3.u32, ctx.r4.u32,
+                                                            ctx.r5.u32, ctx.r1.u32 - 160))
+void NativeDropPassed(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  uint64_t r3 = 0;
+  if (ai::DropPassed(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 160, &r3)) {
+    ctx.r3.u64 = r3;
+    return;
+  }
+  g_fallbacks++;
+  __imp__sub_8213F2E0(ctx, base);
+}
 
 // Runs the recompiled version with the native flag off.
 template <GuestFunction recompiled>
@@ -632,6 +648,9 @@ enum Kind {
   kReadVehicle,
   kReadVehicleOwnSlice,
   kBranchMasks,
+  kKeepBranch,
+  kLeftEntry,
+  kDropPassed,
 };
 
 }  // namespace
@@ -928,6 +947,12 @@ void AiDrivers(Context& h) {
        NativeReadVehicleOwnSlice, kReadVehicleOwnSlice, 2000},
       {"AiPath::BranchMasks (sub_8213E500)", Original<__imp__sub_8213E500>, NativeBranchMasks,
        kBranchMasks, 3000},
+      {"AiPath::KeepBranch (sub_8213EAB0)", Original<__imp__sub_8213EAB0>, NativeKeepBranch,
+       kKeepBranch, 3000},
+      {"AiPath::LeftEntry (sub_8213F140)", Original<__imp__sub_8213F140>, NativeLeftEntry,
+       kLeftEntry, 3000},
+      {"AiPath::DropPassed (sub_8213F2E0)", Original<__imp__sub_8213F2E0>, NativeDropPassed,
+       kDropPassed, 3000},
   };
   const uint32_t area = memory::Alloc(kAreaBytes, 0);
   const uint32_t driver = area + kDriver, vehicle = area + kVehicle, io = area + kIo;
@@ -2433,6 +2458,124 @@ void AiDrivers(Context& h) {
           guest::StoreU32(h.base, race_block + 0xA3AF4, r.Below(10));
           guest::StoreU32(h.base, area + kRaceState, r.Below(5));
           r3 = path;
+          break;
+        }
+        case kKeepBranch:
+        case kLeftEntry:
+        case kDropPassed: {
+          // A route (test_route.h) and a point (io); the driver's route
+          // position (+4) and lane (+8); BranchMasks' inputs (the path's
+          // kinds, the driver's +500 object, the vehicle's flags, the race
+          // data in its own block); the ring (its count +5136, first +5138)
+          // and its entries: a route position
+          // (now and then the driver's), a lane (-1 to 3), a slice record of
+          // the route (now and then any bytes) made to lie near the point
+          // most of the time (its center within two slice lengths, unit
+          // directions +36 to +48, a width +12 and margins +16, +20), floats;
+          // WithinRoadAt's +128; the corners (+5162, +5164: their +10, +12)
+          // and the section list (+5144, +5146). KeepBranch's positions at io
+          // + 0x60 and io + 0x64; LeftEntry's entry one of the ring's.
+          const uint32_t path = driver + kPath;
+          const test_route::Route route =
+              test_route::BuildRoute(h.base, route_area, route_table, r);
+          route_file = route_area + test_route::kFile;
+          // A slice length the game has (positive: WithinRoadAt's index, from
+          // the driver's +128 over it, stays on the ring).
+          const float unit = 0.5f + float(r.Below(80)) / 8.0f;
+          guest::StoreU32(h.base, route_file + 8, FloatBits(unit));
+          guest::StoreU32(h.base, path + 0, driver);
+          test_route::RandomPosition(h.base, driver + 4, route, r);
+          guest::StoreU16(h.base, driver + 8, uint16_t(int32_t(r.Below(5)) - 1));
+          const float px = float(int32_t(r.Below(200)) - 100), pz = float(int32_t(r.Below(200)) - 100);
+          guest::StoreU32(h.base, io + 0, r.Below(32) == 0 ? RandomFloat(r, 100.0f) : FloatBits(px));
+          guest::StoreU32(h.base, io + 4, RandomFloat(r, 10.0f));
+          guest::StoreU32(h.base, io + 8, r.Below(32) == 0 ? RandomFloat(r, 100.0f) : FloatBits(pz));
+          // BranchMasks.
+          const auto kind = [&]() { return r.Below(3) ? 0xFFFFFFFFu : r.Below(6); };
+          guest::StoreU32(h.base, path + 5524, kind());
+          guest::StoreU32(h.base, path + 5528, kind());
+          const uint32_t object = io + 0x40;
+          guest::StoreU32(h.base, driver + 500, r.Below(4) == 0 ? object : 0);
+          guest::StoreU8(h.base, object + 36, uint8_t(r.Below(10)));
+          const uint32_t vflags[] = {0, 4, 0x80, 0x84, 0x81};
+          guest::StoreU32(h.base, vehicle + 6148, vflags[r.Below(5)]);
+          guest::StoreU32(h.base, vehicle + 5712, 0);
+          race_data = race_block;
+          guest::StoreU32(h.base, race_block + 20, (r.Below(64) << 2) | r.Below(4));
+          guest::StoreU32(h.base, race_block + 4, r.Below(8));
+          guest::StoreU32(h.base, race_block + 0xA3AF4, r.Below(10));
+          // The ring.
+          guest::StoreU16(h.base, path + 5136, uint16_t(r.Below(8) == 0 ? int32_t(r.Below(84)) - 2
+                                                                        : int32_t(1 + r.Below(12))));
+          // (32768 or more only for DropPassed, which then returns: else the
+          // first entry is in the ring, as in the game, whose entries all
+          // have a slice record.)
+          guest::StoreU16(h.base, path + 5138,
+                          uint16_t(f.kind == kDropPassed && r.Below(16) == 0 ? 32768 + r.Below(100)
+                                                                              : r.Below(80)));
+          guest::StoreU32(h.base, driver + 128, FloatBits(float(r.Below(400)) / 20.0f));
+          for (uint32_t k = 0; k < 80; k++) {
+            const uint32_t entry = path + 16 + 64 * k;
+            if (r.Below(4) == 0) {
+              guest::StoreU32(h.base, entry + 16, guest::LoadU32(h.base, driver + 4));
+            } else {
+              test_route::RandomPosition(h.base, entry + 16, route, r);
+            }
+            guest::StoreU32(h.base, entry + 20, uint32_t(int32_t(r.Below(5)) - 1));
+            const uint32_t section = r.Below(route.sections);
+            const uint32_t record =
+                r.Below(16) == 0 ? io + 0xC0
+                                 : route.Address(section) + 124 + 84 * r.Below(route.Slices(section));
+            guest::StoreU32(h.base, entry + 52, record);
+            if (record != io + 0xC0 && r.Below(4) != 0) {
+              const auto near = [&]() {
+                return (float(r.Below(1u << 16)) / float(1u << 15) - 1.0f) * 2.0f * unit;
+              };
+              guest::StoreU32(h.base, record + 0, FloatBits(px + near()));
+              guest::StoreU32(h.base, record + 8, FloatBits(pz + near()));
+              const float a = float(r.Below(628)) / 100.0f;
+              guest::StoreU32(h.base, record + 36, FloatBits(std::cos(a)));
+              guest::StoreU32(h.base, record + 40, FloatBits(std::sin(a)));
+              guest::StoreU32(h.base, record + 44, FloatBits(-std::sin(a)));
+              guest::StoreU32(h.base, record + 48, FloatBits(std::cos(a)));
+              guest::StoreU32(h.base, record + 12, FloatBits(float(1 + r.Below(12))));
+              guest::StoreU32(h.base, record + 16, FloatBits(float(r.Below(8)) / 2.0f));
+              guest::StoreU32(h.base, record + 20, FloatBits(float(r.Below(8)) / 2.0f));
+            }
+            for (uint32_t at : {0u, 8u, 24u, 40u, 44u}) {
+              guest::StoreU32(h.base, entry + at, RandomFloat(r, 8.0f));
+            }
+            floats.push_back({kPath + 16 + 64 * k, 3});
+            floats.push_back({kPath + 16 + 64 * k + 24, 1});
+          }
+          // The corners and the section list.
+          guest::StoreU16(h.base, path + 5162, uint16_t(int32_t(r.Below(10)) - 1));
+          for (uint32_t i = 0; i < 8; i++) {
+            const uint32_t record = path + 5164 + 44 * i;
+            guest::StoreU16(h.base, record + 12, uint16_t(int32_t(r.Below(14)) - 3));
+            guest::StoreU16(h.base, record + 10, uint16_t(int32_t(r.Below(14)) - 3));
+          }
+          guest::StoreU16(h.base, path + 5144, uint16_t(int32_t(r.Below(10)) - 1));
+          for (uint32_t i = 0; i < 8; i++) {
+            guest::StoreU16(h.base, path + 5146 + 2 * i, uint16_t(r.Below(route.sections)));
+          }
+          r3 = path;
+          if (f.kind == kKeepBranch) {
+            test_route::RandomPosition(h.base, io + 0x60, route, r);
+            if (r.Below(4) == 0) {
+              guest::StoreU32(h.base, io + 0x64, guest::LoadU32(h.base, io + 0x60));
+            } else {
+              test_route::RandomPosition(h.base, io + 0x64, route, r);
+            }
+            r4 = io + 0x60;
+            r5 = io + 0x64;
+            r6 = io;
+          } else if (f.kind == kLeftEntry) {
+            r4 = io;
+            r5 = path + 16 + 64 * r.Below(80);
+          } else {
+            r4 = io;
+          }
           break;
         }
         case kStartGroup:

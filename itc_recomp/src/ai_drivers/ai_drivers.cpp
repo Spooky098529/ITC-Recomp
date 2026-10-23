@@ -5041,4 +5041,153 @@ uint64_t BranchMasks(uint8_t* base, uint32_t path, uint32_t frame) {
   }
 }
 
+// --- Keeping to the path's entries ---
+
+uint32_t KeepBranch(uint8_t* base, uint32_t path, uint32_t a, uint32_t b, uint32_t point,
+                    uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_8213EAB0 AiPath::KeepBranch");
+  const uint64_t masks = BranchMasks(base, path, frame - 96);
+  const uint32_t table = Load(base, Load(base, track_route::kRoute) + 12);
+  const uint32_t section_b = Load(base, table + (uint32_t(guest::LoadU16(base, b)) << 2));
+  const uint32_t section_a = Load(base, table + (uint32_t(guest::LoadU16(base, a)) << 2));
+  const int32_t prefer =
+      CompareBranches(base, path, section_a, section_b, a, b, uint32_t(masks));
+  if (prefer != 0) {
+    return prefer < 0 ? 1 : 0;
+  }
+  return track_route::LocateAt(base, track_route::kRoute, point, b, frame - 112) != 0 ? 1 : 0;
+}
+
+uint32_t LeftEntry(uint8_t* base, uint32_t path, uint32_t point, uint32_t entry,
+                   uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_8213F140 AiPath::LeftEntry");
+  const uint32_t at = entry + 16;
+  const uint32_t driver = Load(base, path + 0);
+  const uint32_t position = driver + 4;
+  if (guest::LoadU16(base, at + 0) == guest::LoadU16(base, position + 0) &&
+      guest::LoadU16(base, at + 2) == guest::LoadU16(base, position + 2)) {
+    const int32_t lane = int32_t(Load(base, entry + 20));
+    if (lane < 0 || lane == LoadS16(base, driver + 8)) {
+      return 0;
+    }
+  }
+  const uint32_t record = Load(base, entry + 52);
+  const double dz = Fsubs(Lfs(base, point + 8), Lfs(base, record + 8));
+  const double dx = Fsubs(Lfs(base, point + 0), Lfs(base, record + 0));
+  const double length = Lfs(base, Load(base, track_route::kRoute) + 8);
+  const double along = Fmadds(Lfs(base, record + 44), dx, Fmuls(Lfs(base, record + 48), dz));
+  if (along > length) {
+    return 1;
+  }
+  if (along < Fneg(length)) {
+    guest::StoreU16(base, path + 5136, 0);
+    return 1;
+  }
+  const double half = Fmuls(Lfs(base, record + 12), Lfs(base, kHalf));
+  const double across = Fmadds(Lfs(base, record + 36), dx, Fmuls(Lfs(base, record + 40), dz));
+  Stfs(base, frame + 80, across);
+  const double minus_half = Fneg(half);
+  if (across > half || across < minus_half) {
+    if (across > Fadds(Lfs(base, record + 20), half)) {
+      return 1;
+    }
+    if (across < Fsubs(minus_half, Lfs(base, record + 16))) {
+      return 1;
+    }
+    if (KeepBranch(base, path, at, position, point, frame - 128) == 0) {
+      return 1;
+    }
+    if (WithinRoadAt(base, path, frame + 80) == 0) {
+      return 1;
+    }
+  }
+  int32_t lane = 0;
+  if (!(int32_t(Load(base, entry + 20)) < 0)) {
+    lane = int16_t(track_route::LaneAt(base, track_route::kRoute, point, at));
+    if (int32_t(Load(base, entry + 20)) != lane) {
+      return 1;
+    }
+  }
+  guest::StoreU16(base, position + 0, guest::LoadU16(base, at + 0));
+  guest::StoreU16(base, position + 2, guest::LoadU16(base, at + 2));
+  guest::StoreU16(base, driver + 8, uint16_t(lane));
+  return 0;
+}
+
+bool DropPassed(uint8_t* base, uint32_t path, uint32_t point, uint32_t frame, uint64_t* r3) {
+  // AdvanceCorners' condition for its native copies (it only depends on the
+  // path): checked first, so the original runs whole where it fails.
+  const uint32_t records = path + 5164;
+  if (records >= 0xA0000000u || !c_runtime::InOneView(records, 9 * 44)) {
+    return false;
+  }
+  ITC_NATIVE_RUNNING("sub_8213F2E0 AiPath::DropPassed");
+  *r3 = path;
+  if (!(guest::LoadU16(base, path + 5138) < 32768) || !(LoadS16(base, path + 5136) > 0)) {
+    return true;
+  }
+  const uint32_t before = guest::LoadU16(base, path + 5136);
+  const auto first = [&]() {
+    return path + 16 + (uint32_t(LoadS16(base, path + 5138)) << 6);
+  };
+  uint32_t left = LeftEntry(base, path, point, first(), frame - 160);
+  *r3 = left;
+  if (left == 0) {
+    return true;
+  }
+  guest::StoreU16(base, frame + 80, 0xFFFF);
+  guest::StoreU16(base, frame + 82, 0xFFFF);
+  const double one = Lfs(base, kOne);
+  const double zero = Lfs(base, kZero);
+  int32_t tries = 5;
+  for (;;) {
+    const uint32_t entry = first();
+    const uint32_t none = Load(base, frame + 80);
+    Stfs(base, entry + 0, zero);
+    guest::StoreU32(base, entry + 16, none);
+    Stfs(base, entry + 4, zero);
+    guest::StoreU32(base, entry + 20, 0xFFFFFFFFu);
+    Stfs(base, entry + 8, zero);
+    guest::StoreU32(base, entry + 52, 0);
+    Stfs(base, entry + 12, one);
+    Stfs(base, entry + 24, zero);
+    Stfs(base, entry + 48, zero);
+    for (uint32_t at = 28; at <= 44; at += 4) {
+      Stfs(base, entry + at, zero);
+    }
+    const int16_t count = int16_t(guest::LoadU16(base, path + 5136) - 1);
+    guest::StoreU16(base, path + 5136, uint16_t(count));
+    if (!(count > 0) || --tries < 0) {
+      *r3 = ResetPath(base, path);
+      return true;
+    }
+    const int32_t next = LoadS16(base, path + 5138) + 1;
+    const int16_t wrapped = int16_t(next - (next / 80) * 80);
+    guest::StoreU16(base, path + 5138, uint16_t(wrapped));
+    left = LeftEntry(base, path, point, first(), frame - 160);
+    *r3 = left;
+    if (left == 0) {
+      break;
+    }
+  }
+  if (!(LoadS16(base, path + 5136) > 0)) {
+    return true;
+  }
+  const uint32_t entry = first();
+  guest::StoreU16(base, frame + 80, uint16_t(before - guest::LoadU16(base, path + 5136)));
+  uint32_t ignored = 0;
+  AdvanceCorners(base, path, frame + 80, &ignored);  // can't fail: checked above
+  DropPassedSections(base, path);
+  *r3 = path;
+  const uint32_t record = Load(base, entry + 52);
+  const double dx = Fsubs(Lfs(base, point + 0), Lfs(base, record + 0));
+  const double dz = Fsubs(Lfs(base, point + 8), Lfs(base, record + 8));
+  const double offset = Fmadds(dz, Lfs(base, record + 40), Fmuls(dx, Lfs(base, record + 36)));
+  Stfs(base, entry + 24, offset);
+  Stfs(base, entry + 0, Fmadds(Lfs(base, record + 36), offset, Lfs(base, record + 0)));
+  CopyWord(base, record + 4, entry + 4);
+  Stfs(base, entry + 8, Fmadds(Lfs(base, record + 40), offset, Lfs(base, record + 8)));
+  return true;
+}
+
 }  // namespace ai_drivers
