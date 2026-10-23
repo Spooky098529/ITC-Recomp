@@ -27,6 +27,26 @@ When the user has reviewed a run's section, its heading gets
   and +384 sets' helpers and `sub_825A20E8` never did); Model::Animate
   advances times by 1.0 a call from `sub_820F6068`, probably on
   render-only passes too (not checked).
+  Migration 1's 36 rows (6f51fc2, 6714e72; `--native_model_animation`;
+  16 Native, written without adapters as only native callers reach
+  them; 3 new rows, Native and not seen in play: `sub_825A0FE0`,
+  `sub_825A10A8`, `sub_825A20E8`; `models.md`'s `sub_8259C3A8` Native,
+  named Skeleton::UpdateNodeMatrices; left: the primitive drawer's
+  vtable methods, blocked by the graphics device). For review: the
+  releases, set-ups, frees, destructors and the drawer's constructor
+  run natively only under `--native_heap`, handing the call to the
+  original when free or operator new would refuse it (the collision
+  precedent), and abort if `OperatorNewArray` fails after those checks;
+  `TrackSet::Setup208` is native only for sections with no tracks (all
+  in play) and `sub_8259C3A8` hands node types 8 and 16 to the
+  original, so `sub_825A6608`, `sub_825A1938`, `sub_8259B748` and
+  `sub_8259BE40` stay recompiled (both checks assume the data isn't
+  written during the call); `sub_8259C3A8` notes its multiplies with
+  `BlendState_OnMultiply` under the original's return addresses;
+  `Curve::Sample` corrected (before the second key it interpolates the
+  first two, not clamps); the harnesses never build node types 8 or 16
+  or Setup208 sections with tracks; the new code reuses
+  `car_physics/float_ops.h` and `xact::WaveEntryConstruct`.
 
 ## Run 2026-10-23 11:06 (`b7-loop-23-10-26-2`)
 

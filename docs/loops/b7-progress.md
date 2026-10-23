@@ -13,8 +13,8 @@ file's history. What's left to see in a drive, from every run:
 - Run started 2026-10-23 13:44 on `b7-loop-23-10-26-3` (the user's
   branch), from 97be4fc; summary `b7-loop-2026-10-23-1344.md`.
 - Subsystem 1 of 3: the model animation (the top lead): mapped in
-  c425049 (36 rows, 18 ready groups), checked; migration agent 1
-  running.
+  c425049 (36 rows, 18 ready groups), checked; migration 1 done
+  (6f51fc2, 6714e72; nothing ready left); validation agent running.
 
 ## Done
 
@@ -35,5 +35,9 @@ This run's groups: `expected-differences.md` (the "13:44 run" lines).
 - Start: ours 1023, work left 5730 (wrapped 129, known 586, unknown 5015).
 - After mapping the model animation: ours 1023, work left 5730 (wrapped
   129, known 622, unknown 4979).
+- After the model animation's migration 1: ours 1060, work left 5696
+  (wrapped 129, known 588, unknown 4979). Race 19 s at 30 ticks/s with
+  `--run_harnesses=all`, 0 errors, every harness 0 differing outside
+  the earlier "(expected to differ)" groups (none added).
 
 ## Stopped
