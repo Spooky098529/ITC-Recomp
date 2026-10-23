@@ -110,20 +110,11 @@ extern "C" REX_FUNC(sub_82118720) {
 ITC_SOUND_WORD(82480710, X3DAudioInitialize(base, ctx.r3.u32, ctx.f1.f64, ctx.r5.u32))
 ITC_SOUND_WORD(8259CE10, AudioEngineStart3D(base, ctx.r3.u32))
 
-// The bank holders' destructor and deletes: the original where a handle is
-// to be closed, and (for the deletes, which free through the native heap)
-// unless --native_heap routes the game's heap there or where operator
-// delete refuses the block.
-extern "C" REX_FUNC(sub_8259D438) {
-  ITC_SOUND_FALLBACK(8259D438)
-  uint32_t r3 = 0;
-  if (!WaveBankHolderDestroy(base, ctx.r3.u32, &r3)) {
-    __imp__sub_8259D438(ctx, base);
-    return;
-  }
-  ctx.r3.u64 = r3;
-}
-
+// The bank holders' deletes, which free through the native heap: the
+// original unless --native_heap routes the game's heap there, with a handle
+// to close, or where operator delete refuses the block.
+// WaveBankHolder::~WaveBankHolder (sub_8259D438) has no adapter: its caller
+// in play, sub_82117AD8, is native.
 #define ITC_SOUND_HOLDER_DELETE(address, function)                         \
   extern "C" REX_FUNC(sub_##address) {                                    \
     ITC_SOUND_FALLBACK(address)                                           \
