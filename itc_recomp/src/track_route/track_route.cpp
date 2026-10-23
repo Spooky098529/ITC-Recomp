@@ -20,6 +20,9 @@ constexpr uint32_t kNoDistance = 0x82002814;    // 10000.0
 constexpr uint32_t kNine = 0x82006844;          // 9.0
 constexpr uint32_t kTen = 0x82001FD8;           // 10.0
 constexpr uint32_t kDefaultBranchMask = 0x82008A00;  // 0xDFFFFE7F, then 0
+constexpr uint32_t kHeightReach = 0x82002A0C;        // 100.0 (10 m squared)
+constexpr uint32_t kReachSquared = 0x8200681C;       // 62500.0 (250 m squared)
+constexpr uint32_t kFarthest = 0x82006824;           // FullSearch's first score
 
 uint32_t Load(uint8_t* base, uint32_t address) {
   return guest::LoadU32(base, address);
@@ -924,6 +927,332 @@ uint32_t ToMainRoad(uint8_t* base, uint32_t route, uint32_t position, uint32_t f
   const uint32_t result = Normalize(base, route, copy, kDefaultBranchMask);
   guest::StoreU32(base, position, Load(base, copy));
   return result;
+}
+
+uint32_t NoteShoulder(uint8_t* base, uint32_t route, uint32_t point, uint32_t position,
+                      uint32_t best, uint32_t distance, uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_820FB100 TrackRoute::NoteShoulder");
+  const uint32_t section = Section(base, Load(base, route), LoadU16(base, position));
+  const uint32_t record = Record(section, LoadS16(base, position + 2));
+  const uint32_t where = LocateShoulder(base, route, point, position, record, frame - 112);
+  if (where < 3 || where > 4) {
+    return where;
+  }
+  const double dy = Fsubs(Lfs(base, point + 4), Lfs(base, record + 4));
+  const double dx = Fsubs(Lfs(base, point + 0), Lfs(base, record + 0));
+  const double dz = Fsubs(Lfs(base, point + 8), Lfs(base, record + 8));
+  const double nearest = Lfs(base, distance);
+  const double squared = Fmadds(dz, dz, Fmadds(dx, dx, Fmuls(dy, dy)));
+  if (squared < nearest) {
+    guest::StoreU16(base, best + 0, uint16_t(LoadU16(base, position + 0)));
+    guest::StoreU16(base, best + 2, uint16_t(LoadU16(base, position + 2)));
+    Stfs(base, distance, squared);
+  }
+  return where;
+}
+
+uint32_t TakeBranch(uint8_t* base, uint32_t route, uint32_t position, uint32_t which) {
+  ITC_NATIVE_RUNNING("sub_820FA4A8 TrackRoute::TakeBranch");
+  if (OnRoute(base, route, position)) {
+    return 1;
+  }
+  const uint32_t table = Load(base, Load(base, route) + 12);
+  const int32_t slice = LoadS16(base, position + 2);
+  const uint32_t section = SectionIn(base, table, LoadU16(base, position));
+  int32_t counted = 0;
+  // Whether this is the n-th link (the word at `which`), else counted.
+  const auto nth = [&] {
+    if (!(counted < int32_t(Load(base, which)))) {
+      return true;
+    }
+    counted++;
+    return false;
+  };
+  if (slice >= 0) {
+    // Past the end: forward links 2, 1, 0 (2 and 1 not to kinds 2 or 4),
+    // then 2 and 1 to kinds 2 and 4; the slice less the section's count.
+    const auto take = [&](uint32_t link) {
+      guest::StoreU16(base, position + 0, uint16_t(LoadU16(base, link)));
+      guest::StoreU16(base, position + 2, uint16_t(uint32_t(slice) - LoadU16(base, section)));
+      return Normalize(base, route, position, 0);
+    };
+    for (int32_t i = 2; i >= 0; i--) {
+      const uint32_t link = section + 28 + 4 * uint32_t(i);
+      const uint32_t to = LoadU16(base, link);
+      if (to == 0xFFFF) {
+        continue;
+      }
+      if (i > 0) {
+        const uint32_t kind = Kind(base, SectionIn(base, table, to));
+        if (kind == 2 || kind == 4) {
+          continue;
+        }
+      }
+      if (nth()) {
+        return take(link);
+      }
+    }
+    for (int32_t i = 2; i >= 1; i--) {
+      const uint32_t link = section + 28 + 4 * uint32_t(i);
+      const uint32_t to = LoadU16(base, link);
+      if (to == 0xFFFF) {
+        continue;
+      }
+      const uint32_t kind = Kind(base, SectionIn(base, table, to));
+      if (kind != 2 && kind != 4) {
+        continue;
+      }
+      if (nth()) {
+        return take(link);
+      }
+    }
+    return 0;
+  }
+  // Before the start: back links 5, 4, 3 (5 and 4 to sections not of kinds 1
+  // or 3 with a back link of their own), then 5 and 4 to kinds 1 and 3; the
+  // slice plus the new section's count.
+  const auto take = [&](uint32_t link) {
+    guest::StoreU16(base, position + 0, uint16_t(LoadU16(base, link)));
+    const uint32_t to = Section(base, Load(base, route), LoadU16(base, link));
+    guest::StoreU16(base, position + 2, uint16_t(LoadU16(base, to) + uint32_t(slice)));
+    return Normalize(base, route, position, 0);
+  };
+  for (int32_t i = 5; i >= 3; i--) {
+    const uint32_t link = section + 28 + 4 * uint32_t(i);
+    const uint32_t to = LoadU16(base, link);
+    if (to == 0xFFFF) {
+      continue;
+    }
+    if (i > 3) {
+      const uint32_t s = SectionIn(base, table, to);
+      const uint32_t kind = Kind(base, s);
+      if (kind == 1 || kind == 3) {
+        continue;
+      }
+      uint32_t back = 0;
+      for (uint32_t j = 0; j < 3; j++) {
+        if (LoadU16(base, s + 40 + 4 * j) != 0xFFFF) {
+          back++;
+        }
+      }
+      if (back == 0) {
+        continue;
+      }
+    }
+    if (nth()) {
+      return take(link);
+    }
+  }
+  for (int32_t i = 5; i >= 4; i--) {
+    const uint32_t link = section + 28 + 4 * uint32_t(i);
+    const uint32_t to = LoadU16(base, link);
+    if (to == 0xFFFF) {
+      continue;
+    }
+    const uint32_t kind = Kind(base, SectionIn(base, table, to));
+    if (kind != 1 && kind != 3) {
+      continue;
+    }
+    if (nth()) {
+      return take(link);
+    }
+  }
+  return 0;
+}
+
+void FullSearch(uint8_t* base, uint32_t route, uint32_t out, uint32_t point, uint32_t section,
+                uint32_t before, uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_820FB2B0 TrackRoute::FullSearch");
+  const uint32_t position = frame + 80;
+  const uint32_t best = frame + 84;
+  const uint32_t score = frame + 88;
+  double nearest = Lfs(base, kFarthest);
+  Stfs(base, score, nearest);
+  guest::StoreU16(base, best + 2, 0);
+  guest::StoreU16(base, best + 0, 0xFFFF);
+  const double reach = Lfs(base, kReachSquared);
+  const int32_t given = int16_t(section);
+  const auto table = [&] { return Load(base, Load(base, route) + 12); };
+  // Every slice of the section `s` (its number at `position`), the nearest
+  // on it kept (OnSlice's score).
+  const auto slices = [&](uint32_t s) {
+    guest::StoreU16(base, position + 2, 0);
+    if (!(LoadS16(base, s) > 0)) {
+      return;
+    }
+    int32_t slice = 0;
+    do {
+      if (OnSlice(base, route, point, position, score, frame - 128) == 1) {
+        const double value = Lfs(base, score);
+        if (value < nearest) {
+          nearest = value;
+          guest::StoreU32(base, best, Load(base, position));
+        }
+      }
+      slice = int16_t(slice + 1);
+      guest::StoreU16(base, position + 2, uint16_t(slice));
+    } while (slice < LoadS16(base, s));
+  };
+  // The sections the links of `s` lead to, within their bounds. `follow`:
+  // the original's register for `s` taking each such section (its next
+  // links read from there).
+  const auto links = [&](uint32_t s, bool follow) {
+    for (uint32_t i = 0; i < 12; i++) {
+      const uint32_t to = LoadU16(base, s + 28 + 4 * i);
+      guest::StoreU16(base, position, uint16_t(to));
+      if (int16_t(to) == -1 || SectionOutcode(base, route, point, to) != 0) {
+        continue;
+      }
+      const uint32_t next = SectionIn(base, table(), to);
+      if (follow) {
+        s = next;
+      }
+      slices(next);
+    }
+  };
+  const auto found = [&] { return nearest < reach && LoadU16(base, best) != 0xFFFF; };
+  // The given section's links.
+  bool done = false;
+  if (given != -1) {
+    links(SectionIn(base, table(), section), false);
+    done = found();
+  }
+  // The section before and its links.
+  const int32_t previous = int16_t(before);
+  if (!done && previous != -1 && previous != given) {
+    guest::StoreU16(base, position, uint16_t(before));
+    const uint32_t s = SectionIn(base, table(), before);
+    if (SectionOutcode(base, route, point, before) == 0) {
+      slices(s);
+    }
+    links(s, true);
+    done = found();
+  }
+  if (!done) {
+    // Every section of kind 0x30 and up (the whole byte) within its bounds.
+    uint32_t file = Load(base, route);
+    guest::StoreU16(base, position, 0);
+    for (int32_t i = 0; i < int32_t(Load(base, file));) {
+      const uint32_t s = SectionIn(base, Load(base, file + 12), uint32_t(i));
+      if (!(LoadU8(base, s + 2) < 48) && SectionOutcode(base, route, point, uint32_t(i)) == 0) {
+        slices(s);
+      }
+      file = Load(base, route);
+      i = int16_t(i + 1);
+      guest::StoreU16(base, position, uint16_t(i));
+    }
+    if (LoadU16(base, best) == 0xFFFF) {
+      // None: the out position if whole, else the section before with
+      // out's slice, else (0, 0).
+      if (LoadU16(base, out + 0) != 0xFFFF && LoadU16(base, out + 2) != 0xFFFF) {
+        guest::StoreU32(base, best, Load(base, out));
+      } else if (previous != -1 && LoadU16(base, out + 2) != 0xFFFF) {
+        guest::StoreU16(base, best + 0, uint16_t(before));
+        guest::StoreU16(base, best + 2, uint16_t(LoadU16(base, out + 2)));
+      } else {
+        guest::StoreU16(base, best + 0, 0);
+        guest::StoreU16(base, best + 2, 0);
+      }
+    }
+  }
+  guest::StoreU32(base, out, Load(base, best));
+}
+
+void Follow(uint8_t* base, uint32_t route, uint32_t position, uint32_t point, uint32_t before,
+            uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_820FB680 TrackRoute::Follow");
+  const uint32_t copy = frame + 80;
+  const uint32_t best = frame + 84;
+  const uint32_t distance = frame + 88;
+  const uint32_t which = frame + 92;
+  guest::StoreU32(base, copy, Load(base, position));
+  uint32_t section = LoadU16(base, copy);
+  Stfs(base, distance, Lfs(base, kNoDistance));
+  guest::StoreU16(base, best + 0, 0xFFFF);
+  guest::StoreU16(base, best + 2, 0xFFFF);
+  int32_t moved = 0;
+  uint32_t branch = 0;
+  if (int16_t(section) >= 0) {
+    uint32_t slice = LoadU16(base, copy + 2);
+    if (int16_t(slice) >= 0) {
+      for (int32_t steps_left = 5;;) {
+        const uint32_t where =
+            NoteShoulder(base, route, point, copy, best, distance, frame - 128);
+        if (where == 0) {
+          guest::StoreU32(base, position, Load(base, copy));
+          return;
+        }
+        if (where == 1 || where == 2) {
+          // Past or before the slice: the next or previous one.
+          const int32_t step = where == 1 ? 1 : -1;
+          guest::StoreU16(base, copy + 2, uint16_t(slice + uint32_t(step)));
+          moved += step;
+          Normalize(base, route, copy, 0);
+        } else if (where >= 7) {
+          steps_left = 0;
+        } else {
+          const uint32_t first = LoadU16(base, position + 0);
+          if (int16_t(section) == int16_t(first)) {
+            // Beside the road in the first section: the section beside it
+            // (link 6 on the left, 8 on the right).
+            const uint32_t s = SectionIn(base, Load(base, Load(base, route) + 12), section);
+            const uint32_t link = (where == 3 || where == 5) ? 6 : 8;
+            const uint32_t to = LoadU16(base, s + (link + 7) * 4);
+            if (to == 0xFFFF) {
+              steps_left = 0;
+            } else {
+              guest::StoreU16(base, copy, uint16_t(to));
+              Normalize(base, route, copy, 0);
+            }
+          } else {
+            // Beside the road in another section: the first section's
+            // next branch, from its slice plus the slices moved.
+            const uint32_t from = LoadU16(base, position + 2);
+            branch++;
+            guest::StoreU16(base, copy, uint16_t(first));
+            guest::StoreU32(base, which, branch);
+            guest::StoreU16(base, copy + 2, uint16_t(from + uint32_t(moved)));
+            if (TakeBranch(base, route, copy, which) == 0) {
+              steps_left = 0;
+            }
+          }
+        }
+        if (--steps_left < 0) {
+          break;
+        }
+        slice = LoadU16(base, copy + 2);
+        section = LoadU16(base, copy);
+      }
+    }
+  }
+  // No slice found: the shoulder kept, else the full search, taken when its
+  // slice's center is within 10 m in height.
+  if (LoadS16(base, best + 0) >= 0 && LoadS16(base, best + 2) >= 0) {
+    guest::StoreU32(base, position, Load(base, best));
+    return;
+  }
+  const uint32_t word = Load(base, position);
+  const uint32_t previous = LoadU16(base, before);
+  const uint32_t current = LoadU16(base, position);
+  guest::StoreU32(base, copy, word);
+  FullSearch(base, route, copy, point, current, previous, frame - 192);
+  const uint32_t found = LoadU16(base, copy);
+  if (int16_t(found) < 0) {
+    return;
+  }
+  const int32_t slice = LoadS16(base, copy + 2);
+  if (slice < 0) {
+    return;
+  }
+  const uint32_t record = Record(Section(base, Load(base, route), found), slice);
+  if (record == 0) {
+    return;
+  }
+  const double dy = Fsubs(Lfs(base, record + 4), Lfs(base, point + 4));
+  if (!(Fmuls(dy, dy) < Lfs(base, kHeightReach))) {
+    return;
+  }
+  guest::StoreU32(base, position, Load(base, copy));
 }
 
 uint32_t OnSlice(uint8_t* base, uint32_t route, uint32_t point, uint32_t position, uint32_t score,

@@ -167,6 +167,35 @@ uint32_t LocateAt(uint8_t* base, uint32_t route, uint32_t point, uint32_t positi
 // last Normalize's answer, or 0 when none was found).
 uint32_t ToMainRoad(uint8_t* base, uint32_t route, uint32_t position, uint32_t flag,
                     uint32_t frame);
+// TrackRoute::NoteShoulder (sub_820FB100): LocateShoulder on the position's
+// slice; on a shoulder (3 or 4) nearer the slice's center (squared, in 3D)
+// than the float at `distance`, the position into `best` and the distance
+// into `distance`. Returns LocateShoulder's answer. `frame`: the original's.
+uint32_t NoteShoulder(uint8_t* base, uint32_t route, uint32_t point, uint32_t position,
+                      uint32_t best, uint32_t distance, uint32_t frame);
+// TrackRoute::TakeBranch (sub_820FA4A8): 1 when on the route; past the end,
+// the n-th (the word at `which`, from 0) forward link (its row), before the
+// start the n-th back link, the slice moved by a section's count, then
+// Normalize; 0 when there's no n-th.
+uint32_t TakeBranch(uint8_t* base, uint32_t route, uint32_t position, uint32_t which);
+// TrackRoute::Follow's full search (sub_820FB2B0, never seen in play, so
+// without a row): the nearest slice holding the point (OnSlice's score)
+// among the sections the section's links lead to, then the section before
+// (`before`, -1 none) and its links, then every section of kind byte 0x30
+// and up; a score from the first two below [0x8200681C] ends the search.
+// None: out as it was when whole, else the section before with out's slice,
+// else (0, 0). Out = the result. `frame`: the original's (its +80, +84 and
+// +88 its position, best and score, as the original keeps them).
+void FullSearch(uint8_t* base, uint32_t route, uint32_t out, uint32_t point, uint32_t section,
+                uint32_t before, uint32_t frame);
+// TrackRoute::Follow (sub_820FB680): the route position moved to the slice
+// holding the point, up to six steps (its row); else the nearest shoulder
+// noted, else FullSearch's answer when within 10 m in height. `before`: the
+// route position before (its section for FullSearch). `frame`: the
+// original's (its +80 to +95 its copy, best, distance and branch count).
+// The original's r3 isn't kept (no caller reads it).
+void Follow(uint8_t* base, uint32_t route, uint32_t position, uint32_t point, uint32_t before,
+            uint32_t frame);
 // TrackRoute::OnSlice (sub_820FB1B8): 1 when the point is within the
 // position's section's bounds (SectionOutcode) and on its slice (Locate);
 // the score at `score` (when not 0). `frame`: the original's.

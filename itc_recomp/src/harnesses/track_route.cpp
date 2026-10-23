@@ -112,6 +112,17 @@ ITC_NATIVE_STEP(NativeLocateAt,
 ITC_NATIVE_STEP(NativeToMainRoad,
                 ctx.r3.u64 = tr::ToMainRoad(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
                                             ctx.r1.u32 - 144))
+ITC_NATIVE_STEP(NativeNoteShoulder,
+                ctx.r3.u64 = tr::NoteShoulder(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                              ctx.r6.u32, ctx.r7.u32, ctx.r1.u32 - 128))
+ITC_NATIVE_STEP(NativeTakeBranch,
+                ctx.r3.u64 = tr::TakeBranch(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+// r3 not compared for these two (the originals' r3 isn't kept: nothing reads
+// it).
+ITC_NATIVE_STEP(NativeFullSearch, tr::FullSearch(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                                 ctx.r6.u32, ctx.r7.u32, ctx.r1.u32 - 192))
+ITC_NATIVE_STEP(NativeFollow, tr::Follow(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
+                                         ctx.r1.u32 - 176))
 ITC_NATIVE_STEP(NativeOnSlice,
                 ctx.r3.u64 = tr::OnSlice(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
                                          ctx.r1.u32 - 128))
@@ -314,6 +325,10 @@ enum Kind {
   kSlicePoint,
   kLocateAt,
   kToMainRoad,
+  kNoteShoulder,
+  kTakeBranch,
+  kFullSearch,
+  kFollow,
 };
 
 }  // namespace
@@ -394,6 +409,14 @@ void TrackRoute(Context& h) {
        kLocateAt, 3000},
       {"TrackRoute::ToMainRoad (sub_820FA728)", Original<__imp__sub_820FA728>,
        NativeToMainRoad, kToMainRoad, 3000},
+      {"TrackRoute::NoteShoulder (sub_820FB100)", Original<__imp__sub_820FB100>,
+       NativeNoteShoulder, kNoteShoulder, 3000},
+      {"TrackRoute::TakeBranch (sub_820FA4A8)", Original<__imp__sub_820FA4A8>,
+       NativeTakeBranch, kTakeBranch, 3000},
+      {"TrackRoute::FullSearch (sub_820FB2B0)", Original<__imp__sub_820FB2B0>,
+       NativeFullSearch, kFullSearch, 3000},
+      {"TrackRoute::Follow (sub_820FB680)", Original<__imp__sub_820FB680>, NativeFollow,
+       kFollow, 4000},
   };
   const uint32_t area = memory::Alloc(kAreaBytes, 0);
   const uint32_t table = memory::Alloc(4 * kTableEntries, 0);
@@ -570,6 +593,9 @@ void TrackRoute(Context& h) {
         case kLocate:
         case kLocateShoulder:
         case kLocateAt:
+        case kNoteShoulder:
+        case kFollow:
+        case kFullSearch:
         case kOnSlice: {
           // A slice of the route (now and then its section's last), its
           // record, and a point near it (or anywhere).
@@ -589,6 +615,88 @@ void TrackRoute(Context& h) {
           r4 = area + kPoint;
           r5 = area + kA;
           r6 = f.kind == kOnSlice ? (r.Below(4) == 0 ? 0 : area + kFloat) : record;
+          if (f.kind == kNoteShoulder) {
+            // Out (a position) and the best squared distance so far.
+            r6 = area + kB;
+            r7 = area + kFloat;
+            if (r.Below(2)) {
+              guest::StoreFloat(h.base, area + kFloat, float(r.Below(400)));
+            }
+          }
+          if ((f.kind == kFollow || f.kind == kFullSearch) && r.Below(4) != 0) {
+            // The point on a slice (A's, or any section's), close to its
+            // center in x and z, up to 15 m off in height, and its section's
+            // bounds around it, so the slices' searches find it.
+            const uint32_t t = f.kind == kFollow && r.Below(2) ? section : r.Below(route.sections);
+            const uint32_t k = t == section && r.Below(2) ? slice : r.Below(route.Slices(t));
+            const uint32_t at = route.Address(t) + 124 + 84 * k;
+            const float jitter[3] = {float(int32_t(r.Below(41)) - 20) / 100.0f,
+                                     float(int32_t(r.Below(31)) - 15),
+                                     float(int32_t(r.Below(41)) - 20) / 100.0f};
+            for (uint32_t i = 0; i < 3; i++) {
+              const float c0 = guest::LoadFloat(h.base, at + 4 * i);
+              guest::StoreFloat(h.base, area + kPoint + 4 * i, c0 + jitter[i]);
+              guest::StoreFloat(h.base, route.Address(t) + 4 + 4 * i, c0 - 30.0f);
+              guest::StoreFloat(h.base, route.Address(t) + 16 + 4 * i, c0 + 30.0f);
+            }
+          }
+          if (f.kind == kFollow) {
+            // The position now and then off its section (past, before, or a
+            // section above 0x7FFF); the position before (B) random.
+            switch (r.Below(6)) {
+              case 0:
+                guest::StoreU16(h.base, area + kA + 2, uint16_t(n + r.Below(4)));
+                break;
+              case 1:
+                guest::StoreU16(h.base, area + kA + 2, uint16_t(-int32_t(1 + r.Below(4))));
+                break;
+              case 2:
+                if (r.Below(4) == 0) {
+                  guest::StoreU16(h.base, area + kA, uint16_t(0x8000 | r.Below(0x8000)));
+                }
+                break;
+              default:
+                break;
+            }
+            r4 = area + kA;
+            r5 = area + kPoint;
+            r6 = area + kB;
+          } else if (f.kind == kFullSearch) {
+            // Out (A: whole, or a halfword 0xFFFF), the section (now and then
+            // -1) and the section before (now and then -1 or the same).
+            const uint32_t pick = r.Below(4);
+            if (pick == 0) {
+              guest::StoreU16(h.base, area + kA, 0xFFFF);
+            } else if (pick == 1) {
+              guest::StoreU16(h.base, area + kA + 2, 0xFFFF);
+            }
+            r4 = area + kA;
+            r5 = area + kPoint;
+            r6 = r.Below(6) == 0 ? 0xFFFF : r.Below(route.sections);
+            r7 = r.Below(5) == 0 ? 0xFFFF : r.Below(4) == 0 ? r6 : r.Below(route.sections);
+          }
+          break;
+        }
+        case kTakeBranch: {
+          // Off the route mostly: past either end, or a section off it; the
+          // branch number 0 to 4, now and then negative.
+          const uint32_t section = guest::LoadU16(h.base, area + kA);
+          switch (r.Below(5)) {
+            case 0:
+            case 1:
+              guest::StoreU16(h.base, area + kA + 2,
+                              uint16_t(route.Slices(section) + r.Below(12)));
+              break;
+            case 2:
+            case 3:
+              guest::StoreU16(h.base, area + kA + 2, uint16_t(-int32_t(1 + r.Below(12))));
+              break;
+            default:
+              break;
+          }
+          guest::StoreU32(h.base, area + kCount, uint32_t(int32_t(r.Below(6)) - 1));
+          r4 = area + kA;
+          r5 = area + kCount;
           break;
         }
         case kToMainRoad:
@@ -681,8 +789,10 @@ void TrackRoute(Context& h) {
           out[v].Bytes(Read(h.base, area + i, 64));
         }
         out[v].Floats(h.base, area + kOut, 4);
-        out[v].Word(uint32_t(t.r3.u64 >> 32));
-        out[v].Word(t.r3.u32);
+        if (f.kind != kFollow && f.kind != kFullSearch) {
+          out[v].Word(uint32_t(t.r3.u64 >> 32));
+          out[v].Word(t.r3.u32);
+        }
         if (f.kind == kDistance) {
           out[v].Double(t.f1.u64);
         }

@@ -19,8 +19,9 @@
 // (sub_820F9448, from NormalizeLane), StepForwardLaneMasked (sub_820F9600,
 // from NormalizeLaneMasked), AlongSlice (sub_820FAE78, from Locate and
 // LocateShoulder), Locate (sub_820FAF88, from OnSlice) and SectionOutcode
-// (sub_820F8EF0, from OnSlice; its other caller, sub_820FB2B0, never ran
-// in play and runs the original).
+// (sub_820F8EF0, from OnSlice and Follow's full search). NoteShoulder
+// (sub_820FB100), TakeBranch (sub_820FA4A8) and the full search
+// (sub_820FB2B0, never seen in play) are reached only from Follow.
 
 #include "guest.h"
 
@@ -39,7 +40,8 @@ ITC_FLAG_BOOL(native_track_route, true, "ITC",
               "NormalizeLane sub_820FA210, NormalizeLaneMasked sub_820FA350, Point "
               "sub_820FA860, AlongSlice sub_820FAE78, Locate sub_820FAF88, LocateShoulder "
               "sub_820FB030, LocateAt sub_820FB888, ToMainRoad sub_820FA728, OnSlice "
-              "sub_820FB1B8, ClampPosition sub_820F8420 with ToIndex sub_820AB408 and FromIndex "
+              "sub_820FB1B8, Follow sub_820FB680 with NoteShoulder sub_820FB100, TakeBranch "
+              "sub_820FA4A8 and its full search sub_820FB2B0, ClampPosition sub_820F8420 with ToIndex sub_820AB408 and FromIndex "
               "sub_820AB498, Distance sub_820F9278 with LinkDistance sub_820F8720, SlicePoint "
               "sub_820F9768 with its case 0 sub_820F985C (cases 5 to 16, never seen in play, on "
               "the translated code)) natively instead of through the translated code (the same "
@@ -47,7 +49,8 @@ ITC_FLAG_BOOL(native_track_route, true, "ITC",
               "from native callers have no adapters, and the flag switches their callers: "
               "sub_820F8A58, sub_820AB408, sub_820AB498, sub_820F8720, sub_820F8CE8, "
               "sub_820F8BD0, sub_820F93A0, sub_820F9EA8, sub_820F9F58, sub_820F8B48, sub_820F8C58, "
-              "sub_820F9320, sub_820F9448, sub_820F9600, sub_820FAE78, sub_820FAF88, sub_820F8EF0");
+              "sub_820F9320, sub_820F9448, sub_820F9600, sub_820FAE78, sub_820FAF88, sub_820F8EF0, "
+              "sub_820FB100, sub_820FA4A8, sub_820FB2B0");
 
 // Defines an adapter: `body` uses `ctx` and `base`.
 #define ITC_TRACK_ROUTE(address, body)   \
@@ -105,6 +108,11 @@ ITC_TRACK_ROUTE(820FB888, ctx.r3.u64 = LocateAt(base, ctx.r3.u32, ctx.r4.u32, ct
 // frame (144 bytes down).
 ITC_TRACK_ROUTE(820FA728, ctx.r3.u64 = ToMainRoad(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
                                                   ctx.r1.u32 - 144))
+// r4 = the route position (changed), r5 = the point, r6 = the route
+// position before; the original's frame (176 bytes down). r3 left as it
+// came (no caller reads it).
+ITC_TRACK_ROUTE(820FB680, Follow(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
+                                 ctx.r1.u32 - 176))
 // r4 = the point, r5 = the position, r6 = the score or 0; the original's
 // frame (128 bytes down).
 ITC_TRACK_ROUTE(820FB1B8, ctx.r3.u64 = OnSlice(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
