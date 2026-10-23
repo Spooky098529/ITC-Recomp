@@ -51,6 +51,14 @@ When the user has reviewed a run's section, its heading gets
   LimitThrottle read the vehicle without a null check, as the
   originals. The AI harness refills its block every fourth case (about
   4 s to under 1 s).
+  Migration 2's rows (e01cc35..24669a4; 18 more ours, 22 adapters
+  removed: 92 ours, 46 Native): `sub_821462A0` (UpdateState's state 6,
+  never seen in play, no row) ported with UpdateState and its own
+  harness cases, said in UpdateState's row and the intro; JoinCornerPair's
+  equal-direction steps (`sub_8213BDF0`, `sub_8213BE80`, never seen in
+  play) left on the recompiled code, called by AddCornersAt's adapter
+  from the original's stack frames; SteerToTarget's row corrected (+152
+  is sin × +384 + cos × +392, not cos × +384 + sin × +392).
 
 ## Run 2026-10-23 17:22 (`b7-loop-23-10-26-4`)
 

@@ -20,8 +20,9 @@ file's history. What's left to see in a drive, from every run:
   race states' route users went back to `leads.md`). Migration 1
   (c94d6be..91b8da2): 74 ours, 24 Native, `--native_ai_drivers`; 47
   ready groups left. Validated (74 of 74 harness lines; `itc_1124`,
-  `itc_1125`, replay ok; 8 to drive). Step: migration 2 (agent
-  running).
+  `itc_1125`, replay ok; 8 to drive). Migration 2 (e01cc35..24669a4):
+  92 ours, 46 Native; 29 ready groups left. Step: validation of
+  migration 2 (agent running).
 
 ## Done
 
@@ -48,3 +49,7 @@ This run's groups: `expected-differences.md` (the "20:22 run" lines).
   123, known 631, unknown 4706). Race 22 s (`itc_1123`) with
   `--run_harnesses=all`, 0 errors, every harness 0 differing (no
   "(expected to differ)" groups added).
+- After the AI drivers' migration 2: ours 1315, work left 5442 (wrapped
+  123, known 613, unknown 4706). Race 22 s (`itc_1144`) with
+  `--run_harnesses=all`, 0 errors, every harness 0 differing (none
+  added).
