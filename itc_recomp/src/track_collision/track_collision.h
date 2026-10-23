@@ -224,6 +224,13 @@ uint32_t WallQueryIgnoresWall(uint8_t* base, uint32_t kind, uint32_t a, uint32_t
 // the wall's ends, recorded (AddHit). `hit` 1 when one was. `frame`: the
 // original's 304 bytes.
 bool WallQueryCornersThroughWall(uint8_t* base, uint32_t query, uint32_t frame, uint32_t* hit);
+// WallQuery::EdgesAcrossWall (sub_820FC900): the box's edges (all but 1,
+// 3, 9 and 10) against the wall: an edge across it in x and z with an end
+// gone through it, or the wall's end pushed out of the face for the edge;
+// an edge beside it with both of the wall's ends inside the box, pushed
+// out along the edge's move. The deepest of each edge recorded (AddHit).
+// `hit` 1 when one was. `frame`: the original's 944 bytes.
+bool WallQueryEdgesAcrossWall(uint8_t* base, uint32_t query, uint32_t frame, uint32_t* hit);
 
 // The vector unit's normalize as the translated code does it, flush-to-zero
 // on: the 16 bytes at `from` rounded down to 16 (x, y, z, w), the squared

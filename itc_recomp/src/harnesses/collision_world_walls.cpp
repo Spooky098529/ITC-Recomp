@@ -66,6 +66,16 @@ void NativeCorners(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = hit;
 }
 
+void NativeEdges(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  uint32_t hit = 0;
+  if (!tc::WallQueryEdgesAcrossWall(base, ctx.r3.u32, ctx.r1.u32 - 944, &hit)) {
+    __imp__sub_820FC900(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = hit;
+}
+
 // Runs the recompiled version with the native flags off, so the functions
 // it calls that are ours run the originals too.
 template <GuestFunction recompiled>
@@ -324,6 +334,7 @@ void ThroughCases(Context& h, uint32_t area, uint32_t race) {
   } functions[] = {
       {"WallQuery::CornersThroughWall (sub_820FC3C8)", Original<__imp__sub_820FC3C8>,
        NativeCorners},
+      {"WallQuery::EdgesAcrossWall (sub_820FC900)", Original<__imp__sub_820FC900>, NativeEdges},
   };
   enum Group { kNumbers, kOneNaN };
   const char* const kGroupNames[] = {"", ", one NaN"};
