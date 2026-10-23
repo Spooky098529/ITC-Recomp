@@ -314,6 +314,16 @@ Both local words start as whatever is on the guest stack: only bits 0-29
 are written, so bits 30 and 31 of held (and so of held before, pressed
 and released) are stack leftovers. A native version would have them 0;
 whether anything reads bit 30 (`sub_8210B140`'s "none") isn't known.
+Read further (2026-10-23, B7's loop): the states word's bits 30-31 are
+never read (only bits 0-29 are tested), and the held word's stack word
+(`sub_8210BBA0`'s +80) is always, below `sub_8210C0E0`, the high half of
+r25 as `sub_8210B7D0`'s `__savegprlr_24` saved it. So the native update
+(`--native_action_mappers`, `src/action_mappers/`, rows in
+`functions/action-mappers.md`) is handed that word and gives the same
+bits 30 and 31; its harness checks it against the recompiled one with
+r25 random. The update is native under the same per-tick override (step 2
+below), and the repeat counts are unchanged, so the pause menu's repeat
+behaves as before.
 
 Not known yet (a run will tell): the constants at `0x82007F58`,
 `0x82007F5C`, `0x82007F60` and `0x82007F64`; the bytes at `0x82007F20`;

@@ -807,6 +807,18 @@ void InputRead_Note(uint32_t function, uint32_t caller, uint32_t object, uint32_
 
 }  // namespace
 
+bool frame_pacing::GameMessages_LogInputReads() {
+  return ITC_FLAG(log_input_reads);
+}
+
+void frame_pacing::GameMessages_NoteInputRead(uint32_t function, uint32_t caller,
+                                              uint32_t object, uint32_t mask, uint32_t result) {
+  InputRead_Note(function, caller, object, mask, result);
+}
+
+// 825924E0 and 8258CF10 (the listeners' held test the action mappers make)
+// are native: their adapters, src/hooks/action_mappers.cpp, note them the
+// same way, and so does the mappers' native update for its own calls.
 #define ITC_INPUT_READ(address)                                                    \
   extern "C" REX_FUNC(sub_##address) {                                             \
     REX_FUNC_PROLOGUE();                                                           \
@@ -820,10 +832,8 @@ void InputRead_Note(uint32_t function, uint32_t caller, uint32_t object, uint32_
     __imp__sub_##address(ctx, base);                                               \
     InputRead_Note(0x##address, caller, object, mask, ctx.r3.u32 & 0xFF);          \
   }
-ITC_INPUT_READ(825924E0)
 ITC_INPUT_READ(82592500)
 ITC_INPUT_READ(82592520)
-ITC_INPUT_READ(8258CF10)
 ITC_INPUT_READ(8258CEB0)
 ITC_INPUT_READ(8258CEE0)
 #undef ITC_INPUT_READ

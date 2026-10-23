@@ -146,8 +146,18 @@ translated (no host library plays its data); the rest waits on XACT's
 critical section, XAudio and its voices, the tracks and waves, and
 GetTickCount (`sub_822956F0`, the user's call). What's for the user's
 review is in `docs/loops/review.md`, harness groups expected to differ
-in `docs/loops/expected-differences.md`; new harness code compares
-floats with `harness::Outputs` (two NaNs match).
+in `docs/loops/expected-differences.md`, the functions still to see in a
+drive in `docs/loops/to-drive.md`; new harness code compares
+floats with `harness::Outputs` (two NaNs match). Its sixth run
+(`b7-loop-23-10-26-2`, stopped 2026-10-23 for the user's review, not
+merged; summary `docs/loops/b7-loop-2026-10-23-1106.md`) made the
+action mappers and the game's data tables native as far as they were
+ready (`action-mappers.md`, `data-tables.md`;
+`--native_action_mappers`, `--native_data_tables`; ours 971 -> 1,023),
+with no change in the game's behavior (the user's call: B7 only moves
+the game off the recompiled code); the rest waits on the input
+manager's vtable targets, the input processor's constructor and the
+archive.
 After each plan item, run `itc_recomp/tools/boundary_status.py` and record
 its output in "The boundary over time" at the end of
 `docs/rexglue-removal.md`. Plan steps are done on their

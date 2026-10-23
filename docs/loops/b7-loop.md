@@ -426,11 +426,14 @@ race: <seconds at 30 ticks/s>, <error lines>, harnesses all 0: yes | no
 stop: none | <reason>
 ```
 
-The lead copies `not in game:` into "To check in a drive" in the progress
-file, and notes the `replay:` line beside it when the replay broke (the
-native code under test may be the cause). When the loop ends, the user drives a race (menus, a save) with
-`--log_level=info` and checks the log's `native running (game):` lines for
-those functions: the validation step done by playing.
+The lead copies `not in game:` into `docs/loops/to-drive.md` (the user's
+call, 2026-10-23: one list kept across runs, so no run record needs
+searching), under the run's heading, and notes the `replay:` line beside
+it when the replay broke (the native code under test may be the cause);
+it commits it with the progress file. When the loop ends, the user drives
+a race (menus, a save) with `--log_level=info` and checks the log's
+`native running (game):` lines for those functions: the validation step
+done by playing. A function seen in a log leaves the list.
 
 ## When to halt
 
@@ -440,7 +443,7 @@ file, when:
 - a harness differs (outside "(expected to differ)"), or a function made
   native has no harness cases;
 - a validation agent reports a function `missing:` (a broken replay is
-  not a reason to halt: its functions go to the drive list);
+  not a reason to halt: its functions go to `to-drive.md`);
 - an attract race failed, stalled twice, logged new errors, or ran under
   ~20 seconds at 30 ticks/s;
 - an agent left work uncommitted, or a commit doesn't build;
@@ -502,11 +505,11 @@ listing groups.
 
 `docs/loops/b7-progress.md`, for the current run. Kept short, so a pass
 can read it whole. A run's first pass finds the previous run's file
-stopped: it starts it afresh, first copying the old one's drive list
-and totals into that run's summary file under "Left for the user" (the
-rest is in git; rows to review and expected differences already live in
-`review.md` and `expected-differences.md`), and adds a section for the
-new run to `review.md`:
+stopped: it starts it afresh, first copying the old one's totals into
+that run's summary file under "Left for the user" (the rest is in git;
+rows to review, expected differences and the drive list already live in
+`review.md`, `expected-differences.md` and `to-drive.md`), and adds a
+section for the new run to `review.md`:
 
 - **Now:** the subsystem, the step, the agent running, the run's
   subsystem count.
@@ -514,6 +517,7 @@ new run to `review.md`:
   commits), newest first.
 - **Rows to review:** a pointer to the run's section of `review.md` only.
 - **Expected to differ:** a pointer to `expected-differences.md` only.
+- **To check in a drive:** a pointer to `to-drive.md` only.
 - **Totals:** `b7_status.py`'s totals line after each step.
 - **Stopped:** when and why, if the loop ended itself.
 

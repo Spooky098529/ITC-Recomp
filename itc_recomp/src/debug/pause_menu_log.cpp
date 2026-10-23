@@ -163,14 +163,19 @@ void NoteRead(int slot, uint32_t mapper, uint32_t action, uint32_t caller, bool 
   }
 
 PAUSE_MENU_READ_SLOT(8210BA68, 5, ctx.f1.f64)
-PAUSE_MENU_READ_SLOT(8210BE70, 8, double(ctx.r3.u32))
 PAUSE_MENU_READ_SLOT(8210BED8, 9, double(ctx.r3.u32))
-PAUSE_MENU_READ_SLOT(8210BF40, 10, double(ctx.r3.u32))
 PAUSE_MENU_READ_SLOT(8210BFA8, 11, double(ctx.r3.u32))
-PAUSE_MENU_READ_SLOT(8210C010, 12, double(ctx.r3.u32))
-PAUSE_MENU_READ_SLOT(8210BA28, 14, double(ctx.r3.u32 & 0xFFFF))
 
 #undef PAUSE_MENU_READ_SLOT
+
+// Slots 8, 10, 12 and 14 are native (hooks/action_mappers.cpp); their
+// adapters log through this.
+void debug::PauseMenuLog_NoteSlotRead(int slot, uint32_t mapper, uint32_t action,
+                                      uint32_t caller, double value) {
+  if (ITC_FLAG(log_pause_menu)) {
+    NoteRead(slot, mapper, action, caller, value != 0, value);
+  }
+}
 
 void debug::PauseMenuLog_NoteMapperUpdate(uint32_t caller) {
   if (ITC_FLAG(log_pause_menu)) {
@@ -205,17 +210,20 @@ extern "C" REX_FUNC(sub_8220C1E0) {
   }
 }
 
-// The action mapper's input update.
-extern "C" REX_FUNC(sub_8210C370) {
-  REX_FUNC_PROLOGUE();
+// The action mapper's input update (sub_8210C370; its adapter is in
+// hooks/action_mappers.cpp).
+uint32_t debug::PauseMenuLog_BeforeMapperUpdate(uint8_t* base, uint32_t mapper) {
   if (!ITC_FLAG(log_pause_menu)) {
-    __imp__sub_8210C370(ctx, base);
+    return 0;
+  }
+  return guest::LoadU32(base, mapper + 464);
+}
+
+void debug::PauseMenuLog_AfterMapperUpdate(uint8_t* base, uint32_t mapper, uint32_t caller,
+                                           uint32_t fired_before) {
+  if (!ITC_FLAG(log_pause_menu)) {
     return;
   }
-  uint32_t mapper = ctx.r3.u32;
-  uint32_t caller = uint32_t(ctx.lr);
-  uint32_t fired_before = guest::LoadU32(base, mapper + 464);
-  __imp__sub_8210C370(ctx, base);
   uint32_t held = guest::LoadU32(base, mapper + 448);
   uint32_t fired = guest::LoadU32(base, mapper + 464);
   if (((held | fired | fired_before) & kDirectionBits) && TakeLine()) {

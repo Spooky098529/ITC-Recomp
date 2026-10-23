@@ -11,6 +11,78 @@ functions to check in a drive in the progress file.
 When the user has reviewed a run's section, its heading gets
 "(reviewed <date>)"; the section stays for the record.
 
+## Run 2026-10-23 11:06 (`b7-loop-23-10-26-2`)
+
+- `action-mappers.md` (new, 40 rows; 15 moved from `functions.md`, 25
+  new), 4 `known-data.md` rows (the globals `0x826BAB78`/`7C`/`80`, the
+  client list at `0x82970C14`, the settings table at
+  `0x82600B84`/`B88`, the action mapper's layout); 2 leads (the input
+  processor's constructors, the app's start-up). For review: the read
+  slots never seen in play (`sub_8210BA68`, `sub_8210BED8`,
+  `sub_8210BFA8`) stay in `functions.md`; of the button tests only
+  `sub_8258CF10` and `sub_825924E0` (called only by the mappers) moved;
+  `sub_8210C370`'s old note (a copy of MenuList::Update's) kept, with
+  the real description after it; the config slots
+  (`sub_8210B698`, `sub_8210BDF0`, `sub_8210BE30`) matched to their
+  slots from `sub_8209F228`'s arguments and the constants' values,
+  both "probably" (the vtables and tables weren't read from the image).
+  Migration 1's 36 rows (`--native_action_mappers`; 10 Native, adapters
+  removed; 4 rows left: `sub_8210AF08` BindAll and `sub_8210B270` Bind,
+  whose 7 calls into the input manager's vtables aren't identified, and
+  `sub_8210C180`, `sub_8209F430`, blocked by `sub_8258CE60`). No behavior
+  change (the user's call, 2026-10-23: migrate off the recompiled code
+  only): every harness matches exactly, the registers the originals
+  leave behind too; the per-tick override of `sub_8210B018` still skips
+  render-only passes first. For review: bits 30-31 of the held,
+  pressed and released words come from an uninitialized stack word in
+  `sub_8210BBA0` (r25's high half as saved by `sub_8210B7D0`), and the
+  native code is handed the same value (`docs/pause-menu-fix.md`); the
+  update, Configure and the set-up run the original unless every repeat
+  and curve object's slot is the function seen in play; their slot 0
+  (`sub_8243DC88`, `sub_82106540`, shared with other classes) done in
+  place, no rows; the `--log_pause_menu` and `--log_input_reads`
+  diagnostics moved into `src/hooks/action_mappers.cpp` over new helpers
+  in `src/debug/pause_menu_log` and `src/frame_pacing/game_messages`,
+  and the adapters of `sub_8210C370`, `sub_8258CF10`, `sub_825924E0`
+  kept for them on the fallback path; c67265f has a batch and four
+  adapter removals together; new names `InputProcessor::AllHeld`,
+  `TestHeld`, `ActionMapper::Held`, `Pressed`, `Fired`, `AnalogRaw`,
+  `SetThreshold`, `SetRepeat`, `SetCurve`.
+- `data-tables.md` (new, 18 rows, none moved): `[0x826C5CA0]`'s set-up
+  (`sub_82116DB0`), twelve asset loads (94: 400 items of 3,008 bytes,
+  "probably" the game's items, keyed by the save data's 12-byte records
+  at +0x199F8; 84 with no reader but the load; eight 56-byte tables from
+  the ids at `0x82616C64`; 95's 20-byte and 96's 40-byte entries), their
+  load callbacks byte-swapping the 56-, 20- and 40-byte tables in place
+  (the items aren't), and the accessors; 4 `known-data.md` rows; 4 leads
+  (the boot data load, the save data's items, `82140340`-`82144E58`, the
+  front-end callers at `822271F8`-`8222F0B0`). For review: the eight
+  asset ids at `0x82616C64` not recorded (they need an image dump; one
+  outside the repo wasn't used); `SwapWord` (`sub_820C97D8`) swaps a
+  word through a float load and store, which in the recompiled code
+  probably quiets a signaling NaN's bits (the 360 wouldn't): the native
+  code keeps the recompiled result (no behavior change, the user's
+  call; see migration 1 below: there's no quieting).
+  Migration 1's 16 rows (`--native_data_tables`; 4 Native: SwapWord and
+  the three entry swaps; left: DataTables::Init and Load, blocked by
+  the archive's `sub_8209DE48`, `sub_8209D868`, `sub_820A0678`). For
+  review: SwapWord's float round trip is folded away by the compiler in
+  the release build (a plain byte swap; signaling NaNs come through
+  unchanged), and the native code writes the same steps under the same
+  floating-point settings, so it folds the same (256 signaling-NaN
+  patterns compared exactly; the mapping's "probably quieted" corrected
+  in the row); the adapter turns flush-to-zero off as the original
+  does, and doesn't set f0 (no caller reads it); the accessors return
+  r3 zero-extended where the originals keep the argument's upper 32
+  bits (as the vehicle accessors do: the game reads the low word only);
+  Entry56, Find20, Entry20, Entry40 and ItemRecords::Item weren't seen
+  in the attract race (the front end, the save data); the five load
+  callbacks keep their adapters (reached through Archive::Load's
+  function pointer), the seven accessors too (recompiled callers).
+  After the run's validation: `sub_82116DA8`'s adapter calls a new
+  one-line `data_tables::RecordsItem` (over `Item`) with its own print,
+  as its harness step does (the user's call).
+
 ## Run 2026-10-23 01:52 (`b7-loop-23-10-26`)
 
 - `sound-cues.md` (new, 87 rows; 4 moved from `functions.md`:
