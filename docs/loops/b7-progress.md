@@ -22,7 +22,9 @@ see in a drive, from every run: `to-drive.md`.
   e211173 (40 rows, 15 ready groups); migration 1 done
   (9c3cbaa..7785364, five batches; ready groups left), validated (33
   of 33 harness lines; `itc_1085`, `itc_1086`, replay ok; 3 to drive);
-  step: migration 2 (a migration agent running).
+  migration 2 done (0b863a1..1b58c97: nothing ready left, with
+  `TrackPosition::Init` and `Update`); step: validation of migration 2
+  (a validation agent running).
 
 ## Done
 
@@ -73,5 +75,9 @@ This run's groups: `expected-differences.md` (the "17:22 run" lines).
   harness 0 differing (none added); 18 s is the harnesses' ~4.9 s inside
   the 25 s timeout: without them 23 s (`itc_1084`), accepted by the
   lead.
+- After the course's route's migration 2: ours 1223, work left 5534
+  (wrapped 123, known 559, unknown 4852). Race 23 s (`itc_1098`, with
+  `attract_race.sh 30`) with `--run_harnesses=all`, 0 errors, every
+  harness 0 differing (none added).
 
 ## Stopped

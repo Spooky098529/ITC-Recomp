@@ -108,6 +108,22 @@ When the user has reviewed a run's section, its heading gets
   (19 before): the harnesses take ~4.9 s before the race; without them
   23 s as before (`itc_1084`, checked by the lead). Since (the user's
   call, 2026-10-23), harness runs use `attract_race.sh 30`.
+  Migration 2's rows (0b863a1..1b58c97; all 40 of `track-route.md`
+  ours; `collision-world.md`'s `TrackPosition::Update` (`sub_820F8470`)
+  and `Init` (`sub_820F8578`) native under `--native_collision_world`
+  in `src/track_collision/track_cell.cpp`, calling the route's native
+  Follow and Point whatever `--native_track_route` says; 7 adapters
+  removed). For review: Follow's full search (`sub_820FB2B0`, never in
+  play) ported as `TrackRoute::FullSearch`, with its own harness group
+  but no row of its own (described in Follow's row; CLAUDE.md gives
+  unseen functions rows marked "Not seen in play": a row may be
+  wanted), keeping two quirks of the original (the next link from the
+  last linked section in bounds; the whole kind byte tested `>= 0x30`);
+  Follow, PathDistance, Update and Init don't keep the original's r3
+  (no caller reads it); positions the callees read by address stay in
+  the original's frames; PathDistance's harness uses routes of 8-slice
+  sections (the original's loops can run forever on random links);
+  18 adapters stay for the race and vehicle code's recompiled callers.
 
 ## Run 2026-10-23 13:44 (`b7-loop-23-10-26-3`)
 
