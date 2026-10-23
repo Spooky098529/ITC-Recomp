@@ -12,7 +12,8 @@ lists are there), and this file's history.
   branch), from 21cdb6a; summary `b7-loop-2026-10-23-0152.md`.
 - Subsystem 1 of 3 (the sound cues) finished: the rest waits on XACT.
 - Subsystem 2 of 3: XACT (`xact.md`, mapped in 7ba4592, 149 rows, 60
-  ready groups by direct calls); step 6, migration agent 1 running.
+  ready groups by direct calls); step 8, migration 1 done
+  (904e6ee..0c0fd63, 55 ours); validation agent running.
 
 ## Done
 
@@ -44,3 +45,5 @@ This run's groups: `expected-differences.md` (the "01:52 run" lines).
   137, known 375, unknown 5374).
 - After mapping XACT: ours 867, work left 5886 (wrapped 137, known 524,
   unknown 5225).
+- After XACT's migration 1: ours 922, work left 5831 (wrapped 137, known
+  469, unknown 5225).

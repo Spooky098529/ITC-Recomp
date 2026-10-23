@@ -50,6 +50,19 @@ When the user has reviewed a run's section, its heading gets
   3D settings). The mapping agent read the vtables from `default.xex`
   decrypted and decompressed into its scratchpad with Python's
   `cryptography` and the retail key (nothing of it in the repo).
+  Migration 1's 55 rows (46 Overridden, 9 Native; the intro's
+  paragraphs on how the translation is set up). For review: a function
+  calling its own object's vtable slot runs natively only while the
+  slot holds the already-native function (GetHeader at sound bank +64,
+  GetEntry and GetSeekTable at wave bank +16 and +20, AddListener at
+  the bank interface's +0), else hands off to the original before
+  changing anything; partial ports taking only the paths seen in play
+  (`sub_825CA980` only a sound without tracks, `sub_825CC1D0` only an
+  idle fader, `sub_825C8230` hands complex cues to the original);
+  allocating functions run the original unless `--native_heap` is on.
+  Left recompiled: the engine's critical section (no native lock in
+  `src/`; the core's), the global settings' unmapped vtable slots,
+  calls through vtables into recompiled code, unmapped callees.
 
 ## Run 2026-10-22 22:11 (`b7-loop-22-10-26-2`)
 
