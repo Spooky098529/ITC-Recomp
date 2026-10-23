@@ -73,6 +73,19 @@ When the user has reviewed a run's section, its heading gets
   from what callers do (no image dump read); for your call:
   GetTickCount made native means reading the kernel's timestamp bundle
   the SDK fills, or a host clock (left recompiled).
+  XACT's migration 2 (46 rows ours: 39 Overridden, the rest Native, 7
+  of them by adapter removal; the intro's settings vtable +0 to +68,
+  read from the loaded image). For review: paths seen in play only,
+  the rest handed to the original (`sub_825CC9C8` no optional sections,
+  `sub_825CB470` flags without 0x2, `sub_825C27C0` no presets and no
+  effect or both, `sub_825C2910` +100 is 0, `sub_825C6A20` +240 is 0,
+  `sub_825C7798` no listener cues); `sub_825CC380` reads the bank's
+  entry through the accessors instead of a stack copy (same words, all
+  read before the stores); the folded getters `sub_82099BA0`,
+  `sub_820A8958`, `sub_82379D50` overridden (same results for the game
+  code folded with them); the harness's `Case` compares f1, a
+  `Relocate` helper. Waiting on GetTickCount (your call): XACT's clock
+  `sub_825BFE28` and everything above it.
 
 ## Run 2026-10-22 22:11 (`b7-loop-22-10-26-2`)
 
