@@ -136,7 +136,8 @@ collision narrow phase and the collision world native as far as they
 were ready (`heap.md`, `collision.md`, `collision-world.md`;
 `--native_c_runtime_heap`, `--native_collision`,
 `--native_collision_world`; ours 714 -> 837). Its fifth run
-(`b7-loop-23-10-26`, 2026-10-23, not yet merged; summary
+(`b7-loop-23-10-26`, merged into
+`rexglue-removal-project` 2026-10-23 after a drive; summary
 `docs/loops/b7-loop-2026-10-23-0152.md`) made the sound cues and XACT
 native as far as they were ready (`sound-cues.md`, `xact.md`;
 `--native_sound_cues`, `--native_xact`; ours 837 -> 970): the user's

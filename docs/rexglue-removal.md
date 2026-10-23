@@ -65,7 +65,7 @@ goes in `src/` as overrides), American English.
   memory (ours 714), its fourth run (branch `b7-loop-22-10-26-2`, merged
   2026-10-23) made the C runtime heap, the collision narrow phase and
   the collision world native as far as they were ready (ours 837); its
-  fifth run (branch `b7-loop-23-10-26`, not yet merged) made the sound
+  fifth run (branch `b7-loop-23-10-26`, merged 2026-10-23) made the sound
   cues and XACT (the user's call: translated, no host library plays its
   data) native as far as they were ready (ours 970). The
   runs' rows wait for the user's review (`docs/loops/review.md`). See
