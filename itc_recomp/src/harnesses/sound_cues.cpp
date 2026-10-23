@@ -89,6 +89,18 @@ ITC_NATIVE_STEP(NativeManagerIsCuePlaying,
 ITC_NATIVE_STEP(NativeX3DAudioInitialize,
                 ctx.r3.u64 = sc::X3DAudioInitialize(base, ctx.r3.u32, ctx.f1.f64, ctx.r5.u32))
 ITC_NATIVE_STEP(NativeAudioEngineStart3D, ctx.r3.u64 = sc::AudioEngineStart3D(base, ctx.r3.u32))
+#define ITC_NATIVE_DECLINES(name, function)             \
+  void name(PPCContext& ctx, uint8_t* base) {            \
+    uint32_t r3 = 0;                                     \
+    if (!function(base, ctx.r3.u32, &r3)) {              \
+      ctx.r3.u64 = 0xDEADDEAD; /* the original's path */ \
+      return;                                            \
+    }                                                    \
+    ctx.r3.u64 = r3;                                     \
+  }
+ITC_NATIVE_DECLINES(NativeWaveBankHolderDestroy, sc::WaveBankHolderDestroy)
+ITC_NATIVE_DECLINES(NativeWaveBankHolderDelete, sc::WaveBankHolderDelete)
+ITC_NATIVE_DECLINES(NativeSoundBankHolderDelete, sc::SoundBankHolderDelete)
 void NativeDelegateClone(PPCContext& ctx, uint8_t* base) {
   uint32_t copy = 0;
   if (!sc::DelegateClone(base, ctx.r3.u32, &copy)) {
@@ -390,6 +402,58 @@ void CueList(Context& h) {
   clone.Report();
 }
 
+// The bank holders' destructor and deletes. The holders come from operator
+// new for each version (their addresses differ, so r3 is compared as
+// "the block" or "the slot"); handles other than -1 aren't run (the
+// original would close them; the native version hands them to it).
+void Holders(Context& h) {
+  Results results("sound_cues holders");
+  const uint32_t d = h.data;
+  for (int i = 0; i < 6; i++) {
+    Case(h, results, [&] { RandomWords(h, d, 4); guest::StoreU32(h.base, d + 12, 0xFFFFFFFFu); },
+         [&](PPCContext& t) { t.r3.u64 = d; }, __imp__sub_8259D438, NativeWaveBankHolderDestroy,
+         {}, fmt::format("WaveBankHolder::~WaveBankHolder {}", i));
+  }
+  if (hooks::NativeHeapActive()) {
+    for (int i = 0; i < 24; i++) {
+      const bool wave = i % 2 == 0;
+      const bool empty = i % 6 < 2;
+      Outputs out[2];
+      const Random start = h.random;
+      for (int v = 0; v < 2; v++) {
+        h.random = start;
+        Fill(h.base, h.data, kScratchBytes);
+        RandomWords(h, d, 8);
+        uint32_t block = 0;
+        if (!empty) {
+          block = *memory::crt::OperatorNew(h.base, wave ? 28 : 12);
+          RandomWords(h, block, wave ? 7 : 3);
+          if (wave) {
+            guest::StoreU32(h.base, block + 12, 0xFFFFFFFFu);
+          }
+        }
+        guest::StoreU32(h.base, d + 16, block);
+        PPCContext t = CallContext(h);
+        t.r3.u64 = d + 16;
+        ITC_FLAG(native_sound_cues) = v == 1;
+        if (wave) {
+          (v == 0 ? __imp__sub_82117AD8 : NativeWaveBankHolderDelete)(t, h.base);
+        } else {
+          (v == 0 ? __imp__sub_82117B30 : NativeSoundBankHolderDelete)(t, h.base);
+        }
+        ITC_FLAG(native_sound_cues) = true;
+        const uint32_t r3 = t.r3.u32;
+        out[v].Word(r3 == block ? 1 : r3 == d + 16 ? 2 : r3);
+        out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+      }
+      results.Check(out[0], out[1],
+                    fmt::format("{} {}{}", wave ? "sub_82117AD8" : "sub_82117B30", i,
+                                empty ? " (empty)" : ""));
+    }
+  }
+  results.Report();
+}
+
 void X3DAudio(Context& h) {
   Results results("sound_cues X3DAudio");
   const uint32_t d = h.data;
@@ -438,6 +502,7 @@ void SoundCues(Context& h) {
   Banks(h);
   Sounds(h);
   CueList(h);
+  Holders(h);
   X3DAudio(h);
 }
 

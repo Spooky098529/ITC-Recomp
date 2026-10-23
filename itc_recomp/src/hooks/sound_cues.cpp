@@ -16,7 +16,7 @@ ITC_FLAG_BOOL(native_sound_cues, true, "ITC",
               "sub_82117EA8; the bank pairs' and the manager's bank slots' accessors, "
               "sub_82117670 to sub_82117770 and sub_82118190 to sub_82118400; the Sounds' "
               "accessors, sub_821173F0 to sub_821175B8; the emitter's and the bank holders' "
-              "constructors, sub_8259C9B0, sub_8259D3D8 and sub_8259D418; AudioManager::IsCuePlaying, sub_82118B58; the delegate clone, sub_82118720; X3DAudioInitialize and AudioEngine::Start3D, sub_82480710 and sub_8259CE10) natively instead of "
+              "constructors, sub_8259C9B0, sub_8259D3D8 and sub_8259D418; AudioManager::IsCuePlaying, sub_82118B58; the delegate clone, sub_82118720; X3DAudioInitialize and AudioEngine::Start3D, sub_82480710 and sub_8259CE10; the bank holders' destructor and deletes, sub_8259D438, sub_82117AD8 and sub_82117B30) natively instead of "
               "through the translated code (same results; checked by "
               "--run_harnesses=sound_cues)");
 
@@ -109,3 +109,30 @@ extern "C" REX_FUNC(sub_82118720) {
 
 ITC_SOUND_WORD(82480710, X3DAudioInitialize(base, ctx.r3.u32, ctx.f1.f64, ctx.r5.u32))
 ITC_SOUND_WORD(8259CE10, AudioEngineStart3D(base, ctx.r3.u32))
+
+// The bank holders' destructor and deletes: the original where a handle is
+// to be closed, and (for the deletes, which free through the native heap)
+// unless --native_heap routes the game's heap there or where operator
+// delete refuses the block.
+extern "C" REX_FUNC(sub_8259D438) {
+  ITC_SOUND_FALLBACK(8259D438)
+  uint32_t r3 = 0;
+  if (!WaveBankHolderDestroy(base, ctx.r3.u32, &r3)) {
+    __imp__sub_8259D438(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = r3;
+}
+
+#define ITC_SOUND_HOLDER_DELETE(address, function)                         \
+  extern "C" REX_FUNC(sub_##address) {                                    \
+    ITC_SOUND_FALLBACK(address)                                           \
+    uint32_t r3 = 0;                                                      \
+    if (!hooks::NativeHeapActive() || !function(base, ctx.r3.u32, &r3)) { \
+      __imp__sub_##address(ctx, base);                                    \
+      return;                                                             \
+    }                                                                     \
+    ctx.r3.u64 = r3;                                                      \
+  }
+ITC_SOUND_HOLDER_DELETE(82117AD8, WaveBankHolderDelete)
+ITC_SOUND_HOLDER_DELETE(82117B30, SoundBankHolderDelete)

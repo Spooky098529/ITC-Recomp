@@ -246,6 +246,47 @@ void WaveBankHolderConstruct(uint8_t* base, uint32_t holder) {
   guest::StoreU32(base, holder + 12, 0xFFFFFFFFu);
 }
 
+bool WaveBankHolderDestroy(uint8_t* base, uint32_t holder, uint32_t* r3) {
+  ITC_NATIVE_RUNNING("sub_8259D438 WaveBankHolder::~WaveBankHolder");
+  const uint32_t handle = guest::LoadU32(base, holder + 12);
+  if (handle != 0xFFFFFFFFu) {
+    return false;
+  }
+  *r3 = handle;
+  return true;
+}
+
+bool WaveBankHolderDelete(uint8_t* base, uint32_t slot, uint32_t* r3) {
+  ITC_NATIVE_RUNNING("sub_82117AD8 WaveBankHolderDelete");
+  const uint32_t holder = guest::LoadU32(base, slot);
+  if (holder == 0) {
+    *r3 = slot;
+    return true;
+  }
+  uint32_t ignored = 0;
+  if (!WaveBankHolderDestroy(base, holder, &ignored) || !memory::crt::OperatorDelete(holder)) {
+    return false;
+  }
+  guest::StoreU32(base, slot, 0);
+  *r3 = holder;
+  return true;
+}
+
+bool SoundBankHolderDelete(uint8_t* base, uint32_t slot, uint32_t* r3) {
+  ITC_NATIVE_RUNNING("sub_82117B30 SoundBankHolderDelete");
+  const uint32_t holder = guest::LoadU32(base, slot);
+  if (holder == 0) {
+    *r3 = slot;
+    return true;
+  }
+  if (!memory::crt::OperatorDelete(holder)) {
+    return false;
+  }
+  guest::StoreU32(base, slot, 0);
+  *r3 = holder;
+  return true;
+}
+
 uint32_t ManagerIsCuePlaying(uint8_t* base, uint32_t manager, uint32_t bank_address,
                              uint32_t cue_address) {
   ITC_NATIVE_RUNNING("sub_82118B58 AudioManager::IsCuePlaying");

@@ -102,6 +102,21 @@ void SoundBankHolderConstruct(uint8_t* base, uint32_t holder);
 // -1.
 void WaveBankHolderConstruct(uint8_t* base, uint32_t holder);
 
+// WaveBankHolder::~WaveBankHolder (sub_8259D438): nothing while the handle
+// at +12 is -1 (always, in play); false when there's one to close
+// (CloseHandle is still the recompiled code's: the original runs).
+// `r3` gets what the original leaves (the handle, -1).
+bool WaveBankHolderDestroy(uint8_t* base, uint32_t holder, uint32_t* r3);
+// sub_82117AD8 and sub_82117B30: the wave (sound) bank holder in the slot
+// at `slot`, when there is one, destroyed (WaveBankHolderDestroy; the
+// sound bank holder's destructor, sub_82106540, does nothing), deleted
+// (operator delete) and the slot cleared. False, with nothing changed,
+// where the original's path is needed (a handle to close, or operator
+// delete refusing the block). `r3` gets what the original leaves (the
+// block, or the slot when empty).
+bool WaveBankHolderDelete(uint8_t* base, uint32_t slot, uint32_t* r3);
+bool SoundBankHolderDelete(uint8_t* base, uint32_t slot, uint32_t* r3);
+
 // --- The manager's Sound list and handlers ---
 
 // AudioManager::IsCuePlaying (sub_82118B58): 1 when a Sound in the list at
