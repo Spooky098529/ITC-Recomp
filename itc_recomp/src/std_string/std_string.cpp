@@ -262,6 +262,28 @@ void Construct(uint8_t* base, uint32_t string) {
   Require(Tidy(base, string, false, 0), "string()'s _Tidy");
 }
 
+bool ConstructFromText(uint8_t* base, uint32_t string, uint32_t text) {
+  ITC_NATIVE_RUNNING("sub_825931D0 std::string::string(const char*)");
+  Require(Tidy(base, string, false, 0), "string(const char*)'s _Tidy");
+  uint32_t end = text;
+  while (guest::LoadU8(base, end) != 0) {
+    end++;
+  }
+  return AssignText(base, string, text, end - text);
+}
+
+bool ConstructFromTextWithAllocator(uint8_t* base, uint32_t string, uint32_t text) {
+  ITC_NATIVE_RUNNING("sub_82593248 std::string::string(const char*, const allocator&)");
+  return ConstructFromText(base, string, text);
+}
+
+bool ConstructFrom(uint8_t* base, uint32_t string, uint32_t source, uint32_t offset,
+                   uint32_t count) {
+  ITC_NATIVE_RUNNING("sub_82593040 std::string::string(const string&, size_t, size_t)");
+  Require(Tidy(base, string, false, 0), "string(const string&, ...)'s _Tidy");
+  return AssignFrom(base, string, source, offset, count);
+}
+
 uint32_t WildcardSearch(uint8_t* base, uint32_t text, uint32_t pattern, uint32_t offset_out,
                         uint32_t length_out) {
   ITC_NATIVE_RUNNING("sub_82592740 WildcardSearch");

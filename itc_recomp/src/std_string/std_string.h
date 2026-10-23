@@ -96,6 +96,21 @@ bool Append(uint8_t* base, uint32_t string, uint32_t text, uint32_t count);
 // string() (sub_825929E8): _Tidy(string, false, 0), an empty string in place.
 void Construct(uint8_t* base, uint32_t string);
 
+// string(const char* text) (sub_825931D0): _Tidy(string, false, 0), then
+// AssignText of the text's strlen characters. False where the original must
+// run (AssignText's paths): only the empty start is written then, which the
+// original writes again the same way before anything reads it.
+bool ConstructFromText(uint8_t* base, uint32_t string, uint32_t text);
+
+// string(const char* text, const allocator&) (sub_82593248):
+// ConstructFromText.
+bool ConstructFromTextWithAllocator(uint8_t* base, uint32_t string, uint32_t text);
+
+// string(const string& source, size_t offset, size_t count) (sub_82593040):
+// _Tidy(string, false, 0), then AssignFrom. False as ConstructFromText.
+bool ConstructFrom(uint8_t* base, uint32_t string, uint32_t source, uint32_t offset,
+                   uint32_t count);
+
 // The library's wildcard search (sub_82592740, probably): the first match of
 // `pattern` in the C string `text`, trying each start: '?' matches one
 // character, '*' any run (the '*'s and '?'s after it skipped, then the next

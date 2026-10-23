@@ -111,6 +111,27 @@ void NativeConstruct(PPCContext& ctx, uint8_t* base) {
   ss::Construct(base, ctx.r3.u32);
 }
 
+void NativeConstructFromText(PPCContext& ctx, uint8_t* base) {
+  if (!ss::ConstructFromText(base, ctx.r3.u32, ctx.r4.u32)) {
+    g_fallbacks++;
+    __imp__sub_825931D0(ctx, base);
+  }
+}
+
+void NativeConstructFromTextWithAllocator(PPCContext& ctx, uint8_t* base) {
+  if (!ss::ConstructFromTextWithAllocator(base, ctx.r3.u32, ctx.r4.u32)) {
+    g_fallbacks++;
+    __imp__sub_82593248(ctx, base);
+  }
+}
+
+void NativeConstructFrom(PPCContext& ctx, uint8_t* base) {
+  if (!ss::ConstructFrom(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32)) {
+    g_fallbacks++;
+    __imp__sub_82593040(ctx, base);
+  }
+}
+
 // The wildcard replace's step, as its adapter; a match (replace) is the
 // original's.
 void NativeReplaceAll(PPCContext& ctx, uint8_t* base) {
@@ -502,6 +523,76 @@ void ConstructCases(Context& h) {
   results.Report();
 }
 
+// The constructors from a C string: unbuilt memory, a text of 0 to a few
+// hundred characters.
+void ConstructFromTextCases(Context& h, bool allocator) {
+  Results results(allocator ? "sub_82593248 std::string::string(const char*, const allocator&)"
+                            : "sub_825931D0 std::string::string(const char*)");
+  const uint32_t string = h.data + 64;
+  const uint32_t text = h.data + 1024;
+  for (int i = 0; i < 1000; i++) {
+    Outputs out[2];
+    const Random start = h.random;
+    for (int v = 0; v < 2; v++) {
+      h.random = start;
+      Fill(h.base, h.data, kScratchBytes);
+      for (uint32_t k = 0; k < 28; k++) {
+        guest::StoreU8(h.base, string + k, uint8_t(h.random.Next()));
+      }
+      const uint32_t length = h.random.Below(3) == 0 ? h.random.Below(17) : h.random.Below(400);
+      WriteText(h, text, length, "abcdefghijklmnopqrstuvwxyz_.0123456789");
+      PPCContext t = CallContext(h);
+      t.r3.u64 = string;
+      t.r4.u64 = text;
+      t.r5.u64 = h.random.Next();
+      if (allocator) {
+        (v == 0 ? __imp__sub_82593248 : NativeConstructFromTextWithAllocator)(t, h.base);
+      } else {
+        (v == 0 ? __imp__sub_825931D0 : NativeConstructFromText)(t, h.base);
+      }
+      Collect(h, out[v], t, {}, {string});
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", i));
+  }
+  results.Report();
+}
+
+// The copy constructor from part of a string: unbuilt memory, a source as
+// the game's, the offset within it, the count -1 (the game's) or any.
+void ConstructFromCases(Context& h) {
+  Results results("sub_82593040 std::string::string(const string&, size_t, size_t)");
+  const uint32_t string = h.data + 64;
+  const uint32_t source = h.data + 128;
+  for (int i = 0; i < 1000; i++) {
+    Outputs out[2];
+    const Random start = h.random;
+    for (int v = 0; v < 2; v++) {
+      h.random = start;
+      Fill(h.base, h.data, kScratchBytes);
+      for (uint32_t k = 0; k < 28; k++) {
+        guest::StoreU8(h.base, string + k, uint8_t(h.random.Next()));
+      }
+      const uint32_t source_capacity = PickGameCapacity(h.random);
+      const uint32_t source_length = h.random.Below(source_capacity + 1);
+      const uint32_t source_block = WriteString(h, source, source_capacity, source_length);
+      const uint32_t offset = h.random.Below(2) == 0 ? 0 : h.random.Below(source_length + 1);
+      const uint32_t count = h.random.Below(2) == 0 ? 0xFFFFFFFFu : h.random.Below(500);
+      Blocks blocks;
+      blocks.Add(source_block);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = string;
+      t.r4.u64 = source;
+      t.r5.u64 = offset;
+      t.r6.u64 = count;
+      t.r7.u64 = h.random.Next();
+      (v == 0 ? __imp__sub_82593040 : NativeConstructFrom)(t, h.base);
+      Collect(h, out[v], t, blocks, {string, source});
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", i));
+  }
+  results.Report();
+}
+
 // --- The wildcard search, find and replace. ---
 
 // The game's pattern for the loader's loose read (sub_8209DFA8): "/".
@@ -608,7 +699,10 @@ void FindCases(Context& h) {
 // The replace's cases have no match (the pattern holds a character the text
 // doesn't: the path the game takes), except with the game's pattern ("/",
 // replaced with "\\") over path-like text, which may match and run the
-// original on both sides.
+// original on both sides. Capacities as the game's (15 up): with one under
+// 15, a match's replace grows the string through _Copy to a capacity under
+// 16, which keeps the new block's address in the text area (the original's
+// own quirk, on both sides), where it can't be compared.
 void ReplaceAllCases(Context& h) {
   Results results("sub_82593088 String::ReplaceAll");
   const uint32_t string = h.data + 64;
@@ -621,7 +715,7 @@ void ReplaceAllCases(Context& h) {
       h.random = start;
       Fill(h.base, h.data, kScratchBytes);
       const char* alphabet = PickAlphabet(h.random);
-      const uint32_t capacity = PickCapacity(h.random);
+      const uint32_t capacity = PickGameCapacity(h.random);
       const uint32_t length = h.random.Below(std::min(capacity, 40u) + 1);
       const uint32_t block = WriteString(h, string, capacity, length);
       WriteText(h, ss::Text(h.base, string), length, alphabet);
@@ -665,6 +759,9 @@ void StdString(Context& h) {
   FromTextCases(h, false);
   FromTextCases(h, true);
   ConstructCases(h);
+  ConstructFromTextCases(h, false);
+  ConstructFromTextCases(h, true);
+  ConstructFromCases(h);
   WildcardSearchCases(h);
   FindCases(h);
   ReplaceAllCases(h);
