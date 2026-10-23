@@ -127,6 +127,17 @@ void NativeViewportSetRoll(PPCContext& ctx, uint8_t* base) {
   cm::ViewportSetRoll(base, ctx.r3.u32, ctx.f1.f64);
 }
 
+void NativeCameraUpdate(PPCContext& ctx, uint8_t* base) {
+  if (!hooks::CameraUpdate(ctx, base)) {
+    __imp__sub_82593568(ctx, base);
+  }
+}
+void NativeCameraConstruct(PPCContext& ctx, uint8_t* base) {
+  if (!hooks::CameraConstruct(ctx, base)) {
+    __imp__sub_82593908(ctx, base);
+  }
+}
+
 // As the adapters: the guest calls made by hooks/cameras.cpp, the work the
 // plain C++'s.
 void NativePassUpdate(PPCContext& ctx, uint8_t* base) {
@@ -370,6 +381,53 @@ void SetViewportSizeCases(Context& h) {
         },
         __imp__sub_82593500, NativeSetViewportSize,
         fmt::format("case {} {} x {} kind {}", i, width, height, kind));
+  }
+  results.Report();
+}
+
+// Camera::Update on a camera in the scratch area: its angles, position,
+// size, field of view and planes random or a camera's (small angles, the
+// game's sizes). The view and its copy (+16 to +79, +208 to +271), the
+// projection, the view-projection and +368 to +395 are compared as floats.
+void CameraUpdateCases(Context& h) {
+  Results results("sub_82593568 Camera::Update");
+  for (int i = 0; i < 600; i++) {
+    const uint32_t camera = h.data + 64 + 4 * h.random.Below(4);
+    const uint32_t kind = h.random.Below(3);
+    const bool game = h.random.Below(2);
+    Case(
+        h, results, camera, {{16, 272}, {368, 396}},
+        [&] {
+          RandomWords(h, camera, 100);
+          CameraInputs(h, camera + 368, camera + 392, camera + 388, camera + 384, kind);
+          if (game) {
+            for (uint32_t k = 0; k < 3; k++) {
+              guest::StoreU32(h.base, camera + 288 + 4 * k,
+                              FloatBits(float(int32_t(h.random.Below(4000)) - 2000) / 300.0f));
+              guest::StoreU32(h.base, camera + 272 + 4 * k,
+                              FloatBits(float(int32_t(h.random.Below(1u << 20)) - (1 << 19)) / 64.0f));
+            }
+            guest::StoreU32(h.base, camera + 284, FloatBits(1.0f));
+            guest::StoreU32(h.base, camera + 376, FloatBits(h.random.Below(2) ? 1280.0f : 640.0f));
+            guest::StoreU32(h.base, camera + 380, FloatBits(h.random.Below(2) ? 720.0f : 480.0f));
+          }
+        },
+        [&](PPCContext& t) { t.r3.u64 = camera; }, __imp__sub_82593568, NativeCameraUpdate,
+        fmt::format("case {} kind {} game {}", i, kind, game));
+  }
+  results.Report();
+}
+
+// Camera::Camera on a camera in the scratch area full of random words.
+void CameraConstructCases(Context& h) {
+  Results results("sub_82593908 Camera::Camera");
+  for (int i = 0; i < 40; i++) {
+    const uint32_t camera = h.data + 64 + 4 * h.random.Below(4);
+    Case(
+        h, results, camera, {{16, 272}, {272, 304}, {368, 396}},
+        [&] { RandomWords(h, camera, 100); },
+        [&](PPCContext& t) { t.r3.u64 = camera; }, __imp__sub_82593908, NativeCameraConstruct,
+        fmt::format("case {}", i));
   }
   results.Report();
 }
@@ -897,6 +955,8 @@ void Cameras(Context& h) {
   SetFieldOfViewCases(h);
   BuildProjectionCases(h);
   SetViewportSizeCases(h);
+  CameraUpdateCases(h);
+  CameraConstructCases(h);
   PassStateCases(h);
   ViewportCases(h);
   RecordViewportCases(h);

@@ -47,6 +47,31 @@ void BuildProjection(uint8_t* base, uint32_t camera, uint32_t fov, uint32_t aspe
 // height, then BuildProjection(camera, +368, +392, +388, +384).
 void SetViewportSize(uint8_t* base, uint32_t camera, uint32_t width, uint32_t height);
 
+// Camera::Update (sub_82593568, vtable slot 2): the view from the Euler
+// angles (+288, +292, +296) and the position (+272): an identity built at
+// `frame` + 112 (`frame` its 320-byte frame, 16-byte aligned: the original's
+// stack) turned by Matrix::RotateY, RotateX and RotateZ by the negated
+// angles (each at `frame` + 80, their turns at `frame` - 80), the position's
+// dots with its columns negated into its fourth row, copied to +208 and from
+// there to +16 (Matrix::Copy); +392 = +376 / +380; BuildProjection(camera,
+// +368, +392, +388, +384); +144 = +16 x +80 (Matrix::Multiply); +372 = +380
+// x 0.5 / the half field of view's cosine polynomial x its sine polynomial
+// (the polynomials BuildProjection uses). The copies and the multiply are
+// noted for frame interpolation as the original's calls (return addresses
+// 0x825936C4, 0x825936D4 and 0x82593798; the turns note their own). The
+// original's vertical angle (tan and atan of a constant over the aspect) is
+// left out: nothing reads its result.
+void Update(uint8_t* base, uint32_t camera, uint32_t frame);
+
+// Camera::Camera (sub_82593908): +0 the vtable (0x82001EC0), 1.0 at +28 and
+// every 16 bytes to +364, the position +272 (0, the floats at 0x8200277C and
+// 0x82008E48, 1) and the angles +288 (0, 0, 0, 1), the near and far planes
+// (+384, +388: 0x82001FBC's, 0x82001FC8's), the viewport's size (+376, +380:
+// 0x82009EB8's, 0x8200B5CC's), the aspect +392 (0x82052CFC's), the field of
+// view +368 (0x82001FC4's, wrapped into [-pi, pi]); then BuildProjection and
+// Update (its frame 320 bytes below `frame`, this one's 128-byte frame).
+void Construct(uint8_t* base, uint32_t camera, uint32_t frame);
+
 // --- The camera passes (592 bytes each from kPasses) ---
 //
 // A pass is a camera (above) and: +400, +416, +432 the eye, target and up,

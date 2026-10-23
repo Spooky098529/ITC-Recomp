@@ -16,6 +16,13 @@ namespace hooks {
 // Camera::SetViewportSize).
 bool CameraPassUpdate(PPCContext& ctx, uint8_t* base);
 
+// Camera::Update (sub_82593568) and Camera::Camera (sub_82593908)
+// natively, without the flag: r3 = the camera; from frames like the
+// originals' (320 and 128 bytes). False, with nothing done, where the
+// original must run (a stack pointer not 16-byte aligned).
+bool CameraUpdate(PPCContext& ctx, uint8_t* base);
+bool CameraConstruct(PPCContext& ctx, uint8_t* base);
+
 // CameraPass::RecordViewport (sub_820A0978)'s adapter's work, without the
 // flag: r3 = the pass, r4 = the sort key (for the harness).
 void CameraPassRecordViewport(PPCContext& ctx, uint8_t* base);

@@ -265,6 +265,138 @@ void SetViewportSize(uint8_t* base, uint32_t camera, uint32_t width, uint32_t he
   BuildProjection(base, camera, camera + 368, camera + 392, camera + 388, camera + 384);
 }
 
+namespace {
+
+simde__m128 Unpackhi(simde__m128 a, simde__m128 b) {
+  return simde_mm_castsi128_ps(
+      simde_mm_unpackhi_epi32(simde_mm_castps_si128(a), simde_mm_castps_si128(b)));
+}
+simde__m128 Unpacklo(simde__m128 a, simde__m128 b) {
+  return simde_mm_castsi128_ps(
+      simde_mm_unpacklo_epi32(simde_mm_castps_si128(a), simde_mm_castps_si128(b)));
+}
+
+}  // namespace
+
+void Update(uint8_t* base, uint32_t camera, uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_82593568 Camera::Update");
+  // The identity at frame + 112 (vupkd3d128's (0, 0, 0, 1) shuffled into
+  // each row), turned by the negated angles.
+  const uint32_t m = frame + 112;
+  for (uint32_t row = 0; row < 4; row++) {
+    for (uint32_t column = 0; column < 4; column++) {
+      guest::StoreU32(base, m + 16 * row + 4 * column, row == column ? 0x3F800000u : 0);
+    }
+  }
+  const uint32_t angle = frame + 80, turn = frame - 80;
+  Stfs(base, angle, Fneg(Lfs(base, camera + 292)));
+  matrix_math::RotateY(base, m, m, angle, turn);
+  Stfs(base, angle, Fneg(Lfs(base, camera + 288)));
+  matrix_math::RotateX(base, m, m, angle, turn);
+  Stfs(base, angle, Fneg(Lfs(base, camera + 296)));
+  matrix_math::RotateZ(base, m, m, angle, turn);
+  // The position (+272) dotted with the turned matrix's columns, as the
+  // translation's merges and dot products do it, at frame + 96; its x, y
+  // and z negated into the fourth row.
+  {
+    simde__m128 v9 = Lvx(base, m + 48), v11 = Lvx(base, m + 32), v8 = Lvx(base, m + 16),
+                v10 = Lvx(base, m);
+    simde__m128 v12 = Unpackhi(v9, v8);
+    simde__m128 v13 = Unpackhi(v11, v10);
+    v11 = Unpacklo(v11, v10);
+    v10 = Unpacklo(v9, v8);
+    v9 = Unpackhi(v12, v13);
+    v13 = Unpacklo(v12, v13);
+    simde__m128 v0 = Lvx(base, camera + 272);
+    v12 = Unpackhi(v10, v11);
+    v11 = Unpacklo(v10, v11);
+    {
+      FlushToZero flush;
+      v10 = Dot(v0, v9);
+      v13 = Dot(v0, v13);
+      v12 = Dot(v0, v12);
+      v0 = Dot(v0, v11);
+    }
+    v12 = Unpackhi(v12, v10);
+    v0 = Unpackhi(v0, v13);
+    v0 = Unpackhi(v0, v12);
+    Stvx(base, frame + 96, v0);
+  }
+  for (uint32_t i = 0; i < 12; i += 4) {
+    Stfs(base, m + 48 + i, Fneg(Lfs(base, frame + 96 + i)));
+  }
+  matrix_math::Copy(base, camera + 208, m);
+  interpolation::BlendState_OnCopy(base, camera + 208, m, 0x825936C4);
+  matrix_math::Copy(base, camera + 16, camera + 208);
+  interpolation::BlendState_OnCopy(base, camera + 16, camera + 208, 0x825936D4);
+  Stfs(base, camera + 392, Fdivs(Lfs(base, camera + 376), Lfs(base, camera + 380)));
+  BuildProjection(base, camera, camera + 368, camera + 392, camera + 388, camera + 384);
+  matrix_math::Multiply(base, camera + 144, camera + 16, camera + 80);
+  interpolation::BlendState_OnMultiply(base, camera + 144, camera + 16, camera + 80, 0x82593798);
+  // +372: the half field of view's polynomials, as BuildProjection's (the
+  // translation's steps in its order; the original's stack words held here).
+  const double half = Lfs(base, kHalf);
+  const uint32_t one = Bits(Lfs(base, kOne));
+  const double x = WrapAngle(base, Fmuls(Lfs(base, camera + 368), half));
+  const double x2 = Fmuls(x, x);
+  const double x3 = Fmuls(x2, x);
+  const simde__m128 ca00 = Lvx(base, 0x82000A00), ca10 = Lvx(base, 0x82000A10),
+                    c9f0 = Lvx(base, 0x820009F0), c9c0 = Lvx(base, 0x820009C0),
+                    c9d0 = Lvx(base, 0x820009D0), c9e0 = Lvx(base, 0x820009E0);
+  simde__m128 s80, s96, s176, s192, s208, s224;
+  {
+    FlushToZero flush;
+    simde__m128 v13 = VectorOf(one, Bits(x), Bits(x2), Bits(x3));
+    simde__m128 v0 = Mul(v13, v13);
+    const simde__m128 v5 = Splat<0x55>(v13);
+    v13 = Splat<0xAA>(v13);
+    simde__m128 v12 = Mul(v0, v13);
+    s208 = Dot(v0, c9f0);
+    const simde__m128 v4 = Splat<0x00>(v0);
+    s192 = Dot(v12, c9c0);
+    v13 = Mul(v4, v5);
+    v0 = Mul(v0, v13);
+    v12 = Mul(v12, v13);
+    const simde__m128 v9 = Mul(v0, v13);
+    s96 = Dot(v0, ca00);
+    v13 = Mul(v12, v13);
+    s224 = Dot(v12, c9d0);
+    s176 = Dot(v13, c9e0);
+    s80 = Dot(v9, ca10);
+  }
+  double f13 = Fadds(Word0(s80), Word0(s96));
+  f13 = Fadds(f13, Word0(s208));
+  double f12 = Fadds(Word0(s176), Word0(s224));
+  const double h = Fmuls(Lfs(base, camera + 380), half);
+  f12 = Fadds(f12, Word0(s192));
+  Stfs(base, camera + 372, Fmuls(Fdivs(h, f12), f13));
+}
+
+void Construct(uint8_t* base, uint32_t camera, uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_82593908 Camera::Camera");
+  const double zero = Lfs(base, 0x82000A34);
+  const double one = Lfs(base, kOne);
+  guest::StoreU32(base, camera, 0x82001EC0);
+  for (uint32_t at = 28; at <= 364; at += 16) {
+    Stfs(base, camera + at, one);
+  }
+  // The position and the angles (through the original's stack, as words).
+  const uint32_t position[4] = {Bits(zero), Bits(Lfs(base, 0x8200277C)),
+                                Bits(Lfs(base, 0x82008E48)), Bits(one)};
+  for (uint32_t i = 0; i < 4; i++) {
+    guest::StoreU32(base, camera + 272 + 4 * i, position[i]);
+    guest::StoreU32(base, camera + 288 + 4 * i, i == 3 ? Bits(one) : Bits(zero));
+  }
+  Stfs(base, camera + 384, Lfs(base, 0x82001FBC));
+  Stfs(base, camera + 388, Lfs(base, 0x82001FC8));
+  Stfs(base, camera + 376, Lfs(base, 0x82009EB8));
+  Stfs(base, camera + 380, Lfs(base, 0x8200B5CC));
+  Stfs(base, camera + 392, Lfs(base, 0x82052CFC));
+  Stfs(base, camera + 368, WrapAngle(base, Lfs(base, 0x82001FC4)));
+  BuildProjection(base, camera, camera + 368, camera + 392, camera + 388, camera + 384);
+  Update(base, camera, frame - 320);
+}
+
 uint32_t Mode(uint8_t* base, int32_t which) {
   ITC_NATIVE_RUNNING("sub_8209F718 CameraPasses::Mode");
   return which == 1 ? guest::LoadU32(base, kMode) : 0xFFFFFFFFu;

@@ -1,7 +1,7 @@
 // The camera passes and viewports natively: adapters in front of
 // src/cameras/cameras.cpp (docs/functions/cameras.md). Camera::SetViewportSize
 // and Camera::SetFieldOfView are reached through the camera's vtable (slots 0
-// and 1), so their adapters stay. Flush-to-zero is left off, as the
+// and 1), so their adapters stay, as Camera::Update's (slot 2). Flush-to-zero is left off, as the
 // translated code leaves it. CameraPasses::RenderTarget's, CameraPass::Disable's
 // and CameraPasses::EnableForView's adapters are the diagnostics' wrappers in
 // src/debug/frame_state_diff.cpp (one override per function); they read
@@ -23,7 +23,7 @@
 
 ITC_FLAG_BOOL(native_cameras, true, "ITC",
               "Run the camera passes and viewports (docs/functions/cameras.md: the library "
-              "camera's Camera::SetFieldOfView sub_82593278, Camera::BuildProjection "
+              "camera's Camera::Camera sub_82593908, Camera::Update sub_82593568, Camera::SetFieldOfView sub_82593278, Camera::BuildProjection "
               "sub_825932E8 and Camera::SetViewportSize sub_82593500; the camera passes' "
               "CameraPasses::Mode sub_8209F718, SetMode sub_8209F738, RenderTarget "
               "sub_8209F7A8, EnableForView sub_820AA1A8 and SetNear sub_820AA368, "
@@ -76,6 +76,26 @@ extern "C" REX_FUNC(sub_82593500) {
   }
   ctx.fpscr.disableFlushMode();
   cameras::SetViewportSize(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+}
+
+// Camera::Update (vtable slot 2): r3 = the camera. From a frame like the
+// original's (320 bytes), 16-byte aligned (the original otherwise); r3 left
+// as the original's last call leaves it (Matrix::Multiply's out, +144) and
+// flush-to-zero off.
+extern "C" REX_FUNC(sub_82593568) {
+  ITC_CAMERAS_FALLBACK(82593568)
+  if (!hooks::CameraUpdate(ctx, base)) {
+    __imp__sub_82593568(ctx, base);
+  }
+}
+
+// Camera::Camera: r3 = the camera; r3 = it. Its frame 128 bytes, Update's
+// below it.
+extern "C" REX_FUNC(sub_82593908) {
+  ITC_CAMERAS_FALLBACK(82593908)
+  if (!hooks::CameraConstruct(ctx, base)) {
+    __imp__sub_82593908(ctx, base);
+  }
 }
 
 // CameraPasses::Mode: r3 = which (1); r3 = the mode (lwz) or -1.
@@ -257,6 +277,38 @@ extern "C" REX_FUNC(sub_8209FA38) {
 
 namespace hooks {
 
+bool CameraUpdate(PPCContext& ctx, uint8_t* base) {
+  if ((ctx.r1.u32 & 0xF) != 0) {
+    return false;
+  }
+  const uint32_t camera = ctx.r3.u32;
+  const uint64_t lr = ctx.lr;
+  guest_call::InFrame(ctx, base, 320, 0x825935EC, [&](uint32_t frame) {
+    ctx.fpscr.disableFlushMode();
+    cameras::Update(base, camera, frame);
+  });
+  ctx.lr = lr;
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = camera + 144;
+  return true;
+}
+
+bool CameraConstruct(PPCContext& ctx, uint8_t* base) {
+  if ((ctx.r1.u32 & 0xF) != 0) {
+    return false;
+  }
+  const uint32_t camera = ctx.r3.u32;
+  const uint64_t lr = ctx.lr;
+  guest_call::InFrame(ctx, base, 128, 0x82593AA4, [&](uint32_t frame) {
+    ctx.fpscr.disableFlushMode();
+    cameras::Construct(base, camera, frame);
+  });
+  ctx.lr = lr;
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = camera;
+  return true;
+}
+
 void RecordClear(PPCContext& ctx, uint8_t* base) {
   static constexpr uint32_t kReturns[5] = {0x8209FA6C, 0x8209FA7C, 0x8209FB44, 0x8209FB54,
                                            0x8209FB74};
@@ -332,3 +384,4 @@ extern "C" REX_FUNC(sub_820AA4A8) {
   });
   ctx.lr = lr;
 }
+
