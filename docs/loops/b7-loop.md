@@ -109,8 +109,8 @@ nothing runs and there's work, about a minute.
 - `itc_recomp/coverage/seen_in_play.txt`: the functions seen in play
   (`docs/coverage.md`). Functions that never ran get no rows.
 - `itc_recomp/tools/b7_status.py`: B7's measure (ours, wrapped, known,
-  unknown), by function file; checks rows that say their function no
-  longer runs.
+  unknown), by function file; checks rows that say "never called" whose
+  function ran.
 - `itc_recomp/tools/b7_groups.py [root ...]`: a function's group (it and
   the callees only it calls), whether it's ready (nothing outside it that
   runs is still recompiled), the ready groups under a root and the

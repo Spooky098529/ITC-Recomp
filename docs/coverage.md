@@ -128,9 +128,11 @@ asks for a measure of its progress (per-subsystem counts of the statuses in
   recompiled body does the work), **known** (a row, still recompiled) or
   **unknown** (no row yet). Wrapped, known and unknown are the work left.
   It counts them by table (the subsystem files, and "(no row)"), and lists
-  as checks the rows that say their function no longer runs (Native,
-  Dropped, an override that never calls `__imp__`, "never called") whose
-  function ran. Run it after each B7 item and record its totals in "The
+  as checks the rows that say "never called" whose function ran. (Until
+  2026-10-23 it also flagged Native, Dropped and overridden functions that
+  ran; dropped, the user's call: the list predates most of them, so every
+  one was flagged, and the function tables and the native-running logs
+  show what's ours and that it runs.) Run it after each B7 item and record its totals in "The
   boundary over time".
 - **Choosing what to do next:** a subsystem's size in functions that
   actually run is a better guide to its cost than its size in `generated/`.
