@@ -135,7 +135,15 @@ native caller. Its fourth run (`b7-loop-22-10-26-2`, merged into
 collision narrow phase and the collision world native as far as they
 were ready (`heap.md`, `collision.md`, `collision-world.md`;
 `--native_c_runtime_heap`, `--native_collision`,
-`--native_collision_world`; ours 714 -> 837). What's for the user's
+`--native_collision_world`; ours 714 -> 837). Its fifth run
+(`b7-loop-23-10-26`, 2026-10-23, not yet merged; summary
+`docs/loops/b7-loop-2026-10-23-0152.md`) made the sound cues and XACT
+native as far as they were ready (`sound-cues.md`, `xact.md`;
+`--native_sound_cues`, `--native_xact`; ours 837 -> 970): the user's
+call is that XACT, the sound library linked into the game, is
+translated (no host library plays its data); the rest waits on XACT's
+critical section, XAudio and its voices, the tracks and waves, and
+GetTickCount (`sub_822956F0`, the user's call). What's for the user's
 review is in `docs/loops/review.md`, harness groups expected to differ
 in `docs/loops/expected-differences.md`; new harness code compares
 floats with `harness::Outputs` (two NaNs match).

@@ -122,6 +122,17 @@ Rows not yet moved stay in the table below. So far:
   (walls, ground) and the ground probe the wheels use, the mesh's
   lookups and the track positions they keep (B7; the course's route
   queries are a lead).
+- [`sound-cues.md`](sound-cues.md): the game's sound manager (sound
+  bank pairs loaded and released, cues played as sounds with a 3D
+  emitter each, stopped and removed, the listener and the categories)
+  and its thin wrapper over XACT and X3DAudio, with the libraries'
+  entry points it calls (B7; the rest of XACT and X3DAudio is a lead).
+- [`xact.md`](xact.md): XACT, the 360's sound library linked into the
+  game, as far as the game's wrapper reaches it in play: the engine
+  (start-up, DoWork, the audio callback, categories), its global
+  settings and variables, sound banks, wave banks, cues, sounds and
+  faders, and where it meets XAudio and the kernel (B7; the tracks,
+  waves and voices below are a lead).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
@@ -158,6 +169,8 @@ old performance notes to the end of `../native-renderer.md`.
 | `sub_8258DD78` | `Event::Signal` | | r3 = event. |
 | `sub_822B20D8` | | Dropped | Frame statistics, for a debugger: frame counter (+20024 += 1), time since the last Swap from the timebase (+20028; +20032/+20036 the last), +20048/+20056 moved to +20064/+20068 and zeroed, debugger requests (+15168 through `820007F0`), the GPU performance counters while +20104 is 1 or 2 (`Device::SetClockGating`, `sub_8229B930`, `sub_8229B9C8`, `sub_8229BFE8`, `sub_82106540`, `sub_822976F8`), then `sub_822B1788` and the debugger's callback at `820007B4` +4. Was called once a frame, only from Swap. Readers of what it leaves: `sub_822B1088` and `sub_822ACAA8`. The native Swap leaves the call out (before that, skipped behind a temporary switch: only +20024 and +20028 differed, frames right). |
 | `sub_825BA0C8` | `QueryPerformanceCounter` | | System library. |
+| `sub_822956F0` | `GetTickCount` (probably) | | Returns the word at `[0x82000854]` + 16: probably the kernel's `KeTimeStampBundle` (a variable import; the slot at `0x82000854` not checked) and its tick count in ms, which the SDK refreshes every 1 ms. Leaf. 25 callers, 5 seen in play: XACT's clock (`sub_825BFE28`) and `sub_825CBD10` ([`xact.md`](xact.md)), `sub_8214F6E8` ([`system-services.md`](system-services.md)), `824CF448`, `824CF840`. Native, it would read a kernel variable the SDK fills (or a host clock in its place): a choice for whoever makes it native. |
+| `sub_8220BC28` | `MenuList::GetPreviousSelection` (probably) | Overridden | Returns the word at +20: the menu list's previous selection ("The menu list" in `../pause-menu-fix.md`). A one-instruction getter the linker folded, so XACT's `sub_825C8440` ([`xact.md`](xact.md)) calls it for an entry accessor's play offset (+20). 52 callers, 7 seen in play: the menus' `8220C7B8`, `8220D898`, `8220DD98`, `8220E1F8`, `82218788`, `82222E88`, and XACT's. Leaf. Native in `src/xact/xact.cpp` (`WaveEntryGetPlayOffset`) behind `--native_xact` (adapter in `src/hooks/xact.cpp`, harness `xact`, its wave entries and lookups group): one load, so the override gives every caller, the menus' too, the same result. Runs in attract races. |
 | `sub_820C0128` | `Vehicle::GetSpeedKmh` | Overridden | Returns the float at vehicle+48 (m/s) times 3.6. The plain C++ (`Vehicle_GetSpeedKmh`, `src/hooks/vehicle.h`) is also called directly by the native `OverlayView::SpeedKmh` (`sub_821268C0`, [`race-overlays.md`](race-overlays.md)); the adapter also tells the state capture (`--capture_dir`) about the vehicle. Checked against the original by the `race_overlays` harness. |
 | `sub_82093DC0` | | | First tick handler: polls input, then walks listener lists that run both game logic and the draw step (see "Separating drawing from the game tick" in `../frame-interpolation.md`). Tests player 1's input itself, on every pass: processor 0's pressed bits (`sub_8258CEB0`) and held-or-repeating bits (`sub_8258CEE0`), read from the input manager in guest memory ("Who reads the input manager" in `docs/pause-menu-fix.md`). |
 | `sub_821062E8` | `GameMessages::Dispatch` | Overridden | Delivers the game's queued messages to its handlers: 0 = Update (all game logic), 1 = Draw. Skips Update on render-only passes (`src/frame_pacing/game_messages.cpp`). |
@@ -447,11 +460,7 @@ old performance notes to the end of `../native-renderer.md`.
 | `sub_8210BA28` | | Wrapped | The action mappers' read slots (vtable `0x82007F78`; r3 the mapper, r4 the action id 151-180); logged for `--log_pause_menu` (`PAUSE_MENU_READ_SLOT`). |
 | `sub_8258E5E0` | | Wrapped | Named in `--find_menu_selection`'s log (`ITC_MENU_SCAN_WRAP`): `Scene::Update`'s two screen calls and others. |
 | `sub_8258ED78` | | Wrapped | Named in `--find_menu_selection`'s log (`ITC_MENU_SCAN_WRAP`): `Scene::Update`'s two screen calls and others. |
-| `sub_8259D1A8` | | Wrapped | Named in `--find_menu_selection`'s log (`ITC_MENU_SCAN_WRAP`): `Scene::Update`'s two screen calls and others. |
 | `sub_82094B10` | | Wrapped | Named in `--find_menu_selection`'s log (`ITC_MENU_SCAN_WRAP`): `Scene::Update`'s two screen calls and others. |
-| `sub_821184E8` | | Wrapped | Named in `--find_menu_selection`'s log (`ITC_MENU_SCAN_WRAP`): `Scene::Update`'s two screen calls and others. |
-| `sub_82118FB0` | | Wrapped | Named in `--find_menu_selection`'s log (`ITC_MENU_SCAN_WRAP`): `Scene::Update`'s two screen calls and others. |
-| `sub_82118C18` | | Wrapped | Named in `--find_menu_selection`'s log (`ITC_MENU_SCAN_WRAP`): `Scene::Update`'s two screen calls and others. |
 | `sub_8209F8A0` | | Wrapped | The race draw step's parts and the per-car update's callees, wrapped only to name which one advances per-frame state (`--find_per_frame_state`) and to skip one (`--debug_hide`) (`ITC_FRAME_STATE_WRAP`, `src/debug/frame_state_diff.cpp`). |
 | `sub_8209F900` | | Wrapped | The race draw step's parts and the per-car update's callees, wrapped only to name which one advances per-frame state (`--find_per_frame_state`) and to skip one (`--debug_hide`) (`ITC_FRAME_STATE_WRAP`, `src/debug/frame_state_diff.cpp`). |
 | `sub_820C5DE8` | | Wrapped | The race draw step's parts and the per-car update's callees, wrapped only to name which one advances per-frame state (`--find_per_frame_state`) and to skip one (`--debug_hide`) (`ITC_FRAME_STATE_WRAP`, `src/debug/frame_state_diff.cpp`). |

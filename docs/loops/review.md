@@ -11,6 +11,87 @@ functions to check in a drive in the progress file.
 When the user has reviewed a run's section, its heading gets
 "(reviewed <date>)"; the section stays for the record.
 
+## Run 2026-10-23 01:52 (`b7-loop-23-10-26`)
+
+- `sound-cues.md` (new, 87 rows; 4 moved from `functions.md`:
+  `sub_8259D1A8`, `sub_821184E8`, `sub_82118FB0`, `sub_82118C18`), 8 new
+  `known-data.md` rows (the sound manager, the audio engine, the bank
+  pair and holders, the sound, the emitter, the listener, the XACT and
+  XAudio engines); 4 leads added (XACT's body, X3DAudio and the engine
+  sounds, the data tables, a file-layer helper). For review: XACT's
+  vtable slots named only "probably <method>"; the intro records the
+  user's call that XACT will probably be translated (it replaces "keep
+  the game's XACT" in `native-audio.md`'s decisions, not yet edited
+  there); the 3D path never ran in play.
+  Migration 1's 30 rows (7 Native; the intro's "Native so far"). For
+  review: X3DAudioInitialize (`sub_82480710`, a library entry point,
+  pure math) translated; it doesn't store the speed at r1+28 in its
+  caller's frame as the original does (no caller reads it);
+  SoundBankHolderDelete leaves out the call to the empty `sub_82106540`;
+  the bank slot functions run the original where it traps, and the
+  allocating ones unless the native heap is on; `sub_8259D438` runs the
+  original when a handle is to be closed (never in play). The message
+  handler `sub_82119188` left recompiled (guest vtable calls); the rest
+  waits on XACT (the cue and engine calls through its vtables), the
+  file layer and the string helpers; `sub_82092B78` (a std allocator)
+  has no row anywhere.
+  `xact.md` (new, 149 rows: the engine with Initialize, DoWork, the
+  bank creation and categories, its global settings and audio callback
+  `sub_825C0248` run by XAudio on its own thread, the sound and wave
+  banks, the cue, sound and fader), `known-data.md`'s XACT objects, the
+  `.xsb` and `.xwb` layouts, volume tables and clock globals; 4 leads
+  (the rest of XACT, about 265 functions; the voice class with XAudio;
+  shared helpers). For review: names follow the XACT3 interfaces where
+  slots and arguments make them clear, else "probably"; the boundary
+  named in the intro (XAudio's voices and callback, the kernel's
+  critical sections and clock, XMemAlloc); a correction to
+  `sound-cues.md` and `known-data.md` (the cue's slot +60 is
+  GetProperties, writing the emitter's +136 block's first 14 bytes, not
+  3D settings). The mapping agent read the vtables from `default.xex`
+  decrypted and decompressed into its scratchpad with Python's
+  `cryptography` and the retail key (nothing of it in the repo).
+  Migration 1's 55 rows (46 Overridden, 9 Native; the intro's
+  paragraphs on how the translation is set up). For review: a function
+  calling its own object's vtable slot runs natively only while the
+  slot holds the already-native function (GetHeader at sound bank +64,
+  GetEntry and GetSeekTable at wave bank +16 and +20, AddListener at
+  the bank interface's +0), else hands off to the original before
+  changing anything; partial ports taking only the paths seen in play
+  (`sub_825CA980` only a sound without tracks, `sub_825CC1D0` only an
+  idle fader, `sub_825C8230` hands complex cues to the original);
+  allocating functions run the original unless `--native_heap` is on.
+  Left recompiled: the engine's critical section (no native lock in
+  `src/`; the core's), the global settings' unmapped vtable slots,
+  calls through vtables into recompiled code, unmapped callees.
+  XACT's second map (37 rows in `xact.md`: the global settings'
+  accessors, the renderer's voice slots, the sound classes' and
+  listener slots, the wave entry's getters; 2 in `functions.md`:
+  `sub_822956F0` probably GetTickCount, `sub_8220BC28` probably
+  MenuList::GetPreviousSelection; `known-data.md`'s sound fields +96,
+  +104, +120, +128; 1 lead, the code above the tracks). For review: the
+  settings' slots +16, +20, +32, +36, +44, +48, +52, +56 "probably",
+  from what callers do (no image dump read); for your call:
+  GetTickCount made native means reading the kernel's timestamp bundle
+  the SDK fills, or a host clock (left recompiled).
+  XACT's migration 2 (46 rows ours: 39 Overridden, the rest Native, 7
+  of them by adapter removal; the intro's settings vtable +0 to +68,
+  read from the loaded image). For review: paths seen in play only,
+  the rest handed to the original (`sub_825CC9C8` no optional sections,
+  `sub_825CB470` flags without 0x2, `sub_825C27C0` no presets and no
+  effect or both, `sub_825C2910` +100 is 0, `sub_825C6A20` +240 is 0,
+  `sub_825C7798` no listener cues); `sub_825CC380` reads the bank's
+  entry through the accessors instead of a stack copy (same words, all
+  read before the stores); the folded getters `sub_82099BA0`,
+  `sub_820A8958`, `sub_82379D50` overridden (same results for the game
+  code folded with them); the harness's `Case` compares f1, a
+  `Relocate` helper. Waiting on GetTickCount (your call): XACT's clock
+  `sub_825BFE28` and everything above it.
+  XACT's migration 3: `sub_825C8440` GetWaveRegion (builds its entry
+  accessor in the original's stack slot, as the collision and matrix
+  adapters do) and the folded getter `sub_8220BC28` (`functions.md`,
+  one load of +20, the menus' callers get the same result) under
+  `--native_xact`; 4 adapters removed.
+
 ## Run 2026-10-22 22:11 (`b7-loop-22-10-26-2`)
 
 - `collision-world.md` (new, 43 rows), `known-data.md`'s mesh, route,

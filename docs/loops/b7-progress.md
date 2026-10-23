@@ -3,90 +3,78 @@
 Kept by the loop's lead (`b7-loop.md`). Short: details are in the
 commits, the function files and the subsystems' docs. Earlier runs'
 records: `b7-loop-2026-10-22-0111.md`, `b7-loop-2026-10-22-1047.md`,
-`b7-loop-2026-10-22-1439.md` (their rows to review and drive lists are
-there), and this file's history.
+`b7-loop-2026-10-22-1439.md`, `b7-loop-2026-10-22-2211.md` (their drive
+lists are there), and this file's history.
 
 ## Now
 
-- Run started 2026-10-22 22:11 on `b7-loop-22-10-26-2` (the user's
-  branch), from 91f40be; summary `b7-loop-2026-10-22-2211.md`.
-- Subsystem 1 of 3 (the C runtime heap) finished.
-- Subsystem 2 of 3 (the collision narrow phase) finished.
-- Subsystem 3 of 3 (the collision world) stopped after two migrations
-  (37 of 43 ours): the run stopped at the user's call, for a drive and
-  the merge.
+- Run started 2026-10-23 01:52 on `b7-loop-23-10-26` (the user's
+  branch), from 21cdb6a; summary `b7-loop-2026-10-23-0152.md`.
+- Subsystem 1 of 3 (the sound cues) finished: the rest waits on XACT.
+- Subsystem 2 of 3 (XACT) finished: the rest waits on blockers.
+- Subsystem 3 of 3 (XACT's settings and slots, a second map into
+  `xact.md`) finished. The run's limit reached: stopped.
 
 ## Done
 
-- The collision world (`collision-world.md`, mapped in a28943d; 43
-  rows): 37 ours in two migrations (323cd79..ee7d5e1, validated;
-  027d891..4fc6646, validated from the user's drive `itc_853.log`, 14 of
-  14 harness lines); `--native_collision_world`; with 3 `car-physics.md`
-  teardown rows. Left: the tick and set-up groups, the course load
-  (Archive::Load), the route's two functions.
+- XACT's settings and slots (mapped in 284f3a2: 37 rows in `xact.md`, 2
+  in `functions.md`): 47 ours in two migrations (4e8a8fc..ebdb01f,
+  validated 52 of 52, replay ok; e659e09..222ad37, validated 6 of 6);
+  `--native_xact`; `xact.md` 102 of 186. Left: the critical section,
+  XAudio and the voices, vtable calls into the tracks and waves, the
+  clock (GetTickCount, the user's call).
 
-- The collision narrow phase (`collision.md`, mapped in dd758b3; 64
-  rows): all 64 ours (29 Overridden, 35 Native) in two migrations
-  (f5b59e8..e634cfd, df767d1..b83c56a), each validated (53 and 27
-  harness lines; replays ok); `--native_collision`; with
-  `car-physics.md`'s CollisionObject::Translate and Vehicle::ApplyForces
-  and `vehicle-accessors.md`'s RigidBody::Force and Torque. Left: none.
+- XACT (`xact.md`, mapped in 7ba4592; 149 rows): 55 ours in one
+  migration (904e6ee..0c0fd63), validated (55 of 55 harness lines, all
+  ran in the attract race; the migration's log `itc_870` at the same
+  code); `--native_xact`. Left: the critical section, the settings'
+  unmapped slots, vtable calls into recompiled code, XAudio and the
+  voices, the tracks, events and waves.
 
-- The C runtime heap (`heap.md`, its existing rows read in full in
-  1f48eaf): 15 functions ours (12 Overridden, 3 Native) in one migration
-  (510aae9..34d8c7b), validated (15 of 15 harness lines, all ran in
-  play); `--native_c_runtime_heap`. Left: none (the game's own heap
-  internals aren't ported).
+- The sound cues (`sound-cues.md`, mapped in bfa9d03; 87 rows): 30
+  ours in one migration (6187975..fae15f5), validated (30 of 30
+  harness lines, all ran in the attract race or the replay; replay
+  ok); `--native_sound_cues`. Left: everything calling XACT through its
+  vtables and their callers, the bank loads (file layer, std::string),
+  the message handler.
 
 ## Rows to review
 
-This run's rows: `review.md` ("Run 2026-10-22 22:11").
+This run's rows: `review.md` ("Run 2026-10-23 01:52").
 
 ## Expected to differ
 
-This run's groups: `expected-differences.md` (the "22:11 run" lines).
+This run's groups: `expected-differences.md` (the "01:52 run" lines).
 
 ## To check in a drive
 
-Functions made native this run with no `native running (game):` line in
-the validation agent's attract race or pad replay; the user drives (with
-`--log_level=info`) and checks the log for them when the loop ends.
-
-- Collision (migration 2's validation, attract race `itc_799` and replay
-  `itc_800`, replay ok): `sub_820BACB8` CollisionShape::Type. Migration
-  1's 18 impact-path functions all ran in that replay (the first replay,
-  `itc_779`, had no deep enough contact). Not in the drive either
-  (`itc_853.log`).
-- Collision world, migration 2 (the user's drive `itc_853.log`):
-  `sub_820FEFB0` TrackCollision::Unload, `sub_820B86B8`
-  CollisionWorld::Destroy, `sub_820B9110` and `sub_820B7B40`
-  CollisionObject's destructors (a race's end: the drive was quit from
-  the race), `sub_820FD6D8` IgnoresWall, `sub_820FC870`
-  WallQuery::ModeSkips.
+None: every function made native this run ran in an attract race or
+the pad replay.
 
 ## Totals
 
-- Start: ours 714, work left 6039 (wrapped 137, known 336, unknown 5566).
-- After mapping the heap: the same (rows rewritten in place).
-- After the heap's migration 1: ours 729, work left 6024 (wrapped 137,
-  known 321, unknown 5566).
-- After mapping the collision narrow phase: ours 729, work left 6024
-  (wrapped 137, known 385, unknown 5502).
-- After the collision's migration 1: ours 782, work left 5971 (wrapped
-  137, known 332, unknown 5502).
-- After the collision's migration 2: ours 797, work left 5956 (wrapped
-  137, known 319, unknown 5500).
-- After mapping the collision world: ours 797, work left 5956 (wrapped
-  137, known 362, unknown 5457).
-- After the collision world's migration 1: ours 826, work left 5927
-  (wrapped 137, known 333, unknown 5457).
-- After the collision world's migration 2: ours 837, work left 5916
-  (wrapped 137, known 322, unknown 5457).
+- Start: ours 837, work left 5916 (wrapped 137, known 322, unknown 5457).
+- After mapping the sound cues: ours 837, work left 5916 (wrapped 137,
+  known 405, unknown 5374).
+- After the sound cues' migration 1: ours 867, work left 5886 (wrapped
+  137, known 375, unknown 5374).
+- After mapping XACT: ours 867, work left 5886 (wrapped 137, known 524,
+  unknown 5225).
+- After XACT's migration 1: ours 922, work left 5831 (wrapped 137, known
+  469, unknown 5225).
+- After XACT's second map: ours 922, work left 5831 (wrapped 137, known
+  508, unknown 5186).
+- After XACT's migration 2: ours 968, work left 5785 (wrapped 137, known
+  462, unknown 5186).
+- After XACT's migration 3: ours 970, work left 5783 (wrapped 137, known
+  460, unknown 5186).
 
 ## Stopped
 
-2026-10-23, the user's call: a drive (`itc_853.log`, felt fine), then the
-merge into `rexglue-removal-project`. Not a failure: every validation
-passed. Two of the run's three subsystems finished, the third (the
-collision world) has its tick and set-up left. The user reviews
-`review.md`, `expected-differences.md` and the drive list above.
+2026-10-23, the run's limit (3 subsystems: the sound cues, XACT, XACT's
+settings and slots). Not a failure: every check and validation passed.
+The user reviews `review.md` ("Run 2026-10-23 01:52"; the GetTickCount
+call), drives a race, and merges.
+Drive (2026-10-23, `itc_895.log`, ~2 minutes at 30 ticks/s, 0 errors;
+everything sounded normal to the user): all 133 functions whose Status
+changed this run logged `native running (game)`.
