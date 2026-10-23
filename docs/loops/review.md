@@ -26,6 +26,28 @@ When the user has reviewed a run's section, its heading gets
   (`sub_8210B698`, `sub_8210BDF0`, `sub_8210BE30`) matched to their
   slots from `sub_8209F228`'s arguments and the constants' values,
   both "probably" (the vtables and tables weren't read from the image).
+  Migration 1's 36 rows (`--native_action_mappers`; 10 Native, adapters
+  removed; 4 rows left: `sub_8210AF08` BindAll and `sub_8210B270` Bind,
+  whose 7 calls into the input manager's vtables aren't identified, and
+  `sub_8210C180`, `sub_8209F430`, blocked by `sub_8258CE60`). No behavior
+  change (the user's call, 2026-10-23: migrate off the recompiled code
+  only): every harness matches exactly, the registers the originals
+  leave behind too; the per-tick override of `sub_8210B018` still skips
+  render-only passes first. For review: bits 30-31 of the held,
+  pressed and released words come from an uninitialized stack word in
+  `sub_8210BBA0` (r25's high half as saved by `sub_8210B7D0`), and the
+  native code is handed the same value (`docs/pause-menu-fix.md`); the
+  update, Configure and the set-up run the original unless every repeat
+  and curve object's slot is the function seen in play; their slot 0
+  (`sub_8243DC88`, `sub_82106540`, shared with other classes) done in
+  place, no rows; the `--log_pause_menu` and `--log_input_reads`
+  diagnostics moved into `src/hooks/action_mappers.cpp` over new helpers
+  in `src/debug/pause_menu_log` and `src/frame_pacing/game_messages`,
+  and the adapters of `sub_8210C370`, `sub_8258CF10`, `sub_825924E0`
+  kept for them on the fallback path; c67265f has a batch and four
+  adapter removals together; new names `InputProcessor::AllHeld`,
+  `TestHeld`, `ActionMapper::Held`, `Pressed`, `Fired`, `AnalogRaw`,
+  `SetThreshold`, `SetRepeat`, `SetCurve`.
 
 ## Run 2026-10-23 01:52 (`b7-loop-23-10-26`)
 
