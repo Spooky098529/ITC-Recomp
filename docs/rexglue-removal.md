@@ -76,7 +76,10 @@ goes in `src/` as overrides), American English.
   drive) made the
   model animation, the car specs and the cameras native as far as they
   were ready (ours 1,139; the cameras keep frame interpolation's hooks,
-  with a new `BlendState_OnCopy`). The
+  with a new `BlendState_OnCopy`); its eighth run (branch
+  `b7-loop-23-10-26-4`) made the string table and font, `std::string`
+  (the user's call: translated over the guest layout) and the course's
+  route native as far as they were ready (ours 1,223). The
   runs' rows wait for the user's review (`docs/loops/review.md`). See
   "B7's loop runs" under B7, and `docs/loops/b7-progress.md`. Guest
   allocation is no longer a block (`docs/native-memory.md`); what the
@@ -2525,6 +2528,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-10-23 | The cameras below the camera modes (the library's `Camera` class, the 21 camera passes and their record passes, the two viewports; interpolation's hooks kept) | `cameras.md` | 32 of 42 (two migrations) | `--native_cameras` |
 | 2026-10-23 | The string table and font (the 17 string files, their pages and formatting with the game's `swprintf`, the font's layout and text draw; the C runtime's wide printf with it) | `strings-and-font.md` | 25 of 36 | `--native_strings_and_font` |
 | 2026-10-23 | `std::string` (Dinkumware's `basic_string<char>` over the guest layout: constructors, `_Tidy`, `_Copy`, `_Grow`, assign, append, the allocator; the library's wildcard search, find and replace-all) | `std-string.md` | 14 of 16 | `--native_std_string` |
+| 2026-10-23 | The course's route (route positions normalized and moved along linked sections, points, lanes and distances, `TrackRoute::Follow` with its full search; with `collision-world.md`'s `TrackPosition::Init` and `Update`) | `track-route.md` | 40 of 40 (two migrations) | `--native_track_route` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -3064,3 +3068,16 @@ row yet 4,892); `std-string.md` 14 ours of 16. 971 overrides in
 layout (the user's call: the game's inlined code reads its fields, so
 host strings can't stand in; thrown away at the port's end); the two
 global strings' static set-ups wait on `atexit`.
+
+**2026-10-23, B7's eighth loop run, stopped (branch
+`b7-loop-23-10-26-4`: the string table and font, `std::string`, the
+course's route):** the boundary unchanged: 449 functions (916 pairs):
+overridden 67, Native 3, Dropped 23, never called 70, live 286.
+Imports: 186 called, 62 with a live caller. B7 (`b7_status.py`): 6,757
+in play, ours 1,223, work left 5,534 (Wrapped 123, with a row 559, no
+row yet 4,852); `track-route.md` 40 ours of 40, `collision-world.md`
+39 of 43. 986 overrides in `src/`. Follow's full search
+(`sub_820FB2B0`, never seen in play) is ported, so Follow and
+`TrackPosition::Update` need no `ctx`; 18 of the route's adapters stay
+for the race and vehicle code's recompiled callers. Harness runs now
+use `attract_race.sh 30` (the harnesses take ~5 s before the race).

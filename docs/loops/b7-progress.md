@@ -17,16 +17,19 @@ see in a drive, from every run: `to-drive.md`.
   compiler and the device's state save.
 - Subsystem 2 of 3 (`std::string`) finished: the two static set-ups
   wait on `atexit`.
-- Subsystem 3 of 3: the course's route (picked: ready groups, runs
-  every update, blocks `TrackPosition::Init` and `Update`), mapped in
-  e211173 (40 rows, 15 ready groups); migration 1 done
-  (9c3cbaa..7785364, five batches; ready groups left), validated (33
-  of 33 harness lines; `itc_1085`, `itc_1086`, replay ok; 3 to drive);
-  migration 2 done (0b863a1..1b58c97: nothing ready left, with
-  `TrackPosition::Init` and `Update`); step: validation of migration 2
-  (a validation agent running).
+- Subsystem 3 of 3 (the course's route) finished: all 40 ours, with
+  `TrackPosition::Init` and `Update`; 18 adapters stay for recompiled
+  callers. The loop stopped at the run's limit (below).
 
 ## Done
+
+- The course's route (`track-route.md`, mapped in e211173; 40 rows): 40
+  ours in two migrations (9c3cbaa..7785364, 0b863a1..1b58c97), with
+  `collision-world.md`'s `TrackPosition::Init` and `Update`; validated
+  (33 of 33 and 15 of 15 harness lines; `itc_1085`, `itc_1086`,
+  `itc_1099`, `itc_1100`, replays ok; 4 to drive);
+  `--native_track_route`. Left: none ready; the race and vehicle code's
+  recompiled callers keep 18 adapters.
 
 - `std::string` (`std-string.md`, mapped in 7aeebb5; 16 rows): 14 ours
   in one migration (2028ce7..5fdcfc2), validated (14 of 14 harness
@@ -81,3 +84,12 @@ This run's groups: `expected-differences.md` (the "17:22 run" lines).
   harness 0 differing (none added).
 
 ## Stopped
+
+2026-10-23, after the course's route: the run's limit (3 subsystems)
+reached. Everything passed: harnesses 0 differing outside the earlier
+"(expected to differ)" groups (none added), attract races with all
+harnesses 18-19 s under `attract_race.sh 25` (accepted: the harnesses'
+~5 s; 23 s without them, `itc_1084`), then 23 s under
+`attract_race.sh 30` (the user's call), no errors, replays ok. Next:
+the user reviews `review.md` ("Run 2026-10-23 17:22"), drives a race
+for `to-drive.md`, and merges.

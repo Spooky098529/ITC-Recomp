@@ -27,6 +27,12 @@ Not in the attract race or the replay (`itc_1085`, `itc_1086`, ok):
 - `sub_820F9F58` TrackRoute::NormalizeForwardPath (`track-route.md`)
 - `sub_820FA0F8` TrackRoute::NormalizePath (`track-route.md`)
 
+Not in the attract race or the replay (`itc_1099`, `itc_1100`, ok);
+never seen in play before either, ported with Follow:
+
+- `sub_820FB2B0` TrackRoute::FullSearch (`track-route.md`, described
+  in `sub_820FB680`'s row)
+
 ## Run 2026-10-23 13:44 (`b7-loop-23-10-26-3`)
 
 Not in the drive `itc_1015.log` (2026-10-23) either.
