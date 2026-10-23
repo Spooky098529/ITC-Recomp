@@ -189,7 +189,9 @@ ITC_XACT_OPTIONAL(825CC1D0, FaderStep(base, ctx.r3.u32))
 // XACTCueBase::XACTCueBase (sub_825C5E58) have no adapters: their only
 // callers are native constructors.
 ITC_XACT_VOID(825C20B0, VariableConstruct(base, ctx.r3.u32), ctx.r3.u32)
-ITC_XACT_HEAP_WORD(825C60C0, NodePoolPushBack(base, ctx.r3.u32, ctx.r4.u32))
+// XACTNodePool::PushBack (sub_825C60C0) has no adapter: its callers in
+// play, the listener lists' AddListener (sub_825C6140, sub_825C7858,
+// sub_825C8690), are native.
 ITC_XACT_HEAP_WORD(825C6140, CueAddListener(base, ctx.r3.u32, ctx.r4.u32))
 ITC_XACT_HEAP_WORD(825C7858, SoundBankAddListener(base, ctx.r3.u32, ctx.r4.u32))
 ITC_XACT_WORD(825C6040, CueRemoveListener(base, ctx.r3.u32, ctx.r4.u32))
@@ -281,7 +283,8 @@ extern "C" REX_FUNC(sub_825CAC48) {
 }
 ITC_XACT_HEAP_WORD(825C8690, WaveBankAddListener(base, ctx.r3.u32, ctx.r4.u32))
 ITC_XACT_WORD(825C8540, WaveBankRemoveListener(base, ctx.r3.u32, ctx.r4.u32))
-ITC_XACT_OPTIONAL(825C0360, EngineFindWaveBank(base, ctx.r3.u32, ctx.r4.u32))
+// XACTEngine::FindWaveBank (sub_825C0360) has no adapter: its only caller,
+// GetWaveBank, is native.
 // GetWaveBank registers with the wave bank (AddListener, which
 // allocates): the original unless --native_heap routes the game's heap to
 // the native layer.
