@@ -25,7 +25,7 @@ ITC_FLAG_BOOL(native_xact, true, "ITC",
               "sub_825C76A0, sub_825C79B8, sub_825CC620, sub_825CEBE0, sub_825C8310, sub_825C5E58 "
               "and sub_825C67E8; the listener lists, sub_825C60C0, sub_825C6140, sub_825C7858, "
               "sub_825C6040 and sub_825C7758; the loop region in bytes, sub_825CF210 and "
-              "sub_825CF288) natively "
+              "sub_825CF288; loading a sound bank, sub_825C7E40 and sub_825C7448) natively "
               "instead of through the translated code (same results; checked by "
               "--run_harnesses=xact)");
 
@@ -203,3 +203,21 @@ extern "C" REX_FUNC(sub_825C67E8) {
 }
 ITC_XACT_OPTIONAL(825CF210, WaveEntryGetLoopStartBytes(base, ctx.r3.u32, ctx.r4.u32))
 ITC_XACT_OPTIONAL(825CF288, WaveEntryGetLoopLengthBytes(base, ctx.r3.u32))
+
+// Loading a sound bank, which allocates: the original unless --native_heap
+// routes the game's heap to the native layer, or where the bank's slot +64
+// isn't GetHeader.
+// XACTSoundBank::InitInstanceCounts (sub_825C7448) has no adapter: its only
+// caller, Load, is native.
+extern "C" REX_FUNC(sub_825C7E40) {
+  ITC_XACT_FALLBACK(825C7E40)
+  const auto result = hooks::NativeHeapActive()
+                          ? SoundBankLoad(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
+                                          ctx.r7.u32)
+                          : std::nullopt;
+  if (!result) {
+    __imp__sub_825C7E40(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = *result;
+}

@@ -7,6 +7,7 @@
 #include "memory/c_runtime_heap.h"
 
 #include <bit>
+#include <cstring>
 #include <tuple>
 #include <utility>
 
@@ -838,6 +839,68 @@ std::optional<uint32_t> WaveEntryGetLoopLengthBytes(uint8_t* base, uint32_t entr
     }
   }
   return last - *WaveEntrySamplesToBytes(base, entry, guest::LoadU32(base, entry + 28), 0);
+}
+
+namespace {
+
+constexpr uint32_t kOutOfMemory = 0x8007000E;  // E_OUTOFMEMORY
+
+// memset (sub_825A71D0) as its adapter does it: the bytes set host part by
+// host part.
+void Zero(uint8_t* base, uint32_t address, uint32_t bytes) {
+  guest::ForEachHostPart(base, address, bytes, [](uint8_t* host, uint32_t, uint32_t count) {
+    std::memset(host, 0, count);
+  });
+}
+
+// InitInstanceCounts once its bank's slot +64 is known to be GetHeader.
+uint32_t InitInstanceCounts(uint8_t* base, uint32_t bank) {
+  ITC_NATIVE_RUNNING("sub_825C7448 XACTSoundBank::InitInstanceCounts");
+  if (*SoundBankGetCueCount(base, bank) == 0) {
+    return 0;
+  }
+  const uint32_t bytes = (*SoundBankGetCueCount(base, bank) << 2) & 0x3FFFC;
+  const uint32_t counts = memory::crt::XMemAlloc(base, bytes, kPoolAttributes);
+  if (counts == 0) {
+    return kOutOfMemory;
+  }
+  Zero(base, counts, (*SoundBankGetCueCount(base, bank) << 2) & 0x3FFFC);
+  guest::StoreU32(base, bank + 248, counts);
+  return 0;
+}
+
+}  // namespace
+
+std::optional<uint32_t> SoundBankInitInstanceCounts(uint8_t* base, uint32_t bank) {
+  if (!SlotIs(base, bank, 64, kGetHeader)) {
+    return std::nullopt;
+  }
+  return InitInstanceCounts(base, bank);
+}
+
+std::optional<uint32_t> SoundBankLoad(uint8_t* base, uint32_t bank, uint32_t file, uint32_t size,
+                                      uint32_t flags, uint32_t attributes) {
+  if (!SlotIs(base, bank, 64, kGetHeader)) {
+    return std::nullopt;
+  }
+  ITC_NATIVE_RUNNING("sub_825C7E40 XACTSoundBank::Load");
+  guest::StoreU32(base, bank + 252, flags);
+  guest::StoreU32(base, bank + 256, attributes);
+  guest::StoreU32(base, bank + 264, size);
+  guest::StoreU32(base, bank + 260, file);
+  auto wave_banks = [&] { return guest::LoadU8(base, SoundBankGetHeader(base, bank) + 17); };
+  if (wave_banks() != 0) {
+    const uint32_t array = memory::crt::XMemAlloc(base, uint32_t(wave_banks()) << 2,
+                                                  kPoolAttributes);
+    guest::StoreU32(base, bank + 244, array);
+    if (array == 0) {
+      return kOutOfMemory;
+    }
+    for (uint32_t i = 0; i < wave_banks(); i++) {
+      guest::StoreU32(base, guest::LoadU32(base, bank + 244) + 4 * i, 0);
+    }
+  }
+  return InitInstanceCounts(base, bank);
 }
 
 }  // namespace xact

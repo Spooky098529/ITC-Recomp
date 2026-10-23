@@ -221,4 +221,17 @@ bool CueConstruct(uint8_t* base, uint32_t cue, uint32_t engine, uint32_t bank, u
 std::optional<uint32_t> WaveEntryGetLoopStartBytes(uint8_t* base, uint32_t entry, uint32_t out);
 std::optional<uint32_t> WaveEntryGetLoopLengthBytes(uint8_t* base, uint32_t entry);
 
+// --- Batch 5: loading a sound bank ---
+
+// XACTSoundBank::InitInstanceCounts (sub_825C7448): a zeroed word a cue
+// (XMemAlloc 0x20840001) at +248 when the bank has cues. Returns 0 or
+// E_OUTOFMEMORY. XACTSoundBank::Load (sub_825C7E40): the file's buffer,
+// size, flags and allocation attributes at +260, +264, +252, +256, a
+// zeroed word a wave bank at +244 when there are any, then
+// InitInstanceCounts. nullopt, with nothing changed, where the bank's slot
+// +64 isn't GetHeader. Native layer only (they allocate).
+std::optional<uint32_t> SoundBankInitInstanceCounts(uint8_t* base, uint32_t bank);
+std::optional<uint32_t> SoundBankLoad(uint8_t* base, uint32_t bank, uint32_t file, uint32_t size,
+                                      uint32_t flags, uint32_t attributes);
+
 }  // namespace xact

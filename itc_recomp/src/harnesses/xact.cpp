@@ -163,6 +163,10 @@ ITC_NATIVE_OPTIONAL(NativeWaveEntryGetLoopStartBytes,
                     xa::WaveEntryGetLoopStartBytes(base, ctx.r3.u32, ctx.r4.u32))
 ITC_NATIVE_OPTIONAL(NativeWaveEntryGetLoopLengthBytes,
                     xa::WaveEntryGetLoopLengthBytes(base, ctx.r3.u32))
+ITC_NATIVE_OPTIONAL(NativeSoundBankInitInstanceCounts,
+                    xa::SoundBankInitInstanceCounts(base, ctx.r3.u32))
+ITC_NATIVE_OPTIONAL(NativeSoundBankLoad, xa::SoundBankLoad(base, ctx.r3.u32, ctx.r4.u32,
+                                                           ctx.r5.u32, ctx.r6.u32, ctx.r7.u32))
 ITC_NATIVE_OPTIONAL(NativeWaveEntrySamplesToBytes,
                     xa::WaveEntrySamplesToBytes(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
 
@@ -1060,6 +1064,69 @@ void LoopRegions(Context& h) {
   results.Report();
 }
 
+// Loading a sound bank: the bank at the area's start, its file at +1024
+// (the wave bank count at +17, the cue counts at +9 and +11). Each
+// version's blocks differ: the words at +244 and +248 are compared as
+// "a block" or the value, the blocks' bytes compared, and the blocks freed.
+void Loads(Context& h) {
+  Results results("xact sound bank loads");
+  const uint32_t d = h.data;
+  if (!hooks::NativeHeapActive()) {
+    results.Report();
+    return;
+  }
+  for (int i = 0; i < 40; i++) {
+    const bool load = i % 2;
+    const uint32_t wave_banks = i % 8 < 2 ? 0 : 1 + h.random.Below(i < 20 ? 4 : 255);
+    const uint32_t simple = i % 5 == 0 ? 0 : h.random.Below(300);
+    const uint32_t complex = i % 3 == 0 ? 0 : h.random.Below(i < 30 ? 4 : 0x10000);
+    Outputs out[2];
+    const Random start = h.random;
+    for (int v = 0; v < 2; v++) {
+      h.random = start;
+      Fill(h.base, h.data, kScratchBytes);
+      SoundBank(h, kSoundBankVtable);
+      guest::StoreU8(h.base, d + 1024 + 17, uint8_t(wave_banks));
+      guest::StoreU16(h.base, d + 1024 + 9, uint16_t(simple));
+      guest::StoreU16(h.base, d + 1024 + 11, uint16_t(complex));
+      // No blocks before the call: what's there after is the call's.
+      guest::StoreU32(h.base, d + 244, 0);
+      guest::StoreU32(h.base, d + 248, 0);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = d;
+      t.r4.u64 = d + 1024;
+      t.r5.u64 = 0x1234;
+      t.r6.u64 = 0x5678;
+      t.r7.u64 = 0x9ABC;
+      ITC_FLAG(native_xact) = v == 1;
+      if (load) {
+        (v == 0 ? __imp__sub_825C7E40 : NativeSoundBankLoad)(t, h.base);
+      } else {
+        (v == 0 ? __imp__sub_825C7448 : NativeSoundBankInitInstanceCounts)(t, h.base);
+      }
+      ITC_FLAG(native_xact) = true;
+      out[v].Word(t.r3.u32);
+      for (uint32_t field : {244u, 248u}) {
+        const uint32_t block = guest::LoadU32(h.base, d + field);
+        const bool ours = block != 0;
+        out[v].Word(ours ? 1 : block);
+        if (ours) {
+          const uint32_t bytes = field == 244 ? 4 * wave_banks : 4 * ((simple + complex) & 0xFFFF);
+          out[v].Bytes(Read(h.base, block, bytes));
+          memory::crt::XMemFree(block, 0x20840001);
+          guest::StoreU32(h.base, d + field, 0);
+        }
+      }
+      out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+    }
+    results.Check(out[0], out[1],
+                  fmt::format("XACTSoundBank::{} {} ({} wave banks, {} cues)",
+                              load ? "Load" : "InitInstanceCounts", i, wave_banks,
+                              simple + complex));
+  }
+  results.Report();
+}
+
 }  // namespace
 
 void Xact(Context& h) {
@@ -1071,6 +1138,7 @@ void Xact(Context& h) {
   CuesAndSounds(h);
   Constructors(h);
   LoopRegions(h);
+  Loads(h);
 }
 
 }  // namespace harness
