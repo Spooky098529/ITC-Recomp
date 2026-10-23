@@ -249,9 +249,9 @@ void ListInit(uint8_t* base, uint32_t list);
 // for an empty list, and the first node when n is past the end.
 uint32_t ListAt(uint8_t* base, uint32_t list, uint32_t n);
 // ScenePools::ClaimA (sub_820C42C8) and ClaimB (sub_820C5AB0): the first
-// free object (+16 = 0) of the scene's pool (scene + 56 + 12 x pool, or
-// + 4944 for the second set; the count at +8) marked in use (+16 = 3), its
-// index returned; -1 when none.
+// free object (+16 = 0) of a pool (+56 + 12 x pool in the first set,
+// [0x826C2E40]; + 4944 in the scene's second set, [0x826C2E44]; the count
+// at +8) marked in use (+16 = 3), its index returned; -1 when none.
 int32_t ScenePoolsClaimA(uint8_t* base, uint32_t scene, uint32_t pool);
 int32_t ScenePoolsClaimB(uint8_t* base, uint32_t scene, uint32_t pool);
 // ScenePools::GetA (sub_820C4420) and GetB (sub_820C5C20): the object when
