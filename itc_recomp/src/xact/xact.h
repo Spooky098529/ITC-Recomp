@@ -373,4 +373,28 @@ std::optional<uint32_t> SoundGetTrackRecord(uint8_t* base, uint32_t sound, uint3
 // (as for every sound in play); nullopt otherwise.
 std::optional<uint32_t> SoundSetUpRpcs(uint8_t* base, uint32_t sound);
 
+// --- Batch 9: loading the global settings ---
+
+// XACTGlobalSettings::Load (sub_825C26E0): the file's buffer, size, flags
+// and allocation attributes at +132, +140, +144, +136; the RPCs on DSP
+// parameters (header +17 of them from +55, 5 + 9 x points bytes each,
+// parameter above 2) counted into +100; then MakeState (sub_825C3B68):
+// four word arrays a category (XMemAlloc 0x20840001: +104 live counts,
+// +112 and +108 zeroed, +120 the volumes from the gain table) and the
+// global variables (a counted array of 252-byte variables, 0x20840051,
+// constructed and initialized) at +124. Returns 0 or E_OUTOFMEMORY
+// (freeing what was made). nullopt, with nothing changed, where the
+// slots it reaches (+4, +8, +28, +44) aren't the native accessors. Native
+// layer only (they allocate).
+std::optional<uint32_t> SettingsLoad(uint8_t* base, uint32_t settings, uint32_t buffer,
+                                     uint32_t size, uint32_t flags, uint32_t attributes);
+// XACTGlobalSettings::SetUpDspPreset (sub_825C27C0): 0 where there's
+// nothing to do (no DSP presets in the file and no effect made, or both);
+// nullopt where the renderer would make or release the effect (never in
+// play) or slot +44 isn't GetBuffer.
+std::optional<uint32_t> SettingsSetUpDspPreset(uint8_t* base, uint32_t settings);
+// XACTGlobalSettings::SetUpRpcs (sub_825C2910): 0 without RPCs on DSP
+// parameters (+100, as in play); nullopt otherwise.
+std::optional<uint32_t> SettingsSetUpRpcs(uint8_t* base, uint32_t settings);
+
 }  // namespace xact

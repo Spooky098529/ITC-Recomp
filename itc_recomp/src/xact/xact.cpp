@@ -1429,4 +1429,120 @@ std::optional<uint32_t> SoundSetUpRpcs(uint8_t* base, uint32_t sound) {
   return 0;
 }
 
+// --- Batch 9: loading the global settings ---
+
+namespace {
+
+constexpr uint32_t kGlobalsAttributes = 0x20840051;  // the array of global variables
+
+// MakeState once the slots it reaches are known to be the native ones.
+uint32_t MakeState(uint8_t* base, uint32_t settings) {
+  ITC_NATIVE_RUNNING("sub_825C3B68 XACTGlobalSettings::MakeState");
+  const auto buffer = [&] { return SettingsGetBuffer(base, settings); };
+  const uint32_t variables = guest::LoadU16(base, buffer() + 11);
+  const auto category_bytes = [&] { return uint32_t(guest::LoadU16(base, buffer() + 9)) << 2; };
+  const uint32_t counts = memory::crt::XMemAlloc(base, category_bytes(), kPoolAttributes);
+  if (counts == 0) {
+    return kOutOfMemory;
+  }
+  uint32_t volumes = 0, states = 0, flags = 0, globals = 0;
+  bool failed = (volumes = memory::crt::XMemAlloc(base, category_bytes(), kPoolAttributes)) == 0 ||
+                (states = memory::crt::XMemAlloc(base, category_bytes(), kPoolAttributes)) == 0 ||
+                (flags = memory::crt::XMemAlloc(base, category_bytes(), kPoolAttributes)) == 0;
+  if (!failed && variables != 0) {
+    const uint32_t block = memory::crt::XMemAlloc(base, 252 * variables + 4, kGlobalsAttributes);
+    if (block == 0) {
+      failed = true;
+    } else {
+      globals = block + 4;
+      guest::StoreU32(base, block, variables);
+      for (uint32_t v = 0; v < variables; v++) {
+        VariableConstruct(base, globals + 252 * v);
+      }
+    }
+  }
+  if (failed) {
+    memory::crt::XMemFree(counts, kPoolAttributes);
+    for (uint32_t block : {volumes, states, flags}) {
+      if (block != 0) {
+        memory::crt::XMemFree(block, kPoolAttributes);
+      }
+    }
+    return kOutOfMemory;
+  }
+  Zero(base, counts, category_bytes());
+  guest::StoreU32(base, settings + 104, counts);
+  Zero(base, states, category_bytes());
+  guest::StoreU32(base, settings + 112, states);
+  Zero(base, flags, category_bytes());
+  guest::StoreU32(base, settings + 108, flags);
+  // Each category's volume from the gain table by its volume byte.
+  for (uint32_t c = 0; c < guest::LoadU16(base, buffer() + 9); c++) {
+    const uint32_t byte = *SettingsGetVolumeByte(base, settings, c);
+    CopyFloat(base, volumes + (c << 2), kGainTable + ((byte << 2) & 0x3FC));
+  }
+  guest::StoreU32(base, settings + 120, volumes);
+  for (uint32_t v = 0; v < variables; v++) {
+    const uint32_t record = *SettingsGetVariableRecord(base, settings, v);
+    VariableInit(base, globals + 252 * v, guest::LoadU32(base, settings + 4), 0, v, record, 0);
+  }
+  guest::StoreU32(base, settings + 124, globals);
+  return 0;
+}
+
+}  // namespace
+
+std::optional<uint32_t> SettingsLoad(uint8_t* base, uint32_t settings, uint32_t buffer,
+                                     uint32_t size, uint32_t flags, uint32_t attributes) {
+  if (!BufferSlot(base, settings) || !SlotIs(base, settings, 28, kSettingsGetVolumeByte) ||
+      !RecordSlots(base, settings) || !SlotIs(base, settings, 8, kSettingsGetVariableRecord)) {
+    return std::nullopt;
+  }
+  ITC_NATIVE_RUNNING("sub_825C26E0 XACTGlobalSettings::Load");
+  guest::StoreU32(base, settings + 144, flags);
+  guest::StoreU32(base, settings + 136, attributes);
+  guest::StoreU32(base, settings + 140, size);
+  guest::StoreU32(base, settings + 132, buffer);
+  const auto header = [&] { return SettingsGetBuffer(base, settings); };
+  if (guest::LoadU16(base, header() + 17) != 0) {
+    // The RPCs on DSP parameters (parameter above 2) counted into +100.
+    uint32_t step = guest::LoadU32(base, header() + 55);
+    guest::StoreU16(base, settings + 100, 0);
+    uint32_t rpc = buffer;
+    for (uint32_t i = 0;; i = (i + 1) & 0xFFFF) {
+      rpc += step;
+      if (i >= guest::LoadU16(base, header() + 17)) {
+        break;
+      }
+      const uint32_t points = guest::LoadU8(base, rpc + 2);
+      step = points * 9 + 5;
+      if (guest::LoadU16(base, rpc + 3) > 2) {
+        guest::StoreU16(base, settings + 100, uint16_t(guest::LoadU16(base, settings + 100) + 1));
+      }
+    }
+  }
+  return MakeState(base, settings);
+}
+
+std::optional<uint32_t> SettingsSetUpDspPreset(uint8_t* base, uint32_t settings) {
+  if (!BufferSlot(base, settings)) {
+    return std::nullopt;
+  }
+  const bool presets = guest::LoadU16(base, SettingsGetBuffer(base, settings) + 19) != 0;
+  const bool made = guest::LoadU32(base, settings + 8) != 0;
+  if (presets != made) {
+    return std::nullopt;  // the renderer makes or releases the effect (never in play)
+  }
+  ITC_NATIVE_RUNNING("sub_825C27C0 XACTGlobalSettings::SetUpDspPreset");
+  return 0;
+}
+
+std::optional<uint32_t> SettingsSetUpRpcs(uint8_t* base, uint32_t settings) {
+  if (guest::LoadU16(base, settings + 100) != 0) {
+    return std::nullopt;  // RPCs on DSP parameters (never in play)
+  }
+  ITC_NATIVE_RUNNING("sub_825C2910 XACTGlobalSettings::SetUpRpcs");
+  return 0;
+}
+
 }  // namespace xact

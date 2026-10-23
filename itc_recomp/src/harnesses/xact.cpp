@@ -19,6 +19,7 @@
 
 #include <fmt/format.h>
 
+#include <algorithm>
 #include <bit>
 #include <iterator>
 #include <string>
@@ -259,6 +260,11 @@ ITC_NATIVE_OPTIONAL(NativeCueMakeInstanceVariable, xa::CueMakeInstanceVariable(b
 ITC_NATIVE_OPTIONAL(NativeSoundGetTrackRecord,
                     xa::SoundGetTrackRecord(base, ctx.r3.u32, ctx.r4.u32))
 ITC_NATIVE_OPTIONAL(NativeSoundSetUpRpcs, xa::SoundSetUpRpcs(base, ctx.r3.u32))
+
+ITC_NATIVE_OPTIONAL(NativeSettingsLoad, xa::SettingsLoad(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                                         ctx.r6.u32, ctx.r7.u32))
+ITC_NATIVE_OPTIONAL(NativeSettingsSetUpDspPreset, xa::SettingsSetUpDspPreset(base, ctx.r3.u32))
+ITC_NATIVE_OPTIONAL(NativeSettingsSetUpRpcs, xa::SettingsSetUpRpcs(base, ctx.r3.u32))
 
 // The odd float words mixed into inputs: NaNs of both kinds and signs,
 // infinities, denormals, signed zeros.
@@ -1264,6 +1270,7 @@ void Settings(Context& h, uint32_t vtable, bool engine_has_settings) {
   guest::StoreU32(h.base, d + 116, h.random.Below(2) ? 0 : uint32_t(h.random.Next()));
   RandomWords(h, d + kEngine, 40);
   guest::StoreU32(h.base, d + kEngine + 124, engine_has_settings ? d : 0);
+  guest::StoreU32(h.base, d + 4, d + kEngine);  // the settings' engine (SetUpDspPreset reads its +12)
   // The image's vtable copied into the area (the same slots).
   for (uint32_t i = 0; i < 20; i++) {
     guest::StoreU32(h.base, d + kSettingsVtableCopy + 4 * i,
@@ -1782,6 +1789,113 @@ void SoundsAndCueVariables(Context& h) {
   results.Report();
 }
 
+void SettingsLoads(Context& h) {
+  Results results("xact global settings loads");
+  const uint32_t d = h.data;
+  const uint32_t buffer = d + 1024;
+  // SetUpDspPreset and SetUpRpcs where there's nothing to do (the other
+  // paths decline below).
+  for (int i = 0; i < 40; i++) {
+    const bool presets = i % 2;
+    auto setup = [&] {
+      Settings(h, i % 4 == 3 ? d + kSettingsVtableCopy : kSettingsVtable, true);
+      guest::StoreU16(h.base, buffer + 19, presets ? uint16_t(1 + h.random.Below(5)) : 0);
+      guest::StoreU32(h.base, d + 8, presets ? 1 + uint32_t(h.random.Below(1000)) : 0);
+      guest::StoreU16(h.base, d + 100, 0);
+    };
+    Case(h, results, setup, [&](PPCContext& t) { t.r3.u64 = d; }, __imp__sub_825C27C0,
+         NativeSettingsSetUpDspPreset, {},
+         fmt::format("XACTGlobalSettings::SetUpDspPreset {} ({})", i, presets ? "made" : "none"));
+    Case(h, results, setup, [&](PPCContext& t) { t.r3.u64 = d; }, __imp__sub_825C2910,
+         NativeSettingsSetUpRpcs, {}, fmt::format("XACTGlobalSettings::SetUpRpcs {}", i));
+  }
+  for (int i = 0; i < 2; i++) {
+    Fill(h.base, d, kScratchBytes);
+    Settings(h, kSettingsVtable, true);
+    guest::StoreU16(h.base, buffer + 19, uint16_t(i));
+    guest::StoreU32(h.base, d + 8, i ? 0 : 0x1234);
+    CheckDeclines(h, results, NativeSettingsSetUpDspPreset, d, 0,
+                  fmt::format("XACTGlobalSettings::SetUpDspPreset, presets {} made {}", i, !i));
+  }
+  Fill(h.base, d, kScratchBytes);
+  guest::StoreU16(h.base, d + 100, 1);
+  CheckDeclines(h, results, NativeSettingsSetUpRpcs, d, 0, "XACTGlobalSettings::SetUpRpcs, +100 1");
+  // Load (only while the native layer has the heap): 0 to 16 categories, 0
+  // to 3 global variables, 0 to 4 RPCs (their table at the buffer's +600,
+  // 0 to 3 points each). The five blocks it makes are compared by their
+  // bytes, the words pointing into them relocated, then freed.
+  if (hooks::NativeHeapActive()) {
+    for (int i = 0; i < 60; i++) {
+      const uint32_t categories = i % 10 == 0 ? 0 : 1 + h.random.Below(16);
+      const uint32_t variables = h.random.Below(4);
+      const uint32_t rpcs = i % 3 == 0 ? 0 : h.random.Below(5);
+      Outputs out[2];
+      const Random start = h.random;
+      for (int v = 0; v < 2; v++) {
+        h.random = start;
+        Fill(h.base, d, kScratchBytes);
+        Settings(h, i % 4 == 3 ? d + kSettingsVtableCopy : kSettingsVtable, true);
+        guest::StoreU16(h.base, buffer + 9, uint16_t(categories));
+        guest::StoreU16(h.base, buffer + 11, uint16_t(variables));
+        guest::StoreU16(h.base, buffer + 17, uint16_t(rpcs));
+        guest::StoreU32(h.base, buffer + 55, 600);
+        uint32_t rpc = buffer + 600;
+        for (uint32_t k = 0; k < rpcs; k++) {
+          const uint32_t points = h.random.Below(4);
+          RandomBytes(h, rpc, 5 + 9 * points);
+          guest::StoreU8(h.base, rpc + 2, uint8_t(points));
+          guest::StoreU16(h.base, rpc + 3, uint16_t(h.random.Below(6)));
+          rpc += 5 + 9 * points;
+        }
+        PPCContext t = CallContext(h);
+        t.r3.u64 = d;
+        t.r4.u64 = buffer;
+        t.r5.u64 = 0x1111;
+        t.r6.u64 = 0x2222;
+        t.r7.u64 = 0x3333;
+        ITC_FLAG(native_xact) = v == 1;
+        (v == 0 ? __imp__sub_825C26E0 : NativeSettingsLoad)(t, h.base);
+        ITC_FLAG(native_xact) = true;
+        out[v].Word(t.r3.u32);
+        auto area = Read(h.base, d, kScratchBytes);
+        if (t.r3.u32 == 0) {
+          const uint32_t fields[] = {104, 112, 108, 120};
+          std::vector<std::pair<uint32_t, uint32_t>> blocks;
+          for (uint32_t field : fields) {
+            blocks.push_back({guest::LoadU32(h.base, d + field), 4 * categories});
+          }
+          const uint32_t globals = guest::LoadU32(h.base, d + 124);
+          out[v].Word(globals != 0);
+          if (globals != 0) {
+            blocks.push_back({globals - 4, 4 + 252 * variables});
+          }
+          std::vector<std::vector<uint8_t>> contents;
+          for (const auto& [block, size] : blocks) {
+            contents.push_back(Read(h.base, block, size));
+          }
+          for (auto& bytes : contents) {
+            for (const auto& [block, size] : blocks) {
+              Relocate(bytes, block, std::max(size, 1u));
+            }
+            out[v].Bytes(bytes);
+          }
+          for (const auto& [block, size] : blocks) {
+            Relocate(area, block, std::max(size, 1u));
+          }
+          for (size_t k = 0; k < blocks.size(); k++) {
+            memory::crt::XMemFree(blocks[k].first, k < 4 ? 0x20840001 : 0x20840051);
+          }
+        }
+        out[v].Bytes(area);
+      }
+      results.Check(out[0], out[1],
+                    fmt::format("XACTGlobalSettings::Load {} ({} categories, {} variables, {} RPCs)",
+                                i, categories, variables, rpcs));
+    }
+  }
+  results.Report();
+}
+
 }  // namespace
 
 void Xact(Context& h) {
@@ -1798,6 +1912,7 @@ void Xact(Context& h) {
   WaveEntriesAndLookups(h);
   VariableDestructors(h);
   SoundsAndCueVariables(h);
+  SettingsLoads(h);
 }
 
 }  // namespace harness
