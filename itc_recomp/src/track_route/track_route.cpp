@@ -48,15 +48,105 @@ uint32_t Kind(uint8_t* base, uint32_t section) {
 }
 
 // A position moved over the link at `link` (StepForward's and
-// StepAlongPath's ends): the section from the link, the slice less the
-// word at `count`, in the original's order.
-uint32_t TakeForward(uint8_t* base, uint32_t position, uint32_t link, uint32_t count) {
+// StepAlongPath's ends, and the lane steps'): the section from the link, the
+// slice less the slices' count (`slices()`, read when the original reads its
+// word), in the original's order.
+template <typename Slices>
+uint32_t TakeForward(uint8_t* base, uint32_t position, uint32_t link, Slices slices) {
   const uint32_t section = LoadU16(base, link);
   const uint32_t slice = LoadU16(base, position + 2);
   guest::StoreU16(base, position + 0, uint16_t(section));
-  const uint32_t slices = Load(base, count);
-  guest::StoreU16(base, position + 2, uint16_t(slice - slices));
+  guest::StoreU16(base, position + 2, uint16_t(slice - slices()));
   return 1;
+}
+// The word at `address`, read when called.
+auto WordAt(uint8_t* base, uint32_t address) {
+  return [base, address] { return Load(base, address); };
+}
+
+// StepForward with the slices' count from `slices()`.
+template <typename Slices>
+uint32_t StepForwardWith(uint8_t* base, uint32_t route, uint32_t position, Slices slices) {
+  ITC_NATIVE_RUNNING("sub_820F8B48 TrackRoute::StepForward");
+  const uint32_t table = Load(base, Load(base, route) + 12);
+  const uint32_t section = SectionIn(base, table, LoadU16(base, position));
+  for (int32_t i = 2; i >= 0; i--) {
+    const uint32_t link = section + 28 + 4 * uint32_t(i);
+    const uint32_t to = LoadU16(base, link);
+    if (to == 0xFFFF) {
+      continue;
+    }
+    if (i > 0) {
+      const uint32_t kind = Kind(base, SectionIn(base, table, to));
+      if (kind == 2 || kind == 4) {
+        continue;
+      }
+    }
+    return TakeForward(base, position, link, slices);
+  }
+  return 0;
+}
+
+// BranchesMatching, each match handed to `found(section, link index)`.
+template <typename Found>
+uint32_t BranchesMatchingWith(uint8_t* base, uint32_t route, uint32_t section, uint32_t mask,
+                              Found found) {
+  ITC_NATIVE_RUNNING("sub_820F8BD0 TrackRoute::BranchesMatching");
+  uint32_t count = 0;
+  for (uint32_t i = 0; i <= 2; i++) {
+    const uint32_t to = LoadU16(base, section + 28 + 4 * i);
+    if (to == 0xFFFF) {
+      continue;
+    }
+    const uint32_t s = Section(base, Load(base, route), to);
+    const uint32_t kind = Kind(base, s);
+    if (kind == 2 || kind == 4) {
+      continue;
+    }
+    const uint32_t branch = LoadU8(base, s + 3);
+    const uint32_t bits = Load(base, mask);
+    const uint32_t bit = (branch & 0x20) != 0 ? 0 : (1u << (branch & 0x1F));
+    if ((bit & bits) == 0) {
+      continue;
+    }
+    found(to, i);
+    count++;
+  }
+  return count;
+}
+
+// The first match of BranchesMatching (its count, the first's section and
+// link index), as the callers read it from their frames.
+struct FirstBranch {
+  uint32_t count = 0;
+  uint32_t section = 0;
+  uint32_t link = 0;
+};
+FirstBranch FirstBranchMatching(uint8_t* base, uint32_t route, uint32_t section, uint32_t mask) {
+  FirstBranch first;
+  bool any = false;
+  first.count = BranchesMatchingWith(base, route, section, mask, [&](uint32_t to, uint32_t i) {
+    if (!any) {
+      any = true;
+      first.section = to;
+      first.link = i;
+    }
+  });
+  return first;
+}
+
+// LinkLane with the link index as a value.
+int32_t LinkLaneWith(uint8_t* base, uint32_t route, uint32_t position, int32_t link,
+                     uint32_t lane_address) {
+  ITC_NATIVE_RUNNING("sub_820F8CE8 TrackRoute::LinkLane");
+  const uint32_t file = Load(base, route);
+  const uint32_t number = LoadU16(base, position);
+  const uint32_t section = Section(base, file, number);
+  if (LoadU16(base, section + (uint32_t(link) + 7) * 4) == 0xFFFF) {
+    return -1;
+  }
+  const int32_t lane = LoadS16(base, lane_address);
+  return int8_t(LoadU8(base, section + uint32_t(link) * 8 + uint32_t(lane) + 76));
 }
 
 // A link's slice difference (LinkDistance): `from` less the slice of link
@@ -69,6 +159,107 @@ int32_t LinkSlices(uint8_t* base, int32_t from, uint32_t section, int32_t index)
     d--;
   }
   return d;
+}
+
+// StepForwardMasked with the slices' count from `slices()`.
+template <typename Slices>
+uint32_t StepForwardMaskedWith(uint8_t* base, uint32_t route, uint32_t position, Slices slices,
+                               uint32_t masks) {
+  ITC_NATIVE_RUNNING("sub_820F93A0 TrackRoute::StepForwardMasked");
+  const uint32_t section = Section(base, Load(base, route), LoadU16(base, position));
+  if (Load(base, masks) != 0) {
+    uint32_t mask = masks;
+    for (uint32_t m = 0;;) {
+      const FirstBranch first = FirstBranchMatching(base, route, section, mask);
+      if (int32_t(first.count) > 0) {
+        const uint32_t slice = LoadU16(base, position + 2);
+        guest::StoreU16(base, position + 0, uint16_t(first.section));
+        guest::StoreU16(base, position + 2, uint16_t(slice - slices()));
+        return 1;
+      }
+      m++;
+      mask = masks + 4 * m;
+      if (Load(base, mask) == 0) {
+        break;
+      }
+    }
+  }
+  return StepForwardWith(base, route, position, slices);
+}
+
+// The lane steps' end: the position over the link (`link` its index) to
+// the section `to`, the lane carried over the link (LinkLane, from the new
+// section's lane bytes as the original reads them), kept below the new
+// section's lanes; none: the last lane for link 0, else 0.
+template <typename Slices>
+uint32_t TakeLane(uint8_t* base, uint32_t route, uint32_t position, uint32_t lane_address,
+                  uint32_t to, int32_t link, Slices slices) {
+  const uint32_t slice = LoadU16(base, position + 2);
+  guest::StoreU16(base, position + 0, uint16_t(to));
+  guest::StoreU16(base, position + 2, uint16_t(slice - slices()));
+  const int32_t carried = LinkLaneWith(base, route, position, link, lane_address);
+  guest::StoreU16(base, lane_address, uint16_t(carried));
+  const int32_t lanes =
+      int32_t(LoadU8(base, Section(base, Load(base, route), LoadU16(base, position)) + 180) & 0xF);
+  const int32_t lane = int16_t(carried);
+  if (lane < 0) {
+    guest::StoreU16(base, lane_address, uint16_t(link == 0 ? lanes - 1 : 0));
+  } else if (!(lane < lanes)) {
+    guest::StoreU16(base, lane_address, uint16_t(lanes - 1));
+  }
+  return 1;
+}
+
+// StepForwardLane with the slices' count from `slices()`.
+template <typename Slices>
+uint32_t StepForwardLaneWith(uint8_t* base, uint32_t route, uint32_t position,
+                             uint32_t lane_address, Slices slices) {
+  ITC_NATIVE_RUNNING("sub_820F9448 TrackRoute::StepForwardLane");
+  const uint32_t file = Load(base, route);
+  const uint32_t table = Load(base, file + 12);
+  const uint32_t section = SectionIn(base, table, LoadU16(base, position));
+  // The forward links whose lanes, added up in link order, hold the lane
+  // (every linked section's lanes added; kinds 1, 3 and 4 not taken).
+  int32_t lanes = 0;
+  for (uint32_t i = 0; i < 3; i++) {
+    const uint32_t link = section + 28 + 4 * i;
+    const uint32_t to = LoadU16(base, link);
+    if (int16_t(to) < 0) {
+      continue;
+    }
+    const uint32_t s = SectionIn(base, Load(base, file + 12), to);
+    lanes += int32_t(LoadU8(base, s + 180) & 0xF);
+    const int32_t kind = int32_t(Kind(base, s));
+    if (kind == 1 || (kind > 2 && kind <= 4)) {
+      continue;
+    }
+    if (LoadS16(base, lane_address) < lanes) {
+      return TakeLane(base, route, position, lane_address, LoadU16(base, link), int32_t(i), slices);
+    }
+  }
+  // Else links 2, 1, 0 to a section not of kinds 1, 3 or 4, onto its last
+  // lane (0 when it has none).
+  for (int32_t i = 2; i >= 0; i--) {
+    const uint32_t link = section + 28 + 4 * uint32_t(i);
+    const uint32_t to = LoadU16(base, link);
+    if (int16_t(to) < 0) {
+      continue;
+    }
+    const uint32_t kind = Kind(base, SectionIn(base, table, to));
+    if (kind == 1 || kind - 3 <= 1) {
+      continue;
+    }
+    const uint32_t next = LoadU16(base, link);
+    TakeForward(base, position, link, slices);
+    const int32_t last = int16_t(
+        int32_t(LoadU8(base, Section(base, Load(base, route), next) + 180) & 0xF) - 1);
+    guest::StoreU16(base, lane_address, uint16_t(last));
+    if (last < 0) {
+      guest::StoreU16(base, lane_address, 0);
+    }
+    return 1;
+  }
+  return 0;
 }
 
 }  // namespace
@@ -146,16 +337,7 @@ int32_t Link(uint8_t* base, uint32_t route, uint32_t section, uint32_t link) {
 
 int32_t LinkLane(uint8_t* base, uint32_t route, uint32_t position, uint32_t link_address,
                  uint32_t lane_address) {
-  ITC_NATIVE_RUNNING("sub_820F8CE8 TrackRoute::LinkLane");
-  const uint32_t file = Load(base, route);
-  const uint32_t number = LoadU16(base, position);
-  const int32_t link = LoadS16(base, link_address);
-  const uint32_t section = Section(base, file, number);
-  if (LoadU16(base, section + (uint32_t(link) + 7) * 4) == 0xFFFF) {
-    return -1;
-  }
-  const int32_t lane = LoadS16(base, lane_address);
-  return int8_t(LoadU8(base, section + uint32_t(link) * 8 + uint32_t(lane) + 76));
+  return LinkLaneWith(base, route, position, LoadS16(base, link_address), lane_address);
 }
 
 int32_t SpecialSection(uint8_t* base, uint32_t route, uint32_t position) {
@@ -257,52 +439,16 @@ uint32_t SectionOutcode(uint8_t* base, uint32_t route, uint32_t point, uint32_t 
 // --- Steps between sections ---
 
 uint32_t StepForward(uint8_t* base, uint32_t route, uint32_t position, uint32_t count) {
-  ITC_NATIVE_RUNNING("sub_820F8B48 TrackRoute::StepForward");
-  const uint32_t table = Load(base, Load(base, route) + 12);
-  const uint32_t section = SectionIn(base, table, LoadU16(base, position));
-  for (int32_t i = 2; i >= 0; i--) {
-    const uint32_t link = section + 28 + 4 * uint32_t(i);
-    const uint32_t to = LoadU16(base, link);
-    if (to == 0xFFFF) {
-      continue;
-    }
-    if (i > 0) {
-      const uint32_t kind = Kind(base, SectionIn(base, table, to));
-      if (kind == 2 || kind == 4) {
-        continue;
-      }
-    }
-    return TakeForward(base, position, link, count);
-  }
-  return 0;
+  return StepForwardWith(base, route, position, WordAt(base, count));
 }
 
 uint32_t BranchesMatching(uint8_t* base, uint32_t route, uint32_t out, uint32_t section,
                           uint32_t mask) {
-  ITC_NATIVE_RUNNING("sub_820F8BD0 TrackRoute::BranchesMatching");
-  uint32_t found = 0;
-  for (uint32_t i = 0; i <= 2; i++) {
-    const uint32_t to = LoadU16(base, section + 28 + 4 * i);
-    if (to == 0xFFFF) {
-      continue;
-    }
-    const uint32_t s = Section(base, Load(base, route), to);
-    const uint32_t kind = Kind(base, s);
-    if (kind == 2 || kind == 4) {
-      continue;
-    }
-    const uint32_t branch = LoadU8(base, s + 3);
-    const uint32_t bits = Load(base, mask);
-    const uint32_t bit = (branch & 0x20) != 0 ? 0 : (1u << (branch & 0x1F));
-    if ((bit & bits) == 0) {
-      continue;
-    }
+  return BranchesMatchingWith(base, route, section, mask, [&](uint32_t to, uint32_t i) {
     guest::StoreU16(base, out + 0, uint16_t(to));
-    found++;
     guest::StoreU16(base, out + 2, uint16_t(i));
     out += 4;
-  }
-  return found;
+  });
 }
 
 uint32_t StepAlongPath(uint8_t* base, uint32_t route, uint32_t position, uint32_t count,
@@ -314,12 +460,82 @@ uint32_t StepAlongPath(uint8_t* base, uint32_t route, uint32_t position, uint32_
       const uint32_t link = section + 28 + 4 * i;
       const int32_t to = LoadS16(base, link);
       if (to != -1 && to == LoadS16(base, path)) {
-        return TakeForward(base, position, link, count);
+        return TakeForward(base, position, link, WordAt(base, count));
       }
     }
     path += 2;
   }
   return 0;
+}
+
+uint32_t StepForwardMasked(uint8_t* base, uint32_t route, uint32_t position, uint32_t count,
+                           uint32_t masks) {
+  return StepForwardMaskedWith(base, route, position, WordAt(base, count), masks);
+}
+
+uint32_t NormalizeForward(uint8_t* base, uint32_t route, uint32_t position, uint32_t masks) {
+  ITC_NATIVE_RUNNING("sub_820F9EA8 TrackRoute::NormalizeForward");
+  for (;;) {
+    const uint32_t section = Section(base, Load(base, route), LoadU16(base, position));
+    const int32_t slice = LoadS16(base, position + 2);
+    const int32_t slices = LoadS16(base, section);
+    if (slice < slices) {
+      return 1;
+    }
+    const auto count = [slices] { return uint32_t(slices); };
+    const uint32_t stepped = masks == 0
+                                 ? StepForwardWith(base, route, position, count)
+                                 : StepForwardMaskedWith(base, route, position, count, masks);
+    if (stepped == 0) {
+      if (LoadU16(base, position) < 0x8000) {
+        guest::StoreU16(base, position + 2, uint16_t(slices - 1));
+      } else {
+        guest::StoreU32(base, position, 0);
+      }
+      return 0;
+    }
+  }
+}
+
+uint32_t StepForwardLane(uint8_t* base, uint32_t route, uint32_t position, uint32_t lane,
+                         uint32_t count) {
+  return StepForwardLaneWith(base, route, position, lane, WordAt(base, count));
+}
+
+uint32_t StepForwardLaneMasked(uint8_t* base, uint32_t route, uint32_t position, uint32_t lane,
+                               uint32_t count, uint32_t masks) {
+  ITC_NATIVE_RUNNING("sub_820F9600 TrackRoute::StepForwardLaneMasked");
+  const uint32_t section = Section(base, Load(base, route), LoadU16(base, position));
+  if (Load(base, masks) == 0) {
+    return 0;
+  }
+  uint32_t mask = masks;
+  for (uint32_t m = 0;;) {
+    const FirstBranch first = FirstBranchMatching(base, route, section, mask);
+    if (int32_t(first.count) > 0) {
+      // The matching link's lanes, added up over the links before it: the
+      // first match taken when the lane is within them or it's the only one.
+      int32_t lanes = 0;
+      for (int32_t i = 0; i < 3; i++) {
+        const uint32_t to = LoadU16(base, section + 28 + 4 * uint32_t(i));
+        if (int16_t(to) < 0) {
+          continue;
+        }
+        lanes += int32_t(LoadU8(base, Section(base, Load(base, route), to) + 180) & 0xF);
+        if (i != int32_t(int16_t(first.link))) {
+          continue;
+        }
+        if (LoadS16(base, lane) < lanes || !(int32_t(first.count) > 1)) {
+          return TakeLane(base, route, position, lane, first.section, i, WordAt(base, count));
+        }
+      }
+    }
+    m++;
+    mask = masks + 4 * m;
+    if (Load(base, mask) == 0) {
+      return 0;
+    }
+  }
 }
 
 uint32_t StepBack(uint8_t* base, uint32_t route, uint32_t position) {

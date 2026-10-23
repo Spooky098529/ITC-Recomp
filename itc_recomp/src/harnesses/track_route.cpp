@@ -71,6 +71,17 @@ ITC_NATIVE_STEP(NativeBranchesMatching,
 ITC_NATIVE_STEP(NativeStepAlongPath,
                 ctx.r3.u64 = tr::StepAlongPath(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
                                                ctx.r6.u32))
+ITC_NATIVE_STEP(NativeStepForwardMasked,
+                ctx.r3.u64 = tr::StepForwardMasked(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                                   ctx.r6.u32))
+ITC_NATIVE_STEP(NativeNormalizeForward,
+                ctx.r3.u64 = tr::NormalizeForward(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+ITC_NATIVE_STEP(NativeStepForwardLane,
+                ctx.r3.u64 = tr::StepForwardLane(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                                 ctx.r6.u32))
+ITC_NATIVE_STEP(NativeStepForwardLaneMasked,
+                ctx.r3.u64 = tr::StepForwardLaneMasked(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                                       ctx.r6.u32, ctx.r7.u32))
 ITC_NATIVE_STEP(NativeStepBack, ctx.r3.u64 = tr::StepBack(base, ctx.r3.u32, ctx.r4.u32))
 ITC_NATIVE_STEP(NativeNormalizeBack,
                 ctx.r3.u64 = tr::NormalizeBack(base, ctx.r3.u32, ctx.r4.u32))
@@ -123,7 +134,7 @@ constexpr uint32_t kTableEntries = 0x10000;
 constexpr uint32_t kIo = 0x2800;
 constexpr uint32_t kA = kIo + 0, kB = kIo + 4, kLinkIndex = kIo + 8, kLane = kIo + 10,
                    kCount = kIo + 12, kMask = kIo + 16, kFloat = kIo + 20, kPath = kIo + 0x40,
-                   kPoint = kIo + 0x80, kBranches = kIo + 0xC0;
+                   kPoint = kIo + 0x80, kBranches = kIo + 0xC0, kMasks = kIo + 0x24;
 constexpr uint32_t kCompared = 0x2900, kOut = 0x2900;
 
 // A float: now and then NaN (any sign, payload), an infinity or a zero.
@@ -246,6 +257,10 @@ enum Kind {
   kStepForward,
   kBranchesMatching,
   kStepAlongPath,
+  kStepForwardMasked,
+  kNormalizeForward,
+  kStepForwardLane,
+  kStepForwardLaneMasked,
   kStepBack,
   kNormalizeBack,
   kToIndex,
@@ -286,6 +301,14 @@ void TrackRoute(Context& h) {
        NativeBranchesMatching, kBranchesMatching, 2000},
       {"TrackRoute::StepAlongPath (sub_820F8C58)", Original<__imp__sub_820F8C58>,
        NativeStepAlongPath, kStepAlongPath, 2000},
+      {"TrackRoute::StepForwardMasked (sub_820F93A0)", Original<__imp__sub_820F93A0>,
+       NativeStepForwardMasked, kStepForwardMasked, 2000},
+      {"TrackRoute::NormalizeForward (sub_820F9EA8)", Original<__imp__sub_820F9EA8>,
+       NativeNormalizeForward, kNormalizeForward, 2000},
+      {"TrackRoute::StepForwardLane (sub_820F9448)", Original<__imp__sub_820F9448>,
+       NativeStepForwardLane, kStepForwardLane, 2000},
+      {"TrackRoute::StepForwardLaneMasked (sub_820F9600)", Original<__imp__sub_820F9600>,
+       NativeStepForwardLaneMasked, kStepForwardLaneMasked, 2000},
       {"TrackRoute::StepBack (sub_820F8A58)", Original<__imp__sub_820F8A58>, NativeStepBack,
        kStepBack, 2000},
       {"TrackRoute::NormalizeBack (sub_820F9320)", Original<__imp__sub_820F9320>,
@@ -334,6 +357,13 @@ void TrackRoute(Context& h) {
       guest::StoreU32(h.base, area + kMask,
                       r.Below(4) == 0 ? 0xDFFFFE7Fu : uint32_t(r.Next()));
       guest::StoreU32(h.base, area + kFloat, RandomFloat(r, 50.0f));
+      // The masks: 0 to 4 words (none zero), then 0.
+      const uint32_t masks = r.Below(5);
+      for (uint32_t i = 0; i < masks; i++) {
+        const uint32_t word = r.Below(3) == 0 ? 0xDFFFFE7Fu : uint32_t(r.Next());
+        guest::StoreU32(h.base, area + kMasks + 4 * i, word != 0 ? word : 1u);
+      }
+      guest::StoreU32(h.base, area + kMasks + 4 * masks, 0);
       const uint32_t path_length = r.Below(6);
       for (uint32_t i = 0; i < path_length; i++) {
         guest::StoreU16(h.base, area + kPath + 2 * i, uint16_t(r.Below(route.sections + 2)));
@@ -406,6 +436,33 @@ void TrackRoute(Context& h) {
           r4 = area + kA;
           r5 = area + kCount;
           r6 = area + kPath;
+          break;
+        case kStepForwardMasked:
+          r4 = area + kA;
+          r5 = area + kCount;
+          r6 = area + kMasks;
+          break;
+        case kNormalizeForward: {
+          // Past the section's end mostly; with masks or none.
+          if (r.Below(4)) {
+            const uint32_t section = guest::LoadU16(h.base, area + kA);
+            guest::StoreU16(h.base, area + kA + 2,
+                            uint16_t(route.Slices(section) + r.Below(24)));
+          }
+          if (r.Below(8) == 0) {  // a section above 0x7FFF
+            guest::StoreU16(h.base, area + kA, uint16_t(0x8000 | r.Below(0x8000)));
+          }
+          r4 = area + kA;
+          r5 = r.Below(3) == 0 ? 0 : area + kMasks;
+          break;
+        }
+        case kStepForwardLane:
+        case kStepForwardLaneMasked:
+          guest::StoreU16(h.base, area + kLane, uint16_t(int32_t(r.Below(14)) - 2));
+          r4 = area + kA;
+          r5 = area + kLane;
+          r6 = area + kCount;
+          r7 = area + kMasks;
           break;
         case kBranchesMatching:
           r4 = area + kBranches;

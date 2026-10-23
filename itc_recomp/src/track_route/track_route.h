@@ -78,6 +78,26 @@ uint32_t BranchesMatching(uint8_t* base, uint32_t route, uint32_t out, uint32_t 
 // less the word at `count`. 1 when found.
 uint32_t StepAlongPath(uint8_t* base, uint32_t route, uint32_t position, uint32_t count,
                        uint32_t path);
+// TrackRoute::StepForwardMasked (sub_820F93A0): the first mask (a list of
+// words ending with 0) with a matching branch (BranchesMatching) gives the
+// next section; none, StepForward. 1 when one was taken.
+uint32_t StepForwardMasked(uint8_t* base, uint32_t route, uint32_t position, uint32_t count,
+                           uint32_t masks);
+// TrackRoute::NormalizeForward (sub_820F9EA8): while the slice is past the
+// section's last, the next section (StepForwardMasked with masks, else
+// StepForward); when none, the last slice (or the position (0, 0) with a
+// section above 0x7FFF) and 0. 1 once it's in the section.
+uint32_t NormalizeForward(uint8_t* base, uint32_t route, uint32_t position, uint32_t masks);
+// TrackRoute::StepForwardLane (sub_820F9448): the forward link whose lanes
+// hold the halfword lane at `lane` (changed: the lane over the link), else
+// links 2, 1, 0 onto the last lane; the slice less the word at `count`. 1
+// when a section was taken.
+uint32_t StepForwardLane(uint8_t* base, uint32_t route, uint32_t position, uint32_t lane,
+                         uint32_t count);
+// TrackRoute::StepForwardLaneMasked (sub_820F9600): StepForwardLane by the
+// branch masks' first matches. 1 when a section was taken.
+uint32_t StepForwardLaneMasked(uint8_t* base, uint32_t route, uint32_t position, uint32_t lane,
+                               uint32_t count, uint32_t masks);
 // TrackRoute::StepBack (sub_820F8A58): the previous section by the back
 // links 5, 4, 3 (its row), the slice plus its slices' count. 1 when one was
 // taken.
