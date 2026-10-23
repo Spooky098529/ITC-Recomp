@@ -160,3 +160,5 @@ were at 0.
 | `sub_820F7590` TrackMesh::QuadHeight | out not 16-aligned | 11 of 28 | Unaligned out | for review (22:11 run) |
 | `sub_820F7590` TrackMesh::QuadHeight | one NaN in a vertex | 9 of 91 | Negated NaN | for review (22:11 run) |
 | `sub_820F7590` TrackMesh::QuadHeight | one NaN in a vertex, out not 16-aligned | 6 of 9 | Negated NaN, Unaligned out | for review (22:11 run) |
+| `sub_820FDC18` WallQuery::TestCell | one NaN in a vertex | 1 of 300 | Two NaNs (the word +1464's sign) | for review (22:11 run) |
+| `sub_820FDF38` TrackCollision::QueryWalls | one NaN in a vertex | 1 of 300 | Two NaNs (the word +1464's sign) | for review (22:11 run) |

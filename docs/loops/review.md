@@ -30,6 +30,17 @@ When the user has reviewed a run's section, its heading gets
   `sub_820F8618`, `sub_820FEBD0`, `sub_820FC188`) the print comes after
   a guard that falls back to the recompiled code (the validation agent
   didn't count them as missing).
+  Migration 2's rows: 11 in `collision-world.md` (the wall query,
+  Unload; `sub_820FC870` named WallQuery::ModeSkips, ours), 3 in
+  `car-physics.md` (CollisionWorld::Destroy, CollisionObject's
+  destructors, under `--native_collision_world`: their only caller is
+  Unload). For review: the wall hits are reached only by the harness (the
+  AI cars don't touch walls; every path but EdgesAcrossWall's
+  equal-lengths sum); TestCell and QueryWalls' harnesses don't compare r3
+  (their callers don't read it); TestCell's up vector at `0x826382B0`,
+  not `0x826282B0`; prints moved before the guards in GatherCells,
+  TrackMesh::Free, TrackRoute::Free; a new `CollisionShapeDestroyable`
+  in `collision.h`.
 
 - `collision.md` (new, 64 rows), `known-data.md`'s shape, box, pair
   query and table entries, `car-physics.md`'s intro; 1 lead added (the

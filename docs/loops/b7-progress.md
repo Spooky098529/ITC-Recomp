@@ -18,8 +18,10 @@ there), and this file's history.
   every tick, above `collision.md` and `car-physics.md`), mapped in
   `collision-world.md` (a28943d; 43 rows; checked: 14 ready groups).
   Migration 1 done (323cd79..ee7d5e1, 29 of 43 ours). Validated (29 of
-  29 harness lines, all ran in play or the replay; replay ok). Step:
-  migration 2 (agent running).
+  29 harness lines, all ran in play or the replay; replay ok). Migration 2
+  done (027d891..4fc6646: the wall query, Unload and the teardown; 37 of
+  43 ours). Step: the harness NaN comparison change (the user's call),
+  then migration 2's validation.
 
 ## Done
 
@@ -71,3 +73,5 @@ the validation agent's attract race or pad replay; the user drives (with
   137, known 362, unknown 5457).
 - After the collision world's migration 1: ours 826, work left 5927
   (wrapped 137, known 333, unknown 5457).
+- After the collision world's migration 2: ours 837, work left 5916
+  (wrapped 137, known 322, unknown 5457).
