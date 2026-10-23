@@ -24,8 +24,9 @@ file's history. What's left to see in a drive, from every run:
   92 ours, 46 Native; 29 ready groups left. Validated (32 of 32
   harness lines; `itc_1145`, `itc_1146`, replay ok; 3 to drive, 3 of
   migration 1's seen). Migration 3 (1521ad2..18ea84b): 114 ours, 71
-  Native; 16 ready groups left. Step: validation of migration 3 (agent
-  running).
+  Native; 16 ready groups left. Validated (44 of 44 harness lines;
+  `itc_1169` 20 s, `itc_1170`, replay ok; 9 to drive, 4 earlier ones
+  seen). Step: migration 4 (agent running).
 
 ## Done
 

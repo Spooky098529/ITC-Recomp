@@ -17,15 +17,13 @@ here loses its heading.
 
 Not in the attract race or the replay (`itc_1124`, `itc_1125`, ok):
 
-- `sub_82101760` RaceTime::FromTicks (`ai-drivers.md`)
-- `sub_8213ADF8` AiDrivers::AllSettled (`ai-drivers.md`)
 - `sub_8213C358` AiPath::PreferredSections (`ai-drivers.md`)
-- `sub_821451B8` AiDriver::PickTargetBehind (`ai-drivers.md`)
-- `sub_82146408` AiDriver::IsSettled (`ai-drivers.md`)
 
 (`sub_82145118` PickTarget, `sub_82146220` UpdateState4 and
 `sub_82146388` UpdateState5 were seen in migration 2's replay,
-`itc_1146`.)
+`itc_1146`; `sub_82101760` RaceTime::FromTicks, `sub_8213ADF8`
+AllSettled, `sub_821451B8` PickTargetBehind and `sub_82146408`
+IsSettled in migration 3's, `itc_1170`.)
 
 Migration 2's, not in the attract race or the replay (`itc_1145`,
 `itc_1146`, ok):
@@ -34,6 +32,18 @@ Migration 2's, not in the attract race or the replay (`itc_1145`,
 - `sub_82145F48` AiDriver::UpdateState2 (`ai-drivers.md`)
 - `sub_821462A0` AiDriver::UpdateState6 (never seen in play, no row;
   ported with UpdateState, `ai-drivers.md`'s intro)
+
+Migration 3's, not in the attract race or the replay (`itc_1169`,
+`itc_1170`, ok):
+
+- `sub_8213B890` AiPath::SpreadOffset (`ai-drivers.md`)
+- Never seen in play, no rows (ported with their callers,
+  `ai-drivers.md`'s "Not seen in play"): `sub_8213D898`
+  AiPath::AvoidByLane, `sub_8213F7E0` AiSkill::EntryWord,
+  `sub_8213F868` AiSkill::EntryValue, `sub_8213AB40`
+  AiDriver::SteerIntoCorner, `sub_82139A08` AiDriver::SteerOutOfCorner,
+  `sub_8213A200` AiDriver::SteerAtCornerPoint, `sub_82138FA8`
+  AiDriver::SteerByRoom, `sub_821392D8` AiDriver::LimitSlide
 
 ## Run 2026-10-23 17:22 (`b7-loop-23-10-26-4`)
 
