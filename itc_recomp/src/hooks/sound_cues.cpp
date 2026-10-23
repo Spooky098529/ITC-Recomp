@@ -6,6 +6,7 @@
 #include "guest.h"
 
 #include "base/flags.h"
+#include "hooks/heap.h"
 #include "sound_cues/sound_cues.h"
 
 ITC_FLAG_BOOL(native_sound_cues, true, "ITC",
@@ -15,7 +16,7 @@ ITC_FLAG_BOOL(native_sound_cues, true, "ITC",
               "sub_82117EA8; the bank pairs' and the manager's bank slots' accessors, "
               "sub_82117670 to sub_82117770 and sub_82118190 to sub_82118400; the Sounds' "
               "accessors, sub_821173F0 to sub_821175B8; the emitter's and the bank holders' "
-              "constructors, sub_8259C9B0, sub_8259D3D8 and sub_8259D418) natively instead of "
+              "constructors, sub_8259C9B0, sub_8259D3D8 and sub_8259D418; AudioManager::IsCuePlaying, sub_82118B58; the delegate clone, sub_82118720; X3DAudioInitialize and AudioEngine::Start3D, sub_82480710 and sub_8259CE10) natively instead of "
               "through the translated code (same results; checked by "
               "--run_harnesses=sound_cues)");
 
@@ -90,3 +91,21 @@ ITC_SOUND_WORD(82117578, SoundIsCue(base, ctx.r3.u32, ctx.r4.u32))
 ITC_SOUND_VOID(8259C9B0, EmitterConstruct(base, ctx.r3.u32), ctx.r3.u32)
 ITC_SOUND_VOID(8259D3D8, SoundBankHolderConstruct(base, ctx.r3.u32), ctx.r3.u32)
 ITC_SOUND_VOID(8259D418, WaveBankHolderConstruct(base, ctx.r3.u32), ctx.r3.u32)
+
+ITC_SOUND_WORD(82118B58, ManagerIsCuePlaying(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+
+// The delegate clone allocates through the native heap: the original runs
+// unless --native_heap routes the game's heap there, and where operator new
+// fails.
+extern "C" REX_FUNC(sub_82118720) {
+  ITC_SOUND_FALLBACK(82118720)
+  uint32_t copy = 0;
+  if (!hooks::NativeHeapActive() || !DelegateClone(base, ctx.r3.u32, &copy)) {
+    __imp__sub_82118720(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = copy;
+}
+
+ITC_SOUND_WORD(82480710, X3DAudioInitialize(base, ctx.r3.u32, ctx.f1.f64, ctx.r5.u32))
+ITC_SOUND_WORD(8259CE10, AudioEngineStart3D(base, ctx.r3.u32))

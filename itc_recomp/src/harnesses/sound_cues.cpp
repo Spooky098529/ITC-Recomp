@@ -12,12 +12,15 @@
 
 #include "base/flags.h"
 #include "base/log.h"
+#include "hooks/heap.h"
+#include "memory/c_runtime_heap.h"
 #include "sound_cues/sound_cues.h"
 
 #include <fmt/format.h>
 
 #include <bit>
 #include <iterator>
+#include <limits>
 #include <string>
 #include <utility>
 #include <vector>
@@ -81,6 +84,19 @@ ITC_NATIVE_STEP(NativeSoundIsCue, ctx.r3.u64 = sc::SoundIsCue(base, ctx.r3.u32, 
 ITC_NATIVE_STEP(NativeEmitterConstruct, sc::EmitterConstruct(base, ctx.r3.u32))
 ITC_NATIVE_STEP(NativeSoundBankHolderConstruct, sc::SoundBankHolderConstruct(base, ctx.r3.u32))
 ITC_NATIVE_STEP(NativeWaveBankHolderConstruct, sc::WaveBankHolderConstruct(base, ctx.r3.u32))
+ITC_NATIVE_STEP(NativeManagerIsCuePlaying,
+                ctx.r3.u64 = sc::ManagerIsCuePlaying(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+ITC_NATIVE_STEP(NativeX3DAudioInitialize,
+                ctx.r3.u64 = sc::X3DAudioInitialize(base, ctx.r3.u32, ctx.f1.f64, ctx.r5.u32))
+ITC_NATIVE_STEP(NativeAudioEngineStart3D, ctx.r3.u64 = sc::AudioEngineStart3D(base, ctx.r3.u32))
+void NativeDelegateClone(PPCContext& ctx, uint8_t* base) {
+  uint32_t copy = 0;
+  if (!sc::DelegateClone(base, ctx.r3.u32, &copy)) {
+    ctx.r3.u64 = 0xDEADDEAD;  // operator new failed: the original's path
+    return;
+  }
+  ctx.r3.u64 = copy;
+}
 
 // The odd float words mixed into inputs: NaNs of both kinds and signs,
 // infinities, denormals, signed zeros.
@@ -309,12 +325,120 @@ void Sounds(Context& h) {
   results.Report();
 }
 
+void CueList(Context& h) {
+  Results results("sound_cues cue list");
+  const uint32_t d = h.data;
+  // The manager at the area's start: the list's sentinel at +2048 (its
+  // address at +1532), up to six nodes from +2064 (16 bytes apart), their
+  // Sounds from +2400 (24 bytes apart), the bank and cue indexes at +3584
+  // and +3588.
+  constexpr uint32_t kSentinel = 2048, kNodes = 2064, kSounds = 2400, kIndexes = 3584;
+  for (int i = 0; i < 200; i++) {
+    const uint32_t count = h.random.Below(7);
+    auto setup = [&] {
+      RandomWords(h, d + 1528, 2);
+      guest::StoreU32(h.base, d + 1532, d + kSentinel);
+      uint32_t previous = d + kSentinel;
+      for (uint32_t n = 0; n < count; n++) {
+        const uint32_t node = d + kNodes + 16 * n;
+        guest::StoreU32(h.base, previous, node);
+        guest::StoreU32(h.base, node + 4, previous);
+        guest::StoreU32(h.base, node + 8, d + kSounds + 24 * n);
+        RandomWords(h, d + kSounds + 24 * n, 6);
+        guest::StoreU32(h.base, d + kSounds + 24 * n + 16, h.random.Below(3));
+        guest::StoreU32(h.base, d + kSounds + 24 * n + 20, h.random.Below(3));
+        previous = node;
+      }
+      guest::StoreU32(h.base, previous, d + kSentinel);
+      guest::StoreU32(h.base, d + kIndexes, h.random.Below(3));
+      guest::StoreU32(h.base, d + kIndexes + 4, h.random.Below(3));
+    };
+    Case(h, results, setup,
+         [&](PPCContext& t) { t.r3.u64 = d; t.r4.u64 = d + kIndexes; t.r5.u64 = d + kIndexes + 4; },
+         __imp__sub_82118B58, NativeManagerIsCuePlaying, {},
+         fmt::format("AudioManager::IsCuePlaying {} ({} Sounds)", i, count));
+  }
+  results.Report();
+
+  // The delegate clone: each version's block differs, so its 16 bytes are
+  // compared (and r3 being non-zero), and both blocks freed.
+  Results clone("sound_cues delegate clone");
+  if (hooks::NativeHeapActive()) {
+    for (int i = 0; i < 20; i++) {
+      Outputs out[2];
+      const Random start = h.random;
+      for (int v = 0; v < 2; v++) {
+        h.random = start;
+        Fill(h.base, h.data, kScratchBytes);
+        RandomWords(h, d, 4);
+        PPCContext t = CallContext(h);
+        t.r3.u64 = d;
+        ITC_FLAG(native_sound_cues) = v == 1;
+        (v == 0 ? __imp__sub_82118720 : NativeDelegateClone)(t, h.base);
+        ITC_FLAG(native_sound_cues) = true;
+        const uint32_t block = t.r3.u32;
+        out[v].Word(block != 0 && block != 0xDEADDEAD ? 1 : 0);
+        if (block != 0 && block != 0xDEADDEAD) {
+          out[v].Bytes(Read(h.base, block, 16));
+          memory::crt::OperatorDelete(block);
+        }
+        out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+      }
+      clone.Check(out[0], out[1], fmt::format("sub_82118720 {}", i));
+    }
+  }
+  clone.Report();
+}
+
+void X3DAudio(Context& h) {
+  Results results("sound_cues X3DAudio");
+  const uint32_t d = h.data;
+  const uint32_t masks[] = {0, 1, 3, 4, 7, 8, 9, 15, 0x3F, 0xFF, 0x80000000u, 0xFFFFFFFFu};
+  const double speeds[] = {343.5,
+                           0.0,
+                           -0.0,
+                           -1.0,
+                           1e-40,
+                           1e300,
+                           std::numeric_limits<double>::infinity(),
+                           -std::numeric_limits<double>::infinity(),
+                           std::numeric_limits<double>::quiet_NaN(),
+                           std::bit_cast<double>(0xFFF0000000000001ull),
+                           std::bit_cast<double>(0x36A0000000000000ull)};
+  int n = 0;
+  for (uint32_t mask : masks) {
+    for (double speed : speeds) {
+      Case(h, results, [&] { RandomWords(h, d, 8); },
+           [&](PPCContext& t) { t.r3.u64 = mask; t.f1.f64 = speed; t.r5.u64 = d + 4; },
+           __imp__sub_82480710, NativeX3DAudioInitialize, {{12, 20}},
+           fmt::format("X3DAudioInitialize {:08X} {}", mask, speed));
+      n++;
+    }
+  }
+  for (int i = 0; i < 60; i++) {
+    const uint32_t mask = uint32_t(h.random.Next());
+    const double speed = double(std::bit_cast<float>(FloatWord(h.random)));
+    Case(h, results, [&] { RandomWords(h, d, 8); },
+         [&](PPCContext& t) { t.r3.u64 = mask; t.f1.f64 = speed; t.r5.u64 = d; },
+         __imp__sub_82480710, NativeX3DAudioInitialize, {{8, 16}},
+         fmt::format("X3DAudioInitialize random {}", i));
+  }
+  for (int i = 0; i < 4; i++) {
+    Case(h, results, [&] { RandomWords(h, d, 40); },
+         [&](PPCContext& t) { t.r3.u64 = d; }, __imp__sub_8259CE10, NativeAudioEngineStart3D,
+         {{20, 28}}, fmt::format("AudioEngine::Start3D {}", i));
+  }
+  results.Report();
+}
+
 }  // namespace
 
 void SoundCues(Context& h) {
   Listener(h);
   Banks(h);
   Sounds(h);
+  CueList(h);
+  X3DAudio(h);
 }
 
 }  // namespace harness

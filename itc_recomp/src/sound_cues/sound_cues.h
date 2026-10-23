@@ -102,4 +102,34 @@ void SoundBankHolderConstruct(uint8_t* base, uint32_t holder);
 // -1.
 void WaveBankHolderConstruct(uint8_t* base, uint32_t holder);
 
+// --- The manager's Sound list and handlers ---
+
+// AudioManager::IsCuePlaying (sub_82118B58): 1 when a Sound in the list at
+// +1528 (a std::list: its sentinel node at +1532, each node's +0 the next
+// and +8 the Sound) is for the bank and cue at the two addresses
+// (Sound::IsBank and Sound::IsCue), else 0.
+uint32_t ManagerIsCuePlaying(uint8_t* base, uint32_t manager, uint32_t bank_address,
+                             uint32_t cue_address);
+// sub_82118720: a 16-byte copy of the member-function delegate at
+// `delegate` (operator new; vtable 0x8200833C, +4 the object, +8 and +12
+// the member pointer), or 0 when operator new gives 0. False when operator
+// new fails (its new handler and std::bad_alloc are the original's).
+bool DelegateClone(uint8_t* base, uint32_t delegate, uint32_t* copy);
+
+// --- The audio engine's X3DAudio ---
+
+// X3DAudioInitialize (sub_82480710, the X3DAudio library's): for the
+// speaker mask, the speed of sound and the handle: +0 the channel count
+// (the mask's bits; 1 for an empty mask, as the original's loop counts),
+// +4 the LFE channel's index (-1 without bit 3, else the count of bits
+// 0-2), +8 the speed, +12 the float just below it (its bits less one).
+// Returns 0 (the original's r3).
+uint32_t X3DAudioInitialize(uint8_t* base, uint32_t speaker_mask, double speed_of_sound,
+                            uint32_t handle);
+// AudioEngine::Start3D (sub_8259CE10): X3DAudioInitialize for 5.1 (mask
+// 63) and the speed of sound at 0x8207145C into the handle at +12; the DSP
+// settings at +28: the matrix pointer (+76), one source and six destination
+// channels (+36, +40), the matrix six 1.0. Returns 0.
+uint32_t AudioEngineStart3D(uint8_t* base, uint32_t engine);
+
 }  // namespace sound_cues

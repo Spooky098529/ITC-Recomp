@@ -3,6 +3,9 @@
 #include "guest.h"
 
 #include "base/log.h"
+#include "memory/c_runtime_heap.h"
+
+#include <bit>
 
 namespace sound_cues {
 
@@ -241,6 +244,67 @@ void WaveBankHolderConstruct(uint8_t* base, uint32_t holder) {
     guest::StoreU32(base, holder + offset, 0);
   }
   guest::StoreU32(base, holder + 12, 0xFFFFFFFFu);
+}
+
+uint32_t ManagerIsCuePlaying(uint8_t* base, uint32_t manager, uint32_t bank_address,
+                             uint32_t cue_address) {
+  ITC_NATIVE_RUNNING("sub_82118B58 AudioManager::IsCuePlaying");
+  const uint32_t end = guest::LoadU32(base, manager + 1528 + 4);
+  for (uint32_t node = guest::LoadU32(base, end); node != end;
+       node = guest::LoadU32(base, node)) {
+    const uint32_t sound = guest::LoadU32(base, node + 8);
+    if (SoundIsBank(base, sound, bank_address) != 0 && SoundIsCue(base, sound, cue_address) != 0) {
+      return 1;
+    }
+  }
+  return 0;
+}
+
+bool DelegateClone(uint8_t* base, uint32_t delegate, uint32_t* copy) {
+  ITC_NATIVE_RUNNING("sub_82118720 DelegateClone");
+  const auto block = memory::crt::OperatorNew(base, 16);
+  if (!block) {
+    return false;
+  }
+  *copy = *block;
+  if (*block != 0) {
+    guest::StoreU32(base, *block + 0, 0x8200833Cu);
+    for (uint32_t offset = 4; offset < 16; offset += 4) {
+      guest::StoreU32(base, *block + offset, guest::LoadU32(base, delegate + offset));
+    }
+  }
+  return true;
+}
+
+uint32_t X3DAudioInitialize(uint8_t* base, uint32_t speaker_mask, double speed_of_sound,
+                            uint32_t handle) {
+  ITC_NATIVE_RUNNING("sub_82480710 X3DAudioInitialize");
+  uint32_t lfe = 0xFFFFFFFFu;
+  if ((speaker_mask & 8) != 0) {
+    lfe = (speaker_mask & 1) + ((speaker_mask >> 1) & 1) + ((speaker_mask >> 2) & 1);
+  }
+  guest::StoreU32(base, handle + 4, lfe);
+  const uint32_t count = speaker_mask == 0 ? 1 : uint32_t(std::popcount(speaker_mask));
+  const float speed = float(speed_of_sound);
+  guest::StoreFloat(base, handle + 8, speed);
+  guest::StoreU32(base, handle + 0, count);
+  // The float whose bits are one less (lfs widens it; stfs narrows it back).
+  const float below = std::bit_cast<float>(std::bit_cast<uint32_t>(speed) - 1);
+  guest::StoreFloat(base, handle + 12, float(double(below)));
+  return 0;
+}
+
+uint32_t AudioEngineStart3D(uint8_t* base, uint32_t engine) {
+  ITC_NATIVE_RUNNING("sub_8259CE10 AudioEngine::Start3D");
+  const uint32_t r3 = X3DAudioInitialize(
+      base, 63, double(guest::LoadFloat(base, 0x8207145C)), engine + 12);
+  guest::StoreU32(base, engine + 28, engine + 76);
+  guest::StoreU32(base, engine + 36, 1);
+  guest::StoreU32(base, engine + 40, 6);
+  for (uint32_t i = 0; i < 6; i++) {
+    guest::StoreU32(base, engine + 76 + 4 * i, 0x3F800000u);
+  }
+  return r3;
 }
 
 }  // namespace sound_cues
