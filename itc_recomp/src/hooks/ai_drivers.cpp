@@ -6,7 +6,12 @@
 // AiDriver::ClearOtherIndexes (sub_82144ED8) and AiPath::ClearCorners
 // (sub_8213C720), from AiPath::Reset; AiDriver::SpeedOverDistance
 // (sub_821450E0) and AiDriver::CornerFactor (sub_821453A0), from
-// AiDriver::LimitSpeed.
+// AiDriver::LimitSpeed; LimitSpeed (sub_82139248), from LimitSpeedBlend;
+// AiSkill::Load (sub_8213F730), from AiDriver::SetSkill; AiSkill::SetSource
+// (sub_8213F900), from AiDriver::SetParams; AiPathEntry::SetLaneOffset
+// (sub_8213B390), from AiPath::NormalizeByLane; AiDriver::ClearOthers
+// (sub_821459B0), from ResetOthers and ClearCarState; and
+// AiDriver::PickTargetBehind (sub_821451B8), from UpdateState5.
 
 #include "guest.h"
 
@@ -43,7 +48,8 @@ ITC_FLAG_BOOL(native_ai_drivers, true, "ITC",
               "AiPath::WithinRoadAt sub_8213C1A0) natively instead of through the translated "
               "code (the same words, bit for bit; checked by --run_harnesses=ai_drivers). Those "
               "reached only from native callers have no adapters, and the flag switches their "
-              "callers: sub_82144ED8, sub_8213C720, sub_821450E0, sub_821453A0");
+              "callers: sub_82144ED8, sub_8213C720, sub_821450E0, sub_821453A0, sub_82139248, "
+              "sub_8213F730, sub_8213F900, sub_8213B390, sub_821459B0, sub_821451B8");
 
 // Defines an adapter: `body` uses `ctx` and `base`.
 #define ITC_AI_DRIVERS(address, body)   \
@@ -83,16 +89,9 @@ ITC_AI_DRIVERS(8213B4D8, ctx.r3.u64 = TargetPoint(base, ctx.r3.u32, ctx.f1.f64, 
 // --- The skill (r3 kept) ---
 
 ITC_AI_DRIVERS(8213F700, ClearSkill(base, ctx.r3.u32))
-// r4 = the source or 0.
-ITC_AI_DRIVERS(8213F900, SetSkillSource(base, ctx.r3.u32, ctx.r4.u32))
-ITC_AI_DRIVERS(8213F730, LoadSkill(base, ctx.r3.u32))
 
 // --- Speeds and steering (r3 kept) ---
 
-// r4 = &the speed, r5, r6 = CornerFactor's, r7 = &the slices; f1 as the
-// original leaves it; the original's frame 128 bytes down.
-ITC_AI_DRIVERS(82139248, ctx.f1.f64 = LimitSpeed(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
-                                                 ctx.r6.u32, ctx.r7.u32, ctx.r1.u32 - 128))
 // r4 = the table, r5 = &the fraction, r6 = &the index, r7 = the record or 0.
 ITC_AI_DRIVERS(821390D0, LimitByCurve(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
                                       ctx.r7.u32))
@@ -108,16 +107,13 @@ ITC_AI_DRIVERS(8213D318, ctx.r3.u64 = RaceAllowsSides(base))
 ITC_AI_DRIVERS(8213B5D8, RefreshPoints(base, ctx.r3.u32))
 // r3 the path's driver word, as the original leaves it.
 ITC_AI_DRIVERS(8213D438, ctx.r3.u64 = ResetPath(base, ctx.r3.u32))
-ITC_AI_DRIVERS(8213B390, SetLaneOffset(base, ctx.r3.u32))
 
 // --- The other racers (r3 kept, but KeepsGapFrom's) ---
 
 ITC_AI_DRIVERS(82145450, UpdateOtherFlags(base, ctx.r3.u32))
 // r4 = &the other's index, r5 = &the limit.
 ITC_AI_DRIVERS(821456A0, UpdateOtherTimer(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
-ITC_AI_DRIVERS(821459B0, ClearOthers(base, ctx.r3.u32))
 ITC_AI_DRIVERS(82145118, PickTarget(base, ctx.r3.u32))
-ITC_AI_DRIVERS(821451B8, PickTargetBehind(base, ctx.r3.u32))
 // r4 = &the other's index.
 ITC_AI_DRIVERS(82145048, ctx.r3.u64 = KeepsGapFrom(base, ctx.r3.u32, ctx.r4.u32))
 
