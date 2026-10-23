@@ -12,6 +12,8 @@
 
 #include "base/flags.h"
 #include "car_specs/car_specs.h"
+#include "hooks/heap.h"
+#include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
 
 #include <fmt/format.h>
@@ -144,6 +146,18 @@ ITC_NATIVE_STEP(NativeCarRefresh, {
   uint32_t r3;
   if (!cs::CarRefresh(base, ctx.r3.u32, &r3)) {
     __imp__sub_820C4998(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = r3;
+})
+ITC_NATIVE_STEP(NativeParamsInit, {
+  uint32_t tocs[12];
+  for (uint32_t k = 0; k < 12; k++) {
+    tocs[k] = TocOf(ctx, base, 72 + k);
+  }
+  uint32_t r3;
+  if (!cs::ParamsInit(base, tocs, &r3)) {
+    __imp__sub_820C9960(ctx, base);
     return;
   }
   ctx.r3.u64 = r3;
@@ -874,6 +888,62 @@ void Refresh(Context& h, const Block& block) {
   guest::StoreU32(h.base, cs::kParams, params_global);
 }
 
+// Params::Init on the game's TOC: the object and the block it allocates
+// compared by what's in them (the block's pointer as whether it's a heap
+// block, the table pointers as offsets into it), then freed; the global put
+// back. Both run over the allocation layer (--native_heap).
+void Init(Context& h) {
+  Results results("sub_820C9960 Params::Init");
+  if (!hooks::NativeHeapActive()) {
+    return;
+  }
+  const uint32_t params_global = guest::LoadU32(h.base, cs::kParams);
+  static constexpr uint32_t kSlots[12] = {12, 8, 16, 20, 24, 28, 32, 36, 40, 44, 48, 52};
+  for (int i = 0; i < 4; i++) {
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Fill(h.base, h.data, kScratchBytes);
+      guest::StoreU32(h.base, cs::kParams, uint32_t(h.random.Next()));
+      PPCContext t = CallContext(h);
+      t.r3.u64 = h.random.Next();
+      ITC_FLAG(native_car_specs) = v == 1;
+      (v == 0 ? __imp__sub_820C9960 : NativeParamsInit)(t, h.base);
+      ITC_FLAG(native_car_specs) = true;
+      const uint32_t object = guest::LoadU32(h.base, cs::kParams);
+      const bool made = object != 0 && memory::IsHeapBlock(object);
+      out[v].Word(made);
+      if (made) {
+        std::vector<uint8_t> words = Read(h.base, object, 468);
+        const uint32_t block = guest::LoadU32(h.base, object + 4);
+        const bool block_made = block != 0 && memory::IsHeapBlock(block);
+        out[v].Word(block_made);
+        out[v].Word(block_made ? memory::Size(block) : 0);
+        for (uint32_t slot : kSlots) {
+          out[v].Word(guest::LoadU32(h.base, object + slot) - block);
+        }
+        for (uint32_t offset : kSlots) {
+          for (uint32_t k = 0; k < 4; k++) {
+            words[offset + k] = 0;
+          }
+        }
+        for (uint32_t k = 0; k < 4; k++) {
+          words[4 + k] = 0;
+        }
+        out[v].Bytes(words);
+        if (block_made) {
+          memory::crt::OperatorDeleteArray(block);
+        }
+        memory::crt::OperatorDelete(object);
+      }
+      out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+      out[v].Word(t.r3.u32);
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", i));
+  }
+  results.Report();
+  guest::StoreU32(h.base, cs::kParams, params_global);
+}
+
 }  // namespace
 
 void CarSpecs(Context& h) {
@@ -884,6 +954,7 @@ void CarSpecs(Context& h) {
   Getters(h, block);
   AeroParts(h, block);
   Refresh(h, block);
+  Init(h);
 }
 
 }  // namespace harness

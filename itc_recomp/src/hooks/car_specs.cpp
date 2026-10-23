@@ -19,6 +19,7 @@
 
 #include "base/flags.h"
 #include "car_specs/car_specs.h"
+#include "hooks/heap.h"
 
 ITC_FLAG_BOOL(native_car_specs, true, "ITC",
               "Run the car parameter tables (docs/functions/car-specs.md: the loads' "
@@ -28,7 +29,8 @@ ITC_FLAG_BOOL(native_car_specs, true, "ITC",
               "sub_820C9E98, sub_820C9EB0, sub_820C9EE0, sub_820C9E00, sub_820C9928 and "
               "sub_820C9DD8; the aero parts' getters, sub_820CB848 to sub_820CBC90, their "
               "swaps and sub_820CBD20; Car::Refresh, sub_820C4998, with sub_820C4888, "
-              "sub_820C4568 and Tire::InchUp, sub_820C46B8) natively "
+              "sub_820C4568 and Tire::InchUp, sub_820C46B8; Params::Init, sub_820C9960, "
+              "with --native_heap) natively "
               "instead of through the translated code (same results; checked by "
               "--run_harnesses=car_specs)");
 
@@ -144,6 +146,29 @@ extern "C" REX_FUNC(sub_820C4998) {
   uint32_t r3;
   if (!CarRefresh(base, ctx.r3.u32, &r3)) {
     __imp__sub_820C4998(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = r3;
+}
+
+// Params::Init: no arguments; r3 as the original leaves it. Natively only
+// while --native_heap routes the game's heap to the allocation layer (it
+// allocates the object and the block); the archive's TOC lookup
+// (sub_8209D868) a guest call for each asset first. The original where an
+// allocation would fail.
+extern "C" REX_FUNC(sub_820C9960) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_car_specs) || !hooks::NativeHeapActive()) {
+    __imp__sub_820C9960(ctx, base);
+    return;
+  }
+  uint32_t tocs[12];
+  for (uint32_t k = 0; k < 12; k++) {
+    tocs[k] = Toc(ctx, base, 72 + k);
+  }
+  uint32_t r3;
+  if (!ParamsInit(base, tocs, &r3)) {
+    __imp__sub_820C9960(ctx, base);
     return;
   }
   ctx.r3.u64 = r3;

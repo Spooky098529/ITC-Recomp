@@ -4,11 +4,13 @@
 
 #include "base/log.h"
 #include "c_runtime/strings.h"
+#include "memory/c_runtime_heap.h"
 #include "guest.h"
 
 #include <bit>
 #include <climits>
 #include <cmath>
+#include <cstdlib>
 
 namespace car_specs {
 
@@ -645,6 +647,67 @@ bool CarRefresh(uint8_t* base, uint32_t car, uint32_t* r3) {
   c_runtime::Memcpy(base, car + 3268, WheelOf(base, car, 1728, spec), 48);
   c_runtime::Memcpy(base, car + 3316, WheelOf(base, car, 1736, spec), 48);
   *r3 = car + 3316;
+  return true;
+}
+
+bool ParamsInit(uint8_t* base, const uint32_t tocs[12], uint32_t* r3) {
+  ITC_NATIVE_RUNNING("sub_820C9960 Params::Init");
+  uint32_t sizes[12];
+  uint32_t total = 0;
+  for (uint32_t k = 0; k < 12; k++) {
+    sizes[k] = AssetSize(base, tocs[k], 72 + k);
+    total += sizes[k];
+  }
+  // operator new's and new[]'s failures (the new handler, std::bad_alloc)
+  // and the original's endless loop for a total of 0 stay the original's.
+  constexpr uint32_t kMaxAllocation = 0xFFFFF000;
+  if (total == 0 || total > kMaxAllocation || memory::crt::GetProcessHeap(base) == 0) {
+    return false;
+  }
+  const auto made = memory::crt::OperatorNew(base, 468);
+  if (!made) {
+    ITC_LOG_ERROR("car specs: operator new(468) failed after its checks");
+    std::abort();
+  }
+  const uint32_t object = *made;
+  guest::StoreU32(base, kParams, object);
+  guest::StoreU32(base, object + 4, 0);
+  guest::StoreU32(base, Params(base) + 56, 0);
+  guest::StoreU32(base, Params(base) + 60, 0);
+  for (uint32_t offset = 64; offset < 464; offset += 4) {
+    guest::StoreU32(base, Params(base) + offset, 0xFFFFFFFFu);
+  }
+  guest::StoreU32(base, Params(base) + 0, 0);
+  // Two passes (the original's loop until the block is made): the first
+  // with no block (every pointer 0) for the total, the second with it.
+  // The table pointers' slots by asset: 72 at +12, 73 at +8, 74 to 82 at
+  // +16 to +48, 83 at +52.
+  static constexpr uint32_t kSlots[12] = {12, 8, 16, 20, 24, 28, 32, 36, 40, 44, 48, 52};
+  uint32_t r30 = 0;
+  while (guest::LoadU32(base, Params(base) + 4) == 0) {
+    if (r30 != 0) {
+      const auto block = memory::crt::OperatorNewArray(base, r30);
+      if (!block) {
+        ITC_LOG_ERROR("car specs: operator new[]({}) failed after its checks", r30);
+        std::abort();
+      }
+      guest::StoreU32(base, Params(base) + 4, *block);
+    }
+    r30 = guest::LoadU32(base, Params(base) + 4);
+    guest::StoreU32(base, Params(base) + 0, 0);
+    uint32_t sum = 0;
+    for (uint32_t k = 0; k < 12; k++) {
+      if (k > 0) {
+        r30 = r30 != 0 ? guest::LoadU32(base, Params(base) + 4) + sum : 0;
+      }
+      const uint32_t params = Params(base);
+      guest::StoreU32(base, params + 0, guest::LoadU32(base, params + 0) + 1);
+      guest::StoreU32(base, params + kSlots[k], r30);
+      sum += sizes[k];
+    }
+    r30 = sum;
+  }
+  *r3 = tocs[11];
   return true;
 }
 

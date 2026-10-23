@@ -130,4 +130,15 @@ uint32_t CopyAeroParts(uint8_t* base, uint32_t car, const uint32_t parts[9]);
 // Needs flush-to-zero off.
 bool CarRefresh(uint8_t* base, uint32_t car, uint32_t* r3);
 
+// Params::Init (sub_820C9960): the parameter object made into the global,
+// the block for tables 72-83 sized from the archive's TOC (`tocs[k]` = its
+// TOC for asset 72 + k, sub_8209D868's answer, a guest call the adapter
+// makes) in two passes, the second with the block, and the table pointers
+// set. `r3` as the original leaves it (the TOC for 83). Allocates through
+// the native allocation layer (only while --native_heap routes the game's
+// heap there: the adapter checks). False, with nothing done, where an
+// allocation would fail or the sizes add up to 0 (the original loops there
+// for good): the original runs there.
+bool ParamsInit(uint8_t* base, const uint32_t tocs[12], uint32_t* r3);
+
 }  // namespace car_specs
