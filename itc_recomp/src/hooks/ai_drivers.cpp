@@ -44,7 +44,11 @@
 // from ApplyCornerLines; AiPath::PreferredSections (sub_8213C358), from
 // CompareBranches and NormalizeByBranch; SpreadOffset (sub_8213B890), from
 // ClampOffset; and AiPathEntry::NarrowToOtherEx (sub_8213C4C0), from
-// NarrowBehind.
+// NarrowBehind; AiPathEntry::BlockLeft (sub_8213C5C8) and BlockRight
+// (sub_8213C630), AiDriver::AdjustForOther (sub_821452A0), from AvoidOnLeft
+// and AvoidOnRight; MeasureOthers (sub_8213B650), from AvoidOthers; and
+// AvoidOnLeft (sub_8213CB30), AvoidOnRight (sub_8213CD50) and
+// ChooseSideForOther (sub_8213D788), from AvoidOthers (and ChooseSideForOther).
 
 #include "guest.h"
 
@@ -125,7 +129,8 @@ ITC_FLAG_BOOL(native_ai_drivers, true, "ITC",
               "sub_82145118, sub_821390D0, sub_82139B40, sub_8213C710, sub_82139AC8, sub_8213A620, "
               "sub_8213AB98, sub_8213B4D8, sub_82139168, sub_82139B98, sub_82139BE8, "
               "sub_8213C148, sub_8213AD48, sub_8213F700, sub_8213C3A8, sub_8213CA18, sub_8213C010, "
-              "sub_8213BB58, sub_8213C358, sub_8213B890, sub_8213C4C0");
+              "sub_8213BB58, sub_8213C358, sub_8213B890, sub_8213C4C0, sub_8213C5C8, sub_8213C630, "
+              "sub_821452A0, sub_8213B650, sub_8213CB30, sub_8213CD50, sub_8213D788");
 
 // Defines an adapter: `body` uses `ctx` and `base`.
 #define ITC_AI_DRIVERS(address, body)   \
@@ -189,9 +194,6 @@ ITC_AI_DRIVERS(82145610, MirrorOther(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
 
 // --- The path's entries and corners ---
 
-// r4 = &the position across, r5 = &the width, r6 = &out.
-ITC_AI_DRIVERS(8213C5C8, BlockLeft(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32))
-ITC_AI_DRIVERS(8213C630, BlockRight(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32))
 // r4 = &the offset.
 ITC_AI_DRIVERS(8213C1A0, ctx.r3.u64 = WithinRoadAt(base, ctx.r3.u32, ctx.r4.u32))
 
@@ -219,8 +221,6 @@ extern "C" REX_FUNC(sub_8213ADF8) {
 // --- Pedals and steering (r3 kept) ---
 
 ITC_AI_DRIVERS(82139CB0, LimitThrottle(base, ctx.r3.u32))
-// r4 = the record, r5 = &the mode.
-ITC_AI_DRIVERS(821452A0, AdjustForOther(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
 ITC_AI_DRIVERS(82146608, ctx.r3.u64 = UpdateAgainstPlayer(base, ctx.r3.u32))
 // r4 = &the new gap, r5 = &the length.
 ITC_AI_DRIVERS(821454C8, UpdateOther(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
@@ -393,16 +393,5 @@ ITC_AI_DRIVERS(8213C908, ctx.r3.u64 = NormalizeByBranch(base, ctx.r3.u32, ctx.r4
 
 // --- Making room for the other racers ---
 
-// r4 = out (20-byte records).
-ITC_AI_DRIVERS(8213B650, ctx.r3.u64 = MeasureOthers(base, ctx.r3.u32, ctx.r4.u32))
-// r4 = a MeasureOthers record, r5 = the driver's record of that racer; the
-// originals' frames 176 and 160 bytes down.
-ITC_AI_DRIVERS(8213CB30, ctx.r3.u64 = AvoidOnLeft(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
-                                                  ctx.r1.u32 - 176))
-ITC_AI_DRIVERS(8213CD50, ctx.r3.u64 = AvoidOnRight(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
-                                                   ctx.r1.u32 - 160))
-// r4, r5 as AvoidOnLeft's (its tail calls from this stack pointer).
-ITC_AI_DRIVERS(8213D788, ctx.r3.u64 = ChooseSideForOther(base, ctx.r3.u32, ctx.r4.u32,
-                                                         ctx.r5.u32, ctx.r1.u32))
 // The original's frame 272 bytes down.
 ITC_AI_DRIVERS(8213E690, ctx.r3.u64 = AvoidOthers(base, ctx.r3.u32, ctx.r1.u32 - 272))
