@@ -170,4 +170,50 @@ uint32_t SetCurve(uint8_t* base, uint32_t mapper, uint32_t id, double center, do
 bool ConfigureKnown(uint8_t* base);
 uint32_t Configure(uint8_t* base, uint32_t index, double f[3]);
 
+// --- The set-up ---
+//
+// The repeat and curve objects' slot 0 (their reset) in play:
+// sub_8243DC88 (the count, +4, set to 0) and sub_82106540 (nothing), both
+// shared with other classes; their work is done here where the slot is
+// those, and the adapters run the original otherwise (the *Known checks).
+constexpr uint32_t kRepeatResetFunction = 0x8243DC88;
+constexpr uint32_t kCurveResetFunction = 0x82106540;
+
+// Whether the 30 objects at `first` + 4i (pointers) or `first` + 16i
+// (objects) have that slot 0.
+bool RepeatResetsKnown(uint8_t* base, uint32_t pointers);
+bool CurveResetsKnown(uint8_t* base, uint32_t pointers);
+bool RepeatObjectsResetKnown(uint8_t* base, uint32_t objects);
+bool CurveObjectsResetKnown(uint8_t* base, uint32_t objects);
+
+// ActionMapper::ResetWords (sub_8210B8A8): `words` = mapper + 448; each
+// repeat object reset, the six words 0. Returns the original's r3 (the
+// last repeat object).
+uint32_t ResetWords(uint8_t* base, uint32_t words);
+// ActionMapper::ResetAnalog (sub_8210B438): `analog` = mapper + 1072; each
+// curve object reset, the 30 u16s 0 and the 30 floats [0x82000A34].
+// Returns the original's r3 (the last curve object).
+uint32_t ResetAnalog(uint8_t* base, uint32_t analog);
+// ActionMapper::InitRepeats (sub_8210BB38): `words` = mapper + 448; each
+// pointer at +24 + 4i set to its object (+144 + 16i), reset, delay 20 and
+// period 10; then ResetWords.
+uint32_t InitRepeats(uint8_t* base, uint32_t words);
+// ActionMapper::InitCurves (sub_8210BAB0): `analog` = mapper + 1072; each
+// pointer at +180 + 4i set to its object (+300 + 16i), reset, center and
+// dead zone [0x82000A34], maximum [0x82000A30]; then ResetAnalog.
+uint32_t InitCurves(uint8_t* base, uint32_t analog);
+// ActionMapper::ResetStages (sub_8210C078): `words` = mapper + 448;
+// InitRepeats, InitCurves, and the 30 threshold entries (on and off
+// [0x82000A34], the rest 0).
+uint32_t ResetStages(uint8_t* base, uint32_t words);
+
+// InputClientList::InputClientList (sub_8210AEB0): the client list, +36 the
+// input manager, vtable 0x82007F18.
+void InputClientListConstruct(uint8_t* base, uint32_t list, uint32_t manager);
+// InputClient::InputClient (sub_8210AE60): the node of `type`, vtable
+// 0x82007ED8.
+void InputClientConstruct(uint8_t* base, uint32_t node, uint32_t type);
+// InputClientList::Add (sub_8210AF00): ClientList::Add on `node`.
+void InputClientListAdd(uint8_t* base, uint32_t node);
+
 }  // namespace action_mappers

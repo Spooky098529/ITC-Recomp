@@ -583,4 +583,130 @@ uint32_t Configure(uint8_t* base, uint32_t index, double f[3]) {
   return r3;
 }
 
+// --- The set-up ---
+
+namespace {
+
+uint32_t Slot0(uint8_t* base, uint32_t object) {
+  return guest::LoadU32(base, guest::LoadU32(base, object));
+}
+
+bool PointersKnown(uint8_t* base, uint32_t pointers, uint32_t function) {
+  for (uint32_t i = 0; i < kActions; i++) {
+    if (Slot0(base, guest::LoadU32(base, pointers + 4 * i)) != function) {
+      return false;
+    }
+  }
+  return true;
+}
+
+bool ObjectsKnown(uint8_t* base, uint32_t objects, uint32_t function) {
+  for (uint32_t i = 0; i < kActions; i++) {
+    if (Slot0(base, objects + 16 * i) != function) {
+      return false;
+    }
+  }
+  return true;
+}
+
+}  // namespace
+
+bool RepeatResetsKnown(uint8_t* base, uint32_t pointers) {
+  return PointersKnown(base, pointers, kRepeatResetFunction);
+}
+bool CurveResetsKnown(uint8_t* base, uint32_t pointers) {
+  return PointersKnown(base, pointers, kCurveResetFunction);
+}
+bool RepeatObjectsResetKnown(uint8_t* base, uint32_t objects) {
+  return ObjectsKnown(base, objects, kRepeatResetFunction);
+}
+bool CurveObjectsResetKnown(uint8_t* base, uint32_t objects) {
+  return ObjectsKnown(base, objects, kCurveResetFunction);
+}
+
+uint32_t ResetWords(uint8_t* base, uint32_t words) {
+  ITC_NATIVE_RUNNING("sub_8210B8A8 ActionMapper::ResetWords");
+  uint32_t object = 0;
+  for (uint32_t i = 0; i < kActions; i++) {
+    object = guest::LoadU32(base, words + 24 + 4 * i);
+    guest::StoreU32(base, object + 4, 0);  // sub_8243DC88
+  }
+  for (uint32_t k = 0; k < 6; k++) {
+    guest::StoreU32(base, words + 4 * k, 0);
+  }
+  return object;
+}
+
+uint32_t ResetAnalog(uint8_t* base, uint32_t analog) {
+  ITC_NATIVE_RUNNING("sub_8210B438 ActionMapper::ResetAnalog");
+  // Each curve's slot 0 (sub_82106540) does nothing.
+  const uint32_t object = guest::LoadU32(base, analog + 180 + 4 * (kActions - 1));
+  const double zero = Lfs(base, kZero);
+  for (uint32_t i = 0; i < kActions; i++) {
+    guest::StoreU16(base, analog + 2 * i, 0);
+    guest::StoreFloat(base, analog + 60 + 4 * i, float(zero));
+  }
+  return object;
+}
+
+uint32_t InitRepeats(uint8_t* base, uint32_t words) {
+  ITC_NATIVE_RUNNING("sub_8210BB38 ActionMapper::InitRepeats");
+  for (uint32_t i = 0; i < kActions; i++) {
+    const uint32_t object = words + 144 + 16 * i;
+    guest::StoreU32(base, words + 24 + 4 * i, object);
+    guest::StoreU32(base, object + 4, 0);  // sub_8243DC88
+    guest::StoreU32(base, object + 8, 20);
+    guest::StoreU32(base, object + 12, 10);
+  }
+  return ResetWords(base, words);
+}
+
+uint32_t InitCurves(uint8_t* base, uint32_t analog) {
+  ITC_NATIVE_RUNNING("sub_8210BAB0 ActionMapper::InitCurves");
+  const double one = Lfs(base, kOne);
+  const double zero = Lfs(base, kZero);
+  for (uint32_t i = 0; i < kActions; i++) {
+    const uint32_t object = analog + 300 + 16 * i;
+    guest::StoreU32(base, analog + 180 + 4 * i, object);
+    guest::StoreFloat(base, object + 4, float(zero));
+    guest::StoreFloat(base, object + 8, float(zero));
+    guest::StoreFloat(base, object + 12, float(one));
+  }
+  return ResetAnalog(base, analog);
+}
+
+uint32_t ResetStages(uint8_t* base, uint32_t words) {
+  ITC_NATIVE_RUNNING("sub_8210C078 ActionMapper::ResetStages");
+  InitRepeats(base, words);
+  const uint32_t r3 = InitCurves(base, words + 624);
+  const double zero = Lfs(base, kZero);
+  for (uint32_t i = 0; i < kActions; i++) {
+    const uint32_t entry = words + 1404 + 20 * i;
+    guest::StoreFloat(base, entry, float(zero));
+    guest::StoreU32(base, entry + 8, 0);
+    guest::StoreFloat(base, entry + 4, float(zero));
+    guest::StoreU32(base, entry + 12, 0);
+    guest::StoreU8(base, entry + 16, 0);
+  }
+  return r3;
+}
+
+void InputClientListConstruct(uint8_t* base, uint32_t list, uint32_t manager) {
+  ITC_NATIVE_RUNNING("sub_8210AEB0 InputClientList::InputClientList");
+  ClientListConstruct(base, list);
+  guest::StoreU32(base, list + 36, manager);
+  guest::StoreU32(base, list, 0x82007F18);
+}
+
+void InputClientConstruct(uint8_t* base, uint32_t node, uint32_t type) {
+  ITC_NATIVE_RUNNING("sub_8210AE60 InputClient::InputClient");
+  ClientNodeConstruct(base, node, type);
+  guest::StoreU32(base, node, 0x82007ED8);
+}
+
+void InputClientListAdd(uint8_t* base, uint32_t node) {
+  ITC_NATIVE_RUNNING("sub_8210AF00 InputClientList::Add");
+  ClientListAdd(base, node);
+}
+
 }  // namespace action_mappers

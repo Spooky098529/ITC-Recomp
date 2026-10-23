@@ -94,6 +94,17 @@ ITC_NATIVE_STEP(NativeSetRepeat, ctx.r3.u64 = am::SetRepeat(base, ctx.r3.u32, ct
                                                              ctx.r5.u32, ctx.r6.u32))
 ITC_NATIVE_STEP(NativeSetCurve, ctx.r3.u64 = am::SetCurve(base, ctx.r3.u32, ctx.r4.u32,
                                                            ctx.f1.f64, ctx.f2.f64, ctx.f3.f64))
+ITC_NATIVE_STEP(NativeResetWords, ctx.r3.u64 = am::ResetWords(base, ctx.r3.u32))
+ITC_NATIVE_STEP(NativeResetAnalog, ctx.r3.u64 = am::ResetAnalog(base, ctx.r3.u32))
+ITC_NATIVE_STEP(NativeInitRepeats, ctx.r3.u64 = am::InitRepeats(base, ctx.r3.u32))
+ITC_NATIVE_STEP(NativeInitCurves, ctx.r3.u64 = am::InitCurves(base, ctx.r3.u32))
+ITC_NATIVE_STEP(NativeResetStages, ctx.r3.u64 = am::ResetStages(base, ctx.r3.u32))
+ITC_NATIVE_STEP(NativeInputClientListConstruct,
+                am::InputClientListConstruct(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_STEP(NativeInputClientConstruct, am::InputClientConstruct(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_STEP(NativeInputClientListAdd, am::InputClientListAdd(base, ctx.r4.u32);
+                ctx.r3.u64 = ctx.r4.u32)
+
 void NativeConfigure(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   double f[3] = {ctx.f1.f64, ctx.f2.f64, ctx.f3.f64};
@@ -744,6 +755,114 @@ void Slots(Context& h) {
   }
 }
 
+// --- The set-up ---
+
+void SetUp(Context& h) {
+  if (!GameMapper(h)) {
+    return;
+  }
+  const uint32_t m = h.data + kMapper;
+  // The analog floats, the curves' floats and the thresholds' on and off as
+  // floats.
+  Options options;
+  options.f1 = false;
+  for (uint32_t i = 0; i < 30; i++) {
+    options.floats.push_back({kMapper + am::kAnalog + 60 + 4 * i, kMapper + am::kAnalog + 64 + 4 * i});
+  }
+  for (uint32_t i = 0; i < 30; i++) {
+    options.floats.push_back({kMapper + 1372 + 16 * i + 4, kMapper + 1372 + 16 * i + 16});
+  }
+  for (uint32_t i = 0; i < 30; i++) {
+    options.floats.push_back(
+        {kMapper + am::kThresholds + 20 * i, kMapper + am::kThresholds + 20 * i + 8});
+  }
+  struct Step {
+    const char* name;
+    GuestFunction recompiled, native;
+    uint32_t r3;
+  };
+  const Step steps[] = {
+      {"sub_8210B8A8 ActionMapper::ResetWords", __imp__sub_8210B8A8, NativeResetWords,
+       m + am::kWords},
+      {"sub_8210B438 ActionMapper::ResetAnalog", __imp__sub_8210B438, NativeResetAnalog,
+       m + am::kAnalog},
+      {"sub_8210BB38 ActionMapper::InitRepeats", __imp__sub_8210BB38, NativeInitRepeats,
+       m + am::kWords},
+      {"sub_8210BAB0 ActionMapper::InitCurves", __imp__sub_8210BAB0, NativeInitCurves,
+       m + am::kAnalog},
+      {"sub_8210C078 ActionMapper::ResetStages", __imp__sub_8210C078, NativeResetStages,
+       m + am::kWords},
+  };
+  for (const Step& step : steps) {
+    Results results(step.name);
+    for (int i = 0; i < 40; i++) {
+      Case(
+          h, results,
+          [&] {
+            RandomMapper(h, i % 2);
+            // Pointers to the objects scrambled (the inits set them again).
+            if (i % 4 >= 2) {
+              for (uint32_t k = 0; k < 30; k++) {
+                const uint32_t j = h.random.Below(30);
+                guest::StoreU32(h.base, m + am::kRepeatPointers + 4 * k, m + 592 + 16 * j);
+                guest::StoreU32(h.base, m + am::kCurvePointers + 4 * k, m + 1372 + 16 * j);
+              }
+            }
+          },
+          [&](PPCContext& t) { t.r3.u64 = step.r3; }, step.recompiled, step.native, options,
+          fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  const uint32_t list = h.data + kList;
+  {
+    Results results("sub_8210AEB0 InputClientList::InputClientList");
+    for (int i = 0; i < 4; i++) {
+      Case(
+          h, results, [&] { RandomList(h, list, h.data + 64, i, i % 2); },
+          [&](PPCContext& t) {
+            t.r3.u64 = list;
+            t.r4.u64 = h.random.Next();
+          },
+          __imp__sub_8210AEB0, NativeInputClientListConstruct, {}, fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    Results results("sub_8210AE60 InputClient::InputClient");
+    for (uint32_t type : {0u, 1u, 2u, 3u}) {
+      Case(
+          h, results, [] {},
+          [&](PPCContext& t) {
+            t.r3.u64 = h.data + 64;
+            t.r4.u64 = type;
+          },
+          __imp__sub_8210AE60, NativeInputClientConstruct, {}, fmt::format("type {}", type));
+    }
+    results.Report();
+  }
+  {
+    Results results("sub_8210AF00 InputClientList::Add");
+    const uint32_t added = h.data + 1024;
+    for (int i = 0; i < 30; i++) {
+      Case(
+          h, results,
+          [&] {
+            RandomList(h, list, h.data + 128, i % 6, i % 10 != 9);
+            guest::StoreU32(h.base, added, 0x82007ED8);
+            guest::StoreU32(h.base, added + 4, h.random.Below(3));
+            guest::StoreU32(h.base, added + 8, 0);
+          },
+          [&](PPCContext& t) {
+            t.r3.u64 = list;
+            t.r4.u64 = added;
+          },
+          __imp__sub_8210AF00, NativeInputClientListAdd, {}, fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void ActionMappers(Context& h) {
@@ -754,6 +873,7 @@ void ActionMappers(Context& h) {
   ClientLists(h);
   Updates(h);
   Slots(h);
+  SetUp(h);
 }
 
 }  // namespace harness

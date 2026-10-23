@@ -18,7 +18,9 @@ ITC_FLAG_BOOL(native_action_mappers, true, "ITC",
               "sub_8210C0E0, sub_8210B7D0, sub_8210B4A8, sub_8210B500, sub_8210B718 and "
               "sub_8210BBA0; the read slots, sub_8210BE70, sub_8210BF40, sub_8210C010 and "
               "sub_8210BA28; the setters, sub_8210B698, sub_8210BDF0 and sub_8210BE30; "
-              "ActionMappers::Configure, sub_8209F228) natively instead of through the translated "
+              "ActionMappers::Configure, sub_8209F228; the set-up, sub_8210C078, sub_8210BB38, "
+              "sub_8210BAB0, sub_8210B8A8, sub_8210B438, sub_8210AEB0, sub_8210AE60 and "
+              "sub_8210AF00) natively instead of through the translated "
               "code (same results; checked by --run_harnesses=action_mappers)");
 
 // The flag's fallback; the floats as the original's (no flush to zero).
@@ -51,7 +53,6 @@ extern "C" REX_FUNC(sub_8210B5B8) {
   ctx.f1.f64 = CurveApply(base, ctx.r3.u32, ctx.f1.f64);
 }
 ITC_MAPPERS_WORD(8210B568, RepeatUpdate(base, ctx.r3.u32, ctx.r4.u32))
-ITC_MAPPERS_WORD(8210B140, IndexOf(ctx.r4.u32))
 
 // The held tests, also counted for --log_input_reads (as the wrappers in
 // src/frame_pacing/game_messages.cpp count the other button tests).
@@ -87,9 +88,9 @@ extern "C" REX_FUNC(sub_8258CF10) {
   NoteListenerTest(caller, listener, mask, ctx.r3.u32);
 }
 
-ITC_MAPPERS_VOID(8259C6D0, ClientNodeConstruct(base, ctx.r3.u32, ctx.r4.u32))
-ITC_MAPPERS_VOID(8259C7B8, ClientListConstruct(base, ctx.r3.u32))
-ITC_MAPPERS_VOID(8259C960, ClientListAdd(base, ctx.r3.u32))
+// IndexOf (sub_8210B140), ClientNode::ClientNode, ClientList::ClientList and
+// ClientList::Add (sub_8259C6D0, sub_8259C7B8, sub_8259C960) have no
+// adapters: their callers in play are native.
 ITC_MAPPERS_WORD(8259C868, ClientListCount(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
 ITC_MAPPERS_WORD(8259C898, ClientListBoundCount(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
 ITC_MAPPERS_WORD(8259C818, ClientListFind(base, ctx.r3.u32, ctx.r4.u32))
@@ -164,4 +165,38 @@ extern "C" REX_FUNC(sub_8209F228) {
   ctx.f1.f64 = f[0];
   ctx.f2.f64 = f[1];
   ctx.f3.f64 = f[2];
+}
+
+// The set-up (at boot, from the mappers' constructor and ActionMappers::Init,
+// still recompiled): the original unless the repeat and curve objects' slot
+// 0 is the reset seen in play.
+#define ITC_MAPPERS_CHECKED(address, known, call) \
+  extern "C" REX_FUNC(sub_##address) {           \
+    ITC_MAPPERS_FALLBACK(address)                \
+    if (!(known)) {                              \
+      __imp__sub_##address(ctx, base);           \
+      return;                                    \
+    }                                            \
+    ctx.r3.u64 = call;                           \
+  }
+ITC_MAPPERS_CHECKED(8210B8A8, RepeatResetsKnown(base, ctx.r3.u32 + 24),
+                    ResetWords(base, ctx.r3.u32))
+ITC_MAPPERS_CHECKED(8210B438, CurveResetsKnown(base, ctx.r3.u32 + 180),
+                    ResetAnalog(base, ctx.r3.u32))
+ITC_MAPPERS_CHECKED(8210BB38, RepeatObjectsResetKnown(base, ctx.r3.u32 + 144),
+                    InitRepeats(base, ctx.r3.u32))
+ITC_MAPPERS_CHECKED(8210BAB0, CurveObjectsResetKnown(base, ctx.r3.u32 + 300),
+                    InitCurves(base, ctx.r3.u32))
+ITC_MAPPERS_CHECKED(8210C078,
+                    RepeatObjectsResetKnown(base, ctx.r3.u32 + 144) &&
+                        CurveObjectsResetKnown(base, ctx.r3.u32 + 624 + 300),
+                    ResetStages(base, ctx.r3.u32))
+#undef ITC_MAPPERS_CHECKED
+
+ITC_MAPPERS_VOID(8210AEB0, InputClientListConstruct(base, ctx.r3.u32, ctx.r4.u32))
+ITC_MAPPERS_VOID(8210AE60, InputClientConstruct(base, ctx.r3.u32, ctx.r4.u32))
+extern "C" REX_FUNC(sub_8210AF00) {
+  ITC_MAPPERS_FALLBACK(8210AF00)
+  InputClientListAdd(base, ctx.r4.u32);
+  ctx.r3.u64 = ctx.r4.u32;
 }
