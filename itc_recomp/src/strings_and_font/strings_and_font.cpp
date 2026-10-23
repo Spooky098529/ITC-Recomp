@@ -137,6 +137,68 @@ bool Swprintf(uint8_t* base, uint32_t buffer, uint32_t format, uint32_t args, ui
   return c_runtime::Vswprintf(base, buffer, format, args, frame, count);
 }
 
+namespace {
+
+// swprintf (natively) of `format` with one argument from a frame at
+// `frame` (the caller's r1): the argument in the caller's parameter area
+// (+32), as the original's stores it.
+void SwprintfOne(uint8_t* base, uint32_t buffer, uint32_t format, uint64_t argument,
+                 uint32_t frame) {
+  guest::StoreU32(base, frame + 32, uint32_t(argument >> 32));
+  guest::StoreU32(base, frame + 36, uint32_t(argument));
+  int32_t count;
+  Swprintf(base, buffer, format, frame + 32, frame - 96 - 144 - 2336, &count);
+}
+
+constexpr uint32_t kGroupedFormat = 0x82007E9C;  // L",%03d"
+constexpr uint32_t kPlainFormat = 0x82007E94;    // L"%d"
+constexpr uint32_t kMinusFormat = 0x82007E8C;    // L"-%s"
+
+void FormatGrouped(uint8_t* base, int32_t value, uint32_t out, uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_8210A680 Strings::FormatGrouped");
+  uint64_t v = uint64_t(int64_t(value));
+  const bool negative = value < 0;
+  if (negative) {
+    v = 0 - v;
+  }
+  const uint32_t buffer = frame + 96;
+  const int32_t magnitude = int32_t(uint32_t(v));
+  const double thousands =
+      Single(ToSingle(magnitude) * Lfs(base, 0x820029D8));  // x 0.001
+  if (thousands < Lfs(base, 0x82000A30)) {                  // below 1.0
+    SwprintfOne(base, buffer, kPlainFormat, v, frame);
+  } else {
+    const int32_t rest = int32_t(uint32_t(v) - uint32_t(magnitude / 1000) * 1000);
+    FormatGrouped(base, int32_t(uint32_t(v) - uint32_t(rest)) / 1000, out, frame - 640);
+    SwprintfOne(base, buffer, kGroupedFormat, uint64_t(int64_t(rest)), frame);
+  }
+  c_runtime::Wcscat(base, out, buffer);
+  if (negative) {
+    SwprintfOne(base, buffer, kMinusFormat, out, frame);
+    c_runtime::Wcscpy(base, out, buffer);
+  }
+}
+
+}  // namespace
+
+bool StringsFormatGrouped(uint8_t* base, int32_t value, uint32_t out, uint32_t frame) {
+  if (value < 0) {
+    // "-%s" of `out` after the digits: no 0xFFFF in it, and with the sign,
+    // the digits (11 at most) and the terminator within the 256 units.
+    const uint32_t length = c_runtime::Wcslen(base, out);
+    if (length > 240) {
+      return false;
+    }
+    for (uint32_t k = 0; k < length; k++) {
+      if (guest::LoadU16(base, out + 2 * k) == 0xFFFF) {
+        return false;
+      }
+    }
+  }
+  FormatGrouped(base, value, out, frame);
+  return true;
+}
+
 uint32_t StringsPageCount(uint8_t* base, uint32_t text) {
   ITC_NATIVE_RUNNING("sub_8210A5C0 Strings::PageCount");
   uint32_t count = 0;

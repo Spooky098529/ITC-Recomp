@@ -135,6 +135,15 @@ void NativeSwprintf(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = uint32_t(count);
 }
 
+void NativeFormatGrouped(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  if (!sf::StringsFormatGrouped(base, ctx.r4.s32, ctx.r5.u32, ctx.r1.u32 - 640)) {
+    __imp__sub_8210A680(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = ctx.r5.u32;
+}
+
 // Runs the original with the flag off (its callees' adapters fall back) or
 // the native step.
 void Run(int v, GuestFunction recompiled, GuestFunction native, PPCContext& t, uint8_t* base) {
@@ -1127,6 +1136,49 @@ void SwprintfCases(Context& h) {
   results.Report();
 }
 
+// Strings::FormatGrouped: values small, around the thousands, the edges
+// (INT_MIN among them) and random, negative too; the output empty or
+// holding text (a few with 0xFFFF or too long for "-%s": the original).
+void FormatGroupedCases(Context& h) {
+  Results results("sub_8210A680 Strings::FormatGrouped");
+  for (int i = 0; i < 1500; i++) {
+    int32_t value;
+    switch (h.random.Below(5)) {
+      case 0: value = int32_t(h.random.Next()); break;
+      case 1: {
+        constexpr int32_t kEdges[] = {0, 1, -1, 999, 1000, -1000, 999999, 1000000, -999999,
+                                      INT32_MIN, INT32_MAX, 1234567, -7654321};
+        value = kEdges[h.random.Below(std::size(kEdges))];
+        break;
+      }
+      default: value = int32_t(h.random.Below(4000000)) - 2000000; break;
+    }
+    const uint32_t prefix = h.random.Below(3) == 0 ? h.random.Below(i % 50 == 7 ? 260 : 20) : 0;
+    const bool odd = h.random.Below(40) == 0;
+    const Random start = h.random;
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      h.random = start;
+      Fill(h.base, h.data, kScratchBytes);
+      const uint32_t output = h.data + 2048;
+      for (uint32_t k = 0; k < prefix; k++) {
+        guest::StoreU16(h.base, output + 2 * k,
+                        odd && k == 0 ? uint16_t(0xFFFF) : uint16_t('a' + h.random.Below(26)));
+      }
+      guest::StoreU16(h.base, output + 2 * prefix, 0);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = h.random.Next();
+      t.r4.u64 = (uint64_t(h.random.Next()) << 32) | uint32_t(value);
+      t.r5.u64 = output;
+      Run(v, __imp__sub_8210A680, NativeFormatGrouped, t, h.base);
+      out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+      out[v].Word(t.r3.u32);
+    }
+    results.Check(out[0], out[1], fmt::format("case {} ({})", i, value));
+  }
+  results.Report();
+}
+
 }  // namespace
 
 void StringsAndFont(Context& h) {
@@ -1141,6 +1193,7 @@ void StringsAndFont(Context& h) {
   FontLayout(h);
   FontDrawing(h);
   SwprintfCases(h);
+  FormatGroupedCases(h);
 }
 
 }  // namespace harness

@@ -65,6 +65,17 @@ uint32_t TextIsLoaded(uint8_t* base);
 bool Swprintf(uint8_t* base, uint32_t buffer, uint32_t format, uint32_t args, uint32_t frame,
               int32_t* count);
 
+// Strings::FormatGrouped (sub_8210A680): `value`'s magnitude with
+// thousands separators appended to `out` (itself on the thousands first,
+// then ",%03d" of the rest, or "%d" below 1,000, through swprintf into a
+// 512-byte buffer at `frame` + 96), then for a negative value `out`
+// rewritten as "-%s". `frame` is the original's r1 (its 640-byte frame;
+// deeper calls below it, as the original's). False, with nothing written,
+// where the original must run: a negative value whose rewrite swprintf
+// wouldn't do natively (`out` holding the unit 0xFFFF) or wouldn't fit its
+// buffer (the original would overrun its frame).
+bool StringsFormatGrouped(uint8_t* base, int32_t value, uint32_t out, uint32_t frame);
+
 // Strings::PageCount (sub_8210A5C0): the page breaks (0xFFD1) in `text`.
 uint32_t StringsPageCount(uint8_t* base, uint32_t text);
 

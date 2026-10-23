@@ -31,7 +31,8 @@ ITC_FLAG_BOOL(native_strings_and_font, true, "ITC",
               "sub_82211C90 with Strings::IsLoaded sub_8210A768 and Font::IsLoaded "
               "sub_821081A0, swprintf sub_8210A490 (with vswprintf sub_825A9A80, _vswprintf_l "
               "sub_825A9980 and _woutput_l sub_825B13D0, no adapters of their own; the original "
-              "for %n, %Z, floats but %f and the unit 0xFFFF), Strings::PageCount sub_8210A5C0, Strings::CopyPage sub_8210A5E8, "
+              "for %n, %Z, floats but %f and the unit 0xFFFF), Strings::FormatGrouped "
+              "sub_8210A680, Strings::PageCount sub_8210A5C0, Strings::CopyPage sub_8210A5E8, "
               "the font's pixel shader entries sub_825D9590, Font::TextWidth sub_82108B30 "
               "with Font::SetParams sub_82108368, Font::DrawPass sub_82109EF0 (without the "
               "command list's diagnostics; with Font::CountGlyphs sub_82108210, "
@@ -118,6 +119,19 @@ extern "C" REX_FUNC(sub_8210A490) {
     return;
   }
   ctx.r3.u64 = uint32_t(count);
+}
+
+// Strings::FormatGrouped: r4 = the value, r5 = the output; r3 the output
+// (wcscat's or wcscpy's), its frame where the original's would be (640
+// bytes down). Flush-to-zero off, as its lfd leaves it.
+extern "C" REX_FUNC(sub_8210A680) {
+  ITC_STRINGS_AND_FONT_FALLBACK(8210A680)
+  ctx.fpscr.disableFlushMode();
+  if (!StringsFormatGrouped(base, ctx.r4.s32, ctx.r5.u32, ctx.r1.u32 - 640)) {
+    __imp__sub_8210A680(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = ctx.r5.u32;
 }
 
 // Strings::PageCount: r4 = the text; r3 the count.
