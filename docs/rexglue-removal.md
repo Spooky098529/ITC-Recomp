@@ -2600,8 +2600,9 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
     tracks, an idle fader, simple cues). Left: the engine's critical
     section (no native lock in `src/`: the core's), the global settings'
     unmapped vtable slots (a lead, taken next), calls through vtables
-    into recompiled code, XAudio and its voice class (where a
-    translation meets our own audio output; the user's call how), the
+    into recompiled code, XAudio and its voice class (the
+    game's recompiled XAudio, whose mixer already feeds our own output;
+    the next layer to translate), the
     tracks, events and waves (a lead). A second map (the run's third
     subsystem: the global settings' accessors, the renderer's and the
     sound classes' slots, the wave entry's getters, two shared helpers

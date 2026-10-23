@@ -42,8 +42,9 @@ fade step and the sounds' audio update, each wave bank's slot +56),
 both under the engine's lock. A translation needs both entry points (or
 one that does both).
 
-Where XACT reaches below itself (the boundary a translation must
-replace with our own audio output; how is the user's call):
+Where XACT reaches below itself (what a translation still calls into;
+XAudio's mixer already runs on our own output's thread, which takes its
+frames: `itc_recomp/src/audio/`, `docs/native-audio.md`):
 
 - **XAudio** (`8245xxxx`, not mapped; a lead): at start-up the
   renderer (`sub_825C2BB0`) calls `XAudioInitialize` (`sub_8245A760`),

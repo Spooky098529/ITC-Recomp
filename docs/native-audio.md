@@ -121,11 +121,11 @@ Not known yet:
   there is no upstream library to use instead. The translation runs from
   the leaves up under `--native_xact` (`itc_recomp/src/xact/`,
   `docs/functions/xact.md`; the game's sound manager above it under
-  `--native_sound_cues`, `docs/functions/sound-cues.md`). Where XACT
-  meets XAudio (its voice class, the audio callback XAudio runs on its
-  own thread) is the boundary a translation must replace with our own
-  audio output; how is the user's call, not yet made. XAudio itself is
-  still the game's recompiled copy.
+  `--native_sound_cues`, `docs/functions/sound-cues.md`). Below XACT,
+  XAudio is still the game's recompiled copy: XACT's voice class calls
+  it, and its mixer runs on our own output's thread, which takes its
+  frames (`itc_recomp/src/audio/`, step 1 below). XAudio is the next
+  layer to translate the same way; the output itself is already ours.
 - **Keep the SDK's XMA decoder** (the user's call, 2026-10-14): it costs
   nothing measurable, so replacing it gains no speed. (Considered:
   converting the XMA wave banks to PCM banks on first launch, decoded once
