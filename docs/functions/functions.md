@@ -166,6 +166,11 @@ Rows not yet moved stay in the table below. So far:
   (their set-up by type, render targets and surfaces, enabling, update
   and the commands recorded at a pass's start and end) and the two
   viewports with their 20 camera entries the camera modes write (B7).
+- [`strings-and-font.md`](strings-and-font.md): the game's texts: the
+  string table (17 string files loaded by mask, a string id formatted
+  with its arguments into UTF-16, pages) and the bitmap font (four pages
+  of glyphs in a texture's channels, their shaders, a text's width, and
+  drawing a text as quads through the command list) (B7).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what

@@ -1,0 +1,162 @@
+# Known functions: the string table and the font
+
+The game's texts (`82108018`-`8210ADF8`): the string table at
+`[0x826C5C34]` and the bitmap font at `[0x826C5C00]`, both made once at
+boot (`Text::Init`, from the app's start-up `sub_82106548`, a lead) and
+loaded once (`Text::Load`, from the game's data load `sub_82106618`, a
+lead). The UI movies' texts (`ui-movies-game.md`) are formatted from a
+string id with arguments into a UTF-16 buffer (`Strings::FormatV`,
+`Strings::Format`), cut to the page shown (`Strings::CopyPage`) and drawn
+(`Text::Draw`) every movie update.
+
+- **The string table** (4,304 bytes, `../known-data.md`): 17 string
+  files (assets 22638-22654, the ids at `0x82007DD0`), each a data file
+  (`DataFile::GetEntry`, `files-and-saves.md`) of UTF-16 strings; a
+  string id picks the file by the 18 bounds at `0x82007E18` (0, 1646,
+  1954, 2054, 5411, 5463, 5918, 6683, 6718, 6722, 6887, 7017, 7108,
+  7268, 7411, 7493, 7527, 7739) and the entry by its offset in it. Files
+  are loaded by bit mask with a count each (`Strings::Load`, in
+  `files-and-saves.md`, shared) and released when the count reaches 0
+  (`Strings::Release`); at boot files 0 and 15 (`0x8001`), and each
+  front-end screen loads and releases its own (the screens' pairs at
+  `82196EC0`/`82197278`, `82211B98`/`82211DA0`, `82224AB8`/`82224C70`,
+  `8222FB90`/`8222FD68`, `8225D590`/`8225D6D0`, named in
+  `ui-movies-game.md`).
+- **The strings' control characters** (UTF-16, read by the formatting,
+  the font and the movies' texts): `0xFFD1` a page break (a text shows
+  one page at a time: `Strings::PageCount`, `Strings::CopyPage`);
+  `0xFFD2` a number drawn by the font (`sub_82108A70`, never ran);
+  `0xFFD3` an integer with thousands separators (`,%03d`); `0xFFD7` a
+  nested string id; `0xFFD8`-`0xFFE1` a zero-padded integer
+  (`%0<0xFFE1 - c>d`), `0xFFE2`-`0xFFEB` a float (`%.<0xFFEB - c>f`),
+  `0xFFEC`-`0xFFF5` an integer (`%<0xFFF5 - c>d`); in the text drawn,
+  `0xFFD6` back to the text's color and `0xFFF6`-`0xFFFF` a color from the
+  font's ten (`0xFFFF - c`: yellow 255,234,0; cyan 44,242,242; green
+  82,240,105; orange 198,66,14; green 0,255,0; gray 127,127,127; then
+  black), neither drawn; `\n` a new line.
+- **The font** (16,592 bytes, `../known-data.md`): four pages (assets
+  22655-22658, the ids at `0x82007C5C`), each a data file holding the
+  glyph table (entry 0: +0 the cell's width and +2 its height, both
+  16-bit; then 4 bytes per UTF-16 code: +0 the cell's index, +2 the
+  advance × 4 plus the texture channel 0-3) and an XPR2 bundle (entry 1)
+  whose texture holds four glyph sheets, one in each of R, G, B and A.
+  It draws through the command list (`command-list.md`): a vertex
+  declaration (position float3, color, texture coordinate float2: 24
+  bytes), one vertex shader and four pixel shaders (each takes one
+  channel as alpha times the vertex color), compiled from HLSL in the
+  image at boot (`vs_3_0` and `ps_2_0`, `main`), and each text is one
+  chunk of render states and up to four DrawPrimitiveUP (one per
+  channel, six vertices per glyph), handed to the render queue.
+
+The draw parameters (a stack block from `UiMovie::DrawTexts`, kept at the
+font's +16 while drawing; `../known-data.md`): +0, +4 x and y (ints),
++8, +12 (ints, the point the scale is about, probably), +16 an angle in
+degrees, +20..+22 the color (r, g, b bytes), +24 the alpha (float, 0-1),
++28, +32 the scale, +36, +40 the glyph scale, +44..+56 the clip
+rectangle (x, y, width, height; all 0 for none), +60 the page, +68, +72
+the box's width and height, +76 the horizontal alignment (0 left, 1
+center, 2 right, 3 justified), +80 the vertical one (0 top, 1 middle, 2
+bottom, 3 justified), +96, +100 a second pass's offset, +108 its page,
++112 the second pass on (never in play), +116 the layer.
+
+Not here: `Strings::Load` (`sub_8210A8D0`, in `files-and-saves.md`);
+`Archive::Load` (`sub_8209DE48`) and an asset's size (`sub_820A0678`,
+`files-and-saves.md`, a lead); `DataFile::GetEntry` (`sub_82294730`,
+`files-and-saves.md`); the C runtime's `wcslen`, `wcscpy`, `wcscat`,
+`memset` and `vswprintf` (`c-runtime.md`); operator new and delete,
+VirtualAlloc and VirtualFree (`heap.md`); the command list's chunks and
+slots (`command-list.md`); the XPR (`XPR::XPR`, `Create` in `models.md`,
+`GetTexture` `sub_82597118` in `functions.md`, `sub_82597148` its
+destructor, a lead); a texture's description (`sub_822A5B78`, a lead);
+the shader compiler and the vertex and pixel shaders made
+(`sub_822B8F10`, `sub_822AA018`, `sub_822A9EE8`, a lead) and the
+device's state saved and restored around them (`sub_8258D8C8`,
+`sub_8258D908`, a lead). Never ran in play, so no rows: the font's
+teardown (`sub_82109A40`, `sub_82109400`), the second pass's vertices
+(`sub_82109D80`), rotated text (`sub_821097F0`, `sub_82108F68`),
+justified text's glyph count (`sub_82108810`) and the `0xFFD2` number
+(`sub_82108A70`). `sub_82108018` and `sub_82108160` in this range belong
+to the app's framework beside it (a lead). The rows were drafted by the
+B7 loop's mapping agent (2026-10-23) from the generated code.
+
+Status:
+
+- **Native**: plain C++ in `itc_recomp/src/` that doesn't use the
+  PowerPC context (`ctx`): normal arguments and host structs (it may
+  still read and write guest memory through `src/guest.h` while
+  recompiled code shares the data). The game reaches it without `ctx`,
+  from native or overridden callers, and the recompiled original is no
+  longer called (except behind a fallback flag or to check against it).
+  No `REX_FUNC` override of it exists, not even an adapter kept only for
+  a harness (that's Overridden until the adapter goes).
+  The end state for every function.
+- **Overridden**: an `extern "C" REX_FUNC(sub_XXXXXXXX)` override in
+  `itc_recomp/src/` (or a macro defining one) does the work instead of
+  the original: a thin adapter in front of native code, or a body that
+  still uses `ctx` (calling guest code, reading registers). It may call
+  the original when its flag is off, or to check itself against it.
+- **Wrapped**: an override that does something of its own (skipping
+  render-only passes, logging, timing) and still calls the original
+  (`__imp__sub_XXXXXXXX`) for the work.
+- **Dropped**: its work isn't needed on PC (hardware set-up, kernel calls
+  the SDK already stubbed), so it no longer runs: an override in
+  `itc_recomp/src/` replaces it with nothing (or a fixed return value), or
+  its callers, made native, leave the call out (no override then; the row
+  says which caller). Logs, a harness or the renderer's frame dumps have
+  shown that nothing reads what it did. The original is no longer called,
+  except behind a fallback flag while the drop is being checked. A
+  function the game never calls in the first place isn't Dropped: its
+  status stays blank and its row says it's never called.
+- **Merged**: its work is done inside a native caller's plain C++ (a
+  few lines only that caller needs), so it has no function or override of
+  its own in `itc_recomp/src/`. The row names the caller(s) and the
+  harness that covers the work. The original is no longer called, except
+  behind the caller's fallback flag.
+- **Patched**: the generated code was edited in place (search for
+  `PATCH:`).
+
+A function usually moves from recompiled or Wrapped to Overridden to
+Native as the `ctx` edge moves up through its callers, or straight to
+Dropped when its work isn't needed.
+`itc_recomp/tools/check_function_statuses.py` checks this column, in
+every file of the tables, against `src/` (an override marked Native, a
+status with no override, an override with no row, a row in two files);
+run it after changing either, on any branch.
+
+| Address | Name | Status | Notes |
+|---|---|---|---|
+| `sub_8210ADD0` | `Text::Init` | | No arguments; once at boot (only caller `sub_82106548`, the app's start-up): `Font::Init`, then `Strings::Init`. |
+| `sub_8210ADF8` | `Text::Load` | | No arguments; once at boot (only caller `sub_82106618`, the game's data load): `Font::Load([0x826C5C00], 15)` (the four pages) and `Strings::Load([0x826C5C34], 0x8001)` (files 0 and 15). |
+| `sub_82211C90` | `Text::IsLoaded` | | No arguments: 1 when `Strings::IsLoaded([0x826C5C34])` and `Font::IsLoaded([0x826C5C00])`, else 0. From `sub_821514A0` (not read). |
+| `sub_8210A860` | `Strings::Init` | | No arguments; once (from `Text::Init`). When `[0x826C5C34]` is 0: allocates 4,304 bytes (`sub_82295398(0, 4304, 4096, 4)`, VirtualAlloc) into it and clears the 17 file pointers (+0), the 17 counts (+4236) and the loaded mask (+136). Allocates guest memory. |
+| `sub_8210A850` | `Strings::OnLoaded` | | `Strings::Load`'s load callback (passed to `Archive::Load`; no direct callers): r6 = the file's loaded flag (strings +68 + 4i), set to 1. Leaf. |
+| `sub_8210A538` | `Strings::Release` | | r3 = the string table, r4 = a mask of files (17 bits): for each bit with a file loaded (+4i), its count (+4236 + 4i) down by one; at 0 the file is freed (`sub_82295330(file, 0, 0x8000)`, VirtualFree), its pointer and loaded flag (+68 + 4i) cleared and its bit taken out of the mask (+136). From the front-end screens' releases `sub_82196EC0`, `sub_82211B98`, `sub_82224AB8`, `sub_8222FB90`, `sub_8225D590` (`ui-movies-game.md`). |
+| `sub_8210A768` | `Strings::IsLoaded` | | r3 = the string table: 1 when at least one file is asked for (mask +136), each asked for has its loaded flag (+68 + 4i) set, and `Font::IsLoaded([0x826C5C00])`; else 0. From `Text::IsLoaded`. |
+| `sub_8210A800` | `Strings::Get` | | r3 = the string table, r4 = a string id (16-bit): the file `i` whose bound at `0x82007E18 + 4i` is at most the id and the next bound above it, and returns `DataFile::GetEntry(file i, id - bound i, 0)` (the UTF-16 string). An id of 7739 or more returns r3 unchanged (no check). From `Strings::FormatV` and `Strings::Format`. |
+| `sub_8210A990` | `Strings::FormatV` | | r3 = the string table, r4 = the output (UTF-16, appended to with `wcscat`), r5 = a string id, r6 = the arguments (a `va_list`: 8-byte slots). The string (`Strings::Get`) copied a character at a time, with the control characters replaced (the list above): `0xFFD7` formats the 16-bit id in the next slot recursively (with the slots after it), `0xFFD8`-`0xFFF5` build a format (`%%0%dd`, `%%.%df`, `%%%dd` at `0x82007EC4`, `0x82007EB4`, `0x82007EA8`) and print the slot's int or double with it (`swprintf`), `0xFFD3` an int with separators (`Strings::FormatGrouped`), `0xFFD2` a number through the font (`sub_82108A70`, never ran). Uses a 4 KB buffer on its stack (cleared with `memset` before each argument). Returns r4. From `UiMovie::SetText` (`sub_8211C1F8`), `UiMovie::SetNodeText` (`sub_8211C7E8`), `sub_8211CBD8` (`ui-movies-game.md`), `Strings::Format` and itself. |
+| `sub_8210ABC0` | `Strings::Format` | | `Strings::FormatV` with the arguments as varargs (r6 to r10 saved to the stack as the `va_list`), without the `0xFFD2` case (left as a character); returns r4. From `sub_8211C740` and `sub_8211CA18` (`ui-movies-game.md`: strings 8 and 9). |
+| `sub_8210A680` | `Strings::FormatGrouped` | | r3 = passed on (unused), r4 = an int, r5 = the output (appended to): the int's magnitude with thousands separators: when it times 0.001 is at least 1.0, itself on the thousands first, then `,%03d` of the rest, else `%d` (`swprintf`, the formats at `0x82007E9C`, `0x82007E94`); a negative int then has the output rewritten as `-%s` (`0x82007E8C`, `wcscpy`). Uses a 512-byte buffer on its stack. From `Strings::FormatV`, `Strings::Format` and itself. |
+| `sub_8210A490` | `swprintf` (probably, the game's) | | r3 = the buffer, r4 = a UTF-16 format, r5.. the arguments (varargs): `vswprintf` (`sub_825A9A80`, `c-runtime.md`) with them as the `va_list`. From `Strings::FormatV`, `Strings::Format`, `Strings::FormatGrouped` and `sub_8228FB00` (not read). |
+| `sub_8210A5C0` | `Strings::PageCount` | | r3 unused, r4 = a UTF-16 string: the count of page breaks (`0xFFD1`) in it (the pages less one). Leaf. From `sub_8211C930` and `sub_8211C9C0` (`ui-movies-game.md`: a text's next page). |
+| `sub_8210A5E8` | `Strings::CopyPage` | | r3 unused, r4 = the output (appended to), r5 = a string, r6 = a page, r7 = lines to skip: past the r6-th page break (`0xFFD1`), appends the characters up to the next page break or the end (one at a time, `wcscat`), leaving out the first r7 lines (`\n` counted). Returns r4. From `UiMovie::DrawTexts` (`sub_8211CD90`) with the text's +20 (the page) and +24. |
+| `sub_82109A00` | `Font::Init` | | No arguments; once (from `Text::Init`). Allocates 16,592 bytes (`sub_82295398(0, 16592, 4096, 4)`, VirtualAlloc) into `[0x826C5C00]` and sets it up (`Font::Font`). Allocates guest memory. |
+| `sub_82109228` | `Font::Font` | | r3 = the font. +0 the device's state object (`[0x8266D088]`'s vtable slot 7, then that object's slot 3), +4 the command list and +8 the render queue (`[0x826BABA0]`'s slot 8, then that object's slot 1 and slot 2); the shaders made (`Font::CreateShaders`) with the device's state saved and restored around them (`sub_8258D8C8`, `sub_8258D908`); the pages (+20..+32) and their files (+40..+52) cleared; the ten colors (3 bytes each) at +16528 (the list above); +12 (the pages asked for) = 0. From `Font::Init`. |
+| `sub_821088B8` | `Font::CreateShaders` | | r3 = the font. The vertex declaration from the elements at `0x826032F8` (`sub_822A8980`) into +16560; the vertex shader compiled from the HLSL at `[0x82603338]` (`sub_822B8F10` with its length, `main`, `vs_3_0`) and made (`sub_822AA018`) into +16564; the four pixel shaders from the 12-byte entries at `0x826C5C04` (+0 the source, +4 its length; `ps_2_0`, made with `sub_822A9EE8`) into +16568..+16580; each compile's result released through its vtable slot 2. No check for errors. From `Font::Font`. |
+| `sub_825D9590` | | | A static initializer (the C runtime's start-up table; no direct callers): fills the font's four 12-byte pixel shader entries at `0x826C5C04` with the HLSL sources at `[0x8260333C]`..`[0x82603348]` (one per channel: R, G, B, A as alpha) and their lengths (`strlen`), +8 = 0. Leaf. |
+| `sub_82109498` | `Font::Load` | | r3 = the font, r4 = a mask of pages (4 bits; 15 at boot): the mask added to +12; for each page asked for whose file (+40 + 4i) isn't there, a 28-byte page made (`sub_825A6880`, operator new) into +20 + 4i with +24 (loaded) = 0, the asset's size (asset `0x82007C5C + 4i`, 22655 + i; `sub_820A0678`) allocated (`sub_82295398`) into +40 + 4i, and `Archive::Load(asset, file, Font::OnPageLoaded, page)`. From `Text::Load`. Allocates guest memory. |
+| `sub_82109160` | `Font::OnPageLoaded` | | `Font::Load`'s load callback (no direct callers): r4 = the page's file, r6 = the page. +0 the glyph table (`DataFile::GetEntry(file, 0, 0)`), +4 its records (+0 + 4); +8 an XPR made (24 bytes, `sub_825A6880`, `XPR::XPR`) and set up from entry 1 (`XPR::Create`), +12 its texture 1 (`sub_82597118`), +16 and +20 the texture's width and height (`sub_822A5B78(texture, 0, description)`: its +24, +28); +24 = 1 (loaded). Allocates guest memory. |
+| `sub_821081A0` | `Font::IsLoaded` | | r3 = the font: 1 when at least one page is asked for (+12) and each one asked for is loaded (its +24), else 0. Leaf. From `Strings::IsLoaded` and `Text::IsLoaded`. |
+| `sub_8210A758` | `Text::Draw` | | r3 unused (the string table from `UiMovie::DrawTexts`), r4 = the draw parameters, r5 = the text: `Font::Draw` on `[0x826C5C00]`. From `UiMovie::DrawTexts` (`sub_8211CD90`), every movie update for each text shown. |
+| `sub_8210A400` | `Font::Draw` | | r3 = the font, r4 = the draw parameters, r5 = the text: `Font::SetParams`, the page (+36) from the parameters' +60, `Font::DrawPass(text, 0)`; when the parameters' +112 is set, again with the page from +108 and pass 1 (never in play: `sub_82109D80` never ran). From `Text::Draw`. |
+| `sub_82108368` | `Font::SetParams` | | r3 = the font, r4 = the draw parameters: kept at +16; +56 = (int)(x - (+28 - 1) × +8) and +60 = (int)(y - (+32 - 1) × +12) as floats (the start point, probably scaled about +8, +12); +16448 (the letter spacing) and +16452 (the line spacing) = the parameters' +84 and +88 as floats. Leaf. From `Font::Draw` and `Font::TextWidth`. |
+| `sub_82108B30` | `Font::TextWidth` | | r3 = the font, r4 = the draw parameters, r5 = a text: `Font::SetParams`, the page from +60; the widest line's width (each glyph's advance × the glyph scale (+36), truncated, plus the letter spacing, except with alignment 3), up to a page break; colors and `0xFFD6` count nothing. Returns (that - the letter spacing) × the scale (+28) in f1. From `UiMovie::ScrollOffset` (`sub_8211B800`). |
+| `sub_82108458` | `Font::LineWidth` | | r3 = the font, r4 = a text: as `Font::TextWidth` for one line (to `\n` or a page break), with the page and parameters already set; with alignment 3 the plain sum (not less the spacing or scaled). Leaf. From `Font::LineX`. |
+| `sub_82108FE0` | `Font::LineX` | | r3 = the font, r4 = a line: its start x (f1) by the horizontal alignment (+76) from `Font::LineWidth` (w, truncated): 0 the font's +56; 1 +56 + (box width +68 × +28 - w) × 0.5, truncated; 2 +56 + +68 × +28 - w, truncated; 3 (justified) +56, with the letter spacing set to (+68 - w) / (glyphs - 1) when there are two or more (`sub_82108810`, never ran). From `Font::BuildVertices` (each line). |
+| `sub_82108568` | `Font::LineY` | | r3 = the font, r4 = the line count, r5 = a line: its y (f1) by the vertical alignment (+80): the line height (the glyph table's +2 × +40, truncated) plus the line spacing, times the line, times +32, from: 0 the font's +60; 1 +60 + (box height +72 / 2) × +32 - the block's height × 0.5; 2 +60 + +72 × +32 - the block's height; 3 (justified) +60, with the line spacing set to (+72 - height × lines) / (lines - 1) when lines > 1. Leaf. From `Font::BuildVertices`. |
+| `sub_82109EF0` | `Font::DrawPass` | | r3 = the font, r4 = a text, r5 = the pass (0, or 1 for the second pass). Nothing for no text or no glyphs (`Font::CountGlyphs` into the four counts at `0x826C5BCC`). Opens a chunk on the command list (+4; `CommandList::OpenChunk`) and records (`CommandList::AllocateSlots`, one slot each; each command a slot of {command, count} and its payload's slots; the first slot, +2 = 5, kept at `0x826C5BFC`): SetTexture (4: sampler 0, the page's texture +12); SetRenderState (1) × 5: blend enable (60) 1, source blend (72) 6, destination blend (76) 7, viewport transform (304) 0, cull mode (56) 0; scissor enable (200) 0 with no clip rectangle, else SetScissorRect (31) with +44..+56 as 16-bit; SetSamplerState (2) × 3 on sampler 0: mip filter 2, min and mag filter 1; SetVertexDeclaration (10, +16560); SetVertexShader (8, +16564); for each channel with glyphs, n × 144 bytes of vertices (`CommandList::AllocateBytes`, with a header) kept at `0x826C5BDC` (the write pointers) and `0x826C5BEC` (the starts); the vertices written (`Font::BuildVertices`; pass 1: `sub_82109D80`); then for each channel SetPixelShader (9, +16568 + 4i) and DrawPrimitiveUP (19: triangle list 4, n × 6 vertices, 24 bytes each, the start); then the viewport transform (304) back to 1 and command 36 (no payload; not in `../gpu-functions.md`'s table); `CommandList::CloseChunk`; the chunk's first slot (`0x826C5BFC`) handed to the render queue (+8, vtable slot 4: the layer +116 + 1, the depth 0.0, or -1000.0 for pass 1), and `0x826C5BFC` = 0. In `command-list.md`'s callers of the list. From `Font::Draw`. |
+| `sub_82108210` | `Font::CountGlyphs` | | r3 = the font, r4 = four counts (one per channel), r5 = a text: for each of its `wcslen` characters but `\n`, space, `0xFFD6` and `0xFFF6`-`0xFFFF`, the count of its glyph's channel (the record's +2 & 3, page +36) up by one (control characters such as page breaks are counted too). Returns the length. From `Font::DrawPass`. |
+| `sub_82109AA8` | `Font::BuildVertices` | | r3 = the font, r4 = a text: the lines counted (to a page break); the color from the parameters (+20..+22, alpha +24 × 255); the first line's start (`Font::LineX`, `Font::LineY`); a rotated text (+16 / 360 not whole) goes through `sub_821097F0` (never ran). For each of the `wcslen` characters: the glyph's advance (× +36, truncated); a space moves x on; `\n` starts the next line; `0xFFD6` and `0xFFF6`-`0xFFFF` set the color (keeping the alpha); others are drawn (`Font::AddGlyph`) and, with the second pass on, their position plus +96, +100 × the scale kept at the font's +64 + 8i; x moves on by (advance + letter spacing) × +28. Returns 0. From `Font::DrawPass` (pass 0). |
+| `sub_82109560` | `Font::AddGlyph` | | r3 = the font, r6 = the character, r7 = the color, f1, f2 = x, y: the glyph's cell (record +0) in the page's sheet (columns = the texture's width / the cell's width), its size the cell × +36 × +28 and × +40 × +32, written as six 24-byte vertices (two triangles: x, y, z = 0, the color, u, v) at its channel's write pointer (`0x826C5BDC` + 4 × channel). Not rotated: clipped (`Font::ClipGlyph`): kept, the pointer moves on 144 bytes, else the channel's count (`0x826C5BCC`) goes down by one; rotated: each vertex turned (`sub_82108F68`, never ran). From `Font::BuildVertices`. |
+| `sub_82108C90` | `Font::ClipGlyph` | | r3 = the font, r4 = a glyph's six vertices: 1 with no clip rectangle (+44..+56 all 0); 0 when the glyph is wholly outside it; else each vertex outside (`Font::OutCode`) is moved to the edge, its u or v moved by the same distance / the scale (+28, +32) / the texture's size (page +16, +20); returns 1. From `Font::AddGlyph`. |
+| `sub_821082A0` | `Font::OutCode` | | r3 = the font, r4 = a vertex: bits for x left of the clip rectangle (1), right of it (2) or inside (4), and y above (8), below (16) or inside (32). Leaf. From `Font::ClipGlyph`. |
+| `sub_82108860` | `XPR::Release` (probably) | | r3 = a slot holding an XPR (a texture set): when set, its destructor (`sub_82597148`, a lead), `operator delete` (`sub_825A70E8`) and the slot cleared. From `UiMovie::Unload` (`sub_8211B540`, `ui-movies-game.md`), `CarOverlays::ReleaseTextures` (`sub_821258F8`, `race-overlays.md`) and `sub_82228438` (not read). In this address range, but the movies' and overlays' (and not the font's: its teardown never ran). |
