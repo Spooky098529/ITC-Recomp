@@ -61,7 +61,10 @@ memory.
 7. The migration agent works in the **build, attract race, debug** cycle
    used so far, and reports. A subsystem too big for one agent gets
    another migration agent after the first reports, until nothing ready
-   is left in it.
+   is left in it. The lead adds the report's nonzero `expected to differ:`
+   groups to `expected-differences.md` ("Expected differences" below),
+   and what's for the user's review to `review.md` ("Rows to review"
+   below), not to the progress file.
 8. **Hand its work to a validation agent** (below; added by the user,
    2026-10-22) after each migration agent's report has passed the
    lead's checks, the "no mapping" leads' too: it checks from a log that
@@ -124,7 +127,8 @@ nothing runs and there's work, about a minute.
 - `itc_recomp/tools/scripted_run.sh <recording> [flags]`: a recorded pad
   (`itc_recomp/pad_recordings/`) replayed into the game, for functions
   attract races don't reach (the menus, a driven race); the same report
-  (`docs/pad-replay.md`).
+  (`docs/pad-replay.md`). The validation agent replays it after its
+  attract race ("The validation agent", step 3).
 - `src/harnesses/`: native against recompiled on the same inputs
   ("Checking with a harness" in `docs/rexglue-removal.md`).
 - `--native_renderer_dump=<dir>`: frames from a race.
@@ -227,12 +231,17 @@ skips Merged rows). Never
    edits `generated/`. A callee that never ran in play: its branch keeps
    the recompiled path behind the flag, or is ported too, said in the row.
 3. Adds harness cases in the same change, registered in `harness.cpp` and
-   the flag's help text. Cases that differ for a reason that isn't the
-   game's (a NaN's bits as the compiler left them in the translated code,
-   say) may go in their own group named "... (expected to differ)", with
-   the reason in a comment beside it and in the function's row, and the
-   group in the report's `expected to differ:` line. Every other case
-   matches.
+   the flag's help text. Cases keep NaN and infinity inputs, and float
+   outputs are compared with `harness::Outputs` ("Comparing floats"
+   below), so a NaN's sign or payload is no difference. Cases that
+   differ for a real reason that isn't the game's (the fixed-body stack
+   leftovers in `expected-differences.md`, say) may go in their own group
+   named "... (expected to differ)", with the reason in a comment beside
+   it and in the function's row, and the group in the report's `expected
+   to differ:` line (the lead records them in
+   `docs/loops/expected-differences.md`). No NaN-only "(expected to
+   differ)" groups and no explanations of NaN-sign differences (the
+   user's call, 2026-10-23). Every other case matches.
 4. Builds (`cmake --build itc_recomp/out/build/linux-amd64-release
    -j$(nproc)`) and runs `attract_race.sh 25 --run_harnesses=all`: no new
    error lines, ~20 seconds at 30 ticks/s, every harness at 0 differing
@@ -256,6 +265,49 @@ skips Merged rows). Never
    (callees become removable as their callers are made native), each
    candidate confirmed, its adapter removed and its row set to Native,
    committed on its own.
+
+### Comparing floats
+
+NaN signs and payloads aren't a goal, thoroughness is (the user's call,
+2026-10-23). New harness code (a new harness, or new cases in an
+existing one) builds each case's outputs with `harness::Outputs`
+(`src/harnesses/harness.h`) and checks them with
+`Results::Check(const Outputs&, const Outputs&, what)`:
+
+- `Bytes(...)` and `Word(...)` compare exactly: integers, pointers,
+  flags, r3, padding.
+- `Float(bits)`, `Floats(base, address, count)` (guest words) and
+  `Double(bits)` also match when both sides are NaNs (any sign or
+  payload); infinities and every other value must match exactly.
+- A value is marked a float only when it's shown to be one: f1 and the
+  other float registers, a vector's lanes, a field the function loads
+  and stores with float instructions in `generated/`. Everything else,
+  and anything unsure, is compared exactly: a float compared exactly
+  only fails loudly, while an integer passed as a float could hide a
+  difference.
+- A case passes only if every entry passes; it counts as NaN-only when
+  it passed and some entry matched only as NaNs. The harness line ends
+  with "(N NaN-only)". A failing case logs the entry, its kind, its byte
+  offset and both values.
+
+The pattern, inside the loop that runs both versions:
+
+```cpp
+harness::Outputs out[2];
+for (int v = 0; v < 2; v++) {
+  // ... set up, run the recompiled (v == 0) or native version on t ...
+  out[v].Bytes(Read(h.base, block, 16));          // pointers, flags: exact
+  out[v].Floats(h.base, block + 16, 4);           // a vector's four lanes
+  out[v].Float(guest::LoadU32(h.base, block + 32));  // a float field
+  out[v].Word(t.r3.u32);                          // exact
+  out[v].Double(t.f1.u64);                        // f1
+}
+results.Check(out[0], out[1], what);
+```
+
+Existing harnesses keep their byte comparison (they aren't rewritten);
+the old `Check(bytes, bytes, what)` stays for them, and their recorded
+NaN groups stay in `expected-differences.md` as they are.
 
 ### Removing an adapter
 
@@ -343,8 +395,17 @@ made native, or whose adapter it removed:
    on both sides once its adapter is gone), or its harness doesn't reach
    it. The `(game):` lines list which functions ran in play. No game line
    isn't a failure (a function may only run in menus, saves or on paths
-   an attract race doesn't take): those functions are listed for the
-   user's drive (below).
+   an attract race doesn't take): those functions go to the replay.
+3. **Replays the recorded pad** for the functions with no `native running
+   (game):` line (added by the user, 2026-10-22):
+   `itc_recomp/tools/scripted_run.sh <the recording in
+   itc_recomp/pad_recordings/>` (default flags; the script already passes
+   `--log_level=info`, and a flag given twice is refused). Functions with a game line in the replay's log count as
+   ran in play. Only what the replay didn't reach goes to the user's
+   drive (below). A replay that breaks (stalls, logs new errors, desyncs,
+   ends early) is not a halt: the agent says how it broke and where it
+   stopped, and every function still without a game line goes to the
+   drive list. It doesn't restart or debug the replay.
 
 Functions whose rows are Merged (set by the migration agent) have no
 print of their own: the agent skips them.
@@ -357,14 +418,17 @@ validate: <name>
 prints added: none | <functions>: <commit>
 harness lines: <count> of <count>
 missing: none | <functions with no harness line, and why if known>
-ran in play: <functions with a game line> | none
-not in game: <functions with no game line> | none
+ran in play: <functions with a game line in the attract race> | none
+ran in replay: <functions with a game line only in the replay> | none
+replay: ok | broke: <how, where it stopped>
+not in game: <functions seen in neither the attract race nor the replay> | none
 race: <seconds at 30 ticks/s>, <error lines>, harnesses all 0: yes | no
 stop: none | <reason>
 ```
 
 The lead copies `not in game:` into "To check in a drive" in the progress
-file. When the loop ends, the user drives a race (menus, a save) with
+file, and notes the `replay:` line beside it when the replay broke (the
+native code under test may be the cause). When the loop ends, the user drives a race (menus, a save) with
 `--log_level=info` and checks the log's `native running (game):` lines for
 those functions: the validation step done by playing.
 
@@ -375,7 +439,8 @@ file, when:
 
 - a harness differs (outside "(expected to differ)"), or a function made
   native has no harness cases;
-- a validation agent reports a function `missing:`;
+- a validation agent reports a function `missing:` (a broken replay is
+  not a reason to halt: its functions go to the drive list);
 - an attract race failed, stalled twice, logged new errors, or ran under
   ~20 seconds at 30 ticks/s;
 - an agent left work uncommitted, or a commit doesn't build;
@@ -408,21 +473,47 @@ branch; commit before any revert; stage only your own files; only search
 inside the repo; SBX-Recomp only when the user says so; never screenshot
 the user's desktop; find problems with logs, not guesses.
 
+## Rows to review
+
+`docs/loops/review.md` (the user's call, 2026-10-23) holds what each run
+leaves for the user's review, kept across runs, a section per run, newest
+first: the function files added or changed (rows, intros,
+`known-data.md`), corrections to earlier maps, and the choices a report
+names for review (behavior kept, paths left on the recompiled code, new
+helpers). The lead adds to the current run's section after each map and
+migration report it checks, and commits it with the progress file. The
+user marks a section reviewed. The progress file and run summaries point
+to it instead of listing rows.
+
+## Expected differences
+
+`docs/loops/expected-differences.md` (the user's call, 2026-10-23) holds
+every "(expected to differ)" harness group with cases that differ, kept
+across runs: one table per function file (function, group, differing
+cases, reason, review), with the common reasons written once at the top.
+When a migration agent's report has a nonzero `expected to differ:`
+group, the lead adds its lines there (a new reason gets a line under
+"Reasons"), marked "for review (<run> run)", and commits it with the
+progress file; the user's agreement makes it "accepted". The other loop
+docs (the progress file, the run summaries) point to it instead of
+listing groups.
+
 ## The progress file
 
 `docs/loops/b7-progress.md`, for the current run. Kept short, so a pass
 can read it whole. A run's first pass finds the previous run's file
-stopped: it starts it afresh, first copying the old one's rows to
-review, expected differences, drive list and totals into that run's
-summary file under "Left for the user" (the rest is in git):
+stopped: it starts it afresh, first copying the old one's drive list
+and totals into that run's summary file under "Left for the user" (the
+rest is in git; rows to review and expected differences already live in
+`review.md` and `expected-differences.md`), and adds a section for the
+new run to `review.md`:
 
 - **Now:** the subsystem, the step, the agent running, the run's
   subsystem count.
 - **Done:** one line a subsystem (file, groups made native, flags,
   commits), newest first.
-- **Rows to review:** the function files added or changed, for the user.
-- **Expected to differ:** the functions given an "(expected to differ)"
-  harness group this run (from the reports), with the reason.
+- **Rows to review:** a pointer to the run's section of `review.md` only.
+- **Expected to differ:** a pointer to `expected-differences.md` only.
 - **Totals:** `b7_status.py`'s totals line after each step.
 - **Stopped:** when and why, if the loop ended itself.
 

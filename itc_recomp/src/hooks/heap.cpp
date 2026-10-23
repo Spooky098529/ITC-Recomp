@@ -73,6 +73,10 @@ uint32_t PhysicalProtection(uint8_t* base, uint32_t protection) {
 
 }  // namespace
 
+bool NativeHeapActive() {
+  return Native();
+}
+
 RecompiledHeapScope::RecompiledHeapScope() {
   use_recompiled = true;
 }

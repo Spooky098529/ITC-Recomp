@@ -88,6 +88,8 @@ void NativeRigidBodySetCenterOfMass(PPCContext& ctx, uint8_t* base) {
 ITC_NATIVE_WORD(NativeRigidBodyField80, va::RigidBodyField80(ctx.r3.u32))
 ITC_NATIVE_WORD(NativeRigidBodyVelocity, va::RigidBodyVelocity(ctx.r3.u32))
 ITC_NATIVE_WORD(NativeRigidBodyField144, va::RigidBodyField144(ctx.r3.u32))
+ITC_NATIVE_WORD(NativeRigidBodyForce, va::RigidBodyForce(ctx.r3.u32))
+ITC_NATIVE_WORD(NativeRigidBodyTorque, va::RigidBodyTorque(ctx.r3.u32))
 ITC_NATIVE_WORD(NativeRigidBodyField160, va::RigidBodyField160(ctx.r3.u32))
 ITC_NATIVE_WORD(NativeRigidBodyOrientation, va::RigidBodyOrientation(ctx.r3.u32))
 ITC_NATIVE_WORD(NativeRigidBodyAngularVelocity, va::RigidBodyAngularVelocity(ctx.r3.u32))
@@ -386,6 +388,8 @@ void AddressCases(Context& h) {
       {"RigidBody::Field80 (sub_820B6880)", __imp__sub_820B6880, NativeRigidBodyField80},
       {"RigidBody::Velocity (sub_820B6888)", __imp__sub_820B6888, NativeRigidBodyVelocity},
       {"RigidBody::Field144 (sub_820B6890)", __imp__sub_820B6890, NativeRigidBodyField144},
+      {"RigidBody::Force (sub_820988C0)", __imp__sub_820988C0, NativeRigidBodyForce},
+      {"RigidBody::Torque (sub_82379328)", __imp__sub_82379328, NativeRigidBodyTorque},
       {"RigidBody::Field160 (sub_820B6898)", __imp__sub_820B6898, NativeRigidBodyField160},
       {"RigidBody::Orientation (sub_820B6928)", __imp__sub_820B6928,
        NativeRigidBodyOrientation},

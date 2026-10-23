@@ -135,6 +135,8 @@ ITC_NATIVE_STEP(NativeAntiLock, cp::VehicleAntiLock(base, ctx.r3.u32))
 ITC_NATIVE_STEP(NativeSuspensionTorques,
                 ctx.r3.u64 = cp::VehicleSuspensionTorques(base, ctx.r3.u32, ctx.r1.u32 - 256))
 
+ITC_NATIVE_STEP(NativeApplyForces,
+                ctx.r3.u64 = cp::VehicleApplyForces(base, ctx.r3.u32, ctx.r1.u32 - 352))
 ITC_NATIVE_STEP(NativeEngineTorque,
                 ctx.f1.f64 = cp::VehicleEngineTorque(base, ctx.r3.u32, ctx.f1.f64, ctx.r1.u32))
 ITC_NATIVE_STEP(NativeMagicFormula,
@@ -737,6 +739,11 @@ void FillVehicle(uint8_t* base, uint32_t area, Random& r, Word word) {
       guest::StoreU32(base, v + at, 0);
     }
   }
+  // Vehicle::ApplyForces's bytes: in the air (+3132), tipped (+3241), at
+  // rest (+2928).
+  for (uint32_t at : {3132u, 3241u, 2928u}) {
+    guest::StoreU8(base, v + at, uint8_t(r.Below(2)));
+  }
 }
 
 }  // namespace
@@ -825,6 +832,8 @@ void CarPhysicsVehicle(Context& h) {
       {"Vehicle::UpdateAtRest (sub_820B2808)", Original<__imp__sub_820B2808>, NativeUpdateAtRest,
        false},
       {"Vehicle::UpdateAero (sub_820B2A48)", Original<__imp__sub_820B2A48>, NativeUpdateAero,
+       false},
+      {"Vehicle::ApplyForces (sub_820B2CC0)", Original<__imp__sub_820B2CC0>, NativeApplyForces,
        false},
       {"Vehicle::UpdateWheelAxes (sub_820B1B00)", Original<__imp__sub_820B1B00>,
        NativeUpdateWheelAxes, false, kWheelR4, false, true, true},

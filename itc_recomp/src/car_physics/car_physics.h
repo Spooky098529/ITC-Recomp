@@ -292,6 +292,15 @@ uint32_t VehicleUpdateAtRest(uint8_t* base, uint32_t vehicle, uint32_t frame);
 // original's 240 bytes (EngineTorque's below it). Returns what the
 // original leaves in r3.
 uint32_t VehicleUpdateAero(uint8_t* base, uint32_t vehicle, uint32_t frame);
+// Vehicle::ApplyForces (sub_820B2CC0): the speed squared (+2440), the
+// center of mass by byte +3132, the wheels' accumulators (+2544) summed in
+// the ground frame into +368 and given to the body at their contact
+// points, the tip check (byte +3241) setting the angular velocity, +80 and
+// +84, the body's force (+2464 before +2608 is added; at rest the
+// horizontal part cancelled) and torque (+2480), RigidBody::Integrate by
+// +2352, and the body's +516 bits. `frame`: the original's 352 bytes (its
+// callees' below). Returns what the original leaves in r3 (Integrate's).
+uint32_t VehicleApplyForces(uint8_t* base, uint32_t vehicle, uint32_t frame);
 // Vehicle::UpdateWheelAxes (sub_820B1B00): per wheel the toe +36 and the
 // axes +144 and +128 (the vehicle's +112 and +128 turned by toe and
 // steering; those two also into +2080 and +2064), +324 = +320, the contact's
@@ -449,6 +458,13 @@ uint32_t CollisionObjectAccumulateForce(uint8_t* base, uint32_t object, uint32_t
 // CollisionObject::AddContact (sub_820B7C50): a new contact
 // (CollisionWorld::NewContact) pushed on +240; returns it, or 0.
 uint32_t CollisionObjectAddContact(uint8_t* base, uint32_t object);
+// CollisionObject::Translate (sub_820B7B60): the body's center (+16) moved
+// by the offset (RigidBody::SetCenterOfMassPosition), the shape record
+// (+32) moved (CollisionShape::Translate), +304 += the offset, +284 = 0.
+// False, with nothing done, where the record's current copy isn't a box
+// (CollisionShape::Translate isn't native for it). `frame`: the original's
+// 128 bytes (the callees' frames below it).
+bool CollisionObjectTranslate(uint8_t* base, uint32_t object, uint32_t offset, uint32_t frame);
 // sub_820B7ED0 (the name ours: CollisionRecords::Merge): the `count` hit
 // records copied to `out`, those with the same id (+60) merged (averaged,
 // the push +32 normalized with its length in +48; merged ones' ids -1,
@@ -506,6 +522,31 @@ bool CollisionWorldRemovePairsByGroups(uint8_t* base, uint32_t object, uint32_t 
 // (RemovePairsOf; false as it, with the rest done: the original
 // RemovePairsOf then).
 bool CollisionWorldRemoveObject(uint8_t* base, uint32_t object, uint32_t* r3);
+// The collision world's teardown (src/car_physics/collision_world.cpp),
+// switched by --native_collision_world with its only caller,
+// TrackCollision::Unload (src/track_collision/). Operator delete through
+// the C runtime's heap over the allocation layer, so the caller calls these
+// only while --native_heap routes the game's heap to the layer.
+//
+// CollisionObject::~CollisionObject (sub_820B7B40): +0 = the vtable
+// 0x82002A94, +268 = 0, the shape record +32 destroyed
+// (CollisionShape::~CollisionShape).
+void CollisionObjectDestruct(uint8_t* base, uint32_t object);
+// CollisionObject::DeletingDestructor (sub_820B9110, the vtable's slot 0):
+// with bit 0x2 of `flags` an array (its count at r3 - 16, 320 bytes each)
+// destroyed from the last and, with bit 0x1, its block (r3 - 16) freed
+// (operator delete[]); else the one object, freed with operator delete.
+// Returns the original's r3 (the block or the object).
+uint32_t CollisionObjectDeletingDestructor(uint8_t* base, uint32_t object, uint32_t flags);
+// Whether CollisionWorld::Destroy can run natively: a world, its blocks the
+// heap's (or 0), its objects' slot 0 CollisionObject::DeletingDestructor
+// and their shape records' copies deletable.
+bool CollisionWorldDestroyable(uint8_t* base);
+// CollisionWorld::Destroy (sub_820B86B8): the objects (+16) deleted through
+// the first's slot 0 with r4 = 3 (or, with a count of 0, their block freed),
+// the blocks +36 and +48 freed, the world freed, 0x826C2D88 = 0; each
+// pointer zeroed after its block.
+void CollisionWorldDestroy(uint8_t* base);
 // CollisionObject::AddGroups (sub_820B7CC8): the bits not in +248 set
 // there, and with any in the low 24 bits, AddPairs with them. Returns the
 // original's r3.

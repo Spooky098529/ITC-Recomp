@@ -52,7 +52,7 @@ goes in `src/` as overrides), American English.
   the leftovers above (the movie player, Voice::Init skipped as high as
   is safe), or the main thread's performance leads
   (`sub_821298C0`, `sub_8209C6E0`, in `docs/native-renderer.md`).
-- **B7 in progress (2026-10-22):** its measure is `b7_status.py`
+- **B7 in progress (2026-10-23):** its measure is `b7_status.py`
   (`docs/coverage.md`), and the B7 loop (`docs/loops/b7-loop.md`, a
   `/loop` session handing each subsystem to a mapping agent, then
   migration agents) did its first run on the branch `b7-loop-test` (merged 2026-10-22): five
@@ -60,11 +60,16 @@ goes in `src/` as overrides), American English.
   -> 335); its second run (branch `b7-loop-22-10-26`) removed
   31 adapters and made the race overlays native as far as they were
   ready (ours 422); its third run (the same branch; both merged
-  2026-10-22, their rows not yet reviewed by the user) made the vehicle accessors, the matrix math and the
-  car physics native as far as they were ready (ours 705). See "B7's loop runs" under B7, and
-  `docs/loops/b7-progress.md`. What most of the rest waits on is the
-  user's call on allocating guest memory from native code (the heap and
-  the VirtualAlloc wrappers, in `docs/loops/leads.md`).
+  2026-10-22) made the vehicle accessors, the matrix math and the
+  car physics native as far as they were ready (ours 705); after native
+  memory (ours 714), its fourth run (branch `b7-loop-22-10-26-2`, merged
+  2026-10-23) made the C runtime heap, the collision narrow phase and
+  the collision world native as far as they were ready (ours 837). The
+  runs' rows wait for the user's review (`docs/loops/review.md`). See
+  "B7's loop runs" under B7, and `docs/loops/b7-progress.md`. Guest
+  allocation is no longer a block (`docs/native-memory.md`); what the
+  rest waits on is in `docs/loops/leads.md` (the archive loader, the
+  route, the scene and race set-up, guest vtable calls).
 
 ## The approach (agreed with the user, 2026-10-19)
 
@@ -2479,6 +2484,9 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
     | 2026-10-22 | The vehicle, rigid body, collision and race data accessors, and the vector library | `vehicle-accessors.md` | 127 of 132 | `--native_vehicle_accessors`, `--native_vector_library` |
     | 2026-10-22 | The matrix, vector and quaternion math (`Matrix::` and the vector library's 4x4 half) | `matrix-math.md` | 28 of 28 | `--native_matrix_math` |
     | 2026-10-22 | The car physics and the collision world | `car-physics.md` | 106 of 130 | `--native_car_physics` |
+| 2026-10-22 | The C runtime heap (operator new and delete, malloc, free, calloc, realloc, `_msize`, XMemAlloc, XMemFree, LocalAlloc, LocalFree, GetProcessHeap; in the existing `heap.md`) | `heap.md` | 24 of 30 | `--native_c_runtime_heap` |
+| 2026-10-23 | The collision world's narrow phase and shapes (with CollisionObject::Translate, Vehicle::ApplyForces and two rigid body accessors) | `collision.md` | 64 of 64 | `--native_collision` |
+| 2026-10-23 | The collision world's owner and the track's collision (the wall and ground queries, the track mesh and positions, the teardown) | `collision-world.md` | 37 of 43 | `--native_collision_world` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -2526,6 +2534,45 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
     through a function pointer), the collision object's destructor (a
     vtable call), the collision update and narrow phase (a lead), and
     the set-up functions that allocate (the heap).
+
+    The C runtime heap (2026-10-22, branch `b7-loop-22-10-26-2`, the
+    fourth run): the 15 C runtime allocators above the native allocation
+    layer made native in one migration, plain C++ in
+    `src/memory/c_runtime_heap.cpp` calling the layer directly. Their
+    adapters run it only while `--native_heap` is on (`hooks::NativeHeapActive()`),
+    so the game's own heap and the layer never mix; the error paths
+    (errno, the new handler, `bad_alloc`, `_invalid_parameter`) run the
+    recompiled function from the start. `_calloc_impl`, LocalAlloc and
+    LocalFree are Native; the rest keep adapters for their recompiled
+    callers (the core's C runtime set-up, the shader code's
+    `sub_8235AAC0`, the game's many callers of new, delete and XMemAlloc).
+    The game's own heap internals (`sub_82297FD8`, `sub_822982B8`) no
+    longer run with `--native_heap` and aren't ported.
+
+    The collision narrow phase (2026-10-23, the same run): all 64 ours
+    in two migrations: the box shape (the only shape seen in play; its
+    vtable read at run time), the shape record's placement and motion,
+    the box-box separation tests, impacts and push-outs, and the pair's
+    solve and response. Any other shape, or an impact table entry that
+    isn't the box-box one, runs the original. Attract races never reach
+    the impacts; the harness builds boxes that touch, and the pad replay
+    (now step 3 of the validation agent) reached them. Respond's and
+    Solve's harnesses keep "a fixed body meeting the impulse" as expected
+    to differ: the original ContactImpulseWith reads its stack's leftovers
+    for a fixed body.
+
+    The collision world (2026-10-23, the same run): 37 of 43 ours in two
+    migrations: the ground and wall queries the collision world calls
+    through function pointers, the track mesh's lookups and track
+    positions, the world's reset and its teardown. The wall hits are
+    reached only by the harness in attract races (the AI cars don't touch
+    walls); a drive ran the wall query natively. Left: the world's tick
+    (with `car-physics.md`'s CollisionWorld::Update group) and set-up,
+    the course load (blocked by Archive::Load and the asset size) and the
+    route's two functions. During this run the harnesses gained
+    `harness::Outputs` (two NaNs match for values marked floats; the
+    user's call: NaN bits aren't a goal), and the validation agent a pad
+    replay.
 
     The second run (from 2026-10-22, branch `b7-loop-22-10-26`; its first
     session stopped after one subsystem): the first run's removable
@@ -2797,3 +2844,25 @@ Cleared: `KeBugCheckEx` (the heap's own checks, in HeapAlloc, HeapFree,
 HeapReAlloc and HeapSize). B7 (`b7_status.py`): 6,753 in play, ours 714,
 work left 6,039 (Wrapped 137, with a row 336, no row yet 5,566); the new
 `heap.md` has 9 ours of 30 in play. 703 overrides in `src/`.
+
+**2026-10-22, B7's fourth loop run, the C runtime heap (branch
+`b7-loop-22-10-26-2`):** the boundary unchanged: 449 functions (916
+pairs): overridden 67, Native 3, Dropped 23, never called 70, live 286.
+Imports: 186 called, 62 with a live caller. B7 (`b7_status.py`): 6,753
+in play, ours 729, work left 6,024 (Wrapped 137, with a row 321, no row
+yet 5,566); `heap.md` 24 ours of 30. 715 overrides in `src/`.
+
+**2026-10-23, B7's fourth loop run, the collision narrow phase (branch
+`b7-loop-22-10-26-2`):** the boundary unchanged: 449 functions (916
+pairs): overridden 67, Native 3, Dropped 23, never called 70, live 286.
+Imports: 186 called, 62 with a live caller. B7 (`b7_status.py`): 6,753
+in play, ours 797, work left 5,956 (Wrapped 137, with a row 319, no row
+yet 5,500); `collision.md` 64 ours of 64. 747 overrides in `src/`.
+
+**2026-10-23, B7's fourth loop run, done (branch `b7-loop-22-10-26-2`:
+the C runtime heap, the collision narrow phase, the collision world):**
+the boundary unchanged: 449 functions (916 pairs): overridden 67, Native
+3, Dropped 23, never called 70, live 286. Imports: 186 called, 62 with a
+live caller. B7 (`b7_status.py`): 6,753 in play, ours 837, work left
+5,916 (Wrapped 137, with a row 322, no row yet 5,457); `collision-world.md`
+37 ours of 43. 764 overrides in `src/`.

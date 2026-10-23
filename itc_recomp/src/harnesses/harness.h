@@ -40,18 +40,49 @@ struct Context {
   Random random;
 };
 
+// A case's outputs with what each part is, for Results::Check: bytes and
+// words compare exactly; floats and doubles also match when both are NaNs
+// (any sign or payload), counted as NaN-only. Infinities and every other
+// value must match exactly. Mark a value as a float only when it's shown to
+// be one (f1, a vector's lanes, a field the code loads and stores as a
+// float); when unsure, compare it exactly. See "Comparing floats" in
+// docs/loops/b7-loop.md.
+class Outputs {
+ public:
+  void Bytes(const std::vector<uint8_t>& bytes);
+  void Word(uint32_t value);
+  void Float(uint32_t bits);
+  void Floats(uint8_t* base, uint32_t address, uint32_t count);  // guest words
+  void Double(uint64_t bits);
+
+ private:
+  friend class Results;
+  enum class Kind : uint8_t { kExact, kFloat, kDouble };
+  struct Entry {
+    Kind kind;
+    uint32_t offset;
+    uint32_t size;
+  };
+  void Add(Kind kind, const uint8_t* data, uint32_t size);
+  std::vector<uint8_t> bytes_;
+  std::vector<Entry> entries_;
+};
+
 // Counts a harness's cases and differences; logs the first ten.
 class Results {
  public:
   explicit Results(std::string name) : name_(std::move(name)) {}
   void Check(const std::vector<uint8_t>& recompiled, const std::vector<uint8_t>& native,
              const std::string& what);
+  void Check(const Outputs& recompiled, const Outputs& native, const std::string& what);
   void Report() const;
 
  private:
   std::string name_;
   int cases_ = 0;
   int differ_ = 0;
+  int nan_only_ = 0;
+  bool typed_ = false;  // a case went through the Outputs check
 };
 
 using GuestFunction = void (*)(PPCContext&, uint8_t*);
@@ -118,6 +149,9 @@ void RaceOverlays(Context& h);
 void VehicleAccessors(Context& h);
 void MatrixMath(Context& h);
 void CarPhysics(Context& h);
+void Collision(Context& h);
+void CollisionWorld(Context& h);
 void Heap(Context& h);
+void CRuntimeHeap(Context& h);
 
 }  // namespace harness

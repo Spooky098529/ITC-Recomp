@@ -261,6 +261,18 @@ uint32_t Size(uint32_t address) {
   return it->second.size;
 }
 
+bool IsHeapBlock(uint32_t address) {
+  std::lock_guard lock(mutex);
+  auto it = blocks.find(address);
+  return it != blocks.end() && !it->second.pages;
+}
+
+bool IsPages(uint32_t address) {
+  std::lock_guard lock(mutex);
+  auto it = blocks.find(address);
+  return it != blocks.end() && it->second.pages;
+}
+
 uint32_t AllocPages(uint32_t size, uint32_t alignment) {
   ITC_NATIVE_RUNNING("sub_82295398 VirtualAlloc");
   if (size == 0) {

@@ -31,6 +31,10 @@ uint32_t Realloc(uint32_t address, uint32_t size, uint32_t flags);
 // HeapSize (sub_82298FF8): the size asked for; 0xFFFFFFFF for an address the
 // layer didn't give.
 uint32_t Size(uint32_t address);
+// Whether `address` is a heap block the layer gave (one HeapFree frees and
+// HeapSize answers), with nothing logged: for native callers checking
+// before they free.
+bool IsHeapBlock(uint32_t address);
 
 // VirtualAlloc (sub_82295398) with MEM_COMMIT and no address: `size`
 // rounded up to 4 KiB, at `alignment` (4,096, or 65,536 for large pages),
@@ -39,6 +43,10 @@ uint32_t AllocPages(uint32_t size, uint32_t alignment);
 // VirtualFree (sub_82295330) with MEM_RELEASE: false (logged once) for an
 // address the layer didn't give.
 bool FreePages(uint32_t address);
+// Whether `address` is pages the layer gave (VirtualFree frees it), with
+// nothing logged: for native callers and harnesses checking before they
+// free.
+bool IsPages(uint32_t address);
 // Whether `address` is inside the layer's range (false before the first
 // allocation).
 bool InRange(uint32_t address);

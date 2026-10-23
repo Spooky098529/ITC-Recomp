@@ -213,6 +213,16 @@ uint32_t RigidBodyField144(uint32_t body) {
   return body + 144;
 }
 
+uint32_t RigidBodyForce(uint32_t body) {
+  ITC_NATIVE_RUNNING("sub_820988C0 RigidBody::Force");
+  return body + 64;
+}
+
+uint32_t RigidBodyTorque(uint32_t body) {
+  ITC_NATIVE_RUNNING("sub_82379328 RigidBody::Torque");
+  return body + 128;
+}
+
 uint32_t RigidBodyField160(uint32_t body) {
   ITC_NATIVE_RUNNING("sub_820B6898 RigidBody::Field160");
   return body + 160;

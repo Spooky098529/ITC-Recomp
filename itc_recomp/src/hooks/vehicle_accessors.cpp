@@ -15,7 +15,7 @@ ITC_FLAG_BOOL(native_vehicle_accessors, true, "ITC",
               "position and strength, sub_820B8CC0 to sub_820B8D08; Racers::IndexOf and "
               "Stages::HasRacer, sub_820FF9F8 and sub_820FFCF8; SaveData::Of, sub_82105620; "
               "the switch sub_825C8388; the rigid body's accessors and setters, sub_820B6638 "
-              "to sub_820B69D8; the wheels' slip, sub_820C0180 and sub_820C0290; the vehicle's "
+              "to sub_820B69D8, and its force and torque, sub_820988C0 and sub_82379328; the wheels' slip, sub_820C0180 and sub_820C0290; the vehicle's "
               "other accessors, sub_820C0140 to sub_820C0590; the collision object's and the "
               "collision world's, sub_820B7BF0 to sub_820B8D10; the +344 object's, "
               "sub_820B9658 to sub_820B99C8; the race data's setters, stages and racer records, "
@@ -102,6 +102,11 @@ ITC_ACCESSOR_WORD(820B6880, RigidBodyField80(ctx.r3.u32))
 ITC_ACCESSOR_WORD(820B6888, RigidBodyVelocity(ctx.r3.u32))
 ITC_ACCESSOR_WORD(820B6890, RigidBodyField144(ctx.r3.u32))
 ITC_ACCESSOR_WORD(820B6898, RigidBodyField160(ctx.r3.u32))
+// RigidBody::Force (sub_820988C0) keeps its adapter: something reaches it
+// indirectly in play (a temporary log saw it called with its direct
+// caller native). RigidBody::Torque (sub_82379328) has none: its callers in
+// play, Vehicle::ApplyForces and BoxBox::PushOutCorners, are native.
+ITC_ACCESSOR_WORD(820988C0, RigidBodyForce(ctx.r3.u32))
 ITC_ACCESSOR_FLOAT(820B68A0, RigidBodyFloat48(base, ctx.r3.u32))
 ITC_ACCESSOR_VOID(820B68C0, RigidBodyPointVelocity(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
 ITC_ACCESSOR_WORD(820B6928, RigidBodyOrientation(ctx.r3.u32))
