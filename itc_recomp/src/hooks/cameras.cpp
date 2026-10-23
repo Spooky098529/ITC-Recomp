@@ -25,7 +25,8 @@ ITC_FLAG_BOOL(native_cameras, true, "ITC",
               "CameraPasses::Mode sub_8209F718, SetMode sub_8209F738, RenderTarget "
               "sub_8209F7A8, EnableForView sub_820AA1A8 and SetNear sub_820AA368, "
               "CameraPass::Enable sub_820A0968, Disable sub_820A0958 and ReleaseSurfaces "
-              "sub_820A0C40, and SetZoom sub_820AA378; the viewports' Viewports::Release "
+              "sub_820A0C40, and SetZoom sub_820AA378 (no adapter: only CameraPass::FromViewport's "
+              "plain C++ calls it, and the flag switches that); the viewports' Viewports::Release "
               "sub_820AA430 (with --native_heap), Viewport::SetZoom sub_820AAE90 and SetRoll "
               "sub_820AA2D0; CameraPass::Update sub_820A3978, its frame interpolation's notes kept, and "
               "CameraPass::RecordViewport sub_820A0978, without the command list's "
@@ -140,13 +141,6 @@ extern "C" REX_FUNC(sub_820A0C40) {
   } else if (!released_580) {
     ctx.r3.u64 = 0;
   }
-}
-
-// CameraPass::SetZoom: r3 = the pass, f1 = the zoom.
-extern "C" REX_FUNC(sub_820AA378) {
-  ITC_CAMERAS_FALLBACK(820AA378)
-  ctx.fpscr.disableFlushMode();
-  cameras::PassSetZoom(base, ctx.r3.u32, ctx.f1.f64);
 }
 
 // Viewports::Release: no arguments; r3 = VirtualFree's answer for the block
