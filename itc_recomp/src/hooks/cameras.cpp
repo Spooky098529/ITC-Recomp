@@ -24,7 +24,8 @@
 ITC_FLAG_BOOL(native_cameras, true, "ITC",
               "Run the camera passes and viewports (docs/functions/cameras.md: the library "
               "camera's Camera::Camera sub_82593908, Camera::Update sub_82593568, Camera::SetFieldOfView sub_82593278, Camera::BuildProjection "
-              "sub_825932E8 and Camera::SetViewportSize sub_82593500; the camera passes' "
+              "sub_825932E8 (no adapter: only Camera::SetViewportSize's, Update's and Camera's plain C++ call it, "
+              "and the flag switches them) and Camera::SetViewportSize sub_82593500; the camera passes' "
               "CameraPasses::Mode sub_8209F718, SetMode sub_8209F738, RenderTarget "
               "sub_8209F7A8, EnableForView sub_820AA1A8 and SetNear sub_820AA368, "
               "CameraPass::Enable sub_820A0968, Disable sub_820A0958 and ReleaseSurfaces "
@@ -50,20 +51,6 @@ extern "C" REX_FUNC(sub_82593278) {
   ITC_CAMERAS_FALLBACK(82593278)
   ctx.fpscr.disableFlushMode();
   cameras::SetFieldOfView(base, ctx.r3.u32, ctx.f1.f64);
-}
-
-// Camera::BuildProjection: r3 = the camera, r4 to r7 = &field of view,
-// &aspect, &far, &near. Its stack words are held in the plain C++, the same
-// with the stack pointer 16-byte aligned (as the game's always is); the
-// original otherwise.
-extern "C" REX_FUNC(sub_825932E8) {
-  ITC_CAMERAS_FALLBACK(825932E8)
-  if ((ctx.r1.u32 & 0xF) != 0) {
-    __imp__sub_825932E8(ctx, base);
-    return;
-  }
-  ctx.fpscr.disableFlushMode();
-  cameras::BuildProjection(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32);
 }
 
 // Camera::SetViewportSize: r3 = the camera, r4 = width, r5 = height (their
