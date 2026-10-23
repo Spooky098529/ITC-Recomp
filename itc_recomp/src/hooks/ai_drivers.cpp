@@ -50,7 +50,11 @@
 // AvoidOnLeft (sub_8213CB30), AvoidOnRight (sub_8213CD50) and
 // ChooseSideForOther (sub_8213D788), from AvoidOthers (and ChooseSideForOther);
 // AiSkill::TriggerStarts (sub_8213F958) and TriggerEnds (sub_8213FB48), from
-// AiSkill::Update.
+// AiSkill::Update; AiDriver::UpdateSteerInput (sub_8213AC70) and
+// AiPath::IsSlow (sub_8213C0E8), from UpdateSteering (and SteerToTarget);
+// and UpdateSteering (sub_8213AEF0), SteerToTarget (sub_82138D78),
+// UpdateSpeed (sub_8213ACD0), UpdatePedals (sub_8213A428) and LimitThrottle
+// (sub_82139CB0), from AiDriver::Drive.
 
 #include "guest.h"
 
@@ -138,7 +142,8 @@ ITC_FLAG_BOOL(native_ai_drivers, true, "ITC",
               "sub_8213C148, sub_8213AD48, sub_8213F700, sub_8213C3A8, sub_8213CA18, sub_8213C010, "
               "sub_8213BB58, sub_8213C358, sub_8213B890, sub_8213C4C0, sub_8213C5C8, sub_8213C630, "
               "sub_821452A0, sub_8213B650, sub_8213CB30, sub_8213CD50, sub_8213D788, sub_8213F958, "
-              "sub_8213FB48");
+              "sub_8213FB48, sub_8213AC70, sub_8213C0E8, sub_8213AEF0, sub_82138D78, sub_8213ACD0, "
+              "sub_8213A428, sub_82139CB0");
 
 // Defines an adapter: `body` uses `ctx` and `base`.
 #define ITC_AI_DRIVERS(address, body)   \
@@ -168,7 +173,6 @@ ITC_AI_DRIVERS(82145230, UpdateHalfWidth(base, ctx.r3.u32))
 
 // --- The path's corners and points ---
 
-ITC_AI_DRIVERS(8213C0E8, ctx.r3.u64 = IsSlow(base, ctx.r3.u32))
 ITC_AI_DRIVERS(8213D318, ctx.r3.u64 = RaceAllowsSides(base))
 ITC_AI_DRIVERS(8213B5D8, RefreshPoints(base, ctx.r3.u32))
 // r3 the path's driver word, as the original leaves it.
@@ -228,7 +232,6 @@ extern "C" REX_FUNC(sub_8213ADF8) {
 
 // --- Pedals and steering (r3 kept) ---
 
-ITC_AI_DRIVERS(82139CB0, LimitThrottle(base, ctx.r3.u32))
 ITC_AI_DRIVERS(82146608, ctx.r3.u64 = UpdateAgainstPlayer(base, ctx.r3.u32))
 // r4 = &the new gap, r5 = &the length.
 ITC_AI_DRIVERS(821454C8, UpdateOther(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
@@ -239,16 +242,6 @@ ITC_AI_DRIVERS(821454C8, UpdateOther(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
 // (+6048), as ResetToMode1 leaves it.
 ITC_AI_DRIVERS(82139580, ResetControl(base, ctx.r3.u32, ctx.r1.u32 - 112); ctx.r3.u64 += 6048)
 ITC_AI_DRIVERS(8213AAA8, ctx.r3.u64 = ResetDriver(base, ctx.r3.u32))
-// Kinds 2 and 3's steps (never seen in play) from this stack pointer, as
-// the original's tail calls; f1 atan2's when it ran.
-ITC_AI_DRIVERS(8213AC70, {
-  double f1 = 0;
-  bool f1_set = false;
-  ctx.r3.u64 = UpdateSteerInput(base, ctx.r3.u32, ctx.r1.u32, &f1, &f1_set);
-  if (f1_set) {
-    ctx.f1.f64 = f1;
-  }
-})
 ITC_AI_DRIVERS(8213BA48, DropPassedSections(base, ctx.r3.u32))
 // r4 = the other entry or 0, r5 = &the margin, r6 = &the offset.
 ITC_AI_DRIVERS(8213C420, NarrowToOther(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32))
@@ -328,29 +321,6 @@ extern "C" REX_FUNC(sub_8213E970) {
   ctx.r3.u64 = r3;
 }
 
-// --- The target speed (f1 LimitSpeedBlend's, when it ran) ---
-
-// The original's frame 96 bytes down.
-ITC_AI_DRIVERS(8213ACD0, {
-  double f1 = 0;
-  bool f1_set = false;
-  ctx.r3.u64 = UpdateSpeed(base, ctx.r3.u32, ctx.r1.u32 - 96, &f1, &f1_set);
-  if (f1_set) {
-    ctx.f1.f64 = f1;
-  }
-})
-
-// --- Steering at the target and the pedals ---
-
-// f1 as the original leaves it.
-ITC_AI_DRIVERS(82138D78, {
-  double f1 = 0;
-  ctx.r3.u64 = SteerToTarget(base, ctx.r3.u32, &f1);
-  ctx.f1.f64 = f1;
-})
-// r3 kept; the original's frame 112 bytes down.
-ITC_AI_DRIVERS(8213A428, UpdatePedals(base, ctx.r3.u32, ctx.r1.u32 - 112))
-
 // --- The drivers' table and the path's lines and ranges ---
 
 // The original where operator new fails natively.
@@ -410,15 +380,6 @@ ITC_AI_DRIVERS(8213FCF8, {
 
 // --- Steering through the corners and driving ---
 
-// The original's frame 112 bytes down; f1 atan2's when it ran.
-ITC_AI_DRIVERS(8213AEF0, {
-  double f1 = 0;
-  bool f1_set = false;
-  ctx.r3.u64 = UpdateSteering(base, ctx.r3.u32, ctx.r1.u32 - 112, &f1, &f1_set);
-  if (f1_set) {
-    ctx.f1.f64 = f1;
-  }
-})
 // r4 = the car's input record; the original's frame 160 bytes down.
 ITC_AI_DRIVERS(8213B058, {
   double f1 = 0;
