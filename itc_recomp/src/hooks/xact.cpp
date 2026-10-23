@@ -17,7 +17,10 @@ ITC_FLAG_BOOL(native_xact, true, "ITC",
               "fader's constructor and destructor, sub_825CC0A0 and sub_825CC0D0; the sound "
               "banks' file readers, sub_825C7AA8 to sub_825C8230 and sub_825C6928, while the bank's "
               "slot +64 is GetHeader; the wave banks' accessors, sub_825C8398 to sub_825C85E8 and "
-              "sub_825CC320; the wave entry accessors, sub_825CED88 to sub_825CF080) natively "
+              "sub_825CC320; the wave entry accessors, sub_825CED88 to sub_825CF080; the cue's "
+              "GetStateInternal, sub_825C4D90; the sound banks' ForgetWaveBank and the engine's "
+              "loop over them, sub_825C72B0 and sub_825C0408; XACTSound::SetTrackParameter "
+              "without tracks, sub_825CA980; XACTFader::Step when idle, sub_825CC1D0) natively "
               "instead of through the translated code (same results; checked by "
               "--run_harnesses=xact)");
 
@@ -154,3 +157,15 @@ extern "C" REX_FUNC(sub_825CEE70) {
   ctx.r3.u64 = ms;
 }
 ITC_XACT_OPTIONAL(825CF080, WaveEntrySamplesToBytes(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+
+ITC_XACT_WORD(825C4D90, CueGetStateInternal(base, ctx.r3.u32))
+// XACTSoundBank::ForgetWaveBank (sub_825C72B0) has no adapter: its only
+// caller, sub_825C0408, is native.
+ITC_XACT_OPTIONAL(825C0408, EngineForgetWaveBank(base, ctx.r3.u32, ctx.r4.u32))
+extern "C" REX_FUNC(sub_825CA980) {
+  ITC_XACT_FALLBACK(825CA980)
+  if (!SoundSetTrackParameter(base, ctx.r3.u32)) {
+    __imp__sub_825CA980(ctx, base);
+  }
+}
+ITC_XACT_OPTIONAL(825CC1D0, FaderStep(base, ctx.r3.u32))

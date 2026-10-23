@@ -150,4 +150,30 @@ void WaveEntryFindXmaBlock(uint8_t* base, uint32_t entry, uint32_t position, uin
 std::optional<uint32_t> WaveEntrySamplesToBytes(uint8_t* base, uint32_t entry, uint32_t position,
                                                 uint32_t out);
 
+// --- Batch 3: cue state, wave bank forgetting, sounds, faders ---
+
+// XACTCue::GetStateInternal (sub_825C4D90): XACT_CUESTATE flags from the
+// sound (+52): STOPPED (0x20) without one; else its state (+80, 1 to 6) as
+// 1, 2, 4, 8, 0x10, 0x20 (0 out of range), plus PAUSED (0x40) when the
+// sound's byte +52 has 0x20.
+uint32_t CueGetStateInternal(uint8_t* base, uint32_t cue);
+// XACTSoundBank::ForgetWaveBank (sub_825C72B0): the bank's wave bank array
+// (+244) entry holding `wave_bank` cleared. Returns what the original leaves
+// in r3 (the bank without an array, else the header). nullopt where the
+// bank's slot +64 isn't GetHeader.
+std::optional<uint32_t> SoundBankForgetWaveBank(uint8_t* base, uint32_t bank,
+                                                uint32_t wave_bank);
+// sub_825C0408: ForgetWaveBank on every sound bank in the engine's list
+// +44 (nodes at bank + 12). Returns r3 as the original leaves it; nullopt,
+// with nothing changed, where any bank's slot +64 isn't GetHeader.
+std::optional<uint32_t> EngineForgetWaveBank(uint8_t* base, uint32_t engine, uint32_t wave_bank);
+// XACTSound::SetTrackParameter (sub_825CA980): sub_825D0540 on each track
+// (list +36/+40). Only a sound without tracks (as in play) is native: false
+// otherwise (sub_825D0540 never ran; the original runs).
+bool SoundSetTrackParameter(uint8_t* base, uint32_t sound);
+// XACTFader::Step (sub_825CC1D0): 0 for an idle fader (state +16 neither 1
+// nor 2). nullopt for a fading one (no fade ran in play: the original's
+// fade steps, curve and completion slots run).
+std::optional<uint32_t> FaderStep(uint8_t* base, uint32_t fader);
+
 }  // namespace xact

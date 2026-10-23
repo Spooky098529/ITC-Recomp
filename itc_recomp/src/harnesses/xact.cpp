@@ -120,6 +120,17 @@ void NativeWaveEntrySamplesToMs(PPCContext& ctx, uint8_t* base) {
 ITC_NATIVE_STEP(NativeWaveEntryFindXmaBlock,
                 xa::WaveEntryFindXmaBlock(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
                                           ctx.r7.u32))
+ITC_NATIVE_STEP(NativeCueGetStateInternal, ctx.r3.u64 = xa::CueGetStateInternal(base, ctx.r3.u32))
+ITC_NATIVE_OPTIONAL(NativeSoundBankForgetWaveBank,
+                    xa::SoundBankForgetWaveBank(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_OPTIONAL(NativeEngineForgetWaveBank,
+                    xa::EngineForgetWaveBank(base, ctx.r3.u32, ctx.r4.u32))
+void NativeSoundSetTrackParameter(PPCContext& ctx, uint8_t* base) {
+  if (!xa::SoundSetTrackParameter(base, ctx.r3.u32)) {
+    ctx.r3.u64 = 0xDEADDEAD;
+  }
+}
+ITC_NATIVE_OPTIONAL(NativeFaderStep, xa::FaderStep(base, ctx.r3.u32))
 ITC_NATIVE_OPTIONAL(NativeWaveEntrySamplesToBytes,
                     xa::WaveEntrySamplesToBytes(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
 
@@ -772,6 +783,116 @@ void WaveBanks(Context& h) {
   results.Report();
 }
 
+// A native version's decline (0xDEADDEAD in r3), where the original runs.
+void CheckDeclines(Context& h, Results& results, GuestFunction native, uint32_t r3, uint32_t r4,
+                   const std::string& what) {
+  Outputs out[2];
+  PPCContext t = CallContext(h);
+  t.r3.u64 = r3;
+  t.r4.u64 = r4;
+  native(t, h.base);
+  out[0].Word(0xDEADDEAD);
+  out[1].Word(t.r3.u32);
+  results.Check(out[0], out[1], what + " (declines)");
+}
+
+void CuesAndSounds(Context& h) {
+  Results results("xact cues and sounds");
+  const uint32_t d = h.data;
+  // GetStateInternal: the cue at the area's start, its sound at +512.
+  for (int i = 0; i < 80; i++) {
+    const bool sound = i % 8 != 0;
+    const uint32_t state = i < 40 ? uint32_t(i % 9) : uint32_t(h.random.Next());
+    auto setup = [&] {
+      RandomWords(h, d, 32);
+      RandomWords(h, d + 512, 32);
+      guest::StoreU32(h.base, d + 52, sound ? d + 512 : 0);
+      guest::StoreU32(h.base, d + 512 + 80, state);
+    };
+    Case(h, results, setup, [&](PPCContext& t) { t.r3.u64 = d; }, __imp__sub_825C4D90,
+         NativeCueGetStateInternal, {},
+         fmt::format("XACTCue::GetStateInternal {} (state {})", i, state));
+  }
+  // ForgetWaveBank: banks at the area's start, +300 and +600 (vtable,
+  // node +12, the array +244 at +2048 + 64 k or none, the header at +1024
+  // for all: its wave bank count +17), the engine at +3584 (its list's
+  // sentinel at +44, the head at +48).
+  constexpr uint32_t kEngine = 3584;
+  for (int i = 0; i < 120; i++) {
+    const uint32_t banks = i < 60 ? 1 : h.random.Below(4);
+    const uint32_t count = h.random.Below(i % 5 == 0 ? 256 : 13);
+    const uint32_t wave_bank = 0x40001000u + h.random.Below(4) * 0x100;
+    auto setup = [&] {
+      RandomBytes(h, d + 1024, 64);
+      guest::StoreU8(h.base, d + 1024 + 17, uint8_t(count));
+      RandomWords(h, d + kEngine, 32);
+      uint32_t previous = d + kEngine + 44;
+      for (uint32_t k = 0; k < 3; k++) {
+        const uint32_t bank = d + 300 * k;
+        RandomWords(h, bank, 70);
+        guest::StoreU32(h.base, bank, kSoundBankVtable);
+        guest::StoreU32(h.base, bank + 260, d + 1024);
+        const bool array = h.random.Below(5) != 0;
+        guest::StoreU32(h.base, bank + 244, array ? d + 2048 + 64 * k : 0);
+        for (uint32_t w = 0; w < 16; w++) {
+          guest::StoreU32(h.base, d + 2048 + 64 * k + 4 * w,
+                          0x40001000u + h.random.Below(6) * 0x100);
+        }
+        if (k < banks) {
+          guest::StoreU32(h.base, previous + 4, bank + 12);
+          previous = bank + 12;
+        }
+      }
+      guest::StoreU32(h.base, previous + 4, d + kEngine + 44);
+    };
+    if (i < 60) {
+      Case(h, results, setup, [&](PPCContext& t) { t.r3.u64 = d; t.r4.u64 = wave_bank; },
+           __imp__sub_825C72B0, NativeSoundBankForgetWaveBank, {},
+           fmt::format("XACTSoundBank::ForgetWaveBank {} ({} wave banks)", i, count));
+    }
+    Case(h, results, setup, [&](PPCContext& t) { t.r3.u64 = d + kEngine; t.r4.u64 = wave_bank; },
+         __imp__sub_825C0408, NativeEngineForgetWaveBank, {},
+         fmt::format("sub_825C0408 {} ({} banks, {} wave banks)", i, banks, count));
+  }
+  for (int i = 0; i < 4; i++) {
+    Fill(h.base, d, kScratchBytes);
+    RandomWords(h, d, 70);
+    guest::StoreU32(h.base, d, d + 3072);  // a vtable whose +64 isn't GetHeader
+    guest::StoreU32(h.base, d + 3072 + 64, 0x825C7AB0);
+    guest::StoreU32(h.base, d + 244, d + 2048);
+    CheckDeclines(h, results, NativeSoundBankForgetWaveBank, d, 0, "ForgetWaveBank, slot +64");
+    guest::StoreU32(h.base, d + kEngine + 48, d + 12);
+    guest::StoreU32(h.base, d + 16, d + kEngine + 44);
+    CheckDeclines(h, results, NativeEngineForgetWaveBank, d + kEngine, 0,
+                  "sub_825C0408, slot +64");
+  }
+  // SetTrackParameter without tracks (the list's sentinel at +36, its head
+  // at +40), and its decline with one; Fader::Step idle, and its declines
+  // fading.
+  for (int i = 0; i < 20; i++) {
+    auto setup = [&] {
+      RandomWords(h, d, 32);
+      guest::StoreU32(h.base, d + 40, d + 36);
+    };
+    Case(h, results, setup, [&](PPCContext& t) { t.r3.u64 = d; t.r4.u64 = d + 1024; },
+         __imp__sub_825CA980, NativeSoundSetTrackParameter, {},
+         fmt::format("XACTSound::SetTrackParameter {}", i));
+    const uint32_t state = i < 10 ? uint32_t(i) : uint32_t(h.random.Next());
+    if (state != 1 && state != 2) {
+      Case(h, results, [&] { RandomWords(h, d, 8); guest::StoreU32(h.base, d + 16, state); },
+           [&](PPCContext& t) { t.r3.u64 = d; }, __imp__sub_825CC1D0, NativeFaderStep, {},
+           fmt::format("XACTFader::Step {} (state {})", i, state));
+    }
+  }
+  for (uint32_t state : {1u, 2u}) {
+    guest::StoreU32(h.base, d + 16, state);
+    CheckDeclines(h, results, NativeFaderStep, d, 0, fmt::format("XACTFader::Step {}", state));
+  }
+  guest::StoreU32(h.base, d + 40, d + 512);
+  CheckDeclines(h, results, NativeSoundSetTrackParameter, d, 0, "XACTSound::SetTrackParameter");
+  results.Report();
+}
+
 }  // namespace
 
 void Xact(Context& h) {
@@ -780,6 +901,7 @@ void Xact(Context& h) {
   Objects(h);
   SoundBanks(h);
   WaveBanks(h);
+  CuesAndSounds(h);
 }
 
 }  // namespace harness

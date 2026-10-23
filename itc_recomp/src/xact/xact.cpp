@@ -518,4 +518,84 @@ std::optional<uint32_t> WaveEntrySamplesToBytes(uint8_t* base, uint32_t entry, u
   return result;
 }
 
+uint32_t CueGetStateInternal(uint8_t* base, uint32_t cue) {
+  ITC_NATIVE_RUNNING("sub_825C4D90 XACTCue::GetStateInternal");
+  const uint32_t sound = guest::LoadU32(base, cue + 52);
+  if (sound == 0) {
+    return 0x20;  // XACT_CUESTATE_STOPPED
+  }
+  const uint32_t state = guest::LoadU32(base, sound + 80) - 1;
+  uint32_t flags = state <= 5 ? 1u << state : 0;
+  if (guest::LoadU8(base, sound + 52) & 0x20) {
+    flags |= 0x40;  // XACT_CUESTATE_PAUSED
+  }
+  return flags;
+}
+
+namespace {
+
+// ForgetWaveBank once its bank's slot +64 is known to be GetHeader.
+uint32_t ForgetWaveBank(uint8_t* base, uint32_t bank, uint32_t wave_bank) {
+  ITC_NATIVE_RUNNING("sub_825C72B0 XACTSoundBank::ForgetWaveBank");
+  if (guest::LoadU32(base, bank + 244) == 0) {
+    return bank;
+  }
+  const uint32_t header = SoundBankGetHeader(base, bank);
+  const uint32_t count = guest::LoadU8(base, header + 17);
+  for (uint32_t i = 0; i < count; i++) {
+    const uint32_t array = guest::LoadU32(base, bank + 244);
+    if (guest::LoadU32(base, array + 4 * i) == wave_bank) {
+      guest::StoreU32(base, array + 4 * i, 0);
+      break;
+    }
+  }
+  return header;
+}
+
+}  // namespace
+
+std::optional<uint32_t> SoundBankForgetWaveBank(uint8_t* base, uint32_t bank,
+                                                uint32_t wave_bank) {
+  if (guest::LoadU32(base, bank + 244) != 0 && !SlotIs(base, bank, 64, kGetHeader)) {
+    return std::nullopt;
+  }
+  return ForgetWaveBank(base, bank, wave_bank);
+}
+
+std::optional<uint32_t> EngineForgetWaveBank(uint8_t* base, uint32_t engine, uint32_t wave_bank) {
+  const uint32_t end = engine + 44;
+  auto bank_of = [](uint32_t node) { return node != 0 ? node - 12 : 0; };
+  for (uint32_t node = guest::LoadU32(base, engine + 48); node != end;
+       node = guest::LoadU32(base, node + 4)) {
+    const uint32_t bank = bank_of(node);
+    if (guest::LoadU32(base, bank + 244) != 0 && !SlotIs(base, bank, 64, kGetHeader)) {
+      return std::nullopt;
+    }
+  }
+  ITC_NATIVE_RUNNING("sub_825C0408 XACTEngine::ForgetWaveBank");
+  uint32_t r3 = engine;
+  for (uint32_t node = guest::LoadU32(base, engine + 48); node != end;
+       node = guest::LoadU32(base, node + 4)) {
+    r3 = ForgetWaveBank(base, bank_of(node), wave_bank);
+  }
+  return r3;
+}
+
+bool SoundSetTrackParameter(uint8_t* base, uint32_t sound) {
+  if (guest::LoadU32(base, sound + 40) != sound + 36) {
+    return false;
+  }
+  ITC_NATIVE_RUNNING("sub_825CA980 XACTSound::SetTrackParameter");
+  return true;
+}
+
+std::optional<uint32_t> FaderStep(uint8_t* base, uint32_t fader) {
+  const uint32_t state = guest::LoadU32(base, fader + 16);
+  if (state == 1 || state == 2) {
+    return std::nullopt;
+  }
+  ITC_NATIVE_RUNNING("sub_825CC1D0 XACTFader::Step");
+  return 0;
+}
+
 }  // namespace xact
