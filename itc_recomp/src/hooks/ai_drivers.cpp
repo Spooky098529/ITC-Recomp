@@ -63,7 +63,29 @@
 // Mirror (sub_82145610) and Update (sub_821454C8), from
 // AiDriver::CompareWith (sub_82145B08), from AiDrivers::UpdateAll; and
 // AiDriver::KeepsGapFrom (sub_82145048) and AiOther::PlanReaction
-// (sub_821456F8), from AiDriver::ReactToOthers.
+// (sub_821456F8), from AiDriver::ReactToOthers. Since the fifth migration:
+// AiDriver::Update (sub_8213B310), from DriveCar; UpdateAgainstPlayer
+// (sub_82146608) and UpdateHalfWidth (sub_82145230), from ReadVehicle;
+// Angle::Wrap (sub_82145408), from SteerToTarget and ReadVehicle;
+// ResetToMode0 (sub_821394F0), from UpdateIdle; SetState2or3 (sub_82139E40),
+// from AiDrivers::StartGroup; SetStateFromList (sub_82139EA8) and SetState4
+// (sub_82139FA0), from StartRanked; Drive (sub_8213B058), from
+// AiDriver::Update; AiPath::Update (sub_8213F530), from UpdateIdle and
+// AiDriver::Update; AiPath::Reset (sub_8213D438), from its native callers;
+// CompareBranches (sub_8213C788), from FindSideSection and KeepBranch;
+// BranchMasks (sub_8213E500), from KeepBranch and Extend; LeaderBranchKind
+// (sub_8213D1F0), from StartGroup and StartRanked; RaceAllowsSides
+// (sub_8213D318), from BranchMasks; FollowLeaderBranch (sub_8213EB48),
+// DropPassed (sub_8213F2E0), Extend (sub_8213ECF8), RefreshPoints
+// (sub_8213B5D8), SetRanges (sub_8213D670), FollowTargets (sub_8213D9D8),
+// PlanLine (sub_8213F4B0), AiDriver::ReactToOthers (sub_82145CA8) and
+// AvoidOthers (sub_8213E690), from AiPath::Update; LeftEntry (sub_8213F140),
+// DropPassedSections (sub_8213BA48) and AdvanceCorners (sub_8213D020), from
+// DropPassed; KeepBranch (sub_8213EAB0) and WithinRoadAt (sub_8213C1A0),
+// from LeftEntry; and FindSideSection (sub_8213D550), NarrowToOther
+// (sub_8213C420), NarrowBehind (sub_8213D140), AddCornersAt (sub_8213E970),
+// DropOffRouteCorners (sub_8213DC08) and ApplyCornerLines (sub_8213CFC8), from
+// Extend.
 
 #include "guest.h"
 
@@ -173,7 +195,13 @@ ITC_FLAG_BOOL(native_ai_drivers, true, "ITC",
               "sub_8213FB48, sub_8213AC70, sub_8213C0E8, sub_8213AEF0, sub_82138D78, sub_8213ACD0, "
               "sub_8213A428, sub_82139CB0, sub_8213DB08, sub_8213DE30, sub_8213E018, sub_8213E1D0, "
               "sub_8213E360, sub_8213E7B8, sub_8213CF58, sub_821456A0, sub_82145610, sub_821454C8, "
-              "sub_82145B08, sub_82145048, sub_821456F8");
+              "sub_82145B08, sub_82145048, sub_821456F8, sub_8213B310, sub_82146608, sub_82145230, "
+              "sub_82145408, sub_821394F0, sub_82139E40, sub_82139EA8, sub_82139FA0, sub_8213B058, "
+              "sub_8213F530, sub_8213D438, sub_8213C788, sub_8213E500, sub_8213D1F0, sub_8213D318, "
+              "sub_8213EB48, sub_8213F2E0, sub_8213F140, sub_8213EAB0, sub_8213C1A0, sub_8213BA48, "
+              "sub_8213ECF8, sub_8213D550, sub_8213C420, sub_8213D140, sub_8213B5D8, sub_8213D670, "
+              "sub_8213D9D8, sub_8213F4B0, sub_8213E970, sub_8213DC08, sub_8213D020, sub_8213CFC8, "
+              "sub_82145CA8, sub_8213E690");
 
 // Defines an adapter: `body` uses `ctx` and `base`.
 #define ITC_AI_DRIVERS(address, body)   \
@@ -196,17 +224,8 @@ ITC_AI_DRIVERS(820C96E8, ClearCarInput(base, ctx.r3.u32))
 
 // --- Small reads and steps ---
 
-ITC_AI_DRIVERS(82145408, WrapAngle(base, ctx.r3.u32))
 ITC_AI_DRIVERS(82101760, ctx.r3.u64 = TimeFromTicks(ctx.r3.u32))
 ITC_AI_DRIVERS(82144F50, ctx.r3.u64 = ReadCar(base, ctx.r3.u32))
-ITC_AI_DRIVERS(82145230, UpdateHalfWidth(base, ctx.r3.u32))
-
-// --- The path's corners and points ---
-
-ITC_AI_DRIVERS(8213D318, ctx.r3.u64 = RaceAllowsSides(base))
-ITC_AI_DRIVERS(8213B5D8, RefreshPoints(base, ctx.r3.u32))
-// r3 the path's driver word, as the original leaves it.
-ITC_AI_DRIVERS(8213D438, ctx.r3.u64 = ResetPath(base, ctx.r3.u32))
 
 // --- Set-up, modes and the plan ---
 
@@ -222,16 +241,8 @@ ITC_AI_DRIVERS(8213B428, ctx.r3.u64 = NormalizeByLane(base, ctx.r4.u32, ctx.r5.u
 ITC_AI_DRIVERS(82144EF8, UpdateLane(base, ctx.r3.u32, ctx.r1.u32 - 128);
                ctx.r3.u64 = ctx.r1.u32 - 128 + 80)
 
-// --- The path's entries and corners ---
-
-// r4 = &the offset.
-ITC_AI_DRIVERS(8213C1A0, ctx.r3.u64 = WithinRoadAt(base, ctx.r3.u32, ctx.r4.u32))
-
 // --- Starts and resets ---
 
-// The words passed by address in the original's frame (128 bytes down); r3
-// left at the skill (+6048), as the original leaves it.
-ITC_AI_DRIVERS(821394F0, ResetToMode0(base, ctx.r3.u32, ctx.r1.u32 - 128); ctx.r3.u64 += 6048)
 ITC_AI_DRIVERS(82139DA0, ctx.r3.u64 = StartRace(base, ctx.r3.u32, ctx.r1.u32 - 112))
 // The copies in the original's frame (6,320 bytes down); the original where
 // one can't be made natively.
@@ -248,52 +259,24 @@ extern "C" REX_FUNC(sub_8213ADF8) {
   __imp__sub_8213ADF8(ctx, base);
 }
 
-// --- Pedals and steering (r3 kept) ---
-
-ITC_AI_DRIVERS(82146608, ctx.r3.u64 = UpdateAgainstPlayer(base, ctx.r3.u32))
-
 // --- Resets, steering input and the path's lists ---
 
 // The word in the original's frame (112 bytes down); r3 left at the skill
 // (+6048), as ResetToMode1 leaves it.
 ITC_AI_DRIVERS(82139580, ResetControl(base, ctx.r3.u32, ctx.r1.u32 - 112); ctx.r3.u64 += 6048)
 ITC_AI_DRIVERS(8213AAA8, ctx.r3.u64 = ResetDriver(base, ctx.r3.u32))
-ITC_AI_DRIVERS(8213BA48, DropPassedSections(base, ctx.r3.u32))
-// r4 = the other entry or 0, r5 = &the margin, r6 = &the offset.
-ITC_AI_DRIVERS(8213C420, NarrowToOther(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32))
-// r4 = &the slices; the original where the records' moves can't be made
-// natively.
-extern "C" REX_FUNC(sub_8213D020) {
-  REX_FUNC_PROLOGUE();
-  if (ITC_FLAG(native_ai_drivers)) {
-    ctx.fpscr.disableFlushMode();
-    uint32_t r3 = 0;
-    if (AdvanceCorners(base, ctx.r3.u32, ctx.r4.u32, &r3)) {
-      ctx.r3.u64 = r3;
-      return;
-    }
-  }
-  __imp__sub_8213D020(ctx, base);
-}
 
 // --- The states and the drivers' resets (the originals' frames: 112 or 128
 // bytes down) ---
 
 ITC_AI_DRIVERS(82139750, ctx.r3.u64 = ResetAll(base, ctx.r1.u32 - 128))
-// r4 = &the word, r5 = &the flag.
-ITC_AI_DRIVERS(82139E40, ctx.r3.u64 = SetState2or3(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
-                                                   ctx.r1.u32 - 112))
-// r4 = &the word, r5 = &the count, r6 = the list.
-ITC_AI_DRIVERS(82139EA8, ctx.r3.u64 = SetStateFromList(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
-                                                       ctx.r6.u32, ctx.r1.u32 - 128))
-// r4 = &the word.
-ITC_AI_DRIVERS(82139FA0, ctx.r3.u64 = SetState4(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 112))
 ITC_AI_DRIVERS(8213A140, ctx.r3.u64 = ClearAll(base, ctx.r1.u32 - 128))
 
 // --- The corners' joins ---
 
 namespace {
-// JoinCornerPair's equal directions (never seen in play, from AddCornersAt):
+// JoinCornerPair's equal directions (never seen in play, from AddCornersAt in
+// AiPath::Extend, CallJoinStep below):
 // the translated step 2 (sub_8213BDF0) or 3 (sub_8213BE80), called from
 // JoinCornerPair's frame (`frame`, its back chain `chain`) as the original does, with r6 =
 // &the gap there; r3, r4 and r5 as set.
@@ -312,31 +295,6 @@ void RunJoinStep(PPCContext& ctx, uint8_t* base, uint32_t step, uint32_t frame,
 }
 }  // namespace
 
-// r4 = the path entry; the original's frame 144 bytes down (JoinCornerPair's
-// 112 below it).
-extern "C" REX_FUNC(sub_8213E970) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_ai_drivers)) {
-    __imp__sub_8213E970(ctx, base);
-    return;
-  }
-  ctx.fpscr.disableFlushMode();
-  const uint32_t path = ctx.r3.u32;
-  const uint32_t frame = ctx.r1.u32 - 144;
-  uint32_t r3 = 0, a = 0, b = 0;
-  const uint32_t step = AddCornersAt(base, path, ctx.r4.u32, frame, &r3, &a, &b);
-  if (step >= 2) {
-    guest::StoreU32(base, frame, ctx.r1.u32);
-    ctx.r3.u64 = path;
-    ctx.r4.u64 = a;
-    ctx.r5.u64 = b;
-    RunJoinStep(ctx, base, step, frame - 112, frame);
-    AddCornersAtFinish(base, path);
-    return;
-  }
-  ctx.r3.u64 = r3;
-}
-
 // --- The drivers' table and the path's lines and ranges ---
 
 // The original where operator new fails natively.
@@ -352,30 +310,13 @@ extern "C" REX_FUNC(sub_8213B1E0) {
   }
   __imp__sub_8213B1E0(ctx, base);
 }
-// The original's frame 112 bytes down (r3 kept).
-ITC_AI_DRIVERS(8213CFC8, ApplyCornerLines(base, ctx.r3.u32, ctx.r1.u32 - 112))
-// r4 = &the count; the original's frame 128 bytes down.
-ITC_AI_DRIVERS(8213D670, ctx.r3.u64 = SetRanges(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 128))
-ITC_AI_DRIVERS(8213DC08, ctx.r3.u64 = DropOffRouteCorners(base, ctx.r3.u32))
 
 // --- The path's offsets, narrowing and branches ---
 
-// r4 = the entry after, r5 = the entry, r6 = &the step, r7 = &the limit; the
-// original's frame 128 bytes down.
-ITC_AI_DRIVERS(8213D140, ctx.r3.u64 = NarrowBehind(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
-                                                   ctx.r6.u32, ctx.r7.u32, ctx.r1.u32 - 128))
-// r4, r5 = the sections, r6, r7 = &their numbers, r8 = the masks or 0.
-ITC_AI_DRIVERS(8213C788, ctx.r3.s64 = CompareBranches(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
-                                                      ctx.r6.u32, ctx.r7.u32, ctx.r8.u32))
 // The path's +5532 in mode 0 (no direct callers): r4 = the entry, r5 = the
 // position, r6 = &the lane, r7 = the masks or 0.
 ITC_AI_DRIVERS(8213C908, ctx.r3.u64 = NormalizeByBranch(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
                                                         ctx.r6.u32, ctx.r7.u32))
-
-// --- Making room for the other racers ---
-
-// The original's frame 272 bytes down.
-ITC_AI_DRIVERS(8213E690, ctx.r3.u64 = AvoidOthers(base, ctx.r3.u32, ctx.r1.u32 - 272))
 
 // --- The skill's timed triggers (f1 the last trigger's value of kinds 6 and
 // 7, as the original leaves it) ---
@@ -390,37 +331,13 @@ ITC_AI_DRIVERS(8213FCF8, {
   }
 })
 
-// --- Steering through the corners and driving ---
-
-// r4 = the car's input record; the original's frame 160 bytes down.
-ITC_AI_DRIVERS(8213B058, {
-  double f1 = 0;
-  ctx.r3.u64 = Drive(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 160, &f1);
-  ctx.f1.f64 = f1;
-})
-
-// --- The path's line through the corners ---
-
-// The original's frame 96 bytes down.
-ITC_AI_DRIVERS(8213F4B0, ctx.r3.u64 = PlanLine(base, ctx.r3.u32, ctx.r1.u32 - 96))
-
 // --- The path's branch kinds and lines ---
 
 // r3 = &the kind; the list's address sign-extended, as the original's lis
 // leaves it.
 ITC_AI_DRIVERS(8213D378, ctx.r3.s64 = int32_t(BranchMasksFor(base, ctx.r3.u32)))
-// r4 = &the kind, r5 = &the best.
-ITC_AI_DRIVERS(8213D1F0, ctx.r3.u64 = LeaderBranchKind(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
-// r4 = out, r5 = the point, r6 = the masks; the original's frame 208 bytes
-// down.
-ITC_AI_DRIVERS(8213D550, ctx.r3.u64 = FindSideSection(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
-                                                      ctx.r6.u32, ctx.r1.u32 - 208))
-// The original's frame 128 bytes down (r3 kept).
-ITC_AI_DRIVERS(8213D9D8, FollowTargets(base, ctx.r3.u32, ctx.r1.u32 - 128))
-ITC_AI_DRIVERS(8213EB48, ctx.r3.u64 = FollowLeaderBranch(base, ctx.r3.u32))
 
 // --- The drivers' updates and the pairs ---
-
 
 namespace {
 struct UpdateCall {
@@ -452,12 +369,6 @@ ITC_AI_DRIVERS(82139628, {
   ctx.r3.u64 = UpdateAll(base, ctx.r1.u32 - 176, CallDriverUpdate, &call);
 })
 
-// --- Reacting to the other racers ---
-
-// r4 = &the entry count; the original's frame 240 bytes down.
-ITC_AI_DRIVERS(82145CA8, ctx.r3.u64 = ReactToOthers(base, ctx.r3.u32, ctx.r4.u32,
-                                                    ctx.r1.u32 - 240))
-
 // --- The drivers' starts (the originals' frames: 160 and 224 bytes down) ---
 
 ITC_AI_DRIVERS(8213A000, ctx.r3.u64 = StartGroup(base, ctx.r1.u32 - 160))
@@ -469,35 +380,6 @@ ITC_AI_DRIVERS(8213A8B0, ctx.r3.u64 = StartRanked(base, ctx.r1.u32 - 224))
 // r4 = the slice record or 0.
 ITC_AI_DRIVERS(821467F0, ctx.r3.u64 = ReadVehicle(base, ctx.r3.u32, ctx.r4.u32))
 ITC_AI_DRIVERS(821469D0, ctx.r3.u64 = ReadVehicleOwnSlice(base, ctx.r3.u32))
-
-// --- The path's branch masks ---
-
-// The original's frame 96 bytes down.
-ITC_AI_DRIVERS(8213E500, ctx.r3.u64 = BranchMasks(base, ctx.r3.u32, ctx.r1.u32 - 96))
-
-// --- Keeping to the path's entries ---
-
-// r4, r5 = &the route positions, r6 = the point; the original's frame 128
-// bytes down.
-ITC_AI_DRIVERS(8213EAB0, ctx.r3.u64 = KeepBranch(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
-                                                 ctx.r6.u32, ctx.r1.u32 - 128))
-// r4 = the point, r5 = the ring entry; the original's frame 160 bytes down.
-ITC_AI_DRIVERS(8213F140, ctx.r3.u64 = LeftEntry(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
-                                                ctx.r1.u32 - 160))
-// r4 = the point; the original's frame 160 bytes down. The original where
-// AdvanceCorners' copies couldn't be native.
-extern "C" REX_FUNC(sub_8213F2E0) {
-  REX_FUNC_PROLOGUE();
-  if (ITC_FLAG(native_ai_drivers)) {
-    ctx.fpscr.disableFlushMode();
-    uint64_t r3 = 0;
-    if (DropPassed(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 160, &r3)) {
-      ctx.r3.u64 = r3;
-      return;
-    }
-  }
-  __imp__sub_8213F2E0(ctx, base);
-}
 
 // --- The path's update ---
 
@@ -530,7 +412,7 @@ uint64_t CallNormalizer(void* user, uint32_t function, uint32_t frame, uint32_t 
   return ctx.r3.u64;
 }
 // AddCornersAt's translated join step (never seen in play), from its frame
-// (`frame`, Extend's 144 bytes below it) as its adapter runs it.
+// (`frame`, Extend's 144 bytes below it) as its adapter ran it.
 uint64_t CallJoinStep(void* user, uint32_t step, uint32_t frame, uint32_t path, uint32_t a,
                       uint32_t b) {
   auto& call = *static_cast<PathCall*>(user);
@@ -546,56 +428,8 @@ uint64_t CallJoinStep(void* user, uint32_t step, uint32_t frame, uint32_t path, 
 }
 }  // namespace
 
-// r4 = the point; the original's frame 208 bytes down.
-extern "C" REX_FUNC(sub_8213ECF8) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_ai_drivers)) {
-    __imp__sub_8213ECF8(ctx, base);
-    return;
-  }
-  ctx.fpscr.disableFlushMode();
-  PathCall call{&ctx, base};
-  const PathCalls calls{&call, CallNormalizer, CallJoinStep};
-  ctx.r3.u64 = Extend(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 208, calls);
-}
-// The original's frame 144 bytes down; the original where DropPassed
-// couldn't be native.
-extern "C" REX_FUNC(sub_8213F530) {
-  REX_FUNC_PROLOGUE();
-  if (ITC_FLAG(native_ai_drivers)) {
-    ctx.fpscr.disableFlushMode();
-    PathCall call{&ctx, base};
-    const PathCalls calls{&call, CallNormalizer, CallJoinStep};
-    uint64_t r3 = 0;
-    if (UpdatePath(base, ctx.r3.u32, ctx.r1.u32 - 144, calls, &r3)) {
-      ctx.r3.u64 = r3;
-      return;
-    }
-  }
-  __imp__sub_8213F530(ctx, base);
-}
-
 // --- The drivers' updates (f1 Drive's, as the originals leave it) ---
 
-// r4 = the car's input record, r5 = &the flag; the original's frame 112 bytes
-// down. The original where AiPath::Update couldn't be native.
-extern "C" REX_FUNC(sub_8213B310) {
-  REX_FUNC_PROLOGUE();
-  if (ITC_FLAG(native_ai_drivers)) {
-    ctx.fpscr.disableFlushMode();
-    PathCall call{&ctx, base};
-    const PathCalls calls{&call, CallNormalizer, CallJoinStep};
-    uint64_t r3 = 0;
-    double f1 = 0;
-    if (UpdateDriver(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32 - 112, calls, &r3,
-                     &f1)) {
-      ctx.r3.u64 = r3;
-      ctx.f1.f64 = f1;
-      return;
-    }
-  }
-  __imp__sub_8213B310(ctx, base);
-}
 // r3 = the car's input record (left in r3), r4 = the racer's index, r5 = the
 // flag; the original's frame 144 bytes down.
 extern "C" REX_FUNC(sub_8215F678) {
