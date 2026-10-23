@@ -24,8 +24,10 @@
 // ResetToMode1, ResetToMode0, ResetControl and StartRace; ResetToMode1
 // (sub_82139450), from ResetControl; AccumulateSteer (sub_82138F00), from
 // UpdateSteerInput; ClearPlan (sub_82139820), from StartRace, SetState2or3,
-// SetStateFromList, SetState4 and ClearAll; and Restart (sub_821395D0), from
-// ResetAll.
+// SetStateFromList, SetState4 and ClearAll; Restart (sub_821395D0), from
+// ResetAll; and AiCorner::Init (sub_8213C698) and JoinCornerPair
+// (sub_8213DD40), from AddCornersAt, JoinCorners (sub_8213BCD0) and
+// JoinCornersShort (sub_8213BF28), from JoinCornerPair.
 
 #include "guest.h"
 
@@ -85,7 +87,8 @@ ITC_FLAG_BOOL(native_ai_drivers, true, "ITC",
               "sub_8213F730, sub_8213F900, sub_8213B390, sub_821459B0, sub_821451B8, sub_821464B8, "
               "sub_82146508, sub_82146588, sub_82146408, sub_8213F698, sub_821393D8, sub_8213D508, "
               "sub_82145450, sub_821467B8, sub_82138D20, sub_82139450, sub_82138F00, sub_8213E658, "
-              "sub_82145A48, sub_82139820, sub_821395D0");
+              "sub_82145A48, sub_82139820, sub_821395D0, sub_8213C698, sub_8213DD40, "
+              "sub_8213BCD0, sub_8213BF28");
 
 // Defines an adapter: `body` uses `ctx` and `base`.
 #define ITC_AI_DRIVERS(address, body)   \
@@ -179,8 +182,6 @@ ITC_AI_DRIVERS(82145610, MirrorOther(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
 // r4 = &the position across, r5 = &the width, r6 = &out.
 ITC_AI_DRIVERS(8213C5C8, BlockLeft(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32))
 ITC_AI_DRIVERS(8213C630, BlockRight(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32))
-// r4 = the corner's data, r5 = &the slice's corner entry, r6 = &the count.
-ITC_AI_DRIVERS(8213C698, InitCorner(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32))
 // r4 = &the offset.
 ITC_AI_DRIVERS(8213C1A0, ctx.r3.u64 = WithinRoadAt(base, ctx.r3.u32, ctx.r4.u32))
 
@@ -280,13 +281,10 @@ ITC_AI_DRIVERS(8213A140, ctx.r3.u64 = ClearAll(base, ctx.r1.u32 - 128))
 
 // --- The corners' joins ---
 
-// r4 = a, r5 = b, r6 = &the count; r3 not read.
-ITC_AI_DRIVERS(8213BCD0, ctx.r3.u64 = JoinCorners(base, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32))
-ITC_AI_DRIVERS(8213BF28, ctx.r3.u64 = JoinCornersShort(base, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32))
 namespace {
-// JoinCornerPair's equal directions (never seen in play): the translated
-// step 2 (sub_8213BDF0) or 3 (sub_8213BE80), called from JoinCornerPair's
-// frame (`frame`, its back chain `chain`) as the original does, with r6 =
+// JoinCornerPair's equal directions (never seen in play, from AddCornersAt):
+// the translated step 2 (sub_8213BDF0) or 3 (sub_8213BE80), called from
+// JoinCornerPair's frame (`frame`, its back chain `chain`) as the original does, with r6 =
 // &the gap there; r3, r4 and r5 as set.
 void RunJoinStep(PPCContext& ctx, uint8_t* base, uint32_t step, uint32_t frame,
                  uint32_t chain) {
@@ -303,23 +301,6 @@ void RunJoinStep(PPCContext& ctx, uint8_t* base, uint32_t step, uint32_t frame,
 }
 }  // namespace
 
-// r4 = a, r5 = b; the original's frame 112 bytes down.
-extern "C" REX_FUNC(sub_8213DD40) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_ai_drivers)) {
-    __imp__sub_8213DD40(ctx, base);
-    return;
-  }
-  ctx.fpscr.disableFlushMode();
-  uint32_t r3 = 0;
-  const uint32_t frame = ctx.r1.u32 - 112;
-  const uint32_t step = JoinCornerPair(base, ctx.r4.u32, ctx.r5.u32, frame, &r3);
-  if (step == 1) {
-    ctx.r3.u64 = r3;
-  } else if (step >= 2) {
-    RunJoinStep(ctx, base, step, frame, ctx.r1.u32);
-  }
-}
 // r4 = the path entry; the original's frame 144 bytes down (JoinCornerPair's
 // 112 below it).
 extern "C" REX_FUNC(sub_8213E970) {
