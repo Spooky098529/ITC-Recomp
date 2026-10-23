@@ -118,10 +118,8 @@ ITC_XACT_VOID(825C1518, EngineAddCue(base, ctx.r3.u32, ctx.r4.u32), ctx.r3.u32)
 // adapter: its only caller, sub_825C21B0, is native.
 ITC_XACT_VOID(825C21B0, GlobalSettingsConstruct(base, ctx.r3.u32, ctx.r4.u32), ctx.r3.u32)
 
-ITC_XACT_VOID(825C1DE0,
-              VariableInit(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32,
-                           ctx.r8.u32),
-              ctx.r3.u32)
+// XACTVariable::Init (sub_825C1DE0) has no adapter: its callers in play,
+// MakeState and XACTCue::GetVariable, are native.
 ITC_XACT_VOID(825C4FC0, CueDetachSound(base, ctx.r3.u32), ctx.r3.u32)
 ITC_XACT_WORD(825C5758, CueFindVariable(base, ctx.r3.u32, ctx.r4.u32))
 ITC_XACT_VOID(825CC0A0, FaderConstruct(base, ctx.r3.u32), ctx.r3.u32)
@@ -193,7 +191,8 @@ ITC_XACT_OPTIONAL(825CC1D0, FaderStep(base, ctx.r3.u32))
 // XACTWaveBankBase::XACTWaveBankBase (sub_825CEBE0) and
 // XACTCueBase::XACTCueBase (sub_825C5E58) have no adapters: their only
 // callers are native constructors.
-ITC_XACT_VOID(825C20B0, VariableConstruct(base, ctx.r3.u32), ctx.r3.u32)
+// XACTVariable::XACTVariable (sub_825C20B0) has no adapter: its callers in
+// play, MakeState and XACTCue::GetVariable, are native.
 // XACTNodePool::PushBack (sub_825C60C0) has no adapter: its callers in
 // play, the listener lists' AddListener (sub_825C6140, sub_825C7858,
 // sub_825C8690), are native.
