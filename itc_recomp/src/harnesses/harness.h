@@ -160,5 +160,6 @@ void DataTables(Context& h);
 void ModelAnimation(Context& h);
 void CarSpecs(Context& h);
 void Cameras(Context& h);
+void StringsAndFont(Context& h);
 
 }  // namespace harness
