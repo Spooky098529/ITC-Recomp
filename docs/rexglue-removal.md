@@ -72,7 +72,8 @@ goes in `src/` as overrides), American English.
   `b7-loop-23-10-26-2`, merged 2026-10-23) made
   the action mappers and the data tables native as far as they were
   ready, with no change in the game's behavior (ours 1,023); its
-  seventh run (branch `b7-loop-23-10-26-3`, not yet merged) made the
+  seventh run (branch `b7-loop-23-10-26-3`, merged 2026-10-23 after a
+  drive) made the
   model animation, the car specs and the cameras native as far as they
   were ready (ours 1,139; the cameras keep frame interpolation's hooks,
   with a new `BlendState_OnCopy`). The

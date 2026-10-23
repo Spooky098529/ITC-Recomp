@@ -158,7 +158,8 @@ with no change in the game's behavior (the user's call: B7 only moves
 the game off the recompiled code); the rest waits on the input
 manager's vtable targets, the input processor's constructor and the
 archive.
-Its seventh run (`b7-loop-23-10-26-3`, not yet merged; summary
+Its seventh run (`b7-loop-23-10-26-3`, merged into
+`rexglue-removal-project` 2026-10-23 after a drive; summary
 `docs/loops/b7-loop-2026-10-23-1344.md`) made the model animation, the
 car specs and the cameras native as far as they were ready
 (`model-animation.md`, `car-specs.md`, `cameras.md`;

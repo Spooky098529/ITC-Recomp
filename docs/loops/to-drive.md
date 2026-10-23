@@ -15,6 +15,8 @@ here loses its heading.
 
 ## Run 2026-10-23 13:44 (`b7-loop-23-10-26-3`)
 
+Not in the drive `itc_1015.log` (2026-10-23) either.
+
 Not in the attract race or the replay (`itc_932`, `itc_933`, ok); never
 seen in play before either (the 32-bit and node channel tracks):
 

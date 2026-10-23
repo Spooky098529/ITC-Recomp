@@ -78,3 +78,6 @@ Everything passed: harnesses 0 differing outside the earlier
 "(expected to differ)" groups (none added), attract races 19 s with all
 harnesses, no errors, replays ok. Next: the user reviews `review.md`
 ("Run 2026-10-23 13:44"), drives a race for `to-drive.md`, and merges.
+Concluded (the user's call, 2026-10-23): a drive (`itc_1015`, 139 s,
+no errors) looked right to the user; none of `to-drive.md`'s functions
+ran in it. Merged into `rexglue-removal-project`.
