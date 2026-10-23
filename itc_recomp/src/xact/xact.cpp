@@ -14,7 +14,14 @@ namespace xact {
 
 namespace {
 
-constexpr uint32_t kOne = 0x82000A30;  // the game's float 1.0
+constexpr uint32_t kOne = 0x82000A30;   // the game's float 1.0
+constexpr uint32_t kZero = 0x82000A34;  // the game's float 0.0
+
+// The vtables the constructors write.
+constexpr uint32_t kVariableVtable = 0x820753A4;
+constexpr uint32_t kListHeadVtable = 0x82075344;
+constexpr uint32_t kInterfaceBaseVtable = 0x82075860;
+constexpr uint32_t kListenerBaseVtable = 0x8203DF00;
 
 constexpr uint32_t kSettingsVtable = 0x820753A8;
 constexpr uint32_t kSettingsBaseVtable = 0x82075818;
@@ -30,6 +37,7 @@ constexpr uint32_t kNodeBytes = 12;
 constexpr uint32_t kGetHeader = 0x825C7AA8;     // the sound bank's slot +64
 constexpr uint32_t kGetEntry = 0x825C8398;      // the wave bank's slot +16
 constexpr uint32_t kGetSeekTable = 0x825C8580;  // the wave bank's slot +20
+constexpr uint32_t kSoundBankAddListener = 0x825C7858;  // the bank's +4 interface's slot +0
 
 // Whether the object's vtable slot at `offset` is `function`.
 bool SlotIs(uint8_t* base, uint32_t object, uint32_t offset, uint32_t function) {
@@ -596,6 +604,240 @@ std::optional<uint32_t> FaderStep(uint8_t* base, uint32_t fader) {
   }
   ITC_NATIVE_RUNNING("sub_825CC1D0 XACTFader::Step");
   return 0;
+}
+
+void VariableConstruct(uint8_t* base, uint32_t variable) {
+  ITC_NATIVE_RUNNING("sub_825C20B0 XACTVariable::XACTVariable");
+  CopyFloat(base, variable + 20, kZero);
+  guest::StoreU32(base, variable + 4, variable);
+  guest::StoreU32(base, variable + 8, variable);
+  guest::StoreU32(base, variable + 0, kVariableVtable);
+  guest::StoreU32(base, variable + 12, 0);
+  guest::StoreU32(base, variable + 16, 0);
+  NodePoolConstruct(base, variable + 24);
+  guest::StoreU32(base, variable + 240, 0);
+  guest::StoreU32(base, variable + 248, 0);
+  guest::StoreU16(base, variable + 244, 0xFFFF);
+}
+
+uint32_t NodePoolPushBack(uint8_t* base, uint32_t pool, uint32_t value) {
+  ITC_NATIVE_RUNNING("sub_825C60C0 XACTNodePool::PushBack");
+  const uint32_t node = NodePoolAlloc(base, pool);
+  if (node == 0) {
+    return 0;
+  }
+  guest::StoreU32(base, node + 0, value);
+  guest::StoreU32(base, node + 4, 0);
+  guest::StoreU32(base, node + 8, guest::LoadU32(base, pool + 208));
+  const uint32_t tail = guest::LoadU32(base, pool + 208);
+  if (tail != 0) {
+    guest::StoreU32(base, tail + 4, node);
+  } else {
+    guest::StoreU32(base, pool + 204, node);
+  }
+  const uint32_t count = guest::LoadU32(base, pool + 212);
+  guest::StoreU32(base, pool + 208, node);
+  guest::StoreU32(base, pool + 212, count + 1);
+  return node;
+}
+
+uint32_t CueAddListener(uint8_t* base, uint32_t self, uint32_t listener) {
+  ITC_NATIVE_RUNNING("sub_825C6140 XACTCue::AddListener");
+  return NodePoolPushBack(base, self + 72, listener);
+}
+
+uint32_t SoundBankAddListener(uint8_t* base, uint32_t self, uint32_t listener) {
+  ITC_NATIVE_RUNNING("sub_825C7858 XACTSoundBank::AddListener");
+  return NodePoolPushBack(base, self + 24, listener);
+}
+
+namespace {
+
+// The listener lists' removal: the node holding `listener` in the used
+// list whose head is at `head`, freed to `pool`. r3 as the originals leave
+// it.
+uint32_t RemoveListener(uint8_t* base, uint32_t self, uint32_t head, uint32_t pool,
+                        uint32_t listener) {
+  for (uint32_t node = guest::LoadU32(base, head); node != 0;
+       node = guest::LoadU32(base, node + 4)) {
+    if (guest::LoadU32(base, node) == listener) {
+      NodePoolFree(base, pool, node);
+      return pool;
+    }
+  }
+  return self;
+}
+
+}  // namespace
+
+uint32_t CueRemoveListener(uint8_t* base, uint32_t self, uint32_t listener) {
+  ITC_NATIVE_RUNNING("sub_825C6040 XACTCue::RemoveListener");
+  return RemoveListener(base, self, self + 276, self + 72, listener);
+}
+
+uint32_t SoundBankRemoveListener(uint8_t* base, uint32_t self, uint32_t listener) {
+  ITC_NATIVE_RUNNING("sub_825C7758 XACTSoundBank::RemoveListener");
+  return RemoveListener(base, self, self + 228, self + 24, listener);
+}
+
+void SoundBankBaseConstruct(uint8_t* base, uint32_t bank, uint32_t engine) {
+  ITC_NATIVE_RUNNING("sub_825C76A0 XACTSoundBankBase::XACTSoundBankBase");
+  const uint32_t node = bank + 12;
+  guest::StoreU32(base, bank + 4, kInterfaceBaseVtable);
+  guest::StoreU32(base, bank + 8, kListenerBaseVtable);
+  guest::StoreU32(base, node + 4, node);
+  guest::StoreU32(base, node + 0, kListHeadVtable);
+  guest::StoreU32(base, node + 8, node);
+  guest::StoreU32(base, bank + 0, 0x82075A30);
+  guest::StoreU32(base, bank + 4, 0x82075A28);
+  guest::StoreU32(base, bank + 8, 0x82075A24);
+  guest::StoreU32(base, node + 0, 0x82075A84);
+  guest::StoreU32(base, bank + 24, engine);
+  NodePoolConstruct(base, bank + 28);
+  guest::StoreU32(base, bank + 244, 0);
+  guest::StoreU32(base, bank + 248, 0);
+}
+
+void SoundBankConstruct(uint8_t* base, uint32_t bank, uint32_t engine) {
+  ITC_NATIVE_RUNNING("sub_825C79B8 XACTSoundBank::XACTSoundBank");
+  SoundBankBaseConstruct(base, bank, engine);
+  guest::StoreU32(base, bank + 0, 0x82075A90);
+  guest::StoreU32(base, bank + 4, 0x82075A28);
+  guest::StoreU32(base, bank + 8, 0x82075A24);
+  guest::StoreU32(base, bank + 12, 0x82075A88);
+  for (uint32_t offset = 252; offset <= 264; offset += 4) {
+    guest::StoreU32(base, bank + offset, 0);
+  }
+}
+
+void WaveBankRootConstruct(uint8_t* base, uint32_t bank, uint32_t engine) {
+  ITC_NATIVE_RUNNING("sub_825CC620 XACTWaveBankRoot::XACTWaveBankRoot");
+  const uint32_t node = bank + 8;
+  guest::StoreU32(base, bank + 4, kInterfaceBaseVtable);
+  guest::StoreU32(base, node + 0, kListHeadVtable);
+  guest::StoreU32(base, node + 4, node);
+  guest::StoreU32(base, node + 8, node);
+  guest::StoreU32(base, bank + 0, 0x82076024);
+  guest::StoreU32(base, bank + 4, 0x8207601C);
+  guest::StoreU32(base, node + 0, 0x82076018);
+  guest::StoreU32(base, bank + 20, engine);
+  NodePoolConstruct(base, bank + 24);
+  const uint32_t waves = bank + 240;
+  guest::StoreU32(base, waves + 0, kListHeadVtable);
+  guest::StoreU32(base, waves + 4, waves);
+  guest::StoreU32(base, waves + 8, waves);
+  guest::StoreU32(base, bank + 252, 0);
+  guest::StoreU32(base, bank + 256, 0);
+}
+
+void WaveBankBaseConstruct(uint8_t* base, uint32_t bank, uint32_t engine) {
+  ITC_NATIVE_RUNNING("sub_825CEBE0 XACTWaveBankBase::XACTWaveBankBase");
+  WaveBankRootConstruct(base, bank, engine);
+  guest::StoreU32(base, bank + 0, 0x82076140);
+  guest::StoreU32(base, bank + 4, 0x8207601C);
+  guest::StoreU32(base, bank + 8, 0x8207613C);
+}
+
+void WaveBankConstruct(uint8_t* base, uint32_t bank, uint32_t engine) {
+  ITC_NATIVE_RUNNING("sub_825C8310 XACTWaveBank::XACTWaveBank");
+  WaveBankBaseConstruct(base, bank, engine);
+  guest::StoreU32(base, bank + 0, 0x82075AE8);
+  guest::StoreU32(base, bank + 4, 0x8207601C);
+  guest::StoreU32(base, bank + 8, 0x82075AE4);
+  for (uint32_t offset = 260; offset <= 276; offset += 4) {
+    guest::StoreU32(base, bank + offset, 0);
+  }
+  guest::StoreU32(base, bank + 288, 0);
+}
+
+bool CueBaseConstruct(uint8_t* base, uint32_t cue, uint32_t engine, uint32_t bank,
+                      uint32_t record, uint32_t index) {
+  // The bank's +4 interface's slot +0 (read before anything is written, as
+  // the cue's stores can't reach the bank's vtables but for a cue built
+  // over them).
+  if (!SlotIs(base, bank + 4, 0, kSoundBankAddListener) ||
+      c_runtime::MayShare(cue, 352, bank + 4, 4)) {
+    return false;
+  }
+  ITC_NATIVE_RUNNING("sub_825C5E58 XACTCueBase::XACTCueBase");
+  const uint32_t listener = cue + 8;
+  const uint32_t node = cue + 12;
+  const uint32_t fader = cue + 24;
+  guest::StoreU32(base, cue + 4, kInterfaceBaseVtable);
+  guest::StoreU32(base, listener, kListenerBaseVtable);
+  guest::StoreU32(base, node + 4, node);
+  guest::StoreU32(base, node + 0, kListHeadVtable);
+  guest::StoreU32(base, node + 8, node);
+  FaderConstruct(base, fader);
+  guest::StoreU32(base, cue + 48, record);
+  guest::StoreU32(base, cue + 56, engine);
+  guest::StoreU32(base, cue + 52, 0);
+  guest::StoreU32(base, cue + 0, 0x82075878);
+  guest::StoreU32(base, cue + 4, 0x8207586C);
+  guest::StoreU32(base, listener, 0x820760AC);
+  guest::StoreU32(base, node, 0x82075868);
+  guest::StoreU32(base, fader, 0x8207609C);
+  guest::StoreU32(base, cue + 60, 0);
+  guest::StoreU32(base, cue + 64, 0);
+  guest::StoreU16(base, cue + 68, 0);
+  guest::StoreU32(base, cue + 72, 0);
+  NodePoolConstruct(base, cue + 76);
+  guest::StoreU32(base, cue + 296, bank);
+  guest::StoreU32(base, cue + 292, 0);
+  guest::StoreU32(base, cue + 300, 0);
+  guest::StoreU16(base, cue + 304, uint16_t(index));
+  guest::StoreU32(base, cue + 316, 0);
+  guest::StoreU32(base, cue + 320, 0);
+  const uint32_t variables = cue + 324;
+  guest::StoreU32(base, variables + 0, kListHeadVtable);
+  guest::StoreU32(base, variables + 4, variables);
+  guest::StoreU32(base, variables + 8, variables);
+  for (uint32_t offset : {336u, 348u, 308u, 312u, 340u, 344u}) {
+    guest::StoreU32(base, cue + offset, 0);
+  }
+  SoundBankAddListener(base, guest::LoadU32(base, cue + 296) + 4, listener);
+  return true;
+}
+
+bool CueConstruct(uint8_t* base, uint32_t cue, uint32_t engine, uint32_t bank, uint32_t record,
+                  uint32_t index) {
+  if (!CueBaseConstruct(base, cue, engine, bank, record, index)) {
+    return false;
+  }
+  ITC_NATIVE_RUNNING("sub_825C67E8 XACTCue::XACTCue");
+  guest::StoreU32(base, cue + 0, 0x82075908);
+  guest::StoreU32(base, cue + 4, 0x8207586C);
+  guest::StoreU32(base, cue + 8, 0x820760AC);
+  guest::StoreU32(base, cue + 12, 0x82075904);
+  guest::StoreU32(base, cue + 24, 0x8207609C);
+  return true;
+}
+
+std::optional<uint32_t> WaveEntryGetLoopStartBytes(uint8_t* base, uint32_t entry, uint32_t out) {
+  const auto bytes = WaveEntrySamplesToBytes(base, entry, guest::LoadU32(base, entry + 28), out);
+  if (bytes) {
+    ITC_NATIVE_RUNNING("sub_825CF210 XACTWaveEntry::GetLoopStartBytes");
+  }
+  return bytes;
+}
+
+std::optional<uint32_t> WaveEntryGetLoopLengthBytes(uint8_t* base, uint32_t entry) {
+  const uint32_t start = guest::LoadU32(base, entry + 28);
+  auto end = WaveEntrySamplesToBytes(base, entry, guest::LoadU32(base, entry + 32) + start, 0);
+  if (!end) {
+    return std::nullopt;
+  }
+  ITC_NATIVE_RUNNING("sub_825CF288 XACTWaveEntry::GetLoopLengthBytes");
+  uint32_t last = *end;
+  if ((guest::LoadU32(base, entry + 16) & 3) == 1) {
+    // XMA: one 64 KB block more, capped at the play length.
+    last += 0x10000;
+    const uint32_t play = guest::LoadU32(base, entry + 24);
+    if (last > play) {
+      last = play;
+    }
+  }
+  return last - *WaveEntrySamplesToBytes(base, entry, guest::LoadU32(base, entry + 28), 0);
 }
 
 }  // namespace xact

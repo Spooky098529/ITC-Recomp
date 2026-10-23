@@ -20,7 +20,12 @@ ITC_FLAG_BOOL(native_xact, true, "ITC",
               "sub_825CC320; the wave entry accessors, sub_825CED88 to sub_825CF080; the cue's "
               "GetStateInternal, sub_825C4D90; the sound banks' ForgetWaveBank and the engine's "
               "loop over them, sub_825C72B0 and sub_825C0408; XACTSound::SetTrackParameter "
-              "without tracks, sub_825CA980; XACTFader::Step when idle, sub_825CC1D0) natively "
+              "without tracks, sub_825CA980; XACTFader::Step when idle, sub_825CC1D0; the "
+              "variable's, sound banks', wave banks' and cues' constructors, sub_825C20B0, "
+              "sub_825C76A0, sub_825C79B8, sub_825CC620, sub_825CEBE0, sub_825C8310, sub_825C5E58 "
+              "and sub_825C67E8; the listener lists, sub_825C60C0, sub_825C6140, sub_825C7858, "
+              "sub_825C6040 and sub_825C7758; the loop region in bytes, sub_825CF210 and "
+              "sub_825CF288) natively "
               "instead of through the translated code (same results; checked by "
               "--run_harnesses=xact)");
 
@@ -169,3 +174,32 @@ extern "C" REX_FUNC(sub_825CA980) {
   }
 }
 ITC_XACT_OPTIONAL(825CC1D0, FaderStep(base, ctx.r3.u32))
+
+// Constructors and listener lists. XACTSoundBankBase::XACTSoundBankBase
+// (sub_825C76A0), XACTWaveBankRoot::XACTWaveBankRoot (sub_825CC620),
+// XACTWaveBankBase::XACTWaveBankBase (sub_825CEBE0) and
+// XACTCueBase::XACTCueBase (sub_825C5E58) have no adapters: their only
+// callers are native constructors.
+ITC_XACT_VOID(825C20B0, VariableConstruct(base, ctx.r3.u32), ctx.r3.u32)
+ITC_XACT_HEAP_WORD(825C60C0, NodePoolPushBack(base, ctx.r3.u32, ctx.r4.u32))
+ITC_XACT_HEAP_WORD(825C6140, CueAddListener(base, ctx.r3.u32, ctx.r4.u32))
+ITC_XACT_HEAP_WORD(825C7858, SoundBankAddListener(base, ctx.r3.u32, ctx.r4.u32))
+ITC_XACT_WORD(825C6040, CueRemoveListener(base, ctx.r3.u32, ctx.r4.u32))
+ITC_XACT_WORD(825C7758, SoundBankRemoveListener(base, ctx.r3.u32, ctx.r4.u32))
+ITC_XACT_VOID(825C79B8, SoundBankConstruct(base, ctx.r3.u32, ctx.r4.u32), ctx.r3.u32)
+ITC_XACT_VOID(825C8310, WaveBankConstruct(base, ctx.r3.u32, ctx.r4.u32), ctx.r3.u32)
+// The cue's constructor registers the cue with its bank (AddListener, which
+// allocates): the original unless --native_heap routes the game's heap to
+// the native layer, or where the bank's slot isn't AddListener.
+extern "C" REX_FUNC(sub_825C67E8) {
+  ITC_XACT_FALLBACK(825C67E8)
+  const uint32_t cue = ctx.r3.u32;
+  if (!hooks::NativeHeapActive() ||
+      !CueConstruct(base, cue, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32)) {
+    __imp__sub_825C67E8(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = cue;
+}
+ITC_XACT_OPTIONAL(825CF210, WaveEntryGetLoopStartBytes(base, ctx.r3.u32, ctx.r4.u32))
+ITC_XACT_OPTIONAL(825CF288, WaveEntryGetLoopLengthBytes(base, ctx.r3.u32))

@@ -176,4 +176,49 @@ bool SoundSetTrackParameter(uint8_t* base, uint32_t sound);
 // fade steps, curve and completion slots run).
 std::optional<uint32_t> FaderStep(uint8_t* base, uint32_t fader);
 
+// --- Batch 4: constructors and listener lists ---
+
+// XACTVariable::XACTVariable (sub_825C20B0): the 252-byte variable's
+// defaults (a node pool at +24).
+void VariableConstruct(uint8_t* base, uint32_t variable);
+// XACTNodePool::PushBack (sub_825C60C0): a node (NodePoolAlloc) holding
+// `value` linked at the used list's tail; 0 when out of memory. Native
+// layer only, as NodePoolAlloc.
+uint32_t NodePoolPushBack(uint8_t* base, uint32_t pool, uint32_t value);
+// XACTCue::AddListener and XACTSoundBank::AddListener (sub_825C6140,
+// sub_825C7858), through their +4 interfaces (`self`): PushBack on the
+// pool at self + 72 (+24). Native layer only.
+uint32_t CueAddListener(uint8_t* base, uint32_t self, uint32_t listener);
+uint32_t SoundBankAddListener(uint8_t* base, uint32_t self, uint32_t listener);
+// XACTCue::RemoveListener and XACTSoundBank::RemoveListener (sub_825C6040,
+// sub_825C7758), through the +4 interfaces: the node holding `listener` in
+// the used list (self + 276, + 228) freed to the pool (self + 72, + 24).
+// Returns r3 as the original leaves it (self, or the pool when freed).
+uint32_t CueRemoveListener(uint8_t* base, uint32_t self, uint32_t listener);
+uint32_t SoundBankRemoveListener(uint8_t* base, uint32_t self, uint32_t listener);
+// XACTSoundBankBase::XACTSoundBankBase and XACTSoundBank::XACTSoundBank
+// (sub_825C76A0, sub_825C79B8): r4 the engine.
+void SoundBankBaseConstruct(uint8_t* base, uint32_t bank, uint32_t engine);
+void SoundBankConstruct(uint8_t* base, uint32_t bank, uint32_t engine);
+// XACTWaveBankRoot::XACTWaveBankRoot, XACTWaveBankBase::XACTWaveBankBase
+// and XACTWaveBank::XACTWaveBank (sub_825CC620, sub_825CEBE0,
+// sub_825C8310): r4 the engine.
+void WaveBankRootConstruct(uint8_t* base, uint32_t bank, uint32_t engine);
+void WaveBankBaseConstruct(uint8_t* base, uint32_t bank, uint32_t engine);
+void WaveBankConstruct(uint8_t* base, uint32_t bank, uint32_t engine);
+// XACTCueBase::XACTCueBase and XACTCue::XACTCue (sub_825C5E58,
+// sub_825C67E8): r4 the engine, r5 the sound bank, r6 the cue's record, r7
+// the cue index; registers the cue with the bank (its +4 interface's slot
+// +0, AddListener). False, with nothing changed, where that slot isn't
+// sub_825C7858. Native layer only (AddListener allocates).
+bool CueBaseConstruct(uint8_t* base, uint32_t cue, uint32_t engine, uint32_t bank,
+                      uint32_t record, uint32_t index);
+bool CueConstruct(uint8_t* base, uint32_t cue, uint32_t engine, uint32_t bank, uint32_t record,
+                  uint32_t index);
+// XACTWaveEntry::GetLoopStartBytes and GetLoopLengthBytes (sub_825CF210,
+// sub_825CF288): the loop region in bytes (SamplesToBytes; nullopt where it
+// is).
+std::optional<uint32_t> WaveEntryGetLoopStartBytes(uint8_t* base, uint32_t entry, uint32_t out);
+std::optional<uint32_t> WaveEntryGetLoopLengthBytes(uint8_t* base, uint32_t entry);
+
 }  // namespace xact
