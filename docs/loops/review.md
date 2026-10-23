@@ -13,7 +13,19 @@ When the user has reviewed a run's section, its heading gets
 
 ## Run 2026-10-23 11:06 (`b7-loop-23-10-26-2`)
 
-Nothing yet.
+- `action-mappers.md` (new, 40 rows; 15 moved from `functions.md`, 25
+  new), 4 `known-data.md` rows (the globals `0x826BAB78`/`7C`/`80`, the
+  client list at `0x82970C14`, the settings table at
+  `0x82600B84`/`B88`, the action mapper's layout); 2 leads (the input
+  processor's constructors, the app's start-up). For review: the read
+  slots never seen in play (`sub_8210BA68`, `sub_8210BED8`,
+  `sub_8210BFA8`) stay in `functions.md`; of the button tests only
+  `sub_8258CF10` and `sub_825924E0` (called only by the mappers) moved;
+  `sub_8210C370`'s old note (a copy of MenuList::Update's) kept, with
+  the real description after it; the config slots
+  (`sub_8210B698`, `sub_8210BDF0`, `sub_8210BE30`) matched to their
+  slots from `sub_8209F228`'s arguments and the constants' values,
+  both "probably" (the vtables and tables weren't read from the image).
 
 ## Run 2026-10-23 01:52 (`b7-loop-23-10-26`)
 
