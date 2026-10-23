@@ -163,5 +163,6 @@ void Cameras(Context& h);
 void StringsAndFont(Context& h);
 void StdString(Context& h);
 void TrackRoute(Context& h);
+void AiDrivers(Context& h);
 
 }  // namespace harness
