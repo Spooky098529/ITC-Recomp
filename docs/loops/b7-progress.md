@@ -15,9 +15,10 @@ file's history. What's left to see in a drive, from every run:
   branch), from cf1f2cb; summary `b7-loop-2026-10-23-2022.md`.
 - `leads.md`'s top lead (VirtualAlloc and VirtualFree, `sub_82295398`,
   `sub_82295330`) dropped: both already ours (native memory).
-- Subsystem 1 of 3: the race code's users of the course's route
-  (`sub_8213B428` and the others from `leads.md`; several ready groups,
-  run every tick in a race). Step: mapping (agent running).
+- Subsystem 1 of 3: the AI drivers (`ai-drivers.md`, mapped in
+  1eeb084 from the route users' lead; 148 rows, 67 ready groups; the
+  race states' route users went back to `leads.md`). Step: migration 1
+  (agent running).
 
 ## Done
 
@@ -38,3 +39,5 @@ This run's groups: `expected-differences.md` (the "20:22 run" lines).
 ## Totals
 
 - Start: ours 1223, work left 5534 (wrapped 123, known 559, unknown 4852).
+- After mapping the AI drivers: ours 1223, work left 5534 (wrapped 123,
+  known 705, unknown 4706).

@@ -13,7 +13,24 @@ When the user has reviewed a run's section, its heading gets
 
 ## Run 2026-10-23 20:22 (`b7-loop-23-10-26-5`)
 
-- (Nothing yet.)
+- `ai-drivers.md` (new, 148 rows; 2 moved from `functions.md`, 146
+  new; mapped in 1eeb084), `known-data.md` (the driver, path, corner,
+  other-racer, skill and car input record layouts; the route file's
+  corners table and per-slice corner list; globals `0x826C6074`,
+  `0x826C6078`, `0x826C5B30`, `0x826D82E8`; `.rdata` tables at
+  `0x82008970`, `0x82008A08`), `track-route.md`'s intro; 2 leads (the
+  race states' route users, the drivers' callers). For review: the two
+  moved rows corrected (`sub_8213F530` is `AiPath::Update`,
+  `sub_8213D438` `AiPath::Reset`, not the speed trail); unsure names:
+  the other-racer record states 0-3, driver states 2-6, the corner
+  points at data +48 to +54, `AiDriver::KeepsGapFrom`,
+  `AiPath::RaceAllowsSides`, `AiDriver::IsFree`,
+  `AiPath::LeaderBranchKind`, `AiPath::FollowLeaderBranch`, the skill
+  block as a profile plus triggers, vehicle flags 0x81 as the player's
+  car, input flag 0x200 as reverse when stuck; ~30 rows "Not read in
+  detail" (the corner planning and avoidance math); `AiDrivers::Create`
+  zeroes the table after `AiDriver::InitPath` set its floats (the
+  game's own, kept).
 
 ## Run 2026-10-23 17:22 (`b7-loop-23-10-26-4`)
 
