@@ -13,7 +13,16 @@ When the user has reviewed a run's section, its heading gets
 
 ## Run 2026-10-23 01:52 (`b7-loop-23-10-26`)
 
-(nothing yet)
+- `sound-cues.md` (new, 87 rows; 4 moved from `functions.md`:
+  `sub_8259D1A8`, `sub_821184E8`, `sub_82118FB0`, `sub_82118C18`), 8 new
+  `known-data.md` rows (the sound manager, the audio engine, the bank
+  pair and holders, the sound, the emitter, the listener, the XACT and
+  XAudio engines); 4 leads added (XACT's body, X3DAudio and the engine
+  sounds, the data tables, a file-layer helper). For review: XACT's
+  vtable slots named only "probably <method>"; the intro records the
+  user's call that XACT will probably be translated (it replaces "keep
+  the game's XACT" in `native-audio.md`'s decisions, not yet edited
+  there); the 3D path never ran in play.
 
 ## Run 2026-10-22 22:11 (`b7-loop-22-10-26-2`)
 
