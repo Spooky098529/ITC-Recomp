@@ -42,7 +42,7 @@ ITC_FLAG_BOOL(native_track_route, true, "ITC",
               "sub_820FB030, LocateAt sub_820FB888, ToMainRoad sub_820FA728, OnSlice "
               "sub_820FB1B8, Follow sub_820FB680 with NoteShoulder sub_820FB100, TakeBranch "
               "sub_820FA4A8 and its full search sub_820FB2B0, ClampPosition sub_820F8420 with ToIndex sub_820AB408 and FromIndex "
-              "sub_820AB498, Distance sub_820F9278 with LinkDistance sub_820F8720, SlicePoint "
+              "sub_820AB498, Distance sub_820F9278 with LinkDistance sub_820F8720, PathDistance sub_820FA9D0, SlicePoint "
               "sub_820F9768 with its case 0 sub_820F985C (cases 5 to 16, never seen in play, on "
               "the translated code)) natively instead of through the translated code (the same "
               "words, bit for bit; checked by --run_harnesses=track_route). Those reached only "
@@ -132,6 +132,12 @@ ITC_TRACK_ROUTE(820F9278, bool linked = false;
                                    guest::LoadU16(base, ctx.r5.u32);
                 ctx.f1.f64 = Distance(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, &linked);
                 if (apart) { ctx.r3.u64 = linked ? 1 : 0; })
+
+// r4, r5 = the positions (packed), r6 = the path, r7 = its length; f1 the
+// distance; the original's frame (288 bytes down). r3 left as it came (no
+// caller reads it).
+ITC_TRACK_ROUTE(820FA9D0, ctx.f1.f64 = PathDistance(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                                    ctx.r6.u32, ctx.r7.s32, ctx.r1.u32 - 288))
 
 // --- Points of a slice ---
 

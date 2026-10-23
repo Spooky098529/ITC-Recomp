@@ -4,8 +4,13 @@
 
 #include "car_physics/float_ops.h"
 #include "strings_and_font/steps.h"
+#include "vehicle_accessors/vectors.h"
 
 #include "base/log.h"
+
+#include <bit>
+#include <cmath>
+#include <cstring>
 
 namespace track_route {
 
@@ -1436,6 +1441,172 @@ double Distance(uint8_t* base, uint32_t route, uint32_t a, uint32_t b, bool* lin
     *linked = found;
   }
   return found ? double(distance) : Lfs(base, kNoDistance);
+}
+
+// --- Distances along a path ---
+
+namespace {
+
+// fsqrts: the double's square root rounded to single.
+double Fsqrts(double a) {
+  return double(float(std::sqrt(a)));
+}
+
+// PathDistance's length of a difference: the vector at `from` (as lvx
+// reads it, 16-aligned) dotted with itself (vmsum3fp128, flush-to-zero on),
+// stored in all four words at `to` (as stvx, 16-aligned), its first word's
+// square root.
+double LengthThrough(uint8_t* base, uint32_t from, uint32_t to) {
+  const vector_library::Vector v = vector_library::LoadVector(base, from & ~0xFu);
+  const uint32_t dot = std::bit_cast<uint32_t>(vector_library::Dot(v, v));
+  for (uint32_t i = 0; i < 16; i += 4) {
+    guest::StoreU32(base, (to & ~0xFu) + i, dot);
+  }
+  return Fsqrts(Lfs(base, to));
+}
+
+// PathDistance's difference of the point at `frame` + 112 (P) and a slice's
+// center (`record` + 124), into `frame` + 96; with `keep`, the center into
+// `frame` + 128 (Q) first, as the original stores it.
+void Difference(uint8_t* base, uint32_t frame, uint32_t record, bool keep) {
+  for (uint32_t i = 0; i < 12; i += 4) {
+    const double p = Lfs(base, frame + 112 + i);
+    const double c = Lfs(base, record + 124 + i);
+    if (keep) {
+      Stfs(base, frame + 128 + i, c);
+    }
+    Stfs(base, frame + 96 + i, Fsubs(p, c));
+  }
+}
+
+}  // namespace
+
+double PathDistance(uint8_t* base, uint32_t route, uint32_t a, uint32_t b, uint32_t path,
+                    int32_t length, uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_820FA9D0 TrackRoute::PathDistance");
+  const uint32_t at = frame + 80;    // the position stepped
+  const uint32_t from = frame + 84;  // the last part's start
+  double sum = Lfs(base, kZero);
+  const double one = Lfs(base, kOne);
+  Stfs(base, frame + 140, one);
+  Stfs(base, frame + 108, one);
+  const int32_t to_section = int16_t(b >> 16);
+  // The path's last entry that is b's section (its index; 0 when none).
+  int32_t last = 0;
+  for (int32_t i = int16_t(length - 1); i >= 0; i = int16_t(i - 1)) {
+    if (to_section == LoadS16(base, path + 2 * uint32_t(i))) {
+      last = i;
+      break;
+    }
+  }
+  const auto table = [&] { return Load(base, Load(base, route) + 12); };
+  // One slice along: the slice at `position` + 2 moved by `step`,
+  // normalized; the distance from P to its center added (`dot_at` the
+  // original's temporary), and P = the center. Returns the slice; `section`
+  // its section, `offset` the slice times 84.
+  const auto step = [&](uint32_t position, int32_t slice, int32_t delta, uint32_t dot_at,
+                        uint32_t& section, uint32_t& offset) {
+    slice += delta;
+    guest::StoreU16(base, position + 2, uint16_t(slice));
+    Normalize(base, route, position, 0);
+    section = LoadU16(base, position);
+    const uint32_t s = SectionIn(base, table(), section);
+    slice = LoadS16(base, position + 2);
+    offset = uint32_t(slice) * 84;
+    Difference(base, frame, s + offset, true);
+    // P = Q (its 16 bytes, read before the dot's store as the original).
+    uint8_t center[16];
+    std::memcpy(center, base + frame + 128, 16);
+    const double length_of = LengthThrough(base, frame + 96, dot_at);
+    std::memcpy(base + frame + 112, center, 16);
+    sum = Fadds(length_of, sum);
+    return slice;
+  };
+  guest::StoreU32(base, at, a);
+  if (length > 1) {
+    int32_t slice = int16_t(a);
+    uint32_t section = LoadU16(base, at);
+    uint32_t offset = uint32_t(slice) * 84;
+    for (int32_t k = 1; k < length; k++) {
+      const uint32_t next = LoadU16(base, path + 2 * uint32_t(k));
+      const uint32_t current = SectionIn(base, table(), section);
+      const uint32_t following = SectionIn(base, table(), next);
+      // P: the slice's center.
+      for (uint32_t i = 0; i < 12; i += 4) {
+        Stfs(base, frame + 112 + i, Lfs(base, current + offset + 124 + i));
+      }
+      bool linked = false;
+      // The next section's link back to this one: its slice here, stepped
+      // to a slice at a time.
+      for (uint32_t j = 0; j < 12; j++) {
+        if (LoadS16(base, following + 28 + 4 * j) != int16_t(section)) {
+          continue;
+        }
+        const int32_t target = LoadS16(base, following + 4 * j + 30);
+        if (slice < target) {
+          Stfs(base, frame + 140, one);
+          do {
+            slice = step(at, slice, 1, frame + 144, section, offset);
+          } while (slice < target);
+        } else if (slice > target) {
+          Stfs(base, frame + 140, one);
+          do {
+            slice = step(at, slice, -1, frame + 160, section, offset);
+          } while (slice > target);
+        }
+        linked = true;
+        break;
+      }
+      if (linked) {
+        // This section's link to the next: over it, the distance from P to
+        // the slice it leads to (P not moved).
+        for (uint32_t m = 0; m < 12; m++) {
+          const uint32_t link = current + 4 * m;
+          if (LoadS16(base, link + 28) != int16_t(next)) {
+            continue;
+          }
+          section = next;
+          Stfs(base, frame + 140, one);
+          guest::StoreU16(base, at, uint16_t(section));
+          const uint32_t there = LoadU16(base, link + 30);
+          guest::StoreU16(base, at + 2, uint16_t(there));
+          slice = int16_t(there);
+          offset = uint32_t(slice) * 84;
+          Difference(base, frame, SectionIn(base, table(), next) + offset, false);
+          sum = Fadds(LengthThrough(base, frame + 96, frame + 176), sum);
+          break;
+        }
+      }
+      if (int16_t(section) == to_section && k == last) {
+        break;
+      }
+    }
+  }
+  // The last part, from the lesser slice to the greater, in the start's
+  // section.
+  uint32_t end = b;
+  if (int16_t(b) < LoadS16(base, at + 2)) {
+    guest::StoreU32(base, from, b);
+    end = Load(base, at);
+  } else {
+    guest::StoreU32(base, from, Load(base, at));
+  }
+  uint32_t section = LoadU16(base, from);
+  int32_t slice = LoadS16(base, from + 2);
+  const int32_t target = int16_t(end);
+  uint32_t offset = uint32_t(slice) * 84;
+  const uint32_t start = SectionIn(base, table(), section) + offset;
+  for (uint32_t i = 0; i < 12; i += 4) {
+    Stfs(base, frame + 112 + i, Lfs(base, start + 124 + i));
+  }
+  if (slice == target) {
+    return sum;
+  }
+  Stfs(base, frame + 140, one);
+  do {
+    slice = step(from, slice, 1, frame + 176, section, offset);
+  } while (slice != target);
+  return sum;
 }
 
 // --- Points of a slice ---

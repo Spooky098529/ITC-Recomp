@@ -227,6 +227,19 @@ bool LinkDistance(uint8_t* base, uint32_t route, uint32_t a, uint32_t b, float& 
 // LinkDistance found them (the original's r3 then).
 double Distance(uint8_t* base, uint32_t route, uint32_t a, uint32_t b, bool* linked = nullptr);
 
+// TrackRoute::PathDistance (sub_820FA9D0): f1 = the distance from a to b
+// (packed positions) along the path (`length` sections, halfwords): from
+// each section to the next (k = 1 on), the slices stepped one at a time to
+// the slice the next section's link back names, then over this section's
+// link to the next, each step adding the distance between slice centers;
+// until the path's last entry that is b's section; then from the lesser
+// slice to the greater (the position reached and b) a slice at a time.
+// `frame`: the original's (its +80 to +191 its positions and vectors, as the
+// original keeps them; the stores into its caller's frame aren't made).
+// The original's r3 isn't kept (no caller reads it).
+double PathDistance(uint8_t* base, uint32_t route, uint32_t a, uint32_t b, uint32_t path,
+                    int32_t length, uint32_t frame);
+
 // --- Points of a slice (the global route's file) ---
 
 // TrackRoute::SlicePoint (sub_820F9768, with its case 0, sub_820F985C):

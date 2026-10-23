@@ -117,12 +117,15 @@ ITC_NATIVE_STEP(NativeNoteShoulder,
                                               ctx.r6.u32, ctx.r7.u32, ctx.r1.u32 - 128))
 ITC_NATIVE_STEP(NativeTakeBranch,
                 ctx.r3.u64 = tr::TakeBranch(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
-// r3 not compared for these two (the originals' r3 isn't kept: nothing reads
-// it).
+// r3 not compared for these two and PathDistance (the originals' r3 isn't
+// kept: nothing reads it).
 ITC_NATIVE_STEP(NativeFullSearch, tr::FullSearch(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
                                                  ctx.r6.u32, ctx.r7.u32, ctx.r1.u32 - 192))
 ITC_NATIVE_STEP(NativeFollow, tr::Follow(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
                                          ctx.r1.u32 - 176))
+ITC_NATIVE_STEP(NativePathDistance,
+                ctx.f1.f64 = tr::PathDistance(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                              ctx.r6.u32, ctx.r7.s32, ctx.r1.u32 - 288))
 ITC_NATIVE_STEP(NativeOnSlice,
                 ctx.r3.u64 = tr::OnSlice(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
                                          ctx.r1.u32 - 128))
@@ -213,7 +216,9 @@ void FillTable(uint8_t* base, uint32_t table, uint32_t area) {
 }
 
 // A random route in the block (see the top).
-Route BuildRoute(uint8_t* base, uint32_t area, uint32_t table, Random& r) {
+// `whole`: every section 8 slices and every link's slice within them
+// (PathDistance's cases: its slice steps end only where they meet).
+Route BuildRoute(uint8_t* base, uint32_t area, uint32_t table, Random& r, bool whole = false) {
   Route route;
   route.sections = 1 + r.Below(8);
   guest::StoreU32(base, area + 0, area + kFile);
@@ -225,7 +230,7 @@ Route BuildRoute(uint8_t* base, uint32_t area, uint32_t table, Random& r) {
   guest::StoreU32(base, area + kFile + 12, table);
   for (uint32_t s = 0; s < 8; s++) {
     const uint32_t at = area + kSections + kSectionStride * s;
-    const uint32_t n = 1 + r.Below(8);
+    const uint32_t n = whole ? 8 : 1 + r.Below(8);
     route.slices[s] = n;
     route.address[s] = at;
     guest::StoreU16(base, at + 0, uint16_t(n));
@@ -248,7 +253,8 @@ Route BuildRoute(uint8_t* base, uint32_t area, uint32_t table, Random& r) {
                            : uint16_t(r.Below(4)    ? r.Below(route.sections)
                                       : r.Below(2) ? r.Below(16)
                                                    : r.Below(0xFFFF)));
-      guest::StoreU16(base, at + 30 + 4 * i, uint16_t(int32_t(r.Below(12)) - 2));
+      guest::StoreU16(base, at + 30 + 4 * i,
+                      uint16_t(whole ? int32_t(r.Below(8)) : int32_t(r.Below(12)) - 2));
     }
     for (uint32_t i = 0; i < 48; i++) {
       guest::StoreU8(base, at + 76 + i, uint8_t(r.Below(4) == 0 ? 0xFF : r.Below(8)));
@@ -329,6 +335,7 @@ enum Kind {
   kTakeBranch,
   kFullSearch,
   kFollow,
+  kPathDistance,
 };
 
 }  // namespace
@@ -417,6 +424,8 @@ void TrackRoute(Context& h) {
        NativeFullSearch, kFullSearch, 3000},
       {"TrackRoute::Follow (sub_820FB680)", Original<__imp__sub_820FB680>, NativeFollow,
        kFollow, 4000},
+      {"TrackRoute::PathDistance (sub_820FA9D0)", Original<__imp__sub_820FA9D0>,
+       NativePathDistance, kPathDistance, 3000},
   };
   const uint32_t area = memory::Alloc(kAreaBytes, 0);
   const uint32_t table = memory::Alloc(4 * kTableEntries, 0);
@@ -432,7 +441,7 @@ void TrackRoute(Context& h) {
       // route every fourth case (the inputs differ in each).
       if (c % 4 == 0) {
         std::memset(h.base + area, 0xCD, kAreaBytes);
-        route = BuildRoute(h.base, area, table, r);
+        route = BuildRoute(h.base, area, table, r, f.kind == kPathDistance);
         built = Read(h.base, area, kIo);
       } else {
         Write(h.base, area, built.data(), kIo);
@@ -699,6 +708,35 @@ void TrackRoute(Context& h) {
           r5 = area + kCount;
           break;
         }
+        case kPathDistance: {
+          // Positions on the route (packed), and a path of 1 to 6 of its
+          // sections, a's first mostly, b's among them mostly (its slice
+          // steps end only where they meet: sections on the route, slices
+          // within them).
+          const auto packed = [&] {
+            return (r.Below(route.sections) << 16) | r.Below(8);
+          };
+          const uint32_t pa = packed();
+          uint32_t pb = packed();
+          if (r.Below(4) == 0) {
+            pb = (pa & 0xFFFF0000u) | (pb & 0xFFFF);
+          }
+          const uint32_t n = 1 + r.Below(6);
+          for (uint32_t i = 0; i < n; i++) {
+            guest::StoreU16(h.base, area + kPath + 2 * i, uint16_t(r.Below(route.sections)));
+          }
+          if (r.Below(4) != 0) {
+            guest::StoreU16(h.base, area + kPath, uint16_t(pa >> 16));
+          }
+          if (r.Below(4) != 0) {
+            guest::StoreU16(h.base, area + kPath + 2 * r.Below(n), uint16_t(pb >> 16));
+          }
+          r4 = (uint64_t(r.Next()) << 32) | pa;
+          r5 = pb;
+          r6 = area + kPath;
+          r7 = r.Below(8) == 0 ? uint64_t(int64_t(-int32_t(r.Below(3)))) : n;
+          break;
+        }
         case kToMainRoad:
           // On the route mostly, now and then past either end; the flag 0, 1
           // or any word.
@@ -789,11 +827,11 @@ void TrackRoute(Context& h) {
           out[v].Bytes(Read(h.base, area + i, 64));
         }
         out[v].Floats(h.base, area + kOut, 4);
-        if (f.kind != kFollow && f.kind != kFullSearch) {
+        if (f.kind != kFollow && f.kind != kFullSearch && f.kind != kPathDistance) {
           out[v].Word(uint32_t(t.r3.u64 >> 32));
           out[v].Word(t.r3.u32);
         }
-        if (f.kind == kDistance) {
+        if (f.kind == kDistance || f.kind == kPathDistance) {
           out[v].Double(t.f1.u64);
         }
       }
