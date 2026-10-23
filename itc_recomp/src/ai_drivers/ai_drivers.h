@@ -702,4 +702,22 @@ uint32_t CornerToApex(uint8_t* base, uint32_t path, uint32_t record, uint32_t in
 uint32_t CornerToExit(uint8_t* base, uint32_t path, uint32_t record, uint32_t index,
                       uint32_t previous, uint32_t frame);
 
+// AiPath::PlanCorners (sub_8213E7B8): for each corner record with data and
+// a table: the index (at `index`) moved back to the corner's offset +10 when
+// past it, or on to the end index (at `end`) when before it (the previous
+// entry the ring entry before, in the word at frame + 172, the caller's,
+// where the original keeps r4: `frame` 144 bytes below the caller's stack
+// pointer); then ApproachCorner, CornerToEntry, CornerToApex and
+// CornerToExit in turn, returning 1 at the first that reaches the
+// look-ahead's end; the end index set to the corner's exit (+54) plus +10.
+// After the last, the end = the index and ContinueLine. Returns the r3 the
+// original leaves (1, or the path).
+uint32_t PlanCorners(uint8_t* base, uint32_t path, uint32_t entry, uint32_t index, uint32_t end,
+                     uint32_t frame);
+// AiPath::PlanLine (sub_8213F4B0): from the ring's first entry (0 with
+// none), with both indexes 1 (at frame + 84 and + 80, `frame` 96 bytes
+// down), PlanCorners with corner records, else ContinueLine. Returns their
+// r3.
+uint32_t PlanLine(uint8_t* base, uint32_t path, uint32_t frame);
+
 }  // namespace ai_drivers

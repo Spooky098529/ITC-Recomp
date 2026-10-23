@@ -4187,4 +4187,52 @@ uint32_t CornerToExit(uint8_t* base, uint32_t path, uint32_t record, uint32_t in
   return reached;
 }
 
+uint32_t PlanCorners(uint8_t* base, uint32_t path, uint32_t entry, uint32_t index, uint32_t end,
+                     uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_8213E7B8 AiPath::PlanCorners");
+  const uint32_t previous = frame + 172;
+  guest::StoreU32(base, previous, entry);
+  for (int32_t k = 0; k < LoadS16(base, path + 5162); k++) {
+    const uint32_t record = path + 5164 + 44 * uint32_t(k);
+    if (Load(base, record + 0) == 0 || Load(base, record + 4) == 0) {
+      continue;
+    }
+    const int32_t offset = LoadS16(base, record + 10);
+    if (!(offset < 1) && int32_t(Load(base, index)) > offset) {
+      guest::StoreU32(base, index, uint32_t(offset));
+      guest::StoreU32(base, previous,
+                      RingEntry(base, path, int32_t(uint32_t(offset) - 1)));
+    }
+    const int32_t until = int32_t(Load(base, end));
+    if (int32_t(Load(base, index)) < until) {
+      guest::StoreU32(base, index, uint32_t(until));
+      guest::StoreU32(base, previous, RingEntry(base, path, int32_t(uint32_t(until) - 1)));
+    }
+    if (ApproachCorner(base, path, record, index, previous, frame - 160) == 1 ||
+        CornerToEntry(base, path, record, index, previous, frame - 160) == 1 ||
+        CornerToApex(base, path, record, index, previous, frame - 160) == 1 ||
+        CornerToExit(base, path, record, index, previous, frame - 160) == 1) {
+      return 1;
+    }
+    guest::StoreU32(base, end,
+                    uint32_t(LoadS16(base, Load(base, record + 0) + 54)) +
+                        uint32_t(LoadS16(base, record + 10)));
+  }
+  guest::StoreU32(base, end, Load(base, index));
+  ContinueLine(base, path, Load(base, previous), index, end, frame - 112);
+  return path;
+}
+
+uint32_t PlanLine(uint8_t* base, uint32_t path, uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_8213F4B0 AiPath::PlanLine");
+  const uint32_t entry = RingEntry(base, path, 0);
+  guest::StoreU32(base, frame + 80, 1);
+  guest::StoreU32(base, frame + 84, 1);
+  if (LoadS16(base, path + 5162) > 0) {
+    return PlanCorners(base, path, entry, frame + 84, frame + 80, frame - 144);
+  }
+  ContinueLine(base, path, entry, frame + 84, frame + 80, frame - 112);
+  return path;
+}
+
 }  // namespace ai_drivers

@@ -128,7 +128,8 @@ ITC_FLAG_BOOL(native_ai_drivers, true, "ITC",
               "play, ported with them), AiDriver::UpdateSteering sub_8213AEF0, AiDriver::Drive "
               "sub_8213B058, AiPath::ContinueLine sub_8213DB08, AiPath::ApproachCorner sub_8213DE30, "
               "AiPath::CornerToEntry sub_8213E018, AiPath::CornerToApex sub_8213E1D0, "
-              "AiPath::CornerToExit sub_8213E360) "
+              "AiPath::CornerToExit sub_8213E360, AiPath::PlanCorners sub_8213E7B8, "
+              "AiPath::PlanLine sub_8213F4B0) "
               "natively instead of "
               "through the translated code (the same words, bit for bit; checked by "
               "--run_harnesses=ai_drivers). Those "
@@ -405,3 +406,10 @@ ITC_AI_DRIVERS(8213E1D0, ctx.r3.u64 = CornerToApex(base, ctx.r3.u32, ctx.r4.u32,
                                                    ctx.r6.u32, ctx.r1.u32 - 160))
 ITC_AI_DRIVERS(8213E360, ctx.r3.u64 = CornerToExit(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
                                                    ctx.r6.u32, ctx.r1.u32 - 160))
+// r4 = the entry before, r5 = &the index, r6 = &the end index; the
+// original's frame 144 bytes down (the entry kept in the caller's frame at
+// +28, as the original does).
+ITC_AI_DRIVERS(8213E7B8, ctx.r3.u64 = PlanCorners(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                                  ctx.r6.u32, ctx.r1.u32 - 144))
+// The original's frame 96 bytes down.
+ITC_AI_DRIVERS(8213F4B0, ctx.r3.u64 = PlanLine(base, ctx.r3.u32, ctx.r1.u32 - 96))

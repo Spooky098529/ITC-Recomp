@@ -369,6 +369,11 @@ ITC_NATIVE_STEP(NativeCornerToExit,
                 ctx.r3.u64 = ai::CornerToExit(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
                                               ctx.r6.u32, ctx.r1.u32 - 160))
 
+ITC_NATIVE_STEP(NativePlanCorners,
+                ctx.r3.u64 = ai::PlanCorners(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                             ctx.r6.u32, ctx.r1.u32 - 144))
+ITC_NATIVE_STEP(NativePlanLine, ctx.r3.u64 = ai::PlanLine(base, ctx.r3.u32, ctx.r1.u32 - 96))
+
 // Runs the recompiled version with the native flag off.
 template <GuestFunction recompiled>
 void Original(PPCContext& ctx, uint8_t* base) {
@@ -563,6 +568,8 @@ enum Kind {
   kCornerToEntry,
   kCornerToApex,
   kCornerToExit,
+  kPlanCorners,
+  kPlanLine,
 };
 
 }  // namespace
@@ -827,6 +834,10 @@ void AiDrivers(Context& h) {
        kCornerToApex, 2000},
       {"AiPath::CornerToExit (sub_8213E360)", Original<__imp__sub_8213E360>, NativeCornerToExit,
        kCornerToExit, 2000},
+      {"AiPath::PlanCorners (sub_8213E7B8)", Original<__imp__sub_8213E7B8>, NativePlanCorners,
+       kPlanCorners, 2000},
+      {"AiPath::PlanLine (sub_8213F4B0)", Original<__imp__sub_8213F4B0>, NativePlanLine,
+       kPlanLine, 2000},
   };
   const uint32_t area = memory::Alloc(kAreaBytes, 0);
   const uint32_t driver = area + kDriver, vehicle = area + kVehicle, io = area + kIo;
@@ -1995,7 +2006,9 @@ void AiDrivers(Context& h) {
         case kApproachCorner:
         case kCornerToEntry:
         case kCornerToApex:
-        case kCornerToExit: {
+        case kCornerToExit:
+        case kPlanCorners:
+        case kPlanLine: {
           // The ring (count, start, look-ahead +5140 within the count; each
           // entry's +24, +28, ranges +32 to +36 and +40 to +44 (mostly
           // ordered) and target +48), the step limit +5516, the index (io),
@@ -2048,8 +2061,39 @@ void AiDrivers(Context& h) {
           for (uint32_t at : {50u, 52u, 54u}) {
             guest::StoreU16(h.base, data + at, uint16_t(int32_t(r.Below(40)) - 8));
           }
+          // PlanCorners and PlanLine: up to four corner records from +5164
+          // (now and then without data or a table, or a count of 0 to 8 or
+          // negative), their data four in the vehicle's bytes, 0x40 apart;
+          // the end index at io + 8.
+          if (f.kind == kPlanCorners || f.kind == kPlanLine) {
+            const int32_t corners = r.Below(8) == 0 ? int32_t(r.Below(10)) - 1
+                                                    : int32_t(r.Below(5));
+            guest::StoreU16(h.base, path + 5162, uint16_t(corners));
+            int32_t at = int32_t(r.Below(6)) - 2;
+            for (uint32_t i = 0; i < 4; i++) {
+              const uint32_t corner = path + 5164 + 44 * i;
+              const uint32_t its = vehicle + 0x100 + 0x40 * i;
+              guest::StoreU32(h.base, corner + 0, r.Below(10) == 0 ? 0 : its);
+              guest::StoreU32(h.base, corner + 4, r.Below(10) == 0 ? 0 : vehicle + 0x80);
+              at += int32_t(r.Below(look / 3 + 2)) - 1;
+              guest::StoreU16(h.base, corner + 10, uint16_t(at));
+              guest::StoreU32(h.base, corner + 16, r.Below(8) == 0 ? RandomFloat(r, 2.0f)
+                                                   : FloatBits(r.Below(2) ? 1.0f : -1.0f));
+              int32_t point = int32_t(r.Below(4));
+              for (uint32_t p : {50u, 52u, 54u}) {
+                guest::StoreU16(h.base, its + p, uint16_t(point));
+                point += int32_t(r.Below(look / 4 + 2)) - (r.Below(8) == 0 ? 3 : 0);
+              }
+            }
+            guest::StoreU32(h.base, io + 8, r.Below(look + 2));
+          }
           r3 = path;
-          if (f.kind == kContinueLine) {
+          if (f.kind == kPlanLine) {
+          } else if (f.kind == kPlanCorners) {
+            r4 = before;
+            r5 = io;
+            r6 = io + 8;
+          } else if (f.kind == kContinueLine) {
             r4 = before;
             r5 = io;
             r6 = io + 8;
