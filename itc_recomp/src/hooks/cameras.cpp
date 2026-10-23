@@ -32,7 +32,8 @@ ITC_FLAG_BOOL(native_cameras, true, "ITC",
               "sub_820A0C40, and SetZoom sub_820AA378 (no adapter: only CameraPass::FromViewport's "
               "plain C++ calls it, and the flag switches that); the viewports' Viewports::Release "
               "sub_820AA430 (with --native_heap), Viewport::SetZoom sub_820AAE90, SetRoll "
-              "sub_820AA2D0, UpdateEntries sub_820AA550, Update sub_820AAE40, Set sub_820AAE48 and "
+              "sub_820AA2D0, UpdateEntries sub_820AA550 (no adapter: only Update's, Set's and LookAt's plain C++ "
+              "call it, and the flag switches them), Update sub_820AAE40, Set sub_820AAE48 and "
               "LookAt sub_820AAF68; CameraPass::Update sub_820A3978, its frame interpolation's notes kept, and "
               "CameraPass::RecordViewport sub_820A0978, without the command list's "
               "diagnostics, and CameraPass::FromViewport sub_820AA4A8; RecordClear sub_8209FA38, "
@@ -116,16 +117,10 @@ extern "C" REX_FUNC(sub_8209F738) {
   }
 }
 
-// Viewport::UpdateEntries: r3 = the viewport; r3 = entry 16 (as the
-// original leaves it). Viewport::Update is only its tail call; Viewport::Set
-// (r4 to r7 = the four vectors) and Viewport::LookAt (r4 = the eye, r5 = the
-// target) copy theirs first. Flush-to-zero left off.
-extern "C" REX_FUNC(sub_820AA550) {
-  ITC_CAMERAS_FALLBACK(820AA550)
-  ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = cameras::ViewportUpdateEntries(base, ctx.r3.u32);
-}
-
+// Viewport::Update, Set and LookAt: r3 = the viewport (Set's r4 to r7 the
+// four vectors, LookAt's r4 the eye and r5 the target); r3 = entry 16, as
+// Viewport::UpdateEntries leaves it (no adapter of its own: only their plain
+// C++ calls it). Flush-to-zero left off.
 extern "C" REX_FUNC(sub_820AAE40) {
   ITC_CAMERAS_FALLBACK(820AAE40)
   ctx.fpscr.disableFlushMode();
