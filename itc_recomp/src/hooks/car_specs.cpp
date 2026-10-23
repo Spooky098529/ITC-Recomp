@@ -7,7 +7,8 @@
 // parts, the wheels' and table 83's) have no adapters: only the callbacks'
 // plain C++ calls them (the flag switches the callbacks). The aero parts'
 // swaps (sub_820CB6C8, sub_820CB7E8) have none either: only the getters'
-// plain C++ calls them.
+// plain C++ calls them. Car::Refresh's callees (sub_820C4888, sub_820C4568,
+// Tire::InchUp sub_820C46B8) have none: only its plain C++ calls them.
 
 #include "guest.h"
 
@@ -21,7 +22,8 @@ ITC_FLAG_BOOL(native_car_specs, true, "ITC",
               "sub_820CC1F0, sub_820CBE10, sub_820CB588 and sub_820CB658; the getters, "
               "sub_820C9E98, sub_820C9EB0, sub_820C9EE0, sub_820C9E00, sub_820C9928 and "
               "sub_820C9DD8; the aero parts' getters, sub_820CB848 to sub_820CBC90, their "
-              "swaps and sub_820CBD20) natively "
+              "swaps and sub_820CBD20; Car::Refresh, sub_820C4998, with sub_820C4888, "
+              "sub_820C4568 and Tire::InchUp, sub_820C46B8) natively "
               "instead of through the translated code (same results; checked by "
               "--run_harnesses=car_specs)");
 
@@ -93,16 +95,25 @@ ITC_CAR_SPECS_WORD(820C9DD8, Exists(base))
 // Params::GetCarParts: r3 = out, left as it came.
 extern "C" REX_FUNC(sub_820C9E00) {
   ITC_CAR_SPECS_FALLBACK(820C9E00)
-  GetCarParts(base, ctx.r3.u32, ctx.r4.u32);
+  uint32_t parts[9];
+  GetCarParts(base, ctx.r4.u32, parts);
+  for (uint32_t i = 0; i < 9; i++) {
+    guest::StoreU32(base, ctx.r3.u32 + 4 * i, parts[i]);
+  }
 }
 
-// The aero part getters: r3 = out (returned as it came), r4 = the parts, r5 = the level;
+// The aero part getters: r3 = out (returned as it came), r4 = the parts (the
+// 9 pointers read here; the original reads the one it needs), r5 = the level;
 // the original where memcpy's copy wouldn't be the host's. They turn
 // flush-to-zero off, as the originals' lfs leave it.
 #define ITC_CAR_SPECS_AERO(address, function)                          \
   extern "C" REX_FUNC(sub_##address) {                                 \
     ITC_CAR_SPECS_FALLBACK(address)                                    \
-    if (!function(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.s32)) {         \
+    uint32_t parts[9];                                                 \
+    for (uint32_t i = 0; i < 9; i++) {                                 \
+      parts[i] = guest::LoadU32(base, ctx.r4.u32 + 4 * i);             \
+    }                                                                  \
+    if (!function(base, ctx.r3.u32, parts, ctx.r5.s32)) {              \
       __imp__sub_##address(ctx, base);                                 \
       return;                                                          \
     }                                                                  \
@@ -125,4 +136,19 @@ extern "C" REX_FUNC(sub_820CBD20) {
   ITC_CAR_SPECS_FALLBACK(820CBD20)
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = CountBodyKits(base, ctx.r3.u32);
+}
+
+// Car::Refresh: r3 = the car; r3 as the original leaves it (its last
+// memcpy's destination). The original where one of its memcpys wouldn't be
+// the host's copy. Flush-to-zero off first, as its first lfs sets it (the
+// tires' float steps need it).
+extern "C" REX_FUNC(sub_820C4998) {
+  ITC_CAR_SPECS_FALLBACK(820C4998)
+  ctx.fpscr.disableFlushMode();
+  uint32_t r3;
+  if (!CarRefresh(base, ctx.r3.u32, &r3)) {
+    __imp__sub_820C4998(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = r3;
 }

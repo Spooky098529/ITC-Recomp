@@ -84,7 +84,13 @@ ITC_NATIVE_STEP(NativeFirstWheelOfModel, ctx.r3.u64 = cs::FirstWheelOfModel(base
 ITC_NATIVE_STEP(NativeGetTire,
                 ctx.r3.u64 = cs::GetTire(ctx.r3.u32, ctx.r4.s32, ctx.r5.u32, ctx.r6.s32))
 ITC_NATIVE_STEP(NativeExists, ctx.r3.u64 = cs::Exists(base))
-ITC_NATIVE_STEP(NativeGetCarParts, cs::GetCarParts(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_STEP(NativeGetCarParts, {
+  uint32_t parts[9];
+  cs::GetCarParts(base, ctx.r4.u32, parts);
+  for (uint32_t i = 0; i < 9; i++) {
+    guest::StoreU32(base, ctx.r3.u32 + 4 * i, parts[i]);
+  }
+})
 ITC_NATIVE_STEP(NativeCountBodyKits, {
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = cs::CountBodyKits(base, ctx.r3.u32);
@@ -92,7 +98,11 @@ ITC_NATIVE_STEP(NativeCountBodyKits, {
 
 #define ITC_NATIVE_AERO(name, function, address)                      \
   ITC_NATIVE_STEP(name, {                                             \
-    if (!cs::function(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.s32)) {    \
+    uint32_t parts[9];                                                \
+    for (uint32_t i = 0; i < 9; i++) {                                \
+      parts[i] = guest::LoadU32(base, ctx.r4.u32 + 4 * i);            \
+    }                                                                 \
+    if (!cs::function(base, ctx.r3.u32, parts, ctx.r5.s32)) {         \
       __imp__sub_##address(ctx, base);                                \
       return;                                                         \
     }                                                                 \
@@ -111,6 +121,33 @@ ITC_NATIVE_AERO(NativeAeroPart82, AeroPart82, 820CBC90)
 ITC_NATIVE_SWAP(NativeSwapAeroPart, SwapAeroPart)
 ITC_NATIVE_SWAP(NativeSwapAeroPart36, SwapAeroPart36)
 
+ITC_NATIVE_STEP(NativeInchUp, {
+  if (ctx.r4.s32 != 0) {
+    ctx.fpscr.disableFlushMode();
+  }
+  cs::InchUp(base, ctx.r3.u32, ctx.r4.s32);
+})
+ITC_NATIVE_STEP(NativeCopySpec, {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = cs::CopySpec(base, ctx.r3.u32, ctx.r4.u32);
+})
+ITC_NATIVE_STEP(NativeCopyAeroParts, {
+  uint32_t parts[9];
+  for (uint32_t i = 0; i < 9; i++) {
+    parts[i] = guest::LoadU32(base, ctx.r4.u32 + 4 * i);
+  }
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = cs::CopyAeroParts(base, ctx.r3.u32, parts);
+})
+ITC_NATIVE_STEP(NativeCarRefresh, {
+  ctx.fpscr.disableFlushMode();
+  uint32_t r3;
+  if (!cs::CarRefresh(base, ctx.r3.u32, &r3)) {
+    __imp__sub_820C4998(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = r3;
+})
 #undef ITC_NATIVE_AERO
 #undef ITC_NATIVE_CALLBACK
 #undef ITC_NATIVE_SWAP
@@ -607,6 +644,236 @@ void AeroParts(Context& h, const Block& block) {
   }
 }
 
+// One case through both versions with outputs `collect` builds (floats
+// marked where the code stores them with float instructions), then the area
+// and r3. The game's tables are read, not changed, so the global stays.
+template <typename Setup, typename Args, typename Collect>
+void CaseWith(Context& h, Results& results, const Block& block, uint32_t block_bytes, Setup setup,
+              Args args, GuestFunction recompiled, GuestFunction native, Collect collect,
+              const std::string& what) {
+  Outputs out[2];
+  const Random start = h.random;
+  Random after;
+  for (int v = 0; v < 2; v++) {
+    h.random = start;
+    Fill(h.base, h.data, kScratchBytes);
+    Fill(h.base, block.address, block_bytes);
+    setup();
+    PPCContext t = CallContext(h);
+    args(t);
+    ITC_FLAG(native_car_specs) = v == 1;
+    (v == 0 ? recompiled : native)(t, h.base);
+    ITC_FLAG(native_car_specs) = true;
+    collect(out[v]);
+    out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+    out[v].Word(t.r3.u32);
+    after = h.random;
+  }
+  h.random = after;
+  results.Check(out[0], out[1], what);
+}
+
+// Whether a tire's word at `offset` is one Tire::InchUp stores with stfs.
+bool TireFloat(uint32_t offset) {
+  return offset == 48 || offset == 64 || offset == 68 || offset == 80 || offset == 84 ||
+         offset == 88;
+}
+
+// `bytes` words from `address`, the ones `is_float(offset)` marks as floats.
+template <typename IsFloat>
+void Words(Outputs& out, uint8_t* base, uint32_t address, uint32_t bytes, IsFloat is_float) {
+  for (uint32_t offset = 0; offset < bytes; offset += 4) {
+    const uint32_t word = guest::LoadU32(base, address + offset);
+    if (is_float(offset)) {
+      out.Float(word);
+    } else {
+      out.Word(word);
+    }
+  }
+}
+
+// The car object's words Car::Refresh stores as floats: its tires' (+3084,
+// +3176) and the change in their widths (+3876, +3880).
+bool CarFloat(uint32_t offset) {
+  if (offset == 3876 || offset == 3880) {
+    return true;
+  }
+  for (uint32_t tire : {3084u, 3176u}) {
+    if (offset >= tire && offset < tire + 92 && TireFloat(offset - tire)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// A float field for a tire: mostly near the game's values, sometimes an
+// edge value (NaN, infinity, a denormal, 0).
+uint32_t TireValue(Random& r, float typical) {
+  static const uint32_t kEdges[] = {0x7FC00000u, 0xFF800000u, 0x7F800000u, 0x00000001u,
+                                    0x80000000u, 0x00000000u, 0x7F7FFFFFu, 0xBF800000u};
+  if (r.Below(12) == 0) {
+    return kEdges[r.Below(uint32_t(std::size(kEdges)))];
+  }
+  const float scale = 0.5f + float(r.Below(1000)) / 1000.0f;
+  return std::bit_cast<uint32_t>(typical * scale);
+}
+
+// A tire's float fields near the game's: the radius (+44), the width (+48),
+// the grip (+64), the rim (+80) and the aspect (+84).
+void RandomTire(Context& h, uint32_t tire) {
+  guest::StoreU32(h.base, tire + 44, TireValue(h.random, 0.3f));
+  guest::StoreU32(h.base, tire + 48, TireValue(h.random, 0.2f));
+  guest::StoreU32(h.base, tire + 64, TireValue(h.random, 1.0f));
+  guest::StoreU32(h.base, tire + 80, TireValue(h.random, 16.0f));
+  guest::StoreU32(h.base, tire + 84, TireValue(h.random, 0.6f));
+}
+
+constexpr uint32_t kCarBytes = 4096;
+
+// A car object: random words, then the fields Car::Refresh reads, in range
+// for the game's tables.
+void RandomCar(Context& h, uint32_t car, uint32_t specs, uint32_t wheels) {
+  Random& r = h.random;
+  RandomWords(h, car, kCarBytes / 4);
+  auto set = [&](uint32_t offset, uint32_t value) { guest::StoreU32(h.base, car + offset, value); };
+  set(12, r.Below(specs));
+  set(1656, r.Below(16));
+  for (uint32_t offset : {1712u, 1720u}) {
+    const uint32_t type = r.Below(5);
+    set(offset, type);
+    set(offset + 4, type == 0 ? uint32_t(r.Next()) : 1 + r.Below(5));
+  }
+  set(1732, r.Below(3) == 0 ? 0 : uint32_t(int32_t(r.Below(7)) - 2));
+  set(1740, r.Below(3) == 0 ? 0 : uint32_t(int32_t(r.Below(7)) - 2));
+  set(1744, r.Below(11));
+  set(1748, r.Below(11));
+  set(1752, r.Below(11));
+  set(1756, uint32_t(int32_t(r.Below(12)) - 1));
+  set(1760, r.Below(7));
+  set(1764, r.Below(2) == 0 ? 0 : uint32_t(r.Next()));
+  set(1768, r.Below(4));
+  set(1780, r.Below(4));
+  set(1784, r.Below(3));
+  set(1728, r.Below(3) == 0 ? 0 : 1 + r.Below(wheels));
+  set(1736, r.Below(3) == 0 ? 0 : 1 + r.Below(wheels));
+}
+
+// Made-up tables for Car::Refresh's cases (the game's load only after the
+// harnesses run): a parameter object, 3 specs (random words, their tires'
+// floats near the game's, the third's +771 set: car 0's parts then), 8
+// wheels and 3 cars' aero parts, in a block of their own that the cases
+// only read. The global points at the object while they run.
+struct MadeUpTables {
+  explicit MadeUpTables(Context& h) : block(512 + 3 * cs::kSpecBytes + 8 * cs::kWheelBytes + 3 * 1720) {
+    params = block.address;
+    specs = params + 512;
+    wheels = specs + 3 * cs::kSpecBytes;
+    uint32_t aero = wheels + 8 * cs::kWheelBytes;
+    RandomWords(h, block.address, block.bytes / 4);
+    guest::StoreU32(h.base, params + 0, 0);
+    guest::StoreU32(h.base, params + 8, wheels);
+    guest::StoreU32(h.base, params + 12, specs);
+    static constexpr uint32_t kStrides[9] = {280, 280, 280, 280, 168, 168, 84, 108, 72};
+    for (uint32_t k = 0; k < 9; k++) {
+      guest::StoreU32(h.base, params + 16 + 4 * k, aero);
+      aero += 3 * kStrides[k];
+    }
+    guest::StoreU32(h.base, params + 56, 3);
+    guest::StoreU32(h.base, params + 60, 8);
+    for (uint32_t n = 0; n < 3; n++) {
+      const uint32_t spec = specs + n * cs::kSpecBytes;
+      guest::StoreU8(h.base, spec + 771, n == 2 ? 1 : 0);
+      for (uint32_t t = 0; t < 42; t++) {
+        RandomTire(h, spec + 4244 + 92 * t);
+      }
+    }
+  }
+  Block block;
+  uint32_t params, specs, wheels;
+};
+
+void Refresh(Context& h, const Block& block) {
+  const uint32_t params_global = guest::LoadU32(h.base, cs::kParams);
+  MadeUpTables tables(h);
+  guest::StoreU32(h.base, cs::kParams, tables.params);
+  const uint32_t specs = 3;
+  const uint32_t table72 = tables.specs;
+  const uint32_t wheels = 8;
+  {
+    Results results("sub_820C46B8 Tire::InchUp");
+    const uint32_t tire = h.data + 64;
+    for (int i = 0; i < 600; i++) {
+      const int32_t n = i % 10 == 0 ? 0 : int32_t(h.random.Below(9)) - 3;
+      CaseWith(
+          h, results, block, 16,
+          [&] {
+            RandomWords(h, tire, 92 / 4);
+            RandomTire(h, tire);
+          },
+          [&](PPCContext& t) {
+            t.r3.u64 = tire;
+            t.r4.u64 = Upper(h.random) | uint32_t(n);
+          },
+          __imp__sub_820C46B8, NativeInchUp,
+          [&](Outputs& out) {
+            Words(out, h.base, tire, 92, [](uint32_t offset) { return TireFloat(offset); });
+          },
+          fmt::format("case {} ({} inches)", i, n));
+    }
+    results.Report();
+  }
+  const uint32_t car = block.address + 64;
+  auto collect_car = [&](Outputs& out) {
+    Words(out, h.base, car, kCarBytes, [](uint32_t offset) { return CarFloat(offset); });
+  };
+  {
+    Results results("sub_820C4888 Car::CopySpec");
+    for (int i = 0; i < 150; i++) {
+      CaseWith(
+          h, results, block, kCarBytes + 128, [&] { RandomCar(h, car, specs, wheels); },
+          [&](PPCContext& t) {
+            t.r3.u64 = car;
+            t.r4.u64 = table72 + cs::kSpecBytes * h.random.Below(specs);
+          },
+          __imp__sub_820C4888, NativeCopySpec, collect_car, fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    Results results("sub_820C4568 Car::CopyAeroParts");
+    const uint32_t parts = h.data + 512;
+    for (int i = 0; i < 150; i++) {
+      CaseWith(
+          h, results, block, kCarBytes + 128,
+          [&] {
+            RandomCar(h, car, specs, wheels);
+            uint32_t p[9];
+            cs::GetCarParts(h.base, h.random.Below(3), p);
+            for (uint32_t k = 0; k < 9; k++) {
+              guest::StoreU32(h.base, parts + 4 * k, p[k]);
+            }
+          },
+          [&](PPCContext& t) {
+            t.r3.u64 = car;
+            t.r4.u64 = parts;
+          },
+          __imp__sub_820C4568, NativeCopyAeroParts, collect_car, fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    Results results("sub_820C4998 Car::Refresh");
+    for (int i = 0; i < 300; i++) {
+      CaseWith(
+          h, results, block, kCarBytes + 128, [&] { RandomCar(h, car, specs, wheels); },
+          [&](PPCContext& t) { t.r3.u64 = car; }, __imp__sub_820C4998, NativeCarRefresh,
+          collect_car, fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  guest::StoreU32(h.base, cs::kParams, params_global);
+}
+
 }  // namespace
 
 void CarSpecs(Context& h) {
@@ -616,6 +883,7 @@ void CarSpecs(Context& h) {
   Callbacks(h);
   Getters(h, block);
   AeroParts(h, block);
+  Refresh(h, block);
 }
 
 }  // namespace harness

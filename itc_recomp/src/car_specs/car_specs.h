@@ -72,9 +72,9 @@ uint32_t GetWheel(uint8_t* base, int32_t n);
 // Params::FirstWheelOfModel (sub_820C9EE0): 0 below 1, else the model's
 // first record (+64 + 4 × m) + 1.
 uint32_t FirstWheelOfModel(uint8_t* base, int32_t m);
-// Params::GetCarParts (sub_820C9E00): tables 74-82's records of `car` into
-// the 9 pointers at `out`.
-void GetCarParts(uint8_t* base, uint32_t out, uint32_t car);
+// Params::GetCarParts (sub_820C9E00): tables 74-82's records of `car` (the
+// 9 pointers the original stores at r3, the adapter's job).
+void GetCarParts(uint8_t* base, uint32_t car, uint32_t parts[9]);
 // CarSpec::GetTire (sub_820C9928): the spec's tire for the type and grade,
 // front or rear.
 uint32_t GetTire(uint32_t spec, int32_t type, uint32_t grade, int32_t rear);
@@ -85,23 +85,49 @@ uint32_t Exists(uint8_t* base);
 uint32_t SwapAeroPart(uint8_t* base, uint32_t p);    // sub_820CB6C8
 uint32_t SwapAeroPart36(uint8_t* base, uint32_t p);  // sub_820CB7E8
 // AeroParts::Get74 to Get82 (sub_820CB848 to sub_820CBC90): `out` = table
-// 74 + n's record `level` - 1 of the car (`parts` = GetCarParts' block),
+// 74 + n's record `level` - 1 of the car (`parts` = GetCarParts' pointers),
 // copied and swapped, or the defaults for level 0 (Get77: 0 and below).
 // False, with nothing done, where memcpy's copy wouldn't be the host's (the
 // ranges sharing memory, or a destination in the physical views it records
 // for the renderer): the original runs there.
-bool AeroPart74(uint8_t* base, uint32_t out, uint32_t parts, int32_t level);
-bool AeroPart75(uint8_t* base, uint32_t out, uint32_t parts, int32_t level);
-bool AeroPart76(uint8_t* base, uint32_t out, uint32_t parts, int32_t level);
-bool AeroPart77(uint8_t* base, uint32_t out, uint32_t parts, int32_t level);
-bool AeroPart78(uint8_t* base, uint32_t out, uint32_t parts, int32_t level);
-bool AeroPart79(uint8_t* base, uint32_t out, uint32_t parts, int32_t level);
-bool AeroPart80(uint8_t* base, uint32_t out, uint32_t parts, int32_t level);
-bool AeroPart81(uint8_t* base, uint32_t out, uint32_t parts, int32_t level);
-bool AeroPart82(uint8_t* base, uint32_t out, uint32_t parts, int32_t level);
+bool AeroPart74(uint8_t* base, uint32_t out, const uint32_t parts[9], int32_t level);
+bool AeroPart75(uint8_t* base, uint32_t out, const uint32_t parts[9], int32_t level);
+bool AeroPart76(uint8_t* base, uint32_t out, const uint32_t parts[9], int32_t level);
+bool AeroPart77(uint8_t* base, uint32_t out, const uint32_t parts[9], int32_t level);
+bool AeroPart78(uint8_t* base, uint32_t out, const uint32_t parts[9], int32_t level);
+bool AeroPart79(uint8_t* base, uint32_t out, const uint32_t parts[9], int32_t level);
+bool AeroPart80(uint8_t* base, uint32_t out, const uint32_t parts[9], int32_t level);
+bool AeroPart81(uint8_t* base, uint32_t out, const uint32_t parts[9], int32_t level);
+bool AeroPart82(uint8_t* base, uint32_t out, const uint32_t parts[9], int32_t level);
 // sub_820CBD20: how many of table 82's first two records of the car have a
 // first float other than 0.0 (a float compare: -0.0 counts as 0.0, a NaN
 // doesn't). Needs flush-to-zero off, as the original's lfs leaves it.
 uint32_t CountBodyKits(uint8_t* base, uint32_t parts);
+
+// Tire::InchUp (sub_820C46B8): the 92-byte tire `n` inches up (0: nothing),
+// with the original's single-precision steps. Needs flush-to-zero off.
+void InchUp(uint8_t* base, uint32_t tire, int32_t n);
+
+// sub_820C4888 Car::CopySpec: the spec's blocks, engine stage, paints and
+// tires copied into the car (memcpy's copies the host's: the caller checks
+// they fit), the tires inched up, the change in their widths. Returns what
+// the original leaves in r3 (car + 3176).
+uint32_t CopySpec(uint8_t* base, uint32_t car, uint32_t spec);
+// sub_820C4568 Car::CopyAeroParts: the aero parts' records for the car's
+// levels into the car (the original has each getter write to the stack,
+// then copies that to the car; here the getters write to the car; the
+// caller checks the copies fit). Returns what the original leaves in r3
+// (car + 3748).
+uint32_t CopyAeroParts(uint8_t* base, uint32_t car, const uint32_t parts[9]);
+
+// Car::Refresh (sub_820C4998), with sub_820C4888 (the spec's copies and the
+// tires inched up) and sub_820C4568 (the aero parts) in it: the car
+// object's copy of its spec as tuned. Returns what the original leaves in r3
+// (its last memcpy's destination, car + 3316) in `r3`; false, with nothing
+// done, where one of its memcpys wouldn't be the host's copy (the ranges
+// sharing memory, a destination in the physical views, or a range the
+// spec's copies could change before it's read): the original runs there.
+// Needs flush-to-zero off.
+bool CarRefresh(uint8_t* base, uint32_t car, uint32_t* r3);
 
 }  // namespace car_specs
