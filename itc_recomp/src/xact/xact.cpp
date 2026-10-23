@@ -903,4 +903,283 @@ std::optional<uint32_t> SoundBankLoad(uint8_t* base, uint32_t bank, uint32_t fil
   return InitInstanceCounts(base, bank);
 }
 
+// --- Batch 6: the global settings' accessors and their users ---
+
+namespace {
+
+// The global settings' slots (vtable 0x820753A8, read from the loaded
+// image) the accessors call.
+constexpr uint32_t kSettingsGetCategoryRecord = 0x825C23C8;  // +4
+constexpr uint32_t kSettingsGetVariableRecord = 0x825C2428;  // +8
+constexpr uint32_t kSettingsGetParent = 0x825C24E8;          // +24
+constexpr uint32_t kSettingsGetVolumeByte = 0x825C2518;      // +28
+constexpr uint32_t kSettingsGetCategoryFlag = 0x825C2618;    // +32
+constexpr uint32_t kSettingsGetBuffer = 0x825C2200;          // +44
+constexpr uint32_t kSettingsGetNameBuckets = 0x825C2208;     // +48
+constexpr uint32_t kGainTable = 0x82075418;  // a category volume byte's gain
+
+// Whether the settings' slots a function reaches are the native ones: the
+// buffer (+44); a category's record (+4, and the buffer); its parent (+24,
+// and the record).
+bool BufferSlot(uint8_t* base, uint32_t settings) {
+  return SlotIs(base, settings, 44, kSettingsGetBuffer);
+}
+bool RecordSlots(uint8_t* base, uint32_t settings) {
+  return SlotIs(base, settings, 4, kSettingsGetCategoryRecord) && BufferSlot(base, settings);
+}
+bool ParentSlots(uint8_t* base, uint32_t settings) {
+  return SlotIs(base, settings, 24, kSettingsGetParent) && RecordSlots(base, settings);
+}
+
+// The settings at the engine's +124 (0 for none).
+uint32_t EngineSettings(uint8_t* base, uint32_t engine) {
+  return guest::LoadU32(base, engine + 124);
+}
+
+// A category's record and parent once RecordSlots and ParentSlots hold.
+uint32_t CategoryRecord(uint8_t* base, uint32_t settings, uint32_t index) {
+  return *SettingsGetCategoryRecord(base, settings, index);
+}
+uint32_t Parent(uint8_t* base, uint32_t settings, uint32_t index) {
+  return *SettingsGetParentCategory(base, settings, index);
+}
+
+// AddInstance and RemoveInstance once ParentSlots holds: `delta` added to
+// the live instance count (+104) of the category and each parent. r3 as
+// the original leaves it: the settings for none, else the last parent.
+uint32_t AddToInstances(uint8_t* base, uint32_t settings, uint32_t index, uint32_t delta) {
+  uint32_t r3 = settings;
+  uint32_t c = index & 0xFFFF;
+  while (c != 0xFFFF) {
+    const uint32_t at = guest::LoadU32(base, settings + 104) + (c << 2);
+    guest::StoreU32(base, at, guest::LoadU32(base, at) + delta);
+    r3 = Parent(base, settings, c);
+    c = r3 & 0xFFFF;
+  }
+  return r3;
+}
+
+}  // namespace
+
+uint32_t SettingsGetBuffer(uint8_t* base, uint32_t settings) {
+  ITC_NATIVE_RUNNING("sub_825C2200 XACTGlobalSettings::GetBuffer");
+  return guest::LoadU32(base, settings + 132);
+}
+
+std::optional<uint32_t> SettingsGetNameBuckets(uint8_t* base, uint32_t settings) {
+  if (!BufferSlot(base, settings)) {
+    return std::nullopt;
+  }
+  ITC_NATIVE_RUNNING("sub_825C2208 XACTGlobalSettings::GetNameBuckets");
+  const uint32_t buffer = SettingsGetBuffer(base, settings);
+  return guest::LoadU32(base, buffer + 31) + buffer;
+}
+
+std::optional<uint32_t> SettingsGetNameEntry(uint8_t* base, uint32_t settings, uint32_t index) {
+  if (!BufferSlot(base, settings)) {
+    return std::nullopt;
+  }
+  ITC_NATIVE_RUNNING("sub_825C2268 XACTGlobalSettings::GetNameEntry");
+  const uint32_t buffer = SettingsGetBuffer(base, settings);
+  return 6 * (index & 0xFFFF) + guest::LoadU32(base, buffer + 35) + buffer;
+}
+
+std::optional<uint32_t> SettingsGetPointer(uint8_t* base, uint32_t settings, uint32_t offset) {
+  if (!BufferSlot(base, settings)) {
+    return std::nullopt;
+  }
+  ITC_NATIVE_RUNNING("sub_825C22C8 XACTGlobalSettings::GetPointer");
+  return SettingsGetBuffer(base, settings) + offset;
+}
+
+std::optional<uint32_t> SettingsGetCategoryRecord(uint8_t* base, uint32_t settings,
+                                                  uint32_t index) {
+  if (!BufferSlot(base, settings)) {
+    return std::nullopt;
+  }
+  ITC_NATIVE_RUNNING("sub_825C23C8 XACTGlobalSettings::GetCategoryRecord");
+  const uint32_t buffer = SettingsGetBuffer(base, settings);
+  return 10 * (index & 0xFFFF) + guest::LoadU32(base, buffer + 23) + buffer;
+}
+
+std::optional<uint32_t> SettingsGetVariableRecord(uint8_t* base, uint32_t settings,
+                                                  uint32_t index) {
+  if (!BufferSlot(base, settings)) {
+    return std::nullopt;
+  }
+  ITC_NATIVE_RUNNING("sub_825C2428 XACTGlobalSettings::GetVariableRecord");
+  const uint32_t buffer = SettingsGetBuffer(base, settings);
+  return 13 * (index & 0xFFFF) + guest::LoadU32(base, buffer + 27) + buffer;
+}
+
+std::optional<uint32_t> SettingsGetMaxInstances(uint8_t* base, uint32_t settings,
+                                                uint32_t index) {
+  if (!RecordSlots(base, settings)) {
+    return std::nullopt;
+  }
+  ITC_NATIVE_RUNNING("sub_825C2480 XACTGlobalSettings::GetMaxInstances");
+  return guest::LoadU8(base, CategoryRecord(base, settings, index));
+}
+
+std::optional<uint32_t> SettingsGetInstanceBehavior(uint8_t* base, uint32_t settings,
+                                                    uint32_t index) {
+  if (!RecordSlots(base, settings)) {
+    return std::nullopt;
+  }
+  ITC_NATIVE_RUNNING("sub_825C24B0 XACTGlobalSettings::GetInstanceBehavior");
+  return (guest::LoadU8(base, CategoryRecord(base, settings, index) + 5) >> 3) & 7;
+}
+
+std::optional<uint32_t> SettingsGetParentCategory(uint8_t* base, uint32_t settings,
+                                                  uint32_t index) {
+  if (!RecordSlots(base, settings)) {
+    return std::nullopt;
+  }
+  ITC_NATIVE_RUNNING("sub_825C24E8 XACTGlobalSettings::GetParentCategory");
+  return guest::LoadU16(base, CategoryRecord(base, settings, index) + 6);
+}
+
+std::optional<uint32_t> SettingsGetVolumeByte(uint8_t* base, uint32_t settings, uint32_t index) {
+  if (!RecordSlots(base, settings)) {
+    return std::nullopt;
+  }
+  ITC_NATIVE_RUNNING("sub_825C2518 XACTGlobalSettings::GetVolumeByte");
+  return guest::LoadU8(base, CategoryRecord(base, settings, index) + 8);
+}
+
+std::optional<uint32_t> SettingsGetNameEntryIndex(uint8_t* base, uint32_t settings,
+                                                  uint32_t entry) {
+  if (!SlotIs(base, settings, 48, kSettingsGetNameBuckets) || !BufferSlot(base, settings)) {
+    return std::nullopt;
+  }
+  ITC_NATIVE_RUNNING("sub_825C2548 XACTGlobalSettings::GetNameEntryIndex");
+  const uint32_t buckets = *SettingsGetNameBuckets(base, settings);
+  const uint32_t count = guest::LoadU16(base, SettingsGetBuffer(base, settings) + 13);
+  const uint32_t bytes = entry - (count << 1) - buckets;
+  // The division by 6 as the original's multiply.
+  return (uint32_t((uint64_t(bytes) * 0xAAAAAAABu) >> 32) >> 2) & 0xFFFF;
+}
+
+std::optional<uint32_t> SettingsGetCategoryFlag(uint8_t* base, uint32_t settings,
+                                                uint32_t index) {
+  if (!RecordSlots(base, settings)) {
+    return std::nullopt;
+  }
+  ITC_NATIVE_RUNNING("sub_825C2618 XACTGlobalSettings::GetCategoryFlag");
+  return guest::LoadU8(base, CategoryRecord(base, settings, index) + 9) & 1;
+}
+
+std::optional<uint32_t> EngineGetCategoryFlag(uint8_t* base, uint32_t engine, uint32_t index) {
+  const uint32_t settings = EngineSettings(base, engine);
+  if (settings != 0 &&
+      (!SlotIs(base, settings, 32, kSettingsGetCategoryFlag) || !RecordSlots(base, settings))) {
+    return std::nullopt;
+  }
+  ITC_NATIVE_RUNNING("sub_825C0708 XACTEngine::GetCategoryFlag");
+  return settings == 0 ? 0 : *SettingsGetCategoryFlag(base, settings, index);
+}
+
+std::optional<uint32_t> SettingsIsInCategory(uint8_t* base, uint32_t settings, uint32_t category,
+                                             uint32_t ancestor) {
+  if (!ParentSlots(base, settings)) {
+    return std::nullopt;
+  }
+  ITC_NATIVE_RUNNING("sub_825C3548 XACTGlobalSettings::IsInCategory");
+  for (uint32_t c = category & 0xFFFF; c != 0xFFFF; c = Parent(base, settings, c) & 0xFFFF) {
+    if (c == (ancestor & 0xFFFF)) {
+      return 1;
+    }
+  }
+  return 0;
+}
+
+std::optional<uint32_t> SettingsAddInstance(uint8_t* base, uint32_t settings, uint32_t index) {
+  if (!ParentSlots(base, settings)) {
+    return std::nullopt;
+  }
+  ITC_NATIVE_RUNNING("sub_825C3F90 XACTGlobalSettings::AddInstance");
+  return AddToInstances(base, settings, index, 1);
+}
+
+std::optional<uint32_t> SettingsRemoveInstance(uint8_t* base, uint32_t settings, uint32_t index) {
+  if (!ParentSlots(base, settings)) {
+    return std::nullopt;
+  }
+  ITC_NATIVE_RUNNING("sub_825C4000 XACTGlobalSettings::RemoveInstance");
+  return AddToInstances(base, settings, index, 0xFFFFFFFFu);
+}
+
+std::optional<uint32_t> EngineAddInstance(uint8_t* base, uint32_t engine, uint32_t index) {
+  const uint32_t settings = EngineSettings(base, engine);
+  if (settings != 0 && !ParentSlots(base, settings)) {
+    return std::nullopt;
+  }
+  ITC_NATIVE_RUNNING("sub_825C0598 XACTEngine::AddInstance");
+  return settings == 0 ? 0 : *SettingsAddInstance(base, settings, index);
+}
+
+std::optional<uint32_t> EngineRemoveInstance(uint8_t* base, uint32_t engine, uint32_t index) {
+  const uint32_t settings = EngineSettings(base, engine);
+  if (settings != 0 && !ParentSlots(base, settings)) {
+    return std::nullopt;
+  }
+  ITC_NATIVE_RUNNING("sub_825C05B0 XACTEngine::RemoveInstance");
+  return settings == 0 ? 0 : *SettingsRemoveInstance(base, settings, index);
+}
+
+std::optional<uint32_t> SettingsSetCategoryVolume(uint8_t* base, uint32_t settings,
+                                                  uint32_t index, double volume) {
+  if (!SlotIs(base, settings, 28, kSettingsGetVolumeByte) || !RecordSlots(base, settings)) {
+    return std::nullopt;
+  }
+  ITC_NATIVE_RUNNING("sub_825C4070 XACTGlobalSettings::SetCategoryVolume");
+  const uint32_t byte = *SettingsGetVolumeByte(base, settings, index);
+  const float gain = guest::LoadFloat(base, kGainTable + ((byte << 2) & 0x3FC));
+  guest::StoreFloat(base, guest::LoadU32(base, settings + 120) + ((index << 2) & 0x3FFFC),
+                    float(double(gain) * volume));
+  return byte;
+}
+
+std::optional<uint32_t> EngineGetVariableRecord(uint8_t* base, uint32_t engine, uint32_t index) {
+  const uint32_t settings = EngineSettings(base, engine);
+  if (settings != 0 && (!BufferSlot(base, settings) ||
+                        !SlotIs(base, settings, 8, kSettingsGetVariableRecord))) {
+    return std::nullopt;
+  }
+  ITC_NATIVE_RUNNING("sub_825C0748 XACTEngine::GetVariableRecord");
+  if (settings == 0 ||
+      (index & 0xFFFF) >= guest::LoadU16(base, SettingsGetBuffer(base, settings) + 11)) {
+    return 0;
+  }
+  return SettingsGetVariableRecord(base, settings, index);
+}
+
+std::optional<CategoryVolume> EngineGetCategoryVolume(uint8_t* base, uint32_t engine,
+                                                      uint32_t index) {
+  const uint32_t settings = EngineSettings(base, engine);
+  if (settings != 0 && !ParentSlots(base, settings)) {
+    return std::nullopt;
+  }
+  ITC_NATIVE_RUNNING("sub_825C04D8 XACTEngine::GetCategoryVolume");
+  double volume = double(guest::LoadFloat(base, kOne));
+  if (settings == 0) {
+    return CategoryVolume{volume, engine};
+  }
+  const uint32_t c = index & 0xFFFF;
+  const auto word = [&](uint32_t field) {
+    return guest::LoadU32(base, guest::LoadU32(base, settings + field) + (c << 2));
+  };
+  if (word(112) != 0 || (guest::LoadU32(base, settings + 116) != 0 && word(108) == 0)) {
+    return CategoryVolume{double(guest::LoadFloat(base, kZero)), engine};
+  }
+  uint32_t r3 = engine;
+  for (uint32_t at = c; at != 0xFFFF; at = r3 & 0xFFFF) {
+    const float gain =
+        guest::LoadFloat(base, guest::LoadU32(base, settings + 120) + (at << 2));
+    volume = double(float(double(gain) * volume));
+    r3 = Parent(base, settings, at);
+  }
+  return CategoryVolume{volume, r3};
+}
+
 }  // namespace xact

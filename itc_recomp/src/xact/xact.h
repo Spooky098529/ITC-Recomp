@@ -234,4 +234,75 @@ std::optional<uint32_t> SoundBankInitInstanceCounts(uint8_t* base, uint32_t bank
 std::optional<uint32_t> SoundBankLoad(uint8_t* base, uint32_t bank, uint32_t file, uint32_t size,
                                       uint32_t flags, uint32_t attributes);
 
+// --- Batch 6: the global settings' accessors (vtable 0x820753A8) and their
+// users. The settings file's buffer is +132; the header's +23, +27, +31 and
+// +35 the offsets of the category records (10 bytes), the variable records
+// (13 bytes), the name hash buckets and the name entries (6 bytes). The
+// accessors reach the buffer and the records through the settings' own
+// slots (+44 GetBuffer, +4 GetCategoryRecord, +8 GetVariableRecord, +24
+// GetParentCategory, +28 GetVolumeByte, +32 GetCategoryFlag, +48
+// GetNameBuckets): each runs natively only while the slots it reaches hold
+// those functions, std::nullopt otherwise, with nothing changed. ---
+
+// XACTGlobalSettings::GetBuffer (sub_825C2200): +132.
+uint32_t SettingsGetBuffer(uint8_t* base, uint32_t settings);
+// GetNameBuckets, GetNameEntry, GetPointer (sub_825C2208, sub_825C2268,
+// sub_825C22C8): the buffer + the header's +31, + its +35 + 6 x the 16-bit
+// index, + the offset.
+std::optional<uint32_t> SettingsGetNameBuckets(uint8_t* base, uint32_t settings);
+std::optional<uint32_t> SettingsGetNameEntry(uint8_t* base, uint32_t settings, uint32_t index);
+std::optional<uint32_t> SettingsGetPointer(uint8_t* base, uint32_t settings, uint32_t offset);
+// GetCategoryRecord, GetVariableRecord (sub_825C23C8, sub_825C2428): the
+// record of the 16-bit index.
+std::optional<uint32_t> SettingsGetCategoryRecord(uint8_t* base, uint32_t settings,
+                                                  uint32_t index);
+std::optional<uint32_t> SettingsGetVariableRecord(uint8_t* base, uint32_t settings,
+                                                  uint32_t index);
+// A category record's fields: GetMaxInstances (sub_825C2480, byte +0),
+// GetInstanceBehavior (sub_825C24B0, byte +5 bits 3-5), GetParentCategory
+// (sub_825C24E8, 16-bit +6), GetVolumeByte (sub_825C2518, byte +8),
+// GetCategoryFlag (sub_825C2618, byte +9 bit 0).
+std::optional<uint32_t> SettingsGetMaxInstances(uint8_t* base, uint32_t settings, uint32_t index);
+std::optional<uint32_t> SettingsGetInstanceBehavior(uint8_t* base, uint32_t settings,
+                                                    uint32_t index);
+std::optional<uint32_t> SettingsGetParentCategory(uint8_t* base, uint32_t settings,
+                                                  uint32_t index);
+std::optional<uint32_t> SettingsGetVolumeByte(uint8_t* base, uint32_t settings, uint32_t index);
+std::optional<uint32_t> SettingsGetCategoryFlag(uint8_t* base, uint32_t settings, uint32_t index);
+// GetNameEntryIndex (sub_825C2548): a name entry's index (its offset past
+// the buckets, / 6).
+std::optional<uint32_t> SettingsGetNameEntryIndex(uint8_t* base, uint32_t settings,
+                                                  uint32_t entry);
+// IsInCategory (sub_825C3548): 1 when `ancestor` is the category or one of
+// its parents, else 0.
+std::optional<uint32_t> SettingsIsInCategory(uint8_t* base, uint32_t settings, uint32_t category,
+                                             uint32_t ancestor);
+// AddInstance and RemoveInstance (sub_825C3F90, sub_825C4000): 1 added to
+// or taken from the live instance count (+104) of the category and each
+// parent; r3 as the original leaves it.
+std::optional<uint32_t> SettingsAddInstance(uint8_t* base, uint32_t settings, uint32_t index);
+std::optional<uint32_t> SettingsRemoveInstance(uint8_t* base, uint32_t settings, uint32_t index);
+// SetCategoryVolume (sub_825C4070): +120[index] = the gain of the record's
+// volume byte x `volume` (f1). Returns r3 (the volume byte).
+std::optional<uint32_t> SettingsSetCategoryVolume(uint8_t* base, uint32_t settings,
+                                                  uint32_t index, double volume);
+// The engine's wrappers (the settings at +124, or none): sub_825C0708 (a
+// category's flag, 0 without settings), sub_825C0598 and sub_825C05B0
+// (AddInstance, RemoveInstance; r3 0 without settings), sub_825C0748 (a
+// variable's record below the header's variable count +11, else 0).
+std::optional<uint32_t> EngineGetCategoryFlag(uint8_t* base, uint32_t engine, uint32_t index);
+std::optional<uint32_t> EngineAddInstance(uint8_t* base, uint32_t engine, uint32_t index);
+std::optional<uint32_t> EngineRemoveInstance(uint8_t* base, uint32_t engine, uint32_t index);
+std::optional<uint32_t> EngineGetVariableRecord(uint8_t* base, uint32_t engine, uint32_t index);
+// sub_825C04D8: a category's effective volume (f1): 1.0 without settings;
+// 0.0 when +112[index] is set, or +116 is and +108[index] isn't; else the
+// product of +120[c] over the category and its parents. r3 as the original
+// leaves it (the engine, or the last parent).
+struct CategoryVolume {
+  double f1;
+  uint32_t r3;
+};
+std::optional<CategoryVolume> EngineGetCategoryVolume(uint8_t* base, uint32_t engine,
+                                                      uint32_t index);
+
 }  // namespace xact

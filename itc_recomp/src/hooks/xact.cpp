@@ -25,7 +25,11 @@ ITC_FLAG_BOOL(native_xact, true, "ITC",
               "sub_825C76A0, sub_825C79B8, sub_825CC620, sub_825CEBE0, sub_825C8310, sub_825C5E58 "
               "and sub_825C67E8; the listener lists, sub_825C60C0, sub_825C6140, sub_825C7858, "
               "sub_825C6040 and sub_825C7758; the loop region in bytes, sub_825CF210 and "
-              "sub_825CF288; loading a sound bank, sub_825C7E40 and sub_825C7448) natively "
+              "sub_825CF288; loading a sound bank, sub_825C7E40 and sub_825C7448; the global settings' "
+              "accessors, sub_825C2200 to sub_825C2618, and their users, sub_825C3548, "
+              "sub_825C3F90, sub_825C4000, sub_825C4070, sub_825C0598, sub_825C05B0, "
+              "sub_825C0708, sub_825C0748 and sub_825C04D8, while the settings' slots are "
+              "those functions) natively "
               "instead of through the translated code (same results; checked by "
               "--run_harnesses=xact)");
 
@@ -220,4 +224,39 @@ extern "C" REX_FUNC(sub_825C7E40) {
     return;
   }
   ctx.r3.u64 = *result;
+}
+
+// The global settings' accessors, reached through the settings' vtable
+// (0x820753A8): each runs the original where a slot it reaches isn't the
+// native function. XACTGlobalSettings::AddInstance and RemoveInstance
+// (sub_825C3F90, sub_825C4000) have no adapters: their only callers,
+// sub_825C0598 and sub_825C05B0, are native.
+ITC_XACT_WORD(825C2200, SettingsGetBuffer(base, ctx.r3.u32))
+ITC_XACT_OPTIONAL(825C2208, SettingsGetNameBuckets(base, ctx.r3.u32))
+ITC_XACT_OPTIONAL(825C2268, SettingsGetNameEntry(base, ctx.r3.u32, ctx.r4.u32))
+ITC_XACT_OPTIONAL(825C22C8, SettingsGetPointer(base, ctx.r3.u32, ctx.r4.u32))
+ITC_XACT_OPTIONAL(825C23C8, SettingsGetCategoryRecord(base, ctx.r3.u32, ctx.r4.u32))
+ITC_XACT_OPTIONAL(825C2428, SettingsGetVariableRecord(base, ctx.r3.u32, ctx.r4.u32))
+ITC_XACT_OPTIONAL(825C2480, SettingsGetMaxInstances(base, ctx.r3.u32, ctx.r4.u32))
+ITC_XACT_OPTIONAL(825C24B0, SettingsGetInstanceBehavior(base, ctx.r3.u32, ctx.r4.u32))
+ITC_XACT_OPTIONAL(825C24E8, SettingsGetParentCategory(base, ctx.r3.u32, ctx.r4.u32))
+ITC_XACT_OPTIONAL(825C2518, SettingsGetVolumeByte(base, ctx.r3.u32, ctx.r4.u32))
+ITC_XACT_OPTIONAL(825C2548, SettingsGetNameEntryIndex(base, ctx.r3.u32, ctx.r4.u32))
+ITC_XACT_OPTIONAL(825C2618, SettingsGetCategoryFlag(base, ctx.r3.u32, ctx.r4.u32))
+ITC_XACT_OPTIONAL(825C3548, SettingsIsInCategory(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+ITC_XACT_OPTIONAL(825C4070,
+                  SettingsSetCategoryVolume(base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64))
+ITC_XACT_OPTIONAL(825C0708, EngineGetCategoryFlag(base, ctx.r3.u32, ctx.r4.u32))
+ITC_XACT_OPTIONAL(825C0598, EngineAddInstance(base, ctx.r3.u32, ctx.r4.u32))
+ITC_XACT_OPTIONAL(825C05B0, EngineRemoveInstance(base, ctx.r3.u32, ctx.r4.u32))
+ITC_XACT_OPTIONAL(825C0748, EngineGetVariableRecord(base, ctx.r3.u32, ctx.r4.u32))
+extern "C" REX_FUNC(sub_825C04D8) {
+  ITC_XACT_FALLBACK(825C04D8)
+  const auto result = EngineGetCategoryVolume(base, ctx.r3.u32, ctx.r4.u32);
+  if (!result) {
+    __imp__sub_825C04D8(ctx, base);
+    return;
+  }
+  ctx.f1.f64 = result->f1;
+  ctx.r3.u64 = result->r3;
 }

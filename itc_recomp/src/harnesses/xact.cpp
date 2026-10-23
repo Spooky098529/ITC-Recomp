@@ -170,6 +170,56 @@ ITC_NATIVE_OPTIONAL(NativeSoundBankLoad, xa::SoundBankLoad(base, ctx.r3.u32, ctx
 ITC_NATIVE_OPTIONAL(NativeWaveEntrySamplesToBytes,
                     xa::WaveEntrySamplesToBytes(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
 
+ITC_NATIVE_STEP(NativeSettingsGetBuffer, ctx.r3.u64 = xa::SettingsGetBuffer(base, ctx.r3.u32))
+ITC_NATIVE_OPTIONAL(NativeSettingsGetNameBuckets, xa::SettingsGetNameBuckets(base, ctx.r3.u32))
+ITC_NATIVE_OPTIONAL(NativeSettingsGetNameEntry,
+                    xa::SettingsGetNameEntry(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_OPTIONAL(NativeSettingsGetPointer, xa::SettingsGetPointer(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_OPTIONAL(NativeSettingsGetCategoryRecord,
+                    xa::SettingsGetCategoryRecord(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_OPTIONAL(NativeSettingsGetVariableRecord,
+                    xa::SettingsGetVariableRecord(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_OPTIONAL(NativeSettingsGetMaxInstances,
+                    xa::SettingsGetMaxInstances(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_OPTIONAL(NativeSettingsGetInstanceBehavior,
+                    xa::SettingsGetInstanceBehavior(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_OPTIONAL(NativeSettingsGetParentCategory,
+                    xa::SettingsGetParentCategory(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_OPTIONAL(NativeSettingsGetVolumeByte,
+                    xa::SettingsGetVolumeByte(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_OPTIONAL(NativeSettingsGetNameEntryIndex,
+                    xa::SettingsGetNameEntryIndex(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_OPTIONAL(NativeSettingsGetCategoryFlag,
+                    xa::SettingsGetCategoryFlag(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_OPTIONAL(NativeSettingsIsInCategory,
+                    xa::SettingsIsInCategory(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+ITC_NATIVE_OPTIONAL(NativeSettingsAddInstance,
+                    xa::SettingsAddInstance(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_OPTIONAL(NativeSettingsRemoveInstance,
+                    xa::SettingsRemoveInstance(base, ctx.r3.u32, ctx.r4.u32))
+void NativeSettingsSetCategoryVolume(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const auto result = xa::SettingsSetCategoryVolume(base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64);
+  ctx.r3.u64 = result ? *result : 0xDEADDEADu;
+}
+ITC_NATIVE_OPTIONAL(NativeEngineGetCategoryFlag,
+                    xa::EngineGetCategoryFlag(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_OPTIONAL(NativeEngineAddInstance, xa::EngineAddInstance(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_OPTIONAL(NativeEngineRemoveInstance,
+                    xa::EngineRemoveInstance(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_OPTIONAL(NativeEngineGetVariableRecord,
+                    xa::EngineGetVariableRecord(base, ctx.r3.u32, ctx.r4.u32))
+void NativeEngineGetCategoryVolume(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const auto result = xa::EngineGetCategoryVolume(base, ctx.r3.u32, ctx.r4.u32);
+  if (!result) {
+    ctx.r3.u64 = 0xDEADDEAD;
+    return;
+  }
+  ctx.f1.f64 = result->f1;
+  ctx.r3.u64 = result->r3;
+}
+
 // The odd float words mixed into inputs: NaNs of both kinds and signs,
 // infinities, denormals, signed zeros.
 constexpr uint32_t kOddFloats[] = {0x7FC00000, 0x7F800001, 0xFFC00001, 0xFF800001, 0x7F800000,
@@ -199,8 +249,9 @@ void RandomWords(Context& h, uint32_t address, uint32_t count) {
 using FloatRanges = std::vector<std::pair<uint32_t, uint32_t>>;
 
 // The scratch area's outputs: the float ranges as floats, the rest as bytes,
-// then r3.
-void Collect(Context& h, Outputs& out, const FloatRanges& floats, const PPCContext& t) {
+// then r3 (and f1 when the function returns a float).
+void Collect(Context& h, Outputs& out, const FloatRanges& floats, const PPCContext& t,
+             bool f1 = false) {
   uint32_t at = 0;
   for (const auto& [from, to] : floats) {
     if (from > at) {
@@ -211,6 +262,9 @@ void Collect(Context& h, Outputs& out, const FloatRanges& floats, const PPCConte
   }
   out.Bytes(Read(h.base, h.data + at, kScratchBytes - at));
   out.Word(t.r3.u32);
+  if (f1) {
+    out.Double(t.f1.u64);
+  }
 }
 
 // One case through both versions: the area filled, `setup()` writes the
@@ -219,7 +273,8 @@ void Collect(Context& h, Outputs& out, const FloatRanges& floats, const PPCConte
 // runs, and the area and r3 are compared.
 template <typename Setup, typename Args>
 void Case(Context& h, Results& results, Setup setup, Args args, GuestFunction recompiled,
-          GuestFunction native, const FloatRanges& floats, const std::string& what) {
+          GuestFunction native, const FloatRanges& floats, const std::string& what,
+          bool f1 = false) {
   Outputs out[2];
   const Random start = h.random;
   Random after;
@@ -232,7 +287,7 @@ void Case(Context& h, Results& results, Setup setup, Args args, GuestFunction re
     ITC_FLAG(native_xact) = v == 1;
     (v == 0 ? recompiled : native)(t, h.base);
     ITC_FLAG(native_xact) = true;
-    Collect(h, out[v], floats, t);
+    Collect(h, out[v], floats, t, f1);
     after = h.random;
   }
   h.random = after;
@@ -1127,6 +1182,179 @@ void Loads(Context& h) {
   results.Report();
 }
 
+// The global settings at the area's start (vtable `vtable`), their file's
+// buffer at +1024 (16 category records at +64, 16 variable records at
+// +240, the name buckets at +460 and entries at +480; the bucket and
+// variable counts random), the arrays +104, +108, +112 and +120 at +512,
+// +576, +640 and +704, and an engine at +3072 holding them (or none). The
+// categories' parents are acyclic (a later category or none), as a walk
+// over them would never end otherwise.
+constexpr uint32_t kSettingsVtable = 0x820753A8;
+constexpr uint32_t kEngine = 3072;
+constexpr uint32_t kSettingsVtableCopy = 3584;
+
+void Settings(Context& h, uint32_t vtable, bool engine_has_settings) {
+  const uint32_t d = h.data;
+  const uint32_t buffer = d + 1024;
+  RandomWords(h, d, 36);
+  guest::StoreU32(h.base, d, vtable);
+  guest::StoreU32(h.base, d + 132, buffer);
+  RandomBytes(h, buffer, 512);
+  guest::StoreU32(h.base, buffer + 23, 64);
+  guest::StoreU32(h.base, buffer + 27, 240);
+  guest::StoreU32(h.base, buffer + 31, 460);
+  guest::StoreU32(h.base, buffer + 35, 480);
+  guest::StoreU16(h.base, buffer + 13, uint16_t(h.random.Below(10)));
+  guest::StoreU16(h.base, buffer + 11, uint16_t(h.random.Below(20)));
+  for (uint32_t c = 0; c < 16; c++) {
+    const uint32_t parent =
+        c == 15 || h.random.Below(3) == 0 ? 0xFFFF : c + 1 + h.random.Below(15 - c);
+    guest::StoreU16(h.base, buffer + 64 + 10 * c + 6, uint16_t(parent));
+  }
+  const uint32_t arrays[] = {104, 108, 112, 120};
+  for (uint32_t i = 0; i < 4; i++) {
+    const uint32_t at = d + 512 + 64 * i;
+    guest::StoreU32(h.base, d + arrays[i], at);
+    for (uint32_t c = 0; c < 16; c++) {
+      const bool zero = (i == 1 || i == 2) && h.random.Below(4) != 0;
+      guest::StoreU32(h.base, at + 4 * c,
+                      zero ? 0 : i == 3 ? FloatWord(h.random) : uint32_t(h.random.Next()));
+    }
+  }
+  guest::StoreU32(h.base, d + 116, h.random.Below(2) ? 0 : uint32_t(h.random.Next()));
+  RandomWords(h, d + kEngine, 40);
+  guest::StoreU32(h.base, d + kEngine + 124, engine_has_settings ? d : 0);
+  // The image's vtable copied into the area (the same slots).
+  for (uint32_t i = 0; i < 20; i++) {
+    guest::StoreU32(h.base, d + kSettingsVtableCopy + 4 * i,
+                    guest::LoadU32(h.base, kSettingsVtable + 4 * i));
+  }
+}
+
+void GlobalSettings(Context& h) {
+  Results results("xact global settings");
+  const uint32_t d = h.data;
+  struct Accessor {
+    GuestFunction recompiled, native;
+    const char* name;
+  };
+  const Accessor by_index[] = {
+      {__imp__sub_825C2268, NativeSettingsGetNameEntry, "GetNameEntry"},
+      {__imp__sub_825C22C8, NativeSettingsGetPointer, "GetPointer"},
+      {__imp__sub_825C23C8, NativeSettingsGetCategoryRecord, "GetCategoryRecord"},
+      {__imp__sub_825C2428, NativeSettingsGetVariableRecord, "GetVariableRecord"},
+      {__imp__sub_825C2548, NativeSettingsGetNameEntryIndex, "GetNameEntryIndex"},
+  };
+  const Accessor by_category[] = {
+      {__imp__sub_825C2480, NativeSettingsGetMaxInstances, "GetMaxInstances"},
+      {__imp__sub_825C24B0, NativeSettingsGetInstanceBehavior, "GetInstanceBehavior"},
+      {__imp__sub_825C24E8, NativeSettingsGetParentCategory, "GetParentCategory"},
+      {__imp__sub_825C2518, NativeSettingsGetVolumeByte, "GetVolumeByte"},
+      {__imp__sub_825C2618, NativeSettingsGetCategoryFlag, "GetCategoryFlag"},
+      {__imp__sub_825C3F90, NativeSettingsAddInstance, "AddInstance"},
+      {__imp__sub_825C4000, NativeSettingsRemoveInstance, "RemoveInstance"},
+  };
+  const Accessor engine_wrappers[] = {
+      {__imp__sub_825C0708, NativeEngineGetCategoryFlag, "XACTEngine GetCategoryFlag"},
+      {__imp__sub_825C0598, NativeEngineAddInstance, "XACTEngine AddInstance"},
+      {__imp__sub_825C05B0, NativeEngineRemoveInstance, "XACTEngine RemoveInstance"},
+      {__imp__sub_825C0748, NativeEngineGetVariableRecord, "XACTEngine GetVariableRecord"},
+  };
+  // A category: mostly one of the 16, sometimes none (0xFFFF) or with high
+  // bits set (the functions take the low 16).
+  auto category = [&](int i) -> uint32_t {
+    const uint32_t c = i % 7 == 0 ? 0xFFFF : h.random.Below(16);
+    return i % 5 == 0 ? c | 0xABCD0000u : c;
+  };
+  for (int i = 0; i < 120; i++) {
+    const uint32_t vtable = i % 4 == 3 ? d + kSettingsVtableCopy : kSettingsVtable;
+    const bool engine_has = i % 6 != 5;
+    auto setup = [&] { Settings(h, vtable, engine_has); };
+    Case(h, results, setup, [&](PPCContext& t) { t.r3.u64 = d; }, __imp__sub_825C2200,
+         NativeSettingsGetBuffer, {}, fmt::format("XACTGlobalSettings::GetBuffer {}", i));
+    Case(h, results, setup, [&](PPCContext& t) { t.r3.u64 = d; }, __imp__sub_825C2208,
+         NativeSettingsGetNameBuckets, {}, fmt::format("XACTGlobalSettings::GetNameBuckets {}", i));
+    // The address functions with any 32-bit argument (none of them reads
+    // what it computes, but GetNameEntryIndex's buckets).
+    const uint32_t word = i % 3 == 0 ? h.random.Below(40) : uint32_t(h.random.Next());
+    for (const Accessor& a : by_index) {
+      Case(h, results, setup, [&](PPCContext& t) { t.r3.u64 = d; t.r4.u64 = word; },
+           a.recompiled, a.native, {}, fmt::format("XACTGlobalSettings::{} {}", a.name, i));
+    }
+    const uint32_t c = category(i);
+    for (const Accessor& a : by_category) {
+      if ((c & 0xFFFF) == 0xFFFF && a.native != NativeSettingsAddInstance &&
+          a.native != NativeSettingsRemoveInstance) {
+        continue;  // its record would be outside the area
+      }
+      Case(h, results, setup, [&](PPCContext& t) { t.r3.u64 = d; t.r4.u64 = c; }, a.recompiled,
+           a.native, {}, fmt::format("XACTGlobalSettings::{} {} ({:#x})", a.name, i, c));
+    }
+    const uint32_t ancestor = i % 3 == 0 ? c : category(i + 1);
+    Case(h, results, setup,
+         [&](PPCContext& t) { t.r3.u64 = d; t.r4.u64 = c; t.r5.u64 = ancestor; },
+         __imp__sub_825C3548, NativeSettingsIsInCategory, {},
+         fmt::format("XACTGlobalSettings::IsInCategory {} ({:#x} in {:#x})", i, c, ancestor));
+    const bool none = (c & 0xFFFF) == 0xFFFF;
+    const uint32_t volume_index = none ? h.random.Below(16) : c;
+    const double volume =
+        i % 9 == 0 ? std::bit_cast<double>(h.random.Next())
+                   : double(std::bit_cast<float>(FloatWord(h.random)));
+    Case(h, results, setup,
+         [&](PPCContext& t) { t.r3.u64 = d; t.r4.u64 = volume_index; t.f1.f64 = volume; },
+         __imp__sub_825C4070, NativeSettingsSetCategoryVolume, {{704, 768}},
+         fmt::format("XACTGlobalSettings::SetCategoryVolume {} ({:#x})", i, volume_index));
+    const uint32_t variable = i % 4 == 0 ? uint32_t(h.random.Next()) : h.random.Below(24);
+    for (const Accessor& a : engine_wrappers) {
+      const uint32_t index = a.native == NativeEngineGetVariableRecord ? variable
+                             : none && a.native == NativeEngineGetCategoryFlag ? 3
+                                                                                    : c;
+      Case(h, results, setup,
+           [&](PPCContext& t) { t.r3.u64 = d + kEngine; t.r4.u64 = index; }, a.recompiled,
+           a.native, {}, fmt::format("{} {} ({:#x}{})", a.name, i, index,
+                                     engine_has ? "" : ", no settings"));
+    }
+    // Its arrays are read at the category before the walk (not for none).
+    Case(h, results, setup,
+         [&](PPCContext& t) { t.r3.u64 = d + kEngine; t.r4.u64 = volume_index; },
+         __imp__sub_825C04D8, NativeEngineGetCategoryVolume, {},
+         fmt::format("XACTEngine GetCategoryVolume {} ({:#x}{})", i, volume_index,
+                     engine_has ? "" : ", no settings"),
+         true);
+  }
+  // A slot the functions reach changed in the copied vtable: the native
+  // versions decline.
+  const std::pair<uint32_t, GuestFunction> declines[] = {
+      {44, NativeSettingsGetNameBuckets},   {44, NativeSettingsGetNameEntry},
+      {44, NativeSettingsGetPointer},       {44, NativeSettingsGetCategoryRecord},
+      {44, NativeSettingsGetVariableRecord}, {4, NativeSettingsGetMaxInstances},
+      {4, NativeSettingsGetInstanceBehavior}, {4, NativeSettingsGetParentCategory},
+      {4, NativeSettingsGetVolumeByte},     {4, NativeSettingsGetCategoryFlag},
+      {48, NativeSettingsGetNameEntryIndex}, {24, NativeSettingsIsInCategory},
+      {24, NativeSettingsAddInstance},      {24, NativeSettingsRemoveInstance},
+      {28, NativeSettingsSetCategoryVolume}, {44, NativeSettingsSetCategoryVolume},
+  };
+  for (const auto& [slot, native] : declines) {
+    Fill(h.base, d, kScratchBytes);
+    Settings(h, d + kSettingsVtableCopy, true);
+    guest::StoreU32(h.base, d + kSettingsVtableCopy + slot, 0x825C2B50);
+    CheckDeclines(h, results, native, d, 1, fmt::format("settings slot +{} changed", slot));
+  }
+  const std::pair<uint32_t, GuestFunction> engine_declines[] = {
+      {32, NativeEngineGetCategoryFlag},   {24, NativeEngineAddInstance},
+      {24, NativeEngineRemoveInstance},    {8, NativeEngineGetVariableRecord},
+      {44, NativeEngineGetVariableRecord}, {24, NativeEngineGetCategoryVolume},
+  };
+  for (const auto& [slot, native] : engine_declines) {
+    Fill(h.base, d, kScratchBytes);
+    Settings(h, d + kSettingsVtableCopy, true);
+    guest::StoreU32(h.base, d + kSettingsVtableCopy + slot, 0x825C2B50);
+    CheckDeclines(h, results, native, d + kEngine, 1,
+                  fmt::format("engine's settings slot +{} changed", slot));
+  }
+  results.Report();
+}
+
 }  // namespace
 
 void Xact(Context& h) {
@@ -1139,6 +1367,7 @@ void Xact(Context& h) {
   Constructors(h);
   LoopRegions(h);
   Loads(h);
+  GlobalSettings(h);
 }
 
 }  // namespace harness
