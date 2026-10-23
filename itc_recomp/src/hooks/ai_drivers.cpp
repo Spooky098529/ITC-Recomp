@@ -18,7 +18,12 @@
 // ResetToMode1, ResetToMode0, AiSkill::Clear, Load and SetSource; SetSkill
 // (sub_821393D8), from StartRace; AiPath::SetMode (sub_8213D508), from
 // ResetToMode1, ResetToMode0 and StartRace; and AiOther::UpdateFlags
-// (sub_82145450), from AiOther::Update and Mirror.
+// (sub_82145450), from AiOther::Update and Mirror; ResetFollow
+// (sub_821467B8), AiPath::ResetFor (sub_8213E658) and ResetOthers
+// (sub_82145A48), from AiDriver::Reset; SetFlag2 (sub_82138D20), from
+// ResetToMode1, ResetToMode0, ResetControl and StartRace; ResetToMode1
+// (sub_82139450), from ResetControl; and AccumulateSteer (sub_82138F00),
+// from UpdateSteerInput.
 
 #include "guest.h"
 
@@ -70,7 +75,8 @@ ITC_FLAG_BOOL(native_ai_drivers, true, "ITC",
               "callers: sub_82144ED8, sub_8213C720, sub_821450E0, sub_821453A0, sub_82139248, "
               "sub_8213F730, sub_8213F900, sub_8213B390, sub_821459B0, sub_821451B8, sub_821464B8, "
               "sub_82146508, sub_82146588, sub_82146408, sub_8213F698, sub_821393D8, sub_8213D508, "
-              "sub_82145450");
+              "sub_82145450, sub_821467B8, sub_82138D20, sub_82139450, sub_82138F00, sub_8213E658, "
+              "sub_82145A48");
 
 // Defines an adapter: `body` uses `ctx` and `base`.
 #define ITC_AI_DRIVERS(address, body)   \
@@ -97,8 +103,6 @@ ITC_AI_DRIVERS(8213C710, ClearCornerKind(base, ctx.r3.u32))
 
 ITC_AI_DRIVERS(82145408, WrapAngle(base, ctx.r3.u32))
 ITC_AI_DRIVERS(82101760, ctx.r3.u64 = TimeFromTicks(ctx.r3.u32))
-// r4 = &the word.
-ITC_AI_DRIVERS(82138D20, ctx.r3.u64 = SetFlag2(base, ctx.r3.u32, ctx.r4.u32))
 ITC_AI_DRIVERS(82144F50, ctx.r3.u64 = ReadCar(base, ctx.r3.u32))
 ITC_AI_DRIVERS(82145230, UpdateHalfWidth(base, ctx.r3.u32))
 // f1 = the distance ahead, r4 = out.
@@ -145,8 +149,6 @@ ITC_AI_DRIVERS(82139820, ctx.r3.u64 = ClearPlan(base, ctx.r3.u32))
 ITC_AI_DRIVERS(82139B40, ctx.f1.f64 = LimitSpeedBlend(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
                                                       ctx.r6.u32, ctx.r7.u32, ctx.r8.u32,
                                                       ctx.r1.u32 - 96))
-// r4 = the driver.
-ITC_AI_DRIVERS(8213E658, ctx.r3.u64 = ResetFor(base, ctx.r3.u32, ctx.r4.u32))
 // The path's +5532 in mode 1 (no direct callers): r3 not read, r4 = the
 // entry, r5 = the position, r6 = &the lane, r7 = the masks or 0.
 ITC_AI_DRIVERS(8213B428, ctx.r3.u64 = NormalizeByLane(base, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
@@ -158,7 +160,6 @@ ITC_AI_DRIVERS(82144EF8, UpdateLane(base, ctx.r3.u32, ctx.r1.u32 - 128);
 
 // --- The other racers' records and the states ---
 
-ITC_AI_DRIVERS(82145A48, ctx.r3.u64 = ResetOthers(base, ctx.r3.u32))
 // r4 = &the target speed.
 ITC_AI_DRIVERS(82146220, UpdateState4(base, ctx.r3.u32, ctx.r4.u32))
 ITC_AI_DRIVERS(82146388, ctx.r3.u64 = UpdateState5(base, ctx.r3.u32, ctx.r4.u32))
@@ -177,12 +178,10 @@ ITC_AI_DRIVERS(8213C1A0, ctx.r3.u64 = WithinRoadAt(base, ctx.r3.u32, ctx.r4.u32)
 
 // --- Starts and resets ---
 
-// The words passed by address in the originals' frames (112 and 128 bytes
-// down); r3 left at the skill (+6048), as the originals leave it.
-ITC_AI_DRIVERS(82139450, ResetToMode1(base, ctx.r3.u32, ctx.r1.u32 - 112); ctx.r3.u64 += 6048)
+// The words passed by address in the original's frame (128 bytes down); r3
+// left at the skill (+6048), as the original leaves it.
 ITC_AI_DRIVERS(821394F0, ResetToMode0(base, ctx.r3.u32, ctx.r1.u32 - 128); ctx.r3.u64 += 6048)
 ITC_AI_DRIVERS(82139DA0, ctx.r3.u64 = StartRace(base, ctx.r3.u32, ctx.r1.u32 - 112))
-ITC_AI_DRIVERS(821467B8, ResetFollow(base, ctx.r3.u32))
 // The copies in the original's frame (6,320 bytes down); the original where
 // one can't be made natively.
 extern "C" REX_FUNC(sub_8213ADF8) {
@@ -200,7 +199,6 @@ extern "C" REX_FUNC(sub_8213ADF8) {
 
 // --- Pedals and steering (r3 kept) ---
 
-ITC_AI_DRIVERS(82138F00, AccumulateSteer(base, ctx.r3.u32))
 ITC_AI_DRIVERS(82139168, ThrottleForSpeed(base, ctx.r3.u32))
 // r4 = &the flag.
 ITC_AI_DRIVERS(82139BE8, EaseThrottleForSlide(base, ctx.r3.u32, ctx.r4.u32))
