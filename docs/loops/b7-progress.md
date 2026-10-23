@@ -14,7 +14,10 @@ lists are there), and this file's history.
 - Subsystem 2 of 3 (XACT) finished: the rest waits on blockers.
 - Subsystem 3 of 3: the rest of XACT's upper part (its unmapped vtable
   slots, `825BF5C8`-`825D0000`, with the small shared helpers), rows
-  added to `xact.md`; step 2, the mapping agent running.
+  added to `xact.md` (mapped in 284f3a2: 37 rows there, 2 in
+  `functions.md`; 33 ready groups); step 6, migration agent 1 running.
+  `sub_822956F0` (probably GetTickCount, reading the kernel's
+  timestamp bundle) left recompiled: the user's call.
 
 ## Done
 
@@ -55,3 +58,5 @@ This run's groups: `expected-differences.md` (the "01:52 run" lines).
   unknown 5225).
 - After XACT's migration 1: ours 922, work left 5831 (wrapped 137, known
   469, unknown 5225).
+- After XACT's second map: ours 922, work left 5831 (wrapped 137, known
+  508, unknown 5186).

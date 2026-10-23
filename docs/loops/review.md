@@ -63,6 +63,16 @@ When the user has reviewed a run's section, its heading gets
   Left recompiled: the engine's critical section (no native lock in
   `src/`; the core's), the global settings' unmapped vtable slots,
   calls through vtables into recompiled code, unmapped callees.
+  XACT's second map (37 rows in `xact.md`: the global settings'
+  accessors, the renderer's voice slots, the sound classes' and
+  listener slots, the wave entry's getters; 2 in `functions.md`:
+  `sub_822956F0` probably GetTickCount, `sub_8220BC28` probably
+  MenuList::GetPreviousSelection; `known-data.md`'s sound fields +96,
+  +104, +120, +128; 1 lead, the code above the tracks). For review: the
+  settings' slots +16, +20, +32, +36, +44, +48, +52, +56 "probably",
+  from what callers do (no image dump read); for your call:
+  GetTickCount made native means reading the kernel's timestamp bundle
+  the SDK fills, or a host clock (left recompiled).
 
 ## Run 2026-10-22 22:11 (`b7-loop-22-10-26-2`)
 
