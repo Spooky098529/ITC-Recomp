@@ -13,12 +13,15 @@ file's history.
   branch), from 5b4cecd; summary `b7-loop-2026-10-23-1106.md`.
 - Subsystem 1 of 3 (the action mappers) finished: the rest waits on
   the input manager's vtable targets and `sub_8258CE60`.
-- Subsystem 2 of 3: the game's data tables at `[0x826C5CA0]`
-  (`data-tables.md`, mapped in d8f876f: 18 rows, 9 ready groups).
-  Migration 1 (db90dc4..4344730) passed the checks: 16 of 18 ours.
-  Step: validation (agent running).
+- Subsystem 2 of 3 (the data tables) finished: the rest waits on the
+  archive. The loop stopped at its validation (below).
 
 ## Done
+
+- The data tables (`data-tables.md`, mapped in d8f876f; 18 rows): 16
+  ours in one migration (db90dc4..4344730), validated 15 of 16 harness
+  lines (`itc_921`; replay `itc_922` ok); `--native_data_tables`. Left:
+  DataTables::Init and Load (the archive).
 
 - The action mappers (`action-mappers.md`, mapped in 422b250; 40 rows):
   36 ours in one migration (006e5e4..c67265f), validated (35 of 35
@@ -37,8 +40,10 @@ This run's groups: `expected-differences.md` (the "11:06 run" lines).
 
 ## To check in a drive
 
-None so far: the action mappers' functions all ran in the attract
-race or the replay.
+The data tables' `sub_821171B0` Find20, `sub_82117210` Entry20,
+`sub_82117228` Entry40 (in neither the attract race nor the replay; the
+replay was ok), and `sub_82116DA8` ItemRecords::Item (no print, so no
+game line can show). The action mappers' functions all ran.
 
 ## Totals
 
@@ -54,3 +59,14 @@ race or the replay.
   known 474, unknown 5143).
 - After the data tables' migration 1: ours 1023, work left 5730 (wrapped
   129, known 458, unknown 5143).
+
+## Stopped
+
+2026-10-23, at the data tables' validation: `sub_82116DA8`
+ItemRecords::Item has no harness line (`missing:`). It's a thunk whose
+adapter (`src/hooks/data_tables.cpp`) and harness step both call
+`data_tables::Item` directly, which prints as `sub_82117178`; its 300
+harness cases match. Giving it a print means a plain C++ function of
+its own and a harness change (more than the validation agent may do),
+or the user may call it Merged. Everything else passed. The user
+reviews `review.md` ("Run 2026-10-23 11:06"), drives a race, and merges.
