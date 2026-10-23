@@ -354,6 +354,21 @@ ITC_NATIVE_STEP(NativeNormalizeByBranch,
                 ctx.r3.u64 = ai::NormalizeByBranch(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
                                                    ctx.r6.u32, ctx.r7.u32))
 
+ITC_NATIVE_STEP(NativeContinueLine, ai::ContinueLine(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                                     ctx.r6.u32, ctx.r1.u32 - 112))
+ITC_NATIVE_STEP(NativeApproachCorner,
+                ctx.r3.u64 = ai::ApproachCorner(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                                ctx.r6.u32, ctx.r1.u32 - 160))
+ITC_NATIVE_STEP(NativeCornerToEntry,
+                ctx.r3.u64 = ai::CornerToEntry(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                               ctx.r6.u32, ctx.r1.u32 - 160))
+ITC_NATIVE_STEP(NativeCornerToApex,
+                ctx.r3.u64 = ai::CornerToApex(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                              ctx.r6.u32, ctx.r1.u32 - 160))
+ITC_NATIVE_STEP(NativeCornerToExit,
+                ctx.r3.u64 = ai::CornerToExit(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                              ctx.r6.u32, ctx.r1.u32 - 160))
+
 // Runs the recompiled version with the native flag off.
 template <GuestFunction recompiled>
 void Original(PPCContext& ctx, uint8_t* base) {
@@ -543,6 +558,11 @@ enum Kind {
   kSteerIntoCorner,
   kUpdateSteering,
   kDrive,
+  kContinueLine,
+  kApproachCorner,
+  kCornerToEntry,
+  kCornerToApex,
+  kCornerToExit,
 };
 
 }  // namespace
@@ -797,6 +817,16 @@ void AiDrivers(Context& h) {
        NativeUpdateSteering, kUpdateSteering, 3000},
       {"AiDriver::Drive (sub_8213B058)", Original<__imp__sub_8213B058>, NativeDrive, kDrive,
        3000},
+      {"AiPath::ContinueLine (sub_8213DB08)", Original<__imp__sub_8213DB08>, NativeContinueLine,
+       kContinueLine, 2000},
+      {"AiPath::ApproachCorner (sub_8213DE30)", Original<__imp__sub_8213DE30>,
+       NativeApproachCorner, kApproachCorner, 2000},
+      {"AiPath::CornerToEntry (sub_8213E018)", Original<__imp__sub_8213E018>,
+       NativeCornerToEntry, kCornerToEntry, 2000},
+      {"AiPath::CornerToApex (sub_8213E1D0)", Original<__imp__sub_8213E1D0>, NativeCornerToApex,
+       kCornerToApex, 2000},
+      {"AiPath::CornerToExit (sub_8213E360)", Original<__imp__sub_8213E360>, NativeCornerToExit,
+       kCornerToExit, 2000},
   };
   const uint32_t area = memory::Alloc(kAreaBytes, 0);
   const uint32_t driver = area + kDriver, vehicle = area + kVehicle, io = area + kIo;
@@ -1959,6 +1989,80 @@ void AiDrivers(Context& h) {
           for (uint32_t k = 0; k < 80; k++) {
             floats.push_back({kPath + 16 + 64 * k + 24, 1});
           }
+          break;
+        }
+        case kContinueLine:
+        case kApproachCorner:
+        case kCornerToEntry:
+        case kCornerToApex:
+        case kCornerToExit: {
+          // The ring (count, start, look-ahead +5140 within the count; each
+          // entry's +24, +28, ranges +32 to +36 and +40 to +44 (mostly
+          // ordered) and target +48), the step limit +5516, the index (io),
+          // the entry before (io + 4: a ring entry or one at kOut), the first
+          // index (io + 8) and a corner record at io + 0x20 (its data in the
+          // vehicle's bytes with +50, +52, +54; its table's +4; the offset
+          // +10 and side +16).
+          const uint32_t path = driver + kPath;
+          const uint32_t count = 30 + r.Below(51);
+          const uint32_t look = r.Below(4) == 0 ? r.Below(count + 1) : count - r.Below(6);
+          guest::StoreU16(h.base, path + 5136, uint16_t(count));
+          guest::StoreU16(h.base, path + 5138, uint16_t(r.Below(200)));
+          guest::StoreU16(h.base, path + 5140, uint16_t(look));
+          guest::StoreU32(h.base, path + 5516,
+                          r.Below(8) == 0 ? RandomFloat(r, 1.0f)
+                                          : FloatBits(0.01f + float(r.Below(100)) / 200.0f));
+          const auto range = [&](uint32_t at, float size) {
+            uint32_t low = RandomFloat(r, size), high = RandomFloat(r, size);
+            if (r.Below(8) != 0 && std::bit_cast<float>(low) > std::bit_cast<float>(high)) {
+              std::swap(low, high);
+            }
+            guest::StoreU32(h.base, at, low);
+            guest::StoreU32(h.base, at + 4, high);
+          };
+          const auto fill = [&](uint32_t entry) {
+            guest::StoreU32(h.base, entry + 24, RandomFloat(r, 4.0f));
+            guest::StoreU32(h.base, entry + 28, RandomFloat(r, 0.5f));
+            range(entry + 32, 5.0f);
+            range(entry + 40, 4.0f);
+            guest::StoreU32(h.base, entry + 48, RandomFloat(r, 4.0f));
+          };
+          for (uint32_t k = 0; k < 80; k++) {
+            fill(path + 16 + 64 * k);
+          }
+          fill(area + kOut);
+          const uint32_t index = r.Below(16) == 0 ? r.Below(look + 3) : r.Below(look / 2 + 1);
+          guest::StoreU32(h.base, io, index);
+          const uint32_t before =
+              r.Below(4) == 0 ? area + kOut : path + 16 + 64 * r.Below(80);
+          guest::StoreU32(h.base, io + 4, before);
+          guest::StoreU32(h.base, io + 8, r.Below(8) == 0 ? index + 1 : r.Below(index + 1));
+          const uint32_t record = io + 0x20, data = vehicle + 0x40;
+          guest::StoreU32(h.base, record + 0, data);
+          guest::StoreU32(h.base, record + 4, vehicle + 0x80);
+          guest::StoreU32(h.base, vehicle + 0x84, RandomFloat(r, 4.0f));
+          const int32_t offset = int32_t(r.Below(look + 4)) - 4;
+          guest::StoreU16(h.base, record + 10, uint16_t(offset));
+          guest::StoreU32(h.base, record + 16, r.Below(8) == 0 ? RandomFloat(r, 2.0f)
+                                               : FloatBits(r.Below(2) ? 1.0f : -1.0f));
+          for (uint32_t at : {50u, 52u, 54u}) {
+            guest::StoreU16(h.base, data + at, uint16_t(int32_t(r.Below(40)) - 8));
+          }
+          r3 = path;
+          if (f.kind == kContinueLine) {
+            r4 = before;
+            r5 = io;
+            r6 = io + 8;
+          } else {
+            r4 = record;
+            r5 = io;
+            r6 = io + 4;
+          }
+          for (uint32_t k = 0; k < 80; k++) {
+            floats.push_back({kPath + 16 + 64 * k + 24, 1});
+          }
+          floats.push_back({kOut + 24, 1});
+          what += fmt::format(" count {} look {} index {}", count, look, index);
           break;
         }
         case kNarrowToOtherEx: {

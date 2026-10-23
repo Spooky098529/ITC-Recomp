@@ -126,7 +126,9 @@ ITC_FLAG_BOOL(native_ai_drivers, true, "ITC",
               "sub_8213FB48, AiSkill::Update sub_8213FCF8 (their conditions sub_8213F7E0 and "
               "sub_8213F868, and kind 0's steps sub_8213F9A4 and sub_8213FB98, never seen in "
               "play, ported with them), AiDriver::UpdateSteering sub_8213AEF0, AiDriver::Drive "
-              "sub_8213B058) "
+              "sub_8213B058, AiPath::ContinueLine sub_8213DB08, AiPath::ApproachCorner sub_8213DE30, "
+              "AiPath::CornerToEntry sub_8213E018, AiPath::CornerToApex sub_8213E1D0, "
+              "AiPath::CornerToExit sub_8213E360) "
               "natively instead of "
               "through the translated code (the same words, bit for bit; checked by "
               "--run_harnesses=ai_drivers). Those "
@@ -386,3 +388,20 @@ ITC_AI_DRIVERS(8213B058, {
   ctx.r3.u64 = Drive(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 160, &f1);
   ctx.f1.f64 = f1;
 })
+
+// --- The path's line through the corners ---
+
+// r4 = the entry before, r5 = &the index, r6 = &the first index; the
+// original's frame 112 bytes down (r3 kept).
+ITC_AI_DRIVERS(8213DB08, ContinueLine(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
+                                      ctx.r1.u32 - 112))
+// r4 = the corner record, r5 = &the index, r6 = &the entry before; the
+// originals' frames 160 bytes down.
+ITC_AI_DRIVERS(8213DE30, ctx.r3.u64 = ApproachCorner(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                                     ctx.r6.u32, ctx.r1.u32 - 160))
+ITC_AI_DRIVERS(8213E018, ctx.r3.u64 = CornerToEntry(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                                    ctx.r6.u32, ctx.r1.u32 - 160))
+ITC_AI_DRIVERS(8213E1D0, ctx.r3.u64 = CornerToApex(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                                   ctx.r6.u32, ctx.r1.u32 - 160))
+ITC_AI_DRIVERS(8213E360, ctx.r3.u64 = CornerToExit(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                                   ctx.r6.u32, ctx.r1.u32 - 160))

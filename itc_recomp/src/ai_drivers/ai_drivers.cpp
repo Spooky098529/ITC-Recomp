@@ -3945,4 +3945,246 @@ uint64_t Drive(uint8_t* base, uint32_t driver, uint32_t input, uint32_t frame, d
   return driver;
 }
 
+// --- The path's line through the corners ---
+
+namespace {
+constexpr uint32_t kFourFifths = 0x82001070;  // 0.8
+// The entry's offset +24 (just set to `offset`) kept within +40 to +44.
+void KeepInRange(uint8_t* base, uint32_t entry, double offset) {
+  const double low = Lfs(base, entry + 40);
+  if (offset < low) {
+    Stfs(base, entry + 24, low);
+    return;
+  }
+  const double high = Lfs(base, entry + 44);
+  if (offset > high) {
+    Stfs(base, entry + 24, high);
+  }
+}
+// The entry's offset +24 moved from `from` by at most the path's +5516.
+void LimitStep(uint8_t* base, uint32_t path, uint32_t entry, double from, double zero) {
+  double step = Fsubs(Lfs(base, entry + 24), from);
+  const double most = Lfs(base, path + 5516);
+  if (Fadds(most, step) < zero) {
+    step = Fneg(most);
+  } else if (Fsubs(step, most) > zero) {
+    step = most;
+  }
+  Stfs(base, entry + 24, Fadds(step, from));
+}
+// The corner steps' shared start: the end index (`end`, the corner's data's
+// halfword at `point` plus the record's offset +10) and the start (the word
+// at `index`); 0 to stop (`*stop` = the return value) when the end isn't
+// past it. Else the start index at frame + 80, `*span` = end - start, and
+// the end clamped to the look-ahead +5140 (`*reached` = 1 then).
+bool CornerSpan(uint8_t* base, uint32_t path, uint32_t record, uint32_t point, uint32_t index,
+                uint32_t frame, int32_t* start, int32_t* end, int32_t* span,
+                uint32_t* reached) {
+  *start = int32_t(Load(base, index));
+  *end = int32_t(uint32_t(LoadS16(base, Load(base, record + 0) + point)) +
+                 uint32_t(LoadS16(base, record + 10)));
+  *reached = 0;
+  if (!(*end > *start)) {
+    return false;
+  }
+  guest::StoreU32(base, frame + 80, uint32_t(*start));
+  *span = int32_t(uint32_t(*end) - uint32_t(*start));
+  const int32_t look = LoadS16(base, path + 5140);
+  if (!(*end < look)) {
+    *end = look;
+    *reached = 1;
+  }
+  return true;
+}
+// A corner step's last part for the entry: kept in range, the step from
+// `from` limited, ClampOffset, the previous entry and the index moved on.
+// True while the index is below `end`.
+bool FinishCornerEntry(uint8_t* base, uint32_t path, uint32_t entry, double from, double zero,
+                       uint32_t index, uint32_t previous, int32_t end, uint32_t frame) {
+  KeepInRange(base, entry, Lfs(base, entry + 24));
+  LimitStep(base, path, entry, from, zero);
+  ClampOffset(base, path, entry, index, frame + 80, frame - 96);
+  guest::StoreU32(base, previous, entry);
+  guest::StoreU32(base, index, Load(base, index) + 1);
+  return int32_t(Load(base, index)) < end;
+}
+}  // namespace
+
+void ContinueLine(uint8_t* base, uint32_t path, uint32_t entry, uint32_t index, uint32_t first,
+                  uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_8213DB08 AiPath::ContinueLine");
+  if (!(int32_t(Load(base, index)) < LoadS16(base, path + 5140))) {
+    return;
+  }
+  const double zero = Lfs(base, kZero);
+  uint32_t previous = entry;
+  do {
+    const uint32_t at = RingEntry(base, path, int32_t(Load(base, index)));
+    const double offset = Fadds(Lfs(base, at + 28), Lfs(base, previous + 24));
+    Stfs(base, at + 24, offset);
+    const double low = Lfs(base, at + 40);
+    bool clamp = offset < low;
+    double bound = low;
+    if (!clamp) {
+      bound = Lfs(base, at + 44);
+      clamp = offset > bound;
+    }
+    if (clamp) {
+      Stfs(base, at + 24, bound);
+      LimitStep(base, path, at, offset, zero);
+    }
+    ClampOffset(base, path, at, index, first, frame - 96);
+    guest::StoreU32(base, index, Load(base, index) + 1);
+    previous = at;
+  } while (int32_t(Load(base, index)) < LoadS16(base, path + 5140));
+}
+
+uint32_t ApproachCorner(uint8_t* base, uint32_t path, uint32_t record, uint32_t index,
+                        uint32_t previous, uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_8213DE30 AiPath::ApproachCorner");
+  int32_t end = int32_t(uint32_t(LoadS16(base, record + 10)) + 1);
+  const int32_t start = int32_t(Load(base, index));
+  if (!(end > start)) {
+    return 0;
+  }
+  const uint32_t at = RingEntry(base, path, end);
+  guest::StoreU32(base, frame + 80, uint32_t(start));
+  const double target =
+      at != 0 ? Lfs(base, at + 48) : Lfs(base, Load(base, record + 4) + 4);
+  const double gap = Fmsubs(target, Lfs(base, kFourFifths),
+                            Lfs(base, Load(base, previous) + 24));
+  const double most = Fmuls(Lfs(base, path + 5516), Lfs(base, kHalf));
+  const double zero = Lfs(base, kZero);
+  double step = Fdivs(gap, IntToFloat(int32_t(uint32_t(end) - uint32_t(start))));
+  if (Fadds(most, step) < zero) {
+    step = Fneg(most);
+  } else if (Fsubs(step, most) > zero) {
+    step = most;
+  }
+  uint32_t reached = 0;
+  const int32_t look = LoadS16(base, path + 5140);
+  if (!(end < look)) {
+    end = look;
+    reached = 1;
+  }
+  if (!(start < end)) {
+    return reached;
+  }
+  bool more;
+  do {
+    const uint32_t entry = RingEntry(base, path, int32_t(Load(base, index)));
+    const double from =
+        Fadds(Lfs(base, Load(base, previous) + 24), Lfs(base, entry + 28));
+    Stfs(base, entry + 24, Fadds(from, step));
+    more = FinishCornerEntry(base, path, entry, from, zero, index, previous, end, frame);
+  } while (more);
+  return reached;
+}
+
+uint32_t CornerToEntry(uint8_t* base, uint32_t path, uint32_t record, uint32_t index,
+                       uint32_t previous, uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_8213E018 AiPath::CornerToEntry");
+  int32_t start, end, span;
+  uint32_t reached;
+  if (!CornerSpan(base, path, record, 50, index, frame, &start, &end, &span, &reached)) {
+    return 0;
+  }
+  const uint32_t first = Load(base, previous);
+  const double step = Fdivs(Fsubs(Lfs(base, first + 48), Lfs(base, first + 24)),
+                            IntToFloat(span));
+  if (!(start < end)) {
+    return reached;
+  }
+  const double zero = Lfs(base, kZero);
+  bool more;
+  do {
+    const uint32_t entry = RingEntry(base, path, int32_t(Load(base, index)));
+    const uint32_t before = Load(base, previous);
+    const double target = Lfs(base, entry + 48);
+    const double side = Lfs(base, record + 16);
+    const double limit = Fmuls(side, target);
+    const double offset = Lfs(base, before + 24);
+    double from = Fsubs(Fadds(target, offset), Lfs(base, before + 48));
+    if (Fmuls(side, from) < limit) {
+      Stfs(base, entry + 24, Fadds(step, from));
+    } else {
+      from = Fadds(Lfs(base, entry + 28), offset);
+      if (Fmuls(from, Lfs(base, record + 16)) < limit) {
+        Stfs(base, entry + 24, target);
+      } else {
+        Stfs(base, entry + 24, from);
+      }
+    }
+    more = FinishCornerEntry(base, path, entry, from, zero, index, previous, end, frame);
+  } while (more);
+  return reached;
+}
+
+uint32_t CornerToApex(uint8_t* base, uint32_t path, uint32_t record, uint32_t index,
+                      uint32_t previous, uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_8213E1D0 AiPath::CornerToApex");
+  int32_t start, end, span;
+  uint32_t reached;
+  if (!CornerSpan(base, path, record, 52, index, frame, &start, &end, &span, &reached)) {
+    return 0;
+  }
+  const uint32_t first = Load(base, previous);
+  const double step = Fdivs(Fsubs(Lfs(base, first + 48), Lfs(base, first + 24)),
+                            IntToFloat(span));
+  if (!(start < end)) {
+    return reached;
+  }
+  const double zero = Lfs(base, kZero);
+  bool more;
+  do {
+    const uint32_t entry = RingEntry(base, path, int32_t(Load(base, index)));
+    const uint32_t before = Load(base, previous);
+    const double target = Lfs(base, entry + 48);
+    const double from =
+        Fsubs(Fadds(Lfs(base, before + 24), target), Lfs(base, before + 48));
+    const double offset = Fadds(step, from);
+    Stfs(base, entry + 24, offset);
+    const double side = Lfs(base, record + 16);
+    if (Fmuls(side, offset) < Fmuls(side, target)) {
+      Stfs(base, entry + 24, target);
+    }
+    more = FinishCornerEntry(base, path, entry, from, zero, index, previous, end, frame);
+  } while (more);
+  return reached;
+}
+
+uint32_t CornerToExit(uint8_t* base, uint32_t path, uint32_t record, uint32_t index,
+                      uint32_t previous, uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_8213E360 AiPath::CornerToExit");
+  int32_t start, end, span;
+  uint32_t reached;
+  if (!CornerSpan(base, path, record, 54, index, frame, &start, &end, &span, &reached)) {
+    return 0;
+  }
+  const uint32_t first = Load(base, previous);
+  const double scale = Lfs(base, kFourFifths);
+  const double step =
+      Fdivs(Fmuls(Fsubs(Lfs(base, first + 48), Lfs(base, first + 24)), scale),
+            IntToFloat(span));
+  if (!(start < end)) {
+    return reached;
+  }
+  const double zero = Lfs(base, kZero);
+  bool more;
+  do {
+    const uint32_t entry = RingEntry(base, path, int32_t(Load(base, index)));
+    const uint32_t before = Load(base, previous);
+    const double target = Lfs(base, entry + 48);
+    const double from =
+        Fmadds(Fsubs(target, Lfs(base, before + 48)), scale, Lfs(base, before + 24));
+    Stfs(base, entry + 24, from);
+    const double side = Lfs(base, record + 16);
+    if (Fmuls(side, from) < Fmuls(side, target)) {
+      Stfs(base, entry + 24, Fadds(step, from));
+    }
+    more = FinishCornerEntry(base, path, entry, from, zero, index, previous, end, frame);
+  } while (more);
+  return reached;
+}
+
 }  // namespace ai_drivers

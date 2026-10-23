@@ -668,4 +668,38 @@ uint32_t UpdateSteering(uint8_t* base, uint32_t driver, uint32_t frame, double* 
 // leaves it.
 uint64_t Drive(uint8_t* base, uint32_t driver, uint32_t input, uint32_t frame, double* f1);
 
+// --- The path's line through the corners ---
+//
+// Each moves the ring entries' offsets (+24) from the index at `index` on
+// (advanced as it goes), each from the entry before (at `previous`, a word
+// updated to each entry in turn; ContinueLine's starts at `entry`), kept in
+// the entry's range (+40 to +44), the step from the one before limited to
+// the path's +5516, then ClampOffset (from the original's frame: `frame`,
+// 112 or 160 bytes below the caller's stack pointer, ClampOffset's 96 below
+// it). The others return 1 when they stopped at the look-ahead's end
+// (+5140), else 0.
+
+// AiPath::ContinueLine (sub_8213DB08): up to +5140, each entry's offset the
+// one before's plus its +28 (the first index at `first`; `frame` 112 down).
+void ContinueLine(uint8_t* base, uint32_t path, uint32_t entry, uint32_t index, uint32_t first,
+                  uint32_t frame);
+// AiPath::ApproachCorner (sub_8213DE30): up to the corner record's entry
+// (+10 plus one), the offsets moved in even steps toward the target there
+// (the entry's +48, or the corner's table's first offset) x 0.8, each step
+// limited to half +5516 (`frame` 160 down; the start index at frame + 80).
+uint32_t ApproachCorner(uint8_t* base, uint32_t path, uint32_t record, uint32_t index,
+                        uint32_t previous, uint32_t frame);
+// AiPath::CornerToEntry (sub_8213E018): up to the corner's turn-in (its
+// data's +50 plus the offset +10), toward each entry's +48 in even steps (by
+// the corner's side +16).
+uint32_t CornerToEntry(uint8_t* base, uint32_t path, uint32_t record, uint32_t index,
+                       uint32_t previous, uint32_t frame);
+// AiPath::CornerToApex (sub_8213E1D0): the same up to the data's +52.
+uint32_t CornerToApex(uint8_t* base, uint32_t path, uint32_t record, uint32_t index,
+                      uint32_t previous, uint32_t frame);
+// AiPath::CornerToExit (sub_8213E360): the same up to the data's +54, the
+// steps x 0.8.
+uint32_t CornerToExit(uint8_t* base, uint32_t path, uint32_t record, uint32_t index,
+                      uint32_t previous, uint32_t frame);
+
 }  // namespace ai_drivers
