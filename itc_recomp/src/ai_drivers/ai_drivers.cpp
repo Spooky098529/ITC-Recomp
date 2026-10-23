@@ -3109,4 +3109,347 @@ uint32_t NormalizeByBranch(uint8_t* base, uint32_t path, uint32_t entry, uint32_
   return 1;
 }
 
+// --- Making room for the other racers ---
+
+uint64_t MeasureOthers(uint8_t* base, uint32_t path, uint32_t out) {
+  ITC_NATIVE_RUNNING("sub_8213B650 AiPath::MeasureOthers");
+  const int32_t count = int32_t(track_collision::RaceRacerCount(base));
+  uint64_t r3 = uint32_t(count);
+  const double zero = Lfs(base, kZero);
+  int32_t at = 2;     // kept from one racer to the next, as the original does
+  double sum = zero;  // the same
+  for (int32_t k = 0; k < count; k++) {
+    const int32_t index = int32_t(Load(base, Load(base, path + 0) + 452 + 4 * uint32_t(k)));
+    if (index < 0) {
+      continue;
+    }
+    r3 = OfIndex(base, uint32_t(index));
+    const uint32_t other = uint32_t(r3);
+    const uint32_t driver = Load(base, path + 0);
+    const uint32_t entry = out + 20 * uint32_t(k);
+    Stfs(base, entry + 4, zero);
+    Stfs(base, entry + 8, zero);
+    guest::StoreU16(base, entry + 2, 0);
+    Stfs(base, entry + 12, zero);
+    Stfs(base, entry + 16, zero);
+    const uint32_t record = uint32_t(index) * 40 + driver + 172;
+    guest::StoreU16(base, entry + 0, 0);
+    const uint16_t ring = guest::LoadU16(base, record + 26);
+    const int32_t last = int16_t(ring);
+    if (!(at > last)) {
+      const int32_t n = LoadS16(base, path + 5136);
+      do {
+        if (!(at < n)) {
+          break;
+        }
+        const int32_t m = int32_t(uint32_t(LoadS16(base, path + 5138)) + uint32_t(at));
+        at++;
+        sum = Fadds(Lfs(base, path + (uint32_t(m - (m / 80) * 80) << 6) + 44), sum);
+      } while (!(at > last));
+    }
+    guest::StoreU16(base, entry + 0, ring);
+    uint16_t next;
+    if ((guest::LoadU16(base, record + 28) & 4) != 0) {
+      next = uint16_t(guest::LoadU16(base, record + 26) + 1);
+    } else {
+      const int32_t after = LoadS16(base, record + 26) + 1;
+      const int32_t look = LoadS16(base, path + 5140);
+      next = uint16_t(look < after ? after : look);
+    }
+    Stfs(base, entry + 8, sum);
+    guest::StoreU16(base, entry + 2, next);
+    const uint32_t me = Load(base, path + 0);
+    Stfs(base, entry + 12, Fadds(Lfs(base, me + 116), Lfs(base, other + 116)));
+    const int32_t n = LoadS16(base, path + 5136);
+    if (!(LoadS16(base, record + 26) < n)) {
+      guest::StoreU32(base, Load(base, path + 0) + 452 + 4 * uint32_t(k), 0xFFFFFFFFu);
+      return r3;
+    }
+    const uint32_t file = Load(base, track_route::kRoute);
+    const double gap = Lfs(base, record + 0);
+    const double length = Lfs(base, file + 8);
+    int32_t slot;
+    if (gap > length) {
+      CopyWord(base, other + 144, entry + 4);
+      if (LoadS16(base, path + 5136) <= 0) {
+        continue;
+      }
+      if ((guest::LoadU16(base, record + 28) & 0x10) == 0) {
+        continue;
+      }
+      slot = LoadS16(base, path + 5138);
+    } else {
+      int32_t ahead = int32_t(
+          uint32_t(strings_and_font::steps::Fctiwz(Fdivs(Fneg(gap), length))) + 1);
+      if (ahead < 0) {
+        ahead = 0;
+      }
+      if (!(ahead < n)) {
+        CopyWord(base, other + 144, entry + 4);
+        continue;
+      }
+      slot = int32_t(uint32_t(LoadS16(base, path + 5138)) + uint32_t(ahead));
+    }
+    const double ox = Lfs(base, other + 80);
+    const double oz = Lfs(base, other + 88);
+    const uint32_t slice = Load(base, path + (uint32_t(slot - (slot / 80) * 80) << 6) + 68);
+    double dx = Fsubs(ox, Lfs(base, slice + 0));
+    const double dz = Fsubs(oz, Lfs(base, slice + 8));
+    dx = Fmuls(dx, Lfs(base, slice + 36));
+    Stfs(base, entry + 4, Fmadds(dz, Lfs(base, slice + 40), dx));
+  }
+  return r3;
+}
+
+namespace {
+// AvoidOnLeft's and AvoidOnRight's spread: the width over a's +0 - 1
+// entries (at frame + 80), kept within the path's step +5516.
+void SpreadWidth(uint8_t* base, uint32_t path, uint32_t a, double line, double mine,
+                 uint32_t frame) {
+  const double zero = Lfs(base, kZero);
+  const int32_t first = LoadS16(base, a + 0);
+  double width = Fsubs(line, mine);
+  Stfs(base, frame + 80, width);
+  if (first > 1) {
+    width = Fdivs(width, IntToFloat(first - 1));
+    Stfs(base, frame + 80, width);
+  }
+  const double step = Lfs(base, path + 5516);
+  if (Fadds(step, width) < zero) {
+    Stfs(base, frame + 80, Fneg(step));
+  } else if (Fsubs(width, step) > zero) {
+    Stfs(base, frame + 80, step);
+  }
+}
+}  // namespace
+
+uint64_t AvoidOnLeft(uint8_t* base, uint32_t path, uint32_t a, uint32_t record, uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_8213CB30 AiPath::AvoidOnLeft");
+  const uint32_t driver = Load(base, path + 0);
+  uint64_t r3 = driver;
+  const uint32_t mode = Load(base, path + 5520);
+  const double across = Fmuls(Lfs(base, a + 16), Lfs(base, record + 12));
+  const double zero = Lfs(base, kZero);
+  double steer = zero;
+  const double mine = Lfs(base, driver + 144);
+  CopyWord(base, driver + 144, frame + 96);
+  if (int32_t(mode) != 1) {
+    steer = Lfs(base, driver + 152);
+  }
+  if (mine < across) {
+    guest::StoreU32(base, frame + 88, mode == 1 ? 0 : 1);
+    AdjustForOther(base, driver, record, frame + 88);
+  }
+  double line = Fadds(across, Lfs(base, 0x82002A3C));
+  if (mine < line && Lfs(base, record + 0) < zero) {
+    line = Fmadds(IntToFloat(LoadS16(base, a + 2) + 1), Fsubs(line, mine), line);
+  }
+  line = Fadds(line, Lfs(base, 0x8200296C));
+  Stfs(base, frame + 88, line);
+  if (steer > zero) {
+    line = Fmadds(steer, Lfs(base, kFifth), line);
+    Stfs(base, frame + 88, line);
+  }
+  if (!(mine < line)) {
+    for (int32_t j = 1; j < LoadS16(base, a + 2); j++) {
+      const uint32_t entry = RingAt(base, path, j);
+      line = Fsubs(line, Lfs(base, entry + 28));
+      if (Lfs(base, entry + 40) < line) {
+        const double most = Lfs(base, entry + 44);
+        Stfs(base, entry + 40, line);
+        if (line > most) {
+          Stfs(base, entry + 40, most);
+        }
+      }
+    }
+    return r3;
+  }
+  SpreadWidth(base, path, a, line, mine, frame);
+  for (int32_t j = 1; j < LoadS16(base, a + 2); j++) {
+    r3 = RingAt(base, path, j);
+    BlockLeft(base, uint32_t(r3), frame + 88, frame + 80, frame + 96);
+  }
+  return r3;
+}
+
+uint64_t AvoidOnRight(uint8_t* base, uint32_t path, uint32_t a, uint32_t record,
+                      uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_8213CD50 AiPath::AvoidOnRight");
+  uint64_t r3 = path;
+  const double across = Fmuls(Lfs(base, a + 16), Lfs(base, record + 12));
+  const uint32_t driver = Load(base, path + 0);
+  const double mine = Lfs(base, driver + 144);
+  CopyWord(base, driver + 144, frame + 96);
+  if (mine > across) {
+    guest::StoreU32(base, frame + 88, Load(base, path + 5520));
+    AdjustForOther(base, driver, record, frame + 88);
+    r3 = driver;
+  }
+  double line = Fsubs(across, Lfs(base, 0x82002A3C));
+  const double zero = Lfs(base, kZero);
+  if (mine > line && Lfs(base, record + 0) < zero) {
+    line = Fmadds(IntToFloat(LoadS16(base, a + 2) + 1), Fsubs(line, mine), line);
+  }
+  const double steer = Lfs(base, driver + 152);
+  line = Fsubs(line, Lfs(base, 0x8200296C));
+  Stfs(base, frame + 88, line);
+  if (steer < zero) {
+    line = Fmadds(steer, Lfs(base, kFifth), line);
+    Stfs(base, frame + 88, line);
+  }
+  if (!(mine > line)) {
+    for (int32_t j = 1; j < LoadS16(base, a + 2); j++) {
+      const uint32_t entry = RingAt(base, path, j);
+      line = Fsubs(line, Lfs(base, entry + 28));
+      if (Lfs(base, entry + 44) > line) {
+        const double least = Lfs(base, entry + 40);
+        Stfs(base, entry + 44, line);
+        if (line < least) {
+          Stfs(base, entry + 44, least);
+        }
+      }
+    }
+    return r3;
+  }
+  SpreadWidth(base, path, a, line, mine, frame);
+  for (int32_t j = 1; j < LoadS16(base, a + 2); j++) {
+    r3 = RingAt(base, path, j);
+    BlockRight(base, uint32_t(r3), frame + 88, frame + 80, frame + 96);
+  }
+  return r3;
+}
+
+uint64_t ChooseSideForOther(uint8_t* base, uint32_t path, uint32_t a, uint32_t record,
+                            uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_8213D788 AiPath::ChooseSideForOther");
+  const uint32_t driver = Load(base, path + 0);
+  const double a12 = Lfs(base, a + 12);
+  const int32_t index = LoadS16(base, record + 26);
+  const int32_t n = LoadS16(base, path + 5136);
+  const double a8 = Lfs(base, a + 8);
+  const double width = Fadds(a12, Lfs(base, kFifth));
+  const double reach = Fadds(Lfs(base, driver + 144), a8);
+  const double zero = Lfs(base, kZero);
+  double left = zero, right = zero;
+  if (index < n) {
+    const int32_t m = int32_t(uint32_t(LoadS16(base, path + 5138)) + uint32_t(index));
+    const uint32_t entry = path + (uint32_t(m - (m / 80) * 80) << 6);
+    left = Lfs(base, entry + 56);
+    right = Lfs(base, entry + 60);
+  }
+  const int32_t kind = LoadS16(base, record + 24);
+  const double other = Lfs(base, a + 4);
+  const double gap = Fsubs(reach, other);
+  bool to_right;
+  if (kind == 1) {
+    const double room = Fadds(width, Lfs(base, kOne));
+    if (!(Fadds(other, room) > right)) {
+      to_right = gap < zero && !(Fsubs(other, room) < left);
+    } else if (!(Fsubs(other, room) < left)) {
+      to_right = true;
+    } else if (!(Fadds(other, width) > right)) {
+      to_right = gap < zero && !(Fsubs(other, width) < left);
+    } else if (!(Fsubs(other, width) < left)) {
+      to_right = true;
+    } else {
+      to_right = gap < zero;
+    }
+  } else if (uint32_t(kind - 2) > 1) {
+    return path;
+  } else {
+    to_right = gap < zero;
+  }
+  if (to_right) {
+    Stfs(base, a + 16, Fsubs(other, width));
+    return AvoidOnRight(base, path, a, record, stack - 160);
+  }
+  Stfs(base, a + 16, Fadds(other, width));
+  return AvoidOnLeft(base, path, a, record, stack - 176);
+}
+
+uint64_t AvoidByLane(uint8_t* base, uint32_t path, uint32_t a, uint32_t record, uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_8213D898 AiPath::AvoidByLane");
+  const uint32_t driver = Load(base, path + 0);
+  const double other = Lfs(base, a + 4);
+  const double one = Lfs(base, kOne);
+  const double room = Fadds(Lfs(base, a + 12), one);
+  const double off = Fsubs(Lfs(base, driver + 144), other);
+  if (!(off < room) || !(off > Fneg(room))) {
+    return path;
+  }
+  if (LoadS16(base, path + 5136) <= 1) {
+    return path;
+  }
+  const uint32_t entry = RingAt(base, path, 1);
+  if (int32_t(entry) == 0) {
+    return path;
+  }
+  const uint32_t slice = Load(base, entry + 52);
+  if (slice == 0) {
+    return path;
+  }
+  const uint32_t lanes = guest::LoadU8(base, slice + 56) & 0xF;
+  int32_t lane = 0;
+  if (lanes > 1) {
+    const int32_t now = int32_t(Load(base, entry + 20));
+    if (now <= 0) {
+      lane = 1;
+    } else if (off < Lfs(base, kZero)) {
+      lane = now - 1;
+    } else {
+      lane = now + 1;
+      if (!(uint32_t(lane) < lanes)) {
+        lane = now - 1;
+      }
+    }
+  }
+  const double width = Lfs(base, slice + 12);
+  const double half = Lfs(base, kHalf);
+  const double count = IntToFloat(int32_t(lanes));
+  const double centered = Fnmsubs(Fsubs(count, one), half, IntToFloat(lane));
+  Stfs(base, a + 16, Fmuls(Fdivs(centered, count), width));
+  if (lane > int32_t(Load(base, entry + 20))) {
+    return AvoidOnLeft(base, path, a, record, frame - 176);
+  }
+  return AvoidOnRight(base, path, a, record, frame - 160);
+}
+
+uint64_t AvoidOthers(uint8_t* base, uint32_t path, uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_8213E690 AiPath::AvoidOthers");
+  const int32_t count = int32_t(track_collision::RaceRacerCount(base));
+  const double zero = Lfs(base, kZero);
+  for (uint32_t i = 0; i < 7; i++) {
+    const uint32_t a = frame + 80 + 20 * i;
+    Stfs(base, a + 4, zero);
+    guest::StoreU16(base, a + 0, 0);
+    Stfs(base, a + 8, zero);
+    guest::StoreU16(base, a + 2, 0);
+    Stfs(base, a + 12, zero);
+    Stfs(base, a + 16, zero);
+  }
+  uint64_t r3 = MeasureOthers(base, path, frame + 80);
+  for (int32_t k = 0; k < count; k++) {
+    const uint32_t driver = Load(base, path + 0);
+    const int32_t index = int32_t(Load(base, driver + 452 + 4 * uint32_t(k)));
+    if (index < 0) {
+      return r3;
+    }
+    const uint32_t record = uint32_t(index) * 40 + driver + 172;
+    const uint32_t a = frame + 80 + 20 * uint32_t(k);
+    const int32_t flags = LoadS16(base, record + 28);
+    if ((flags & 1) != 0) {
+      r3 = ChooseSideForOther(base, path, a, record, frame);
+    } else if ((flags & 6) != 0) {
+      if (k == 0) {
+        CopyWord(base, a + 4, a + 16);
+        AvoidOnLeft(base, path, a, record, frame - 176);
+        r3 = AvoidOnRight(base, path, a, record, frame - 160);
+      }
+    } else if ((flags & 0x10) != 0 && k == 0) {
+      r3 = AvoidByLane(base, path, a, record, frame - 96);
+    }
+  }
+  return r3;
+}
+
 }  // namespace ai_drivers

@@ -551,4 +551,44 @@ int32_t CompareBranches(uint8_t* base, uint32_t path, uint32_t a, uint32_t b, ui
 uint32_t NormalizeByBranch(uint8_t* base, uint32_t path, uint32_t entry, uint32_t position,
                            uint32_t lane, uint32_t masks);
 
+// --- Making room for the other racers ---
+
+// AiPath::MeasureOthers (sub_8213B650): a 20-byte record at `out` for each
+// racer listed at the driver's +452 (Race::RacerCount of them, negative ones
+// skipped): +0 the driver's record of it's ring index (+26), +2 the entry
+// after it (or the look-ahead +5140), +4 the other's offset across the road,
+// +8 the entries' +28 summed up to it (the sum and the entry kept from one
+// racer to the next), +12 the two drivers' +116 added, +16 = 0.0; a ring
+// index past the entries sets that list slot to -1 and ends it. Returns the
+// r3 the original leaves (the last other driver, or the count).
+uint64_t MeasureOthers(uint8_t* base, uint32_t path, uint32_t out);
+// AiPath::AvoidOnLeft (sub_8213CB30): with `a` a MeasureOthers record and
+// `record` the driver's record of that racer: AdjustForOther when the
+// driver is to its right, then a line to the other car's left side, the
+// ring entries' +40 raised to it, or BlockLeft on each entry up to a's +2
+// (see the row; the original's frame `frame`, 176 bytes below the caller's
+// stack pointer: +80, +88, +96). Returns the r3 the original leaves.
+uint64_t AvoidOnLeft(uint8_t* base, uint32_t path, uint32_t a, uint32_t record, uint32_t frame);
+// AiPath::AvoidOnRight (sub_8213CD50): AvoidOnLeft mirrored (`frame` 160
+// bytes down).
+uint64_t AvoidOnRight(uint8_t* base, uint32_t path, uint32_t a, uint32_t record, uint32_t frame);
+// AiPath::ChooseSideForOther (sub_8213D788): by the record's kind (+24) and
+// the room each side, a's +16 = the other's offset plus or minus its width
+// and AvoidOnLeft or AvoidOnRight (from `stack`, the caller's stack
+// pointer, as the original's tail calls). Returns their r3, or the path.
+uint64_t ChooseSideForOther(uint8_t* base, uint32_t path, uint32_t a, uint32_t record,
+                            uint32_t stack);
+// AiPath::AvoidByLane (sub_8213D898, never seen in play, so without a row:
+// AvoidOthers' flag 0x10): with the other within its width + 1.0 of the
+// driver, a's +16 = the center of the lane beside the next ring entry's
+// (toward the driver), then AvoidOnLeft or AvoidOnRight (`frame` 96 bytes
+// down). Returns their r3, or the path.
+uint64_t AvoidByLane(uint8_t* base, uint32_t path, uint32_t a, uint32_t record, uint32_t frame);
+// AiPath::AvoidOthers (sub_8213E690): seven MeasureOthers records in the
+// original's frame (`frame`, 272 bytes below the caller's stack pointer,
+// from +80), then for each listed racer by the flags of the driver's record
+// of it: ChooseSideForOther, AvoidOnLeft and AvoidOnRight, or AvoidByLane
+// (see the row). Returns the r3 the original leaves.
+uint64_t AvoidOthers(uint8_t* base, uint32_t path, uint32_t frame);
+
 }  // namespace ai_drivers

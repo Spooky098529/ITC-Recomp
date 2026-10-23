@@ -107,7 +107,11 @@ ITC_FLAG_BOOL(native_ai_drivers, true, "ITC",
               "AiPath::SetRanges sub_8213D670, AiPath::DropOffRouteCorners sub_8213DC08, "
               "AiPath::SpreadOffset sub_8213B890, AiPath::ClampOffset sub_8213CF58, "
               "AiPathEntry::NarrowToOtherEx sub_8213C4C0, AiPath::NarrowBehind sub_8213D140, "
-              "AiPath::CompareBranches sub_8213C788, AiPath::NormalizeByBranch sub_8213C908) "
+              "AiPath::CompareBranches sub_8213C788, AiPath::NormalizeByBranch sub_8213C908, "
+              "AiPath::MeasureOthers sub_8213B650, AiPath::AvoidOnLeft sub_8213CB30, "
+              "AiPath::AvoidOnRight sub_8213CD50, AiPath::ChooseSideForOther sub_8213D788, "
+              "AiPath::AvoidOthers sub_8213E690 (with its flag 0x10's step, sub_8213D898, never "
+              "seen in play)) "
               "natively instead of "
               "through the translated code (the same words, bit for bit; checked by "
               "--run_harnesses=ai_drivers). Those "
@@ -386,3 +390,19 @@ ITC_AI_DRIVERS(8213C788, ctx.r3.s64 = CompareBranches(base, ctx.r3.u32, ctx.r4.u
 // position, r6 = &the lane, r7 = the masks or 0.
 ITC_AI_DRIVERS(8213C908, ctx.r3.u64 = NormalizeByBranch(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
                                                         ctx.r6.u32, ctx.r7.u32))
+
+// --- Making room for the other racers ---
+
+// r4 = out (20-byte records).
+ITC_AI_DRIVERS(8213B650, ctx.r3.u64 = MeasureOthers(base, ctx.r3.u32, ctx.r4.u32))
+// r4 = a MeasureOthers record, r5 = the driver's record of that racer; the
+// originals' frames 176 and 160 bytes down.
+ITC_AI_DRIVERS(8213CB30, ctx.r3.u64 = AvoidOnLeft(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                                  ctx.r1.u32 - 176))
+ITC_AI_DRIVERS(8213CD50, ctx.r3.u64 = AvoidOnRight(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                                   ctx.r1.u32 - 160))
+// r4, r5 as AvoidOnLeft's (its tail calls from this stack pointer).
+ITC_AI_DRIVERS(8213D788, ctx.r3.u64 = ChooseSideForOther(base, ctx.r3.u32, ctx.r4.u32,
+                                                         ctx.r5.u32, ctx.r1.u32))
+// The original's frame 272 bytes down.
+ITC_AI_DRIVERS(8213E690, ctx.r3.u64 = AvoidOthers(base, ctx.r3.u32, ctx.r1.u32 - 272))

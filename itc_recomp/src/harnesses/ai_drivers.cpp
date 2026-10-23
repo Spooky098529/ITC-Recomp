@@ -303,6 +303,19 @@ ITC_NATIVE_STEP(NativeNarrowBehind,
 ITC_NATIVE_STEP(NativeCompareBranches,
                 ctx.r3.s64 = ai::CompareBranches(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
                                                  ctx.r6.u32, ctx.r7.u32, ctx.r8.u32))
+ITC_NATIVE_STEP(NativeMeasureOthers,
+                ctx.r3.u64 = ai::MeasureOthers(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_STEP(NativeAvoidOnLeft, ctx.r3.u64 = ai::AvoidOnLeft(base, ctx.r3.u32, ctx.r4.u32,
+                                                                ctx.r5.u32, ctx.r1.u32 - 176))
+ITC_NATIVE_STEP(NativeAvoidOnRight, ctx.r3.u64 = ai::AvoidOnRight(base, ctx.r3.u32, ctx.r4.u32,
+                                                                  ctx.r5.u32, ctx.r1.u32 - 160))
+ITC_NATIVE_STEP(NativeChooseSideForOther,
+                ctx.r3.u64 = ai::ChooseSideForOther(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                                    ctx.r1.u32))
+ITC_NATIVE_STEP(NativeAvoidByLane, ctx.r3.u64 = ai::AvoidByLane(base, ctx.r3.u32, ctx.r4.u32,
+                                                                ctx.r5.u32, ctx.r1.u32 - 96))
+ITC_NATIVE_STEP(NativeAvoidOthers,
+                ctx.r3.u64 = ai::AvoidOthers(base, ctx.r3.u32, ctx.r1.u32 - 272))
 ITC_NATIVE_STEP(NativeNormalizeByBranch,
                 ctx.r3.u64 = ai::NormalizeByBranch(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
                                                    ctx.r6.u32, ctx.r7.u32))
@@ -478,6 +491,12 @@ enum Kind {
   kNarrowBehind,
   kCompareBranches,
   kNormalizeByBranch,
+  kMeasureOthers,
+  kAvoidOnLeft,
+  kAvoidOnRight,
+  kChooseSideForOther,
+  kAvoidByLane,
+  kAvoidOthers,
 };
 
 }  // namespace
@@ -696,6 +715,18 @@ void AiDrivers(Context& h) {
        NativeCompareBranches, kCompareBranches, 3000},
       {"AiPath::NormalizeByBranch (sub_8213C908)", Original<__imp__sub_8213C908>,
        NativeNormalizeByBranch, kNormalizeByBranch, 3000},
+      {"AiPath::MeasureOthers (sub_8213B650)", Original<__imp__sub_8213B650>,
+       NativeMeasureOthers, kMeasureOthers, 3000},
+      {"AiPath::AvoidOnLeft (sub_8213CB30)", Original<__imp__sub_8213CB30>, NativeAvoidOnLeft,
+       kAvoidOnLeft, 3000},
+      {"AiPath::AvoidOnRight (sub_8213CD50)", Original<__imp__sub_8213CD50>, NativeAvoidOnRight,
+       kAvoidOnRight, 3000},
+      {"AiPath::ChooseSideForOther (sub_8213D788)", Original<__imp__sub_8213D788>,
+       NativeChooseSideForOther, kChooseSideForOther, 3000},
+      {"AiPath::AvoidByLane (sub_8213D898, never seen in play)", Original<__imp__sub_8213D898>,
+       NativeAvoidByLane, kAvoidByLane, 3000},
+      {"AiPath::AvoidOthers (sub_8213E690)", Original<__imp__sub_8213E690>, NativeAvoidOthers,
+       kAvoidOthers, 3000},
   };
   const uint32_t area = memory::Alloc(kAreaBytes, 0);
   const uint32_t driver = area + kDriver, vehicle = area + kVehicle, io = area + kIo;
@@ -1891,6 +1922,108 @@ void AiDrivers(Context& h) {
             r7 = r.Below(2) ? 0 : io + 0x80;
             floats.push_back({kIo + 0x100, 3});
           }
+          break;
+        }
+        case kMeasureOthers:
+        case kAvoidOnLeft:
+        case kAvoidOnRight:
+        case kChooseSideForOther:
+        case kAvoidByLane:
+        case kAvoidOthers: {
+          // The racers (their count, the driver's list +452: indexes 0 to 6,
+          // now and then -1 or others), the other drivers in the table (+80,
+          // +88, +116, +144), the driver's records of them (+0 the gap, +4,
+          // +12, +16, +24 the kind, +26 the ring index, +28 the flags), the
+          // ring (count, start, look-ahead; each entry's +20 lane, +28, +40,
+          // +44 and slice record +52, one of four in the vehicle's bytes:
+          // +0, +8, +12, +36, +40, the lanes +56), the slice length, the
+          // path's step +5516 and mode, the driver's +100, +116, +136, +144,
+          // +152, +164, +168; the MeasureOthers record (io) for the others.
+          const uint32_t path = driver + kPath;
+          guest::StoreU32(h.base, path + 0, driver);
+          const uint32_t count = r.Below(9);
+          guest::StoreU32(h.base, area + kRacers + 56, count);
+          for (uint32_t i = 0; i < 8; i++) {
+            const uint32_t index = r.Below(8) == 0 ? (r.Below(2) ? 0xFFFFFFFFu : r.Below(16))
+                                                   : r.Below(7);
+            guest::StoreU32(h.base, driver + 452 + 4 * i, index);
+          }
+          drivers = table;
+          for (uint32_t i = 0; i < 16; i++) {
+            const uint32_t other = table + i * ai::kDriverBytes;
+            for (uint32_t at : {80u, 88u, 144u}) {
+              guest::StoreU32(h.base, other + at, RandomFloat(r, 20.0f));
+            }
+            guest::StoreU32(h.base, other + 116, RandomFloat(r, 2.0f));
+          }
+          for (uint32_t i = 0; i < 16; i++) {
+            const uint32_t record = driver + 172 + 40 * i;
+            if (record + 40 > driver + 452) {
+              break;
+            }
+            guest::StoreU32(h.base, record + 0, RandomFloat(r, 40.0f));
+            guest::StoreU32(h.base, record + 4, RandomFloat(r, 10.0f));
+            guest::StoreU32(h.base, record + 12, RandomFloat(r, 3.0f));
+            guest::StoreU32(h.base, record + 16, RandomFloat(r, 100.0f));
+            guest::StoreU16(h.base, record + 24, uint16_t(r.Below(8) == 0 ? r.Next() : r.Below(5)));
+            guest::StoreU16(h.base, record + 26, uint16_t(int32_t(r.Below(90)) - 3));
+            guest::StoreU16(h.base, record + 28,
+                            uint16_t(r.Below(4) == 0 ? r.Next() : (1u << r.Below(6)) & 0x17));
+          }
+          guest::StoreU16(h.base, path + 5136, uint16_t(int32_t(r.Below(84)) - 2));
+          guest::StoreU16(h.base, path + 5138, uint16_t(r.Below(200)));
+          guest::StoreU16(h.base, path + 5140, uint16_t(int32_t(r.Below(90)) - 3));
+          for (uint32_t i = 0; i < 4; i++) {
+            const uint32_t slice = vehicle + 0x80 * i;
+            for (uint32_t at : {0u, 8u, 36u, 40u}) {
+              guest::StoreU32(h.base, slice + at, RandomFloat(r, 20.0f));
+            }
+            guest::StoreU32(h.base, slice + 12, RandomFloat(r, 12.0f));
+            guest::StoreU8(h.base, slice + 56, uint8_t((r.Below(16) << 4) | r.Below(5)));
+          }
+          for (uint32_t k = 0; k < 80; k++) {
+            const uint32_t entry = path + 16 + 64 * k;
+            guest::StoreU32(h.base, entry + 20, r.Below(8) == 0 ? uint32_t(r.Next()) : r.Below(5));
+            for (uint32_t at : {28u, 40u, 44u}) {
+              guest::StoreU32(h.base, entry + at, RandomFloat(r, 4.0f));
+            }
+            // None now and then for AvoidByLane, which checks (the others
+            // read it without a check).
+            guest::StoreU32(h.base, entry + 52, f.kind == kAvoidByLane && r.Below(16) == 0
+                                                    ? 0
+                                                    : vehicle + 0x80 * r.Below(4));
+          }
+          guest::StoreU32(h.base, area + kFile + 8,
+                          r.Below(16) == 0 ? RandomFloat(r, 8.0f)
+                                           : FloatBits(0.5f + float(r.Below(80)) / 8.0f));
+          guest::StoreU32(h.base, path + 5516, RandomFloat(r, 1.0f));
+          guest::StoreU32(h.base, path + 5520, r.Below(3));
+          for (uint32_t at : {100u, 136u, 164u, 168u}) {
+            guest::StoreU32(h.base, driver + at, RandomFloat(r, 200.0f));
+          }
+          guest::StoreU32(h.base, driver + 116, RandomFloat(r, 2.0f));
+          guest::StoreU32(h.base, driver + 144, RandomFloat(r, 6.0f));
+          guest::StoreU32(h.base, driver + 152, RandomFloat(r, 3.0f));
+          guest::StoreU16(h.base, io + 0, uint16_t(int32_t(r.Below(12)) - 2));
+          guest::StoreU16(h.base, io + 2, uint16_t(int32_t(r.Below(14)) - 2));
+          for (uint32_t at : {4u, 8u, 12u, 16u}) {
+            guest::StoreU32(h.base, io + at, RandomFloat(r, at == 12 ? 3.0f : 6.0f));
+          }
+          r3 = path;
+          if (f.kind == kMeasureOthers) {
+            r4 = area + kOut;
+            for (uint32_t i = 0; i < 8; i++) {
+              floats.push_back({kOut + 20 * i + 4, 4});
+            }
+          } else if (f.kind != kAvoidOthers) {
+            r4 = io;
+            r5 = driver + 172 + 40 * r.Below(7);
+            floats.push_back({kIo + 16, 1});
+          }
+          for (uint32_t k = 0; k < 80; k++) {
+            floats.push_back({kPath + 16 + 64 * k + 40, 2});
+          }
+          floats.push_back({kDriver + 164, 2});
           break;
         }
       }
