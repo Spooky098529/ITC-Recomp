@@ -57,7 +57,9 @@
 // (sub_82139CB0), from AiDriver::Drive; AiPath::ContinueLine (sub_8213DB08),
 // from PlanCorners and PlanLine; and ApproachCorner (sub_8213DE30),
 // CornerToEntry (sub_8213E018), CornerToApex (sub_8213E1D0) and CornerToExit
-// (sub_8213E360), from PlanCorners (sub_8213E7B8), from PlanLine.
+// (sub_8213E360), from PlanCorners (sub_8213E7B8), from PlanLine; and
+// ClampOffset (sub_8213CF58), from FollowTargets, ContinueLine,
+// ApproachCorner and the CornerTo steps.
 
 #include "guest.h"
 
@@ -154,7 +156,7 @@ ITC_FLAG_BOOL(native_ai_drivers, true, "ITC",
               "sub_821452A0, sub_8213B650, sub_8213CB30, sub_8213CD50, sub_8213D788, sub_8213F958, "
               "sub_8213FB48, sub_8213AC70, sub_8213C0E8, sub_8213AEF0, sub_82138D78, sub_8213ACD0, "
               "sub_8213A428, sub_82139CB0, sub_8213DB08, sub_8213DE30, sub_8213E018, sub_8213E1D0, "
-              "sub_8213E360, sub_8213E7B8");
+              "sub_8213E360, sub_8213E7B8, sub_8213CF58");
 
 // Defines an adapter: `body` uses `ctx` and `base`.
 #define ITC_AI_DRIVERS(address, body)   \
@@ -355,10 +357,6 @@ ITC_AI_DRIVERS(8213DC08, ctx.r3.u64 = DropOffRouteCorners(base, ctx.r3.u32))
 
 // --- The path's offsets, narrowing and branches ---
 
-// r4 = the entry, r5 = &the last index, r6 = &the first; the original's
-// frame 96 bytes down (r3 kept).
-ITC_AI_DRIVERS(8213CF58, ClampOffset(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
-                                     ctx.r1.u32 - 96))
 // r4 = the entry after, r5 = the entry, r6 = &the step, r7 = &the limit; the
 // original's frame 128 bytes down.
 ITC_AI_DRIVERS(8213D140, ctx.r3.u64 = NarrowBehind(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
