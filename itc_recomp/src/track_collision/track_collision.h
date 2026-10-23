@@ -231,6 +231,25 @@ bool WallQueryCornersThroughWall(uint8_t* base, uint32_t query, uint32_t frame, 
 // out along the edge's move. The deepest of each edge recorded (AddHit).
 // `hit` 1 when one was. `frame`: the original's 944 bytes.
 bool WallQueryEdgesAcrossWall(uint8_t* base, uint32_t query, uint32_t frame, uint32_t* hit);
+// WallQuery::TestCell (sub_820FDC18): each of the cell's walls not skipped
+// (IgnoresWall) or already tested (the list +628, at most 128 kept) set as
+// the query's wall (its ends from the section's vertices, its direction,
+// normal and spans) and tested: CornersThroughWall, else EdgesAcrossWall.
+// The cell (two halfwords: section, slice) is kept at `frame` + 292 (the
+// caller's frame) as the original does. `frame`: the original's 256 bytes.
+bool WallQueryTestCell(uint8_t* base, uint32_t query, uint32_t mesh, uint32_t cell,
+                       uint32_t frame);
+// TrackCollision::QueryWalls (sub_820FDF38): +624 = 0, the cells near the
+// box (GatherCells), then TestCell on each. `frame`: the original's 128
+// bytes.
+bool TrackCollisionQueryWalls(uint8_t* base, uint32_t query, uint32_t mesh, uint32_t frame);
+// TrackCollision::WallHits (sub_820FF1B0, the collision world's first
+// query): the shape record's bounds (UpdateBounds), a wall query on the
+// frame (+80: +0 the count 0, +4 2.0, +8 `hits`, +12 the record; the
+// first record's +64 = 2.0), QueryWalls on the mesh; `count` the hits.
+// `frame`: the original's 1,584 bytes.
+bool TrackCollisionWallHits(uint8_t* base, uint32_t hits, uint32_t record, uint32_t frame,
+                            uint32_t* count);
 
 // The vector unit's normalize as the translated code does it, flush-to-zero
 // on: the 16 bytes at `from` rounded down to 16 (x, y, z, w), the squared

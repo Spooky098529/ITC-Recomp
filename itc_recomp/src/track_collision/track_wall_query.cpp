@@ -11,6 +11,9 @@
 #include "vehicle_accessors/vectors.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
+#include <rex/platform/fpscr.h>
+#include <simde/x86/sse4.1.h>
+
 #include <bit>
 
 namespace track_collision {
@@ -18,8 +21,11 @@ namespace track_collision {
 using namespace car_physics::ops;
 namespace vl = vector_library;
 namespace co = collision;
+namespace va = vehicle_accessors;
 
 namespace {
+
+using Fpscr = rex::platform::FPSCRPlatform;
 
 constexpr uint32_t kRaceData = 0x826C5B2C;     // the race data's pointer
 constexpr uint32_t kRaceMode = 0xA3AF4;        // its word: the race mode
@@ -32,6 +38,52 @@ constexpr uint32_t kWallHit = 0x01000000;      // the hit's surface bits
 constexpr uint32_t kHalf = 0x82001BE4;         // 0.5
 constexpr uint32_t kOutward = 0x8200690C;      // the faces' normals scaled by this
 constexpr uint32_t kSlopeFloor = 0x82006908;   // the ends' moves toward the wall at least this
+constexpr uint32_t kMinusOne = 0x82001BE0;     // -1.0 (the direction negated)
+constexpr uint32_t kUp = 0x82640000u - 32080;  // 0x826382B0: the up axis
+constexpr uint32_t kTwo = 0x820021E8;          // 2.0
+constexpr uint32_t kWallLimit = 128;           // the walls kept in the tested list
+
+// The shape record's template and copies are boxes (the wall query's
+// functions are native only then).
+bool Boxes(uint8_t* base, uint32_t record) {
+  uint32_t previous = 0, current = 0;
+  return co::CollisionShapePrevious(base, record, &previous) &&
+         co::CollisionShapeCurrent(base, record, &current) && co::IsBox(base, previous) &&
+         co::IsBox(base, current);
+}
+
+// out = the vector at `v` crossed with the one at `up` as the vector unit
+// does it (vpermwi 0x9C and 0x78, vmulfp128, vnmsubfp), flush-to-zero on;
+// the 16 bytes at each rounded down to 16. Its w is v.w * up.w - v.w *
+// up.w's, as the original's.
+void CrossVector(uint8_t* base, uint32_t v, uint32_t up, uint32_t to) {
+  auto load = [base](uint32_t at) {
+    const uint32_t in = at & ~0xFu;
+    return simde_mm_set_epi32(int(guest::LoadU32(base, in + 0)), int(guest::LoadU32(base, in + 4)),
+                              int(guest::LoadU32(base, in + 8)), int(guest::LoadU32(base, in + 12)));
+  };
+  const simde__m128i u = load(up), d = load(v);
+  simde__m128 u78 = simde_mm_castsi128_ps(simde_mm_shuffle_epi32(u, 0x78));
+  simde__m128 u9c = simde_mm_castsi128_ps(simde_mm_shuffle_epi32(u, 0x9C));
+  simde__m128 d9c = simde_mm_castsi128_ps(simde_mm_shuffle_epi32(d, 0x9C));
+  simde__m128 d78 = simde_mm_castsi128_ps(simde_mm_shuffle_epi32(d, 0x78));
+  const uint32_t csr = Fpscr::getcsr();
+  Fpscr::setcsr(csr | uint32_t(Fpscr::FlushMask));
+  vl::PinInMode(u78, u9c, d9c, d78);
+  const simde__m128 product = simde_mm_mul_ps(d9c, u78);
+  simde__m128 result =
+      simde_mm_xor_ps(simde_mm_sub_ps(simde_mm_mul_ps(d78, u9c), product),
+                      simde_mm_castsi128_ps(simde_mm_set1_epi32(int(0x80000000))));
+  vl::PinInMode(result);
+  Fpscr::setcsr(csr);
+  alignas(16) uint32_t lanes[4];
+  simde_mm_store_si128(reinterpret_cast<simde__m128i*>(lanes), simde_mm_castps_si128(result));
+  const uint32_t out = to & ~0xFu;
+  guest::StoreU32(base, out + 0, lanes[3]);
+  guest::StoreU32(base, out + 4, lanes[2]);
+  guest::StoreU32(base, out + 8, lanes[1]);
+  guest::StoreU32(base, out + 12, lanes[0]);
+}
 
 // vmsum3fp128 of the 16 bytes at `a` and `b` (each rounded down to 16),
 // flush-to-zero on, stored to all four words at `to` (rounded down).
@@ -639,6 +691,137 @@ bool WallQueryEdgesAcrossWall(uint8_t* base, uint32_t query, uint32_t frame, uin
     WallQueryAddHit(base, q, kWallHit);
     *hit = 1;
   }
+  return true;
+}
+
+bool WallQueryTestCell(uint8_t* base, uint32_t query, uint32_t mesh, uint32_t cell,
+                       uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_820FDC18 WallQuery::TestCell");
+  const uint32_t q = query;
+  if (!Boxes(base, guest::LoadU32(base, q + 12))) {
+    return false;
+  }
+  const uint32_t f = frame;
+  // The cell in the caller's frame (+36), as the original keeps it.
+  guest::StoreU32(base, f + 292, cell);
+  const uint32_t table = guest::LoadU32(base, guest::LoadU32(base, mesh + 4) + 4);
+  const uint32_t section_number = guest::LoadU16(base, f + 292);
+  const int32_t slice = int16_t(guest::LoadU16(base, f + 294));
+  const uint32_t section =
+      guest::LoadU32(base, uint32_t(int32_t(int16_t(section_number))) * 4 + table);
+  const uint32_t slice_at = uint32_t(slice) * 28 + guest::LoadU32(base, section + 72) + section;
+  const uint32_t vertices = guest::LoadU32(base, section + 64) + section;
+  const uint32_t first = guest::LoadU16(base, slice_at + 6);
+  uint32_t walls = guest::LoadU16(base, slice_at + 4);
+  uint32_t wall = (first << 3) + guest::LoadU32(base, section + 80) + section;
+  if (walls == 0) {
+    return true;
+  }
+  guest::StoreU16(base, f + 84, uint16_t(section_number));
+  const double minus_one = Lfs(base, kMinusOne);
+  const double one = Lfs(base, kOne);
+  const double zero = Lfs(base, kZero);
+  for (; walls != 0; walls--, wall += 8) {
+    const uint32_t tested = guest::LoadU32(base, q + 624);
+    const uint32_t listed = tested > kWallLimit ? kWallLimit : tested;
+    const uint32_t a = guest::LoadU16(base, wall + 0), b = guest::LoadU16(base, wall + 2);
+    guest::StoreU16(base, f + 86, uint16_t(a));
+    guest::StoreU16(base, f + 88, uint16_t(b));
+    // A wall with a kind the race skips.
+    if (guest::LoadU16(base, wall + 4) != 0) {
+      const uint32_t shape = guest::LoadU32(base, guest::LoadU32(base, q + 12));
+      guest::StoreU16(base, f + 80, uint16_t(va::ObjectHalf114(base, shape)));
+      guest::StoreU16(base, f + 82, uint16_t(va::ObjectHalf112(base, shape)));
+      if (WallQueryIgnoresWall(base, wall + 4, f + 82, f + 80, f - 96) != 0) {
+        continue;
+      }
+    }
+    // One already tested (another cell's), else listed.
+    bool seen = false;
+    for (uint32_t i = 0; i < listed && int32_t(listed) > 0; i++) {
+      const uint32_t entry = q + 628 + 6 * i;
+      if (guest::LoadU16(base, entry + 0) == section_number &&
+          guest::LoadU16(base, entry + 2) == a && guest::LoadU16(base, entry + 4) == b) {
+        seen = true;
+        break;
+      }
+    }
+    if (seen) {
+      continue;
+    }
+    if (guest::LoadU32(base, q + 624) < kWallLimit) {
+      const uint32_t entry = guest::LoadU32(base, q + 624) * 6 + q + 628;
+      guest::StoreU16(base, entry + 0, guest::LoadU16(base, f + 84));
+      guest::StoreU16(base, entry + 2, guest::LoadU16(base, f + 86));
+      guest::StoreU16(base, entry + 4, guest::LoadU16(base, f + 88));
+      guest::StoreU32(base, q + 624, guest::LoadU32(base, q + 624) + 1);
+    }
+    // The wall: its ends, direction, normal and spans.
+    for (uint32_t i = 0; i < 12; i += 4) {
+      Stfs(base, q + 16 + i, Lfs(base, guest::LoadU16(base, wall + 0) * 12 + vertices + i));
+    }
+    for (uint32_t i = 0; i < 12; i += 4) {
+      Stfs(base, q + 32 + i, Lfs(base, guest::LoadU16(base, wall + 2) * 12 + vertices + i));
+    }
+    if (double(vl::Vec3Direction(base, q + 1408, q + 16, q + 32)) == zero) {
+      continue;
+    }
+    Stfs(base, q + 1420, one);
+    Stfs(base, q + 1424, Fmuls(Lfs(base, q + 1408), minus_one));
+    Stfs(base, q + 1428, Fmuls(Lfs(base, q + 1412), minus_one));
+    Stfs(base, q + 1432, Fmuls(Lfs(base, q + 1416), minus_one));
+    CrossVector(base, q + 1408, kUp, q + 1440);
+    Stfs(base, q + 1452, one);
+    Stfs(base, q + 1456, DotTo(base, q + 1408, q + 16, f + 96));
+    Stfs(base, q + 1460, DotTo(base, q + 1408, q + 32, f + 112));
+    Stfs(base, q + 1464, DotTo(base, q + 1440, q + 32, f + 128));
+    uint32_t hit = 0;
+    WallQueryCornersThroughWall(base, q, f - 304, &hit);
+    if (hit == 0) {
+      WallQueryEdgesAcrossWall(base, q, f - 944, &hit);
+    }
+  }
+  return true;
+}
+
+bool TrackCollisionQueryWalls(uint8_t* base, uint32_t query, uint32_t mesh, uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_820FDF38 TrackCollision::QueryWalls");
+  if (!Boxes(base, guest::LoadU32(base, query + 12))) {
+    return false;
+  }
+  guest::StoreU32(base, query + 624, 0);
+  uint32_t count = 0;
+  WallQueryGatherCells(base, query, mesh, frame - 192, &count);
+  for (int32_t i = 0; i < int32_t(guest::LoadU32(base, query + 108)); i++) {
+    WallQueryTestCell(base, query, mesh, guest::LoadU32(base, query + 112 + 4 * uint32_t(i)),
+                      frame - 256);
+  }
+  return true;
+}
+
+bool TrackCollisionWallHits(uint8_t* base, uint32_t hits, uint32_t record, uint32_t frame,
+                            uint32_t* count) {
+  ITC_NATIVE_RUNNING("sub_820FF1B0 TrackCollision::WallHits");
+  if (!Boxes(base, record)) {
+    return false;
+  }
+  const uint32_t f = frame;
+  const double zero = Lfs(base, kZero);
+  Stfs(base, f + 108, zero);
+  Stfs(base, f + 124, zero);
+  const double one = Lfs(base, kOne);
+  for (const uint32_t at : {140u, 156u, 172u, 1500u, 1516u, 1532u}) {
+    Stfs(base, f + at, one);
+  }
+  co::CollisionShapeUpdateBounds(base, record);
+  guest::StoreU32(base, f + 88, hits);
+  guest::StoreU32(base, f + 92, record);
+  const double two = Lfs(base, kTwo);
+  Stfs(base, hits + 64, two);
+  Stfs(base, f + 84, two);
+  guest::StoreU32(base, f + 80, 0);
+  TrackCollisionQueryWalls(base, f + 80, kMesh, f - 128);
+  *count = guest::LoadU32(base, f + 80);
   return true;
 }
 
