@@ -20,9 +20,9 @@ see in a drive, from every run: `to-drive.md`.
 - Subsystem 3 of 3: the course's route (picked: ready groups, runs
   every update, blocks `TrackPosition::Init` and `Update`), mapped in
   e211173 (40 rows, 15 ready groups); migration 1 done
-  (9c3cbaa..7785364, five batches; ready groups left); step:
-  validation of migration 1 (a validation agent running), then
-  migration 2.
+  (9c3cbaa..7785364, five batches; ready groups left), validated (33
+  of 33 harness lines; `itc_1085`, `itc_1086`, replay ok; 3 to drive);
+  step: migration 2 (a migration agent running).
 
 ## Done
 

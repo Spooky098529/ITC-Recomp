@@ -21,6 +21,12 @@ Not in the attract race or the replay (`itc_1043`, `itc_1044`, ok):
 - `sub_82108810` Font::LineGlyphs (`strings-and-font.md`; never seen in
   play before either)
 
+Not in the attract race or the replay (`itc_1085`, `itc_1086`, ok):
+
+- `sub_820F8C58` TrackRoute::StepAlongPath (`track-route.md`)
+- `sub_820F9F58` TrackRoute::NormalizeForwardPath (`track-route.md`)
+- `sub_820FA0F8` TrackRoute::NormalizePath (`track-route.md`)
+
 ## Run 2026-10-23 13:44 (`b7-loop-23-10-26-3`)
 
 Not in the drive `itc_1015.log` (2026-10-23) either.
