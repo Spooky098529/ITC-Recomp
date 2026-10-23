@@ -48,7 +48,9 @@
 // (sub_8213C630), AiDriver::AdjustForOther (sub_821452A0), from AvoidOnLeft
 // and AvoidOnRight; MeasureOthers (sub_8213B650), from AvoidOthers; and
 // AvoidOnLeft (sub_8213CB30), AvoidOnRight (sub_8213CD50) and
-// ChooseSideForOther (sub_8213D788), from AvoidOthers (and ChooseSideForOther).
+// ChooseSideForOther (sub_8213D788), from AvoidOthers (and ChooseSideForOther);
+// AiSkill::TriggerStarts (sub_8213F958) and TriggerEnds (sub_8213FB48), from
+// AiSkill::Update.
 
 #include "guest.h"
 
@@ -133,7 +135,8 @@ ITC_FLAG_BOOL(native_ai_drivers, true, "ITC",
               "sub_8213AB98, sub_8213B4D8, sub_82139168, sub_82139B98, sub_82139BE8, "
               "sub_8213C148, sub_8213AD48, sub_8213F700, sub_8213C3A8, sub_8213CA18, sub_8213C010, "
               "sub_8213BB58, sub_8213C358, sub_8213B890, sub_8213C4C0, sub_8213C5C8, sub_8213C630, "
-              "sub_821452A0, sub_8213B650, sub_8213CB30, sub_8213CD50, sub_8213D788");
+              "sub_821452A0, sub_8213B650, sub_8213CB30, sub_8213CD50, sub_8213D788, sub_8213F958, "
+              "sub_8213FB48");
 
 // Defines an adapter: `body` uses `ctx` and `base`.
 #define ITC_AI_DRIVERS(address, body)   \
@@ -399,27 +402,9 @@ ITC_AI_DRIVERS(8213C908, ctx.r3.u64 = NormalizeByBranch(base, ctx.r3.u32, ctx.r4
 // The original's frame 272 bytes down.
 ITC_AI_DRIVERS(8213E690, ctx.r3.u64 = AvoidOthers(base, ctx.r3.u32, ctx.r1.u32 - 272))
 
-// --- The skill's timed triggers (f1 the trigger's value for kinds 6 and 7,
-// as the originals leave it) ---
+// --- The skill's timed triggers (f1 the last trigger's value of kinds 6 and
+// 7, as the original leaves it) ---
 
-// r3 not read, r4 = the driver, r5 = the trigger.
-ITC_AI_DRIVERS(8213F958, {
-  double f1 = 0;
-  bool f1_set = false;
-  ctx.r3.u64 = TriggerStarts(base, ctx.r4.u32, ctx.r5.u32, &f1, &f1_set);
-  if (f1_set) {
-    ctx.f1.f64 = f1;
-  }
-})
-// r3 = the trigger's state, r4 = the driver, r5 = the trigger.
-ITC_AI_DRIVERS(8213FB48, {
-  double f1 = 0;
-  bool f1_set = false;
-  ctx.r3.u64 = TriggerEnds(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, &f1, &f1_set);
-  if (f1_set) {
-    ctx.f1.f64 = f1;
-  }
-})
 // r3 = the skill, r4 = its driver.
 ITC_AI_DRIVERS(8213FCF8, {
   double f1 = 0;
