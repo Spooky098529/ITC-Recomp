@@ -165,7 +165,8 @@ own branches and merged into `rexglue-removal-project` (no force pushes:
 GitHub refuses them on that branch).
 `docs/coverage.md` is which recompiled functions actually run (the
 `itc_coverage` build, `itc_recomp/coverage/seen_in_play.txt`) and how that
-measures B7; functions that never run get no rows.
+measures B7; functions not seen in play still get rows, marked "Not seen in play"
+(the user's call, 2026-10-23: a session may not have taken their path).
 `docs/pad-replay.md` is recording the user's pad and replaying it into the
 game through a virtual pad (`pad_record.py`, `scripted_run.sh`), for test
 runs past the title screen.
