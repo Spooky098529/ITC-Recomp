@@ -21,7 +21,12 @@
 // LocateShoulder), Locate (sub_820FAF88, from OnSlice) and SectionOutcode
 // (sub_820F8EF0, from OnSlice and Follow's full search). NoteShoulder
 // (sub_820FB100), TakeBranch (sub_820FA4A8) and the full search
-// (sub_820FB2B0, never seen in play) are reached only from Follow.
+// (sub_820FB2B0, never seen in play) are reached only from Follow; and,
+// their callers having been made native, IsMainRoad (sub_820F8E98, from
+// ToMainRoad), LocateShoulder (sub_820FB030, from NoteShoulder and
+// LocateAt), Follow (sub_820FB680, from TrackPosition::Update) and Point
+// (sub_820FA860, from TrackPosition::Init; both in src/track_collision/,
+// --native_collision_world, which calls them whatever this flag says).
 
 #include "guest.h"
 
@@ -50,7 +55,9 @@ ITC_FLAG_BOOL(native_track_route, true, "ITC",
               "sub_820F8A58, sub_820AB408, sub_820AB498, sub_820F8720, sub_820F8CE8, "
               "sub_820F8BD0, sub_820F93A0, sub_820F9EA8, sub_820F9F58, sub_820F8B48, sub_820F8C58, "
               "sub_820F9320, sub_820F9448, sub_820F9600, sub_820FAE78, sub_820FAF88, sub_820F8EF0, "
-              "sub_820FB100, sub_820FA4A8, sub_820FB2B0");
+              "sub_820FB100, sub_820FA4A8, sub_820FB2B0, sub_820F8E98, sub_820FB030 (and through "
+              "--native_collision_world's TrackPosition::Update and Init: sub_820FB680, "
+              "sub_820FA860)");
 
 // Defines an adapter: `body` uses `ctx` and `base`.
 #define ITC_TRACK_ROUTE(address, body)   \
@@ -74,7 +81,6 @@ ITC_TRACK_ROUTE(820F8920, ctx.r3.u64 = LaneAt(base, ctx.r3.u32, ctx.r4.u32, ctx.
 ITC_TRACK_ROUTE(820F89F0, ctx.r3.s64 = Link(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
 ITC_TRACK_ROUTE(820F8D38, ctx.r3.s64 = SpecialSection(base, ctx.r3.u32, ctx.r4.u32))
 ITC_TRACK_ROUTE(820F8DE8, ctx.r3.u64 = SliceTest(base, ctx.r3.u32, ctx.r4.u32))
-ITC_TRACK_ROUTE(820F8E98, ctx.r3.u64 = IsMainRoad(base, ctx.r3.u32, ctx.r4.u32))
 
 // --- Steps between sections ---
 
@@ -91,15 +97,6 @@ ITC_TRACK_ROUTE(820FA350, ctx.r3.u64 = NormalizeLaneMasked(base, ctx.r3.u32, ctx
 
 // --- Points and slices ---
 
-// r3 = the route, r4 = out, r5 = the position; the copy in the original's
-// frame (112 bytes down).
-ITC_TRACK_ROUTE(820FA860, ctx.r3.u64 = Point(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
-                                             ctx.r1.u32 - 112))
-
-// r4 = the point, r5 = the position, r6 = its slice's record; the original's
-// frame (112 bytes down; AlongSlice's below it).
-ITC_TRACK_ROUTE(820FB030, ctx.r3.u64 = LocateShoulder(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
-                                                      ctx.r6.u32, ctx.r1.u32 - 112))
 // r4 = the point, r5 = the position (a tail call: LocateShoulder's frame
 // 112 bytes down).
 ITC_TRACK_ROUTE(820FB888, ctx.r3.u64 = LocateAt(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
@@ -108,11 +105,6 @@ ITC_TRACK_ROUTE(820FB888, ctx.r3.u64 = LocateAt(base, ctx.r3.u32, ctx.r4.u32, ct
 // frame (144 bytes down).
 ITC_TRACK_ROUTE(820FA728, ctx.r3.u64 = ToMainRoad(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
                                                   ctx.r1.u32 - 144))
-// r4 = the route position (changed), r5 = the point, r6 = the route
-// position before; the original's frame (176 bytes down). r3 left as it
-// came (no caller reads it).
-ITC_TRACK_ROUTE(820FB680, Follow(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
-                                 ctx.r1.u32 - 176))
 // r4 = the point, r5 = the position, r6 = the score or 0; the original's
 // frame (128 bytes down).
 ITC_TRACK_ROUTE(820FB1B8, ctx.r3.u64 = OnSlice(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,

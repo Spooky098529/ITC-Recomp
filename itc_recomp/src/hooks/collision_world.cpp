@@ -36,7 +36,8 @@ ITC_FLAG_BOOL(native_collision_world, true, "ITC",
               "sub_820F71B0, sub_820F7EE8, sub_820F7E30, sub_820F7D70, sub_820F6C88, sub_820FC110, "
               "sub_820FE8F8, sub_820FC870, sub_820FC2E0, sub_820FC658, sub_820FC188, sub_820FD6D8, "
               "sub_820FC3C8, sub_820FC900, sub_820FDC18, sub_820FDF38, "
-              "sub_820B86B8, sub_820B9110, sub_820B7B40");
+              "sub_820B86B8, sub_820B9110, sub_820B7B40, sub_820F6A08, sub_820F7AA0, "
+              "sub_820F8090");
 
 // Defines an adapter: `body` uses `ctx` and `base`.
 #define ITC_COLLISION_WORLD(address, body)   \
@@ -98,17 +99,16 @@ ITC_COLLISION_WORLD(820F69B0, TrackMeshOnLoaded(base, ctx.r6.u32))
 
 // --- The mesh's lookups ---
 
-ITC_COLLISION_WORLD(820F6A08, ctx.r3.u64 = TrackMeshSliceKind(base, ctx.r3.u32, ctx.r4.u32))
+// TrackMesh::SliceKind (sub_820F6A08) has no adapter: its only caller,
+// TrackPosition::Update, is native.
 
 // --- The ground ---
 
 // TrackMesh::TriangleInSlice, TriangleNormal, QuadHeight, FindTriangle and
 // ColorAt (sub_820F72F8, sub_820F7468, sub_820F7590, sub_820F7818,
-// sub_820F6E18) have no adapters: their callers in play are native.
-// r4 = the point, r5 = the track position, r6 = the color, r7 = the normal.
-ITC_COLLISION_WORLD(820F7AA0, ctx.r3.u64 = TrackMeshGroundHeight(base, ctx.r3.u32, ctx.r4.u32,
-                                                                 ctx.r5.u32, ctx.r6.u32,
-                                                                 ctx.r7.u32, ctx.r1.u32 - 240))
+// sub_820F6E18), and GroundHeight (sub_820F7AA0) have no adapters: their
+// callers in play are native (GroundHeight's: TrackPosition::Update and
+// TrackCollision::Ground).
 // TrackCollision::Ground (sub_820FE8F8) has no adapter: its callers in
 // play, GroundCallback and GroundHits, are native.
 // The collision world's +8 (CollisionWorld::Callback).
@@ -136,10 +136,8 @@ extern "C" REX_FUNC(sub_820FEBD0) {
 // TrackMesh::SliceContains, FindSlice and TrackPosition::CrossSection
 // (sub_820F6A38, sub_820F6BE8, sub_820F71B0), and the full searches
 // (sub_820F7EE8, sub_820F7E30, sub_820F7D70, sub_820F6C88, never seen in
-// play) have no adapters: their callers are native.
-// r3 = the mesh, r4 = the track position, r5 = its point.
-ITC_COLLISION_WORLD(820F8090, ctx.r3.u64 = TrackPositionFindCell(base, ctx.r3.u32, ctx.r4.u32,
-                                                                 ctx.r5.u32, ctx.r1.u32 - 240))
+// play), and FindCell (sub_820F8090, from TrackPosition::Update) have no
+// adapters: their callers are native.
 
 // r3 = the track position; the originals' frames (144 and 128 bytes down).
 // r3 left as it came (no caller reads it). They call the course's route's
