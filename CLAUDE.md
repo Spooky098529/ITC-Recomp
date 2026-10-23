@@ -129,7 +129,16 @@ matrix math and the car physics native as far as they were ready
 `--native_matrix_math`, `--native_car_physics`; ours 422 -> 705); native
 functions log `native running (game|harness)` once
 (`ITC_NATIVE_RUNNING`), and the status Merged is work done inside a
-native caller.
+native caller. Its fourth run (`b7-loop-22-10-26-2`, merged into
+`rexglue-removal-project` 2026-10-23 after a drive; summary
+`docs/loops/b7-loop-2026-10-22-2211.md`) made the C runtime heap, the
+collision narrow phase and the collision world native as far as they
+were ready (`heap.md`, `collision.md`, `collision-world.md`;
+`--native_c_runtime_heap`, `--native_collision`,
+`--native_collision_world`; ours 714 -> 837). What's for the user's
+review is in `docs/loops/review.md`, harness groups expected to differ
+in `docs/loops/expected-differences.md`; new harness code compares
+floats with `harness::Outputs` (two NaNs match).
 After each plan item, run `itc_recomp/tools/boundary_status.py` and record
 its output in "The boundary over time" at the end of
 `docs/rexglue-removal.md`. Plan steps are done on their

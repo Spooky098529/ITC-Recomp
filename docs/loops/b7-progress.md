@@ -12,18 +12,18 @@ there), and this file's history.
   branch), from 91f40be; summary `b7-loop-2026-10-22-2211.md`.
 - Subsystem 1 of 3 (the C runtime heap) finished.
 - Subsystem 2 of 3 (the collision narrow phase) finished.
-- Subsystem 3 of 3: the collision world's owner and the track's
-  collision queries (two leads joined: `sub_820FF050`, `sub_820FF368`,
-  ..., and `sub_820FDF38`, `sub_820FDC18`, ...; the collision update
-  every tick, above `collision.md` and `car-physics.md`), mapped in
-  `collision-world.md` (a28943d; 43 rows; checked: 14 ready groups).
-  Migration 1 done (323cd79..ee7d5e1, 29 of 43 ours). Validated (29 of
-  29 harness lines, all ran in play or the replay; replay ok). Migration 2
-  done (027d891..4fc6646: the wall query, Unload and the teardown; 37 of
-  43 ours). Step: the harness NaN comparison change (the user's call),
-  then migration 2's validation.
+- Subsystem 3 of 3 (the collision world) stopped after two migrations
+  (37 of 43 ours): the run stopped at the user's call, for a drive and
+  the merge.
 
 ## Done
+
+- The collision world (`collision-world.md`, mapped in a28943d; 43
+  rows): 37 ours in two migrations (323cd79..ee7d5e1, validated;
+  027d891..4fc6646, validated from the user's drive `itc_853.log`, 14 of
+  14 harness lines); `--native_collision_world`; with 3 `car-physics.md`
+  teardown rows. Left: the tick and set-up groups, the course load
+  (Archive::Load), the route's two functions.
 
 - The collision narrow phase (`collision.md`, mapped in dd758b3; 64
   rows): all 64 ours (29 Overridden, 35 Native) in two migrations
@@ -55,7 +55,14 @@ the validation agent's attract race or pad replay; the user drives (with
 - Collision (migration 2's validation, attract race `itc_799` and replay
   `itc_800`, replay ok): `sub_820BACB8` CollisionShape::Type. Migration
   1's 18 impact-path functions all ran in that replay (the first replay,
-  `itc_779`, had no deep enough contact).
+  `itc_779`, had no deep enough contact). Not in the drive either
+  (`itc_853.log`).
+- Collision world, migration 2 (the user's drive `itc_853.log`):
+  `sub_820FEFB0` TrackCollision::Unload, `sub_820B86B8`
+  CollisionWorld::Destroy, `sub_820B9110` and `sub_820B7B40`
+  CollisionObject's destructors (a race's end: the drive was quit from
+  the race), `sub_820FD6D8` IgnoresWall, `sub_820FC870`
+  WallQuery::ModeSkips.
 
 ## Totals
 
@@ -75,3 +82,11 @@ the validation agent's attract race or pad replay; the user drives (with
   (wrapped 137, known 333, unknown 5457).
 - After the collision world's migration 2: ours 837, work left 5916
   (wrapped 137, known 322, unknown 5457).
+
+## Stopped
+
+2026-10-23, the user's call: a drive (`itc_853.log`, felt fine), then the
+merge into `rexglue-removal-project`. Not a failure: every validation
+passed. Two of the run's three subsystems finished, the third (the
+collision world) has its tick and set-up left. The user reviews
+`review.md`, `expected-differences.md` and the drive list above.
