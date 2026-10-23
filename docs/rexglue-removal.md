@@ -2487,6 +2487,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-10-22 | The C runtime heap (operator new and delete, malloc, free, calloc, realloc, `_msize`, XMemAlloc, XMemFree, LocalAlloc, LocalFree, GetProcessHeap; in the existing `heap.md`) | `heap.md` | 24 of 30 | `--native_c_runtime_heap` |
 | 2026-10-23 | The collision world's narrow phase and shapes (with CollisionObject::Translate, Vehicle::ApplyForces and two rigid body accessors) | `collision.md` | 64 of 64 | `--native_collision` |
 | 2026-10-23 | The collision world's owner and the track's collision (the wall and ground queries, the track mesh and positions, the teardown) | `collision-world.md` | 37 of 43 | `--native_collision_world` |
+| 2026-10-23 | The sound cues (the game's sound manager, its wrapper over XACT and X3DAudio, X3DAudioInitialize) | `sound-cues.md` | 30 of 87 | `--native_sound_cues` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -2573,6 +2574,18 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
     `harness::Outputs` (two NaNs match for values marked floats; the
     user's call: NaN bits aren't a goal), and the validation agent a pad
     replay.
+
+    The sound cues (2026-10-23, branch `b7-loop-23-10-26`, the fifth
+    run): 30 of 87 ours in one migration: the sound manager's
+    bookkeeping (bank slots, the sounds' accessors, the cue list), the
+    listener, the bank holders, the emitter's constructor and the
+    library entry point X3DAudioInitialize (pure math). The rest waits
+    on XACT: the cue and engine calls go through XACT's vtables into the
+    recompiled library, and everything above them (PlayCue, the sounds'
+    update and stop, AudioManager::Update) waits on those. The user's
+    call (2026-10-23): XACT will probably be translated, as no host
+    library plays its data (a lead). The bank loads wait on the file
+    layer and std::string; the message handler makes guest vtable calls.
 
     The second run (from 2026-10-22, branch `b7-loop-22-10-26`; its first
     session stopped after one subsystem): the first run's removable
@@ -2866,3 +2879,10 @@ the boundary unchanged: 449 functions (916 pairs): overridden 67, Native
 live caller. B7 (`b7_status.py`): 6,753 in play, ours 837, work left
 5,916 (Wrapped 137, with a row 322, no row yet 5,457); `collision-world.md`
 37 ours of 43. 764 overrides in `src/`.
+
+**2026-10-23, B7's fifth loop run, the sound cues (branch
+`b7-loop-23-10-26`):** the boundary unchanged: 449 functions (916
+pairs): overridden 67, Native 3, Dropped 23, never called 70, live 286.
+Imports: 186 called, 62 with a live caller. B7 (`b7_status.py`): 6,753
+in play, ours 867, work left 5,886 (Wrapped 137, with a row 375, no row
+yet 5,374); `sound-cues.md` 30 ours of 87. 787 overrides in `src/`.

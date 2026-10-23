@@ -10,14 +10,18 @@ lists are there), and this file's history.
 
 - Run started 2026-10-23 01:52 on `b7-loop-23-10-26` (the user's
   branch), from 21cdb6a; summary `b7-loop-2026-10-23-0152.md`.
-- Subsystem 1 of 3: the sound cues (`sound-cues.md`, mapped in
-  bfa9d03, 87 rows, 55 ready groups); step 8, migration 1 done
-  (6187975..fae15f5, 30 ours); validation agent running. The user's call (2026-10-23): XACT will probably be
-  translated (no host library plays its data); its body is a lead.
+- Subsystem 1 of 3 (the sound cues) finished: the rest waits on XACT.
+- Subsystem 2 of 3: XACT's body (lead `sub_825C2BB0`, the user's call
+  to translate it); step 2, the mapping agent running.
 
 ## Done
 
-(none yet)
+- The sound cues (`sound-cues.md`, mapped in bfa9d03; 87 rows): 30
+  ours in one migration (6187975..fae15f5), validated (30 of 30
+  harness lines, all ran in the attract race or the replay; replay
+  ok); `--native_sound_cues`. Left: everything calling XACT through its
+  vtables and their callers, the bank loads (file layer, std::string),
+  the message handler.
 
 ## Rows to review
 
