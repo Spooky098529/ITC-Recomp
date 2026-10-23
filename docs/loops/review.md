@@ -26,6 +26,27 @@ When the user has reviewed a run's section, its heading gets
   `Font::DrawPass`'s slot layout (command 36 not in `gpu-functions.md`),
   `sub_82108860` probably `XPR::Release`, `sub_8210A490` probably
   `swprintf` (its ready group is the C runtime's wide printf).
+  Migration 1's rows (16458d3..29aea2e; `--native_strings_and_font`;
+  25 of 36 ours, 14 Native; `c-runtime.md`'s `sub_825A9A80` Merged,
+  `sub_825A9980` and `sub_825B13D0` Native; `sub_82108810` a new row,
+  not seen in play). For review: the agent ran `git checkout` on
+  `src/strings_and_font/font.cpp` with uncommitted work in it (against
+  the "commit before reverting" rule), then re-applied the same edits,
+  checked with all harnesses (`itc_1029`) and a frame dump, before
+  16b310a; kept on the recompiled code (never in play): rotated text
+  (`sub_821097F0`, `sub_82108F68`), the second pass (`sub_82109D80`),
+  DrawPass with a chunk open, a list possibly too full or the command
+  list's diagnostics on, Strings::Init and Release without
+  `--native_heap`, swprintf's `%n`, `%Z`, float types but `%f` and
+  `%f` needing the heap or a forced point, output holding 0xFFFF,
+  FormatGrouped's negative values holding 0xFFFF or over 240 units;
+  swprintf's `_woutput_l` is a step-by-step translation
+  (`src/c_runtime/wide_format.cpp`) run once dry to decide whether it
+  can run natively, its buffer where the original's frame would be
+  (2,542 of 3,441 harness cases took the native path); DrawPass's and
+  Font::Draw's adapters stay (the render queue's call through its
+  vtable); new helpers `src/strings_and_font/steps.h`,
+  `c_runtime::Vswprintf` in `format.h`.
 
 ## Run 2026-10-23 13:44 (`b7-loop-23-10-26-3`)
 
