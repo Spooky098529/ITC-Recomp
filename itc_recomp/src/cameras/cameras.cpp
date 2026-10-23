@@ -575,6 +575,161 @@ void ViewportSetRoll(uint8_t* base, uint32_t viewport, double angle) {
   Stfs(base, viewport + 1584, x);
 }
 
+uint32_t ViewportUpdateEntries(uint8_t* base, uint32_t viewport) {
+  ITC_NATIVE_RUNNING("sub_820AA550 Viewport::UpdateEntries");
+  const uint32_t v = viewport;
+  auto entry = [&](uint32_t i) { return v + 80 * i; };
+  // A word copied through a float register (lfs, stfs): its bits.
+  auto copy = [&](uint32_t to, uint32_t from) {
+    guest::StoreU32(base, to, Through(guest::LoadU32(base, from)));
+  };
+  auto copy4 = [&](uint32_t to, uint32_t from) {
+    for (uint32_t i = 0; i < 16; i += 4) {
+      copy(to + i, from + i);
+    }
+  };
+  // Entry 0's eye, target and up kept (eight bytes at a time).
+  for (uint32_t i = 0; i < 48; i += 8) {
+    const uint32_t high = guest::LoadU32(base, v + 16 + i);
+    const uint32_t low = guest::LoadU32(base, v + 20 + i);
+    guest::StoreU32(base, v + 1760 + i, high);
+    guest::StoreU32(base, v + 1764 + i, low);
+  }
+  copy4(v + 16, v + 1600);
+  copy4(v + 32, v + 1616);
+  copy4(v + 48, v + 1632);
+  // Entry 1: along the target's direction, y fixed, normalized, scaled and
+  // put on the eye.
+  const uint32_t e1 = entry(1), t1 = e1 + 32;
+  const uint32_t from = guest::LoadU32(base, v + 1860) == 1 ? v + 1664 : v + 1616;
+  Stfs(base, t1, Fsubs(Lfs(base, from), Lfs(base, v + 1600)));
+  Stfs(base, t1 + 4, Fsubs(Lfs(base, from + 4), Lfs(base, v + 1604)));
+  Stfs(base, t1 + 8, Fsubs(Lfs(base, from + 8), Lfs(base, v + 1608)));
+  copy(e1 + 36, 0x82002804);
+  {
+    FlushToZero flush;
+    Stvx(base, t1, Normalize(Lvx(base, t1)));
+  }
+  const double scale = Lfs(base, 0x82001BE0);
+  for (uint32_t i = 0; i < 12; i += 4) {
+    Stfs(base, t1 + i, Fmuls(Lfs(base, t1 + i), scale));
+  }
+  for (uint32_t i = 0; i < 12; i += 4) {
+    Stfs(base, t1 + i, Fadds(Lfs(base, t1 + i), Lfs(base, v + 1600 + i)));
+  }
+  copy4(e1 + 16, v + 1600);
+  copy4(e1 + 48, v + 1632);
+  // The rest: one, zero.
+  const uint32_t mode = Mode(base, 1);
+  const double one = Lfs(base, kOne);
+  const double zero = Lfs(base, 0x82000A34);
+  auto up = [&](uint32_t e, double x, double y, double z, double w) {
+    Stfs(base, e + 48, x);
+    Stfs(base, e + 52, y);
+    Stfs(base, e + 56, z);
+    Stfs(base, e + 60, w);
+  };
+  const uint32_t e2 = entry(2);
+  if (mode == 0) {
+    copy4(e2 + 16, v + 1648);
+    copy4(e2 + 32, v + 16);
+    up(e2, zero, one, zero, one);
+  } else if (mode == 1) {
+    copy4(e2 + 16, v + 1648);
+    Stfs(base, e2 + 32, Fadds(Lfs(base, e2 + 16), one));
+    copy(e2 + 36, e2 + 20);
+    copy(e2 + 40, e2 + 24);
+    up(e2, zero, one, zero, zero);
+  }
+  // An entry at `eye` looking one unit along an axis (0 x, 1 y, 2 z) one
+  // way or the other.
+  auto face = [&](uint32_t e, uint32_t eye, uint32_t axis, bool plus) {
+    copy4(e + 16, eye);
+    for (uint32_t k = 0; k < 3; k++) {
+      if (k == axis) {
+        const double c = Lfs(base, e + 16 + 4 * k);
+        Stfs(base, e + 32 + 4 * k, plus ? Fadds(c, one) : Fsubs(c, one));
+      } else {
+        copy(e + 32 + 4 * k, e + 16 + 4 * k);
+      }
+    }
+  };
+  face(entry(3), v + 1648, 0, false);
+  up(entry(3), zero, one, zero, zero);
+  face(entry(4), v + 1648, 1, true);
+  up(entry(4), zero, zero, scale, zero);
+  face(entry(5), v + 1648, 1, false);
+  up(entry(5), zero, zero, one, zero);
+  face(entry(6), v + 1648, 2, true);
+  up(entry(6), zero, one, zero, zero);
+  face(entry(7), v + 1648, 2, false);
+  up(entry(7), zero, one, zero, zero);
+  for (uint32_t i = 8; i <= 16; i++) {
+    face(entry(i), v + 16, 2, false);
+    up(entry(i), zero, one, zero, one);
+  }
+  const uint32_t e17 = entry(17);
+  copy4(e17 + 16, v + 1600);
+  copy4(e17 + 32, v + 1616);
+  copy4(e17 + 48, v + 1632);
+  const uint32_t e18 = entry(18);
+  const double height = Fmuls(Lfs(base, v + 1856), Lfs(base, kHalf));
+  copy(e18 + 16, v + 1648);
+  Stfs(base, e18 + 20, height);
+  copy(e18 + 24, v + 1656);
+  Stfs(base, e18 + 28, one);
+  copy(e18 + 32, v + 1648);
+  Stfs(base, e18 + 36, zero);
+  copy(e18 + 40, v + 1656);
+  Stfs(base, e18 + 44, one);
+  up(e18, zero, zero, one, one);
+  face(entry(19), v + 16, 2, false);
+  up(entry(19), zero, one, zero, one);
+  return entry(16);
+}
+
+uint32_t ViewportUpdate(uint8_t* base, uint32_t viewport) {
+  ITC_NATIVE_RUNNING("sub_820AAE40 Viewport::Update");
+  return ViewportUpdateEntries(base, viewport);
+}
+
+uint32_t ViewportSet(uint8_t* base, uint32_t viewport, uint32_t eye, uint32_t target, uint32_t up,
+                     uint32_t fourth) {
+  ITC_NATIVE_RUNNING("sub_820AAE48 Viewport::Set");
+  uint32_t to = viewport + 1600;
+  for (uint32_t from : {eye, target, up, fourth}) {
+    for (uint32_t i = 0; i < 16; i += 8) {
+      const uint32_t high = guest::LoadU32(base, from + i);
+      const uint32_t low = guest::LoadU32(base, from + i + 4);
+      guest::StoreU32(base, to + i, high);
+      guest::StoreU32(base, to + i + 4, low);
+    }
+    to += 16;
+  }
+  return ViewportUpdateEntries(base, viewport);
+}
+
+uint32_t ViewportLookAt(uint8_t* base, uint32_t viewport, uint32_t eye, uint32_t target) {
+  ITC_NATIVE_RUNNING("sub_820AAF68 Viewport::LookAt");
+  auto copy16 = [&](uint32_t to, uint32_t from) {
+    for (uint32_t i = 0; i < 16; i += 8) {
+      const uint32_t high = guest::LoadU32(base, from + i);
+      const uint32_t low = guest::LoadU32(base, from + i + 4);
+      guest::StoreU32(base, to + i, high);
+      guest::StoreU32(base, to + i + 4, low);
+    }
+  };
+  copy16(viewport + 1600, eye);
+  copy16(viewport + 1616, target);
+  const uint32_t zero = Bits(Lfs(base, 0x82000A34)), one = Bits(Lfs(base, kOne));
+  guest::StoreU32(base, viewport + 1632, zero);
+  guest::StoreU32(base, viewport + 1636, one);
+  guest::StoreU32(base, viewport + 1640, zero);
+  guest::StoreU32(base, viewport + 1644, one);
+  copy16(viewport + 1648, target);
+  return ViewportUpdateEntries(base, viewport);
+}
+
 std::optional<uint32_t> RecordViewport(uint8_t* base, uint32_t list, uint32_t pass) {
   ITC_NATIVE_RUNNING("sub_820A0978 CameraPass::RecordViewport");
   // What the original's command list calls would print about: another chunk

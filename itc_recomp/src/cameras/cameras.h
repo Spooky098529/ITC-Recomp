@@ -213,4 +213,32 @@ void ViewportSetZoom(uint8_t* base, uint32_t viewport, double zoom);
 // in the original (the game's are numbers).
 void ViewportSetRoll(uint8_t* base, uint32_t viewport, double angle);
 
+// Viewport::UpdateEntries (sub_820AA550): entry 0's eye, target and up
+// (+16 to +63) kept at +1760, then the twenty entries' eye (+16), target
+// (+32) and up (+48) from the viewport's eye (+1600), target (+1616), up
+// (+1632) and fourth vector (+1648): entry 0 the viewport's own; entry 1
+// looking from the eye along the target's direction (+1664's in view mode
+// 1, +1860) with y the float at 0x82002804, normalized as the vector unit
+// does it, times the float at 0x82001BE0 and added to the eye; entry 2 by
+// the mode (Mode(1): 0 from +1648 to entry 0's eye, 1 from +1648 along x,
+// others left as they were); entries 3 to 7 from +1648 along -x, +y, -y,
+// +z and -z (a cube map's faces); 8 to 16 and 19 from entry 0's eye along
+// -z; 17 the viewport's eye, target and up; 18 above +1648 (y +1856 x 0.5)
+// looking down. Returns entry 16's address (the original's r3).
+uint32_t ViewportUpdateEntries(uint8_t* base, uint32_t viewport);
+
+// Viewport::Update (sub_820AAE40): ViewportUpdateEntries (a tail call).
+uint32_t ViewportUpdate(uint8_t* base, uint32_t viewport);
+
+// Viewport::Set (sub_820AAE48): the eye, target, up and fourth vector (16
+// bytes each, from `eye`, `target`, `up`, `fourth`, eight bytes at a time)
+// into +1600 to +1663, then ViewportUpdateEntries (a tail call).
+uint32_t ViewportSet(uint8_t* base, uint32_t viewport, uint32_t eye, uint32_t target, uint32_t up,
+                     uint32_t fourth);
+
+// Viewport::LookAt (sub_820AAF68): +1600 = the eye, +1616 and +1648 = the
+// target, +1632 = (0, 1, 0, 1) (eight bytes at a time), then
+// ViewportUpdateEntries.
+uint32_t ViewportLookAt(uint8_t* base, uint32_t viewport, uint32_t eye, uint32_t target);
+
 }  // namespace cameras

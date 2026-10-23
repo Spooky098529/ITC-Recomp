@@ -138,6 +138,23 @@ void NativeCameraConstruct(PPCContext& ctx, uint8_t* base) {
   }
 }
 
+void NativeViewportUpdateEntries(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = cm::ViewportUpdateEntries(base, ctx.r3.u32);
+}
+void NativeViewportUpdate(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = cm::ViewportUpdate(base, ctx.r3.u32);
+}
+void NativeViewportSet(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = cm::ViewportSet(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32);
+}
+void NativeViewportLookAt(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = cm::ViewportLookAt(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+}
+
 // As the adapters: the guest calls made by hooks/cameras.cpp, the work the
 // plain C++'s.
 void NativePassUpdate(PPCContext& ctx, uint8_t* base) {
@@ -767,6 +784,75 @@ uint32_t RandomKind(Random& r) {
   return r.Below(4) ? 0 : r.Below(4);
 }
 
+// Viewport::UpdateEntries, Update, Set and LookAt on a viewport in the
+// scratch area (1,872 bytes, aligned or 4, 8 or 12 bytes on) full of random
+// words: its eye, target, up and fourth vectors random or a camera's, the
+// view mode (+1860) and the passes' mode (CameraPasses::Mode) the game's or
+// random. Set's and LookAt's vectors after the viewport, or inside it (its
+// own vectors, copied over each other). Everything but the view mode is
+// compared as floats.
+void ViewportEntriesCases(Context& h) {
+  const Globals globals(h.base);
+  struct Kind {
+    const char* name;
+    GuestFunction recompiled, native;
+  };
+  const Kind kinds[] = {
+      {"sub_820AA550 Viewport::UpdateEntries", __imp__sub_820AA550, NativeViewportUpdateEntries},
+      {"sub_820AAE40 Viewport::Update", __imp__sub_820AAE40, NativeViewportUpdate},
+      {"sub_820AAE48 Viewport::Set", __imp__sub_820AAE48, NativeViewportSet},
+      {"sub_820AAF68 Viewport::LookAt", __imp__sub_820AAF68, NativeViewportLookAt},
+  };
+  for (const Kind& kind : kinds) {
+    Results results(kind.name);
+    for (int i = 0; i < 300; i++) {
+      const uint32_t viewport = h.data + 64 + 4 * h.random.Below(4);
+      const bool game = h.random.Below(2);
+      const uint32_t view_mode = h.random.Below(4) ? h.random.Below(3) : uint32_t(h.random.Next());
+      const uint32_t mode = RandomMode(h.random);
+      const bool inside = h.random.Below(4) == 0;
+      uint32_t vectors[4];
+      for (uint32_t k = 0; k < 4; k++) {
+        vectors[k] = inside ? viewport + 1600 + 16 * h.random.Below(4) : h.data + 2048 + 16 * k;
+      }
+      Case(
+          h, results, viewport, {{0, 1860}, {1864, 1872}},
+          [&] {
+            RandomWords(h, viewport, 468);
+            RandomWords(h, h.data + 2048, 16);
+            if (game) {
+              for (uint32_t k = 0; k < 3; k++) {
+                const float e = float(int32_t(h.random.Below(1u << 20)) - (1 << 19)) / 64.0f;
+                const float t = e + float(int32_t(h.random.Below(1u << 12)) - (1 << 11)) / 64.0f;
+                for (uint32_t at : {viewport + 1600, h.data + 2048}) {
+                  guest::StoreU32(h.base, at + 4 * k, FloatBits(e));
+                  guest::StoreU32(h.base, at + 16 + 4 * k, FloatBits(t));
+                  guest::StoreU32(h.base, at + 32 + 4 * k, FloatBits(k == 1 ? 1.0f : 0.0f));
+                  guest::StoreU32(h.base, at + 48 + 4 * k, FloatBits(t));
+                }
+                guest::StoreU32(h.base, viewport + 1664 + 4 * k, FloatBits(t));
+              }
+              guest::StoreU32(h.base, viewport + 1856, FloatBits(8000.0f));
+            }
+            guest::StoreU32(h.base, viewport + 1860, view_mode);
+            guest::StoreU32(h.base, cm::kMode, mode);
+          },
+          [&](PPCContext& t) {
+            t.r3.u64 = viewport;
+            t.r4.u64 = vectors[0];
+            t.r5.u64 = vectors[1];
+            t.r6.u64 = vectors[2];
+            t.r7.u64 = vectors[3];
+          },
+          kind.recompiled, kind.native,
+          fmt::format("case {} game {} view mode {} mode {} inside {}", i, game, int32_t(view_mode),
+                      int32_t(mode), inside),
+          {}, &globals, kScratchBytes);
+    }
+    results.Report();
+  }
+}
+
 void RecordViewportCases(Context& h) {
   const SceneGlobals scene(h.base);
   Results results("sub_820A0978 CameraPass::RecordViewport");
@@ -959,6 +1045,7 @@ void Cameras(Context& h) {
   CameraConstructCases(h);
   PassStateCases(h);
   ViewportCases(h);
+  ViewportEntriesCases(h);
   RecordViewportCases(h);
   RecordClearCases(h);
   PassUpdateCases(h);
