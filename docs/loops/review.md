@@ -11,6 +11,10 @@ functions to check in a drive in the progress file.
 When the user has reviewed a run's section, its heading gets
 "(reviewed <date>)"; the section stays for the record.
 
+## Run 2026-10-23 13:44 (`b7-loop-23-10-26-3`)
+
+(Filled in as reports come in.)
+
 ## Run 2026-10-23 11:06 (`b7-loop-23-10-26-2`)
 
 - `action-mappers.md` (new, 40 rows; 15 moved from `functions.md`, 25
