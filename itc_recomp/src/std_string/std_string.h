@@ -55,6 +55,23 @@ bool Tidy(uint8_t* base, uint32_t string, bool built, uint32_t length);
 // over 0xFFFFFFFF, never).
 std::optional<uint32_t> Allocate(uint8_t* base, uint32_t count);
 
+// _Copy (sub_82091458): a new block for `new_length` (its capacity
+// `new_length` with the low four bits set, or 1.5 times the old capacity
+// when that's more and doesn't overflow; capacity + 1 bytes from
+// Allocate), the first `keep` bytes of the old text copied into it
+// (memcpy_s), the old block freed (_Tidy(string, true, 0)), then +24 the
+// capacity, +4 the block, +20 `keep` and the byte at the text + `keep` 0.
+// False, with nothing done, where the original must run (a size malloc
+// refuses, memcpy_s's errors, an old block the layer didn't give).
+bool Copy(uint8_t* base, uint32_t string, uint32_t new_length, uint32_t keep);
+
+// _Grow (sub_82091540): room for `new_length`: _Copy (keeping the text) when
+// the capacity is less; else with `trim` and a length under 16, _Tidy back
+// in place (keeping up to `new_length`); else for 0, the string emptied.
+// Returns whether `new_length` isn't 0; nullopt, with nothing done, where
+// the original must run (a length over 0xFFFFFFFE: _Xlen; its callees').
+std::optional<bool> Grow(uint8_t* base, uint32_t string, uint32_t new_length, bool trim);
+
 // The library's wildcard search (sub_82592740, probably): the first match of
 // `pattern` in the C string `text`, trying each start: '?' matches one
 // character, '*' any run (the '*'s and '?'s after it skipped, then the next

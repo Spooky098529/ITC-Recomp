@@ -17,7 +17,8 @@
 
 ITC_FLAG_BOOL(native_std_string, true, "ITC",
               "Run the C++ library's narrow string (docs/functions/std-string.md: _Tidy "
-              "sub_82091328, allocator<char>::allocate sub_820912B0, with --native_heap; the "
+              "sub_82091328, allocator<char>::allocate sub_820912B0, _Copy sub_82091458 and _Grow "
+              "sub_82091540, with --native_heap; the "
               "wildcard replace sub_82593088 with its find sub_82592970 and search "
               "sub_82592740, no adapters of their own; replace sub_82592E18, for a match, on "
               "the translated code) "
@@ -64,6 +65,36 @@ extern "C" REX_FUNC(sub_820912B0) {
     }
   }
   __imp__sub_820912B0(ctx, base);
+}
+
+// _Copy: r3 = the string, r4 = the new length, r5 = the length kept. The
+// original leaves r3 as its _Tidy did (the old block when it had one, else
+// the string); its only caller, _Grow, sets r3 after it.
+extern "C" REX_FUNC(sub_82091458) {
+  REX_FUNC_PROLOGUE();
+  const uint32_t string = ctx.r3.u32;
+  const bool frees = guest::LoadU32(base, string + kCapacity) >= kInPlace;
+  const uint32_t block = guest::LoadU32(base, string + kText);
+  if (!NativeLifetime() || !Copy(base, string, ctx.r4.u32, ctx.r5.u32)) {
+    __imp__sub_82091458(ctx, base);
+    return;
+  }
+  if (frees) {
+    ctx.r3.u64 = block;
+  }
+}
+
+// _Grow: r3 = the string, r4 = the new length, r5 = trim (its low byte); r3
+// 1 when the new length isn't 0, else 0.
+extern "C" REX_FUNC(sub_82091540) {
+  REX_FUNC_PROLOGUE();
+  if (NativeLifetime()) {
+    if (const auto grown = Grow(base, ctx.r3.u32, ctx.r4.u32, (ctx.r5.u32 & 0xFF) != 0)) {
+      ctx.r3.u64 = *grown ? 1 : 0;
+      return;
+    }
+  }
+  __imp__sub_82091540(ctx, base);
 }
 
 // The wildcard replace: r3 = the string, r4 = the pattern, r5 = the

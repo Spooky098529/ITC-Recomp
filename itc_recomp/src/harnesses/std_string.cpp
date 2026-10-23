@@ -63,6 +63,29 @@ void NativeAllocate(PPCContext& ctx, uint8_t* base) {
   __imp__sub_820912B0(ctx, base);
 }
 
+void NativeCopy(PPCContext& ctx, uint8_t* base) {
+  const uint32_t string = ctx.r3.u32;
+  const bool frees = guest::LoadU32(base, string + ss::kCapacity) >= ss::kInPlace;
+  const uint32_t block = guest::LoadU32(base, string + ss::kText);
+  if (!ss::Copy(base, string, ctx.r4.u32, ctx.r5.u32)) {
+    g_fallbacks++;
+    __imp__sub_82091458(ctx, base);
+    return;
+  }
+  if (frees) {
+    ctx.r3.u64 = block;
+  }
+}
+
+void NativeGrow(PPCContext& ctx, uint8_t* base) {
+  if (const auto grown = ss::Grow(base, ctx.r3.u32, ctx.r4.u32, (ctx.r5.u32 & 0xFF) != 0)) {
+    ctx.r3.u64 = *grown ? 1 : 0;
+    return;
+  }
+  g_fallbacks++;
+  __imp__sub_82091540(ctx, base);
+}
+
 // The wildcard replace's step, as its adapter; a match (replace) is the
 // original's.
 void NativeReplaceAll(PPCContext& ctx, uint8_t* base) {
@@ -252,6 +275,97 @@ void AllocateCases(Context& h) {
   results.Report();
 }
 
+// --- _Copy and _Grow. ---
+
+// A new length: 0, under 16, about the capacity, or well past it (no more
+// than a few thousand: lengths near 0xFFFFFFFF are _Xlen's and the new
+// handler's paths).
+uint32_t PickNewLength(Random& random, uint32_t capacity) {
+  switch (random.Below(5)) {
+    case 0:
+      return 0;
+    case 1:
+      return random.Below(16);
+    case 2:
+      return capacity + random.Below(3) - (capacity > 0 ? 1 : 0);
+    case 3:
+      return random.Below(capacity + 40);
+    default:
+      return random.Below(3000);
+  }
+}
+
+void CopyCases(Context& h) {
+  Results results("sub_82091458 std::string::_Copy");
+  const uint32_t string = h.data + 64;
+  for (int i = 0; i < 1500; i++) {
+    Outputs out[2];
+    const Random start = h.random;
+    for (int v = 0; v < 2; v++) {
+      h.random = start;
+      Fill(h.base, h.data, kScratchBytes);
+      const uint32_t capacity = PickCapacity(h.random);
+      const uint32_t length = h.random.Below(capacity + 1);
+      const uint32_t block = WriteString(h, string, capacity, length);
+      // The game's: the length kept, the new length past the capacity.
+      // Also less kept, and new lengths at or under it (_Copy doesn't
+      // check).
+      // A new capacity under 16 (a new length under 16, which the game's
+      // _Grow never asks for: its capacities are 15 and up) would keep the
+      // block's address in the text area, where it can't be compared.
+      uint32_t new_length = h.random.Below(3) != 0 ? capacity + 1 + h.random.Below(200)
+                                                   : PickNewLength(h.random, capacity);
+      if (new_length < 16) {
+        new_length += 16;
+      }
+      uint32_t keep = h.random.Below(3) != 0 ? length : h.random.Below(length + 1);
+      if (keep > (new_length | 15) + 1) {
+        keep = 0;  // more than the new block holds is memcpy_s's error
+      }
+      Blocks blocks;
+      blocks.Add(block);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = string;
+      t.r4.u64 = new_length;
+      t.r5.u64 = keep;
+      (v == 0 ? __imp__sub_82091458 : NativeCopy)(t, h.base);
+      Collect(h, out[v], t, blocks, {string});
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", i));
+  }
+  results.Report();
+}
+
+void GrowCases(Context& h) {
+  Results results("sub_82091540 std::string::_Grow");
+  const uint32_t string = h.data + 64;
+  for (int i = 0; i < 2000; i++) {
+    Outputs out[2];
+    const Random start = h.random;
+    for (int v = 0; v < 2; v++) {
+      h.random = start;
+      Fill(h.base, h.data, kScratchBytes);
+      // Capacities of 15 and up, as the game's (under 15, _Copy for a new
+      // length under 16 keeps the block's address in the text area).
+      const uint32_t capacity = std::max(PickCapacity(h.random), 15u);
+      const uint32_t length = h.random.Below(capacity + 1);
+      const uint32_t block = WriteString(h, string, capacity, length);
+      const uint32_t new_length = PickNewLength(h.random, capacity);
+      static const uint32_t kTrim[] = {0, 1, 0x100, 0x3FF};
+      Blocks blocks;
+      blocks.Add(block);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = string;
+      t.r4.u64 = new_length;
+      t.r5.u64 = kTrim[h.random.Below(4)];
+      (v == 0 ? __imp__sub_82091540 : NativeGrow)(t, h.base);
+      Collect(h, out[v], t, blocks, {string});
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", i));
+  }
+  results.Report();
+}
+
 // --- The wildcard search, find and replace. ---
 
 // The game's pattern for the loader's loose read (sub_8209DFA8): "/".
@@ -418,6 +532,8 @@ void StdString(Context& h) {
   g_fallbacks = 0;
   TidyCases(h);
   AllocateCases(h);
+  CopyCases(h);
+  GrowCases(h);
   WildcardSearchCases(h);
   FindCases(h);
   ReplaceAllCases(h);

@@ -7,6 +7,8 @@
 #include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
 
+#include <cstdlib>
+
 namespace std_string {
 
 namespace {
@@ -32,6 +34,37 @@ bool CopyFits(uint32_t destination, uint32_t size, uint32_t source, uint32_t cou
   return destination != 0 && source != 0 && count <= size && destination < 0xA0000000u &&
          c_runtime::InOneView(destination, count) && c_runtime::InOneView(source, count) &&
          !c_runtime::MayShare(destination, count, source, count);
+}
+
+// Whether operator new gives `size` bytes natively (malloc's checks; the
+// layer aborts when out of memory): else the new handler and
+// std::bad_alloc, the original's.
+bool Allocatable(uint8_t* base, uint32_t size) {
+  return size <= 0xFFFFF000u && memory::crt::GetProcessHeap(base) != 0;
+}
+
+// A copy whose checks were made before anything changed, into a block just
+// allocated (which shares memory with nothing live): the host's memcpy, or
+// a logged abort when it can't be.
+void CopyChecked(uint8_t* base, uint32_t destination, uint32_t size, uint32_t source,
+                 uint32_t count, const char* what) {
+  if (count == 0) {
+    return;
+  }
+  if (!CopyFits(destination, size, source, count) ||
+      !c_runtime::Memcpy(base, destination, source, count)) {
+    ITC_LOG_ERROR("std::string: {}: memcpy_s({:08X}, {}, {:08X}, {}) failed after its checks",
+                  what, destination, size, source, count);
+    std::abort();
+  }
+}
+
+// A callee whose checks the caller made: aborts when it refuses anyway.
+void Require(bool done, const char* what) {
+  if (!done) {
+    ITC_LOG_ERROR("std::string: {} refused after its checks", what);
+    std::abort();
+  }
 }
 
 }  // namespace
@@ -62,6 +95,60 @@ bool Tidy(uint8_t* base, uint32_t string, bool built, uint32_t length) {
 std::optional<uint32_t> Allocate(uint8_t* base, uint32_t count) {
   ITC_NATIVE_RUNNING("sub_820912B0 std::allocator<char>::allocate");
   return memory::crt::OperatorNew(base, count);
+}
+
+bool Copy(uint8_t* base, uint32_t string, uint32_t new_length, uint32_t keep) {
+  ITC_NATIVE_RUNNING("sub_82091458 std::string::_Copy");
+  const uint32_t old_capacity = Load(base, string + kCapacity);
+  uint32_t capacity = new_length | 15;
+  if (capacity > 0xFFFFFFFEu) {
+    capacity = new_length;
+  } else {
+    const uint32_t half = old_capacity >> 1;
+    if (capacity / 3 < half && old_capacity <= 0xFFFFFFFEu - half) {
+      capacity = half + old_capacity;
+    }
+  }
+  const uint32_t size = capacity + 1;
+  const uint32_t old_text = Text(base, string);
+  if (!Allocatable(base, size) ||
+      (keep != 0 && (old_text == 0 || keep > size || !c_runtime::InOneView(old_text, keep))) ||
+      (old_capacity >= kInPlace && !Deletable(Load(base, string + kText)))) {
+    return false;
+  }
+  const auto block = Allocate(base, size);
+  Require(block.has_value(), "_Copy's allocate");
+  CopyChecked(base, *block, size, old_text, keep, "_Copy");
+  Require(Tidy(base, string, true, 0), "_Copy's _Tidy");
+  Store(base, string + kCapacity, capacity);
+  Store(base, string + kText, *block);
+  const uint32_t text = capacity < kInPlace ? string + kText : *block;
+  Store(base, string + kLength, keep);
+  guest::StoreU8(base, text + keep, 0);
+  return true;
+}
+
+std::optional<bool> Grow(uint8_t* base, uint32_t string, uint32_t new_length, bool trim) {
+  ITC_NATIVE_RUNNING("sub_82091540 std::string::_Grow");
+  if (new_length > 0xFFFFFFFEu) {
+    return std::nullopt;
+  }
+  const uint32_t capacity = Load(base, string + kCapacity);
+  if (capacity < new_length) {
+    if (!Copy(base, string, new_length, Load(base, string + kLength))) {
+      return std::nullopt;
+    }
+  } else if (trim && new_length < kInPlace) {
+    const uint32_t length = Load(base, string + kLength);
+    if (!Tidy(base, string, true, new_length < length ? new_length : length)) {
+      return std::nullopt;
+    }
+  } else if (new_length == 0) {
+    const uint32_t text = capacity < kInPlace ? string + kText : Load(base, string + kText);
+    Store(base, string + kLength, 0);
+    guest::StoreU8(base, text, 0);
+  }
+  return new_length != 0;
 }
 
 uint32_t WildcardSearch(uint8_t* base, uint32_t text, uint32_t pattern, uint32_t offset_out,
