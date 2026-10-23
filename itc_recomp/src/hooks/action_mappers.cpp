@@ -92,70 +92,13 @@ ITC_MAPPERS_WORD(8259C868, ClientListCount(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.
 ITC_MAPPERS_WORD(8259C898, ClientListBoundCount(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
 ITC_MAPPERS_WORD(8259C818, ClientListFind(base, ctx.r3.u32, ctx.r4.u32))
 
-// The update. The functions calling a repeat or curve object's slot run the
-// original unless every object's slot is the function seen in play. The
-// held word's bits 30 and 31 come from the stack word the original builds it
-// in (see action_mappers.h): the high half of r25 below sub_8210C0E0, the
-// word at r1 - 64 for sub_8210BBA0 itself.
-namespace {
-
-bool CurveKnown(uint8_t* base, uint32_t analog, uint32_t index) {
-  const uint32_t curve = guest::LoadU32(base, analog + 4 * (index + 45));
-  return guest::LoadU32(base, guest::LoadU32(base, curve) + 4) == kCurveApplyFunction;
-}
-
-}  // namespace
-
-extern "C" REX_FUNC(sub_8210B4A8) {
-  ITC_MAPPERS_FALLBACK(8210B4A8)
-  if (!CurveKnown(base, ctx.r3.u32, ctx.r4.u32)) {
-    __imp__sub_8210B4A8(ctx, base);
-    return;
-  }
-  ctx.f1.f64 = CurveUnsigned(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
-  ctx.r3.u64 = guest::LoadU32(base, ctx.r3.u32 + 4 * (ctx.r4.u32 + 45));
-}
-extern "C" REX_FUNC(sub_8210B500) {
-  ITC_MAPPERS_FALLBACK(8210B500)
-  if (!CurveKnown(base, ctx.r3.u32, ctx.r4.u32)) {
-    __imp__sub_8210B500(ctx, base);
-    return;
-  }
-  ctx.f1.f64 = CurveCentered(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
-  ctx.r3.u64 = guest::LoadU32(base, ctx.r3.u32 + 4 * (ctx.r4.u32 + 45));
-}
-extern "C" REX_FUNC(sub_8210B7D0) {
-  ITC_MAPPERS_FALLBACK(8210B7D0)
-  if (!CurvesKnown(base, ctx.r3.u32 - kAnalog)) {
-    __imp__sub_8210B7D0(ctx, base);
-    return;
-  }
-  double f1 = ctx.f1.f64;
-  ctx.r3.u64 = Analog(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, &f1);
-  ctx.f1.f64 = f1;
-}
-ITC_MAPPERS_WORD(8210B718,
-                 Hysteresis(base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64, ctx.r6.u32))
-extern "C" REX_FUNC(sub_8210BBA0) {
-  ITC_MAPPERS_FALLBACK(8210BBA0)
-  if (!RepeatsKnown(base, ctx.r3.u32 - kWords)) {
-    __imp__sub_8210BBA0(ctx, base);
-    return;
-  }
-  ctx.r3.u64 = Words(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
-                     guest::LoadU32(base, ctx.r1.u32 - 64));
-}
-extern "C" REX_FUNC(sub_8210C0E0) {
-  ITC_MAPPERS_FALLBACK(8210C0E0)
-  if (!MapperCallsKnown(base, ctx.r3.u32 - kWords)) {
-    __imp__sub_8210C0E0(ctx, base);
-    return;
-  }
-  double f1 = 0;
-  ctx.r3.u64 = Rebuild(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
-                       uint32_t(ctx.r25.u64 >> 32), &f1);
-  ctx.f1.f64 = f1;
-}
+// The update. sub_8210C0E0, sub_8210B7D0, sub_8210B4A8, sub_8210B500,
+// sub_8210B718 and sub_8210BBA0 have no adapters: their only callers in
+// play (sub_8210C370 and below) are native, and call their plain C++. The
+// update runs the original unless every repeat and curve object's slot is
+// the function seen in play. The held word's bits 30 and 31 come from the
+// stack word the original builds it in (see action_mappers.h): the high
+// half of r25 at sub_8210C370.
 
 // The mapper's update, also logged for --log_pause_menu (moved from
 // src/debug/pause_menu_log.cpp).
