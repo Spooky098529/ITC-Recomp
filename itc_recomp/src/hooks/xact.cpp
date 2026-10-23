@@ -164,15 +164,8 @@ extern "C" REX_FUNC(sub_825CED98) {
 }
 ITC_XACT_WORD(825CEDF8, WaveEntryGetLoopRegion(ctx.r3.u32))
 ITC_XACT_WORD(825CEE00, WaveEntryGetDuration(base, ctx.r3.u32))
-extern "C" REX_FUNC(sub_825CEE70) {
-  ITC_XACT_FALLBACK(825CEE70)
-  uint32_t ms = 0;
-  if (!WaveEntrySamplesToMs(base, ctx.r3.u32, ctx.r4.u32, &ms)) {
-    __imp__sub_825CEE70(ctx, base);
-    return;
-  }
-  ctx.r3.u64 = ms;
-}
+// XACTWaveEntry::SamplesToMs (sub_825CEE70) has no adapter: its only
+// caller in play, GetWaveDurations, is native.
 ITC_XACT_OPTIONAL(825CF080, WaveEntrySamplesToBytes(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
 
 ITC_XACT_WORD(825C4D90, CueGetStateInternal(base, ctx.r3.u32))

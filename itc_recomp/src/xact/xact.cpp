@@ -1552,18 +1552,20 @@ std::optional<WaveDurations> WaveBankGetWaveDurations(uint8_t* base, uint32_t ba
   if (!SlotIs(base, bank, 16, kGetEntry)) {
     return std::nullopt;
   }
-  // The original copies the entry into an accessor on its stack and reads
-  // the copy; the same words read from the entry, all before the stores.
-  const uint32_t entry = WaveBankGetEntry(base, bank, index);
-  const uint32_t rate = (guest::LoadU32(base, entry + 4) >> 5) & 0x3FFFF;
-  if (rate == 0) {
-    return std::nullopt;  // the original traps
+  // The original copies the entry into an accessor on its stack (its copy
+  // at +12) and reads the copy; here the accessor functions read the entry
+  // itself, as an accessor 12 bytes before it (the same words, all read
+  // before the adapter's stores).
+  const uint32_t accessor = WaveBankGetEntry(base, bank, index) - 12;
+  WaveDurations durations{};
+  if (!WaveEntrySamplesToMs(base, accessor, WaveEntryGetDuration(base, accessor),
+                            &durations.duration_ms)) {
+    return std::nullopt;  // a rate of 0: the original traps
   }
   ITC_NATIVE_RUNNING("sub_825CC380 XACTWaveBank::GetWaveDurations");
-  const uint32_t duration = guest::LoadU32(base, entry) >> 4;
-  const uint32_t loop_length = guest::LoadU32(base, entry + 20);
-  return WaveDurations{uint32_t(uint64_t(duration) * 1000 / rate),
-                       uint32_t(uint64_t(loop_length) * 1000 / rate)};
+  WaveEntrySamplesToMs(base, accessor, WaveEntryGetLoopLength(base, accessor),
+                       &durations.loop_length_ms);
+  return durations;
 }
 
 namespace {
