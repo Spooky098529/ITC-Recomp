@@ -456,4 +456,131 @@ uint32_t UpdateAll(uint8_t* base, uint32_t list, uint32_t stack_word, double* f1
   return count;
 }
 
+namespace {
+
+uint32_t WordBit(uint8_t* base, uint32_t mapper, uint32_t id, uint32_t word) {
+  const uint32_t index = IndexOf(id);
+  if (index == 30) {
+    return 0;
+  }
+  return Bit(guest::LoadU32(base, mapper + word), index);
+}
+
+}  // namespace
+
+uint32_t Held(uint8_t* base, uint32_t mapper, uint32_t id) {
+  ITC_NATIVE_RUNNING("sub_8210BE70 ActionMapper::Held");
+  return WordBit(base, mapper, id, kWords);
+}
+
+uint32_t Pressed(uint8_t* base, uint32_t mapper, uint32_t id) {
+  ITC_NATIVE_RUNNING("sub_8210BF40 ActionMapper::Pressed");
+  return WordBit(base, mapper, id, kWords + 8);
+}
+
+uint32_t Fired(uint8_t* base, uint32_t mapper, uint32_t id) {
+  ITC_NATIVE_RUNNING("sub_8210C010 ActionMapper::Fired");
+  return WordBit(base, mapper, id, kWords + 16);
+}
+
+uint32_t AnalogRaw(uint8_t* base, uint32_t mapper, uint32_t id) {
+  ITC_NATIVE_RUNNING("sub_8210BA28 ActionMapper::AnalogRaw");
+  const uint32_t index = IndexOf(id);
+  if (index == 30) {
+    return 0;
+  }
+  return guest::LoadU16(base, mapper + kAnalog + 2 * index);
+}
+
+uint32_t SetThreshold(uint8_t* base, uint32_t mapper, uint32_t id, double on, double off,
+                      uint32_t ticks) {
+  ITC_NATIVE_RUNNING("sub_8210B698 ActionMapper::SetThreshold");
+  const uint32_t index = IndexOf(id);
+  if (index == 30) {
+    return index;
+  }
+  const uint32_t entry = mapper + kThresholds + 20 * index;
+  guest::StoreFloat(base, entry, float(on));
+  guest::StoreU32(base, entry + 8, ticks);
+  guest::StoreFloat(base, entry + 4, float(off));
+  guest::StoreU32(base, entry + 12, 0);
+  guest::StoreU8(base, entry + 16, 0);
+  return index;
+}
+
+uint32_t SetRepeat(uint8_t* base, uint32_t mapper, uint32_t id, uint32_t delay,
+                   uint32_t period) {
+  ITC_NATIVE_RUNNING("sub_8210BDF0 ActionMapper::SetRepeat");
+  const uint32_t index = IndexOf(id);
+  if (index == 30) {
+    return index;
+  }
+  const uint32_t repeat = mapper + 592 + 16 * index;
+  guest::StoreU32(base, repeat + 8, delay);
+  guest::StoreU32(base, repeat + 12, period);
+  return index;
+}
+
+uint32_t SetCurve(uint8_t* base, uint32_t mapper, uint32_t id, double center, double dead,
+                  double maximum) {
+  ITC_NATIVE_RUNNING("sub_8210BE30 ActionMapper::SetCurve");
+  const uint32_t index = IndexOf(id);
+  if (index == 30) {
+    return index;
+  }
+  const uint32_t curve = mapper + 1372 + 16 * index;
+  guest::StoreFloat(base, curve + 4, float(center));
+  guest::StoreFloat(base, curve + 8, float(dead));
+  guest::StoreFloat(base, curve + 12, float(maximum));
+  return index;
+}
+
+namespace {
+
+constexpr uint32_t kMappers = 0x826BAB80;
+constexpr uint32_t kSettingsIndex = 0x82600B84;
+constexpr uint32_t kSettings = 0x82600B88;
+
+}  // namespace
+
+bool ConfigureKnown(uint8_t* base) {
+  for (uint32_t j = 0; j < 4; j++) {
+    const uint32_t mapper = guest::LoadU32(base, kMappers + 8 * j);
+    if (mapper == 0) {
+      return false;
+    }
+    const uint32_t vtable = guest::LoadU32(base, mapper);
+    if (guest::LoadU32(base, vtable + 8) != 0x8210B698 ||
+        guest::LoadU32(base, vtable + 16) != 0x8210BDF0 ||
+        guest::LoadU32(base, vtable + 28) != 0x8210BE30) {
+      return false;
+    }
+  }
+  return true;
+}
+
+uint32_t Configure(uint8_t* base, uint32_t index, double f[3]) {
+  ITC_NATIVE_RUNNING("sub_8209F228 ActionMappers::Configure");
+  guest::StoreU32(base, kSettingsIndex, index);
+  uint32_t r3 = 0;
+  for (uint32_t j = 0; j < 4; j++) {
+    for (uint32_t id = 151; id < 181; id++) {
+      const uint32_t mapper = guest::LoadU32(base, kMappers + 8 * j);
+      uint32_t entry = kSettings + 32 * guest::LoadU32(base, kSettingsIndex);
+      f[1] = Lfs(base, entry + 4);
+      f[0] = Lfs(base, entry);
+      SetThreshold(base, mapper, id, f[0], f[1], guest::LoadU32(base, entry + 8));
+      entry = kSettings + 32 * guest::LoadU32(base, kSettingsIndex);
+      SetRepeat(base, guest::LoadU32(base, kMappers + 8 * j), id, guest::LoadU32(base, entry + 12),
+                guest::LoadU32(base, entry + 16));
+      entry = kSettings + 32 * guest::LoadU32(base, kSettingsIndex);
+      f[2] = Lfs(base, entry + 28);
+      f[1] = Lfs(base, entry + 24);
+      f[0] = Lfs(base, entry + 20);
+      r3 = SetCurve(base, guest::LoadU32(base, kMappers + 8 * j), id, f[0], f[1], f[2]);
+    }
+  }
+  return r3;
+}
+
 }  // namespace action_mappers

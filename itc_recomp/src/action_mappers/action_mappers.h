@@ -139,4 +139,35 @@ bool UpdateAllKnown(uint8_t* base, uint32_t list);
 // (the last mapper's, or unchanged when there's none).
 uint32_t UpdateAll(uint8_t* base, uint32_t list, uint32_t stack_word, double* f1);
 
+// --- The read slots and the setters (vtable 0x82007F78; r4 an action id) ---
+//
+// Each returns the original's r3: the bit or value, 0 for an id out of
+// range (the setters: IndexOf's result).
+
+// Slots 8, 10 and 12 (sub_8210BE70, sub_8210BF40, sub_8210C010): bit i of
+// held (+448), pressed (+456) or fired (+464).
+uint32_t Held(uint8_t* base, uint32_t mapper, uint32_t id);
+uint32_t Pressed(uint8_t* base, uint32_t mapper, uint32_t id);
+uint32_t Fired(uint8_t* base, uint32_t mapper, uint32_t id);
+// Slot 14 (sub_8210BA28): the u16 at +1072 + 2i.
+uint32_t AnalogRaw(uint8_t* base, uint32_t mapper, uint32_t id);
+// Slot 2 (sub_8210B698): the threshold entry's on (f1), off (f2) and
+// suppress ticks (r7); its counter and state cleared.
+uint32_t SetThreshold(uint8_t* base, uint32_t mapper, uint32_t id, double on, double off,
+                      uint32_t ticks);
+// Slot 4 (sub_8210BDF0): the repeat object's delay and period.
+uint32_t SetRepeat(uint8_t* base, uint32_t mapper, uint32_t id, uint32_t delay,
+                   uint32_t period);
+// Slot 7 (sub_8210BE30): the curve object's center, dead zone and maximum.
+uint32_t SetCurve(uint8_t* base, uint32_t mapper, uint32_t id, double center, double dead,
+                  double maximum);
+
+// ActionMappers::Configure (sub_8209F228): the settings' index kept at
+// [0x82600B84], then for the four mappers ([0x826BAB80] + 8j) and each
+// action, slots 2, 4 and 7 with the entry at 0x82600B88 + 32 × index.
+// ConfigureKnown: the four mappers are there and their slots are the
+// three above. `f` gets the original's f1-f3; returns its r3.
+bool ConfigureKnown(uint8_t* base);
+uint32_t Configure(uint8_t* base, uint32_t index, double f[3]);
+
 }  // namespace action_mappers

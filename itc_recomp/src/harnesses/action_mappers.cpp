@@ -83,6 +83,26 @@ ITC_NATIVE_STEP(NativeUpdateAll, double f1 = ctx.f1.f64;
                 ctx.r3.u64 = am::UpdateAll(base, ctx.r3.u32, uint32_t(ctx.r25.u64 >> 32), &f1);
                 ctx.f1.f64 = f1)
 
+ITC_NATIVE_STEP(NativeHeld, ctx.r3.u64 = am::Held(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_STEP(NativePressed, ctx.r3.u64 = am::Pressed(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_STEP(NativeFired, ctx.r3.u64 = am::Fired(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_STEP(NativeAnalogRaw, ctx.r3.u64 = am::AnalogRaw(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_STEP(NativeSetThreshold,
+                ctx.r3.u64 = am::SetThreshold(base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64,
+                                              ctx.f2.f64, ctx.r7.u32))
+ITC_NATIVE_STEP(NativeSetRepeat, ctx.r3.u64 = am::SetRepeat(base, ctx.r3.u32, ctx.r4.u32,
+                                                             ctx.r5.u32, ctx.r6.u32))
+ITC_NATIVE_STEP(NativeSetCurve, ctx.r3.u64 = am::SetCurve(base, ctx.r3.u32, ctx.r4.u32,
+                                                           ctx.f1.f64, ctx.f2.f64, ctx.f3.f64))
+void NativeConfigure(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  double f[3] = {ctx.f1.f64, ctx.f2.f64, ctx.f3.f64};
+  ctx.r3.u64 = am::Configure(base, ctx.r3.u32, f);
+  ctx.f1.f64 = f[0];
+  ctx.f2.f64 = f[1];
+  ctx.f3.f64 = f[2];
+}
+
 #undef ITC_NATIVE_STEP
 
 // Byte ranges of the scratch area holding floats, [from, to).
@@ -594,6 +614,136 @@ void Updates(Context& h) {
       });
 }
 
+// --- The read slots, the setters and Configure ---
+
+void Slots(Context& h) {
+  if (!GameMapper(h)) {
+    return;
+  }
+  const uint32_t m = h.data + kMapper;
+  // Ids around 151-180, then any.
+  auto id = [&](int i) -> uint64_t {
+    if (i % 10 == 9) {
+      return h.random.Next();
+    }
+    return 140 + h.random.Below(50);
+  };
+  struct Slot {
+    const char* name;
+    GuestFunction recompiled, native;
+  };
+  const Slot reads[] = {
+      {"sub_8210BE70 ActionMapper::Held", __imp__sub_8210BE70, NativeHeld},
+      {"sub_8210BF40 ActionMapper::Pressed", __imp__sub_8210BF40, NativePressed},
+      {"sub_8210C010 ActionMapper::Fired", __imp__sub_8210C010, NativeFired},
+      {"sub_8210BA28 ActionMapper::AnalogRaw", __imp__sub_8210BA28, NativeAnalogRaw},
+  };
+  for (const Slot& slot : reads) {
+    Results results(slot.name);
+    for (int i = 0; i < 300; i++) {
+      Case(
+          h, results, [&] { RandomMapper(h, true); },
+          [&](PPCContext& t) {
+            t.r3.u64 = m;
+            t.r4.u64 = id(i);
+          },
+          slot.recompiled, slot.native, UpdateOptions(), fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  // The thresholds' and curves' floats as floats.
+  Options setters;
+  setters.f1 = false;
+  setters.floats = {{kMapper + 1376, kMapper + 1372 + 480}};
+  for (uint32_t i = 0; i < 30; i++) {
+    setters.floats.push_back({kMapper + am::kThresholds + 20 * i,
+                              kMapper + am::kThresholds + 20 * i + 8});
+  }
+  // Curves' ranges: one range of the whole objects would mark vtables as
+  // floats, so each curve's three floats.
+  setters.floats.erase(setters.floats.begin());
+  FloatRanges curves;
+  for (uint32_t i = 0; i < 30; i++) {
+    curves.push_back({kMapper + 1372 + 16 * i + 4, kMapper + 1372 + 16 * i + 16});
+  }
+  curves.insert(curves.end(), setters.floats.begin(), setters.floats.end());
+  setters.floats = curves;
+  {
+    Results results("sub_8210B698 ActionMapper::SetThreshold");
+    for (int i = 0; i < 300; i++) {
+      Case(
+          h, results, [&] { RandomMapper(h, i % 2); },
+          [&](PPCContext& t) {
+            t.r3.u64 = m;
+            t.r4.u64 = id(i);
+            t.f1.f64 = double(RandomFloat(h.random, 1.0f));
+            t.f2.f64 = i % 7 == 0 ? double(RandomFloat(h.random, 1.0f)) * 1.000001
+                                  : double(RandomFloat(h.random, 1.0f));
+            t.r7.u64 = h.random.Next();
+          },
+          __imp__sub_8210B698, NativeSetThreshold, setters, fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    Results results("sub_8210BDF0 ActionMapper::SetRepeat");
+    for (int i = 0; i < 300; i++) {
+      Case(
+          h, results, [&] { RandomMapper(h, i % 2); },
+          [&](PPCContext& t) {
+            t.r3.u64 = m;
+            t.r4.u64 = id(i);
+            t.r5.u64 = h.random.Next();
+            t.r6.u64 = h.random.Next();
+          },
+          __imp__sub_8210BDF0, NativeSetRepeat, setters, fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    Results results("sub_8210BE30 ActionMapper::SetCurve");
+    for (int i = 0; i < 300; i++) {
+      Case(
+          h, results, [&] { RandomMapper(h, i % 2); },
+          [&](PPCContext& t) {
+            t.r3.u64 = m;
+            t.r4.u64 = id(i);
+            t.f1.f64 = double(RandomFloat(h.random, 1.0f));
+            // A double that isn't a single, rounded by the store.
+            t.f2.f64 = double(RandomFloat(h.random, 1.0f)) + (i % 5 == 0 ? 1e-12 : 0.0);
+            t.f3.f64 = double(RandomFloat(h.random, 2.0f));
+          },
+          __imp__sub_8210BE30, NativeSetCurve, setters, fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  // Configure: the four mappers' entries pointed at the area's mapper (the
+  // same one four times), the settings' index the game's or another table
+  // entry; the globals put back after each case.
+  {
+    Results results("sub_8209F228 ActionMappers::Configure");
+    constexpr uint32_t kTable = 0x826BAB80;
+    constexpr uint32_t kIndex = 0x82600B84;
+    const std::vector<uint8_t> table = Read(h.base, kTable, 32);
+    const uint32_t index = guest::LoadU32(h.base, kIndex);
+    for (int i = 0; i < 8; i++) {
+      Case(
+          h, results,
+          [&] {
+            RandomMapper(h, false);
+            for (uint32_t j = 0; j < 4; j++) {
+              guest::StoreU32(h.base, kTable + 8 * j, m);
+            }
+          },
+          [&](PPCContext& t) { t.r3.u64 = i < 4 ? index : uint32_t(i - 4); },
+          __imp__sub_8209F228, NativeConfigure, setters, fmt::format("index {}", i < 4 ? index : uint32_t(i - 4)));
+      Write(h.base, kTable, table.data(), 32);
+      guest::StoreU32(h.base, kIndex, index);
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void ActionMappers(Context& h) {
@@ -603,6 +753,7 @@ void ActionMappers(Context& h) {
   HeldTests(h);
   ClientLists(h);
   Updates(h);
+  Slots(h);
 }
 
 }  // namespace harness

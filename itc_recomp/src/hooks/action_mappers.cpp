@@ -16,7 +16,9 @@ ITC_FLAG_BOOL(native_action_mappers, true, "ITC",
               "the listeners' held test, sub_8258CF10 and sub_825924E0; the client list, "
               "sub_8259C6D0 to sub_8259C960; the update, sub_8210B018, sub_8210C370, "
               "sub_8210C0E0, sub_8210B7D0, sub_8210B4A8, sub_8210B500, sub_8210B718 and "
-              "sub_8210BBA0) natively instead of through the translated "
+              "sub_8210BBA0; the read slots, sub_8210BE70, sub_8210BF40, sub_8210C010 and "
+              "sub_8210BA28; the setters, sub_8210B698, sub_8210BDF0 and sub_8210BE30; "
+              "ActionMappers::Configure, sub_8209F228) natively instead of through the translated "
               "code (same results; checked by --run_harnesses=action_mappers)");
 
 // The flag's fallback; the floats as the original's (no flush to zero).
@@ -116,4 +118,50 @@ extern "C" REX_FUNC(sub_8210C370) {
     __imp__sub_8210C370(ctx, base);
   }
   debug::PauseMenuLog_AfterMapperUpdate(base, mapper, caller, fired_before);
+}
+
+// The read slots, also logged for --log_pause_menu (moved from
+// src/debug/pause_menu_log.cpp): reached through the mapper's vtable from
+// the menus, the pause menu and the car.
+#define ITC_MAPPERS_READ_SLOT(address, slot, function)                          \
+  extern "C" REX_FUNC(sub_##address) {                                         \
+    REX_FUNC_PROLOGUE();                                                       \
+    const uint32_t mapper = ctx.r3.u32;                                        \
+    const uint32_t action = ctx.r4.u32;                                        \
+    const uint32_t caller = uint32_t(ctx.lr);                                  \
+    if (ITC_FLAG(native_action_mappers)) {                                     \
+      ctx.r3.u64 = function(base, mapper, action);                             \
+    } else {                                                                   \
+      __imp__sub_##address(ctx, base);                                         \
+    }                                                                          \
+    debug::PauseMenuLog_NoteSlotRead(slot, mapper, action, caller,             \
+                                     double(slot == 14 ? ctx.r3.u32 & 0xFFFF   \
+                                                       : ctx.r3.u32));         \
+  }
+ITC_MAPPERS_READ_SLOT(8210BE70, 8, Held)
+ITC_MAPPERS_READ_SLOT(8210BF40, 10, Pressed)
+ITC_MAPPERS_READ_SLOT(8210C010, 12, Fired)
+ITC_MAPPERS_READ_SLOT(8210BA28, 14, AnalogRaw)
+#undef ITC_MAPPERS_READ_SLOT
+
+// The setters (slots 2, 4 and 7), from ActionMappers::Configure at boot.
+ITC_MAPPERS_WORD(8210B698, SetThreshold(base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64, ctx.f2.f64,
+                                        ctx.r7.u32))
+ITC_MAPPERS_WORD(8210BDF0, SetRepeat(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32))
+ITC_MAPPERS_WORD(8210BE30, SetCurve(base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64, ctx.f2.f64,
+                                    ctx.f3.f64))
+
+// ActionMappers::Configure: the original unless the four mappers' slots are
+// the setters above.
+extern "C" REX_FUNC(sub_8209F228) {
+  ITC_MAPPERS_FALLBACK(8209F228)
+  if (!ConfigureKnown(base)) {
+    __imp__sub_8209F228(ctx, base);
+    return;
+  }
+  double f[3] = {ctx.f1.f64, ctx.f2.f64, ctx.f3.f64};
+  ctx.r3.u64 = Configure(base, ctx.r3.u32, f);
+  ctx.f1.f64 = f[0];
+  ctx.f2.f64 = f[1];
+  ctx.f3.f64 = f[2];
 }
