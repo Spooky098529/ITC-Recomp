@@ -7,7 +7,8 @@ usage: b7_groups.py [--cap <lines>] [root ...]
   root   a function (sub_XXXXXXXX or its address): the groups in its subtree
          (what it calls, followed down, seen in play and not ours). With no
          root, the whole game: the count of ready groups and the blockers.
-  --cap  the most generated lines a group should have (default 1500)
+  --cap  the size (generated lines) above which a group's migration is
+         best split into parts, a hint, not a limit (default 1500)
   --removable  which overridden functions' adapters may go (they become
          Native): every direct caller seen in play is ours. Of the given
          functions, or of every overridden one. Candidates only: the
@@ -213,7 +214,7 @@ def main():
     def describe(f, info):
         flags = []
         if info["lines"] > cap:
-            flags.append(f"over the {cap}-line cap")
+            flags.append(f"over {cap} lines: split the migration")
         if info["indirect"]:
             flags.append(f"{info['indirect']} indirect calls")
         if info["unseen"]:
@@ -230,7 +231,7 @@ def main():
         blocking = collections.Counter(c for f in open_ for c in group(f)["blockers"])
         print(f"functions left (seen in play, not ours): {len(open_)}")
         print(f"ready groups (no blockers): {len(ready)}, "
-              f"{sum(1 for f in ready if group(f)['lines'] <= cap)} within the cap")
+              f"{sum(1 for f in ready if group(f)['lines'] <= cap)} of {cap} lines or fewer")
         print("\nblockers holding the most groups back:")
         for c, n in blocking.most_common(15):
             print(f"  {c}: {n} groups wait on it; its own group: "

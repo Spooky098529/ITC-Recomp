@@ -351,10 +351,12 @@ It works in batches (a group, or small related groups together, each
 built, raced and committed before the next), one after another in its
 own context. It stops when nothing ready is left in the subsystem, after
 about five batches (the lead starts another), or at a failure. A massive
-migration (a batch too big for one context, such as a group over the
-1,500-line cap) may be split: the agent hands its parts to subagents one
-at a time, each finishing (committed, or reported failed) before the next
-starts, and reports for all of them. Report, in its last
+migration (a batch too big for one context, such as a group over 1,500
+lines, which `b7_groups.py` flags "split the migration") is split: the
+agent hands its parts to subagents one at a time, each finishing
+(committed, or reported failed) before the next starts, and reports for
+all of them. The size is a hint for splitting, never a reason to stop or
+to leave a ready group (the user's call, 2026-10-23). Report, in its last
 message:
 
 ```
