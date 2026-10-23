@@ -153,6 +153,8 @@ set(ITC_SOURCES
     src/hooks/strings_and_font.cpp
     src/strings_and_font/strings_and_font.cpp
     src/strings_and_font/font.cpp
+    src/hooks/std_string.cpp
+    src/std_string/std_string.cpp
     src/hooks/sound_cues.cpp
     src/sound_cues/sound_cues.cpp
     src/hooks/xact.cpp
@@ -208,6 +210,7 @@ set(ITC_SOURCES
     src/harnesses/car_specs.cpp
     src/harnesses/cameras.cpp
     src/harnesses/strings_and_font.cpp
+    src/harnesses/std_string.cpp
     src/harnesses/sound_cues.cpp
     src/harnesses/xact.cpp
     src/helpers/debug_output.cpp
