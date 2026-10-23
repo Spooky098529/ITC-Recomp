@@ -48,6 +48,21 @@ When the user has reviewed a run's section, its heading gets
   adapter removals together; new names `InputProcessor::AllHeld`,
   `TestHeld`, `ActionMapper::Held`, `Pressed`, `Fired`, `AnalogRaw`,
   `SetThreshold`, `SetRepeat`, `SetCurve`.
+- `data-tables.md` (new, 18 rows, none moved): `[0x826C5CA0]`'s set-up
+  (`sub_82116DB0`), twelve asset loads (94: 400 items of 3,008 bytes,
+  "probably" the game's items, keyed by the save data's 12-byte records
+  at +0x199F8; 84 with no reader but the load; eight 56-byte tables from
+  the ids at `0x82616C64`; 95's 20-byte and 96's 40-byte entries), their
+  load callbacks byte-swapping the 56-, 20- and 40-byte tables in place
+  (the items aren't), and the accessors; 4 `known-data.md` rows; 4 leads
+  (the boot data load, the save data's items, `82140340`-`82144E58`, the
+  front-end callers at `822271F8`-`8222F0B0`). For review: the eight
+  asset ids at `0x82616C64` not recorded (they need an image dump; one
+  outside the repo wasn't used); `SwapWord` (`sub_820C97D8`) swaps a
+  word through a float load and store, which in the recompiled code
+  probably quiets a signaling NaN's bits (the 360 wouldn't): the native
+  code keeps the recompiled result (no behavior change, the user's
+  call).
 
 ## Run 2026-10-23 01:52 (`b7-loop-23-10-26`)
 

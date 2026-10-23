@@ -14,8 +14,8 @@ file's history.
 - Subsystem 1 of 3 (the action mappers) finished: the rest waits on
   the input manager's vtable targets and `sub_8258CE60`.
 - Subsystem 2 of 3: the game's data tables at `[0x826C5CA0]`
-  (`sub_82117240` and its accessors, from `leads.md`: 6 of 7 ready, ~100
-  callers). Step: mapping (agent running).
+  (`data-tables.md`, mapped in d8f876f: 18 rows, 9 ready groups). Step:
+  migration 1 (agent running).
 
 ## Done
 
@@ -49,3 +49,5 @@ race or the replay.
   ticks/s with `--run_harnesses=all` (36 new harnesses at boot); 23 s
   without, with `--native_action_mappers` on and off (`itc_913`,
   `itc_914`).
+- After mapping the data tables: ours 1007, work left 5746 (wrapped 129,
+  known 474, unknown 5143).
