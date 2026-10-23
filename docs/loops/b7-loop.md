@@ -231,13 +231,17 @@ skips Merged rows). Never
    edits `generated/`. A callee that never ran in play: its branch keeps
    the recompiled path behind the flag, or is ported too, said in the row.
 3. Adds harness cases in the same change, registered in `harness.cpp` and
-   the flag's help text. Cases that differ for a reason that isn't the
-   game's (a NaN's bits as the compiler left them in the translated code,
-   say) may go in their own group named "... (expected to differ)", with
-   the reason in a comment beside it and in the function's row, and the
-   group in the report's `expected to differ:` line (the lead records
-   them in `docs/loops/expected-differences.md`). Every other case
-   matches.
+   the flag's help text. Cases keep NaN and infinity inputs, and float
+   outputs are compared with `harness::Outputs` ("Comparing floats"
+   below), so a NaN's sign or payload is no difference. Cases that
+   differ for a real reason that isn't the game's (the fixed-body stack
+   leftovers in `expected-differences.md`, say) may go in their own group
+   named "... (expected to differ)", with the reason in a comment beside
+   it and in the function's row, and the group in the report's `expected
+   to differ:` line (the lead records them in
+   `docs/loops/expected-differences.md`). No NaN-only "(expected to
+   differ)" groups and no explanations of NaN-sign differences (the
+   user's call, 2026-10-23). Every other case matches.
 4. Builds (`cmake --build itc_recomp/out/build/linux-amd64-release
    -j$(nproc)`) and runs `attract_race.sh 25 --run_harnesses=all`: no new
    error lines, ~20 seconds at 30 ticks/s, every harness at 0 differing
@@ -261,6 +265,49 @@ skips Merged rows). Never
    (callees become removable as their callers are made native), each
    candidate confirmed, its adapter removed and its row set to Native,
    committed on its own.
+
+### Comparing floats
+
+NaN signs and payloads aren't a goal, thoroughness is (the user's call,
+2026-10-23). New harness code (a new harness, or new cases in an
+existing one) builds each case's outputs with `harness::Outputs`
+(`src/harnesses/harness.h`) and checks them with
+`Results::Check(const Outputs&, const Outputs&, what)`:
+
+- `Bytes(...)` and `Word(...)` compare exactly: integers, pointers,
+  flags, r3, padding.
+- `Float(bits)`, `Floats(base, address, count)` (guest words) and
+  `Double(bits)` also match when both sides are NaNs (any sign or
+  payload); infinities and every other value must match exactly.
+- A value is marked a float only when it's shown to be one: f1 and the
+  other float registers, a vector's lanes, a field the function loads
+  and stores with float instructions in `generated/`. Everything else,
+  and anything unsure, is compared exactly: a float compared exactly
+  only fails loudly, while an integer passed as a float could hide a
+  difference.
+- A case passes only if every entry passes; it counts as NaN-only when
+  it passed and some entry matched only as NaNs. The harness line ends
+  with "(N NaN-only)". A failing case logs the entry, its kind, its byte
+  offset and both values.
+
+The pattern, inside the loop that runs both versions:
+
+```cpp
+harness::Outputs out[2];
+for (int v = 0; v < 2; v++) {
+  // ... set up, run the recompiled (v == 0) or native version on t ...
+  out[v].Bytes(Read(h.base, block, 16));          // pointers, flags: exact
+  out[v].Floats(h.base, block + 16, 4);           // a vector's four lanes
+  out[v].Float(guest::LoadU32(h.base, block + 32));  // a float field
+  out[v].Word(t.r3.u32);                          // exact
+  out[v].Double(t.f1.u64);                        // f1
+}
+results.Check(out[0], out[1], what);
+```
+
+Existing harnesses keep their byte comparison (they aren't rewritten);
+the old `Check(bytes, bytes, what)` stays for them, and their recorded
+NaN groups stay in `expected-differences.md` as they are.
 
 ### Removing an adapter
 

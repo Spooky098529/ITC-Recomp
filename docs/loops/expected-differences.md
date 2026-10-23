@@ -7,6 +7,13 @@ other loop docs point here instead of listing them. A group at 0 differing
 isn't listed. Counts are from the run that added the line; a later run
 may show other counts for the same group (random inputs).
 
+Since 2a7c804 (2026-10-23, the user's call: NaN signs and payloads
+aren't a goal), new harness code compares floats with `harness::Outputs`,
+where two NaNs match ("Comparing floats" in `b7-loop.md`), and gets no
+NaN-only groups; only real behavior differences (like Stack leftovers)
+are added here. The existing harnesses weren't switched over, so their
+NaN groups below stay as recorded.
+
 ## Reasons
 
 - **Two NaNs:** where two NaNs meet in one operation, which one comes out
