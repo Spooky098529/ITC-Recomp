@@ -17,7 +17,8 @@ there), and this file's history.
   ..., and `sub_820FDF38`, `sub_820FDC18`, ...; the collision update
   every tick, above `collision.md` and `car-physics.md`), mapped in
   `collision-world.md` (a28943d; 43 rows; checked: 14 ready groups).
-  Step: migration 1 (agent running).
+  Migration 1 done (323cd79..ee7d5e1, 29 of 43 ours). Step: its
+  validation (agent running); then migration 2 for what's left.
 
 ## Done
 
@@ -41,7 +42,15 @@ there), and this file's history.
   CollisionObject::Collide (the first query's arguments: r3 the
   records, r4 the shape record), `collision.md`'s box words +160 (the
   lower corners' track positions), `sub_820C0168` probably the car's own
-  track position; 5 leads added.
+  track position; 5 leads added. Migration 1's 29 rows (and the intro:
+  its constants; the up vector at `0x82638280`, not `0x82628280`). For
+  review: a new `memory::IsPages`; the native normalize reproduces the
+  vector unit's; `TrackPosition::SearchLinked` (never ran in play) writes
+  -1 past its six halfwords onto the route's first at `0x826C5B10`, as
+  the game does, kept; four functions ported that never ran in play are
+  described in FindCell's row; the "Negated NaN" groups
+  (`expected-differences.md`): ours flips a NaN's sign where the
+  translated code doesn't.
 
 - `collision.md` (new, 64 rows), `known-data.md`'s shape, box, pair
   query and table entries, `car-physics.md`'s intro; 1 lead added (the
@@ -107,3 +116,5 @@ the validation agent's attract race or pad replay; the user drives (with
   137, known 319, unknown 5500).
 - After mapping the collision world: ours 797, work left 5956 (wrapped
   137, known 362, unknown 5457).
+- After the collision world's migration 1: ours 826, work left 5927
+  (wrapped 137, known 333, unknown 5457).

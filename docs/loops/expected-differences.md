@@ -25,6 +25,15 @@ may show other counts for the same group (random inputs).
   on the guest stack). The game's cars aren't fixed; whether anything
   fixed meets a car in play isn't known.
 
+- **Negated NaN:** where the vector unit's normalize meets a NaN or an
+  infinity, the translated code keeps the NaN's sign where the source
+  negates it (the compiler built -(x - 0.5) as 0.5 - x); ours negates it.
+  Only a NaN's sign differs. The game's normals are numbers.
+- **Unaligned out:** the normalize reads the words around an out pointer
+  that isn't 16-aligned, which hold random values in the harness (with
+  Negated NaN where they're NaNs). The game's outs are 16-aligned frame
+  temporaries.
+
 ## By function file
 
 Review: "accepted" once the user has agreed, else "for review" (the run
@@ -135,3 +144,19 @@ Every function has a "NaNs and infinities anywhere" group (run
 | `sub_820BB868` CollisionPair::Respond | one NaN anywhere | 4 of 158 | Two NaNs (signs only) | for review (22:11 run) |
 | `sub_820BB868` CollisionPair::Respond | one NaN anywhere, a fixed body meeting the impulse | 6 of 42 | Stack leftovers, Two NaNs | for review (22:11 run) |
 | `sub_820BBE30` CollisionPair::Solve | one NaN anywhere, a fixed body meeting the impulse | 2 of 42 | Stack leftovers, Two NaNs | for review (22:11 run) |
+
+### `collision-world.md`
+
+The functions going through a normal have "one NaN in a vertex" and "out
+not 16-aligned" groups (run 2026-10-22 22:11, migration 1); those of
+TrackMesh::Ground, GroundProbe, WheelGround and TrackCollision::Ground
+were at 0.
+
+| Function | Group | Differ | Reason | Review |
+|---|---|---|---|---|
+| `sub_820F7468` TrackMesh::TriangleNormal | out not 16-aligned | 11 of 28 | Unaligned out | for review (22:11 run) |
+| `sub_820F7468` TrackMesh::TriangleNormal | one NaN in a vertex | 4 of 91 | Negated NaN | for review (22:11 run) |
+| `sub_820F7468` TrackMesh::TriangleNormal | one NaN in a vertex, out not 16-aligned | 4 of 9 | Negated NaN, Unaligned out | for review (22:11 run) |
+| `sub_820F7590` TrackMesh::QuadHeight | out not 16-aligned | 11 of 28 | Unaligned out | for review (22:11 run) |
+| `sub_820F7590` TrackMesh::QuadHeight | one NaN in a vertex | 9 of 91 | Negated NaN | for review (22:11 run) |
+| `sub_820F7590` TrackMesh::QuadHeight | one NaN in a vertex, out not 16-aligned | 6 of 9 | Negated NaN, Unaligned out | for review (22:11 run) |
