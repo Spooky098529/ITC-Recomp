@@ -23,6 +23,23 @@ bool CameraPassUpdate(PPCContext& ctx, uint8_t* base);
 bool CameraUpdate(PPCContext& ctx, uint8_t* base);
 bool CameraConstruct(PPCContext& ctx, uint8_t* base);
 
+// CameraPass::RecordBegin (sub_820A0CC0) and RecordEnd (sub_820A1C30)
+// natively, without the flag: r3 = the pass; the scene's getters and the
+// render queue called as the originals do, from frames like theirs, and
+// RecordEnd's CameraPasses::RenderTarget through its override (the
+// diagnostics' wrapper). False where the original must run (the command
+// list's diagnostics on, or a chunk its calls would print about), r3 put
+// back.
+bool CameraPassRecordBegin(PPCContext& ctx, uint8_t* base);
+bool CameraPassRecordEnd(PPCContext& ctx, uint8_t* base);
+
+// CameraPasses::RecordBegins (sub_8209F8A0) and RecordEnds (sub_8209F900)
+// natively, for their wrappers in src/debug/frame_state_diff.cpp: each
+// enabled pass recorded as above (the original RecordBegin or RecordEnd
+// where it must run), from frames like the originals'.
+void CameraPassesRecordBegins(PPCContext& ctx, uint8_t* base);
+void CameraPassesRecordEnds(PPCContext& ctx, uint8_t* base);
+
 // CameraPass::RecordViewport (sub_820A0978)'s adapter's work, without the
 // flag: r3 = the pass, r4 = the sort key (for the harness).
 void CameraPassRecordViewport(PPCContext& ctx, uint8_t* base);

@@ -888,6 +888,120 @@ void RecordViewportCases(Context& h) {
   results.Report();
 }
 
+void NativeRecordBegin(PPCContext& ctx, uint8_t* base) {
+  if (!hooks::CameraPassRecordBegin(ctx, base)) {
+    __imp__sub_820A0CC0(ctx, base);
+  }
+}
+void NativeRecordEnd(PPCContext& ctx, uint8_t* base) {
+  if (!hooks::CameraPassRecordEnd(ctx, base)) {
+    __imp__sub_820A1C30(ctx, base);
+  }
+}
+
+// The list's kinds for the record passes: FakeScene's 0 to 2, and 3 room
+// for 33 slots exactly (FakeScene's own 3 has room for 4, and the original
+// then writes a header at guest address 0).
+void SetRecordScene(Context& h, uint32_t kind, uint32_t used) {
+  FakeScene::Set(h, kind == 3 ? 0 : kind, used);
+  if (kind == 3) {
+    guest::StoreU32(h.base, h.data + FakeScene::kList + 8, used + 33);
+  }
+}
+
+// CameraPass::RecordBegin and RecordEnd on a pass in the scratch area: each
+// type (and others), its surfaces, clear color and depth random words, pass
+// 10 enabled or not (type 20's clear), the list as FakeScene makes it. The
+// chunks are compared, and the last chunk and key handed to the made-up
+// render queue (its +32, +36), and the open chunks' count.
+void RecordPassCases(Context& h) {
+  const SceneGlobals scene(h.base);
+  const Globals globals(h.base);
+  struct Kind {
+    const char* name;
+    GuestFunction recompiled, native;
+  };
+  const Kind kinds[] = {
+      {"sub_820A0CC0 CameraPass::RecordBegin", __imp__sub_820A0CC0, NativeRecordBegin},
+      {"sub_820A1C30 CameraPass::RecordEnd", __imp__sub_820A1C30, NativeRecordEnd},
+  };
+  const uint32_t pass = h.data + FakeScene::kPass;
+  for (const Kind& k : kinds) {
+    Results results(k.name);
+    for (int i = 0; i < 400; i++) {
+      const uint32_t type = h.random.Below(8) ? h.random.Below(23) : uint32_t(h.random.Next());
+      const uint32_t kind = h.random.Below(4) ? 0 : h.random.Below(4);
+      const uint32_t used = h.random.Below(2) ? 0 : h.random.Below(100000);
+      const bool pass10 = h.random.Below(2);
+      Case(
+          h, results, pass, {},
+          [&] {
+            SetRecordScene(h, kind, used);
+            RandomWords(h, pass + 560, 8);
+            guest::StoreU32(h.base, pass + 584, type);
+            guest::StoreU32(h.base, cm::Pass(10) + 588, pass10 ? 1 : 0);
+          },
+          [&](PPCContext& t) { t.r3.u64 = pass; }, k.recompiled, k.native,
+          fmt::format("case {} type {} kind {} used {} pass 10 {}", i, int32_t(type), kind, used,
+                      pass10),
+          [&](Outputs& out) {
+            out.Word(guest::LoadU32(h.base, command_list::kOpenChunks));
+            scene.Restore();
+          },
+          &globals, kScratchBytes);
+    }
+    results.Report();
+  }
+}
+
+// CameraPasses::RecordBegins and RecordEnds over the game's 21 passes with
+// up to three of them enabled (any), the list as above.
+void RecordPassesCases(Context& h) {
+  const SceneGlobals scene(h.base);
+  const Globals globals(h.base);
+  struct Kind {
+    const char* name;
+    GuestFunction recompiled;
+    void (*native)(PPCContext&, uint8_t*);
+  };
+  const Kind kinds[] = {
+      {"sub_8209F8A0 CameraPasses::RecordBegins", __imp__sub_8209F8A0,
+       hooks::CameraPassesRecordBegins},
+      {"sub_8209F900 CameraPasses::RecordEnds", __imp__sub_8209F900, hooks::CameraPassesRecordEnds},
+  };
+  for (const Kind& k : kinds) {
+    Results results(k.name);
+    for (int i = 0; i < 100; i++) {
+      const uint32_t kind = h.random.Below(4) ? 0 : h.random.Below(3);
+      uint32_t enabled[3];
+      const uint32_t count = h.random.Below(4);
+      for (uint32_t j = 0; j < 3; j++) {
+        enabled[j] = h.random.Below(21);
+      }
+      Case(
+          h, results, h.data, {},
+          [&] {
+            SetRecordScene(h, kind, 0);
+            for (uint32_t p = 0; p < cm::kPassCount; p++) {
+              guest::StoreU32(h.base, cm::Pass(p) + 588, 0);
+            }
+            for (uint32_t j = 0; j < count; j++) {
+              guest::StoreU32(h.base, cm::Pass(enabled[j]) + 588, 1);
+            }
+          },
+          [](PPCContext&) {}, k.recompiled, k.native,
+          fmt::format("case {} kind {} passes {} {} {} ({})", i, kind, enabled[0], enabled[1],
+                      enabled[2], count),
+          [&](Outputs& out) {
+            out.Word(guest::LoadU32(h.base, command_list::kOpenChunks));
+            scene.Restore();
+          },
+          &globals, kScratchBytes);
+    }
+    results.Report();
+  }
+}
+
 void RecordClearCases(Context& h) {
   const SceneGlobals scene(h.base);
   Results results("sub_8209FA38 RecordClear");
@@ -1050,6 +1164,8 @@ void Cameras(Context& h) {
   RecordClearCases(h);
   PassUpdateCases(h);
   FromViewportCases(h);
+  RecordPassCases(h);
+  RecordPassesCases(h);
 }
 
 }  // namespace harness

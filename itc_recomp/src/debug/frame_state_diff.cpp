@@ -3,6 +3,7 @@
 #include "frame_pacing/game_messages.h"
 #include "guest.h"
 #include "cameras/cameras.h"
+#include "hooks/cameras.h"
 #include "matrix_math/matrix_math.h"
 
 #include "base/flags.h"
@@ -421,8 +422,25 @@ void Vec4Transform(uint8_t* base, uint32_t out, uint32_t m, uint32_t v) {
     __imp__sub_##address(ctx, base);                        \
     debug::FrameStateDiff_After(base, "draw step part", 0x##address); \
   }
-ITC_FRAME_STATE_WRAP(8209F8A0)
-ITC_FRAME_STATE_WRAP(8209F900)
+// CameraPasses::RecordBegins and RecordEnds: the passes' recording natively
+// (src/cameras/cameras.cpp, --native_cameras) or translated, inside the
+// same wrap.
+#define ITC_FRAME_STATE_WRAP_RECORDS(address, native)                 \
+  extern "C" REX_FUNC(sub_##address) {                                \
+    REX_FUNC_PROLOGUE();                                              \
+    if (debug::IsHidden(0x##address)) {                               \
+      return;                                                         \
+    }                                                                 \
+    debug::FrameStateDiff_Before(base);                               \
+    if (ITC_FLAG(native_cameras)) {                                   \
+      native(ctx, base);                                              \
+    } else {                                                          \
+      __imp__sub_##address(ctx, base);                                \
+    }                                                                 \
+    debug::FrameStateDiff_After(base, "draw step part", 0x##address); \
+  }
+ITC_FRAME_STATE_WRAP_RECORDS(8209F8A0, hooks::CameraPassesRecordBegins)
+ITC_FRAME_STATE_WRAP_RECORDS(8209F900, hooks::CameraPassesRecordEnds)
 ITC_FRAME_STATE_WRAP(820C5DE8)
 ITC_FRAME_STATE_WRAP(820F6068)
 ITC_FRAME_STATE_WRAP(82130978)

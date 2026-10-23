@@ -37,7 +37,9 @@ ITC_FLAG_BOOL(native_cameras, true, "ITC",
               "LookAt sub_820AAF68; CameraPass::Update sub_820A3978, its frame interpolation's notes kept, and "
               "CameraPass::RecordViewport sub_820A0978, without the command list's "
               "diagnostics, and CameraPass::FromViewport sub_820AA4A8; RecordClear sub_8209FA38, "
-              "without the command list's diagnostics) natively instead of "
+              "without the command list's diagnostics; CameraPasses::RecordBegins sub_8209F8A0 and "
+              "RecordEnds sub_8209F900 (in their diagnostics' wrappers) with CameraPass::RecordBegin "
+              "sub_820A0CC0 and RecordEnd sub_820A1C30, without the command list's diagnostics) natively instead of "
               "through the translated code (the same words, bit for bit; checked by "
               "--run_harnesses=cameras)");
 
@@ -272,7 +274,126 @@ bool RecordViewportCalls(PPCContext& ctx, uint8_t* base, uint32_t pass, uint32_t
   });
 }
 
+// The record passes' guest calls by type: the getters' (scene slot 8, then
+// slot 2) and the render queue's slot 4's return addresses for each chunk
+// handed on, and (RecordEnd) CameraPasses::RenderTarget's.
+struct Route {
+  uint32_t get[2][2];
+  uint32_t submit[2];
+  uint32_t render_target;
+};
+
+// Hands `subs` to the render queue as the original does: for each, the
+// scene's getters (slot 8, then slot 2) and the queue's slot 4 (r4 = the
+// chunk, r5 = the key, f1 = 0.0).
+void Submit(PPCContext& ctx, uint8_t* base, const cameras::Submissions& subs, const Route& route) {
+  for (uint32_t i = 0; i < subs.count; i++) {
+    ctx.r3.u64 = guest::LoadU32(base, kScene);
+    VtableCall(ctx, base, 8, route.get[i][0]);
+    VtableCall(ctx, base, 2, route.get[i][1]);
+    ctx.fpscr.disableFlushMode();
+    ctx.f1.f64 = double(guest::LoadFloat(base, 0x82000A34));
+    ctx.r4.u64 = subs.chunk[i];
+    ctx.r5.u64 = subs.key[i];
+    VtableCall(ctx, base, 4, route.submit[i]);
+  }
+}
+
+// A record pass (RecordBegin or RecordEnd): from a frame like the original's
+// (176 bytes), the scene's getters for the list (slot 8, then slot 1, with
+// `list_returns`), `record(list)` (the plain C++), then the chunks handed on.
+// False where the original must run (the command list's diagnostics on, or
+// a chunk its command list calls would print about: then the scene's getters
+// have been called once more than the original would, never seen in play).
+bool RecordPass(PPCContext& ctx, uint8_t* base, const uint32_t (&list_returns)[2],
+                const Route& route,
+                const std::function<std::optional<cameras::Submissions>(uint32_t list)>& record) {
+  if (ITC_FLAG(log_overlay_uploads) || ITC_FLAG(log_slot_callers) ||
+      ITC_FLAG(log_recording_by_pass)) {
+    return false;
+  }
+  const uint64_t lr = ctx.lr;
+  bool done = false;
+  guest_call::InFrame(ctx, base, 176, list_returns[0], [&](uint32_t) {
+    ctx.r3.u64 = guest::LoadU32(base, kScene);
+    VtableCall(ctx, base, 8, list_returns[0]);
+    VtableCall(ctx, base, 1, list_returns[1]);
+    const std::optional<cameras::Submissions> subs = record(ctx.r3.u32);
+    if (!subs) {
+      return;
+    }
+    done = true;
+    Submit(ctx, base, *subs, route);
+  });
+  ctx.lr = lr;
+  return done;
+}
+
+Route BeginRoute(uint32_t type) {
+  // The second chunk's return addresses by the first's key's path.
+  static constexpr uint32_t kLast[2][2] = {{0x820A12F8, 0x820A1308}, {0x820A1358, 0x820A1368}};
+  switch (type) {
+    case 3: return {{{0x820A0ED8, 0x820A0EE8}}, {0x820A1C20}, 0};
+    case 4: return {{{0x820A109C, 0x820A10AC}}, {0x820A1C20}, 0};
+    case 19: return {{{0x820A1998, 0x820A19A8}}, {0x820A1C20}, 0};
+    case 16: return {{{0x820A12B8, 0x820A12C8}, {kLast[0][0], kLast[0][1]}}, {0x820A12E4, 0x820A1C20}, 0};
+    case 17: return {{{0x820A1580, 0x820A1590}, {kLast[0][0], kLast[0][1]}}, {0x820A12E4, 0x820A1C20}, 0};
+    case 18: return {{{0x820A17C4, 0x820A17D4}, {kLast[0][0], kLast[0][1]}}, {0x820A12E4, 0x820A1C20}, 0};
+    case 10:
+    case 13: return {{{0x820A1318, 0x820A1328}, {kLast[1][0], kLast[1][1]}}, {0x820A1344, 0x820A1C20}, 0};
+    case 11:
+    case 14: return {{{0x820A159C, 0x820A15AC}, {kLast[1][0], kLast[1][1]}}, {0x820A1344, 0x820A1C20}, 0};
+    case 12:
+    case 15: return {{{0x820A17E0, 0x820A17F0}, {kLast[1][0], kLast[1][1]}}, {0x820A1344, 0x820A1C20}, 0};
+    case 20: return {{{0x820A1BB4, 0x820A1BC4}, {0x820A1BF4, 0x820A1C04}}, {0x820A1BE0, 0x820A1C20}, 0};
+    default: return {};
+  }
+}
+
+Route EndRoute(uint32_t type) {
+  static constexpr uint32_t kLast[2] = {0x820A2648, 0x820A2658};
+  switch (type) {
+    case 3: return {{{0x820A1DA8, 0x820A1DB8}}, {0x820A2D24}, 0x820A1D1C};
+    case 4: return {{{0x820A1EC4, 0x820A1ED4}}, {0x820A2D24}, 0x820A1E38};
+    case 5: return {{{0x820A1FDC, 0x820A1FEC}}, {0x820A2D24}, 0x820A1F50};
+    case 6: return {{{0x820A20F8, 0x820A2108}}, {0x820A2D24}, 0x820A206C};
+    case 7: return {{{0x820A2214, 0x820A2224}}, {0x820A2D24}, 0x820A2184};
+    case 8: return {{{0x820A2330, 0x820A2340}}, {0x820A2D24}, 0x820A22A0};
+    case 9: return {{{0x820A2448, 0x820A2458}}, {0x820A2D24}, 0x820A23BC};
+    case 10:
+    case 13: return {{{0x820A2664, 0x820A2674}, {kLast[0], kLast[1]}}, {0x820A2634, 0x820A2D24}, 0x820A2500};
+    case 16: return {{{0x820A2608, 0x820A2618}, {kLast[0], kLast[1]}}, {0x820A2634, 0x820A2D24}, 0x820A2500};
+    case 11:
+    case 14: return {{{0x820A283C, 0x820A284C}, {kLast[0], kLast[1]}}, {0x820A2634, 0x820A2D24}, 0x820A2718};
+    case 17: return {{{0x820A2820, 0x820A2830}, {kLast[0], kLast[1]}}, {0x820A2634, 0x820A2D24}, 0x820A2718};
+    case 12:
+    case 15: return {{{0x820A2A14, 0x820A2A24}, {kLast[0], kLast[1]}}, {0x820A2634, 0x820A2D24}, 0x820A28F0};
+    case 18: return {{{0x820A29F8, 0x820A2A08}, {kLast[0], kLast[1]}}, {0x820A2634, 0x820A2D24}, 0x820A28F0};
+    case 19: return {{{0x820A2B2C, 0x820A2B3C}}, {0x820A2D24}, 0x820A2AA0};
+    case 20: return {{{0x820A2CB8, 0x820A2CC8}, {0x820A2CF8, 0x820A2D08}}, {0x820A2CE4, 0x820A2D24}, 0x820A2BB8};
+    default: return {};
+  }
+}
+
 }  // namespace
+
+// CameraPass::RecordBegin and RecordEnd: r3 = the pass. Their callers
+// (CameraPasses::RecordBegins and RecordEnds) are native and call the work
+// directly; these stay for them with the flag off (their work makes guest
+// calls).
+extern "C" REX_FUNC(sub_820A0CC0) {
+  ITC_CAMERAS_FALLBACK(820A0CC0)
+  if (!hooks::CameraPassRecordBegin(ctx, base)) {
+    __imp__sub_820A0CC0(ctx, base);
+  }
+}
+
+extern "C" REX_FUNC(sub_820A1C30) {
+  ITC_CAMERAS_FALLBACK(820A1C30)
+  if (!hooks::CameraPassRecordEnd(ctx, base)) {
+    __imp__sub_820A1C30(ctx, base);
+  }
+}
 
 // CameraPass::RecordViewport: r3 = the pass, r4 = the sort key.
 extern "C" REX_FUNC(sub_820A0978) {
@@ -335,6 +456,69 @@ void RecordClear(PPCContext& ctx, uint8_t* base) {
     ctx.r7 = in.r7;
     __imp__sub_8209FA38(ctx, base);
   }
+}
+
+bool CameraPassRecordBegin(PPCContext& ctx, uint8_t* base) {
+  static constexpr uint32_t kList[2] = {0x820A0CEC, 0x820A0CFC};
+  const uint32_t pass = ctx.r3.u32;
+  const Route route = BeginRoute(guest::LoadU32(base, pass + 584));
+  if (!RecordPass(ctx, base, kList, route,
+                  [&](uint32_t list) { return cameras::RecordBegin(base, list, pass); })) {
+    ctx.r3.u64 = pass;
+    return false;
+  }
+  return true;
+}
+
+bool CameraPassRecordEnd(PPCContext& ctx, uint8_t* base) {
+  static constexpr uint32_t kList[2] = {0x820A1C5C, 0x820A1C6C};
+  const uint32_t pass = ctx.r3.u32;
+  const Route route = EndRoute(guest::LoadU32(base, pass + 584));
+  if (!RecordPass(ctx, base, kList, route, [&](uint32_t list) {
+        return cameras::RecordEnd(base, list, pass, [&](uint32_t id) {
+          // Through its override (the diagnostics' wrapper), as the original.
+          ctx.r3.u64 = id;
+          ctx.lr = route.render_target;
+          sub_8209F7A8(ctx, base);
+          return ctx.r3.u32;
+        });
+      })) {
+    ctx.r3.u64 = pass;
+    return false;
+  }
+  return true;
+}
+
+void CameraPassesRecordBegins(PPCContext& ctx, uint8_t* base) {
+  const uint64_t lr = ctx.lr;
+  guest_call::InFrame(ctx, base, 112, 0x8209F8D4, [&](uint32_t) {
+    cameras::RecordBegins(base, [&](uint32_t pass) {
+      ctx.r3.u64 = pass;
+      ctx.lr = 0x8209F8D4;
+      if (!ITC_FLAG(native_cameras) || !CameraPassRecordBegin(ctx, base)) {
+        ctx.r3.u64 = pass;
+        ctx.lr = 0x8209F8D4;
+        __imp__sub_820A0CC0(ctx, base);
+      }
+    });
+  });
+  ctx.lr = lr;
+}
+
+void CameraPassesRecordEnds(PPCContext& ctx, uint8_t* base) {
+  const uint64_t lr = ctx.lr;
+  guest_call::InFrame(ctx, base, 112, 0x8209F934, [&](uint32_t) {
+    cameras::RecordEnds(base, [&](uint32_t pass) {
+      ctx.r3.u64 = pass;
+      ctx.lr = 0x8209F934;
+      if (!ITC_FLAG(native_cameras) || !CameraPassRecordEnd(ctx, base)) {
+        ctx.r3.u64 = pass;
+        ctx.lr = 0x8209F934;
+        __imp__sub_820A1C30(ctx, base);
+      }
+    });
+  });
+  ctx.lr = lr;
 }
 
 void CameraPassRecordViewport(PPCContext& ctx, uint8_t* base) {

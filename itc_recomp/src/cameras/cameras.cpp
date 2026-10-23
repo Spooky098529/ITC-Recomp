@@ -804,6 +804,221 @@ std::optional<uint32_t> RecordClear(uint8_t* base, uint32_t list, uint32_t flags
   return chunk;
 }
 
+namespace {
+
+// Whether `slots` more fit on the list with no message from its calls: no
+// other chunk open (unless the list's own is), and the slots used then below
+// the capacity (each allocation's check; the last is the largest unless the
+// count wraps, which is left to the original too).
+bool Room(uint8_t* base, uint32_t list, uint32_t slots) {
+  if (guest::LoadU8(base, list + 52) == 0 && guest::LoadU32(base, command_list::kOpenChunks) != 0) {
+    return false;
+  }
+  const uint32_t used = guest::LoadU32(base, list + 12);
+  return used + slots < guest::LoadU32(base, list + 8) && used + slots >= used;
+}
+
+uint32_t Slot(uint8_t* base, uint32_t list) {
+  return command_list::AllocateSlots(base, list, 1);
+}
+// A chunk's header slot: +2 = 5, +4 = 0.
+uint32_t Header(uint8_t* base, uint32_t list) {
+  const uint32_t s = Slot(base, list);
+  guest::StoreU16(base, s + 2, 5);
+  guest::StoreU32(base, s + 4, 0);
+  return s;
+}
+// A command slot: [id, arg1, arg2].
+void Command(uint8_t* base, uint32_t list, uint32_t id, uint32_t arg1, uint32_t arg2) {
+  const uint32_t s = Slot(base, list);
+  guest::StoreU32(base, s + 8, arg2);
+  guest::StoreU32(base, s + 0, id);
+  guest::StoreU32(base, s + 4, arg1);
+}
+// Command 23 with the four render targets (`surface` each) and command 24
+// with the depth surface (+580).
+void Targets(uint8_t* base, uint32_t list, uint32_t pass, bool surfaces) {
+  Command(base, list, 23, 4, 0);
+  for (uint32_t i = 0; i < 4; i++) {
+    const uint32_t s = Slot(base, list);
+    guest::StoreU32(base, s + 0, i);
+    guest::StoreU32(base, s + 4, surfaces ? guest::LoadU32(base, pass + 576) : 0);
+  }
+  Command(base, list, 24, 1, 0);
+  const uint32_t s = Slot(base, list);
+  guest::StoreU32(base, s + 0, guest::LoadU32(base, pass + 580));
+}
+// Command 26 and its 280-byte item: the flags, the color, the depth.
+void Clear(uint8_t* base, uint32_t list, uint32_t flags, uint32_t color, double depth) {
+  Command(base, list, 26, 1, 0);
+  const uint32_t s = command_list::AllocateBytes(base, list, 280, false);
+  guest::StoreU32(base, s + 8, flags);
+  guest::StoreU32(base, s + 268, color);
+  guest::StoreU32(base, s + 276, 0);
+  guest::StoreU32(base, s + 4, 0);
+  guest::StoreU32(base, s + 0, 0);
+  Stfs(base, s + 272, depth);
+}
+// The second chunk: a header, command 7 (1, 0x01020001) with its 4-byte item
+// (`value`), command 36.
+uint32_t ConstantsChunk(uint8_t* base, uint32_t list, uint32_t value) {
+  const uint32_t header = Header(base, list);
+  Command(base, list, 7, 1, 0x01020001);
+  const uint32_t s = command_list::AllocateBytes(base, list, 4, false);
+  guest::StoreU32(base, s + 0, value);
+  Command(base, list, 36, 0, 0);
+  return header;
+}
+
+}  // namespace
+
+std::optional<Submissions> RecordBegin(uint8_t* base, uint32_t list, uint32_t pass) {
+  ITC_NATIVE_RUNNING("sub_820A0CC0 CameraPass::RecordBegin");
+  const uint32_t type = guest::LoadU32(base, pass + 584);
+  Submissions out;
+  const double zero = Lfs(base, 0x82000A34);
+  if (type == 3 || type == 4 || type == 19) {
+    if (!Room(base, list, 28)) {
+      return std::nullopt;
+    }
+    command_list::OpenChunk(base, list);
+    const uint32_t header = Header(base, list);
+    Targets(base, list, pass, true);
+    const uint32_t depth = guest::LoadU32(base, pass + 572);
+    Clear(base, list, 49, guest::LoadU32(base, pass + 564),
+          double(float(double(int64_t(uint64_t(depth))))));
+    Command(base, list, 36, 0, 0);
+    command_list::CloseChunk(base, list);
+    out.count = 1;
+    out.chunk[0] = header;
+    out.key[0] = type == 3 ? 49 : type == 4 ? 55 : 103;
+    return out;
+  }
+  if (type < 10 || type > 20 || type == 19) {
+    return out;
+  }
+  // Types 10 to 18 and 20: their render targets, a clear and the constants'
+  // chunk. In threes: 10, 13, 16 (no surfaces, flags 48); 11, 14, 17 and 12,
+  // 15, 18 (the surface, flags 49).
+  const bool clears = type != 20 || guest::LoadU32(base, Pass(10) + 588) == 0;
+  if (!Room(base, list, clears ? 32 : 13)) {
+    return std::nullopt;
+  }
+  const uint32_t set = type == 20 ? 0 : (type - 10) % 3;
+  command_list::OpenChunk(base, list);
+  const uint32_t header = Header(base, list);
+  Targets(base, list, pass, set != 0);
+  if (clears) {
+    Clear(base, list, set == 0 ? 48 : 49, 0, zero);
+  }
+  Command(base, list, 36, 0, 0);
+  const uint32_t second = ConstantsChunk(base, list, 1);
+  command_list::CloseChunk(base, list);
+  out.count = 2;
+  out.chunk[0] = header;
+  out.chunk[1] = second;
+  static constexpr uint32_t kFirst[3] = {16, 4, 13}, kLast[3] = {41, 29, 38};
+  if (type == 20) {
+    out.key[0] = 22;
+    out.key[1] = 161;
+  } else if (type >= 16) {
+    out.key[0] = kLast[set];
+    out.key[1] = 382;
+  } else {
+    out.key[0] = kFirst[set];
+    out.key[1] = 161;
+  }
+  return out;
+}
+
+std::optional<Submissions> RecordEnd(uint8_t* base, uint32_t list, uint32_t pass,
+                                     const std::function<uint32_t(uint32_t id)>& render_target) {
+  ITC_NATIVE_RUNNING("sub_820A1C30 CameraPass::RecordEnd");
+  const uint32_t type = guest::LoadU32(base, pass + 584);
+  if (type < 3 || type > 20) {
+    return Submissions{};
+  }
+  // The render target's id, the resolve's mode (+4) and face (+40), whether
+  // the constants' chunk follows, and the keys.
+  uint32_t id, mode, face = 0;
+  bool constants = false;
+  Submissions out;
+  if (type <= 9) {
+    id = type == 3 ? 0 : 1;
+    mode = 768;
+    face = type <= 4 ? 0 : type - 4;
+    static constexpr uint32_t kKeys[] = {54, 60, 66, 72, 78, 84, 90};
+    out.key[0] = kKeys[type - 3];
+  } else if (type <= 18) {
+    const uint32_t set = (type - 10) % 3;
+    id = type - 8;
+    mode = set == 0 ? 516 : 0;
+    constants = true;
+    static constexpr uint32_t kFirst[3] = {20, 12, 15}, kLast[3] = {45, 37, 40};
+    out.key[0] = type >= 16 ? kLast[set] : kFirst[set];
+    out.key[1] = 603;
+  } else if (type == 19) {
+    id = 11;
+    mode = 768;
+    out.key[0] = 105;
+  } else {
+    id = 12;
+    mode = 4;
+    constants = true;
+    out.key[0] = 24;
+    out.key[1] = 603;
+  }
+  if (!Room(base, list, constants ? 12 : 8)) {
+    return std::nullopt;
+  }
+  command_list::OpenChunk(base, list);
+  const uint32_t header = Header(base, list);
+  Command(base, list, 25, 1, 0);
+  const uint32_t r = command_list::AllocateResolve(base, list, false);
+  guest::StoreU32(base, r + 0, 2);
+  guest::StoreU32(base, r + 4, mode);
+  const uint32_t texture = render_target(id);
+  guest::StoreU32(base, r + 24, texture);
+  guest::StoreU32(base, r + 36, 0);
+  guest::StoreU32(base, r + 40, face);
+  guest::StoreU32(base, r + 52, 0);
+  Stfs(base, r + 48, Lfs(base, 0x82000A34));
+  guest::StoreU8(base, r + 44, 0);
+  guest::StoreU8(base, r + 45, 0);
+  guest::StoreU8(base, r + 46, 0);
+  guest::StoreU8(base, r + 47, 255);
+  guest::StoreU32(base, r + 56, 0x18280186);
+  guest::StoreU32(base, r + 60, 0);
+  guest::StoreU32(base, r + 64, 0x1A220197);
+  Command(base, list, 36, 0, 0);
+  out.count = 1;
+  out.chunk[0] = header;
+  if (constants) {
+    out.count = 2;
+    out.chunk[1] = ConstantsChunk(base, list, 0);
+  }
+  command_list::CloseChunk(base, list);
+  return out;
+}
+
+void RecordBegins(uint8_t* base, const std::function<void(uint32_t pass)>& record) {
+  ITC_NATIVE_RUNNING("sub_8209F8A0 CameraPasses::RecordBegins");
+  for (uint32_t i = 0; i < kPassCount; i++) {
+    if (guest::LoadU32(base, Pass(i) + 588) != 0) {
+      record(Pass(i));
+    }
+  }
+}
+
+void RecordEnds(uint8_t* base, const std::function<void(uint32_t pass)>& record) {
+  ITC_NATIVE_RUNNING("sub_8209F900 CameraPasses::RecordEnds");
+  for (uint32_t i = 0; i < kPassCount; i++) {
+    if (guest::LoadU32(base, Pass(i) + 588) != 0) {
+      record(Pass(i));
+    }
+  }
+}
+
 bool PassUpdate(uint8_t* base, uint32_t pass, uint32_t frame,
                 const std::function<void(uint32_t key)>& record_viewport) {
   ITC_NATIVE_RUNNING("sub_820A3978 CameraPass::Update");

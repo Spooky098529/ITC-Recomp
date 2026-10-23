@@ -152,6 +152,54 @@ std::optional<uint32_t> RecordViewport(uint8_t* base, uint32_t list, uint32_t pa
 std::optional<uint32_t> RecordClear(uint8_t* base, uint32_t list, uint32_t flags, uint32_t color,
                                     uint32_t depth);
 
+// What a pass's recording hands to the render queue: up to two chunks (their
+// first slots) with their sort keys, in order.
+struct Submissions {
+  uint32_t count = 0;
+  uint32_t chunk[2] = {};
+  uint32_t key[2] = {};
+};
+
+// CameraPass::RecordBegin (sub_820A0CC0, with its type 3 part sub_820A0D38
+// merged)'s chunks on the command list `list` (the scene's: the adapter's
+// guest calls), by the pass's type (+584): types 3, 4 and 19 one chunk: a
+// header, command 23 (four slots: the render targets 0-3, each the surface
+// +576), command 24 (the depth surface +580), a clear (command 26, a 280-byte
+// item: flags 49, the clear color +564, the depth +572 as a float) and
+// command 36, keys 49, 55 and 103. Types 10 to 18 and 20 two chunks in one
+// open chunk: the first as that but its render targets 0 (types 10, 13, 16
+// and 20) or the surface, its clear flags 48 (10, 13, 16, 20) or 49 with
+// color 0 and depth 0.0 (type 20 only clears when pass 10 is disabled); the
+// second a header, command 7 (arg2 0x01020001) with a 4-byte item (1) and
+// command 36; keys 16, 4 and 13 (then 161) by the pass's place in its set,
+// 41, 29 and 38 (then 382) for types 16 to 18, 22 (then 161) for type 20.
+// Other types: nothing. Nullopt, with nothing done, where the original's
+// command list calls would print a message (another chunk open, the list
+// full): the original then runs.
+std::optional<Submissions> RecordBegin(uint8_t* base, uint32_t list, uint32_t pass);
+
+// CameraPass::RecordEnd (sub_820A1C30, with its type 3 part sub_820A1CA8
+// merged)'s chunks: a header, command 25 (1) and a resolve
+// (CommandList::AllocateResolve without its header: +0 2, +4 a mode (768,
+// 516 for types 10, 13, 16, 0 for 11 to 18's others, 4 for type 20), +24
+// the render target's texture (`render_target(id)`: CameraPasses::RenderTarget,
+// called by the adapter through its wrapper, after +0 and +4 are stored),
+// +36 0, +40 a face (0, and 1 to 5 for types 5 to 9: the cube map's), +44
+// to +46 0 and +47 255, +48 0.0, +52 0, +56 0x18280186, +60 0, +64
+// 0x1A220197), command 36; types 10 to 18 and 20 then a second chunk as
+// RecordBegin's with the 4-byte item 0. The ids: type 3 0, 4 to 9 1, 10 to
+// 18 2 to 10, 19 11, 20 12. Keys: 54, 60, 66, 72, 78, 84, 90 for types 3 to
+// 9, 105 for 19; 20, 12, 15 (then 603) for types 10 to 15, 45, 37, 40 (then
+// 603) for 16 to 18, 24 (then 603) for 20. Nullopt as RecordBegin's.
+std::optional<Submissions> RecordEnd(uint8_t* base, uint32_t list, uint32_t pass,
+                                     const std::function<uint32_t(uint32_t id)>& render_target);
+
+// CameraPasses::RecordBegins (sub_8209F8A0) and RecordEnds (sub_8209F900):
+// `record(pass)` (RecordBegin or RecordEnd, the adapter's) for each enabled
+// pass (+588 not 0) of the 21, in order.
+void RecordBegins(uint8_t* base, const std::function<void(uint32_t pass)>& record);
+void RecordEnds(uint8_t* base, const std::function<void(uint32_t pass)>& record);
+
 // CameraPass::Update (sub_820A3978): types 0 to 2 (+584, unsigned) first
 // have their viewport recorded (`record_viewport(key)`: RecordViewport with
 // the adapter's guest calls; key 150 for types 0 and 1, 371 for 2); then the
