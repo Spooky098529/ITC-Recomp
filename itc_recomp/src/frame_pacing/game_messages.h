@@ -51,4 +51,11 @@ bool GameMessages_InRace();
 bool GameMessages_Paused();
 uint32_t GameMessages_InputListener0();
 
+// Diagnostics (--log_input_reads): whether the input processors' button
+// tests are logged, and a test to count (`function` called from `caller` on
+// `object` with `mask`, returning `result`).
+bool GameMessages_LogInputReads();
+void GameMessages_NoteInputRead(uint32_t function, uint32_t caller, uint32_t object,
+                                uint32_t mask, uint32_t result);
+
 }  // namespace frame_pacing
