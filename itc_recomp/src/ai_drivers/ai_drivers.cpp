@@ -4468,4 +4468,76 @@ uint32_t FollowLeaderBranch(uint8_t* base, uint32_t path) {
   return r3;
 }
 
+// --- The drivers' updates and the pairs ---
+
+uint64_t CompareWith(uint8_t* base, uint64_t a, uint32_t other, uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_82145B08 AiDriver::CompareWith");
+  const uint32_t driver = uint32_t(a);
+  guest::StoreU32(base, frame + 84, Load(base, other));
+  const uint64_t b64 = Of(base, frame + 84);
+  const uint32_t b = uint32_t(b64);
+  const uint32_t record = uint32_t(uint64_t(Load(base, other)) * 40 + a + 172);
+  if (Load(base, b + 160) == 0) {
+    ResetOtherRecord(base, record, Lfs(base, kOtherGap), Lfs(base, kZero), Lfs(base, kOne),
+                     Lfs(base, kMinusOne));
+    return b64;
+  }
+  const uint32_t mine = vehicle_accessors::VehicleIdentity(Load(base, driver + 160));
+  const uint32_t theirs = vehicle_accessors::VehicleIdentity(Load(base, b + 160));
+  const double distance =
+      track_route::Distance(base, track_route::kRoute, theirs + 4, mine + 4);
+  const double length = Fadds(Lfs(base, b + 124), Lfs(base, driver + 124));
+  const double ahead = Fadds(Lfs(base, driver + 156), distance);
+  Stfs(base, record + 16, Lfs(base, b + 100));
+  Stfs(base, frame + 88, Fsubs(ahead, Lfs(base, b + 156)));
+  Stfs(base, frame + 80, Fmuls(length, Lfs(base, kFourFifths)));
+  const bool both = (Load(base, driver + 16) & 0x4) != 0 && (Load(base, b + 16) & 0x4) != 0;
+  guest::StoreU8(base, record + 32, both ? 1 : 0);
+  guest::StoreU8(base, record + 33, 0);
+  UpdateOther(base, record, frame + 88, frame + 80);
+  const uint64_t back64 = uint64_t(Load(base, driver + 0)) * 40 + b64 + 172;
+  const uint32_t back = uint32_t(back64);
+  MirrorOther(base, back, record, driver + 100);
+  if (guest::LoadU16(base, driver + 8) == guest::LoadU16(base, b + 8)) {
+    UpdateOtherTimer(base, record, other, frame + 80);
+    UpdateOtherTimer(base, back, driver, frame + 80);
+  }
+  return back64;
+}
+
+uint64_t UpdateAll(uint8_t* base, uint32_t frame, DriverUpdate update, void* user) {
+  ITC_NATIVE_RUNNING("sub_82139628 AiDrivers::UpdateAll");
+  const uint32_t count = track_collision::RaceRacerCount(base);
+  uint64_t r3 = count;
+  if (Load(base, kDrivers) == 0 || !(int32_t(count) > 0)) {
+    return r3;
+  }
+  const auto index_of = [&](uint32_t i) {
+    return Load(base, Load(base, Load(base, kRace) + 2308 + 4 * i) + 20);
+  };
+  const auto driver_of = [&](uint32_t index) {
+    return uint64_t(index) * kDriverBytes + Load(base, kDrivers);
+  };
+  for (uint32_t i = 0; i < count; i++) {
+    const uint64_t driver = driver_of(index_of(i));
+    r3 = update(user, driver, Load(base, uint32_t(driver) + 6148));
+  }
+  for (uint32_t i = 0; i < count; i++) {
+    const uint32_t mine = index_of(i);
+    for (uint32_t j = i + 1; int32_t(j) < int32_t(count); j++) {
+      const uint32_t theirs = index_of(j);
+      uint64_t driver;
+      if (int32_t(mine) < int32_t(theirs)) {
+        guest::StoreU32(base, frame + 80, theirs);
+        driver = driver_of(mine);
+      } else {
+        guest::StoreU32(base, frame + 80, mine);
+        driver = driver_of(theirs);
+      }
+      r3 = CompareWith(base, driver, frame + 80, frame - 144);
+    }
+  }
+  return r3;
+}
+
 }  // namespace ai_drivers

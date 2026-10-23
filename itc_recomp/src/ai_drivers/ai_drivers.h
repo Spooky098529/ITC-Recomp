@@ -755,4 +755,26 @@ void FollowTargets(uint8_t* base, uint32_t path, uint32_t frame);
 // Returns the r3 the original leaves.
 uint32_t FollowLeaderBranch(uint8_t* base, uint32_t path);
 
+// --- The drivers' updates and the pairs ---
+
+// AiDriver::CompareWith (sub_82145B08): driver a's record of the racer at
+// `other` (an index word) and that driver's record of a: the gap (the route
+// distance between their vehicles plus a's +156 less the other's) and the
+// cars' length ((+124 + +124) x 0.8) at frame + 88 and + 80 (`frame` 144
+// bytes below the caller's stack pointer), the other's speed into +16, the
+// flags +32 and +33, AiOther::Update, the other's record = the mirror
+// (MirrorOther with a's speed) and, in the same lane, UpdateOtherTimer on
+// both; without the other's vehicle, a's record reset. Returns the r3 the
+// original leaves (the other's record of a, or AiDriver::Of's).
+uint64_t CompareWith(uint8_t* base, uint64_t a, uint32_t other, uint32_t frame);
+// A driver's update (the function at its +6148, called with r3 = the
+// driver), made by the caller; returns the r3 it leaves.
+using DriverUpdate = uint64_t (*)(void* user, uint64_t driver, uint32_t function);
+// AiDrivers::UpdateAll (sub_82139628): with the drivers' table and racers
+// (Race::RacerCount), each racer's driver's update (`update`), then
+// CompareWith for each pair of racers (the lower index's driver, the other's
+// index at frame + 80: `frame` 176 bytes below the caller's stack pointer).
+// Returns the r3 the original leaves.
+uint64_t UpdateAll(uint8_t* base, uint32_t frame, DriverUpdate update, void* user);
+
 }  // namespace ai_drivers

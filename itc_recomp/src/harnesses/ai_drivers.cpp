@@ -15,6 +15,7 @@
 #include "test_route.h"
 
 #include "ai_drivers/ai_drivers.h"
+#include "hooks/guest_call.h"
 #include "base/flags.h"
 #include "base/hash.h"
 #include "base/log.h"
@@ -384,6 +385,32 @@ ITC_NATIVE_STEP(NativeFindSideSection,
 ITC_NATIVE_STEP(NativeFollowTargets, ai::FollowTargets(base, ctx.r3.u32, ctx.r1.u32 - 128))
 ITC_NATIVE_STEP(NativeFollowLeaderBranch, ctx.r3.u64 = ai::FollowLeaderBranch(base, ctx.r3.u32))
 
+ITC_NATIVE_STEP(NativeCompareWith,
+                ctx.r3.u64 = ai::CompareWith(base, ctx.r3.u64, ctx.r4.u32, ctx.r1.u32 - 144))
+// UpdateAll's drivers' updates as the adapter makes them (recompiled code
+// through +6148, from a frame like the original's).
+struct UpdateCall {
+  PPCContext* ctx;
+  uint8_t* base;
+};
+uint64_t CallDriverUpdate(void* user, uint64_t driver, uint32_t function) {
+  auto& call = *static_cast<UpdateCall*>(user);
+  PPCContext& ctx = *call.ctx;
+  uint8_t* base = call.base;
+  guest_call::InFrame(ctx, base, 176, 0x82139684, [&](uint32_t) {
+    ctx.r3.u64 = driver;
+    ctx.ctr.u64 = function;
+    REX_CALL_INDIRECT_FUNC(function);
+  });
+  ctx.fpscr.disableFlushMode();
+  return ctx.r3.u64;
+}
+void NativeUpdateAll(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  UpdateCall call{&ctx, base};
+  ctx.r3.u64 = ai::UpdateAll(base, ctx.r1.u32 - 176, CallDriverUpdate, &call);
+}
+
 // Runs the recompiled version with the native flag off.
 template <GuestFunction recompiled>
 void Original(PPCContext& ctx, uint8_t* base) {
@@ -585,6 +612,8 @@ enum Kind {
   kFindSideSection,
   kFollowTargets,
   kFollowLeaderBranch,
+  kCompareWith,
+  kUpdateAll,
 };
 
 }  // namespace
@@ -863,6 +892,10 @@ void AiDrivers(Context& h) {
        NativeFollowTargets, kFollowTargets, 2000},
       {"AiPath::FollowLeaderBranch (sub_8213EB48)", Original<__imp__sub_8213EB48>,
        NativeFollowLeaderBranch, kFollowLeaderBranch, 1000},
+      {"AiDriver::CompareWith (sub_82145B08)", Original<__imp__sub_82145B08>, NativeCompareWith,
+       kCompareWith, 2000},
+      {"AiDrivers::UpdateAll (sub_82139628)", Original<__imp__sub_82139628>, NativeUpdateAll,
+       kUpdateAll, 500},
   };
   const uint32_t area = memory::Alloc(kAreaBytes, 0);
   const uint32_t driver = area + kDriver, vehicle = area + kVehicle, io = area + kIo;
@@ -2208,6 +2241,82 @@ void AiDrivers(Context& h) {
                                          r);
             }
             guest::StoreU32(h.base, path + 5528, uint32_t(int32_t(r.Below(9)) - 1));
+          }
+          break;
+        }
+        case kCompareWith:
+        case kUpdateAll: {
+          // The table's first seven drivers (written: their bytes compared by
+          // hash): +0 their index, +8 the lane, +16, +100 the speed, +124,
+          // +156, +160 a vehicle (one of eight, their identities' positions
+          // on a route, test_route.h) or none, +6148 the update (UpdateAll:
+          // one of three recompiled leaves), their seven other-racer records
+          // (six floats, then the halfwords and bytes); finite floats, so
+          // the hash compares them exactly. The racers (up to 8, indexes 0
+          // to 6, now and then repeated) and their inputs.
+          drivers = table;
+          table_written = true;
+          const test_route::Route route =
+              test_route::BuildRoute(h.base, route_area, route_table, r);
+          route_file = route_area + test_route::kFile;
+          for (uint32_t v = 0; v < 8; v++) {
+            test_route::RandomPosition(h.base, vehicles + kVehicleBytes * v + 5232 + 4, route, r);
+          }
+          const auto finite = [&](float range) {
+            return FloatBits((float(r.Below(1u << 20)) / float(1u << 19) - 1.0f) * range);
+          };
+          const uint32_t updates[] = {0x82144ED8, 0x82145230, 0x820C96E8};
+          for (uint32_t d = 0; d < 7; d++) {
+            const uint32_t at = table + ai::kDriverBytes * d;
+            guest::StoreU32(h.base, at + 0, r.Below(16) == 0 ? r.Below(7) : d);
+            guest::StoreU16(h.base, at + 8, uint16_t(r.Below(3)));
+            guest::StoreU32(h.base, at + 16, r.Below(4) | (r.Below(2) ? 4u : 0u));
+            guest::StoreU32(h.base, at + 100, finite(150.0f));
+            guest::StoreU32(h.base, at + 124, finite(3.0f));
+            guest::StoreU32(h.base, at + 148, finite(3.0f));
+            guest::StoreU32(h.base, at + 156, finite(5.0f));
+            // Without a vehicle only as the other racer (the original reads
+            // the driver's own vehicle without a check): driver 6, the
+            // highest index.
+            guest::StoreU32(h.base, at + 160, d == 6 && r.Below(3) == 0
+                                                  ? 0
+                                                  : vehicles + kVehicleBytes * r.Below(8));
+            guest::StoreU32(h.base, at + 6148, updates[r.Below(3)]);
+            for (uint32_t k = 0; k < 7; k++) {
+              const uint32_t record = at + 172 + 40 * k;
+              for (uint32_t w = 0; w < 6; w++) {
+                guest::StoreU32(h.base, record + 4 * w, finite(w == 0 ? 100.0f : 20.0f));
+              }
+              guest::StoreU16(h.base, record + 24, uint16_t(r.Below(5)));
+              guest::StoreU16(h.base, record + 26, uint16_t(int32_t(r.Below(80)) - 1));
+              guest::StoreU16(h.base, record + 28, uint16_t(r.Below(64)));
+              guest::StoreU16(h.base, record + 30, uint16_t(r.Below(130)));
+              guest::StoreU8(h.base, record + 32, uint8_t(r.Below(2)));
+              guest::StoreU8(h.base, record + 33, uint8_t(r.Below(2)));
+              guest::StoreU16(h.base, record + 34, uint16_t(r.Below(64)));
+              guest::StoreU16(h.base, record + 36, uint16_t(r.Below(4)));
+            }
+          }
+          for (uint32_t i = 0; i < 8; i++) {
+            guest::StoreU32(h.base, area + kInputWords + 4 * i,
+                            r.Below(2) ? 0x20000u : uint32_t(r.Next()));
+          }
+          if (f.kind == kCompareWith) {
+            const uint32_t a = r.Below(6);
+            guest::StoreU32(h.base, io, r.Below(16) == 0 ? a : r.Below(7));
+            r3 = table + ai::kDriverBytes * a;
+            r4 = io;
+          } else {
+            const uint32_t count = r.Below(16) == 0 ? 0 : 1 + r.Below(7);
+            guest::StoreU32(h.base, area + kRacers + 56, count);
+            for (uint32_t i = 0; i < 8; i++) {
+              const uint32_t racer = area + kRacerRecords + 24 * i;
+              guest::StoreU32(h.base, area + kRacers + 4 * i, racer);
+              guest::StoreU32(h.base, racer + 20, r.Below(8) == 0 ? r.Below(7) : i % 7);
+            }
+            if (r.Below(16) == 0) {
+              drivers = 0;
+            }
           }
           break;
         }

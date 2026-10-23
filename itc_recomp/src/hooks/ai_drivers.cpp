@@ -64,6 +64,7 @@
 #include "guest.h"
 
 #include "ai_drivers/ai_drivers.h"
+#include "hooks/guest_call.h"
 #include "base/flags.h"
 
 ITC_FLAG_BOOL(native_ai_drivers, true, "ITC",
@@ -138,7 +139,9 @@ ITC_FLAG_BOOL(native_ai_drivers, true, "ITC",
               "and 7's step, sub_8213D3D8, never seen in play), AiPath::LeaderBranchKind "
               "sub_8213D1F0 (its kind 5's step sub_8213D2B8 with it), AiPath::FindSideSection "
               "sub_8213D550, AiPath::FollowTargets sub_8213D9D8, AiPath::FollowLeaderBranch "
-              "sub_8213EB48 (its kind 5's step sub_8213EC8C with it)) "
+              "sub_8213EB48 (its kind 5's step sub_8213EC8C with it), AiDriver::CompareWith "
+              "sub_82145B08, AiDrivers::UpdateAll sub_82139628 (the drivers' updates, through "
+              "their +6148, on the translated code)) "
               "natively instead of "
               "through the translated code (the same words, bit for bit; checked by "
               "--run_harnesses=ai_drivers). Those "
@@ -415,3 +418,38 @@ ITC_AI_DRIVERS(8213D550, ctx.r3.u64 = FindSideSection(base, ctx.r3.u32, ctx.r4.u
 // The original's frame 128 bytes down (r3 kept).
 ITC_AI_DRIVERS(8213D9D8, FollowTargets(base, ctx.r3.u32, ctx.r1.u32 - 128))
 ITC_AI_DRIVERS(8213EB48, ctx.r3.u64 = FollowLeaderBranch(base, ctx.r3.u32))
+
+// --- The drivers' updates and the pairs ---
+
+// r4 = &the other's index; the original's frame 144 bytes down.
+ITC_AI_DRIVERS(82145B08, ctx.r3.u64 = CompareWith(base, ctx.r3.u64, ctx.r4.u32, ctx.r1.u32 - 144))
+
+namespace {
+struct UpdateCall {
+  PPCContext* ctx;
+  uint8_t* base;
+};
+// A driver's update (its +6148), called from a frame like UpdateAll's (176
+// bytes, returning to 0x82139684) with r3 = the driver, as the original.
+uint64_t CallDriverUpdate(void* user, uint64_t driver, uint32_t function) {
+  auto& call = *static_cast<UpdateCall*>(user);
+  PPCContext& ctx = *call.ctx;
+  uint8_t* base = call.base;
+  guest_call::InFrame(ctx, base, 176, 0x82139684, [&](uint32_t) {
+    ctx.r3.u64 = driver;
+    ctx.ctr.u64 = function;
+    REX_CALL_INDIRECT_FUNC(function);
+  });
+  ctx.fpscr.disableFlushMode();
+  return ctx.r3.u64;
+}
+}  // namespace
+
+// The updates are recompiled code (through the driver's +6148); the
+// original's frame 176 bytes down.
+ITC_AI_DRIVERS(82139628, {
+  UpdateCall call;
+  call.ctx = &ctx;
+  call.base = base;
+  ctx.r3.u64 = UpdateAll(base, ctx.r1.u32 - 176, CallDriverUpdate, &call);
+})
