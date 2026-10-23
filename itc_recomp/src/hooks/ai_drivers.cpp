@@ -69,7 +69,10 @@ ITC_FLAG_BOOL(native_ai_drivers, true, "ITC",
               "sub_82139A08, never seen in play, on the translated code), "
               "AiPath::DropPassedSections sub_8213BA48, AiPath::SharesSections sub_8213C010, "
               "AiPathEntry::Widen sub_8213C3A8, AiPathEntry::NarrowToOther sub_8213C420, "
-              "AiPath::AdvanceCorners sub_8213D020) natively instead of through the translated "
+              "AiPath::AdvanceCorners sub_8213D020, AiDriver::Restart sub_821395D0, "
+              "AiDrivers::ResetAll sub_82139750, AiDriver::SetState2or3 sub_82139E40, "
+              "AiDriver::SetStateFromList sub_82139EA8, AiDriver::SetState4 sub_82139FA0, "
+              "AiDrivers::ClearAll sub_8213A140) natively instead of through the translated "
               "code (the same words, bit for bit; checked by --run_harnesses=ai_drivers). Those "
               "reached only from native callers have no adapters, and the flag switches their "
               "callers: sub_82144ED8, sub_8213C720, sub_821450E0, sub_821453A0, sub_82139248, "
@@ -255,3 +258,19 @@ extern "C" REX_FUNC(sub_8213D020) {
   }
   __imp__sub_8213D020(ctx, base);
 }
+
+// --- The states and the drivers' resets (the originals' frames: 112 or 128
+// bytes down) ---
+
+// r4 = &the mask.
+ITC_AI_DRIVERS(821395D0, ctx.r3.u64 = Restart(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 112))
+ITC_AI_DRIVERS(82139750, ctx.r3.u64 = ResetAll(base, ctx.r1.u32 - 128))
+// r4 = &the word, r5 = &the flag.
+ITC_AI_DRIVERS(82139E40, ctx.r3.u64 = SetState2or3(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                                   ctx.r1.u32 - 112))
+// r4 = &the word, r5 = &the count, r6 = the list.
+ITC_AI_DRIVERS(82139EA8, ctx.r3.u64 = SetStateFromList(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                                       ctx.r6.u32, ctx.r1.u32 - 128))
+// r4 = &the word.
+ITC_AI_DRIVERS(82139FA0, ctx.r3.u64 = SetState4(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 112))
+ITC_AI_DRIVERS(8213A140, ctx.r3.u64 = ClearAll(base, ctx.r1.u32 - 128))

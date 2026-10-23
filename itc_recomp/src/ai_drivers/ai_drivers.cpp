@@ -1800,4 +1800,159 @@ bool AdvanceCorners(uint8_t* base, uint32_t path, uint32_t slices, uint32_t* r3)
   return true;
 }
 
+// --- The states and the drivers' resets ---
+
+namespace {
+// slw: 0 for shifts of 32 to 63 (the amount's low six bits).
+uint32_t Slw(uint32_t value, uint32_t shift) {
+  return (shift & 0x20) != 0 ? 0 : value << (shift & 0x1F);
+}
+// The driver's state set to `state`, the old one kept in +36.
+void SetStateWord(uint8_t* base, uint32_t driver, uint32_t state) {
+  const uint32_t old = Load(base, driver + 32);
+  guest::StoreU32(base, driver + 32, state);
+  guest::StoreU32(base, driver + 36, old);
+}
+}  // namespace
+
+uint32_t Restart(uint8_t* base, uint32_t driver, uint32_t mask, uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_821395D0 AiDriver::Restart");
+  ResetControl(base, driver, frame - 112);
+  const uint32_t r3 = ResetPath(base, driver + 512);
+  const uint32_t old = Load(base, driver + 32);
+  guest::StoreU32(base, driver + 36, old);
+  guest::StoreU32(base, driver + 32, 5);
+  guest::StoreU16(base, driver + 40, uint16_t(Load(base, mask)));
+  return r3;
+}
+
+uint32_t ResetAll(uint8_t* base, uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_82139750 AiDrivers::ResetAll");
+  const int32_t count = int32_t(track_collision::RaceRacerCount(base));
+  uint32_t r3 = uint32_t(count);
+  uint32_t mask = 0;
+  guest::StoreU32(base, frame + 80, mask);
+  uint32_t table = Load(base, kDrivers);
+  if (table == 0) {
+    return r3;
+  }
+  uint32_t race = Load(base, kRace);
+  if (count <= 0) {
+    return r3;
+  }
+  for (int32_t i = 0; i < count; i++) {
+    const uint32_t racer = Load(base, race + 2308 + 4 * uint32_t(i));
+    if ((Load(base, racer + 0) & 0x10) != 0) {
+      continue;
+    }
+    const uint32_t index = Load(base, racer + 20);
+    if (int32_t(index) < 0) {
+      continue;
+    }
+    mask |= Slw(1, index);
+  }
+  guest::StoreU32(base, frame + 80, mask);
+  for (int32_t i = 0; i < count; i++) {
+    const uint32_t racer = Load(base, race + 2308 + 4 * uint32_t(i));
+    if ((Load(base, racer + 0) & 0x10) != 0) {
+      continue;
+    }
+    const uint32_t index = Load(base, racer + 20);
+    if (int32_t(index) < 0) {
+      continue;
+    }
+    r3 = Restart(base, index * kDriverBytes + table, frame + 80, frame - 112);
+    table = Load(base, kDrivers);
+    race = Load(base, kRace);
+  }
+  return r3;
+}
+
+uint32_t SetState2or3(uint8_t* base, uint32_t driver, uint32_t word, uint32_t flag,
+                      uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_82139E40 AiDriver::SetState2or3");
+  ResetControl(base, driver, frame - 112);
+  ClearPlan(base, driver);
+  const bool set = Load(base, flag) != 0;
+  const uint32_t r3 = ResetPath(base, driver + 512);
+  SetStateWord(base, driver, set ? 3 : 2);
+  guest::StoreU16(base, driver + 40, uint16_t(Load(base, word)));
+  return r3;
+}
+
+uint32_t SetStateFromList(uint8_t* base, uint32_t driver, uint32_t word, uint32_t count,
+                          uint32_t list, uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_82139EA8 AiDriver::SetStateFromList");
+  ResetControl(base, driver, frame - 112);
+  const uint32_t r3 = ClearPlan(base, driver);
+  const int32_t n = int32_t(Load(base, count));
+  if (n <= 1) {
+    return r3;
+  }
+  if (n <= 2) {
+    const uint32_t reset = ResetPath(base, driver + 512);
+    const uint32_t old = Load(base, driver + 32);
+    guest::StoreU32(base, driver + 36, old);
+    guest::StoreU32(base, driver + 32, 3);
+    guest::StoreU16(base, driver + 40, uint16_t(Load(base, word)));
+    return reset;
+  }
+  int32_t k = 0;
+  const int32_t me = int32_t(Load(base, driver + 0));
+  for (; k < n; k++) {
+    if (me == int32_t(Load(base, list + 4 * uint32_t(k)))) {
+      break;
+    }
+  }
+  if (!(k < n)) {
+    return r3;
+  }
+  uint32_t state = 3;
+  uint32_t other;
+  if (k == 0) {
+    other = Load(base, list + 4);
+  } else if (k == 1) {
+    other = Load(base, list + 0);
+  } else {
+    other = Load(base, list + 4 * uint32_t(k - 2));
+    state = 2;
+  }
+  const uint32_t mask = Slw(1, other);
+  const uint32_t reset = ResetPath(base, driver + 512);
+  const uint32_t old = Load(base, driver + 32);
+  guest::StoreU16(base, driver + 40, uint16_t(mask));
+  guest::StoreU32(base, driver + 32, state);
+  guest::StoreU32(base, driver + 36, old);
+  return reset;
+}
+
+uint32_t SetState4(uint8_t* base, uint32_t driver, uint32_t word, uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_82139FA0 AiDriver::SetState4");
+  ResetControl(base, driver, frame - 112);
+  ClearPlan(base, driver);
+  const uint32_t r3 = ResetPath(base, driver + 512);
+  const uint32_t old = Load(base, driver + 32);
+  guest::StoreU32(base, driver + 36, old);
+  guest::StoreU32(base, driver + 32, 4);
+  guest::StoreU16(base, driver + 40, uint16_t(Load(base, word)));
+  return r3;
+}
+
+uint32_t ClearAll(uint8_t* base, uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_8213A140 AiDrivers::ClearAll");
+  const int32_t count = int32_t(track_collision::RaceRacerCount(base));
+  uint32_t r3 = uint32_t(count);
+  if (Load(base, kDrivers) == 0 || count <= 0) {
+    return r3;
+  }
+  for (int32_t i = 0; i < count; i++) {
+    const uint32_t table = Load(base, kDrivers);
+    const uint32_t racer = Load(base, Load(base, kRace) + 2308 + 4 * uint32_t(i));
+    const uint32_t driver = Load(base, racer + 20) * kDriverBytes + table;
+    ResetControl(base, driver, frame - 112);
+    r3 = ClearPlan(base, driver);
+  }
+  return r3;
+}
+
 }  // namespace ai_drivers

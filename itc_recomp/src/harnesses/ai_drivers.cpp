@@ -175,6 +175,19 @@ void NativeAdvanceCorners(PPCContext& ctx, uint8_t* base) {
   __imp__sub_8213D020(ctx, base);
 }
 
+ITC_NATIVE_STEP(NativeRestart,
+                ctx.r3.u64 = ai::Restart(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 112))
+ITC_NATIVE_STEP(NativeResetAll, ctx.r3.u64 = ai::ResetAll(base, ctx.r1.u32 - 128))
+ITC_NATIVE_STEP(NativeSetState2or3,
+                ctx.r3.u64 = ai::SetState2or3(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                              ctx.r1.u32 - 112))
+ITC_NATIVE_STEP(NativeSetStateFromList,
+                ctx.r3.u64 = ai::SetStateFromList(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                                  ctx.r6.u32, ctx.r1.u32 - 128))
+ITC_NATIVE_STEP(NativeSetState4,
+                ctx.r3.u64 = ai::SetState4(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 112))
+ITC_NATIVE_STEP(NativeClearAll, ctx.r3.u64 = ai::ClearAll(base, ctx.r1.u32 - 128))
+
 // Runs the recompiled version with the native flag off.
 template <GuestFunction recompiled>
 void Original(PPCContext& ctx, uint8_t* base) {
@@ -316,6 +329,12 @@ enum Kind {
   kWiden,
   kNarrowToOther,
   kAdvanceCorners,
+  kRestart,
+  kResetAll,
+  kSetState2or3,
+  kSetStateFromList,
+  kSetState4,
+  kClearAll,
 };
 
 }  // namespace
@@ -474,6 +493,18 @@ void AiDrivers(Context& h) {
        NativeNarrowToOther, kNarrowToOther, 3000},
       {"AiPath::AdvanceCorners (sub_8213D020)", Original<__imp__sub_8213D020>,
        NativeAdvanceCorners, kAdvanceCorners, 3000},
+      {"AiDriver::Restart (sub_821395D0)", Original<__imp__sub_821395D0>, NativeRestart,
+       kRestart, 300},
+      {"AiDrivers::ResetAll (sub_82139750)", Original<__imp__sub_82139750>, NativeResetAll,
+       kResetAll, 300},
+      {"AiDriver::SetState2or3 (sub_82139E40)", Original<__imp__sub_82139E40>,
+       NativeSetState2or3, kSetState2or3, 300},
+      {"AiDriver::SetStateFromList (sub_82139EA8)", Original<__imp__sub_82139EA8>,
+       NativeSetStateFromList, kSetStateFromList, 1000},
+      {"AiDriver::SetState4 (sub_82139FA0)", Original<__imp__sub_82139FA0>, NativeSetState4,
+       kSetState4, 300},
+      {"AiDrivers::ClearAll (sub_8213A140)", Original<__imp__sub_8213A140>, NativeClearAll,
+       kClearAll, 300},
   };
   const uint32_t area = memory::Alloc(kAreaBytes, 0);
   const uint32_t driver = area + kDriver, vehicle = area + kVehicle, io = area + kIo;
@@ -1081,6 +1112,61 @@ void AiDrivers(Context& h) {
           r3 = driver + kPath;
           r4 = io;
           break;
+        case kRestart:
+        case kSetState2or3:
+        case kSetStateFromList:
+        case kSetState4: {
+          // The path's driver word (AiPath::Reset's) and what ClearPlan and
+          // ResetToMode1 read.
+          guest::StoreU32(h.base, driver + kPath, r.Below(4) == 0 ? 0 : driver);
+          guest::StoreU32(h.base, driver + kPath + 5520, r.Below(3));
+          guest::StoreU32(h.base, driver + kPath + 5524, r.Below(2) ? 0xFFFFFFFFu : r.Below(8));
+          guest::StoreU32(h.base, driver + kPath + 5528, r.Below(2) ? 0xFFFFFFFFu : r.Below(8));
+          guest::StoreU32(h.base, driver + 0, r.Below(8));
+          guest::StoreU32(h.base, io, uint32_t(r.Next()));
+          guest::StoreU32(h.base, io + 4, r.Below(2) ? 0 : uint32_t(r.Next()));
+          // The list's count (-1 to 9) and its words (racers 0 to 7, now and
+          // then a shift of 32 or more).
+          const int32_t n = int32_t(r.Below(11)) - 1;
+          guest::StoreU32(h.base, io + 8, r.Below(16) == 0 ? uint32_t(r.Next()) : uint32_t(n));
+          for (uint32_t i = 0; i < 12; i++) {
+            guest::StoreU32(h.base, io + 0x10 + 4 * i, r.Below(8) ? r.Below(8) : r.Below(70));
+          }
+          r4 = io;
+          r5 = f.kind == kSetState2or3 ? io + 4 : io + 8;
+          r6 = io + 0x10;
+          what += fmt::format(" n {}", n);
+          break;
+        }
+        case kResetAll:
+        case kClearAll: {
+          // The racers: up to 7, flag 0x10 half the time, an index 0 to 6
+          // (ResetAll: or -1, which it skips; ClearAll doesn't check).
+          const uint32_t count = r.Below(8) == 0 ? 0 : 1 + r.Below(7);
+          guest::StoreU32(h.base, area + kRacers + 56, r.Below(16) == 0 ? 0xFFFFFFFFu : count);
+          for (uint32_t i = 0; i < 7; i++) {
+            const uint32_t racer = area + kRacerRecords + 24 * i;
+            guest::StoreU32(h.base, area + kRacers + 4 * i, racer);
+            guest::StoreU32(h.base, racer + 0, uint32_t(r.Next()) & (r.Below(2) ? ~0x10u : ~0u));
+            guest::StoreU32(h.base, racer + 20,
+                            f.kind == kResetAll && r.Below(8) == 0 ? 0xFFFFFFFFu : r.Below(7));
+          }
+          // The drivers they reset: a vehicle or none, the path's driver word
+          // (itself or 0) and what ClearPlan and ResetToMode1 read.
+          for (uint32_t i = 0; i < 7; i++) {
+            const uint32_t other = table + i * ai::kDriverBytes;
+            guest::StoreU32(h.base, other + 160, r.Below(4) == 0 ? 0 : vehicle);
+            guest::StoreU32(h.base, other + kPath, r.Below(4) == 0 ? 0 : other);
+            guest::StoreU32(h.base, other + kPath + 5520, r.Below(3));
+            guest::StoreU32(h.base, other + kPath + 5524,
+                            r.Below(2) ? 0xFFFFFFFFu : r.Below(8));
+            guest::StoreU32(h.base, other + kPath + 5528,
+                            r.Below(2) ? 0xFFFFFFFFu : r.Below(8));
+          }
+          drivers = r.Below(16) == 0 ? 0 : table;
+          table_written = true;
+          break;
+        }
       }
       // Guest memory is one host mapping: the blocks copied as they are.
       const std::vector<uint8_t> inputs(h.base + area, h.base + area + kAreaBytes);

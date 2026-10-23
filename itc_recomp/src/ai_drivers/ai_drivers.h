@@ -349,4 +349,38 @@ void NarrowToOther(uint8_t* base, uint32_t entry, uint32_t other, uint32_t margi
 // across one's end: the original runs then).
 bool AdvanceCorners(uint8_t* base, uint32_t path, uint32_t slices, uint32_t* r3);
 
+// --- The states and the drivers' resets ---
+
+// AiDriver::Restart (sub_821395D0): ResetControl (its frame 112 bytes below
+// `frame`, the original's, 112 bytes below the caller's stack pointer),
+// ResetPath, the state +36 = the old +32, +32 = 5, the halfword +40 = the
+// word at `mask`. Returns ResetPath's r3.
+uint32_t Restart(uint8_t* base, uint32_t driver, uint32_t mask, uint32_t frame);
+// AiDrivers::ResetAll (sub_82139750): the mask of the racers without flag
+// 0x10 (bit [racer + 20], written at frame + 80: `frame` the original's,
+// 128 bytes below the caller's stack pointer), then Restart for each such
+// racer's driver with it. Returns the r3 the original leaves (the count, or
+// the last Restart's).
+uint32_t ResetAll(uint8_t* base, uint32_t frame);
+// AiDriver::SetState2or3 (sub_82139E40): ResetControl, ClearPlan,
+// ResetPath; +32 = 3 when the word at `flag` is set, else 2 (the old into
+// +36); +40 = the word at `word`. `frame` 112 bytes down. Returns
+// ResetPath's r3.
+uint32_t SetState2or3(uint8_t* base, uint32_t driver, uint32_t word, uint32_t flag,
+                      uint32_t frame);
+// AiDriver::SetStateFromList (sub_82139EA8): ResetControl, ClearPlan; by
+// the count at `count` and where the driver's +0 is in the list (see the
+// row), ResetPath and the state 2 or 3 with +40. `frame` 128 bytes down.
+// Returns the r3 the original leaves (ClearPlan's or ResetPath's).
+uint32_t SetStateFromList(uint8_t* base, uint32_t driver, uint32_t word, uint32_t count,
+                          uint32_t list, uint32_t frame);
+// AiDriver::SetState4 (sub_82139FA0): ResetControl, ClearPlan, ResetPath;
+// +32 = 4 (the old into +36), +40 = the word at `word`. `frame` 112 bytes
+// down. Returns ResetPath's r3.
+uint32_t SetState4(uint8_t* base, uint32_t driver, uint32_t word, uint32_t frame);
+// AiDrivers::ClearAll (sub_8213A140): every racer's driver ResetControl and
+// ClearPlan. `frame` 128 bytes down. Returns the r3 the original leaves (the
+// count, or the last ClearPlan's).
+uint32_t ClearAll(uint8_t* base, uint32_t frame);
+
 }  // namespace ai_drivers
