@@ -159,5 +159,6 @@ void ActionMappers(Context& h);
 void DataTables(Context& h);
 void ModelAnimation(Context& h);
 void CarSpecs(Context& h);
+void Cameras(Context& h);
 
 }  // namespace harness

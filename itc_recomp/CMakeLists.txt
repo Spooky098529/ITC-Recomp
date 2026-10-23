@@ -148,6 +148,8 @@ set(ITC_SOURCES
     src/model_animation/model_animation.cpp
     src/hooks/car_specs.cpp
     src/car_specs/car_specs.cpp
+    src/hooks/cameras.cpp
+    src/cameras/cameras.cpp
     src/hooks/sound_cues.cpp
     src/sound_cues/sound_cues.cpp
     src/hooks/xact.cpp
@@ -200,6 +202,7 @@ set(ITC_SOURCES
     src/harnesses/data_tables.cpp
     src/harnesses/model_animation.cpp
     src/harnesses/car_specs.cpp
+    src/harnesses/cameras.cpp
     src/harnesses/sound_cues.cpp
     src/harnesses/xact.cpp
     src/helpers/debug_output.cpp
@@ -258,7 +261,8 @@ set(ITC_SOURCES
 # track's collision (src/track_collision/, docs/functions/collision-world.md)
 # and the model animation (src/model_animation/,
 # docs/functions/model-animation.md) and the car specs (src/car_specs/,
-# docs/functions/car-specs.md).
+# docs/functions/car-specs.md) and the cameras (src/cameras/,
+# docs/functions/cameras.md).
 set_source_files_properties(src/c_runtime/math.cpp src/ui_movies/keys.cpp
     src/matrix_math/matrix_math.cpp src/car_physics/rigid_body.cpp
     src/car_physics/vehicle_step.cpp src/car_physics/vehicle_update.cpp
@@ -270,7 +274,7 @@ set_source_files_properties(src/c_runtime/math.cpp src/ui_movies/keys.cpp
     src/track_collision/track_ground.cpp src/track_collision/track_cell.cpp
     src/track_collision/track_walls.cpp src/track_collision/track_wall_query.cpp
     src/action_mappers/action_mappers.cpp src/model_animation/model_animation.cpp
-    src/car_specs/car_specs.cpp PROPERTIES
+    src/car_specs/car_specs.cpp src/cameras/cameras.cpp PROPERTIES
     COMPILE_OPTIONS "-ffp-model=strict;-ffp-contract=off"
     SKIP_PRECOMPILE_HEADERS ON)
 
