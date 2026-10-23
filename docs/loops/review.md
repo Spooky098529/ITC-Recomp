@@ -13,6 +13,20 @@ When the user has reviewed a run's section, its heading gets
 
 ## Run 2026-10-23 17:22 (`b7-loop-23-10-26-4`)
 
+- `strings-and-font.md` (new, 35 rows; 0 moved, 35 new; mapped in
+  0974397), `known-data.md` (`0x826C5C34` and `0x826C5C00` split into
+  their own rows; new rows: the font page, the text draw parameters, the
+  draw counts at `0x826C5BCC`, the pixel shader sources at `0x826C5C04`);
+  1 lead (the app's framework beside the string table). For review:
+  `ui-movies-game.md` corrected (a text's +20 is the page shown, +24 the
+  lines to skip; `sub_8210A5C0` counts page breaks, so `sub_8211C930`
+  moves to the next page; `UiMovie::RevealText`'s name kept, probably
+  "next page"); `files-and-saves.md`'s `sub_8210A8D0` named
+  `Strings::Load`; unsure: `Font::SetParams`'s +8 and +12,
+  `Font::DrawPass`'s slot layout (command 36 not in `gpu-functions.md`),
+  `sub_82108860` probably `XPR::Release`, `sub_8210A490` probably
+  `swprintf` (its ready group is the C runtime's wide printf).
+
 ## Run 2026-10-23 13:44 (`b7-loop-23-10-26-3`)
 
 - `model-animation.md` (new, 36 rows; 0 moved, 36 new; mapped in
