@@ -2,6 +2,7 @@
 
 #include "frame_pacing/game_messages.h"
 #include "guest.h"
+#include "cameras/cameras.h"
 #include "matrix_math/matrix_math.h"
 
 #include "base/flags.h"
@@ -21,6 +22,7 @@
 #include <vector>
 
 ITC_FLAG_DECLARE(bool, native_matrix_math);
+ITC_FLAG_DECLARE(bool, native_cameras);
 
 ITC_FLAG_BOOL(find_per_frame_state, false, "ITC",
               "Find game state that advances on render-only passes, and the code that "
@@ -424,10 +426,52 @@ ITC_FRAME_STATE_WRAP(8209F900)
 ITC_FRAME_STATE_WRAP(820C5DE8)
 ITC_FRAME_STATE_WRAP(820F6068)
 ITC_FRAME_STATE_WRAP(82130978)
-// The render orchestrator's (sub_820C5DE8) callees.
-ITC_FRAME_STATE_WRAP(8209F7A8)
-ITC_FRAME_STATE_WRAP(820A0958)
-ITC_FRAME_STATE_WRAP(820AA1A8)
+// The render orchestrator's (sub_820C5DE8) callees. The camera passes'
+// work natively (src/cameras/cameras.cpp, --native_cameras) or translated,
+// inside the same wrap. CameraPasses::RenderTarget: r3 = the id; r3 = its
+// texture (zero-extended, as lwz leaves it).
+extern "C" REX_FUNC(sub_8209F7A8) {
+  REX_FUNC_PROLOGUE();
+  if (debug::IsHidden(0x8209F7A8)) {
+    return;
+  }
+  debug::FrameStateDiff_Before(base);
+  if (ITC_FLAG(native_cameras)) {
+    ctx.r3.u64 = cameras::RenderTarget(base, ctx.r3.u32);
+  } else {
+    __imp__sub_8209F7A8(ctx, base);
+  }
+  debug::FrameStateDiff_After(base, "draw step part", 0x8209F7A8);
+}
+// CameraPass::Disable: r3 = the pass.
+extern "C" REX_FUNC(sub_820A0958) {
+  REX_FUNC_PROLOGUE();
+  if (debug::IsHidden(0x820A0958)) {
+    return;
+  }
+  debug::FrameStateDiff_Before(base);
+  if (ITC_FLAG(native_cameras)) {
+    cameras::Disable(base, ctx.r3.u32);
+  } else {
+    __imp__sub_820A0958(ctx, base);
+  }
+  debug::FrameStateDiff_After(base, "draw step part", 0x820A0958);
+}
+// CameraPasses::EnableForView: r3 = the last pass enabled, as the original
+// leaves it.
+extern "C" REX_FUNC(sub_820AA1A8) {
+  REX_FUNC_PROLOGUE();
+  if (debug::IsHidden(0x820AA1A8)) {
+    return;
+  }
+  debug::FrameStateDiff_Before(base);
+  if (ITC_FLAG(native_cameras)) {
+    ctx.r3.u64 = cameras::EnableForView(base);
+  } else {
+    __imp__sub_820AA1A8(ctx, base);
+  }
+  debug::FrameStateDiff_After(base, "draw step part", 0x820AA1A8);
+}
 // Vec4::Transform: r3 = out, r4 = a matrix, r5 = a vector; its work natively
 // (src/matrix_math/matrix_math.cpp, --native_matrix_math; the translated
 // code leaves flush-to-zero on) or translated, inside the same wrap.

@@ -214,4 +214,102 @@ void SetViewportSize(uint8_t* base, uint32_t camera, uint32_t width, uint32_t he
   BuildProjection(base, camera, camera + 368, camera + 392, camera + 388, camera + 384);
 }
 
+uint32_t Mode(uint8_t* base, int32_t which) {
+  ITC_NATIVE_RUNNING("sub_8209F718 CameraPasses::Mode");
+  return which == 1 ? guest::LoadU32(base, kMode) : 0xFFFFFFFFu;
+}
+
+bool SetMode(uint8_t* base, int32_t which, uint32_t mode) {
+  ITC_NATIVE_RUNNING("sub_8209F738 CameraPasses::SetMode");
+  if (which != 1) {
+    return true;
+  }
+  const uint32_t pass = Pass(4);
+  const bool sets_view = mode == 0 || mode == 1;
+  if (sets_view && guest::LoadU32(base, guest::LoadU32(base, pass) + 4) != 0x82593278) {
+    return false;
+  }
+  guest::StoreU32(base, kMode, mode);
+  if (sets_view) {
+    SetFieldOfView(base, pass, Lfs(base, mode == 0 ? 0x82001E8C : 0x82001E88));
+  }
+  return true;
+}
+
+uint32_t RenderTarget(uint8_t* base, uint32_t id) {
+  ITC_NATIVE_RUNNING("sub_8209F7A8 CameraPasses::RenderTarget");
+  static constexpr uint32_t kTextures[] = {
+      0x826BABE8, 0, 0x826BABDC, 0x826BABC8, 0x826BABD4, 0x826BABFC, 0x826BABF8,
+      0x826BABF4, 0x826BABF0, 0x826BABD0, 0x826BABD8, 0x826BABE0, 0x826BABC4,
+  };
+  if (id > 12) {
+    return 0;
+  }
+  if (id == 1) {
+    const uint32_t mode = guest::LoadU32(base, kMode);
+    return mode == 0 ? guest::LoadU32(base, 0x826BABEC)
+           : mode == 1 ? guest::LoadU32(base, 0x826BABCC)
+                       : 0;
+  }
+  return guest::LoadU32(base, kTextures[id]);
+}
+
+void Enable(uint8_t* base, uint32_t pass) {
+  ITC_NATIVE_RUNNING("sub_820A0968 CameraPass::Enable");
+  guest::StoreU32(base, pass + 588, 1);
+}
+
+void Disable(uint8_t* base, uint32_t pass) {
+  ITC_NATIVE_RUNNING("sub_820A0958 CameraPass::Disable");
+  guest::StoreU32(base, pass + 588, 0);
+}
+
+uint32_t EnableForView(uint8_t* base) {
+  ITC_NATIVE_RUNNING("sub_820AA1A8 CameraPasses::EnableForView");
+  if (guest::LoadU32(base, guest::LoadU32(base, kViewports) + 8) == 0) {
+    for (uint32_t i : {0, 10, 11, 12, 19, 20}) {
+      Enable(base, Pass(i));
+    }
+    const uint32_t viewport = guest::LoadU32(base, guest::LoadU32(base, kViewports));
+    const uint32_t view_mode = guest::LoadU32(base, viewport + 1860);
+    if (view_mode == 2 || view_mode == 1) {
+      Enable(base, Pass(3));
+    }
+  } else {
+    for (uint32_t i : {1, 2, 13, 14, 15, 16, 17, 18, 20}) {
+      Enable(base, Pass(i));
+    }
+  }
+  if (Mode(base, 1) == 1) {
+    for (uint32_t i = 4; i <= 9; i++) {
+      Enable(base, Pass(i));
+    }
+    return Pass(9);
+  }
+  Enable(base, Pass(4));
+  return Pass(4);
+}
+
+void SetNear(uint8_t* base, double near) {
+  ITC_NATIVE_RUNNING("sub_820AA368 CameraPasses::SetNear");
+  Stfs(base, Pass(0) + 384, near);
+}
+
+bool ReleaseSurfaces(uint8_t* base, uint32_t pass,
+                     const std::function<void(uint32_t surface, uint32_t field)>& release) {
+  ITC_NATIVE_RUNNING("sub_820A0C40 CameraPass::ReleaseSurfaces");
+  const int32_t type = int32_t(guest::LoadU32(base, pass + 584));
+  if (type < 3 || (type > 4 && uint32_t(type - 10) > 10)) {
+    return false;
+  }
+  for (uint32_t field : {576u, 580u}) {
+    const uint32_t surface = guest::LoadU32(base, pass + field);
+    if (surface != 0) {
+      release(surface, field);
+      guest::StoreU32(base, pass + field, 0);
+    }
+  }
+  return true;
+}
+
 }  // namespace cameras

@@ -46,6 +46,61 @@ void NativeSetViewportSize(PPCContext& ctx, uint8_t* base) {
   cm::SetViewportSize(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
 }
 
+void NativeMode(PPCContext& ctx, uint8_t* base) {
+  const int32_t which = ctx.r3.s32;
+  const uint32_t mode = cm::Mode(base, which);
+  if (which == 1) {
+    ctx.r3.u64 = mode;
+  } else {
+    ctx.r3.s64 = -1;
+  }
+}
+void NativeSetMode(PPCContext& ctx, uint8_t* base) {
+  const int32_t which = ctx.r3.s32;
+  const uint32_t mode = ctx.r4.u32;
+  ctx.fpscr.disableFlushMode();
+  if (!cm::SetMode(base, which, mode)) {
+    __imp__sub_8209F738(ctx, base);
+    return;
+  }
+  if (which == 1 && (mode == 0 || mode == 1)) {
+    ctx.r3.u64 = cm::Pass(4);
+    ctx.f1.f64 = double(guest::LoadFloat(base, mode == 0 ? 0x82001E8C : 0x82001E88));
+  }
+}
+void NativeRenderTarget(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = cm::RenderTarget(base, ctx.r3.u32);
+}
+void NativeEnable(PPCContext& ctx, uint8_t* base) {
+  cm::Enable(base, ctx.r3.u32);
+}
+void NativeDisable(PPCContext& ctx, uint8_t* base) {
+  cm::Disable(base, ctx.r3.u32);
+}
+void NativeEnableForView(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = cm::EnableForView(base);
+}
+void NativeSetNear(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  cm::SetNear(base, ctx.f1.f64);
+}
+// As the adapter: Resource::Release a guest call.
+void NativeReleaseSurfaces(PPCContext& ctx, uint8_t* base) {
+  const uint32_t pass = ctx.r3.u32;
+  bool released_580 = false;
+  const bool has_surfaces =
+      cm::ReleaseSurfaces(base, pass, [&](uint32_t surface, uint32_t field) {
+        ctx.r3.u64 = surface;
+        sub_822A67B0(ctx, base);
+        released_580 = field == 580;
+      });
+  if (!has_surfaces) {
+    ctx.r3.u64 = pass;
+  } else if (!released_580) {
+    ctx.r3.u64 = 0;
+  }
+}
+
 // Runs the recompiled version with the flag off, so the functions it calls
 // that are ours run the originals too.
 void RunRecompiled(GuestFunction recompiled, PPCContext& t, uint8_t* base) {
@@ -87,12 +142,41 @@ struct FloatRange {
   uint32_t from, to;
 };
 
+// The game's camera globals the functions change (the mode, the passes'
+// enabled words, pass 0's near plane, pass 4's field of view, the viewports'
+// pointer), kept before a harness and put back after each run.
+class Globals {
+ public:
+  explicit Globals(uint8_t* base) : base_(base) {
+    Keep(cm::kMode, 4);
+    Keep(cm::kViewports, 4);
+    Keep(cm::Pass(0) + 384, 4);
+    Keep(cm::Pass(4) + 368, 4);
+    for (uint32_t i = 0; i < cm::kPassCount; i++) {
+      Keep(cm::Pass(i) + 588, 4);
+    }
+  }
+  ~Globals() { Restore(); }
+  void Restore() const {
+    for (const auto& [address, bytes] : kept_) {
+      Write(base_, address, bytes.data(), uint32_t(bytes.size()));
+    }
+  }
+
+ private:
+  void Keep(uint32_t address, uint32_t bytes) { kept_.push_back({address, Read(base_, address, bytes)}); }
+  uint8_t* base_;
+  std::vector<std::pair<uint32_t, std::vector<uint8_t>>> kept_;
+};
+
 // One case through both versions: the scratch area filled with 0xCD,
 // `setup()` writes the inputs (from h.random, the same for both), `args(t)`
-// sets the registers.
+// sets the registers. `extra(out)` adds outputs outside the scratch area
+// (the game's globals), and `globals` puts those back after each run.
 void Case(Context& h, Results& results, uint32_t object, std::vector<FloatRange> floats,
           const std::function<void()>& setup, const std::function<void(PPCContext&)>& args,
-          GuestFunction recompiled, GuestFunction native, const std::string& what) {
+          GuestFunction recompiled, GuestFunction native, const std::string& what,
+          const std::function<void(Outputs&)>& extra = {}, const Globals* globals = nullptr) {
   Outputs out[2];
   // The same random inputs for both.
   const Random inputs = h.random;
@@ -120,6 +204,12 @@ void Case(Context& h, Results& results, uint32_t object, std::vector<FloatRange>
       }
     }
     out[v].Word(t.r3.u32);
+    if (extra) {
+      extra(out[v]);
+    }
+    if (globals) {
+      globals->Restore();
+    }
   }
   results.Check(out[0], out[1], what);
 }
@@ -240,12 +330,171 @@ void SetViewportSizeCases(Context& h) {
   results.Report();
 }
 
+// A mode word: the two the game sets, others and random bits.
+uint32_t RandomMode(Random& r) {
+  static constexpr uint32_t kModes[] = {0, 1, 2, 0xFFFFFFFF, 0x80000000};
+  return r.Below(2) ? kModes[r.Below(std::size(kModes))] : uint32_t(r.Next());
+}
+int32_t RandomWhich(Random& r) {
+  static constexpr int32_t kWhich[] = {1, 1, 1, 0, 2, -1};
+  return r.Below(4) ? kWhich[r.Below(std::size(kWhich))] : int32_t(r.Next());
+}
+
+// The camera passes' state: the mode, the render targets, enabling, the near
+// plane and the surfaces' release, on the game's globals (kept and put back).
+void PassStateCases(Context& h) {
+  const Globals globals(h.base);
+  auto mode_word = [&](Outputs& out) { out.Word(guest::LoadU32(h.base, cm::kMode)); };
+  {
+    Results results("sub_8209F718 CameraPasses::Mode");
+    for (int i = 0; i < 100; i++) {
+      const int32_t which = RandomWhich(h.random);
+      const uint32_t mode = RandomMode(h.random);
+      Case(
+          h, results, h.data, {}, [&] { guest::StoreU32(h.base, cm::kMode, mode); },
+          [&](PPCContext& t) { t.r3.s64 = which; }, __imp__sub_8209F718, NativeMode,
+          fmt::format("case {} which {} mode {:08X}", i, which, mode),
+          mode_word, &globals);
+    }
+    results.Report();
+  }
+  {
+    Results results("sub_8209F738 CameraPasses::SetMode");
+    for (int i = 0; i < 100; i++) {
+      const int32_t which = RandomWhich(h.random);
+      const uint32_t mode = RandomMode(h.random);
+      const uint32_t fov = FloatWord(h.random);
+      Case(
+          h, results, h.data, {},
+          [&] {
+            guest::StoreU32(h.base, cm::kMode, 0x12345678);
+            guest::StoreU32(h.base, cm::Pass(4) + 368, fov);
+          },
+          [&](PPCContext& t) {
+            t.r3.s64 = which;
+            t.r4.u64 = mode;
+          },
+          __imp__sub_8209F738, NativeSetMode,
+          fmt::format("case {} which {} mode {:08X}", i, which, mode),
+          [&](Outputs& out) {
+            mode_word(out);
+            out.Float(guest::LoadU32(h.base, cm::Pass(4) + 368));
+          },
+          &globals);
+    }
+    results.Report();
+  }
+  {
+    Results results("sub_8209F7A8 CameraPasses::RenderTarget");
+    for (int i = 0; i < 200; i++) {
+      const uint32_t id = h.random.Below(3) ? h.random.Below(15) : uint32_t(h.random.Next());
+      const uint32_t mode = RandomMode(h.random);
+      Case(
+          h, results, h.data, {}, [&] { guest::StoreU32(h.base, cm::kMode, mode); },
+          [&](PPCContext& t) { t.r3.u64 = id; }, __imp__sub_8209F7A8, NativeRenderTarget,
+          fmt::format("case {} id {} mode {:08X}", i, int32_t(id), mode), mode_word, &globals);
+    }
+    results.Report();
+  }
+  {
+    Results enable("sub_820A0968 CameraPass::Enable");
+    Results disable("sub_820A0958 CameraPass::Disable");
+    for (int i = 0; i < 50; i++) {
+      const uint32_t pass = h.data + 4 * h.random.Below(64);
+      Case(
+          h, enable, pass, {}, [&] { RandomWords(h, h.data, 256); },
+          [&](PPCContext& t) { t.r3.u64 = pass; }, __imp__sub_820A0968, NativeEnable,
+          fmt::format("case {}", i));
+      Case(
+          h, disable, pass, {}, [&] { RandomWords(h, h.data, 256); },
+          [&](PPCContext& t) { t.r3.u64 = pass; }, __imp__sub_820A0958, NativeDisable,
+          fmt::format("case {}", i));
+    }
+    enable.Report();
+    disable.Report();
+  }
+  {
+    // A viewports block and viewport 0 in the scratch area, the passes'
+    // enabled words random.
+    Results results("sub_820AA1A8 CameraPasses::EnableForView");
+    const uint32_t block = h.data, viewport = h.data + 64;
+    for (int i = 0; i < 100; i++) {
+      const uint32_t split = h.random.Below(3) ? 0 : (h.random.Below(2) ? 1 : uint32_t(h.random.Next()));
+      const uint32_t view_mode = h.random.Below(4) ? h.random.Below(4) : uint32_t(h.random.Next());
+      const uint32_t mode = RandomMode(h.random);
+      uint32_t enabled[cm::kPassCount];
+      for (uint32_t& word : enabled) {
+        word = h.random.Below(2) ? h.random.Below(2) : uint32_t(h.random.Next());
+      }
+      Case(
+          h, results, h.data, {},
+          [&] {
+            guest::StoreU32(h.base, block + 0, viewport);
+            guest::StoreU32(h.base, block + 8, split);
+            guest::StoreU32(h.base, viewport + 1860, view_mode);
+            guest::StoreU32(h.base, cm::kViewports, block);
+            guest::StoreU32(h.base, cm::kMode, mode);
+            for (uint32_t p = 0; p < cm::kPassCount; p++) {
+              guest::StoreU32(h.base, cm::Pass(p) + 588, enabled[p]);
+            }
+          },
+          [](PPCContext&) {}, __imp__sub_820AA1A8, NativeEnableForView,
+          fmt::format("case {} split {} view mode {} mode {:08X}", i, split, view_mode, mode),
+          [&](Outputs& out) {
+            for (uint32_t p = 0; p < cm::kPassCount; p++) {
+              out.Word(guest::LoadU32(h.base, cm::Pass(p) + 588));
+            }
+          },
+          &globals);
+    }
+    results.Report();
+  }
+  {
+    Results results("sub_820AA368 CameraPasses::SetNear");
+    for (int i = 0; i < 100; i++) {
+      const double near = RandomF1(h.random);
+      Case(
+          h, results, h.data, {}, [] {}, [&](PPCContext& t) { t.f1.f64 = near; },
+          __imp__sub_820AA368, NativeSetNear, fmt::format("case {} near {}", i, near),
+          [&](Outputs& out) { out.Float(guest::LoadU32(h.base, cm::Pass(0) + 384)); }, &globals);
+    }
+    results.Report();
+  }
+  {
+    // Fake resources in the scratch area with counts of 2 or more, so
+    // Release only counts down (a count reaching 0 would destroy them).
+    Results results("sub_820A0C40 CameraPass::ReleaseSurfaces");
+    const uint32_t pass = h.data + 256, objects = h.data + 16;
+    for (int i = 0; i < 100; i++) {
+      const int32_t type = int32_t(h.random.Below(24)) - 1;
+      const uint32_t first = h.random.Below(3) ? objects : 0;
+      const uint32_t second = h.random.Below(3) ? objects + 32 : 0;
+      const uint32_t count = 2 + h.random.Below(5);
+      Case(
+          h, results, pass, {},
+          [&] {
+            for (uint32_t o : {objects, objects + 32}) {
+              guest::StoreU32(h.base, o + 0, 0);
+              guest::StoreU32(h.base, o + 4, count);
+            }
+            guest::StoreU32(h.base, pass + 576, first);
+            guest::StoreU32(h.base, pass + 580, second);
+            guest::StoreU32(h.base, pass + 584, uint32_t(type));
+          },
+          [&](PPCContext& t) { t.r3.u64 = pass; }, __imp__sub_820A0C40, NativeReleaseSurfaces,
+          fmt::format("case {} type {} surfaces {:08X} {:08X}", i, type, first, second));
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void Cameras(Context& h) {
   SetFieldOfViewCases(h);
   BuildProjectionCases(h);
   SetViewportSizeCases(h);
+  PassStateCases(h);
 }
 
 }  // namespace harness
