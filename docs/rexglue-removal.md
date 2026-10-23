@@ -2514,6 +2514,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-10-23 | XACT, the sound library linked into the game (its engine, banks, cues, sounds and faders; the user's call to translate it) | `xact.md` | 102 of 186 (two maps, three migrations) | `--native_xact` |
 | 2026-10-23 | The action mappers (the game's input actions over the pads: set-up, client list, update, read slots; no behavior change) | `action-mappers.md` | 36 of 40 | `--native_action_mappers` |
 | 2026-10-23 | The game's data tables at `[0x826C5CA0]` (their load callbacks, byte swaps and accessors; no behavior change) | `data-tables.md` | 16 of 18 | `--native_data_tables` |
+| 2026-10-23 | The model animation (track sets and their keyframed curves, `Model::Animate`, the skeleton's node values and matrices; with the primitive drawer's constructor) | `model-animation.md` | 36 of 39 (and `models.md`'s `sub_8259C3A8`) | `--native_model_animation` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -2998,3 +2999,13 @@ functions (916 pairs): overridden 67, Native 3, Dropped 23, never called
 (`b7_status.py`): 6,753 in play, ours 1,023, work left 5,730 (Wrapped
 129, with a row 458, no row yet 5,143); `data-tables.md` 16 ours of 18.
 895 overrides in `src/`.
+
+**2026-10-23, B7's seventh loop run, the model animation (branch
+`b7-loop-23-10-26-3`):** the boundary unchanged: 449 functions (916
+pairs): overridden 67, Native 3, Dropped 23, never called 70, live 286.
+Imports: 186 called, 62 with a live caller. B7 (`b7_status.py`): 6,756
+in play, ours 1,060, work left 5,696 (Wrapped 129, with a row 588, no
+row yet 4,979); `model-animation.md` 36 ours of 39. 916 overrides in
+`src/`. The model animation's sections with tracks in `Setup208` and
+node types 8 and 16 stay on the recompiled code (never in play); the
+primitive drawer's methods wait on the graphics device.

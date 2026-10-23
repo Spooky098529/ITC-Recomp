@@ -13,6 +13,15 @@ function goes from this list when a log shows its `native running
 (game):` line (say which log in the commit). A run with nothing left
 here loses its heading.
 
+## Run 2026-10-23 13:44 (`b7-loop-23-10-26-3`)
+
+Not in the attract race or the replay (`itc_932`, `itc_933`, ok); never
+seen in play before either (the 32-bit and node channel tracks):
+
+- `sub_825A0FE0` TrackSet::Sample32 (`model-animation.md`)
+- `sub_825A10A8` TrackSet::Advance32 (`model-animation.md`)
+- `sub_825A20E8` CursorCurve::Sample (`model-animation.md`)
+
 ## Run 2026-10-23 11:06 (`b7-loop-23-10-26-2`)
 
 Not in the attract race or two replays (`itc_922`, `itc_924`, both ok);
