@@ -188,6 +188,52 @@ ITC_NATIVE_STEP(NativeSetState4,
                 ctx.r3.u64 = ai::SetState4(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 112))
 ITC_NATIVE_STEP(NativeClearAll, ctx.r3.u64 = ai::ClearAll(base, ctx.r1.u32 - 128))
 
+ITC_NATIVE_STEP(NativeJoinCorners,
+                ctx.r3.u64 = ai::JoinCorners(base, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32))
+ITC_NATIVE_STEP(NativeJoinCornersShort,
+                ctx.r3.u64 = ai::JoinCornersShort(base, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32))
+void RunJoinStep(PPCContext& ctx, uint8_t* base, uint32_t step, uint32_t frame,
+                 uint32_t chain) {
+  const uint32_t saved = ctx.r1.u32;
+  guest::StoreU32(base, frame, chain);
+  ctx.r1.u32 = frame;
+  ctx.r6.u64 = frame + 80;
+  if (step == 2) {
+    sub_8213BDF0(ctx, base);
+  } else {
+    sub_8213BE80(ctx, base);
+  }
+  ctx.r1.u32 = saved;
+}
+void NativeJoinCornerPair(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  uint32_t r3 = 0;
+  const uint32_t frame = ctx.r1.u32 - 112;
+  const uint32_t step = ai::JoinCornerPair(base, ctx.r4.u32, ctx.r5.u32, frame, &r3);
+  if (step == 1) {
+    ctx.r3.u64 = r3;
+  } else if (step >= 2) {
+    RunJoinStep(ctx, base, step, frame, ctx.r1.u32);
+  }
+}
+void NativeAddCornersAt(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const uint32_t path = ctx.r3.u32;
+  const uint32_t frame = ctx.r1.u32 - 144;
+  uint32_t r3 = 0, a = 0, b = 0;
+  const uint32_t step = ai::AddCornersAt(base, path, ctx.r4.u32, frame, &r3, &a, &b);
+  if (step >= 2) {
+    guest::StoreU32(base, frame, ctx.r1.u32);
+    ctx.r3.u64 = path;
+    ctx.r4.u64 = a;
+    ctx.r5.u64 = b;
+    RunJoinStep(ctx, base, step, frame - 112, frame);
+    ai::AddCornersAtFinish(base, path);
+    return;
+  }
+  ctx.r3.u64 = r3;
+}
+
 // Runs the recompiled version with the native flag off.
 template <GuestFunction recompiled>
 void Original(PPCContext& ctx, uint8_t* base) {
@@ -335,6 +381,10 @@ enum Kind {
   kSetStateFromList,
   kSetState4,
   kClearAll,
+  kJoinCorners,
+  kJoinCornersShort,
+  kJoinCornerPair,
+  kAddCornersAt,
 };
 
 }  // namespace
@@ -505,6 +555,14 @@ void AiDrivers(Context& h) {
        kSetState4, 300},
       {"AiDrivers::ClearAll (sub_8213A140)", Original<__imp__sub_8213A140>, NativeClearAll,
        kClearAll, 300},
+      {"AiPath::JoinCorners (sub_8213BCD0)", Original<__imp__sub_8213BCD0>, NativeJoinCorners,
+       kJoinCorners, 3000},
+      {"AiPath::JoinCornersShort (sub_8213BF28)", Original<__imp__sub_8213BF28>,
+       NativeJoinCornersShort, kJoinCornersShort, 3000},
+      {"AiPath::JoinCornerPair (sub_8213DD40)", Original<__imp__sub_8213DD40>,
+       NativeJoinCornerPair, kJoinCornerPair, 3000},
+      {"AiPath::AddCornersAt (sub_8213E970)", Original<__imp__sub_8213E970>,
+       NativeAddCornersAt, kAddCornersAt, 3000},
   };
   const uint32_t area = memory::Alloc(kAreaBytes, 0);
   const uint32_t driver = area + kDriver, vehicle = area + kVehicle, io = area + kIo;
@@ -1165,6 +1223,117 @@ void AiDrivers(Context& h) {
           }
           drivers = r.Below(16) == 0 ? 0 : table;
           table_written = true;
+          break;
+        }
+        case kJoinCorners:
+        case kJoinCornersShort:
+        case kJoinCornerPair: {
+          // Two corner records (+0x100, +0x140 in the driver's bytes), their
+          // data (+0x200, +0x280) and tables (+0x400, +0x600, 8-byte entries:
+          // the fill's floats); the count at io.
+          const uint32_t a = driver + 0x100, b = driver + 0x140;
+          const uint32_t data_a = driver + 0x200, data_b = driver + 0x280;
+          const bool none = f.kind == kJoinCornerPair && r.Below(16) == 0;
+          guest::StoreU32(h.base, a + 0, none && r.Below(4) == 0 ? 0 : data_a);
+          guest::StoreU32(h.base, a + 4, none && r.Below(4) == 0 ? 0 : driver + 0x400);
+          guest::StoreU32(h.base, b + 0, none && r.Below(4) == 0 ? 0 : data_b);
+          guest::StoreU32(h.base, b + 4, none && r.Below(4) == 0 ? 0 : driver + 0x600);
+          guest::StoreU16(h.base, data_b + 0, uint16_t(int32_t(r.Below(15)) - 2));
+          guest::StoreU16(h.base, data_b + 52, uint16_t(r.Below(41)));
+          guest::StoreU16(h.base, data_b + 54, uint16_t(r.Below(41)));
+          guest::StoreU16(h.base, data_a + 50, uint16_t(r.Below(31)));
+          guest::StoreU32(h.base, data_a + 12, RandomFloat(r, 20.0f));
+          guest::StoreU32(h.base, data_b + 28, r.Below(16) == 0 ? FloatBits(100.0f)
+                                                               : RandomFloat(r, 200.0f));
+          guest::StoreU16(h.base, b + 14, uint16_t(r.Below(51)));
+          guest::StoreU16(h.base, a + 10, uint16_t(int32_t(r.Below(41)) - 10));
+          guest::StoreU16(h.base, b + 10, uint16_t(int32_t(r.Below(41)) - 10));
+          // The directions: 1.0 or -1.0 (now and then a fill float); the same
+          // for the translated steps (never seen in play) now and then.
+          const float sides[] = {1.0f, -1.0f};
+          const uint32_t side_a = r.Below(8) ? FloatBits(sides[r.Below(2)]) : RandomFloat(r, 2.0f);
+          guest::StoreU32(h.base, a + 16, side_a);
+          guest::StoreU32(h.base, b + 16, r.Below(8) == 0 ? side_a : FloatBits(-std::bit_cast<float>(side_a)));
+          guest::StoreU32(h.base, area + kFile + 8,
+                          r.Below(16) == 0 ? RandomFloat(r, 8.0f)
+                                           : FloatBits(0.5f + float(r.Below(80)) / 8.0f));
+          guest::StoreU32(h.base, io, r.Below(16) == 0 ? uint32_t(r.Next()) & 0xFF : r.Below(41));
+          r4 = a;
+          r5 = b;
+          r6 = io;
+          floats.push_back({kDriver + 0x100 + 28, 1});
+          floats.push_back({kDriver + 0x140 + 32, 1});
+          break;
+        }
+        case kAddCornersAt: {
+          // Four corners' data in the vehicle's bytes (0x300 apart: +0 the
+          // length, +2 and +36 its sections, +4 its direction, +12, +28, +50
+          // to +54, its table from +56), the route file's corner table (+16:
+          // 8 words, some 0) at +0xD00, the slice record (+58 the count, its
+          // corners from +60) at +0xC00 and the path entry at io + 0x100.
+          const uint32_t path = driver + kPath;
+          for (uint32_t i = 0; i < 4; i++) {
+            const uint32_t data = vehicle + 0x300 * i;
+            guest::StoreU16(h.base, data + 0, uint16_t(r.Below(13)));
+            guest::StoreU16(h.base, data + 2, uint16_t(int32_t(r.Below(8)) - 1));
+            for (uint32_t k = 0; k < 8; k++) {
+              guest::StoreU16(h.base, data + 36 + 2 * k, uint16_t(r.Below(7)));
+            }
+            guest::StoreU32(h.base, data + 4, RandomFloat(r, 2.0f));
+            guest::StoreU32(h.base, data + 12, RandomFloat(r, 20.0f));
+            guest::StoreU32(h.base, data + 28, RandomFloat(r, 200.0f));
+            guest::StoreU16(h.base, data + 50, uint16_t(r.Below(31)));
+            guest::StoreU16(h.base, data + 52, uint16_t(r.Below(41)));
+            guest::StoreU16(h.base, data + 54, uint16_t(r.Below(41)));
+          }
+          for (uint32_t i = 0; i < 8; i++) {
+            guest::StoreU32(h.base, vehicle + 0xD00 + 4 * i,
+                            r.Below(6) == 0 ? 0 : vehicle + 0x300 * r.Below(4));
+          }
+          guest::StoreU32(h.base, area + kFile + 16, vehicle + 0xD00);
+          guest::StoreU32(h.base, area + kFile + 8, FloatBits(0.5f + float(r.Below(80)) / 8.0f));
+          const uint32_t slice = vehicle + 0xC00;
+          guest::StoreU16(h.base, slice + 58, uint16_t(int32_t(r.Below(8)) - 1));
+          for (uint32_t i = 0; i < 8; i++) {
+            guest::StoreU16(h.base, slice + 60 + 4 * i, uint16_t(r.Below(8)));
+            guest::StoreU16(h.base, slice + 62 + 4 * i, uint16_t(r.Below(41)));
+          }
+          guest::StoreU32(h.base, io + 0x100 + 52, slice);
+          // The path: its records (the data, their tables, numbers, offsets
+          // and directions), count, entries' count and sections.
+          guest::StoreU16(h.base, path + 5162, uint16_t(r.Below(10)));
+          guest::StoreU16(h.base, path + 5136, uint16_t(r.Below(81)));
+          guest::StoreU16(h.base, path + 5144, uint16_t(int32_t(r.Below(10)) - 1));
+          for (uint32_t i = 0; i < 8; i++) {
+            guest::StoreU16(h.base, path + 5146 + 2 * i, uint16_t(r.Below(7)));
+          }
+          // Most corners share the path's sections (copies of its list).
+          for (uint32_t i = 0; i < 4; i++) {
+            const uint32_t data = vehicle + 0x300 * i;
+            if (r.Below(4) == 0) {
+              continue;
+            }
+            guest::StoreU16(h.base, data + 2, guest::LoadU16(h.base, path + 5144));
+            for (uint32_t k = 0; k < 8; k++) {
+              guest::StoreU16(h.base, data + 36 + 2 * k, guest::LoadU16(h.base, path + 5146 + 2 * k));
+            }
+          }
+          for (uint32_t i = 0; i < 9; i++) {
+            const uint32_t record = path + 5164 + 44 * i;
+            const uint32_t data = r.Below(8) == 0 ? 0 : vehicle + 0x300 * r.Below(4);
+            guest::StoreU32(h.base, record + 0, data);
+            guest::StoreU32(h.base, record + 4, data == 0 ? 0 : data + 56);
+            guest::StoreU16(h.base, record + 8, uint16_t(r.Below(10)));
+            guest::StoreU16(h.base, record + 10, uint16_t(int32_t(r.Below(41)) - 10));
+            guest::StoreU16(h.base, record + 12, uint16_t(r.Below(90)));
+            guest::StoreU16(h.base, record + 14, uint16_t(r.Below(51)));
+            guest::StoreU32(h.base, record + 16, FloatBits(r.Below(2) ? 1.0f : -1.0f));
+          }
+          r3 = path;
+          r4 = io + 0x100;
+          for (uint32_t i = 0; i < 9; i++) {
+            floats.push_back({kDriver + kPath + 5164 + 44 * i + 28, 2});
+          }
           break;
         }
       }

@@ -383,4 +383,38 @@ uint32_t SetState4(uint8_t* base, uint32_t driver, uint32_t word, uint32_t frame
 // count, or the last ClearPlan's).
 uint32_t ClearAll(uint8_t* base, uint32_t frame);
 
+// --- The corners' joins ---
+
+// AiPath::JoinCorners (sub_8213BCD0): the slopes joining corner record a's
+// exit to b's entry (a +28, b +32), the flags a +36 and b +37 set, the
+// halfwords +14 (the count at `count` raised to the gap first). Returns b's
+// word +4 (the r3 the original leaves).
+uint32_t JoinCorners(uint8_t* base, uint32_t a, uint32_t b, uint32_t count);
+// AiPath::JoinCornersShort (sub_8213BF28): the same for corners closer than
+// the gap (the count at `count` read, not changed). Returns b's word +4.
+uint32_t JoinCornersShort(uint8_t* base, uint32_t a, uint32_t b, uint32_t count);
+// AiPath::JoinCornerPair (sub_8213DD40): with both records' data and
+// tables, the gap (a +10 - b +10 - b's data +0, written at frame + 80:
+// `frame` the original's, 112 bytes below the caller's stack pointer):
+// negative, JoinCorners when the directions (+16) differ (1, `r3` set),
+// else 2 (sub_8213BDF0, b's data +28 below 100.0) or 3 (sub_8213BE80), for
+// the caller to run the translated step (never seen in play) with r6 =
+// frame + 80; positive and at most 100.0 times the slice length,
+// JoinCornersShort (1, `r3` set). 0 otherwise (r3 kept).
+uint32_t JoinCornerPair(uint8_t* base, uint32_t a, uint32_t b, uint32_t frame, uint32_t* r3);
+
+// AiPath::AddCornersAt (sub_8213E970): of the corners listed on the path
+// entry's slice (+52: +58 the count, 4-byte entries from +60), the first not
+// among the path's records whose data (the route file's +16 table) ends past
+// the listed slice and SharesSections, added (at most 8: InitCorner, then
+// JoinCornerPair with the one before; `frame` the original's, 144 bytes
+// below the caller's stack pointer) and the count +5162 raised. 0 when done
+// (`r3` the r3 the original leaves); 2 or 3 when JoinCornerPair's
+// translated step is to run (r3 = the path, r4 = `a`, r5 = `b`, from 112
+// bytes below `frame`), then AddCornersAtFinish.
+uint32_t AddCornersAt(uint8_t* base, uint32_t path, uint32_t entry, uint32_t frame,
+                      uint32_t* r3, uint32_t* a, uint32_t* b);
+// AddCornersAt's last step: the count +5162 raised by one.
+void AddCornersAtFinish(uint8_t* base, uint32_t path);
+
 }  // namespace ai_drivers

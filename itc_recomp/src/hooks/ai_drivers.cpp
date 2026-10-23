@@ -74,8 +74,12 @@ ITC_FLAG_BOOL(native_ai_drivers, true, "ITC",
               "AiPath::AdvanceCorners sub_8213D020, AiDriver::Restart sub_821395D0, "
               "AiDrivers::ResetAll sub_82139750, AiDriver::SetState2or3 sub_82139E40, "
               "AiDriver::SetStateFromList sub_82139EA8, AiDriver::SetState4 sub_82139FA0, "
-              "AiDrivers::ClearAll sub_8213A140) natively instead of through the translated "
-              "code (the same words, bit for bit; checked by --run_harnesses=ai_drivers). Those "
+              "AiDrivers::ClearAll sub_8213A140, AiPath::JoinCorners sub_8213BCD0, "
+              "AiPath::JoinCornersShort sub_8213BF28, AiPath::JoinCornerPair sub_8213DD40 "
+              "(its equal directions' steps, sub_8213BDF0 and sub_8213BE80, never seen in play, "
+              "on the translated code), AiPath::AddCornersAt sub_8213E970) natively instead of "
+              "through the translated code (the same words, bit for bit; checked by "
+              "--run_harnesses=ai_drivers). Those "
               "reached only from native callers have no adapters, and the flag switches their "
               "callers: sub_82144ED8, sub_8213C720, sub_821450E0, sub_821453A0, sub_82139248, "
               "sub_8213F730, sub_8213F900, sub_8213B390, sub_821459B0, sub_821451B8, sub_821464B8, "
@@ -273,3 +277,70 @@ ITC_AI_DRIVERS(82139EA8, ctx.r3.u64 = SetStateFromList(base, ctx.r3.u32, ctx.r4.
 // r4 = &the word.
 ITC_AI_DRIVERS(82139FA0, ctx.r3.u64 = SetState4(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 112))
 ITC_AI_DRIVERS(8213A140, ctx.r3.u64 = ClearAll(base, ctx.r1.u32 - 128))
+
+// --- The corners' joins ---
+
+// r4 = a, r5 = b, r6 = &the count; r3 not read.
+ITC_AI_DRIVERS(8213BCD0, ctx.r3.u64 = JoinCorners(base, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32))
+ITC_AI_DRIVERS(8213BF28, ctx.r3.u64 = JoinCornersShort(base, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32))
+namespace {
+// JoinCornerPair's equal directions (never seen in play): the translated
+// step 2 (sub_8213BDF0) or 3 (sub_8213BE80), called from JoinCornerPair's
+// frame (`frame`, its back chain `chain`) as the original does, with r6 =
+// &the gap there; r3, r4 and r5 as set.
+void RunJoinStep(PPCContext& ctx, uint8_t* base, uint32_t step, uint32_t frame,
+                 uint32_t chain) {
+  const uint32_t saved = ctx.r1.u32;
+  guest::StoreU32(base, frame, chain);
+  ctx.r1.u32 = frame;
+  ctx.r6.u64 = frame + 80;
+  if (step == 2) {
+    sub_8213BDF0(ctx, base);
+  } else {
+    sub_8213BE80(ctx, base);
+  }
+  ctx.r1.u32 = saved;
+}
+}  // namespace
+
+// r4 = a, r5 = b; the original's frame 112 bytes down.
+extern "C" REX_FUNC(sub_8213DD40) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_ai_drivers)) {
+    __imp__sub_8213DD40(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  uint32_t r3 = 0;
+  const uint32_t frame = ctx.r1.u32 - 112;
+  const uint32_t step = JoinCornerPair(base, ctx.r4.u32, ctx.r5.u32, frame, &r3);
+  if (step == 1) {
+    ctx.r3.u64 = r3;
+  } else if (step >= 2) {
+    RunJoinStep(ctx, base, step, frame, ctx.r1.u32);
+  }
+}
+// r4 = the path entry; the original's frame 144 bytes down (JoinCornerPair's
+// 112 below it).
+extern "C" REX_FUNC(sub_8213E970) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_ai_drivers)) {
+    __imp__sub_8213E970(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  const uint32_t path = ctx.r3.u32;
+  const uint32_t frame = ctx.r1.u32 - 144;
+  uint32_t r3 = 0, a = 0, b = 0;
+  const uint32_t step = AddCornersAt(base, path, ctx.r4.u32, frame, &r3, &a, &b);
+  if (step >= 2) {
+    guest::StoreU32(base, frame, ctx.r1.u32);
+    ctx.r3.u64 = path;
+    ctx.r4.u64 = a;
+    ctx.r5.u64 = b;
+    RunJoinStep(ctx, base, step, frame - 112, frame);
+    AddCornersAtFinish(base, path);
+    return;
+  }
+  ctx.r3.u64 = r3;
+}
