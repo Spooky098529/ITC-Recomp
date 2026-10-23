@@ -15,8 +15,9 @@ see in a drive, from every run: `to-drive.md`.
 - Subsystem 1 of 3 (the string table and font) finished: the rest
   waits on `DataFile::GetEntry`, the archive, the XPR, the shader
   compiler and the device's state save.
-- Subsystem 2 of 3: `std::string` (`leads.md`'s top lead); step:
-  mapping (a mapping agent running).
+- Subsystem 2 of 3: `std::string` (`leads.md`'s top lead), mapped in
+  7aeebb5 (16 rows, 3 ready groups); step: migration 1 (a migration
+  agent running).
 
 ## Done
 
@@ -47,5 +48,7 @@ This run's groups: `expected-differences.md` (the "17:22 run" lines).
   5590 (wrapped 123, known 559, unknown 4908). Race 19 s (`itc_1042`)
   with `--run_harnesses=all`, 0 errors, every harness 0 differing (no
   "(expected to differ)" groups added).
+- After mapping `std::string`: ours 1167, work left 5590 (wrapped 123,
+  known 575, unknown 4892).
 
 ## Stopped

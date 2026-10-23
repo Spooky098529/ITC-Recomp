@@ -47,6 +47,19 @@ When the user has reviewed a run's section, its heading gets
   Font::Draw's adapters stay (the render queue's call through its
   vtable); new helpers `src/strings_and_font/steps.h`,
   `c_runtime::Vswprintf` in `format.h`.
+- `std-string.md` (new, 16 rows; 0 moved, 16 new; mapped in 7aeebb5:
+  Dinkumware's `std::basic_string<char>`, the library's wildcard search,
+  find and replace-all, two global strings' static set-ups),
+  `known-data.md` (the 28-byte string layout, the global strings at
+  `0x8266EE7C` and `0x8266EE98`); 1 lead (the containers'
+  instantiations). For review, not edited: `ui-movies-game.md`'s
+  `sub_8211E378` separator from `0x82001DE8` called "." without the
+  image's string read (maybe "/"); `files-and-saves.md`'s `sub_8209DFA8`
+  leaves out the path's copy into a string and its wildcard replace
+  (`sub_82593088`, never matched in play); `sub_82593040` is the
+  substring copy constructor, not "making an empty one"; unsure:
+  `String::ReplaceAll`, `String::Find`, `WildcardSearch` (probably; the
+  `*` backtracking not read in detail), the global strings' texts.
 
 ## Run 2026-10-23 13:44 (`b7-loop-23-10-26-3`)
 
