@@ -201,6 +201,38 @@ uint32_t WallQueryAddHit(uint8_t* base, uint32_t query, uint32_t surface);
 // z the crossing.
 uint32_t SegmentsIntersect2D(uint8_t* base, uint32_t points, uint32_t out);
 
+// --- The wall query (src/track_collision/track_wall_query.cpp). The query's
+// wall, set by TestCell: +16 and +32 its two ends, +624 the walls tested
+// (+628 the list, 6 bytes each: section, the two vertices), +1408 its
+// direction, +1424 the direction negated, +1440 its horizontal normal,
+// +1456 and +1460 the ends along the direction, +1464 the normal's
+// distance. The shape record's template, previous and current copies must
+// be boxes: the functions taking the query return false for any other,
+// with nothing done. ---
+
+// WallQuery::ModeSkips (sub_820FC870, the name ours): 1 when the word at
+// `word` is 2, or by the race mode (the race data's +0xA3AF4) unless the
+// stage list's flags (+0x59620 + 1220) have 0x20 or 0x40; else 0.
+uint32_t WallQueryModeSkips(uint8_t* base, uint32_t word);
+// WallQuery::IgnoresWall (sub_820FD6D8): nonzero when the wall's kind (the
+// halfword at `kind`) is skipped for the box's halfwords at `a` (+112) and
+// `b` (+114) and the race's settings. `frame`: the original's 96 bytes.
+uint32_t WallQueryIgnoresWall(uint8_t* base, uint32_t kind, uint32_t a, uint32_t b,
+                              uint32_t frame);
+// WallQuery::CornersThroughWall (sub_820FC3C8): each corner of the box
+// moving through the wall between its previous and current place, within
+// the wall's ends, recorded (AddHit). `hit` 1 when one was. `frame`: the
+// original's 304 bytes.
+bool WallQueryCornersThroughWall(uint8_t* base, uint32_t query, uint32_t frame, uint32_t* hit);
+
+// The vector unit's normalize as the translated code does it, flush-to-zero
+// on: the 16 bytes at `from` rounded down to 16 (x, y, z, w), the squared
+// length of x, y, z (vmsum3fp128: dpps 0xEF), its reciprocal square root as
+// 1/sqrt and one Newton step (vrsqrtefp, vnmsubfp, vmaddfp), all four lanes
+// times it; the squared length itself (0) where it's 0. Stored to the 16
+// bytes at `to` rounded down (src/track_collision/track_ground.cpp).
+void NormalizeVector(uint8_t* base, uint32_t from, uint32_t to);
+
 // TrackRoute::OnLoaded (sub_820F9050, Archive::Load's callback): the
 // route file's offsets made pointers, the race's route bits applied to its
 // entries' +148 and +152, +4 the sum of the +12 entries' first halfwords,

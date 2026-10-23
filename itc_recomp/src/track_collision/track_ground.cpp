@@ -50,12 +50,9 @@ uint32_t Vertex(uint8_t* base, uint32_t section, uint32_t index) {
   return index * 12 + guest::LoadU32(base, section + 64) + section;
 }
 
-// The vector unit's normalize as the translated code does it, flush-to-zero
-// on: the 16 bytes at `from` rounded down to 16 (x, y, z, w), the squared
-// length of x, y, z (vmsum3fp128: dpps 0xEF), its reciprocal square root as
-// 1/sqrt and one Newton step (vrsqrtefp, vnmsubfp, vmaddfp), all four lanes
-// times it; the squared length itself (0) where it's 0. Stored to the 16
-// bytes at `to` rounded down.
+}  // namespace
+
+// See track_collision.h (shared with the wall query).
 void NormalizeVector(uint8_t* base, uint32_t from, uint32_t to) {
   const uint32_t in = from & ~0xFu;
   simde__m128 v = simde_mm_castsi128_ps(
@@ -90,6 +87,8 @@ void NormalizeVector(uint8_t* base, uint32_t from, uint32_t to) {
   guest::StoreU32(base, out + 8, lanes[1]);
   guest::StoreU32(base, out + 12, lanes[0]);
 }
+
+namespace {
 
 // An RGB555 color's channels as the original takes them: (c >> 7) & 0xF8,
 // (c >> 2) & 0xF8, (c << 3) & 0xF8, each as a float.

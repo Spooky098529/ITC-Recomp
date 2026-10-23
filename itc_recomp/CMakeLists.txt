@@ -139,6 +139,7 @@ set(ITC_SOURCES
     src/track_collision/track_ground.cpp
     src/track_collision/track_cell.cpp
     src/track_collision/track_walls.cpp
+    src/track_collision/track_wall_query.cpp
     src/hooks/command_list.cpp
     src/command_list/command_list.cpp
     src/hooks/c_runtime.cpp
@@ -182,6 +183,7 @@ set(ITC_SOURCES
     src/harnesses/car_physics.cpp
     src/harnesses/collision.cpp
     src/harnesses/collision_world.cpp
+    src/harnesses/collision_world_walls.cpp
     src/helpers/debug_output.cpp
     src/helpers/object_attributes.cpp
     src/helpers/time.cpp
@@ -244,7 +246,7 @@ set_source_files_properties(src/c_runtime/math.cpp src/ui_movies/keys.cpp
     src/collision/box_box.cpp src/collision/impacts.cpp src/collision/pairs.cpp
     src/track_collision/track_world.cpp src/track_collision/track_mesh.cpp
     src/track_collision/track_ground.cpp src/track_collision/track_cell.cpp
-    src/track_collision/track_walls.cpp PROPERTIES
+    src/track_collision/track_walls.cpp src/track_collision/track_wall_query.cpp PROPERTIES
     COMPILE_OPTIONS "-ffp-model=strict;-ffp-contract=off"
     SKIP_PRECOMPILE_HEADERS ON)
 

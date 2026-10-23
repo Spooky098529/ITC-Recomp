@@ -1170,12 +1170,16 @@ void WallCases(Context& h, uint32_t area) {
 
 }  // namespace
 
+// The wall query's cases (collision_world_walls.cpp).
+void CollisionWorldWalls(Context& h, uint32_t area);
+
 void CollisionWorld(Context& h) {
   const uint32_t area = memory::Alloc(kAreaBytes, 0);
   SmallCases(h, area);
   LifetimeCases(h, area);
   WallCases(h, area);
   GroundCases(h, area);
+  CollisionWorldWalls(h, area);
   memory::Free(area);
 }
 

@@ -23,13 +23,14 @@ ITC_FLAG_BOOL(native_collision_world, true, "ITC",
               "sub_820FEBD0, for boxes; the track position's cell, sub_820F8090 with sub_820F6A38, "
               "sub_820F6BE8, sub_820F71B0, sub_820F7EE8, sub_820F7E30, sub_820F7D70, "
               "sub_820F6C88; the wall query's parts, sub_820FC188 with sub_820FC110, sub_820FC2E0, "
-              "sub_820FC658; the route, sub_820F9050) natively "
+              "sub_820FC658; the wall query, sub_820FD6D8 with sub_820FC870, sub_820FC3C8; the "
+              "route, sub_820F9050) natively "
               "instead of through the translated code (the same words, bit for bit; checked by "
               "--run_harnesses=collision_world). Those reached only from native callers have no "
               "adapters, and the flag switches their callers: sub_820F6898, sub_820F72F8, "
               "sub_820F7468, sub_820F7590, sub_820F7818, sub_820F6E18, sub_820F6A38, sub_820F6BE8, "
               "sub_820F71B0, sub_820F7EE8, sub_820F7E30, sub_820F7D70, sub_820F6C88, sub_820FC110, "
-              "sub_820FE8F8");
+              "sub_820FE8F8, sub_820FC870");
 
 // Defines an adapter: `body` uses `ctx` and `base`.
 #define ITC_COLLISION_WORLD(address, body)   \
@@ -150,3 +151,25 @@ ITC_COLLISION_WORLD(820FC658, ctx.r3.u64 = SegmentsIntersect2D(base, ctx.r3.u32,
 // Archive::Load's callback: r6 = the route; r3 comes back as 12 (the
 // original's count of route bits).
 ITC_COLLISION_WORLD(820F9050, TrackRouteOnLoaded(base, ctx.r6.u32); ctx.r3.u64 = 12)
+
+// --- The wall query ---
+
+// WallQuery::ModeSkips (sub_820FC870) has no adapter: its only caller is
+// native.
+// r3 = &the wall's kind, r4 = &the box's +112, r5 = &its +114.
+ITC_COLLISION_WORLD(820FD6D8, ctx.r3.u64 = WallQueryIgnoresWall(base, ctx.r3.u32, ctx.r4.u32,
+                                                                ctx.r5.u32, ctx.r1.u32 - 96))
+// r3 = the query. A shape that isn't a box: the original.
+extern "C" REX_FUNC(sub_820FC3C8) {
+  REX_FUNC_PROLOGUE();
+  uint32_t hit = 0;
+  if (ITC_FLAG(native_collision_world)) {
+    ctx.fpscr.disableFlushMode();
+  }
+  if (!ITC_FLAG(native_collision_world) ||
+      !WallQueryCornersThroughWall(base, ctx.r3.u32, ctx.r1.u32 - 304, &hit)) {
+    __imp__sub_820FC3C8(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = hit;
+}
