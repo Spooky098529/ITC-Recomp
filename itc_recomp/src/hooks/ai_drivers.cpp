@@ -61,7 +61,9 @@
 // ClampOffset (sub_8213CF58), from FollowTargets, ContinueLine,
 // ApproachCorner and the CornerTo steps; AiOther::UpdateTimer (sub_821456A0),
 // Mirror (sub_82145610) and Update (sub_821454C8), from
-// AiDriver::CompareWith (sub_82145B08), from AiDrivers::UpdateAll.
+// AiDriver::CompareWith (sub_82145B08), from AiDrivers::UpdateAll; and
+// AiDriver::KeepsGapFrom (sub_82145048) and AiOther::PlanReaction
+// (sub_821456F8), from AiDriver::ReactToOthers.
 
 #include "guest.h"
 
@@ -163,7 +165,7 @@ ITC_FLAG_BOOL(native_ai_drivers, true, "ITC",
               "sub_8213FB48, sub_8213AC70, sub_8213C0E8, sub_8213AEF0, sub_82138D78, sub_8213ACD0, "
               "sub_8213A428, sub_82139CB0, sub_8213DB08, sub_8213DE30, sub_8213E018, sub_8213E1D0, "
               "sub_8213E360, sub_8213E7B8, sub_8213CF58, sub_821456A0, sub_82145610, sub_821454C8, "
-              "sub_82145B08");
+              "sub_82145B08, sub_82145048, sub_821456F8");
 
 // Defines an adapter: `body` uses `ctx` and `base`.
 #define ITC_AI_DRIVERS(address, body)   \
@@ -198,11 +200,6 @@ ITC_AI_DRIVERS(8213B5D8, RefreshPoints(base, ctx.r3.u32))
 // r3 the path's driver word, as the original leaves it.
 ITC_AI_DRIVERS(8213D438, ctx.r3.u64 = ResetPath(base, ctx.r3.u32))
 
-// --- The other racers (r3 kept, but KeepsGapFrom's) ---
-
-// r4 = &the other's index.
-ITC_AI_DRIVERS(82145048, ctx.r3.u64 = KeepsGapFrom(base, ctx.r3.u32, ctx.r4.u32))
-
 // --- Set-up, modes and the plan ---
 
 // r4 = the object or 0; r3 left at the skill (+6048), as the original's
@@ -216,9 +213,6 @@ ITC_AI_DRIVERS(8213B428, ctx.r3.u64 = NormalizeByLane(base, ctx.r4.u32, ctx.r5.u
 // (ClampPosition's out), as the original leaves it.
 ITC_AI_DRIVERS(82144EF8, UpdateLane(base, ctx.r3.u32, ctx.r1.u32 - 128);
                ctx.r3.u64 = ctx.r1.u32 - 128 + 80)
-
-// --- The other racers' records and the states ---
-
 
 // --- The path's entries and corners ---
 
@@ -452,9 +446,6 @@ ITC_AI_DRIVERS(82139628, {
 
 // --- Reacting to the other racers ---
 
-// r4 = the skill, r5 = &the rate, r6 = the flag, r7 = the mode (r3 kept).
-ITC_AI_DRIVERS(821456F8, PlanReaction(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
-                                      ctx.r7.u32))
 // r4 = &the entry count; the original's frame 240 bytes down.
 ITC_AI_DRIVERS(82145CA8, ctx.r3.u64 = ReactToOthers(base, ctx.r3.u32, ctx.r4.u32,
                                                     ctx.r1.u32 - 240))
