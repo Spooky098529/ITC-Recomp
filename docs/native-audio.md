@@ -5,8 +5,9 @@ system, in `rexglue-sdk/src/audio/` and
 `rexglue-sdk/src/kernel/xboxkrnl/xboxkrnl_audio.cpp`) with our own, as
 the native renderer replaced the emulated GPU (`native-renderer.md`). Why:
 the SDK's "Audio Worker" thread takes ~80% of a core for the whole game
-(see "Measured" below). As with rendering, the game's own audio library is
-kept and only what's under it is replaced.
+(see "Measured" below). As with rendering, the game's own audio library was
+kept at first and only what's under it replaced; since 2026-10-23 XACT
+itself is being translated to native C++ (B7, "Decisions" below).
 
 ## How the game's audio works
 
@@ -113,6 +114,18 @@ Not known yet:
 - **Keep the game's XACT and XAudio**; replace the SDK's render driver.
   Replacing XACT itself (e.g. with FAudio) isn't planned: the banks are XACT2-era big-endian files, and the engine
   sounds depend on XACT's runtime variables.
+  **Changed (the user's call, 2026-10-23, B7's fifth loop run):** XACT
+  is translated to native C++, the game's own copy function by
+  function, as B7 does with the game's code: no host library plays its
+  data (FAudio's XACT doesn't read these XACT2-era big-endian banks), so
+  there is no upstream library to use instead. The translation runs from
+  the leaves up under `--native_xact` (`itc_recomp/src/xact/`,
+  `docs/functions/xact.md`; the game's sound manager above it under
+  `--native_sound_cues`, `docs/functions/sound-cues.md`). Where XACT
+  meets XAudio (its voice class, the audio callback XAudio runs on its
+  own thread) is the boundary a translation must replace with our own
+  audio output; how is the user's call, not yet made. XAudio itself is
+  still the game's recompiled copy.
 - **Keep the SDK's XMA decoder** (the user's call, 2026-10-14): it costs
   nothing measurable, so replacing it gains no speed. (Considered:
   converting the XMA wave banks to PCM banks on first launch, decoded once
