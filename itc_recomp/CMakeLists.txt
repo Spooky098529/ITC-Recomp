@@ -140,6 +140,8 @@ set(ITC_SOURCES
     src/track_collision/track_cell.cpp
     src/track_collision/track_walls.cpp
     src/track_collision/track_wall_query.cpp
+    src/hooks/track_route.cpp
+    src/track_route/track_route.cpp
     src/hooks/action_mappers.cpp
     src/action_mappers/action_mappers.cpp
     src/hooks/data_tables.cpp
@@ -204,6 +206,7 @@ set(ITC_SOURCES
     src/harnesses/collision.cpp
     src/harnesses/collision_world.cpp
     src/harnesses/collision_world_walls.cpp
+    src/harnesses/track_route.cpp
     src/harnesses/action_mappers.cpp
     src/harnesses/data_tables.cpp
     src/harnesses/model_animation.cpp
@@ -271,7 +274,8 @@ set(ITC_SOURCES
 # docs/functions/model-animation.md) and the car specs (src/car_specs/,
 # docs/functions/car-specs.md) and the cameras (src/cameras/,
 # docs/functions/cameras.md) and the string table and font
-# (src/strings_and_font/, docs/functions/strings-and-font.md).
+# (src/strings_and_font/, docs/functions/strings-and-font.md) and the
+# course's route (src/track_route/, docs/functions/track-route.md).
 set_source_files_properties(src/c_runtime/math.cpp src/ui_movies/keys.cpp
     src/matrix_math/matrix_math.cpp src/car_physics/rigid_body.cpp
     src/car_physics/vehicle_step.cpp src/car_physics/vehicle_update.cpp
@@ -284,7 +288,8 @@ set_source_files_properties(src/c_runtime/math.cpp src/ui_movies/keys.cpp
     src/track_collision/track_walls.cpp src/track_collision/track_wall_query.cpp
     src/action_mappers/action_mappers.cpp src/model_animation/model_animation.cpp
     src/car_specs/car_specs.cpp src/cameras/cameras.cpp
-    src/strings_and_font/strings_and_font.cpp src/strings_and_font/font.cpp PROPERTIES
+    src/strings_and_font/strings_and_font.cpp src/strings_and_font/font.cpp
+    src/track_route/track_route.cpp PROPERTIES
     COMPILE_OPTIONS "-ffp-model=strict;-ffp-contract=off"
     SKIP_PRECOMPILE_HEADERS ON)
 
