@@ -42,8 +42,8 @@ This run's groups: `expected-differences.md` (the "11:06 run" lines).
 
 The data tables' `sub_821171B0` Find20, `sub_82117210` Entry20,
 `sub_82117228` Entry40 (in neither the attract race nor the replay; the
-replay was ok), and `sub_82116DA8` ItemRecords::Item (its print added after the
-run; not seen in the attract race). The action mappers' functions all ran.
+replay was ok), `sub_82116DA8` ItemRecords::Item ran in a second replay after its
+print was added (`itc_924`, 127 s, 0 errors); the other three didn't. The action mappers' functions all ran.
 
 ## Totals
 
