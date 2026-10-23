@@ -153,7 +153,8 @@ ITC_FLAG_BOOL(native_ai_drivers, true, "ITC",
               "AiPath::DropPassed sub_8213F2E0, AiPath::Extend sub_8213ECF8 (the path's "
               "normalizer through its +5532 natively when it's NormalizeByLane or "
               "NormalizeByBranch, and AddCornersAt's join step on the translated code), "
-              "AiPath::Update sub_8213F530) "
+              "AiPath::Update sub_8213F530, AiDriver::Update sub_8213B310, AiDriver::DriveCar "
+              "sub_8215F678, AiDriver::UpdateIdle sub_821399A8) "
               "natively instead of "
               "through the translated code (the same words, bit for bit; checked by "
               "--run_harnesses=ai_drivers). Those "
@@ -572,4 +573,61 @@ extern "C" REX_FUNC(sub_8213F530) {
     }
   }
   __imp__sub_8213F530(ctx, base);
+}
+
+// --- The drivers' updates (f1 Drive's, as the originals leave it) ---
+
+// r4 = the car's input record, r5 = &the flag; the original's frame 112 bytes
+// down. The original where AiPath::Update couldn't be native.
+extern "C" REX_FUNC(sub_8213B310) {
+  REX_FUNC_PROLOGUE();
+  if (ITC_FLAG(native_ai_drivers)) {
+    ctx.fpscr.disableFlushMode();
+    PathCall call{&ctx, base};
+    const PathCalls calls{&call, CallNormalizer, CallJoinStep};
+    uint64_t r3 = 0;
+    double f1 = 0;
+    if (UpdateDriver(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32 - 112, calls, &r3,
+                     &f1)) {
+      ctx.r3.u64 = r3;
+      ctx.f1.f64 = f1;
+      return;
+    }
+  }
+  __imp__sub_8213B310(ctx, base);
+}
+// r3 = the car's input record (left in r3), r4 = the racer's index, r5 = the
+// flag; the original's frame 144 bytes down.
+extern "C" REX_FUNC(sub_8215F678) {
+  REX_FUNC_PROLOGUE();
+  if (ITC_FLAG(native_ai_drivers)) {
+    ctx.fpscr.disableFlushMode();
+    PathCall call{&ctx, base};
+    const PathCalls calls{&call, CallNormalizer, CallJoinStep};
+    uint64_t r3 = 0;
+    double f1 = 0;
+    const uint64_t input = ctx.r3.u64;
+    if (DriveCar(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32 - 144, calls, &r3, &f1)) {
+      ctx.r3.u64 = input;
+      ctx.f1.f64 = f1;
+      return;
+    }
+  }
+  __imp__sub_8215F678(ctx, base);
+}
+// The original's frame 96 bytes down.
+extern "C" REX_FUNC(sub_821399A8) {
+  REX_FUNC_PROLOGUE();
+  if (ITC_FLAG(native_ai_drivers)) {
+    ctx.fpscr.disableFlushMode();
+    PathCall call{&ctx, base};
+    const PathCalls calls{&call, CallNormalizer, CallJoinStep};
+    bool done = false;
+    const uint64_t r3 = UpdateIdle(base, ctx.r3.u32, ctx.r1.u32 - 96, calls, &done);
+    if (done) {
+      ctx.r3.u64 = r3;
+      return;
+    }
+  }
+  __imp__sub_821399A8(ctx, base);
 }

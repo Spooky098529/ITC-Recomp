@@ -5429,4 +5429,74 @@ bool UpdatePath(uint8_t* base, uint32_t path, uint32_t frame, const PathCalls& c
   return true;
 }
 
+// --- The drivers' updates ---
+
+bool UpdateDriver(uint8_t* base, uint32_t driver, uint32_t input, uint32_t flag, uint32_t frame,
+                  const PathCalls& calls, uint64_t* r3, double* f1) {
+  if (!CornersMovable(driver + 512)) {  // AiPath::Update's condition, checked first
+    return false;
+  }
+  ITC_NATIVE_RUNNING("sub_8213B310 AiDriver::Update");
+  const uint32_t flags = Load(base, driver + 16);
+  if ((flags & 0x2) == 0 || int32_t(Load(base, flag)) == int32_t((flags >> 2) & 1)) {
+    if (Load(base, flag) != 0) {
+      ResetControl(base, driver, frame - 112);
+    } else {
+      StartRace(base, driver, frame - 112);
+    }
+  }
+  uint64_t path_r3 = 0;
+  UpdatePath(base, driver + 512, frame - 144, calls, &path_r3);  // can't fail: checked above
+  *r3 = Drive(base, driver, input, frame - 160, f1);
+  return true;
+}
+
+bool DriveCar(uint8_t* base, uint32_t input, uint32_t index, uint32_t flag, uint32_t frame,
+              const PathCalls& calls, uint64_t* r3, double* f1) {
+  const uint32_t table = Load(base, kDrivers);
+  if (table != 0 && !CornersMovable(uint32_t(uint64_t(index) * kDriverBytes + table) + 512)) {
+    return false;  // AiPath::Update's condition, checked first
+  }
+  ITC_NATIVE_RUNNING("sub_8215F678 AiDriver::DriveCar");
+  const uint32_t vehicle = vehicle_accessors::VehicleGet(base, index);
+  const uint32_t identity = vehicle_accessors::VehicleIdentity(vehicle);
+  track_route::ClampPosition(base, frame + 88, Load(base, identity + 4));
+  Vehicle_GetSpeedKmh(base, vehicle);  // not read (its f1 Drive's later)
+  if (guest::LoadU8(base, vehicle + 2249) == 0) {
+    guest::StoreU8(base, vehicle + 2249, 1);
+  }
+  if ((Load(base, vehicle + 6148) & 0x81) != 0 && guest::LoadU8(base, vehicle + 2424) != 0) {
+    guest::StoreU8(base, vehicle + 2424, 0);
+  }
+  ClearCarInput(base, input);
+  guest::StoreU32(base, frame + 84, flag);
+  guest::StoreU32(base, frame + 80, index);
+  guest::StoreU8(base, input + 17, 2);
+  const uint32_t driver = uint32_t(Of(base, frame + 80));
+  uint64_t ignored = 0;
+  UpdateDriver(base, driver, input, frame + 84, frame - 112, calls, &ignored, f1);
+  *r3 = input;
+  return true;
+}
+
+uint64_t UpdateIdle(uint8_t* base, uint32_t driver, uint32_t frame, const PathCalls& calls,
+                    bool* done) {
+  *done = CornersMovable(driver + 512);  // AiPath::Update's condition, checked first
+  if (!*done) {
+    return 0;
+  }
+  ITC_NATIVE_RUNNING("sub_821399A8 AiDriver::UpdateIdle");
+  if ((Load(base, driver + 16) & 0x2) != 0) {
+    ResetToMode0(base, driver, frame - 128);
+  }
+  uint64_t r3 = 0;
+  UpdatePath(base, driver + 512, frame - 144, calls, &r3);
+  const double zero = Lfs(base, kZero);
+  Stfs(base, driver + 6120, zero);
+  guest::StoreU8(base, driver + 6132, 0);
+  Stfs(base, driver + 6124, zero);
+  Stfs(base, driver + 6128, zero);
+  return r3;
+}
+
 }  // namespace ai_drivers

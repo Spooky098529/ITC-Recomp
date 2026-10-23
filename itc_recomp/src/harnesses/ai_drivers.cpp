@@ -483,6 +483,49 @@ void NativeUpdatePath(PPCContext& ctx, uint8_t* base) {
   g_fallbacks++;
   __imp__sub_8213F530(ctx, base);
 }
+void NativeUpdateDriver(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  PathCall call{&ctx, base};
+  const ai::PathCalls calls{&call, CallNormalizer, CallJoinStep};
+  uint64_t r3 = 0;
+  double f1 = 0;
+  if (ai::UpdateDriver(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32 - 112, calls, &r3,
+                       &f1)) {
+    ctx.r3.u64 = r3;
+    ctx.f1.f64 = f1;
+    return;
+  }
+  g_fallbacks++;
+  __imp__sub_8213B310(ctx, base);
+}
+void NativeDriveCar(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  PathCall call{&ctx, base};
+  const ai::PathCalls calls{&call, CallNormalizer, CallJoinStep};
+  uint64_t r3 = 0;
+  double f1 = 0;
+  const uint64_t input = ctx.r3.u64;
+  if (ai::DriveCar(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32 - 144, calls, &r3, &f1)) {
+    ctx.r3.u64 = input;
+    ctx.f1.f64 = f1;
+    return;
+  }
+  g_fallbacks++;
+  __imp__sub_8215F678(ctx, base);
+}
+void NativeUpdateIdle(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  PathCall call{&ctx, base};
+  const ai::PathCalls calls{&call, CallNormalizer, CallJoinStep};
+  bool done = false;
+  const uint64_t r3 = ai::UpdateIdle(base, ctx.r3.u32, ctx.r1.u32 - 96, calls, &done);
+  if (done) {
+    ctx.r3.u64 = r3;
+    return;
+  }
+  g_fallbacks++;
+  __imp__sub_821399A8(ctx, base);
+}
 void NativeDropPassed(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   uint64_t r3 = 0;
@@ -709,6 +752,9 @@ enum Kind {
   kDropPassed,
   kExtend,
   kUpdatePath,
+  kUpdateDriver,
+  kDriveCar,
+  kUpdateIdle,
 };
 
 }  // namespace
@@ -1015,6 +1061,12 @@ void AiDrivers(Context& h) {
        2000},
       {"AiPath::Update (sub_8213F530)", Original<__imp__sub_8213F530>, NativeUpdatePath,
        kUpdatePath, 2000},
+      {"AiDriver::Update (sub_8213B310)", Original<__imp__sub_8213B310>, NativeUpdateDriver,
+       kUpdateDriver, 2000},
+      {"AiDriver::DriveCar (sub_8215F678)", Original<__imp__sub_8215F678>, NativeDriveCar,
+       kDriveCar, 2000},
+      {"AiDriver::UpdateIdle (sub_821399A8)", Original<__imp__sub_821399A8>, NativeUpdateIdle,
+       kUpdateIdle, 2000},
   };
   const uint32_t area = memory::Alloc(kAreaBytes, 0);
   const uint32_t driver = area + kDriver, vehicle = area + kVehicle, io = area + kIo;
@@ -1071,6 +1123,9 @@ void AiDrivers(Context& h) {
       bool table_written = false;
       uint64_t f1 = 0x7FF8DEADBEEF0000ull;
       std::vector<std::pair<uint32_t, uint32_t>> floats;  // (offset, count) in the block
+      // Guest bytes outside the block a case's function writes (address,
+      // size): put back before each version and compared after.
+      std::vector<std::pair<uint32_t, uint32_t>> extras;
       std::string what = fmt::format("case {}", c);
       // The steering's fields (UpdateSteerInput and its steps, UpdateSteering,
       // Drive): with `records`, up to four corner records (+5676: their data,
@@ -2526,7 +2581,10 @@ void AiDrivers(Context& h) {
         case kLeftEntry:
         case kDropPassed:
         case kExtend:
-        case kUpdatePath: {
+        case kUpdatePath:
+        case kUpdateDriver:
+        case kDriveCar:
+        case kUpdateIdle: {
           // A route (test_route.h) and a point (io); the driver's route
           // position (+4) and lane (+8); BranchMasks' inputs (the path's
           // kinds, the driver's +500 object, the vehicle's flags, the race
@@ -2546,7 +2604,9 @@ void AiDrivers(Context& h) {
           // isn't bounded by the original, which runs past its 8 entries into
           // the corners' count and records (the game drops passed sections
           // first, DropPassedSections).
-          const bool extend = f.kind == kExtend || f.kind == kUpdatePath;
+          const bool update = f.kind == kUpdatePath || f.kind == kUpdateDriver ||
+                              f.kind == kDriveCar || f.kind == kUpdateIdle;
+          const bool extend = f.kind == kExtend || update;
           const test_route::Route route =
               test_route::BuildRoute(h.base, route_area, route_table, r, extend);
           if (extend) {
@@ -2655,7 +2715,7 @@ void AiDrivers(Context& h) {
           } else {
             r4 = io;
           }
-          if (f.kind == kExtend || f.kind == kUpdatePath) {
+          if (extend) {
             // The corners (as AddCornersAt's cases): four corners' data in the
             // vehicle's bytes (0x300 apart; +48 to +54 their slices), the route
             // file's corner table (+16) at vehicle + 0xD00, each route slice's
@@ -2695,10 +2755,15 @@ void AiDrivers(Context& h) {
                 }
               }
             }
-            guest::StoreU16(h.base, path + 5162, uint16_t(r.Below(5)));
-            for (uint32_t i = 0; i < 9; i++) {
+            // (Records with data up to the count, as the game's: LimitForCorner
+            // reads it without a check; ClearCorners and DropOffRouteCorners
+            // clear the others.)
+            const uint32_t corners = r.Below(5);
+            guest::StoreU16(h.base, path + 5162, uint16_t(corners));
+            for (uint32_t i = 0; i < 8; i++) {
               const uint32_t record = path + 5164 + 44 * i;
-              const uint32_t data = r.Below(8) == 0 ? 0 : vehicle + 0x300 * r.Below(4);
+              const uint32_t data =
+                  i >= corners && r.Below(2) == 0 ? 0 : vehicle + 0x300 * r.Below(4);
               guest::StoreU32(h.base, record + 0, data);
               guest::StoreU32(h.base, record + 4, data == 0 ? 0 : data + 56);
               guest::StoreU16(h.base, record + 8, uint16_t(r.Below(10)));
@@ -2726,18 +2791,20 @@ void AiDrivers(Context& h) {
             test_route::RandomPosition(h.base, vehicle + 5232 + 4, route, r);
             guest::StoreU16(h.base, object + 88, uint16_t(r.Below(5) + 2));
             guest::StoreU8(h.base, object + 90, uint8_t(r.Below(4)));
-            for (uint32_t at : {116u, 128u, 152u}) {
-              guest::StoreU32(h.base, driver + at, RandomFloat(r, 3.0f));
-            }
+            // The car's sizes (ReadCar's: +116 and +128 positive, as the game's;
+            // WithinRoadAt's index from +128 then stays on the ring) and +152.
+            guest::StoreU32(h.base, driver + 116, FloatBits(float(1 + r.Below(40)) / 20.0f));
+            guest::StoreU32(h.base, driver + 128, FloatBits(float(r.Below(400)) / 20.0f));
+            guest::StoreU32(h.base, driver + 152, RandomFloat(r, 3.0f));
             guest::StoreU32(h.base, path + 5516, RandomFloat(r, 1.0f));
-            for (uint32_t i = 0; i < 9; i++) {
+            for (uint32_t i = 0; i < 8; i++) {
               floats.push_back({kPath + 5164 + 44 * i + 28, 2});
             }
             for (uint32_t k = 0; k < 80; k++) {
               floats.push_back({kPath + 16 + 64 * k + 28, 6});
             }
           }
-          if (f.kind == kUpdatePath) {
+          if (update) {
             // The point (the driver's +80), the driver at index 0 of a table
             // at the block (the others' +80, +88, +116, +144 in the block
             // past it), its +16 (bit 0 now and then), state, mask, speed and
@@ -2792,6 +2859,67 @@ void AiDrivers(Context& h) {
             }
             floats.push_back({kDriver + 164, 2});
             floats.push_back({kPath + 5516, 1});
+          }
+          if (f.kind == kUpdateDriver || f.kind == kDriveCar || f.kind == kUpdateIdle) {
+            // The resets' and Drive's: the vehicle's box shape (+344, or
+            // none), the skill's source (+6048: seven halfwords at io + 0xA0,
+            // or none) and halfwords, Drive's vehicle and driver fields (as
+            // Drive's cases), the corners' speeds; the flag (io + 0xF8) and
+            // the input record (io + 0x100); DriveCar's racer 0 (its vehicle,
+            // the vehicles' first: its bytes +2249 and +2424, put back before
+            // each version and compared).
+            guest::StoreU32(h.base, vehicle + 344, r.Below(4) == 0 ? 0 : area + kShape);
+            guest::StoreU32(h.base, driver + kSkill, r.Below(2) ? 0 : io + 0xA0);
+            for (uint32_t i = 0; i < 7; i++) {
+              guest::StoreU16(h.base, io + 0xA0 + 2 * i, uint16_t(int32_t(r.Below(200)) - 50));
+            }
+            guest::StoreU32(h.base, race_block + 0xA3AF0, r.Below(2));
+            guest::StoreU16(h.base, driver + 6056, uint16_t(int32_t(r.Below(300)) - 150));
+            guest::StoreU16(h.base, driver + 6058, uint16_t(int32_t(r.Below(300)) - 150));
+            guest::StoreU16(h.base, driver + 6060, uint16_t(int32_t(r.Below(5)) - 2));
+            guest::StoreU32(h.base, driver + 6032, r.Below(3));
+            guest::StoreU32(h.base, driver + 156, RandomFloat(r, 20.0f));
+            for (uint32_t at : {92u, 384u, 392u}) {
+              guest::StoreU32(h.base, vehicle + at, RandomFloat(r, 4.0f));
+            }
+            guest::StoreU32(h.base, vehicle + 3548, r.Below(4));
+            guest::StoreU32(h.base, driver + 6088, RandomFloat(r, 200.0f));
+            for (uint32_t at : {6112u, 6116u}) {
+              guest::StoreU32(h.base, driver + at, RandomFloat(r, 1.0f));
+            }
+            for (uint32_t at : {6120u, 6124u, 6128u, 6136u, 6140u, 6144u}) {
+              guest::StoreU32(h.base, driver + at, RandomFloat(r, 1.5f));
+            }
+            for (uint32_t i = 0; i < 4; i++) {
+              const uint32_t data = vehicle + 0x300 * i;
+              for (uint32_t k = 8; k <= 28; k += 4) {
+                guest::StoreU32(h.base, data + k, RandomFloat(r, 200.0f));
+              }
+            }
+            const uint32_t flag = r.Below(3) == 0 ? uint32_t(r.Next()) : r.Below(2);
+            guest::StoreU32(h.base, io + 0xF8, flag);
+            for (uint32_t i = 0; i < 8; i++) {
+              floats.push_back({kPath + 5164 + 44 * i + 16, 2});
+            }
+            floats.push_back({kDriver + 152, 1});
+            floats.push_back({kDriver + 6088, 1});
+            floats.push_back({kDriver + 6096, 3});
+            floats.push_back({kDriver + 6112, 9});
+            if (f.kind == kUpdateDriver) {
+              r3 = driver;
+              r4 = io + 0x100;
+              r5 = io + 0xF8;
+            } else if (f.kind == kDriveCar) {
+              guest::StoreU8(h.base, vehicles + 2249, uint8_t(r.Below(2)));
+              guest::StoreU8(h.base, vehicles + 2424, uint8_t(r.Below(2)));
+              extras.push_back({vehicles + 2249, 1});
+              extras.push_back({vehicles + 2424, 1});
+              r3 = io + 0x100;
+              r4 = 0;
+              r5 = flag;
+            } else {
+              r3 = driver;
+            }
           }
           break;
         }
@@ -3245,9 +3373,16 @@ void AiDrivers(Context& h) {
       const std::vector<uint8_t> seven =
           table_written ? std::vector<uint8_t>(h.base + table, h.base + table + kSevenBytes)
                         : std::vector<uint8_t>();
+      std::vector<std::vector<uint8_t>> extra_inputs;
+      for (const auto& [address, size] : extras) {
+        extra_inputs.emplace_back(h.base + address, h.base + address + size);
+      }
       Outputs out[2];
       for (int v = 0; v < 2; v++) {
         std::memcpy(h.base + area, inputs.data(), kAreaBytes);
+        for (size_t i = 0; i < extras.size(); i++) {
+          std::memcpy(h.base + extras[i].first, extra_inputs[i].data(), extras[i].second);
+        }
         if (table_written) {
           std::memcpy(h.base + table, seven.data(), kSevenBytes);
         }
@@ -3294,9 +3429,12 @@ void AiDrivers(Context& h) {
           out[v].Word(uint32_t(hash >> 32));
           out[v].Word(uint32_t(hash));
         }
+        for (const auto& [address, size] : extras) {
+          out[v].Bytes(std::vector<uint8_t>(h.base + address, h.base + address + size));
+        }
         out[v].Word(uint32_t(t.r3.u64 >> 32));
         out[v].Word(t.r3.u32);
-        if (f.kind == kSpeedOverDistance || f.kind == kCornerFactor || f.kind == kLimitSpeed ||
+        if (f.kind == kUpdateDriver || f.kind == kDriveCar || f.kind == kSpeedOverDistance || f.kind == kCornerFactor || f.kind == kLimitSpeed ||
             f.kind == kLimitSpeedBlend || f.kind == kLimitForCorner ||
             f.kind == kUpdateTargetSpeed || f.kind == kUpdateSpeed || f.kind == kSteerToTarget ||
             f.kind == kSkillEntryValue || f.kind == kTriggerStarts || f.kind == kTriggerEnds ||

@@ -914,4 +914,31 @@ uint64_t Extend(uint8_t* base, uint32_t path, uint32_t point, uint32_t frame,
 bool UpdatePath(uint8_t* base, uint32_t path, uint32_t frame, const PathCalls& calls,
                 uint64_t* r3);
 
+// --- The drivers' updates ---
+
+// AiDriver::Update (sub_8213B310): unless the driver's +16 has bit 0x2 and
+// the word at `flag` differs from its bit 0x4, ResetControl (the flag set) or
+// StartRace; then AiPath::Update on the path (+512) and Drive into the car's
+// input record at `input`. `frame` the original's, 112 bytes below the
+// caller's stack pointer. `r3` and `f1` Drive's. False, with nothing done,
+// where AiPath::Update couldn't be native (the original runs then).
+bool UpdateDriver(uint8_t* base, uint32_t driver, uint32_t input, uint32_t flag, uint32_t frame,
+                  const PathCalls& calls, uint64_t* r3, double* f1);
+// AiDriver::DriveCar (sub_8215F678): the racer's vehicle (Vehicle::Get of
+// `index`): its route position clamped (at frame + 88: `frame` 144 bytes
+// down; not read), its speed read (not used), its byte +2249 set to 1, with
+// the flags 0x81 its byte +2424 cleared; the input record cleared, its byte
+// +17 = 2, then the racer's driver (AiDriver::Of, the index at frame + 80)
+// updated into it (UpdateDriver, the flag at frame + 84). `r3` the record,
+// `f1` Drive's. False, with nothing done, where AiPath::Update couldn't be
+// native (the original runs then).
+bool DriveCar(uint8_t* base, uint32_t input, uint32_t index, uint32_t flag, uint32_t frame,
+              const PathCalls& calls, uint64_t* r3, double* f1);
+// AiDriver::UpdateIdle (sub_821399A8): with +16 bit 1 set ResetToMode0, then
+// AiPath::Update on the path, +6120, +6124, +6128 = 0.0 and the byte +6132 =
+// 0. `frame` 96 bytes down. Returns AiPath::Update's r3; `done` false, with
+// nothing done, where it couldn't be native (the original runs then).
+uint64_t UpdateIdle(uint8_t* base, uint32_t driver, uint32_t frame, const PathCalls& calls,
+                    bool* done);
+
 }  // namespace ai_drivers
