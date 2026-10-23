@@ -22,6 +22,10 @@ seen in play before either (the 32-bit and node channel tracks):
 - `sub_825A10A8` TrackSet::Advance32 (`model-animation.md`)
 - `sub_825A20E8` CursorCurve::Sample (`model-animation.md`)
 
+Not in the attract race or the replay (`itc_1013`, `itc_1014`, ok):
+
+- `sub_820AAE48` Viewport::Set (`cameras.md`)
+
 ## Run 2026-10-23 11:06 (`b7-loop-23-10-26-2`)
 
 Not in the attract race or two replays (`itc_922`, `itc_924`, both ok);

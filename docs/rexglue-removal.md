@@ -71,12 +71,17 @@ goes in `src/` as overrides), American English.
   from the host clock (ours 971), its sixth run (branch
   `b7-loop-23-10-26-2`, merged 2026-10-23) made
   the action mappers and the data tables native as far as they were
-  ready, with no change in the game's behavior (ours 1,023). The
+  ready, with no change in the game's behavior (ours 1,023); its
+  seventh run (branch `b7-loop-23-10-26-3`, not yet merged) made the
+  model animation, the car specs and the cameras native as far as they
+  were ready (ours 1,139; the cameras keep frame interpolation's hooks,
+  with a new `BlendState_OnCopy`). The
   runs' rows wait for the user's review (`docs/loops/review.md`). See
   "B7's loop runs" under B7, and `docs/loops/b7-progress.md`. Guest
   allocation is no longer a block (`docs/native-memory.md`); what the
   rest waits on is in `docs/loops/leads.md` (the archive loader, the
-  route, the scene and race set-up, guest vtable calls).
+  route, the scene and race set-up, guest vtable calls, the graphics
+  device's resource calls).
 
 ## The approach (agreed with the user, 2026-10-19)
 
@@ -2516,6 +2521,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-10-23 | The game's data tables at `[0x826C5CA0]` (their load callbacks, byte swaps and accessors; no behavior change) | `data-tables.md` | 16 of 18 | `--native_data_tables` |
 | 2026-10-23 | The model animation (track sets and their keyframed curves, `Model::Animate`, the skeleton's node values and matrices; with the primitive drawer's constructor) | `model-animation.md` | 36 of 39 (and `models.md`'s `sub_8259C3A8`) | `--native_model_animation` |
 | 2026-10-23 | The car specs (the parameter tables' set-up, load callbacks and byte swaps, the getters, `Car::Refresh` and `Tire::InchUp`; no behavior change) | `car-specs.md` | 47 of 48 (`Params::Free` not seen in play) | `--native_car_specs` |
+| 2026-10-23 | The cameras below the camera modes (the library's `Camera` class, the 21 camera passes and their record passes, the two viewports; interpolation's hooks kept) | `cameras.md` | 32 of 42 (two migrations) | `--native_cameras` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -3020,3 +3026,14 @@ row yet 4,979); `car-specs.md` 47 ours of 48. 929 overrides in `src/`.
 `Params::Load` waits on the archive (its twelve `Archive::Load` calls);
 the archive's TOC lookup `sub_8209D868` stays a guest call from the
 adapters.
+
+**2026-10-23, B7's seventh loop run, stopped (branch
+`b7-loop-23-10-26-3`: the model animation, the car specs, the
+cameras):** the boundary unchanged: 449 functions (916 pairs):
+overridden 67, Native 3, Dropped 23, never called 70, live 286.
+Imports: 186 called, 62 with a live caller. B7 (`b7_status.py`): 6,756
+in play, ours 1,139, work left 5,617 (Wrapped 123, with a row 551, no
+row yet 4,943); `cameras.md` 32 ours of 42. 949 overrides in `src/`.
+The cameras' rest waits on the graphics device's resource calls
+(`CameraPass::Init`, `SetUpSurfaces`, `CameraPasses::MakeRenderTarget`)
+and memset and atexit (`Viewports::Init`, `Viewport::Init`).

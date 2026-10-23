@@ -16,15 +16,17 @@ file's history. What's left to see in a drive, from every run:
   the graphics device.
 - Subsystem 2 of 3 (the car specs) finished: the rest waits on the
   archive.
-- Subsystem 3 of 3: the game's cameras above `CameraPass::Update` (the
-  lead whose functions run every frame, nearly all ready): mapped in 8fb7201 (`cameras.md`,
-  42 rows, 16 ready groups), checked; migration 1 done
-  (81d1c0c..1736a63; 4 ready groups left), validated (19 of 19
-  harness lines; all ran in the attract race or the replay, `itc_982`,
-  `itc_983` ok); migration 2 done (14a4cc8..11837c9;
-  nothing ready left); validation agent running.
+- Subsystem 3 of 3 (the cameras) finished: the rest waits on the
+  graphics device's resource calls and memset/atexit. The loop stopped
+  at the run's limit (below).
 
 ## Done
+
+- The cameras (`cameras.md`, mapped in 8fb7201; 42 rows): 32 ours in
+  two migrations (81d1c0c..1736a63, 14a4cc8..11837c9), validated (19 of
+  19 and 11 of 11 harness lines; `itc_982`, `itc_983`, `itc_1013`,
+  `itc_1014`, replays ok; 1 to drive); `--native_cameras`. Left: the
+  passes' and viewports' set-ups (the graphics device, memset, atexit).
 
 - The car specs (`car-specs.md`, already mapped; 48 rows): 47 ours in
   one migration (d87b553..114aa35), validated (47 of 47 harness lines;
@@ -70,3 +72,9 @@ This run's groups: `expected-differences.md` (the "13:44 run" lines).
   123, known 551, unknown 4943). Race 19 s, the same checks.
 
 ## Stopped
+
+2026-10-23, after the cameras: the run's limit (3 subsystems) reached.
+Everything passed: harnesses 0 differing outside the earlier
+"(expected to differ)" groups (none added), attract races 19 s with all
+harnesses, no errors, replays ok. Next: the user reviews `review.md`
+("Run 2026-10-23 13:44"), drives a race for `to-drive.md`, and merges.
