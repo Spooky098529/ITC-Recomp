@@ -18,8 +18,7 @@
 
 ITC_FLAG_BOOL(native_c_runtime, true, "ITC",
               "Run the C runtime's helpers natively instead of through the translated code: "
-              "the stack probe (__chkstk, sub_825A9934) is skipped, as its reads of the guest "
-              "stack have no effect; memset (sub_825A71D0); wcslen, wcscpy, wcscat and wcscmp "
+              "memset (sub_825A71D0); wcslen, wcscpy, wcscat and wcscmp "
               "(sub_825A9958, sub_825A7F30, sub_825A7EF8, sub_825A7EB0); mbtowc's single-byte "
               "path (sub_825B7EC8); strncpy, strcpy_s, strncmp, _stricmp, _strnicmp and its compare, "
               "strstr (sub_825A7F50, sub_825A9DD8, sub_825AACD0, sub_825AA100, sub_825AC710, "
@@ -52,13 +51,9 @@ ITC_FLAG_BOOL(native_memcpy, true, "ITC",
 // word every 4,096 bytes below r1 down to the new frame, touching the guard
 // pages on the 360; the guest stack here is ordinary memory, so the reads do
 // nothing and are left out. The callers only use r12 and r1 after it, both
-// unchanged either way.
+// unchanged either way. Dropped: no fallback to the original.
 extern "C" REX_FUNC(sub_825A9934) {
   REX_FUNC_PROLOGUE();
-
-  if (!ITC_FLAG(native_c_runtime)) {
-    __imp__sub_825A9934(ctx, base);
-  }
 }
 
 // memset: r3 = destination, r4 = the value (its low byte), r5 = the count
