@@ -75,3 +75,6 @@ the pad replay.
 settings and slots). Not a failure: every check and validation passed.
 The user reviews `review.md` ("Run 2026-10-23 01:52"; the GetTickCount
 call), drives a race, and merges.
+Drive (2026-10-23, `itc_895.log`, ~2 minutes at 30 ticks/s, 0 errors;
+everything sounded normal to the user): all 133 functions whose Status
+changed this run logged `native running (game)`.
