@@ -11,8 +11,8 @@ lists are there), and this file's history.
 - Run started 2026-10-23 01:52 on `b7-loop-23-10-26` (the user's
   branch), from 21cdb6a; summary `b7-loop-2026-10-23-0152.md`.
 - Subsystem 1 of 3: the sound cues (`sound-cues.md`, mapped in
-  bfa9d03, 87 rows, 55 ready groups); step 6, migration agent 1
-  running. The user's call (2026-10-23): XACT will probably be
+  bfa9d03, 87 rows, 55 ready groups); step 8, migration 1 done
+  (6187975..fae15f5, 30 ours); validation agent running. The user's call (2026-10-23): XACT will probably be
   translated (no host library plays its data); its body is a lead.
 
 ## Done
@@ -36,3 +36,5 @@ This run's groups: `expected-differences.md` (the "01:52 run" lines).
 - Start: ours 837, work left 5916 (wrapped 137, known 322, unknown 5457).
 - After mapping the sound cues: ours 837, work left 5916 (wrapped 137,
   known 405, unknown 5374).
+- After the sound cues' migration 1: ours 867, work left 5886 (wrapped
+  137, known 375, unknown 5374).

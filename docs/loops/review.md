@@ -23,6 +23,18 @@ When the user has reviewed a run's section, its heading gets
   user's call that XACT will probably be translated (it replaces "keep
   the game's XACT" in `native-audio.md`'s decisions, not yet edited
   there); the 3D path never ran in play.
+  Migration 1's 30 rows (7 Native; the intro's "Native so far"). For
+  review: X3DAudioInitialize (`sub_82480710`, a library entry point,
+  pure math) translated; it doesn't store the speed at r1+28 in its
+  caller's frame as the original does (no caller reads it);
+  SoundBankHolderDelete leaves out the call to the empty `sub_82106540`;
+  the bank slot functions run the original where it traps, and the
+  allocating ones unless the native heap is on; `sub_8259D438` runs the
+  original when a handle is to be closed (never in play). The message
+  handler `sub_82119188` left recompiled (guest vtable calls); the rest
+  waits on XACT (the cue and engine calls through its vtables), the
+  file layer and the string helpers; `sub_82092B78` (a std allocator)
+  has no row anywhere.
 
 ## Run 2026-10-22 22:11 (`b7-loop-22-10-26-2`)
 
