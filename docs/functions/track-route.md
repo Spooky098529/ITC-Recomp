@@ -11,7 +11,8 @@ per course with the collision mesh (`TrackCollision::Load`,
 `Update`, the two callers here from the track positions). Read by the
 B7 loop's mapping agent, 2026-10-23, from the collision world's and the
 cameras' leads; the race code's callers (`8213B428`-`82173A90`) aren't
-read.
+read here: the AI drivers' (`8213B428`-`8215F678`) are in
+`ai-drivers.md`, the race states' in a lead.
 
 - **The file** (`[0x826C5B10]`, `../known-data.md`): +0 the sections'
   count, +8 a float, the length of a slice (a distance in slices times

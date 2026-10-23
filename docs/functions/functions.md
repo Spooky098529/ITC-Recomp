@@ -180,6 +180,12 @@ Rows not yet moved stay in the table below. So far:
   moved along its linked sections by lane, branch or path, points and
   lanes on it, distances along it, and following a point along it for
   the track positions (B7).
+- [`ai-drivers.md`](ai-drivers.md): the AI drivers: the computer
+  racers' table of drivers, filling their cars' input records, the path
+  each keeps along the course's route (its line across the road, the
+  corners, the room left by other racers), their target speeds, pedals
+  and steering, their records of the other racers, and their skill
+  blocks (B7).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
@@ -235,8 +241,6 @@ old performance notes to the end of `../native-renderer.md`.
 | `sub_8258FD48` | `Command::SetShaderConstants` | Wrapped | Render thread, command 7: r3 = payload, r4 = register count, r5 = stage << 24 \| type << 16 \| start << 8 \| count. Interpolation substitutes blended values here. |
 | `sub_8210EDB0` | | | Wind sound; scales with speed. |
 | `sub_82152CD8` | | | Camera shake; scales with speed. |
-| `sub_8213F530` | | | Parent of the speed trail object (switches mode at about 88 km/h). Calls `sub_8213F2E0`, `sub_8213F140` and `sub_8213F4B0`. |
-| `sub_8213D438` | | | Resets the trail history; runs on a camera switch. |
 | `sub_820F11A8` | `TextureAnimations::Advance` | Wrapped | From the draw step part `sub_820F6068`: advances the flipbook animation set at r3+1060 (`sub_82146B20`). Skipped on render-only passes (see "Per-frame logic" in `../frame-interpolation.md`). |
 | `sub_82146B20` | | | Calls `sub_82146AC0` on every animation in a set: count at +0, then offsets to each animation. |
 | `sub_82146AC0` | | | Advances one flipbook animation: frame count +0, current frame +4, tick counter +8 (wraps at the length at +12), frame start ticks from +16. |
