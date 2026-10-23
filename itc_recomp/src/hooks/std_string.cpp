@@ -18,7 +18,8 @@
 ITC_FLAG_BOOL(native_std_string, true, "ITC",
               "Run the C++ library's narrow string (docs/functions/std-string.md: _Tidy "
               "sub_82091328, allocator<char>::allocate sub_820912B0, _Copy sub_82091458 and _Grow "
-              "sub_82091540, with --native_heap; the "
+              "sub_82091540, assign sub_82091720 and sub_82091808, append sub_820A6F60, with "
+              "--native_heap; string() sub_825929E8; the "
               "wildcard replace sub_82593088 with its find sub_82592970 and search "
               "sub_82592740, no adapters of their own; replace sub_82592E18, for a match, on "
               "the translated code) "
@@ -95,6 +96,45 @@ extern "C" REX_FUNC(sub_82091540) {
     }
   }
   __imp__sub_82091540(ctx, base);
+}
+
+// assign(const string&, size_t, size_t): r3 = the string, r4 = the source,
+// r5 = the offset, r6 = the count; r3 the string (left as it came).
+extern "C" REX_FUNC(sub_82091720) {
+  REX_FUNC_PROLOGUE();
+  if (!NativeLifetime() ||
+      !AssignFrom(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32)) {
+    __imp__sub_82091720(ctx, base);
+  }
+}
+
+// assign(const char*, size_t): r3 = the string, r4 = the text, r5 = the
+// count; r3 the string (left as it came).
+extern "C" REX_FUNC(sub_82091808) {
+  REX_FUNC_PROLOGUE();
+  if (!NativeLifetime() || !AssignText(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32)) {
+    __imp__sub_82091808(ctx, base);
+  }
+}
+
+// append(const char*, size_t): r3 = the string, r4 = the text, r5 = the
+// count; r3 the string (left as it came).
+extern "C" REX_FUNC(sub_820A6F60) {
+  REX_FUNC_PROLOGUE();
+  if (!NativeLifetime() || !Append(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32)) {
+    __imp__sub_820A6F60(ctx, base);
+  }
+}
+
+// string(): r3 = the string, returned (r4, the allocator, not read). It
+// neither allocates nor frees.
+extern "C" REX_FUNC(sub_825929E8) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_std_string)) {
+    __imp__sub_825929E8(ctx, base);
+    return;
+  }
+  Construct(base, ctx.r3.u32);
 }
 
 // The wildcard replace: r3 = the string, r4 = the pattern, r5 = the

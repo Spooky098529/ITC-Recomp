@@ -72,6 +72,30 @@ bool Copy(uint8_t* base, uint32_t string, uint32_t new_length, uint32_t keep);
 // the original must run (a length over 0xFFFFFFFE: _Xlen; its callees').
 std::optional<bool> Grow(uint8_t* base, uint32_t string, uint32_t new_length, bool trim);
 
+// assign(const string& source, size_t offset, size_t count)
+// (sub_82091720): the source's text from `offset`, at most `count` (-1 for
+// all) characters, into the string (_Grow, then memcpy_s), its length set
+// and the text ended. False, with nothing done, where the original must run:
+// an offset past the source's length (_Xran), the string assigned from
+// itself (erase), or its callees' paths.
+bool AssignFrom(uint8_t* base, uint32_t string, uint32_t source, uint32_t offset,
+                uint32_t count);
+
+// assign(const char* text, size_t count) (sub_82091808): `count` characters
+// from `text` into the string. False, with nothing done, where the original
+// must run: text inside the string's own (its assign from itself), or its
+// callees' paths.
+bool AssignText(uint8_t* base, uint32_t string, uint32_t text, uint32_t count);
+
+// append(const char* text, size_t count) (sub_820A6F60): `count` characters
+// from `text` after the string's. False, with nothing done, where the
+// original must run: text inside the string's own (sub_820A6E60), a length
+// that would pass 0xFFFFFFFF (_Xlen), or its callees' paths.
+bool Append(uint8_t* base, uint32_t string, uint32_t text, uint32_t count);
+
+// string() (sub_825929E8): _Tidy(string, false, 0), an empty string in place.
+void Construct(uint8_t* base, uint32_t string);
+
 // The library's wildcard search (sub_82592740, probably): the first match of
 // `pattern` in the C string `text`, trying each start: '?' matches one
 // character, '*' any run (the '*'s and '?'s after it skipped, then the next

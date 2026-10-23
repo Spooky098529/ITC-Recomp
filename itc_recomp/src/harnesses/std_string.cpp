@@ -86,6 +86,31 @@ void NativeGrow(PPCContext& ctx, uint8_t* base) {
   __imp__sub_82091540(ctx, base);
 }
 
+void NativeAssignFrom(PPCContext& ctx, uint8_t* base) {
+  if (!ss::AssignFrom(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32)) {
+    g_fallbacks++;
+    __imp__sub_82091720(ctx, base);
+  }
+}
+
+void NativeAssignText(PPCContext& ctx, uint8_t* base) {
+  if (!ss::AssignText(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32)) {
+    g_fallbacks++;
+    __imp__sub_82091808(ctx, base);
+  }
+}
+
+void NativeAppend(PPCContext& ctx, uint8_t* base) {
+  if (!ss::Append(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32)) {
+    g_fallbacks++;
+    __imp__sub_820A6F60(ctx, base);
+  }
+}
+
+void NativeConstruct(PPCContext& ctx, uint8_t* base) {
+  ss::Construct(base, ctx.r3.u32);
+}
+
 // The wildcard replace's step, as its adapter; a match (replace) is the
 // original's.
 void NativeReplaceAll(PPCContext& ctx, uint8_t* base) {
@@ -275,6 +300,15 @@ void AllocateCases(Context& h) {
   results.Report();
 }
 
+// A C string of `length` characters from `alphabet`.
+void WriteText(Context& h, uint32_t address, uint32_t length, const char* alphabet) {
+  const uint32_t n = uint32_t(std::strlen(alphabet));
+  for (uint32_t i = 0; i < length; i++) {
+    guest::StoreU8(h.base, address + i, uint8_t(alphabet[h.random.Below(n)]));
+  }
+  guest::StoreU8(h.base, address + length, 0);
+}
+
 // --- _Copy and _Grow. ---
 
 // A new length: 0, under 16, about the capacity, or well past it (no more
@@ -366,19 +400,112 @@ void GrowCases(Context& h) {
   results.Report();
 }
 
+// --- assign, append and string(). ---
+
+// A string as the game's: capacity 15 in place, or a heap block of 16 up.
+uint32_t PickGameCapacity(Random& random) {
+  return random.Below(3) == 0 ? 15 : PickCapacity(random) | 15;
+}
+
+void AssignFromCases(Context& h) {
+  Results results("sub_82091720 std::string::assign(const string&, size_t, size_t)");
+  const uint32_t string = h.data + 64;
+  const uint32_t source = h.data + 128;
+  for (int i = 0; i < 2000; i++) {
+    Outputs out[2];
+    const Random start = h.random;
+    for (int v = 0; v < 2; v++) {
+      h.random = start;
+      Fill(h.base, h.data, kScratchBytes);
+      const uint32_t capacity = PickGameCapacity(h.random);
+      const uint32_t block = WriteString(h, string, capacity, h.random.Below(capacity + 1));
+      const uint32_t source_capacity = PickGameCapacity(h.random);
+      const uint32_t source_length = h.random.Below(source_capacity + 1);
+      const uint32_t source_block = WriteString(h, source, source_capacity, source_length);
+      // The offset within the source (past it is _Xran's out_of_range); the
+      // count -1 (all, the game's), or any.
+      const uint32_t offset = h.random.Below(3) == 0 ? 0 : h.random.Below(source_length + 1);
+      static const uint32_t kCounts[] = {0xFFFFFFFFu, 0, 1, 15, 16};
+      const uint32_t count =
+          h.random.Below(2) == 0 ? kCounts[h.random.Below(5)] : h.random.Below(500);
+      Blocks blocks;
+      blocks.Add(block);
+      blocks.Add(source_block);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = string;
+      t.r4.u64 = source;
+      t.r5.u64 = offset;
+      t.r6.u64 = count;
+      (v == 0 ? __imp__sub_82091720 : NativeAssignFrom)(t, h.base);
+      Collect(h, out[v], t, blocks, {string, source});
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", i));
+  }
+  results.Report();
+}
+
+// assign and append from a C string: the text in the scratch area (not in
+// the string's own text: that's the originals' other paths, never in play).
+void FromTextCases(Context& h, bool append) {
+  Results results(append ? "sub_820A6F60 std::string::append(const char*, size_t)"
+                         : "sub_82091808 std::string::assign(const char*, size_t)");
+  const uint32_t string = h.data + 64;
+  const uint32_t text = h.data + 1024;
+  for (int i = 0; i < 2000; i++) {
+    Outputs out[2];
+    const Random start = h.random;
+    for (int v = 0; v < 2; v++) {
+      h.random = start;
+      Fill(h.base, h.data, kScratchBytes);
+      const uint32_t capacity = PickGameCapacity(h.random);
+      const uint32_t block = WriteString(h, string, capacity, h.random.Below(capacity + 1));
+      const uint32_t count = h.random.Below(4) == 0 ? h.random.Below(17) : h.random.Below(600);
+      WriteText(h, text, count, "abcdefghijklmnopqrstuvwxyz0123456789");
+      Blocks blocks;
+      blocks.Add(block);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = string;
+      t.r4.u64 = text;
+      t.r5.u64 = count;
+      if (append) {
+        (v == 0 ? __imp__sub_820A6F60 : NativeAppend)(t, h.base);
+      } else {
+        (v == 0 ? __imp__sub_82091808 : NativeAssignText)(t, h.base);
+      }
+      Collect(h, out[v], t, blocks, {string});
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", i));
+  }
+  results.Report();
+}
+
+void ConstructCases(Context& h) {
+  Results results("sub_825929E8 std::string::string");
+  const uint32_t string = h.data + 64;
+  for (int i = 0; i < 200; i++) {
+    Outputs out[2];
+    const Random start = h.random;
+    for (int v = 0; v < 2; v++) {
+      h.random = start;
+      Fill(h.base, h.data, kScratchBytes);
+      for (uint32_t k = 0; k < 28; k++) {
+        guest::StoreU8(h.base, string + k, uint8_t(h.random.Next()));  // unbuilt memory
+      }
+      PPCContext t = CallContext(h);
+      t.r3.u64 = string;
+      t.r4.u64 = h.random.Next();
+      (v == 0 ? __imp__sub_825929E8 : NativeConstruct)(t, h.base);
+      Collect(h, out[v], t, {}, {});
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", i));
+  }
+  results.Report();
+}
+
 // --- The wildcard search, find and replace. ---
 
 // The game's pattern for the loader's loose read (sub_8209DFA8): "/".
 constexpr uint32_t kGamePattern = 0x82001DE8;
-
-// A C string of `length` characters from `alphabet`.
-void WriteText(Context& h, uint32_t address, uint32_t length, const char* alphabet) {
-  const uint32_t n = uint32_t(std::strlen(alphabet));
-  for (uint32_t i = 0; i < length; i++) {
-    guest::StoreU8(h.base, address + i, uint8_t(alphabet[h.random.Below(n)]));
-  }
-  guest::StoreU8(h.base, address + length, 0);
-}
 
 // A pattern: a few characters from the text's alphabet, '?' and '*', maybe
 // anchored at the start (2) or the end (3), never empty (an empty pattern
@@ -534,6 +661,10 @@ void StdString(Context& h) {
   AllocateCases(h);
   CopyCases(h);
   GrowCases(h);
+  AssignFromCases(h);
+  FromTextCases(h, false);
+  FromTextCases(h, true);
+  ConstructCases(h);
   WildcardSearchCases(h);
   FindCases(h);
   ReplaceAllCases(h);
