@@ -54,7 +54,10 @@
 // AiPath::IsSlow (sub_8213C0E8), from UpdateSteering (and SteerToTarget);
 // and UpdateSteering (sub_8213AEF0), SteerToTarget (sub_82138D78),
 // UpdateSpeed (sub_8213ACD0), UpdatePedals (sub_8213A428) and LimitThrottle
-// (sub_82139CB0), from AiDriver::Drive.
+// (sub_82139CB0), from AiDriver::Drive; AiPath::ContinueLine (sub_8213DB08),
+// from PlanCorners and PlanLine; and ApproachCorner (sub_8213DE30),
+// CornerToEntry (sub_8213E018), CornerToApex (sub_8213E1D0) and CornerToExit
+// (sub_8213E360), from PlanCorners (sub_8213E7B8), from PlanLine.
 
 #include "guest.h"
 
@@ -146,7 +149,8 @@ ITC_FLAG_BOOL(native_ai_drivers, true, "ITC",
               "sub_8213BB58, sub_8213C358, sub_8213B890, sub_8213C4C0, sub_8213C5C8, sub_8213C630, "
               "sub_821452A0, sub_8213B650, sub_8213CB30, sub_8213CD50, sub_8213D788, sub_8213F958, "
               "sub_8213FB48, sub_8213AC70, sub_8213C0E8, sub_8213AEF0, sub_82138D78, sub_8213ACD0, "
-              "sub_8213A428, sub_82139CB0");
+              "sub_8213A428, sub_82139CB0, sub_8213DB08, sub_8213DE30, sub_8213E018, sub_8213E1D0, "
+              "sub_8213E360, sub_8213E7B8");
 
 // Defines an adapter: `body` uses `ctx` and `base`.
 #define ITC_AI_DRIVERS(address, body)   \
@@ -392,24 +396,5 @@ ITC_AI_DRIVERS(8213B058, {
 
 // --- The path's line through the corners ---
 
-// r4 = the entry before, r5 = &the index, r6 = &the first index; the
-// original's frame 112 bytes down (r3 kept).
-ITC_AI_DRIVERS(8213DB08, ContinueLine(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
-                                      ctx.r1.u32 - 112))
-// r4 = the corner record, r5 = &the index, r6 = &the entry before; the
-// originals' frames 160 bytes down.
-ITC_AI_DRIVERS(8213DE30, ctx.r3.u64 = ApproachCorner(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
-                                                     ctx.r6.u32, ctx.r1.u32 - 160))
-ITC_AI_DRIVERS(8213E018, ctx.r3.u64 = CornerToEntry(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
-                                                    ctx.r6.u32, ctx.r1.u32 - 160))
-ITC_AI_DRIVERS(8213E1D0, ctx.r3.u64 = CornerToApex(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
-                                                   ctx.r6.u32, ctx.r1.u32 - 160))
-ITC_AI_DRIVERS(8213E360, ctx.r3.u64 = CornerToExit(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
-                                                   ctx.r6.u32, ctx.r1.u32 - 160))
-// r4 = the entry before, r5 = &the index, r6 = &the end index; the
-// original's frame 144 bytes down (the entry kept in the caller's frame at
-// +28, as the original does).
-ITC_AI_DRIVERS(8213E7B8, ctx.r3.u64 = PlanCorners(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
-                                                  ctx.r6.u32, ctx.r1.u32 - 144))
 // The original's frame 96 bytes down.
 ITC_AI_DRIVERS(8213F4B0, ctx.r3.u64 = PlanLine(base, ctx.r3.u32, ctx.r1.u32 - 96))
