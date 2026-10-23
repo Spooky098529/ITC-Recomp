@@ -35,7 +35,7 @@ atexit (`sub_825A7068`, over `sub_825A6F60`), neither with rows (a
 lead). Two functions
 in the viewports' address range aren't cameras: `sub_820AB408` and
 `sub_820AB498` convert track positions over the course's route
-(`[0x826C5B10]`, from `sub_820F8420`; the route's lead). The rows were
+(`[0x826C5B10]`, from `sub_820F8420`; their rows are in `track-route.md`). The rows were
 drafted by the B7 loop's mapping agent (2026-10-23) from the generated
 code; float constants read from the image (`../known-data.md`, "Values
 from the image").

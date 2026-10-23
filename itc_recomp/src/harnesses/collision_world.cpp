@@ -33,6 +33,7 @@ ITC_FLAG_DECLARE(bool, native_vector_library);
 ITC_FLAG_DECLARE(bool, native_matrix_math);
 ITC_FLAG_DECLARE(bool, native_vehicle_accessors);
 ITC_FLAG_DECLARE(bool, native_math);
+ITC_FLAG_DECLARE(bool, native_track_route);
 
 namespace harness {
 
@@ -123,6 +124,9 @@ ITC_NATIVE_STEP(NativeSearchLinked,
 ITC_NATIVE_STEP(NativeSearchAll,
                 ctx.r3.u64 = tc::TrackPositionSearchAll(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
                                                         ctx.r1.u32 - 160))
+// r3 not compared for these two (the originals' r3, Follow's, isn't kept).
+ITC_NATIVE_STEP(NativeUpdate, tc::TrackPositionUpdate(base, ctx.r3.u32, ctx.r1.u32 - 144))
+ITC_NATIVE_STEP(NativeInit, tc::TrackPositionInit(base, ctx.r3.u32, ctx.r1.u32 - 128))
 ITC_NATIVE_STEP(NativeFindCell,
                 ctx.r3.u64 = tc::TrackPositionFindCell(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
                                                        ctx.r1.u32 - 240))
@@ -160,7 +164,7 @@ void Original(PPCContext& ctx, uint8_t* base) {
   bool* flags[] = {&ITC_FLAG(native_collision_world), &ITC_FLAG(native_collision),
                    &ITC_FLAG(native_car_physics),     &ITC_FLAG(native_vector_library),
                    &ITC_FLAG(native_matrix_math),     &ITC_FLAG(native_vehicle_accessors),
-                   &ITC_FLAG(native_math)};
+                   &ITC_FLAG(native_math),            &ITC_FLAG(native_track_route)};
   bool saved[std::size(flags)];
   for (size_t i = 0; i < std::size(flags); i++) {
     saved[i] = *flags[i];
@@ -620,6 +624,18 @@ constexpr uint32_t kBoxP = kSectionP + 2 * kSectionBytes, kTemplateP = kBoxP + 0
 // the cells) and the record.
 constexpr uint32_t kQueryP = kBoxP + 0x900, kRecordP = kBoxP + 0xBC0;
 constexpr uint32_t kGroundCompared = kBoxP + 0xC00;
+// For TrackPosition::Update and Init: the course's route over the mesh
+// (its file installed as the game's, [0x826C5B10], for each case; the
+// area's kRouteP holds the same pointer, unused): its file, two
+// sections of kSlices slices whose centers run down the mesh's middle (each
+// slice's word +32 its mesh cell), linked end to start, and a table of all
+// 65,536 section numbers (entry i the section i modulo 2), so any number a
+// position names is a section (a block of its own). Compared after the
+// area above.
+constexpr uint32_t kRouteP = kGroundCompared, kRouteFileP = kRouteP + 0x10,
+                   kRouteSectionP = kRouteP + 0x100, kRouteSectionBytes = 0x400,
+                   kRouteBytes = 0x900;
+constexpr uint32_t kRoute = 0x826C5B10;
 
 uint32_t SectionAt(uint32_t area, uint32_t k) {
   return area + kSectionP + kSectionBytes * k;
@@ -737,6 +753,60 @@ void BuildMesh(uint8_t* base, uint32_t area, Random& r, std::vector<uint32_t>& t
   }
 }
 
+// Builds the route (see kRouteP); the table is filled once.
+void BuildRoute(uint8_t* base, uint32_t area, uint32_t table, Random& r) {
+  guest::StoreU32(base, area + kRouteP, area + kRouteFileP);
+  guest::StoreU32(base, area + kRouteFileP + 0, 2);
+  guest::StoreU32(base, area + kRouteFileP + 8, std::bit_cast<uint32_t>(2.5f));
+  guest::StoreU32(base, area + kRouteFileP + 12, table);
+  for (uint32_t k = 0; k < 2; k++) {
+    const uint32_t s = area + kRouteSectionP + kRouteSectionBytes * k;
+    const float z0 = 5.0f * float(kSlices * k);
+    guest::StoreU16(base, s + 0, uint16_t(kSlices));
+    guest::StoreU8(base, s + 2, uint8_t(r.Below(4) == 0 ? r.Below(6) : 0));
+    guest::StoreU8(base, s + 3, uint8_t(r.Below(4) == 0 ? 7 : 0));
+    const float bounds[6] = {-10.0f, -1.0f, z0, 10.0f, 2.0f, z0 + 5.0f * float(kSlices)};
+    for (uint32_t i = 0; i < 6; i++) {
+      guest::StoreFloat(base, s + 4 + 4 * i, bounds[i]);
+    }
+    for (uint32_t i = 0; i < 12; i++) {
+      guest::StoreU16(base, s + 28 + 4 * i, 0xFFFF);
+      guest::StoreU16(base, s + 30 + 4 * i, uint16_t(r.Below(kSlices)));
+    }
+    // Section 0's forward link to section 1's start, section 1's back link
+    // to section 0's end; now and then a side link to the other.
+    guest::StoreU16(base, s + 28 + 4 * (k == 0 ? 0 : 3), uint16_t(1 - k));
+    guest::StoreU16(base, s + 30 + 4 * (k == 0 ? 0 : 3), uint16_t(k == 0 ? 0 : kSlices - 1));
+    if (r.Below(3) == 0) {
+      guest::StoreU16(base, s + 28 + 4 * (6 + 2 * r.Below(2)), uint16_t(1 - k));
+    }
+    for (uint32_t i = 0; i < 48; i++) {
+      guest::StoreU8(base, s + 76 + i, uint8_t(r.Below(4)));
+    }
+    for (uint32_t n = 0; n < kSlices; n++) {
+      const uint32_t record = s + 124 + 84 * n;
+      for (uint32_t i = 0; i < 84; i += 4) {
+        guest::StoreU32(base, record + i, uint32_t(r.Next()));
+      }
+      guest::StoreFloat(base, record + 0, float(int32_t(r.Below(201)) - 100) / 100.0f);
+      guest::StoreFloat(base, record + 4, 0.5f);
+      guest::StoreFloat(base, record + 8, z0 + 5.0f * float(n) + 2.5f);
+      guest::StoreFloat(base, record + 12, 12.0f + float(r.Below(9)));
+      guest::StoreFloat(base, record + 16, 2.0f);
+      guest::StoreFloat(base, record + 20, 2.0f);
+      guest::StoreU16(base, record + 32, uint16_t(k));
+      guest::StoreU16(base, record + 34, uint16_t(n));
+      guest::StoreFloat(base, record + 36, 1.0f);
+      guest::StoreFloat(base, record + 40, 0.0f);
+      guest::StoreFloat(base, record + 44, 0.0f);
+      guest::StoreFloat(base, record + 48, 1.0f);
+      guest::StoreU8(base, record + 56, uint8_t(1 + r.Below(3)));
+      const uint8_t kinds[] = {0, 3, 4};
+      guest::StoreU8(base, record + 57, kinds[r.Below(3)]);
+    }
+  }
+}
+
 void GroundCases(Context& h, uint32_t area) {
   enum GroundKind {
     kInSlice,       // r3 = a section, r4 = a slice, r5 = the point, r6 = 0 or 1
@@ -756,6 +826,7 @@ void GroundCases(Context& h, uint32_t area) {
     kFindCell,      // r3 = the mesh, r4 = the position, r5 = the point
     kGather,        // r3 = the query (its box as for GroundHits), r4 = the mesh
     kAddCell,       // r3 = the query (some cells listed), r4 = a cell
+    kUpdate,        // r3 = the position (its route position on the route over the mesh)
   };
   const struct {
     const char* name;
@@ -800,7 +871,17 @@ void GroundCases(Context& h, uint32_t area) {
        kGather},
       {"WallQuery::AddCell (sub_820FC110)", Original<__imp__sub_820FC110>, NativeAddCell,
        kAddCell},
+      {"TrackPosition::Update (sub_820F8470)", Original<__imp__sub_820F8470>, NativeUpdate,
+       kUpdate},
+      {"TrackPosition::Init (sub_820F8578)", Original<__imp__sub_820F8578>, NativeInit,
+       kUpdate},
   };
+  const uint32_t route_table = memory::Alloc(4 * 0x10000, 0);
+  for (uint32_t i = 0; i < 0x10000; i++) {
+    guest::StoreU32(h.base, route_table + 4 * i,
+                    area + kRouteSectionP + kRouteSectionBytes * (i % 2));
+  }
+  const uint32_t saved_route = guest::LoadU32(h.base, kRoute);
   uint8_t saved_mesh[12];
   std::memcpy(saved_mesh, h.base + tc::kMesh, sizeof(saved_mesh));
   const uint32_t saved_world = guest::LoadU32(h.base, kWorldPointer);
@@ -831,6 +912,7 @@ void GroundCases(Context& h, uint32_t area) {
       bool out_unaligned = false;
       for (uint64_t seed = 0; seed < (group == kNumbers ? 200u : 100u); seed++) {
         std::vector<uint8_t> result[2];
+        Outputs outputs[2];
         std::string what = fmt::format("seed {}", seed);
         for (int v = 0; v < 2; v++) {
           Random r = Seeded(seed * 53 + 17 * uint64_t(group) + 1);
@@ -1107,6 +1189,52 @@ void GroundCases(Context& h, uint32_t area) {
               }
               break;
             }
+            case kUpdate: {
+              out_unaligned = false;
+              std::memcpy(h.base + tc::kMesh, h.base + area + kMeshP, 12);
+              BuildRoute(h.base, area, route_table, r);
+              guest::StoreU32(h.base, kRoute, area + kRouteFileP);
+              // The point (w 1.0); the route position the point's slice,
+              // near it, the other section's, past either end, or off the
+              // route; the cell as above.
+              guest::StoreFloat(h.base, position + 28, 1.0f);
+              guest::StoreFloat(h.base, position + 16, px);
+              guest::StoreFloat(h.base, position + 20, py);
+              guest::StoreFloat(h.base, position + 24, pz);
+              int32_t rs = true_section, rl = true_slice;
+              switch (r.Below(7)) {
+                case 0:
+                case 1:
+                  break;
+                case 2:
+                  rl += int32_t(r.Below(5)) - 2;
+                  break;
+                case 3:
+                  rs = 1 - rs;
+                  rl = int32_t(r.Below(kSlices));
+                  break;
+                case 4:
+                  rl = r.Below(2) == 0 ? -1 - int32_t(r.Below(3)) : int32_t(kSlices + r.Below(3));
+                  break;
+                case 5:
+                  rs = r.Below(2) == 0 ? -1 : int32_t(2 + r.Below(4));
+                  break;
+                default:
+                  rl = int32_t(r.Below(kSlices));
+                  break;
+              }
+              if (f.recompiled == Original<__imp__sub_820F8578>) {
+                // Init reads the cell from the route slice's record before
+                // normalizing (the vehicle placed passes one on the route).
+                rs = std::clamp(rs, 0, 1);
+                rl = std::clamp(rl, 0, int32_t(kSlices) - 1);
+              }
+              guest::StoreU16(h.base, position + 4, uint16_t(rs));
+              guest::StoreU16(h.base, position + 6, uint16_t(rl));
+              guest::StoreU16(h.base, position + 82, uint16_t(r.Next()));
+              t.r3.u64 = position;
+              break;
+            }
             case kGround:
               out_unaligned = false;
               std::memcpy(h.base + tc::kMesh, h.base + area + kMeshP, 12);
@@ -1124,18 +1252,40 @@ void GroundCases(Context& h, uint32_t area) {
             result[v].insert(result[v].end(), tried.begin(), tried.end());
             std::memcpy(h.base + kLinkedTried, saved_tried, kLinkedTriedBytes);
           }
-          Append32(result[v], t.r3.u32);
+          if (f.kind == kUpdate) {
+            // Update's and Init's outputs as harness::Outputs: the track
+            // position's point, color and normal (+16, +32, +48) floats,
+            // everything else exact.
+            const uint32_t p = area + kPositionP;
+            outputs[v].Bytes(Read(h.base, area, kPositionP));
+            outputs[v].Bytes(Read(h.base, p, 16));
+            outputs[v].Floats(h.base, p + 16, 4);
+            outputs[v].Floats(h.base, p + 32, 4);
+            outputs[v].Floats(h.base, p + 48, 4);
+            outputs[v].Bytes(Read(h.base, p + 64, kGroundCompared - kPositionP - 64));
+            outputs[v].Bytes(std::vector<uint8_t>(result[v].begin() + kGroundCompared,
+                                                  result[v].end()));
+            outputs[v].Bytes(Read(h.base, area + kRouteP, kRouteBytes));
+            outputs[v].Word(guest::LoadU32(h.base, kRoute));
+          } else {
+            Append32(result[v], t.r3.u32);
+          }
           if (compare_f1) {
             const uint64_t bits = std::bit_cast<uint64_t>(t.f1.f64);
             Append32(result[v], uint32_t(bits >> 32));
             Append32(result[v], uint32_t(bits));
           }
-          if (f.kind == kGround || f.kind == kHits) {
+          if (f.kind == kUpdate) {
+            guest::StoreU32(h.base, kRoute, saved_route);
+          }
+          if (f.kind == kGround || f.kind == kHits || f.kind == kUpdate) {
             std::memcpy(h.base + tc::kMesh, saved_mesh, sizeof(saved_mesh));
             guest::StoreU32(h.base, kWorldPointer, saved_world);
           }
         }
-        if (!result[0].empty() || !result[1].empty()) {
+        if (f.kind == kUpdate) {
+          results.Check(outputs[0], outputs[1], what);
+        } else if (!result[0].empty() || !result[1].empty()) {
           (out_unaligned ? unaligned : results).Check(result[0], result[1], what);
         }
       }
@@ -1146,6 +1296,7 @@ void GroundCases(Context& h, uint32_t area) {
     }
   }
   std::memcpy(h.base + tc::kMesh, saved_mesh, sizeof(saved_mesh));
+  memory::Free(route_table);
 }
 
 // --- The wall query's hit records, the segments' crossing and the route's

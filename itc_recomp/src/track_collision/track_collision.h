@@ -155,6 +155,20 @@ uint32_t TrackPositionCrossSection(uint8_t* base, uint32_t position, uint32_t me
 // original's 240 bytes.
 uint32_t TrackPositionFindCell(uint8_t* base, uint32_t mesh, uint32_t position, uint32_t point,
                                uint32_t frame);
+// TrackPosition::Update (sub_820F8470): the track position's cell (FindCell
+// on the game's mesh), its point 0.5 higher and the ground under it
+// (GroundHeight, the color into +32, the normal into +48; the y put back
+// when none), +82 = 1 for surface kinds 4 and 20, plus 2, 4 or 8 for the
+// slice's kind 30, 31 or 32, then its route position (+4) followed
+// (track_route::Follow, with the route position as it was before, kept in
+// the frame's +80). `frame`: the original's 144 bytes. The original's r3
+// (Follow's) isn't kept: no caller reads it.
+void TrackPositionUpdate(uint8_t* base, uint32_t position, uint32_t frame);
+// TrackPosition::Init (sub_820F8578): the point (+16) from the route
+// position (+4) (track_route::Point), the cell (+0, +2) from the route
+// slice's record's word +32, +80 and +82 = 0, then Update. `frame`: the
+// original's 128 bytes (its stack copy of the cell's word not written).
+void TrackPositionInit(uint8_t* base, uint32_t position, uint32_t frame);
 // sub_820F7D70 (the name ours: TrackMesh::SectionOutcode): bits 1, 2 for
 // the point's x below or above the section's bounds (+48, +56, with the
 // margin [0x82001FD8]), 4, 8 for y (+44 - +40, +40 + +44), 16, 32 for z

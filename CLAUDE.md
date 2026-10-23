@@ -167,6 +167,17 @@ car specs and the cameras native as far as they were ready
 ours 1,023 -> 1,139), the cameras keeping frame interpolation's hooks
 (`BlendState_OnCopy` added); the rest waits on the graphics device's
 resource calls, the archive and memset/atexit.
+Its eighth run (`b7-loop-23-10-26-4`, 2026-10-23, not yet merged;
+summary `docs/loops/b7-loop-2026-10-23-1722.md`) made the string table
+and font, `std::string` and the course's route native as far as they
+were ready (`strings-and-font.md`, `std-string.md`, `track-route.md`;
+`--native_strings_and_font`, `--native_std_string`,
+`--native_track_route`; ours 1,139 -> 1,223), with
+`TrackPosition::Init` and `Update`; `std::string`'s member functions
+are translated over the guest layout (the user's call); the rest waits
+on `DataFile::GetEntry`, the archive, the XPR, the shader compiler, the
+device's state save and `atexit`. Harness runs use
+`attract_race.sh 30`.
 After each plan item, run `itc_recomp/tools/boundary_status.py` and record
 its output in "The boundary over time" at the end of
 `docs/rexglue-removal.md`. Plan steps are done on their

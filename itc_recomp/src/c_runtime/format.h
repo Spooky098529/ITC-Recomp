@@ -137,6 +137,20 @@ uint32_t DecimalPointAddress(uint8_t* base, uint32_t* words = nullptr);
 // written: the original runs there.
 bool Cftof(uint8_t* base, uint64_t bits, uint32_t buffer, uint32_t size, int32_t precision);
 
+// _vswprintf_l (sub_825A9980, from vswprintf sub_825A9A80) with _woutput_l
+// (sub_825B13D0, wide_format.cpp): `format` (UTF-16) with the arguments at
+// `args` (a va_list: 8-byte slots) into `buffer` through a string stream of
+// INT_MAX bytes, then the two-byte terminator; `*count` the characters
+// written (or -1). The work in `frame` (the original _woutput_l's r1, all
+// below the caller's stack pointer): its text buffer at +128, as the
+// original. A dry run first: false, with nothing written to `buffer`, where
+// the original must run: a null buffer or format, %n, a counted string
+// (%Z), a float conversion other than %f or one needing the heap (a
+// precision above 163) or a forced point, %f's _cftof_l not native for the
+// value, or the unit 0xFFFF written (the original's error paths read errno).
+bool Vswprintf(uint8_t* base, uint32_t buffer, uint32_t format, uint32_t args, uint32_t frame,
+               int32_t* count);
+
 // __iob_func (sub_825AD4C0): the C runtime's stream table (_iob: 32 bytes
 // a stream, stdin, stdout and stderr first).
 constexpr uint32_t kStreams = 0x8266B7D0;

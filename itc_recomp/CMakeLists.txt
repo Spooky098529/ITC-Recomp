@@ -140,6 +140,8 @@ set(ITC_SOURCES
     src/track_collision/track_cell.cpp
     src/track_collision/track_walls.cpp
     src/track_collision/track_wall_query.cpp
+    src/hooks/track_route.cpp
+    src/track_route/track_route.cpp
     src/hooks/action_mappers.cpp
     src/action_mappers/action_mappers.cpp
     src/hooks/data_tables.cpp
@@ -150,6 +152,11 @@ set(ITC_SOURCES
     src/car_specs/car_specs.cpp
     src/hooks/cameras.cpp
     src/cameras/cameras.cpp
+    src/hooks/strings_and_font.cpp
+    src/strings_and_font/strings_and_font.cpp
+    src/strings_and_font/font.cpp
+    src/hooks/std_string.cpp
+    src/std_string/std_string.cpp
     src/hooks/sound_cues.cpp
     src/sound_cues/sound_cues.cpp
     src/hooks/xact.cpp
@@ -161,6 +168,7 @@ set(ITC_SOURCES
     src/c_runtime/math.cpp
     src/c_runtime/strings.cpp
     src/c_runtime/format.cpp
+    src/c_runtime/wide_format.cpp
     src/c_runtime/start_up.cpp
     src/c_runtime/parse.cpp
     src/game_data/game_data.cpp
@@ -198,11 +206,14 @@ set(ITC_SOURCES
     src/harnesses/collision.cpp
     src/harnesses/collision_world.cpp
     src/harnesses/collision_world_walls.cpp
+    src/harnesses/track_route.cpp
     src/harnesses/action_mappers.cpp
     src/harnesses/data_tables.cpp
     src/harnesses/model_animation.cpp
     src/harnesses/car_specs.cpp
     src/harnesses/cameras.cpp
+    src/harnesses/strings_and_font.cpp
+    src/harnesses/std_string.cpp
     src/harnesses/sound_cues.cpp
     src/harnesses/xact.cpp
     src/helpers/debug_output.cpp
@@ -262,7 +273,9 @@ set(ITC_SOURCES
 # and the model animation (src/model_animation/,
 # docs/functions/model-animation.md) and the car specs (src/car_specs/,
 # docs/functions/car-specs.md) and the cameras (src/cameras/,
-# docs/functions/cameras.md).
+# docs/functions/cameras.md) and the string table and font
+# (src/strings_and_font/, docs/functions/strings-and-font.md) and the
+# course's route (src/track_route/, docs/functions/track-route.md).
 set_source_files_properties(src/c_runtime/math.cpp src/ui_movies/keys.cpp
     src/matrix_math/matrix_math.cpp src/car_physics/rigid_body.cpp
     src/car_physics/vehicle_step.cpp src/car_physics/vehicle_update.cpp
@@ -274,7 +287,9 @@ set_source_files_properties(src/c_runtime/math.cpp src/ui_movies/keys.cpp
     src/track_collision/track_ground.cpp src/track_collision/track_cell.cpp
     src/track_collision/track_walls.cpp src/track_collision/track_wall_query.cpp
     src/action_mappers/action_mappers.cpp src/model_animation/model_animation.cpp
-    src/car_specs/car_specs.cpp src/cameras/cameras.cpp PROPERTIES
+    src/car_specs/car_specs.cpp src/cameras/cameras.cpp
+    src/strings_and_font/strings_and_font.cpp src/strings_and_font/font.cpp
+    src/track_route/track_route.cpp PROPERTIES
     COMPILE_OPTIONS "-ffp-model=strict;-ffp-contract=off"
     SKIP_PRECOMPILE_HEADERS ON)
 

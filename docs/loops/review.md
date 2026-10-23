@@ -11,6 +11,120 @@ functions to check in a drive in the progress file.
 When the user has reviewed a run's section, its heading gets
 "(reviewed <date>)"; the section stays for the record.
 
+## Run 2026-10-23 17:22 (`b7-loop-23-10-26-4`)
+
+- `strings-and-font.md` (new, 35 rows; 0 moved, 35 new; mapped in
+  0974397), `known-data.md` (`0x826C5C34` and `0x826C5C00` split into
+  their own rows; new rows: the font page, the text draw parameters, the
+  draw counts at `0x826C5BCC`, the pixel shader sources at `0x826C5C04`);
+  1 lead (the app's framework beside the string table). For review:
+  `ui-movies-game.md` corrected (a text's +20 is the page shown, +24 the
+  lines to skip; `sub_8210A5C0` counts page breaks, so `sub_8211C930`
+  moves to the next page; `UiMovie::RevealText`'s name kept, probably
+  "next page"); `files-and-saves.md`'s `sub_8210A8D0` named
+  `Strings::Load`; unsure: `Font::SetParams`'s +8 and +12,
+  `Font::DrawPass`'s slot layout (command 36 not in `gpu-functions.md`),
+  `sub_82108860` probably `XPR::Release`, `sub_8210A490` probably
+  `swprintf` (its ready group is the C runtime's wide printf).
+  Migration 1's rows (16458d3..29aea2e; `--native_strings_and_font`;
+  25 of 36 ours, 14 Native; `c-runtime.md`'s `sub_825A9A80` Merged,
+  `sub_825A9980` and `sub_825B13D0` Native; `sub_82108810` a new row,
+  not seen in play). For review: the agent ran `git checkout` on
+  `src/strings_and_font/font.cpp` with uncommitted work in it (against
+  the "commit before reverting" rule), then re-applied the same edits,
+  checked with all harnesses (`itc_1029`) and a frame dump, before
+  16b310a; kept on the recompiled code (never in play): rotated text
+  (`sub_821097F0`, `sub_82108F68`), the second pass (`sub_82109D80`),
+  DrawPass with a chunk open, a list possibly too full or the command
+  list's diagnostics on, Strings::Init and Release without
+  `--native_heap`, swprintf's `%n`, `%Z`, float types but `%f` and
+  `%f` needing the heap or a forced point, output holding 0xFFFF,
+  FormatGrouped's negative values holding 0xFFFF or over 240 units;
+  swprintf's `_woutput_l` is a step-by-step translation
+  (`src/c_runtime/wide_format.cpp`) run once dry to decide whether it
+  can run natively, its buffer where the original's frame would be
+  (2,542 of 3,441 harness cases took the native path); DrawPass's and
+  Font::Draw's adapters stay (the render queue's call through its
+  vtable); new helpers `src/strings_and_font/steps.h`,
+  `c_runtime::Vswprintf` in `format.h`.
+- `std-string.md` (new, 16 rows; 0 moved, 16 new; mapped in 7aeebb5:
+  Dinkumware's `std::basic_string<char>`, the library's wildcard search,
+  find and replace-all, two global strings' static set-ups),
+  `known-data.md` (the 28-byte string layout, the global strings at
+  `0x8266EE7C` and `0x8266EE98`); 1 lead (the containers'
+  instantiations). For review, not edited: `ui-movies-game.md`'s
+  `sub_8211E378` separator from `0x82001DE8` called "." without the
+  image's string read (maybe "/"); `files-and-saves.md`'s `sub_8209DFA8`
+  leaves out the path's copy into a string and its wildcard replace
+  (`sub_82593088`, never matched in play); `sub_82593040` is the
+  substring copy constructor, not "making an empty one"; unsure:
+  `String::ReplaceAll`, `String::Find`, `WildcardSearch` (probably; the
+  `*` backtracking not read in detail), the global strings' texts.
+  Migration 1's rows (2028ce7..5fdcfc2; `--native_std_string`; 14 of
+  16 ours, 5 Native). For review: paths left to the original, checked
+  before anything changes (never in play): memcpy_s's and free's
+  errors, operator new's new handler, `_Xlen`, `_Xran`, erase on a
+  self-assign, `append` from the string's own text (`sub_820A6E60`),
+  `replace` (`sub_82592E18`) when the wildcard replace matches, copies
+  not below 0xA0000000 in one view (the mirrors' memcpy recording
+  kept); the constructors write the empty start before their assign's
+  checks (the original writes the same bytes again on a fallback);
+  `_Tidy`'s r3 kept as the original leaves it; allocating paths native
+  only with `--native_heap`; the harness's ReplaceAll patterns can't
+  match except the game's (`/` to `\`: a matching-anything pattern
+  makes the original loop forever), and `_Copy`, `_Grow` cases use
+  capacities 15 and up (the `_Copy` quirk in the file's intro); new
+  helpers in `src/std_string/std_string.cpp`.
+- `track-route.md` (new, 40 rows; 0 moved, 40 new; mapped in e211173:
+  route positions normalized and moved along linked sections, points,
+  lanes and distances, `TrackRoute::Follow`), `known-data.md`
+  (`0x826C5B10`'s full layout, the default branch mask at `0x82008A00`,
+  the track position's +4 and +6 as a route position, the vehicle's
+  +5232 as the car's track position); 1 lead (the race code's users of
+  the route). For review: `collision-world.md`'s `TrackPosition::Init`
+  (`sub_820F8578`) corrected (its point comes from its route position,
+  not the other way round); `cameras.md`'s intro points to
+  `track-route.md` for `sub_820AB408`, `sub_820AB498`;
+  `vehicle-accessors.md`'s `sub_820C0168` `Vehicle::Identity` probably
+  deserves a new name (left); `sub_820F985C` is a jump table's case 0
+  split off by the recompiler; unsure: `TrackRoute::SliceTest`,
+  `SpecialSection` (fixed section numbers, probably one course's),
+  links 6 and 8 as the left and right neighbors, the two point tables
+  as the road's edges, `LinkDistance`, `PathDistance`, `ToMainRoad`'s
+  end not read in detail.
+  Migration 1's rows (9c3cbaa..7785364; `--native_track_route`; 33
+  rows changed, 17 Native, `sub_820F985C` Merged). For review: the map
+  corrected for `sub_820F9448` (every linked section's lanes added up;
+  kinds 1, 3 and 4 only not taken), `sub_820F9600` (taken when it's the
+  only match), `sub_820FB030` (the shoulders start at half the width
+  plus 0.5); kept on the recompiled code: SlicePoint's points 5 to 16
+  (`sub_820F8FA0`), the unseen callers `sub_820F9DD0` and `sub_820FB2B0`;
+  stack temporaries mostly not written (nothing reads them after the
+  return), but Point and AlongSlice still write their position copy at
+  the original's frame + 80; Distance's r3 kept as the original leaves
+  it; new helpers inside `src/track_route/track_route.cpp`, built with
+  `-ffp-model=strict -ffp-contract=off`. Attract races with all
+  harnesses now reach 18 s at 30 ticks/s inside `attract_race.sh 25`
+  (19 before): the harnesses take ~4.9 s before the race; without them
+  23 s as before (`itc_1084`, checked by the lead). Since (the user's
+  call, 2026-10-23), harness runs use `attract_race.sh 30`.
+  Migration 2's rows (0b863a1..1b58c97; all 40 of `track-route.md`
+  ours; `collision-world.md`'s `TrackPosition::Update` (`sub_820F8470`)
+  and `Init` (`sub_820F8578`) native under `--native_collision_world`
+  in `src/track_collision/track_cell.cpp`, calling the route's native
+  Follow and Point whatever `--native_track_route` says; 7 adapters
+  removed). For review: Follow's full search (`sub_820FB2B0`, never in
+  play) ported as `TrackRoute::FullSearch`, with its own harness group
+  but no row of its own (described in Follow's row; CLAUDE.md gives
+  unseen functions rows marked "Not seen in play": a row may be
+  wanted), keeping two quirks of the original (the next link from the
+  last linked section in bounds; the whole kind byte tested `>= 0x30`);
+  Follow, PathDistance, Update and Init don't keep the original's r3
+  (no caller reads it); positions the callees read by address stay in
+  the original's frames; PathDistance's harness uses routes of 8-slice
+  sections (the original's loops can run forever on random links);
+  18 adapters stay for the race and vehicle code's recompiled callers.
+
 ## Run 2026-10-23 13:44 (`b7-loop-23-10-26-3`)
 
 - `model-animation.md` (new, 36 rows; 0 moved, 36 new; mapped in
