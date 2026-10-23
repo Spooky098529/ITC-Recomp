@@ -257,17 +257,10 @@ ITC_XACT_OPTIONAL(825C4070,
 ITC_XACT_OPTIONAL(825C0708, EngineGetCategoryFlag(base, ctx.r3.u32, ctx.r4.u32))
 ITC_XACT_OPTIONAL(825C0598, EngineAddInstance(base, ctx.r3.u32, ctx.r4.u32))
 ITC_XACT_OPTIONAL(825C05B0, EngineRemoveInstance(base, ctx.r3.u32, ctx.r4.u32))
-ITC_XACT_OPTIONAL(825C0748, EngineGetVariableRecord(base, ctx.r3.u32, ctx.r4.u32))
-extern "C" REX_FUNC(sub_825C04D8) {
-  ITC_XACT_FALLBACK(825C04D8)
-  const auto result = EngineGetCategoryVolume(base, ctx.r3.u32, ctx.r4.u32);
-  if (!result) {
-    __imp__sub_825C04D8(ctx, base);
-    return;
-  }
-  ctx.f1.f64 = result->f1;
-  ctx.r3.u64 = result->r3;
-}
+// sub_825C0748 (a variable's record) has no adapter: its only caller,
+// XACTCue::GetVariable, is native.
+// sub_825C04D8 (a category's effective volume) has no adapter: its only
+// caller, XACTSound::GetVolume, is native.
 
 // The wave entries' leaves (the folded getters' callers in play are
 // XACT's; the same results for the game code folded with them), the
