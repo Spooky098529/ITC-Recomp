@@ -115,7 +115,10 @@ ITC_FLAG_BOOL(native_ai_drivers, true, "ITC",
               "AiPath::MeasureOthers sub_8213B650, AiPath::AvoidOnLeft sub_8213CB30, "
               "AiPath::AvoidOnRight sub_8213CD50, AiPath::ChooseSideForOther sub_8213D788, "
               "AiPath::AvoidOthers sub_8213E690 (with its flag 0x10's step, sub_8213D898, never "
-              "seen in play)) "
+              "seen in play), AiSkill::TriggerStarts sub_8213F958, AiSkill::TriggerEnds "
+              "sub_8213FB48, AiSkill::Update sub_8213FCF8 (their conditions sub_8213F7E0 and "
+              "sub_8213F868, and kind 0's steps sub_8213F9A4 and sub_8213FB98, never seen in "
+              "play, ported with them)) "
               "natively instead of "
               "through the translated code (the same words, bit for bit; checked by "
               "--run_harnesses=ai_drivers). Those "
@@ -395,3 +398,34 @@ ITC_AI_DRIVERS(8213C908, ctx.r3.u64 = NormalizeByBranch(base, ctx.r3.u32, ctx.r4
 
 // The original's frame 272 bytes down.
 ITC_AI_DRIVERS(8213E690, ctx.r3.u64 = AvoidOthers(base, ctx.r3.u32, ctx.r1.u32 - 272))
+
+// --- The skill's timed triggers (f1 the trigger's value for kinds 6 and 7,
+// as the originals leave it) ---
+
+// r3 not read, r4 = the driver, r5 = the trigger.
+ITC_AI_DRIVERS(8213F958, {
+  double f1 = 0;
+  bool f1_set = false;
+  ctx.r3.u64 = TriggerStarts(base, ctx.r4.u32, ctx.r5.u32, &f1, &f1_set);
+  if (f1_set) {
+    ctx.f1.f64 = f1;
+  }
+})
+// r3 = the trigger's state, r4 = the driver, r5 = the trigger.
+ITC_AI_DRIVERS(8213FB48, {
+  double f1 = 0;
+  bool f1_set = false;
+  ctx.r3.u64 = TriggerEnds(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, &f1, &f1_set);
+  if (f1_set) {
+    ctx.f1.f64 = f1;
+  }
+})
+// r3 = the skill, r4 = its driver.
+ITC_AI_DRIVERS(8213FCF8, {
+  double f1 = 0;
+  bool f1_set = false;
+  ctx.r3.u64 = UpdateSkill(base, ctx.r3.u32, ctx.r4.u32, &f1, &f1_set);
+  if (f1_set) {
+    ctx.f1.f64 = f1;
+  }
+})

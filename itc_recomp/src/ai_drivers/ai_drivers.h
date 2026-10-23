@@ -591,4 +591,30 @@ uint64_t AvoidByLane(uint8_t* base, uint32_t path, uint32_t a, uint32_t record, 
 // (see the row). Returns the r3 the original leaves.
 uint64_t AvoidOthers(uint8_t* base, uint32_t path, uint32_t frame);
 
+// --- The skill's timed triggers ---
+
+// sub_8213F7E0 (never seen in play, so without a row: a trigger condition,
+// kinds 4 and 5): the float +824, truncated, of the race state's record
+// (+2184: a count, 972-byte records from +2188, matched by their word +0)
+// keyed by the driver's +500 object's halfword +0; 0 with none.
+uint32_t SkillEntryWord(uint8_t* base, uint32_t driver);
+// sub_8213F868 (never seen in play, so without a row: kinds 6 and 7): the
+// same record's word +784 as a float x the float at 0x8200805C; 0.0 with
+// none.
+double SkillEntryValue(uint8_t* base, uint32_t driver);
+// AiSkill::TriggerStarts (sub_8213F958): 1 when the trigger's condition
+// (by its kind, 0 to 14) holds (see the row), else 0. `f1` set (and
+// `f1_set`) for kinds 6 and 7, as the original leaves it.
+uint32_t TriggerStarts(uint8_t* base, uint32_t driver, uint32_t trigger, double* f1,
+                       bool* f1_set);
+// AiSkill::TriggerEnds (sub_8213FB48): 1 when it ends: the conditions
+// reversed; kinds 10 to 14 count the state's halfword (at `state`) down
+// and end at 0; 1 for kinds above 14.
+uint32_t TriggerEnds(uint8_t* base, uint32_t state, uint32_t driver, uint32_t trigger,
+                     double* f1, bool* f1_set);
+// AiSkill::Update (sub_8213FCF8): with a source and +36 = 1, the three
+// triggers started (timer 150, active, their value added to +20) or ended
+// (inactive, taken off). 1 when one changed.
+uint32_t UpdateSkill(uint8_t* base, uint32_t skill, uint32_t driver, double* f1, bool* f1_set);
+
 }  // namespace ai_drivers

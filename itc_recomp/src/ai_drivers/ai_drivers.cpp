@@ -3452,4 +3452,182 @@ uint64_t AvoidOthers(uint8_t* base, uint32_t path, uint32_t frame) {
   return r3;
 }
 
+// --- The skill's timed triggers ---
+
+namespace {
+// The race's time in seconds: RaceTime::FromTicks on the race state's +6116,
+// minutes x 60 + seconds.
+int32_t RaceSeconds(uint8_t* base) {
+  const uint32_t time = TimeFromTicks(Load(base, Load(base, kRaceState) + 6116));
+  return int32_t(((time >> 16) & 0x7FFF) * 60 + ((time >> 10) & 0x3F));
+}
+// The race state's record (+2184 + 972 x i + 4) whose word matches the
+// driver's +500 object's halfword +0; 0 with none.
+uint32_t SkillEntry(uint8_t* base, uint32_t driver) {
+  const uint32_t object = Load(base, driver + 500);
+  const uint32_t list = Load(base, kRaceState) + 2184;
+  if (object == 0) {
+    return 0;
+  }
+  const int32_t n = int32_t(Load(base, list));
+  if (n <= 0) {
+    return 0;
+  }
+  const int32_t key = LoadS16(base, object + 0);
+  for (int32_t i = 0; i < n; i++) {
+    if (int32_t(Load(base, list + 8 + 972 * uint32_t(i))) == key) {
+      return list + 972 * uint32_t(i) + 4;
+    }
+  }
+  return 0;
+}
+}  // namespace
+
+uint32_t SkillEntryWord(uint8_t* base, uint32_t driver) {
+  ITC_NATIVE_RUNNING("sub_8213F7E0 AiSkill::EntryWord");
+  const uint32_t entry = SkillEntry(base, driver);
+  if (entry == 0) {
+    return 0;
+  }
+  return uint32_t(strings_and_font::steps::Fctiwz(Lfs(base, entry + 824)));
+}
+
+double SkillEntryValue(uint8_t* base, uint32_t driver) {
+  ITC_NATIVE_RUNNING("sub_8213F868 AiSkill::EntryValue");
+  const uint32_t entry = SkillEntry(base, driver);
+  if (entry == 0) {
+    return Lfs(base, kZero);
+  }
+  return Fmuls(IntToFloat(int32_t(Load(base, entry + 784))), Lfs(base, 0x8200805C));
+}
+
+uint32_t TriggerStarts(uint8_t* base, uint32_t driver, uint32_t trigger, double* f1,
+                       bool* f1_set) {
+  ITC_NATIVE_RUNNING("sub_8213F958 AiSkill::TriggerStarts");
+  const uint32_t kind = Load(base, trigger + 0);
+  const auto value = [&] { return LoadS16(base, trigger + 4); };
+  switch (kind) {
+    case 0:
+      return Lfs(base, driver + 488) < IntToFloat(value()) ? 0 : 1;
+    case 1:
+      return Lfs(base, driver + 488) > IntToFloat(int32_t(0u - uint32_t(value()))) ? 0 : 1;
+    case 2:
+      return RaceSeconds(base) < value() ? 0 : 1;
+    case 3:
+      return RaceSeconds(base) > value() ? 0 : 1;
+    case 4:
+      return int32_t(SkillEntryWord(base, driver)) < value() ? 0 : 1;
+    case 5:
+      return int32_t(SkillEntryWord(base, driver)) > value() ? 0 : 1;
+    case 6:
+    case 7: {
+      const double got = SkillEntryValue(base, driver);
+      *f1 = got;
+      *f1_set = true;
+      const double against = IntToFloat(value());
+      return (kind == 6 ? got < against : got > against) ? 0 : 1;
+    }
+    case 8:
+      return Load(base, driver + 496) != 0 ? 0 : 1;
+    case 9:
+      return Load(base, driver + 496) == 0 ? 0 : 1;
+    case 10: {
+      const uint32_t vehicle = Load(base, driver + 160);
+      if (vehicle == 0) {
+        return 0;
+      }
+      return (Load(base, vehicle + 6152) & 1) == 0 ? 0 : 1;
+    }
+    case 11:
+      return LoadS16(base, driver + 484) > 0 ? 1 : 0;
+    case 12:
+      return LoadS16(base, driver + 486) > 0 ? 1 : 0;
+    case 13:
+      return (Load(base, Load(base, kInputs)) & 0x100) == 0 ? 0 : 1;
+    case 14:
+      return (Load(base, Load(base, kInputs)) & 0x20000) == 0 ? 0 : 1;
+    default:
+      return 0;
+  }
+}
+
+uint32_t TriggerEnds(uint8_t* base, uint32_t state, uint32_t driver, uint32_t trigger,
+                     double* f1, bool* f1_set) {
+  ITC_NATIVE_RUNNING("sub_8213FB48 AiSkill::TriggerEnds");
+  const uint32_t kind = Load(base, trigger + 0);
+  const auto value = [&] { return LoadS16(base, trigger + 4); };
+  switch (kind) {
+    case 0:
+      return Lfs(base, driver + 488) < IntToFloat(value()) ? 1 : 0;
+    case 1:
+      return Lfs(base, driver + 488) > IntToFloat(int32_t(0u - uint32_t(value()))) ? 1 : 0;
+    case 2:
+      return RaceSeconds(base) < value() ? 1 : 0;
+    case 3:
+      return RaceSeconds(base) > value() ? 1 : 0;
+    case 4:
+      return int32_t(SkillEntryWord(base, driver)) < value() ? 1 : 0;
+    case 5:
+      return int32_t(SkillEntryWord(base, driver)) > value() ? 1 : 0;
+    case 6:
+    case 7: {
+      const double got = SkillEntryValue(base, driver);
+      *f1 = got;
+      *f1_set = true;
+      const double against = IntToFloat(value());
+      return (kind == 6 ? got < against : got > against) ? 1 : 0;
+    }
+    case 8:
+      return Load(base, driver + 496) != 0 ? 1 : 0;
+    case 9:
+      return Load(base, driver + 496) == 0 ? 1 : 0;
+    case 10:
+    case 11:
+    case 12:
+    case 13:
+    case 14: {
+      const uint16_t left = uint16_t(guest::LoadU16(base, state + 0) - 1);
+      guest::StoreU16(base, state + 0, left);
+      return left != 0 ? 0 : 1;
+    }
+    default:
+      return 1;
+  }
+}
+
+uint32_t UpdateSkill(uint8_t* base, uint32_t skill, uint32_t driver, double* f1, bool* f1_set) {
+  ITC_NATIVE_RUNNING("sub_8213FCF8 AiSkill::Update");
+  if (Load(base, skill + 0) == 0 || int32_t(Load(base, skill + 36)) != 1) {
+    return 0;
+  }
+  uint32_t changed = 0;
+  uint32_t state = skill + 24;
+  for (uint32_t at = 16; at < 40; at += 8, state += 4) {
+    const uint32_t trigger = at + Load(base, skill + 0);
+    if (int32_t(Load(base, trigger + 0)) == -1) {
+      continue;
+    }
+    int32_t step;
+    if (guest::LoadU8(base, state + 2) == 0) {
+      step = TriggerStarts(base, driver, trigger, f1, f1_set) != 0 ? 1 : 0;
+    } else {
+      step = TriggerEnds(base, state, driver, trigger, f1, f1_set) != 0 ? -1 : 0;
+    }
+    if (step > 0) {
+      guest::StoreU16(base, state + 0, 150);
+      guest::StoreU8(base, state + 2, 1);
+      const double now = Lfs(base, skill + 20);
+      Stfs(base, skill + 20, Fadds(IntToFloat(LoadS16(base, trigger + 4)), now));
+    } else if (step < 0) {
+      guest::StoreU8(base, state + 2, 0);
+      const double now = Lfs(base, skill + 20);
+      Stfs(base, skill + 20, Fsubs(now, IntToFloat(LoadS16(base, trigger + 4))));
+    } else {
+      continue;
+    }
+    changed = 1;
+  }
+  return changed;
+}
+
 }  // namespace ai_drivers

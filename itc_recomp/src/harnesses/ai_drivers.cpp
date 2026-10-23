@@ -316,6 +316,24 @@ ITC_NATIVE_STEP(NativeAvoidByLane, ctx.r3.u64 = ai::AvoidByLane(base, ctx.r3.u32
                                                                 ctx.r5.u32, ctx.r1.u32 - 96))
 ITC_NATIVE_STEP(NativeAvoidOthers,
                 ctx.r3.u64 = ai::AvoidOthers(base, ctx.r3.u32, ctx.r1.u32 - 272))
+ITC_NATIVE_STEP(NativeSkillEntryWord, ctx.r3.u64 = ai::SkillEntryWord(base, ctx.r3.u32))
+ITC_NATIVE_STEP(NativeSkillEntryValue, ctx.f1.f64 = ai::SkillEntryValue(base, ctx.r3.u32))
+#define ITC_NATIVE_TRIGGER_STEP(name, call)   \
+  void name(PPCContext& ctx, uint8_t* base) { \
+    ctx.fpscr.disableFlushMode();             \
+    double f1 = 0;                            \
+    bool f1_set = false;                      \
+    ctx.r3.u64 = call;                        \
+    if (f1_set) {                             \
+      ctx.f1.f64 = f1;                        \
+    }                                         \
+  }
+ITC_NATIVE_TRIGGER_STEP(NativeTriggerStarts,
+                        ai::TriggerStarts(base, ctx.r4.u32, ctx.r5.u32, &f1, &f1_set))
+ITC_NATIVE_TRIGGER_STEP(NativeTriggerEnds, ai::TriggerEnds(base, ctx.r3.u32, ctx.r4.u32,
+                                                           ctx.r5.u32, &f1, &f1_set))
+ITC_NATIVE_TRIGGER_STEP(NativeUpdateSkill,
+                        ai::UpdateSkill(base, ctx.r3.u32, ctx.r4.u32, &f1, &f1_set))
 ITC_NATIVE_STEP(NativeNormalizeByBranch,
                 ctx.r3.u64 = ai::NormalizeByBranch(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
                                                    ctx.r6.u32, ctx.r7.u32))
@@ -497,6 +515,11 @@ enum Kind {
   kChooseSideForOther,
   kAvoidByLane,
   kAvoidOthers,
+  kSkillEntryWord,
+  kSkillEntryValue,
+  kTriggerStarts,
+  kTriggerEnds,
+  kUpdateSkill,
 };
 
 }  // namespace
@@ -727,6 +750,16 @@ void AiDrivers(Context& h) {
        NativeAvoidByLane, kAvoidByLane, 3000},
       {"AiPath::AvoidOthers (sub_8213E690)", Original<__imp__sub_8213E690>, NativeAvoidOthers,
        kAvoidOthers, 3000},
+      {"AiSkill::EntryWord (sub_8213F7E0, never seen in play)", Original<__imp__sub_8213F7E0>,
+       NativeSkillEntryWord, kSkillEntryWord, 2000},
+      {"AiSkill::EntryValue (sub_8213F868, never seen in play)", Original<__imp__sub_8213F868>,
+       NativeSkillEntryValue, kSkillEntryValue, 2000},
+      {"AiSkill::TriggerStarts (sub_8213F958)", Original<__imp__sub_8213F958>,
+       NativeTriggerStarts, kTriggerStarts, 3000},
+      {"AiSkill::TriggerEnds (sub_8213FB48)", Original<__imp__sub_8213FB48>, NativeTriggerEnds,
+       kTriggerEnds, 3000},
+      {"AiSkill::Update (sub_8213FCF8)", Original<__imp__sub_8213FCF8>, NativeUpdateSkill,
+       kUpdateSkill, 3000},
   };
   const uint32_t area = memory::Alloc(kAreaBytes, 0);
   const uint32_t driver = area + kDriver, vehicle = area + kVehicle, io = area + kIo;
@@ -2026,6 +2059,75 @@ void AiDrivers(Context& h) {
           floats.push_back({kDriver + 164, 2});
           break;
         }
+        case kSkillEntryWord:
+        case kSkillEntryValue:
+        case kTriggerStarts:
+        case kTriggerEnds:
+        case kUpdateSkill: {
+          // The race state's records (its +2184, in the vehicle's bytes: a
+          // count, 0 to 3, 972-byte records keyed by their word +4, their
+          // +788 and +828) and tick count (+6116), the driver's +500 object
+          // (io + 0x80: the key +0), +160, +484, +486, +488, +496, the
+          // vehicle's +6152, the input word; the skill's source (io + 0x40:
+          // three 8-byte triggers from +16, a kind and a value), +20, +36 and
+          // the triggers' states (+24: a timer, the byte active).
+          const uint32_t state_base = area + kRaceState - 6100;
+          const uint32_t list = state_base + 2184;
+          const uint32_t n = r.Below(4);
+          guest::StoreU32(h.base, list, r.Below(16) == 0 ? uint32_t(int32_t(-1)) : n);
+          const uint32_t object = io + 0x80;
+          const int16_t key = int16_t(r.Below(6));
+          guest::StoreU16(h.base, object + 0, uint16_t(key));
+          for (uint32_t i = 0; i < 3; i++) {
+            const uint32_t record = list + 972 * i + 4;
+            guest::StoreU32(h.base, record + 4, r.Below(6));
+            guest::StoreU32(h.base, record + 824, RandomFloat(r, 200.0f));
+            guest::StoreU32(h.base, record + 784, uint32_t(int32_t(r.Below(400)) - 200));
+          }
+          guest::StoreU32(h.base, state_base + 6116,
+                          r.Below(8) == 0 ? uint32_t(r.Next()) : r.Below(30 * 600));
+          guest::StoreU32(h.base, driver + 500, r.Below(6) == 0 ? 0 : object);
+          guest::StoreU32(h.base, driver + 488, RandomFloat(r, 150.0f));
+          guest::StoreU32(h.base, driver + 496, r.Below(2) ? 0 : uint32_t(r.Next()));
+          guest::StoreU16(h.base, driver + 484, uint16_t(int32_t(r.Below(5)) - 2));
+          guest::StoreU16(h.base, driver + 486, uint16_t(int32_t(r.Below(5)) - 2));
+          guest::StoreU32(h.base, vehicle + 6152, uint32_t(r.Next()));
+          guest::StoreU32(h.base, area + kInputWords, uint32_t(r.Next()));
+          const uint32_t skill = driver + kSkill;
+          const uint32_t source = io + 0x40;
+          guest::StoreU32(h.base, skill + 0, r.Below(8) == 0 ? 0 : source);
+          guest::StoreU32(h.base, skill + 36, r.Below(8) == 0 ? r.Below(3) : 1);
+          guest::StoreU32(h.base, skill + 20, RandomFloat(r, 150.0f));
+          for (uint32_t i = 0; i < 3; i++) {
+            const uint32_t trigger = source + 16 + 8 * i;
+            guest::StoreU32(h.base, trigger + 0,
+                            r.Below(8) == 0 ? (r.Below(2) ? 0xFFFFFFFFu : 15 + r.Below(4))
+                                            : r.Below(15));
+            const int32_t value = r.Below(4) == 0 ? int32_t(int16_t(r.Next()))
+                                                  : int32_t(r.Below(400)) - 200;
+            guest::StoreU16(h.base, trigger + 4, uint16_t(value));
+            guest::StoreU16(h.base, skill + 24 + 4 * i, uint16_t(r.Below(3) ? r.Below(3) : r.Next()));
+            guest::StoreU8(h.base, skill + 26 + 4 * i, uint8_t(r.Below(4) == 0 ? r.Below(256)
+                                                                              : r.Below(2)));
+          }
+          const uint32_t pick = source + 16 + 8 * r.Below(3);
+          if (f.kind == kSkillEntryWord || f.kind == kSkillEntryValue) {
+            r3 = driver;
+          } else if (f.kind == kTriggerStarts) {
+            r3 = uint32_t(r.Next());
+            r4 = driver;
+            r5 = pick;
+          } else if (f.kind == kTriggerEnds) {
+            r3 = skill + 24 + 4 * r.Below(3);
+            r4 = driver;
+            r5 = pick;
+          } else {
+            r3 = skill;
+            r4 = driver;
+          }
+          floats.push_back({kSkill + 20, 1});
+          break;
+        }
       }
       // Guest memory is one host mapping: the blocks copied as they are.
       const std::vector<uint8_t> inputs(h.base + area, h.base + area + kAreaBytes);
@@ -2085,7 +2187,9 @@ void AiDrivers(Context& h) {
         out[v].Word(t.r3.u32);
         if (f.kind == kSpeedOverDistance || f.kind == kCornerFactor || f.kind == kLimitSpeed ||
             f.kind == kLimitSpeedBlend || f.kind == kLimitForCorner ||
-            f.kind == kUpdateTargetSpeed || f.kind == kUpdateSpeed || f.kind == kSteerToTarget) {
+            f.kind == kUpdateTargetSpeed || f.kind == kUpdateSpeed || f.kind == kSteerToTarget ||
+            f.kind == kSkillEntryValue || f.kind == kTriggerStarts || f.kind == kTriggerEnds ||
+            f.kind == kUpdateSkill) {
           out[v].Double(t.f1.u64);
         }
       }
