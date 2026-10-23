@@ -19,7 +19,8 @@ The tables (what's known of them, `../known-data.md`):
   `DataTables::Item` (`sub_82117178`) has 62 callers.
 - asset 84 at +60: no reader found besides the load.
 - eight assets at +20 to +48 (their ids the eight words at
-  `0x82616C64`, not read: the image isn't dumped): 56-byte entries
+  `0x82616C64`: 86, 87, 91, 88, 92, 89, 90, 93, read from the image,
+  `../known-data.md`): 56-byte entries
   ending with one whose +0 is -1; `DataTables::Entry56` (`sub_82117190`)
   with the table (0-7) and the entry.
 - asset 95 at +52: 20-byte entries ending with -1 at +0, searched by

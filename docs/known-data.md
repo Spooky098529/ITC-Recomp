@@ -3,6 +3,39 @@
 The game's globals and object fields worked out so far (the functions
 are in [`functions/`](functions/functions.md)).
 
+## Values from the image
+
+`itc/xex_image/default.bin` (not committed: `itc/` holds the game's
+files) is `default.xex` decrypted into its memory image, made by
+`itc/xex_image/xexdump.py` beside it (this XEX only: its header offset is
+hardcoded). It starts at the load address: address A is at file offset
+A − 0x82000000, and it covers `0x82000000`-`0x829B0000`. The XEX always
+loads there, so addresses don't change between runs. It's the memory at
+load, before any code runs, so a value is only right if nothing writes
+to it. Read only these from it:
+
+- The read-only sections: `.rdata` (`0x82000600`-`0x820773C4`; the
+  float constants, the table at `0x820044B0`) and `.text`
+  (`0x82090000`-`0x825DC064`).
+- In `.data` (`0x82600000`-`0x8297833C`, writable), only the tables
+  below. Each was checked (2026-10-23): every instruction in
+  `generated/` that forms an address in it (a `lis` and its immediate)
+  is a load, and so is every use in `src/`.
+
+| Address | What | Read by |
+|---|---|---|
+| `0x82600AA8`, `0x82600AB8` | The TOC entry counts: 23011 (`BUILD`) and 1359 (`BUILD_CRS`), the same as the TOC files' | `Archive::Init` (`sub_8209E210`) and its override (`src/hooks/archive_streaming.cpp`) |
+| `0x8260181C` | Six pointers to 88-byte records at `0x82601610` to `0x82601820` (by car data +176) | `Vehicle::SetupFromCar` (`sub_820C27E8`) only |
+| `0x82602570` | The vinyl sheet's size: 1024, 1024, 16, 16 | `sub_820D5EC8`, `sub_820D5D20`, `sub_820D5750`, `sub_820D3C80`, `sub_820EE638`, `sub_820EE698` |
+| `0x82602A50` | The vinyl sheet's ten regions (16 bytes each) | `sub_820EE638`, `sub_820EE698` |
+| `0x82616C64` | The data tables' eight asset ids: 86, 87, 91, 88, 92, 89, 90, 93 | `DataTables::Init` (`sub_82116DB0`), `DataTables::Load` (`sub_82117240`) |
+
+Anything else in `.data` (the globals and pointers the game sets, such
+as `[0x826C2E48]`, which is 0 in the image) gets the same check before
+it's read from the image, and a row here.
+
+## Globals and fields
+
 | Address | What | Notes |
 |---|---|---|
 | vehicle+0x30 | Speed (float, m/s) | Read by `Vehicle::GetSpeedKmh`. |
@@ -127,7 +160,7 @@ are in [`functions/`](functions/functions.md)).
 | `0x82970C14` | The client list | The one list (`ClientList::ClientList`, `sub_8259C7B8`, keeps it here; the same object as `[0x826BAB7C]`): vtable `0x820713C0` (`0x82007F18` for the input clients), +4 and +8 the first and last node, +12, +16, +20 the nodes added of types 0-2, +24, +28, +32 those bound, +36 the input manager. A node: +0 vtable, +4 its type (2 an action mapper), +8 the next. Looked up by type and index (`sub_8259C818`). |
 | `0x82600B84`, `0x82600B88` | The action mappers' settings | The index (1 at boot) and the table of 32-byte entries it picks (`sub_8209F228`): +0, +4 on and off thresholds, +8 suppress ticks, +12, +16 repeat delay and period, +20, +24, +28 the curve's center, dead zone and maximum; one entry for every action. Values not read. |
 | action mapper | One player's action mapper (2,896 bytes, vtable `0x82007F78`, `sub_8210C180`; the update's fields in `../pause-menu-fix.md`) | +4 type 2, +8 the next client; +12 30 kinds (1), +132 30 analog kinds (2 for actions 24-29, else 1), +252 30 links (probably each direction's opposite; 30 none), +372 to +384 pointers to them; +448 the words, +472 and +1252 pointers to the repeat and curve objects; +592 30 repeat objects (16 bytes, vtable `0x82007F68`: +4 the count, +8 delay, +12 period; `sub_8210B568`); +1372 30 curve objects (vtable `0x82007F70`: +4 center, +8 dead zone, +12 maximum; `sub_8210B5B8`); +1852 the threshold entries; +2464 the listener (an input processor); +2880 the logical pad's values; +2884 bound (byte); +2888 the player; +2892 the input object it's bound to. |
-| `0x826C5CA0` | The data tables (64 bytes, `DataTables::Init` `sub_82116DB0`; `functions/data-tables.md`) | +0 the last load's serial (not read), +4 the loads pending (12 at boot, each callback counts down; `DataTables::IsLoading`), +8 the item count (400, set by asset 94's callback), +12 the block all the tables are in (operator new[]), +16 asset 94 (the items), +20 to +48 eight 56-byte tables (their asset ids the eight words at `0x82616C64`, not read), +52 asset 95 (20-byte entries), +56 asset 96 (40-byte entries), +60 asset 84 (no reader found). The 56-, 20- and 40-byte tables are little-endian in the files and byte-swapped word by word on load; each ends with an entry holding -1 (+0 for the 56- and 20-byte ones, +4 for the 40-byte one by its callback, +16 by `sub_82116588`). |
+| `0x826C5CA0` | The data tables (64 bytes, `DataTables::Init` `sub_82116DB0`; `functions/data-tables.md`) | +0 the last load's serial (not read), +4 the loads pending (12 at boot, each callback counts down; `DataTables::IsLoading`), +8 the item count (400, set by asset 94's callback), +12 the block all the tables are in (operator new[]), +16 asset 94 (the items), +20 to +48 eight 56-byte tables (their asset ids the eight words at `0x82616C64`: 86, 87, 91, 88, 92, 89, 90, 93), +52 asset 95 (20-byte entries), +56 asset 96 (40-byte entries), +60 asset 84 (no reader found). The 56-, 20- and 40-byte tables are little-endian in the files and byte-swapped word by word on load; each ends with an entry holding -1 (+0 for the 56- and 20-byte ones, +4 for the 40-byte one by its callback, +16 by `sub_82116588`). |
 | item | One of the 400 3,008-byte entries of asset 94 (`DataTables::Item`, `sub_82117178`) | Probably a car or a part; indexed by the same ids as the save data's 12-byte records at +0x199F8 (halfwords +0x199F8, +0x199FA (+2: a count up to 999, `sub_82114B88`), +0x199FC; `functions/race-overlays.md`). Read by its callers: bytes +6, +34, +35 (3 tested by `sub_82111780`), +36, +46, +91 and halfwords +42 (1 tested by `sub_82111780`), +88. Not byte-swapped on load. Not read in detail. |
 | 20-byte data entry | Asset 95's entries (`[0x826C5CA0] + 52`) | +0 and +8 the two keys `DataTables::Find20` (`sub_821171B0`) matches, +4 read by the front end's callers. |
 | 56-byte data entry | The eight tables at `[0x826C5CA0] + 20` | +0 (-1 ends the table), +8, +16 read by callers; +24 to +44 three pairs of words (by the swap's layout). |
