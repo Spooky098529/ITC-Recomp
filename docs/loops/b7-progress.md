@@ -19,7 +19,9 @@ file's history. What's left to see in a drive, from every run:
 - Subsystem 3 of 3: the game's cameras above `CameraPass::Update` (the
   lead whose functions run every frame, nearly all ready): mapped in 8fb7201 (`cameras.md`,
   42 rows, 16 ready groups), checked; migration 1 done
-  (81d1c0c..1736a63; 4 ready groups left); validation agent running.
+  (81d1c0c..1736a63; 4 ready groups left), validated (19 of 19
+  harness lines; all ran in the attract race or the replay, `itc_982`,
+  `itc_983` ok); migration agent 2 running.
 
 ## Done
 
