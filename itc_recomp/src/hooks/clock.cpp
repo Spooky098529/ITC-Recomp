@@ -1,5 +1,5 @@
-// The game's reader of the performance counter's rate natively, with the
-// rate from src/helpers/clock.h. (The audio library's hardware wait,
+// The game's clock readers natively, from src/helpers/clock.h: the
+// performance counter's rate and the tick count. (The audio library's hardware wait,
 // sub_8245D288, which also read it, is in hooks/xma.cpp since B2: nothing to
 // wait for.)
 
@@ -14,4 +14,12 @@ extern "C" REX_FUNC(sub_825B9A70) {
   guest::StoreU32(base, out, uint32_t(helpers::kPerformanceFrequency >> 32));
   guest::StoreU32(base, out + 4, uint32_t(helpers::kPerformanceFrequency));
   ctx.r3.u64 = 1;
+}
+
+// GetTickCount: returns the milliseconds since start. Every recompiled caller
+// reaches the tick count through here, native callers through
+// helpers::TickCount directly: one clock for both.
+extern "C" REX_FUNC(sub_822956F0) {
+  REX_FUNC_PROLOGUE();
+  ctx.r3.u64 = helpers::TickCount();
 }

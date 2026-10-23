@@ -193,6 +193,7 @@ set(ITC_SOURCES
     src/helpers/debug_output.cpp
     src/helpers/object_attributes.cpp
     src/helpers/time.cpp
+    src/helpers/clock.cpp
     src/helpers/strings.cpp
     src/helpers/executable.cpp
     src/user/profile.cpp

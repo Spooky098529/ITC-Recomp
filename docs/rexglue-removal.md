@@ -2373,6 +2373,22 @@ B6. **Pure helpers** (55 functions): string, time and formatting
     caller in play outside B6; they stay imported until those callers are
     gone with the SDK.
 
+    GetTickCount (2026-10-23, the user's call, branch
+    `native-tick-count`): `sub_822956F0` read the kernel's
+    `KeTimeStampBundle` (a variable import, +16 the tick count in
+    milliseconds, which the SDK sets to its uptime every 1 ms on a timer)
+    and is the game's only reader of it. Its adapter
+    (`src/hooks/clock.cpp`) returns `helpers::TickCount()`
+    (`src/helpers/clock.cpp`): milliseconds since start from the host's
+    steady clock, wrapping at 2^32. Recompiled callers reach it through
+    the adapter and native ones call it directly, so both share one
+    clock, as the heap's callers share the allocation layer. No flag
+    (like QueryPerformanceFrequency): a fallback would put the two kinds
+    of callers on different clocks. Harness `clock`: over sleeps of 0 to
+    100 ms, ours advances as the SDK's count does, within 3 ms. The
+    boundary tool counts function imports only, so its numbers don't
+    change; the SDK's timer goes with the SDK.
+
     Blocked entirely: `RtlRaiseException`,
     `RtlUnwind`, `RtlCaptureContext` (the core). `XGetAVPack` and
     `XGetLanguage`, first listed here, were cleared by B5 step 1
@@ -2610,8 +2626,8 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
     with the folded getter `sub_8220BC28`. What's left needs the
     critical section, XAudio and the voice class, vtable calls into the
     still-recompiled tracks and waves (`825D0000`-`825D9000`, leads), or
-    XACT's clock, which waits on GetTickCount (`sub_822956F0`: reading
-    the kernel's timestamp bundle or a host clock is the user's call).
+    XACT's clock, which waited on GetTickCount (`sub_822956F0`; ours
+    since 2026-10-23, from the host clock: "GetTickCount" under B6).
 
     The second run (from 2026-10-22, branch `b7-loop-22-10-26`; its first
     session stopped after one subsystem): the first run's removable
@@ -2927,3 +2943,10 @@ called 70, live 286. Imports: 186 called, 62 with a live caller. B7
 (`b7_status.py`): 6,753 in play, ours 970, work left 5,783 (Wrapped
 137, with a row 460, no row yet 5,186); `xact.md` 102 ours of 186. 865
 overrides in `src/`.
+
+**2026-10-23, GetTickCount from the host clock (branch
+`native-tick-count`):** the boundary unchanged (the tool counts function
+imports; `KeTimeStampBundle` is a variable import, with no reader left
+in play): 449 functions (916 pairs): overridden 67, Native 3, Dropped
+23, never called 70, live 286. Imports: 186 called, 62 with a live
+caller. B7 (`b7_status.py`): ours 971.
