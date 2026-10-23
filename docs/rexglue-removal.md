@@ -64,7 +64,10 @@ goes in `src/` as overrides), American English.
   car physics native as far as they were ready (ours 705); after native
   memory (ours 714), its fourth run (branch `b7-loop-22-10-26-2`, merged
   2026-10-23) made the C runtime heap, the collision narrow phase and
-  the collision world native as far as they were ready (ours 837). The
+  the collision world native as far as they were ready (ours 837); its
+  fifth run (branch `b7-loop-23-10-26`, not yet merged) made the sound
+  cues and XACT (the user's call: translated, no host library plays its
+  data) native as far as they were ready (ours 970). The
   runs' rows wait for the user's review (`docs/loops/review.md`). See
   "B7's loop runs" under B7, and `docs/loops/b7-progress.md`. Guest
   allocation is no longer a block (`docs/native-memory.md`); what the
@@ -2488,7 +2491,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-10-23 | The collision world's narrow phase and shapes (with CollisionObject::Translate, Vehicle::ApplyForces and two rigid body accessors) | `collision.md` | 64 of 64 | `--native_collision` |
 | 2026-10-23 | The collision world's owner and the track's collision (the wall and ground queries, the track mesh and positions, the teardown) | `collision-world.md` | 37 of 43 | `--native_collision_world` |
 | 2026-10-23 | The sound cues (the game's sound manager, its wrapper over XACT and X3DAudio, X3DAudioInitialize) | `sound-cues.md` | 30 of 87 | `--native_sound_cues` |
-| 2026-10-23 | XACT, the sound library linked into the game (its engine, banks, cues, sounds and faders; the user's call to translate it) | `xact.md` | 55 of 149 | `--native_xact` |
+| 2026-10-23 | XACT, the sound library linked into the game (its engine, banks, cues, sounds and faders; the user's call to translate it) | `xact.md` | 102 of 186 (two maps, three migrations) | `--native_xact` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -2599,7 +2602,15 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
     unmapped vtable slots (a lead, taken next), calls through vtables
     into recompiled code, XAudio and its voice class (where a
     translation meets our own audio output; the user's call how), the
-    tracks, events and waves (a lead).
+    tracks, events and waves (a lead). A second map (the run's third
+    subsystem: the global settings' accessors, the renderer's and the
+    sound classes' slots, the wave entry's getters, two shared helpers
+    in `functions.md`) and two more migrations made 102 of 186 ours,
+    with the folded getter `sub_8220BC28`. What's left needs the
+    critical section, XAudio and the voice class, vtable calls into the
+    still-recompiled tracks and waves (`825D0000`-`825D9000`, leads), or
+    XACT's clock, which waits on GetTickCount (`sub_822956F0`: reading
+    the kernel's timestamp bundle or a host clock is the user's call).
 
     The second run (from 2026-10-22, branch `b7-loop-22-10-26`; its first
     session stopped after one subsystem): the first run's removable
@@ -2907,3 +2918,11 @@ Native 3, Dropped 23, never called 70, live 286. Imports: 186 called, 62
 with a live caller. B7 (`b7_status.py`): 6,753 in play, ours 922, work
 left 5,831 (Wrapped 137, with a row 469, no row yet 5,225); `xact.md`
 55 ours of 149. 833 overrides in `src/`.
+
+**2026-10-23, B7's fifth loop run, done (branch `b7-loop-23-10-26`: the
+sound cues, XACT, XACT's settings and slots):** the boundary unchanged:
+449 functions (916 pairs): overridden 67, Native 3, Dropped 23, never
+called 70, live 286. Imports: 186 called, 62 with a live caller. B7
+(`b7_status.py`): 6,753 in play, ours 970, work left 5,783 (Wrapped
+137, with a row 460, no row yet 5,186); `xact.md` 102 ours of 186. 865
+overrides in `src/`.
