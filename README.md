@@ -25,8 +25,7 @@ The above branch contains the most up to date functions reference, and is where 
 
 - Linux, or Windows 10 or 11 (experimental, see below), on a 64-bit x86
   CPU with SSE4.2 (most CPUs from 2009 on).
-- A GPU and driver supporting Vulkan 1.3 or newer (the game won't start
-  without it). With up-to-date drivers, that should include for example:
+- A GPU and driver supporting Vulkan 1.3 or newer with up-to-date drivers, that should include for example:
   - NVIDIA GeForce GTX 750 Ti, GTX 900 series or newer
   - AMD Radeon RX 400 series or newer
   - Intel Iris Xe (11th-gen Core laptops) or Arc
