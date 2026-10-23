@@ -4,6 +4,7 @@
 #include "track_collision/track_collision.h"
 
 #include "car_physics/float_ops.h"
+#include "track_route/track_route.h"
 
 #include "base/log.h"
 
@@ -20,6 +21,7 @@ constexpr uint32_t kInsideEpsilon = 0x820029D8;
 constexpr uint32_t kBoundsMargin = 0x82001FD8;
 constexpr uint32_t kFarthest = 0x82006824;  // SearchAll's first best distance
 constexpr uint32_t kLinkedTried = 0x826C5B04;
+constexpr uint32_t kGroundRaise = 0x82001BE4;  // 0.5
 
 uint32_t S16(uint8_t* base, uint32_t address) {
   return uint32_t(int32_t(int16_t(guest::LoadU16(base, address))));
@@ -460,6 +462,63 @@ uint32_t TrackPositionFindCell(uint8_t* base, uint32_t mesh, uint32_t position, 
     }
   }
   return guest::LoadU32(base, f + 80);
+}
+
+void TrackPositionUpdate(uint8_t* base, uint32_t position, uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_820F8470 TrackPosition::Update");
+  const uint32_t route_position = position + 4;
+  const uint32_t point = position + 16;
+  // The route position before, for Follow (its frame's +80).
+  guest::StoreU32(base, frame + 80, guest::LoadU32(base, route_position));
+  TrackPositionFindCell(base, kMesh, position, point, frame - 240);
+  // The ground under the point raised by 0.5; its y put back when none.
+  const double y = Lfs(base, point + 4);
+  Stfs(base, point + 4, Fadds(y, Lfs(base, kGroundRaise)));
+  const int32_t kind = int32_t(
+      TrackMeshGroundHeight(base, kMesh, point, position, position + 32, position + 48, frame - 240));
+  if (!(kind > -1)) {
+    Stfs(base, point + 4, y);
+  }
+  guest::StoreU16(base, position + 82, 0);
+  if (kind == 4 || kind == 20) {
+    guest::StoreU16(base, position + 82, 1);
+  }
+  uint32_t bit = 0;
+  switch (int32_t(TrackMeshSliceKind(base, kMesh, position) & 0xFFFF)) {
+    case 30:
+      bit = 2;
+      break;
+    case 31:
+      bit = 4;
+      break;
+    case 32:
+      bit = 8;
+      break;
+    default:
+      break;
+  }
+  if (bit != 0) {
+    guest::StoreU16(base, position + 82, uint16_t(guest::LoadU16(base, position + 82) | bit));
+  }
+  track_route::Follow(base, track_route::kRoute, route_position, point, frame + 80, frame - 176);
+}
+
+void TrackPositionInit(uint8_t* base, uint32_t position, uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_820F8578 TrackPosition::Init");
+  const uint32_t route_position = position + 4;
+  track_route::Point(base, track_route::kRoute, position + 16, route_position, frame - 112);
+  // The cell from the route slice's record's word +32.
+  const uint32_t file = guest::LoadU32(base, track_route::kRoute);
+  const uint32_t number = guest::LoadU16(base, route_position);
+  const uint32_t table = guest::LoadU32(base, file + 12);
+  const uint32_t section = guest::LoadU32(base, table + number * 4);
+  const int32_t slice = int16_t(guest::LoadU16(base, position + 6));
+  const uint32_t cell = guest::LoadU32(base, section + uint32_t(slice) * 84 + 156);
+  guest::StoreU16(base, position + 80, 0);
+  guest::StoreU16(base, position + 82, 0);
+  guest::StoreU16(base, position + 0, uint16_t(cell >> 16));
+  guest::StoreU16(base, position + 2, uint16_t(cell));
+  TrackPositionUpdate(base, position, frame - 144);
 }
 
 }  // namespace track_collision

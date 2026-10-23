@@ -23,7 +23,9 @@ ITC_FLAG_BOOL(native_collision_world, true, "ITC",
               "TrackCollision::Ground sub_820FE8F8, GroundCallback sub_820FEAB0 and GroundHits "
               "sub_820FEBD0, for boxes; the track position's cell, sub_820F8090 with sub_820F6A38, "
               "sub_820F6BE8, sub_820F71B0, sub_820F7EE8, sub_820F7E30, sub_820F7D70, "
-              "sub_820F6C88; the wall query's parts, sub_820FC188 with sub_820FC110, sub_820FC2E0, "
+              "sub_820F6C88; the track position, TrackPosition::Update sub_820F8470 and Init "
+              "sub_820F8578 (with the course's route's Follow and Point, native whatever "
+              "--native_track_route says); the wall query's parts, sub_820FC188 with sub_820FC110, sub_820FC2E0, "
               "sub_820FC658; the wall query, sub_820FD6D8 with sub_820FC870, sub_820FC3C8, "
               "sub_820FC900, sub_820FDC18, sub_820FDF38, sub_820FF1B0; the "
               "route, sub_820F9050) natively "
@@ -138,6 +140,13 @@ extern "C" REX_FUNC(sub_820FEBD0) {
 // r3 = the mesh, r4 = the track position, r5 = its point.
 ITC_COLLISION_WORLD(820F8090, ctx.r3.u64 = TrackPositionFindCell(base, ctx.r3.u32, ctx.r4.u32,
                                                                  ctx.r5.u32, ctx.r1.u32 - 240))
+
+// r3 = the track position; the originals' frames (144 and 128 bytes down).
+// r3 left as it came (no caller reads it). They call the course's route's
+// Follow and Point (src/track_route/) natively whatever --native_track_route
+// says.
+ITC_COLLISION_WORLD(820F8470, TrackPositionUpdate(base, ctx.r3.u32, ctx.r1.u32 - 144))
+ITC_COLLISION_WORLD(820F8578, TrackPositionInit(base, ctx.r3.u32, ctx.r1.u32 - 128))
 
 // --- The route ---
 
