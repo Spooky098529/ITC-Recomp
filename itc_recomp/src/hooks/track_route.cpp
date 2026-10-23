@@ -5,7 +5,12 @@
 // callers): TrackRoute::StepBack (sub_820F8A58, from NormalizeBack),
 // ToIndex and FromIndex (sub_820AB408, sub_820AB498, from ClampPosition;
 // FromIndex's other caller, sub_820F9DD0, never ran in play and runs the
-// original) and LinkDistance (sub_820F8720, from Distance and itself).
+// original) and LinkDistance (sub_820F8720, from Distance and itself);
+// and, their recompiled callers having been made native, LinkLane
+// (sub_820F8CE8, from StepForwardLane and StepForwardLaneMasked),
+// BranchesMatching (sub_820F8BD0, from StepForwardMasked and
+// StepForwardLaneMasked) and StepForwardMasked (sub_820F93A0, from
+// NormalizeForward).
 
 #include "guest.h"
 
@@ -25,7 +30,8 @@ ITC_FLAG_BOOL(native_track_route, true, "ITC",
               "the translated code)) natively instead of through the translated code (the same "
               "words, bit for bit; checked by --run_harnesses=track_route). Those reached only "
               "from native callers have no adapters, and the flag switches their callers: "
-              "sub_820F8A58, sub_820AB408, sub_820AB498, sub_820F8720");
+              "sub_820F8A58, sub_820AB408, sub_820AB498, sub_820F8720, sub_820F8CE8, "
+              "sub_820F8BD0, sub_820F93A0");
 
 // Defines an adapter: `body` uses `ctx` and `base`.
 #define ITC_TRACK_ROUTE(address, body)   \
@@ -47,8 +53,6 @@ using namespace track_route;
 ITC_TRACK_ROUTE(820F8668, LanePoint(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.s32))
 ITC_TRACK_ROUTE(820F8920, ctx.r3.u64 = LaneAt(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
 ITC_TRACK_ROUTE(820F89F0, ctx.r3.s64 = Link(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
-ITC_TRACK_ROUTE(820F8CE8,
-                ctx.r3.s64 = LinkLane(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32))
 ITC_TRACK_ROUTE(820F8D38, ctx.r3.s64 = SpecialSection(base, ctx.r3.u32, ctx.r4.u32))
 ITC_TRACK_ROUTE(820F8DE8, ctx.r3.u64 = SliceTest(base, ctx.r3.u32, ctx.r4.u32))
 ITC_TRACK_ROUTE(820F8E98, ctx.r3.u64 = IsMainRoad(base, ctx.r3.u32, ctx.r4.u32))
@@ -57,14 +61,9 @@ ITC_TRACK_ROUTE(820F8EF0, ctx.r3.u64 = SectionOutcode(base, ctx.r3.u32, ctx.r4.u
 // --- Steps between sections ---
 
 ITC_TRACK_ROUTE(820F8B48, ctx.r3.u64 = StepForward(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
-ITC_TRACK_ROUTE(820F8BD0, ctx.r3.u64 = BranchesMatching(base, ctx.r3.u32, ctx.r4.u32,
-                                                        ctx.r5.u32, ctx.r6.u32))
 ITC_TRACK_ROUTE(820F8C58, ctx.r3.u64 = StepAlongPath(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
                                                      ctx.r6.u32))
 ITC_TRACK_ROUTE(820F9320, ctx.r3.u64 = NormalizeBack(base, ctx.r3.u32, ctx.r4.u32))
-// r6 = the masks (words, ending with 0).
-ITC_TRACK_ROUTE(820F93A0, ctx.r3.u64 = StepForwardMasked(base, ctx.r3.u32, ctx.r4.u32,
-                                                         ctx.r5.u32, ctx.r6.u32))
 // r5 = the masks or 0.
 ITC_TRACK_ROUTE(820F9EA8, ctx.r3.u64 = NormalizeForward(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
 // r5 = the lane (a halfword, changed), r6 = the slices' count.
