@@ -27,6 +27,7 @@
 #include <bit>
 #include <cstring>
 #include <string>
+#include <utility>
 #include <vector>
 
 ITC_FLAG_DECLARE(bool, native_ai_drivers);
@@ -289,6 +290,22 @@ ITC_NATIVE_STEP(NativeSetRanges,
                 ctx.r3.u64 = ai::SetRanges(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 128))
 ITC_NATIVE_STEP(NativeDropOffRouteCorners,
                 ctx.r3.u64 = ai::DropOffRouteCorners(base, ctx.r3.u32))
+ITC_NATIVE_STEP(NativeSpreadOffset, ai::SpreadOffset(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                                     ctx.r6.u32, ctx.r1.u32 - 128))
+ITC_NATIVE_STEP(NativeClampOffset, ai::ClampOffset(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                                   ctx.r6.u32, ctx.r1.u32 - 96))
+ITC_NATIVE_STEP(NativeNarrowToOtherEx,
+                ctx.r3.u64 = ai::NarrowToOtherEx(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                                 ctx.r6.u32, ctx.r7.u32, ctx.r8.u32, ctx.r9.u32))
+ITC_NATIVE_STEP(NativeNarrowBehind,
+                ctx.r3.u64 = ai::NarrowBehind(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                              ctx.r6.u32, ctx.r7.u32, ctx.r1.u32 - 128))
+ITC_NATIVE_STEP(NativeCompareBranches,
+                ctx.r3.s64 = ai::CompareBranches(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                                 ctx.r6.u32, ctx.r7.u32, ctx.r8.u32))
+ITC_NATIVE_STEP(NativeNormalizeByBranch,
+                ctx.r3.u64 = ai::NormalizeByBranch(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                                   ctx.r6.u32, ctx.r7.u32))
 
 // Runs the recompiled version with the native flag off.
 template <GuestFunction recompiled>
@@ -455,6 +472,12 @@ enum Kind {
   kKeepToCornerSide,
   kSetRanges,
   kDropOffRouteCorners,
+  kSpreadOffset,
+  kClampOffset,
+  kNarrowToOtherEx,
+  kNarrowBehind,
+  kCompareBranches,
+  kNormalizeByBranch,
 };
 
 }  // namespace
@@ -661,6 +684,18 @@ void AiDrivers(Context& h) {
        kSetRanges, 3000},
       {"AiPath::DropOffRouteCorners (sub_8213DC08)", Original<__imp__sub_8213DC08>,
        NativeDropOffRouteCorners, kDropOffRouteCorners, 3000},
+      {"AiPath::SpreadOffset (sub_8213B890)", Original<__imp__sub_8213B890>, NativeSpreadOffset,
+       kSpreadOffset, 3000},
+      {"AiPath::ClampOffset (sub_8213CF58)", Original<__imp__sub_8213CF58>, NativeClampOffset,
+       kClampOffset, 3000},
+      {"AiPathEntry::NarrowToOtherEx (sub_8213C4C0)", Original<__imp__sub_8213C4C0>,
+       NativeNarrowToOtherEx, kNarrowToOtherEx, 3000},
+      {"AiPath::NarrowBehind (sub_8213D140)", Original<__imp__sub_8213D140>, NativeNarrowBehind,
+       kNarrowBehind, 3000},
+      {"AiPath::CompareBranches (sub_8213C788)", Original<__imp__sub_8213C788>,
+       NativeCompareBranches, kCompareBranches, 3000},
+      {"AiPath::NormalizeByBranch (sub_8213C908)", Original<__imp__sub_8213C908>,
+       NativeNormalizeByBranch, kNormalizeByBranch, 3000},
   };
   const uint32_t area = memory::Alloc(kAreaBytes, 0);
   const uint32_t driver = area + kDriver, vehicle = area + kVehicle, io = area + kIo;
@@ -707,7 +742,7 @@ void AiDrivers(Context& h) {
       guest::StoreU32(h.base, driver + 16, r.Below(2) ? uint32_t(r.Next()) : r.Below(4));
       guest::StoreU32(h.base, driver + 32, r.Below(8) ? r.Below(8) : uint32_t(r.Next()));
       uint32_t drivers = saved_drivers;
-      uint64_t r3 = driver, r4 = 0, r5 = 0, r6 = 0, r7 = 0, r8 = 0;
+      uint64_t r3 = driver, r4 = 0, r5 = 0, r6 = 0, r7 = 0, r8 = 0, r9 = 0;
       uint32_t route_file = area + kFile;
       bool table_written = false;
       uint64_t f1 = 0x7FF8DEADBEEF0000ull;
@@ -1696,6 +1731,168 @@ void AiDrivers(Context& h) {
           r3 = path;
           break;
         }
+        case kSpreadOffset:
+        case kClampOffset: {
+          // The ring (count, start; each entry's offset +24 and range +32 to
+          // +36, mostly ordered), the indexes (io, io + 4: first and last,
+          // the last within the count) and the amount (io + 8).
+          const uint32_t path = driver + kPath;
+          const uint32_t count = 40 + r.Below(41);
+          guest::StoreU16(h.base, path + 5136, uint16_t(count));
+          guest::StoreU16(h.base, path + 5138, uint16_t(r.Below(200)));
+          for (uint32_t k = 0; k < 80; k++) {
+            const uint32_t entry = path + 16 + 64 * k;
+            uint32_t low = RandomFloat(r, 3.0f), high = RandomFloat(r, 3.0f);
+            if (r.Below(8) != 0 && std::bit_cast<float>(low) > std::bit_cast<float>(high)) {
+              std::swap(low, high);
+            }
+            guest::StoreU32(h.base, entry + 24, RandomFloat(r, 4.0f));
+            guest::StoreU32(h.base, entry + 32, low);
+            guest::StoreU32(h.base, entry + 36, high);
+          }
+          const uint32_t last = r.Below(count + 1);
+          const int32_t first = r.Below(8) == 0 ? int32_t(r.Below(last + 3)) - 2
+                                                : int32_t(r.Below(last + 2));
+          guest::StoreU32(h.base, io, uint32_t(first));
+          guest::StoreU32(h.base, io + 4, last);
+          guest::StoreU32(h.base, io + 8, RandomFloat(r, 6.0f));
+          r3 = path;
+          if (f.kind == kSpreadOffset) {
+            r4 = io;
+            r5 = io + 4;
+            r6 = io + 8;
+          } else {
+            r4 = path + 16 + 64 * r.Below(80);
+            r5 = io + 4;
+            r6 = io;
+          }
+          for (uint32_t k = 0; k < 80; k++) {
+            floats.push_back({kPath + 16 + 64 * k + 24, 1});
+          }
+          break;
+        }
+        case kNarrowToOtherEx: {
+          // The entry at kOut, the other at kOut + 64 (its range +32, +36 and
+          // record +52: its +24 and +28, in the vehicle's bytes), the step,
+          // offset, margins and limit (io to io + 16).
+          const uint32_t entry = area + kOut, other = area + kOut + 64;
+          guest::StoreU32(h.base, other + 52, r.Below(8) == 0 ? 0 : vehicle + 0x40);
+          guest::StoreU32(h.base, vehicle + 0x40 + 24, RandomFloat(r, 4.0f));
+          guest::StoreU32(h.base, vehicle + 0x40 + 28, RandomFloat(r, 4.0f));
+          for (uint32_t at : {32u, 36u}) {
+            guest::StoreU32(h.base, entry + at, RandomFloat(r, 4.0f));
+            guest::StoreU32(h.base, other + at, RandomFloat(r, 4.0f));
+          }
+          for (uint32_t i = 0; i < 5; i++) {
+            guest::StoreU32(h.base, io + 4 * i, RandomFloat(r, 2.0f));
+          }
+          r3 = entry;
+          r4 = r.Below(8) == 0 ? 0 : other;
+          r5 = io;
+          r6 = io + 4;
+          r7 = io + 8;
+          r8 = io + 12;
+          r9 = io + 16;
+          floats.push_back({kOut + 32, 4});
+          floats.push_back({kIo, 5});
+          break;
+        }
+        case kNarrowBehind: {
+          // The ring (count, start; each entry's +28, range +32, +36 and
+          // record +52, one of eight in the vehicle's bytes, now and then
+          // none), the step and limit (io, io + 4).
+          const uint32_t path = driver + kPath;
+          guest::StoreU16(h.base, path + 5136, uint16_t(int32_t(r.Below(83)) - 2));
+          guest::StoreU16(h.base, path + 5138, uint16_t(r.Below(200)));
+          for (uint32_t i = 0; i < 8; i++) {
+            guest::StoreU32(h.base, vehicle + 0x40 + 16 * i + 0, RandomFloat(r, 4.0f));
+            guest::StoreU32(h.base, vehicle + 0x40 + 16 * i + 4, RandomFloat(r, 4.0f));
+          }
+          for (uint32_t k = 0; k < 80; k++) {
+            const uint32_t entry = path + 16 + 64 * k;
+            guest::StoreU32(h.base, entry + 52,
+                            r.Below(16) == 0 ? 0 : vehicle + 0x40 + 16 * r.Below(8) - 24);
+            for (uint32_t at : {28u, 32u, 36u}) {
+              guest::StoreU32(h.base, entry + at, RandomFloat(r, 4.0f));
+            }
+          }
+          guest::StoreU32(h.base, io, RandomFloat(r, 1.0f));
+          guest::StoreU32(h.base, io + 4, RandomFloat(r, 3.0f));
+          r3 = path;
+          r4 = path + 16 + 64 * r.Below(80);
+          r5 = path + 16 + 64 * r.Below(80);
+          r6 = io;
+          r7 = io + 4;
+          for (uint32_t k = 0; k < 80; k++) {
+            floats.push_back({kPath + 16 + 64 * k + 32, 4});
+          }
+          break;
+        }
+        case kCompareBranches:
+        case kNormalizeByBranch: {
+          // The driver's +500 object (io + 0x40: +88, the bytes +36 and +90
+          // choosing a preferred list) and vehicle flags; CompareBranches'
+          // sections (io + 0x20, + 0x30: kinds +2, branch numbers +3), their
+          // numbers (io + 0x60, + 0x62, now and then from the preferred
+          // list); NormalizeByBranch's route, position (io), lane (io + 8);
+          // the masks (io + 0x80).
+          const uint32_t path = driver + kPath;
+          const uint32_t object = io + 0x40;
+          guest::StoreU32(h.base, path + 0, driver);
+          guest::StoreU32(h.base, driver + 500, r.Below(6) == 0 ? 0 : object);
+          guest::StoreU16(h.base, object + 88, uint16_t(r.Below(5) + 2));
+          const uint32_t a = 4 + r.Below(6), b = r.Below(4);
+          guest::StoreU8(h.base, object + 36, uint8_t(r.Below(8) == 0 ? r.Below(256) : a));
+          guest::StoreU8(h.base, object + 90, uint8_t(r.Below(8) == 0 ? r.Below(256) : b));
+          guest::StoreU32(h.base, vehicle + 6148, r.Below(2) ? 4u : uint32_t(r.Next()));
+          const uint32_t list = 0x82008A08 + 64 * ((a - 4) * 2 + b);
+          const auto number = [&]() {
+            if (r.Below(2) && (a - 4) * 2 + b <= 11) {
+              return guest::LoadU16(h.base, list + 2 * r.Below(4));
+            }
+            return uint16_t(r.Below(400));
+          };
+          for (uint32_t i = 0; i < 2; i++) {
+            const uint32_t section = io + 0x20 + 0x10 * i;
+            guest::StoreU8(h.base, section + 2,
+                           uint8_t((r.Below(16) << 4) | (r.Below(3) == 0 ? r.Below(16) : 0)));
+            const uint8_t branches[] = {7, 8, 0, 13, 29, 31, 32, 40};
+            guest::StoreU8(h.base, section + 3,
+                           uint8_t(r.Below(2) ? branches[r.Below(8)] : r.Below(256)));
+          }
+          guest::StoreU16(h.base, io + 0x60, number());
+          guest::StoreU16(h.base, io + 0x62, number());
+          const uint32_t masks = r.Below(4);
+          for (uint32_t i = 0; i < masks; i++) {
+            uint32_t word = r.Below(3) == 0 ? 0xDFFFFE7Fu : uint32_t(r.Next());
+            if (r.Below(2)) {  // the sections' bits, one or both
+              word = (r.Below(2) ? 1u << (guest::LoadU8(h.base, io + 0x23) & 31) : 0) |
+                     (r.Below(2) ? 1u << (guest::LoadU8(h.base, io + 0x33) & 31) : 0);
+            }
+            guest::StoreU32(h.base, io + 0x80 + 4 * i, word != 0 ? word : 1u);
+          }
+          guest::StoreU32(h.base, io + 0x80 + 4 * masks, 0);
+          r3 = path;
+          if (f.kind == kCompareBranches) {
+            r4 = io + 0x20;
+            r5 = io + 0x30;
+            r6 = io + 0x60;
+            r7 = io + 0x62;
+            r8 = r.Below(4) == 0 ? 0 : io + 0x80;
+          } else {
+            const test_route::Route route =
+                test_route::BuildRoute(h.base, route_area, route_table, r);
+            route_file = route_area + test_route::kFile;
+            test_route::RandomPosition(h.base, io, route, r);
+            guest::StoreU16(h.base, io + 8, uint16_t(r.Below(4) ? r.Below(8) : r.Next()));
+            r4 = io + 0x100;
+            r5 = io;
+            r6 = io + 8;
+            r7 = r.Below(2) ? 0 : io + 0x80;
+            floats.push_back({kIo + 0x100, 3});
+          }
+          break;
+        }
       }
       // Guest memory is one host mapping: the blocks copied as they are.
       const std::vector<uint8_t> inputs(h.base + area, h.base + area + kAreaBytes);
@@ -1725,6 +1922,7 @@ void AiDrivers(Context& h) {
         t.r6.u64 = r6;
         t.r7.u64 = r7;
         t.r8.u64 = r8;
+        t.r9.u64 = r9;
         t.f1.u64 = f1;
         (v == 0 ? f.recompiled : f.native)(t, h.base);
         guest::StoreU32(h.base, ai::kDrivers, saved_drivers);

@@ -101,7 +101,10 @@ ITC_FLAG_BOOL(native_ai_drivers, true, "ITC",
               "AiDriver::SteerToTarget sub_82138D78, AiDriver::UpdatePedals sub_8213A428, "
               "AiDrivers::Create sub_8213B1E0, AiPath::ApplyCornerLine sub_8213BB58, "
               "AiPath::ApplyCornerLines sub_8213CFC8, AiPath::KeepToCornerSide sub_8213CA18, "
-              "AiPath::SetRanges sub_8213D670, AiPath::DropOffRouteCorners sub_8213DC08) "
+              "AiPath::SetRanges sub_8213D670, AiPath::DropOffRouteCorners sub_8213DC08, "
+              "AiPath::SpreadOffset sub_8213B890, AiPath::ClampOffset sub_8213CF58, "
+              "AiPathEntry::NarrowToOtherEx sub_8213C4C0, AiPath::NarrowBehind sub_8213D140, "
+              "AiPath::CompareBranches sub_8213C788, AiPath::NormalizeByBranch sub_8213C908) "
               "natively instead of "
               "through the translated code (the same words, bit for bit; checked by "
               "--run_harnesses=ai_drivers). Those "
@@ -364,3 +367,30 @@ ITC_AI_DRIVERS(8213CFC8, ApplyCornerLines(base, ctx.r3.u32, ctx.r1.u32 - 112))
 // r4 = &the count; the original's frame 128 bytes down.
 ITC_AI_DRIVERS(8213D670, ctx.r3.u64 = SetRanges(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 128))
 ITC_AI_DRIVERS(8213DC08, ctx.r3.u64 = DropOffRouteCorners(base, ctx.r3.u32))
+
+// --- The path's offsets, narrowing and branches ---
+
+// r4 = &the first index, r5 = &the last, r6 = &the amount; the original's
+// frame 128 bytes down (r3 kept).
+ITC_AI_DRIVERS(8213B890, SpreadOffset(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
+                                      ctx.r1.u32 - 128))
+// r4 = the entry, r5 = &the last index, r6 = &the first; the original's
+// frame 96 bytes down (r3 kept).
+ITC_AI_DRIVERS(8213CF58, ClampOffset(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
+                                     ctx.r1.u32 - 96))
+// r3 = the entry, r4 = the other or 0, r5 = &the step, r6 = &the offset, r7
+// and r8 = &the margins, r9 = &the limit.
+ITC_AI_DRIVERS(8213C4C0, ctx.r3.u64 = NarrowToOtherEx(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                                      ctx.r6.u32, ctx.r7.u32, ctx.r8.u32,
+                                                      ctx.r9.u32))
+// r4 = the entry after, r5 = the entry, r6 = &the step, r7 = &the limit; the
+// original's frame 128 bytes down.
+ITC_AI_DRIVERS(8213D140, ctx.r3.u64 = NarrowBehind(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                                   ctx.r6.u32, ctx.r7.u32, ctx.r1.u32 - 128))
+// r4, r5 = the sections, r6, r7 = &their numbers, r8 = the masks or 0.
+ITC_AI_DRIVERS(8213C788, ctx.r3.s64 = CompareBranches(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                                      ctx.r6.u32, ctx.r7.u32, ctx.r8.u32))
+// The path's +5532 in mode 0 (no direct callers): r4 = the entry, r5 = the
+// position, r6 = &the lane, r7 = the masks or 0.
+ITC_AI_DRIVERS(8213C908, ctx.r3.u64 = NormalizeByBranch(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                                        ctx.r6.u32, ctx.r7.u32))

@@ -2860,4 +2860,253 @@ uint32_t DropOffRouteCorners(uint8_t* base, uint32_t path) {
   return r3;
 }
 
+// --- The path's offsets, narrowing and branches ---
+
+void SpreadOffset(uint8_t* base, uint32_t path, uint32_t first, uint32_t last, uint32_t amount,
+                  uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_8213B890 AiPath::SpreadOffset");
+  int32_t low = int32_t(Load(base, first));
+  int32_t i = int32_t(Load(base, last));
+  if (!(i > low)) {
+    return;
+  }
+  const double share =
+      Fdivs(Lfs(base, amount), IntToFloat(int32_t(uint32_t(i) - uint32_t(low) + 1)));
+  for (;;) {
+    i = int32_t(uint32_t(i) - 1);
+    guest::StoreU32(base, frame + 80, uint32_t(i));
+    if (i < low) {
+      return;
+    }
+    const uint32_t entry = RingEntry(base, path, i);
+    const double offset = Lfs(base, entry + 24);
+    const double least = Lfs(base, entry + 32);
+    const double moved =
+        Fmadds(IntToFloat(int32_t(uint32_t(i) - uint32_t(low) + 1)), share, offset);
+    uint32_t end;
+    if (moved < least) {
+      end = entry + 32;
+    } else if (moved > Lfs(base, entry + 36)) {
+      end = entry + 36;
+    } else {
+      Stfs(base, entry + 24, moved);
+      low = int32_t(Load(base, first));
+      i = int32_t(Load(base, frame + 80));
+      continue;
+    }
+    Stfs(base, frame + 88, Fsubs(Lfs(base, end), Lfs(base, entry + 24)));
+    SpreadOffset(base, path, first, frame + 80, frame + 88, frame - 128);
+    const double bound = Lfs(base, end);
+    CopyWord(base, end, entry + 24);
+    int32_t high = int32_t(Load(base, last));
+    const int32_t at = int32_t(Load(base, frame + 80));
+    if (!(at < int32_t(uint32_t(high) - 1))) {
+      return;
+    }
+    const double step =
+        Fdivs(Fsubs(bound, moved), IntToFloat(int32_t(uint32_t(high) - uint32_t(at))));
+    for (int32_t j = int32_t(uint32_t(at) + 1); j < high; j = int32_t(uint32_t(j) + 1)) {
+      // The same entry each time, as the original does.
+      const double now = Lfs(base, entry + 24);
+      Stfs(base, entry + 24,
+           Fmadds(IntToFloat(int32_t(uint32_t(high) - uint32_t(j))), step, now));
+      high = int32_t(Load(base, last));
+    }
+    return;
+  }
+}
+
+void ClampOffset(uint8_t* base, uint32_t path, uint32_t entry, uint32_t last, uint32_t first,
+                 uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_8213CF58 AiPath::ClampOffset");
+  const double offset = Lfs(base, entry + 24);
+  uint32_t end;
+  if (offset < Lfs(base, entry + 32)) {
+    end = entry + 32;
+  } else if (offset > Lfs(base, entry + 36)) {
+    end = entry + 36;
+  } else {
+    return;
+  }
+  Stfs(base, frame + 80, Fsubs(Lfs(base, end), offset));
+  SpreadOffset(base, path, first, last, frame + 80, frame - 128);
+  CopyWord(base, end, entry + 24);
+}
+
+uint32_t NarrowToOtherEx(uint8_t* base, uint32_t entry, uint32_t other, uint32_t step,
+                         uint32_t offset, uint32_t low, uint32_t high, uint32_t limit) {
+  ITC_NATIVE_RUNNING("sub_8213C4C0 AiPathEntry::NarrowToOtherEx");
+  if (other == 0) {
+    return 0;
+  }
+  const uint32_t record = Load(base, other + 52);
+  if (record == 0) {
+    return 0;
+  }
+  double lo = Fsubs(Lfs(base, other + 32), Lfs(base, low));
+  double hi = Fadds(Lfs(base, other + 36), Lfs(base, high));
+  const double least = Lfs(base, record + 24);
+  if (lo < least) {
+    lo = least;
+  }
+  const double most = Lfs(base, record + 28);
+  if (hi > most) {
+    hi = most;
+  }
+  const double by = Lfs(base, offset);
+  lo = Fadds(by, lo);
+  hi = Fadds(by, hi);
+  if (lo > hi) {
+    hi = Fmuls(Fadds(hi, lo), Lfs(base, kHalf));
+    lo = hi;
+  }
+  uint32_t narrowed = 0;
+  if (Lfs(base, entry + 32) < lo) {
+    Stfs(base, entry + 32, lo);
+    Stfs(base, entry + 40, lo);
+    const double margin = Lfs(base, low);
+    if (margin < Lfs(base, limit)) {
+      Stfs(base, low, Fadds(Lfs(base, step), margin));
+    }
+    narrowed = 1;
+  } else {
+    CopyWord(base, step, low);
+  }
+  if (Lfs(base, entry + 36) > hi) {
+    Stfs(base, entry + 36, hi);
+    Stfs(base, entry + 44, hi);
+    const double margin = Lfs(base, high);
+    if (margin < Lfs(base, limit)) {
+      Stfs(base, high, Fadds(Lfs(base, step), margin));
+    }
+    return 1;
+  }
+  CopyWord(base, step, high);
+  return narrowed;
+}
+
+uint32_t NarrowBehind(uint8_t* base, uint32_t path, uint32_t other, uint32_t entry,
+                      uint32_t step, uint32_t limit, uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_8213D140 AiPath::NarrowBehind");
+  CopyWord(base, step, frame + 84);
+  CopyWord(base, step, frame + 80);
+  int32_t k = int32_t(uint32_t(LoadS16(base, path + 5136)) - 1);
+  uint32_t r3;
+  for (;;) {
+    Stfs(base, frame + 88, Fneg(Lfs(base, other + 28)));
+    r3 = NarrowToOtherEx(base, entry, other, step, frame + 88, frame + 84, frame + 80, limit);
+    if (int32_t(r3) != 1) {
+      return r3;
+    }
+    k = int32_t(uint32_t(k) - 1);
+    other = entry;
+    if (k < 0) {
+      return r3;
+    }
+    entry = RingEntry(base, path, k);
+    if (entry == 0) {
+      return r3;
+    }
+  }
+}
+
+int32_t CompareBranches(uint8_t* base, uint32_t path, uint32_t a, uint32_t b, uint32_t a_number,
+                        uint32_t b_number, uint32_t masks) {
+  ITC_NATIVE_RUNNING("sub_8213C788 AiPath::CompareBranches");
+  if (uint32_t((guest::LoadU8(base, b + 2) & 0xF) - 1) <= 3) {
+    return -1;
+  }
+  if (uint32_t((guest::LoadU8(base, a + 2) & 0xF) - 1) <= 3) {
+    return 1;
+  }
+  const uint32_t driver = Load(base, path + 0);
+  const uint32_t vehicle = Load(base, driver + 160);
+  const uint32_t flag = vehicle == 0 ? 0 : (Load(base, vehicle + 6148) >> 2) & 1;
+  if (flag == 0) {
+    if (uint32_t(guest::LoadU8(base, b + 3)) - 7 <= 1) {
+      return -1;
+    }
+    if (uint32_t(guest::LoadU8(base, a + 3)) - 7 <= 1) {
+      return 1;
+    }
+  }
+  uint32_t passed = 0;
+  const uint32_t object = Load(base, driver + 500);
+  if (object != 0 && uint32_t(LoadS16(base, object + 88) - 4) <= 1) {
+    uint32_t list = PreferredSections(base, object + 36, object + 90);
+    if (list != 0) {
+      int32_t section = LoadS16(base, list + 0);
+      if (section >= 0) {
+        const int32_t first = LoadS16(base, a_number);
+        do {
+          if (section == first) {
+            return -1;
+          }
+          if (section == LoadS16(base, b_number)) {
+            return 1;
+          }
+          list += 2;
+          passed++;
+          section = LoadS16(base, list + 0);
+        } while (section >= 0);
+      }
+    }
+  }
+  if (masks == 0) {
+    return 0;
+  }
+  uint32_t at = (passed << 2) + masks;
+  uint32_t mask = Load(base, at);
+  if (int32_t(mask) == 0) {
+    return 0;
+  }
+  const uint32_t b_bit = Slw(1, guest::LoadU8(base, b + 3));
+  const uint32_t a_bit = Slw(1, guest::LoadU8(base, a + 3));
+  do {
+    if ((a_bit & mask) != 0) {
+      return (b_bit & mask) == 0 ? -1 : 0;
+    }
+    if ((b_bit & mask) != 0) {
+      return 1;
+    }
+    at += 4;
+    mask = Load(base, at);
+  } while (int32_t(mask) != 0);
+  return 0;
+}
+
+uint32_t NormalizeByBranch(uint8_t* base, uint32_t path, uint32_t entry, uint32_t position,
+                           uint32_t lane, uint32_t masks) {
+  ITC_NATIVE_RUNNING("sub_8213C908 AiPath::NormalizeByBranch");
+  const uint32_t route = track_route::kRoute;
+  const uint32_t object = Load(base, Load(base, path + 0) + 500);
+  uint32_t on;
+  if (object != 0 && uint32_t(LoadS16(base, object + 88) - 4) <= 1) {
+    const uint32_t list = PreferredSections(base, object + 36, object + 90);
+    on = track_route::NormalizePath(base, route, position, list, masks);
+  } else {
+    on = track_route::Normalize(base, route, position, masks);
+  }
+  if (int32_t(on) == 0) {
+    return 0;
+  }
+  const uint32_t file = Load(base, route);
+  const uint32_t section = guest::LoadU16(base, position + 0);
+  const int32_t slice = LoadS16(base, position + 2);
+  const uint32_t table = Load(base, file + 12);
+  const double zero = Lfs(base, kZero);
+  const uint32_t record = Load(base, (section << 2) + table) + uint32_t(slice) * 84 + 124;
+  guest::StoreU32(base, entry + 52, record);
+  guest::StoreU16(base, entry + 16, guest::LoadU16(base, position + 0));
+  guest::StoreU16(base, entry + 18, guest::LoadU16(base, position + 2));
+  const int32_t at = LoadS16(base, lane);
+  Stfs(base, entry + 24, zero);
+  Stfs(base, entry + 48, zero);
+  guest::StoreU32(base, entry + 20, uint32_t(at));
+  CopyWord(base, record + 0, entry + 0);
+  CopyWord(base, record + 4, entry + 4);
+  CopyWord(base, record + 8, entry + 8);
+  return 1;
+}
+
 }  // namespace ai_drivers

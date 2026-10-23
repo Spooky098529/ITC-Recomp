@@ -510,4 +510,45 @@ uint32_t SetRanges(uint8_t* base, uint32_t path, uint32_t count, uint32_t frame)
 // SharesSections' answer, 0 for a record without data).
 uint32_t DropOffRouteCorners(uint8_t* base, uint32_t path);
 
+// --- The path's offsets, narrowing and branches ---
+
+// AiPath::SpreadOffset (sub_8213B890): the amount at `amount` spread over
+// the ring entries from the index at `last` - 1 back to the one at `first`
+// (each entry's +24 moved by its share); at an entry that would leave its
+// range (+32 to +36), the rest spread again before it (recursively), the
+// entry set to the range's end and the leftover added to that entry once a
+// step after it (see the row). The index and leftover are passed by address
+// in the original's frame (`frame`, 128 bytes below the caller's stack
+// pointer: +80, +88).
+void SpreadOffset(uint8_t* base, uint32_t path, uint32_t first, uint32_t last, uint32_t amount,
+                  uint32_t frame);
+// AiPath::ClampOffset (sub_8213CF58): an entry's +24 outside +32 to +36:
+// the difference spread (SpreadOffset with the indexes at `first` and
+// `last`; the amount at frame + 80, `frame` 96 bytes down), then +24 = the
+// range's end.
+void ClampOffset(uint8_t* base, uint32_t path, uint32_t entry, uint32_t last, uint32_t first,
+                 uint32_t frame);
+// AiPathEntry::NarrowToOtherEx (sub_8213C4C0): NarrowToOther with a margin
+// a side (at `low` and `high`), grown by the step at `step` while below the
+// limit at `limit` when its side was narrowed, else reset to the step. 1
+// when a side was narrowed, else 0.
+uint32_t NarrowToOtherEx(uint8_t* base, uint32_t entry, uint32_t other, uint32_t step,
+                         uint32_t offset, uint32_t low, uint32_t high, uint32_t limit);
+// AiPath::NarrowBehind (sub_8213D140): `entry` narrowed to `other`
+// (NarrowToOtherEx, the offset -(other +28)), then back along the ring
+// while each was narrowed (the margins and offset in the original's frame:
+// `frame`, 128 bytes down, +80, +84, +88). Returns the last answer.
+uint32_t NarrowBehind(uint8_t* base, uint32_t path, uint32_t other, uint32_t entry,
+                      uint32_t step, uint32_t limit, uint32_t frame);
+// AiPath::CompareBranches (sub_8213C788): -1 to take section a, 1 to take
+// b, 0 for no preference (see the row).
+int32_t CompareBranches(uint8_t* base, uint32_t path, uint32_t a, uint32_t b, uint32_t a_number,
+                        uint32_t b_number, uint32_t masks);
+// AiPath::NormalizeByBranch (sub_8213C908): the position normalized (along
+// the preferred sections or by the masks); on the route, the entry's slice
+// record (+52), position (+16), lane (+20), offsets +24 and +48 = 0.0 and
+// point (+0 to +8) set. 1, else 0.
+uint32_t NormalizeByBranch(uint8_t* base, uint32_t path, uint32_t entry, uint32_t position,
+                           uint32_t lane, uint32_t masks);
+
 }  // namespace ai_drivers
