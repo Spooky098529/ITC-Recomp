@@ -20,11 +20,20 @@ Not in the attract race or the replay (`itc_1124`, `itc_1125`, ok):
 - `sub_82101760` RaceTime::FromTicks (`ai-drivers.md`)
 - `sub_8213ADF8` AiDrivers::AllSettled (`ai-drivers.md`)
 - `sub_8213C358` AiPath::PreferredSections (`ai-drivers.md`)
-- `sub_82145118` AiDriver::PickTarget (`ai-drivers.md`)
 - `sub_821451B8` AiDriver::PickTargetBehind (`ai-drivers.md`)
-- `sub_82146220` AiDriver::UpdateState4 (`ai-drivers.md`)
-- `sub_82146388` AiDriver::UpdateState5 (`ai-drivers.md`)
 - `sub_82146408` AiDriver::IsSettled (`ai-drivers.md`)
+
+(`sub_82145118` PickTarget, `sub_82146220` UpdateState4 and
+`sub_82146388` UpdateState5 were seen in migration 2's replay,
+`itc_1146`.)
+
+Migration 2's, not in the attract race or the replay (`itc_1145`,
+`itc_1146`, ok):
+
+- `sub_82139E40` AiDriver::SetState2or3 (`ai-drivers.md`)
+- `sub_82145F48` AiDriver::UpdateState2 (`ai-drivers.md`)
+- `sub_821462A0` AiDriver::UpdateState6 (never seen in play, no row;
+  ported with UpdateState, `ai-drivers.md`'s intro)
 
 ## Run 2026-10-23 17:22 (`b7-loop-23-10-26-4`)
 
