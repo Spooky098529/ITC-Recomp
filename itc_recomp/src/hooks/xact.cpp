@@ -37,8 +37,9 @@ ITC_FLAG_BOOL(native_xact, true, "ITC",
               "sub_825CB5E8; the cue's variables, sub_825C5960 and sub_825C5E28; the track "
               "record, sub_825CC9C8, and XACTSound::SetUpRpcs, sub_825CB470, as in play; "
               "loading the global settings, sub_825C26E0 and sub_825C3B68, and their DSP "
-              "preset and RPC set-up where nothing is to do, sub_825C27C0 and sub_825C2910) "
-              "natively "
+              "preset and RPC set-up where nothing is to do, sub_825C27C0 and sub_825C2910; the "
+              "wave durations, sub_825CC380; letting go of wave banks without listeners to "
+              "tell, sub_825C6A20 and sub_825C7798) natively "
               "instead of through the translated code (same results; checked by "
               "--run_harnesses=xact)");
 
@@ -346,3 +347,29 @@ extern "C" REX_FUNC(sub_825C26E0) {
 }
 ITC_XACT_OPTIONAL(825C27C0, SettingsSetUpDspPreset(base, ctx.r3.u32))
 ITC_XACT_OPTIONAL(825C2910, SettingsSetUpRpcs(base, ctx.r3.u32))
+
+// The wave durations (stored at r5 and r6, r3 0), letting go of wave banks.
+extern "C" REX_FUNC(sub_825CC380) {
+  ITC_XACT_FALLBACK(825CC380)
+  const auto result = WaveBankGetWaveDurations(base, ctx.r3.u32, ctx.r4.u32);
+  if (!result) {
+    __imp__sub_825CC380(ctx, base);
+    return;
+  }
+  guest::StoreU32(base, ctx.r5.u32, result->duration_ms);
+  guest::StoreU32(base, ctx.r6.u32, result->loop_length_ms);
+  ctx.r3.u64 = 0;
+}
+// ReleaseWaveBanks frees: the original unless --native_heap routes the
+// game's heap to the native layer.
+extern "C" REX_FUNC(sub_825C6A20) {
+  ITC_XACT_FALLBACK(825C6A20)
+  const auto result =
+      hooks::NativeHeapActive() ? SoundBankReleaseWaveBanks(base, ctx.r3.u32) : std::nullopt;
+  if (!result) {
+    __imp__sub_825C6A20(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = *result;
+}
+ITC_XACT_OPTIONAL(825C7798, SoundBankOnWaveBankGone(base, ctx.r3.u32, ctx.r4.u32))

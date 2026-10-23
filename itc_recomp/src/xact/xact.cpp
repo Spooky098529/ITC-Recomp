@@ -1545,4 +1545,81 @@ std::optional<uint32_t> SettingsSetUpRpcs(uint8_t* base, uint32_t settings) {
   return 0;
 }
 
+// --- Batch 10: the wave durations, letting go of wave banks ---
+
+std::optional<WaveDurations> WaveBankGetWaveDurations(uint8_t* base, uint32_t bank,
+                                                      uint32_t index) {
+  if (!SlotIs(base, bank, 16, kGetEntry)) {
+    return std::nullopt;
+  }
+  // The original copies the entry into an accessor on its stack and reads
+  // the copy; the same words read from the entry, all before the stores.
+  const uint32_t entry = WaveBankGetEntry(base, bank, index);
+  const uint32_t rate = (guest::LoadU32(base, entry + 4) >> 5) & 0x3FFFF;
+  if (rate == 0) {
+    return std::nullopt;  // the original traps
+  }
+  ITC_NATIVE_RUNNING("sub_825CC380 XACTWaveBank::GetWaveDurations");
+  const uint32_t duration = guest::LoadU32(base, entry) >> 4;
+  const uint32_t loop_length = guest::LoadU32(base, entry + 20);
+  return WaveDurations{uint32_t(uint64_t(duration) * 1000 / rate),
+                       uint32_t(uint64_t(loop_length) * 1000 / rate)};
+}
+
+namespace {
+
+constexpr uint32_t kWaveBankRemoveListener = 0x825C8540;  // its +4 interface's slot +4
+
+}  // namespace
+
+std::optional<uint32_t> SoundBankReleaseWaveBanks(uint8_t* base, uint32_t bank) {
+  // Listeners to tell (the cues, through their slots) are left to the
+  // original, as is a wave bank whose RemoveListener isn't the native one.
+  if (guest::LoadU32(base, bank + 240) != 0) {
+    return std::nullopt;
+  }
+  const uint32_t array = guest::LoadU32(base, bank + 244);
+  if (array != 0) {
+    if (!SlotIs(base, bank, 64, kGetHeader)) {
+      return std::nullopt;
+    }
+    const uint32_t count = guest::LoadU8(base, SoundBankGetHeader(base, bank) + 17);
+    for (uint32_t i = 0; i < count; i++) {
+      const uint32_t wave_bank = guest::LoadU32(base, array + 4 * i);
+      if (wave_bank != 0 && !SlotIs(base, wave_bank + 4, 4, kWaveBankRemoveListener)) {
+        return std::nullopt;
+      }
+    }
+  }
+  ITC_NATIVE_RUNNING("sub_825C6A20 XACTSoundBank::ReleaseWaveBanks");
+  if (array != 0) {
+    for (uint32_t i = 0; i < guest::LoadU8(base, SoundBankGetHeader(base, bank) + 17); i++) {
+      const uint32_t wave_bank = guest::LoadU32(base, guest::LoadU32(base, bank + 244) + 4 * i);
+      if (wave_bank != 0) {
+        WaveBankRemoveListener(base, wave_bank + 4, bank + 8);
+      }
+    }
+    memory::crt::XMemFree(guest::LoadU32(base, bank + 244), kPoolAttributes);
+    guest::StoreU32(base, bank + 244, 0);
+  }
+  const uint32_t counts = guest::LoadU32(base, bank + 248);
+  if (counts == 0) {
+    return 0;
+  }
+  const uint32_t r3 = memory::crt::XMemFree(counts, kPoolAttributes);
+  guest::StoreU32(base, bank + 248, 0);
+  return r3;
+}
+
+std::optional<uint32_t> SoundBankOnWaveBankGone(uint8_t* base, uint32_t self,
+                                                uint32_t wave_bank) {
+  // Listener cues to ask (their slot +104) are left to the original.
+  if (guest::LoadU32(base, self + 224) != 0 ||
+      !SlotIs(base, wave_bank, 4, kWaveBankRemoveListener)) {
+    return std::nullopt;
+  }
+  ITC_NATIVE_RUNNING("sub_825C7798 XACTSoundBank::OnWaveBankGone");
+  return WaveBankRemoveListener(base, wave_bank, self - 8 == 0 ? 0 : self);
+}
+
 }  // namespace xact

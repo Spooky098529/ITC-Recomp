@@ -397,4 +397,28 @@ std::optional<uint32_t> SettingsSetUpDspPreset(uint8_t* base, uint32_t settings)
 // parameters (+100, as in play); nullopt otherwise.
 std::optional<uint32_t> SettingsSetUpRpcs(uint8_t* base, uint32_t settings);
 
+// --- Batch 10: the wave durations, letting go of wave banks ---
+
+// XACTWaveBank::GetWaveDurations (sub_825CC380): the wave's duration and
+// loop length (its entry's +0 >> 4 and +20, samples) in ms, for the words
+// at r5 and r6 (the adapter stores them; r3 0). nullopt where the bank's
+// slot +16 isn't GetEntry or the rate is 0 (the original traps).
+struct WaveDurations {
+  uint32_t duration_ms;
+  uint32_t loop_length_ms;
+};
+std::optional<WaveDurations> WaveBankGetWaveDurations(uint8_t* base, uint32_t bank,
+                                                      uint32_t index);
+// XACTSoundBank::ReleaseWaveBanks (sub_825C6A20): unregisters from each
+// wave bank in +244 (their RemoveListener), frees +244 and +248; r3 as the
+// original leaves it. nullopt, with nothing changed, where it has
+// listeners to tell (+240), its slot +64 isn't GetHeader or a wave bank's
+// RemoveListener isn't sub_825C8540. Native layer only (it frees).
+std::optional<uint32_t> SoundBankReleaseWaveBanks(uint8_t* base, uint32_t bank);
+// XACTSoundBank::OnWaveBankGone (sub_825C7798), through the bank's +8
+// interface (`self`): unregisters from the wave bank (its +4 interface,
+// RemoveListener); r3 as that leaves it. nullopt where listener cues
+// would be asked (self + 224) or the slot isn't sub_825C8540.
+std::optional<uint32_t> SoundBankOnWaveBankGone(uint8_t* base, uint32_t self, uint32_t wave_bank);
+
 }  // namespace xact

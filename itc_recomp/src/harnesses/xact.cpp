@@ -266,6 +266,21 @@ ITC_NATIVE_OPTIONAL(NativeSettingsLoad, xa::SettingsLoad(base, ctx.r3.u32, ctx.r
 ITC_NATIVE_OPTIONAL(NativeSettingsSetUpDspPreset, xa::SettingsSetUpDspPreset(base, ctx.r3.u32))
 ITC_NATIVE_OPTIONAL(NativeSettingsSetUpRpcs, xa::SettingsSetUpRpcs(base, ctx.r3.u32))
 
+void NativeWaveBankGetWaveDurations(PPCContext& ctx, uint8_t* base) {
+  const auto result = xa::WaveBankGetWaveDurations(base, ctx.r3.u32, ctx.r4.u32);
+  if (!result) {
+    ctx.r3.u64 = 0xDEADDEAD;
+    return;
+  }
+  guest::StoreU32(base, ctx.r5.u32, result->duration_ms);
+  guest::StoreU32(base, ctx.r6.u32, result->loop_length_ms);
+  ctx.r3.u64 = 0;
+}
+ITC_NATIVE_OPTIONAL(NativeSoundBankReleaseWaveBanks,
+                    xa::SoundBankReleaseWaveBanks(base, ctx.r3.u32))
+ITC_NATIVE_OPTIONAL(NativeSoundBankOnWaveBankGone,
+                    xa::SoundBankOnWaveBankGone(base, ctx.r3.u32, ctx.r4.u32))
+
 // The odd float words mixed into inputs: NaNs of both kinds and signs,
 // infinities, denormals, signed zeros.
 constexpr uint32_t kOddFloats[] = {0x7FC00000, 0x7F800001, 0xFFC00001, 0xFF800001, 0x7F800000,
@@ -1896,6 +1911,115 @@ void SettingsLoads(Context& h) {
   results.Report();
 }
 
+void WaveDurationsAndReleases(Context& h) {
+  Results results("xact wave durations and releases");
+  const uint32_t d = h.data;
+  // GetWaveDurations: a wave bank of 4 entries, each with a non-zero rate
+  // (a rate of 0 traps in the original; the native version declines).
+  for (int i = 0; i < 120; i++) {
+    const uint32_t index = h.random.Below(4) | (i % 5 == 0 ? 0x12340000u : 0);
+    auto setup = [&] {
+      WaveBank(h, 4);
+      for (uint32_t k = 0; k < 4; k++) {
+        const uint32_t format = d + 1024 + 24 * k + 4;
+        const uint32_t rate = i % 7 == 0 ? 1 + h.random.Below(0x3FFFF) : 8000 + h.random.Below(44100);
+        guest::StoreU32(h.base, format,
+                        (guest::LoadU32(h.base, format) & ~(0x3FFFFu << 5)) | (rate << 5));
+      }
+    };
+    Case(h, results, setup,
+         [&](PPCContext& t) { t.r3.u64 = d; t.r4.u64 = index; t.r5.u64 = d + 3584; t.r6.u64 = d + 3588; },
+         __imp__sub_825CC380, NativeWaveBankGetWaveDurations, {},
+         fmt::format("XACTWaveBank::GetWaveDurations {} (index {:#x})", i, index));
+  }
+  Fill(h.base, d, kScratchBytes);
+  WaveBank(h, 4);
+  guest::StoreU32(h.base, d + 1024 + 4, 0);
+  CheckDeclines(h, results, NativeWaveBankGetWaveDurations, d, 0,
+                "XACTWaveBank::GetWaveDurations, a rate of 0");
+  // OnWaveBankGone through the sound bank's +8 interface (the bank at
+  // +1600), the wave bank's +4 interface at +4 (its pool at +24 holding the
+  // sound bank or not); no listener cues (those decline below).
+  for (int i = 0; i < 100; i++) {
+    const uint32_t used = h.random.Below(4);
+    auto setup = [&] {
+      WaveBankList(h, 1);
+      RandomPool(h, d + 24, d + 2400, used, h.random.Below(2));
+      if (used != 0 && i % 3 != 0) {
+        guest::StoreU32(h.base, guest::LoadU32(h.base, d + 228), d + 1608);
+      }
+      RandomWords(h, d + 1600, 66);
+      guest::StoreU32(h.base, d + 1608 + 224, 0);
+    };
+    Case(h, results, setup, [&](PPCContext& t) { t.r3.u64 = d + 1608; t.r4.u64 = d + 4; },
+         __imp__sub_825C7798, NativeSoundBankOnWaveBankGone, {},
+         fmt::format("XACTSoundBank::OnWaveBankGone {} ({} listeners)", i, used));
+  }
+  Fill(h.base, d, kScratchBytes);
+  WaveBankList(h, 1);
+  guest::StoreU32(h.base, d + 1608 + 224, d + 2400);
+  CheckDeclines(h, results, NativeSoundBankOnWaveBankGone, d + 1608, d + 4,
+                "XACTSoundBank::OnWaveBankGone, listener cues");
+  // ReleaseWaveBanks (only while the native layer has the heap): the sound
+  // bank at +1600 (its file at +1280, 0 to 3 wave banks), its wave bank
+  // array and instance counts allocated, the wave banks at +0, +320, +640
+  // each holding the sound bank in their listener pools or not; no
+  // listeners of its own (those decline below). r3, when it's the counts'
+  // block, compared as a mark.
+  if (hooks::NativeHeapActive()) {
+    for (int i = 0; i < 60; i++) {
+      const uint32_t wave_banks = h.random.Below(4);
+      const bool has_array = i % 5 != 0, has_counts = i % 3 != 0;
+      Outputs out[2];
+      const Random start = h.random;
+      for (int v = 0; v < 2; v++) {
+        h.random = start;
+        Fill(h.base, d, kScratchBytes);
+        WaveBankList(h, 3);
+        const uint32_t bank = d + 1600;
+        RandomWords(h, bank, 66);
+        guest::StoreU32(h.base, bank, kSoundBankVtable);
+        guest::StoreU32(h.base, bank + 260, d + 1280);
+        RandomBytes(h, d + 1280, 64);
+        guest::StoreU8(h.base, d + 1280 + 17, uint8_t(wave_banks));
+        guest::StoreU32(h.base, bank + 240, 0);
+        uint32_t array = 0, counts = 0;
+        if (has_array) {
+          array = memory::crt::XMemAlloc(h.base, 4 * std::max(wave_banks, 1u), 0x20840001);
+          for (uint32_t k = 0; k < wave_banks; k++) {
+            guest::StoreU32(h.base, array + 4 * k, h.random.Below(4) == 0 ? 0 : d + 320 * k);
+            const uint32_t head = guest::LoadU32(h.base, d + 320 * k + 228);
+            if (head != 0 && h.random.Below(2)) {
+              guest::StoreU32(h.base, head, bank + 8);
+            }
+          }
+        }
+        if (has_counts) {
+          counts = memory::crt::XMemAlloc(h.base, 64, 0x20840001);
+        }
+        guest::StoreU32(h.base, bank + 244, array);
+        guest::StoreU32(h.base, bank + 248, counts);
+        PPCContext t = CallContext(h);
+        t.r3.u64 = bank;
+        ITC_FLAG(native_xact) = v == 1;
+        (v == 0 ? __imp__sub_825C6A20 : NativeSoundBankReleaseWaveBanks)(t, h.base);
+        ITC_FLAG(native_xact) = true;
+        out[v].Word(counts != 0 && t.r3.u32 == counts ? 0xB10C0000u : t.r3.u32);
+        out[v].Bytes(Read(h.base, d, kScratchBytes));
+      }
+      results.Check(out[0], out[1],
+                    fmt::format("XACTSoundBank::ReleaseWaveBanks {} ({} wave banks{}{})", i,
+                                wave_banks, has_array ? "" : ", no array",
+                                has_counts ? "" : ", no counts"));
+    }
+  }
+  Fill(h.base, d, kScratchBytes);
+  guest::StoreU32(h.base, d + 1600 + 240, 1);
+  CheckDeclines(h, results, NativeSoundBankReleaseWaveBanks, d + 1600, 0,
+                "XACTSoundBank::ReleaseWaveBanks, listeners");
+  results.Report();
+}
+
 }  // namespace
 
 void Xact(Context& h) {
@@ -1913,6 +2037,7 @@ void Xact(Context& h) {
   VariableDestructors(h);
   SoundsAndCueVariables(h);
   SettingsLoads(h);
+  WaveDurationsAndReleases(h);
 }
 
 }  // namespace harness
