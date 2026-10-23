@@ -419,6 +419,8 @@ ITC_NATIVE_STEP(NativeStartGroup, ctx.r3.u64 = ai::StartGroup(base, ctx.r1.u32 -
 ITC_NATIVE_STEP(NativeStartRanked, ctx.r3.u64 = ai::StartRanked(base, ctx.r1.u32 - 224))
 ITC_NATIVE_STEP(NativeReadVehicle, ctx.r3.u64 = ai::ReadVehicle(base, ctx.r3.u32, ctx.r4.u32))
 ITC_NATIVE_STEP(NativeReadVehicleOwnSlice, ctx.r3.u64 = ai::ReadVehicleOwnSlice(base, ctx.r3.u32))
+ITC_NATIVE_STEP(NativeBranchMasks,
+                ctx.r3.u64 = ai::BranchMasks(base, ctx.r3.u32, ctx.r1.u32 - 96))
 
 // Runs the recompiled version with the native flag off.
 template <GuestFunction recompiled>
@@ -629,6 +631,7 @@ enum Kind {
   kStartRanked,
   kReadVehicle,
   kReadVehicleOwnSlice,
+  kBranchMasks,
 };
 
 }  // namespace
@@ -923,6 +926,8 @@ void AiDrivers(Context& h) {
        kReadVehicle, 3000},
       {"AiDriver::ReadVehicleOwnSlice (sub_821469D0)", Original<__imp__sub_821469D0>,
        NativeReadVehicleOwnSlice, kReadVehicleOwnSlice, 2000},
+      {"AiPath::BranchMasks (sub_8213E500)", Original<__imp__sub_8213E500>, NativeBranchMasks,
+       kBranchMasks, 3000},
   };
   const uint32_t area = memory::Alloc(kAreaBytes, 0);
   const uint32_t driver = area + kDriver, vehicle = area + kVehicle, io = area + kIo;
@@ -946,6 +951,8 @@ void AiDrivers(Context& h) {
   }
   // A course's route for the functions reading one (test_route.h).
   const uint32_t route_area = memory::Alloc(test_route::kRouteBytes, 0);
+  // Race data with its words +4, +20 and +0xA3AF4 (BranchMasks' cases).
+  const uint32_t race_block = memory::Alloc(0xA3B00, 0);
   const uint32_t route_table = memory::Alloc(4 * test_route::kTableEntries, 0);
   test_route::FillTable(h.base, route_table, route_area);
   // The table's first seven drivers, for ResetOthers (which writes them).
@@ -2392,6 +2399,42 @@ void AiDrivers(Context& h) {
           }
           break;
         }
+        case kBranchMasks: {
+          // The path's kinds (+5524, +5528: -1 mostly, else 0 to 11 or any
+          // word), the driver's +500 object (now and then; its byte +36 any)
+          // and vehicle (now and then none; its flags +6148 by the bits 0x81
+          // and 0x4, its +5712 object (or none) with the word +12 around 66 to
+          // 70), the race data (a block of its own, read only: its word +4 0
+          // to 9, its flags +20 for BranchMasksFor, the mode +0xA3AF4 for
+          // RaceAllowsSides) and the race state's +6100.
+          const uint32_t path = driver + kPath;
+          guest::StoreU32(h.base, path + 0, driver);
+          const auto kind = [&]() {
+            return r.Below(3) ? 0xFFFFFFFFu
+                   : r.Below(8) == 0 ? uint32_t(r.Next())
+                                     : r.Below(12);
+          };
+          guest::StoreU32(h.base, path + 5524, kind());
+          guest::StoreU32(h.base, path + 5528, kind());
+          const uint32_t object = io + 0x40;
+          guest::StoreU32(h.base, driver + 500, r.Below(4) == 0 ? object : 0);
+          guest::StoreU8(h.base, object + 36, uint8_t(r.Below(2) ? r.Below(12) : r.Next()));
+          const uint32_t flags[] = {0, 1, 4, 5, 0x80, 0x84, 0x81, uint32_t(r.Next())};
+          guest::StoreU32(h.base, vehicle + 6148, flags[r.Below(8)]);
+          const uint32_t other = io + 0x80;
+          guest::StoreU32(h.base, vehicle + 5712, r.Below(6) == 0 ? 0 : other);
+          guest::StoreU32(h.base, other + 12, r.Below(8) == 0 ? uint32_t(r.Next())
+                                                              : 64 + r.Below(8));
+          race_data = race_block;
+          guest::StoreU32(h.base, race_block + 20, r.Below(8) == 0 ? uint32_t(r.Next())
+                                                                 : (r.Below(64) << 2) | r.Below(4));
+          guest::StoreU32(h.base, race_block + 4, r.Below(8) == 0 ? uint32_t(r.Next())
+                                                                : r.Below(10));
+          guest::StoreU32(h.base, race_block + 0xA3AF4, r.Below(10));
+          guest::StoreU32(h.base, area + kRaceState, r.Below(5));
+          r3 = path;
+          break;
+        }
         case kStartGroup:
         case kStartRanked: {
           // The racers (up to 7: flags 0x10, 0x4 and 0x8 in any mix, or any
@@ -2953,6 +2996,7 @@ void AiDrivers(Context& h) {
   }
   memory::Free(vehicles);
   memory::Free(route_table);
+  memory::Free(race_block);
   memory::Free(route_area);
   memory::Free(table);
   memory::Free(area);

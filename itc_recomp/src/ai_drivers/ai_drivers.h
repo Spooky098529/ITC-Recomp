@@ -828,4 +828,17 @@ uint64_t ReadVehicle(uint8_t* base, uint32_t driver, uint32_t slice);
 // record of the vehicle's own route position.
 uint64_t ReadVehicleOwnSlice(uint8_t* base, uint32_t driver);
 
+// --- The path's branch masks ---
+
+// AiPath::BranchMasks (sub_8213E500): the branch masks list the path follows
+// (64 bits, the lists' address sign-extended as the original's lis leaves
+// it): with a kind (+5524, else +5528, not -1) the list at 0x82008970 + 16 x
+// it; else with the driver's +500 object, BranchMasksFor its signed byte +36
+// (written at frame + 80: `frame` the original's, 96 bytes below the caller's
+// stack pointer); else for a vehicle without the flags 0x81, with 0x4 the +128
+// list when its +5712 object's word +12 is 66, 67 or 70 (else 0), without it
+// the +0 list; else (no vehicle, or 0x81) by RaceAllowsSides and the race
+// data's word +4 the +16 (2, 3), +32 (4) or +48 (5) list, else the +0 list.
+uint64_t BranchMasks(uint8_t* base, uint32_t path, uint32_t frame);
+
 }  // namespace ai_drivers

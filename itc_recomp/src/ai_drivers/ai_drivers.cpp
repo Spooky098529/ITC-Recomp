@@ -4988,4 +4988,57 @@ uint64_t ReadVehicleOwnSlice(uint8_t* base, uint32_t driver) {
   return ReadVehicle(base, driver, SliceRecordAt(base, identity + 4));
 }
 
+// --- The path's branch masks ---
+
+uint64_t BranchMasks(uint8_t* base, uint32_t path, uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_8213E500 AiPath::BranchMasks");
+  // The lists' address as the original's lis and addi leave it (sign-extended).
+  const uint64_t lists = uint64_t(int64_t(int32_t(kBranchMasks)));
+  const uint32_t driver = Load(base, path + 0);
+  const uint32_t object = Load(base, driver + 500);
+  const uint32_t vehicle = Load(base, driver + 160);
+  uint32_t kind = Load(base, path + 5524);
+  if (int32_t(kind) == -1) {
+    kind = Load(base, path + 5528);
+  }
+  if (int32_t(kind) != -1) {
+    return uint64_t((kind << 4) & 0xFFFFFFF0u) + lists;
+  }
+  if (object != 0) {
+    guest::StoreU32(base, frame + 80, uint32_t(int32_t(int8_t(guest::LoadU8(base, object + 36)))));
+    return uint64_t(int64_t(int32_t(BranchMasksFor(base, frame + 80))));
+  }
+  if (vehicle != 0) {
+    const uint32_t flags = Load(base, vehicle + 6148);
+    if ((flags & 0x81) == 0) {
+      if ((flags & 0x4) == 0) {
+        return lists;
+      }
+      const uint32_t other = Load(base, vehicle + 5712);
+      if (other == 0) {
+        return 0;
+      }
+      const int32_t word = int32_t(Load(base, other + 12));
+      if (word == 66 || word == 67 || word == 70) {
+        return lists + 128;
+      }
+      return 0;
+    }
+  }
+  if (RaceAllowsSides(base) == 0) {
+    return lists;
+  }
+  switch (Load(base, Load(base, kRaceData) + 4)) {
+    case 2:
+    case 3:
+      return lists + 16;
+    case 4:
+      return lists + 32;
+    case 5:
+      return lists + 48;
+    default:  // 0, 1, 6, 7 and above 7
+      return lists;
+  }
+}
+
 }  // namespace ai_drivers

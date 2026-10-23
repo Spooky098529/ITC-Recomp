@@ -148,7 +148,7 @@ ITC_FLAG_BOOL(native_ai_drivers, true, "ITC",
               "their +6148, on the translated code), AiOther::PlanReaction sub_821456F8, "
               "AiDriver::ReactToOthers sub_82145CA8, AiDrivers::StartGroup sub_8213A000, "
               "AiDrivers::StartRanked sub_8213A8B0, AiDriver::ReadVehicle sub_821467F0, "
-              "AiDriver::ReadVehicleOwnSlice sub_821469D0) "
+              "AiDriver::ReadVehicleOwnSlice sub_821469D0, AiPath::BranchMasks sub_8213E500) "
               "natively instead of "
               "through the translated code (the same words, bit for bit; checked by "
               "--run_harnesses=ai_drivers). Those "
@@ -463,3 +463,8 @@ ITC_AI_DRIVERS(8213A8B0, ctx.r3.u64 = StartRanked(base, ctx.r1.u32 - 224))
 // r4 = the slice record or 0.
 ITC_AI_DRIVERS(821467F0, ctx.r3.u64 = ReadVehicle(base, ctx.r3.u32, ctx.r4.u32))
 ITC_AI_DRIVERS(821469D0, ctx.r3.u64 = ReadVehicleOwnSlice(base, ctx.r3.u32))
+
+// --- The path's branch masks ---
+
+// The original's frame 96 bytes down.
+ITC_AI_DRIVERS(8213E500, ctx.r3.u64 = BranchMasks(base, ctx.r3.u32, ctx.r1.u32 - 96))
