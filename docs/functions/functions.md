@@ -139,6 +139,11 @@ Rows not yet moved stay in the table below. So far:
   the client list they're kept in, binding to the pads, the update and
   the read slots seen in play (B7; the input path below them is B1's,
   here in `functions.md`).
+- [`data-tables.md`](data-tables.md): the game's data tables at
+  `[0x826C5CA0]`: twelve archive assets loaded once at boot into one
+  block, byte-swapped by their load callbacks, and the accessors that
+  index them (the 400 3,008-byte items and the 56-, 20- and 40-byte
+  tables; B7).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
