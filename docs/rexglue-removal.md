@@ -69,7 +69,7 @@ goes in `src/` as overrides), American English.
   cues and XACT (the user's call: translated, no host library plays its
   data) native as far as they were ready (ours 970); after GetTickCount
   from the host clock (ours 971), its sixth run (branch
-  `b7-loop-23-10-26-2`, stopped 2026-10-23 for the user's review) made
+  `b7-loop-23-10-26-2`, merged 2026-10-23) made
   the action mappers and the data tables native as far as they were
   ready, with no change in the game's behavior (ours 1,023). The
   runs' rows wait for the user's review (`docs/loops/review.md`). See
