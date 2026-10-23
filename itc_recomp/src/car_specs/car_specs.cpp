@@ -3,6 +3,7 @@
 #include "car_specs/car_specs.h"
 
 #include "base/log.h"
+#include "c_runtime/strings.h"
 #include "guest.h"
 
 #include <bit>
@@ -276,6 +277,138 @@ uint32_t OnTable83Loaded(uint8_t* base, uint32_t object, uint32_t toc) {
   }
   CountDown(base, object);
   return r3;
+}
+
+uint32_t GetCarSpec(uint8_t* base, uint32_t id) {
+  ITC_NATIVE_RUNNING("sub_820C9E98 Params::GetCarSpec");
+  return guest::LoadU32(base, Params(base) + 12) + kSpecBytes * id;
+}
+
+uint32_t GetWheel(uint8_t* base, int32_t n) {
+  ITC_NATIVE_RUNNING("sub_820C9EB0 Params::GetWheel");
+  if (n < 1) {
+    return 0;
+  }
+  return guest::LoadU32(base, Params(base) + 8) + kWheelBytes * uint32_t(n) - kWheelBytes;
+}
+
+uint32_t FirstWheelOfModel(uint8_t* base, int32_t m) {
+  ITC_NATIVE_RUNNING("sub_820C9EE0 Params::FirstWheelOfModel");
+  if (m < 1) {
+    return 0;
+  }
+  return guest::LoadU32(base, Params(base) + 4 * (uint32_t(m) + 16)) + 1;
+}
+
+void GetCarParts(uint8_t* base, uint32_t out, uint32_t car) {
+  ITC_NATIVE_RUNNING("sub_820C9E00 Params::GetCarParts");
+  static constexpr uint32_t kStrides[9] = {280, 280, 280, 280, 168, 168, 84, 108, 72};
+  // Every table read before any store, as the original.
+  const uint32_t params = Params(base);
+  uint32_t parts[9];
+  for (uint32_t i = 0; i < 9; i++) {
+    parts[i] = guest::LoadU32(base, params + 16 + 4 * i) + kStrides[i] * car;
+  }
+  for (uint32_t i = 0; i < 9; i++) {
+    guest::StoreU32(base, out + 4 * i, parts[i]);
+  }
+}
+
+uint32_t GetTire(uint32_t spec, int32_t type, uint32_t grade, int32_t rear) {
+  ITC_NATIVE_RUNNING("sub_820C9928 CarSpec::GetTire");
+  const uint32_t index = type == 0 ? 0 : uint32_t(type) * 5 + grade - 5;
+  return index * 92 + spec + (rear == 0 ? 4244 : 6176);
+}
+
+uint32_t Exists(uint8_t* base) {
+  ITC_NATIVE_RUNNING("sub_820C9DD8 Params::Exists");
+  return Params(base) != 0 ? 1 : 0;
+}
+
+uint32_t SwapAeroPart(uint8_t* base, uint32_t p) {
+  ITC_NATIVE_RUNNING("sub_820CB6C8 AeroPart::Swap");
+  SwapWords(base, p, 7);
+  return p;
+}
+
+uint32_t SwapAeroPart36(uint8_t* base, uint32_t p) {
+  ITC_NATIVE_RUNNING("sub_820CB7E8 AeroPart::Swap36");
+  SwapAeroPart(base, p);
+  SwapWords(base, p + 28, 2);
+  return p;
+}
+
+namespace {
+
+// An aero part getter: table `table` (its pointer at parts + 4 × table), its
+// records `size` bytes; `use` whether the level picks a record.
+bool AeroPart(uint8_t* base, uint32_t out, uint32_t parts, int32_t level, uint32_t table,
+              uint32_t size, bool use) {
+  if (use) {
+    const uint32_t from =
+        guest::LoadU32(base, parts + 4 * table) + size * uint32_t(level) - size;
+    if (out >= 0xA0000000u || !c_runtime::InOneView(out, size) ||
+        !c_runtime::InOneView(from, size) || c_runtime::MayShare(out, size, from, size)) {
+      return false;
+    }
+    c_runtime::Memcpy(base, out, from, size);
+    if (size == 28) {
+      SwapAeroPart(base, out);
+    } else {
+      SwapAeroPart36(base, out);
+    }
+    return true;
+  }
+  // The defaults: the floats at 0x82000A34 (0.0) and 0x82000A30 (1.0),
+  // stored as loaded.
+  const uint32_t zero = guest::LoadU32(base, 0x82000A34);
+  const uint32_t one = guest::LoadU32(base, 0x82000A30);
+  for (uint32_t offset = 0; offset < 16; offset += 4) {
+    guest::StoreU32(base, out + offset, zero);
+  }
+  guest::StoreU32(base, out + 16, one);
+  guest::StoreU32(base, out + 20, one);
+  guest::StoreU32(base, out + 24, 0);
+  if (size == 36) {
+    guest::StoreU32(base, out + 28, 0);
+    guest::StoreU32(base, out + 32, 0);
+  }
+  return true;
+}
+
+}  // namespace
+
+#define ITC_AERO_PART(number, address, table, size, use)                       \
+  bool AeroPart##number(uint8_t* base, uint32_t out, uint32_t parts, int32_t level) { \
+    ITC_NATIVE_RUNNING("sub_" #address " AeroParts::Get" #number);             \
+    return AeroPart(base, out, parts, level, table, size, use);                \
+  }
+
+ITC_AERO_PART(74, 820CB848, 0, 28, level != 0)
+ITC_AERO_PART(75, 820CB8D0, 1, 28, level != 0)
+ITC_AERO_PART(76, 820CB958, 2, 28, level != 0)
+ITC_AERO_PART(77, 820CB9E0, 3, 28, level > 0)
+ITC_AERO_PART(78, 820CBA68, 4, 28, level != 0)
+ITC_AERO_PART(79, 820CBAF0, 5, 28, level != 0)
+ITC_AERO_PART(80, 820CBB78, 6, 28, level != 0)
+ITC_AERO_PART(81, 820CBC00, 7, 36, level != 0)
+ITC_AERO_PART(82, 820CBC90, 8, 36, level != 0)
+
+#undef ITC_AERO_PART
+
+uint32_t CountBodyKits(uint8_t* base, uint32_t parts) {
+  ITC_NATIVE_RUNNING("sub_820CBD20 CountBodyKits");
+  // The original copies each record to the stack and swaps it there; only
+  // the first float is read.
+  const float zero = std::bit_cast<float>(guest::LoadU32(base, 0x82000A34));
+  uint32_t count = 0;
+  for (uint32_t offset = 0; offset < 72; offset += 36) {
+    const uint32_t word = guest::LoadU32(base, guest::LoadU32(base, parts + 32) + offset);
+    if (double(std::bit_cast<float>(std::byteswap(word))) != double(zero)) {
+      count++;
+    }
+  }
+  return count;
 }
 
 }  // namespace car_specs

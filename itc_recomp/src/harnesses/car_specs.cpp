@@ -78,6 +78,40 @@ ITC_NATIVE_CALLBACK(NativeOnWheelsLoaded, OnWheelsLoaded, 73)
 ITC_NATIVE_CALLBACK(NativeOnTable83Loaded, OnTable83Loaded, 83)
 ITC_NATIVE_STEP(NativeOnLoaded, cs::OnLoaded(base, ctx.r6.u32))
 
+ITC_NATIVE_STEP(NativeGetCarSpec, ctx.r3.u64 = cs::GetCarSpec(base, ctx.r3.u32))
+ITC_NATIVE_STEP(NativeGetWheel, ctx.r3.u64 = cs::GetWheel(base, ctx.r3.s32))
+ITC_NATIVE_STEP(NativeFirstWheelOfModel, ctx.r3.u64 = cs::FirstWheelOfModel(base, ctx.r3.s32))
+ITC_NATIVE_STEP(NativeGetTire,
+                ctx.r3.u64 = cs::GetTire(ctx.r3.u32, ctx.r4.s32, ctx.r5.u32, ctx.r6.s32))
+ITC_NATIVE_STEP(NativeExists, ctx.r3.u64 = cs::Exists(base))
+ITC_NATIVE_STEP(NativeGetCarParts, cs::GetCarParts(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_STEP(NativeCountBodyKits, {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = cs::CountBodyKits(base, ctx.r3.u32);
+})
+
+#define ITC_NATIVE_AERO(name, function, address)                      \
+  ITC_NATIVE_STEP(name, {                                             \
+    if (!cs::function(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.s32)) {    \
+      __imp__sub_##address(ctx, base);                                \
+      return;                                                         \
+    }                                                                 \
+    ctx.fpscr.disableFlushMode();                                     \
+  })
+
+ITC_NATIVE_AERO(NativeAeroPart74, AeroPart74, 820CB848)
+ITC_NATIVE_AERO(NativeAeroPart75, AeroPart75, 820CB8D0)
+ITC_NATIVE_AERO(NativeAeroPart76, AeroPart76, 820CB958)
+ITC_NATIVE_AERO(NativeAeroPart77, AeroPart77, 820CB9E0)
+ITC_NATIVE_AERO(NativeAeroPart78, AeroPart78, 820CBA68)
+ITC_NATIVE_AERO(NativeAeroPart79, AeroPart79, 820CBAF0)
+ITC_NATIVE_AERO(NativeAeroPart80, AeroPart80, 820CBB78)
+ITC_NATIVE_AERO(NativeAeroPart81, AeroPart81, 820CBC00)
+ITC_NATIVE_AERO(NativeAeroPart82, AeroPart82, 820CBC90)
+ITC_NATIVE_SWAP(NativeSwapAeroPart, SwapAeroPart)
+ITC_NATIVE_SWAP(NativeSwapAeroPart36, SwapAeroPart36)
+
+#undef ITC_NATIVE_AERO
 #undef ITC_NATIVE_CALLBACK
 #undef ITC_NATIVE_SWAP
 #undef ITC_NATIVE_STEP
@@ -387,6 +421,192 @@ void Callbacks(Context& h) {
   }
 }
 
+// A register's upper half: often random (the originals' 32-bit compares and
+// address sums don't read it).
+uint64_t Upper(Random& r) { return r.Below(2) == 0 ? 0 : r.Next() << 32; }
+
+void Getters(Context& h, const Block& block) {
+  {
+    Results results("sub_820C9E98 Params::GetCarSpec");
+    for (int i = 0; i < 100; i++) {
+      Case(
+          h, results, block, 16, [&] { SetUpObject(h); },
+          [&](PPCContext& t) {
+            t.r3.u64 = Upper(h.random) |
+                       (i % 4 == 3 ? uint32_t(h.random.Next()) : h.random.Below(72));
+          },
+          __imp__sub_820C9E98, NativeGetCarSpec, fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    Results results("sub_820C9EB0 Params::GetWheel");
+    for (int i = 0; i < 200; i++) {
+      Case(
+          h, results, block, 16, [&] { SetUpObject(h); },
+          [&](PPCContext& t) {
+            const uint32_t n = i % 5 == 4 ? uint32_t(h.random.Next())
+                                          : uint32_t(int32_t(h.random.Below(300)) - 3);
+            t.r3.u64 = Upper(h.random) | n;
+          },
+          __imp__sub_820C9EB0, NativeGetWheel, fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    Results results("sub_820C9EE0 Params::FirstWheelOfModel");
+    for (int i = 0; i < 200; i++) {
+      Case(
+          h, results, block, 16, [&] { SetUpObject(h); },
+          [&](PPCContext& t) {
+            // -3 to 99 (the object's table), or a large negative one.
+            const uint32_t m = i % 10 == 9 ? 0x80000000u | uint32_t(h.random.Next())
+                                           : uint32_t(int32_t(h.random.Below(103)) - 3);
+            t.r3.u64 = Upper(h.random) | m;
+          },
+          __imp__sub_820C9EE0, NativeFirstWheelOfModel, fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    Results results("sub_820C9E00 Params::GetCarParts");
+    for (int i = 0; i < 100; i++) {
+      Case(
+          h, results, block, 16, [&] { SetUpObject(h); },
+          [&](PPCContext& t) {
+            t.r3.u64 = h.data + 1024 + 4 * h.random.Below(8);
+            t.r4.u64 = Upper(h.random) |
+                       (i % 4 == 3 ? uint32_t(h.random.Next()) : h.random.Below(23));
+          },
+          __imp__sub_820C9E00, NativeGetCarParts, fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    Results results("sub_820C9928 CarSpec::GetTire");
+    for (int i = 0; i < 300; i++) {
+      Case(
+          h, results, block, 16, [] {},
+          [&](PPCContext& t) {
+            const bool any = i % 6 == 5;
+            t.r3.u64 = Upper(h.random) | uint32_t(h.random.Next());
+            t.r4.u64 = Upper(h.random) | (any ? uint32_t(h.random.Next()) : h.random.Below(6));
+            t.r5.u64 = Upper(h.random) | (any ? uint32_t(h.random.Next()) : h.random.Below(6));
+            t.r6.u64 = Upper(h.random) |
+                       (h.random.Below(3) == 0 ? uint32_t(h.random.Next()) : h.random.Below(2));
+          },
+          __imp__sub_820C9928, NativeGetTire, fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    Results results("sub_820C9DD8 Params::Exists");
+    for (int i = 0; i < 20; i++) {
+      Case(
+          h, results, block, 16,
+          [&] {
+            guest::StoreU32(h.base, cs::kParams, i % 2 == 0 ? 0 : uint32_t(h.random.Next()));
+          },
+          [&](PPCContext& t) { t.r3.u64 = h.random.Next(); }, __imp__sub_820C9DD8, NativeExists,
+          fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+}
+
+void AeroParts(Context& h, const Block& block) {
+  // The tables in the block, 512 bytes apart from +128 (12 records each);
+  // the parts' 9 pointers in the area at +512, out at +64.
+  const uint32_t parts = h.data + 512;
+  auto set_up = [&] {
+    RandomWords(h, block.address, (128 + 9 * 512) / 4);
+    for (uint32_t t = 0; t < 9; t++) {
+      guest::StoreU32(h.base, parts + 4 * t, block.address + 128 + 512 * t);
+    }
+  };
+  {
+    struct Kind {
+      const char* name;
+      uint32_t size;
+      GuestFunction recompiled;
+      GuestFunction native;
+    };
+    const Kind kKinds[] = {
+        {"sub_820CB6C8 AeroPart::Swap", 28, __imp__sub_820CB6C8, NativeSwapAeroPart},
+        {"sub_820CB7E8 AeroPart::Swap36", 36, __imp__sub_820CB7E8, NativeSwapAeroPart36},
+    };
+    for (const Kind& kind : kKinds) {
+      Results results(kind.name);
+      for (int i = 0; i < 200; i++) {
+        const uint32_t record = block.address + 4 * uint32_t(i % 8);
+        Case(
+            h, results, block, kind.size + 64,
+            [&] { RandomWords(h, block.address, (kind.size + 64) / 4); },
+            [&](PPCContext& t) { t.r3.u64 = record; }, kind.recompiled, kind.native,
+            fmt::format("case {}", i));
+      }
+      results.Report();
+    }
+  }
+  struct Getter {
+    const char* name;
+    GuestFunction recompiled;
+    GuestFunction native;
+  };
+  const Getter kGetters[] = {
+      {"sub_820CB848 AeroParts::Get74", __imp__sub_820CB848, NativeAeroPart74},
+      {"sub_820CB8D0 AeroParts::Get75", __imp__sub_820CB8D0, NativeAeroPart75},
+      {"sub_820CB958 AeroParts::Get76", __imp__sub_820CB958, NativeAeroPart76},
+      {"sub_820CB9E0 AeroParts::Get77", __imp__sub_820CB9E0, NativeAeroPart77},
+      {"sub_820CBA68 AeroParts::Get78", __imp__sub_820CBA68, NativeAeroPart78},
+      {"sub_820CBAF0 AeroParts::Get79", __imp__sub_820CBAF0, NativeAeroPart79},
+      {"sub_820CBB78 AeroParts::Get80", __imp__sub_820CBB78, NativeAeroPart80},
+      {"sub_820CBC00 AeroParts::Get81", __imp__sub_820CBC00, NativeAeroPart81},
+      {"sub_820CBC90 AeroParts::Get82", __imp__sub_820CBC90, NativeAeroPart82},
+  };
+  for (const Getter& getter : kGetters) {
+    Results results(getter.name);
+    for (int i = 0; i < 150; i++) {
+      // Levels -2 to 12 (0 the defaults; -1 and -2 the records before the
+      // table, as the originals read them), level 0 every fifth case.
+      const int32_t level = i % 5 == 0 ? 0 : int32_t(h.random.Below(15)) - 2;
+      Case(
+          h, results, block, 128 + 9 * 512, set_up,
+          [&](PPCContext& t) {
+            t.r3.u64 = h.data + 64 + 4 * h.random.Below(8);
+            t.r4.u64 = parts;
+            t.r5.u64 = Upper(h.random) | uint32_t(level);
+          },
+          getter.recompiled, getter.native, fmt::format("case {} (level {})", i, level));
+    }
+    results.Report();
+  }
+  {
+    Results results("sub_820CBD20 CountBodyKits");
+    static const uint32_t kFirst[] = {
+        0x00000000u, 0x80000000u, 0x00000001u, 0x80000001u, 0x007FFFFFu, 0x7FC00000u,
+        0xFFC00000u, 0x7F800001u, 0x7F800000u, 0x3F800000u, 0xBF800000u, 0x40400000u,
+    };
+    for (int i = 0; i < 300; i++) {
+      Case(
+          h, results, block, 128 + 9 * 512,
+          [&] {
+            set_up();
+            const uint32_t table = block.address + 128 + 512 * 8;
+            for (uint32_t r = 0; r < 2; r++) {
+              const uint32_t first = h.random.Below(4) == 0
+                                         ? uint32_t(h.random.Next())
+                                         : kFirst[h.random.Below(uint32_t(std::size(kFirst)))];
+              guest::StoreU32(h.base, table + 36 * r, std::byteswap(first));
+            }
+          },
+          [&](PPCContext& t) { t.r3.u64 = parts; }, __imp__sub_820CBD20, NativeCountBodyKits,
+          fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void CarSpecs(Context& h) {
@@ -394,6 +614,8 @@ void CarSpecs(Context& h) {
   Leaves(h, block);
   Tables(h, block);
   Callbacks(h);
+  Getters(h, block);
+  AeroParts(h, block);
 }
 
 }  // namespace harness

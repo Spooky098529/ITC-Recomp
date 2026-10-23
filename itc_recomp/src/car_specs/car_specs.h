@@ -63,4 +63,45 @@ uint32_t OnWheelsLoaded(uint8_t* base, uint32_t object, uint32_t toc);    // sub
 void OnLoaded(uint8_t* base, uint32_t object);                            // sub_820C9DF0
 uint32_t OnTable83Loaded(uint8_t* base, uint32_t object, uint32_t toc);   // sub_820CBD90
 
+// The getters, on the tables the global points at (no bounds checks, as the
+// originals'):
+// Params::GetCarSpec (sub_820C9E98): table 72's spec `id`.
+uint32_t GetCarSpec(uint8_t* base, uint32_t id);
+// Params::GetWheel (sub_820C9EB0): 0 below 1, else table 73's record n - 1.
+uint32_t GetWheel(uint8_t* base, int32_t n);
+// Params::FirstWheelOfModel (sub_820C9EE0): 0 below 1, else the model's
+// first record (+64 + 4 × m) + 1.
+uint32_t FirstWheelOfModel(uint8_t* base, int32_t m);
+// Params::GetCarParts (sub_820C9E00): tables 74-82's records of `car` into
+// the 9 pointers at `out`.
+void GetCarParts(uint8_t* base, uint32_t out, uint32_t car);
+// CarSpec::GetTire (sub_820C9928): the spec's tire for the type and grade,
+// front or rear.
+uint32_t GetTire(uint32_t spec, int32_t type, uint32_t grade, int32_t rear);
+// Params::Exists (sub_820C9DD8): 1 when the global isn't 0.
+uint32_t Exists(uint8_t* base);
+
+// The aero parts' records (28 bytes; 36 for tables 81 and 82).
+uint32_t SwapAeroPart(uint8_t* base, uint32_t p);    // sub_820CB6C8
+uint32_t SwapAeroPart36(uint8_t* base, uint32_t p);  // sub_820CB7E8
+// AeroParts::Get74 to Get82 (sub_820CB848 to sub_820CBC90): `out` = table
+// 74 + n's record `level` - 1 of the car (`parts` = GetCarParts' block),
+// copied and swapped, or the defaults for level 0 (Get77: 0 and below).
+// False, with nothing done, where memcpy's copy wouldn't be the host's (the
+// ranges sharing memory, or a destination in the physical views it records
+// for the renderer): the original runs there.
+bool AeroPart74(uint8_t* base, uint32_t out, uint32_t parts, int32_t level);
+bool AeroPart75(uint8_t* base, uint32_t out, uint32_t parts, int32_t level);
+bool AeroPart76(uint8_t* base, uint32_t out, uint32_t parts, int32_t level);
+bool AeroPart77(uint8_t* base, uint32_t out, uint32_t parts, int32_t level);
+bool AeroPart78(uint8_t* base, uint32_t out, uint32_t parts, int32_t level);
+bool AeroPart79(uint8_t* base, uint32_t out, uint32_t parts, int32_t level);
+bool AeroPart80(uint8_t* base, uint32_t out, uint32_t parts, int32_t level);
+bool AeroPart81(uint8_t* base, uint32_t out, uint32_t parts, int32_t level);
+bool AeroPart82(uint8_t* base, uint32_t out, uint32_t parts, int32_t level);
+// sub_820CBD20: how many of table 82's first two records of the car have a
+// first float other than 0.0 (a float compare: -0.0 counts as 0.0, a NaN
+// doesn't). Needs flush-to-zero off, as the original's lfs leaves it.
+uint32_t CountBodyKits(uint8_t* base, uint32_t parts);
+
 }  // namespace car_specs
