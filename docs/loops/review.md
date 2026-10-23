@@ -110,6 +110,24 @@ When the user has reviewed a run's section, its heading gets
   and raced only with the next commit; two functions named
   `RecordClear` (`sub_8209FA38` here, `sub_825A18D8` in
   `model-animation.md`).
+  Migration 2's 13 rows (14a4cc8..11837c9; still `--native_cameras`;
+  2 Merged, `sub_820A0D38`, `sub_820A1CA8`; the adapters of
+  `Camera::BuildProjection` and `Viewport::UpdateEntries` removed). For
+  review: Camera::Update leaves out the original's dead `tan` and `atan`
+  (results never read; memory and r3 the same, only f1 on return
+  differs, which the caller doesn't read); it keeps interpolation's
+  notes (its view at the original's r1+112, the copies at 0x825936C4
+  and 0x825936D4, the multiply at 0x82593798); the record passes keep
+  their `frame_state_diff` wrapper (`--find_per_frame_state`,
+  `--debug_hide`) and RecordEnd calls RenderTarget through its override
+  with the original's return addresses; with the command list's
+  diagnostics on, or a full list or another chunk open, the original
+  runs and the scene's getters are called once more (never in play);
+  RecordBegin, RecordEnd and RecordViewport keep their adapters (guest
+  calls); the record-pass harness checks only the last submission to
+  its made-up queue; map corrected: `sub_825D9310` (marked never run)
+  is the 21 passes' static constructor, run at boot; +372 is height ×
+  0.5 × tan(fov/2).
 
 ## Run 2026-10-23 11:06 (`b7-loop-23-10-26-2`)
 

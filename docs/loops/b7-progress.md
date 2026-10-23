@@ -21,7 +21,8 @@ file's history. What's left to see in a drive, from every run:
   42 rows, 16 ready groups), checked; migration 1 done
   (81d1c0c..1736a63; 4 ready groups left), validated (19 of 19
   harness lines; all ran in the attract race or the replay, `itc_982`,
-  `itc_983` ok); migration agent 2 running.
+  `itc_983` ok); migration 2 done (14a4cc8..11837c9;
+  nothing ready left); validation agent running.
 
 ## Done
 
@@ -65,5 +66,7 @@ This run's groups: `expected-differences.md` (the "13:44 run" lines).
   known 577, unknown 4943).
 - After the cameras' migration 1: ours 1127, work left 5629 (wrapped
   125, known 561, unknown 4943). Race 19 s (`itc_979`), the same checks.
+- After the cameras' migration 2: ours 1139, work left 5617 (wrapped
+  123, known 551, unknown 4943). Race 19 s, the same checks.
 
 ## Stopped
