@@ -143,7 +143,8 @@ ITC_FLAG_BOOL(native_ai_drivers, true, "ITC",
               "sub_8213D550, AiPath::FollowTargets sub_8213D9D8, AiPath::FollowLeaderBranch "
               "sub_8213EB48 (its kind 5's step sub_8213EC8C with it), AiDriver::CompareWith "
               "sub_82145B08, AiDrivers::UpdateAll sub_82139628 (the drivers' updates, through "
-              "their +6148, on the translated code)) "
+              "their +6148, on the translated code), AiOther::PlanReaction sub_821456F8, "
+              "AiDriver::ReactToOthers sub_82145CA8) "
               "natively instead of "
               "through the translated code (the same words, bit for bit; checked by "
               "--run_harnesses=ai_drivers). Those "
@@ -448,3 +449,12 @@ ITC_AI_DRIVERS(82139628, {
   call.base = base;
   ctx.r3.u64 = UpdateAll(base, ctx.r1.u32 - 176, CallDriverUpdate, &call);
 })
+
+// --- Reacting to the other racers ---
+
+// r4 = the skill, r5 = &the rate, r6 = the flag, r7 = the mode (r3 kept).
+ITC_AI_DRIVERS(821456F8, PlanReaction(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
+                                      ctx.r7.u32))
+// r4 = &the entry count; the original's frame 240 bytes down.
+ITC_AI_DRIVERS(82145CA8, ctx.r3.u64 = ReactToOthers(base, ctx.r3.u32, ctx.r4.u32,
+                                                    ctx.r1.u32 - 240))

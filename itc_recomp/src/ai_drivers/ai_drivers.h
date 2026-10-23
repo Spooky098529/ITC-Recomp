@@ -777,4 +777,21 @@ using DriverUpdate = uint64_t (*)(void* user, uint64_t driver, uint32_t function
 // Returns the r3 the original leaves.
 uint64_t UpdateAll(uint8_t* base, uint32_t frame, DriverUpdate update, void* user);
 
+// --- Reacting to the other racers ---
+
+// AiOther::PlanReaction (sub_821456F8): +12 = 1.0, then by the state +24
+// (see the row) the ring index +26, the flags +28 and +12 from the skill's
+// percentages (at `skill` +14 and +16, kept in 0 to 100), the rate (the
+// float at `rate`), `flag` and `mode`.
+void PlanReaction(uint8_t* base, uint32_t record, uint32_t skill, uint32_t rate, uint32_t flag,
+                  uint32_t mode);
+// AiDriver::ReactToOthers (sub_82145CA8): the rate (slices a tick at the
+// driver's speed, at frame + 80: `frame` 240 bytes below the caller's stack
+// pointer), each other racer's record's flags +28 cleared and its reaction
+// (PlanReaction, or for one in the mask in states 2 and 3 the steps in the
+// row), the racers with flags and a ring index below the count at `count`
+// listed at +452 (-1 after them) and sorted by their records' ring index
+// (+26), then their gaps. Returns the r3 the original leaves.
+uint64_t ReactToOthers(uint8_t* base, uint32_t driver, uint32_t count, uint32_t frame);
+
 }  // namespace ai_drivers

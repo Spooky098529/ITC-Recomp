@@ -4540,4 +4540,227 @@ uint64_t UpdateAll(uint8_t* base, uint32_t frame, DriverUpdate update, void* use
   return r3;
 }
 
+// --- Reacting to the other racers ---
+
+namespace {
+constexpr uint32_t kHundredth = 0x8200222C;   // the percentages' scale (0.01)
+constexpr uint32_t kReactGap = 0x8200277C;    // states 1 and 3's gap limit
+constexpr uint32_t kReactSpeed = 0x82000F14;  // state 1's speed limit
+constexpr uint32_t kReactRate = 0x820029F8;   // state 1's rate limit
+constexpr uint32_t kTick = 0x82617730;        // 1/30 s
+constexpr uint32_t kPerKmh = 0x82002BD8;      // 1/3.6
+// A skill percentage (a halfword) kept in 0 to 100.
+int32_t Percentage(uint8_t* base, uint32_t at) {
+  const int32_t value = LoadS16(base, at);
+  if (value < 0) {
+    return 0;
+  }
+  return value > 100 ? 100 : value;
+}
+void OrFlags(uint8_t* base, uint32_t record, uint16_t bits) {
+  guest::StoreU16(base, record + 28, uint16_t(guest::LoadU16(base, record + 28) | bits));
+}
+uint16_t Truncated(double value) {
+  return uint16_t(strings_and_font::steps::Fctiwz(value));
+}
+// PlanReaction's +12 from a percentage, with the flag 0x2.
+void ReactionScale(uint8_t* base, uint32_t record, int32_t percentage) {
+  const double scale = IntToFloat(percentage);
+  OrFlags(base, record, 0x2);
+  Stfs(base, record + 12, Fmuls(scale, Lfs(base, kHundredth)));
+}
+}  // namespace
+
+void PlanReaction(uint8_t* base, uint32_t record, uint32_t skill, uint32_t rate, uint32_t flag,
+                  uint32_t mode) {
+  ITC_NATIVE_RUNNING("sub_821456F8 AiOther::PlanReaction");
+  const uint32_t state = uint32_t(LoadS16(base, record + 24));
+  Stfs(base, record + 12, Lfs(base, kOne));
+  if (state < 1) {
+    guest::StoreU16(base, record + 26, 0xFFFF);
+    guest::StoreU16(base, record + 28, 0);
+    return;
+  }
+  if (state == 1) {
+    const double gap = Lfs(base, kReactGap);
+    if (int32_t(flag) == 0 && Lfs(base, record + 16) > Lfs(base, kReactSpeed) &&
+        !(Lfs(base, record + 4) > Lfs(base, kTenth)) && Lfs(base, record + 0) < gap) {
+      guest::StoreU16(base, record + 26, 0xFFFF);
+      return;
+    }
+    if (Lfs(base, record + 0) > gap && !(Lfs(base, record + 4) < Lfs(base, kReactRate))) {
+      guest::StoreU16(base, record + 26, 1);
+      OrFlags(base, record, 0x1);
+      return;
+    }
+    const double meet = Lfs(base, record + 20);
+    if (meet < Lfs(base, kZero)) {
+      guest::StoreU16(base, record + 26, 0xFFFF);
+      return;
+    }
+    OrFlags(base, record, 0x1);
+    const int32_t percentage = Percentage(base, skill + 16);
+    const double by = Lfs(base, rate);
+    double ahead = Fadds(IntToFloat(percentage), Lfs(base, kHundred));
+    ahead = Fmuls(ahead, by);
+    ahead = Fmuls(ahead, meet);
+    guest::StoreU16(base, record + 26, Truncated(Fmuls(ahead, Lfs(base, kHundredth))));
+    return;
+  }
+  if (state < 3) {
+    guest::StoreU16(base, record + 26, 1);
+    if (Percentage(base, skill + 14) > 0) {
+      return;
+    }
+    OrFlags(base, record, 0x1);
+    return;
+  }
+  if (state != 3) {
+    return;
+  }
+  if (int32_t(mode) == 1 && int32_t(flag) == 0 && LoadS16(base, record + 30) > 0) {
+    guest::StoreU16(base, record + 26, 2);
+    OrFlags(base, record, 0x10);
+    return;
+  }
+  if (Lfs(base, record + 0) > Lfs(base, kTen)) {
+    const double meet = Lfs(base, record + 20);
+    if (meet < Lfs(base, kZero)) {
+      guest::StoreU16(base, record + 26, 0xFFFF);
+      return;
+    }
+    guest::StoreU16(base, record + 26, Truncated(Fmuls(Lfs(base, rate), meet)));
+    if (guest::LoadU8(base, record + 33) != 1) {
+      return;
+    }
+    const int32_t percentage = Percentage(base, skill + 14);
+    if (!(percentage > 0)) {
+      return;
+    }
+    ReactionScale(base, record, percentage);
+    return;
+  }
+  if (int32_t(flag) == 0) {
+    guest::StoreU16(base, record + 26, 1);
+    OrFlags(base, record, 0x1);
+    return;
+  }
+  guest::StoreU16(base, record + 26, 0xFFFF);
+  if (guest::LoadU8(base, record + 33) != 1) {
+    return;
+  }
+  const int32_t percentage = Percentage(base, skill + 14);
+  if (!(percentage > 0)) {
+    return;
+  }
+  guest::StoreU16(base, record + 26, 1);
+  ReactionScale(base, record, percentage);
+}
+
+uint64_t ReactToOthers(uint8_t* base, uint32_t driver, uint32_t count, uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_82145CA8 AiDriver::ReactToOthers");
+  guest::StoreU32(base, frame + 84, Load(base, driver + 0));
+  const uint32_t file = Load(base, track_route::kRoute);
+  const uint64_t skill = Of(base, frame + 84) + 6048;
+  const uint32_t racers = track_collision::RaceRacerCount(base);
+  uint64_t r3 = racers;
+  const double speed = Lfs(base, driver + 100);
+  double rate = Fmuls(Lfs(base, kTick), Lfs(base, kPerKmh));
+  const double length = Lfs(base, file + 8);
+  const double zero = Lfs(base, kZero);
+  rate = Fdivs(rate, length);
+  Stfs(base, frame + 80, Fmuls(rate, speed));
+  uint32_t listed = 0;
+  if (int32_t(racers) > 0) {
+    const double ten = Lfs(base, kTen);
+    const double far = Lfs(base, kReactGap);
+    const double one = Lfs(base, kOne);
+    uint32_t slot = driver + 452;
+    for (uint32_t i = 0; i < racers; i++) {
+      const uint32_t other = Load(base, Load(base, Load(base, kRace) + 2308 + 4 * i) + 20);
+      guest::StoreU32(base, frame + 88, other);
+      if (int32_t(Load(base, driver + 0)) == int32_t(other)) {
+        continue;
+      }
+      const uint64_t record64 = uint64_t(other) * 40 + driver + 172;
+      const uint32_t record = uint32_t(record64);
+      guest::StoreU16(base, record + 28, 0);
+      const uint32_t keeps = KeepsGapFrom(base, driver, frame + 88);
+      r3 = keeps;
+      bool react = int32_t(keeps) != 0;
+      if (!react) {
+        const uint32_t bit = (other & 0x20) != 0 ? 0 : 1u << (other & 0x3F);
+        if ((uint32_t(LoadS16(base, driver + 40)) & bit) != 0) {
+          Stfs(base, record + 12, one);
+          const int32_t state = int32_t(Load(base, driver + 32));
+          if (state == 2) {
+            const double gap = Lfs(base, record + 0);
+            if (gap < zero) {
+              const double slices = Fdivs(gap, Lfs(base, file + 8));
+              guest::StoreU16(base, record + 28, 4);
+              guest::StoreU16(base, record + 26, Truncated(Fneg(slices)));
+            }
+          } else if (state == 3) {
+            const double gap = Lfs(base, record + 0);
+            guest::StoreU16(base, record + 28, 1);
+            if (gap < far && gap > ten) {
+              guest::StoreU16(base, record + 26,
+                              Truncated(Fdivs(Fabs(gap), Lfs(base, file + 8))));
+            } else {
+              guest::StoreU16(base, record + 26, 1);
+            }
+          } else {
+            react = true;
+          }
+        }
+      }
+      if (react) {
+        const uint32_t vehicle = Load(base, driver + 160);
+        const uint32_t flag7 = vehicle != 0 ? (Load(base, vehicle + 6148) >> 2) & 1 : 0;
+        const uint32_t flag6 = (Load(base, driver + 16) >> 2) & 1;
+        PlanReaction(base, record, uint32_t(skill), frame + 80, flag6, flag7);
+        r3 = record64;
+      }
+      if (guest::LoadU16(base, record + 28) != 0) {
+        const int32_t at = LoadS16(base, record + 26);
+        if (!(at < 0) && at < int32_t(Load(base, count))) {
+          guest::StoreU32(base, slot, other);
+          listed++;
+          slot += 4;
+        }
+      }
+    }
+  }
+  guest::StoreU32(base, ((listed + 113) << 2) + driver, 0xFFFFFFFFu);
+  if (!(int32_t(listed - 1) > 0)) {
+    return r3;
+  }
+  uint32_t at = driver + 452;
+  uint32_t k = 1;
+  for (uint32_t outer = 0; outer < listed - 1; outer++, at += 4, k++) {
+    if (!(int32_t(k) < int32_t(listed))) {
+      continue;
+    }
+    uint32_t next = at + 4;
+    for (uint32_t n = listed - k; n != 0; n--, next += 4) {
+      const uint32_t a = Load(base, at);
+      const uint32_t b = Load(base, next);
+      const uint32_t ra = uint32_t(uint64_t(a) * 40 + driver);
+      const uint32_t rb = uint32_t(uint64_t(b) * 40 + driver);
+      const int32_t ia = LoadS16(base, ra + 198);
+      const int32_t ib = LoadS16(base, rb + 198);
+      bool swap = ia > ib;
+      if (ia == ib) {
+        const double gb = Lfs(base, rb + 172);
+        swap = !(gb > zero) && Lfs(base, ra + 172) < gb;
+      }
+      if (swap) {
+        guest::StoreU32(base, at, b);
+        guest::StoreU32(base, next, a);
+      }
+    }
+  }
+  return k;
+}
+
 }  // namespace ai_drivers

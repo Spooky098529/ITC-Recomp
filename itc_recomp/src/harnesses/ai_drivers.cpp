@@ -411,6 +411,11 @@ void NativeUpdateAll(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = ai::UpdateAll(base, ctx.r1.u32 - 176, CallDriverUpdate, &call);
 }
 
+ITC_NATIVE_STEP(NativePlanReaction, ai::PlanReaction(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                                     ctx.r6.u32, ctx.r7.u32))
+ITC_NATIVE_STEP(NativeReactToOthers,
+                ctx.r3.u64 = ai::ReactToOthers(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 240))
+
 // Runs the recompiled version with the native flag off.
 template <GuestFunction recompiled>
 void Original(PPCContext& ctx, uint8_t* base) {
@@ -614,6 +619,8 @@ enum Kind {
   kFollowLeaderBranch,
   kCompareWith,
   kUpdateAll,
+  kPlanReaction,
+  kReactToOthers,
 };
 
 }  // namespace
@@ -896,6 +903,10 @@ void AiDrivers(Context& h) {
        kCompareWith, 2000},
       {"AiDrivers::UpdateAll (sub_82139628)", Original<__imp__sub_82139628>, NativeUpdateAll,
        kUpdateAll, 500},
+      {"AiOther::PlanReaction (sub_821456F8)", Original<__imp__sub_821456F8>, NativePlanReaction,
+       kPlanReaction, 3000},
+      {"AiDriver::ReactToOthers (sub_82145CA8)", Original<__imp__sub_82145CA8>,
+       NativeReactToOthers, kReactToOthers, 2000},
   };
   const uint32_t area = memory::Alloc(kAreaBytes, 0);
   const uint32_t driver = area + kDriver, vehicle = area + kVehicle, io = area + kIo;
@@ -2317,6 +2328,98 @@ void AiDrivers(Context& h) {
             if (r.Below(16) == 0) {
               drivers = 0;
             }
+          }
+          break;
+        }
+        case kPlanReaction: {
+          // A record at kOut: its gap +0, rate +4, speed +16 and time to meet
+          // +20 near the limits (10.0 and the floats at 0x8200277C,
+          // 0x82000F14, 0x820029F8: some exactly), the state +24 (0 to 3, now
+          // and then others or negative), +26, +28, the timer +30 and byte
+          // +33; the skill's percentages (io + 14, + 16: -20 to 120); the
+          // rate (io + 0x20); the flag and mode.
+          const uint32_t record = area + kOut;
+          const auto near = [&](uint32_t constant, float spread) {
+            const float at = guest::LoadFloat(h.base, constant);
+            switch (r.Below(4)) {
+              case 0:
+                return FloatBits(at);
+              case 1:
+                return RandomFloat(r, 4.0f * spread);
+              default:
+                return FloatBits(at + (float(r.Below(2001)) / 1000.0f - 1.0f) * spread);
+            }
+          };
+          guest::StoreU32(h.base, record + 0, r.Below(2) ? near(0x8200277C, 30.0f)
+                                                       : near(0x82001FD8, 10.0f));
+          guest::StoreU32(h.base, record + 4, r.Below(2) ? near(0x82001FBC, 1.0f)
+                                                       : near(0x820029F8, 2.0f));
+          guest::StoreU32(h.base, record + 16, near(0x82000F14, 20.0f));
+          guest::StoreU32(h.base, record + 20, r.Below(4) == 0 ? RandomFloat(r, 20.0f)
+                                                               : FloatBits(float(r.Below(400)) / 40.0f - 1.0f));
+          guest::StoreU16(h.base, record + 24,
+                          uint16_t(r.Below(8) == 0 ? int32_t(r.Below(10)) - 3 : int32_t(r.Below(4))));
+          guest::StoreU16(h.base, record + 26, uint16_t(r.Next()));
+          guest::StoreU16(h.base, record + 28, uint16_t(r.Below(4) ? r.Below(32) : r.Next()));
+          guest::StoreU16(h.base, record + 30, uint16_t(int32_t(r.Below(6)) - 2));
+          guest::StoreU8(h.base, record + 33, uint8_t(r.Below(4) ? r.Below(2) : r.Below(256)));
+          guest::StoreU16(h.base, io + 14, uint16_t(int32_t(r.Below(141)) - 20));
+          guest::StoreU16(h.base, io + 16, uint16_t(int32_t(r.Below(141)) - 20));
+          guest::StoreU32(h.base, io + 0x20, r.Below(8) == 0 ? RandomFloat(r, 10.0f)
+                                                             : FloatBits(float(r.Below(100)) / 20.0f));
+          r3 = record;
+          r4 = io;
+          r5 = io + 0x20;
+          r6 = r.Below(8) == 0 ? uint32_t(r.Next()) : r.Below(2);
+          r7 = r.Below(8) == 0 ? uint32_t(r.Next()) : r.Below(3);
+          floats.push_back({kOut + 12, 1});
+          break;
+        }
+        case kReactToOthers: {
+          // The driver at kDriver (its index +0, 0 to 6; the mask +40, the
+          // state +32, +16, +100, its vehicle's flags) in the table at its
+          // index, so AiDriver::Of finds it (the table's drivers: their +32
+          // and +40 for KeepsGapFrom); its seven records (+172: the gap, the
+          // rate, the speed, the time to meet, the state, +30, +33); the
+          // racers (up to 8, indexes 0 to 6, now and then repeated), a route
+          // file (its slice length) and the count (io).
+          const uint32_t index = r.Below(7);
+          drivers = area + kDriver - ai::kDriverBytes * index;
+          guest::StoreU32(h.base, driver + 0, index);
+          guest::StoreU32(h.base, driver + 32, r.Below(8) ? r.Below(7) : uint32_t(r.Next()));
+          guest::StoreU16(h.base, driver + 40, uint16_t(r.Below(4) ? r.Below(128) : r.Next()));
+          guest::StoreU32(h.base, driver + 100, FloatBits(float(r.Below(250))));
+          guest::StoreU32(h.base, area + kFile + 8,
+                          r.Below(16) == 0 ? RandomFloat(r, 8.0f)
+                                           : FloatBits(0.5f + float(r.Below(80)) / 8.0f));
+          for (uint32_t k = 0; k < 7; k++) {
+            const uint32_t record = driver + 172 + 40 * k;
+            const float gaps[] = {-120.0f, -10.0f, 10.0f, 120.0f};
+            guest::StoreU32(h.base, record + 0, r.Below(8) == 0
+                                                    ? FloatBits(gaps[r.Below(4)])
+                                                    : FloatBits(float(r.Below(4001)) / 10.0f - 200.0f));
+            guest::StoreU32(h.base, record + 4, FloatBits(float(r.Below(400)) / 100.0f - 2.0f));
+            guest::StoreU32(h.base, record + 16, FloatBits(float(r.Below(250))));
+            guest::StoreU32(h.base, record + 20, FloatBits(float(r.Below(400)) / 40.0f - 1.0f));
+            guest::StoreU16(h.base, record + 24, uint16_t(r.Below(5)));
+            guest::StoreU16(h.base, record + 30, uint16_t(int32_t(r.Below(4)) - 1));
+            guest::StoreU8(h.base, record + 33, uint8_t(r.Below(2)));
+          }
+          guest::StoreU16(h.base, driver + kSkill + 14, uint16_t(int32_t(r.Below(141)) - 20));
+          guest::StoreU16(h.base, driver + kSkill + 16, uint16_t(int32_t(r.Below(141)) - 20));
+          const uint32_t count = r.Below(16) == 0 ? 0 : 1 + r.Below(7);
+          guest::StoreU32(h.base, area + kRacers + 56, count);
+          for (uint32_t i = 0; i < 8; i++) {
+            const uint32_t racer = area + kRacerRecords + 24 * i;
+            guest::StoreU32(h.base, area + kRacers + 4 * i, racer);
+            guest::StoreU32(h.base, racer + 20, r.Below(8) == 0 ? r.Below(7) : i % 7);
+          }
+          guest::StoreU32(h.base, io, r.Below(8) == 0 ? uint32_t(int32_t(r.Below(5)) - 2)
+                                                      : r.Below(40));
+          r3 = driver;
+          r4 = io;
+          for (uint32_t k = 0; k < 7; k++) {
+            floats.push_back({kDriver + 172 + 40 * k + 12, 1});
           }
           break;
         }
