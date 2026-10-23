@@ -77,6 +77,20 @@ When the user has reviewed a run's section, its heading gets
   its +37 is set and more than one is kept. Kept, probably a game bug:
   SpreadOffset (`sub_8213B890`) adds the leftover after a clamp to the
   same entry several times, not the ones after it.
+  Migration 4's rows (fcec6fd..2ea28d9; 16 more ours, 13 adapters
+  removed: 130 ours, 84 Native). `AiDrivers::UpdateAll` keeps its
+  adapter: each driver's update goes through the pointer at +6148,
+  still recompiled targets, so the plain C++ takes a callback and the
+  adapter makes the guest call from a frame like the original's.
+  Corrections: `LeaderBranchKind` and `FollowLeaderBranch` also give
+  kind 5 (branches 1 and 5, through `sub_8213D2B8` and `sub_8213EC8C`,
+  jump targets made functions, never seen in play, ported with their
+  callers); `BranchMasksFor`'s kinds 1, 6 and 7 fall through to the
+  +32 and +48 lists' checks. r3 kept 64-bit where the original
+  sign-extends (BranchMasksFor's list address, FindSideSection's -1).
+  Harness limits: FindSideSection and CompareWith always given a
+  vehicle (the originals read it without a null check), CompareWith
+  and UpdateAll cases use finite floats in the first seven drivers.
 
 ## Run 2026-10-23 17:22 (`b7-loop-23-10-26-4`)
 
