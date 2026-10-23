@@ -22,8 +22,10 @@
 // (sub_821467B8), AiPath::ResetFor (sub_8213E658) and ResetOthers
 // (sub_82145A48), from AiDriver::Reset; SetFlag2 (sub_82138D20), from
 // ResetToMode1, ResetToMode0, ResetControl and StartRace; ResetToMode1
-// (sub_82139450), from ResetControl; and AccumulateSteer (sub_82138F00),
-// from UpdateSteerInput.
+// (sub_82139450), from ResetControl; AccumulateSteer (sub_82138F00), from
+// UpdateSteerInput; ClearPlan (sub_82139820), from StartRace, SetState2or3,
+// SetStateFromList, SetState4 and ClearAll; and Restart (sub_821395D0), from
+// ResetAll.
 
 #include "guest.h"
 
@@ -79,7 +81,7 @@ ITC_FLAG_BOOL(native_ai_drivers, true, "ITC",
               "sub_8213F730, sub_8213F900, sub_8213B390, sub_821459B0, sub_821451B8, sub_821464B8, "
               "sub_82146508, sub_82146588, sub_82146408, sub_8213F698, sub_821393D8, sub_8213D508, "
               "sub_82145450, sub_821467B8, sub_82138D20, sub_82139450, sub_82138F00, sub_8213E658, "
-              "sub_82145A48");
+              "sub_82145A48, sub_82139820, sub_821395D0");
 
 // Defines an adapter: `body` uses `ctx` and `base`.
 #define ITC_AI_DRIVERS(address, body)   \
@@ -146,7 +148,6 @@ ITC_AI_DRIVERS(82145048, ctx.r3.u64 = KeepsGapFrom(base, ctx.r3.u32, ctx.r4.u32)
 // r4 = the object or 0; r3 left at the skill (+6048), as the original's
 // tail call leaves it.
 ITC_AI_DRIVERS(82138D00, SetParams(base, ctx.r3.u32, ctx.r4.u32); ctx.r3.u64 += 6048)
-ITC_AI_DRIVERS(82139820, ctx.r3.u64 = ClearPlan(base, ctx.r3.u32))
 // r4 = &the speed, r5 = &(a, b), r6 = &t, r7 = &the weight, r8 = &the
 // slices; the original's frame 96 bytes down.
 ITC_AI_DRIVERS(82139B40, ctx.f1.f64 = LimitSpeedBlend(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
@@ -262,8 +263,6 @@ extern "C" REX_FUNC(sub_8213D020) {
 // --- The states and the drivers' resets (the originals' frames: 112 or 128
 // bytes down) ---
 
-// r4 = &the mask.
-ITC_AI_DRIVERS(821395D0, ctx.r3.u64 = Restart(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 112))
 ITC_AI_DRIVERS(82139750, ctx.r3.u64 = ResetAll(base, ctx.r1.u32 - 128))
 // r4 = &the word, r5 = &the flag.
 ITC_AI_DRIVERS(82139E40, ctx.r3.u64 = SetState2or3(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
