@@ -11,11 +11,19 @@ lists are there), and this file's history.
 - Run started 2026-10-23 01:52 on `b7-loop-23-10-26` (the user's
   branch), from 21cdb6a; summary `b7-loop-2026-10-23-0152.md`.
 - Subsystem 1 of 3 (the sound cues) finished: the rest waits on XACT.
-- Subsystem 2 of 3: XACT (`xact.md`, mapped in 7ba4592, 149 rows, 60
-  ready groups by direct calls); step 8, migration 1 done
-  (904e6ee..0c0fd63, 55 ours); validation agent running.
+- Subsystem 2 of 3 (XACT) finished: the rest waits on blockers.
+- Subsystem 3 of 3: the rest of XACT's upper part (its unmapped vtable
+  slots, `825BF5C8`-`825D0000`, with the small shared helpers), rows
+  added to `xact.md`; step 2, the mapping agent running.
 
 ## Done
+
+- XACT (`xact.md`, mapped in 7ba4592; 149 rows): 55 ours in one
+  migration (904e6ee..0c0fd63), validated (55 of 55 harness lines, all
+  ran in the attract race; the migration's log `itc_870` at the same
+  code); `--native_xact`. Left: the critical section, the settings'
+  unmapped slots, vtable calls into recompiled code, XAudio and the
+  voices, the tracks, events and waves.
 
 - The sound cues (`sound-cues.md`, mapped in bfa9d03; 87 rows): 30
   ours in one migration (6187975..fae15f5), validated (30 of 30
