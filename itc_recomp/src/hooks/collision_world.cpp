@@ -31,7 +31,8 @@ ITC_FLAG_BOOL(native_collision_world, true, "ITC",
               "adapters, and the flag switches their callers: sub_820F6898, sub_820F72F8, "
               "sub_820F7468, sub_820F7590, sub_820F7818, sub_820F6E18, sub_820F6A38, sub_820F6BE8, "
               "sub_820F71B0, sub_820F7EE8, sub_820F7E30, sub_820F7D70, sub_820F6C88, sub_820FC110, "
-              "sub_820FE8F8, sub_820FC870, sub_820FC2E0, sub_820FC658");
+              "sub_820FE8F8, sub_820FC870, sub_820FC2E0, sub_820FC658, sub_820FC188, sub_820FD6D8, "
+              "sub_820FC3C8, sub_820FC900, sub_820FDC18, sub_820FDF38");
 
 // Defines an adapter: `body` uses `ctx` and `base`.
 #define ITC_COLLISION_WORLD(address, body)   \
@@ -130,88 +131,20 @@ extern "C" REX_FUNC(sub_820FEBD0) {
 ITC_COLLISION_WORLD(820F8090, ctx.r3.u64 = TrackPositionFindCell(base, ctx.r3.u32, ctx.r4.u32,
                                                                  ctx.r5.u32, ctx.r1.u32 - 240))
 
-// --- The wall query's parts and the route ---
+// --- The route ---
 
-// WallQuery::AddCell (sub_820FC110) has no adapter: its only caller is
-// native.
-// r3 = the query, r4 = the mesh. A shape that isn't a box: the original.
-extern "C" REX_FUNC(sub_820FC188) {
-  REX_FUNC_PROLOGUE();
-  uint32_t count = 0;
-  if (!ITC_FLAG(native_collision_world) ||
-      !WallQueryGatherCells(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 192, &count)) {
-    __imp__sub_820FC188(ctx, base);
-    return;
-  }
-  ctx.r3.u64 = count;
-}
-// WallQuery::AddHit and Segments::Intersect2D (sub_820FC2E0, sub_820FC658)
-// have no adapters: their callers, the wall query's CornersThroughWall and
-// EdgesAcrossWall, are native.
 // Archive::Load's callback: r6 = the route; r3 comes back as 12 (the
 // original's count of route bits).
 ITC_COLLISION_WORLD(820F9050, TrackRouteOnLoaded(base, ctx.r6.u32); ctx.r3.u64 = 12)
 
 // --- The wall query ---
 
-// WallQuery::ModeSkips (sub_820FC870) has no adapter: its only caller is
-// native.
-// r3 = &the wall's kind, r4 = &the box's +112, r5 = &its +114.
-ITC_COLLISION_WORLD(820FD6D8, ctx.r3.u64 = WallQueryIgnoresWall(base, ctx.r3.u32, ctx.r4.u32,
-                                                                ctx.r5.u32, ctx.r1.u32 - 96))
-// r3 = the query. A shape that isn't a box: the original.
-extern "C" REX_FUNC(sub_820FC3C8) {
-  REX_FUNC_PROLOGUE();
-  uint32_t hit = 0;
-  if (ITC_FLAG(native_collision_world)) {
-    ctx.fpscr.disableFlushMode();
-  }
-  if (!ITC_FLAG(native_collision_world) ||
-      !WallQueryCornersThroughWall(base, ctx.r3.u32, ctx.r1.u32 - 304, &hit)) {
-    __imp__sub_820FC3C8(ctx, base);
-    return;
-  }
-  ctx.r3.u64 = hit;
-}
-// r3 = the query. A shape that isn't a box: the original.
-extern "C" REX_FUNC(sub_820FC900) {
-  REX_FUNC_PROLOGUE();
-  uint32_t hit = 0;
-  if (ITC_FLAG(native_collision_world)) {
-    ctx.fpscr.disableFlushMode();
-  }
-  if (!ITC_FLAG(native_collision_world) ||
-      !WallQueryEdgesAcrossWall(base, ctx.r3.u32, ctx.r1.u32 - 944, &hit)) {
-    __imp__sub_820FC900(ctx, base);
-    return;
-  }
-  ctx.r3.u64 = hit;
-}
-// r3 = the query, r4 = the mesh, r5 = the cell (r6 not read). Its r3 isn't
-// kept (QueryWalls, its only caller, doesn't read it). A shape that isn't a
-// box: the original.
-extern "C" REX_FUNC(sub_820FDC18) {
-  REX_FUNC_PROLOGUE();
-  if (ITC_FLAG(native_collision_world)) {
-    ctx.fpscr.disableFlushMode();
-  }
-  if (!ITC_FLAG(native_collision_world) ||
-      !WallQueryTestCell(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32 - 256)) {
-    __imp__sub_820FDC18(ctx, base);
-  }
-}
-// r3 = the query, r4 = the mesh. Its r3 isn't kept (WallHits, its only
-// caller, doesn't read it). A shape that isn't a box: the original.
-extern "C" REX_FUNC(sub_820FDF38) {
-  REX_FUNC_PROLOGUE();
-  if (ITC_FLAG(native_collision_world)) {
-    ctx.fpscr.disableFlushMode();
-  }
-  if (!ITC_FLAG(native_collision_world) ||
-      !TrackCollisionQueryWalls(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 128)) {
-    __imp__sub_820FDF38(ctx, base);
-  }
-}
+// WallQuery::GatherCells, AddCell, AddHit, ModeSkips, IgnoresWall,
+// CornersThroughWall, EdgesAcrossWall, TestCell and
+// TrackCollision::QueryWalls (sub_820FC188, sub_820FC110, sub_820FC2E0,
+// sub_820FC870, sub_820FD6D8, sub_820FC3C8, sub_820FC900, sub_820FDC18,
+// sub_820FDF38) and Segments::Intersect2D (sub_820FC658) have no adapters:
+// their callers are native.
 // The collision world's first query ([0x826C2D78]): r3 = the hit records,
 // r4 = the shape record (r5 not read). A shape that isn't a box: the
 // original.

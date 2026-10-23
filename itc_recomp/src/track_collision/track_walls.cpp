@@ -48,12 +48,12 @@ uint32_t WallQueryAddCell(uint8_t* base, uint32_t query, uint32_t cell, uint32_t
 
 bool WallQueryGatherCells(uint8_t* base, uint32_t query, uint32_t mesh, uint32_t frame,
                           uint32_t* count) {
+  ITC_NATIVE_RUNNING("sub_820FC188 WallQuery::GatherCells");
   uint32_t box = 0;
   if (!co::CollisionShapeCurrent(base, guest::LoadU32(base, query + 12), &box) ||
       !co::IsBox(base, box)) {
     return false;
   }
-  ITC_NATIVE_RUNNING("sub_820FC188 WallQuery::GatherCells");
   const uint32_t f = frame;
   // Half the corner count (srawi, addze): the lower corners.
   const uint32_t corners = uint32_t(int32_t(co::BoxCornerCount()) / 2);
