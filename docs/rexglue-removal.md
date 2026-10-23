@@ -2508,6 +2508,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-10-23 | The collision world's owner and the track's collision (the wall and ground queries, the track mesh and positions, the teardown) | `collision-world.md` | 37 of 43 | `--native_collision_world` |
 | 2026-10-23 | The sound cues (the game's sound manager, its wrapper over XACT and X3DAudio, X3DAudioInitialize) | `sound-cues.md` | 30 of 87 | `--native_sound_cues` |
 | 2026-10-23 | XACT, the sound library linked into the game (its engine, banks, cues, sounds and faders; the user's call to translate it) | `xact.md` | 102 of 186 (two maps, three migrations) | `--native_xact` |
+| 2026-10-23 | The action mappers (the game's input actions over the pads: set-up, client list, update, read slots; no behavior change) | `action-mappers.md` | 36 of 40 | `--native_action_mappers` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -2628,6 +2629,20 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
     still-recompiled tracks and waves (`825D0000`-`825D9000`, leads), or
     XACT's clock, which waited on GetTickCount (`sub_822956F0`; ours
     since 2026-10-23, from the host clock: "GetTickCount" under B6).
+
+    The action mappers (2026-10-23, branch `b7-loop-23-10-26-2`, the
+    sixth run): 36 of 40 ours in one migration, with no change in the
+    game's behavior (the user's call: migrate off the recompiled code
+    only): every harness matches exactly, `--input_mappers_by_tick`'s
+    override of ActionMappers::Update (`sub_8210B018`) keeps skipping
+    render-only passes before the native update, and the pause menu's
+    diagnostics moved into the adapters. Left: BindAll and Bind
+    (`sub_8210AF08`, `sub_8210B270`), whose calls into the input
+    manager's vtables aren't identified, and the mapper's constructor and
+    ActionMappers::Init, blocked by the input processor's constructor
+    (`sub_8258CE60`, a lead). With `--run_harnesses=all` an attract race
+    under `attract_race.sh 25` now counts 19 s at 30 ticks/s (the
+    harnesses' time at boot; 23 s without them).
 
     The second run (from 2026-10-22, branch `b7-loop-22-10-26`; its first
     session stopped after one subsystem): the first run's removable
@@ -2950,3 +2965,11 @@ imports; `KeTimeStampBundle` is a variable import, with no reader left
 in play): 449 functions (916 pairs): overridden 67, Native 3, Dropped
 23, never called 70, live 286. Imports: 186 called, 62 with a live
 caller. B7 (`b7_status.py`): ours 971.
+
+**2026-10-23, B7's sixth loop run, the action mappers (branch
+`b7-loop-23-10-26-2`):** the boundary unchanged: 449 functions (916
+pairs): overridden 67, Native 3, Dropped 23, never called 70, live 286.
+Imports: 186 called, 62 with a live caller. B7 (`b7_status.py`): 6,753
+in play, ours 1,007, work left 5,746 (Wrapped 129, with a row 456, no
+row yet 5,161); `action-mappers.md` 36 ours of 40. 883 overrides in
+`src/`.

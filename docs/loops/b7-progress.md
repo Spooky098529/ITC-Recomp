@@ -11,14 +11,20 @@ file's history.
 
 - Run started 2026-10-23 11:06 on `b7-loop-23-10-26-2` (the user's
   branch), from 5b4cecd; summary `b7-loop-2026-10-23-1106.md`.
-- Subsystem 1 of 3: the action mappers (`action-mappers.md`, mapped in
-  422b250 from the list helpers' lead: 40 rows, 15 ready groups). Migration 1
-  (006e5e4..c67265f) passed the checks: 36 of 40 ours. Step:
-  validation (agent running).
+- Subsystem 1 of 3 (the action mappers) finished: the rest waits on
+  the input manager's vtable targets and `sub_8258CE60`.
+- Subsystem 2 of 3: the game's data tables at `[0x826C5CA0]`
+  (`sub_82117240` and its accessors, from `leads.md`: 6 of 7 ready, ~100
+  callers). Step: mapping (agent running).
 
 ## Done
 
-None yet.
+- The action mappers (`action-mappers.md`, mapped in 422b250; 40 rows):
+  36 ours in one migration (006e5e4..c67265f), validated (35 of 35
+  harness lines, one Merged; all ran in the attract race or the replay,
+  replay ok); `--native_action_mappers`. Left: BindAll and Bind (the
+  input manager's vtable targets), the mapper's constructor and Init
+  (`sub_8258CE60`).
 
 ## Rows to review
 
@@ -30,7 +36,8 @@ This run's groups: `expected-differences.md` (the "11:06 run" lines).
 
 ## To check in a drive
 
-None yet.
+None so far: the action mappers' functions all ran in the attract
+race or the replay.
 
 ## Totals
 
