@@ -13,6 +13,7 @@
 #include "guest.h"
 
 #include "base/flags.h"
+#include "hooks/guest_call.h"
 #include "hooks/heap.h"
 #include "strings_and_font/strings_and_font.h"
 
@@ -25,11 +26,22 @@ ITC_FLAG_BOOL(native_strings_and_font, true, "ITC",
               "the font's pixel shader entries sub_825D9590, Font::SetParams sub_82108368, "
               "Font::TextWidth sub_82108B30, Font::LineX sub_82108FE0 with Font::LineWidth "
               "sub_82108458 and sub_82108810, Font::LineY sub_82108568, Font::CountGlyphs "
-              "sub_82108210 and Font::OutCode sub_821082A0) "
+              "sub_82108210, Font::OutCode sub_821082A0, Font::ClipGlyph sub_82108C90, "
+              "Font::AddGlyph sub_82109560, Font::BuildVertices sub_82109AA8, Font::DrawPass "
+              "sub_82109EF0 (without the command list's diagnostics), Font::Draw sub_8210A400 "
+              "and Text::Draw sub_8210A758; rotated text and the second pass, never in play, "
+              "on the translated code) "
               "natively instead of through the translated code (same results; checked by "
               "--run_harnesses=strings_and_font)");
 
 using namespace strings_and_font;
+
+// The command list's diagnostics (blend_state.cpp) see the slots the
+// originals allocate through AllocateSlots: with any of them on, the
+// originals run.
+ITC_FLAG_DECLARE(bool, log_overlay_uploads);
+ITC_FLAG_DECLARE(bool, log_slot_callers);
+ITC_FLAG_DECLARE(bool, log_recording_by_pass);
 
 #define ITC_STRINGS_AND_FONT_FALLBACK(address) \
   REX_FUNC_PROLOGUE();                         \
@@ -141,4 +153,137 @@ extern "C" REX_FUNC(sub_821082A0) {
   ITC_STRINGS_AND_FONT_FALLBACK(821082A0)
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = FontOutCode(base, ctx.r3.u32, ctx.r4.u32);
+}
+
+// Font::ClipGlyph: r3 = the font, r4 = the vertices; r3 1 kept, 0 outside.
+extern "C" REX_FUNC(sub_82108C90) {
+  ITC_STRINGS_AND_FONT_FALLBACK(82108C90)
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = FontClipGlyph(base, ctx.r3.u32, ctx.r4.u32);
+}
+
+// Font::AddGlyph: r3 = the font, r6 = the character, r7 = the color, f1, f2
+// = x, y. The original for rotated text. (The original's r3 after is
+// ClipGlyph's or a count; its only caller, Font::BuildVertices, reads none.)
+extern "C" REX_FUNC(sub_82109560) {
+  ITC_STRINGS_AND_FONT_FALLBACK(82109560)
+  ctx.fpscr.disableFlushMode();
+  if (!FontAddGlyph(base, ctx.r3.u32, ctx.r6.u32, ctx.r7.u32, ctx.f1.f64, ctx.f2.f64)) {
+    __imp__sub_82109560(ctx, base);
+  }
+}
+
+// Font::BuildVertices: r3 = the font, r4 = the text; r3 0. The original for
+// rotated text.
+extern "C" REX_FUNC(sub_82109AA8) {
+  ITC_STRINGS_AND_FONT_FALLBACK(82109AA8)
+  ctx.fpscr.disableFlushMode();
+  if (!FontBuildVertices(base, ctx.r3.u32, ctx.r4.u32)) {
+    __imp__sub_82109AA8(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = 0;
+}
+
+namespace {
+
+bool SlotDiagnostics() {
+  return ITC_FLAG(log_overlay_uploads) || ITC_FLAG(log_slot_callers) ||
+         ITC_FLAG(log_recording_by_pass);
+}
+
+// Font::DrawPass for pass 0 from a frame like the original's (192 bytes):
+// the plain C++ up to the render queue, then the chunk handed to it (the
+// font's +8, its vtable slot 4: r4 = the chunk, r5 = the parameters' +116
+// + 1, f1 = 0.0) and 0x826C5BFC cleared, as the original. False, with
+// nothing done that the original won't redo, where it must run.
+bool DrawPass(PPCContext& ctx, uint8_t* base, uint32_t font, uint32_t text) {
+  const DrawPassResult result = FontDrawPass(base, font, text);
+  if (result.kind == DrawPassResult::kOriginal) {
+    return false;
+  }
+  if (result.kind == DrawPassResult::kNothing) {
+    return true;
+  }
+  if (result.chunk != 0) {
+    guest_call::InFrame(ctx, base, 192, 0x8210A3F0, [&](uint32_t) {
+      const uint32_t params = guest::LoadU32(base, font + 16);
+      const uint32_t queue = guest::LoadU32(base, font + 8);
+      ctx.fpscr.disableFlushMode();
+      ctx.f1.f64 = double(guest::LoadFloat(base, 0x82000A34));
+      ctx.r3.u64 = queue;
+      ctx.r4.u64 = result.chunk;
+      ctx.r5.s64 = int64_t(int32_t(guest::LoadU32(base, params + 116))) + 1;
+      REX_CALL_INDIRECT_FUNC(guest::LoadU32(base, guest::LoadU32(base, queue) + 16));
+    });
+  }
+  guest::StoreU32(base, kDrawGlobals + 48, 0);
+  return true;
+}
+
+// Font::Draw on `font` (`set_up` its set-up: Font::Draw's or Text::Draw's
+// plain C++), then pass 0 (the original DrawPass
+// where it must run), from a frame like the original's (112 bytes). The
+// whole original where the second pass is on (never in play).
+template <typename SetUp>
+void FontDraw(PPCContext& ctx, uint8_t* base, SetUp set_up) {
+  const uint32_t params = ctx.r4.u32, text = ctx.r5.u32;
+  ctx.fpscr.disableFlushMode();
+  const uint32_t font = set_up(params);
+  const uint64_t lr = ctx.lr;
+  guest_call::InFrame(ctx, base, 112, 0x8210A444, [&](uint32_t) {
+    if (!DrawPass(ctx, base, font, text)) {
+      ctx.r3.u64 = font;
+      ctx.r4.u64 = text;
+      ctx.r5.u64 = 0;
+      __imp__sub_82109EF0(ctx, base);
+    }
+  });
+  ctx.lr = lr;
+}
+
+}  // namespace
+
+// Font::DrawPass: r3 = the font, r4 = the text, r5 = the pass. The original
+// for pass 1 (never in play), with the command list's diagnostics on, and
+// where FontDrawPass says it must run.
+extern "C" REX_FUNC(sub_82109EF0) {
+  ITC_STRINGS_AND_FONT_FALLBACK(82109EF0)
+  if (ctx.r5.u32 != 0 || SlotDiagnostics()) {
+    __imp__sub_82109EF0(ctx, base);
+    return;
+  }
+  const uint64_t lr = ctx.lr;
+  ctx.fpscr.disableFlushMode();
+  if (!DrawPass(ctx, base, ctx.r3.u32, ctx.r4.u32)) {
+    ctx.lr = lr;
+    __imp__sub_82109EF0(ctx, base);
+    return;
+  }
+  ctx.lr = lr;
+}
+
+// Font::Draw: r3 = the font, r4 = the draw parameters, r5 = the text.
+extern "C" REX_FUNC(sub_8210A400) {
+  ITC_STRINGS_AND_FONT_FALLBACK(8210A400)
+  if (guest::LoadU32(base, ctx.r4.u32 + 112) != 0 || SlotDiagnostics()) {
+    __imp__sub_8210A400(ctx, base);
+    return;
+  }
+  const uint32_t font = ctx.r3.u32;
+  FontDraw(ctx, base, [&](uint32_t params) {
+    FontDrawSetUp(base, font, params);
+    return font;
+  });
+}
+
+// Text::Draw: r4 = the draw parameters, r5 = the text: Font::Draw on
+// [0x826C5C00].
+extern "C" REX_FUNC(sub_8210A758) {
+  ITC_STRINGS_AND_FONT_FALLBACK(8210A758)
+  if (guest::LoadU32(base, ctx.r4.u32 + 112) != 0 || SlotDiagnostics()) {
+    __imp__sub_8210A758(ctx, base);
+    return;
+  }
+  FontDraw(ctx, base, [&](uint32_t params) { return TextDrawSetUp(base, params); });
 }

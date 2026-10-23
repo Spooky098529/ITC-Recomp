@@ -109,4 +109,52 @@ uint32_t FontCountGlyphs(uint8_t* base, uint32_t font, uint32_t counts, uint32_t
 // 4 inside; y 8 above, 16 below, 32 inside.
 uint32_t FontOutCode(uint8_t* base, uint32_t font, uint32_t vertex);
 
+// The font's drawing (font.cpp). The globals at 0x826C5BCC: +0 the four
+// channels' glyph counts, +16 their vertex write pointers, +32 their
+// vertices' starts, +48 the chunk's first slot while drawing.
+constexpr uint32_t kDrawGlobals = 0x826C5BCC;
+
+// Whether the text is rotated (the parameters' +16 angle / 360, through a
+// float, not whole; a NaN is): Font::BuildVertices and Font::AddGlyph then
+// call the rotation functions (sub_821097F0, sub_82108F68), which never ran
+// in play and stay recompiled.
+bool FontRotated(uint8_t* base, uint32_t font);
+
+// Font::ClipGlyph (sub_82108C90): the glyph's six vertices at `vertices`
+// against the clip rectangle: 1 with none or when kept (the vertices outside
+// moved to its edges, their u or v with them), 0 when wholly outside.
+uint32_t FontClipGlyph(uint8_t* base, uint32_t font, uint32_t vertices);
+
+// Font::AddGlyph (sub_82109560): the glyph of `c` (its low 16 bits) as six
+// vertices at its channel's write pointer, at (x, y) in `color`; clipped,
+// the pointer moved on 144 bytes, or the channel's count down by one. False,
+// with nothing done, for rotated text (the original runs).
+bool FontAddGlyph(uint8_t* base, uint32_t font, uint32_t c, uint32_t color, double x, double y);
+
+// Font::BuildVertices (sub_82109AA8): the text's glyphs' vertices, line by
+// line. False, with nothing done, for rotated text (the original runs).
+bool FontBuildVertices(uint8_t* base, uint32_t font, uint32_t text);
+
+// Font::DrawPass (sub_82109EF0) for pass 0, up to the render queue: the
+// counts, the chunk of render states, vertices and draws on the font's
+// command list (+4). `kind` says what was done.
+struct DrawPassResult {
+  enum Kind {
+    kOriginal,  // nothing done that the original won't redo: it must run
+                // (rotated text, another chunk open, the list too full)
+    kNothing,   // no text or no glyphs: returned before the list
+    kRecorded,  // the chunk recorded; its first slot is at 0x826C5BFC
+  } kind;
+  uint32_t chunk;  // kRecorded: the chunk's first slot (0x826C5BFC's word)
+};
+DrawPassResult FontDrawPass(uint8_t* base, uint32_t font, uint32_t text);
+
+// Font::Draw (sub_8210A400)'s set-up: Font::SetParams and the page (+36)
+// from the parameters' +60.
+void FontDrawSetUp(uint8_t* base, uint32_t font, uint32_t params);
+
+// Text::Draw (sub_8210A758)'s set-up: Font::Draw's on [0x826C5C00]; returns
+// the font.
+uint32_t TextDrawSetUp(uint8_t* base, uint32_t params);
+
 }  // namespace strings_and_font

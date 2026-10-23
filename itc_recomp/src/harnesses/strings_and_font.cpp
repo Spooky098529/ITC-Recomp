@@ -11,12 +11,14 @@
 #include "harness.h"
 
 #include "base/flags.h"
+#include "command_list/command_list.h"
 #include "hooks/heap.h"
 #include "memory/heap.h"
 #include "strings_and_font/strings_and_font.h"
 
 #include <fmt/format.h>
 
+#include <algorithm>
 #include <bit>
 #include <functional>
 #include <iterator>
@@ -95,6 +97,25 @@ void NativeCountGlyphs(PPCContext& ctx, uint8_t* base) {
 void NativeOutCode(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = sf::FontOutCode(base, ctx.r3.u32, ctx.r4.u32);
+}
+
+void NativeClipGlyph(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = sf::FontClipGlyph(base, ctx.r3.u32, ctx.r4.u32);
+}
+void NativeAddGlyph(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  if (!sf::FontAddGlyph(base, ctx.r3.u32, ctx.r6.u32, ctx.r7.u32, ctx.f1.f64, ctx.f2.f64)) {
+    __imp__sub_82109560(ctx, base);
+  }
+}
+void NativeBuildVertices(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  if (!sf::FontBuildVertices(base, ctx.r3.u32, ctx.r4.u32)) {
+    __imp__sub_82109AA8(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = 0;
 }
 
 // Runs the original with the flag off (its callees' adapters fall back) or
@@ -584,6 +605,301 @@ void FontLayout(Context& h) {
               });
 }
 
+// The drawing's globals (0x826C5BCC, 52 bytes), the font's pointer and the
+// open chunks' count, kept and put back.
+struct DrawGlobals {
+  explicit DrawGlobals(uint8_t* base)
+      : base(base),
+        saved(Read(base, sf::kDrawGlobals, 52)),
+        font(guest::LoadU32(base, sf::kFont)),
+        open(guest::LoadU32(base, command_list::kOpenChunks)) {}
+  ~DrawGlobals() {
+    Write(base, sf::kDrawGlobals, saved.data(), 52);
+    guest::StoreU32(base, sf::kFont, font);
+    guest::StoreU32(base, command_list::kOpenChunks, open);
+  }
+  uint8_t* base;
+  std::vector<uint8_t> saved;
+  uint32_t font, open;
+};
+
+// Vertices (24 bytes: x, y, z, the color, u, v) for Outputs.
+void VertexOutputs(Context& h, Outputs& out, uint32_t address, uint32_t count) {
+  for (uint32_t k = 0; k < count; k++) {
+    const uint32_t v = address + 24 * k;
+    out.Floats(h.base, v, 3);
+    out.Word(guest::LoadU32(h.base, v + 12));
+    out.Floats(h.base, v + 16, 2);
+  }
+}
+
+// The drawing's set-up on top of SetUpLayout: the pages' textures (+12 a
+// word, +16 and +20 the width and height: powers of two or random), the
+// cell's size not 0 (but two AddGlyph cases: the original's tw traps,
+// logged, and its divisions give 0), the font's ten colors, shader words
+// and command list and queue; the parameters' angle whole turns or 0 (a few
+// random: rotated text), the alpha 0-1 and the clip rectangle around the
+// text or none; the text drawn mostly letters.
+void SetUpDrawing(Context& h, const Layout& l, int i, bool zero_cells = false) {
+  SetUpLayout(h, l, false);
+  for (uint32_t p = 0; p < 4; p++) {
+    const uint32_t page = h.data + kPages + 28 * p;
+    guest::StoreU32(h.base, page + 12, uint32_t(h.random.Next()));
+    guest::StoreU32(h.base, page + 16,
+                    h.random.Below(8) == 0 ? uint32_t(h.random.Next()) : 64u << h.random.Below(4));
+    guest::StoreU32(h.base, page + 20,
+                    h.random.Below(8) == 0 ? uint32_t(h.random.Next()) : 64u << h.random.Below(4));
+  }
+  guest::StoreU16(h.base, h.data + kTable + 0,
+                  zero_cells && i % 300 == 5 ? 0 : uint16_t(1 + h.random.Below(40)));
+  guest::StoreU16(h.base, h.data + kTable + 2, uint16_t(1 + h.random.Below(40)));
+  for (uint32_t k = 0; k < 32; k++) {
+    guest::StoreU8(h.base, l.font.address + 16528 + k, uint8_t(h.random.Next()));
+  }
+  for (uint32_t k = 64; k < 400; k += 4) {  // the second pass's positions
+    guest::StoreU32(h.base, l.font.address + k, 0xCDCDCDCD);
+  }
+  for (uint32_t k = 16560; k < 16584; k += 4) {
+    guest::StoreU32(h.base, l.font.address + k, uint32_t(h.random.Next()));
+  }
+  const uint32_t params = h.data + kParams;
+  const uint32_t angle = h.random.Below(10) == 0 ? FloatWord(h.random)
+                                                  : std::bit_cast<uint32_t>(360.0f * float(h.random.Below(3)));
+  guest::StoreU32(h.base, params + 16, angle);
+  guest::StoreU32(h.base, params + 24,
+                  h.random.Below(6) == 0 ? FloatWord(h.random)
+                                         : std::bit_cast<uint32_t>(float(h.random.Below(257)) / 256.0f));
+  if (h.random.Below(2) == 0) {
+    for (uint32_t k = 44; k <= 56; k += 4) {
+      guest::StoreU32(h.base, params + k, 0);
+    }
+  } else {
+    guest::StoreU32(h.base, params + 44, uint32_t(int32_t(h.random.Below(600)) - 100));
+    guest::StoreU32(h.base, params + 48, uint32_t(int32_t(h.random.Below(600)) - 100));
+    guest::StoreU32(h.base, params + 52, h.random.Below(800));
+    guest::StoreU32(h.base, params + 56, h.random.Below(800));
+  }
+  guest::StoreU32(h.base, params + 112, h.random.Below(10) == 0 ? 1 : 0);
+  guest::StoreU32(h.base, params + 116, h.random.Below(8));
+  // Scales and positions a screen's.
+  for (uint32_t k : {28u, 32u, 36u, 40u}) {
+    if (h.random.Below(3) != 0) {
+      guest::StoreU32(h.base, params + k, std::bit_cast<uint32_t>(float(1 + h.random.Below(8)) / 4.0f));
+    }
+  }
+}
+
+// A text of mostly glyphs for drawing: letters, spaces, new lines, colors
+// and a page break now and then.
+void WriteDrawnText(Context& h, uint32_t address, uint32_t length) {
+  for (uint32_t k = 0; k < length; k++) {
+    const uint32_t pick = h.random.Below(40);
+    uint16_t unit = uint16_t('A' + h.random.Below(58));
+    if (pick == 0) unit = 0xFFD1;
+    else if (pick < 4) unit = '\n';
+    else if (pick < 8) unit = ' ';
+    else if (pick == 8) unit = 0xFFD6;
+    else if (pick == 9) unit = uint16_t(0xFFF6 + h.random.Below(10));
+    else if (pick == 10) unit = uint16_t(h.random.Next());
+    if (unit == 0) unit = 'A';
+    guest::StoreU16(h.base, address + 2 * k, unit);
+  }
+  guest::StoreU16(h.base, address + 2 * length, 0);
+}
+
+void ClipCases(Context& h, const Layout& l) {
+  Results results("sub_82108C90 Font::ClipGlyph");
+  for (int i = 0; i < 1500; i++) {
+    const Random start = h.random;
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      h.random = start;
+      Fill(h.base, h.data, kScratchBytes);
+      SetUpDrawing(h, l, i);
+      const uint32_t vertices = h.data + 3200;
+      for (uint32_t k = 0; k < 36; k++) {
+        const uint32_t word = (k % 6) == 3 ? uint32_t(h.random.Next())
+                              : h.random.Below(8) == 0
+                                  ? FloatWord(h.random)
+                                  : std::bit_cast<uint32_t>(float(int32_t(h.random.Below(1000)) - 200) +
+                                                            float(h.random.Below(4)) * 0.25f);
+        guest::StoreU32(h.base, vertices + 4 * k, word);
+      }
+      PPCContext t = CallContext(h);
+      t.r3.u64 = l.font.address;
+      t.r4.u64 = vertices;
+      Run(v, __imp__sub_82108C90, NativeClipGlyph, t, h.base);
+      VertexOutputs(h, out[v], vertices, 6);
+      out[v].Bytes(Read(h.base, h.data, 3200));
+      out[v].Word(t.r3.u32);
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", i));
+  }
+  results.Report();
+}
+
+void AddGlyphCases(Context& h, const Layout& l) {
+  Results results("sub_82109560 Font::AddGlyph");
+  for (int i = 0; i < 1500; i++) {
+    const Random start = h.random;
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      h.random = start;
+      Fill(h.base, h.data, kScratchBytes);
+      SetUpDrawing(h, l, i, true);
+      // The counts, and each channel's write pointer at its own 160 bytes.
+      const uint32_t area = h.data + 3200;
+      for (uint32_t c = 0; c < 4; c++) {
+        guest::StoreU32(h.base, sf::kDrawGlobals + 4 * c, h.random.Below(5));
+        guest::StoreU32(h.base, sf::kDrawGlobals + 16 + 4 * c, area + 160 * c);
+      }
+      PPCContext t = CallContext(h);
+      t.r3.u64 = l.font.address;
+      t.r6.u64 = h.random.Next();
+      t.r7.u64 = h.random.Next();
+      auto coordinate = [&] {
+        return h.random.Below(8) == 0
+                   ? h.random.Next()
+                   : std::bit_cast<uint64_t>(double(float(int32_t(h.random.Below(900)) - 100)));
+      };
+      t.f1.u64 = coordinate();
+      t.f2.u64 = coordinate();
+      Run(v, __imp__sub_82109560, NativeAddGlyph, t, h.base);
+      VertexOutputs(h, out[v], area, 26);
+      out[v].Bytes(Read(h.base, sf::kDrawGlobals, 48));
+      out[v].Bytes(Read(h.base, h.data, 3200));
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", i));
+  }
+  results.Report();
+}
+
+void BuildVerticesCases(Context& h, const Layout& l, const Block& area) {
+  Results results("sub_82109AA8 Font::BuildVertices");
+  for (int i = 0; i < 600; i++) {
+    const Random start = h.random;
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      h.random = start;
+      Fill(h.base, h.data, kScratchBytes);
+      Fill(h.base, area.address, area.bytes);
+      SetUpDrawing(h, l, i);
+      const uint32_t text = h.data + kTexts;
+      const uint32_t length = i % 30 == 0 ? 0 : h.random.Below(40);
+      WriteDrawnText(h, text, length);
+      for (uint32_t c = 0; c < 4; c++) {
+        guest::StoreU32(h.base, sf::kDrawGlobals + 4 * c, 40);
+        guest::StoreU32(h.base, sf::kDrawGlobals + 16 + 4 * c, area.address + 6000 * c);
+      }
+      PPCContext t = CallContext(h);
+      t.r3.u64 = l.font.address;
+      t.r4.u64 = text;
+      Run(v, __imp__sub_82109AA8, NativeBuildVertices, t, h.base);
+      for (uint32_t c = 0; c < 4; c++) {
+        VertexOutputs(h, out[v], area.address + 6000 * c, 240);
+      }
+      out[v].Bytes(Read(h.base, sf::kDrawGlobals, 48));
+      out[v].Floats(h.base, l.font.address + 64, 84);
+      FontOutputs(h, l, out[v]);
+      out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+      out[v].Word(t.r3.u32);
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", i));
+  }
+  results.Report();
+}
+
+// Font::DrawPass, Font::Draw and Text::Draw through their adapters (they
+// hand the chunk to the render queue, a guest call): a command list at the
+// scratch area's +3072 over `slots`, the queue at +3200 (its slot 4
+// sub_8209F5C8, which keeps r4 and r5 at its +32 and +36), the open chunks'
+// count 0 or 1 (another chunk open: the original), the list's chunk open
+// or not. Compared: the slots (the vertices as floats), the list, the
+// globals, the queue's words, the font's.
+void DrawCases(Context& h, const Layout& l, const Block& slots, const char* name,
+               GuestFunction function, GuestFunction original, int count) {
+  Results results(name);
+  constexpr uint32_t kList = 3072, kQueue = 3200, kQueueVtable = 3264;
+  for (int i = 0; i < count; i++) {
+    const Random start = h.random;
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      h.random = start;
+      Fill(h.base, h.data, kScratchBytes);
+      Fill(h.base, slots.address, slots.bytes);
+      SetUpDrawing(h, l, i);
+      const uint32_t text = h.data + kTexts;
+      const uint32_t length = i % 30 == 0 ? 0 : h.random.Below(40);
+      WriteDrawnText(h, text, length);
+      const uint32_t list = h.data + kList;
+      const bool open = h.random.Below(6) == 0;
+      for (uint32_t k = 0; k < 56; k += 4) {
+        guest::StoreU32(h.base, list + k, 0);
+      }
+      guest::StoreU32(h.base, list + 8, 100000);
+      guest::StoreU32(h.base, list + 12, h.random.Below(1000));
+      guest::StoreU32(h.base, list + 32, slots.address);
+      guest::StoreU32(h.base, list + 44, slots.address + (open ? 64 : 0));
+      guest::StoreU8(h.base, list + 52, open ? 1 : 0);
+      guest::StoreU32(h.base, command_list::kOpenChunks, h.random.Below(8) == 0 ? 1 : 0);
+      guest::StoreU32(h.base, h.data + kQueue, h.data + kQueueVtable);
+      guest::StoreU32(h.base, h.data + kQueueVtable + 16, 0x8209F5C8);
+      guest::StoreU32(h.base, l.font.address + 4, list);
+      guest::StoreU32(h.base, l.font.address + 8, h.data + kQueue);
+      guest::StoreU32(h.base, sf::kFont, l.font.address);
+      Fill(h.base, sf::kDrawGlobals, 52);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = l.font.address;
+      t.r4.u64 = function == __imp__sub_82109EF0 || original == __imp__sub_82109EF0
+                     ? text
+                     : h.data + kParams;
+      t.r5.u64 = function == __imp__sub_82109EF0 || original == __imp__sub_82109EF0
+                     ? (h.random.Below(10) == 0 ? 1 : 0)
+                     : text;
+      if (v == 0) {
+        ITC_FLAG(native_strings_and_font) = false;
+        original(t, h.base);
+        ITC_FLAG(native_strings_and_font) = true;
+      } else {
+        function(t, h.base);
+      }
+      // The slots, with each channel's vertices as floats.
+      std::vector<uint8_t> bytes = Read(h.base, slots.address, slots.bytes);
+      for (uint32_t c = 0; c < 4; c++) {
+        const uint32_t from = guest::LoadU32(h.base, sf::kDrawGlobals + 32 + 4 * c);
+        const uint32_t n = guest::LoadU32(h.base, sf::kDrawGlobals + 4 * c) * 6;
+        if (from >= slots.address && from + 24 * n <= slots.address + slots.bytes) {
+          VertexOutputs(h, out[v], from, n);
+          std::fill(bytes.begin() + (from - slots.address),
+                    bytes.begin() + (from - slots.address) + 24 * n, 0);
+        }
+      }
+      out[v].Bytes(bytes);
+      out[v].Bytes(Read(h.base, sf::kDrawGlobals, 52));
+      out[v].Word(guest::LoadU32(h.base, command_list::kOpenChunks));
+      out[v].Floats(h.base, l.font.address + 64, 84);
+      FontOutputs(h, l, out[v]);
+      out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", i));
+  }
+  results.Report();
+}
+
+void FontDrawing(Context& h) {
+  const DrawGlobals globals(h.base);
+  Layout l;
+  SetUpLayout(h, l, true);
+  Block area(24000);
+  ClipCases(h, l);
+  AddGlyphCases(h, l);
+  BuildVerticesCases(h, l, area);
+  // The adapters (the flag on) against the originals (the flag off).
+  DrawCases(h, l, area, "sub_82109EF0 Font::DrawPass", sub_82109EF0, __imp__sub_82109EF0, 600);
+  DrawCases(h, l, area, "sub_8210A400 Font::Draw", sub_8210A400, __imp__sub_8210A400, 300);
+  DrawCases(h, l, area, "sub_8210A758 Text::Draw", sub_8210A758, __imp__sub_8210A758, 300);
+}
+
 }  // namespace
 
 void StringsAndFont(Context& h) {
@@ -596,6 +912,7 @@ void StringsAndFont(Context& h) {
   ShaderEntries(h);
   SetParams(h);
   FontLayout(h);
+  FontDrawing(h);
 }
 
 }  // namespace harness
