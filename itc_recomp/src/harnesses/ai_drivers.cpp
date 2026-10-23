@@ -150,14 +150,11 @@ ITC_NATIVE_STEP(NativeResetControl, ai::ResetControl(base, ctx.r3.u32, ctx.r1.u3
 ITC_NATIVE_STEP(NativeResetDriver, ctx.r3.u64 = ai::ResetDriver(base, ctx.r3.u32))
 void NativeUpdateSteerInput(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
-  uint32_t record = 0;
-  const uint32_t kind = ai::UpdateSteerInput(base, ctx.r3.u32, &record);
-  if (kind == 2) {
-    ctx.r4.u64 = record;
-    sub_8213AB40(ctx, base);
-  } else if (kind == 3) {
-    ctx.r4.u64 = record;
-    sub_82139A08(ctx, base);
+  double f1 = 0;
+  bool f1_set = false;
+  ctx.r3.u64 = ai::UpdateSteerInput(base, ctx.r3.u32, ctx.r1.u32, &f1, &f1_set);
+  if (f1_set) {
+    ctx.f1.f64 = f1;
   }
 }
 ITC_NATIVE_STEP(NativeDropPassedSections, ai::DropPassedSections(base, ctx.r3.u32))
@@ -334,6 +331,25 @@ ITC_NATIVE_TRIGGER_STEP(NativeTriggerEnds, ai::TriggerEnds(base, ctx.r3.u32, ctx
                                                            ctx.r5.u32, &f1, &f1_set))
 ITC_NATIVE_TRIGGER_STEP(NativeUpdateSkill,
                         ai::UpdateSkill(base, ctx.r3.u32, ctx.r4.u32, &f1, &f1_set))
+ITC_NATIVE_STEP(NativeLimitSlide, ai::LimitSlide(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+ITC_NATIVE_STEP(NativeSteerByRoom,
+                ctx.r3.u64 = ai::SteerByRoom(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+ITC_NATIVE_STEP(NativeSteerOutOfCorner,
+                ctx.r3.u64 = ai::SteerOutOfCorner(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 96))
+ITC_NATIVE_TRIGGER_STEP(NativeSteerAtCornerPoint,
+                        ai::SteerAtCornerPoint(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                               ctx.r1.u32 - 128, &f1, &f1_set))
+ITC_NATIVE_TRIGGER_STEP(NativeSteerIntoCorner,
+                        ai::SteerIntoCorner(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 96, &f1,
+                                            &f1_set))
+ITC_NATIVE_TRIGGER_STEP(NativeUpdateSteering,
+                        ai::UpdateSteering(base, ctx.r3.u32, ctx.r1.u32 - 112, &f1, &f1_set))
+void NativeDrive(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  double f1 = 0;
+  ctx.r3.u64 = ai::Drive(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 160, &f1);
+  ctx.f1.f64 = f1;
+}
 ITC_NATIVE_STEP(NativeNormalizeByBranch,
                 ctx.r3.u64 = ai::NormalizeByBranch(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
                                                    ctx.r6.u32, ctx.r7.u32))
@@ -520,6 +536,13 @@ enum Kind {
   kTriggerStarts,
   kTriggerEnds,
   kUpdateSkill,
+  kLimitSlide,
+  kSteerByRoom,
+  kSteerOutOfCorner,
+  kSteerAtCornerPoint,
+  kSteerIntoCorner,
+  kUpdateSteering,
+  kDrive,
 };
 
 }  // namespace
@@ -760,6 +783,20 @@ void AiDrivers(Context& h) {
        kTriggerEnds, 3000},
       {"AiSkill::Update (sub_8213FCF8)", Original<__imp__sub_8213FCF8>, NativeUpdateSkill,
        kUpdateSkill, 3000},
+      {"AiDriver::LimitSlide (sub_821392D8, never seen in play)", Original<__imp__sub_821392D8>,
+       NativeLimitSlide, kLimitSlide, 3000},
+      {"AiDriver::SteerByRoom (sub_82138FA8, never seen in play)", Original<__imp__sub_82138FA8>,
+       NativeSteerByRoom, kSteerByRoom, 3000},
+      {"AiDriver::SteerOutOfCorner (sub_82139A08, never seen in play)",
+       Original<__imp__sub_82139A08>, NativeSteerOutOfCorner, kSteerOutOfCorner, 3000},
+      {"AiDriver::SteerAtCornerPoint (sub_8213A200, never seen in play)",
+       Original<__imp__sub_8213A200>, NativeSteerAtCornerPoint, kSteerAtCornerPoint, 3000},
+      {"AiDriver::SteerIntoCorner (sub_8213AB40, never seen in play)",
+       Original<__imp__sub_8213AB40>, NativeSteerIntoCorner, kSteerIntoCorner, 3000},
+      {"AiDriver::UpdateSteering (sub_8213AEF0)", Original<__imp__sub_8213AEF0>,
+       NativeUpdateSteering, kUpdateSteering, 3000},
+      {"AiDriver::Drive (sub_8213B058)", Original<__imp__sub_8213B058>, NativeDrive, kDrive,
+       3000},
   };
   const uint32_t area = memory::Alloc(kAreaBytes, 0);
   const uint32_t driver = area + kDriver, vehicle = area + kVehicle, io = area + kIo;
@@ -812,6 +849,67 @@ void AiDrivers(Context& h) {
       uint64_t f1 = 0x7FF8DEADBEEF0000ull;
       std::vector<std::pair<uint32_t, uint32_t>> floats;  // (offset, count) in the block
       std::string what = fmt::format("case {}", c);
+      // The steering's fields (UpdateSteerInput and its steps, UpdateSteering,
+      // Drive): with `records`, up to four corner records (+5676: their data,
+      // four in the vehicle's bytes, 0x300 apart, with +50 and +52, the offset
+      // +10, the direction +16, the kind +40) and their count; the ring (count,
+      // start, look-ahead; each entry's point, +40, +44 and slice, now and then
+      // none) and the driver's fields.
+      const auto steering = [&](bool records) {
+        const uint32_t path = driver + kPath;
+        if (records) {
+          guest::StoreU16(h.base, driver + 5674, uint16_t(int32_t(r.Below(6)) - 1));
+          for (uint32_t i = 0; i < 4; i++) {
+            const uint32_t data = vehicle + 0x300 * i;
+            guest::StoreU16(h.base, data + 50, uint16_t(int32_t(r.Below(60)) - 10));
+            guest::StoreU16(h.base, data + 52, uint16_t(int32_t(r.Below(60)) - 20));
+            const uint32_t at = driver + 5676 + 44 * i;
+            guest::StoreU32(h.base, at + 0, r.Below(6) == 0 ? 0 : vehicle + 0x300 * r.Below(4));
+            guest::StoreU16(h.base, at + 10, uint16_t(int32_t(r.Below(40)) - 20));
+            guest::StoreU32(h.base, at + 16, r.Below(8) == 0 ? RandomFloat(r, 2.0f)
+                                             : FloatBits(r.Below(2) ? 1.0f : -1.0f));
+          }
+        }
+        for (uint32_t i = 0; i < 4; i++) {
+          guest::StoreU32(h.base, driver + 5676 + 44 * i + 40, r.Below(6));
+        }
+        guest::StoreU16(h.base, path + 5136, uint16_t(int32_t(r.Below(84)) - 2));
+        guest::StoreU16(h.base, path + 5138, uint16_t(r.Below(200)));
+        guest::StoreU16(h.base, path + 5142, uint16_t(int32_t(r.Below(30)) - 2));
+        for (uint32_t k = 0; k < 80; k++) {
+          const uint32_t entry = path + 16 + 64 * k;
+          guest::StoreU32(h.base, entry + 0, RandomFloat(r, 100.0f));
+          guest::StoreU32(h.base, entry + 8, RandomFloat(r, 100.0f));
+          guest::StoreU32(h.base, entry + 40, RandomFloat(r, 4.0f));
+          guest::StoreU32(h.base, entry + 44, RandomFloat(r, 4.0f));
+          guest::StoreU32(h.base, entry + 52, r.Below(10) == 0 ? 0 : vehicle + 0x1000);
+        }
+        if (r.Below(16) == 0) {  // now and then the target point at the driver's
+          for (uint32_t k = 0; k < 80; k++) {
+            guest::StoreU32(h.base, path + 16 + 64 * k + 0, guest::LoadU32(h.base, driver + 80));
+            guest::StoreU32(h.base, path + 16 + 64 * k + 8, guest::LoadU32(h.base, driver + 88));
+          }
+        }
+        guest::StoreU32(h.base, driver + 100, r.Below(2) ? FloatBits(float(r.Below(140)))
+                                                         : RandomFloat(r, 300.0f));
+        guest::StoreU32(h.base, driver + 96, RandomFloat(r, 4.0f));
+        guest::StoreU32(h.base, driver + 104, RandomFloat(r, 1.0f));
+        guest::StoreU32(h.base, driver + 108, RandomFloat(r, 2.0f));
+        guest::StoreU32(h.base, driver + 112, RandomFloat(r, 2.0f));
+        guest::StoreU32(h.base, driver + 116, RandomFloat(r, 2.0f));
+        guest::StoreU32(h.base, driver + 128, RandomFloat(r, 3.0f));
+        guest::StoreU32(h.base, driver + 132, RandomFloat(r, 1.5f));
+        guest::StoreU32(h.base, driver + 144, RandomFloat(r, 5.0f));
+        guest::StoreU32(h.base, driver + 6088, RandomFloat(r, 200.0f));
+        for (uint32_t at : {6112u, 6116u}) {
+          guest::StoreU32(h.base, driver + at, RandomFloat(r, 1.0f));
+        }
+        for (uint32_t at : {6120u, 6136u, 6140u}) {
+          guest::StoreU32(h.base, driver + at, RandomFloat(r, 1.5f));
+        }
+        floats.push_back({kDriver + 6136, 2});
+        floats.push_back({kDriver + 6120, 1});
+      };
       switch (f.kind) {
         case kInitPath:
         case kClearFollow:
@@ -1315,21 +1413,26 @@ void AiDrivers(Context& h) {
           drivers = table;
           table_written = true;
           break;
-        case kUpdateSteerInput: {
-          guest::StoreU16(h.base, driver + 5674, uint16_t(int32_t(r.Below(11)) - 1));
-          // Kinds 2 and 3 only in records without data (skipped): their steps
-          // (never seen in play) read what a real record holds.
-          for (uint32_t i = 0; i < 9; i++) {
-            const uint32_t at = driver + 5676 + 44 * i;
-            const uint32_t kinds[] = {0, 1, 4, 5, 0xFFFFFFFFu};
-            const bool data = r.Below(3) != 0;
-            guest::StoreU32(h.base, at + 0, data ? 1 + r.Below(1000) : 0);
-            guest::StoreU32(h.base, at + 40, data ? kinds[r.Below(5)] : r.Below(4));
+        case kUpdateSteerInput:
+        case kLimitSlide:
+        case kSteerByRoom:
+        case kSteerOutOfCorner:
+        case kSteerAtCornerPoint:
+        case kSteerIntoCorner:
+        case kUpdateSteering:
+          steering(true);
+          r4 = driver + 5676 + 44 * r.Below(4);
+          if (f.kind == kSteerIntoCorner && guest::LoadU32(h.base, r4) == 0) {
+            guest::StoreU32(h.base, r4, vehicle);  // its data read without a check
           }
-          guest::StoreU32(h.base, driver + 100, RandomFloat(r, 400.0f));
-          floats.push_back({kDriver + 6136, 1});
+          guest::StoreU32(h.base, io, f.kind == kLimitSlide ? r.Below(2)
+                                                            : uint32_t(int32_t(r.Below(90)) - 5));
+          r5 = io;
+          floats.push_back({kIo, 1});
+          for (uint32_t i = 0; i < 4; i++) {
+            floats.push_back({kDriver + 5676 + 44 * i + 40, 1});
+          }
           break;
-        }
         case kDropPassedSections: {
           guest::StoreU32(h.base, driver + kPath, driver);
           guest::StoreU16(h.base, driver + 4, uint16_t(r.Below(6)));
@@ -1560,7 +1663,8 @@ void AiDrivers(Context& h) {
         }
         case kLimitForCorner:
         case kUpdateTargetSpeed:
-        case kUpdateSpeed: {
+        case kUpdateSpeed:
+        case kDrive: {
           // Two corners' data in the vehicle's bytes (0x300 apart: +0 the
           // table's count, +8 to +28 the speeds, +50 to +54 the entry,
           // middle and exit, the table from +56) and up to three corner
@@ -1623,6 +1727,28 @@ void AiDrivers(Context& h) {
           r4 = io;  // the scale (LimitForCorner, UpdateTargetSpeed)
           r5 = driver + 5676 + 44 * r.Below(3);  // the corner record (LimitForCorner)
           floats.push_back({kDriver + 6088, 1});
+          if (f.kind == kDrive) {
+            // The steering (its corner records as UpdateSpeed's), SteerToTarget's
+            // vehicle fields and the driver's +156, UpdatePedals' and the
+            // pedals, the skill's +12 (+6060) and the input record (io + 0x100).
+            steering(false);
+            guest::StoreU32(h.base, driver + 156, RandomFloat(r, 20.0f));
+            for (uint32_t at : {92u, 384u, 392u}) {
+              guest::StoreU32(h.base, vehicle + at, RandomFloat(r, 4.0f));
+            }
+            guest::StoreU32(h.base, vehicle + 3548, r.Below(4));
+            guest::StoreU32(h.base, driver + 164, RandomFloat(r, 200.0f));
+            guest::StoreU32(h.base, driver + 168, RandomFloat(r, 300.0f));
+            for (uint32_t at : {6124u, 6128u, 6144u}) {
+              guest::StoreU32(h.base, driver + at, RandomFloat(r, 1.6f));
+            }
+            guest::StoreU16(h.base, driver + 6060, uint16_t(int32_t(r.Below(5)) - 2));
+            r4 = io + 0x100;
+            floats.push_back({kDriver + 152, 1});
+            floats.push_back({kDriver + 6096, 3});
+            floats.push_back({kDriver + 6112, 5});
+            floats.push_back({kDriver + 6144, 1});
+          }
           break;
         }
         case kSteerToTarget: {
@@ -2189,7 +2315,9 @@ void AiDrivers(Context& h) {
             f.kind == kLimitSpeedBlend || f.kind == kLimitForCorner ||
             f.kind == kUpdateTargetSpeed || f.kind == kUpdateSpeed || f.kind == kSteerToTarget ||
             f.kind == kSkillEntryValue || f.kind == kTriggerStarts || f.kind == kTriggerEnds ||
-            f.kind == kUpdateSkill) {
+            f.kind == kUpdateSkill || f.kind == kUpdateSteerInput ||
+            f.kind == kSteerAtCornerPoint || f.kind == kSteerIntoCorner ||
+            f.kind == kUpdateSteering || f.kind == kDrive) {
           out[v].Double(t.f1.u64);
         }
       }

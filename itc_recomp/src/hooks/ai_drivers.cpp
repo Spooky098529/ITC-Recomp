@@ -92,8 +92,9 @@ ITC_FLAG_BOOL(native_ai_drivers, true, "ITC",
               "sub_82139CB0, AiDriver::AdjustForOther sub_821452A0, "
               "AiDriver::UpdateAgainstPlayer sub_82146608, AiOther::Update sub_821454C8, "
               "AiDriver::ResetControl sub_82139580, AiDriver::Reset sub_8213AAA8, "
-              "AiDriver::UpdateSteerInput sub_8213AC70 (its kinds 2 and 3, sub_8213AB40 and "
-              "sub_82139A08, never seen in play, on the translated code), "
+              "AiDriver::UpdateSteerInput sub_8213AC70 (with its kinds 2 and 3's steps, "
+              "sub_8213AB40, sub_82139A08, sub_8213A200, sub_82138FA8 and sub_821392D8, never "
+              "seen in play), "
               "AiPath::DropPassedSections sub_8213BA48, AiPath::SharesSections sub_8213C010, "
               "AiPathEntry::Widen sub_8213C3A8, AiPathEntry::NarrowToOther sub_8213C420, "
               "AiPath::AdvanceCorners sub_8213D020, AiDriver::Restart sub_821395D0, "
@@ -120,7 +121,8 @@ ITC_FLAG_BOOL(native_ai_drivers, true, "ITC",
               "seen in play), AiSkill::TriggerStarts sub_8213F958, AiSkill::TriggerEnds "
               "sub_8213FB48, AiSkill::Update sub_8213FCF8 (their conditions sub_8213F7E0 and "
               "sub_8213F868, and kind 0's steps sub_8213F9A4 and sub_8213FB98, never seen in "
-              "play, ported with them)) "
+              "play, ported with them), AiDriver::UpdateSteering sub_8213AEF0, AiDriver::Drive "
+              "sub_8213B058) "
               "natively instead of "
               "through the translated code (the same words, bit for bit; checked by "
               "--run_harnesses=ai_drivers). Those "
@@ -237,25 +239,16 @@ ITC_AI_DRIVERS(821454C8, UpdateOther(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
 // (+6048), as ResetToMode1 leaves it.
 ITC_AI_DRIVERS(82139580, ResetControl(base, ctx.r3.u32, ctx.r1.u32 - 112); ctx.r3.u64 += 6048)
 ITC_AI_DRIVERS(8213AAA8, ctx.r3.u64 = ResetDriver(base, ctx.r3.u32))
-// Kinds 2 and 3 (never seen in play): the translated steps, tail-called as
-// the original does, with the record in r4.
-extern "C" REX_FUNC(sub_8213AC70) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_ai_drivers)) {
-    __imp__sub_8213AC70(ctx, base);
-    return;
+// Kinds 2 and 3's steps (never seen in play) from this stack pointer, as
+// the original's tail calls; f1 atan2's when it ran.
+ITC_AI_DRIVERS(8213AC70, {
+  double f1 = 0;
+  bool f1_set = false;
+  ctx.r3.u64 = UpdateSteerInput(base, ctx.r3.u32, ctx.r1.u32, &f1, &f1_set);
+  if (f1_set) {
+    ctx.f1.f64 = f1;
   }
-  ctx.fpscr.disableFlushMode();
-  uint32_t record = 0;
-  const uint32_t kind = UpdateSteerInput(base, ctx.r3.u32, &record);
-  if (kind == 2) {
-    ctx.r4.u64 = record;
-    sub_8213AB40(ctx, base);
-  } else if (kind == 3) {
-    ctx.r4.u64 = record;
-    sub_82139A08(ctx, base);
-  }
-}
+})
 ITC_AI_DRIVERS(8213BA48, DropPassedSections(base, ctx.r3.u32))
 // r4 = the other entry or 0, r5 = &the margin, r6 = &the offset.
 ITC_AI_DRIVERS(8213C420, NarrowToOther(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32))
@@ -413,4 +406,22 @@ ITC_AI_DRIVERS(8213FCF8, {
   if (f1_set) {
     ctx.f1.f64 = f1;
   }
+})
+
+// --- Steering through the corners and driving ---
+
+// The original's frame 112 bytes down; f1 atan2's when it ran.
+ITC_AI_DRIVERS(8213AEF0, {
+  double f1 = 0;
+  bool f1_set = false;
+  ctx.r3.u64 = UpdateSteering(base, ctx.r3.u32, ctx.r1.u32 - 112, &f1, &f1_set);
+  if (f1_set) {
+    ctx.f1.f64 = f1;
+  }
+})
+// r4 = the car's input record; the original's frame 160 bytes down.
+ITC_AI_DRIVERS(8213B058, {
+  double f1 = 0;
+  ctx.r3.u64 = Drive(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 160, &f1);
+  ctx.f1.f64 = f1;
 })

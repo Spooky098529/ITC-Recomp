@@ -1579,7 +1579,8 @@ uint64_t ResetDriver(uint8_t* base, uint32_t driver) {
   return ResetOthers(base, driver);
 }
 
-uint32_t UpdateSteerInput(uint8_t* base, uint32_t driver, uint32_t* record) {
+uint64_t UpdateSteerInput(uint8_t* base, uint32_t driver, uint32_t stack, double* f1,
+                          bool* f1_set) {
   ITC_NATIVE_RUNNING("sub_8213AC70 AiDriver::UpdateSteerInput");
   const int32_t count = LoadS16(base, driver + 5674);
   for (int32_t i = 0; i < count; i++) {
@@ -1591,13 +1592,15 @@ uint32_t UpdateSteerInput(uint8_t* base, uint32_t driver, uint32_t* record) {
     if (kind == 1) {
       break;
     }
-    if (kind == 2 || kind == 3) {
-      *record = at;
-      return uint32_t(kind);
+    if (kind == 2) {
+      return SteerIntoCorner(base, driver, at, stack - 96, f1, f1_set);
+    }
+    if (kind == 3) {
+      return SteerOutOfCorner(base, driver, at, stack - 96);
     }
   }
   AccumulateSteer(base, driver);
-  return 0;
+  return driver;
 }
 
 void DropPassedSections(uint8_t* base, uint32_t path) {
@@ -3628,6 +3631,318 @@ uint32_t UpdateSkill(uint8_t* base, uint32_t skill, uint32_t driver, double* f1,
     changed = 1;
   }
   return changed;
+}
+
+// --- Steering through the corners and driving ---
+
+void LimitSlide(uint8_t* base, uint32_t driver, uint32_t record, uint32_t flag) {
+  ITC_NATIVE_RUNNING("sub_821392D8 AiDriver::LimitSlide");
+  const double speed = Lfs(base, driver + 100);
+  if (speed < Lfs(base, kHundred)) {
+    if (speed < Lfs(base, kTwenty)) {
+      return;
+    }
+    if (speed < Fmuls(Lfs(base, driver + 6088), Lfs(base, 0x82001070))) {
+      return;
+    }
+  }
+  const double back = Fneg(Lfs(base, record + 16));
+  const double steer = Lfs(base, driver + 6136);
+  const double zero = Lfs(base, kZero);
+  const double side = Lfs(base, steer < zero ? driver + 112 : driver + 108);
+  const double ratio = Fmuls(Fdivs(steer, side), back);
+  const double fifth = Lfs(base, kFifth);
+  if (!(ratio > fifth)) {
+    return;
+  }
+  const double yaw = Fmuls(Lfs(base, driver + 104), back);
+  if (yaw < Lfs(base, 0x82002A10)) {
+    Stfs(base, driver + 6140, zero);
+    Stfs(base, driver + 6136, Fmuls(steer, Lfs(base, 0x820021E8)));
+  }
+  if (int32_t(Load(base, flag)) == 0) {
+    return;
+  }
+  if (!(ratio > Lfs(base, 0x820029D4)) || yaw < fifth) {
+    return;
+  }
+  double most = Lfs(base, kOne);
+  const double grip = Lfs(base, driver + 132);
+  if (grip < most) {
+    most = grip;
+  }
+  if (!(yaw < most)) {
+    return;
+  }
+  Stfs(base, driver + 6140, zero);
+  guest::StoreU8(base, driver + 6132, 1);
+}
+
+namespace {
+// The room on the corner's side at the first ring entry (its +40 or +44
+// against the driver's +144); `valid` false without that entry or its slice.
+double CornerRoom(uint8_t* base, uint32_t driver, uint32_t record, bool* valid) {
+  const uint32_t path = driver + 512;
+  const uint32_t entry = LoadS16(base, path + 5136) > 1 ? RingAt(base, path, 1) : 0;
+  *valid = entry != 0 && Load(base, entry + 52) != 0;
+  if (!*valid) {
+    return 0;
+  }
+  if (Lfs(base, record + 16) < Lfs(base, kZero)) {
+    return Fsubs(Lfs(base, driver + 144), Lfs(base, entry + 40));
+  }
+  return Fsubs(Lfs(base, entry + 44), Lfs(base, driver + 144));
+}
+}  // namespace
+
+uint32_t SteerByRoom(uint8_t* base, uint32_t driver, uint32_t record, uint32_t out) {
+  ITC_NATIVE_RUNNING("sub_82138FA8 AiDriver::SteerByRoom");
+  uint32_t result = 0;
+  if (LoadS16(base, driver + 5648) > 1) {
+    bool valid = false;
+    const double room = CornerRoom(base, driver, record, &valid);
+    if (valid) {
+      Stfs(base, out, room);
+      if (room > Lfs(base, driver + 116)) {
+        const double angle = Lfs(base, driver + 6116);
+        if (!(Fmuls(Lfs(base, record + 16), angle) > Lfs(base, kZero))) {
+          result = 1;
+        } else {
+          const double now = Lfs(base, driver + 6136);
+          const double half = Fmuls(angle, Lfs(base, kHalf));
+          const double sum = Fadds(Fadds(Lfs(base, driver + 6112), now), half);
+          Stfs(base, driver + 6136, sum);
+          const double size = Lfs(base, driver + 128);
+          const double left = Lfs(base, out);
+          if (size > left) {
+            Stfs(base, driver + 6136,
+                 Fmadds(Fsubs(Lfs(base, kOne), Fdivs(left, size)), half, sum));
+          }
+          return 1;
+        }
+      }
+    }
+  }
+  AccumulateSteer(base, driver);
+  return result;
+}
+
+uint64_t SteerOutOfCorner(uint8_t* base, uint32_t driver, uint32_t record, uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_82139A08 AiDriver::SteerOutOfCorner");
+  const double back = Fneg(Lfs(base, record + 16));
+  const double zero = Lfs(base, kZero);
+  const double speed = Lfs(base, driver + 100);
+  Stfs(base, frame + 80, zero);
+  if (!(speed > Lfs(base, kTwenty))) {
+    AccumulateSteer(base, driver);
+    return driver;
+  }
+  const uint32_t result = SteerByRoom(base, driver, record, frame + 80);
+  if (result == 0) {
+    return 0;
+  }
+  const double turn = Fmuls(Lfs(base, driver + 6116), back);
+  const double target = Lfs(base, driver + 6088);
+  const double now = Lfs(base, driver + 100);
+  bool cut;
+  if (turn < zero) {
+    cut = now > target || (Fmuls(Lfs(base, driver + 144), back) < zero &&
+                           Fmuls(Lfs(base, driver + 104), back) < zero);
+  } else {
+    cut = now > target && !(Fmuls(Lfs(base, driver + 6112), back) < zero);
+  }
+  if (cut) {
+    Stfs(base, driver + 6140, zero);
+  }
+  return result;
+}
+
+uint64_t SteerAtCornerPoint(uint8_t* base, uint32_t driver, uint32_t record, uint32_t at,
+                            uint32_t frame, double* f1, bool* f1_set) {
+  ITC_NATIVE_RUNNING("sub_8213A200 AiDriver::SteerAtCornerPoint");
+  int32_t k = int32_t(Load(base, at));
+  const double zero = Lfs(base, kZero);
+  const int32_t look = LoadS16(base, driver + 5654);
+  if (k < look) {
+    k = look;
+  }
+  if (!(k < LoadS16(base, driver + 5648))) {
+    AccumulateSteer(base, driver);
+    return driver;
+  }
+  bool valid = false;
+  double room = CornerRoom(base, driver, record, &valid);
+  if (!valid) {
+    room = zero;
+  }
+  if (room < Lfs(base, driver + 116)) {
+    guest::StoreU32(base, record + 40, 3);
+    return SteerOutOfCorner(base, driver, record, frame - 96);
+  }
+  const uint32_t path = driver + 512;
+  const uint32_t target = RingEntry(base, path, k);
+  if (target == 0) {
+    AccumulateSteer(base, driver);
+    return driver;
+  }
+  const double dx = Fsubs(Lfs(base, target + 0), Lfs(base, driver + 80));
+  const double dz = Fsubs(Lfs(base, target + 8), Lfs(base, driver + 88));
+  *f1 = dx;  // the original works it out in f1
+  *f1_set = true;
+  if (dx == zero && dz == zero) {
+    AccumulateSteer(base, driver);
+    return driver;
+  }
+  const double toward = c_runtime::Atan2(dx, dz);
+  *f1 = toward;
+  *f1_set = true;
+  Stfs(base, frame + 80, Fneg(Fsubs(double(float(toward)), Lfs(base, driver + 96))));
+  WrapAngle(base, frame + 80);
+  const double turn = Lfs(base, driver + 6116);
+  const double angle = Lfs(base, frame + 80);
+  if (Fmuls(turn, angle) != zero) {
+    Stfs(base, driver + 6136, Fadds(Lfs(base, driver + 6136), turn));
+  }
+  const double sum = Fadds(Lfs(base, driver + 6112), Lfs(base, driver + 6136));
+  Stfs(base, driver + 6136, sum);
+  if (!(room < zero)) {
+    double add = Fmuls(Fdivs(room, Lfs(base, driver + 128)), angle);
+    Stfs(base, frame + 80, add);
+    const double least = Lfs(base, 0x82008960);
+    if (add < least) {
+      add = least;
+      Stfs(base, frame + 80, add);
+    } else {
+      const double most = Lfs(base, 0x82001FC4);
+      if (add > most) {
+        add = most;
+        Stfs(base, frame + 80, add);
+      }
+    }
+    Stfs(base, driver + 6136, Fadds(sum, add));
+  }
+  guest::StoreU32(base, frame + 84, 0);
+  LimitSlide(base, driver, record, frame + 84);
+  return driver;
+}
+
+uint64_t SteerIntoCorner(uint8_t* base, uint32_t driver, uint32_t record, uint32_t frame,
+                         double* f1, bool* f1_set) {
+  ITC_NATIVE_RUNNING("sub_8213AB40 AiDriver::SteerIntoCorner");
+  const uint32_t data = Load(base, record + 0);
+  const int32_t offset = LoadS16(base, record + 10);
+  if (int32_t(uint32_t(LoadS16(base, data + 52)) + uint32_t(offset)) < 0) {
+    guest::StoreU32(base, record + 40, 3);
+    return SteerOutOfCorner(base, driver, record, frame - 96);
+  }
+  guest::StoreU32(base, frame + 80, uint32_t(LoadS16(base, data + 50)) + uint32_t(offset));
+  return SteerAtCornerPoint(base, driver, record, frame + 80, frame - 128, f1, f1_set);
+}
+
+uint32_t UpdateSteering(uint8_t* base, uint32_t driver, uint32_t frame, double* f1,
+                        bool* f1_set) {
+  ITC_NATIVE_RUNNING("sub_8213AEF0 AiDriver::UpdateSteering");
+  UpdateSteerInput(base, driver, frame, f1, f1_set);
+  double scale = Lfs(base, 0x8200296C);
+  double limit = Lfs(base, 0x82002A10);
+  const uint32_t slow = IsSlow(base, driver + 512);
+  const double fifth = Lfs(base, kFifth);
+  if (slow == 0) {
+    const double yaw = Lfs(base, driver + 104);
+    if (yaw > Lfs(base, 0x82002FB0) || yaw < Lfs(base, 0x82002C00)) {
+      Stfs(base, driver + 6136, Fnmsubs(yaw, fifth, Lfs(base, driver + 6136)));
+    }
+  } else {
+    scale = fifth;
+    limit = Lfs(base, 0x82002A14);
+  }
+  const double yaw = Lfs(base, driver + 104);
+  if (yaw > limit) {
+    Stfs(base, driver + 6136, Fnmsubs(Fsubs(yaw, limit), scale, Lfs(base, driver + 6136)));
+  } else if (yaw < Fneg(limit)) {
+    Stfs(base, driver + 6136, Fnmsubs(Fadds(yaw, limit), scale, Lfs(base, driver + 6136)));
+  }
+  double steer = Lfs(base, driver + 6136);
+  const double zero = Lfs(base, kZero);
+  steer = Fdivs(steer, Lfs(base, steer < zero ? driver + 112 : driver + 108));
+  const double now = Lfs(base, driver + 6120);
+  Stfs(base, driver + 6136, steer);
+  double move = Fsubs(steer, now);
+  if (Fadds(move, fifth) < zero) {
+    move = Lfs(base, 0x82006908);
+  } else if (Fsubs(move, fifth) > zero) {
+    move = fifth;
+  }
+  const double next = Fadds(now, move);
+  Stfs(base, driver + 6120, next);
+  const double one = Lfs(base, kOne);
+  if (Fadds(next, one) < zero) {
+    Stfs(base, driver + 6120, Lfs(base, kMinusOne));
+  } else if (Fsubs(next, one) > zero) {
+    Stfs(base, driver + 6120, one);
+  }
+  return slow;
+}
+
+uint64_t Drive(uint8_t* base, uint32_t driver, uint32_t input, uint32_t frame, double* f1) {
+  ITC_NATIVE_RUNNING("sub_8213B058 AiDriver::Drive");
+  const uint32_t vehicle = Load(base, driver + 160);
+  StoreConstant(base, driver + 6140, 0x820027A8);
+  guest::StoreU8(base, driver + 6132, 0);
+  const double zero = Lfs(base, kZero);
+  Stfs(base, driver + 6144, zero);
+  Stfs(base, driver + 6136, zero);
+  if (SteerToTarget(base, driver, f1) == 0) {
+    Stfs(base, driver + 6120, zero);
+    guest::StoreU8(base, driver + 6132, 0);
+    Stfs(base, driver + 6128, zero);
+    Stfs(base, driver + 6124, zero);
+  } else if (((Load(base, vehicle + 6148) >> 26) & 1) != 0) {
+    Stfs(base, driver + 6120, zero);
+    Stfs(base, driver + 6124, zero);
+    Stfs(base, driver + 6128, Lfs(base, kOne));
+    guest::StoreU16(base, input + 10, 32767);
+  } else {
+    double f = 0;
+    bool set = false;
+    UpdateSpeed(base, driver, frame - 96, &f, &set);
+    if (LoadS16(base, driver + 6060) <= 0) {
+      const double most = Lfs(base, driver + 164);
+      if (Lfs(base, driver + 6088) > most) {
+        Stfs(base, driver + 6088, most);
+      }
+    }
+    const double least = Lfs(base, kTwenty);
+    if (Lfs(base, driver + 6088) < least) {
+      Stfs(base, driver + 6088, least);
+    }
+    UpdateSteering(base, driver, frame - 112, &f, &set);
+    if (set) {
+      *f1 = f;
+    }
+    UpdatePedals(base, driver, frame - 112);
+    if ((Load(base, driver + 16) & 0x20) != 0) {
+      guest::StoreU32(base, input + 0, Load(base, input + 0) | 0x200);
+      Stfs(base, driver + 6120, Fmuls(Lfs(base, driver + 6120), Lfs(base, 0x82001BE8)));
+      Stfs(base, driver + 6124, zero);
+    }
+  }
+  if (guest::LoadU8(base, driver + 6132) != 0) {
+    guest::StoreU16(base, input + 10, 32767);
+  }
+  LimitThrottle(base, driver);
+  const double brake = Lfs(base, driver + 6128);
+  if (brake > zero) {
+    Stfs(base, driver + 6124, zero);
+  }
+  const double scale = Lfs(base, 0x82007F58);
+  const double steer = Fmuls(Lfs(base, driver + 6120), scale);
+  const double throttle = Fmuls(Lfs(base, driver + 6124), scale);
+  const double pressed = Fmuls(brake, scale);
+  guest::StoreU16(base, input + 4, uint16_t(strings_and_font::steps::Fctiwz(throttle)));
+  guest::StoreU16(base, input + 8, uint16_t(strings_and_font::steps::Fctiwz(steer)));
+  guest::StoreU16(base, input + 6, uint16_t(strings_and_font::steps::Fctiwz(pressed)));
+  return driver;
 }
 
 }  // namespace ai_drivers

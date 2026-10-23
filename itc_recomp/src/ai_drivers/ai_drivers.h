@@ -318,10 +318,12 @@ void ResetControl(uint8_t* base, uint32_t driver, uint32_t frame);
 uint64_t ResetDriver(uint8_t* base, uint32_t driver);
 // AiDriver::UpdateSteerInput (sub_8213AC70): the first corner record with
 // data (+5676, 44 bytes each, +5674 the count) of kind 1, 2 or 3 picks the
-// step: 1 or none, AccumulateSteer (done here; returns 0); 2 or 3 (never
-// seen in play: sub_8213AB40, sub_82139A08) return the kind with the record
-// in `record`, for the caller to run the translated step with it in r4.
-uint32_t UpdateSteerInput(uint8_t* base, uint32_t driver, uint32_t* record);
+// step: 1 or none, AccumulateSteer; 2, SteerIntoCorner; 3, SteerOutOfCorner
+// (both never seen in play; tail calls, from `stack`, the caller's stack
+// pointer). Returns the r3 the original leaves; `f1` set (and `f1_set`)
+// when SteerAtCornerPoint's atan2 ran.
+uint64_t UpdateSteerInput(uint8_t* base, uint32_t driver, uint32_t stack, double* f1,
+                          bool* f1_set);
 // AiPath::DropPassedSections (sub_8213BA48): the section list (+5144,
 // +5146) up to the driver's route section dropped, or emptied when it isn't
 // listed.
@@ -616,5 +618,54 @@ uint32_t TriggerEnds(uint8_t* base, uint32_t state, uint32_t driver, uint32_t tr
 // triggers started (timer 150, active, their value added to +20) or ended
 // (inactive, taken off). 1 when one changed.
 uint32_t UpdateSkill(uint8_t* base, uint32_t skill, uint32_t driver, double* f1, bool* f1_set);
+
+// --- Steering through the corners and driving ---
+//
+// The corner kinds 2 and 3's steps (never seen in play, so without rows;
+// AiDriver::UpdateSteerInput's): each takes the driver and a corner record
+// (+0 its data, +10 its offset, +16 its direction, +40 its kind).
+
+// AiDriver::LimitSlide (sub_821392D8): above 100.0 km/h (or 20.0 and the
+// target speed x the float at 0x82001070), with the steering ratio toward
+// the corner above 0.2: the yaw against it below the float at 0x82002A10
+// takes the throttle request off and scales +6136; with the flag at `flag`
+// set, also the handbrake byte +6132 (see the code).
+void LimitSlide(uint8_t* base, uint32_t driver, uint32_t record, uint32_t flag);
+// AiDriver::SteerByRoom (sub_82138FA8): the room on the corner's side at the
+// first ring entry (into the float at `out`); above +116 and turning toward
+// the corner, +6136 = +6112 + +6136 + the angle +6116 x 0.5 (scaled down by
+// the room against +128), returning 1; else AccumulateSteer, returning 1
+// when only the turn wasn't toward it, else 0.
+uint32_t SteerByRoom(uint8_t* base, uint32_t driver, uint32_t record, uint32_t out);
+// AiDriver::SteerOutOfCorner (sub_82139A08, kind 3): above 20.0 km/h,
+// SteerByRoom (the room at frame + 80: `frame` 96 bytes below the caller's
+// stack pointer) and the throttle request cut by the angles; else
+// AccumulateSteer. Returns the r3 the original leaves.
+uint64_t SteerOutOfCorner(uint8_t* base, uint32_t driver, uint32_t record, uint32_t frame);
+// AiDriver::SteerAtCornerPoint (sub_8213A200): the ring entry at the index
+// at `at` (at least the look-ahead +5654): with room on the corner's side,
+// +6136 steered at its point (atan2, the angle wrapped at frame + 80:
+// `frame` 128 bytes down), then LimitSlide (the flag 0 at frame + 84); with
+// none, kind 3 and SteerOutOfCorner. Returns the r3 the original leaves.
+uint64_t SteerAtCornerPoint(uint8_t* base, uint32_t driver, uint32_t record, uint32_t at,
+                            uint32_t frame, double* f1, bool* f1_set);
+// AiDriver::SteerIntoCorner (sub_8213AB40, kind 2): past the corner's exit
+// (its data's +52 + the offset below 0), kind 3 and SteerOutOfCorner; else
+// SteerAtCornerPoint at its entry (+50 + the offset, at frame + 80: `frame`
+// 96 bytes down).
+uint64_t SteerIntoCorner(uint8_t* base, uint32_t driver, uint32_t record, uint32_t frame,
+                         double* f1, bool* f1_set);
+// AiDriver::UpdateSteering (sub_8213AEF0): UpdateSteerInput (from `frame`,
+// 112 bytes below the caller's stack pointer), the request +6136 corrected
+// by the yaw +104 and scaled by +108 or +112, and the steering +6120 moved
+// toward it by at most 0.2 within -1.0 to 1.0 (see the row). Returns IsSlow's
+// answer (the r3 the original leaves).
+uint32_t UpdateSteering(uint8_t* base, uint32_t driver, uint32_t frame, double* f1,
+                        bool* f1_set);
+// AiDriver::Drive (sub_8213B058): the car's input record at `input` from the
+// driver (see the row; `frame` 160 bytes below the caller's stack pointer).
+// Returns the r3 the original leaves (the driver); `f1` as the original
+// leaves it.
+uint64_t Drive(uint8_t* base, uint32_t driver, uint32_t input, uint32_t frame, double* f1);
 
 }  // namespace ai_drivers
