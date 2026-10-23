@@ -4,8 +4,11 @@
 
 #include "base/log.h"
 #include "car_physics/float_ops.h"
+#include "interpolation/blend_state.h"
+#include "matrix_math/matrix_math.h"
 #include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
+#include "xact/xact.h"
 
 #include <cstdlib>
 
@@ -460,6 +463,354 @@ bool TrackSetSetup208(uint8_t* base, uint32_t set, uint32_t section) {
   // The count is 0 (checked above): nothing is allocated or set up.
   TrackSetCount(base, set);
   return true;
+}
+
+// --- The skeleton. ---
+
+namespace {
+
+constexpr uint32_t kSkeletonBaseVtable = 0x8206CE60;
+constexpr uint32_t kSkeletonVtable = 0x8206CE50;
+constexpr uint32_t kPrimitiveDrawerVtable = 0x820721D4;
+
+// Whether SkeletonBase::Free frees all four natively.
+bool BaseFreeable(uint8_t* base, uint32_t skeleton) {
+  const uint32_t cursors = Load(base, skeleton + 128);
+  if (!Deletable(cursors)) {
+    return false;
+  }
+  for (uint32_t offset : {136u, 144u, 132u}) {
+    const uint32_t array = Load(base, skeleton + offset);
+    if (array != 0 && !Deletable(array - 16)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+// Matrix::Multiply as its adapter does it: out = a * b, noted for
+// interpolation with the return address of the call it replaces.
+void Multiply(uint8_t* base, uint32_t out, uint32_t a, uint32_t b, uint32_t caller) {
+  matrix_math::Multiply(base, out, a, b);
+  interpolation::BlendState_OnMultiply(base, out, a, b, caller);
+}
+
+// Two doublewords from `from` to `to` (ld, std, ld, std).
+void CopyRow(uint8_t* base, uint32_t from, uint32_t to) {
+  for (uint32_t half = 0; half < 16; half += 8) {
+    const uint32_t high = Load(base, from + half), low = Load(base, from + half + 4);
+    Store(base, to + half, high);
+    Store(base, to + half + 4, low);
+  }
+}
+
+}  // namespace
+
+uint32_t SkeletonBaseConstruct(uint8_t* base, uint32_t skeleton) {
+  ITC_NATIVE_RUNNING("sub_8259A140 SkeletonBase::SkeletonBase");
+  const uint32_t matrix = skeleton + 16;
+  const double one = Lfs(base, kOne);
+  Store(base, skeleton + 0, kSkeletonBaseVtable);
+  for (uint32_t row = 0; row < 4; row++) {
+    Stfs(base, matrix + 16 * row + 12, one);
+  }
+  xact::WaveEntryConstruct(base, skeleton + 80);
+  // The identity, built on the original's stack and copied in.
+  for (uint32_t word = 0; word < 16; word++) {
+    Store(base, matrix + 4 * word, word % 5 == 0 ? 0x3F800000u : 0);
+  }
+  for (uint32_t offset = 128; offset <= 160; offset += 4) {
+    Store(base, skeleton + offset, 0);
+  }
+  return skeleton;
+}
+
+uint32_t SkeletonConstruct(uint8_t* base, uint32_t skeleton) {
+  ITC_NATIVE_RUNNING("sub_82599758 Skeleton::Skeleton");
+  SkeletonBaseConstruct(base, skeleton);
+  Store(base, skeleton + 176, 0);
+  Store(base, skeleton + 0, kSkeletonVtable);
+  return skeleton;
+}
+
+bool SkeletonBaseFree(uint8_t* base, uint32_t skeleton) {
+  ITC_NATIVE_RUNNING("sub_8259A228 SkeletonBase::Free");
+  if (!BaseFreeable(base, skeleton)) {
+    return false;
+  }
+  const uint32_t cursors = Load(base, skeleton + 128);
+  if (cursors != 0) {
+    memory::crt::OperatorDeleteArray(cursors);
+  }
+  for (uint32_t offset : {136u, 144u, 132u}) {
+    const uint32_t array = Load(base, skeleton + offset);
+    if (array != 0) {
+      memory::crt::OperatorDeleteArray(array - 16);
+    }
+  }
+  for (uint32_t offset : {128u, 136u, 144u, 132u}) {
+    Store(base, skeleton + offset, 0);
+  }
+  return true;
+}
+
+bool SkeletonBaseDestruct(uint8_t* base, uint32_t skeleton) {
+  ITC_NATIVE_RUNNING("sub_8259A9D0 SkeletonBase::~SkeletonBase");
+  if (!BaseFreeable(base, skeleton)) {
+    return false;
+  }
+  Store(base, skeleton + 0, kSkeletonBaseVtable);
+  return SkeletonBaseFree(base, skeleton);
+}
+
+bool SkeletonDestruct(uint8_t* base, uint32_t skeleton) {
+  ITC_NATIVE_RUNNING("sub_825999C8 Skeleton::~Skeleton");
+  const uint32_t values = Load(base, skeleton + 176);
+  if (!Deletable(values) || !BaseFreeable(base, skeleton)) {
+    return false;
+  }
+  Store(base, skeleton + 0, kSkeletonVtable);
+  if (values != 0) {
+    memory::crt::OperatorDeleteArray(values);
+  }
+  Store(base, skeleton + 176, 0);
+  return SkeletonBaseDestruct(base, skeleton);
+}
+
+bool SkeletonFreeNodeValues(uint8_t* base, uint32_t skeleton) {
+  ITC_NATIVE_RUNNING("sub_825997A0 Skeleton::FreeNodeValues");
+  const uint32_t values = Load(base, skeleton + 176);
+  if (!Deletable(values)) {
+    return false;
+  }
+  if (values != 0) {
+    memory::crt::OperatorDeleteArray(values);
+  }
+  Store(base, skeleton + 176, 0);
+  return true;
+}
+
+void SkeletonCursorClear(uint8_t* base, uint32_t cursor) {
+  ITC_NATIVE_RUNNING("sub_825A2068 SkeletonCursor::Clear");
+  Stfs(base, cursor + 12, Lfs(base, kZero));
+  Store(base, cursor + 0, 0);
+  Store(base, cursor + 4, 0);
+  Store(base, cursor + 8, 0);
+  Store(base, cursor + 16, 0);
+}
+
+void SkeletonCursorView(uint8_t* base, uint32_t cursor, uint32_t section) {
+  ITC_NATIVE_RUNNING("sub_825A2090 SkeletonCursor::View");
+  if (section == 0) {
+    Stfs(base, cursor + 12, Lfs(base, kZero));
+    Store(base, cursor + 0, 0);
+    Store(base, cursor + 4, 0);
+    Store(base, cursor + 8, 0);
+    Store(base, cursor + 16, 0);
+    return;
+  }
+  Store(base, cursor + 0, section);
+  Store(base, cursor + 4, section + 16);
+  Store(base, cursor + 8, section + 20);
+  Stfs(base, cursor + 12, Lfs(base, section + 4));
+  Store(base, cursor + 16, 0);
+}
+
+void SkeletonLoadNodeValues(uint8_t* base, uint32_t skeleton, uint32_t section) {
+  ITC_NATIVE_RUNNING("sub_825997E0 Skeleton::LoadNodeValues");
+  if (Load(base, skeleton + 176) == 0) {
+    return;
+  }
+  SkeletonCursorView(base, Load(base, skeleton + 128), section);
+  const uint32_t cursor = Load(base, skeleton + 128);
+  uint32_t entry = Load(base, cursor + 8);
+  if (!(int32_t(Load(base, Load(base, cursor + 4))) > 0)) {
+    return;
+  }
+  int32_t i = 0;
+  do {
+    const uint32_t node = Load(base, entry + 0);
+    const double a = Lfs(base, entry + 12);
+    const uint32_t value = (node << 4) + Load(base, skeleton + 176);
+    i++;
+    Stfs(base, value + 0, a);
+    const double x = Lfs(base, value + 0);
+    const double b = Lfs(base, entry + 16);
+    entry += 20;
+    Stfs(base, value + 4, b);
+    Stfs(base, value + 8, x);
+  } while (i < int32_t(Load(base, Load(base, Load(base, skeleton + 128) + 4))));
+}
+
+uint32_t SkeletonNodeCount(uint8_t* base, uint32_t skeleton) {
+  ITC_NATIVE_RUNNING("sub_82599880 Skeleton::NodeCount");
+  if (Load(base, skeleton + 176) == 0) {
+    return 0;
+  }
+  return Load(base, Load(base, skeleton + 80) + 4);
+}
+
+MatricesResult SkeletonUpdateNodeMatrices(uint8_t* base, uint32_t skeleton) {
+  ITC_NATIVE_RUNNING("sub_8259C3A8 Skeleton::UpdateNodeMatrices");
+  // The node types the loop below takes, read first (the node file isn't
+  // written here): 8 and 16 go to sub_8259B748 and sub_8259BE40.
+  for (int32_t i = 0; i < int32_t(Load(base, Load(base, skeleton + 80) + 4)); i++) {
+    const uint32_t type = Load(base, Load(base, skeleton + 84) + 160 * uint32_t(i) + 132);
+    if (int32_t(type) > 4 && (type == 8 || type == 16)) {
+      return MatricesResult::kOriginal;
+    }
+  }
+  const uint32_t root = (Load(base, skeleton + 156) << 6) + Load(base, skeleton + 148);
+  Multiply(base, root, root, skeleton + 16, 0x8259C3D4);
+  uint32_t matrix = Load(base, skeleton + 148);
+  const uint32_t records = Load(base, skeleton + 84);
+  if (int32_t(Load(base, Load(base, skeleton + 80) + 4)) > 0) {
+    uint32_t type_at = records + 132;
+    uint32_t row = matrix + 48;
+    uint32_t record = 0;
+    int32_t i = 0;
+    do {
+      if (!(int32_t(Load(base, type_at)) > 4)) {
+        const uint32_t parent = Load(base, type_at - 4);
+        if (int32_t(parent) != -1) {
+          Multiply(base, matrix, matrix, (parent << 6) + Load(base, skeleton + 148), 0x8259C42C);
+        }
+        const uint32_t source = Load(base, record + Load(base, skeleton + 84) + 92);
+        if (int32_t(source) != -1) {
+          CopyRow(base, (source << 6) + Load(base, skeleton + 148) + 48, row);
+        }
+      }
+      i++;
+      record += 160;
+      type_at += 160;
+      matrix += 64;
+      row += 64;
+    } while (i < int32_t(Load(base, Load(base, skeleton + 80) + 4)));
+  }
+  const uint32_t file = Load(base, skeleton + 80);
+  const uint32_t matrices = Load(base, skeleton + 148);
+  const uint32_t first = Load(base, file + 12);
+  matrix = (first << 6) + matrices;
+  uint32_t bone = first * 160 + Load(base, skeleton + 84) + 128;
+  if (int32_t(Load(base, file + 8)) > 0) {
+    int32_t i = 0;
+    do {
+      if ((Load(base, bone + 4) & 0x80) != 0) {
+        const uint32_t parent = Load(base, bone + 0);
+        if (int32_t(parent) != -1) {
+          Multiply(base, matrix, matrix, (parent << 6) + Load(base, skeleton + 148), 0x8259C528);
+        }
+      }
+      i++;
+      bone += 160;
+      matrix += 64;
+    } while (i < int32_t(Load(base, Load(base, skeleton + 80) + 8)));
+  }
+  return MatricesResult::kMultiplied;
+}
+
+MatricesResult SkeletonUpdateMatrices(uint8_t* base, uint32_t skeleton) {
+  ITC_NATIVE_RUNNING("sub_825998A0 Skeleton::UpdateMatrices");
+  if (Load(base, skeleton + 176) == 0) {
+    return MatricesResult::kNothing;
+  }
+  return SkeletonUpdateNodeMatrices(base, skeleton);
+}
+
+double CursorCurveSample(uint8_t* base, uint32_t keys, uint32_t cursor, uint32_t count,
+                         double time) {
+  ITC_NATIVE_RUNNING("sub_825A20E8 CursorCurve::Sample");
+  if (!(int32_t(count) > 1)) {
+    return Lfs(base, keys + 8);
+  }
+  const uint32_t end = count * 20 + keys;
+  if (!(time < Lfs(base, end - 20))) {
+    return Lfs(base, end - 12);
+  }
+  if (!(time > Lfs(base, keys))) {
+    return Lfs(base, keys + 8);
+  }
+  const uint32_t at = Load(base, cursor);
+  if (!(int32_t(at) > 0) || !(int32_t(at) < int32_t(count))) {
+    Store(base, cursor, 1);
+  }
+  uint32_t next = Load(base, cursor) * 20 + keys;
+  uint32_t key = next - 20;
+  for (;;) {
+    if (!(Lfs(base, key) > time) && time < Lfs(base, next)) {
+      return KeyInterpolate(base, key, next, time);
+    }
+    const uint32_t moved = Load(base, cursor) + 1;
+    key += 20;
+    next += 20;
+    Store(base, cursor, moved);
+    if (int32_t(moved) < int32_t(count)) {
+      continue;
+    }
+    key = keys;
+    Store(base, cursor, 1);
+    next = keys + 20;
+  }
+}
+
+void SkeletonApplyAnimation(uint8_t* base, uint32_t skeleton) {
+  ITC_NATIVE_RUNNING("sub_825998B8 Skeleton::ApplyAnimation");
+  uint32_t cursor = Load(base, skeleton + 128);
+  if (Load(base, cursor + 0) == 0) {
+    return;
+  }
+  uint32_t entry = Load(base, cursor + 8);
+  if (!(int32_t(Load(base, Load(base, cursor + 4))) > 0)) {
+    return;
+  }
+  uint32_t offset = 0;
+  int32_t i = 0;
+  do {
+    const uint32_t node = Load(base, entry + 0);
+    const uint32_t entry_now = Load(base, cursor + 8) + offset;
+    const uint32_t time_at = (node << 4) + Load(base, skeleton + 176);
+    const uint32_t records = Load(base, skeleton + 136);
+    const uint32_t section = Load(base, cursor + 0);
+    const uint32_t channels = Load(base, entry + 4);
+    const uint32_t record = node * 144 + records;
+    uint32_t channel = Load(base, entry_now + 8) + section;
+    const double time = Lfs(base, time_at + 8);
+    if (int32_t(channels) > 0) {
+      int32_t j = 0;
+      do {
+        const uint32_t component = Load(base, channel + 4);
+        const uint32_t keys = channel + 8;
+        const uint32_t key_count = Load(base, channel + 0);
+        const double value = CursorCurveSample(base, keys, ((component + 16) << 2) + record,
+                                               key_count, time);
+        Stfs(base, (component << 2) + record, value);
+        channel = Load(base, channel + 0) * 20 + keys;
+        j++;
+      } while (j < int32_t(Load(base, entry + 4)));
+    }
+    cursor = Load(base, skeleton + 128);
+    i++;
+    offset += 20;
+    entry += 20;
+  } while (i < int32_t(Load(base, Load(base, cursor + 4))));
+}
+
+bool PrimitiveDrawerConstruct(uint8_t* base, uint32_t drawer) {
+  ITC_NATIVE_RUNNING("sub_825A1378 PrimitiveDrawer::PrimitiveDrawer");
+  Store(base, drawer + 0, kPrimitiveDrawerVtable);
+  const auto block = memory::crt::OperatorNew(base, 4);
+  if (!block) {
+    return false;
+  }
+  Store(base, drawer + 4, *block);
+  return true;
+}
+
+void RecordClear(uint8_t* base, uint32_t record) {
+  ITC_NATIVE_RUNNING("sub_825A18D8 RecordClear");
+  Stfs(base, record + 0, Lfs(base, kZero));
+  Store(base, record + 4, 0);
+  Store(base, record + 8, 0);
 }
 
 }  // namespace model_animation

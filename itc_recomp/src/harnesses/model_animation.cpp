@@ -64,6 +64,30 @@ ITC_NATIVE_STEP(NativeSample32, ma::TrackSetSample32(base, ctx.r3.u32, ctx.r4.u3
 ITC_NATIVE_STEP(NativeAdvance32,
                 ctx.r3.u64 = ma::TrackSetAdvance32(base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64))
 ITC_NATIVE_STEP(NativeAnimate, ctx.r3.u64 = ma::ModelAnimate(base, ctx.r3.u32))
+ITC_NATIVE_STEP(NativeBaseConstruct, ctx.r3.u64 = ma::SkeletonBaseConstruct(base, ctx.r3.u32))
+ITC_NATIVE_STEP(NativeSkeletonConstruct, ctx.r3.u64 = ma::SkeletonConstruct(base, ctx.r3.u32))
+ITC_NATIVE_STEP(NativeCursorClear, ma::SkeletonCursorClear(base, ctx.r3.u32))
+ITC_NATIVE_STEP(NativeCursorView, ma::SkeletonCursorView(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_STEP(NativeRecordClear, ma::RecordClear(base, ctx.r3.u32))
+ITC_NATIVE_STEP(NativeNodeCount, ctx.r3.u64 = ma::SkeletonNodeCount(base, ctx.r3.u32))
+ITC_NATIVE_STEP(NativeLoadNodeValues,
+                ma::SkeletonLoadNodeValues(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_STEP(NativeApplyAnimation, ma::SkeletonApplyAnimation(base, ctx.r3.u32))
+ITC_NATIVE_STEP(NativeCursorCurveSample,
+                ctx.f1.f64 = ma::CursorCurveSample(base, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
+                                                   ctx.f1.f64))
+// The matrices' steps as Skeleton::UpdateMatrices' adapter (the original
+// for a node of type 8 or 16, which the cases don't make).
+void NativeUpdateMatrices(PPCContext& ctx, uint8_t* base) {
+  if (ma::SkeletonUpdateMatrices(base, ctx.r3.u32) == ma::MatricesResult::kOriginal) {
+    __imp__sub_825998A0(ctx, base);
+  }
+}
+void NativeUpdateNodeMatrices(PPCContext& ctx, uint8_t* base) {
+  if (ma::SkeletonUpdateNodeMatrices(base, ctx.r3.u32) == ma::MatricesResult::kOriginal) {
+    __imp__sub_8259C3A8(ctx, base);
+  }
+}
 
 // The lifetime's steps as their adapters: the original for what the plain
 // C++ hands back.
@@ -82,6 +106,11 @@ ITC_LIFETIME_STEP(NativeSetupFloat4, 825A1E08,
 ITC_LIFETIME_STEP(NativeSetupFloat, 825A1BE8, ma::TrackSetSetupFloat(base, ctx.r3.u32, ctx.r4.u32))
 ITC_LIFETIME_STEP(NativeSetup32, 825A1218, ma::TrackSetSetup32(base, ctx.r3.u32, ctx.r4.u32))
 ITC_LIFETIME_STEP(NativeSetup208, 825A1A38, ma::TrackSetSetup208(base, ctx.r3.u32, ctx.r4.u32))
+ITC_LIFETIME_STEP(NativeBaseFree, 8259A228, ma::SkeletonBaseFree(base, ctx.r3.u32))
+ITC_LIFETIME_STEP(NativeBaseDestruct, 8259A9D0, ma::SkeletonBaseDestruct(base, ctx.r3.u32))
+ITC_LIFETIME_STEP(NativeDestruct, 825999C8, ma::SkeletonDestruct(base, ctx.r3.u32))
+ITC_LIFETIME_STEP(NativeFreeNodeValues, 825997A0, ma::SkeletonFreeNodeValues(base, ctx.r3.u32))
+ITC_LIFETIME_STEP(NativeDrawerConstruct, 825A1378, ma::PrimitiveDrawerConstruct(base, ctx.r3.u32))
 
 #undef ITC_LIFETIME_STEP
 #undef ITC_NATIVE_STEP
@@ -488,12 +517,312 @@ void Lifetime(Context& h) {
   }
 }
 
+
+// --- The skeleton. ---
+
+// The area's layout for the skeleton's cases.
+struct SkeletonLayout {
+  uint32_t skeleton;  // 180 bytes
+  uint32_t file;      // the node file's view: +4 nodes, +8 bones, +12 the first bone
+  uint32_t records;   // 160 bytes a node
+  uint32_t matrices;  // 64 bytes a node
+  uint32_t values;    // +176: 16 bytes a node
+  uint32_t nodes;     // +136: 144 bytes a node
+  uint32_t cursor;    // +128: instance 0's cursor
+  uint32_t section;   // the cursor's: 20-byte entries, then their channels
+};
+
+SkeletonLayout MakeSkeletonLayout(const Context& h) {
+  return {h.data,        h.data + 192,  h.data + 256,  h.data + 896,
+          h.data + 1216, h.data + 1280, h.data + 1856, h.data + 1888};
+}
+
+constexpr uint32_t kMaxNodes = 4;
+
+// A node index, or -1 now and then.
+uint32_t NodeOrNone(Random& r) {
+  return r.Below(4) == 0 ? 0xFFFFFFFFu : r.Below(kMaxNodes);
+}
+
+// An ordinary float word now and then an odd one (the matrices go through
+// Matrix::Multiply's adapter on both sides).
+uint32_t MatrixWord(Random& r) {
+  return r.Below(16) == 0 ? FloatWord(r)
+                          : std::bit_cast<uint32_t>(float(int32_t(r.Below(65)) - 32) / 8.0f);
+}
+
+// `values`: +176 always set (Skeleton::ApplyAnimation reads it unchecked).
+void WriteSkeleton(Context& h, const SkeletonLayout& l, bool values) {
+  const uint32_t s = l.skeleton;
+  for (uint32_t i = 0; i < 16; i++) {
+    StoreFloatWord(h.base, s + 16 + 4 * i, MatrixWord(h.random));
+  }
+  guest::StoreU32(h.base, s + 80, l.file);
+  guest::StoreU32(h.base, s + 84, l.records);
+  guest::StoreU32(h.base, s + 128, l.cursor);
+  guest::StoreU32(h.base, s + 136, l.nodes);
+  guest::StoreU32(h.base, s + 148, l.matrices);
+  guest::StoreU32(h.base, s + 156, h.random.Below(kMaxNodes));
+  guest::StoreU32(h.base, s + 176, h.random.Below(6) == 0 && !values ? 0 : l.values);
+  const uint32_t nodes = h.random.Below(kMaxNodes + 1);
+  const uint32_t first = h.random.Below(kMaxNodes);
+  guest::StoreU32(h.base, l.file + 4, nodes);
+  guest::StoreU32(h.base, l.file + 8, h.random.Below(kMaxNodes - first + 1));
+  guest::StoreU32(h.base, l.file + 12, first);
+  // Types: 4 and below take the parent and the translation row; 0x80 marks
+  // a bone (-1 does both); never 8 or 16 (sub_8259B748 and sub_8259BE40,
+  // never in play, which these records don't fit).
+  static const uint32_t kTypes[] = {0, 1, 2, 3, 4, 5, 0x80, 0x81, 0x84, 0xFFFFFFFFu, 32};
+  for (uint32_t n = 0; n < kMaxNodes; n++) {
+    const uint32_t record = l.records + 160 * n;
+    guest::StoreU32(h.base, record + 92, NodeOrNone(h.random));
+    guest::StoreU32(h.base, record + 128, NodeOrNone(h.random));
+    guest::StoreU32(h.base, record + 132, kTypes[h.random.Below(std::size(kTypes))]);
+  }
+  for (uint32_t i = 0; i < kMaxNodes * 16; i++) {
+    StoreFloatWord(h.base, l.matrices + 4 * i, MatrixWord(h.random));
+  }
+  for (uint32_t i = 0; i < kMaxNodes * 4; i++) {
+    StoreFloatWord(h.base, l.values + 4 * i, TimeWord(h.random));
+  }
+  for (uint32_t n = 0; n < kMaxNodes; n++) {
+    const uint32_t node = l.nodes + 144 * n;
+    for (uint32_t i = 0; i < 16; i++) {
+      StoreFloatWord(h.base, node + 4 * i, FloatWord(h.random));
+      // The channels' cursors: a key index, often out of range.
+      guest::StoreU32(h.base, node + 64 + 4 * i,
+                      h.random.Below(4) == 0 ? uint32_t(h.random.Next()) : h.random.Below(6));
+    }
+  }
+  // The cursor bound to the section (or not), its entries and channels.
+  const uint32_t entries = h.random.Below(kMaxNodes + 1);
+  StoreFloatWord(h.base, l.section + 4, TimeWord(h.random));
+  guest::StoreU32(h.base, l.section + 16, entries);
+  uint32_t channel_at = 20 + 20 * kMaxNodes;
+  for (uint32_t e = 0; e < entries; e++) {
+    const uint32_t entry = l.section + 20 + 20 * e;
+    const uint32_t channels = h.random.Below(3);
+    guest::StoreU32(h.base, entry + 0, h.random.Below(kMaxNodes));
+    guest::StoreU32(h.base, entry + 4, channels);
+    guest::StoreU32(h.base, entry + 8, channel_at);
+    StoreFloatWord(h.base, entry + 12, FloatWord(h.random));
+    StoreFloatWord(h.base, entry + 16, FloatWord(h.random));
+    for (uint32_t c = 0; c < channels; c++) {
+      const uint32_t channel = l.section + channel_at;
+      const uint32_t keys = h.random.Below(kMaxKeys + 1);
+      guest::StoreU32(h.base, channel + 0, keys);
+      guest::StoreU32(h.base, channel + 4, h.random.Below(16));
+      WriteKeys(h, channel + 8, keys);
+      channel_at += 8 + 20 * keys;
+    }
+  }
+  const bool bound = h.random.Below(5) != 0;
+  guest::StoreU32(h.base, l.cursor + 0, bound ? l.section : 0);
+  guest::StoreU32(h.base, l.cursor + 4, bound ? l.section + 16 : 0);
+  guest::StoreU32(h.base, l.cursor + 8, bound ? l.section + 20 : 0);
+  StoreFloatWord(h.base, l.cursor + 12, TimeWord(h.random));
+  guest::StoreU32(h.base, l.cursor + 16, h.random.Below(3));
+}
+
+// The float words: the skeleton's matrix, the cursor's +12, the nodes'
+// matrices and values, the 144-byte records' first 16 words.
+std::vector<uint32_t> SkeletonFloats(const SkeletonLayout& l) {
+  std::vector<uint32_t> floats = {l.cursor + 12};
+  for (uint32_t i = 0; i < 16; i++) {
+    floats.push_back(l.skeleton + 16 + 4 * i);
+  }
+  for (uint32_t i = 0; i < kMaxNodes * 16; i++) {
+    floats.push_back(l.matrices + 4 * i);
+  }
+  for (uint32_t i = 0; i < kMaxNodes * 4; i++) {
+    floats.push_back(l.values + 4 * i);
+  }
+  for (uint32_t n = 0; n < kMaxNodes; n++) {
+    for (uint32_t i = 0; i < 16; i++) {
+      floats.push_back(l.nodes + 144 * n + 4 * i);
+    }
+  }
+  return floats;
+}
+
+void Skeletons(Context& h) {
+  const SkeletonLayout l = MakeSkeletonLayout(h);
+  const std::vector<uint32_t> floats = SkeletonFloats(l);
+  enum class Target { kSkeleton, kCursor };
+  struct Function {
+    const char* name;
+    GuestFunction recompiled, native;
+    Result result;
+    Target target;
+    uint32_t extra_float;  // another float word (offset from the target + 1), or 0
+  };
+  const Function functions[] = {
+      {"sub_8259A140 SkeletonBase::SkeletonBase", __imp__sub_8259A140, NativeBaseConstruct,
+       Result::kR3, Target::kSkeleton, 0},
+      {"sub_82599758 Skeleton::Skeleton", __imp__sub_82599758, NativeSkeletonConstruct,
+       Result::kR3, Target::kSkeleton, 0},
+      {"sub_825A2068 SkeletonCursor::Clear", __imp__sub_825A2068, NativeCursorClear,
+       Result::kNone, Target::kCursor, 0},
+      {"sub_825A2090 SkeletonCursor::View", __imp__sub_825A2090, NativeCursorView, Result::kNone,
+       Target::kCursor, 0},
+      {"sub_825A18D8 RecordClear", __imp__sub_825A18D8, NativeRecordClear, Result::kNone,
+       Target::kCursor, 1},
+      {"sub_82599880 Skeleton::NodeCount", __imp__sub_82599880, NativeNodeCount, Result::kR3,
+       Target::kSkeleton, 0},
+      {"sub_825997E0 Skeleton::LoadNodeValues", __imp__sub_825997E0, NativeLoadNodeValues,
+       Result::kNone, Target::kSkeleton, 0},
+      {"sub_825998A0 Skeleton::UpdateMatrices", __imp__sub_825998A0, NativeUpdateMatrices,
+       Result::kNone, Target::kSkeleton, 0},
+      {"sub_8259C3A8 Skeleton::UpdateNodeMatrices", __imp__sub_8259C3A8,
+       NativeUpdateNodeMatrices, Result::kNone, Target::kSkeleton, 0},
+      {"sub_825998B8 Skeleton::ApplyAnimation", __imp__sub_825998B8, NativeApplyAnimation,
+       Result::kNone, Target::kSkeleton, 0},
+  };
+  for (const Function& f : functions) {
+    Results results(f.name);
+    const uint32_t target = f.target == Target::kSkeleton ? l.skeleton : l.cursor;
+    std::vector<uint32_t> case_floats = floats;
+    if (f.extra_float != 0) {
+      case_floats.push_back(target + f.extra_float - 1);
+    }
+    for (int i = 0; i < 400; i++) {
+      uint32_t section = 0;
+      Case(
+          h, results,
+          [&] {
+            WriteSkeleton(h, l, f.recompiled == __imp__sub_825998B8);
+            // LoadNodeValues reads the bound cursor's count unchecked: a
+            // section always (as Mesh::Parse passes).
+            section = h.random.Below(5) == 0 && f.recompiled != __imp__sub_825997E0 ? 0 : l.section;
+          },
+          [&](PPCContext& t) {
+            t.r3.u64 = target;
+            t.r4.u64 = section;
+          },
+          f.recompiled, f.native, f.result, case_floats, fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  // The node channels' sampler on keys alone: f1 and the cursor word.
+  Results results("sub_825A20E8 CursorCurve::Sample");
+  const uint32_t keys = h.data + 64;
+  const uint32_t cursor = h.data + 16;
+  for (int i = 0; i < 2000; i++) {
+    uint32_t count = 0;
+    uint64_t time = 0;
+    Case(
+        h, results,
+        [&] {
+          count = h.random.Below(8);
+          if (h.random.Below(20) == 0) {
+            count = uint32_t(-int32_t(h.random.Below(3)));
+          }
+          WriteKeys(h, keys, int32_t(count) > 0 ? count : 1);
+          guest::StoreU32(h.base, cursor,
+                          h.random.Below(4) == 0 ? uint32_t(h.random.Next()) : h.random.Below(9));
+          time = std::bit_cast<uint64_t>(double(std::bit_cast<float>(TimeWord(h.random))));
+        },
+        [&](PPCContext& t) {
+          t.r4.u64 = keys;
+          t.r5.u64 = cursor;
+          t.r6.u64 = count;
+          t.f1.u64 = time;
+        },
+        __imp__sub_825A20E8, NativeCursorCurveSample, Result::kF1, {}, fmt::format("case {}", i));
+  }
+  results.Report();
+}
+
+// The skeleton's frees and the primitive drawer's constructor: blocks from
+// the allocation layer at +128 (plain), +132, +136, +144 (count headers)
+// and +176 (plain), each there or not; after each side, the skeleton's
+// bytes and which blocks were freed are compared, and what's left freed.
+void SkeletonLifetime(Context& h) {
+  if (!hooks::NativeHeapActive()) {
+    ITC_LOG_INFO("harness: model_animation: the skeleton's frees skipped (--native_heap off)");
+    return;
+  }
+  struct Function {
+    const char* name;
+    GuestFunction recompiled, native;
+  };
+  const Function functions[] = {
+      {"sub_8259A228 SkeletonBase::Free", __imp__sub_8259A228, NativeBaseFree},
+      {"sub_8259A9D0 SkeletonBase::~SkeletonBase", __imp__sub_8259A9D0, NativeBaseDestruct},
+      {"sub_825999C8 Skeleton::~Skeleton", __imp__sub_825999C8, NativeDestruct},
+      {"sub_825997A0 Skeleton::FreeNodeValues", __imp__sub_825997A0, NativeFreeNodeValues},
+      {"sub_825A1378 PrimitiveDrawer::PrimitiveDrawer", __imp__sub_825A1378,
+       NativeDrawerConstruct},
+  };
+  const uint32_t skeleton = h.data;
+  const uint32_t kOffsets[] = {128, 132, 136, 144, 176};
+  const uint32_t kHeaders[] = {0, 16, 16, 16, 0};
+  for (const Function& f : functions) {
+    Results results(f.name);
+    const bool drawer = f.recompiled == __imp__sub_825A1378;
+    for (int i = 0; i < 200; i++) {
+      Outputs out[2];
+      const Random start = h.random;
+      for (int v = 0; v < 2; v++) {
+        h.random = start;
+        Fill(h.base, h.data, kScratchBytes);
+        uint32_t blocks[std::size(kOffsets)] = {};
+        for (size_t b = 0; b < std::size(kOffsets) && !drawer; b++) {
+          if (h.random.Below(3) != 0) {
+            blocks[b] = *memory::crt::OperatorNewArray(h.base, 16 + 16 * (1 + h.random.Below(3)));
+            guest::StoreU32(h.base, skeleton + kOffsets[b], blocks[b] + kHeaders[b]);
+          } else {
+            guest::StoreU32(h.base, skeleton + kOffsets[b], 0);
+          }
+        }
+        PPCContext t = CallContext(h);
+        t.r3.u64 = skeleton;
+        ITC_FLAG(native_model_animation) = v == 1;
+        (v == 0 ? f.recompiled : f.native)(t, h.base);
+        ITC_FLAG(native_model_animation) = true;
+        if (drawer) {
+          const uint32_t block = guest::LoadU32(h.base, skeleton + 4);
+          out[v].Word(guest::LoadU32(h.base, skeleton + 0));
+          out[v].Word(block != 0 && memory::IsHeapBlock(block));
+          out[v].Bytes(Read(h.base, skeleton + 8, kScratchBytes - 8));
+          out[v].Word(t.r3.u32);
+          if (block != 0 && memory::IsHeapBlock(block)) {
+            memory::crt::OperatorDelete(block);
+          }
+          continue;
+        }
+        std::vector<uint8_t> area = Read(h.base, h.data, kScratchBytes);
+        // The pointers left (blocks not freed) as their number.
+        for (size_t b = 0; b < std::size(kOffsets); b++) {
+          const uint32_t word = guest::LoadU32(h.base, skeleton + kOffsets[b]);
+          out[v].Word(word == 0 ? 0 : word == blocks[b] + kHeaders[b] ? 1 + uint32_t(b) : 99);
+          for (uint32_t k = 0; k < 4; k++) {
+            area[kOffsets[b] + k] = 0;
+          }
+        }
+        out[v].Bytes(area);
+        for (size_t b = 0; b < std::size(kOffsets); b++) {
+          const bool left = blocks[b] != 0 && memory::IsHeapBlock(blocks[b]);
+          out[v].Word(left);
+          if (left) {
+            memory::crt::OperatorDeleteArray(blocks[b]);
+          }
+        }
+      }
+      results.Check(out[0], out[1], fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void ModelAnimation(Context& h) {
   Sampling(h);
   Curves(h);
   Lifetime(h);
+  Skeletons(h);
+  SkeletonLifetime(h);
 }
 
 }  // namespace harness

@@ -86,4 +86,68 @@ bool TrackSetSetupFloat(uint8_t* base, uint32_t set, uint32_t section);
 // sub_825A6608 and sub_825A1938, never ran in play: the original's).
 bool TrackSetSetup208(uint8_t* base, uint32_t set, uint32_t section);
 
+// --- The skeleton (the base class: +0 the vtable 0x8206CE60, +16 a matrix,
+// +80 the node file's view, +84 its node records (160 bytes), +128 the
+// instances' cursors (20 bytes each), +132, +136 (144-byte node records),
+// +144 and +148 (the nodes' 64-byte matrices) arrays, +156 the root's
+// index; the skeleton: the vtable 0x8206CE50, +176 a float4 a node). ---
+
+// SkeletonBase::SkeletonBase (sub_8259A140): the vtable, +16 the identity,
+// +80 = 0 (XACTWaveEntry::XACTWaveEntry, folded), +128 to +160 = 0; returns
+// it.
+uint32_t SkeletonBaseConstruct(uint8_t* base, uint32_t skeleton);
+// Skeleton::Skeleton (sub_82599758): the base, +176 = 0, the vtable;
+// returns it.
+uint32_t SkeletonConstruct(uint8_t* base, uint32_t skeleton);
+// SkeletonBase::Free (sub_8259A228): +128 freed (operator delete[]), +136,
+// +144 and +132 (count headers: less 16), all four cleared.
+bool SkeletonBaseFree(uint8_t* base, uint32_t skeleton);
+// SkeletonBase::~SkeletonBase (sub_8259A9D0): the vtable, then Free.
+bool SkeletonBaseDestruct(uint8_t* base, uint32_t skeleton);
+// Skeleton::~Skeleton (sub_825999C8): the vtable, +176 freed and cleared,
+// then the base's destructor.
+bool SkeletonDestruct(uint8_t* base, uint32_t skeleton);
+// Skeleton::FreeNodeValues (sub_825997A0): +176 freed and cleared.
+bool SkeletonFreeNodeValues(uint8_t* base, uint32_t skeleton);
+
+// SkeletonCursor::Clear (sub_825A2068): +0, +4, +8, +16 = 0, +12 = 0.0.
+void SkeletonCursorClear(uint8_t* base, uint32_t cursor);
+// SkeletonCursor::View (sub_825A2090): as TrackSet::View, +16 = 0.
+void SkeletonCursorView(uint8_t* base, uint32_t cursor, uint32_t section);
+// Skeleton::LoadNodeValues (sub_825997E0): with +176, instance 0's cursor
+// bound to the section and each entry's node float4 = (+12, +16, +12).
+void SkeletonLoadNodeValues(uint8_t* base, uint32_t skeleton, uint32_t section);
+// Skeleton::NodeCount (sub_82599880): the node file's count; 0 without
+// +176.
+uint32_t SkeletonNodeCount(uint8_t* base, uint32_t skeleton);
+
+// What UpdateMatrices did: nothing (no +176), the matrices multiplied
+// (Matrix::Multiply leaves flush-to-zero on, as the translated code), or
+// handed back to the original with nothing done (a node of type 8 or 16:
+// sub_8259B748 and sub_8259BE40, never in play, stay recompiled).
+enum class MatricesResult { kNothing, kMultiplied, kOriginal };
+// sub_8259C3A8 (models.md): the root's matrix × +16, then in node order
+// each node's matrix × its parent's and its +92's translation row copied
+// in, then the bones' (+132 flag 0x80) × theirs; each multiply noted for
+// interpolation as Matrix::Multiply's adapter does.
+MatricesResult SkeletonUpdateNodeMatrices(uint8_t* base, uint32_t skeleton);
+// Skeleton::UpdateMatrices (sub_825998A0): with +176, the above.
+MatricesResult SkeletonUpdateMatrices(uint8_t* base, uint32_t skeleton);
+// sub_825A20E8 (never ran in play): a node channel's keys sampled at
+// `time` from the key the cursor word at `cursor` holds, which it moves.
+double CursorCurveSample(uint8_t* base, uint32_t keys, uint32_t cursor, uint32_t count,
+                         double time);
+// Skeleton::ApplyAnimation (sub_825998B8): each entry of instance 0's
+// cursor: its node's channels sampled at the node's time into its record.
+void SkeletonApplyAnimation(uint8_t* base, uint32_t skeleton);
+
+// --- Beside it in the library. ---
+
+// PrimitiveDrawer::PrimitiveDrawer (sub_825A1378): the vtable 0x820721D4,
+// +4 = operator new(4). False, with only the vtable written, when operator
+// new would take its error path (the original's, from the start).
+bool PrimitiveDrawerConstruct(uint8_t* base, uint32_t drawer);
+// sub_825A18D8: a 12-byte record's +0 = 0.0, +4, +8 = 0.
+void RecordClear(uint8_t* base, uint32_t record);
+
 }  // namespace model_animation
