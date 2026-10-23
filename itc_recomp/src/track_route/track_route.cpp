@@ -321,6 +321,75 @@ uint32_t NormalizeWith(uint8_t* base, uint32_t route, uint32_t position, Forward
   return 0;
 }
 
+// StepForwardLaneMasked with the slices' count from `slices()`.
+template <typename Slices>
+uint32_t StepForwardLaneMaskedWith(uint8_t* base, uint32_t route, uint32_t position,
+                                   uint32_t lane, Slices slices, uint32_t masks) {
+  ITC_NATIVE_RUNNING("sub_820F9600 TrackRoute::StepForwardLaneMasked");
+  const uint32_t section = Section(base, Load(base, route), LoadU16(base, position));
+  if (Load(base, masks) == 0) {
+    return 0;
+  }
+  uint32_t mask = masks;
+  for (uint32_t m = 0;;) {
+    const FirstBranch first = FirstBranchMatching(base, route, section, mask);
+    if (int32_t(first.count) > 0) {
+      // The matching link's lanes, added up over the links before it: the
+      // first match taken when the lane is within them or it's the only one.
+      int32_t lanes = 0;
+      for (int32_t i = 0; i < 3; i++) {
+        const uint32_t to = LoadU16(base, section + 28 + 4 * uint32_t(i));
+        if (int16_t(to) < 0) {
+          continue;
+        }
+        lanes += int32_t(LoadU8(base, Section(base, Load(base, route), to) + 180) & 0xF);
+        if (i != int32_t(int16_t(first.link))) {
+          continue;
+        }
+        if (LoadS16(base, lane) < lanes || !(int32_t(first.count) > 1)) {
+          return TakeLane(base, route, position, lane, first.section, i, slices);
+        }
+      }
+    }
+    m++;
+    mask = masks + 4 * m;
+    if (Load(base, mask) == 0) {
+      return 0;
+    }
+  }
+}
+
+// The lane normalizers' forward loop: while the slice is past the
+// section's end, `step(count)` (a lane step with the section's slices'
+// count); 1 once in a section, else `otherwise()`.
+template <typename Step, typename Otherwise>
+uint32_t ForwardByLane(uint8_t* base, uint32_t route, uint32_t position, Step step,
+                       Otherwise otherwise) {
+  for (;;) {
+    const uint32_t section = Section(base, Load(base, route), LoadU16(base, position));
+    const int32_t slice = LoadS16(base, position + 2);
+    const int32_t slices = LoadS16(base, section);
+    if (slice < slices) {
+      return 1;
+    }
+    if (step([slices] { return uint32_t(slices); }) == 0) {
+      return otherwise();
+    }
+  }
+}
+
+// The lane normalizers' backward end: NormalizeBack, 1 when it did; else
+// 0, the position (0, 0) unless it's on the route.
+uint32_t BackOrClear(uint8_t* base, uint32_t route, uint32_t position) {
+  if (NormalizeBack(base, route, position) != 0) {
+    return 1;
+  }
+  if (!OnRoute(base, route, position)) {
+    guest::StoreU32(base, position, 0);
+  }
+  return 0;
+}
+
 }  // namespace
 
 // --- Lookups ---
@@ -551,38 +620,7 @@ uint32_t StepForwardLane(uint8_t* base, uint32_t route, uint32_t position, uint3
 
 uint32_t StepForwardLaneMasked(uint8_t* base, uint32_t route, uint32_t position, uint32_t lane,
                                uint32_t count, uint32_t masks) {
-  ITC_NATIVE_RUNNING("sub_820F9600 TrackRoute::StepForwardLaneMasked");
-  const uint32_t section = Section(base, Load(base, route), LoadU16(base, position));
-  if (Load(base, masks) == 0) {
-    return 0;
-  }
-  uint32_t mask = masks;
-  for (uint32_t m = 0;;) {
-    const FirstBranch first = FirstBranchMatching(base, route, section, mask);
-    if (int32_t(first.count) > 0) {
-      // The matching link's lanes, added up over the links before it: the
-      // first match taken when the lane is within them or it's the only one.
-      int32_t lanes = 0;
-      for (int32_t i = 0; i < 3; i++) {
-        const uint32_t to = LoadU16(base, section + 28 + 4 * uint32_t(i));
-        if (int16_t(to) < 0) {
-          continue;
-        }
-        lanes += int32_t(LoadU8(base, Section(base, Load(base, route), to) + 180) & 0xF);
-        if (i != int32_t(int16_t(first.link))) {
-          continue;
-        }
-        if (LoadS16(base, lane) < lanes || !(int32_t(first.count) > 1)) {
-          return TakeLane(base, route, position, lane, first.section, i, WordAt(base, count));
-        }
-      }
-    }
-    m++;
-    mask = masks + 4 * m;
-    if (Load(base, mask) == 0) {
-      return 0;
-    }
-  }
+  return StepForwardLaneMaskedWith(base, route, position, lane, WordAt(base, count), masks);
 }
 
 uint32_t StepBack(uint8_t* base, uint32_t route, uint32_t position) {
@@ -672,6 +710,101 @@ uint32_t NormalizePath(uint8_t* base, uint32_t route, uint32_t position, uint32_
   return NormalizeWith(base, route, position, [&] {
     return NormalizeForwardPath(base, route, position, path, masks);
   });
+}
+
+uint32_t NormalizeLane(uint8_t* base, uint32_t route, uint32_t position, uint32_t lane) {
+  ITC_NATIVE_RUNNING("sub_820FA210 TrackRoute::NormalizeLane");
+  if (OnRoute(base, route, position)) {
+    return 1;
+  }
+  if (LoadU16(base, position + 2) >= 0x8000) {
+    return BackOrClear(base, route, position);
+  }
+  return ForwardByLane(
+      base, route, position,
+      [&](auto slices) { return StepForwardLaneWith(base, route, position, lane, slices); },
+      [&] { return Normalize(base, route, position, 0); });
+}
+
+uint32_t NormalizeLaneMasked(uint8_t* base, uint32_t route, uint32_t position, uint32_t lane,
+                             uint32_t masks) {
+  ITC_NATIVE_RUNNING("sub_820FA350 TrackRoute::NormalizeLaneMasked");
+  if (OnRoute(base, route, position)) {
+    return 1;
+  }
+  const int32_t section = LoadS16(base, position);
+  if (section < 0 || !(section < int32_t(Load(base, Load(base, route))))) {
+    guest::StoreU32(base, position, 0);
+    return 0;
+  }
+  if (LoadU16(base, position + 2) >= 0x8000) {
+    return BackOrClear(base, route, position);
+  }
+  return ForwardByLane(
+      base, route, position,
+      [&](auto slices) {
+        return StepForwardLaneMaskedWith(base, route, position, lane, slices, masks);
+      },
+      [&] { return NormalizeLane(base, route, position, lane); });
+}
+
+uint32_t Point(uint8_t* base, uint32_t route, uint32_t out, uint32_t position, uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_820FA860 TrackRoute::Point");
+  const uint32_t copy = frame + 80;
+  guest::StoreU32(base, copy, Load(base, position));
+  const uint32_t valid = Normalize(base, route, copy, 0);
+  const uint32_t section = LoadU16(base, copy);
+  if (valid != 0) {
+    const double one = Lfs(base, kOne);
+    const int32_t slice = LoadS16(base, copy + 2);
+    const uint32_t record = Record(Section(base, Load(base, route), section), slice);
+    Stfs(base, out + 0, Lfs(base, record + 0));
+    Stfs(base, out + 4, Lfs(base, record + 4));
+    Stfs(base, out + 8, Lfs(base, record + 8));
+    Stfs(base, out + 12, one);
+  }
+  return section;
+}
+
+uint32_t AlongSlice(uint8_t* base, uint32_t route, uint32_t point, uint32_t position,
+                    uint32_t record, uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_820FAE78 TrackRoute::AlongSlice");
+  const double across_x = Fsubs(Lfs(base, point + 0), Lfs(base, record + 0));
+  const double forward_x = Lfs(base, record + 44);
+  const double z = Lfs(base, point + 8);
+  const uint32_t file = Load(base, route);
+  const double forward_z = Lfs(base, record + 48);
+  const double along_x = Fmuls(across_x, forward_x);
+  const double across_z = Fsubs(z, Lfs(base, record + 8));
+  const double length = Lfs(base, file + 8);
+  const double along = Fmadds(across_z, forward_z, along_x);
+  if (!(along < Fneg(length)) && !(along > length)) {
+    return 0;
+  }
+  // The next slice, normalized.
+  const uint32_t copy = frame + 80;
+  const uint32_t section = LoadU16(base, position);
+  const uint32_t slice = LoadU16(base, position + 2);
+  guest::StoreU16(base, copy + 0, uint16_t(section));
+  guest::StoreU16(base, copy + 2, uint16_t(slice + 1));
+  if (along < Lfs(base, kZero)) {
+    return 2;
+  }
+  if (Normalize(base, route, copy, 0) == 0) {
+    return 1;
+  }
+  const uint32_t next = Record(Section(base, Load(base, route), LoadU16(base, copy)),
+                               LoadS16(base, copy + 2));
+  if (next != 0) {
+    return 1;
+  }
+  // A null record (never: what follows reads address 8 and 0, as the
+  // original does).
+  const double dz = Fsubs(Lfs(base, 8), Lfs(base, record + 8));
+  const double squared = Fmuls(along, along);
+  const double dx = Fsubs(Lfs(base, 0), Lfs(base, record + 0));
+  const double distance = Fmadds(dx, dx, Fmuls(dz, dz));
+  return squared < distance ? 0 : 1;
 }
 
 // --- The linear index ---

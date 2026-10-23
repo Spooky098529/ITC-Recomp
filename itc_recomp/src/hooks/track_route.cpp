@@ -29,7 +29,9 @@ ITC_FLAG_BOOL(native_track_route, true, "ITC",
               "StepAlongPath sub_820F8C58, NormalizeBack sub_820F9320 with StepBack "
               "sub_820F8A58, StepForwardMasked sub_820F93A0, NormalizeForward sub_820F9EA8, "
               "StepForwardLane sub_820F9448, StepForwardLaneMasked sub_820F9600, Normalize "
-              "sub_820F9FE8, NormalizeForwardPath sub_820F9F58, NormalizePath sub_820FA0F8, ClampPosition sub_820F8420 with ToIndex sub_820AB408 and FromIndex "
+              "sub_820F9FE8, NormalizeForwardPath sub_820F9F58, NormalizePath sub_820FA0F8, "
+              "NormalizeLane sub_820FA210, NormalizeLaneMasked sub_820FA350, Point "
+              "sub_820FA860, AlongSlice sub_820FAE78, ClampPosition sub_820F8420 with ToIndex sub_820AB408 and FromIndex "
               "sub_820AB498, Distance sub_820F9278 with LinkDistance sub_820F8720, SlicePoint "
               "sub_820F9768 with its case 0 sub_820F985C (cases 5 to 16, never seen in play, on "
               "the translated code)) natively instead of through the translated code (the same "
@@ -77,6 +79,23 @@ ITC_TRACK_ROUTE(820F9448, ctx.r3.u64 = StepForwardLane(base, ctx.r3.u32, ctx.r4.
 // r7 = the masks.
 ITC_TRACK_ROUTE(820F9600, ctx.r3.u64 = StepForwardLaneMasked(base, ctx.r3.u32, ctx.r4.u32,
                                                              ctx.r5.u32, ctx.r6.u32, ctx.r7.u32))
+
+// r5 = the lane (a halfword, changed).
+ITC_TRACK_ROUTE(820FA210, ctx.r3.u64 = NormalizeLane(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+// r6 = the masks.
+ITC_TRACK_ROUTE(820FA350, ctx.r3.u64 = NormalizeLaneMasked(base, ctx.r3.u32, ctx.r4.u32,
+                                                           ctx.r5.u32, ctx.r6.u32))
+
+// --- Points and slices ---
+
+// r3 = the route, r4 = out, r5 = the position; the copy in the original's
+// frame (112 bytes down).
+ITC_TRACK_ROUTE(820FA860, ctx.r3.u64 = Point(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                             ctx.r1.u32 - 112))
+// r4 = the point, r5 = the position, r6 = its slice's record; the next
+// slice's position in the original's frame (128 bytes down).
+ITC_TRACK_ROUTE(820FAE78, ctx.r3.u64 = AlongSlice(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                                  ctx.r6.u32, ctx.r1.u32 - 128))
 
 // --- The linear index ---
 

@@ -123,6 +123,29 @@ uint32_t NormalizeForwardPath(uint8_t* base, uint32_t route, uint32_t position, 
 uint32_t NormalizePath(uint8_t* base, uint32_t route, uint32_t position, uint32_t path,
                        uint32_t masks);
 
+// TrackRoute::NormalizeLane (sub_820FA210): 1 when on the route; past the
+// end, StepForwardLane while past it (the lane at `lane` carried), else
+// Normalize; before the start, NormalizeBack, else 0 and the position (0,
+// 0) unless it's on the route.
+uint32_t NormalizeLane(uint8_t* base, uint32_t route, uint32_t position, uint32_t lane);
+// TrackRoute::NormalizeLaneMasked (sub_820FA350): as NormalizeLane, a
+// section off the route (0, 0) and 0 first, forward by
+// StepForwardLaneMasked, else NormalizeLane.
+uint32_t NormalizeLaneMasked(uint8_t* base, uint32_t route, uint32_t position, uint32_t lane,
+                             uint32_t masks);
+
+// --- Points and slices ---
+
+// TrackRoute::Point (sub_820FA860): a copy of the position (at `frame` +
+// 80, the original's frame) normalized; when on the route, out (x, y, z,
+// 1.0) = its slice's center. Returns the copy's section.
+uint32_t Point(uint8_t* base, uint32_t route, uint32_t out, uint32_t position, uint32_t frame);
+// TrackRoute::AlongSlice (sub_820FAE78): the point's offset along the road
+// from the slice's center (`record`): 0 within a slice's length, 2 before,
+// 1 past. The next slice's position (at `frame` + 80) normalized when past.
+uint32_t AlongSlice(uint8_t* base, uint32_t route, uint32_t point, uint32_t position,
+                    uint32_t record, uint32_t frame);
+
 // --- The linear index (the global route's file) ---
 
 // TrackRoute::ToIndex (sub_820AB408): the slices before the packed position

@@ -90,6 +90,16 @@ ITC_NATIVE_STEP(NativeNormalizeForwardPath,
 ITC_NATIVE_STEP(NativeNormalizePath,
                 ctx.r3.u64 = tr::NormalizePath(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
                                                ctx.r6.u32))
+ITC_NATIVE_STEP(NativeNormalizeLane,
+                ctx.r3.u64 = tr::NormalizeLane(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+ITC_NATIVE_STEP(NativeNormalizeLaneMasked,
+                ctx.r3.u64 = tr::NormalizeLaneMasked(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                                     ctx.r6.u32))
+ITC_NATIVE_STEP(NativePoint, ctx.r3.u64 = tr::Point(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                                    ctx.r1.u32 - 112))
+ITC_NATIVE_STEP(NativeAlongSlice,
+                ctx.r3.u64 = tr::AlongSlice(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
+                                            ctx.r1.u32 - 128))
 ITC_NATIVE_STEP(NativeStepBack, ctx.r3.u64 = tr::StepBack(base, ctx.r3.u32, ctx.r4.u32))
 ITC_NATIVE_STEP(NativeNormalizeBack,
                 ctx.r3.u64 = tr::NormalizeBack(base, ctx.r3.u32, ctx.r4.u32))
@@ -272,6 +282,10 @@ enum Kind {
   kNormalize,
   kNormalizeForwardPath,
   kNormalizePath,
+  kNormalizeLane,
+  kNormalizeLaneMasked,
+  kPointOf,
+  kAlongSlice,
   kStepBack,
   kNormalizeBack,
   kToIndex,
@@ -326,6 +340,14 @@ void TrackRoute(Context& h) {
        NativeNormalizeForwardPath, kNormalizeForwardPath, 2000},
       {"TrackRoute::NormalizePath (sub_820FA0F8)", Original<__imp__sub_820FA0F8>,
        NativeNormalizePath, kNormalizePath, 2000},
+      {"TrackRoute::NormalizeLane (sub_820FA210)", Original<__imp__sub_820FA210>,
+       NativeNormalizeLane, kNormalizeLane, 2000},
+      {"TrackRoute::NormalizeLaneMasked (sub_820FA350)", Original<__imp__sub_820FA350>,
+       NativeNormalizeLaneMasked, kNormalizeLaneMasked, 2000},
+      {"TrackRoute::Point (sub_820FA860)", Original<__imp__sub_820FA860>, NativePoint, kPointOf,
+       2000},
+      {"TrackRoute::AlongSlice (sub_820FAE78)", Original<__imp__sub_820FAE78>, NativeAlongSlice,
+       kAlongSlice, 3000},
       {"TrackRoute::StepBack (sub_820F8A58)", Original<__imp__sub_820F8A58>, NativeStepBack,
        kStepBack, 2000},
       {"TrackRoute::NormalizeBack (sub_820F9320)", Original<__imp__sub_820F9320>,
@@ -475,7 +497,10 @@ void TrackRoute(Context& h) {
         }
         case kNormalize:
         case kNormalizeForwardPath:
-        case kNormalizePath: {
+        case kNormalizePath:
+        case kNormalizeLane:
+        case kNormalizeLaneMasked:
+        case kPointOf: {
           // On the route, before its start, past its end, or a section off
           // it (beyond the count, or above 0x7FFF).
           const uint32_t section = guest::LoadU16(h.base, area + kA);
@@ -501,6 +526,35 @@ void TrackRoute(Context& h) {
           const uint32_t path = r.Below(4) == 0 ? 0 : area + kPath;
           r5 = f.kind == kNormalize ? masks : path;
           r6 = masks;
+          if (f.kind == kNormalizeLane || f.kind == kNormalizeLaneMasked) {
+            guest::StoreU16(h.base, area + kLane, uint16_t(int32_t(r.Below(14)) - 2));
+            r5 = area + kLane;
+            r6 = area + kMasks;  // never null: the masked lane step reads it
+          } else if (f.kind == kPointOf) {
+            r4 = area + kOut;
+            r5 = area + kA;
+          }
+          break;
+        }
+        case kAlongSlice: {
+          // A slice of the route (now and then its section's last), its
+          // record, and a point near it (or anywhere).
+          const uint32_t section = r.Below(route.sections);
+          const uint32_t n = route.Slices(section);
+          const uint32_t slice = r.Below(3) == 0 ? n - 1 : r.Below(n);
+          guest::StoreU16(h.base, area + kA, uint16_t(section));
+          guest::StoreU16(h.base, area + kA + 2, uint16_t(slice));
+          const uint32_t record = route.Address(section) + 124 + 84 * slice;
+          if (r.Below(4)) {
+            for (uint32_t i = 0; i < 3; i++) {
+              const float c0 = guest::LoadFloat(h.base, record + 4 * i);
+              const float spread = float(r.Below(400)) / 20.0f - 10.0f;
+              guest::StoreFloat(h.base, area + kPoint + 4 * i, c0 + spread);
+            }
+          }
+          r4 = area + kPoint;
+          r5 = area + kA;
+          r6 = record;
           break;
         }
         case kStepForwardLane:
