@@ -171,6 +171,10 @@ Rows not yet moved stay in the table below. So far:
   with its arguments into UTF-16, pages) and the bitmap font (four pages
   of glyphs in a texture's channels, their shaders, a text's width, and
   drawing a text as quads through the command list) (B7).
+- [`std-string.md`](std-string.md): the C++ library's narrow string
+  (`std::string`: constructors, `_Tidy` and the destructor, growth,
+  assign and append) as seen in play, with the library's wildcard search
+  and replace over it and two global strings' static set-ups (B7).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
