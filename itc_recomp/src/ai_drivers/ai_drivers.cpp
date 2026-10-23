@@ -11,6 +11,7 @@
 #include "vehicle_accessors/vehicle_accessors.h"
 
 #include "base/log.h"
+#include "memory/c_runtime_heap.h"
 
 #include <cmath>
 #include <cstring>
@@ -2598,6 +2599,265 @@ void UpdatePedals(uint8_t* base, uint32_t driver, uint32_t frame) {
   };
   approach(driver + 6124, driver + 6140);
   approach(driver + 6128, driver + 6144);
+}
+
+// --- The drivers' table and the path's lines and ranges ---
+
+namespace {
+// The ring entry k (from the path's start +5138, modulo 80, as divw
+// truncates), without a check against the entries' count.
+uint32_t RingAt(uint8_t* base, uint32_t path, int32_t k) {
+  const int32_t at = int32_t(uint32_t(LoadS16(base, path + 5138)) + uint32_t(k));
+  return path + (uint32_t(at - (at / 80) * 80) << 6) + 16;
+}
+}  // namespace
+
+bool Create(uint8_t* base, uint64_t* r3) {
+  ITC_NATIVE_RUNNING("sub_8213B1E0 AiDrivers::Create");
+  const auto block = memory::crt::OperatorNew(base, 43120);
+  if (!block) {
+    return false;
+  }
+  const uint32_t made = *block;
+  if (made != 0) {
+    for (uint32_t i = 0; i < 7; i++) {
+      InitPath(base, made + kDriverBytes * i);
+    }
+  }
+  guest::StoreU32(base, kDrivers, made);
+  *r3 = made;
+  if (made == 0) {
+    return true;
+  }
+  guest::ForEachHostPart(base, made, 43120, [](uint8_t* host, uint32_t, uint32_t bytes) {
+    std::memset(host, 0, bytes);
+  });
+  for (uint32_t i = 0; i < 7; i++) {
+    const uint32_t vehicle = vehicle_accessors::VehicleGet(base, i);
+    const uint32_t driver = kDriverBytes * i + Load(base, kDrivers);
+    ClearSkill(base, driver + 6048);
+    guest::StoreU32(base, driver + 500, 0);
+    *r3 = ResetDriver(base, driver);
+    guest::StoreU32(base, kDriverBytes * i + Load(base, kDrivers), i);
+    if (vehicle != 0) {
+      guest::StoreU32(base, kDriverBytes * i + Load(base, kDrivers) + 160, vehicle);
+    }
+  }
+  return true;
+}
+
+void ApplyCornerLine(uint8_t* base, uint32_t path, uint32_t index) {
+  ITC_NATIVE_RUNNING("sub_8213BB58 AiPath::ApplyCornerLine");
+  const uint32_t record = Load(base, index) * 44u + path + 5164;
+  const uint32_t data = Load(base, record + 0);
+  if (data == 0) {
+    return;
+  }
+  const uint32_t table = Load(base, record + 4);
+  if (table == 0) {
+    return;
+  }
+  const int32_t count = LoadS16(base, data + 0);
+  const int32_t first = LoadS16(base, record + 14);
+  if (first >= count) {
+    return;
+  }
+  int32_t start = int16_t(uint16_t(guest::LoadU16(base, record + 10) + uint32_t(first)));
+  if (start >= LoadS16(base, path + 5136)) {
+    return;
+  }
+  if (start < 0) {
+    guest::StoreU16(base, record + 14, uint16_t(first - start));
+    start = 0;
+  }
+  int32_t k = start;
+  int32_t n = LoadS16(base, path + 5136);
+  while (k < n) {
+    const int32_t at = LoadS16(base, record + 14);
+    if (at >= count) {
+      return;
+    }
+    const uint32_t entry = RingEntry(base, path, k);
+    CopyWord(base, uint32_t(at) * 8u + table + 4, entry + 48);
+    if (guest::LoadU8(base, record + 36) == 1) {
+      const int32_t until = LoadS16(base, data + 50);
+      const int32_t now = LoadS16(base, record + 14);
+      if (now < until) {
+        const double slope = Lfs(base, record + 28);
+        const double offset = Lfs(base, entry + 48);
+        Stfs(base, entry + 48, Fmadds(IntToFloat(until - now), slope, offset));
+      }
+    }
+    if (guest::LoadU8(base, record + 37) == 1) {
+      const int32_t from = LoadS16(base, data + 52);
+      const int32_t now = LoadS16(base, record + 14);
+      if (now > from) {
+        const double slope = Lfs(base, record + 32);
+        const double offset = Lfs(base, entry + 48);
+        Stfs(base, entry + 48, Fmadds(IntToFloat(now - from), slope, offset));
+      }
+    }
+    guest::StoreU16(base, record + 14, uint16_t(guest::LoadU16(base, record + 14) + 1));
+    k = int16_t(k + 1);
+    n = LoadS16(base, path + 5136);
+  }
+}
+
+void ApplyCornerLines(uint8_t* base, uint32_t path, uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_8213CFC8 AiPath::ApplyCornerLines");
+  int32_t i = 0;
+  guest::StoreU32(base, frame + 80, 0);
+  if (LoadS16(base, path + 5162) <= 0) {
+    return;
+  }
+  do {
+    ApplyCornerLine(base, path, frame + 80);
+    i++;
+    guest::StoreU32(base, frame + 80, uint32_t(i));
+  } while (i < LoadS16(base, path + 5162));
+}
+
+void KeepToCornerSide(uint8_t* base, uint32_t path, uint32_t record, uint32_t count,
+                      uint32_t margin, uint32_t shift) {
+  ITC_NATIVE_RUNNING("sub_8213CA18 AiPath::KeepToCornerSide");
+  int32_t k = LoadS16(base, record + 10);
+  if (k < 1) {
+    k = 1;
+  }
+  const double direction = Lfs(base, record + 16);
+  const int32_t n = int32_t(Load(base, count));
+  double m = Lfs(base, margin);
+  const double zero = Lfs(base, kZero);
+  const double by = Lfs(base, shift);
+  if (direction < zero) {
+    if (by < zero) {
+      m = Fadds(by, m);
+    }
+    for (; k < n; k++) {
+      const uint32_t entry = RingAt(base, path, k);
+      const double high = Fsubs(Lfs(base, entry + 36), m);
+      if (high < Lfs(base, entry + 44)) {
+        Stfs(base, entry + 44, high);
+      }
+      const double low = Lfs(base, entry + 40);
+      if (Lfs(base, entry + 44) < low) {
+        Stfs(base, entry + 44, low);
+      }
+    }
+  } else {
+    if (by > zero) {
+      m = Fadds(by, m);
+    }
+    for (; k < n; k++) {
+      const uint32_t entry = RingAt(base, path, k);
+      const double low = Fadds(Lfs(base, entry + 32), m);
+      if (low > Lfs(base, entry + 40)) {
+        Stfs(base, entry + 40, low);
+      }
+      const double high = Lfs(base, entry + 44);
+      if (Lfs(base, entry + 40) > high) {
+        Stfs(base, entry + 40, high);
+      }
+    }
+  }
+}
+
+uint32_t SetRanges(uint8_t* base, uint32_t path, uint32_t count, uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_8213D670 AiPath::SetRanges");
+  uint32_t r3 = path;
+  const uint32_t driver = Load(base, path + 0);
+  const uint32_t mode = Load(base, path + 5520);
+  const double steer = Lfs(base, driver + 152);
+  const double half = Lfs(base, driver + 116);
+  const double shift = Fmuls(steer, Lfs(base, kFifth));
+  Stfs(base, frame + 80, shift);
+  Stfs(base, frame + 84, Fadds(half, Lfs(base, 0x82002A14)));
+  if (int32_t(mode) == 1) {
+    Stfs(base, frame + 80, Lfs(base, kZero));
+  } else {
+    const double lowest = Lfs(base, kMinusOne);
+    if (shift < lowest) {
+      Stfs(base, frame + 80, lowest);
+    } else {
+      const double highest = Lfs(base, kOne);
+      if (shift > highest) {
+        Stfs(base, frame + 80, highest);
+      }
+    }
+  }
+  for (int32_t i = 1; i < int32_t(Load(base, count)); i++) {
+    r3 = RingAt(base, path, i);
+    Widen(base, r3, frame + 84, frame + 80);
+  }
+  if (LoadS16(base, path + 5162) > 0) {
+    int32_t i = 0;
+    uint32_t record = path + 5164;
+    do {
+      r3 = path;
+      KeepToCornerSide(base, path, record, count, driver + 128, frame + 80);
+      i++;
+      record += 44;
+    } while (i < LoadS16(base, path + 5162));
+  }
+  return r3;
+}
+
+uint32_t DropOffRouteCorners(uint8_t* base, uint32_t path) {
+  ITC_NATIVE_RUNNING("sub_8213DC08 AiPath::DropOffRouteCorners");
+  if (LoadS16(base, path + 5162) <= 0) {
+    return path;
+  }
+  uint32_t r3 = 0;
+  int32_t kept = 0;
+  for (;;) {
+    const uint32_t data = Load(base, path + 44 * uint32_t(kept) + 5164);
+    r3 = data == 0 ? 0 : SharesSections(base, path, data);
+    if (int32_t(r3) != 1) {
+      break;
+    }
+    kept = int16_t(kept + 1);
+    if (!(kept < LoadS16(base, path + 5162))) {
+      return r3;
+    }
+  }
+  const double zero = Lfs(base, kZero);
+  if (kept > 1) {
+    const uint32_t last = path + 44 * uint32_t(kept) + 5120;  // record kept - 1
+    if (guest::LoadU8(base, last + 37) == 1) {
+      const uint32_t data = Load(base, last + 0);
+      guest::StoreU8(base, last + 37, 0);
+      const int32_t at = LoadS16(base, last + 14);
+      const uint16_t most = guest::LoadU16(base, data + 52);
+      if (at > int32_t(int16_t(most))) {
+        guest::StoreU16(base, last + 14, most);
+      }
+      Stfs(base, last + 32, zero);
+    }
+  }
+  int32_t k = kept;
+  if (k < LoadS16(base, path + 5162)) {
+    const double one = Lfs(base, kOne);
+    do {
+      const uint32_t record = path + 44 * uint32_t(k) + 5164;
+      k = int16_t(k + 1);
+      Stfs(base, record + 16, one);
+      guest::StoreU32(base, record + 0, 0);
+      Stfs(base, record + 20, zero);
+      guest::StoreU32(base, record + 4, 0);
+      Stfs(base, record + 28, zero);
+      guest::StoreU16(base, record + 8, 0);
+      Stfs(base, record + 32, zero);
+      guest::StoreU16(base, record + 10, 0);
+      guest::StoreU16(base, record + 12, 0);
+      guest::StoreU16(base, record + 14, 0);
+      guest::StoreU32(base, record + 24, 0);
+      guest::StoreU8(base, record + 36, 0);
+      guest::StoreU8(base, record + 37, 0);
+      guest::StoreU32(base, record + 40, 0);
+    } while (k < LoadS16(base, path + 5162));
+  }
+  guest::StoreU16(base, path + 5162, uint16_t(kept));
+  return r3;
 }
 
 }  // namespace ai_drivers

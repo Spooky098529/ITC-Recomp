@@ -18,6 +18,7 @@
 #include "base/flags.h"
 #include "base/hash.h"
 #include "base/log.h"
+#include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
 #include "track_route/track_route.h"
 
@@ -270,6 +271,25 @@ void NativeSteerToTarget(PPCContext& ctx, uint8_t* base) {
 }
 ITC_NATIVE_STEP(NativeUpdatePedals, ai::UpdatePedals(base, ctx.r3.u32, ctx.r1.u32 - 112))
 
+void NativeCreate(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  uint64_t r3 = 0;
+  if (ai::Create(base, &r3)) {
+    ctx.r3.u64 = r3;
+    return;
+  }
+  g_fallbacks++;
+  __imp__sub_8213B1E0(ctx, base);
+}
+ITC_NATIVE_STEP(NativeApplyCornerLine, ai::ApplyCornerLine(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_STEP(NativeApplyCornerLines, ai::ApplyCornerLines(base, ctx.r3.u32, ctx.r1.u32 - 112))
+ITC_NATIVE_STEP(NativeKeepToCornerSide, ai::KeepToCornerSide(base, ctx.r3.u32, ctx.r4.u32,
+                                                             ctx.r5.u32, ctx.r6.u32, ctx.r7.u32))
+ITC_NATIVE_STEP(NativeSetRanges,
+                ctx.r3.u64 = ai::SetRanges(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 128))
+ITC_NATIVE_STEP(NativeDropOffRouteCorners,
+                ctx.r3.u64 = ai::DropOffRouteCorners(base, ctx.r3.u32))
+
 // Runs the recompiled version with the native flag off.
 template <GuestFunction recompiled>
 void Original(PPCContext& ctx, uint8_t* base) {
@@ -430,6 +450,11 @@ enum Kind {
   kUpdateSpeed,
   kSteerToTarget,
   kUpdatePedals,
+  kApplyCornerLine,
+  kApplyCornerLines,
+  kKeepToCornerSide,
+  kSetRanges,
+  kDropOffRouteCorners,
 };
 
 }  // namespace
@@ -626,6 +651,16 @@ void AiDrivers(Context& h) {
        NativeSteerToTarget, kSteerToTarget, 3000},
       {"AiDriver::UpdatePedals (sub_8213A428)", Original<__imp__sub_8213A428>,
        NativeUpdatePedals, kUpdatePedals, 3000},
+      {"AiPath::ApplyCornerLine (sub_8213BB58)", Original<__imp__sub_8213BB58>,
+       NativeApplyCornerLine, kApplyCornerLine, 3000},
+      {"AiPath::ApplyCornerLines (sub_8213CFC8)", Original<__imp__sub_8213CFC8>,
+       NativeApplyCornerLines, kApplyCornerLines, 3000},
+      {"AiPath::KeepToCornerSide (sub_8213CA18)", Original<__imp__sub_8213CA18>,
+       NativeKeepToCornerSide, kKeepToCornerSide, 3000},
+      {"AiPath::SetRanges (sub_8213D670)", Original<__imp__sub_8213D670>, NativeSetRanges,
+       kSetRanges, 3000},
+      {"AiPath::DropOffRouteCorners (sub_8213DC08)", Original<__imp__sub_8213DC08>,
+       NativeDropOffRouteCorners, kDropOffRouteCorners, 3000},
   };
   const uint32_t area = memory::Alloc(kAreaBytes, 0);
   const uint32_t driver = area + kDriver, vehicle = area + kVehicle, io = area + kIo;
@@ -1554,6 +1589,113 @@ void AiDrivers(Context& h) {
           floats.push_back({kDriver + 6140, 2});
           break;
         }
+        case kApplyCornerLine:
+        case kApplyCornerLines: {
+          // Three corners' data in the vehicle's bytes (0x300 apart: +0 the
+          // table's count, +50 and +52, the table's floats from +56), nine
+          // records (+5164: the data, the table, +10, +14, the slopes +28 and
+          // +32, the bytes +36 and +37), the ring's count and start.
+          const uint32_t path = driver + kPath;
+          for (uint32_t i = 0; i < 3; i++) {
+            const uint32_t data = vehicle + 0x300 * i;
+            guest::StoreU16(h.base, data + 0, uint16_t(int32_t(r.Below(40)) - 2));
+            guest::StoreU16(h.base, data + 50, uint16_t(int32_t(r.Below(46)) - 5));
+            guest::StoreU16(h.base, data + 52, uint16_t(int32_t(r.Below(46)) - 5));
+            for (uint32_t k = 0; k < 40; k++) {
+              guest::StoreU32(h.base, data + 56 + 8 * k + 4, RandomFloat(r, 30.0f));
+            }
+          }
+          for (uint32_t i = 0; i < 9; i++) {
+            const uint32_t record = path + 5164 + 44 * i;
+            const uint32_t data = r.Below(8) == 0 ? 0 : vehicle + 0x300 * r.Below(3);
+            guest::StoreU32(h.base, record + 0, data);
+            guest::StoreU32(h.base, record + 4, data == 0 || r.Below(10) == 0 ? 0 : data + 56);
+            guest::StoreU16(h.base, record + 10, uint16_t(int32_t(r.Below(100)) - 30));
+            guest::StoreU16(h.base, record + 14, uint16_t(int32_t(r.Below(43)) - 3));
+            guest::StoreU32(h.base, record + 28, RandomFloat(r, 2.0f));
+            guest::StoreU32(h.base, record + 32, RandomFloat(r, 2.0f));
+            guest::StoreU8(h.base, record + 36, uint8_t(r.Below(3)));
+            guest::StoreU8(h.base, record + 37, uint8_t(r.Below(3)));
+          }
+          guest::StoreU16(h.base, path + 5136, uint16_t(int32_t(r.Below(85)) - 2));
+          guest::StoreU16(h.base, path + 5138, uint16_t(r.Below(200)));
+          guest::StoreU16(h.base, path + 5162, uint16_t(int32_t(r.Below(10)) - 1));
+          guest::StoreU32(h.base, io, r.Below(9));
+          r3 = path;
+          r4 = io;
+          for (uint32_t k = 0; k < 80; k++) {
+            floats.push_back({kPath + 16 + 64 * k + 48, 1});
+          }
+          break;
+        }
+        case kKeepToCornerSide:
+        case kSetRanges: {
+          // The corner records' +10 and directions (+16), the ring's start,
+          // the count (io), the margin and shift (io + 4, + 8: KeepToCornerSide)
+          // or the driver's +116, +128, +152 and the mode (SetRanges).
+          const uint32_t path = driver + kPath;
+          for (uint32_t i = 0; i < 8; i++) {
+            const uint32_t record = path + 5164 + 44 * i;
+            guest::StoreU16(h.base, record + 10, uint16_t(int32_t(r.Below(100)) - 20));
+            guest::StoreU32(h.base, record + 16, r.Below(4) == 0 ? RandomFloat(r, 2.0f)
+                                                 : FloatBits(r.Below(2) ? 1.0f : -1.0f));
+          }
+          guest::StoreU16(h.base, path + 5138, uint16_t(r.Below(200)));
+          guest::StoreU16(h.base, path + 5162, uint16_t(int32_t(r.Below(10)) - 1));
+          guest::StoreU32(h.base, io, uint32_t(int32_t(r.Below(84)) - 2));
+          guest::StoreU32(h.base, io + 4, RandomFloat(r, 2.0f));
+          guest::StoreU32(h.base, io + 8, RandomFloat(r, 2.0f));
+          guest::StoreU32(h.base, path + 0, driver);
+          guest::StoreU32(h.base, path + 5520, r.Below(3));
+          guest::StoreU32(h.base, driver + 116, RandomFloat(r, 3.0f));
+          guest::StoreU32(h.base, driver + 128, RandomFloat(r, 2.0f));
+          guest::StoreU32(h.base, driver + 152, RandomFloat(r, 10.0f));
+          r3 = path;
+          if (f.kind == kKeepToCornerSide) {
+            r4 = path + 5164 + 44 * r.Below(8);
+            r5 = io;
+            r6 = io + 4;
+            r7 = io + 8;
+          } else {
+            r4 = io;
+          }
+          for (uint32_t k = 0; k < 80; k++) {
+            floats.push_back({kPath + 16 + 64 * k + 40, 2});
+          }
+          break;
+        }
+        case kDropOffRouteCorners: {
+          // Four corners' data in the vehicle's bytes (0x300 apart: +2 and
+          // +36 its sections, +52), the path's sections (+5144, +5146; most
+          // corners share them), nine records (+5164: the data, +14, +37).
+          const uint32_t path = driver + kPath;
+          guest::StoreU16(h.base, path + 5144, uint16_t(int32_t(r.Below(10)) - 1));
+          for (uint32_t i = 0; i < 8; i++) {
+            guest::StoreU16(h.base, path + 5146 + 2 * i, uint16_t(r.Below(7)));
+          }
+          for (uint32_t i = 0; i < 4; i++) {
+            const uint32_t data = vehicle + 0x300 * i;
+            const bool shares = r.Below(5) != 0;
+            guest::StoreU16(h.base, data + 2, shares ? guest::LoadU16(h.base, path + 5144)
+                                                     : uint16_t(int32_t(r.Below(8)) - 1));
+            for (uint32_t k = 0; k < 8; k++) {
+              guest::StoreU16(h.base, data + 36 + 2 * k,
+                              shares ? guest::LoadU16(h.base, path + 5146 + 2 * k)
+                                     : uint16_t(r.Below(7)));
+            }
+            guest::StoreU16(h.base, data + 52, uint16_t(int32_t(r.Below(50)) - 5));
+          }
+          guest::StoreU16(h.base, path + 5162, uint16_t(int32_t(r.Below(10)) - 1));
+          for (uint32_t i = 0; i < 9; i++) {
+            const uint32_t record = path + 5164 + 44 * i;
+            guest::StoreU32(h.base, record + 0,
+                            r.Below(10) == 0 ? 0 : vehicle + 0x300 * r.Below(4));
+            guest::StoreU16(h.base, record + 14, uint16_t(int32_t(r.Below(60)) - 5));
+            guest::StoreU8(h.base, record + 37, uint8_t(r.Below(3)));
+          }
+          r3 = path;
+          break;
+        }
       }
       // Guest memory is one host mapping: the blocks copied as they are.
       const std::vector<uint8_t> inputs(h.base + area, h.base + area + kAreaBytes);
@@ -1617,6 +1759,47 @@ void AiDrivers(Context& h) {
         }
       }
       results.Check(out[0], out[1], what);
+    }
+    results.Report();
+  }
+  // AiDrivers::Create (sub_8213B1E0): each run makes its own table, so the
+  // tables are compared with the words pointing into them as offsets (and
+  // r3, a driver in it, the same way); both freed after.
+  {
+    Results results("AiDrivers::Create (sub_8213B1E0)");
+    constexpr uint32_t kTableBytes = 7 * ai::kDriverBytes;
+    for (int c = 0; c < 50; c++) {
+      const uint32_t array = r.Below(4) == 0 ? 0 : vehicles;
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        guest::StoreU32(h.base, kVehiclesGlobal, array);
+        PPCContext t = CallContext(h);
+        t.fpscr.disableFlushModeUnconditional();
+        (v == 0 ? Original<__imp__sub_8213B1E0> : NativeCreate)(t, h.base);
+        const uint32_t made = guest::LoadU32(h.base, ai::kDrivers);
+        guest::StoreU32(h.base, ai::kDrivers, saved_drivers);
+        guest::StoreU32(h.base, kVehiclesGlobal, saved_vehicles);
+        const auto relative = [&](uint32_t word) {
+          return made != 0 && word - made < kTableBytes ? 0xA1000000u | (word - made) : word;
+        };
+        std::vector<uint8_t> bytes;
+        if (made != 0) {
+          for (uint32_t i = 0; i < kTableBytes; i += 4) {
+            const uint32_t word = relative(guest::LoadU32(h.base, made + i));
+            for (int b = 0; b < 4; b++) {
+              bytes.push_back(uint8_t(word >> (24 - 8 * b)));
+            }
+          }
+        }
+        out[v].Bytes(bytes);
+        out[v].Word(made == 0 ? 0 : 1);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+        out[v].Word(relative(t.r3.u32));
+        if (made != 0) {
+          memory::crt::OperatorDelete(made);
+        }
+      }
+      results.Check(out[0], out[1], fmt::format("case {}", c));
     }
     results.Report();
   }

@@ -93,7 +93,10 @@ ITC_FLAG_BOOL(native_ai_drivers, true, "ITC",
               "AiDriver::UpdateState sub_82139AC8 (with its state 6's step, sub_821462A0, never "
               "seen in play), AiDriver::LimitForCorner sub_8213A620, "
               "AiDriver::UpdateTargetSpeed sub_8213AB98, AiDriver::UpdateSpeed sub_8213ACD0, "
-              "AiDriver::SteerToTarget sub_82138D78, AiDriver::UpdatePedals sub_8213A428) "
+              "AiDriver::SteerToTarget sub_82138D78, AiDriver::UpdatePedals sub_8213A428, "
+              "AiDrivers::Create sub_8213B1E0, AiPath::ApplyCornerLine sub_8213BB58, "
+              "AiPath::ApplyCornerLines sub_8213CFC8, AiPath::KeepToCornerSide sub_8213CA18, "
+              "AiPath::SetRanges sub_8213D670, AiPath::DropOffRouteCorners sub_8213DC08) "
               "natively instead of "
               "through the translated code (the same words, bit for bit; checked by "
               "--run_harnesses=ai_drivers). Those "
@@ -343,3 +346,30 @@ ITC_AI_DRIVERS(82138D78, {
 })
 // r3 kept; the original's frame 112 bytes down.
 ITC_AI_DRIVERS(8213A428, UpdatePedals(base, ctx.r3.u32, ctx.r1.u32 - 112))
+
+// --- The drivers' table and the path's lines and ranges ---
+
+// The original where operator new fails natively.
+extern "C" REX_FUNC(sub_8213B1E0) {
+  REX_FUNC_PROLOGUE();
+  if (ITC_FLAG(native_ai_drivers)) {
+    ctx.fpscr.disableFlushMode();
+    uint64_t r3 = 0;
+    if (Create(base, &r3)) {
+      ctx.r3.u64 = r3;
+      return;
+    }
+  }
+  __imp__sub_8213B1E0(ctx, base);
+}
+// r4 = &the record's index (r3 kept).
+ITC_AI_DRIVERS(8213BB58, ApplyCornerLine(base, ctx.r3.u32, ctx.r4.u32))
+// The original's frame 112 bytes down (r3 kept).
+ITC_AI_DRIVERS(8213CFC8, ApplyCornerLines(base, ctx.r3.u32, ctx.r1.u32 - 112))
+// r4 = the record, r5 = &the count, r6 = &the margin, r7 = &the shift (r3
+// kept).
+ITC_AI_DRIVERS(8213CA18, KeepToCornerSide(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
+                                          ctx.r7.u32))
+// r4 = &the count; the original's frame 128 bytes down.
+ITC_AI_DRIVERS(8213D670, ctx.r3.u64 = SetRanges(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 128))
+ITC_AI_DRIVERS(8213DC08, ctx.r3.u64 = DropOffRouteCorners(base, ctx.r3.u32))

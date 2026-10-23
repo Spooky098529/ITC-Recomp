@@ -475,4 +475,39 @@ uint32_t SteerToTarget(uint8_t* base, uint32_t driver, double* f1);
 // 1.0.
 void UpdatePedals(uint8_t* base, uint32_t driver, uint32_t frame);
 
+// --- The drivers' table and the path's lines and ranges ---
+
+// AiDrivers::Create (sub_8213B1E0): the table of 7 drivers from operator
+// new (each InitPath) into [0x826C6074], zeroed, then each driver's skill
+// cleared, +500 = 0, ResetDriver, +0 = its index and +160 = Vehicle::Get of
+// it (when there is one). `r3` = the r3 the original leaves (the last
+// ResetDriver's, or 0 without a table). False, with nothing done, when
+// operator new fails natively (the original runs then).
+bool Create(uint8_t* base, uint64_t* r3);
+// AiPath::ApplyCornerLine (sub_8213BB58): for the corner record at the
+// index at `index`, the ring entries' +48 from the corner's table (+4) from
+// its position +14 on, with the slopes +28 and +32 (see the row).
+void ApplyCornerLine(uint8_t* base, uint32_t path, uint32_t index);
+// AiPath::ApplyCornerLines (sub_8213CFC8): ApplyCornerLine for each corner
+// record (the index written at frame + 80: `frame` the original's, 112
+// bytes below the caller's stack pointer).
+void ApplyCornerLines(uint8_t* base, uint32_t path, uint32_t frame);
+// AiPath::KeepToCornerSide (sub_8213CA18): the ring entries from the
+// record's +10 (at least 1) up to the count at `count` kept to the corner's
+// side (+40 raised, or +44 lowered, by the margin at `margin` and the shift
+// at `shift`).
+void KeepToCornerSide(uint8_t* base, uint32_t path, uint32_t record, uint32_t count,
+                      uint32_t margin, uint32_t shift);
+// AiPath::SetRanges (sub_8213D670): the shift (the driver's +152 x 0.2 in
+// -1.0 to 1.0, 0.0 in mode 1) and margin (+116 + 0.6) at frame + 80 and +
+// 84 (`frame` 128 bytes down), entries 1 to the count at `count` - 1
+// widened (Widen), KeepToCornerSide for each corner record (the margin the
+// driver's +128). Returns the r3 the original leaves.
+uint32_t SetRanges(uint8_t* base, uint32_t path, uint32_t count, uint32_t frame);
+// AiPath::DropOffRouteCorners (sub_8213DC08): the corner records kept
+// while SharesSections; the rest cleared and the count +5162 cut (see the
+// row). Returns the r3 the original leaves (the path, or the last
+// SharesSections' answer, 0 for a record without data).
+uint32_t DropOffRouteCorners(uint8_t* base, uint32_t path);
+
 }  // namespace ai_drivers
