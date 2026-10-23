@@ -38,7 +38,8 @@ ITC_FLAG_BOOL(native_track_route, true, "ITC",
               "sub_820F9FE8, NormalizeForwardPath sub_820F9F58, NormalizePath sub_820FA0F8, "
               "NormalizeLane sub_820FA210, NormalizeLaneMasked sub_820FA350, Point "
               "sub_820FA860, AlongSlice sub_820FAE78, Locate sub_820FAF88, LocateShoulder "
-              "sub_820FB030, OnSlice sub_820FB1B8, ClampPosition sub_820F8420 with ToIndex sub_820AB408 and FromIndex "
+              "sub_820FB030, LocateAt sub_820FB888, ToMainRoad sub_820FA728, OnSlice "
+              "sub_820FB1B8, ClampPosition sub_820F8420 with ToIndex sub_820AB408 and FromIndex "
               "sub_820AB498, Distance sub_820F9278 with LinkDistance sub_820F8720, SlicePoint "
               "sub_820F9768 with its case 0 sub_820F985C (cases 5 to 16, never seen in play, on "
               "the translated code)) natively instead of through the translated code (the same "
@@ -96,6 +97,14 @@ ITC_TRACK_ROUTE(820FA860, ctx.r3.u64 = Point(base, ctx.r3.u32, ctx.r4.u32, ctx.r
 // frame (112 bytes down; AlongSlice's below it).
 ITC_TRACK_ROUTE(820FB030, ctx.r3.u64 = LocateShoulder(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
                                                       ctx.r6.u32, ctx.r1.u32 - 112))
+// r4 = the point, r5 = the position (a tail call: LocateShoulder's frame
+// 112 bytes down).
+ITC_TRACK_ROUTE(820FB888, ctx.r3.u64 = LocateAt(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                                ctx.r1.u32 - 112))
+// r4 = the position (changed), r5 = the flag; the copy in the original's
+// frame (144 bytes down).
+ITC_TRACK_ROUTE(820FA728, ctx.r3.u64 = ToMainRoad(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                                  ctx.r1.u32 - 144))
 // r4 = the point, r5 = the position, r6 = the score or 0; the original's
 // frame (128 bytes down).
 ITC_TRACK_ROUTE(820FB1B8, ctx.r3.u64 = OnSlice(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,

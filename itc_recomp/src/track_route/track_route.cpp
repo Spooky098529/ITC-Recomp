@@ -19,6 +19,7 @@ constexpr uint32_t kBoundsMargin = 0x82002568;  // 20.0
 constexpr uint32_t kNoDistance = 0x82002814;    // 10000.0
 constexpr uint32_t kNine = 0x82006844;          // 9.0
 constexpr uint32_t kTen = 0x82001FD8;           // 10.0
+constexpr uint32_t kDefaultBranchMask = 0x82008A00;  // 0xDFFFFE7F, then 0
 
 uint32_t Load(uint8_t* base, uint32_t address) {
   return guest::LoadU32(base, address);
@@ -864,6 +865,65 @@ uint32_t LocateShoulder(uint8_t* base, uint32_t route, uint32_t point, uint32_t 
     return 4;
   }
   return 0;
+}
+
+uint32_t LocateAt(uint8_t* base, uint32_t route, uint32_t point, uint32_t position,
+                  uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_820FB888 TrackRoute::LocateAt");
+  const uint32_t section = Section(base, Load(base, route), LoadU16(base, position));
+  const uint32_t record = Record(section, LoadS16(base, position + 2));
+  return LocateShoulder(base, route, point, position, record, frame);
+}
+
+uint32_t ToMainRoad(uint8_t* base, uint32_t route, uint32_t position, uint32_t flag,
+                    uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_820FA728 TrackRoute::ToMainRoad");
+  const uint32_t copy = frame + 80;
+  // Forward: up to 10 sections (the slice put past each section's end, then
+  // normalized with the default branch mask), counting the slices moved.
+  guest::StoreU32(base, copy, Load(base, position));
+  int32_t moved = 0;
+  bool found = false;
+  for (int32_t tries = 10;;) {
+    if (IsMainRoad(base, route, copy) != 0) {
+      found = true;
+      break;
+    }
+    if (--tries < 0) {
+      break;
+    }
+    const int32_t slice = LoadS16(base, copy + 2);
+    const uint32_t slices = LoadU16(base, Section(base, Load(base, route), LoadU16(base, copy)));
+    guest::StoreU16(base, copy + 2, uint16_t(slices));
+    moved += int32_t(int16_t(slices)) - slice;
+    if (Normalize(base, route, copy, kDefaultBranchMask) == 0) {
+      break;
+    }
+  }
+  if (!found) {
+    // Back: up to 10 sections (the slice put before each section's start).
+    guest::StoreU32(base, copy, Load(base, position));
+    moved = 0;
+    for (int32_t tries = 10;;) {
+      if (IsMainRoad(base, route, copy) != 0) {
+        break;
+      }
+      if (--tries < 0) {
+        return 0;
+      }
+      moved = moved - LoadS16(base, copy + 2) - 1;
+      guest::StoreU16(base, copy + 2, 0xFFFF);
+      if (Normalize(base, route, copy, kDefaultBranchMask) == 0) {
+        return 0;
+      }
+    }
+  }
+  if (int32_t(flag) != 0) {
+    guest::StoreU16(base, copy + 2, uint16_t(LoadU16(base, copy + 2) - uint32_t(moved)));
+  }
+  const uint32_t result = Normalize(base, route, copy, kDefaultBranchMask);
+  guest::StoreU32(base, position, Load(base, copy));
+  return result;
 }
 
 uint32_t OnSlice(uint8_t* base, uint32_t route, uint32_t point, uint32_t position, uint32_t score,

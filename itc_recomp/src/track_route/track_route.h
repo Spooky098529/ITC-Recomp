@@ -155,6 +155,18 @@ uint32_t Locate(uint8_t* base, uint32_t route, uint32_t point, uint32_t position
 // margins 3 or 4 beyond half the width plus 0.5 on the left or right.
 uint32_t LocateShoulder(uint8_t* base, uint32_t route, uint32_t point, uint32_t position,
                         uint32_t record, uint32_t frame);
+// TrackRoute::LocateAt (sub_820FB888): LocateShoulder on the position's
+// slice. `frame`: LocateShoulder's (the original tail-calls it).
+uint32_t LocateAt(uint8_t* base, uint32_t route, uint32_t point, uint32_t position,
+                  uint32_t frame);
+// TrackRoute::ToMainRoad (sub_820FA728): in a copy (at `frame` + 80, the
+// original's frame), up to 10 sections forward (the default branch mask,
+// [0x82008A00]), else up to 10 back, to the first on the main road
+// (IsMainRoad); found, the slice less the slices moved when `flag` is set,
+// normalized, and the position = the copy. Returns the original's r3 (the
+// last Normalize's answer, or 0 when none was found).
+uint32_t ToMainRoad(uint8_t* base, uint32_t route, uint32_t position, uint32_t flag,
+                    uint32_t frame);
 // TrackRoute::OnSlice (sub_820FB1B8): 1 when the point is within the
 // position's section's bounds (SectionOutcode) and on its slice (Locate);
 // the score at `score` (when not 0). `frame`: the original's.

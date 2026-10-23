@@ -106,6 +106,12 @@ ITC_NATIVE_STEP(NativeLocate,
 ITC_NATIVE_STEP(NativeLocateShoulder,
                 ctx.r3.u64 = tr::LocateShoulder(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
                                                 ctx.r6.u32, ctx.r1.u32 - 112))
+ITC_NATIVE_STEP(NativeLocateAt,
+                ctx.r3.u64 = tr::LocateAt(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                          ctx.r1.u32 - 112))
+ITC_NATIVE_STEP(NativeToMainRoad,
+                ctx.r3.u64 = tr::ToMainRoad(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                            ctx.r1.u32 - 144))
 ITC_NATIVE_STEP(NativeOnSlice,
                 ctx.r3.u64 = tr::OnSlice(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
                                          ctx.r1.u32 - 128))
@@ -306,6 +312,8 @@ enum Kind {
   kDistance,
   kLinkDistance,
   kSlicePoint,
+  kLocateAt,
+  kToMainRoad,
 };
 
 }  // namespace
@@ -382,6 +390,10 @@ void TrackRoute(Context& h) {
        NativeLinkDistance, kLinkDistance, 3000},
       {"TrackRoute::SlicePoint (sub_820F9768)", Original<__imp__sub_820F9768>, NativeSlicePoint,
        kSlicePoint, 2000},
+      {"TrackRoute::LocateAt (sub_820FB888)", Original<__imp__sub_820FB888>, NativeLocateAt,
+       kLocateAt, 3000},
+      {"TrackRoute::ToMainRoad (sub_820FA728)", Original<__imp__sub_820FA728>,
+       NativeToMainRoad, kToMainRoad, 3000},
   };
   const uint32_t area = memory::Alloc(kAreaBytes, 0);
   const uint32_t table = memory::Alloc(4 * kTableEntries, 0);
@@ -557,6 +569,7 @@ void TrackRoute(Context& h) {
         case kAlongSlice:
         case kLocate:
         case kLocateShoulder:
+        case kLocateAt:
         case kOnSlice: {
           // A slice of the route (now and then its section's last), its
           // record, and a point near it (or anywhere).
@@ -578,6 +591,18 @@ void TrackRoute(Context& h) {
           r6 = f.kind == kOnSlice ? (r.Below(4) == 0 ? 0 : area + kFloat) : record;
           break;
         }
+        case kToMainRoad:
+          // On the route mostly, now and then past either end; the flag 0, 1
+          // or any word.
+          if (r.Below(4) == 0) {
+            const uint32_t section = guest::LoadU16(h.base, area + kA);
+            guest::StoreU16(h.base, area + kA + 2,
+                            uint16_t(r.Below(2) ? route.Slices(section) + r.Below(4)
+                                                : -int32_t(1 + r.Below(4))));
+          }
+          r4 = area + kA;
+          r5 = r.Below(3) == 0 ? uint64_t(r.Next()) : r.Below(2);
+          break;
         case kStepForwardLane:
         case kStepForwardLaneMasked:
           guest::StoreU16(h.base, area + kLane, uint16_t(int32_t(r.Below(14)) - 2));
