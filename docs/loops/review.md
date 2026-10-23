@@ -86,6 +86,11 @@ When the user has reviewed a run's section, its heading gets
   code folded with them); the harness's `Case` compares f1, a
   `Relocate` helper. Waiting on GetTickCount (your call): XACT's clock
   `sub_825BFE28` and everything above it.
+  XACT's migration 3: `sub_825C8440` GetWaveRegion (builds its entry
+  accessor in the original's stack slot, as the collision and matrix
+  adapters do) and the folded getter `sub_8220BC28` (`functions.md`,
+  one load of +20, the menus' callers get the same result) under
+  `--native_xact`; 4 adapters removed.
 
 ## Run 2026-10-22 22:11 (`b7-loop-22-10-26-2`)
 
