@@ -1,0 +1,148 @@
+# Known functions: the course's route
+
+The course's route at `0x826C5B10` (`820F8668`-`820FB8B0`, with
+`sub_820F8420`, `sub_820AB408` and `sub_820AB498`): the road as a graph
+of sections, each a run of slices along it, which the race code, the
+vehicle placed and every track position (`TrackPosition::Update`) query
+to know where a point is along the course. The route's file is loaded
+per course with the collision mesh (`TrackCollision::Load`,
+`TrackRoute::Prepare`, `Load`, `OnLoaded` and `Free` in
+`collision-world.md`, shared, which also has `TrackPosition::Init` and
+`Update`, the two callers here from the track positions). Read by the
+B7 loop's mapping agent, 2026-10-23, from the collision world's and the
+cameras' leads; the race code's callers (`8213B428`-`82173A90`) aren't
+read.
+
+- **The file** (`[0x826C5B10]`, `../known-data.md`): +0 the sections'
+  count, +8 a float, the length of a slice (a distance in slices times
+  it is in meters, `TrackRoute::Distance`), +12 the sections' table (a
+  pointer per section after `OnLoaded`). The route's own +4 is the
+  slices' total (`OnLoaded`), the size of the linear index
+  (`TrackRoute::ToIndex`, `FromIndex`).
+- **A section**: +0 halfword its slices' count, +2 byte its kind (low
+  four bits: 0 the plain road; 1 to 4 kinds the links treat apart, 2 and
+  4 skipped when going forward, 1 and 3 when going back, probably branch
+  or pit lanes), +3 byte a branch number (a bit in the masks the callers
+  pass; the default mask at `0x82008A00`, 0xDFFFFE7F, leaves out 7, 8 and
+  29), +4 to +24 its bounds (minimum x, y, z, then maximum),
+  +28 twelve links of 4 bytes (halfword a section, -1 for none, and
+  halfword a slice there: links 0 to 2 forward, 3 to 5 back, 6 and 8 the
+  sections beside it, left and right by `TrackRoute::Follow`'s use),
+  +76 a byte table, 8 bytes a link (the lane taken on that link from each
+  lane, -1 none: `TrackRoute::LinkLane`), +124 the slices' 84-byte
+  records, then two tables of 12-byte points, one a slice each, at
+  +124 + 84 × count and +124 + 96 × count (probably the road's two
+  edges: `TrackRoute::SlicePoint`).
+- **A slice's record** (84 bytes): +0 its center (x, y, z), +12 the
+  road's width, +16 and +20 the margins beyond each side, +24 and +28
+  the floats `OnLoaded` raises or lowers by the race's route bits, +32 a
+  word (halfwords: the collision mesh's section and slice there, taken by
+  `TrackPosition::Init`), +36 and +40 the side direction (x, z), +44 and
+  +48 the forward direction (x, z), +56 byte (low four bits) the lanes'
+  count, +57 byte a kind (3 and 4 tested).
+- **A route position**: two halfwords, a section and a slice in it (a
+  track position's +4 and +6, `../known-data.md`), passed by address or
+  packed in a word. The slice may run past either end; the normalizers
+  move it into the linked sections (`TrackRoute::Normalize` and its
+  variants, with lanes, branch masks or a path of sections), and set it
+  to (0, 0) when it leaves the route.
+
+Floats named by address are in `.rdata`, read from the image
+(`../known-data.md`, "Values from the image"): `0x82000A30` 1.0,
+`0x82000A34` 0.0, `0x82001BE4` 0.5, `0x82002568` 20.0 (the sections'
+bounds margin), `0x82002814` 10000.0 (no distance; a squared 100 m),
+`0x82006844` 9.0, `0x82001FD8` 10.0, `0x82002A0C` 100.0.
+
+Not seen in play, so without rows: `sub_820F8FA0` (a vector difference,
+probably, under `TrackRoute::SlicePoint`'s cases 5 to 16, which no caller
+in play asks for) and `sub_820FB2B0` (`TrackRoute::Follow`'s full search,
+when six steps found neither the slice nor a shoulder; it calls
+`TrackRoute::OnSlice` and `SectionOutcode`). A native `Follow` has to port
+`sub_820FB2B0` or keep it on the recompiled code.
+
+Status:
+
+- **Native**: plain C++ in `itc_recomp/src/` that doesn't use the
+  PowerPC context (`ctx`): normal arguments and host structs (it may
+  still read and write guest memory through `src/guest.h` while
+  recompiled code shares the data). The game reaches it without `ctx`,
+  from native or overridden callers, and the recompiled original is no
+  longer called (except behind a fallback flag or to check against it).
+  No `REX_FUNC` override of it exists, not even an adapter kept only for
+  a harness (that's Overridden until the adapter goes).
+  The end state for every function.
+- **Overridden**: an `extern "C" REX_FUNC(sub_XXXXXXXX)` override in
+  `itc_recomp/src/` (or a macro defining one) does the work instead of
+  the original: a thin adapter in front of native code, or a body that
+  still uses `ctx` (calling guest code, reading registers). It may call
+  the original when its flag is off, or to check itself against it.
+- **Wrapped**: an override that does something of its own (skipping
+  render-only passes, logging, timing) and still calls the original
+  (`__imp__sub_XXXXXXXX`) for the work.
+- **Dropped**: its work isn't needed on PC (hardware set-up, kernel calls
+  the SDK already stubbed), so it no longer runs: an override in
+  `itc_recomp/src/` replaces it with nothing (or a fixed return value), or
+  its callers, made native, leave the call out (no override then; the row
+  says which caller). Logs, a harness or the renderer's frame dumps have
+  shown that nothing reads what it did. The original is no longer called,
+  except behind a fallback flag while the drop is being checked. A
+  function the game never calls in the first place isn't Dropped: its
+  status stays blank and its row says it's never called.
+- **Merged**: its work is done inside a native caller's plain C++ (a
+  few lines only that caller needs), so it has no function or override of
+  its own in `itc_recomp/src/`. The row names the caller(s) and the
+  harness that covers the work. The original is no longer called, except
+  behind the caller's fallback flag.
+- **Patched**: the generated code was edited in place (search for
+  `PATCH:`).
+
+A function usually moves from recompiled or Wrapped to Overridden to
+Native as the `ctx` edge moves up through its callers, or straight to
+Dropped when its work isn't needed.
+`itc_recomp/tools/check_function_statuses.py` checks this column, in
+every file of the tables, against `src/` (an override marked Native, a
+status with no override, an override with no row, a row in two files);
+run it after changing either, on any branch.
+
+| Address | Name | Status | Notes |
+|---|---|---|---|
+| `sub_820FB680` | `TrackRoute::Follow` | | r3 = the route, r4 = a route position (updated), r5 = a point, r6 = a route position before (only its section is read, for `sub_820FB2B0`). Up to six steps from the position: the point against the slice (`TrackRoute::NoteShoulder`, which keeps the nearest slice whose shoulder the point is on, from 10000.0): inside it, the position is taken; past it or before it, the next or previous slice (`TrackRoute::Normalize`, no masks); beside the road while still in the first section, the section beside it (link 6 for the left side, 3 and 5, link 8 for the right, 4 and 6; none ends the search); beside the road in another section, the next branch in turn (`TrackRoute::TakeBranch`, from the first section's slice plus the steps moved). With no slice found: the shoulder kept, else the full search (`sub_820FB2B0`, never ran in play), taken when its slice's center is within 10 m in height (`0x82002A0C`, 100.0 squared). Only caller `TrackPosition::Update` (`collision-world.md`), probably once a tick for each track position (a vehicle's and its wheels'). Read for the map; the branch step not read in detail. |
+| `sub_820FB100` | `TrackRoute::NoteShoulder` | | r3 = the route, r4 = a point, r5 = a route position, r6 = out (the best position), r7 = in and out (the best squared distance): the point against the position's slice (`TrackRoute::LocateShoulder`); on a shoulder (3 or 4) and nearer the slice's center than r7 (squared, in 3D), r6 and r7 updated. Returns `LocateShoulder`'s answer. Only caller `sub_820FB680`. |
+| `sub_820FB888` | `TrackRoute::LocateAt` | | r3 = the route, r4 = a point, r5 = a route position: `TrackRoute::LocateShoulder` with the position's slice (a tail call). Only caller `sub_8213EAB0`. |
+| `sub_820FB030` | `TrackRoute::LocateShoulder` | | r3 = the route, r4 = a point, r5 = a route position, r6 = its slice's record: `TrackRoute::AlongSlice` (1 past the slice, 2 before it); in it, the point's offset across the road (from the center, along the side direction +36, +40): 5 beyond the left margin (below -(+16) - width/2), 6 beyond the right (+20 + width/2), 3 on the left shoulder (below -width/2), 4 on the right, else 0 (on the road). From `sub_820FB100`, `sub_820FB888`. |
+| `sub_820FAF88` | `TrackRoute::Locate` | | As `TrackRoute::LocateShoulder` without the shoulders: 0 anywhere between the margins, 5 and 6 beyond them, 1 and 2 past or before the slice. Only caller `sub_820FB1B8`. |
+| `sub_820FAE78` | `TrackRoute::AlongSlice` | | r3 = the route, r4 = a point, r5 = a route position, r6 = its slice's record: the point's offset along the road from the slice's center (along the forward direction +44, +48, in x and z): 0 within plus or minus a slice's length (the file's +8), 2 before it, 1 past it (after normalizing the next slice; what follows reads address 8 if the record were null, which it never is). From `sub_820FAF88`, `sub_820FB030`. |
+| `sub_820FB1B8` | `TrackRoute::OnSlice` | | r3 = the route, r4 = a point, r5 = a route position, r6 = out or 0 (a score): 1 when the point is within the section's bounds (`TrackRoute::SectionOutcode`) and on the slice between its margins (`TrackRoute::Locate`), else 0. The score: the squared height from the slice's center (0.0 below 9.0, `0x82006844`), plus 10.0 (`0x82001FD8`) for sections of kinds 1 to 4, plus the squared distance in x and z. From `sub_8213D550` and `sub_820FB2B0` (never ran). |
+| `sub_820F8EF0` | `TrackRoute::SectionOutcode` | | r3 = the route, r4 = a point, r5 = a section: the point against the section's bounds (+4 to +24) widened by 20.0 (`0x82002568`): bits 1 and 2 below or above x, 4 and 8 y, 16 and 32 z; 0 inside. From `sub_820FB1B8`, `sub_820FB2B0` (never ran). |
+| `sub_820FA860` | `TrackRoute::Point` | | r3 = the route, r4 = out (x, y, z, 1.0), r5 = a route position (read, not changed; r6 not read): a copy normalized (`TrackRoute::Normalize`, no masks); when valid, out = its slice's center. Returns the normalized section. Only caller `TrackPosition::Init` (`collision-world.md`: the track position's point from its route position). |
+| `sub_820F8668` | `TrackRoute::LanePoint` | | r3 = the route, r4 = out (x, y, z, 1.0), r5 = a route position, r6 = a lane (at most the slice's lane count - 1): the slice's center moved sideways (along +36, +40) by (lane - (n - 1) / 2) / n of the road's width (n the lanes' count, the record's byte +56); y the center's. Only caller `sub_820C3608` (the vehicle placed). |
+| `sub_820F8920` | `TrackRoute::LaneAt` | | r3 = the route, r4 = a point, r5 = a route position: the lane the point is in (0 to n - 1, from its offset across the road over the width plus 0.5; 0 for slices with one lane). From `sub_8213F140`, `sub_82144EF8`. |
+| `sub_820F9768` | `TrackRoute::SlicePoint` | | r3 = out (x, y, z), r4 = which point (0 to 16), r5 = a section, r6 = a slice (no normalizing): 0 and 3 the slice's center, 1 and 2 its points in the section's two 12-byte tables after the records (probably the road's edges), 4 the center again (its half-sum with itself); 5 to 16 points between them and the center (`sub_820F8FA0`, never ran, times 3.0, 0.25, 1.2, 2.0, 5.0 or others). Case 0 is `sub_820F985C`, split off by the recompiler; callers in play pass 0, 1 and 2. From `sub_820C23E8`, `sub_820C3608`, `sub_82170CB8`, `sub_82171978`, `sub_82171E50`, `sub_82172118`, `sub_821724F8`, `sub_82173050`, `sub_821737F8`. Cases 5 to 16 not read in detail. |
+| `sub_820F985C` | `TrackRoute::SlicePoint`'s case 0 | | Not a function in the game: the jump table target for case 0 of `sub_820F9768` (the center into out, then the function's epilogue), made a function by the recompiler, which calls it from the switch. Merged into a native `SlicePoint`. |
+| `sub_820F9278` | `TrackRoute::Distance` | | r3 = the route, r4 = a route position, r5 = another: f1 = the distance from the first to the second, in meters (slices times the file's +8): in the same section, the slices' difference; else over the sections' links, two deep (`TrackRoute::LinkDistance`, starting from the second's slice); 10000.0 (`0x82002814`) when they aren't linked. From `sub_82145B08`, `sub_82170920`. |
+| `sub_820F8720` | `TrackRoute::LinkDistance` | | r3 = the route, r4 = the position to reach, r5 = a position to search from, r6 = in and out (the distance so far), r7 = the depth: when the second's section links to the first's (any of its 12 links) and back, the distance adds the links' slices and the first's slice (plus or minus 1 by the link's direction, forward or back) times the slice length; else each link (not -1, not the target's section) searched again from the link's position, one level less deep. Returns 1 when found. From `sub_820F9278` and itself. The arithmetic not read in detail. |
+| `sub_820FA9D0` | `TrackRoute::PathDistance` | | r3 = the route, r4 = a route position (packed), r5 = another (packed), r6 = a path (halfwords, sections), r7 = the path's length: f1 = the distance from the first to the second along the path, the sum of the distances between the slices' centers as it steps a slice at a time (`TrackRoute::Normalize`) through each section of the path to the slice its link names, ending at the second (the path searched for the second's section from its end). 425 lines. From `sub_82162330`, `sub_82163C50`. Not read in detail. |
+| `sub_820F9FE8` | `TrackRoute::Normalize` | | r3 = the route, r4 = a route position (changed), r5 = branch masks or 0 (a list of words ending with 0): 1 when the position is on the route (section in 0 to the count, slice in 0 to its slices); else, with a section on the route, back (`TrackRoute::NormalizeBack`) then forward (`NormalizeForward`, with the masks) until it is; when it isn't, (0, 0) and 0. 14 callers seen: `sub_820FA210`, `sub_820FA4A8`, `sub_820FA728`, `sub_820FA860`, `sub_820FA9D0`, `sub_820FAE78`, `sub_820FB680`, `sub_8213C908`, `sub_8213D550`, `sub_82143150`, `sub_82143210`, `sub_82143740`, `sub_82170F18`, `sub_82170F90`. |
+| `sub_820F9320` | `TrackRoute::NormalizeBack` | | r3 = the route, r4 = a route position: while the slice is negative, the previous section (`TrackRoute::StepBack`); when there's none, slice 0 (or (0, 0) with a negative section) and 0. 1 once the slice isn't negative. From `sub_820F9FE8`, `sub_820FA0F8`, `sub_820FA210`, `sub_820FA350`. |
+| `sub_820F9EA8` | `TrackRoute::NormalizeForward` | | r3 = the route, r4 = a route position, r5 = branch masks or 0: while the slice is past the section's last, the next section (`TrackRoute::StepForwardMasked` with masks, else `StepForward`); when there's none, the last slice (or (0, 0) with a negative section) and 0. 1 once it's in the section. From `sub_820F9F58`, `sub_820F9FE8`. |
+| `sub_820FA0F8` | `TrackRoute::NormalizePath` | | As `TrackRoute::Normalize`, forward along a path first (`TrackRoute::NormalizeForwardPath`): r5 = a path (halfwords, sections, ending with a negative one), r6 = branch masks. Only caller `sub_8213C908`. |
+| `sub_820F9F58` | `TrackRoute::NormalizeForwardPath` | | r3 = the route, r4 = a route position, r5 = a path or 0, r6 = branch masks: while past the section's end, the next section on the path (`TrackRoute::StepAlongPath`) or else the default (`StepForward`); when neither (or with no path), `TrackRoute::NormalizeForward` with the masks. Only caller `sub_820FA0F8`. |
+| `sub_820FA210` | `TrackRoute::NormalizeLane` | | r3 = the route, r4 = a route position, r5 = a lane (halfword, changed): 1 when on the route; past the end, the next sections by lane (`TrackRoute::StepForwardLane`) until in one, else `TrackRoute::Normalize` (no masks); before the start, `NormalizeBack`, (0, 0) when it fails. From `sub_820FA350`, `sub_8213B428`. |
+| `sub_820FA350` | `TrackRoute::NormalizeLaneMasked` | | As `TrackRoute::NormalizeLane` going forward by lane and branch masks (r6, `TrackRoute::StepForwardLaneMasked`) first, then `NormalizeLane`. Only caller `sub_8213B428`. |
+| `sub_820F8B48` | `TrackRoute::StepForward` | | r3 = the route, r4 = a route position, r5 = &the section's slices' count: the next section, forward links 2, 1 then 0, a link of kind 2 or 4 taken only as link 0; the slice less the count. 1 when one was taken. From `sub_820F93A0`, `sub_820F9EA8`, `sub_820F9F58`. |
+| `sub_820F8A58` | `TrackRoute::StepBack` | | r3 = the route, r4 = a route position: the previous section, back links 5, 4 then 3; links 5 and 4 only to a section not of kinds 1 or 3, not of branch number 7, 13 or 29, and with a back link of its own; the slice plus the new section's count. 1 when one was taken. Only caller `sub_820F9320`. |
+| `sub_820F93A0` | `TrackRoute::StepForwardMasked` | | r3 = the route, r4 = a route position, r5 = &the slices' count, r6 = branch masks: the first mask with a matching branch (`TrackRoute::BranchesMatching`) gives the next section; none, `TrackRoute::StepForward`. Only caller `sub_820F9EA8`. |
+| `sub_820F8BD0` | `TrackRoute::BranchesMatching` | | r3 = the route, r4 = out (a list of section and link index pairs), r5 = a section, r6 = &a mask: the forward links 0 to 2 whose section isn't of kind 2 or 4 and whose branch number's bit is set in the mask. Returns their count. From `sub_820F93A0`, `sub_820F9600`. |
+| `sub_820F8C58` | `TrackRoute::StepAlongPath` | | r3 = the route, r4 = a route position, r5 = &the slices' count, r6 = a path (halfwords, ending with a negative one): the first section of the path that a forward link (0 to 2) leads to; the slice less the count. 1 when found. Only caller `sub_820F9F58`. |
+| `sub_820F9448` | `TrackRoute::StepForwardLane` | | r3 = the route, r4 = a route position, r5 = a lane (halfword, changed), r6 = &the slices' count: the forward link whose lanes (the linked sections' first slices' lane counts, added up in link order, skipping kinds 1, 3 and 4) hold the lane; the lane carried over the link (`TrackRoute::LinkLane`; none: the last lane for link 0, else 0; kept below the new lane count). With none, links 2 to 0 to a section not of kinds 1, 3 or 4, onto its last lane. 1 when a section was taken. Only caller `sub_820FA210`. |
+| `sub_820F9600` | `TrackRoute::StepForwardLaneMasked` | | As `TrackRoute::StepForwardLane` with branch masks (r7): for each mask, the matching branches (`TrackRoute::BranchesMatching`), the first taken when the lane is within its lanes or more than one matches. 1 when a section was taken. Only caller `sub_820FA350`. |
+| `sub_820F8CE8` | `TrackRoute::LinkLane` | | r3 = the route, r4 = a route position (its section), r5 = &a link index, r6 = &a lane: the signed byte at the section's +76 + 8 × link + lane, the lane on the other side; -1 when the link is -1. From `sub_820F9448`, `sub_820F9600`. |
+| `sub_820F89F0` | `TrackRoute::Link` | | r3 = the route, r4 = a section, r5 = a link index: the link's section; when it's -1, link 0 (indexes 0 to 2) or link 3 (the others); when that's -1 too, the section itself. From `sub_82166658` (and `sub_820F9B48`, never ran). |
+| `sub_820FA4A8` | `TrackRoute::TakeBranch` | | r3 = the route, r4 = a route position, r5 = &a branch number n: 1 when on the route; past the end, the n-th forward link counting 2, 1, 0 (links 2 and 1 to kinds 2 and 4 counted only after the others, link 0 always); before the start, the n-th back link counting 5, 4, 3 (5 and 4 to sections with a back link and not of kinds 1 or 3, link 3 always, then 5 and 4 to kinds 1 and 3); the slice moved by the section's count, then `TrackRoute::Normalize`. 0 when there's no n-th. Only caller `sub_820FB680`. |
+| `sub_820FA728` | `TrackRoute::ToMainRoad` | | r3 = the route, r4 = a route position (changed), r5 = a flag: up to 10 sections forward (the default branch mask at `0x82008A00`) to the first that's on the main road (`TrackRoute::IsMainRoad`); failing that, up to 10 back; the position put there, its slice less the slices moved when r5 is set (not read in detail). Nothing changes when neither finds one. From `sub_82143608` (a tail call), `sub_82143740`, `sub_82143B78`, `sub_82144798`, `sub_82165E20` (and `sub_82143920`, never ran). |
+| `sub_820F8E98` | `TrackRoute::IsMainRoad` | | r3 = the route, r4 = a route position: 1 for a section of kind 0 (or above 4) whose branch number isn't 7, 8 or 29. Only caller `sub_820FA728`. |
+| `sub_820F8DE8` | `TrackRoute::SliceTest` | | r3 = the route, r4 = a route position: by the section's kind: 0, 0; 1 and 2, 1 when the slice's mesh section (the record's halfword +32) is the section's first slice's; 3, 1 when the record's byte +57 isn't 3; 4, 1 when it's 4; others 0. What it means isn't known. Only caller `sub_82168B80`. |
+| `sub_820F8D38` | `TrackRoute::SpecialSection` | | r3 = the route, r4 = a route position: for the sections 293, 230, 156, 20, 39 and 77 (fixed numbers in the code), 0 to 5 in that order, when the section is of kind 4 and the slice's byte +57 is 4; else -1. Probably for one course's layout. Only caller `sub_82166658`. |
+| `sub_820F8420` | `TrackRoute::ClampPosition` | | r3 = out (a route position), r4 = a route position (packed): through the linear index and back (`TrackRoute::ToIndex`, `FromIndex`): a slice past its section's end lands in the next section in the table's order (not by links), and the result is kept on the route. From `sub_8213D550`, `sub_82144EF8`, `sub_8215F678`, `sub_82173A90` (and `sub_820ABDA8`, never ran). |
+| `sub_820AB408` | `TrackRoute::ToIndex` | | r3 = a route position (packed: section, slice): the slices' counts of the sections before it plus the slice (`[0x826C5B10]`'s file: +0 the count, +12 the sections). A section past the last counts as the last, its own count added too; a negative one as 0. Only caller `sub_820F8420`. In the cameras' address range, not a camera (`cameras.md`). |
+| `sub_820AB498` | `TrackRoute::FromIndex` | | r3 = a linear index: returns the route position (packed) holding it: sections' counts taken off in order; past the last section, its count added back; the section and slice kept on the route (clamped). From `sub_820F8420` (and `sub_820F9DD0`, never ran). In the cameras' address range, not a camera (`cameras.md`). |

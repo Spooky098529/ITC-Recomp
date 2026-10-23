@@ -175,6 +175,11 @@ Rows not yet moved stay in the table below. So far:
   (`std::string`: constructors, `_Tidy` and the destructor, growth,
   assign and append) as seen in play, with the library's wildcard search
   and replace over it and two global strings' static set-ups (B7).
+- [`track-route.md`](track-route.md): the course's route at
+  `0x826C5B10`: route positions (a section and a slice) normalized and
+  moved along its linked sections by lane, branch or path, points and
+  lanes on it, distances along it, and following a point along it for
+  the track positions (B7).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
