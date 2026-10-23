@@ -47,6 +47,28 @@ When the user has reviewed a run's section, its heading gets
   first two, not clamps); the harnesses never build node types 8 or 16
   or Setup208 sections with tracks; the new code reuses
   `car_physics/float_ops.h` and `xact::WaveEntryConstruct`.
+- `car-specs.md` (already mapped from the game data check; the map
+  checked by the lead, not remapped). Migration 1's 46 rows (d87b553,
+  04c3ebd, f1727ea, 80867d4, 114aa35; `--native_car_specs`; 9 adapters
+  removed and 25 Native with no adapter; 12 unnamed rows named, among
+  them `Car::CopySpec` `sub_820C4888`, `Car::CopyAeroParts`
+  `sub_820C4568`, `CountBodyKits` `sub_820CBD20`; left: `Params::Load`,
+  blocked by the archive, and `Params::Free`, not seen in play). For
+  review: the swaps byte-swap integers where the original round-trips
+  through lfs/stfs (folded in `generated/`; the harness checks
+  signaling NaNs and denormals); the archive's TOC lookup `sub_8209D868`
+  (no row anywhere) stays a guest call from the adapters; the four load
+  callbacks keep their adapters (reached through a function pointer);
+  `Car::Refresh` runs the original if a copy wouldn't be the host's
+  memcpy or the car's span overlaps a source (never taken), its aero
+  getters write into the car directly and the 36-byte parts block is a
+  host array; the float adapters turn flush-to-zero off unconditionally
+  (the data tables' precedent); `sub_820CB0C0`'s leftover r3 reproduced;
+  the Refresh, CopySpec, CopyAeroParts and InchUp harnesses use made-up
+  tables (the game's load after the harnesses), and some cases point
+  the parameter global at a test object for the call (the data tables'
+  precedent: the load callbacks run when the main thread lets them);
+  `Params::Init` native only under `--native_heap`.
 
 ## Run 2026-10-23 11:06 (`b7-loop-23-10-26-2`)
 

@@ -15,7 +15,8 @@ file's history. What's left to see in a drive, from every run:
 - Subsystem 1 of 3 (the model animation) finished: the rest waits on
   the graphics device.
 - Subsystem 2 of 3: the car specs (`car-specs.md`, already mapped from
-  the game data check; the map checked); migration agent 1 running.
+  the game data check; the map checked); migration 1 done (d87b553..114aa35;
+  nothing ready left); validation agent running.
 
 ## Done
 
@@ -47,5 +48,7 @@ This run's groups: `expected-differences.md` (the "13:44 run" lines).
   (wrapped 129, known 588, unknown 4979). Race 19 s at 30 ticks/s with
   `--run_harnesses=all`, 0 errors, every harness 0 differing outside
   the earlier "(expected to differ)" groups (none added).
+- After the car specs' migration 1: ours 1107, work left 5649 (wrapped
+  129, known 541, unknown 4979). Race 19 s (`itc_946`), the same checks.
 
 ## Stopped
