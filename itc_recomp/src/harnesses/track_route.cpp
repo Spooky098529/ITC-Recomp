@@ -100,6 +100,15 @@ ITC_NATIVE_STEP(NativePoint, ctx.r3.u64 = tr::Point(base, ctx.r3.u32, ctx.r4.u32
 ITC_NATIVE_STEP(NativeAlongSlice,
                 ctx.r3.u64 = tr::AlongSlice(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
                                             ctx.r1.u32 - 128))
+ITC_NATIVE_STEP(NativeLocate,
+                ctx.r3.u64 = tr::Locate(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
+                                        ctx.r1.u32 - 112))
+ITC_NATIVE_STEP(NativeLocateShoulder,
+                ctx.r3.u64 = tr::LocateShoulder(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                                ctx.r6.u32, ctx.r1.u32 - 112))
+ITC_NATIVE_STEP(NativeOnSlice,
+                ctx.r3.u64 = tr::OnSlice(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
+                                         ctx.r1.u32 - 128))
 ITC_NATIVE_STEP(NativeStepBack, ctx.r3.u64 = tr::StepBack(base, ctx.r3.u32, ctx.r4.u32))
 ITC_NATIVE_STEP(NativeNormalizeBack,
                 ctx.r3.u64 = tr::NormalizeBack(base, ctx.r3.u32, ctx.r4.u32))
@@ -286,6 +295,9 @@ enum Kind {
   kNormalizeLaneMasked,
   kPointOf,
   kAlongSlice,
+  kLocate,
+  kLocateShoulder,
+  kOnSlice,
   kStepBack,
   kNormalizeBack,
   kToIndex,
@@ -348,6 +360,12 @@ void TrackRoute(Context& h) {
        2000},
       {"TrackRoute::AlongSlice (sub_820FAE78)", Original<__imp__sub_820FAE78>, NativeAlongSlice,
        kAlongSlice, 3000},
+      {"TrackRoute::Locate (sub_820FAF88)", Original<__imp__sub_820FAF88>, NativeLocate, kLocate,
+       3000},
+      {"TrackRoute::LocateShoulder (sub_820FB030)", Original<__imp__sub_820FB030>,
+       NativeLocateShoulder, kLocateShoulder, 3000},
+      {"TrackRoute::OnSlice (sub_820FB1B8)", Original<__imp__sub_820FB1B8>, NativeOnSlice,
+       kOnSlice, 3000},
       {"TrackRoute::StepBack (sub_820F8A58)", Original<__imp__sub_820F8A58>, NativeStepBack,
        kStepBack, 2000},
       {"TrackRoute::NormalizeBack (sub_820F9320)", Original<__imp__sub_820F9320>,
@@ -536,7 +554,10 @@ void TrackRoute(Context& h) {
           }
           break;
         }
-        case kAlongSlice: {
+        case kAlongSlice:
+        case kLocate:
+        case kLocateShoulder:
+        case kOnSlice: {
           // A slice of the route (now and then its section's last), its
           // record, and a point near it (or anywhere).
           const uint32_t section = r.Below(route.sections);
@@ -554,7 +575,7 @@ void TrackRoute(Context& h) {
           }
           r4 = area + kPoint;
           r5 = area + kA;
-          r6 = record;
+          r6 = f.kind == kOnSlice ? (r.Below(4) == 0 ? 0 : area + kFloat) : record;
           break;
         }
         case kStepForwardLane:

@@ -17,6 +17,8 @@ namespace {
 constexpr uint32_t kHalf = 0x82001BE4;          // 0.5
 constexpr uint32_t kBoundsMargin = 0x82002568;  // 20.0
 constexpr uint32_t kNoDistance = 0x82002814;    // 10000.0
+constexpr uint32_t kNine = 0x82006844;          // 9.0
+constexpr uint32_t kTen = 0x82001FD8;           // 10.0
 
 uint32_t Load(uint8_t* base, uint32_t address) {
   return guest::LoadU32(base, address);
@@ -388,6 +390,22 @@ uint32_t BackOrClear(uint8_t* base, uint32_t route, uint32_t position) {
     guest::StoreU32(base, position, 0);
   }
   return 0;
+}
+
+// The point's offset across the road from the record's center (along its
+// side direction): Locate's and LocateShoulder's (their steps the same).
+// `half` = the width times 0.5.
+struct Across {
+  double offset;
+  double half;
+};
+Across AcrossRoad(uint8_t* base, uint32_t point, uint32_t record) {
+  const double dx = Fsubs(Lfs(base, point + 0), Lfs(base, record + 0));
+  const double dz = Fsubs(Lfs(base, point + 8), Lfs(base, record + 8));
+  const double side_x = Lfs(base, record + 36);
+  const double half = Fmuls(Lfs(base, record + 12), Lfs(base, kHalf));
+  const double side_z = Lfs(base, record + 40);
+  return {Fmadds(dz, side_z, Fmuls(dx, side_x)), half};
 }
 
 }  // namespace
@@ -805,6 +823,77 @@ uint32_t AlongSlice(uint8_t* base, uint32_t route, uint32_t point, uint32_t posi
   const double dx = Fsubs(Lfs(base, 0), Lfs(base, record + 0));
   const double distance = Fmadds(dx, dx, Fmuls(dz, dz));
   return squared < distance ? 0 : 1;
+}
+
+uint32_t Locate(uint8_t* base, uint32_t route, uint32_t point, uint32_t position,
+                uint32_t record, uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_820FAF88 TrackRoute::Locate");
+  const uint32_t along = AlongSlice(base, route, point, position, record, frame - 128);
+  if (along != 0) {
+    return along;
+  }
+  const Across a = AcrossRoad(base, point, record);
+  if (a.offset < Fsubs(Fneg(Lfs(base, record + 16)), a.half)) {
+    return 5;
+  }
+  if (a.offset > Fadds(Lfs(base, record + 20), a.half)) {
+    return 6;
+  }
+  return 0;
+}
+
+uint32_t LocateShoulder(uint8_t* base, uint32_t route, uint32_t point, uint32_t position,
+                        uint32_t record, uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_820FB030 TrackRoute::LocateShoulder");
+  const uint32_t along = AlongSlice(base, route, point, position, record, frame - 128);
+  if (along != 0) {
+    return along;
+  }
+  const Across a = AcrossRoad(base, point, record);
+  if (a.offset < Fsubs(Fneg(Lfs(base, record + 16)), a.half)) {
+    return 5;
+  }
+  if (a.offset > Fadds(Lfs(base, record + 20), a.half)) {
+    return 6;
+  }
+  const double shoulder = Fadds(a.half, Lfs(base, kHalf));
+  if (a.offset < Fneg(shoulder)) {
+    return 3;
+  }
+  if (a.offset > shoulder) {
+    return 4;
+  }
+  return 0;
+}
+
+uint32_t OnSlice(uint8_t* base, uint32_t route, uint32_t point, uint32_t position, uint32_t score,
+                 uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_820FB1B8 TrackRoute::OnSlice");
+  const uint32_t number = LoadU16(base, position);
+  if (SectionOutcode(base, route, point, number) != 0) {
+    return 0;
+  }
+  const int32_t slice = LoadS16(base, position + 2);
+  const uint32_t section = Section(base, Load(base, route), number);
+  const uint32_t record = Record(section, slice);
+  if (Locate(base, route, point, position, record, frame - 112) != 0) {
+    return 0;
+  }
+  if (score == 0) {
+    return 1;
+  }
+  const double dy = Fsubs(Lfs(base, point + 4), Lfs(base, record + 4));
+  double value = Fmuls(dy, dy);
+  if (value < Lfs(base, kNine)) {
+    value = Lfs(base, kZero);
+  }
+  if (Kind(base, section) - 1 <= 3) {
+    value = Fadds(value, Lfs(base, kTen));
+  }
+  const double dz = Fsubs(Lfs(base, point + 8), Lfs(base, record + 8));
+  const double dx = Fsubs(Lfs(base, point + 0), Lfs(base, record + 0));
+  Stfs(base, score, Fadds(Fmadds(dx, dx, Fmuls(dz, dz)), value));
+  return 1;
 }
 
 // --- The linear index ---

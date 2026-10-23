@@ -146,6 +146,21 @@ uint32_t Point(uint8_t* base, uint32_t route, uint32_t out, uint32_t position, u
 uint32_t AlongSlice(uint8_t* base, uint32_t route, uint32_t point, uint32_t position,
                     uint32_t record, uint32_t frame);
 
+// TrackRoute::Locate (sub_820FAF88): AlongSlice's answer (1 past, 2
+// before); within it, 5 beyond the left margin (+16), 6 beyond the right
+// (+20), else 0. `frame`: the original's (AlongSlice's below it).
+uint32_t Locate(uint8_t* base, uint32_t route, uint32_t point, uint32_t position,
+                uint32_t record, uint32_t frame);
+// TrackRoute::LocateShoulder (sub_820FB030): as Locate, and within the
+// margins 3 or 4 beyond half the width plus 0.5 on the left or right.
+uint32_t LocateShoulder(uint8_t* base, uint32_t route, uint32_t point, uint32_t position,
+                        uint32_t record, uint32_t frame);
+// TrackRoute::OnSlice (sub_820FB1B8): 1 when the point is within the
+// position's section's bounds (SectionOutcode) and on its slice (Locate);
+// the score at `score` (when not 0). `frame`: the original's.
+uint32_t OnSlice(uint8_t* base, uint32_t route, uint32_t point, uint32_t position, uint32_t score,
+                 uint32_t frame);
+
 // --- The linear index (the global route's file) ---
 
 // TrackRoute::ToIndex (sub_820AB408): the slices before the packed position
