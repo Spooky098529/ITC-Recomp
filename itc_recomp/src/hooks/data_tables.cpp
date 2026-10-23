@@ -1,7 +1,10 @@
 // The data tables natively: adapters in front of
 // src/data_tables/data_tables.cpp (docs/functions/data-tables.md). The
 // loads' callbacks are reached through Archive::Load's function pointer, so
-// their adapters stay until it's native.
+// their adapters stay until it's native. SwapWord (sub_820C97D8) and the
+// entries' swaps (sub_82111AE0, sub_82111B30, sub_821128E0) have no adapters:
+// only the callbacks' plain C++ calls them (the fallback flag switches the
+// callbacks).
 
 #include "guest.h"
 
@@ -17,7 +20,7 @@ ITC_FLAG_BOOL(native_data_tables, true, "ITC",
 
 // The flag's fallback. The swapping adapters then turn flush-to-zero off, as
 // the originals leave it (SwapWord's lfs sets it); its f0 (volatile, read by
-// none of its callers) isn't set.
+// no caller) isn't set.
 #define ITC_DATA_TABLES_FALLBACK(address)  \
   REX_FUNC_PROLOGUE();                     \
   if (!ITC_FLAG(native_data_tables)) {     \
@@ -36,14 +39,6 @@ ITC_FLAG_BOOL(native_data_tables, true, "ITC",
 
 using namespace data_tables;
 
-extern "C" REX_FUNC(sub_820C97D8) {
-  ITC_DATA_TABLES_FALLBACK(820C97D8)
-  ctx.fpscr.disableFlushMode();
-  SwapWord(base, ctx.r3.u32);
-}
-ITC_DATA_TABLES_SWAP(82111AE0, SwapEntry20(base, ctx.r3.u32))
-ITC_DATA_TABLES_SWAP(82111B30, SwapEntry56(base, ctx.r3.u32))
-ITC_DATA_TABLES_SWAP(821128E0, SwapEntry40(base, ctx.r3.u32))
 ITC_DATA_TABLES_SWAP(821170F0, On56Loaded(base, ctx.r6.u32))
 ITC_DATA_TABLES_SWAP(82116FF0, On20Loaded(base, ctx.r6.u32))
 ITC_DATA_TABLES_SWAP(82117058, On40Loaded(base, ctx.r6.u32))
