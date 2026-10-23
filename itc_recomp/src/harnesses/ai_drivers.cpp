@@ -234,6 +234,20 @@ void NativeAddCornersAt(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = r3;
 }
 
+ITC_NATIVE_STEP(NativeUpdateState2,
+                ctx.r3.u64 = ai::UpdateState2(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_STEP(NativeUpdateState3,
+                ctx.r3.u64 = ai::UpdateState3(base, ctx.r3.u32, ctx.r4.u32))
+void NativeUpdateState(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  uint64_t r3 = 0;
+  if (ai::UpdateState(base, ctx.r3.u32, ctx.r4.u32, &r3) == 1) {
+    sub_821462A0(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = r3;
+}
+
 // Runs the recompiled version with the native flag off.
 template <GuestFunction recompiled>
 void Original(PPCContext& ctx, uint8_t* base) {
@@ -385,6 +399,9 @@ enum Kind {
   kJoinCornersShort,
   kJoinCornerPair,
   kAddCornersAt,
+  kUpdateState2,
+  kUpdateState3,
+  kUpdateState,
 };
 
 }  // namespace
@@ -563,6 +580,12 @@ void AiDrivers(Context& h) {
        NativeJoinCornerPair, kJoinCornerPair, 3000},
       {"AiPath::AddCornersAt (sub_8213E970)", Original<__imp__sub_8213E970>,
        NativeAddCornersAt, kAddCornersAt, 3000},
+      {"AiDriver::UpdateState2 (sub_82145F48)", Original<__imp__sub_82145F48>,
+       NativeUpdateState2, kUpdateState2, 3000},
+      {"AiDriver::UpdateState3 (sub_821460C8)", Original<__imp__sub_821460C8>,
+       NativeUpdateState3, kUpdateState3, 3000},
+      {"AiDriver::UpdateState (sub_82139AC8)", Original<__imp__sub_82139AC8>, NativeUpdateState,
+       kUpdateState, 3000},
   };
   const uint32_t area = memory::Alloc(kAreaBytes, 0);
   const uint32_t driver = area + kDriver, vehicle = area + kVehicle, io = area + kIo;
@@ -916,6 +939,9 @@ void AiDrivers(Context& h) {
           break;
         case kClearCarState:
           break;
+        case kUpdateState2:
+        case kUpdateState3:
+        case kUpdateState:
         case kUpdateState4:
         case kUpdateState5:
         case kIsSettled: {
@@ -924,9 +950,15 @@ void AiDrivers(Context& h) {
           // A target already picked stays (its record is read): 0 to 6 only.
           const uint32_t current[] = {0xFFFFFFFFu, 0, 3, 6, 0x80000000u};
           guest::StoreU32(h.base, driver + 480, current[r.Below(5)]);
-          guest::StoreU32(h.base, driver + 32, r.Below(8) ? r.Below(5) : uint32_t(r.Next()));
+          guest::StoreU32(h.base, driver + 32,
+                          f.kind == kUpdateState ? (r.Below(8) ? r.Below(8) : uint32_t(r.Next()))
+                          : r.Below(8)           ? r.Below(5)
+                                                 : uint32_t(r.Next()));
+          // States 2 and 3 tell gaps up to 100.0 apart, and beyond.
+          const bool far = f.kind == kUpdateState2 || f.kind == kUpdateState3 ||
+                           f.kind == kUpdateState;
           for (uint32_t i = 0; i < 7; i++) {
-            guest::StoreU32(h.base, driver + 172 + 40 * i, RandomFloat(r, 60.0f));
+            guest::StoreU32(h.base, driver + 172 + 40 * i, RandomFloat(r, far ? 140.0f : 60.0f));
             guest::StoreU32(h.base, table + i * ai::kDriverBytes + 100, RandomFloat(r, 200.0f));
           }
           guest::StoreU32(h.base, io, RandomFloat(r, 300.0f));
@@ -934,6 +966,11 @@ void AiDrivers(Context& h) {
           r4 = io;
           if (f.kind != kIsSettled) {
             floats.push_back({kIo, 1});
+          }
+          if (f.kind == kUpdateState) {
+            guest::StoreU32(h.base, driver + 100, RandomFloat(r, 200.0f));
+            guest::StoreU32(h.base, driver + 6088, RandomFloat(r, 200.0f));
+            floats.push_back({kDriver + 6088, 1});
           }
           break;
         }

@@ -2153,4 +2153,139 @@ void AddCornersAtFinish(uint8_t* base, uint32_t path) {
   guest::StoreU16(base, path + 5162, uint16_t(guest::LoadU16(base, path + 5162) + 1));
 }
 
+// --- The states' speeds ---
+
+uint64_t UpdateState2(uint8_t* base, uint32_t driver, uint32_t speed) {
+  ITC_NATIVE_RUNNING("sub_82145F48 AiDriver::UpdateState2");
+  PickTarget(base, driver);
+  const uint32_t target = Load(base, driver + 480);
+  if (int32_t(target) < 0) {
+    return driver;
+  }
+  const uint32_t record = target * 40 + driver;
+  const double gap = Lfs(base, record + 172);
+  uint64_t r3 = driver;
+  double f0;
+  if (gap > Lfs(base, 0x82002834)) {
+    if (!(gap < Lfs(base, kHundred))) {
+      f0 = Lfs(base, kTwenty);
+    } else {
+      r3 = OfIndex(base, target);
+      f0 = Fmuls(Lfs(base, uint32_t(r3) + 100), Lfs(base, 0x82002A2C));
+      const double most = Lfs(base, 0x82000F14);
+      if (f0 > most) {
+        f0 = most;
+      }
+    }
+  } else {
+    const double zero = Lfs(base, kZero);
+    if (!(gap < zero)) {
+      return r3;
+    }
+    r3 = OfIndex(base, target);
+    const double again = Lfs(base, record + 172);
+    if (!(again > Lfs(base, 0x82008E54))) {
+      f0 = again > Lfs(base, 0x82008E4C)
+               ? Fmuls(Lfs(base, uint32_t(r3) + 100), Lfs(base, 0x820029D4))
+               : Lfs(base, kFiveHundred);
+      if (f0 > Lfs(base, speed)) {
+        Stfs(base, speed, f0);
+      }
+      return r3;
+    }
+    const bool near = again < Lfs(base, 0x82008E50);
+    f0 = Lfs(base, uint32_t(r3) + 100);
+    if (!near) {
+      const bool slow = f0 < Lfs(base, 0x82000F14);
+      const double factor = Lfs(base, 0x82002A2C);
+      if (!slow) {
+        f0 = Fmuls(f0, factor);
+      } else {
+        f0 = Fmuls(f0, factor) < Lfs(base, kTwenty) ? zero : Lfs(base, kTwenty);
+      }
+    }
+  }
+  if (f0 < Lfs(base, speed)) {
+    Stfs(base, speed, f0);
+  }
+  return r3;
+}
+
+uint64_t UpdateState3(uint8_t* base, uint32_t driver, uint32_t speed) {
+  ITC_NATIVE_RUNNING("sub_821460C8 AiDriver::UpdateState3");
+  double f11 = Lfs(base, speed);
+  PickTarget(base, driver);
+  const uint32_t target = Load(base, driver + 480);
+  if (int32_t(target) < 0) {
+    return driver;
+  }
+  const uint32_t record = target * 40 + driver;
+  const double gap = Lfs(base, record + 172);
+  uint64_t r3 = driver;
+  if (gap > Lfs(base, kZero)) {
+    r3 = OfIndex(base, target);
+    const double again = Lfs(base, record + 172);
+    double f0;
+    if (again < Lfs(base, 0x82002674)) {
+      f0 = Lfs(base, uint32_t(r3) + 100);
+    } else if (again < Lfs(base, kTen)) {
+      f0 = Fmuls(Lfs(base, uint32_t(r3) + 100), Lfs(base, 0x82002A2C));
+    } else if (again < Lfs(base, kHundred)) {
+      f0 = Fmuls(Lfs(base, uint32_t(r3) + 100), Lfs(base, 0x82002A2C));
+      const double most = Lfs(base, 0x82000F14);
+      if (!(f0 < most)) {
+        f0 = most;
+      }
+    } else {
+      f0 = Lfs(base, kTwenty);
+    }
+    if (f0 < Lfs(base, speed)) {
+      Stfs(base, speed, f0);
+    }
+    return r3;
+  }
+  if (gap < Lfs(base, 0x8200895C)) {
+    f11 = Lfs(base, kFiveHundred);
+  } else if (gap < Lfs(base, 0x82008E58)) {
+    r3 = OfIndex(base, target);
+    f11 = Fmuls(Lfs(base, uint32_t(r3) + 100), Lfs(base, 0x820029D4));
+  }
+  if (f11 > Lfs(base, speed)) {
+    Stfs(base, speed, f11);
+  }
+  return r3;
+}
+
+uint32_t UpdateState(uint8_t* base, uint32_t driver, uint32_t speed, uint64_t* r3) {
+  ITC_NATIVE_RUNNING("sub_82139AC8 AiDriver::UpdateState");
+  *r3 = driver;
+  switch (int32_t(Load(base, driver + 32))) {
+    case 2:
+      *r3 = UpdateState2(base, driver, speed);
+      return 0;
+    case 3:
+      *r3 = UpdateState3(base, driver, speed);
+      return 0;
+    case 4:
+      UpdateState4(base, driver, speed);
+      return 0;
+    case 5:
+      *r3 = UpdateState5(base, driver, speed);
+      return 0;
+    case 6: {
+      double f0 = Fsubs(Lfs(base, driver + 100), Lfs(base, kTen));
+      const double least = Lfs(base, 0x82008948);
+      if (f0 < least) {
+        f0 = least;
+      }
+      if (f0 < Lfs(base, driver + 6088)) {
+        Stfs(base, driver + 6088, f0);
+      }
+      return 1;
+    }
+    default:
+      return 0;
+  }
+}
+
 }  // namespace ai_drivers

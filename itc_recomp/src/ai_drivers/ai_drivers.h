@@ -417,4 +417,20 @@ uint32_t AddCornersAt(uint8_t* base, uint32_t path, uint32_t entry, uint32_t fra
 // AddCornersAt's last step: the count +5162 raised by one.
 void AddCornersAtFinish(uint8_t* base, uint32_t path);
 
+// --- The states' speeds ---
+
+// AiDriver::UpdateState2 (sub_82145F48): PickTarget; by the gap to it, the
+// target speed at `speed` lowered (ahead) or raised (behind) to a speed
+// from the target's (see the row). Returns the r3 the original leaves (the
+// driver, or AiDriver::Of's).
+uint64_t UpdateState2(uint8_t* base, uint32_t driver, uint32_t speed);
+// AiDriver::UpdateState3 (sub_821460C8): the same with state 3's bands.
+uint64_t UpdateState3(uint8_t* base, uint32_t driver, uint32_t speed);
+// AiDriver::UpdateState (sub_82139AC8): by the state +32, UpdateState2, 3,
+// 4 or 5 with `speed` (0, `r3` set); in state 6, +6088 lowered to the speed
+// less 10.0 (at least 73.0) and 1, for the caller to run sub_821462A0 (never
+// seen in play) with r3 = the driver and r4 = `speed`; else 0 (`r3` the
+// driver).
+uint32_t UpdateState(uint8_t* base, uint32_t driver, uint32_t speed, uint64_t* r3);
+
 }  // namespace ai_drivers

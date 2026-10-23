@@ -79,7 +79,10 @@ ITC_FLAG_BOOL(native_ai_drivers, true, "ITC",
               "AiDrivers::ClearAll sub_8213A140, AiPath::JoinCorners sub_8213BCD0, "
               "AiPath::JoinCornersShort sub_8213BF28, AiPath::JoinCornerPair sub_8213DD40 "
               "(its equal directions' steps, sub_8213BDF0 and sub_8213BE80, never seen in play, "
-              "on the translated code), AiPath::AddCornersAt sub_8213E970) natively instead of "
+              "on the translated code), AiPath::AddCornersAt sub_8213E970, "
+              "AiDriver::UpdateState2 sub_82145F48, AiDriver::UpdateState3 sub_821460C8, "
+              "AiDriver::UpdateState sub_82139AC8 (its state 6's step, sub_821462A0, never seen "
+              "in play, on the translated code)) natively instead of "
               "through the translated code (the same words, bit for bit; checked by "
               "--run_harnesses=ai_drivers). Those "
               "reached only from native callers have no adapters, and the flag switches their "
@@ -321,6 +324,28 @@ extern "C" REX_FUNC(sub_8213E970) {
     ctx.r5.u64 = b;
     RunJoinStep(ctx, base, step, frame - 112, frame);
     AddCornersAtFinish(base, path);
+    return;
+  }
+  ctx.r3.u64 = r3;
+}
+
+// --- The states' speeds ---
+
+// r4 = &the target speed.
+ITC_AI_DRIVERS(82145F48, ctx.r3.u64 = UpdateState2(base, ctx.r3.u32, ctx.r4.u32))
+ITC_AI_DRIVERS(821460C8, ctx.r3.u64 = UpdateState3(base, ctx.r3.u32, ctx.r4.u32))
+// r4 = &the target speed. State 6's step (never seen in play): the
+// translated one, tail-called as the original does.
+extern "C" REX_FUNC(sub_82139AC8) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_ai_drivers)) {
+    __imp__sub_82139AC8(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  uint64_t r3 = 0;
+  if (UpdateState(base, ctx.r3.u32, ctx.r4.u32, &r3) == 1) {
+    sub_821462A0(ctx, base);
     return;
   }
   ctx.r3.u64 = r3;
