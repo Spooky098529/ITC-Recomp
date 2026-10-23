@@ -69,6 +69,20 @@ When the user has reviewed a run's section, its heading gets
   the parameter global at a test object for the call (the data tables'
   precedent: the load callbacks run when the main thread lets them);
   `Params::Init` native only under `--native_heap`.
+- `cameras.md` (new, 42 rows; 6 moved from `functions.md`, still
+  Wrapped with their old text, 36 new; mapped in 8fb7201): the library's
+  `Camera` class, the 21 camera passes at `0x826BAC00` and their render
+  targets, the two 1,872-byte viewports at `[0x826C2CE8]`; 4 leads (the
+  camera modes at `82152028`-`82156CC0`, a second camera class, the
+  graphics device's resource calls, memset and atexit), and
+  `sub_820AB408`, `sub_820AB498` added to the route lead. For review:
+  `known-data.md`'s `0x826C2CE8` row corrected (1,872-byte viewports of
+  twenty 80-byte entries, not 80-byte records) with new rows for
+  `0x826BABC0`-`0x826BABFC`, the viewport and its entry; a reversed
+  depth range from `Camera::BuildProjection` (+384 near, +388 far);
+  "probably" for mode 1's passes 4-9 as a cube map's faces, the entries'
+  +68 as a focal length in pixels; `CameraPass::RecordBegin`,
+  `RecordEnd` and `Viewport::UpdateEntries` not read in detail.
 
 ## Run 2026-10-23 11:06 (`b7-loop-23-10-26-2`)
 

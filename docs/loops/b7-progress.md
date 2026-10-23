@@ -17,8 +17,8 @@ file's history. What's left to see in a drive, from every run:
 - Subsystem 2 of 3 (the car specs) finished: the rest waits on the
   archive.
 - Subsystem 3 of 3: the game's cameras above `CameraPass::Update` (the
-  lead whose functions run every frame, nearly all ready); mapping agent
-  running.
+  lead whose functions run every frame, nearly all ready): mapped in 8fb7201 (`cameras.md`,
+  42 rows, 16 ready groups), checked; migration agent 1 running.
 
 ## Done
 
@@ -58,5 +58,7 @@ This run's groups: `expected-differences.md` (the "13:44 run" lines).
   the earlier "(expected to differ)" groups (none added).
 - After the car specs' migration 1: ours 1107, work left 5649 (wrapped
   129, known 541, unknown 4979). Race 19 s (`itc_946`), the same checks.
+- After mapping the cameras: ours 1107, work left 5649 (wrapped 129,
+  known 577, unknown 4943).
 
 ## Stopped
