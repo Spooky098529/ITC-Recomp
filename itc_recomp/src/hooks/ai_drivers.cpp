@@ -146,7 +146,8 @@ ITC_FLAG_BOOL(native_ai_drivers, true, "ITC",
               "sub_8213EB48 (its kind 5's step sub_8213EC8C with it), AiDriver::CompareWith "
               "sub_82145B08, AiDrivers::UpdateAll sub_82139628 (the drivers' updates, through "
               "their +6148, on the translated code), AiOther::PlanReaction sub_821456F8, "
-              "AiDriver::ReactToOthers sub_82145CA8) "
+              "AiDriver::ReactToOthers sub_82145CA8, AiDrivers::StartGroup sub_8213A000, "
+              "AiDrivers::StartRanked sub_8213A8B0) "
               "natively instead of "
               "through the translated code (the same words, bit for bit; checked by "
               "--run_harnesses=ai_drivers). Those "
@@ -449,3 +450,8 @@ ITC_AI_DRIVERS(82139628, {
 // r4 = &the entry count; the original's frame 240 bytes down.
 ITC_AI_DRIVERS(82145CA8, ctx.r3.u64 = ReactToOthers(base, ctx.r3.u32, ctx.r4.u32,
                                                     ctx.r1.u32 - 240))
+
+// --- The drivers' starts (the originals' frames: 160 and 224 bytes down) ---
+
+ITC_AI_DRIVERS(8213A000, ctx.r3.u64 = StartGroup(base, ctx.r1.u32 - 160))
+ITC_AI_DRIVERS(8213A8B0, ctx.r3.u64 = StartRanked(base, ctx.r1.u32 - 224))

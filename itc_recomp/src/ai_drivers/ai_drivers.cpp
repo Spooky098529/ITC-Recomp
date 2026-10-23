@@ -4763,4 +4763,153 @@ uint64_t ReactToOthers(uint8_t* base, uint32_t driver, uint32_t count, uint32_t 
   return k;
 }
 
+// --- The drivers' starts ---
+
+namespace {
+constexpr uint32_t kMinusHundred = 0x8200895C;  // -100.0: LeaderBranchKind's first best
+// The race's racer i's record ([0x826D82F4] + 2308).
+uint32_t RacerAt(uint8_t* base, uint32_t i) {
+  return Load(base, Load(base, kRace) + 2308 + 4 * i);
+}
+}  // namespace
+
+uint64_t StartGroup(uint8_t* base, uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_8213A000 AiDrivers::StartGroup");
+  const uint32_t count = track_collision::RaceRacerCount(base);
+  uint64_t r3 = count;
+  StoreConstant(base, frame + 88, kMinusHundred);
+  uint32_t mask = 0;
+  guest::StoreU32(base, frame + 80, mask);
+  guest::StoreU32(base, frame + 84, 0xFFFFFFFFu);
+  if (Load(base, kDrivers) == 0 || !(int32_t(count) > 0)) {
+    return r3;
+  }
+  for (uint32_t i = 0; i < count; i++) {
+    const uint32_t racer = RacerAt(base, i);
+    const uint32_t flags = Load(base, racer + 0);
+    if ((flags & 0x10) == 0) {
+      continue;
+    }
+    const uint32_t index = Load(base, racer + 20);
+    if (int32_t(index) < 0) {
+      continue;
+    }
+    if ((flags & 0xC) == 0) {
+      mask |= Slw(1, index);
+    }
+    const uint64_t driver = uint64_t(index) * kDriverBytes + Load(base, kDrivers);
+    r3 = LeaderBranchKind(base, uint32_t(driver + 512), frame + 84, frame + 88);
+  }
+  guest::StoreU32(base, frame + 80, mask);
+  for (uint32_t i = 0; i < count; i++) {
+    const uint32_t racer = RacerAt(base, i);
+    const uint32_t index = Load(base, racer + 20);
+    if (int32_t(index) < 0) {
+      continue;
+    }
+    const uint32_t flags = Load(base, racer + 0);
+    const uint64_t driver = uint64_t(index) * kDriverBytes + Load(base, kDrivers);
+    if ((flags & 0x10) == 0) {
+      continue;
+    }
+    if ((flags & 0xC) == 0) {
+      guest::StoreU32(base, frame + 92, 0);
+      r3 = SetState2or3(base, uint32_t(driver), frame + 80, frame + 92, frame - 112);
+    }
+    const uint64_t path = driver + 512;
+    r3 = path;
+    const uint32_t best = Load(base, frame + 84);
+    if (int32_t(Load(base, uint32_t(path) + 5524)) != int32_t(best)) {
+      guest::StoreU32(base, uint32_t(path) + 5524, best);
+      r3 = ResetPath(base, uint32_t(path));
+    }
+  }
+  return r3;
+}
+
+uint64_t StartRanked(uint8_t* base, uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_8213A8B0 AiDrivers::StartRanked");
+  const uint32_t count = track_collision::RaceRacerCount(base);
+  uint64_t r3 = count;
+  uint32_t table = Load(base, kDrivers);
+  StoreConstant(base, frame + 92, kMinusHundred);
+  uint32_t mask = 0;
+  uint32_t listed = 0;
+  guest::StoreU32(base, frame + 80, mask);
+  guest::StoreU32(base, frame + 84, listed);
+  guest::StoreU32(base, frame + 88, 0xFFFFFFFFu);
+  if (table == 0 || !(int32_t(count) > 0)) {
+    return r3;
+  }
+  const uint32_t list = frame + 96;
+  for (uint32_t i = 0; i < count; i++) {
+    const uint32_t racer = RacerAt(base, i);
+    if ((Load(base, racer + 0) & 0x10) == 0) {
+      continue;
+    }
+    const uint32_t index = Load(base, racer + 20);
+    if (int32_t(index) < 0) {
+      continue;
+    }
+    const uint64_t driver = uint64_t(index) * kDriverBytes + table;
+    mask |= Slw(1, index);
+    r3 = LeaderBranchKind(base, uint32_t(driver + 512), frame + 88, frame + 92);
+    guest::StoreU32(base, list + 4 * listed, index);
+    listed++;
+    table = Load(base, kDrivers);
+  }
+  guest::StoreU32(base, frame + 84, listed);
+  guest::StoreU32(base, frame + 80, mask);
+  // Sorted only with three or more listed, as the original (its count
+  // checked against 2).
+  if (int32_t(listed) > 2) {
+    for (uint32_t i = 0; i < listed; i++) {
+      for (uint32_t j = i + 1; j < listed; j++) {
+        const uint32_t at = list + 4 * i;
+        const uint32_t next = list + 4 * j;
+        const uint32_t a = Load(base, at) * kDriverBytes + table;
+        const uint32_t b = Load(base, next) * kDriverBytes + table;
+        uint32_t flags = Load(base, Load(base, a + 160) + 6148) & 0x81;
+        r3 = flags;
+        if (flags != 0) {
+          continue;
+        }
+        flags = Load(base, Load(base, b + 160) + 6148) & 0x81;
+        r3 = flags;
+        if (flags == 0 && Lfs(base, a + 488) > Lfs(base, b + 488)) {
+          continue;
+        }
+        const uint32_t second = Load(base, next);
+        const uint32_t first = Load(base, at);
+        guest::StoreU32(base, at, second);
+        guest::StoreU32(base, next, first);
+      }
+    }
+  }
+  for (uint32_t i = 0; i < count; i++) {
+    const uint32_t racer = RacerAt(base, i);
+    const uint32_t index = Load(base, racer + 20);
+    if (int32_t(index) < 0) {
+      continue;
+    }
+    const uint32_t flags = Load(base, racer + 0);
+    const uint64_t driver = uint64_t(index) * kDriverBytes + table;
+    r3 = driver;
+    if ((flags & 0x10) != 0) {
+      SetStateFromList(base, uint32_t(driver), frame + 80, frame + 84, list, frame - 128);
+      const uint64_t path = driver + 512;
+      r3 = path;
+      const uint32_t best = Load(base, frame + 88);
+      if (int32_t(Load(base, uint32_t(path) + 5524)) != int32_t(best)) {
+        guest::StoreU32(base, uint32_t(path) + 5524, best);
+        r3 = ResetPath(base, uint32_t(path));
+      }
+    } else {
+      r3 = SetState4(base, uint32_t(driver), frame + 80, frame - 112);
+    }
+    table = Load(base, kDrivers);
+  }
+  return r3;
+}
+
 }  // namespace ai_drivers

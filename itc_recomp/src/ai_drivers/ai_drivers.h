@@ -794,4 +794,23 @@ void PlanReaction(uint8_t* base, uint32_t record, uint32_t skill, uint32_t rate,
 // (+26), then their gaps. Returns the r3 the original leaves.
 uint64_t ReactToOthers(uint8_t* base, uint32_t driver, uint32_t count, uint32_t frame);
 
+// --- The drivers' starts ---
+
+// AiDrivers::StartGroup (sub_8213A000): for the racers with flag 0x10 (their
+// word +0) and an index, LeaderBranchKind on their paths (the kind at frame +
+// 84 from -1, the best at frame + 88 from -100.0: `frame` the original's, 160
+// bytes below the caller's stack pointer) and the mask (frame + 80) of those
+// without 0x0C; then each of them without 0x0C SetState2or3 (the mask, a 0
+// word at frame + 92) and its path's +5524 = the kind (ResetPath on a
+// change). Returns the r3 the original leaves.
+uint64_t StartGroup(uint8_t* base, uint32_t frame);
+// AiDrivers::StartRanked (sub_8213A8B0): the racers with flag 0x10 listed (at
+// frame + 96, the count at + 84, the mask at + 80: `frame` 224 bytes down)
+// with LeaderBranchKind on their paths (the kind at + 88, the best at + 92);
+// with three or more, the list sorted by the drivers' +488, highest first
+// (those whose vehicles have the flags 0x81 kept first); then each racer with
+// 0x10 SetStateFromList and its path's +5524 = the kind (ResetPath on a
+// change), each other one SetState4. Returns the r3 the original leaves.
+uint64_t StartRanked(uint8_t* base, uint32_t frame);
+
 }  // namespace ai_drivers

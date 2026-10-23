@@ -415,6 +415,8 @@ ITC_NATIVE_STEP(NativePlanReaction, ai::PlanReaction(base, ctx.r3.u32, ctx.r4.u3
                                                      ctx.r6.u32, ctx.r7.u32))
 ITC_NATIVE_STEP(NativeReactToOthers,
                 ctx.r3.u64 = ai::ReactToOthers(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 240))
+ITC_NATIVE_STEP(NativeStartGroup, ctx.r3.u64 = ai::StartGroup(base, ctx.r1.u32 - 160))
+ITC_NATIVE_STEP(NativeStartRanked, ctx.r3.u64 = ai::StartRanked(base, ctx.r1.u32 - 224))
 
 // Runs the recompiled version with the native flag off.
 template <GuestFunction recompiled>
@@ -621,6 +623,8 @@ enum Kind {
   kUpdateAll,
   kPlanReaction,
   kReactToOthers,
+  kStartGroup,
+  kStartRanked,
 };
 
 }  // namespace
@@ -907,6 +911,10 @@ void AiDrivers(Context& h) {
        kPlanReaction, 3000},
       {"AiDriver::ReactToOthers (sub_82145CA8)", Original<__imp__sub_82145CA8>,
        NativeReactToOthers, kReactToOthers, 2000},
+      {"AiDrivers::StartGroup (sub_8213A000)", Original<__imp__sub_8213A000>, NativeStartGroup,
+       kStartGroup, 2000},
+      {"AiDrivers::StartRanked (sub_8213A8B0)", Original<__imp__sub_8213A8B0>,
+       NativeStartRanked, kStartRanked, 2000},
   };
   const uint32_t area = memory::Alloc(kAreaBytes, 0);
   const uint32_t driver = area + kDriver, vehicle = area + kVehicle, io = area + kIo;
@@ -2329,6 +2337,65 @@ void AiDrivers(Context& h) {
               drivers = 0;
             }
           }
+          break;
+        }
+        case kStartGroup:
+        case kStartRanked: {
+          // The racers (up to 7: flags 0x10, 0x4 and 0x8 in any mix, or any
+          // word; an index 0 to 6, now and then -1), the race flags and a
+          // route for LeaderBranchKind (as FollowLeaderBranch's cases), the
+          // vehicles (their flags +6148, positions, box shapes) and the
+          // table's first seven drivers: +0 their index, +16, +488 (ties
+          // often, for the sort), a vehicle (StartGroup: now and then none;
+          // StartRanked reads its flags without a check), the path's driver
+          // word (itself: LeaderBranchKind reads it without a check) and what
+          // ClearPlan and ResetToMode1 read.
+          drivers = r.Below(16) == 0 ? 0 : table;
+          table_written = true;
+          race_data = io + 0xF0 - 20;
+          guest::StoreU32(h.base, io + 0xF0, r.Below(8) == 0 ? uint32_t(r.Next())
+                                                           : (r.Below(64) << 2) | r.Below(4));
+          const test_route::Route route =
+              test_route::BuildRoute(h.base, route_area, route_table, r);
+          route_file = route_area + test_route::kFile;
+          for (uint32_t v = 0; v < 8; v++) {
+            const uint32_t at = vehicles + kVehicleBytes * v;
+            test_route::RandomPosition(h.base, at + 5232 + 4, route, r);
+            guest::StoreU32(h.base, at + 6148, r.Below(4) == 0 ? 0x80u >> r.Below(8) : 0u);
+            guest::StoreU32(h.base, at + 344, r.Below(4) == 0 ? 0 : area + kShape);
+          }
+          const uint32_t count = r.Below(8) == 0 ? 0 : 1 + r.Below(7);
+          guest::StoreU32(h.base, area + kRacers + 56, r.Below(16) == 0 ? 0xFFFFFFFFu : count);
+          for (uint32_t i = 0; i < 7; i++) {
+            const uint32_t racer = area + kRacerRecords + 24 * i;
+            guest::StoreU32(h.base, area + kRacers + 4 * i, racer);
+            const uint32_t flags = r.Below(8) == 0
+                                       ? uint32_t(r.Next())
+                                       : (r.Below(4) ? 0x10u : 0u) | (r.Below(3) == 0 ? 4u : 0u) |
+                                             (r.Below(3) == 0 ? 8u : 0u);
+            guest::StoreU32(h.base, racer + 0, flags);
+            guest::StoreU32(h.base, racer + 20, r.Below(8) == 0 ? 0xFFFFFFFFu
+                                                : r.Below(4) == 0 ? r.Below(7)
+                                                                  : i);
+          }
+          for (uint32_t d = 0; d < 7; d++) {
+            const uint32_t other = table + d * ai::kDriverBytes;
+            guest::StoreU32(h.base, other + 0, d);
+            guest::StoreU32(h.base, other + 16, r.Below(2) ? uint32_t(r.Next()) : r.Below(8));
+            guest::StoreU32(h.base, other + 488, r.Below(4) == 0
+                                                     ? RandomFloat(r, 100.0f)
+                                                     : FloatBits(-60.0f + 10.0f * float(r.Below(5))));
+            guest::StoreU32(h.base, other + 160, f.kind == kStartGroup && r.Below(6) == 0
+                                                     ? 0
+                                                     : vehicles + kVehicleBytes * r.Below(8));
+            guest::StoreU32(h.base, other + kPath, other);
+            guest::StoreU32(h.base, other + kPath + 5520, r.Below(3));
+            guest::StoreU32(h.base, other + kPath + 5524,
+                            r.Below(2) ? 0xFFFFFFFFu : uint32_t(int32_t(r.Below(9)) - 1));
+            guest::StoreU32(h.base, other + kPath + 5528,
+                            r.Below(2) ? 0xFFFFFFFFu : r.Below(8));
+          }
+          what += fmt::format(" racers {}", count);
           break;
         }
         case kPlanReaction: {
