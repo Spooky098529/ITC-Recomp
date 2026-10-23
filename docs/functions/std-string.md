@@ -50,6 +50,7 @@ by the B7 loop's mapping agent, 2026-10-23, from the UI movies' lead.
 - **A quirk of `_Copy`:** for a new capacity under 16 (only from strings
   with a capacity under 11, which the game never makes) it stores the new
   block's pointer at +4 while the text stays in place there.
+
 Status:
 
 Status:
