@@ -57,6 +57,32 @@ ITC_NATIVE_STEP(NativeClientListBoundCount,
 ITC_NATIVE_STEP(NativeClientListFind,
                 ctx.r3.u64 = am::ClientListFind(base, ctx.r3.u32, ctx.r4.u32))
 
+ITC_NATIVE_STEP(NativeCurveUnsigned,
+                ctx.f1.f64 = am::CurveUnsigned(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+                ctx.r3.u64 = guest::LoadU32(base, ctx.r3.u32 + 4 * (ctx.r4.u32 + 45)))
+ITC_NATIVE_STEP(NativeCurveCentered,
+                ctx.f1.f64 = am::CurveCentered(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+                ctx.r3.u64 = guest::LoadU32(base, ctx.r3.u32 + 4 * (ctx.r4.u32 + 45)))
+ITC_NATIVE_STEP(NativeAnalog, double f1 = ctx.f1.f64;
+                ctx.r3.u64 = am::Analog(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, &f1);
+                ctx.f1.f64 = f1)
+ITC_NATIVE_STEP(NativeHysteresis, ctx.r3.u64 = am::Hysteresis(base, ctx.r3.u32, ctx.r4.u32,
+                                                               ctx.f1.f64, ctx.r6.u32))
+ITC_NATIVE_STEP(NativeWords,
+                ctx.r3.u64 = am::Words(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                       guest::LoadU32(base, ctx.r1.u32 - 64)))
+ITC_NATIVE_STEP(NativeRebuild, double f1 = 0;
+                ctx.r3.u64 = am::Rebuild(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                         uint32_t(ctx.r25.u64 >> 32), &f1);
+                ctx.f1.f64 = f1)
+ITC_NATIVE_STEP(NativeMapperUpdate, double f1 = 0;
+                ctx.r3.u64 = am::MapperUpdate(base, ctx.r3.u32, uint32_t(ctx.r25.u64 >> 32),
+                                              &f1);
+                ctx.f1.f64 = f1)
+ITC_NATIVE_STEP(NativeUpdateAll, double f1 = ctx.f1.f64;
+                ctx.r3.u64 = am::UpdateAll(base, ctx.r3.u32, uint32_t(ctx.r25.u64 >> 32), &f1);
+                ctx.f1.f64 = f1)
+
 #undef ITC_NATIVE_STEP
 
 // Byte ranges of the scratch area holding floats, [from, to).
@@ -372,6 +398,202 @@ void ClientLists(Context& h) {
   }
 }
 
+// --- The update ---
+
+// A mapper in the scratch area: the game's mapper 0 copied (its pointers
+// into itself moved), its state made random. `game` keeps the game's
+// configuration (kinds, links, thresholds, delays, curves); otherwise those
+// are random too. The logical pad's values (40 floats) at `pad`.
+constexpr uint32_t kMapper = 16;    // the mapper's offset in the area
+constexpr uint32_t kPad = 2928;     // the pad values'
+constexpr uint32_t kStates = 3100;  // a states word (sub_8210BBA0's r5)
+constexpr uint32_t kList = 3200;    // a client list
+
+std::vector<uint8_t> g_game_mapper;
+uint32_t g_game_mapper_address = 0;
+
+bool GameMapper(Context& h) {
+  if (!g_game_mapper.empty()) {
+    return true;
+  }
+  g_game_mapper_address = guest::LoadU32(h.base, 0x826BAB80);
+  if (g_game_mapper_address == 0) {
+    return false;
+  }
+  g_game_mapper = Read(h.base, g_game_mapper_address, 2896);
+  return true;
+}
+
+void RandomMapper(Context& h, bool game) {
+  Random& r = h.random;
+  uint8_t* base = h.base;
+  const uint32_t m = h.data + kMapper;
+  Write(base, m, g_game_mapper.data(), 2896);
+  const uint32_t delta = m - g_game_mapper_address;
+  auto move = [&](uint32_t field) {
+    guest::StoreU32(base, m + field, guest::LoadU32(base, m + field) + delta);
+  };
+  for (uint32_t k = 0; k < 4; k++) {
+    move(am::kConfig + 4 * k);
+  }
+  for (uint32_t i = 0; i < 30; i++) {
+    move(am::kRepeatPointers + 4 * i);
+    move(am::kCurvePointers + 4 * i);
+  }
+  guest::StoreU32(base, m + am::kPadValues, h.data + kPad);
+  // The client node: type 2, no next.
+  guest::StoreU32(base, m + 4, 2);
+  guest::StoreU32(base, m + 8, 0);
+  // The words (held, held before, pressed, released, fired, pending).
+  for (uint32_t k = 0; k < 6; k++) {
+    guest::StoreU32(base, m + am::kWords + 4 * k, uint32_t(r.Next()));
+  }
+  if (!game) {
+    for (uint32_t i = 0; i < 30; i++) {
+      guest::StoreU32(base, m + 12 + 4 * i, r.Below(3));                    // kinds
+      guest::StoreU32(base, m + 132 + 4 * i, r.Below(4));                   // analog kinds
+      guest::StoreU32(base, m + 252 + 4 * i, r.Below(4) ? 30 : r.Below(31));  // links
+    }
+  }
+  for (uint32_t i = 0; i < 30; i++) {
+    // The raw and analog values before (the update overwrites most).
+    guest::StoreU16(base, m + am::kRaw + 2 * i, uint16_t(r.Next()));
+    guest::StoreU16(base, m + am::kAnalog + 2 * i, uint16_t(r.Next()));
+    guest::StoreU32(base, m + am::kAnalog + 60 + 4 * i, Bits(RandomFloat(r, 1.0f)));
+    // The threshold entry: on, off, suppress ticks, counter, state.
+    const uint32_t e = m + am::kThresholds + 20 * i;
+    if (!game) {
+      guest::StoreU32(base, e, Bits(RandomFloat(r, 1.0f)));
+      guest::StoreU32(base, e + 4, r.Below(4) ? Bits(RandomFloat(r, 1.0f))
+                                              : guest::LoadU32(base, e));
+      guest::StoreU32(base, e + 8, r.Below(4));
+    }
+    guest::StoreU32(base, e + 12, r.Below(3) ? 0 : r.Below(4));
+    guest::StoreU8(base, e + 16, uint8_t(r.Below(2)));
+    // The repeat object: its count, and (not game) its delay and period.
+    const uint32_t repeat = m + 592 + 16 * i;
+    if (!game) {
+      guest::StoreU32(base, repeat + 8, r.Below(25));
+      guest::StoreU32(base, repeat + 12, r.Below(10));
+    }
+    const uint32_t delay = guest::LoadU32(base, repeat + 8);
+    const uint32_t period = guest::LoadU32(base, repeat + 12);
+    guest::StoreU32(base, repeat + 4,
+                    r.Below(3) == 0 ? delay + period : r.Below(delay + period + 3));
+    // The curve object (not game): center, dead zone, maximum.
+    if (!game) {
+      const uint32_t curve = m + 1372 + 16 * i;
+      guest::StoreU32(base, curve + 4, Bits(RandomFloat(r, 0.5f)));
+      guest::StoreU32(base, curve + 8, Bits(RandomFloat(r, 0.5f)));
+      guest::StoreU32(base, curve + 12, Bits(r.Below(4) ? 1.0f : RandomFloat(r, 2.0f)));
+    }
+  }
+  // The listener's held buttons: mostly a few of the mappers' masks.
+  uint32_t held = 0;
+  if (r.Below(8) == 0) {
+    held = uint32_t(r.Next());
+  } else {
+    static const uint32_t kMasks[] = {1,    2,     4,     8,      16,      32,      64,
+                                      128,  4096,  65536, 16384,  262144,  1048576, 2097152};
+    for (uint32_t k = r.Below(4); k > 0; k--) {
+      held |= kMasks[r.Below(14)];
+    }
+  }
+  guest::StoreU32(base, m + am::kListener + 272, held);
+  // The pad's values: sticks and triggers in [-1, 1], sometimes an edge.
+  for (uint32_t k = 0; k < 40; k++) {
+    guest::StoreU32(base, h.data + kPad + 4 * k, Bits(RandomFloat(r, 1.0f)));
+  }
+  guest::StoreU32(base, h.data + kStates, uint32_t(r.Next()));
+}
+
+const Options& UpdateOptions() {
+  // The analog floats (+1132 to +1252) as floats; r3 and f1.
+  static const Options options{
+      {{kMapper + am::kAnalog + 60, kMapper + am::kAnalog + 180}}, true, true};
+  return options;
+}
+
+void Updates(Context& h) {
+  if (!GameMapper(h)) {
+    ITC_LOG_INFO("harness: action mappers: no mapper at [0x826BAB80], the update not checked");
+    return;
+  }
+  const uint32_t m = h.data + kMapper;
+  const Options& options = UpdateOptions();
+  auto run = [&](const char* name, int cases, GuestFunction recompiled, GuestFunction native,
+                 auto args) {
+    Results results(name);
+    for (int i = 0; i < cases; i++) {
+      const bool game = i < cases / 2;
+      Case(
+          h, results, [&] { RandomMapper(h, game); },
+          [&](PPCContext& t) {
+            t.r25.u64 = h.random.Next();
+            args(t, i);
+          },
+          recompiled, native, options, fmt::format("case {}{}", i, game ? " (game's)" : ""));
+    }
+    results.Report();
+  };
+  run("sub_8210B4A8 ActionMapper::CurveUnsigned", 300, __imp__sub_8210B4A8, NativeCurveUnsigned,
+      [&](PPCContext& t, int i) {
+        t.r3.u64 = m + am::kAnalog;
+        t.r4.u64 = i % 30;
+        t.r5.u64 = h.random.Next();
+      });
+  run("sub_8210B500 ActionMapper::CurveCentered", 300, __imp__sub_8210B500, NativeCurveCentered,
+      [&](PPCContext& t, int i) {
+        t.r3.u64 = m + am::kAnalog;
+        t.r4.u64 = i % 30;
+        t.r5.u64 = i % 5 == 0 ? 0x7FFF + h.random.Below(3) : h.random.Next();
+      });
+  run("sub_8210B7D0 ActionMapper::Analog", 200, __imp__sub_8210B7D0, NativeAnalog,
+      [&](PPCContext& t, int) {
+        t.r3.u64 = m + am::kAnalog;
+        t.r4.u64 = m + am::kConfig + 8;
+        t.r5.u64 = m + am::kRaw;
+      });
+  run("sub_8210B718 ActionMapper::Hysteresis", 600, __imp__sub_8210B718, NativeHysteresis,
+      [&](PPCContext& t, int i) {
+        t.r3.u64 = m + am::kWords;
+        t.r4.u64 = i % 30;
+        t.f1.f64 = double(RandomFloat(h.random, 1.0f));
+        t.r5.u64 = h.random.Next();
+        t.r6.u64 = m + am::kConfig;
+      });
+  run("sub_8210BBA0 ActionMapper::Words", 300, __imp__sub_8210BBA0, NativeWords,
+      [&](PPCContext& t, int) {
+        t.r3.u64 = m + am::kWords;
+        t.r4.u64 = m + am::kConfig;
+        t.r5.u64 = h.data + kStates;
+        // The stack word the held word is built in.
+        guest::StoreU32(h.base, t.r1.u32 - 64, uint32_t(h.random.Next()));
+      });
+  run("sub_8210C0E0 ActionMapper::Rebuild", 300, __imp__sub_8210C0E0, NativeRebuild,
+      [&](PPCContext& t, int) {
+        t.r3.u64 = m + am::kWords;
+        t.r4.u64 = m + am::kConfig;
+        t.r5.u64 = m + am::kRaw;
+      });
+  run("sub_8210C370 ActionMapper::Update", 400, __imp__sub_8210C370, NativeMapperUpdate,
+      [&](PPCContext& t, int) { t.r3.u64 = m; });
+  // ActionMappers::Update on a client list in the area holding the mapper
+  // (bound count 0 or 1).
+  run("sub_8210B018 ActionMappers::Update", 100, __imp__sub_8210B018, NativeUpdateAll,
+      [&](PPCContext& t, int i) {
+        const uint32_t list = h.data + kList;
+        guest::StoreU32(h.base, list, 0x82007F18);
+        guest::StoreU32(h.base, list + 4, m);
+        guest::StoreU32(h.base, list + 8, m);
+        for (uint32_t k = 0; k < 6; k++) {
+          guest::StoreU32(h.base, list + 12 + 4 * k, k == 2 || k == 5 ? (i % 10 != 0) : 0);
+        }
+        guest::StoreU32(h.base, am::kClientList, list);
+        t.r3.u64 = list;
+      });
+}
+
 }  // namespace
 
 void ActionMappers(Context& h) {
@@ -380,6 +602,7 @@ void ActionMappers(Context& h) {
   Indexes(h);
   HeldTests(h);
   ClientLists(h);
+  Updates(h);
 }
 
 }  // namespace harness

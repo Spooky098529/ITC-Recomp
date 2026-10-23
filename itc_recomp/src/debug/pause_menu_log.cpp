@@ -205,17 +205,20 @@ extern "C" REX_FUNC(sub_8220C1E0) {
   }
 }
 
-// The action mapper's input update.
-extern "C" REX_FUNC(sub_8210C370) {
-  REX_FUNC_PROLOGUE();
+// The action mapper's input update (sub_8210C370; its adapter is in
+// hooks/action_mappers.cpp).
+uint32_t debug::PauseMenuLog_BeforeMapperUpdate(uint8_t* base, uint32_t mapper) {
   if (!ITC_FLAG(log_pause_menu)) {
-    __imp__sub_8210C370(ctx, base);
+    return 0;
+  }
+  return guest::LoadU32(base, mapper + 464);
+}
+
+void debug::PauseMenuLog_AfterMapperUpdate(uint8_t* base, uint32_t mapper, uint32_t caller,
+                                           uint32_t fired_before) {
+  if (!ITC_FLAG(log_pause_menu)) {
     return;
   }
-  uint32_t mapper = ctx.r3.u32;
-  uint32_t caller = uint32_t(ctx.lr);
-  uint32_t fired_before = guest::LoadU32(base, mapper + 464);
-  __imp__sub_8210C370(ctx, base);
   uint32_t held = guest::LoadU32(base, mapper + 448);
   uint32_t fired = guest::LoadU32(base, mapper + 464);
   if (((held | fired | fired_before) & kDirectionBits) && TakeLine()) {

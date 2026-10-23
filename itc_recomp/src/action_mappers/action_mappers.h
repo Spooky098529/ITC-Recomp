@@ -55,6 +55,10 @@ uint32_t ListenerHeld(uint8_t* base, uint32_t listener, uint32_t mask);
 // sub_8258CF10: the same with the mask read from `mask_address`.
 uint32_t ListenerTest(uint8_t* base, uint32_t listener, uint32_t mask_address);
 
+// sub_8258CF10's work on a mask already read (what the mappers' update
+// calls).
+uint32_t ListenerTestValue(uint8_t* base, uint32_t listener, uint32_t mask);
+
 // Diagnostics (--log_input_reads): counts a held test made from `caller`
 // (the original's call to sub_8258CF10, from its return address) as the
 // originals' wrappers did: sub_825924E0 from sub_8258CF10, then
@@ -82,5 +86,57 @@ uint32_t ClientListBoundCount(uint8_t* base, uint32_t list, uint32_t type, uint3
 // ClientList::Find (sub_8259C818): the n-th node of `type` (compared as
 // signed words) in the list at [0x82970C14], or 0.
 uint32_t ClientListFind(uint8_t* base, uint32_t type, uint32_t n);
+
+// --- The update ---
+//
+// `stack_word` is what the original finds in the uninitialized stack word it
+// builds the new held word in (sub_8210BBA0's +80): bits 30 and 31 are never
+// set or cleared there, so they're that word's. Called from
+// sub_8210C0E0 it's always the high half of r25 as sub_8210B7D0 saved it
+// (its __savegprlr_24 at the same address), so the adapters pass that.
+
+// Whether every repeat object's and curve object's slot 1 is the function
+// seen in play (and the mapper isn't 0): the native update calls them
+// directly, so the adapters run the original otherwise.
+bool RepeatsKnown(uint8_t* base, uint32_t mapper);
+bool CurvesKnown(uint8_t* base, uint32_t mapper);
+bool MapperCallsKnown(uint8_t* base, uint32_t mapper);
+
+// ActionMapper::CurveUnsigned and CurveCentered (sub_8210B4A8,
+// sub_8210B500): `analog` is mapper + 1072, `raw` the u16 in r5; the curve
+// object's slot 1 on raw × [0x82002BD4], or (raw - [0x82007F64]) ×
+// [0x82007F60]. Returns f1 (r3 is left as the curve object, as the
+// original's).
+double CurveUnsigned(uint8_t* base, uint32_t analog, uint32_t index, uint32_t raw);
+double CurveCentered(uint8_t* base, uint32_t analog, uint32_t index, uint32_t raw);
+// ActionMapper::Analog (sub_8210B7D0): `analog` = mapper + 1072, `config` =
+// the config's +8 (analog kinds, links), `raw` the raw values. Returns the
+// original's r3: the last curve object called, or `analog` when none was;
+// `f1` gets the last curve's result (unchanged when none was called).
+uint32_t Analog(uint8_t* base, uint32_t analog, uint32_t config, uint32_t raw, double* f1);
+// ActionMapper::Hysteresis (sub_8210B718): `words` = mapper + 448; returns
+// the threshold entry's state byte.
+uint32_t Hysteresis(uint8_t* base, uint32_t words, uint32_t index, double value,
+                    uint32_t config);
+// ActionMapper::Words (sub_8210BBA0): `words` = mapper + 448, `states` the
+// address of the hysteresis states' word. Returns what the last repeat
+// update returned (the original's r3).
+uint32_t Words(uint8_t* base, uint32_t words, uint32_t config, uint32_t states,
+               uint32_t stack_word);
+// ActionMapper::Rebuild (sub_8210C0E0): `words` = mapper + 448, `config` =
+// mapper + 372, `raw` = mapper + 388. Returns the original's r3; `f1` gets
+// the original's f1.
+uint32_t Rebuild(uint8_t* base, uint32_t words, uint32_t config, uint32_t raw,
+                 uint32_t stack_word, double* f1);
+// ActionMapper::Update (sub_8210C370): the raw values from the logical pad
+// and the listener, the axes, then Rebuild. Returns the original's r3.
+uint32_t MapperUpdate(uint8_t* base, uint32_t mapper, uint32_t stack_word, double* f1);
+
+// ActionMappers::Update (sub_8210B018): every bound mapper of the client
+// list `list` updated. UpdateAllKnown: every one passes MapperCallsKnown.
+bool UpdateAllKnown(uint8_t* base, uint32_t list);
+// Returns the original's r3 (the bound count); `f1` gets the original's f1
+// (the last mapper's, or unchanged when there's none).
+uint32_t UpdateAll(uint8_t* base, uint32_t list, uint32_t stack_word, double* f1);
 
 }  // namespace action_mappers
