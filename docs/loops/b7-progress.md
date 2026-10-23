@@ -43,7 +43,15 @@ This run's groups: `expected-differences.md` (the "11:06 run" lines).
 The data tables' `sub_821171B0` Find20, `sub_82117210` Entry20,
 `sub_82117228` Entry40 (in neither the attract race nor the replay; the
 replay was ok), `sub_82116DA8` ItemRecords::Item ran in a second replay after its
-print was added (`itc_924`, 127 s, 0 errors); the other three didn't. The action mappers' functions all ran.
+print was added (`itc_924`, 127 s, 0 errors); the other three didn't.
+
+From earlier runs, still with no `native running (game):` line in any
+log (checked 2026-10-23): `sub_82126A00` WheelOnSurface8 and
+`sub_82126A38` WheelOnSurface1Or2 (probably ground no drive touched),
+`sub_82122DB8` FlagsKind and `sub_82127198` NoSaveFlags (never seen in
+the coverage session either); all from `b7-loop-2026-10-22-1439.md`.
+The fourth run's list (`b7-loop-2026-10-22-2211.md`) has since all run
+(the replays `itc_916`, `itc_922`, the drive `itc_895`, `itc_765`). The action mappers' functions all ran.
 
 ## Totals
 
