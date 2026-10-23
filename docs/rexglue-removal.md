@@ -2523,6 +2523,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-10-23 | The model animation (track sets and their keyframed curves, `Model::Animate`, the skeleton's node values and matrices; with the primitive drawer's constructor) | `model-animation.md` | 36 of 39 (and `models.md`'s `sub_8259C3A8`) | `--native_model_animation` |
 | 2026-10-23 | The car specs (the parameter tables' set-up, load callbacks and byte swaps, the getters, `Car::Refresh` and `Tire::InchUp`; no behavior change) | `car-specs.md` | 47 of 48 (`Params::Free` not seen in play) | `--native_car_specs` |
 | 2026-10-23 | The cameras below the camera modes (the library's `Camera` class, the 21 camera passes and their record passes, the two viewports; interpolation's hooks kept) | `cameras.md` | 32 of 42 (two migrations) | `--native_cameras` |
+| 2026-10-23 | The string table and font (the 17 string files, their pages and formatting with the game's `swprintf`, the font's layout and text draw; the C runtime's wide printf with it) | `strings-and-font.md` | 25 of 36 | `--native_strings_and_font` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -3038,3 +3039,16 @@ row yet 4,943); `cameras.md` 32 ours of 42. 949 overrides in `src/`.
 The cameras' rest waits on the graphics device's resource calls
 (`CameraPass::Init`, `SetUpSurfaces`, `CameraPasses::MakeRenderTarget`)
 and memset and atexit (`Viewports::Init`, `Viewport::Init`).
+
+**2026-10-23, B7's eighth loop run, the string table and font (branch
+`b7-loop-23-10-26-4`):** the boundary unchanged: 449 functions (916
+pairs): overridden 67, Native 3, Dropped 23, never called 70, live 286.
+Imports: 186 called, 62 with a live caller. B7 (`b7_status.py`): 6,757
+in play, ours 1,167, work left 5,590 (Wrapped 123, with a row 559, no
+row yet 4,908); `strings-and-font.md` 25 ours of 36. 962 overrides in
+`src/`. The game's `swprintf` runs over a step-by-step translation of
+the C runtime's `_woutput_l` (`src/c_runtime/wide_format.cpp`), which
+hands back to the recompiled code on paths never seen in play. The rest
+waits on `DataFile::GetEntry` (`Strings::Get`, so `FormatV` and
+`Format`), the archive (`Font::Load`, `Strings::Load`), the XPR, the
+shader compiler and the device's state save and restore (`Font::Font`).

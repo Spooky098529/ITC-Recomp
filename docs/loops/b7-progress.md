@@ -12,12 +12,19 @@ see in a drive, from every run: `to-drive.md`.
 
 - Run started 2026-10-23 17:22 on `b7-loop-23-10-26-4` (the user's
   branch), from 305cc52; summary `b7-loop-2026-10-23-1722.md`.
-- Subsystem 1 of 3: the string table and font (`leads.md`'s top lead),
-  mapped in 0974397 (35 rows, 10 ready groups); migration 1 done
-  (16458d3..29aea2e: nothing ready left); step: validation (a
-  validation agent running).
+- Subsystem 1 of 3 (the string table and font) finished: the rest
+  waits on `DataFile::GetEntry`, the archive, the XPR, the shader
+  compiler and the device's state save.
+- Subsystem 2 of 3: `std::string` (`leads.md`'s top lead); step:
+  mapping (a mapping agent running).
 
 ## Done
+
+- The string table and font (`strings-and-font.md`, mapped in 0974397;
+  36 rows): 25 ours in one migration (16458d3..29aea2e), validated (27
+  of 27 harness lines; `itc_1043`, `itc_1044`, replay ok; 2 to drive);
+  `--native_strings_and_font`. Left: `Strings::Get` and what calls it,
+  the loads, `Font::Font` and the shaders.
 
 ## Rows to review
 

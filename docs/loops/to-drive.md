@@ -13,6 +13,14 @@ function goes from this list when a log shows its `native running
 (game):` line (say which log in the commit). A run with nothing left
 here loses its heading.
 
+## Run 2026-10-23 17:22 (`b7-loop-23-10-26-4`)
+
+Not in the attract race or the replay (`itc_1043`, `itc_1044`, ok):
+
+- `sub_8210A5C0` Strings::PageCount (`strings-and-font.md`)
+- `sub_82108810` Font::LineGlyphs (`strings-and-font.md`; never seen in
+  play before either)
+
 ## Run 2026-10-23 13:44 (`b7-loop-23-10-26-3`)
 
 Not in the drive `itc_1015.log` (2026-10-23) either.
