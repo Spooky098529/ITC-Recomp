@@ -59,6 +59,24 @@ When the user has reviewed a run's section, its heading gets
   play) left on the recompiled code, called by AddCornersAt's adapter
   from the original's stack frames; SteerToTarget's row corrected (+152
   is sin × +384 + cos × +392, not cos × +384 + sin × +392).
+  Migration 3's rows (1521ad2..18ea84b; 22 more ours, 25 adapters
+  removed: 114 ours, 71 Native; 23 new rows). Never seen in play,
+  ported from reading only with their own harness cases (no rows; the
+  file's "Not seen in play" paragraph), names guessed: UpdateSteerInput's
+  kinds 2 and 3 (`sub_8213AB40` SteerIntoCorner, `sub_82139A08`
+  SteerOutOfCorner, `sub_8213A200` SteerAtCornerPoint, `sub_82138FA8`
+  SteerByRoom, `sub_821392D8` LimitSlide), `sub_8213D898` AvoidByLane
+  (with AvoidOthers), `sub_8213F7E0` EntryWord and `sub_8213F868`
+  EntryValue (with AiSkill::TriggerStarts), and `sub_8213F9A4`,
+  `sub_8213FB98` (jump targets made functions, inside TriggerStarts and
+  TriggerEnds). Corrections: the steering steps' f1 now compared (the
+  original leaves the x difference to the target in f1 without atan2);
+  MeasureOthers skips a negative racer slot (not the list's end), and
+  its running sum and ring entry carry over between racers from entry 2
+  (kept); DropOffRouteCorners changes the last kept record only when
+  its +37 is set and more than one is kept. Kept, probably a game bug:
+  SpreadOffset (`sub_8213B890`) adds the leftover after a clamp to the
+  same entry several times, not the ones after it.
 
 ## Run 2026-10-23 17:22 (`b7-loop-23-10-26-4`)
 
