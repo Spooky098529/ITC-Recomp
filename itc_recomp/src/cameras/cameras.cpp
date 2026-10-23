@@ -4,6 +4,9 @@
 
 #include "base/log.h"
 #include "c_runtime/math.h"
+#include "command_list/command_list.h"
+#include "interpolation/blend_state.h"
+#include "matrix_math/matrix_math.h"
 #include "memory/heap.h"
 
 #include <rex/platform/fpscr.h>
@@ -115,6 +118,52 @@ simde__m128 Mul(simde__m128 a, simde__m128 b) {
 }
 simde__m128 Dot(simde__m128 a, simde__m128 b) {
   return simde_mm_dp_ps(a, b, 0xFF);
+}
+
+simde__m128 Sub(simde__m128 a, simde__m128 b) {
+  return simde_mm_sub_ps(a, b);
+}
+simde__m128 Add(simde__m128 a, simde__m128 b) {
+  return simde_mm_add_ps(a, b);
+}
+// vnmsubfp128 as the translation does it: -((a * b) - c).
+simde__m128 NegMulSub(simde__m128 a, simde__m128 b, simde__m128 c) {
+  return simde_mm_xor_ps(Sub(Mul(a, b), c), simde_mm_castsi128_ps(simde_mm_set1_epi32(int(0x80000000))));
+}
+// vmsum3fp128: x, y and z multiplied and summed, in every lane.
+simde__m128 Dot3(simde__m128 a, simde__m128 b) {
+  return simde_mm_dp_ps(a, b, 0xEF);
+}
+// The 0.5 the translation makes from vspltisw 1 (vcfsx's scale).
+simde__m128 Half() {
+  return simde_mm_mul_ps(simde_mm_cvtepi32_ps(simde_mm_set1_epi32(1)),
+                         simde_mm_castsi128_ps(simde_mm_set1_epi32(int(0x3F000000))));
+}
+template <int kImm>
+simde__m128 Shuffle(simde__m128 v) {
+  return simde_mm_castsi128_ps(simde_mm_shuffle_epi32(simde_mm_castps_si128(v), kImm));
+}
+// The library's vector normalize, as the translation does it: the length
+// squared (x, y, z) d, r = 1 / sqrt(d) (vrsqrtefp), one Newton step (r +=
+// r (0.5 - d r r / 2)... as -((d / 2) r r - 0.5) r + r), v r; where d is 0,
+// d itself (vsel on vcmpeqfp).
+simde__m128 Normalize(simde__m128 v) {
+  const simde__m128 d = Dot3(v, v);
+  simde__m128 r = simde_mm_div_ps(simde_mm_set1_ps(1), simde_mm_sqrt_ps(d));
+  const simde__m128 t = Mul(d, Half());
+  const simde__m128 zero = simde_mm_cmpeq_ps(d, simde_mm_setzero_ps());
+  const simde__m128 k = NegMulSub(t, Mul(r, r), Half());
+  r = Add(Mul(r, k), r);
+  const simde__m128 n = Mul(v, r);
+  return simde_mm_castsi128_ps(simde_mm_or_si128(
+      simde_mm_andnot_si128(simde_mm_castps_si128(zero), simde_mm_castps_si128(n)),
+      simde_mm_and_si128(simde_mm_castps_si128(zero), simde_mm_castps_si128(d))));
+}
+// A word through lfs and stfs (a float register): its bits, as the
+// hardware keeps them (the translated code's conversions there are folded
+// away, a signaling NaN kept).
+uint32_t Through(uint32_t word) {
+  return word;
 }
 
 // Flush-to-zero on while alive (the vector unit's mode), put back after.
@@ -314,6 +363,21 @@ bool ReleaseSurfaces(uint8_t* base, uint32_t pass,
   return true;
 }
 
+void FromViewport(uint8_t* base, uint32_t pass, uint32_t player, uint32_t entry) {
+  ITC_NATIVE_RUNNING("sub_820AA4A8 CameraPass::FromViewport");
+  const uint32_t at =
+      guest::LoadU32(base, guest::LoadU32(base, kViewports) + (player << 2)) + entry * 80;
+  for (uint32_t i = 0; i < 48; i += 8) {
+    const uint32_t high = guest::LoadU32(base, at + 16 + i);
+    const uint32_t low = guest::LoadU32(base, at + 20 + i);
+    guest::StoreU32(base, pass + 400 + i, high);
+    guest::StoreU32(base, pass + 404 + i, low);
+  }
+  PassSetZoom(base, pass, Lfs(base, at + 68));
+  guest::StoreU32(base, pass + 388, Through(guest::LoadU32(base, at + 72)));
+  guest::StoreU32(base, pass + 448, Through(guest::LoadU32(base, at + 64)));
+}
+
 void PassSetZoom(uint8_t* base, uint32_t pass, double zoom) {
   ITC_NATIVE_RUNNING("sub_820AA378 CameraPass::SetZoom");
   Stfs(base, pass + 516, zoom);
@@ -377,6 +441,137 @@ void ViewportSetRoll(uint8_t* base, uint32_t viewport, double angle) {
     Stfs(base, viewport + 80 * entry + 64, x);
   }
   Stfs(base, viewport + 1584, x);
+}
+
+std::optional<uint32_t> RecordViewport(uint8_t* base, uint32_t list, uint32_t pass) {
+  ITC_NATIVE_RUNNING("sub_820A0978 CameraPass::RecordViewport");
+  // What the original's command list calls would print about: another chunk
+  // open (OpenChunk), or the list full on any of its four allocations.
+  if (guest::LoadU8(base, list + 52) == 0 && guest::LoadU32(base, command_list::kOpenChunks) != 0) {
+    return std::nullopt;
+  }
+  if (guest::LoadU32(base, list + 12) + 4 >= guest::LoadU32(base, list + 8) ||
+      guest::LoadU32(base, list + 12) + 4 < guest::LoadU32(base, list + 12)) {
+    // (each allocation compares the count so far; the last one is the
+    // largest unless the count wraps, which is left to the original too)
+    return std::nullopt;
+  }
+  command_list::OpenChunk(base, list);
+  auto slot = [&] { return command_list::AllocateSlots(base, list, 1); };
+  const uint32_t chunk = slot();
+  guest::StoreU16(base, chunk + 2, 5);
+  guest::StoreU32(base, chunk + 4, 0);
+  uint32_t s = slot();
+  guest::StoreU32(base, s + 8, 0);
+  guest::StoreU32(base, s + 0, 30);
+  guest::StoreU32(base, s + 4, 1);
+  s = slot();
+  guest::StoreU16(base, s + 0, uint16_t(guest::LoadU32(base, pass + 496)));
+  guest::StoreU16(base, s + 2, uint16_t(guest::LoadU32(base, pass + 500)));
+  guest::StoreU16(base, s + 4, uint16_t(guest::LoadU32(base, pass + 504)));
+  const uint32_t height = guest::LoadU32(base, pass + 508);
+  Stfs(base, s + 8, Lfs(base, 0x82000A34));
+  Stfs(base, s + 12, Lfs(base, kOne));
+  guest::StoreU16(base, s + 6, uint16_t(height));
+  s = slot();
+  guest::StoreU32(base, s + 4, 0);
+  guest::StoreU32(base, s + 0, 36);
+  guest::StoreU32(base, s + 8, 0);
+  command_list::CloseChunk(base, list);
+  return chunk;
+}
+
+bool PassUpdate(uint8_t* base, uint32_t pass, uint32_t frame,
+                const std::function<void(uint32_t key)>& record_viewport) {
+  ITC_NATIVE_RUNNING("sub_820A3978 CameraPass::Update");
+  if (guest::LoadU32(base, guest::LoadU32(base, pass)) != 0x82593500) {
+    return false;
+  }
+  const uint32_t type = guest::LoadU32(base, pass + 584);
+  if (type <= 2) {
+    record_viewport(type == 2 ? 371 : 150);
+  }
+  SetViewportSize(base, pass, guest::LoadU32(base, pass + 504), guest::LoadU32(base, pass + 508));
+  if ((type >= 10 && type <= 18) || type == 20) {
+    return true;
+  }
+  // The forward, target - eye, with w 1.0, into +464 (through the stack, as
+  // the original copies it).
+  const uint32_t one = Bits(Lfs(base, kOne));
+  const double fx = Fsubs(Lfs(base, pass + 416), Lfs(base, pass + 400));
+  const double fy = Fsubs(Lfs(base, pass + 420), Lfs(base, pass + 404));
+  const double fz = Fsubs(Lfs(base, pass + 424), Lfs(base, pass + 408));
+  guest::StoreU32(base, pass + 464, Bits(fx));
+  guest::StoreU32(base, pass + 468, Bits(fy));
+  guest::StoreU32(base, pass + 472, Bits(fz));
+  guest::StoreU32(base, pass + 476, one);
+  simde__m128 forward;
+  {
+    FlushToZero flush;
+    Stvx(base, pass + 464, Normalize(Lvx(base, pass + 464)));
+  }
+  // The normalized forward as the stack copy reads it back (w normalized
+  // too), then +476 = 1.0.
+  forward = VectorOf(guest::LoadU32(base, pass + 464), guest::LoadU32(base, pass + 468),
+                     guest::LoadU32(base, pass + 472), guest::LoadU32(base, pass + 476));
+  guest::StoreU32(base, pass + 476, one);
+  const simde__m128 up = Lvx(base, pass + 432);
+  const uint32_t zero = Bits(Lfs(base, 0x82000A34));
+  simde__m128 right, up2;
+  {
+    FlushToZero flush;
+    right = NegMulSub(Shuffle<0x78>(up), Shuffle<0x9C>(forward),
+                      Mul(Shuffle<0x9C>(up), Shuffle<0x78>(forward)));
+    right = Normalize(right);
+    forward = Normalize(forward);
+    up2 = NegMulSub(Shuffle<0x78>(forward), Shuffle<0x9C>(right),
+                    Mul(Shuffle<0x9C>(forward), Shuffle<0x78>(right)));
+  }
+  // -eye (each word negated through a float register).
+  uint32_t eye[4];
+  for (uint32_t i = 0; i < 4; i++) {
+    eye[i] = Bits(Fneg(Lfs(base, pass + 400 + 4 * i)));
+  }
+  const simde__m128 minus_eye = VectorOf(eye[0], eye[1], eye[2], eye[3]);
+  simde__m128 dots[3];
+  {
+    FlushToZero flush;
+    dots[0] = Dot3(minus_eye, right);
+    dots[1] = Dot3(minus_eye, up2);
+    dots[2] = Dot3(minus_eye, forward);
+  }
+  // The view at frame + 128: the right, up and forward as columns, -eye's
+  // dots as the fourth row.
+  const uint32_t view = frame + 128;
+  const simde__m128 columns[3] = {right, up2, forward};
+  for (uint32_t row = 0; row < 3; row++) {
+    for (uint32_t column = 0; column < 3; column++) {
+      guest::StoreU32(base, view + 16 * row + 4 * column, Through(WordOf(columns[column], int(row))));
+    }
+    guest::StoreU32(base, view + 16 * row + 12, zero);
+  }
+  for (uint32_t column = 0; column < 3; column++) {
+    guest::StoreU32(base, view + 48 + 4 * column, Through(WordOf(dots[column], 0)));
+  }
+  guest::StoreU32(base, view + 60, one);
+  // Copied to +16 and turned by the roll, as the original's calls (noted for
+  // interpolation).
+  const uint32_t view_out = pass + 16;
+  matrix_math::Copy(base, view_out, view);
+  interpolation::BlendState_OnCopy(base, view_out, view, 0x820A3D18);
+  matrix_math::RotateZ(base, view_out, view_out, pass + 448, frame - 80);
+  // +480: the up again, from the forward at +464 (w 1.0) and +432.
+  {
+    FlushToZero flush;
+    const simde__m128 f = Lvx(base, pass + 464);
+    const simde__m128 u = Lvx(base, pass + 432);
+    Stvx(base, pass + 480,
+         NegMulSub(Shuffle<0x78>(u), Shuffle<0x9C>(f), Mul(Shuffle<0x9C>(u), Shuffle<0x78>(f))));
+    Stvx(base, pass + 480, Normalize(Lvx(base, pass + 480)));
+  }
+  matrix_math::Multiply(base, pass + 144, view_out, pass + 80);
+  interpolation::BlendState_OnMultiply(base, pass + 144, view_out, pass + 80, 0x820A3D90);
+  return true;
 }
 
 }  // namespace cameras

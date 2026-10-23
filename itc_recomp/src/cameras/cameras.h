@@ -21,6 +21,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <optional>
 
 namespace cameras {
 
@@ -105,6 +106,46 @@ void SetNear(uint8_t* base, double near);
 // made by the adapter) and cleared. Returns whether the type has surfaces.
 bool ReleaseSurfaces(uint8_t* base, uint32_t pass,
                      const std::function<void(uint32_t surface, uint32_t field)>& release);
+
+// CameraPass::RecordViewport (sub_820A0978)'s chunk on the command list
+// `list` (the scene's, [0x826BABA0]'s vtable slot 8 then slot 1: the
+// adapter's guest calls): a header (+2 = 5), command 30 (1), the viewport
+// (+496, +500, +504, +508 as halfwords, depths 0.0 and 1.0) and command 36
+// in one chunk. Returns its first slot, which the adapter hands to the
+// render queue (slot 8 then 2; the queue's slot 4 with the sort key); nothing
+// done (nullopt) where the original's command list calls would print a
+// message (another chunk open, the list full).
+std::optional<uint32_t> RecordViewport(uint8_t* base, uint32_t list, uint32_t pass);
+
+// CameraPass::Update (sub_820A3978): types 0 to 2 (+584, unsigned) first
+// have their viewport recorded (`record_viewport(key)`: RecordViewport with
+// the adapter's guest calls; key 150 for types 0 and 1, 371 for 2); then the
+// camera's vtable slot 0 (Camera::SetViewportSize with +504, +508: its plain
+// C++ here). Types 10 to 18 and 20 stop there. The others: the view from the
+// eye, target and up (+400, +416, +432): the forward (target - eye, w 1.0)
+// kept normalized at +464 (w then 1.0), the right (up x forward) and the up
+// again (forward x right), all normalized as the vector unit does it
+// (vrsqrtefp and a Newton step); the view (their columns and -eye's dots)
+// built at `frame` + 128 (the original's stack: `frame` is its 272-byte
+// frame, 16-byte aligned) and copied to +16 with Matrix::Copy, then turned
+// by the roll (+448, Matrix::RotateZ, its turn at `frame` - 80); +480 the
+// up recomputed (the forward at +464 crossed with +432, normalized); the
+// view-projection +144 = view (+16) x projection (+80) (Matrix::Multiply).
+// The copy and the multiply are noted for frame interpolation as the
+// original's calls (interpolation::BlendState_OnCopy and OnMultiply, with
+// their return addresses 0x820A3D18 and 0x820A3D90; the turn notes its own).
+// False, with nothing done, where slot 0 isn't Camera::SetViewportSize
+// (never so in play).
+bool PassUpdate(uint8_t* base, uint32_t pass, uint32_t frame,
+                const std::function<void(uint32_t key)>& record_viewport);
+
+// CameraPass::FromViewport (sub_820AA4A8)'s work before its tail:
+// viewport `player`'s ([[kViewports] + 4 x player]) entry `entry` (80
+// bytes each): its eye, target and up (+16 to +63, 8 bytes at a time) into
+// the pass's +400 to +447, PassSetZoom(pass, entry +68), the far plane +388
+// = entry +72, the roll +448 = entry +64. The adapter then calls
+// CameraPass::Update (through its wrapper, which keeps its diagnostics).
+void FromViewport(uint8_t* base, uint32_t pass, uint32_t player, uint32_t entry);
 
 // CameraPass::SetZoom (sub_820AA378): +516 = `zoom` (f1) as a float; the
 // field of view +368 = atan(height (+508, a signed integer) x 0.5 / zoom),

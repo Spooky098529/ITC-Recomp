@@ -10,6 +10,7 @@
 #include "frame_pacer.h"
 #include "debug/frame_state_diff.h"
 #include "debug/pause_movie_log.h"
+#include "hooks/cameras.h"
 #include "interpolation/blend_state.h"
 
 #include "base/flags.h"
@@ -673,7 +674,11 @@ extern "C" REX_FUNC(sub_820A3978) {
       render_start = render;
     }
   }
-  __imp__sub_820A3978(ctx, base);
+  // The work natively (src/cameras/cameras.cpp, --native_cameras) or
+  // translated.
+  if (!hooks::CameraPassUpdate(ctx, base)) {
+    __imp__sub_820A3978(ctx, base);
+  }
 }
 
 // Single world-space sprites (sub_821281A8: r3 = sprite, r4 = camera; the

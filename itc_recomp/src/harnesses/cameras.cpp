@@ -12,6 +12,8 @@
 
 #include "base/flags.h"
 #include "cameras/cameras.h"
+#include "command_list/command_list.h"
+#include "hooks/cameras.h"
 #include "hooks/heap.h"
 #include "memory/heap.h"
 
@@ -123,6 +125,23 @@ void NativeViewportSetZoom(PPCContext& ctx, uint8_t* base) {
 void NativeViewportSetRoll(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   cm::ViewportSetRoll(base, ctx.r3.u32, ctx.f1.f64);
+}
+
+// As the adapters: the guest calls made by hooks/cameras.cpp, the work the
+// plain C++'s.
+void NativePassUpdate(PPCContext& ctx, uint8_t* base) {
+  if (!hooks::CameraPassUpdate(ctx, base)) {
+    __imp__sub_820A3978(ctx, base);
+  }
+}
+
+// As the adapter: the fields natively, then the Update wrapper's override.
+void NativeFromViewport(PPCContext& ctx, uint8_t* base) {
+  const uint32_t pass = ctx.r3.u32;
+  ctx.fpscr.disableFlushMode();
+  cm::FromViewport(base, pass, ctx.r4.u32, ctx.r5.u32);
+  ctx.r3.u64 = pass;
+  sub_820A3978(ctx, base);
 }
 
 // Runs the recompiled version with the flag off, so the functions it calls
@@ -630,6 +649,212 @@ void ViewportCases(Context& h) {
   }
 }
 
+// A made-up scene for the viewport's recording, in the scratch area: the
+// scene's vtable slot 8 and the manager's slots 1 and 2 are getters of the
+// game's (sub_8248CA78 returns [r3 + 284], sub_82379320 [r3 + 124]), and the
+// queue's slot 4 is BillboardMaterial::SetLights (sub_8209F5C8: +32 = r4,
+// +36 = r5 unless r4 is 0), which keeps the chunk and the key it's handed.
+// The list as the sprites' harness makes it.
+struct FakeScene {
+  static constexpr uint32_t kScene = 0, kSceneVtable = 320, kManager = 400, kManagerVtable = 720,
+                            kQueue = 760, kQueueVtable = 800, kList = 840, kPass = 1024,
+                            kSlots = 2048;
+  // kind: 0 room, 1 a chunk already open on the list, 2 another open (nested),
+  // 3 just room. (A full list isn't made: the original then writes its
+  // header at guest address 0.)
+  static void Set(Context& h, uint32_t kind, uint32_t used) {
+    const uint32_t d = h.data;
+    guest::StoreU32(h.base, d + kScene, d + kSceneVtable);
+    guest::StoreU32(h.base, d + kSceneVtable + 32, 0x8248CA78);
+    guest::StoreU32(h.base, d + kScene + 284, d + kManager);
+    guest::StoreU32(h.base, d + kManager, d + kManagerVtable);
+    guest::StoreU32(h.base, d + kManagerVtable + 4, 0x8248CA78);
+    guest::StoreU32(h.base, d + kManagerVtable + 8, 0x82379320);
+    guest::StoreU32(h.base, d + kManager + 284, d + kList);
+    guest::StoreU32(h.base, d + kManager + 124, d + kQueue);
+    guest::StoreU32(h.base, d + kQueue, d + kQueueVtable);
+    guest::StoreU32(h.base, d + kQueueVtable + 16, 0x8209F5C8);
+    const uint32_t list = d + kList;
+    guest::StoreU32(h.base, list + 8, kind == 3 ? used + 5 : used + 1000);
+    guest::StoreU32(h.base, list + 12, used);
+    guest::StoreU32(h.base, list + 32, d + kSlots);
+    guest::StoreU8(h.base, list + 52, kind == 1 ? 1 : 0);
+    if (kind == 1) {
+      guest::StoreU32(h.base, list + 44, d + kSlots + 16);
+    }
+    guest::StoreU32(h.base, command_list::kOpenChunks, kind == 2 ? 1 : 0);
+    guest::StoreU32(h.base, 0x826BABA0, d + kScene);
+  }
+};
+
+// The scene global and the open chunks' count, kept and put back.
+class SceneGlobals {
+ public:
+  explicit SceneGlobals(uint8_t* base)
+      : base_(base),
+        scene_(guest::LoadU32(base, 0x826BABA0)),
+        open_(guest::LoadU32(base, command_list::kOpenChunks)) {}
+  ~SceneGlobals() { Restore(); }
+  void Restore() const {
+    guest::StoreU32(base_, 0x826BABA0, scene_);
+    guest::StoreU32(base_, command_list::kOpenChunks, open_);
+  }
+
+ private:
+  uint8_t* base_;
+  uint32_t scene_, open_;
+};
+
+uint32_t RandomKind(Random& r) {
+  return r.Below(4) ? 0 : r.Below(4);
+}
+
+void RecordViewportCases(Context& h) {
+  const SceneGlobals scene(h.base);
+  Results results("sub_820A0978 CameraPass::RecordViewport");
+  const uint32_t pass = h.data + FakeScene::kPass;
+  for (int i = 0; i < 200; i++) {
+    const uint32_t kind = RandomKind(h.random);
+    const uint32_t used = h.random.Below(2) ? 0 : h.random.Below(100000);
+    const uint32_t key = h.random.Below(2) ? (h.random.Below(2) ? 150 : 371) : uint32_t(h.random.Next());
+    Case(
+        h, results, pass, {},
+        [&] {
+          FakeScene::Set(h, kind, used);
+          RandomWords(h, pass + 496, 4);
+          if (h.random.Below(2)) {
+            guest::StoreU32(h.base, pass + 496, 0);
+            guest::StoreU32(h.base, pass + 500, 0);
+            guest::StoreU32(h.base, pass + 504, 1280);
+            guest::StoreU32(h.base, pass + 508, 720);
+          }
+        },
+        [&](PPCContext& t) {
+          t.r3.u64 = pass;
+          t.r4.u64 = key;
+        },
+        __imp__sub_820A0978, hooks::CameraPassRecordViewport,
+        fmt::format("case {} kind {} used {} key {}", i, kind, used, key),
+        [&](Outputs& out) {
+          out.Word(guest::LoadU32(h.base, command_list::kOpenChunks));
+          scene.Restore();
+        },
+        nullptr, kScratchBytes);
+  }
+  results.Report();
+}
+
+// CameraPass::Update on a pass in the scratch area with the library camera's
+// vtable (slot 0 Camera::SetViewportSize), each type, the made-up scene for
+// types 0 to 2's viewport. The view (+16 to +79), the projection, the
+// view-projection, the floats Camera::SetViewportSize stores and the vectors
+// at +464 and +480 are compared as floats.
+void PassUpdateCases(Context& h) {
+  const SceneGlobals scene(h.base);
+  Results results("sub_820A3978 CameraPass::Update");
+  const uint32_t pass = h.data + FakeScene::kPass;
+  for (int i = 0; i < 600; i++) {
+    const uint32_t type = h.random.Below(8) ? h.random.Below(22) : uint32_t(h.random.Next());
+    const uint32_t kind = RandomKind(h.random);
+    const bool game = h.random.Below(2);
+    Case(
+        h, results, pass, {{16, 208}, {368, 396}, {464, 496}},
+        [&] {
+          FakeScene::Set(h, kind, h.random.Below(1000));
+          RandomWords(h, pass, 148);
+          guest::StoreU32(h.base, pass, 0x82001EC0);
+          guest::StoreU32(h.base, pass + 584, type);
+          if (game) {
+            // A camera's: eye and target apart, up (0, 1, 0), ordinary
+            // fields of view, sizes and planes.
+            for (uint32_t k = 0; k < 3; k++) {
+              const float e = float(int32_t(h.random.Below(1u << 20)) - (1 << 19)) / 64.0f;
+              const float t = e + float(int32_t(h.random.Below(1u << 12)) - (1 << 11)) / 64.0f;
+              guest::StoreU32(h.base, pass + 400 + 4 * k, FloatBits(e));
+              guest::StoreU32(h.base, pass + 416 + 4 * k, FloatBits(t));
+              guest::StoreU32(h.base, pass + 432 + 4 * k, FloatBits(k == 1 ? 1.0f : 0.0f));
+            }
+            guest::StoreU32(h.base, pass + 448,
+                            FloatBits(float(int32_t(h.random.Below(2000)) - 1000) / 300.0f));
+            guest::StoreU32(h.base, pass + 368, FloatBits(1.0908f));
+            guest::StoreU32(h.base, pass + 384, FloatBits(1.0f));
+            guest::StoreU32(h.base, pass + 388, FloatBits(5000.0f));
+            guest::StoreU32(h.base, pass + 504, 1280);
+            guest::StoreU32(h.base, pass + 508, 720);
+          } else {
+            guest::StoreU32(h.base, pass + 504, RandomSize(h.random));
+            guest::StoreU32(h.base, pass + 508, RandomSize(h.random));
+          }
+        },
+        [&](PPCContext& t) { t.r3.u64 = pass; }, __imp__sub_820A3978, NativePassUpdate,
+        fmt::format("case {} type {} kind {} game {}", i, int32_t(type), kind, game),
+        [&](Outputs& out) {
+          out.Word(guest::LoadU32(h.base, command_list::kOpenChunks));
+          scene.Restore();
+        },
+        nullptr, kScratchBytes);
+  }
+  results.Report();
+}
+
+// CameraPass::FromViewport: a viewports block (its pointer pointed at it for
+// the case) with two viewports in the scratch area, a pass as Update's
+// cases make it, the entry's fields random or a camera's.
+void FromViewportCases(Context& h) {
+  const SceneGlobals scene(h.base);
+  const Globals globals(h.base);
+  Results results("sub_820AA4A8 CameraPass::FromViewport");
+  const uint32_t pass = h.data + FakeScene::kPass;
+  const uint32_t block = h.data + 1632, viewports[2] = {h.data + 1664, h.data + 2112};
+  for (int i = 0; i < 300; i++) {
+    const uint32_t type = h.random.Below(22);
+    const uint32_t kind = RandomKind(h.random);
+    const uint32_t player = h.random.Below(2), entry = h.random.Below(5);
+    const bool game = h.random.Below(2);
+    Case(
+        h, results, pass, {{16, 208}, {368, 396}, {464, 496}},
+        [&] {
+          FakeScene::Set(h, kind, h.random.Below(1000));
+          RandomWords(h, pass, 148);
+          guest::StoreU32(h.base, pass, 0x82001EC0);
+          guest::StoreU32(h.base, pass + 584, type);
+          guest::StoreU32(h.base, pass + 504, 1280);
+          guest::StoreU32(h.base, pass + 508, 720);
+          guest::StoreU32(h.base, block + 0, viewports[0]);
+          guest::StoreU32(h.base, block + 4, viewports[1]);
+          guest::StoreU32(h.base, cm::kViewports, block);
+          const uint32_t at = viewports[player] + 80 * entry;
+          RandomWords(h, at, 20);
+          if (game) {
+            for (uint32_t k = 0; k < 3; k++) {
+              const float e = float(int32_t(h.random.Below(1u << 20)) - (1 << 19)) / 64.0f;
+              const float t = e + float(int32_t(h.random.Below(1u << 12)) - (1 << 11)) / 64.0f;
+              guest::StoreU32(h.base, at + 16 + 4 * k, FloatBits(e));
+              guest::StoreU32(h.base, at + 32 + 4 * k, FloatBits(t));
+              guest::StoreU32(h.base, at + 48 + 4 * k, FloatBits(k == 1 ? 1.0f : 0.0f));
+            }
+            guest::StoreU32(h.base, at + 64, FloatBits(float(int32_t(h.random.Below(2000)) - 1000) / 300.0f));
+            guest::StoreU32(h.base, at + 68, FloatBits(666.33f));
+            guest::StoreU32(h.base, at + 72, FloatBits(5000.0f));
+          }
+        },
+        [&](PPCContext& t) {
+          t.r3.u64 = pass;
+          t.r4.u64 = player;
+          t.r5.u64 = entry;
+        },
+        __imp__sub_820AA4A8, NativeFromViewport,
+        fmt::format("case {} type {} kind {} player {} entry {} game {}", i, type, kind, player,
+                    entry, game),
+        [&](Outputs& out) {
+          out.Word(guest::LoadU32(h.base, command_list::kOpenChunks));
+          scene.Restore();
+        },
+        &globals, kScratchBytes);
+  }
+  results.Report();
+}
+
 }  // namespace
 
 void Cameras(Context& h) {
@@ -638,6 +863,9 @@ void Cameras(Context& h) {
   SetViewportSizeCases(h);
   PassStateCases(h);
   ViewportCases(h);
+  RecordViewportCases(h);
+  PassUpdateCases(h);
+  FromViewportCases(h);
 }
 
 }  // namespace harness
