@@ -177,7 +177,7 @@ were ready (`strings-and-font.md`, `std-string.md`, `track-route.md`;
 are translated over the guest layout (the user's call); the rest waits
 on `DataFile::GetEntry`, the archive, the XPR, the shader compiler, the
 device's state save and `atexit`. Harness runs use
-`attract_race.sh 30`.
+`attract_race.sh 40` (the user's call, 2026-10-23).
 After each plan item, run `itc_recomp/tools/boundary_status.py` and record
 its output in "The boundary over time" at the end of
 `docs/rexglue-removal.md`. Plan steps are done on their
