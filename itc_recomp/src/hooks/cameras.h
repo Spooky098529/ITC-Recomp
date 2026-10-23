@@ -20,4 +20,8 @@ bool CameraPassUpdate(PPCContext& ctx, uint8_t* base);
 // flag: r3 = the pass, r4 = the sort key (for the harness).
 void CameraPassRecordViewport(PPCContext& ctx, uint8_t* base);
 
+// RecordClear (sub_8209FA38)'s adapter's work, without the flag: r4 = the
+// key, r5 = the flags, r6 = the color, r7 = the depth (for the harness).
+void RecordClear(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

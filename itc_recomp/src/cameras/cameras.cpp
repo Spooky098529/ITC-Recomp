@@ -481,6 +481,42 @@ std::optional<uint32_t> RecordViewport(uint8_t* base, uint32_t list, uint32_t pa
   return chunk;
 }
 
+std::optional<uint32_t> RecordClear(uint8_t* base, uint32_t list, uint32_t flags, uint32_t color,
+                                    uint32_t depth) {
+  ITC_NATIVE_RUNNING("sub_8209FA38 RecordClear");
+  // Another chunk open, or the list full on any allocation (1, 1, 18 and 1
+  // slots: the last the largest unless the count wraps, left to the
+  // original too).
+  if (guest::LoadU8(base, list + 52) == 0 && guest::LoadU32(base, command_list::kOpenChunks) != 0) {
+    return std::nullopt;
+  }
+  const uint32_t used = guest::LoadU32(base, list + 12);
+  if (used + 21 >= guest::LoadU32(base, list + 8) || used + 21 < used) {
+    return std::nullopt;
+  }
+  command_list::OpenChunk(base, list);
+  const uint32_t chunk = command_list::AllocateSlots(base, list, 1);
+  guest::StoreU16(base, chunk + 2, 5);
+  guest::StoreU32(base, chunk + 4, 0);
+  uint32_t s = command_list::AllocateSlots(base, list, 1);
+  guest::StoreU32(base, s + 8, 0);
+  guest::StoreU32(base, s + 0, 26);
+  guest::StoreU32(base, s + 4, 1);
+  s = command_list::AllocateBytes(base, list, 280, false);
+  guest::StoreU32(base, s + 8, flags);
+  guest::StoreU32(base, s + 268, color);
+  guest::StoreU32(base, s + 276, 0);
+  guest::StoreU32(base, s + 4, 0);
+  guest::StoreU32(base, s + 0, 0);
+  Stfs(base, s + 272, double(float(double(int64_t(uint64_t(depth))))));
+  s = command_list::AllocateSlots(base, list, 1);
+  guest::StoreU32(base, s + 4, 0);
+  guest::StoreU32(base, s + 0, 36);
+  guest::StoreU32(base, s + 8, 0);
+  command_list::CloseChunk(base, list);
+  return chunk;
+}
+
 bool PassUpdate(uint8_t* base, uint32_t pass, uint32_t frame,
                 const std::function<void(uint32_t key)>& record_viewport) {
   ITC_NATIVE_RUNNING("sub_820A3978 CameraPass::Update");

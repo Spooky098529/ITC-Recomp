@@ -18,6 +18,9 @@
 #include "hooks/guest_call.h"
 #include "hooks/heap.h"
 
+#include <functional>
+#include <optional>
+
 ITC_FLAG_BOOL(native_cameras, true, "ITC",
               "Run the camera passes and viewports (docs/functions/cameras.md: the library "
               "camera's Camera::SetFieldOfView sub_82593278, Camera::BuildProjection "
@@ -30,7 +33,8 @@ ITC_FLAG_BOOL(native_cameras, true, "ITC",
               "sub_820AA430 (with --native_heap), Viewport::SetZoom sub_820AAE90 and SetRoll "
               "sub_820AA2D0; CameraPass::Update sub_820A3978, its frame interpolation's notes kept, and "
               "CameraPass::RecordViewport sub_820A0978, without the command list's "
-              "diagnostics, and CameraPass::FromViewport sub_820AA4A8) natively instead of "
+              "diagnostics, and CameraPass::FromViewport sub_820AA4A8; RecordClear sub_8209FA38, "
+              "without the command list's diagnostics) natively instead of "
               "through the translated code (the same words, bit for bit; checked by "
               "--run_harnesses=cameras)");
 
@@ -187,40 +191,53 @@ void VtableCall(PPCContext& ctx, uint8_t* base, uint32_t slot, uint32_t return_a
   REX_CALL_INDIRECT_FUNC(guest::LoadU32(base, guest::LoadU32(base, ctx.r3.u32) + 4 * slot));
 }
 
-// CameraPass::RecordViewport's work: the command list from the scene
-// ([kScene]'s slot 8, then slot 1), the chunk recorded natively, handed to
-// the render queue (slot 8, then slot 2; the queue's slot 4: r4 = the
-// chunk, r5 = the key, f1 = 0.0), the calls made from a frame like the
-// original's (144 bytes) with its return addresses. False where the
-// original must run (the diagnostics on, or a chunk its command list calls
-// would print about: then the scene's getters have been called once more
-// than the original would, never seen in play).
-bool RecordViewportCalls(PPCContext& ctx, uint8_t* base, uint32_t pass, uint32_t key) {
+// A chunk recorded and handed to the render queue, as RecordViewport and
+// RecordClear do: the command list from the scene ([kScene]'s slot 8, then
+// slot 1), `record(list)` (the plain C++: its first slot, or nullopt where
+// the original must run), the render queue (slot 8, then slot 2) and its
+// slot 4 (r4 = the chunk, r5 = the key, f1 = 0.0), the calls made from a
+// frame like the original's (`frame_bytes`) with its return addresses
+// (`returns`, in that order). False where the original must run (the
+// command list's diagnostics on, or a chunk its command list calls would
+// print about: then the scene's getters have been called once more than the
+// original would, never seen in play).
+bool RecordAndSubmit(PPCContext& ctx, uint8_t* base, uint32_t frame_bytes,
+                     const uint32_t (&returns)[5], uint32_t key,
+                     const std::function<std::optional<uint32_t>(uint32_t list)>& record) {
   if (ITC_FLAG(log_overlay_uploads) || ITC_FLAG(log_slot_callers) ||
       ITC_FLAG(log_recording_by_pass)) {
     return false;
   }
   const uint64_t lr = ctx.lr;
   std::optional<uint32_t> chunk;
-  guest_call::InFrame(ctx, base, 144, 0x820A09A8, [&](uint32_t) {
+  guest_call::InFrame(ctx, base, frame_bytes, returns[0], [&](uint32_t) {
     ctx.r3.u64 = guest::LoadU32(base, kScene);
-    VtableCall(ctx, base, 8, 0x820A09A8);
-    VtableCall(ctx, base, 1, 0x820A09B8);
-    chunk = cameras::RecordViewport(base, ctx.r3.u32, pass);
+    VtableCall(ctx, base, 8, returns[0]);
+    VtableCall(ctx, base, 1, returns[1]);
+    chunk = record(ctx.r3.u32);
     if (!chunk) {
       return;
     }
     ctx.r3.u64 = guest::LoadU32(base, kScene);
-    VtableCall(ctx, base, 8, 0x820A0A88);
-    VtableCall(ctx, base, 2, 0x820A0A98);
+    VtableCall(ctx, base, 8, returns[2]);
+    VtableCall(ctx, base, 2, returns[3]);
     ctx.fpscr.disableFlushMode();
     ctx.f1.f64 = double(guest::LoadFloat(base, 0x82000A34));
     ctx.r4.u64 = *chunk;
     ctx.r5.u64 = key;
-    VtableCall(ctx, base, 4, 0x820A0AB4);
+    VtableCall(ctx, base, 4, returns[4]);
   });
   ctx.lr = lr;
   return chunk.has_value();
+}
+
+// CameraPass::RecordViewport's: its frame is 144 bytes.
+bool RecordViewportCalls(PPCContext& ctx, uint8_t* base, uint32_t pass, uint32_t key) {
+  static constexpr uint32_t kReturns[5] = {0x820A09A8, 0x820A09B8, 0x820A0A88, 0x820A0A98,
+                                           0x820A0AB4};
+  return RecordAndSubmit(ctx, base, 144, kReturns, key, [&](uint32_t list) {
+    return cameras::RecordViewport(base, list, pass);
+  });
 }
 
 }  // namespace
@@ -231,7 +248,30 @@ extern "C" REX_FUNC(sub_820A0978) {
   hooks::CameraPassRecordViewport(ctx, base);
 }
 
+// RecordClear: r4 = the key, r5 = the flags, r6 = the color, r7 = the depth
+// (its low word). The guest calls as RecordViewport's, from a 160-byte frame.
+extern "C" REX_FUNC(sub_8209FA38) {
+  ITC_CAMERAS_FALLBACK(8209FA38)
+  hooks::RecordClear(ctx, base);
+}
+
 namespace hooks {
+
+void RecordClear(PPCContext& ctx, uint8_t* base) {
+  static constexpr uint32_t kReturns[5] = {0x8209FA6C, 0x8209FA7C, 0x8209FB44, 0x8209FB54,
+                                           0x8209FB74};
+  const PPCContext in = ctx;
+  const uint32_t flags = ctx.r5.u32, color = ctx.r6.u32, depth = ctx.r7.u32;
+  if (!RecordAndSubmit(ctx, base, 160, kReturns, ctx.r4.u32, [&](uint32_t list) {
+        return cameras::RecordClear(base, list, flags, color, depth);
+      })) {
+    ctx.r4 = in.r4;
+    ctx.r5 = in.r5;
+    ctx.r6 = in.r6;
+    ctx.r7 = in.r7;
+    __imp__sub_8209FA38(ctx, base);
+  }
+}
 
 void CameraPassRecordViewport(PPCContext& ctx, uint8_t* base) {
   const uint32_t pass = ctx.r3.u32;

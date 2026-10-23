@@ -117,6 +117,16 @@ bool ReleaseSurfaces(uint8_t* base, uint32_t pass,
 // message (another chunk open, the list full).
 std::optional<uint32_t> RecordViewport(uint8_t* base, uint32_t list, uint32_t pass);
 
+// RecordClear (sub_8209FA38)'s chunk on the command list `list` (as
+// RecordViewport's): a header (+2 = 5), command 26 (1) and a 280-byte item
+// (CommandList::AllocateBytes, no header: +0, +4 and +276 = 0, +8 the
+// flags, +268 the color, +272 the depth, an unsigned integer, as a float),
+// then command 36, in one chunk. Returns its first slot (the adapter hands
+// it to the render queue with the key); nullopt, with nothing done, where
+// the original's command list calls would print a message.
+std::optional<uint32_t> RecordClear(uint8_t* base, uint32_t list, uint32_t flags, uint32_t color,
+                                    uint32_t depth);
+
 // CameraPass::Update (sub_820A3978): types 0 to 2 (+584, unsigned) first
 // have their viewport recorded (`record_viewport(key)`: RecordViewport with
 // the adapter's guest calls; key 150 for types 0 and 1, 371 for 2); then the

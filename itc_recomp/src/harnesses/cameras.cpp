@@ -744,6 +744,42 @@ void RecordViewportCases(Context& h) {
   results.Report();
 }
 
+void RecordClearCases(Context& h) {
+  const SceneGlobals scene(h.base);
+  Results results("sub_8209FA38 RecordClear");
+  for (int i = 0; i < 200; i++) {
+    const uint32_t kind = RandomKind(h.random);
+    const uint32_t used = h.random.Below(2) ? 0 : h.random.Below(100000);
+    const uint64_t key = h.random.Below(2) ? 49 : h.random.Next();
+    const uint64_t flags = h.random.Below(2) ? 49 : h.random.Next();
+    const uint64_t color = h.random.Below(2) ? 0xFF000000 : h.random.Next();
+    const uint64_t depth = h.random.Below(2) ? h.random.Below(2) : h.random.Next();
+    Case(
+        h, results, h.data, {},
+        [&] {
+          FakeScene::Set(h, kind, used);
+          // Room for its 21 slots in "just room".
+          if (kind == 3) {
+            guest::StoreU32(h.base, h.data + FakeScene::kList + 8, used + 22);
+          }
+        },
+        [&](PPCContext& t) {
+          t.r4.u64 = key;
+          t.r5.u64 = flags;
+          t.r6.u64 = color;
+          t.r7.u64 = depth;
+        },
+        __imp__sub_8209FA38, hooks::RecordClear,
+        fmt::format("case {} kind {} used {} depth {:X}", i, kind, used, depth),
+        [&](Outputs& out) {
+          out.Word(guest::LoadU32(h.base, command_list::kOpenChunks));
+          scene.Restore();
+        },
+        nullptr, kScratchBytes);
+  }
+  results.Report();
+}
+
 // CameraPass::Update on a pass in the scratch area with the library camera's
 // vtable (slot 0 Camera::SetViewportSize), each type, the made-up scene for
 // types 0 to 2's viewport. The view (+16 to +79), the projection, the
@@ -864,6 +900,7 @@ void Cameras(Context& h) {
   PassStateCases(h);
   ViewportCases(h);
   RecordViewportCases(h);
+  RecordClearCases(h);
   PassUpdateCases(h);
   FromViewportCases(h);
 }
