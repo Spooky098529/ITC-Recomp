@@ -245,7 +245,9 @@ skips Merged rows). Never
 4. Builds (`cmake --build itc_recomp/out/build/linux-amd64-release
    -j$(nproc)`) and runs `attract_race.sh 30 --run_harnesses=all` (30 s,
    not 25: the harnesses run ~5 s before the race starts; the user's
-   call, 2026-10-23): no new error lines, ~20 seconds at 30 ticks/s, every harness at 0 differing
+   call, 2026-10-23): no new error lines, ~20 seconds at 30 ticks/s (fewer
+   is fine when only the harnesses' growing time took them: the user's
+   call, 2026-10-23), every harness at 0 differing
    (outside "(expected to differ)" groups); a stalled boot restarted once.
    If the group runs in the race, a temporary counter override shows it
    was called (removed before committing). For anything drawn, a frame
@@ -448,7 +450,10 @@ file, when:
 - a validation agent reports a function `missing:` (a broken replay is
   not a reason to halt: its functions go to `to-drive.md`);
 - an attract race failed, stalled twice, logged new errors, or ran under
-  ~20 seconds at 30 ticks/s;
+  ~20 seconds at 30 ticks/s for any reason other than the harnesses
+  taking longer before it (their time grows with their cases, which is
+  expected: the user's call, 2026-10-23; the report still gives the
+  seconds);
 - an agent left work uncommitted, or a commit doesn't build;
 - a report's `stop:` isn't `none`;
 - a map fails its check, or `leads.md` has nothing the loop can take;
