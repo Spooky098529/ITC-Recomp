@@ -55,4 +55,28 @@ bool Tidy(uint8_t* base, uint32_t string, bool built, uint32_t length);
 // over 0xFFFFFFFF, never).
 std::optional<uint32_t> Allocate(uint8_t* base, uint32_t count);
 
+// The library's wildcard search (sub_82592740, probably): the first match of
+// `pattern` in the C string `text`, trying each start: '?' matches one
+// character, '*' any run (the '*'s and '?'s after it skipped, then the next
+// character looked for one ahead), the byte 2 anchors the match to the
+// text's start and 3 to its end; other characters match themselves. Returns
+// the match's start, its offset stored at `offset_out` and its length at
+// `length_out` (each when not 0), or 0. The original's steps, quirks and all.
+uint32_t WildcardSearch(uint8_t* base, uint32_t text, uint32_t pattern, uint32_t offset_out,
+                        uint32_t length_out);
+
+// The string's wildcard find (sub_82592970, probably): for a string that
+// isn't empty, WildcardSearch(its text + `from`, ...), and on a match `from`
+// added to the offset at `offset_out` (when not 0). Returns the match or 0.
+uint32_t Find(uint8_t* base, uint32_t string, uint32_t pattern, uint32_t offset_out,
+              uint32_t length_out, uint32_t from);
+
+// The string's wildcard replace (sub_82593088, probably): `frame` is the
+// original's frame (its r1 after the stwu: the offset and length at +80 and
+// +84, cleared first). With no match from the start, the string's text
+// (c_str); nullopt, with only the frame's two words written, when there is
+// one: replace (sub_82592E18) never ran in play, so the original runs.
+std::optional<uint32_t> ReplaceAll(uint8_t* base, uint32_t string, uint32_t pattern,
+                                   uint32_t frame);
+
 }  // namespace std_string

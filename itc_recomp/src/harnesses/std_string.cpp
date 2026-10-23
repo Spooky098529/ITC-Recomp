@@ -21,6 +21,8 @@
 
 #include <fmt/format.h>
 
+#include <algorithm>
+#include <cstring>
 #include <iterator>
 #include <string>
 #include <vector>
@@ -59,6 +61,26 @@ void NativeAllocate(PPCContext& ctx, uint8_t* base) {
   }
   g_fallbacks++;
   __imp__sub_820912B0(ctx, base);
+}
+
+// The wildcard replace's step, as its adapter; a match (replace) is the
+// original's.
+void NativeReplaceAll(PPCContext& ctx, uint8_t* base) {
+  if (const auto text = ss::ReplaceAll(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 144)) {
+    ctx.r3.u64 = *text;
+    return;
+  }
+  __imp__sub_82593088(ctx, base);
+}
+
+// The find and the search have no adapters: their plain C++ with the
+// registers they take.
+void NativeFind(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ss::Find(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32);
+}
+
+void NativeWildcardSearch(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ss::WildcardSearch(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32);
 }
 
 // --- Writing strings and reading back what a case left. ---
@@ -230,6 +252,162 @@ void AllocateCases(Context& h) {
   results.Report();
 }
 
+// --- The wildcard search, find and replace. ---
+
+// The game's pattern for the loader's loose read (sub_8209DFA8): "/".
+constexpr uint32_t kGamePattern = 0x82001DE8;
+
+// A C string of `length` characters from `alphabet`.
+void WriteText(Context& h, uint32_t address, uint32_t length, const char* alphabet) {
+  const uint32_t n = uint32_t(std::strlen(alphabet));
+  for (uint32_t i = 0; i < length; i++) {
+    guest::StoreU8(h.base, address + i, uint8_t(alphabet[h.random.Below(n)]));
+  }
+  guest::StoreU8(h.base, address + length, 0);
+}
+
+// A pattern: a few characters from the text's alphabet, '?' and '*', maybe
+// anchored at the start (2) or the end (3), never empty (an empty pattern
+// tries every start up to the end of memory); or the game's.
+uint32_t WritePattern(Context& h, uint32_t address, const char* alphabet) {
+  if (h.random.Below(8) == 0) {
+    return kGamePattern;
+  }
+  const uint32_t n = uint32_t(std::strlen(alphabet));
+  uint32_t at = address;
+  if (h.random.Below(4) == 0) {
+    guest::StoreU8(h.base, at++, 2);
+  }
+  const uint32_t length = 1 + h.random.Below(6);
+  for (uint32_t i = 0; i < length; i++) {
+    const uint32_t pick = h.random.Below(n + 3);
+    uint8_t c = pick < n ? uint8_t(alphabet[pick]) : pick == n ? '?' : '*';
+    if (pick == n + 2 && h.random.Below(6) == 0) {
+      c = 3;  // an end anchor in the middle
+    }
+    guest::StoreU8(h.base, at++, c);
+  }
+  if (h.random.Below(4) == 0) {
+    guest::StoreU8(h.base, at++, 3);
+  }
+  guest::StoreU8(h.base, at, 0);
+  return address;
+}
+
+const char* PickAlphabet(Random& random) {
+  static const char* kAlphabets[] = {"ab", "abc", "a", "abcdefgh", "game:\\data/._"};
+  return kAlphabets[random.Below(5)];
+}
+
+void WildcardSearchCases(Context& h) {
+  Results results("sub_82592740 WildcardSearch");
+  const uint32_t text = h.data + 1024;
+  const uint32_t pattern = h.data + 2048;
+  const uint32_t outs = h.data + 3072;
+  for (int i = 0; i < 3000; i++) {
+    Outputs out[2];
+    const Random start = h.random;
+    for (int v = 0; v < 2; v++) {
+      h.random = start;
+      Fill(h.base, h.data, kScratchBytes);
+      const char* alphabet = PickAlphabet(h.random);
+      const uint32_t length = h.random.Below(24);
+      WriteText(h, text, length, alphabet);
+      if (h.random.Below(2) == 0) {
+        Fill(h.base, text + length + 1, 64, 0);  // zeros after the text
+      }
+      const uint32_t p = WritePattern(h, pattern, alphabet);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = h.random.Below(20) == 0 ? 0 : text + h.random.Below(length + 1);
+      t.r4.u64 = p;
+      t.r5.u64 = h.random.Below(4) == 0 ? 0 : outs;
+      t.r6.u64 = h.random.Below(4) == 0 ? 0 : outs + 4;
+      (v == 0 ? __imp__sub_82592740 : NativeWildcardSearch)(t, h.base);
+      Collect(h, out[v], t, {}, {});
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", i));
+  }
+  results.Report();
+}
+
+void FindCases(Context& h) {
+  Results results("sub_82592970 String::Find");
+  const uint32_t string = h.data + 64;
+  const uint32_t pattern = h.data + 2048;
+  const uint32_t outs = h.data + 3072;
+  for (int i = 0; i < 2000; i++) {
+    Outputs out[2];
+    const Random start = h.random;
+    for (int v = 0; v < 2; v++) {
+      h.random = start;
+      Fill(h.base, h.data, kScratchBytes);
+      const char* alphabet = PickAlphabet(h.random);
+      const uint32_t capacity = PickCapacity(h.random);
+      const uint32_t length = h.random.Below(std::min(capacity, 40u) + 1);
+      const uint32_t block = WriteString(h, string, capacity, length);
+      WriteText(h, ss::Text(h.base, string), length, alphabet);
+      const uint32_t p = WritePattern(h, pattern, alphabet);
+      Blocks blocks;
+      blocks.Add(block);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = string;
+      t.r4.u64 = p;
+      t.r5.u64 = h.random.Below(4) == 0 ? 0 : outs;
+      t.r6.u64 = h.random.Below(4) == 0 ? 0 : outs + 4;
+      t.r7.u64 = h.random.Below(length + 1);
+      guest::StoreU32(h.base, outs, h.random.Below(3) == 0 ? 0 : uint32_t(h.random.Next()));
+      (v == 0 ? __imp__sub_82592970 : NativeFind)(t, h.base);
+      Collect(h, out[v], t, blocks, {string});
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", i));
+  }
+  results.Report();
+}
+
+// The replace's cases have no match (the pattern holds a character the text
+// doesn't: the path the game takes), except with the game's pattern ("/",
+// replaced with "\\") over path-like text, which may match and run the
+// original on both sides.
+void ReplaceAllCases(Context& h) {
+  Results results("sub_82593088 String::ReplaceAll");
+  const uint32_t string = h.data + 64;
+  const uint32_t pattern = h.data + 2048;
+  const uint32_t replacement = h.data + 2560;
+  for (int i = 0; i < 1000; i++) {
+    Outputs out[2];
+    const Random start = h.random;
+    for (int v = 0; v < 2; v++) {
+      h.random = start;
+      Fill(h.base, h.data, kScratchBytes);
+      const char* alphabet = PickAlphabet(h.random);
+      const uint32_t capacity = PickCapacity(h.random);
+      const uint32_t length = h.random.Below(std::min(capacity, 40u) + 1);
+      const uint32_t block = WriteString(h, string, capacity, length);
+      WriteText(h, ss::Text(h.base, string), length, alphabet);
+      uint32_t p = WritePattern(h, pattern, alphabet);
+      if (p != kGamePattern) {
+        // No match: 'Z' (in no alphabet) as the first character after an
+        // anchor. A match runs the original, whose replace loops for ever on
+        // a pattern that matches anything (such as "*?*").
+        const uint32_t at = guest::LoadU8(h.base, pattern) == 2 ? pattern + 1 : pattern;
+        guest::StoreU8(h.base, at, 'Z');
+      }
+      WriteText(h, replacement, h.random.Below(4), "xyz");
+      Blocks blocks;
+      blocks.Add(block);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = string;
+      t.r4.u64 = p;
+      t.r5.u64 = replacement;
+      t.r6.u64 = h.random.Below(3);
+      (v == 0 ? __imp__sub_82593088 : NativeReplaceAll)(t, h.base);
+      Collect(h, out[v], t, blocks, {string});
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", i));
+  }
+  results.Report();
+}
+
 }  // namespace
 
 void StdString(Context& h) {
@@ -240,6 +418,9 @@ void StdString(Context& h) {
   g_fallbacks = 0;
   TidyCases(h);
   AllocateCases(h);
+  WildcardSearchCases(h);
+  FindCases(h);
+  ReplaceAllCases(h);
   if (g_fallbacks != 0) {
     ITC_LOG_INFO("harness: std_string: {} cases handed to the original by the plain C++",
                  g_fallbacks);
