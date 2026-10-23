@@ -62,7 +62,23 @@ When the user has reviewed a run's section, its heading gets
   word through a float load and store, which in the recompiled code
   probably quiets a signaling NaN's bits (the 360 wouldn't): the native
   code keeps the recompiled result (no behavior change, the user's
-  call).
+  call; see migration 1 below: there's no quieting).
+  Migration 1's 16 rows (`--native_data_tables`; 4 Native: SwapWord and
+  the three entry swaps; left: DataTables::Init and Load, blocked by
+  the archive's `sub_8209DE48`, `sub_8209D868`, `sub_820A0678`). For
+  review: SwapWord's float round trip is folded away by the compiler in
+  the release build (a plain byte swap; signaling NaNs come through
+  unchanged), and the native code writes the same steps under the same
+  floating-point settings, so it folds the same (256 signaling-NaN
+  patterns compared exactly; the mapping's "probably quieted" corrected
+  in the row); the adapter turns flush-to-zero off as the original
+  does, and doesn't set f0 (no caller reads it); the accessors return
+  r3 zero-extended where the originals keep the argument's upper 32
+  bits (as the vehicle accessors do: the game reads the low word only);
+  Entry56, Find20, Entry20, Entry40 and ItemRecords::Item weren't seen
+  in the attract race (the front end, the save data); the five load
+  callbacks keep their adapters (reached through Archive::Load's
+  function pointer), the seven accessors too (recompiled callers).
 
 ## Run 2026-10-23 01:52 (`b7-loop-23-10-26`)
 

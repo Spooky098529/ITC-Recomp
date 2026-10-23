@@ -14,8 +14,9 @@ file's history.
 - Subsystem 1 of 3 (the action mappers) finished: the rest waits on
   the input manager's vtable targets and `sub_8258CE60`.
 - Subsystem 2 of 3: the game's data tables at `[0x826C5CA0]`
-  (`data-tables.md`, mapped in d8f876f: 18 rows, 9 ready groups). Step:
-  migration 1 (agent running).
+  (`data-tables.md`, mapped in d8f876f: 18 rows, 9 ready groups).
+  Migration 1 (db90dc4..4344730) passed the checks: 16 of 18 ours.
+  Step: validation (agent running).
 
 ## Done
 
@@ -51,3 +52,5 @@ race or the replay.
   `itc_914`).
 - After mapping the data tables: ours 1007, work left 5746 (wrapped 129,
   known 474, unknown 5143).
+- After the data tables' migration 1: ours 1023, work left 5730 (wrapped
+  129, known 458, unknown 5143).
