@@ -111,6 +111,37 @@ When the user has reviewed a run's section, its heading gets
     `input.md`).
   - The processor's constructor sets the repeat period to 4; the
     mappers' repeat objects use 3 (both as read).
+  Migration 1 (57373be..4dd7a11): all 29 native under `--native_input`
+  (`src/input/input_manager.*`, `src/std_list/ptr_list.*` for other
+  subsystems to call, adapters in `src/hooks/input_manager.cpp`), with
+  `ActionMapper::ActionMapper`, `ActionMapper::Bind` and
+  `InputClientList::BindAll` (`action-mappers.md`, under
+  `--native_action_mappers`); 16 adapters removed. For review:
+  - A harness depends on the heap's layout: with the binding cases in
+    the `action_mappers` harness, the later `strings_and_font` harness
+    failed (`Font::Draw` differed, then its swprintf cases crashed on a
+    read of guest 0x5E44, or a call to 0x00200020), and the race didn't
+    start; one `memory::Alloc(0x4400)` and its `Free` before it is
+    enough. Probably the same as the eleventh run's swprintf crash with
+    other random inputs (above). Not investigated; worked around by
+    putting the binding cases in their own harness,
+    `action_mappers_binding`, run last.
+  - Kept as guest calls (the functions stay Overridden): the manager's
+    constructor's two handler registrations through the dispatcher's
+    slots +8 and +4 (from the original's 192-byte frame); `BindAll`'s
+    app slot +36 (logged: `sub_820944C8`, through `sub_82094350`,
+    probably to `sub_82090788`; the input manager each time, players
+    0-3).
+  - Left on the recompiled code: `AddListener` on a list with a listener
+    already (its reset `sub_82592400` never runs); `AllocateNodes`'
+    `bad_alloc` and `IncSize`'s `length_error` paths (the latter doesn't
+    throw in the original: a case past the limit crashed in it, so the
+    cases stop at the limit); the constructor and Bind with vtable slots
+    other than those seen in play; anything allocating with
+    `--native_heap` off.
+  - The `--log_input_reads` wrappers moved from
+    `src/frame_pacing/game_messages.cpp` into the new adapters (same
+    counts).
 
 ## Run 2026-10-24 16:01 (`b7-loop-24-10-26-2`)
 

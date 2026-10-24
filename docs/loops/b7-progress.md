@@ -38,7 +38,11 @@ see in a drive, from every run: `to-drive.md`.
   `ActionMapper::ActionMapper`). Mapped as the input manager and
   processors (`input.md`, 29 rows: 13 moved from `functions.md`, 16 new;
   167d407; 17 ready groups; 1 lead added); map checked (0 errors, 29 of
-  29 in play). Migration 1 running.
+  29 in play). Migration 1 done (57373be..4dd7a11: input.md 29 of
+  29 ours, with `ActionMapper::ActionMapper`, `Bind` and
+  `InputClientList::BindAll` it unblocked; 16 adapters removed;
+  `--native_input`); `ActionMappers::Init` (`sub_8209F430`) ready, left
+  for migration 2. Validation 1 running.
 
 ## Done
 
