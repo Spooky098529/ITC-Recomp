@@ -147,6 +147,54 @@ ITC_SAMPLER_STATE_SETTERS(ITC_DECLARE_SAMPLER_SETTER)
 // shadow (+10444) bit 0.
 uint32_t GetViewportEnable(uint8_t* base, uint32_t device);
 
+// The bound objects and the shader constants. The ones that fence the
+// object they replace return false, with nothing written, when the fence
+// would go on a full fence list (its flush, sub_822AD790, is guest code and
+// isn't seen in play): the original runs then.
+
+// sub_822A3740 Device::GetViewport: the 24-byte viewport at +12392 copied
+// to `out` (memcpy's copy). False, with nothing copied, where memcpy's
+// override has to run (a destination in the physical views, which it
+// records for the renderer, or ranges that may share memory).
+bool GetViewport(uint8_t* base, uint32_t device, uint32_t out);
+
+// sub_822A3758 Device::SetStreamSource: the stream's vertex fetch constant
+// (with a buffer; `dirty` ORed into +16), the previous buffer fenced, the
+// buffer and its stride / 4 kept, and +16 bit 51 when the stride differs
+// from the vertex shader's.
+bool SetStreamSource(uint8_t* base, uint32_t device, uint32_t stream, uint32_t buffer,
+                     uint32_t offset, uint32_t stride, uint64_t dirty);
+
+// sub_822A3908 Device::SetIndices: the previous index buffer fenced, then
+// +12180 = `buffer`.
+bool SetIndices(uint8_t* base, uint32_t device, uint32_t buffer);
+
+// sub_822A6008 Device::SetTexture: with a texture, its fetch constant
+// merged into the stage's (the sampler states' bits kept, the mip levels
+// clamped by the stage's), `dirty` ORed into +16; the texture kept and the
+// previous one fenced.
+bool SetTexture(uint8_t* base, uint32_t device, uint32_t stage, uint32_t texture,
+                uint64_t dirty);
+
+// sub_822A3B30 Device::SetBlendControl: RB_BLENDCONTROL of render target
+// `target` = `value`; its register's dirty bit and +16 bit 49.
+void SetBlendControl(uint8_t* base, uint32_t device, uint32_t target, uint32_t value);
+
+// sub_822A81F8 Device::SetVertexShaderConstantF and sub_822A8308
+// Device::SetPixelShaderConstantF: `count` four-float constants from
+// `data` (any alignment) to device + 1792 (+5888) + 16 x `first`, stored
+// 16-byte aligned as the original's stvx; `dirty` ORed into +0 (+8).
+void SetVertexShaderConstantF(uint8_t* base, uint32_t device, uint32_t first, uint32_t data,
+                              uint32_t count, uint64_t dirty);
+void SetPixelShaderConstantF(uint8_t* base, uint32_t device, uint32_t first, uint32_t data,
+                             uint32_t count, uint64_t dirty);
+
+// sub_822A8470 Device::SetPixelShaderConstantB: `count` (at least 1, as
+// the original's do-while) bool constants from `data` (a word each, bit 0)
+// into the bits at +10000; +24 bit 1.
+void SetPixelShaderConstantB(uint8_t* base, uint32_t device, uint32_t first, uint32_t data,
+                             uint32_t count);
+
 // Device fields the setters write (byte offsets).
 constexpr uint32_t kShaderDirty = 16;  // the dirty masks: the shader state
 constexpr uint32_t kRenderDirty = 24;  // the render state

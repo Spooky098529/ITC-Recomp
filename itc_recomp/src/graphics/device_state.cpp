@@ -9,6 +9,7 @@
 #include "guest.h"
 
 #include "base/log.h"
+#include "c_runtime/strings.h"
 
 #include <emmintrin.h>
 
@@ -16,6 +17,7 @@
 #include <climits>
 #include <cmath>
 #include <cstdint>
+#include <cstring>
 
 namespace graphics::device_state {
 
@@ -289,6 +291,89 @@ void SetMipLevel(uint8_t* base, uint32_t device, uint32_t sampler, uint32_t valu
     Mark(base, device + kShaderDirty, SamplerBit(sampler));
   }
   guest::StoreU8(base, device + sampler + (max ? kMaxMipLevel : kMinMipLevel), uint8_t(value));
+}
+
+// The fences of a replaced resource: with a command position (+10780), the
+// resource's +8 = it; else, when the resource's flags (+0) meet the mask
+// at +10784, an entry on the fence list (+13168; ends at +13172): the
+// resource's address / 4 in bits 0-29, bit 30 clear, then -1. The
+// original's bit 31 comes from an uninitialized stack word; 0 here (the
+// list is in the command buffer, read by nothing since the emulated GPU
+// went).
+constexpr uint32_t kCommandPosition = 10780;
+constexpr uint32_t kFenceMask = 10784;
+constexpr uint32_t kFenceList = 13168;
+constexpr uint32_t kFenceListEnd = 13172;
+
+// Whether fencing `resource` would need the full list flushed.
+bool FenceNeedsFlush(uint8_t* base, uint32_t device, uint32_t resource) {
+  return resource != 0 && Load(base, device + kCommandPosition) == 0 &&
+         (Load(base, device + kFenceMask) & Load(base, resource)) != 0 &&
+         !(Load(base, device + kFenceList) < Load(base, device + kFenceListEnd));
+}
+
+void Fence(uint8_t* base, uint32_t device, uint32_t resource) {
+  if (resource == 0) {
+    return;
+  }
+  const uint32_t position = Load(base, device + kCommandPosition);
+  if (position != 0) {
+    Store(base, resource + 8, position);
+    return;
+  }
+  if ((Load(base, device + kFenceMask) & Load(base, resource)) == 0) {
+    return;
+  }
+  const uint32_t list = Load(base, device + kFenceList);
+  Store(base, list, (resource >> 2) & 0x3FFFFFFF);
+  Store(base, list + 4, 0xFFFFFFFFu);
+  Store(base, device + kFenceList, list + 8);
+}
+
+// A guest address as the GPU's physical one: its low 29 bits, plus 0x1000
+// for the views from 0xE0000000 (their 4 KB offset).
+uint32_t Physical(uint32_t address) {
+  return ((((address >> 20) & 0xFFF) + 512) & 0x1000) + (address & 0x1FFFFFFF);
+}
+
+// The float constants' copy: `count` 16-byte vectors from `data` (any
+// alignment) to `to` + 16 x i, each stored at its 16-byte aligned address
+// as stvx does; four loaded before four are stored, as the original's
+// unrolled loop, then one at a time.
+void CopyConstants(uint8_t* base, uint32_t to, uint32_t data, uint32_t count) {
+  auto load = [&](uint32_t from, uint8_t* out) {
+    // lvlx and lvrx: the bytes up to the next 16-byte line, then the rest.
+    const uint32_t first = 16 - (from & 0xF);
+    std::memcpy(out, REX_RAW_ADDR(from), first);
+    if (first < 16) {
+      std::memcpy(out + first, REX_RAW_ADDR(from + first), 16 - first);
+    }
+  };
+  auto store = [&](uint32_t at, const uint8_t* in) {
+    std::memcpy(REX_RAW_ADDR(at & ~0xFu), in, 16);
+  };
+  uint32_t left = count;
+  if (count > 3) {
+    for (uint32_t round = ((count - 4) >> 2) + 1; round != 0; round--) {
+      uint8_t vectors[4][16];
+      for (int i = 0; i < 4; i++) {
+        load(data + 16 * i, vectors[i]);
+      }
+      for (int i = 0; i < 4; i++) {
+        store(to + 16 * i, vectors[i]);
+      }
+      data += 64;
+      to += 64;
+      left -= 4;
+    }
+  }
+  for (; left != 0; left--) {
+    uint8_t vector[16];
+    load(data, vector);
+    store(to, vector);
+    data += 16;
+    to += 16;
+  }
 }
 
 }  // namespace
@@ -920,6 +1005,140 @@ void SetWhiteBorderColorW(uint8_t* base, uint32_t device, uint32_t sampler, uint
 void SetPointBorderEnable(uint8_t* base, uint32_t device, uint32_t sampler, uint32_t value) {
   ITC_NATIVE_RUNNING("sub_822A33F0 Device::SetSamplerState_PointBorderEnable");
   SetSamplerField(base, device, sampler, 4, value == 0 ? 1 : 0, 11, 0x800);
+}
+
+bool GetViewport(uint8_t* base, uint32_t device, uint32_t out) {
+  ITC_NATIVE_RUNNING("sub_822A3740 Device::GetViewport");
+  return out < 0xA0000000u && c_runtime::Memcpy(base, out, device + 12392, 24);
+}
+
+bool SetStreamSource(uint8_t* base, uint32_t device, uint32_t stream, uint32_t buffer,
+                     uint32_t offset, uint32_t stride, uint64_t dirty) {
+  ITC_NATIVE_RUNNING("sub_822A3758 Device::SetStreamSource");
+  const uint32_t slot = device + 4 * (stream + 3051);  // +12204, the streams
+  if (FenceNeedsFlush(base, device, Load(base, slot))) {
+    return false;
+  }
+  if (buffer != 0) {
+    // Vertex fetch constant 95 - stream: the address, then the size.
+    const uint32_t address = Load(base, buffer + 24) + offset;
+    const uint32_t size = Load(base, buffer + 28) - offset;
+    const uint32_t index = 17 - stream;
+    Store(base, device + 8 * index + 1652, size);
+    Store(base, device + 8 * (index + 206), Physical(address));
+    Mark(base, device + kShaderDirty, dirty);
+  }
+  Fence(base, device, Load(base, slot));
+  const uint32_t words = stride >> 2;
+  Store(base, slot, buffer);
+  guest::StoreU8(base, device + stream + 12272, uint8_t(words));
+  if (words != 0 && words != guest::LoadU8(base, device + stream + 11568)) {
+    Mark(base, device + kShaderDirty, 1ull << 51);  // the vertex shader, patched again
+  }
+  return true;
+}
+
+bool SetIndices(uint8_t* base, uint32_t device, uint32_t buffer) {
+  ITC_NATIVE_RUNNING("sub_822A3908 Device::SetIndices");
+  const uint32_t previous = Load(base, device + 12180);
+  if (FenceNeedsFlush(base, device, previous)) {
+    return false;
+  }
+  Fence(base, device, previous);
+  Store(base, device + 12180, buffer);
+  return true;
+}
+
+bool SetTexture(uint8_t* base, uint32_t device, uint32_t stage, uint32_t texture,
+                uint64_t dirty) {
+  ITC_NATIVE_RUNNING("sub_822A6008 Device::SetTexture");
+  const uint32_t slot = device + 4 * (stage + 3072);  // +12288, the textures
+  const uint32_t previous = Load(base, slot);
+  if (FenceNeedsFlush(base, device, previous)) {
+    return false;
+  }
+  if (texture != 0) {
+    const uint32_t fc = FetchConstant(device, stage);
+    const uint32_t mip = Load(base, texture + 48);
+    const uint32_t word0 = Load(base, texture + 28);
+    const uint32_t word2 = Load(base, texture + 36);
+    const uint32_t word3 = Load(base, texture + 40);
+    const uint32_t levels = Load(base, texture + 44);
+    const uint32_t address = Physical(Load(base, texture + 32));
+    const uint32_t mip_address =
+        ((((mip >> 20) & 0xFFF) + 512) & 0x1000) + (mip & 0x1FFFFE00);
+    const uint32_t old0 = Load(base, fc + 0);
+    Store(base, fc + 8, word2);
+    const uint32_t new0 = (old0 & 0x3FFC00) | (word0 & ~0x3FFC00u);  // the clamps kept
+    const uint32_t new5 = (Load(base, fc + 20) & 0x1FF) | (mip_address & ~0x1FFu);
+    uint32_t max_level = guest::LoadU8(base, device + stage + kMaxMipLevel);
+    const uint32_t own_max = (levels >> 2) & 0xF;
+    uint32_t new4 = (Load(base, fc + 16) & 0xFFFFFC03u) | (levels & 0x3FC);
+    const uint32_t new3 = (Load(base, fc + 12) & 0x7FF80000) | (word3 & ~0x7FF80000u);
+    Store(base, fc + 0, new0);
+    const uint32_t new1 = (Load(base, fc + 4) & 0x800) | (address & ~0x800u);
+    Store(base, fc + 16, new4);
+    Store(base, fc + 20, new5);
+    Store(base, fc + 12, new3);
+    Store(base, fc + 4, new1);
+    if (own_max > max_level) {
+      max_level = (Load(base, texture + 44) >> 2) & 0xF;
+    }
+    const uint32_t now = Load(base, texture + 44);
+    new4 = (Rotl(max_level, 2) & 0x3C) | (new4 & ~0x3Cu);
+    uint32_t min_level = guest::LoadU8(base, device + stage + kMinMipLevel);
+    const uint32_t own_min = (now >> 6) & 0xF;
+    Store(base, fc + 16, new4);
+    if (own_min < min_level) {
+      min_level = own_min;
+    }
+    new4 = (Rotl(min_level, 6) & 0x3C0) | (new4 & ~0x3C0u);
+    Store(base, fc + 16, new4);
+    Mark(base, device + kShaderDirty, dirty);
+  }
+  Store(base, slot, texture);
+  Fence(base, device, previous);
+  return true;
+}
+
+void SetBlendControl(uint8_t* base, uint32_t device, uint32_t target, uint32_t value) {
+  ITC_NATIVE_RUNNING("sub_822A3B30 Device::SetBlendControl");
+  const uint32_t index = target != 0 ? target + 7 : 0;  // 0x2201, or 0x2208 + target
+  Store(base, device + 4 * (index + 2606), value);
+  const uint32_t bit = index + 0x20135;
+  const uint32_t mask_word = uint32_t(int32_t(bit) >> 16) << 3;
+  const uint32_t shift = bit & 0xFF;
+  const uint64_t mask = (shift & 0x40) ? 0 : (0x8000000000000000ull >> (shift & 0x3F));
+  Mark(base, device + mask_word, mask);
+  Mark(base, device + kShaderDirty, 1ull << 49);
+}
+
+void SetVertexShaderConstantF(uint8_t* base, uint32_t device, uint32_t first, uint32_t data,
+                              uint32_t count, uint64_t dirty) {
+  ITC_NATIVE_RUNNING("sub_822A81F8 Device::SetVertexShaderConstantF");
+  CopyConstants(base, device + ((first + 112) << 4), data, count);
+  Mark(base, device + 0, dirty);
+}
+
+void SetPixelShaderConstantF(uint8_t* base, uint32_t device, uint32_t first, uint32_t data,
+                             uint32_t count, uint64_t dirty) {
+  ITC_NATIVE_RUNNING("sub_822A8308 Device::SetPixelShaderConstantF");
+  CopyConstants(base, device + ((first + 368) << 4), data, count);
+  Mark(base, device + 8, dirty);
+}
+
+void SetPixelShaderConstantB(uint8_t* base, uint32_t device, uint32_t first, uint32_t data,
+                             uint32_t count) {
+  ITC_NATIVE_RUNNING("sub_822A8470 Device::SetPixelShaderConstantB");
+  do {
+    const uint32_t bit = first & 0x1F;
+    const uint32_t word = device + 4 * ((first >> 5) + 2500);  // +10000
+    const uint32_t on = (Load(base, data) & 1) << bit;
+    Store(base, word, (Load(base, word) & ~(1u << bit)) | on);
+    data += 4;
+    first++;
+  } while (--count != 0);
+  Mark(base, device + kRenderDirty, 2);
 }
 
 uint32_t GetViewportEnable(uint8_t* base, uint32_t device) {

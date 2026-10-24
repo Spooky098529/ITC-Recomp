@@ -13,8 +13,11 @@
 ITC_FLAG_BOOL(native_device_state, true, "ITC",
               "Run the graphics device's state setters (docs/functions/device-state.md: "
               "the render state setters sub_822A1260 to sub_822A2A50, the sampler state "
-              "setters sub_822A2A70 to sub_822A33F0 and "
-              "Device::GetRenderState_ViewportEnable sub_822A2470) natively instead of "
+              "setters sub_822A2A70 to sub_822A33F0, Device::GetRenderState_ViewportEnable "
+              "sub_822A2470, GetViewport sub_822A3740, SetStreamSource sub_822A3758, "
+              "SetIndices sub_822A3908, SetTexture sub_822A6008, SetBlendControl "
+              "sub_822A3B30, the shader constants sub_822A81F8, sub_822A8308 and "
+              "sub_822A8470; the fence list's flush left to the originals) natively instead of "
               "through the translated code (the same writes to the register shadow and the "
               "dirty masks; checked by --run_harnesses=device_state).");
 
@@ -163,3 +166,47 @@ extern "C" REX_FUNC(sub_822A2470) {
   }
   ctx.r3.u64 = ds::GetViewportEnable(base, ctx.r3.u32);
 }
+
+// The bound objects and the shader constants: the original runs where the
+// plain C++ returns false (GetViewport's copy left to memcpy's override, a
+// fence on a full fence list).
+#define ITC_DEVICE_STATE_CALL(address, ...)  \
+  extern "C" REX_FUNC(sub_##address) {       \
+    REX_FUNC_PROLOGUE();                     \
+    if (!ITC_FLAG(native_device_state)) {    \
+      __imp__sub_##address(ctx, base);       \
+      return;                                \
+    }                                        \
+    __VA_ARGS__;                             \
+  }
+
+ITC_DEVICE_STATE_CALL(822A3740, {
+  if (!ds::GetViewport(base, ctx.r3.u32, ctx.r4.u32)) {
+    __imp__sub_822A3740(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = ctx.r4.u32;  // memcpy's: the destination
+})
+ITC_DEVICE_STATE_CALL(822A3758, {
+  if (!ds::SetStreamSource(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32,
+                           ctx.r8.u64)) {
+    __imp__sub_822A3758(ctx, base);
+  }
+})
+ITC_DEVICE_STATE_CALL(822A3908, {
+  if (!ds::SetIndices(base, ctx.r3.u32, ctx.r4.u32)) {
+    __imp__sub_822A3908(ctx, base);
+  }
+})
+ITC_DEVICE_STATE_CALL(822A6008, {
+  if (!ds::SetTexture(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u64)) {
+    __imp__sub_822A6008(ctx, base);
+  }
+})
+ITC_DEVICE_STATE_CALL(822A3B30, ds::SetBlendControl(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+ITC_DEVICE_STATE_CALL(822A81F8, ds::SetVertexShaderConstantF(base, ctx.r3.u32, ctx.r4.u32,
+                                                             ctx.r5.u32, ctx.r6.u32, ctx.r7.u64))
+ITC_DEVICE_STATE_CALL(822A8308, ds::SetPixelShaderConstantF(base, ctx.r3.u32, ctx.r4.u32,
+                                                            ctx.r5.u32, ctx.r6.u32, ctx.r7.u64))
+ITC_DEVICE_STATE_CALL(822A8470, ds::SetPixelShaderConstantB(base, ctx.r3.u32, ctx.r4.u32,
+                                                            ctx.r5.u32, ctx.r6.u32))

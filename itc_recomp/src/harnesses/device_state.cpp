@@ -176,6 +176,209 @@ void RunSetter(Context& h, uint32_t device, const Setter& setter, int cases) {
   results.Report();
 }
 
+// --- The bound objects and the shader constants ---
+//
+// The scratch area holds eight objects (buffers, textures, the resources
+// fenced: +0 their flags, +8 their fence, +24/+28 a buffer's address and
+// size, +28-+48 a texture's fetch constant), the fence list, the constants'
+// source and GetViewport's out. The device block is random but for the
+// slots (null or an object), the command position (0 half the time), the
+// fence mask (0, all ones or random) and the fence list (in the scratch
+// area, never full: a full one runs the original, sub_822AD790 not seen in
+// play). Compared: the device block, the scratch area and, for GetViewport,
+// r3; the void setters' r3 isn't (the originals leave the fence list's
+// position there when they queue a fence, which their callers don't read).
+// The fence list entry's bit 31 is the original's uninitialized stack word
+// (the native one writes 0): left out of the comparison and compared in its
+// own group, expected to differ (the entry is in the command buffer, which
+// nothing reads since the emulated GPU went).
+
+constexpr uint32_t kObjects = 8;
+constexpr uint32_t kObjectBytes = 64;
+constexpr uint32_t kList = 1024;      // the fence list, in the scratch area
+constexpr uint32_t kConstants = 2048;  // the constants' source
+constexpr uint32_t kOut = 3584;        // GetViewport's out
+
+struct BoundCase {
+  std::vector<uint32_t> device;
+  std::vector<uint32_t> scratch;
+  uint32_t list = 0;  // the fence list's position before
+};
+
+BoundCase MakeBoundCase(Context& h, Random& r) {
+  BoundCase c;
+  c.device.resize(kDeviceBytes / 4);
+  for (uint32_t& w : c.device) {
+    w = uint32_t(r.Next());
+  }
+  auto object = [&] { return h.data + kObjectBytes * r.Below(kObjects); };
+  for (uint32_t slot = 12180; slot < 12288 + 4 * 32; slot += 4) {  // indices, streams, textures
+    c.device[slot / 4] = r.Below(3) == 0 ? 0 : object();
+  }
+  c.device[10780 / 4] = r.Below(2) == 0 ? 0 : uint32_t(r.Next());
+  const uint32_t pick = r.Below(3);
+  c.device[10784 / 4] = pick == 0 ? 0 : pick == 1 ? 0xFFFFFFFFu : uint32_t(r.Next());
+  c.list = h.data + kList + 8 * r.Below(32);
+  c.device[13168 / 4] = c.list;
+  c.device[13172 / 4] = c.list + 8 * (1 + r.Below(4));
+  c.scratch.resize(kScratchBytes / 4);
+  for (uint32_t& w : c.scratch) {
+    w = uint32_t(r.Next());
+  }
+  return c;
+}
+
+// The device block and the scratch area, the fence list entry's bit 31
+// left out (in `bit31` instead).
+void BoundOutputs(Context& h, uint32_t device, const BoundCase& c, Outputs& out,
+                  Outputs& bit31) {
+  out.Bytes(Read(h.base, device, kDeviceBytes));
+  std::vector<uint8_t> scratch = Read(h.base, h.data, kScratchBytes);
+  const uint32_t entry = c.list - h.data;
+  bit31.Word(scratch[entry] & 0x80);
+  scratch[entry] &= 0x7F;
+  out.Bytes(scratch);
+}
+
+template <typename Args>
+void RunBound(Context& h, uint32_t device, const char* name, GuestFunction recompiled,
+              GuestFunction native, int cases, Args args, bool fences, bool compare_r3 = false) {
+  Random& r = h.random;
+  Results results(name);
+  Results bit31_results(std::string(name) +
+                        ", the fence list entry's bit 31 (expected to differ)");
+  for (int i = 0; i < cases; i++) {
+    BoundCase c = MakeBoundCase(h, r);
+    Random args_random = r;  // the same arguments for both versions
+    r.Next();
+    Outputs out[2], bit31[2];
+    for (int v = 0; v < 2; v++) {
+      Random a = args_random;
+      guest::StoreU32s(h.base, h.data, c.scratch.data(), uint32_t(c.scratch.size()));
+      PPCContext t = CallContext(h);
+      t.r3.u64 = device;
+      args(t, a, c);
+      guest::StoreU32s(h.base, device, c.device.data(), uint32_t(c.device.size()));
+      (v == 0 ? recompiled : native)(t, h.base);
+      BoundOutputs(h, device, c, out[v], bit31[v]);
+      if (compare_r3) {
+        out[v].Word(t.r3.u32);
+      }
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", i));
+    bit31_results.Check(bit31[0], bit31[1], fmt::format("case {}", i));
+  }
+  results.Report();
+  if (fences) {
+    bit31_results.Report();
+  }
+}
+
+void NativeGetViewport(PPCContext& ctx, uint8_t* base) {
+  if (!ds::GetViewport(base, ctx.r3.u32, ctx.r4.u32)) {
+    ITC_LOG_INFO("harness: device_state: GetViewport fell back");
+    return;
+  }
+  ctx.r3.u64 = ctx.r4.u32;
+}
+void NativeSetStreamSource(PPCContext& ctx, uint8_t* base) {
+  if (!ds::SetStreamSource(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32,
+                           ctx.r8.u64)) {
+    ITC_LOG_INFO("harness: device_state: SetStreamSource fell back");
+  }
+}
+void NativeSetIndices(PPCContext& ctx, uint8_t* base) {
+  if (!ds::SetIndices(base, ctx.r3.u32, ctx.r4.u32)) {
+    ITC_LOG_INFO("harness: device_state: SetIndices fell back");
+  }
+}
+void NativeSetTexture(PPCContext& ctx, uint8_t* base) {
+  if (!ds::SetTexture(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u64)) {
+    ITC_LOG_INFO("harness: device_state: SetTexture fell back");
+  }
+}
+void NativeSetBlendControl(PPCContext& ctx, uint8_t* base) {
+  ds::SetBlendControl(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+}
+void NativeSetVertexShaderConstantF(PPCContext& ctx, uint8_t* base) {
+  ds::SetVertexShaderConstantF(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
+                               ctx.r7.u64);
+}
+void NativeSetPixelShaderConstantF(PPCContext& ctx, uint8_t* base) {
+  ds::SetPixelShaderConstantF(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
+                              ctx.r7.u64);
+}
+void NativeSetPixelShaderConstantB(PPCContext& ctx, uint8_t* base) {
+  ds::SetPixelShaderConstantB(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32);
+}
+
+void BoundObjects(Context& h, uint32_t device) {
+  auto object = [&](Random& a) {
+    return a.Below(4) == 0 ? 0 : h.data + kObjectBytes * a.Below(kObjects);
+  };
+  RunBound(h, device, "Device::GetViewport (sub_822A3740)", __imp__sub_822A3740,
+           NativeGetViewport, 32,
+           [&](PPCContext& t, Random& a, BoundCase&) { t.r4.u64 = h.data + kOut + a.Below(8); },
+           false, true);
+  RunBound(h, device, "Device::SetStreamSource (sub_822A3758)", __imp__sub_822A3758,
+           NativeSetStreamSource, 400, [&](PPCContext& t, Random& a, BoundCase& c) {
+             const uint32_t stream = a.Below(16);
+             t.r4.u64 = stream;
+             t.r5.u64 = object(a);
+             t.r6.u64 = a.Below(2) ? a.Below(256) : uint32_t(a.Next());
+             const uint32_t stride = a.Below(4) == 0 ? uint32_t(a.Next()) : 4 * a.Below(32);
+             t.r7.u64 = stride;
+             t.r8.u64 = a.Next();
+             // The vertex shader's stride now and then the same.
+             if (a.Below(2)) {
+               const uint32_t at = 11568 + stream;
+               uint32_t& w = c.device[at / 4];
+               const int shift = 24 - 8 * int(at % 4);
+               w = (w & ~(0xFFu << shift)) | (((stride >> 2) & 0xFF) << shift);
+             }
+           },
+           true);
+  RunBound(h, device, "Device::SetIndices (sub_822A3908)", __imp__sub_822A3908,
+           NativeSetIndices, 200,
+           [&](PPCContext& t, Random& a, BoundCase&) { t.r4.u64 = object(a); }, true);
+  RunBound(h, device, "Device::SetTexture (sub_822A6008)", __imp__sub_822A6008,
+           NativeSetTexture, 400, [&](PPCContext& t, Random& a, BoundCase&) {
+             t.r4.u64 = a.Below(26);
+             t.r5.u64 = object(a);
+             t.r6.u64 = a.Next();
+           },
+           true);
+  RunBound(h, device, "Device::SetBlendControl (sub_822A3B30)", __imp__sub_822A3B30,
+           NativeSetBlendControl, 200, [&](PPCContext& t, Random& a, BoundCase&) {
+             t.r4.u64 = a.Below(8) == 0 ? a.Below(200) : a.Below(4);
+             t.r5.u64 = uint32_t(a.Next());
+           },
+           false);
+  for (int pixel = 0; pixel < 2; pixel++) {
+    RunBound(h, device,
+             pixel ? "Device::SetPixelShaderConstantF (sub_822A8308)"
+                   : "Device::SetVertexShaderConstantF (sub_822A81F8)",
+             pixel ? __imp__sub_822A8308 : __imp__sub_822A81F8,
+             pixel ? NativeSetPixelShaderConstantF : NativeSetVertexShaderConstantF, 300,
+             [&](PPCContext& t, Random& a, BoundCase&) {
+               const uint32_t count = a.Below(4) == 0 ? a.Below(4) : a.Below(32);
+               t.r4.u64 = a.Below(256 - count);
+               t.r5.u64 = h.data + kConstants + a.Below(16);
+               t.r6.u64 = count;
+               t.r7.u64 = a.Next();
+             },
+             false);
+  }
+  RunBound(h, device, "Device::SetPixelShaderConstantB (sub_822A8470)", __imp__sub_822A8470,
+           NativeSetPixelShaderConstantB, 200, [&](PPCContext& t, Random& a, BoundCase&) {
+             const uint32_t count = 1 + a.Below(40);
+             t.r4.u64 = a.Below(256 - count);
+             t.r5.u64 = h.data + kConstants + 4 * a.Below(64);
+             t.r6.u64 = count;
+           },
+           false);
+}
+
 }  // namespace
 
 void DeviceState(Context& h) {
@@ -194,6 +397,7 @@ void DeviceState(Context& h) {
             {"Device::GetRenderState_ViewportEnable (sub_822A2470)", __imp__sub_822A2470,
              NativeGetViewportEnable},
             32);
+  BoundObjects(h, device);
   memory::Free(device);
 }
 
