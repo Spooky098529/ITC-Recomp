@@ -26,7 +26,8 @@ ITC_FLAG_BOOL(native_cameras, true, "ITC",
               "camera's Camera::Camera sub_82593908, Camera::Update sub_82593568, Camera::SetFieldOfView sub_82593278, Camera::BuildProjection "
               "sub_825932E8 (no adapter: only Camera::SetViewportSize's, Update's and Camera's plain C++ call it, "
               "and the flag switches them) and Camera::SetViewportSize sub_82593500; the camera passes' "
-              "CameraPasses::Mode sub_8209F718, SetMode sub_8209F738, RenderTarget "
+              "CameraPasses::Mode sub_8209F718, SetMode sub_8209F738 (no adapter: only InitPasses' plain C++ "
+              "calls it, and the flag switches that), RenderTarget "
               "sub_8209F7A8, EnableForView sub_820AA1A8 and SetNear sub_820AA368, "
               "CameraPass::Enable sub_820A0968, Disable sub_820A0958 and ReleaseSurfaces "
               "sub_820A0C40, and SetZoom sub_820AA378 (no adapter: only CameraPass::FromViewport's "
@@ -44,7 +45,7 @@ ITC_FLAG_BOOL(native_cameras, true, "ITC",
               "CameraPass::SetUpSurfaces sub_820A2F40 with its types 0-2 chunk sub_820A2F94, with "
               "--native_video_output, --native_graphics_resources and --native_heap; CameraPass::Init "
               "sub_820A3DB0 with its type 0 chunk sub_820A3E04; CameraPasses::Init sub_8209F9B8 and InitPasses "
-              "sub_8209F960) natively instead of "
+              "sub_8209F960 (no adapter: only Init's plain C++ calls it, and the flag switches that)) natively instead of "
               "through the translated code (the same words, bit for bit; checked by "
               "--run_harnesses=cameras)");
 
@@ -106,24 +107,6 @@ extern "C" REX_FUNC(sub_8209F718) {
     ctx.r3.u64 = mode;
   } else {
     ctx.r3.s64 = -1;
-  }
-}
-
-// CameraPasses::SetMode: r3 = which (1), r4 = the mode. Where pass 4's field
-// of view is set, r3 = pass 4 and f1 = the degrees, as the original's tail
-// call leaves them.
-extern "C" REX_FUNC(sub_8209F738) {
-  ITC_CAMERAS_FALLBACK(8209F738)
-  const int32_t which = ctx.r3.s32;
-  const uint32_t mode = ctx.r4.u32;
-  ctx.fpscr.disableFlushMode();
-  if (!cameras::SetMode(base, which, mode)) {
-    __imp__sub_8209F738(ctx, base);
-    return;
-  }
-  if (which == 1 && (mode == 0 || mode == 1)) {
-    ctx.r3.u64 = cameras::Pass(4);
-    ctx.f1.f64 = double(guest::LoadFloat(base, mode == 0 ? 0x82001E8C : 0x82001E88));
   }
 }
 
@@ -396,16 +379,11 @@ extern "C" REX_FUNC(sub_820A2F40) {
   }
 }
 
-// CameraPasses::Init (no arguments) and InitPasses
-// (hooks::CameraPassesInit).
+// CameraPasses::Init: no arguments (hooks::CameraPassesInit). InitPasses
+// (sub_8209F960) has no adapter: only Init's plain C++ calls it.
 extern "C" REX_FUNC(sub_8209F9B8) {
   ITC_CAMERAS_FALLBACK(8209F9B8)
   hooks::CameraPassesInit(ctx, base, true);
-}
-
-extern "C" REX_FUNC(sub_8209F960) {
-  ITC_CAMERAS_FALLBACK(8209F960)
-  hooks::CameraPassesInit(ctx, base, false);
 }
 
 // CameraPass::Init: r3 = the pass, r4 = the type (hooks::CameraPassInit).
