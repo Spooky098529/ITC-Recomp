@@ -1,8 +1,9 @@
 # Native movies
 
-The plan (2026-10-25, not started) to play the game's movies through
-upstream FFmpeg instead of the movie library linked into the game, and
-draw their frames with our renderer. Part of B7: it moves the game off
+The game's movies played through upstream FFmpeg instead of the movie
+library linked into the game, and their frames drawn with our renderer
+(`--play_movies_with_ffmpeg`, on by default since 2026-10-25; "Progress"
+below). Part of B7: it moves the game off
 ~580 recompiled functions (about 11% of the work left by functions,
 `docs/coverage.md`), as `--use_hardcoded_shaders` did for the HLSL
 compiler. The functions are in `functions/movies.md`.
@@ -81,10 +82,51 @@ the library stops running.
    stage opening (the picture, its timing and the sound); then a fresh
    coverage session, as after the hardcoded shaders.
 
+## Progress
+
+Done 2026-10-25, on `b7-loop-24-10-26-4`, steps 1-5 of the plan:
+
+- **FFmpeg** (`ecb9968`): `tools/ffmpeg_config.sh` configures the
+  `asf` demuxer and the `wmv3` and `wmav2` decoders too, with
+  libavformat (`itc_avformat`, no protocols: the bytes come through our
+  own AVIOContext); the configs made again for both platforms.
+- **The player** (`src/movies/player.h`, the library `itc_movies` on our
+  FFmpeg alone, as `itc_xma`): decodes on a thread of its own, six frames
+  and two seconds of sound ahead of a steady clock that `Start` starts and
+  `Pause` holds; `CurrentFrame` gives the frame due, `Ended` says when the
+  last one's time is past, `MixAudio` the sound. `itc_movie_check`
+  (`tests/movie_check.cpp`, built on request) plays a movie in real time,
+  one frame a 30 Hz tick: the logo ran 9.07 s (the file 9.05), 256
+  frames, its frame at 2 s the same as the system `ffmpeg`'s.
+- **The draw** (`Passes::DrawMovie`, `glsl/movie.frag`): the planes
+  uploaded per frame in flight and drawn over render target 0's top-left
+  1280x720 guest pixels (scaled), with the library's BT.709 numbers, in a
+  rendering scope of its own like a resolve's; the resolve's pipeline
+  set-up shared (`MakeFullscreenPipeline`).
+- **The sound** (`audio/output_mix.h`, `native_audio.cpp`): the movie's
+  stereo added to the front channels before the fold and the clamp, for
+  every frame the output plays (also where the mixer had none).
+- **The class** (`src/movies/movie.cpp`, adapters in
+  `src/hooks/movies.cpp`): slots 0-7. `--skip_intro`'s wait for the first
+  `RenderFrame` moved there (`TitleScreen_MovieRendered`).
+
+Checked by play, not with a harness: the work is FFmpeg's, so nothing
+comes out byte for byte as the library's, and the only shared output, the
+state at +308, shows in play (a movie that didn't start, end or move on).
+The user's boot (2026-10-25): the logo shown in our window for the first
+time, 9.09 s, then the front end; "looked fine".
+
 ## Open
 
-- The library's YUV to RGB math (its pixel shader and constants, set in
-  `sub_824842C8`): read before step 4.
+- A stage opening (before a race, where render-only passes may run
+  between ticks: command 28 is queued on ticks only, so a movie drawn once
+  a tick might flicker there) and the movies' sound: the user's drive.
+- A coverage session afterwards, to take the library's ~580 functions
+  out of the work left.
+
+- The library's YUV to RGB math (done): built into its pixel shaders
+  (`0x8204D4F8` BT.601 for frames up to 576 lines, `0x8204D6B8` BT.709
+  above, picked by `sub_824840C8`), no constants set in `sub_824842C8`.
 - Whether anything is drawn over a movie (the stage openings): the
   user's drive will show.
 - Timing: the library plays at the file's rate on its own clock; ours

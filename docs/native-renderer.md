@@ -1170,7 +1170,11 @@ To be fixed (or accepted) in milestone 7.
   `docs/rexglue-removal.md`.) The game
   ships 12 movies in `DATA/TXR/MOVIE` (`OPENING`, `STAGE1-3_OPENING`,
   `SHIBUYA_OPEN`, `SHINJUKU_OPEN`, endings, staff rolls).
-- **The boot movie (`UBI_LOGO.wmv`) isn't drawn** in our window (seen by
+- **Fixed (2026-10-25, `--play_movies_with_ffmpeg`, on by default):** the
+  movies are played through our own FFmpeg and drawn by our renderer at
+  command 28's place (`native-movies.md`); what follows is how it was
+  with the movie library.
+  **The boot movie (`UBI_LOGO.wmv`) isn't drawn** in our window (seen by
   the user). It's drawn outside the command list (see "Movies" in
   `gpu-functions.md`), which the replay hooks don't see; the log names it
   ("DrawVertices ... called from 8248466C ... outside the command list").
