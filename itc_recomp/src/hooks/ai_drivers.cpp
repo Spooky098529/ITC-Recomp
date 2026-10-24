@@ -139,8 +139,8 @@ ITC_FLAG_BOOL(native_ai_drivers, true, "ITC",
               "AiDriver::SetStateFromList sub_82139EA8, AiDriver::SetState4 sub_82139FA0, "
               "AiDrivers::ClearAll sub_8213A140, AiPath::JoinCorners sub_8213BCD0, "
               "AiPath::JoinCornersShort sub_8213BF28, AiPath::JoinCornerPair sub_8213DD40 "
-              "(its equal directions' steps, sub_8213BDF0 and sub_8213BE80, never seen in play, "
-              "on the translated code), AiPath::AddCornersAt sub_8213E970, "
+              "(with its equal directions' steps, JoinCornersByExit sub_8213BDF0 and "
+              "JoinCornersByEntry sub_8213BE80, never seen in play), AiPath::AddCornersAt sub_8213E970, "
               "AiDriver::UpdateState2 sub_82145F48, AiDriver::UpdateState3 sub_821460C8, "
               "AiDriver::UpdateState sub_82139AC8 (with its state 6's step, sub_821462A0, never "
               "seen in play), AiDriver::LimitForCorner sub_8213A620, "
@@ -277,28 +277,6 @@ ITC_AI_DRIVERS(8213AAA8, ctx.r3.u64 = ResetDriver(base, ctx.r3.u32))
 ITC_AI_DRIVERS(82139750, ctx.r3.u64 = ResetAll(base, ctx.r1.u32 - 128))
 ITC_AI_DRIVERS(8213A140, ctx.r3.u64 = ClearAll(base, ctx.r1.u32 - 128))
 
-// --- The corners' joins ---
-
-namespace {
-// JoinCornerPair's equal directions (never seen in play, from AddCornersAt in
-// AiPath::Extend, CallJoinStep below):
-// the translated step 2 (sub_8213BDF0) or 3 (sub_8213BE80), called from
-// JoinCornerPair's frame (`frame`, its back chain `chain`) as the original does, with r6 =
-// &the gap there; r3, r4 and r5 as set.
-void RunJoinStep(PPCContext& ctx, uint8_t* base, uint32_t step, uint32_t frame,
-                 uint32_t chain) {
-  const uint32_t saved = ctx.r1.u32;
-  guest::StoreU32(base, frame, chain);
-  ctx.r1.u32 = frame;
-  ctx.r6.u64 = frame + 80;
-  if (step == 2) {
-    sub_8213BDF0(ctx, base);
-  } else {
-    sub_8213BE80(ctx, base);
-  }
-  ctx.r1.u32 = saved;
-}
-}  // namespace
 
 // --- The drivers' table and the path's lines and ranges ---
 
@@ -429,21 +407,6 @@ uint64_t CallNormalizer(void* user, uint32_t function, uint32_t frame, uint32_t 
   ctx.fpscr.disableFlushMode();
   return ctx.r3.u64;
 }
-// AddCornersAt's translated join step (never seen in play), from its frame
-// (`frame`, Extend's 144 bytes below it) as its adapter ran it.
-uint64_t CallJoinStep(void* user, uint32_t step, uint32_t frame, uint32_t path, uint32_t a,
-                      uint32_t b) {
-  auto& call = *static_cast<PathCall*>(user);
-  PPCContext& ctx = *call.ctx;
-  uint8_t* base = call.base;
-  guest::StoreU32(base, frame, frame + 144);
-  ctx.r3.u64 = path;
-  ctx.r4.u64 = a;
-  ctx.r5.u64 = b;
-  RunJoinStep(ctx, base, step, frame - 112, frame);
-  ctx.fpscr.disableFlushMode();
-  return ctx.r3.u64;
-}
 }  // namespace
 
 // --- The drivers' updates (f1 Drive's, as the originals leave it) ---
@@ -458,7 +421,7 @@ void hooks::AiDriveCar(PPCContext& ctx, uint8_t* base) {
   if (ITC_FLAG(native_ai_drivers)) {
     ctx.fpscr.disableFlushMode();
     PathCall call{&ctx, base};
-    const PathCalls calls{&call, CallNormalizer, CallJoinStep};
+    const PathCalls calls{&call, CallNormalizer};
     uint64_t r3 = 0;
     double f1 = 0;
     const uint64_t input = ctx.r3.u64;
@@ -483,7 +446,7 @@ void hooks::AiUpdateIdle(PPCContext& ctx, uint8_t* base) {
   if (ITC_FLAG(native_ai_drivers)) {
     ctx.fpscr.disableFlushMode();
     PathCall call{&ctx, base};
-    const PathCalls calls{&call, CallNormalizer, CallJoinStep};
+    const PathCalls calls{&call, CallNormalizer};
     bool done = false;
     const uint64_t r3 = UpdateIdle(base, ctx.r3.u32, ctx.r1.u32 - 96, calls, &done);
     if (done) {
