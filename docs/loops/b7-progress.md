@@ -23,7 +23,10 @@ see in a drive, from every run: `to-drive.md`.
   validated (`itc_1267`, `itc_1269`; replay ok; 1 to drive): migration 2
   done (062da1d..4be0508, 46 of 46 ours), validated (`itc_1292`,
   `itc_1293`; replay ok; 1 to drive). Finished.
-- Subsystem 2 of 4: being picked.
+- Subsystem 2 of 4: `leads.md`'s graphics device resource calls under
+  the camera passes (`sub_822A5D08` and others, the device's state save
+  and restore `sub_8258D8C8`, `sub_8258D908`; closest to ready: 17 left,
+  8 ready groups, 5 already ours): mapping agent running.
 
 ## Done
 
