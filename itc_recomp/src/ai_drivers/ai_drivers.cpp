@@ -12,7 +12,10 @@
 #include "vehicle_accessors/vehicle_accessors.h"
 
 #include "base/log.h"
+#include "c_runtime/arrays.h"
+#include "hooks/heap.h"
 #include "memory/c_runtime_heap.h"
+#include "memory/heap.h"
 
 #include <cmath>
 #include <cstring>
@@ -2647,6 +2650,33 @@ bool Create(uint8_t* base, uint64_t* r3) {
       guest::StoreU32(base, kDriverBytes * i + Load(base, kDrivers) + 160, vehicle);
     }
   }
+  return true;
+}
+
+uint64_t DestroyRings(uint8_t* base, uint64_t drivers) {
+  ITC_NATIVE_RUNNING("sub_8213AD98 AiDrivers::DestroyRings");
+  constexpr uint32_t kEmptyDestructor = 0x82106540;
+  uint64_t ring = drivers + 7 * kDriverBytes + 528;
+  for (int32_t i = 6; i >= 0; i--) {
+    ring -= kDriverBytes;
+    // The empty destructor is never called, so no guest call is needed.
+    c_runtime::VectorDestruct(base, ring, 64, 80, kEmptyDestructor, nullptr, nullptr);
+  }
+  return ring;
+}
+
+bool Destroy(uint8_t* base, uint64_t* r3) {
+  ITC_NATIVE_RUNNING("sub_8213B2B8 AiDrivers::Destroy");
+  const uint32_t drivers = Load(base, kDrivers);
+  if (!hooks::NativeHeapActive() || (drivers != 0 && !memory::IsHeapBlock(drivers))) {
+    return false;
+  }
+  if (drivers != 0) {
+    DestroyRings(base, drivers);
+    memory::crt::OperatorDelete(drivers);
+    *r3 = drivers;  // operator delete's adapter leaves r3 as the block
+  }
+  guest::StoreU32(base, kDrivers, 0);
   return true;
 }
 

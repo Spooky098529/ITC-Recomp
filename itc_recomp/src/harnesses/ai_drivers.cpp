@@ -281,6 +281,16 @@ void NativeCreate(PPCContext& ctx, uint8_t* base) {
   g_fallbacks++;
   __imp__sub_8213B1E0(ctx, base);
 }
+void NativeDestroy(PPCContext& ctx, uint8_t* base) {
+  uint64_t r3 = ctx.r3.u64;
+  if (ai::Destroy(base, &r3)) {
+    ctx.r3.u64 = r3;
+    return;
+  }
+  g_fallbacks++;
+  __imp__sub_8213B2B8(ctx, base);
+}
+ITC_NATIVE_STEP(NativeDestroyRings, ctx.r3.u64 = ai::DestroyRings(base, ctx.r3.u64))
 ITC_NATIVE_STEP(NativeApplyCornerLine, ai::ApplyCornerLine(base, ctx.r3.u32, ctx.r4.u32))
 ITC_NATIVE_STEP(NativeApplyCornerLines, ai::ApplyCornerLines(base, ctx.r3.u32, ctx.r1.u32 - 112))
 ITC_NATIVE_STEP(NativeKeepToCornerSide, ai::KeepToCornerSide(base, ctx.r3.u32, ctx.r4.u32,
@@ -3484,6 +3494,71 @@ void AiDrivers(Context& h) {
         if (made != 0) {
           memory::crt::OperatorDelete(made);
         }
+      }
+      results.Check(out[0], out[1], fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  // AiDrivers::Destroy (sub_8213B2B8): a table of random bytes from operator
+  // new (or none), r3 random; [0x826C6074], whether the table is still a
+  // heap block after (freed) and r3 (the table as a marker) compared.
+  {
+    Results results("AiDrivers::Destroy (sub_8213B2B8)");
+    constexpr uint32_t kTableBytes = 7 * ai::kDriverBytes;
+    for (int c = 0; c < 30; c++) {
+      const bool with_table = r.Below(5) != 0;
+      std::vector<uint8_t> fill(kTableBytes);
+      for (auto& b : fill) {
+        b = uint8_t(r.Next());
+      }
+      const uint64_t r3 = r.Next();
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        uint32_t made = 0;
+        if (with_table) {
+          const auto block = memory::crt::OperatorNew(h.base, kTableBytes);
+          made = block ? *block : 0;
+          if (made != 0) {
+            guest::ForEachHostPart(h.base, made, kTableBytes,
+                                   [&](uint8_t* host, uint32_t offset, uint32_t bytes) {
+                                     std::memcpy(host, fill.data() + offset, bytes);
+                                   });
+          }
+        }
+        guest::StoreU32(h.base, ai::kDrivers, made);
+        PPCContext t = CallContext(h);
+        t.r3.u64 = r3;
+        (v == 0 ? Original<__imp__sub_8213B2B8> : NativeDestroy)(t, h.base);
+        out[v].Word(guest::LoadU32(h.base, ai::kDrivers));
+        out[v].Word(made == 0 ? 2 : memory::IsHeapBlock(made) ? 1 : 0);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+        out[v].Word(made != 0 && t.r3.u32 == made ? 0xA1000000u : t.r3.u32);
+        guest::StoreU32(h.base, ai::kDrivers, saved_drivers);
+      }
+      results.Check(out[0], out[1], fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  // AiDrivers::DestroyRings (sub_8213AD98): r3 = a table in the scratch
+  // table (random bytes); r3 and the table's bytes compared.
+  {
+    Results results("AiDrivers::DestroyRings (sub_8213AD98)");
+    constexpr uint32_t kTableBytes = 7 * ai::kDriverBytes;
+    for (int c = 0; c < 20; c++) {
+      const uint32_t at = table + ai::kDriverBytes * r.Below(kTableDrivers - 7) + 4 * r.Below(16);
+      std::vector<uint8_t> fill(kTableBytes);
+      for (auto& b : fill) {
+        b = uint8_t(r.Next());
+      }
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        std::memcpy(h.base + at, fill.data(), kTableBytes);
+        PPCContext t = CallContext(h);
+        t.r3.u64 = at;
+        (v == 0 ? Original<__imp__sub_8213AD98> : NativeDestroyRings)(t, h.base);
+        out[v].Bytes(std::vector<uint8_t>(h.base + at, h.base + at + kTableBytes));
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+        out[v].Word(t.r3.u32);
       }
       results.Check(out[0], out[1], fmt::format("case {}", c));
     }
