@@ -17,11 +17,11 @@
 ITC_FLAG_BOOL(native_input, true, "ITC",
               "Run the input manager's set-up and the C++ library's std::list of pointers "
               "(docs/functions/input.md: PtrList::AllocateNodes sub_82099C08, IncSize "
-              "sub_820958B8, PtrList sub_820AD058 and Insert sub_82095958, with --native_heap; "
+              "sub_820958B8 (no adapter), PtrList sub_820AD058 and Insert sub_82095958, with --native_heap; "
               "the pads' and processors' constructors sub_82591B38, sub_82591B68, sub_825920D0 "
-              "and sub_8258CE60, LogicalPad::Bind sub_825918F0, the pads' values sub_82591B30 "
+              "(no adapter) and sub_8258CE60, LogicalPad::Bind sub_825918F0, the pads' values sub_82591B30 "
               "and sub_820988B8, InputProcessor::Assign sub_82098D60, the button tests "
-              "sub_8258CEB0, sub_82592500, sub_8258CEE0 and sub_82592520, the manager's slots "
+              "sub_8258CEB0 and sub_8258CEE0 with sub_82592500 and sub_82592520 (no adapters), the manager's slots "
               "sub_82098CB8, sub_82098CD0 and sub_82098FE0) "
               "natively instead of through the translated code (same results; checked by "
               "--run_harnesses=input)");
@@ -36,6 +36,10 @@ bool NativeLifetime() {
 }  // namespace
 
 // --- std::list of pointers ---
+//
+// IncSize (sub_820958B8) has no adapter: its only caller in play is
+// Insert, whose plain C++ calls its plain C++ (a recompiled caller reaching
+// it runs the original, and the flag switches Insert).
 
 // AllocateNodes: r3 = the count; r3 the block.
 extern "C" REX_FUNC(sub_82099C08) {
@@ -47,14 +51,6 @@ extern "C" REX_FUNC(sub_82099C08) {
     }
   }
   __imp__sub_82099C08(ctx, base);
-}
-
-// IncSize: r3 = the list, r4 = the count; r3 left as it came.
-extern "C" REX_FUNC(sub_820958B8) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_input) || !std_list::IncSize(base, ctx.r3.u32, ctx.r4.u32)) {
-    __imp__sub_820958B8(ctx, base);
-  }
 }
 
 // PtrList: r3 = the list; r3 left as it came.
@@ -86,7 +82,8 @@ extern "C" REX_FUNC(sub_82095958) {
   }
 
 // The constructors: r3 = the object; r3 comes back as it (LogicalPad's
-// leaves it untouched).
+// leaves it untouched). InputProcessorBase's (sub_825920D0) has no adapter:
+// its only caller is InputProcessor's, whose plain C++ calls its plain C++.
 extern "C" REX_FUNC(sub_82591B38) {
   ITC_INPUT_FALLBACK(82591B38)
   input::LogicalPadConstruct(base, ctx.r3.u32);
@@ -94,10 +91,6 @@ extern "C" REX_FUNC(sub_82591B38) {
 extern "C" REX_FUNC(sub_82591B68) {
   ITC_INPUT_FALLBACK(82591B68)
   input::PhysicalPadConstruct(base, ctx.r3.u32);
-}
-extern "C" REX_FUNC(sub_825920D0) {
-  ITC_INPUT_FALLBACK(825920D0)
-  input::InputProcessorBaseConstruct(base, ctx.r3.u32);
 }
 extern "C" REX_FUNC(sub_8258CE60) {
   ITC_INPUT_FALLBACK(8258CE60)
@@ -151,7 +144,11 @@ void NoteRead(uint32_t function, uint32_t caller, uint32_t object, uint32_t mask
 
 }  // namespace
 
-#define ITC_INPUT_TEST(address, function)                                      \
+// AnyPressed and PressedOrRepeat (sub_82592500, sub_82592520) have no
+// adapters: their only callers in play are these wrappers, whose plain C++
+// they are. The wrappers count their calls as the originals' did (from the
+// return addresses in the wrappers), the flag on or off.
+#define ITC_INPUT_WRAPPER(address, test, function, return_address)            \
   extern "C" REX_FUNC(sub_##address) {                                         \
     REX_FUNC_PROLOGUE();                                                       \
     const uint32_t caller = uint32_t(ctx.lr);                                  \
@@ -162,25 +159,7 @@ void NoteRead(uint32_t function, uint32_t caller, uint32_t object, uint32_t mask
     } else {                                                                   \
       __imp__sub_##address(ctx, base);                                         \
     }                                                                          \
-    NoteRead(0x##address, caller, processor, mask, ctx.r3.u32 & 0xFF);         \
-  }
-ITC_INPUT_TEST(82592500, input::InputProcessorAnyPressed)
-ITC_INPUT_TEST(82592520, input::InputProcessorPressedOrRepeat)
-#undef ITC_INPUT_TEST
-
-// The wrappers: the mask copied to the stack and the test above called.
-#define ITC_INPUT_WRAPPER(address, test, function, return_address)            \
-  extern "C" REX_FUNC(sub_##address) {                                         \
-    REX_FUNC_PROLOGUE();                                                       \
-    const uint32_t caller = uint32_t(ctx.lr);                                  \
-    const uint32_t processor = ctx.r3.u32;                                     \
-    const uint32_t mask = guest::LoadU32(base, ctx.r4.u32);                    \
-    if (ITC_FLAG(native_input)) {                                              \
-      ctx.r3.u64 = function(base, processor, mask);                            \
-      NoteRead(0x##test, return_address, processor, mask, ctx.r3.u32 & 0xFF);  \
-    } else {                                                                   \
-      __imp__sub_##address(ctx, base); /* its call to the test noted there */  \
-    }                                                                          \
+    NoteRead(0x##test, return_address, processor, mask, ctx.r3.u32 & 0xFF);    \
     NoteRead(0x##address, caller, processor, mask, ctx.r3.u32 & 0xFF);         \
   }
 ITC_INPUT_WRAPPER(8258CEB0, 82592500, input::InputProcessorAnyPressed, 0x8258CED0)
