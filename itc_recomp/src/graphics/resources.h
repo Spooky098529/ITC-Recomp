@@ -76,6 +76,38 @@ struct LevelLayout {
 };
 LevelLayout TextureLevelLayout(uint8_t* base, uint32_t texture, uint32_t level);
 
+// sub_822A4A40 TextureLayout::MipTailOffset (not seen in play): a level's
+// place inside the packed mip tail, from its index in the tail, the tail's
+// width, height and depth (powers of two), pitch, slice bytes and format:
+// its offset in blocks (x, y) and slices (z) out, and its bytes from the
+// tail's start returned.
+struct MipTailPlace {
+  uint32_t x;
+  uint32_t y;
+  uint32_t z;
+  uint32_t offset;
+};
+MipTailPlace MipTailOffset(uint8_t* base, uint32_t level, uint32_t width, uint32_t height,
+                           uint32_t depth, uint32_t pitch, uint32_t slice, uint32_t format);
+
+// sub_822A4FF0 Texture::LevelOffset: where a face's (or array slice's) level
+// starts in the texture's data (the base data for level 0, else the mip
+// data; the faces' sizes times `face` added), its row pitch, slice bytes,
+// bytes over its depth, width, height, depth, and its offset inside the
+// mip tail (0 outside it). Levels from 2^31 on read uninitialized stack
+// words in the original (its adapter runs the original for those).
+struct LevelPlace {
+  uint32_t offset;
+  uint32_t pitch;
+  uint32_t slice;
+  uint32_t size;
+  uint32_t width;
+  uint32_t height;
+  uint32_t depth;
+  uint32_t tail;
+};
+LevelPlace TextureLevelOffset(uint8_t* base, uint32_t texture, uint32_t face, uint32_t level);
+
 // sub_822A4F60 Texture::LevelDesc: fills the 32-byte description at `desc`
 // (+0 the format, +4 the type, +24 and +28 the level's width and height,
 // the rest 0); returns the type (the original's r3).

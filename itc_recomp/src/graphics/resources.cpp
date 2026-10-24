@@ -525,6 +525,173 @@ LevelLayout TextureLevelLayout(uint8_t* base, uint32_t texture, uint32_t level) 
   return {out_width, out_height, out_depth, pitch, slice};
 }
 
+MipTailPlace MipTailOffset(uint8_t* base, uint32_t level, uint32_t width, uint32_t height,
+                           uint32_t depth, uint32_t pitch, uint32_t slice, uint32_t format) {
+  ITC_NATIVE_RUNNING("sub_822A4A40 TextureLayout::MipTailOffset");
+  const uint32_t bits = guest::LoadU8(base, kFormatTable + 1 + (format << 1));
+  const Block block = GpuBlockSize(format);
+  const uint32_t log_w = 32 - Clz(width - 1);
+  const uint32_t log_h = 32 - Clz(height - 1);
+  const uint32_t log_d = 32 - Clz(depth - 1);
+  const uint32_t sides[2] = {Slw(1, log_w), Slw(1, log_h)};
+  // The texel offsets (the original's stack +96, +100) and the slice's.
+  uint32_t texels[2] = {0, 0};
+  uint32_t z = 0;
+  // The level steps along the longer side first (x when the width is the
+  // larger), 16 texels then halving; from level 3 along the other.
+  uint32_t along = log_h >= log_w ? 0 : 1;
+  if (level < 3) {
+    texels[along] = uint32_t(16 >> level);
+  } else {
+    along ^= 1;
+    const uint32_t step = Srw(sides[along], level - 2);
+    texels[along] = step;
+    if (step < 4) {
+      const uint32_t left = log_d - level;
+      z = (left > 1 ? left : 1) << 2;
+    }
+  }
+  // Blocks are at least 1 x 1 (the original's divide traps never hit).
+  MipTailPlace place;
+  place.x = texels[0] / block.width;
+  place.y = texels[1] / block.height;
+  place.z = z;
+  place.offset = ((block.width * bits * texels[0]) >> 3) + texels[1] * pitch + z * slice;
+  return place;
+}
+
+LevelPlace TextureLevelOffset(uint8_t* base, uint32_t texture, uint32_t face, uint32_t level) {
+  ITC_NATIVE_RUNNING("sub_822A4FF0 Texture::LevelOffset");
+  const uint32_t bits = guest::LoadU8(base, kFormatTable + 1 + ((Load(base, texture + 32) & 0x3F) << 1));
+  const uint32_t border = Load(base, texture + 40) >> 31;
+  const uint32_t dimension = (Load(base, texture + 48) >> 9) & 3;
+  const uint32_t tiled = Load(base, texture + 28) >> 31;
+  const uint32_t twice = border << 1;
+  const Extent size = TextureBaseSize(base, texture);
+  LevelPlace place{};
+  place.width = size.width;
+  place.height = size.height;
+  place.depth = size.depth;
+  const uint32_t w_inner = size.width - twice;
+  const uint32_t h_inner = size.height - twice;
+  // The base size rounded up to powers of two (border kept).
+  const uint32_t pow_w = Slw(1, border - Clz(w_inner - 1) + 32);
+  const uint32_t pow_h = Slw(1, border - Clz(h_inner - 1) + 32);
+  const uint32_t pow_d =
+      dimension == 2 ? Slw(1, border - Clz(size.depth - twice - 1) + 32) : 1;
+  // The base level itself in the mip tail (packed, a side at 16 texels).
+  const bool packed_base =
+      (pow_w <= 16 || pow_h <= 16) && (Load(base, texture + 48) & 0x800) != 0;
+  uint32_t start =
+      Load(base, texture + ((level != 0 && !packed_base) ? 48 : 32)) & 0xFFFFF000;  // r14
+  uint32_t pitch;           // r30
+  uint32_t aligned_height;  // r19
+  uint32_t aligned_depth;   // r17
+  if (level == 0 && !packed_base) {
+    const uint32_t w48 = Load(base, texture + 48);
+    const uint32_t w32 = Load(base, texture + 32);
+    const uint32_t level_dimension = (w48 >> 9) & 3;
+    const uint32_t format = w32 & 0x3F;
+    uint32_t w = size.width, h = size.height, d = size.depth;
+    TextureLevelSize(w, h, d, bits, format, level_dimension, tiled);
+    const uint32_t w28 = Load(base, texture + 28);
+    aligned_height = h;
+    if (!(w28 & 0x80000000) && !(w32 & 0x400) && !(w48 & 0x800) && level_dimension == 1 &&
+        !(Load(base, texture + 44) & 0x3C0) && !(Load(base, texture + 40) & 0x80000000)) {
+      // A linear 2D texture's height aligned only to its block.
+      const Block block = GpuBlockSize(format);
+      aligned_height = (block.height + size.height - 1) & ~(block.height - 1);
+    }
+    aligned_depth = d;
+    if (dimension == 0) {
+      pitch = (w * bits) >> 3;
+    } else {
+      pitch = (((w28 >> 22) & 0x1FF) * bits << 2) & 0x1FFFFFFC;
+    }
+  } else {
+    place.width = AtLeast1(Srw(w_inner, level)) + twice;
+    place.height = AtLeast1(Srw(h_inner, level)) + twice;
+    place.depth = dimension == 2 ? AtLeast1(Srw(size.depth - twice, level)) + twice : 1;
+    // A cube map's faces, or an array's slices (aligned to 4 with +32 bit
+    // 0x400), share each level.
+    uint32_t slices = 1;  // r16
+    const uint32_t type = ResourceType(base, texture);
+    if (type == 18 || type == 19) {
+      const uint32_t align = Slw(1, (Load(base, texture + 32) >> 9) & 2);
+      slices = ((Load(base, texture + 36) >> 26) + align) & ~(align - 1);
+    }
+    uint32_t log_w = 31 - Clz(pow_w);
+    uint32_t log_h = 31 - Clz(pow_h);
+    uint32_t log_d = 31 - Clz(pow_d);
+    int32_t left;  // r20: the levels still to pass
+    if (packed_base) {
+      left = int32_t(level);
+      log_w++;
+      log_h++;
+      log_d++;
+    } else {
+      left = int32_t(level - 1);
+    }
+    const uint32_t w48 = Load(base, texture + 48);
+    const uint32_t level_dimension = (w48 >> 9) & 3;
+    const uint32_t level_tiled = Load(base, texture + 28) >> 31;
+    const uint32_t format = Load(base, texture + 32) & 0x3F;
+    pitch = 0;
+    aligned_height = 0;
+    aligned_depth = 0;
+    // left < 0 (a level from 2^31) is the adapter's (the original).
+    while (left >= 0) {
+      if (log_w != 0) {
+        log_w--;
+      }
+      if (log_h != 0) {
+        log_h--;
+      }
+      if (log_d != 0) {
+        log_d--;
+      }
+      const uint32_t mw = Slw(1, log_w), mh = Slw(1, log_h), md = Slw(1, log_d);
+      uint32_t w = mw, h = mh, d = md;
+      TextureLevelSize(w, h, d, bits, format, level_dimension, level_tiled);
+      pitch = (w * bits) >> 3;
+      if ((mw <= 16 || mh <= 16) && (w48 & 0x800)) {
+        // The level is in the mip tail.
+        aligned_height = h;
+        const MipTailPlace tail =
+            MipTailOffset(base, uint32_t(left), mw, mh, md, pitch, pitch * h, format);
+        aligned_depth = d;
+        place.tail = tail.offset;
+        start += tail.offset;
+        break;
+      }
+      aligned_height = h;
+      aligned_depth = d;
+      if (left > 0) {
+        uint32_t bytes;
+        if (level_dimension == 2) {
+          bytes = (pitch * d * h + 4095) & 0xFFFFF000;
+        } else {
+          bytes = ((pitch * h + 4095) & 0xFFFFF000) * d;
+        }
+        start += bytes * slices;
+      }
+      left--;
+    }
+  }
+  const uint32_t slice = pitch * aligned_height;
+  const uint32_t aligned = (slice + 4095) & 0xFFFFF000;
+  place.offset = aligned * face + start;
+  place.pitch = pitch;
+  if ((Load(base, texture + 48) & 0x600) == 0x400) {
+    place.slice = slice;
+    place.size = (slice * aligned_depth + 4095) & 0xFFFFF000;
+  } else {
+    place.slice = aligned;
+    place.size = aligned * aligned_depth;
+  }
+  return place;
+}
+
 uint32_t TextureLevelDesc(uint8_t* base, uint32_t texture, uint32_t level, uint32_t desc) {
   ITC_NATIVE_RUNNING("sub_822A4F60 Texture::LevelDesc");
   const LevelLayout layout = TextureLevelLayout(base, texture, level);

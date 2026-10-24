@@ -163,6 +163,27 @@ void NativeSetTextureHeader(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = sizes.r3;
 }
 
+void NativeMipTailOffset(PPCContext& ctx, uint8_t* base) {
+  const gr::MipTailPlace place = gr::MipTailOffset(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                                   ctx.r6.u32, ctx.r7.u32, ctx.r8.u32, ctx.r9.u32);
+  guest::StoreU32(base, ctx.r10.u32, place.x);
+  guest::StoreU32(base, guest::LoadU32(base, ctx.r1.u32 + 84), place.y);
+  guest::StoreU32(base, guest::LoadU32(base, ctx.r1.u32 + 92), place.z);
+  ctx.r3.u64 = place.offset;
+}
+void NativeLevelOffset(PPCContext& ctx, uint8_t* base) {
+  const gr::LevelPlace place = gr::TextureLevelOffset(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+  const uint32_t stack = ctx.r1.u32;
+  guest::StoreU32(base, guest::LoadU32(base, stack + 100), place.offset);
+  guest::StoreU32(base, ctx.r6.u32, place.pitch);
+  guest::StoreU32(base, ctx.r7.u32, place.slice);
+  guest::StoreU32(base, ctx.r8.u32, place.size);
+  guest::StoreU32(base, ctx.r10.u32, place.width);
+  guest::StoreU32(base, guest::LoadU32(base, stack + 84), place.height);
+  guest::StoreU32(base, guest::LoadU32(base, stack + 92), place.depth);
+  guest::StoreU32(base, ctx.r9.u32, place.tail);
+}
+
 // The scratch area's layout.
 constexpr uint32_t kHeader = 0;    // 64 bytes
 constexpr uint32_t kParent = 64;   // 64 bytes
@@ -480,6 +501,91 @@ void TextureHeaders(Context& h, Random& r) {
                                 "{:X}, packed {:X}, border {}, field {:X}, pitch {:X}, {}",
                                 i, type, w, hh, d, levels, usage, format, packed, border, field,
                                 pitch, Hex(words)));
+    }
+    results.Report();
+  }
+}
+
+// TextureLayout::MipTailOffset on random tail levels, power-of-two sizes,
+// pitches, slices and formats; Texture::LevelOffset on random textures (as
+// LevelDescs's, packed now and then), faces and levels below 16. Compared:
+// every output and, for the tail, r3 (no caller reads LevelOffset's r3).
+void LevelOffsets(Context& h, Random& r) {
+  {
+    Results results("TextureLayout::MipTailOffset (sub_822A4A40)");
+    for (int i = 0; i < 1000; i++) {
+      const uint32_t level = r.Below(8) ? r.Below(12) : uint32_t(r.Next());
+      const uint32_t w = r.Below(8) ? 1u << r.Below(6) : TextureSide(r);
+      const uint32_t hh = r.Below(8) ? 1u << r.Below(6) : TextureSide(r);
+      const uint32_t d = r.Below(2) ? 1 : r.Below(8) ? 1u << r.Below(6) : TextureSide(r);
+      const uint32_t pitch = r.Below(8) ? 32 * r.Below(64) : uint32_t(r.Next());
+      const uint32_t slice = r.Below(8) ? 4096 * r.Below(16) : uint32_t(r.Next());
+      const uint32_t format = r.Below(8) ? r.Below(64) : uint32_t(r.Next());
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Fill(h.base, h.data, kScratchBytes);
+        PPCContext t = CallContext(h);
+        guest::StoreU32(h.base, t.r1.u32 + 84, h.data + kOut + 4);
+        guest::StoreU32(h.base, t.r1.u32 + 92, h.data + kOut + 8);
+        t.r3.u64 = level;
+        t.r4.u64 = w;
+        t.r5.u64 = hh;
+        t.r6.u64 = d;
+        t.r7.u64 = pitch;
+        t.r8.u64 = slice;
+        t.r9.u64 = format;
+        t.r10.u64 = h.data + kOut;
+        (v == 0 ? Original<__imp__sub_822A4A40> : NativeMipTailOffset)(t, h.base);
+        out[v].Bytes(Read(h.base, h.data + kOut, 12));
+        out[v].Word(t.r3.u32);
+      }
+      results.Check(out[0], out[1],
+                    fmt::format("case {}: level {}, {} x {} x {}, pitch {:X}, slice {:X}, "
+                                "format {:X}",
+                                i, level, w, hh, d, pitch, slice, format));
+    }
+    results.Report();
+  }
+  {
+    Results results("Texture::LevelOffset (sub_822A4FF0) with TextureLayout::MipTailOffset");
+    for (int i = 0; i < 3000; i++) {
+      Fill(h.base, h.data, kScratchBytes);
+      RandomTexture(h.base, h.data + kHeader, r);
+      const uint32_t format = guest::LoadU32(h.base, h.data + kHeader + 32) & 0x3F;
+      if (guest::LoadU8(h.base, 0x82013468 + 1 + (format << 1)) == 0 && r.Below(16)) {
+        const uint32_t w28 = guest::LoadU32(h.base, h.data + kHeader + 28);
+        guest::StoreU32(h.base, h.data + kHeader + 28, w28 | 0x80000000);
+      }
+      if (r.Below(2)) {  // small sizes reach the mip tail sooner
+        const uint32_t w36 = guest::LoadU32(h.base, h.data + kHeader + 36);
+        guest::StoreU32(h.base, h.data + kHeader + 36,
+                        (w36 & ~0x03FFFFFFu) | r.Below(64) | (r.Below(64) << 13));
+      }
+      const std::vector<uint8_t> inputs = Read(h.base, h.data, 64);
+      const uint32_t face = r.Below(4) ? r.Below(6) : uint32_t(r.Next());
+      const uint32_t level = r.Below(16);
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Fill(h.base, h.data, kScratchBytes);
+        Write(h.base, h.data, inputs.data(), uint32_t(inputs.size()));
+        PPCContext t = CallContext(h);
+        guest::StoreU32(h.base, t.r1.u32 + 84, h.data + kOut + 20);
+        guest::StoreU32(h.base, t.r1.u32 + 92, h.data + kOut + 24);
+        guest::StoreU32(h.base, t.r1.u32 + 100, h.data + kOut + 28);
+        t.r3.u64 = h.data + kHeader;
+        t.r4.u64 = face;
+        t.r5.u64 = level;
+        t.r6.u64 = h.data + kOut;
+        t.r7.u64 = h.data + kOut + 4;
+        t.r8.u64 = h.data + kOut + 8;
+        t.r9.u64 = h.data + kOut + 12;
+        t.r10.u64 = h.data + kOut + 16;
+        (v == 0 ? Original<__imp__sub_822A4FF0> : NativeLevelOffset)(t, h.base);
+        out[v].Bytes(Read(h.base, h.data + kOut, 32));
+        out[v].Bytes(Read(h.base, h.data, 64));
+      }
+      results.Check(out[0], out[1],
+                    fmt::format("case {}: face {:X}, level {}, {}", i, face, level, Hex(inputs)));
     }
     results.Report();
   }
@@ -1145,6 +1251,7 @@ void GraphicsResources(Context& h) {
   SizeMath(h, r);
   LevelDescs(h, r);
   TextureHeaders(h, r);
+  LevelOffsets(h, r);
   Buffers(h, r);
   Getters(h, r);
   SurfaceHeaders(h, r);

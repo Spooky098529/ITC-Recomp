@@ -9,7 +9,8 @@
 // (sub_822B5EF8), from CreateSurface; Edram::Free (sub_822B5EA8), from
 // CreateSurface and Resource::DestroySurface; Edram::NextRun and Mark
 // (sub_822B5C90, sub_822B5D70), from Alloc and Free; TextureLayout::LevelCount
-// and Sizes (sub_822A4530, sub_822A46C8), from TextureHeader::Set.
+// and Sizes (sub_822A4530, sub_822A46C8), from TextureHeader::Set;
+// TextureLayout::MipTailOffset (sub_822A4A40), from Texture::LevelOffset.
 
 #include "guest.h"
 
@@ -25,7 +26,8 @@ ITC_FLAG_BOOL(native_graphics_resources, true, "ITC",
               "TextureLayout::LevelSize sub_822A45B8, Texture::LevelDesc sub_822A4F60 with "
               "Texture::LevelLayout sub_822A4B98, Texture::GetLevelDesc sub_822A5B78, "
               "Surface::GetDesc sub_822A5F50, TextureLayout::Sizes sub_822A46C8, "
-              "TextureHeader::Set sub_822A5608; Device::CreateSurface sub_822A5E28 "
+              "TextureHeader::Set sub_822A5608, Texture::LevelOffset sub_822A4FF0 with "
+              "TextureLayout::MipTailOffset sub_822A4A40; Device::CreateSurface sub_822A5E28 "
               "with SurfaceHeader::Set sub_822A5910, with --native_heap; "
               "Device::CreateVertexBuffer sub_822A6830 and Device::CreateIndexBuffer "
               "sub_822A6968, with --native_heap; Device::GetRenderTarget sub_822A3998, "
@@ -38,7 +40,7 @@ ITC_FLAG_BOOL(native_graphics_resources, true, "ITC",
               "by --run_harnesses=graphics_resources). Those reached only from native "
               "callers have no adapters, and the flag switches their callers: sub_822A44A8, "
               "sub_822A4F60, sub_822A4B98, sub_822A5910, sub_822B5EF8, sub_822B5EA8, "
-              "sub_822B5C90, sub_822B5D70, sub_822A4530, sub_822A46C8");
+              "sub_822B5C90, sub_822B5D70, sub_822A4530, sub_822A46C8, sub_822A4A40");
 
 // Defines an adapter: the body (the arguments after the address) uses `ctx`
 // and `base`.
@@ -64,6 +66,24 @@ ITC_FLAG_BOOL(native_graphics_resources, true, "ITC",
   }
 
 using namespace graphics;
+
+namespace {
+
+// Texture::LevelOffset's outputs, through the pointers in r6-r10 and the
+// caller's stack (+84, +92, +100), in the original's order.
+void StoreLevelPlace(uint8_t* base, const PPCContext& ctx, const LevelPlace& place) {
+  const uint32_t stack = ctx.r1.u32;
+  guest::StoreU32(base, guest::LoadU32(base, stack + 100), place.offset);
+  guest::StoreU32(base, ctx.r6.u32, place.pitch);
+  guest::StoreU32(base, ctx.r7.u32, place.slice);
+  guest::StoreU32(base, ctx.r8.u32, place.size);
+  guest::StoreU32(base, ctx.r10.u32, place.width);
+  guest::StoreU32(base, guest::LoadU32(base, stack + 84), place.height);
+  guest::StoreU32(base, guest::LoadU32(base, stack + 92), place.depth);
+  guest::StoreU32(base, ctx.r9.u32, place.tail);
+}
+
+}  // namespace
 
 // --- Headers: r3 = the header ---
 
@@ -130,6 +150,20 @@ extern "C" REX_FUNC(sub_822A5608) {
   guest::StoreU32(base, guest::LoadU32(base, stack + 116), sizes.base_size);
   guest::StoreU32(base, guest::LoadU32(base, stack + 124), sizes.mip_size);
   ctx.r3.u64 = sizes.r3;
+}
+
+// r3 the texture, r4 the face, r5 the level; out: r6 the pitch, r7 the
+// slice, r8 the bytes over the depth, r9 the mip tail offset, r10 the width,
+// the stack's +84 the height, +92 the depth, +100 the level's offset (stored
+// in the original's order). r3 is left as it came (no caller reads it).
+// Levels from 2^31 on run the original (it reads uninitialized stack words).
+extern "C" REX_FUNC(sub_822A4FF0) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_graphics_resources) || ctx.r5.u32 >= 0x80000000u) {
+    __imp__sub_822A4FF0(ctx, base);
+    return;
+  }
+  StoreLevelPlace(base, ctx, TextureLevelOffset(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32));
 }
 
 // --- Surfaces: r3 width, r4 height, r5 format, r6 the multisample type, r7
