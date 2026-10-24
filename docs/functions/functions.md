@@ -204,6 +204,11 @@ Rows not yet moved stay in the table below. So far:
   tiles, surface levels and vertex and index buffers, the device's
   current targets and stream, locks and unlocks, reference counts and
   destruction (B7).
+- [`video-output.md`](video-output.md): the game's video output: its
+  set-up, the display and the front buffers, present and the vblank
+  wait, the frame's unbinding, the device lock (with the device's thread
+  word) and the core's sync primitives under it (the semaphore, events,
+  critical sections, scoped locks, waits) (B7).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
@@ -229,15 +234,10 @@ old performance notes to the end of `../native-renderer.md`.
 | `sub_82098940` | `Scene::Draw` | | Draw listener on the same object. Calls the mode object's draw (vtable slot 5), reading live game state. |
 | `sub_8223A3F0` | `Delegate::Invoke` | | Calls the function at +8 with the argument at +4. Used for tick and draw listeners. |
 | `sub_82233460` | `MemberDelegate::Invoke` | | Calls the member function at +8 on the object at +4, adjusted by +12. |
-| `sub_8258D568` | `VideoOutput::SetUpDisplay` | Overridden | `src/hooks/video_mode.cpp`, without `XGetVideoMode` (its answer went to +152..+199 and was never read: shown by overwriting it; left zeroed). Once at boot, from `Renderer::Init` (`820923F0`), r3 = the video output (`Renderer + 64`), r6 = the vblank interval (2; +304 = 1 for 0 or 1, 2, 3 for 4, 0 for `0x80000000`). Zeroes and fills the presentation parameters at +16 (124 bytes: 1280x720, render target format `0x18280186`, a depth surface `0x1A220197`, +60 = 1 for no library front buffer), two physical blocks (`sub_82296550`: 64 KB to +96, 1 MB to +104, with their sizes), makes the device (`sub_8229DB38`, to +140), +296/+300 = size, two front buffers (`sub_822A5D08`, format `0x28280106`, to +272 and +276), Z function 6, the viewport (0, 0, size, Z 0-1), the four render targets' format switches on, `sub_822A1EE8`/`sub_822A1F20`/`sub_822A1F58` with 0, the vblank callback (`sub_8229DA20(device, sub_8258D4D8)`), and the safe area (5%-95% of the size: +208 x, +212 y, +216 width, +220 height; 64, 36, 1152, 648). Returns the device, or 0. |
-| `sub_8258DAA8` | `VideoOutput::WaitForVblank` | Overridden | Waited for the 2-vblank interval (on the event at `8296BD34`, with the vblank counts at `8296BD2C`/`8296BD30`); now only makes the preceding device call (`sub_822A0718`). The only reader of those counts and the only waiter on that event. |
 | `sub_8258D4D8` | `VideoOutput::OnVblank` | | The vblank callback (device +15144): adds 1 to `8296BD2C` and `8296BD30` and signals the event at `8296BD34` (`Event::Signal`). Only `sub_8229DEA0` calls it, which is never called now. Its counts and event were read and waited on only by the original `VideoOutput::WaitForVblank`, which our override replaced. Never called. |
 | `sub_825DA470` | | | Static set-up: makes the vblank event at `8296BD34` (`sub_8258DCC8`) and registers its clean-up (`sub_825A7068`). Not read in detail. |
 | `sub_825DB2C0` | | | Static clean-up: closes the vblank event at `8296BD34` (`sub_8258DD60`). |
-| `sub_8258DCC8` | | | Probably `Event::Create`: r3 = where the event goes (the renderer's events at +388 and +392, the vblank event). Not read. |
 | `sub_8258DD60` | | | Probably `Event::Close`: r3 = the event. Not read. |
-| `sub_8258DD90` | `Event::Wait` | | r3 = event, r4 = pointer to timeout (-1 = forever). |
-| `sub_8258DD78` | `Event::Signal` | | r3 = event. |
 | `sub_822B20D8` | | Dropped | Frame statistics, for a debugger: frame counter (+20024 += 1), time since the last Swap from the timebase (+20028; +20032/+20036 the last), +20048/+20056 moved to +20064/+20068 and zeroed, debugger requests (+15168 through `820007F0`), the GPU performance counters while +20104 is 1 or 2 (`Device::SetClockGating`, `sub_8229B930`, `sub_8229B9C8`, `sub_8229BFE8`, `sub_82106540`, `sub_822976F8`), then `sub_822B1788` and the debugger's callback at `820007B4` +4. Was called once a frame, only from Swap. Readers of what it leaves: `sub_822B1088` and `sub_822ACAA8`. The native Swap leaves the call out (before that, skipped behind a temporary switch: only +20024 and +20028 differed, frames right). |
 | `sub_825BA0C8` | `QueryPerformanceCounter` | | System library. |
 | `sub_822956F0` | `GetTickCount` | Overridden | Returned the word at `[0x82000854]` + 16: the kernel's `KeTimeStampBundle` (a variable import; the SDK sets +16 to its uptime in milliseconds every 1 ms), the game's only reader of it. Leaf. 25 callers, 5 seen in play: XACT's clock (`sub_825BFE28`) and `sub_825CBD10` ([`xact.md`](xact.md)), `sub_8214F6E8` ([`system-services.md`](system-services.md)), `824CF448`, `824CF840`. Ours (2026-10-23, the user's call): the adapter in `src/hooks/clock.cpp` returns `helpers::TickCount()` (`src/helpers/clock.cpp`), milliseconds since start from the host's steady clock, wrapping at 2^32; native callers call it directly, so both share one clock. No flag (a fallback would split the callers between two clocks). Harness `clock` (the advance over sleeps, within 3 ms of the SDK's). |
@@ -440,7 +440,6 @@ old performance notes to the end of `../native-renderer.md`.
 | `sub_825BD8F0` | `BeginVertices` | Wrapped | Same file: an inline vertex draw noted, then handed to the native renderer (in commands 15 and 19). |
 | `sub_825BDDA0` | `EndVertices` | Wrapped | Same file: an inline vertex draw noted, then handed to the native renderer (in commands 15 and 19). |
 | `sub_8258F5C0` | | Wrapped | Same file: the single-command items' command 15 (the helper object's draw), marked as command 15 so the native renderer draws its inline vertices. |
-| `sub_8258D998` | `VideoOutput::ResolveFrontBuffer` | Wrapped | Same file: resolves render target 0 into a front buffer at the frame's end; the native renderer shows that target ("The end of a frame" in `gpu-functions.md`). |
 | `sub_822AFA58` | `Device::Resolve` | Wrapped | Same file: resolves made outside command 25 (command 33's, one per tile) passed to the native renderer. |
 | `sub_82133960` | | Overridden | A draw step part, rewritten as the original to name each view's draw for `--find_per_frame_state`: for the 15 per-view objects at `0x826C5D80` with an active camera pass and +52 clear, calls vtable slot 0, clears +8056 and +48, flips +8060. |
 | `sub_82096340` | | Wrapped | A tick handler thunk (vtable slot 1 of r3); names its target for `--find_per_frame_state`. |
