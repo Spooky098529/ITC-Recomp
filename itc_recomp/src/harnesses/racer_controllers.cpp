@@ -12,6 +12,7 @@
 
 #include "ai_drivers/ai_drivers.h"
 #include "base/flags.h"
+#include "base/log.h"
 #include "data_tables/data_tables.h"
 #include "hooks/ai_drivers.h"
 #include "hooks/heap.h"
@@ -130,9 +131,32 @@ void CallDriveCar(void* user, uint32_t input, uint32_t index, uint32_t flag, uin
   hooks::AiDriveCar(ctx, call.base);
   ctx.r1.u64 = saved;
 }
+uint64_t CallGuest(void* user, uint32_t function, uint64_t r3, uint64_t r4, bool set_r4,
+                   uint32_t frame, uint32_t lr, double* f1) {
+  auto& call = *static_cast<HarnessCalls*>(user);
+  PPCContext& ctx = *call.ctx;
+  uint8_t* base = call.base;
+  const uint64_t saved = ctx.r1.u64;
+  ctx.r1.u64 = frame;
+  ctx.lr = lr;
+  ctx.r3.u64 = r3;
+  if (set_r4) {
+    ctx.r4.u64 = r4;
+  }
+  ctx.ctr.u64 = function;
+  REX_CALL_INDIRECT_FUNC(function);
+  ctx.r1.u64 = saved;
+  if (f1 != nullptr) {
+    *f1 = ctx.f1.f64;
+  }
+  return ctx.r3.u64;
+}
+// Whether the native side reads the mappers' slots natively (alternated by
+// the cases; the adapters use --native_action_mappers).
+bool g_native_slots = true;
 #define ITC_HARNESS_CALLS          \
   HarnessCalls call{&ctx, base};   \
-  const rc::Calls calls { &call, CallDriveCar }
+  const rc::Calls calls { &call, CallDriveCar, CallGuest, g_native_slots }
 
 void NativeDriveByAi(PPCContext& ctx, uint8_t* base) {
   ITC_HARNESS_CALLS;
@@ -148,6 +172,34 @@ void NativeOnState16(PPCContext& ctx, uint8_t* base) {
 }
 void NativeClearAllRecords(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = rc::ClearAllRecords(base, ctx.r1.u32);
+}
+void SetRegs(PPCContext& ctx, const rc::Regs& regs) {
+  ctx.r3.u64 = regs.r3;
+  if (regs.f1_set) {
+    ctx.f1.f64 = regs.f1;
+  }
+}
+void NativeRead(PPCContext& ctx, uint8_t* base) {
+  ITC_HARNESS_CALLS;
+  rc::Regs regs{ctx.r3.u64, 0, false};
+  rc::Read(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r1.u32, calls, &regs);
+  SetRegs(ctx, regs);
+}
+void NativeControl(PPCContext& ctx, uint8_t* base) {
+  ITC_HARNESS_CALLS;
+  rc::Regs regs{ctx.r3.u64, 0, false};
+  const uint32_t answer =
+      rc::Control(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r1.u32, calls, &regs);
+  SetRegs(ctx, regs);
+  ctx.r3.u64 = answer;
+}
+void NativeIsConnected(PPCContext& ctx, uint8_t* base) {
+  ITC_HARNESS_CALLS;
+  ctx.r3.u64 = rc::PadIsConnected(base, ctx.r3.u32, ctx.r1.u32, calls);
+}
+void NativeIsWheel(PPCContext& ctx, uint8_t* base) {
+  ITC_HARNESS_CALLS;
+  ctx.r3.u64 = rc::PadIsWheel(base, ctx.r3.u32, ctx.r1.u32, calls);
 }
 void NativeSetup(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
@@ -534,6 +586,127 @@ void SetUp(Context& h, Random& r) {
   memory::Free(table);
 }
 
+// --- The player's controls ---
+
+// Four mappers of our own (2,896 bytes each, the game's vtable 0x82007F78,
+// their held, pressed and fired words and analog values random, the player
+// +2888 0 to 3) in the mappers' table (its entries' word +4 1 now and then:
+// not read), each player's entry index random; the table, the indexes and
+// the input manager's real pads (Pad::IsConnected and IsWheel ask them).
+// The table and the indexes are put back after each version.
+constexpr uint32_t kMapperBytes = 2896;
+constexpr uint32_t kTableBytes = rc::kPlayerEntries + 16 - rc::kMapperEntries;
+
+void RandomMappers(uint8_t* base, Random& r, uint32_t mappers) {
+  for (uint32_t j = 0; j < 4; j++) {
+    const uint32_t mapper = mappers + kMapperBytes * j;
+    RandomWords(base, r, mapper, kMapperBytes);
+    guest::StoreU32(base, mapper + 0, 0x82007F78);
+    guest::StoreU32(base, mapper + 2888, r.Below(4));
+    for (uint32_t i = 0; i < 30; i++) {
+      // Analog values: now and then 0 (the axes' second action).
+      if (r.Below(3) == 0) {
+        guest::StoreU16(base, mapper + 1072 + 2 * i, 0);
+      }
+    }
+    for (uint32_t w = 448; w < 472; w += 4) {
+      if (r.Below(3) == 0) {
+        guest::StoreU32(base, mapper + w, 0);
+      }
+    }
+    guest::StoreU32(base, rc::kMapperEntries + 8 * j, mapper);
+    guest::StoreU32(base, rc::kMapperEntries + 8 * j + 4, r.Below(4) == 0 ? 1 : r.Below(2) * 2);
+    guest::StoreU32(base, rc::kPlayerEntries + 4 * j, r.Below(4));
+  }
+}
+
+void Controls(Context& h, Random& r) {
+  const std::vector<uint8_t> table = Bytes(h.base, rc::kMapperEntries, kTableBytes);
+  const uint32_t mappers = memory::Alloc(4 * kMapperBytes, 0);
+  {
+    std::string slots;
+    for (uint32_t k = 0; k < 16; k++) {
+      slots += fmt::format(" {:08X}", guest::LoadU32(h.base, 0x82007F78 + 4 * k));
+    }
+    ITC_LOG_INFO("harness: racer_controllers: the mappers' vtable slots:{}", slots);
+  }
+  enum Kind { kRead, kControl, kIsConnected, kIsWheel };
+  const struct {
+    const char* name;
+    GuestFunction recompiled, native;
+    Kind kind;
+    int cases;
+  } functions[] = {
+      {"PlayerInput::Read (sub_82102350)", Original<__imp__sub_82102350>, NativeRead, kRead, 1000},
+      {"PlayerInput::Control (sub_82102488)", Original<__imp__sub_82102488>, NativeControl,
+       kControl, 2000},
+      {"Pad::IsConnected (sub_8209F340)", Original<__imp__sub_8209F340>, NativeIsConnected,
+       kIsConnected, 100},
+      {"Pad::IsWheel (sub_8209F3B8)", Original<__imp__sub_8209F3B8>, NativeIsWheel, kIsWheel, 100},
+  };
+  const uint32_t out = h.data + 0x100;
+  for (const auto& f : functions) {
+    Results results(f.name);
+    for (int c = 0; c < f.cases; c++) {
+      RandomMappers(h.base, r, mappers);
+      const std::vector<uint8_t> state = Bytes(h.base, mappers, 4 * kMapperBytes);
+      const std::vector<uint8_t> entries = Bytes(h.base, rc::kMapperEntries, kTableBytes);
+      const uint32_t player = r.Below(4);
+      // Ids 151 to 180, now and then outside; kinds 0 to 3 mostly (the
+      // ones the game reads), 4 (a float, slot 5) and 5 now and then.
+      const uint32_t id = r.Below(8) == 0 ? 140 + r.Below(60) : 151 + r.Below(30);
+      const uint32_t kind = r.Below(8) == 0 ? 4 + r.Below(2) : r.Below(4);
+      const uint32_t control = r.Below(16) == 0 ? 31 + r.Below(4) : r.Below(31);
+      const uint32_t old_out = uint32_t(r.Next());
+      const uint32_t entry = rc::kMapperEntries + 8 * r.Below(4);
+      g_native_slots = r.Below(4) != 0;
+      Outputs out_[2];
+      for (int v = 0; v < 2; v++) {
+        Write(h.base, mappers, state.data(), 4 * kMapperBytes);
+        Write(h.base, rc::kMapperEntries, entries.data(), kTableBytes);
+        Fill(h.base, h.data - 1024 - 0x400, 0x400, 0xA5);
+        guest::StoreU32(h.base, out, old_out);
+        PPCContext t = CallContext(h);
+        t.fpscr.disableFlushModeUnconditional();
+        t.f1.u64 = 0x7FF8DEADBEEF0000ull;
+        switch (f.kind) {
+          case kRead:
+            t.r3.u64 = player;
+            t.r4.u64 = id;
+            t.r5.u64 = kind;
+            t.r6.u64 = out;
+            break;
+          case kControl:
+            t.r3.u64 = player;
+            t.r4.u64 = control;
+            t.r5.u64 = kind;
+            t.r6.u64 = out;
+            break;
+          default:
+            t.r3.u64 = entry;
+        }
+        (v == 0 ? f.recompiled : f.native)(t, h.base);
+        Write(h.base, rc::kMapperEntries, table.data(), kTableBytes);
+        if (kind == 4 && f.kind != kIsConnected && f.kind != kIsWheel) {
+          out_[v].Float(guest::LoadU32(h.base, out));
+          out_[v].Double(t.f1.u64);
+        } else {
+          out_[v].Word(guest::LoadU32(h.base, out));
+        }
+        out_[v].Bytes(Bytes(h.base, mappers, 4 * kMapperBytes) == state ? std::vector<uint8_t>{1}
+                                                                        : std::vector<uint8_t>{0});
+        out_[v].Word(uint32_t(t.r3.u64 >> 32));
+        out_[v].Word(t.r3.u32);
+      }
+      results.Check(out_[0], out_[1], fmt::format("case {} (control {}, kind {}, id {})", c,
+                                                  control, kind, id));
+    }
+    results.Report();
+  }
+  g_native_slots = true;
+  memory::Free(mappers);
+}
+
 }  // namespace
 
 void RacerControllers(Context& h) {
@@ -544,6 +717,7 @@ void RacerControllers(Context& h) {
   }
   Handoff(h, r);
   SetUp(h, r);
+  Controls(h, r);
 }
 
 }  // namespace harness

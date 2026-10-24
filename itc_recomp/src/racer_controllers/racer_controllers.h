@@ -48,6 +48,21 @@ struct Calls {
   // it.
   void (*drive_car)(void* user, uint32_t input, uint32_t index, uint32_t flag, uint32_t frame,
                     uint32_t lr);
+  // The guest function `function` (through a vtable) with r3 (and r4 when
+  // `set_r4`; the other registers as they are); its r3, and its f1 into `f1`
+  // when not null.
+  uint64_t (*call)(void* user, uint32_t function, uint64_t r3, uint64_t r4, bool set_r4,
+                   uint32_t frame, uint32_t lr, double* f1);
+  // Whether the action mappers' read slots run natively (their flag,
+  // --native_action_mappers); when not, they're called through `call`.
+  bool native_slots;
+};
+
+// What a function leaves in r3 and f1 (f1 only when `f1_set`).
+struct Regs {
+  uint64_t r3;
+  double f1;
+  bool f1_set;
 };
 
 // --- The cars' input records ---
@@ -103,6 +118,43 @@ uint32_t ClearAllRecords(uint8_t* base, uint32_t sp);
 // 3, or the mode 6 with the stage's word +0 not 1, ClearAllRecords; else
 // HoldAll. Returns 1.
 uint32_t OnState16(uint8_t* base, uint32_t sp, const Calls& calls);
+
+// --- The player's controls ---
+
+// The action mappers' table (0x826BAB80, 8 bytes an entry: the mapper, a
+// word +4: 1 when it isn't read), each player's entry index (0x826BABA4)
+// and the input manager (0x826BAB78).
+constexpr uint32_t kMapperEntries = 0x826BAB80;
+constexpr uint32_t kPlayerEntries = 0x826BABA4;
+constexpr uint32_t kInputManager = 0x826BAB78;
+// The player's mapper entry.
+uint32_t MapperEntry(uint8_t* base, uint32_t player);
+
+// PlayerInput::Read (sub_82102350): action `id` of the player's mapper
+// into `out`: with the entry's word +4 1, 0 (0.0, [0x82000A34], for kind
+// 4); else through the mapper's vtable: kind 0 slot 8 (held), 1 slot 10
+// (pressed), 2 slot 12 (fired), each as a byte made a word; 3 slot 14 (the
+// analog word); 4 slot 5 (a float). Kinds 5 and up: nothing. The slots
+// seen in play (ActionMapper::Held, Pressed, Fired, AnalogRaw) are the
+// action mappers' plain C++ (with --log_pause_menu's line); others are
+// called. `regs.r3` comes in as the original's r3 (kept where it's left).
+void Read(uint8_t* base, uint32_t player, uint32_t id, uint32_t kind, uint32_t out, uint32_t sp,
+          const Calls& calls, Regs* regs);
+// PlayerInput::Control (sub_82102488, its case 1 sub_821024D0 merged in):
+// control `control` (0 to 30) read into `out` as one action or an axis of
+// two (the first's value negated when it isn't 0, kinds 3 and 4; else the
+// second's). Returns 1 or 0 by the control (see the row); 0 above 30 or for
+// 0, with nothing read.
+uint32_t Control(uint8_t* base, uint32_t player, uint32_t control, uint32_t kind, uint32_t out,
+                 uint32_t sp, const Calls& calls, Regs* regs);
+// Pad::IsConnected (sub_8209F340, sub_82591C08 merged in): the player's pad
+// (the mapper's +2888) through the input manager's slot 9, then that
+// object's slot 5 with &the player (in the original's frame, +80); 1 when
+// its flags (+4) have bit 0x1.
+uint32_t PadIsConnected(uint8_t* base, uint32_t entry, uint32_t sp, const Calls& calls);
+// Pad::IsWheel (sub_8209F3B8): the pad as PadIsConnected finds it; 1 when
+// its byte +193 has bit 0x2.
+uint32_t PadIsWheel(uint8_t* base, uint32_t entry, uint32_t sp, const Calls& calls);
 
 // --- The AI drivers' set-up ---
 
