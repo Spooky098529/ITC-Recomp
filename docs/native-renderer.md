@@ -564,7 +564,9 @@ step 1's logs are there to find them before anything is stubbed.
     `sub_82490A60` and `sub_82490A90`;
   - the movie's decoder threads asleep (`sub_824908A0`, `sub_824908D0`);
   - the main thread already in `Boot::EndMovie` (`sub_82107BF8` →
-    `sub_820AE528` → `sub_8258D8C8`), waiting on the render thread.
+    `sub_820AE528` → `sub_8258D8C8`), waiting on the render thread
+    (`VideoOutput::LockDevice`, the device lock; native over a host
+    `std::binary_semaphore` since 2026-10-24, `functions/video-output.md`).
 
   `--skip_intro` makes the movie step report the movie finished at once,
   so the movie is stopped while it's still starting. The user's call: it's

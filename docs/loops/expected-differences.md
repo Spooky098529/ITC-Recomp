@@ -40,6 +40,29 @@ NaN groups below stay as recorded.
   that isn't 16-aligned, which hold random values in the harness (with
   Negated NaN where they're NaNs). The game's outs are 16-aligned frame
   temporaries.
+- **Mutex for a critical section:** the user's call (2026-10-24) to
+  replace a kernel critical section with a `std::mutex`: the recompiled
+  code initializes the critical section in the guest object, ours leaves
+  those bytes as the allocation cleared them. Everything else in the
+  object matches.
+- **Host semaphore:** the user's call (2026-10-24) to run the video
+  output's device lock over a host `std::binary_semaphore`: the native
+  constructor no longer writes the guest semaphore's 40 bytes at +224
+  (an event and a critical section); nothing else reads them (its
+  release `sub_8258DBA8` never runs).
+- **Packets nothing reads:** the graphics rule (the user's, standing):
+  a packet written straight into the command buffer that nothing reads
+  is Dropped, so the command buffer's words and its write position (+40)
+  differ where the original writes one (here: the window-scissor packets
+  of `Device::SetScreenScissor`, reached from the scissor and viewport
+  setters). Every other output matches.
+- **Flush packet dropped:** the user's call (2026-10-24) to drop
+  `Resource::Lock`'s cache flush packet: the recompiled code queues the
+  flush (widening the device's pending flush range at +11560 through
+  `sub_8229DDD8`, or writing the packet past the command buffer's write
+  position); ours leaves them. Only cases taking the packet path (flags
+  without 0x2 or 0x10) differ; the header, ranges, lock count and r3
+  match. The renderer skips coherency packets.
 
 ## By function file
 
@@ -169,3 +192,33 @@ were at 0.
 | `sub_820F7590` TrackMesh::QuadHeight | one NaN in a vertex, out not 16-aligned | 6 of 9 | Negated NaN, Unaligned out | for review (22:11 run) |
 | `sub_820FDC18` WallQuery::TestCell | one NaN in a vertex | 1 of 300 | Two NaNs (the word +1464's sign) | for review (22:11 run) |
 | `sub_820FDF38` TrackCollision::QueryWalls | one NaN in a vertex | 1 of 300 | Two NaNs (the word +1464's sign) | for review (22:11 run) |
+
+### `graphics-resources.md`
+
+| Function | Group | Differ | Reason | Review |
+|---|---|---|---|---|
+| `sub_822B5EF8` Edram::Alloc | the allocator made: its critical section | 8 of 8 | Mutex for a critical section (bytes +0 to +27) | for review (03:25 run) |
+| `sub_822A63F8` Resource::Lock | its command buffer | 448 of 1000 | Flush packet dropped (the pending range at +11560) | for review (03:25 run) |
+
+### `video-output.md`
+
+| Function | Group | Differ | Reason | Review |
+|---|---|---|---|---|
+| `sub_8258DB18` VideoOutput::VideoOutput | its semaphore at +224 | 4 of 4 | Host semaphore | for review (03:25 run) |
+
+### `device-state.md`
+
+| Function | Group | Differ | Reason | Review |
+|---|---|---|---|---|
+| `sub_822A3450` Device::SetScissorRect | the command buffer | 300 of 300 | Packets nothing reads | for review (03:25 run) |
+| `sub_822A3D20` Device::SetRenderState_ScissorTestEnable | the command buffer | 200 of 200 | Packets nothing reads | for review (03:25 run) |
+| `sub_822A3518` Device::SetViewport | the command buffer | 352 of 400 | Packets nothing reads | for review (03:25 run) |
+| `sub_822A3C88` Device::SetSurfaceInfo | the command buffer | 175 of 200 | Packets nothing reads | for review (03:25 run) |
+| `sub_822A3D30` Device::SetRenderTarget | the command buffer | 131 of 600 | Packets nothing reads | for review (03:25 run) |
+| `sub_822A4340` Device::SetRenderTarget_External | the command buffer | 25 of 100 | Packets nothing reads | for review (03:25 run) |
+| `sub_822A4060` Device::SetDepthStencilSurface | the command buffer | 123 of 500 | Packets nothing reads | for review (03:25 run) |
+| `sub_8229B7D8` | the command buffer | 200 of 200 | Packets nothing reads | for review (03:25 run) |
+| `sub_822A3B90` Device::DirtyAllState | the command buffer | 200 of 200 | Packets nothing reads | for review (03:25 run) |
+| `sub_822A8A60` Device::SetShaderGprAllocation | the command buffer | 300 of 300 | Packets nothing reads | for review (03:25 run) |
+| `sub_822A3A20` Device::SetGammaRamp | the command buffer | 40 of 60 | Packets nothing reads | for review (03:25 run) |
+| `sub_822ACB90` Device::SetDefaultState | the command buffer | 40 of 40 | Packets nothing reads | for review (03:25 run) |

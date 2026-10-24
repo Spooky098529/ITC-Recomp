@@ -39,9 +39,16 @@ ITC_FLAG_BOOL(native_cameras, true, "ITC",
               "diagnostics, and CameraPass::FromViewport sub_820AA4A8; RecordClear sub_8209FA38, "
               "without the command list's diagnostics; CameraPasses::RecordBegins sub_8209F8A0 and "
               "RecordEnds sub_8209F900 (in their diagnostics' wrappers) with CameraPass::RecordBegin "
-              "sub_820A0CC0 and RecordEnd sub_820A1C30, without the command list's diagnostics) natively instead of "
+              "sub_820A0CC0 and RecordEnd sub_820A1C30, without the command list's diagnostics; "
+              "CameraPasses::MakeRenderTarget sub_8209FBF0 with its case 0 sub_8209FC7C and "
+              "CameraPass::SetUpSurfaces sub_820A2F40 with its types 0-2 chunk sub_820A2F94, with "
+              "--native_video_output, --native_graphics_resources and --native_heap; CameraPass::Init "
+              "sub_820A3DB0 with its type 0 chunk sub_820A3E04) natively instead of "
               "through the translated code (the same words, bit for bit; checked by "
               "--run_harnesses=cameras)");
+
+ITC_FLAG_DECLARE(bool, native_video_output);
+ITC_FLAG_DECLARE(bool, native_graphics_resources);
 
 #define ITC_CAMERAS_FALLBACK(address) \
   REX_FUNC_PROLOGUE();                \
@@ -179,6 +186,181 @@ extern "C" REX_FUNC(sub_820A0C40) {
   } else if (!released_580) {
     ctx.r3.u64 = 0;
   }
+}
+
+namespace {
+
+// The video output, as the device's users reach it: `[0x8266D088]`'s vtable
+// slot 7, then that object's slot 3, as guest calls with the original's
+// return addresses. r3 = the video output after.
+uint32_t VideoOutputCall(PPCContext& ctx, uint8_t* base, uint32_t first, uint32_t second) {
+  ctx.r3.u64 = guest::LoadU32(base, 0x8266D088);
+  ctx.ctr.u64 = guest::LoadU32(base, guest::LoadU32(base, ctx.r3.u32) + 28);
+  ctx.lr = first;
+  REX_CALL_INDIRECT_FUNC(ctx.ctr.u32);
+  ctx.ctr.u64 = guest::LoadU32(base, guest::LoadU32(base, ctx.r3.u32) + 12);
+  ctx.lr = second;
+  REX_CALL_INDIRECT_FUNC(ctx.ctr.u32);
+  return ctx.r3.u32;
+}
+
+// Whether the native device users can run: the device lock, the texture and
+// surface makers native.
+bool DeviceUsersNative() {
+  return ITC_FLAG(native_video_output) && ITC_FLAG(native_graphics_resources) &&
+         hooks::NativeHeapActive();
+}
+
+}  // namespace
+
+namespace hooks {
+
+bool CameraPassesMakeRenderTarget(PPCContext& ctx, uint8_t* base) {
+  if (!DeviceUsersNative()) {
+    return false;
+  }
+  const uint32_t id = ctx.r3.u32;
+  const uint64_t lr = ctx.lr;
+  uint32_t video_output = 0;
+  guest_call::InFrame(ctx, base, 112, 0x8209FC20, [&](uint32_t frame) {
+    video_output = cameras::MakeRenderTarget(
+        base, frame, id,
+        {[&](int at) {
+           return at == 0 ? VideoOutputCall(ctx, base, 0x8209FC20, 0x8209FC30)
+                          : VideoOutputCall(ctx, base, 0x8209FF84, 0x8209FF94);
+         },
+         [&](uint32_t target) {
+           ctx.r3.u64 = target;
+           ctx.lr = 0x8209FC40;
+           sub_8209F7A8(ctx, base);
+           return ctx.r3.u32;
+         },
+         [&](uint32_t resource) {
+           ctx.r3.u64 = resource;
+           ctx.lr = 0x8209FC4C;
+           sub_822A67B0(ctx, base);
+         }});
+  });
+  ctx.lr = lr;
+  ctx.r3.u64 = video_output;
+  return true;
+}
+
+bool CameraPassSetUpSurfaces(PPCContext& ctx, uint8_t* base) {
+  if (!DeviceUsersNative()) {
+    return false;
+  }
+  const uint32_t pass = ctx.r3.u32;
+  const uint64_t lr = ctx.lr;
+  // The lock's video output calls' return addresses, by type (types 0-2
+  // the chunk's; 5-9 don't lock).
+  struct ReturnAddresses {
+    uint32_t first, second;
+  };
+  static constexpr ReturnAddresses kLock[21] = {
+      {0x820A2FAC, 0x820A2FBC}, {0x820A2FAC, 0x820A2FBC}, {0x820A2FAC, 0x820A2FBC},
+      {0x820A3010, 0x820A3020}, {0x820A30E8, 0x820A30F8}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0},
+      {0x820A324C, 0x820A325C}, {0x820A3414, 0x820A3424}, {0x820A360C, 0x820A361C},
+      {0x820A32E4, 0x820A32F4}, {0x820A34BC, 0x820A34CC}, {0x820A36B4, 0x820A36C4},
+      {0x820A337C, 0x820A338C}, {0x820A3564, 0x820A3574}, {0x820A375C, 0x820A376C},
+      {0x820A3804, 0x820A3814}, {0x820A38B0, 0x820A38C0},
+  };
+  // The other calls' return addresses are type 3's (or type 4's for the
+  // cube face; 5-9 make none of these but RenderTarget and the cube face):
+  // nothing reads them.
+  guest_call::InFrame(ctx, base, 544, 0x820A2F48, [&](uint32_t frame) {
+    cameras::SetUpSurfaces(
+        base, frame, pass,
+        {[&](int at) {
+           const uint32_t type = guest::LoadU32(base, pass + 584);
+           const ReturnAddresses r = at == 0 && type <= 20 ? kLock[type]
+                                                          : ReturnAddresses{0x820A3950, 0x820A3960};
+           return VideoOutputCall(ctx, base, r.first, r.second);
+         },
+         [&](uint32_t id) {
+           ctx.r3.u64 = id;
+           ctx.lr = 0x820A2FF0;
+           sub_8209F7A8(ctx, base);
+           return ctx.r3.u32;
+         },
+         [&](uint32_t id) {
+           ctx.r3.u64 = id;
+           ctx.lr = 0x820A2FE8;
+           sub_8209FBF0(ctx, base);
+         },
+         [&](uint32_t texture, uint32_t face) {
+           ctx.r3.u64 = texture;
+           ctx.r4.u64 = face;
+           ctx.r5.u64 = 0;
+           ctx.lr = 0x820A30BC;
+           sub_822A5C50(ctx, base);
+           return ctx.r3.u32;
+         },
+         [&] {
+           ctx.r3.u64 = pass;
+           ctx.lr = 0x820A2F60;
+           sub_820A0C40(ctx, base);
+         }});
+  });
+  ctx.lr = lr;
+  return true;
+}
+
+bool CameraPassInit(PPCContext& ctx, uint8_t* base) {
+  const uint32_t pass = ctx.r3.u32;
+  const uint32_t type = ctx.r4.u32;
+  const uint64_t lr = ctx.lr;
+  ctx.fpscr.disableFlushMode();
+  guest_call::InFrame(ctx, base, 144, 0x820A3DB8, [&](uint32_t) {
+    cameras::InitPass(base, pass, type,
+                      {[&] {
+                         ctx.r3.u64 = pass;
+                         ctx.lr = 0x820A3DD4;
+                         sub_82593908(ctx, base);
+                         ctx.fpscr.disableFlushMode();
+                       },
+                       [&](int at) {
+                         return at == 0 ? VideoOutputCall(ctx, base, 0x820A3E24, 0x820A3E34)
+                                        : VideoOutputCall(ctx, base, 0x820A3E50, 0x820A3E60);
+                       },
+                       [&] {
+                         ctx.r3.u64 = pass;
+                         ctx.lr = 0x820A4348;
+                         sub_820A3978(ctx, base);
+                       },
+                       [&] {
+                         ctx.r3.u64 = pass;
+                         ctx.lr = 0x820A4350;
+                         sub_820A2F40(ctx, base);
+                       }});
+  });
+  ctx.lr = lr;
+  ctx.r3.u64 = 0;
+  return true;
+}
+
+}  // namespace hooks
+
+// CameraPasses::MakeRenderTarget: r3 = the id (hooks::CameraPassesMakeRenderTarget).
+extern "C" REX_FUNC(sub_8209FBF0) {
+  ITC_CAMERAS_FALLBACK(8209FBF0)
+  if (!hooks::CameraPassesMakeRenderTarget(ctx, base)) {
+    __imp__sub_8209FBF0(ctx, base);
+  }
+}
+
+// CameraPass::SetUpSurfaces: r3 = the pass (hooks::CameraPassSetUpSurfaces).
+extern "C" REX_FUNC(sub_820A2F40) {
+  ITC_CAMERAS_FALLBACK(820A2F40)
+  if (!hooks::CameraPassSetUpSurfaces(ctx, base)) {
+    __imp__sub_820A2F40(ctx, base);
+  }
+}
+
+// CameraPass::Init: r3 = the pass, r4 = the type (hooks::CameraPassInit).
+extern "C" REX_FUNC(sub_820A3DB0) {
+  ITC_CAMERAS_FALLBACK(820A3DB0)
+  hooks::CameraPassInit(ctx, base);
 }
 
 // Viewports::Release: no arguments; r3 = VirtualFree's answer for the block

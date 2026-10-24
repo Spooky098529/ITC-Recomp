@@ -11,6 +11,141 @@ functions to check in a drive in the progress file.
 When the user has reviewed a run's section, its heading gets
 "(reviewed <date>)"; the section stays for the record.
 
+## Run 2026-10-24 03:25 (`b7-loop-24-10-26`)
+
+- `device-state.md` (new, 131 rows; 11 moved from `functions.md`, 120
+  new; mapped in 8b1b86b), `known-data.md` (the setter tables at
+  `0x826388F8` and `0x82638D78`, the device's fields); the blocker notes
+  in `graphics-resources.md` and `video-output.md` point to it; 1 lead
+  (the command buffer, `8229DC28`-`8229F228`). For review: the
+  shadow, dirty masks, fetch constants, bound objects, scissor and the
+  predicated tiling bit (+10808 bit 1) Kept (the renderer reads them);
+  the packets written straight into the command buffer (the screen
+  scissor, binning and WAIT_UNTIL, the GPU register split and its dummy
+  draws, gamma) Dropped by the graphics rule (nothing reads them: the
+  lead checked `gpu_link.cpp` only counts them for its log); the fence
+  writes in SetStreamSource, SetIndices and SetTexture kept (recompiled
+  code reads fences); the WRAP8-15 setters' dirty bit quirk (bit 45,
+  0x2183's) kept.
+  Migration 1 (7b1c218..c421c0b): 121 of 131 ours (the 105 state
+  setters, the bound objects, constants, SetFVF, the scissor, viewport
+  and surface info; `sub_822A6A88` VertexDeclaration::FromFvf Native;
+  `sub_822A0F80` SetScreenScissor Dropped). For review: zero-difference
+  "(expected to differ)" groups for an uninitialized stack word in the
+  originals (the fence list entry's bit 31 in SetStreamSource,
+  SetIndices, SetTexture; FromFvf's end-marker pad byte), written 0 by
+  ours; a fence on a full fence list leaves the whole call to the
+  original, and GetViewport's copy to a physical destination to
+  memcpy's override (neither in play); native float copies keep a
+  signaling NaN's bits where the originals quiet it (compared as
+  floats); the constant copies as raw 16-byte copies (as lvlx/lvrx);
+  the adapters written one per line for `check_function_statuses.py`;
+  the setters' adapters stay (the device's tables point at them).
+  Migration 2 (fd70fa2..fd026da): 131 of 131 ours; SetRenderTarget,
+  SetRenderTarget_External, SetDepthStencilSurface, and the packet
+  writers without their packets (SetDefaultState, DirtyAllState,
+  `sub_8229B7D8`, SetShaderGprAllocation with `sub_8229F680`'s dummy
+  draws and their reservations left out, SetGammaRamp); `sub_822B0C38`
+  Dropped (no override: SetGammaRamp's C++ leaves the call out; its
+  other caller `sub_822A3AA8` isn't seen in play); `functions.md`'s
+  Device::SetUpDisplay, Init and SetDisplayMode rows (they call the plain
+  C++; their guest calls in the new `src/hooks/device_state_calls.h`).
+  For review: guest calls kept through `DeviceCalls` (the draw's Wrapped
+  flush helpers `sub_822ADC08` and `sub_822ADE30`, so `sub_8229F680`'s
+  mask flush and renderer marks match; non-native table setters, none in
+  play; SetTexture's original on a full fence list); SetDefaultState
+  calls each setter natively by its table address (the empty
+  `sub_82106540` as nothing); the command buffer allocator's bookkeeping
+  (+13532, +44, +48, +13516, +10809 bit 6) is read only by the command
+  buffer code, not `src/native`; SetGammaRamp writes +13608 itself
+  instead of calling memcpy (the original runs if the device were ever
+  in the physical views); temporary logs showed no REG_TO_MEM in play
+  and the gamma's COND_WRITE (display register 0x1922) the only one.
+
+- `video-output.md` (new, 30 rows; 6 moved from `functions.md`:
+  VideoOutput::SetUpDisplay, WaitForVblank, ResolveFrontBuffer,
+  Event::Create, Wait, Signal; 24 new; mapped in 2fdfea4),
+  `known-data.md` (the video output, renderer +384, device +10760, the
+  semaphore's layout, `0x8266D088`, the vblank counts); 3 leads (the
+  device lock's other callers, `sub_822A8A60` probably
+  SetShaderGPRAllocation, the other ScopedLock users). Corrections to
+  earlier maps: "state saved and restored" is "device locked and
+  unlocked" in `cameras.md` (`sub_8209FBF0`, `sub_8209FC7C`,
+  `sub_820A2F40`, `sub_820A2F94`, the intro) and `strings-and-font.md`
+  (Font::Font, the intro).
+  Migration 1 (c234559..bafb51c): the video output's constructor,
+  LockDevice, UnlockDevice, Device::Acquire/ReleaseThreadOwnership and
+  `sub_825B9A60` CurrentThreadId (`functions.md`; through the SDK's
+  `XThread::GetCurrentThreadId`) native, with `cameras.md`'s
+  MakeRenderTarget, SetUpSurfaces and Init (their helpers Merged); the
+  sync wrappers' rows say they stay recompiled (the user's call). For
+  review: an unlock without the lock held is logged and skipped (a
+  binary semaphore can't count to 2 as the game's could; never seen);
+  device +10760 written as the game does; SetUpSurfaces' leak of its
+  level 0 surface, once a pass at boot, kept; the cube face's surface
+  `sub_822A5C50` (never in play) left a guest call; the lock's guest-call
+  return addresses in SetUpSurfaces per type, its other guest calls
+  type 3's (nothing reads them); MakeRenderTarget's and SetUpSurfaces'
+  adapters stay (guest calls through `ctx`). The user's call (2026-10-24): (a): the device lock alone over a host primitive, a
+`std::binary_semaphore` (a semaphore may be released by another thread
+than the one that took it; a mutex may not), through LockDevice,
+UnlockDevice and the video output's constructor; the Semaphore class
+stays recompiled for the archive loader.
+
+- The graphics resources' first migration (e4730b8..e6b9811): 25 of 45
+  ours (7 Native), the new row `sub_822B5EA8` Edram::Free (Native, not
+  seen in play), `sub_822A6268` named `Resource::DestroySurface`, the
+  file's intro. For review: native callers call `refcount::AddRef`
+  without the lock whatever `--refcount_global_lock` says (the flag now
+  switches only recompiled callers); `Texture::BaseSize` and
+  `TextureLayout::LevelSize` read their in/out words once, not again
+  after each store (matters only if an out pointed into the header: no
+  caller does); `LevelSize` doesn't keep r3's upper 32 bits;
+  `Resource::DestroySurface`'s adapter pops Destroy's 112-byte frame
+  (the recompiler split it off); the buffers' and CreateSurface's
+  failed-allocation paths have no cases (the allocation layer aborts
+  when out of memory); a frame dump against the fallback flag showed the
+  same targets and draws, the resolve addresses offset by a constant
+  (probably the heap's layout; not confirmed with two fallback runs).
+  Validated (`itc_1267`, `itc_1269`): `sub_822A5B78`
+  Texture::GetLevelDesc has no print of its own (the original only
+  jumps to LevelDesc, whose plain C++ its adapter calls; its harness
+  and LevelDesc's game line cover it); AddRef's print added (2783ad0).
+- The graphics resources' second migration (062da1d..4be0508): 46 of
+  46 ours; new row `sub_822A4A40` TextureLayout::MipTailOffset (Native,
+  not seen in play). `functions.md` rows changed: `sub_8229E908` (also a
+  fence wait), `sub_822AC470` (the data cache flush), `sub_825B9A60` (the
+  current thread's id), and new `sub_8229DDD8` (widens the device's
+  pending flush range; Dropped from Lock); their Status blank (other
+  recompiled callers). For review: paths kept on the originals, never
+  taken in play (TextureHeader::Set for unknown types, which read an
+  uninitialized stack word; levels from 2^31 in LevelOffset, LockLevel,
+  LockRect, LockRectLevel; Destroy's type 9 with `sub_822AD9D8`;
+  XGSetTextureHeader with its header out in the physical views or across
+  two views); GetSurfaceLevel leaves out its LevelOffset call (it writes
+  only its own stack); XGSetTextureHeaderEx stores the 52-byte header
+  directly instead of calling memcpy; the lock count by compare-and-swap
+  without the recompiler's global lock (as `refcount.cpp`); frame dumps
+  matched the fallback flag's.
+
+- `graphics-resources.md` (new, 44 rows; 8 moved from `functions.md`,
+  36 new; mapped in 0e67c00), `known-data.md` (the texture, surface
+  and buffer headers, the level description, the GPU format table at
+  `0x82013468`, the EDRAM allocator at `0x82953E20`, the hi-z flag at
+  `0x829537C4`, the device's target and stream fields, the device
+  pointer at `0x820007B0`); 3 leads (the device's state setters at
+  `822A3030`-`822A4340` and `sub_822A6008`, the boot movie player's
+  graphics side at `8248xxxx`, the resources' other makers and users).
+  Shared rows left where they were: `sub_822A5B68`, `sub_8235A9F8`,
+  `sub_8235A990` (`models.md`), XMemAlloc and XMemFree (`heap.md`).
+  The user's calls (2026-10-24): (1) `Edram::Alloc` (`sub_822B5EF8`) made native with a `std::mutex`
+in place of the kernel's critical section (its bases kept: the
+renderer keys targets by them); (2) `Resource::Lock`'s and
+`Resource::Destroy`'s fence waits, `Lock`'s cache flush packet and
+`Unlock`'s data cache flush (`sub_822AC470`) Dropped, the lock count,
+the returned address and the freeing kept (a harness group for the
+command buffer's words expected to differ).
+
 ## Run 2026-10-23 20:22 (`b7-loop-23-10-26-5`)
 
 - `ai-drivers.md` (new, 148 rows; 2 moved from `functions.md`, 146

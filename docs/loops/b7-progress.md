@@ -5,53 +5,79 @@ commits, the function files and the subsystems' docs. Earlier runs'
 records: `b7-loop-2026-10-22-0111.md`, `b7-loop-2026-10-22-1047.md`,
 `b7-loop-2026-10-22-1439.md`, `b7-loop-2026-10-22-2211.md`,
 `b7-loop-2026-10-23-0152.md`, `b7-loop-2026-10-23-1106.md`,
-`b7-loop-2026-10-23-1344.md`, `b7-loop-2026-10-23-1722.md`, and this
-file's history. What's left to see in a drive, from every run:
-`to-drive.md`.
+`b7-loop-2026-10-23-1344.md`, `b7-loop-2026-10-23-1722.md`,
+`b7-loop-2026-10-23-2022.md`, and this file's history. What's left to
+see in a drive, from every run: `to-drive.md`.
 
 ## Now
 
-- Run started 2026-10-23 20:22 on `b7-loop-23-10-26-5` (the user's
-  branch), from cf1f2cb; summary `b7-loop-2026-10-23-2022.md`.
-- `leads.md`'s top lead (VirtualAlloc and VirtualFree, `sub_82295398`,
-  `sub_82295330`) dropped: both already ours (native memory).
-- Subsystem 1 of 3 (the AI drivers) finished: 143 of 148 ours; the
-  rest waits on `sub_820900C0` and `sub_821434E8`.
-- Subsystem 2 of 3 (the racer controllers) finished: 27 of 27 ours.
-- Subsystem 3 of 3 (the track zones) finished: 92 of 92 ours. The
-  loop stopped at the run's limit (below).
+- Run started 2026-10-24 03:25 on `b7-loop-24-10-26` (the user's
+  branch), from 8073e3b; summary `b7-loop-2026-10-24-0325.md`.
+- Limit for this run: 3 subsystems (the user's call, 2026-10-24: back to 3 after asking for 4).
+- Subsystem 1 of 3: `leads.md`'s top lead (`sub_822A5B78`, a texture's
+  description, with the UI movie's texture set): mapped as the graphics
+  resources (`graphics-resources.md`, 44 rows, 0e67c00; 13 ready
+  groups). The map's checks passed, but its report's `stop:` named two
+  choices for the user, so the loop stopped before migrating (below); resumed with the
+  user's calls. Migration 1 done (e4730b8..e6b9811, 25 of 45 ours),
+  validated (`itc_1267`, `itc_1269`; replay ok; 1 to drive): migration 2
+  done (062da1d..4be0508, 46 of 46 ours), validated (`itc_1292`,
+  `itc_1293`; replay ok; 1 to drive). Finished.
+- Subsystem 2 of 3: `leads.md`'s graphics device resource calls under
+  the camera passes (`sub_822A5D08` and others, the device's state save
+  and restore `sub_8258D8C8`, `sub_8258D908`; closest to ready: 17 left,
+  8 ready groups, 5 already ours): mapped as the video output and the
+  device lock (`video-output.md`, 30 rows, 2fdfea4; 6 ready groups, 5
+  of them on kernel sync imports). The map's checks passed, but its
+  `stop:` named a choice for the user, so the loop stopped (below);
+  resumed with the user's call. Migration 1 done (c234559..bafb51c;
+  7 of 30 ours, the rest the shared sync wrappers kept recompiled, and
+  cameras.md's three camera passes), validated (`itc_1310`; all ran in
+  play). Finished.
+- Subsystem 3 of 3: `leads.md`'s graphics device state setters
+  (`sub_822A3D30` and others) with `sub_822A8A60` (probably
+  SetShaderGPRAllocation; blocks `VideoOutput::Present`): they run every
+  frame and block the video output's rest: mapped as the device state
+  (`device-state.md`, 131 rows, 8b1b86b; 116 ready groups); map checked
+  (0 errors, 131 of 131 in play; the packets nothing reads are Dropped by
+  the graphics rule: `gpu_link.cpp` only counts them). Migration 1 done
+  (7b1c218..c421c0b, 121 of 131 ours: 120 native, 1 Dropped), validated
+  (`itc_1320`; all 120 ran in play): migration 2 done (fd70fa2..fd026da,
+  131 of 131 ours), validated (`itc_1334`; all ran in play). Finished;
+  the loop stopped at the run's limit (below).
 
 ## Done
 
-- The track zones (`track-zones.md`, mapped in 52cd53b; 92 rows): 92
-  ours (9 Native) in one migration (31bc1e8..a99b454), validated (92
-  of 92 harness lines; `itc_1253`, `itc_1254`, replay ok; all ran in
-  play); `--native_track_zones`. Left: none; Init, AddBranch, Update
-  and Test keep adapters for the camera modes' recompiled callers.
+- The device state (`device-state.md`, mapped in 8b1b86b; 131 rows):
+  131 ours in two migrations (7b1c218..c421c0b, fd70fa2..fd026da), each
+  validated (`itc_1320`, `itc_1334`; all ran in play);
+  `--native_device_state`. The packets nothing reads Dropped (the
+  graphics rule). Left: none; the setters' adapters stay for the
+  device's tables and the command replay.
 
-- The racer controllers (`racer-controllers.md`, mapped in b5491fb; 27
-  rows): 27 ours (15 Native) in one migration (699bbde..7b85ae8) and
-  the three jump handlers' prints (94b17b0); validated (`itc_1227`,
-  `itc_1228`, `itc_1229`, `itc_1230`; replays ok; 2 to drive);
-  `--native_racer_controllers`. Left: none; the handlers' adapters stay
-  for the race flow's functors.
+- The video output and the device lock (`video-output.md`, mapped in
+  2fdfea4; 30 rows): 7 ours in one migration (c234559..bafb51c), with
+  `cameras.md`'s MakeRenderTarget, SetUpSurfaces and Init; validated
+  (`itc_1310`); `--native_video_output`. The user's call: the lock over
+  a `std::binary_semaphore`. Left: the sync wrappers (kept recompiled),
+  what waits on the device's state setters (`sub_822A8A60` and that
+  lead).
 
-- The AI drivers (`ai-drivers.md`, mapped in 1eeb084; 148 rows): 143
-  ours (119 Native) in five migrations (c94d6be..91b8da2,
-  e01cc35..24669a4, 1521ad2..18ea84b, fcec6fd..2ea28d9,
-  5a7f90d..2ddd638), each validated (`itc_1124`/`1125`, `1145`/`1146`,
-  `1169`/`1170`, `1185`/`1186`, `1203`/`1204`; replays ok; 14 to
-  drive); `--native_ai_drivers`. Left: Destroy and DestroyRings
-  (`sub_820900C0`), UpdateStarting, UpdateTrack and NoteFixedSections
-  (`sub_821434E8`).
+- The graphics resources (`graphics-resources.md`, mapped in 0e67c00;
+  46 rows): 46 ours in two migrations (e4730b8..e6b9811,
+  062da1d..4be0508), each validated (`itc_1267`/`1269`, `itc_1292`/`1293`;
+  replays ok; 2 to drive); `--native_graphics_resources`. The user's
+  calls: `Edram::Alloc` with a `std::mutex`, the locks' fence waits and
+  flushes Dropped. Left: none; adapters stay for other files' recompiled
+  callers.
 
 ## Rows to review
 
-This run's rows: `review.md` ("Run 2026-10-23 20:22").
+This run's rows: `review.md` ("Run 2026-10-24 03:25").
 
 ## Expected to differ
 
-This run's groups: `expected-differences.md` (the "20:22 run" lines).
+This run's groups: `expected-differences.md` (the "03:25 run" lines).
 
 ## To check in a drive
 
@@ -59,53 +85,98 @@ This run's groups: `expected-differences.md` (the "20:22 run" lines).
 
 ## Totals
 
-- Start: ours 1223, work left 5534 (wrapped 123, known 559, unknown 4852).
-- After mapping the AI drivers: ours 1223, work left 5534 (wrapped 123,
-  known 705, unknown 4706).
-- After the AI drivers' migration 1: ours 1297, work left 5460 (wrapped
-  123, known 631, unknown 4706). Race 22 s (`itc_1123`) with
-  `--run_harnesses=all`, 0 errors, every harness 0 differing (no
-  "(expected to differ)" groups added).
-- After the AI drivers' migration 2: ours 1315, work left 5442 (wrapped
-  123, known 613, unknown 4706). Race 22 s (`itc_1144`) with
-  `--run_harnesses=all`, 0 errors, every harness 0 differing (none
-  added).
-- After the AI drivers' migration 3: ours 1337, work left 5420 (wrapped
-  123, known 591, unknown 4706). Race 21 s (`itc_1168`) with
-  `--run_harnesses=all`, 0 errors, every harness 0 differing (none
-  added).
-- After the AI drivers' migration 4: ours 1353, work left 5404 (wrapped
-  123, known 575, unknown 4706). Race 30 s (`itc_1184`, now
-  `attract_race.sh 40`, the user's call) with `--run_harnesses=all`, 0
-  errors, every harness 0 differing (none added).
-- After the AI drivers' migration 5: ours 1366, work left 5391 (wrapped
-  123, known 562, unknown 4706). Race 30 s (`itc_1202`) with
-  `--run_harnesses=all`, 0 errors, every harness 0 differing (none
-  added).
-- After mapping the racer controllers: ours 1366, work left 5391
-  (wrapped 123, known 585, unknown 4683).
-- After the racer controllers' migration 1: ours 1393, work left 5365
-  (wrapped 123, known 559, unknown 4683). Race 28 s (`itc_1226`) with
-  `--run_harnesses=all`, 0 errors, every harness 0 differing (none
-  added).
-- After the racer controllers: ours 1393, work left 5365 (wrapped 123,
-  known 559, unknown 4683).
-- After mapping the track zones: ours 1393, work left 5365 (wrapped
-  123, known 651, unknown 4591).
-- After the track zones' migration 1: ours 1485, work left 5273
-  (wrapped 123, known 559, unknown 4591). Race 28 s (`itc_1252`) with
-  `--run_harnesses=all`, 0 errors, every harness 0 differing (none
-  added).
+- Start: ours 1485, work left 5273 (wrapped 123, known 559, unknown 4591).
+- After mapping the graphics resources: ours 1485, work left 5273
+  (wrapped 123, known 595, unknown 4555).
+
+- After the graphics resources' migration 1: ours 1508, work left 5251
+  (wrapped 123, known 573, unknown 4555). Race 28 s (`itc_1266`) with
+  `--run_harnesses=all`, 0 errors, every harness 0 differing outside
+  one "(expected to differ)" group added (Edram::Alloc's critical
+  section, the user's call).
+- After the graphics resources' migration 2: ours 1529, work left 5231
+  (wrapped 123, known 554, unknown 4554). Race 27 s (`itc_1291`) with
+  `--run_harnesses=all`, 0 errors, every harness 0 differing outside
+  one "(expected to differ)" group added (Resource::Lock's command
+  buffer, the user's call).
+- After the video output's migration 1: ours 1541, work left 5219
+  (wrapped 123, known 566, unknown 4530). Race 25 s (`itc_1307`) with
+  `--run_harnesses=all`, 0 errors, every harness 0 differing outside
+  one "(expected to differ)" group added (the video output's semaphore,
+  the user's call).
+- After mapping the device state: ours 1541, work left 5219 (wrapped
+  123, known 686, unknown 4410).
+- After the device state's migration 1: ours 1662, work left 5098
+  (wrapped 123, known 565, unknown 4410). Race 27 s (`itc_1317`) with
+  `--run_harnesses=all`, 0 errors, every harness 0 differing outside
+  four "(expected to differ)" groups added (the command buffer's
+  packets, the graphics rule).
+- After the device state's migration 2: ours 1672, work left 5088
+  (wrapped 123, known 555, unknown 4410). Race 27 s (`itc_1333`) with
+  `--run_harnesses=all`, 0 errors, every harness 0 differing outside
+  eight "(expected to differ)" groups added (the command buffer's
+  packets, the graphics rule).
 
 ## Stopped
 
-2026-10-24, after the track zones: the run's limit (3 subsystems)
-reached. Everything passed: harnesses 0 differing outside the earlier
-"(expected to differ)" groups (none added), attract races 20-22 s
-under `attract_race.sh 30`, then 28-31 s under `attract_race.sh 40`
-(the user's call), no errors, replays ok. Next: the user reviews
-`review.md` ("Run 2026-10-23 20:22"), drives a race for `to-drive.md`,
-and merges.
+2026-10-24, after mapping the graphics resources: the mapping report's
+`stop:` wasn't `none` (`b7-loop.md`, "When to halt"). For the user:
+(1) `Edram::Alloc` (`sub_822B5EF8`, a ready group) calls
+RtlInitializeCriticalSection, RtlEnterCriticalSection and
+RtlLeaveCriticalSection: porting it replaces kernel imports. (2)
+Whether `Resource::Lock`'s fence wait and cache flush packet,
+`Resource::Unlock`'s data cache flush (`sub_822AC470`) and
+`Resource::Destroy`'s fence waits are Dropped under the graphics rule
+(blocked groups: needed only when they're ported). The other 12 ready
+groups (format math, descriptions, buffer creation, the device's
+getters) need neither. Map checks: `check_function_statuses.py` 0
+errors; `b7_status.py` lists the file, 44 of 44 in play. Next: the
+user's two calls, then a new loop (or this run continued).
+
+Resumed 2026-10-24 (the user's calls): (1) `Edram::Alloc` (`sub_822B5EF8`) made native with a `std::mutex`
+in place of the kernel's critical section (its bases kept: the
+renderer keys targets by them); (2) `Resource::Lock`'s and
+`Resource::Destroy`'s fence waits, `Lock`'s cache flush packet and
+`Unlock`'s data cache flush (`sub_822AC470`) Dropped, the lock count,
+the returned address and the freeing kept (a harness group for the
+command buffer's words expected to differ). The run goes on
+with this subsystem's migration.
+
+2026-10-24, after mapping the video output and the device lock: the
+mapping report's `stop:` wasn't `none`. `VideoOutput::LockDevice` and
+`UnlockDevice` (`sub_8258D8C8`, `sub_8258D908`; the lead's "state saved
+and restored") take the video output's device lock, a semaphore of
+count 1 at +224 built on critical sections and kernel events (the render
+thread holds it for the whole frame, the main thread around making and
+releasing resources), and block `CameraPasses::MakeRenderTarget`,
+`CameraPass::SetUpSurfaces` and `CameraPass::Init`. For the user: (a)
+the device lock alone over a host primitive (its semaphore is reached
+only through LockDevice, UnlockDevice and the video output's
+constructor; the Semaphore class stays recompiled for the archive
+loader's four), (b) the game's sync primitives native for every caller
+(a core step: "Shared sync objects" in the plan), or (c) the lock left
+recompiled and the camera passes blocked. Map checks:
+`check_function_statuses.py` 0 errors; `b7_status.py` lists the file, 30
+of 30 in play.
+
+Resumed 2026-10-24 (the user's call): (a): the device lock alone over a host primitive, a
+`std::binary_semaphore` (a semaphore may be released by another thread
+than the one that took it; a mutex may not), through LockDevice,
+UnlockDevice and the video output's constructor; the Semaphore class
+stays recompiled for the archive loader. The run goes on
+with this subsystem's migration.
+
+2026-10-24, after the device state: the run's limit (3 subsystems, the
+user's call) reached. Everything passed: harnesses 0 differing outside
+"(expected to differ)" groups (15 added, all from the user's calls or
+the graphics rule), attract races 25-28 s under `attract_race.sh 40`,
+no errors, replays ok. Next: the user reviews `review.md` ("Run
+2026-10-24 03:25") and `expected-differences.md` ("03:25 run"), drives
+a race for `to-drive.md`, and merges.
+A drive by the user (`itc_1335`, 2026-10-24, with `--xbox_gamma=hdtv`):
+a race at the 144 cap, no errors, everything looked correct (the
+user); `to-drive.md`'s two functions not seen (neither ever in play).
 Concluded (the user's call, 2026-10-24): merged into
-`rexglue-removal-project` before a drive; `review.md`'s section for
-this run is still to review and `to-drive.md`'s functions still to see.
+`rexglue-removal-project` after the drive; `review.md`'s section for
+this run and the "03:25 run" expected differences are still to review,
+and `to-drive.md`'s two functions still to see.

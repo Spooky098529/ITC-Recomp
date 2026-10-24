@@ -5,6 +5,8 @@
 #include "base/log.h"
 #include "c_runtime/math.h"
 #include "command_list/command_list.h"
+#include "graphics/resources.h"
+#include "graphics/video_output.h"
 #include "interpolation/blend_state.h"
 #include "matrix_math/matrix_math.h"
 #include "memory/heap.h"
@@ -435,6 +437,204 @@ uint32_t RenderTarget(uint8_t* base, uint32_t id) {
                        : 0;
   }
   return guest::LoadU32(base, kTextures[id]);
+}
+
+uint32_t MakeRenderTarget(uint8_t* base, uint32_t frame, uint32_t id, const DeviceCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_8209FBF0 CameraPasses::MakeRenderTarget");
+  struct Target {
+    uint32_t size;
+    uint32_t format;
+    uint32_t global;
+  };
+  // Ids 0 and 2 to 12 (id 0 is 512 x 128; id 1 below).
+  static constexpr Target kTargets[] = {
+      {512, 0x182801B6, 0x826BABE8},  {0, 0, 0},
+      {1024, 0x1A220197, 0x826BABDC}, {512, 0x18280186, 0x826BABC8},
+      {1024, 0x18280186, 0x826BABD4}, {512, 0x1A220197, 0x826BABFC},
+      {256, 0x18280186, 0x826BABF8},  {256, 0x18280186, 0x826BABF4},
+      {512, 0x1A220197, 0x826BABF0},  {256, 0x18280186, 0x826BABD0},
+      {256, 0x18280186, 0x826BABD8},  {256, 0x18280186, 0x826BABE0},
+      {1024, 0x1A220197, 0x826BABC4},
+  };
+  constexpr uint32_t kCubeSize = 0x82001EF0;  // id 1's size (a word)
+  const uint32_t local = frame + 80;
+  guest::StoreU32(base, local,
+                  graphics::video_output::LockDevice(base, calls.video_output(0)));
+  if (const uint32_t old = calls.render_target(id); old != 0) {
+    calls.release(old);
+  }
+  if (id == 1) {
+    const int32_t mode = int32_t(guest::LoadU32(base, kMode));
+    const uint32_t size = guest::LoadU32(base, kCubeSize);
+    if (mode == 0) {
+      guest::StoreU32(base, 0x826BABEC,
+                      graphics::CreateTexture(base, size, size, 1, 1, 1, 0x182801B6, 3));
+    } else if (mode == 1) {
+      guest::StoreU32(base, 0x826BABCC,
+                      graphics::CreateTexture(base, size, size, 6, 1, 1, 0x182801B6, 18));
+    }
+  } else if (id <= 12) {
+    const Target& t = kTargets[id];
+    const uint32_t height = id == 0 ? 128 : t.size;
+    guest::StoreU32(base, t.global,
+                    graphics::CreateTexture(base, t.size, height, 1, 1, 1, t.format, 3));
+  }
+  const uint32_t video_output = calls.video_output(1);
+  graphics::video_output::UnlockDevice(base, video_output, local);
+  return video_output;
+}
+
+void SetUpSurfaces(uint8_t* base, uint32_t frame, uint32_t pass, const SurfaceCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_820A2F40 CameraPass::SetUpSurfaces");
+  namespace gr = graphics;
+  namespace vo = graphics::video_output;
+  const uint32_t local = frame + 80;
+  guest::StoreU32(base, local, 0);
+  calls.release_surfaces();
+  const uint32_t type = guest::LoadU32(base, pass + 584);
+  uint32_t color = 0;
+  uint32_t depth = 0;
+  if (type <= 2) {
+    guest::StoreU32(base, local, vo::LockDevice(base, calls.video_output(0)));
+    color = gr::GetRenderTarget(base, guest::LoadU32(base, local), 0);
+    depth = gr::GetDepthStencilSurface(base, guest::LoadU32(base, local));
+    vo::UnlockDevice(base, calls.video_output(1), local);
+  } else if (type >= 5 && type <= 9) {
+    if (Mode(base, 1) == 1) {
+      const uint32_t surface = calls.cube_surface(calls.render_target(1), type - 4);
+      color = type == 5 ? guest::LoadU32(base, 0x826BB780) : surface;
+      depth = guest::LoadU32(base, 0x826BB784);
+    }
+  } else if (type <= 20) {
+    // Types 3, 4 and 10 to 20: the render target's id, and whether the
+    // depth surface's parameters are {0, -1, 0} (else after the color one).
+    static constexpr uint32_t kIds[21] = {0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 2,
+                                          3, 4, 5, 6, 7, 8, 9, 10, 11, 12};
+    const bool fixed = type == 10 || type == 13 || type == 16 || type == 20;
+    const int32_t samples = type == 3 || type == 4 || type == 19 ? 2 : 0;
+    const uint32_t format = type == 4 ? 0x1A2201BF : 0x18280186;
+    const uint32_t id = kIds[type];
+    calls.make_render_target(id);
+    if (type == 4) {
+      const uint32_t mode = Mode(base, 1);
+      if (mode == 0) {
+        gr::GetSurfaceLevel(base, calls.render_target(1), 0);
+      } else if (mode == 1) {
+        calls.cube_surface(calls.render_target(1), 0);
+      }
+    } else {
+      gr::GetSurfaceLevel(base, calls.render_target(id), 0);
+    }
+    guest::StoreU32(base, local, vo::LockDevice(base, calls.video_output(0)));
+    const uint32_t color_parameters = frame + 440;
+    const uint32_t depth_parameters = frame + 120;
+    for (uint32_t i = 0; i < 12; i += 4) {
+      guest::StoreU32(base, color_parameters + i, 0);
+    }
+    color = gr::CreateSurface(base, guest::LoadU32(base, pass + 504),
+                              guest::LoadU32(base, pass + 508), format, samples, color_parameters);
+    for (uint32_t i = 0; i < 12; i += 4) {
+      guest::StoreU32(base, depth_parameters + i, 0);
+    }
+    if (fixed) {
+      guest::StoreU32(base, depth_parameters + 4, 0xFFFFFFFF);
+    } else {
+      guest::StoreU32(base, depth_parameters + 0, guest::LoadU32(base, color + 44) / 5120);
+    }
+    depth = gr::CreateSurface(base, guest::LoadU32(base, pass + 504),
+                              guest::LoadU32(base, pass + 508), 0x1A220197, samples,
+                              depth_parameters);
+    vo::UnlockDevice(base, calls.video_output(1), local);
+  }
+  guest::StoreU32(base, pass + 576, color);
+  guest::StoreU32(base, pass + 580, depth);
+}
+
+uint32_t InitPass(uint8_t* base, uint32_t pass, uint32_t type, const PassInitCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_820A3DB0 CameraPass::Init");
+  // The game's float constants (words at 0x82000000 + offset), copied as
+  // the original's lfs and stfs do (none is a NaN).
+  auto constant = [&](uint32_t offset) { return guest::LoadU32(base, 0x82000000 + offset); };
+  auto store = [&](uint32_t field, uint32_t value) { guest::StoreU32(base, pass + field, value); };
+  store(576, 0);
+  store(580, 0);
+  calls.construct();
+  if (type <= 20) {
+    uint32_t width = 256, height = 256;
+    uint32_t y = 0;
+    uint32_t settings_544 = constant(2608);
+    uint32_t far_548 = constant(7820);
+    uint32_t settings_524 = constant(2608);
+    uint32_t settings_552 = 0;
+    uint32_t clear_color = 0xFF000000;
+    bool field_of_view = true;
+    uint32_t fov = constant(8116);
+    if (type == 0) {
+      width = guest::LoadU32(base, calls.video_output(0) + 296);
+      height = guest::LoadU32(base, calls.video_output(1) + 300);
+      settings_524 = constant(8144);
+      far_548 = constant(8140);
+      field_of_view = false;
+    } else if (type <= 3) {
+      width = type == 3 ? 512 : 1024;
+      height = type == 3 ? 128 : 288;
+      y = type == 2 ? 288 : 0;
+      far_548 = constant(type == 3 ? 8128 : 8136);
+      settings_552 = 1;
+      fov = constant(8132);
+    } else if (type <= 9) {
+      settings_544 = constant(8124);
+      if (type == 4) {
+        far_548 = constant(Mode(base, 1) == 0 ? 8120 : 7820);
+      } else if (type == 7) {
+        far_548 = constant(8112);
+      }
+    } else if (type <= 18) {
+      static constexpr uint32_t kSizes[9] = {1024, 512, 1024, 512, 256, 256, 512, 256, 256};
+      width = height = kSizes[type - 10];
+    } else if (type == 19) {
+      far_548 = constant(8108);
+      clear_color = 0;
+    } else {
+      width = height = 1024;
+    }
+    store(496, 0);
+    store(500, y);
+    store(504, width);
+    store(508, height);
+    store(512, 0);
+    store(516, constant(8156));
+    store(520, constant(2608));
+    store(524, settings_524);
+    store(528, constant(2612));
+    store(532, constant(8152));
+    store(536, constant(8148));
+    store(540, constant(8148));
+    store(544, settings_544);
+    store(548, far_548);
+    store(552, settings_552);
+    store(556, 0);
+    store(560, 1);
+    store(564, clear_color);
+    store(568, 1);
+    store(572, 0);
+    if (field_of_view) {
+      store(368, fov);
+    }
+  }
+  // lfs and stfs through a double, as the original.
+  guest::StoreFloat(base, pass + 384, float(double(guest::LoadFloat(base, pass + 544))));
+  guest::StoreFloat(base, pass + 388, float(double(guest::LoadFloat(base, pass + 548))));
+  store(584, type);
+  store(588, 0);
+  // fcfid of the sign-extended words, then frsp.
+  guest::StoreFloat(base, pass + 376,
+                    float(double(int64_t(int32_t(guest::LoadU32(base, pass + 504))))));
+  guest::StoreFloat(base, pass + 380,
+                    float(double(int64_t(int32_t(guest::LoadU32(base, pass + 508))))));
+  calls.update();
+  calls.set_up_surfaces();
+  return 0;
 }
 
 void Enable(uint8_t* base, uint32_t pass) {

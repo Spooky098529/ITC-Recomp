@@ -108,6 +108,85 @@ bool SetMode(uint8_t* base, int32_t which, uint32_t mode);
 // the mode (0 for modes other than 0 and 1).
 uint32_t RenderTarget(uint8_t* base, uint32_t id);
 
+// The guest calls the device's users make (the adapters' guest calls):
+// the video output (`[0x8266D088]`'s vtable slot 7, then that object's slot
+// 3; `at` picks the original's return addresses), CameraPasses::RenderTarget
+// through its override (the diagnostics' wrapper) and Resource::Release
+// (sub_822A67B0).
+struct DeviceCalls {
+  std::function<uint32_t(int at)> video_output;
+  std::function<uint32_t(uint32_t id)> render_target;
+  std::function<void(uint32_t resource)> release;
+};
+
+// CameraPasses::MakeRenderTarget (sub_8209FBF0, with its case 0, sub_8209FC7C,
+// merged): with the device locked (VideoOutput::LockDevice's plain C++, the
+// device kept in the original's frame at `frame` + 80), render target `id`'s
+// old texture released (when set), then for ids 0 to 12 a new one
+// (Device::CreateTexture's plain C++: one level, usage 1; 512 x 128, the
+// 1024, 512 and 256 squares, formats 0x182801B6, 0x1A220197 and 0x18280186;
+// id 1 by the mode, mode 0 a 2D texture into 0x826BABEC, mode 1 a cube map
+// into 0x826BABCC, none for other modes) into its global; then the device
+// unlocked. Returns the video output from the last call (r3 as the original
+// leaves it). Needs --native_heap and --native_graphics_resources (the
+// adapter checks).
+uint32_t MakeRenderTarget(uint8_t* base, uint32_t frame, uint32_t id, const DeviceCalls& calls);
+
+// CameraPass::SetUpSurfaces' guest calls (the adapter's): the video output
+// (`at` 0 for the lock, 1 for the unlock), CameraPasses::RenderTarget
+// (through its override), CameraPasses::MakeRenderTarget and
+// CameraPass::ReleaseSurfaces (through their overrides, native), and the
+// cube map's surface (sub_822A5C50, never run in play: the recompiled one).
+struct SurfaceCalls {
+  std::function<uint32_t(int at)> video_output;
+  std::function<uint32_t(uint32_t id)> render_target;
+  std::function<void(uint32_t id)> make_render_target;
+  std::function<uint32_t(uint32_t texture, uint32_t face)> cube_surface;
+  std::function<void()> release_surfaces;
+};
+
+// CameraPass::SetUpSurfaces (sub_820A2F40, with its types 0-2 chunk
+// sub_820A2F94 merged): the pass's surfaces released, then by its type
+// (+584): types 0-2 the device's render target 0 and depth surface; type 3
+// and 10-20 their render target made (ids 0, 2-12) and its level 0 surface
+// taken (Texture::GetSurfaceLevel, the answer dropped as the original does);
+// type 4 render target 1 made and, by the mode, its level 0 (mode 0) or
+// cube face 0 (mode 1) surface taken and dropped; then, with the device
+// locked, a color surface of the pass's size (+504, +508; format
+// 0x18280186, type 4 0x1A2201BF; 2 samples for types 3, 4 and 19, else 0)
+// and a depth surface (0x1A220197, the same samples) from EDRAM after the
+// color one (its +44 / 5120 tiles) or, for types 10, 13, 16 and 20, at
+// parameters {0, -1, 0}, their parameter blocks in the original's frame at
+// `frame` (544 bytes; the device at +80); types 5-9 in mode 1 render
+// target 1's cube face (type - 4) surface (type 5 drops it and takes pass
+// 4's color surface, 0x826BB780), with pass 4's depth surface (0x826BB784),
+// none in other modes; types above 20 none. The color and depth surfaces
+// (0 for none) into +576 and +580. Needs --native_heap and
+// --native_graphics_resources (the adapter checks).
+void SetUpSurfaces(uint8_t* base, uint32_t frame, uint32_t pass, const SurfaceCalls& calls);
+
+// CameraPass::Init's guest calls (the adapter's): Camera::Camera on the
+// pass, the video output (type 0's two reads; `at` 0 and 1), and
+// CameraPass::Update and CameraPass::SetUpSurfaces on the pass (through
+// their overrides).
+struct PassInitCalls {
+  std::function<void()> construct;
+  std::function<uint32_t(int at)> video_output;
+  std::function<void()> update;
+  std::function<void()> set_up_surfaces;
+};
+
+// CameraPass::Init (sub_820A3DB0, with its type 0 chunk sub_820A3E04
+// merged): r3 = the pass, `type` 0-20 (r4; others set nothing by type):
+// +576 and +580 = 0, Camera::Camera, then the type's viewport (+496 to
+// +508; type 0 the display's size, the video output's +296 and +300),
+// settings (+512 to +572, from the game's constants at 0x82000000 + 2608 to
+// 8156) and field of view (+368, types 1-20); then for every type +384 and
+// +388 (near and far) from +544 and +548, +584 the type, +588 = 0, +376 and
+// +380 the size as floats, CameraPass::Update and CameraPass::SetUpSurfaces.
+// Returns 0.
+uint32_t InitPass(uint8_t* base, uint32_t pass, uint32_t type, const PassInitCalls& calls);
+
 // CameraPass::Enable (sub_820A0968) and CameraPass::Disable (sub_820A0958):
 // +588 = 1 or 0.
 void Enable(uint8_t* base, uint32_t pass);

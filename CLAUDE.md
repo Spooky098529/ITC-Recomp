@@ -186,7 +186,26 @@ ready (`ai-drivers.md`, `racer-controllers.md`, `track-zones.md`;
 `--native_track_zones`; ours 1,223 -> 1,485); the rest waits on the
 array destructor iterator (`sub_820900C0`), the getter of
 `[0x826C6078]` (`sub_821434E8`), the race flow's functors and the
-camera modes. Harness runs use `attract_race.sh 40` (the user's call,
+camera modes. Its tenth run (`b7-loop-24-10-26`, 2026-10-24) mapped
+the graphics resources (`docs/functions/graphics-resources.md`, 44
+rows) and stopped for two of the user's calls, then went on (the
+user's calls, 2026-10-24: `Edram::Alloc`, `sub_822B5EF8`, native with a
+`std::mutex` for the kernel's critical section; the resource locks'
+fence waits and cache flushes Dropped, their lock count, address and
+freeing kept; 46 of 46 ours, `--native_graphics_resources`, ours 1,485
+-> 1,529), then mapped the video output and the device lock
+(`video-output.md`) and stopped again for the user's call on the
+device lock's kernel sync, then went on (the user's call, 2026-10-24:
+the device lock alone over a `std::binary_semaphore`; the game's
+Semaphore class stays recompiled for the archive loader; 7 of 30 ours,
+`--native_video_output`, with three camera passes), and made the device's
+state setters native (`docs/functions/device-state.md`, 131 of 131,
+`--native_device_state`; the packets written straight into the command
+buffer, which nothing reads, Dropped by the graphics rule; ours 1,672).
+It stopped at its limit and was merged into `rexglue-removal-project`
+2026-10-24 after a drive (its rows not yet reviewed by the user);
+summary `docs/loops/b7-loop-2026-10-24-0325.md`.
+Harness runs use `attract_race.sh 40` (the user's call,
 2026-10-23); a race short only because the harnesses took longer is
 no halt.
 After each plan item, run `itc_recomp/tools/boundary_status.py` and record

@@ -8,11 +8,16 @@
 
 #include <bit>
 
+#include "base/flags.h"
 #include "display/display.h"
+#include "graphics/device_state.h"
+#include "hooks/device_state_calls.h"
 #include "helpers/clock.h"
 #include "helpers/console_settings.h"
 
 using guest_call::InFrame;
+
+ITC_FLAG_DECLARE(bool, native_device_state);
 
 namespace {
 
@@ -118,11 +123,18 @@ extern "C" REX_FUNC(sub_822ACE00) {
         return;
       }
       guest::StoreU32(base, device + kDeviceRenderTarget, surface);
-      ctx.r3.u64 = device;
-      ctx.r4.u64 = 0;
-      ctx.r5.u64 = surface;
-      ctx.lr = 0x822ACF18;
-      sub_822A3D30(ctx, base);  // set as render target 0
+      // Set as render target 0 (Device::SetRenderTarget's plain C++ with
+      // --native_device_state, src/graphics/device_state.h).
+      if (ITC_FLAG(native_device_state)) {
+        ctx.fpscr.disableFlushMode();
+        graphics::device_state::SetRenderTarget(base, device, 0, surface);
+      } else {
+        ctx.r3.u64 = device;
+        ctx.r4.u64 = 0;
+        ctx.r5.u64 = surface;
+        ctx.lr = 0x822ACF18;
+        sub_822A3D30(ctx, base);
+      }
     }
     if (parameter(36) != 0) {
       ctx.r3.u64 = width;
@@ -138,10 +150,16 @@ extern "C" REX_FUNC(sub_822ACE00) {
         return;
       }
       guest::StoreU32(base, device + kDeviceDepthSurface, surface);
-      ctx.r3.u64 = device;
-      ctx.r4.u64 = surface;
-      ctx.lr = 0x822ACF50;
-      sub_822A4060(ctx, base);  // set as the depth surface
+      // Set as the depth surface (as render target 0).
+      if (ITC_FLAG(native_device_state)) {
+        ctx.fpscr.disableFlushMode();
+        graphics::device_state::SetDepthStencilSurface(base, device, surface);
+      } else {
+        ctx.r3.u64 = device;
+        ctx.r4.u64 = surface;
+        ctx.lr = 0x822ACF50;
+        sub_822A4060(ctx, base);
+      }
     }
     // Through the game's memcpy, as the original (it's wrapped for the
     // renderer's memory mirrors).
@@ -215,9 +233,20 @@ extern "C" REX_FUNC(sub_822AD298) {
     if (!ctx.r3.u32) {
       return;
     }
-    ctx.r3.u64 = device;
-    ctx.lr = 0x822AD380;
-    sub_822ACB90(ctx, base);
+    // Device::SetDefaultState: its plain C++ with --native_device_state
+    // (src/graphics/device_state.h), the guest calls it keeps from
+    // hooks::DeviceStateCalls.
+    if (ITC_FLAG(native_device_state)) {
+      ctx.fpscr.disableFlushMode();  // the float setters'
+      guest_call::InFrame(ctx, base, 160, 0x822ACBF0, [&](uint32_t) {
+        graphics::device_state::SetDefaultState(base, device,
+                                                hooks::DeviceStateCalls(ctx, base, device));
+      });
+    } else {
+      ctx.r3.u64 = device;
+      ctx.lr = 0x822AD380;
+      sub_822ACB90(ctx, base);
+    }
     ctx.r3.u64 = 0;
     ctx.r4.u64 = 0xB1800000;
     ctx.lr = 0x822AD38C;
@@ -450,11 +479,17 @@ extern "C" REX_FUNC(sub_822AD0B0) {
     ctx.r4.u64 = 0;
     ctx.lr = piecewise_linear ? 0x822AD114 : 0x822AD0F4;
     (piecewise_linear ? sub_822B0E60 : sub_822B0E08)(ctx, base);  // the default ramp
+    // Set as the gamma ramp (Device::SetGammaRamp's plain C++ with
+    // --native_device_state; the original where it can't copy).
+    if (!piecewise_linear && ITC_FLAG(native_device_state) &&
+        graphics::device_state::SetGammaRamp(base, device, ramp)) {
+      return;
+    }
     ctx.r3.u64 = device;
     ctx.r4.u64 = 0;
     ctx.r5.u64 = ramp;
     ctx.lr = piecewise_linear ? 0x822AD128 : 0x822AD104;
-    (piecewise_linear ? sub_822A3AA8 : sub_822A3A20)(ctx, base);  // set as the gamma ramp
+    (piecewise_linear ? sub_822A3AA8 : sub_822A3A20)(ctx, base);
   });
   guest::StoreU32(base, device + kDeviceDisplayWidth, display::kWidth);
   guest::StoreU32(base, device + kDeviceDisplayHeight, display::kHeight);
