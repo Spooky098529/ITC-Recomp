@@ -34,7 +34,10 @@ see in a drive, from every run: `to-drive.md`.
   7 of 30 ours, the rest the shared sync wrappers kept recompiled, and
   cameras.md's three camera passes), validated (`itc_1310`; all ran in
   play). Finished.
-- Subsystem 3 of 4: being picked.
+- Subsystem 3 of 4: `leads.md`'s graphics device state setters
+  (`sub_822A3D30` and others) with `sub_822A8A60` (probably
+  SetShaderGPRAllocation; blocks `VideoOutput::Present`): they run every
+  frame and block the video output's rest: mapping agent running.
 
 ## Done
 
