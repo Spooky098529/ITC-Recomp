@@ -113,4 +113,5 @@ harness that seemed to depend on the heap's layout was the harnesses'
 shared random generator, with `swprintf`'s format generator and the
 drawing cases' vertex comparison (1ce3182; `review.md`). The run isn't
 resumed: `ActionMappers::Init` is the top of `leads.md` for the next
-run.
+run. Concluded (the user's call, 2026-10-24): merged into
+`rexglue-removal-project`; `review.md`'s section for this run reviewed.

@@ -217,14 +217,16 @@ unblocked) native as far as they were ready (ours 1,672 -> 1,714); the
 rest waits on `atexit` and the critical section wrappers (the core),
 `MmQueryAllocationSize`'s wrapper, `DataFile::GetEntry`, the XPR, the
 archive's queue and the texture provider.
-Its twelfth run (`b7-loop-24-10-26-3`, 2026-10-24, not yet merged;
+Its twelfth run (`b7-loop-24-10-26-3`, 2026-10-24, merged into
+`rexglue-removal-project` 2026-10-24;
 summary `docs/loops/b7-loop-2026-10-24-1746.md`) made the post effects
 (`post-effects.md`, `--native_post_effects`, 44 of 57), the UI movie
 walk and the AI drivers' teardown (cleanup leads), and the input
 manager and processors (`input.md`, `--native_input`, 29 of 29, with
 `ActionMapper::ActionMapper` it unblocked) native (ours 1,714 ->
-1,794); it stopped on two input functions whose harness doesn't reach
-their prints (the user's call pending); the rest waits on the models'
+1,794); it stopped on two input functions whose harness didn't reach
+their prints (given plain C++ of their own since; each harness now has
+its own random generator); `ActionMappers::Init` tops the leads; the rest waits on the models'
 resource relocation and shader pairs, the vertex declaration and the
 critical section wrappers.
 Harness runs use `attract_race.sh 40` (the user's call,
