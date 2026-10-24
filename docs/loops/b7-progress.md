@@ -20,7 +20,9 @@ file's history. What's left to see in a drive, from every run:
   constructor helpers): mapped into `c-runtime.md` (2 new rows, 3a15cda;
   probably the compiler's `vector constructor iterator` and `vector
   destructor iterator`; 2 ready groups; 2 leads added); map checked (0
-  errors, 2 of 2 in play). Migration agent running.
+  errors, 2 of 2 in play). Migration 1 done (f624a82, 93e739f: both
+  helpers under `--native_c_runtime`, and wcslen, mbtowc and the wide
+  write_char's adapters removed); validation agent running.
 
 ## Done
 
@@ -43,6 +45,9 @@ This run's groups: `expected-differences.md` (the "16:01 run" lines).
 - Start: ours 1672, work left 5088 (wrapped 123, known 555, unknown 4410).
 - After mapping the array helpers: ours 1672, work left 5088 (wrapped
   123, known 557, unknown 4408).
+- After the array helpers' migration 1: ours 1674, work left 5086
+  (wrapped 123, known 555, unknown 4408). Race 27 s (`itc_1341`) with
+  `--run_harnesses=all`, 0 errors, every harness 0 differing.
 
 ## Stopped
 

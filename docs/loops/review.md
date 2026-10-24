@@ -21,6 +21,22 @@ When the user has reviewed a run's section, its heading gets
   +0x59AEC records, `0x826D82D4`); 2 leads (the race object at
   `[0x826D82D4]`, `sub_8217C708` with `sub_821DF350`) and the race data
   lead extended with `sub_82101D20`.
+  Migration 1 (f624a82, 93e739f): both helpers native under
+  `--native_c_runtime` (`src/c_runtime/arrays.cpp`). For review: the
+  native targets (`SetWsToOne`, `Particle::Particle`) called as plain
+  C++, the empty destructor `sub_82106540` skipped, any other target
+  (`sub_82101D20` in play) a guest call through an `ElementCall`
+  callback from a 128-byte frame like the original's; r3 left as it
+  came with the empty destructor (volatile, no caller reads it); a count
+  of 0x80000000 wraps to 2^31 calls in both, left out of the harness.
+  Adapters removed: wcslen, mbtowc, the wide write_char (Native);
+  memcpy_s's (`sub_825A7270`) kept, its work a guest call to memcpy's
+  override. To look at later: the new cases first drew from the shared
+  `h.random`, which shifted later harnesses' inputs, and the
+  strings-and-font swprintf harness (`sub_8210A490`) then crashed (guest
+  writes at 0x70000000, probably an endless loop; `itc_1337.log`): a
+  swprintf case, or the native swprintf, fails on other random inputs.
+  The new cases use their own generator.
 
 ## Run 2026-10-24 03:25 (`b7-loop-24-10-26`)
 
