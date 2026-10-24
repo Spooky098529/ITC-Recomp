@@ -34,6 +34,9 @@ file's history. What's left to see in a drive, from every run:
   fixed (ThinLTO had moved a `dpps` out of one), 3 AI driver adapters
   removed), validated (`itc_1508`, `itc_1509`; the joins' two steps,
   never seen in play, to `to-drive.md`). Done.
+- Subsystem 1 of 3: `leads.md`'s race's screen objects (`sub_8212F148`,
+  `sub_821329B8`, `sub_82132778`, `sub_8212FCC8`, `sub_8212EDF8`,
+  `sub_8212EED0`; `8212EDF8`-`82133000`). Mapping agent running.
 
 ## Done
 
