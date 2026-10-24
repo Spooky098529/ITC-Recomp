@@ -205,6 +205,16 @@ buffer, which nothing reads, Dropped by the graphics rule; ours 1,672).
 It stopped at its limit and was merged into `rexglue-removal-project`
 2026-10-24 after a drive (its rows not yet reviewed by the user);
 summary `docs/loops/b7-loop-2026-10-24-0325.md`.
+Its eleventh run (`b7-loop-24-10-26-2`, 2026-10-24, not yet merged;
+summary `docs/loops/b7-loop-2026-10-24-1601.md`) made the compiler's
+array helpers (`c-runtime.md`), the course scenery
+(`docs/functions/course-scenery.md`, `--native_course_scenery`: the
+areas' models and lights streamed into pools, 38 of 73) and XAPI's
+memset (`XMemSet`, with `Scenery::Init` and `CameraPasses::Init` it
+unblocked) native as far as they were ready (ours 1,672 -> 1,714); the
+rest waits on `atexit` and the critical section wrappers (the core),
+`MmQueryAllocationSize`'s wrapper, `DataFile::GetEntry`, the XPR, the
+archive's queue and the texture provider.
 Harness runs use `attract_race.sh 40` (the user's call,
 2026-10-23); a race short only because the harnesses took longer is
 no halt.

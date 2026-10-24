@@ -43,9 +43,17 @@ file's history. What's left to see in a drive, from every run:
   map checked (0 errors, all in play). Migration 1 done
   (671f5d0..b549e6c: XMemSet, with `Scenery::Init` and
   `CameraPasses::Init` and `InitPasses` it unblocked; two adapters
-  removed); validation agent running.
+  removed), validated (`itc_1362`; all ran in play). Finished; the loop
+  stopped at the run's limit (below).
 
 ## Done
+
+- XAPI's memset (`c-runtime.md`, mapped in a212f92; 1 row, with 2 in
+  `heap.md` kept for the core): XMemSet ours in one migration
+  (671f5d0..b549e6c), with `Scenery::Init`, `CameraPasses::Init` and
+  `InitPasses` it unblocked and two adapters removed; validated
+  (`itc_1362`); `--native_c_runtime`. Left: `Viewports::Init` and
+  `Viewport::Init` on `atexit` (the core).
 
 - The course scenery (`course-scenery.md`, mapped in 043a0d2; 71 rows,
   73 with two moved in by the migration): 37 ours in one migration
@@ -87,10 +95,17 @@ This run's groups: `expected-differences.md` (the "16:01 run" lines).
 - After memset's migration 1: ours 1714, work left 5046 (wrapped 122,
   known 587, unknown 4337). Races 27, 25, 25 s with
   `--run_harnesses=all`, 0 errors, every harness 0 differing.
+- After memset's validation (the end): ours 1714, work left 5046
+  (wrapped 122, known 587, unknown 4337).
 - After the course scenery's migration 1: ours 1710, work left 5050
   (wrapped 122, known 588, unknown 4340). Race 27 s with
   `--run_harnesses=all`, 0 errors, every harness 0 differing.
 
 ## Stopped
 
-(not stopped)
+2026-10-24, after XAPI's memset: the run's limit (3 subsystems)
+reached. Everything passed: harnesses 0 differing (no "(expected to
+differ)" groups added), attract races 25-27 s under `attract_race.sh
+40`, no errors, replays ok. Next: the user reviews `review.md` ("Run
+2026-10-24 16:01"), drives a race for `to-drive.md` (the wide
+write_char), and merges.
