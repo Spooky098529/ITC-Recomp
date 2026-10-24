@@ -2,7 +2,10 @@
 // (docs/functions/track-zones.md). Each leaves r3 as the original does.
 // Functions reached only from native callers have no adapters (the flag
 // switches their callers): List64::Link (sub_820FE2C8), from
-// List64::Insert; List128::Link (sub_8228B5A0), from List128::Insert.
+// List64::Insert; List128::Link (sub_8228B5A0), from List128::Insert;
+// RouteRange::ToNeighbor (sub_820FDF98), from WithinEnds and Test;
+// RouteRange::WithinEnds (sub_820FE120), from OnPath; RouteRange::OnPath
+// (sub_820FE398), from Test.
 
 #include "guest.h"
 
@@ -21,7 +24,7 @@ ITC_FLAG_BOOL(native_track_zones, true, "ITC",
               "sub_8228BC80) natively instead of through the "
               "translated code (the same writes; checked by --run_harnesses=track_zones). "
               "Those reached only from native callers have no adapters, and the flag switches "
-              "their callers: sub_820FE2C8, sub_8228B5A0");
+              "their callers: sub_820FE2C8, sub_8228B5A0, sub_820FDF98, sub_820FE120, sub_820FE398");
 
 // Defines an adapter: the body (the arguments after the address) uses `ctx`
 // and `base`.
@@ -64,27 +67,10 @@ ITC_TRACK_ZONES(820FE058, RangeInit(base, ctx.r3.u32, LoadPosition(base, ctx.r4.
 ITC_TRACK_ZONES(820FE8C8, RangeAddBranch(base, ctx.r3.u32, ctx.r4.u32);
                 ctx.r3.u64 = ctx.r3.u64 + 12)
 
-// RouteRange::ToNeighbor: r3 = out (a section and a slice), r4 = a section,
-// r5 = &a position; returns 1 or 0 (out written either way).
-extern "C" REX_FUNC(sub_820FDF98) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_track_zones)) {
-    __imp__sub_820FDF98(ctx, base);
-    return;
-  }
-  Position out;
-  const uint32_t result =
-      RangeToNeighbor(base, &out, ctx.r4.u16, LoadPosition(base, ctx.r5.u32));
-  guest::StoreU16(base, ctx.r3.u32, out.section);
-  guest::StoreU16(base, ctx.r3.u32 + 2, out.slice);
-  ctx.r3.u64 = result;
-}
-// RouteRange::WithinEnds, OnPath, Test and Update: r3 = a range, r4 = &a
-// position; each returns its result.
-ITC_TRACK_ZONES(820FE120,
-                ctx.r3.u64 = RangeWithinEnds(base, ctx.r3.u32, LoadPosition(base, ctx.r4.u32)))
-ITC_TRACK_ZONES(820FE398,
-                ctx.r3.u64 = RangeOnPath(base, ctx.r3.u32, LoadPosition(base, ctx.r4.u32)))
+// RouteRange::Test and Update: r3 = a range, r4 = &a position; each
+// returns its result. Their adapters stay: in attract races, Update is
+// called from the camera modes (sub_821562F8, return address 0x821563C0)
+// and Test from sub_820FE830 (0x820FE854), both recompiled.
 ITC_TRACK_ZONES(820FE6F8,
                 ctx.r3.u64 = RangeTest(base, ctx.r3.u32, LoadPosition(base, ctx.r4.u32)))
 ITC_TRACK_ZONES(820FE878,
