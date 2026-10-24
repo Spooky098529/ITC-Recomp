@@ -21,11 +21,21 @@ file's history. What's left to see in a drive, from every run:
   the harness lines of `sub_8258CEB0` and `sub_8258CEE0` to check.
   Migration done (3ac7be7, 9e36924: Init native, 7 adapters removed;
   action-mappers.md and input.md have nothing ready left; TestPressed's
-  and TestRepeat's harness lines seen). Validation agent running.
+  and TestRepeat's harness lines seen), validated (`itc_1494`,
+  `itc_1495`; all ran in play or the replay). Done.
+- Between subsystems (no mapping, not counted): `leads.md`'s three
+  cleanup leads: `sub_8212B288` Smoke::~Smoke, `sub_8212BF88`
+  ParticlesB::~ParticlesB, `sub_8212BFE8` ParticlesB::ParticlesB and
+  their deleting destructors (`race-overlays.md`); `sub_8213BDF0`,
+  `sub_8213BE80`, `AiPath::JoinCornerPair`'s steps (`ai-drivers.md`);
+  the race overlays' flush-to-zero window (`src/race_overlays/`).
+  Migration agent running.
 
 ## Done
 
-(none yet)
+- Cleanup lead (no mapping): `ActionMappers::Init` (`action-mappers.md`;
+  3ac7be7, 9e36924), 7 adapters removed; validated (`itc_1494`,
+  `itc_1495`); `--native_action_mappers`.
 
 ## Rows to review
 
