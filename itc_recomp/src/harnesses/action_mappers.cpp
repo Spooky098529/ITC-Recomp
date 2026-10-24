@@ -99,6 +99,7 @@ ITC_NATIVE_STEP(NativeResetAnalog, ctx.r3.u64 = am::ResetAnalog(base, ctx.r3.u32
 ITC_NATIVE_STEP(NativeInitRepeats, ctx.r3.u64 = am::InitRepeats(base, ctx.r3.u32))
 ITC_NATIVE_STEP(NativeInitCurves, ctx.r3.u64 = am::InitCurves(base, ctx.r3.u32))
 ITC_NATIVE_STEP(NativeResetStages, ctx.r3.u64 = am::ResetStages(base, ctx.r3.u32))
+ITC_NATIVE_STEP(NativeMapperConstruct, am::MapperConstruct(base, ctx.r3.u32, ctx.r4.u32))
 ITC_NATIVE_STEP(NativeInputClientListConstruct,
                 am::InputClientListConstruct(base, ctx.r3.u32, ctx.r4.u32))
 ITC_NATIVE_STEP(NativeInputClientConstruct, am::InputClientConstruct(base, ctx.r3.u32, ctx.r4.u32))
@@ -858,6 +859,27 @@ void SetUp(Context& h) {
             t.r4.u64 = added;
           },
           __imp__sub_8210AF00, NativeInputClientListAdd, {}, fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    // The constructor over a random mapper (what the area held), for the
+    // four players and others; its listener's constants as floats too.
+    Results results("sub_8210C180 ActionMapper::ActionMapper");
+    Options constructed = options;
+    constructed.floats.push_back({kMapper + am::kListener + 16, kMapper + am::kListener + 32});
+    for (uint32_t k = 0; k < 6; k++) {
+      const uint32_t w = kMapper + am::kListener + 44 + 16 * k;
+      constructed.floats.push_back({w, w + 4});
+    }
+    for (int i = 0; i < 24; i++) {
+      Case(
+          h, results, [&] { RandomMapper(h, i % 2); },
+          [&](PPCContext& t) {
+            t.r3.u64 = m;
+            t.r4.u64 = i < 16 ? uint32_t(i % 4) : uint32_t(h.random.Next());
+          },
+          __imp__sub_8210C180, NativeMapperConstruct, constructed, fmt::format("case {}", i));
     }
     results.Report();
   }

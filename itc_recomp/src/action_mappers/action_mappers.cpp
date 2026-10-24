@@ -6,6 +6,7 @@
 #include "debug/pause_menu_log.h"
 #include "frame_pacing/game_messages.h"
 #include "guest.h"
+#include "input/input_manager.h"
 
 #include <immintrin.h>
 
@@ -707,6 +708,72 @@ void InputClientConstruct(uint8_t* base, uint32_t node, uint32_t type) {
 void InputClientListAdd(uint8_t* base, uint32_t node) {
   ITC_NATIVE_RUNNING("sub_8210AF00 InputClientList::Add");
   ClientListAdd(base, node);
+}
+
+namespace {
+
+constexpr uint32_t kMapperVtable = 0x82007F78;
+constexpr uint32_t kRepeatVtable = 0x82007F68;
+constexpr uint32_t kCurveVtable = 0x82007F70;
+constexpr uint32_t kThresholdOn = 0x82002A10;
+constexpr uint32_t kThresholdOff = 0x8200296C;
+// The links of actions 2-23 (the byte table at 0x82007F40 picks the case):
+// each direction's opposite, or 30 (none).
+constexpr uint32_t kLinks[22] = {3,  2,  5,  4,  30, 30, 30, 30, 30, 30, 30,
+                                 30, 30, 30, 17, 16, 19, 18, 21, 20, 23, 22};
+
+}  // namespace
+
+bool MapperConstructKnown(uint8_t* base) {
+  return guest::LoadU32(base, kRepeatVtable) == kRepeatResetFunction &&
+         guest::LoadU32(base, kCurveVtable) == kCurveResetFunction;
+}
+
+void MapperConstruct(uint8_t* base, uint32_t mapper, uint32_t player) {
+  ITC_NATIVE_RUNNING("sub_8210C180 ActionMapper::ActionMapper");
+  InputClientConstruct(base, mapper, 2);
+  const uint32_t words = mapper + kWords;
+  guest::StoreU32(base, mapper, kMapperVtable);
+  for (uint32_t i = 0; i < kActions; i++) {
+    guest::StoreU32(base, words + 144 + 16 * i, kRepeatVtable);
+  }
+  for (uint32_t i = 0; i < kActions; i++) {
+    guest::StoreU32(base, words + 924 + 16 * i, kCurveVtable);
+  }
+  input::InputProcessorConstruct(base, mapper + kListener);
+  guest::StoreU32(base, mapper + 2888, player);
+  guest::StoreU8(base, mapper + 2884, 0);
+  ResetStages(base, words);
+
+  const double one = Lfs(base, kOne);
+  const double zero = Lfs(base, kZero);
+  const double off = Lfs(base, kThresholdOff);
+  const double on = Lfs(base, kThresholdOn);
+  for (uint32_t i = 0; i < kActions; i++) {
+    guest::StoreU32(base, mapper + 12 + 4 * i, 1);
+    guest::StoreU32(base, mapper + 132 + 4 * i, i >= 24 ? 2 : 1);
+    const uint32_t c = i - 2;  // the switch's case, unsigned
+    guest::StoreU32(base, mapper + 252 + 4 * i, c <= 21 ? kLinks[c] : 30);
+    const uint32_t entry = mapper + kThresholds + 20 * i;
+    guest::StoreFloat(base, entry, float(on));
+    guest::StoreU32(base, entry + 8, 0);
+    guest::StoreFloat(base, entry + 4, float(off));
+    guest::StoreU32(base, entry + 12, 0);
+    guest::StoreU8(base, entry + 16, 0);
+    const uint32_t repeat = mapper + 592 + 16 * i;
+    guest::StoreU32(base, repeat + 8, 20);
+    guest::StoreU32(base, repeat + 12, 3);
+    const uint32_t curve = mapper + 1372 + 16 * i;
+    guest::StoreFloat(base, curve + 4, float(zero));
+    guest::StoreFloat(base, curve + 8, float(zero));
+    guest::StoreFloat(base, curve + 12, float(one));
+  }
+  guest::StoreU32(base, mapper + 376, mapper + 252);
+  guest::StoreU32(base, mapper + 384, mapper + 252);
+  guest::StoreU32(base, mapper + 372, mapper + 12);
+  guest::StoreU32(base, mapper + 380, mapper + 132);
+  ResetWords(base, words);
+  ResetAnalog(base, mapper + kAnalog);
 }
 
 }  // namespace action_mappers

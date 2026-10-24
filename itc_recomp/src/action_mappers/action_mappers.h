@@ -216,4 +216,19 @@ void InputClientConstruct(uint8_t* base, uint32_t node, uint32_t type);
 // InputClientList::Add (sub_8210AF00): ClientList::Add on `node`.
 void InputClientListAdd(uint8_t* base, uint32_t node);
 
+// ActionMapper::ActionMapper (sub_8210C180): the mapper (2,896 bytes) for
+// `player` (+2888): its node (InputClient, type 2), vtable 0x82007F78, the
+// repeat and curve objects' vtables (0x82007F68 at +592 + 16i, 0x82007F70 at
+// +1372 + 16i), its listener (an input processor, +2464), not bound (+2884),
+// ResetStages; the config tables (+12 the kinds, all 1; +132 the analog
+// kinds, 2 for actions 24-29, else 1; +252 the links, each direction's
+// opposite for actions 2-23, else 30), each action's threshold (on
+// [0x82002A10], off [0x8200296C], the rest 0), repeat (delay 20, period 3)
+// and curve (center and dead zone [0x82000A34], maximum [0x82000A30]); the
+// four config pointers (+372); then ResetWords and ResetAnalog.
+// MapperConstructKnown: the two vtables' slot 0 are the resets seen in play
+// (the plain C++ does their work), else its adapter runs the original.
+bool MapperConstructKnown(uint8_t* base);
+void MapperConstruct(uint8_t* base, uint32_t mapper, uint32_t player);
+
 }  // namespace action_mappers
