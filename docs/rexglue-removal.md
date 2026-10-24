@@ -84,9 +84,9 @@ goes in `src/` as overrides), American English.
   controllers and the track zones native as far as they were ready
   (ours 1,485); its tenth run (branch `b7-loop-24-10-26`) mapped the
   graphics resources (`graphics-resources.md`, 44 rows) and stopped
-  for two of the user's calls before migrating (kernel critical
-  sections in `Edram::Alloc`; dropping the resource locks' fence waits
-  and cache flushes). The
+  for two of the user's calls before migrating: `Edram::Alloc` native
+  with a `std::mutex` for the kernel's critical section, and the
+  resource locks' fence waits and cache flushes Dropped (2026-10-24). The
   runs' rows wait for the user's review (`docs/loops/review.md`). See
   "B7's loop runs" under B7, and `docs/loops/b7-progress.md`. Guest
   allocation is no longer a block (`docs/native-memory.md`); what the
