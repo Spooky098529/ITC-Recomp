@@ -44,6 +44,10 @@ file's history. What's left to see in a drive, from every run:
   adapters removed; `--native_screen_objects`), validated (`itc_1518`,
   `itc_1519`; `sub_8212EEF8`, never seen in play, to `to-drive.md`).
   Finished.
+- Subsystem 2 of 3: `leads.md`'s framework's set-up (`sub_82090A08`,
+  `sub_82090788`, `sub_820944C8`, `sub_82094350`, `sub_82090830`, the
+  getters `sub_82090760`-`sub_82090788`; 12 of 18 named ready).
+  Mapping agent running.
 
 ## Done
 
