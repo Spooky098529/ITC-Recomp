@@ -45,6 +45,13 @@ NaN groups below stay as recorded.
   code initializes the critical section in the guest object, ours leaves
   those bytes as the allocation cleared them. Everything else in the
   object matches.
+- **Flush packet dropped:** the user's call (2026-10-24) to drop
+  `Resource::Lock`'s cache flush packet: the recompiled code queues the
+  flush (widening the device's pending flush range at +11560 through
+  `sub_8229DDD8`, or writing the packet past the command buffer's write
+  position); ours leaves them. Only cases taking the packet path (flags
+  without 0x2 or 0x10) differ; the header, ranges, lock count and r3
+  match. The renderer skips coherency packets.
 
 ## By function file
 
@@ -180,3 +187,4 @@ were at 0.
 | Function | Group | Differ | Reason | Review |
 |---|---|---|---|---|
 | `sub_822B5EF8` Edram::Alloc | the allocator made: its critical section | 8 of 8 | Mutex for a critical section (bytes +0 to +27) | for review (03:25 run) |
+| `sub_822A63F8` Resource::Lock | its command buffer | 448 of 1000 | Flush packet dropped (the pending range at +11560) | for review (03:25 run) |

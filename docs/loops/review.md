@@ -32,6 +32,22 @@ When the user has reviewed a run's section, its heading gets
   Texture::GetLevelDesc has no print of its own (the original only
   jumps to LevelDesc, whose plain C++ its adapter calls; its harness
   and LevelDesc's game line cover it); AddRef's print added (2783ad0).
+- The graphics resources' second migration (062da1d..4be0508): 46 of
+  46 ours; new row `sub_822A4A40` TextureLayout::MipTailOffset (Native,
+  not seen in play). `functions.md` rows changed: `sub_8229E908` (also a
+  fence wait), `sub_822AC470` (the data cache flush), `sub_825B9A60` (the
+  current thread's id), and new `sub_8229DDD8` (widens the device's
+  pending flush range; Dropped from Lock); their Status blank (other
+  recompiled callers). For review: paths kept on the originals, never
+  taken in play (TextureHeader::Set for unknown types, which read an
+  uninitialized stack word; levels from 2^31 in LevelOffset, LockLevel,
+  LockRect, LockRectLevel; Destroy's type 9 with `sub_822AD9D8`;
+  XGSetTextureHeader with its header out in the physical views or across
+  two views); GetSurfaceLevel leaves out its LevelOffset call (it writes
+  only its own stack); XGSetTextureHeaderEx stores the 52-byte header
+  directly instead of calling memcpy; the lock count by compare-and-swap
+  without the recompiler's global lock (as `refcount.cpp`); frame dumps
+  matched the fallback flag's.
 
 - `graphics-resources.md` (new, 44 rows; 8 moved from `functions.md`,
   36 new; mapped in 0e67c00), `known-data.md` (the texture, surface

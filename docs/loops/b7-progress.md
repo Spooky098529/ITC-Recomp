@@ -20,9 +20,8 @@ see in a drive, from every run: `to-drive.md`.
   groups). The map's checks passed, but its report's `stop:` named two
   choices for the user, so the loop stopped before migrating (below); resumed with the
   user's calls. Migration 1 done (e4730b8..e6b9811, 25 of 45 ours),
-  validated (`itc_1267`, `itc_1269`; replay ok; 1 to drive): second
-  migration agent running (Lock, Unlock, Destroy by the user's call,
-  and the three ready groups left).
+  validated (`itc_1267`, `itc_1269`; replay ok; 1 to drive): migration 2
+  done (062da1d..4be0508, 46 of 46 ours): validation agent running.
 
 ## Done
 
@@ -49,6 +48,11 @@ This run's groups: `expected-differences.md` (the "03:25 run" lines).
   `--run_harnesses=all`, 0 errors, every harness 0 differing outside
   one "(expected to differ)" group added (Edram::Alloc's critical
   section, the user's call).
+- After the graphics resources' migration 2: ours 1529, work left 5231
+  (wrapped 123, known 554, unknown 4554). Race 27 s (`itc_1291`) with
+  `--run_harnesses=all`, 0 errors, every harness 0 differing outside
+  one "(expected to differ)" group added (Resource::Lock's command
+  buffer, the user's call).
 
 ## Stopped
 
