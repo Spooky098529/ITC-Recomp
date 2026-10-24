@@ -86,6 +86,11 @@ bool DestroyInputs(uint8_t* base, uint32_t* last) {
   return true;
 }
 
+bool OnEnd(uint8_t* base, uint32_t* last) {
+  ITC_NATIVE_RUNNING("sub_8215F5E8 RaceFlow::OnEnd");
+  return DestroyInputs(base, last);
+}
+
 // --- The input recording ---
 
 uint32_t RecordingAppend(uint8_t* base, uint32_t record, uint32_t player) {
@@ -189,6 +194,11 @@ uint32_t ClearAllRecords(uint8_t* base, uint32_t sp) {
     Copy20(base, InputOf(base, RacerWord(base, uint32_t(i), 20)), record);
   }
   return 1;
+}
+
+uint32_t OnHold(uint8_t* base, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8215FC28 RaceFlow::OnHold");
+  return HoldAll(base, sp, calls);
 }
 
 uint32_t OnState16(uint8_t* base, uint32_t sp, const Calls& calls) {
@@ -842,6 +852,12 @@ uint32_t PlayersAndHeldAi(uint8_t* base, uint32_t flow, uint32_t owner, uint32_t
   return ByRacer(
       base, flow, owner, sp, calls, [] { return 1u; },
       [](uint32_t first) { return first == 0 ? 1u : 0u; }, [](uint32_t) { return 1u; });
+}
+
+uint32_t OnState7(uint8_t* base, uint32_t flow, uint32_t owner, uint32_t sp,
+                  const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_82160940 RaceFlow::OnState7");
+  return PlayersAndHeldAi(base, flow, owner, sp, calls);
 }
 
 uint32_t PlayersAndAi(uint8_t* base, uint32_t flow, uint32_t owner, uint32_t sp,

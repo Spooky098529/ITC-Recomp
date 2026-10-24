@@ -63,7 +63,7 @@ void NativeOnSetUp(PPCContext& ctx, uint8_t* base) {
 }
 void NativeOnEnd(PPCContext& ctx, uint8_t* base) {
   uint32_t last = 0;
-  if (rc::DestroyInputs(base, &last)) {
+  if (rc::OnEnd(base, &last)) {
     ctx.r3.u64 = last;
   } else {
     Original<__imp__sub_8215F5E8>(ctx, base);
@@ -181,6 +181,10 @@ void NativeHoldAll(PPCContext& ctx, uint8_t* base) {
   ITC_HARNESS_CALLS;
   ctx.r3.u64 = rc::HoldAll(base, ctx.r1.u32, calls);
 }
+void NativeOnHold(PPCContext& ctx, uint8_t* base) {
+  ITC_HARNESS_CALLS;
+  ctx.r3.u64 = rc::OnHold(base, ctx.r1.u32, calls);
+}
 void NativeOnState16(PPCContext& ctx, uint8_t* base) {
   ITC_HARNESS_CALLS;
   ctx.r3.u64 = rc::OnState16(base, ctx.r1.u32, calls);
@@ -242,6 +246,11 @@ void NativePlayersAndHeldAi(PPCContext& ctx, uint8_t* base) {
   ITC_HARNESS_CALLS;
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = rc::PlayersAndHeldAi(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, calls);
+}
+void NativeOnState7(PPCContext& ctx, uint8_t* base) {
+  ITC_HARNESS_CALLS;
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = rc::OnState7(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, calls);
 }
 void NativePlayersAndAi(PPCContext& ctx, uint8_t* base) {
   ITC_HARNESS_CALLS;
@@ -522,7 +531,7 @@ void Handoff(Context& h, Random& r) {
        kDriveByAi, 300},
       {"RaceFlow::HoldAll (sub_8215FA10)", Original<__imp__sub_8215FA10>, NativeHoldAll, kHoldAll,
        300},
-      {"RaceFlow::OnHold (sub_8215FC28)", Original<__imp__sub_8215FC28>, NativeHoldAll, kOnHold,
+      {"RaceFlow::OnHold (sub_8215FC28)", Original<__imp__sub_8215FC28>, NativeOnHold, kOnHold,
        100},
       {"RaceFlow::OnState16 (sub_8215FB90)", Original<__imp__sub_8215FB90>, NativeOnState16,
        kOnState16, 300},
@@ -825,7 +834,7 @@ void Pads(Context& h, Random& r) {
       {"RaceFlow::PlayersAndHeldAi (sub_821606D0)", Original<__imp__sub_821606D0>,
        NativePlayersAndHeldAi, kByRacer, 500},
       {"RaceFlow::OnState7 (sub_82160940)", Original<__imp__sub_82160940>,
-       NativePlayersAndHeldAi, kByRacer, 200},
+       NativeOnState7, kByRacer, 200},
       {"RaceFlow::PlayersAndAi (sub_821607A0)", Original<__imp__sub_821607A0>,
        NativePlayersAndAi, kByRacer, 500},
       {"sub_82160880 (never seen in play)", Original<__imp__sub_82160880>,

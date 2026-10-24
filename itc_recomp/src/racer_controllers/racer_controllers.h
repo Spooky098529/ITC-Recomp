@@ -82,6 +82,9 @@ bool CreateInputs(uint8_t* base, uint32_t* last);
 // original's r3). False, with nothing done, when one isn't a block the
 // layer gave (operator delete's error path, the original's then).
 bool DestroyInputs(uint8_t* base, uint32_t* last);
+// RaceFlow::OnEnd (sub_8215F5E8): a jump to DestroyInputs (`last` the
+// original's r3; false, with nothing done, where DestroyInputs is).
+bool OnEnd(uint8_t* base, uint32_t* last);
 
 // --- The input recording ---
 
@@ -115,6 +118,8 @@ void DriveByAi(uint8_t* base, uint32_t index, uint32_t hold, uint32_t sp, const 
 // RaceFlow::HoldAll (sub_8215FA10; sub_8215FC28 jumps to it): each racer
 // driven by its AI driver held (DriveByAi with 1). Returns 1.
 uint32_t HoldAll(uint8_t* base, uint32_t sp, const Calls& calls);
+// RaceFlow::OnHold (sub_8215FC28): a jump to HoldAll. Returns 1.
+uint32_t OnHold(uint8_t* base, uint32_t sp, const Calls& calls);
 // sub_8215F5F0 (never seen in play): a record cleared in the original's
 // frame (CarInput::Clear at +80; its bytes +18 and +19 the frame's) and
 // copied to every racer's input record. Returns 1.
@@ -207,6 +212,9 @@ uint32_t AllByAi(uint8_t* base, uint32_t flow, uint32_t sp, const Calls& calls);
 // held. Returns 1.
 uint32_t PlayersAndHeldAi(uint8_t* base, uint32_t flow, uint32_t owner, uint32_t sp,
                           const Calls& calls);
+// RaceFlow::OnState7 (sub_82160940): a jump to PlayersAndHeldAi. Returns 1.
+uint32_t OnState7(uint8_t* base, uint32_t flow, uint32_t owner, uint32_t sp,
+                  const Calls& calls);
 // RaceFlow::PlayersAndAi (sub_821607A0): as PlayersAndHeldAi, the others
 // held unless their word +0 has 0x10 and not 0x4000. Returns 1.
 uint32_t PlayersAndAi(uint8_t* base, uint32_t flow, uint32_t owner, uint32_t sp,

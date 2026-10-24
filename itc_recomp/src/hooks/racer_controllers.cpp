@@ -153,7 +153,7 @@ ITC_RACER_CONTROLLERS(8215F728, {
 // where a record isn't the layer's.
 ITC_RACER_CONTROLLERS(8215F5E8, {
   uint32_t last = 0;
-  if (DestroyInputs(base, &last)) {
+  if (OnEnd(base, &last)) {
     ctx.r3.u64 = last;
     return;
   }
@@ -165,7 +165,7 @@ ITC_RACER_CONTROLLERS(8215F5E8, {
 // Through the race flow's functors: a jump to HoldAll, and state 16's.
 ITC_RACER_CONTROLLERS(8215FC28, {
   ITC_RACER_CALLS;
-  ctx.r3.u64 = HoldAll(base, ctx.r1.u32, calls);
+  ctx.r3.u64 = OnHold(base, ctx.r1.u32, calls);
 })
 ITC_RACER_CONTROLLERS(8215FB90, {
   ITC_RACER_CALLS;
@@ -188,7 +188,7 @@ ITC_RACER_CONTROLLERS(82170FF8, {
 ITC_RACER_CONTROLLERS(82160940, {
   ITC_RACER_CALLS;
   ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = PlayersAndHeldAi(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, calls);
+  ctx.r3.u64 = OnState7(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, calls);
 })
 ITC_RACER_CONTROLLERS(82160948, {
   ITC_RACER_CALLS;
