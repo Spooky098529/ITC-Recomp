@@ -39,9 +39,14 @@ ITC_FLAG_BOOL(native_cameras, true, "ITC",
               "diagnostics, and CameraPass::FromViewport sub_820AA4A8; RecordClear sub_8209FA38, "
               "without the command list's diagnostics; CameraPasses::RecordBegins sub_8209F8A0 and "
               "RecordEnds sub_8209F900 (in their diagnostics' wrappers) with CameraPass::RecordBegin "
-              "sub_820A0CC0 and RecordEnd sub_820A1C30, without the command list's diagnostics) natively instead of "
+              "sub_820A0CC0 and RecordEnd sub_820A1C30, without the command list's diagnostics; "
+              "CameraPasses::MakeRenderTarget sub_8209FBF0 with its case 0 sub_8209FC7C, with "
+              "--native_video_output, --native_graphics_resources and --native_heap) natively instead of "
               "through the translated code (the same words, bit for bit; checked by "
               "--run_harnesses=cameras)");
+
+ITC_FLAG_DECLARE(bool, native_video_output);
+ITC_FLAG_DECLARE(bool, native_graphics_resources);
 
 #define ITC_CAMERAS_FALLBACK(address) \
   REX_FUNC_PROLOGUE();                \
@@ -178,6 +183,74 @@ extern "C" REX_FUNC(sub_820A0C40) {
     ctx.r3.u64 = pass;
   } else if (!released_580) {
     ctx.r3.u64 = 0;
+  }
+}
+
+namespace {
+
+// The video output, as the device's users reach it: `[0x8266D088]`'s vtable
+// slot 7, then that object's slot 3, as guest calls with the original's
+// return addresses. r3 = the video output after.
+uint32_t VideoOutputCall(PPCContext& ctx, uint8_t* base, uint32_t first, uint32_t second) {
+  ctx.r3.u64 = guest::LoadU32(base, 0x8266D088);
+  ctx.ctr.u64 = guest::LoadU32(base, guest::LoadU32(base, ctx.r3.u32) + 28);
+  ctx.lr = first;
+  REX_CALL_INDIRECT_FUNC(ctx.ctr.u32);
+  ctx.ctr.u64 = guest::LoadU32(base, guest::LoadU32(base, ctx.r3.u32) + 12);
+  ctx.lr = second;
+  REX_CALL_INDIRECT_FUNC(ctx.ctr.u32);
+  return ctx.r3.u32;
+}
+
+// Whether the native device users can run: the device lock, the texture and
+// surface makers native.
+bool DeviceUsersNative() {
+  return ITC_FLAG(native_video_output) && ITC_FLAG(native_graphics_resources) &&
+         hooks::NativeHeapActive();
+}
+
+}  // namespace
+
+namespace hooks {
+
+bool CameraPassesMakeRenderTarget(PPCContext& ctx, uint8_t* base) {
+  if (!DeviceUsersNative()) {
+    return false;
+  }
+  const uint32_t id = ctx.r3.u32;
+  const uint64_t lr = ctx.lr;
+  uint32_t video_output = 0;
+  guest_call::InFrame(ctx, base, 112, 0x8209FC20, [&](uint32_t frame) {
+    video_output = cameras::MakeRenderTarget(
+        base, frame, id,
+        {[&](int at) {
+           return at == 0 ? VideoOutputCall(ctx, base, 0x8209FC20, 0x8209FC30)
+                          : VideoOutputCall(ctx, base, 0x8209FF84, 0x8209FF94);
+         },
+         [&](uint32_t target) {
+           ctx.r3.u64 = target;
+           ctx.lr = 0x8209FC40;
+           sub_8209F7A8(ctx, base);
+           return ctx.r3.u32;
+         },
+         [&](uint32_t resource) {
+           ctx.r3.u64 = resource;
+           ctx.lr = 0x8209FC4C;
+           sub_822A67B0(ctx, base);
+         }});
+  });
+  ctx.lr = lr;
+  ctx.r3.u64 = video_output;
+  return true;
+}
+
+}  // namespace hooks
+
+// CameraPasses::MakeRenderTarget: r3 = the id (hooks::CameraPassesMakeRenderTarget).
+extern "C" REX_FUNC(sub_8209FBF0) {
+  ITC_CAMERAS_FALLBACK(8209FBF0)
+  if (!hooks::CameraPassesMakeRenderTarget(ctx, base)) {
+    __imp__sub_8209FBF0(ctx, base);
   }
 }
 

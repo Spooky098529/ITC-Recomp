@@ -108,6 +108,30 @@ bool SetMode(uint8_t* base, int32_t which, uint32_t mode);
 // the mode (0 for modes other than 0 and 1).
 uint32_t RenderTarget(uint8_t* base, uint32_t id);
 
+// The guest calls the device's users make (the adapters' guest calls):
+// the video output (`[0x8266D088]`'s vtable slot 7, then that object's slot
+// 3; `at` picks the original's return addresses), CameraPasses::RenderTarget
+// through its override (the diagnostics' wrapper) and Resource::Release
+// (sub_822A67B0).
+struct DeviceCalls {
+  std::function<uint32_t(int at)> video_output;
+  std::function<uint32_t(uint32_t id)> render_target;
+  std::function<void(uint32_t resource)> release;
+};
+
+// CameraPasses::MakeRenderTarget (sub_8209FBF0, with its case 0, sub_8209FC7C,
+// merged): with the device locked (VideoOutput::LockDevice's plain C++, the
+// device kept in the original's frame at `frame` + 80), render target `id`'s
+// old texture released (when set), then for ids 0 to 12 a new one
+// (Device::CreateTexture's plain C++: one level, usage 1; 512 x 128, the
+// 1024, 512 and 256 squares, formats 0x182801B6, 0x1A220197 and 0x18280186;
+// id 1 by the mode, mode 0 a 2D texture into 0x826BABEC, mode 1 a cube map
+// into 0x826BABCC, none for other modes) into its global; then the device
+// unlocked. Returns the video output from the last call (r3 as the original
+// leaves it). Needs --native_heap and --native_graphics_resources (the
+// adapter checks).
+uint32_t MakeRenderTarget(uint8_t* base, uint32_t frame, uint32_t id, const DeviceCalls& calls);
+
 // CameraPass::Enable (sub_820A0968) and CameraPass::Disable (sub_820A0958):
 // +588 = 1 or 0.
 void Enable(uint8_t* base, uint32_t pass);

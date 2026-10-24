@@ -5,6 +5,8 @@
 #include "base/log.h"
 #include "c_runtime/math.h"
 #include "command_list/command_list.h"
+#include "graphics/resources.h"
+#include "graphics/video_output.h"
 #include "interpolation/blend_state.h"
 #include "matrix_math/matrix_math.h"
 #include "memory/heap.h"
@@ -435,6 +437,51 @@ uint32_t RenderTarget(uint8_t* base, uint32_t id) {
                        : 0;
   }
   return guest::LoadU32(base, kTextures[id]);
+}
+
+uint32_t MakeRenderTarget(uint8_t* base, uint32_t frame, uint32_t id, const DeviceCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_8209FBF0 CameraPasses::MakeRenderTarget");
+  struct Target {
+    uint32_t size;
+    uint32_t format;
+    uint32_t global;
+  };
+  // Ids 0 and 2 to 12 (id 0 is 512 x 128; id 1 below).
+  static constexpr Target kTargets[] = {
+      {512, 0x182801B6, 0x826BABE8},  {0, 0, 0},
+      {1024, 0x1A220197, 0x826BABDC}, {512, 0x18280186, 0x826BABC8},
+      {1024, 0x18280186, 0x826BABD4}, {512, 0x1A220197, 0x826BABFC},
+      {256, 0x18280186, 0x826BABF8},  {256, 0x18280186, 0x826BABF4},
+      {512, 0x1A220197, 0x826BABF0},  {256, 0x18280186, 0x826BABD0},
+      {256, 0x18280186, 0x826BABD8},  {256, 0x18280186, 0x826BABE0},
+      {1024, 0x1A220197, 0x826BABC4},
+  };
+  constexpr uint32_t kCubeSize = 0x82001EF0;  // id 1's size (a word)
+  const uint32_t local = frame + 80;
+  guest::StoreU32(base, local,
+                  graphics::video_output::LockDevice(base, calls.video_output(0)));
+  if (const uint32_t old = calls.render_target(id); old != 0) {
+    calls.release(old);
+  }
+  if (id == 1) {
+    const int32_t mode = int32_t(guest::LoadU32(base, kMode));
+    const uint32_t size = guest::LoadU32(base, kCubeSize);
+    if (mode == 0) {
+      guest::StoreU32(base, 0x826BABEC,
+                      graphics::CreateTexture(base, size, size, 1, 1, 1, 0x182801B6, 3));
+    } else if (mode == 1) {
+      guest::StoreU32(base, 0x826BABCC,
+                      graphics::CreateTexture(base, size, size, 6, 1, 1, 0x182801B6, 18));
+    }
+  } else if (id <= 12) {
+    const Target& t = kTargets[id];
+    const uint32_t height = id == 0 ? 128 : t.size;
+    guest::StoreU32(base, t.global,
+                    graphics::CreateTexture(base, t.size, height, 1, 1, 1, t.format, 3));
+  }
+  const uint32_t video_output = calls.video_output(1);
+  graphics::video_output::UnlockDevice(base, video_output, local);
+  return video_output;
 }
 
 void Enable(uint8_t* base, uint32_t pass) {

@@ -33,6 +33,16 @@ bool CameraConstruct(PPCContext& ctx, uint8_t* base);
 bool CameraPassRecordBegin(PPCContext& ctx, uint8_t* base);
 bool CameraPassRecordEnd(PPCContext& ctx, uint8_t* base);
 
+// CameraPasses::MakeRenderTarget (sub_8209FBF0) natively, without the
+// flag: r3 = the id; from a frame like the original's (112 bytes), the video
+// output (`[0x8266D088]`'s slots), CameraPasses::RenderTarget (through its
+// override, the diagnostics' wrapper) and Resource::Release as guest calls
+// with its return addresses; r3 the video output, as the original's last
+// call leaves it. False, with nothing done, where the original must run
+// (--native_video_output or --native_graphics_resources off, or the
+// allocation layer not routing the heaps).
+bool CameraPassesMakeRenderTarget(PPCContext& ctx, uint8_t* base);
+
 // CameraPasses::RecordBegins (sub_8209F8A0) and RecordEnds (sub_8209F900)
 // natively, for their wrappers in src/debug/frame_state_diff.cpp: each
 // enabled pass recorded as above (the original RecordBegin or RecordEnd

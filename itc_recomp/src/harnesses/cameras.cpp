@@ -15,6 +15,7 @@
 #include "command_list/command_list.h"
 #include "hooks/cameras.h"
 #include "hooks/heap.h"
+#include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
 
 #include <fmt/format.h>
@@ -1151,6 +1152,98 @@ void FromViewportCases(Context& h) {
 
 }  // namespace
 
+// CameraPasses::MakeRenderTarget on every id (13 above the range), id 1 in
+// modes 0 to 2, with the old texture a fake resource in the scratch area
+// (its count 2 or more, so Release only counts it down) or none. The 16
+// globals at 0x826BABC0 (the mode and the targets) are saved and put back,
+// and the textures made freed, so the game's are untouched. The device lock
+// is the game's (taken and given back on this thread). Compared: r3, the
+// fake's count, and each global: a new texture's header with its addresses'
+// top 20 bits cleared (they differ by allocation), others exactly.
+void MakeRenderTargetCases(Context& h) {
+  if (!hooks::NativeHeapActive()) {
+    return;
+  }
+  Results results("sub_8209FBF0 CameraPasses::MakeRenderTarget");
+  constexpr uint32_t kGlobals = 0x826BABC0, kWords = 16;
+  uint32_t saved[kWords];
+  for (uint32_t i = 0; i < kWords; i++) {
+    saved[i] = guest::LoadU32(h.base, kGlobals + 4 * i);
+  }
+  const uint32_t fake = h.data + 16;
+  for (int c = 0; c < 32; c++) {
+    const uint32_t id = c < 14 ? uint32_t(c) : c < 17 ? 1 : h.random.Below(14);
+    const uint32_t mode = c >= 14 && c < 17 ? uint32_t(c - 14) : h.random.Below(3);
+    const bool old = c % 2 == 1 || c >= 17;
+    const uint32_t count = 2 + h.random.Below(4);
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      for (uint32_t i = 0; i < kWords; i++) {
+        guest::StoreU32(h.base, kGlobals + 4 * i, 0);
+      }
+      guest::StoreU32(h.base, cm::kMode, mode);
+      guest::StoreU32(h.base, fake + 0, 0);
+      guest::StoreU32(h.base, fake + 4, count);
+      static constexpr uint32_t kTargets[] = {0x826BABE8, 0, 0x826BABDC, 0x826BABC8, 0x826BABD4,
+                                              0x826BABFC, 0x826BABF8, 0x826BABF4, 0x826BABF0,
+                                              0x826BABD0, 0x826BABD8, 0x826BABE0, 0x826BABC4};
+      if (old && id <= 12) {
+        const uint32_t global = id != 1 ? kTargets[id] : mode == 0 ? 0x826BABEC : 0x826BABCC;
+        guest::StoreU32(h.base, global, fake);
+      }
+      uint32_t before[kWords];
+      for (uint32_t i = 0; i < kWords; i++) {
+        before[i] = guest::LoadU32(h.base, kGlobals + 4 * i);
+      }
+      PPCContext t = CallContext(h);
+      t.r3.u64 = id;
+      bool ran = true;
+      if (v == 0) {
+        const bool flag = ITC_FLAG(native_cameras);
+        ITC_FLAG(native_cameras) = false;
+        __imp__sub_8209FBF0(t, h.base);
+        ITC_FLAG(native_cameras) = flag;
+      } else {
+        ran = hooks::CameraPassesMakeRenderTarget(t, h.base);
+      }
+      out[v].Word(ran);
+      out[v].Word(t.r3.u32);
+      out[v].Word(guest::LoadU32(h.base, fake + 4));
+      for (uint32_t i = 0; i < kWords; i++) {
+        const uint32_t word = guest::LoadU32(h.base, kGlobals + 4 * i);
+        if (word == before[i] || word == 0) {
+          out[v].Word(word);
+          continue;
+        }
+        out[v].Word(word & 0xFFF);
+        std::vector<uint8_t> header = Read(h.base, word, 52);
+        const uint32_t data = guest::LoadU32(h.base, word + 32) & 0xFFFFF000;
+        const uint32_t mips = guest::LoadU32(h.base, word + 48) & 0xFFFFF000;
+        out[v].Word(data != 0);
+        out[v].Word(mips != 0);
+        for (int k = 0; k < 3; k++) {
+          header[32 + k] = 0;
+          header[48 + k] = 0;
+        }
+        header[35] &= 0x0F;
+        header[51] &= 0x0F;
+        out[v].Bytes(header);
+        if (mips) {
+          memory::crt::XMemFree(mips, 0xBC800000);
+        }
+        memory::crt::XMemFree(data, 0xBC800000);
+        memory::crt::XMemFree(word, 0x24800000);
+      }
+    }
+    results.Check(out[0], out[1],
+                  fmt::format("case {}: id {} mode {} old {}", c, id, mode, old ? "set" : "none"));
+  }
+  for (uint32_t i = 0; i < kWords; i++) {
+    guest::StoreU32(h.base, kGlobals + 4 * i, saved[i]);
+  }
+  results.Report();
+}
+
 void Cameras(Context& h) {
   SetFieldOfViewCases(h);
   BuildProjectionCases(h);
@@ -1166,6 +1259,7 @@ void Cameras(Context& h) {
   FromViewportCases(h);
   RecordPassCases(h);
   RecordPassesCases(h);
+  MakeRenderTargetCases(h);
 }
 
 }  // namespace harness
