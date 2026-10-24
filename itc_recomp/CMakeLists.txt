@@ -155,6 +155,8 @@ set(ITC_SOURCES
     src/graphics/video_output.cpp
     src/hooks/device_state.cpp
     src/graphics/device_state.cpp
+    src/hooks/post_effects.cpp
+    src/post_effects/post_effects.cpp
     src/hooks/course_scenery.cpp
     src/course_scenery/course_scenery.cpp
     src/hooks/action_mappers.cpp
@@ -230,6 +232,7 @@ set(ITC_SOURCES
     src/harnesses/video_output.cpp
     src/harnesses/device_state.cpp
     src/harnesses/course_scenery.cpp
+    src/harnesses/post_effects.cpp
     src/harnesses/action_mappers.cpp
     src/harnesses/data_tables.cpp
     src/harnesses/model_animation.cpp

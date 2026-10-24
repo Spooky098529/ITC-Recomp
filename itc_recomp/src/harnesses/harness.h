@@ -170,5 +170,6 @@ void GraphicsResources(Context& h);
 void VideoOutput(Context& h);
 void DeviceState(Context& h);
 void CourseScenery(Context& h);
+void PostEffects(Context& h);
 
 }  // namespace harness
