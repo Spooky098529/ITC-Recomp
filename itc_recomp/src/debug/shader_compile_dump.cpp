@@ -1,8 +1,4 @@
-// --dump_shader_compiles: captures what the game's HLSL compiler
-// (D3DXCompileShader, sub_822B8F10) makes, so the 14 shaders it compiles at
-// boot from source in the image can be stored and plugged in instead (see
-// sub_822B8F10 in docs/functions/functions.md). Temporary: goes once the
-// stored shaders replace the compiles.
+#include "shader_compile_dump.h"
 
 #include "guest.h"
 
@@ -17,8 +13,10 @@
 #include "base/log.h"
 
 ITC_FLAG_STRING(dump_shader_compiles, "", "ITC",
-                "Write each shader the game's HLSL compiler (sub_822B8F10) makes to "
-                "this directory, and log each compile");
+                "Compile the game's shaders with its HLSL compiler (sub_822B8F10) even "
+                "with --use_hardcoded_shaders, write each one to this directory "
+                "(shader_<source>_<profile>.bin, for tools/compiled_shaders.py) and log "
+                "each compile");
 
 namespace {
 
@@ -62,17 +60,14 @@ void WriteFile(const std::filesystem::path& path, const std::vector<uint8_t>& by
 
 }  // namespace
 
+bool debug::ShaderCompileDump_Active() { return !ITC_FLAG(dump_shader_compiles).empty(); }
+
 // D3DXCompileShader: r3 the source, r4 its length, r5 the defines, r6 the
 // include handler, r7 the entry point, r8 the profile, r9 the flags, r10
 // where the shader buffer goes; the caller's stack words +84 and +92 where
 // the errors and the constant table go.
-extern "C" REX_FUNC(sub_822B8F10) {
-  REX_FUNC_PROLOGUE();
+void debug::ShaderCompileDump_Compile(PPCContext& ctx, uint8_t* base) {
   std::string dir = ITC_FLAG(dump_shader_compiles);
-  if (dir.empty()) {
-    __imp__sub_822B8F10(ctx, base);
-    return;
-  }
   uint32_t caller = ctx.lr;
   uint32_t source = ctx.r3.u32;
   uint32_t length = ctx.r4.u32;

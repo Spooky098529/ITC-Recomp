@@ -240,6 +240,7 @@ set(ITC_SOURCES
     src/harnesses/course_scenery.cpp
     src/harnesses/post_effects.cpp
     src/harnesses/screen_objects.cpp
+    src/harnesses/hardcoded_shaders.cpp
     src/harnesses/action_mappers.cpp
     src/harnesses/data_tables.cpp
     src/harnesses/model_animation.cpp
@@ -273,6 +274,7 @@ set(ITC_SOURCES
     src/debug/pause_movie_log.cpp
     src/debug/image_dump.cpp
     src/debug/shader_compile_dump.cpp
+    src/hooks/shader_compiles.cpp
     src/debug/replay_stats.cpp
     src/debug/thread_cpu.cpp
     src/native/app_window.cpp
