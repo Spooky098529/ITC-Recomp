@@ -106,4 +106,40 @@ uint32_t StarDefInit(uint8_t* base, uint32_t star, uint32_t lines, uint32_t pass
                      double sample_length, double attenuation, double inclination,
                      uint32_t rotation);
 
+// --- The render textures and surfaces ---
+
+// RenderTexture::Release (sub_82133070): one user taken from the entry
+// (+20) when it has any; at 0, its memory (+28, XPhysicalFree) and header
+// (+24, operator delete) freed and both cleared. Returns r3 as the
+// original leaves it (the entry, or the header after the frees), or
+// nothing, with nothing done, when the header isn't a block of the
+// allocation layer's (the original then runs).
+std::optional<uint32_t> RenderTextureRelease(uint8_t* base, uint32_t entry);
+// RenderTextures::Release (sub_821332F0): RenderTexture::Release on the
+// entry at `at`, then an entry of id 20 (its own) deleted and *at = 0.
+// Returns r3 (the entry), or nothing as RenderTexture::Release (or for an
+// own entry not the layer's).
+std::optional<uint32_t> RenderTexturesRelease(uint8_t* base, uint32_t at);
+
+// The guest calls PostEffect::ReleaseSurface makes: the video output
+// (`[0x8266D088]`'s vtable slot 7, then that object's slot 3; `at` 0 or 1
+// picks the original's return addresses) and Resource::Release.
+struct SurfaceCalls {
+  std::function<uint32_t(int at)> video_output;
+  std::function<void(uint32_t resource)> release;
+};
+// PostEffect::ReleaseSurface (sub_82133C60): with the device locked
+// (VideoOutput::LockDevice's plain C++, the device kept at `frame` + 80, the
+// original's frame), Resource::Release(*at) and *at = 0. Returns r3 (the
+// video output).
+uint32_t ReleaseSurface(uint8_t* base, uint32_t frame, uint32_t at, const SurfaceCalls& calls);
+
+// TargetFilter::TargetFilter (sub_82135AA8): the base vtable, the table
+// entry's 36 bytes copied to +4 (memcpy, c_runtime::Memcpy), the fields
+// cleared, its vtable, +8064 = Device::CreateSurface(+16, +20, 0x18280186,
+// 0, the 12 zero bytes at `frame` + 80). Returns r3 (the filter), or
+// nothing, with nothing done, when the copy can't be made natively.
+std::optional<uint32_t> TargetFilterConstruct(uint8_t* base, uint32_t frame, uint32_t filter,
+                                              uint32_t entry);
+
 }  // namespace post_effects

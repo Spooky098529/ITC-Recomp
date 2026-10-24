@@ -5,7 +5,12 @@
 #include "guest.h"
 
 #include "base/log.h"
+#include "c_runtime/strings.h"
 #include "command_list/command_list.h"
+#include "graphics/resources.h"
+#include "graphics/video_output.h"
+#include "memory/c_runtime_heap.h"
+#include "memory/heap.h"
 
 #include <bit>
 #include <cmath>
@@ -454,6 +459,101 @@ uint32_t StarDefInit(uint8_t* base, uint32_t star, uint32_t lines, uint32_t pass
     CopySingle(base, star + 112 + 16 * i + 12, kZero);
   }
   return 0;
+}
+
+// --- The render textures and surfaces ---
+
+namespace {
+
+// Whether operator delete's plain C++ frees `block` (0, or a block of the
+// layer's).
+bool Deletable(uint32_t block) {
+  return block == 0 || memory::IsHeapBlock(block);
+}
+
+}  // namespace
+
+std::optional<uint32_t> RenderTextureRelease(uint8_t* base, uint32_t entry) {
+  ITC_NATIVE_RUNNING("sub_82133070 RenderTexture::Release");
+  const uint32_t users = guest::LoadU32(base, entry + 20);
+  if (users == 0) {
+    return entry;
+  }
+  if (users - 1 != 0) {
+    guest::StoreU32(base, entry + 20, users - 1);
+    return entry;
+  }
+  if (!Deletable(guest::LoadU32(base, entry + 24))) {
+    return std::nullopt;
+  }
+  guest::StoreU32(base, entry + 20, 0);
+  memory::FreePhysical(guest::LoadU32(base, entry + 28));
+  const uint32_t header = guest::LoadU32(base, entry + 24);
+  memory::crt::OperatorDelete(header);
+  guest::StoreU32(base, entry + 28, 0);
+  guest::StoreU32(base, entry + 24, 0);
+  return header;
+}
+
+std::optional<uint32_t> RenderTexturesRelease(uint8_t* base, uint32_t at) {
+  ITC_NATIVE_RUNNING("sub_821332F0 RenderTextures::Release");
+  const uint32_t entry = guest::LoadU32(base, at);
+  // What the frees would leave to the original: checked first, as nothing
+  // is done then. (RenderTexture::Release writes only +20, +24 and +28.)
+  if (entry == 0 || (guest::LoadU32(base, entry + 20) == 1 &&
+                     !Deletable(guest::LoadU32(base, entry + 24)))) {
+    return std::nullopt;
+  }
+  if (int32_t(guest::LoadU32(base, entry + 32)) == 20 && !Deletable(entry)) {
+    return std::nullopt;
+  }
+  RenderTextureRelease(base, entry);
+  const uint32_t own = guest::LoadU32(base, at);
+  if (int32_t(guest::LoadU32(base, own + 32)) == 20) {
+    memory::crt::OperatorDelete(own);
+    guest::StoreU32(base, at, 0);
+  }
+  return own;
+}
+
+uint32_t ReleaseSurface(uint8_t* base, uint32_t frame, uint32_t at, const SurfaceCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_82133C60 PostEffect::ReleaseSurface");
+  namespace vo = graphics::video_output;
+  const uint32_t local = frame + 80;
+  guest::StoreU32(base, local, vo::LockDevice(base, calls.video_output(0)));
+  calls.release(guest::LoadU32(base, at));
+  guest::StoreU32(base, at, 0);
+  const uint32_t video_output = calls.video_output(1);
+  vo::UnlockDevice(base, video_output, local);
+  return video_output;
+}
+
+std::optional<uint32_t> TargetFilterConstruct(uint8_t* base, uint32_t frame, uint32_t filter,
+                                              uint32_t entry) {
+  ITC_NATIVE_RUNNING("sub_82135AA8 TargetFilter::TargetFilter");
+  // memcpy's override records destinations in the physical views: those
+  // copies are the original's.
+  if (filter + 4 >= 0xA0000000u) {
+    return std::nullopt;
+  }
+  guest::StoreU32(base, filter + 0, 0x82008838);  // the base vtable
+  if (!c_runtime::Memcpy(base, filter + 4, entry, 36)) {
+    return std::nullopt;
+  }
+  guest::StoreU32(base, filter + 40, 1);
+  guest::StoreU32(base, filter + 0, 0x8200889C);
+  guest::StoreU32(base, filter + 44, 0);
+  guest::StoreU32(base, frame + 80, 0);
+  guest::StoreU32(base, frame + 84, 0);
+  for (uint32_t offset : {48u, 52u, 8056u, 8060u, 8064u}) {
+    guest::StoreU32(base, filter + offset, 0);
+  }
+  const uint32_t height = guest::LoadU32(base, filter + 20);
+  const uint32_t width = guest::LoadU32(base, filter + 16);
+  guest::StoreU32(base, frame + 88, 0);
+  guest::StoreU32(base, filter + 8064,
+                  graphics::CreateSurface(base, width, height, 0x18280186, 0, frame + 80));
+  return filter;
 }
 
 }  // namespace post_effects

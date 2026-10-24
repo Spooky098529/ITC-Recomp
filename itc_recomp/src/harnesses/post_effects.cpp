@@ -13,6 +13,7 @@
 
 #include "base/flags.h"
 #include "hooks/heap.h"
+#include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
 #include "post_effects/post_effects.h"
 
@@ -20,6 +21,7 @@
 
 #include <bit>
 #include <cstring>
+#include <initializer_list>
 #include <limits>
 #include <string>
 #include <vector>
@@ -569,6 +571,172 @@ void GlareCases(Context& h, uint32_t block) {
   }
 }
 
+// --- The render textures and surfaces ---
+
+// Maps the addresses a case made for one version to small numbers, so the
+// two versions' outputs compare.
+uint32_t Mapped(uint32_t value, std::initializer_list<uint32_t> made) {
+  uint32_t i = 1;
+  for (uint32_t address : made) {
+    if (address != 0 && value == address) {
+      return 0xADD00000u + i;
+    }
+    i++;
+  }
+  return value;
+}
+
+// RenderTexture::Release and RenderTextures::Release: an entry with random
+// users (0 to 3, or any) and its header (operator new, 52 bytes) and memory
+// (XPhysicalAlloc's, 4 KiB) made for each version; for RenderTextures, the
+// entry the pointer at kAt holds is a pool entry in the block (any id but
+// 20) or one of its own (operator new, 36 bytes, id 20). Compared: the
+// block, the own entry while it's there, r3 and what was freed, the made
+// addresses mapped; what's left is freed after.
+void RenderTextureCases(Context& h, uint32_t block) {
+  Random& r = h.random;
+  constexpr uint32_t kAt = 0x80, kPool = 0x100;
+  for (bool pool : {false, true}) {
+    Results results(pool ? "sub_821332F0 RenderTextures::Release" : "sub_82133070 RenderTexture::Release");
+    for (int c = 0; c < 60; c++) {
+      std::vector<uint32_t> words(0x200 / 4);
+      for (uint32_t& w : words) {
+        w = uint32_t(r.Next());
+      }
+      const uint32_t users = r.Below(5) == 0 ? uint32_t(r.Next()) : r.Below(4);
+      const bool own = pool && r.Below(2) == 0;
+      uint32_t id = r.Below(21);
+      if (id == 20 && !own) {
+        id = r.Below(20);
+      }
+      if (own) {
+        id = 20;
+      }
+      std::vector<uint32_t> fields(9);
+      for (uint32_t& w : fields) {
+        w = uint32_t(r.Next());
+      }
+      fields[5] = users;
+      fields[8] = id;
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        for (uint32_t i = 0; i < words.size(); i++) {
+          guest::StoreU32(h.base, block + 4 * i, words[i]);
+        }
+        const uint32_t header = *memory::crt::OperatorNew(h.base, 52);
+        const uint32_t memory = memory::AllocPhysical(4096, 0, 0xFFFFFFFFu, 4096, 0x404);
+        const uint32_t entry = own ? *memory::crt::OperatorNew(h.base, 36) : block + kPool;
+        fields[6] = header;
+        fields[7] = memory;
+        for (uint32_t i = 0; i < 9; i++) {
+          guest::StoreU32(h.base, entry + 4 * i, fields[i]);
+        }
+        guest::StoreU32(h.base, block + kAt, entry);
+        PPCContext t = CallContext(h);
+        t.r3.u64 = pool ? block + kAt : entry;
+        if (pool) {
+          Run(v, __imp__sub_821332F0, sub_821332F0, t, h.base);
+        } else {
+          Run(v, __imp__sub_82133070, sub_82133070, t, h.base);
+        }
+        const std::initializer_list<uint32_t> made = {header, memory, entry};
+        for (uint32_t i = 0; i < 0x200; i += 4) {
+          out[v].Word(Mapped(guest::LoadU32(h.base, block + i), made));
+        }
+        const bool own_left = own && memory::IsHeapBlock(entry);
+        out[v].Word(own_left);
+        if (own_left) {
+          for (uint32_t i = 0; i < 9; i++) {
+            out[v].Word(Mapped(guest::LoadU32(h.base, entry + 4 * i), made));
+          }
+        }
+        const bool header_left = memory::IsHeapBlock(header);
+        out[v].Word(header_left);
+        out[v].Word(Mapped(t.r3.u32, made));
+        if (header_left) {
+          memory::crt::OperatorDelete(header);
+          memory::FreePhysical(memory);
+        }
+        if (own_left) {
+          memory::crt::OperatorDelete(entry);
+        }
+      }
+      results.Check(out[0], out[1], fmt::format("case {} users {} id {}", c, users, id));
+    }
+    results.Report();
+  }
+}
+
+// PostEffect::ReleaseSurface on a stand-in surface in the block (type 0, a
+// count of 2 to 5, so Resource::Release only takes one), with the game's
+// video output and device lock. Compared: the pointer, the count, r3.
+void ReleaseSurfaceCases(Context& h, uint32_t block) {
+  Results results("sub_82133C60 PostEffect::ReleaseSurface");
+  constexpr uint32_t kAt = 0x80, kSurface = 0x100;
+  for (int c = 0; c < 20; c++) {
+    const uint32_t count = 2 + h.random.Below(4);
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      guest::StoreU32(h.base, block + kSurface + 0, 0);
+      guest::StoreU32(h.base, block + kSurface + 4, count);
+      guest::StoreU32(h.base, block + kAt, block + kSurface);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = block + kAt;
+      Run(v, __imp__sub_82133C60, sub_82133C60, t, h.base);
+      out[v].Word(guest::LoadU32(h.base, block + kAt));
+      out[v].Word(guest::LoadU32(h.base, block + kSurface + 4));
+      out[v].Word(t.r3.u32);
+    }
+    results.Check(out[0], out[1], fmt::format("case {} count {}", c, count));
+  }
+  results.Report();
+}
+
+// TargetFilter::TargetFilter on an object at the block's start (random
+// bytes), from the game's table entry 14 or a random one (its size, +16
+// and +20, up to 2,048), the hi-z taken or not. Compared: the object but
+// +8064, the surface's 48-byte header (freed after), the hi-z word, r3.
+void TargetFilterCases(Context& h, uint32_t block) {
+  Results results("sub_82135AA8 TargetFilter::TargetFilter");
+  Random& r = h.random;
+  constexpr uint32_t kEntry = 0x3F80;
+  constexpr uint32_t kHiZTaken = 0x829537C4;  // the device's hi-z taken (graphics_resources)
+  Saved hi_z(h.base, kHiZTaken, 1);
+  for (int c = 0; c < 40; c++) {
+    std::vector<uint32_t> words(kBlockBytes / 4);
+    for (uint32_t& w : words) {
+      w = uint32_t(r.Next());
+    }
+    const bool game = c < 10;
+    words[kEntry / 4 + 3] = 1 + r.Below(2048);
+    words[kEntry / 4 + 4] = 1 + r.Below(2048);
+    const uint32_t entry = game ? 0x826174A8u + 36 * 14 : block + kEntry;
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      for (uint32_t i = 0; i < words.size(); i++) {
+        guest::StoreU32(h.base, block + 4 * i, words[i]);
+      }
+      PPCContext t = CallContext(h);
+      t.r3.u64 = block;
+      t.r4.u64 = entry;
+      guest::StoreU32(h.base, kHiZTaken, uint32_t(c & 1));
+      Run(v, __imp__sub_82135AA8, sub_82135AA8, t, h.base);
+      const uint32_t surface = guest::LoadU32(h.base, block + 8064);
+      out[v].Bytes(Read(h.base, block, 8064));
+      out[v].Bytes(Read(h.base, block + 8068, kBlockBytes - 8068));
+      out[v].Word(surface != 0);
+      if (surface != 0) {
+        out[v].Bytes(Read(h.base, surface, 48));
+        memory::crt::XMemFree(surface, 0x24800000);
+      }
+      out[v].Word(guest::LoadU32(h.base, kHiZTaken));
+      out[v].Word(t.r3.u32);
+    }
+    results.Check(out[0], out[1], fmt::format("case {} entry {:08X}", c, entry));
+  }
+  results.Report();
+}
+
 }  // namespace
 
 void PostEffects(Context& h) {
@@ -586,6 +754,9 @@ void PostEffects(Context& h) {
   RecordCases(h, block);
   AddQuadCases(h, block);
   GlareCases(h, block);
+  RenderTextureCases(h, block);
+  ReleaseSurfaceCases(h, block);
+  TargetFilterCases(h, block);
   memory::Free(block);
 }
 

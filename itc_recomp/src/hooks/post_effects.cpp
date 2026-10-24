@@ -16,9 +16,14 @@
 
 #include "base/flags.h"
 #include "hooks/guest_call.h"
+#include "hooks/heap.h"
 #include "post_effects/post_effects.h"
 
 #include <optional>
+
+ITC_FLAG_DECLARE(bool, native_video_output);
+ITC_FLAG_DECLARE(bool, native_graphics_resources);
+ITC_FLAG_DECLARE(bool, native_c_runtime_heap);
 
 ITC_FLAG_BOOL(native_post_effects, true, "ITC",
               "Run the post effects (docs/functions/post-effects.md: PostEffects::Get "
@@ -33,7 +38,11 @@ ITC_FLAG_BOOL(native_post_effects, true, "ITC",
               "sub_82133D70, RecordTexelSize sub_82133DD8, AddQuad sub_82133E30 and RecordResolve "
               "sub_82133F58, without the command list's diagnostics; the glare's GlareDef::GlareDef "
               "sub_8212ED78, GlareDef::Init sub_8212EC90 and StarDef::Init sub_8212EA98 (no adapter: only "
-              "GlareDef::Init's plain C++ calls it, and the flag switches that)) natively instead of through the "
+              "GlareDef::Init's plain C++ calls it, and the flag switches that); "
+              "RenderTexture::Release sub_82133070 and RenderTextures::Release sub_821332F0 (with "
+              "--native_heap and --native_c_runtime_heap), PostEffect::ReleaseSurface sub_82133C60 "
+              "(with --native_video_output) and TargetFilter::TargetFilter sub_82135AA8 (with "
+              "--native_graphics_resources and --native_heap)) natively instead of through the "
               "translated code (the same writes; checked by --run_harnesses=post_effects)");
 
 #define ITC_POST_EFFECTS(address, ...)    \
@@ -54,7 +63,7 @@ ITC_POST_EFFECTS(82133AE8, ctx.r3.u64 = Get(base, ctx.r3.u32))
 ITC_POST_EFFECTS(82133A08, MarkUpdated(base))
 // The deleting destructors through the effects' slot 1 (r4 = 1), from the
 // original's 112-byte frame.
-ITC_POST_EFFECTS(82133A70, uint32_t r3 = 0;
+ITC_POST_EFFECTS(82133A70, uint32_t r3 = 0; const uint64_t lr = ctx.lr;
                  guest_call::InFrame(ctx, base, 112, 0x82133ABC, [&](uint32_t) {
                    r3 = DestroyRace(base, [&](uint32_t function, uint32_t effect) {
                      ctx.r3.u64 = effect;
@@ -65,7 +74,7 @@ ITC_POST_EFFECTS(82133A70, uint32_t r3 = 0;
                      return ctx.r3.u32;
                    });
                  });
-                 ctx.r3.u64 = r3)
+                 ctx.lr = lr; ctx.r3.u64 = r3)
 
 // r3 = the race object.
 ITC_POST_EFFECTS(8215B690, ctx.r3.u64 = ToggleRaceEffects(base, ctx.r3.u32))
@@ -98,7 +107,7 @@ ITC_GLOW_SET(82136F48, 8476)
 // Glow::SetFromSpeed: f1 = the speed. Its three slots are called from the
 // original's 112-byte frame; r3 and f1 come back as the last one leaves them.
 ITC_POST_EFFECTS(82133878, ctx.fpscr.disableFlushMode(); const uint32_t glow = ctx.r3.u32;
-                 const double speed = ctx.f1.f64;
+                 const double speed = ctx.f1.f64; const uint64_t lr = ctx.lr;
                  guest_call::InFrame(ctx, base, 112, 0x821338FC, [&](uint32_t) {
                    static constexpr uint32_t kReturns[3] = {0x821338FC, 0x82133920, 0x82133944};
                    int call = 0;
@@ -109,7 +118,8 @@ ITC_POST_EFFECTS(82133878, ctx.fpscr.disableFlushMode(); const uint32_t glow = c
                      ctx.ctr.u64 = function;
                      REX_CALL_INDIRECT_FUNC(function);
                    });
-                 }))
+                 });
+                 ctx.lr = lr)
 
 // --- The color filter's setters: r3 = the filter ---
 
@@ -169,3 +179,84 @@ ITC_POST_EFFECTS(8212ED78, ctx.fpscr.disableFlushMode(); GlareDefConstruct(base,
 // r4 = the glare type.
 ITC_POST_EFFECTS(8212EC90, ctx.fpscr.disableFlushMode();
                  ctx.r3.u64 = GlareDefInit(base, ctx.r3.u32, ctx.r4.u32))
+
+// --- The render textures and surfaces ---
+
+namespace {
+
+// Whether operator delete and XPhysicalFree are the layer's.
+bool FreesNative() {
+  return ITC_FLAG(native_c_runtime_heap) && hooks::NativeHeapActive();
+}
+
+// The video output, as the device's users reach it: `[0x8266D088]`'s vtable
+// slot 7, then that object's slot 3, as guest calls with the original's
+// return addresses. r3 = the video output after.
+uint32_t VideoOutputCall(PPCContext& ctx, uint8_t* base, uint32_t first, uint32_t second) {
+  ctx.r3.u64 = guest::LoadU32(base, 0x8266D088);
+  ctx.ctr.u64 = guest::LoadU32(base, guest::LoadU32(base, ctx.r3.u32) + 28);
+  ctx.lr = first;
+  REX_CALL_INDIRECT_FUNC(ctx.ctr.u32);
+  ctx.ctr.u64 = guest::LoadU32(base, guest::LoadU32(base, ctx.r3.u32) + 12);
+  ctx.lr = second;
+  REX_CALL_INDIRECT_FUNC(ctx.ctr.u32);
+  return ctx.r3.u32;
+}
+
+}  // namespace
+
+// r3 = the entry; r3 = the address of an effect's entry pointer.
+ITC_POST_EFFECTS_RECORD(82133070, FreesNative() ? RenderTextureRelease(base, ctx.r3.u32)
+                                                : std::optional<uint32_t>())
+ITC_POST_EFFECTS_RECORD(821332F0, FreesNative() ? RenderTexturesRelease(base, ctx.r3.u32)
+                                                : std::optional<uint32_t>())
+
+// PostEffect::ReleaseSurface: r3 = the address of an effect's surface
+// pointer. Its guest calls from a frame like the original's (112 bytes).
+extern "C" REX_FUNC(sub_82133C60) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_post_effects) || !ITC_FLAG(native_video_output)) {
+    __imp__sub_82133C60(ctx, base);
+    return;
+  }
+  const uint32_t at = ctx.r3.u32;
+  const uint64_t lr = ctx.lr;
+  uint32_t r3 = 0;
+  guest_call::InFrame(ctx, base, 112, 0x82133C90, [&](uint32_t frame) {
+    const SurfaceCalls calls{
+        [&](int which) {
+          return which == 0 ? VideoOutputCall(ctx, base, 0x82133C90, 0x82133CA0)
+                            : VideoOutputCall(ctx, base, 0x82133CCC, 0x82133CDC);
+        },
+        [&](uint32_t resource) {
+          ctx.r3.u64 = resource;
+          ctx.lr = 0x82133CB0;
+          sub_822A67B0(ctx, base);
+        }};
+    r3 = ReleaseSurface(base, frame, at, calls);
+  });
+  ctx.lr = lr;
+  ctx.r3.u64 = r3;
+}
+
+// TargetFilter::TargetFilter: r3 = the object, r4 = the table entry. The
+// surface's parameters in a frame like the original's (112 bytes).
+extern "C" REX_FUNC(sub_82135AA8) {
+  REX_FUNC_PROLOGUE();
+  std::optional<uint32_t> r3;
+  if (ITC_FLAG(native_post_effects) && ITC_FLAG(native_graphics_resources) &&
+      hooks::NativeHeapActive()) {
+    const uint32_t filter = ctx.r3.u32;
+    const uint32_t entry = ctx.r4.u32;
+    const uint64_t lr = ctx.lr;
+    guest_call::InFrame(ctx, base, 112, 0x82135AD4, [&](uint32_t frame) {
+      r3 = TargetFilterConstruct(base, frame, filter, entry);
+    });
+    ctx.lr = lr;
+  }
+  if (!r3) {
+    __imp__sub_82135AA8(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = *r3;
+}
