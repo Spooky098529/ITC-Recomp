@@ -1282,6 +1282,124 @@ void SetFVF(uint8_t* base, uint32_t device, uint32_t fvf) {
   Mark(base, device + kShaderDirty, 1ull << 51);
 }
 
+void SetScissorRect(uint8_t* base, uint32_t device, uint32_t rect) {
+  ITC_NATIVE_RUNNING("sub_822A3450 Device::SetScissorRect");
+  const int32_t left = int32_t(Load(base, rect + 0)), top = int32_t(Load(base, rect + 4));
+  const int32_t right = int32_t(Load(base, rect + 8)), bottom = int32_t(Load(base, rect + 12));
+  const bool scissor = Load(base, device + 11600) != 0;
+  int32_t x0 = int32_t(Load(base, device + 12392)), y0 = int32_t(Load(base, device + 12396));
+  int32_t x1 = int32_t(Load(base, device + 12400) + uint32_t(x0));
+  int32_t y1 = int32_t(Load(base, device + 12404) + uint32_t(y0));
+  Store(base, device + 12416, uint32_t(left));
+  Store(base, device + 12420, uint32_t(top));
+  Store(base, device + 12424, uint32_t(right));
+  Store(base, device + 12428, uint32_t(bottom));
+  if (scissor) {
+    x0 = x0 > left ? x0 : left;
+    y0 = y0 > top ? y0 : top;
+    x1 = x1 < right ? x1 : right;
+    y1 = y1 < bottom ? y1 : bottom;
+  }
+  // PA_SC_WINDOW_SCISSOR_TL and _BR's shadows: 15 bits each.
+  uint32_t tl = Load(base, device + 10308), br = Load(base, device + 10312);
+  tl = (Rotl(uint32_t(y0), 16) & 0x7FFF0000) | (tl & 0x8000FFFFu);
+  br = (Rotl(uint32_t(y1), 16) & 0x7FFF0000) | (br & 0x8000FFFFu);
+  tl = (uint32_t(x0) & 0x7FFF) | (tl & 0xFFFF8000u);
+  br = (uint32_t(x1) & 0x7FFF) | (br & 0xFFFF8000u);
+  Store(base, device + 10308, tl);
+  Store(base, device + 10312, br);
+  // Device::SetScreenScissor (sub_822A0F80) with the window: Dropped (its
+  // packets, which nothing reads).
+}
+
+void SetScissorTestEnable(uint8_t* base, uint32_t device, uint32_t value) {
+  ITC_NATIVE_RUNNING("sub_822A3D20 Device::SetRenderState_ScissorTestEnable");
+  Store(base, device + 11600, value);
+  SetScissorRect(base, device, device + 12416);
+}
+
+void SetViewport(uint8_t* base, uint32_t device, uint32_t viewport) {
+  ITC_NATIVE_RUNNING("sub_822A3518 Device::SetViewport");
+  const uint32_t target = Load(base, device + kRenderTargets);
+  uint32_t surface = target;
+  if (int32_t(surface) == 0) {
+    surface = Load(base, device + kDepthSurface);
+    if (surface == 0) {
+      return;
+    }
+  }
+  // Whether predicated tiling holds the bound set (its size then the
+  // tiling's): flag 0x10, or 0x20 with each bound surface the one saved
+  // (+12468 to +12484) or none.
+  const uint8_t flags = guest::LoadU8(base, device + 10808);
+  bool tiled = false;
+  if (flags & 0x10) {
+    tiled = true;
+  } else if (flags & 0x20) {
+    tiled = true;
+    for (uint32_t k = 0; k < 5; k++) {
+      const uint32_t bound = Load(base, device + kRenderTargets + 4 * k);
+      const uint32_t saved = Load(base, device + 12468 + 4 * k);
+      if (saved != bound && bound != 0) {
+        tiled = false;
+        break;
+      }
+    }
+  }
+  uint32_t max_width, max_height;
+  if (tiled) {
+    max_width = Load(base, device + 12916);
+    max_height = Load(base, device + 12920);
+  } else {
+    const uint32_t size = Load(base, surface + 36);
+    max_height = (Rotl(size, 29) & 0x7FFF) + 1;
+    max_width = (Rotl(size, 14) & 0x3FFF) + 1;
+  }
+  const uint32_t x = Load(base, viewport + 0), y = Load(base, viewport + 4);
+  uint32_t right = Load(base, viewport + 8) + x;
+  if (!(right < max_width)) {
+    right = max_width;
+  }
+  uint32_t bottom = Load(base, viewport + 12) + y;
+  if (!(bottom < max_height)) {
+    bottom = max_height;
+  }
+  const uint32_t width = right - x, height = bottom - y;
+  Store(base, device + 12392, x);
+  Store(base, device + 12396, y);
+  Store(base, device + 12400, width);
+  Store(base, device + 12404, height);
+  Store(base, device + 12408, Load(base, viewport + 16));  // min and max Z
+  Store(base, device + 12412, Load(base, viewport + 20));
+  SetScissorRect(base, device, device + 12416);
+  // PA_CL_VPORT_XSCALE ... _ZOFFSET.
+  const float half = LoadF(base, 0x82001BE4);
+  const float x_scale = float(double(width)) * half;
+  const float y_scale = float(double(height)) * half;
+  guest::StoreFloat(base, device + 10376, x_scale);
+  guest::StoreFloat(base, device + 10380, float(double(x)) + x_scale);
+  guest::StoreFloat(base, device + 10384, -y_scale);
+  guest::StoreFloat(base, device + 10388, float(double(y)) + y_scale);
+  guest::StoreFloat(base, device + 10392,
+                    LoadF(base, viewport + 20) - LoadF(base, viewport + 16));
+  Store(base, device + 10396, Load(base, viewport + 16));
+  Mark(base, device + kRenderDirty, 0xFC);
+}
+
+void SetSurfaceInfo(uint8_t* base, uint32_t device, uint32_t surface) {
+  ITC_NATIVE_RUNNING("sub_822A3C88 Device::SetSurfaceInfo");
+  const uint32_t info = Load(base, surface + 24);
+  const uint32_t msaa = (info >> 16) & 3;
+  Store(base, device + 10556, msaa == 0 ? 0 : msaa == 1 ? 0x8001 : 0xC003);  // the AA config
+  Store(base, device + 10240, info);  // RB_SURFACE_INFO
+  Mark(base, device + kRenderDirty, 1ull << 38);
+  Mark(base, device + kOtherDirty, 1ull << 36);
+  for (uint32_t i = 0; i < 16; i += 4) {
+    Store(base, device + 12416 + i, Load(base, 0x82013618 + i));  // the whole surface
+  }
+  SetViewport(base, device, 0x82013600);
+}
+
 uint32_t GetViewportEnable(uint8_t* base, uint32_t device) {
   ITC_NATIVE_RUNNING("sub_822A2470 Device::GetRenderState_ViewportEnable");
   return Load(base, device + kPaClVteCntl) & 1;

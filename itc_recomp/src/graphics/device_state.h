@@ -208,6 +208,32 @@ uint32_t VertexDeclarationFromFvf(uint8_t* base, uint32_t fvf, uint32_t declarat
 // vertex shader, patched again).
 void SetFVF(uint8_t* base, uint32_t device, uint32_t fvf);
 
+// The scissor and the viewport. Device::SetScreenScissor (sub_822A0F80)
+// only wrote the window scissor into the command buffer, which nothing reads
+// since the emulated GPU went (our renderer takes the scissor from +11600
+// and +12416): Dropped, so these don't call it.
+
+// sub_822A3450 Device::SetScissorRect: the rectangle (left, top, right,
+// bottom at `rect`) kept at +12416; the window scissor's shadow (+10308,
+// +10312) from it clipped to the viewport with the scissor test on
+// (+11600), else from the viewport.
+void SetScissorRect(uint8_t* base, uint32_t device, uint32_t rect);
+
+// sub_822A3D20 Device::SetRenderState_ScissorTestEnable (render state 200):
+// +11600 = `value`, then SetScissorRect with the kept rectangle.
+void SetScissorTestEnable(uint8_t* base, uint32_t device, uint32_t value);
+
+// sub_822A3518 Device::SetViewport: nothing without render target 0 or a
+// depth surface; the viewport (`viewport`: x, y, width, height, min and max
+// Z) clipped to the bound surface (or the tiling's size), kept at +12392,
+// SetScissorRect with the kept rectangle, and PA_CL_VPORT's shadow.
+void SetViewport(uint8_t* base, uint32_t device, uint32_t viewport);
+
+// sub_822A3C88 Device::SetSurfaceInfo: the AA config and RB_SURFACE_INFO
+// from `surface`, the scissor rectangle and the viewport set to the whole
+// surface (from the image's 0x82013618 and 0x82013600).
+void SetSurfaceInfo(uint8_t* base, uint32_t device, uint32_t surface);
+
 // Device fields the setters write (byte offsets).
 constexpr uint32_t kShaderDirty = 16;  // the dirty masks: the shader state
 constexpr uint32_t kRenderDirty = 24;  // the render state

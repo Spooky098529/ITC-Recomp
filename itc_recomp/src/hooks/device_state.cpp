@@ -18,7 +18,9 @@ ITC_FLAG_BOOL(native_device_state, true, "ITC",
               "SetIndices sub_822A3908, SetTexture sub_822A6008, SetBlendControl "
               "sub_822A3B30, the shader constants sub_822A81F8, sub_822A8308 and "
               "sub_822A8470, SetFVF sub_822AA0E8 with VertexDeclaration::FromFvf "
-              "sub_822A6A88; the fence list's flush left to the originals) natively instead of "
+              "sub_822A6A88, SetScissorRect sub_822A3450, ScissorTestEnable sub_822A3D20, "
+              "SetViewport sub_822A3518, SetSurfaceInfo sub_822A3C88, with SetScreenScissor "
+              "sub_822A0F80 dropped; the fence list's flush left to the originals) natively instead of "
               "through the translated code (the same writes to the register shadow and the "
               "dirty masks; checked by --run_harnesses=device_state).");
 
@@ -214,3 +216,28 @@ ITC_DEVICE_STATE_CALL(822A8470, ds::SetPixelShaderConstantB(base, ctx.r3.u32, ct
 // VertexDeclaration::FromFvf (sub_822A6A88) has no adapter: its only caller
 // is Device::SetFVF, whose plain C++ calls it.
 ITC_DEVICE_STATE_CALL(822AA0E8, ds::SetFVF(base, ctx.r3.u32, ctx.r4.u32))
+
+// Device::SetScreenScissor (sub_822A0F80): Dropped. It only wrote the window
+// scissor (or one per tile, and the binning packets) into the command
+// buffer, which nothing reads since the emulated GPU went (the kick only
+// looks for fences and interrupts, src/native/gpu_link.cpp); our renderer
+// takes the scissor from +11600 and +12416. Its recompiled callers
+// (Device::DirtyAllState, sub_8229F680, Device::Resolve) don't read r3 after
+// it. The original runs with the flag off.
+extern "C" REX_FUNC(sub_822A0F80) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_device_state)) {
+    __imp__sub_822A0F80(ctx, base);
+  }
+}
+
+ITC_DEVICE_STATE_CALL(822A3450, ds::SetScissorRect(base, ctx.r3.u32, ctx.r4.u32))
+ITC_DEVICE_STATE_CALL(822A3D20, ds::SetScissorTestEnable(base, ctx.r3.u32, ctx.r4.u32))
+ITC_DEVICE_STATE_CALL(822A3518, {
+  ctx.fpscr.disableFlushMode();
+  ds::SetViewport(base, ctx.r3.u32, ctx.r4.u32);
+})
+ITC_DEVICE_STATE_CALL(822A3C88, {
+  ctx.fpscr.disableFlushMode();
+  ds::SetSurfaceInfo(base, ctx.r3.u32, ctx.r4.u32);
+})

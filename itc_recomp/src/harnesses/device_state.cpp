@@ -14,6 +14,7 @@
 
 #include "harness.h"
 
+#include "base/flags.h"
 #include "base/log.h"
 #include "graphics/device_state.h"
 #include "memory/heap.h"
@@ -26,6 +27,8 @@
 #include <string>
 #include <string_view>
 #include <vector>
+
+ITC_FLAG_DECLARE(bool, native_device_state);
 
 namespace harness {
 
@@ -478,6 +481,156 @@ void Fvf(Context& h, uint32_t device) {
   }
 }
 
+// --- The scissor and the viewport ---
+//
+// SetScissorRect, ScissorTestEnable, SetViewport and SetSurfaceInfo; the
+// originals run with --native_device_state off, so they reach
+// Device::SetScreenScissor (Dropped natively), which writes its packets at
+// the command buffer position (+40, set to the scratch area's second half;
+// the segment limit +48 high, so no segment ends; at most three tiles).
+// Compared: the device block but +40, the scratch area's first half (the
+// objects, the viewport and the rectangle) and the viewport's float fields
+// as floats; the command buffer's words and +40 in their own group, expected
+// to differ (the graphics rule: packets nothing reads).
+
+constexpr uint32_t kViewport = 1024;  // the viewport or rectangle passed
+constexpr uint32_t kCommands = 2048;  // the command buffer, the scratch area's second half
+constexpr uint32_t kViewportFloats[] = {10376, 10380, 10384, 10388, 10392, 10396, 12408, 12412};
+
+template <GuestFunction recompiled>
+void Original(PPCContext& ctx, uint8_t* base) {
+  const bool saved = ITC_FLAG(native_device_state);
+  ITC_FLAG(native_device_state) = false;
+  recompiled(ctx, base);
+  ITC_FLAG(native_device_state) = saved;
+}
+
+void NativeSetScissorRect(PPCContext& ctx, uint8_t* base) {
+  ds::SetScissorRect(base, ctx.r3.u32, ctx.r4.u32);
+}
+void NativeSetScissorTestEnable(PPCContext& ctx, uint8_t* base) {
+  ds::SetScissorTestEnable(base, ctx.r3.u32, ctx.r4.u32);
+}
+void NativeSetViewport(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ds::SetViewport(base, ctx.r3.u32, ctx.r4.u32);
+}
+void NativeSetSurfaceInfo(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ds::SetSurfaceInfo(base, ctx.r3.u32, ctx.r4.u32);
+}
+
+uint32_t RandomCoordinate(Random& r) {
+  switch (r.Below(4)) {
+    case 0: return uint32_t(r.Next());
+    case 1: return uint32_t(-int32_t(r.Below(64)));
+    default: return r.Below(2048);
+  }
+}
+
+template <typename Args>
+void RunViewportCases(Context& h, uint32_t device, const char* name, GuestFunction recompiled,
+                      GuestFunction native, int cases, Args args) {
+  Random& r = h.random;
+  Results results(name);
+  Results packets(std::string(name) + ", the command buffer (expected to differ)");
+  for (int i = 0; i < cases; i++) {
+    std::vector<uint32_t> words(kDeviceBytes / 4);
+    for (uint32_t& w : words) {
+      w = uint32_t(r.Next());
+    }
+    auto object = [&] { return h.data + kObjectBytes * r.Below(kObjects); };
+    for (uint32_t k = 0; k < 5; k++) {
+      const uint32_t bound = r.Below(3) == 0 ? 0 : object();
+      words[(ds::kRenderTargets + 4 * k) / 4] = bound;
+      // The tiling's saved set: the same now and then.
+      words[(12468 + 4 * k) / 4] = r.Below(2) ? bound : (r.Below(2) ? 0 : object());
+    }
+    words[11600 / 4] = r.Below(3) == 0 ? uint32_t(r.Next()) : r.Below(2);
+    for (uint32_t at = 12392; at < 12408; at += 4) {
+      words[at / 4] = RandomCoordinate(r);
+    }
+    words[12916 / 4] = r.Below(4096);
+    words[12920 / 4] = r.Below(4096);
+    words[40 / 4] = h.data + kCommands - 4;  // where the next packet goes, minus 4
+    words[48 / 4] = 0xFFFFFFF0u;
+    words[12488 / 4] = r.Below(4);
+    std::vector<uint32_t> scratch(kScratchBytes / 4);
+    for (uint32_t& w : scratch) {
+      w = uint32_t(r.Next());
+    }
+    for (uint32_t k = 0; k < kObjects; k++) {
+      // A surface's size word (+36): widths and heights up to 2048 mostly.
+      uint32_t& size = scratch[(kObjectBytes * k + 36) / 4];
+      if (r.Below(4) != 0) {
+        size = (r.Below(2048) << 18) | (r.Below(2048) << 3) | (size & 0x7);
+      }
+    }
+    for (uint32_t at = 0; at < 16; at += 4) {
+      scratch[(kViewport + at) / 4] = RandomCoordinate(r);
+    }
+    {
+      static const uint32_t kZ[] = {0, 0x3F800000, 0x3F000000, 0x7FC00000, 0x7F800001,
+                                    0xFF800000u, 0x80000000u};
+      scratch[(kViewport + 16) / 4] = r.Below(3) ? kZ[r.Below(std::size(kZ))] : uint32_t(r.Next());
+      scratch[(kViewport + 20) / 4] = r.Below(3) ? kZ[r.Below(std::size(kZ))] : uint32_t(r.Next());
+    }
+    Random args_random = r;
+    r.Next();
+    Outputs out[2], commands[2];
+    for (int v = 0; v < 2; v++) {
+      Random a = args_random;
+      guest::StoreU32s(h.base, h.data, scratch.data(), uint32_t(scratch.size()));
+      guest::StoreU32s(h.base, device, words.data(), uint32_t(words.size()));
+      PPCContext t = CallContext(h);
+      t.r3.u64 = device;
+      args(t, a);
+      (v == 0 ? recompiled : native)(t, h.base);
+      uint32_t at = 0;
+      auto bytes_to = [&](uint32_t end) {
+        out[v].Bytes(Read(h.base, device + at, end - at));
+        at = end;
+      };
+      bytes_to(40);
+      commands[v].Word(guest::LoadU32(h.base, device + 40));
+      at = 44;
+      for (uint32_t field : kViewportFloats) {
+        bytes_to(field);
+        out[v].Float(guest::LoadU32(h.base, device + field));
+        at = field + 4;
+      }
+      bytes_to(kDeviceBytes);
+      out[v].Bytes(Read(h.base, h.data, kCommands));
+      commands[v].Bytes(Read(h.base, h.data + kCommands, kScratchBytes - kCommands));
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", i));
+    packets.Check(commands[0], commands[1], fmt::format("case {}", i));
+  }
+  results.Report();
+  packets.Report();
+}
+
+void ScissorAndViewport(Context& h, uint32_t device) {
+  RunViewportCases(h, device, "Device::SetScissorRect (sub_822A3450)",
+                   Original<__imp__sub_822A3450>, NativeSetScissorRect, 300,
+                   [&](PPCContext& t, Random& a) {
+                     t.r4.u64 = a.Below(4) == 0 ? device + 12416 : h.data + kViewport;
+                   });
+  RunViewportCases(h, device, "Device::SetRenderState_ScissorTestEnable (sub_822A3D20)",
+                   Original<__imp__sub_822A3D20>, NativeSetScissorTestEnable, 200,
+                   [&](PPCContext& t, Random& a) {
+                     t.r4.u64 = a.Below(4) == 0 ? uint32_t(a.Next()) : a.Below(2);
+                   });
+  RunViewportCases(h, device, "Device::SetViewport (sub_822A3518)",
+                   Original<__imp__sub_822A3518>, NativeSetViewport, 400,
+                   [&](PPCContext& t, Random&) { t.r4.u64 = h.data + kViewport; });
+  RunViewportCases(h, device, "Device::SetSurfaceInfo (sub_822A3C88)",
+                   Original<__imp__sub_822A3C88>, NativeSetSurfaceInfo, 200,
+                   [&](PPCContext& t, Random& a) {
+                     t.r4.u64 = h.data + kObjectBytes * a.Below(kObjects);
+                   });
+}
+
 }  // namespace
 
 void DeviceState(Context& h) {
@@ -498,6 +651,7 @@ void DeviceState(Context& h) {
             32);
   BoundObjects(h, device);
   Fvf(h, device);
+  ScissorAndViewport(h, device);
   memory::Free(device);
 }
 
