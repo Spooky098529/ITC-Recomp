@@ -32,6 +32,12 @@ file's history. What's left to see in a drive, from every run:
   map checked (0 errors, 71 of 71 in play). Migration 1 done
   (551a868..e7309a0, 37 of 73 ours, nothing ready left), validated
   (`itc_1353`, `itc_1354`; all ran in play or the replay). Finished.
+- Subsystem 3 of 3: `leads.md`'s memset and `atexit` lead
+  (`sub_822962B0`, `sub_825A7068`): memset blocks the cameras' viewports
+  and the course scenery. Taken for memset alone: `atexit` locks with
+  RtlEnterCriticalSection and RtlLeaveCriticalSection, a kernel import
+  replaced (a decision for the user), and `c-runtime.md`'s intro already
+  puts it with the core. Mapping agent running.
 
 ## Done
 
