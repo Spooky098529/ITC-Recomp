@@ -556,4 +556,71 @@ std::optional<uint32_t> TargetFilterConstruct(uint8_t* base, uint32_t frame, uin
   return filter;
 }
 
+// --- The destructors ---
+
+namespace {
+
+constexpr uint32_t kBaseVtable = 0x82008838;
+
+}  // namespace
+
+uint32_t GlowDestroy(uint8_t* base, uint32_t glow, const DestroyCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_82136E30 Glow::~Glow");
+  guest::StoreU32(base, glow + 0, 0x820088B0);
+  for (uint32_t at = 8432; at >= 8412; at -= 4) {
+    calls.release_surface(glow + at);
+  }
+  uint32_t r3 = 0;
+  for (uint32_t at = 8408; at >= 8352; at -= 4) {
+    r3 = calls.release_texture(glow + at);
+  }
+  guest::StoreU32(base, glow + 0, kBaseVtable);
+  return r3;
+}
+
+uint32_t ColorFilterDestroy(uint8_t* base, uint32_t filter, const DestroyCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_821351A8 ColorFilter::~ColorFilter");
+  guest::StoreU32(base, filter + 0, 0x82008860);
+  const uint32_t r3 = calls.release_texture(filter + 8064);
+  guest::StoreU32(base, filter + 0, kBaseVtable);
+  return r3;
+}
+
+uint32_t MotionBlurDestroy(uint8_t* base, uint32_t blur, const DestroyCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_82136390 MotionBlur::~MotionBlur");
+  guest::StoreU32(base, blur + 0, 0x820088A4);
+  calls.release_surface(blur + 8076);
+  calls.release_surface(blur + 8072);
+  calls.release_texture(blur + 8068);
+  const uint32_t r3 = calls.release_texture(blur + 8064);
+  guest::StoreU32(base, blur + 0, kBaseVtable);
+  return r3;
+}
+
+std::optional<uint32_t> DeleteEffect(uint8_t* base, EffectKind kind, uint32_t effect,
+                                     uint32_t flags, const DestroyCalls& calls) {
+  switch (kind) {
+    case EffectKind::kGlow: ITC_NATIVE_RUNNING("sub_821389C8 Glow::~Glow (deleting)"); break;
+    case EffectKind::kColorFilter:
+      ITC_NATIVE_RUNNING("sub_82138570 ColorFilter::~ColorFilter (deleting)");
+      break;
+    case EffectKind::kMotionBlur:
+      ITC_NATIVE_RUNNING("sub_821385C0 MotionBlur::~MotionBlur (deleting)");
+      break;
+  }
+  const bool del = (flags & 1) != 0;
+  if (del && !Deletable(effect)) {
+    return std::nullopt;
+  }
+  switch (kind) {
+    case EffectKind::kGlow: GlowDestroy(base, effect, calls); break;
+    case EffectKind::kColorFilter: ColorFilterDestroy(base, effect, calls); break;
+    case EffectKind::kMotionBlur: MotionBlurDestroy(base, effect, calls); break;
+  }
+  if (del) {
+    memory::crt::OperatorDelete(effect);
+  }
+  return effect;
+}
+
 }  // namespace post_effects

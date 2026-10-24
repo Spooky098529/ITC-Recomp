@@ -597,6 +597,15 @@ uint32_t Mapped(uint32_t value, std::initializer_list<uint32_t> made) {
   return value;
 }
 
+uint32_t MappedIn(uint32_t value, const std::vector<uint32_t>& made) {
+  for (uint32_t i = 0; i < made.size(); i++) {
+    if (made[i] != 0 && value == made[i]) {
+      return 0xADD00000u + i + 1;
+    }
+  }
+  return value;
+}
+
 // RenderTexture::Release and RenderTextures::Release: an entry with random
 // users (0 to 3, or any) and its header (operator new, 52 bytes) and memory
 // (XPhysicalAlloc's, 4 KiB) made for each version; for RenderTextures, the
@@ -748,6 +757,146 @@ void TargetFilterCases(Context& h, uint32_t block) {
   results.Report();
 }
 
+// --- The destructors ---
+
+// The destructors and the deleting ones (r4 0 or 1, or any) on an effect of
+// each kind made for each version (operator new, its size; random bytes),
+// its surfaces stand-ins in the block (type 0, a count of 2 to 5), its
+// render textures each a pool entry in the block (users 0, 2 or 3, any id
+// but 20), an own entry (operator new, id 20, users 2), or one whose last
+// user goes (users 1, with a header from operator new and 4 KiB from
+// XPhysicalAlloc). Compared: the block, the effect and the own entries
+// while they're there, what was freed, r3, the made addresses mapped;
+// what's left is freed after.
+void DestroyCases(Context& h, uint32_t block) {
+  Random& r = h.random;
+  struct Kind {
+    const char* name;
+    GuestFunction recompiled, native;
+    uint32_t size;
+    std::vector<uint32_t> surfaces, textures;
+    bool deleting;
+  };
+  std::vector<uint32_t> glow_textures;
+  for (uint32_t at = 8408; at >= 8352; at -= 4) {
+    glow_textures.push_back(at);
+  }
+  const Kind kinds[] = {
+      {"sub_82136E30 Glow::~Glow", __imp__sub_82136E30, sub_82136E30, 8480,
+       {8432, 8428, 8424, 8420, 8416, 8412}, glow_textures, false},
+      {"sub_821351A8 ColorFilter::~ColorFilter", __imp__sub_821351A8, sub_821351A8, 8128, {}, {8064},
+       false},
+      {"sub_82136390 MotionBlur::~MotionBlur", __imp__sub_82136390, sub_82136390, 8224,
+       {8076, 8072}, {8068, 8064}, false},
+      {"sub_821389C8 Glow::~Glow (deleting)", __imp__sub_821389C8, sub_821389C8, 8480,
+       {8432, 8428, 8424, 8420, 8416, 8412}, glow_textures, true},
+      {"sub_82138570 ColorFilter::~ColorFilter (deleting)", __imp__sub_82138570, sub_82138570, 8128,
+       {}, {8064}, true},
+      {"sub_821385C0 MotionBlur::~MotionBlur (deleting)", __imp__sub_821385C0, sub_821385C0, 8224,
+       {8076, 8072}, {8068, 8064}, true},
+  };
+  constexpr uint32_t kSurfaces = 0x100, kPool = 0x400;  // 16 and 36 bytes each
+  for (const Kind& k : kinds) {
+    Results results(k.name);
+    for (int c = 0; c < 20; c++) {
+      std::vector<uint32_t> words(0x1000 / 4);
+      for (uint32_t& w : words) {
+        w = uint32_t(r.Next());
+      }
+      std::vector<uint32_t> object(k.size / 4);
+      for (uint32_t& w : object) {
+        w = uint32_t(r.Next());
+      }
+      // Each texture's mode: 0 a pool entry, 1 an own entry (users 2), 2
+      // one whose last user goes (own or pool).
+      std::vector<uint32_t> modes, users;
+      for (size_t i = 0; i < k.textures.size(); i++) {
+        modes.push_back(r.Below(3));
+        const uint32_t u = r.Below(3);
+        users.push_back(u == 1 ? 3 : u);
+      }
+      for (size_t i = 0; i < k.surfaces.size(); i++) {
+        words[(kSurfaces + 16 * i) / 4] = 0;
+        words[(kSurfaces + 16 * i) / 4 + 1] = 2 + r.Below(4);
+      }
+      const uint32_t r4 = k.deleting ? (r.Below(4) == 0 ? uint32_t(r.Next()) : r.Below(2)) : 0;
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        for (uint32_t i = 0; i < words.size(); i++) {
+          guest::StoreU32(h.base, block + 4 * i, words[i]);
+        }
+        std::vector<uint32_t> made;
+        const uint32_t effect = *memory::crt::OperatorNew(h.base, k.size);
+        made.push_back(effect);
+        guest::StoreU32s(h.base, effect, object.data(), uint32_t(object.size()));
+        for (size_t i = 0; i < k.surfaces.size(); i++) {
+          guest::StoreU32(h.base, effect + k.surfaces[i], block + kSurfaces + 16 * uint32_t(i));
+        }
+        std::vector<uint32_t> owns;
+        std::vector<std::pair<uint32_t, uint32_t>> textures;
+        for (size_t i = 0; i < k.textures.size(); i++) {
+          const bool own = modes[i] == 1 || (modes[i] == 2 && (i & 1) == 0);
+          const uint32_t entry = own ? *memory::crt::OperatorNew(h.base, 36)
+                                     : block + kPool + 36 * uint32_t(i);
+          if (own) {
+            owns.push_back(entry);
+            made.push_back(entry);
+          }
+          uint32_t fields[9];
+          for (uint32_t j = 0; j < 9; j++) {
+            fields[j] = guest::LoadU32(h.base, block + kPool + 36 * uint32_t(i) + 4 * j);
+          }
+          fields[8] = own ? 20 : (fields[8] % 20);
+          fields[5] = modes[i] == 2 ? 1 : (own ? 2 : users[i]);
+          if (modes[i] == 2) {
+            fields[6] = *memory::crt::OperatorNew(h.base, 52);
+            fields[7] = memory::AllocPhysical(4096, 0, 0xFFFFFFFFu, 4096, 0x404);
+            made.push_back(fields[6]);
+            made.push_back(fields[7]);
+            textures.push_back({fields[6], fields[7]});
+          }
+          guest::StoreU32s(h.base, entry, fields, 9);
+          guest::StoreU32(h.base, effect + k.textures[i], entry);
+        }
+        PPCContext t = CallContext(h);
+        t.r3.u64 = effect;
+        t.r4.u64 = r4;
+        Run(v, k.recompiled, k.native, t, h.base);
+        for (uint32_t i = 0; i < 0x1000; i += 4) {
+          out[v].Word(MappedIn(guest::LoadU32(h.base, block + i), made));
+        }
+        const bool effect_left = memory::IsHeapBlock(effect);
+        out[v].Word(effect_left);
+        if (effect_left) {
+          for (uint32_t i = 0; i < k.size; i += 4) {
+            out[v].Word(MappedIn(guest::LoadU32(h.base, effect + i), made));
+          }
+        }
+        for (size_t i = 1; i < made.size(); i++) {
+          out[v].Word(memory::IsHeapBlock(made[i]));  // what's freed (physical: always 0)
+        }
+        out[v].Word(MappedIn(t.r3.u32, made));
+        for (const auto& [header, physical] : textures) {
+          if (memory::IsHeapBlock(header)) {
+            memory::crt::OperatorDelete(header);
+            memory::FreePhysical(physical);
+          }
+        }
+        for (uint32_t own : owns) {
+          if (memory::IsHeapBlock(own)) {
+            memory::crt::OperatorDelete(own);
+          }
+        }
+        if (effect_left) {
+          memory::crt::OperatorDelete(effect);
+        }
+      }
+      results.Check(out[0], out[1], fmt::format("case {} r4 {:X}", c, r4));
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void PostEffects(Context& h) {
@@ -768,6 +917,7 @@ void PostEffects(Context& h) {
   RenderTextureCases(h, block);
   ReleaseSurfaceCases(h, block);
   TargetFilterCases(h, block);
+  DestroyCases(h, block);
   memory::Free(block);
 }
 

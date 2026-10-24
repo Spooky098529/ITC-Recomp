@@ -142,4 +142,31 @@ uint32_t ReleaseSurface(uint8_t* base, uint32_t frame, uint32_t at, const Surfac
 std::optional<uint32_t> TargetFilterConstruct(uint8_t* base, uint32_t frame, uint32_t filter,
                                               uint32_t entry);
 
+// --- The destructors ---
+
+// The calls the destructors make, each returning r3 as it leaves it:
+// PostEffect::ReleaseSurface and RenderTextures::Release on a field's
+// address (the adapters' paths: native or the original).
+struct DestroyCalls {
+  std::function<uint32_t(uint32_t at)> release_surface;
+  std::function<uint32_t(uint32_t at)> release_texture;
+};
+// Glow::~Glow (sub_82136E30): its vtable, its six surfaces (+8432 down to
+// +8412) and 15 render textures (+8408 down to +8352) released, the base
+// vtable. Returns r3 (the last release's).
+uint32_t GlowDestroy(uint8_t* base, uint32_t glow, const DestroyCalls& calls);
+// ColorFilter::~ColorFilter (sub_821351A8): its render texture (+8064).
+uint32_t ColorFilterDestroy(uint8_t* base, uint32_t filter, const DestroyCalls& calls);
+// MotionBlur::~MotionBlur (sub_82136390): its surfaces (+8076, +8072) and
+// render textures (+8068, +8064).
+uint32_t MotionBlurDestroy(uint8_t* base, uint32_t blur, const DestroyCalls& calls);
+
+enum class EffectKind { kGlow, kColorFilter, kMotionBlur };
+// The deleting destructors (vtable slot 1: sub_821389C8, sub_82138570,
+// sub_821385C0): the destructor, then operator delete of the effect when
+// `flags` bit 0 is set. Returns r3 (the effect), or nothing, with nothing
+// done, when the effect to delete isn't a block of the layer's.
+std::optional<uint32_t> DeleteEffect(uint8_t* base, EffectKind kind, uint32_t effect,
+                                     uint32_t flags, const DestroyCalls& calls);
+
 }  // namespace post_effects
