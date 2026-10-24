@@ -113,6 +113,32 @@ When the user has reviewed a run's section, its heading gets
     BuildFan, Init and the constructor; `sub_822A8980` and the shader
     pairs not taken (they unblock nothing yet); `Record`'s body never
     ran, so no frame dump was compared.
+- `framework.md` (new, mapped in c4b5b86): 68 rows (5 moved from
+  `functions.md`: `main` `sub_82090108`, `App::Run` `sub_8209A760`,
+  `ForEachTickHandler` `sub_82099D50`, `TickHandler::Invoke`
+  `sub_82099A98`, `sub_82096340`), the app's framework (its services
+  made through factories at boot, the run loop and its tick handlers);
+  `known-data.md`'s framework, run loop, app (partial), `0x8296B910`,
+  `0x8296B914`, `0x8266D080`, `0x8296BCE0`; 5 leads added. For review:
+  - BindAll's slot +36 worked out: `sub_820944C8` -> `sub_82094350` ->
+    `sub_82090830` -> `sub_82090778`, the input manager at framework+88
+    (natively `[[owner + 8] + 52]`), not `sub_82090788` as the lead
+    guessed (that's framework+124, the save devices); corrected in
+    `action-mappers.md` and `input.md`.
+  - Names on guesses: `Framework::`, `RunLoop::`, `HandlerMap::`
+    (probably `std::map<unsigned, Delegate*>`), `RequestVector::`
+    (probably `std::vector`), `FrameStart`, `DebugText`,
+    `DebugFont::SetPosition`, `PoolMaker::PoolMaker`, the factories
+    (`Users::`, `SaveDevices::`, `WorkerPool::`, `Renderer::`,
+    `Scene::`, `App::Create`).
+  - Corrections: `App::Run`'s "quit flag at this+12" is the tick
+    handler map's size; `TickHandler::Invoke`'s r3 is the run loop;
+    `system-services.md`'s "app" (`App::ReadUsers`, `App::PollSignIn`)
+    is the users and sign-in object at framework+128 (noted in
+    `framework.md` only, not renamed).
+  - Taken from other leads: `sub_82093400`, `sub_82093740` (the
+    containers'), `sub_820944C8`, `sub_82094350` (the app's start-up);
+    both lines updated.
 
 ## Run 2026-10-24 17:46 (`b7-loop-24-10-26-3`) (reviewed 2026-10-24)
 

@@ -47,7 +47,9 @@ file's history. What's left to see in a drive, from every run:
 - Subsystem 2 of 3: `leads.md`'s framework's set-up (`sub_82090A08`,
   `sub_82090788`, `sub_820944C8`, `sub_82094350`, `sub_82090830`, the
   getters `sub_82090760`-`sub_82090788`; 12 of 18 named ready).
-  Mapping agent running.
+  Mapped as the app framework (`framework.md`, 68 rows: 5 moved from
+  `functions.md`, 63 new; c4b5b86; 29 ready groups; 5 leads added, 2
+  updated); all 68 in play. Not migrated (paused).
 
 ## Done
 
@@ -95,4 +97,9 @@ This run's groups: `expected-differences.md` (the "21:33 run" lines).
 
 Paused 2026-10-24 (the user's call) while the framework's mapping agent
 ran: the loop stops after recording its report; no migration started.
-1 of 3 subsystems done.
+1 of 3 subsystems done. The framework's map is recorded, and its
+check is left for when the loop resumes: `check_function_statuses.py`
+has 1 error that isn't the loop's, `sub_822B8F10` in `functions.md`
+with no status since 2f4ed30 (`--dump_shader_compiles`, the user's
+work beside the loop, with an uncommitted change in
+`src/debug/shader_compile_dump.cpp`).
