@@ -8,11 +8,15 @@
 
 #include <bit>
 
+#include "base/flags.h"
 #include "display/display.h"
+#include "graphics/device_state.h"
 #include "helpers/clock.h"
 #include "helpers/console_settings.h"
 
 using guest_call::InFrame;
+
+ITC_FLAG_DECLARE(bool, native_device_state);
 
 namespace {
 
@@ -118,11 +122,18 @@ extern "C" REX_FUNC(sub_822ACE00) {
         return;
       }
       guest::StoreU32(base, device + kDeviceRenderTarget, surface);
-      ctx.r3.u64 = device;
-      ctx.r4.u64 = 0;
-      ctx.r5.u64 = surface;
-      ctx.lr = 0x822ACF18;
-      sub_822A3D30(ctx, base);  // set as render target 0
+      // Set as render target 0 (Device::SetRenderTarget's plain C++ with
+      // --native_device_state, src/graphics/device_state.h).
+      if (ITC_FLAG(native_device_state)) {
+        ctx.fpscr.disableFlushMode();
+        graphics::device_state::SetRenderTarget(base, device, 0, surface);
+      } else {
+        ctx.r3.u64 = device;
+        ctx.r4.u64 = 0;
+        ctx.r5.u64 = surface;
+        ctx.lr = 0x822ACF18;
+        sub_822A3D30(ctx, base);
+      }
     }
     if (parameter(36) != 0) {
       ctx.r3.u64 = width;
@@ -138,10 +149,16 @@ extern "C" REX_FUNC(sub_822ACE00) {
         return;
       }
       guest::StoreU32(base, device + kDeviceDepthSurface, surface);
-      ctx.r3.u64 = device;
-      ctx.r4.u64 = surface;
-      ctx.lr = 0x822ACF50;
-      sub_822A4060(ctx, base);  // set as the depth surface
+      // Set as the depth surface (as render target 0).
+      if (ITC_FLAG(native_device_state)) {
+        ctx.fpscr.disableFlushMode();
+        graphics::device_state::SetDepthStencilSurface(base, device, surface);
+      } else {
+        ctx.r3.u64 = device;
+        ctx.r4.u64 = surface;
+        ctx.lr = 0x822ACF50;
+        sub_822A4060(ctx, base);
+      }
     }
     // Through the game's memcpy, as the original (it's wrapped for the
     // renderer's memory mirrors).

@@ -239,17 +239,12 @@ ITC_DEVICE_STATE_CALL(822A3518, {
   ctx.fpscr.disableFlushMode();
   ds::SetViewport(base, ctx.r3.u32, ctx.r4.u32);
 })
-ITC_DEVICE_STATE_CALL(822A3C88, {
-  ctx.fpscr.disableFlushMode();
-  ds::SetSurfaceInfo(base, ctx.r3.u32, ctx.r4.u32);
-})
-// SetRenderTarget, SetRenderTarget_External and SetDepthStencilSurface: the
-// originals leave a temporary in r3, which none of their callers read; these
-// leave the device.
-ITC_DEVICE_STATE_CALL(822A3D30, {
-  ctx.fpscr.disableFlushMode();
-  ds::SetRenderTarget(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
-})
+// SetRenderTarget_External and SetDepthStencilSurface: the originals leave a
+// temporary in r3, which none of their callers read; these leave the device.
+// Device::SetRenderTarget (sub_822A3D30) and Device::SetSurfaceInfo
+// (sub_822A3C88) have no adapters: their callers in play are native
+// (SetRenderTarget_External, SetDepthStencilSurface, Device::SetUpDisplay's
+// override, src/hooks/graphics_device.cpp).
 ITC_DEVICE_STATE_CALL(822A4340, {
   ctx.fpscr.disableFlushMode();
   ds::SetRenderTargetExternal(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
