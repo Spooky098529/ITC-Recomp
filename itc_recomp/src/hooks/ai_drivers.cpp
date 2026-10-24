@@ -234,9 +234,10 @@ ITC_AI_DRIVERS(82144F50, ctx.r3.u64 = ReadCar(base, ctx.r3.u32))
 
 // --- Set-up, modes and the plan ---
 
-// r4 = the object or 0; r3 left at the skill (+6048), as the original's
-// tail call leaves it.
-ITC_AI_DRIVERS(82138D00, SetParams(base, ctx.r3.u32, ctx.r4.u32); ctx.r3.u64 += 6048)
+// AiDriver::SetParams (sub_82138D00), StartRace (sub_82139DA0) and
+// ResetControl (sub_82139580) have no adapters: their only callers in play,
+// AiDriver::Setup (racer controllers) and the native drivers' functions,
+// call their plain C++.
 // The path's +5532 in mode 1 (no direct callers): r3 not read, r4 = the
 // entry, r5 = the position, r6 = &the lane, r7 = the masks or 0.
 ITC_AI_DRIVERS(8213B428, ctx.r3.u64 = NormalizeByLane(base, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
@@ -248,7 +249,6 @@ ITC_AI_DRIVERS(82144EF8, UpdateLane(base, ctx.r3.u32, ctx.r1.u32 - 128);
 
 // --- Starts and resets ---
 
-ITC_AI_DRIVERS(82139DA0, ctx.r3.u64 = StartRace(base, ctx.r3.u32, ctx.r1.u32 - 112))
 // The copies in the original's frame (6,320 bytes down); the original where
 // one can't be made natively.
 extern "C" REX_FUNC(sub_8213ADF8) {
@@ -266,9 +266,6 @@ extern "C" REX_FUNC(sub_8213ADF8) {
 
 // --- Resets, steering input and the path's lists ---
 
-// The word in the original's frame (112 bytes down); r3 left at the skill
-// (+6048), as ResetToMode1 leaves it.
-ITC_AI_DRIVERS(82139580, ResetControl(base, ctx.r3.u32, ctx.r1.u32 - 112); ctx.r3.u64 += 6048)
 ITC_AI_DRIVERS(8213AAA8, ctx.r3.u64 = ResetDriver(base, ctx.r3.u32))
 
 // --- The states and the drivers' resets (the originals' frames: 112 or 128
