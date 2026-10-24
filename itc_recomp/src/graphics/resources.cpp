@@ -10,6 +10,7 @@
 #include "memory/c_runtime_heap.h"
 #include "native/refcount.h"
 
+#include <bit>
 #include <optional>
 
 namespace graphics {
@@ -200,6 +201,233 @@ uint32_t Srw(uint32_t value, uint32_t shift) {
 uint32_t AtLeast1(uint32_t value) { return value > 1 ? value : 1; }
 
 }  // namespace
+
+namespace {
+
+// PowerPC's rotate-and-mask forms on 32-bit words.
+uint32_t Rlwinm(uint32_t value, uint32_t shift, uint32_t mask) {
+  return std::rotl(value, int(shift)) & mask;
+}
+uint32_t Rlwimi(uint32_t into, uint32_t value, uint32_t shift, uint32_t mask) {
+  return (std::rotl(value, int(shift)) & mask) | (into & ~mask);
+}
+uint32_t Sraw(uint32_t value, uint32_t shift) { return uint32_t(int32_t(value) >> shift); }
+
+}  // namespace
+
+TextureSizes TextureLayoutSizes(uint8_t* base, uint32_t width, uint32_t height, uint32_t depth,
+                                uint32_t levels, uint32_t format, uint32_t dimension,
+                                uint32_t tiled, uint32_t packed, uint32_t border, uint32_t pitch) {
+  ITC_NATIVE_RUNNING("sub_822A46C8 TextureLayout::Sizes");
+  // A 2D texture with a depth over 1 is an array; arrays and cube maps lay
+  // out one slice and multiply (the original's r14; the stack word at +92
+  // tells arrays, aligned to 4 slices, from cube maps).
+  const bool array = dimension == 1 && depth > 1;
+  const bool slices = array || dimension == 3;
+  uint32_t level_depth = slices ? 1 : depth;  // r28
+  const uint32_t bits = guest::LoadU8(base, kFormatTable + 1 + (format << 1));
+  const uint32_t twice = border << 1;
+  const uint32_t w_inner = width - twice;   // r23
+  const uint32_t h_inner = height - twice;  // r26
+  // The sizes' log2, rounded up, plus the border (r29, r30).
+  uint32_t log_w = border - Clz(w_inner - 1) + 32;
+  uint32_t log_h = border - Clz(h_inner - 1) + 32;
+  uint32_t d_inner = 1;  // r24
+  uint32_t log_d = 0;
+  if (dimension == 2) {
+    d_inner = level_depth - twice;
+    log_d = border - Clz(d_inner - 1) + 32;
+  }
+  // The base level's width, height and depth (the stack's +88, +84, +80):
+  // powers of two when packed below 16 texels, else the size (the width
+  // from the pitch when one is given).
+  uint32_t w = Slw(1, log_w);
+  uint32_t h = Slw(1, log_h);
+  uint32_t d = Slw(1, log_d);
+  if (!((w <= 16 || h <= 16) && packed != 0)) {
+    if (pitch == 0) {
+      w = width;
+    } else {
+      if (bits == 0) {
+        ITC_LOG_WARN("tw/td trap hit (type 0): TextureLayout::Sizes's divide by 0");
+      }
+      w = bits ? (pitch << 3) / bits : 0;
+    }
+    h = height;
+    d = level_depth;
+  }
+  TextureLevelSize(w, h, d, bits, format, dimension, tiled);
+  TextureSizes sizes{levels, w, 0, 0};
+  if (pitch == 0) {
+    pitch = (w * bits) >> 3;
+  }
+  bool mips = true;
+  if (dimension == 2) {
+    sizes.base_size = (pitch * d * h + 4095) & 0xFFFFF000;
+    if (slices) {
+      sizes.base_size *= depth;
+    }
+  } else if (tiled == 0 && !slices) {
+    if (dimension == 1 && levels == 1 && packed == 0 && border == 0) {
+      // A linear 2D texture of one level: its height aligned only to the
+      // block, no mips.
+      const Block block = GpuBlockSize(format);
+      sizes.base_size = ((block.height + height - 1) & ~(block.height - 1)) * pitch;
+      mips = false;
+    } else {
+      sizes.base_size = pitch * d * h;
+    }
+  } else {
+    sizes.base_size = ((pitch * h + 4095) & 0xFFFFF000) * d;
+    if (slices) {
+      sizes.base_size *= depth;
+    }
+  }
+  if (!mips || !(levels > 1 || levels == 0)) {
+    return sizes;
+  }
+  uint32_t largest = h_inner > d_inner ? h_inner : d_inner;
+  if (w_inner > largest) {
+    largest = w_inner;
+  }
+  if (levels == 0) {
+    levels = 31 - Clz(largest) + 1;
+    sizes.levels = levels;
+  }
+  uint32_t mip_size = 0;
+  for (uint32_t count = levels - 1; count != 0; count--) {
+    // Packed mips end where the mip tail starts (a side at 16 texels).
+    if (packed != 0 && (log_w <= 4 || log_h <= 4)) {
+      break;
+    }
+    if (log_w != 0) {
+      log_w--;
+    }
+    if (log_h != 0) {
+      log_h--;
+    }
+    if (level_depth > 1) {
+      level_depth >>= 1;
+    }
+    uint32_t mw = Slw(1, log_w);
+    uint32_t mh = Slw(1, log_h);
+    uint32_t md = level_depth;
+    mip_size += TextureLevelSize(mw, mh, md, bits, format, dimension, tiled);
+  }
+  if (slices) {
+    const uint32_t align = array ? 4 : 1;
+    mip_size *= (depth + align - 1) & ~(align - 1);
+  }
+  sizes.mip_size = mip_size;
+  return sizes;
+}
+
+bool TextureTypeKnown(uint32_t type) {
+  return type == 3 || type == 17 || type == 18 || type == 19 || type == 20;
+}
+
+TextureHeaderSizes SetTextureHeader(uint8_t* base, uint32_t type, uint32_t width, uint32_t height,
+                                    uint32_t depth, uint32_t levels, uint32_t usage,
+                                    uint32_t format, uint32_t packed, uint32_t border,
+                                    uint32_t field, uint32_t pitch, uint32_t header) {
+  ITC_NATIVE_RUNNING("sub_822A5608 TextureHeader::Set");
+  const uint32_t bordered = (border << 1) + 1;  // r25: the sizes' bias
+  // The fetch constant's dimension (0 1D, 1 2D, 2 3D, 3 cube).
+  uint32_t dimension = 1;
+  switch (type) {
+    case 20:
+      dimension = 0;
+      break;
+    case 18:
+      dimension = 3;
+      break;
+    case 17:
+      dimension = 2;
+      break;
+    default:
+      break;  // 3 and 19 (TextureTypeKnown is the caller's)
+  }
+  const uint32_t full = TextureLevelCount(width, height, type == 17 ? depth : 1, border);
+  if (levels == 0) {
+    levels = full;
+  }
+  if (packed == 2) {
+    packed = levels > 1 ? 1 : 0;
+  }
+  const TextureSizes sizes = TextureLayoutSizes(base, width, height, depth, levels,
+                                                format & 0x3F, dimension, (format >> 8) & 1,
+                                                packed, border, pitch);
+  uint32_t common = (usage & 0x4) ? 0x00300003 : 0x00100003;
+  if (usage & 0x200) {
+    common |= 0x00400000;
+  }
+  Store(base, header + 20, kUnlocked);
+  Store(base, header + 24, kUnlocked);
+  Store(base, header + 0, common);
+  Store(base, header + 8, 0);
+  uint32_t w48 = Load(base, header + 48);
+  Store(base, header + 4, 1);
+  w48 = Rlwimi(w48, dimension, 9, 0x600);
+  Store(base, header + 48, w48);
+  // The size word (+36), as Texture::BaseSize reads it back.
+  if (dimension == 0) {
+    Store(base, header + 36, (Load(base, header + 36) & 0xFF000000) |
+                                 ((width - bordered) & 0x00FFFFFF));
+  } else if (dimension == 1 || dimension == 3) {
+    uint32_t size = (((height - bordered) << 13) & 0x3FFE000) | ((depth - 1) << 26);
+    size |= (width - bordered) & 0x1FFF;
+    Store(base, header + 36, size);
+  } else {
+    uint32_t size = (((height - bordered) << 11) & 0x3FF800) | ((depth - bordered) << 22);
+    size |= (width - bordered) & 0x7FF;
+    Store(base, header + 36, size);
+  }
+  // The format's fields into +28, +32, +40 and +44 (the original's steps).
+  uint32_t r9 = Sraw(format, 15);
+  uint32_t r8 = Sraw(format, 13);
+  uint32_t r7 = Sraw(format, 11);
+  uint32_t r6 = Sraw(format, 9);
+  uint32_t r5 = Sraw(format, 8);
+  uint32_t r4 = Sraw(format, 6);
+  uint32_t r3 = Sraw(format, 27) & 7;
+  r8 = Rlwimi(r8, r9, 2, 0xC);
+  r3 |= Rlwinm(border, 21, 0xFFE00000);
+  r9 = Rlwimi(sizes.base_width, r5, 14, 0xFFFFC000);
+  r3 = Rlwimi(r3, field, 3, 0x1F8);
+  uint32_t r30 = Sraw(format, 24);
+  r8 &= 0xF;
+  r30 = Rlwimi(r30, r3, 3, 0xFFFFFFF8);
+  r3 = Load(base, header + 28);
+  r7 = Rlwimi(r7, r8, 2, 0xFFFFFFFC);
+  const uint32_t is_array = type == 19 ? 1 : 0;
+  r8 = Sraw(format, 21);
+  r6 = Rlwimi(r6, r7, 2, 0xFFFFFFFC);
+  r4 = Rlwimi(r4, is_array, 4, 0x10);
+  r3 = Rlwimi(r3, r9, 17, 0xFFC00000);
+  uint32_t w44 = Load(base, header + 44);
+  r8 = Rlwimi(r8, r30, 3, 0xFFFFFFF8);
+  uint32_t w32 = Load(base, header + 32) & 0xFFFFFFC0;
+  r7 = Sraw(format, 18);
+  r7 = Rlwimi(r7, r8, 3, 0xFFFFFFF8);
+  w44 = Rlwimi(w44, levels - 1, 6, 0x3C0);
+  w48 = Rlwimi(w48, packed, 11, 0x800);
+  const uint32_t w40 = Load(base, header + 40);
+  r5 = Sraw(format, 17);
+  r6 = Rlwinm(r6, 2, 0xFFFFFFFC);
+  r5 = Rlwimi(r5, r7, 1, 0xFFFFFFFE);
+  Store(base, header + 44, w44);
+  Store(base, header + 48, w48);
+  w32 |= format & 0x3F;
+  r3 &= 0xFFFFFC00;
+  w32 = Rlwimi(w32, r4, 6, 0xC0);
+  r6 |= r3;
+  w32 = Rlwimi(w32, r4, 6, 0x400);
+  Store(base, header + 40, r5 | (w40 & 0x7FF80000));
+  r6 |= 2;
+  Store(base, header + 32, w32);
+  Store(base, header + 28, r6);
+  return {r3, sizes.base_size, sizes.mip_size};
+}
 
 LevelLayout TextureLevelLayout(uint8_t* base, uint32_t texture, uint32_t level) {
   ITC_NATIVE_RUNNING("sub_822A4B98 Texture::LevelLayout");

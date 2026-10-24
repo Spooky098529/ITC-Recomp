@@ -142,6 +142,27 @@ void NativeSurfaceDesc(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = gr::SurfaceDesc(base, ctx.r3.u32, ctx.r4.u32);
 }
 
+void NativeLayoutSizes(PPCContext& ctx, uint8_t* base) {
+  const uint32_t stack = ctx.r1.u32;
+  const gr::TextureSizes sizes = gr::TextureLayoutSizes(
+      base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32, ctx.r8.u32, ctx.r9.u32,
+      ctx.r10.u32, guest::LoadU32(base, stack + 84), guest::LoadU32(base, stack + 100));
+  guest::StoreU32(base, guest::LoadU32(base, stack + 108), sizes.base_width);
+  guest::StoreU32(base, guest::LoadU32(base, stack + 116), sizes.base_size);
+  guest::StoreU32(base, guest::LoadU32(base, stack + 124), sizes.mip_size);
+  ctx.r3.u64 = sizes.levels;
+}
+void NativeSetTextureHeader(PPCContext& ctx, uint8_t* base) {
+  const uint32_t stack = ctx.r1.u32;
+  const gr::TextureHeaderSizes sizes = gr::SetTextureHeader(
+      base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32, ctx.r8.u32, ctx.r9.u32,
+      ctx.r10.u32, guest::LoadU32(base, stack + 84), guest::LoadU32(base, stack + 92),
+      guest::LoadU32(base, stack + 100), guest::LoadU32(base, stack + 108));
+  guest::StoreU32(base, guest::LoadU32(base, stack + 116), sizes.base_size);
+  guest::StoreU32(base, guest::LoadU32(base, stack + 124), sizes.mip_size);
+  ctx.r3.u64 = sizes.r3;
+}
+
 // The scratch area's layout.
 constexpr uint32_t kHeader = 0;    // 64 bytes
 constexpr uint32_t kParent = 64;   // 64 bytes
@@ -342,6 +363,125 @@ void LevelDescs(Context& h, Random& r) {
       more.Check(out[0], out[1], fmt::format("case {}: level {}, {}", i, level, Hex(inputs)));
     }
     more.Report();
+  }
+}
+
+// A texture's size for the layouts: up to 2,048 mostly, a power of two or
+// one less now and then, an edge value rarely.
+uint32_t TextureSide(Random& r) {
+  switch (r.Below(8)) {
+    case 0:
+      return 1u << r.Below(13);
+    case 1:
+      return (1u << r.Below(13)) - 1;
+    case 2:
+      return Size(r);
+    default:
+      return 1 + r.Below(2048);
+  }
+}
+
+// TextureLayout::Sizes on random sizes, levels (0 now and then: the full
+// chain; never so many the loop runs long), formats, dimensions, tiling,
+// packing, borders and pitches (0 mostly); TextureHeader::Set on headers of
+// random words with the types it knows, random formats, usages and fields.
+// Compared: the outputs, the header, r3. A pitch with a format of no bits a
+// pixel hits Sizes's divide trap (a warning each version).
+void TextureHeaders(Context& h, Random& r) {
+  {
+    Results results("TextureLayout::Sizes (sub_822A46C8)");
+    for (int i = 0; i < 2000; i++) {
+      const uint32_t w = TextureSide(r), hh = TextureSide(r);
+      const uint32_t d = r.Below(2) ? 1 : r.Below(4) ? r.Below(65) : TextureSide(r);
+      const uint32_t levels = r.Below(4) == 0 ? 0 : r.Below(16);
+      const uint32_t format = r.Below(8) ? r.Below(64) : uint32_t(r.Next());
+      const uint32_t dimension = r.Below(16) ? r.Below(4) : uint32_t(r.Next());
+      const uint32_t tiled = r.Below(8) ? r.Below(2) : uint32_t(r.Next());
+      const uint32_t packed = r.Below(8) ? r.Below(2) : uint32_t(r.Next());
+      const uint32_t border = r.Below(8) ? (r.Below(4) == 0) : uint32_t(r.Next());
+      const uint32_t pitch = r.Below(4) ? 0 : r.Below(8) ? 32 * r.Below(256) : uint32_t(r.Next());
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Fill(h.base, h.data, kScratchBytes);
+        PPCContext t = CallContext(h);
+        const uint32_t stack = t.r1.u32;
+        guest::StoreU32(h.base, stack + 84, border);
+        guest::StoreU32(h.base, stack + 92, 0x5A5A5A5A);  // not read
+        guest::StoreU32(h.base, stack + 100, pitch);
+        guest::StoreU32(h.base, stack + 108, h.data + kOut);
+        guest::StoreU32(h.base, stack + 116, h.data + kOut + 4);
+        guest::StoreU32(h.base, stack + 124, h.data + kOut + 8);
+        t.r3.u64 = w;
+        t.r4.u64 = hh;
+        t.r5.u64 = d;
+        t.r6.u64 = levels;
+        t.r7.u64 = format;
+        t.r8.u64 = dimension;
+        t.r9.u64 = tiled;
+        t.r10.u64 = packed;
+        (v == 0 ? Original<__imp__sub_822A46C8> : NativeLayoutSizes)(t, h.base);
+        out[v].Bytes(Read(h.base, h.data + kOut, 12));
+        out[v].Word(t.r3.u32);
+      }
+      results.Check(out[0], out[1],
+                    fmt::format("case {}: {} x {} x {}, {} levels, format {:X}, dimension {:X}, "
+                                "tiled {:X}, packed {:X}, border {:X}, pitch {:X}",
+                                i, w, hh, d, levels, format, dimension, tiled, packed, border,
+                                pitch));
+    }
+    results.Report();
+  }
+  {
+    Results results("TextureHeader::Set (sub_822A5608) with TextureLayout::Sizes");
+    const uint32_t types[] = {3, 3, 3, 17, 18, 19, 20};
+    const uint32_t usages[] = {0, 0x4, 0x200, 0x204, 0x8};
+    for (int i = 0; i < 2000; i++) {
+      const uint32_t type = types[r.Below(7)];
+      const uint32_t w = TextureSide(r), hh = TextureSide(r);
+      const uint32_t d = type == 18 ? 6 : type == 3 || type == 20 ? 1 : 1 + r.Below(64);
+      const uint32_t levels = r.Below(3) == 0 ? 0 : r.Below(14);
+      const uint32_t usage = r.Below(4) ? usages[r.Below(5)] : uint32_t(r.Next());
+      const uint32_t format = uint32_t(r.Next());
+      const uint32_t packed = r.Below(8) ? r.Below(3) : uint32_t(r.Next());
+      const uint32_t border = r.Below(8) ? (r.Below(4) == 0) : r.Below(4);
+      const uint32_t field = r.Below(2) ? 0 : uint32_t(r.Next());
+      const uint32_t pitch = r.Below(4) ? 0 : 32 * r.Below(256);
+      std::vector<uint8_t> words(64);
+      for (uint8_t& b : words) {
+        b = uint8_t(r.Next());
+      }
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Fill(h.base, h.data, kScratchBytes);
+        Write(h.base, h.data + kHeader, words.data(), uint32_t(words.size()));
+        PPCContext t = CallContext(h);
+        const uint32_t stack = t.r1.u32;
+        guest::StoreU32(h.base, stack + 84, border);
+        guest::StoreU32(h.base, stack + 92, field);
+        guest::StoreU32(h.base, stack + 100, pitch);
+        guest::StoreU32(h.base, stack + 108, h.data + kHeader);
+        guest::StoreU32(h.base, stack + 116, h.data + kOut);
+        guest::StoreU32(h.base, stack + 124, h.data + kOut + 4);
+        t.r3.u64 = type;
+        t.r4.u64 = w;
+        t.r5.u64 = hh;
+        t.r6.u64 = d;
+        t.r7.u64 = levels;
+        t.r8.u64 = usage;
+        t.r9.u64 = format;
+        t.r10.u64 = packed;
+        (v == 0 ? Original<__imp__sub_822A5608> : NativeSetTextureHeader)(t, h.base);
+        out[v].Bytes(Read(h.base, h.data + kHeader, 64));
+        out[v].Bytes(Read(h.base, h.data + kOut, 8));
+        out[v].Word(t.r3.u32);
+      }
+      results.Check(out[0], out[1],
+                    fmt::format("case {}: type {}, {} x {} x {}, {} levels, usage {:X}, format "
+                                "{:X}, packed {:X}, border {}, field {:X}, pitch {:X}, {}",
+                                i, type, w, hh, d, levels, usage, format, packed, border, field,
+                                pitch, Hex(words)));
+    }
+    results.Report();
   }
 }
 
@@ -1004,6 +1144,7 @@ void GraphicsResources(Context& h) {
   BlockSizes(h, r);
   SizeMath(h, r);
   LevelDescs(h, r);
+  TextureHeaders(h, r);
   Buffers(h, r);
   Getters(h, r);
   SurfaceHeaders(h, r);

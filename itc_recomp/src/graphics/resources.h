@@ -105,6 +105,44 @@ struct SurfaceSizes {
 SurfaceSizes SetSurfaceHeader(uint8_t* base, uint32_t width, uint32_t height, uint32_t format,
                               int32_t multisample, uint32_t parameters, uint32_t header);
 
+// sub_822A46C8 TextureLayout::Sizes: a texture's base level's aligned width
+// (or, with a pitch, the pitch's texels), the base level's bytes (times the
+// faces or slices for cube maps and arrays) and the mip chain's bytes
+// (TextureLevelSize per level below the base; packed mips stop where the
+// mip tail starts), and the level count (0 asks for the full chain).
+// `dimension` is the fetch constant's (0 1D, 1 2D, 2 3D, 3 cube; 2D with a
+// depth over 1 is an array). A pitch whose format has no bits a pixel hits
+// the original's divide trap (logged, then 0).
+struct TextureSizes {
+  uint32_t levels;      // the original's r3
+  uint32_t base_width;  // out: the aligned width
+  uint32_t base_size;   // out: the base level's bytes
+  uint32_t mip_size;    // out: the mip chain's bytes
+};
+TextureSizes TextureLayoutSizes(uint8_t* base, uint32_t width, uint32_t height, uint32_t depth,
+                                uint32_t levels, uint32_t format, uint32_t dimension,
+                                uint32_t tiled, uint32_t packed, uint32_t border, uint32_t pitch);
+
+// sub_822A5608 TextureHeader::Set: fills a 52-byte texture header (+0 the
+// common word, +4 = 1, +8 = 0, +20 and +24 unlocked, +28 to +48 the fetch
+// constant) for a type (3 2D, 17 volume, 18 cube, 19 array, 20 1D: only
+// these; the original reads an uninitialized stack word for the others, so
+// its adapter runs the original then), a size, levels (0: the full chain),
+// usage (0x4, 0x200), format, packed mips (2: when there's more than one
+// level), border, `field` (the stack word put in +40 bits 3-8's place,
+// probably the exponent bias), pitch (0: from the width). Returns the
+// original's r3 (+28 before its low bits) and the base and mip sizes.
+bool TextureTypeKnown(uint32_t type);
+struct TextureHeaderSizes {
+  uint32_t r3;
+  uint32_t base_size;
+  uint32_t mip_size;
+};
+TextureHeaderSizes SetTextureHeader(uint8_t* base, uint32_t type, uint32_t width, uint32_t height,
+                                    uint32_t depth, uint32_t levels, uint32_t usage,
+                                    uint32_t format, uint32_t packed, uint32_t border,
+                                    uint32_t field, uint32_t pitch, uint32_t header);
+
 // --- Buffers (the allocation layer: run only with --native_heap) ---
 
 // sub_822A6830 Device::CreateVertexBuffer: a 32-byte header and `bytes` of
