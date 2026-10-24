@@ -168,7 +168,7 @@ with this subsystem's migration.
 
 2026-10-24, after the device state: the run's limit (3 subsystems, the
 user's call) reached. Everything passed: harnesses 0 differing outside
-"(expected to differ)" groups (16 added, all from the user's calls or
+"(expected to differ)" groups (15 added, all from the user's calls or
 the graphics rule), attract races 25-28 s under `attract_race.sh 40`,
 no errors, replays ok. Next: the user reviews `review.md` ("Run
 2026-10-24 03:25") and `expected-differences.md` ("03:25 run"), drives
