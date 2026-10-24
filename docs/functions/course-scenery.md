@@ -1,0 +1,219 @@
+# Known functions: the course scenery
+
+The course scenery: what the game draws of the course besides the cars,
+loaded around the cameras as they move and drawn each frame. Its manager
+(248 bytes, `Scenery::`, at `[0x826C5514]` and `[0x826C551C]`, both set
+to the same object; physical memory) is made by `Scenery::Create` and set
+up by `Scenery::Setup` from a 44-byte configuration (the course's table
+of areas and their asset ids), then `Scenery::StartLoad` loads the
+course's shared set and `Scenery::IsLoaded` is polled until it's in. It's
+made, set up, loaded and freed by the race's code (`sub_8215B790`,
+`sub_8215AA88`, `sub_821514A0`, `sub_821516F0`) and by the front end's
+(`sub_82227A50`, `sub_8222C300`, `sub_82228548`, `sub_82229678`,
+`sub_82229238`), all in `../loops/leads.md`; `Scenery::Update` runs from
+the race's `sub_8215D2B0` and the front end's camera `sub_822282E8`, and
+`Scenery::Draw` (the race draw step's part `sub_820F6068`) from
+`sub_8215B4F8` (`Race::DrawStep`, `functions.md`) and `sub_822282E8`.
+
+The course is cut into areas, each with bounds (four corners in x and
+z) and a list of models, in a file of the shared set. Every update, for
+each player's viewport, the areas within the viewport's far distance
+(plus 70.0) are put in a list by distance with a mask of the camera
+passes that see them (`Scenery::CollectAreas`, the table at `0x82602F80`
+in `../known-data.md`), and the models of those areas likewise
+(`Scenery::CollectModels`); both lists are sorted nearest first and cut
+to what the pools hold. In the streaming mode (the configuration's +0
+not 0; seen in play) each item's object is found
+in its pool by its key (area, model), or taken from the pool and loaded
+through `Archive::Load` (`files-and-saves.md`) while the archive's queue
+is short enough; objects not seen for two updates go back to their pool
+(`SceneryList::ReleaseUnused`). The loaded areas with models are then
+listed for the draw (`Scenery::Update`; the manager's +216). Lights come
+with the areas: an area's light file is what `Lights::FindNearest` scans
+(it lists the manager's visible areas) and what the light billboards
+draw (`sub_82148658`, `sprites.md`). The draw also records the cars'
+headlight projectors on the scenery (`Scenery::RecordHeadlightProjectors`,
+"The projector" in `../frame-interpolation.md`).
+
+The objects live in five fixed pools (`ObjectPools::`), one block of
+physical memory for all, each object 40 bytes of header (`PoolObject::`:
+a vtable of three slots, the key, load, reset; a data buffer the loads
+are put in; links for the pool's free and used lists; flags 0x1 in use,
+0x8 loaded, 0x10 seen this update, 0x20 not seen, about to be released)
+and its own fields. Pool 0 (60 bytes, one object when the configuration's
++36 is set) and pool 1 (60 bytes, none) never loaded in play (their load
+slots `sub_820F1098` and `sub_820F1100` never ran, nor the base's
+`sub_820FBB68`); pool 2 is the course's shared set (3,824 bytes, one,
+`CourseSet::`: its textures, a model, six lists of models, the areas'
+file, the light groups' texture animations); pool 3 holds the areas'
+lights (88 bytes, `AreaLights::`) and pool 4 the areas' models (560
+bytes, `AreaModel::`: a model and its textures, loaded into the shared
+load buffer `0x826A5134` and parsed from there).
+
+Read by the B7 loop's mapping agent, 2026-10-24, from its lead (found by
+the collision world's mapping agent: "`820FB8B8`-`820FC0E8`, called only
+from `820F1138`-`820F4558`"). The names are ours. `Scenery::Draw`,
+`Scenery::DrawArea`, `Scenery::DrawSetLists` and
+`Scenery::RecordHeadlightProjectors` are read only for their outline
+(their rows say so). Fields: `../known-data.md` (`0x826C5514`,
+`0x826C5518`, `0x82602F80`, "scenery list", "pool object", "visible
+area", "course set").
+
+Calls through pointers (none of their targets is native): the pools'
+slots (key, load, reset; each row names its targets seen in play), the
+pool set's factory (`Scenery::MakePoolObject` only), the texture provider
+at the manager's +228 (vtable `0x8206CCB4`, made by `sub_82594850`; slot 2
+`sub_82594328` and slot 4 `sub_82594718`, both seen in play, no rows),
+and the scene's render manager `[0x826BABA0]` (slot 8 `sub_820944D8`,
+seen in play, no row, which calls through `sub_82094338` to another
+object's slot 3; the command list and render queue behind it are found
+at run time, as for `CameraPass::RecordBegin`, `cameras.md`).
+
+Shared with other files, without rows here: `Archive::Load`
+(`sub_8209DE48`), the asset's size (`sub_820A0678`) and
+`DataFile::GetEntry` (`sub_82294730`) (`files-and-saves.md`);
+`XPhysicalAlloc`, `XPhysicalFree` and `operator delete` (`sub_822964C8`,
+`sub_822965C8`, `sub_825A70E8`, `heap.md`); `memcpy` (`sub_825A7410`,
+`c-runtime.md`); `Model::Load`, `Model::Release`, `XPR::XPR`,
+`XPR::Create` (`sub_82596920`, `sub_82594970`, `sub_82596E68`,
+`sub_82596F68`, `models.md`); `Model::Animate` (`sub_82594B60`,
+`model-animation.md`); `Matrix::Copy`, `Vec4::Transform`
+(`matrix-math.md`); `CameraPass::FromViewport` and `RecordClear`
+(`cameras.md`); `Vehicle::Get`, `List::At` (`vehicle-accessors.md`);
+the command list's chunk calls (`command-list.md`); `Projector::Build`
+(`sub_82597610`), the car draw step's `sub_820DAA38`, `sub_820DAAC8`,
+`sub_820DAB10` and `Minimap::Draw` (`sub_820F5740`) (`functions.md`);
+the light billboards (`sub_82148658`, `sprites.md`). Without rows
+anywhere, in `../loops/leads.md`: the archive's queue length
+(`sub_8209D7B0`), `MmQueryAllocationSize`'s wrapper (`sub_822965C0`),
+memset (`sub_822962B0`), the model class and texture provider
+(`sub_825948C0`, `sub_82594F58`, `sub_82594850`), the lists of models
+and their draws at `82146AA8`-`82148650` (`sub_82147FB8`,
+`sub_82148428`, `sub_82148528`, `sub_82147D88`, `sub_82146AA8`,
+`sub_82148650`, `sub_82147850`, `sub_82147958`, `sub_82147B18`,
+`sub_82148058`), `sub_825970A8` (probably `XPR::Release`),
+`sub_82596D48` and `sub_82596B18` (model recorders), and `sub_82133AE8`
+(`[0x826C5D80 + 4 × r3]`).
+
+Not here: the minimap's callees between the scenery and
+`Minimap::Draw` (`sub_820F2D28`, `sub_820F2EF8`, `sub_820F4040` to
+`sub_820F5238`), a lead; `sub_820C9170` (`Lights::FindNearest`'s caller,
+which reads `[0x826C551C]`, in `functions.md`).
+
+Status:
+
+- **Native**: plain C++ in `itc_recomp/src/` that doesn't use the
+  PowerPC context (`ctx`): normal arguments and host structs (it may
+  still read and write guest memory through `src/guest.h` while
+  recompiled code shares the data). The game reaches it without `ctx`,
+  from native or overridden callers, and the recompiled original is no
+  longer called (except behind a fallback flag or to check against it).
+  No `REX_FUNC` override of it exists, not even an adapter kept only for
+  a harness (that's Overridden until the adapter goes).
+  The end state for every function.
+- **Overridden**: an `extern "C" REX_FUNC(sub_XXXXXXXX)` override in
+  `itc_recomp/src/` (or a macro defining one) does the work instead of
+  the original: a thin adapter in front of native code, or a body that
+  still uses `ctx` (calling guest code, reading registers). It may call
+  the original when its flag is off, or to check itself against it.
+- **Wrapped**: an override that does something of its own (skipping
+  render-only passes, logging, timing) and still calls the original
+  (`__imp__sub_XXXXXXXX`) for the work.
+- **Dropped**: its work isn't needed on PC (hardware set-up, kernel calls
+  the SDK already stubbed), so it no longer runs: an override in
+  `itc_recomp/src/` replaces it with nothing (or a fixed return value), or
+  its callers, made native, leave the call out (no override then; the row
+  says which caller). Logs, a harness or the renderer's frame dumps have
+  shown that nothing reads what it did. The original is no longer called,
+  except behind a fallback flag while the drop is being checked. A
+  function the game never calls in the first place isn't Dropped: its
+  status stays blank and its row says it's never called.
+- **Merged**: its work is done inside a native caller's plain C++ (a
+  few lines only that caller needs), so it has no function or override of
+  its own in `itc_recomp/src/`. The row names the caller(s) and the
+  harness that covers the work. The original is no longer called, except
+  behind the caller's fallback flag.
+- **Patched**: the generated code was edited in place (search for
+  `PATCH:`).
+
+A function usually moves from recompiled or Wrapped to Overridden to
+Native as the `ctx` edge moves up through its callers, or straight to
+Dropped when its work isn't needed.
+`itc_recomp/tools/check_function_statuses.py` checks this column, in
+every file of the tables, against `src/` (an override marked Native, a
+status with no override, an override with no row, a row in two files);
+run it after changing either, on any branch.
+
+| Address | Name | Status | Notes |
+|---|---|---|---|
+| `sub_820F2F88` | `Scenery::Create` | | No arguments: the 248-byte manager from physical memory (`Scenery::AllocPhysical(248)`) into `[0x826C551C]`; +196 = 0x38435 (a mask of camera pass bits, ANDed with each pass's and each area's mask by `Scenery::DrawArea`; 0x400 draws the areas' lights, 0x4000 stops the texture animations), +200 = 192.0, +204 = 72.0, +208 = 256.0, +212 = 64.0 (from `0x820067B8`, `0x820067B4`, `0x82001FAC`, `0x820067B0`; where they're read wasn't looked for), +224 = 0, the texture provider at +228 made (`sub_82594850(+228, -1)`, a lead), then `Scenery::Init`. From `sub_8215B790` and `sub_82227A50` (leads). |
+| `sub_820F1360` | `Scenery::Init` | | r3 = the manager: `[0x826C5514]` = r3; +52, +56 = 0; +60 to +107 cleared in 8-byte pieces (memset `sub_822962B0`), +108, +112, +184, +188 = 0, the two lists (+116 and +144, 28 bytes each) cleared, +172 = +176 = -1, +192 = 0. Only caller `Scenery::Create`. |
+| `sub_820F3020` | `Scenery::Setup` | | r3 = the manager, r4 = the 44-byte configuration: `Scenery::SetupPools`, then the visible areas: +216 = 0, +220 = the area count (+92), +224 = 272 × that from physical memory (`Scenery::AllocPhysical`), each entry's +4 = 0 and +8 = the model count (+100). From `sub_8215B790` and `sub_8222C300` (leads). |
+| `sub_820F2720` | `Scenery::SetupPools` | | r3 = the manager, r4 = the configuration: `[0x826C5518]` = 0 (physical bytes held), +180, +184 = 0; the configuration copied to +8 (`memcpy`, 44 bytes); a mode of 2 with +12 (the view count − 1) 0 becomes `[[+40]]`. `Scenery::PoolSizes` gives the counts (+92 and +96 the areas, +100 the models, +104 those at most 16) and each pool's data size. List A (+116): pool 3, capacity +128 = the area count, a 4-byte pointer array +132, 16-byte items +136 and 12-byte table +140 (each `Scenery::AllocPhysical`, the last two cleared); list B (+144) the same for pool 4 with the model count. The tables: for each area i of the configuration's table (+36's entries from +20, 12 bytes: the light asset, the first and last model asset; the table's count at +16) with an asset (not -1), A gets {i, 0, asset} and B {i, k, `SceneryConfig::ModelAsset(i, k)`} for each model k. Then the five pool descriptors (24 bytes: +0 the index, +4 the object size, +8 the data size, +12 and +16 two counts, +20 the factory `0x820F2638`): pool 0 when +44 is set (60 bytes, one, data the size of `[[+32]]`'s asset, in a physical block of its own at +184, size +180), pool 1 when +48 is set (60 bytes, none), pool 2 (3,824 bytes, one), pool 3 (88 bytes; +96 objects, or +92 in mode 0 with one data buffer), pool 4 (560 bytes; +104 objects, or +100 in mode 0; data 0: +188 = the shared load buffer `[0x826A5134]` when its size `[0x826A5130]` is at least pool 4's largest asset, else 0); `ObjectPools::Init(manager, 5, descriptors)`; +192 = 0. Only caller `Scenery::Setup`. |
+| `sub_820F2030` | `Scenery::PoolSizes` | | r3 = &the area counts (+92), r4 = &the model counts (+100), r5 = out (five words), r6 = the configuration: each pool's data size: 0 the size (`sub_820A0678`) of `[[+24]]`'s asset; 1: 0; 2: the size of the table's +8 asset; 3: of each area's light asset (+20 of its entry, up to the first -1), summed in mode 0 (+0 = 0), else the largest, and both counts = the areas; 4: of each model asset (`SceneryConfig::ModelAsset`), summed or the largest the same way, the count and that capped at 16. Only caller `Scenery::SetupPools`. |
+| `sub_820F1530` | `SceneryConfig::ModelAsset` | | r3 = the configuration, r4 = an area, r5 = a model: -1 when the area isn't below the table's count (+28's +16); else its first model asset (+24 of its 12-byte entry from +20) + r5 when that's within its last (+28), else last + 1 (the loop's end). Leaf. From `Scenery::SetupPools` and `Scenery::PoolSizes`. |
+| `sub_820F1490` | `Scenery::AllocPhysical` | | r3 = a size: `XPhysicalAlloc(size, -1, 0, 4)` (`sub_822964C8`, `heap.md`), its allocated size (`MmQueryAllocationSize`'s wrapper `sub_822965C0`, a lead) added to `[0x826C5518]`; returns the block. From `Scenery::Create`, `Setup`, `SetupPools` and `CourseSet::Load`. |
+| `sub_820F14E8` | `Scenery::FreePhysical` | | r3 = a block: its allocated size (`sub_822965C0`) taken off `[0x826C5518]`, then `XPhysicalFree` (`sub_822965C8`). From `Scenery::Destroy`, `Unload`, `UnloadPools` and `CourseSet::OnLoaded`. |
+| `sub_820F1E00` | `Scenery::StartLoad` | | r3 = the manager: a course set taken from pool 2 (`ObjectPools::Acquire(2, key 0)`) and loaded (`ObjectPools::Load`), +112 = it, +172 = 2 and +176 its index. In mode 0 both lists are emptied and filled with every entry of their tables (`SceneryList::Add`, distance 0.0, mask 0), for `Scenery::IsLoaded` to load them all. With +44 set, pool 0's object the same way into +108. +192 = 1. From `sub_8215B790` and `sub_8222C300` (leads). |
+| `sub_820F1F68` | `Scenery::IsLoaded` | | r3 = the manager: while +192 is set, `SceneryList::LoadAll` on list A, then list B (0 until each is done); then the object last asked for (+172 the pool, +176 its index, both 0 or more) must be loaded: not in use (`PoolObject::InUse` 0) or `PoolObject::IsLoaded`; then +192 = 0 and 1 is returned, else 0. From `sub_821514A0`, `sub_821516F0` (the race's) and `sub_82229238` (the front end's), probably polled until it gives 1. |
+| `sub_820F4558` | `Scenery::Update` | | r3 = the manager. The 14 camera passes of the table at `0x82602F80` that are enabled (+588) set from their viewports (`CameraPass::FromViewport(pass, player, entry)`); both lists emptied (`SceneryList::Clear`); for each view (0 to +12) `Scenery::CollectAreas` with its viewport (`[[0x826C2CE8] + 4i]`), list A sorted (`SceneryList::Sort`) and cut to +96; `Scenery::CollectModels` for each view, list B sorted, `Scenery::LimitLargeModels`, cut to +104. Mode 0: `SceneryList::LoadAll` on both; else `SceneryList::Stream`. Then the visible areas (+216, 272-byte entries): for each item of A whose object (+12) is loaded and whose mask is not 0: the entry's +0 = the mask, +12 = the object, +16 on the loaded models of B with the same area, nearer than viewport 0's far distance (`[[0x826C2CE8]]` +72) (each marked seen, `PoolObject::SetVisible(1)`), +4 their count; an entry with models marks its area seen and counts (+216). Not in mode 0, `SceneryList::ReleaseUnused` on both. From `sub_8215D2B0` (the race's) and `sub_822282E8` (the front end's camera; leads). How often isn't known. |
+| `sub_820F1588` | `SceneryList::Clear` | | r3 = the manager (not read), r4 = a list: +4 (the items done) and +8 (the count) = 0. Leaf. Only caller `Scenery::Update`. |
+| `sub_820F3098` | `Scenery::CollectAreas` | | r3 = the manager, r4 = a view, r5 = its viewport: for each area of the course set's area file (`[set +1056]`, its little-endian count at +0, each `DataFile::GetEntry`): its four corners (x, z at +0, +8 of 16-byte points, copied from the entry's +32) against the viewport's eye (+1600, +1608): 0.0 when inside the rectangle of corners 0 and 2; else the viewport's far distance (+72) × 0.5 when the eye moved by that in x and z (four ways) is inside; else the nearest corner's distance. Kept when within far + 70.0 (`0x82002A20`): the mask is the OR of the table at `0x82602F80`'s bits for this view's enabled passes, and the area is added to list A (`SceneryList::Add`, model 0). Only caller `Scenery::Update`. |
+| `sub_820F32D0` | `Scenery::CollectModels` | | r3 = the manager, r4 = a view, r5 = its viewport: for each area in list A, each of its models (the area's entry: count +0, 96-byte records from +32: the model's number at +0, four corners from +32): the nearest corner's distance (0.0 inside), kept within the far distance plus a constant (not read) with the view's mask when that's not 0, added to list B (`SceneryList::Add`, area and model). Only caller `Scenery::Update`. Not read in detail. |
+| `sub_820F1888` | `SceneryList::Add` | | r3 = the manager (not read), r4 = a list, f1 = a distance, r6 = an area, r7 = a model, r8 = a mask: the item with this key (16-byte items: +0 the distance, +4 the mask, +8 the area, +10 the model, halfwords), searched from the last, gets the smaller distance and its mask ORed; else a new one (the next 16-byte slot, its pointer into the array at +16, count +8 up by 1; no check for a full list). Leaf. From `Scenery::CollectAreas`, `CollectModels` and `StartLoad`. |
+| `sub_820F1930` | `SceneryList::Sort` | | r3 = the manager, r4 = a list, r5, r6 = the first and last item: quicksort of the pointer array (+16) by the items' distance (+0), pivot the middle; recursive on the left part, a loop on the right. From `Scenery::Update` and itself. |
+| `sub_820F2B80` | `Scenery::LimitLargeModels` (probably) | | r3 = the manager: when list B holds more than +104 items: a table on the stack (24, 11, 18, 9, 54) by the item's area (+8, so areas 0-4 only) gives a model number from which a model counts as large (probably); among the first +104 items, past the 5th large one (the 10th when +12 is 1, two views) a large item is swapped with the next item after it that isn't large, so the cut keeps at most that many. Leaf. Only caller `Scenery::Update`. |
+| `sub_820F1598` | `SceneryList::LoadAll` | | r3 = the manager, r4 = a list: the archive's queue (`sub_8209D7B0`, a lead); from item +4 to the count: its object from the table (+24, count +12; 12-byte entries: the key, the asset, +8 the object) or, when the entry has none and the queue is below 480, one taken from the list's pool (+0) by the key and loaded (`ObjectPools::Acquire`, `Load`; +172, +176 = the pool and index); with an object: the item's +12 = it, its flags 0x20 and 0x10 cleared, +4 up by 1. Returns 1 when +4 reached the count. From `Scenery::IsLoaded` and `Scenery::Update` (mode 0). |
+| `sub_820F16C0` | `SceneryList::Stream` | | r3 = the manager, r4 = a list: the archive's queue (`sub_8209D7B0`); for each item: its object in the pool by its key (`ObjectPools::Find`), else when the queue is below 960 one taken and loaded (`Acquire`, `Load`; +172, +176 set), the item's +12 = it (`ObjectPools::Object`) with 0x20 and 0x10 cleared, or 0 when none. Returns 1 when +4 equals the count (never changed here). Only caller `Scenery::Update`. |
+| `sub_820F17C0` | `SceneryList::ReleaseUnused` | | r3 = the manager, r4 = a list: its pool's used objects (`ObjectPools::Pool(+0)` +20, then each +24): not loaded or seen (`PoolObject::IsLoaded` 0, `IsVisible` 1): the seen flag cleared (`SetVisible(0)`); loaded, not seen and already marked (`IsExpiring`): +36 counted down, and released (`ObjectPools::Release`) at 0; else marked (`SetExpiring(1)`), +36 = 2. Only caller `Scenery::Update`. |
+| `sub_820F4128` | `Lights::FindNearest` | Overridden | `src/hooks/lights.cpp` (`--native_nearest_lights`, "Lights::FindNearest" in `native-renderer.md`). Collects the lights nearest a point, nearest first; 13.1% of the main thread in an uncapped attract race (2026-10-16, "The main thread" in `native-renderer.md`). Arguments: r3 the light set owner (list at r3+216: count +0, array +8 of 272-byte entries, each's +12 → +80 a light set), r4 the output, r5 the point, r6 the most lights to keep (at most 32; 0 returned above), r9 a direction vector, f1 a merge radius, f2 the farthest squared distance, f3 the least dot product. For each light (48 bytes: position xyz at +0, 32 bytes copied out): skipped beyond f2, or when the direction to it dotted with r9 is below f3 (a cone); within f1 of a light already kept, it replaces that one if nearer, else is dropped; otherwise insertion-sorted by squared distance into a 33-entry array on its ~2 KB guest stack frame. Writes 32 bytes a light to r4 (position with w = the float at `0x82000A30`, then the light's +16..+31) and returns the count. A light set's count (+0) is little-endian (byte-swapped after `lwz`); `sub_82294730` gives each of its entries, whose +0 count says how many times the entry's one light group (count +60, lights from +76) is scanned: the group pointer isn't advanced, so a count above 1 scans the same lights again (the merge then drops the copies). It happens: in an attract race ~63 repeated scans a call, ~1,465 of the ~6,240 lights it tests a call. Hot spot: three `stfs` of the difference to r1+80, then a 16-byte `lvx` of the same spot (a failed store forward) for every light tested. Only caller: `sub_820C9170`, ~3 calls a frame, 93% of them on render-only passes. The light set owner is the course scenery's manager (`[0x826C551C]`): its visible areas (`Scenery::Update`), each's +12 the area's lights (`AreaLights`, +80 its light file). |
+| `sub_820F3B70` | `Scenery::DrawArea` | | r3 = the manager, r4 = a pass description (+8 the camera pass, +12 the player, +16 the viewport entry, +20 the pass index, +24 and +28 two keys, +32 a mask), r5 = a visible area (272 bytes). Nothing unless the manager's +196, the description's +32 and the area's +0 share a bit. `Scenery::RecordHeadlightProjectors`; the pass's +144 matrix copied (`Matrix::Copy`) and +16 to `0x8265ECA0`, `0x8296B908` = 163, `0x8296B90C` and `0x8296B900` = the keys (probably the model recorders' sort keys). For each of the area's models (+16, count +4): in pass types (+584) 10, 13 and 16 (probably the shadow passes), the keys and `sub_82596D48` on each shape (+412 the count); else `sub_82146AA8` on the model (+56), the texture provider's slot 4 (`sub_82594718`) with the set's textures (+64) when the set's +1060 is set, and with the model's own (+60), model +436 = the set's +1060, +48 = the provider; `sub_82147D88` on each shape; then for pass types 0, 1, 2 with the target `sub_82133AE8(3, 7, 11)` whose +52 is 0, the keys 116, 116, 119 and `sub_82596D48` again. Then, with +196 & 0x400 and not those three pass types, the area's lights (+12's +80, a light file): `sub_82148650` and `sub_82148658` (`sprites.md`) for each light group (`DataFile::GetEntry`) with the set's +64 and +1060. Calls through pointers: the provider's slot 4 only. Two call sites in `Scenery::Draw`. Read for its outline. |
+| `sub_820F52A8` | `Scenery::DrawSetLists` | | r3 = the manager, r4 = a pass description: the course set's lists of models at +1596, +2124, +2652 and +3180 drawn (`sub_82147D88`, `sub_82146AA8`, `sub_82147850`, `sub_82147958`, `sub_82147B18`, `sub_82148058`, leads), with the texture provider's slot 4 (`sub_82594718`) and the set's +1060. Only caller `Scenery::Draw`. Not read in detail. |
+| `sub_820F34C8` | `Scenery::RecordHeadlightProjectors` (probably) | | r4 = a pass description: +8 = its camera pass (`0x826BAC00` + 592 × +20), `CameraPass::FromViewport(pass, +12, +16)`; nothing more when `Vehicle::Get(0)` is 0. The 8 projector slots at `0x8296BAE0` and `0x8296BB60` (16 bytes each) set to defaults from the stack; for up to 8 of the scene's objects (`List::At` on `[0x826C2E44]` + 5028, count +5036) of type 3 (+16) with a car (+5048) and +32 1 or 2 (probably the headlights on): the beam from the car's matrix at +4304 (`memcpy`, `Vec4::Transform`, `sub_820DAAC8`, `sub_820DAB10`, `sub_820DAA38`), `Projector::Build` (return `0x820F3944`), then a chunk on the scene's command list (`[0x826BABA0]`'s slot 8, then slot 1; `CommandList::OpenChunk`, `AllocateSlots`, `AllocateBytes`, `CloseChunk`): a header (5), command 7 with four registers from `0x7700` + 1024 × the slot, the 64-byte matrix, command 36; handed to the render queue (slot 8 then 2, its slot 4) with key 371 for pass 2 (slots 0 and 1 swapped) or 150. Then 16 bytes from `[0x826C2E44]` + 5328 to `0x8265ED00`, and in every case the keys (+24, +28) to `0x8296B90C`, `0x8296B900` and the pass's eye (+400) to `0x8265ECE0`. 17 calls through pointers, all the scene's (its slot 8 `sub_820944D8`, seen in play; the rest found at run time). From `Scenery::DrawArea` and `Scenery::Draw` (four call sites). The projectors `../frame-interpolation.md` says the lights code builds. Read for its outline. |
+| `sub_820F11A8` | `TextureAnimations::Advance` | Wrapped | From the draw step part `sub_820F6068`: advances the flipbook animation set at r3+1060 (`sub_82146B20`). Skipped on render-only passes (see "Per-frame logic" in `../frame-interpolation.md`). r3 is the course set (the manager's +112; `CourseSet`, +1060 the second file's entry 1, set by `CourseSet::Parse`); `Scenery::Draw` calls it unless the manager's +196 has 0x4000. |
+| `sub_820F6068` | `Scenery::Draw` | Wrapped | The race draw step's parts and the per-car update's callees, wrapped only to name which one advances per-frame state (`--find_per_frame_state`) and to skip one (`--debug_hide`) (`ITC_FRAME_STATE_WRAP`, `src/debug/frame_state_diff.cpp`). The course scenery's draw: r3 = the manager. The texture provider's (+228) slot 2 (`sub_82594328`); `TextureAnimations::Advance` on the course set (+112) unless +196 has 0x4000; `Model::Animate` (`sub_82594B60`) on each visible area's models (+216's entries, +16); the provider's slot 4 (`sub_82594718`) with the set's textures (+64); then, by camera pass, `Scenery::RecordHeadlightProjectors`, the set's model (`sub_82596B18`, a lead) and lists (`sub_82146AA8`, `sub_82147D88`), `Scenery::DrawArea` for each visible area (two places), `Scenery::DrawSetLists`, the set's light groups (+1592, `sub_82148650`, `sub_82148658` with +1060), `RecordClear` (`sub_8209FA38`, `cameras.md`) and `Minimap::Draw` (`sub_820F5740`). From `Race::DrawStep` (`sub_8215B4F8`, `functions.md`) and `sub_822282E8` (a lead). 1,202 lines; read only for its outline. |
+| `sub_820F2B38` | `Scenery::Unload` | | r3 = the manager: the visible areas' block (+224) freed (`Scenery::FreePhysical`) and cleared, then `Scenery::UnloadPools`. From `sub_8215AA88` and `sub_82229678` (leads). |
+| `sub_820F1D20` | `Scenery::UnloadPools` | | r3 = the manager: `ObjectPools::Shutdown`; +188 = 0, +180 = 0, pool 0's block (+184) freed and cleared; list B's arrays (+168, +164, +160) freed (`Scenery::FreePhysical`) and the list cleared (memset `sub_822962B0`, 28 bytes), then list A's (+140, +136, +132). Only caller `Scenery::Unload`. |
+| `sub_820F2AF8` | `Scenery::Destroy` | | No arguments: `Scenery::ClearGlobal`, the manager at `[0x826C551C]` freed (`Scenery::FreePhysical`) and the pointer cleared. From `sub_8215AA88` and `sub_82228548` (leads). |
+| `sub_820F1480` | `Scenery::ClearGlobal` | | No arguments: `[0x826C5514]` = 0. Leaf. Only caller `Scenery::Destroy`. |
+| `sub_820FBBE8` | `ObjectPools::Init` | | r3 = the pool set (the manager's +0), r4 = the pool count, r5 = their 24-byte descriptors (`Scenery::SetupPools`): one block of physical memory (`XPhysicalAlloc(size, -1, 64, 4)`, `sub_822964C8`) for the 24-byte pool records (rounded up to 64) and, per pool, the first count × the object size and the second count × the data size (each rounded up to 64); +0 = the count, +4 = the block. Each pool record: +0 the object count, +4 and +8 the object and data sizes, +12 its first object; its objects one after another (object size + data size apart, by each object's +24), each made by the descriptor's factory (+20; r3 the pool, r4 the address, r5, r6 the sizes, r7 the object's index; returns it) or, without one, as a plain `PoolObject`; +20 links each to the one before, the last's +24 = 0; the pool's +16 (the free list) = its first object, +20 (the used list) = 0. One call through a pointer: the factory, only `Scenery::MakePoolObject` (`0x820F2638`) in the game's one call (`Scenery::SetupPools`). |
+| `sub_820FBDC8` | `ObjectPools::Shutdown` | | r3 = the pool set: each object of each pool (`ObjectPools::Object`'s address) reset through its vtable slot 2 (+8), then the block freed (`XPhysicalFree`, `sub_822965C8`) and +0, +4 = 0. One call through a pointer: slot 2, seen in play `PoolObject::Reset`, `CourseSet::Reset` and `AreaModel::Reset` (all here, none native). Only caller `Scenery::UnloadPools`. |
+| `sub_820FBB10` | `ObjectPools::Pool` | | r3 = the pool set, r4 = a pool: its record (+4 + 24 × r4). Leaf. Only caller `SceneryList::ReleaseUnused`. |
+| `sub_820FC0E8` | `ObjectPools::Object` | | r3 = the pool set, r4 = a pool, r5 = an index: the pool's +12 + (its object size + data size) × r5. No bounds check. Leaf. From `Scenery::StartLoad`, `IsLoaded` and `SceneryList::Stream`. |
+| `sub_820FBF08` | `ObjectPools::Acquire` | | r3 = the pool set, r4 = a pool, r5 = a key: the head of the pool's free list (+16), or -1 when empty; its +36 = -1, flags (+32) |= 1 (in use), its key set (`PoolObject::SetKey`); off the free list (the next's +20 = 0) and onto the used list's head (+20; the old head's +20 = it); returns its index (+16). From `Scenery::StartLoad`, `SceneryList::LoadAll` and `Stream`. |
+| `sub_820FBE80` | `ObjectPools::Find` | | r3 = the pool set, r4 = a pool, r5 = a key: the first object on the used list (+20, then +24) in use whose key matches (`PoolObject::KeyEquals`); returns its index (+16), or -1. Only caller `SceneryList::Stream`. |
+| `sub_820FBFD0` | `ObjectPools::Load` | | r3 = the pool set, r4 = a pool, r5 = an index: the object (as `ObjectPools::Object`), when not 0, loaded through its vtable slot 1 (+4); returns the object. One call through a pointer: slot 1, seen in play `CourseSet::Load`, `AreaLights::Load` and `AreaModel::Load` (here, none native); pools 0 and 1's `sub_820F1098` and `sub_820F1100` and the base's `sub_820FBB68` never ran. From `Scenery::StartLoad`, `SceneryList::LoadAll` and `Stream`. |
+| `sub_820FC038` | `ObjectPools::Release` | | r3 = the pool set, r4 = a pool, r5 = an index: the object reset through its vtable slot 2 (+8), taken off the used list (its neighbors' +24 and +20, or the pool's +20) and put at the free list's head (+16; its +20 = 0, +24 = the old head, whose +20 = it); returns the object that followed it on the used list. One call through a pointer: slot 2 (targets as `ObjectPools::Shutdown`'s). Only caller `SceneryList::ReleaseUnused`. |
+| `sub_820F2638` | `Scenery::MakePoolObject` | | The pools' factory (no direct callers; `0x820F2638` in `Scenery::SetupPools`' descriptors): r3 = the pool, r4 = the address (nothing when 0), r5, r6 = the object and data sizes, r7 = the index. Pools 0 and 1: a `PoolObject` with the vtable `0x8200674C` or `0x82006758` and +56 = 0; 2: `CourseSet::CourseSet`; 3: a `PoolObject` with the vtable `0x8200676C` (`AreaLights`) and an XPR at +56 (`XPR::XPR`, `sub_82596E68`); 4: `AreaModel::AreaModel`. Returns r4. |
+| `sub_820FBB20` | `PoolObject::PoolObject` | | r3 = the object, r4 = its own size, r5 = the data size, r6 = its index: +0 the vtable `0x82006848` (the key `PoolObject::Key`, the load `sub_820FBB68`, never seen, and `PoolObject::Reset`), +4 = r3 + r4 (its data), +8 = r5, +12 = 0 (data used), +16 = r6, +24 = r3 + r4 + r5 (the next object), +28 = 0, +32 = 0 (flags), +36 = -1. Leaf. From `Scenery::MakePoolObject`, `CourseSet::CourseSet` and `AreaModel::AreaModel`; `ObjectPools::Init` does the same inline. |
+| `sub_820FB9F0` | `PoolObject::Key` | | Slot 0 of the base vtable and pools 0, 1 and 2's (no direct callers): r4 = &a size: *r4 = 0, returns 0 (no key). Leaf. |
+| `sub_820FB9D8` | `PoolObject::Reset` | | Slot 2 of the base vtable and pool 3's (no direct callers there): +32 (flags) = 0, +36 = -1, +12 (data used) = 0. Leaf. From `CourseSet::Reset` and `AreaModel::Reset`. |
+| `sub_820FBA00` | `PoolObject::SetKey` | | r3 = an object, r4 = a key: its key buffer and size through its vtable slot 0 (+0); when both are not 0, the key copied there (`memcpy`). One call through a pointer: slot 0, seen in play `PoolObject::Key`, `AreaLights::Key` and `AreaModel::Key` (here, none native). Only caller `ObjectPools::Acquire`. |
+| `sub_820FBA60` | `PoolObject::KeyEquals` | | r3 = an object, r4 = a key: 1 when the object has no key (size or buffer 0) or its key's bytes equal r4's, else 0. One call through a pointer: slot 0 (targets as `PoolObject::SetKey`'s). Only caller `ObjectPools::Find`. |
+| `sub_820FB8B8` | `PoolObject::AllocData` | | r3 = the object's +4 (its data, size, used), r4 = a size: returns data + used; used (+8 there) += the size rounded up to 64. No check against the size. Leaf. From `CourseSet::Load` and `AreaLights::Load`. |
+| `sub_820FB8E0` | `PoolObject::InUse` | | r3 = an object: flags (+32) & 1. Leaf. Only caller `Scenery::IsLoaded`. |
+| `sub_820FB8F0` | `PoolObject::IsLoaded` | | r3 = an object: 1 when flags (+32) have both 0x1 and 0x8. Leaf. From `Scenery::IsLoaded`, `Update` and `SceneryList::ReleaseUnused`. |
+| `sub_820FB908` | `PoolObject::IsVisible` | | r3 = an object: 1 when flags have 0x1, 0x8 and 0x10 (seen this update). Leaf. Only caller `SceneryList::ReleaseUnused`. |
+| `sub_820FB920` | `PoolObject::IsExpiring` | | r3 = an object: 1 when flags have 0x1, 0x8 and 0x20 (not seen, to be released). Leaf. Only caller `SceneryList::ReleaseUnused`. |
+| `sub_820FB938` | `PoolObject::SetVisible` | | r3 = an object, r4: when not 0 and the object is loaded (0x1 and 0x8), flags 0x30 cleared and 0x10 set (else unchanged); when 0, 0x10 cleared. Leaf. From `Scenery::Update`, `SceneryList::LoadAll`, `Stream` and `ReleaseUnused`. |
+| `sub_820FB968` | `PoolObject::SetExpiring` | | r3 = an object, r4: as `SetVisible` with 0x20. Leaf. From `SceneryList::LoadAll`, `Stream` and `ReleaseUnused`. |
+| `sub_820FB998` | `PoolObject::ClearLoadFlags` | | r3 = an object: flags (+32) &= ~0x3C. Leaf. From `CourseSet::Load`, `AreaLights::Load` and `AreaModel::Load` (and `sub_820F1098`, `sub_820F1100`, never seen). |
+| `sub_820FB9A8` | `PoolObject::MarkLoaded` | | r3 = an object: flags (+32) 0x2 cleared, 0x8 set. Leaf. From the loads' callbacks `CourseSet::OnLoaded`, `AreaLights::OnLoaded` and `AreaModel::OnLoaded`. |
+| `sub_820F2478` | `CourseSet::CourseSet` | | r3 = the 3,824-byte object (from `Scenery::MakePoolObject`, r4 to r6 the sizes and index): `PoolObject::PoolObject`, the vtable `0x82006784` (the key `PoolObject::Key`, `CourseSet::Load`, `CourseSet::Reset`), `CourseSet::InitParts(+64)`, +3808, +3812, +1056, +1060 = 0, the six lists at +528, +1064, +1596, +2124, +2652, +3180 made empty again (`ModelList::Init`), +1592 = 0, +3788 to +3800 = 0. Returns r3. |
+| `sub_820F2230` | `CourseSet::InitParts` | | r3 = the course set + 64: an XPR (`XPR::XPR`) at +0, a model (`Model::Model`, `sub_825948C0`, a lead) at +32, and the six lists at +464, +1000, +1532, +2060, +2588, +3116 (`ModelList::Init`), the last's +608 to +620 = 0. Returns r3. Only caller `CourseSet::CourseSet`. |
+| `sub_820F1A20` | `ModelList::Init` | | r3 = a 528-byte list: +0 = 0, then at +4 a 64-slot list in `List64`'s layout (`track-zones.md`) made empty: node i's next i + 1 and data slot i (node 63's next -1), the free list's head 0, the list's head -1, the two halfwords not read -1, the count 0. Leaf. From `CourseSet::CourseSet` and `InitParts`; the lists are filled by `sub_82148428` and `sub_82148528` (leads). |
+| `sub_820F2520` | `CourseSet::Load` | | Slot 1 (no direct callers): r3 = the course set: `PoolObject::ClearLoadFlags`, +1056, +1060 = 0; its two assets from the configuration's table (the manager `[0x826C5514]`'s +36: +12 the first, +8 the second): the first in a physical block of its own (`Scenery::AllocPhysical`) at +3808, the second in its data (`PoolObject::AllocData`) at +3812 (0 when there's no asset); `Archive::Load` of each (r7, r8 = 0, the set as context), the last one with the callback `CourseSet::OnLoaded` (`0x820F22B8`). |
+| `sub_820F22B8` | `CourseSet::OnLoaded` | | `Archive::Load`'s callback (no direct callers; `0x820F22B8` from `CourseSet::Load`): r6 = the course set: `CourseSet::Parse`, the first file's block (+3808) freed (`Scenery::FreePhysical`), `PoolObject::MarkLoaded`. |
+| `sub_820F1A70` | `CourseSet::Parse` | | r3 = the course set. The first file (+3808, by `DataFile::GetEntry` with r5 = 1): entry 0 into the XPR at +64 (`XPR::XPR`, `XPR::Create`), entry 1 into the model at +96 (`Model::Model`, then `Model::Load` of the entry's own entry 0), entries 2 to 6 into the lists at +528, +1064, +1596, +2124, +2652 (`sub_82148428`) and entry 7 into +3180 (`sub_82148528`). The second (+3812): entry 0 to +1056 (the areas), 1 to +1060 (the light groups' textures and their animations), 2 to +1592 (the set's light groups). Only caller `CourseSet::OnLoaded`. |
+| `sub_820F1138` | `CourseSet::Reset` | | Slot 2 (no direct callers): r3 = the course set: the XPR at +64 released (`sub_825970A8`, a lead), the model at +96 (`Model::Release`), the six lists (`sub_82147FB8`, a lead), then `PoolObject::Reset`. |
+| `sub_820F1C20` | `AreaLights::Key` | | Slot 0 of pool 3's vtable `0x8200676C` (no direct callers): r4 = &a size: *r4 = 4, returns r3 + 84 (the key: the area and model halfwords, the model 0). Leaf. |
+| `sub_820F22F8` | `AreaLights::Load` | | Slot 1 (no direct callers): r3 = the area's lights: `PoolObject::ClearLoadFlags`, +80 = 0; the asset from list A's table (the manager's +140, count +128) whose key equals +84 (-1 when none), its size (`sub_820A0678`) taken from its data (`PoolObject::AllocData`), and `Archive::Load` into it with the callback `AreaLights::OnLoaded` (`0x820F1C30`). |
+| `sub_820F1C30` | `AreaLights::OnLoaded` | | `Archive::Load`'s callback (no direct callers): r6 = the area's lights: `AreaLights::Parse`, `PoolObject::MarkLoaded`. |
+| `sub_820F11C0` | `AreaLights::Parse` | | r3 = the area's lights: +80 = the file's entry 0 (`DataFile::GetEntry(+4, 0, 1)`) when there is one: the light file `Lights::FindNearest` and `Scenery::DrawArea` read. Only caller `AreaLights::OnLoaded`. |
+| `sub_820F1C68` | `AreaModel::AreaModel` | | r3 = the 560-byte object (from `Scenery::MakePoolObject`): `PoolObject::PoolObject`, the vtable `0x82006778` (`AreaModel::Key`, `Load`, `Reset`), a model at +80 (`Model::Model`, `sub_825948C0`) with the vtable `0x82006764` (`sub_820F1208`, then `sub_82106540`, which does nothing, `audio.md`), an XPR at +528 (`XPR::XPR`), +56 = +60 = 0. Returns r3. |
+| `sub_820F1CD8` | `AreaModel::Key` | | Slot 0 (no direct callers): r4 = &a size: *r4 = 4, returns r3 + 64 (the area and model halfwords). Leaf. |
+| `sub_820F23C0` | `AreaModel::Load` | | Slot 1 (no direct callers): r3 = the area's model: `PoolObject::ClearLoadFlags`, +56 = +60 = 0; the asset from list B's table (+168, count +156) whose key equals +64 (-1 when none) loaded (`Archive::Load`) into the manager's +188 (the shared load buffer, or 0) with the callback `AreaModel::OnLoaded` (`0x820F1CE8`). |
+| `sub_820F1CE8` | `AreaModel::OnLoaded` | | `Archive::Load`'s callback (no direct callers): r6 = the area's model: `AreaModel::Parse`, `PoolObject::MarkLoaded`. |
+| `sub_820F1258` | `AreaModel::Parse` | | r3 = the area's model: from the file in the manager's +188 (`DataFile::GetEntry`, r5 = 1): entry 0 loaded into the model at +80 (`Model::Load(+80, entry, 0)`), +56 = +80 (else 0); entry 1 into the XPR at +528 (`XPR::Create`), +60 = +528 (else 0). Only caller `AreaModel::OnLoaded`. |
+| `sub_820F12F8` | `AreaModel::Reset` | | Slot 2 (no direct callers): r3 = the area's model: the model (+56) released (`Model::Release`) and +56 = 0, the XPR (+60) released (`sub_825970A8`) and +60 = 0, then `PoolObject::Reset`. |
+| `sub_820F1208` | `AreaModel::~Model` (probably) | | Slot 0 of the area model's model's vtable `0x82006764` (no direct callers): r3 = the model, r4 = flags: `Model::~Model` (`sub_82594F58`, a lead), and with bit 0 the model freed (`operator delete`, `sub_825A70E8`). Returns r3. |
