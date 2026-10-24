@@ -42,9 +42,17 @@ see in a drive, from every run: `to-drive.md`.
   29 ours, with `ActionMapper::ActionMapper`, `Bind` and
   `InputClientList::BindAll` it unblocked; 16 adapters removed;
   `--native_input`); `ActionMappers::Init` (`sub_8209F430`) ready, left
-  for migration 2. Validation 1 running.
+  for migration 2. Validation 1 (`itc_1448`, `itc_1449`; prints added
+  in 0c64e99; all ran in play or the replay) reported two functions
+  `missing:`: the loop stopped (below).
 
 ## Done
+
+- The input manager and processors (`input.md`, mapped in 167d407; 29
+  rows): 29 ours in one migration (57373be..4dd7a11), with three action
+  mapper functions it unblocked; 16 adapters removed; validated with
+  two missing harness lines (below); `--native_input`. Left:
+  `ActionMappers::Init` (`sub_8209F430`, ready).
 
 - Cleanup leads (no mapping): the collision shape's adapter, the AI
   drivers' teardown, the UI movie walk (`collision.md`, `ai-drivers.md`,
@@ -80,4 +88,21 @@ This run's groups: `expected-differences.md` (the "17:46 run" lines).
 
 ## Stopped
 
-(not stopped)
+2026-10-24, after the input's validation 1: two functions `missing:`
+(`b7-loop.md`'s "When to halt"). `sub_8258CEB0` InputProcessor::
+TestPressed and `sub_8258CEE0` InputProcessor::TestRepeat have no plain
+C++ of their own: their adapters (`ITC_INPUT_WRAPPER`,
+`src/hooks/input_manager.cpp`) read the mask and call AnyPressed's and
+PressedOrRepeat's plain C++, and hold their prints (0c64e99); the
+`input` harness's native side for them (`NativeAnyPressed`,
+`NativePressedOrRepeat` in `src/harnesses/input.cpp`) calls the inner
+plain C++ directly, so their prints aren't reached. Both harnesses at
+300 cases, 0 differ; both ran in play or the replay. Everything else
+passed: harnesses 0 differing (none added to expected differences),
+races 24-25 s under `attract_race.sh 40`, no errors, replays ok.
+For the user: whether those two become plain C++ functions of their own
+(with the harness calling them), get Merged rows, or the harness calls
+their adapters; then the input subsystem's migration 2
+(`ActionMappers::Init`, ready). Run limit: 2 of 3 subsystems done.
+Also: `review.md` ("Run 2026-10-24 17:46"), among it the harness that
+depends on the heap's layout (`strings_and_font`).

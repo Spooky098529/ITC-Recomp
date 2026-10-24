@@ -96,7 +96,12 @@ goes in `src/` as overrides), American English.
   ours 1,672; merged 2026-10-24 after a drive); its eleventh run (branch
   `b7-loop-24-10-26-2`) made the compiler's array helpers, the course
   scenery (`course-scenery.md`, 38 of 73) and XAPI's memset with what
-  it unblocked native as far as they were ready (ours 1,714). The
+  it unblocked native as far as they were ready (ours 1,714); its
+  twelfth run (branch `b7-loop-24-10-26-3`) made the post effects
+  (`post-effects.md`, 44 of 57), the UI movie walk and the AI drivers'
+  teardown, and the input manager (`input.md`, 29 of 29) with the action
+  mappers' constructor native (ours 1,794), stopped on two harness lines
+  missing. The
   runs' rows wait for the user's review (`docs/loops/review.md`). See
   "B7's loop runs" under B7, and `docs/loops/b7-progress.md`. Guest
   allocation is no longer a block (`docs/native-memory.md`); what the
@@ -3285,3 +3290,14 @@ row yet 4,283); `post-effects.md` 44 ours of 57. 1,320 overrides in
 `src/`. The rest waits on the models' resource relocation
 (`sub_8235A9F8`) and shader pairs (`sub_825896D8`, `sub_82589700`), the
 vertex declaration (`sub_822A8980`) and `sub_8209AE48`.
+
+**2026-10-24, B7's twelfth loop run, stopped (branch
+`b7-loop-24-10-26-3`: the post effects, three cleanup leads, the input
+manager):** the boundary unchanged: 449 functions (916 pairs):
+overridden 67, Native 5, Dropped 23, never called 70, live 284.
+Imports: 186 called, 62 with a live caller. B7 (`b7_status.py`): 6,761
+in play, ours 1,794, work left 4,967 (Wrapped 115, with a row 585, no
+row yet 4,267); `input.md` 29 ours of 29, `action-mappers.md` 39 of 40,
+`post-effects.md` 44 of 57. 1,325 overrides in `src/`. Stopped on two
+input functions whose harness doesn't reach their prints; the input's
+`ActionMappers::Init` is ready.
