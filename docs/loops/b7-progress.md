@@ -18,8 +18,10 @@ see in a drive, from every run: `to-drive.md`.
   resources (`graphics-resources.md`, 44 rows, 0e67c00; 13 ready
   groups). The map's checks passed, but its report's `stop:` named two
   choices for the user, so the loop stopped before migrating (below); resumed with the
-  user's calls. Migration 1 done (e4730b8..e6b9811, 25 of 45 ours):
-  validation agent running.
+  user's calls. Migration 1 done (e4730b8..e6b9811, 25 of 45 ours),
+  validated (`itc_1267`, `itc_1269`; replay ok; 1 to drive): second
+  migration agent running (Lock, Unlock, Destroy by the user's call,
+  and the three ready groups left).
 
 ## Done
 

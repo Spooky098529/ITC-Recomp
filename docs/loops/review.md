@@ -28,6 +28,10 @@ When the user has reviewed a run's section, its heading gets
   when out of memory); a frame dump against the fallback flag showed the
   same targets and draws, the resolve addresses offset by a constant
   (probably the heap's layout; not confirmed with two fallback runs).
+  Validated (`itc_1267`, `itc_1269`): `sub_822A5B78`
+  Texture::GetLevelDesc has no print of its own (the original only
+  jumps to LevelDesc, whose plain C++ its adapter calls; its harness
+  and LevelDesc's game line cover it); AddRef's print added (2783ad0).
 
 - `graphics-resources.md` (new, 44 rows; 8 moved from `functions.md`,
   36 new; mapped in 0e67c00), `known-data.md` (the texture, surface
