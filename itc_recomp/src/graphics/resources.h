@@ -50,6 +50,29 @@ uint32_t TextureLevelCount(uint32_t width, uint32_t height, uint32_t depth, uint
 // this size, format and multisample type takes.
 uint32_t SurfaceEdramTiles(uint32_t width, uint32_t height, uint32_t format, int32_t multisample);
 
+// sub_822A45B8 TextureLayout::LevelSize: a level's width, height and depth
+// aligned in place (the width to 32 blocks, or when linear to 256 bytes a
+// row and at least 32 blocks; the height to 32 blocks; the depth to 4 for
+// 3D, dimension 2) and its bytes (4 KiB aligned: the whole for 3D, else a
+// slice's times the depth). `bits` = bits a pixel. A linear format whose
+// block has no bytes hits the original's divide trap (logged, as the
+// translated code does, then 0).
+uint32_t TextureLevelSize(uint32_t& width, uint32_t& height, uint32_t& depth, uint32_t bits,
+                          uint32_t format, uint32_t dimension, uint32_t tiled);
+
+// sub_822A5910 SurfaceHeader::Set: fills a 48-byte surface header (+0 = 4,
+// +4 = 1, +20 unlocked, +24 the pitch and samples, +28 the EDRAM base and
+// format bits, +32 the hi-z, +36 the size, +40 the format, +44 the EDRAM
+// bytes) from the size, format, multisample type and `parameters` (a guest
+// pointer to the EDRAM base, hi-z base and +8, or 0). Returns the EDRAM
+// tiles and the hi-z size (depth formats 22 and 23).
+struct SurfaceSizes {
+  uint32_t tiles;
+  uint32_t hi_z;
+};
+SurfaceSizes SetSurfaceHeader(uint8_t* base, uint32_t width, uint32_t height, uint32_t format,
+                              int32_t multisample, uint32_t parameters, uint32_t header);
+
 // --- Buffers (the allocation layer: run only with --native_heap) ---
 
 // sub_822A6830 Device::CreateVertexBuffer: a 32-byte header and `bytes` of
@@ -59,6 +82,14 @@ uint32_t CreateVertexBuffer(uint8_t* base, uint32_t bytes, uint32_t usage);
 // sub_822A6968 Device::CreateIndexBuffer: the same with the index format in
 // the header's top 3 bits.
 uint32_t CreateIndexBuffer(uint8_t* base, uint32_t bytes, uint32_t usage, uint32_t format);
+
+// sub_822A5E28 Device::CreateSurface: a 48-byte header (XMemAlloc) set by
+// SetSurfaceHeader, +0 bit 0x00100000; with no `parameters`, its EDRAM from
+// the allocator (+0 bit 0x80000000, the base in +28's low 12 bits; 0 when
+// none fits or it passes 2,048 tiles) and the first depth surface takes the
+// hi-z. 0 when it fails.
+uint32_t CreateSurface(uint8_t* base, uint32_t width, uint32_t height, uint32_t format,
+                       int32_t multisample, uint32_t parameters);
 
 // --- The device's current resources (AddRef'ed when set) ---
 

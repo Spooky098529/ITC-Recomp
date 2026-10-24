@@ -10,6 +10,8 @@
 #include "memory/c_runtime_heap.h"
 #include "native/refcount.h"
 
+#include <optional>
+
 namespace graphics {
 
 namespace {
@@ -28,6 +30,9 @@ constexpr uint32_t kDataAttributes = 0x82800000;
 constexpr uint32_t kUsageWriteCombined = 0x4;
 constexpr uint32_t kUsage200 = 0x200;
 constexpr uint32_t kUnlocked = 0xFFFF0000;  // the locked ranges at +20 and +24
+// The formats' table (a halfword each, bits 8-11 a surface's format bits;
+// probably bits a pixel elsewhere).
+constexpr uint32_t kFormatTable = 0x82013468;
 // 1 while a depth surface holds the hi-z.
 constexpr uint32_t kHiZTaken = 0x829537C4;
 
@@ -150,6 +155,143 @@ uint32_t SurfaceEdramTiles(uint32_t width, uint32_t height, uint32_t format,
   const uint32_t low = format & 0x3F;
   const uint32_t bytes = (low == 21 || low == 32 || low == 37) ? 8 : 4;
   return rows * pitch * bytes / 5120;
+}
+
+uint32_t TextureLevelSize(uint32_t& width, uint32_t& height, uint32_t& depth, uint32_t bits,
+                          uint32_t format, uint32_t dimension, uint32_t tiled) {
+  ITC_NATIVE_RUNNING("sub_822A45B8 TextureLayout::LevelSize");
+  const uint32_t depth_align = dimension == 2 ? 4 : 1;
+  const Block block = GpuBlockSize(format);
+  // The width's alignment in blocks: 32, or for linear textures 256 bytes'
+  // worth when that's more.
+  uint32_t row_blocks = 32;
+  if (tiled == 0) {
+    const uint32_t block_bytes = (block.width * block.height * bits) >> 3;
+    if (block_bytes == 0) {
+      ITC_LOG_WARN("tw/td trap hit (type 0): TextureLayout::LevelSize's divide by 0");
+    }
+    const uint32_t blocks = block_bytes ? 256 / block_bytes : 0;
+    if (blocks >= 32) {
+      row_blocks = blocks;
+    }
+  }
+  const uint32_t width_align = block.width * row_blocks;
+  width = (width + width_align - 1) & ~(width_align - 1);
+  const uint32_t height_align = block.height << 5;
+  height = (height + height_align - 1) & ~(height_align - 1);
+  depth = (depth + depth_align - 1) & ~(depth_align - 1);
+  const uint32_t slice = ((width * bits) >> 3) * height;
+  if (dimension == 2) {
+    return (depth * slice + 4095) & 0xFFFFF000;
+  }
+  return ((slice + 4095) & 0xFFFFF000) * depth;
+}
+
+SurfaceSizes SetSurfaceHeader(uint8_t* base, uint32_t width, uint32_t height, uint32_t format,
+                              int32_t multisample, uint32_t parameters, uint32_t header) {
+  ITC_NATIVE_RUNNING("sub_822A5910 SurfaceHeader::Set");
+  uint32_t low = format & 0x3F;
+  const bool depth = low == 22 || low == 23;
+  if (low == 54) {
+    low = 7;
+  }
+  Store(base, header + 4, 1);
+  Store(base, header + 0, 4);
+  Store(base, header + 20, kUnlocked);
+  const uint32_t tiles = SurfaceEdramTiles(width, height, format, multisample);
+  // The hi-z: 32 x 16 pixel blocks (samples counted), for depth formats.
+  uint32_t hi_z = 0;
+  if (depth) {
+    uint32_t w = width;
+    uint32_t h = height;
+    if (multisample >= 1) {
+      h = height << 1;
+    }
+    if (multisample == 2) {
+      w = width << 1;
+    }
+    hi_z = (((w + 31) >> 5) * ((h + 15) >> 4)) & 0x7FFFFF;
+  }
+  uint32_t edram_base = 0;
+  uint32_t hi_z_base = 0xFFFFFFFF;
+  uint32_t parameter8 = 0;
+  if (parameters != 0) {
+    edram_base = Load(base, parameters + 0);
+    hi_z_base = Load(base, parameters + 4);
+    parameter8 = Load(base, parameters + 8);
+  } else if (depth && Load(base, kHiZTaken) == 0) {
+    hi_z_base = 0;
+  }
+  // The pitch: 80-pixel tiles (40 with 4x samples), and the width aligned.
+  uint32_t pitch, aligned;
+  if (multisample == 0 || multisample == 1) {
+    pitch = (width + 79) / 80 * 80;
+    aligned = (width + 31) & ~31u;
+  } else {
+    pitch = (width + 39) / 40 * 40;
+    aligned = (width + 15) & ~15u;
+  }
+  const uint32_t pitch_word = (aligned << 2) | (uint32_t(multisample) & 3);
+  Store(base, header + 40, format);
+  Store(base, header + 24, (pitch_word << 16) | (pitch & 0x3FFF));
+  const uint32_t size = ((width - 1) << 18) | (((height - 1) << 3) & 0x3FFF8) |
+                        (Load(base, header + 36) & 7);
+  Store(base, header + 36, size);
+  const uint32_t format_bits = (guest::LoadU16(base, kFormatTable + (low << 1)) >> 8) & 0xF;
+  if (depth) {
+    Store(base, header + 28, ((format_bits & 1) << 16) | (edram_base & 0xFFF));
+    if (hi_z_base == 0xFFFFFFFF) {
+      Store(base, header + 32, 0);
+    } else {
+      const uint32_t hi_z_word = (low != 22 ? 1 : 0) | (hi_z_base << 13);
+      Store(base, header + 32, (hi_z_word << 4) | 1);
+    }
+  } else {
+    uint32_t bits = format_bits;
+    if (bits == 0 && !(format & 0x20000) && (format & 0x600) == 0x600 &&
+        (format & 0x1800) == 0x1800 && (format & 0x6000) == 0x6000 && !(format & 0x18000)) {
+      bits = 1;
+    }
+    bits = ((parameter8 << 4) & 0x3F0) | (bits & ~0x3F0u);
+    Store(base, header + 28, ((bits << 16) & 0x3FF0000) | (edram_base & 0xFFF));
+  }
+  Store(base, header + 44, tiles * 5120);
+  return {tiles, hi_z};
+}
+
+uint32_t CreateSurface(uint8_t* base, uint32_t width, uint32_t height, uint32_t format,
+                       int32_t multisample, uint32_t parameters) {
+  ITC_NATIVE_RUNNING("sub_822A5E28 Device::CreateSurface");
+  const uint32_t header = memory::crt::XMemAlloc(base, 48, kHeaderAttributes);
+  if (header == 0) {
+    return 0;
+  }
+  const SurfaceSizes sizes =
+      SetSurfaceHeader(base, width, height, format, multisample, parameters, header);
+  Store(base, header + 0, Load(base, header + 0) | 0x00100000);
+  if (parameters != 0) {
+    return header;
+  }
+  const uint32_t low = Load(base, header + 40) & 0x3F;
+  const bool depth = low == 22 || low == 23;
+  const std::optional<edram::Allocation> allocation = edram::Alloc(base, sizes.tiles);
+  if (!allocation || !allocation->ok) {
+    memory::crt::XMemFree(header, kHeaderFreeAttributes);
+    return 0;
+  }
+  const uint32_t edram_base = allocation->base;
+  if (edram_base + sizes.tiles > 2048) {
+    edram::Free(base, edram_base, sizes.tiles);
+    memory::crt::XMemFree(header, kHeaderFreeAttributes);
+    return 0;
+  }
+  Store(base, header + 0, Load(base, header + 0) | 0x80000000);
+  Store(base, header + 28, (Load(base, header + 28) & 0xFFFFF000) | (edram_base & 0xFFF));
+  if (depth && Load(base, kHiZTaken) == 0) {
+    Store(base, kHiZTaken, 1);
+    Store(base, header + 32, Load(base, header + 32) & 0x1FFFF);
+  }
+  return header;
 }
 
 uint32_t CreateVertexBuffer(uint8_t* base, uint32_t bytes, uint32_t usage) {

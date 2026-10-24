@@ -110,6 +110,30 @@ void NativeDestroySurface(PPCContext& ctx, uint8_t* base) {
   __restgprlr_29(ctx, base);
 }
 
+void NativeLevelSize(PPCContext& ctx, uint8_t* base) {
+  uint32_t width = guest::LoadU32(base, ctx.r3.u32);
+  uint32_t height = guest::LoadU32(base, ctx.r4.u32);
+  uint32_t depth = guest::LoadU32(base, ctx.r5.u32);
+  const uint32_t bytes = gr::TextureLevelSize(width, height, depth, ctx.r6.u32, ctx.r7.u32,
+                                              ctx.r8.u32, ctx.r9.u32);
+  guest::StoreU32(base, ctx.r3.u32, width);
+  guest::StoreU32(base, ctx.r4.u32, height);
+  guest::StoreU32(base, ctx.r5.u32, depth);
+  ctx.r3.u64 = bytes;
+}
+// SurfaceHeader::Set has no adapter (only CreateSurface calls it): the
+// register steps of the original's.
+void NativeSetSurfaceHeader(PPCContext& ctx, uint8_t* base) {
+  const gr::SurfaceSizes sizes = gr::SetSurfaceHeader(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                                      ctx.r6.s32, ctx.r7.u32, ctx.r8.u32);
+  guest::StoreU32(base, ctx.r9.u32, sizes.tiles);
+  guest::StoreU32(base, ctx.r10.u32, sizes.hi_z);
+  ctx.r3.u64 = sizes.tiles;
+}
+void NativeCreateSurface(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = gr::CreateSurface(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.s32, ctx.r7.u32);
+}
+
 // The scratch area's layout.
 constexpr uint32_t kHeader = 0;    // 64 bytes
 constexpr uint32_t kParent = 64;   // 64 bytes
@@ -222,6 +246,43 @@ void BlockSizes(Context& h, Random& r) {
 }
 
 void SizeMath(Context& h, Random& r) {
+  {
+    // A linear format whose block has no bytes (bits 0) hits the divide
+    // trap: a few such cases (each version logs a warning).
+    Results results("TextureLayout::LevelSize (sub_822A45B8)");
+    const uint32_t bits[] = {1, 2, 4, 8, 16, 32, 64, 128};
+    for (int i = 0; i < 1000; i++) {
+      const uint32_t w = r.Below(3) ? r.Below(4097) : Size(r);
+      const uint32_t hh = r.Below(3) ? r.Below(4097) : Size(r);
+      const uint32_t d = r.Below(3) ? r.Below(65) : Size(r);
+      const uint32_t b = i < 4 ? 0 : r.Below(8) ? bits[r.Below(8)] : uint32_t(r.Next());
+      const uint32_t format = r.Below(4) ? r.Below(64) : uint32_t(r.Next());
+      const uint32_t dimension = r.Below(8) ? r.Below(4) : uint32_t(r.Next());
+      const uint32_t tiled = i < 4 ? 0 : r.Below(4) ? r.Below(2) : uint32_t(r.Next());
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Fill(h.base, h.data, kScratchBytes);
+        guest::StoreU32(h.base, h.data + kOut, w);
+        guest::StoreU32(h.base, h.data + kOut + 4, hh);
+        guest::StoreU32(h.base, h.data + kOut + 8, d);
+        PPCContext t = CallContext(h);
+        t.r3.u64 = h.data + kOut;
+        t.r4.u64 = h.data + kOut + 4;
+        t.r5.u64 = h.data + kOut + 8;
+        t.r6.u64 = b;
+        t.r7.u64 = format;
+        t.r8.u64 = dimension;
+        t.r9.u64 = tiled;
+        (v == 0 ? Original<__imp__sub_822A45B8> : NativeLevelSize)(t, h.base);
+        out[v].Bytes(Read(h.base, h.data + kOut, 12));
+        out[v].Word(t.r3.u32);
+      }
+      results.Check(out[0], out[1],
+                    fmt::format("{} x {} x {}, {} bits, format {:X}, dimension {:X}, tiled {:X}",
+                                w, hh, d, b, format, dimension, tiled));
+    }
+    results.Report();
+  }
   {
     Results results("TextureLayout::LevelCount (sub_822A4530)");
     for (int i = 0; i < 1000; i++) {
@@ -470,6 +531,80 @@ uint32_t Tile(Random& r) {
   }
 }
 
+
+// A surface's format: the depth formats (22, 23), 54 (taken as 7), others,
+// with the bits SurfaceHeader::Set tests (0x600, 0x1800, 0x6000 all set,
+// 0x20000 and 0x18000 clear) now and then, or random.
+uint32_t SurfaceFormat(Random& r) {
+  const uint32_t lows[] = {22, 23, 54, 6, 7, 26, 21, 32, 37, 0, 1};
+  uint32_t format = r.Below(4) ? lows[r.Below(11)] : r.Below(64);
+  switch (r.Below(4)) {
+    case 0:
+      format |= 0x7E00;
+      break;
+    case 1:
+      format |= uint32_t(r.Next()) & ~0x3Fu;
+      break;
+    default:
+      format |= (uint32_t(r.Next()) & 0x7FFC0) & ~0x18000u;
+      break;
+  }
+  return format;
+}
+
+int32_t Multisample(Random& r) {
+  return r.Below(8) ? int32_t(r.Below(3)) : int32_t(uint32_t(r.Next()));
+}
+
+// SurfaceHeader::Set on a header of random words (its +36's low 3 bits
+// kept), with or without parameters, the hi-z taken or not (0x829537C4,
+// put back after).
+void SurfaceHeaders(Context& h, Random& r) {
+  Results results("SurfaceHeader::Set (sub_822A5910)");
+  const uint32_t hi_z = guest::LoadU32(h.base, kHiZTaken);
+  for (int i = 0; i < 1000; i++) {
+    const uint32_t w = r.Below(4) ? 1 + r.Below(2048) : Size(r);
+    const uint32_t hh = r.Below(4) ? 1 + r.Below(2048) : Size(r);
+    const uint32_t format = SurfaceFormat(r);
+    const int32_t multisample = Multisample(r);
+    const bool with_parameters = r.Below(3) == 0;
+    const uint32_t taken = r.Below(2);
+    uint32_t words[16];
+    for (uint32_t& word : words) {
+      word = uint32_t(r.Next());
+    }
+    if (r.Below(2)) {
+      words[1] = 0xFFFFFFFF;  // the hi-z base none
+    }
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Fill(h.base, h.data, kScratchBytes);
+      guest::StoreU32s(h.base, h.data + kHeader, words, 12);
+      guest::StoreU32s(h.base, h.data + kParent, words + 12, 3);
+      guest::StoreU32(h.base, kHiZTaken, taken);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = w;
+      t.r4.u64 = hh;
+      t.r5.u64 = format;
+      t.r6.s64 = multisample;
+      t.r7.u64 = with_parameters ? h.data + kParent : 0;
+      t.r8.u64 = h.data + kHeader;
+      t.r9.u64 = h.data + kOut;
+      t.r10.u64 = h.data + kOut + 4;
+      (v == 0 ? Original<__imp__sub_822A5910> : NativeSetSurfaceHeader)(t, h.base);
+      out[v].Bytes(Read(h.base, h.data + kHeader, 48));
+      out[v].Bytes(Read(h.base, h.data + kOut, 8));
+      out[v].Word(t.r3.u32);
+      out[v].Word(guest::LoadU32(h.base, kHiZTaken));
+    }
+    results.Check(out[0], out[1],
+                  fmt::format("{} x {}, format {:X}, samples {:X}, parameters {}, hi-z {}", w, hh,
+                              format, uint32_t(multisample), with_parameters, taken));
+  }
+  guest::StoreU32(h.base, kHiZTaken, hi_z);
+  results.Report();
+}
+
 void EdramLeaves(Context& h, Random& r) {
   {
     Results results("Edram::NextRun (sub_822B5C90)");
@@ -681,6 +816,63 @@ void EdramAllocator(Context& h, Random& r) {
     guest::StoreU32(h.base, kHiZTaken, hi_z);
     results.Report();
   }
+  {
+    // CreateSurface: the header from the allocation layer (freed after,
+    // with its EDRAM left in the case's allocator), its EDRAM from the
+    // case's allocator (as for Alloc; now and then too full, or a base past
+    // 2,048 tiles), the hi-z taken or not.
+    Results results("Device::CreateSurface (sub_822A5E28)");
+    const uint32_t hi_z = guest::LoadU32(h.base, kHiZTaken);
+    for (int i = 0; i < 400; i++) {
+      EdramState state = RandomEdram(r);
+      if (r.Below(4) == 0) {
+        // Free only past tile 2,048 now and then (the base too high).
+        for (uint32_t t = 0; t < 2048 + r.Below(256); t++) {
+          if (!(state.bitmap[t / 32] & (0x80000000u >> (t % 32)))) {
+            state.bitmap[t / 32] |= 0x80000000u >> (t % 32);
+            state.free--;
+          }
+        }
+      }
+      const uint32_t w = 1 + r.Below(r.Below(4) ? 1280 : 4096);
+      const uint32_t hh = 1 + r.Below(r.Below(4) ? 720 : 4096);
+      const uint32_t format = SurfaceFormat(r);
+      const int32_t multisample = r.Below(8) ? int32_t(r.Below(3)) : int32_t(r.Below(16));
+      const bool with_parameters = r.Below(8) == 0;
+      const uint32_t taken = r.Below(2);
+      const uint32_t parameters[3] = {uint32_t(r.Next()), r.Below(2) ? 0xFFFFFFFF : uint32_t(r.Next()),
+                                      uint32_t(r.Next())};
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        const uint32_t object = MakeAllocator(h, state, v == 0);
+        guest::StoreU32(h.base, edram::kAllocator, object);
+        guest::StoreU32(h.base, kHiZTaken, taken);
+        Fill(h.base, h.data, kScratchBytes);
+        guest::StoreU32s(h.base, h.data + kParent, parameters, 3);
+        PPCContext t = CallContext(h);
+        t.r3.u64 = w;
+        t.r4.u64 = hh;
+        t.r5.u64 = format;
+        t.r6.s64 = multisample;
+        t.r7.u64 = with_parameters ? h.data + kParent : 0;
+        (v == 0 ? Original<__imp__sub_822A5E28> : NativeCreateSurface)(t, h.base);
+        const uint32_t surface = t.r3.u32;
+        out[v].Word(surface != 0);
+        if (surface != 0) {
+          out[v].Bytes(Read(h.base, surface, 48));
+          memory::crt::XMemFree(surface, 0x24800000);
+        }
+        out[v].Word(guest::LoadU32(h.base, kHiZTaken));
+        out[v].Bytes(AllocatorState(h, object));
+        memory::crt::XMemFree(object, kObjectAttributes);
+      }
+      results.Check(out[0], out[1],
+                    fmt::format("case {}: {} x {}, format {:X}, samples {}, parameters {}, hi-z {}",
+                                i, w, hh, format, multisample, with_parameters, taken));
+    }
+    guest::StoreU32(h.base, kHiZTaken, hi_z);
+    results.Report();
+  }
   guest::StoreU32(h.base, edram::kAllocator, saved);
 }
 
@@ -693,6 +885,7 @@ void GraphicsResources(Context& h) {
   SizeMath(h, r);
   Buffers(h, r);
   Getters(h, r);
+  SurfaceHeaders(h, r);
   EdramLeaves(h, r);
   EdramAllocator(h, r);
 }
