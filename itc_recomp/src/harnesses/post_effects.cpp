@@ -39,6 +39,14 @@ void NativeToggleHidden(PPCContext& ctx, uint8_t* base) {
   pe::ToggleScreenObjectHidden(base, ctx.r3.u32);
 }
 
+// StarDef::Init: r3 = the star definition, r4 = lines, r5 = passes, f1 =
+// sample length, f2 = attenuation, f4 = inclination, r10 = rotation.
+void NativeStarDefInit(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = pe::StarDefInit(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.f1.f64, ctx.f2.f64,
+                               ctx.f4.f64, ctx.r10.u32);
+}
+
 constexpr uint32_t kBlockBytes = 0x4000;
 constexpr uint32_t kGlowVtable = 0x820088B0;  // the game's (slots 2, 6, 8 the setters)
 
@@ -550,7 +558,7 @@ void GlareCases(Context& h, uint32_t block) {
         } else if (f == 1) {
           Run(v, __imp__sub_8212EC90, sub_8212EC90, t, h.base);
         } else {
-          Run(v, __imp__sub_8212EA98, sub_8212EA98, t, h.base);
+          Run(v, __imp__sub_8212EA98, NativeStarDefInit, t, h.base);
         }
         out[v].Bytes(Read(h.base, block, 0x200));
         out[v].Word(t.r3.u32);

@@ -9,7 +9,8 @@
 // rewrite (src/debug/frame_state_diff.cpp): none of them is here.
 // PostEffects::ToggleNoHistory (sub_82133A38) and ScreenObject::ToggleHidden
 // (sub_8212EDE0) have no adapters: only Race::ToggleEffects' plain C++ calls
-// them, and the flag switches it.
+// them, and the flag switches it. StarDef::Init (sub_8212EA98) has none
+// either: only GlareDef::Init's plain C++ calls it.
 
 #include "guest.h"
 
@@ -31,7 +32,8 @@ ITC_FLAG_BOOL(native_post_effects, true, "ITC",
               "RecordTargets sub_82133790, RecordPixelConstants sub_82133D00, RecordPixelBool "
               "sub_82133D70, RecordTexelSize sub_82133DD8, AddQuad sub_82133E30 and RecordResolve "
               "sub_82133F58, without the command list's diagnostics; the glare's GlareDef::GlareDef "
-              "sub_8212ED78, GlareDef::Init sub_8212EC90 and StarDef::Init sub_8212EA98) natively instead of through the "
+              "sub_8212ED78, GlareDef::Init sub_8212EC90 and StarDef::Init sub_8212EA98 (no adapter: only "
+              "GlareDef::Init's plain C++ calls it, and the flag switches that)) natively instead of through the "
               "translated code (the same writes; checked by --run_harnesses=post_effects)");
 
 #define ITC_POST_EFFECTS(address, ...)    \
@@ -167,8 +169,3 @@ ITC_POST_EFFECTS(8212ED78, ctx.fpscr.disableFlushMode(); GlareDefConstruct(base,
 // r4 = the glare type.
 ITC_POST_EFFECTS(8212EC90, ctx.fpscr.disableFlushMode();
                  ctx.r3.u64 = GlareDefInit(base, ctx.r3.u32, ctx.r4.u32))
-// r3 = the star definition, r4 = lines, r5 = passes, f1 = sample length,
-// f2 = attenuation, f4 = inclination, r10 = rotation.
-ITC_POST_EFFECTS(8212EA98, ctx.fpscr.disableFlushMode();
-                 ctx.r3.u64 = StarDefInit(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.f1.f64,
-                                          ctx.f2.f64, ctx.f4.f64, ctx.r10.u32))
