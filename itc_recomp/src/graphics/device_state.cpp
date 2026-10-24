@@ -1141,6 +1141,147 @@ void SetPixelShaderConstantB(uint8_t* base, uint32_t device, uint32_t first, uin
   Mark(base, device + kRenderDirty, 2);
 }
 
+uint32_t VertexDeclarationFromFvf(uint8_t* base, uint32_t fvf, uint32_t declaration) {
+  ITC_NATIVE_RUNNING("sub_822A6A88 VertexDeclaration::FromFvf");
+  // The element types (D3DDECLTYPE_*'s 360 codes) and usages.
+  constexpr uint32_t kFloat3 = 0x2A23B9, kFloat4Ish = 0x1A23A6, kFloat1 = 0x2C83A4;
+  constexpr uint32_t kFloat2 = 0x2C23A5, kColor = 0x182886, kUbyte4 = 0x1A2286;
+  constexpr uint8_t kPosition = 0, kBlendWeight = 1, kBlendIndices = 2, kNormal = 3,
+                    kPointSize = 4, kTexCoord = 5, kColorUsage = 10;
+  constexpr uint32_t kTexCoordTable = 0x82013690;  // a byte a format, then the types
+  uint32_t at = declaration + 52;
+  uint32_t count = 0;   // the original's r8
+  uint32_t offset = 0;  // the next element's offset (r9)
+  auto element = [&](uint32_t type, uint32_t element_offset, uint8_t usage, uint8_t index) {
+    guest::StoreU16(base, at + 0, 0);
+    guest::StoreU16(base, at + 2, uint16_t(element_offset));
+    Store(base, at + 4, type);
+    guest::StoreU8(base, at + 8, 0);
+    guest::StoreU8(base, at + 9, usage);
+    guest::StoreU8(base, at + 10, index);
+    at += 12;
+  };
+  const bool ubyte4 = (fvf & 0x1000) != 0;  // the last beta is UBYTE4 indices
+  const bool color = (fvf & 0x8000) != 0;   // the last beta is a D3DCOLOR
+  switch (fvf & 0x400E) {
+    case 2:  // XYZ
+      element(kFloat3, 0, kPosition, 0);
+      offset = 12, count = 1;
+      break;
+    case 0x4002:  // XYZW
+      element(kFloat4Ish, 0, kPosition, 0);
+      offset = 16, count = 1;
+      break;
+    case 6:  // XYZB1
+      element(kFloat3, 0, kPosition, 0);
+      offset = 16, count = 2;
+      if (ubyte4) {
+        element(kUbyte4, 12, kBlendIndices, 0);
+      } else if (color) {
+        element(kColor, 12, kBlendIndices, 0);
+      } else {
+        element(kFloat1, 12, kBlendWeight, 0);
+      }
+      break;
+    case 8:  // XYZB2
+      element(kFloat3, 0, kPosition, 0);
+      if (ubyte4) {
+        element(kFloat1, 12, kBlendWeight, 0);
+        element(kUbyte4, 16, kBlendIndices, 0);
+        offset = 20, count = 3;
+      } else if (color) {
+        element(kColor, 12, kBlendWeight, 0);
+        element(kUbyte4, 16, kBlendIndices, 0);
+        offset = 20, count = 3;
+      } else {
+        element(kFloat2, 12, kBlendWeight, 0);
+        offset = 20, count = 2;
+      }
+      break;
+    case 10:  // XYZB3
+      element(kFloat3, 0, kPosition, 0);
+      offset = 24;
+      if (ubyte4) {
+        element(kFloat2, 12, kBlendWeight, 0);
+        element(kUbyte4, 20, kBlendIndices, 0);
+        count = 3;
+      } else if (color) {
+        element(kFloat2, 12, kBlendWeight, 0);
+        element(kColor, 20, kBlendIndices, 0);
+        count = 3;
+      } else {
+        element(kFloat3, 12, kBlendWeight, 0);
+        count = 2;
+      }
+      break;
+    case 12:  // XYZB4
+      element(kFloat3, 0, kPosition, 0);
+      offset = 28;
+      if (ubyte4) {
+        element(kFloat3, 12, kBlendWeight, 0);
+        element(kUbyte4, 24, kBlendIndices, 0);
+        count = 3;
+      } else if (color) {
+        element(kFloat3, 12, kBlendWeight, 0);
+        element(kColor, 24, kBlendIndices, 0);
+        count = 3;
+      } else {
+        element(kFloat4Ish, 12, kBlendWeight, 0);
+        count = 2;
+      }
+      break;
+    case 14:  // XYZB5
+      element(kFloat3, 0, kPosition, 0);
+      element(kFloat4Ish, 12, kBlendWeight, 0);
+      offset = 32, count = 3;
+      element(ubyte4 ? kUbyte4 : color ? kColor : kFloat1, 28, kBlendIndices, 0);
+      break;
+    default:  // 4 (XYZRHW) and the rest: no position element
+      break;
+  }
+  if (fvf & 0x10) {  // NORMAL
+    element(kFloat3, offset, kNormal, 0);
+    count++, offset = (offset + 12) & 0xFFFF;
+  }
+  if (fvf & 0x20) {  // PSIZE
+    element(kFloat1, offset, kPointSize, 0);
+    count++, offset = (offset + 4) & 0xFFFF;
+  }
+  if (fvf & 0x40) {  // DIFFUSE
+    element(kColor, offset, kColorUsage, 0);
+    count++, offset = (offset + 4) & 0xFFFF;
+  }
+  if (fvf & 0x80) {  // SPECULAR
+    element(kColor, offset, kColorUsage, 1);
+    count++, offset = (offset + 4) & 0xFFFF;
+  }
+  const uint32_t texcoords = (fvf >> 8) & 0xF;
+  uint32_t formats = (fvf >> 16) & 0xFFFF;
+  count += texcoords;
+  for (uint32_t i = 0; i < texcoords; i++) {
+    const uint32_t size = guest::LoadU8(base, kTexCoordTable + (formats & 3)) & ~3u;
+    element(Load(base, kTexCoordTable + size), offset, kTexCoord, uint8_t(i));
+    formats >>= 2;
+    offset = (offset + size) & 0xFFFF;
+  }
+  // The end marker (D3DDECL_END): stream 0xFF, type unused.
+  Store(base, at + 0, 0x00FF0000);
+  Store(base, at + 4, 0xFFFFFFFFu);
+  Store(base, at + 8, 0);
+  Store(base, declaration + 24, count);
+  Store(base, declaration + 28, 0);
+  Store(base, declaration + 48, 0);
+  return (at - declaration - 52) / 12;
+}
+
+void SetFVF(uint8_t* base, uint32_t device, uint32_t fvf) {
+  ITC_NATIVE_RUNNING("sub_822AA0E8 Device::SetFVF");
+  Store(base, device + 12176, fvf);
+  VertexDeclarationFromFvf(base, fvf, device + 11936);
+  Store(base, device + 11552, device + 11936);  // the vertex declaration
+  Mark(base, device + kShaderDirty, 1ull << 51);
+}
+
 uint32_t GetViewportEnable(uint8_t* base, uint32_t device) {
   ITC_NATIVE_RUNNING("sub_822A2470 Device::GetRenderState_ViewportEnable");
   return Load(base, device + kPaClVteCntl) & 1;

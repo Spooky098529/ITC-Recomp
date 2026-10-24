@@ -195,6 +195,19 @@ void SetPixelShaderConstantF(uint8_t* base, uint32_t device, uint32_t first, uin
 void SetPixelShaderConstantB(uint8_t* base, uint32_t device, uint32_t first, uint32_t data,
                              uint32_t count);
 
+// sub_822A6A88 VertexDeclaration::FromFvf: the declaration for flexible
+// vertex format `fvf` built at `declaration` (its 12-byte elements from
+// +52: stream, offset, type, method, usage, usage index; the end marker
+// after them), its element count at +24 and +28, +48 = 0. Returns the
+// elements written before the end marker. The end marker's last byte (a
+// pad) is the original's uninitialized stack byte; 0 here.
+uint32_t VertexDeclarationFromFvf(uint8_t* base, uint32_t fvf, uint32_t declaration);
+
+// sub_822AA0E8 Device::SetFVF: +12176 = `fvf`, the device's own declaration
+// built from it at +11936 and made the current one (+11552), +16 bit 51 (the
+// vertex shader, patched again).
+void SetFVF(uint8_t* base, uint32_t device, uint32_t fvf);
+
 // Device fields the setters write (byte offsets).
 constexpr uint32_t kShaderDirty = 16;  // the dirty masks: the shader state
 constexpr uint32_t kRenderDirty = 24;  // the render state

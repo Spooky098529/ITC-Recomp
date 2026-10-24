@@ -17,7 +17,8 @@ ITC_FLAG_BOOL(native_device_state, true, "ITC",
               "sub_822A2470, GetViewport sub_822A3740, SetStreamSource sub_822A3758, "
               "SetIndices sub_822A3908, SetTexture sub_822A6008, SetBlendControl "
               "sub_822A3B30, the shader constants sub_822A81F8, sub_822A8308 and "
-              "sub_822A8470; the fence list's flush left to the originals) natively instead of "
+              "sub_822A8470, SetFVF sub_822AA0E8 with VertexDeclaration::FromFvf "
+              "sub_822A6A88; the fence list's flush left to the originals) natively instead of "
               "through the translated code (the same writes to the register shadow and the "
               "dirty masks; checked by --run_harnesses=device_state).");
 
@@ -210,3 +211,6 @@ ITC_DEVICE_STATE_CALL(822A8308, ds::SetPixelShaderConstantF(base, ctx.r3.u32, ct
                                                             ctx.r5.u32, ctx.r6.u32, ctx.r7.u64))
 ITC_DEVICE_STATE_CALL(822A8470, ds::SetPixelShaderConstantB(base, ctx.r3.u32, ctx.r4.u32,
                                                             ctx.r5.u32, ctx.r6.u32))
+// VertexDeclaration::FromFvf (sub_822A6A88) has no adapter: its only caller
+// is Device::SetFVF, whose plain C++ calls it.
+ITC_DEVICE_STATE_CALL(822AA0E8, ds::SetFVF(base, ctx.r3.u32, ctx.r4.u32))

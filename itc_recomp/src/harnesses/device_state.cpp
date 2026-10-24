@@ -379,6 +379,105 @@ void BoundObjects(Context& h, uint32_t device) {
            false);
 }
 
+// --- The flexible vertex format ---
+//
+// FromFvf on codes with each position kind (2, 4, 6, 8, 10, 12, 14, 0x4002
+// and random ones), the last beta's two bits, the normal, point size and
+// colors, 0-15 texture coordinates of random formats; the declaration in the
+// scratch area. SetFVF on the device block. Compared: the declaration (the
+// scratch area) or the device block, but the end marker's last byte, the
+// original's uninitialized stack byte (a pad; 0 natively), in its own
+// group, expected to differ.
+
+uint32_t RandomFvf(Random& r) {
+  static const uint32_t kKinds[] = {0, 2, 4, 6, 8, 10, 12, 14, 0x4002};
+  uint32_t fvf = r.Below(6) == 0 ? uint32_t(r.Next()) : kKinds[r.Below(std::size(kKinds))];
+  if (r.Below(6) != 0) {
+    fvf = (fvf & 0x400E) | (uint32_t(r.Next()) & 0xFFFF9FF0u);
+  }
+  return fvf;
+}
+
+void Fvf(Context& h, uint32_t device) {
+  Random& r = h.random;
+  {
+    Results results("VertexDeclaration::FromFvf (sub_822A6A88)");
+    Results pad("VertexDeclaration::FromFvf (sub_822A6A88), the end marker's pad byte "
+                "(expected to differ)");
+    for (int c = 0; c < 400; c++) {
+      const uint32_t fvf = RandomFvf(r);
+      std::vector<uint32_t> scratch(kScratchBytes / 4);
+      for (uint32_t& w : scratch) {
+        w = uint32_t(r.Next());
+      }
+      const uint32_t declaration = h.data + 64;
+      uint32_t elements = 0;
+      std::vector<uint8_t> bytes[2];
+      for (int v = 0; v < 2; v++) {
+        guest::StoreU32s(h.base, h.data, scratch.data(), uint32_t(scratch.size()));
+        PPCContext t = CallContext(h);
+        t.r3.u64 = fvf;
+        t.r4.u64 = declaration;
+        if (v == 0) {
+          __imp__sub_822A6A88(t, h.base);
+        } else {
+          elements = ds::VertexDeclarationFromFvf(h.base, fvf, declaration);
+        }
+        bytes[v] = Read(h.base, h.data, kScratchBytes);
+      }
+      const uint32_t at = declaration - h.data + 52 + 12 * elements + 11;
+      Outputs out[2], last[2];
+      for (int v = 0; v < 2; v++) {
+        last[v].Word(bytes[v][at]);
+        bytes[v][at] = 0;
+        out[v].Bytes(bytes[v]);
+      }
+      results.Check(out[0], out[1], fmt::format("fvf {:08X}", fvf));
+      pad.Check(last[0], last[1], fmt::format("fvf {:08X}", fvf));
+    }
+    results.Report();
+    pad.Report();
+  }
+  {
+    Results results("Device::SetFVF (sub_822AA0E8)");
+    Results pad("Device::SetFVF (sub_822AA0E8), the end marker's pad byte (expected to differ)");
+    for (int c = 0; c < 100; c++) {
+      const uint32_t fvf = RandomFvf(r);
+      std::vector<uint32_t> words(kDeviceBytes / 4);
+      for (uint32_t& w : words) {
+        w = uint32_t(r.Next());
+      }
+      std::vector<uint8_t> bytes[2];
+      for (int v = 0; v < 2; v++) {
+        guest::StoreU32s(h.base, device, words.data(), uint32_t(words.size()));
+        PPCContext t = CallContext(h);
+        t.r3.u64 = device;
+        t.r4.u64 = fvf;
+        if (v == 0) {
+          __imp__sub_822AA0E8(t, h.base);
+        } else {
+          ds::SetFVF(h.base, device, fvf);
+        }
+        bytes[v] = Read(h.base, device, kDeviceBytes);
+      }
+      // The end marker: after the elements (counted by a build in the
+      // scratch area, not compared here).
+      const uint32_t elements = ds::VertexDeclarationFromFvf(h.base, fvf, h.data);
+      const uint32_t at = 11936 + 52 + 12 * elements + 11;
+      Outputs out[2], last[2];
+      for (int v = 0; v < 2; v++) {
+        last[v].Word(bytes[v][at]);
+        bytes[v][at] = 0;
+        out[v].Bytes(bytes[v]);
+      }
+      results.Check(out[0], out[1], fmt::format("fvf {:08X}", fvf));
+      pad.Check(last[0], last[1], fmt::format("fvf {:08X}", fvf));
+    }
+    results.Report();
+    pad.Report();
+  }
+}
+
 }  // namespace
 
 void DeviceState(Context& h) {
@@ -398,6 +497,7 @@ void DeviceState(Context& h) {
              NativeGetViewportEnable},
             32);
   BoundObjects(h, device);
+  Fvf(h, device);
   memory::Free(device);
 }
 
