@@ -2544,6 +2544,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-10-24 | The racer controllers (each car's input record filled from the player's pad or its AI driver each tick: the pad reader, the input recording and replay, the race flow's per-state handlers, `AiDriver::Setup`) | `racer-controllers.md` | 27 of 27 (one migration) | `--native_racer_controllers` |
 | 2026-10-24 | The track zones (70 hardcoded stretches of the course's route the player's car is checked against each tick for the HUD: their set-ups, route ranges, fixed-size lists and the owner at `[0x828161EC]`) | `track-zones.md` | 92 of 92 (one migration; 9 Native) | `--native_track_zones` |
 | 2026-10-24 | The graphics resources (the graphics library's texture, surface and buffer headers and descriptions, their creation, the EDRAM allocator, surface levels, the device's current targets and stream, locks, reference counts and destruction; the user's calls: `Edram::Alloc` with a `std::mutex`, the locks' fence waits and cache flushes Dropped) | `graphics-resources.md` | 46 of 46 (two migrations) | `--native_graphics_resources` |
+| 2026-10-24 | The video output and the device lock (the video output's constructor, `LockDevice` and `UnlockDevice` over a host `std::binary_semaphore` by the user's call, the device's thread ownership; with `cameras.md`'s `MakeRenderTarget`, `SetUpSurfaces` and `Init`, which it blocked; the shared sync wrappers kept recompiled) | `video-output.md` | 7 of 30 (and 3 of `cameras.md`) | `--native_video_output` (`--native_cameras`) |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -3168,3 +3169,13 @@ ours of 46. 1,127 overrides in `src/`. `Resource::Lock`'s, `Unlock`'s
 and `Destroy`'s fence waits and cache flushes are left out (the user's
 call); adapters stay for callers in other files still recompiled
 (`Device::Resolve`, the DXT compressor, the game's direct calls).
+
+**2026-10-24, B7's tenth loop run, the video output and the device lock
+(branch `b7-loop-24-10-26`):** the boundary unchanged: 449 functions
+(916 pairs): overridden 67, Native 5, Dropped 23, never called 70, live
+284. Imports: 186 called, 62 with a live caller. B7 (`b7_status.py`):
+6,760 in play, ours 1,541, work left 5,219 (Wrapped 123, with a row 566,
+no row yet 4,530); `video-output.md` 7 ours of 30 (the rest the game's
+sync wrappers, kept recompiled for the core by the user's call, and what
+waits on the device's state setters), `cameras.md` 38 of 42. 1,136
+overrides in `src/`.

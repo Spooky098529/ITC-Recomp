@@ -32,9 +32,19 @@ see in a drive, from every run: `to-drive.md`.
   `stop:` named a choice for the user, so the loop stopped (below);
   resumed with the user's call. Migration 1 done (c234559..bafb51c;
   7 of 30 ours, the rest the shared sync wrappers kept recompiled, and
-  cameras.md's three camera passes): validation agent running.
+  cameras.md's three camera passes), validated (`itc_1310`; all ran in
+  play). Finished.
+- Subsystem 3 of 4: being picked.
 
 ## Done
+
+- The video output and the device lock (`video-output.md`, mapped in
+  2fdfea4; 30 rows): 7 ours in one migration (c234559..bafb51c), with
+  `cameras.md`'s MakeRenderTarget, SetUpSurfaces and Init; validated
+  (`itc_1310`); `--native_video_output`. The user's call: the lock over
+  a `std::binary_semaphore`. Left: the sync wrappers (kept recompiled),
+  what waits on the device's state setters (`sub_822A8A60` and that
+  lead).
 
 - The graphics resources (`graphics-resources.md`, mapped in 0e67c00;
   46 rows): 46 ours in two migrations (e4730b8..e6b9811,
