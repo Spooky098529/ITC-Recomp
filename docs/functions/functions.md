@@ -234,6 +234,12 @@ Rows not yet moved stay in the table below. So far:
   blur, the render target filter), the render texture pool they share,
   their shared command recorders (states, targets, constants, quads,
   resolves), and the race's toggle over them (B7).
+- [`screen-objects.md`](screen-objects.md): the race's screen objects
+  (one a view, at the race object's +31152 to +31160): their texture,
+  vertex declaration and the fan and rings built at their set-up, the
+  map of the rings' texture coordinates by position (two `std::map`
+  instantiations), the speed update and the draw, probably a screen
+  blur while the nitrous runs (B7).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
@@ -497,7 +503,6 @@ old performance notes to the end of `../native-renderer.md`.
 | `sub_8258ED78` | | Wrapped | Named in `--find_menu_selection`'s log (`ITC_MENU_SCAN_WRAP`): `Scene::Update`'s two screen calls and others. |
 | `sub_82094B10` | | Wrapped | Named in `--find_menu_selection`'s log (`ITC_MENU_SCAN_WRAP`): `Scene::Update`'s two screen calls and others. |
 | `sub_820C5DE8` | | Wrapped | The race draw step's parts and the per-car update's callees, wrapped only to name which one advances per-frame state (`--find_per_frame_state`) and to skip one (`--debug_hide`) (`ITC_FRAME_STATE_WRAP`, `src/debug/frame_state_diff.cpp`). |
-| `sub_82130978` | | Wrapped | The race draw step's parts and the per-car update's callees, wrapped only to name which one advances per-frame state (`--find_per_frame_state`) and to skip one (`--debug_hide`) (`ITC_FRAME_STATE_WRAP`, `src/debug/frame_state_diff.cpp`). |
 | `sub_820C4EB8` | | Wrapped | The race draw step's parts and the per-car update's callees, wrapped only to name which one advances per-frame state (`--find_per_frame_state`) and to skip one (`--debug_hide`) (`ITC_FRAME_STATE_WRAP`, `src/debug/frame_state_diff.cpp`). |
 | `sub_820C4FB8` | | Wrapped | The race draw step's parts and the per-car update's callees, wrapped only to name which one advances per-frame state (`--find_per_frame_state`) and to skip one (`--debug_hide`) (`ITC_FRAME_STATE_WRAP`, `src/debug/frame_state_diff.cpp`). |
 | `sub_820DAA38` | | Wrapped | The race draw step's parts and the per-car update's callees, wrapped only to name which one advances per-frame state (`--find_per_frame_state`) and to skip one (`--debug_hide`) (`ITC_FRAME_STATE_WRAP`, `src/debug/frame_state_diff.cpp`). |
