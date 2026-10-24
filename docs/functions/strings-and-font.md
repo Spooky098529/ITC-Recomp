@@ -85,8 +85,9 @@ VirtualAlloc and VirtualFree (`heap.md`); the command list's chunks and
 slots (`command-list.md`); the XPR (`XPR::XPR`, `Create` in `models.md`,
 `GetTexture` `sub_82597118` in `functions.md`, `sub_82597148` its
 destructor, a lead); a texture's description (`sub_822A5B78`, a lead);
-the shader compiler and the vertex and pixel shaders made
-(`sub_822B8F10`, `sub_822AA018`, `sub_822A9EE8`, a lead) and the
+the shader compiler (`sub_822B8F10`, the D3DX HLSL compiler, used only for
+14 shaders made from source in the image; `functions.md`) and the vertex
+and pixel shaders made (`sub_822AA018`, `sub_822A9EE8`, a lead) and the
 device locked around them (`sub_8258D8C8`,
 `sub_8258D908`, `video-output.md`). Never ran in play, so no rows: the font's
 teardown (`sub_82109A40`, `sub_82109400`), the second pass's vertices
