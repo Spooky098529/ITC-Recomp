@@ -13,6 +13,22 @@ When the user has reviewed a run's section, its heading gets
 
 ## Run 2026-10-24 03:25 (`b7-loop-24-10-26`)
 
+- The graphics resources' first migration (e4730b8..e6b9811): 25 of 45
+  ours (7 Native), the new row `sub_822B5EA8` Edram::Free (Native, not
+  seen in play), `sub_822A6268` named `Resource::DestroySurface`, the
+  file's intro. For review: native callers call `refcount::AddRef`
+  without the lock whatever `--refcount_global_lock` says (the flag now
+  switches only recompiled callers); `Texture::BaseSize` and
+  `TextureLayout::LevelSize` read their in/out words once, not again
+  after each store (matters only if an out pointed into the header: no
+  caller does); `LevelSize` doesn't keep r3's upper 32 bits;
+  `Resource::DestroySurface`'s adapter pops Destroy's 112-byte frame
+  (the recompiler split it off); the buffers' and CreateSurface's
+  failed-allocation paths have no cases (the allocation layer aborts
+  when out of memory); a frame dump against the fallback flag showed the
+  same targets and draws, the resolve addresses offset by a constant
+  (probably the heap's layout; not confirmed with two fallback runs).
+
 - `graphics-resources.md` (new, 44 rows; 8 moved from `functions.md`,
   36 new; mapped in 0e67c00), `known-data.md` (the texture, surface
   and buffer headers, the level description, the GPU format table at

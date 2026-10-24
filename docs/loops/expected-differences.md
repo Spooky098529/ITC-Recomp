@@ -40,6 +40,11 @@ NaN groups below stay as recorded.
   that isn't 16-aligned, which hold random values in the harness (with
   Negated NaN where they're NaNs). The game's outs are 16-aligned frame
   temporaries.
+- **Mutex for a critical section:** the user's call (2026-10-24) to
+  replace a kernel critical section with a `std::mutex`: the recompiled
+  code initializes the critical section in the guest object, ours leaves
+  those bytes as the allocation cleared them. Everything else in the
+  object matches.
 
 ## By function file
 
@@ -169,3 +174,9 @@ were at 0.
 | `sub_820F7590` TrackMesh::QuadHeight | one NaN in a vertex, out not 16-aligned | 6 of 9 | Negated NaN, Unaligned out | for review (22:11 run) |
 | `sub_820FDC18` WallQuery::TestCell | one NaN in a vertex | 1 of 300 | Two NaNs (the word +1464's sign) | for review (22:11 run) |
 | `sub_820FDF38` TrackCollision::QueryWalls | one NaN in a vertex | 1 of 300 | Two NaNs (the word +1464's sign) | for review (22:11 run) |
+
+### `graphics-resources.md`
+
+| Function | Group | Differ | Reason | Review |
+|---|---|---|---|---|
+| `sub_822B5EF8` Edram::Alloc | the allocator made: its critical section | 8 of 8 | Mutex for a critical section (bytes +0 to +27) | for review (03:25 run) |
