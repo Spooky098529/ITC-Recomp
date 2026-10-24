@@ -2555,6 +2555,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-10-24 | The compiler's array helpers (`vector constructor iterator` and `vector destructor iterator`, probably: the element constructor or destructor called on each; the native targets called as plain C++, the empty destructor skipped, others a guest call; in the existing `c-runtime.md`, with wcslen's, mbtowc's and the wide write_char's adapters removed) | `c-runtime.md` | 84 of 91 (2 new, one migration) | `--native_c_runtime` |
 | 2026-10-24 | The course scenery (the course's areas, their models and lights collected around each viewport and streamed into five pools of physical memory: the pools, pool objects and their keys, the scenery lists, `StartLoad`, `ReleaseUnused`, `LimitLargeModels`; with the texture animations' advance, interpolation's render-only skip kept) | `course-scenery.md` | 37 of 73 (one migration) | `--native_course_scenery` |
 | 2026-10-24 | XAPI's memset (`XMemSet`: one host memset at the stride the game sets, the translated steps at any other; with what it unblocked: `Scenery::Init`, `CameraPasses::Init` and `InitPasses`; XAPI's `XPhysicalSize` and `XQueryMemoryProtect` mapped in `heap.md`, kept for the core) | `c-runtime.md` | 1 of 1 new (85 of 92 in the file; and `cameras.md` 40 of 42, `course-scenery.md` 38 of 73) | `--native_c_runtime` (`--native_cameras`, `--native_course_scenery`) |
+| 2026-10-24 | The post effects (the screen-space effects drawn over each view: the effect list's globals and toggles, the glow's and color filter's setters, the recording helpers (states, targets, constants, quads, resolves), the glare's definitions, the render textures' release, the destructors; frame interpolation's overrides kept; `RenderTextures::Acquire` left on `sub_8235A9F8`) | `post-effects.md` | 44 of 57 (one migration) | `--native_post_effects` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -3274,3 +3275,13 @@ row yet 4,337); `c-runtime.md` 85 ours of 92, `cameras.md` 40 of 42,
 `course-scenery.md` 38 of 73. 1,286 overrides in `src/`. `Viewports::Init`
 and `Viewport::Init` wait on `atexit` (its critical sections, with the
 core).
+
+**2026-10-24, B7's twelfth loop run, the post effects (branch
+`b7-loop-24-10-26-3`):** the boundary unchanged: 449 functions (916
+pairs): overridden 67, Native 5, Dropped 23, never called 70, live 284.
+Imports: 186 called, 62 with a live caller. B7 (`b7_status.py`): 6,760
+in play, ours 1,757, work left 5,003 (Wrapped 122, with a row 598, no
+row yet 4,283); `post-effects.md` 44 ours of 57. 1,320 overrides in
+`src/`. The rest waits on the models' resource relocation
+(`sub_8235A9F8`) and shader pairs (`sub_825896D8`, `sub_82589700`), the
+vertex declaration (`sub_822A8980`) and `sub_8209AE48`.

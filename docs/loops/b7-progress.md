@@ -22,11 +22,16 @@ see in a drive, from every run: `to-drive.md`.
   f3643e1; 32 ready groups; 3 leads added); map checked (0 errors, 57 of
   57 in play). Migration 1 done (ece3c32..66b8f81: 43 functions,
   44 of 57 ours, nothing ready left; 9 adapters removed;
-  `--native_post_effects`). Validation running.
+  `--native_post_effects`), validated (`itc_1395`, `itc_1396`; all
+  ran in play or the replay). Finished.
 
 ## Done
 
-(none yet)
+- The post effects (`post-effects.md`, mapped in f3643e1; 57 rows): 44
+  ours in one migration (ece3c32..66b8f81), 9 adapters removed;
+  validated (`itc_1395`, `itc_1396`); `--native_post_effects`. Left:
+  `RenderTextures::Acquire` and the recorders on `sub_8235A9F8`, the
+  models' shader pairs, the vertex declaration, `sub_8209AE48`.
 
 ## Rows to review
 
