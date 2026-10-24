@@ -17,7 +17,9 @@ ITC_FLAG_BOOL(native_graphics_resources, true, "ITC",
               "Resource::GetType sub_822A6180, Texture::Format sub_822A44A8, "
               "GpuFormat::BlockSize sub_822A4410, Texture::BaseSize sub_822A4348, "
               "TextureLayout::LevelCount sub_822A4530, Surface::EdramTiles sub_8209AD68, "
-              "TextureLayout::LevelSize sub_822A45B8; Device::CreateSurface sub_822A5E28 "
+              "TextureLayout::LevelSize sub_822A45B8, Texture::LevelDesc sub_822A4F60 with "
+              "Texture::LevelLayout sub_822A4B98, Texture::GetLevelDesc sub_822A5B78, "
+              "Surface::GetDesc sub_822A5F50; Device::CreateSurface sub_822A5E28 "
               "with SurfaceHeader::Set sub_822A5910, with --native_heap; "
               "Device::CreateVertexBuffer sub_822A6830 and Device::CreateIndexBuffer "
               "sub_822A6968, with --native_heap; Device::GetRenderTarget sub_822A3998, "
@@ -81,6 +83,17 @@ ITC_GRAPHICS_RESOURCES(822A4530, ctx.r3.u64 = TextureLevelCount(ctx.r3.u32, ctx.
 // r3 width, r4 height, r5 format, r6 the multisample type.
 ITC_GRAPHICS_RESOURCES(8209AD68, ctx.r3.u64 = SurfaceEdramTiles(ctx.r3.u32, ctx.r4.u32,
                                                                 ctx.r5.u32, ctx.r6.s32))
+
+// r3 = the texture, r4 = the level, r5 = the description; returns the type.
+// LevelLayout has no adapter: only LevelDesc calls it.
+ITC_GRAPHICS_RESOURCES(822A4F60, ctx.r3.u64 = TextureLevelDesc(base, ctx.r3.u32, ctx.r4.u32,
+                                                               ctx.r5.u32))
+
+ITC_GRAPHICS_RESOURCES(822A5B78, ctx.r3.u64 = TextureLevelDesc(base, ctx.r3.u32, ctx.r4.u32,
+                                                               ctx.r5.u32))
+
+// r3 = the surface, r4 = the description.
+ITC_GRAPHICS_RESOURCES(822A5F50, ctx.r3.u64 = SurfaceDesc(base, ctx.r3.u32, ctx.r4.u32))
 
 // r3, r4, r5 = width, height and depth (aligned in place), r6 = bits a
 // pixel, r7 = the format, r8 = the dimension, r9 = tiled; returns the bytes.

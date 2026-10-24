@@ -60,6 +60,38 @@ uint32_t SurfaceEdramTiles(uint32_t width, uint32_t height, uint32_t format, int
 uint32_t TextureLevelSize(uint32_t& width, uint32_t& height, uint32_t& depth, uint32_t bits,
                           uint32_t format, uint32_t dimension, uint32_t tiled);
 
+// sub_822A4B98 Texture::LevelLayout: a level's width, height and depth
+// (the base size halved per level, at least 1, plus the border; for a
+// surface, type 4, its base size), its row pitch in bytes and its slice's
+// bytes (the pitch times the aligned height; 4 KiB aligned but for the
+// first two levels of a linear 2D or 1D texture, and for 3D textures).
+// Packed mips (+48 bit 0x800) below 16 texels lay out at the mip tail's
+// level.
+struct LevelLayout {
+  uint32_t width;
+  uint32_t height;
+  uint32_t depth;
+  uint32_t pitch;
+  uint32_t slice;
+};
+LevelLayout TextureLevelLayout(uint8_t* base, uint32_t texture, uint32_t level);
+
+// sub_822A4F60 Texture::LevelDesc: fills the 32-byte description at `desc`
+// (+0 the format, +4 the type, +24 and +28 the level's width and height,
+// the rest 0); returns the type (the original's r3).
+uint32_t TextureLevelDesc(uint8_t* base, uint32_t texture, uint32_t level, uint32_t desc);
+
+// sub_822A5B78 Texture::GetLevelDesc: TextureLevelDesc (the original jumps
+// to it).
+
+// sub_822A5F50 Surface::GetDesc: a texture's level (+0 bit 0x40000000)
+// asks TextureLevelDesc of its parent (+24) and level (+28's top 4 bits); a
+// render target or depth surface fills it from its own header (+0 its
+// format +40, +24 and +28 its width and height from +36, +16 the
+// multisample type, +8, +12, +20 = 0); +4 = 4 either way. Returns the
+// original's r3: the level description's type, or the surface.
+uint32_t SurfaceDesc(uint8_t* base, uint32_t surface, uint32_t desc);
+
 // sub_822A5910 SurfaceHeader::Set: fills a 48-byte surface header (+0 = 4,
 // +4 = 1, +20 unlocked, +24 the pitch and samples, +28 the EDRAM base and
 // format bits, +32 the hi-z, +36 the size, +40 the format, +44 the EDRAM

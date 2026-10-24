@@ -134,6 +134,14 @@ void NativeCreateSurface(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = gr::CreateSurface(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.s32, ctx.r7.u32);
 }
 
+void NativeLevelDesc(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = gr::TextureLevelDesc(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+}
+
+void NativeSurfaceDesc(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = gr::SurfaceDesc(base, ctx.r3.u32, ctx.r4.u32);
+}
+
 // The scratch area's layout.
 constexpr uint32_t kHeader = 0;    // 64 bytes
 constexpr uint32_t kParent = 64;   // 64 bytes
@@ -222,6 +230,118 @@ void Headers(Context& h, Random& r) {
           fmt::format("case {}: {}", i, Hex(inputs)));
     }
     results.Report();
+  }
+}
+
+// A texture header like the game's: random words, then the type (3, or a
+// surface's 4 with or without the child bit), the format (+32's low 6 bits),
+// the size (+36: 2D sizes up to 2,048 mostly), the border (+40's top bit,
+// now and then), the dimension and packed mips (+48 bits 9-10 and 0x800),
+// tiling and the pitch (+28's top bit and bits 22-30) drawn.
+void RandomTexture(uint8_t* base, uint32_t address, Random& r) {
+  RandomHeader(base, address, r);
+  uint32_t common = guest::LoadU32(base, address);
+  if (r.Below(4)) {
+    common = (common & ~0x4000000Fu) | 3;
+  }
+  guest::StoreU32(base, address, common);
+  auto set = [&](uint32_t offset, uint32_t mask, uint32_t value) {
+    const uint32_t word = guest::LoadU32(base, address + offset);
+    guest::StoreU32(base, address + offset, (word & ~mask) | (value & mask));
+  };
+  if (r.Below(4)) {
+    const uint32_t w = r.Below(2) ? (1u << r.Below(12)) - 1 : r.Below(2048);
+    const uint32_t h = r.Below(2) ? (1u << r.Below(12)) - 1 : r.Below(2048);
+    set(36, 0x03FFFFFF, w | (h << 13));
+  }
+  if (r.Below(4)) {
+    set(40, 0x80000000, 0);
+  }
+  if (r.Below(2)) {
+    set(48, 0x600, 1u << 9);  // 2D
+  }
+  if (r.Below(4)) {
+    set(32, 0x400, 0);
+  }
+  if (r.Below(2)) {
+    set(44, 0x3C0, 0);
+  }
+}
+
+void LevelDescs(Context& h, Random& r) {
+  Results results("Texture::LevelDesc (sub_822A4F60) with Texture::LevelLayout (sub_822A4B98)");
+  for (int i = 0; i < 2000; i++) {
+    Fill(h.base, h.data, kScratchBytes);
+    RandomTexture(h.base, h.data + kHeader, r);
+    RandomTexture(h.base, h.data + kParent, r);
+    guest::StoreU32(h.base, h.data + kHeader + 24, h.data + kParent);
+    // A linear format with no bits a pixel hits LevelSize's divide trap
+    // (a warning each version): mostly made tiled.
+    const uint32_t format = guest::LoadU32(h.base, h.data + kHeader + 32) & 0x3F;
+    if (guest::LoadU8(h.base, 0x82013468 + 1 + (format << 1)) == 0 && r.Below(16)) {
+      const uint32_t w28 = guest::LoadU32(h.base, h.data + kHeader + 28);
+      guest::StoreU32(h.base, h.data + kHeader + 28, w28 | 0x80000000);
+    }
+    const std::vector<uint8_t> inputs = Read(h.base, h.data, 128);
+    const uint32_t level = r.Below(8) ? r.Below(13) : uint32_t(r.Next());
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Fill(h.base, h.data, kScratchBytes);
+      Write(h.base, h.data, inputs.data(), uint32_t(inputs.size()));
+      PPCContext t = CallContext(h);
+      t.r3.u64 = h.data + kHeader;
+      t.r4.u64 = level;
+      t.r5.u64 = h.data + kOut;
+      (v == 0 ? Original<__imp__sub_822A4F60> : NativeLevelDesc)(t, h.base);
+      out[v].Bytes(Read(h.base, h.data + kOut, 32));
+      out[v].Word(t.r3.u32);
+    }
+    results.Check(out[0], out[1], fmt::format("case {}: level {}, {}", i, level, Hex(inputs)));
+  }
+  results.Report();
+  // GetLevelDesc jumps to LevelDesc; Surface::GetDesc on a texture's
+  // surface (asking its parent, a random texture) or a target's header.
+  struct Desc {
+    const char* name;
+    GuestFunction recompiled;
+    GuestFunction native;
+  };
+  const Desc descs[] = {
+      {"Texture::GetLevelDesc (sub_822A5B78)", Original<__imp__sub_822A5B78>, NativeLevelDesc},
+      {"Surface::GetDesc (sub_822A5F50)", Original<__imp__sub_822A5F50>, NativeSurfaceDesc},
+  };
+  for (const Desc& d : descs) {
+    Results more(d.name);
+    const bool surface = d.native == NativeSurfaceDesc;
+    for (int i = 0; i < 500; i++) {
+      Fill(h.base, h.data, kScratchBytes);
+      RandomTexture(h.base, h.data + kHeader, r);
+      RandomTexture(h.base, h.data + kParent, r);
+      if (surface) {
+        // The header a surface; its parent (when a texture's level) a texture.
+        const uint32_t common = guest::LoadU32(h.base, h.data + kHeader);
+        guest::StoreU32(h.base, h.data + kHeader, (common & ~0xFu) | 4);
+        const uint32_t parent = guest::LoadU32(h.base, h.data + kParent);
+        guest::StoreU32(h.base, h.data + kParent, (parent & ~0x4000000Fu) | 3);
+      }
+      guest::StoreU32(h.base, h.data + kHeader + 24, h.data + kParent);
+      const std::vector<uint8_t> inputs = Read(h.base, h.data, 128);
+      const uint32_t level = r.Below(13);
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Fill(h.base, h.data, kScratchBytes);
+        Write(h.base, h.data, inputs.data(), uint32_t(inputs.size()));
+        PPCContext t = CallContext(h);
+        t.r3.u64 = h.data + kHeader;
+        t.r4.u64 = surface ? h.data + kOut : level;
+        t.r5.u64 = h.data + kOut;
+        (v == 0 ? d.recompiled : d.native)(t, h.base);
+        out[v].Bytes(Read(h.base, h.data + kOut, 32));
+        out[v].Word(t.r3.u32);
+      }
+      more.Check(out[0], out[1], fmt::format("case {}: level {}, {}", i, level, Hex(inputs)));
+    }
+    more.Report();
   }
 }
 
@@ -883,6 +1003,7 @@ void GraphicsResources(Context& h) {
   Headers(h, r);
   BlockSizes(h, r);
   SizeMath(h, r);
+  LevelDescs(h, r);
   Buffers(h, r);
   Getters(h, r);
   SurfaceHeaders(h, r);

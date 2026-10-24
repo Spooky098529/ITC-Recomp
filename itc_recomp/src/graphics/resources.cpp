@@ -187,6 +187,151 @@ uint32_t TextureLevelSize(uint32_t& width, uint32_t& height, uint32_t& depth, ui
   return ((slice + 4095) & 0xFFFFF000) * depth;
 }
 
+namespace {
+
+uint32_t Clz(uint32_t value) { return value == 0 ? 32 : uint32_t(__builtin_clz(value)); }
+// PowerPC's slw and srw: a shift by 32 to 63 gives 0 (the shift's low 6 bits).
+uint32_t Slw(uint32_t value, uint32_t shift) {
+  return (shift & 0x20) ? 0 : value << (shift & 0x1F);
+}
+uint32_t Srw(uint32_t value, uint32_t shift) {
+  return (shift & 0x20) ? 0 : value >> (shift & 0x1F);
+}
+uint32_t AtLeast1(uint32_t value) { return value > 1 ? value : 1; }
+
+}  // namespace
+
+LevelLayout TextureLevelLayout(uint8_t* base, uint32_t texture, uint32_t level) {
+  ITC_NATIVE_RUNNING("sub_822A4B98 Texture::LevelLayout");
+  const uint32_t format = Load(base, texture + 32) & 0x3F;
+  const uint32_t bits = guest::LoadU8(base, kFormatTable + 1 + (format << 1));
+  const uint32_t type = ResourceType(base, texture);
+  // The level's width, height and depth for TextureLevelSize (the
+  // original's stack slots +88, +80 and +84; +80 is the aligned height).
+  uint32_t width = 0, height = 0, depth = 0;
+  uint32_t out_width, out_height, out_depth, pitch;
+  // The level the layout and the alignment test use (the mip tail's for
+  // packed mips).
+  uint32_t at = level;
+  if (type == 4) {
+    const Extent size = TextureBaseSize(base, texture);
+    const uint32_t w28 = Load(base, texture + 28);
+    const uint32_t dimension = (Load(base, texture + 48) >> 9) & 3;
+    out_height = size.height;
+    out_width = size.width;
+    out_depth = size.depth;
+    const uint32_t row = ((w28 >> 22) & 0x1FF) * bits;
+    width = out_width;
+    height = out_height;
+    depth = out_depth;
+    TextureLevelSize(width, height, depth, bits, format, dimension, w28 >> 31);
+    pitch = (row << 2) & 0x1FFFFFFC;
+  } else {
+    const uint32_t border = Load(base, texture + 40) >> 31;
+    const uint32_t twice = border << 1;
+    const Extent size = TextureBaseSize(base, texture);
+    out_width = size.width;
+    out_height = size.height;
+    out_depth = size.depth;
+    const uint32_t w48 = Load(base, texture + 48);
+    const uint32_t dimension = (w48 >> 9) & 3;
+    const bool packed = (w48 & 0x800) != 0;
+    // The base size rounded up to powers of two (less the border).
+    const uint32_t w_inner = out_width - twice;
+    const uint32_t h_inner = out_height - twice;
+    const uint32_t pow_width = Slw(1, border - Clz(w_inner - 1) + 32);
+    const uint32_t pow_height = Slw(1, border - Clz(h_inner - 1) + 32);
+    const uint32_t pow_depth =
+        dimension == 2 ? Slw(1, border - Clz(out_depth - twice - 1) + 32) : 1;
+    if (level == 0) {
+      width = pow_width;
+      height = pow_height;
+      depth = pow_depth;
+      if (!((pow_width <= 16 || pow_height <= 16) && packed)) {
+        width = out_width;
+        height = out_height;
+        depth = out_depth;
+      }
+      const uint32_t w28 = Load(base, texture + 28);
+      const uint32_t tiled = w28 >> 31;
+      TextureLevelSize(width, height, depth, bits, format, dimension, tiled);
+      const uint32_t w32 = Load(base, texture + 32);
+      if (tiled == 0 && !(w32 & 0x400) && !packed && dimension == 1 &&
+          !(Load(base, texture + 44) & 0x3C0) && border == 0) {
+        // A linear 2D texture's height aligned only to its block.
+        const Block block = GpuBlockSize(w32 & 0x3F);
+        height = (block.height + out_height - 1) & ~(block.height - 1);
+      }
+      pitch = (((w28 >> 22) & 0x1FF) * bits << 2) & 0x1FFFFFFC;
+    } else {
+      const uint32_t base_width = out_width;
+      const uint32_t base_height = out_height;
+      out_width = AtLeast1(Srw(w_inner, level)) + twice;
+      out_height = AtLeast1(Srw(h_inner, level)) + twice;
+      out_depth = dimension == 2 ? AtLeast1(Srw(out_depth - twice, level)) + twice : 1;
+      if (packed) {
+        // The mip tail starts where the smaller side is below 16 texels.
+        auto tail = [&] {
+          const int32_t log_w = int32_t(border - Clz(base_width - twice - 1) + 32);
+          const int32_t log_h = int32_t(border - Clz(base_height - twice - 1) + 32);
+          const int32_t smaller = log_w < log_h ? log_w : log_h;
+          return smaller - 4 > 0 ? uint32_t(smaller - 4) : 0u;
+        };
+        if (level >= tail()) {
+          at = tail();
+        }
+      }
+      width = AtLeast1(Srw(pow_width, at));
+      height = AtLeast1(Srw(pow_height, at));
+      depth = AtLeast1(Srw(pow_depth, at));
+      TextureLevelSize(width, height, depth, bits, format, dimension,
+                       Load(base, texture + 28) >> 31);
+      pitch = (width * bits) >> 3;
+    }
+  }
+  uint32_t slice = pitch * height;
+  if (!(!(Load(base, texture + 28) & 0x80000000) && at <= 1 && (type == 3 || type == 20)) &&
+      (Load(base, texture + 48) & 0x600) != 0x400) {
+    slice = (slice + 4095) & 0xFFFFF000;
+  }
+  return {out_width, out_height, out_depth, pitch, slice};
+}
+
+uint32_t TextureLevelDesc(uint8_t* base, uint32_t texture, uint32_t level, uint32_t desc) {
+  ITC_NATIVE_RUNNING("sub_822A4F60 Texture::LevelDesc");
+  const LevelLayout layout = TextureLevelLayout(base, texture, level);
+  Store(base, desc + 0, TextureFormat(base, texture));
+  const uint32_t type = ResourceType(base, texture);
+  Store(base, desc + 4, type);
+  Store(base, desc + 8, 0);
+  Store(base, desc + 12, 0);
+  Store(base, desc + 20, 0);
+  Store(base, desc + 24, layout.width);
+  Store(base, desc + 28, layout.height);
+  Store(base, desc + 16, 0);
+  return type;
+}
+
+uint32_t SurfaceDesc(uint8_t* base, uint32_t surface, uint32_t desc) {
+  ITC_NATIVE_RUNNING("sub_822A5F50 Surface::GetDesc");
+  uint32_t r3 = surface;
+  if (Load(base, surface) & 0x40000000) {
+    const uint32_t level = Load(base, surface + 28) >> 28;
+    r3 = TextureLevelDesc(base, Load(base, surface + 24), level, desc);
+  } else {
+    const uint32_t format = Load(base, surface + 40);
+    Store(base, desc + 8, 0);
+    Store(base, desc + 12, 0);
+    Store(base, desc + 20, 0);
+    Store(base, desc + 0, format);
+    Store(base, desc + 24, ((Load(base, surface + 36) >> 18) & 0x3FFF) + 1);
+    Store(base, desc + 28, ((Load(base, surface + 36) >> 3) & 0x7FFF) + 1);
+    Store(base, desc + 16, guest::LoadU16(base, surface + 24) & 3);
+  }
+  Store(base, desc + 4, 4);
+  return r3;
+}
+
 SurfaceSizes SetSurfaceHeader(uint8_t* base, uint32_t width, uint32_t height, uint32_t format,
                               int32_t multisample, uint32_t parameters, uint32_t header) {
   ITC_NATIVE_RUNNING("sub_822A5910 SurfaceHeader::Set");
