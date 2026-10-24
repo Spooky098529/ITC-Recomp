@@ -84,9 +84,10 @@ at run time, as for `CameraPass::RecordBegin`, `cameras.md`).
 Shared with other files, without rows here: `Archive::Load`
 (`sub_8209DE48`), the asset's size (`sub_820A0678`) and
 `DataFile::GetEntry` (`sub_82294730`) (`files-and-saves.md`);
-`XPhysicalAlloc`, `XPhysicalFree` and `operator delete` (`sub_822964C8`,
-`sub_822965C8`, `sub_825A70E8`, `heap.md`); `memcpy` (`sub_825A7410`,
-`c-runtime.md`); `Model::Load`, `Model::Release`, `XPR::XPR`,
+`XPhysicalAlloc`, `XPhysicalFree`, `operator delete` and
+`MmQueryAllocationSize`'s wrapper (`sub_822964C8`, `sub_822965C8`,
+`sub_825A70E8`, `sub_822965C0`, `heap.md`); `memcpy` and XAPI's memset
+(`sub_825A7410`, `sub_822962B0`, `c-runtime.md`); `Model::Load`, `Model::Release`, `XPR::XPR`,
 `XPR::Create` (`sub_82596920`, `sub_82594970`, `sub_82596E68`,
 `sub_82596F68`, `models.md`); `Model::Animate` (`sub_82594B60`,
 `model-animation.md`); `Matrix::Copy`, `Vec4::Transform`
@@ -97,8 +98,7 @@ the command list's chunk calls (`command-list.md`); `Projector::Build`
 `sub_820DAB10` and `Minimap::Draw` (`sub_820F5740`) (`functions.md`);
 the light billboards (`sub_82148658`, `sprites.md`). Without rows
 anywhere, in `../loops/leads.md`: the archive's queue length
-(`sub_8209D7B0`), `MmQueryAllocationSize`'s wrapper (`sub_822965C0`),
-memset (`sub_822962B0`), the model class and texture provider
+(`sub_8209D7B0`), the model class and texture provider
 (`sub_825948C0`, `sub_82594F58`, `sub_82594850`), the lists of models
 and their draws at `82146AA8`-`82148650` (`sub_82147FB8`,
 `sub_82148428`, `sub_82148528`, `sub_82147D88`, `sub_82146AA8`,
@@ -164,7 +164,7 @@ run it after changing either, on any branch.
 | `sub_820F2720` | `Scenery::SetupPools` | | r3 = the manager, r4 = the configuration: `[0x826C5518]` = 0 (physical bytes held), +180, +184 = 0; the configuration copied to +8 (`memcpy`, 44 bytes); a mode of 2 with +12 (the view count − 1) 0 becomes `[[+40]]`. `Scenery::PoolSizes` gives the counts (+92 and +96 the areas, +100 the models, +104 those at most 16) and each pool's data size. List A (+116): pool 3, capacity +128 = the area count, a 4-byte pointer array +132, 16-byte items +136 and 12-byte table +140 (each `Scenery::AllocPhysical`, the last two cleared); list B (+144) the same for pool 4 with the model count. The tables: for each area i of the configuration's table (+36's entries from +20, 12 bytes: the light asset, the first and last model asset; the table's count at +16) with an asset (not -1), A gets {i, 0, asset} and B {i, k, `SceneryConfig::ModelAsset(i, k)`} for each model k. Then the five pool descriptors (24 bytes: +0 the index, +4 the object size, +8 the data size, +12 and +16 two counts, +20 the factory `0x820F2638`): pool 0 when +44 is set (60 bytes, one, data the size of `[[+32]]`'s asset, in a physical block of its own at +184, size +180), pool 1 when +48 is set (60 bytes, none), pool 2 (3,824 bytes, one), pool 3 (88 bytes; +96 objects, or +92 in mode 0 with one data buffer), pool 4 (560 bytes; +104 objects, or +100 in mode 0; data 0: +188 = the shared load buffer `[0x826A5134]` when its size `[0x826A5130]` is at least pool 4's largest asset, else 0); `ObjectPools::Init(manager, 5, descriptors)`; +192 = 0. Only caller `Scenery::Setup`. |
 | `sub_820F2030` | `Scenery::PoolSizes` | | r3 = &the area counts (+92), r4 = &the model counts (+100), r5 = out (five words), r6 = the configuration: each pool's data size: 0 the size (`sub_820A0678`) of `[[+24]]`'s asset; 1: 0; 2: the size of the table's +8 asset; 3: of each area's light asset (+20 of its entry, up to the first -1), summed in mode 0 (+0 = 0), else the largest, and both counts = the areas; 4: of each model asset (`SceneryConfig::ModelAsset`), summed or the largest the same way, the count and that capped at 16. Only caller `Scenery::SetupPools`. |
 | `sub_820F1530` | `SceneryConfig::ModelAsset` | Overridden | r3 = the configuration, r4 = an area, r5 = a model: -1 when the area isn't below the table's count (+28's +16); else its first model asset (+24 of its 12-byte entry from +20) + r5 when that's within its last (+28), else last + 1 (the loop's end). Leaf. From `Scenery::SetupPools` and `Scenery::PoolSizes`. Native (2026-10-24): `ModelAsset`, `--native_course_scenery` (`src/course_scenery/course_scenery.cpp`, adapter in `src/hooks/course_scenery.cpp`; harness `course_scenery`). |
-| `sub_820F1490` | `Scenery::AllocPhysical` | | r3 = a size: `XPhysicalAlloc(size, -1, 0, 4)` (`sub_822964C8`, `heap.md`), its allocated size (`MmQueryAllocationSize`'s wrapper `sub_822965C0`, a lead) added to `[0x826C5518]`; returns the block. From `Scenery::Create`, `Setup`, `SetupPools` and `CourseSet::Load`. |
+| `sub_820F1490` | `Scenery::AllocPhysical` | | r3 = a size: `XPhysicalAlloc(size, -1, 0, 4)` (`sub_822964C8`, `heap.md`), its allocated size (`MmQueryAllocationSize`'s wrapper `sub_822965C0`, `heap.md`) added to `[0x826C5518]`; returns the block. From `Scenery::Create`, `Setup`, `SetupPools` and `CourseSet::Load`. |
 | `sub_820F14E8` | `Scenery::FreePhysical` | | r3 = a block: its allocated size (`sub_822965C0`) taken off `[0x826C5518]`, then `XPhysicalFree` (`sub_822965C8`). From `Scenery::Destroy`, `Unload`, `UnloadPools` and `CourseSet::OnLoaded`. |
 | `sub_820F1E00` | `Scenery::StartLoad` | Overridden | r3 = the manager: a course set taken from pool 2 (`ObjectPools::Acquire(2, key 0)`) and loaded (`ObjectPools::Load`), +112 = it, +172 = 2 and +176 its index. In mode 0 both lists are emptied and filled with every entry of their tables (`SceneryList::Add`, distance 0.0, mask 0), for `Scenery::IsLoaded` to load them all. With +44 set, pool 0's object the same way into +108. +192 = 1. From `sub_8215B790` and `sub_8222C300` (leads). Native (2026-10-24): `StartLoad`, `--native_course_scenery` (`src/course_scenery/course_scenery.cpp`, adapter in `src/hooks/course_scenery.cpp`; harness `course_scenery`). `ObjectPools::Acquire`, `Load` and `Object` and `SceneryList::Add` natively (the loads through the vtable, as `ObjectPools::Load`'s). r3 = the last call's, as the original leaves it. |
 | `sub_820F1F68` | `Scenery::IsLoaded` | | r3 = the manager: while +192 is set, `SceneryList::LoadAll` on list A, then list B (0 until each is done); then the object last asked for (+172 the pool, +176 its index, both 0 or more) must be loaded: not in use (`PoolObject::InUse` 0) or `PoolObject::IsLoaded`; then +192 = 0 and 1 is returned, else 0. From `sub_821514A0`, `sub_821516F0` (the race's) and `sub_82229238` (the front end's), probably polled until it gives 1. |
