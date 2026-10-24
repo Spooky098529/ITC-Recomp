@@ -8,6 +8,7 @@
 #include "base/log.h"
 #include "command_list/command_list.h"
 #include "hooks/ui_movies.h"
+#include "memory/heap.h"
 #include "ui_movies/ui_movies.h"
 
 #include <algorithm>
@@ -1412,6 +1413,230 @@ void DrawWalkCases(Context& h) {
   }
 }
 
+// UiMovie::DrawNode (sub_8259F848) and UiMovie::Draw (sub_8259FA00), the
+// whole walk: ui_movies_hooks::RecordDrawNode and Draw (flag on) against the
+// originals run with --native_ui_movies off. Small trees of up to 11 nodes
+// in a guest block: a root scene whose table points at the nodes after it,
+// each node a group (children from the scene's table, after it), a
+// sub-scene (its own table), a textured picture, a primitive, a text, a
+// transform or junk, some invisible or scaled to (near) nothing, the
+// transforms mostly at rest; a made-up command list, renderer and texture
+// table as QuadDrawCases', and a text list with room, full (the original
+// QueueText) or none. Compared: the scratch area, the block (nodes,
+// recorded slots, queued texts), the open chunk count and r3, exactly.
+void TreeDrawCases(Context& h) {
+  Random r;  // its own, so the harnesses after it keep their inputs
+  constexpr uint32_t kList = 0, kRendererObject = 64, kVtable = 128, kContext = 256,
+                     kTextList = 384, kTableRef = 1536, kTable = 1600, kTexture = 1664;
+  constexpr uint32_t kBlockBytes = 0x10000, kNodeBytes = 1024, kNodes = 12, kLeaf = 11;
+  constexpr uint32_t kSlots = 0x3000, kTexts = 0x8000;
+  const uint32_t block = memory::Alloc(kBlockBytes, 0);
+  if (block == 0) {
+    ITC_LOG_ERROR("harness: ui_movies: no block for the tree cases");
+    return;
+  }
+  const uint32_t saved_renderer = guest::LoadU32(h.base, ui_movies_kRenderer);
+  const uint32_t saved_list = guest::LoadU32(h.base, ui_movies_kRenderer + 4);
+  const uint32_t saved_open = guest::LoadU32(h.base, command_list::kOpenChunks);
+  const uint32_t threshold = guest::LoadU32(h.base, 0x82002A44);
+  const uint32_t odd[] = {0x7FC00000u, 0xFFC00000u, 0x7F800000u, 0x80000000u, 0x7F800001u,
+                          0x00000001u, threshold, threshold + 1, threshold ^ 0x80000000u};
+  const auto value = [&](float lo, float hi) {
+    return r.Below(40) == 0 ? odd[r.Below(std::size(odd))] : RandomFloat(r, lo, hi);
+  };
+  constexpr uint32_t kTags[] = {0x47525000, 0x53434500, 0x50494300, 0x50524D00,
+                                0x54585400, 0x54464D00, 0x12345678};
+  Results results("UiMovie::DrawNode (sub_8259F848) and Draw (sub_8259FA00)");
+  std::vector<uint8_t> image(kBlockBytes);
+  for (int c = 0; c < 400; c++) {
+    const bool through_draw = c % 2 == 1;
+    const uint32_t count = 1 + r.Below(kLeaf - 1);  // nodes 1..count after the root
+    std::vector<uint32_t> words(kBlockBytes / 4, 0);
+    const auto node_at = [&](uint32_t k) { return block + kNodeBytes * k; };
+    const auto w = [&](uint32_t k, uint32_t offset) -> uint32_t& {
+      return words[(kNodeBytes * k + offset) / 4];
+    };
+    for (uint32_t k = 0; k <= kLeaf; k++) {
+      if (k > count && k < kLeaf) {
+        continue;
+      }
+      for (uint32_t i = 0; i < kNodeBytes / 4; i++) {
+        w(k, 4 * i) = r.Below(4) == 0 ? uint32_t(r.Next()) : r.Below(64);
+      }
+      const uint32_t tag = k == 0       ? 0x53434500
+                           : k == kLeaf ? 0x54464D00
+                           : k <= 3     ? kTags[r.Below(std::size(kTags))]
+                                        : kTags[2 + r.Below(std::size(kTags) - 2)];
+      w(k, 0) = tag;
+      w(k, 12) = r.Below(2) ? 0 : value(-640, 640);
+      w(k, 16) = r.Below(2) ? 0 : value(-360, 360);
+      w(k, 20) = r.Below(2) ? 0 : r.Below(200);
+      w(k, 24) = r.Below(2) ? 0 : r.Below(200);
+      w(k, 28) = r.Below(4) ? 0x3F800000u : value(-3, 3);
+      w(k, 32) = r.Below(4) ? 0x3F800000u : value(-3, 3);
+      w(k, 36) = r.Below(2) ? 0 : value(-360, 360);
+      for (uint32_t o = 40; o < 56; o += 4) {
+        w(k, o) = r.Below(4) == 0 ? r.Below(1280) : 0;
+      }
+      for (uint32_t o = 56; o < 68; o += 4) {
+        w(k, o) = r.Below(256);
+      }
+      w(k, 68) = value(0, 1);
+      w(k, 72) = r.Below(8) == 0 ? uint32_t(r.Next()) : r.Below(100);
+      w(k, 80) = r.Below(6) == 0 ? 0 : 1;
+      if (tag == 0x47525000 || tag == 0x53434500) {
+        // A scene's table (the root's, a sub-scene's): entry j at +128 + 8 j
+        // is node k + 1 + j, or the leaf after the last node, from index
+        // [+108] = 0. Its children: any range of the table. A group's
+        // children come from the scene it's drawn in, whose entry j is a
+        // node after j: entries from k on, so every level goes deeper.
+        w(k, 108) = 0;
+        for (uint32_t j = 0; j < kNodes; j++) {
+          w(k, 128 + 8 * j) = node_at(std::min(k + 1 + j, kLeaf));
+        }
+        const uint32_t first = tag == 0x47525000 && k != 0 ? k + r.Below(kNodes - k) : r.Below(kNodes);
+        w(k, 100) = first;
+        w(k, 104) = r.Below(std::min(kNodes - first, 3u) + 1);  // at most 3 children
+      } else if (tag == 0x50494300) {
+        w(k, 100) = value(0, 512);
+        w(k, 104) = value(0, 512);
+        w(k, 108) = r.Below(3);
+        for (uint32_t o = 116; o < 132; o += 4) {
+          w(k, o) = r.Below(512);
+        }
+        w(k, 132) = r.Below(2) ? 0 : 1 + r.Below(3);
+        w(k, 136) = r.Below(2) ? 0 : 1;
+        w(k, 140) = 1 + r.Below(2);
+        for (uint32_t i = 0; i < 3; i++) {
+          w(k, 144 + 16 * i) = r.Below(4);
+        }
+      } else if (tag == 0x50524D00) {
+        w(k, 100) = r.Below(2) ? 0 : 1 + r.Below(3);
+        const uint32_t entries = r.Below(3);
+        w(k, 104) = 0;
+        w(k, 112) = entries;
+        const uint32_t vertices = r.Below(7);
+        w(k, 116) = vertices;
+        for (uint32_t i = 0; i < entries; i++) {
+          w(k, 128 + 16 * i) = r.Below(4);
+        }
+        for (uint32_t i = 0; i < vertices; i++) {
+          const uint32_t at = 128 + 16 * entries + 32 * i;
+          w(k, at + 0) = value(-300, 300);
+          w(k, at + 4) = value(-300, 300);
+          w(k, at + 8) = r.Below(256);
+          w(k, at + 12) = r.Below(256);
+          w(k, at + 16) = r.Below(256);
+          w(k, at + 20) = value(0, 1);
+          w(k, at + 24) = r.Below(512);
+          w(k, at + 28) = r.Below(512);
+        }
+      }
+    }
+    for (size_t i = 0; i < words.size(); i++) {
+      const uint32_t v = words[i];
+      image[4 * i + 0] = uint8_t(v >> 24);
+      image[4 * i + 1] = uint8_t(v >> 16);
+      image[4 * i + 2] = uint8_t(v >> 8);
+      image[4 * i + 3] = uint8_t(v);
+    }
+    uint32_t cw[28];
+    for (int i = 0; i < 16; i++) {
+      cw[i] = value(-2, 2);
+    }
+    const bool clip = r.Below(2) == 0;
+    for (int i = 16; i < 20; i++) {
+      cw[i] = clip ? r.Below(1400) : 0;
+    }
+    for (int i = 20; i < 24; i++) {
+      cw[i] = value(0, 1);
+    }
+    cw[24] = 0;
+    cw[25] = 0;
+    cw[26] = uint32_t(r.Next());
+    cw[27] = r.Below(2) ? 0 : 1;
+    // 0: none, else room. A full list would grow (sub_8259EC58, never seen
+    // in play), which the harness can't run safely (the game's threads
+    // faulted after it, 2026-10-24): no full lists.
+    const uint32_t text_list_kind = r.Below(4) == 0 ? 0 : 2;
+    const uint32_t text_capacity = 64, text_count = r.Below(2);
+    const uint32_t layer = r.Below(100);
+    std::vector<uint8_t> result[2];
+    for (int v = 0; v < 2; v++) {
+      Fill(h.base, h.data, kScratchBytes);
+      Write(h.base, block, image.data(), kBlockBytes);
+      const uint32_t list = h.data + kList;
+      guest::StoreU32(h.base, list + 8, 1000);
+      guest::StoreU32(h.base, list + 12, 0);
+      guest::StoreU32(h.base, list + 32, block + kSlots);
+      guest::StoreU8(h.base, list + 52, 0);
+      guest::StoreU32(h.base, command_list::kOpenChunks, 0);
+      guest::StoreU32(h.base, h.data + kRendererObject, h.data + kVtable);
+      guest::StoreU32(h.base, h.data + kVtable + 16, 0x8209F5C8);
+      const uint32_t context = h.data + kContext;
+      for (int i = 0; i < 28; i++) {
+        guest::StoreU32(h.base, context + 4 * i, cw[i]);
+      }
+      const uint32_t text_list = text_list_kind == 0 ? 0 : h.data + kTextList;
+      guest::StoreU32(h.base, h.data + kTextList + 0, block + kTexts);
+      guest::StoreU32(h.base, h.data + kTextList + 4, text_capacity);
+      guest::StoreU32(h.base, h.data + kTextList + 8, text_count);
+      guest::StoreU32(h.base, h.data + kTableRef, h.data + kTable);
+      for (uint32_t i = 0; i < 4; i++) {
+        guest::StoreU32(h.base, h.data + kTable + 4 * i, h.data + kTexture);
+      }
+      guest::StoreU32(h.base, h.data + kTexture + 0, 0x1234);
+      guest::StoreU32(h.base, h.data + kTexture + 4, 256);
+      guest::StoreU32(h.base, h.data + kTexture + 8, 128);
+      if (!through_draw) {
+        guest::StoreU32(h.base, context + 96, h.data + kTableRef);
+        guest::StoreU32(h.base, context + 100, text_list);
+      }
+      guest::StoreU32(h.base, ui_movies_kRenderer, h.data + kRendererObject);
+      guest::StoreU32(h.base, ui_movies_kRenderer + 4, list);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = context;
+      t.r4.u64 = block;
+      if (through_draw) {
+        t.r5.u64 = h.data + kTableRef;
+        t.r6.u64 = text_list;
+        t.r7.u64 = 0xFFFFFFFFFFFFFFFFull;
+      } else {
+        t.r5.u64 = block;
+        t.r6.u64 = layer;
+      }
+      if (v == 0) {
+        ITC_FLAG(native_ui_movies) = false;
+        (through_draw ? __imp__sub_8259FA00 : __imp__sub_8259F848)(t, h.base);
+        ITC_FLAG(native_ui_movies) = true;
+      } else {
+        (through_draw ? ui_movies_hooks::Draw : ui_movies_hooks::RecordDrawNode)(t, h.base);
+      }
+      result[v] = Read(h.base, h.data, kScratchBytes);
+      const std::vector<uint8_t> after = Read(h.base, block, kBlockBytes);
+      result[v].insert(result[v].end(), after.begin(), after.end());
+      AppendWord(result[v], guest::LoadU32(h.base, command_list::kOpenChunks));
+      AppendWord(result[v], uint32_t(t.r3.u64 >> 32));
+      AppendWord(result[v], t.r3.u32);
+    }
+    size_t at = 0;
+    while (at < result[0].size() && result[0][at] == result[1][at]) {
+      at++;
+    }
+    const size_t from = at < result[0].size() ? at : 0;
+    const size_t to = std::min(result[0].size(), from + 32);
+    results.Check({result[0].begin() + from, result[0].begin() + to},
+                  {result[1].begin() + from, result[1].begin() + to},
+                  fmt::format("case {}: draw {} nodes {} texts {}, from byte {}", c, through_draw,
+                              count, text_list_kind, from));
+  }
+  results.Report();
+  guest::StoreU32(h.base, ui_movies_kRenderer, saved_renderer);
+  guest::StoreU32(h.base, ui_movies_kRenderer + 4, saved_list);
+  guest::StoreU32(h.base, command_list::kOpenChunks, saved_open);
+  memory::Free(block);
+}
+
 }  // namespace
 
 void UiMovies(Context& h) {
@@ -1446,6 +1671,7 @@ void UiMovies(Context& h) {
   ApplyTransformCases(h);
   DrawWalkCases(h);
   QuadDrawCases(h);
+  TreeDrawCases(h);
 }
 
 }  // namespace harness

@@ -508,4 +508,53 @@ QuadCall BuildPrimitive(uint8_t* base, uint32_t context, uint32_t primitive, uin
   return {quad, guest::LoadU32(base, primitive + 72), depth};
 }
 
+uint32_t DrawNode(uint8_t* base, uint32_t context, uint32_t scene, uint32_t node, uint64_t layer,
+                  uint32_t stack, DrawNodeCall call, void* user) {
+  ITC_NATIVE_RUNNING("sub_8259F848 UiMovie::DrawNode");
+  constexpr uint32_t kGrp = 0x47525000, kPic = 0x50494300, kPrm = 0x50524D00,
+                     kSce = 0x53434500, kTxt = 0x54585400;
+  const uint32_t frame = stack - 272;
+  const uint32_t copy = frame + 80;
+  uint32_t r3 = ApplyTransform(base, context, node, frame - 352);
+  const uint32_t first = guest::LoadU32(base, node + 100);
+  int32_t i = int32_t(guest::LoadU32(base, node + 104) + first - 1);
+  if (i < int32_t(first)) {
+    return r3;
+  }
+  const double threshold = Lfs(base, kNearZero);
+  const double zero = Lfs(base, kZero);
+  do {
+    const uint32_t child = Child(base, scene, uint32_t(i));
+    r3 = child;
+    if (guest::LoadU32(base, child + 80) != 0 &&
+        BeyondThreshold(Lfs(base, child + 28), zero, threshold) &&
+        BeyondThreshold(Lfs(base, child + 32), zero, threshold)) {
+      r3 = CopyDrawContext(base, copy, context);
+      const uint32_t tag = guest::LoadU32(base, child + 0);
+      const auto child_layer = [&] { return uint64_t(guest::LoadU32(base, child + 72)) + layer; };
+      if (tag == kGrp) {
+        r3 = DrawNode(base, copy, scene, child, child_layer(), frame, call, user);
+      } else if (tag == kPic) {
+        r3 = call(user, DrawCall::kPicture, copy, scene, child, child_layer(), frame, 0x8259F9C0);
+      } else if (tag == kPrm) {
+        r3 = call(user, DrawCall::kPrimitive, copy, scene, child, child_layer(), frame,
+                  0x8259F9A4);
+      } else if (tag == kSce) {
+        r3 = DrawNode(base, copy, child, child, child_layer(), frame, call, user);
+      } else if (tag == kTxt) {
+        const uint64_t text_layer = child_layer();
+        uint32_t queued = 0;
+        if ((text_layer >> 32) == 0 &&
+            QueueText(base, copy, child, uint32_t(text_layer), frame - 272, &queued)) {
+          r3 = queued;
+        } else {
+          r3 = call(user, DrawCall::kText, copy, scene, child, text_layer, frame, 0x8259F980);
+        }
+      }
+    }
+    i--;
+  } while (!(i < int32_t(guest::LoadU32(base, node + 100))));
+  return r3;
+}
+
 }  // namespace ui_movies

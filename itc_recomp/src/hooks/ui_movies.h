@@ -31,4 +31,17 @@ void DrawPrimitive(PPCContext& ctx, uint8_t* base);
 void RecordPicture(PPCContext& ctx, uint8_t* base);
 void RecordPrimitive(PPCContext& ctx, uint8_t* base);
 
+// UiMovie::Draw (sub_8259FA00; r3 = the draw context, r4 = the scene, r5
+// = the textures, r6 = the text list, r7 = -1): the context's +96, +100 and
+// +104 set, then UiMovie::DrawNode natively (ui_movies::DrawNode, its
+// pictures and primitives through DrawPicture and DrawPrimitive above, a
+// text that would grow its list through the original QueueText, each from
+// the level's frame with the original's return address) or, with
+// --native_ui_movies off, the original. Its override (WATCH_MOVIE_CALL's,
+// src/debug/pause_movie_log.cpp) wraps this for --log_pause_movie.
+void Draw(PPCContext& ctx, uint8_t* base);
+// UiMovie::DrawNode natively, whatever the flag (r3 = the draw context, r4
+// = the scene, r5 = the node, r6 = the layer; for the harness).
+void RecordDrawNode(PPCContext& ctx, uint8_t* base);
+
 }  // namespace ui_movies_hooks

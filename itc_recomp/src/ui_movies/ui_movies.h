@@ -240,6 +240,25 @@ uint32_t PictureTextureOf(uint8_t* base, uint32_t context, uint32_t picture);
 QuadCall BuildPrimitive(uint8_t* base, uint32_t context, uint32_t primitive, uint32_t layer,
                         uint32_t frame);
 
+// UiMovie::DrawNode (sub_8259F848): ApplyTransform on the node, then its
+// children [+100] to [+100] + [+104] - 1 of `scene` (Child), last first
+// ([+100] read again each time), each skipped when invisible (+80 = 0) or
+// either scale (+28, +32) is near zero, else the context copied to the
+// level's frame (CopyDrawContext at `stack` - 272 + 80) and, by tag: GRP
+// drawn again (the same scene), SCE drawn as its own scene, PIC and PRM
+// through `call` (they hand their quads to the renderer through a guest
+// call), TXT through QueueText (`call` where it would grow the list or the
+// layer doesn't fit 32 bits), the layer `layer` + [child + 72] (64-bit, as
+// the original adds it). `stack` is the r1 the original is called with;
+// each level's frame is 272 bytes below it, the callees called with r1 at
+// that frame. Returns the r3 the original leaves.
+enum class DrawCall { kPicture, kPrimitive, kText };
+using DrawNodeCall = uint32_t (*)(void* user, DrawCall kind, uint32_t context, uint32_t scene,
+                                  uint32_t node, uint64_t layer, uint32_t stack,
+                                  uint32_t return_address);
+uint32_t DrawNode(uint8_t* base, uint32_t context, uint32_t scene, uint32_t node, uint64_t layer,
+                  uint32_t stack, DrawNodeCall call, void* user);
+
 // The recorders (recording.cpp), on the command list `list` (the global at
 // 0x82970C1C). Each records a chunk and returns its first slot, which the
 // caller hands to the renderer (vtable slot 4); nothing is done (nullopt)
