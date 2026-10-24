@@ -27,7 +27,9 @@ file's history. What's left to see in a drive, from every run:
 - Subsystem 2 of 3: `leads.md`'s `820FB8B8`-`820FC0E8` lead
   (`sub_820FBBE8` and others, called only from `820F1138`-`820F4558`):
   closest to ready (all 6 of its roots ready, 8 functions left).
-  Mapping agent running.
+  Mapped as the course scenery (`course-scenery.md`, 71 rows: 3 moved
+  from `functions.md`, 68 new; 043a0d2; 29 ready groups; 5 leads added);
+  map checked (0 errors, 71 of 71 in play). Migration agent running.
 
 ## Done
 
@@ -57,6 +59,8 @@ This run's groups: `expected-differences.md` (the "16:01 run" lines).
 - After the array helpers' migration 1: ours 1674, work left 5086
   (wrapped 123, known 555, unknown 4408). Race 27 s (`itc_1341`) with
   `--run_harnesses=all`, 0 errors, every harness 0 differing.
+- After mapping the course scenery: ours 1674, work left 5086 (wrapped
+  123, known 623, unknown 4340).
 
 ## Stopped
 

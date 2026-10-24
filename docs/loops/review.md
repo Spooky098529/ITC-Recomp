@@ -37,6 +37,15 @@ When the user has reviewed a run's section, its heading gets
   writes at 0x70000000, probably an endless loop; `itc_1337.log`): a
   swprintf case, or the native swprintf, fails on other random inputs.
   The new cases use their own generator.
+- `course-scenery.md` (new, 71 rows; 3 moved from `functions.md`:
+  `Lights::FindNearest`, `TextureAnimations::Advance`, `sub_820F6068`
+  now `Scenery::Draw`; 68 new; mapped in 043a0d2): the course's areas,
+  their models and lights collected around each viewport and streamed
+  through `Archive::Load` into five pools of physical memory (manager at
+  `[0x826C5514]`/`[0x826C551C]`), the scenery's draw and the cars'
+  headlight projectors (`sub_820F34C8`). Four rows read only in outline
+  (`sub_820F6068`, `sub_820F3B70`, `sub_820F34C8`, `sub_820F52A8`);
+  `known-data.md` 7 rows; 5 leads.
 
 ## Run 2026-10-24 03:25 (`b7-loop-24-10-26`)
 
