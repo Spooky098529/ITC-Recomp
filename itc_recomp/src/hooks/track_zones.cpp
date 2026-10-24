@@ -5,7 +5,8 @@
 // List64::Insert; List128::Link (sub_8228B5A0), from List128::Insert;
 // RouteRange::ToNeighbor (sub_820FDF98), from WithinEnds and Test;
 // RouteRange::WithinEnds (sub_820FE120), from OnPath; RouteRange::OnPath
-// (sub_820FE398), from Test.
+// (sub_820FE398), from Test; Zone::Reset (sub_8228B540) and
+// ZoneRanges::Insert (sub_8228BBA8), from the zones' set-ups.
 
 #include "guest.h"
 
@@ -25,7 +26,8 @@ ITC_FLAG_BOOL(native_track_zones, true, "ITC",
               "natively instead of through the "
               "translated code (the same writes; checked by --run_harnesses=track_zones). "
               "Those reached only from native callers have no adapters, and the flag switches "
-              "their callers: sub_820FE2C8, sub_8228B5A0, sub_820FDF98, sub_820FE120, sub_820FE398");
+              "their callers: sub_820FE2C8, sub_8228B5A0, sub_820FDF98, sub_820FE120, sub_820FE398, "
+              "sub_8228B540, sub_8228BBA8");
 
 // Defines an adapter: the body (the arguments after the address) uses `ctx`
 // and `base`.
@@ -87,36 +89,8 @@ ITC_TRACK_ZONES(8228BC80, {
   ctx.r3.u64 = last < 0 ? ctx.r1.u64 - 208 + 80 : uint64_t(last);
 })
 
-// Zone::Reset: r3 = the zone (left), r4 = &(its index, its vehicle).
-ITC_TRACK_ZONES(8228B540, ZoneReset(base, ctx.r3.u32, guest::LoadU32(base, ctx.r4.u32),
-                                    guest::LoadU32(base, ctx.r4.u32 + 4)))
 // Zone::IsInside: r3 = the zone; returns its flag.
 ITC_TRACK_ZONES(8228B4F8, ctx.r3.u64 = ZoneIsInside(base, ctx.r3.u32))
-
-// ZoneRanges::Insert: r3 = the list, r4 = a range, r5 = a position; r3 =
-// the copy's destination, as memcpy leaves it. A copy that can't be made
-// natively goes through memcpy (sub_825A7410) from a frame like the
-// original's.
-extern "C" REX_FUNC(sub_8228BBA8) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_track_zones)) {
-    __imp__sub_8228BBA8(ctx, base);
-    return;
-  }
-  const uint32_t range = ctx.r4.u32;
-  uint32_t to = 0;
-  if (!ZoneRangesInsert(base, ctx.r3.u32, range, ctx.r5.u32, &to)) {
-    const uint64_t lr = ctx.lr;
-    guest_call::InFrame(ctx, base, 112, 0x8228BC10, [&](uint32_t) {
-      ctx.r3.u64 = to;
-      ctx.r4.u64 = range;
-      ctx.r5.u64 = kRangeBytes;
-      sub_825A7410(ctx, base);
-    });
-    ctx.lr = lr;
-  }
-  ctx.r3.u64 = to;
-}
 
 // --- The zones' set-ups ---
 
