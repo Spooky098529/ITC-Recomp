@@ -59,6 +59,37 @@ When the user has reviewed a run's section, its heading gets
     ends: attract races don't reach them (harness only).
   - New helpers in `src/hooks/post_effects.h`: `PostEffectsReleaseTexture`,
     `PostEffectsReleaseSurface`, `PostEffectsDestroyCalls`.
+- Cleanup leads (no mapping; 1197f81..cdaa66d): `sub_820BAAA0`
+  CollisionShape::~CollisionShape's adapter removed (`collision.md`);
+  `AiDrivers::Destroy` and `DestroyRings` native under
+  `--native_ai_drivers` (`ai-drivers.md`; fall back while
+  `--native_heap` is off or the table isn't the layer's; run only when a
+  race ends: harness only); the UI movie walk native under
+  `--native_ui_movies` (`ui-movies.md`, a new Merged row `sub_8259D730`
+  the clip intersection, never in play, ported into ApplyTransform;
+  `src/ui_movies/draw.cpp`, strict fp). For review:
+  - `UiMovie::Draw` stays Overridden (its work uses `ctx`, inside the
+    `--log_pause_movie` watch override); DrawPicture's and
+    DrawPrimitive's adapters stay (a guest call to `sub_8259EBE8`)
+    though `--removable` lists them; DrawNode reaches them through a
+    callback from the original's 272-byte frames.
+  - Frame interpolation kept: every Matrix::Multiply and Copy in the
+    walk noted through `BlendState_OnMultiply`/`OnCopy` with the
+    original's return address; Vec4::Transform through
+    `debug::Vec4Transform`. Frame dumps match `--native_ui_movies=false`
+    (2,414 draws).
+  - Left on the recompiled code: the text list's grow `sub_8259EC58`
+    (never in play: a full list runs the original append or QueueText);
+    a picture without a texture runs the original DrawPicture.
+  - Float words copied bit for bit where the original pairs lfs/stfs
+    (a signaling NaN keeps its bits).
+  - The DrawPicture, DrawPrimitive and tree harnesses compare bytes
+    exactly instead of with `harness::Outputs`.
+  - Found along the way: `sub_8210A758` Text::Draw's harness compares a
+    slot word as bytes outside the vertex ranges it marks as floats
+    (a NaN sign showed as 1 difference when its random inputs changed);
+    the new cases now use their own `Random`, Text::Draw back to 0. A
+    gap in that harness worth a later look.
 
 ## Run 2026-10-24 16:01 (`b7-loop-24-10-26-2`)
 

@@ -29,7 +29,9 @@ see in a drive, from every run: `to-drive.md`.
   (`ui-movies.md`), `sub_8213B2B8` AiDrivers::Destroy and `sub_8213AD98`
   AiDrivers::DestroyRings (`ai-drivers.md`), `sub_820BAAA0`
   CollisionShape::~CollisionShape's adapter (`collision.md`). Migration
-  agent running.
+  done (1197f81..cdaa66d: the collision shape's adapter removed, the AI
+  drivers' teardown, the UI movie walk from ApplyTransform up to
+  `UiMovie::Draw`; 6 adapters removed). Validation running.
 
 ## Done
 
