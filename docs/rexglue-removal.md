@@ -82,7 +82,11 @@ goes in `src/` as overrides), American English.
   route native as far as they were ready (ours 1,223); its ninth run
   (branch `b7-loop-23-10-26-5`) made the AI drivers, the racer
   controllers and the track zones native as far as they were ready
-  (ours 1,485). The
+  (ours 1,485); its tenth run (branch `b7-loop-24-10-26`) mapped the
+  graphics resources (`graphics-resources.md`, 44 rows) and stopped
+  for two of the user's calls before migrating (kernel critical
+  sections in `Edram::Alloc`; dropping the resource locks' fence waits
+  and cache flushes). The
   runs' rows wait for the user's review (`docs/loops/review.md`). See
   "B7's loop runs" under B7, and `docs/loops/b7-progress.md`. Guest
   allocation is no longer a block (`docs/native-memory.md`); what the

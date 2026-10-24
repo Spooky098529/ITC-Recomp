@@ -13,7 +13,18 @@ When the user has reviewed a run's section, its heading gets
 
 ## Run 2026-10-24 03:25 (`b7-loop-24-10-26`)
 
-Nothing yet.
+- `graphics-resources.md` (new, 44 rows; 8 moved from `functions.md`,
+  36 new; mapped in 0e67c00), `known-data.md` (the texture, surface
+  and buffer headers, the level description, the GPU format table at
+  `0x82013468`, the EDRAM allocator at `0x82953E20`, the hi-z flag at
+  `0x829537C4`, the device's target and stream fields, the device
+  pointer at `0x820007B0`); 3 leads (the device's state setters at
+  `822A3030`-`822A4340` and `sub_822A6008`, the boot movie player's
+  graphics side at `8248xxxx`, the resources' other makers and users).
+  Shared rows left where they were: `sub_822A5B68`, `sub_8235A9F8`,
+  `sub_8235A990` (`models.md`), XMemAlloc and XMemFree (`heap.md`).
+  For the user's call: the two choices under "Stopped" in
+  `b7-progress.md`.
 
 ## Run 2026-10-23 20:22 (`b7-loop-23-10-26-5`)
 

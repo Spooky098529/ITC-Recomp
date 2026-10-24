@@ -186,7 +186,11 @@ ready (`ai-drivers.md`, `racer-controllers.md`, `track-zones.md`;
 `--native_track_zones`; ours 1,223 -> 1,485); the rest waits on the
 array destructor iterator (`sub_820900C0`), the getter of
 `[0x826C6078]` (`sub_821434E8`), the race flow's functors and the
-camera modes. Harness runs use `attract_race.sh 40` (the user's call,
+camera modes. Its tenth run (`b7-loop-24-10-26`, 2026-10-24) mapped
+the graphics resources (`docs/functions/graphics-resources.md`, 44
+rows) and stopped before migrating, for two of the user's calls (the
+kernel critical sections in `Edram::Alloc`, `sub_822B5EF8`; whether the
+resource locks' fence waits and cache flushes are Dropped). Harness runs use `attract_race.sh 40` (the user's call,
 2026-10-23); a race short only because the harnesses took longer is
 no halt.
 After each plan item, run `itc_recomp/tools/boundary_status.py` and record
