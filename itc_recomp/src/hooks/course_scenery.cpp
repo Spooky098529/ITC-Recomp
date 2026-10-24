@@ -4,7 +4,12 @@
 // switches their callers): AnimationSet::Advance (sub_82146B20) and
 // Animation::Advance (sub_82146AC0), from TextureAnimations::Advance
 // (sub_820F11A8), whose override is the per-frame logic's wrap
-// (src/frame_pacing/per_frame_logic.cpp: skipped on render-only passes).
+// (src/frame_pacing/per_frame_logic.cpp: skipped on render-only passes);
+// PoolObject::SetKey (sub_820FBA00), from ObjectPools::Acquire;
+// PoolObject::KeyEquals (sub_820FBA60), from ObjectPools::Find; and
+// PoolObject::IsVisible (sub_820FB908), IsExpiring (sub_820FB920),
+// ObjectPools::Pool (sub_820FBB10) and Release (sub_820FC038), from
+// SceneryList::ReleaseUnused.
 
 #include "guest.h"
 
@@ -28,7 +33,9 @@ ITC_FLAG_BOOL(native_course_scenery, true, "ITC",
               "AnimationSet::Advance sub_82146B20, Animation::Advance sub_82146AC0) "
               "natively instead of through the translated code (the same writes; checked by "
               "--run_harnesses=course_scenery). Those reached only from native callers have no "
-              "adapters, and the flag switches their callers: sub_82146B20, sub_82146AC0");
+              "adapters, and the flag switches their callers: sub_82146B20, sub_82146AC0, "
+              "sub_820FBA00, sub_820FBA60, sub_820FB908, sub_820FB920, sub_820FBB10, "
+              "sub_820FC038");
 
 // Defines an adapter: the body (the arguments after the address) uses `ctx`
 // and `base`.
@@ -91,8 +98,6 @@ void SetIndex(PPCContext& ctx, uint32_t index) {
 ITC_COURSE_SCENERY(820FB8B8, ctx.r3.u64 = AllocData(base, ctx.r3.u32, ctx.r4.u32))
 ITC_COURSE_SCENERY(820FB8E0, ctx.r3.u64 = InUse(base, ctx.r3.u32))
 ITC_COURSE_SCENERY(820FB8F0, ctx.r3.u64 = IsLoaded(base, ctx.r3.u32))
-ITC_COURSE_SCENERY(820FB908, ctx.r3.u64 = IsVisible(base, ctx.r3.u32))
-ITC_COURSE_SCENERY(820FB920, ctx.r3.u64 = IsExpiring(base, ctx.r3.u32))
 ITC_COURSE_SCENERY(820FB938, SetVisible(base, ctx.r3.u32, ctx.r4.u32))
 ITC_COURSE_SCENERY(820FB968, SetExpiring(base, ctx.r3.u32, ctx.r4.u32))
 ITC_COURSE_SCENERY(820FB998, ClearLoadFlags(base, ctx.r3.u32))
@@ -112,15 +117,9 @@ ITC_COURSE_SCENERY(820F1CD8, uint32_t size = 0;
 // r4 = its own size, r5 = the data size, r6 = its index.
 ITC_COURSE_SCENERY(820FBB20, ConstructObject(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
                                              ctx.r6.u32))
-// r4 = the key.
-ITC_COURSE_SCENERY(820FBA00, ITC_SCENERY_CALLS;
-                   ctx.r3.u64 = SetKey(base, calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32))
-ITC_COURSE_SCENERY(820FBA60, ITC_SCENERY_CALLS;
-                   ctx.r3.u64 = KeyEquals(base, calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32))
 
 // --- The pools: r3 = the pool set, r4 = a pool ---
 
-ITC_COURSE_SCENERY(820FBB10, ctx.r3.u64 = PoolRecord(base, ctx.r3.u32, ctx.r4.u32))
 // r5 = an index.
 ITC_COURSE_SCENERY(820FC0E8, ctx.r3.u64 = PoolObjectAt(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
 // r5 = a key.
@@ -134,9 +133,6 @@ ITC_COURSE_SCENERY(820FBE80, ITC_SCENERY_CALLS;
 ITC_COURSE_SCENERY(820FBFD0, ITC_SCENERY_CALLS;
                    ctx.r3.u64 = LoadObject(base, calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32,
                                            ctx.r5.u32))
-ITC_COURSE_SCENERY(820FC038, ITC_SCENERY_CALLS;
-                   ctx.r3.u64 = Release(base, calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32,
-                                        ctx.r5.u32))
 
 // ObjectPools::Init: r4 = the pool count, r5 = the descriptors. The original
 // runs when the native heap isn't active.
