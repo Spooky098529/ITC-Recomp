@@ -9,6 +9,7 @@
 #include "guest.h"
 
 #include "base/flags.h"
+#include "base/log.h"
 #include "frame_pacing/game_messages.h"
 #include "hooks/guest_call.h"
 #include "hooks/heap.h"
@@ -129,13 +130,14 @@ void NoteRead(uint32_t function, uint32_t caller, uint32_t object, uint32_t mask
 // adapters: their only callers in play are these wrappers, whose plain C++
 // they are. The wrappers count their calls as the originals' did (from the
 // return addresses in the wrappers), the flag on or off.
-#define ITC_INPUT_WRAPPER(address, test, function, return_address)            \
+#define ITC_INPUT_WRAPPER(address, name, test, function, return_address)      \
   extern "C" REX_FUNC(sub_##address) {                                         \
     REX_FUNC_PROLOGUE();                                                       \
     const uint32_t caller = uint32_t(ctx.lr);                                  \
     const uint32_t processor = ctx.r3.u32;                                     \
     const uint32_t mask = guest::LoadU32(base, ctx.r4.u32);                    \
     if (ITC_FLAG(native_input)) {                                              \
+      ITC_NATIVE_RUNNING("sub_" #address " " name);                            \
       ctx.r3.u64 = function(base, processor, mask);                            \
     } else {                                                                   \
       __imp__sub_##address(ctx, base);                                         \
@@ -143,8 +145,8 @@ void NoteRead(uint32_t function, uint32_t caller, uint32_t object, uint32_t mask
     NoteRead(0x##test, return_address, processor, mask, ctx.r3.u32 & 0xFF);    \
     NoteRead(0x##address, caller, processor, mask, ctx.r3.u32 & 0xFF);         \
   }
-ITC_INPUT_WRAPPER(8258CEB0, 82592500, input::InputProcessorAnyPressed, 0x8258CED0)
-ITC_INPUT_WRAPPER(8258CEE0, 82592520, input::InputProcessorPressedOrRepeat, 0x8258CF00)
+ITC_INPUT_WRAPPER(8258CEB0, "InputProcessor::TestPressed", 82592500, input::InputProcessorAnyPressed, 0x8258CED0)
+ITC_INPUT_WRAPPER(8258CEE0, "InputProcessor::TestRepeat", 82592520, input::InputProcessorPressedOrRepeat, 0x8258CF00)
 #undef ITC_INPUT_WRAPPER
 
 #define ITC_INPUT_VALUES(address, function)                                    \
