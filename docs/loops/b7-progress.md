@@ -173,3 +173,6 @@ the graphics rule), attract races 25-28 s under `attract_race.sh 40`,
 no errors, replays ok. Next: the user reviews `review.md` ("Run
 2026-10-24 03:25") and `expected-differences.md` ("03:25 run"), drives
 a race for `to-drive.md`, and merges.
+A drive by the user (`itc_1335`, 2026-10-24, with `--xbox_gamma=hdtv`):
+a race at the 144 cap, no errors, everything looked correct (the
+user); `to-drive.md`'s two functions not seen (neither ever in play).
