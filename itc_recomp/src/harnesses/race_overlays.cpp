@@ -21,6 +21,7 @@
 
 #include <algorithm>
 #include <bit>
+#include <cmath>
 #include <iterator>
 #include <string>
 #include <utility>
@@ -2119,6 +2120,56 @@ void SmokeInRegionCases(Context& h, uint32_t block) {
             __imp__sub_8212A868, NativeSmokeInRegion, fmt::format("case {}", i));
   }
   results.Report();
+
+  // Tiny values, so the point's dot product with b's side (computed after
+  // the one with a's, which must come out negative) is denormal: the vector
+  // unit's flush-to-zero (and denormals read as 0) decide its sign. Even
+  // cases: a of small numbers, b and the point denormal words (either
+  // sign); odd cases: a near 2^-60, b and the point near 2^-70, so the
+  // products are denormal and past a's normal.
+  Results tiny("Smoke::InRegion (sub_8212A868), tiny values");
+  auto scaled = [](Random& fill, int exponent) {
+    return std::bit_cast<uint32_t>(
+        std::ldexp(float(int32_t(fill.Below(1 << 20)) - (1 << 19)), exponent - 19));
+  };
+  for (int i = 0; i < 400; i++) {
+    const uint64_t seed = r.Next();
+    harness::Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Random fill;
+      for (uint64_t n = 0; n < seed % 61; n++) {
+        fill.Next();
+      }
+      const bool denormal = i % 2 == 0;
+      for (uint32_t k = 0; k < 3; k++) {
+        const float value = float(int32_t(fill.Below(21)) - 10) * 0.5f;
+        guest::StoreU32(h.base, smoke + 32592 + 4 * k,
+                        denormal ? std::bit_cast<uint32_t>(value) : scaled(fill, -60));
+        for (const uint32_t at : {smoke + 32608 + 4 * k, point + 4 * k}) {
+          guest::StoreU32(h.base, at,
+                          denormal ? uint32_t(fill.Next()) & 0x807FFFFF : scaled(fill, -70));
+        }
+      }
+      guest::StoreU32(h.base, smoke + 32604, RandomWord(fill));
+      guest::StoreU32(h.base, point + 12, RandomWord(fill));
+      PPCContext t = CallContext(h);
+      // Flush-to-zero off for real (the side before may have left it on,
+      // which disableFlushMode's cached state doesn't see).
+      t.fpscr.disableFlushModeUnconditional();
+      t.r3.u64 = smoke;
+      t.r4.u64 = point;
+      if (v == 0) {
+        RunRecompiled(__imp__sub_8212A868, t, h.base);
+      } else {
+        NativeSmokeInRegion(t, h.base);
+      }
+      out[v].Bytes(Read(h.base, point, 16));
+      out[v].Bytes(Read(h.base, smoke + 32592, 32));
+      out[v].Word(t.r3.u32);
+    }
+    tiny.Check(out[0], out[1], fmt::format("case {}", i));
+  }
+  tiny.Report();
 }
 
 // Sparks::Update: entries of random words with small lives (0 to 20, some
