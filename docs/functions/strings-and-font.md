@@ -59,6 +59,14 @@ center, 2 right, 3 justified), +80 the vertical one (0 top, 1 middle, 2
 bottom, 3 justified), +96, +100 a second pass's offset, +108 its page,
 +112 the second pass on (never in play), +116 the layer.
 
+To look at: while the eleventh B7 loop run was adding array helper
+cases, other harnesses' random inputs shifted, and the `swprintf`
+harness (`sub_8210A490`) crashed (`itc_1337.log`: guest writes at
+0x70000000, probably an endless loop). A case, or the native
+`swprintf`, fails on some inputs. It wasn't followed up: the new cases
+moved to their own generator, and the harness passes with its old
+inputs (`docs/loops/review.md`, the run of 2026-10-24 16:01).
+
 Not here: `Strings::Load` (`sub_8210A8D0`, in `files-and-saves.md`);
 `Archive::Load` (`sub_8209DE48`) and an asset's size (`sub_820A0678`,
 `files-and-saves.md`, a lead); `DataFile::GetEntry` (`sub_82294730`,

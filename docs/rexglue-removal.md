@@ -2708,7 +2708,8 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
     their callers (UpdateSteerInput's kinds 2 and 3, jump targets the
     recompiler made functions; harness cases each, no rows). Left:
     `AiDrivers::Destroy` and `DestroyRings` (the array destructor
-    iterator `sub_820900C0`, a lead) and `UpdateStarting`,
+    iterator `sub_820900C0`, native since the eleventh run, so both
+    are ready now) and `UpdateStarting`,
     `UpdateTrack` and `NoteFixedSections` (the getter of `[0x826C6078]`,
     `sub_821434E8`, in the data tables' range); `UpdateAll` keeps its
     adapter for the +6148 update targets, and 22 adapters stay for the
@@ -2733,6 +2734,46 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
     camera-mode functions that run in attract races (`sub_82155288`,
     `sub_821562F8`, `sub_820FE830`), so the route ranges' Init,
     AddBranch, Update and Test keep their adapters for them.
+
+    The graphics resources, the video output and the device state
+    (2026-10-24, branch `b7-loop-24-10-26`, the tenth run): the run
+    stopped twice for the user's calls on kernel sync and the graphics
+    rule. `Edram::Alloc` is native with a `std::mutex` for its critical
+    section; the resource locks' fence waits and cache flushes are
+    Dropped (their lock count, address and freeing kept); the video
+    output's device lock alone is a `std::binary_semaphore` (released by
+    another thread than the one that took it), while the game's
+    Semaphore class and sync wrappers stay recompiled for the archive
+    loader and the core. The device's state setters write the shadow,
+    dirty masks and fetch constants the renderer reads; the packets they
+    wrote straight into the command buffer, which nothing reads since
+    the emulated GPU went, are Dropped, with harness groups for those
+    words expected to differ. The setters keep their adapters: the
+    device's tables at +56 and +440 point at them, and the command
+    replay reaches them.
+
+    The array helpers, the course scenery and XAPI's memset (2026-10-24,
+    branch `b7-loop-24-10-26-2`, the eleventh run). Native code calls
+    guest function pointers and vtable slots in one way: targets that
+    are already native are called as plain C++ by their address; any
+    other target is a guest call through a callback the adapter gives,
+    from a frame laid out like the original's. The vector constructor
+    and destructor iterators work like this, and so do the scenery
+    pools' key, load and reset slots. The slots keep their adapters for
+    the vtables. `Scenery::LimitLargeModels` reads past its five-entry
+    stack table for an area above 4, so the native version keeps that
+    table in guest stack memory to give the same values. `XMemSet` steps
+    by the word at `[0x8263830C]`, logged as 16 and stored by nothing in
+    `generated/`: it is one host memset at 16, and the translated steps
+    at any other stride. `atexit` (`sub_825A7068`) stays with the core
+    (its critical sections) and blocks `Viewports::Init` and
+    `Viewport::Init`. The rest of the scenery waits on
+    `MmQueryAllocationSize`'s wrapper, `DataFile::GetEntry`, the XPR,
+    the archive's queue and the texture provider. A harness that adds
+    cases must draw from its own random generator: drawing from the
+    shared `h.random` shifts the inputs of every harness after it, and
+    when it did, the `swprintf` harness crashed
+    (`strings-and-font.md`).
 
     The second run (from 2026-10-22, branch `b7-loop-22-10-26`; its first
     session stopped after one subsystem): the first run's removable

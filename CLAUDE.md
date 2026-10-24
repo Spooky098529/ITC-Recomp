@@ -184,7 +184,8 @@ the racer controllers and the track zones native as far as they were
 ready (`ai-drivers.md`, `racer-controllers.md`, `track-zones.md`;
 `--native_ai_drivers`, `--native_racer_controllers`,
 `--native_track_zones`; ours 1,223 -> 1,485); the rest waits on the
-array destructor iterator (`sub_820900C0`), the getter of
+array destructor iterator (`sub_820900C0`, native since the eleventh
+run), the getter of
 `[0x826C6078]` (`sub_821434E8`), the race flow's functors and the
 camera modes. Its tenth run (`b7-loop-24-10-26`, 2026-10-24) mapped
 the graphics resources (`docs/functions/graphics-resources.md`, 44
