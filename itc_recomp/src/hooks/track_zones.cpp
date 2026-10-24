@@ -6,7 +6,9 @@
 // RouteRange::ToNeighbor (sub_820FDF98), from WithinEnds and Test;
 // RouteRange::WithinEnds (sub_820FE120), from OnPath; RouteRange::OnPath
 // (sub_820FE398), from Test; Zone::Reset (sub_8228B540) and
-// ZoneRanges::Insert (sub_8228BBA8), from the zones' set-ups.
+// ZoneRanges::Insert (sub_8228BBA8), from the zones' set-ups;
+// TrackZones::TrackZones (sub_8228B608) and List128::Insert (sub_8228BC18),
+// from TrackZones::Create.
 
 #include "guest.h"
 
@@ -30,7 +32,7 @@ ITC_FLAG_BOOL(native_track_zones, true, "ITC",
               "translated code (the same writes; checked by --run_harnesses=track_zones). "
               "Those reached only from native callers have no adapters, and the flag switches "
               "their callers: sub_820FE2C8, sub_8228B5A0, sub_820FDF98, sub_820FE120, sub_820FE398, "
-              "sub_8228B540, sub_8228BBA8");
+              "sub_8228B540, sub_8228BBA8, sub_8228B608, sub_8228BC18");
 
 // Defines an adapter: the body (the arguments after the address) uses `ctx`
 // and `base`.
@@ -60,8 +62,6 @@ ITC_TRACK_ZONES(821531C0, List16Link(base, ctx.r3.u32, int16_t(ctx.r4.u16)))
 // r4 = &the word, r5 = the position.
 ITC_TRACK_ZONES(820FE330, List64Insert(base, ctx.r3.u32, guest::LoadU32(base, ctx.r4.u32),
                                        ctx.r5.u32))
-ITC_TRACK_ZONES(8228BC18, List128Insert(base, ctx.r3.u32, guest::LoadU32(base, ctx.r4.u32),
-                                        ctx.r5.u32))
 
 // --- The route ranges ---
 
@@ -147,8 +147,6 @@ uint64_t CallZone(void* user, uint32_t function, uint32_t r3, uint32_t r4, bool 
 
 // Racers::Vehicle: r3 = a racer index; returns its vehicle or 0.
 ITC_TRACK_ZONES(820C9718, ctx.r3.u64 = RacersVehicle(base, ctx.r3.u32))
-// TrackZones::TrackZones: r3 = the owner (left).
-ITC_TRACK_ZONES(8228B608, OwnerConstruct(base, ctx.r3.u32))
 
 // TrackZones::Create: no arguments; r3 = the last set-up's. The original
 // where operator new can't be native.
