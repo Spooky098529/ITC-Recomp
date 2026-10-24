@@ -13,8 +13,8 @@ see in a drive, from every run: `to-drive.md`.
 
 - Run started 2026-10-24 03:25 on `b7-loop-24-10-26` (the user's
   branch), from 8073e3b; summary `b7-loop-2026-10-24-0325.md`.
-- Limit for this run: 4 subsystems (the user's call, 2026-10-24; `b7-loop.md` says 3).
-- Subsystem 1 of 4: `leads.md`'s top lead (`sub_822A5B78`, a texture's
+- Limit for this run: 3 subsystems (the user's call, 2026-10-24: back to 3 after asking for 4).
+- Subsystem 1 of 3: `leads.md`'s top lead (`sub_822A5B78`, a texture's
   description, with the UI movie's texture set): mapped as the graphics
   resources (`graphics-resources.md`, 44 rows, 0e67c00; 13 ready
   groups). The map's checks passed, but its report's `stop:` named two
@@ -23,7 +23,7 @@ see in a drive, from every run: `to-drive.md`.
   validated (`itc_1267`, `itc_1269`; replay ok; 1 to drive): migration 2
   done (062da1d..4be0508, 46 of 46 ours), validated (`itc_1292`,
   `itc_1293`; replay ok; 1 to drive). Finished.
-- Subsystem 2 of 4: `leads.md`'s graphics device resource calls under
+- Subsystem 2 of 3: `leads.md`'s graphics device resource calls under
   the camera passes (`sub_822A5D08` and others, the device's state save
   and restore `sub_8258D8C8`, `sub_8258D908`; closest to ready: 17 left,
   8 ready groups, 5 already ours): mapped as the video output and the
@@ -34,7 +34,7 @@ see in a drive, from every run: `to-drive.md`.
   7 of 30 ours, the rest the shared sync wrappers kept recompiled, and
   cameras.md's three camera passes), validated (`itc_1310`; all ran in
   play). Finished.
-- Subsystem 3 of 4: `leads.md`'s graphics device state setters
+- Subsystem 3 of 3: `leads.md`'s graphics device state setters
   (`sub_822A3D30` and others) with `sub_822A8A60` (probably
   SetShaderGPRAllocation; blocks `VideoOutput::Present`): they run every
   frame and block the video output's rest: mapped as the device state
