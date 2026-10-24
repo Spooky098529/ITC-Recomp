@@ -19,7 +19,9 @@ file's history. What's left to see in a drive, from every run:
 - Between subsystems (no mapping, not counted): `leads.md`'s top lead,
   `sub_8209F430` ActionMappers::Init (`action-mappers.md`, ready), with
   the harness lines of `sub_8258CEB0` and `sub_8258CEE0` to check.
-  Migration agent running.
+  Migration done (3ac7be7, 9e36924: Init native, 7 adapters removed;
+  action-mappers.md and input.md have nothing ready left; TestPressed's
+  and TestRepeat's harness lines seen). Validation agent running.
 
 ## Done
 
@@ -40,6 +42,9 @@ This run's groups: `expected-differences.md` (the "21:33 run" lines).
 ## Totals
 
 - Start: ours 1794, work left 4967 (wrapped 115, known 585, unknown 4267).
+- After ActionMappers::Init's migration: ours 1795, work left 4966
+  (wrapped 115, known 584, unknown 4267). Race 27 s (`itc_1493`) with
+  `--run_harnesses=all`, 0 errors, every harness 0 differing.
 
 ## Stopped
 

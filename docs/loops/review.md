@@ -13,7 +13,27 @@ When the user has reviewed a run's section, its heading gets
 
 ## Run 2026-10-24 21:33 (`b7-loop-24-10-26-4`)
 
-(nothing yet)
+- Cleanup lead `sub_8209F430` ActionMappers::Init (`action-mappers.md`;
+  3ac7be7, 9e36924): plain C++ `InitCreate`
+  (`src/action_mappers/action_mappers.cpp`), under
+  `--native_action_mappers` (needs `--native_heap`); 24 cases in the
+  `action_mappers_binding` harness. 7 adapters removed (Native:
+  `sub_8259C868`, `sub_8259C898`, `sub_8259C818`, `sub_8209F228`,
+  `sub_8210AEB0`, `sub_8210AF00`, `sub_8210C180`). For review:
+  - Init takes its five blocks from operator new first, in the
+    original's order; if one isn't given, it frees them all and runs the
+    original.
+  - Its adapter runs BindAll's adapter inside the original's 112-byte
+    frame; BindAll stays Overridden (a guest call to the owner's slot
+    +36: `sub_820944C8` -> `sub_82094350` -> probably `sub_82090788`,
+    the app's, unmapped).
+  - The harness cases call Init's adapter (it makes guest calls), and
+    give both versions the same operator new blocks with the same
+    random leftovers.
+  - Kept though `--removable` lists them: `sub_8210C370`,
+    `sub_8258CF10`, `sub_825924E0` (the fallback's `--log_pause_menu`
+    and `--log_input_reads` diagnostics), `sub_820991E0` and
+    `sub_8210AF08` (guest calls through `ctx`).
 
 ## Run 2026-10-24 17:46 (`b7-loop-24-10-26-3`) (reviewed 2026-10-24)
 
