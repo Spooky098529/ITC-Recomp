@@ -1,5 +1,8 @@
 // The track zones natively: adapters in front of src/track_zones/
 // (docs/functions/track-zones.md). Each leaves r3 as the original does.
+// Functions reached only from native callers have no adapters (the flag
+// switches their callers): List64::Link (sub_820FE2C8), from
+// List64::Insert; List128::Link (sub_8228B5A0), from List128::Insert.
 
 #include "guest.h"
 
@@ -13,7 +16,9 @@ ITC_FLAG_BOOL(native_track_zones, true, "ITC",
               "sub_8228B5A0, List128::Insert sub_8228BC18, RouteRange::Init sub_820FE058, "
               "RouteRange::AddBranch sub_820FE8C8, Zone::Reset sub_8228B540, Zone::IsInside "
               "sub_8228B4F8, ZoneRanges::Insert sub_8228BBA8) natively instead of through the "
-              "translated code (the same writes; checked by --run_harnesses=track_zones)");
+              "translated code (the same writes; checked by --run_harnesses=track_zones). "
+              "Those reached only from native callers have no adapters, and the flag switches "
+              "their callers: sub_820FE2C8, sub_8228B5A0");
 
 // Defines an adapter: the body (the arguments after the address) uses `ctx`
 // and `base`.
@@ -40,8 +45,6 @@ Position LoadPosition(uint8_t* base, uint32_t address) {
 // --- The fixed-size lists: r3 = the list (left), r4 = a position ---
 
 ITC_TRACK_ZONES(821531C0, List16Link(base, ctx.r3.u32, int16_t(ctx.r4.u16)))
-ITC_TRACK_ZONES(820FE2C8, List64Link(base, ctx.r3.u32, int16_t(ctx.r4.u16)))
-ITC_TRACK_ZONES(8228B5A0, List128Link(base, ctx.r3.u32, int16_t(ctx.r4.u16)))
 // r4 = &the word, r5 = the position.
 ITC_TRACK_ZONES(820FE330, List64Insert(base, ctx.r3.u32, guest::LoadU32(base, ctx.r4.u32),
                                        ctx.r5.u32))

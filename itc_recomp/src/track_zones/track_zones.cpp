@@ -81,10 +81,11 @@ void Link(uint8_t* base, uint32_t list, int16_t position) {
   Store16(base, list + kCount, Load16(base, list + kCount) + 1);
 }
 
-// Insert for an N-slot list of words (data at +4N + 12).
+// Insert for an N-slot list of words (data at +4N + 12), after `link`.
 template <uint32_t N>
-void Insert(uint8_t* base, uint32_t list, uint32_t word, uint32_t position) {
-  Link<N>(base, list, int16_t(position));
+void Insert(uint8_t* base, uint32_t list, uint32_t word, uint32_t position,
+            void (*link)(uint8_t*, uint32_t, int16_t)) {
+  link(base, list, int16_t(position));
   const uint32_t node = NodeAt(base, list, list + 4 * N + 4, position);
   Store32(base, uint32_t(Slot(base, node) + int32_t(N + 3)) * 4 + list, word);
 }
@@ -121,12 +122,12 @@ void List128Link(uint8_t* base, uint32_t list, int16_t position) {
 
 void List64Insert(uint8_t* base, uint32_t list, uint32_t word, uint32_t position) {
   ITC_NATIVE_RUNNING("sub_820FE330 List64::Insert");
-  Insert<64>(base, list, word, position);
+  Insert<64>(base, list, word, position, List64Link);
 }
 
 void List128Insert(uint8_t* base, uint32_t list, uint32_t word, uint32_t position) {
   ITC_NATIVE_RUNNING("sub_8228BC18 List128::Insert");
-  Insert<128>(base, list, word, position);
+  Insert<128>(base, list, word, position, List128Link);
 }
 
 // --- The route ranges ---
