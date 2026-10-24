@@ -96,7 +96,12 @@ goes in `src/` as overrides), American English.
   ours 1,672; merged 2026-10-24 after a drive); its eleventh run (branch
   `b7-loop-24-10-26-2`) made the compiler's array helpers, the course
   scenery (`course-scenery.md`, 38 of 73) and XAPI's memset with what
-  it unblocked native as far as they were ready (ours 1,714). The
+  it unblocked native as far as they were ready (ours 1,714); its
+  twelfth run (branch `b7-loop-24-10-26-3`) made the post effects
+  (`post-effects.md`, 44 of 57), the UI movie walk and the AI drivers'
+  teardown, and the input manager (`input.md`, 29 of 29) with the action
+  mappers' constructor native (ours 1,794), stopped on two harness lines
+  missing. The
   runs' rows wait for the user's review (`docs/loops/review.md`). See
   "B7's loop runs" under B7, and `docs/loops/b7-progress.md`. Guest
   allocation is no longer a block (`docs/native-memory.md`); what the
@@ -211,7 +216,8 @@ itc_recomp/tools/attract_race.sh 30 --run_harnesses=all
 - `harness.h` has what they share: `Both` (one case through both
   versions: the scratch area filled with 0xCD, inputs written, registers
   set, the function run, the output bytes and r3 kept), `Results`
-  (counts and logs), a seeded `Random` (the same cases each run) and
+  (counts and logs), `Random` (the same cases each run; each harness
+  starts its own, seeded from its name, since 2026-10-24) and
   guest memory helpers. The scratch area is 512 bytes below the stack
   pointer, and calls run with their stack below it.
 - One file per area, registered in `harness.cpp`'s list (and the flag's
@@ -2555,6 +2561,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-10-24 | The compiler's array helpers (`vector constructor iterator` and `vector destructor iterator`, probably: the element constructor or destructor called on each; the native targets called as plain C++, the empty destructor skipped, others a guest call; in the existing `c-runtime.md`, with wcslen's, mbtowc's and the wide write_char's adapters removed) | `c-runtime.md` | 84 of 91 (2 new, one migration) | `--native_c_runtime` |
 | 2026-10-24 | The course scenery (the course's areas, their models and lights collected around each viewport and streamed into five pools of physical memory: the pools, pool objects and their keys, the scenery lists, `StartLoad`, `ReleaseUnused`, `LimitLargeModels`; with the texture animations' advance, interpolation's render-only skip kept) | `course-scenery.md` | 37 of 73 (one migration) | `--native_course_scenery` |
 | 2026-10-24 | XAPI's memset (`XMemSet`: one host memset at the stride the game sets, the translated steps at any other; with what it unblocked: `Scenery::Init`, `CameraPasses::Init` and `InitPasses`; XAPI's `XPhysicalSize` and `XQueryMemoryProtect` mapped in `heap.md`, kept for the core) | `c-runtime.md` | 1 of 1 new (85 of 92 in the file; and `cameras.md` 40 of 42, `course-scenery.md` 38 of 73) | `--native_c_runtime` (`--native_cameras`, `--native_course_scenery`) |
+| 2026-10-24 | The post effects (the screen-space effects drawn over each view: the effect list's globals and toggles, the glow's and color filter's setters, the recording helpers (states, targets, constants, quads, resolves), the glare's definitions, the render textures' release, the destructors; frame interpolation's overrides kept; `RenderTextures::Acquire` left on `sub_8235A9F8`) | `post-effects.md` | 44 of 57 (one migration) | `--native_post_effects` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -2769,10 +2776,11 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
     (its critical sections) and blocks `Viewports::Init` and
     `Viewport::Init`. The rest of the scenery waits on
     `MmQueryAllocationSize`'s wrapper, `DataFile::GetEntry`, the XPR,
-    the archive's queue and the texture provider. A harness that adds
-    cases must draw from its own random generator: drawing from the
-    shared `h.random` shifts the inputs of every harness after it, and
-    when it did, the `swprintf` harness crashed
+    the archive's queue and the texture provider. Harnesses then drew
+    from one shared `h.random`, so adding cases shifted the inputs of
+    every harness after them, and the `swprintf` harness crashed. Since
+    2026-10-24 each harness starts its own generator, seeded from its
+    name, and the crash was the harness's format generator
     (`strings-and-font.md`).
 
     The second run (from 2026-10-22, branch `b7-loop-22-10-26`; its first
@@ -3274,3 +3282,24 @@ row yet 4,337); `c-runtime.md` 85 ours of 92, `cameras.md` 40 of 42,
 `course-scenery.md` 38 of 73. 1,286 overrides in `src/`. `Viewports::Init`
 and `Viewport::Init` wait on `atexit` (its critical sections, with the
 core).
+
+**2026-10-24, B7's twelfth loop run, the post effects (branch
+`b7-loop-24-10-26-3`):** the boundary unchanged: 449 functions (916
+pairs): overridden 67, Native 5, Dropped 23, never called 70, live 284.
+Imports: 186 called, 62 with a live caller. B7 (`b7_status.py`): 6,760
+in play, ours 1,757, work left 5,003 (Wrapped 122, with a row 598, no
+row yet 4,283); `post-effects.md` 44 ours of 57. 1,320 overrides in
+`src/`. The rest waits on the models' resource relocation
+(`sub_8235A9F8`) and shader pairs (`sub_825896D8`, `sub_82589700`), the
+vertex declaration (`sub_822A8980`) and `sub_8209AE48`.
+
+**2026-10-24, B7's twelfth loop run, stopped (branch
+`b7-loop-24-10-26-3`: the post effects, three cleanup leads, the input
+manager):** the boundary unchanged: 449 functions (916 pairs):
+overridden 67, Native 5, Dropped 23, never called 70, live 284.
+Imports: 186 called, 62 with a live caller. B7 (`b7_status.py`): 6,761
+in play, ours 1,794, work left 4,967 (Wrapped 115, with a row 585, no
+row yet 4,267); `input.md` 29 ours of 29, `action-mappers.md` 39 of 40,
+`post-effects.md` 44 of 57. 1,325 overrides in `src/`. Stopped on two
+input functions whose harness doesn't reach their prints; the input's
+`ActionMappers::Init` is ready.

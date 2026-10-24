@@ -169,6 +169,96 @@ std::optional<double> CubicFloat(uint8_t* base, uint32_t k0, uint32_t k1, double
 // sub_8259FC18: the same cubic on integer values, truncated (fctiwz).
 std::optional<uint32_t> CubicInteger(uint8_t* base, uint32_t k0, uint32_t k1, double t);
 
+// The drawing walk (draw.cpp).
+//
+// UiMovie::ApplyTransform (sub_8259E6C8): the node's transform applied to
+// the draw context: the clip (the node's rectangle +40..+52 offset by the
+// context's +32 and +36 as integers, kept at +64 or intersected with the
+// context's, sub_8259D730 merged), the color (+80..+92), and the matrix
+// (Matrix::Multiply, local first, each noted for frame interpolation with the
+// original's return address): translated by the position plus the pivot,
+// turned (Matrix::RotateZ), scaled (+108 set when a factor isn't 1.0), and
+// translated back. `frame` is the original's 352-byte frame (the local
+// matrices at +176 and +240, the angle at +80, the turn's at -80). Returns
+// the r3 the original leaves (the context, or its clip when no matrix was
+// multiplied). Flush-to-zero off on entry (the adapter's job).
+uint32_t ApplyTransform(uint8_t* base, uint32_t context, uint32_t node, uint32_t frame);
+
+// sub_8259D9F8: a draw context copied from its parent's: the matrix
+// (Matrix::Copy, noted for frame interpolation with the original's return
+// address; the w column set to 1.0 first), then +64..+108 (the clip, the
+// color, +96..+108). Returns the context.
+uint32_t CopyDrawContext(uint8_t* base, uint32_t context, uint32_t parent);
+// sub_8259E620: a queued text item copied: +0, the matrix at +16
+// (Matrix::Copy, noted), +80 (as a float), +84..+112. Returns `to`.
+uint32_t CopyQueuedText(uint8_t* base, uint32_t to, uint32_t from);
+// Whether a text list (+0 the items, +4 the capacity, +8 the count) is full.
+bool TextListFull(uint8_t* base, uint32_t list);
+// sub_8259F700: the item appended to the list (the count raised first,
+// then CopyQueuedText into items + 128 x count); `r3` its slot. False, with
+// nothing done, when the list is full (its grow, sub_8259EC58, never seen in
+// play, is the original's).
+bool AppendText(uint8_t* base, uint32_t list, uint32_t item, uint32_t* r3);
+// UiMovie::QueueText (sub_8259F770): ApplyTransform, then with a text list
+// (+100) a text item built at `frame` + 96 (`frame` the original's 272-byte
+// frame): MakeTextItem, the node, the matrix (Matrix::Copy, noted), the
+// depth (the layer, unsigned, times the float at 0x82071520), the color and
+// the clip; appended, then ClearTextItem. `r3` as the original leaves it.
+// False, with nothing done, when the list is full (the original runs).
+bool QueueText(uint8_t* base, uint32_t context, uint32_t node, uint32_t layer, uint32_t frame,
+               uint32_t* r3);
+
+// A quad or primitive built for sub_8259EBE8: r3 = `quad` (on the
+// builder's frame), r4 = `key`, f1 = `depth`.
+struct QuadCall {
+  uint32_t quad;
+  uint32_t key;
+  double depth;
+};
+// UiMovie::DrawPicture (sub_8259ED40)'s work before its call of
+// sub_8259EBE8: the picture's transform applied (ApplyTransform), its quad
+// built at `frame` + 112 (the original's 1,088-byte frame: positions at
+// +240, colors +496, texture coordinates +752): the corners (0, 0) to
+// (+100, +104) transformed by the context (Vec4::Transform through
+// debug::Vec4Transform), the context's color as integers, the texture's
+// coordinates (+116..+128 over its size, else 0 to 1; +132 and +136 flip
+// them), the clip; the key +72 and the depth (the layer times the float at
+// 0x82071520).
+// Its caller checks first that the picture has a texture (PictureTextureOf
+// below not 0): without one, the original reads its size at guest address
+// 4, which faults (never so in play), and the original is left to run.
+QuadCall BuildPicture(uint8_t* base, uint32_t context, uint32_t picture, uint32_t layer,
+                      uint32_t frame);
+// The picture's texture: with +140 set, the context's table entry for its
+// texture entry [+108]; else 0.
+uint32_t PictureTextureOf(uint8_t* base, uint32_t context, uint32_t picture);
+// UiMovie::DrawPrimitive (sub_8259F348)'s work before its call of
+// sub_8259EBE8: the same for a primitive's [+116] vertices, its quad at
+// `frame` + 96 (the original's 1,152-byte frame: positions +272, colors
+// +528, texture coordinates +784), the vertices' colors times the
+// context's (squared with +100, which is also the quad's blend mode).
+QuadCall BuildPrimitive(uint8_t* base, uint32_t context, uint32_t primitive, uint32_t layer,
+                        uint32_t frame);
+
+// UiMovie::DrawNode (sub_8259F848): ApplyTransform on the node, then its
+// children [+100] to [+100] + [+104] - 1 of `scene` (Child), last first
+// ([+100] read again each time), each skipped when invisible (+80 = 0) or
+// either scale (+28, +32) is near zero, else the context copied to the
+// level's frame (CopyDrawContext at `stack` - 272 + 80) and, by tag: GRP
+// drawn again (the same scene), SCE drawn as its own scene, PIC and PRM
+// through `call` (they hand their quads to the renderer through a guest
+// call), TXT through QueueText (`call` where it would grow the list or the
+// layer doesn't fit 32 bits), the layer `layer` + [child + 72] (64-bit, as
+// the original adds it). `stack` is the r1 the original is called with;
+// each level's frame is 272 bytes below it, the callees called with r1 at
+// that frame. Returns the r3 the original leaves.
+enum class DrawCall { kPicture, kPrimitive, kText };
+using DrawNodeCall = uint32_t (*)(void* user, DrawCall kind, uint32_t context, uint32_t scene,
+                                  uint32_t node, uint64_t layer, uint32_t stack,
+                                  uint32_t return_address);
+uint32_t DrawNode(uint8_t* base, uint32_t context, uint32_t scene, uint32_t node, uint64_t layer,
+                  uint32_t stack, DrawNodeCall call, void* user);
+
 // The recorders (recording.cpp), on the command list `list` (the global at
 // 0x82970C1C). Each records a chunk and returns its first slot, which the
 // caller hands to the renderer (vtable slot 4); nothing is done (nullopt)

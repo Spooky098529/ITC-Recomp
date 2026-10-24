@@ -482,9 +482,19 @@ void WatchMovingTargets(const char* name, PPCContext& ctx, uint8_t* base, Call&&
     }                                                                                   \
     debug::WatchMovingTargets(#address, ctx, base, [&] { __imp__sub_##address(ctx, base); }); \
   }
-WATCH_MOVIE_CALL(8259FA00)
 WATCH_MOVIE_CALL(8211CD90)
 #undef WATCH_MOVIE_CALL
+
+// UiMovie::Draw, watched as the others; its work (natively with
+// --native_ui_movies) is in src/hooks/ui_movies.cpp.
+extern "C" REX_FUNC(sub_8259FA00) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(log_pause_movie)) {
+    ui_movies_hooks::Draw(ctx, base);
+    return;
+  }
+  debug::WatchMovingTargets("8259FA00", ctx, base, [&] { ui_movies_hooks::Draw(ctx, base); });
+}
 
 // AnimationList::Insert and RemoveAt, watched as the others; their work
 // (natively with --native_ui_movies_game) is in src/hooks/ui_movies_game.cpp.

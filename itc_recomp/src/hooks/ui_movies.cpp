@@ -24,7 +24,13 @@ ITC_FLAG_BOOL(native_ui_movies, true, "ITC",
               "sub_825A0EF0 with sub_825A0E40, sub_825A0ED8, sub_8259D688 and sub_825A6570, "
               "the helpers without adapters (the flag switches their callers); "
               "sub_8259EBE8 and sub_8259DAC0, which call the recorders; UiMovie::RestorePose "
-              "sub_82119B80) "
+              "sub_82119B80; UiMovie::DrawPicture sub_8259ED40 and UiMovie::DrawPrimitive "
+              "sub_8259F348, which hand their quads to sub_8259EBE8; UiMovie::Draw sub_8259FA00 "
+              "with the walk under it, which has no adapters (the flag switches Draw): "
+              "UiMovie::DrawNode sub_8259F848, UiMovie::ApplyTransform sub_8259E6C8 with "
+              "sub_8259D730, the draw context copy sub_8259D9F8, the queued texts' copy "
+              "sub_8259E620, append sub_8259F700 (its grow the original's) and "
+              "UiMovie::QueueText sub_8259F770) "
               "natively instead of through the translated code (same results; checked by "
               "--run_harnesses=ui_movies)");
 
@@ -68,6 +74,17 @@ UI_MOVIE_ACCESSOR(8259D648, ui_movies::PictureTexture(object, i))
 UI_MOVIE_ACCESSOR(8259D658, ui_movies::Child(base, object, i))
 UI_MOVIE_ACCESSOR(8259D670, ui_movies::SceneAnimation(base, object, i))
 #undef UI_MOVIE_ACCESSOR
+
+// UiMovie::DrawPicture and DrawPrimitive: r3 = the draw context, r5 = the
+// node, r6 = the layer (src/hooks/ui_movies.h).
+extern "C" REX_FUNC(sub_8259ED40) {
+  REX_FUNC_PROLOGUE();
+  ui_movies_hooks::DrawPicture(ctx, base);
+}
+extern "C" REX_FUNC(sub_8259F348) {
+  REX_FUNC_PROLOGUE();
+  ui_movies_hooks::DrawPrimitive(ctx, base);
+}
 
 // sub_8259D5C8: r3 = a chunk, r4 = a tag; the next chunk with that tag.
 extern "C" REX_FUNC(sub_8259D5C8) {
@@ -300,6 +317,121 @@ extern "C" REX_FUNC(sub_8259EBE8) {
 }
 
 namespace ui_movies_hooks {
+
+namespace {
+// The quad built natively, then handed to sub_8259EBE8 from a frame of
+// `frame_bytes` (the original's) returning to `return_address`.
+template <typename Build>
+void BuildAndRecord(PPCContext& ctx, uint8_t* base, uint32_t frame_bytes,
+                    uint32_t return_address, Build build) {
+  const uint64_t lr = ctx.lr;
+  ctx.fpscr.disableFlushMode();
+  const ui_movies::QuadCall call = build(ctx.r1.u32 - frame_bytes);
+  guest_call::InFrame(ctx, base, frame_bytes, return_address, [&](uint32_t) {
+    ctx.r3.u64 = call.quad;
+    ctx.r4.u64 = call.key;
+    ctx.fpscr.disableFlushMode();
+    ctx.f1.f64 = call.depth;
+    sub_8259EBE8(ctx, base);
+  });
+  ctx.lr = lr;
+}
+}  // namespace
+
+void DrawPicture(PPCContext& ctx, uint8_t* base) {
+  if (!ITC_FLAG(native_ui_movies)) {
+    __imp__sub_8259ED40(ctx, base);
+    return;
+  }
+  // Without a texture the original faults (its size read at guest address
+  // 4; never so in play): it's left to run.
+  if (ui_movies::PictureTextureOf(base, ctx.r3.u32, ctx.r5.u32) == 0) {
+    __imp__sub_8259ED40(ctx, base);
+    return;
+  }
+  RecordPicture(ctx, base);
+}
+
+void RecordPicture(PPCContext& ctx, uint8_t* base) {
+  const uint32_t context = ctx.r3.u32, picture = ctx.r5.u32, layer = ctx.r6.u32;
+  BuildAndRecord(ctx, base, 1088, 0x8259F338, [&](uint32_t frame) {
+    return ui_movies::BuildPicture(base, context, picture, layer, frame);
+  });
+}
+
+void DrawPrimitive(PPCContext& ctx, uint8_t* base) {
+  if (!ITC_FLAG(native_ui_movies)) {
+    __imp__sub_8259F348(ctx, base);
+    return;
+  }
+  RecordPrimitive(ctx, base);
+}
+
+void RecordPrimitive(PPCContext& ctx, uint8_t* base) {
+  const uint32_t context = ctx.r3.u32, primitive = ctx.r5.u32, layer = ctx.r6.u32;
+  BuildAndRecord(ctx, base, 1152, 0x8259F6EC, [&](uint32_t frame) {
+    return ui_movies::BuildPrimitive(base, context, primitive, layer, frame);
+  });
+}
+
+namespace {
+// DrawNode's calls that need the guest context: from the level's frame
+// (`stack`, the r1 the original has there) with its return address.
+struct Walk {
+  PPCContext* ctx;
+  uint8_t* base;
+};
+uint32_t CallFromWalk(void* user, ui_movies::DrawCall kind, uint32_t context, uint32_t scene,
+                      uint32_t node, uint64_t layer, uint32_t stack, uint32_t return_address) {
+  Walk& walk = *static_cast<Walk*>(user);
+  PPCContext& ctx = *walk.ctx;
+  const uint64_t r1 = ctx.r1.u64, lr = ctx.lr;
+  ctx.r1.u64 = stack;
+  ctx.lr = return_address;
+  ctx.r3.u64 = context;
+  ctx.r4.u64 = scene;
+  ctx.r5.u64 = node;
+  ctx.r6.u64 = layer;
+  switch (kind) {
+    case ui_movies::DrawCall::kPicture:
+      DrawPicture(ctx, walk.base);
+      break;
+    case ui_movies::DrawCall::kPrimitive:
+      DrawPrimitive(ctx, walk.base);
+      break;
+    case ui_movies::DrawCall::kText:
+      __imp__sub_8259F770(ctx, walk.base);
+      break;
+  }
+  ctx.r1.u64 = r1;
+  ctx.lr = lr;
+  ctx.fpscr.disableFlushMode();
+  return ctx.r3.u32;
+}
+}  // namespace
+
+void Draw(PPCContext& ctx, uint8_t* base) {
+  if (!ITC_FLAG(native_ui_movies)) {
+    __imp__sub_8259FA00(ctx, base);
+    return;
+  }
+  ITC_NATIVE_RUNNING("sub_8259FA00 UiMovie::Draw");
+  const uint32_t context = ctx.r3.u32;
+  guest::StoreU32(base, context + 104, ctx.r7.u32);
+  guest::StoreU32(base, context + 96, ctx.r5.u32);
+  guest::StoreU32(base, context + 100, ctx.r6.u32);
+  ctx.r5.u64 = ctx.r4.u64;
+  ctx.r6.u64 = 0;
+  RecordDrawNode(ctx, base);
+}
+
+void RecordDrawNode(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  Walk walk{&ctx, base};
+  ctx.r3.u64 = ui_movies::DrawNode(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u64,
+                                   ctx.r1.u32, CallFromWalk, &walk);
+}
+
 void ResetAfterMovie(PPCContext& ctx, uint8_t* base) {
   if (!ITC_FLAG(native_ui_movies)) {
     __imp__sub_8259DAC0(ctx, base);

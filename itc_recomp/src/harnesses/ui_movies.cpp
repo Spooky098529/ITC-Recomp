@@ -4,8 +4,11 @@
 
 #include "harness.h"
 
+#include "base/flags.h"
 #include "base/log.h"
 #include "command_list/command_list.h"
+#include "hooks/ui_movies.h"
+#include "memory/heap.h"
 #include "ui_movies/ui_movies.h"
 
 #include <algorithm>
@@ -13,6 +16,8 @@
 #include <cmath>
 #include <iterator>
 #include <limits>
+
+ITC_FLAG_DECLARE(bool, native_ui_movies);
 
 namespace harness {
 
@@ -40,6 +45,44 @@ void NativeFixUpScene(PPCContext& ctx, uint8_t* base) {
 
 void NativeFixUpAnimation(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = ui_movies::FixUpAnimation(base, ctx.r3.u32, ctx.r4.u32);
+}
+
+// The draw walk's register steps (as their adapters', without the flag).
+void NativeCopyDrawContext(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = ui_movies::CopyDrawContext(base, ctx.r3.u32, ctx.r4.u32);
+}
+void NativeCopyQueuedText(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = ui_movies::CopyQueuedText(base, ctx.r3.u32, ctx.r4.u32);
+}
+int g_draw_fallbacks = 0;
+void NativeAppendText(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  uint32_t r3 = 0;
+  if (!ui_movies::AppendText(base, ctx.r3.u32, ctx.r4.u32, &r3)) {
+    g_draw_fallbacks++;
+    __imp__sub_8259F700(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = r3;
+}
+void NativeQueueText(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  uint32_t r3 = 0;
+  if (!ui_movies::QueueText(base, ctx.r3.u32, ctx.r5.u32, ctx.r6.u32, ctx.r1.u32 - 272, &r3)) {
+    g_draw_fallbacks++;
+    __imp__sub_8259F770(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = r3;
+}
+
+// UiMovie::ApplyTransform's register steps (as its adapter's, without the
+// flag).
+void NativeApplyTransform(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = ui_movies::ApplyTransform(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 352);
 }
 
 constexpr uint32_t ui_movies_kTrm = 0x54524D00;       // "TRM\0"
@@ -895,6 +938,705 @@ void RestorePoseCases(Context& h) {
   results.Report();
 }
 
+// UiMovie::ApplyTransform (sub_8259E6C8): a draw context (random matrix,
+// clip zero or random, color) and a node (position, pivot, scale, rotation,
+// rectangle, color) in the scratch area, each field often at its "nothing to
+// do" value (0, 1.0, near the threshold) and with odd floats (NaN, -0.0,
+// infinities, huge). The context's matrix and color compared as floats, the
+// rest (clip, +96..+108, the node) exactly, and r3.
+void ApplyTransformCases(Context& h) {
+  Results results("UiMovie::ApplyTransform (sub_8259E6C8)");
+  Random r;  // its own, so the harnesses after it keep their inputs
+  const uint32_t threshold = guest::LoadU32(h.base, 0x82002A44);
+  const float threshold_f = std::bit_cast<float>(threshold);
+  const uint32_t odd[] = {0x7FC00000u, 0xFFC00000u, 0x80000000u, 0x7F800000u, 0xFF800000u,
+                          0x4F000000u /* 2^31 */, 0xCF000001u, 0x5F000000u, 0x00000001u,
+                          threshold, threshold ^ 0x80000000u, threshold + 1,
+                          (threshold + 1) ^ 0x80000000u, threshold - 1, 0x3F800000u,
+                          0x7F800001u /* signaling */, 0xFFA00000u};
+  const auto odd_or = [&](uint32_t usual, uint32_t otherwise) {
+    const uint32_t pick = r.Below(10);
+    if (pick == 0) {
+      return odd[r.Below(std::size(odd))];
+    }
+    return pick < 5 ? usual : otherwise;
+  };
+  const auto small_int = [&] {
+    const uint32_t pick = r.Below(12);
+    if (pick == 0) return 0x80000000u;
+    if (pick == 1) return 0x7FFFFFFFu;
+    if (pick == 2) return uint32_t(r.Next());
+    return uint32_t(int32_t(r.Below(1400)) - 700);
+  };
+  for (int c = 0; c < 3000; c++) {
+    const uint32_t context = h.data + 16 * r.Below(2);  // aligned, and not (a frame's +16)
+    const uint32_t node = h.data + 192 + 4 * r.Below(4);
+    uint32_t cw[28];
+    for (int i = 0; i < 16; i++) {
+      cw[i] = r.Below(12) == 0 ? odd[r.Below(std::size(odd))] : RandomFloat(r, -800, 800);
+    }
+    const bool clip_set = r.Below(2) == 0;
+    for (int i = 16; i < 20; i++) {
+      cw[i] = clip_set ? small_int() : 0;
+    }
+    for (int i = 20; i < 24; i++) {
+      cw[i] = odd_or(0x3F800000u, RandomFloat(r, 0, 1));
+    }
+    for (int i = 24; i < 28; i++) {
+      cw[i] = r.Below(2) == 0 ? 0 : uint32_t(r.Next());
+    }
+    uint32_t nw[18];
+    for (int i = 0; i < 3; i++) {
+      nw[i] = uint32_t(r.Next());
+    }
+    nw[3] = odd_or(0, RandomFloat(r, -640, 640));  // +12, +16: the position
+    nw[4] = odd_or(0, RandomFloat(r, -360, 360));
+    nw[5] = r.Below(2) == 0 ? 0 : small_int();  // +20, +24: the pivot
+    nw[6] = r.Below(2) == 0 ? 0 : small_int();
+    nw[7] = odd_or(0x3F800000u, RandomFloat(r, -3, 3));  // +28, +32: the scale
+    nw[8] = odd_or(0x3F800000u, r.Below(3) == 0 ? RandomFloat(r, -threshold_f * 2,
+                                                              threshold_f * 2)
+                                                : RandomFloat(r, -3, 3));
+    nw[9] = odd_or(0, RandomFloat(r, -720, 720));  // +36: the rotation
+    const bool rect = r.Below(2) == 0;
+    for (int i = 10; i < 14; i++) {  // +40..+52
+      nw[i] = rect && r.Below(4) != 0 ? small_int() : 0;
+    }
+    for (int i = 14; i < 17; i++) {  // +56..+64
+      nw[i] = r.Below(3) == 0 ? small_int() : r.Below(256);
+    }
+    nw[17] = odd_or(0x3F800000u, RandomFloat(r, 0, 1));  // +68
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Fill(h.base, h.data, kScratchBytes);
+      for (int i = 0; i < 28; i++) {
+        guest::StoreU32(h.base, context + 4 * i, cw[i]);
+      }
+      for (int i = 0; i < 18; i++) {
+        guest::StoreU32(h.base, node + 4 * i, nw[i]);
+      }
+      PPCContext t = CallContext(h);
+      t.r3.u64 = context;
+      t.r4.u64 = node;
+      (v == 0 ? __imp__sub_8259E6C8 : NativeApplyTransform)(t, h.base);
+      out[v].Floats(h.base, context, 16);
+      out[v].Bytes(Read(h.base, context + 64, 16));
+      out[v].Floats(h.base, context + 80, 4);
+      out[v].Bytes(Read(h.base, context + 96, 16));
+      out[v].Bytes(Read(h.base, node, 72));
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      out[v].Word(t.r3.u32);
+    }
+    results.Check(out[0], out[1],
+                  fmt::format("case {}: clip {} rect {} pos {:08X} {:08X} pivot {:08X} {:08X} "
+                              "scale {:08X} {:08X} turn {:08X}",
+                              c, clip_set, rect, nw[3], nw[4], nw[5], nw[6], nw[7], nw[8],
+                              nw[9]));
+  }
+  results.Report();
+}
+
+// The draw walk's copies and the texts' queue: sub_8259D9F8 (a context from
+// its parent's, apart or overlapping), sub_8259E620 (a text item, apart or
+// overlapping), sub_8259F700 (a list with room: a full one grows, the
+// original's) and UiMovie::QueueText (a context with no list or one with
+// room, a node as ApplyTransform's cases make them, a random layer with
+// junk in r6's upper half). Floats only where the code loads and stores
+// them as floats (the matrix's and color's arithmetic in QueueText's
+// transform, the items' +80); the rest exactly.
+// UiMovie::DrawPicture (sub_8259ED40) and UiMovie::DrawPrimitive
+// (sub_8259F348), the whole path: the quad built natively and handed to
+// sub_8259EBE8's adapter (ui_movies_hooks::RecordPicture and
+// RecordPrimitive) against the originals run with --native_ui_movies off
+// (so their callees are the translated ones too). A made-up command list,
+// renderer (slot 4 BillboardMaterial::SetLights, storing r4 and r5 at its
+// +32 and +36, as RecorderCases) and texture table in the scratch area, the
+// game's globals pointed at them during the cases. A random draw context
+// (matrix, clip set or not, color, +108) and node (the transform's fields,
+// a texture or none, a zero-sized texture, the flips; a primitive's 0 to 16
+// vertices, its color flag), with odd floats (NaN, infinities) in some.
+// Compared: the whole scratch area (the recorded chunks, the context, the
+// node), the open chunk count and r3.
+void QuadDrawCases(Context& h) {
+  Random r;  // its own, so the harnesses after it keep their inputs
+  constexpr uint32_t kList = 0, kRendererObject = 64, kVtable = 128, kContext = 256,
+                     kNode = 512, kTableRef = 1536, kTable = 1600, kTexture = 1664,
+                     kSlots = 2048;
+  const uint32_t saved_renderer = guest::LoadU32(h.base, ui_movies_kRenderer);
+  const uint32_t saved_list = guest::LoadU32(h.base, ui_movies_kRenderer + 4);
+  const uint32_t saved_open = guest::LoadU32(h.base, command_list::kOpenChunks);
+  const uint32_t odd[] = {0x7FC00000u, 0xFFC00000u, 0x7F800000u, 0xFF800000u, 0x80000000u,
+                          0x7F800001u, 0x00000001u, 0x5F800000u};
+  const auto value = [&](float lo, float hi) {
+    return r.Below(40) == 0 ? odd[r.Below(std::size(odd))] : RandomFloat(r, lo, hi);
+  };
+  for (int kind = 0; kind < 2; kind++) {
+    const bool picture = kind == 0;
+    Results results(picture ? "UiMovie::DrawPicture (sub_8259ED40)"
+                            : "UiMovie::DrawPrimitive (sub_8259F348)");
+    for (int c = 0; c < 600; c++) {
+      uint32_t cw[28];
+      for (int i = 0; i < 16; i++) {
+        cw[i] = value(-2, 2);
+      }
+      const bool clip = r.Below(2) == 0;
+      for (int i = 16; i < 20; i++) {
+        cw[i] = clip ? (r.Below(4) == 0 ? uint32_t(r.Next()) : r.Below(1400)) : 0;
+      }
+      if (clip && r.Below(4) == 0) {  // only +72 set: no clip, as read
+        cw[16] = cw[17] = cw[19] = 0;
+      }
+      for (int i = 20; i < 24; i++) {
+        cw[i] = value(0, 1);
+      }
+      cw[24] = 0;  // the texture table, set below
+      cw[25] = uint32_t(r.Next());
+      cw[26] = uint32_t(r.Next());
+      cw[27] = r.Below(2) ? 0 : 1;
+      // The node: the transform's fields mostly at rest.
+      uint32_t nw[256];
+      for (uint32_t& w : nw) {
+        w = r.Below(4) == 0 ? uint32_t(r.Next()) : r.Below(64);
+      }
+      nw[3] = r.Below(2) ? 0 : value(-640, 640);
+      nw[4] = r.Below(2) ? 0 : value(-360, 360);
+      nw[5] = r.Below(2) ? 0 : r.Below(200);
+      nw[6] = r.Below(2) ? 0 : r.Below(200);
+      nw[7] = r.Below(2) ? 0x3F800000u : value(-3, 3);
+      nw[8] = r.Below(2) ? 0x3F800000u : value(-3, 3);
+      nw[9] = r.Below(2) ? 0 : value(-360, 360);
+      for (int i = 10; i < 14; i++) {
+        nw[i] = r.Below(3) == 0 ? r.Below(1280) : 0;
+      }
+      for (int i = 14; i < 17; i++) {
+        nw[i] = r.Below(256);
+      }
+      nw[17] = value(0, 1);
+      nw[18] = r.Below(1000);  // +72: the key
+      const uint32_t texture_index = r.Below(4);
+      const bool textured = r.Below(4) != 0;
+      uint32_t vertices = 0;
+      if (picture) {
+        nw[25] = value(0, 512);  // +100, +104: the size
+        nw[26] = value(0, 512);
+        nw[27] = r.Below(3);  // +108: the texture entry
+        for (int i = 29; i < 33; i++) {  // +116..+128: the pixel rectangle
+          nw[i] = r.Below(8) == 0 ? uint32_t(r.Next()) : r.Below(512);
+        }
+        nw[33] = r.Below(2) ? 0 : 1 + r.Below(3);  // +132, +136: the flips
+        nw[34] = r.Below(2) ? 0 : 1;
+        nw[35] = 1 + r.Below(2);  // +140: a texture (see null_texture)
+        for (int i = 0; i < 3; i++) {  // the entries from +144: +0 the index
+          nw[36 + 4 * i] = texture_index;
+        }
+      } else {
+        nw[25] = r.Below(2) ? 0 : 1 + r.Below(3);  // +100: the color flag (and blend mode)
+        const uint32_t entries = textured ? 1 + r.Below(2) : 0;
+        nw[26] = 0;  // +104: the texture entry
+        nw[28] = entries;  // +112
+        vertices = r.Below(8) == 0 ? 16 : r.Below(9);
+        nw[29] = vertices;  // +116
+        for (uint32_t i = 0; i < entries; i++) {
+          nw[32 + 4 * i] = texture_index;
+        }
+        for (uint32_t i = 0; i < vertices; i++) {
+          const uint32_t at = 32 + 4 * entries + 8 * i;
+          nw[at + 0] = value(-300, 300);
+          nw[at + 1] = value(-300, 300);
+          nw[at + 2] = r.Below(256);
+          nw[at + 3] = r.Below(256);
+          nw[at + 4] = r.Below(8) == 0 ? uint32_t(r.Next()) : r.Below(256);
+          nw[at + 5] = value(0, 1);
+          nw[at + 6] = r.Below(512);
+          nw[at + 7] = r.Below(512);
+        }
+      }
+      const uint32_t size_case = r.Below(6);  // 0: a zero width, 1: a zero height
+      const uint32_t width = size_case == 0 ? 0 : 1 + r.Below(1024);
+      const uint32_t height = size_case == 1 ? 0 : 1 + r.Below(1024);
+      // A picture without a texture faults in the original (its size read at
+      // guest address 4): the adapter leaves those to it, so no cases.
+      const bool null_texture = !picture && r.Below(6) == 0;
+      const uint32_t texture_word = uint32_t(r.Next());
+      const uint32_t layer = r.Below(8) == 0 ? uint32_t(r.Next()) : r.Below(100);
+      std::vector<uint8_t> result[2];
+      for (int v = 0; v < 2; v++) {
+        Fill(h.base, h.data, kScratchBytes);
+        const uint32_t list = h.data + kList;
+        guest::StoreU32(h.base, list + 8, 1000);
+        guest::StoreU32(h.base, list + 12, 0);
+        guest::StoreU32(h.base, list + 32, h.data + kSlots);
+        guest::StoreU8(h.base, list + 52, 0);
+        guest::StoreU32(h.base, command_list::kOpenChunks, 0);
+        guest::StoreU32(h.base, h.data + kRendererObject, h.data + kVtable);
+        guest::StoreU32(h.base, h.data + kVtable + 16, 0x8209F5C8);
+        const uint32_t context = h.data + kContext, node = h.data + kNode;
+        for (int i = 0; i < 28; i++) {
+          guest::StoreU32(h.base, context + 4 * i, cw[i]);
+        }
+        guest::StoreU32(h.base, context + 96, h.data + kTableRef);
+        guest::StoreU32(h.base, h.data + kTableRef, h.data + kTable);
+        for (uint32_t i = 0; i < 4; i++) {
+          guest::StoreU32(h.base, h.data + kTable + 4 * i,
+                          null_texture && i == texture_index ? 0 : h.data + kTexture);
+        }
+        guest::StoreU32(h.base, h.data + kTexture + 0, texture_word);
+        guest::StoreU32(h.base, h.data + kTexture + 4, width);
+        guest::StoreU32(h.base, h.data + kTexture + 8, height);
+        for (int i = 0; i < 256; i++) {
+          guest::StoreU32(h.base, node + 4 * i, nw[i]);
+        }
+        guest::StoreU32(h.base, ui_movies_kRenderer, h.data + kRendererObject);
+        guest::StoreU32(h.base, ui_movies_kRenderer + 4, list);
+        PPCContext t = CallContext(h);
+        t.r3.u64 = context;
+        t.r4.u64 = node;  // the scene, not read
+        t.r5.u64 = node;
+        t.r6.u64 = layer;
+        if (v == 0) {
+          ITC_FLAG(native_ui_movies) = false;
+          (picture ? __imp__sub_8259ED40 : __imp__sub_8259F348)(t, h.base);
+          ITC_FLAG(native_ui_movies) = true;
+        } else {
+          (picture ? ui_movies_hooks::RecordPicture : ui_movies_hooks::RecordPrimitive)(t, h.base);
+        }
+        result[v] = Read(h.base, h.data, kScratchBytes);
+        AppendWord(result[v], guest::LoadU32(h.base, command_list::kOpenChunks));
+        AppendWord(result[v], uint32_t(t.r3.u64 >> 32));
+        AppendWord(result[v], t.r3.u32);
+      }
+      size_t at = 0;
+      while (at < result[0].size() && result[0][at] == result[1][at]) {
+        at++;
+      }
+      const size_t from = at < result[0].size() ? at : 0;
+      const size_t to = std::min(result[0].size(), from + 32);
+      results.Check({result[0].begin() + from, result[0].begin() + to},
+                    {result[1].begin() + from, result[1].begin() + to},
+                    fmt::format("case {}: clip {} textured {} size {} null {} vertices {}, "
+                                "from byte {}",
+                                c, clip, textured, size_case, null_texture, vertices, from));
+    }
+    results.Report();
+  }
+  guest::StoreU32(h.base, ui_movies_kRenderer, saved_renderer);
+  guest::StoreU32(h.base, ui_movies_kRenderer + 4, saved_list);
+  guest::StoreU32(h.base, command_list::kOpenChunks, saved_open);
+}
+
+void DrawWalkCases(Context& h) {
+  Random r;  // its own, so the harnesses after it keep their inputs
+  const auto random_words = [&](uint32_t* words, int count) {
+    for (int i = 0; i < count; i++) {
+      words[i] = r.Below(3) == 0 ? uint32_t(r.Next()) : RandomFloat(r, -500, 500);
+    }
+  };
+  {
+    Results results("DrawContext::Copy (sub_8259D9F8)");
+    for (int c = 0; c < 500; c++) {
+      uint32_t words[28], fill[28];
+      random_words(words, 28);
+      random_words(fill, 28);
+      const uint32_t parent = h.data + 256;
+      const uint32_t context =
+          r.Below(4) == 0 ? parent + 16 * (int32_t(r.Below(7)) - 3) : h.data + 16 * r.Below(4);
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Fill(h.base, h.data, kScratchBytes);
+        for (int i = 0; i < 28; i++) {
+          guest::StoreU32(h.base, context + 4 * i, fill[i]);
+        }
+        for (int i = 0; i < 28; i++) {
+          guest::StoreU32(h.base, parent + 4 * i, words[i]);
+        }
+        PPCContext t = CallContext(h);
+        t.r3.u64 = context;
+        t.r4.u64 = parent;
+        (v == 0 ? __imp__sub_8259D9F8 : NativeCopyDrawContext)(t, h.base);
+        out[v].Bytes(Read(h.base, h.data, 512));
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+        out[v].Word(t.r3.u32);
+      }
+      results.Check(out[0], out[1], fmt::format("case {}: context {:X} parent {:X}", c,
+                                                context - h.data, parent - h.data));
+    }
+    results.Report();
+  }
+  {
+    Results results("TextItem::CopyQueued (sub_8259E620)");
+    for (int c = 0; c < 500; c++) {
+      uint32_t words[32], fill[32];
+      random_words(words, 32);
+      random_words(fill, 32);
+      const uint32_t from = h.data + 512;
+      const uint32_t to =
+          r.Below(4) == 0 ? from + 16 * (int32_t(r.Below(9)) - 4) : h.data + 16 * r.Below(8);
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Fill(h.base, h.data, kScratchBytes);
+        for (int i = 0; i < 32; i++) {
+          guest::StoreU32(h.base, to + 4 * i, fill[i]);
+        }
+        for (int i = 0; i < 32; i++) {
+          guest::StoreU32(h.base, from + 4 * i, words[i]);
+        }
+        PPCContext t = CallContext(h);
+        t.r3.u64 = to;
+        t.r4.u64 = from;
+        (v == 0 ? __imp__sub_8259E620 : NativeCopyQueuedText)(t, h.base);
+        out[v].Bytes(Read(h.base, h.data, to + 80 - h.data));
+        out[v].Float(guest::LoadU32(h.base, to + 80));
+        out[v].Bytes(Read(h.base, to + 84, h.data + 1024 - (to + 84)));
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+        out[v].Word(t.r3.u32);
+      }
+      results.Check(out[0], out[1], fmt::format("case {}: to {:X} from {:X}", c,
+                                                to - h.data, from - h.data));
+    }
+    results.Report();
+  }
+  // A list at +0 of the scratch area, its items from +128 (up to 8), the
+  // item to add at +1536.
+  {
+    Results results("TextList::Append (sub_8259F700)");
+    for (int c = 0; c < 300; c++) {
+      const uint32_t capacity = 1 + r.Below(8);
+      const uint32_t count = r.Below(capacity);
+      uint32_t item[32];
+      random_words(item, 32);
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Fill(h.base, h.data, kScratchBytes);
+        guest::StoreU32(h.base, h.data + 0, h.data + 128);
+        guest::StoreU32(h.base, h.data + 4, capacity);
+        guest::StoreU32(h.base, h.data + 8, count);
+        for (int i = 0; i < 32; i++) {
+          guest::StoreU32(h.base, h.data + 1536 + 4 * i, item[i]);
+        }
+        PPCContext t = CallContext(h);
+        t.r3.u64 = h.data;
+        t.r4.u64 = h.data + 1536;
+        (v == 0 ? __imp__sub_8259F700 : NativeAppendText)(t, h.base);
+        const uint32_t slot = h.data + 128 + 128 * count;
+        out[v].Bytes(Read(h.base, h.data, slot + 80 - h.data));
+        out[v].Float(guest::LoadU32(h.base, slot + 80));
+        out[v].Bytes(Read(h.base, slot + 84, h.data + 2048 - (slot + 84)));
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+        out[v].Word(t.r3.u32);
+      }
+      results.Check(out[0], out[1], fmt::format("case {}: {} of {}", c, count, capacity));
+    }
+    results.Report();
+  }
+  // The context at +0, the node at +192, the list at +512 with its items
+  // from +640.
+  {
+    Results results("UiMovie::QueueText (sub_8259F770)");
+    for (int c = 0; c < 1000; c++) {
+      uint32_t cw[28];
+      for (int i = 0; i < 16; i++) {
+        cw[i] = RandomFloat(r, -800, 800);
+      }
+      const bool clip_set = r.Below(2) == 0;
+      for (int i = 16; i < 20; i++) {
+        cw[i] = clip_set ? uint32_t(int32_t(r.Below(1400)) - 700) : 0;
+      }
+      for (int i = 20; i < 24; i++) {
+        cw[i] = r.Below(2) == 0 ? 0x3F800000u : RandomFloat(r, 0, 1);
+      }
+      const bool with_list = r.Below(5) != 0;
+      cw[24] = uint32_t(r.Next());
+      cw[25] = with_list ? h.data + 512 : 0;
+      cw[26] = uint32_t(r.Next());
+      cw[27] = r.Below(2);
+      uint32_t nw[18];
+      for (int i = 0; i < 18; i++) {
+        nw[i] = 0;
+      }
+      nw[3] = r.Below(2) == 0 ? 0 : RandomFloat(r, -640, 640);
+      nw[4] = r.Below(2) == 0 ? 0 : RandomFloat(r, -360, 360);
+      nw[5] = r.Below(2) == 0 ? 0 : uint32_t(int32_t(r.Below(200)) - 100);
+      nw[6] = r.Below(2) == 0 ? 0 : uint32_t(int32_t(r.Below(200)) - 100);
+      nw[7] = r.Below(2) == 0 ? 0x3F800000u : RandomFloat(r, -3, 3);
+      nw[8] = r.Below(2) == 0 ? 0x3F800000u : RandomFloat(r, -3, 3);
+      nw[9] = r.Below(2) == 0 ? 0 : RandomFloat(r, -720, 720);
+      for (int i = 10; i < 14; i++) {
+        nw[i] = r.Below(3) == 0 ? uint32_t(int32_t(r.Below(1400)) - 700) : 0;
+      }
+      for (int i = 14; i < 17; i++) {
+        nw[i] = r.Below(256);
+      }
+      nw[17] = r.Below(2) == 0 ? 0x3F800000u : RandomFloat(r, 0, 1);
+      const uint32_t capacity = 1 + r.Below(4);
+      const uint32_t count = r.Below(capacity);
+      const uint64_t r6 = (r.Next() << 32) |
+                          (r.Below(3) == 0 ? uint32_t(r.Next()) : r.Below(40));
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Fill(h.base, h.data, kScratchBytes);
+        for (int i = 0; i < 28; i++) {
+          guest::StoreU32(h.base, h.data + 4 * i, cw[i]);
+        }
+        for (int i = 0; i < 18; i++) {
+          guest::StoreU32(h.base, h.data + 192 + 4 * i, nw[i]);
+        }
+        guest::StoreU32(h.base, h.data + 512, h.data + 640);
+        guest::StoreU32(h.base, h.data + 516, capacity);
+        guest::StoreU32(h.base, h.data + 520, count);
+        PPCContext t = CallContext(h);
+        t.r3.u64 = h.data;
+        t.r5.u64 = h.data + 192;
+        t.r6.u64 = r6;
+        (v == 0 ? __imp__sub_8259F770 : NativeQueueText)(t, h.base);
+        out[v].Floats(h.base, h.data, 16);
+        out[v].Bytes(Read(h.base, h.data + 64, 16));
+        out[v].Floats(h.base, h.data + 80, 4);
+        out[v].Bytes(Read(h.base, h.data + 96, 512 - 96));
+        out[v].Bytes(Read(h.base, h.data + 512, 128));
+        for (uint32_t k = 0; k < 4; k++) {  // the items: +16..+79 the matrix, +80 the depth
+          const uint32_t at = h.data + 640 + 128 * k;
+          out[v].Bytes(Read(h.base, at, 16));
+          out[v].Floats(h.base, at + 16, 17);
+          out[v].Bytes(Read(h.base, at + 84, 44));
+        }
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+        out[v].Word(t.r3.u32);
+      }
+      results.Check(out[0], out[1], fmt::format("case {}: list {} {} of {} layer {:X}", c,
+                                                with_list, count, capacity, r6));
+    }
+    results.Report();
+  }
+  if (g_draw_fallbacks != 0) {
+    ITC_LOG_INFO("harness: ui_movies: {} draw walk cases handed to the original",
+                 g_draw_fallbacks);
+  }
+}
+
+// UiMovie::DrawNode (sub_8259F848) and UiMovie::Draw (sub_8259FA00), the
+// whole walk: ui_movies_hooks::RecordDrawNode and Draw (flag on) against the
+// originals run with --native_ui_movies off. Small trees of up to 11 nodes
+// in a guest block: a root scene whose table points at the nodes after it,
+// each node a group (children from the scene's table, after it), a
+// sub-scene (its own table), a textured picture, a primitive, a text, a
+// transform or junk, some invisible or scaled to (near) nothing, the
+// transforms mostly at rest; a made-up command list, renderer and texture
+// table as QuadDrawCases', and a text list with room, full (the original
+// QueueText) or none. Compared: the scratch area, the block (nodes,
+// recorded slots, queued texts), the open chunk count and r3, exactly.
+void TreeDrawCases(Context& h) {
+  Random r;  // its own, so the harnesses after it keep their inputs
+  constexpr uint32_t kList = 0, kRendererObject = 64, kVtable = 128, kContext = 256,
+                     kTextList = 384, kTableRef = 1536, kTable = 1600, kTexture = 1664;
+  constexpr uint32_t kBlockBytes = 0x10000, kNodeBytes = 1024, kNodes = 12, kLeaf = 11;
+  constexpr uint32_t kSlots = 0x3000, kTexts = 0x8000;
+  const uint32_t block = memory::Alloc(kBlockBytes, 0);
+  if (block == 0) {
+    ITC_LOG_ERROR("harness: ui_movies: no block for the tree cases");
+    return;
+  }
+  const uint32_t saved_renderer = guest::LoadU32(h.base, ui_movies_kRenderer);
+  const uint32_t saved_list = guest::LoadU32(h.base, ui_movies_kRenderer + 4);
+  const uint32_t saved_open = guest::LoadU32(h.base, command_list::kOpenChunks);
+  const uint32_t threshold = guest::LoadU32(h.base, 0x82002A44);
+  const uint32_t odd[] = {0x7FC00000u, 0xFFC00000u, 0x7F800000u, 0x80000000u, 0x7F800001u,
+                          0x00000001u, threshold, threshold + 1, threshold ^ 0x80000000u};
+  const auto value = [&](float lo, float hi) {
+    return r.Below(40) == 0 ? odd[r.Below(std::size(odd))] : RandomFloat(r, lo, hi);
+  };
+  constexpr uint32_t kTags[] = {0x47525000, 0x53434500, 0x50494300, 0x50524D00,
+                                0x54585400, 0x54464D00, 0x12345678};
+  Results results("UiMovie::DrawNode (sub_8259F848) and Draw (sub_8259FA00)");
+  std::vector<uint8_t> image(kBlockBytes);
+  for (int c = 0; c < 400; c++) {
+    const bool through_draw = c % 2 == 1;
+    const uint32_t count = 1 + r.Below(kLeaf - 1);  // nodes 1..count after the root
+    std::vector<uint32_t> words(kBlockBytes / 4, 0);
+    const auto node_at = [&](uint32_t k) { return block + kNodeBytes * k; };
+    const auto w = [&](uint32_t k, uint32_t offset) -> uint32_t& {
+      return words[(kNodeBytes * k + offset) / 4];
+    };
+    for (uint32_t k = 0; k <= kLeaf; k++) {
+      if (k > count && k < kLeaf) {
+        continue;
+      }
+      for (uint32_t i = 0; i < kNodeBytes / 4; i++) {
+        w(k, 4 * i) = r.Below(4) == 0 ? uint32_t(r.Next()) : r.Below(64);
+      }
+      const uint32_t tag = k == 0       ? 0x53434500
+                           : k == kLeaf ? 0x54464D00
+                           : k <= 3     ? kTags[r.Below(std::size(kTags))]
+                                        : kTags[2 + r.Below(std::size(kTags) - 2)];
+      w(k, 0) = tag;
+      w(k, 12) = r.Below(2) ? 0 : value(-640, 640);
+      w(k, 16) = r.Below(2) ? 0 : value(-360, 360);
+      w(k, 20) = r.Below(2) ? 0 : r.Below(200);
+      w(k, 24) = r.Below(2) ? 0 : r.Below(200);
+      w(k, 28) = r.Below(4) ? 0x3F800000u : value(-3, 3);
+      w(k, 32) = r.Below(4) ? 0x3F800000u : value(-3, 3);
+      w(k, 36) = r.Below(2) ? 0 : value(-360, 360);
+      for (uint32_t o = 40; o < 56; o += 4) {
+        w(k, o) = r.Below(4) == 0 ? r.Below(1280) : 0;
+      }
+      for (uint32_t o = 56; o < 68; o += 4) {
+        w(k, o) = r.Below(256);
+      }
+      w(k, 68) = value(0, 1);
+      w(k, 72) = r.Below(8) == 0 ? uint32_t(r.Next()) : r.Below(100);
+      w(k, 80) = r.Below(6) == 0 ? 0 : 1;
+      if (tag == 0x47525000 || tag == 0x53434500) {
+        // A scene's table (the root's, a sub-scene's): entry j at +128 + 8 j
+        // is node k + 1 + j, or the leaf after the last node, from index
+        // [+108] = 0. Its children: any range of the table. A group's
+        // children come from the scene it's drawn in, whose entry j is a
+        // node after j: entries from k on, so every level goes deeper.
+        w(k, 108) = 0;
+        for (uint32_t j = 0; j < kNodes; j++) {
+          w(k, 128 + 8 * j) = node_at(std::min(k + 1 + j, kLeaf));
+        }
+        const uint32_t first = tag == 0x47525000 && k != 0 ? k + r.Below(kNodes - k) : r.Below(kNodes);
+        w(k, 100) = first;
+        w(k, 104) = r.Below(std::min(kNodes - first, 3u) + 1);  // at most 3 children
+      } else if (tag == 0x50494300) {
+        w(k, 100) = value(0, 512);
+        w(k, 104) = value(0, 512);
+        w(k, 108) = r.Below(3);
+        for (uint32_t o = 116; o < 132; o += 4) {
+          w(k, o) = r.Below(512);
+        }
+        w(k, 132) = r.Below(2) ? 0 : 1 + r.Below(3);
+        w(k, 136) = r.Below(2) ? 0 : 1;
+        w(k, 140) = 1 + r.Below(2);
+        for (uint32_t i = 0; i < 3; i++) {
+          w(k, 144 + 16 * i) = r.Below(4);
+        }
+      } else if (tag == 0x50524D00) {
+        w(k, 100) = r.Below(2) ? 0 : 1 + r.Below(3);
+        const uint32_t entries = r.Below(3);
+        w(k, 104) = 0;
+        w(k, 112) = entries;
+        const uint32_t vertices = r.Below(7);
+        w(k, 116) = vertices;
+        for (uint32_t i = 0; i < entries; i++) {
+          w(k, 128 + 16 * i) = r.Below(4);
+        }
+        for (uint32_t i = 0; i < vertices; i++) {
+          const uint32_t at = 128 + 16 * entries + 32 * i;
+          w(k, at + 0) = value(-300, 300);
+          w(k, at + 4) = value(-300, 300);
+          w(k, at + 8) = r.Below(256);
+          w(k, at + 12) = r.Below(256);
+          w(k, at + 16) = r.Below(256);
+          w(k, at + 20) = value(0, 1);
+          w(k, at + 24) = r.Below(512);
+          w(k, at + 28) = r.Below(512);
+        }
+      }
+    }
+    for (size_t i = 0; i < words.size(); i++) {
+      const uint32_t v = words[i];
+      image[4 * i + 0] = uint8_t(v >> 24);
+      image[4 * i + 1] = uint8_t(v >> 16);
+      image[4 * i + 2] = uint8_t(v >> 8);
+      image[4 * i + 3] = uint8_t(v);
+    }
+    uint32_t cw[28];
+    for (int i = 0; i < 16; i++) {
+      cw[i] = value(-2, 2);
+    }
+    const bool clip = r.Below(2) == 0;
+    for (int i = 16; i < 20; i++) {
+      cw[i] = clip ? r.Below(1400) : 0;
+    }
+    for (int i = 20; i < 24; i++) {
+      cw[i] = value(0, 1);
+    }
+    cw[24] = 0;
+    cw[25] = 0;
+    cw[26] = uint32_t(r.Next());
+    cw[27] = r.Below(2) ? 0 : 1;
+    // 0: none, else room. A full list would grow (sub_8259EC58, never seen
+    // in play), which the harness can't run safely (the game's threads
+    // faulted after it, 2026-10-24): no full lists.
+    const uint32_t text_list_kind = r.Below(4) == 0 ? 0 : 2;
+    const uint32_t text_capacity = 64, text_count = r.Below(2);
+    const uint32_t layer = r.Below(100);
+    std::vector<uint8_t> result[2];
+    for (int v = 0; v < 2; v++) {
+      Fill(h.base, h.data, kScratchBytes);
+      Write(h.base, block, image.data(), kBlockBytes);
+      const uint32_t list = h.data + kList;
+      guest::StoreU32(h.base, list + 8, 1000);
+      guest::StoreU32(h.base, list + 12, 0);
+      guest::StoreU32(h.base, list + 32, block + kSlots);
+      guest::StoreU8(h.base, list + 52, 0);
+      guest::StoreU32(h.base, command_list::kOpenChunks, 0);
+      guest::StoreU32(h.base, h.data + kRendererObject, h.data + kVtable);
+      guest::StoreU32(h.base, h.data + kVtable + 16, 0x8209F5C8);
+      const uint32_t context = h.data + kContext;
+      for (int i = 0; i < 28; i++) {
+        guest::StoreU32(h.base, context + 4 * i, cw[i]);
+      }
+      const uint32_t text_list = text_list_kind == 0 ? 0 : h.data + kTextList;
+      guest::StoreU32(h.base, h.data + kTextList + 0, block + kTexts);
+      guest::StoreU32(h.base, h.data + kTextList + 4, text_capacity);
+      guest::StoreU32(h.base, h.data + kTextList + 8, text_count);
+      guest::StoreU32(h.base, h.data + kTableRef, h.data + kTable);
+      for (uint32_t i = 0; i < 4; i++) {
+        guest::StoreU32(h.base, h.data + kTable + 4 * i, h.data + kTexture);
+      }
+      guest::StoreU32(h.base, h.data + kTexture + 0, 0x1234);
+      guest::StoreU32(h.base, h.data + kTexture + 4, 256);
+      guest::StoreU32(h.base, h.data + kTexture + 8, 128);
+      if (!through_draw) {
+        guest::StoreU32(h.base, context + 96, h.data + kTableRef);
+        guest::StoreU32(h.base, context + 100, text_list);
+      }
+      guest::StoreU32(h.base, ui_movies_kRenderer, h.data + kRendererObject);
+      guest::StoreU32(h.base, ui_movies_kRenderer + 4, list);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = context;
+      t.r4.u64 = block;
+      if (through_draw) {
+        t.r5.u64 = h.data + kTableRef;
+        t.r6.u64 = text_list;
+        t.r7.u64 = 0xFFFFFFFFFFFFFFFFull;
+      } else {
+        t.r5.u64 = block;
+        t.r6.u64 = layer;
+      }
+      if (v == 0) {
+        ITC_FLAG(native_ui_movies) = false;
+        (through_draw ? __imp__sub_8259FA00 : __imp__sub_8259F848)(t, h.base);
+        ITC_FLAG(native_ui_movies) = true;
+      } else {
+        (through_draw ? ui_movies_hooks::Draw : ui_movies_hooks::RecordDrawNode)(t, h.base);
+      }
+      result[v] = Read(h.base, h.data, kScratchBytes);
+      const std::vector<uint8_t> after = Read(h.base, block, kBlockBytes);
+      result[v].insert(result[v].end(), after.begin(), after.end());
+      AppendWord(result[v], guest::LoadU32(h.base, command_list::kOpenChunks));
+      AppendWord(result[v], uint32_t(t.r3.u64 >> 32));
+      AppendWord(result[v], t.r3.u32);
+    }
+    size_t at = 0;
+    while (at < result[0].size() && result[0][at] == result[1][at]) {
+      at++;
+    }
+    const size_t from = at < result[0].size() ? at : 0;
+    const size_t to = std::min(result[0].size(), from + 32);
+    results.Check({result[0].begin() + from, result[0].begin() + to},
+                  {result[1].begin() + from, result[1].begin() + to},
+                  fmt::format("case {}: draw {} nodes {} texts {}, from byte {}", c, through_draw,
+                              count, text_list_kind, from));
+  }
+  results.Report();
+  guest::StoreU32(h.base, ui_movies_kRenderer, saved_renderer);
+  guest::StoreU32(h.base, ui_movies_kRenderer + 4, saved_list);
+  guest::StoreU32(h.base, command_list::kOpenChunks, saved_open);
+  memory::Free(block);
+}
+
 }  // namespace
 
 void UiMovies(Context& h) {
@@ -926,6 +1668,10 @@ void UiMovies(Context& h) {
   FixUpSceneCases(h);
   FixUpFileCases(h);
   RestorePoseCases(h);
+  ApplyTransformCases(h);
+  DrawWalkCases(h);
+  QuadDrawCases(h);
+  TreeDrawCases(h);
 }
 
 }  // namespace harness

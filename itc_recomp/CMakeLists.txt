@@ -72,6 +72,8 @@ set(ITC_SOURCES
     src/hooks/cockpit_dials.cpp
     src/hooks/input.cpp
     src/hooks/input_update.cpp
+    src/hooks/input_manager.cpp
+    src/std_list/ptr_list.cpp
     src/hooks/debug_output.cpp
     src/hooks/object_attributes.cpp
     src/hooks/time.cpp
@@ -109,6 +111,7 @@ set(ITC_SOURCES
     src/ui_movies/ui_movies.cpp
     src/ui_movies/keys.cpp
     src/ui_movies/recording.cpp
+    src/ui_movies/draw.cpp
     src/ui_movies/files.cpp
     src/hooks/ui_movies_game.cpp
     src/ui_movies/game.cpp
@@ -155,6 +158,8 @@ set(ITC_SOURCES
     src/graphics/video_output.cpp
     src/hooks/device_state.cpp
     src/graphics/device_state.cpp
+    src/hooks/post_effects.cpp
+    src/post_effects/post_effects.cpp
     src/hooks/course_scenery.cpp
     src/course_scenery/course_scenery.cpp
     src/hooks/action_mappers.cpp
@@ -230,6 +235,7 @@ set(ITC_SOURCES
     src/harnesses/video_output.cpp
     src/harnesses/device_state.cpp
     src/harnesses/course_scenery.cpp
+    src/harnesses/post_effects.cpp
     src/harnesses/action_mappers.cpp
     src/harnesses/data_tables.cpp
     src/harnesses/model_animation.cpp
@@ -239,6 +245,7 @@ set(ITC_SOURCES
     src/harnesses/std_string.cpp
     src/harnesses/sound_cues.cpp
     src/harnesses/xact.cpp
+    src/harnesses/input.cpp
     src/helpers/debug_output.cpp
     src/helpers/object_attributes.cpp
     src/helpers/time.cpp
@@ -248,6 +255,7 @@ set(ITC_SOURCES
     src/user/profile.cpp
     src/input/gamepads.cpp
     src/input/input_processor.cpp
+    src/input/input_manager.cpp
     src/input/logical_pad.cpp
     src/input/physical_pad.cpp
     src/input/xinput.cpp
@@ -288,7 +296,7 @@ set(ITC_SOURCES
 # negation into an addition (LLVM's default model treats a NaN's sign as
 # free; seen with -O3 on asin of a negative NaN). See
 # docs/functions/c-runtime.md. The UI movie keys' interpolation
-# (src/ui_movies/keys.cpp) likewise (docs/functions/ui-movies.md), and the
+# (src/ui_movies/keys.cpp) and its drawing walk (src/ui_movies/draw.cpp) likewise (docs/functions/ui-movies.md), and the
 # matrix math (src/matrix_math/matrix_math.cpp, docs/functions/matrix-math.md)
 # and the car physics (src/car_physics/, docs/functions/car-physics.md) and
 # the collision shapes (src/collision/, docs/functions/collision.md) and the
@@ -301,6 +309,7 @@ set(ITC_SOURCES
 # course's route (src/track_route/, docs/functions/track-route.md) and the AI
 # drivers (src/ai_drivers/, docs/functions/ai-drivers.md).
 set_source_files_properties(src/c_runtime/math.cpp src/ui_movies/keys.cpp
+    src/ui_movies/draw.cpp
     src/matrix_math/matrix_math.cpp src/car_physics/rigid_body.cpp
     src/car_physics/vehicle_step.cpp src/car_physics/vehicle_update.cpp
     src/car_physics/vehicle_state.cpp src/car_physics/collision_world.cpp

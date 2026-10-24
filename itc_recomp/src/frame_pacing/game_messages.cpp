@@ -816,42 +816,6 @@ void frame_pacing::GameMessages_NoteInputRead(uint32_t function, uint32_t caller
   InputRead_Note(function, caller, object, mask, result);
 }
 
-// 825924E0 and 8258CF10 (the listeners' held test the action mappers make)
-// are native: their adapters, src/hooks/action_mappers.cpp, note them the
-// same way, and so does the mappers' native update for its own calls.
-#define ITC_INPUT_READ(address)                                                    \
-  extern "C" REX_FUNC(sub_##address) {                                             \
-    REX_FUNC_PROLOGUE();                                                           \
-    if (!ITC_FLAG(log_input_reads)) {                                           \
-      __imp__sub_##address(ctx, base);                                             \
-      return;                                                                      \
-    }                                                                              \
-    uint32_t caller = uint32_t(ctx.lr);                                            \
-    uint32_t object = ctx.r3.u32;                                                  \
-    uint32_t mask = guest::LoadU32(base, ctx.r4.u32);                              \
-    __imp__sub_##address(ctx, base);                                               \
-    InputRead_Note(0x##address, caller, object, mask, ctx.r3.u32 & 0xFF);          \
-  }
-ITC_INPUT_READ(82592500)
-ITC_INPUT_READ(82592520)
-ITC_INPUT_READ(8258CEB0)
-ITC_INPUT_READ(8258CEE0)
-#undef ITC_INPUT_READ
-
-// The pads' values (vtable slot 1, r3 = pad, returns a pointer to its 40
-// floats, the stick's among them): 82591B30 a logical pad's (+36), 820988B8
-// a physical pad's (+8). Input::Update calls them itself; any other caller
-// reads the stick. Logged like the button tests, with mask and result 0.
-#define ITC_INPUT_VALUES(address)                                                  \
-  extern "C" REX_FUNC(sub_##address) {                                             \
-    REX_FUNC_PROLOGUE();                                                           \
-    uint32_t caller = uint32_t(ctx.lr);                                            \
-    uint32_t object = ctx.r3.u32;                                                  \
-    __imp__sub_##address(ctx, base);                                               \
-    if (ITC_FLAG(log_input_reads)) {                                            \
-      InputRead_Note(0x##address, caller, object, 0, 0);                           \
-    }                                                                              \
-  }
-ITC_INPUT_VALUES(82591B30)
-ITC_INPUT_VALUES(820988B8)
-#undef ITC_INPUT_VALUES
+// The button tests and the pads' values are native (--native_input): their
+// adapters, src/hooks/input_manager.cpp, note them the same way, as the
+// action mappers' (src/hooks/action_mappers.cpp) note 825924E0 and 8258CF10.

@@ -486,6 +486,17 @@ void UpdatePedals(uint8_t* base, uint32_t driver, uint32_t frame);
 // ResetDriver's, or 0 without a table). False, with nothing done, when
 // operator new fails natively (the original runs then).
 bool Create(uint8_t* base, uint64_t* r3);
+// AiDrivers::DestroyRings (sub_8213AD98): each driver's ring (80 entries of
+// 64 bytes at +528), last driver first, through the vector destructor
+// iterator with the empty destructor (sub_82106540), so nothing is written.
+// Returns the r3 the original leaves (the first driver's ring).
+uint64_t DestroyRings(uint8_t* base, uint64_t drivers);
+// AiDrivers::Destroy (sub_8213B2B8): with a table at [0x826C6074],
+// DestroyRings and operator delete; the pointer cleared. `r3` = the r3 the
+// original leaves (the table; untouched without one). False, with nothing
+// done, while --native_heap isn't active or the table isn't a heap block of
+// the layer's (the original runs then).
+bool Destroy(uint8_t* base, uint64_t* r3);
 // AiPath::ApplyCornerLine (sub_8213BB58): for the corner record at the
 // index at `index`, the ring entries' +48 from the corner's table (+4) from
 // its position +14 on, with the slopes +28 and +32 (see the row).

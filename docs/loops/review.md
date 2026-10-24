@@ -11,6 +11,148 @@ functions to check in a drive in the progress file.
 When the user has reviewed a run's section, its heading gets
 "(reviewed <date>)"; the section stays for the record.
 
+## Run 2026-10-24 17:46 (`b7-loop-24-10-26-3`) (reviewed 2026-10-24)
+
+- `post-effects.md` (new, mapped in f3643e1): 57 rows (3 moved from
+  `functions.md`: `Glow::Record`, `PostEffects::RecordAll`
+  (`sub_82133960`, unnamed before), `sub_821363F0`), the post effects
+  (up to 15 screen-space effects a view, objects at `0x826C5D80` made
+  from the table at `0x826174A8`: the glow, probably a color filter, the
+  motion blur, a two-pass filter over render target 3 or 4, two kinds
+  never run); `known-data.md`'s "Values from the image" (the three
+  `.data` tables, float constants); 3 leads. For review:
+  - `sub_821363F0` renamed from `View::UploadPreviousViewProjection` to
+    `MotionBlur::Record` (it records the whole motion blur), and the
+    mention in `matrix-math.md`'s `Matrix::Copy` row changed to match.
+  - `sub_8212EDE0` belongs to the race's screen objects (made by
+    `sub_82133000`, now a lead), kept here beside its caller
+    `sub_8215B690` (probably the pause toggle).
+  - The glow's tables at `0x82617280` and `0x826171D8` probably the
+    DirectX SDK HDR sample's glare library (`GLAREDEF`/`STARDEF`).
+  - `RenderTextures::Acquire` (`sub_82133190`) returns an uninitialized
+    stack word when an id is in use with another key (split screen's
+    second player, probably; not checked whether it runs).
+  Migration 1 (ece3c32..66b8f81): 43 functions native under
+  `--native_post_effects` (`src/post_effects/`, adapters in
+  `src/hooks/post_effects.cpp`, harness `post_effects`), 9 adapters
+  removed. For review:
+  - Stack leftovers below the stack pointer not reproduced
+    (RecordTexelSize's c32, StarDef::Init's colors, AddQuad's integer
+    conversions); nothing reads them.
+  - The recording helpers check for room first; with the list full the
+    whole original runs (its message and write through address 0); the
+    command list's diagnostics (`--log_slot_callers`) skipped, as in
+    earlier native recorders.
+  - RecordBeginStates and RecordEndStates allocate one slot more than
+    they write (24 and 13), as the original.
+  - Left on the recompiled code behind fallbacks: the release paths and
+    deleting destructors when a block isn't the allocation layer's or
+    `--native_c_runtime_heap`/`--native_heap` is off; ReleaseSurface
+    without `--native_video_output`; TargetFilter::TargetFilter where
+    memcpy's copy can't be native or without
+    `--native_graphics_resources`/`--native_heap`.
+  - Frame interpolation's overrides untouched (`Glow::Record`, the
+    motion blur's copy at 8213653C, `PostEffects::RecordAll`).
+  - `RenderTextures::Acquire` not ported (blocked by `sub_8235A9F8`):
+    its uninitialized-word path is still the original's.
+  - The destructors, release paths and DestroyRace run only when a race
+    ends: attract races don't reach them (harness only).
+  - New helpers in `src/hooks/post_effects.h`: `PostEffectsReleaseTexture`,
+    `PostEffectsReleaseSurface`, `PostEffectsDestroyCalls`.
+- Cleanup leads (no mapping; 1197f81..cdaa66d): `sub_820BAAA0`
+  CollisionShape::~CollisionShape's adapter removed (`collision.md`);
+  `AiDrivers::Destroy` and `DestroyRings` native under
+  `--native_ai_drivers` (`ai-drivers.md`; fall back while
+  `--native_heap` is off or the table isn't the layer's; run only when a
+  race ends: harness only); the UI movie walk native under
+  `--native_ui_movies` (`ui-movies.md`, a new Merged row `sub_8259D730`
+  the clip intersection, never in play, ported into ApplyTransform;
+  `src/ui_movies/draw.cpp`, strict fp). For review:
+  - `UiMovie::Draw` stays Overridden (its work uses `ctx`, inside the
+    `--log_pause_movie` watch override); DrawPicture's and
+    DrawPrimitive's adapters stay (a guest call to `sub_8259EBE8`)
+    though `--removable` lists them; DrawNode reaches them through a
+    callback from the original's 272-byte frames.
+  - Frame interpolation kept: every Matrix::Multiply and Copy in the
+    walk noted through `BlendState_OnMultiply`/`OnCopy` with the
+    original's return address; Vec4::Transform through
+    `debug::Vec4Transform`. Frame dumps match `--native_ui_movies=false`
+    (2,414 draws).
+  - Left on the recompiled code: the text list's grow `sub_8259EC58`
+    (never in play: a full list runs the original append or QueueText);
+    a picture without a texture runs the original DrawPicture.
+  - Float words copied bit for bit where the original pairs lfs/stfs
+    (a signaling NaN keeps its bits).
+  - The DrawPicture, DrawPrimitive and tree harnesses compare bytes
+    exactly instead of with `harness::Outputs`.
+  - Found along the way: `sub_8210A758` Text::Draw's harness compares a
+    slot word as bytes outside the vertex ranges it marks as floats
+    (a NaN sign showed as 1 difference when its random inputs changed);
+    the new cases now use their own `Random`, Text::Draw back to 0. A
+    gap in that harness worth a later look.
+- `input.md` (new, mapped in 167d407): 29 rows, the input manager and
+  input processors (B1's 13 input rows moved from `functions.md`, kept
+  with "B1's native code" or "Read (2026-10-24)" added; four unnamed
+  ones named `AnyPressed`, `PressedOrRepeat`, `TestPressed`,
+  `TestRepeat`, the getters `LogicalPad::Values` and
+  `PhysicalPad::Values`); 1 lead (the app framework). For review:
+  - The manager's vtable `0x82000F48` read from the image: slots 1
+    `GetProcessor`, 2 `GetLogicalPad`, 3 `AddListener`, 5
+    `GetPhysicalPad` in play.
+  - Four `std::list` of pointers helpers mapped here as `PtrList::`
+    (`sub_820AD058`, `sub_82099C08`, `sub_82095958`, `sub_820958B8`;
+    the last taken from the C++ containers lead, which says so); shared
+    with other subsystems (the sound manager).
+  - Correction to the action mappers' map: the object
+    `ActionMappers::Init` is given is probably the app object from
+    `sub_82106548` (its slot +36 gives the input manager), not the input
+    manager (`known-data.md`'s `0x826BAB78` row, `input.md`'s intro;
+    `action-mappers.md`'s rows unchanged, its pointers moved to
+    `input.md`).
+  - The processor's constructor sets the repeat period to 4; the
+    mappers' repeat objects use 3 (both as read).
+  Migration 1 (57373be..4dd7a11): all 29 native under `--native_input`
+  (`src/input/input_manager.*`, `src/std_list/ptr_list.*` for other
+  subsystems to call, adapters in `src/hooks/input_manager.cpp`), with
+  `ActionMapper::ActionMapper`, `ActionMapper::Bind` and
+  `InputClientList::BindAll` (`action-mappers.md`, under
+  `--native_action_mappers`); 16 adapters removed. For review:
+  - A harness depends on the heap's layout: with the binding cases in
+    the `action_mappers` harness, the later `strings_and_font` harness
+    failed (`Font::Draw` differed, then its swprintf cases crashed on a
+    read of guest 0x5E44, or a call to 0x00200020), and the race didn't
+    start; one `memory::Alloc(0x4400)` and its `Free` before it is
+    enough. Probably the same as the eleventh run's swprintf crash with
+    other random inputs (above). Not investigated; worked around by
+    putting the binding cases in their own harness,
+    `action_mappers_binding`, run last.
+    Looked into (the user's call, 2026-10-24): not the heap's layout
+    (an Alloc and Free moved nothing) but the harnesses' one shared
+    random generator: the binding cases drew from it, and later
+    harnesses got other inputs. The crash was `swprintf`'s format
+    generator (a bare "I" then '%' starts a new conversion; the original
+    and the native agree), the differences NaN signs in vertices the
+    drawing cases compared as bytes (clipped glyphs'). Fixed in the
+    harnesses (`strings-and-font.md`'s intro): each harness starts its
+    own generator, seeded from its name; `action_mappers_binding` runs
+    after `action_mappers` again; 12 other seeds 0 differing.
+  - Kept as guest calls (the functions stay Overridden): the manager's
+    constructor's two handler registrations through the dispatcher's
+    slots +8 and +4 (from the original's 192-byte frame); `BindAll`'s
+    app slot +36 (logged: `sub_820944C8`, through `sub_82094350`,
+    probably to `sub_82090788`; the input manager each time, players
+    0-3).
+  - Left on the recompiled code: `AddListener` on a list with a listener
+    already (its reset `sub_82592400` never runs); `AllocateNodes`'
+    `bad_alloc` and `IncSize`'s `length_error` paths (the latter doesn't
+    throw in the original: a case past the limit crashed in it, so the
+    cases stop at the limit); the constructor and Bind with vtable slots
+    other than those seen in play; anything allocating with
+    `--native_heap` off.
+  - The `--log_input_reads` wrappers moved from
+    `src/frame_pacing/game_messages.cpp` into the new adapters (same
+    counts).
+
 ## Run 2026-10-24 16:01 (`b7-loop-24-10-26-2`)
 
 - `c-runtime.md`: 2 new rows (mapped in 3a15cda), `sub_820911A8` and

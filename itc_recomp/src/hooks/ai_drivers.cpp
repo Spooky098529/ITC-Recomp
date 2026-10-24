@@ -146,7 +146,8 @@ ITC_FLAG_BOOL(native_ai_drivers, true, "ITC",
               "seen in play), AiDriver::LimitForCorner sub_8213A620, "
               "AiDriver::UpdateTargetSpeed sub_8213AB98, AiDriver::UpdateSpeed sub_8213ACD0, "
               "AiDriver::SteerToTarget sub_82138D78, AiDriver::UpdatePedals sub_8213A428, "
-              "AiDrivers::Create sub_8213B1E0, AiPath::ApplyCornerLine sub_8213BB58, "
+              "AiDrivers::Create sub_8213B1E0, AiDrivers::Destroy sub_8213B2B8 (AiDrivers::DestroyRings "
+              "sub_8213AD98 with it), AiPath::ApplyCornerLine sub_8213BB58, "
               "AiPath::ApplyCornerLines sub_8213CFC8, AiPath::KeepToCornerSide sub_8213CA18, "
               "AiPath::SetRanges sub_8213D670, AiPath::DropOffRouteCorners sub_8213DC08, "
               "AiPath::SpreadOffset sub_8213B890, AiPath::ClampOffset sub_8213CF58, "
@@ -182,7 +183,7 @@ ITC_FLAG_BOOL(native_ai_drivers, true, "ITC",
               "through the translated code (the same words, bit for bit; checked by "
               "--run_harnesses=ai_drivers). Those "
               "reached only from native callers have no adapters, and the flag switches their "
-              "callers: sub_82144ED8, sub_8213C720, sub_821450E0, sub_821453A0, sub_82139248, "
+              "callers: sub_8213AD98, sub_82144ED8, sub_8213C720, sub_821450E0, sub_821453A0, sub_82139248, "
               "sub_8213F730, sub_8213F900, sub_8213B390, sub_821459B0, sub_821451B8, sub_821464B8, "
               "sub_82146508, sub_82146588, sub_82146408, sub_8213F698, sub_821393D8, sub_8213D508, "
               "sub_82145450, sub_821467B8, sub_82138D20, sub_82139450, sub_82138F00, sub_8213E658, "
@@ -313,6 +314,19 @@ extern "C" REX_FUNC(sub_8213B1E0) {
     }
   }
   __imp__sub_8213B1E0(ctx, base);
+}
+
+// The original where the table can't be freed natively.
+extern "C" REX_FUNC(sub_8213B2B8) {
+  REX_FUNC_PROLOGUE();
+  if (ITC_FLAG(native_ai_drivers)) {
+    uint64_t r3 = ctx.r3.u64;
+    if (Destroy(base, &r3)) {
+      ctx.r3.u64 = r3;
+      return;
+    }
+  }
+  __imp__sub_8213B2B8(ctx, base);
 }
 
 // --- The path's offsets, narrowing and branches ---

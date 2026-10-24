@@ -36,7 +36,7 @@ ITC_FLAG_BOOL(native_collision, true, "ITC",
               "sub_820BC858, sub_820BACD0, sub_820BF080, sub_820BF320, sub_820BE150, sub_820BACB8, "
               "sub_820B9FC8, sub_820B9FE0, sub_820BC908, sub_820BEBF0, sub_820BB868, sub_820BAB30, "
               "sub_820BD1C8, sub_820BC848, sub_820BD508, sub_820BD6E0, sub_820BCE80, "
-              "sub_820BCDD0");
+              "sub_820BCDD0, sub_820BAAA0");
 
 // Defines an adapter: `body` uses `ctx` and `base`.
 #define ITC_COLLISION(address, body)   \
@@ -258,16 +258,6 @@ extern "C" REX_FUNC(sub_820BB218) {
     return;
   }
   ctx.r3.u64 = copy;
-}
-// r3 comes back as the old current copy (+8).
-extern "C" REX_FUNC(sub_820BAAA0) {
-  REX_FUNC_PROLOGUE();
-  uint32_t r3 = 0;
-  if (!NativeLifetime() || !CollisionShapeDestroy(base, ctx.r3.u32, &r3)) {
-    __imp__sub_820BAAA0(ctx, base);
-    return;
-  }
-  ctx.r3.u64 = r3;
 }
 // r4 = the template, r5 = the matrix, r6 = memory for the clones or 0; r3
 // comes back as the record.

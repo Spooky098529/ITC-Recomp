@@ -216,4 +216,31 @@ void InputClientConstruct(uint8_t* base, uint32_t node, uint32_t type);
 // InputClientList::Add (sub_8210AF00): ClientList::Add on `node`.
 void InputClientListAdd(uint8_t* base, uint32_t node);
 
+// ActionMapper::ActionMapper (sub_8210C180): the mapper (2,896 bytes) for
+// `player` (+2888): its node (InputClient, type 2), vtable 0x82007F78, the
+// repeat and curve objects' vtables (0x82007F68 at +592 + 16i, 0x82007F70 at
+// +1372 + 16i), its listener (an input processor, +2464), not bound (+2884),
+// ResetStages; the config tables (+12 the kinds, all 1; +132 the analog
+// kinds, 2 for actions 24-29, else 1; +252 the links, each direction's
+// opposite for actions 2-23, else 30), each action's threshold (on
+// [0x82002A10], off [0x8200296C], the rest 0), repeat (delay 20, period 3)
+// and curve (center and dead zone [0x82000A34], maximum [0x82000A30]); the
+// four config pointers (+372); then ResetWords and ResetAnalog.
+// MapperConstructKnown: the two vtables' slot 0 are the resets seen in play
+// (the plain C++ does their work), else its adapter runs the original.
+bool MapperConstructKnown(uint8_t* base);
+void MapperConstruct(uint8_t* base, uint32_t mapper, uint32_t player);
+
+// ActionMapper::Bind (sub_8210B270): `object` (the input manager, from
+// InputClientList::BindAll) kept at +2892; for players (+2888) 0-3, the
+// listener (+2464) added to that pad's listeners (the object's slot 3,
+// InputManager::AddListener) and the logical pad's values (its slot 2,
+// then the pad's slot 1) kept at +2880; then +2884 = 1 (bound). Returns 1.
+// MapperBindKnown: the player isn't 0-3, or the object's slots 2 and 3 and
+// the pad's slot 1 are the functions seen in play and AddListener runs
+// natively (the list empty, a node operator new gives: the caller also
+// needs --native_heap); otherwise the adapter runs the original.
+bool MapperBindKnown(uint8_t* base, uint32_t mapper, uint32_t object);
+uint32_t MapperBind(uint8_t* base, uint32_t mapper, uint32_t object);
+
 }  // namespace action_mappers
