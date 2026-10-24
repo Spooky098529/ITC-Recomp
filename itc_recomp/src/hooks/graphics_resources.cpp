@@ -1,16 +1,20 @@
 // The graphics library's resources natively: adapters in front of
 // src/graphics/ (docs/functions/graphics-resources.md). Each leaves r3 as
 // the original does (the return value, or r3 as it came for those with
-// none).
+// none). Those reached only from native callers have no adapters, and the
+// flag switches their callers: Texture::Format (sub_822A44A8), from
+// LevelDesc; Texture::LevelDesc (sub_822A4F60), from GetLevelDesc and
+// Surface::GetDesc; Texture::LevelLayout (sub_822A4B98), from LevelDesc;
+// SurfaceHeader::Set (sub_822A5910), from CreateSurface; Edram::Alloc
+// (sub_822B5EF8), from CreateSurface; Edram::Free (sub_822B5EA8), from
+// CreateSurface and Resource::DestroySurface; Edram::NextRun and Mark
+// (sub_822B5C90, sub_822B5D70), from Alloc and Free.
 
 #include "guest.h"
 
 #include "base/flags.h"
-#include "graphics/edram.h"
 #include "graphics/resources.h"
 #include "hooks/heap.h"
-
-#include <optional>
 
 ITC_FLAG_BOOL(native_graphics_resources, true, "ITC",
               "Run the graphics library's resources (docs/functions/graphics-resources.md: "
@@ -29,7 +33,10 @@ ITC_FLAG_BOOL(native_graphics_resources, true, "ITC",
               "Edram::NextRun sub_822B5C90 and Edram::Mark sub_822B5D70, and Edram::Free "
               "sub_822B5EA8, under a std::mutex in place of the kernel's critical section) "
               "natively instead of through the translated code (the same results; checked "
-              "by --run_harnesses=graphics_resources)");
+              "by --run_harnesses=graphics_resources). Those reached only from native "
+              "callers have no adapters, and the flag switches their callers: sub_822A44A8, "
+              "sub_822A4F60, sub_822A4B98, sub_822A5910, sub_822B5EF8, sub_822B5EA8, "
+              "sub_822B5C90, sub_822B5D70");
 
 // Defines an adapter: the body (the arguments after the address) uses `ctx`
 // and `base`.
@@ -59,7 +66,6 @@ using namespace graphics;
 // --- Headers: r3 = the header ---
 
 ITC_GRAPHICS_RESOURCES(822A6180, ctx.r3.u64 = ResourceType(base, ctx.r3.u32))
-ITC_GRAPHICS_RESOURCES(822A44A8, ctx.r3.u64 = TextureFormat(base, ctx.r3.u32))
 
 // r3 = the format, r4, r5 = the block's width and height out (in that order).
 ITC_GRAPHICS_RESOURCES(822A4410, {
@@ -85,10 +91,6 @@ ITC_GRAPHICS_RESOURCES(8209AD68, ctx.r3.u64 = SurfaceEdramTiles(ctx.r3.u32, ctx.
                                                                 ctx.r5.u32, ctx.r6.s32))
 
 // r3 = the texture, r4 = the level, r5 = the description; returns the type.
-// LevelLayout has no adapter: only LevelDesc calls it.
-ITC_GRAPHICS_RESOURCES(822A4F60, ctx.r3.u64 = TextureLevelDesc(base, ctx.r3.u32, ctx.r4.u32,
-                                                               ctx.r5.u32))
-
 ITC_GRAPHICS_RESOURCES(822A5B78, ctx.r3.u64 = TextureLevelDesc(base, ctx.r3.u32, ctx.r4.u32,
                                                                ctx.r5.u32))
 
@@ -152,22 +154,3 @@ extern "C" REX_FUNC(sub_822A6268) {
   ctx.r1.s64 = ctx.r1.s64 + 112;
   __restgprlr_29(ctx, base);
 }
-
-// --- EDRAM: NextRun and Mark have no adapters (only Alloc and Free call
-// them) ---
-
-// r3 = the tiles, r4 = the base out; returns 1 or 0.
-ITC_GRAPHICS_RESOURCES_HEAP(822B5EF8, {
-  const std::optional<edram::Allocation> allocation = edram::Alloc(base, ctx.r3.u32);
-  if (!allocation) {
-    ctx.r3.u64 = 0;
-    return;
-  }
-  guest::StoreU32(base, ctx.r4.u32, allocation->base);
-  ctx.r3.u64 = allocation->ok;
-})
-
-// r3 = the first tile, r4 = the tiles. r3 left as it came (the original
-// leaves RtlLeaveCriticalSection's). With Alloc's fallback (--native_heap),
-// so both take the same lock.
-ITC_GRAPHICS_RESOURCES_HEAP(822B5EA8, edram::Free(base, ctx.r3.u32, ctx.r4.u32))
