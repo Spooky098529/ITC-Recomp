@@ -150,6 +150,7 @@ set(ITC_SOURCES
     src/track_zones/track_zones.cpp
     src/hooks/graphics_resources.cpp
     src/graphics/resources.cpp
+    src/graphics/edram.cpp
     src/hooks/action_mappers.cpp
     src/action_mappers/action_mappers.cpp
     src/hooks/data_tables.cpp

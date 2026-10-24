@@ -10,6 +10,7 @@
 
 #include "base/flags.h"
 #include "base/log.h"
+#include "graphics/edram.h"
 #include "graphics/resources.h"
 #include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
@@ -17,6 +18,7 @@
 #include <fmt/format.h>
 
 #include <string>
+#include <utility>
 #include <vector>
 
 ITC_FLAG_DECLARE(bool, native_graphics_resources);
@@ -79,6 +81,33 @@ void NativeGetStreamSource(PPCContext& ctx, uint8_t* base) {
   guest::StoreU32(base, ctx.r5.u32, source.offset);
   guest::StoreU32(base, ctx.r6.u32, source.stride);
   ctx.r3.u64 = source.buffer;
+}
+
+void NativeNextRun(PPCContext& ctx, uint8_t* base) {
+  uint32_t position = guest::LoadU32(base, ctx.r4.u32);
+  const uint32_t length = gr::edram::NextRun(base, ctx.r3.u32, position);
+  guest::StoreU32(base, ctx.r4.u32, position);
+  ctx.r3.u64 = length;
+}
+void NativeMark(PPCContext& ctx, uint8_t* base) {
+  gr::edram::Mark(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32 != 0);
+}
+void NativeEdramAlloc(PPCContext& ctx, uint8_t* base) {
+  const auto allocation = gr::edram::Alloc(base, ctx.r3.u32);
+  if (!allocation) {
+    ctx.r3.u64 = 0;
+    return;
+  }
+  guest::StoreU32(base, ctx.r4.u32, allocation->base);
+  ctx.r3.u64 = allocation->ok;
+}
+void NativeEdramFree(PPCContext& ctx, uint8_t* base) {
+  gr::edram::Free(base, ctx.r3.u32, ctx.r4.u32);
+}
+void NativeDestroySurface(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = gr::DestroySurface(base, ctx.r31.u32, ctx.r11.u32);
+  ctx.r1.s64 = ctx.r1.s64 + 112;
+  __restgprlr_29(ctx, base);
 }
 
 // The scratch area's layout.
@@ -367,6 +396,294 @@ void Getters(Context& h, Random& r) {
   memory::Free(device);
 }
 
+
+// --- EDRAM ---
+
+namespace edram = gr::edram;
+
+constexpr uint32_t kObjectAttributes = 0x64800000;
+constexpr uint32_t kHiZTaken = 0x829537C4;
+
+// An allocator's state: the bitmap's 192 words and the free count.
+struct EdramState {
+  std::vector<uint32_t> bitmap;
+  uint32_t free;
+};
+
+// Runs of free and used tiles of random lengths (32-aligned now and then);
+// the free count true, or now and then random.
+EdramState RandomEdram(Random& r) {
+  EdramState state{std::vector<uint32_t>(edram::kTiles / 32, 0), 0};
+  uint32_t tile = 0;
+  bool used = r.Below(2) != 0;
+  const uint32_t scale = r.Below(3) == 0 ? 2000 : r.Below(2) ? 300 : 40;
+  while (tile < edram::kTiles) {
+    uint32_t run = 1 + r.Below(scale);
+    if (r.Below(4) == 0) {
+      run = (run + 31) & ~31u;
+    }
+    for (uint32_t i = 0; i < run && tile < edram::kTiles; i++, tile++) {
+      if (used) {
+        state.bitmap[tile / 32] |= 0x80000000u >> (tile % 32);
+      } else {
+        state.free++;
+      }
+    }
+    used = !used;
+  }
+  if (r.Below(8) == 0) {
+    state.free = r.Below(edram::kTiles + 1);
+  }
+  return state;
+}
+
+// An allocator object with the state (from the allocation layer, as the
+// game's); for the recompiled side its critical section is set up.
+uint32_t MakeAllocator(Context& h, const EdramState& state, bool recompiled) {
+  const uint32_t object = memory::crt::XMemAlloc(h.base, edram::kObjectBytes, kObjectAttributes);
+  guest::StoreU32(h.base, object + edram::kFree, state.free);
+  guest::StoreU32s(h.base, object + edram::kBitmap, state.bitmap.data(),
+                   uint32_t(state.bitmap.size()));
+  guest::StoreU32(h.base, object + edram::kBitmapEnd, edram::kSentinel);
+  if (recompiled) {
+    PPCContext t = CallContext(h);
+    t.r3.u64 = object;
+    __imp__RtlInitializeCriticalSection(t, h.base);
+  }
+  return object;
+}
+
+// The allocator's state but its critical section (+0 to +27).
+std::vector<uint8_t> AllocatorState(Context& h, uint32_t object) {
+  return Read(h.base, object + edram::kFree, edram::kObjectBytes - edram::kFree);
+}
+
+// A position or a run's end: anywhere, at a word's edge, or at the end.
+uint32_t Tile(Random& r) {
+  switch (r.Below(5)) {
+    case 0:
+      return r.Below(edram::kTiles / 32 + 1) * 32;
+    case 1:
+      return edram::kTiles - r.Below(40);
+    default:
+      return r.Below(edram::kTiles);
+  }
+}
+
+void EdramLeaves(Context& h, Random& r) {
+  {
+    Results results("Edram::NextRun (sub_822B5C90)");
+    for (int i = 0; i < 600; i++) {
+      EdramState state = RandomEdram(r);
+      if (i % 50 == 0) {
+        // Used to the end from somewhere.
+        for (uint32_t t = Tile(r); t < edram::kTiles; t++) {
+          state.bitmap[t / 32] |= 0x80000000u >> (t % 32);
+        }
+      }
+      const uint32_t position = i % 37 == 0 ? edram::kTiles : Tile(r);
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        const uint32_t object = MakeAllocator(h, state, false);
+        guest::StoreU32(h.base, h.data, position);
+        PPCContext t = CallContext(h);
+        t.r3.u64 = object;
+        t.r4.u64 = h.data;
+        (v == 0 ? Original<__imp__sub_822B5C90> : NativeNextRun)(t, h.base);
+        out[v].Word(t.r3.u32);
+        out[v].Word(guest::LoadU32(h.base, h.data));
+        out[v].Bytes(AllocatorState(h, object));
+        memory::crt::XMemFree(object, kObjectAttributes);
+      }
+      results.Check(out[0], out[1], fmt::format("case {}: position {}", i, position));
+    }
+    results.Report();
+  }
+  {
+    Results results("Edram::Mark (sub_822B5D70)");
+    for (int i = 0; i < 600; i++) {
+      const EdramState state = RandomEdram(r);
+      uint32_t start = Tile(r), end = Tile(r);
+      // Now and then reversed (the start's word set, the next word's bits
+      // before the end set), but inside the object.
+      if (start > end && (r.Below(8) != 0 || start >= edram::kTiles - 32)) {
+        std::swap(start, end);
+      }
+      if (r.Below(6) == 0) {
+        end = start + r.Below(32);  // in one word, or across one edge
+        if (end > edram::kTiles) {
+          end = edram::kTiles;
+        }
+      }
+      const uint32_t used = r.Below(2);
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        const uint32_t object = MakeAllocator(h, state, false);
+        PPCContext t = CallContext(h);
+        t.r3.u64 = object;
+        t.r4.u64 = start;
+        t.r5.u64 = end;
+        t.r6.u64 = used;
+        (v == 0 ? Original<__imp__sub_822B5D70> : NativeMark)(t, h.base);
+        out[v].Bytes(AllocatorState(h, object));
+        memory::crt::XMemFree(object, kObjectAttributes);
+      }
+      results.Check(out[0], out[1], fmt::format("case {}: [{}, {}) {}", i, start, end, used));
+    }
+    results.Report();
+  }
+}
+
+// Alloc, Free and the surface's destroy work on the allocator at
+// [0x82953E20]: each case puts its own there (the recompiled side's with
+// its critical section set up, the native side's without), and the game's
+// is put back after (the harnesses run on the main thread, before any race
+// makes surfaces). Compared: the allocator from +28 on (the free count, the
+// bitmap, the sentinel), the out and r3; the creation's critical section
+// apart (expected to differ).
+void EdramAllocator(Context& h, Random& r) {
+  const uint32_t saved = guest::LoadU32(h.base, edram::kAllocator);
+  {
+    Results results("Edram::Alloc (sub_822B5EF8)");
+    for (int i = 0; i < 400; i++) {
+      const EdramState state = RandomEdram(r);
+      uint32_t tiles = r.Below(4) == 0 ? r.Below(2049) : r.Below(400);
+      if (r.Below(16) == 0) {
+        tiles = state.free + r.Below(3);
+      }
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        const uint32_t object = MakeAllocator(h, state, v == 0);
+        guest::StoreU32(h.base, edram::kAllocator, object);
+        Fill(h.base, h.data, 16);
+        PPCContext t = CallContext(h);
+        t.r3.u64 = tiles;
+        t.r4.u64 = h.data;
+        (v == 0 ? Original<__imp__sub_822B5EF8> : NativeEdramAlloc)(t, h.base);
+        out[v].Word(t.r3.u32);
+        out[v].Word(guest::LoadU32(h.base, h.data));
+        out[v].Word(guest::LoadU32(h.base, edram::kAllocator) == object);
+        out[v].Bytes(AllocatorState(h, object));
+        memory::crt::XMemFree(object, kObjectAttributes);
+      }
+      results.Check(out[0], out[1], fmt::format("case {}: {} tiles, {} free", i, tiles, state.free));
+    }
+    results.Report();
+  }
+  {
+    // The first use: no allocator yet, one made. Its critical section is
+    // the kernel's in the recompiled version and left cleared in the native
+    // one (the user's call, 2026-10-24: a std::mutex in its place).
+    Results results("Edram::Alloc (sub_822B5EF8), the allocator made");
+    Results cs("Edram::Alloc (sub_822B5EF8), the allocator made: its critical section "
+               "(expected to differ)");
+    for (int i = 0; i < 8; i++) {
+      const uint32_t tiles = i == 0 ? 0 : r.Below(2049);
+      Outputs out[2], section[2];
+      for (int v = 0; v < 2; v++) {
+        guest::StoreU32(h.base, edram::kAllocator, 0);
+        Fill(h.base, h.data, 16);
+        PPCContext t = CallContext(h);
+        t.r3.u64 = tiles;
+        t.r4.u64 = h.data;
+        (v == 0 ? Original<__imp__sub_822B5EF8> : NativeEdramAlloc)(t, h.base);
+        const uint32_t object = guest::LoadU32(h.base, edram::kAllocator);
+        out[v].Word(t.r3.u32);
+        out[v].Word(guest::LoadU32(h.base, h.data));
+        out[v].Word(object != 0);
+        if (object != 0) {
+          out[v].Bytes(AllocatorState(h, object));
+          section[v].Bytes(Read(h.base, object, edram::kFree));
+          memory::crt::XMemFree(object, kObjectAttributes);
+        }
+      }
+      results.Check(out[0], out[1], fmt::format("case {}: {} tiles", i, tiles));
+      cs.Check(section[0], section[1], fmt::format("case {}", i));
+    }
+    results.Report();
+    cs.Report();
+  }
+  {
+    Results results("Edram::Free (sub_822B5EA8)");
+    for (int i = 0; i < 300; i++) {
+      const EdramState state = RandomEdram(r);
+      const uint32_t start = Tile(r);
+      uint32_t tiles = r.Below(3) == 0 ? r.Below(32) : r.Below(1024);
+      if (start + tiles > edram::kTiles) {
+        tiles = edram::kTiles - start;
+      }
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        const uint32_t object = MakeAllocator(h, state, v == 0);
+        guest::StoreU32(h.base, edram::kAllocator, object);
+        PPCContext t = CallContext(h);
+        t.r3.u64 = start;
+        t.r4.u64 = tiles;
+        (v == 0 ? Original<__imp__sub_822B5EA8> : NativeEdramFree)(t, h.base);
+        out[v].Bytes(AllocatorState(h, object));
+        memory::crt::XMemFree(object, kObjectAttributes);
+      }
+      results.Check(out[0], out[1], fmt::format("case {}: {} at {}", i, tiles, start));
+    }
+    results.Report();
+  }
+  {
+    // The surface's destroy: a 48-byte header from the allocation layer
+    // (freed by it), entered with Destroy's 112-byte frame (r29-r31 and lr
+    // in it, restored at the end; compared too). The hi-z flag is put back.
+    Results results("Resource::Destroy's surface case (sub_822A6268)");
+    const uint32_t hi_z = guest::LoadU32(h.base, kHiZTaken);
+    for (int i = 0; i < 300; i++) {
+      const EdramState state = RandomEdram(r);
+      uint32_t common = uint32_t(r.Next());
+      common = (common & ~0xFu) | 4;
+      const uint32_t edram_base = r.Below(2048);
+      const uint32_t tiles = r.Below(4) == 0 ? r.Below(32) : r.Below(1024);
+      const uint32_t w28 = (uint32_t(r.Next()) & ~0xFFFu) | edram_base;
+      const uint32_t w32 = uint32_t(r.Next());
+      const uint32_t w44 = tiles * 5120 + r.Below(5120);
+      const uint32_t frame[4] = {uint32_t(r.Next()), uint32_t(r.Next()), uint32_t(r.Next()),
+                                 0x82000000u | (uint32_t(r.Next()) & 0xFFFFFC)};
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        const uint32_t object = MakeAllocator(h, state, v == 0);
+        guest::StoreU32(h.base, edram::kAllocator, object);
+        guest::StoreU32(h.base, kHiZTaken, 1);
+        const uint32_t surface = memory::crt::XMemAlloc(h.base, 48, kObjectAttributes);
+        guest::StoreU32(h.base, surface, common);
+        guest::StoreU32(h.base, surface + 28, w28);
+        guest::StoreU32(h.base, surface + 32, w32);
+        guest::StoreU32(h.base, surface + 44, w44);
+        PPCContext t = CallContext(h);
+        const uint32_t top = t.r1.u32;
+        // Destroy's frame: r29-r31 saved at top - 32, -24, -16, lr at -8.
+        for (int k = 0; k < 3; k++) {
+          StoreU64(h.base, top - 32 + 8 * k, frame[k]);
+        }
+        guest::StoreU32(h.base, top - 8, frame[3]);
+        t.r1.u64 = top - 112;
+        t.r31.u64 = surface;
+        t.r11.u64 = common;
+        (v == 0 ? Original<__imp__sub_822A6268> : NativeDestroySurface)(t, h.base);
+        out[v].Word(t.r3.u32);
+        out[v].Word(t.r1.u32 - top);
+        out[v].Word(t.r29.u32);
+        out[v].Word(t.r30.u32);
+        out[v].Word(t.r31.u32);
+        out[v].Word(uint32_t(t.lr));
+        out[v].Word(guest::LoadU32(h.base, kHiZTaken));
+        out[v].Bytes(AllocatorState(h, object));
+        memory::crt::XMemFree(object, kObjectAttributes);
+      }
+      results.Check(out[0], out[1],
+                    fmt::format("case {}: {:08X}, {} at {}", i, common, tiles, edram_base));
+    }
+    guest::StoreU32(h.base, kHiZTaken, hi_z);
+    results.Report();
+  }
+  guest::StoreU32(h.base, edram::kAllocator, saved);
+}
+
 }  // namespace
 
 void GraphicsResources(Context& h) {
@@ -376,6 +693,8 @@ void GraphicsResources(Context& h) {
   SizeMath(h, r);
   Buffers(h, r);
   Getters(h, r);
+  EdramLeaves(h, r);
+  EdramAllocator(h, r);
 }
 
 }  // namespace harness

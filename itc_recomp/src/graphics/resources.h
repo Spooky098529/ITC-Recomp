@@ -78,4 +78,13 @@ struct StreamSource {
 };
 StreamSource GetStreamSource(uint8_t* base, uint32_t device, uint32_t stream);
 
+// --- Destruction (the allocation layer: run only with --native_heap) ---
+
+// sub_822A6268 Resource::Destroy's surface case: a render target's EDRAM
+// freed (+0 bit 0x80000000; the base +28's low 12 bits, the tiles +44 /
+// 5120), the hi-z taken back (+32 bit 0: 0x829537C4 = 0), but for a
+// texture's surface (+0 bit 0x40000000); then the header freed. `common` is
+// the header's +0 as the caller read it; returns XMemFree's r3.
+uint32_t DestroySurface(uint8_t* base, uint32_t surface, uint32_t common);
+
 }  // namespace graphics

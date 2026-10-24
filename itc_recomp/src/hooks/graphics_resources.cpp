@@ -6,8 +6,11 @@
 #include "guest.h"
 
 #include "base/flags.h"
+#include "graphics/edram.h"
 #include "graphics/resources.h"
 #include "hooks/heap.h"
+
+#include <optional>
 
 ITC_FLAG_BOOL(native_graphics_resources, true, "ITC",
               "Run the graphics library's resources (docs/functions/graphics-resources.md: "
@@ -17,7 +20,10 @@ ITC_FLAG_BOOL(native_graphics_resources, true, "ITC",
               "Device::CreateVertexBuffer sub_822A6830 and Device::CreateIndexBuffer "
               "sub_822A6968, with --native_heap; Device::GetRenderTarget sub_822A3998, "
               "Device::GetDepthStencilSurface sub_822A39E0, Device::GetStreamSource "
-              "sub_822A3880) "
+              "sub_822A3880; Resource::Destroy's surface case sub_822A6268, with "
+              "--native_heap; Edram::Alloc sub_822B5EF8, with --native_heap, with "
+              "Edram::NextRun sub_822B5C90 and Edram::Mark sub_822B5D70, and Edram::Free "
+              "sub_822B5EA8, under a std::mutex in place of the kernel's critical section) "
               "natively instead of through the translated code (the same results; checked "
               "by --run_harnesses=graphics_resources)");
 
@@ -93,3 +99,38 @@ ITC_GRAPHICS_RESOURCES(822A3880, {
   guest::StoreU32(base, ctx.r6.u32, source.stride);
   ctx.r3.u64 = source.buffer;
 })
+
+// --- Destruction ---
+
+// Resource::Destroy's surface case, split off by the recompiler: entered
+// with Destroy's frame (r31 = the surface, r11 = its +0), so it ends as
+// Destroy does (its 112-byte frame popped, r29-r31 and lr restored).
+extern "C" REX_FUNC(sub_822A6268) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_graphics_resources) || !hooks::NativeHeapActive()) {
+    __imp__sub_822A6268(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = DestroySurface(base, ctx.r31.u32, ctx.r11.u32);
+  ctx.r1.s64 = ctx.r1.s64 + 112;
+  __restgprlr_29(ctx, base);
+}
+
+// --- EDRAM: NextRun and Mark have no adapters (only Alloc and Free call
+// them) ---
+
+// r3 = the tiles, r4 = the base out; returns 1 or 0.
+ITC_GRAPHICS_RESOURCES_HEAP(822B5EF8, {
+  const std::optional<edram::Allocation> allocation = edram::Alloc(base, ctx.r3.u32);
+  if (!allocation) {
+    ctx.r3.u64 = 0;
+    return;
+  }
+  guest::StoreU32(base, ctx.r4.u32, allocation->base);
+  ctx.r3.u64 = allocation->ok;
+})
+
+// r3 = the first tile, r4 = the tiles. r3 left as it came (the original
+// leaves RtlLeaveCriticalSection's). With Alloc's fallback (--native_heap),
+// so both take the same lock.
+ITC_GRAPHICS_RESOURCES_HEAP(822B5EA8, edram::Free(base, ctx.r3.u32, ctx.r4.u32))

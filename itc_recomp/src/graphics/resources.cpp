@@ -6,6 +6,7 @@
 #include "guest.h"
 
 #include "base/log.h"
+#include "graphics/edram.h"
 #include "memory/c_runtime_heap.h"
 #include "native/refcount.h"
 
@@ -27,6 +28,8 @@ constexpr uint32_t kDataAttributes = 0x82800000;
 constexpr uint32_t kUsageWriteCombined = 0x4;
 constexpr uint32_t kUsage200 = 0x200;
 constexpr uint32_t kUnlocked = 0xFFFF0000;  // the locked ranges at +20 and +24
+// 1 while a depth surface holds the hi-z.
+constexpr uint32_t kHiZTaken = 0x829537C4;
 
 }  // namespace
 
@@ -244,6 +247,20 @@ StreamSource GetStreamSource(uint8_t* base, uint32_t device, uint32_t stream) {
   source.offset = offset << 2;
   source.stride = uint32_t(guest::LoadU8(base, device + stream + 12272)) << 2;
   return source;
+}
+
+uint32_t DestroySurface(uint8_t* base, uint32_t surface, uint32_t common) {
+  ITC_NATIVE_RUNNING("sub_822A6268 Resource::DestroySurface");
+  if (!(common & 0x40000000)) {
+    if (common & 0x80000000) {
+      const uint32_t tiles = Load(base, surface + 44) / 5120;
+      edram::Free(base, Load(base, surface + 28) & 0xFFF, tiles);
+    }
+    if (Load(base, surface + 32) & 1) {
+      Store(base, kHiZTaken, 0);
+    }
+  }
+  return memory::crt::XMemFree(surface, kHeaderFreeAttributes);
 }
 
 }  // namespace graphics
