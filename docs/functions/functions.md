@@ -240,6 +240,12 @@ Rows not yet moved stay in the table below. So far:
   map of the rings' texture coordinates by position (two `std::map`
   instantiations), the speed update and the draw, probably a screen
   blur while the nitrous runs (B7).
+- [`framework.md`](framework.md): the app framework: the framework
+  object `main` makes, its set-up and the factories of its services
+  (named only as far as the framework makes them), its sixteen
+  interfaces' getters, the run loop (`App::Run`, its tick handler and
+  listener maps and the requests applied each pass) and the frame start
+  and debug text it owns (B7).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
@@ -250,11 +256,8 @@ old performance notes to the end of `../native-renderer.md`.
 
 | Address | Name | Status | Notes |
 |---|---|---|---|
-| `sub_82090108` | `main` | | Guest entry point on the main thread (from `xstart`): `sub_820909B8`, App::Run through `sub_82090378` and `sub_8209ABE8`, `sub_82090350`; returns App::Run's answer. Never returns in play: closing the window ends the title's threads (the SDK's TerminateTitle) and exits, so `xstart`'s exit, `DbgPrint` and `XamLoaderTerminateTitle` never run. |
 | `sub_8258DE50` | `Thread::Start` | | Entry point of the game's threads: calls vtable slot 1 of the object at start context + 8. |
 | `sub_82095AF0` | | | A worker thread's loop (started through `sub_8258DE50`): waits on an event, runs jobs through function pointers, signals events; it opens the game's data files at boot. On the Steam Deck it spiked to 66-82% of a core with 15-32% in the kernel around race loads; here (2026-10-14) ~29% with ~68,000 minor page faults in 2 s while a race loads. On the Deck (`itc_041.log`) the kernel time is page faults: 37-69% of a core (19-24% kernel) with 27,000-52,000 minor faults and no major ones per 2 s, its system call samples all `running` (in a fault, not a call) but once `202` (futex: waiting). Only around loads (2-4 s each); in a race it's at 0-15%. The fix, if worth it: populate the guest memory's pages in advance (e.g. `MADV_POPULATE_WRITE` on the views), moving the cost to startup. |
-| `sub_8209A760` | `App::Run` | | Main loop: calls every handler in the tick list at this+4, repeats until the quit flag at this+12 is set. One logic tick per pass, with no measured time. |
-| `sub_82099D50` | `ForEachTickHandler` | | Calls each handler in a list through a member function pointer. |
 | `sub_82092358` | `Renderer::Init` | | Sets the vblank interval (2 = 30 fps) via `sub_8258D568`, then subscribes renderer callbacks to numbered events (2, 3, 5, 6, 16). |
 | `sub_820920D8` | `Renderer::WaitForFrame` | Wrapped | Tick handler on the main thread. Blocks until the render thread signals the frame is done (event at this+392), swaps, and starts the next frame. Frame pacing runs after it (`src/frame_pacing/renderer_hooks.cpp`). |
 | `sub_82091EF8` | `Renderer::ThreadLoop` | Overridden | Render thread loop; started through `sub_8258DE50`. Draws one frame each time the main thread asks, as the game did, without the 2-vblank wait. |
@@ -342,7 +345,6 @@ old performance notes to the end of `../native-renderer.md`.
 | `sub_825972A8` | `Matrix::Perspective` | | r3 = out, f1 = field of view, f2 = aspect, f3 = near, f4 = far: y scale = 1 / tan(f1 * the constant at `0x82001BE4`), x scale = y scale / aspect, depth = far / (far - near), offset -near * far / (far - near). |
 | `sub_820D06F0` | `CarPart::Draw` | | r3 = the part (returns if `[part + 4]`, its model, is 0), r4 = the camera, r5 = the world matrix, r6, r7: with r7 = 0, `sub_820D04E8([part + 4], camera, world, [part + 228], r6)`. |
 | `sub_820D04E8` | `Model::Draw` | | Draws a model (r31 = r3): a visibility test (`sub_825951E0`), then the per-object recorder `sub_825953D0` (return address `0x820D0564`, which pairs products by r31). Culls with the camera it's given, so a world matrix away from the tick's can be culled. For car parts, `Model::RecordMaterials` (`sub_820CECA0`, `models.md`) for groups 0 and 1. |
-| `sub_82099A98` | `TickHandler::Invoke` | Wrapped | r3 = the app, r4 = the handler (target at +8). Skips some tick handlers on render-only passes (`SkipTickHandlerOnRenderOnlyPass`, `src/frame_pacing/game_messages.cpp`); the diagnostics' before and after hooks (`--log_tick_handlers`, `--find_per_frame_state` and others). |
 | `sub_820DC958` | `BlinkTimers::Advance` | Wrapped | Skipped on render-only passes (`--per_tick_blink_timers`; "Per-frame logic" in `../frame-interpolation.md`). |
 | `sub_821594B8` | | Wrapped | The rival intro cutscene's Update handler: runs on logic passes; on render-only passes only its logo's draw (`sub_82211A28`) is repeated (`--redraw_rival_logo`; "The rival logo at the race start" in `../frame-interpolation.md`). |
 | `sub_82211A28` | | Wrapped | Draws the rival's logo; noted during the cutscene for the render-only redraw. |
@@ -452,7 +454,6 @@ old performance notes to the end of `../native-renderer.md`.
 | `sub_825BDDA0` | `EndVertices` | Wrapped | Same file: an inline vertex draw noted, then handed to the native renderer (in commands 15 and 19). |
 | `sub_8258F5C0` | | Wrapped | Same file: the single-command items' command 15 (the helper object's draw), marked as command 15 so the native renderer draws its inline vertices. |
 | `sub_822AFA58` | `Device::Resolve` | Wrapped | Same file: resolves made outside command 25 (command 33's, one per tile) passed to the native renderer. |
-| `sub_82096340` | | Wrapped | A tick handler thunk (vtable slot 1 of r3); names its target for `--find_per_frame_state`. |
 | `sub_82092968` | | Wrapped | Runs the app's component lists (r4's low word a component; its vtable slot 1); named for `--find_menu_selection`. |
 | `sub_8220C1E0` | `MenuList::Update` | Wrapped | Logged for `--log_pause_menu` (`src/debug/pause_menu_log.cpp`). `sub_8210C370` reads logical pad `j`'s values 0-7 (sticks, triggers) through the pointer at mapper +2880 (= input manager +44 + 196j) and the buttons through the listener object at mapper +2464 (seen by the read watch, 2026-10-19). |
 | `sub_821BE5A8` | | Wrapped | The pause sub-menus' calls on their UI movie (setting animation targets and the children's +80 flags, starting animations, switching sub-screens); logged for `--log_pause_movie` (`src/debug/pause_movie_log.cpp`). |
