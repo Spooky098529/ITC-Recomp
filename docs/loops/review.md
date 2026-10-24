@@ -13,6 +13,19 @@ When the user has reviewed a run's section, its heading gets
 
 ## Run 2026-10-24 03:25 (`b7-loop-24-10-26`)
 
+- `video-output.md` (new, 30 rows; 6 moved from `functions.md`:
+  VideoOutput::SetUpDisplay, WaitForVblank, ResolveFrontBuffer,
+  Event::Create, Wait, Signal; 24 new; mapped in 2fdfea4),
+  `known-data.md` (the video output, renderer +384, device +10760, the
+  semaphore's layout, `0x8266D088`, the vblank counts); 3 leads (the
+  device lock's other callers, `sub_822A8A60` probably
+  SetShaderGPRAllocation, the other ScopedLock users). Corrections to
+  earlier maps: "state saved and restored" is "device locked and
+  unlocked" in `cameras.md` (`sub_8209FBF0`, `sub_8209FC7C`,
+  `sub_820A2F40`, `sub_820A2F94`, the intro) and `strings-and-font.md`
+  (Font::Font, the intro). For the user's call: the device lock
+  (`b7-progress.md`, "Stopped").
+
 - The graphics resources' first migration (e4730b8..e6b9811): 25 of 45
   ours (7 Native), the new row `sub_822B5EA8` Edram::Free (Native, not
   seen in play), `sub_822A6268` named `Resource::DestroySurface`, the

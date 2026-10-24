@@ -26,7 +26,10 @@ see in a drive, from every run: `to-drive.md`.
 - Subsystem 2 of 4: `leads.md`'s graphics device resource calls under
   the camera passes (`sub_822A5D08` and others, the device's state save
   and restore `sub_8258D8C8`, `sub_8258D908`; closest to ready: 17 left,
-  8 ready groups, 5 already ours): mapping agent running.
+  8 ready groups, 5 already ours): mapped as the video output and the
+  device lock (`video-output.md`, 30 rows, 2fdfea4; 6 ready groups, 5
+  of them on kernel sync imports). The map's checks passed, but its
+  `stop:` named a choice for the user, so the loop stopped (below).
 
 ## Done
 
@@ -91,3 +94,20 @@ renderer keys targets by them); (2) `Resource::Lock`'s and
 the returned address and the freeing kept (a harness group for the
 command buffer's words expected to differ). The run goes on
 with this subsystem's migration.
+
+2026-10-24, after mapping the video output and the device lock: the
+mapping report's `stop:` wasn't `none`. `VideoOutput::LockDevice` and
+`UnlockDevice` (`sub_8258D8C8`, `sub_8258D908`; the lead's "state saved
+and restored") take the video output's device lock, a semaphore of
+count 1 at +224 built on critical sections and kernel events (the render
+thread holds it for the whole frame, the main thread around making and
+releasing resources), and block `CameraPasses::MakeRenderTarget`,
+`CameraPass::SetUpSurfaces` and `CameraPass::Init`. For the user: (a)
+the device lock alone over a host primitive (its semaphore is reached
+only through LockDevice, UnlockDevice and the video output's
+constructor; the Semaphore class stays recompiled for the archive
+loader's four), (b) the game's sync primitives native for every caller
+(a core step: "Shared sync objects" in the plan), or (c) the lock left
+recompiled and the camera passes blocked. Map checks:
+`check_function_statuses.py` 0 errors; `b7_status.py` lists the file, 30
+of 30 in play.
