@@ -29,7 +29,8 @@ see in a drive, from every run: `to-drive.md`.
   8 ready groups, 5 already ours): mapped as the video output and the
   device lock (`video-output.md`, 30 rows, 2fdfea4; 6 ready groups, 5
   of them on kernel sync imports). The map's checks passed, but its
-  `stop:` named a choice for the user, so the loop stopped (below).
+  `stop:` named a choice for the user, so the loop stopped (below);
+  resumed with the user's call: migration agent running.
 
 ## Done
 
@@ -111,3 +112,10 @@ loader's four), (b) the game's sync primitives native for every caller
 recompiled and the camera passes blocked. Map checks:
 `check_function_statuses.py` 0 errors; `b7_status.py` lists the file, 30
 of 30 in play.
+
+Resumed 2026-10-24 (the user's call): (a): the device lock alone over a host primitive, a
+`std::binary_semaphore` (a semaphore may be released by another thread
+than the one that took it; a mutex may not), through LockDevice,
+UnlockDevice and the video output's constructor; the Semaphore class
+stays recompiled for the archive loader. The run goes on
+with this subsystem's migration.

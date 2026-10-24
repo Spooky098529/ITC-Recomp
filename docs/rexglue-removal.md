@@ -89,7 +89,8 @@ goes in `src/` as overrides), American English.
   resource locks' fence waits and cache flushes Dropped (2026-10-24);
   46 of 46 ours (ours 1,529). It then mapped the video output and the
   device lock (`video-output.md`) and stopped for the user's call on
-  the device lock's kernel sync. The
+  the device lock's kernel sync: the lock alone over a
+  `std::binary_semaphore` (2026-10-24). The
   runs' rows wait for the user's review (`docs/loops/review.md`). See
   "B7's loop runs" under B7, and `docs/loops/b7-progress.md`. Guest
   allocation is no longer a block (`docs/native-memory.md`); what the

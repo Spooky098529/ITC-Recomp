@@ -195,7 +195,9 @@ fence waits and cache flushes Dropped, their lock count, address and
 freeing kept; 46 of 46 ours, `--native_graphics_resources`, ours 1,485
 -> 1,529), then mapped the video output and the device lock
 (`video-output.md`) and stopped again for the user's call on the
-device lock's kernel sync (`docs/loops/b7-progress.md`, "Stopped"). Harness runs use `attract_race.sh 40` (the user's call,
+device lock's kernel sync, then went on (the user's call, 2026-10-24:
+the device lock alone over a `std::binary_semaphore`; the game's
+Semaphore class stays recompiled for the archive loader). Harness runs use `attract_race.sh 40` (the user's call,
 2026-10-23); a race short only because the harnesses took longer is
 no halt.
 After each plan item, run `itc_recomp/tools/boundary_status.py` and record

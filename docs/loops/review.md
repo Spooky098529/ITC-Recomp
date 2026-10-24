@@ -23,8 +23,11 @@ When the user has reviewed a run's section, its heading gets
   earlier maps: "state saved and restored" is "device locked and
   unlocked" in `cameras.md` (`sub_8209FBF0`, `sub_8209FC7C`,
   `sub_820A2F40`, `sub_820A2F94`, the intro) and `strings-and-font.md`
-  (Font::Font, the intro). For the user's call: the device lock
-  (`b7-progress.md`, "Stopped").
+  (Font::Font, the intro). The user's call (2026-10-24): (a): the device lock alone over a host primitive, a
+`std::binary_semaphore` (a semaphore may be released by another thread
+than the one that took it; a mutex may not), through LockDevice,
+UnlockDevice and the video output's constructor; the Semaphore class
+stays recompiled for the archive loader.
 
 - The graphics resources' first migration (e4730b8..e6b9811): 25 of 45
   ours (7 Native), the new row `sub_822B5EA8` Edram::Free (Native, not
