@@ -42,6 +42,37 @@ void NativeFixUpAnimation(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = ui_movies::FixUpAnimation(base, ctx.r3.u32, ctx.r4.u32);
 }
 
+// The draw walk's register steps (as their adapters', without the flag).
+void NativeCopyDrawContext(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = ui_movies::CopyDrawContext(base, ctx.r3.u32, ctx.r4.u32);
+}
+void NativeCopyQueuedText(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = ui_movies::CopyQueuedText(base, ctx.r3.u32, ctx.r4.u32);
+}
+int g_draw_fallbacks = 0;
+void NativeAppendText(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  uint32_t r3 = 0;
+  if (!ui_movies::AppendText(base, ctx.r3.u32, ctx.r4.u32, &r3)) {
+    g_draw_fallbacks++;
+    __imp__sub_8259F700(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = r3;
+}
+void NativeQueueText(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  uint32_t r3 = 0;
+  if (!ui_movies::QueueText(base, ctx.r3.u32, ctx.r5.u32, ctx.r6.u32, ctx.r1.u32 - 272, &r3)) {
+    g_draw_fallbacks++;
+    __imp__sub_8259F770(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = r3;
+}
+
 // UiMovie::ApplyTransform's register steps (as its adapter's, without the
 // flag).
 void NativeApplyTransform(PPCContext& ctx, uint8_t* base) {
@@ -916,7 +947,8 @@ void ApplyTransformCases(Context& h) {
   const uint32_t odd[] = {0x7FC00000u, 0xFFC00000u, 0x80000000u, 0x7F800000u, 0xFF800000u,
                           0x4F000000u /* 2^31 */, 0xCF000001u, 0x5F000000u, 0x00000001u,
                           threshold, threshold ^ 0x80000000u, threshold + 1,
-                          (threshold + 1) ^ 0x80000000u, threshold - 1, 0x3F800000u};
+                          (threshold + 1) ^ 0x80000000u, threshold - 1, 0x3F800000u,
+                          0x7F800001u /* signaling */, 0xFFA00000u};
   const auto odd_or = [&](uint32_t usual, uint32_t otherwise) {
     const uint32_t pick = r.Below(10);
     if (pick == 0) {
@@ -999,6 +1031,203 @@ void ApplyTransformCases(Context& h) {
   results.Report();
 }
 
+// The draw walk's copies and the texts' queue: sub_8259D9F8 (a context from
+// its parent's, apart or overlapping), sub_8259E620 (a text item, apart or
+// overlapping), sub_8259F700 (a list with room: a full one grows, the
+// original's) and UiMovie::QueueText (a context with no list or one with
+// room, a node as ApplyTransform's cases make them, a random layer with
+// junk in r6's upper half). Floats only where the code loads and stores
+// them as floats (the matrix's and color's arithmetic in QueueText's
+// transform, the items' +80); the rest exactly.
+void DrawWalkCases(Context& h) {
+  Random r;  // its own, so the harnesses after it keep their inputs
+  const auto random_words = [&](uint32_t* words, int count) {
+    for (int i = 0; i < count; i++) {
+      words[i] = r.Below(3) == 0 ? uint32_t(r.Next()) : RandomFloat(r, -500, 500);
+    }
+  };
+  {
+    Results results("DrawContext::Copy (sub_8259D9F8)");
+    for (int c = 0; c < 500; c++) {
+      uint32_t words[28], fill[28];
+      random_words(words, 28);
+      random_words(fill, 28);
+      const uint32_t parent = h.data + 256;
+      const uint32_t context =
+          r.Below(4) == 0 ? parent + 16 * (int32_t(r.Below(7)) - 3) : h.data + 16 * r.Below(4);
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Fill(h.base, h.data, kScratchBytes);
+        for (int i = 0; i < 28; i++) {
+          guest::StoreU32(h.base, context + 4 * i, fill[i]);
+        }
+        for (int i = 0; i < 28; i++) {
+          guest::StoreU32(h.base, parent + 4 * i, words[i]);
+        }
+        PPCContext t = CallContext(h);
+        t.r3.u64 = context;
+        t.r4.u64 = parent;
+        (v == 0 ? __imp__sub_8259D9F8 : NativeCopyDrawContext)(t, h.base);
+        out[v].Bytes(Read(h.base, h.data, 512));
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+        out[v].Word(t.r3.u32);
+      }
+      results.Check(out[0], out[1], fmt::format("case {}: context {:X} parent {:X}", c,
+                                                context - h.data, parent - h.data));
+    }
+    results.Report();
+  }
+  {
+    Results results("TextItem::CopyQueued (sub_8259E620)");
+    for (int c = 0; c < 500; c++) {
+      uint32_t words[32], fill[32];
+      random_words(words, 32);
+      random_words(fill, 32);
+      const uint32_t from = h.data + 512;
+      const uint32_t to =
+          r.Below(4) == 0 ? from + 16 * (int32_t(r.Below(9)) - 4) : h.data + 16 * r.Below(8);
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Fill(h.base, h.data, kScratchBytes);
+        for (int i = 0; i < 32; i++) {
+          guest::StoreU32(h.base, to + 4 * i, fill[i]);
+        }
+        for (int i = 0; i < 32; i++) {
+          guest::StoreU32(h.base, from + 4 * i, words[i]);
+        }
+        PPCContext t = CallContext(h);
+        t.r3.u64 = to;
+        t.r4.u64 = from;
+        (v == 0 ? __imp__sub_8259E620 : NativeCopyQueuedText)(t, h.base);
+        out[v].Bytes(Read(h.base, h.data, to + 80 - h.data));
+        out[v].Float(guest::LoadU32(h.base, to + 80));
+        out[v].Bytes(Read(h.base, to + 84, h.data + 1024 - (to + 84)));
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+        out[v].Word(t.r3.u32);
+      }
+      results.Check(out[0], out[1], fmt::format("case {}: to {:X} from {:X}", c,
+                                                to - h.data, from - h.data));
+    }
+    results.Report();
+  }
+  // A list at +0 of the scratch area, its items from +128 (up to 8), the
+  // item to add at +1536.
+  {
+    Results results("TextList::Append (sub_8259F700)");
+    for (int c = 0; c < 300; c++) {
+      const uint32_t capacity = 1 + r.Below(8);
+      const uint32_t count = r.Below(capacity);
+      uint32_t item[32];
+      random_words(item, 32);
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Fill(h.base, h.data, kScratchBytes);
+        guest::StoreU32(h.base, h.data + 0, h.data + 128);
+        guest::StoreU32(h.base, h.data + 4, capacity);
+        guest::StoreU32(h.base, h.data + 8, count);
+        for (int i = 0; i < 32; i++) {
+          guest::StoreU32(h.base, h.data + 1536 + 4 * i, item[i]);
+        }
+        PPCContext t = CallContext(h);
+        t.r3.u64 = h.data;
+        t.r4.u64 = h.data + 1536;
+        (v == 0 ? __imp__sub_8259F700 : NativeAppendText)(t, h.base);
+        const uint32_t slot = h.data + 128 + 128 * count;
+        out[v].Bytes(Read(h.base, h.data, slot + 80 - h.data));
+        out[v].Float(guest::LoadU32(h.base, slot + 80));
+        out[v].Bytes(Read(h.base, slot + 84, h.data + 2048 - (slot + 84)));
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+        out[v].Word(t.r3.u32);
+      }
+      results.Check(out[0], out[1], fmt::format("case {}: {} of {}", c, count, capacity));
+    }
+    results.Report();
+  }
+  // The context at +0, the node at +192, the list at +512 with its items
+  // from +640.
+  {
+    Results results("UiMovie::QueueText (sub_8259F770)");
+    for (int c = 0; c < 1000; c++) {
+      uint32_t cw[28];
+      for (int i = 0; i < 16; i++) {
+        cw[i] = RandomFloat(r, -800, 800);
+      }
+      const bool clip_set = r.Below(2) == 0;
+      for (int i = 16; i < 20; i++) {
+        cw[i] = clip_set ? uint32_t(int32_t(r.Below(1400)) - 700) : 0;
+      }
+      for (int i = 20; i < 24; i++) {
+        cw[i] = r.Below(2) == 0 ? 0x3F800000u : RandomFloat(r, 0, 1);
+      }
+      const bool with_list = r.Below(5) != 0;
+      cw[24] = uint32_t(r.Next());
+      cw[25] = with_list ? h.data + 512 : 0;
+      cw[26] = uint32_t(r.Next());
+      cw[27] = r.Below(2);
+      uint32_t nw[18];
+      for (int i = 0; i < 18; i++) {
+        nw[i] = 0;
+      }
+      nw[3] = r.Below(2) == 0 ? 0 : RandomFloat(r, -640, 640);
+      nw[4] = r.Below(2) == 0 ? 0 : RandomFloat(r, -360, 360);
+      nw[5] = r.Below(2) == 0 ? 0 : uint32_t(int32_t(r.Below(200)) - 100);
+      nw[6] = r.Below(2) == 0 ? 0 : uint32_t(int32_t(r.Below(200)) - 100);
+      nw[7] = r.Below(2) == 0 ? 0x3F800000u : RandomFloat(r, -3, 3);
+      nw[8] = r.Below(2) == 0 ? 0x3F800000u : RandomFloat(r, -3, 3);
+      nw[9] = r.Below(2) == 0 ? 0 : RandomFloat(r, -720, 720);
+      for (int i = 10; i < 14; i++) {
+        nw[i] = r.Below(3) == 0 ? uint32_t(int32_t(r.Below(1400)) - 700) : 0;
+      }
+      for (int i = 14; i < 17; i++) {
+        nw[i] = r.Below(256);
+      }
+      nw[17] = r.Below(2) == 0 ? 0x3F800000u : RandomFloat(r, 0, 1);
+      const uint32_t capacity = 1 + r.Below(4);
+      const uint32_t count = r.Below(capacity);
+      const uint64_t r6 = (r.Next() << 32) |
+                          (r.Below(3) == 0 ? uint32_t(r.Next()) : r.Below(40));
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Fill(h.base, h.data, kScratchBytes);
+        for (int i = 0; i < 28; i++) {
+          guest::StoreU32(h.base, h.data + 4 * i, cw[i]);
+        }
+        for (int i = 0; i < 18; i++) {
+          guest::StoreU32(h.base, h.data + 192 + 4 * i, nw[i]);
+        }
+        guest::StoreU32(h.base, h.data + 512, h.data + 640);
+        guest::StoreU32(h.base, h.data + 516, capacity);
+        guest::StoreU32(h.base, h.data + 520, count);
+        PPCContext t = CallContext(h);
+        t.r3.u64 = h.data;
+        t.r5.u64 = h.data + 192;
+        t.r6.u64 = r6;
+        (v == 0 ? __imp__sub_8259F770 : NativeQueueText)(t, h.base);
+        out[v].Floats(h.base, h.data, 16);
+        out[v].Bytes(Read(h.base, h.data + 64, 16));
+        out[v].Floats(h.base, h.data + 80, 4);
+        out[v].Bytes(Read(h.base, h.data + 96, 512 - 96));
+        out[v].Bytes(Read(h.base, h.data + 512, 128));
+        for (uint32_t k = 0; k < 4; k++) {  // the items: +16..+79 the matrix, +80 the depth
+          const uint32_t at = h.data + 640 + 128 * k;
+          out[v].Bytes(Read(h.base, at, 16));
+          out[v].Floats(h.base, at + 16, 17);
+          out[v].Bytes(Read(h.base, at + 84, 44));
+        }
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+        out[v].Word(t.r3.u32);
+      }
+      results.Check(out[0], out[1], fmt::format("case {}: list {} {} of {} layer {:X}", c,
+                                                with_list, count, capacity, r6));
+    }
+    results.Report();
+  }
+  if (g_draw_fallbacks != 0) {
+    ITC_LOG_INFO("harness: ui_movies: {} draw walk cases handed to the original",
+                 g_draw_fallbacks);
+  }
+}
+
 }  // namespace
 
 void UiMovies(Context& h) {
@@ -1031,6 +1260,7 @@ void UiMovies(Context& h) {
   FixUpFileCases(h);
   RestorePoseCases(h);
   ApplyTransformCases(h);
+  DrawWalkCases(h);
 }
 
 }  // namespace harness

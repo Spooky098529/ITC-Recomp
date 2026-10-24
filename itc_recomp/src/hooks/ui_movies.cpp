@@ -24,7 +24,9 @@ ITC_FLAG_BOOL(native_ui_movies, true, "ITC",
               "sub_825A0EF0 with sub_825A0E40, sub_825A0ED8, sub_8259D688 and sub_825A6570, "
               "the helpers without adapters (the flag switches their callers); "
               "sub_8259EBE8 and sub_8259DAC0, which call the recorders; UiMovie::RestorePose "
-              "sub_82119B80; UiMovie::ApplyTransform sub_8259E6C8, with sub_8259D730) "
+              "sub_82119B80; UiMovie::ApplyTransform sub_8259E6C8, with sub_8259D730; the draw "
+              "context copy sub_8259D9F8; the queued texts' copy sub_8259E620, append "
+              "sub_8259F700 (its grow the original's) and UiMovie::QueueText sub_8259F770) "
               "natively instead of through the translated code (same results; checked by "
               "--run_harnesses=ui_movies)");
 
@@ -79,6 +81,58 @@ extern "C" REX_FUNC(sub_8259E6C8) {
   }
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = ui_movies::ApplyTransform(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 352);
+}
+
+// sub_8259D9F8: r3 = a new draw context, r4 = its parent's; returns r3.
+extern "C" REX_FUNC(sub_8259D9F8) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_ui_movies)) {
+    __imp__sub_8259D9F8(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = ui_movies::CopyDrawContext(base, ctx.r3.u32, ctx.r4.u32);
+}
+
+// sub_8259E620: r3 = the destination, r4 = a text item; returns r3.
+extern "C" REX_FUNC(sub_8259E620) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_ui_movies)) {
+    __imp__sub_8259E620(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = ui_movies::CopyQueuedText(base, ctx.r3.u32, ctx.r4.u32);
+}
+
+// sub_8259F700: r3 = a text list, r4 = an item; the original when the list
+// is full (its grow).
+extern "C" REX_FUNC(sub_8259F700) {
+  REX_FUNC_PROLOGUE();
+  uint32_t r3 = 0;
+  if (!ITC_FLAG(native_ui_movies) || ui_movies::TextListFull(base, ctx.r3.u32)) {
+    __imp__sub_8259F700(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  ui_movies::AppendText(base, ctx.r3.u32, ctx.r4.u32, &r3);
+  ctx.r3.u64 = r3;
+}
+
+// UiMovie::QueueText: r3 = the draw context, r5 = the text node, r6 = the
+// layer; the original's 272-byte frame below r1. The original when the text
+// list is full.
+extern "C" REX_FUNC(sub_8259F770) {
+  REX_FUNC_PROLOGUE();
+  uint32_t r3 = 0;
+  if (ITC_FLAG(native_ui_movies)) {
+    ctx.fpscr.disableFlushMode();
+    if (ui_movies::QueueText(base, ctx.r3.u32, ctx.r5.u32, ctx.r6.u32, ctx.r1.u32 - 272, &r3)) {
+      ctx.r3.u64 = r3;
+      return;
+    }
+  }
+  __imp__sub_8259F770(ctx, base);
 }
 
 // sub_8259D5C8: r3 = a chunk, r4 = a tag; the next chunk with that tag.

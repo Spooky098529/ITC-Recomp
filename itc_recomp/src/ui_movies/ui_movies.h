@@ -184,6 +184,30 @@ std::optional<uint32_t> CubicInteger(uint8_t* base, uint32_t k0, uint32_t k1, do
 // multiplied). Flush-to-zero off on entry (the adapter's job).
 uint32_t ApplyTransform(uint8_t* base, uint32_t context, uint32_t node, uint32_t frame);
 
+// sub_8259D9F8: a draw context copied from its parent's: the matrix
+// (Matrix::Copy, noted for frame interpolation with the original's return
+// address; the w column set to 1.0 first), then +64..+108 (the clip, the
+// color, +96..+108). Returns the context.
+uint32_t CopyDrawContext(uint8_t* base, uint32_t context, uint32_t parent);
+// sub_8259E620: a queued text item copied: +0, the matrix at +16
+// (Matrix::Copy, noted), +80 (as a float), +84..+112. Returns `to`.
+uint32_t CopyQueuedText(uint8_t* base, uint32_t to, uint32_t from);
+// Whether a text list (+0 the items, +4 the capacity, +8 the count) is full.
+bool TextListFull(uint8_t* base, uint32_t list);
+// sub_8259F700: the item appended to the list (the count raised first,
+// then CopyQueuedText into items + 128 x count); `r3` its slot. False, with
+// nothing done, when the list is full (its grow, sub_8259EC58, never seen in
+// play, is the original's).
+bool AppendText(uint8_t* base, uint32_t list, uint32_t item, uint32_t* r3);
+// UiMovie::QueueText (sub_8259F770): ApplyTransform, then with a text list
+// (+100) a text item built at `frame` + 96 (`frame` the original's 272-byte
+// frame): MakeTextItem, the node, the matrix (Matrix::Copy, noted), the
+// depth (the layer, unsigned, times the float at 0x82071520), the color and
+// the clip; appended, then ClearTextItem. `r3` as the original leaves it.
+// False, with nothing done, when the list is full (the original runs).
+bool QueueText(uint8_t* base, uint32_t context, uint32_t node, uint32_t layer, uint32_t frame,
+               uint32_t* r3);
+
 // The recorders (recording.cpp), on the command list `list` (the global at
 // 0x82970C1C). Each records a chunk and returns its first slot, which the
 // caller hands to the renderer (vtable slot 4); nothing is done (nullopt)

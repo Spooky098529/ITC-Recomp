@@ -10,6 +10,7 @@
 #include "car_physics/float_ops.h"
 #include "interpolation/blend_state.h"
 #include "matrix_math/matrix_math.h"
+#include "ui_movies/game.h"
 
 #include <simde/x86/sse2.h>
 
@@ -154,9 +155,9 @@ uint32_t ApplyTransform(uint8_t* base, uint32_t context, uint32_t node, uint32_t
     if (BeyondThreshold(sx, zero, threshold) ||
         BeyondThreshold(Lfs(base, node + 32), zero, threshold)) {
       Identity(base, local);
-      const double sy = Lfs(base, node + 32);
-      Stfs(base, local + 0, sx);
-      Stfs(base, local + 20, sy);
+      // lfs then stfs: the words' bits (as CopyWord).
+      CopyWord(base, node + 28, local + 0);
+      CopyWord(base, node + 32, local + 20);
       MultiplyInto(base, context, local, 0x8259EAD8);
       r3 = context;
       const double one = Lfs(base, kOne);
@@ -179,6 +180,88 @@ uint32_t ApplyTransform(uint8_t* base, uint32_t context, uint32_t node, uint32_t
     }
   }
   return r3;
+}
+
+uint32_t CopyDrawContext(uint8_t* base, uint32_t context, uint32_t parent) {
+  ITC_NATIVE_RUNNING("sub_8259D9F8 DrawContext::Copy");
+  // The w column set to 1.0 first (then overwritten by the copy), as read.
+  const double one = Lfs(base, kOne);
+  Stfs(base, context + 12, one);
+  Stfs(base, context + 28, one);
+  Stfs(base, context + 44, one);
+  Stfs(base, context + 60, one);
+  matrix_math::Copy(base, context, parent);
+  interpolation::BlendState_OnCopy(base, context, parent, 0x8259DA30);
+  for (uint32_t at = 64; at < 112; at += 4) {  // the clip, the color, +96..+108
+    guest::StoreU32(base, context + at, guest::LoadU32(base, parent + at));
+  }
+  return context;
+}
+
+uint32_t CopyQueuedText(uint8_t* base, uint32_t to, uint32_t from) {
+  ITC_NATIVE_RUNNING("sub_8259E620 TextItem::CopyQueued");
+  guest::StoreU32(base, to + 0, guest::LoadU32(base, from + 0));
+  matrix_math::Copy(base, to + 16, from + 16);
+  interpolation::BlendState_OnCopy(base, to + 16, from + 16, 0x8259E650);
+  CopyWord(base, from + 80, to + 80);  // lfs then stfs: its bits
+  for (uint32_t at = 84; at < 116; at += 4) {  // the color and the clip
+    guest::StoreU32(base, to + at, guest::LoadU32(base, from + at));
+  }
+  return to;
+}
+
+bool TextListFull(uint8_t* base, uint32_t list) {
+  return guest::LoadU32(base, list + 8) >= guest::LoadU32(base, list + 4);
+}
+
+bool AppendText(uint8_t* base, uint32_t list, uint32_t item, uint32_t* r3) {
+  ITC_NATIVE_RUNNING("sub_8259F700 TextList::Append");
+  if (TextListFull(base, list)) {
+    return false;  // the grow (sub_8259EC58, never seen in play): the original
+  }
+  const uint32_t count = guest::LoadU32(base, list + 8);
+  const uint32_t slot = (count << 7) + guest::LoadU32(base, list + 0);
+  guest::StoreU32(base, list + 8, count + 1);
+  *r3 = CopyQueuedText(base, slot, item);
+  return true;
+}
+
+bool QueueText(uint8_t* base, uint32_t context, uint32_t node, uint32_t layer, uint32_t frame,
+               uint32_t* r3) {
+  ITC_NATIVE_RUNNING("sub_8259F770 UiMovie::QueueText");
+  const uint32_t list = guest::LoadU32(base, context + 100);
+  if (list != 0 && TextListFull(base, list)) {
+    return false;
+  }
+  *r3 = ApplyTransform(base, context, node, frame - 352);
+  if (guest::LoadU32(base, context + 100) == 0) {
+    return true;
+  }
+  const uint32_t item = frame + 96;
+  MakeTextItem(base, item);
+  guest::StoreU32(base, item + 0, node);
+  matrix_math::Copy(base, item + 16, context);
+  interpolation::BlendState_OnCopy(base, item + 16, context, 0x8259F7B4);
+  uint32_t color[4], clip[4];
+  for (uint32_t i = 0; i < 4; i++) {
+    color[i] = guest::LoadU32(base, context + 80 + 4 * i);
+  }
+  for (uint32_t i = 0; i < 4; i++) {
+    clip[i] = guest::LoadU32(base, context + 64 + 4 * i);
+  }
+  // The layer as an unsigned 32-bit integer (std then lfd, fcfid, frsp).
+  const double depth = double(float(double(int64_t(uint64_t(layer)))));
+  Stfs(base, item + 80, Fmuls(depth, Lfs(base, 0x82071520)));
+  for (uint32_t i = 0; i < 4; i++) {
+    guest::StoreU32(base, item + 84 + 4 * i, color[i]);
+  }
+  for (uint32_t i = 0; i < 4; i++) {
+    guest::StoreU32(base, item + 100 + 4 * i, clip[i]);
+  }
+  uint32_t appended = 0;
+  AppendText(base, guest::LoadU32(base, context + 100), item, &appended);
+  *r3 = ClearTextItem(base, item);
+  return true;
 }
 
 }  // namespace ui_movies
