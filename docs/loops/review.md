@@ -23,8 +23,13 @@ When the user has reviewed a run's section, its heading gets
   graphics side at `8248xxxx`, the resources' other makers and users).
   Shared rows left where they were: `sub_822A5B68`, `sub_8235A9F8`,
   `sub_8235A990` (`models.md`), XMemAlloc and XMemFree (`heap.md`).
-  For the user's call: the two choices under "Stopped" in
-  `b7-progress.md`.
+  The user's calls (2026-10-24): (1) `Edram::Alloc` (`sub_822B5EF8`) made native with a `std::mutex`
+in place of the kernel's critical section (its bases kept: the
+renderer keys targets by them); (2) `Resource::Lock`'s and
+`Resource::Destroy`'s fence waits, `Lock`'s cache flush packet and
+`Unlock`'s data cache flush (`sub_822AC470`) Dropped, the lock count,
+the returned address and the freeing kept (a harness group for the
+command buffer's words expected to differ).
 
 ## Run 2026-10-23 20:22 (`b7-loop-23-10-26-5`)
 

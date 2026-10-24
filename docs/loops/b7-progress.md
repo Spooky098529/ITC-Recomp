@@ -17,7 +17,8 @@ see in a drive, from every run: `to-drive.md`.
   description, with the UI movie's texture set): mapped as the graphics
   resources (`graphics-resources.md`, 44 rows, 0e67c00; 13 ready
   groups). The map's checks passed, but its report's `stop:` named two
-  choices for the user, so the loop stopped before migrating (below).
+  choices for the user, so the loop stopped before migrating (below); resumed with the
+  user's calls: migration agent running.
 
 ## Done
 
@@ -54,3 +55,12 @@ groups (format math, descriptions, buffer creation, the device's
 getters) need neither. Map checks: `check_function_statuses.py` 0
 errors; `b7_status.py` lists the file, 44 of 44 in play. Next: the
 user's two calls, then a new loop (or this run continued).
+
+Resumed 2026-10-24 (the user's calls): (1) `Edram::Alloc` (`sub_822B5EF8`) made native with a `std::mutex`
+in place of the kernel's critical section (its bases kept: the
+renderer keys targets by them); (2) `Resource::Lock`'s and
+`Resource::Destroy`'s fence waits, `Lock`'s cache flush packet and
+`Unlock`'s data cache flush (`sub_822AC470`) Dropped, the lock count,
+the returned address and the freeing kept (a harness group for the
+command buffer's words expected to differ). The run goes on
+with this subsystem's migration.
