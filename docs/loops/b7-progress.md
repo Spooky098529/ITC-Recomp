@@ -13,7 +13,8 @@ see in a drive, from every run: `to-drive.md`.
 
 - Run started 2026-10-24 03:25 on `b7-loop-24-10-26` (the user's
   branch), from 8073e3b; summary `b7-loop-2026-10-24-0325.md`.
-- Subsystem 1 of 3: `leads.md`'s top lead (`sub_822A5B78`, a texture's
+- Limit for this run: 4 subsystems (the user's call, 2026-10-24; `b7-loop.md` says 3).
+- Subsystem 1 of 4: `leads.md`'s top lead (`sub_822A5B78`, a texture's
   description, with the UI movie's texture set): mapped as the graphics
   resources (`graphics-resources.md`, 44 rows, 0e67c00; 13 ready
   groups). The map's checks passed, but its report's `stop:` named two
