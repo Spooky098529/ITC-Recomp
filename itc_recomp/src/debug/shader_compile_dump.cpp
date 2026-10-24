@@ -113,10 +113,11 @@ extern "C" REX_FUNC(sub_822B8F10) {
   ITC_LOG_INFO(
       "dump_shader_compiles: caller {:08X} source {:08X} length {} (hash {:016X}) entry {} "
       "profile {} flags {:08X} defines {:08X} include {:08X} -> result {:08X} shader {:08X} "
-      "({} bytes, hash {:016X}) constant table asked {} made {:08X} errors {:08X} '{}'",
+      "({} bytes, hash {:016X}, vtable {:08X}) constant table asked {} made {:08X} errors {:08X} '{}'",
       caller, source, length, base::Hash64(source_bytes.data(), source_bytes.size()), entry,
       profile, flags, defines, include, result, shader, shader_bytes.size(),
-      base::Hash64(shader_bytes.data(), shader_bytes.size()), table_out != 0, table, errors,
+      base::Hash64(shader_bytes.data(), shader_bytes.size()),
+      shader ? guest::LoadU32(base, shader) : 0, table_out != 0, table, errors,
       error_text);
   ctx.r3.u64 = result;
 }
