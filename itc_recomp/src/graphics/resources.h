@@ -50,4 +50,32 @@ uint32_t TextureLevelCount(uint32_t width, uint32_t height, uint32_t depth, uint
 // this size, format and multisample type takes.
 uint32_t SurfaceEdramTiles(uint32_t width, uint32_t height, uint32_t format, int32_t multisample);
 
+// --- Buffers (the allocation layer: run only with --native_heap) ---
+
+// sub_822A6830 Device::CreateVertexBuffer: a 32-byte header and `bytes` of
+// physical memory (write-combined with usage 0x4); 0 when either fails.
+uint32_t CreateVertexBuffer(uint8_t* base, uint32_t bytes, uint32_t usage);
+
+// sub_822A6968 Device::CreateIndexBuffer: the same with the index format in
+// the header's top 3 bits.
+uint32_t CreateIndexBuffer(uint8_t* base, uint32_t bytes, uint32_t usage, uint32_t format);
+
+// --- The device's current resources (AddRef'ed when set) ---
+
+// sub_822A3998 Device::GetRenderTarget: device +12184 + 4 x index.
+uint32_t GetRenderTarget(uint8_t* base, uint32_t device, uint32_t index);
+
+// sub_822A39E0 Device::GetDepthStencilSurface: device +12200.
+uint32_t GetDepthStencilSurface(uint8_t* base, uint32_t device);
+
+// sub_822A3880 Device::GetStreamSource: the stream's buffer (device +12204 +
+// 4 x stream), its offset (from the stream's fetch constant, 0 with no
+// buffer) and stride.
+struct StreamSource {
+  uint32_t buffer;
+  uint32_t offset;
+  uint32_t stride;
+};
+StreamSource GetStreamSource(uint8_t* base, uint32_t device, uint32_t stream);
+
 }  // namespace graphics

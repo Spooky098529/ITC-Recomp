@@ -9,7 +9,10 @@
 #include "harness.h"
 
 #include "base/flags.h"
+#include "base/log.h"
 #include "graphics/resources.h"
+#include "memory/c_runtime_heap.h"
+#include "memory/heap.h"
 
 #include <fmt/format.h>
 
@@ -57,6 +60,25 @@ void NativeLevelCount(PPCContext& ctx, uint8_t* base) {
 }
 void NativeEdramTiles(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = gr::SurfaceEdramTiles(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.s32);
+}
+
+void NativeCreateVertexBuffer(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = gr::CreateVertexBuffer(base, ctx.r3.u32, ctx.r4.u32);
+}
+void NativeCreateIndexBuffer(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = gr::CreateIndexBuffer(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+}
+void NativeGetRenderTarget(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = gr::GetRenderTarget(base, ctx.r3.u32, ctx.r4.u32);
+}
+void NativeGetDepthStencilSurface(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = gr::GetDepthStencilSurface(base, ctx.r3.u32);
+}
+void NativeGetStreamSource(PPCContext& ctx, uint8_t* base) {
+  const gr::StreamSource source = gr::GetStreamSource(base, ctx.r3.u32, ctx.r4.u32);
+  guest::StoreU32(base, ctx.r5.u32, source.offset);
+  guest::StoreU32(base, ctx.r6.u32, source.stride);
+  ctx.r3.u64 = source.buffer;
 }
 
 // The scratch area's layout.
@@ -215,6 +237,136 @@ void SizeMath(Context& h, Random& r) {
   }
 }
 
+// The buffers: both versions allocate, so the header's data address (+24)
+// differs between them; its low 12 bits (the flags, the data 4 KiB aligned)
+// are compared, and every other header word exactly. Each version's header
+// and data are freed after it. The paths where an allocation fails aren't
+// taken: the allocation layer stops the game when out of memory.
+void Buffers(Context& h, Random& r) {
+  const uint32_t usages[] = {0, 0x4, 0x200, 0x204, 0x8, 0x10};
+  for (int index = 0; index < 2; index++) {
+    Results results(index ? "Device::CreateIndexBuffer (sub_822A6968)"
+                          : "Device::CreateVertexBuffer (sub_822A6830)");
+    for (int i = 0; i < 60; i++) {
+      const uint32_t bytes = 4 + r.Below(65536);
+      const uint32_t usage = r.Below(4) ? usages[r.Below(6)] : uint32_t(r.Next());
+      const uint32_t format = r.Below(4) ? r.Below(2) : uint32_t(r.Next());
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        PPCContext t = CallContext(h);
+        t.r3.u64 = bytes;
+        t.r4.u64 = usage;
+        t.r5.u64 = format;
+        t.r6.u64 = 0;
+        GuestFunction f = index ? (v == 0 ? Original<__imp__sub_822A6968> : NativeCreateIndexBuffer)
+                                : (v == 0 ? Original<__imp__sub_822A6830> : NativeCreateVertexBuffer);
+        f(t, h.base);
+        const uint32_t header = t.r3.u32;
+        out[v].Word(header != 0);
+        if (header == 0) {
+          continue;
+        }
+        std::vector<uint8_t> words = Read(h.base, header, 32);
+        const uint32_t data = guest::LoadU32(h.base, header + 24);
+        out[v].Word(data & 0xFFF);
+        out[v].Word((data & ~0xFFFu) != 0);
+        for (int k = 0; k < 4; k++) {
+          words[24 + k] = 0;
+        }
+        out[v].Bytes(words);
+        const uint32_t protection = (usage & 0x4) ? 2 : 3;
+        memory::crt::XMemFree(data & ~0xFFFu, 0x82800000u | (protection << 28));
+        memory::crt::XMemFree(header, 0x24800000);
+      }
+      results.Check(out[0], out[1],
+                    fmt::format("{} bytes, usage {:X}, format {:X}", bytes, usage, format));
+    }
+    results.Report();
+  }
+}
+
+// The device's getters on a block standing for the device (its slots and
+// the streams' fetch constants and strides random, a slot null now and
+// then) and resources in the scratch area: some type 4 with the child bit,
+// whose first reference also AddRefs their parent. Compared: the outputs,
+// r3 and every resource's count.
+void Getters(Context& h, Random& r) {
+  constexpr uint32_t kDeviceBytes = 12304;
+  const uint32_t device = memory::Alloc(kDeviceBytes, 0);
+  if (device == 0) {
+    ITC_LOG_INFO("harness: graphics_resources: no block for the device");
+    return;
+  }
+  constexpr uint32_t kResources = 8;
+  constexpr uint32_t kResourceBytes = 64;
+  auto resource = [&](uint32_t i) { return h.data + kResourceBytes * i; };
+  struct Getter {
+    const char* name;
+    GuestFunction recompiled;
+    GuestFunction native;
+  };
+  const Getter getters[] = {
+      {"Device::GetRenderTarget (sub_822A3998)", Original<__imp__sub_822A3998>,
+       NativeGetRenderTarget},
+      {"Device::GetDepthStencilSurface (sub_822A39E0)", Original<__imp__sub_822A39E0>,
+       NativeGetDepthStencilSurface},
+      {"Device::GetStreamSource (sub_822A3880)", Original<__imp__sub_822A3880>,
+       NativeGetStreamSource},
+  };
+  for (const Getter& getter : getters) {
+    Results results(getter.name);
+    for (int i = 0; i < 200; i++) {
+      // The inputs, the same for both versions.
+      std::vector<uint32_t> device_words(kDeviceBytes / 4);
+      for (uint32_t& w : device_words) {
+        w = uint32_t(r.Next());
+      }
+      // The slots: +12184 to +12264 (render targets, depth, streams).
+      for (uint32_t slot = 12184; slot < 12272; slot += 4) {
+        device_words[slot / 4] = r.Below(5) == 0 ? 0 : resource(r.Below(kResources));
+      }
+      std::vector<uint8_t> resources(kResources * kResourceBytes);
+      for (uint8_t& b : resources) {
+        b = uint8_t(r.Next());
+      }
+      for (uint32_t k = 0; k < kResources; k++) {
+        uint8_t* p = resources.data() + kResourceBytes * k;
+        const uint32_t type = r.Below(2) ? 4 : r.Below(16);
+        p[3] = uint8_t((p[3] & 0xF0) | type);
+        p[0] = uint8_t(r.Below(2) ? (p[0] | 0x40) : (p[0] & ~0x40));
+        // The count: 0 now and then (a first reference).
+        const uint32_t count = r.Below(3) == 0 ? 0 : r.Below(100);
+        p[4] = 0, p[5] = 0, p[6] = 0, p[7] = uint8_t(count);
+        const uint32_t parent = resource(r.Below(kResources));
+        p[24] = uint8_t(parent >> 24), p[25] = uint8_t(parent >> 16);
+        p[26] = uint8_t(parent >> 8), p[27] = uint8_t(parent);
+      }
+      const uint32_t index = r.Below(4);  // the render targets
+      const uint32_t stream = r.Below(16);
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Fill(h.base, h.data, kScratchBytes);
+        Write(h.base, h.data, resources.data(), uint32_t(resources.size()));
+        guest::StoreU32s(h.base, device, device_words.data(), uint32_t(device_words.size()));
+        PPCContext t = CallContext(h);
+        t.r3.u64 = device;
+        t.r4.u64 = &getter == &getters[2] ? stream : index;
+        t.r5.u64 = h.data + 1024;
+        t.r6.u64 = h.data + 1028;
+        (v == 0 ? getter.recompiled : getter.native)(t, h.base);
+        out[v].Word(t.r3.u32);
+        out[v].Bytes(Read(h.base, h.data + 1024, 8));
+        for (uint32_t k = 0; k < kResources; k++) {
+          out[v].Word(guest::LoadU32(h.base, resource(k) + 4));
+        }
+      }
+      results.Check(out[0], out[1], fmt::format("case {}: index {}, stream {}", i, index, stream));
+    }
+    results.Report();
+  }
+  memory::Free(device);
+}
+
 }  // namespace
 
 void GraphicsResources(Context& h) {
@@ -222,6 +374,8 @@ void GraphicsResources(Context& h) {
   Headers(h, r);
   BlockSizes(h, r);
   SizeMath(h, r);
+  Buffers(h, r);
+  Getters(h, r);
 }
 
 }  // namespace harness

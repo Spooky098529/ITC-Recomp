@@ -20,7 +20,11 @@
 // throughout), so both are skipped; the rest of the call runs as before.
 // How many calls bind the same shader is logged every 5 s.
 //
-// --refcount_global_lock=true runs the library's own functions instead.
+// --refcount_global_lock=true runs the library's own functions instead
+// (for the recompiled callers; native callers, src/graphics/, call
+// refcount::AddRef, lock-free, either way).
+
+#include "native/refcount.h"
 
 #include "guest.h"
 
@@ -67,24 +71,28 @@ bool HoldsChild(uint8_t* base, uint32_t object) {
 
 }  // namespace
 
+namespace refcount {
+
+uint32_t AddRef(uint8_t* base, uint32_t object) {
+  if (object == g_unchanged_shader) {
+    return guest::LoadU32(base, object + kCount);  // unused by the caller
+  }
+  uint32_t count = AddToCount(base, object + kCount, 1);
+  if (count == 1 && HoldsChild(base, object)) {
+    AddRef(base, guest::LoadU32(base, object + kChild));
+  }
+  return count;
+}
+
+}  // namespace refcount
+
 extern "C" REX_FUNC(sub_822A6738) {
   REX_FUNC_PROLOGUE();
   if (ITC_FLAG(refcount_global_lock)) {
     __imp__sub_822A6738(ctx, base);
     return;
   }
-  uint32_t object = ctx.r3.u32;
-  if (object == g_unchanged_shader) {
-    ctx.r3.u64 = guest::LoadU32(base, object + kCount);  // unused by the caller
-    return;
-  }
-  uint32_t count = AddToCount(base, object + kCount, 1);
-  if (count == 1 && HoldsChild(base, object)) {
-    ctx.r3.u64 = guest::LoadU32(base, object + kChild);
-    ctx.lr = 0x822A6794;
-    sub_822A6738(ctx, base);
-  }
-  ctx.r3.u64 = count;
+  ctx.r3.u64 = refcount::AddRef(base, ctx.r3.u32);
 }
 
 extern "C" REX_FUNC(sub_822A67B0) {
