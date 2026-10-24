@@ -144,6 +144,8 @@ set(ITC_SOURCES
     src/track_route/track_route.cpp
     src/hooks/ai_drivers.cpp
     src/ai_drivers/ai_drivers.cpp
+    src/hooks/racer_controllers.cpp
+    src/racer_controllers/racer_controllers.cpp
     src/hooks/action_mappers.cpp
     src/action_mappers/action_mappers.cpp
     src/hooks/data_tables.cpp
@@ -210,6 +212,7 @@ set(ITC_SOURCES
     src/harnesses/collision_world_walls.cpp
     src/harnesses/track_route.cpp
     src/harnesses/ai_drivers.cpp
+    src/harnesses/racer_controllers.cpp
     src/harnesses/action_mappers.cpp
     src/harnesses/data_tables.cpp
     src/harnesses/model_animation.cpp
