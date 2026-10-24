@@ -41,6 +41,26 @@ When the user has reviewed a run's section, its heading gets
   floats); the constant copies as raw 16-byte copies (as lvlx/lvrx);
   the adapters written one per line for `check_function_statuses.py`;
   the setters' adapters stay (the device's tables point at them).
+  Migration 2 (fd70fa2..fd026da): 131 of 131 ours; SetRenderTarget,
+  SetRenderTarget_External, SetDepthStencilSurface, and the packet
+  writers without their packets (SetDefaultState, DirtyAllState,
+  `sub_8229B7D8`, SetShaderGprAllocation with `sub_8229F680`'s dummy
+  draws and their reservations left out, SetGammaRamp); `sub_822B0C38`
+  Dropped (no override: SetGammaRamp's C++ leaves the call out; its
+  other caller `sub_822A3AA8` isn't seen in play); `functions.md`'s
+  Device::SetUpDisplay, Init and SetDisplayMode rows (they call the plain
+  C++; their guest calls in the new `src/hooks/device_state_calls.h`).
+  For review: guest calls kept through `DeviceCalls` (the draw's Wrapped
+  flush helpers `sub_822ADC08` and `sub_822ADE30`, so `sub_8229F680`'s
+  mask flush and renderer marks match; non-native table setters, none in
+  play; SetTexture's original on a full fence list); SetDefaultState
+  calls each setter natively by its table address (the empty
+  `sub_82106540` as nothing); the command buffer allocator's bookkeeping
+  (+13532, +44, +48, +13516, +10809 bit 6) is read only by the command
+  buffer code, not `src/native`; SetGammaRamp writes +13608 itself
+  instead of calling memcpy (the original runs if the device were ever
+  in the physical views); temporary logs showed no REG_TO_MEM in play
+  and the gamma's COND_WRITE (display register 0x1922) the only one.
 
 - `video-output.md` (new, 30 rows; 6 moved from `functions.md`:
   VideoOutput::SetUpDisplay, WaitForVblank, ResolveFrontBuffer,

@@ -214,3 +214,11 @@ were at 0.
 | `sub_822A3D20` Device::SetRenderState_ScissorTestEnable | the command buffer | 200 of 200 | Packets nothing reads | for review (03:25 run) |
 | `sub_822A3518` Device::SetViewport | the command buffer | 352 of 400 | Packets nothing reads | for review (03:25 run) |
 | `sub_822A3C88` Device::SetSurfaceInfo | the command buffer | 175 of 200 | Packets nothing reads | for review (03:25 run) |
+| `sub_822A3D30` Device::SetRenderTarget | the command buffer | 131 of 600 | Packets nothing reads | for review (03:25 run) |
+| `sub_822A4340` Device::SetRenderTarget_External | the command buffer | 25 of 100 | Packets nothing reads | for review (03:25 run) |
+| `sub_822A4060` Device::SetDepthStencilSurface | the command buffer | 123 of 500 | Packets nothing reads | for review (03:25 run) |
+| `sub_8229B7D8` | the command buffer | 200 of 200 | Packets nothing reads | for review (03:25 run) |
+| `sub_822A3B90` Device::DirtyAllState | the command buffer | 200 of 200 | Packets nothing reads | for review (03:25 run) |
+| `sub_822A8A60` Device::SetShaderGprAllocation | the command buffer | 300 of 300 | Packets nothing reads | for review (03:25 run) |
+| `sub_822A3A20` Device::SetGammaRamp | the command buffer | 40 of 60 | Packets nothing reads | for review (03:25 run) |
+| `sub_822ACB90` Device::SetDefaultState | the command buffer | 40 of 40 | Packets nothing reads | for review (03:25 run) |
