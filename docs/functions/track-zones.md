@@ -52,7 +52,21 @@ its state forced to 1, returning the slices counted along the path in
 `0x82603274` when the position is on it, else -1; no callers seen),
 `sub_820FE598` (not read), and the camera modes' users of route ranges
 `sub_82155288` (44 ranges made), `sub_821562F8` and `sub_82156980`
-(`RouteRange::Update`, `Test`).
+(`RouteRange::Update`, `Test`). The migration (2026-10-24) saw some of these run in
+attract races by temporary logs, though the coverage list doesn't have
+them: `sub_82155288` calls `RouteRange::Init` and `AddBranch` (return
+address 0x821554D8), `sub_821562F8` calls `RouteRange::Update`
+(0x821563C0), and `sub_820FE830` calls `RouteRange::Test` (0x820FE854);
+so `Init`, `AddBranch`, `Update` and `Test` keep their adapters. They're
+for the camera modes' map (`../loops/leads.md`).
+
+Native since 2026-10-24 (`--native_track_zones`): `src/track_zones/`
+(plain C++), `src/hooks/track_zones.cpp` (adapters), harness
+`track_zones` (`src/harnesses/track_zones.cpp`). The 70 set-ups are one
+plain C++ function each over a table of their ranges read from
+`generated/` (`kSetupRanges`), each with its own print. The owner's,
+`Zone::Update`'s and `Zone::IsInside`'s vtable calls run natively when
+the slot is the known function, else through the vtable.
 
 Status:
 
