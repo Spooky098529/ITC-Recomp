@@ -12,7 +12,9 @@
 #include "harness.h"
 
 #include "base/flags.h"
+#include "hooks/guest_call.h"
 #include "hooks/heap.h"
+#include "hooks/post_effects.h"
 #include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
 #include "post_effects/post_effects.h"
@@ -58,6 +60,27 @@ void NativeRenderTextureRelease(PPCContext& ctx, uint8_t* base) {
     return;
   }
   ctx.r3.u64 = *r3;
+}
+
+// The removed adapters' steps, without the flag: RenderTextures::Release
+// and PostEffect::ReleaseSurface (r3 = the field's address), the
+// destructors (r3 = the effect; from a frame like the original's).
+void NativeRenderTexturesRelease(PPCContext& ctx, uint8_t* base) {
+  hooks::PostEffectsReleaseTexture(ctx, base);
+}
+void NativeReleaseSurface(PPCContext& ctx, uint8_t* base) {
+  hooks::PostEffectsReleaseSurface(ctx, base);
+}
+template <uint32_t (*Destroy)(uint8_t*, uint32_t, const pe::DestroyCalls&)>
+void NativeDestroy(PPCContext& ctx, uint8_t* base) {
+  const uint64_t lr = ctx.lr;
+  const uint32_t effect = ctx.r3.u32;
+  uint32_t r3 = 0;
+  guest_call::InFrame(ctx, base, 112, 0, [&](uint32_t) {
+    r3 = Destroy(base, effect, hooks::PostEffectsDestroyCalls(ctx, base));
+  });
+  ctx.lr = lr;
+  ctx.r3.u64 = r3;
 }
 
 constexpr uint32_t kBlockBytes = 0x4000;
@@ -655,7 +678,7 @@ void RenderTextureCases(Context& h, uint32_t block) {
         PPCContext t = CallContext(h);
         t.r3.u64 = pool ? block + kAt : entry;
         if (pool) {
-          Run(v, __imp__sub_821332F0, sub_821332F0, t, h.base);
+          Run(v, __imp__sub_821332F0, NativeRenderTexturesRelease, t, h.base);
         } else {
           Run(v, __imp__sub_82133070, NativeRenderTextureRelease, t, h.base);
         }
@@ -702,7 +725,7 @@ void ReleaseSurfaceCases(Context& h, uint32_t block) {
       guest::StoreU32(h.base, block + kAt, block + kSurface);
       PPCContext t = CallContext(h);
       t.r3.u64 = block + kAt;
-      Run(v, __imp__sub_82133C60, sub_82133C60, t, h.base);
+      Run(v, __imp__sub_82133C60, NativeReleaseSurface, t, h.base);
       out[v].Word(guest::LoadU32(h.base, block + kAt));
       out[v].Word(guest::LoadU32(h.base, block + kSurface + 4));
       out[v].Word(t.r3.u32);
@@ -782,11 +805,11 @@ void DestroyCases(Context& h, uint32_t block) {
     glow_textures.push_back(at);
   }
   const Kind kinds[] = {
-      {"sub_82136E30 Glow::~Glow", __imp__sub_82136E30, sub_82136E30, 8480,
+      {"sub_82136E30 Glow::~Glow", __imp__sub_82136E30, NativeDestroy<pe::GlowDestroy>, 8480,
        {8432, 8428, 8424, 8420, 8416, 8412}, glow_textures, false},
-      {"sub_821351A8 ColorFilter::~ColorFilter", __imp__sub_821351A8, sub_821351A8, 8128, {}, {8064},
+      {"sub_821351A8 ColorFilter::~ColorFilter", __imp__sub_821351A8, NativeDestroy<pe::ColorFilterDestroy>, 8128, {}, {8064},
        false},
-      {"sub_82136390 MotionBlur::~MotionBlur", __imp__sub_82136390, sub_82136390, 8224,
+      {"sub_82136390 MotionBlur::~MotionBlur", __imp__sub_82136390, NativeDestroy<pe::MotionBlurDestroy>, 8224,
        {8076, 8072}, {8068, 8064}, false},
       {"sub_821389C8 Glow::~Glow (deleting)", __imp__sub_821389C8, sub_821389C8, 8480,
        {8432, 8428, 8424, 8420, 8416, 8412}, glow_textures, true},

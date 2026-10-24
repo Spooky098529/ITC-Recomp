@@ -11,13 +11,21 @@
 // (sub_8212EDE0) have no adapters: only Race::ToggleEffects' plain C++ calls
 // them, and the flag switches it. StarDef::Init (sub_8212EA98) has none
 // either: only GlareDef::Init's plain C++ calls it; nor RenderTexture::Release
-// (sub_82133070): only RenderTextures::Release's plain C++ calls it.
+// (sub_82133070): only RenderTextures::Release's plain C++ calls it; nor
+// RenderTextures::Release (sub_821332F0), PostEffect::ReleaseSurface
+// (sub_82133C60) and the destructors Glow::~Glow (sub_82136E30),
+// ColorFilter::~ColorFilter (sub_821351A8) and MotionBlur::~MotionBlur
+// (sub_82136390): only the destructors' and the deleting destructors' plain
+// C++ calls them (the first two through hooks::PostEffectsReleaseTexture and
+// PostEffectsReleaseSurface, which take the original's path where theirs
+// isn't native).
 
 #include "guest.h"
 
 #include "base/flags.h"
 #include "hooks/guest_call.h"
 #include "hooks/heap.h"
+#include "hooks/post_effects.h"
 #include "post_effects/post_effects.h"
 
 #include <optional>
@@ -46,7 +54,9 @@ ITC_FLAG_BOOL(native_post_effects, true, "ITC",
               "(with --native_video_output) and TargetFilter::TargetFilter sub_82135AA8 (with "
               "--native_graphics_resources and --native_heap); the destructors Glow::~Glow "
               "sub_82136E30, ColorFilter::~ColorFilter sub_821351A8 and MotionBlur::~MotionBlur "
-              "sub_82136390 and their deleting ones sub_821389C8, sub_82138570 and sub_821385C0 "
+              "sub_82136390 (no adapters, nor for RenderTextures::Release and ReleaseSurface: only "
+              "the deleting destructors' and the destructors' plain C++ call them, and the flag "
+              "switches those) and their deleting ones sub_821389C8, sub_82138570 and sub_821385C0 "
               "(operator delete with --native_c_runtime_heap)) natively instead of through the "
               "translated code (the same writes; checked by --run_harnesses=post_effects)");
 
@@ -211,7 +221,11 @@ uint32_t VideoOutputCall(PPCContext& ctx, uint8_t* base, uint32_t first, uint32_
 // RenderTextures::Release (r3 = the address of an effect's entry pointer)
 // natively, or the original where the frees aren't native; its adapter's
 // body, which the destructors' adapters call too.
-void ReleaseTexture(PPCContext& ctx, uint8_t* base) {
+}  // namespace
+
+namespace hooks {
+
+void PostEffectsReleaseTexture(PPCContext& ctx, uint8_t* base) {
   std::optional<uint32_t> r3;
   if (FreesNative()) {
     r3 = RenderTexturesRelease(base, ctx.r3.u32);
@@ -227,7 +241,7 @@ void ReleaseTexture(PPCContext& ctx, uint8_t* base) {
 // pointer) natively, its guest calls from a frame like the original's (112
 // bytes), or the original without the native device lock; its adapter's
 // body, as ReleaseTexture.
-void ReleaseSurfaceCall(PPCContext& ctx, uint8_t* base) {
+void PostEffectsReleaseSurface(PPCContext& ctx, uint8_t* base) {
   if (!ITC_FLAG(native_video_output)) {
     __imp__sub_82133C60(ctx, base);
     return;
@@ -253,27 +267,20 @@ void ReleaseSurfaceCall(PPCContext& ctx, uint8_t* base) {
 }
 
 // The destructors' calls: the two above, r3 = the field's address.
-DestroyCalls MakeDestroyCalls(PPCContext& ctx, uint8_t* base) {
+DestroyCalls PostEffectsDestroyCalls(PPCContext& ctx, uint8_t* base) {
   return {[&ctx, base](uint32_t at) {
             ctx.r3.u64 = at;
-            ReleaseSurfaceCall(ctx, base);
+            PostEffectsReleaseSurface(ctx, base);
             return ctx.r3.u32;
           },
           [&ctx, base](uint32_t at) {
             ctx.r3.u64 = at;
-            ReleaseTexture(ctx, base);
+            PostEffectsReleaseTexture(ctx, base);
             return ctx.r3.u32;
           }};
 }
 
-}  // namespace
-
-// RenderTextures::Release: r3 = the address of an effect's entry pointer.
-ITC_POST_EFFECTS(821332F0, ReleaseTexture(ctx, base))
-
-// PostEffect::ReleaseSurface: r3 = the address of an effect's surface
-// pointer.
-ITC_POST_EFFECTS(82133C60, ReleaseSurfaceCall(ctx, base))
+}  // namespace hooks
 
 // TargetFilter::TargetFilter: r3 = the object, r4 = the table entry. The
 // surface's parameters in a frame like the original's (112 bytes).
@@ -297,30 +304,7 @@ extern "C" REX_FUNC(sub_82135AA8) {
   ctx.r3.u64 = *r3;
 }
 
-// --- The destructors: r3 = the effect ---
-
-// Each from a frame like the original's (112 or 96 bytes; the calls' own
-// frames below it).
-#define ITC_POST_EFFECT_DESTROY(address, bytes, Destroy)                     \
-  extern "C" REX_FUNC(sub_##address) {                                       \
-    REX_FUNC_PROLOGUE();                                                     \
-    if (!ITC_FLAG(native_post_effects)) {                                    \
-      __imp__sub_##address(ctx, base);                                       \
-      return;                                                                \
-    }                                                                        \
-    const uint64_t lr = ctx.lr;                                              \
-    const uint32_t effect = ctx.r3.u32;                                      \
-    uint32_t r3 = 0;                                                         \
-    guest_call::InFrame(ctx, base, bytes, 0, [&](uint32_t) {                 \
-      r3 = Destroy(base, effect, MakeDestroyCalls(ctx, base));               \
-    });                                                                      \
-    ctx.lr = lr;                                                             \
-    ctx.r3.u64 = r3;                                                         \
-  }
-
-ITC_POST_EFFECT_DESTROY(82136E30, 112, GlowDestroy)
-ITC_POST_EFFECT_DESTROY(821351A8, 96, ColorFilterDestroy)
-ITC_POST_EFFECT_DESTROY(82136390, 96, MotionBlurDestroy)
+// --- The destructors ---
 
 // The deleting destructors (vtable slot 1): r4 bit 0 = delete. The
 // original where the delete isn't native.
@@ -336,7 +320,7 @@ ITC_POST_EFFECT_DESTROY(82136390, 96, MotionBlurDestroy)
     const uint32_t flags = ctx.r4.u32;                                                 \
     std::optional<uint32_t> r3;                                                        \
     guest_call::InFrame(ctx, base, 112, 0, [&](uint32_t) {                             \
-      r3 = DeleteEffect(base, kind, effect, flags, MakeDestroyCalls(ctx, base));       \
+      r3 = DeleteEffect(base, kind, effect, flags, hooks::PostEffectsDestroyCalls(ctx, base));       \
     });                                                                                \
     ctx.lr = lr;                                                                       \
     if (!r3) {                                                                         \
