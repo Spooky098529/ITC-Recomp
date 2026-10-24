@@ -20,6 +20,8 @@
 
 #include "base/flags.h"
 #include "base/log.h"
+#include "hooks/heap.h"
+#include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
 #include "track_zones/track_zones.h"
 
@@ -788,6 +790,386 @@ void Setups(Context& h, Random& r) {
   memory::Free(block);
 }
 
+// --- The zones' owner ---
+
+constexpr uint32_t kVehicles = 0x826C2E34;  // the vehicles' array (Vehicle::Get)
+
+// The globals the owner's functions read and write, saved and put back.
+struct Globals {
+  uint8_t* base;
+  uint32_t owner, race_data, race, vehicles, player_flag, route, slices;
+  explicit Globals(uint8_t* b) : base(b) {
+    owner = guest::LoadU32(base, tz::kOwner);
+    race_data = guest::LoadU32(base, tz::kRaceData);
+    race = guest::LoadU32(base, tz::kRace);
+    vehicles = guest::LoadU32(base, kVehicles);
+    player_flag = guest::LoadU32(base, tz::kPlayerFlag);
+    route = guest::LoadU32(base, tz::kRoute);
+    slices = guest::LoadU32(base, tz::kSliceCount);
+  }
+  void Restore() const {
+    guest::StoreU32(base, tz::kOwner, owner);
+    guest::StoreU32(base, tz::kRaceData, race_data);
+    guest::StoreU32(base, tz::kRace, race);
+    guest::StoreU32(base, kVehicles, vehicles);
+    guest::StoreU32(base, tz::kPlayerFlag, player_flag);
+    guest::StoreU32(base, tz::kRoute, route);
+    guest::StoreU32(base, tz::kSliceCount, slices);
+  }
+};
+
+// The guest calls the native owner makes, as the adapter's.
+struct HarnessCalls {
+  PPCContext* ctx;
+  uint8_t* base;
+};
+uint64_t CallZone(void* user, uint32_t function, uint32_t r3, uint32_t r4, bool set_r4,
+                  uint32_t frame, uint32_t lr) {
+  auto& call = *static_cast<HarnessCalls*>(user);
+  PPCContext& ctx = *call.ctx;
+  uint8_t* base = call.base;
+  const uint64_t saved = ctx.r1.u64;
+  ctx.r1.u64 = frame;
+  ctx.lr = lr;
+  ctx.r3.u64 = r3;
+  if (set_r4) {
+    ctx.r4.u64 = r4;
+  }
+  ctx.ctr.u64 = function;
+  REX_CALL_INDIRECT_FUNC(function);
+  ctx.r1.u64 = saved;
+  return ctx.r3.u64;
+}
+
+void NativeRacersVehicle(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = tz::RacersVehicle(base, ctx.r3.u32);
+}
+void NativeConstruct(PPCContext& ctx, uint8_t* base) {
+  tz::OwnerConstruct(base, ctx.r3.u32);
+}
+void NativeDestroy(PPCContext& ctx, uint8_t* base) {
+  uint32_t r3 = 0;
+  if (!tz::OwnerDestroy(base, &r3)) {
+    g_fallbacks++;
+  }
+  ctx.r3.u64 = r3;
+}
+void NativeOwnerUpdate(PPCContext& ctx, uint8_t* base) {
+  HarnessCalls user{&ctx, base};
+  const tz::OwnerCalls calls{&user, CallZone};
+  ctx.r3.u64 = tz::OwnerUpdate(base, ctx.r3.u32, ctx.r1.u32, calls);
+}
+void NativeOwnerIsInside(PPCContext& ctx, uint8_t* base) {
+  HarnessCalls user{&ctx, base};
+  const tz::OwnerCalls calls{&user, CallZone};
+  ctx.r3.u64 =
+      tz::OwnerIsInside(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, uint32_t(ctx.lr), calls);
+}
+void NativeCreate(PPCContext& ctx, uint8_t* base) {
+  HarnessCalls user{&ctx, base};
+  const tz::OwnerCalls calls{&user, CallZone};
+  const tz::SetupCalls setup_calls{nullptr, NoCopy};
+  uint64_t r3 = 0;
+  if (!tz::OwnerCreate(base, ctx.r1.u32, calls, setup_calls, &r3)) {
+    g_fallbacks++;
+  }
+  ctx.r3.u64 = r3;
+}
+
+// Racers::Vehicle: the race's racer records (+2308) and the vehicles in
+// blocks of their own.
+void RacersVehicles(Context& h, Random& r) {
+  const Globals saved(h.base);
+  const uint32_t block = memory::Alloc(0x1000, 0);
+  const uint32_t race = block, racers = block + 0xC00;
+  Results results("Racers::Vehicle (sub_820C9718)");
+  for (int c = 0; c < 300; c++) {
+    RandomBytes(h.base, block, 0x1000, r);
+    const uint32_t index = r.Below(16) == 0 ? r.Below(64) : r.Below(8);
+    for (uint32_t i = 0; i < 8; i++) {
+      const uint32_t racer = racers + 32 * i;
+      guest::StoreU32(h.base, race + 2308 + 4 * i, r.Below(6) == 0 ? 0 : racer);
+      guest::StoreU32(h.base, racer, uint32_t(r.Next()) ^ (r.Below(2) ? 0x40 : 0));
+      guest::StoreU32(h.base, racer + 20, r.Below(8) == 0 ? uint32_t(r.Next()) : r.Below(8));
+    }
+    const uint32_t vehicles = r.Below(8) == 0 ? 0 : uint32_t(r.Next());
+    const std::vector<uint8_t> inputs = Read(h.base, block, 0x1000);
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Write(h.base, block, inputs.data(), 0x1000);
+      guest::StoreU32(h.base, tz::kRace, race);
+      guest::StoreU32(h.base, kVehicles, vehicles);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = index;
+      (v == 0 ? Original<__imp__sub_820C9718> : NativeRacersVehicle)(t, h.base);
+      saved.Restore();
+      out[v].Word(t.r3.u32);
+    }
+    results.Check(out[0], out[1], fmt::format("case {} (index {})", c, index));
+  }
+  results.Report();
+  memory::Free(block);
+}
+
+// TrackZones::TrackZones, Destroy, Update and IsInside on owners of random
+// bytes: Update and IsInside on a list of up to four zones (in a block
+// after the list), each zone's vtable the real one (Zone::Update and
+// IsInside natively) or now and then one whose slots 1 and 2 are
+// Zone::IsInside (the guest call), the zones' ranges on a random route as
+// Zone::Update's cases.
+void Owner(Context& h, Random& r) {
+  const Globals saved(h.base);
+  {
+    Results results("TrackZones::TrackZones (sub_8228B608)");
+    const uint32_t owner = memory::Alloc(tz::kOwnerBytes, 0);
+    for (int c = 0; c < 3; c++) {
+      RandomBytes(h.base, owner, tz::kOwnerBytes, r);
+      const std::vector<uint8_t> inputs = Read(h.base, owner, tz::kOwnerBytes);
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Write(h.base, owner, inputs.data(), tz::kOwnerBytes);
+        PPCContext t = CallContext(h);
+        t.r3.u64 = owner;
+        (v == 0 ? Original<__imp__sub_8228B608> : NativeConstruct)(t, h.base);
+        out[v].Bytes(Read(h.base, owner, tz::kOwnerBytes));
+        out[v].Word(t.r3.u32);
+      }
+      results.Check(out[0], out[1], fmt::format("case {}", c));
+    }
+    results.Report();
+    memory::Free(owner);
+  }
+  if (hooks::NativeHeapActive()) {
+    Results results("TrackZones::Destroy (sub_8228B500)");
+    g_fallbacks = 0;
+    for (int c = 0; c < 20; c++) {
+      const bool none = c % 4 == 0;
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        uint32_t block = 0;
+        if (!none) {
+          block = memory::crt::OperatorNew(h.base, 64 + 16 * uint32_t(c)).value_or(0);
+        }
+        guest::StoreU32(h.base, tz::kOwner, block);
+        PPCContext t = CallContext(h);
+        (v == 0 ? Original<__imp__sub_8228B500> : NativeDestroy)(t, h.base);
+        out[v].Word(guest::LoadU32(h.base, tz::kOwner));
+        out[v].Word(t.r3.u32 == block ? 1 : 0);
+        out[v].Word(block != 0 && memory::IsHeapBlock(block) ? 1 : 0);
+        saved.Restore();
+      }
+      results.Check(out[0], out[1], fmt::format("case {}", c));
+    }
+    results.Report();
+    if (g_fallbacks != 0) {
+      ITC_LOG_INFO("harness: TrackZones::Destroy: {} cases left to the original", g_fallbacks);
+    }
+  }
+  // Update and IsInside.
+  constexpr uint32_t kAreaBytes = 0x3000;
+  constexpr uint32_t kListBytes = 1036;
+  constexpr uint32_t kMost = 4;
+  const uint32_t block_bytes = kListBytes + 0x40 + kMost * tz::kZoneBytes + 5232 + 96;
+  const uint32_t area = memory::Alloc(kAreaBytes, 0);
+  const uint32_t table = memory::Alloc(4 * test_route::kTableEntries, 0);
+  const uint32_t block = memory::Alloc(block_bytes + 0x40, 0);
+  const uint32_t owner = block + 0x20;
+  const uint32_t vtable = owner + kListBytes;  // the guest-call vtable: 3 words
+  const uint32_t zones = owner + kListBytes + 0x40;
+  const uint32_t vehicle = zones + kMost * tz::kZoneBytes;
+  test_route::FillTable(h.base, table, area);
+  for (int which = 0; which < 2; which++) {
+    Results results(which == 0 ? "TrackZones::Update (sub_8228BD30)"
+                               : "TrackZones::IsInside (sub_8228BDD0)");
+    int left_out = 0;
+    for (int c = 0; c < 150; c++) {
+      RandomBytes(h.base, area, kAreaBytes, r);
+      const test_route::Route route = test_route::BuildRoute(h.base, area, table, r);
+      guest::StoreU32(h.base, tz::kRoute, area + test_route::kFile);
+      RandomBytes(h.base, block, block_bytes + 0x40, r);
+      const uint32_t count = which == 1 ? 1 + r.Below(kMost) : r.Below(kMost + 1);
+      RandomList(h.base, owner, 128, count, r);
+      // The zones in the list's first slots in its order: slot k's word is
+      // a zone (the rest random).
+      const tz::Position position = RandomRoutePosition(r, route);
+      guest::StoreU16(h.base, vehicle + 5236, position.section);
+      guest::StoreU16(h.base, vehicle + 5238, position.slice);
+      guest::StoreU32(h.base, vtable + 4, 0x8228B4F8);
+      guest::StoreU32(h.base, vtable + 8, 0x8228B4F8);
+      bool ends = true;
+      uint32_t vtables[kMost] = {};
+      uint32_t head = guest::LoadU16(h.base, owner + 516);
+      for (uint32_t k = 0; k < count; k++) {
+        const uint32_t zone = zones + tz::kZoneBytes * k;
+        const uint32_t slot = guest::LoadU16(h.base, owner + 4 * head + 2);
+        guest::StoreU32(h.base, owner + 524 + 4 * slot, zone);
+        head = guest::LoadU16(h.base, owner + 4 * head);
+        vtables[k] = r.Below(8) == 0 ? vtable : tz::kZoneVtables + 12 * r.Below(tz::kZones);
+        const uint32_t ranges = r.Below(3);
+        RandomList(h.base, zone + tz::kZoneRanges, 16, ranges, r);
+        for (uint32_t i = 0; i < 16; i++) {
+          const uint32_t range = zone + tz::kZoneRanges + 76 + tz::kRangeBytes * i;
+          RandomRange(h.base, range, route, r);
+          ends = ends && TestEnds(h.base, range, position);
+        }
+      }
+      // After the lists (whose -1 halfwords before them reach the zone's
+      // vtable and the zone before's last words).
+      for (uint32_t k = 0; k < count; k++) {
+        const uint32_t zone = zones + tz::kZoneBytes * k;
+        guest::StoreU32(h.base, zone, vtables[k]);
+        guest::StoreU32(h.base, zone + tz::kZoneVehicle, vehicle);
+      }
+      guest::StoreU32(h.base, tz::kRoute, saved.route);
+      if (!ends) {
+        left_out++;
+        continue;
+      }
+      const uint32_t i = which == 1 ? r.Below(count) : 0;
+      const std::vector<uint8_t> inputs = Read(h.base, block, block_bytes + 0x40);
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Write(h.base, block, inputs.data(), block_bytes + 0x40);
+        guest::StoreU32(h.base, tz::kRoute, area + test_route::kFile);
+        PPCContext t = CallContext(h);
+        t.r3.u64 = owner;
+        t.r4.u64 = i;
+        if (which == 0) {
+          (v == 0 ? Original<__imp__sub_8228BD30> : NativeOwnerUpdate)(t, h.base);
+        } else {
+          (v == 0 ? Original<__imp__sub_8228BDD0> : NativeOwnerIsInside)(t, h.base);
+        }
+        out[v].Bytes(Read(h.base, block, block_bytes + 0x40));
+        out[v].Word(guest::LoadU32(h.base, tz::kSliceCount));
+        out[v].Word(t.r3.u32);
+        saved.Restore();
+      }
+      results.Check(out[0], out[1], fmt::format("case {} ({} zones)", c, count));
+    }
+    results.Report();
+    ITC_LOG_INFO("harness: {} cases left out (a walk that might not end)", left_out);
+  }
+  memory::Free(block);
+  memory::Free(table);
+  memory::Free(area);
+}
+
+// The bytes of a made owner that are copies of the set-ups' stack as it
+// was before them (each range is built on the stack and copied whole; the
+// lists' data slots that Init leaves unwritten and the two bytes before
+// them): what was there is the callers' leftovers (Create's callees'
+// saved registers and frames), which the native Create doesn't write, so
+// they're zeroed in both versions' bytes; the set-ups' harness compares
+// these copies on the same stack bytes. The data words of the slots a
+// list links (AddBranch's sections) are kept.
+void MaskStackLeftovers(std::vector<uint8_t>& bytes) {
+  auto s16 = [&](uint32_t at) { return int16_t(uint16_t(bytes[at] << 8 | bytes[at + 1])); };
+  for (uint32_t z = 0; z < tz::kZones; z++) {
+    const uint32_t zone = tz::kZonesAt + tz::kZoneBytes * z;
+    const uint32_t list = zone + tz::kZoneRanges;
+    int32_t node = s16(list + 68);
+    for (int32_t n = s16(list + 72); n > 0 && node >= 0 && node < 16; n--) {
+      const uint32_t range = list + 76 + tz::kRangeBytes * uint32_t(s16(list + 4 * uint32_t(node) + 2));
+      for (uint32_t at : {range + 12, range + 536}) {
+        std::vector<bool> linked(64, false);
+        int32_t k = s16(at + 260);
+        for (int32_t m = s16(at + 264); m > 0 && k >= 0 && k < 64; m--) {
+          linked[uint32_t(s16(at + 4 * uint32_t(k) + 2)) & 63] = true;
+          k = s16(at + 4 * uint32_t(k));
+        }
+        bytes[at + 266] = bytes[at + 267] = 0;
+        for (uint32_t slot = 0; slot < 64; slot++) {
+          if (!linked[slot]) {
+            for (uint32_t i = 0; i < 4; i++) {
+              bytes[at + 268 + 4 * slot + i] = 0;
+            }
+          }
+        }
+      }
+      node = s16(list + 4 * uint32_t(node));
+    }
+  }
+}
+
+// TrackZones::Create: the race data (the word +0x59614, the mode +0xA3AF0,
+// the stage list +0x59620), 0x826C7824, the race's racers and the vehicles
+// in blocks of their own; each version makes its owner (operator new: the
+// same block for both, it's freed between them) and the owner's bytes,
+// 0x828161EC and r3 are compared, the owner freed after.
+void Create(Context& h, Random& r) {
+  if (!hooks::NativeHeapActive()) {
+    return;
+  }
+  const Globals saved(h.base);
+  constexpr uint32_t kRaceBytes = 0xA4000;
+  const uint32_t race_data = memory::Alloc(kRaceBytes, 0);
+  const uint32_t race = memory::Alloc(0x1000, 0);
+  Results results("TrackZones::Create (sub_8228E788)");
+  g_fallbacks = 0;
+  int moved = 0;
+  for (int c = 0; c < 8; c++) {
+    RandomBytes(h.base, race_data + 0x59600, 0x400, r);
+    guest::StoreU32(h.base, race_data + 0x59614, r.Below(3) ? 2 : r.Below(4));
+    guest::StoreU32(h.base, race_data + 0xA3AF0, r.Below(3) ? 6 : r.Below(8));
+    const uint32_t stage = r.Below(8);
+    guest::StoreU32(h.base, race_data + 0x59620 + 804, stage);
+    guest::StoreU32(h.base, race_data + 0x59620 + 80 * stage, r.Below(3) ? 0 : 1);
+    const uint32_t flag = r.Below(3) ? 0 : 1;
+    RandomBytes(h.base, race, 0x1000, r);
+    for (uint32_t i = 0; i < 2; i++) {
+      const uint32_t racer = race + 0xC00 + 32 * i;
+      guest::StoreU32(h.base, race + 2308 + 4 * i, racer);
+      guest::StoreU32(h.base, racer, uint32_t(r.Next()) | 0x40);
+      guest::StoreU32(h.base, racer + 20, r.Below(8));
+    }
+    const uint32_t vehicles = uint32_t(r.Next());
+    const uint8_t fill = uint8_t(r.Next());
+    const std::vector<uint8_t> inputs = Read(h.base, race_data + 0x59600, 0x400);
+    const std::vector<uint8_t> race_bytes = Read(h.base, race, 0x1000);
+    Outputs out[2];
+    uint32_t owners[2] = {};
+    for (int v = 0; v < 2; v++) {
+      Write(h.base, race_data + 0x59600, inputs.data(), 0x400);
+      Write(h.base, race, race_bytes.data(), 0x1000);
+      guest::StoreU32(h.base, tz::kRaceData, race_data);
+      guest::StoreU32(h.base, tz::kRace, race);
+      guest::StoreU32(h.base, kVehicles, vehicles);
+      guest::StoreU32(h.base, tz::kPlayerFlag, flag);
+      guest::StoreU32(h.base, tz::kOwner, 0);
+      // The block operator new will give, filled with the case's bytes and
+      // freed first, so both versions start from the same bytes.
+      if (const auto block = memory::crt::OperatorNew(h.base, tz::kOwnerBytes)) {
+        Fill(h.base, *block, tz::kOwnerBytes, fill);
+        memory::crt::OperatorDelete(*block);
+      }
+      PPCContext t = CallContext(h);
+      (v == 0 ? Original<__imp__sub_8228E788> : NativeCreate)(t, h.base);
+      const uint32_t owner = guest::LoadU32(h.base, tz::kOwner);
+      owners[v] = owner;
+      out[v].Word(owner == owners[0] ? 0 : 1);
+      if (owner != 0) {
+        std::vector<uint8_t> bytes = Read(h.base, owner, tz::kOwnerBytes);
+        MaskStackLeftovers(bytes);
+        out[v].Bytes(bytes);
+        memory::crt::OperatorDelete(owner);
+      }
+      out[v].Word(t.r3.u32 - owner);
+      saved.Restore();
+    }
+    if (owners[0] != owners[1]) {
+      moved++;
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", c));
+  }
+  results.Report();
+  if (moved != 0 || g_fallbacks != 0) {
+    ITC_LOG_INFO("harness: TrackZones::Create: {} owners at another address, {} fallbacks",
+                 moved, g_fallbacks);
+  }
+  memory::Free(race);
+  memory::Free(race_data);
+}
+
 }  // namespace
 
 void TrackZones(Context& h) {
@@ -798,6 +1180,9 @@ void TrackZones(Context& h) {
   RangeTests(h, r);
   ZoneUpdates(h, r);
   Setups(h, r);
+  RacersVehicles(h, r);
+  Owner(h, r);
+  Create(h, r);
 }
 
 }  // namespace harness

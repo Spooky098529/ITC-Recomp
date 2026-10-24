@@ -109,6 +109,65 @@ uint32_t ZoneIsInside(uint8_t* base, uint32_t zone);
 bool ZoneRangesInsert(uint8_t* base, uint32_t list, uint32_t range, uint32_t position,
                       uint32_t* copy_to);
 
+struct SetupCalls;
+
+// --- The zones' owner (TrackZones::, [0x828161EC]) ---
+
+// The owner (0x828161EC), its size, its list of the zones (128 slots at +0)
+// and the zones (+1036, 17,116 bytes apart; zone i's vtable 0x82011AF0 +
+// 12 x i).
+constexpr uint32_t kOwner = 0x828161EC;
+constexpr uint32_t kOwnerBytes = 0x124C34;
+constexpr uint32_t kZonesAt = 1036;
+constexpr uint32_t kZoneBytes = 17116;
+constexpr uint32_t kZoneVtables = 0x82011AF0;
+// The race data ([0x826C5B2C]: +0x59614 a word, +0x59620 the stage list,
+// +0xA3AF0 the mode), 0x826C7824 (a word) and the race ([0x826D82F4]: +2308
+// the racers' records).
+constexpr uint32_t kRaceData = 0x826C5B2C;
+constexpr uint32_t kRace = 0x826D82F4;
+constexpr uint32_t kPlayerFlag = 0x826C7824;
+
+// The calls into code that takes the guest context, made by the adapters:
+// the guest function `function` (a zone's vtable slot) with r3 (and r4
+// when `set_r4`; the other registers as they are), from `frame` (r1) with
+// the link register `lr`; its r3. A set-up's r4 points at (the index, the
+// vehicle), which the owner writes at the original's frame offset first.
+struct OwnerCalls {
+  void* user;
+  uint64_t (*call)(void* user, uint32_t function, uint32_t r3, uint32_t r4, bool set_r4,
+                   uint32_t frame, uint32_t lr);
+};
+
+// Racers::Vehicle (sub_820C9718): racer `index`'s vehicle (Vehicle::Get of
+// its +20), or 0 when the racer is 0 or its word +0 lacks bit 0x40.
+uint32_t RacersVehicle(uint8_t* base, uint32_t index);
+// TrackZones::TrackZones (sub_8228B608): zone i's vtable for the 70 zones.
+void OwnerConstruct(uint8_t* base, uint32_t owner);
+// TrackZones::Create (sub_8228E788): the owner made (operator new and the
+// constructor) and stored at 0x828161EC, its list reset, the 70 zones
+// added, then each one's set-up (slot 0, natively when it's the zone's own
+// set-up, else through `calls`) with its list position and the vehicle;
+// `stack` is the caller's r1. False, with nothing done, when operator new
+// can't be native (the native heap off, or a failed allocation): the
+// original runs. `r3` = the last set-up's r3.
+bool OwnerCreate(uint8_t* base, uint32_t stack, const OwnerCalls& calls,
+                 const SetupCalls& setup_calls, uint64_t* r3);
+// TrackZones::Destroy (sub_8228B500): the owner deleted when not 0, and
+// cleared. False, with nothing done, when operator delete can't be native
+// (the native heap off, or a block the layer didn't give). `r3` = the
+// owner, as operator delete leaves it.
+bool OwnerDestroy(uint8_t* base, uint32_t* r3);
+// TrackZones::Update (sub_8228BD30): each zone's slot 1 (Zone::Update
+// natively when it's that, else through `calls`). Returns the original's
+// r3: the owner with no zones, else the last zone's.
+uint64_t OwnerUpdate(uint8_t* base, uint32_t owner, uint32_t stack, const OwnerCalls& calls);
+// TrackZones::IsInside (sub_8228BDD0): the list's zone `i`'s slot 2
+// (Zone::IsInside natively when it's that, else through `calls`, a tail
+// call from `stack` with `lr`). No bounds check.
+uint64_t OwnerIsInside(uint8_t* base, uint32_t owner, uint32_t i, uint32_t stack, uint32_t lr,
+                       const OwnerCalls& calls);
+
 // --- The zones' set-ups (ZoneN::Setup, slot 0 of zone N's vtable) ---
 
 constexpr uint32_t kZones = 70;

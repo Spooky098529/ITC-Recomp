@@ -6,6 +6,9 @@
 
 #include "base/log.h"
 #include "c_runtime/strings.h"
+#include "hooks/heap.h"
+#include "memory/c_runtime_heap.h"
+#include "memory/heap.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
 #include <fmt/format.h>
@@ -438,6 +441,150 @@ bool ZoneRangesInsert(uint8_t* base, uint32_t list, uint32_t range, uint32_t pos
   return to < 0xA0000000u && c_runtime::Memcpy(base, to, range, kRangeBytes);
 }
 
+
+// --- The zones' owner ---
+
+uint32_t RacersVehicle(uint8_t* base, uint32_t index) {
+  ITC_NATIVE_RUNNING("sub_820C9718 Racers::Vehicle");
+  const uint32_t racer = Load32(base, Load32(base, kRace) + (index + 577) * 4);
+  if (racer == 0 || (Load32(base, racer) & 0x40) == 0) {
+    return 0;
+  }
+  return vehicle_accessors::VehicleGet(base, Load32(base, racer + 20));
+}
+
+void OwnerConstruct(uint8_t* base, uint32_t owner) {
+  ITC_NATIVE_RUNNING("sub_8228B608 TrackZones::TrackZones");
+  for (uint32_t i = 0; i < kZones; i++) {
+    Store32(base, owner + kZonesAt + kZoneBytes * i, kZoneVtables + 12 * i);
+  }
+}
+
+namespace {
+
+// The zone `steps` along the owner's list (its data slot's word).
+uint32_t ListedZone(uint8_t* base, uint32_t owner, uint32_t steps) {
+  const uint32_t node = NodeAt(base, owner, owner + 516, steps);
+  return Load32(base, uint32_t(Slot(base, node) + 131) * 4 + owner);
+}
+
+// The zone's vtable slot at `offset`.
+uint32_t ZoneSlot(uint8_t* base, uint32_t zone, uint32_t offset) {
+  return Load32(base, Load32(base, zone) + offset);
+}
+
+}  // namespace
+
+bool OwnerCreate(uint8_t* base, uint32_t stack, const OwnerCalls& calls,
+                 const SetupCalls& setup_calls, uint64_t* r3) {
+  ITC_NATIVE_RUNNING("sub_8228E788 TrackZones::Create");
+  if (!hooks::NativeHeapActive()) {
+    return false;
+  }
+  const uint32_t word = Load32(base, Load32(base, kRaceData) + 0x59614);
+  const auto block = memory::crt::OperatorNew(base, kOwnerBytes);
+  if (!block) {
+    return false;
+  }
+  const uint32_t owner = *block;
+  if (owner != 0) {
+    OwnerConstruct(base, owner);
+  }
+  Store32(base, kOwner, owner);
+  // The player: 1 in mode 6 with the word 2, the current stage's word +0
+  // not 1 (Stages::Copy's copy of it, read in place) and 0x826C7824 0.
+  const uint32_t race = Load32(base, kRaceData);
+  uint32_t player = 0;
+  if (int32_t(Load32(base, race + 0xA3AF0)) == 6 && int32_t(word) == 2) {
+    const uint32_t stages = race + 0x59620;
+    const uint32_t stage = stages + 80 * Load32(base, stages + 804);
+    if (int32_t(Load32(base, stage)) != 1 && int32_t(Load32(base, kPlayerFlag)) == 0) {
+      player = 1;
+    }
+  }
+  const uint32_t vehicle = RacersVehicle(base, player);
+  // The list reset.
+  Reset<128>(base, owner);
+  Store16(base, owner + 512, 0);
+  Store16(base, owner + 520, 0);
+  Store16(base, owner + 508, 0xFFFF);
+  Store16(base, owner + 518, 0xFFFF);
+  Store16(base, owner + 514, 0xFFFF);
+  Store16(base, owner + 516, 0xFFFF);
+  for (uint32_t i = 0; i < kZones; i++) {
+    const uint32_t position = i == 0 ? 0 : uint32_t(LoadS16(base, owner + 520));
+    List128Insert(base, owner, owner + kZonesAt + kZoneBytes * i, position);
+  }
+  // Each zone's set-up, from the original's frame (240 bytes; the index
+  // and vehicle at +96 for a set-up that isn't native).
+  const uint32_t frame = stack - 240;
+  for (uint32_t i = 0; i < kZones; i++) {
+    const uint32_t zone = ListedZone(base, owner, i);
+    const uint32_t function = ZoneSlot(base, zone, 0);
+    uint32_t number = kZones;
+    for (uint32_t n = 0; n < kZones; n++) {
+      if (SetupAddress(n) == function) {
+        number = n;
+        break;
+      }
+    }
+    if (number < kZones) {
+      *r3 = ZoneSetup(base, number, zone, i, vehicle, frame, setup_calls);
+    } else {
+      Store32(base, frame + 96, i);
+      Store32(base, frame + 100, vehicle);
+      *r3 = calls.call(calls.user, function, zone, frame + 96, true, frame, 0x8228F078);
+    }
+  }
+  return true;
+}
+
+bool OwnerDestroy(uint8_t* base, uint32_t* r3) {
+  ITC_NATIVE_RUNNING("sub_8228B500 TrackZones::Destroy");
+  if (!hooks::NativeHeapActive()) {
+    return false;
+  }
+  const uint32_t owner = Load32(base, kOwner);
+  if (owner != 0 && !memory::IsHeapBlock(owner)) {
+    return false;
+  }
+  if (owner != 0) {
+    memory::crt::OperatorDelete(owner);
+    Store32(base, kOwner, 0);
+  }
+  *r3 = owner;
+  return true;
+}
+
+uint64_t OwnerUpdate(uint8_t* base, uint32_t owner, uint32_t stack, const OwnerCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_8228BD30 TrackZones::Update");
+  const uint32_t frame = stack - 112;
+  uint64_t r3 = owner;
+  for (uint32_t i = 0; i < uint32_t(LoadS16(base, owner + 520)); i++) {
+    const uint32_t zone = ListedZone(base, owner, i);
+    const uint32_t function = ZoneSlot(base, zone, 4);
+    if (function == 0x8228BC80) {
+      // Zone::Update's r3: its last range's result, or with no ranges
+      // where its memcpy left it (its frame + 80).
+      const int32_t last = ZoneUpdate(base, zone);
+      r3 = last < 0 ? uint64_t(frame - 208 + 80) : uint64_t(last);
+    } else {
+      r3 = calls.call(calls.user, function, zone, 0, false, frame, 0x8228BDA4);
+    }
+  }
+  return r3;
+}
+
+uint64_t OwnerIsInside(uint8_t* base, uint32_t owner, uint32_t i, uint32_t stack, uint32_t lr,
+                       const OwnerCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_8228BDD0 TrackZones::IsInside");
+  const uint32_t zone = ListedZone(base, owner, i);
+  const uint32_t function = ZoneSlot(base, zone, 8);
+  if (function == 0x8228B4F8) {
+    return ZoneIsInside(base, zone);
+  }
+  return calls.call(calls.user, function, zone, 0, false, stack, lr);
+}
 
 // --- The zones' set-ups ---
 

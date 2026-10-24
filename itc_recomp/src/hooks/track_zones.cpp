@@ -22,7 +22,10 @@ ITC_FLAG_BOOL(native_track_zones, true, "ITC",
               "sub_8228B4F8, ZoneRanges::Insert sub_8228BBA8, RouteRange::ToNeighbor sub_820FDF98, "
               "RouteRange::WithinEnds sub_820FE120, RouteRange::OnPath sub_820FE398, "
               "RouteRange::Test sub_820FE6F8, RouteRange::Update sub_820FE878, Zone::Update "
-              "sub_8228BC80, and the 70 zones' set-ups ZoneN::Setup sub_8228BE20 to sub_8228E6A0) "
+              "sub_8228BC80, the 70 zones' set-ups ZoneN::Setup sub_8228BE20 to sub_8228E6A0, "
+              "Racers::Vehicle sub_820C9718, TrackZones::TrackZones sub_8228B608, "
+              "TrackZones::Create sub_8228E788, TrackZones::Destroy sub_8228B500, "
+              "TrackZones::Update sub_8228BD30, TrackZones::IsInside sub_8228BDD0) "
               "natively instead of through the "
               "translated code (the same writes; checked by --run_harnesses=track_zones). "
               "Those reached only from native callers have no adapters, and the flag switches "
@@ -120,7 +123,87 @@ void CopyRange(void* user, uint32_t to, uint32_t from, uint32_t frame) {
   ctx.lr = lr;
 }
 
+uint64_t CallZone(void* user, uint32_t function, uint32_t r3, uint32_t r4, bool set_r4,
+                  uint32_t frame, uint32_t lr) {
+  auto& call = *static_cast<GuestCalls*>(user);
+  PPCContext& ctx = *call.ctx;
+  uint8_t* base = call.base;
+  const uint64_t saved = ctx.r1.u64;
+  ctx.r1.u64 = frame;
+  ctx.lr = lr;
+  ctx.r3.u64 = r3;
+  if (set_r4) {
+    ctx.r4.u64 = r4;
+  }
+  ctx.ctr.u64 = function;
+  REX_CALL_INDIRECT_FUNC(function);
+  ctx.r1.u64 = saved;
+  return ctx.r3.u64;
+}
+
 }  // namespace
+
+// --- The zones' owner ---
+
+// Racers::Vehicle: r3 = a racer index; returns its vehicle or 0.
+ITC_TRACK_ZONES(820C9718, ctx.r3.u64 = RacersVehicle(base, ctx.r3.u32))
+// TrackZones::TrackZones: r3 = the owner (left).
+ITC_TRACK_ZONES(8228B608, OwnerConstruct(base, ctx.r3.u32))
+
+// TrackZones::Create: no arguments; r3 = the last set-up's. The original
+// where operator new can't be native.
+extern "C" REX_FUNC(sub_8228E788) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_track_zones)) {
+    __imp__sub_8228E788(ctx, base);
+    return;
+  }
+  const uint64_t lr = ctx.lr;
+  GuestCalls user{&ctx, base};
+  const OwnerCalls calls{&user, CallZone};
+  const SetupCalls setup_calls{&user, CopyRange};
+  uint64_t r3 = 0;
+  if (!OwnerCreate(base, ctx.r1.u32, calls, setup_calls, &r3)) {
+    __imp__sub_8228E788(ctx, base);
+    return;
+  }
+  ctx.lr = lr;
+  ctx.r3.u64 = r3;
+}
+
+// TrackZones::Destroy: no arguments; r3 = the owner (as operator delete
+// leaves it). The original where operator delete can't be native.
+extern "C" REX_FUNC(sub_8228B500) {
+  REX_FUNC_PROLOGUE();
+  uint32_t r3 = 0;
+  if (!ITC_FLAG(native_track_zones) || !OwnerDestroy(base, &r3)) {
+    __imp__sub_8228B500(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = r3;
+}
+
+// TrackZones::Update: r3 = the owner; r3 = the last zone's.
+ITC_TRACK_ZONES(8228BD30, {
+  const uint64_t lr = ctx.lr;
+  GuestCalls user{&ctx, base};
+  const OwnerCalls calls{&user, CallZone};
+  const uint64_t r3 = OwnerUpdate(base, ctx.r3.u32, ctx.r1.u32, calls);
+  ctx.lr = lr;
+  ctx.r3.u64 = r3;
+})
+
+// TrackZones::IsInside: r3 = the owner, r4 = a zone's position in the list;
+// returns its flag.
+ITC_TRACK_ZONES(8228BDD0, {
+  const uint64_t lr = ctx.lr;
+  GuestCalls user{&ctx, base};
+  const OwnerCalls calls{&user, CallZone};
+  const uint64_t r3 =
+      OwnerIsInside(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, uint32_t(lr), calls);
+  ctx.lr = lr;
+  ctx.r3.u64 = r3;
+})
 
 // ZoneN::Setup: r3 = the zone, r4 = &(its index, the vehicle); r3 = the
 // last copy's destination. Reached through the zones' vtables (from
