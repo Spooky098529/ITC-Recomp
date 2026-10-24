@@ -134,6 +134,34 @@ When the user has reviewed a run's section, its heading gets
   `RacerControl::DriveByAiWithPad` (`sub_8215F7E8`) would write the
   steering on its scale's overflow, which a clamped value can't reach
   (kept).
+  Migration 1's rows (699bbde..7b85ae8; `--native_racer_controllers`;
+  27 of 27 ours, 15 Native; `sub_821024D0` and `sub_82591C08` Merged;
+  `sub_8215F5F0`, `sub_82160880`, `sub_82102A28`, never seen in play,
+  ported with harness cases, no rows; `ai-drivers.md`'s DriveCar and
+  UpdateIdle rows corrected). The agent ran `git checkout` on
+  uncommitted work once (batch 4, after a mutation test), against the
+  rules; it redid the same edits and committed them (a71062d), nothing
+  lost. New row: `sub_8215FC38` (RaceFlow::OnState34) drives every car
+  in attract races but isn't in `seen_in_play.txt` (found with a
+  temporary log): the coverage list may miss other attract-race paths;
+  it leaves r3 at the last racer count read (kept). Correction:
+  `RaceFlow::AllByAi` passes hold flag 1 to both callees (the cars are
+  held). For review: the input record's bytes +18 and +19 are written
+  by nothing: `PlayerControl::Update` builds the record in its stack
+  frame, so they're the frame's leftovers; native code keeps the same
+  frame offsets (the harness matches), but the leftovers under native
+  callers can differ in play from the recompiled ones (they look like
+  padding nothing reads); `DriveByAiWithPad` likewise reads its control
+  words from the frame when a control of 0 or above 30 writes nothing.
+  DriveCar's and UpdateIdle's adapter work moved into
+  `hooks::AiDriveCar` and `AiUpdateIdle` (`src/hooks/ai_drivers.h`),
+  with stand-in pointers only the racer_controllers harness sets.
+  ReadPad calls `Vehicle_GetSpeedKmh` directly (no `--capture_dir`
+  note); `PlayerInput::Read` reads mapper slots 8, 10, 12 and 14
+  through the action mappers' plain C++ when `--native_action_mappers`
+  is on (slot 5, `sub_8210BA68`, still through the vtable). Adapters
+  kept: the 8 handlers reached through the race flow's functors, and
+  `sub_82102968`, `sub_82170FF8` for recompiled callers.
 
 ## Run 2026-10-23 17:22 (`b7-loop-23-10-26-4`)
 

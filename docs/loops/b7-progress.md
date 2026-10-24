@@ -20,8 +20,9 @@ file's history. What's left to see in a drive, from every run:
 - Subsystem 2 of 3: the AI drivers' callers (the per-racer controllers
   `8215F5E8`-`821609E0` and the drivers' per-race set-up `sub_82170FF8`,
   from `leads.md`): `racer-controllers.md`, mapped in b5491fb (26 rows,
-  9 ready groups, no outside blockers). Step: migration 1 (agent
-  running).
+  9 ready groups, no outside blockers). Migration 1 (699bbde..7b85ae8):
+  27 of 27 ours (one row added), `--native_racer_controllers`; nothing
+  left. Step: validation (agent running).
 
 ## Done
 
@@ -73,3 +74,7 @@ This run's groups: `expected-differences.md` (the "20:22 run" lines).
   added).
 - After mapping the racer controllers: ours 1366, work left 5391
   (wrapped 123, known 585, unknown 4683).
+- After the racer controllers' migration 1: ours 1393, work left 5365
+  (wrapped 123, known 559, unknown 4683). Race 28 s (`itc_1226`) with
+  `--run_harnesses=all`, 0 errors, every harness 0 differing (none
+  added).
