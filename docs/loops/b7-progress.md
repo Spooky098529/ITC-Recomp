@@ -30,10 +30,17 @@ file's history. What's left to see in a drive, from every run:
   Mapped as the course scenery (`course-scenery.md`, 71 rows: 3 moved
   from `functions.md`, 68 new; 043a0d2; 29 ready groups; 5 leads added);
   map checked (0 errors, 71 of 71 in play). Migration 1 done
-  (551a868..e7309a0, 37 of 73 ours, nothing ready left); validation
-  agent running.
+  (551a868..e7309a0, 37 of 73 ours, nothing ready left), validated
+  (`itc_1353`, `itc_1354`; all ran in play or the replay). Finished.
 
 ## Done
+
+- The course scenery (`course-scenery.md`, mapped in 043a0d2; 71 rows,
+  73 with two moved in by the migration): 37 ours in one migration
+  (551a868..e7309a0), validated (`itc_1353`, `itc_1354`; all ran);
+  `--native_course_scenery`. Left: blocked on the critical section
+  wrappers, memset, `DataFile::GetEntry`, the XPR, the archive's queue,
+  the texture provider.
 
 - The compiler's array helpers (`c-runtime.md`, mapped in 3a15cda; 2
   new rows): 2 ours in one migration (f624a82), with wcslen's, mbtowc's
