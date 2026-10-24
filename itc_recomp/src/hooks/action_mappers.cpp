@@ -7,8 +7,11 @@
 
 #include "action_mappers/action_mappers.h"
 #include "base/flags.h"
+#include "base/log.h"
 #include "debug/pause_menu_log.h"
 #include "frame_pacing/game_messages.h"
+#include "hooks/guest_call.h"
+#include "hooks/heap.h"
 
 ITC_FLAG_BOOL(native_action_mappers, true, "ITC",
               "Run the action mappers (docs/functions/action-mappers.md: the repeat and "
@@ -20,7 +23,9 @@ ITC_FLAG_BOOL(native_action_mappers, true, "ITC",
               "sub_8210BA28; the setters, sub_8210B698, sub_8210BDF0 and sub_8210BE30; "
               "ActionMappers::Configure, sub_8209F228; the set-up, sub_8210C078, sub_8210BB38, "
               "sub_8210BAB0, sub_8210B8A8, sub_8210B438, sub_8210AEB0, sub_8210AE60 and "
-              "sub_8210AF00; the mapper's constructor, sub_8210C180) natively instead of through the translated "
+              "sub_8210AF00; the mapper's constructor, sub_8210C180; ActionMapper::Bind, "
+              "sub_8210B270, and InputClientList::BindAll, sub_8210AF08, with --native_heap) "
+              "natively instead of through the translated "
               "code (same results; checked by --run_harnesses=action_mappers)");
 
 // The flag's fallback; the floats as the original's (no flush to zero).
@@ -191,4 +196,51 @@ extern "C" REX_FUNC(sub_8210C180) {
     return;
   }
   MapperConstruct(base, ctx.r3.u32, ctx.r4.u32);
+}
+
+// ActionMapper::Bind: r3 = the mapper, r4 = the input object; r3 = 1. The
+// original unless MapperBindKnown (AddListener allocates: only over the
+// allocation layer).
+extern "C" REX_FUNC(sub_8210B270) {
+  ITC_MAPPERS_FALLBACK(8210B270)
+  if (!hooks::NativeHeapActive() || !MapperBindKnown(base, ctx.r3.u32, ctx.r4.u32)) {
+    __imp__sub_8210B270(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = MapperBind(base, ctx.r3.u32, ctx.r4.u32);
+}
+
+// InputClientList::BindAll: r3 = the list; r3 = 1. For each mapper (the
+// nodes of type 2), the input object from the list's owner (+36) through
+// its vtable slot +36 (a guest call into the app: sub_820944C8 in play,
+// which reaches the input manager through the framework), the mapper bound
+// (natively when MapperBindKnown, else the original Bind) and the bound
+// count up. Run in the original's frame (112 bytes); its own work is the
+// client list's plain C++.
+extern "C" REX_FUNC(sub_8210AF08) {
+  ITC_MAPPERS_FALLBACK(8210AF08)
+  ITC_NATIVE_RUNNING("sub_8210AF08 InputClientList::BindAll");
+  const uint32_t list = ctx.r3.u32;
+  const uint64_t saved_lr = ctx.lr;
+  guest_call::InFrame(ctx, base, 112, 0x8210AF58, [&](uint32_t) {
+    for (uint32_t i = 0; i < ClientListCount(base, list, 2, 0); i++) {
+      const uint32_t mapper = ClientListFind(base, 2, i);
+      const uint32_t owner = guest::LoadU32(base, list + 36);
+      ctx.r3.u64 = owner;
+      ctx.lr = 0x8210AF58;
+      REX_CALL_INDIRECT_FUNC(guest::LoadU32(base, guest::LoadU32(base, owner) + 36));
+      const uint32_t object = ctx.r3.u32;
+      if (hooks::NativeHeapActive() && MapperBindKnown(base, mapper, object)) {
+        MapperBind(base, mapper, object);
+      } else {
+        ctx.r3.u64 = mapper;
+        ctx.r4.u64 = object;
+        ctx.lr = 0x8210AF64;
+        __imp__sub_8210B270(ctx, base);
+      }
+      ClientListBoundCount(base, list, 2, 1);
+    }
+  });
+  ctx.lr = saved_lr;
+  ctx.r3.u64 = 1;
 }

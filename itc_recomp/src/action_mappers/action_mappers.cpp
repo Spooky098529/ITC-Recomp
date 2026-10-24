@@ -7,11 +7,13 @@
 #include "frame_pacing/game_messages.h"
 #include "guest.h"
 #include "input/input_manager.h"
+#include "std_list/ptr_list.h"
 
 #include <immintrin.h>
 
 #include <bit>
 #include <cmath>
+#include <cstdlib>
 #include <cstdint>
 
 namespace action_mappers {
@@ -774,6 +776,53 @@ void MapperConstruct(uint8_t* base, uint32_t mapper, uint32_t player) {
   guest::StoreU32(base, mapper + 380, mapper + 132);
   ResetWords(base, words);
   ResetAnalog(base, mapper + kAnalog);
+}
+
+namespace {
+
+constexpr uint32_t kGetLogicalPad = 0x82098CD0;  // the manager's slot 2
+constexpr uint32_t kAddListener = 0x82099430;    // its slot 3
+constexpr uint32_t kLogicalPadValues = 0x82591B30;  // the pad's slot 1
+
+uint32_t VtableSlot(uint8_t* base, uint32_t object, uint32_t offset) {
+  return guest::LoadU32(base, guest::LoadU32(base, object) + offset);
+}
+
+}  // namespace
+
+bool MapperBindKnown(uint8_t* base, uint32_t mapper, uint32_t object) {
+  if (mapper == 0) {
+    return false;
+  }
+  const uint32_t player = guest::LoadU32(base, mapper + 2888);
+  if (player > 3) {
+    return true;
+  }
+  if (object == 0 || VtableSlot(base, object, 12) != kAddListener ||
+      VtableSlot(base, object, 8) != kGetLogicalPad) {
+    return false;
+  }
+  const uint32_t list =
+      object + input::kManagerListeners + input::kListenerListBytes * player;
+  const uint32_t pad = input::ManagerLogicalPad(object, player);
+  return guest::LoadU32(base, list + std_list::kSize) == 0 &&
+         std_list::CanAllocate(base, 1) && VtableSlot(base, pad, 4) == kLogicalPadValues;
+}
+
+uint32_t MapperBind(uint8_t* base, uint32_t mapper, uint32_t object) {
+  ITC_NATIVE_RUNNING("sub_8210B270 ActionMapper::Bind");
+  const uint32_t player = guest::LoadU32(base, mapper + 2888);
+  guest::StoreU32(base, mapper + 2892, object);
+  if (player <= 3) {
+    if (!input::ManagerAddListener(base, object, player, mapper + kListener)) {
+      ITC_LOG_ERROR("ActionMapper::Bind: AddListener refused after its checks");
+      std::abort();
+    }
+    const uint32_t pad = input::ManagerLogicalPad(guest::LoadU32(base, mapper + 2892), player);
+    guest::StoreU32(base, mapper + kPadValues, input::LogicalPadValues(pad));
+  }
+  guest::StoreU8(base, mapper + 2884, 1);
+  return 1;
 }
 
 }  // namespace action_mappers

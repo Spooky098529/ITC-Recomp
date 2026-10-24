@@ -11,6 +11,11 @@
 #include "harness.h"
 
 #include "action_mappers/action_mappers.h"
+#include "hooks/heap.h"
+#include "input/input_manager.h"
+#include "memory/c_runtime_heap.h"
+#include "memory/heap.h"
+#include "std_list/ptr_list.h"
 #include "base/flags.h"
 #include "base/log.h"
 
@@ -24,12 +29,18 @@
 #include <vector>
 
 ITC_FLAG_DECLARE(bool, native_action_mappers);
+ITC_FLAG_DECLARE(bool, native_input);
 
 namespace harness {
 
 namespace {
 
 namespace am = action_mappers;
+namespace in = input;
+
+// Bind cases handed to the original (only those meant to: a player 0-3 with
+// a list already holding a listener).
+int g_bind_fallbacks = 0;
 
 // The register steps: the cases run the plain C++ through these (not the
 // adapters), with the registers each adapter leaves.
@@ -100,6 +111,16 @@ ITC_NATIVE_STEP(NativeInitRepeats, ctx.r3.u64 = am::InitRepeats(base, ctx.r3.u32
 ITC_NATIVE_STEP(NativeInitCurves, ctx.r3.u64 = am::InitCurves(base, ctx.r3.u32))
 ITC_NATIVE_STEP(NativeResetStages, ctx.r3.u64 = am::ResetStages(base, ctx.r3.u32))
 ITC_NATIVE_STEP(NativeMapperConstruct, am::MapperConstruct(base, ctx.r3.u32, ctx.r4.u32))
+// Bind's step as its adapter (src/hooks/action_mappers.cpp); BindAll's
+// adapter makes a guest call, so its cases run the adapter itself.
+void NativeBind(PPCContext& ctx, uint8_t* base) {
+  if (!am::MapperBindKnown(base, ctx.r3.u32, ctx.r4.u32)) {
+    g_bind_fallbacks++;
+    __imp__sub_8210B270(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = am::MapperBind(base, ctx.r3.u32, ctx.r4.u32);
+}
 ITC_NATIVE_STEP(NativeInputClientListConstruct,
                 am::InputClientListConstruct(base, ctx.r3.u32, ctx.r4.u32))
 ITC_NATIVE_STEP(NativeInputClientConstruct, am::InputClientConstruct(base, ctx.r3.u32, ctx.r4.u32))
@@ -885,6 +906,128 @@ void SetUp(Context& h) {
   }
 }
 
+// --- Binding ---
+//
+// A block of its own (the manager and four mappers don't fit the scratch
+// area): an input manager (its vtable, logical pads' vtables, random
+// processors, empty listener lists with their heads in the block), an
+// owner object whose vtable slot +36 is LogicalPad::Values (returning
+// owner + 36: the manager), a client list owning the mappers (made by the
+// constructor's plain C++), and the global pointed at it. The nodes
+// AddListener makes are compared by contents, their addresses replaced by
+// markers, and freed.
+constexpr uint32_t kBindBytes = 0x4400;
+constexpr uint32_t kBindOtherListener = 0x4200;  // a filled list's listener (416 bytes)
+constexpr uint32_t kBindManager = 0x40;
+constexpr uint32_t kBindHeads = 0x1000;
+constexpr uint32_t kBindOwnerVtable = 0x1100;
+constexpr uint32_t kBindList = 0x1200;
+constexpr uint32_t kBindMappers = 0x1400;
+constexpr uint32_t kMapperBytes = 2896;
+
+struct BindSetup {
+  uint32_t mappers = 4;     // in the list
+  uint32_t players[4] = {0, 1, 2, 3};
+  uint32_t filled = 0xFF;   // a list already holding a listener (0xFF: none)
+};
+
+void MakeBindBlock(Context& h, uint32_t block, const BindSetup& setup) {
+  Random& r = h.random;
+  Fill(h.base, block, kBindBytes);
+  const uint32_t manager = block + kBindManager;
+  guest::StoreU32(h.base, manager, in::kManagerVtable);
+  for (uint32_t j = 0; j < 5; j++) {
+    const uint32_t pad = manager + in::kManagerLogicalPads + in::kLogicalPadBytes * j;
+    guest::StoreU32(h.base, pad, 0x8206CBEC);
+    for (uint32_t at = 0; at < in::kProcessorBytes; at += 4) {
+      const bool is_float = at >= 16 && at < 264;
+      guest::StoreU32(h.base, manager + in::kManagerProcessors + in::kProcessorBytes * j + at,
+                      is_float ? uint32_t(r.Below(0x3F800000)) : uint32_t(r.Next()));
+    }
+    const uint32_t list = manager + in::kManagerListeners + in::kListenerListBytes * j;
+    const uint32_t head = block + kBindHeads + 32 * j;
+    const uint32_t other = head + 16;  // a listener node, for a filled list
+    const bool filled = setup.filled == j;
+    guest::StoreU32(h.base, head + std_list::kNext, filled ? other : head);
+    guest::StoreU32(h.base, head + std_list::kPrevious, filled ? other : head);
+    guest::StoreU32(h.base, other + std_list::kNext, head);
+    guest::StoreU32(h.base, other + std_list::kPrevious, head);
+    guest::StoreU32(h.base, other + std_list::kValue, block + kBindOtherListener);
+    guest::StoreU32(h.base, list + std_list::kHead, head);
+    guest::StoreU32(h.base, list + std_list::kSize, filled ? 1 : 0);
+  }
+  // The owner: its vtable word at manager - 36, slot +36 returning r3 + 36.
+  guest::StoreU32(h.base, manager - 36, block + kBindOwnerVtable);
+  guest::StoreU32(h.base, block + kBindOwnerVtable + 36, 0x82591B30);
+  const uint32_t list = block + kBindList;
+  guest::StoreU32(h.base, list, 0x82007F18);
+  for (uint32_t k = 0; k < 6; k++) {
+    guest::StoreU32(h.base, list + 12 + 4 * k, r.Below(4));
+  }
+  guest::StoreU32(h.base, list + 12 + 4 * 2, setup.mappers);
+  guest::StoreU32(h.base, list + 36, manager - 36);
+  guest::StoreU32(h.base, list + 4, setup.mappers ? block + kBindMappers : 0);
+  for (uint32_t k = 0; k < setup.mappers; k++) {
+    const uint32_t mapper = block + kBindMappers + kMapperBytes * k;
+    am::MapperConstruct(h.base, mapper, setup.players[k]);
+    guest::StoreU32(h.base, mapper + 8, k + 1 < setup.mappers ? mapper + kMapperBytes : 0);
+    guest::StoreU32(h.base, list + 8, mapper);
+  }
+  guest::StoreU32(h.base, am::kClientList, list);
+}
+
+// The block (the nodes made replaced by markers; each mapper's listener
+// floats as floats), then the nodes, freed.
+void BindOut(Context& h, Outputs& out, uint32_t block, const BindSetup& setup) {
+  // Every node in the five lists that isn't the block's (AddListener's,
+  // native or not), in list order.
+  std::vector<uint32_t> nodes;
+  for (uint32_t j = 0; j < 5; j++) {
+    const uint32_t head = block + kBindHeads + 32 * j;
+    uint32_t node = guest::LoadU32(h.base, head + std_list::kNext);
+    for (int n = 0; n < 8 && node != head; n++) {
+      if (node != head + 16) {
+        nodes.push_back(node);
+      }
+      node = guest::LoadU32(h.base, node + std_list::kNext);
+    }
+  }
+  auto normalize = [&](uint32_t word) {
+    for (size_t k = 0; k < nodes.size(); k++) {
+      if (word == nodes[k]) {
+        return 0xB10C0000 + uint32_t(k);
+      }
+    }
+    return word;
+  };
+  for (uint32_t at = block; at < block + kBindBytes; at += 4) {
+    const uint32_t word = guest::LoadU32(h.base, at);
+    bool is_float = false;
+    for (uint32_t k = 0; k < setup.mappers; k++) {
+      const uint32_t listener = block + kBindMappers + kMapperBytes * k + am::kListener;
+      is_float = is_float || (at >= listener + 128 && at < listener + 264);
+    }
+    if (is_float) {
+      out.Float(word);
+    } else {
+      out.Word(normalize(word));
+    }
+  }
+  out.Word(uint32_t(nodes.size()));
+  for (uint32_t node : nodes) {
+    const bool heap = memory::IsHeapBlock(node);
+    out.Word(heap ? memory::Size(node) : 0xFFFFFFFF);
+    for (uint32_t w = 0; w < 3; w++) {
+      out.Word(normalize(guest::LoadU32(h.base, node + 4 * w)));
+    }
+  }
+  for (uint32_t node : nodes) {
+    if (memory::IsHeapBlock(node)) {
+      memory::crt::OperatorDelete(node);
+    }
+  }
+}
+
 }  // namespace
 
 void ActionMappers(Context& h) {
@@ -896,6 +1039,94 @@ void ActionMappers(Context& h) {
   Updates(h);
   Slots(h);
   SetUp(h);
+}
+
+// Its own harness, run after the others: allocating its block shifts the
+// heap's layout, and with it before them strings_and_font's Font::Draw and
+// swprintf cases differ or crash (seen 2026-10-24 with nothing but this
+// block's Alloc and Free; for review).
+void ActionMappersBinding(Context& h) {
+  if (!hooks::NativeHeapActive()) {
+    ITC_LOG_INFO("harness: action_mappers: the binding cases need --native_heap; skipped");
+    return;
+  }
+  g_bind_fallbacks = 0;
+  const uint32_t block = memory::Alloc(kBindBytes, 0);
+  const uint32_t global = guest::LoadU32(h.base, am::kClientList);
+  // The cases: the game's (four mappers, players 0-3), players outside 0-3,
+  // fewer mappers, a list already holding a listener (Bind hands that to
+  // the original).
+  auto setup_for = [&](int i) {
+    BindSetup setup;
+    if (i >= 8) {
+      setup.mappers = uint32_t(i % 5);
+      for (uint32_t k = 0; k < 4; k++) {
+        setup.players[k] = h.random.Below(3) == 0 ? 4 + h.random.Below(100) : h.random.Below(4);
+      }
+    }
+    if (i % 7 == 6) {
+      setup.filled = h.random.Below(4);
+    }
+    return setup;
+  };
+  struct Function {
+    const char* name;
+    bool all;
+  };
+  for (const Function f : {Function{"sub_8210B270 ActionMapper::Bind", false},
+                           Function{"sub_8210AF08 InputClientList::BindAll", true}}) {
+    Results results(f.name);
+    int expected_fallbacks = 0;
+    for (int i = 0; i < 40; i++) {
+      Outputs out[2];
+      const Random start = h.random;
+      Random after;
+      BindSetup setup;
+      uint32_t mapper = 0;
+      for (int v = 0; v < 2; v++) {
+        h.random = start;
+        setup = setup_for(i);
+        if (!f.all && setup.mappers == 0) {
+          setup.mappers = 1;
+        }
+        MakeBindBlock(h, block, setup);
+        mapper = block + kBindMappers + kMapperBytes * h.random.Below(setup.mappers ? setup.mappers : 1);
+        PPCContext t = CallContext(h);
+        if (f.all) {
+          t.r3.u64 = block + kBindList;
+        } else {
+          t.r3.u64 = mapper;
+          t.r4.u64 = block + kBindManager;
+        }
+        ITC_FLAG(native_action_mappers) = v == 1;
+        ITC_FLAG(native_input) = v == 1;
+        if (f.all) {
+          (v == 0 ? __imp__sub_8210AF08 : sub_8210AF08)(t, h.base);
+        } else {
+          (v == 0 ? __imp__sub_8210B270 : NativeBind)(t, h.base);
+        }
+        ITC_FLAG(native_action_mappers) = true;
+        ITC_FLAG(native_input) = true;
+        BindOut(h, out[v], block, setup);
+        out[v].Word(guest::LoadU32(h.base, am::kClientList));
+        out[v].Word(t.r3.u32);
+        guest::StoreU32(h.base, am::kClientList, global);
+        after = h.random;
+      }
+      if (!f.all && setup.filled != 0xFF &&
+          guest::LoadU32(h.base, mapper + 2888) == setup.filled) {
+        expected_fallbacks++;
+      }
+      h.random = after;
+      results.Check(out[0], out[1], fmt::format("case {}", i));
+    }
+    results.Report();
+    if (!f.all && g_bind_fallbacks != expected_fallbacks) {
+      ITC_LOG_ERROR("harness: action_mappers: {} Bind cases handed to the original, {} expected",
+                    g_bind_fallbacks, expected_fallbacks);
+    }
+  }
+  memory::Free(block);
 }
 
 }  // namespace harness

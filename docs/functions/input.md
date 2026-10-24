@@ -27,8 +27,9 @@ make their listeners with `InputProcessor::InputProcessor`
 2 and 3 (`ActionMapper::Bind`, from `InputClientList::BindAll`, which
 gets the manager from its owner's vtable slot +36: the object
 `ActionMappers::Init` is given, the app of `sub_82106548` rather than the
-input manager, probably reaching `sub_82090788`, the framework's +88,
-through the app's `sub_820944C8` and `sub_82094350`; not traced, a lead);
+input manager: its slot +36 is `sub_820944C8`, through `sub_82094350`,
+probably reaching `sub_82090788`, the framework's +88; logged 2026-10-24,
+every call returned the input manager);
 the first tick handler (`sub_82093DC0`, `functions.md`) gets processor 0
 through slot 1 and tests its buttons; `InputProcessor::TestHeld` and
 `AllHeld` (the mappers' listener tests) are in `action-mappers.md`, and
@@ -51,6 +52,18 @@ two handlers removed), and the list's error paths (`bad_alloc`,
 `length_error`). The rows were drafted by the B7 loop's mapping agent
 (2026-10-24) from the generated code, except the rows moved from
 `functions.md` (B1's, as they were, with what's new added).
+
+Native since 2026-10-24 (`--native_input`, harness `input`): the
+manager's set-up and slots, the pads' and processors' constructors,
+`InputProcessor::Assign` and the button tests in
+`itc_recomp/src/input/input_manager.cpp`, and the `std::list` of pointers
+in `itc_recomp/src/std_list/ptr_list.cpp` (plain C++ any native caller
+can use; the functions that allocate only with `--native_heap`); the
+adapters in `itc_recomp/src/hooks/input_manager.cpp`, which also keep the
+`--log_input_reads` counts (moved from
+`itc_recomp/src/frame_pacing/game_messages.cpp`). The manager's
+constructor keeps its two handler registrations as guest calls through
+the dispatcher's slots, so it stays Overridden.
 
 Status:
 

@@ -231,4 +231,16 @@ void InputClientListAdd(uint8_t* base, uint32_t node);
 bool MapperConstructKnown(uint8_t* base);
 void MapperConstruct(uint8_t* base, uint32_t mapper, uint32_t player);
 
+// ActionMapper::Bind (sub_8210B270): `object` (the input manager, from
+// InputClientList::BindAll) kept at +2892; for players (+2888) 0-3, the
+// listener (+2464) added to that pad's listeners (the object's slot 3,
+// InputManager::AddListener) and the logical pad's values (its slot 2,
+// then the pad's slot 1) kept at +2880; then +2884 = 1 (bound). Returns 1.
+// MapperBindKnown: the player isn't 0-3, or the object's slots 2 and 3 and
+// the pad's slot 1 are the functions seen in play and AddListener runs
+// natively (the list empty, a node operator new gives: the caller also
+// needs --native_heap); otherwise the adapter runs the original.
+bool MapperBindKnown(uint8_t* base, uint32_t mapper, uint32_t object);
+uint32_t MapperBind(uint8_t* base, uint32_t mapper, uint32_t object);
+
 }  // namespace action_mappers

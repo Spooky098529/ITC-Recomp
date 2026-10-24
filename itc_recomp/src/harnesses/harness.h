@@ -172,5 +172,6 @@ void DeviceState(Context& h);
 void CourseScenery(Context& h);
 void PostEffects(Context& h);
 void Input(Context& h);
+void ActionMappersBinding(Context& h);
 
 }  // namespace harness
