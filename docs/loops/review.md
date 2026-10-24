@@ -13,7 +13,25 @@ When the user has reviewed a run's section, its heading gets
 
 ## Run 2026-10-24 17:46 (`b7-loop-24-10-26-3`)
 
-(nothing yet)
+- `post-effects.md` (new, mapped in f3643e1): 57 rows (3 moved from
+  `functions.md`: `Glow::Record`, `PostEffects::RecordAll`
+  (`sub_82133960`, unnamed before), `sub_821363F0`), the post effects
+  (up to 15 screen-space effects a view, objects at `0x826C5D80` made
+  from the table at `0x826174A8`: the glow, probably a color filter, the
+  motion blur, a two-pass filter over render target 3 or 4, two kinds
+  never run); `known-data.md`'s "Values from the image" (the three
+  `.data` tables, float constants); 3 leads. For review:
+  - `sub_821363F0` renamed from `View::UploadPreviousViewProjection` to
+    `MotionBlur::Record` (it records the whole motion blur), and the
+    mention in `matrix-math.md`'s `Matrix::Copy` row changed to match.
+  - `sub_8212EDE0` belongs to the race's screen objects (made by
+    `sub_82133000`, now a lead), kept here beside its caller
+    `sub_8215B690` (probably the pause toggle).
+  - The glow's tables at `0x82617280` and `0x826171D8` probably the
+    DirectX SDK HDR sample's glare library (`GLAREDEF`/`STARDEF`).
+  - `RenderTextures::Acquire` (`sub_82133190`) returns an uninitialized
+    stack word when an id is in use with another key (split screen's
+    second player, probably; not checked whether it runs).
 
 ## Run 2026-10-24 16:01 (`b7-loop-24-10-26-2`)
 
