@@ -41,7 +41,9 @@ see in a drive, from every run: `to-drive.md`.
   (`device-state.md`, 131 rows, 8b1b86b; 116 ready groups); map checked
   (0 errors, 131 of 131 in play; the packets nothing reads are Dropped by
   the graphics rule: `gpu_link.cpp` only counts them). Migration 1 done
-  (7b1c218..c421c0b, 121 of 131 ours): validation agent running.
+  (7b1c218..c421c0b, 121 of 131 ours: 120 native, 1 Dropped), validated
+  (`itc_1320`; all 120 ran in play): migration agent 2 running
+  (SetRenderTarget, SetDepthStencilSurface, the packet-writing roots).
 
 ## Done
 
