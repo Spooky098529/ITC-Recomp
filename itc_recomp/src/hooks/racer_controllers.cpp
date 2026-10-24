@@ -5,21 +5,26 @@
 // their adapters stay until it's native. Functions reached only from native
 // callers have no adapters (the flag switches their callers):
 // CarInputs::Create (sub_82102258), from RaceFlow::OnSetUp; and
-// CarInputs::Destroy (sub_82102300), from RaceFlow::OnEnd.
+// CarInputs::Destroy (sub_82102300), from RaceFlow::OnEnd; and sub_8215F5F0
+// (never seen in play), from RaceFlow::OnState16.
 
 #include "guest.h"
 
 #include "base/flags.h"
+#include "hooks/ai_drivers.h"
 #include "racer_controllers/racer_controllers.h"
 
 ITC_FLAG_BOOL(native_racer_controllers, true, "ITC",
               "Run the racer controllers (docs/functions/racer-controllers.md: "
               "RaceFlow::OnSetUp sub_8215F728, RaceFlow::OnEnd sub_8215F5E8, "
-              "InputRecording::Append sub_821029A8, InputRecording::HasRoom sub_82102968) "
+              "InputRecording::Append sub_821029A8, InputRecording::HasRoom sub_82102968, "
+              "RacerControl::DriveByAi sub_8215F968, RaceFlow::HoldAll sub_8215FA10, "
+              "RaceFlow::OnHold sub_8215FC28, RaceFlow::OnState16 sub_8215FB90, "
+              "AiDriver::Setup sub_82170FF8) "
               "natively instead of through the translated code (the same words; checked by "
               "--run_harnesses=racer_controllers). Those reached only from native callers "
               "have no adapters, and the flag switches their callers: sub_82102258, "
-              "sub_82102300");
+              "sub_82102300, sub_8215F5F0");
 
 // Defines an adapter: `body` uses `ctx` and `base`.
 #define ITC_RACER_CONTROLLERS(address, body)   \
@@ -33,6 +38,34 @@ ITC_FLAG_BOOL(native_racer_controllers, true, "ITC",
   }
 
 using namespace racer_controllers;
+
+namespace {
+
+struct GuestCalls {
+  PPCContext* ctx;
+  uint8_t* base;
+};
+
+void CallDriveCar(void* user, uint32_t input, uint32_t index, uint32_t flag, uint32_t frame,
+                  uint32_t lr) {
+  auto& call = *static_cast<GuestCalls*>(user);
+  PPCContext& ctx = *call.ctx;
+  const uint64_t saved = ctx.r1.u64;
+  ctx.r1.u64 = frame;
+  ctx.lr = lr;
+  ctx.r3.u64 = input;
+  ctx.r4.u64 = index;
+  ctx.r5.u64 = flag;
+  hooks::AiDriveCar(ctx, call.base);
+  ctx.r1.u64 = saved;
+}
+
+}  // namespace
+
+// The calls the plain C++ makes into code that takes the context.
+#define ITC_RACER_CALLS          \
+  GuestCalls call{&ctx, base};   \
+  const Calls calls { &call, CallDriveCar }
 
 // --- The input recording ---
 
@@ -60,4 +93,33 @@ ITC_RACER_CONTROLLERS(8215F5E8, {
     return;
   }
   __imp__sub_8215F5E8(ctx, base);
+})
+
+// --- The AI drivers' hand-off (r3 as the originals leave it; f1 DriveCar's) ---
+
+// r3 = the racer's index, r4 = the hold flag.
+ITC_RACER_CONTROLLERS(8215F968, {
+  ITC_RACER_CALLS;
+  DriveByAi(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, calls, &ctx.r3.u64);
+})
+ITC_RACER_CONTROLLERS(8215FA10, {
+  ITC_RACER_CALLS;
+  ctx.r3.u64 = HoldAll(base, ctx.r1.u32, calls);
+})
+// Through the race flow's functors: a jump to HoldAll, and state 16's.
+ITC_RACER_CONTROLLERS(8215FC28, {
+  ITC_RACER_CALLS;
+  ctx.r3.u64 = HoldAll(base, ctx.r1.u32, calls);
+})
+ITC_RACER_CONTROLLERS(8215FB90, {
+  ITC_RACER_CALLS;
+  ctx.r3.u64 = OnState16(base, ctx.r1.u32, calls);
+})
+
+// --- The AI drivers' set-up ---
+
+// r3 = &the racer's index, r4 = &the item id, r5 = &the hold flag.
+ITC_RACER_CONTROLLERS(82170FF8, {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = Setup(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32);
 })

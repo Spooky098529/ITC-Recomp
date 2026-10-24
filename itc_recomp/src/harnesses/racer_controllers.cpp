@@ -10,7 +10,10 @@
 
 #include "harness.h"
 
+#include "ai_drivers/ai_drivers.h"
 #include "base/flags.h"
+#include "data_tables/data_tables.h"
+#include "hooks/ai_drivers.h"
 #include "hooks/heap.h"
 #include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
@@ -18,6 +21,7 @@
 
 #include <fmt/format.h>
 
+#include <algorithm>
 #include <string>
 #include <vector>
 
@@ -63,6 +67,93 @@ void NativeOnEnd(PPCContext& ctx, uint8_t* base) {
   }
 }
 
+// The AI drivers' stand-ins (hooks/ai_drivers.h), for both versions: each
+// call logged (its registers: r3 to r5, r1, the link register) and answered
+// with a record of words from the call's count and arguments, f1 = the
+// count.
+std::vector<uint32_t> g_stand_in_log;
+uint32_t g_stand_in_calls = 0;
+uint32_t Mix(uint32_t x) {
+  x ^= x >> 16;
+  x *= 0x7FEB352Du;
+  x ^= x >> 15;
+  x *= 0x846CA68Bu;
+  return x ^ (x >> 16);
+}
+void StandInDriveCar(PPCContext& ctx, uint8_t* base) {
+  g_stand_in_log.insert(g_stand_in_log.end(), {0xD0000000u, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                               ctx.r1.u32, uint32_t(ctx.lr)});
+  for (uint32_t i = 0; i < 5; i++) {
+    guest::StoreU32(base, ctx.r3.u32 + 4 * i,
+                    Mix(g_stand_in_calls * 7 + i + ctx.r4.u32 * 131 + ctx.r5.u32 * 977));
+  }
+  ctx.f1.f64 = double(g_stand_in_calls);
+  g_stand_in_calls++;
+}
+void StandInUpdateIdle(PPCContext& ctx, uint8_t* base) {
+  g_stand_in_log.insert(g_stand_in_log.end(), {0xD1000000u, uint32_t(ctx.r3.u64 >> 32),
+                                               ctx.r3.u32, ctx.r1.u32, uint32_t(ctx.lr)});
+  ctx.r3.u64 = Mix(g_stand_in_calls++);
+}
+// While alive, the stand-ins answer and the log starts empty.
+struct StandIns {
+  StandIns() {
+    hooks::g_drive_car_stand_in = StandInDriveCar;
+    hooks::g_update_idle_stand_in = StandInUpdateIdle;
+    Reset();
+  }
+  ~StandIns() {
+    hooks::g_drive_car_stand_in = nullptr;
+    hooks::g_update_idle_stand_in = nullptr;
+  }
+  static void Reset() {
+    g_stand_in_log.clear();
+    g_stand_in_calls = 0;
+  }
+};
+
+// The adapters' calls (hooks/racer_controllers.cpp) for the native side.
+struct HarnessCalls {
+  PPCContext* ctx;
+  uint8_t* base;
+};
+void CallDriveCar(void* user, uint32_t input, uint32_t index, uint32_t flag, uint32_t frame,
+                  uint32_t lr) {
+  auto& call = *static_cast<HarnessCalls*>(user);
+  PPCContext& ctx = *call.ctx;
+  const uint64_t saved = ctx.r1.u64;
+  ctx.r1.u64 = frame;
+  ctx.lr = lr;
+  ctx.r3.u64 = input;
+  ctx.r4.u64 = index;
+  ctx.r5.u64 = flag;
+  hooks::AiDriveCar(ctx, call.base);
+  ctx.r1.u64 = saved;
+}
+#define ITC_HARNESS_CALLS          \
+  HarnessCalls call{&ctx, base};   \
+  const rc::Calls calls { &call, CallDriveCar }
+
+void NativeDriveByAi(PPCContext& ctx, uint8_t* base) {
+  ITC_HARNESS_CALLS;
+  rc::DriveByAi(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, calls, &ctx.r3.u64);
+}
+void NativeHoldAll(PPCContext& ctx, uint8_t* base) {
+  ITC_HARNESS_CALLS;
+  ctx.r3.u64 = rc::HoldAll(base, ctx.r1.u32, calls);
+}
+void NativeOnState16(PPCContext& ctx, uint8_t* base) {
+  ITC_HARNESS_CALLS;
+  ctx.r3.u64 = rc::OnState16(base, ctx.r1.u32, calls);
+}
+void NativeClearAllRecords(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = rc::ClearAllRecords(base, ctx.r1.u32);
+}
+void NativeSetup(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = rc::Setup(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32);
+}
+
 std::vector<uint8_t> Bytes(uint8_t* base, uint32_t address, uint32_t size) {
   return std::vector<uint8_t>(base + address, base + address + size);
 }
@@ -70,10 +161,13 @@ std::vector<uint8_t> Bytes(uint8_t* base, uint32_t address, uint32_t size) {
 // The globals a case may point elsewhere, saved and put back.
 struct Globals {
   uint8_t* base;
-  uint32_t race_data, recordings, inputs[8];
+  uint32_t race_data, recordings, race, drivers, tables, inputs[8];
   explicit Globals(uint8_t* b) : base(b) {
     race_data = guest::LoadU32(base, rc::kRaceData);
     recordings = guest::LoadU32(base, rc::kRecordings);
+    race = guest::LoadU32(base, rc::kRace);
+    drivers = guest::LoadU32(base, ai_drivers::kDrivers);
+    tables = guest::LoadU32(base, data_tables::kTables);
     for (uint32_t i = 0; i < 8; i++) {
       inputs[i] = guest::LoadU32(base, rc::kInputs + 4 * i);
     }
@@ -81,6 +175,9 @@ struct Globals {
   void Restore() const {
     guest::StoreU32(base, rc::kRaceData, race_data);
     guest::StoreU32(base, rc::kRecordings, recordings);
+    guest::StoreU32(base, rc::kRace, race);
+    guest::StoreU32(base, ai_drivers::kDrivers, drivers);
+    guest::StoreU32(base, data_tables::kTables, tables);
     for (uint32_t i = 0; i < 8; i++) {
       guest::StoreU32(base, rc::kInputs + 4 * i, inputs[i]);
     }
@@ -259,6 +356,184 @@ void Inputs(Context& h, Random& r) {
   memory::Free(race);
 }
 
+// --- The AI drivers' hand-off ---
+
+// The racers ([0x826D82F4] at `race`: +2308 the records' pointers, +2364
+// their count) and their input records (seven of 20 bytes at `records`,
+// [0x826C5B30] pointing at them, the eighth word kept).
+struct Racers {
+  uint32_t race, racers, records;
+};
+
+// Up to seven racers (now and then none, or a count above seven: the
+// records' list runs into the race's words after it) with indexes 0 to 6
+// (now and then with high bits, which the records' lookup masks), the input
+// records random, the race data's flags with or without 0x100.
+void RandomRacers(uint8_t* base, Random& r, const Racers& at, uint32_t race_data) {
+  RandomWords(base, r, at.records, 7 * 20);
+  const uint32_t count = r.Below(10) == 0 ? 0 : 1 + r.Below(7);
+  guest::StoreU32(base, at.race + 2364, r.Below(32) == 0 ? 0xFFFFFFFFu : count);
+  for (uint32_t i = 0; i < 7; i++) {
+    const uint32_t racer = at.racers + 32 * i;
+    guest::StoreU32(base, at.race + 2308 + 4 * i, racer);
+    RandomWords(base, r, racer, 32);
+    const uint32_t index = r.Below(7);
+    guest::StoreU32(base, racer + 20, r.Below(16) == 0 ? index | (r.Below(4) << 8) : index);
+  }
+  const uint32_t flags = uint32_t(r.Next());
+  guest::StoreU32(base, race_data + rc::kFlags, r.Below(4) == 0 ? flags | 0x100 : flags & ~0x100u);
+}
+
+void Handoff(Context& h, Random& r) {
+  const Globals saved(h.base);
+  const uint32_t race_data = memory::Alloc(0xA3B00, 0);
+  const uint32_t block = memory::Alloc(0x1000, 0);
+  const Racers at{block, block + 0xA00, block + 0xE00};
+  const StandIns stand_ins;
+  enum Kind { kDriveByAi, kHoldAll, kOnHold, kOnState16, kClearAllRecords };
+  const struct {
+    const char* name;
+    GuestFunction recompiled, native;
+    Kind kind;
+    int cases;
+  } functions[] = {
+      {"RacerControl::DriveByAi (sub_8215F968)", Original<__imp__sub_8215F968>, NativeDriveByAi,
+       kDriveByAi, 300},
+      {"RaceFlow::HoldAll (sub_8215FA10)", Original<__imp__sub_8215FA10>, NativeHoldAll, kHoldAll,
+       300},
+      {"RaceFlow::OnHold (sub_8215FC28)", Original<__imp__sub_8215FC28>, NativeHoldAll, kOnHold,
+       100},
+      {"RaceFlow::OnState16 (sub_8215FB90)", Original<__imp__sub_8215FB90>, NativeOnState16,
+       kOnState16, 300},
+      {"sub_8215F5F0 (never seen in play)", Original<__imp__sub_8215F5F0>, NativeClearAllRecords,
+       kClearAllRecords, 100},
+  };
+  for (const auto& f : functions) {
+    Results results(f.name);
+    for (int c = 0; c < f.cases; c++) {
+      RandomRacers(h.base, r, at, race_data);
+      if (f.kind == kOnState16) {
+        RandomStage(h.base, r, race_data);
+      }
+      const std::vector<uint8_t> records = Bytes(h.base, at.records, 7 * 20);
+      const uint32_t index = r.Below(8) == 0 ? r.Below(7) | 0x300 : r.Below(7);
+      const uint32_t hold = r.Below(8) == 0 ? uint32_t(r.Next()) : r.Below(2);
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Write(h.base, at.records, records.data(), 7 * 20);
+        // The stack below the scratch area (the frames), filled the same.
+        Fill(h.base, h.data - 1024 - 0x400, 0x400, 0xA5);
+        guest::StoreU32(h.base, rc::kRaceData, race_data);
+        guest::StoreU32(h.base, rc::kRace, at.race);
+        for (uint32_t i = 0; i < 7; i++) {
+          guest::StoreU32(h.base, rc::kInputs + 4 * i, at.records + 20 * i);
+        }
+        StandIns::Reset();
+        PPCContext t = CallContext(h);
+        t.r3.u64 = index;
+        t.r4.u64 = hold;
+        t.f1.u64 = 0x7FF8DEADBEEF0000ull;
+        (v == 0 ? f.recompiled : f.native)(t, h.base);
+        saved.Restore();
+        out[v].Bytes(Bytes(h.base, at.records, 7 * 20));
+        for (uint32_t word : g_stand_in_log) {
+          out[v].Word(word);
+        }
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+        out[v].Word(t.r3.u32);
+        out[v].Double(t.f1.u64);
+      }
+      results.Check(out[0], out[1], fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  memory::Free(block);
+  memory::Free(race_data);
+}
+
+// --- The AI drivers' set-up ---
+
+// AiDriver::Setup on a table of seven drivers (random words, then what the
+// resets read: each driver's index +0, a vehicle +160 with its box shape
+// +344 and flags +6148, the path's driver +512 and modes +5520 to +5528),
+// an item from made-up data tables ([0x826C5CA0]: +16 the items, 3,008
+// bytes each, +120 the skill's seven halfwords) and the race data's mode
+// (+0xA3AF0, the skill's load). The table, the vehicle, the shape and r3
+// are compared.
+void SetUp(Context& h, Random& r) {
+  const Globals saved(h.base);
+  constexpr uint32_t kTableBytes = 7 * ai_drivers::kDriverBytes;
+  const uint32_t table = memory::Alloc(kTableBytes, 0);
+  const uint32_t vehicle = memory::Alloc(6272 + 0x100, 0);
+  const uint32_t shape = vehicle + 6272;
+  const uint32_t race_data = memory::Alloc(0xA3B00, 0);
+  const uint32_t tables = memory::Alloc(0x40 + 4 * 3008, 0);
+  const uint32_t items = tables + 0x40;
+  const uint32_t args = h.data;  // the index, the item id and the hold flag
+  Results results("AiDriver::Setup (sub_82170FF8)");
+  for (int c = 0; c < 300; c++) {
+    RandomWords(h.base, r, table, kTableBytes);
+    RandomWords(h.base, r, vehicle, 6272 + 0x100);
+    for (uint32_t i = 0; i < 7; i++) {
+      const uint32_t driver = table + ai_drivers::kDriverBytes * i;
+      guest::StoreU32(h.base, driver + 0, i);
+      guest::StoreU32(h.base, driver + 160, vehicle);
+      guest::StoreU32(h.base, driver + 16, r.Below(2) ? uint32_t(r.Next()) : r.Below(8));
+      guest::StoreU32(h.base, driver + 512, r.Below(4) == 0 ? 0 : driver);
+      guest::StoreU32(h.base, driver + 512 + 5520, r.Below(3));
+      guest::StoreU32(h.base, driver + 512 + 5524, r.Below(2) ? 0xFFFFFFFFu : r.Below(8));
+      guest::StoreU32(h.base, driver + 512 + 5528, r.Below(2) ? 0xFFFFFFFFu : r.Below(8));
+    }
+    guest::StoreU32(h.base, vehicle + 344, r.Below(4) == 0 ? 0 : shape);
+    const uint32_t vflags[] = {0, 1, 0x80, 0x81, uint32_t(r.Next())};
+    guest::StoreU32(h.base, vehicle + 6148, vflags[r.Below(5)]);
+    guest::StoreU32(h.base, tables + 16, items);
+    for (uint32_t k = 0; k < 4; k++) {
+      for (uint32_t i = 0; i < 7; i++) {
+        guest::StoreU16(h.base, items + 3008 * k + 120 + 2 * i,
+                        uint16_t(int32_t(r.Below(300)) - 100));
+      }
+    }
+    guest::StoreU32(h.base, race_data + rc::kMode, r.Below(3));
+    const std::vector<uint8_t> before = Bytes(h.base, table, kTableBytes);
+    const std::vector<uint8_t> vehicle_before = Bytes(h.base, vehicle, 6272 + 0x100);
+    const uint32_t index = r.Below(7);
+    const uint32_t id = r.Below(4) == 0 ? 0xFFFFFFFFu - r.Below(3) : r.Below(4);
+    const uint32_t hold = r.Below(2) ? r.Below(2) : uint32_t(r.Next());
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Write(h.base, table, before.data(), kTableBytes);
+      Write(h.base, vehicle, vehicle_before.data(), 6272 + 0x100);
+      Fill(h.base, h.data - 1024 - 0x400, 0x400, 0xA5);
+      guest::StoreU32(h.base, args + 0, index);
+      guest::StoreU32(h.base, args + 4, id);
+      guest::StoreU32(h.base, args + 8, hold);
+      guest::StoreU32(h.base, ai_drivers::kDrivers, table);
+      guest::StoreU32(h.base, data_tables::kTables, tables);
+      guest::StoreU32(h.base, rc::kRaceData, race_data);
+      PPCContext t = CallContext(h);
+      t.fpscr.disableFlushModeUnconditional();
+      t.r3.u64 = args + 0;
+      t.r4.u64 = args + 4;
+      t.r5.u64 = args + 8;
+      (v == 0 ? Original<__imp__sub_82170FF8> : NativeSetup)(t, h.base);
+      saved.Restore();
+      for (uint32_t i = 0; i < kTableBytes; i += 256) {
+        out[v].Bytes(Bytes(h.base, table + i, std::min<uint32_t>(256, kTableBytes - i)));
+      }
+      out[v].Bytes(Bytes(h.base, vehicle, 6272 + 0x100));
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      out[v].Word(t.r3.u32);
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", c));
+  }
+  results.Report();
+  memory::Free(tables);
+  memory::Free(race_data);
+  memory::Free(vehicle);
+  memory::Free(table);
+}
+
 }  // namespace
 
 void RacerControllers(Context& h) {
@@ -267,6 +542,8 @@ void RacerControllers(Context& h) {
   if (hooks::NativeHeapActive()) {
     Inputs(h, r);
   }
+  Handoff(h, r);
+  SetUp(h, r);
 }
 
 }  // namespace harness

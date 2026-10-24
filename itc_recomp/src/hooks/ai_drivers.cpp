@@ -90,6 +90,7 @@
 #include "guest.h"
 
 #include "ai_drivers/ai_drivers.h"
+#include "hooks/ai_drivers.h"
 #include "hooks/guest_call.h"
 #include "base/flags.h"
 
@@ -216,6 +217,9 @@ ITC_FLAG_BOOL(native_ai_drivers, true, "ITC",
   }
 
 using namespace ai_drivers;
+
+hooks::GuestStandIn hooks::g_drive_car_stand_in = nullptr;
+hooks::GuestStandIn hooks::g_update_idle_stand_in = nullptr;
 
 // --- Set-up and clears (r3 kept) ---
 
@@ -432,8 +436,11 @@ uint64_t CallJoinStep(void* user, uint32_t step, uint32_t frame, uint32_t path, 
 
 // r3 = the car's input record (left in r3), r4 = the racer's index, r5 = the
 // flag; the original's frame 144 bytes down.
-extern "C" REX_FUNC(sub_8215F678) {
-  REX_FUNC_PROLOGUE();
+void hooks::AiDriveCar(PPCContext& ctx, uint8_t* base) {
+  if (g_drive_car_stand_in != nullptr) {
+    g_drive_car_stand_in(ctx, base);
+    return;
+  }
   if (ITC_FLAG(native_ai_drivers)) {
     ctx.fpscr.disableFlushMode();
     PathCall call{&ctx, base};
@@ -449,9 +456,16 @@ extern "C" REX_FUNC(sub_8215F678) {
   }
   __imp__sub_8215F678(ctx, base);
 }
-// The original's frame 96 bytes down.
-extern "C" REX_FUNC(sub_821399A8) {
+extern "C" REX_FUNC(sub_8215F678) {
   REX_FUNC_PROLOGUE();
+  hooks::AiDriveCar(ctx, base);
+}
+// The original's frame 96 bytes down.
+void hooks::AiUpdateIdle(PPCContext& ctx, uint8_t* base) {
+  if (g_update_idle_stand_in != nullptr) {
+    g_update_idle_stand_in(ctx, base);
+    return;
+  }
   if (ITC_FLAG(native_ai_drivers)) {
     ctx.fpscr.disableFlushMode();
     PathCall call{&ctx, base};
@@ -464,4 +478,8 @@ extern "C" REX_FUNC(sub_821399A8) {
     }
   }
   __imp__sub_821399A8(ctx, base);
+}
+extern "C" REX_FUNC(sub_821399A8) {
+  REX_FUNC_PROLOGUE();
+  hooks::AiUpdateIdle(ctx, base);
 }
