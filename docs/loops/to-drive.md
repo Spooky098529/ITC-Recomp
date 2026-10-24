@@ -13,6 +13,13 @@ function goes from this list when a log shows its `native running
 (game):` line (say which log in the commit). A run with nothing left
 here loses its heading.
 
+## Run 2026-10-24 16:01 (`b7-loop-24-10-26-2`)
+
+The array helpers' migration 1 (with the adapters removed), not in the
+attract race or the replay (`itc_1342`, `itc_1343`, ok):
+
+- `sub_825B1368` the wide write_char (`c-runtime.md`)
+
 ## Run 2026-10-24 03:25 (`b7-loop-24-10-26`)
 
 The graphics resources' migration 1, not in the attract race or the

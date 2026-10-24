@@ -5,6 +5,9 @@
 
 #include "guest.h"
 
+#include <array>
+#include <vector>
+
 namespace hooks {
 
 // CameraPass::Update (sub_820A3978) natively (src/cameras/cameras.cpp) for
@@ -59,6 +62,18 @@ bool CameraPassSetUpSurfaces(PPCContext& ctx, uint8_t* base);
 // SetUpSurfaces (through their overrides) as guest calls; r3 = 0.
 // Flush-to-zero left off. Always runs (true).
 bool CameraPassInit(PPCContext& ctx, uint8_t* base);
+
+// For the cameras harness: while not null, CameraPass::Init's adapter only
+// appends its r3, r4 and r5 here (and leaves r3 = 0; whatever the flag), so
+// the original CameraPasses::InitPasses can be run without touching the
+// game's passes.
+extern thread_local std::vector<std::array<uint32_t, 3>>* camera_pass_init_calls;
+
+// CameraPasses::Init (sub_8209F9B8, `all`) or InitPasses (sub_8209F960)
+// natively, without the flag: from a frame like InitPasses' (128 bytes),
+// CameraPass::Init through its override with InitPasses' return address;
+// r3 and f1 as the original's last call (SetMode) leaves them.
+void CameraPassesInit(PPCContext& ctx, uint8_t* base, bool all);
 
 // CameraPasses::RecordBegins (sub_8209F8A0) and RecordEnds (sub_8209F900)
 // natively, for their wrappers in src/debug/frame_state_diff.cpp: each

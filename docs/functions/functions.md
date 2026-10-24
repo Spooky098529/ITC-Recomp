@@ -79,8 +79,9 @@ Rows not yet moved stay in the table below. So far:
 - [`c-runtime.md`](c-runtime.md): the C runtime and math library as seen
   in play: math functions and their floating-point helpers, string,
   memory and character helpers, number parsing and formatting, and the
-  pure parts of its start-up (B7; the heap and what calls kernel imports
-  aren't in it).
+  pure parts of its start-up, and the compiler's array constructor and
+  destructor helpers (B7; the heap and what calls kernel imports aren't
+  in it).
 - [`ui-movies.md`](ui-movies.md): the UI movie library (the HUD's, the
   menus' and the pause screens' 2D movies): loading and fixing up movie
   files, applying animations' tracks to nodes, and drawing the node tree
@@ -216,6 +217,12 @@ Rows not yet moved stay in the table below. So far:
   shader constants, the default state at boot, and the GPU register
   split, the screen scissor and the gamma ramp with the packets they
   write (B7).
+- [`course-scenery.md`](course-scenery.md): the course scenery: its
+  manager at `0x826C5514`, the areas and their models and lights
+  collected around the viewports each update and streamed in and out of
+  five fixed pools of physical memory, the course's shared set, the
+  lights' nearest search and the scenery's draw with the cars' headlight
+  projectors (B7).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
@@ -266,9 +273,6 @@ old performance notes to the end of `../native-renderer.md`.
 | `sub_8258FD48` | `Command::SetShaderConstants` | Wrapped | Render thread, command 7: r3 = payload, r4 = register count, r5 = stage << 24 \| type << 16 \| start << 8 \| count. Interpolation substitutes blended values here. |
 | `sub_8210EDB0` | | | Wind sound; scales with speed. |
 | `sub_82152CD8` | | | Camera shake; scales with speed. |
-| `sub_820F11A8` | `TextureAnimations::Advance` | Wrapped | From the draw step part `sub_820F6068`: advances the flipbook animation set at r3+1060 (`sub_82146B20`). Skipped on render-only passes (see "Per-frame logic" in `../frame-interpolation.md`). |
-| `sub_82146B20` | | | Calls `sub_82146AC0` on every animation in a set: count at +0, then offsets to each animation. |
-| `sub_82146AC0` | | | Advances one flipbook animation: frame count +0, current frame +4, tick counter +8 (wraps at the length at +12), frame start ticks from +16. |
 | `sub_82146B80` | | | Returns the current frame's entry of animation r4 in set r3 (texture id at +4). |
 | `sub_82146A38` | | | Finds the animation in set r3 whose texture is r4; -1 if none. |
 | `sub_820F5740` | `Minimap::Draw` | Wrapped | From the draw step part `sub_820F6068`; steps the minimap blink clock at `0x826C5AA4`/`0x826C5AA8` after drawing (see "Per-frame logic" in `../frame-interpolation.md`). |
@@ -312,7 +316,6 @@ old performance notes to the end of `../native-renderer.md`.
 | `sub_8229B7B0` | | | Copies four words of the device's presentation parameters (+13188 width, +13192 height, +13236, +13196) to r5. r3 device, r4 unused (0). From `sub_82482B18`. |
 | `sub_822A8980` | | | Probably CreateVertexDeclaration: r3 the elements (`8264D550` from `sub_82482B18`); allocates (`sub_822976F8`), clears and copies (`memset`, `sub_825A7410`). Not read in detail. |
 | `sub_822221A0` | `TitleScreen::Update` | Wrapped | Counts idle ticks and starts the attract race at 600 (see "The title screen" in `../title-screen.md`). `--attract_after_s` shortens the wait. |
-| `sub_820F4128` | `Lights::FindNearest` | Overridden | `src/hooks/lights.cpp` (`--native_nearest_lights`, "Lights::FindNearest" in `native-renderer.md`). Collects the lights nearest a point, nearest first; 13.1% of the main thread in an uncapped attract race (2026-10-16, "The main thread" in `native-renderer.md`). Arguments: r3 the light set owner (list at r3+216: count +0, array +8 of 272-byte entries, each's +12 → +80 a light set), r4 the output, r5 the point, r6 the most lights to keep (at most 32; 0 returned above), r9 a direction vector, f1 a merge radius, f2 the farthest squared distance, f3 the least dot product. For each light (48 bytes: position xyz at +0, 32 bytes copied out): skipped beyond f2, or when the direction to it dotted with r9 is below f3 (a cone); within f1 of a light already kept, it replaces that one if nearer, else is dropped; otherwise insertion-sorted by squared distance into a 33-entry array on its ~2 KB guest stack frame. Writes 32 bytes a light to r4 (position with w = the float at `0x82000A30`, then the light's +16..+31) and returns the count. A light set's count (+0) is little-endian (byte-swapped after `lwz`); `sub_82294730` gives each of its entries, whose +0 count says how many times the entry's one light group (count +60, lights from +76) is scanned: the group pointer isn't advanced, so a count above 1 scans the same lights again (the merge then drops the copies). It happens: in an attract race ~63 repeated scans a call, ~1,465 of the ~6,240 lights it tests a call. Hot spot: three `stfs` of the difference to r1+80, then a 16-byte `lvx` of the same spot (a failed store forward) for every light tested. Only caller: `sub_820C9170`, ~3 calls a frame, 93% of them on render-only passes. |
 | `sub_820C9170` | | | Asks `sub_820F4128` for up to 10 lights near a point (r1+112) in a cone (cosine-like value from `sub_825A8978` of a setting at `[r27+11844]+5500` times a constant) of the light set at `[0x826C551C]`. Probably feeds the 8 per-object light slots of the pixel constants (see "Per-object pixel constants" in `../frame-interpolation.md`; not checked). Called from `0x820E1DF0`, `0x820E6B00` and `0x820DC3B8`. |
 | `sub_8218E420` | | Patched | Post-race check; the comparison against 60 was changed to 1 to fix the black screen after quest races. |
 | `sub_820DAC68` | `Car::DrawUpdate` | Wrapped | Draw's per-car update (r3 = car - 4288; it passes r3 + 4288 on as the car), on every pass: first takes `[0x82000A30]` (1.0) off car + 704 (the boost; the tick sets it again), then poses and draws the car, the cockpit dials among it (`sub_820E51D0`, `sub_820E45A8`). The player's car in cockpit view runs it twice a pass; only the first poses the dials. Wrapped only for `--find_per_frame_state` (`ITC_FRAME_STATE_WRAP`). |
@@ -499,7 +502,6 @@ old performance notes to the end of `../native-renderer.md`.
 | `sub_8258ED78` | | Wrapped | Named in `--find_menu_selection`'s log (`ITC_MENU_SCAN_WRAP`): `Scene::Update`'s two screen calls and others. |
 | `sub_82094B10` | | Wrapped | Named in `--find_menu_selection`'s log (`ITC_MENU_SCAN_WRAP`): `Scene::Update`'s two screen calls and others. |
 | `sub_820C5DE8` | | Wrapped | The race draw step's parts and the per-car update's callees, wrapped only to name which one advances per-frame state (`--find_per_frame_state`) and to skip one (`--debug_hide`) (`ITC_FRAME_STATE_WRAP`, `src/debug/frame_state_diff.cpp`). |
-| `sub_820F6068` | | Wrapped | The race draw step's parts and the per-car update's callees, wrapped only to name which one advances per-frame state (`--find_per_frame_state`) and to skip one (`--debug_hide`) (`ITC_FRAME_STATE_WRAP`, `src/debug/frame_state_diff.cpp`). |
 | `sub_82130978` | | Wrapped | The race draw step's parts and the per-car update's callees, wrapped only to name which one advances per-frame state (`--find_per_frame_state`) and to skip one (`--debug_hide`) (`ITC_FRAME_STATE_WRAP`, `src/debug/frame_state_diff.cpp`). |
 | `sub_820C4EB8` | | Wrapped | The race draw step's parts and the per-car update's callees, wrapped only to name which one advances per-frame state (`--find_per_frame_state`) and to skip one (`--debug_hide`) (`ITC_FRAME_STATE_WRAP`, `src/debug/frame_state_diff.cpp`). |
 | `sub_820C4FB8` | | Wrapped | The race draw step's parts and the per-car update's callees, wrapped only to name which one advances per-frame state (`--find_per_frame_state`) and to skip one (`--debug_hide`) (`ITC_FRAME_STATE_WRAP`, `src/debug/frame_state_diff.cpp`). |

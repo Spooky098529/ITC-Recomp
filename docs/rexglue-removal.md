@@ -93,7 +93,10 @@ goes in `src/` as overrides), American English.
   `std::binary_semaphore` (2026-10-24; 7 of 30 ours, with three camera
   passes), and made the device's state setters native (`device-state.md`,
   131 of 131; the packets nothing reads Dropped by the graphics rule;
-  ours 1,672; merged 2026-10-24 after a drive). The
+  ours 1,672; merged 2026-10-24 after a drive); its eleventh run (branch
+  `b7-loop-24-10-26-2`) made the compiler's array helpers, the course
+  scenery (`course-scenery.md`, 38 of 73) and XAPI's memset with what
+  it unblocked native as far as they were ready (ours 1,714). The
   runs' rows wait for the user's review (`docs/loops/review.md`). See
   "B7's loop runs" under B7, and `docs/loops/b7-progress.md`. Guest
   allocation is no longer a block (`docs/native-memory.md`); what the
@@ -2549,6 +2552,9 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-10-24 | The graphics resources (the graphics library's texture, surface and buffer headers and descriptions, their creation, the EDRAM allocator, surface levels, the device's current targets and stream, locks, reference counts and destruction; the user's calls: `Edram::Alloc` with a `std::mutex`, the locks' fence waits and cache flushes Dropped) | `graphics-resources.md` | 46 of 46 (two migrations) | `--native_graphics_resources` |
 | 2026-10-24 | The video output and the device lock (the video output's constructor, `LockDevice` and `UnlockDevice` over a host `std::binary_semaphore` by the user's call, the device's thread ownership; with `cameras.md`'s `MakeRenderTarget`, `SetUpSurfaces` and `Init`, which it blocked; the shared sync wrappers kept recompiled) | `video-output.md` | 7 of 30 (and 3 of `cameras.md`) | `--native_video_output` (`--native_cameras`) |
 | 2026-10-24 | The graphics device's state (the render and sampler state setters through the device's tables, the stream, indices, textures, shader constants, `SetFVF`, the render target and depth surface, scissor and viewport, `SetDefaultState`, `DirtyAllState`, the GPU register split, gamma; the packets written straight into the command buffer, which nothing reads, Dropped by the graphics rule) | `device-state.md` | 131 of 131 (two migrations) | `--native_device_state` |
+| 2026-10-24 | The compiler's array helpers (`vector constructor iterator` and `vector destructor iterator`, probably: the element constructor or destructor called on each; the native targets called as plain C++, the empty destructor skipped, others a guest call; in the existing `c-runtime.md`, with wcslen's, mbtowc's and the wide write_char's adapters removed) | `c-runtime.md` | 84 of 91 (2 new, one migration) | `--native_c_runtime` |
+| 2026-10-24 | The course scenery (the course's areas, their models and lights collected around each viewport and streamed into five pools of physical memory: the pools, pool objects and their keys, the scenery lists, `StartLoad`, `ReleaseUnused`, `LimitLargeModels`; with the texture animations' advance, interpolation's render-only skip kept) | `course-scenery.md` | 37 of 73 (one migration) | `--native_course_scenery` |
+| 2026-10-24 | XAPI's memset (`XMemSet`: one host memset at the stride the game sets, the translated steps at any other; with what it unblocked: `Scenery::Init`, `CameraPasses::Init` and `InitPasses`; XAPI's `XPhysicalSize` and `XQueryMemoryProtect` mapped in `heap.md`, kept for the core) | `c-runtime.md` | 1 of 1 new (85 of 92 in the file; and `cameras.md` 40 of 42, `course-scenery.md` 38 of 73) | `--native_c_runtime` (`--native_cameras`, `--native_course_scenery`) |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -2702,7 +2708,8 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
     their callers (UpdateSteerInput's kinds 2 and 3, jump targets the
     recompiler made functions; harness cases each, no rows). Left:
     `AiDrivers::Destroy` and `DestroyRings` (the array destructor
-    iterator `sub_820900C0`, a lead) and `UpdateStarting`,
+    iterator `sub_820900C0`, native since the eleventh run, so both
+    are ready now) and `UpdateStarting`,
     `UpdateTrack` and `NoteFixedSections` (the getter of `[0x826C6078]`,
     `sub_821434E8`, in the data tables' range); `UpdateAll` keeps its
     adapter for the +6148 update targets, and 22 adapters stay for the
@@ -2727,6 +2734,46 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
     camera-mode functions that run in attract races (`sub_82155288`,
     `sub_821562F8`, `sub_820FE830`), so the route ranges' Init,
     AddBranch, Update and Test keep their adapters for them.
+
+    The graphics resources, the video output and the device state
+    (2026-10-24, branch `b7-loop-24-10-26`, the tenth run): the run
+    stopped twice for the user's calls on kernel sync and the graphics
+    rule. `Edram::Alloc` is native with a `std::mutex` for its critical
+    section; the resource locks' fence waits and cache flushes are
+    Dropped (their lock count, address and freeing kept); the video
+    output's device lock alone is a `std::binary_semaphore` (released by
+    another thread than the one that took it), while the game's
+    Semaphore class and sync wrappers stay recompiled for the archive
+    loader and the core. The device's state setters write the shadow,
+    dirty masks and fetch constants the renderer reads; the packets they
+    wrote straight into the command buffer, which nothing reads since
+    the emulated GPU went, are Dropped, with harness groups for those
+    words expected to differ. The setters keep their adapters: the
+    device's tables at +56 and +440 point at them, and the command
+    replay reaches them.
+
+    The array helpers, the course scenery and XAPI's memset (2026-10-24,
+    branch `b7-loop-24-10-26-2`, the eleventh run). Native code calls
+    guest function pointers and vtable slots in one way: targets that
+    are already native are called as plain C++ by their address; any
+    other target is a guest call through a callback the adapter gives,
+    from a frame laid out like the original's. The vector constructor
+    and destructor iterators work like this, and so do the scenery
+    pools' key, load and reset slots. The slots keep their adapters for
+    the vtables. `Scenery::LimitLargeModels` reads past its five-entry
+    stack table for an area above 4, so the native version keeps that
+    table in guest stack memory to give the same values. `XMemSet` steps
+    by the word at `[0x8263830C]`, logged as 16 and stored by nothing in
+    `generated/`: it is one host memset at 16, and the translated steps
+    at any other stride. `atexit` (`sub_825A7068`) stays with the core
+    (its critical sections) and blocks `Viewports::Init` and
+    `Viewport::Init`. The rest of the scenery waits on
+    `MmQueryAllocationSize`'s wrapper, `DataFile::GetEntry`, the XPR,
+    the archive's queue and the texture provider. A harness that adds
+    cases must draw from its own random generator: drawing from the
+    shared `h.random` shifts the inputs of every harness after it, and
+    when it did, the `swprintf` harness crashed
+    (`strings-and-font.md`).
 
     The second run (from 2026-10-22, branch `b7-loop-22-10-26`; its first
     session stopped after one subsystem): the first run's removable
@@ -3195,3 +3242,35 @@ row yet 4,410); `device-state.md` 131 ours of 131. 1,258 overrides in
 point at them, and the command replay reaches them); what the video
 output's rest waits on is now the command replay and the game's sync
 wrappers (kept recompiled for the core).
+
+**2026-10-24, B7's eleventh loop run, the compiler's array helpers
+(branch `b7-loop-24-10-26-2`):** the boundary unchanged: 449 functions
+(916 pairs): overridden 67, Native 5, Dropped 23, never called 70, live
+284. Imports: 186 called, 62 with a live caller. B7 (`b7_status.py`):
+6,760 in play, ours 1,674, work left 5,086 (Wrapped 123, with a row 555,
+no row yet 4,408); `c-runtime.md` 84 ours of 91. 1,257 overrides in
+`src/`. The array destructor iterator, which blocked the AI drivers'
+and the race overlays' rest, is native; its callers' other blockers
+remain (leads).
+
+**2026-10-24, B7's eleventh loop run, the course scenery (branch
+`b7-loop-24-10-26-2`):** the boundary unchanged: 449 functions (916
+pairs): overridden 67, Native 5, Dropped 23, never called 70, live 284.
+Imports: 186 called, 62 with a live caller. B7 (`b7_status.py`): 6,760
+in play, ours 1,710, work left 5,050 (Wrapped 122, with a row 588, no
+row yet 4,340); `course-scenery.md` 37 ours of 73. 1,284 overrides in
+`src/`. The rest of the scenery waits on the critical section
+wrappers, `MmQueryAllocationSize`'s wrapper, memset, `DataFile::GetEntry`,
+the XPR, the archive's queue and the texture provider; the pools' slots
+keep their adapters for the vtables.
+
+**2026-10-24, B7's eleventh loop run, stopped (branch
+`b7-loop-24-10-26-2`: the array helpers, the course scenery, XAPI's
+memset):** the boundary unchanged: 449 functions (916 pairs):
+overridden 67, Native 5, Dropped 23, never called 70, live 284.
+Imports: 186 called, 62 with a live caller. B7 (`b7_status.py`): 6,760
+in play, ours 1,714, work left 5,046 (Wrapped 122, with a row 587, no
+row yet 4,337); `c-runtime.md` 85 ours of 92, `cameras.md` 40 of 42,
+`course-scenery.md` 38 of 73. 1,286 overrides in `src/`. `Viewports::Init`
+and `Viewport::Init` wait on `atexit` (its critical sections, with the
+core).

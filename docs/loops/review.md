@@ -11,6 +11,78 @@ functions to check in a drive in the progress file.
 When the user has reviewed a run's section, its heading gets
 "(reviewed <date>)"; the section stays for the record.
 
+## Run 2026-10-24 16:01 (`b7-loop-24-10-26-2`)
+
+- `c-runtime.md`: 2 new rows (mapped in 3a15cda), `sub_820911A8` and
+  `sub_820900C0`, probably the compiler's `vector constructor iterator`
+  and `vector destructor iterator` (no exception handling, so not the
+  library's `__ehvec_*`), added to the C runtime file instead of a new
+  one, with an intro paragraph; `known-data.md` (the race data's
+  +0x59AEC records, `0x826D82D4`); 2 leads (the race object at
+  `[0x826D82D4]`, `sub_8217C708` with `sub_821DF350`) and the race data
+  lead extended with `sub_82101D20`.
+  Migration 1 (f624a82, 93e739f): both helpers native under
+  `--native_c_runtime` (`src/c_runtime/arrays.cpp`). For review: the
+  native targets (`SetWsToOne`, `Particle::Particle`) called as plain
+  C++, the empty destructor `sub_82106540` skipped, any other target
+  (`sub_82101D20` in play) a guest call through an `ElementCall`
+  callback from a 128-byte frame like the original's; r3 left as it
+  came with the empty destructor (volatile, no caller reads it); a count
+  of 0x80000000 wraps to 2^31 calls in both, left out of the harness.
+  Adapters removed: wcslen, mbtowc, the wide write_char (Native);
+  memcpy_s's (`sub_825A7270`) kept, its work a guest call to memcpy's
+  override. To look at later: the new cases first drew from the shared
+  `h.random`, which shifted later harnesses' inputs, and the
+  strings-and-font swprintf harness (`sub_8210A490`) then crashed (guest
+  writes at 0x70000000, probably an endless loop; `itc_1337.log`): a
+  swprintf case, or the native swprintf, fails on other random inputs.
+  The new cases use their own generator.
+- `course-scenery.md` (new, 71 rows; 3 moved from `functions.md`:
+  `Lights::FindNearest`, `TextureAnimations::Advance`, `sub_820F6068`
+  now `Scenery::Draw`; 68 new; mapped in 043a0d2): the course's areas,
+  their models and lights collected around each viewport and streamed
+  through `Archive::Load` into five pools of physical memory (manager at
+  `[0x826C5514]`/`[0x826C551C]`), the scenery's draw and the cars'
+  headlight projectors (`sub_820F34C8`). Four rows read only in outline
+  (`sub_820F6068`, `sub_820F3B70`, `sub_820F34C8`, `sub_820F52A8`);
+  `known-data.md` 7 rows; 5 leads.
+  Migration 1 (551a868..e7309a0): 37 of 73 ours under
+  `--native_course_scenery` (`src/course_scenery/`; `sub_82146B20`,
+  `sub_82146AC0` moved from `functions.md`, Native), six adapters
+  removed. For review: the native key and reset slots called directly,
+  other targets and every load slot through a `Calls` callback from a
+  frame laid out like the original's (the slot adapters stay for the
+  vtables); `Scenery::LimitLargeModels` (`sub_820F2B80`) reads past its
+  5-entry stack table for an area above 4, matched by running
+  `__savegprlr_27` first and keeping the table in guest stack memory;
+  `ObjectPools::Init` and `Shutdown` native only with the native heap
+  on; `TextureAnimations::Advance`'s render-only skip in
+  `per_frame_logic.cpp` kept where it was; frame dumps with the flag on
+  and off had the same 2,414 draws. Left: blocked on the critical
+  section wrappers, `MmQueryAllocationSize`'s, memset,
+  `DataFile::GetEntry`, the XPR, the archive's queue and the texture
+  provider.
+- `c-runtime.md`: `sub_822962B0` memset (probably XAPI's `XMemSet`; new
+  row, a212f92: vector stores and `dcbzl` for whole 128-byte lines, the
+  same bytes as a plain memset; its 16-byte loops step by the word at
+  `[0x8263830C]`); `heap.md`: `sub_822965C0` (probably `XPhysicalSize`,
+  over MmQueryAllocationSize) and `sub_822965D8` (probably
+  `XQueryMemoryProtect`, over MmQueryAddressProtect), kept for the core;
+  1 lead (`sub_82562FF0`). `atexit` left out of this subsystem (its
+  critical sections).
+  Migration 1 (671f5d0..b549e6c): XMemSet native under
+  `--native_c_runtime`, with what it unblocked: `Scenery::Init`
+  (`--native_course_scenery`), `CameraPasses::Init` and `InitPasses`
+  (`--native_cameras`); `InitPasses`' and `SetMode`'s adapters removed.
+  For review: `[0x8263830C]` logged as 16 (nothing in `generated/`
+  stores there), so XMemSet is one host memset at stride 16 and follows
+  the translated steps for any other stride (harness cases for 0, 8, 20,
+  32, 48); the scratch below r1 not written; `CameraPass::Init`'s adapter
+  has a thread-local test hook (`hooks::camera_pass_init_calls`, null
+  outside the harness) so the harness can record its calls;
+  `Scenery::Init` leaves r3 as the original does. `Viewports::Init` and
+  `Viewport::Init` still wait on `atexit`.
+
 ## Run 2026-10-24 03:25 (`b7-loop-24-10-26`)
 
 - `device-state.md` (new, 131 rows; 11 moved from `functions.md`, 120

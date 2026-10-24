@@ -22,6 +22,7 @@
 #include <fmt/format.h>
 
 #include <algorithm>
+#include <array>
 #include <bit>
 #include <functional>
 #include <iterator>
@@ -1393,6 +1394,76 @@ void SetUpSurfacesCases(Context& h) {
 // pass's float ranges as Update's cases have them (Update reads the random
 // words left there, NaNs among them) as floats, +576 and +580 as SetUpSurfacesCases does, each global, the open
 // chunks' count and r3.
+// CameraPasses::Init and InitPasses with CameraPass::Init recorded, not
+// run (hooks::camera_pass_init_calls), so the game's passes stay as they
+// are: the 16 words at 0x826BABC0 random first (the mode 0, 1, 2 or any,
+// 0x826BABE4 any), pass 4's field of view random; SetMode runs (the
+// original's on the recompiled side). Compared: the recorded calls, the 16
+// words, pass 4's field of view (a float), r3, r4 and f1. The words and
+// the field of view put back after.
+void PassesInitCases(Context& h) {
+  constexpr uint32_t kGlobals = 0x826BABC0, kWords = 16;
+  const uint32_t fov_at = cm::Pass(4) + 368;
+  uint32_t saved[kWords];
+  for (uint32_t i = 0; i < kWords; i++) {
+    saved[i] = guest::LoadU32(h.base, kGlobals + 4 * i);
+  }
+  const uint32_t saved_fov = guest::LoadU32(h.base, fov_at);
+  for (bool all : {true, false}) {
+    Results results(all ? "sub_8209F9B8 CameraPasses::Init" : "sub_8209F960 CameraPasses::InitPasses");
+    for (int c = 0; c < 40; c++) {
+      uint32_t words[kWords];
+      for (uint32_t& w : words) {
+        w = uint32_t(h.random.Next());
+      }
+      words[0] = c < 30 ? uint32_t(c % 3) : uint32_t(h.random.Next());
+      const uint32_t fov = FloatWord(h.random);
+      const double f1 = double(std::bit_cast<float>(FloatWord(h.random)));
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        for (uint32_t i = 0; i < kWords; i++) {
+          guest::StoreU32(h.base, kGlobals + 4 * i, words[i]);
+        }
+        guest::StoreU32(h.base, fov_at, fov);
+        std::vector<std::array<uint32_t, 3>> calls;
+        hooks::camera_pass_init_calls = &calls;
+        PPCContext t = CallContext(h);
+        t.r3.u64 = 0x12345678;
+        t.r4.u64 = 0x9ABCDEF0;
+        t.f1.f64 = f1;
+        if (v == 0) {
+          const bool flag = ITC_FLAG(native_cameras);
+          ITC_FLAG(native_cameras) = false;
+          (all ? __imp__sub_8209F9B8 : __imp__sub_8209F960)(t, h.base);
+          ITC_FLAG(native_cameras) = flag;
+        } else {
+          hooks::CameraPassesInit(t, h.base, all);
+        }
+        hooks::camera_pass_init_calls = nullptr;
+        out[v].Word(uint32_t(calls.size()));
+        for (const auto& call : calls) {
+          for (uint32_t w : call) {
+            out[v].Word(w);
+          }
+        }
+        for (uint32_t i = 0; i < kWords; i++) {
+          out[v].Word(guest::LoadU32(h.base, kGlobals + 4 * i));
+        }
+        out[v].Float(guest::LoadU32(h.base, fov_at));
+        out[v].Word(t.r3.u32);
+        out[v].Word(t.r4.u32);
+        out[v].Double(t.f1.u64);
+      }
+      results.Check(out[0], out[1], fmt::format("case {} mode {:08X}", c, words[0]));
+    }
+    results.Report();
+  }
+  for (uint32_t i = 0; i < kWords; i++) {
+    guest::StoreU32(h.base, kGlobals + 4 * i, saved[i]);
+  }
+  guest::StoreU32(h.base, fov_at, saved_fov);
+}
+
 void InitPassCases(Context& h) {
   if (!hooks::NativeHeapActive()) {
     return;
@@ -1534,6 +1605,7 @@ void Cameras(Context& h) {
   MakeRenderTargetCases(h);
   SetUpSurfacesCases(h);
   InitPassCases(h);
+  PassesInitCases(h);
 }
 
 }  // namespace harness

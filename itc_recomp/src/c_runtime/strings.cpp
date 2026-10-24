@@ -12,6 +12,7 @@
 namespace c_runtime {
 
 uint32_t Wcslen(uint8_t* base, uint32_t string) {
+  ITC_NATIVE_RUNNING("sub_825A9958 wcslen");
   uint32_t n = 0;
   while (guest::LoadU16(base, string + 2 * n) != 0) {
     n++;
@@ -54,6 +55,7 @@ int32_t Wcscmp(uint8_t* base, uint32_t a, uint32_t b) {
 }
 
 int32_t Mbtowc(uint8_t* base, uint32_t wide, uint32_t bytes, uint32_t count) {
+  ITC_NATIVE_RUNNING("sub_825B7EC8 mbtowc");
   if (bytes == 0 || count == 0) {
     return 0;
   }
@@ -376,6 +378,79 @@ bool Memcpy(uint8_t* base, uint32_t destination, uint32_t source, uint32_t size)
   }
   std::memcpy(REX_RAW_ADDR(destination), REX_RAW_ADDR(source), size);
   return true;
+}
+
+void XMemSet(uint8_t* base, uint32_t destination, uint32_t value, uint32_t bytes) {
+  ITC_NATIVE_RUNNING("sub_822962B0 XMemSet");
+  const uint8_t byte = uint8_t(value);
+  if (bytes < 16) {
+    for (uint32_t i = 0; i < bytes; i++) {
+      guest::StoreU8(base, destination + i, byte);
+    }
+    return;
+  }
+  const uint32_t stride = guest::LoadU32(base, kXMemSetStride);
+  if (stride == 16) {
+    guest::ForEachHostPart(base, destination, bytes, [&](uint8_t* host, uint32_t, uint32_t n) {
+      std::memset(host, byte, n);
+    });
+    return;
+  }
+  // The translated code's steps (docs/functions/c-runtime.md).
+  auto store16 = [&](uint32_t at) { std::memset(REX_RAW_ADDR(at & ~15u), byte, 16); };
+  auto clear_line = [&](uint32_t at) { std::memset(REX_RAW_ADDR(at & ~127u), 0, 128); };
+  uint32_t p = destination;
+  uint32_t left = bytes;
+  const uint32_t head = (0u - destination) & 15;
+  uint32_t to_line = ((0u - destination) >> 4) & 7;
+  if (head) {  // stvlx: up to the next 16-byte boundary
+    for (uint32_t i = 0; i < head; i++) {
+      guest::StoreU8(base, destination + i, byte);
+    }
+    left -= head;
+    p = destination + head;
+  }
+  if ((left >> 4) < to_line) {
+    to_line = left >> 4;
+  }
+  for (uint32_t i = 0; i < to_line; i++) {
+    store16(p);
+    p += stride;
+  }
+  left -= to_line << 4;
+  const uint32_t lines = left >> 7;
+  if (byte == 0) {
+    for (uint32_t i = 0; i < lines; i++) {
+      clear_line(p);
+      p += 128;
+    }
+  } else {
+    const uint32_t first = lines < 4 ? lines : 4;
+    for (uint32_t i = 0; i < first; i++) {
+      clear_line(p + (i << 7));
+    }
+    for (uint32_t i = 0; i < lines; i++) {
+      if (i + 4 < lines) {
+        clear_line(p + 512);
+      }
+      for (uint32_t j = 0; j < 8; j++) {
+        store16(p + 16 * j);
+      }
+      p += 128;
+    }
+  }
+  uint32_t rest = left - (lines << 7);
+  if (rest >= 16) {
+    for (uint32_t pieces = rest >> 4; pieces; pieces--) {
+      store16(p);
+      rest -= 16;
+      p += stride;
+    }
+  }
+  const uint32_t end = p + rest;  // stvrx: the bytes below `end` in its 16
+  for (uint32_t i = 0; i < (end & 15); i++) {
+    guest::StoreU8(base, end - i - 1, byte);
+  }
 }
 
 bool MemmoveDown(uint8_t* base, uint32_t destination, uint32_t source, uint32_t size) {

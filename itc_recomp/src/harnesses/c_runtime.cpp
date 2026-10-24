@@ -402,6 +402,25 @@ void NativeCftof2(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = 0;
 }
 
+// wcslen: r3 = UTF-16 string; returns its length.
+void NativeWcslen(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.s64 = c_runtime::Wcslen(base, ctx.r3.u32);
+}
+
+// mbtowc's single-byte path: r3 = wide character out (or 0), r4 = the
+// bytes, r5 = their count; returns 0 or 1.
+void NativeMbtowc(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.s64 = c_runtime::Mbtowc(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+}
+
+// The wide write_char: r3 = the UTF-16 unit, r4 = the stream, r5 = the
+// count; r3 left as it came; the original where the native one refuses.
+void NativeWideWriteChar(PPCContext& ctx, uint8_t* base) {
+  if (!c_runtime::WriteWideChar(base, ctx.r3.u16, ctx.r4.u32, ctx.r5.u32)) {
+    __imp__sub_825B1368(ctx, base);
+  }
+}
+
 // _putwc_nolock: r3 = the UTF-16 unit, r4 = the stream; string streams
 // natively, the rest the original.
 void NativePutwc(PPCContext& ctx, uint8_t* base) {
@@ -484,6 +503,75 @@ void CRuntime(Context& h) {
     results.Report();
   }
 
+  // XAPI's vectorized memset (sub_822962B0): every count 0-300, larger ones
+  // across many 128-byte lines, every alignment within a 16-byte piece and
+  // some within a line, values 0 and not 0 (with bits above the low byte);
+  // the whole scratch area and r3 compared, not the original's scratch
+  // below r1. Its stores step by the word at 0x8263830C: logged, and the
+  // cases also run with other steps written there for a while (restored).
+  {
+    const uint32_t stride = guest::LoadU32(h.base, c_runtime::kXMemSetStride);
+    ITC_LOG_INFO("harness: XMemSet (sub_822962B0): the step at 0x8263830C is {}", stride);
+    Results results("XMemSet (sub_822962B0)");
+    const uint32_t line = (h.data + 127) & ~127u;  // a 128-byte line in the scratch area
+    auto one = [&](uint32_t offset, uint32_t count, uint64_t value, const std::string& what) {
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Fill(h.base, h.data, kScratchBytes);
+        PPCContext t = CallContext(h);
+        t.r3.u64 = line + offset;
+        t.r4.u64 = value;
+        t.r5.u64 = count;
+        if (v == 0) {
+          __imp__sub_822962B0(t, h.base);
+        } else {
+          c_runtime::XMemSet(h.base, t.r3.u32, t.r4.u32, t.r5.u32);
+        }
+        out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+        out[v].Word(t.r3.u32);
+      }
+      results.Check(out[0], out[1], what);
+    };
+    const uint64_t values[] = {0, 0xFF, 0x5A, 0x12345678ABull, 0xFFFFFFFFFFFFFF00ull, 1};
+    const uint32_t offsets[] = {0, 1, 3, 7, 8, 15, 16, 17, 31, 48, 64, 100, 112, 127};
+    uint32_t n = 0;
+    for (uint32_t count = 0; count <= 300; count++) {
+      for (uint32_t offset : {0u, 1u, 15u, 16u, 112u, 127u}) {
+        const uint64_t value = values[n++ % 6];
+        one(offset, count, value, fmt::format("count {} offset {} value {:X}", count, offset, value));
+      }
+    }
+    for (uint32_t count : {383u, 384u, 385u, 511u, 512u, 513u, 640u, 641u, 1023u, 1024u, 1025u,
+                           1151u, 1280u, 2047u, 2048u, 2049u, 3000u, 3700u}) {
+      for (uint32_t offset : offsets) {
+        for (uint64_t value : {uint64_t(0), uint64_t(0x5A), uint64_t(0x1FF)}) {
+          one(offset, count, value, fmt::format("count {} offset {} value {:X}", count, offset, value));
+        }
+      }
+    }
+    for (int i = 0; i < 200; i++) {
+      const uint32_t offset = h.random.Below(128);
+      const uint32_t count = h.random.Below(3800);
+      const uint64_t value = values[h.random.Below(6)];
+      one(offset, count, value, fmt::format("count {} offset {} value {:X}", count, offset, value));
+    }
+    // Other steps at 0x8263830C (the stores may then reach past the range,
+    // up to 7 x (step - 16) bytes at each end: counts kept to fit).
+    for (uint32_t step : {0u, 8u, 32u, 48u, 20u}) {
+      guest::StoreU32(h.base, c_runtime::kXMemSetStride, step);
+      for (uint32_t count : {16u, 17u, 31u, 100u, 128u, 200u, 300u, 640u, 1100u, 2048u}) {
+        for (uint32_t offset : offsets) {
+          for (uint64_t value : {uint64_t(0), uint64_t(0x5A)}) {
+            one(offset, count, value,
+                fmt::format("step {} count {} offset {} value {:X}", step, count, offset, value));
+          }
+        }
+      }
+      guest::StoreU32(h.base, c_runtime::kXMemSetStride, stride);
+    }
+    results.Report();
+  }
+
   // The wide string helpers: every length in kLengths at each place (odd
   // addresses and across a page end included), units with high bits; the
   // destination apart from the source, or overlapping below it.
@@ -497,7 +585,7 @@ void CRuntime(Context& h) {
         const uint32_t at = h.data + offset;
         const std::string what = fmt::format("length {} offset {}", length, offset);
         StringCase(h, lengths, [&] { WriteUnits(h, at, units); },
-                   [&](PPCContext& t) { t.r3.u64 = at; }, __imp__sub_825A9958, sub_825A9958,
+                   [&](PPCContext& t) { t.r3.u64 = at; }, __imp__sub_825A9958, NativeWcslen,
                    what);
         // The destination elsewhere (the source near the page end goes to the
         // start, and the other way), then overlapping, one unit below.
@@ -588,7 +676,7 @@ void CRuntime(Context& h) {
                          t.r4.u64 = bytes;
                          t.r5.u64 = count;
                        },
-                       __imp__sub_825B7EC8, sub_825B7EC8,
+                       __imp__sub_825B7EC8, NativeMbtowc,
                        fmt::format("wide {:X} bytes {:X} count {} byte {:X}", wide, bytes, count,
                                    byte));
           }
@@ -1205,7 +1293,7 @@ void CRuntime(Context& h) {
                              t.r5.u64 = count;
                            },
                            wide_char ? __imp__sub_825B1368 : __imp__sub_825B7A80,
-                           wide_char ? sub_825B1368 : NativePutwc,
+                           wide_char ? NativeWideWriteChar : NativePutwc,
                            fmt::format("flags {:X} base {:X} room {:X} pointer +{} count {:X} "
                                        "unit {:X}",
                                        flag, base_word, room, pointer - h.data, c, unit));
@@ -1840,6 +1928,87 @@ void CRuntime(Context& h) {
                  sub_825AD4C0, fmt::format("r3 {:X}", r3));
     }
     results.Report();
+  }
+
+  // The array helpers: each kind of element function the game passes (the
+  // native SetWsToOne and Particle::Particle, the translated sub_82101D20,
+  // the empty destructor) and Vec3::SwapXZ, whose swaps over overlapping
+  // elements show the order; the game's sizes and small overlapping ones,
+  // counts of none, below none, one and many (some with bits above the low
+  // 32; not 0x80000000, which both run 2^31 times: the count less one
+  // wraps to INT_MAX). The scratch area holds random bytes; it, r1 and r28-r31 compared
+  // exactly (the elements' fields are copied as words).
+  {
+    Results constructs("vector constructor iterator (sub_820911A8)");
+    Results destructs("vector destructor iterator (sub_820900C0)");
+    struct Target {
+      uint32_t function;
+      uint32_t extent;  // the bytes past the element it writes
+    };
+    // Their own generator: the shared one's later numbers stay as they were
+    // for the harnesses after this one.
+    Random random;
+    const Target targets[] = {{0x8209B038, 64}, {0x8212B3D0, 32}, {0x82101D20, 800},
+                              {0x82106540, 0},  {0x820AB688, 12}};
+    const int64_t sizes[] = {4, 8, 16, 48, 64, 972, 0, -16};
+    const uint64_t counts[] = {0,  1,  2,  3,  5,  15, 80, 0xFFFFFFFFull, 0x80000001ull,
+                               0xFFFFFFFF00000004ull, 0x0000000100000000ull};
+    for (const Target& target : targets) {
+      for (const int64_t size : sizes) {
+        for (const uint64_t count : counts) {
+          const int32_t n = int32_t(uint32_t(count));
+          const int64_t span = n > 0 ? int64_t(n - 1) * size : 0;
+          // The array where every element and what it writes fit in the
+          // scratch area (below its last 64 bytes).
+          const int64_t low = std::min<int64_t>(0, span);
+          const int64_t high = std::max<int64_t>(0, span) + target.extent;
+          if (high - low > int64_t(kScratchBytes) - 128) {
+            continue;
+          }
+          const uint32_t array = h.data + 64 + uint32_t(-low);
+          for (int which = 0; which < 2; which++) {
+            if (which == 0 && target.function == 0x82106540) {
+              continue;  // not a constructor
+            }
+            std::vector<uint8_t> fill(kScratchBytes);
+            for (auto& b : fill) {
+              b = uint8_t(random.Next());
+            }
+            const uint64_t high_bits = (count & 1) ? 0xFFFFFFFF00000000ull : 0;
+            Outputs out[2];
+            for (int v = 0; v < 2; v++) {
+              Write(h.base, h.data, fill.data(), kScratchBytes);
+              PPCContext t = CallContext(h);
+              t.r3.u64 = array;
+              t.r4.u64 = uint64_t(size);
+              t.r5.u64 = count;
+              t.r6.u64 = high_bits | target.function;
+              t.r28.u64 = 0x2828282828282828ull;
+              t.r29.u64 = 0x2929292929292929ull;
+              t.r30.u64 = 0x3030303030303030ull;
+              t.r31.u64 = 0x3131313131313131ull;
+              if (which == 0) {
+                (v == 0 ? __imp__sub_820911A8 : sub_820911A8)(t, h.base);
+              } else {
+                (v == 0 ? __imp__sub_820900C0 : sub_820900C0)(t, h.base);
+              }
+              out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+              out[v].Word(t.r1.u32);
+              for (const uint64_t r : {t.r28.u64, t.r29.u64, t.r30.u64, t.r31.u64}) {
+                out[v].Word(uint32_t(r >> 32));
+                out[v].Word(uint32_t(r));
+              }
+            }
+            (which == 0 ? constructs : destructs)
+                .Check(out[0], out[1],
+                       fmt::format("function {:08X} size {} count {:X}", target.function, size,
+                                   count));
+          }
+        }
+      }
+    }
+    constructs.Report();
+    destructs.Report();
   }
 }
 

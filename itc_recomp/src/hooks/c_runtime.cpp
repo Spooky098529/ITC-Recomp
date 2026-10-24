@@ -1,9 +1,12 @@
 // The game's statically linked C runtime (docs/functions/c-runtime.md): the
 // stack probe dropped, memset natively, and adapters in front of the string
-// and character helpers in src/c_runtime/strings.cpp.
+// and character helpers in src/c_runtime/strings.cpp, and in front of the
+// compiler's array helpers in src/c_runtime/arrays.cpp.
 
 #include "guest.h"
+#include "hooks/guest_call.h"
 
+#include "c_runtime/arrays.h"
 #include "c_runtime/format.h"
 #include "c_runtime/parse.h"
 #include "c_runtime/start_up.h"
@@ -18,7 +21,7 @@
 
 ITC_FLAG_BOOL(native_c_runtime, true, "ITC",
               "Run the C runtime's helpers natively instead of through the translated code: "
-              "memset (sub_825A71D0); wcslen, wcscpy, wcscat and wcscmp "
+              "memset (sub_825A71D0); XAPI's vectorized memset (sub_822962B0, XMemSet); wcslen, wcscpy, wcscat and wcscmp "
               "(sub_825A9958, sub_825A7F30, sub_825A7EF8, sub_825A7EB0); mbtowc's single-byte "
               "path (sub_825B7EC8); strncpy, strcpy_s, strncmp, _stricmp, _strnicmp and its compare, "
               "strstr (sub_825A7F50, sub_825A9DD8, sub_825AACD0, sub_825AA100, sub_825AC710, "
@@ -34,10 +37,14 @@ ITC_FLAG_BOOL(native_c_runtime, true, "ITC",
               "(sub_825AF000), write_multi_char (sub_825AF098), the wide write_char and _putwc_nolock "
               "(sub_825B1368, sub_825B7A80); __iob_func (sub_825AD4C0); the start-up's _cfltcvt_init (sub_825A6DB0, "
               "sub_825A6E48), _init_pointers' setters (sub_825AD140, sub_825AEE18, sub_825AFCB8, "
-              "sub_825B3560, sub_825B3548), __initmbctable and setSBCS (sub_825B6958, sub_825B68C8) "
+              "sub_825B3560, sub_825B3548), __initmbctable and setSBCS (sub_825B6958, sub_825B68C8); "
+              "the compiler's vector constructor and destructor iterators (sub_820911A8, "
+              "sub_820900C0: the elements' native functions called as plain C++, the empty "
+              "destructor sub_82106540 skipped, any other called in the translated code) "
               "(checked by "
               "--run_harnesses=c_runtime). Those reached only from native callers have no "
-              "adapters, and the flag switches their callers: strcpy_s, __ascii_strnicmp, "
+              "adapters, and the flag switches their callers: wcslen, mbtowc, the wide write_char, "
+              "strcpy_s, __ascii_strnicmp, "
               "strtoxl, ___dtold, _ld12tod, _atof_l, _fltin2, __strgtold12_l, __mtold12, $I10_OUTPUT, "
               "_fltout2, _cftof_l, _cftof2_l, _fptostr, _putwc_nolock, _cfltcvt_init and setSBCS");
 
@@ -72,14 +79,17 @@ extern "C" REX_FUNC(sub_825A71D0) {
                          });
 }
 
-// wcslen: r3 = UTF-16 string; returns its length.
-extern "C" REX_FUNC(sub_825A9958) {
+// XAPI's vectorized memset (probably XMemSet): r3 = destination, r4 = the
+// value (its low byte), r5 = the count (32 bits); r3 comes back unchanged.
+// The original's scratch below r1 (its vector and counters, dead after it
+// returns) isn't written.
+extern "C" REX_FUNC(sub_822962B0) {
   REX_FUNC_PROLOGUE();
   if (!ITC_FLAG(native_c_runtime)) {
-    __imp__sub_825A9958(ctx, base);
+    __imp__sub_822962B0(ctx, base);
     return;
   }
-  ctx.r3.s64 = c_runtime::Wcslen(base, ctx.r3.u32);
+  c_runtime::XMemSet(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
 }
 
 // wcscpy: r3 = destination, r4 = source; returns r3 (left as it is).
@@ -110,17 +120,6 @@ extern "C" REX_FUNC(sub_825A7EB0) {
     return;
   }
   ctx.r3.s64 = c_runtime::Wcscmp(base, ctx.r3.u32, ctx.r4.u32);
-}
-
-// mbtowc (the C locale's single-byte path): r3 = wide character out (or 0),
-// r4 = the bytes, r5 = their count; returns 0 or 1.
-extern "C" REX_FUNC(sub_825B7EC8) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_c_runtime)) {
-    __imp__sub_825B7EC8(ctx, base);
-    return;
-  }
-  ctx.r3.s64 = c_runtime::Mbtowc(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
 }
 
 // strncpy: r3 = destination, r4 = source, r5 = count; returns r3.
@@ -446,16 +445,6 @@ extern "C" REX_FUNC(sub_825AF098) {
   }
 }
 
-// The wide write_char: r3 = the UTF-16 unit, r4 = the stream, r5 = the
-// count; r3 left as it came (as the original's _putwc_nolock returns it).
-extern "C" REX_FUNC(sub_825B1368) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_c_runtime) ||
-      !c_runtime::WriteWideChar(base, ctx.r3.u16, ctx.r4.u32, ctx.r5.u32)) {
-    __imp__sub_825B1368(ctx, base);
-  }
-}
-
 // __iob_func: returns the stream table (sign-extended, as the original's
 // lis and addi leave it).
 extern "C" REX_FUNC(sub_825AD4C0) {
@@ -535,3 +524,55 @@ extern "C" REX_FUNC(sub_825B6958) {
   ctx.r3.s64 = c_runtime::InitMbcTable(base);
 }
 
+
+// --- The compiler's array helpers (src/c_runtime/arrays.cpp) ---
+
+namespace {
+
+struct ArrayCall {
+  PPCContext* ctx;
+  uint8_t* base;
+  uint32_t return_address;  // after the original's bctrl
+};
+
+// An element's function the native code doesn't know (sub_82101D20, the
+// race data's records, in play), called through its pointer from a frame
+// like the original's (128 bytes, its back chain written), r3 = the element.
+void CallElement(void* user, uint64_t function, uint64_t element) {
+  auto& call = *static_cast<ArrayCall*>(user);
+  PPCContext& ctx = *call.ctx;
+  uint8_t* base = call.base;
+  guest_call::InFrame(ctx, base, 128, call.return_address, [&](uint32_t) {
+    ctx.r3.u64 = element;
+    ctx.ctr.u64 = function;
+    REX_CALL_INDIRECT_FUNC(ctx.ctr.u32);
+  });
+}
+
+}  // namespace
+
+// `vector constructor iterator': r3 = the array, r4 = the element size,
+// r5 = the count, r6 = the constructor.
+extern "C" REX_FUNC(sub_820911A8) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_c_runtime)) {
+    __imp__sub_820911A8(ctx, base);
+    return;
+  }
+  ArrayCall call{&ctx, base, 0x820911D4};
+  c_runtime::VectorConstruct(base, ctx.r3.u64, ctx.r4.u64, ctx.r5.u64, ctx.r6.u64, CallElement,
+                             &call);
+}
+
+// `vector destructor iterator': r3 = the array, r4 = the element size,
+// r5 = the count, r6 = the destructor.
+extern "C" REX_FUNC(sub_820900C0) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_c_runtime)) {
+    __imp__sub_820900C0(ctx, base);
+    return;
+  }
+  ArrayCall call{&ctx, base, 0x820900F4};
+  c_runtime::VectorDestruct(base, ctx.r3.u64, ctx.r4.u64, ctx.r5.u64, ctx.r6.u64, CallElement,
+                            &call);
+}

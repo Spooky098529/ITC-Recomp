@@ -241,6 +241,7 @@ bool PutwcString(uint8_t* base, uint16_t unit, uint32_t stream) {
 }
 
 bool WriteWideChar(uint8_t* base, uint16_t unit, uint32_t stream, uint32_t count) {
+  ITC_NATIVE_RUNNING("sub_825B1368 wide write_char");
   if (CountsOnly(base, stream)) {
     guest::StoreU32(base, count, guest::LoadU32(base, count) + 1);
     return true;
