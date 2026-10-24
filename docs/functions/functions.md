@@ -192,6 +192,11 @@ Rows not yet moved stay in the table below. So far:
   by the racer's AI driver, the input recordings and replays, the race
   flow's handlers that pick which each racer gets, and each AI driver's
   set-up with its profile (B7).
+- [`track-zones.md`](track-zones.md): the track zones: 70 stretches
+  of the course's route, each a few route ranges (a start and an end
+  section and slice, and the sections to take at forks), that the
+  player's car is checked against for the HUD, their owner at
+  `0x828161EC`, and the fixed-size lists they're kept in (B7).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
