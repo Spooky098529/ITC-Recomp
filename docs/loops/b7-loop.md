@@ -484,6 +484,17 @@ branch; commit before any revert; stage only your own files; only search
 inside the repo; SBX-Recomp only when the user says so; never screenshot
 the user's desktop; find problems with logs, not guesses.
 
+Libraries replaced wholesale aren't mapped or ported, and no lead goes
+into them (the user's call, 2026-10-25): their code no longer runs, and
+the coverage list may still show what ran before (`../coverage.md`). So
+far: the HLSL compiler, everything under `sub_822B8F10` (answered with
+stored shaders, `--use_hardcoded_shaders`, `functions/functions.md`), and
+the movie library, `82481A70`-`82575B07` under the movie class (the
+movies played through our FFmpeg, `--play_movies_with_ffmpeg`,
+`functions/movies.md`, `../native-movies.md`). A function in such a range
+is checked against its callers first: one the game's own code still calls
+directly is mapped as usual.
+
 ## Rows to review
 
 `docs/loops/review.md` (the user's call, 2026-10-23) holds what each run
