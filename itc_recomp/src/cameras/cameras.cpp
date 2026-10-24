@@ -637,6 +637,28 @@ uint32_t InitPass(uint8_t* base, uint32_t pass, uint32_t type, const PassInitCal
   return 0;
 }
 
+uint32_t InitPasses(uint8_t* base, const PassesInitCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_8209F960 CameraPasses::InitPasses");
+  for (uint32_t i = 0; i < kPassCount; i++) {
+    calls.init_pass(Pass(i), i, guest::LoadU32(base, 0x826BABE4));
+  }
+  const uint32_t mode = guest::LoadU32(base, kMode);
+  if (!SetMode(base, 1, mode)) {
+    calls.set_mode(mode);
+  }
+  return mode;
+}
+
+uint32_t InitAll(uint8_t* base, const PassesInitCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_8209F9B8 CameraPasses::Init");
+  for (uint32_t at : {0x826BABE4u, 0x826BABC0u, 0x826BABE8u, 0x826BABECu, 0x826BABCCu,
+                      0x826BABDCu, 0x826BABC8u, 0x826BABD4u, 0x826BABFCu, 0x826BABF8u,
+                      0x826BABF4u, 0x826BABF0u, 0x826BABD0u, 0x826BABD8u, 0x826BABE0u}) {
+    guest::StoreU32(base, at, 0);
+  }
+  return InitPasses(base, calls);
+}
+
 void Enable(uint8_t* base, uint32_t pass) {
   ITC_NATIVE_RUNNING("sub_820A0968 CameraPass::Enable");
   guest::StoreU32(base, pass + 588, 1);

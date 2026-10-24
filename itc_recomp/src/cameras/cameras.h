@@ -187,6 +187,27 @@ struct PassInitCalls {
 // Returns 0.
 uint32_t InitPass(uint8_t* base, uint32_t pass, uint32_t type, const PassInitCalls& calls);
 
+// CameraPasses::InitPasses' guest calls (the adapter's): CameraPass::Init
+// on `pass` with `type` and r5 = `r5` (not read by it), through its
+// override, and the original CameraPasses::SetMode (r3 = 1, r4 = `mode`)
+// where SetMode's plain C++ can't run (never in play).
+struct PassesInitCalls {
+  std::function<void(uint32_t pass, uint32_t type, uint32_t r5)> init_pass;
+  std::function<void(uint32_t mode)> set_mode;
+};
+
+// CameraPasses::InitPasses (sub_8209F960): the 21 passes initialized,
+// CameraPass::Init(Pass(i), i, [0x826BABE4]) for i = 0 to 20 (the word
+// read each time), then CameraPasses::SetMode(1, [kMode]). Returns the
+// mode it was given.
+uint32_t InitPasses(uint8_t* base, const PassesInitCalls& calls);
+
+// CameraPasses::Init (sub_8209F9B8): the 15 words at kMode to 0x826BABFC
+// but 0x826BABC4 (the mode, 0x826BABE4 and 13 of the render targets'
+// textures) set to 0 in the original's order, then InitPasses (a tail
+// call). Returns InitPasses' answer.
+uint32_t InitAll(uint8_t* base, const PassesInitCalls& calls);
+
 // CameraPass::Enable (sub_820A0968) and CameraPass::Disable (sub_820A0958):
 // +588 = 1 or 0.
 void Enable(uint8_t* base, uint32_t pass);

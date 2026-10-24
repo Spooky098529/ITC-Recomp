@@ -43,7 +43,8 @@ ITC_FLAG_BOOL(native_cameras, true, "ITC",
               "CameraPasses::MakeRenderTarget sub_8209FBF0 with its case 0 sub_8209FC7C and "
               "CameraPass::SetUpSurfaces sub_820A2F40 with its types 0-2 chunk sub_820A2F94, with "
               "--native_video_output, --native_graphics_resources and --native_heap; CameraPass::Init "
-              "sub_820A3DB0 with its type 0 chunk sub_820A3E04) natively instead of "
+              "sub_820A3DB0 with its type 0 chunk sub_820A3E04; CameraPasses::Init sub_8209F9B8 and InitPasses "
+              "sub_8209F960) natively instead of "
               "through the translated code (the same words, bit for bit; checked by "
               "--run_harnesses=cameras)");
 
@@ -306,6 +307,44 @@ bool CameraPassSetUpSurfaces(PPCContext& ctx, uint8_t* base) {
   return true;
 }
 
+thread_local std::vector<std::array<uint32_t, 3>>* camera_pass_init_calls = nullptr;
+
+void CameraPassesInit(PPCContext& ctx, uint8_t* base, bool all) {
+  const uint64_t lr = ctx.lr;
+  ctx.fpscr.disableFlushMode();
+  bool original_set_mode = false;
+  const cameras::PassesInitCalls calls{
+      [&](uint32_t pass, uint32_t type, uint32_t r5) {
+        ctx.r3.u64 = pass;
+        ctx.r4.u64 = type;
+        ctx.r5.u64 = r5;
+        ctx.lr = 0x8209F990;
+        sub_820A3DB0(ctx, base);
+      },
+      [&](uint32_t mode) {
+        original_set_mode = true;
+        ctx.r3.u64 = 1;
+        ctx.r4.u64 = mode;
+        ctx.lr = 0x8209F9B0;
+        __imp__sub_8209F738(ctx, base);
+      }};
+  uint32_t mode = 0;
+  guest_call::InFrame(ctx, base, 128, 0x8209F968, [&](uint32_t) {
+    mode = all ? cameras::InitAll(base, calls) : cameras::InitPasses(base, calls);
+  });
+  ctx.lr = lr;
+  if (original_set_mode) {
+    return;  // r3 and f1 as the original SetMode left them
+  }
+  // As SetMode's adapter leaves them where it sets pass 4's field of view.
+  ctx.r3.u64 = 1;
+  ctx.r4.u64 = mode;
+  if (mode == 0 || mode == 1) {
+    ctx.r3.u64 = cameras::Pass(4);
+    ctx.f1.f64 = double(guest::LoadFloat(base, mode == 0 ? 0x82001E8C : 0x82001E88));
+  }
+}
+
 bool CameraPassInit(PPCContext& ctx, uint8_t* base) {
   const uint32_t pass = ctx.r3.u32;
   const uint32_t type = ctx.r4.u32;
@@ -357,9 +396,32 @@ extern "C" REX_FUNC(sub_820A2F40) {
   }
 }
 
+// CameraPasses::Init (no arguments) and InitPasses
+// (hooks::CameraPassesInit).
+extern "C" REX_FUNC(sub_8209F9B8) {
+  ITC_CAMERAS_FALLBACK(8209F9B8)
+  hooks::CameraPassesInit(ctx, base, true);
+}
+
+extern "C" REX_FUNC(sub_8209F960) {
+  ITC_CAMERAS_FALLBACK(8209F960)
+  hooks::CameraPassesInit(ctx, base, false);
+}
+
 // CameraPass::Init: r3 = the pass, r4 = the type (hooks::CameraPassInit).
+// While the cameras harness records (hooks::camera_pass_init_calls), only
+// the arguments are kept.
 extern "C" REX_FUNC(sub_820A3DB0) {
-  ITC_CAMERAS_FALLBACK(820A3DB0)
+  REX_FUNC_PROLOGUE();
+  if (hooks::camera_pass_init_calls != nullptr) {
+    hooks::camera_pass_init_calls->push_back({ctx.r3.u32, ctx.r4.u32, ctx.r5.u32});
+    ctx.r3.u64 = 0;
+    return;
+  }
+  if (!ITC_FLAG(native_cameras)) {
+    __imp__sub_820A3DB0(ctx, base);
+    return;
+  }
   hooks::CameraPassInit(ctx, base);
 }
 
