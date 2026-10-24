@@ -184,6 +184,7 @@ set(ITC_SOURCES
     src/c_runtime/wide_format.cpp
     src/c_runtime/start_up.cpp
     src/c_runtime/parse.cpp
+    src/c_runtime/arrays.cpp
     src/game_data/game_data.cpp
     src/display/gamma.cpp
     src/harnesses/harness.cpp

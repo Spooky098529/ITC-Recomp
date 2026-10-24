@@ -1841,6 +1841,87 @@ void CRuntime(Context& h) {
     }
     results.Report();
   }
+
+  // The array helpers: each kind of element function the game passes (the
+  // native SetWsToOne and Particle::Particle, the translated sub_82101D20,
+  // the empty destructor) and Vec3::SwapXZ, whose swaps over overlapping
+  // elements show the order; the game's sizes and small overlapping ones,
+  // counts of none, below none, one and many (some with bits above the low
+  // 32; not 0x80000000, which both run 2^31 times: the count less one
+  // wraps to INT_MAX). The scratch area holds random bytes; it, r1 and r28-r31 compared
+  // exactly (the elements' fields are copied as words).
+  {
+    Results constructs("vector constructor iterator (sub_820911A8)");
+    Results destructs("vector destructor iterator (sub_820900C0)");
+    struct Target {
+      uint32_t function;
+      uint32_t extent;  // the bytes past the element it writes
+    };
+    // Their own generator: the shared one's later numbers stay as they were
+    // for the harnesses after this one.
+    Random random;
+    const Target targets[] = {{0x8209B038, 64}, {0x8212B3D0, 32}, {0x82101D20, 800},
+                              {0x82106540, 0},  {0x820AB688, 12}};
+    const int64_t sizes[] = {4, 8, 16, 48, 64, 972, 0, -16};
+    const uint64_t counts[] = {0,  1,  2,  3,  5,  15, 80, 0xFFFFFFFFull, 0x80000001ull,
+                               0xFFFFFFFF00000004ull, 0x0000000100000000ull};
+    for (const Target& target : targets) {
+      for (const int64_t size : sizes) {
+        for (const uint64_t count : counts) {
+          const int32_t n = int32_t(uint32_t(count));
+          const int64_t span = n > 0 ? int64_t(n - 1) * size : 0;
+          // The array where every element and what it writes fit in the
+          // scratch area (below its last 64 bytes).
+          const int64_t low = std::min<int64_t>(0, span);
+          const int64_t high = std::max<int64_t>(0, span) + target.extent;
+          if (high - low > int64_t(kScratchBytes) - 128) {
+            continue;
+          }
+          const uint32_t array = h.data + 64 + uint32_t(-low);
+          for (int which = 0; which < 2; which++) {
+            if (which == 0 && target.function == 0x82106540) {
+              continue;  // not a constructor
+            }
+            std::vector<uint8_t> fill(kScratchBytes);
+            for (auto& b : fill) {
+              b = uint8_t(random.Next());
+            }
+            const uint64_t high_bits = (count & 1) ? 0xFFFFFFFF00000000ull : 0;
+            Outputs out[2];
+            for (int v = 0; v < 2; v++) {
+              Write(h.base, h.data, fill.data(), kScratchBytes);
+              PPCContext t = CallContext(h);
+              t.r3.u64 = array;
+              t.r4.u64 = uint64_t(size);
+              t.r5.u64 = count;
+              t.r6.u64 = high_bits | target.function;
+              t.r28.u64 = 0x2828282828282828ull;
+              t.r29.u64 = 0x2929292929292929ull;
+              t.r30.u64 = 0x3030303030303030ull;
+              t.r31.u64 = 0x3131313131313131ull;
+              if (which == 0) {
+                (v == 0 ? __imp__sub_820911A8 : sub_820911A8)(t, h.base);
+              } else {
+                (v == 0 ? __imp__sub_820900C0 : sub_820900C0)(t, h.base);
+              }
+              out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+              out[v].Word(t.r1.u32);
+              for (const uint64_t r : {t.r28.u64, t.r29.u64, t.r30.u64, t.r31.u64}) {
+                out[v].Word(uint32_t(r >> 32));
+                out[v].Word(uint32_t(r));
+              }
+            }
+            (which == 0 ? constructs : destructs)
+                .Check(out[0], out[1],
+                       fmt::format("function {:08X} size {} count {:X}", target.function, size,
+                                   count));
+          }
+        }
+      }
+    }
+    constructs.Report();
+    destructs.Report();
+  }
 }
 
 }  // namespace harness
