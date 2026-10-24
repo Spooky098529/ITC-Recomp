@@ -12,6 +12,7 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 
 namespace input {
 
@@ -65,5 +66,33 @@ uint32_t InputProcessorPressedOrRepeat(uint8_t* base, uint32_t processor, uint32
 uint32_t ManagerProcessor(uint32_t manager, uint32_t index);
 uint32_t ManagerLogicalPad(uint32_t manager, uint32_t index);
 uint32_t ManagerPhysicalPad(uint32_t manager, uint32_t index);
+
+// --- The manager ---
+//
+// Its constructor (sub_820991E0) registers two handlers with the message
+// dispatcher (the argument block's +0) through the dispatcher's vtable
+// slots +8 and +4: guest calls, made by its adapter between the two parts
+// below.
+
+constexpr uint32_t kManagerVtable = 0x82000F48;
+
+// Input::Create's allocation (sub_820993E8): the manager's 3,984 bytes from
+// operator new. nullopt where the original must run (operator new's error
+// paths).
+std::optional<uint32_t> ManagerAllocate(uint8_t* base);
+// InputManager::InputManager (sub_820991E0) up to its handlers: vtable
+// 0x82000F48, the five logical pads, four physical pads, five processors and
+// five listener lists made, +4 = the argument block's +4. False, with
+// nothing done, when the lists' head nodes can't be allocated natively.
+bool ManagerConstructMembers(uint8_t* base, uint32_t manager, uint32_t block);
+// The rest, after the handlers: logical pad i (0-3) bound (binding 0) to
+// physical pad i, and the "any pad" (4) bindings 0-3 to logical pads 0-3.
+void ManagerBindPads(uint8_t* base, uint32_t manager);
+// InputManager::AddListener (sub_82099430, the vtable's slot 3): `listener`
+// pushed at the end of pad `index`'s list and processor `index` copied into
+// it (Assign). False, with nothing done, when the list isn't empty (the
+// original resets its last listener first, sub_82592400, never seen in play)
+// or the node can't be allocated natively.
+bool ManagerAddListener(uint8_t* base, uint32_t manager, uint32_t index, uint32_t listener);
 
 }  // namespace input

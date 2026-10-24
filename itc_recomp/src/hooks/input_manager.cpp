@@ -10,6 +10,7 @@
 
 #include "base/flags.h"
 #include "frame_pacing/game_messages.h"
+#include "hooks/guest_call.h"
 #include "hooks/heap.h"
 #include "input/input_manager.h"
 #include "std_list/ptr_list.h"
@@ -22,7 +23,9 @@ ITC_FLAG_BOOL(native_input, true, "ITC",
               "(no adapter) and sub_8258CE60, LogicalPad::Bind sub_825918F0, the pads' values sub_82591B30 "
               "and sub_820988B8, InputProcessor::Assign sub_82098D60, the button tests "
               "sub_8258CEB0 and sub_8258CEE0 with sub_82592500 and sub_82592520 (no adapters), the manager's slots "
-              "sub_82098CB8, sub_82098CD0 and sub_82098FE0) "
+              "sub_82098CB8, sub_82098CD0 and sub_82098FE0; Input::Create sub_820993E8, "
+              "InputManager::InputManager sub_820991E0 and AddListener sub_82099430, with "
+              "--native_heap) "
               "natively instead of through the translated code (same results; checked by "
               "--run_harnesses=input)");
 
@@ -181,3 +184,104 @@ ITC_INPUT_WRAPPER(8258CEE0, 82592520, input::InputProcessorPressedOrRepeat, 0x82
 ITC_INPUT_VALUES(82591B30, input::LogicalPadValues)
 ITC_INPUT_VALUES(820988B8, input::PhysicalPadValues)
 #undef ITC_INPUT_VALUES
+
+// --- The manager ---
+
+namespace {
+
+constexpr uint32_t kFunctorVtable = 0x82002850;  // the handler functor's
+constexpr uint32_t kFunctorDone = 0x82000ABC;    // set back after the call
+constexpr uint32_t kUpdateHandler = 0x820990F0;  // Input::Update, message 5
+constexpr uint32_t kMessage7Handler = 0x82098CE8;
+
+// InputManager::InputManager natively: r3 = the manager, r4 = the argument
+// block. Its plain C++ around the two guest calls registering its handlers
+// with the dispatcher (block +0), each with a functor on the stack, in the
+// original's frame (192 bytes) at its offsets. False, with nothing done,
+// where the original must run.
+bool ConstructManager(PPCContext& ctx, uint8_t* base) {
+  const uint32_t manager = ctx.r3.u32;
+  const uint32_t block = ctx.r4.u32;
+  if (!NativeLifetime() || !input::ManagerConstructMembers(base, manager, block)) {
+    return false;
+  }
+  const uint64_t saved_lr = ctx.lr;
+  guest_call::InFrame(ctx, base, 192, 0x820992C0, [&](uint32_t frame) {
+    // Message 5 through the dispatcher's slot +8.
+    guest::StoreU32(base, frame + 92, manager);
+    guest::StoreU32(base, frame + 88, kFunctorVtable);
+    guest::StoreU32(base, frame + 96, kUpdateHandler);
+    guest::StoreU32(base, frame + 80, 5);
+    uint32_t dispatcher = guest::LoadU32(base, block);
+    ctx.r3.u64 = dispatcher;
+    ctx.r4.u64 = frame + 80;
+    ctx.r5.u64 = frame + 88;
+    REX_CALL_INDIRECT_FUNC(guest::LoadU32(base, guest::LoadU32(base, dispatcher) + 8));
+    // Message 7 through its slot +4.
+    dispatcher = guest::LoadU32(base, block);
+    guest::StoreU32(base, frame + 108, manager);
+    guest::StoreU32(base, frame + 88, kFunctorDone);
+    guest::StoreU32(base, frame + 104, kFunctorVtable);
+    guest::StoreU32(base, frame + 112, kMessage7Handler);
+    guest::StoreU32(base, frame + 80, 7);
+    ctx.r3.u64 = dispatcher;
+    ctx.r4.u64 = frame + 80;
+    ctx.r5.u64 = frame + 104;
+    ctx.lr = 0x8209930C;
+    REX_CALL_INDIRECT_FUNC(guest::LoadU32(base, guest::LoadU32(base, dispatcher) + 4));
+    guest::StoreU32(base, frame + 104, kFunctorDone);
+  });
+  input::ManagerBindPads(base, manager);
+  ctx.lr = saved_lr;
+  ctx.r3.u64 = manager;
+  return true;
+}
+
+}  // namespace
+
+extern "C" REX_FUNC(sub_820991E0) {
+  REX_FUNC_PROLOGUE();
+  if (!ConstructManager(ctx, base)) {
+    __imp__sub_820991E0(ctx, base);
+  }
+}
+
+// Input::Create: r3 = the argument block; r3 the manager, or 0 when the
+// allocation gave none. The manager's constructor is called in the
+// original's frame (96 bytes), from its call's return address.
+extern "C" REX_FUNC(sub_820993E8) {
+  REX_FUNC_PROLOGUE();
+  const auto manager = NativeLifetime() ? input::ManagerAllocate(base) : std::nullopt;
+  if (!manager) {
+    __imp__sub_820993E8(ctx, base);
+    return;
+  }
+  if (*manager == 0) {
+    ctx.r3.u64 = 0;
+    return;
+  }
+  const uint32_t block = ctx.r3.u32;
+  const uint64_t saved_lr = ctx.lr;
+  guest_call::InFrame(ctx, base, 96, 0x82099414, [&](uint32_t) {
+    ctx.r3.u64 = *manager;
+    ctx.r4.u64 = block;
+    if (!ConstructManager(ctx, base)) {
+      __imp__sub_820991E0(ctx, base);
+    }
+  });
+  ctx.lr = saved_lr;
+}
+
+// AddListener (slot 3): r3 = the manager, r4 = the index's address, r5 = the
+// listener; r3 the listener.
+extern "C" REX_FUNC(sub_82099430) {
+  REX_FUNC_PROLOGUE();
+  const uint32_t listener = ctx.r5.u32;
+  if (!NativeLifetime() || !input::ManagerAddListener(base, ctx.r3.u32,
+                                                      guest::LoadU32(base, ctx.r4.u32),
+                                                      listener)) {
+    __imp__sub_82099430(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = listener;
+}

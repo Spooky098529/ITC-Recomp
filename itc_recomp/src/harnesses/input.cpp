@@ -98,6 +98,20 @@ ITC_NATIVE_STEP(NativePressedOrRepeat, ctx.r3.u64 = in::InputProcessorPressedOrR
                                            base, ctx.r3.u32, guest::LoadU32(base, ctx.r4.u32)))
 #undef ITC_NATIVE_STEP
 
+// The manager's adapters' steps (src/hooks/input_manager.cpp) make guest
+// calls, so the cases run the adapters themselves with the flag on (the
+// originals with it off): the constructor's and Create's work around the
+// dispatcher's calls is theirs. AddListener's step is its plain C++.
+void NativeAddListener(PPCContext& ctx, uint8_t* base) {
+  const uint32_t listener = ctx.r5.u32;
+  if (!in::ManagerAddListener(base, ctx.r3.u32, guest::LoadU32(base, ctx.r4.u32), listener)) {
+    g_fallbacks++;
+    __imp__sub_82099430(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = listener;
+}
+
 // A heap block a case made: its address replaced by this marker wherever
 // it's stored.
 constexpr uint32_t kNodeMarker = 0xB10C0001;
@@ -512,6 +526,214 @@ void PadCases(Context& h) {
   }
 }
 
+// --- The manager ---
+
+// Words of guest memory: exact, with the nodes' addresses (and the
+// manager's, for Create) replaced by markers, `floats` as floats.
+void BlockWords(Context& h, Outputs& out, uint32_t address, uint32_t bytes,
+                const std::vector<uint32_t>& blocks, const FloatWords& floats) {
+  for (uint32_t at = address; at < address + bytes; at += 4) {
+    uint32_t word = guest::LoadU32(h.base, at);
+    if (std::find(floats.begin(), floats.end(), at) != floats.end()) {
+      out.Float(word);
+      continue;
+    }
+    for (size_t k = 0; k < blocks.size(); k++) {
+      if (blocks[k] != 0 && word == blocks[k]) {
+        word = kNodeMarker + uint32_t(k);
+        break;
+      }
+    }
+    out.Word(word);
+  }
+}
+
+// The words a manager's constructor stores as floats: its processors' dead
+// zones and w's, its physical pads' records.
+FloatWords ManagerFloats(uint32_t manager) {
+  FloatWords floats;
+  for (uint32_t i = 0; i < 5; i++) {
+    for (uint32_t w : ProcessorConstantFloats(manager + in::kManagerProcessors +
+                                              in::kProcessorBytes * i)) {
+      floats.push_back(w);
+    }
+  }
+  for (uint32_t i = 0; i < 4; i++) {
+    const uint32_t pad = manager + in::kManagerPhysicalPads + in::kPhysicalPadBytes * i;
+    floats.push_back(pad + 168);
+    floats.push_back(pad + 180);
+  }
+  return floats;
+}
+
+// A test dispatcher whose slots +4 and +8 are LogicalPad::Bind
+// (sub_825918F0): called with (dispatcher, &message, &functor), it keeps the
+// functor's address at +8 + 8 x message (and a 1 at +4 + 8 x message), so
+// the functor the constructor built on its stack can be read back.
+struct Dispatcher {
+  uint32_t arguments, dispatcher, vtable;
+};
+Dispatcher MakeDispatcher(Context& h, uint32_t at, uint32_t word) {
+  Dispatcher d{at, at + 32, at + 112};
+  guest::StoreU32(h.base, d.arguments, d.dispatcher);
+  guest::StoreU32(h.base, d.arguments + 4, word);
+  for (uint32_t k = 0; k < 80; k += 4) {
+    guest::StoreU32(h.base, d.dispatcher + k, 0);
+  }
+  guest::StoreU32(h.base, d.dispatcher, d.vtable);
+  guest::StoreU32(h.base, d.vtable + 4, 0x825918F0);
+  guest::StoreU32(h.base, d.vtable + 8, 0x825918F0);
+  return d;
+}
+
+// The dispatcher's words and the two functors (12 bytes each, on the
+// constructor's stack).
+void DispatcherOut(Context& h, Outputs& out, const Dispatcher& d,
+                   const std::vector<uint32_t>& blocks) {
+  BlockWords(h, out, d.dispatcher, 80, blocks, {});
+  for (uint32_t message : {5u, 7u}) {
+    const uint32_t functor = guest::LoadU32(h.base, d.dispatcher + 8 + 8 * message);
+    out.Word(functor - h.ctx.r1.u32);
+    BlockWords(h, out, functor, 12, blocks, {});
+  }
+}
+
+// The manager's five head nodes (their addresses, in `blocks` from 1),
+// compared as nodes and freed.
+std::vector<uint32_t> HeadNodes(Context& h, uint32_t manager) {
+  std::vector<uint32_t> nodes;
+  for (uint32_t i = 0; i < 5; i++) {
+    nodes.push_back(guest::LoadU32(
+        h.base, manager + in::kManagerListeners + in::kListenerListBytes * i + sl::kHead));
+  }
+  return nodes;
+}
+void HeadNodesOut(Context& h, Outputs& out, const std::vector<uint32_t>& blocks) {
+  for (size_t k = 1; k < blocks.size(); k++) {
+    const uint32_t node = blocks[k];
+    const bool block = node != 0 && memory::IsHeapBlock(node);
+    out.Word(block);
+    if (block) {
+      out.Word(memory::Size(node));
+      BlockWords(h, out, node, 8, blocks, {});  // the head's value isn't set
+      memory::crt::OperatorDelete(node);
+    }
+  }
+}
+
+void ManagerCases(Context& h) {
+  const uint32_t area = memory::Alloc(0x2000, 0);
+  {
+    Results results("sub_820991E0 InputManager::InputManager");
+    const uint32_t manager = area;
+    for (int i = 0; i < 8; i++) {
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Fill(h.base, area, 0x2000);
+        const Dispatcher d = MakeDispatcher(h, area + 4000, 0x12340000u + uint32_t(i));
+        PPCContext t = CallContext(h);
+        t.r3.u64 = manager;
+        t.r4.u64 = d.arguments;
+        ITC_FLAG(native_input) = v == 1;
+        (v == 0 ? __imp__sub_820991E0 : sub_820991E0)(t, h.base);
+        ITC_FLAG(native_input) = true;
+        std::vector<uint32_t> blocks = {0};
+        for (uint32_t node : HeadNodes(h, manager)) {
+          blocks.push_back(node);
+        }
+        BlockWords(h, out[v], area, 0x2000, blocks, ManagerFloats(manager));
+        DispatcherOut(h, out[v], d, blocks);
+        out[v].Word(t.r3.u32);
+        HeadNodesOut(h, out[v], blocks);
+      }
+      results.Check(out[0], out[1], fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    Results results("sub_820993E8 Input::Create");
+    for (int i = 0; i < 8; i++) {
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Fill(h.base, area, 0x2000);
+        const Dispatcher d = MakeDispatcher(h, area + 4000, 0x56780000u + uint32_t(i));
+        PPCContext t = CallContext(h);
+        t.r3.u64 = d.arguments;
+        ITC_FLAG(native_input) = v == 1;
+        (v == 0 ? __imp__sub_820993E8 : sub_820993E8)(t, h.base);
+        ITC_FLAG(native_input) = true;
+        const uint32_t manager = t.r3.u32;
+        std::vector<uint32_t> blocks = {manager};
+        for (uint32_t node : HeadNodes(h, manager)) {
+          blocks.push_back(node);
+        }
+        out[v].Word(manager != 0 && memory::IsHeapBlock(manager));
+        out[v].Word(memory::Size(manager));
+        BlockWords(h, out[v], manager, in::kManagerBytes, blocks, ManagerFloats(manager));
+        BlockWords(h, out[v], area, 0x2000, blocks, {});
+        DispatcherOut(h, out[v], d, blocks);
+        HeadNodesOut(h, out[v], blocks);
+        memory::crt::OperatorDelete(manager);
+      }
+      results.Check(out[0], out[1], fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    Results results("sub_82099430 InputManager::AddListener");
+    const uint32_t manager = area;
+    const uint32_t heads = area + 0x1000;
+    const uint32_t listener = area + 0x1100;
+    const uint32_t index = area + 0x1300;
+    for (int i = 0; i < 100; i++) {
+      Outputs out[2];
+      const Random start = h.random;
+      uint32_t node = 0;
+      for (int v = 0; v < 2; v++) {
+        h.random = start;
+        Random& r = h.random;
+        Fill(h.base, area, 0x2000);
+        // The five processors' words (floats where the update keeps them),
+        // the lists empty with their heads in the area.
+        for (uint32_t at = 0; at < 5 * in::kProcessorBytes; at += 4) {
+          const uint32_t offset = at % in::kProcessorBytes;
+          const bool is_float = offset >= 16 && offset < 264;
+          guest::StoreU32(h.base, manager + in::kManagerProcessors + at,
+                          is_float ? Bits(RandomFloat(r, 2.0f)) : uint32_t(r.Next()));
+        }
+        for (uint32_t k = 0; k < 5; k++) {
+          const uint32_t list = manager + in::kManagerListeners + in::kListenerListBytes * k;
+          const uint32_t head = heads + 16 * k;
+          guest::StoreU32(h.base, head + sl::kNext, head);
+          guest::StoreU32(h.base, head + sl::kPrevious, head);
+          guest::StoreU32(h.base, list + sl::kHead, head);
+          guest::StoreU32(h.base, list + sl::kSize, 0);
+        }
+        const uint32_t pad = uint32_t(i % 5);
+        guest::StoreU32(h.base, index, pad);
+        PPCContext t = CallContext(h);
+        t.r3.u64 = manager;
+        t.r4.u64 = index;
+        t.r5.u64 = listener;
+        ITC_FLAG(native_input) = v == 1;
+        (v == 0 ? __imp__sub_82099430 : NativeAddListener)(t, h.base);
+        ITC_FLAG(native_input) = true;
+        node = guest::LoadU32(h.base, heads + 16 * pad + sl::kPrevious);
+        FloatWords floats;
+        for (uint32_t at = 128; at < 264; at += 4) {
+          floats.push_back(listener + at);
+        }
+        BlockWords(h, out[v], area, 0x2000, {node}, floats);
+        out[v].Word(t.r3.u32);
+        NodeOut(h, out[v], node, 3);
+      }
+      results.Check(out[0], out[1], fmt::format("pad {}", i % 5));
+    }
+    results.Report();
+  }
+  memory::Free(area);
+}
+
 }  // namespace
 
 void Input(Context& h) {
@@ -522,6 +744,7 @@ void Input(Context& h) {
     AllocateNodesCases(h);
     ConstructCases(h);
     InsertCases(h);
+    ManagerCases(h);
   }
   IncSizeCases(h);
   PadCases(h);

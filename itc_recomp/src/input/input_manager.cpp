@@ -5,8 +5,11 @@
 
 #include "base/log.h"
 #include "guest.h"
+#include "memory/c_runtime_heap.h"
+#include "std_list/ptr_list.h"
 #include "model_animation/model_animation.h"
 
+#include <cstdlib>
 #include <cstring>
 
 namespace input {
@@ -143,6 +146,62 @@ uint32_t ManagerLogicalPad(uint32_t manager, uint32_t index) {
 uint32_t ManagerPhysicalPad(uint32_t manager, uint32_t index) {
   ITC_NATIVE_RUNNING("sub_82098FE0 InputManager::GetPhysicalPad");
   return manager + kManagerPhysicalPads + kPhysicalPadBytes * index;
+}
+
+std::optional<uint32_t> ManagerAllocate(uint8_t* base) {
+  ITC_NATIVE_RUNNING("sub_820993E8 Input::Create");
+  return memory::crt::OperatorNew(base, kManagerBytes);
+}
+
+bool ManagerConstructMembers(uint8_t* base, uint32_t manager, uint32_t block) {
+  ITC_NATIVE_RUNNING("sub_820991E0 InputManager::InputManager");
+  if (!std_list::CanAllocate(base, 1)) {
+    return false;
+  }
+  Store(base, manager, kManagerVtable);
+  for (uint32_t i = 0; i < 5; i++) {
+    LogicalPadConstruct(base, manager + kManagerLogicalPads + kLogicalPadBytes * i);
+  }
+  for (uint32_t i = 0; i < 4; i++) {
+    PhysicalPadConstruct(base, manager + kManagerPhysicalPads + kPhysicalPadBytes * i);
+  }
+  for (uint32_t i = 0; i < 5; i++) {
+    InputProcessorConstruct(base, manager + kManagerProcessors + kProcessorBytes * i);
+  }
+  for (uint32_t i = 0; i < 5; i++) {
+    if (!std_list::Construct(base, manager + kManagerListeners + kListenerListBytes * i)) {
+      ITC_LOG_ERROR("InputManager: a listener list refused after its checks");
+      std::abort();
+    }
+  }
+  Store(base, manager + 4, Load(base, block + 4));
+  return true;
+}
+
+void ManagerBindPads(uint8_t* base, uint32_t manager) {
+  const uint32_t pads = manager + kManagerLogicalPads;
+  for (uint32_t i = 0; i < 4; i++) {
+    LogicalPadBind(base, pads + kLogicalPadBytes * i, 0,
+                   manager + kManagerPhysicalPads + kPhysicalPadBytes * i);
+  }
+  const uint32_t any = pads + kLogicalPadBytes * 4;
+  for (uint32_t i = 0; i < 4; i++) {
+    LogicalPadBind(base, any, i, pads + kLogicalPadBytes * i);
+  }
+}
+
+bool ManagerAddListener(uint8_t* base, uint32_t manager, uint32_t index, uint32_t listener) {
+  ITC_NATIVE_RUNNING("sub_82099430 InputManager::AddListener");
+  const uint32_t list = manager + kManagerListeners + kListenerListBytes * index;
+  if (Load(base, list + std_list::kSize) != 0 || !std_list::CanAllocate(base, 1)) {
+    return false;
+  }
+  if (!std_list::Insert(base, list, Load(base, list + std_list::kHead), listener)) {
+    ITC_LOG_ERROR("InputManager::AddListener: the node refused after its checks");
+    std::abort();
+  }
+  InputProcessorAssign(base, listener, manager + kManagerProcessors + kProcessorBytes * index);
+  return true;
 }
 
 }  // namespace input
