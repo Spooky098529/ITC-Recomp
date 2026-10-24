@@ -2530,6 +2530,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-10-23 | `std::string` (Dinkumware's `basic_string<char>` over the guest layout: constructors, `_Tidy`, `_Copy`, `_Grow`, assign, append, the allocator; the library's wildcard search, find and replace-all) | `std-string.md` | 14 of 16 | `--native_std_string` |
 | 2026-10-23 | The course's route (route positions normalized and moved along linked sections, points, lanes and distances, `TrackRoute::Follow` with its full search; with `collision-world.md`'s `TrackPosition::Init` and `Update`) | `track-route.md` | 40 of 40 (two migrations) | `--native_track_route` |
 | 2026-10-24 | The AI drivers (the computer racers' driving: each driver's path along the course's route, its corners and line, the other racers' records, the skill block, the steering, throttle and brake into the car's input record; `AiDriver::DriveCar` and `AiDrivers::UpdateAll`) | `ai-drivers.md` | 143 of 148 (five migrations; 119 Native) | `--native_ai_drivers` |
+| 2026-10-24 | The racer controllers (each car's input record filled from the player's pad or its AI driver each tick: the pad reader, the input recording and replay, the race flow's per-state handlers, `AiDriver::Setup`) | `racer-controllers.md` | 27 of 27 (one migration) | `--native_racer_controllers` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -2690,6 +2691,16 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
     race states' and set-up's recompiled callers. Harness runs now use
     `attract_race.sh 40` (the user's call: the harnesses' time grows
     with their cases, and a race short only for that is no halt).
+
+    The racer controllers (2026-10-24, the same run): all 27 ours in
+    one migration, with three functions never seen in play; the race
+    flow's handlers keep their adapters (reached through the functors
+    `sub_82160AE0` registers, a lead), and the three that only jump to
+    another (OnEnd, OnHold, OnState7) got one-line functions with their
+    own prints, as `data_tables::RecordsItem`. State 34's handler
+    (`sub_8215FC38`), which drives the cars in attract races, was
+    missing from `seen_in_play.txt`. The input record's bytes +18 and
+    +19 are stack leftovers nothing writes (for the user's review).
 
     The second run (from 2026-10-22, branch `b7-loop-22-10-26`; its first
     session stopped after one subsystem): the first run's removable
@@ -3105,3 +3116,11 @@ in play, ours 1,366, work left 5,391 (Wrapped 123, with a row 562, no
 row yet 4,706); `ai-drivers.md` 143 ours of 148 (119 Native). 1,010
 overrides in `src/`. The rest waits on `sub_820900C0` and
 `sub_821434E8`.
+
+**2026-10-24, B7's ninth loop run, the racer controllers (branch
+`b7-loop-23-10-26-5`):** the boundary unchanged: 449 functions (916
+pairs): overridden 67, Native 3, Dropped 23, never called 70, live 286.
+Imports: 186 called, 62 with a live caller. B7 (`b7_status.py`): 6,758
+in play, ours 1,393, work left 5,365 (Wrapped 123, with a row 559, no
+row yet 4,683); `racer-controllers.md` 27 ours of 27. 1,020 overrides
+in `src/`.

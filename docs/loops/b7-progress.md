@@ -17,20 +17,19 @@ file's history. What's left to see in a drive, from every run:
   `sub_82295330`) dropped: both already ours (native memory).
 - Subsystem 1 of 3 (the AI drivers) finished: 143 of 148 ours; the
   rest waits on `sub_820900C0` and `sub_821434E8`.
-- Subsystem 2 of 3: the AI drivers' callers (the per-racer controllers
-  `8215F5E8`-`821609E0` and the drivers' per-race set-up `sub_82170FF8`,
-  from `leads.md`): `racer-controllers.md`, mapped in b5491fb (26 rows,
-  9 ready groups, no outside blockers). Migration 1 (699bbde..7b85ae8):
-  27 of 27 ours (one row added), `--native_racer_controllers`; nothing
-  left. Validated (`itc_1227` 28 s, `itc_1228`, replay ok; 25 of 25
-  harness lines; 2 never-seen ports to drive), except OnEnd, OnHold and
-  OnState7 (`sub_8215F5E8`, `sub_8215FC28`, `sub_82160940`): adapters
-  calling other plain C++ directly, no print of their own; given
-  one-line functions with prints as `data_tables::RecordsItem` was (the
-  user's call in the eighth run). Step: that fix (migration agent
-  running), then their validation.
+- Subsystem 2 of 3 (the racer controllers) finished: 27 of 27 ours.
+- Subsystem 3 of 3: the path search over two 64-node lists
+  (`sub_820FE058` and the others from `leads.md`, `820FDF98`-`820FE8C8`,
+  probably the AI's; nearly all ready). Step: mapping (agent running).
 
 ## Done
+
+- The racer controllers (`racer-controllers.md`, mapped in b5491fb; 27
+  rows): 27 ours (15 Native) in one migration (699bbde..7b85ae8) and
+  the three jump handlers' prints (94b17b0); validated (`itc_1227`,
+  `itc_1228`, `itc_1229`, `itc_1230`; replays ok; 2 to drive);
+  `--native_racer_controllers`. Left: none; the handlers' adapters stay
+  for the race flow's functors.
 
 - The AI drivers (`ai-drivers.md`, mapped in 1eeb084; 148 rows): 143
   ours (119 Native) in five migrations (c94d6be..91b8da2,
@@ -84,3 +83,5 @@ This run's groups: `expected-differences.md` (the "20:22 run" lines).
   (wrapped 123, known 559, unknown 4683). Race 28 s (`itc_1226`) with
   `--run_harnesses=all`, 0 errors, every harness 0 differing (none
   added).
+- After the racer controllers: ours 1393, work left 5365 (wrapped 123,
+  known 559, unknown 4683).
