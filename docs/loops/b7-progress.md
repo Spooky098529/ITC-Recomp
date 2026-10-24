@@ -106,3 +106,11 @@ their adapters; then the input subsystem's migration 2
 (`ActionMappers::Init`, ready). Run limit: 2 of 3 subsystems done.
 Also: `review.md` ("Run 2026-10-24 17:46"), among it the harness that
 depends on the heap's layout (`strings_and_font`).
+Resolved (the user's calls, 2026-10-24): TestPressed and TestRepeat
+given plain C++ of their own, which their adapters and the `input`
+harness call (7021b78; both harness lines seen, `itc_1490`); the
+harness that seemed to depend on the heap's layout was the harnesses'
+shared random generator, with `swprintf`'s format generator and the
+drawing cases' vertex comparison (1ce3182; `review.md`). The run isn't
+resumed: `ActionMappers::Init` is the top of `leads.md` for the next
+run.
