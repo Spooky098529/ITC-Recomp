@@ -341,6 +341,12 @@ add_library(itc_xma STATIC src/audio/xma_packets.cpp src/audio/xma_stream.cpp)
 target_include_directories(itc_xma PUBLIC src)
 target_link_libraries(itc_xma PRIVATE itc_avcodec)
 
+# The movies played through our own FFmpeg (src/movies/: docs/native-movies.md),
+# in a library of its own for the same reason.
+add_library(itc_movies STATIC src/movies/player.cpp)
+target_include_directories(itc_movies PUBLIC src)
+target_link_libraries(itc_movies PRIVATE itc_avformat)
+
 # The SDK's Xenos shader translator (to SPIR-V), built into our binary for
 # the native renderer (docs/native-renderer.md: reused for now, to be
 # replaced). The plugin has its own copy with hidden symbols.
@@ -426,3 +432,8 @@ endif()
 # built by default.
 add_executable(itc_xma_check EXCLUDE_FROM_ALL tests/xma_check.cpp)
 target_link_libraries(itc_xma_check PRIVATE itc_xma itc_avcodec)
+
+# Plays one movie through src/movies/ in real time (docs/native-movies.md; how
+# to run it is at the top of the file). Not built by default.
+add_executable(itc_movie_check EXCLUDE_FROM_ALL tests/movie_check.cpp)
+target_link_libraries(itc_movie_check PRIVATE itc_movies)
