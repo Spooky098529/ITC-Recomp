@@ -29,7 +29,9 @@ file's history. What's left to see in a drive, from every run:
   closest to ready (all 6 of its roots ready, 8 functions left).
   Mapped as the course scenery (`course-scenery.md`, 71 rows: 3 moved
   from `functions.md`, 68 new; 043a0d2; 29 ready groups; 5 leads added);
-  map checked (0 errors, 71 of 71 in play). Migration agent running.
+  map checked (0 errors, 71 of 71 in play). Migration 1 done
+  (551a868..e7309a0, 37 of 73 ours, nothing ready left); validation
+  agent running.
 
 ## Done
 
@@ -61,6 +63,9 @@ This run's groups: `expected-differences.md` (the "16:01 run" lines).
   `--run_harnesses=all`, 0 errors, every harness 0 differing.
 - After mapping the course scenery: ours 1674, work left 5086 (wrapped
   123, known 623, unknown 4340).
+- After the course scenery's migration 1: ours 1710, work left 5050
+  (wrapped 122, known 588, unknown 4340). Race 27 s with
+  `--run_harnesses=all`, 0 errors, every harness 0 differing.
 
 ## Stopped
 

@@ -46,6 +46,22 @@ When the user has reviewed a run's section, its heading gets
   headlight projectors (`sub_820F34C8`). Four rows read only in outline
   (`sub_820F6068`, `sub_820F3B70`, `sub_820F34C8`, `sub_820F52A8`);
   `known-data.md` 7 rows; 5 leads.
+  Migration 1 (551a868..e7309a0): 37 of 73 ours under
+  `--native_course_scenery` (`src/course_scenery/`; `sub_82146B20`,
+  `sub_82146AC0` moved from `functions.md`, Native), six adapters
+  removed. For review: the native key and reset slots called directly,
+  other targets and every load slot through a `Calls` callback from a
+  frame laid out like the original's (the slot adapters stay for the
+  vtables); `Scenery::LimitLargeModels` (`sub_820F2B80`) reads past its
+  5-entry stack table for an area above 4, matched by running
+  `__savegprlr_27` first and keeping the table in guest stack memory;
+  `ObjectPools::Init` and `Shutdown` native only with the native heap
+  on; `TextureAnimations::Advance`'s render-only skip in
+  `per_frame_logic.cpp` kept where it was; frame dumps with the flag on
+  and off had the same 2,414 draws. Left: blocked on the critical
+  section wrappers, `MmQueryAllocationSize`'s, memset,
+  `DataFile::GetEntry`, the XPR, the archive's queue and the texture
+  provider.
 
 ## Run 2026-10-24 03:25 (`b7-loop-24-10-26`)
 
