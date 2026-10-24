@@ -36,6 +36,23 @@ are in `post-effects.md`, with their caller.
 
 The object's fields are in `../known-data.md` ("screen object").
 
+Native since 2026-10-24 (the B7 loop, `--native_screen_objects`, on by
+default; `src/screen_objects/`, adapters in `src/hooks/screen_objects.cpp`,
+harness `--run_harnesses=screen_objects`): the two maps' functions
+(`uv_trees.cpp`, one copy of the red-black tree code for both layouts,
+store for store as the originals, nodes from the C runtime heap's plain
+C++, so only with `--native_heap`), `BuildRings` with `AddRingPoint`,
+`SetSpeed`, and `~ScreenObject` with `Release` (`screen_objects.cpp`; the
+device lock native, so with `--native_video_output`). The paths that never
+ran in play (the trees' `bad_alloc` and `length_error`, an erase of part of
+a tree, a checked iterator's trap, `SetSpeed` while running, `BuildRings`
+over a map not empty) hand the call to the original from the start.
+Still recompiled: `ScreenObject::ScreenObject` and `Init` above
+`BuildFan`, which calls `rand` (its thread data, `_getptd`, goes through
+the core), and `Record`, whose body never ran (it waits on the shader
+pairs `sub_825896D8` and `sub_82589700`, `models.md`). Nothing the objects
+draw was seen in play (`Start` never ran), so no frame dump was compared.
+
 Graphics: what our Vulkan renderer needs stays native, the rest is
 Dropped (the user's rule). The draw records render commands our
 renderer replays, and the set-up makes the texture and vertex
