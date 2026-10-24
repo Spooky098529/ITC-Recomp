@@ -37,7 +37,10 @@ file's history. What's left to see in a drive, from every run:
   and the course scenery. Taken for memset alone: `atexit` locks with
   RtlEnterCriticalSection and RtlLeaveCriticalSection, a kernel import
   replaced (a decision for the user), and `c-runtime.md`'s intro already
-  puts it with the core. Mapping agent running.
+  puts it with the core. Mapped (a212f92): memset, probably XAPI's
+  `XMemSet`, in `c-runtime.md`, and XAPI's two memory query wrappers in
+  `heap.md` (kernel imports, left for the core); 1 ready group, 1 lead;
+  map checked (0 errors, all in play). Migration agent running.
 
 ## Done
 
@@ -76,6 +79,8 @@ This run's groups: `expected-differences.md` (the "16:01 run" lines).
   `--run_harnesses=all`, 0 errors, every harness 0 differing.
 - After mapping the course scenery: ours 1674, work left 5086 (wrapped
   123, known 623, unknown 4340).
+- After mapping memset: ours 1710, work left 5050 (wrapped 122, known
+  591, unknown 4337).
 - After the course scenery's migration 1: ours 1710, work left 5050
   (wrapped 122, known 588, unknown 4340). Race 27 s with
   `--run_harnesses=all`, 0 errors, every harness 0 differing.

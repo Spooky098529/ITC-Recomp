@@ -62,6 +62,14 @@ When the user has reviewed a run's section, its heading gets
   section wrappers, `MmQueryAllocationSize`'s, memset,
   `DataFile::GetEntry`, the XPR, the archive's queue and the texture
   provider.
+- `c-runtime.md`: `sub_822962B0` memset (probably XAPI's `XMemSet`; new
+  row, a212f92: vector stores and `dcbzl` for whole 128-byte lines, the
+  same bytes as a plain memset; its 16-byte loops step by the word at
+  `[0x8263830C]`); `heap.md`: `sub_822965C0` (probably `XPhysicalSize`,
+  over MmQueryAllocationSize) and `sub_822965D8` (probably
+  `XQueryMemoryProtect`, over MmQueryAddressProtect), kept for the core;
+  1 lead (`sub_82562FF0`). `atexit` left out of this subsystem (its
+  critical sections).
 
 ## Run 2026-10-24 03:25 (`b7-loop-24-10-26`)
 
