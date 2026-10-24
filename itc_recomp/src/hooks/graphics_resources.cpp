@@ -10,7 +10,9 @@
 // CreateSurface and Resource::DestroySurface; Edram::NextRun and Mark
 // (sub_822B5C90, sub_822B5D70), from Alloc and Free; TextureLayout::LevelCount
 // and Sizes (sub_822A4530, sub_822A46C8), from TextureHeader::Set;
-// TextureLayout::MipTailOffset (sub_822A4A40), from Texture::LevelOffset.
+// TextureLayout::MipTailOffset (sub_822A4A40), from Texture::LevelOffset;
+// Texture::BaseSize and TextureLayout::LevelSize (sub_822A4348, sub_822A45B8),
+// from LevelLayout, LevelOffset and Sizes.
 
 #include "guest.h"
 
@@ -40,7 +42,8 @@ ITC_FLAG_BOOL(native_graphics_resources, true, "ITC",
               "by --run_harnesses=graphics_resources). Those reached only from native "
               "callers have no adapters, and the flag switches their callers: sub_822A44A8, "
               "sub_822A4F60, sub_822A4B98, sub_822A5910, sub_822B5EF8, sub_822B5EA8, "
-              "sub_822B5C90, sub_822B5D70, sub_822A4530, sub_822A46C8, sub_822A4A40");
+              "sub_822B5C90, sub_822B5D70, sub_822A4530, sub_822A46C8, sub_822A4A40, sub_822A4348, "
+              "sub_822A45B8");
 
 // Defines an adapter: the body (the arguments after the address) uses `ctx`
 // and `base`.
@@ -96,14 +99,6 @@ ITC_GRAPHICS_RESOURCES(822A4410, {
   guest::StoreU32(base, ctx.r5.u32, block.height);
 })
 
-// r3 = the texture, r4, r5, r6 = width, height and depth out.
-ITC_GRAPHICS_RESOURCES(822A4348, {
-  const Extent size = TextureBaseSize(base, ctx.r3.u32);
-  guest::StoreU32(base, ctx.r4.u32, size.width);
-  guest::StoreU32(base, ctx.r5.u32, size.height);
-  guest::StoreU32(base, ctx.r6.u32, size.depth);
-})
-
 // r3 width, r4 height, r5 format, r6 the multisample type.
 ITC_GRAPHICS_RESOURCES(8209AD68, ctx.r3.u64 = SurfaceEdramTiles(ctx.r3.u32, ctx.r4.u32,
                                                                 ctx.r5.u32, ctx.r6.s32))
@@ -114,20 +109,6 @@ ITC_GRAPHICS_RESOURCES(822A5B78, ctx.r3.u64 = TextureLevelDesc(base, ctx.r3.u32,
 
 // r3 = the surface, r4 = the description.
 ITC_GRAPHICS_RESOURCES(822A5F50, ctx.r3.u64 = SurfaceDesc(base, ctx.r3.u32, ctx.r4.u32))
-
-// r3, r4, r5 = width, height and depth (aligned in place), r6 = bits a
-// pixel, r7 = the format, r8 = the dimension, r9 = tiled; returns the bytes.
-ITC_GRAPHICS_RESOURCES(822A45B8, {
-  uint32_t width = guest::LoadU32(base, ctx.r3.u32);
-  uint32_t height = guest::LoadU32(base, ctx.r4.u32);
-  uint32_t depth = guest::LoadU32(base, ctx.r5.u32);
-  const uint32_t bytes =
-      TextureLevelSize(width, height, depth, ctx.r6.u32, ctx.r7.u32, ctx.r8.u32, ctx.r9.u32);
-  guest::StoreU32(base, ctx.r3.u32, width);
-  guest::StoreU32(base, ctx.r4.u32, height);
-  guest::StoreU32(base, ctx.r5.u32, depth);
-  ctx.r3.u64 = bytes;
-})
 
 // --- Texture headers: arguments past r10 on the caller's stack (+84 on).
 // TextureLayout::LevelCount and Sizes have no adapters: only Set calls them. ---
