@@ -13,6 +13,7 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 
 namespace graphics::device_state {
 
@@ -253,6 +254,72 @@ void SetRenderTargetExternal(uint8_t* base, uint32_t device, uint32_t index,
 // worked out again, and the Z and stencil enables applied again to
 // RB_DEPTHCONTROL.
 void SetDepthStencilSurface(uint8_t* base, uint32_t device, uint32_t surface);
+
+// --- The packet writers ---
+//
+// These wrote packets straight into the command buffer (device +40), which
+// nothing reads since the emulated GPU went (the kick only looks for fences,
+// interrupts and memory writes, src/native/gpu_link.cpp): the native versions
+// leave the packets out (with the segment ends and the reservations they
+// made), and keep every write to the device's state (the register shadow,
+// the dirty masks, the tables, the software copies).
+
+// The guest calls the packet writers keep (their adapters'): the draw's
+// flush helpers (Wrapped: their hooks mark what they flush for the renderer),
+// the setters in the device's tables that aren't native, and SetTexture's
+// original where its fence would need the full fence list flushed.
+struct DeviceCalls {
+  // sub_822ADC08: r4 the shader state mask, r5 the hi-z control (+10432),
+  // r6 0; returns the bits it ORs into +16.
+  std::function<uint64_t(uint64_t mask, uint32_t hiz)> flush_hiz;
+  // sub_822ADE30: r4 a register block's dirty bits (from bit 63 down), r5
+  // its first register, r6 its shadow.
+  std::function<void(uint64_t mask, uint32_t first, uint32_t shadow)> flush_registers;
+  // A setter from the device's tables (r3 the device, r4 and r5).
+  std::function<void(uint32_t setter, uint32_t r4, uint32_t r5)> setter;
+  // Device::SetTexture's original (r4 the stage, r5 the texture, r6 the mask).
+  std::function<void(uint32_t stage, uint32_t texture, uint64_t dirty)> set_texture;
+};
+
+// sub_8229B7D8: +10788 bits 12-13 = `bits`; its WAIT_UNTIL and register
+// 0xF01 packets left out.
+void SetRegisterF01Bits(uint8_t* base, uint32_t device, uint32_t bits);
+
+// sub_822A3B90 Device::DirtyAllState: with `mode` 0, sub_8229B7D8 with the
+// bits +10788 holds (its binning packets left out); every dirty mask
+// (+0..+39) set, so the next draw writes every register block again (the
+// screen scissor's packets, Dropped, left out).
+void DirtyAllState(uint8_t* base, uint32_t device, uint32_t mode);
+
+// sub_8229F680: the dirty register blocks flushed as a draw does (the flush
+// helpers, guest calls) and their mask bits cleared; then the blocks its
+// dummy draws would overwrite marked dirty again (its built-in shaders,
+// register writes, screen scissors and two dummy draws left out).
+void FlushForGprAllocation(uint8_t* base, uint32_t device, const DeviceCalls& calls);
+
+// sub_822A8A60 Device::SetShaderGprAllocation: the GPU register split
+// (SQ_GPR_MANAGEMENT: `vertex` registers in bits 12-18, `pixel` in bits
+// 4-10; 0x40400 when both are 0) at +10792, its packets left out, then
+// sub_8229F680.
+void SetShaderGprAllocation(uint8_t* base, uint32_t device, uint32_t vertex, uint32_t pixel,
+                            const DeviceCalls& calls);
+
+// sub_822A3A20 Device::SetGammaRamp: the ramp at `ramp` (three channels of
+// 256 16-bit values) through ComputeGammaRamp (sub_822B0910's plain C++,
+// src/display/gamma.h); when it differs from the device's (+13608, 1,536
+// bytes), copied there (its packets, sub_822B0C38, left out). False, with
+// nothing written, for a device in the physical views (memcpy's override
+// records those for the renderer): the original runs.
+bool SetGammaRamp(uint8_t* base, uint32_t device, uint32_t ramp);
+
+// sub_822ACB90 Device::SetDefaultState: the setter tables filled from the
+// image's (render states at 0x826388F8, sampler states at 0x82638D78 for
+// each of the 26 samplers, with the getters) and each setter called with its
+// default (the native setters directly; others through `calls`), the
+// textures unset, the default vertex declaration, the present interval kept,
+// the predicated tiling bit worked out again, and, with +10808 bit 7 clear,
+// SetShaderGprAllocation(0, 0).
+void SetDefaultState(uint8_t* base, uint32_t device, const DeviceCalls& calls);
 
 // Device fields the setters write (byte offsets).
 constexpr uint32_t kShaderDirty = 16;  // the dirty masks: the shader state

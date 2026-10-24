@@ -10,6 +10,7 @@
 
 #include "base/log.h"
 #include "c_runtime/strings.h"
+#include "display/gamma.h"
 
 #include <emmintrin.h>
 
@@ -1512,6 +1513,232 @@ void SetDepthStencilSurface(uint8_t* base, uint32_t device, uint32_t surface) {
   Store(base, device + 11624, stencil);
   SetDepthControl(base, device, Load(base, device + kDepthSurface) != 0 ? stencil : 0, 0, 0x1,
                   true);
+}
+
+// --- The packet writers ---
+
+namespace {
+
+uint64_t Load64(uint8_t* base, uint32_t address) { return REX_LOAD_U64(address); }
+void Store64(uint8_t* base, uint32_t address, uint64_t value) { REX_STORE_U64(address, value); }
+uint64_t Rotl64(uint64_t x, int n) { return std::rotl(x, n); }
+
+// A render state setter from the device's table, natively when it's one of
+// ours (the empty sub_82106540 of states 0-36 does nothing).
+bool CallRenderStateSetter(uint8_t* base, uint32_t device, uint32_t setter, uint32_t value) {
+  switch (setter) {
+#define ITC_SETTER_CASE(address, name, uses_float) \
+  case 0x##address:                                \
+    name(base, device, value);                     \
+    return true;
+    ITC_RENDER_STATE_SETTERS(ITC_SETTER_CASE)
+#undef ITC_SETTER_CASE
+    case 0x822A3D20:
+      SetScissorTestEnable(base, device, value);
+      return true;
+    case 0x82106540:
+      return true;
+    default:
+      return false;
+  }
+}
+
+bool CallSamplerStateSetter(uint8_t* base, uint32_t device, uint32_t setter, uint32_t sampler,
+                            uint32_t value) {
+  switch (setter) {
+#define ITC_SETTER_CASE(address, name, uses_float) \
+  case 0x##address:                                \
+    name(base, device, sampler, value);            \
+    return true;
+    ITC_SAMPLER_STATE_SETTERS(ITC_SETTER_CASE)
+#undef ITC_SETTER_CASE
+    case 0x82106540:
+      return true;
+    default:
+      return false;
+  }
+}
+
+constexpr uint32_t kRenderStateTable = 0x826388F8;   // 96 entries: getter, setter, default
+constexpr uint32_t kSamplerStateTable = 0x82638D78;  // 20 entries
+
+}  // namespace
+
+void SetRegisterF01Bits(uint8_t* base, uint32_t device, uint32_t bits) {
+  ITC_NATIVE_RUNNING("sub_8229B7D8");
+  Insert(base, device + 10788, bits, 12, 0x3000);
+  // WAIT_UNTIL and register 0xF01 = +10788: packets nothing reads.
+}
+
+void DirtyAllState(uint8_t* base, uint32_t device, uint32_t mode) {
+  ITC_NATIVE_RUNNING("sub_822A3B90 Device::DirtyAllState");
+  if (int32_t(mode) == 0) {
+    // The binning packets (from +12448 and +12452): packets nothing reads.
+    SetRegisterF01Bits(base, device, Rotl(Load(base, device + 10788), 20) & 3);
+  }
+  // Device::SetScreenScissor with the window scissor: Dropped.
+  for (uint32_t at = 0; at < 40; at += 8) {
+    Store64(base, device + at, ~0ull);
+  }
+}
+
+void FlushForGprAllocation(uint8_t* base, uint32_t device, const DeviceCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_8229F680");
+  const uint64_t shader = Load64(base, device + kShaderDirty);
+  if (shader != 0) {
+    if (shader & 0x100) {
+      const uint64_t bits = calls.flush_hiz(shader, Load(base, device + kRbDepthHiZ));
+      Store64(base, device + kShaderDirty, Load64(base, device + kShaderDirty) | bits);
+    }
+    uint64_t m = Load64(base, device + kShaderDirty);
+    if (m & 0xFFF) {
+      calls.flush_registers(Rotl64(m, 52) & 0xFFF0000000000000ull, 0x2200, device + 10420);
+      Store64(base, device + kShaderDirty, Load64(base, device + kShaderDirty) & ~0xFFFull);
+    }
+    m = Load64(base, device + kShaderDirty);
+    if (m & (0x1Full << 44)) {
+      calls.flush_registers(Rotl64(m, 15) & 0xF800000000000000ull, 0x2180, device + 10400);
+      Store64(base, device + kShaderDirty,
+              Load64(base, device + kShaderDirty) & Rotl64(~31ull, 44));
+    }
+  }
+  const uint64_t render = Load64(base, device + kRenderDirty);
+  if (render != 0) {
+    if (uint32_t(render) & 0x7FFFFC) {
+      calls.flush_registers(Rotl64(render, 41) & 0xFFFFF80000000000ull, 0x2100, device + 10316);
+      Store64(base, device + kRenderDirty,
+              Load64(base, device + kRenderDirty) & 0xFFFFFFFFFF800003ull);
+    }
+    uint64_t m = Load64(base, device + kRenderDirty);
+    if (m & 0x7FFF800000ull) {
+      calls.flush_registers(Rotl64(m, 25) & 0xFFFF000000000000ull, 0x2000, device + 10240);
+      Store64(base, device + kRenderDirty,
+              Load64(base, device + kRenderDirty) & Rotl64(0xFFFFFFFFFFFF0000ull, 23));
+    }
+    m = Load64(base, device + kRenderDirty);
+    if (m & (Rotl64(0x1FFFFF, 39) & 0xFFFFFF8000000000ull)) {
+      calls.flush_registers(Rotl64(m, 4) & 0xFFFFF80000000000ull, 0x2280, device + 10468);
+      Store64(base, device + kRenderDirty,
+              Load64(base, device + kRenderDirty) & Rotl64(0xFFFFFFFFFFE00000ull, 39));
+    }
+  }
+  const uint64_t other = Load64(base, device + kOtherDirty);
+  if (other != 0 && (other & 0x3FFFFFFFFFull)) {
+    calls.flush_registers(Rotl64(other, 26) & 0xFFFFFFFFFC000000ull, 0x2300, device + 10552);
+    Store64(base, device + kOtherDirty,
+            Load64(base, device + kOtherDirty) & 0xFFFFFFC000000000ull);
+  }
+  // Left out: the segment end, the two built-in shaders (IM_LOAD_IMMEDIATE),
+  // registers 0x2180 and 0x2181, sub_822AF978's register block, the registers
+  // set for the dummy draws, the screen scissors (Dropped) and the two dummy
+  // draws with their reservations (sub_8229E308): packets nothing reads. What
+  // they overwrite is marked dirty again, as the original does, so the next
+  // draw writes it from the shadow: sub_822AF978's marks first, then its own.
+  Mark(base, device + kRenderDirty, 0x400000 | 0x200000);
+  Mark(base, device + kShaderDirty, 0x80 | 0x40 | 0x20);
+  Mark(base, device + kOtherDirty, 0x80000);
+  Mark(base, device + kRenderDirty, 0x2000000);
+  Mark(base, device + kShaderDirty, (1ull << 51) | (1ull << 52) | 0x800 | 0x100 | 0x8);
+  Mark(base, device + kRenderDirty, 0x40000 | (1ull << 59));
+  Mark(base, device + kOtherDirty, 1ull << 35);
+  Mark(base, device + kShaderDirty, 1ull << 43);
+}
+
+void SetShaderGprAllocation(uint8_t* base, uint32_t device, uint32_t vertex, uint32_t pixel,
+                            const DeviceCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_822A8A60 Device::SetShaderGprAllocation");
+  const uint32_t both = (Rotl(vertex, 8) & 0x7F00) | (pixel & ~0x7F00u);
+  uint32_t split = (Rotl(both, 4) & 0x7FFF0) & ~0x800u;
+  if (split == 0) {
+    split = 0x40400;
+  }
+  Store(base, device + 10792, split);
+  // WAIT_UNTIL and register 0xD00 = the split (with bit 0, eight times, then
+  // without): packets nothing reads, nor +10792.
+  FlushForGprAllocation(base, device, calls);
+}
+
+bool SetGammaRamp(uint8_t* base, uint32_t device, uint32_t ramp) {
+  ITC_NATIVE_RUNNING("sub_822A3A20 Device::SetGammaRamp");
+  const uint32_t kept = device + 13608;
+  if (kept >= 0xA0000000u || !c_runtime::InOneView(kept, 1536)) {
+    return false;
+  }
+  display::GammaRamp in;
+  for (int c = 0; c < 3; c++) {
+    for (int i = 0; i < 256; i++) {
+      in[c][i] = guest::LoadU16(base, ramp + 512 * c + 2 * i);
+    }
+  }
+  const display::GammaRamp out =
+      display::ApplyGammaCurve(display::MakeGammaCurve(display::kGamma, false), in);
+  bool same = true;
+  for (int c = 0; c < 3 && same; c++) {
+    for (int i = 0; i < 256; i++) {
+      if (guest::LoadU16(base, kept + 512 * c + 2 * i) != out[c][i]) {
+        same = false;
+        break;
+      }
+    }
+  }
+  if (same) {
+    return true;
+  }
+  for (int c = 0; c < 3; c++) {
+    for (int i = 0; i < 256; i++) {
+      guest::StoreU16(base, kept + 512 * c + 2 * i, out[c][i]);
+    }
+  }
+  // sub_822B0C38, the display's gamma registers: packets nothing reads (our
+  // renderer applies the 360's gamma from its own tables, --xbox_gamma).
+  return true;
+}
+
+void SetDefaultState(uint8_t* base, uint32_t device, const DeviceCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_822ACB90 Device::SetDefaultState");
+  const uint32_t interval = Load(base, device + 13240);
+  for (uint32_t state = 0; state < 384; state += 4) {
+    const uint32_t entry = kRenderStateTable + 3 * state;
+    Store(base, device + 56 + state, Load(base, entry + 4));
+    Store(base, device + 520 + state, Load(base, entry + 0));
+    const uint32_t setter = Load(base, device + 56 + state);
+    const uint32_t value = Load(base, entry + 8);
+    if (!CallRenderStateSetter(base, device, setter, value)) {
+      calls.setter(setter, value, 0);
+    }
+  }
+  for (uint32_t sampler = 0; sampler < 26; sampler++) {
+    for (uint32_t state = 0; state < 80; state += 4) {
+      const uint32_t entry = kSamplerStateTable + 3 * state;
+      Store(base, device + 440 + state, Load(base, entry + 4));
+      Store(base, device + 904 + state, Load(base, entry + 0));
+      const uint32_t setter = Load(base, device + 440 + state);
+      const uint32_t value = Load(base, entry + 8);
+      if (!CallSamplerStateSetter(base, device, setter, sampler, value)) {
+        calls.setter(setter, sampler, value);
+      }
+    }
+    const uint32_t shift = (sampler + 20) & 0xFF;
+    const uint64_t dirty = (shift & 0x40) ? 0 : (0x8000000000000000ull >> (shift & 0x7F));
+    if (!SetTexture(base, device, sampler, 0, dirty)) {
+      calls.set_texture(sampler, 0, dirty);
+    }
+  }
+  // The default vertex declaration's header (the type, its count).
+  Store(base, device + 11936, 5);
+  Store(base, device + 11940, 1);
+  SetRegisterF01Bits(base, device, 2);
+  SetFVF(base, device, 2);
+  SetPresentInterval(base, device, interval);
+  Store(base, device + 12456, 0);
+  UpdatePredicatedTiling(base, device);
+  Store(base, device + 12452, 0);
+  Store(base, device + 10800, 0);
+  Store(base, device + 10804, 0);
+  Store(base, device + 12448, 0xFFFFFFFFu);
+  if (!(guest::LoadU8(base, device + 10808) & 0x80)) {
+    SetShaderGprAllocation(base, device, 0, 0, calls);
+  }
 }
 
 uint32_t GetViewportEnable(uint8_t* base, uint32_t device) {

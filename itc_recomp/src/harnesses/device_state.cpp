@@ -16,6 +16,7 @@
 
 #include "base/flags.h"
 #include "base/log.h"
+#include "display/gamma.h"
 #include "graphics/device_state.h"
 #include "memory/heap.h"
 
@@ -691,6 +692,216 @@ void ScissorAndViewport(Context& h, uint32_t device) {
                    });
 }
 
+// --- The packet writers ---
+//
+// SetDefaultState, DirtyAllState, sub_8229B7D8, SetShaderGprAllocation (with
+// sub_8229F680) and SetGammaRamp; the originals run with --native_device_state
+// off (their setters, SetTexture and SetScreenScissor the originals too). The
+// device is a bigger block (the gamma ramp at +13608), random but for the
+// slots (render targets, depth surface, index buffer, streams, textures: null
+// or an object in the scratch area), the command position (+10780, never 0,
+// so fences go into the resources), and the command buffer: +40 at a block of
+// its own, +44 and +48 high (no segment ends), +10809 bit 6 set (the
+// reservation for sub_8229F680's dummy draws fails at once: its allocator, the
+// command buffer's own, isn't run). Compared: the device block but +40, and
+// the scratch area; the command buffer's words and +40 in their own group,
+// expected to differ (the graphics rule: packets nothing reads). The flush
+// helpers (sub_822ADC08, sub_822ADE30) are guest calls on both sides.
+
+constexpr uint32_t kBigDeviceBytes = 15360;  // through the gamma ramp (+13608, 1,536 bytes)
+constexpr uint32_t kCommandBytes = 65536;
+
+ds::DeviceCalls HarnessCalls(PPCContext& ctx, uint8_t* base, uint32_t device) {
+  ds::DeviceCalls calls;
+  calls.flush_hiz = [&ctx, base, device](uint64_t mask, uint32_t hiz) {
+    ctx.r3.u64 = device;
+    ctx.r4.u64 = mask;
+    ctx.r5.u64 = hiz;
+    ctx.r6.u64 = 0;
+    sub_822ADC08(ctx, base);
+    return ctx.r3.u64;
+  };
+  calls.flush_registers = [&ctx, base, device](uint64_t mask, uint32_t first, uint32_t shadow) {
+    ctx.r3.u64 = device;
+    ctx.r4.u64 = mask;
+    ctx.r5.u64 = first;
+    ctx.r6.u64 = shadow;
+    sub_822ADE30(ctx, base);
+  };
+  calls.setter = [&ctx, base, device](uint32_t setter, uint32_t r4, uint32_t r5) {
+    ctx.r3.u64 = device;
+    ctx.r4.u64 = r4;
+    ctx.r5.u64 = r5;
+    REX_CALL_INDIRECT_FUNC(setter);
+  };
+  calls.set_texture = [&ctx, base, device](uint32_t stage, uint32_t texture, uint64_t dirty) {
+    ctx.r3.u64 = device;
+    ctx.r4.u64 = stage;
+    ctx.r5.u64 = texture;
+    ctx.r6.u64 = dirty;
+    __imp__sub_822A6008(ctx, base);
+  };
+  return calls;
+}
+
+void NativeSetRegisterF01Bits(PPCContext& ctx, uint8_t* base) {
+  ds::SetRegisterF01Bits(base, ctx.r3.u32, ctx.r4.u32);
+}
+void NativeDirtyAllState(PPCContext& ctx, uint8_t* base) {
+  ds::DirtyAllState(base, ctx.r3.u32, ctx.r4.u32);
+}
+void NativeSetShaderGprAllocation(PPCContext& ctx, uint8_t* base) {
+  const uint32_t device = ctx.r3.u32;
+  ds::SetShaderGprAllocation(base, device, ctx.r5.u32, ctx.r6.u32,
+                             HarnessCalls(ctx, base, device));
+}
+void NativeSetGammaRamp(PPCContext& ctx, uint8_t* base) {
+  if (!ds::SetGammaRamp(base, ctx.r3.u32, ctx.r5.u32)) {
+    ITC_LOG_INFO("harness: device_state: SetGammaRamp left to the original");
+    __imp__sub_822A3A20(ctx, base);
+  }
+}
+void NativeSetDefaultState(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const uint32_t device = ctx.r3.u32;
+  ds::SetDefaultState(base, device, HarnessCalls(ctx, base, device));
+}
+
+template <typename Args>
+void RunPacketCases(Context& h, uint32_t device, uint32_t commands, const char* name,
+                    GuestFunction recompiled, GuestFunction native, int cases, Args args) {
+  Random& r = h.random;
+  Results results(name);
+  Results packets(std::string(name) + ", the command buffer (expected to differ)");
+  for (int i = 0; i < cases; i++) {
+    std::vector<uint32_t> words(kBigDeviceBytes / 4);
+    for (uint32_t& w : words) {
+      w = uint32_t(r.Next());
+    }
+    auto object = [&] { return h.data + kObjectBytes * r.Below(kObjects); };
+    for (uint32_t slot = 12180; slot < 12288 + 4 * 32; slot += 4) {
+      words[slot / 4] = r.Below(3) == 0 ? 0 : object();
+    }
+    for (uint32_t k = 0; k < 5; k++) {
+      words[(12468 + 4 * k) / 4] = r.Below(2) ? words[(ds::kRenderTargets + 4 * k) / 4]
+                                              : (r.Below(2) ? 0 : object());
+    }
+    words[12456 / 4] = r.Below(4) == 0 ? uint32_t(r.Next()) : 0;
+    words[10780 / 4] |= 1;
+    words[40 / 4] = commands - 4;
+    words[44 / 4] = 0xFFFFFFF0u;
+    words[48 / 4] = 0xFFFFFFF0u;
+    words[12488 / 4] = r.Below(4);
+    for (uint32_t at = 12392; at < 12408; at += 4) {
+      words[at / 4] = RandomCoordinate(r);
+    }
+    std::vector<uint32_t> scratch(kScratchBytes / 4);
+    for (uint32_t& w : scratch) {
+      w = uint32_t(r.Next());
+    }
+    for (uint32_t k = 0; k < kObjects; k++) {
+      uint32_t& size = scratch[(kObjectBytes * k + 36) / 4];
+      if (r.Below(4) != 0) {
+        size = (r.Below(2048) << 18) | (r.Below(2048) << 3) | (size & 0x7);
+      }
+    }
+    Random args_random = r;
+    r.Next();
+    Outputs out[2], commands_out[2];
+    for (int v = 0; v < 2; v++) {
+      Random a = args_random;
+      guest::StoreU32s(h.base, h.data, scratch.data(), uint32_t(scratch.size()));
+      guest::StoreU32s(h.base, device, words.data(), uint32_t(words.size()));
+      guest::StoreU8(h.base, device + 10809, guest::LoadU8(h.base, device + 10809) | 0x40);
+      Fill(h.base, commands, kCommandBytes);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = device;
+      args(t, a, device);
+      (v == 0 ? recompiled : native)(t, h.base);
+      out[v].Bytes(Read(h.base, device, 40));
+      commands_out[v].Word(guest::LoadU32(h.base, device + 40));
+      out[v].Bytes(Read(h.base, device + 44, kBigDeviceBytes - 44));
+      out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+      commands_out[v].Bytes(Read(h.base, commands, kCommandBytes));
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", i));
+    packets.Check(commands_out[0], commands_out[1], fmt::format("case {}", i));
+  }
+  results.Report();
+  packets.Report();
+}
+
+void PacketWriters(Context& h) {
+  const uint32_t device = memory::Alloc(kBigDeviceBytes, 0);
+  const uint32_t commands = memory::Alloc(kCommandBytes, 0);
+  if (device == 0 || commands == 0) {
+    ITC_LOG_INFO("harness: device_state: no blocks for the packet writers");
+    memory::Free(device);
+    memory::Free(commands);
+    return;
+  }
+  auto none = [](PPCContext&, Random&, uint32_t) {};
+  RunPacketCases(h, device, commands, "sub_8229B7D8", Original<__imp__sub_8229B7D8>,
+                 NativeSetRegisterF01Bits, 200, [](PPCContext& t, Random& a, uint32_t) {
+                   t.r4.u64 = a.Below(4) == 0 ? uint32_t(a.Next()) : a.Below(4);
+                 });
+  RunPacketCases(h, device, commands, "Device::DirtyAllState (sub_822A3B90)",
+                 Original<__imp__sub_822A3B90>, NativeDirtyAllState, 200,
+                 [](PPCContext& t, Random& a, uint32_t) {
+                   t.r4.u64 = a.Below(2) ? 0 : (a.Below(2) ? 1 : uint32_t(a.Next()));
+                 });
+  RunPacketCases(h, device, commands, "Device::SetShaderGprAllocation (sub_822A8A60)",
+                 Original<__imp__sub_822A8A60>, NativeSetShaderGprAllocation, 300,
+                 [](PPCContext& t, Random& a, uint32_t) {
+                   static const uint32_t kSplits[][2] = {{0, 0}, {32, 96}, {96, 32}, {64, 64}};
+                   const uint32_t pick = a.Below(6);
+                   if (pick < 4) {
+                     t.r5.u64 = kSplits[pick][0];
+                     t.r6.u64 = kSplits[pick][1];
+                   } else {
+                     t.r5.u64 = pick == 4 ? a.Below(256) : uint32_t(a.Next());
+                     t.r6.u64 = pick == 4 ? a.Below(256) : uint32_t(a.Next());
+                   }
+                   t.r4.u64 = uint32_t(a.Next());
+                 });
+  // The gamma ramp: the scratch area's start (1,536 bytes), and half the time
+  // the device's already the result (nothing copied).
+  RunPacketCases(h, device, commands, "Device::SetGammaRamp (sub_822A3A20)",
+                 Original<__imp__sub_822A3A20>, NativeSetGammaRamp, 60,
+                 [&](PPCContext& t, Random& a, uint32_t dev) {
+                   display::GammaRamp in;
+                   for (int c = 0; c < 3; c++) {
+                     for (int k = 0; k < 256; k++) {
+                       const uint32_t pick = a.Below(4);
+                       in[c][k] = pick == 0 ? uint16_t(a.Next())
+                                  : pick == 1 ? uint16_t(k * 257)
+                                              : uint16_t(std::min(65535u, k * 257 + a.Below(512)));
+                       guest::StoreU16(h.base, h.data + 512 * c + 2 * k, in[c][k]);
+                     }
+                   }
+                   if (a.Below(2)) {
+                     const display::GammaRamp out = display::ApplyGammaCurve(
+                         display::MakeGammaCurve(display::kGamma, false), in);
+                     for (int c = 0; c < 3; c++) {
+                       for (int k = 0; k < 256; k++) {
+                         guest::StoreU16(h.base, dev + 13608 + 512 * c + 2 * k, out[c][k]);
+                       }
+                     }
+                     if (a.Below(4) == 0) {  // one entry off
+                       guest::StoreU8(h.base, dev + 13608 + a.Below(1536), uint8_t(a.Next()));
+                     }
+                   }
+                   t.r4.u64 = uint32_t(a.Next());
+                   t.r5.u64 = h.data;
+                 });
+  // SetDefaultState: +13240 (the present interval) and +10808 (bit 7 skips
+  // the register split) random with the rest.
+  RunPacketCases(h, device, commands, "Device::SetDefaultState (sub_822ACB90)",
+                 Original<__imp__sub_822ACB90>, NativeSetDefaultState, 40, none);
+  memory::Free(commands);
+  memory::Free(device);
+}
+
 }  // namespace
 
 void DeviceState(Context& h) {
@@ -713,6 +924,7 @@ void DeviceState(Context& h) {
   Fvf(h, device);
   ScissorAndViewport(h, device);
   memory::Free(device);
+  PacketWriters(h);
 }
 
 }  // namespace harness
