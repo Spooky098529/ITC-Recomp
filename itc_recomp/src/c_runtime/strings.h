@@ -100,6 +100,15 @@ bool Memcpy(uint8_t* base, uint32_t destination, uint32_t source, uint32_t size)
 // original's tail call to memcpy, sub_825A7410.)
 bool MemmoveDown(uint8_t* base, uint32_t destination, uint32_t source, uint32_t size);
 
+// XAPI's vectorized memset (sub_822962B0, probably XMemSet): `bytes` bytes
+// at `destination` set to `value`'s low byte. Its 16-byte store loops step
+// by the word at 0x8263830C (kXMemSetStride, 16 in the xex): with 16 the
+// bytes are a plain memset's (the 128-byte lines it clears with dcbzl lie
+// wholly inside the range); with any other step the same stores, line
+// clears and edge bytes as the translated code, in its order.
+constexpr uint32_t kXMemSetStride = 0x8263830C;
+void XMemSet(uint8_t* base, uint32_t destination, uint32_t value, uint32_t bytes);
+
 // Whether `size` bytes at `address` lie in one guest view (not crossing
 // into the next one).
 bool InOneView(uint32_t address, uint32_t size);

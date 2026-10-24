@@ -503,6 +503,75 @@ void CRuntime(Context& h) {
     results.Report();
   }
 
+  // XAPI's vectorized memset (sub_822962B0): every count 0-300, larger ones
+  // across many 128-byte lines, every alignment within a 16-byte piece and
+  // some within a line, values 0 and not 0 (with bits above the low byte);
+  // the whole scratch area and r3 compared, not the original's scratch
+  // below r1. Its stores step by the word at 0x8263830C: logged, and the
+  // cases also run with other steps written there for a while (restored).
+  {
+    const uint32_t stride = guest::LoadU32(h.base, c_runtime::kXMemSetStride);
+    ITC_LOG_INFO("harness: XMemSet (sub_822962B0): the step at 0x8263830C is {}", stride);
+    Results results("XMemSet (sub_822962B0)");
+    const uint32_t line = (h.data + 127) & ~127u;  // a 128-byte line in the scratch area
+    auto one = [&](uint32_t offset, uint32_t count, uint64_t value, const std::string& what) {
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Fill(h.base, h.data, kScratchBytes);
+        PPCContext t = CallContext(h);
+        t.r3.u64 = line + offset;
+        t.r4.u64 = value;
+        t.r5.u64 = count;
+        if (v == 0) {
+          __imp__sub_822962B0(t, h.base);
+        } else {
+          c_runtime::XMemSet(h.base, t.r3.u32, t.r4.u32, t.r5.u32);
+        }
+        out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+        out[v].Word(t.r3.u32);
+      }
+      results.Check(out[0], out[1], what);
+    };
+    const uint64_t values[] = {0, 0xFF, 0x5A, 0x12345678ABull, 0xFFFFFFFFFFFFFF00ull, 1};
+    const uint32_t offsets[] = {0, 1, 3, 7, 8, 15, 16, 17, 31, 48, 64, 100, 112, 127};
+    uint32_t n = 0;
+    for (uint32_t count = 0; count <= 300; count++) {
+      for (uint32_t offset : {0u, 1u, 15u, 16u, 112u, 127u}) {
+        const uint64_t value = values[n++ % 6];
+        one(offset, count, value, fmt::format("count {} offset {} value {:X}", count, offset, value));
+      }
+    }
+    for (uint32_t count : {383u, 384u, 385u, 511u, 512u, 513u, 640u, 641u, 1023u, 1024u, 1025u,
+                           1151u, 1280u, 2047u, 2048u, 2049u, 3000u, 3700u}) {
+      for (uint32_t offset : offsets) {
+        for (uint64_t value : {uint64_t(0), uint64_t(0x5A), uint64_t(0x1FF)}) {
+          one(offset, count, value, fmt::format("count {} offset {} value {:X}", count, offset, value));
+        }
+      }
+    }
+    for (int i = 0; i < 200; i++) {
+      const uint32_t offset = h.random.Below(128);
+      const uint32_t count = h.random.Below(3800);
+      const uint64_t value = values[h.random.Below(6)];
+      one(offset, count, value, fmt::format("count {} offset {} value {:X}", count, offset, value));
+    }
+    // Other steps at 0x8263830C (the stores may then reach past the range,
+    // up to 7 x (step - 16) bytes at each end: counts kept to fit).
+    for (uint32_t step : {0u, 8u, 32u, 48u, 20u}) {
+      guest::StoreU32(h.base, c_runtime::kXMemSetStride, step);
+      for (uint32_t count : {16u, 17u, 31u, 100u, 128u, 200u, 300u, 640u, 1100u, 2048u}) {
+        for (uint32_t offset : offsets) {
+          for (uint64_t value : {uint64_t(0), uint64_t(0x5A)}) {
+            one(offset, count, value,
+                fmt::format("step {} count {} offset {} value {:X}", step, count, offset, value));
+          }
+        }
+      }
+      guest::StoreU32(h.base, c_runtime::kXMemSetStride, stride);
+    }
+    results.Report();
+  }
+
   // The wide string helpers: every length in kLengths at each place (odd
   // addresses and across a page end included), units with high bits; the
   // destination apart from the source, or overlapping below it.

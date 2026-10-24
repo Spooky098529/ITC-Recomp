@@ -21,7 +21,7 @@
 
 ITC_FLAG_BOOL(native_c_runtime, true, "ITC",
               "Run the C runtime's helpers natively instead of through the translated code: "
-              "memset (sub_825A71D0); wcslen, wcscpy, wcscat and wcscmp "
+              "memset (sub_825A71D0); XAPI's vectorized memset (sub_822962B0, XMemSet); wcslen, wcscpy, wcscat and wcscmp "
               "(sub_825A9958, sub_825A7F30, sub_825A7EF8, sub_825A7EB0); mbtowc's single-byte "
               "path (sub_825B7EC8); strncpy, strcpy_s, strncmp, _stricmp, _strnicmp and its compare, "
               "strstr (sub_825A7F50, sub_825A9DD8, sub_825AACD0, sub_825AA100, sub_825AC710, "
@@ -77,6 +77,19 @@ extern "C" REX_FUNC(sub_825A71D0) {
                          [&](uint8_t* host, uint32_t, uint32_t bytes) {
                            std::memset(host, value, bytes);
                          });
+}
+
+// XAPI's vectorized memset (probably XMemSet): r3 = destination, r4 = the
+// value (its low byte), r5 = the count (32 bits); r3 comes back unchanged.
+// The original's scratch below r1 (its vector and counters, dead after it
+// returns) isn't written.
+extern "C" REX_FUNC(sub_822962B0) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_c_runtime)) {
+    __imp__sub_822962B0(ctx, base);
+    return;
+  }
+  c_runtime::XMemSet(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
 }
 
 // wcscpy: r3 = destination, r4 = source; returns r3 (left as it is).
