@@ -70,6 +70,25 @@ and fence waits the same way. With their packets left out, the setters
 no longer reach the command buffer's functions (`sub_8229EF48`,
 `sub_8229E308` and the segment code, a lead).
 
+**Made native (B7 loop, 2026-10-24).** `src/graphics/device_state.cpp`
+behind `--native_device_state` (harness `device_state`): the 86 render
+state setters (with ScissorTestEnable), the 20 sampler state setters, the
+viewport getter and `GetViewport`, `SetStreamSource`, `SetIndices`,
+`SetTexture`, `SetBlendControl`, the three constant setters, `SetFVF` with
+`VertexDeclaration::FromFvf`, `SetScissorRect`, `SetViewport` and
+`SetSurfaceInfo`; `Device::SetScreenScissor` Dropped (its packets). The
+setters' adapters stay: the tables at +56 and +440 hold their guest
+addresses. Learned on the way: the fence list's entries (and FromFvf's end
+marker's pad byte) take a bit from an uninitialized stack word in the
+originals (0 natively; both in the command buffer or a pad nothing reads);
+a fence that would go on a full list leaves the call to the original
+(`sub_822AD790`, not seen in play). Left: `SetRenderTarget` (with `_External`)
+and `SetDepthStencilSurface` (ready), then the packet writers
+(`SetDefaultState`, `DirtyAllState`, `sub_8229B7D8`,
+`SetShaderGprAllocation` with `sub_8229F680`, `SetGammaRamp` with
+`sub_822B0C38`), which `b7_groups.py` still counts as blocked by the command
+buffer's functions their dropped packets used.
+
 Callers in other files: the command replay's handlers (`Command::*` 1-4,
 7, 11, 12, 15, 23, 24, 29-31, 34, 35, `sub_8258F5C0` and `sub_8258F0F0` (no row, probably the single commands' constants),
 `functions.md`), `Device::Init`, `Device::SetUpDisplay`,
