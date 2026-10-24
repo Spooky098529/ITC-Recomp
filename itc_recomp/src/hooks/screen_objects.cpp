@@ -13,13 +13,22 @@
 #include "guest.h"
 
 #include "base/flags.h"
+#include "hooks/guest_call.h"
 #include "hooks/heap.h"
+#include "hooks/screen_objects.h"
+#include "screen_objects/screen_objects.h"
 #include "screen_objects/uv_trees.h"
 
 #include <bit>
 
+ITC_FLAG_DECLARE(bool, native_video_output);
+
 ITC_FLAG_BOOL(native_screen_objects, true, "ITC",
-              "Run the race's screen objects (docs/functions/screen-objects.md): their two maps "
+              "Run the race's screen objects (docs/functions/screen-objects.md): "
+              "ScreenObject::BuildRings sub_821329B8 with AddRingPoint sub_82132778 (no adapter: only "
+              "BuildRings' plain C++ calls it), SetSpeed sub_8212FCC8, ~ScreenObject sub_82132FC8 "
+              "with Release sub_8212F0B8 (no adapter: only ~ScreenObject's plain C++ calls it; with "
+              "--native_video_output); their two maps "
               "(the C++ library's red-black trees: UvColumn::UvColumn sub_82130140, Copy "
               "sub_82130088, Find sub_821301F0, InsertUnique sub_82131CB8 and ~UvColumn "
               "sub_82131EE0, UvMap::UvMap sub_82130198, Find sub_82130290, InsertUnique "
@@ -170,4 +179,97 @@ extern "C" REX_FUNC(sub_82132F58) {
     return;
   }
   ctx.r3.u64 = *head;
+}
+
+// --- ScreenObject ---
+
+// BuildRings: r3 = the object; r3 as the last AddRingPoint leaves it.
+extern "C" REX_FUNC(sub_821329B8) {
+  ITC_SCREEN_OBJECTS_FALLBACK(821329B8)
+  const auto r3 = so::BuildRings(base, ctx.r3.u32, ctx.r1.u32);
+  if (!r3) {
+    __imp__sub_821329B8(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = *r3;
+}
+
+// SetSpeed: r3 = the object, f1 = the strength (allocates nothing, so not
+// tied to --native_heap); r3 and f1 left as they came.
+extern "C" REX_FUNC(sub_8212FCC8) {
+  REX_FUNC_PROLOGUE();
+  ctx.fpscr.disableFlushMode();
+  if (!ITC_FLAG(native_screen_objects) || !so::SetSpeed(base, ctx.r3.u32, ctx.f1.f64)) {
+    __imp__sub_8212FCC8(ctx, base);
+  }
+}
+
+namespace {
+
+// The video output: [0x8266D088]'s slot 7, then that one's slot 3, with
+// the original's return addresses.
+uint32_t VideoOutputCall(PPCContext& ctx, uint8_t* base, uint32_t first, uint32_t second) {
+  ctx.r3.u64 = guest::LoadU32(base, 0x8266D088);
+  ctx.ctr.u64 = guest::LoadU32(base, guest::LoadU32(base, ctx.r3.u32) + 28);
+  ctx.lr = first;
+  REX_CALL_INDIRECT_FUNC(ctx.ctr.u32);
+  ctx.ctr.u64 = guest::LoadU32(base, guest::LoadU32(base, ctx.r3.u32) + 12);
+  ctx.lr = second;
+  REX_CALL_INDIRECT_FUNC(ctx.ctr.u32);
+  return ctx.r3.u32;
+}
+
+// Release's guest calls, from its frame (ctx.r1 there).
+so::ReleaseCalls ReleaseCalls(PPCContext& ctx, uint8_t* base, int& releases) {
+  return {[&ctx, base](int which) {
+            return which == 0 ? VideoOutputCall(ctx, base, 0x8212F0E0, 0x8212F0F0)
+                              : VideoOutputCall(ctx, base, 0x8212F128, 0x8212F138);
+          },
+          [&ctx, base, &releases](uint32_t resource) {
+            ctx.r3.u64 = resource;
+            ctx.lr = releases++ == 0 ? 0x8212F100 : 0x8212F110;
+            sub_822A67B0(ctx, base);
+          }};
+}
+
+}  // namespace
+
+namespace hooks {
+
+void ScreenObjectRelease(PPCContext& ctx, uint8_t* base) {
+  const uint32_t object = ctx.r3.u32;
+  const uint64_t lr = ctx.lr;
+  uint32_t r3 = 0;
+  guest_call::InFrame(ctx, base, 128, 0x8212F0E0, [&](uint32_t frame) {
+    int releases = 0;
+    r3 = so::Release(base, object, frame, ReleaseCalls(ctx, base, releases));
+  });
+  ctx.lr = lr;
+  ctx.r3.u64 = r3;
+}
+
+void ScreenObjectDestroy(PPCContext& ctx, uint8_t* base) {
+  const uint32_t object = ctx.r3.u32;
+  const uint64_t lr = ctx.lr;
+  uint32_t r3 = 0;
+  guest_call::InFrame(ctx, base, 96, 0x82132FE0, [&](uint32_t frame) {
+    guest_call::InFrame(ctx, base, 128, 0x8212F0E0, [&](uint32_t) {
+      int releases = 0;
+      r3 = so::Destroy(base, object, frame, ReleaseCalls(ctx, base, releases));
+    });
+  });
+  ctx.lr = lr;
+  ctx.r3.u64 = r3;
+}
+
+}  // namespace hooks
+
+// ~ScreenObject: r3 = the object; r3 the map's freed head.
+extern "C" REX_FUNC(sub_82132FC8) {
+  REX_FUNC_PROLOGUE();
+  if (!Native() || !ITC_FLAG(native_video_output)) {
+    __imp__sub_82132FC8(ctx, base);
+    return;
+  }
+  hooks::ScreenObjectDestroy(ctx, base);
 }

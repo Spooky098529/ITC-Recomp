@@ -21,6 +21,7 @@
 #include "base/flags.h"
 #include "base/log.h"
 #include "hooks/heap.h"
+#include "hooks/screen_objects.h"
 #include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
 #include "screen_objects/screen_objects.h"
@@ -37,6 +38,7 @@
 #include <vector>
 
 ITC_FLAG_DECLARE(bool, native_screen_objects);
+ITC_FLAG_DECLARE(bool, native_video_output);
 
 namespace harness {
 
@@ -195,6 +197,32 @@ ITC_ERASE_STEP(NativeMapErase, so::MapErase, 82132BD8)
   })
 ITC_DESTROY_STEP(NativeColumnDestroy, so::ColumnDestroy, 82131EE0)
 ITC_DESTROY_STEP(NativeMapDestroy, so::MapDestroy, 82132F58)
+// AddRingPoint: r3 = the object, f1-f4 = x, y, u, v (from the caller's
+// frame, as BuildRings calls it). BuildRings: r3 = the object.
+ITC_STEP(NativeAddRingPoint, {
+  if (const auto r3 = so::AddRingPoint(base, ctx.r3.u32, ctx.f1.f64, ctx.f2.f64, ctx.f3.f64,
+                                       ctx.f4.f64, ctx.r1.u32)) {
+    ctx.r3.u64 = *r3;
+  } else {
+    ITC_FALLBACK(82132778)
+  }
+})
+ITC_STEP(NativeBuildRings, {
+  if (const auto r3 = so::BuildRings(base, ctx.r3.u32, ctx.r1.u32)) {
+    ctx.r3.u64 = *r3;
+  } else {
+    ITC_FALLBACK(821329B8)
+  }
+})
+// SetSpeed: r3 = the object, f1 = the strength.
+ITC_STEP(NativeSetSpeed, {
+  if (!so::SetSpeed(base, ctx.r3.u32, ctx.f1.f64)) {
+    ITC_FALLBACK(8212FCC8)
+  }
+})
+// Release and ~ScreenObject: their adapters' guest-call paths.
+void NativeRelease(PPCContext& ctx, uint8_t* base) { hooks::ScreenObjectRelease(ctx, base); }
+void NativeDestroy(PPCContext& ctx, uint8_t* base) { hooks::ScreenObjectDestroy(ctx, base); }
 #undef ITC_STEP
 
 // --- The two trees' layouts, for walking them ---
@@ -396,7 +424,7 @@ double RandomCoordinate(Random& r) {
   if (r.Below(24) == 0) {
     return RandomKey(r) * 1e6;
   }
-  return double(r.Below(41)) * 0.25 + double(r.Below(1000)) * 1e-7;
+  return double(r.Below(41)) * 0.25 + double(r.Below(1000)) * 1e-6;
 }
 
 // A map at `map` with `count` points added by the game's AddRingPoint (on
@@ -1065,6 +1093,217 @@ void ConstructNodeCases(Context& h) {
   results.Report();
 }
 
+// --- ScreenObject ---
+
+// What AddRingPoint and BuildRings leave in r3, which no caller reads: a
+// temporary column's freed head (its address the heap's, so only whether
+// it's freed is compared) or an iterator out in the frame.
+uint32_t PointR3(uint32_t r3, uint32_t frame) {
+  if (r3 == frame + 80) {
+    return 1;
+  }
+  if (r3 == frame + 112) {
+    return 2;
+  }
+  return memory::IsHeapBlock(r3) ? r3 : 3;
+}
+
+// An odd double for a point's or a strength's value.
+double OddDouble(Random& r) {
+  static const uint64_t kOdd[] = {0x7FF8000000000000ull, 0xFFF8000000000000ull,
+                                  0x7FF4000000000000ull, 0x7FF0000000000000ull,
+                                  0xFFF0000000000000ull, 0x0000000000000000ull,
+                                  0x8000000000000000ull, 0x0000000000000001ull,
+                                  0x3690000000000000ull, 0x47F0000000000000ull};
+  return std::bit_cast<double>(kOdd[r.Below(std::size(kOdd))]);
+}
+
+void AddRingPointCases(Context& h) {
+  Results results("sub_82132778 ScreenObject::AddRingPoint");
+  const uint32_t map = h.data + kTree;
+  const uint32_t object = map - so::kUvMap;
+  for (int i = 0; i < 300; i++) {
+    const uint32_t count = RandomCount(h.random, i);
+    double point[4] = {};
+    Case(
+        h, results,
+        [&](Nodes&, std::vector<Seed>& seeds) {
+          BuildMap(h, map, count);
+          seeds.push_back({&kMapKind, map});
+          Random& r = h.random;
+          for (double& d : point) {
+            d = r.Below(20) == 0 ? OddDouble(r) : RandomCoordinate(r);
+          }
+          // An x (and a y) already there, often.
+          const auto nodes = TreeNodes(h, kMapKind, map);
+          if (!nodes.empty() && r.Below(3) != 0) {
+            const uint32_t node = nodes[r.Below(uint32_t(nodes.size()))];
+            point[0] = KeyAt(h.base, node + so::kKey);
+            const auto column = TreeNodes(h, kColumnKind, node + so::kMapColumn);
+            if (!column.empty() && r.Below(2) == 0) {
+              point[1] = KeyAt(h.base, column[r.Below(uint32_t(column.size()))] + so::kKey);
+            }
+          }
+        },
+        [&](int v, PPCContext& t, Nodes&) {
+          t.r3.u64 = object;
+          t.f1.f64 = point[0];
+          t.f2.f64 = point[1];
+          t.f3.f64 = point[2];
+          t.f4.f64 = point[3];
+          Run(v, __imp__sub_82132778, NativeAddRingPoint, t, h.base);
+        },
+        [&](Outputs& out, const PPCContext& t, Nodes& ids) {
+          Tree(h, ids, kMapKind, map, &out);
+          out.Word(PointR3(t.r3.u32, CallContext(h).r1.u32 - 272));
+        },
+        fmt::format("case {} count {}", i, count));
+  }
+  results.Report();
+}
+
+void BuildRingsCases(Context& h, uint32_t object) {
+  Results results("sub_821329B8 ScreenObject::BuildRings");
+  static const uint32_t kSizes[][2] = {{1024, 576}, {1024, 288}, {1280, 720}, {0, 0},
+                                       {1, 1},      {4096, 2160}, {0xFFFFFFFF, 3}};
+  for (int i = 0; i < 10; i++) {
+    uint32_t width = 0, height = 0, first = 0;
+    if (i < int(std::size(kSizes))) {
+      width = kSizes[i][0];
+      height = kSizes[i][1];
+    } else {
+      width = h.random.Below(65536);
+      height = h.random.Below(65536);
+      first = h.random.Below(4);  // vertices already there (none in play)
+    }
+    const uint32_t map = object + so::kUvMap;
+    Case(
+        h, results,
+        [&](Nodes&, std::vector<Seed>& seeds) {
+          Fill(h.base, object + so::kRingVertices, 20 * (so::kRingPoints + 4));
+          guest::StoreU32(h.base, object + 8, width);
+          guest::StoreU32(h.base, object + 12, height);
+          guest::StoreU32(h.base, object + so::kRingCount, first);
+          PPCContext t = CallContext(h);
+          t.r3.u64 = map;
+          __imp__sub_82130198(t, h.base);
+          seeds.push_back({&kMapKind, map});
+        },
+        [&](int v, PPCContext& t, Nodes&) {
+          t.r3.u64 = object;
+          Run(v, __imp__sub_821329B8, NativeBuildRings, t, h.base);
+        },
+        [&](Outputs& out, const PPCContext& t, Nodes& ids) {
+          out.Word(Load(h.base, object + so::kRingCount));
+          for (uint32_t k = 0; k < so::kRingPoints + 4; k++) {
+            const uint32_t vertex = object + so::kRingVertices + 20 * k;
+            out.Floats(h.base, vertex, 2);
+            out.Word(Load(h.base, vertex + 8));
+            out.Floats(h.base, vertex + 12, 2);
+          }
+          Tree(h, ids, kMapKind, map, &out);
+          out.Word(PointR3(t.r3.u32, CallContext(h).r1.u32 - 272 - 272));
+        },
+        fmt::format("{} x {}, {} there", width, height, first));
+  }
+  results.Report();
+}
+
+void SetSpeedCases(Context& h) {
+  Results results("sub_8212FCC8 ScreenObject::SetSpeed");
+  const uint32_t object = h.data + kTree;
+  for (int i = 0; i < 200; i++) {
+    std::vector<uint8_t> bytes(96);
+    for (uint8_t& b : bytes) {
+      b = uint8_t(h.random.Next());
+    }
+    bytes[24] = 0;  // not running (running is the original's path)
+    const double strength = i % 8 == 7 ? OddDouble(h.random)
+                                       : (double(h.random.Below(4000)) - 1000.0) / 1000.0;
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Write(h.base, object, bytes.data(), uint32_t(bytes.size()));
+      PPCContext t = CallContext(h);
+      t.r3.u64 = object;
+      t.f1.f64 = strength;
+      Run(v, __imp__sub_8212FCC8, NativeSetSpeed, t, h.base);
+      out[v].Bytes(Read(h.base, object, 76));
+      out[v].Float(Load(h.base, object + 76));
+      out[v].Bytes(Read(h.base, object + 80, 16));
+      out[v].Word(t.r3.u32);
+      out[v].Double(t.f1.u64);
+    }
+    results.Check(out[0], out[1], fmt::format("case {} strength {}", i, strength));
+  }
+  results.Report();
+}
+
+// Stand-in resources for +0 and +4 (type 0, a count of 2-5: released, not
+// freed), in the scratch area.
+void StandIns(Context& h, uint32_t object, uint32_t counts[2]) {
+  for (uint32_t k = 0; k < 2; k++) {
+    const uint32_t resource = h.data + 0x300 + 0x20 * k;
+    guest::StoreU32(h.base, resource + 0, 0);
+    guest::StoreU32(h.base, resource + 4, counts[k]);
+    guest::StoreU32(h.base, object + 4 * k, resource);
+  }
+}
+void StandInsOut(Context& h, uint32_t object, Outputs& out) {
+  out.Word(Load(h.base, object + 0));
+  out.Word(Load(h.base, object + 4));
+  for (uint32_t k = 0; k < 2; k++) {
+    out.Word(Load(h.base, h.data + 0x300 + 0x20 * k + 4));
+  }
+}
+
+void ReleaseCases(Context& h) {
+  Results results("sub_8212F0B8 ScreenObject::Release");
+  const uint32_t object = h.data + kTree;
+  for (int i = 0; i < 20; i++) {
+    uint32_t counts[2] = {2 + h.random.Below(4), 2 + h.random.Below(4)};
+    Case(
+        h, results, [&](Nodes&, std::vector<Seed>&) { StandIns(h, object, counts); },
+        [&](int v, PPCContext& t, Nodes&) {
+          t.r3.u64 = object;
+          Run(v, __imp__sub_8212F0B8, NativeRelease, t, h.base);
+        },
+        [&](Outputs& out, const PPCContext& t, Nodes&) {
+          StandInsOut(h, object, out);
+          out.Word(t.r3.u32);
+        },
+        fmt::format("case {} counts {} {}", i, counts[0], counts[1]));
+  }
+  results.Report();
+}
+
+void DestroyCases(Context& h, uint32_t object) {
+  Results results("sub_82132FC8 ScreenObject::~ScreenObject");
+  const uint32_t map = object + so::kUvMap;
+  for (int i = 0; i < 30; i++) {
+    uint32_t counts[2] = {2 + h.random.Below(4), 2 + h.random.Below(4)};
+    const uint32_t points = RandomCount(h.random, i);
+    Case(
+        h, results,
+        [&](Nodes&, std::vector<Seed>& seeds) {
+          StandIns(h, object, counts);
+          BuildMap(h, map, points);
+          seeds.push_back({&kMapKind, map});
+        },
+        [&](int v, PPCContext& t, Nodes&) {
+          t.r3.u64 = object;
+          Run(v, __imp__sub_82132FC8, NativeDestroy, t, h.base);
+        },
+        [&](Outputs& out, const PPCContext& t, Nodes& ids) {
+          StandInsOut(h, object, out);
+          out.Word(Load(h.base, map + so::kHead));
+          out.Word(Load(h.base, map + so::kSize));
+          out.Word(ids.Norm(t.r3.u32));
+        },
+        fmt::format("case {} points {}", i, points));
+  }
+  results.Report();
+}
+
 }  // namespace
 
 void ScreenObjects(Context& h) {
@@ -1079,6 +1318,22 @@ void ScreenObjects(Context& h) {
   CopyCases(h, true);
   CopyCases(h, false);
   ConstructNodeCases(h);
+  AddRingPointCases(h);
+  SetSpeedCases(h);
+  // Release's native path takes the native device lock.
+  const bool device_lock = ITC_FLAG(native_video_output);
+  if (device_lock) {
+    ReleaseCases(h);
+  }
+  // A screen object's size (128,000 bytes), its fields past the scratch area.
+  const uint32_t object = memory::Alloc(128000, memory::kHeapZeroMemory);
+  if (object != 0) {
+    BuildRingsCases(h, object);
+    if (device_lock) {
+      DestroyCases(h, object);
+    }
+    memory::Free(object);
+  }
   if (g_fallbacks != 0) {
     ITC_LOG_ERROR("harness: screen_objects: {} cases handed to the original", g_fallbacks);
   }
