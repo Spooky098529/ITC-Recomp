@@ -3315,3 +3315,16 @@ row yet 4,226); `screen-objects.md` 38 ours of 42, `action-mappers.md`
 40 of 40. 1,323 overrides in `src/`. The screen objects' rest waits on
 `rand` (`sub_825A9BB8`, its thread data through the core) and the
 shader pairs (`sub_825896D8`, `sub_82589700`).
+
+**2026-10-25, the hardcoded shaders and a new coverage list (branch
+`b7-loop-24-10-26-4`):** the game's HLSL compiler (`sub_822B8F10`) no
+longer runs: its 14 compiles at boot are answered with the shaders they
+made (`--use_hardcoded_shaders`, `src/hooks/shader_compiles.cpp`). The
+boundary unchanged (the compiler calls no imports): 449 functions (916
+pairs): overridden 67, Native 5, Dropped 23, never called 70, live 284.
+Imports: 186 called, 62 with a live caller. `seen_in_play.txt` made
+again from the user's second session ("Running a session" in
+`docs/coverage.md`), so the compiler's ~640 functions left it. B7
+(`b7_status.py`): 7,039 in play, ours 1,839, work left 5,200 (Wrapped
+117, with a row 644, no row yet 4,439): more than before, from the 917
+functions the second session reached that the first hadn't.

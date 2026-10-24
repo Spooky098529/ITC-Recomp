@@ -98,6 +98,15 @@ session ran it, so later sessions only add what earlier ones missed. Delete
 the build's `coverage/` folder between sessions so old files aren't counted
 again (harmless, but slower).
 
+Once (2026-10-25), the list was made again instead of added to: the
+HLSL compiler's tree (~640 functions, only under `sub_822B8F10`) had run
+at boot in the first session, and `--use_hardcoded_shaders` stopped it, so
+those would have stayed in the work left. The second session's list
+replaced the first's, keeping the first's functions that neither run
+under an override now nor sit in the compiler's tree (136: paths the
+second session didn't take). Do the same after another replacement
+leaves a tree that ran before.
+
 ## What's kept, and what isn't
 
 - `itc_recomp/coverage/seen_in_play.txt`: the functions seen in play, one
@@ -151,6 +160,7 @@ checked over several sessions.
 |---|---|---|---|
 | 2026-10-21 | a 20-second attract race (`--skip_intro`) | 4,975 of 16,552 (30%) | The test run; not written to the list |
 | 2026-10-21 | the user's first session (~5.5 minutes, closed cleanly) | 6,656 of 16,552 (40.2%; 39.8% of the generated lines) | The list's first entries. 208 of them were "unreachable" to the static pass. The user judged it most of what's needed: the game's loop is simple and reuses its systems (boot and a 20-second attract race already ran 4,975) |
+| 2026-10-25 | the user's second session (~9.5 minutes, closed cleanly), with `--use_hardcoded_shaders` | 5,135 ran; the list 5,271 with the first's 136 (5,206 of 16,315 `sub_` functions) | Made again, not added to (above). Of the first list's 6,656, 2,438 didn't run: 1,663 ours since, 639 the compiler's tree, 136 kept. 917 new, almost all without rows: front-end and career paths (422 of their entry points only reached indirectly) |
 
 `b7_status.py` after the first session (2026-10-21). It counts the 16,315
 `sub_` functions (the register save and restore helpers and `xstart` left
@@ -189,3 +199,13 @@ in play (seen, or ours): 6753
 
 Its one check left is the stack probe (`sub_825A9934`), Dropped since but
 seen running in that session.
+
+Against the second session's list (2026-10-25, after B7's thirteenth loop
+run and the hardcoded shaders): more work left than before, as the 917
+new functions outweigh the compiler's 639:
+
+```
+in play (seen, or ours): 7039
+  ours 1839, work left 5200 (wrapped 117, known 644, unknown 4439)
+rows: 2793; for functions not seen in play: 193
+```
