@@ -18,9 +18,11 @@ file's history. What's left to see in a drive, from every run:
 - Subsystem 1 of 3 (the AI drivers) finished: 143 of 148 ours; the
   rest waits on `sub_820900C0` and `sub_821434E8`.
 - Subsystem 2 of 3 (the racer controllers) finished: 27 of 27 ours.
-- Subsystem 3 of 3: the path search over two 64-node lists
-  (`sub_820FE058` and the others from `leads.md`, `820FDF98`-`820FE8C8`,
-  probably the AI's; nearly all ready). Step: mapping (agent running).
+- Subsystem 3 of 3: the track zones (`track-zones.md`, mapped in
+  52cd53b from the "path search" lead, which turned out to be 70
+  stretches of the course's route the player's car is checked against
+  for the HUD; 92 rows, 12 ready groups, no outside blockers). Step:
+  migration 1 (agent running).
 
 ## Done
 
@@ -85,3 +87,5 @@ This run's groups: `expected-differences.md` (the "20:22 run" lines).
   added).
 - After the racer controllers: ours 1393, work left 5365 (wrapped 123,
   known 559, unknown 4683).
+- After mapping the track zones: ours 1393, work left 5365 (wrapped
+  123, known 651, unknown 4591).

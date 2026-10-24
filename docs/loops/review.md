@@ -162,6 +162,24 @@ When the user has reviewed a run's section, its heading gets
   is on (slot 5, `sub_8210BA68`, still through the vtable). Adapters
   kept: the 8 handlers reached through the race flow's functors, and
   `sub_82102968`, `sub_82170FF8` for recompiled callers.
+- `track-zones.md` (new, 92 rows, all new; mapped in 52cd53b): not the
+  AI's path search the lead guessed but 70 hardcoded stretches of the
+  course's route (zones, their set-ups the slot 0 of 70 vtables at
+  `0x82011AF0`), each of up to 16 route ranges (start and end (section,
+  slice), two 64-slot section lists), checked each tick against the
+  player's car; the owner at `[0x828161EC]` (`TrackZones::`); fixed-size
+  lists for 16, 64 and 128 slots; the HUD reads the flags
+  (`sub_82212F00`, `sub_82213510`, a lead). `known-data.md`:
+  `0x828161EC`, the zone and route range layouts, `0x82603274`,
+  `0x82011AF0`, `0x8200D838`. For review: `sub_820C9718`
+  (`Racers::Vehicle`) has its row here, though the race manager's (to
+  move when that's mapped); `List16::Link` and `List64::Insert` shared
+  with the camera modes and the model list; unsure: what the zones mean
+  (probably expressway route names or signs), `RouteRange::ToNeighbor`,
+  `TrackZones::Create`'s player choice (probably the second player);
+  zone 55's only range is the point (0, 0)-(0, 0), probably a
+  placeholder; `RouteRange::WithinEnds`'s "slice above -1" test as the
+  code has it.
 
 ## Run 2026-10-23 17:22 (`b7-loop-23-10-26-4`)
 
