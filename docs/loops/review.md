@@ -115,6 +115,25 @@ When the user has reviewed a run's section, its heading gets
   adapters stay for recompiled callers in play, 2 (NormalizeByLane,
   NormalizeByBranch) for the +5532 pointer, and UpdateAll's for the
   +6148 targets.
+- `racer-controllers.md` (new, 26 rows; 3 moved from `functions.md`,
+  23 new; mapped in b5491fb): the per-tick code filling each car's
+  input record from the pad or the AI driver (`CarInputs::Create` and
+  `Destroy`, `PlayerControl::ReadPad`, the input recording and replay,
+  the race flow's per-state handlers, `AiDriver::Setup`);
+  `known-data.md` (the car input record is 20 bytes, +17 0 pad / 1
+  wheel / 2 AI; `0x826C5B30`, the race data's +0x59AE4 flags, the race
+  flow object, the control map, `0x826C5B4C`, `0x826C7960` and
+  `0x826C7964`); 3 leads. For review: the handlers are reached through
+  functors `sub_82160AE0` registers (a lead), so their adapters stay
+  until that table is native; the state numbers from simulating those
+  registrations, their meanings guessed (7 the race start, 23 the race,
+  22 after the finish; messages 29, 30, 34 "probably" pause and
+  replay); `sub_8209F340`, `sub_8209F3B8` named `Pad::IsConnected`,
+  `Pad::IsWheel` (`sub_82591C08` moved too); `ai-drivers.md`'s input
+  record size (18 bytes) and DriveCar's callers to correct;
+  `RacerControl::DriveByAiWithPad` (`sub_8215F7E8`) would write the
+  steering on its scale's overflow, which a clamped value can't reach
+  (kept).
 
 ## Run 2026-10-23 17:22 (`b7-loop-23-10-26-4`)
 
