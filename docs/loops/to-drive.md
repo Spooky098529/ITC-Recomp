@@ -13,6 +13,15 @@ function goes from this list when a log shows its `native running
 (game):` line (say which log in the commit). A run with nothing left
 here loses its heading.
 
+## Run 2026-10-24 21:33 (`b7-loop-24-10-26-4`)
+
+The three cleanup leads' migration, not in the attract race or the
+replay (`itc_1508`, `itc_1509`, ok):
+
+- `sub_8213BDF0` AiPath::JoinCornersByExit, `sub_8213BE80`
+  AiPath::JoinCornersByEntry (`ai-drivers.md`'s "Not seen in play"; no
+  rows, never seen in play either)
+
 ## Run 2026-10-24 16:01 (`b7-loop-24-10-26-2`)
 
 The array helpers' migration 1 (with the adapters removed), not in the

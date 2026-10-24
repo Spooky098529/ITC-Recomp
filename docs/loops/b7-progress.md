@@ -32,10 +32,15 @@ file's history. What's left to see in a drive, from every run:
   Migration done (2e5ce7c..b6888ac: the particle arrays, the joins'
   steps with PathCalls' join callback gone, the flush-to-zero windows
   fixed (ThinLTO had moved a `dpps` out of one), 3 AI driver adapters
-  removed). Validation agent running.
+  removed), validated (`itc_1508`, `itc_1509`; the joins' two steps,
+  never seen in play, to `to-drive.md`). Done.
 
 ## Done
 
+- Cleanup leads (no mapping): the particle arrays, the joins' steps,
+  the flush-to-zero windows (`race-overlays.md`, `ai-drivers.md`;
+  2e5ce7c..b6888ac), 3 adapters removed; validated (`itc_1508`,
+  `itc_1509`); existing flags.
 - Cleanup lead (no mapping): `ActionMappers::Init` (`action-mappers.md`;
   3ac7be7, 9e36924), 7 adapters removed; validated (`itc_1494`,
   `itc_1495`); `--native_action_mappers`.
