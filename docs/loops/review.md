@@ -88,6 +88,31 @@ When the user has reviewed a run's section, its heading gets
     object's +31152/+31156/+31160.
   - Left open: the objects at +88 and +92 (set through vtable calls in
     `Record`; who makes them isn't known).
+  Migration 1 (472d5ac..4e3513e): 38 of 42 native under
+  `--native_screen_objects` (`src/screen_objects/`, adapters in
+  `src/hooks/screen_objects.cpp`, harness `screen_objects`; the tree
+  functions also need `--native_heap`, `~ScreenObject`
+  `--native_video_output`), 8 adapters removed. For review:
+  - `sub_8212EEF8` (UvColumn's iterator decrement, never seen in play,
+    no row) ported so the native InsertUnique has no recompiled callee;
+    its own harness group.
+  - Handed to the original from the start: the trees' `bad_alloc` and
+    `length_error`; erasing part of a tree (`sub_8212F030`,
+    `sub_8212EFA8`, `sub_82132318`, `sub_821318B8`, never ran); a
+    checked iterator's trap; SetSpeed while +24 is set (calls
+    `sub_8212F778`, never ran); BuildRings over a map that isn't empty.
+  - Inside a native caller, an operator new or delete refusal after the
+    checks, or a broken tree, is logged and aborts (as
+    `std_list/ptr_list.cpp`).
+  - AddRingPoint's r3 set to what the original leaves (no caller reads
+    it), compared only by kind for the freed head; its temporaries live
+    in the original's 272-byte guest stack frame.
+  - Two corrected notes: both AllocateNodes rows said 0 returns 0 (it
+    calls operator new(0)).
+  - Left: `rand` (`sub_825A9BB8`, the core's thread data) blocks
+    BuildFan, Init and the constructor; `sub_822A8980` and the shader
+    pairs not taken (they unblock nothing yet); `Record`'s body never
+    ran, so no frame dump was compared.
 
 ## Run 2026-10-24 17:46 (`b7-loop-24-10-26-3`) (reviewed 2026-10-24)
 

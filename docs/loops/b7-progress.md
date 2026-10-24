@@ -39,7 +39,10 @@ file's history. What's left to see in a drive, from every run:
   `sub_8212EED0`; `8212EDF8`-`82133000`). Mapped as the screen objects
   (`screen-objects.md`, 42 rows: 1 moved from `functions.md`, 41 new;
   78f986b; 12 ready groups; 0 leads added); map checked (0 errors, 42
-  of 42 in play). Migration agent 1 running.
+  of 42 in play). Migration 1 done (472d5ac..4e3513e: both maps, the
+  rings, strength and teardown; 38 of 42 ours, nothing ready left; 8
+  adapters removed; `--native_screen_objects`). Validation agent
+  running.
 
 ## Done
 
@@ -71,6 +74,9 @@ This run's groups: `expected-differences.md` (the "21:33 run" lines).
   `--run_harnesses=all`, 0 errors, every harness 0 differing.
 - After mapping the screen objects: ours 1800, work left 4961 (wrapped
   115, known 620, unknown 4226).
+- After the screen objects' migration 1: ours 1838, work left 4923
+  (wrapped 115, known 582, unknown 4226). Race 27 s, 0 errors, every
+  harness 0 differing.
 - After the three cleanup leads' migration: ours 1800, work left 4961
   (wrapped 115, known 579, unknown 4267). Race 27 s (`itc_1507`), 0
   errors, every harness 0 differing.
