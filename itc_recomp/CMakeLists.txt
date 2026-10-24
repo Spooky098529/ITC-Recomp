@@ -272,6 +272,7 @@ set(ITC_SOURCES
     src/debug/pause_menu_log.cpp
     src/debug/pause_movie_log.cpp
     src/debug/image_dump.cpp
+    src/debug/shader_compile_dump.cpp
     src/debug/replay_stats.cpp
     src/debug/thread_cpu.cpp
     src/native/app_window.cpp
