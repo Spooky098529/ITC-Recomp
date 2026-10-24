@@ -89,4 +89,21 @@ std::optional<uint32_t> RecordResolve(uint8_t* base, uint32_t effect, uint32_t l
                                       uint32_t texture, uint32_t flags, uint32_t more_flags,
                                       bool by_view);
 
+// --- The glare's definition (the glow's +8064) ---
+
+// GlareDef::GlareDef (sub_8212ED78): its floats 0 (+12 left as it was),
+// its star definition's lines, inclination and rotation 0, the w of its
+// eight colors 1.
+void GlareDefConstruct(uint8_t* base, uint32_t glare);
+// GlareDef::Init (sub_8212EC90): the glare table's entry `type` copied in
+// (0x82617280, 44 bytes an entry), then StarDef::Init from the star table
+// (0x826171D8, 28 bytes an entry) for its star type. Returns 0.
+uint32_t GlareDefInit(uint8_t* base, uint32_t glare, uint32_t type);
+// StarDef::Init (sub_8212EA98): +0 = lines, +100 = inclination, +104 =
+// rotation, each line's passes, sample length, attenuation and angle, the
+// eight colors at +112. Returns 0.
+uint32_t StarDefInit(uint8_t* base, uint32_t star, uint32_t lines, uint32_t passes,
+                     double sample_length, double attenuation, double inclination,
+                     uint32_t rotation);
+
 }  // namespace post_effects

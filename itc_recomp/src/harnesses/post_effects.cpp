@@ -504,6 +504,63 @@ void AddQuadCases(Context& h, uint32_t block) {
   results.Report();
 }
 
+// --- The glare's definition ---
+
+// GlareDef::GlareDef, GlareDef::Init (the table's eight glare types) and
+// StarDef::Init (lines 0 to 13: from 7 on, the lines' words run over the
+// inclination and rotation and the colors, which the original writes
+// after) on a definition in the block with random bytes. Compared: its
+// 288 bytes and the ones around it, exactly (constants and conversions of
+// the inputs), r3.
+void GlareCases(Context& h, uint32_t block) {
+  Random& r = h.random;
+  const uint32_t glare = block + 0x100;
+  for (int f = 0; f < 3; f++) {
+    Results results(f == 0   ? "sub_8212ED78 GlareDef::GlareDef"
+                    : f == 1 ? "sub_8212EC90 GlareDef::Init"
+                             : "sub_8212EA98 StarDef::Init");
+    for (int c = 0; c < 80; c++) {
+      std::vector<uint32_t> words(0x200 / 4);
+      for (uint32_t& w : words) {
+        w = uint32_t(r.Next());
+      }
+      RecordCase k{};
+      k.r3 = f == 2 ? glare + 48 : glare;
+      k.r4 = f == 1 ? r.Below(8) : r.Below(14);
+      k.r5 = r.Below(2) == 0 ? 1 + r.Below(3) : uint32_t(r.Next());
+      k.f1 = RandomDouble(r, 2.0);
+      k.f2 = RandomDouble(r, 2.0);
+      const double f4 = RandomDouble(r, 3.2);
+      const uint64_t r10 = r.Next();
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        for (uint32_t i = 0; i < words.size(); i++) {
+          guest::StoreU32(h.base, block + 4 * i, words[i]);
+        }
+        PPCContext t = CallContext(h);
+        t.r3.u64 = k.r3;
+        t.r4.u64 = k.r4;
+        t.r5.u64 = k.r5;
+        t.f1.f64 = k.f1;
+        t.f2.f64 = k.f2;
+        t.f4.f64 = f4;
+        t.r10.u64 = r10;
+        if (f == 0) {
+          Run(v, __imp__sub_8212ED78, sub_8212ED78, t, h.base);
+        } else if (f == 1) {
+          Run(v, __imp__sub_8212EC90, sub_8212EC90, t, h.base);
+        } else {
+          Run(v, __imp__sub_8212EA98, sub_8212EA98, t, h.base);
+        }
+        out[v].Bytes(Read(h.base, block, 0x200));
+        out[v].Word(t.r3.u32);
+      }
+      results.Check(out[0], out[1], fmt::format("case {} r4 {}", c, k.r4));
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void PostEffects(Context& h) {
@@ -520,6 +577,7 @@ void PostEffects(Context& h) {
   SetFromSpeedCases(h, block);
   RecordCases(h, block);
   AddQuadCases(h, block);
+  GlareCases(h, block);
   memory::Free(block);
 }
 

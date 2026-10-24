@@ -376,4 +376,84 @@ std::optional<uint32_t> RecordResolve(uint8_t* base, uint32_t effect, uint32_t l
   return item;
 }
 
+// --- The glare's definition ---
+
+namespace {
+
+// An lfs then stfs of a constant: its bits through a double, as the
+// originals copy them.
+void CopySingle(uint8_t* base, uint32_t to, uint32_t from) {
+  StoreSingle(base, to, Constant(base, from));
+}
+
+}  // namespace
+
+void GlareDefConstruct(uint8_t* base, uint32_t glare) {
+  ITC_NATIVE_RUNNING("sub_8212ED78 GlareDef::GlareDef");
+  const uint32_t star = glare + 48;
+  for (uint32_t i = 0; i < 8; i++) {
+    CopySingle(base, star + 112 + 16 * i + 12, 0x82000A30);  // 1.0
+  }
+  CopySingle(base, star + 100, kZero);
+  guest::StoreU32(base, star + 0, 0);
+  guest::StoreU32(base, star + 104, 0);
+  for (uint32_t offset : {0u, 4u, 8u, 16u, 20u, 24u, 28u, 32u, 36u}) {
+    CopySingle(base, glare + offset, kZero);
+  }
+}
+
+uint32_t GlareDefInit(uint8_t* base, uint32_t glare, uint32_t type) {
+  ITC_NATIVE_RUNNING("sub_8212EC90 GlareDef::Init");
+  const uint32_t entry = 0x82617280u + type * 44u;
+  // +0 to +16 as they are, +24 to +40 to +20 to +36 (the star type at +20
+  // left out).
+  for (uint32_t i = 0; i < 5; i++) {
+    CopySingle(base, glare + 4 * i, entry + 4 * i);
+  }
+  for (uint32_t i = 0; i < 5; i++) {
+    CopySingle(base, glare + 20 + 4 * i, entry + 24 + 4 * i);
+  }
+  const uint32_t star = 0x826171D8u + guest::LoadU32(base, entry + 20) * 28u;
+  StarDefInit(base, glare + 48, guest::LoadU32(base, star + 0), guest::LoadU32(base, star + 4),
+              Constant(base, star + 8), Constant(base, star + 12), Constant(base, star + 20),
+              guest::LoadU32(base, star + 24));
+  return 0;
+}
+
+uint32_t StarDefInit(uint8_t* base, uint32_t star, uint32_t lines, uint32_t passes,
+                     double sample_length, double attenuation, double inclination,
+                     uint32_t rotation) {
+  ITC_NATIVE_RUNNING("sub_8212EA98 StarDef::Init");
+  guest::StoreU32(base, star + 104, rotation);
+  StoreSingle(base, star + 100, inclination);
+  guest::StoreU32(base, star + 0, lines);
+  // 360 / lines (as a single), times pi / 180.
+  const double count = double(float(double(int64_t(uint64_t(lines)))));
+  const double turn = double(float(Constant(base, 0x82002244) / count));
+  const double step = double(float(turn * Constant(base, 0x82002948)));
+  // Its count read again each time, as the original does (the lines' words
+  // never reach +0).
+  for (uint32_t i = 0; i < guest::LoadU32(base, star + 0); i++) {
+    const uint32_t line = star + 4 + 16 * i;
+    StoreSingle(base, line + 4, sample_length);
+    StoreSingle(base, line + 8, attenuation);
+    guest::StoreU32(base, line + 0, passes);
+    const double index = double(float(double(int64_t(uint64_t(i)))));
+    StoreSingle(base, line + 12, double(float(index * step)));
+  }
+  // The eight colors (r, g, b, 0), from the image's constants.
+  constexpr uint32_t k05 = 0x82001BE4, k08 = 0x82001070, k03 = 0x8200296C, k10 = 0x82000A30,
+                     k02 = 0x82002208, k06 = 0x82002A14, k07 = 0x82002A3C;
+  const uint32_t colors[8][3] = {{k05, k05, k05}, {k08, k03, k03}, {k10, k02, k02},
+                                 {k05, k02, k06}, {k02, k02, k10}, {k02, k03, k07},
+                                 {k02, k06, k02}, {k03, k05, k03}};
+  for (uint32_t i = 0; i < 8; i++) {
+    for (uint32_t j = 0; j < 3; j++) {
+      CopySingle(base, star + 112 + 16 * i + 4 * j, colors[i][j]);
+    }
+    CopySingle(base, star + 112 + 16 * i + 12, kZero);
+  }
+  return 0;
+}
+
 }  // namespace post_effects
