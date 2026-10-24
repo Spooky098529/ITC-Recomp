@@ -12,7 +12,8 @@
 
 ITC_FLAG_BOOL(native_device_state, true, "ITC",
               "Run the graphics device's state setters (docs/functions/device-state.md: "
-              "the render state setters sub_822A1260 to sub_822A2A50 and "
+              "the render state setters sub_822A1260 to sub_822A2A50, the sampler state "
+              "setters sub_822A2A70 to sub_822A33F0 and "
               "Device::GetRenderState_ViewportEnable sub_822A2470) natively instead of "
               "through the translated code (the same writes to the register shadow and the "
               "dirty masks; checked by --run_harnesses=device_state).");
@@ -119,6 +120,40 @@ ITC_DEVICE_STATE_SETTER(822A29F0, SetHiStencilFunc, false)
 ITC_DEVICE_STATE_SETTER(822A2A20, SetHiStencilRef, false)
 ITC_DEVICE_STATE_SETTER(822A2A40, SetPresentInterval, false)
 ITC_DEVICE_STATE_SETTER(822A2A50, SetPresentImmediateThreshold, false)
+
+#define ITC_DEVICE_SAMPLER_SETTER(address, name, uses_float) \
+  extern "C" REX_FUNC(sub_##address) {                        \
+    REX_FUNC_PROLOGUE();                                      \
+    if (!ITC_FLAG(native_device_state)) {                     \
+      __imp__sub_##address(ctx, base);                        \
+      return;                                                 \
+    }                                                         \
+    if (uses_float) {                                         \
+      ctx.fpscr.disableFlushMode();                           \
+    }                                                         \
+    ds::name(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);       \
+  }
+
+ITC_DEVICE_SAMPLER_SETTER(822A31A0, SetAddressU, false)
+ITC_DEVICE_SAMPLER_SETTER(822A31F0, SetAddressV, false)
+ITC_DEVICE_SAMPLER_SETTER(822A3240, SetAddressW, false)
+ITC_DEVICE_SAMPLER_SETTER(822A3130, SetBorderColor, false)
+ITC_DEVICE_SAMPLER_SETTER(822A2BF8, SetMagFilter, false)
+ITC_DEVICE_SAMPLER_SETTER(822A2A70, SetMinFilter, false)
+ITC_DEVICE_SAMPLER_SETTER(822A2D80, SetMipFilter, false)
+ITC_DEVICE_SAMPLER_SETTER(822A2F90, SetMipMapLodBias, true)
+ITC_DEVICE_SAMPLER_SETTER(822A3030, SetMaxMipLevel, false)
+ITC_DEVICE_SAMPLER_SETTER(822A2E70, SetMaxAnisotropy, false)
+ITC_DEVICE_SAMPLER_SETTER(822A2CE8, SetMagFilterZ, false)
+ITC_DEVICE_SAMPLER_SETTER(822A2B60, SetMinFilterZ, false)
+ITC_DEVICE_SAMPLER_SETTER(822A2DD8, SetSeparateZFilterEnable, false)
+ITC_DEVICE_SAMPLER_SETTER(822A30B0, SetMinMipLevel, false)
+ITC_DEVICE_SAMPLER_SETTER(822A3290, SetTrilinearThreshold, false)
+ITC_DEVICE_SAMPLER_SETTER(822A2EE8, SetAnisotropyBias, true)
+ITC_DEVICE_SAMPLER_SETTER(822A32E8, SetHGradientExpBias, false)
+ITC_DEVICE_SAMPLER_SETTER(822A3340, SetVGradientExpBias, false)
+ITC_DEVICE_SAMPLER_SETTER(822A3398, SetWhiteBorderColorW, false)
+ITC_DEVICE_SAMPLER_SETTER(822A33F0, SetPointBorderEnable, false)
 
 extern "C" REX_FUNC(sub_822A2470) {
   REX_FUNC_PROLOGUE();

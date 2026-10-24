@@ -2,7 +2,7 @@
 // (docs/functions/device-state.md): the render states, set through the
 // device's setter table at +56 (filled by Device::SetDefaultState from the
 // image's table at 0x826388F8), and the one render state getter seen in
-// play. Each writes the device's register shadow and the software copies
+// play, and the sampler states, set through the table at +440. Each writes the device's register shadow and the software copies
 // the setters build registers from, and marks what it wrote in the dirty
 // masks (+16 the shader state, +24 the render state, +32 the other state),
 // exactly as the original (the WRAP8-15 quirk kept: they mark +16 bit 45,
@@ -112,6 +112,37 @@ namespace graphics::device_state {
 ITC_RENDER_STATE_SETTERS(ITC_DECLARE_SETTER)
 #undef ITC_DECLARE_SETTER
 
+// The sampler state setters: X(address, name, float), as the render
+// states'. Each: r3 the device, r4 the sampler (0-25), r5 the value; they
+// write the sampler's fetch constant (device + 1024 + 24 x sampler) and
+// mark +16 bit 43 - sampler.
+#define ITC_SAMPLER_STATE_SETTERS(X)                 \
+  X(822A31A0, SetAddressU, false)                    \
+  X(822A31F0, SetAddressV, false)                    \
+  X(822A3240, SetAddressW, false)                    \
+  X(822A3130, SetBorderColor, false)                 \
+  X(822A2BF8, SetMagFilter, false)                   \
+  X(822A2A70, SetMinFilter, false)                   \
+  X(822A2D80, SetMipFilter, false)                   \
+  X(822A2F90, SetMipMapLodBias, true)                \
+  X(822A3030, SetMaxMipLevel, false)                 \
+  X(822A2E70, SetMaxAnisotropy, false)               \
+  X(822A2CE8, SetMagFilterZ, false)                  \
+  X(822A2B60, SetMinFilterZ, false)                  \
+  X(822A2DD8, SetSeparateZFilterEnable, false)       \
+  X(822A30B0, SetMinMipLevel, false)                 \
+  X(822A3290, SetTrilinearThreshold, false)          \
+  X(822A2EE8, SetAnisotropyBias, true)               \
+  X(822A32E8, SetHGradientExpBias, false)            \
+  X(822A3340, SetVGradientExpBias, false)            \
+  X(822A3398, SetWhiteBorderColorW, false)           \
+  X(822A33F0, SetPointBorderEnable, false)
+
+#define ITC_DECLARE_SAMPLER_SETTER(address, name, uses_float) \
+  void name(uint8_t* base, uint32_t device, uint32_t sampler, uint32_t value);
+ITC_SAMPLER_STATE_SETTERS(ITC_DECLARE_SAMPLER_SETTER)
+#undef ITC_DECLARE_SAMPLER_SETTER
+
 // sub_822A2470 Device::GetRenderState_ViewportEnable: PA_CL_VTE_CNTL's
 // shadow (+10444) bit 0.
 uint32_t GetViewportEnable(uint8_t* base, uint32_t device);
@@ -122,5 +153,7 @@ constexpr uint32_t kRenderDirty = 24;  // the render state
 constexpr uint32_t kOtherDirty = 32;   // the other state
 constexpr uint32_t kRenderTargets = 12184;  // four surfaces
 constexpr uint32_t kDepthSurface = 12200;
+constexpr uint32_t kTextures = 12288;       // a texture a stage
+constexpr uint32_t kFetchConstants = 1024;  // 24 bytes a sampler
 
 }  // namespace graphics::device_state

@@ -196,6 +196,101 @@ uint16_t PointSizeBits(uint8_t* base, float size, uint32_t scale) {
   return uint16_t(ToInt32(double(size * LoadF(base, scale))) & 0xFFFF);
 }
 
+// The sampler states'.
+constexpr uint32_t kMipMapLodBiasScale = 0x820029CC;  // the LOD bias to fixed point
+constexpr uint32_t kAnisotropyBiasScale = 0x82000F18;
+constexpr uint32_t kAnisotropyTable = 0x82013628;  // max anisotropy -> the filter's bits
+constexpr uint32_t kMaxAnisotropy = 11668;  // a byte a sampler
+constexpr uint32_t kMaxMipLevel = 11694;
+constexpr uint32_t kMinMipLevel = 11720;
+constexpr uint32_t kZFilters = 11746;  // bits 0-2: mag, min, separate
+
+// A sampler's fetch constant and its dirty bit (+16 bit 43 - sampler; 0
+// past the mask, as the original's shift).
+uint32_t FetchConstant(uint32_t device, uint32_t sampler) {
+  return device + 1024 + 24 * sampler;
+}
+uint64_t SamplerBit(uint32_t sampler) {
+  const uint32_t amount = (sampler + 20) & 0x7F;
+  return (amount & 0x40) ? 0 : (0x8000000000000000ull >> amount);
+}
+
+// A field of one of the sampler's fetch constant words, then its bit.
+void SetSamplerField(uint8_t* base, uint32_t device, uint32_t sampler, uint32_t word,
+                     uint32_t value, int shift, uint32_t mask) {
+  Insert(base, FetchConstant(device, sampler) + word, value, shift, mask);
+  Mark(base, device + kShaderDirty, SamplerBit(sampler));
+}
+
+// Word 4's low two bits from word 3's filters and the z filter bits `z`
+// (the original's steps, kept as they are).
+uint32_t ZFilterBits(uint32_t word3, uint32_t z) {
+  uint32_t bits = (Rotl(word3, 31) & 0x7FFFF) | (word3 & 0xFFF80000u);
+  bits = (Rotl(word3, 31) & 0x7FF00000u) | (bits & 0x800FFFFFu);
+  const uint32_t filters = Rotl(bits, 13) & 0xFFF;
+  const uint32_t m = (z >> 2) - 1;
+  return (filters & m) + (z & ~m);
+}
+
+// MagFilter and MinFilter: the filter in word 3, its anisotropic bit in word
+// 4, the anisotropic filter from the sampler's max anisotropy, and word 4's
+// low bits from the z filters.
+void SetFilter(uint8_t* base, uint32_t device, uint32_t sampler, uint32_t value, bool mag) {
+  const uint32_t fc = FetchConstant(device, sampler);
+  const uint32_t aniso = guest::LoadU8(base, device + sampler + kMaxAnisotropy);
+  uint32_t word3 = Load(base, fc + 12);
+  const uint32_t entry = Load(base, kAnisotropyTable + 4 * aniso);
+  uint32_t word4 = Load(base, fc + 16);
+  const uint32_t anisotropic = value >> 2;
+  const uint32_t other = (word4 >> (mag ? 11 : 10)) & 1;  // the other filter's bit
+  const uint32_t own = mag ? 0x400 : 0x800;
+  word4 = (Rotl(anisotropic, mag ? 10 : 11) & own) | (word4 & ~own);
+  const uint32_t m = (other | anisotropic) - 1;
+  Store(base, fc + 16, word4);
+  const uint32_t bits = (mag ? (Rotl(entry & ~m, 6) & 0xFFFFFFC0u)
+                             : (Rotl(entry & ~m, 4) & 0xFFFFFFF0u)) |
+                        anisotropic | value;
+  const int shift = mag ? 19 : 21;
+  const uint32_t field = mag ? 0x180000 : 0x600000;
+  word3 = (Rotl(bits, shift) & field) | (word3 & ~field);
+  word3 = (Rotl(bits, shift) & 0xE000000) | (word3 & ~0xE000000u);
+  Store(base, fc + 12, word3);
+  const uint32_t z = guest::LoadU8(base, device + sampler + kZFilters);
+  Store(base, fc + 16, (word4 & 0xFFFFFFFCu) | (ZFilterBits(word3, z) & 3));
+  Mark(base, device + kShaderDirty, SamplerBit(sampler));
+}
+
+// MagFilterZ, MinFilterZ and SeparateZFilterEnable: their bit of the z
+// filters (`bit` cleared, the value ORed in shifted, not masked), then word
+// 4's low bits worked out again.
+void SetZFilter(uint8_t* base, uint32_t device, uint32_t sampler, uint32_t value, int shift) {
+  const uint32_t fc = FetchConstant(device, sampler);
+  const uint32_t word4 = Load(base, fc + 16);
+  const uint32_t old = guest::LoadU8(base, device + sampler + kZFilters);
+  const uint32_t z = (old & ~(1u << shift)) | (value << shift);
+  const uint32_t word3 = Load(base, fc + 12);
+  Store(base, fc + 16, (word4 & 0xFFFFFFFCu) | (ZFilterBits(word3, z) & 3));
+  guest::StoreU8(base, device + sampler + kZFilters, uint8_t(z));
+  Mark(base, device + kShaderDirty, SamplerBit(sampler));
+}
+
+// MaxMipLevel and MinMipLevel: the level kept, and with a texture bound the
+// larger (smaller) of it and the texture's own in word 4.
+void SetMipLevel(uint8_t* base, uint32_t device, uint32_t sampler, uint32_t value, bool max) {
+  const uint32_t texture = Load(base, device + kTextures + 4 * sampler);
+  if (texture != 0) {
+    const uint32_t own = Load(base, texture + 44);
+    uint32_t level = max ? (own >> 2) & 0xF : (own >> 6) & 0xF;
+    if (max ? !(level > value) : !(level < value)) {
+      level = value;
+    }
+    Insert(base, FetchConstant(device, sampler) + 16, level, max ? 2 : 6,
+           max ? 0x3Cu : 0x3C0u);
+    Mark(base, device + kShaderDirty, SamplerBit(sampler));
+  }
+  guest::StoreU8(base, device + sampler + (max ? kMaxMipLevel : kMinMipLevel), uint8_t(value));
+}
+
 }  // namespace
 
 void SetZEnable(uint8_t* base, uint32_t device, uint32_t value) {
@@ -711,6 +806,120 @@ void SetPresentInterval(uint8_t* base, uint32_t device, uint32_t value) {
 void SetPresentImmediateThreshold(uint8_t* base, uint32_t device, uint32_t value) {
   ITC_NATIVE_RUNNING("sub_822A2A50 Device::SetRenderState_PresentImmediateThreshold");
   Insert(base, device + kBlendFlags, value, 23, 0x3F800000);
+}
+
+void SetAddressU(uint8_t* base, uint32_t device, uint32_t sampler, uint32_t value) {
+  ITC_NATIVE_RUNNING("sub_822A31A0 Device::SetSamplerState_AddressU");
+  SetSamplerField(base, device, sampler, 0, value, 10, 0x1C00);
+}
+
+void SetAddressV(uint8_t* base, uint32_t device, uint32_t sampler, uint32_t value) {
+  ITC_NATIVE_RUNNING("sub_822A31F0 Device::SetSamplerState_AddressV");
+  SetSamplerField(base, device, sampler, 0, value, 13, 0xE000);
+}
+
+void SetAddressW(uint8_t* base, uint32_t device, uint32_t sampler, uint32_t value) {
+  ITC_NATIVE_RUNNING("sub_822A3240 Device::SetSamplerState_AddressW");
+  SetSamplerField(base, device, sampler, 0, value, 16, 0x70000);
+}
+
+void SetBorderColor(uint8_t* base, uint32_t device, uint32_t sampler, uint32_t value) {
+  ITC_NATIVE_RUNNING("sub_822A3130 Device::SetSamplerState_BorderColor");
+  const uint32_t word5 = FetchConstant(device, sampler) + 20;
+  Store(base, word5, (Load(base, word5) & 0xFFFFFFFCu) | (value != 0 ? 1 : 0));
+  Mark(base, device + kShaderDirty, SamplerBit(sampler));
+}
+
+void SetMagFilter(uint8_t* base, uint32_t device, uint32_t sampler, uint32_t value) {
+  ITC_NATIVE_RUNNING("sub_822A2BF8 Device::SetSamplerState_MagFilter");
+  SetFilter(base, device, sampler, value, true);
+}
+
+void SetMinFilter(uint8_t* base, uint32_t device, uint32_t sampler, uint32_t value) {
+  ITC_NATIVE_RUNNING("sub_822A2A70 Device::SetSamplerState_MinFilter");
+  SetFilter(base, device, sampler, value, false);
+}
+
+void SetMipFilter(uint8_t* base, uint32_t device, uint32_t sampler, uint32_t value) {
+  ITC_NATIVE_RUNNING("sub_822A2D80 Device::SetSamplerState_MipFilter");
+  SetSamplerField(base, device, sampler, 12, value, 23, 0x1800000);
+}
+
+void SetMipMapLodBias(uint8_t* base, uint32_t device, uint32_t sampler, uint32_t value) {
+  ITC_NATIVE_RUNNING("sub_822A2F90 Device::SetSamplerState_MipMapLodBias");
+  const uint32_t bias =
+      uint32_t(ToInt64(double(Bits(value) * LoadF(base, kMipMapLodBiasScale))));
+  SetSamplerField(base, device, sampler, 16, bias, 12, 0x3FF000);
+}
+
+void SetMaxMipLevel(uint8_t* base, uint32_t device, uint32_t sampler, uint32_t value) {
+  ITC_NATIVE_RUNNING("sub_822A3030 Device::SetSamplerState_MaxMipLevel");
+  SetMipLevel(base, device, sampler, value, true);
+}
+
+void SetMaxAnisotropy(uint8_t* base, uint32_t device, uint32_t sampler, uint32_t value) {
+  ITC_NATIVE_RUNNING("sub_822A2E70 Device::SetSamplerState_MaxAnisotropy");
+  const uint32_t fc = FetchConstant(device, sampler);
+  const uint32_t word4 = Load(base, fc + 16);
+  if ((word4 & 0x800) || (word4 & 0x400)) {  // an anisotropic filter
+    const uint32_t entry = Load(base, kAnisotropyTable + (value << 2));
+    Insert(base, fc + 12, entry, 25, 0xE000000);
+    Mark(base, device + kShaderDirty, SamplerBit(sampler));
+  }
+  guest::StoreU8(base, device + sampler + kMaxAnisotropy, uint8_t(value));
+}
+
+void SetMagFilterZ(uint8_t* base, uint32_t device, uint32_t sampler, uint32_t value) {
+  ITC_NATIVE_RUNNING("sub_822A2CE8 Device::SetSamplerState_MagFilterZ");
+  SetZFilter(base, device, sampler, value, 0);
+}
+
+void SetMinFilterZ(uint8_t* base, uint32_t device, uint32_t sampler, uint32_t value) {
+  ITC_NATIVE_RUNNING("sub_822A2B60 Device::SetSamplerState_MinFilterZ");
+  SetZFilter(base, device, sampler, value, 1);
+}
+
+void SetSeparateZFilterEnable(uint8_t* base, uint32_t device, uint32_t sampler,
+                              uint32_t value) {
+  ITC_NATIVE_RUNNING("sub_822A2DD8 Device::SetSamplerState_SeparateZFilterEnable");
+  SetZFilter(base, device, sampler, value, 2);
+}
+
+void SetMinMipLevel(uint8_t* base, uint32_t device, uint32_t sampler, uint32_t value) {
+  ITC_NATIVE_RUNNING("sub_822A30B0 Device::SetSamplerState_MinMipLevel");
+  SetMipLevel(base, device, sampler, value, false);
+}
+
+void SetTrilinearThreshold(uint8_t* base, uint32_t device, uint32_t sampler, uint32_t value) {
+  ITC_NATIVE_RUNNING("sub_822A3290 Device::SetSamplerState_TrilinearThreshold");
+  SetSamplerField(base, device, sampler, 20, value, 3, 0x18);
+}
+
+void SetAnisotropyBias(uint8_t* base, uint32_t device, uint32_t sampler, uint32_t value) {
+  ITC_NATIVE_RUNNING("sub_822A2EE8 Device::SetSamplerState_AnisotropyBias");
+  const uint32_t bias =
+      uint32_t(ToInt64(double(Bits(value) * LoadF(base, kAnisotropyBiasScale))));
+  SetSamplerField(base, device, sampler, 20, bias, 5, 0x1E0);
+}
+
+void SetHGradientExpBias(uint8_t* base, uint32_t device, uint32_t sampler, uint32_t value) {
+  ITC_NATIVE_RUNNING("sub_822A32E8 Device::SetSamplerState_HGradientExpBias");
+  SetSamplerField(base, device, sampler, 16, value, 22, 0x7C00000);
+}
+
+void SetVGradientExpBias(uint8_t* base, uint32_t device, uint32_t sampler, uint32_t value) {
+  ITC_NATIVE_RUNNING("sub_822A3340 Device::SetSamplerState_VGradientExpBias");
+  SetSamplerField(base, device, sampler, 16, value, 27, 0xF8000000u);
+}
+
+void SetWhiteBorderColorW(uint8_t* base, uint32_t device, uint32_t sampler, uint32_t value) {
+  ITC_NATIVE_RUNNING("sub_822A3398 Device::SetSamplerState_WhiteBorderColorW");
+  SetSamplerField(base, device, sampler, 20, value, 2, 0x4);
+}
+
+void SetPointBorderEnable(uint8_t* base, uint32_t device, uint32_t sampler, uint32_t value) {
+  ITC_NATIVE_RUNNING("sub_822A33F0 Device::SetSamplerState_PointBorderEnable");
+  SetSamplerField(base, device, sampler, 4, value == 0 ? 1 : 0, 11, 0x800);
 }
 
 uint32_t GetViewportEnable(uint8_t* base, uint32_t device) {

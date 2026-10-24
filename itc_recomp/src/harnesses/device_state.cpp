@@ -1,8 +1,8 @@
 // The graphics device's state setters (src/graphics/device_state.h,
 // docs/functions/device-state.md) against the recompiled functions, on a
 // block standing for the device (every word random, the render targets'
-// and depth surface's slots null now and then or one of four surfaces in
-// the scratch area, whose +28 has the formats the high-precision blend
+// and depth surface's slots, and the textures', null now and then or one of
+// four surfaces in the scratch area, whose +28 has the formats the high-precision blend
 // switches). The values: edge values first (0, 1, the fields' widths,
 // all ones, float bits including NaNs, infinities and denormals), then
 // random. Compared: the whole device block, the surfaces and r3; the float
@@ -24,6 +24,7 @@
 #include <bit>
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace harness {
@@ -65,6 +66,8 @@ struct Setter {
   const char* name;
   GuestFunction recompiled;
   GuestFunction native;
+  bool sampler = false;       // r4 a sampler, r5 the value
+  uint32_t values = 0;        // the values below this only (0: any)
 };
 
 #define ITC_NATIVE_STEP(address, name, uses_float)             \
@@ -84,6 +87,26 @@ void NativeGetViewportEnable(PPCContext& ctx, uint8_t* base) {
 const Setter kRenderStateSetters[] = {ITC_RENDER_STATE_SETTERS(ITC_SETTER_ENTRY)};
 #undef ITC_SETTER_ENTRY
 
+#define ITC_NATIVE_SAMPLER_STEP(address, name, uses_float)   \
+  void Native##name(PPCContext& ctx, uint8_t* base) {        \
+    ctx.fpscr.disableFlushMode();                            \
+    ds::name(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);      \
+  }
+ITC_SAMPLER_STATE_SETTERS(ITC_NATIVE_SAMPLER_STEP)
+#undef ITC_NATIVE_SAMPLER_STEP
+
+// MaxAnisotropy reads the image's table by the value: values below 256
+// (the table's 17 entries and the image's words after them).
+#define ITC_SAMPLER_ENTRY(address, name, uses_float)                                     \
+  {"Device::" #name " (sub_" #address ")", __imp__sub_##address,                        \
+   Native##name, true, std::string_view(#name) == "SetMaxAnisotropy" ? 256u : 0u},
+const Setter kSamplerStateSetters[] = {ITC_SAMPLER_STATE_SETTERS(ITC_SAMPLER_ENTRY)};
+#undef ITC_SAMPLER_ENTRY
+
+// Samplers past the 26 now and then (the dirty bit's shift past the mask
+// from 44 on).
+const uint32_t kOddSamplers[] = {26, 27, 31, 43, 44, 45, 50};
+
 // One setter's cases on the device block.
 void RunSetter(Context& h, uint32_t device, const Setter& setter, int cases) {
   Random& r = h.random;
@@ -97,6 +120,11 @@ void RunSetter(Context& h, uint32_t device, const Setter& setter, int cases) {
     // The render targets and the depth surface: null or a surface.
     for (uint32_t slot = ds::kRenderTargets; slot <= ds::kDepthSurface; slot += 4) {
       words[slot / 4] = r.Below(3) == 0 ? 0 : surface(r.Below(kSurfaces));
+    }
+    // The textures (a stage's slot read by the mip levels): null or a
+    // surface (their +44 random).
+    for (uint32_t stage = 0; stage <= 50; stage++) {
+      words[(ds::kTextures + 4 * stage) / 4] = r.Below(3) == 0 ? 0 : surface(r.Below(kSurfaces));
     }
     // Floats now and then in the float fields the setters read back.
     for (uint32_t field : {10704u, 10708u, 10712u, 10716u}) {
@@ -115,9 +143,14 @@ void RunSetter(Context& h, uint32_t device, const Setter& setter, int cases) {
       uint32_t& info = surfaces[k * kSurfaceBytes / 4 + 7];
       info = (info & ~0xF0000u) | (format << 16);
     }
-    const uint32_t value = size_t(c) < std::size(kEdgeValues)
-                               ? kEdgeValues[c]
-                               : (r.Below(2) ? uint32_t(r.Next()) : r.Below(32));
+    uint32_t value = size_t(c) < std::size(kEdgeValues)
+                         ? kEdgeValues[c]
+                         : (r.Below(2) ? uint32_t(r.Next()) : r.Below(32));
+    if (setter.values != 0) {
+      value %= setter.values;
+    }
+    const uint32_t sampler =
+        r.Below(8) == 0 ? kOddSamplers[r.Below(std::size(kOddSamplers))] : r.Below(26);
     Outputs out[2];
     for (int v = 0; v < 2; v++) {
       Fill(h.base, h.data, kScratchBytes);
@@ -125,13 +158,20 @@ void RunSetter(Context& h, uint32_t device, const Setter& setter, int cases) {
       guest::StoreU32s(h.base, device, words.data(), uint32_t(words.size()));
       PPCContext t = CallContext(h);
       t.r3.u64 = device;
-      t.r4.u64 = value;
+      if (setter.sampler) {
+        t.r4.u64 = sampler;
+        t.r5.u64 = value;
+      } else {
+        t.r4.u64 = value;
+      }
       (v == 0 ? setter.recompiled : setter.native)(t, h.base);
       DeviceOutputs(h, device, out[v]);
       out[v].Bytes(Read(h.base, h.data, kSurfaces * kSurfaceBytes));
       out[v].Word(t.r3.u32);
     }
-    results.Check(out[0], out[1], fmt::format("case {}: value {:08X}", c, value));
+    results.Check(out[0], out[1],
+                  setter.sampler ? fmt::format("case {}: sampler {}, value {:08X}", c, sampler, value)
+                                 : fmt::format("case {}: value {:08X}", c, value));
   }
   results.Report();
 }
@@ -146,6 +186,9 @@ void DeviceState(Context& h) {
   }
   for (const Setter& setter : kRenderStateSetters) {
     RunSetter(h, device, setter, 64);
+  }
+  for (const Setter& setter : kSamplerStateSetters) {
+    RunSetter(h, device, setter, 96);
   }
   RunSetter(h, device,
             {"Device::GetRenderState_ViewportEnable (sub_822A2470)", __imp__sub_822A2470,
