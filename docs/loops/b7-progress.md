@@ -36,7 +36,10 @@ file's history. What's left to see in a drive, from every run:
   never seen in play, to `to-drive.md`). Done.
 - Subsystem 1 of 3: `leads.md`'s race's screen objects (`sub_8212F148`,
   `sub_821329B8`, `sub_82132778`, `sub_8212FCC8`, `sub_8212EDF8`,
-  `sub_8212EED0`; `8212EDF8`-`82133000`). Mapping agent running.
+  `sub_8212EED0`; `8212EDF8`-`82133000`). Mapped as the screen objects
+  (`screen-objects.md`, 42 rows: 1 moved from `functions.md`, 41 new;
+  78f986b; 12 ready groups; 0 leads added); map checked (0 errors, 42
+  of 42 in play). Migration agent 1 running.
 
 ## Done
 
@@ -66,6 +69,8 @@ This run's groups: `expected-differences.md` (the "21:33 run" lines).
 - After ActionMappers::Init's migration: ours 1795, work left 4966
   (wrapped 115, known 584, unknown 4267). Race 27 s (`itc_1493`) with
   `--run_harnesses=all`, 0 errors, every harness 0 differing.
+- After mapping the screen objects: ours 1800, work left 4961 (wrapped
+  115, known 620, unknown 4226).
 - After the three cleanup leads' migration: ours 1800, work left 4961
   (wrapped 115, known 579, unknown 4267). Race 27 s (`itc_1507`), 0
   errors, every harness 0 differing.

@@ -66,6 +66,28 @@ When the user has reviewed a run's section, its heading gets
     generation can make an input the original faults on.
   - `sub_82138D00` SetParams, `sub_82139DA0` StartRace,
     `sub_82139580` ResetControl: adapters removed (Native).
+- `screen-objects.md` (new, mapped in 78f986b): 42 rows (1 moved from
+  `functions.md`: `sub_82130978`, now `ScreenObject::Record`, Wrapped),
+  the race's screen object (128,000 bytes, one a view: a 1024-wide
+  A8R8G8B8 texture, a 720-triangle fan with `rand`-jittered UVs and 20
+  rings of 36 points; strength = speed km/h / 300 at +76; probably a
+  screen blur while the nitrous runs, started and stopped by the race's
+  update from the vehicle's byte +2424). `Start` and `Stop`
+  (`sub_8212EDF8`, `sub_8212EED0`) never ran, so `Record`'s 1,038-line
+  body never ran either. For review:
+  - Names on guesses: the `ScreenObject::` functions, `UvMap::` and
+    `UvColumn::` (the two map types), the nitrous trigger, +84 as the
+    sort key (599/601).
+  - Correction: the lead said `std::string`-keyed trees; the keys are
+    doubles (the string is only the `length_error` message).
+  - `sub_82131680` (`UvColumn::Insert`) and `sub_82131FB0`
+    (`UvMap::Insert`) mapped here, not under the containers' lead (only
+    the screen objects use these two map types).
+  - `post-effects.md`'s intro and `sub_8215B690`, `sub_8212EDE0` rows
+    now point here; `known-data.md` gets the screen object and the race
+    object's +31152/+31156/+31160.
+  - Left open: the objects at +88 and +92 (set through vtable calls in
+    `Record`; who makes them isn't known).
 
 ## Run 2026-10-24 17:46 (`b7-loop-24-10-26-3`) (reviewed 2026-10-24)
 
