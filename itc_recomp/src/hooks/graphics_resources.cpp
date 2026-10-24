@@ -13,7 +13,8 @@
 // TextureLayout::MipTailOffset (sub_822A4A40), from Texture::LevelOffset;
 // Texture::BaseSize and TextureLayout::LevelSize (sub_822A4348, sub_822A45B8),
 // from LevelLayout, LevelOffset and Sizes; XGSetTextureHeaderEx
-// (sub_8235A720), from XGSetTextureHeader.
+// (sub_8235A720), from XGSetTextureHeader; TextureHeader::Set (sub_822A5608),
+// from Device::CreateTexture and XGSetTextureHeaderEx.
 
 #include "guest.h"
 
@@ -46,7 +47,7 @@ ITC_FLAG_BOOL(native_graphics_resources, true, "ITC",
               "callers have no adapters, and the flag switches their callers: sub_822A44A8, "
               "sub_822A4F60, sub_822A4B98, sub_822A5910, sub_822B5EF8, sub_822B5EA8, "
               "sub_822B5C90, sub_822B5D70, sub_822A4530, sub_822A46C8, sub_822A4A40, sub_822A4348, "
-              "sub_822A45B8, sub_8235A720");
+              "sub_822A45B8, sub_8235A720, sub_822A5608");
 
 // Defines an adapter: the body (the arguments after the address) uses `ctx`
 // and `base`.
@@ -114,27 +115,8 @@ ITC_GRAPHICS_RESOURCES(822A5B78, ctx.r3.u64 = TextureLevelDesc(base, ctx.r3.u32,
 ITC_GRAPHICS_RESOURCES(822A5F50, ctx.r3.u64 = SurfaceDesc(base, ctx.r3.u32, ctx.r4.u32))
 
 // --- Texture headers: arguments past r10 on the caller's stack (+84 on).
-// TextureLayout::LevelCount and Sizes have no adapters: only Set calls them. ---
-
-// r3 the type, r4-r6 width, height, depth, r7 levels, r8 usage, r9 format,
-// r10 packed; the stack: +84 the border, +92 the field, +100 the pitch, +108
-// the header, +116 and +124 the base and mip sizes out. Types other than
-// 3, 17-20 run the original (it reads an uninitialized stack word there).
-extern "C" REX_FUNC(sub_822A5608) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_graphics_resources) || !TextureTypeKnown(ctx.r3.u32)) {
-    __imp__sub_822A5608(ctx, base);
-    return;
-  }
-  const uint32_t stack = ctx.r1.u32;
-  const TextureHeaderSizes sizes = SetTextureHeader(
-      base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32, ctx.r8.u32, ctx.r9.u32,
-      ctx.r10.u32, guest::LoadU32(base, stack + 84), guest::LoadU32(base, stack + 92),
-      guest::LoadU32(base, stack + 100), guest::LoadU32(base, stack + 108));
-  guest::StoreU32(base, guest::LoadU32(base, stack + 116), sizes.base_size);
-  guest::StoreU32(base, guest::LoadU32(base, stack + 124), sizes.mip_size);
-  ctx.r3.u64 = sizes.r3;
-}
+// TextureHeader::Set has no adapter: only CreateTexture and
+// XGSetTextureHeaderEx call it. ---
 
 // r3 the texture, r4 the face, r5 the level; out: r6 the pitch, r7 the
 // slice, r8 the bytes over the depth, r9 the mip tail offset, r10 the width,
