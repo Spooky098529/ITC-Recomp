@@ -31,9 +31,18 @@ see in a drive, from every run: `to-drive.md`.
   CollisionShape::~CollisionShape's adapter (`collision.md`). Migration
   done (1197f81..cdaa66d: the collision shape's adapter removed, the AI
   drivers' teardown, the UI movie walk from ApplyTransform up to
-  `UiMovie::Draw`; 6 adapters removed). Validation running.
+  `UiMovie::Draw`; 6 adapters removed), validated (`itc_1420`, `itc_1421`; all ran in
+  play or the replay). Done.
+- Subsystem 2 of 3: `leads.md`'s input processor's constructors
+  (`sub_8258CE60`, `sub_825920D0`; both ready, 3 functions left; block
+  `ActionMapper::ActionMapper`). Mapping agent running.
 
 ## Done
+
+- Cleanup leads (no mapping): the collision shape's adapter, the AI
+  drivers' teardown, the UI movie walk (`collision.md`, `ai-drivers.md`,
+  `ui-movies.md`; 1197f81..cdaa66d); validated (`itc_1420`,
+  `itc_1421`); existing flags.
 
 - The post effects (`post-effects.md`, mapped in f3643e1; 57 rows): 44
   ours in one migration (ece3c32..66b8f81), 9 adapters removed;
