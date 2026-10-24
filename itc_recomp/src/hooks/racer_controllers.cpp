@@ -13,8 +13,9 @@
 // the pad reader is native, PlayerInput::Control (sub_82102488), from
 // ReadPad and DriveByAiWithPad; Pad::IsConnected and IsWheel (sub_8209F340,
 // sub_8209F3B8), from ReadPad (sub_822231B0, not seen in play, reaches
-// IsConnected's original); and InputRecording::Append (sub_821029A8), from
-// PlayerControl::Update.
+// IsConnected's original); InputRecording::Append (sub_821029A8), from
+// PlayerControl::Update; and sub_82160880 (never seen in play), from
+// RaceFlow::OnState22 and OnState23.
 
 #include "guest.h"
 
@@ -34,12 +35,15 @@ ITC_FLAG_BOOL(native_racer_controllers, true, "ITC",
               "PlayerInput::Control sub_82102488, Pad::IsConnected sub_8209F340, "
               "Pad::IsWheel sub_8209F3B8, PlayerControl::ReadPad sub_8215FCA8, "
               "PlayerControl::Update sub_821604C8, RacerControl::DriveByAiWithPad sub_8215F7E8, "
-              "RaceFlow::AllByAi sub_8215FA68) "
+              "RaceFlow::AllByAi sub_8215FA68, RaceFlow::PlayersAndHeldAi sub_821606D0, "
+              "RaceFlow::PlayersAndAi sub_821607A0, RaceFlow::OnState7 sub_82160940, "
+              "RaceFlow::OnState22 sub_82160948, RaceFlow::OnState23 sub_821609E0, "
+              "RaceFlow::OnState34 sub_8215FC38) "
               "natively instead of through the translated code (the same words; checked by "
               "--run_harnesses=racer_controllers). Those reached only from native callers "
               "have no adapters, and the flag switches their callers: sub_82102258, "
               "sub_82102300, sub_8215F5F0, sub_8215FA10, sub_82102350, sub_82102A28, "
-              "sub_82102488, sub_8209F340, sub_8209F3B8, sub_821029A8; merged into their callers: "
+              "sub_82102488, sub_8209F340, sub_8209F3B8, sub_821029A8, sub_82160880; merged into their callers: "
               "sub_821024D0, sub_82591C08");
 
 // Defines an adapter: the body (the arguments after the address) uses `ctx`
@@ -202,4 +206,39 @@ ITC_RACER_CONTROLLERS(8215F7E8, {
 ITC_RACER_CONTROLLERS(8215FA68, {
   ITC_RACER_CALLS;
   ctx.r3.u64 = AllByAi(base, ctx.r3.u32, ctx.r1.u32, calls);
+})
+
+// --- The race flow's per-racer states (r3 = the race flow, r4 = the message
+// ring's owner) ---
+
+ITC_RACER_CONTROLLERS(821606D0, {
+  ITC_RACER_CALLS;
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = PlayersAndHeldAi(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, calls);
+})
+ITC_RACER_CONTROLLERS(821607A0, {
+  ITC_RACER_CALLS;
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = PlayersAndAi(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, calls);
+})
+// Through the race flow's functors: state 7's (a jump to PlayersAndHeldAi),
+// 22's, 23's and 34's (the attract races').
+ITC_RACER_CONTROLLERS(82160940, {
+  ITC_RACER_CALLS;
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = PlayersAndHeldAi(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, calls);
+})
+ITC_RACER_CONTROLLERS(82160948, {
+  ITC_RACER_CALLS;
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = OnState22(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, calls);
+})
+ITC_RACER_CONTROLLERS(821609E0, {
+  ITC_RACER_CALLS;
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = OnState23(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, calls);
+})
+ITC_RACER_CONTROLLERS(8215FC38, {
+  ITC_RACER_CALLS;
+  ctx.r3.u64 = OnState34(base, ctx.r1.u32, calls);
 })

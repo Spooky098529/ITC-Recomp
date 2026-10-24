@@ -197,6 +197,42 @@ void DriveByAiWithPad(uint8_t* base, uint32_t index, uint32_t hold, uint32_t pla
 // DriveByAi. Returns 1.
 uint32_t AllByAi(uint8_t* base, uint32_t flow, uint32_t sp, const Calls& calls);
 
+// --- The race flow's per-racer states ---
+
+// RaceFlow::PlayersAndHeldAi (sub_821606D0; sub_82160940, state 7's
+// handler, jumps to it): each racer: with its vehicle's flags +6148 0x1,
+// PlayerUpdate (its record slot the racer's +24, the player at the flow's
+// +9612, may pause), its answer kept; with 0x80, the same with +9616's
+// player, may pause only when the first answered 0; the others DriveByAi
+// held. Returns 1.
+uint32_t PlayersAndHeldAi(uint8_t* base, uint32_t flow, uint32_t owner, uint32_t sp,
+                          const Calls& calls);
+// RaceFlow::PlayersAndAi (sub_821607A0): as PlayersAndHeldAi, the others
+// held unless their word +0 has 0x10 and not 0x4000. Returns 1.
+uint32_t PlayersAndAi(uint8_t* base, uint32_t flow, uint32_t owner, uint32_t sp,
+                      const Calls& calls);
+// sub_82160880 (never seen in play): as PlayersAndAi with no player able to
+// pause, the others held only when their word +0 has 0x4000. Returns 1.
+uint32_t PlayersAndAiNoPause(uint8_t* base, uint32_t flow, uint32_t owner, uint32_t sp,
+                             const Calls& calls);
+// RaceFlow::OnState22 (sub_82160948): with the current stage of type 2 or
+// 3, or the mode 6 with the stage's word +0 not 1, PlayersAndAiNoPause;
+// else AllByAi. Returns 1.
+uint32_t OnState22(uint8_t* base, uint32_t flow, uint32_t owner, uint32_t sp,
+                   const Calls& calls);
+// RaceFlow::OnState23 (sub_821609E0): with the mode 6 and the stage's word
+// +0 not 1, PlayersAndAiNoPause, else PlayersAndAi; then the race data's
+// flag 0x20000 (the replay's end) cleared and, while replaying (0x40),
+// message 34 posted. Returns 1.
+uint32_t OnState23(uint8_t* base, uint32_t flow, uint32_t owner, uint32_t sp,
+                   const Calls& calls);
+
+// RaceFlow::OnState34 (sub_8215FC38; the attract races' state): each racer
+// by its AI driver, held unless its vehicle's flags +6148 have 0x1
+// (DriveByAi). Returns the last racer count read (the original's r3: it
+// doesn't set one).
+uint32_t OnState34(uint8_t* base, uint32_t sp, const Calls& calls);
+
 // --- The AI drivers' set-up ---
 
 // AiDriver::Setup (sub_82170FF8): the driver of the racer at `index`

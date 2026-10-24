@@ -238,6 +238,35 @@ void NativeAllByAi(PPCContext& ctx, uint8_t* base) {
   ITC_HARNESS_CALLS;
   ctx.r3.u64 = rc::AllByAi(base, ctx.r3.u32, ctx.r1.u32, calls);
 }
+void NativePlayersAndHeldAi(PPCContext& ctx, uint8_t* base) {
+  ITC_HARNESS_CALLS;
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = rc::PlayersAndHeldAi(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, calls);
+}
+void NativePlayersAndAi(PPCContext& ctx, uint8_t* base) {
+  ITC_HARNESS_CALLS;
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = rc::PlayersAndAi(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, calls);
+}
+void NativePlayersAndAiNoPause(PPCContext& ctx, uint8_t* base) {
+  ITC_HARNESS_CALLS;
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = rc::PlayersAndAiNoPause(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, calls);
+}
+void NativeOnState22(PPCContext& ctx, uint8_t* base) {
+  ITC_HARNESS_CALLS;
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = rc::OnState22(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, calls);
+}
+void NativeOnState23(PPCContext& ctx, uint8_t* base) {
+  ITC_HARNESS_CALLS;
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = rc::OnState23(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, calls);
+}
+void NativeOnState34(PPCContext& ctx, uint8_t* base) {
+  ITC_HARNESS_CALLS;
+  ctx.r3.u64 = rc::OnState34(base, ctx.r1.u32, calls);
+}
 void NativeNext(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = rc::RecordingNext(base, ctx.r3.u32, ctx.r4.u32);
 }
@@ -776,7 +805,7 @@ void Pads(Context& h, Random& r) {
   const uint32_t owner = h.data + 0x200;  // the ring at +204 to +812
   const uint32_t flow = h.data + 0x600 - 9600;  // +9612 and +9616 in the scratch area
   const StandIns stand_ins;
-  enum Kind { kReadPad, kUpdate, kWithPad, kAllByAi, kNext };
+  enum Kind { kReadPad, kUpdate, kWithPad, kAllByAi, kNext, kByRacer };
   const struct {
     const char* name;
     GuestFunction recompiled, native;
@@ -793,6 +822,20 @@ void Pads(Context& h, Random& r) {
        500},
       {"InputRecording::Next (sub_82102A28, never seen in play)", Original<__imp__sub_82102A28>,
        NativeNext, kNext, 300},
+      {"RaceFlow::PlayersAndHeldAi (sub_821606D0)", Original<__imp__sub_821606D0>,
+       NativePlayersAndHeldAi, kByRacer, 500},
+      {"RaceFlow::OnState7 (sub_82160940)", Original<__imp__sub_82160940>,
+       NativePlayersAndHeldAi, kByRacer, 200},
+      {"RaceFlow::PlayersAndAi (sub_821607A0)", Original<__imp__sub_821607A0>,
+       NativePlayersAndAi, kByRacer, 500},
+      {"sub_82160880 (never seen in play)", Original<__imp__sub_82160880>,
+       NativePlayersAndAiNoPause, kByRacer, 300},
+      {"RaceFlow::OnState22 (sub_82160948)", Original<__imp__sub_82160948>, NativeOnState22,
+       kByRacer, 500},
+      {"RaceFlow::OnState23 (sub_821609E0)", Original<__imp__sub_821609E0>, NativeOnState23,
+       kByRacer, 1000},
+      {"RaceFlow::OnState34 (sub_8215FC38)", Original<__imp__sub_8215FC38>, NativeOnState34,
+       kByRacer, 500},
   };
   for (const auto& f : functions) {
     Results results(f.name);
@@ -848,6 +891,23 @@ void Pads(Context& h, Random& r) {
         guest::StoreU32(h.base, recordings + p * rc::kRecordingBytes + rc::kRecordingCount, count);
         RandomWords(h.base, r, recordings + p * rc::kRecordingBytes + 20 * std::min(count, 53999u),
                     20);
+      }
+      if (f.kind == kByRacer) {
+        // The racers' indexes 0 to 6 (their vehicles are read and written),
+        // record slots +24 0 to 6, words +0 with 0x10 and 0x4000 in any mix;
+        // the race data's flag 0x20000 now and then (the replay's end).
+        for (uint32_t i = 0; i < 7; i++) {
+          const uint32_t racer = at.racers + 32 * i;
+          guest::StoreU32(h.base, racer + 20, r.Below(7));
+          guest::StoreU32(h.base, racer + 24, r.Below(7));
+          guest::StoreU32(h.base, racer + 0, (r.Below(2) ? 0x10u : 0u) |
+                                                 (r.Below(3) == 0 ? 0x4000u : 0u) |
+                                                 (uint32_t(r.Next()) & ~0x4010u));
+        }
+        if (r.Below(3) == 0) {
+          guest::StoreU32(h.base, race_data + rc::kFlags,
+                          guest::LoadU32(h.base, race_data + rc::kFlags) | 0x20000);
+        }
       }
       RandomMappers(h.base, r, mappers);
       RandomWords(h.base, r, record, 20);
@@ -939,6 +999,10 @@ void Pads(Context& h, Random& r) {
           case kNext:
             t.r3.u64 = record;
             t.r4.u64 = player;
+            break;
+          case kByRacer:
+            t.r3.u64 = flow;
+            t.r4.u64 = owner;
             break;
         }
         (v == 0 ? f.recompiled : f.native)(t, h.base);

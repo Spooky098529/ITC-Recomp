@@ -801,6 +801,114 @@ uint32_t AllByAi(uint8_t* base, uint32_t flow, uint32_t sp, const Calls& calls) 
   return 1;
 }
 
+// --- The race flow's per-racer states ---
+
+namespace {
+
+// The per-racer loop of sub_821606D0, sub_821607A0 and sub_82160880: the
+// human cars (their vehicle's flags 0x1 and 0x80) by PlayerUpdate with
+// `pause_first` and `pause_second` deciding whether each may pause (the
+// second given the first's answer), the others by DriveByAi with `hold`
+// (given the racer's word +0).
+template <typename PauseFirst, typename PauseSecond, typename Hold>
+uint32_t ByRacer(uint8_t* base, uint32_t flow, uint32_t owner, uint32_t sp, const Calls& calls,
+                 PauseFirst pause_first, PauseSecond pause_second, Hold hold) {
+  const uint32_t frame = sp - 144;
+  uint32_t first = 0;
+  for (int32_t i = 0; i < int32_t(track_collision::RaceRacerCount(base)); i++) {
+    const uint32_t index = RacerWord(base, uint32_t(i), 20);
+    const uint32_t flags = Load(base, vehicle_accessors::VehicleGet(base, index) + 6148);
+    const uint32_t racer = Load(base, Load(base, kRace) + 2308 + 4 * uint32_t(i));
+    const uint32_t slot = Load(base, racer + 24);
+    if ((flags & 0x1) != 0) {
+      first = PlayerUpdate(base, slot, index, Load(base, flow + 9612), owner, pause_first(), frame,
+                           calls);
+    } else if ((flags & 0x80) != 0) {
+      PlayerUpdate(base, slot, index, Load(base, flow + 9616), owner, pause_second(first), frame,
+                   calls);
+    } else {
+      uint64_t r3 = 0;
+      DriveByAi(base, index, hold(Load(base, racer + 0)), frame, calls, &r3);
+    }
+  }
+  return 1;
+}
+
+}  // namespace
+
+uint32_t PlayersAndHeldAi(uint8_t* base, uint32_t flow, uint32_t owner, uint32_t sp,
+                          const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_821606D0 RaceFlow::PlayersAndHeldAi");
+  return ByRacer(
+      base, flow, owner, sp, calls, [] { return 1u; },
+      [](uint32_t first) { return first == 0 ? 1u : 0u; }, [](uint32_t) { return 1u; });
+}
+
+uint32_t PlayersAndAi(uint8_t* base, uint32_t flow, uint32_t owner, uint32_t sp,
+                      const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_821607A0 RaceFlow::PlayersAndAi");
+  return ByRacer(
+      base, flow, owner, sp, calls, [] { return 1u; },
+      [](uint32_t first) { return first == 0 ? 1u : 0u; },
+      [](uint32_t word) { return (word & 0x10) != 0 && (word & 0x4000) == 0 ? 0u : 1u; });
+}
+
+uint32_t PlayersAndAiNoPause(uint8_t* base, uint32_t flow, uint32_t owner, uint32_t sp,
+                             const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_82160880 RaceFlow::PlayersAndAiNoPause");
+  return ByRacer(
+      base, flow, owner, sp, calls, [] { return 0u; }, [](uint32_t) { return 0u; },
+      [](uint32_t word) { return (word & 0x4000) != 0 ? 1u : 0u; });
+}
+
+uint32_t OnState22(uint8_t* base, uint32_t flow, uint32_t owner, uint32_t sp,
+                   const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_82160948 RaceFlow::OnState22");
+  const uint32_t frame = sp - 208;
+  const uint32_t stage_word = CurrentStageWord0(base, Load(base, kRaceData));
+  if (vehicle_accessors::StagesIsType2Or3(base, Load(base, kRaceData) + kStages, 0xFFFFFFFFu) ==
+          0 &&
+      (int32_t(Load(base, Load(base, kRaceData) + kMode)) != 6 || int32_t(stage_word) == 1)) {
+    return AllByAi(base, flow, frame, calls);
+  }
+  return PlayersAndAiNoPause(base, flow, owner, frame, calls);
+}
+
+uint32_t OnState23(uint8_t* base, uint32_t flow, uint32_t owner, uint32_t sp,
+                   const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_821609E0 RaceFlow::OnState23");
+  const uint32_t frame = sp - 192;
+  const uint32_t stage_word = CurrentStageWord0(base, Load(base, kRaceData));
+  uint32_t result;
+  if (int32_t(Load(base, Load(base, kRaceData) + kMode)) == 6 && int32_t(stage_word) != 1) {
+    result = PlayersAndAiNoPause(base, flow, owner, frame, calls);
+  } else {
+    result = PlayersAndAi(base, flow, owner, frame, calls);
+  }
+  const uint32_t at = Load(base, kRaceData) + kFlags;
+  if ((Load(base, at) & 0x20000) != 0) {
+    Store(base, at, Load(base, at) & ~0x20000u);
+    if ((Load(base, Load(base, kRaceData) + kFlags) & 0x40) != 0) {
+      PostMessage(base, owner, 34);
+    }
+  }
+  return result;
+}
+
+uint32_t OnState34(uint8_t* base, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8215FC38 RaceFlow::OnState34");
+  const uint32_t frame = sp - 128;
+  uint32_t count = track_collision::RaceRacerCount(base);
+  for (int32_t i = 0; i < int32_t(count); count = track_collision::RaceRacerCount(base)) {
+    const uint32_t index = RacerWord(base, uint32_t(i), 20);
+    const uint32_t flags = Load(base, vehicle_accessors::VehicleGet(base, index) + 6148);
+    uint64_t r3 = 0;
+    DriveByAi(base, index, (flags & 0x1) != 0 ? 0 : 1, frame, calls, &r3);
+    i++;
+  }
+  return count;
+}
+
 // --- The AI drivers' set-up ---
 
 uint64_t Setup(uint8_t* base, uint32_t index, uint32_t id, uint32_t hold, uint32_t sp) {
