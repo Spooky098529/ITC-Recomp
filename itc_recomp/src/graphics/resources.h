@@ -193,6 +193,50 @@ uint32_t CreateIndexBuffer(uint8_t* base, uint32_t bytes, uint32_t usage, uint32
 uint32_t CreateSurface(uint8_t* base, uint32_t width, uint32_t height, uint32_t format,
                        int32_t multisample, uint32_t parameters);
 
+// sub_822A5D08 Device::CreateTexture: a 52-byte header (XMemAlloc) set by
+// SetTextureHeader (packed mips when more than one level, no border, field
+// or pitch) and its base and mip data in physical memory (write-combined
+// with usage 0x4), their addresses in +32's and +48's top 20 bits; 0 when
+// an allocation fails (what was made freed). `type` must be one
+// TextureTypeKnown takes (the adapter runs the original for others).
+uint32_t CreateTexture(uint8_t* base, uint32_t width, uint32_t height, uint32_t depth,
+                       uint32_t levels, uint32_t usage, uint32_t format, uint32_t type);
+
+// sub_822A5B80 Texture::GetSurfaceLevel: a 48-byte surface header for a
+// level of the texture (+0 `0x40100004` with the texture's +0 bit
+// 0x200000, +4 = 1, +20 unlocked, +24 the texture, +28's top 4 bits the
+// level, face 0), the texture AddRef'ed; 0 when the allocation fails. (The
+// original's Texture::LevelOffset call first only writes its own stack.)
+uint32_t GetSurfaceLevel(uint8_t* base, uint32_t texture, uint32_t level);
+
+// sub_8235A720 XGSetTextureHeaderEx: a texture header built on the stack
+// with SetTextureHeader (+0 = 3, 0x00200003 with usage 0x4, 0x00400000 with
+// usage 0x200, no 0x00100000; +32's top 20 bits `base_address`, +48's
+// `mip_address`, or after the base data for -1, none without mips), a single
+// level 2D texture's pitch from `pitch` (over the block's height, as the
+// original divides);
+// the base size (aligned to 4 KiB with a mip address of -1) and the mip
+// size stored through `base_size_out` and `mip_size_out` and the header
+// copied to `header` (each when not 0; the copy is the original's memcpy,
+// `header` outside the physical views and in one view: the adapter's
+// check). Returns the base size plus the mip size. `type` must be one
+// TextureTypeKnown takes.
+struct XgTextureHeader {
+  uint32_t width, height, depth, levels, usage, format, packed, border, field;
+  uint32_t base_address, mip_address, pitch, type, header, base_size_out, mip_size_out;
+};
+uint32_t XGSetTextureHeaderEx(uint8_t* base, const XgTextureHeader& args);
+// sub_8235A920 XGSetTextureHeader: XGSetTextureHeaderEx for a 2D texture
+// (type 3) of depth 1, packed mips when more than one level, no border or
+// field.
+uint32_t XGSetTextureHeader(uint8_t* base, uint32_t width, uint32_t height, uint32_t levels,
+                            uint32_t usage, uint32_t format, uint32_t base_address,
+                            uint32_t mip_address, uint32_t pitch, uint32_t header,
+                            uint32_t base_size_out, uint32_t mip_size_out);
+// Whether XGSetTextureHeaderEx's copy to `header` is one native code may do
+// (outside the physical views, in one view; 0 is no copy).
+bool XgHeaderCopyFits(uint32_t header);
+
 // --- The device's current resources (AddRef'ed when set) ---
 
 // sub_822A3998 Device::GetRenderTarget: device +12184 + 4 x index.

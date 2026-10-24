@@ -184,6 +184,23 @@ void NativeLevelOffset(PPCContext& ctx, uint8_t* base) {
   guest::StoreU32(base, ctx.r9.u32, place.tail);
 }
 
+void NativeCreateTexture(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = gr::CreateTexture(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
+                                 ctx.r7.u32, ctx.r8.u32, ctx.r10.u32);
+}
+void NativeGetSurfaceLevel(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = gr::GetSurfaceLevel(base, ctx.r3.u32, ctx.r4.u32);
+}
+void NativeXGSetTextureHeader(PPCContext& ctx, uint8_t* base) {
+  const uint32_t stack = ctx.r1.u32;
+  ctx.r3.u64 = gr::XGSetTextureHeader(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
+                                      ctx.r7.u32, ctx.r9.u32, ctx.r10.u32,
+                                      guest::LoadU32(base, stack + 84),
+                                      guest::LoadU32(base, stack + 92),
+                                      guest::LoadU32(base, stack + 100),
+                                      guest::LoadU32(base, stack + 108));
+}
+
 // The scratch area's layout.
 constexpr uint32_t kHeader = 0;    // 64 bytes
 constexpr uint32_t kParent = 64;   // 64 bytes
@@ -586,6 +603,157 @@ void LevelOffsets(Context& h, Random& r) {
       }
       results.Check(out[0], out[1],
                     fmt::format("case {}: face {:X}, level {}, {}", i, face, level, Hex(inputs)));
+    }
+    results.Report();
+  }
+}
+
+// Device::CreateTexture on random sizes (up to 512, so the data stays
+// small), levels, usages, formats and the types it takes; compared: whether
+// it made one, the header but its data addresses (+32's and +48's top 20
+// bits: whether each is set), r3's low 12 bits. Each version's header and
+// data freed after it. Texture::GetSurfaceLevel on random textures (their
+// count at +4) and levels: the surface's 48 bytes, the texture's 64, whether
+// r3 is set. XGSetTextureHeader on random sizes, levels, usages, formats,
+// addresses (the mips' -1 now and then), pitches, with or without the
+// header and the sizes out: what it writes and r3. Failed allocations
+// aren't taken (the allocation layer stops the game when out of memory).
+void TextureCreation(Context& h, Random& r) {
+  {
+    Results results("Device::CreateTexture (sub_822A5D08) with TextureHeader::Set");
+    const uint32_t types[] = {3, 3, 3, 17, 18, 19, 20};
+    const uint32_t usages[] = {0, 0x4, 0x200, 0x204, 0x8, 0x1};
+    for (int i = 0; i < 150; i++) {
+      const uint32_t type = types[r.Below(7)];
+      const uint32_t w = 1 + r.Below(512), hh = type == 20 ? 1 : 1 + r.Below(512);
+      const uint32_t d = type == 18 ? 6 : type == 17 || type == 19 ? 1 + r.Below(8) : 1;
+      const uint32_t levels = r.Below(3) == 0 ? 0 : r.Below(10);
+      const uint32_t usage = r.Below(4) ? usages[r.Below(6)] : uint32_t(r.Next());
+      const uint32_t format = (uint32_t(r.Next()) & ~0x3Fu) | (r.Below(4) ? 6 : r.Below(64));
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        PPCContext t = CallContext(h);
+        t.r3.u64 = w;
+        t.r4.u64 = hh;
+        t.r5.u64 = d;
+        t.r6.u64 = levels;
+        t.r7.u64 = usage;
+        t.r8.u64 = format;
+        t.r9.u64 = 0;
+        t.r10.u64 = type;
+        (v == 0 ? Original<__imp__sub_822A5D08> : NativeCreateTexture)(t, h.base);
+        const uint32_t header = t.r3.u32;
+        out[v].Word(header != 0);
+        out[v].Word(header & 0xFFF);
+        if (header == 0) {
+          continue;
+        }
+        std::vector<uint8_t> words = Read(h.base, header, 52);
+        const uint32_t data = guest::LoadU32(h.base, header + 32) & 0xFFFFF000;
+        const uint32_t mips = guest::LoadU32(h.base, header + 48) & 0xFFFFF000;
+        out[v].Word(data != 0);
+        out[v].Word(mips != 0);
+        for (int k = 0; k < 3; k++) {  // the addresses' top 20 bits
+          words[32 + k] = 0;
+          words[48 + k] = 0;
+        }
+        words[35] &= 0x0F;
+        words[51] &= 0x0F;
+        out[v].Bytes(words);
+        const uint32_t attributes = (usage & 0x4) ? 0xAC800000 : 0xBC800000;
+        if (mips) {
+          memory::crt::XMemFree(mips, attributes);
+        }
+        memory::crt::XMemFree(data, attributes);
+        memory::crt::XMemFree(header, 0x24800000);
+      }
+      results.Check(out[0], out[1],
+                    fmt::format("case {}: type {}, {} x {} x {}, {} levels, usage {:X}, format "
+                                "{:X}",
+                                i, type, w, hh, d, levels, usage, format));
+    }
+    results.Report();
+  }
+  {
+    Results results("Texture::GetSurfaceLevel (sub_822A5B80)");
+    for (int i = 0; i < 300; i++) {
+      Fill(h.base, h.data, kScratchBytes);
+      RandomTexture(h.base, h.data + kHeader, r);
+      RandomTexture(h.base, h.data + kParent, r);
+      // A first reference of a resource holding a child AddRefs it too.
+      guest::StoreU32(h.base, h.data + kHeader + 4, r.Below(100));
+      guest::StoreU32(h.base, h.data + kHeader + 24, h.data + kParent);
+      guest::StoreU32(h.base, h.data + kParent + 24, h.data + kParent);
+      const std::vector<uint8_t> inputs = Read(h.base, h.data, 128);
+      // Below 32: the original's Texture::LevelOffset call walks the levels.
+      const uint32_t level = r.Below(4) ? r.Below(13) : r.Below(32);
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Fill(h.base, h.data, kScratchBytes);
+        Write(h.base, h.data, inputs.data(), uint32_t(inputs.size()));
+        PPCContext t = CallContext(h);
+        t.r3.u64 = h.data + kHeader;
+        t.r4.u64 = level;
+        (v == 0 ? Original<__imp__sub_822A5B80> : NativeGetSurfaceLevel)(t, h.base);
+        const uint32_t surface = t.r3.u32;
+        out[v].Word(surface != 0);
+        out[v].Bytes(Read(h.base, h.data, 128));
+        if (surface != 0) {
+          out[v].Bytes(Read(h.base, surface, 48));
+          memory::crt::XMemFree(surface, 0x24800000);
+        }
+      }
+      results.Check(out[0], out[1], fmt::format("case {}: level {:X}, {}", i, level, Hex(inputs)));
+    }
+    results.Report();
+  }
+  {
+    Results results("XGSetTextureHeader (sub_8235A920) with XGSetTextureHeaderEx (sub_8235A720)");
+    const uint32_t usages[] = {0, 0x4, 0x200, 0x204, 0x8};
+    for (int i = 0; i < 2000; i++) {
+      const uint32_t w = r.Below(8) == 0 ? (r.Below(2) ? 1 : 3) : TextureSide(r);
+      const uint32_t hh = r.Below(8) == 0 ? (r.Below(2) ? 1 : 3) : TextureSide(r);
+      const uint32_t levels = r.Below(3) == 0 ? 0 : r.Below(3) == 0 ? 1 : r.Below(14);
+      const uint32_t usage = r.Below(4) ? usages[r.Below(5)] : uint32_t(r.Next());
+      const uint32_t format = uint32_t(r.Next());
+      const uint32_t base_address = uint32_t(r.Next());
+      const uint32_t mip_address = r.Below(3) == 0 ? 0xFFFFFFFF : uint32_t(r.Next());
+      const uint32_t pitch = r.Below(2) ? 0 : r.Below(2) ? 32 * r.Below(256) : uint32_t(r.Next());
+      const bool header = r.Below(8) != 0;
+      const bool sizes = r.Below(8) != 0;
+      const uint32_t r8 = uint32_t(r.Next());
+      std::vector<uint8_t> words(64);
+      for (uint8_t& b : words) {
+        b = uint8_t(r.Next());
+      }
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Fill(h.base, h.data, kScratchBytes);
+        Write(h.base, h.data + kHeader, words.data(), uint32_t(words.size()));
+        PPCContext t = CallContext(h);
+        const uint32_t stack = t.r1.u32;
+        guest::StoreU32(h.base, stack + 84, pitch);
+        guest::StoreU32(h.base, stack + 92, header ? h.data + kHeader : 0);
+        guest::StoreU32(h.base, stack + 100, sizes ? h.data + kOut : 0);
+        guest::StoreU32(h.base, stack + 108, sizes ? h.data + kOut + 4 : 0);
+        t.r3.u64 = w;
+        t.r4.u64 = hh;
+        t.r5.u64 = levels;
+        t.r6.u64 = usage;
+        t.r7.u64 = format;
+        t.r8.u64 = r8;
+        t.r9.u64 = base_address;
+        t.r10.u64 = mip_address;
+        (v == 0 ? Original<__imp__sub_8235A920> : NativeXGSetTextureHeader)(t, h.base);
+        out[v].Bytes(Read(h.base, h.data + kHeader, 64));
+        out[v].Bytes(Read(h.base, h.data + kOut, 8));
+        out[v].Word(t.r3.u32);
+      }
+      results.Check(out[0], out[1],
+                    fmt::format("case {}: {} x {}, {} levels, usage {:X}, format {:X}, base {:X}, "
+                                "mips {:X}, pitch {:X}, header {}, sizes {}",
+                                i, w, hh, levels, usage, format, base_address, mip_address,
+                                pitch, header, sizes));
     }
     results.Report();
   }
@@ -1252,6 +1420,7 @@ void GraphicsResources(Context& h) {
   LevelDescs(h, r);
   TextureHeaders(h, r);
   LevelOffsets(h, r);
+  TextureCreation(h, r);
   Buffers(h, r);
   Getters(h, r);
   SurfaceHeaders(h, r);

@@ -12,7 +12,8 @@
 // and Sizes (sub_822A4530, sub_822A46C8), from TextureHeader::Set;
 // TextureLayout::MipTailOffset (sub_822A4A40), from Texture::LevelOffset;
 // Texture::BaseSize and TextureLayout::LevelSize (sub_822A4348, sub_822A45B8),
-// from LevelLayout, LevelOffset and Sizes.
+// from LevelLayout, LevelOffset and Sizes; XGSetTextureHeaderEx
+// (sub_8235A720), from XGSetTextureHeader.
 
 #include "guest.h"
 
@@ -29,7 +30,9 @@ ITC_FLAG_BOOL(native_graphics_resources, true, "ITC",
               "Texture::LevelLayout sub_822A4B98, Texture::GetLevelDesc sub_822A5B78, "
               "Surface::GetDesc sub_822A5F50, TextureLayout::Sizes sub_822A46C8, "
               "TextureHeader::Set sub_822A5608, Texture::LevelOffset sub_822A4FF0 with "
-              "TextureLayout::MipTailOffset sub_822A4A40; Device::CreateSurface sub_822A5E28 "
+              "TextureLayout::MipTailOffset sub_822A4A40, XGSetTextureHeader sub_8235A920 with "
+              "XGSetTextureHeaderEx sub_8235A720; Device::CreateTexture sub_822A5D08 and "
+              "Texture::GetSurfaceLevel sub_822A5B80, with --native_heap; Device::CreateSurface sub_822A5E28 "
               "with SurfaceHeader::Set sub_822A5910, with --native_heap; "
               "Device::CreateVertexBuffer sub_822A6830 and Device::CreateIndexBuffer "
               "sub_822A6968, with --native_heap; Device::GetRenderTarget sub_822A3998, "
@@ -43,7 +46,7 @@ ITC_FLAG_BOOL(native_graphics_resources, true, "ITC",
               "callers have no adapters, and the flag switches their callers: sub_822A44A8, "
               "sub_822A4F60, sub_822A4B98, sub_822A5910, sub_822B5EF8, sub_822B5EA8, "
               "sub_822B5C90, sub_822B5D70, sub_822A4530, sub_822A46C8, sub_822A4A40, sub_822A4348, "
-              "sub_822A45B8");
+              "sub_822A45B8, sub_8235A720");
 
 // Defines an adapter: the body (the arguments after the address) uses `ctx`
 // and `base`.
@@ -145,6 +148,42 @@ extern "C" REX_FUNC(sub_822A4FF0) {
     return;
   }
   StoreLevelPlace(base, ctx, TextureLevelOffset(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32));
+}
+
+// r3-r5 width, height, depth, r6 levels, r7 usage, r8 format, r10 the type
+// (others than TextureHeader::Set takes run the original).
+extern "C" REX_FUNC(sub_822A5D08) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_graphics_resources) || !hooks::NativeHeapActive() ||
+      !TextureTypeKnown(ctx.r10.u32)) {
+    __imp__sub_822A5D08(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = CreateTexture(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32,
+                             ctx.r8.u32, ctx.r10.u32);
+}
+
+// r3 = the texture, r4 = the level.
+ITC_GRAPHICS_RESOURCES_HEAP(822A5B80, ctx.r3.u64 = GetSurfaceLevel(base, ctx.r3.u32, ctx.r4.u32))
+
+// r3, r4 width and height, r5 levels, r6 usage, r7 format, r9 and r10 the
+// base and mip addresses; the stack: +84 the pitch, +92 the header (copied
+// there), +100 and +108 the base and mip sizes out. XGSetTextureHeaderEx
+// has no adapter: only this calls it. A header in the physical views or
+// across two views runs the original (its memcpy records those copies).
+extern "C" REX_FUNC(sub_8235A920) {
+  REX_FUNC_PROLOGUE();
+  const uint32_t stack = ctx.r1.u32;
+  const uint32_t header = guest::LoadU32(base, stack + 92);
+  if (!ITC_FLAG(native_graphics_resources) || !XgHeaderCopyFits(header)) {
+    __imp__sub_8235A920(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = XGSetTextureHeader(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
+                                  ctx.r7.u32, ctx.r9.u32, ctx.r10.u32,
+                                  guest::LoadU32(base, stack + 84), header,
+                                  guest::LoadU32(base, stack + 100),
+                                  guest::LoadU32(base, stack + 108));
 }
 
 // --- Surfaces: r3 width, r4 height, r5 format, r6 the multisample type, r7

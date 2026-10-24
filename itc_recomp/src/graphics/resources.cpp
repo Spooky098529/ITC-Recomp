@@ -8,8 +8,10 @@
 #include "base/log.h"
 #include "graphics/edram.h"
 #include "memory/c_runtime_heap.h"
+#include "c_runtime/strings.h"
 #include "native/refcount.h"
 
+#include <array>
 #include <bit>
 #include <optional>
 
@@ -326,11 +328,17 @@ bool TextureTypeKnown(uint32_t type) {
   return type == 3 || type == 17 || type == 18 || type == 19 || type == 20;
 }
 
-TextureHeaderSizes SetTextureHeader(uint8_t* base, uint32_t type, uint32_t width, uint32_t height,
-                                    uint32_t depth, uint32_t levels, uint32_t usage,
-                                    uint32_t format, uint32_t packed, uint32_t border,
-                                    uint32_t field, uint32_t pitch, uint32_t header) {
-  ITC_NATIVE_RUNNING("sub_822A5608 TextureHeader::Set");
+namespace {
+
+uint32_t& Word(uint32_t* words, uint32_t offset) { return words[offset / 4]; }
+
+// TextureHeader::Set on a host copy of the header's 13 words (as guest
+// words); see SetTextureHeader.
+TextureHeaderSizes SetTextureHeaderWords(uint8_t* base, uint32_t* words, uint32_t type,
+                                         uint32_t width, uint32_t height, uint32_t depth,
+                                         uint32_t levels, uint32_t usage, uint32_t format,
+                                         uint32_t packed, uint32_t border, uint32_t field,
+                                         uint32_t pitch) {
   const uint32_t bordered = (border << 1) + 1;  // r25: the sizes' bias
   // The fetch constant's dimension (0 1D, 1 2D, 2 3D, 3 cube).
   uint32_t dimension = 1;
@@ -361,26 +369,26 @@ TextureHeaderSizes SetTextureHeader(uint8_t* base, uint32_t type, uint32_t width
   if (usage & 0x200) {
     common |= 0x00400000;
   }
-  Store(base, header + 20, kUnlocked);
-  Store(base, header + 24, kUnlocked);
-  Store(base, header + 0, common);
-  Store(base, header + 8, 0);
-  uint32_t w48 = Load(base, header + 48);
-  Store(base, header + 4, 1);
+  Word(words, 20) = (kUnlocked);
+  Word(words, 24) = (kUnlocked);
+  Word(words, 0) = (common);
+  Word(words, 8) = (0);
+  uint32_t w48 = Word(words, 48);
+  Word(words, 4) = (1);
   w48 = Rlwimi(w48, dimension, 9, 0x600);
-  Store(base, header + 48, w48);
+  Word(words, 48) = (w48);
   // The size word (+36), as Texture::BaseSize reads it back.
   if (dimension == 0) {
-    Store(base, header + 36, (Load(base, header + 36) & 0xFF000000) |
+    Word(words, 36) = ((Word(words, 36) & 0xFF000000) |
                                  ((width - bordered) & 0x00FFFFFF));
   } else if (dimension == 1 || dimension == 3) {
     uint32_t size = (((height - bordered) << 13) & 0x3FFE000) | ((depth - 1) << 26);
     size |= (width - bordered) & 0x1FFF;
-    Store(base, header + 36, size);
+    Word(words, 36) = (size);
   } else {
     uint32_t size = (((height - bordered) << 11) & 0x3FF800) | ((depth - bordered) << 22);
     size |= (width - bordered) & 0x7FF;
-    Store(base, header + 36, size);
+    Word(words, 36) = (size);
   }
   // The format's fields into +28, +32, +40 and +44 (the original's steps).
   uint32_t r9 = Sraw(format, 15);
@@ -397,36 +405,58 @@ TextureHeaderSizes SetTextureHeader(uint8_t* base, uint32_t type, uint32_t width
   uint32_t r30 = Sraw(format, 24);
   r8 &= 0xF;
   r30 = Rlwimi(r30, r3, 3, 0xFFFFFFF8);
-  r3 = Load(base, header + 28);
+  r3 = Word(words, 28);
   r7 = Rlwimi(r7, r8, 2, 0xFFFFFFFC);
   const uint32_t is_array = type == 19 ? 1 : 0;
   r8 = Sraw(format, 21);
   r6 = Rlwimi(r6, r7, 2, 0xFFFFFFFC);
   r4 = Rlwimi(r4, is_array, 4, 0x10);
   r3 = Rlwimi(r3, r9, 17, 0xFFC00000);
-  uint32_t w44 = Load(base, header + 44);
+  uint32_t w44 = Word(words, 44);
   r8 = Rlwimi(r8, r30, 3, 0xFFFFFFF8);
-  uint32_t w32 = Load(base, header + 32) & 0xFFFFFFC0;
+  uint32_t w32 = Word(words, 32) & 0xFFFFFFC0;
   r7 = Sraw(format, 18);
   r7 = Rlwimi(r7, r8, 3, 0xFFFFFFF8);
   w44 = Rlwimi(w44, levels - 1, 6, 0x3C0);
   w48 = Rlwimi(w48, packed, 11, 0x800);
-  const uint32_t w40 = Load(base, header + 40);
+  const uint32_t w40 = Word(words, 40);
   r5 = Sraw(format, 17);
   r6 = Rlwinm(r6, 2, 0xFFFFFFFC);
   r5 = Rlwimi(r5, r7, 1, 0xFFFFFFFE);
-  Store(base, header + 44, w44);
-  Store(base, header + 48, w48);
+  Word(words, 44) = (w44);
+  Word(words, 48) = (w48);
   w32 |= format & 0x3F;
   r3 &= 0xFFFFFC00;
   w32 = Rlwimi(w32, r4, 6, 0xC0);
   r6 |= r3;
   w32 = Rlwimi(w32, r4, 6, 0x400);
-  Store(base, header + 40, r5 | (w40 & 0x7FF80000));
+  Word(words, 40) = (r5 | (w40 & 0x7FF80000));
   r6 |= 2;
-  Store(base, header + 32, w32);
-  Store(base, header + 28, r6);
+  Word(words, 32) = (w32);
+  Word(words, 28) = (r6);
   return {r3, sizes.base_size, sizes.mip_size};
+}
+
+// The header's words TextureHeader::Set writes (+12 and +16 it leaves).
+constexpr uint32_t kSetWords[] = {0, 4, 8, 20, 24, 28, 32, 36, 40, 44, 48};
+
+}  // namespace
+
+TextureHeaderSizes SetTextureHeader(uint8_t* base, uint32_t type, uint32_t width, uint32_t height,
+                                    uint32_t depth, uint32_t levels, uint32_t usage,
+                                    uint32_t format, uint32_t packed, uint32_t border,
+                                    uint32_t field, uint32_t pitch, uint32_t header) {
+  ITC_NATIVE_RUNNING("sub_822A5608 TextureHeader::Set");
+  uint32_t words[13];
+  for (uint32_t i = 0; i < 13; i++) {
+    words[i] = Load(base, header + 4 * i);
+  }
+  const TextureHeaderSizes sizes = SetTextureHeaderWords(
+      base, words, type, width, height, depth, levels, usage, format, packed, border, field, pitch);
+  for (uint32_t offset : kSetWords) {
+    Store(base, header + offset, Word(words, offset));
+  }
+  return sizes;
 }
 
 LevelLayout TextureLevelLayout(uint8_t* base, uint32_t texture, uint32_t level) {
@@ -889,6 +919,140 @@ uint32_t CreateIndexBuffer(uint8_t* base, uint32_t bytes, uint32_t usage, uint32
   Store(base, header + 4, 1);
   Store(base, header + 20, kUnlocked);
   return header;
+}
+
+uint32_t CreateTexture(uint8_t* base, uint32_t width, uint32_t height, uint32_t depth,
+                       uint32_t levels, uint32_t usage, uint32_t format, uint32_t type) {
+  ITC_NATIVE_RUNNING("sub_822A5D08 Device::CreateTexture");
+  const uint32_t header = memory::crt::XMemAlloc(base, 52, kHeaderAttributes);
+  if (header == 0) {
+    return 0;
+  }
+  const TextureHeaderSizes sizes = SetTextureHeader(base, type, width, height, depth, levels,
+                                                    usage, format, 2, 0, 0, 0, header);
+  // Physical, the protection field 3, or 2 (write-combined) with usage 0x4.
+  const uint32_t attributes = 0x8C800000 | (((~usage >> 2) & 1) | 2) << 28;
+  const uint32_t data = memory::crt::XMemAlloc(base, sizes.base_size, attributes);
+  if (data == 0) {
+    memory::crt::XMemFree(header, kHeaderFreeAttributes);
+    return 0;
+  }
+  uint32_t mips = 0;
+  if (sizes.mip_size != 0) {
+    mips = memory::crt::XMemAlloc(base, sizes.mip_size, attributes);
+    if (mips == 0) {
+      memory::crt::XMemFree(header, kHeaderFreeAttributes);
+      memory::crt::XMemFree(data, 0xB1800000);
+      return 0;
+    }
+  }
+  Store(base, header + 32, (Load(base, header + 32) & 0xFFF) | (data & 0xFFFFF000));
+  Store(base, header + 48, (Load(base, header + 48) & 0xFFF) | (mips & 0xFFFFF000));
+  return header;
+}
+
+uint32_t GetSurfaceLevel(uint8_t* base, uint32_t texture, uint32_t level) {
+  ITC_NATIVE_RUNNING("sub_822A5B80 Texture::GetSurfaceLevel");
+  const uint32_t surface = memory::crt::XMemAlloc(base, 48, kHeaderAttributes);
+  if (surface == 0) {
+    return 0;
+  }
+  const uint32_t common = 0x40100004 | (Load(base, texture) & 0x200000);
+  Store(base, surface + 24, texture);
+  Store(base, surface + 0, common);
+  const uint32_t w28 = Load(base, surface + 28);
+  Store(base, surface + 4, 1);
+  Store(base, surface + 20, kUnlocked);
+  Store(base, surface + 28, (w28 & 0x003FFFFF) | (level << 28));
+  refcount::AddRef(base, texture);
+  return surface;
+}
+
+uint32_t XGSetTextureHeader(uint8_t* base, uint32_t width, uint32_t height, uint32_t levels,
+                            uint32_t usage, uint32_t format, uint32_t base_address,
+                            uint32_t mip_address, uint32_t pitch, uint32_t header,
+                            uint32_t base_size_out, uint32_t mip_size_out) {
+  ITC_NATIVE_RUNNING("sub_8235A920 XGSetTextureHeader");
+  XgTextureHeader args{};
+  args.width = width;
+  args.height = height;
+  args.depth = 1;
+  args.levels = levels;
+  args.usage = usage;
+  args.format = format;
+  args.packed = 2;
+  args.border = 0;
+  args.field = 0;
+  args.base_address = base_address;
+  args.mip_address = mip_address;
+  args.pitch = pitch;
+  args.type = 3;
+  args.header = header;
+  args.base_size_out = base_size_out;
+  args.mip_size_out = mip_size_out;
+  return XGSetTextureHeaderEx(base, args);
+}
+
+bool XgHeaderCopyFits(uint32_t header) {
+  return header == 0 || (header < 0xA0000000u && c_runtime::InOneView(header, 52));
+}
+
+uint32_t XGSetTextureHeaderEx(uint8_t* base, const XgTextureHeader& a) {
+  ITC_NATIVE_RUNNING("sub_8235A720 XGSetTextureHeaderEx");
+  const Block block = GpuBlockSize(a.format & 0x3F);
+  // A single level (one asked, or the full chain of a 1 x 1 x 1 texture,
+  // 3 x 3 x 3 with a border) of a 2D texture takes the pitch, in blocks.
+  bool single = a.levels == 1;
+  if (a.levels == 0) {
+    if (a.width == 1 && a.height == 1 && a.depth == 1 && a.border == 0) {
+      single = true;
+    } else if (a.width == 3 && a.height == 3 && a.depth == 3 && a.border != 0) {
+      single = true;
+    }
+  }
+  // Over the block's height (the original's BlockSize's second output).
+  const uint32_t pitch = single && a.type == 3 ? a.pitch / block.height : 0;
+  // The header, built in a host copy of the original's zeroed stack block.
+  uint32_t words[13] = {};
+  const TextureHeaderSizes sizes =
+      SetTextureHeaderWords(base, words, a.type, a.width, a.height, a.depth, a.levels, a.usage,
+                            a.format, a.packed, a.border, a.field, pitch);
+  Word(words, 32) = (a.base_address & 0xFFFFF000) | (Word(words, 32) & 0xFFF);
+  Word(words, 4) = 1;
+  uint32_t common = 3;
+  if (a.usage & 0x4) {
+    common = 0x00200003;
+  }
+  if (a.usage & 0x200) {
+    common |= 0x00400000;
+  }
+  Word(words, 0) = common;
+  Word(words, 20) = kUnlocked;
+  Word(words, 24) = kUnlocked;
+  uint32_t base_size = sizes.base_size;
+  if (sizes.mip_size != 0) {
+    if (a.mip_address == 0xFFFFFFFF) {
+      // The mips right after the base data.
+      base_size = (sizes.base_size + 4095) & 0xFFFFF000;
+      Word(words, 48) = ((base_size + a.base_address) & ~0xFFFu) | (Word(words, 48) & 0xFFF);
+    } else {
+      Word(words, 48) = (a.mip_address & 0xFFFFF000) | (Word(words, 48) & 0xFFF);
+    }
+  } else {
+    Word(words, 48) &= 0xFFF;
+  }
+  if (a.base_size_out != 0) {
+    Store(base, a.base_size_out, base_size);
+  }
+  if (a.mip_size_out != 0) {
+    Store(base, a.mip_size_out, sizes.mip_size);
+  }
+  if (a.header != 0) {  // the original's memcpy (XgHeaderCopyFits)
+    for (uint32_t i = 0; i < 13; i++) {
+      Store(base, a.header + 4 * i, words[i]);
+    }
+  }
+  return base_size + sizes.mip_size;
 }
 
 namespace {
