@@ -177,7 +177,8 @@ were ready (`strings-and-font.md`, `std-string.md`, `track-route.md`;
 are translated over the guest layout (the user's call); the rest waits
 on `DataFile::GetEntry`, the archive, the XPR, the shader compiler, the
 device's state save and `atexit`.
-Its ninth run (`b7-loop-23-10-26-5`, 2026-10-23 to 24, not yet merged;
+Its ninth run (`b7-loop-23-10-26-5`, 2026-10-23 to 24, merged into
+`rexglue-removal-project` 2026-10-24 before a drive;
 summary `docs/loops/b7-loop-2026-10-23-2022.md`) made the AI drivers,
 the racer controllers and the track zones native as far as they were
 ready (`ai-drivers.md`, `racer-controllers.md`, `track-zones.md`;
