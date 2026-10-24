@@ -275,6 +275,8 @@ set(ITC_SOURCES
     src/debug/image_dump.cpp
     src/debug/shader_compile_dump.cpp
     src/hooks/shader_compiles.cpp
+    src/hooks/movies.cpp
+    src/movies/movie.cpp
     src/debug/replay_stats.cpp
     src/debug/thread_cpu.cpp
     src/native/app_window.cpp
