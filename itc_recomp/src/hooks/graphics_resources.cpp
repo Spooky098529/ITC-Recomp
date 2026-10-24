@@ -14,7 +14,12 @@
 // Texture::BaseSize and TextureLayout::LevelSize (sub_822A4348, sub_822A45B8),
 // from LevelLayout, LevelOffset and Sizes; XGSetTextureHeaderEx
 // (sub_8235A720), from XGSetTextureHeader; TextureHeader::Set (sub_822A5608),
-// from Device::CreateTexture and XGSetTextureHeaderEx.
+// from Device::CreateTexture and XGSetTextureHeaderEx; Resource::Lock
+// (sub_822A63F8), from Texture::LockLevel and the buffers' Locks;
+// Resource::Unlock (sub_822A6630), from the Unlocks; Texture::LockLevel
+// (sub_822A54B0), from LockRect; Texture::LockRect (sub_822A5578), from
+// LockRectLevel and Surface::LockRect; Resource::DestroySurface
+// (sub_822A6268), from Resource::Destroy.
 
 #include "guest.h"
 
@@ -54,7 +59,8 @@ ITC_FLAG_BOOL(native_graphics_resources, true, "ITC",
               "callers have no adapters, and the flag switches their callers: sub_822A44A8, "
               "sub_822A4F60, sub_822A4B98, sub_822A5910, sub_822B5EF8, sub_822B5EA8, "
               "sub_822B5C90, sub_822B5D70, sub_822A4530, sub_822A46C8, sub_822A4A40, sub_822A4348, "
-              "sub_822A45B8, sub_8235A720, sub_822A5608");
+              "sub_822A45B8, sub_8235A720, sub_822A5608, sub_822A63F8, sub_822A6630, sub_822A54B0, "
+              "sub_822A5578, sub_822A6268");
 
 // Defines an adapter: the body (the arguments after the address) uses `ctx`
 // and `base`.
@@ -204,46 +210,9 @@ ITC_GRAPHICS_RESOURCES(822A3880, {
 })
 
 // --- Locks (their GPU work Dropped: src/graphics/resources.h). Levels from
-// 2^31 on run the originals (Texture::LevelOffset's). ---
-
-// r3 the resource, r4 a code (for the fence wait), r5 nonzero for a mip
-// level, r6 and r7 the base and mip data, r8 the address, r9 the size, r10
-// the flags; returns the address.
-ITC_GRAPHICS_RESOURCES(822A63F8, ctx.r3.u64 = LockResource(base, ctx.r3.u32, ctx.r5.u32,
-                                                           ctx.r6.u32, ctx.r7.u32, ctx.r8.u32,
-                                                           ctx.r9.u32, ctx.r10.u32))
-
-// r3 the resource, r4 and r5 the base and mip data.
-ITC_GRAPHICS_RESOURCES(822A6630, ctx.r3.u64 = UnlockResource(base, ctx.r3.u32, ctx.r4.u32,
-                                                             ctx.r5.u32))
-
-// r3 the texture, r4 the face, r5 the level, r6 the flags; out: r7 the
-// address, r8 the pitch, r9 the slice, r10 the tail offset.
-extern "C" REX_FUNC(sub_822A54B0) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_graphics_resources) || ctx.r5.u32 >= 0x80000000u) {
-    __imp__sub_822A54B0(ctx, base);
-    return;
-  }
-  const LevelLock lock = LockTextureLevel(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32);
-  guest::StoreU32(base, ctx.r7.u32, lock.address);
-  guest::StoreU32(base, ctx.r8.u32, lock.pitch);
-  guest::StoreU32(base, ctx.r9.u32, lock.slice);
-  guest::StoreU32(base, ctx.r10.u32, lock.tail);
-  ctx.r3.u64 = lock.r3;
-}
-
-// r3 the texture, r4 the face, r5 the level, r6 the locked rect out, r7 a
-// rectangle or 0, r8 the flags.
-extern "C" REX_FUNC(sub_822A5578) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_graphics_resources) || ctx.r5.u32 >= 0x80000000u) {
-    __imp__sub_822A5578(ctx, base);
-    return;
-  }
-  ctx.r3.u64 = LockTextureRect(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32,
-                               ctx.r8.u32);
-}
+// 2^31 on run the originals (Texture::LevelOffset's). Resource::Lock and
+// Unlock, Texture::LockLevel and LockRect have no adapters: only these call
+// them. ---
 
 // r3 the texture, r4 the level, r5 the locked rect, r6 the rectangle, r7
 // the flags: face 0.
@@ -278,7 +247,9 @@ ITC_GRAPHICS_RESOURCES(822A6A78, ctx.r3.u64 = UnlockIndexBuffer(base, ctx.r3.u32
 // --- Destruction ---
 
 // r3 the resource (from Resource::Release at 0). Type 9 runs the original
-// (its sub_822AD9D8, not seen in play).
+// (its sub_822AD9D8, not seen in play). Its surface case (sub_822A6268, a
+// piece the recompiler split off) has no adapter: the original's runs only
+// from the original Destroy.
 extern "C" REX_FUNC(sub_822A6210) {
   REX_FUNC_PROLOGUE();
   if (!ITC_FLAG(native_graphics_resources) || !hooks::NativeHeapActive() ||
@@ -287,18 +258,4 @@ extern "C" REX_FUNC(sub_822A6210) {
     return;
   }
   ctx.r3.u64 = DestroyResource(base, ctx.r3.u32);
-}
-
-// Resource::Destroy's surface case, split off by the recompiler: entered
-// with Destroy's frame (r31 = the surface, r11 = its +0), so it ends as
-// Destroy does (its 112-byte frame popped, r29-r31 and lr restored).
-extern "C" REX_FUNC(sub_822A6268) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_graphics_resources) || !hooks::NativeHeapActive()) {
-    __imp__sub_822A6268(ctx, base);
-    return;
-  }
-  ctx.r3.u64 = DestroySurface(base, ctx.r31.u32, ctx.r11.u32);
-  ctx.r1.s64 = ctx.r1.s64 + 112;
-  __restgprlr_29(ctx, base);
 }
