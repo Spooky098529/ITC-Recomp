@@ -176,8 +176,18 @@ were ready (`strings-and-font.md`, `std-string.md`, `track-route.md`;
 `TrackPosition::Init` and `Update`; `std::string`'s member functions
 are translated over the guest layout (the user's call); the rest waits
 on `DataFile::GetEntry`, the archive, the XPR, the shader compiler, the
-device's state save and `atexit`. Harness runs use
-`attract_race.sh 40` (the user's call, 2026-10-23).
+device's state save and `atexit`.
+Its ninth run (`b7-loop-23-10-26-5`, 2026-10-23 to 24, not yet merged;
+summary `docs/loops/b7-loop-2026-10-23-2022.md`) made the AI drivers,
+the racer controllers and the track zones native as far as they were
+ready (`ai-drivers.md`, `racer-controllers.md`, `track-zones.md`;
+`--native_ai_drivers`, `--native_racer_controllers`,
+`--native_track_zones`; ours 1,223 -> 1,485); the rest waits on the
+array destructor iterator (`sub_820900C0`), the getter of
+`[0x826C6078]` (`sub_821434E8`), the race flow's functors and the
+camera modes. Harness runs use `attract_race.sh 40` (the user's call,
+2026-10-23); a race short only because the harnesses took longer is
+no halt.
 After each plan item, run `itc_recomp/tools/boundary_status.py` and record
 its output in "The boundary over time" at the end of
 `docs/rexglue-removal.md`. Plan steps are done on their

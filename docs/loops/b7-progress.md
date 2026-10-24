@@ -18,15 +18,16 @@ file's history. What's left to see in a drive, from every run:
 - Subsystem 1 of 3 (the AI drivers) finished: 143 of 148 ours; the
   rest waits on `sub_820900C0` and `sub_821434E8`.
 - Subsystem 2 of 3 (the racer controllers) finished: 27 of 27 ours.
-- Subsystem 3 of 3: the track zones (`track-zones.md`, mapped in
-  52cd53b from the "path search" lead, which turned out to be 70
-  stretches of the course's route the player's car is checked against
-  for the HUD; 92 rows, 12 ready groups, no outside blockers).
-  Migration 1 (31bc1e8..a99b454): 92 of 92 ours (9 Native),
-  `--native_track_zones`; nothing left. Step: validation (agent
-  running).
+- Subsystem 3 of 3 (the track zones) finished: 92 of 92 ours. The
+  loop stopped at the run's limit (below).
 
 ## Done
+
+- The track zones (`track-zones.md`, mapped in 52cd53b; 92 rows): 92
+  ours (9 Native) in one migration (31bc1e8..a99b454), validated (92
+  of 92 harness lines; `itc_1253`, `itc_1254`, replay ok; all ran in
+  play); `--native_track_zones`. Left: none; Init, AddBranch, Update
+  and Test keep adapters for the camera modes' recompiled callers.
 
 - The racer controllers (`racer-controllers.md`, mapped in b5491fb; 27
   rows): 27 ours (15 Native) in one migration (699bbde..7b85ae8) and
@@ -95,3 +96,13 @@ This run's groups: `expected-differences.md` (the "20:22 run" lines).
   (wrapped 123, known 559, unknown 4591). Race 28 s (`itc_1252`) with
   `--run_harnesses=all`, 0 errors, every harness 0 differing (none
   added).
+
+## Stopped
+
+2026-10-24, after the track zones: the run's limit (3 subsystems)
+reached. Everything passed: harnesses 0 differing outside the earlier
+"(expected to differ)" groups (none added), attract races 20-22 s
+under `attract_race.sh 30`, then 28-31 s under `attract_race.sh 40`
+(the user's call), no errors, replays ok. Next: the user reviews
+`review.md` ("Run 2026-10-23 20:22"), drives a race for `to-drive.md`,
+and merges.
