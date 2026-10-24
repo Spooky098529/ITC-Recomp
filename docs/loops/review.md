@@ -90,6 +90,27 @@ When the user has reviewed a run's section, its heading gets
     (a NaN sign showed as 1 difference when its random inputs changed);
     the new cases now use their own `Random`, Text::Draw back to 0. A
     gap in that harness worth a later look.
+- `input.md` (new, mapped in 167d407): 29 rows, the input manager and
+  input processors (B1's 13 input rows moved from `functions.md`, kept
+  with "B1's native code" or "Read (2026-10-24)" added; four unnamed
+  ones named `AnyPressed`, `PressedOrRepeat`, `TestPressed`,
+  `TestRepeat`, the getters `LogicalPad::Values` and
+  `PhysicalPad::Values`); 1 lead (the app framework). For review:
+  - The manager's vtable `0x82000F48` read from the image: slots 1
+    `GetProcessor`, 2 `GetLogicalPad`, 3 `AddListener`, 5
+    `GetPhysicalPad` in play.
+  - Four `std::list` of pointers helpers mapped here as `PtrList::`
+    (`sub_820AD058`, `sub_82099C08`, `sub_82095958`, `sub_820958B8`;
+    the last taken from the C++ containers lead, which says so); shared
+    with other subsystems (the sound manager).
+  - Correction to the action mappers' map: the object
+    `ActionMappers::Init` is given is probably the app object from
+    `sub_82106548` (its slot +36 gives the input manager), not the input
+    manager (`known-data.md`'s `0x826BAB78` row, `input.md`'s intro;
+    `action-mappers.md`'s rows unchanged, its pointers moved to
+    `input.md`).
+  - The processor's constructor sets the repeat period to 4; the
+    mappers' repeat objects use 3 (both as read).
 
 ## Run 2026-10-24 16:01 (`b7-loop-24-10-26-2`)
 

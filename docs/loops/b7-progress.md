@@ -35,7 +35,10 @@ see in a drive, from every run: `to-drive.md`.
   play or the replay). Done.
 - Subsystem 2 of 3: `leads.md`'s input processor's constructors
   (`sub_8258CE60`, `sub_825920D0`; both ready, 3 functions left; block
-  `ActionMapper::ActionMapper`). Mapping agent running.
+  `ActionMapper::ActionMapper`). Mapped as the input manager and
+  processors (`input.md`, 29 rows: 13 moved from `functions.md`, 16 new;
+  167d407; 17 ready groups; 1 lead added); map checked (0 errors, 29 of
+  29 in play). Migration 1 running.
 
 ## Done
 
