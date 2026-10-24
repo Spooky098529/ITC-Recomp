@@ -9,6 +9,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <optional>
 
 namespace post_effects {
 
@@ -48,5 +49,44 @@ void ColorFilterSetColor0(uint8_t* base, uint32_t filter, double r, double g, do
 // ColorFilter::Set8112, Set8116, Set8120 (sub_82135138, sub_82135140,
 // sub_82135148): the float at `offset` = value.
 void ColorFilterSet(uint8_t* base, uint32_t filter, uint32_t offset, double value);
+
+
+// The effects' recording helpers (r3 = the effect, not read by those that
+// take only the list): each writes its slots on the command list `list`
+// (command_list::AllocateSlots, without the list's diagnostics) and
+// returns r3 as the original leaves it (its last slot), or nothing, with
+// nothing written, when the list hasn't room for all its slots (the
+// original prints a message there and writes through address 0: left to
+// it).
+//
+// PostEffect::RecordBeginStates (sub_82133340): 24 slots (command 34's
+// one left as it was).
+std::optional<uint32_t> RecordBeginStates(uint8_t* base, uint32_t list);
+// PostEffect::RecordEndStates (sub_82133608): 13 slots (command 35's one
+// left as it was).
+std::optional<uint32_t> RecordEndStates(uint8_t* base, uint32_t list);
+// PostEffect::RecordTargets (sub_82133790): render targets 0-3 = surface,
+// the depth surface: 7 slots.
+std::optional<uint32_t> RecordTargets(uint8_t* base, uint32_t list, uint32_t surface,
+                                      uint32_t depth);
+// PostEffect::RecordPixelConstants (sub_82133D00): command 7 (pixel floats,
+// `reg`, `count`) and one slot copied from the 16 bytes at `source`.
+std::optional<uint32_t> RecordPixelConstants(uint8_t* base, uint32_t list, uint32_t source,
+                                             uint32_t reg, uint32_t count);
+// PostEffect::RecordPixelBool (sub_82133D70): command 7 (pixel bool, `reg`)
+// and 4 bytes holding `value`.
+std::optional<uint32_t> RecordPixelBool(uint8_t* base, uint32_t list, uint32_t value, uint32_t reg);
+// PostEffect::RecordTexelSize (sub_82133DD8): c32 = (1/width, 1/height, 0,
+// 0) through RecordPixelConstants' slots.
+std::optional<uint32_t> RecordTexelSize(uint8_t* base, uint32_t list, double width, double height);
+// PostEffect::AddQuad (sub_82133E30): three 40-byte vertices in the
+// effect's vertex buffers; returns the first. Never fails.
+uint32_t AddQuad(uint8_t* base, uint32_t effect, uint32_t width, uint32_t height, double value,
+                 bool at_view);
+// PostEffect::RecordResolve (sub_82133F58): command 25 and its 68-byte
+// item (6 slots).
+std::optional<uint32_t> RecordResolve(uint8_t* base, uint32_t effect, uint32_t list,
+                                      uint32_t texture, uint32_t flags, uint32_t more_flags,
+                                      bool by_view);
 
 }  // namespace post_effects

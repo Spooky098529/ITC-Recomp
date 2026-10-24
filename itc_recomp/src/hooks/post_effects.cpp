@@ -17,6 +17,8 @@
 #include "hooks/guest_call.h"
 #include "post_effects/post_effects.h"
 
+#include <optional>
+
 ITC_FLAG_BOOL(native_post_effects, true, "ITC",
               "Run the post effects (docs/functions/post-effects.md: PostEffects::Get "
               "sub_82133AE8, MarkUpdated sub_82133A08, ToggleNoHistory sub_82133A38 (no adapter: only "
@@ -24,7 +26,11 @@ ITC_FLAG_BOOL(native_post_effects, true, "ITC",
               "sub_82133A70, Race::ToggleEffects sub_8215B690 with ScreenObject::ToggleHidden "
               "sub_8212EDE0 (no adapter, the same), the glow's setters sub_82136EF8 to sub_82136F48 and "
               "Glow::SetFromSpeed sub_82133878, the color filter's setters sub_821350F8, "
-              "sub_82135138, sub_82135140 and sub_82135148) natively instead of through the "
+              "sub_82135138, sub_82135140 and sub_82135148; the recording helpers "
+              "PostEffect::RecordBeginStates sub_82133340, RecordEndStates sub_82133608, "
+              "RecordTargets sub_82133790, RecordPixelConstants sub_82133D00, RecordPixelBool "
+              "sub_82133D70, RecordTexelSize sub_82133DD8, AddQuad sub_82133E30 and RecordResolve "
+              "sub_82133F58, without the command list's diagnostics) natively instead of through the "
               "translated code (the same writes; checked by --run_harnesses=post_effects)");
 
 #define ITC_POST_EFFECTS(address, ...)    \
@@ -113,3 +119,42 @@ ITC_POST_EFFECTS(82135140, ctx.fpscr.disableFlushMode();
                  ColorFilterSet(base, ctx.r3.u32, 8116, ctx.f1.f64))
 ITC_POST_EFFECTS(82135148, ctx.fpscr.disableFlushMode();
                  ColorFilterSet(base, ctx.r3.u32, 8120, ctx.f1.f64))
+
+// --- The recording helpers: r3 = the effect, r4 = the command list ---
+
+// Runs the original when the plain C++ has no answer (the list full).
+#define ITC_POST_EFFECTS_RECORD(address, ...)                 \
+  extern "C" REX_FUNC(sub_##address) {                        \
+    REX_FUNC_PROLOGUE();                                      \
+    std::optional<uint32_t> r3;                               \
+    if (ITC_FLAG(native_post_effects)) {                      \
+      r3 = __VA_ARGS__;                                       \
+    }                                                         \
+    if (!r3) {                                                \
+      __imp__sub_##address(ctx, base);                        \
+      return;                                                 \
+    }                                                         \
+    ctx.r3.u64 = *r3;                                         \
+  }
+
+ITC_POST_EFFECTS_RECORD(82133340, RecordBeginStates(base, ctx.r4.u32))
+ITC_POST_EFFECTS_RECORD(82133608, RecordEndStates(base, ctx.r4.u32))
+// r5 = the surface, r6 = the depth surface.
+ITC_POST_EFFECTS_RECORD(82133790, RecordTargets(base, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32))
+// r5 = the 16 bytes, r6 = the register, r7 = the count.
+ITC_POST_EFFECTS_RECORD(82133D00,
+                        RecordPixelConstants(base, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32))
+// r5 = the value, r6 = the register.
+ITC_POST_EFFECTS_RECORD(82133D70, RecordPixelBool(base, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32))
+// f1 = width, f2 = height.
+ITC_POST_EFFECTS_RECORD(82133DD8, (ctx.fpscr.disableFlushMode(),
+                                   RecordTexelSize(base, ctx.r4.u32, ctx.f1.f64, ctx.f2.f64)))
+// r5 = the texture, r6, r7 = the flags, r8 = by the view's rectangle.
+ITC_POST_EFFECTS_RECORD(82133F58, RecordResolve(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                                ctx.r6.u32, ctx.r7.u32, ctx.r8.u32 != 0))
+
+// PostEffect::AddQuad: r4 = width, r5 = height, f1 = the value, r7 = at the
+// view's position.
+ITC_POST_EFFECTS(82133E30, ctx.fpscr.disableFlushMode();
+                 ctx.r3.u64 = AddQuad(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.f1.f64,
+                                      ctx.r7.u32 != 0))

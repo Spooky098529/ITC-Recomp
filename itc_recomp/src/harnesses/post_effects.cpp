@@ -328,6 +328,182 @@ void SetFromSpeedCases(Context& h, uint32_t block) {
   results.Report();
 }
 
+// --- The recording helpers ---
+
+// A command list in the block (at kList): the slots used (+12) random, the
+// capacity (+8) with room for the helper's slots and a little more (a full
+// list makes the original print and write through address 0, so it isn't
+// tried), the write pointer (+44) somewhere in the first 8 KiB (filled with
+// random words, so the words a helper leaves alone are compared too).
+constexpr uint32_t kList = 0x3800;
+
+void RandomList(Context& h, std::vector<uint32_t>& words, uint32_t block, uint32_t slots) {
+  Random& r = h.random;
+  const uint32_t used = r.Below(4) == 0 ? uint32_t(r.Next()) & 0x7FFFFFFFu : r.Below(5000);
+  const uint32_t room = r.Below(3) == 0 ? 1 : 1 + r.Below(100);
+  words[kList / 4 + 2] = used + slots + room;  // the capacity: used + slots below it
+  words[kList / 4 + 3] = used;
+  words[kList / 4 + 11] = block + 16 * r.Below(400) + (r.Below(8) == 0 ? 4 * r.Below(4) : 0);
+}
+
+struct RecordCase {
+  uint32_t r3, r4, r5, r6, r7, r8;
+  double f1, f2;
+};
+
+// Runs one helper on the block both ways and compares the block (the
+// ranges in `floats` as floats: the vertices AddQuad writes), r3 and f1.
+void RecordCheck(Context& h, Results& results, uint32_t block, const std::vector<uint32_t>& words,
+                 const RecordCase& c, GuestFunction recompiled, GuestFunction native,
+                 uint32_t float_start, uint32_t float_count, const std::string& what) {
+  Outputs out[2];
+  for (int v = 0; v < 2; v++) {
+    for (uint32_t i = 0; i < words.size(); i++) {
+      guest::StoreU32(h.base, block + 4 * i, words[i]);
+    }
+    PPCContext t = CallContext(h);
+    t.r3.u64 = c.r3;
+    t.r4.u64 = c.r4;
+    t.r5.u64 = c.r5;
+    t.r6.u64 = c.r6;
+    t.r7.u64 = c.r7;
+    t.r8.u64 = c.r8;
+    t.f1.f64 = c.f1;
+    t.f2.f64 = c.f2;
+    Run(v, recompiled, native, t, h.base);
+    if (float_count != 0) {
+      out[v].Bytes(Read(h.base, block, float_start - block));
+      out[v].Floats(h.base, float_start, float_count);
+      const uint32_t end = float_start + 4 * float_count;
+      out[v].Bytes(Read(h.base, end, block + kBlockBytes - end));
+    } else {
+      out[v].Bytes(Read(h.base, block, kBlockBytes));
+    }
+    out[v].Word(t.r3.u32);
+  }
+  results.Check(out[0], out[1], what);
+}
+
+uint32_t RandomRegister(Random& r) {
+  return r.Below(4) == 0 ? uint32_t(r.Next()) : r.Below(256);
+}
+
+void RecordCases(Context& h, uint32_t block) {
+  struct Helper {
+    const char* name;
+    GuestFunction recompiled, native;
+    uint32_t slots;
+  };
+  const Helper helpers[] = {
+      {"sub_82133340 PostEffect::RecordBeginStates", __imp__sub_82133340, sub_82133340, 24},
+      {"sub_82133608 PostEffect::RecordEndStates", __imp__sub_82133608, sub_82133608, 13},
+      {"sub_82133790 PostEffect::RecordTargets", __imp__sub_82133790, sub_82133790, 7},
+      {"sub_82133D00 PostEffect::RecordPixelConstants", __imp__sub_82133D00, sub_82133D00, 2},
+      {"sub_82133D70 PostEffect::RecordPixelBool", __imp__sub_82133D70, sub_82133D70, 2},
+      {"sub_82133DD8 PostEffect::RecordTexelSize", __imp__sub_82133DD8, sub_82133DD8, 2},
+      {"sub_82133F58 PostEffect::RecordResolve", __imp__sub_82133F58, sub_82133F58, 6},
+  };
+  Random& r = h.random;
+  for (const Helper& helper : helpers) {
+    Results results(helper.name);
+    for (int c = 0; c < 100; c++) {
+      std::vector<uint32_t> words(kBlockBytes / 4);
+      for (uint32_t& w : words) {
+        w = uint32_t(r.Next());
+      }
+      RandomList(h, words, block, helper.slots);
+      // The effect at 0x3000 (its +16 to +28: the view's size and position),
+      // the 16 bytes at 0x2800.
+      RecordCase k{};
+      k.r3 = block + 0x3000;
+      k.r4 = block + kList;
+      k.r5 = uint32_t(r.Next());
+      k.r6 = uint32_t(r.Next());
+      k.r7 = uint32_t(r.Next());
+      k.r8 = r.Below(2) == 0 ? 0 : uint32_t(r.Next());
+      if (helper.recompiled == __imp__sub_82133D00) {
+        k.r5 = block + 0x2800 + 4 * r.Below(16);
+        k.r6 = RandomRegister(r);
+        k.r7 = r.Below(4) == 0 ? uint32_t(r.Next()) : 1 + r.Below(8);
+      } else if (helper.recompiled == __imp__sub_82133D70) {
+        k.r5 = r.Below(2) == 0 ? r.Below(2) : uint32_t(r.Next());
+        k.r6 = RandomRegister(r);
+      } else if (helper.recompiled == __imp__sub_82133F58) {
+        k.r6 = r.Below(2) == 0 ? r.Below(1024) : uint32_t(r.Next());
+        k.r7 = r.Below(2) == 0 ? 0 : (r.Below(2) == 0 ? uint32_t(-3 - int(r.Below(4))) : uint32_t(r.Next()));
+        if (r.Below(8) == 0) {
+          k.r7 = 0;
+          k.r8 = 0x10000000u << r.Below(4);
+        }
+      }
+      k.f1 = c < 50 ? double(1 + r.Below(1280)) : RandomDouble(r, 4096.0);
+      k.f2 = c < 50 ? double(1 + r.Below(720)) : RandomDouble(r, 4096.0);
+      RecordCheck(h, results, block, words, k, helper.recompiled, helper.native, 0, 0,
+                  fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+}
+
+// AddQuad on an effect at the block's start: +8060 (the buffer, 0 or 1),
+// +8056 (the vertices used, mostly below 100), +24 and +28 (the view's
+// position) and the width and height (the game's, or any 32 bits: the
+// original converts them unsigned), f1 random, r7 0 or not (its low word).
+void AddQuadCases(Context& h, uint32_t block) {
+  Results results("sub_82133E30 PostEffect::AddQuad");
+  Random& r = h.random;
+  for (int c = 0; c < 200; c++) {
+    std::vector<uint32_t> words(kBlockBytes / 4);
+    for (uint32_t& w : words) {
+      w = uint32_t(r.Next());
+    }
+    const uint32_t buffer = r.Below(2);
+    const uint32_t used = r.Below(5) == 0 ? r.Below(150) : 3 * r.Below(33);
+    words[8060 / 4] = buffer;
+    words[8056 / 4] = used;
+    auto size = [&](uint32_t typical) {
+      switch (r.Below(4)) {
+        case 0: return uint32_t(r.Next());
+        case 1: return r.Below(1 << 24);
+        default: return typical >> r.Below(4);
+      }
+    };
+    if (r.Below(2) == 0) {
+      words[24 / 4] = r.Below(2) == 0 ? 0 : 288;
+      words[28 / 4] = r.Below(2) == 0 ? 0 : 288;
+    }
+    RecordCase k{};
+    k.r3 = block;
+    k.r4 = size(1280);
+    k.r5 = size(720);
+    k.f1 = c < 100 ? double(r.Below(1000)) / 1000.0 : RandomDouble(r, 10.0);
+    // r7: 0, 1, or only its upper word set (read as 0); r4's upper word
+    // set with it (the original takes the low word).
+    const uint64_t r7 = r.Below(5) == 0 ? 0x100000000ull : r.Below(2);
+    const uint32_t vertices = block + 56 + 40 * (100 * buffer + used);
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      for (uint32_t i = 0; i < words.size(); i++) {
+        guest::StoreU32(h.base, block + 4 * i, words[i]);
+      }
+      PPCContext t = CallContext(h);
+      t.r3.u64 = k.r3;
+      t.r4.u64 = k.r4 | (uint64_t(r7 >> 32) << 40);
+      t.r5.u64 = k.r5;
+      t.r7.u64 = r7;
+      t.f1.f64 = k.f1;
+      Run(v, __imp__sub_82133E30, sub_82133E30, t, h.base);
+      out[v].Bytes(Read(h.base, block, vertices - block));
+      out[v].Floats(h.base, vertices, 30);
+      out[v].Bytes(Read(h.base, vertices + 120, block + kBlockBytes - vertices - 120));
+      out[v].Word(t.r3.u32);
+    }
+    results.Check(out[0], out[1], fmt::format("case {} buffer {} used {} size {} {} r7 {:X}", c,
+                                              buffer, used, k.r4, k.r5, r7));
+  }
+  results.Report();
+}
+
 }  // namespace
 
 void PostEffects(Context& h) {
@@ -342,6 +518,8 @@ void PostEffects(Context& h) {
   ToggleCases(h, block);
   SetterCases(h, block);
   SetFromSpeedCases(h, block);
+  RecordCases(h, block);
+  AddQuadCases(h, block);
   memory::Free(block);
 }
 
