@@ -18,7 +18,13 @@
 #include "memory/heap.h"
 #include "std_list/ptr_list.h"
 
+#include "input/input_manager.h"
+
 #include <fmt/format.h>
+
+#include <algorithm>
+#include <bit>
+#include <limits>
 
 #include <string>
 #include <utility>
@@ -31,6 +37,7 @@ namespace harness {
 namespace {
 
 namespace sl = std_list;
+namespace in = input;
 
 // Cases the plain C++ handed to the original (none expected).
 int g_fallbacks = 0;
@@ -64,6 +71,33 @@ void NativeInsert(PPCContext& ctx, uint8_t* base) {
   }
 }
 
+#define ITC_NATIVE_STEP(name, body)           \
+  void name(PPCContext& ctx, uint8_t* base) { \
+    ctx.fpscr.disableFlushMode();             \
+    body;                                     \
+  }
+ITC_NATIVE_STEP(NativeLogicalPadConstruct, in::LogicalPadConstruct(base, ctx.r3.u32))
+ITC_NATIVE_STEP(NativePhysicalPadConstruct, in::PhysicalPadConstruct(base, ctx.r3.u32))
+ITC_NATIVE_STEP(NativeProcessorBaseConstruct, in::InputProcessorBaseConstruct(base, ctx.r3.u32))
+ITC_NATIVE_STEP(NativeProcessorConstruct, in::InputProcessorConstruct(base, ctx.r3.u32))
+ITC_NATIVE_STEP(NativeBind, in::LogicalPadBind(base, ctx.r3.u32, guest::LoadU32(base, ctx.r4.u32),
+                                               ctx.r5.u32))
+ITC_NATIVE_STEP(NativeAssign, in::InputProcessorAssign(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_STEP(NativeGetProcessor,
+                ctx.r3.u64 = in::ManagerProcessor(ctx.r3.u32, guest::LoadU32(base, ctx.r4.u32)))
+ITC_NATIVE_STEP(NativeGetLogicalPad,
+                ctx.r3.u64 = in::ManagerLogicalPad(ctx.r3.u32, guest::LoadU32(base, ctx.r4.u32)))
+ITC_NATIVE_STEP(NativeGetPhysicalPad,
+                ctx.r3.u64 = in::ManagerPhysicalPad(ctx.r3.u32, guest::LoadU32(base, ctx.r4.u32)))
+ITC_NATIVE_STEP(NativeLogicalPadValues, ctx.r3.u64 = in::LogicalPadValues(ctx.r3.u32))
+ITC_NATIVE_STEP(NativePhysicalPadValues, ctx.r3.u64 = in::PhysicalPadValues(ctx.r3.u32))
+// The tests and their wrappers (the wrappers read the mask from r4 too).
+ITC_NATIVE_STEP(NativeAnyPressed, ctx.r3.u64 = in::InputProcessorAnyPressed(
+                                      base, ctx.r3.u32, guest::LoadU32(base, ctx.r4.u32)))
+ITC_NATIVE_STEP(NativePressedOrRepeat, ctx.r3.u64 = in::InputProcessorPressedOrRepeat(
+                                           base, ctx.r3.u32, guest::LoadU32(base, ctx.r4.u32)))
+#undef ITC_NATIVE_STEP
+
 // A heap block a case made: its address replaced by this marker wherever
 // it's stored.
 constexpr uint32_t kNodeMarker = 0xB10C0001;
@@ -72,10 +106,20 @@ uint32_t Normalize(uint32_t word, uint32_t node) {
   return node != 0 && word == node ? kNodeMarker : word;
 }
 
-// The scratch area as words (exact), with the node's address replaced.
-void AreaWords(Context& h, Outputs& out, uint32_t node) {
+// Guest addresses of words the function stores as floats.
+using FloatWords = std::vector<uint32_t>;
+
+// The scratch area as words (exact, with the node's address replaced), the
+// words in `floats` as floats.
+void AreaWords(Context& h, Outputs& out, uint32_t node, const FloatWords& floats = {}) {
   for (uint32_t at = 0; at < kScratchBytes; at += 4) {
-    out.Word(Normalize(guest::LoadU32(h.base, h.data + at), node));
+    const uint32_t address = h.data + at;
+    const uint32_t word = guest::LoadU32(h.base, address);
+    if (std::find(floats.begin(), floats.end(), address) != floats.end()) {
+      out.Float(word);
+    } else {
+      out.Word(Normalize(word, node));
+    }
   }
 }
 
@@ -239,6 +283,235 @@ void InsertCases(Context& h) {
   results.Report();
 }
 
+// --- The pads and processors ---
+
+uint32_t Bits(float f) {
+  return std::bit_cast<uint32_t>(f);
+}
+
+// A float: mostly in [-range, range], sometimes an edge value.
+float RandomFloat(Random& r, float range) {
+  static const float kEdges[] = {0.0f,
+                                 -0.0f,
+                                 1.0f,
+                                 -1.0f,
+                                 0.5f,
+                                 std::numeric_limits<float>::infinity(),
+                                 -std::numeric_limits<float>::infinity(),
+                                 std::numeric_limits<float>::quiet_NaN(),
+                                 -std::numeric_limits<float>::quiet_NaN(),
+                                 std::numeric_limits<float>::denorm_min(),
+                                 std::numeric_limits<float>::max()};
+  if (r.Below(6) == 0) {
+    return kEdges[r.Below(uint32_t(std::size(kEdges)))];
+  }
+  return (float(r.Below(2000001)) / 1000000.0f - 1.0f) * range;
+}
+
+// An object's address in the scratch area: 16-byte aligned (the game's
+// processors are, and Input::Update's native path wants them so), at a few
+// offsets, leaving `bytes` inside.
+uint32_t ObjectAt(Context& h, int i, uint32_t bytes) {
+  const uint32_t room = (kScratchBytes - bytes) / 16;
+  return h.data + 16 * uint32_t(i % int(room < 8 ? room : 8));
+}
+
+FloatWords ProcessorConstantFloats(uint32_t p) {
+  FloatWords floats = {p + 16, p + 20, p + 24, p + 28};
+  for (uint32_t w = p + 44; w <= p + 124; w += 16) {
+    floats.push_back(w);
+  }
+  return floats;
+}
+
+// A constructor: r3 the object; the area (floats where it stores them), r3.
+void ConstructorCases(Context& h, const char* name, GuestFunction recompiled,
+                      GuestFunction native, uint32_t bytes, FloatWords (*floats)(uint32_t)) {
+  Results results(name);
+  for (int i = 0; i < 16; i++) {
+    const uint32_t object = ObjectAt(h, i, bytes) + (i >= 8 ? 4 * uint32_t(i - 8) : 0);
+    Case(
+        h, results, [] {}, [&](PPCContext& t) { t.r3.u64 = object; }, recompiled, native,
+        [&](Outputs& out, const PPCContext& t) {
+          AreaWords(h, out, 0, floats(object));
+          out.Word(t.r3.u32);
+        },
+        fmt::format("object at +{}", object - h.data));
+  }
+  results.Report();
+}
+
+void PadCases(Context& h) {
+  ConstructorCases(h, "sub_82591B38 LogicalPad::LogicalPad", __imp__sub_82591B38,
+                   NativeLogicalPadConstruct, 196, [](uint32_t) { return FloatWords{}; });
+  ConstructorCases(h, "sub_82591B68 PhysicalPad::PhysicalPad", __imp__sub_82591B68,
+                   NativePhysicalPadConstruct, 212,
+                   [](uint32_t p) { return FloatWords{p + 168, p + 180}; });
+  ConstructorCases(h, "sub_825920D0 InputProcessorBase::InputProcessorBase",
+                   __imp__sub_825920D0, NativeProcessorBaseConstruct, 416,
+                   ProcessorConstantFloats);
+  ConstructorCases(h, "sub_8258CE60 InputProcessor::InputProcessor", __imp__sub_8258CE60,
+                   NativeProcessorConstruct, 416, ProcessorConstantFloats);
+
+  {
+    Results results("sub_825918F0 LogicalPad::Bind");
+    const uint32_t pad = h.data + 256;
+    const uint32_t index = h.data;
+    for (int i = 0; i < 100; i++) {
+      uint32_t device = 0;
+      Case(
+          h, results,
+          [&] {
+            Random& r = h.random;
+            // The game's indices (0-3), then others the pad's room allows.
+            guest::StoreU32(h.base, index, i < 40 ? uint32_t(i % 4) : r.Below(64));
+            device = uint32_t(r.Next());
+          },
+          [&](PPCContext& t) {
+            t.r3.u64 = pad;
+            t.r4.u64 = index;
+            t.r5.u64 = device;
+          },
+          __imp__sub_825918F0, NativeBind,
+          [&](Outputs& out, const PPCContext& t) {
+            AreaWords(h, out, 0);
+            out.Word(t.r3.u32);
+          },
+          fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+
+  // The leaves returning an address from r3 (and the index at r4's).
+  struct Getter {
+    const char* name;
+    GuestFunction recompiled, native;
+  };
+  const Getter kGetters[] = {
+      {"sub_82098CB8 InputManager::GetProcessor", __imp__sub_82098CB8, NativeGetProcessor},
+      {"sub_82098CD0 InputManager::GetLogicalPad", __imp__sub_82098CD0, NativeGetLogicalPad},
+      {"sub_82098FE0 InputManager::GetPhysicalPad", __imp__sub_82098FE0, NativeGetPhysicalPad},
+      {"sub_82591B30 LogicalPad::Values", __imp__sub_82591B30, NativeLogicalPadValues},
+      {"sub_820988B8 PhysicalPad::Values", __imp__sub_820988B8, NativePhysicalPadValues},
+  };
+  for (const Getter& g : kGetters) {
+    Results results(g.name);
+    const uint32_t index = h.data;
+    for (int i = 0; i < 60; i++) {
+      uint32_t object = 0;
+      Case(
+          h, results,
+          [&] {
+            Random& r = h.random;
+            object = i < 20 ? 0x40000000u + 16 * r.Below(0x10000) : uint32_t(r.Next());
+            guest::StoreU32(h.base, index, i < 30 ? uint32_t(i % 5) : uint32_t(r.Next()));
+          },
+          [&](PPCContext& t) {
+            t.r3.u64 = object;
+            t.r4.u64 = index;
+          },
+          g.recompiled, g.native,
+          [&](Outputs& out, const PPCContext& t) {
+            AreaWords(h, out, 0);
+            out.Word(t.r3.u32);
+          },
+          fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+
+  {
+    Results results("sub_82098D60 InputProcessor::Assign");
+    for (int i = 0; i < 100; i++) {
+      // The two processors apart (the manager's and a mapper's listener),
+      // 16-byte aligned or not.
+      const uint32_t source = h.data + 16 + (i % 2 ? 4 : 0);
+      const uint32_t destination = h.data + 2048 + (i % 3 == 2 ? 8 : 0);
+      Case(
+          h, results,
+          [&] {
+            Random& r = h.random;
+            for (uint32_t at = 0; at < 416; at += 4) {
+              const bool is_float = at >= 16 && at < 264;
+              guest::StoreU32(h.base, source + at,
+                              is_float ? Bits(RandomFloat(r, 2.0f)) : uint32_t(r.Next()));
+            }
+          },
+          [&](PPCContext& t) {
+            t.r3.u64 = destination;
+            t.r4.u64 = source;
+          },
+          __imp__sub_82098D60, NativeAssign,
+          [&](Outputs& out, const PPCContext& t) {
+            FloatWords floats;
+            for (uint32_t at = 128; at < 264; at += 4) {
+              floats.push_back(destination + at);
+            }
+            AreaWords(h, out, 0, floats);
+            out.Word(t.r3.u32);
+          },
+          fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+
+  // The button tests: the pressed (+264) and held (+272) words, the delay
+  // (+276) and the counters (+284) set, a mask at the area's start.
+  struct Test {
+    const char* name;
+    GuestFunction recompiled, native;
+  };
+  const Test kTests[] = {
+      {"sub_82592500 InputProcessor::AnyPressed", __imp__sub_82592500, NativeAnyPressed},
+      {"sub_8258CEB0 InputProcessor::TestPressed", __imp__sub_8258CEB0, NativeAnyPressed},
+      {"sub_82592520 InputProcessor::PressedOrRepeat", __imp__sub_82592520,
+       NativePressedOrRepeat},
+      {"sub_8258CEE0 InputProcessor::TestRepeat", __imp__sub_8258CEE0, NativePressedOrRepeat},
+  };
+  for (const Test& test : kTests) {
+    Results results(test.name);
+    const uint32_t mask = h.data;
+    const uint32_t processor = h.data + 64;
+    for (int i = 0; i < 300; i++) {
+      Case(
+          h, results,
+          [&] {
+            Random& r = h.random;
+            // Masks of one button (the game's), none, or several.
+            const uint32_t kind = r.Below(4);
+            guest::StoreU32(h.base, mask,
+                            kind == 0 ? 0 : kind == 3 ? uint32_t(r.Next()) : 1u << r.Below(32));
+            const uint32_t words = r.Below(3);
+            guest::StoreU32(h.base, processor + 264,
+                            words == 0 ? 0 : words == 1 ? ~0u : uint32_t(r.Next()));
+            guest::StoreU32(h.base, processor + 272,
+                            words == 0 ? 0 : words == 1 ? ~0u : uint32_t(r.Next()));
+            const uint32_t delay = r.Below(4) == 0 ? uint32_t(r.Next()) : 20;
+            guest::StoreU32(h.base, processor + 276, delay);
+            for (uint32_t k = 0; k < 32; k++) {
+              const uint32_t pick = r.Below(5);
+              guest::StoreU32(h.base, processor + 284 + 4 * k,
+                              pick == 0   ? 1
+                              : pick == 1 ? delay
+                              : pick == 2 ? uint32_t(r.Next())
+                                          : r.Below(30));
+            }
+          },
+          [&](PPCContext& t) {
+            t.r3.u64 = processor;
+            t.r4.u64 = mask;
+          },
+          test.recompiled, test.native,
+          [&](Outputs& out, const PPCContext& t) {
+            AreaWords(h, out, 0);
+            out.Word(t.r3.u32);
+          },
+          fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void Input(Context& h) {
@@ -251,6 +524,7 @@ void Input(Context& h) {
     InsertCases(h);
   }
   IncSizeCases(h);
+  PadCases(h);
   if (g_fallbacks != 0) {
     ITC_LOG_ERROR("harness: input: {} cases handed to the original", g_fallbacks);
   }

@@ -255,6 +255,7 @@ set(ITC_SOURCES
     src/user/profile.cpp
     src/input/gamepads.cpp
     src/input/input_processor.cpp
+    src/input/input_manager.cpp
     src/input/logical_pad.cpp
     src/input/physical_pad.cpp
     src/input/xinput.cpp
