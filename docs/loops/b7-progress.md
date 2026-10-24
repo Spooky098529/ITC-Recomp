@@ -41,11 +41,17 @@ file's history. What's left to see in a drive, from every run:
   78f986b; 12 ready groups; 0 leads added); map checked (0 errors, 42
   of 42 in play). Migration 1 done (472d5ac..4e3513e: both maps, the
   rings, strength and teardown; 38 of 42 ours, nothing ready left; 8
-  adapters removed; `--native_screen_objects`). Validation agent
-  running.
+  adapters removed; `--native_screen_objects`), validated (`itc_1518`,
+  `itc_1519`; `sub_8212EEF8`, never seen in play, to `to-drive.md`).
+  Finished.
 
 ## Done
 
+- The screen objects (`screen-objects.md`, mapped in 78f986b; 42
+  rows): 38 ours in one migration (472d5ac..4e3513e), 8 adapters
+  removed; validated (`itc_1518`, `itc_1519`);
+  `--native_screen_objects`. Left: BuildFan, Init, the constructor (on
+  `rand`), `Record` (on the shader pairs).
 - Cleanup leads (no mapping): the particle arrays, the joins' steps,
   the flush-to-zero windows (`race-overlays.md`, `ai-drivers.md`;
   2e5ce7c..b6888ac), 3 adapters removed; validated (`itc_1508`,

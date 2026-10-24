@@ -22,6 +22,12 @@ replay (`itc_1508`, `itc_1509`, ok):
   AiPath::JoinCornersByEntry (`ai-drivers.md`'s "Not seen in play"; no
   rows, never seen in play either)
 
+The screen objects' migration 1, not in the attract race or the replay
+(`itc_1518`, `itc_1519`, ok):
+
+- `sub_8212EEF8` UvColumn's iterator decrement (`screen-objects.md`'s
+  InsertUnique row; no row, never seen in play either)
+
 ## Run 2026-10-24 16:01 (`b7-loop-24-10-26-2`)
 
 The array helpers' migration 1 (with the adapters removed), not in the
