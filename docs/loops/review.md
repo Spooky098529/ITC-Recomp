@@ -11,7 +11,7 @@ functions to check in a drive in the progress file.
 When the user has reviewed a run's section, its heading gets
 "(reviewed <date>)"; the section stays for the record.
 
-## Run 2026-10-24 17:46 (`b7-loop-24-10-26-3`)
+## Run 2026-10-24 17:46 (`b7-loop-24-10-26-3`) (reviewed 2026-10-24)
 
 - `post-effects.md` (new, mapped in f3643e1): 57 rows (3 moved from
   `functions.md`: `Glow::Record`, `PostEffects::RecordAll`
@@ -126,6 +126,16 @@ When the user has reviewed a run's section, its heading gets
     other random inputs (above). Not investigated; worked around by
     putting the binding cases in their own harness,
     `action_mappers_binding`, run last.
+    Looked into (the user's call, 2026-10-24): not the heap's layout
+    (an Alloc and Free moved nothing) but the harnesses' one shared
+    random generator: the binding cases drew from it, and later
+    harnesses got other inputs. The crash was `swprintf`'s format
+    generator (a bare "I" then '%' starts a new conversion; the original
+    and the native agree), the differences NaN signs in vertices the
+    drawing cases compared as bytes (clipped glyphs'). Fixed in the
+    harnesses (`strings-and-font.md`'s intro): each harness starts its
+    own generator, seeded from its name; `action_mappers_binding` runs
+    after `action_mappers` again; 12 other seeds 0 differing.
   - Kept as guest calls (the functions stay Overridden): the manager's
     constructor's two handler registrations through the dispatcher's
     slots +8 and +4 (from the original's 192-byte frame); `BindAll`'s

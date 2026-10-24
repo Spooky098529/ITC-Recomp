@@ -1041,10 +1041,10 @@ void ActionMappers(Context& h) {
   SetUp(h);
 }
 
-// Its own harness, run after the others: allocating its block shifts the
-// heap's layout, and with it before them strings_and_font's Font::Draw and
-// swprintf cases differ or crash (seen 2026-10-24 with nothing but this
-// block's Alloc and Free; for review).
+// Its own harness, after action_mappers. (Its cases once shifted the shared
+// random inputs of the harnesses after it, and strings_and_font's swprintf
+// cases crashed: their format generator's doing. Each harness now starts
+// its own generator.)
 void ActionMappersBinding(Context& h) {
   if (!hooks::NativeHeapActive()) {
     ITC_LOG_INFO("harness: action_mappers: the binding cases need --native_heap; skipped");

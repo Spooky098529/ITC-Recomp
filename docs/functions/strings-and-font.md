@@ -59,13 +59,22 @@ center, 2 right, 3 justified), +80 the vertical one (0 top, 1 middle, 2
 bottom, 3 justified), +96, +100 a second pass's offset, +108 its page,
 +112 the second pass on (never in play), +116 the layer.
 
-To look at: while the eleventh B7 loop run was adding array helper
-cases, other harnesses' random inputs shifted, and the `swprintf`
-harness (`sub_8210A490`) crashed (`itc_1337.log`: guest writes at
-0x70000000, probably an endless loop). A case, or the native
-`swprintf`, fails on some inputs. It wasn't followed up: the new cases
-moved to their own generator, and the harness passes with its old
-inputs (`docs/loops/review.md`, the run of 2026-10-24 16:01).
+The harness's crashes with other random inputs (the eleventh and
+twelfth B7 loop runs, `itc_1337.log`, `itc_1456.log`) were its format
+generator's, not `swprintf`'s (2026-10-24): after a bare "I", a '%'
+starts a new conversion (the parser goes back to plain text: the
+original and the native agree), but the generator took "%I%" as text
+with no argument, so the arguments after it were read as the wrong
+kinds (a number as a string pointer: the read of guest 0x5E44). The
+generator now leaves that '%' out (the next piece's '%' follows the
+"I") and follows a bare "I" with a conversion (a letter could be an
+integer type, "Ix"). The drawing cases (`Font::DrawPass`, `Font::Draw`,
+`Text::Draw`) compare as floats all the room a pass took for each
+channel's vertices, not only the counted ones: clipping lowers the
+counts after the vertices are built, and the clipped glyphs' vertices
+(left in the slots) had been compared as bytes, so a NaN's sign showed
+as a difference. Each harness now has its own generator, seeded from its
+name; 12 other seeds checked: 0 differing, no errors.
 
 Not here: `Strings::Load` (`sub_8210A8D0`, in `files-and-saves.md`);
 `Archive::Load` (`sub_8209DE48`) and an asset's size (`sub_820A0678`,

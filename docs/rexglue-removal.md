@@ -216,7 +216,8 @@ itc_recomp/tools/attract_race.sh 30 --run_harnesses=all
 - `harness.h` has what they share: `Both` (one case through both
   versions: the scratch area filled with 0xCD, inputs written, registers
   set, the function run, the output bytes and r3 kept), `Results`
-  (counts and logs), a seeded `Random` (the same cases each run) and
+  (counts and logs), `Random` (the same cases each run; each harness
+  starts its own, seeded from its name, since 2026-10-24) and
   guest memory helpers. The scratch area is 512 bytes below the stack
   pointer, and calls run with their stack below it.
 - One file per area, registered in `harness.cpp`'s list (and the flag's
@@ -2775,10 +2776,11 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
     (its critical sections) and blocks `Viewports::Init` and
     `Viewport::Init`. The rest of the scenery waits on
     `MmQueryAllocationSize`'s wrapper, `DataFile::GetEntry`, the XPR,
-    the archive's queue and the texture provider. A harness that adds
-    cases must draw from its own random generator: drawing from the
-    shared `h.random` shifts the inputs of every harness after it, and
-    when it did, the `swprintf` harness crashed
+    the archive's queue and the texture provider. Harnesses then drew
+    from one shared `h.random`, so adding cases shifted the inputs of
+    every harness after them, and the `swprintf` harness crashed. Since
+    2026-10-24 each harness starts its own generator, seeded from its
+    name, and the crash was the harness's format generator
     (`strings-and-font.md`).
 
     The second run (from 2026-10-22, branch `b7-loop-22-10-26`; its first

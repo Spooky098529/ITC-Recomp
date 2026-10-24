@@ -25,6 +25,7 @@
 #include <iterator>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 ITC_FLAG_DECLARE(bool, native_strings_and_font);
@@ -889,11 +890,18 @@ void DrawCases(Context& h, const Layout& l, const Block& slots, const char* name
       } else {
         function(t, h.base);
       }
-      // The slots, with each channel's vertices as floats.
+      // The slots, with each channel's vertices as floats: all the room
+      // the pass took for them (the {21, bytes, 0} slot before them), as
+      // clipping lowers the counts after the vertices are built, and the
+      // clipped glyphs' vertices stay in the slots.
       std::vector<uint8_t> bytes = Read(h.base, slots.address, slots.bytes);
       for (uint32_t c = 0; c < 4; c++) {
         const uint32_t from = guest::LoadU32(h.base, sf::kDrawGlobals + 32 + 4 * c);
-        const uint32_t n = guest::LoadU32(h.base, sf::kDrawGlobals + 4 * c) * 6;
+        uint32_t n = guest::LoadU32(h.base, sf::kDrawGlobals + 4 * c) * 6;
+        if (from >= slots.address + 16 && from <= slots.address + slots.bytes &&
+            guest::LoadU32(h.base, from - 16) == 21) {
+          n = std::max(n, guest::LoadU32(h.base, from - 12) / 24);
+        }
         if (from >= slots.address && from + 24 * n <= slots.address + slots.bytes) {
           VertexOutputs(h, out[v], from, n);
           std::fill(bytes.begin() + (from - slots.address),
@@ -978,8 +986,11 @@ uint64_t DoubleBits(Random& r) {
 FormatCase MakeFormat(Random& r, uint32_t strings) {
   FormatCase c;
   const uint32_t pieces = 1 + r.Below(6);
+  bool bare_i = false;  // the last piece ended in a bare "I" (below)
   for (uint32_t k = 0; k < pieces; k++) {
-    if (r.Below(3) == 0) {
+    // After a bare "I", a literal letter could be an integer type ("Ix"):
+    // the next piece is a conversion.
+    if (!std::exchange(bare_i, false) && r.Below(3) == 0) {
       const uint32_t pick = r.Below(30);
       c.format += pick == 0 ? char16_t(0xFFFF) : pick == 1 ? char16_t(0xFFD3) : pick == 2 ? u'\n'
                 : char16_t('a' + r.Below(26));
@@ -1018,6 +1029,15 @@ FormatCase MakeFormat(Random& r, uint32_t strings) {
     // read as the wrong kinds.)
     const char16_t* kTypes = u"diuoxXpcCsSfffdegE%kk";
     const char16_t type = kTypes[r.Below(21)];
+    // A bare "I" ends the conversion, and a '%' after it starts a new one
+    // (the parser goes back to plain text: _woutput_l's state table), so
+    // "%I%" isn't a conversion of its own. Leaving the '%' out puts the next
+    // piece's '%' (or the format's end) after the "I": that path, with that
+    // piece's arguments.
+    if (size == u"I" && type == u'%') {
+      bare_i = true;
+      continue;
+    }
     c.format += type;
     const bool wide64 = size == u"ll" || size == u"I64";
     // A bare "I" before anything but an integer type is written out, and

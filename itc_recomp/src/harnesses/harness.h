@@ -23,14 +23,19 @@ namespace harness {
 
 constexpr uint32_t kScratchBytes = 4096;
 
-// A xorshift generator: the same cases on every run.
+// A xorshift generator: the same cases on every run. Each harness starts its
+// own, seeded from its name, so adding cases to one harness doesn't change
+// another's inputs.
 class Random {
  public:
+  Random() = default;
+  explicit Random(uint64_t seed) : state_(seed != 0 ? seed : kDefault) {}
   uint64_t Next();
   uint32_t Below(uint32_t n) { return uint32_t(Next() % n); }
 
  private:
-  uint64_t state_ = 0x9E3779B97F4A7C15ull;
+  static constexpr uint64_t kDefault = 0x9E3779B97F4A7C15ull;
+  uint64_t state_ = kDefault;
 };
 
 struct Context {
