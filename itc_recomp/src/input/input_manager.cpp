@@ -133,6 +133,16 @@ uint32_t InputProcessorPressedOrRepeat(uint8_t* base, uint32_t processor, uint32
   return ticks < delay ? (ticks == 1 ? 1 : 0) : (ticks == delay ? 1 : 0);
 }
 
+uint32_t InputProcessorTestPressed(uint8_t* base, uint32_t processor, uint32_t mask_address) {
+  ITC_NATIVE_RUNNING("sub_8258CEB0 InputProcessor::TestPressed");
+  return InputProcessorAnyPressed(base, processor, Load(base, mask_address));
+}
+
+uint32_t InputProcessorTestRepeat(uint8_t* base, uint32_t processor, uint32_t mask_address) {
+  ITC_NATIVE_RUNNING("sub_8258CEE0 InputProcessor::TestRepeat");
+  return InputProcessorPressedOrRepeat(base, processor, Load(base, mask_address));
+}
+
 uint32_t ManagerProcessor(uint32_t manager, uint32_t index) {
   ITC_NATIVE_RUNNING("sub_82098CB8 InputManager::GetProcessor");
   return manager + kManagerProcessors + kProcessorBytes * index;

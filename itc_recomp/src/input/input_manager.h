@@ -56,8 +56,10 @@ uint32_t InputProcessorAnyPressed(uint8_t* base, uint32_t processor, uint32_t ma
 // InputProcessor::PressedOrRepeat (sub_82592520): for `mask`'s lowest set
 // bit, whether it's held (+272) on its first tick or at the repeat delay.
 uint32_t InputProcessorPressedOrRepeat(uint8_t* base, uint32_t processor, uint32_t mask);
-// TestPressed and TestRepeat (sub_8258CEB0, sub_8258CEE0) are the two above
-// with the mask read from its address: their adapters do that.
+// InputProcessor::TestPressed and TestRepeat (sub_8258CEB0, sub_8258CEE0):
+// the two above with the mask read from its address.
+uint32_t InputProcessorTestPressed(uint8_t* base, uint32_t processor, uint32_t mask_address);
+uint32_t InputProcessorTestRepeat(uint8_t* base, uint32_t processor, uint32_t mask_address);
 
 // --- The manager's slots (vtable 0x82000F48) ---
 

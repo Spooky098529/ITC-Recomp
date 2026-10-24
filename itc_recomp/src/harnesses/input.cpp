@@ -91,11 +91,15 @@ ITC_NATIVE_STEP(NativeGetPhysicalPad,
                 ctx.r3.u64 = in::ManagerPhysicalPad(ctx.r3.u32, guest::LoadU32(base, ctx.r4.u32)))
 ITC_NATIVE_STEP(NativeLogicalPadValues, ctx.r3.u64 = in::LogicalPadValues(ctx.r3.u32))
 ITC_NATIVE_STEP(NativePhysicalPadValues, ctx.r3.u64 = in::PhysicalPadValues(ctx.r3.u32))
-// The tests and their wrappers (the wrappers read the mask from r4 too).
+// The tests (the mask read from r4) and their wrappers (given its address).
 ITC_NATIVE_STEP(NativeAnyPressed, ctx.r3.u64 = in::InputProcessorAnyPressed(
                                       base, ctx.r3.u32, guest::LoadU32(base, ctx.r4.u32)))
 ITC_NATIVE_STEP(NativePressedOrRepeat, ctx.r3.u64 = in::InputProcessorPressedOrRepeat(
                                            base, ctx.r3.u32, guest::LoadU32(base, ctx.r4.u32)))
+ITC_NATIVE_STEP(NativeTestPressed,
+                ctx.r3.u64 = in::InputProcessorTestPressed(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_STEP(NativeTestRepeat,
+                ctx.r3.u64 = in::InputProcessorTestRepeat(base, ctx.r3.u32, ctx.r4.u32))
 #undef ITC_NATIVE_STEP
 
 // The manager's adapters' steps (src/hooks/input_manager.cpp) make guest
@@ -477,10 +481,10 @@ void PadCases(Context& h) {
   };
   const Test kTests[] = {
       {"sub_82592500 InputProcessor::AnyPressed", __imp__sub_82592500, NativeAnyPressed},
-      {"sub_8258CEB0 InputProcessor::TestPressed", __imp__sub_8258CEB0, NativeAnyPressed},
+      {"sub_8258CEB0 InputProcessor::TestPressed", __imp__sub_8258CEB0, NativeTestPressed},
       {"sub_82592520 InputProcessor::PressedOrRepeat", __imp__sub_82592520,
        NativePressedOrRepeat},
-      {"sub_8258CEE0 InputProcessor::TestRepeat", __imp__sub_8258CEE0, NativePressedOrRepeat},
+      {"sub_8258CEE0 InputProcessor::TestRepeat", __imp__sub_8258CEE0, NativeTestRepeat},
   };
   for (const Test& test : kTests) {
     Results results(test.name);
