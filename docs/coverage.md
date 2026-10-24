@@ -105,7 +105,10 @@ those would have stayed in the work left. The second session's list
 replaced the first's, keeping the first's functions that neither run
 under an override now nor sit in the compiler's tree (136: paths the
 second session didn't take). Do the same after another replacement
-leaves a tree that ran before.
+leaves a tree that ran before. Done again on 2026-10-25 after the movie library was
+replaced (`--play_movies_with_ffmpeg`, `native-movies.md`): the third
+session's list, with the second's functions that neither are ours nor sit
+in the library's range (`82481A70`-`82575B07`).
 
 ## What's kept, and what isn't
 
@@ -161,6 +164,7 @@ checked over several sessions.
 | 2026-10-21 | a 20-second attract race (`--skip_intro`) | 4,975 of 16,552 (30%) | The test run; not written to the list |
 | 2026-10-21 | the user's first session (~5.5 minutes, closed cleanly) | 6,656 of 16,552 (40.2%; 39.8% of the generated lines) | The list's first entries. 208 of them were "unreachable" to the static pass. The user judged it most of what's needed: the game's loop is simple and reuses its systems (boot and a 20-second attract race already ran 4,975) |
 | 2026-10-25 | the user's second session (~9.5 minutes, closed cleanly), with `--use_hardcoded_shaders` | 5,135 ran; the list 5,271 with the first's 136 (5,206 of 16,315 `sub_` functions) | Made again, not added to (above). Of the first list's 6,656, 2,438 didn't run: 1,663 ours since, 639 the compiler's tree, 136 kept. 917 new, almost all without rows: front-end and career paths (422 of their entry points only reached indirectly) |
+| 2026-10-25 | the user's third session (~9.7 minutes, closed cleanly; the logo, `OPENING` and `STAGE1_OPENING` played through FFmpeg), with `--play_movies_with_ffmpeg` | 4,094 ran; the list 4,674 with the second's 580 (4,609 of 16,315 `sub_` functions) | Made again (above). Of the second list's 5,271, 1,207 didn't run: 10 ours since, 617 the movie library's, 580 kept. 30 new. Seven in the library's range still run: shared helpers (`sub_8248F030` and the like) |
 
 `b7_status.py` after the first session (2026-10-21). It counts the 16,315
 `sub_` functions (the register save and restore helpers and `xstart` left
@@ -208,4 +212,13 @@ new functions outweigh the compiler's 639:
 in play (seen, or ours): 7039
   ours 1839, work left 5200 (wrapped 117, known 644, unknown 4439)
 rows: 2793; for functions not seen in play: 193
+```
+
+Against the third session's list (2026-10-25, the movie library
+replaced): 596 fewer functions left.
+
+```
+in play (seen, or ours): 6451
+  ours 1847, work left 4604 (wrapped 113, known 651, unknown 3840)
+rows: 2824; for functions not seen in play: 213
 ```

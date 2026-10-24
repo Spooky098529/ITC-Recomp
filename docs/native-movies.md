@@ -118,11 +118,10 @@ time, 9.09 s, then the front end; "looked fine".
 
 ## Open
 
-- A stage opening (before a race, where render-only passes may run
-  between ticks: command 28 is queued on ticks only, so a movie drawn once
-  a tick might flicker there) and the movies' sound: the user's drive.
-- A coverage session afterwards, to take the library's ~580 functions
-  out of the work left.
+- Nothing known. The user's third coverage session (2026-10-25) played
+  the logo, `OPENING` and `STAGE1_OPENING`: "movie playback looks
+  perfect", sound included; the library's 617 functions left the coverage
+  list (work left 5,200 -> 4,604, `../coverage.md`).
 
 - The library's YUV to RGB math (done): built into its pixel shaders
   (`0x8204D4F8` BT.601 for frames up to 576 lines, `0x8204D6B8` BT.709

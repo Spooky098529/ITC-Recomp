@@ -3328,3 +3328,16 @@ again from the user's second session ("Running a session" in
 (`b7_status.py`): 7,039 in play, ours 1,839, work left 5,200 (Wrapped
 117, with a row 644, no row yet 4,439): more than before, from the 917
 functions the second session reached that the first hadn't.
+
+**2026-10-25, the movies through our FFmpeg and a new coverage list
+(branch `b7-loop-24-10-26-4`):** the movie library linked into the game
+(`82481A70`-`82575B07`, ~580 functions seen in play) no longer runs: the
+movie class's slots play the movies through our own FFmpeg and our
+renderer draws them (`--play_movies_with_ffmpeg`, `docs/native-movies.md`;
+the boot movie shows in our window for the first time; the user: "movie
+playback looks perfect"). The boundary unchanged: 449 functions (916
+pairs): overridden 67, Native 5, Dropped 23, never called 70, live 284.
+Imports: 186 called, 62 with a live caller. `seen_in_play.txt` made again
+from the user's third session (`docs/coverage.md`). B7 (`b7_status.py`):
+6,451 in play, ours 1,847, work left 4,604 (Wrapped 113, with a row 651,
+no row yet 3,840), from 5,200.
