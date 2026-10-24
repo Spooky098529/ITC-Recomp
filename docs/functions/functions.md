@@ -223,6 +223,12 @@ Rows not yet moved stay in the table below. So far:
   five fixed pools of physical memory, the course's shared set, the
   lights' nearest search and the scenery's draw with the cars' headlight
   projectors (B7).
+- [`post-effects.md`](post-effects.md): the post effects drawn over
+  each view: their table and the 15 objects at `0x826C5D80` (the glow
+  with its glare and star definitions, the color filter, the motion
+  blur, the render target filter), the render texture pool they share,
+  their shared command recorders (states, targets, constants, quads,
+  resolves), and the race's toggle over them (B7).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
@@ -326,7 +332,6 @@ old performance notes to the end of `../native-renderer.md`.
 | `sub_820D3688` | `Dial::Angle` | Native | `DialAngle` in `src/hooks/cockpit_dials.cpp`, called by the native `sub_820E45A8` (its only caller; the translated one runs only with `--native_cockpit_dials=false` or for `--check_native_cockpit_dials`). r3 = range, r4 = gauge (0-3: car + 704, 712, 716, 720), r5 = the car; returns f1, no state. `[0x82000A34]` with no range. Else from = range + 0, to = + 4, angles + 8, + 12: below from the first angle, above to the second, between `(v - from) / (to - from) * (a1 - a0)` (without `+ a0`, the game's own), all times `[0x82002948]`. |
 | `sub_820D3740` | `Dial::TachometerAngles` | Native | `TachAngles` in `src/hooks/cockpit_dials.cpp`, called by the native `sub_820E42E8` (its only caller; the translated one runs only with `--native_cockpit_dials=false` or for `--check_native_cockpit_dials`). r3 = table, r4 = the car, r5 = [dash], r6 = &a, r7 = &b; no state. `a` from car + 696: `[0x82000A34]` below it; up to from (table + 0, or + 8 when `[[dash]]` isn't 0) value / from * table[16]; up to to (+ 4 or + 12) linear to table[20]; above, table[20]. `b` from car + 700: table[28] below table[24], linear over table[24..36] then table[32..44], clamped at table[44]. |
 | `sub_82597610` | `Projector::Build` | Wrapped | r3 = out, r4 = eye, r5 = target, r6 = up (16-byte vectors), f1-f4 = field of view, aspect, near, far: out = look-at (`sub_82597378`) * perspective (`sub_825972A8`) * a fixed bias matrix at `0x8265EED0` (two `sub_8209BD50` multiplies). Called by the render orchestrator `sub_820C5DE8` (return `0x820C6A2C`) for the player's headlight once a view, and by `sub_820F34C8` (return `0x820F3944`) in a loop of up to 5. See "The headlight beam far from the origin" in `../frame-interpolation.md`. |
-| `sub_821363F0` | `View::UploadPreviousViewProjection` | | r3 = the view (kept in r29). Records vertex c100 x4, the motion blur's previous view-projection: a `Matrix::Copy` (return `8213653C`) from view+8080 (this tick's view-projection) when view+48 is set (passes that ran the game logic) and view+44 is 0, otherwise from view+8144 (the previous tick's). The view moves the pair on right after the logic pass, so it's the same matrix all tick. Header slot allocated at `821364D0` (the owner `--debug_zero_owners` and `--log_slot_callers` name). See "Motion blur reads the 30 Hz tick" in `docs/native-renderer.md`. |
 | `sub_82598768` | `TextureProjection::Fit` | Wrapped | Builds the c14 x4 texture projection, fitted to a camera object's view; called three times by `sub_820C5DE8` (returns `820C7174`, `820C7558`, `820C7950`; the third's result copied to c14 at `820C79F8`). Its multiply at `82599644` (stack temporary sp+352 = sp+352 * sp+208) reads back as a camera, w 1 with the eye at the origin, and was the group of cameras refused far from the origin; overwritten at `825996FC`, never drawn. See "The headlight beam far from the origin" in `../frame-interpolation.md`. |
 | `sub_82597378` | `Matrix::LookAt` | | r3 = out, r4 = eye, r5 = target, r6 = up: a row-vector view matrix, forward = target - eye. |
 | `sub_825972A8` | `Matrix::Perspective` | | r3 = out, f1 = field of view, f2 = aspect, f3 = near, f4 = far: y scale = 1 / tan(f1 * the constant at `0x82001BE4`), x scale = y scale / aspect, depth = far / (far - near), offset -near * far / (far - near). |
@@ -336,7 +341,6 @@ old performance notes to the end of `../native-renderer.md`.
 | `sub_820DC958` | `BlinkTimers::Advance` | Wrapped | Skipped on render-only passes (`--per_tick_blink_timers`; "Per-frame logic" in `../frame-interpolation.md`). |
 | `sub_821594B8` | | Wrapped | The rival intro cutscene's Update handler: runs on logic passes; on render-only passes only its logo's draw (`sub_82211A28`) is repeated (`--redraw_rival_logo`; "The rival logo at the race start" in `../frame-interpolation.md`). |
 | `sub_82211A28` | | Wrapped | Draws the rival's logo; noted during the cutscene for the render-only redraw. |
-| `sub_821379D8` | `Glow::Record` | Wrapped | The glow (bloom) recorder in races: strength and history weight blended between ticks, history written every frame (`--blend_glow`, `--glow_history_every_frame`; `src/interpolation/glow.cpp`). |
 | `sub_820AE958` | | Wrapped | The render thread's command that starts the boot movie; `--skip_intro` waits for it to return (ending the movie earlier stalled the boot; "The title screen" in `../title-screen.md`). |
 | `sub_8229E3F0` | `Device::Kick` | Overridden | `src/native/gpu_link.cpp`. r3 device, r4 (size in words, address) pairs, r5 their count. The kicked buffers are applied directly (only their effects outside the GPU) instead of written to the ring; the original is no longer called. `--native_renderer_log_gpu` logs. |
 | `sub_8229E848` | `Device::DeferredKick` | Overridden | Same file. Queued kicks while GPU interrupts were outstanding; every kick completes at once now, so it kicks straight away; the original is no longer called. |
@@ -440,7 +444,6 @@ old performance notes to the end of `../native-renderer.md`.
 | `sub_825BDDA0` | `EndVertices` | Wrapped | Same file: an inline vertex draw noted, then handed to the native renderer (in commands 15 and 19). |
 | `sub_8258F5C0` | | Wrapped | Same file: the single-command items' command 15 (the helper object's draw), marked as command 15 so the native renderer draws its inline vertices. |
 | `sub_822AFA58` | `Device::Resolve` | Wrapped | Same file: resolves made outside command 25 (command 33's, one per tile) passed to the native renderer. |
-| `sub_82133960` | | Overridden | A draw step part, rewritten as the original to name each view's draw for `--find_per_frame_state`: for the 15 per-view objects at `0x826C5D80` with an active camera pass and +52 clear, calls vtable slot 0, clears +8056 and +48, flips +8060. |
 | `sub_82096340` | | Wrapped | A tick handler thunk (vtable slot 1 of r3); names its target for `--find_per_frame_state`. |
 | `sub_82092968` | | Wrapped | Runs the app's component lists (r4's low word a component; its vtable slot 1); named for `--find_menu_selection`. |
 | `sub_8220C1E0` | `MenuList::Update` | Wrapped | Logged for `--log_pause_menu` (`src/debug/pause_menu_log.cpp`). `sub_8210C370` reads logical pad `j`'s values 0-7 (sticks, triggers) through the pointer at mapper +2880 (= input manager +44 + 196j) and the buttons through the listener object at mapper +2464 (seen by the read watch, 2026-10-19). |
