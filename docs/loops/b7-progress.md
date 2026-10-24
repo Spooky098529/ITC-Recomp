@@ -93,4 +93,6 @@ This run's groups: `expected-differences.md` (the "21:33 run" lines).
 
 ## Stopped
 
-(not stopped)
+Paused 2026-10-24 (the user's call) while the framework's mapping agent
+ran: the loop stops after recording its report; no migration started.
+1 of 3 subsystems done.
