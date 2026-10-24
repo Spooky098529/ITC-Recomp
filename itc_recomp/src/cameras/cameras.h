@@ -165,6 +165,28 @@ struct SurfaceCalls {
 // --native_graphics_resources (the adapter checks).
 void SetUpSurfaces(uint8_t* base, uint32_t frame, uint32_t pass, const SurfaceCalls& calls);
 
+// CameraPass::Init's guest calls (the adapter's): Camera::Camera on the
+// pass, the video output (type 0's two reads; `at` 0 and 1), and
+// CameraPass::Update and CameraPass::SetUpSurfaces on the pass (through
+// their overrides).
+struct PassInitCalls {
+  std::function<void()> construct;
+  std::function<uint32_t(int at)> video_output;
+  std::function<void()> update;
+  std::function<void()> set_up_surfaces;
+};
+
+// CameraPass::Init (sub_820A3DB0, with its type 0 chunk sub_820A3E04
+// merged): r3 = the pass, `type` 0-20 (r4; others set nothing by type):
+// +576 and +580 = 0, Camera::Camera, then the type's viewport (+496 to
+// +508; type 0 the display's size, the video output's +296 and +300),
+// settings (+512 to +572, from the game's constants at 0x82000000 + 2608 to
+// 8156) and field of view (+368, types 1-20); then for every type +384 and
+// +388 (near and far) from +544 and +548, +584 the type, +588 = 0, +376 and
+// +380 the size as floats, CameraPass::Update and CameraPass::SetUpSurfaces.
+// Returns 0.
+uint32_t InitPass(uint8_t* base, uint32_t pass, uint32_t type, const PassInitCalls& calls);
+
 // CameraPass::Enable (sub_820A0968) and CameraPass::Disable (sub_820A0958):
 // +588 = 1 or 0.
 void Enable(uint8_t* base, uint32_t pass);

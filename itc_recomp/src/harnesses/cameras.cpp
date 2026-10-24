@@ -1383,6 +1383,139 @@ void SetUpSurfacesCases(Context& h) {
   results.Report();
 }
 
+// CameraPass::Init on a pass in the scratch area (FakeScene's, for
+// CameraPass::Update's viewport chunk) of every type (-1 to 21, then
+// random), in modes 0 to 2, the pass's words random first. As
+// SetUpSurfacesCases: the 16 globals saved and put back, the textures and
+// surfaces made freed (types 0-2's device surfaces released again), the
+// device lock the game's; types 5-9 in mode 1 get a cube map made first.
+// Compared: the scratch area but +576 and +580 exactly, but for the
+// pass's float ranges as Update's cases have them (Update reads the random
+// words left there, NaNs among them) as floats, +576 and +580 as SetUpSurfacesCases does, each global, the open
+// chunks' count and r3.
+void InitPassCases(Context& h) {
+  if (!hooks::NativeHeapActive()) {
+    return;
+  }
+  const SceneGlobals scene(h.base);
+  Results results("sub_820A3DB0 CameraPass::Init");
+  constexpr uint32_t kGlobals = 0x826BABC0, kWords = 16;
+  uint32_t saved[kWords];
+  for (uint32_t i = 0; i < kWords; i++) {
+    saved[i] = guest::LoadU32(h.base, kGlobals + 4 * i);
+  }
+  const uint32_t pass = h.data + FakeScene::kPass;
+  for (int c = 0; c < 72; c++) {
+    const uint32_t type = c < 23   ? uint32_t(c - 1)
+                          : c < 46 ? uint32_t(c - 24)
+                          : h.random.Below(6) ? h.random.Below(22) : uint32_t(h.random.Next());
+    const uint32_t mode = c < 23 ? 0 : c < 46 ? 1 : h.random.Below(3);
+    const uint32_t used = h.random.Below(1000);
+    std::vector<uint32_t> words(148);
+    for (uint32_t& w : words) {
+      w = uint32_t(h.random.Next());
+    }
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Fill(h.base, h.data, kScratchBytes);
+      FakeScene::Set(h, 0, used);
+      guest::StoreU32s(h.base, pass, words.data(), 148);
+      for (uint32_t i = 0; i < kWords; i++) {
+        guest::StoreU32(h.base, kGlobals + 4 * i, 0);
+      }
+      guest::StoreU32(h.base, cm::kMode, mode);
+      if (mode == 1 && type >= 5 && type <= 9) {
+        guest::StoreU32(h.base, 0x826BABCC,
+                        graphics::CreateTexture(h.base, 64, 64, 6, 1, 1, 0x182801B6, 18));
+      }
+      PPCContext t = CallContext(h);
+      t.r3.u64 = pass;
+      t.r4.u64 = type;
+      if (v == 0) {
+        const bool flag = ITC_FLAG(native_cameras);
+        ITC_FLAG(native_cameras) = false;
+        __imp__sub_820A3DB0(t, h.base);
+        ITC_FLAG(native_cameras) = flag;
+      } else {
+        hooks::CameraPassInit(t, h.base);
+      }
+      out[v].Word(t.r3.u32);
+      out[v].Word(guest::LoadU32(h.base, command_list::kOpenChunks));
+      // The pass's float ranges (CameraPass::Update's, from the random words
+      // there: NaNs among them) as floats, the rest exactly.
+      out[v].Bytes(Read(h.base, h.data, FakeScene::kPass));
+      uint32_t at = 0;
+      for (auto [from, to] : {std::pair{16u, 208u}, {368u, 396u}, {464u, 496u}}) {
+        out[v].Bytes(Read(h.base, pass + at, from - at));
+        out[v].Floats(h.base, pass + from, (to - from) / 4);
+        at = to;
+      }
+      out[v].Bytes(Read(h.base, pass + at, 576 - at));
+      out[v].Bytes(Read(h.base, pass + 584, kScratchBytes - FakeScene::kPass - 584));
+      std::vector<uint32_t> textures;
+      for (uint32_t i = 0; i < kWords; i++) {
+        const uint32_t word = guest::LoadU32(h.base, kGlobals + 4 * i);
+        if (i == 0 || word == 0) {
+          out[v].Word(word);
+          continue;
+        }
+        textures.push_back(word);
+        out[v].Word(1);
+        std::vector<uint8_t> header = Read(h.base, word, 52);
+        for (int k = 0; k < 3; k++) {
+          header[32 + k] = 0;
+          header[48 + k] = 0;
+        }
+        header[35] &= 0x0F;
+        header[51] &= 0x0F;
+        out[v].Bytes(header);
+      }
+      const bool device = type <= 2;
+      const bool made = type == 3 || type == 4 || (type >= 10 && type <= 20);
+      for (uint32_t field : {576u, 580u}) {
+        const uint32_t surface = guest::LoadU32(h.base, pass + field);
+        const bool cube_face = field == 576 && type >= 6 && type <= 9 && mode == 1;
+        if (surface == 0 || !(made || cube_face)) {
+          out[v].Word(surface);
+          if (device && surface != 0) {
+            PPCContext r = CallContext(h);
+            r.r3.u64 = surface;
+            sub_822A67B0(r, h.base);
+          }
+          continue;
+        }
+        out[v].Word(1);
+        std::vector<uint8_t> header = Read(h.base, surface, 48);
+        if (cube_face) {
+          const uint32_t parent = guest::LoadU32(h.base, surface + 24);
+          out[v].Word(std::find(textures.begin(), textures.end(), parent) != textures.end());
+          for (int k = 24; k < 28; k++) {
+            header[k] = 0;
+          }
+        }
+        out[v].Bytes(header);
+        memory::crt::XMemFree(surface, 0x24800000);
+      }
+      for (uint32_t texture : textures) {
+        const uint32_t data = guest::LoadU32(h.base, texture + 32) & 0xFFFFF000;
+        const uint32_t mips = guest::LoadU32(h.base, texture + 48) & 0xFFFFF000;
+        if (mips) {
+          memory::crt::XMemFree(mips, 0xBC800000);
+        }
+        memory::crt::XMemFree(data, 0xBC800000);
+        memory::crt::XMemFree(texture, 0x24800000);
+      }
+      scene.Restore();
+    }
+    results.Check(out[0], out[1],
+                  fmt::format("case {}: type {} mode {}", c, int32_t(type), mode));
+  }
+  for (uint32_t i = 0; i < kWords; i++) {
+    guest::StoreU32(h.base, kGlobals + 4 * i, saved[i]);
+  }
+  results.Report();
+}
+
 void Cameras(Context& h) {
   SetFieldOfViewCases(h);
   BuildProjectionCases(h);
@@ -1400,6 +1533,7 @@ void Cameras(Context& h) {
   RecordPassesCases(h);
   MakeRenderTargetCases(h);
   SetUpSurfacesCases(h);
+  InitPassCases(h);
 }
 
 }  // namespace harness

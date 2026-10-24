@@ -550,6 +550,93 @@ void SetUpSurfaces(uint8_t* base, uint32_t frame, uint32_t pass, const SurfaceCa
   guest::StoreU32(base, pass + 580, depth);
 }
 
+uint32_t InitPass(uint8_t* base, uint32_t pass, uint32_t type, const PassInitCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_820A3DB0 CameraPass::Init");
+  // The game's float constants (words at 0x82000000 + offset), copied as
+  // the original's lfs and stfs do (none is a NaN).
+  auto constant = [&](uint32_t offset) { return guest::LoadU32(base, 0x82000000 + offset); };
+  auto store = [&](uint32_t field, uint32_t value) { guest::StoreU32(base, pass + field, value); };
+  store(576, 0);
+  store(580, 0);
+  calls.construct();
+  if (type <= 20) {
+    uint32_t width = 256, height = 256;
+    uint32_t y = 0;
+    uint32_t settings_544 = constant(2608);
+    uint32_t far_548 = constant(7820);
+    uint32_t settings_524 = constant(2608);
+    uint32_t settings_552 = 0;
+    uint32_t clear_color = 0xFF000000;
+    bool field_of_view = true;
+    uint32_t fov = constant(8116);
+    if (type == 0) {
+      width = guest::LoadU32(base, calls.video_output(0) + 296);
+      height = guest::LoadU32(base, calls.video_output(1) + 300);
+      settings_524 = constant(8144);
+      far_548 = constant(8140);
+      field_of_view = false;
+    } else if (type <= 3) {
+      width = type == 3 ? 512 : 1024;
+      height = type == 3 ? 128 : 288;
+      y = type == 2 ? 288 : 0;
+      far_548 = constant(type == 3 ? 8128 : 8136);
+      settings_552 = 1;
+      fov = constant(8132);
+    } else if (type <= 9) {
+      settings_544 = constant(8124);
+      if (type == 4) {
+        far_548 = constant(Mode(base, 1) == 0 ? 8120 : 7820);
+      } else if (type == 7) {
+        far_548 = constant(8112);
+      }
+    } else if (type <= 18) {
+      static constexpr uint32_t kSizes[9] = {1024, 512, 1024, 512, 256, 256, 512, 256, 256};
+      width = height = kSizes[type - 10];
+    } else if (type == 19) {
+      far_548 = constant(8108);
+      clear_color = 0;
+    } else {
+      width = height = 1024;
+    }
+    store(496, 0);
+    store(500, y);
+    store(504, width);
+    store(508, height);
+    store(512, 0);
+    store(516, constant(8156));
+    store(520, constant(2608));
+    store(524, settings_524);
+    store(528, constant(2612));
+    store(532, constant(8152));
+    store(536, constant(8148));
+    store(540, constant(8148));
+    store(544, settings_544);
+    store(548, far_548);
+    store(552, settings_552);
+    store(556, 0);
+    store(560, 1);
+    store(564, clear_color);
+    store(568, 1);
+    store(572, 0);
+    if (field_of_view) {
+      store(368, fov);
+    }
+  }
+  // lfs and stfs through a double, as the original.
+  guest::StoreFloat(base, pass + 384, float(double(guest::LoadFloat(base, pass + 544))));
+  guest::StoreFloat(base, pass + 388, float(double(guest::LoadFloat(base, pass + 548))));
+  store(584, type);
+  store(588, 0);
+  // fcfid of the sign-extended words, then frsp.
+  guest::StoreFloat(base, pass + 376,
+                    float(double(int64_t(int32_t(guest::LoadU32(base, pass + 504))))));
+  guest::StoreFloat(base, pass + 380,
+                    float(double(int64_t(int32_t(guest::LoadU32(base, pass + 508))))));
+  calls.update();
+  calls.set_up_surfaces();
+  return 0;
+}
+
 void Enable(uint8_t* base, uint32_t pass) {
   ITC_NATIVE_RUNNING("sub_820A0968 CameraPass::Enable");
   guest::StoreU32(base, pass + 588, 1);

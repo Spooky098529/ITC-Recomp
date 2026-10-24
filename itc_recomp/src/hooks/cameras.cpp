@@ -42,7 +42,8 @@ ITC_FLAG_BOOL(native_cameras, true, "ITC",
               "sub_820A0CC0 and RecordEnd sub_820A1C30, without the command list's diagnostics; "
               "CameraPasses::MakeRenderTarget sub_8209FBF0 with its case 0 sub_8209FC7C and "
               "CameraPass::SetUpSurfaces sub_820A2F40 with its types 0-2 chunk sub_820A2F94, with "
-              "--native_video_output, --native_graphics_resources and --native_heap) natively instead of "
+              "--native_video_output, --native_graphics_resources and --native_heap; CameraPass::Init "
+              "sub_820A3DB0 with its type 0 chunk sub_820A3E04) natively instead of "
               "through the translated code (the same words, bit for bit; checked by "
               "--run_harnesses=cameras)");
 
@@ -305,6 +306,39 @@ bool CameraPassSetUpSurfaces(PPCContext& ctx, uint8_t* base) {
   return true;
 }
 
+bool CameraPassInit(PPCContext& ctx, uint8_t* base) {
+  const uint32_t pass = ctx.r3.u32;
+  const uint32_t type = ctx.r4.u32;
+  const uint64_t lr = ctx.lr;
+  ctx.fpscr.disableFlushMode();
+  guest_call::InFrame(ctx, base, 144, 0x820A3DB8, [&](uint32_t) {
+    cameras::InitPass(base, pass, type,
+                      {[&] {
+                         ctx.r3.u64 = pass;
+                         ctx.lr = 0x820A3DD4;
+                         sub_82593908(ctx, base);
+                         ctx.fpscr.disableFlushMode();
+                       },
+                       [&](int at) {
+                         return at == 0 ? VideoOutputCall(ctx, base, 0x820A3E24, 0x820A3E34)
+                                        : VideoOutputCall(ctx, base, 0x820A3E50, 0x820A3E60);
+                       },
+                       [&] {
+                         ctx.r3.u64 = pass;
+                         ctx.lr = 0x820A4348;
+                         sub_820A3978(ctx, base);
+                       },
+                       [&] {
+                         ctx.r3.u64 = pass;
+                         ctx.lr = 0x820A4350;
+                         sub_820A2F40(ctx, base);
+                       }});
+  });
+  ctx.lr = lr;
+  ctx.r3.u64 = 0;
+  return true;
+}
+
 }  // namespace hooks
 
 // CameraPasses::MakeRenderTarget: r3 = the id (hooks::CameraPassesMakeRenderTarget).
@@ -321,6 +355,12 @@ extern "C" REX_FUNC(sub_820A2F40) {
   if (!hooks::CameraPassSetUpSurfaces(ctx, base)) {
     __imp__sub_820A2F40(ctx, base);
   }
+}
+
+// CameraPass::Init: r3 = the pass, r4 = the type (hooks::CameraPassInit).
+extern "C" REX_FUNC(sub_820A3DB0) {
+  ITC_CAMERAS_FALLBACK(820A3DB0)
+  hooks::CameraPassInit(ctx, base);
 }
 
 // Viewports::Release: no arguments; r3 = VirtualFree's answer for the block

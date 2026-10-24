@@ -53,6 +53,13 @@ bool CameraPassesMakeRenderTarget(PPCContext& ctx, uint8_t* base);
 // nothing done, as CameraPassesMakeRenderTarget.
 bool CameraPassSetUpSurfaces(PPCContext& ctx, uint8_t* base);
 
+// CameraPass::Init (sub_820A3DB0) natively, without the flag: r3 = the
+// pass, r4 = the type; from a frame like the original's (144 bytes),
+// Camera::Camera, the video output's slots (type 0), CameraPass::Update and
+// SetUpSurfaces (through their overrides) as guest calls; r3 = 0.
+// Flush-to-zero left off. Always runs (true).
+bool CameraPassInit(PPCContext& ctx, uint8_t* base);
+
 // CameraPasses::RecordBegins (sub_8209F8A0) and RecordEnds (sub_8209F900)
 // natively, for their wrappers in src/debug/frame_state_diff.cpp: each
 // enabled pass recorded as above (the original RecordBegin or RecordEnd
