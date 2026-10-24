@@ -178,5 +178,6 @@ void CourseScenery(Context& h);
 void PostEffects(Context& h);
 void Input(Context& h);
 void ActionMappersBinding(Context& h);
+void ScreenObjects(Context& h);
 
 }  // namespace harness
