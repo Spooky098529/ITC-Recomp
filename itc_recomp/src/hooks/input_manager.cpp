@@ -20,7 +20,7 @@ ITC_FLAG_BOOL(native_input, true, "ITC",
               "(docs/functions/input.md: PtrList::AllocateNodes sub_82099C08, IncSize "
               "sub_820958B8 (no adapter), PtrList sub_820AD058 and Insert sub_82095958, with --native_heap; "
               "the pads' and processors' constructors sub_82591B38, sub_82591B68, sub_825920D0 "
-              "and sub_8258CE60, LogicalPad::Bind sub_825918F0 (all but sub_8258CE60 without adapters), the pads' values sub_82591B30 "
+              "and sub_8258CE60, LogicalPad::Bind sub_825918F0 (no adapters), the pads' values sub_82591B30 "
               "and sub_820988B8, InputProcessor::Assign sub_82098D60 (no adapter), the button tests "
               "sub_8258CEB0 and sub_8258CEE0 with sub_82592500 and sub_82592520 (no adapters), the manager's slots "
               "sub_82098CB8, sub_82098CD0 and sub_82098FE0; Input::Create sub_820993E8, "
@@ -84,16 +84,11 @@ extern "C" REX_FUNC(sub_82095958) {
     return;                            \
   }
 
-// InputProcessor's constructor: r3 = the processor, which r3 comes back as.
-// The pads' constructors, LogicalPad::Bind and InputProcessor::Assign
-// (sub_82591B38, sub_82591B68, sub_825918F0, sub_82098D60) and
-// InputProcessorBase's constructor (sub_825920D0) have no adapters: their
-// only callers in play (the manager's constructor, AddListener and
-// InputProcessor's constructor) call their plain C++.
-extern "C" REX_FUNC(sub_8258CE60) {
-  ITC_INPUT_FALLBACK(8258CE60)
-  input::InputProcessorConstruct(base, ctx.r3.u32);
-}
+// The pads' and processors' constructors, LogicalPad::Bind and
+// InputProcessor::Assign (sub_82591B38, sub_82591B68, sub_8258CE60,
+// sub_825920D0, sub_825918F0, sub_82098D60) have no adapters: their only
+// callers in play (the manager's constructor, AddListener, the action
+// mapper's constructor and InputProcessor's) call their plain C++.
 
 // The manager's slots 1, 2 and 5: r3 = the manager, r4 = the index's address.
 extern "C" REX_FUNC(sub_82098CB8) {
