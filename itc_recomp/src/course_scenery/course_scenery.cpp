@@ -598,4 +598,118 @@ void ClearGlobal(uint8_t* base) {
   Store(base, kManager, 0);
 }
 
+uint32_t ReleaseUnused(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t manager,
+                       uint32_t list) {
+  ITC_NATIVE_RUNNING("sub_820F17C0 SceneryList::ReleaseUnused");
+  const uint32_t frame = stack - 112;
+  const uint32_t pool = Load(base, list + 0);
+  uint32_t r3 = PoolRecord(base, manager, pool);
+  uint32_t object = Load(base, r3 + 20);
+  while (object != 0) {
+    r3 = IsLoaded(base, object);
+    if (r3 != 0) {
+      r3 = IsVisible(base, object);
+      if (r3 == 0) {
+        // Loaded and not seen this update.
+        r3 = IsExpiring(base, object);
+        if (r3 == 0) {
+          SetExpiring(base, object, 1);
+          r3 = object;
+          Store(base, object + 36, 2);
+        } else {
+          const int32_t countdown = int32_t(Load(base, object + 36));
+          if (countdown <= 0) {
+            r3 = Release(base, calls, frame, manager, pool, Load(base, object + 16));
+            object = r3;
+            continue;
+          }
+          Store(base, object + 36, uint32_t(countdown - 1));
+        }
+        object = Load(base, object + 24);
+        continue;
+      }
+    }
+    // Not loaded, or seen: the seen flag cleared.
+    SetVisible(base, object, 0);
+    r3 = object;
+    object = Load(base, object + 24);
+  }
+  return r3;
+}
+
+uint32_t StartLoad(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t manager) {
+  ITC_NATIVE_RUNNING("sub_820F1E00 Scenery::StartLoad");
+  const uint32_t frame = stack - 128;
+  // The configuration's distance for every item (0x82000A34).
+  constexpr uint32_t kDistance = 0x82000A34;
+  uint32_t index = Acquire(base, calls, frame, manager, 2, 0);
+  LoadObject(base, calls, frame, manager, 2, index);
+  uint32_t r3 = PoolObjectAt(base, manager, 2, index);
+  const uint32_t mode = Load(base, manager + 8);
+  Store(base, manager + 176, index);
+  Store(base, manager + 112, r3);
+  Store(base, manager + 172, 2);
+  if (mode == 0) {
+    const uint32_t list_a = manager + 116, list_b = manager + 144;
+    Store(base, list_a + 4, 0);
+    Store(base, list_a + 8, 0);
+    Store(base, list_b + 4, 0);
+    Store(base, list_b + 8, 0);
+    const double distance = guest::LoadFloat(base, kDistance);
+    for (uint32_t i = 0; i < Load(base, manager + 128); i++) {
+      const uint32_t entry = Load(base, manager + 140) + 12 * i;
+      r3 = ListAdd(base, list_a, distance, guest::LoadU16(base, entry + 0),
+                   guest::LoadU16(base, entry + 2), 0, manager);
+    }
+    for (uint32_t i = 0; i < Load(base, manager + 156); i++) {
+      const uint32_t entry = Load(base, manager + 168) + 12 * i;
+      r3 = ListAdd(base, list_b, distance, guest::LoadU16(base, entry + 0),
+                   guest::LoadU16(base, entry + 2), 0, manager);
+    }
+  }
+  if (Load(base, manager + 44) != 0) {
+    index = Acquire(base, calls, frame, manager, 0, 0);
+    LoadObject(base, calls, frame, manager, 0, index);
+    r3 = PoolObjectAt(base, manager, 0, index);
+    Store(base, manager + 172, 0);
+    Store(base, manager + 176, index);
+    Store(base, manager + 108, r3);
+  }
+  Store(base, manager + 192, 1);
+  return r3;
+}
+
+// --- The texture animations ---
+
+uint32_t AdvanceTextureAnimations(uint8_t* base, uint32_t course_set) {
+  ITC_NATIVE_RUNNING("sub_820F11A8 TextureAnimations::Advance");
+  const uint32_t set = Load(base, course_set + 1060);
+  return set == 0 ? 0 : AdvanceAnimationSet(base, set);
+}
+
+uint32_t AdvanceAnimationSet(uint8_t* base, uint32_t set) {
+  ITC_NATIVE_RUNNING("sub_82146B20 AnimationSet::Advance");
+  uint32_t r3 = set;
+  for (int32_t i = 0; i < int32_t(Load(base, set + 0)); i++) {
+    const uint32_t offsets = (Load(base, set + 0) + 1) * 4;
+    r3 = offsets + Load(base, set + 4 + 4 * uint32_t(i)) + set;
+    AdvanceAnimation(base, r3);
+  }
+  return r3;
+}
+
+void AdvanceAnimation(uint8_t* base, uint32_t animation) {
+  ITC_NATIVE_RUNNING("sub_82146AC0 Animation::Advance");
+  if (int32_t(Load(base, animation + 8)) > int32_t(Load(base, animation + 12))) {
+    Store(base, animation + 8, 0);
+    Store(base, animation + 4, 0);
+  }
+  const uint32_t next = Load(base, animation + 4) + 1;
+  if (int32_t(next) < int32_t(Load(base, animation + 0)) &&
+      int32_t(Load(base, animation + 8)) >= int32_t(Load(base, animation + 4 * (next + 4)))) {
+    Store(base, animation + 4, next);
+  }
+  Store(base, animation + 8, Load(base, animation + 8) + 1);
+}
+
 }  // namespace course_scenery

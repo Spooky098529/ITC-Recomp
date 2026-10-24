@@ -102,10 +102,17 @@ constexpr uint32_t kModelVtable = 0x82006778;
 // and 2 PoolObject::Reset (no archive reads).
 constexpr uint32_t kFakeVtable = 4032;
 
+// A second (at kLoadVtable) with PoolObject::Key in slot 0, for the
+// objects StartLoad takes, keys and loads.
+constexpr uint32_t kLoadVtable = 4048;
+
 void WriteFakeVtable(Context& h) {
   guest::StoreU32(h.base, h.data + kFakeVtable + 0, 0x820FFE98);
   guest::StoreU32(h.base, h.data + kFakeVtable + 4, 0x820FB9D8);
   guest::StoreU32(h.base, h.data + kFakeVtable + 8, 0x820FB9D8);
+  guest::StoreU32(h.base, h.data + kLoadVtable + 0, 0x820FB9F0);
+  guest::StoreU32(h.base, h.data + kLoadVtable + 4, 0x820FB9D8);
+  guest::StoreU32(h.base, h.data + kLoadVtable + 8, 0x820FB9D8);
 }
 
 uint32_t RandomFlags(Random& r) {
@@ -303,23 +310,26 @@ void Keys(Context& h) {
   }
 }
 
-// A pool set in the scratch area: the set at +0, its records at +64, two
-// pools of up to 8 objects of 96 bytes (no data) from +256, each pool's
-// objects split at random between the free and used lists in a random
-// order. Returns each pool's object count.
+// A pool set in the scratch area: the set at +0, its records at +64 (or
+// `records`), two pools (or `pools`) of up to 8 objects (or `most`) of 96
+// bytes (no data) from +256, each pool's objects split at random between
+// the free and used lists in a random order. Returns each pool's object
+// count.
 constexpr uint32_t kSet = 0;
 constexpr uint32_t kRecords = 64;
 constexpr uint32_t kObjects = 256;
 constexpr uint32_t kStride = 96;
 
-void RandomPools(Context& h, Random& r, uint32_t counts[2], bool fake_only) {
+void RandomPools(Context& h, Random& r, uint32_t* counts, bool fake_only, uint32_t pools = 2,
+                 uint32_t records = kRecords, uint32_t most = 8,
+                 uint32_t fake_vtable = kFakeVtable) {
   const uint32_t set = h.data + kSet;
-  guest::StoreU32(h.base, set + 0, 2);
-  guest::StoreU32(h.base, set + 4, h.data + kRecords);
-  for (uint32_t p = 0; p < 2; p++) {
-    const uint32_t record = h.data + kRecords + 24 * p;
-    const uint32_t first = h.data + kObjects + p * 8 * kStride;
-    const uint32_t n = r.Below(9);
+  guest::StoreU32(h.base, set + 0, pools);
+  guest::StoreU32(h.base, set + 4, h.data + records);
+  for (uint32_t p = 0; p < pools; p++) {
+    const uint32_t record = h.data + records + 24 * p;
+    const uint32_t first = h.data + kObjects + p * most * kStride;
+    const uint32_t n = r.Below(most + 1);
     counts[p] = n;
     guest::StoreU32(h.base, record + 0, n);
     guest::StoreU32(h.base, record + 4, kStride);
@@ -335,7 +345,7 @@ void RandomPools(Context& h, Random& r, uint32_t counts[2], bool fake_only) {
     const uint32_t used = n == 0 ? 0 : r.Below(n + 1);
     for (uint32_t i = 0; i < n; i++) {
       const uint32_t object = first + kStride * order[i];
-      const uint32_t vtable = fake_only ? h.data + kFakeVtable : PickVtable(h, r, false);
+      const uint32_t vtable = fake_only ? h.data + fake_vtable : PickVtable(h, r, false);
       uint32_t key = 0x00010002u;
       if (r.Below(3) != 0) {
         const uint32_t area = r.Below(4);
@@ -922,6 +932,178 @@ void Lists(Context& h) {
   }
 }
 
+// SceneryList::ReleaseUnused: the manager (the pool set) and its pools as
+// RandomPools makes them (the game's vtables, the countdowns -1 to 3), the
+// list at +200 naming one of them.
+void ReleaseUnusedCases(Context& h) {
+  Random& r = h.random;
+  Results results("SceneryList::ReleaseUnused (sub_820F17C0)");
+  for (int c = 0; c < 96; c++) {
+    const uint64_t seed = r.Next();
+    const uint32_t pool = r.Below(2);
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Random probe;
+      for (uint64_t i = 0; i < (seed & 63); i++) {
+        probe.Next();
+      }
+      Fill(h.base, h.data, kScratchBytes);
+      uint32_t counts[2];
+      RandomPools(h, probe, counts, false);
+      for (uint32_t i = 0; i < 16; i++) {
+        const uint32_t object = h.data + kObjects + kStride * i;
+        guest::StoreU32(h.base, object + 36, probe.Below(5) - 1);
+        // Loaded and in use more often than not.
+        if (probe.Below(3) != 0) {
+          const uint32_t flags = guest::LoadU32(h.base, object + cs::kObjectFlags);
+          guest::StoreU32(h.base, object + cs::kObjectFlags, flags | 0x9);
+        }
+      }
+      guest::StoreU32(h.base, h.data + 200, pool);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = h.data + kSet;
+      t.r4.u64 = h.data + 200;
+      With(v, [&] {
+        if (v == 0) {
+          __imp__sub_820F17C0(t, h.base);
+        } else {
+          WithCalls(t, h.base, [&](const cs::Calls& calls) {
+            t.r3.u64 = cs::ReleaseUnused(h.base, calls, t.r1.u32, t.r3.u32, t.r4.u32);
+          });
+        }
+      });
+      ScratchAndR3(h, out[v], t);
+    }
+    results.Check(out[0], out[1], fmt::format("case {} pool {}", c, pool));
+  }
+  results.Report();
+}
+
+// Scenery::StartLoad: the manager at +0 is the pool set (three pools of up
+// to 6 objects with the second scratch vtable: PoolObject::Key, and
+// PoolObject::Reset for the load;
+// records at +2048); its lists A (+116) and B (+144) with their pointers,
+// items and tables (keys of random areas and models) from +2200; mode 0 or
+// not, pool 0 or not (+44). Cases whose pool 2 (or pool 0, when asked for)
+// has no free object are left out: the original loads object -1 then.
+void StartLoadCases(Context& h) {
+  Random& r = h.random;
+  Results results("Scenery::StartLoad (sub_820F1E00)");
+  constexpr uint32_t kPoolRecords = 2048;
+  constexpr uint32_t kA = 2200, kB = 2600;  // pointers +0, items +40, table +200
+  int done = 0;
+  for (int c = 0; c < 200 && done < 64; c++) {
+    const uint64_t seed = r.Next();
+    const uint32_t mode = r.Below(3) == 0 ? 1 : 0;
+    const uint32_t pool0 = r.Below(2);
+    const uint32_t entries[2] = {r.Below(9), r.Below(9)};
+    Outputs out[2];
+    bool skip = false;
+    for (int v = 0; v < 2 && !skip; v++) {
+      Random probe;
+      for (uint64_t i = 0; i < (seed & 63); i++) {
+        probe.Next();
+      }
+      Fill(h.base, h.data, kScratchBytes);
+      WriteFakeVtable(h);
+      uint32_t counts[3];
+      RandomPools(h, probe, counts, true, 3, kPoolRecords, 6, kLoadVtable);
+      const uint32_t manager = h.data + kSet;
+      if (guest::LoadU32(h.base, h.data + kPoolRecords + 48 + 16) == 0 ||
+          (pool0 != 0 && guest::LoadU32(h.base, h.data + kPoolRecords + 16) == 0)) {
+        skip = true;
+        break;
+      }
+      guest::StoreU32(h.base, manager + 8, mode);
+      guest::StoreU32(h.base, manager + 44, pool0);
+      const uint32_t lists[2] = {kA, kB};
+      for (uint32_t l = 0; l < 2; l++) {
+        const uint32_t list = manager + (l == 0 ? 116 : 144);
+        const uint32_t at = h.data + lists[l];
+        guest::StoreU32(h.base, list + 12, entries[l]);
+        guest::StoreU32(h.base, list + 16, at);
+        guest::StoreU32(h.base, list + 20, at + 40);
+        guest::StoreU32(h.base, list + 24, at + 200);
+        for (uint32_t i = 0; i < 8; i++) {
+          guest::StoreU16(h.base, at + 200 + 12 * i, uint16_t(probe.Below(4)));
+          guest::StoreU16(h.base, at + 202 + 12 * i, uint16_t(probe.Below(4)));
+        }
+      }
+      PPCContext t = CallContext(h);
+      t.r3.u64 = manager;
+      With(v, [&] {
+        if (v == 0) {
+          __imp__sub_820F1E00(t, h.base);
+        } else {
+          WithCalls(t, h.base, [&](const cs::Calls& calls) {
+            t.r3.u64 = cs::StartLoad(h.base, calls, t.r1.u32, t.r3.u32);
+          });
+        }
+      });
+      ScratchAndR3(h, out[v], t);
+    }
+    if (skip) {
+      continue;
+    }
+    done++;
+    results.Check(out[0], out[1],
+                  fmt::format("case {} mode {} pool 0 {} entries {} {}", c, mode, pool0,
+                              entries[0], entries[1]));
+  }
+  results.Report();
+}
+
+// TextureAnimations::Advance (with AnimationSet::Advance and
+// Animation::Advance): a course set's +1060 (0 now and then) naming a set
+// of up to 6 animations at random offsets, each with up to 8 frames, its
+// current frame, tick, length and start ticks random around each other.
+void TextureAnimationCases(Context& h) {
+  Random& r = h.random;
+  Results results("TextureAnimations::Advance (sub_820F11A8)");
+  for (int c = 0; c < 128; c++) {
+    const uint64_t seed = r.Next();
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Random probe;
+      for (uint64_t i = 0; i < (seed & 63); i++) {
+        probe.Next();
+      }
+      Fill(h.base, h.data, kScratchBytes);
+      const uint32_t course_set = h.data;
+      const uint32_t set = h.data + 1200;
+      guest::StoreU32(h.base, course_set + 1060, c < 4 ? 0 : set);
+      const uint32_t count = probe.Below(4) == 0 ? 0 : probe.Below(7);
+      guest::StoreU32(h.base, set, count);
+      for (uint32_t i = 0; i < count; i++) {
+        // Offsets from the end of the offset table, 64 bytes apart.
+        const uint32_t offset = 64 * probe.Below(8);
+        guest::StoreU32(h.base, set + 4 + 4 * i, offset);
+        const uint32_t animation = set + 4 * (count + 1) + offset;
+        const uint32_t frames = probe.Below(9);
+        guest::StoreU32(h.base, animation + 0, frames);
+        guest::StoreU32(h.base, animation + 4, probe.Below(10) - 1);
+        guest::StoreU32(h.base, animation + 8, probe.Below(40) - 2);
+        guest::StoreU32(h.base, animation + 12, probe.Below(40));
+        for (uint32_t k = 0; k < 9; k++) {
+          guest::StoreU32(h.base, animation + 16 + 4 * k, probe.Below(40) - 2);
+        }
+      }
+      PPCContext t = CallContext(h);
+      t.r3.u64 = course_set;
+      With(v, [&] {
+        if (v == 0) {
+          __imp__sub_820F11A8(t, h.base);
+        } else {
+          t.r3.u64 = cs::AdvanceTextureAnimations(h.base, t.r3.u32);
+        }
+      });
+      ScratchAndR3(h, out[v], t);
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", c));
+  }
+  results.Report();
+}
+
 }  // namespace
 
 void CourseScenery(Context& h) {
@@ -932,6 +1114,9 @@ void CourseScenery(Context& h) {
   PoolsShutdown(h);
   ModelAssets(h);
   Lists(h);
+  ReleaseUnusedCases(h);
+  StartLoadCases(h);
+  TextureAnimationCases(h);
 }
 
 }  // namespace harness

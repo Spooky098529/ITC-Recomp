@@ -8,6 +8,7 @@
 #include "game_messages.h"
 #include "guest.h"
 #include "frame_pacer.h"
+#include "course_scenery/course_scenery.h"
 #include "debug/frame_state_diff.h"
 #include "debug/pause_movie_log.h"
 #include "hooks/cameras.h"
@@ -32,6 +33,7 @@
 #include <vector>
 
 ITC_FLAG_DECLARE(bool, interpolate_draw_state);
+ITC_FLAG_DECLARE(bool, native_course_scenery);
 ITC_FLAG_DECLARE(bool, log_pause_movie);
 ITC_FLAG_BOOL(per_tick_blink_timers, true, "ITC",
               "Advance the car blink timers once per tick on render-only passes");
@@ -73,6 +75,11 @@ extern "C" REX_FUNC(sub_820F11A8) {
   REX_FUNC_PROLOGUE();
   if (frame_pacing::GameMessages_IsRenderOnlyPass() &&
       ITC_FLAG(per_tick_texture_animations)) {
+    return;
+  }
+  // The advance itself is the course scenery's (src/course_scenery/).
+  if (ITC_FLAG(native_course_scenery)) {
+    ctx.r3.u64 = course_scenery::AdvanceTextureAnimations(base, ctx.r3.u32);
     return;
   }
   __imp__sub_820F11A8(ctx, base);

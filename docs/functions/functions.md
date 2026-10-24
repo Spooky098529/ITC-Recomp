@@ -273,8 +273,6 @@ old performance notes to the end of `../native-renderer.md`.
 | `sub_8258FD48` | `Command::SetShaderConstants` | Wrapped | Render thread, command 7: r3 = payload, r4 = register count, r5 = stage << 24 \| type << 16 \| start << 8 \| count. Interpolation substitutes blended values here. |
 | `sub_8210EDB0` | | | Wind sound; scales with speed. |
 | `sub_82152CD8` | | | Camera shake; scales with speed. |
-| `sub_82146B20` | | | Calls `sub_82146AC0` on every animation in a set: count at +0, then offsets to each animation. |
-| `sub_82146AC0` | | | Advances one flipbook animation: frame count +0, current frame +4, tick counter +8 (wraps at the length at +12), frame start ticks from +16. |
 | `sub_82146B80` | | | Returns the current frame's entry of animation r4 in set r3 (texture id at +4). |
 | `sub_82146A38` | | | Finds the animation in set r3 whose texture is r4; -1 if none. |
 | `sub_820F5740` | `Minimap::Draw` | Wrapped | From the draw step part `sub_820F6068`; steps the minimap blink clock at `0x826C5AA4`/`0x826C5AA8` after drawing (see "Per-frame logic" in `../frame-interpolation.md`). |

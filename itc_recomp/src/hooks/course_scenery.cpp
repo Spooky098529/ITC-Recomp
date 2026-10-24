@@ -1,7 +1,10 @@
 // The course scenery natively: adapters in front of src/course_scenery/
 // (docs/functions/course-scenery.md). Each leaves r3 as the original does.
 // Functions reached only from native callers have no adapters (the flag
-// switches their callers).
+// switches their callers): AnimationSet::Advance (sub_82146B20) and
+// Animation::Advance (sub_82146AC0), from TextureAnimations::Advance
+// (sub_820F11A8), whose override is the per-frame logic's wrap
+// (src/frame_pacing/per_frame_logic.cpp: skipped on render-only passes).
 
 #include "guest.h"
 
@@ -19,9 +22,13 @@ ITC_FLAG_BOOL(native_course_scenery, true, "ITC",
               "sub_820FBE80, Load sub_820FBFD0, Release sub_820FC038, Init sub_820FBBE8, "
               "Shutdown sub_820FBDC8, SceneryConfig::ModelAsset sub_820F1530, SceneryList::Clear "
               "sub_820F1588, Add sub_820F1888, Sort sub_820F1930, Scenery::LimitLargeModels "
-              "sub_820F2B80, ModelList::Init sub_820F1A20, Scenery::ClearGlobal sub_820F1480) "
+              "sub_820F2B80, ModelList::Init sub_820F1A20, Scenery::ClearGlobal sub_820F1480, "
+              "SceneryList::ReleaseUnused sub_820F17C0, Scenery::StartLoad sub_820F1E00, "
+              "TextureAnimations::Advance sub_820F11A8 (in the per-frame logic's wrap), "
+              "AnimationSet::Advance sub_82146B20, Animation::Advance sub_82146AC0) "
               "natively instead of through the translated code (the same writes; checked by "
-              "--run_harnesses=course_scenery)");
+              "--run_harnesses=course_scenery). Those reached only from native callers have no "
+              "adapters, and the flag switches their callers: sub_82146B20, sub_82146AC0");
 
 // Defines an adapter: the body (the arguments after the address) uses `ctx`
 // and `base`.
@@ -180,3 +187,9 @@ ITC_COURSE_SCENERY(820F2B80, ctx.r12.u64 = ctx.lr; __savegprlr_27(ctx, base);
                    ctx.r3.u64 = ctx.r3.u64 + 100)
 ITC_COURSE_SCENERY(820F1A20, ModelListInit(base, ctx.r3.u32))
 ITC_COURSE_SCENERY(820F1480, ClearGlobal(base))
+// r3 = the manager, r4 = a list.
+ITC_COURSE_SCENERY(820F17C0, ITC_SCENERY_CALLS;
+                   ctx.r3.u64 = ReleaseUnused(base, calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32))
+// r3 = the manager.
+ITC_COURSE_SCENERY(820F1E00, ITC_SCENERY_CALLS;
+                   ctx.r3.u64 = StartLoad(base, calls, ctx.r1.u32, ctx.r3.u32))

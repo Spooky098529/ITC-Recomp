@@ -165,5 +165,36 @@ void LimitLargeModels(uint8_t* base, uint32_t manager, uint32_t stack);
 void ModelListInit(uint8_t* base, uint32_t list);
 // Scenery::ClearGlobal (sub_820F1480): [0x826C5514] = 0.
 void ClearGlobal(uint8_t* base);
+// SceneryList::ReleaseUnused (sub_820F17C0): the used objects of `list`'s
+// pool in the manager's pools (the manager is the pool set): loaded and not
+// seen this update: marked about to be released with a countdown of 2, or,
+// already marked, counted down and released (ObjectPools::Release) at 0;
+// else the seen flag cleared. Returns what the original leaves in r3 (the
+// last call's).
+uint32_t ReleaseUnused(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t manager,
+                       uint32_t list);
+// Scenery::StartLoad (sub_820F1E00): the course set taken from pool 2 and
+// loaded (+112, +172 = 2, +176 its index); in mode 0 (the configuration's
+// +0, the manager's +8) both lists emptied and filled with every entry of
+// their tables (distance [0x82000A34], mask 0); with the configuration's
+// +36 (the manager's +44) set, pool 0's object the same way into +108;
+// +192 = 1. Returns what the original leaves in r3.
+uint32_t StartLoad(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t manager);
+
+// --- The texture animations (the course set's +1060) ---
+
+// TextureAnimations::Advance (sub_820F11A8): the set at `course_set` +
+// 1060, when not 0, advanced (AnimationSet::Advance). Returns what the
+// original leaves in r3 (0, the set, or its last animation).
+uint32_t AdvanceTextureAnimations(uint8_t* base, uint32_t course_set);
+// AnimationSet::Advance (sub_82146B20): each animation of the set (count
+// +0, then offsets from the end of the offset table) advanced. Returns the
+// last animation, or the set when it has none.
+uint32_t AdvanceAnimationSet(uint8_t* base, uint32_t set);
+// Animation::Advance (sub_82146AC0): a flipbook animation (+0 the frame
+// count, +4 the current frame, +8 the tick, +12 the length, +16 each frame's
+// start tick): back to the start past its length, the next frame when its
+// start is reached, the tick up by 1.
+void AdvanceAnimation(uint8_t* base, uint32_t animation);
 
 }  // namespace course_scenery
