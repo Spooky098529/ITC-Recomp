@@ -24,6 +24,10 @@ file's history. What's left to see in a drive, from every run:
   helpers under `--native_c_runtime`, and wcslen, mbtowc and the wide
   write_char's adapters removed), validated (`itc_1342`, `itc_1343`;
   replay ok; 1 to drive; prints added in 9b878fd). Finished.
+- Subsystem 2 of 3: `leads.md`'s `820FB8B8`-`820FC0E8` lead
+  (`sub_820FBBE8` and others, called only from `820F1138`-`820F4558`):
+  closest to ready (all 6 of its roots ready, 8 functions left).
+  Mapping agent running.
 
 ## Done
 
