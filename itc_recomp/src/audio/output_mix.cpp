@@ -25,18 +25,27 @@ float Clamp(float v) {
 
 }  // namespace
 
-void ToInterleaved51(const float* input, size_t samples, float* output) {
+void ToInterleaved51(const float* input, size_t samples, float* output, const float* front) {
   for (size_t i = 0; i < samples; i++) {
     for (size_t c = 0; c < 6; c++) {
-      output[i * 6 + c] = Clamp(LoadBig(&input[c * samples + i]));
+      float v = LoadBig(&input[c * samples + i]);
+      if (front && c < 2) {
+        v += front[i * 2 + c];
+      }
+      output[i * 6 + c] = Clamp(v);
     }
   }
 }
 
-void ToInterleavedStereo(const float* input, size_t samples, float* output) {
+void ToInterleavedStereo(const float* input, size_t samples, float* output,
+                         const float* front) {
   for (size_t i = 0; i < samples; i++) {
-    const float front_left = LoadBig(&input[0 * samples + i]);
-    const float front_right = LoadBig(&input[1 * samples + i]);
+    float front_left = LoadBig(&input[0 * samples + i]);
+    float front_right = LoadBig(&input[1 * samples + i]);
+    if (front) {
+      front_left += front[i * 2];
+      front_right += front[i * 2 + 1];
+    }
     const float center = LoadBig(&input[2 * samples + i]) * kCenter;
     const float back_left = LoadBig(&input[4 * samples + i]);
     const float back_right = LoadBig(&input[5 * samples + i]);

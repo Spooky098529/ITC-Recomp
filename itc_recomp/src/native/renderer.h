@@ -49,6 +49,12 @@ void Renderer_TiledResolve(uint8_t* base, uint32_t device, uint32_t flags, uint3
                            uint32_t destination, uint32_t point, uint32_t clear_color,
                            float clear_z, uint32_t tile, uint32_t tiles);
 
+// Render thread, in command 28 (Movie::RenderFrame, src/hooks/movies.cpp): a
+// movie's frame drawn over render target 0 of `device` (docs/native-movies.md):
+// the Y plane (width x height) and the half-size U and V, rows with no padding.
+void Renderer_DrawMovie(uint8_t* base, uint32_t device, uint32_t width, uint32_t height,
+                        const uint8_t* y, const uint8_t* u, const uint8_t* v);
+
 // Render thread, after each frame's replay and present.
 void Renderer_EndFrame();
 

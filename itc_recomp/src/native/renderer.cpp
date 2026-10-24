@@ -317,6 +317,9 @@ class Renderer {
   void FrontBufferResolve(uint8_t* base, uint32_t device, uint32_t front_buffer) {
     passes_.FrontBufferResolve(BeginFrame(), base, device, front_buffer);
   }
+  void DrawMovie(uint8_t* base, uint32_t device, const Passes::MoviePlanes& planes) {
+    passes_.DrawMovie(BeginFrame(), base, device, planes);
+  }
   void EndFrame();
 
  private:
@@ -1260,6 +1263,14 @@ void Renderer_FrontBufferResolve(uint8_t* base, uint32_t device, uint32_t front_
   g_base = base;
   if (Renderer* renderer = GetRenderer()) {
     renderer->FrontBufferResolve(base, device, front_buffer);
+  }
+}
+
+void Renderer_DrawMovie(uint8_t* base, uint32_t device, uint32_t width, uint32_t height,
+                        const uint8_t* y, const uint8_t* u, const uint8_t* v) {
+  g_base = base;
+  if (Renderer* renderer = GetRenderer()) {
+    renderer->DrawMovie(base, device, {width, height, y, u, v});
   }
 }
 

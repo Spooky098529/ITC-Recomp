@@ -393,7 +393,7 @@ function(itc_add_executable name)
     # include path can't stand in for them.
     target_include_directories(${name} PRIVATE thirdparty)
 
-    target_link_libraries(${name} PRIVATE itc_xma itc_xenos_shaders)
+    target_link_libraries(${name} PRIVATE itc_xma itc_movies itc_xenos_shaders)
 
     # The native renderer (src/native/) uses SDL, which lives in librexruntime,
     # and loads Vulkan at runtime: it needs only the headers. Both are the SDK's
