@@ -21,8 +21,10 @@ file's history. What's left to see in a drive, from every run:
 - Subsystem 3 of 3: the track zones (`track-zones.md`, mapped in
   52cd53b from the "path search" lead, which turned out to be 70
   stretches of the course's route the player's car is checked against
-  for the HUD; 92 rows, 12 ready groups, no outside blockers). Step:
-  migration 1 (agent running).
+  for the HUD; 92 rows, 12 ready groups, no outside blockers).
+  Migration 1 (31bc1e8..a99b454): 92 of 92 ours (9 Native),
+  `--native_track_zones`; nothing left. Step: validation (agent
+  running).
 
 ## Done
 
@@ -89,3 +91,7 @@ This run's groups: `expected-differences.md` (the "20:22 run" lines).
   known 559, unknown 4683).
 - After mapping the track zones: ours 1393, work left 5365 (wrapped
   123, known 651, unknown 4591).
+- After the track zones' migration 1: ours 1485, work left 5273
+  (wrapped 123, known 559, unknown 4591). Race 28 s (`itc_1252`) with
+  `--run_harnesses=all`, 0 errors, every harness 0 differing (none
+  added).

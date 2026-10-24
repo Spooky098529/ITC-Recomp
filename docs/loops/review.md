@@ -180,6 +180,23 @@ When the user has reviewed a run's section, its heading gets
   zone 55's only range is the point (0, 0)-(0, 0), probably a
   placeholder; `RouteRange::WithinEnds`'s "slice above -1" test as the
   code has it.
+  Migration 1's rows (31bc1e8..a99b454; `--native_track_zones`; 92 of
+  92 ours, 9 Native): the 70 set-ups as one plain C++ function each
+  over a table of their ranges read from `generated/` (`kSetupRanges`,
+  checked against the rows), each range built at the original's stack
+  offset; `RouteRange::Init`'s row corrected (the end from r4 + 4, r5
+  not read). The coverage list misses three camera-mode functions that
+  run in attract races (`sub_82155288`, `sub_821562F8`, `sub_820FE830`,
+  seen by temporary logs, no rows: the camera modes' lead): Init,
+  AddBranch, Update and Test keep their adapters for them. For review:
+  Create's harness zeroes the owner's lists' unwritten slots before
+  comparing (copied from the set-ups' stack; in the original, its
+  callees' frame leftovers, which native Create doesn't write; nothing
+  reads them, the walks stop at the counts; the set-ups' own harness
+  compares them byte for byte); the range tests' harnesses leave out
+  cases whose walk might never end on the random route (the original
+  wouldn't return either: OnPath 29 of 1000, Test 70, Update 51,
+  Zone::Update 123 of 300, logged).
 
 ## Run 2026-10-23 17:22 (`b7-loop-23-10-26-4`)
 
