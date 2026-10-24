@@ -45,6 +45,32 @@ divide trap (a linear format with no bytes a block logs a warning and goes
 on with 0); the allocation layer stops the game when out of memory, so
 the creation functions' failure paths have no harness cases.
 
+The second migration (2026-10-24, the same flag and harness) made the rest
+native: the texture headers' layout (`TextureLayout::Sizes`,
+`TextureHeader::Set` on a host copy of the header's words, which
+`XGSetTextureHeaderEx` builds and stores in place of its memcpy),
+`Texture::LevelOffset` with the packed mip tail's offset (not seen in play,
+ported), `Device::CreateTexture`, `Texture::GetSurfaceLevel`, and the locks,
+unlocks and destruction with their wrappers. Their GPU work is Dropped (the
+user's call, 2026-10-24): `Resource::Lock`'s and `Resource::Destroy`'s fence
+waits, `Lock`'s cache flush packet (in play always queued as the device's
+pending flush range, `sub_8229DDD8`, since the device's thread word +10760
+reads 0) and `Unlock`'s data cache flush; the lock count (added by a
+compare-and-swap without the recompiler's global lock), the locked ranges,
+the addresses and the frees are the game's. The harness's "Resource::Lock
+(sub_822A63F8), its command buffer (expected to differ)" group compares
+what the packet path leaves (the original's packets and pending ranges are
+put back after each case). Learned on the way: `XGSetTextureHeaderEx`
+divides its pitch by the block's height (`GpuFormat::BlockSize`'s second
+output); `TextureHeader::Set` reads an uninitialized stack word for a type
+it doesn't know and `Texture::LevelOffset` for levels from 2^31, so their
+adapters run the originals there; `Texture::GetSurfaceLevel`'s
+`LevelOffset` call writes only its own stack (left out); `Resource::Unlock`
+leaves r3 the last flushed range's start. Still with adapters, for callers
+in other files: `Texture::LevelOffset` (`Device::Resolve`),
+`GpuFormat::BlockSize` (`sub_8236D3C8`), `Resource::GetType`
+(`sub_8235A9F8`), and the functions the game's code calls directly.
+
 Callers in other files: `Texture::GetLevelDesc` (`sub_822A5B78`) from
 `UiMovie::OnLoaded` and `sub_8211BEE8` (`ui-movies-game.md`),
 `Font::OnPageLoaded` (`strings-and-font.md`), `sub_822135B0`,
