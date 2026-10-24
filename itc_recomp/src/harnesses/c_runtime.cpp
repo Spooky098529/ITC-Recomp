@@ -402,6 +402,25 @@ void NativeCftof2(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = 0;
 }
 
+// wcslen: r3 = UTF-16 string; returns its length.
+void NativeWcslen(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.s64 = c_runtime::Wcslen(base, ctx.r3.u32);
+}
+
+// mbtowc's single-byte path: r3 = wide character out (or 0), r4 = the
+// bytes, r5 = their count; returns 0 or 1.
+void NativeMbtowc(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.s64 = c_runtime::Mbtowc(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+}
+
+// The wide write_char: r3 = the UTF-16 unit, r4 = the stream, r5 = the
+// count; r3 left as it came; the original where the native one refuses.
+void NativeWideWriteChar(PPCContext& ctx, uint8_t* base) {
+  if (!c_runtime::WriteWideChar(base, ctx.r3.u16, ctx.r4.u32, ctx.r5.u32)) {
+    __imp__sub_825B1368(ctx, base);
+  }
+}
+
 // _putwc_nolock: r3 = the UTF-16 unit, r4 = the stream; string streams
 // natively, the rest the original.
 void NativePutwc(PPCContext& ctx, uint8_t* base) {
@@ -497,7 +516,7 @@ void CRuntime(Context& h) {
         const uint32_t at = h.data + offset;
         const std::string what = fmt::format("length {} offset {}", length, offset);
         StringCase(h, lengths, [&] { WriteUnits(h, at, units); },
-                   [&](PPCContext& t) { t.r3.u64 = at; }, __imp__sub_825A9958, sub_825A9958,
+                   [&](PPCContext& t) { t.r3.u64 = at; }, __imp__sub_825A9958, NativeWcslen,
                    what);
         // The destination elsewhere (the source near the page end goes to the
         // start, and the other way), then overlapping, one unit below.
@@ -588,7 +607,7 @@ void CRuntime(Context& h) {
                          t.r4.u64 = bytes;
                          t.r5.u64 = count;
                        },
-                       __imp__sub_825B7EC8, sub_825B7EC8,
+                       __imp__sub_825B7EC8, NativeMbtowc,
                        fmt::format("wide {:X} bytes {:X} count {} byte {:X}", wide, bytes, count,
                                    byte));
           }
@@ -1205,7 +1224,7 @@ void CRuntime(Context& h) {
                              t.r5.u64 = count;
                            },
                            wide_char ? __imp__sub_825B1368 : __imp__sub_825B7A80,
-                           wide_char ? sub_825B1368 : NativePutwc,
+                           wide_char ? NativeWideWriteChar : NativePutwc,
                            fmt::format("flags {:X} base {:X} room {:X} pointer +{} count {:X} "
                                        "unit {:X}",
                                        flag, base_word, room, pointer - h.data, c, unit));

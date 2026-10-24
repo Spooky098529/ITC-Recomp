@@ -43,7 +43,8 @@ ITC_FLAG_BOOL(native_c_runtime, true, "ITC",
               "destructor sub_82106540 skipped, any other called in the translated code) "
               "(checked by "
               "--run_harnesses=c_runtime). Those reached only from native callers have no "
-              "adapters, and the flag switches their callers: strcpy_s, __ascii_strnicmp, "
+              "adapters, and the flag switches their callers: wcslen, mbtowc, the wide write_char, "
+              "strcpy_s, __ascii_strnicmp, "
               "strtoxl, ___dtold, _ld12tod, _atof_l, _fltin2, __strgtold12_l, __mtold12, $I10_OUTPUT, "
               "_fltout2, _cftof_l, _cftof2_l, _fptostr, _putwc_nolock, _cfltcvt_init and setSBCS");
 
@@ -78,16 +79,6 @@ extern "C" REX_FUNC(sub_825A71D0) {
                          });
 }
 
-// wcslen: r3 = UTF-16 string; returns its length.
-extern "C" REX_FUNC(sub_825A9958) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_c_runtime)) {
-    __imp__sub_825A9958(ctx, base);
-    return;
-  }
-  ctx.r3.s64 = c_runtime::Wcslen(base, ctx.r3.u32);
-}
-
 // wcscpy: r3 = destination, r4 = source; returns r3 (left as it is).
 extern "C" REX_FUNC(sub_825A7F30) {
   REX_FUNC_PROLOGUE();
@@ -116,17 +107,6 @@ extern "C" REX_FUNC(sub_825A7EB0) {
     return;
   }
   ctx.r3.s64 = c_runtime::Wcscmp(base, ctx.r3.u32, ctx.r4.u32);
-}
-
-// mbtowc (the C locale's single-byte path): r3 = wide character out (or 0),
-// r4 = the bytes, r5 = their count; returns 0 or 1.
-extern "C" REX_FUNC(sub_825B7EC8) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_c_runtime)) {
-    __imp__sub_825B7EC8(ctx, base);
-    return;
-  }
-  ctx.r3.s64 = c_runtime::Mbtowc(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
 }
 
 // strncpy: r3 = destination, r4 = source, r5 = count; returns r3.
@@ -449,16 +429,6 @@ extern "C" REX_FUNC(sub_825AF098) {
   }
   if (last >= 0) {
     ctx.r3.u64 = uint32_t(last);
-  }
-}
-
-// The wide write_char: r3 = the UTF-16 unit, r4 = the stream, r5 = the
-// count; r3 left as it came (as the original's _putwc_nolock returns it).
-extern "C" REX_FUNC(sub_825B1368) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_c_runtime) ||
-      !c_runtime::WriteWideChar(base, ctx.r3.u16, ctx.r4.u32, ctx.r5.u32)) {
-    __imp__sub_825B1368(ctx, base);
   }
 }
 
