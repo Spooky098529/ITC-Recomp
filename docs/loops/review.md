@@ -34,6 +34,38 @@ When the user has reviewed a run's section, its heading gets
     `sub_8258CF10`, `sub_825924E0` (the fallback's `--log_pause_menu`
     and `--log_input_reads` diagnostics), `sub_820991E0` and
     `sub_8210AF08` (guest calls through `ctx`).
+- Three cleanup leads (2e5ce7c..b6888ac; `race-overlays.md`,
+  `ai-drivers.md`, `c-runtime.md`):
+  - `sub_8212BFE8` ParticlesB::ParticlesB and the deleting destructors
+    `sub_8212B358`, `sub_8212C070` Overridden; `sub_8212B288`,
+    `sub_8212BF88` Native from the start (only the native deleting
+    destructors call them). The deleting destructors run natively only
+    with `--native_heap`, and fall back to the original (bit 0 set) for
+    a block the allocation layer didn't give. They're called from the
+    recompiled CarOverlays::DeleteChildren at a race's end, so attract
+    races don't reach them.
+  - `sub_8213BDF0`, `sub_8213BE80` (JoinCornersByExit, ByEntry; never
+    seen in play, no rows) native inside AiPath::JoinCornerPair;
+    PathCalls' join callback gone. Like the other native joins, they
+    don't write the original's fcfid scratch below the stack pointer.
+    What's left of PathCalls is the +5532 normalizer's other targets
+    (never in the game), so UpdateIdle's (`sub_821399A8`, listed
+    removable) and DriveCar's adapters stay.
+  - Flush-to-zero: the problem was real. ThinLTO had moved
+    Smoke::InRegion's second `dpps` past the control word's restore: a
+    new "tiny values" group had 135 of 400 differing. Fixed as in
+    ee810a9 (a `Flushing()` helper, `vector_library::PinInMode`
+    barriers); 0 differing since. The barriers changed Sparks::Emit's
+    `mulps` operand order (14 NaN-only differences), so it now picks
+    the kept NaN explicitly (`MulKeepingFirstNaN`); Sparks::UpdateStreak
+    still relies on a plain `addps` that happens to match.
+  - A latent harness input: with the shared random stream shifted,
+    AiDriver::DriveCar's case 540 made the recompiled side fault without
+    end (guest `0x7028C0CC`; `itc_1497`, `itc_1498`). The new groups
+    were put last so earlier inputs stay as before, but DriveCar's case
+    generation can make an input the original faults on.
+  - `sub_82138D00` SetParams, `sub_82139DA0` StartRace,
+    `sub_82139580` ResetControl: adapters removed (Native).
 
 ## Run 2026-10-24 17:46 (`b7-loop-24-10-26-3`) (reviewed 2026-10-24)
 

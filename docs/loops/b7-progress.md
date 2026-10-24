@@ -29,7 +29,10 @@ file's history. What's left to see in a drive, from every run:
   their deleting destructors (`race-overlays.md`); `sub_8213BDF0`,
   `sub_8213BE80`, `AiPath::JoinCornerPair`'s steps (`ai-drivers.md`);
   the race overlays' flush-to-zero window (`src/race_overlays/`).
-  Migration agent running.
+  Migration done (2e5ce7c..b6888ac: the particle arrays, the joins'
+  steps with PathCalls' join callback gone, the flush-to-zero windows
+  fixed (ThinLTO had moved a `dpps` out of one), 3 AI driver adapters
+  removed). Validation agent running.
 
 ## Done
 
@@ -55,6 +58,9 @@ This run's groups: `expected-differences.md` (the "21:33 run" lines).
 - After ActionMappers::Init's migration: ours 1795, work left 4966
   (wrapped 115, known 584, unknown 4267). Race 27 s (`itc_1493`) with
   `--run_harnesses=all`, 0 errors, every harness 0 differing.
+- After the three cleanup leads' migration: ours 1800, work left 4961
+  (wrapped 115, known 579, unknown 4267). Race 27 s (`itc_1507`), 0
+  errors, every harness 0 differing.
 
 ## Stopped
 
