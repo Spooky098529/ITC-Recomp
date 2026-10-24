@@ -74,6 +74,7 @@ bool HoldsChild(uint8_t* base, uint32_t object) {
 namespace refcount {
 
 uint32_t AddRef(uint8_t* base, uint32_t object) {
+  ITC_NATIVE_RUNNING("sub_822A6738 Resource::AddRef");
   if (object == g_unchanged_shader) {
     return guest::LoadU32(base, object + kCount);  // unused by the caller
   }
