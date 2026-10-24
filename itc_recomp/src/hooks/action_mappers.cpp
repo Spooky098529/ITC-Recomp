@@ -24,7 +24,7 @@ ITC_FLAG_BOOL(native_action_mappers, true, "ITC",
               "ActionMappers::Configure, sub_8209F228; the set-up, sub_8210C078, sub_8210BB38, "
               "sub_8210BAB0, sub_8210B8A8, sub_8210B438, sub_8210AEB0, sub_8210AE60 and "
               "sub_8210AF00; the mapper's constructor, sub_8210C180; ActionMapper::Bind, "
-              "sub_8210B270, and InputClientList::BindAll, sub_8210AF08, with --native_heap) "
+              "sub_8210B270 (no adapter), and InputClientList::BindAll, sub_8210AF08, with --native_heap) "
               "natively instead of through the translated "
               "code (same results; checked by --run_harnesses=action_mappers)");
 
@@ -198,17 +198,9 @@ extern "C" REX_FUNC(sub_8210C180) {
   MapperConstruct(base, ctx.r3.u32, ctx.r4.u32);
 }
 
-// ActionMapper::Bind: r3 = the mapper, r4 = the input object; r3 = 1. The
-// original unless MapperBindKnown (AddListener allocates: only over the
-// allocation layer).
-extern "C" REX_FUNC(sub_8210B270) {
-  ITC_MAPPERS_FALLBACK(8210B270)
-  if (!hooks::NativeHeapActive() || !MapperBindKnown(base, ctx.r3.u32, ctx.r4.u32)) {
-    __imp__sub_8210B270(ctx, base);
-    return;
-  }
-  ctx.r3.u64 = MapperBind(base, ctx.r3.u32, ctx.r4.u32);
-}
+// ActionMapper::Bind (sub_8210B270) has no adapter: its only caller in
+// play, BindAll below, calls its plain C++ (a recompiled caller reaching it
+// runs the original, and the flag switches BindAll).
 
 // InputClientList::BindAll: r3 = the list; r3 = 1. For each mapper (the
 // nodes of type 2), the input object from the list's owner (+36) through
