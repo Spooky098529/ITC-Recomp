@@ -7,7 +7,8 @@
 // CarInputs::Create (sub_82102258), from RaceFlow::OnSetUp; and
 // CarInputs::Destroy (sub_82102300), from RaceFlow::OnEnd; sub_8215F5F0
 // (never seen in play), from RaceFlow::OnState16; and RaceFlow::HoldAll
-// (sub_8215FA10), from RaceFlow::OnHold and OnState16.
+// (sub_8215FA10), from RaceFlow::OnHold and OnState16; PlayerInput::Read
+// (sub_82102350), from PlayerInput::Control.
 
 #include "guest.h"
 
@@ -29,7 +30,7 @@ ITC_FLAG_BOOL(native_racer_controllers, true, "ITC",
               "natively instead of through the translated code (the same words; checked by "
               "--run_harnesses=racer_controllers). Those reached only from native callers "
               "have no adapters, and the flag switches their callers: sub_82102258, "
-              "sub_82102300, sub_8215F5F0, sub_8215FA10; merged into their callers: "
+              "sub_82102300, sub_8215F5F0, sub_8215FA10, sub_82102350; merged into their callers: "
               "sub_821024D0, sub_82591C08");
 
 // Defines an adapter: the body (the arguments after the address) uses `ctx`
@@ -159,13 +160,6 @@ void SetRegs(PPCContext& ctx, const Regs& regs) {
 }
 }  // namespace
 
-// r3 = the player, r4 = the action id, r5 = the kind, r6 = out.
-ITC_RACER_CONTROLLERS(82102350, {
-  ITC_RACER_CALLS;
-  Regs regs{ctx.r3.u64, 0, false};
-  Read(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r1.u32, calls, &regs);
-  SetRegs(ctx, regs);
-})
 // r3 = the player, r4 = the control, r5 = the kind, r6 = out.
 ITC_RACER_CONTROLLERS(82102488, {
   ITC_RACER_CALLS;
