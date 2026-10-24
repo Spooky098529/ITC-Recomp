@@ -197,7 +197,13 @@ freeing kept; 46 of 46 ours, `--native_graphics_resources`, ours 1,485
 (`video-output.md`) and stopped again for the user's call on the
 device lock's kernel sync, then went on (the user's call, 2026-10-24:
 the device lock alone over a `std::binary_semaphore`; the game's
-Semaphore class stays recompiled for the archive loader). Harness runs use `attract_race.sh 40` (the user's call,
+Semaphore class stays recompiled for the archive loader; 7 of 30 ours,
+`--native_video_output`, with three camera passes), and made the device's
+state setters native (`docs/functions/device-state.md`, 131 of 131,
+`--native_device_state`; the packets written straight into the command
+buffer, which nothing reads, Dropped by the graphics rule; ours 1,672).
+It stopped at its limit; summary `docs/loops/b7-loop-2026-10-24-0325.md`.
+Harness runs use `attract_race.sh 40` (the user's call,
 2026-10-23); a race short only because the harnesses took longer is
 no halt.
 After each plan item, run `itc_recomp/tools/boundary_status.py` and record

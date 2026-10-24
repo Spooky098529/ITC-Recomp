@@ -90,7 +90,10 @@ goes in `src/` as overrides), American English.
   46 of 46 ours (ours 1,529). It then mapped the video output and the
   device lock (`video-output.md`) and stopped for the user's call on
   the device lock's kernel sync: the lock alone over a
-  `std::binary_semaphore` (2026-10-24). The
+  `std::binary_semaphore` (2026-10-24; 7 of 30 ours, with three camera
+  passes), and made the device's state setters native (`device-state.md`,
+  131 of 131; the packets nothing reads Dropped by the graphics rule;
+  ours 1,672). The
   runs' rows wait for the user's review (`docs/loops/review.md`). See
   "B7's loop runs" under B7, and `docs/loops/b7-progress.md`. Guest
   allocation is no longer a block (`docs/native-memory.md`); what the
@@ -2545,6 +2548,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-10-24 | The track zones (70 hardcoded stretches of the course's route the player's car is checked against each tick for the HUD: their set-ups, route ranges, fixed-size lists and the owner at `[0x828161EC]`) | `track-zones.md` | 92 of 92 (one migration; 9 Native) | `--native_track_zones` |
 | 2026-10-24 | The graphics resources (the graphics library's texture, surface and buffer headers and descriptions, their creation, the EDRAM allocator, surface levels, the device's current targets and stream, locks, reference counts and destruction; the user's calls: `Edram::Alloc` with a `std::mutex`, the locks' fence waits and cache flushes Dropped) | `graphics-resources.md` | 46 of 46 (two migrations) | `--native_graphics_resources` |
 | 2026-10-24 | The video output and the device lock (the video output's constructor, `LockDevice` and `UnlockDevice` over a host `std::binary_semaphore` by the user's call, the device's thread ownership; with `cameras.md`'s `MakeRenderTarget`, `SetUpSurfaces` and `Init`, which it blocked; the shared sync wrappers kept recompiled) | `video-output.md` | 7 of 30 (and 3 of `cameras.md`) | `--native_video_output` (`--native_cameras`) |
+| 2026-10-24 | The graphics device's state (the render and sampler state setters through the device's tables, the stream, indices, textures, shader constants, `SetFVF`, the render target and depth surface, scissor and viewport, `SetDefaultState`, `DirtyAllState`, the GPU register split, gamma; the packets written straight into the command buffer, which nothing reads, Dropped by the graphics rule) | `device-state.md` | 131 of 131 (two migrations) | `--native_device_state` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -3179,3 +3183,15 @@ no row yet 4,530); `video-output.md` 7 ours of 30 (the rest the game's
 sync wrappers, kept recompiled for the core by the user's call, and what
 waits on the device's state setters), `cameras.md` 38 of 42. 1,136
 overrides in `src/`.
+
+**2026-10-24, B7's tenth loop run, stopped (branch `b7-loop-24-10-26`:
+the graphics resources, the video output and the device lock, the
+device state):** the boundary unchanged: 449 functions (916 pairs):
+overridden 67, Native 5, Dropped 23, never called 70, live 284.
+Imports: 186 called, 62 with a live caller. B7 (`b7_status.py`): 6,760
+in play, ours 1,672, work left 5,088 (Wrapped 123, with a row 555, no
+row yet 4,410); `device-state.md` 131 ours of 131. 1,258 overrides in
+`src/`. The setters' adapters stay (the device's tables at +56 and +440
+point at them, and the command replay reaches them); what the video
+output's rest waits on is now the command replay and the game's sync
+wrappers (kept recompiled for the core).

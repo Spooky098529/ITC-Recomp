@@ -43,9 +43,17 @@ see in a drive, from every run: `to-drive.md`.
   the graphics rule: `gpu_link.cpp` only counts them). Migration 1 done
   (7b1c218..c421c0b, 121 of 131 ours: 120 native, 1 Dropped), validated
   (`itc_1320`; all 120 ran in play): migration 2 done (fd70fa2..fd026da,
-  131 of 131 ours): validation agent running.
+  131 of 131 ours), validated (`itc_1334`; all ran in play). Finished;
+  the loop stopped at the run's limit (below).
 
 ## Done
+
+- The device state (`device-state.md`, mapped in 8b1b86b; 131 rows):
+  131 ours in two migrations (7b1c218..c421c0b, fd70fa2..fd026da), each
+  validated (`itc_1320`, `itc_1334`; all ran in play);
+  `--native_device_state`. The packets nothing reads Dropped (the
+  graphics rule). Left: none; the setters' adapters stay for the
+  device's tables and the command replay.
 
 - The video output and the device lock (`video-output.md`, mapped in
   2fdfea4; 30 rows): 7 ours in one migration (c234559..bafb51c), with
@@ -157,3 +165,11 @@ than the one that took it; a mutex may not), through LockDevice,
 UnlockDevice and the video output's constructor; the Semaphore class
 stays recompiled for the archive loader. The run goes on
 with this subsystem's migration.
+
+2026-10-24, after the device state: the run's limit (3 subsystems, the
+user's call) reached. Everything passed: harnesses 0 differing outside
+"(expected to differ)" groups (16 added, all from the user's calls or
+the graphics rule), attract races 25-28 s under `attract_race.sh 40`,
+no errors, replays ok. Next: the user reviews `review.md` ("Run
+2026-10-24 03:25") and `expected-differences.md` ("03:25 run"), drives
+a race for `to-drive.md`, and merges.
