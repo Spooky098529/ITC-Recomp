@@ -13,6 +13,21 @@ When the user has reviewed a run's section, its heading gets
 
 ## Run 2026-10-24 03:25 (`b7-loop-24-10-26`)
 
+- `device-state.md` (new, 131 rows; 11 moved from `functions.md`, 120
+  new; mapped in 8b1b86b), `known-data.md` (the setter tables at
+  `0x826388F8` and `0x82638D78`, the device's fields); the blocker notes
+  in `graphics-resources.md` and `video-output.md` point to it; 1 lead
+  (the command buffer, `8229DC28`-`8229F228`). For review: the
+  shadow, dirty masks, fetch constants, bound objects, scissor and the
+  predicated tiling bit (+10808 bit 1) Kept (the renderer reads them);
+  the packets written straight into the command buffer (the screen
+  scissor, binning and WAIT_UNTIL, the GPU register split and its dummy
+  draws, gamma) Dropped by the graphics rule (nothing reads them: the
+  lead checked `gpu_link.cpp` only counts them for its log); the fence
+  writes in SetStreamSource, SetIndices and SetTexture kept (recompiled
+  code reads fences); the WRAP8-15 setters' dirty bit quirk (bit 45,
+  0x2183's) kept.
+
 - `video-output.md` (new, 30 rows; 6 moved from `functions.md`:
   VideoOutput::SetUpDisplay, WaitForVblank, ResolveFrontBuffer,
   Event::Create, Wait, Signal; 24 new; mapped in 2fdfea4),

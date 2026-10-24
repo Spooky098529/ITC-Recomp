@@ -37,7 +37,11 @@ see in a drive, from every run: `to-drive.md`.
 - Subsystem 3 of 4: `leads.md`'s graphics device state setters
   (`sub_822A3D30` and others) with `sub_822A8A60` (probably
   SetShaderGPRAllocation; blocks `VideoOutput::Present`): they run every
-  frame and block the video output's rest: mapping agent running.
+  frame and block the video output's rest: mapped as the device state
+  (`device-state.md`, 131 rows, 8b1b86b; 116 ready groups); map checked
+  (0 errors, 131 of 131 in play; the packets nothing reads are Dropped by
+  the graphics rule: `gpu_link.cpp` only counts them): migration agent
+  running.
 
 ## Done
 
@@ -90,6 +94,8 @@ This run's groups: `expected-differences.md` (the "03:25 run" lines).
   `--run_harnesses=all`, 0 errors, every harness 0 differing outside
   one "(expected to differ)" group added (the video output's semaphore,
   the user's call).
+- After mapping the device state: ours 1541, work left 5219 (wrapped
+  123, known 686, unknown 4410).
 
 ## Stopped
 
