@@ -197,6 +197,13 @@ Rows not yet moved stay in the table below. So far:
   section and slice, and the sections to take at forks), that the
   player's car is checked against for the HUD, their owner at
   `0x828161EC`, and the fixed-size lists they're kept in (B7).
+- [`graphics-resources.md`](graphics-resources.md): the graphics
+  library's resources: texture and surface headers and what's worked
+  out from them (block sizes, formats, types, a level's size, layout,
+  offset and description), making textures, surfaces with their EDRAM
+  tiles, surface levels and vertex and index buffers, the device's
+  current targets and stream, locks and unlocks, reference counts and
+  destruction (B7).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
@@ -296,10 +303,6 @@ old performance notes to the end of `../native-renderer.md`.
 | `sub_82486BC0` | | | The movie player's stream set-up (from `sub_82481B98`): r3 the player, r4 and r5 two streams' formats, set up through the player's +56, +60 and +64 objects (buffers by `sub_8248F2B8`); a third (r6) only with a `DbgPrint`. Twice a session, r6 0 each time, so the print never runs. Not read in detail. |
 | `sub_8248FBE0` | | | A method that isn't implemented: `DbgPrint` and `0x80004001` (E_NOTIMPL). No direct caller (a vtable). Never called in play (two attract races and two sessions the user played, 2026-10-21). |
 | `sub_8229B7B0` | | | Copies four words of the device's presentation parameters (+13188 width, +13192 height, +13236, +13196) to r5. r3 device, r4 unused (0). From `sub_82482B18`. |
-| `sub_822A6968` | | | Probably CreateIndexBuffer: r3 bytes, r4 usage, r5 format (1), r6 0. Allocates a 32-byte header (`sub_822976F8`) and the data, freeing the header if the data fails; returns the header (+24 the data) or 0. From `sub_82482B18`. Not read in detail. |
-| `sub_822A6A18` | | | Probably a buffer's Lock: r3 the buffer, r4-r6 0; returns the data's address. Calls `sub_822A63F8`. From `sub_82482B18`. Not read in detail. |
-| `sub_822A6A78` | | | Probably a buffer's Unlock: r3 the buffer; calls `sub_822A6630`. From `sub_82482B18`. Not read in detail. |
-| `sub_822A6830` | | | Probably CreateVertexBuffer: r3 bytes, r4 and r5 0; allocates like `sub_822A6968`. From `sub_82482B18` (120 bytes). Not read in detail. |
 | `sub_822A8980` | | | Probably CreateVertexDeclaration: r3 the elements (`8264D550` from `sub_82482B18`); allocates (`sub_822976F8`), clears and copies (`memset`, `sub_825A7410`). Not read in detail. |
 | `sub_822221A0` | `TitleScreen::Update` | Wrapped | Counts idle ticks and starts the attract race at 600 (see "The title screen" in `../title-screen.md`). `--attract_after_s` shortens the wait. |
 | `sub_820F4128` | `Lights::FindNearest` | Overridden | `src/hooks/lights.cpp` (`--native_nearest_lights`, "Lights::FindNearest" in `native-renderer.md`). Collects the lights nearest a point, nearest first; 13.1% of the main thread in an uncapped attract race (2026-10-16, "The main thread" in `native-renderer.md`). Arguments: r3 the light set owner (list at r3+216: count +0, array +8 of 272-byte entries, each's +12 → +80 a light set), r4 the output, r5 the point, r6 the most lights to keep (at most 32; 0 returned above), r9 a direction vector, f1 a merge radius, f2 the farthest squared distance, f3 the least dot product. For each light (48 bytes: position xyz at +0, 32 bytes copied out): skipped beyond f2, or when the direction to it dotted with r9 is below f3 (a cone); within f1 of a light already kept, it replaces that one if nearer, else is dropped; otherwise insertion-sorted by squared distance into a 33-entry array on its ~2 KB guest stack frame. Writes 32 bytes a light to r4 (position with w = the float at `0x82000A30`, then the light's +16..+31) and returns the count. A light set's count (+0) is little-endian (byte-swapped after `lwz`); `sub_82294730` gives each of its entries, whose +0 count says how many times the entry's one light group (count +60, lights from +76) is scanned: the group pointer isn't advanced, so a count above 1 scans the same lights again (the merge then drops the copies). It happens: in an attract race ~63 repeated scans a call, ~1,465 of the ~6,240 lights it tests a call. Hot spot: three `stfs` of the difference to r1+80, then a 16-byte `lvx` of the same spot (a failed store forward) for every light tested. Only caller: `sub_820C9170`, ~3 calls a frame, 93% of them on render-only passes. |
@@ -390,8 +393,6 @@ old performance notes to the end of `../native-renderer.md`.
 | `sub_822B1E70` | | | From `Device::Init` (no arguments): passes two callbacks (28: `822B1AC8`; 47: a block holding 2 and `822B1CB0`) to a function from the kernel variable at `820007B4`, or from the debug monitor data (`820007F0`, +24) if that's set (it points to 0 without a debugger), and clears the global at `82953D14`. Not read in detail. |
 | `sub_822AC530` | | | The library's debug print (r3 a format): `_vsnprintf` into a 260-byte buffer, then `DbgPrint` (see B6). From `Device::Init`'s failures (ours too), `sub_8229DEA0`, `sub_822AC5B8`, the "GPU hung" handler `sub_822ACAA8`, the capture `sub_822B1788` (Dropped) and mounting `sub_822B58F0` (never called). Never called in play (two attract races and two sessions the user played, 2026-10-21). |
 | `sub_825B9A60` | | | From `sub_822AD228`; its result goes to device +10760. Not read. |
-| `sub_822A5D08` | | | Probably creates a texture: r3 width, r4 height, then 1, 1, 0, the format, 0, 3; returns it or 0. From `Device::SetUpDisplay` for the front buffer (skipped: the game sets parameters +60), and twice from the display set-up `sub_8258D568` for the video output's two front buffers (1280x720, `0x28280106`). Not read. |
-| `sub_822A5E28` | | | Probably creates a surface: r3 width, r4 height, r5 format, r6 parameters +16, r7 0; returns it or 0. From `Device::SetUpDisplay` (render target, depth surface). Not read. |
 | `sub_822A3D30` | | | Probably `Device::SetRenderTarget` (r3 device, r4 index, r5 surface); from `Device::SetUpDisplay` with the default render target. Not read. |
 | `sub_822A4060` | | | Probably `Device::SetDepthStencilSurface` (r3 device, r4 surface); from `Device::SetUpDisplay` with the default depth surface. Not read. |
 | `sub_822B42D0` | | | The scaler's parameters: r3 device, r4 them (presentation parameters +96); calls `sub_822B2598`, then `sub_822B4250` (which sets +10810 bit 5, the scaler set up at the next Swap). From `Device::SetUpDisplay`; from Swap only when r5 differs from +13284 (never). Not read in detail. |
@@ -433,8 +434,6 @@ old performance notes to the end of `../native-renderer.md`.
 | `sub_8229E9D0` | | | From `sub_822A0718` (r4 the write position, r6 `822A0688`, r7 from +13240 and +11596); writes packets. Not read. |
 | `sub_825BED08` | | | Graphics library; calls `sub_822A3B90`, sets +10811 bit 6. Not read. |
 | `sub_825BE708` | `DrawIndexedVertices` | Overridden | Exclusive mode, without its packets (`src/native/draw_packets.cpp`). Predicated draws (the device's tiling flags, bit 2) and `--native_renderer_library_packets` still run the original there, so it runs in play (coverage, 2026-10-21). |
-| `sub_822A6738` | `Resource::AddRef` | Overridden | `src/native/refcount.cpp`: reference counts without the library's global lock, skipped for the vertex shader already bound; the original with `--refcount_global_lock`. |
-| `sub_822A67B0` | `Resource::Release` | Overridden | `src/native/refcount.cpp`: reference counts without the library's global lock, skipped for the vertex shader already bound; the original with `--refcount_global_lock`. |
 | `sub_822A8808` | `Device::SetVertexShader` | Wrapped | Same file: marks a rebind of the bound shader, so `AddRef` and `Release` skip it. |
 | `sub_822AE340` | | Wrapped | `src/native/replay_hooks.cpp`: keeps the patched copy of a vertex shader's microcode (made when the GPU may still use the original) for the native renderer. |
 | `sub_825BD8F0` | `BeginVertices` | Wrapped | Same file: an inline vertex draw noted, then handed to the native renderer (in commands 15 and 19). |
