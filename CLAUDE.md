@@ -206,7 +206,8 @@ buffer, which nothing reads, Dropped by the graphics rule; ours 1,672).
 It stopped at its limit and was merged into `rexglue-removal-project`
 2026-10-24 after a drive (its rows not yet reviewed by the user);
 summary `docs/loops/b7-loop-2026-10-24-0325.md`.
-Its eleventh run (`b7-loop-24-10-26-2`, 2026-10-24, not yet merged;
+Its eleventh run (`b7-loop-24-10-26-2`, 2026-10-24, merged into
+`rexglue-removal-project` 2026-10-24 before a drive;
 summary `docs/loops/b7-loop-2026-10-24-1601.md`) made the compiler's
 array helpers (`c-runtime.md`), the course scenery
 (`docs/functions/course-scenery.md`, `--native_course_scenery`: the

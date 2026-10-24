@@ -109,3 +109,7 @@ differ)" groups added), attract races 25-27 s under `attract_race.sh
 40`, no errors, replays ok. Next: the user reviews `review.md` ("Run
 2026-10-24 16:01"), drives a race for `to-drive.md` (the wide
 write_char), and merges.
+Concluded (the user's call, 2026-10-24): merged into
+`rexglue-removal-project` before a drive; `review.md`'s section for this
+run is still to review, and `to-drive.md`'s wide write_char still to
+see.
