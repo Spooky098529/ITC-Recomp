@@ -43,6 +43,16 @@ bool CameraPassRecordEnd(PPCContext& ctx, uint8_t* base);
 // allocation layer not routing the heaps).
 bool CameraPassesMakeRenderTarget(PPCContext& ctx, uint8_t* base);
 
+// CameraPass::SetUpSurfaces (sub_820A2F40) natively, without the flag:
+// r3 = the pass; from a frame like the original's (544 bytes), the video
+// output's slots, CameraPasses::RenderTarget, MakeRenderTarget and
+// CameraPass::ReleaseSurfaces (through their overrides) and the cube map's
+// surface (sub_822A5C50, recompiled) as guest calls. r3 is left as the last
+// guest call leaves it (the video output; the original's last call is
+// UnlockDevice, after the same slot calls; no caller reads it). False, with
+// nothing done, as CameraPassesMakeRenderTarget.
+bool CameraPassSetUpSurfaces(PPCContext& ctx, uint8_t* base);
+
 // CameraPasses::RecordBegins (sub_8209F8A0) and RecordEnds (sub_8209F900)
 // natively, for their wrappers in src/debug/frame_state_diff.cpp: each
 // enabled pass recorded as above (the original RecordBegin or RecordEnd

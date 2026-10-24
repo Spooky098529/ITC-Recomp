@@ -484,6 +484,72 @@ uint32_t MakeRenderTarget(uint8_t* base, uint32_t frame, uint32_t id, const Devi
   return video_output;
 }
 
+void SetUpSurfaces(uint8_t* base, uint32_t frame, uint32_t pass, const SurfaceCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_820A2F40 CameraPass::SetUpSurfaces");
+  namespace gr = graphics;
+  namespace vo = graphics::video_output;
+  const uint32_t local = frame + 80;
+  guest::StoreU32(base, local, 0);
+  calls.release_surfaces();
+  const uint32_t type = guest::LoadU32(base, pass + 584);
+  uint32_t color = 0;
+  uint32_t depth = 0;
+  if (type <= 2) {
+    guest::StoreU32(base, local, vo::LockDevice(base, calls.video_output(0)));
+    color = gr::GetRenderTarget(base, guest::LoadU32(base, local), 0);
+    depth = gr::GetDepthStencilSurface(base, guest::LoadU32(base, local));
+    vo::UnlockDevice(base, calls.video_output(1), local);
+  } else if (type >= 5 && type <= 9) {
+    if (Mode(base, 1) == 1) {
+      const uint32_t surface = calls.cube_surface(calls.render_target(1), type - 4);
+      color = type == 5 ? guest::LoadU32(base, 0x826BB780) : surface;
+      depth = guest::LoadU32(base, 0x826BB784);
+    }
+  } else if (type <= 20) {
+    // Types 3, 4 and 10 to 20: the render target's id, and whether the
+    // depth surface's parameters are {0, -1, 0} (else after the color one).
+    static constexpr uint32_t kIds[21] = {0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 2,
+                                          3, 4, 5, 6, 7, 8, 9, 10, 11, 12};
+    const bool fixed = type == 10 || type == 13 || type == 16 || type == 20;
+    const int32_t samples = type == 3 || type == 4 || type == 19 ? 2 : 0;
+    const uint32_t format = type == 4 ? 0x1A2201BF : 0x18280186;
+    const uint32_t id = kIds[type];
+    calls.make_render_target(id);
+    if (type == 4) {
+      const uint32_t mode = Mode(base, 1);
+      if (mode == 0) {
+        gr::GetSurfaceLevel(base, calls.render_target(1), 0);
+      } else if (mode == 1) {
+        calls.cube_surface(calls.render_target(1), 0);
+      }
+    } else {
+      gr::GetSurfaceLevel(base, calls.render_target(id), 0);
+    }
+    guest::StoreU32(base, local, vo::LockDevice(base, calls.video_output(0)));
+    const uint32_t color_parameters = frame + 440;
+    const uint32_t depth_parameters = frame + 120;
+    for (uint32_t i = 0; i < 12; i += 4) {
+      guest::StoreU32(base, color_parameters + i, 0);
+    }
+    color = gr::CreateSurface(base, guest::LoadU32(base, pass + 504),
+                              guest::LoadU32(base, pass + 508), format, samples, color_parameters);
+    for (uint32_t i = 0; i < 12; i += 4) {
+      guest::StoreU32(base, depth_parameters + i, 0);
+    }
+    if (fixed) {
+      guest::StoreU32(base, depth_parameters + 4, 0xFFFFFFFF);
+    } else {
+      guest::StoreU32(base, depth_parameters + 0, guest::LoadU32(base, color + 44) / 5120);
+    }
+    depth = gr::CreateSurface(base, guest::LoadU32(base, pass + 504),
+                              guest::LoadU32(base, pass + 508), 0x1A220197, samples,
+                              depth_parameters);
+    vo::UnlockDevice(base, calls.video_output(1), local);
+  }
+  guest::StoreU32(base, pass + 576, color);
+  guest::StoreU32(base, pass + 580, depth);
+}
+
 void Enable(uint8_t* base, uint32_t pass) {
   ITC_NATIVE_RUNNING("sub_820A0968 CameraPass::Enable");
   guest::StoreU32(base, pass + 588, 1);

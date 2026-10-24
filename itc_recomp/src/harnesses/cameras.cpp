@@ -15,11 +15,13 @@
 #include "command_list/command_list.h"
 #include "hooks/cameras.h"
 #include "hooks/heap.h"
+#include "graphics/resources.h"
 #include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
 
 #include <fmt/format.h>
 
+#include <algorithm>
 #include <bit>
 #include <functional>
 #include <iterator>
@@ -1244,6 +1246,143 @@ void MakeRenderTargetCases(Context& h) {
   results.Report();
 }
 
+// CameraPass::SetUpSurfaces on a pass in the scratch area of every type
+// (-1 to 21), in modes 0 to 2, at the game's sizes, its old surfaces fake
+// resources (counts of 2 or more, so Release only counts them down) or none.
+// As MakeRenderTargetCases: the 16 globals saved and put back, the textures
+// and surfaces made freed (the level 0 surfaces the game drops leak, as
+// they do in the game), the device lock the game's; types 5-9 in mode 1
+// get a cube map made first (pass 4's, which they don't make). Types 0-2's surfaces
+// are the device's (AddRef'ed: released again after). Compared: the fakes'
+// counts, each global (a new texture's header, its addresses' top 20 bits
+// cleared; where the header is isn't, as the leaks move the allocations),
+// and +576 and +580: a new surface's header (a cube face's
+// parent, +24, as whether it's the texture made), others exactly. r3 isn't
+// compared (no caller reads it; the native code leaves the last guest
+// call's).
+void SetUpSurfacesCases(Context& h) {
+  if (!hooks::NativeHeapActive()) {
+    return;
+  }
+  Results results("sub_820A2F40 CameraPass::SetUpSurfaces");
+  constexpr uint32_t kGlobals = 0x826BABC0, kWords = 16;
+  uint32_t saved[kWords];
+  for (uint32_t i = 0; i < kWords; i++) {
+    saved[i] = guest::LoadU32(h.base, kGlobals + 4 * i);
+  }
+  const uint32_t fakes = h.data + 16, pass = h.data + 1024;
+  static constexpr uint32_t kSizes[][2] = {{1280, 720}, {1024, 1024}, {512, 512}, {256, 256},
+                                           {640, 360}};
+  for (int c = 0; c < 100; c++) {
+    const int32_t type = c < 23 ? c - 1 : int32_t(h.random.Below(23)) - 1;
+    const uint32_t mode = c < 23 ? 0 : c < 46 ? 1 : h.random.Below(3);
+    const uint32_t* size = kSizes[h.random.Below(5)];
+    const bool old = h.random.Below(2);
+    const uint32_t count = 2 + h.random.Below(4);
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Fill(h.base, h.data, kScratchBytes);
+      for (uint32_t i = 0; i < kWords; i++) {
+        guest::StoreU32(h.base, kGlobals + 4 * i, 0);
+      }
+      guest::StoreU32(h.base, cm::kMode, mode);
+      for (uint32_t o : {fakes, fakes + 32}) {
+        guest::StoreU32(h.base, o + 0, 0);
+        guest::StoreU32(h.base, o + 4, count);
+      }
+      guest::StoreU32(h.base, pass + 504, size[0]);
+      guest::StoreU32(h.base, pass + 508, size[1]);
+      guest::StoreU32(h.base, pass + 576, old ? fakes : 0);
+      guest::StoreU32(h.base, pass + 580, old ? fakes + 32 : 0);
+      guest::StoreU32(h.base, pass + 584, uint32_t(type));
+      if (mode == 1 && type >= 5 && type <= 9) {
+        // Types 5-9 don't make render target 1: the cube map pass 4 made.
+        guest::StoreU32(h.base, 0x826BABCC,
+                        graphics::CreateTexture(h.base, 64, 64, 6, 1, 1, 0x182801B6, 18));
+      }
+      PPCContext t = CallContext(h);
+      t.r3.u64 = pass;
+      bool ran = true;
+      if (v == 0) {
+        const bool flag = ITC_FLAG(native_cameras);
+        ITC_FLAG(native_cameras) = false;
+        __imp__sub_820A2F40(t, h.base);
+        ITC_FLAG(native_cameras) = flag;
+      } else {
+        ran = hooks::CameraPassSetUpSurfaces(t, h.base);
+      }
+      out[v].Word(ran);
+      out[v].Word(guest::LoadU32(h.base, fakes + 4));
+      out[v].Word(guest::LoadU32(h.base, fakes + 36));
+      // The textures made (to free after the surfaces).
+      std::vector<uint32_t> textures;
+      for (uint32_t i = 0; i < kWords; i++) {
+        const uint32_t word = guest::LoadU32(h.base, kGlobals + 4 * i);
+        if (i == 0 || word == 0) {  // the mode
+          out[v].Word(word);
+          continue;
+        }
+        textures.push_back(word);
+        out[v].Word(1);
+        std::vector<uint8_t> header = Read(h.base, word, 52);
+        out[v].Word((guest::LoadU32(h.base, word + 32) & 0xFFFFF000) != 0);
+        out[v].Word((guest::LoadU32(h.base, word + 48) & 0xFFFFF000) != 0);
+        for (int k = 0; k < 3; k++) {
+          header[32 + k] = 0;
+          header[48 + k] = 0;
+        }
+        header[35] &= 0x0F;
+        header[51] &= 0x0F;
+        out[v].Bytes(header);
+      }
+      const bool device = type >= 0 && type <= 2;
+      const bool made = type == 3 || type == 4 || (type >= 10 && type <= 20);
+      for (uint32_t field : {576u, 580u}) {
+        const uint32_t surface = guest::LoadU32(h.base, pass + field);
+        const bool cube_face = field == 576 && type >= 6 && type <= 9 && mode == 1;
+        if (surface == 0 || !(made || cube_face)) {
+          out[v].Word(surface);
+          if (device && surface != 0) {
+            PPCContext r = CallContext(h);
+            r.r3.u64 = surface;
+            sub_822A67B0(r, h.base);
+          }
+          continue;
+        }
+        // Its address differs by allocation (the dropped level 0 surfaces
+        // leak, so each side's come at other addresses): whether it's set.
+        out[v].Word(1);
+        std::vector<uint8_t> header = Read(h.base, surface, 48);
+        if (cube_face) {
+          const uint32_t parent = guest::LoadU32(h.base, surface + 24);
+          out[v].Word(std::find(textures.begin(), textures.end(), parent) != textures.end());
+          for (int k = 24; k < 28; k++) {
+            header[k] = 0;
+          }
+        }
+        out[v].Bytes(header);
+        memory::crt::XMemFree(surface, 0x24800000);
+      }
+      for (uint32_t texture : textures) {
+        const uint32_t data = guest::LoadU32(h.base, texture + 32) & 0xFFFFF000;
+        const uint32_t mips = guest::LoadU32(h.base, texture + 48) & 0xFFFFF000;
+        if (mips) {
+          memory::crt::XMemFree(mips, 0xBC800000);
+        }
+        memory::crt::XMemFree(data, 0xBC800000);
+        memory::crt::XMemFree(texture, 0x24800000);
+      }
+    }
+    results.Check(out[0], out[1],
+                  fmt::format("case {}: type {} mode {} {} x {} old {}", c, type, mode, size[0],
+                              size[1], old ? "set" : "none"));
+  }
+  for (uint32_t i = 0; i < kWords; i++) {
+    guest::StoreU32(h.base, kGlobals + 4 * i, saved[i]);
+  }
+  results.Report();
+}
+
 void Cameras(Context& h) {
   SetFieldOfViewCases(h);
   BuildProjectionCases(h);
@@ -1260,6 +1399,7 @@ void Cameras(Context& h) {
   RecordPassCases(h);
   RecordPassesCases(h);
   MakeRenderTargetCases(h);
+  SetUpSurfacesCases(h);
 }
 
 }  // namespace harness

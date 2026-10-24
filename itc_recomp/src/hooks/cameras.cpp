@@ -40,7 +40,8 @@ ITC_FLAG_BOOL(native_cameras, true, "ITC",
               "without the command list's diagnostics; CameraPasses::RecordBegins sub_8209F8A0 and "
               "RecordEnds sub_8209F900 (in their diagnostics' wrappers) with CameraPass::RecordBegin "
               "sub_820A0CC0 and RecordEnd sub_820A1C30, without the command list's diagnostics; "
-              "CameraPasses::MakeRenderTarget sub_8209FBF0 with its case 0 sub_8209FC7C, with "
+              "CameraPasses::MakeRenderTarget sub_8209FBF0 with its case 0 sub_8209FC7C and "
+              "CameraPass::SetUpSurfaces sub_820A2F40 with its types 0-2 chunk sub_820A2F94, with "
               "--native_video_output, --native_graphics_resources and --native_heap) natively instead of "
               "through the translated code (the same words, bit for bit; checked by "
               "--run_harnesses=cameras)");
@@ -244,6 +245,66 @@ bool CameraPassesMakeRenderTarget(PPCContext& ctx, uint8_t* base) {
   return true;
 }
 
+bool CameraPassSetUpSurfaces(PPCContext& ctx, uint8_t* base) {
+  if (!DeviceUsersNative()) {
+    return false;
+  }
+  const uint32_t pass = ctx.r3.u32;
+  const uint64_t lr = ctx.lr;
+  // The lock's video output calls' return addresses, by type (types 0-2
+  // the chunk's; 5-9 don't lock).
+  struct ReturnAddresses {
+    uint32_t first, second;
+  };
+  static constexpr ReturnAddresses kLock[21] = {
+      {0x820A2FAC, 0x820A2FBC}, {0x820A2FAC, 0x820A2FBC}, {0x820A2FAC, 0x820A2FBC},
+      {0x820A3010, 0x820A3020}, {0x820A30E8, 0x820A30F8}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0},
+      {0x820A324C, 0x820A325C}, {0x820A3414, 0x820A3424}, {0x820A360C, 0x820A361C},
+      {0x820A32E4, 0x820A32F4}, {0x820A34BC, 0x820A34CC}, {0x820A36B4, 0x820A36C4},
+      {0x820A337C, 0x820A338C}, {0x820A3564, 0x820A3574}, {0x820A375C, 0x820A376C},
+      {0x820A3804, 0x820A3814}, {0x820A38B0, 0x820A38C0},
+  };
+  // The other calls' return addresses are type 3's (or type 4's for the
+  // cube face; 5-9 make none of these but RenderTarget and the cube face):
+  // nothing reads them.
+  guest_call::InFrame(ctx, base, 544, 0x820A2F48, [&](uint32_t frame) {
+    cameras::SetUpSurfaces(
+        base, frame, pass,
+        {[&](int at) {
+           const uint32_t type = guest::LoadU32(base, pass + 584);
+           const ReturnAddresses r = at == 0 && type <= 20 ? kLock[type]
+                                                          : ReturnAddresses{0x820A3950, 0x820A3960};
+           return VideoOutputCall(ctx, base, r.first, r.second);
+         },
+         [&](uint32_t id) {
+           ctx.r3.u64 = id;
+           ctx.lr = 0x820A2FF0;
+           sub_8209F7A8(ctx, base);
+           return ctx.r3.u32;
+         },
+         [&](uint32_t id) {
+           ctx.r3.u64 = id;
+           ctx.lr = 0x820A2FE8;
+           sub_8209FBF0(ctx, base);
+         },
+         [&](uint32_t texture, uint32_t face) {
+           ctx.r3.u64 = texture;
+           ctx.r4.u64 = face;
+           ctx.r5.u64 = 0;
+           ctx.lr = 0x820A30BC;
+           sub_822A5C50(ctx, base);
+           return ctx.r3.u32;
+         },
+         [&] {
+           ctx.r3.u64 = pass;
+           ctx.lr = 0x820A2F60;
+           sub_820A0C40(ctx, base);
+         }});
+  });
+  ctx.lr = lr;
+  return true;
+}
+
 }  // namespace hooks
 
 // CameraPasses::MakeRenderTarget: r3 = the id (hooks::CameraPassesMakeRenderTarget).
@@ -251,6 +312,14 @@ extern "C" REX_FUNC(sub_8209FBF0) {
   ITC_CAMERAS_FALLBACK(8209FBF0)
   if (!hooks::CameraPassesMakeRenderTarget(ctx, base)) {
     __imp__sub_8209FBF0(ctx, base);
+  }
+}
+
+// CameraPass::SetUpSurfaces: r3 = the pass (hooks::CameraPassSetUpSurfaces).
+extern "C" REX_FUNC(sub_820A2F40) {
+  ITC_CAMERAS_FALLBACK(820A2F40)
+  if (!hooks::CameraPassSetUpSurfaces(ctx, base)) {
+    __imp__sub_820A2F40(ctx, base);
   }
 }
 

@@ -132,6 +132,39 @@ struct DeviceCalls {
 // adapter checks).
 uint32_t MakeRenderTarget(uint8_t* base, uint32_t frame, uint32_t id, const DeviceCalls& calls);
 
+// CameraPass::SetUpSurfaces' guest calls (the adapter's): the video output
+// (`at` 0 for the lock, 1 for the unlock), CameraPasses::RenderTarget
+// (through its override), CameraPasses::MakeRenderTarget and
+// CameraPass::ReleaseSurfaces (through their overrides, native), and the
+// cube map's surface (sub_822A5C50, never run in play: the recompiled one).
+struct SurfaceCalls {
+  std::function<uint32_t(int at)> video_output;
+  std::function<uint32_t(uint32_t id)> render_target;
+  std::function<void(uint32_t id)> make_render_target;
+  std::function<uint32_t(uint32_t texture, uint32_t face)> cube_surface;
+  std::function<void()> release_surfaces;
+};
+
+// CameraPass::SetUpSurfaces (sub_820A2F40, with its types 0-2 chunk
+// sub_820A2F94 merged): the pass's surfaces released, then by its type
+// (+584): types 0-2 the device's render target 0 and depth surface; type 3
+// and 10-20 their render target made (ids 0, 2-12) and its level 0 surface
+// taken (Texture::GetSurfaceLevel, the answer dropped as the original does);
+// type 4 render target 1 made and, by the mode, its level 0 (mode 0) or
+// cube face 0 (mode 1) surface taken and dropped; then, with the device
+// locked, a color surface of the pass's size (+504, +508; format
+// 0x18280186, type 4 0x1A2201BF; 2 samples for types 3, 4 and 19, else 0)
+// and a depth surface (0x1A220197, the same samples) from EDRAM after the
+// color one (its +44 / 5120 tiles) or, for types 10, 13, 16 and 20, at
+// parameters {0, -1, 0}, their parameter blocks in the original's frame at
+// `frame` (544 bytes; the device at +80); types 5-9 in mode 1 render
+// target 1's cube face (type - 4) surface (type 5 drops it and takes pass
+// 4's color surface, 0x826BB780), with pass 4's depth surface (0x826BB784),
+// none in other modes; types above 20 none. The color and depth surfaces
+// (0 for none) into +576 and +580. Needs --native_heap and
+// --native_graphics_resources (the adapter checks).
+void SetUpSurfaces(uint8_t* base, uint32_t frame, uint32_t pass, const SurfaceCalls& calls);
+
 // CameraPass::Enable (sub_820A0968) and CameraPass::Disable (sub_820A0958):
 // +588 = 1 or 0.
 void Enable(uint8_t* base, uint32_t pass);
