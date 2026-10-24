@@ -2549,6 +2549,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-10-24 | The graphics resources (the graphics library's texture, surface and buffer headers and descriptions, their creation, the EDRAM allocator, surface levels, the device's current targets and stream, locks, reference counts and destruction; the user's calls: `Edram::Alloc` with a `std::mutex`, the locks' fence waits and cache flushes Dropped) | `graphics-resources.md` | 46 of 46 (two migrations) | `--native_graphics_resources` |
 | 2026-10-24 | The video output and the device lock (the video output's constructor, `LockDevice` and `UnlockDevice` over a host `std::binary_semaphore` by the user's call, the device's thread ownership; with `cameras.md`'s `MakeRenderTarget`, `SetUpSurfaces` and `Init`, which it blocked; the shared sync wrappers kept recompiled) | `video-output.md` | 7 of 30 (and 3 of `cameras.md`) | `--native_video_output` (`--native_cameras`) |
 | 2026-10-24 | The graphics device's state (the render and sampler state setters through the device's tables, the stream, indices, textures, shader constants, `SetFVF`, the render target and depth surface, scissor and viewport, `SetDefaultState`, `DirtyAllState`, the GPU register split, gamma; the packets written straight into the command buffer, which nothing reads, Dropped by the graphics rule) | `device-state.md` | 131 of 131 (two migrations) | `--native_device_state` |
+| 2026-10-24 | The compiler's array helpers (`vector constructor iterator` and `vector destructor iterator`, probably: the element constructor or destructor called on each; the native targets called as plain C++, the empty destructor skipped, others a guest call; in the existing `c-runtime.md`, with wcslen's, mbtowc's and the wide write_char's adapters removed) | `c-runtime.md` | 84 of 91 (2 new, one migration) | `--native_c_runtime` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -3195,3 +3196,13 @@ row yet 4,410); `device-state.md` 131 ours of 131. 1,258 overrides in
 point at them, and the command replay reaches them); what the video
 output's rest waits on is now the command replay and the game's sync
 wrappers (kept recompiled for the core).
+
+**2026-10-24, B7's eleventh loop run, the compiler's array helpers
+(branch `b7-loop-24-10-26-2`):** the boundary unchanged: 449 functions
+(916 pairs): overridden 67, Native 5, Dropped 23, never called 70, live
+284. Imports: 186 called, 62 with a live caller. B7 (`b7_status.py`):
+6,760 in play, ours 1,674, work left 5,086 (Wrapped 123, with a row 555,
+no row yet 4,408); `c-runtime.md` 84 ours of 91. 1,257 overrides in
+`src/`. The array destructor iterator, which blocked the AI drivers'
+and the race overlays' rest, is native; its callers' other blockers
+remain (leads).

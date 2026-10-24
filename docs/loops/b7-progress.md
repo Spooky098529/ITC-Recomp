@@ -22,11 +22,16 @@ file's history. What's left to see in a drive, from every run:
   destructor iterator`; 2 ready groups; 2 leads added); map checked (0
   errors, 2 of 2 in play). Migration 1 done (f624a82, 93e739f: both
   helpers under `--native_c_runtime`, and wcslen, mbtowc and the wide
-  write_char's adapters removed); validation agent running.
+  write_char's adapters removed), validated (`itc_1342`, `itc_1343`;
+  replay ok; 1 to drive; prints added in 9b878fd). Finished.
 
 ## Done
 
-(none yet)
+- The compiler's array helpers (`c-runtime.md`, mapped in 3a15cda; 2
+  new rows): 2 ours in one migration (f624a82), with wcslen's, mbtowc's
+  and the wide write_char's adapters removed (93e739f); validated
+  (`itc_1342`, `itc_1343`); `--native_c_runtime`. Left: none of the
+  two.
 
 ## Rows to review
 
