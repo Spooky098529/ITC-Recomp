@@ -8,8 +8,13 @@
 // CarInputs::Destroy (sub_82102300), from RaceFlow::OnEnd; sub_8215F5F0
 // (never seen in play), from RaceFlow::OnState16; and RaceFlow::HoldAll
 // (sub_8215FA10), from RaceFlow::OnHold and OnState16; PlayerInput::Read
-// (sub_82102350), from PlayerInput::Control; and InputRecording::Next
-// (sub_82102A28, never seen in play), from PlayerControl::Update.
+// (sub_82102350), from PlayerInput::Control; InputRecording::Next
+// (sub_82102A28, never seen in play), from PlayerControl::Update; and since
+// the pad reader is native, PlayerInput::Control (sub_82102488), from
+// ReadPad and DriveByAiWithPad; Pad::IsConnected and IsWheel (sub_8209F340,
+// sub_8209F3B8), from ReadPad (sub_822231B0, not seen in play, reaches
+// IsConnected's original); and InputRecording::Append (sub_821029A8), from
+// PlayerControl::Update.
 
 #include "guest.h"
 
@@ -33,7 +38,8 @@ ITC_FLAG_BOOL(native_racer_controllers, true, "ITC",
               "natively instead of through the translated code (the same words; checked by "
               "--run_harnesses=racer_controllers). Those reached only from native callers "
               "have no adapters, and the flag switches their callers: sub_82102258, "
-              "sub_82102300, sub_8215F5F0, sub_8215FA10, sub_82102350, sub_82102A28; merged into their callers: "
+              "sub_82102300, sub_8215F5F0, sub_8215FA10, sub_82102350, sub_82102A28, "
+              "sub_82102488, sub_8209F340, sub_8209F3B8, sub_821029A8; merged into their callers: "
               "sub_821024D0, sub_82591C08");
 
 // Defines an adapter: the body (the arguments after the address) uses `ctx`
@@ -116,7 +122,6 @@ uint64_t CallGuest(void* user, uint32_t function, uint64_t r3, uint64_t r4, bool
 
 // --- The input recording ---
 
-ITC_RACER_CONTROLLERS(821029A8, ctx.r3.u64 = RecordingAppend(base, ctx.r3.u32, ctx.r4.u32))
 ITC_RACER_CONTROLLERS(82102968, ctx.r3.u64 = RecordingHasRoom(base, ctx.r3.u32))
 
 // --- The race flow's handlers (through the race flow's functors) ---
@@ -167,35 +172,6 @@ ITC_RACER_CONTROLLERS(82170FF8, {
   ctx.r3.u64 = Setup(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32);
 })
 
-// --- The player's controls (f1 as the originals leave it, where they set it) ---
-
-namespace {
-void SetRegs(PPCContext& ctx, const Regs& regs) {
-  ctx.r3.u64 = regs.r3;
-  if (regs.f1_set) {
-    ctx.f1.f64 = regs.f1;
-  }
-}
-}  // namespace
-
-// r3 = the player, r4 = the control, r5 = the kind, r6 = out.
-ITC_RACER_CONTROLLERS(82102488, {
-  ITC_RACER_CALLS;
-  Regs regs{ctx.r3.u64, 0, false};
-  const uint32_t answer =
-      Control(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r1.u32, calls, &regs);
-  SetRegs(ctx, regs);
-  ctx.r3.u64 = answer;
-})
-// r3 = the player's mapper entry.
-ITC_RACER_CONTROLLERS(8209F340, {
-  ITC_RACER_CALLS;
-  ctx.r3.u64 = PadIsConnected(base, ctx.r3.u32, ctx.r1.u32, calls);
-})
-ITC_RACER_CONTROLLERS(8209F3B8, {
-  ITC_RACER_CALLS;
-  ctx.r3.u64 = PadIsWheel(base, ctx.r3.u32, ctx.r1.u32, calls);
-})
 
 // --- The pad reader and the human cars ---
 
