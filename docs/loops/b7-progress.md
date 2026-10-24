@@ -24,6 +24,12 @@ see in a drive, from every run: `to-drive.md`.
   44 of 57 ours, nothing ready left; 9 adapters removed;
   `--native_post_effects`), validated (`itc_1395`, `itc_1396`; all
   ran in play or the replay). Finished.
+- Between subsystems (no mapping, not counted): `leads.md`'s three
+  cleanup leads, `sub_8259E6C8` UiMovie::ApplyTransform
+  (`ui-movies.md`), `sub_8213B2B8` AiDrivers::Destroy and `sub_8213AD98`
+  AiDrivers::DestroyRings (`ai-drivers.md`), `sub_820BAAA0`
+  CollisionShape::~CollisionShape's adapter (`collision.md`). Migration
+  agent running.
 
 ## Done
 
