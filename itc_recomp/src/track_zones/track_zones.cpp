@@ -8,6 +8,12 @@
 #include "c_runtime/strings.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
+#include <fmt/format.h>
+
+#include <array>
+#include <string>
+#include <utility>
+
 namespace track_zones {
 
 namespace {
@@ -430,6 +436,286 @@ bool ZoneRangesInsert(uint8_t* base, uint32_t list, uint32_t range, uint32_t pos
   const uint32_t to = uint32_t(Slot(base, node)) * kRangeBytes + list + 76;
   *copy_to = to;
   return to < 0xA0000000u && c_runtime::Memcpy(base, to, range, kRangeBytes);
+}
+
+
+// --- The zones' set-ups ---
+
+namespace {
+
+struct SetupRange {
+  Position start, end;
+  int32_t branch;  // the section added to take at forks, or -1
+};
+
+struct Setup {
+  uint32_t address;
+  uint32_t frame_bytes;
+  uint32_t first, count;  // its ranges in kSetupRanges
+};
+
+// The 70 zones' set-ups (slot 0 of each zone's vtable, 0x82011AF0 + 12 x i),
+// read from generated/: each one's frame size, then its ranges (start,
+// end, the section added to take at forks or -1), in the order made.
+const SetupRange kSetupRanges[] = {
+    {{248, 0}, {248, 43}, -1},
+    {{186, 113}, {183, 25}, -1},
+    {{287, 4}, {288, 23}, -1},
+    {{288, 24}, {289, 24}, -1},
+    {{224, 112}, {178, 31}, -1},
+    {{119, 43}, {125, 21}, -1},
+    {{115, 52}, {116, 23}, -1},
+    {{95, 10}, {97, 17}, -1},
+    {{139, 10}, {139, 51}, -1},
+    {{109, 40}, {91, 41}, -1},
+    {{6, 12}, {6, 53}, -1},
+    {{9, 69}, {9, 108}, -1},
+    {{2, 17}, {2, 25}, -1},
+    {{270, 52}, {272, 21}, -1},
+    {{206, 1}, {207, 17}, -1},
+    {{25, 9}, {26, 15}, -1},
+    {{265, 5}, {265, 45}, -1},
+    {{199, 1}, {200, 25}, -1},
+    {{260, 40}, {261, 23}, -1},
+    {{203, 127}, {171, 17}, -1},
+    {{46, 17}, {47, 17}, -1},
+    {{252, 94}, {253, 17}, -1},
+    {{194, 22}, {174, 17}, -1},
+    {{76, 89}, {83, 19}, -1},
+    {{30, 683}, {29, 19}, -1},
+    {{56, 210}, {57, 25}, -1},
+    {{276, 81}, {277, 23}, -1},
+    {{219, 77}, {220, 19}, -1},
+    {{140, 19}, {142, 9}, -1},
+    {{14, 99}, {16, 0}, -1},
+    {{33, 5}, {35, 13}, -1},
+    {{72, 104}, {73, 11}, -1},
+    {{246, 39}, {246, 87}, -1},
+    {{181, 88}, {182, 14}, -1},
+    {{246, 88}, {247, 26}, -1},
+    {{181, 25}, {181, 87}, -1},
+    {{248, 0}, {249, 68}, -1},
+    {{186, 113}, {185, 25}, -1},
+    {{249, 69}, {250, 53}, -1},
+    {{251, 14}, {251, 93}, -1},
+    {{186, 40}, {186, 80}, -1},
+    {{252, 94}, {256, 15}, -1},
+    {{252, 94}, {242, 25}, 239},
+    {{194, 22}, {191, 20}, 188},
+    {{194, 22}, {177, 25}, 174},
+    {{76, 89}, {82, 28}, 79},
+    {{76, 89}, {257, 0}, 83},
+    {{258, 1}, {258, 155}, -1},
+    {{193, 55}, {194, 21}, -1},
+    {{260, 40}, {263, 17}, 261},
+    {{260, 40}, {237, 15}, 235},
+    {{203, 127}, {197, 25}, 195},
+    {{203, 127}, {173, 14}, 171},
+    {{46, 17}, {49, 26}, 47},
+    {{46, 17}, {52, 15}, 50},
+    {{264, 45}, {264, 120}, -1},
+    {{202, 5}, {203, 77}, -1},
+    {{265, 5}, {267, 17}, -1},
+    {{199, 1}, {202, 6}, -1},
+    {{269, 74}, {269, 236}, -1},
+    {{204, 119}, {205, 21}, -1},
+    {{270, 52}, {274, 31}, -1},
+    {{270, 52}, {234, 9}, 232},
+    {{206, 1}, {209, 20}, 207},
+    {{206, 1}, {1, 2}, 168},
+    {{25, 9}, {24, 22}, 22},
+    {{25, 9}, {28, 30}, 26},
+    {{276, 81}, {277, 23}, -1},
+    {{210, 0}, {210, 131}, -1},
+    {{278, 80}, {279, 21}, -1},
+    {{215, 5}, {217, 18}, -1},
+    {{223, 41}, {212, 3}, -1},
+    {{280, 15}, {280, 55}, -1},
+    {{281, 15}, {281, 55}, -1},
+    {{221, 51}, {223, 40}, -1},
+    {{222, 51}, {223, 40}, -1},
+    {{282, 0}, {285, 11}, -1},
+    {{283, 0}, {285, 11}, -1},
+    {{219, 77}, {221, 50}, -1},
+    {{219, 77}, {222, 50}, -1},
+    {{286, 0}, {286, 50}, -1},
+    {{219, 24}, {219, 55}, -1},
+    {{287, 4}, {290, 7}, 288},
+    {{287, 4}, {245, 9}, 243},
+    {{225, 17}, {227, 13}, -1},
+    {{178, 17}, {180, 9}, -1},
+    {{119, 43}, {124, 14}, 122},
+    {{119, 43}, {127, 28}, 125},
+    {{290, 8}, {291, 14}, -1},
+    {{224, 112}, {94, 25}, 243},
+    {{291, 15}, {291, 80}, -1},
+    {{224, 75}, {224, 110}, -1},
+    {{115, 52}, {119, 3}, 113},
+    {{95, 10}, {103, 17}, 96},
+    {{95, 10}, {103, 17}, 97},
+    {{115, 20}, {115, 51}, -1},
+    {{0, 0}, {0, 0}, -1},
+    {{113, 37}, {114, 97}, -1},
+    {{105, 145}, {106, 36}, -1},
+    {{112, 232}, {113, 36}, -1},
+    {{107, 10}, {107, 78}, -1},
+    {{107, 288}, {107, 348}, -1},
+    {{111, 112}, {111, 257}, -1},
+    {{139, 10}, {146, 12}, 142},
+    {{109, 40}, {93, 13}, 91},
+    {{151, 1}, {152, 45}, -1},
+    {{161, 55}, {161, 149}, -1},
+    {{6, 12}, {8, 69}, -1},
+    {{9, 69}, {11, 16}, -1},
+    {{5, 20}, {5, 90}, -1},
+    {{12, 80}, {13, 70}, -1},
+    {{17, 27}, {19, 13}, -1},
+    {{30, 205}, {30, 292}, -1},
+    {{45, 374}, {45, 504}, -1},
+    {{30, 683}, {34, 20}, 31},
+    {{38, 0}, {44, 35}, -1},
+    {{55, 258}, {55, 476}, -1},
+    {{75, 271}, {75, 379}, -1},
+    {{56, 75}, {56, 181}, -1},
+    {{72, 104}, {74, 20}, 73},
+    {{56, 210}, {58, 35}, 57},
+    {{67, 56}, {72, 10}, 69},
+    {{67, 56}, {72, 10}, 70},
+};
+
+const Setup kSetups[kZones] = {
+    {0x8228BE20, 1184, 0, 1},
+    {0x8228BE88, 1184, 1, 1},
+    {0x8228BEF0, 1184, 2, 1},
+    {0x8228BF58, 1184, 3, 1},
+    {0x8228BFC0, 1184, 4, 1},
+    {0x8228C028, 1184, 5, 1},
+    {0x8228C090, 1184, 6, 1},
+    {0x8228C0F8, 1184, 7, 1},
+    {0x8228C160, 1184, 8, 1},
+    {0x8228C1C8, 1184, 9, 1},
+    {0x8228C230, 1184, 10, 1},
+    {0x8228C298, 1184, 11, 1},
+    {0x8228C300, 1184, 12, 1},
+    {0x8228C368, 1184, 13, 1},
+    {0x8228C3D0, 1184, 14, 1},
+    {0x8228C438, 1184, 15, 1},
+    {0x8228C4A0, 1184, 16, 1},
+    {0x8228C508, 1184, 17, 1},
+    {0x8228C570, 1184, 18, 1},
+    {0x8228C5D8, 1184, 19, 1},
+    {0x8228C640, 1184, 20, 1},
+    {0x8228C6A8, 1184, 21, 1},
+    {0x8228C710, 1184, 22, 1},
+    {0x8228C778, 1184, 23, 1},
+    {0x8228C7E0, 1184, 24, 1},
+    {0x8228C848, 1184, 25, 1},
+    {0x8228C8B0, 1184, 26, 1},
+    {0x8228C918, 1184, 27, 1},
+    {0x8228C980, 1184, 28, 1},
+    {0x8228C9E8, 1184, 29, 1},
+    {0x8228CA50, 1184, 30, 1},
+    {0x8228CAB8, 1184, 31, 1},
+    {0x8228CB20, 1184, 32, 2},
+    {0x8228CBC8, 1184, 34, 2},
+    {0x8228CC70, 1184, 36, 2},
+    {0x8228CD18, 1184, 38, 1},
+    {0x8228CD80, 1184, 39, 2},
+    {0x8228CE20, 1200, 41, 6},
+    {0x8228CFC8, 1184, 47, 2},
+    {0x8228D070, 1216, 49, 6},
+    {0x8228D220, 1184, 55, 2},
+    {0x8228D2C8, 1184, 57, 2},
+    {0x8228D370, 1184, 59, 2},
+    {0x8228D418, 1200, 61, 6},
+    {0x8228D5C0, 1184, 67, 2},
+    {0x8228D668, 1184, 69, 2},
+    {0x8228D710, 1184, 71, 1},
+    {0x8228D778, 1200, 72, 4},
+    {0x8228D870, 1200, 76, 4},
+    {0x8228D968, 1184, 80, 2},
+    {0x8228DA08, 1200, 82, 6},
+    {0x8228DBA8, 1184, 88, 2},
+    {0x8228DC60, 1184, 90, 2},
+    {0x8228DD00, 1216, 92, 3},
+    {0x8228DDE8, 1184, 95, 1},
+    {0x8228DE50, 1184, 96, 1},
+    {0x8228DEB0, 1184, 97, 2},
+    {0x8228DF58, 1184, 99, 2},
+    {0x8228E000, 1184, 101, 1},
+    {0x8228E068, 1184, 102, 1},
+    {0x8228E0D0, 1184, 103, 2},
+    {0x8228E190, 1184, 105, 2},
+    {0x8228E238, 1184, 107, 2},
+    {0x8228E2E8, 1184, 109, 2},
+    {0x8228E390, 1184, 111, 1},
+    {0x8228E3F8, 1184, 112, 2},
+    {0x8228E498, 1184, 114, 2},
+    {0x8228E550, 1184, 116, 2},
+    {0x8228E5F0, 1184, 118, 2},
+    {0x8228E6A0, 1216, 120, 3},
+};
+
+// The range a set-up builds on its stack (the original's r1 + 96).
+constexpr uint32_t kSetupRange = 96;
+
+std::string SetupName(uint32_t number) {
+  return fmt::format("sub_{:08X} Zone{}::Setup", kSetups[number].address, number);
+}
+
+uint32_t RunSetup(uint8_t* base, uint32_t number, uint32_t zone, uint32_t index,
+                  uint32_t vehicle, uint32_t stack, const SetupCalls& calls) {
+  const Setup& setup = kSetups[number];
+  const uint32_t frame = stack - setup.frame_bytes;
+  const uint32_t range = frame + kSetupRange;
+  ZoneReset(base, zone, index, vehicle);
+  uint32_t r3 = 0;
+  for (uint32_t i = 0; i < setup.count; i++) {
+    const SetupRange& made = kSetupRanges[setup.first + i];
+    RangeInit(base, range, made.start, made.end);
+    if (made.branch >= 0) {
+      RangeAddBranch(base, range, uint32_t(made.branch));
+    }
+    const uint32_t list = zone + kZoneRanges;
+    if (!ZoneRangesInsert(base, list, range, uint32_t(LoadS16(base, list + 72)), &r3)) {
+      calls.copy(calls.user, r3, range, frame);
+    }
+  }
+  return r3;
+}
+
+// One function a set-up, each with its own print.
+template <uint32_t N>
+uint32_t SetupOf(uint8_t* base, uint32_t zone, uint32_t index, uint32_t vehicle, uint32_t stack,
+                 const SetupCalls& calls) {
+  ITC_NATIVE_RUNNING(SetupName(N));
+  return RunSetup(base, N, zone, index, vehicle, stack, calls);
+}
+
+using SetupFunction = uint32_t (*)(uint8_t*, uint32_t, uint32_t, uint32_t, uint32_t,
+                                   const SetupCalls&);
+
+template <size_t... N>
+constexpr std::array<SetupFunction, kZones> SetupFunctions(std::index_sequence<N...>) {
+  return {SetupOf<uint32_t(N)>...};
+}
+
+constexpr std::array<SetupFunction, kZones> kSetupFunctions =
+    SetupFunctions(std::make_index_sequence<kZones>());
+
+}  // namespace
+
+uint32_t SetupAddress(uint32_t number) {
+  return kSetups[number].address;
+}
+
+uint32_t SetupFrameBytes(uint32_t number) {
+  return kSetups[number].frame_bytes;
+}
+
+uint32_t ZoneSetup(uint8_t* base, uint32_t number, uint32_t zone, uint32_t index,
+                   uint32_t vehicle, uint32_t stack, const SetupCalls& calls) {
+  return kSetupFunctions[number](base, zone, index, vehicle, stack, calls);
 }
 
 }  // namespace track_zones

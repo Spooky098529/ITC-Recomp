@@ -109,4 +109,30 @@ uint32_t ZoneIsInside(uint8_t* base, uint32_t zone);
 bool ZoneRangesInsert(uint8_t* base, uint32_t list, uint32_t range, uint32_t position,
                       uint32_t* copy_to);
 
+// --- The zones' set-ups (ZoneN::Setup, slot 0 of zone N's vtable) ---
+
+constexpr uint32_t kZones = 70;
+
+// The copy a set-up's ZoneRanges::Insert can't make natively: memcpy
+// (sub_825A7410) of the range at `from` (1,064 bytes) to `to`, made by the
+// adapter (src/hooks/track_zones.cpp) from `frame`, the set-up's frame.
+struct SetupCalls {
+  void* user;
+  void (*copy)(void* user, uint32_t to, uint32_t from, uint32_t frame);
+};
+
+// The set-up of zone `number` (0 to 69): its address (sub_8228BE20 to
+// sub_8228E6A0) and its frame's size.
+uint32_t SetupAddress(uint32_t number);
+uint32_t SetupFrameBytes(uint32_t number);
+// ZoneN::Setup: Zone::Reset with the index and vehicle, then each of its
+// hardcoded ranges made in the range on the set-up's stack (`stack`, the
+// caller's r1, less the frame's size, + 96: the original's), with
+// RouteRange::Init and AddBranch, and copied into the zone at the end of
+// its list (ZoneRanges::Insert at the count). The other stack words the
+// original writes (the ends at +80, its saved registers) aren't. Returns
+// the original's r3: the last copy's destination.
+uint32_t ZoneSetup(uint8_t* base, uint32_t number, uint32_t zone, uint32_t index,
+                   uint32_t vehicle, uint32_t stack, const SetupCalls& calls);
+
 }  // namespace track_zones

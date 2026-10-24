@@ -689,6 +689,105 @@ void ZoneUpdates(Context& h, Random& r) {
   memory::Free(area);
 }
 
+// --- The zones' set-ups ---
+
+// The set-ups' originals by zone (slot 0 of each zone's vtable).
+GuestFunction SetupOriginal(uint32_t number) {
+  static const GuestFunction kOriginals[tz::kZones] = {
+#define ITC_ZONE_SETUP_ORIGINAL(address) Original<__imp__sub_##address>,
+      ITC_ZONE_SETUP_ORIGINAL(8228BE20) ITC_ZONE_SETUP_ORIGINAL(8228BE88)
+      ITC_ZONE_SETUP_ORIGINAL(8228BEF0) ITC_ZONE_SETUP_ORIGINAL(8228BF58)
+      ITC_ZONE_SETUP_ORIGINAL(8228BFC0) ITC_ZONE_SETUP_ORIGINAL(8228C028)
+      ITC_ZONE_SETUP_ORIGINAL(8228C090) ITC_ZONE_SETUP_ORIGINAL(8228C0F8)
+      ITC_ZONE_SETUP_ORIGINAL(8228C160) ITC_ZONE_SETUP_ORIGINAL(8228C1C8)
+      ITC_ZONE_SETUP_ORIGINAL(8228C230) ITC_ZONE_SETUP_ORIGINAL(8228C298)
+      ITC_ZONE_SETUP_ORIGINAL(8228C300) ITC_ZONE_SETUP_ORIGINAL(8228C368)
+      ITC_ZONE_SETUP_ORIGINAL(8228C3D0) ITC_ZONE_SETUP_ORIGINAL(8228C438)
+      ITC_ZONE_SETUP_ORIGINAL(8228C4A0) ITC_ZONE_SETUP_ORIGINAL(8228C508)
+      ITC_ZONE_SETUP_ORIGINAL(8228C570) ITC_ZONE_SETUP_ORIGINAL(8228C5D8)
+      ITC_ZONE_SETUP_ORIGINAL(8228C640) ITC_ZONE_SETUP_ORIGINAL(8228C6A8)
+      ITC_ZONE_SETUP_ORIGINAL(8228C710) ITC_ZONE_SETUP_ORIGINAL(8228C778)
+      ITC_ZONE_SETUP_ORIGINAL(8228C7E0) ITC_ZONE_SETUP_ORIGINAL(8228C848)
+      ITC_ZONE_SETUP_ORIGINAL(8228C8B0) ITC_ZONE_SETUP_ORIGINAL(8228C918)
+      ITC_ZONE_SETUP_ORIGINAL(8228C980) ITC_ZONE_SETUP_ORIGINAL(8228C9E8)
+      ITC_ZONE_SETUP_ORIGINAL(8228CA50) ITC_ZONE_SETUP_ORIGINAL(8228CAB8)
+      ITC_ZONE_SETUP_ORIGINAL(8228CB20) ITC_ZONE_SETUP_ORIGINAL(8228CBC8)
+      ITC_ZONE_SETUP_ORIGINAL(8228CC70) ITC_ZONE_SETUP_ORIGINAL(8228CD18)
+      ITC_ZONE_SETUP_ORIGINAL(8228CD80) ITC_ZONE_SETUP_ORIGINAL(8228CE20)
+      ITC_ZONE_SETUP_ORIGINAL(8228CFC8) ITC_ZONE_SETUP_ORIGINAL(8228D070)
+      ITC_ZONE_SETUP_ORIGINAL(8228D220) ITC_ZONE_SETUP_ORIGINAL(8228D2C8)
+      ITC_ZONE_SETUP_ORIGINAL(8228D370) ITC_ZONE_SETUP_ORIGINAL(8228D418)
+      ITC_ZONE_SETUP_ORIGINAL(8228D5C0) ITC_ZONE_SETUP_ORIGINAL(8228D668)
+      ITC_ZONE_SETUP_ORIGINAL(8228D710) ITC_ZONE_SETUP_ORIGINAL(8228D778)
+      ITC_ZONE_SETUP_ORIGINAL(8228D870) ITC_ZONE_SETUP_ORIGINAL(8228D968)
+      ITC_ZONE_SETUP_ORIGINAL(8228DA08) ITC_ZONE_SETUP_ORIGINAL(8228DBA8)
+      ITC_ZONE_SETUP_ORIGINAL(8228DC60) ITC_ZONE_SETUP_ORIGINAL(8228DD00)
+      ITC_ZONE_SETUP_ORIGINAL(8228DDE8) ITC_ZONE_SETUP_ORIGINAL(8228DE50)
+      ITC_ZONE_SETUP_ORIGINAL(8228DEB0) ITC_ZONE_SETUP_ORIGINAL(8228DF58)
+      ITC_ZONE_SETUP_ORIGINAL(8228E000) ITC_ZONE_SETUP_ORIGINAL(8228E068)
+      ITC_ZONE_SETUP_ORIGINAL(8228E0D0) ITC_ZONE_SETUP_ORIGINAL(8228E190)
+      ITC_ZONE_SETUP_ORIGINAL(8228E238) ITC_ZONE_SETUP_ORIGINAL(8228E2E8)
+      ITC_ZONE_SETUP_ORIGINAL(8228E390) ITC_ZONE_SETUP_ORIGINAL(8228E3F8)
+      ITC_ZONE_SETUP_ORIGINAL(8228E498) ITC_ZONE_SETUP_ORIGINAL(8228E550)
+      ITC_ZONE_SETUP_ORIGINAL(8228E5F0) ITC_ZONE_SETUP_ORIGINAL(8228E6A0)
+#undef ITC_ZONE_SETUP_ORIGINAL
+  };
+  return kOriginals[number];
+}
+
+void NoCopy(void*, uint32_t, uint32_t, uint32_t) {
+  g_fallbacks++;
+}
+
+// Each set-up on a zone of random bytes, with its stack (the frame and
+// what's below, where the range is built) random too: the bytes RouteRange
+// ::Init leaves unwritten are copied into the zone as they are. The zone
+// and r3 are compared, and the table's ranges are checked against the
+// original's by the whole zone.
+void Setups(Context& h, Random& r) {
+  constexpr uint32_t kZoneBytes = 17116;
+  constexpr uint32_t kStackBytes = 0x800;
+  const uint32_t block = memory::Alloc(kZoneBytes + 0x100, 0);
+  const uint32_t zone = block + 0x80;
+  const uint32_t args = block + 0x40;
+  const uint32_t block_bytes = kZoneBytes + 0x100;
+  g_fallbacks = 0;
+  for (uint32_t number = 0; number < tz::kZones; number++) {
+    Results results(fmt::format("Zone{}::Setup (sub_{:08X})", number, tz::SetupAddress(number)));
+    for (int c = 0; c < 4; c++) {
+      RandomBytes(h.base, block, block_bytes, r);
+      guest::StoreU32(h.base, args, c == 0 ? number : uint32_t(r.Next()));
+      const std::vector<uint8_t> inputs = Read(h.base, block, block_bytes);
+      const uint32_t stack = CallContext(h).r1.u32 - kStackBytes;
+      RandomBytes(h.base, stack, kStackBytes, r);
+      const std::vector<uint8_t> stack_bytes = Read(h.base, stack, kStackBytes);
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Write(h.base, block, inputs.data(), block_bytes);
+        Write(h.base, stack, stack_bytes.data(), kStackBytes);
+        PPCContext t = CallContext(h);
+        t.r3.u64 = zone;
+        t.r4.u64 = args;
+        if (v == 0) {
+          SetupOriginal(number)(t, h.base);
+        } else {
+          const tz::SetupCalls calls{nullptr, NoCopy};
+          t.r3.u64 = tz::ZoneSetup(h.base, number, zone, guest::LoadU32(h.base, args),
+                                   guest::LoadU32(h.base, args + 4), t.r1.u32, calls);
+        }
+        out[v].Bytes(Read(h.base, block, block_bytes));
+        out[v].Word(t.r3.u32);
+      }
+      results.Check(out[0], out[1], fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  if (g_fallbacks != 0) {
+    ITC_LOG_INFO("harness: the set-ups: {} copies left to memcpy", g_fallbacks);
+  }
+  memory::Free(block);
+}
+
 }  // namespace
 
 void TrackZones(Context& h) {
@@ -698,6 +797,7 @@ void TrackZones(Context& h) {
   Zones(h, r);
   RangeTests(h, r);
   ZoneUpdates(h, r);
+  Setups(h, r);
 }
 
 }  // namespace harness
