@@ -30,7 +30,9 @@ see in a drive, from every run: `to-drive.md`.
   device lock (`video-output.md`, 30 rows, 2fdfea4; 6 ready groups, 5
   of them on kernel sync imports). The map's checks passed, but its
   `stop:` named a choice for the user, so the loop stopped (below);
-  resumed with the user's call: migration agent running.
+  resumed with the user's call. Migration 1 done (c234559..bafb51c;
+  7 of 30 ours, the rest the shared sync wrappers kept recompiled, and
+  cameras.md's three camera passes): validation agent running.
 
 ## Done
 
@@ -70,6 +72,11 @@ This run's groups: `expected-differences.md` (the "03:25 run" lines).
   `--run_harnesses=all`, 0 errors, every harness 0 differing outside
   one "(expected to differ)" group added (Resource::Lock's command
   buffer, the user's call).
+- After the video output's migration 1: ours 1541, work left 5219
+  (wrapped 123, known 566, unknown 4530). Race 25 s (`itc_1307`) with
+  `--run_harnesses=all`, 0 errors, every harness 0 differing outside
+  one "(expected to differ)" group added (the video output's semaphore,
+  the user's call).
 
 ## Stopped
 

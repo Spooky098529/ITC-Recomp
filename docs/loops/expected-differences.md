@@ -45,6 +45,11 @@ NaN groups below stay as recorded.
   code initializes the critical section in the guest object, ours leaves
   those bytes as the allocation cleared them. Everything else in the
   object matches.
+- **Host semaphore:** the user's call (2026-10-24) to run the video
+  output's device lock over a host `std::binary_semaphore`: the native
+  constructor no longer writes the guest semaphore's 40 bytes at +224
+  (an event and a critical section); nothing else reads them (its
+  release `sub_8258DBA8` never runs).
 - **Flush packet dropped:** the user's call (2026-10-24) to drop
   `Resource::Lock`'s cache flush packet: the recompiled code queues the
   flush (widening the device's pending flush range at +11560 through
@@ -188,3 +193,9 @@ were at 0.
 |---|---|---|---|---|
 | `sub_822B5EF8` Edram::Alloc | the allocator made: its critical section | 8 of 8 | Mutex for a critical section (bytes +0 to +27) | for review (03:25 run) |
 | `sub_822A63F8` Resource::Lock | its command buffer | 448 of 1000 | Flush packet dropped (the pending range at +11560) | for review (03:25 run) |
+
+### `video-output.md`
+
+| Function | Group | Differ | Reason | Review |
+|---|---|---|---|---|
+| `sub_8258DB18` VideoOutput::VideoOutput | its semaphore at +224 | 4 of 4 | Host semaphore | for review (03:25 run) |

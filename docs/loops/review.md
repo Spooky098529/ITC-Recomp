@@ -23,7 +23,21 @@ When the user has reviewed a run's section, its heading gets
   earlier maps: "state saved and restored" is "device locked and
   unlocked" in `cameras.md` (`sub_8209FBF0`, `sub_8209FC7C`,
   `sub_820A2F40`, `sub_820A2F94`, the intro) and `strings-and-font.md`
-  (Font::Font, the intro). The user's call (2026-10-24): (a): the device lock alone over a host primitive, a
+  (Font::Font, the intro).
+  Migration 1 (c234559..bafb51c): the video output's constructor,
+  LockDevice, UnlockDevice, Device::Acquire/ReleaseThreadOwnership and
+  `sub_825B9A60` CurrentThreadId (`functions.md`; through the SDK's
+  `XThread::GetCurrentThreadId`) native, with `cameras.md`'s
+  MakeRenderTarget, SetUpSurfaces and Init (their helpers Merged); the
+  sync wrappers' rows say they stay recompiled (the user's call). For
+  review: an unlock without the lock held is logged and skipped (a
+  binary semaphore can't count to 2 as the game's could; never seen);
+  device +10760 written as the game does; SetUpSurfaces' leak of its
+  level 0 surface, once a pass at boot, kept; the cube face's surface
+  `sub_822A5C50` (never in play) left a guest call; the lock's guest-call
+  return addresses in SetUpSurfaces per type, its other guest calls
+  type 3's (nothing reads them); MakeRenderTarget's and SetUpSurfaces'
+  adapters stay (guest calls through `ctx`). The user's call (2026-10-24): (a): the device lock alone over a host primitive, a
 `std::binary_semaphore` (a semaphore may be released by another thread
 than the one that took it; a mutex may not), through LockDevice,
 UnlockDevice and the video output's constructor; the Semaphore class
