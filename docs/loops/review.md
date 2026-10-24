@@ -27,6 +27,20 @@ When the user has reviewed a run's section, its heading gets
   writes in SetStreamSource, SetIndices and SetTexture kept (recompiled
   code reads fences); the WRAP8-15 setters' dirty bit quirk (bit 45,
   0x2183's) kept.
+  Migration 1 (7b1c218..c421c0b): 121 of 131 ours (the 105 state
+  setters, the bound objects, constants, SetFVF, the scissor, viewport
+  and surface info; `sub_822A6A88` VertexDeclaration::FromFvf Native;
+  `sub_822A0F80` SetScreenScissor Dropped). For review: zero-difference
+  "(expected to differ)" groups for an uninitialized stack word in the
+  originals (the fence list entry's bit 31 in SetStreamSource,
+  SetIndices, SetTexture; FromFvf's end-marker pad byte), written 0 by
+  ours; a fence on a full fence list leaves the whole call to the
+  original, and GetViewport's copy to a physical destination to
+  memcpy's override (neither in play); native float copies keep a
+  signaling NaN's bits where the originals quiet it (compared as
+  floats); the constant copies as raw 16-byte copies (as lvlx/lvrx);
+  the adapters written one per line for `check_function_statuses.py`;
+  the setters' adapters stay (the device's tables point at them).
 
 - `video-output.md` (new, 30 rows; 6 moved from `functions.md`:
   VideoOutput::SetUpDisplay, WaitForVblank, ResolveFrontBuffer,

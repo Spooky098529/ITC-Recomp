@@ -50,6 +50,12 @@ NaN groups below stay as recorded.
   constructor no longer writes the guest semaphore's 40 bytes at +224
   (an event and a critical section); nothing else reads them (its
   release `sub_8258DBA8` never runs).
+- **Packets nothing reads:** the graphics rule (the user's, standing):
+  a packet written straight into the command buffer that nothing reads
+  is Dropped, so the command buffer's words and its write position (+40)
+  differ where the original writes one (here: the window-scissor packets
+  of `Device::SetScreenScissor`, reached from the scissor and viewport
+  setters). Every other output matches.
 - **Flush packet dropped:** the user's call (2026-10-24) to drop
   `Resource::Lock`'s cache flush packet: the recompiled code queues the
   flush (widening the device's pending flush range at +11560 through
@@ -199,3 +205,12 @@ were at 0.
 | Function | Group | Differ | Reason | Review |
 |---|---|---|---|---|
 | `sub_8258DB18` VideoOutput::VideoOutput | its semaphore at +224 | 4 of 4 | Host semaphore | for review (03:25 run) |
+
+### `device-state.md`
+
+| Function | Group | Differ | Reason | Review |
+|---|---|---|---|---|
+| `sub_822A3450` Device::SetScissorRect | the command buffer | 300 of 300 | Packets nothing reads | for review (03:25 run) |
+| `sub_822A3D20` Device::SetRenderState_ScissorTestEnable | the command buffer | 200 of 200 | Packets nothing reads | for review (03:25 run) |
+| `sub_822A3518` Device::SetViewport | the command buffer | 352 of 400 | Packets nothing reads | for review (03:25 run) |
+| `sub_822A3C88` Device::SetSurfaceInfo | the command buffer | 175 of 200 | Packets nothing reads | for review (03:25 run) |

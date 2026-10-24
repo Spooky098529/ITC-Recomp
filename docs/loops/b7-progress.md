@@ -40,8 +40,8 @@ see in a drive, from every run: `to-drive.md`.
   frame and block the video output's rest: mapped as the device state
   (`device-state.md`, 131 rows, 8b1b86b; 116 ready groups); map checked
   (0 errors, 131 of 131 in play; the packets nothing reads are Dropped by
-  the graphics rule: `gpu_link.cpp` only counts them): migration agent
-  running.
+  the graphics rule: `gpu_link.cpp` only counts them). Migration 1 done
+  (7b1c218..c421c0b, 121 of 131 ours): validation agent running.
 
 ## Done
 
@@ -96,6 +96,11 @@ This run's groups: `expected-differences.md` (the "03:25 run" lines).
   the user's call).
 - After mapping the device state: ours 1541, work left 5219 (wrapped
   123, known 686, unknown 4410).
+- After the device state's migration 1: ours 1662, work left 5098
+  (wrapped 123, known 565, unknown 4410). Race 27 s (`itc_1317`) with
+  `--run_harnesses=all`, 0 errors, every harness 0 differing outside
+  four "(expected to differ)" groups added (the command buffer's
+  packets, the graphics rule).
 
 ## Stopped
 
