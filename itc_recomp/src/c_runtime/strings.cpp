@@ -12,6 +12,7 @@
 namespace c_runtime {
 
 uint32_t Wcslen(uint8_t* base, uint32_t string) {
+  ITC_NATIVE_RUNNING("sub_825A9958 wcslen");
   uint32_t n = 0;
   while (guest::LoadU16(base, string + 2 * n) != 0) {
     n++;
@@ -54,6 +55,7 @@ int32_t Wcscmp(uint8_t* base, uint32_t a, uint32_t b) {
 }
 
 int32_t Mbtowc(uint8_t* base, uint32_t wide, uint32_t bytes, uint32_t count) {
+  ITC_NATIVE_RUNNING("sub_825B7EC8 mbtowc");
   if (bytes == 0 || count == 0) {
     return 0;
   }
