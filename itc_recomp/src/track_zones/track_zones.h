@@ -65,7 +65,35 @@ void RangeInit(uint8_t* base, uint32_t range, Position start, Position end);
 // 32 bits) added at the end of the list of sections to take (+12).
 void RangeAddBranch(uint8_t* base, uint32_t range, uint32_t section);
 
+// RouteRange::ToNeighbor (sub_820FDF98): `position` mapped onto `section`
+// (the section beside its own): out = (section, the slice), the slice moved
+// by the two sections' slice counts' difference when one of the position's
+// section's forward links 0 and 1 has the same section as one of
+// `section`'s; 0 when that slice is below 0 (out still written), else 1.
+uint32_t RangeToNeighbor(uint8_t* base, Position* out, uint16_t section, Position position);
+// RouteRange::WithinEnds (sub_820FE120): 1 unless the position is on the
+// start's section before its slice or on the end's after its slice (and
+// the same against the ends mapped onto the sections beside them, links 6
+// to 9, when +1060 is set), else 0.
+uint32_t RangeWithinEnds(uint8_t* base, uint32_t range, Position position);
+// RouteRange::OnPath (sub_820FE398): whether the position is on the path
+// from the start's section to the end's: 0 (state 0), 1 (not on it) or 2
+// (on it); 0x82603274 = the slices counted along the path.
+uint32_t RangeOnPath(uint8_t* base, uint32_t range, Position position);
+// RouteRange::Test (sub_820FE6F8): 0 (state 0), 1 (left out, or not on the
+// path) or 2 (on it, or on it mapped onto a section beside, links 6 to 9).
+uint32_t RangeTest(uint8_t* base, uint32_t range, Position position);
+// RouteRange::Update (sub_820FE878): with a section below 0x8000, the state
+// +0 = Test; 1 when the state is 2, else 0.
+uint32_t RangeUpdate(uint8_t* base, uint32_t range, Position position);
+
 // --- The zones (Zone::, ZoneRanges::) ---
+
+// Zone::Update (sub_8228BC80): the vehicle's track position (+4 of
+// Vehicle::Identity), the flag cleared, then each range in list order
+// updated until one returns 1 (the flag set). Returns the last range's
+// result, or -1 when the list is empty.
+int32_t ZoneUpdate(uint8_t* base, uint32_t zone);
 
 // Zone::Reset (sub_8228B540): the range list reset, then its index, vehicle
 // and flag (0).

@@ -15,7 +15,10 @@ ITC_FLAG_BOOL(native_track_zones, true, "ITC",
               "List64::Link sub_820FE2C8, List64::Insert sub_820FE330, List128::Link "
               "sub_8228B5A0, List128::Insert sub_8228BC18, RouteRange::Init sub_820FE058, "
               "RouteRange::AddBranch sub_820FE8C8, Zone::Reset sub_8228B540, Zone::IsInside "
-              "sub_8228B4F8, ZoneRanges::Insert sub_8228BBA8) natively instead of through the "
+              "sub_8228B4F8, ZoneRanges::Insert sub_8228BBA8, RouteRange::ToNeighbor sub_820FDF98, "
+              "RouteRange::WithinEnds sub_820FE120, RouteRange::OnPath sub_820FE398, "
+              "RouteRange::Test sub_820FE6F8, RouteRange::Update sub_820FE878, Zone::Update "
+              "sub_8228BC80) natively instead of through the "
               "translated code (the same writes; checked by --run_harnesses=track_zones). "
               "Those reached only from native callers have no adapters, and the flag switches "
               "their callers: sub_820FE2C8, sub_8228B5A0");
@@ -61,7 +64,41 @@ ITC_TRACK_ZONES(820FE058, RangeInit(base, ctx.r3.u32, LoadPosition(base, ctx.r4.
 ITC_TRACK_ZONES(820FE8C8, RangeAddBranch(base, ctx.r3.u32, ctx.r4.u32);
                 ctx.r3.u64 = ctx.r3.u64 + 12)
 
+// RouteRange::ToNeighbor: r3 = out (a section and a slice), r4 = a section,
+// r5 = &a position; returns 1 or 0 (out written either way).
+extern "C" REX_FUNC(sub_820FDF98) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_track_zones)) {
+    __imp__sub_820FDF98(ctx, base);
+    return;
+  }
+  Position out;
+  const uint32_t result =
+      RangeToNeighbor(base, &out, ctx.r4.u16, LoadPosition(base, ctx.r5.u32));
+  guest::StoreU16(base, ctx.r3.u32, out.section);
+  guest::StoreU16(base, ctx.r3.u32 + 2, out.slice);
+  ctx.r3.u64 = result;
+}
+// RouteRange::WithinEnds, OnPath, Test and Update: r3 = a range, r4 = &a
+// position; each returns its result.
+ITC_TRACK_ZONES(820FE120,
+                ctx.r3.u64 = RangeWithinEnds(base, ctx.r3.u32, LoadPosition(base, ctx.r4.u32)))
+ITC_TRACK_ZONES(820FE398,
+                ctx.r3.u64 = RangeOnPath(base, ctx.r3.u32, LoadPosition(base, ctx.r4.u32)))
+ITC_TRACK_ZONES(820FE6F8,
+                ctx.r3.u64 = RangeTest(base, ctx.r3.u32, LoadPosition(base, ctx.r4.u32)))
+ITC_TRACK_ZONES(820FE878,
+                ctx.r3.u64 = RangeUpdate(base, ctx.r3.u32, LoadPosition(base, ctx.r4.u32)))
+
 // --- The zones ---
+
+// Zone::Update: r3 = a zone (slot 1 of every zone's vtable, from
+// TrackZones::Update). r3 = the last range's result, or with no ranges
+// where memcpy left it (the copy on the original's stack, r1 - 208 + 80).
+ITC_TRACK_ZONES(8228BC80, {
+  const int32_t last = ZoneUpdate(base, ctx.r3.u32);
+  ctx.r3.u64 = last < 0 ? ctx.r1.u64 - 208 + 80 : uint64_t(last);
+})
 
 // Zone::Reset: r3 = the zone (left), r4 = &(its index, its vehicle).
 ITC_TRACK_ZONES(8228B540, ZoneReset(base, ctx.r3.u32, guest::LoadU32(base, ctx.r4.u32),
