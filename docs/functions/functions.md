@@ -79,8 +79,9 @@ Rows not yet moved stay in the table below. So far:
 - [`c-runtime.md`](c-runtime.md): the C runtime and math library as seen
   in play: math functions and their floating-point helpers, string,
   memory and character helpers, number parsing and formatting, and the
-  pure parts of its start-up (B7; the heap and what calls kernel imports
-  aren't in it).
+  pure parts of its start-up, and the compiler's array constructor and
+  destructor helpers (B7; the heap and what calls kernel imports aren't
+  in it).
 - [`ui-movies.md`](ui-movies.md): the UI movie library (the HUD's, the
   menus' and the pause screens' 2D movies): loading and fixing up movie
   files, applying animations' tracks to nodes, and drawing the node tree
