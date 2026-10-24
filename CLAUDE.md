@@ -202,7 +202,9 @@ Semaphore class stays recompiled for the archive loader; 7 of 30 ours,
 state setters native (`docs/functions/device-state.md`, 131 of 131,
 `--native_device_state`; the packets written straight into the command
 buffer, which nothing reads, Dropped by the graphics rule; ours 1,672).
-It stopped at its limit; summary `docs/loops/b7-loop-2026-10-24-0325.md`.
+It stopped at its limit and was merged into `rexglue-removal-project`
+2026-10-24 after a drive (its rows not yet reviewed by the user);
+summary `docs/loops/b7-loop-2026-10-24-0325.md`.
 Harness runs use `attract_race.sh 40` (the user's call,
 2026-10-23); a race short only because the harnesses took longer is
 no halt.

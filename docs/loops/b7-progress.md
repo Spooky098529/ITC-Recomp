@@ -176,3 +176,7 @@ a race for `to-drive.md`, and merges.
 A drive by the user (`itc_1335`, 2026-10-24, with `--xbox_gamma=hdtv`):
 a race at the 144 cap, no errors, everything looked correct (the
 user); `to-drive.md`'s two functions not seen (neither ever in play).
+Concluded (the user's call, 2026-10-24): merged into
+`rexglue-removal-project` after the drive; `review.md`'s section for
+this run and the "03:25 run" expected differences are still to review,
+and `to-drive.md`'s two functions still to see.

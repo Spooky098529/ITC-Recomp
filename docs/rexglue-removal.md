@@ -93,7 +93,7 @@ goes in `src/` as overrides), American English.
   `std::binary_semaphore` (2026-10-24; 7 of 30 ours, with three camera
   passes), and made the device's state setters native (`device-state.md`,
   131 of 131; the packets nothing reads Dropped by the graphics rule;
-  ours 1,672). The
+  ours 1,672; merged 2026-10-24 after a drive). The
   runs' rows wait for the user's review (`docs/loops/review.md`). See
   "B7's loop runs" under B7, and `docs/loops/b7-progress.md`. Guest
   allocation is no longer a block (`docs/native-memory.md`); what the
