@@ -52,7 +52,7 @@ goes in `src/` as overrides), American English.
   the leftovers above (the movie player, Voice::Init skipped as high as
   is safe), or the main thread's performance leads
   (`sub_821298C0`, `sub_8209C6E0`, in `docs/native-renderer.md`).
-- **B7 in progress (2026-10-23):** its measure is `b7_status.py`
+- **B7 in progress (2026-10-24):** its measure is `b7_status.py`
   (`docs/coverage.md`), and the B7 loop (`docs/loops/b7-loop.md`, a
   `/loop` session handing each subsystem to a mapping agent, then
   migration agents) did its first run on the branch `b7-loop-test` (merged 2026-10-22): five
@@ -79,7 +79,10 @@ goes in `src/` as overrides), American English.
   with a new `BlendState_OnCopy`); its eighth run (branch
   `b7-loop-23-10-26-4`) made the string table and font, `std::string`
   (the user's call: translated over the guest layout) and the course's
-  route native as far as they were ready (ours 1,223). The
+  route native as far as they were ready (ours 1,223); its ninth run
+  (branch `b7-loop-23-10-26-5`) made the AI drivers, the racer
+  controllers and the track zones native as far as they were ready
+  (ours 1,485). The
   runs' rows wait for the user's review (`docs/loops/review.md`). See
   "B7's loop runs" under B7, and `docs/loops/b7-progress.md`. Guest
   allocation is no longer a block (`docs/native-memory.md`); what the
@@ -2529,6 +2532,9 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-10-23 | The string table and font (the 17 string files, their pages and formatting with the game's `swprintf`, the font's layout and text draw; the C runtime's wide printf with it) | `strings-and-font.md` | 25 of 36 | `--native_strings_and_font` |
 | 2026-10-23 | `std::string` (Dinkumware's `basic_string<char>` over the guest layout: constructors, `_Tidy`, `_Copy`, `_Grow`, assign, append, the allocator; the library's wildcard search, find and replace-all) | `std-string.md` | 14 of 16 | `--native_std_string` |
 | 2026-10-23 | The course's route (route positions normalized and moved along linked sections, points, lanes and distances, `TrackRoute::Follow` with its full search; with `collision-world.md`'s `TrackPosition::Init` and `Update`) | `track-route.md` | 40 of 40 (two migrations) | `--native_track_route` |
+| 2026-10-24 | The AI drivers (the computer racers' driving: each driver's path along the course's route, its corners and line, the other racers' records, the skill block, the steering, throttle and brake into the car's input record; `AiDriver::DriveCar` and `AiDrivers::UpdateAll`) | `ai-drivers.md` | 143 of 148 (five migrations; 119 Native) | `--native_ai_drivers` |
+| 2026-10-24 | The racer controllers (each car's input record filled from the player's pad or its AI driver each tick: the pad reader, the input recording and replay, the race flow's per-state handlers, `AiDriver::Setup`) | `racer-controllers.md` | 27 of 27 (one migration) | `--native_racer_controllers` |
+| 2026-10-24 | The track zones (70 hardcoded stretches of the course's route the player's car is checked against each tick for the HUD: their set-ups, route ranges, fixed-size lists and the owner at `[0x828161EC]`) | `track-zones.md` | 92 of 92 (one migration; 9 Native) | `--native_track_zones` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -2675,6 +2681,38 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
     `data_tables::Item` directly and so no print of its own; now a
     one-line `data_tables::RecordsItem` with its own print (the user's
     call; the adapter stays for its two recompiled callers).
+
+    The AI drivers (2026-10-23 to 24, branch `b7-loop-23-10-26-5`, the
+    ninth run): mapped from the course's route's users, 143 of 148 ours
+    in five migrations, with functions never seen in play ported with
+    their callers (UpdateSteerInput's kinds 2 and 3, jump targets the
+    recompiler made functions; harness cases each, no rows). Left:
+    `AiDrivers::Destroy` and `DestroyRings` (the array destructor
+    iterator `sub_820900C0`, a lead) and `UpdateStarting`,
+    `UpdateTrack` and `NoteFixedSections` (the getter of `[0x826C6078]`,
+    `sub_821434E8`, in the data tables' range); `UpdateAll` keeps its
+    adapter for the +6148 update targets, and 22 adapters stay for the
+    race states' and set-up's recompiled callers. Harness runs now use
+    `attract_race.sh 40` (the user's call: the harnesses' time grows
+    with their cases, and a race short only for that is no halt).
+
+    The racer controllers (2026-10-24, the same run): all 27 ours in
+    one migration, with three functions never seen in play; the race
+    flow's handlers keep their adapters (reached through the functors
+    `sub_82160AE0` registers, a lead), and the three that only jump to
+    another (OnEnd, OnHold, OnState7) got one-line functions with their
+    own prints, as `data_tables::RecordsItem`. State 34's handler
+    (`sub_8215FC38`), which drives the cars in attract races, was
+    missing from `seen_in_play.txt`. The input record's bytes +18 and
+    +19 are stack leftovers nothing writes (for the user's review).
+
+    The track zones (2026-10-24, the same run; its "path search" lead
+    turned out to be them): all 92 ours in one migration, the 70
+    set-ups over a table of their ranges read from `generated/`, each
+    built at the original's stack offset. The coverage list misses three
+    camera-mode functions that run in attract races (`sub_82155288`,
+    `sub_821562F8`, `sub_820FE830`), so the route ranges' Init,
+    AddBranch, Update and Test keep their adapters for them.
 
     The second run (from 2026-10-22, branch `b7-loop-22-10-26`; its first
     session stopped after one subsystem): the first run's removable
@@ -3081,3 +3119,31 @@ row yet 4,852); `track-route.md` 40 ours of 40, `collision-world.md`
 `TrackPosition::Update` need no `ctx`; 18 of the route's adapters stay
 for the race and vehicle code's recompiled callers. Harness runs now
 use `attract_race.sh 30` (the harnesses take ~5 s before the race).
+
+**2026-10-24, B7's ninth loop run, the AI drivers (branch
+`b7-loop-23-10-26-5`):** the boundary unchanged: 449 functions (916
+pairs): overridden 67, Native 3, Dropped 23, never called 70, live 286.
+Imports: 186 called, 62 with a live caller. B7 (`b7_status.py`): 6,757
+in play, ours 1,366, work left 5,391 (Wrapped 123, with a row 562, no
+row yet 4,706); `ai-drivers.md` 143 ours of 148 (119 Native). 1,010
+overrides in `src/`. The rest waits on `sub_820900C0` and
+`sub_821434E8`.
+
+**2026-10-24, B7's ninth loop run, the racer controllers (branch
+`b7-loop-23-10-26-5`):** the boundary unchanged: 449 functions (916
+pairs): overridden 67, Native 3, Dropped 23, never called 70, live 286.
+Imports: 186 called, 62 with a live caller. B7 (`b7_status.py`): 6,758
+in play, ours 1,393, work left 5,365 (Wrapped 123, with a row 559, no
+row yet 4,683); `racer-controllers.md` 27 ours of 27. 1,020 overrides
+in `src/`.
+
+**2026-10-24, B7's ninth loop run, stopped (branch
+`b7-loop-23-10-26-5`: the AI drivers, the racer controllers, the track
+zones):** the boundary unchanged: 449 functions (916 pairs): overridden
+67, Native 3, Dropped 23, never called 70, live 286. Imports: 186
+called, 62 with a live caller. B7 (`b7_status.py`): 6,758 in play, ours
+1,485, work left 5,273 (Wrapped 123, with a row 559, no row yet 4,591);
+`track-zones.md` 92 ours of 92. 1,103 overrides in `src/`. What blocks
+the rest of the run's subsystems: the array destructor iterator
+(`sub_820900C0`), the getter of `[0x826C6078]` (`sub_821434E8`), the
+race flow's functors (`sub_82160AE0`) and the camera modes (leads).

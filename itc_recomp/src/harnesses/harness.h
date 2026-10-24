@@ -163,5 +163,8 @@ void Cameras(Context& h);
 void StringsAndFont(Context& h);
 void StdString(Context& h);
 void TrackRoute(Context& h);
+void AiDrivers(Context& h);
+void RacerControllers(Context& h);
+void TrackZones(Context& h);
 
 }  // namespace harness

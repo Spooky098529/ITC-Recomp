@@ -180,6 +180,23 @@ Rows not yet moved stay in the table below. So far:
   moved along its linked sections by lane, branch or path, points and
   lanes on it, distances along it, and following a point along it for
   the track positions (B7).
+- [`ai-drivers.md`](ai-drivers.md): the AI drivers: the computer
+  racers' table of drivers, filling their cars' input records, the path
+  each keeps along the course's route (its line across the road, the
+  corners, the room left by other racers), their target speeds, pedals
+  and steering, their records of the other racers, and their skill
+  blocks (B7).
+- [`racer-controllers.md`](racer-controllers.md): the racer
+  controllers: the cars' input records at `0x826C5B30`, filled every
+  tick from the player's pad (the control map, dead zones and flags) or
+  by the racer's AI driver, the input recordings and replays, the race
+  flow's handlers that pick which each racer gets, and each AI driver's
+  set-up with its profile (B7).
+- [`track-zones.md`](track-zones.md): the track zones: 70 stretches
+  of the course's route, each a few route ranges (a start and an end
+  section and slice, and the sections to take at forks), that the
+  player's car is checked against for the HUD, their owner at
+  `0x828161EC`, and the fixed-size lists they're kept in (B7).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
@@ -235,8 +252,6 @@ old performance notes to the end of `../native-renderer.md`.
 | `sub_8258FD48` | `Command::SetShaderConstants` | Wrapped | Render thread, command 7: r3 = payload, r4 = register count, r5 = stage << 24 \| type << 16 \| start << 8 \| count. Interpolation substitutes blended values here. |
 | `sub_8210EDB0` | | | Wind sound; scales with speed. |
 | `sub_82152CD8` | | | Camera shake; scales with speed. |
-| `sub_8213F530` | | | Parent of the speed trail object (switches mode at about 88 km/h). Calls `sub_8213F2E0`, `sub_8213F140` and `sub_8213F4B0`. |
-| `sub_8213D438` | | | Resets the trail history; runs on a camera switch. |
 | `sub_820F11A8` | `TextureAnimations::Advance` | Wrapped | From the draw step part `sub_820F6068`: advances the flipbook animation set at r3+1060 (`sub_82146B20`). Skipped on render-only passes (see "Per-frame logic" in `../frame-interpolation.md`). |
 | `sub_82146B20` | | | Calls `sub_82146AC0` on every animation in a set: count at +0, then offsets to each animation. |
 | `sub_82146AC0` | | | Advances one flipbook animation: frame count +0, current frame +4, tick counter +8 (wraps at the length at +12), frame start ticks from +16. |
@@ -480,9 +495,6 @@ old performance notes to the end of `../native-renderer.md`.
 | `sub_8258CEE0` | | Wrapped | The input processors' button tests, and the pads' values (`sub_82591B30` a logical pad's, `sub_820988B8` a physical pad's): logged by caller and pass type for `--log_input_reads` (`ITC_INPUT_READ`, `ITC_INPUT_VALUES`). Seen reading (a page-protection read watch, 2026-10-19; see "Who reads the input manager" in `docs/pause-menu-fix.md`): `sub_8258CEB0` (→ `sub_82592500`, inlined in our build) tests processor 0's pressed word (manager +2104) for `sub_82093DC0`, at boot and in the front end; `sub_8258CF10` the listeners' held word (+272) for the mappers; `sub_8258CEE0` (→ `sub_82592520`: a held bit on its first tick or repeating) processor 0's held word, counters and delay, for `sub_82093DC0`. |
 | `sub_82591B30` | | Wrapped | The input processors' button tests, and the pads' values (`sub_82591B30` a logical pad's, `sub_820988B8` a physical pad's): logged by caller and pass type for `--log_input_reads` (`ITC_INPUT_READ`, `ITC_INPUT_VALUES`). Seen reading (a page-protection read watch, 2026-10-19; see "Who reads the input manager" in `docs/pause-menu-fix.md`): `sub_8258CEB0` (→ `sub_82592500`, inlined in our build) tests processor 0's pressed word (manager +2104) for `sub_82093DC0`, at boot and in the front end; `sub_8258CF10` the listeners' held word (+272) for the mappers; `sub_8258CEE0` (→ `sub_82592520`: a held bit on its first tick or repeating) processor 0's held word, counters and delay, for `sub_82093DC0`. |
 | `sub_820988B8` | | Wrapped | The input processors' button tests, and the pads' values (`sub_82591B30` a logical pad's, `sub_820988B8` a physical pad's): logged by caller and pass type for `--log_input_reads` (`ITC_INPUT_READ`, `ITC_INPUT_VALUES`). Seen reading (a page-protection read watch, 2026-10-19; see "Who reads the input manager" in `docs/pause-menu-fix.md`): `sub_8258CEB0` (→ `sub_82592500`, inlined in our build) tests processor 0's pressed word (manager +2104) for `sub_82093DC0`, at boot and in the front end; `sub_8258CF10` the listeners' held word (+272) for the mappers; `sub_8258CEE0` (→ `sub_82592520`: a held bit on its first tick or repeating) processor 0's held word, counters and delay, for `sub_82093DC0`. |
-| `sub_8209F340` | | | In a race (callers `sub_8215FCA8`, `sub_822231B0`): find the player's physical pad through the input manager (global `0x826BAB78`, vtable slots 9 and 5) and return whether it's connected (its flags, copied by `sub_82591C08`) or whether its capabilities subtype has bit 2 (a wheel, probably). See "Who reads the input manager" in `docs/pause-menu-fix.md`. |
-| `sub_8209F3B8` | | | In a race (callers `sub_8215FCA8`, `sub_822231B0`): find the player's physical pad through the input manager (global `0x826BAB78`, vtable slots 9 and 5) and return whether it's connected (its flags, copied by `sub_82591C08`) or whether its capabilities subtype has bit 2 (a wheel, probably). See "Who reads the input manager" in `docs/pause-menu-fix.md`. |
-| `sub_82591C08` | | | In a race (callers `sub_8215FCA8`, `sub_822231B0`): find the player's physical pad through the input manager (global `0x826BAB78`, vtable slots 9 and 5) and return whether it's connected (its flags, copied by `sub_82591C08`) or whether its capabilities subtype has bit 2 (a wheel, probably). See "Who reads the input manager" in `docs/pause-menu-fix.md`. |
 | `sub_8209F5E0` | | | Resets the player-to-controller table (`826BABA4`, 4 words) to 0-3 and asks for the profile read (`826C7938` = 1). From `sub_82106548` (boot) and `sub_82221D00`. |
 | `sub_8209F6B8` | | | Puts controller r4 on player r3 in `826BABA4` (swapping with the player that had it) and asks for the profile read (`826C7938` = 1). From `sub_8209E698`, `sub_822219E0` and `sub_822221A0`. |
 | `sub_8210BA68` | | Wrapped | The action mappers' read slots (vtable `0x82007F78`; r3 the mapper, r4 the action id 151-180); logged for `--log_pause_menu` (`PAUSE_MENU_READ_SLOT`). |

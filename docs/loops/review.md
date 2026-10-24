@@ -11,6 +11,193 @@ functions to check in a drive in the progress file.
 When the user has reviewed a run's section, its heading gets
 "(reviewed <date>)"; the section stays for the record.
 
+## Run 2026-10-23 20:22 (`b7-loop-23-10-26-5`)
+
+- `ai-drivers.md` (new, 148 rows; 2 moved from `functions.md`, 146
+  new; mapped in 1eeb084), `known-data.md` (the driver, path, corner,
+  other-racer, skill and car input record layouts; the route file's
+  corners table and per-slice corner list; globals `0x826C6074`,
+  `0x826C6078`, `0x826C5B30`, `0x826D82E8`; `.rdata` tables at
+  `0x82008970`, `0x82008A08`), `track-route.md`'s intro; 2 leads (the
+  race states' route users, the drivers' callers). For review: the two
+  moved rows corrected (`sub_8213F530` is `AiPath::Update`,
+  `sub_8213D438` `AiPath::Reset`, not the speed trail); unsure names:
+  the other-racer record states 0-3, driver states 2-6, the corner
+  points at data +48 to +54, `AiDriver::KeepsGapFrom`,
+  `AiPath::RaceAllowsSides`, `AiDriver::IsFree`,
+  `AiPath::LeaderBranchKind`, `AiPath::FollowLeaderBranch`, the skill
+  block as a profile plus triggers, vehicle flags 0x81 as the player's
+  car, input flag 0x200 as reverse when stuck; ~30 rows "Not read in
+  detail" (the corner planning and avoidance math); `AiDrivers::Create`
+  zeroes the table after `AiDriver::InitPath` set its floats (the
+  game's own, kept).
+  Migration 1's rows (c94d6be..91b8da2; `--native_ai_drivers`; 74 ours,
+  24 Native): notes corrected for `sub_821390D0`, `sub_8213D438`,
+  `sub_82139B40`, `sub_82139820`, `sub_8213C5C8`, `sub_8213C630`,
+  `sub_82146408`, `sub_82139CB0`, `sub_8213ADF8`, `sub_821452A0`,
+  `sub_821454C8`, `sub_8213C010`, `sub_8213C3A8`, `sub_8213C420`,
+  `sub_8213AC70`, `sub_8213D020`. Code in `src/ai_drivers/` (strict
+  float flags), adapters `src/hooks/ai_drivers.cpp`, harness
+  `src/harnesses/ai_drivers.cpp`; the course's route builder moved,
+  unchanged, from the track_route harness into
+  `src/harnesses/test_route.h` (shared). Left on the recompiled code:
+  UpdateSteerInput's kinds 2 and 3 (`sub_8213AB40`, `sub_82139A08`,
+  never seen in play, tail-called); AllSettled and AdvanceCorners hand
+  the call back to the original when memcpy's copy can't be native (a
+  physical-view destination or a range crossing a view's end; none
+  seen in the harness). Kept: stack-passed words written to the
+  originals' frame offsets; r3 left as each original leaves it;
+  single-word float copies keep a signaling NaN's bits; StartRace and
+  LimitThrottle read the vehicle without a null check, as the
+  originals. The AI harness refills its block every fourth case (about
+  4 s to under 1 s).
+  Migration 2's rows (e01cc35..24669a4; 18 more ours, 22 adapters
+  removed: 92 ours, 46 Native): `sub_821462A0` (UpdateState's state 6,
+  never seen in play, no row) ported with UpdateState and its own
+  harness cases, said in UpdateState's row and the intro; JoinCornerPair's
+  equal-direction steps (`sub_8213BDF0`, `sub_8213BE80`, never seen in
+  play) left on the recompiled code, called by AddCornersAt's adapter
+  from the original's stack frames; SteerToTarget's row corrected (+152
+  is sin × +384 + cos × +392, not cos × +384 + sin × +392).
+  Migration 3's rows (1521ad2..18ea84b; 22 more ours, 25 adapters
+  removed: 114 ours, 71 Native; 23 new rows). Never seen in play,
+  ported from reading only with their own harness cases (no rows; the
+  file's "Not seen in play" paragraph), names guessed: UpdateSteerInput's
+  kinds 2 and 3 (`sub_8213AB40` SteerIntoCorner, `sub_82139A08`
+  SteerOutOfCorner, `sub_8213A200` SteerAtCornerPoint, `sub_82138FA8`
+  SteerByRoom, `sub_821392D8` LimitSlide), `sub_8213D898` AvoidByLane
+  (with AvoidOthers), `sub_8213F7E0` EntryWord and `sub_8213F868`
+  EntryValue (with AiSkill::TriggerStarts), and `sub_8213F9A4`,
+  `sub_8213FB98` (jump targets made functions, inside TriggerStarts and
+  TriggerEnds). Corrections: the steering steps' f1 now compared (the
+  original leaves the x difference to the target in f1 without atan2);
+  MeasureOthers skips a negative racer slot (not the list's end), and
+  its running sum and ring entry carry over between racers from entry 2
+  (kept); DropOffRouteCorners changes the last kept record only when
+  its +37 is set and more than one is kept. Kept, probably a game bug:
+  SpreadOffset (`sub_8213B890`) adds the leftover after a clamp to the
+  same entry several times, not the ones after it.
+  Migration 4's rows (fcec6fd..2ea28d9; 16 more ours, 13 adapters
+  removed: 130 ours, 84 Native). `AiDrivers::UpdateAll` keeps its
+  adapter: each driver's update goes through the pointer at +6148,
+  still recompiled targets, so the plain C++ takes a callback and the
+  adapter makes the guest call from a frame like the original's.
+  Corrections: `LeaderBranchKind` and `FollowLeaderBranch` also give
+  kind 5 (branches 1 and 5, through `sub_8213D2B8` and `sub_8213EC8C`,
+  jump targets made functions, never seen in play, ported with their
+  callers); `BranchMasksFor`'s kinds 1, 6 and 7 fall through to the
+  +32 and +48 lists' checks. r3 kept 64-bit where the original
+  sign-extends (BranchMasksFor's list address, FindSideSection's -1).
+  Harness limits: FindSideSection and CompareWith always given a
+  vehicle (the originals read it without a null check), CompareWith
+  and UpdateAll cases use finite floats in the first seven drivers.
+  Migration 5's rows (5a7f90d..2ddd638; 13 more ours, 35 adapters
+  removed: 143 ours, 119 Native). Fallbacks: when AdvanceCorners can't
+  copy natively (corner records in the physical views, never with heap
+  drivers), DropPassed, AiPath::Update, AiDriver::Update, DriveCar and
+  UpdateIdle return false first and the top adapter runs the original
+  whole. For review: `Extend`'s calls it can't make natively (the
+  +5532 normalizer when not NormalizeByLane or NormalizeByBranch,
+  AddCornersAt's join step; neither in play) go through a `PathCalls`
+  struct the top adapter (DriveCar's or UpdateIdle's) hands down, as
+  UpdateAll's +6148 calls; with that, `Extend`'s adapter was removed:
+  does it fit "its work is plain C++"? Kept, the game's: `Extend`
+  appends to the section list with no bound check (past 8 sections it
+  writes into the corner count +5162; harness routes cross at most two
+  a call). Corrections: StartRanked moves vehicles with flags 0x81 to
+  the front, not the back, and sorts only with three or more;
+  BranchMasks uses +5528's kind when +5524 is -1; UpdateIdle's reset
+  bit is 0x2. Harness: DriveCar's cases also compare the vehicle's
+  +2249 and +2424 (an "extras" mechanism); BranchMasks' cases have
+  their own 0xA3B00-byte race-data block. Still recompiled: Destroy
+  and DestroyRings (wait on `sub_820900C0`), UpdateStarting,
+  UpdateTrack and NoteFixedSections (wait on `sub_821434E8`); 22
+  adapters stay for recompiled callers in play, 2 (NormalizeByLane,
+  NormalizeByBranch) for the +5532 pointer, and UpdateAll's for the
+  +6148 targets.
+- `racer-controllers.md` (new, 26 rows; 3 moved from `functions.md`,
+  23 new; mapped in b5491fb): the per-tick code filling each car's
+  input record from the pad or the AI driver (`CarInputs::Create` and
+  `Destroy`, `PlayerControl::ReadPad`, the input recording and replay,
+  the race flow's per-state handlers, `AiDriver::Setup`);
+  `known-data.md` (the car input record is 20 bytes, +17 0 pad / 1
+  wheel / 2 AI; `0x826C5B30`, the race data's +0x59AE4 flags, the race
+  flow object, the control map, `0x826C5B4C`, `0x826C7960` and
+  `0x826C7964`); 3 leads. For review: the handlers are reached through
+  functors `sub_82160AE0` registers (a lead), so their adapters stay
+  until that table is native; the state numbers from simulating those
+  registrations, their meanings guessed (7 the race start, 23 the race,
+  22 after the finish; messages 29, 30, 34 "probably" pause and
+  replay); `sub_8209F340`, `sub_8209F3B8` named `Pad::IsConnected`,
+  `Pad::IsWheel` (`sub_82591C08` moved too); `ai-drivers.md`'s input
+  record size (18 bytes) and DriveCar's callers to correct;
+  `RacerControl::DriveByAiWithPad` (`sub_8215F7E8`) would write the
+  steering on its scale's overflow, which a clamped value can't reach
+  (kept).
+  Migration 1's rows (699bbde..7b85ae8; `--native_racer_controllers`;
+  27 of 27 ours, 15 Native; `sub_821024D0` and `sub_82591C08` Merged;
+  `sub_8215F5F0`, `sub_82160880`, `sub_82102A28`, never seen in play,
+  ported with harness cases, no rows; `ai-drivers.md`'s DriveCar and
+  UpdateIdle rows corrected). The agent ran `git checkout` on
+  uncommitted work once (batch 4, after a mutation test), against the
+  rules; it redid the same edits and committed them (a71062d), nothing
+  lost. New row: `sub_8215FC38` (RaceFlow::OnState34) drives every car
+  in attract races but isn't in `seen_in_play.txt` (found with a
+  temporary log): the coverage list may miss other attract-race paths;
+  it leaves r3 at the last racer count read (kept). Correction:
+  `RaceFlow::AllByAi` passes hold flag 1 to both callees (the cars are
+  held). For review: the input record's bytes +18 and +19 are written
+  by nothing: `PlayerControl::Update` builds the record in its stack
+  frame, so they're the frame's leftovers; native code keeps the same
+  frame offsets (the harness matches), but the leftovers under native
+  callers can differ in play from the recompiled ones (they look like
+  padding nothing reads); `DriveByAiWithPad` likewise reads its control
+  words from the frame when a control of 0 or above 30 writes nothing.
+  DriveCar's and UpdateIdle's adapter work moved into
+  `hooks::AiDriveCar` and `AiUpdateIdle` (`src/hooks/ai_drivers.h`),
+  with stand-in pointers only the racer_controllers harness sets.
+  ReadPad calls `Vehicle_GetSpeedKmh` directly (no `--capture_dir`
+  note); `PlayerInput::Read` reads mapper slots 8, 10, 12 and 14
+  through the action mappers' plain C++ when `--native_action_mappers`
+  is on (slot 5, `sub_8210BA68`, still through the vtable). Adapters
+  kept: the 8 handlers reached through the race flow's functors, and
+  `sub_82102968`, `sub_82170FF8` for recompiled callers.
+- `track-zones.md` (new, 92 rows, all new; mapped in 52cd53b): not the
+  AI's path search the lead guessed but 70 hardcoded stretches of the
+  course's route (zones, their set-ups the slot 0 of 70 vtables at
+  `0x82011AF0`), each of up to 16 route ranges (start and end (section,
+  slice), two 64-slot section lists), checked each tick against the
+  player's car; the owner at `[0x828161EC]` (`TrackZones::`); fixed-size
+  lists for 16, 64 and 128 slots; the HUD reads the flags
+  (`sub_82212F00`, `sub_82213510`, a lead). `known-data.md`:
+  `0x828161EC`, the zone and route range layouts, `0x82603274`,
+  `0x82011AF0`, `0x8200D838`. For review: `sub_820C9718`
+  (`Racers::Vehicle`) has its row here, though the race manager's (to
+  move when that's mapped); `List16::Link` and `List64::Insert` shared
+  with the camera modes and the model list; unsure: what the zones mean
+  (probably expressway route names or signs), `RouteRange::ToNeighbor`,
+  `TrackZones::Create`'s player choice (probably the second player);
+  zone 55's only range is the point (0, 0)-(0, 0), probably a
+  placeholder; `RouteRange::WithinEnds`'s "slice above -1" test as the
+  code has it.
+  Migration 1's rows (31bc1e8..a99b454; `--native_track_zones`; 92 of
+  92 ours, 9 Native): the 70 set-ups as one plain C++ function each
+  over a table of their ranges read from `generated/` (`kSetupRanges`,
+  checked against the rows), each range built at the original's stack
+  offset; `RouteRange::Init`'s row corrected (the end from r4 + 4, r5
+  not read). The coverage list misses three camera-mode functions that
+  run in attract races (`sub_82155288`, `sub_821562F8`, `sub_820FE830`,
+  seen by temporary logs, no rows: the camera modes' lead): Init,
+  AddBranch, Update and Test keep their adapters for them. For review:
+  Create's harness zeroes the owner's lists' unwritten slots before
+  comparing (copied from the set-ups' stack; in the original, its
+  callees' frame leftovers, which native Create doesn't write; nothing
+  reads them, the walks stop at the counts; the set-ups' own harness
+  compares them byte for byte); the range tests' harnesses leave out
+  cases whose walk might never end on the random route (the original
+  wouldn't return either: OnPath 29 of 1000, Test 70, Update 51,
+  Zone::Update 123 of 300, logged).
+
 ## Run 2026-10-23 17:22 (`b7-loop-23-10-26-4`)
 
 - `strings-and-font.md` (new, 35 rows; 0 moved, 35 new; mapped in
