@@ -24,7 +24,8 @@ ITC_FLAG_BOOL(native_action_mappers, true, "ITC",
               "ActionMappers::Configure, sub_8209F228; the set-up, sub_8210C078, sub_8210BB38, "
               "sub_8210BAB0, sub_8210B8A8, sub_8210B438, sub_8210AEB0, sub_8210AE60 and "
               "sub_8210AF00; the mapper's constructor, sub_8210C180; ActionMapper::Bind, "
-              "sub_8210B270 (no adapter), and InputClientList::BindAll, sub_8210AF08, with --native_heap) "
+              "sub_8210B270 (no adapter), and InputClientList::BindAll, sub_8210AF08, with --native_heap; "
+              "ActionMappers::Init, sub_8209F430, with --native_heap) "
               "natively instead of through the translated "
               "code (same results; checked by --run_harnesses=action_mappers)");
 
@@ -235,4 +236,38 @@ extern "C" REX_FUNC(sub_8210AF08) {
   });
   ctx.lr = saved_lr;
   ctx.r3.u64 = 1;
+}
+
+// ActionMappers::Init: r3 = the manager (the app object), r4 = the settings'
+// index. The list and the mappers made natively (InitCreate), then BindAll
+// through its adapter (it makes a guest call to the owner's slot +36) and
+// Configure, in the original's frame (112 bytes). The original unless the
+// heap is the allocation layer's, the mappers' constructor runs natively and
+// operator new gives every block. r3 and f1-f3 are Configure's.
+extern "C" REX_FUNC(sub_8209F430) {
+  ITC_MAPPERS_FALLBACK(8209F430)
+  uint32_t list = 0;
+  if (!hooks::NativeHeapActive() || !MapperConstructKnown(base) ||
+      !InitCreate(base, ctx.r3.u32, &list)) {
+    __imp__sub_8209F430(ctx, base);
+    return;
+  }
+  const uint32_t index = ctx.r4.u32;
+  const uint64_t saved_lr = ctx.lr;
+  guest_call::InFrame(ctx, base, 112, 0x8209F56C, [&](uint32_t) {
+    ctx.r3.u64 = list;
+    sub_8210AF08(ctx, base);
+    if (ConfigureKnown(base)) {
+      double f[3] = {ctx.f1.f64, ctx.f2.f64, ctx.f3.f64};
+      ctx.r3.u64 = Configure(base, index, f);
+      ctx.f1.f64 = f[0];
+      ctx.f2.f64 = f[1];
+      ctx.f3.f64 = f[2];
+    } else {
+      ctx.r3.u64 = index;
+      ctx.lr = 0x8209F574;
+      sub_8209F228(ctx, base);
+    }
+  });
+  ctx.lr = saved_lr;
 }

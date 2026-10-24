@@ -243,4 +243,15 @@ void MapperConstruct(uint8_t* base, uint32_t mapper, uint32_t player);
 bool MapperBindKnown(uint8_t* base, uint32_t mapper, uint32_t object);
 uint32_t MapperBind(uint8_t* base, uint32_t mapper, uint32_t object);
 
+// ActionMappers::Init (sub_8209F430), its own work before the binding: the
+// manager (r3; the app object, whose slot +36 gives the input manager) kept
+// at [0x826BAB78]; the client list (52 bytes from operator new,
+// InputClientList with the manager) at [0x826BAB7C]; four mappers (2,896
+// bytes each, the constructor with players 0-3) into the table at
+// [0x826BAB80] + 8j; each added to the list. `list` gets the list. False
+// (nothing kept, nothing changed) when operator new doesn't give every
+// block: the adapter runs the original. The rest (InputClientList::BindAll,
+// a guest call, then ActionMappers::Configure) is the adapter's.
+bool InitCreate(uint8_t* base, uint32_t manager, uint32_t* list);
+
 }  // namespace action_mappers
