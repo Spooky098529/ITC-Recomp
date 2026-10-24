@@ -608,6 +608,35 @@ void MarkerConstruct(uint8_t* base, uint32_t marker);
 // +124 of each of the 200 entries (144 bytes from +128), at +28,972,
 // +29,004, +29,020 and +29,036 to +29,820.
 void SparksConstruct(uint8_t* base, uint32_t sparks);
+// ParticlesB::ParticlesB (sub_8212BFE8): Overlay::Overlay, vtable
+// 0x82008720; 1.0 at +12 to +76 (every 16 bytes) of each of the 15 entries
+// (176 bytes from +128) and each entry's 48-byte particle (+128) constructed
+// (Particle::Particle through the array helper, c_runtime::VectorConstruct),
+// then 1.0 at +2,796 and +2,812.
+void ParticlesBConstruct(uint8_t* base, uint32_t particles);
+
+// --- The two children's destructors with particle arrays ---
+//
+// The plain destructors put their vtable back, destroy each particle array
+// through the array helper (c_runtime::VectorDestruct with the empty
+// destructor, 0x82106540: nothing is called) and put the base vtable back
+// (Overlay::Overlay); they return the object. The deleting ones (slot 0)
+// then free the object (operator delete) when bit 0 of `flags` is set; they
+// return false, with nothing done, when that block isn't one the allocation
+// layer gave (free's error path, the original's). Their adapters call them
+// only while the game's heap is the layer's (hooks::NativeHeapActive).
+
+// Smoke::~Smoke (sub_8212B288): vtable 0x820086F4, the ten 48-byte
+// particles at +240 of each of the 45 emitters (720 bytes from +128),
+// last emitter first.
+void SmokeDestruct(uint8_t* base, uint32_t smoke);
+// Smoke's deleting destructor (sub_8212B358).
+bool SmokeDeletingDestructor(uint8_t* base, uint32_t smoke, uint32_t flags);
+// ParticlesB::~ParticlesB (sub_8212BF88): vtable 0x82008720, the particle
+// at +128 of each of the 15 entries, last first.
+void ParticlesBDestruct(uint8_t* base, uint32_t particles);
+// ParticlesB's deleting destructor (sub_8212C070).
+bool ParticlesBDeletingDestructor(uint8_t* base, uint32_t particles, uint32_t flags);
 
 // Smoke::Reset (sub_8212A9E0): +32,528 to +32,536 0, +32,544, +32,560 and
 // +32,576 unit vectors, then each of the +104 emitters (720 bytes from

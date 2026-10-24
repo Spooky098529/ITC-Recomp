@@ -3,10 +3,13 @@
 #include "guest.h"
 
 #include "base/log.h"
+#include "c_runtime/arrays.h"
 #include "c_runtime/math.h"
 #include "c_runtime/strings.h"
 #include "debug/frame_state_diff.h"
 #include "hooks/vehicle.h"
+#include "memory/c_runtime_heap.h"
+#include "memory/heap.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
 #include <rex/platform/fpscr.h>
@@ -2090,6 +2093,76 @@ void SparksConstruct(uint8_t* base, uint32_t sparks) {
   for (uint32_t i = 0; i < 50; i++) {
     ApplyStores(base, sparks + 29036 + 16 * i, {{0, 'o'}});
   }
+}
+
+namespace {
+
+constexpr uint32_t kSmokeVtable = 0x820086F4;
+constexpr uint32_t kParticlesBVtable = 0x82008720;
+constexpr uint32_t kParticleConstructor = 0x8212B3D0;  // Particle::Particle
+constexpr uint32_t kEmptyDestructor = 0x82106540;      // blr
+
+// The deleting destructors' frees: 0 or a block the layer gave.
+bool Deletable(uint32_t block) {
+  return block == 0 || memory::IsHeapBlock(block);
+}
+
+}  // namespace
+
+void ParticlesBConstruct(uint8_t* base, uint32_t particles) {
+  ITC_NATIVE_RUNNING("sub_8212BFE8 ParticlesB::ParticlesB");
+  ConstructOverlay(base, particles, kParticlesBVtable);
+  for (uint32_t i = 0; i < 15; i++) {
+    const uint32_t entry = particles + 128 + 176 * i;
+    ApplyStores(base, entry, {{12, 'o'}, {28, 'o'}, {44, 'o'}, {60, 'o'}, {76, 'o'}});
+    // Particle::Particle is native, so the helper calls no guest code.
+    c_runtime::VectorConstruct(base, entry + 128, 48, 1, kParticleConstructor, nullptr, nullptr);
+  }
+  ApplyStores(base, particles, {{2796, 'o'}, {2812, 'o'}});
+}
+
+void SmokeDestruct(uint8_t* base, uint32_t smoke) {
+  ITC_NATIVE_RUNNING("sub_8212B288 Smoke::~Smoke");
+  guest::StoreU32(base, smoke, kSmokeVtable);
+  for (int32_t i = 44; i >= 0; i--) {
+    c_runtime::VectorDestruct(base, smoke + 128 + 720 * uint32_t(i) + 240, 48, 10,
+                              kEmptyDestructor, nullptr, nullptr);
+  }
+  OverlayConstruct(base, smoke);
+}
+
+bool SmokeDeletingDestructor(uint8_t* base, uint32_t smoke, uint32_t flags) {
+  ITC_NATIVE_RUNNING("sub_8212B358 Smoke::~Smoke (deleting)");
+  if ((flags & 1) != 0 && !Deletable(smoke)) {
+    return false;
+  }
+  SmokeDestruct(base, smoke);
+  if ((flags & 1) != 0) {
+    memory::crt::OperatorDelete(smoke);
+  }
+  return true;
+}
+
+void ParticlesBDestruct(uint8_t* base, uint32_t particles) {
+  ITC_NATIVE_RUNNING("sub_8212BF88 ParticlesB::~ParticlesB");
+  guest::StoreU32(base, particles, kParticlesBVtable);
+  for (int32_t i = 14; i >= 0; i--) {
+    c_runtime::VectorDestruct(base, particles + 128 + 176 * uint32_t(i) + 128, 48, 1,
+                              kEmptyDestructor, nullptr, nullptr);
+  }
+  OverlayConstruct(base, particles);
+}
+
+bool ParticlesBDeletingDestructor(uint8_t* base, uint32_t particles, uint32_t flags) {
+  ITC_NATIVE_RUNNING("sub_8212C070 ParticlesB::~ParticlesB (deleting)");
+  if ((flags & 1) != 0 && !Deletable(particles)) {
+    return false;
+  }
+  ParticlesBDestruct(base, particles);
+  if ((flags & 1) != 0) {
+    memory::crt::OperatorDelete(particles);
+  }
+  return true;
 }
 
 void SmokeReset(uint8_t* base, uint32_t smoke) {
